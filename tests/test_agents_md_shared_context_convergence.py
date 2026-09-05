@@ -40,8 +40,14 @@ def loaded_config():
     return config, provider_config
 
 
+# Every provider sharing context_file AGENTS.md (config/ai-providers.yaml).
+# Codex/ZCode/KimiCode joined the shared-context group in 2026-09 — the #638
+# union logic must cover ALL sharers, not just the two that existed then.
+_AGENTS_MD_SHARERS = ("Opencode", "Gemini", "Codex", "ZCode", "KimiCode")
+
+
 def test_shared_managed_block_identical_regardless_of_provider(loaded_config):
-    """The two providers sharing AGENTS.md must render byte-identical content."""
+    """All providers sharing AGENTS.md must render byte-identical content."""
     from lib.context import _build_managed_block
     from lib.log import SyncLog
 
@@ -53,12 +59,14 @@ def test_shared_managed_block_identical_regardless_of_provider(loaded_config):
             REPO_ROOT, config, dict(variables), SyncLog(),
             provider=provider, provider_config=provider_config, project_root=REPO_ROOT,
         )
-        for provider in ("Opencode", "Gemini")
+        for provider in _AGENTS_MD_SHARERS
     }
-    assert rendered["Opencode"] == rendered["Gemini"], (
-        "Opencode and Gemini must render an identical AGENTS.md managed block "
-        "-- any divergence means a lone sync.py --check run will report a "
-        "permanent, unfixable false 'out of sync' (issue #638)."
+    baseline = rendered[_AGENTS_MD_SHARERS[0]]
+    diverged = [p for p, block in rendered.items() if block != baseline]
+    assert not diverged, (
+        f"AGENTS.md sharers {diverged} render a different managed block than "
+        f"{_AGENTS_MD_SHARERS[0]} -- any divergence means a lone sync.py --check "
+        f"run will report a permanent, unfixable false 'out of sync' (issue #638)."
     )
 
 
@@ -84,16 +92,16 @@ def test_repeated_sync_never_reports_pending_agents_md_change(tmp_path, loaded_c
         )
         return log
 
-    # Full convergence sync (both shared providers, real write).
-    sync_once("Opencode", dry_run=False)
-    sync_once("Gemini", dry_run=False)
+    # Full convergence sync (all shared providers, real write).
+    for provider in _AGENTS_MD_SHARERS:
+        sync_once(provider, dry_run=False)
     converged = (project_root / "AGENTS.md").read_text(encoding="utf-8")
 
     # Now emulate `--check`/`--dry-run`: each shared provider re-renders
     # independently against the already-converged file. Neither may log an
     # AGENTS.md UPDATE action -- that action count is exactly what --check
     # exits non-zero on.
-    for provider in ("Opencode", "Gemini"):
+    for provider in _AGENTS_MD_SHARERS:
         log = sync_once(provider, dry_run=True)
         agents_md_updates = [
             a for a in log.actions if "AGENTS.md" in a and "UPDATE" in a

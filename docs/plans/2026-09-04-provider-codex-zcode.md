@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Date** | 2026-09-04 (extended with Kimi Code, 2026-09-04) |
-| **Status** | PLANNED (analysis + plan only — no implementation in this step) |
+| **Status** | IMPLEMENTED (2026-09-04/05, branch feat/provider-codex-zcode-kimicode; see docs/plans/2026-09-04-verification-results.md for the V1–V18 corrections applied) |
 | **Scope** | Framework-level provider support in `scripts/sync.py` + config registries (three providers: Codex, ZCode, Kimi Code) |
 | **Issues** | — (new work; references #505, #629, #630, #631, #625) |
 | **Estimate** | 5.1 / 11.1 / 22.25 pd raw (opt/likely/pess) → **≈ 16.5 pd with 1.5× buffer**, 3–4 calendar weeks (1 dev) |

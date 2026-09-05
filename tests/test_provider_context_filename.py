@@ -28,5 +28,17 @@ def test_explicit_context_file_is_never_overridden():
     assert resolve_context_filename("MAMMOUTH.md", "Mammouth") == "MAMMOUTH.md"
 
 
+def test_agents_md_providers_passthrough_codex_zcode_kimicode():
+    """Codex/ZCode/KimiCode share Gemini/Opencode's AGENTS.md context_file —
+    the explicit value must pass through unchanged (no CLAUDE.md fallback)."""
+    assert resolve_context_filename("AGENTS.md", "Codex") == "AGENTS.md"
+    assert resolve_context_filename("AGENTS.md", "ZCode") == "AGENTS.md"
+    assert resolve_context_filename("AGENTS.md", "KimiCode") == "AGENTS.md"
+    # And the fallback path (raw CLAUDE.md default) maps them onto AGENTS.md too.
+    assert resolve_context_filename("CLAUDE.md", "Codex") == "AGENTS.md"
+    assert resolve_context_filename("CLAUDE.md", "ZCode") == "AGENTS.md"
+    assert resolve_context_filename("CLAUDE.md", "KimiCode") == "AGENTS.md"
+
+
 def test_empty_and_none_like_values_pass_through():
     assert resolve_context_filename("", "Opencode") == ""

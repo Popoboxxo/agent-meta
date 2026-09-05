@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from .agent_toml import build_agent_toml_document
 from .frontmatter import (
     _parse_frontmatter_yaml,
     _remove_frontmatter_fields,
@@ -192,6 +193,11 @@ def _apply_agent_transform(
       frontmatter-mechanism: opencode-native
                                        — build opencode-native frontmatter instead
                                          of the inject/strip steps above
+      frontmatter-mechanism: codex-toml
+                                       — build a Codex-native TOML agent document
+                                         (name/description/model/extra-fields +
+                                         the body as developer_instructions)
+                                         instead of Markdown+YAML frontmatter
     """
     from .roles import (
         load_roles_config,
@@ -242,6 +248,32 @@ def _apply_agent_transform(
         return _transform_frontmatter_for_opencode(
             content, name, description, model, steps, generated_from, agent_meta_root, temperature,
             strip_fields=strip_fields,
+        )
+
+    # --- codex-toml document: native TOML agent file, handled wholesale ---
+    # Codex agents are TOML files (.codex/agents/*.toml, auto-loaded by the
+    # harness): the document is built from name/description/model plus the
+    # extra-fields and the Markdown body as developer_instructions (the
+    # required body field per the verified Codex agent schema). Sampling
+    # fields (temperature/max_tokens/steps) are deliberately NOT resolved —
+    # the Codex agent TOML has no such verified fields — and tools are not
+    # validated either (the mechanism spec declares `tools: skip`: the
+    # document format has no tools field).
+    if spec.get('frontmatter-mechanism') == 'codex-toml':
+        model = resolve_model(role, config, agent_meta_root,
+                              provider=provider, provider_config=provider_config, log=log)
+        if model:
+            _model_note(model)
+        _fm = _parse_frontmatter_yaml(content)
+        body = _strip_frontmatter(content)
+        if spec.get('strip-claude-lines'):
+            body = _strip_claude_specific_lines(body)
+        extra_fields = dict(spec.get('extra-fields') or {})
+        return build_agent_toml_document(
+            name=name, description=description, model=model or "",
+            extra_fields=extra_fields, body=body,
+            version=str(_fm.get("version")) if _fm.get("version") is not None else None,
+            generated_from=generated_from or None,
         )
 
     # --- 1. model ---

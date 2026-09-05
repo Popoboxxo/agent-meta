@@ -40,3 +40,41 @@ bootstrap:
     mechanism: "file-based"
     action: "none"
     description: "Agenten in .mammouth/agents/ werden dateibasiert bereitgestellt — kein Session-Bootstrap nötig."
+
+  Codex:
+    mechanism: "file-based"
+    action: "none"
+    description: "Agenten in .codex/agents/*.toml werden automatisch geladen (V7, 2026-09-04: personal- + project-scoped Config-Layer, kein Registrierungs-Schritt; multi_agent stable default-on)."
+
+  ZCode:
+    # mechanism "api-based" is the legacy dispatch name of BootstrapEngine for
+    # "inject bootstrap instructions into the context file" (same handler as
+    # Gemini). ZCode uses a STATIC instruction text (instructions_mode: static)
+    # instead of Gemini's generated per-agent roster.
+    mechanism: "api-based"
+    action: "inject-bootstrap-instructions"
+    instructions_mode: "static"
+    instructions: |
+      ## Agent Bootstrap — Session-Start Pflicht
+
+      ZCode lädt Workspace-Level `.zcode/agents/` NICHT automatisch als
+      Subagent-Roster (verifizierter Auto-Load nur user-level `~/.zcode/agents/`,
+      V18 2026-09-04; Workspace-Auto-Load = offener P6 real-repo-test).
+
+      **Führe folgende Schritte zu Beginn JEDER Session aus:**
+
+      1. Lies alle `.md`-Dateien in `.zcode/agents/`.
+      2. Registriere jeden Agenten unter seinem Dateinamen (ohne `.md`) als
+         verfügbaren Subagenten in deinem Kontext (Prompt-Registrierung —
+         es gibt KEINE define_subagent-API; Auswahl später über den
+         `Agent`-Toolcall mit `subagent_type` bzw. dem registrierten Namen).
+      3. Erst danach: Bearbeite User-Anfragen (Delegation an Orchestrator etc.).
+
+      > **Ohne diese Registrierung existieren die Agenten NICHT im Roster**
+      > und der Orchestrator kann nicht delegieren.
+    description: "Agenten werden als Dateien generiert (.zcode/agents/*.md) und via Bootstrap-Injection in AGENTS.md als Roster registriert — Workspace-Auto-Load unverified (V18)."
+
+  KimiCode:
+    mechanism: "file-based"
+    action: "none"
+    description: "Kimi Code discoverte Custom Agents automatisch neben den Built-ins (V16, 2026-09-04: explicit > project .kimi-code/agents/ > extra dirs > user > plugin > built-in) — kein Session-Bootstrap nötig."

@@ -66,7 +66,8 @@ def test_provider_supports_skill_channel_claude_with_skills_dir():
     assert provider_supports_skill_channel("Claude", {"skills_dir": ".claude/skills"}) is True
 
 
-@pytest.mark.parametrize("provider", ["Gemini", "Copilot", "Mammouth", "Continue"])
+@pytest.mark.parametrize("provider", ["Gemini", "Copilot", "Mammouth", "Continue",
+                                      "Codex", "ZCode", "KimiCode"])
 def test_provider_supports_skill_channel_excludes_non_allowlisted(provider):
     assert provider_supports_skill_channel(provider, {"skills_dir": f".{provider.lower()}/skills"}) is False
 

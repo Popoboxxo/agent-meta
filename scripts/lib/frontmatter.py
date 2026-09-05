@@ -372,10 +372,16 @@ def inject_model_field(content: str, model: str) -> str:
         content, count=1, flags=re.MULTILINE,
     )
 
-def target_filename(role: str, role_map: dict) -> str | None:
-    """Return the output filename for a role, or None if not in role_map."""
+def target_filename(role: str, role_map: dict, ext: str = ".md") -> str | None:
+    """Return the output filename for a role, or None if not in role_map.
+
+    ext: output file extension. Callers writing a provider's agent files
+    pass the provider's ``agent_ext`` config value (default ``.md``); a
+    provider with a native non-Markdown agent format (Codex: ``.toml``)
+    thereby gets its files named ``<name>.toml``.
+    """
     name = role_map.get(role)
-    return (name + ".md") if name else None
+    return (name + ext) if name else None
 
 def ext_target_filename(role: str, prefix: str) -> str:
     """Extension file name: <prefix>-<role>-ext.md (or <role>-ext.md if no prefix)."""

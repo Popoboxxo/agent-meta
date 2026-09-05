@@ -2,6 +2,7 @@
 
 Führt provider-spezifische Bootstrap-Aktionen nach Agent-Generierung aus:
 - Gemini: Erzeugt define_subagent Instruktionen
+- ZCode: Injiziert statische Roster-Registrierungs-Instruktionen
 - Continue: Erzeugt Config-Update Instruktionen
 
 Usage:
@@ -100,13 +101,23 @@ class BootstrapEngine:
         agents_label: str | None = None,
     ) -> dict[str, Any]:
         """Inject session-start bootstrap instructions into the provider's
-        context file (e.g. GEMINI.md) for API-based providers (Gemini).
+        context file (e.g. GEMINI.md or the provider's AGENTS.md) for
+        api-based providers (Gemini, ZCode).
 
         Issue #628: moved here from provider_transform.py's bespoke
         _inject_gemini_bootstrap so agent_sync.py has one unified bootstrap
         call site (like Continue's config-based path already had) instead of
         a special-cased direct call. Only handles the
         "inject-bootstrap-instructions" action.
+
+        Instruction sources, selected via the provider-bootstrap.yaml entry:
+        - ``instructions_mode: static`` + non-empty ``instructions``: the
+          registry's static text is injected verbatim (trailing newlines
+          stripped) — no per-agent roster generation (no agents_dir.glob).
+          Used by ZCode, whose harness has no define_subagent API.
+        - default (no ``instructions_mode``, i.e. Gemini): the per-agent
+          roster is generated from ``agents_dir`` via
+          generate_gemini_bootstrap_instructions().
         """
         if config.get("action") != "inject-bootstrap-instructions":
             return {"status": "skipped", "reason": f"unsupported action for {provider}: {config.get('action')}"}
@@ -114,11 +125,17 @@ class BootstrapEngine:
         if project_root is None:
             return {"status": "error", "reason": "project_root required for api-based bootstrap"}
 
-        instructions = self.generate_gemini_bootstrap_instructions(
-            agents_dir, compact=compact, agents_label=agents_label or agents_dir.name
-        )
-        if not instructions:
-            return {"status": "skipped", "reason": "no agents found"}
+        static_instructions = config.get("instructions")
+        if config.get("instructions_mode") == "static" and static_instructions:
+            # Static mode (e.g. ZCode): inject the registry text verbatim —
+            # the generated-per-agent path (agents_dir.glob) is skipped.
+            instructions = static_instructions.rstrip("\n")
+        else:
+            instructions = self.generate_gemini_bootstrap_instructions(
+                agents_dir, compact=compact, agents_label=agents_label or agents_dir.name
+            )
+            if not instructions:
+                return {"status": "skipped", "reason": "no agents found"}
 
         context_file = context_file or ".gemini/GEMINI.md"
         # Path-traversal guard: context_file must resolve inside project_root.

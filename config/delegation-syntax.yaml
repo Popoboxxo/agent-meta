@@ -102,3 +102,46 @@ delegation_syntax:
     auto_parallel: false
     parallel_pattern: "**Parallel-Pattern:**\nMammouth Code unterstützt keine native parallele Subagent-Ausführung.\nFühre parallele Schritte sequentiell aus oder verwende separate Mammouth-Sessions.\n"
     handoff: *handoff-yaml
+
+  # Codex (V7, 2026-09-04): native dispatch surface is spawn_agent +
+  # send_input/resume_agent/wait_agent/close_agent; multi_agent is stable
+  # default-on, so fan-out is multiple spawn_agent calls in one response.
+  # JSON handoff (handoff_envelope_support: true).
+  Codex:
+    delegate: "Delegiere via nativen `spawn_agent`-Toolcall an `<ziel-agent>` mit der Aufgabe: \"<vollständiger-task-text>\". Kontrolliere das Ergebnis via `wait_agent`."
+    fanout: "FANOUT — Alle spawn_agent-Calls in EINER Antwort absetzen (multi_agent ist stable default-on):\n```\nspawn_agent(agent=\"<agent_1>\", task=\"<task_1>\")\nspawn_agent(agent=\"<agent_2>\", task=\"<task_2>\")\n```\nErgebnisse via `wait_agent` einsammeln."
+    parallel_group: "PARALLEL_GROUP — Mehrere spawn_agent-Calls in einer Antwort; `wait_agent` sammelt alle Ergebnisse ein."
+    fallback: "Bearbeite: <task>"
+    bootstrap: "file-based"
+    tool_preamble: "false"
+    auto_parallel: false
+    parallel_pattern: "**Parallel-Pattern (konkret):**\n```\nspawn_agent(agent=\"developer\", task=\"Fix A\")\nspawn_agent(agent=\"tester\", task=\"Tests für B\")\nwait_agent(...)  # Ergebnisse einsammeln\n```\n"
+    handoff: *handoff-json
+
+  # ZCode (V17, 2026-09-04): dispatch tool is Agent (legacy alias Task);
+  # background execution via run_in_background + subagents.autoBackgroundMs.
+  # Conservative YAML text-block handoff (handoff_envelope_support: false).
+  ZCode:
+    delegate: "Delegiere via `Agent(subagent_type=\"<ziel-agent>\", prompt=\"<vollständiger-task-text>\")`. Für Hintergrund-Ausführung `run_in_background: true` setzen (Auto-Backgrounding via subagents.autoBackgroundMs, Ergebnis über /tasks)."
+    fanout: "FANOUT — Alle Agent-Calls in EINER Antwort absetzen:\n```\nAgent(subagent_type=\"<agent_1>\", prompt=\"<task_1>\")\nAgent(subagent_type=\"<agent_2>\", prompt=\"<task_2>\")\n```"
+    parallel_group: "PARALLEL_GROUP — Vordergrund-Calls normal, Hintergrund-Calls mit `run_in_background: true`; alle Calls in derselben Antwort absetzen."
+    fallback: "Bearbeite: <task>"
+    bootstrap: "file-based"
+    tool_preamble: "false"
+    auto_parallel: false
+    parallel_pattern: "**Parallel-Pattern (konkret):**\n```\nAgent(subagent_type=\"validator\", prompt=\"DoD-Check für ...\")\nAgent(subagent_type=\"documenter\", prompt=\"Update CODEBASE_OVERVIEW ...\", run_in_background=true)\n# Hintergrund-Ergebnis später über /tasks abholen\n```\n"
+    handoff: *handoff-yaml
+
+  # Kimi Code (V16, 2026-09-04): Agent for single dispatch, AgentSwarm for
+  # uniform fan-out (prompt_template + items, up to 128, aggregated report).
+  # Conservative YAML text-block handoff (handoff_envelope_support: false).
+  KimiCode:
+    delegate: "Delegiere via `Agent(prompt=\"<vollständiger-task-text>\", description=\"<kurzbeschreibung>\", subagent_type=\"<ziel-agent>\")`."
+    fanout: "FANOUT — Für gleichförmige Fan-out-Aufgaben `AgentSwarm` nutzen:\n```\nAgentSwarm(prompt_template=\"<task_template>\", items=[<item_1>, <item_2>, ...])\n```\n(bis 128 Items, aggregierter Report). Alternativ mehrere Agent-Calls in einer Antwort."
+    parallel_group: "PARALLEL_GROUP — AgentSwarm mit prompt_template + items-Array für den Fan-out; einzelne abweichende Aufgaben als separate Agent-Calls in derselben Antwort."
+    fallback: "Bearbeite: <task>"
+    bootstrap: "file-based"
+    tool_preamble: "false"
+    auto_parallel: false
+    parallel_pattern: "**Parallel-Pattern (konkret):**\n```\nAgentSwarm(prompt_template=\"Review {item}\", items=[\"modul_a\", \"modul_b\", \"modul_c\"])\n# einziger Toolcall pro Response, aggregierter Report\n```\n"
+    handoff: *handoff-yaml

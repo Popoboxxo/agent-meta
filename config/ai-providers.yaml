@@ -419,3 +419,181 @@ providers:
         - stop_sequences
         - max_output_tokens
       strip-claude-lines: true
+
+  Codex:
+    agents_dir: .codex/agents
+    agent_ext: .toml
+    context_file: AGENTS.md
+    context_template: templates/configs/AGENTS.project-template.md
+    has_rules: true
+    rules_dir: rules            # Codex reads a project-root rules/ dir (.rules files; exact naming convention = P6 check)
+    has_hooks: true
+    # hooks_dir is a PATH RESERVATION only (path-collision test coverage, see
+    # tests/test_provider_hooks_config.py). Deliberately NO hook_protocol: the
+    # Codex hook payload contract is verified (V1, 2026-09-04: stdin JSON,
+    # sync blocking, hooks.json + inline [hooks], 12 Claude-identical event
+    # names) but NOT 1:1 Claude-compatible — continue/stopReason/suppressOutput
+    # are unsupported for PreToolUse/PermissionRequest, and Codex skips
+    # non-hash-trusted hooks until an interactive /hooks review, so mirrored
+    # scripts would not run by default (#630 pattern). Set hook_protocol once
+    # the deviations are handled.
+    hooks_dir: .codex/hooks
+    has_commands: false         # slash-command surface unverified — P6 item
+    has_settings: false         # no settings.json — everything lives in .codex/config.toml (V8)
+    capabilities:
+      - agents
+      - rules
+      - hooks
+      - snippets
+      - skills
+      - context-managed-block
+    artifact_dir: .codex/artifacts
+    checkpoint_dir: .meta-viz
+    isolation-dirs:
+      - .codex/
+      - AGENTS.md
+    bash_tool_name: Bash        # V4 (2026-09-04): canonical hook/matcher name; apply_patch matches as Edit/Write alias
+    gitignore_entries:
+      - .codex/pending-tasks.md
+    mcp-config:
+      # NO secrets-file: Codex has no include/import mechanism for a second
+      # TOML file (V8, 2026-09-04) — the documented secrets strategy is
+      # env-var indirection in the committed config.toml.
+      committed-file: .codex/config.toml
+      format: codex-toml-mcp
+    skills_dir: .agents/skills  # Codex reads user -> repo -> directory (repo-level .agents/skills)
+    snippets_dir: .codex/snippets
+    pending_tasks_file: .codex/pending-tasks.md
+    extension_dir: .codex/3-project
+    orchestrator_hint: "- **In Codex:** Use the orchestrator agent."
+    # Model tiers per plan §4.3 (GPT-5.x family, state 2026-09)
+    model-tiers:
+      nano:     gpt-5.4-mini
+      fast:     gpt-5.4
+      balanced: gpt-5.3-codex-spark
+      powerful: gpt-5.5
+      max:      gpt-5.6
+    model-aliases:
+      sol:   gpt-5.6-sol
+      terra: gpt-5.6-terra
+      luna:  gpt-5.6-luna
+    # Data-driven agent transform (issue #629). Codex agents are TOML files
+    # (.codex/agents/*.toml, auto-loaded — V7): the codex-toml frontmatter
+    # mechanism builds the native TOML document (name, description, model,
+    # sandbox_mode, developer_instructions — V7 correction: the required
+    # body field is developer_instructions, NOT instructions).
+    agent-transform:
+      frontmatter-mechanism: codex-toml
+      model: inject
+      extra-fields:
+        sandbox_mode: workspace-write
+      tools: skip
+      strip-claude-lines: true
+
+  ZCode:
+    agents_dir: .zcode/agents
+    agent_ext: .md
+    context_file: AGENTS.md
+    context_template: templates/configs/AGENTS.project-template.md
+    has_rules: false            # unverified
+    has_hooks: false            # project-level hooks are IGNORED by the harness (V2: config_project_hooks_ignored) — hooks only via plugin or user level
+    has_commands: false         # commands surface verified (V2) but no sync adapter yet — grows with P6
+    has_settings: true
+    settings_file: .zcode/config.json   # canonical workspace config (V6); models are UI-managed in ~/.zcode/v2/config.json (V9) — no settings_template
+    capabilities:
+      - agents
+      - settings
+      - mcp
+      - context-managed-block
+    artifact_dir: .zcode/artifacts
+    checkpoint_dir: .meta-viz
+    isolation-dirs:
+      - .zcode/
+      - AGENTS.md
+    bash_tool_name: Bash        # V5 (2026-09-04): 9 built-ins + Agent dispatch, all 1:1 names
+    gitignore_entries:
+      - .zcode/pending-tasks.md
+    mcp-config:
+      # ZCode workspace MCP lives under the NESTED key `mcp.servers` in
+      # .zcode/config.json (V2, 2026-09-04). User-level config wins, no merge.
+      committed-file: .zcode/config.json
+      format: zcode-json
+    skills_dir: .zcode/skills   # verified V2 (workspace scope) — capability growth with P6
+    snippets_dir: .zcode/snippets
+    pending_tasks_file: .zcode/pending-tasks.md
+    extension_dir: .zcode/3-project
+    orchestrator_hint: "- **In ZCode:** Use the orchestrator agent."
+    # V9 (2026-09-04): verified built-in IDs glm-5.3 + glm-5.3-flash.
+    # model.lite -> nano/fast tier, model.main -> balanced/powerful/max.
+    model-tiers:
+      nano:     glm-5.3-flash
+      fast:     glm-5.3-flash
+      balanced: glm-5.3
+      powerful: glm-5.3
+      max:      glm-5.3
+    model-aliases: {}
+    # V9 revision: ZCode subagent files support a `model` frontmatter field
+    # (ID or inherit) — per-role models resolve directly in the generated
+    # agent files, so model is INJECTED (not skipped as plan §5.3 sketched).
+    # Unknown frontmatter keys are ignored by the harness (V2).
+    agent-transform:
+      model: inject
+      tools: skip
+      strip-fields: [memory, permissionMode, temperature, top_p, top_k, stop_sequences, max_output_tokens]
+      strip-claude-lines: true
+
+  KimiCode:
+    # Registry key KimiCode stays unambiguous vs. the existing Opencode model
+    # aliases kimi/kimi-code (see Opencode block model-aliases). Generated
+    # paths are lowercase .kimi-code/ (V10 cross-cutting correction — NEVER
+    # .kimi/ and never the cross-tool .agents/ convention).
+    agents_dir: .kimi-code/agents
+    agent_ext: .md
+    context_file: AGENTS.md
+    context_template: templates/configs/AGENTS.project-template.md
+    has_rules: false            # unverified
+    has_hooks: false            # hooks are configured via [[hooks]] in user-level ~/.kimi-code/config.toml only (V11) — no hooks-dir mechanism, no project-level generation
+    has_commands: false         # unverified
+    has_settings: false         # V15: project-level config (.kimi-code/local.toml) is machine-specific — deferred until a real need is verified
+    capabilities:
+      - agents
+      - mcp
+      - context-managed-block
+    artifact_dir: .kimi-code/artifacts
+    checkpoint_dir: .meta-viz
+    isolation-dirs:
+      - .kimi-code/
+      - AGENTS.md
+    bash_tool_name: Bash        # V14 (2026-09-04): exact case-sensitive name, 4 doc sources
+    gitignore_entries:
+      - .kimi-code/pending-tasks.md
+    mcp-config:
+      # Kimi Code reads {"mcpServers": {...}} from .kimi-code/mcp.json —
+      # wire-identical top-level key to the existing claude-settings JSON
+      # branch (V13, 2026-09-04: reuse beats a new format branch). No
+      # separate secrets file — Kimi-native env indirection via
+      # bearerTokenEnvVar / env (P6 detail).
+      committed-file: .kimi-code/mcp.json
+      format: claude-settings
+    skills_dir: .kimi-code/skills   # verified V12 — capability growth with P6
+    snippets_dir: .kimi-code/snippets
+    pending_tasks_file: .kimi-code/pending-tasks.md
+    extension_dir: .kimi-code/3-project
+    orchestrator_hint: "- **In Kimi Code:** Use the orchestrator agent."
+    # Kimi K2.x model IDs per plan §6.5 / opencode-go catalog — exact IDs verified in P6
+    model-tiers:
+      nano:     kimi-k2.6
+      fast:     kimi-k2.6
+      balanced: kimi-k2.7-code
+      powerful: kimi-k2.7-code
+      max:      kimi-k2.7-code
+    model-aliases: {}
+    # Option A posture (V10 determined, 2026-09-04): Kimi agents are plain
+    # Markdown + YAML frontmatter (name/description/whenToUse/tools/...,
+    # unknown fields ignored) — DEFAULT transform path, no new
+    # frontmatter-mechanism value.
+    agent-transform:
+      model: inject
+      tools: keep
+      strip-fields: [memory, temperature, top_p, top_k, stop_sequences, max_output_tokens]
+      strip-claude-lines: true

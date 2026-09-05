@@ -61,6 +61,34 @@ Normal:
         powerful: opencode-go/kimi-k2.6
         max: opencode-go/kimi-k2.7-code
         ultra: opencode-go/kimi-k3
+    # New-provider entries (Codex/ZCode/KimiCode, 2026-09): 1:1 mirrors of the
+    # `model-tiers` tables in config/ai-providers.yaml. Without them the preset
+    # global `tiers:` above (a Claude-centric legacy curve) silently injected
+    # claude-* model IDs into these providers' agents. Known gap: the other
+    # presets (Cheap/Advanced/...) have no entries for these providers yet —
+    # under those presets they fall back to the global curve until someone
+    # defines their per-preset remapping.
+    Codex:
+      tiers:
+        nano: gpt-5.4-mini
+        fast: gpt-5.4
+        balanced: gpt-5.3-codex-spark
+        powerful: gpt-5.5
+        max: gpt-5.6
+    ZCode:
+      tiers:
+        nano: glm-5.3-flash
+        fast: glm-5.3-flash
+        balanced: glm-5.3
+        powerful: glm-5.3
+        max: glm-5.3
+    KimiCode:
+      tiers:
+        nano: kimi-k2.6
+        fast: kimi-k2.6
+        balanced: kimi-k2.7-code
+        powerful: kimi-k2.7-code
+        max: kimi-k2.7-code
 Advanced:
   description: Shifft alles eine Stufe nach oben.
   tiers:
