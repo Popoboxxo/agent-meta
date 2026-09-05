@@ -33,6 +33,7 @@ Immediately Read: `{{AGENT_META_REL_PATH}}external/awesome-claude-code/.claude/c
 | **Agent roles** (new generic types) | `1-generic/<role>.md` |
 | **Platform patterns** (platform-specific knowledge: Bun, Deno, FastAPI, ...) | `2-platform/<platform>-*.md` |
 | **Rules / hooks / workflows** (CLAUDE.md patterns, hooks, slash commands) | `howto/` or snippet |
+| **Plugins** (MCP servers / CLI tools already curated) | `config/plugin-catalog.yaml` (recommend activation, no new integration) |
 
 ## 3. Primary scouting sources
 
@@ -69,6 +70,8 @@ Per candidate: score via the evaluation framework (1-10 per category). Red-flag 
 **agent-meta repo:** {{AGENT_META_REPO}} (v{{AGENT_META_VERSION}})
 
 **Existing skills:** see `{{AGENT_META_REL_PATH}}config/skills-registry.yaml`
+
+**Plugin catalog:** see `{{AGENT_META_REL_PATH}}config/plugin-catalog.yaml` — the curated list of MCP servers + CLI tools. When proposing tooling, prefer an existing catalog entry (recommend activation) over a brand-new external candidate.
 </context>
 
 <tools>
