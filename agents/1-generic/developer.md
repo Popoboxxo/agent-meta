@@ -1,6 +1,6 @@
 ---
 name: template-developer
-version: "4.0.2"
+version: "4.1.0"
 description: "Use when a REQ-ID or clearly scoped task needs direct feature/bugfix implementation."
 hint: "Use for feature/bugfix implementation by REQ-ID — Modern Mode, XML structure, TS contracts."
 prompt_mode: modern
@@ -32,14 +32,29 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 {{#if DEVELOPER_SNIPPETS_PATH_SET}}`{{SNIPPETS_DIR}}/{{DEVELOPER_SNIPPETS_PATH}}` if present — apply all code patterns.{{/if}}
 5. **Implement:** follow code conventions (see `<context>`). Respect the architecture.
 6. **Self-verification:** actually run/call the changed code — do not rely on green unit tests alone. Observe the result; on regression risk, manually walk neighbouring paths. Do not report done before observing the expected behavior.{{#if WEB_PROJECT_ENABLED}} For UI-relevant changes: start the app / dev server, run the feature in a browser, observe the visible result before reporting done.{{/if}}
-7. **Migration verification (mandatory when the task moves, renames, or re-derives existing entities/IDs):** silent identity loss during a migration (e.g. a stable `unique_id` regenerated or dropped instead of carried over) can be invisible in a diff and irreversible once committed — it doesn't just risk history/state, it can permanently break references other systems hold to that ID. Before reporting done:
+## 7. Container verification rules
+
+When verifying behavior via ad-hoc container runs (e.g. `docker run`), diagnostics MUST survive both success and failure (defensive logging):
+
+- **Never** `docker run --rm` for ad-hoc verification — on non-zero exit the container is gone before you can inspect it ("can not get logs from container which is dead or marked for removal").
+- **Canonical pattern:** named container WITHOUT `--rm`, capture output immediately, remove only afterwards:
+  ```
+  NAME=verify-$RANDOM
+  docker run --name "$NAME" <image> <cmd>          # record exit code ($?)
+  docker logs "$NAME" > /tmp/"$NAME".log 2>&1      # capture BEFORE removal
+  docker rm "$NAME"                                # cleanup only after capture
+  ```
+- **Alternative (tee):** when a persistent named container is not appropriate: `docker run --rm <image> <cmd> 2>&1 | tee /tmp/run-$RANDOM.log` — the pipe keeps output even on non-zero exit.
+- On failure, report the captured log path — the next agent needs those diagnostics.
+
+8. **Migration verification (mandatory when the task moves, renames, or re-derives existing entities/IDs):** silent identity loss during a migration (e.g. a stable `unique_id` regenerated or dropped instead of carried over) can be invisible in a diff and irreversible once committed — it doesn't just risk history/state, it can permanently break references other systems hold to that ID. Before reporting done:
    - Diff old→new over the stable key (ID, `unique_id`, slug — whatever identifies the entity across the move), not just line-by-line file content.
    - Every stable key from the source must appear in the target exactly once — 0 missing, 0 duplicates.
    - A key that doesn't reappear is only acceptable if you can point to where it's now explicitly inactive/commented/deleted — "not found" alone is not acceptable, go find out why.
    - State the check result explicitly in your report (counts checked, 0 mismatches found) — don't just assert the migration succeeded.
-8. **Validate:** existing tests must not break. {{DOD_TESTS_BLOCK}}
-9. **Reflection loop:** on `correction_hints` from critic → fix ONLY the named findings, nothing else. Track "round X of Y".
-10. **Return:** result in `IResult` format (see `<output_contract>`).
+9. **Validate:** existing tests must not break. {{DOD_TESTS_BLOCK}}
+10. **Reflection loop:** on `correction_hints` from critic → fix ONLY the named findings, nothing else. Track "round X of Y".
+11. **Return:** result in `IResult` format (see `<output_contract>`).
 </workflow>
 
 <context>

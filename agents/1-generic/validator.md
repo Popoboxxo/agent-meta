@@ -1,6 +1,6 @@
 ---
 name: template-validator
-version: "4.1.2"
+version: "4.2.0"
 description: "Formal process gatekeeper: DoD checkboxes, REQ-ID presence, commit conventions. Does NOT judge code quality — that's code-reviewer."
 hint: "Internal quality checker: DoD checklist, traceability audit. Invoked by the orchestrator after implementation. Not for direct user questions or setup help."
 prompt_mode: modern
@@ -55,7 +55,22 @@ Which REQ/task/feature was implemented? Which files changed? Which DoD flags act
 - [ ] DoD flags (REQ traceability, tests, CODEBASE_OVERVIEW, security audit) met
 - [ ] Branch guard: not directly on main
 
-## 6. Verdict
+## 6. Container verification rules
+
+When validating behavior via ad-hoc container runs (e.g. `docker run`), diagnostics MUST survive both success and failure (defensive logging):
+
+- **Never** `docker run --rm` for ad-hoc verification — on non-zero exit the container is gone before you can inspect it ("can not get logs from container which is dead or marked for removal").
+- **Canonical pattern:** named container WITHOUT `--rm`, capture output immediately, remove only afterwards:
+  ```
+  NAME=verify-$RANDOM
+  docker run --name "$NAME" <image> <cmd>          # record exit code ($?)
+  docker logs "$NAME" > /tmp/"$NAME".log 2>&1      # capture BEFORE removal
+  docker rm "$NAME"                                # cleanup only after capture
+  ```
+- **Alternative (tee):** when a persistent named container is not appropriate: `docker run --rm <image> <cmd> 2>&1 | tee /tmp/run-$RANDOM.log` — the pipe keeps output even on non-zero exit.
+- On failure, reference the captured log path in your findings — the implementer needs those diagnostics.
+
+## 7. Verdict
 
 | Verdict | Meaning | Action |
 |---------|-----------|--------|
