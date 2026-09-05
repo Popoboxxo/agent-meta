@@ -257,13 +257,15 @@ def build_frontmatter(content: str, name: str, description: str,
         if re.search(r'^generated-from:', content, flags=re.MULTILINE):
             content = re.sub(
                 r'^generated-from:.*$',
-                f'generated-from: {generated_from}',
+                # Function replacement: dynamic values must never be passed
+                # as a raw re.sub replacement string (#674 escape-safety).
+                lambda m: f'generated-from: {generated_from}',
                 content, count=1, flags=re.MULTILINE,
             )
         else:
             content = re.sub(
                 r'(^name:.*\n)',
-                rf'\1generated-from: {generated_from}\n',
+                lambda m: f'{m.group(1)}generated-from: {generated_from}\n',
                 content, count=1, flags=re.MULTILINE,
             )
     else:
@@ -292,7 +294,8 @@ def inject_permission_mode_field(content: str, permission_mode: str) -> str:
     if re.search(r"^permissionMode:", content, flags=re.MULTILINE):
         return re.sub(
             r"^permissionMode:.*$",
-            f"permissionMode: {permission_mode}",
+            # Function replacement keeps dynamic values verbatim (#674).
+            lambda m: f"permissionMode: {permission_mode}",
             content, count=1, flags=re.MULTILINE,
         )
 
@@ -306,7 +309,7 @@ def inject_permission_mode_field(content: str, permission_mode: str) -> str:
 
     return re.sub(
         rf"({anchor}\n)",
-        rf"\1permissionMode: {permission_mode}\n",
+        lambda m: f"{m.group(1)}permissionMode: {permission_mode}\n",
         content, count=1, flags=re.MULTILINE,
     )
 
@@ -329,7 +332,8 @@ def inject_memory_field(content: str, memory: str) -> str:
     if re.search(r"^memory:", content, flags=re.MULTILINE):
         return re.sub(
             r"^memory:.*$",
-            f"memory: {memory}",
+            # Function replacement keeps dynamic values verbatim (#674).
+            lambda m: f"memory: {memory}",
             content, count=1, flags=re.MULTILINE,
         )
 
@@ -337,7 +341,7 @@ def inject_memory_field(content: str, memory: str) -> str:
     anchor = r"^model:.*$" if re.search(r"^model:", content, flags=re.MULTILINE) else r"^name:.*$"
     return re.sub(
         rf"({anchor}\n)",
-        rf"\1memory: {memory}\n",
+        lambda m: f"{m.group(1)}memory: {memory}\n",
         content, count=1, flags=re.MULTILINE,
     )
 
@@ -361,14 +365,15 @@ def inject_model_field(content: str, model: str) -> str:
     if re.search(r"^model:", content, flags=re.MULTILINE):
         return re.sub(
             r"^model:.*$",
-            f"model: {model}",
+            # Function replacement keeps dynamic values verbatim (#674).
+            lambda m: f"model: {model}",
             content, count=1, flags=re.MULTILINE,
         )
 
     # Insert after name: line
     return re.sub(
         r"(^name:.*\n)",
-        rf"\1model: {model}\n",
+        lambda m: f"{m.group(1)}model: {model}\n",
         content, count=1, flags=re.MULTILINE,
     )
 

@@ -300,7 +300,8 @@ def _update_continue_yaml_config(
             re.MULTILINE | re.DOTALL,
         )
         if block_re.search(existing):
-            new_content = block_re.sub(block_content, existing, count=1)
+            # Function replacement keeps the generated YAML block verbatim (#674).
+            new_content = block_re.sub(lambda _m: block_content, existing, count=1)
         else:
             new_content = existing.rstrip("\n") + "\n\n" + block_content + "\n"
     else:
@@ -395,7 +396,8 @@ def _update_codex_toml_config(
             re.MULTILINE | re.DOTALL,
         )
         if block_re.search(existing):
-            new_content = block_re.sub(block_content, existing, count=1)
+            # Function replacement keeps the generated TOML block verbatim (#674).
+            new_content = block_re.sub(lambda _m: block_content, existing, count=1)
         else:
             # TOML table headers at the end of the document are safe to
             # append — no prior key/value line can be re-attributed to them.

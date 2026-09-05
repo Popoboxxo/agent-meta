@@ -159,7 +159,8 @@ class BootstrapEngine:
 
         if marker_begin in existing:
             pattern = re.compile(re.escape(marker_begin) + ".*?" + re.escape(marker_end), re.DOTALL)
-            new_content = pattern.sub(block, existing, count=1)
+            # Function replacement keeps the generated block verbatim (#674).
+            new_content = pattern.sub(lambda _m: block, existing, count=1)
         else:
             new_content = existing.rstrip("\n") + "\n\n" + block + "\n"
 
@@ -214,7 +215,8 @@ class BootstrapEngine:
                 re.escape(marker) + ".*?" + re.escape(marker_end),
                 re.DOTALL,
             )
-            new_content = pattern.sub(managed_block, existing, count=1)
+            # Function replacement keeps the generated block verbatim (#674).
+            new_content = pattern.sub(lambda _m: managed_block, existing, count=1)
         else:
             new_content = existing.rstrip("\n") + "\n\n" + managed_block + "\n"
 

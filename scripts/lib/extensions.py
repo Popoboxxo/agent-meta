@@ -72,7 +72,10 @@ def update_managed_block(existing: str, new_managed: str) -> str:
         re.DOTALL,
     )
     if pattern.search(existing):
-        return pattern.sub(new_managed, existing, count=1)
+        # Function replacement: new_managed is rendered template content and
+        # must be inserted verbatim — a raw replacement string would
+        # interpret backslashes as escapes (#674).
+        return pattern.sub(lambda _m: new_managed, existing, count=1)
     # No block found — prepend (should not happen in normal flow)
     return new_managed + "\n\n" + existing
 

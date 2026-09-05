@@ -408,7 +408,9 @@ def _update_managed_html_block(
             target_path.write_text(new_content, encoding="utf-8")
         return
 
-    new_content = managed_pattern.sub(new_managed, existing, count=1)
+    # Function replacement: new_managed is rendered template content and
+    # must be inserted verbatim (#674 escape-safety).
+    new_content = managed_pattern.sub(lambda _m: new_managed, existing, count=1)
     if new_content != existing:
         log.action("UPDATE", rel, "managed block")
         if not dry_run:
@@ -568,7 +570,8 @@ def _sync_opencode_context(
         # so match and replacement share the same boundary.
         new_managed = new_managed.rstrip("\n")
         if managed_pattern.search(existing):
-            new_content = managed_pattern.sub(new_managed, existing, count=1)
+            # Function replacement keeps the rendered block verbatim (#674).
+            new_content = managed_pattern.sub(lambda _m: new_managed, existing, count=1)
             if new_content != existing:
                 log.action("UPDATE", context_file, "managed block (agent hints + rules)")
                 if not dry_run:
@@ -877,7 +880,8 @@ def _update_continue_config_managed_block(
         re.MULTILINE | re.DOTALL,
     )
     if managed_re.search(existing):
-        updated = managed_re.sub(new_block, existing, count=1)
+        # Function replacement keeps the generated metadata block verbatim (#674).
+        updated = managed_re.sub(lambda _m: new_block, existing, count=1)
         if updated != existing:
             log.action("UPDATE", rel, "managed comment block")
             if not dry_run:
@@ -1387,7 +1391,8 @@ def ensure_gitignore_entries(
     )
 
     if block_match:
-        new_content = block_pattern.sub(new_block, existing)
+        # Function replacement keeps generated path entries verbatim (#674).
+        new_content = block_pattern.sub(lambda _m: new_block, existing)
     else:
         new_content = existing.rstrip("\n") + "\n\n" + new_block + "\n"
 

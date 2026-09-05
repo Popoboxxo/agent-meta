@@ -2,6 +2,14 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from ..substitution import constant_lookup, substitute_placeholders
+
+# Permissive placeholder pattern: group 1 captures the name (stripped by the
+# lookup below). Excludes block markers ({{#if}}, {{/if}}, {{else}}) and
+# partials ({{> name}}) — those are handled by resolve_conditionals(),
+# resolve_loops() and resolve_partials().
+_PLACEHOLDER_RE = re.compile(r"\{\{([^#>/][^}]*)\}\}")
+
 
 class TemplateBuilder:
     """Handlebars-style template builder with support for partials, conditionals, loops, and variables."""
@@ -98,10 +106,15 @@ class TemplateBuilder:
                     continue
                 rendered = inner_template
                 for k, v in item.items():
-                    # Function replacement: re.sub treats the return value
-                    # literally. A raw str replacement would interpret
+                    # Shared escape-safe core (issue #476): the constant
+                    # lookup inserts str(v) verbatim via function
+                    # replacement. A raw str replacement would interpret
                     # backslashes as escapes and crash (issue #674).
-                    rendered = re.sub(r'\{\{\s*' + re.escape(k) + r'\s*\}\}', lambda m, val=str(v): val, rendered)
+                    rendered = substitute_placeholders(
+                        rendered,
+                        r"\{\{\s*(" + re.escape(k) + r")\s*\}\}",
+                        constant_lookup(v),
+                    )
                 result.append(rendered)
             return "".join(result)
             
@@ -112,6 +125,10 @@ class TemplateBuilder:
     def resolve_variables(self, template_str: str, variables: dict) -> str:
         """Resolve {{variable}} placeholders by substituting values from the variables dictionary.
 
+        Delegates to the shared escape-safe substitution core (issue #476):
+        values are injected via function replacement, so backslashes and
+        $-group references are never interpreted (issue #674).
+
         Args:
             template_str: Template string containing variable references.
             variables: Dictionary of variable names to values.
@@ -119,14 +136,19 @@ class TemplateBuilder:
         Returns:
             Template string with {{variable}} placeholders replaced or left unchanged if not found.
         """
-        def repl(match):
-            var_name = match.group(1).strip()
-            val = variables.get(var_name)
-            if val is not None:
-                return str(val)
-            return f"{{{{{var_name}}}}}"
-            
-        return re.sub(r'\{\{([^#>/][^}]*)\}\}', repl, template_str)
+        def lookup(name: str) -> str | None:
+            # Whitespace variants ({{ VAR }}) resolve on the stripped name.
+            val = variables.get(name.strip())
+            if val is None:
+                return None
+            return str(val)
+
+        def keep(matched: str, name: str) -> str:
+            # Unresolved names keep their placeholder form, rebuilt from the
+            # stripped name (whitespace variants collapse to {{NAME}}).
+            return f"{{{{{name.strip()}}}}}"
+
+        return substitute_placeholders(template_str, _PLACEHOLDER_RE, lookup, keep)
 
     def build(self, template_name: str, variables: dict) -> str:
         """Load and render a template with the provided variables.
