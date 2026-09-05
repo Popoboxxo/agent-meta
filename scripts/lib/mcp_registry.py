@@ -1,6 +1,7 @@
-"""Neutral MCP registry core: loading ``config/mcp-registry.yaml``, resolving
-which servers are active for a project, and building the guardrails bullet
-list — used by both :mod:`mcp` (rule/provider-config generation) and
+"""Neutral MCP registry core: exposing the mcp-server slice of the unified
+plugin catalog (``config/plugin-catalog.yaml`` via :mod:`lib.plugins`),
+resolving which servers are active for a project, and building the guardrails
+bullet list — used by both :mod:`mcp` (rule/provider-config generation) and
 :mod:`rules` (``resolve_rules``'s ``MCP_GUARDRAILS_LIST`` variable).
 
 Split out of ``mcp.py`` (issue #613) to break the ``mcp ↔ mcp_provider_config
@@ -16,7 +17,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .io import _deep_merge, _load_yaml_or_json
+from .io import _load_yaml_or_json
 from .plugins import _activation_from_config, load_plugin_catalog, plugins_of_kind
 
 SECRETS_LOCAL_FILE = ".meta-config/secrets.local.yaml"
@@ -36,17 +37,19 @@ def resolve_active_mcp_servers(
     """Determine which MCP servers are active for this project.
 
     Sources (merged, preserving order, no duplicates):
-      1. Explicit: config["mcp-servers"] list in project.yaml — always active
+      1. Explicit: the unified `plugins:` block in project.yaml (or the legacy
+         `mcp-servers` list for un-migrated projects) — servers flagged
+         enabled: true are always active
       2. Implicit: platform bundles rules/2-platform/<platform>-mcp.yaml —
          only active when the server's enabled-by-default flag is true (default: true)
 
     Servers from bundles not in the explicit list are skipped when
-    enabled-by-default: false in mcp-registry.yaml.
+    enabled-by-default: false in the catalog.
 
     registry: pass an already-loaded load_mcp_registry() result to skip
-    re-reading/re-parsing config/mcp-registry.yaml when the caller has one
-    on hand (e.g. sync.py's per-provider loop, which would otherwise reload
-    the same on-disk registry once per active provider).
+    re-reading/re-parsing the plugin catalog when the caller has one on hand
+    (e.g. sync.py's per-provider loop, which would otherwise reload the same
+    on-disk catalog once per active provider).
     """
     if registry is None:
         registry = load_mcp_registry(agent_meta_root, config, project_root)
@@ -81,7 +84,7 @@ def resolve_active_mcp_servers(
 def build_mcp_guardrails_list(registry: dict, active_servers: list[str]) -> str:
     """Render the hard-prohibitions bullet list for rules/1-generic/mcp-guardrails.md.
 
-    Generated from each active server's tools.blocked (config/mcp-registry.yaml)
+    Generated from each active server's tools.blocked (config/plugin-catalog.yaml)
     instead of being hand-copied — a server added/removed from the active list,
     or a blocked-tools edit, is picked up on the next sync instead of silently
     going stale in a hand-authored always-on guardrail file.

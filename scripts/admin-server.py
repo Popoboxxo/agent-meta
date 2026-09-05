@@ -3591,6 +3591,13 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         body = self._read_body()
         if body is None:
             raise ValueError("empty body")
+        # Per-project plugin overrides now flow through the plugin-catalog file
+        # (config/plugin-catalog.yaml + .meta-config/plugin-catalog.yaml) rather
+        # than the retired external-tools-registry project section — validate any
+        # permitted-injections here so a bad edit fails at write time (HTTP 400)
+        # instead of only surfacing as a SyncError on the next sync.py run.
+        if key in ("plugin-catalog", "project-plugin-catalog") and isinstance(body, dict):
+            self._validate_permitted_injections_overrides(body.get("plugins", {}))
         if key == "project":
             existing = self.__class__.config_manager.read("project")
             self._deep_merge(existing, body)
@@ -4611,13 +4618,11 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             "conventions", "conventions-preset",
             "tier-preset", "se-focus", "ai-providers", "platforms", "provider-options",
             "provider-isolation", "environments", "model-source-preference", "knowledge-engine",
-            "gitignore", "mcp-servers", "mcp-registry", "external-skills", "skills-registry",
-            "external-tools", "external-tools-registry", "context_file",
+            "gitignore", "external-skills", "skills-registry",
+            "context_file", "plugins",
         }
         if section not in allowed:
             raise ValueError(f"section not allowed: {section}")
-        if section == "external-tools-registry" and isinstance(data, dict):
-            self._validate_permitted_injections_overrides(data)
         existing = self.__class__.config_manager.read("project")
         if not isinstance(existing, dict):
             existing = {}
@@ -4675,12 +4680,12 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             )
 
     def _validate_permitted_injections_overrides(self, overrides: dict) -> None:
-        """Reject a project-override write whose ``permitted-injections`` would
+        """Reject a plugin-override write whose ``permitted-injections`` would
         break the next ``sync.py`` run (schema-invalid kind/name/path combo).
 
         Without this, a bad edit in the Admin UI (e.g. switching an entry's
-        ``kind`` without migrating ``name``/``path``) silently persists to
-        ``project.yaml`` and only surfaces as a hard ``SyncError`` the next
+        ``kind`` without migrating ``name``/``path``) silently persists to the
+        plugin-catalog file and only surfaces as a hard ``SyncError`` the next
         time anything calls ``load_external_tools_registry`` — which is most
         sync operations, not just this panel.
         """

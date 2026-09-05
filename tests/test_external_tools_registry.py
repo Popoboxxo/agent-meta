@@ -482,7 +482,10 @@ def test_scan_injection_drift_skips_hook_and_rule_dirs_without_capability(tmp_pa
         "has_hooks": False,
         "has_rules": False,
     }}
-    findings = scan_injection_drift(agent_meta_root, project_root, {}, provider_config)
+    # scan_injection_drift only scans providers CONFIGURED for the project
+    # (resolve_providers), so declare Opencode as this project's provider.
+    findings = scan_injection_drift(
+        agent_meta_root, project_root, {"ai-providers": ["Opencode"]}, provider_config)
     assert findings["Opencode"] == []
 
 
@@ -502,7 +505,10 @@ def test_scan_injection_drift_infra_root_excuses_agent_memory_and_provider_setti
         "agents_dir": ".continue/agents",
         "settings_local_file": ".continue/config.local.yaml",
     }}
-    findings = scan_injection_drift(agent_meta_root, project_root, {}, provider_config)
+    # scan_injection_drift only scans providers CONFIGURED for the project
+    # (resolve_providers), so declare Continue as this project's provider.
+    findings = scan_injection_drift(
+        agent_meta_root, project_root, {"ai-providers": ["Continue"]}, provider_config)
     assert findings["Continue"] == []
 
 

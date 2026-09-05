@@ -25,7 +25,7 @@ def test_kv_editor_row_delete_requires_confirmation(browser_ctx):
     ctx, base = browser_ctx
     page = ctx.new_page()
     try:
-        page.goto(f"{base}/#/project/mcp-overrides")
+        page.goto(f"{base}/#/project/plugin-overrides")
         page.wait_for_load_state("networkidle")
 
         panel = page.locator(".panel").filter(has=page.get_by_role("heading", name="honcho", exact=True))

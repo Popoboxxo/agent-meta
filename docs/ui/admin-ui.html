@@ -1576,9 +1576,8 @@ function buildSidebar() {
         { route: "/project/conventions-overrides", label: "Conventions Overrides", icon: "🏷" },
         { route: "/project/environments", label: "Environment Variables", icon: "🌐" },
         { route: "/project/plugins", label: "Verfügbare Plugins", icon: "🧭" },
-        { route: "/project/mcp-overrides", label: "MCP Servers", icon: "🔌" },
+        { route: "/project/plugin-overrides", label: "Plugin Overrides", icon: "🔌" },
         { route: "/project/skills-overrides", label: "External Skills", icon: "🧩" },
-        { route: "/project/external-tools-overrides", label: "External Tools", icon: "🧰" },
         { route: "/project/gitignore", label: "Gitignore Rules", icon: "🚫" },
         { route: "/project/knowledge-engine", label: "Knowledge Engine", icon: "🧠" },
         { route: "/project/advanced",  label: "Advanced (raw YAML)", icon: "⌨" },
@@ -2393,8 +2392,8 @@ async function viewSkillsRegistry() {
 /* =========================================================================
  * Views — MCP registry (Phase 3c)
  * ========================================================================= */
-// Shared by viewProjectMcpOverrides and viewProjectSkillsOverrides: both
-// render a per-item override panel (title/badges, active toggle,
+// Shared by viewProjectPluginOverrides and viewProjectSkillsOverrides: both
+// render a per-item override panel (title/badges, optional active toggle,
 // description+secrets info-box, readonly/edit body swap, Customize/Reset
 // actions) that was previously duplicated near-verbatim between the two.
 // Only the readonly/edit body content is type-specific -- supplied via
@@ -2412,14 +2411,19 @@ function renderOverridePanel(opts) {
   if (isOverride) titleBox.appendChild(el("span", { class: "badge", style: "background-color:#7c3aed; color:#fff" }, ["Override Active"]));
   header.appendChild(titleBox);
 
-  const toggleBox = el("div", { style: "display:flex; align-items:center; gap: var(--space-2);" });
-  const activeToggle = makeToggle(isActive, onToggleActive);
-  // Relabel for context: ACTIVE (blue) / INACTIVE (orange)
-  const btns = activeToggle.element.querySelectorAll("div");
-  btns[0].textContent = "ACTIVE";
-  btns[1].textContent = "INACTIVE";
-  toggleBox.appendChild(activeToggle.element);
-  header.appendChild(toggleBox);
+  // Activation toggle is optional: panels that only edit per-project overrides
+  // (viewProjectPluginOverrides — activation lives in viewAvailablePlugins)
+  // omit onToggleActive and get no toggle.
+  if (onToggleActive) {
+    const toggleBox = el("div", { style: "display:flex; align-items:center; gap: var(--space-2);" });
+    const activeToggle = makeToggle(isActive, onToggleActive);
+    // Relabel for context: ACTIVE (blue) / INACTIVE (orange)
+    const btns = activeToggle.element.querySelectorAll("div");
+    btns[0].textContent = "ACTIVE";
+    btns[1].textContent = "INACTIVE";
+    toggleBox.appendChild(activeToggle.element);
+    header.appendChild(toggleBox);
+  }
   p.appendChild(header);
 
   // --- HINTS / INFO BOX ---
@@ -2484,9 +2488,9 @@ function renderOverridePanel(opts) {
   return p;
 }
 
-// Shared by viewProjectMcpOverrides (env vars / headers, string-only) and
+// Shared by viewProjectPluginOverrides (env vars / headers, string-only) and
 // viewProjectProviders (provider-options, string|bool) -- was previously
-// duplicated as viewProjectMcpOverrides' local renderDictEditor and
+// duplicated as the MCP override view's local renderDictEditor and
 // viewProjectProviders' local addKVRow, with addKVRow additionally
 // supporting a bool type. Pass { allowBool: true } to render the type
 // selector; omitted/false renders exactly as the old string-only
@@ -2571,62 +2575,91 @@ const renderDictEditor = (title, dictData, onChange, opts) => {
     return w;
 };
 
-async function viewProjectMcpOverrides() {
+// Unified per-project plugin override editor. Replaces the two now-dead legacy
+// panels (viewProjectMcpOverrides + viewProjectExternalToolsOverrides), which
+// wrote to project.yaml sections (mcp-servers/mcp-registry, external-tools/
+// external-tools-registry) that the plugin-catalog migration stopped reading —
+// so their "saved" toast was a lie. Overrides now go to the unified catalog's
+// project layer (.meta-config/plugin-catalog.yaml, config key
+// project-plugin-catalog), which load_plugin_catalog actually deep-merges into
+// the definitions used by artifact generation. Activation (on/off) lives in
+// viewAvailablePlugins; this view is override-only (no activation toggle).
+async function viewProjectPluginOverrides() {
   const wrap = el("div");
-  wrap.appendChild(el("h1", {}, ["Project — MCP Servers"]));
-  wrap.appendChild(el("p", { class: "help-text" }, ["Enable/Disable Framework MCP servers for your project, or customize them specifically for this repository."]));
+  wrap.appendChild(el("h1", {}, ["Project — Plugin Overrides"]));
+  const help = el("p", { class: "help-text" }, [
+    "Customize catalogued plugins (MCP servers + CLI tools) for this repository — connection details, tool metadata, permitted injections. Enabling/disabling plugins happens in "]);
+  const plink = el("a", { href: "#/project/plugins", style: "color:var(--accent);" }, ["Verfügbare Plugins"]);
+  help.appendChild(plink); help.appendChild(document.createTextNode("."));
+  wrap.appendChild(help);
 
-  let projData, catData;
+  // Live injection-drift banner (ported from the old external-tools panel).
+  // Runs scan_injection_drift() server-side, so it reflects "right now" and can
+  // briefly disagree with the last-sync external-tools-drift.md snapshot.
   try {
-    projData = await api.get("/api/config/project");
-    // Framework MCP-server definitions now live in the unified plugin
-    // catalog (config/plugin-catalog.yaml superseded config/mcp-registry.yaml,
-    // see plugin-catalog-unification) -- filter to the mcp-server kind to
-    // get the same shape the old "mcp-servers" map had.
+    const driftResp = await api.get("/api/external-tools/drift");
+    if (driftResp.error) {
+      wrap.appendChild(el("div", {
+        style: "margin-bottom:var(--space-4); padding:var(--space-2) var(--space-3); "
+             + "border:1px solid var(--border-color); border-radius:4px; "
+             + "color:var(--text-muted); font-size:12px;",
+      }, [`Drift-Scan fehlgeschlagen: ${driftResp.error}`]));
+    } else {
+      const allFindings = Object.values(driftResp.findings || {}).flat();
+      if (allFindings.length > 0) {
+        const banner = el("div", {
+          style: "margin-bottom:var(--space-4); padding:var(--space-3); border:1px solid #b45309; "
+               + "border-radius:4px; background:rgba(180,83,9,0.1);",
+        });
+        banner.appendChild(el("strong", {}, [`${allFindings.length} undeclared artifact(s) found`]));
+        const list = el("ul", { style: "margin:var(--space-2) 0 0 0; padding-left: 20px;" });
+        allFindings.slice(0, 10).forEach((f) => {
+          list.appendChild(el("li", {}, [`${f.path} (${f.kind}) — ${f.tool || "no tool assigned"}`]));
+        });
+        banner.appendChild(list);
+        wrap.appendChild(banner);
+      }
+    }
+  } catch (err) {
+    // Non-fatal — the drift banner is a convenience, not a blocker.
+  }
+
+  let catData, projData;
+  try {
     catData = await api.get("/api/config/plugin-catalog").catch(() => ({ plugins: {} }));
+    // Project override layer: .meta-config/plugin-catalog.yaml (whole file).
+    projData = await api.get("/api/config/project-plugin-catalog").catch(() => ({}));
   } catch (err) {
     wrap.appendChild(renderError(err));
     return wrap;
   }
 
-  const activeServers = new Set(projData["mcp-servers"] || []);
-  const projOverrides = projData["mcp-registry"] || {};
-  const fwServers = Object.fromEntries(
-    Object.entries(catData.plugins || {}).filter(([, def]) => def && def.kind === "mcp-server"));
+  const catalog = catData.plugins || {};
+  const projOverrides = (projData && projData.plugins) || {};
 
   let dirty = false;
   const markDirty = () => { dirty = true; router.setDirty(true); };
 
   const getMerged = (id) => {
-      const fw = fwServers[id] || {};
+      const fw = catalog[id] || {};
       const ov = projOverrides[id] || {};
-      
-      // Deep merge connection block
       const fwConn = fw.connection || {};
       const ovConn = ov.connection || {};
-      return { 
-          ...fw, 
-          ...ov, 
-          connection: { ...fwConn, ...ovConn } 
-      };
+      return { ...fw, ...ov, connection: { ...fwConn, ...ovConn } };
   };
 
-  // UI Helpers
   const renderArrayEditor = (title, arrData, onChange) => {
       const w = el("div", { style: "margin-top: var(--space-2);" });
       w.appendChild(el("label", {}, [title]));
       const list = el("div", { style: "display: flex; flex-direction: column; gap: var(--space-1); margin-bottom: var(--space-2);" });
-      
       const renderRows = () => {
           list.innerHTML = "";
           arrData.forEach((v, idx) => {
               const row = el("div", { style: "display: flex; gap: var(--space-1);" });
               const inpV = el("input", { class: "form-control", value: v, style: "flex: 1;", placeholder: "Argument" });
               const btnDel = el("button", { class: "btn btn-danger btn-sm" }, ["×"]);
-              
               inpV.oninput = (e) => { arrData[idx] = e.target.value; onChange(); };
               btnDel.onclick = () => { arrData.splice(idx, 1); onChange(); renderRows(); };
-              
               row.appendChild(inpV); row.appendChild(btnDel);
               list.appendChild(row);
           });
@@ -2639,16 +2672,21 @@ async function viewProjectMcpOverrides() {
       return w;
   };
 
-  const renderSrvPanel = (id, isFramework) => {
-    const isOverride = projOverrides.hasOwnProperty(id);
-    const isActive = activeServers.has(id);
+  const renderBadgeList = (items) => {
+      const w = el("div", { style: "display:flex; flex-wrap:wrap; gap: var(--space-1); margin-top: var(--space-1);" });
+      (items || []).forEach((v) => { w.appendChild(el("span", { class: "badge" }, [String(v)])); });
+      return w;
+  };
+
+  // --- MCP-server override panel (connection editing) ---
+  const renderMcpPanel = (id, isFramework) => {
+    const isOverride = Object.prototype.hasOwnProperty.call(projOverrides, id);
     const merged = getMerged(id);
     const conn = merged.connection || {};
 
     const setupEditState = () => {
         if (!projOverrides[id]) {
-            // Deep copy framework state to override
-            projOverrides[id] = JSON.parse(JSON.stringify(fwServers[id] || {}));
+            projOverrides[id] = JSON.parse(JSON.stringify(catalog[id] || { kind: "mcp-server" }));
             if (!projOverrides[id].connection) projOverrides[id].connection = { type: conn.type || "stdio" };
         }
         return projOverrides[id].connection;
@@ -2659,16 +2697,8 @@ async function viewProjectMcpOverrides() {
       badgeLabel: "Framework Server",
       isFramework,
       isOverride,
-      isActive,
       description: merged.description,
       secrets: merged.secrets,
-      // Flip colors: active=blue(left), inactive=orange(right) — but makeToggle uses "ignored"=blue
-      // So we init with !isActive: isActive→false means "not ignored"→ACTIVE shows as blue
-      onToggleActive: (newVal) => {
-          if (newVal) activeServers.add(id);
-          else activeServers.delete(id);
-          markDirty();
-      },
       buildReadonly: (isReadonly) => {
         isReadonly.appendChild(el("div", {style:"color:#fff; font-weight:bold; margin-bottom:var(--space-1);"}, [`Type: ${conn.type || "unknown"}`]));
         if (conn.type === "stdio") {
@@ -2699,22 +2729,15 @@ async function viewProjectMcpOverrides() {
             wrapCmd.appendChild(inpCmd);
             isEditing.appendChild(wrapCmd);
 
-            // Args editor
             const localArgs = conn.args ? [...conn.args] : [];
             isEditing.appendChild(renderArrayEditor("Arguments", localArgs, () => {
-                const c = setupEditState();
-                c.args = localArgs;
-                markDirty();
+                const c = setupEditState(); c.args = localArgs; markDirty();
             }));
 
-            // Env editor
             const localEnv = conn.env ? { ...conn.env } : {};
             isEditing.appendChild(renderDictEditor("Environment Variables", localEnv, () => {
-                const c = setupEditState();
-                c.env = localEnv;
-                markDirty();
+                const c = setupEditState(); c.env = localEnv; markDirty();
             }));
-
         } else if (conn.type === "sse") {
             const wrapUrl = el("div", {});
             wrapUrl.appendChild(el("label", {}, ["URL"]));
@@ -2723,12 +2746,9 @@ async function viewProjectMcpOverrides() {
             wrapUrl.appendChild(inpUrl);
             isEditing.appendChild(wrapUrl);
 
-            // Headers editor
             const localHeaders = conn.headers ? { ...conn.headers } : {};
             isEditing.appendChild(renderDictEditor("Headers", localHeaders, () => {
-                const c = setupEditState();
-                c.headers = localHeaders;
-                markDirty();
+                const c = setupEditState(); c.headers = localHeaders; markDirty();
             }));
         } else {
              isEditing.appendChild(el("div", {}, ["Unsupported connection type for UI editing."]));
@@ -2738,45 +2758,208 @@ async function viewProjectMcpOverrides() {
     });
   };
 
+  // --- CLI-tool override panel (metadata / injections editing) ---
+  const renderToolPanel = (id, isFramework) => {
+    const isOverride = Object.prototype.hasOwnProperty.call(projOverrides, id);
+    const merged = getMerged(id);
+
+    const setupEditState = () => {
+        if (!projOverrides[id]) {
+            projOverrides[id] = JSON.parse(JSON.stringify(catalog[id] || { kind: "cli-tool" }));
+        }
+        return projOverrides[id];
+    };
+
+    return renderOverridePanel({
+      id,
+      badgeLabel: "Framework Tool",
+      isFramework,
+      isOverride,
+      description: merged.description,
+      secrets: null,
+      buildReadonly: (isReadonly) => {
+        if (merged.category) {
+            isReadonly.appendChild(el("div", { style: "color:#fff; font-weight:bold; margin-bottom:var(--space-1);" }, [`Category: ${merged.category}`]));
+        }
+        isReadonly.appendChild(el("div", {}, [`Enabled by default: ${merged["enabled-by-default"] ? "yes" : "no"}`]));
+        if (merged["rule-content"]) {
+            isReadonly.appendChild(el("div", { style: "margin-top:var(--space-2); font-weight:bold; color:#fff;" }, ["Rule content:"]));
+            isReadonly.appendChild(el("pre", { style: "white-space:pre-wrap; margin:0; padding:var(--space-2); background:var(--bg-card); border-radius:4px;" }, [merged["rule-content"]]));
+        }
+        if (merged.hooks && merged.hooks.length > 0) {
+            isReadonly.appendChild(el("div", { style: "margin-top:var(--space-2);" }, ["Hooks:"]));
+            isReadonly.appendChild(renderBadgeList(merged.hooks));
+        }
+        if (merged["provider-skip"] && merged["provider-skip"].length > 0) {
+            isReadonly.appendChild(el("div", { style: "margin-top:var(--space-2);" }, ["Provider skip:"]));
+            isReadonly.appendChild(renderBadgeList(merged["provider-skip"]));
+        }
+        if (merged["permitted-injections"] && merged["permitted-injections"].length > 0) {
+            isReadonly.appendChild(el("div", { style: "margin-top:var(--space-2);" }, ["Permitted injections:"]));
+            isReadonly.appendChild(renderBadgeList(merged["permitted-injections"].map(
+              (i) => `${i.kind}: ${i.name || i.path}`
+            )));
+        }
+      },
+      buildEdit: (isEditing) => {
+        const wrapDesc = el("div", {});
+        wrapDesc.appendChild(el("label", {}, ["Description"]));
+        const inpDesc = el("input", { class: "form-control", value: merged.description || "" });
+        inpDesc.oninput = (e) => { const ov = setupEditState(); ov.description = e.target.value; markDirty(); };
+        wrapDesc.appendChild(inpDesc);
+        isEditing.appendChild(wrapDesc);
+
+        const wrapCat = el("div", {});
+        wrapCat.appendChild(el("label", {}, ["Category"]));
+        const inpCat = el("input", { class: "form-control", value: merged.category || "" });
+        inpCat.oninput = (e) => { const ov = setupEditState(); ov.category = e.target.value; markDirty(); };
+        wrapCat.appendChild(inpCat);
+        isEditing.appendChild(wrapCat);
+
+        const wrapDefault = el("div", { style: "display:flex; align-items:center; gap: var(--space-2);" });
+        const cbDefault = el("input", { type: "checkbox" });
+        cbDefault.checked = !!merged["enabled-by-default"];
+        cbDefault.onchange = (e) => { const ov = setupEditState(); ov["enabled-by-default"] = e.target.checked; markDirty(); };
+        wrapDefault.appendChild(cbDefault);
+        wrapDefault.appendChild(el("label", {}, ["Enabled by default"]));
+        isEditing.appendChild(wrapDefault);
+
+        const wrapRule = el("div", {});
+        wrapRule.appendChild(el("label", {}, ["Rule content (Markdown)"]));
+        const taRule = el("textarea", {
+            class: "form-control",
+            style: "width:100%; height:160px; font-family:var(--font-mono); font-size:12px;",
+        });
+        taRule.value = merged["rule-content"] || "";
+        taRule.oninput = (e) => { const ov = setupEditState(); ov["rule-content"] = e.target.value; markDirty(); };
+        wrapRule.appendChild(taRule);
+        isEditing.appendChild(wrapRule);
+
+        const wrapHooks = el("div", { style: "margin-top: var(--space-2);" });
+        wrapHooks.appendChild(el("label", {}, ["Hooks (hooks/0-external/<stem>.sh)"]));
+        wrapHooks.appendChild(tagEditor(merged.hooks || [], (v) => {
+            const ov = setupEditState(); ov.hooks = v; markDirty();
+        }));
+        isEditing.appendChild(wrapHooks);
+
+        const wrapSkip = el("div", { style: "margin-top: var(--space-2);" });
+        wrapSkip.appendChild(el("label", {}, ["Provider skip"]));
+        wrapSkip.appendChild(tagEditor(merged["provider-skip"] || [], (v) => {
+            const ov = setupEditState(); ov["provider-skip"] = v; markDirty();
+        }));
+        isEditing.appendChild(wrapSkip);
+
+        const wrapInjections = el("div", { style: "margin-top: var(--space-2);" });
+        wrapInjections.appendChild(el("label", {}, ["Permitted Injections (skills/hooks/rules a tool may self-install)"]));
+        const injectionsList = el("div", {});
+        const renderInjectionRows = () => {
+          injectionsList.innerHTML = "";
+          const items = merged["permitted-injections"] || [];
+          items.forEach((item, idx) => {
+            const row = el("div", { style: "display:flex; gap:var(--space-1); margin-bottom:var(--space-1);" });
+            const kindSel = el("select", { class: "form-control" });
+            ["skill", "hook", "rule", "config", "other"].forEach((k) => {
+              const opt = el("option", { value: k }, [k]);
+              if (item.kind === k) opt.selected = true;
+              kindSel.appendChild(opt);
+            });
+            kindSel.onchange = (e) => {
+              const ov = setupEditState();
+              const entry = ov["permitted-injections"][idx];
+              const newKind = e.target.value;
+              const wasPathKind = entry.kind === "config" || entry.kind === "other";
+              const isPathKindNow = newKind === "config" || newKind === "other";
+              entry.kind = newKind;
+              if (wasPathKind !== isPathKindNow) {
+                // Migrate the value across the name/path field split so the
+                // persisted entry never mixes kind with the wrong field —
+                // a mismatch is schema-invalid and breaks every subsequent
+                // sync.py run (see _validate_permitted_injections).
+                const carried = wasPathKind ? entry.path : entry.name;
+                delete entry.path;
+                delete entry.name;
+                if (isPathKindNow) entry.path = carried || ""; else entry.name = carried || "";
+              }
+              markDirty();
+              renderInjectionRows();
+            };
+            const isPathKind = item.kind === "config" || item.kind === "other";
+            const valInput = el("input", { class: "form-control", placeholder: isPathKind ? "path" : "name", value: isPathKind ? (item.path || "") : (item.name || "") });
+            valInput.oninput = (e) => {
+              const ov = setupEditState();
+              const field = (ov["permitted-injections"][idx].kind === "config" || ov["permitted-injections"][idx].kind === "other") ? "path" : "name";
+              ov["permitted-injections"][idx][field] = e.target.value;
+              markDirty();
+            };
+            const descInput = el("input", { class: "form-control", placeholder: "description", value: item.description || "" });
+            descInput.oninput = (e) => { const ov = setupEditState(); ov["permitted-injections"][idx].description = e.target.value; markDirty(); };
+            const removeBtn = el("button", { class: "btn btn-sm" }, ["✕"]);
+            removeBtn.onclick = () => { const ov = setupEditState(); ov["permitted-injections"].splice(idx, 1); markDirty(); renderInjectionRows(); };
+            row.appendChild(kindSel); row.appendChild(valInput); row.appendChild(descInput); row.appendChild(removeBtn);
+            injectionsList.appendChild(row);
+          });
+        };
+        renderInjectionRows();
+        wrapInjections.appendChild(injectionsList);
+        const addInjectionBtn = el("button", { class: "btn btn-sm" }, ["+ Add Permitted Injection"]);
+        addInjectionBtn.onclick = () => {
+          const ov = setupEditState();
+          ov["permitted-injections"] = ov["permitted-injections"] || [];
+          ov["permitted-injections"].push({ kind: "skill", name: "" });
+          markDirty();
+          renderInjectionRows();
+        };
+        wrapInjections.appendChild(addInjectionBtn);
+        isEditing.appendChild(wrapInjections);
+      },
+      onReset: () => { delete projOverrides[id]; markDirty(); },
+    });
+  };
+
+  const renderPanel = (id, isFramework) => {
+    const kind = getMerged(id).kind;
+    return kind === "cli-tool" ? renderToolPanel(id, isFramework) : renderMcpPanel(id, isFramework);
+  };
+
   const projListContainer = el("div", { style: "margin-bottom:var(--space-5)" });
-  
-  const allIds = new Set([...Object.keys(fwServers), ...Object.keys(projOverrides)]);
-  
+  const allIds = new Set([...Object.keys(catalog), ...Object.keys(projOverrides)]);
+
   if (allIds.size === 0) {
-    projListContainer.appendChild(el("div", { class: "empty" }, ["No servers found."]));
+    projListContainer.appendChild(el("div", { class: "empty" }, ["No plugins found."]));
   } else {
     Array.from(allIds).sort().forEach(id => {
-      projListContainer.appendChild(renderSrvPanel(id, fwServers.hasOwnProperty(id)));
+      projListContainer.appendChild(renderPanel(id, Object.prototype.hasOwnProperty.call(catalog, id)));
     });
   }
-  
   wrap.appendChild(projListContainer);
 
-  const addBtn = el("button", { class: "btn" }, ["+ Add Custom Server (Not in Framework)"]);
+  const addBtn = el("button", { class: "btn" }, ["+ Add Custom Plugin (Not in Framework)"]);
   addBtn.onclick = () => {
-    const id = prompt("MCP Server ID:");
-    if (id && !allIds.has(id)) {
-      projOverrides[id] = { connection: { type: "stdio", command: "", args: [] } };
-      activeServers.add(id);
-      markDirty();
-      // Render new panel immediately
-      const newPanel = renderSrvPanel(id, false);
-      projListContainer.appendChild(newPanel);
-      allIds.add(id);
-      toast("Custom server added. Configure it below.", "success");
+    const id = prompt("Plugin ID:");
+    if (!id || allIds.has(id)) return;
+    const kind = prompt("Kind — 'mcp-server' or 'cli-tool':", "mcp-server");
+    if (kind !== "mcp-server" && kind !== "cli-tool") { toast("Kind must be 'mcp-server' or 'cli-tool'.", "error"); return; }
+    if (kind === "mcp-server") {
+      projOverrides[id] = { kind, connection: { type: "stdio", command: "", args: [] } };
+    } else {
+      projOverrides[id] = { kind, description: "", category: "", "enabled-by-default": false, "rule-content": "", hooks: [], "provider-skip": [] };
     }
+    markDirty();
+    projListContainer.appendChild(renderPanel(id, false));
+    allIds.add(id);
+    toast("Custom plugin added. Configure it below.", "success");
   };
   wrap.appendChild(addBtn);
 
-  const saveBtn = el("button", { class: "btn btn-primary", style: "margin-top:var(--space-5); display:block; width: 100%" }, ["Save Project MCP Configuration"]);
+  const saveBtn = el("button", { class: "btn btn-primary", style: "margin-top:var(--space-5); display:block; width: 100%" }, ["Save Plugin Overrides"]);
   saveBtn.onclick = async () => {
     try {
-      await api.put("/api/config/project/section", { section: "mcp-servers", data: Array.from(activeServers) });
-      await api.put("/api/config/project/section", { section: "mcp-registry", data: projOverrides });
-      toast("MCP configuration saved", "success");
+      // Whole-file write of .meta-config/plugin-catalog.yaml (project layer).
+      await api.put("/api/config/project-plugin-catalog", { plugins: projOverrides });
+      toast("Plugin overrides saved", "success");
       dirty = false;
       router.setDirty(false);
-      router.navigate("/project/mcp-overrides");
+      router.navigate("/project/plugin-overrides");
     } catch (e) {
       toast(e.message, "error");
     }
@@ -2789,8 +2972,11 @@ async function viewProjectMcpOverrides() {
 async function viewAvailablePlugins() {
   const wrap = el("div");
   wrap.appendChild(el("h1", {}, ["Verfügbare Plugins"]));
-  wrap.appendChild(el("p", { class: "help-text" }, [
-    "Alle katalogisierten Plugins (MCP-Server + CLI-Tools). Aktivieren, testen, konfigurieren."]));
+  const intro = el("p", { class: "help-text" }, [
+    "Alle katalogisierten Plugins (MCP-Server + CLI-Tools) aktivieren und testen. Verbindungs-/Tool-Details pro Projekt anpassen unter "]);
+  intro.appendChild(el("a", { href: "#/project/plugin-overrides", style: "color:var(--accent);" }, ["Plugin Overrides"]));
+  intro.appendChild(document.createTextNode("."));
+  wrap.appendChild(intro);
 
   let catData, projData;
   try {
@@ -3000,326 +3186,6 @@ async function viewProjectSkillsOverrides() {
 
   return wrap;
 }
-async function viewProjectExternalToolsOverrides() {
-  const wrap = el("div");
-  wrap.appendChild(el("h1", {}, ["Project — External Tools"]));
-  wrap.appendChild(el("p", { class: "help-text" }, ["Enable/Disable curated external CLI dev-tool integrations (rule text + hook wiring) for your project, or customize them specifically for this repository."]));
-
-  try {
-    // This banner runs scan_injection_drift() live, so it can briefly
-    // disagree with the last-sync snapshot rendered into
-    // external-tools-drift.md (e.g. right after a manual file drop, before
-    // the next `sync.py` run regenerates that file). That's expected —
-    // treat the banner as "right now", the .md as "as of last sync".
-    const driftResp = await api.get("/api/external-tools/drift");
-    if (driftResp.error) {
-      wrap.appendChild(el("div", {
-        style: "margin-bottom:var(--space-4); padding:var(--space-2) var(--space-3); "
-             + "border:1px solid var(--border-color); border-radius:4px; "
-             + "color:var(--text-muted); font-size:12px;",
-      }, [`Drift-Scan fehlgeschlagen: ${driftResp.error}`]));
-    } else {
-      const allFindings = Object.values(driftResp.findings || {}).flat();
-      if (allFindings.length > 0) {
-        const banner = el("div", {
-          style: "margin-bottom:var(--space-4); padding:var(--space-3); border:1px solid #b45309; "
-               + "border-radius:4px; background:rgba(180,83,9,0.1);",
-        });
-        banner.appendChild(el("strong", {}, [`${allFindings.length} undeclared artifact(s) found`]));
-        const list = el("ul", { style: "margin:var(--space-2) 0 0 0; padding-left: 20px;" });
-        allFindings.slice(0, 10).forEach((f) => {
-          list.appendChild(el("li", {}, [`${f.path} (${f.kind}) — ${f.tool || "no tool assigned"}`]));
-        });
-        banner.appendChild(list);
-        wrap.appendChild(banner);
-      }
-    }
-  } catch (err) {
-    // Non-fatal — network-level failure (e.g. server unreachable); the
-    // drift banner is a convenience, not a blocker for the panel.
-  }
-
-  let projData, catData;
-  try {
-    projData = await api.get("/api/config/project");
-    // Framework external-tool definitions now live in the unified plugin
-    // catalog (config/plugin-catalog.yaml superseded
-    // config/external-tools-registry.yaml, see plugin-catalog-unification)
-    // -- filter to the cli-tool kind to get the same shape the old
-    // "external-tools" map had.
-    catData = await api.get("/api/config/plugin-catalog").catch(() => ({ plugins: {} }));
-  } catch (err) {
-    wrap.appendChild(renderError(err));
-    return wrap;
-  }
-
-  // "external-tools" in project.yaml is a dict { name: { enabled: bool } },
-  // not a flat array like "mcp-servers". Unlike the MCP panel's Set, we keep
-  // this as an explicit map so both enabled:true AND enabled:false can be
-  // recorded (a framework enabled-by-default:true tool can be explicitly
-  // switched off without touching the registry override).
-  const rawTools = projData["external-tools"] || {};
-  const activeTools = {};
-  if (Array.isArray(rawTools)) {
-    rawTools.forEach((name) => { activeTools[name] = { enabled: true }; });
-  } else {
-    Object.entries(rawTools).forEach(([name, v]) => {
-      if (v && typeof v === "object" && typeof v.enabled === "boolean") {
-        activeTools[name] = { enabled: v.enabled };
-      } else if (v === true || v === false) {
-        activeTools[name] = { enabled: v };
-      }
-    });
-  }
-  const projOverrides = projData["external-tools-registry"] || {};
-  const fwTools = Object.fromEntries(
-    Object.entries(catData.plugins || {}).filter(([, def]) => def && def.kind === "cli-tool"));
-
-  let dirty = false;
-  const markDirty = () => { dirty = true; router.setDirty(true); };
-
-  const getMerged = (id) => {
-      const fw = fwTools[id] || {};
-      const ov = projOverrides[id] || {};
-      return { ...fw, ...ov };
-  };
-
-  const isToolActive = (id, merged) => {
-      if (activeTools[id] && typeof activeTools[id].enabled === "boolean") return activeTools[id].enabled;
-      return !!merged["enabled-by-default"];
-  };
-
-  const renderBadgeList = (items) => {
-      const w = el("div", { style: "display:flex; flex-wrap:wrap; gap: var(--space-1); margin-top: var(--space-1);" });
-      (items || []).forEach((v) => {
-          w.appendChild(el("span", { class: "badge" }, [String(v)]));
-      });
-      return w;
-  };
-
-  const renderToolPanel = (id, isFramework) => {
-    const isOverride = projOverrides.hasOwnProperty(id);
-    const isActive = isToolActive(id, getMerged(id));
-    const merged = getMerged(id);
-
-    const setupEditState = () => {
-        if (!projOverrides[id]) {
-            // Deep copy framework state to override
-            projOverrides[id] = JSON.parse(JSON.stringify(fwTools[id] || {}));
-        }
-        return projOverrides[id];
-    };
-
-    return renderOverridePanel({
-      id,
-      badgeLabel: "Framework Tool",
-      isFramework,
-      isOverride,
-      isActive,
-      description: merged.description,
-      secrets: null,
-      onToggleActive: (newVal) => {
-          // Always write an explicit {enabled: true|false} entry — unlike the
-          // MCP panel's Set-membership, an explicit "false" here overrides an
-          // enabled-by-default:true framework tool.
-          activeTools[id] = { enabled: newVal };
-          markDirty();
-      },
-      buildReadonly: (isReadonly) => {
-        if (merged.category) {
-            isReadonly.appendChild(el("div", { style: "color:#fff; font-weight:bold; margin-bottom:var(--space-1);" }, [`Category: ${merged.category}`]));
-        }
-        isReadonly.appendChild(el("div", {}, [`Enabled by default: ${merged["enabled-by-default"] ? "yes" : "no"}`]));
-
-        if (merged["rule-content"]) {
-            isReadonly.appendChild(el("div", { style: "margin-top:var(--space-2); font-weight:bold; color:#fff;" }, ["Rule content:"]));
-            isReadonly.appendChild(el("pre", { style: "white-space:pre-wrap; margin:0; padding:var(--space-2); background:var(--bg-card); border-radius:4px;" }, [merged["rule-content"]]));
-        }
-
-        if (merged.hooks && merged.hooks.length > 0) {
-            isReadonly.appendChild(el("div", { style: "margin-top:var(--space-2);" }, ["Hooks:"]));
-            isReadonly.appendChild(renderBadgeList(merged.hooks));
-        }
-
-        if (merged["provider-skip"] && merged["provider-skip"].length > 0) {
-            isReadonly.appendChild(el("div", { style: "margin-top:var(--space-2);" }, ["Provider skip:"]));
-            isReadonly.appendChild(renderBadgeList(merged["provider-skip"]));
-        }
-
-        if (merged["permitted-injections"] && merged["permitted-injections"].length > 0) {
-            isReadonly.appendChild(el("div", { style: "margin-top:var(--space-2);" }, ["Permitted injections:"]));
-            isReadonly.appendChild(renderBadgeList(merged["permitted-injections"].map(
-              (i) => `${i.kind}: ${i.name || i.path}`
-            )));
-        }
-      },
-      buildEdit: (isEditing) => {
-        const wrapDesc = el("div", {});
-        wrapDesc.appendChild(el("label", {}, ["Description"]));
-        const inpDesc = el("input", { class: "form-control", value: merged.description || "" });
-        inpDesc.oninput = (e) => { const ov = setupEditState(); ov.description = e.target.value; markDirty(); };
-        wrapDesc.appendChild(inpDesc);
-        isEditing.appendChild(wrapDesc);
-
-        const wrapCat = el("div", {});
-        wrapCat.appendChild(el("label", {}, ["Category"]));
-        const inpCat = el("input", { class: "form-control", value: merged.category || "" });
-        inpCat.oninput = (e) => { const ov = setupEditState(); ov.category = e.target.value; markDirty(); };
-        wrapCat.appendChild(inpCat);
-        isEditing.appendChild(wrapCat);
-
-        const wrapDefault = el("div", { style: "display:flex; align-items:center; gap: var(--space-2);" });
-        const cbDefault = el("input", { type: "checkbox" });
-        cbDefault.checked = !!merged["enabled-by-default"];
-        cbDefault.onchange = (e) => { const ov = setupEditState(); ov["enabled-by-default"] = e.target.checked; markDirty(); };
-        wrapDefault.appendChild(cbDefault);
-        wrapDefault.appendChild(el("label", {}, ["Enabled by default"]));
-        isEditing.appendChild(wrapDefault);
-
-        const wrapRule = el("div", {});
-        wrapRule.appendChild(el("label", {}, ["Rule content (Markdown)"]));
-        const taRule = el("textarea", {
-            class: "form-control",
-            style: "width:100%; height:160px; font-family:var(--font-mono); font-size:12px;",
-        });
-        taRule.value = merged["rule-content"] || "";
-        taRule.oninput = (e) => { const ov = setupEditState(); ov["rule-content"] = e.target.value; markDirty(); };
-        wrapRule.appendChild(taRule);
-        isEditing.appendChild(wrapRule);
-
-        const wrapHooks = el("div", { style: "margin-top: var(--space-2);" });
-        wrapHooks.appendChild(el("label", {}, ["Hooks (hooks/0-external/<stem>.sh)"]));
-        wrapHooks.appendChild(tagEditor(merged.hooks || [], (v) => {
-            const ov = setupEditState();
-            ov.hooks = v;
-            markDirty();
-        }));
-        isEditing.appendChild(wrapHooks);
-
-        const wrapSkip = el("div", { style: "margin-top: var(--space-2);" });
-        wrapSkip.appendChild(el("label", {}, ["Provider skip"]));
-        wrapSkip.appendChild(tagEditor(merged["provider-skip"] || [], (v) => {
-            const ov = setupEditState();
-            ov["provider-skip"] = v;
-            markDirty();
-        }));
-        isEditing.appendChild(wrapSkip);
-
-        const wrapInjections = el("div", { style: "margin-top: var(--space-2);" });
-        wrapInjections.appendChild(el("label", {}, ["Permitted Injections (skills/hooks/rules a tool may self-install)"]));
-        const injectionsList = el("div", {});
-        const renderInjectionRows = () => {
-          injectionsList.innerHTML = "";
-          const items = merged["permitted-injections"] || [];
-          items.forEach((item, idx) => {
-            const row = el("div", { style: "display:flex; gap:var(--space-1); margin-bottom:var(--space-1);" });
-            const kindSel = el("select", { class: "form-control" });
-            ["skill", "hook", "rule", "config", "other"].forEach((k) => {
-              const opt = el("option", { value: k }, [k]);
-              if (item.kind === k) opt.selected = true;
-              kindSel.appendChild(opt);
-            });
-            kindSel.onchange = (e) => {
-              const ov = setupEditState();
-              const entry = ov["permitted-injections"][idx];
-              const newKind = e.target.value;
-              const wasPathKind = entry.kind === "config" || entry.kind === "other";
-              const isPathKindNow = newKind === "config" || newKind === "other";
-              entry.kind = newKind;
-              if (wasPathKind !== isPathKindNow) {
-                // Migrate the value across the name/path field split so the
-                // persisted entry never mixes kind with the wrong field —
-                // a mismatch is schema-invalid and breaks every subsequent
-                // sync.py run (see _validate_permitted_injections).
-                const carried = wasPathKind ? entry.path : entry.name;
-                delete entry.path;
-                delete entry.name;
-                if (isPathKindNow) entry.path = carried || ""; else entry.name = carried || "";
-              }
-              markDirty();
-              renderInjectionRows();
-            };
-            const isPathKind = item.kind === "config" || item.kind === "other";
-            const valInput = el("input", { class: "form-control", placeholder: isPathKind ? "path" : "name", value: isPathKind ? (item.path || "") : (item.name || "") });
-            valInput.oninput = (e) => {
-              const ov = setupEditState();
-              const field = (ov["permitted-injections"][idx].kind === "config" || ov["permitted-injections"][idx].kind === "other") ? "path" : "name";
-              ov["permitted-injections"][idx][field] = e.target.value;
-              markDirty();
-            };
-            const descInput = el("input", { class: "form-control", placeholder: "description", value: item.description || "" });
-            descInput.oninput = (e) => { const ov = setupEditState(); ov["permitted-injections"][idx].description = e.target.value; markDirty(); };
-            const removeBtn = el("button", { class: "btn btn-sm" }, ["✕"]);
-            removeBtn.onclick = () => { const ov = setupEditState(); ov["permitted-injections"].splice(idx, 1); markDirty(); renderInjectionRows(); };
-            row.appendChild(kindSel); row.appendChild(valInput); row.appendChild(descInput); row.appendChild(removeBtn);
-            injectionsList.appendChild(row);
-          });
-        };
-        renderInjectionRows();
-        wrapInjections.appendChild(injectionsList);
-        const addInjectionBtn = el("button", { class: "btn btn-sm" }, ["+ Add Permitted Injection"]);
-        addInjectionBtn.onclick = () => {
-          const ov = setupEditState();
-          ov["permitted-injections"] = ov["permitted-injections"] || [];
-          ov["permitted-injections"].push({ kind: "skill", name: "" });
-          markDirty();
-          renderInjectionRows();
-        };
-        wrapInjections.appendChild(addInjectionBtn);
-        isEditing.appendChild(wrapInjections);
-      },
-      onReset: () => { delete projOverrides[id]; markDirty(); },
-    });
-  };
-
-  const projListContainer = el("div", { style: "margin-bottom:var(--space-5)" });
-
-  const allIds = new Set([...Object.keys(fwTools), ...Object.keys(projOverrides)]);
-
-  if (allIds.size === 0) {
-    projListContainer.appendChild(el("div", { class: "empty" }, ["No external tools found."]));
-  } else {
-    Array.from(allIds).sort().forEach(id => {
-      projListContainer.appendChild(renderToolPanel(id, fwTools.hasOwnProperty(id)));
-    });
-  }
-
-  wrap.appendChild(projListContainer);
-
-  const addBtn = el("button", { class: "btn" }, ["+ Add Custom Tool (Not in Framework)"]);
-  addBtn.onclick = () => {
-    const id = prompt("External Tool ID:");
-    if (id && !allIds.has(id)) {
-      projOverrides[id] = { description: "", category: "", "enabled-by-default": false, "rule-content": "", hooks: [], "provider-skip": [] };
-      activeTools[id] = { enabled: true };
-      markDirty();
-      // Render new panel immediately
-      const newPanel = renderToolPanel(id, false);
-      projListContainer.appendChild(newPanel);
-      allIds.add(id);
-      toast("Custom tool added. Configure it below.", "success");
-    }
-  };
-  wrap.appendChild(addBtn);
-
-  const saveBtn = el("button", { class: "btn btn-primary", style: "margin-top:var(--space-5); display:block; width: 100%" }, ["Save Project External Tools Configuration"]);
-  saveBtn.onclick = async () => {
-    try {
-      await api.put("/api/config/project/section", { section: "external-tools", data: activeTools });
-      await api.put("/api/config/project/section", { section: "external-tools-registry", data: projOverrides });
-      toast("External tools configuration saved", "success");
-      dirty = false;
-      router.setDirty(false);
-      router.navigate("/project/external-tools-overrides");
-    } catch (e) {
-      toast(e.message, "error");
-    }
-  };
-  wrap.appendChild(saveBtn);
-
-  return wrap;
-}
-
 
 /* Reusable tag editor — comma- or Enter-separated entries; safe DOM build. */
 function tagEditor(initial, onChange) {
@@ -9941,10 +9807,9 @@ async function init() {
   router.register("/project/advanced",        viewProjectAdvanced);
   router.register("/project/gitignore",       viewProjectGitignore);
   router.register("/project/knowledge-engine", viewProjectKnowledgeEngine);
-  router.register("/project/mcp-overrides",    viewProjectMcpOverrides);
+  router.register("/project/plugin-overrides", viewProjectPluginOverrides);
   router.register("/project/plugins",          viewAvailablePlugins);
   router.register("/project/skills-overrides", viewProjectSkillsOverrides);
-  router.register("/project/external-tools-overrides", viewProjectExternalToolsOverrides);
   // Backward-compat: keep the old route pointing at the raw editor.
   router.register("/config/project",  viewProjectAdvanced);
   router.register("/config/gitignore-defaults", viewGitignoreDefaults);

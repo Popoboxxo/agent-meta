@@ -38,6 +38,7 @@ Immediately Read: `external/awesome-claude-code/.claude/commands/evaluate-reposi
 | **Agent roles** (new generic types) | `1-generic/<role>.md` |
 | **Platform patterns** (platform-specific knowledge: Bun, Deno, FastAPI, ...) | `2-platform/<platform>-*.md` |
 | **Rules / hooks / workflows** (CLAUDE.md patterns, hooks, slash commands) | `howto/` or snippet |
+| **Plugins** (MCP servers / CLI tools already curated) | `config/plugin-catalog.yaml` (recommend activation, no new integration) |
 
 ## 3. Primary scouting sources
 
@@ -74,6 +75,8 @@ Per candidate: score via the evaluation framework (1-10 per category). Red-flag 
 **agent-meta repo:** Popoboxxo/agent-meta (v0.101.0-beta.5)
 
 **Existing skills:** see `config/skills-registry.yaml`
+
+**Plugin catalog:** see `config/plugin-catalog.yaml` — the curated list of MCP servers + CLI tools. When proposing tooling, prefer an existing catalog entry (recommend activation) over a brand-new external candidate.
 </context>
 
 <tools>

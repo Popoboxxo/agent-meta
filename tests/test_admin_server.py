@@ -1205,17 +1205,22 @@ class TestComputeInjectionDrift(unittest.TestCase):
                 encoding="utf-8",
             )
             (root / ".meta-config").mkdir(parents=True)
-            (root / ".meta-config" / "project.yaml").write_text("ai-providers: []\n", encoding="utf-8")
+            # Declare ZzzTestProvider as this project's provider: the drift scan
+            # only covers providers CONFIGURED for the project (resolve_providers),
+            # so it must appear in ai-providers to be scanned at all.
+            (root / ".meta-config" / "project.yaml").write_text(
+                "ai-providers:\n- ZzzTestProvider\n", encoding="utf-8")
 
             handler = self._make_handler(root)
             result = handler._audit_service().compute_injection_drift()
 
             self.assertNotIn("error", result, result.get("error"))
             # "ZzzTestProvider" only exists in .agent-meta/config/ai-providers.yaml
-            # — its presence proves load_providers_config() was called with the
-            # submodule root. The old bug passed the (empty) project root instead,
-            # silently falling back to a Claude-only stub and never seeing this
-            # provider at all.
+            # — its presence in the findings proves load_providers_config() was
+            # called with the submodule root (the provider must be in
+            # provider_config for resolve_providers to keep it). The old bug
+            # passed the (empty) project root instead, silently falling back to a
+            # Claude-only stub and never seeing this provider at all.
             self.assertIn("ZzzTestProvider", result["findings"])
 
 
@@ -1846,6 +1851,90 @@ class TestLoadModelsDevDataResilience(unittest.TestCase):
                 result = handler._models_service()._load_models_dev_data()
             self.assertEqual(result["source"], "api")
             self.assertFalse(hasattr(admin_server.AdminRequestHandler, "_models_dev_error"))
+
+
+class TestWriteProjectSectionPlugins(unittest.TestCase):
+    """C1 regression: the ``plugins`` project section must be writable end-to-end
+    via ``PUT /api/config/project/section`` — the admin UI's "Verfügbare Plugins"
+    Save button PUTs exactly this, and it 400'd before because ``plugins`` was
+    missing from the writable-section whitelist."""
+
+    def _make_handler(self, root: Path):
+        handler = admin_server.AdminRequestHandler.__new__(admin_server.AdminRequestHandler)
+        admin_server.AdminRequestHandler.root = root
+        admin_server.AdminRequestHandler.config_manager = admin_server.ConfigManager(
+            root, mode="project_admin")
+        return handler
+
+    def test_plugins_section_write_persists(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".meta-config").mkdir()
+            handler = self._make_handler(root)
+            payload = {"section": "plugins",
+                       "data": {"graphify": {"enabled": True},
+                                "honcho": {"enabled": False}}}
+            captured: dict[str, Any] = {}
+            handler._read_body = lambda: payload
+            handler._send_json = lambda result: captured.update(result=result)
+
+            handler._write_project_section()  # must not raise
+
+            persisted = handler.config_manager.read("project")
+            self.assertEqual(persisted["plugins"],
+                             {"graphify": {"enabled": True}, "honcho": {"enabled": False}})
+
+    def test_retired_legacy_sections_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".meta-config").mkdir()
+            handler = self._make_handler(root)
+            for dead in ("mcp-servers", "mcp-registry", "external-tools", "external-tools-registry"):
+                handler._read_body = lambda dead=dead: {"section": dead, "data": {}}
+                handler._send_json = lambda result: None
+                with self.assertRaises(ValueError, msg=f"{dead} should be rejected"):
+                    handler._write_project_section()
+
+
+class TestPluginCatalogInjectionValidation(unittest.TestCase):
+    """I2/I3: per-project plugin overrides now flow through the plugin-catalog
+    file (project-plugin-catalog). A schema-invalid permitted-injections entry
+    must be rejected at write time, preserving the guard the retired
+    external-tools-registry section had."""
+
+    def _make_handler(self, root: Path):
+        handler = admin_server.AdminRequestHandler.__new__(admin_server.AdminRequestHandler)
+        admin_server.AdminRequestHandler.root = root
+        admin_server.AdminRequestHandler.config_manager = admin_server.ConfigManager(
+            root, mode="project_admin")
+        return handler
+
+    def test_invalid_injection_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".meta-config").mkdir()
+            handler = self._make_handler(root)
+            # kind=skill requires 'name', not 'path' -> invalid
+            body = {"plugins": {"graphify": {"kind": "cli-tool",
+                    "permitted-injections": [{"kind": "skill", "path": "x"}]}}}
+            handler._read_body = lambda: body
+            handler._send_json = lambda result: None
+            with self.assertRaises(ValueError):
+                handler._route_put_config("project-plugin-catalog")
+
+    def test_valid_injection_persists(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".meta-config").mkdir()
+            handler = self._make_handler(root)
+            body = {"plugins": {"graphify": {"kind": "cli-tool",
+                    "permitted-injections": [{"kind": "skill", "name": "graphify"}]}}}
+            captured: dict[str, Any] = {}
+            handler._read_body = lambda: body
+            handler._send_json = lambda result: captured.update(result=result)
+            handler._route_put_config("project-plugin-catalog")  # must not raise
+            persisted = handler.config_manager.read("project-plugin-catalog")
+            self.assertIn("graphify", persisted["plugins"])
 
 
 if __name__ == "__main__":

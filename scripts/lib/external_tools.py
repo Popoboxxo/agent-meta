@@ -9,9 +9,14 @@ model. No connection blocks, no secrets, no provider-config injection — a tool
 contributes only rule-content and a declarative list of hook wrappers that live
 in ``hooks/0-external/``.
 
+The tool definitions themselves are no longer read from a standalone
+``config/external-tools-registry.yaml``; they are the ``cli-tool`` slice of the
+unified plugin catalog (``config/plugin-catalog.yaml`` via :mod:`lib.plugins`),
+filtered by kind here.
+
 Public interface:
     load_external_tools_registry(agent_meta_root, config, project_root)
-        → dict of tool definitions (3-source merge)
+        → dict of tool definitions (cli-tool slice of the plugin catalog)
     resolve_active_external_tools(config, agent_meta_root, project_root)
         → list of active tool names
     generate_external_tool_artifacts(...)
@@ -25,7 +30,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .io import SyncError, _deep_merge, _load_yaml_or_json, _normalize_enabled_config, safe_path, write_checked
+from .io import SyncError, _normalize_enabled_config, safe_path, write_checked
 from .log import SyncLog
 from .plugins import _activation_from_config, load_plugin_catalog, plugins_of_kind
 from .rule_index import bootstrap_previously_managed, cleanup_stale_managed_files, write_managed_index
@@ -121,14 +126,13 @@ def load_external_tools_registry(
     config: dict | None = None,
     project_root: Path | None = None,
 ) -> dict:
-    """Load config/external-tools-registry.yaml and deep-merge project overrides.
+    """Return the cli-tool slice of the unified plugin catalog.
 
-    Sources (later wins, deep-merged):
-      1. Framework:  <agent_meta_root>/config/external-tools-registry.yaml
-      2. Project:    <project_root>/.meta-config/external-tools-registry.yaml
-      3. Inline:     config["external-tools-registry"] from project.yaml
-
-    Returns a flat {tool_name: tool_def} dict.
+    Loads config/plugin-catalog.yaml (with its own framework/project/inline
+    deep-merge, see lib.plugins.load_plugin_catalog) and filters to the
+    ``cli-tool`` kind, giving the same flat {tool_name: tool_def} shape the
+    old config/external-tools-registry.yaml `external-tools` map had. Each
+    returned tool's permitted-injections list is validated eagerly.
     """
     catalog = load_plugin_catalog(agent_meta_root=agent_meta_root, config=config, project_root=project_root)
     registry = plugins_of_kind(catalog, "cli-tool")
@@ -175,8 +179,8 @@ def resolve_active_external_tools(
     — without a registry definition there is no rule-content to render.
 
     registry: pass an already-loaded load_external_tools_registry() result to
-    skip re-reading/re-parsing config/external-tools-registry.yaml when the
-    caller has one on hand.
+    skip re-reading/re-parsing the plugin catalog when the caller has one on
+    hand.
     """
     if registry is None:
         registry = load_external_tools_registry(agent_meta_root, config, project_root)

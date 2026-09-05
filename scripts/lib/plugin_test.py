@@ -7,6 +7,7 @@ mock them without real subprocess/network.
 from __future__ import annotations
 
 import json
+import os
 import queue
 import re
 import shutil
@@ -60,9 +61,14 @@ def _mcp_initialize_handshake(command: str, args: list, env: dict) -> tuple[bool
     Uses _read_line_with_timeout for correct timeout semantics on all platforms."""
     proc = None
     try:
+        # Merge the plugin's declared vars ON TOP of the parent environment —
+        # passing only `env` (which holds solely the plugin's own vars, no PATH
+        # or HOME) makes every stdio plugin with an env: block fail to even
+        # spawn (e.g. `npx`/`node` not found because PATH is gone).
+        child_env = {**os.environ, **env} if env else None
         proc = subprocess.Popen([command, *args], stdin=subprocess.PIPE,  # noqa: S603
                                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                                text=True, env=env or None)
+                                text=True, env=child_env)
         req = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize",
                           "params": {"protocolVersion": "2024-11-05", "capabilities": {},
                                      "clientInfo": {"name": "agent-meta", "version": "1"}}})

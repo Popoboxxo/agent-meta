@@ -61,17 +61,6 @@ def plugins_of_kind(catalog: dict, kind: str) -> dict:
     }
 
 
-def _plugin_is_active(plugin_id: str, plugin_def: dict, activation: dict) -> bool:
-    """True if plugin should render. Mirrors external_tools._tool_is_active:
-    explicit project activation[plugin_id]['enabled'] wins, else the catalog's
-    enabled-by-default, else False (opt-in)."""
-    if plugin_id in activation and "enabled" in activation[plugin_id]:
-        return bool(activation[plugin_id]["enabled"])
-    if "enabled-by-default" in plugin_def:
-        return bool(plugin_def["enabled-by-default"])
-    return False
-
-
 def _activation_from_config(config: dict) -> dict:
     """Resolve the canonical activation dict. Prefers the unified `plugins:`
     block; falls back to the legacy `mcp-servers:` list + `external-tools:`
@@ -91,13 +80,30 @@ def resolve_active_plugins(
     catalog: dict | None = None,
 ) -> list[str]:
     """All active plugin ids (any kind), catalog order. Used by the browse/probe/
-    scout/test features — NOT by artifact generation (those keep the per-kind
-    resolvers whose order is byte-identity-sensitive)."""
+    scout/test features.
+
+    Delegates to the two generation-layer resolvers (resolve_active_mcp_servers
+    for mcp-server plugins, resolve_active_external_tools for cli-tool plugins)
+    so this browse/probe layer sees EXACTLY the plugins artifact generation
+    activates — no third, looser notion of "active". This matters because the
+    two kinds have *different* activation models: cli-tools honour the catalog's
+    enabled-by-default flag, but mcp-servers do NOT (they are active only via an
+    explicit enabled: true or a platform bundle). A single enabled-by-default
+    fallback for both kinds (the old implementation) made enabled-by-default
+    mcp-servers look active to the probe/scout layer while being absent from the
+    generated .mcp.json — see I5 in the plugin-catalog-unification fix wave.
+
+    Deferred imports break the plugins <- mcp_registry / external_tools cycle
+    (both import _activation_from_config etc. from this module at import time).
+    """
+    from .external_tools import resolve_active_external_tools
+    from .mcp_registry import resolve_active_mcp_servers
+
     if catalog is None:
         catalog = load_plugin_catalog(config=config, agent_meta_root=agent_meta_root, project_root=project_root)
-    activation = _activation_from_config(config)
-    return [pid for pid, pdef in catalog.items()
-            if isinstance(pdef, dict) and _plugin_is_active(pid, pdef, activation)]
+    active = set(resolve_active_mcp_servers(config, agent_meta_root, project_root))
+    active |= set(resolve_active_external_tools(config, agent_meta_root, project_root))
+    return [pid for pid in catalog if pid in active]
 
 
 def provider_has_lazy_channel(pc: dict) -> bool:

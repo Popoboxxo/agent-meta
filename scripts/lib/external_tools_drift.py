@@ -160,7 +160,7 @@ def scan_injection_drift(
     agent-meta itself manages (per-directory .agent-meta-managed indexes) nor
     any active external tool's permitted-injections declares. Pure — no writes.
     """
-    from .deactivation import is_provider_active
+    from .deactivation import get_active_providers
     from .mcp import resolve_active_mcp_servers
 
     registry = load_external_tools_registry(agent_meta_root, config, project_root)
@@ -169,8 +169,19 @@ def scan_injection_drift(
 
     findings_by_provider: dict[str, list[dict]] = {}
 
+    # Only scan providers actually CONFIGURED for this project (resolve_providers)
+    # and not deactivated -- get_active_providers() gives exactly that set.
+    # is_provider_active() alone was wrong: it only tests deactivation, so every
+    # provider merely DEFINED in ai-providers.yaml (Codex/ZCode/... not in the
+    # project's `ai-providers` list) was scanned. Harmless for providers whose
+    # infra dirs don't exist, but Codex's rules_dir is the project-root `rules/`
+    # -- which in agent-meta-self-hosting IS the framework SOURCE tree -- so the
+    # scan misread rules/{0-external,1-generic,2-platform} as foreign artifacts
+    # and wrote a stray rules/external-tools-drift.md into the source tree.
+    active_providers = set(get_active_providers(config, provider_config))
+
     for provider, pc in provider_config.items():
-        if not is_provider_active(config, provider):
+        if provider not in active_providers:
             continue
 
         # Permitted set, resolved to absolute paths, keyed by dir-kind.

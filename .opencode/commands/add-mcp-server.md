@@ -9,7 +9,7 @@ Activate an MCP server for this project. $ARGUMENTS
 1. Read `.agent-meta/config/plugin-catalog.yaml` (mcp-server entries) and `.meta-config/project.yaml`.
 2. If $ARGUMENTS empty/invalid, list available servers and ask.
 3. Show required secrets; wait until `.meta-config/secrets.local.yaml` is updated.
-4. Add the server to `mcp-servers:` in `.meta-config/project.yaml`.
+4. Activate the server in the unified `plugins:` block of `.meta-config/project.yaml` (add `<name>: { enabled: true }`).
 5. Run `python .agent-meta/scripts/sync.py` and report generated files.
 
 Finish with: "MCP server '<name>' is now active. Restart your AI provider to pick up the new tools."

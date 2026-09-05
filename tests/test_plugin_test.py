@@ -122,6 +122,46 @@ def test_local_process_partial_line_timeout(monkeypatch):
     assert "no response" in res["message"].lower()
 
 
+def test_local_process_env_block_inherits_parent_env(monkeypatch):
+    """I4 regression: a stdio plugin with an env: block must inherit the parent
+    PATH/HOME, not run with ONLY its own declared vars (which would strip PATH
+    and make the command unresolvable). The plugin's vars override on top."""
+    captured = {}
+
+    class MockStdin:
+        def write(self, s):
+            pass
+        def flush(self):
+            pass
+
+    class MockProc:
+        def __init__(self):
+            self.stdin = MockStdin()
+            self.stdout = object()
+        def poll(self):
+            return 0  # already exited → finally block skips terminate
+
+    def _fake_popen(cmd, *a, **kw):
+        captured["env"] = kw.get("env")
+        return MockProc()
+
+    monkeypatch.setattr(pt.os, "environ", {"PATH": "/usr/bin", "HOME": "/home/x"})
+    monkeypatch.setattr(pt.subprocess, "Popen", _fake_popen)
+    monkeypatch.setattr(pt, "_read_line_with_timeout", lambda stream, timeout: '{"result": {}}')
+
+    pdef = {"origin-type": "local-process",
+            "connection": {"type": "stdio", "command": "npx", "args": ["-y", "srv"],
+                           "env": {"API_KEY": "{{TOK}}"}}}
+    res = run_plugin_test("srv", pdef, secrets={"TOK": "sekret"})
+
+    assert res["status"] == "PASS"
+    env = captured["env"]
+    assert env is not None
+    assert env["PATH"] == "/usr/bin"          # inherited from parent
+    assert env["HOME"] == "/home/x"           # inherited from parent
+    assert env["API_KEY"] == "sekret"         # plugin's own var, secret-resolved
+
+
 def test_unknown_origin_type():
     res = run_plugin_test("mystery", {"origin-type": "quantum"})
     assert res["status"] == "UNKNOWN"
