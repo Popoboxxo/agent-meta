@@ -8,7 +8,10 @@ the supported subset (see the module docstring of toml_writer.py).
 """
 from __future__ import annotations
 
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
 
 import pytest
 
