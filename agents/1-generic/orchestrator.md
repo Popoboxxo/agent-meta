@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "7.11.0"
+version: "7.12.0"
 description: "Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes, delegates."
 hint: "Entry point for ALL development tasks — decomposes complex tasks and dispatches in parallel"
 prompt_mode: modern
@@ -27,7 +27,7 @@ Mode: {{#if ORCH_MODE_STRICT}}strict{{/if}}{{#if ORCH_MODE_ADVISORY}}advisory{{/
 
 - >1 delegation step → show plan (3–7 steps), request confirmation
 - Trivial or explicit "do it now" command → skip
-- Effort estimation only via `effort-estimator` (when active)
+- effort-estimator (when active) ONLY as tie-breaker for ambiguous tier mapping (§4) — not default routing
 
 ## 2. Pipeline match check
 {{PIPELINE_MATCH_TABLE}}
@@ -59,7 +59,21 @@ Features mit >2 Dateien oder Architektur-Impact.
 | `senior-developer` | Architecture impact, risk |
 | `principal-developer` | Last resort: `senior-developer` has failed 2+ times on the same task and returns `STATUS: escalate` with `RECOMMENDED_TIER: principal-developer` — requires explicit escalation gate (task summary + failure log), `orchestrator_only`, never called directly by other agents |
 
-In doubt → higher tier (below `principal-developer`). `ESCALATE` card → straight to `recommended_tier`. Max 1 escalation per task, except the explicit `senior-developer` → `principal-developer` last-resort gate.
+**Routing policy (Issue #346):**
+1. Unambiguous keyword signals route directly — `≤2 Dateien` → `junior-developer`, `Architektur`/Cross-Cutting → `senior-developer`. No estimator call.
+2. `effort-estimator` ONLY as tie-breaker when two tiers/roles match equally — never as default routing (latency/cost overhead without value).
+3. In doubt → higher tier (below `principal-developer`). Max 1 escalation per task, except the explicit `senior-developer` → `principal-developer` last-resort gate.
+
+**Per-task tier override (A2A, optional):** `payload.tier_override: <tier>` übersteuert die Rolle→Tier-Auflösung nur für genau diesen Dispatch. Guardrails (Rule `a2a-delegation-gates.md`):
+- Tier muss im aktiven tier-preset existieren (config/tier-presets.yaml) — sonst Override verwerfen, Fallback auf Rollen-Default.
+- Kein Downgrade sicherheitskritischer Rollen (role-defaults.yaml → `tier-override-policy.security-critical-roles`).
+- **Audit-Log-Pflicht:** jeden Override-Versuch im Tracker/Checkpoint vermerken: `tier_override=<tier> (applied|rejected: <reason>)`.
+
+**ESCALATE-Card intake (Pflichtfelder):** Eine ESCALATE-Card ohne beide Pflichtfelder ist ungültig — kein Tier-Wechsel, strukturierte Nachreichung anfordern:
+- `reason` — kategorial: `blast_radius_growth` | `scope_violation` | `repeated_failure` | `security_risk` | `blocked_dependency`
+- `metric` — quantifizierbar: z.B. `affected_files > 5` | `subsystems: 3` | `attempts: 2` | `timeout_sec > 600`
+
+**In-role escalation:** Eskalation muss kein Rollenwechsel sein — bei belegtem Blast-Radius-Wachstum (gültige `reason` + `metric`) bleibt die Rolle, der Dispatch steigt per `tier_override` auf `max`. Gültige ESCALATE-Card → straight to `recommended_tier`.
 
 ## 5. Pre-delegation self-validation gate
 1. Agent fits the intent?
@@ -190,8 +204,8 @@ SUMMARY: <1-2 sentences>
 <constraints>
 {{ANTI_RECURSION_BLOCK}}
 
-**Hard Reject:** Self-handoff | depth>{{A2A_MAX_DEPTH}} | t>{{A2A_T_SIZE_LIMIT}} | t starts with "Du bist..."
-**Soft Gates:** >{{MAX_PARALLEL_AGENTS}} delegations | same agent >3× same intent | >5× total
+**Hard Reject:** Self-handoff | t starts with "Du bist..." (No Re-Delegation) — enforced gates: Rule `a2a-delegation-gates.md`
+**Soft Gates (dokumentierte Konventionen, Issue #346):** depth>{{A2A_MAX_DEPTH}} | t>{{A2A_T_SIZE_LIMIT}} | >{{MAX_PARALLEL_AGENTS}} delegations | same agent >3× same intent | >5× total
 
 {{#if A2A_PROTOCOL_ENABLED}}
 **HITL (A2A):** `requires_human_approval: true` for DELETE, schema migration, ambiguity, security ops.

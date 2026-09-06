@@ -1572,6 +1572,16 @@ outcome-caching:
   ttl_seconds: 3600
   max_entries: 100
   invalidation: git-commit
+# Per-task tier override policy (issue #346): guardrails for the optional
+# A2A envelope field `payload.tier_override` — see
+# rules/1-generic/a2a-delegation-gates.md and resolve_tier_override() in
+# scripts/lib/delegation_syntax.py (reference implementation).
+tier-override-policy:
+  # Roles that must never be downgraded via tier_override (same or higher
+  # tier only). An explicitly empty list disables the downgrade guard.
+  security-critical-roles:
+  - security-auditor
+  - code-reviewer
 reflection_pairs:
 - id: dev-review-loop
   generator: developer

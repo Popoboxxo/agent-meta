@@ -1,3 +1,8 @@
+---
+name: threat-model-4-questions
+description: "Use before public releases — answer the 4 threat-model questions (what are you building, what could go wrong, mitigations, consequences)."
+---
+
 # Threat Model — die 4 Fragen
 
 Vor jedem öffentlichen Release die 4 Fragen beantworten (Igor Andriushchenko,

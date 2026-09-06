@@ -158,6 +158,16 @@ context_file:
   #               wird durch Pointer ersetzt. Fehlender Key → immer "full" (Safe-Side).
   mode: full
 
+  # Context-Files (CLAUDE.md/AGENTS.md & Co.) von sync.py generieren und bei
+  # jedem Sync auffrischen (Default: true — bestehendes Verhalten).
+  # false = "Dev-written"-Modus (Issue #540 Fix 3, Evidence arXiv:2602.11988:
+  # handgeschriebene Context-Files schlagen generierte): sync.py lässt Header
+  # UND Managed Block komplett unangetastet. Agenten-/Regel-/Skill-Sync ist
+  # davon nicht betroffen. Hinweis: agent-meta generiert Context-Content nie
+  # per LLM — ausschliesslich template-basiert (Fix 5 damit per Architektur
+  # erfüllt); der Schalter steuert nur template-basiertes Überschreiben.
+  auto_generate: true
+
   # Weiches Zeilen-Limit: Der Konsistenz-Check warnt (kein Fehler), wenn ein
   # generiertes Contextfile diese Zeilenzahl überschreitet.
   max_lines: 250

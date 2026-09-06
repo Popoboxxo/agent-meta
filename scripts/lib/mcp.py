@@ -29,7 +29,7 @@ from .rule_index import (
     cleanup_stale_managed_files,
     write_managed_index,
 )
-from .rules import resolve_rules
+from .rules import provider_opts_skip, resolve_rules
 from .skill_channel import (
     cleanup_stale_skill_channel_rules,
     provider_supports_skill_channel,
@@ -259,10 +259,13 @@ def generate_mcp_artifacts(
     """Generate MCP rule files + provider configs for all active servers.
 
     For each active server (from project.yaml + platform bundles):
-      - Writes mcp-<server>.md into the provider's rules_dir (if has_rules),
-        or <skills_dir>/mcp-<server>/SKILL.md instead when rules-presets.yaml
-        flags rule stem 'mcp-<server>' with channel: skill for a provider
-        that supports it (see scripts/lib/skill_channel.py).
+      - Rule files by provider channel (config-key selected, no provider-name
+        branches): has_rules providers get mcp-<server>.md in their rules_dir
+        (or <skills_dir>/mcp-<server>/SKILL.md via the native Skill channel,
+        scripts/lib/skill_channel.py PROVIDERS); has_rules:false providers
+        WITH a skills_dir (#192 Phase 2 embedded-rules channel) get
+        <skills_dir>/mcp-<server>/SKILL.md for every section the shared
+        managed block no longer embeds (opts embed: false / channel: skill).
       - Writes/updates committed provider config with ${ENV_VAR} references
       - Writes/updates local provider config with actual values (if secrets.local.yaml exists)
 
@@ -294,6 +297,19 @@ def generate_mcp_artifacts(
     )
     all_mcp_rule_stems = {f"{MCP_RULE_PREFIX}{s}" for s in registry}
     now_managed_skill_rules: set[str] = set()
+
+    # Issue #192 Phase 2 (selective rule embedding): providers WITHOUT a
+    # native rules_dir but with a skills_dir receive the per-server sections
+    # the shared managed block no longer embeds (embed: false / channel:
+    # skill in rules-presets.yaml) as separate SKILL.md files — the same
+    # progressive-disclosure channel sync_embedded_rule_files() uses for
+    # rules/ sources. Gated purely on config keys (has_rules / skills_dir),
+    # no provider-name branches.
+    embedded_rules_channel_dir: Path | None = None
+    if not pc.get("has_rules") and skills_dir_rel:
+        embedded_rules_channel_dir = project_root / skills_dir_rel
+        if not dry_run:
+            embedded_rules_channel_dir.mkdir(parents=True, exist_ok=True)
 
     # --- Rule file generation ---
     # Providers without an explicit rules_dir (e.g. Claude) fall back to the
@@ -354,13 +370,43 @@ def generate_mcp_artifacts(
         )
         write_managed_index(managed_index_path, now_managed, dry_run)
 
-    if skills_target_dir is not None:
+    # #192 Phase 2: write the non-embedded per-server sections for
+    # has_rules:false providers into their skills_dir (FULL variant — the
+    # files are lazy-loaded, compaction is an embed-only concern).
+    if embedded_rules_channel_dir is not None:
+        for server_name in active_servers:
+            server_def = registry.get(server_name)
+            if not server_def:
+                log.warning(f"mcp: server '{server_name}' not in registry — skipping rule generation")
+                continue
+            rule_stem = f"{MCP_RULE_PREFIX}{server_name}"
+            opts = rule_options.get(rule_stem, {})
+            if provider_opts_skip(opts, provider):
+                continue
+            if not (opts.get("embed") is False or opts.get("channel") == "skill"):
+                # Preset says embed (no file-channel flag): the managed block
+                # embeds the section — nothing to write here.
+                continue
+            now_managed_skill_rules.add(rule_stem)
+            write_skill_channel_rule(
+                rule_stem, _generate_rule_content(server_name, server_def),
+                opts, embedded_rules_channel_dir, project_root, log, dry_run,
+                f"mcp-registry/{server_name}",
+            )
+
+    # Skill-channel stale-cleanup + managed-index merge — covers BOTH the
+    # native skill channel (has_rules + PROVIDERS, e.g. Claude) and the #192
+    # embedded-rules channel (has_rules:false + skills_dir, e.g. Opencode).
+    # Universe-scoped to the mcp-* stems so entries owned by other writers of
+    # the same shared skills_dir index (rules.py, skills.py) are never touched.
+    effective_skill_dir = skills_target_dir or embedded_rules_channel_dir
+    if effective_skill_dir is not None:
         cleanup_stale_skill_channel_rules(
-            skills_target_dir, project_root, all_mcp_rule_stems, now_managed_skill_rules,
+            effective_skill_dir, project_root, all_mcp_rule_stems, now_managed_skill_rules,
             log, dry_run, "mcp server rule no longer routed to channel: skill",
         )
         write_skill_channel_managed_index(
-            skills_target_dir, now_managed_skill_rules, dry_run, universe=all_mcp_rule_stems
+            effective_skill_dir, now_managed_skill_rules, dry_run, universe=all_mcp_rule_stems
         )
 
     # --- Provider config generation ---

@@ -1,6 +1,6 @@
 ---
 name: se-testreviewer
-version: 1.3.0
+version: 1.4.0
 description: Audits the test strategy. Checks for edge cases, boundary value analysis,
   equivalence class errors, and flakiness.
 hint: Use this agent to review and audit test models and integration test strategies
@@ -134,7 +134,7 @@ Wenn du als Critic in einem Reflection-Loop arbeitest (erkennbar an Iterationsz�
 2. **Bewerte** nur die spezifischen Findings aus der vorherigen Runde.
 3. **REVISE:** präzise, actionable `correction_hints` (max. 5 Punkte).
 4. **APPROVE:** bestätige dass alle Findings behoben sind.
-5. **ESCALATE:** nach `max_iterations` ohne Lösung → mit Begründung.
+5. **ESCALATE:** nach `max_iterations` ohne Lösung → Card mit Pflichtfeldern `reason` (kategorial) + `metric` (quantifizierbar, z.B. attempts: 3) — Freitext allein reicht nicht (issue #346).
 
 **Revision-Regeln:** hints sind spezifisch (kein vages "verbessere die Tests"), referenzierbar (Szenario-ID/Komponente/Interface), umsetzbar (kein "Teststrategie komplett ändern").
 

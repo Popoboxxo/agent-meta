@@ -3,7 +3,7 @@
 > Projektbeschreibung für Claude-Agenten. Diese Datei ist die **einzige Quelle**
 > für projektspezifischen Kontext — Agenten lesen sie, statt eigenen Kontext zu haben.
 >
-> Generiert von agent-meta v0.101.0-beta.5 — `2026-09-04`
+> Generiert von agent-meta v0.101.0-beta.5 — `2026-09-06`
 >
 > **Längenempfehlung:** 200–500 Zeilen optimal. Über 500 Zeilen → Detailwissen in
 > `docs/ARCHITECTURE.md`, `docs/API.md` o.ä. auslagern und manuell verlinken.
@@ -29,9 +29,9 @@ Hier kannst du eigene, projektspezifische Notizen eintragen. Dieser Bereich wird
 **Plattform:** Python CLI (sync.py)
 **Beschreibung:** Zentrales Meta-Repository für die Standardisierung und Wiederverwendung von Claude-Agenten-Rollen über alle Projekte hinweg.
 
-> Stack: Python 3.x · Python 3, Markdown, YAML · Deps: - Python: `>=3.8`
+> Struktur: siehe Verzeichnisstruktur im Repo (`ls`/`find`); deklarativ: `.meta-config/project.yaml` → `variables.PROJECT_STRUCTURE`.
 
-> Struktur: `.meta-config/project.yaml` → `variables.PROJECT_STRUCTURE`.
+> Runtime & Abhängigkeiten: siehe Projekt-Manifest (`pyproject.toml` / `requirements.txt` / `package.json` / `manifest.json`).
 
 **Entry-Point:** `scripts/sync.py — Haupt-CLI für Agent-Generierung`
 

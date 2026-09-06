@@ -23,6 +23,12 @@ delegation_syntax:
       {"protocol_version":"1.0.0","handoff_id":"HOFF-YYYYMMDD-NNN","source_agent":"<quelle>","target_agent":"<ziel>","schema_ref":"<schema-uri>","payload":{...},"trace_parent":"<parent-HOFF>"}
       ```
       FANOUT mit gleichem target: batch:true, payload als Array.
+      Optional per-task tier override: `"tier_override":"<tier>"` in payload —
+      übersteuert die Rolle→Tier-Auflösung nur für diesen Dispatch. Nur Tiers
+      des aktiven tier-presets (config/tier-presets.yaml); kein Downgrade
+      sicherheitskritischer Rollen (role-defaults.yaml → tier-override-policy);
+      Audit-Log-Pflicht: jeden Override-Versuch (applied|rejected) im
+      Delegations-Tracker vermerken (issue #346).
 
   Opencode:
     delegate: "Delegiere via `task(subagent_type=\"<ziel-agent>\", description=\"<kurzbeschreibung>\", prompt=\"<vollständiger-task-text>\"). Ersetze die Platzhalter entsprechend."
@@ -82,6 +88,10 @@ delegation_syntax:
           t: "<task>"
           pri: "<priority>"
       ```
+      Optional: payload.tier_override ("<tier>") — übersteuert die Rolle→Tier-
+      Auflösung nur für diesen Dispatch. Nur Tiers des aktiven tier-presets
+      (config/tier-presets.yaml); kein Downgrade sicherheitskritischer Rollen;
+      Audit-Log-Pflicht im Delegations-Tracker (issue #346).
       Dann: @<ziel> Bearbeite diesen strukturierten Handoff.
 
   Copilot:

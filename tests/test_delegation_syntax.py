@@ -57,25 +57,42 @@ def test_delegation_depth_within_default_max_is_accepted():
     assert errors == []
 
 
-def test_delegation_depth_exceeding_max_is_rejected():
+# --- Issue #346: depth gate degraded to documentation ---
+# The former max_depth range check was removed from validate_envelope():
+# platform limits (e.g. Claude Code's own subagent depth cap) already enforce
+# a ceiling, so the local check was ritual without gate effect. The
+# `max_depth` project.yaml configuration stays documented
+# (docs/concepts/a2a-handoff-protocol.md) but is no longer plumbed through.
+
+def test_delegation_depth_exceeding_max_is_not_enforced():
+    """Issue #346: delegation_depth range is no longer a validation error —
+    the gate was degraded to a documented convention."""
     engine = DelegationSyntaxEngine()
     envelope = _base_envelope(delegation_depth=11)
     errors = engine.validate_envelope(envelope, agent_meta_root=REPO_ROOT)
-    assert any("out of range" in e for e in errors)
+    assert errors == []
+    assert not any("out of range" in e for e in errors)
 
 
-def test_delegation_depth_respects_custom_max_depth():
+def test_validate_envelope_has_no_max_depth_parameter():
+    """Issue #346: the enforced max_depth path (project.yaml plumbing) was
+    removed — the parameter no longer exists on validate_envelope()."""
+    import inspect
+    params = inspect.signature(DelegationSyntaxEngine.validate_envelope).parameters
+    assert "max_depth" not in params
+
+
+def test_tier_override_must_be_string_when_present():
+    """Structural tier_override check in validate_envelope; the full
+    guardrails (preset bounds, downgrade block) live in resolve_tier_override
+    (see tests/test_tier_override.py)."""
     engine = DelegationSyntaxEngine()
-    envelope = _base_envelope(delegation_depth=3)
-    errors = engine.validate_envelope(envelope, agent_meta_root=REPO_ROOT, max_depth=2)
-    assert any("out of range" in e for e in errors)
-
-
-def test_non_integer_delegation_depth_is_rejected():
-    engine = DelegationSyntaxEngine()
-    envelope = _base_envelope(delegation_depth="deep")
+    envelope = _base_envelope(payload={"t": "Fix the thing", "tier_override": 7})
     errors = engine.validate_envelope(envelope, agent_meta_root=REPO_ROOT)
-    assert any("Invalid delegation_depth" in e for e in errors)
+    assert any("tier_override" in e for e in errors)
+
+    ok = _base_envelope(payload={"t": "Fix the thing", "tier_override": "max"})
+    assert engine.validate_envelope(ok, agent_meta_root=REPO_ROOT) == []
 
 
 def test_get_schema_ref_known_names():

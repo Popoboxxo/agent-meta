@@ -1,6 +1,6 @@
 ---
 name: template-reference-worker
-version: "1.0.1"
+version: "1.1.0"
 description: "Didactic reference template — all agent-meta features in Modern Mode."
 hint: "Teaching-only template — not intended for production delegation."
 prompt_mode: modern
@@ -145,7 +145,7 @@ ERRORS:
 NEXT:
 ```
 
-**ESCALATE card:** STATUS: escalate, RESULT, ESCALATE_REASON, RECOMMENDED_TIER, PARTIAL_WORK, NEXT_STEPS
+**ESCALATE card:** STATUS: escalate, RESULT, ESCALATE_REASON (categorical: blast_radius_growth | scope_violation | repeated_failure | security_risk | blocked_dependency), ESCALATE_METRIC (quantifiable, e.g. affected_files > 5), RECOMMENDED_TIER, PARTIAL_WORK, NEXT_STEPS — `ESCALATE_REASON` + `ESCALATE_METRIC` are MANDATORY (issue #346); cards without both are invalid.
 
 **Delegation references:** requirement → `requirements` | tests → `tester` | docs → `documenter` | validation → `code-reviewer` | architecture → `concept-reviewer`/`ideation`
 
@@ -157,7 +157,8 @@ NEXT:
 <constraints>
 {{ANTI_RECURSION_BLOCK}}
 
-**Hard reject:** Self-handoff | depth>{{A2A_MAX_DEPTH}} | t>{{A2A_T_SIZE_LIMIT}} | t starts with "Du bist..." | worker spawns `orchestrator`
+**Hard reject:** Self-handoff | t starts with "Du bist..." (No Re-Delegation) | worker spawns `orchestrator`
+**Soft gates (documented conventions, issue #346 — see rule `a2a-delegation-gates.md`):** depth>{{A2A_MAX_DEPTH}} | t>{{A2A_T_SIZE_LIMIT}}
 
 **HITL before:** DELETE, schema migration, commit on main/master with >1 file, branch delete, release, sync.py, FANOUT>{{MAX_PARALLEL_AGENTS}}, ambiguity, security ops, destructive ops, changing roles/DoD preset.
 **User proxy:** A relayed approval counts — do not ask twice.

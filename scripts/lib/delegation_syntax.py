@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from .io import load_yaml_file
+from .roles import _TIER_SEQUENCE
 
 # Known A2A schemas shipped with agent-meta (relative to repo root).
 # These paths are intentionally relative so they remain valid when the repo is
@@ -35,6 +36,13 @@ _A2A_REQUIRED_FIELDS: tuple[str, ...] = (
     "target_agent",
     "payload",
     "delegation_depth",
+)
+
+# Fallback policy when config/role-defaults.yaml has no tier-override-policy
+# block (issue #346): these roles must never be DOWNGRADED via the optional
+# payload.tier_override envelope field. Config always wins over this default.
+_DEFAULT_SECURITY_CRITICAL_ROLES: frozenset[str] = frozenset(
+    {"security-auditor", "code-reviewer"}
 )
 
 
@@ -89,6 +97,8 @@ class DelegationSyntaxEngine:
         self.config_dir = config_dir
         self._syntax_registry: dict[str, Any] | None = None
         self._capabilities_registry: dict[str, Any] | None = None
+        self._tier_presets: dict[str, Any] | None = None
+        self._role_defaults: dict[str, Any] | None = None
 
     # ------------------------------------------------------------------
     # Internal registries
@@ -125,6 +135,37 @@ class DelegationSyntaxEngine:
         """Return capabilities for a provider."""
         return self.capabilities_registry.get("capabilities", {}).get(provider, {})
 
+    @property
+    def tier_presets(self) -> dict[str, Any]:
+        """Tier preset curves from ``config/tier-presets.yaml`` (fail-soft → ``{}``).
+
+        Same loader pattern as :attr:`syntax_registry` — the file is framework
+        config, absent or malformed content yields an empty registry.
+        """
+        if self._tier_presets is None:
+            self._tier_presets = load_yaml_file(
+                self.config_dir / "tier-presets.yaml",
+                on_error="default",
+                default={},
+            )
+        return self._tier_presets or {}
+
+    @property
+    def role_defaults(self) -> dict[str, Any]:
+        """Raw ``config/role-defaults.yaml`` content (fail-soft → ``{}``).
+
+        Loads the unfiltered file (unlike ``roles.load_roles_config``, which
+        strips everything but ``roles``) because the tier-override policy block
+        is a top-level sibling of ``roles``.
+        """
+        if self._role_defaults is None:
+            self._role_defaults = load_yaml_file(
+                self.config_dir / "role-defaults.yaml",
+                on_error="default",
+                default={},
+            )
+        return self._role_defaults or {}
+
     # ------------------------------------------------------------------
     # A2A schema helpers
     # ------------------------------------------------------------------
@@ -147,7 +188,6 @@ class DelegationSyntaxEngine:
         envelope: dict[str, Any],
         schema_name: str = "a2a-handoff",
         agent_meta_root: Path | None = None,
-        max_depth: int = 10,
     ) -> list[str]:
         """Validate an A2A envelope dict and return a list of error strings.
 
@@ -158,17 +198,32 @@ class DelegationSyntaxEngine:
            subagents through the provider's ``Agent``/``Task`` tool call, not
            through a Python layer, and ``orchestrator-guard.sh`` (the only
            PreToolUse hook running on every tool) can inspect ``Write``,
-           ``Edit`` and ``Bash`` only. The depth and self-handoff limits in
+           ``Edit`` and ``Bash`` only. The gates in
            ``.claude/rules/a2a-delegation-gates.md`` are therefore conventions
            the model follows, not barriers the framework enforces — that rule
            file states this explicitly, and the decision is recorded in
            ``docs/concepts/a2a-handoff-protocol.md``. Do not cite this function
            as evidence that the gates are enforced (issue #460).
 
+        .. note:: **Delegation depth is NOT validated here anymore (issue #346).**
+
+           The former ``max_depth`` range check was removed: platform limits
+           (e.g. Claude Code's own subagent depth cap) already enforce a depth
+           ceiling, making the local check ritual without gate effect. The
+           ``max_depth`` project.yaml configuration
+           (``orchestrator.delegation.max_depth``) is documented in
+           ``docs/concepts/a2a-handoff-protocol.md`` but no longer plumbed
+           through this function. ``delegation_depth`` remains a required
+           envelope field for traceability.
+
         Validation strategy (two tiers):
 
         1. **Stdlib required-fields check** — always runs, no extra dependencies.
-           Verifies that all fields listed in ``_A2A_REQUIRED_FIELDS`` are present.
+           Verifies that all fields listed in ``_A2A_REQUIRED_FIELDS`` are present,
+           rejects self-handoffs (source_agent == target_agent) and performs a
+           structural type check on ``payload.tier_override``. The full
+           tier_override guardrails (preset bounds, security-critical downgrade
+           block, audit record) live in :meth:`resolve_tier_override`.
 
         2. **Full JSON Schema validation** — runs only when ``jsonschema`` is
            importable *and* the schema file can be resolved.  Gracefully skipped
@@ -179,9 +234,6 @@ class DelegationSyntaxEngine:
             schema_name:     Schema key (default ``"a2a-handoff"``).
             agent_meta_root: Repo root path used to locate the schema file.
                              Derived from ``config_dir`` when not provided.
-            max_depth:       Maximum allowed delegation_depth (default 10).
-                             Configurable via ``orchestrator.delegation.max_depth``
-                             in project.yaml.
 
         Returns:
             A list of human-readable error strings.  Empty list means valid.
@@ -202,14 +254,16 @@ class DelegationSyntaxEngine:
                 "Delegation to self is structurally forbidden."
             )
 
-        dd = envelope.get("delegation_depth")
-        if dd is not None:
-            if not isinstance(dd, int) or isinstance(dd, bool):
+        # Tier 1.6: tier_override structural check (type only — the full
+        # guardrails need role/preset context and live in resolve_tier_override).
+        payload = envelope.get("payload")
+        if isinstance(payload, dict) and "tier_override" in payload:
+            tier_override = payload.get("tier_override")
+            if not isinstance(tier_override, str) or not tier_override.strip():
                 errors.append(
-                    f"Invalid delegation_depth: must be integer 0..{max_depth}, got {type(dd).__name__}"
+                    "Invalid tier_override: must be a non-empty string tier name, "
+                    f"got {type(tier_override).__name__}"
                 )
-            elif dd < 0 or dd > max_depth:
-                errors.append(f"Delegation depth {dd} out of range: must be 0..{max_depth}")
 
         # Tier 2: full JSON Schema validation (optional, graceful degradation)
         schema_rel = self.get_schema_ref(schema_name)
@@ -230,6 +284,179 @@ class DelegationSyntaxEngine:
                 pass  # schema file missing/corrupt — skip silently
 
         return errors
+
+    # ------------------------------------------------------------------
+    # Per-task tier override (issue #346)
+    # ------------------------------------------------------------------
+
+    def resolve_tier_override(
+        self,
+        envelope: dict[str, Any],
+        role: str | None = None,
+        active_preset: str = "Normal",
+        provider: str | None = None,
+    ) -> dict[str, Any]:
+        """Resolve the optional ``payload.tier_override`` A2A envelope field.
+
+        Per-task tier override (issue #346): ``payload.tier_override: <tier>``
+        overrides the role→tier resolution (``role-defaults.yaml`` → ``model``)
+        for exactly one dispatch. This method enforces the guardrails and
+        returns an audit record for every override attempt — accepted or
+        rejected (audit-log duty).
+
+        .. note:: **Dormant by design — reference implementation.**
+
+           Like :meth:`validate_envelope`, this is a manually-invokable
+           validation utility, not a runtime interception point. The guardrails
+           are prompt-enforced via the orchestrator template (tier-selection
+           section) and ``.claude/rules/a2a-delegation-gates.md``; this function
+           is the testable single source of truth for their semantics.
+
+        Guardrails, evaluated in order:
+
+        1. **Type** — ``tier_override`` must be a non-empty string.
+        2. **Known tier** — must be one of the abstract tier names
+           (``nano/fast/balanced/powerful/max/ultra``, mirrored from
+           ``scripts/lib/roles.py``).
+        3. **Preset bounds** — the tier must exist in the active tier preset
+           (``config/tier-presets.yaml``): the preset's global ``tiers:`` map,
+           or the union with ``providers.<provider>.tiers`` when a provider
+           context is given. Unknown preset → rejected.
+        4. **No downgrade of security-critical roles** — roles listed in
+           ``tier-override-policy.security-critical-roles`` (from
+           ``config/role-defaults.yaml``; default: ``security-auditor``,
+           ``code-reviewer``) may only be overridden to the same or a higher
+           tier. Roles whose ``model`` value is not an abstract tier (e.g. a
+           raw model ID) skip the rank comparison — model IDs carry no
+           intrinsic ordering.
+
+        Args:
+            envelope:      The A2A envelope dict (reads ``payload.tier_override``).
+            role:          Role the envelope is dispatched to. Falls back to
+                           ``target_agent`` when omitted.
+            active_preset: Name of the active tier preset (project.yaml
+                           ``tier-preset``, default ``"Normal"``).
+            provider:      Optional provider name; widens the preset bounds to
+                           the provider-specific tier map when present.
+
+        Returns:
+            Dict with keys:
+
+            - ``requested``: the raw override value (``None`` when absent).
+            - ``effective``: the applied tier (set only when ``applied``).
+            - ``applied``:   ``True`` when the override passes all guardrails.
+            - ``errors``:    human-readable guardrail violations (empty when
+                             applied or when no override is present).
+            - ``audit``:     audit-log entry (``event``, ``target_agent``,
+                             ``role``, ``requested``, ``active_preset``,
+                             ``decision``, ``reason``) for every present
+                             override attempt, or ``None`` when the envelope
+                             carries no override.
+        """
+        payload = envelope.get("payload")
+        if not isinstance(payload, dict) or "tier_override" not in payload:
+            return {
+                "requested": None,
+                "effective": None,
+                "applied": False,
+                "errors": [],
+                "audit": None,
+            }
+
+        target_agent = envelope.get("target_agent", "")
+        role_name = role or (str(target_agent) if target_agent else "")
+        audit: dict[str, Any] = {
+            "event": "tier_override",
+            "target_agent": target_agent,
+            "role": role_name,
+            "requested": payload.get("tier_override"),
+            "active_preset": active_preset,
+            "decision": "rejected",
+            "reason": "",
+        }
+        result: dict[str, Any] = {
+            "requested": audit["requested"],
+            "effective": None,
+            "applied": False,
+            "errors": [],
+            "audit": audit,
+        }
+
+        # 1. Type guard
+        requested = audit["requested"]
+        if not isinstance(requested, str) or not requested.strip():
+            result["errors"].append(
+                "tier_override must be a non-empty string tier name, "
+                f"got {type(requested).__name__}"
+            )
+            audit["reason"] = "type error: tier_override must be a non-empty string"
+            return result
+        requested = requested.strip()
+        audit["requested"] = requested
+        result["requested"] = requested
+
+        # 2. Known tier
+        if requested not in _TIER_SEQUENCE:
+            result["errors"].append(
+                f"Unknown tier '{requested}': must be one of {', '.join(_TIER_SEQUENCE)}"
+            )
+            audit["reason"] = f"unknown tier '{requested}'"
+            return result
+
+        # 3. Preset bounds
+        preset = self.tier_presets.get(active_preset)
+        if not isinstance(preset, dict) or not preset:
+            result["errors"].append(
+                f"Active tier-preset '{active_preset}' not found in tier-presets.yaml"
+            )
+            audit["reason"] = f"preset '{active_preset}' not found"
+            return result
+        allowed_tiers = set((preset.get("tiers") or {}).keys())
+        if provider:
+            provider_preset = (preset.get("providers") or {}).get(provider) or {}
+            allowed_tiers |= set((provider_preset.get("tiers") or {}).keys())
+        if requested not in allowed_tiers:
+            scope = f" (provider '{provider}')" if provider else ""
+            result["errors"].append(
+                f"Tier '{requested}' is not defined in active tier-preset "
+                f"'{active_preset}'{scope} — override rejected, "
+                "falling back to role default"
+            )
+            audit["reason"] = (
+                f"tier '{requested}' outside active preset '{active_preset}' bounds"
+            )
+            return result
+
+        # 4. Security-critical downgrade guard (config-driven, issue #346)
+        policy = self.role_defaults.get("tier-override-policy")
+        policy = policy if isinstance(policy, dict) else {}
+        critical_roles = policy.get("security-critical-roles")
+        if isinstance(critical_roles, list):
+            critical = frozenset(str(r) for r in critical_roles)
+        else:
+            critical = _DEFAULT_SECURITY_CRITICAL_ROLES
+        if role_name in critical:
+            role_cfg = (self.role_defaults.get("roles") or {}).get(role_name) or {}
+            default_tier = str(role_cfg.get("model") or "")
+            if (
+                default_tier in _TIER_SEQUENCE
+                and _TIER_SEQUENCE.index(requested) < _TIER_SEQUENCE.index(default_tier)
+            ):
+                result["errors"].append(
+                    f"tier_override downgrade rejected: '{role_name}' is "
+                    f"security-critical (default tier '{default_tier}'), "
+                    f"requested tier '{requested}' is lower"
+                )
+                audit["reason"] = (
+                    f"downgrade blocked for security-critical role '{role_name}'"
+                )
+                return result
+
+        result["applied"] = True
+        result["effective"] = requested
+        audit["decision"] = "applied"
+        audit["reason"] = "within preset bounds, no tier-policy violation"
+        return result
 
     # ------------------------------------------------------------------
     # Template substitution

@@ -7,9 +7,9 @@
 **Plattform:** Python CLI (sync.py)
 **Beschreibung:** Zentrales Meta-Repository für die Standardisierung und Wiederverwendung von Claude-Agenten-Rollen über alle Projekte hinweg.
 
-> Stack: Python 3.x · Python 3, Markdown, YAML · Deps: - Python: `>=3.8`
+> Struktur: siehe Verzeichnisstruktur im Repo (`ls`/`find`); deklarativ: `.meta-config/project.yaml` → `variables.PROJECT_STRUCTURE`.
 
-> Struktur: `.meta-config/project.yaml` → `variables.PROJECT_STRUCTURE`.
+> Runtime & Abhängigkeiten: siehe Projekt-Manifest (`pyproject.toml` / `requirements.txt` / `package.json` / `manifest.json`).
 
 **Entry-Point:** `scripts/sync.py — Haupt-CLI für Agent-Generierung`
 

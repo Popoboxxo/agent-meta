@@ -141,6 +141,56 @@ def cleanup_stale_skill_channel_rules(
                     pass
 
 
+def sweep_orphan_skill_channel_rules(
+    project_root: Path,
+    skills_target_dir: Path,
+    union_universe: set[str],
+    log: SyncLog,
+    dry_run: bool,
+) -> None:
+    """Delete skill-channel orphans: index entries NO writer claims anymore.
+
+    Every writer of the shared ``<skills_dir>/.agent-meta-managed`` index
+    cleans only within its own current universe (merge-mode, see
+    ``skills._write_skills_managed_index``). A stem that disappears from ALL
+    sources — e.g. a rule file deleted from ``rules/`` (issue #437:
+    python-conventions), a server removed from ``mcp-registry.yaml`` — is in
+    nobody's universe, so the per-writer cleanups above never touch it and
+    its SKILL.md stays in the always-scanned skills_dir forever: a dead,
+    stale entry in every agent context. The sweep closes that gap: anything
+    OUTSIDE the union of all writers' possible stems (rules sources + mcp
+    registry + external-tools registry + skills registry — see
+    sync_pipeline._skill_channel_universe) is removed together with its
+    index entry; anything any writer could still own is protected.
+    """
+    from .skills import _read_skills_managed_index, _write_skills_managed_index
+
+    orphans = _read_skills_managed_index(skills_target_dir) - union_universe
+    if not orphans:
+        return
+    for stale_stem in sorted(orphans):
+        stale_skill_md = safe_path(skills_target_dir, stale_stem, "SKILL.md")
+        if stale_skill_md.exists():
+            log.action(
+                "DELETE", str(stale_skill_md.relative_to(project_root)),
+                "skill-channel orphan — stem no longer managed by any source "
+                "(removed from rules/mcp/tools/skills sources)",
+            )
+            if not dry_run:
+                stale_skill_md.unlink()
+                stale_dir = stale_skill_md.parent
+                try:
+                    if stale_dir.exists() and not any(stale_dir.iterdir()):
+                        stale_dir.rmdir()
+                except OSError:
+                    pass
+    # Drop the orphan entries from the shared index. Merge-mode with
+    # universe=orphans and an empty now_managed set removes exactly these
+    # entries — other writers' entries survive untouched; an index that ends
+    # up empty is deleted by _write_skills_managed_index.
+    _write_skills_managed_index(skills_target_dir, set(), dry_run, universe=orphans)
+
+
 def write_skill_channel_managed_index(
     skills_target_dir: Path,
     now_managed: set[str],

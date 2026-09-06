@@ -1,3 +1,7 @@
+---
+name: "Project Metadata"
+version: 2.0.0
+---
 ## Projekt
 
 **Name:** {{PROJECT_NAME}}
@@ -5,36 +9,16 @@
 **Plattform:** {{PLATFORM}}
 **Beschreibung:** {{PROJECT_DESCRIPTION}}
 
-{{#if COMPACT_MODE}}> Stack: {{RUNTIME}} · {{LANGUAGE}} · Deps: {{SYSTEM_DEPENDENCIES}}
+> Struktur: siehe Verzeichnisstruktur im Repo (`ls`/`find`); deklarativ: `.meta-config/project.yaml` → `variables.PROJECT_STRUCTURE`.
 
-> Struktur: `.meta-config/project.yaml` → `variables.PROJECT_STRUCTURE`.
+> Runtime & Abhängigkeiten: siehe Projekt-Manifest (`pyproject.toml` / `requirements.txt` / `package.json` / `manifest.json`).
 
 **Entry-Point:** `{{ENTRY_POINT_PATTERN}}`
 
 **Besondere Patterns:**
 {{KEY_PATTERNS}}
 
-{{else}}## Tech-Stack
-
-- **Runtime:** {{RUNTIME}}
-- **Sprache:** {{LANGUAGE}}
-- **Key-Dependencies:** {{SYSTEM_DEPENDENCIES}}
-
-## Architektur
-
-```
-{{PROJECT_STRUCTURE}}
-```
-
-**Entry-Point:**
-```
-{{ENTRY_POINT_PATTERN}}
-```
-
-**Besondere Patterns:**
-{{KEY_PATTERNS}}
-
-{{/if}}## Code-Konventionen
+## Code-Konventionen
 
 {{CODE_CONVENTIONS}}
 

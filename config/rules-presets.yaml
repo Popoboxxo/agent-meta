@@ -9,8 +9,19 @@
 #                        wird unabhängig vom Frontmatter immer komplett geladen
 #                        (verifiziert per frischem sync.py-Testlauf, 2026-08-14).
 #   gemini: skip        → Gemini: Rule wird gar nicht generiert
-#   embed: false        → Rule wird nicht in den Managed Block eingebettet
-#                        (nur als separate Datei verfügbar, z.B. .claude/rules/)
+#   embed: false        → Rule wird NICHT in den Managed Block eingebettet
+#                        (#192 Phase 2, Selective Rule Embedding). Stattdessen
+#                        landet sie als separate Datei in
+#                        '<skills_dir>/<rule-stem>/SKILL.md' und der Managed
+#                        Block rendert nur noch einen Einzeiler-Pointer dorthin
+#                        (Progressive Disclosure — der Agent lädt bei Bedarf
+#                        per Read). Wirksam, wenn ALLE Provider, die dasselbe
+#                        Context-File teilen, ein 'skills_dir' konfiguriert
+#                        haben; fehlt einem Sharer der Kanal, wird die Rule
+#                        eingebettet statt verworfen (kein Content-Loss).
+#                        Provider mit nativem rules_dir (has_rules: true)
+#                        schreiben die Datei via sync_rules() ohnehin separat
+#                        — dort ändert embed: false nichts.
 #   channel: skill       → Rule wird NICHT als <rules_dir>/<name>.md generiert,
 #                        sondern als <skills_dir>/<name>/SKILL.md — der einzige
 #                        echte Lazy-Load-Kanal auf Claude Code: nur `name` +
@@ -21,6 +32,12 @@
 #                        aber has_rules: false, jeder Call-Site ist dahinter
 #                        gated) fällt die Rule unverändert auf die normale
 #                        <rules_dir>/<name>.md-Datei zurück.
+#                        Im EMBED-Kanal (Provider ohne natives rules_dir, z.B.
+#                        Opencode) wirkt channel: skill seit #192 Phase 2 wie
+#                        embed: false: die Rule wird nicht eingebettet, sondern
+#                        als separate SKILL.md-Datei generiert (siehe
+#                        sync_embedded_rule_files) und der Block verweist nur
+#                        noch darauf.
 #   skill-description: "..." → Description im SKILL.md-Frontmatter (Englisch).
 #                        Fallback: erste Textzeile nach der H1-Überschrift des
 #                        Rule-Bodies. Nur relevant zusammen mit channel: skill.
@@ -45,8 +62,6 @@ presets:
     sync-interface:
       alwaysApply: false
     session-conclusion:
-      alwaysApply: false
-    python-conventions:
       alwaysApply: false
     a2a-delegation-gates:
       alwaysApply: false
@@ -73,9 +88,6 @@ presets:
       alwaysApply: false
       embed: false
     no-worktree-isolation:
-      alwaysApply: false
-      embed: false
-    python-conventions:
       alwaysApply: false
       embed: false
     session-conclusion:
@@ -115,9 +127,6 @@ presets:
     a2a-delegation-gates:
       channel: skill
       skill-description: "Use when delegating to subagents with A2A envelopes — covers depth limits, payload size, re-delegation and orchestrator singleton gates."
-    python-conventions:
-      channel: skill
-      skill-description: "Use when writing or reviewing Python code in this project — PEP8, type hints, docstrings."
     issue-lifecycle:
       channel: skill
       skill-description: "Use when working on a GitHub issue — referencing, closing keywords and post-completion commenting."

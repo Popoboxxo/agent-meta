@@ -1,6 +1,6 @@
 ---
 name: se-developer
-version: 1.2.0
+version: 1.3.0
 description: Implements standard SE leaf nodes with multiple interfaces. Follows SE interface discipline and contract-first approach. Persists implementation output.
 hint: |
   Standard SE leaf node implementation. Handles multiple interfaces (2-4). Escalates cross-cutting or boundary-level leafs.
@@ -128,11 +128,14 @@ Escalate (`status: escalate`) when:
 ESCALATE
 leaf_id: <leaf identifier>
 req_id: <REQ-ID>
-reason: <single sentence describing the trigger>
+reason: <categorical: scope_violation | blast_radius_growth | repeated_failure | blocked_dependency> — <single sentence describing the trigger>
+metric: <quantifiable, e.g. interfaces: 6 > 4 | subsystems: 3 | attempts: 2>
 recommended_tier: se-senior-developer
 findings: <files inspected, interface analysis, root cause>
 partial_work: none | <what was changed and current state>
 ```
+
+`reason` (categorical) + `metric` (quantifiable) are MANDATORY (issue #346): a card without both is invalid — the orchestrator rejects the tier change and requests structured re-submission.
 
 ## De-Escalation
 

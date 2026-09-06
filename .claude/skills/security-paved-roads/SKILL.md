@@ -1,3 +1,8 @@
+---
+name: security-paved-roads
+description: "Use before commits, deploys and new features — security paved-road block catalog (auth-flow, dependency-check, secret-scanning, ...) and enforcement points."
+---
+
 # Security Paved Roads
 
 Security wird als vorgeprüfte Paved-Road-Blöcke geliefert, nicht als DIY-Aufgabe:

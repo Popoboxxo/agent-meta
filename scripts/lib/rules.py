@@ -157,6 +157,152 @@ def collect_rule_sources(agent_meta_root: Path, platforms: list[str]) -> list[tu
     return [(src, name) for name, src in seen.items()]
 
 
+def _merged_rule_vars(
+    agent_meta_root: Path,
+    project_root: Path,
+    config: dict,
+    provider: str,
+    pc: dict,
+    variables: dict | None,
+) -> dict:
+    """Build the merged variable dict used to substitute rule content.
+
+    Shared by sync_rules() and sync_embedded_rule_files() so both channels
+    substitute identical placeholders (extension/snippets paths, orchestrator
+    mode flags, MCP guardrails list). `variables` (project variables) win
+    over provider defaults, mirroring the historic merge order.
+    """
+    provider_vars = {
+        'EXTENSION_DIR': pc.get('extension_dir', '.claude/3-project'),
+        'SNIPPETS_DIR': pc.get('snippets_dir', '.claude/snippets'),
+        'PENDING_TASKS_FILE': pc.get('pending_tasks_file', '.claude/pending-tasks.md'),
+        'SKILLS_DIR': pc.get('skills_dir', '.claude/skills'),
+        'ORCHESTRATOR_INVOCATION_HINT': pc.get('orchestrator_hint', '- Bitte wählt den Orchestrator-Agenten aus.'),
+    }
+
+    # Provider-specific orchestrator mode override
+    orch_config = config.get("orchestrator", {})
+    provider_override = orch_config.get("provider-overrides", {}).get(provider, {})
+    _orch_mode = _resolve_orch_mode(orch_config, provider_override)
+    provider_vars.update(_orch_mode_flags(_orch_mode))
+
+    # Override hint if main-chat mode is active
+    if _orch_mode == "main-chat":
+        provider_vars["ORCHESTRATOR_INVOCATION_HINT"] = "- Du bist der Orchestrator! Befolge die Regeln in use-orchestrator.md."
+
+    # MCP registry resolution comes from lib.registry_query (Issue #478) —
+    # the plugins-free resolution layer. Importing from mcp.py here would
+    # recreate the mcp/mcp_provider_config/rules cycle mcp_registry.py was
+    # extracted to break (#613); registry_query sits below both.
+    mcp_registry = load_mcp_registry(agent_meta_root, config, project_root)
+    active_mcp_servers = resolve_active_mcp_servers(config, agent_meta_root, project_root, registry=mcp_registry)
+    provider_vars['MCP_GUARDRAILS_LIST'] = build_mcp_guardrails_list(mcp_registry, active_mcp_servers)
+
+    return {**variables, **provider_vars} if variables is not None else provider_vars
+
+
+def provider_opts_skip(opts: dict, provider: str) -> bool:
+    """True when a rule opts out for THIS provider via its per-provider key.
+
+    Generalizes the per-provider skip convention of rules-presets.yaml
+    (``gemini: skip``) to any provider without naming one: the lowercase
+    provider key maps to "skip" or False.
+    """
+    prov_opt = opts.get(provider.lower())
+    return prov_opt == "skip" or prov_opt is False
+
+
+def sync_embedded_rule_files(
+    agent_meta_root: Path,
+    project_root: Path,
+    config: dict,
+    log: SyncLog,
+    dry_run: bool,
+    variables: dict | None = None,
+    provider: str = "Opencode",
+    provider_config: dict | None = None,
+):
+    """Render non-embedded rules as separate SKILL.md files (issue #192 Phase 2).
+
+    For providers WITHOUT a native rules_dir (``has_rules: false``) that
+    declare a ``skills_dir``: rules flagged ``embed: false`` (or routed via
+    ``channel: skill``) in rules-presets.yaml / project overrides are written
+    to ``<skills_dir>/<rule-stem>/SKILL.md`` instead of only being embedded in
+    the shared context file's managed block. The managed block renders a
+    one-line pointer instead (see context.py::_build_managed_block), so rule
+    content stays reachable while the always-on context shrinks (progressive
+    disclosure, issues #192 + #540).
+
+    Provider-agnostic: gated purely on config keys (has_rules / skills_dir),
+    never on provider names. Providers with ``has_rules: true`` receive their
+    rule files via sync_rules() — this function is a no-op for them, and a
+    no-op when no skills_dir is configured (the managed block then embeds the
+    rules as fallback, no content loss).
+    """
+    pc = (provider_config or {}).get(provider, {})
+    if pc.get("has_rules", False):
+        return
+    skills_dir_rel = pc.get("skills_dir")
+    if not skills_dir_rel:
+        return
+
+    from .platform import substitute_platform
+
+    merged_vars = _merged_rule_vars(
+        agent_meta_root, project_root, config, provider, pc, variables
+    )
+
+    platforms = config.get("platforms", [])
+    sources = collect_rule_sources(agent_meta_root, platforms)
+    if not sources:
+        return
+
+    rule_options = resolve_rules(config, agent_meta_root)
+
+    skills_target_dir = project_root / skills_dir_rel
+    if not dry_run:
+        skills_target_dir.mkdir(parents=True, exist_ok=True)
+    all_rule_stems = {Path(output_name).stem for _, output_name in sources}
+    now_managed_skill_rules: set[str] = set()
+
+    for source_path, output_name in sources:
+        rule_stem = Path(output_name).stem
+        opts = rule_options.get(rule_stem, {})
+
+        if provider_opts_skip(opts, provider):
+            continue
+
+        # Only rules the managed block does NOT embed land here — exactly the
+        # two flags _build_managed_block checks before rendering its pointer
+        # (keeping block pointer and file set consistent).
+        if not (opts.get("embed") is False or opts.get("channel") == "skill"):
+            continue
+
+        source_content = source_path.read_text(encoding="utf-8")
+        layer = source_path.parts[-2]
+        rel_source = f"rules/{layer}/{source_path.name}"
+        src_label = f"rules/{layer}/{source_path.name}"
+
+        source_content = substitute(source_content, merged_vars, rel_source, log)
+        source_content = strip_inactive_conditional_blocks(source_content, merged_vars)
+
+        now_managed_skill_rules.add(rule_stem)
+        write_skill_channel_rule(
+            rule_stem, source_content, opts, skills_target_dir, project_root,
+            log, dry_run, src_label,
+        )
+
+    # channel: skill stale-cleanup + shared managed-index merge in skills_dir,
+    # scoped to this caller's possible name-space (mirrors sync_rules()).
+    cleanup_stale_skill_channel_rules(
+        skills_target_dir, project_root, all_rule_stems, now_managed_skill_rules,
+        log, dry_run, "rule no longer routed to the separate-file channel",
+    )
+    write_skill_channel_managed_index(
+        skills_target_dir, now_managed_skill_rules, dry_run, universe=all_rule_stems
+    )
+
+
 def sync_rules(
     agent_meta_root: Path,
     project_root: Path,
@@ -190,33 +336,9 @@ def sync_rules(
     from .platform import substitute_platform
 
     pc = (provider_config or {}).get(provider, {})
-    provider_vars = {
-        'EXTENSION_DIR': pc.get('extension_dir', '.claude/3-project'),
-        'SNIPPETS_DIR': pc.get('snippets_dir', '.claude/snippets'),
-        'PENDING_TASKS_FILE': pc.get('pending_tasks_file', '.claude/pending-tasks.md'),
-        'SKILLS_DIR': pc.get('skills_dir', '.claude/skills'),
-        'ORCHESTRATOR_INVOCATION_HINT': pc.get('orchestrator_hint', '- Bitte wählt den Orchestrator-Agenten aus.'),
-    }
-    
-    # Provider-specific orchestrator mode override
-    orch_config = config.get("orchestrator", {})
-    provider_override = orch_config.get("provider-overrides", {}).get(provider, {})
-    _orch_mode = _resolve_orch_mode(orch_config, provider_override)
-    provider_vars.update(_orch_mode_flags(_orch_mode))
-    
-    # Override hint if main-chat mode is active
-    if _orch_mode == "main-chat":
-        provider_vars["ORCHESTRATOR_INVOCATION_HINT"] = "- Du bist der Orchestrator! Befolge die Regeln in use-orchestrator.md."
-
-    # MCP registry resolution comes from lib.registry_query (Issue #478) —
-    # the plugins-free resolution layer. Importing from mcp.py here would
-    # recreate the mcp/mcp_provider_config/rules cycle mcp_registry.py was
-    # extracted to break (#613); registry_query sits below both.
-    mcp_registry = load_mcp_registry(agent_meta_root, config, project_root)
-    active_mcp_servers = resolve_active_mcp_servers(config, agent_meta_root, project_root, registry=mcp_registry)
-    provider_vars['MCP_GUARDRAILS_LIST'] = build_mcp_guardrails_list(mcp_registry, active_mcp_servers)
-
-    merged_vars = {**variables, **provider_vars} if variables is not None else provider_vars
+    merged_vars = _merged_rule_vars(
+        agent_meta_root, project_root, config, provider, pc, variables
+    )
 
     platforms = config.get("platforms", [])
     sources = collect_rule_sources(agent_meta_root, platforms)

@@ -83,7 +83,14 @@ from lib.providers import (
     resolve_context_filename,
     resolve_providers,
 )
-from lib.rules import resolve_rules, sync_rules, sync_speech_mode
+from lib.rules import (
+    collect_rule_sources,
+    resolve_rules,
+    sync_embedded_rule_files,
+    sync_rules,
+    sync_speech_mode,
+)
+from lib.skill_channel import sweep_orphan_skill_channel_rules
 from lib.skills import (
     check_pinned_commits,
     load_external_skills_config,
@@ -143,6 +150,24 @@ def _sync_stage_config_and_presets(
     return config, provider_config, providers, mode, platform_vars
 
 
+def _context_auto_generate(config: dict) -> bool:
+    """Read context_file.auto_generate from project.yaml (issue #540 Fix 3).
+
+    Default **True** for backward compatibility: every existing project keeps
+    its generated context files fresh on sync. ``false`` opts a project into
+    the dev-written mode the arXiv:2602.11988 evidence prefers (dev-written
+    context files outperform generated ones): sync.py then leaves the static
+    header AND the managed block of every context file completely untouched —
+    agents/rules/rules-file generation are unaffected. agent-meta never
+    generates context content with an LLM (Fix 5: template-based rendering
+    only, by architecture), so no separate LLM toggle exists.
+    """
+    cfg = config.get("context_file", {})
+    if not isinstance(cfg, dict):
+        return True
+    return cfg.get("auto_generate", True) is not False
+
+
 def _sync_stage_claude_base(
     agent_meta_root: Path, project_root: Path, config: dict,
     provider_config: dict, providers: list, variables: dict,
@@ -167,7 +192,10 @@ def _sync_stage_claude_base(
         else []
     )
     if is_claude:
-        sync_claude_md_static(agent_meta_root, project_root, config, variables, log, args.dry_run)
+        if _context_auto_generate(config):
+            sync_claude_md_static(agent_meta_root, project_root, config, variables, log, args.dry_run)
+        else:
+            log.note("CLAUDE.md", "context_file.auto_generate: false — static header left untouched")
         init_claude_personal(agent_meta_root, project_root, log, args.dry_run)
     init_settings_json(agent_meta_root, project_root, log, args.dry_run,
                        providers=providers, provider_config=provider_config,
@@ -218,6 +246,10 @@ def _sync_stage_contexts(
             )
         else:
             provider_variables = variables
+        if not _context_auto_generate(config):
+            log.note("context_file", "auto_generate: false — context files left untouched "
+                                     "(dev-written mode, issue #540 Fix 3)")
+            continue
         sync_context_for_provider(agent_meta_root, project_root, config, provider_variables,
                                   log, args.dry_run, provider, provider_config)
     return debug_mode, allow_committed_secrets, mcp_gitignore_extras
@@ -285,6 +317,32 @@ def _sync_stage_legacy_cleanup(
                     # logging.debug(msg, *args) — same linter false positive
                     # class as pre-#574 SyncLog.info.
                     log.debug("provider-cleanup", f"could not prune '{prov_dir}': {type(e).__name__}: {e}")  # noqa: PLE1205
+
+
+def _skill_channel_universe(agent_meta_root: Path, config: dict, project_root: Path) -> set[str]:
+    """Union of every writer's possible stems for a shared skills_dir.
+
+    Writers of ``<skills_dir>/.agent-meta-managed`` (merge-mode shared index):
+      - rules/ sources via channel: skill / embed: false (rules.py)
+      - mcp-<server> sections (mcp.py)
+      - tool-<name> sections (external_tools.py)
+      - external-skill sync (skills.py, universe = skills-registry keys)
+    A stem missing from this union is owned by nobody and safe to sweep (see
+    skill_channel.sweep_orphan_skill_channel_rules). All four writers clean
+    only within their own current universe, so a stem that disappears from
+    ALL sources (e.g. a deleted rule file) would otherwise be orphaned
+    forever.
+    """
+    platforms = config.get("platforms", [])
+    universe = {Path(output_name).stem for _, output_name in collect_rule_sources(agent_meta_root, platforms)}
+    from lib.mcp import load_mcp_registry
+    from lib.external_tools import load_external_tools_registry
+    from lib.skills import load_external_skills_config
+
+    universe |= {f"mcp-{s}" for s in load_mcp_registry(agent_meta_root, config, project_root)}
+    universe |= {f"tool-{t}" for t in load_external_tools_registry(agent_meta_root, config, project_root)}
+    universe |= set((load_external_skills_config(agent_meta_root).get("skills") or {}).keys())
+    return universe
 
 
 def _sync_stage_per_provider(
@@ -356,6 +414,17 @@ def _sync_stage_per_provider(
                        provider_config=provider_config)
             sync_speech_mode(agent_meta_root, project_root, config, log, args.dry_run,
                              rules_dir=pc.get("rules_dir"))
+        elif pc.get("skills_dir") and pc.get("context_file"):
+            # Issue #192 Phase 2 (selective rule embedding): providers without
+            # a native rules_dir but with a skills_dir receive the rules the
+            # managed block does NOT embed (embed: false / channel: skill) as
+            # separate <skills_dir>/<rule>/SKILL.md files, so the shared
+            # context file can point at them instead of embedding the bodies
+            # (progressive disclosure). Pure config-key gating — no provider
+            # names. No-op when neither flag is set (block embeds as fallback).
+            sync_embedded_rule_files(agent_meta_root, project_root, config, log,
+                                     args.dry_run, variables=provider_variables,
+                                     provider=provider, provider_config=provider_config)
         # MCP: generate rule files + provider configs + collect gitignore entries
         try:
             mcp_extras = generate_mcp_artifacts(
@@ -378,6 +447,17 @@ def _sync_stage_per_provider(
         except SyncError as exc:
             print(f"\n  !!  External-tools sync aborted: {exc}", file=sys.stderr)
             sys.exit(1)
+        # Skill-channel orphan sweep (issue #437 follow-up): all rule-channel
+        # writers for this provider have run — remove skills_dir index entries
+        # no writer claims anymore (e.g. a rule deleted from rules/ whose
+        # channel: skill copy would otherwise survive forever). Runs for every
+        # provider with a skills_dir; the union protects all live writers.
+        if pc.get("skills_dir") and pc.get("context_file"):
+            sweep_orphan_skill_channel_rules(
+                project_root, project_root / pc["skills_dir"],
+                _skill_channel_universe(agent_meta_root, config, project_root),
+                log, args.dry_run,
+            )
         if pc.get("has_hooks", False):
             # sync_hooks()/sync_hook_lib()/sync_release_gates() each check
             # provider_hooks_supported(pc) internally (issue #630): with

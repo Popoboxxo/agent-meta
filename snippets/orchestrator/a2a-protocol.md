@@ -6,7 +6,7 @@
 ### Kern-Regeln (wenn Envelope Pflicht ist)
 
 - `handoff_id`: `HOFF-YYYYMMDD-NNN` | `schema_ref`: aus Intent-Routing-Tabelle
-- `payload.t` (Pflicht): max. **{{A2A_T_SIZE_LIMIT}} Zeichen** — EIN Satz. Überschreitung → kein Dispatch
+- `payload.t` (Pflicht): max. **{{A2A_T_SIZE_LIMIT}} Zeichen** — EIN Satz. Überschreitung ist eine dokumentierte Konvention, kein Hard-Gate (Issue #346): Plattform-Limits greifen ohnehin, der Re-Delegation-Check deckt Spec-Dumps ab — siehe Rule `a2a-delegation-gates.md`
 - TaskSpec-Felder (`t`, `ctx`, `con`, `pri`, `refs`, `dep`) sind immer kurz — kein Umschalten nötig
 
 ### Reference

@@ -7,9 +7,9 @@
 **Plattform:** Python CLI (sync.py)
 **Beschreibung:** Zentrales Meta-Repository für die Standardisierung und Wiederverwendung von Claude-Agenten-Rollen über alle Projekte hinweg.
 
-> Stack: Python 3.x · Python 3, Markdown, YAML · Deps: - Python: `>=3.8`
+> Struktur: siehe Verzeichnisstruktur im Repo (`ls`/`find`); deklarativ: `.meta-config/project.yaml` → `variables.PROJECT_STRUCTURE`.
 
-> Struktur: `.meta-config/project.yaml` → `variables.PROJECT_STRUCTURE`.
+> Runtime & Abhängigkeiten: siehe Projekt-Manifest (`pyproject.toml` / `requirements.txt` / `package.json` / `manifest.json`).
 
 **Entry-Point:** `scripts/sync.py — Haupt-CLI für Agent-Generierung`
 
@@ -50,23 +50,8 @@ Kategorien für `docs/REQUIREMENTS.md`:
 `agent-meta v0.101.0-beta.5` | DoD: `rapid-prototyping` | REQ-Trace: `false`
 
 
+
 ## Regeln
-
-# A2A Anti-Re-Delegation Gates
-
-1. Limit depth to 10, no self-handoff.
-2. Short payload: `payload.t` max 300 Zeichen.
-3. No Re-Delegation (payload starts with "Du bist...").
-4. Singleton Orchestrator: NUR der `main_chat` darf den `orchestrator` spawnen.
-5. Execution-Trace-Isolation: Worker-Output muss strukturiert sein (STATUS, RESULT, ARTIFACTS). Keine rohen Logs propagieren.
-
-## Bekannte Grenzen
-
-- **Tiefenlimit (Punkt 1) ist modellbasiert, keine technische Barriere.** Eine passende Implementierung existiert (`validate_envelope(max_depth=...)` in `scripts/lib/delegation_syntax.py`), wird aber im aktiven Delegationspfad nirgends aufgerufen. Die Regel verlässt sich auf Modell-Gehorsam, nicht auf Enforcement.
-- **Singleton-Orchestrator (Punkt 4) wird nur über eine Selbstdeklaration der Agenten-Identität gestützt** (`#agent-meta:agent=<name>` in `.claude/hooks/orchestrator-guard.sh`), die im Hook-Quelltext selbst als "soft, self-reported convention, not a security boundary" dokumentiert ist. Jeder Agent kann sich technisch als privilegiert deklarieren. **Das ist eine bewusste Design-Grenze, kein behebbarer Bug:** kein Provider liefert im PreToolUse-Payload eine echte Agenten-Identität, der Hook kann die Behauptung also nicht verifizieren. Der Guard ist ein Konventions-Schutz gegen Versehen, kein Schutz gegen einen Agenten, der die Regel bewusst umgeht. Wer eine harte Grenze braucht, muss Git-Mutationen außerhalb des Agenten-Systems absichern (Branch-Protection, Pre-Receive-Hooks, Review-Pflicht) — zerstörerische Operationen (`push --force`, `reset --hard`, `clean -fd`, `branch -D`) bleiben deshalb ausdrücklich zustimmungspflichtig durch den Nutzer.
-- **Große Ergebnisse gehören in Dateien, nicht in den Return-Channel.** Der synchrone Tool-Result-Kanal hat ein undokumentiertes Größenlimit; überlange Antworten können ohne Fehlersignal beschnitten zurückkommen (agent-meta #514). Read-only-Rollen ohne `Write` (`Plan`, `Explore`, `code-reviewer`) sind davon strukturell betroffen. Daher: Artefakte ab ~1000 Zeilen (Pläne, Konzepte, Reviews) immer von einer schreibfähigen Rolle in eine Datei schreiben lassen und nur den Pfad zurückgeben. Empfangene Ergebnisse auf Vollständigkeit prüfen (fehlender Kopf/erste Abschnitte = Truncation), nicht blind weiterverarbeiten.
-
-
 
 # Branch-Guard
 
@@ -120,12 +105,6 @@ Pflicht: Code komplett, Konventionen & Conv. Commits eingehalten, keine Regressi
 
 
 
-# GitHub Issue Lifecycle
-
-Issues referenzieren und am Ende mit passendem Keyword (`Fixes #123`, `Closes #123`) im PR oder Commit schließen. Kommentiere das Issue nach Fertigstellung.
-
-
-
 # Sprachregeln
 
 | Kontext | Sprache |
@@ -138,18 +117,10 @@ Issues referenzieren und am Ende mit passendem Keyword (`Fixes #123`, `Closes #1
 
 
 
-# Lifecycle-Tasks
-
-Beim Start prüfen: existiert `.gemini/pending-tasks.md bzw. .opencode/pending-tasks.md bzw. .codex/pending-tasks.md bzw. .zcode/pending-tasks.md bzw. .kimi-code/pending-tasks.md`?
-Falls ja und enthält `- [ ]`: User fragen ob delegiert werden soll.
-Nach Erledigung: löschen. Datei nicht committen.
-
-
-
 # MCP Hard Prohibitions
 
 > Kurzfassung der harten Tool-Verbote aktiver MCP-Server. Vollständige Tool-Listen und
-> Hinweise: siehe `.claude/skills/mcp-<server>/SKILL.md` (`use-lazy-rules.md`).
+> Hinweise: pro Provider in `.gemini/skills bzw. .opencode/skills bzw. .agents/skills bzw. .zcode/skills bzw. .kimi-code/skills` — jeweils `mcp-<server>/SKILL.md` (`use-lazy-rules.md`).
 
 - **honcho:** `delete_conclusion`, `set_config` — absolut verboten.
 - **playwright:** `browser_run_code_unsafe`, `browser_evaluate`, `browser_file_upload`, `browser_handle_dialog` — absolut verboten.
@@ -166,81 +137,9 @@ Alle Agenten müssen direkt im Projektverzeichnis arbeiten (Isolation deaktivier
 
 
 
-# Python Conventions
-
-PEP8 einhalten. Type Hints (typing) verwenden. Docstrings für Klassen/Methoden schreiben.
-
-
-
-# Security Paved Roads
-
-Security wird als vorgeprüfte Paved-Road-Blöcke geliefert, nicht als DIY-Aufgabe:
-**invisible, consistent, embedded, non-optional** (Netflix Paved Roads / Golden Path).
-Ein Block ist ausgereift, sicherheitsgeprüft und wird identisch überall verwendet —
-niemand implementiert Security-Logik selbst neu.
-
-## Block-Katalog
-
-| Block | Abdeckt | Eigentümer-Agent |
-|-------|---------|------------------|
-| `auth-flow` | Authentifizierung (Login, Session, Token) | `security-auditor` |
-| `dependency-check` | SBOM + CVE-Scan der Abhängigkeiten | `dependency-auditor` |
-| `input-validation` | Eingabevalidierung (Schema, Sanitizing) | `security-auditor` |
-| `rate-limiting` | Rate-Limiting / Throttling | `devops-engineer` |
-| `cors-config` | CORS-Konfiguration | `security-auditor` |
-| `secret-scanning` | Secret-Scan (Leaks in Diffs, Commits, Logs) | `security-auditor` |
-
-## Enforcement
-
-- **Vor jedem Commit:** Secret-Scan über den Block `secret-scanning` ausführen.
-- **Vor jedem Deploy:** `dependency-check` (SBOM + CVE) ausführen.
-- **Für neue Features:** den `auth-flow`-Block nutzen statt Auth selbst zu bauen.
-
-DIY-Security ist eine Anti-Pattern: jede Variante erzeugt unbekannte Lücken.
-Abweichungen vom Block-Katalog werden als Review-Befund von `security-auditor`
-gemeldet, nicht als Eigenbau gerechtfertigt.
-
-
-
-# Session-Abschluss
-
-Delegate Session-Zusammenfassung an `documenter` am Ende großer Features, um CODEBASE_OVERVIEW.md aktuell zu halten.
-
-
-
-# Submodule-Schutzkonzept
-
-Regeln für den Umgang mit allen Git-Submodulen (`.agent-meta/`, `external/*/`, und alle weiteren in `.gitmodules`):
-
-- **Keine direkten Änderungen in Submodul-Verzeichnissen:** Dateien in `.agent-meta/`, `external/*/` und allen anderen Submodul-Pfaden dürfen in Konsumenten-Repositories niemals direkt editiert oder committet werden. Submodule sind separate Repositories mit eigenem Lifecycle (Build, Push, Deploy, Version-Tags). Änderungen MÜSSEN im Submodul-Repo selbst durchgeführt, committet und gepusht werden — danach aktualisiert das Parent-Repo die Pinned-Commit-Referenz.
-- **Keine Mutation von `.gitmodules` / Git Staging:** `.gitmodules` darf nicht automatisch modifiziert werden und Submodule dürfen nicht automatisch via `git add` gestaged werden.
-- **Kein Source-Code-Scaffolding in Konsumenten-Projekten:** In Konsumenten-Projekten wird kein Anwendungscode generiert/gerüstet; verwaltet werden ausschließlich `.meta-config/project.yaml` und die Managed Blocks.
-- **Framework-Änderungen nur im agent-meta Repo:** Änderungen am agent-meta Framework müssen auf Feature-Branches im agent-meta Repository selbst durchgeführt werden.
-
-
-
-# Threat Model — die 4 Fragen
-
-Vor jedem öffentlichen Release die 4 Fragen beantworten (Igor Andriushchenko,
-CISO Lovable):
-
-1. **Was baust du?** — Datenspeicherung, Auth, Autorisierung, woher kommen die User?
-2. **Was könnte schiefgehen?** — Worst-Case-Szenarien (Leak, Bypass, Datenverlust).
-3. **Was tust du dagegen?** — konkrete Gegenmaßnahme pro Risiko.
-4. **Was sind die Konsequenzen?** — Business-Impact, Datenverlust, Reputation.
-
-## Anwendung
-
-- `concept-reviewer` prüft die 4 Fragen in Design-Docs (Threat-Model-Checkliste).
-- `orchestrator` stellt die 4 Fragen vor Feature-Releases.
-- **Interne Apps:** vereinfacht — 1–2 Fragen reichen.
-- **Customer-facing Apps:** vollständig — alle 4 Fragen plus dokumentiertes Threat Model.
-
-
-
 # Lazy-Loaded Rules
 
-> Nicht immer geladen — bei Bedarf per `Read` öffnen: `.claude/skills/<skill>/SKILL.md`.
+> Nicht immer geladen — bei Bedarf per `Read` öffnen: `.gemini/skills bzw. .opencode/skills bzw. .agents/skills bzw. .zcode/skills bzw. .kimi-code/skills/<skill>/SKILL.md` (jeweils).
 
 | Skill | Wann |
 |---|---|
@@ -250,7 +149,6 @@ CISO Lovable):
 | conventions | Vor Commits in agents/, config/, scripts/lib |
 | submodule-protection | .agent-meta/, external/, .gitmodules |
 | a2a-delegation-gates | A2A-Delegation an Subagenten |
-| python-conventions | Python-Code |
 | issue-lifecycle | GitHub-Issue |
 | lifecycle-tasks | Session-Start, pending-tasks.md vorhanden |
 | session-conclusion | Feature-Abschluss |
@@ -277,285 +175,14 @@ Anti-Recursion: Worker dürfen nicht an `orchestrator` zurück delegieren.
 
 
 
-# agent-meta — Admin-Server / Admin-UI Betriebswissen
 
-Betriebswissen für `scripts/admin-server.py` — den zero-dependency HTTP-Server
-(Python stdlib + PyYAML), der die visuelle Konfigurations-Oberfläche von
-agent-meta (`docs/ui/admin-ui.html`) ausliefert und REST/SSE-Endpunkte über die
-YAML/JSON-Configs des Frameworks bereitstellt.
 
-## Host-Bindung + Token-Regeln
 
-- **Default: Loopback** (`127.0.0.1`) → kein Token nötig.
-- **Non-loopback** (`--host 0.0.0.0`) → Token **erzwungen** (fail-closed: der
-  Server verweigert den Start ohne Token).
-- Token-Auflösung (Priorität): `--admin-token` > Env `ADMIN_UI_TOKEN` >
-  `admin-ui.token` in `project.yaml` > `admin-ui.token-file`.
+## Übrige Regeln (Lazy-Load)
 
-## Token-Distribution
-
-- `Authorization: Bearer <token>` Header — für alle `/api/*`-Requests.
-- `?token=<token>` Query-Parameter — Bequemlichkeit für den Browser: die UI
-  übernimmt das Token nach `sessionStorage` und entfernt es aus der URL (kein
-  `localStorage`, kein Verbleib in der History).
-- Die UI-Shell (`/`, `/favicon.png`) ist public; jeder `/api/*`-Endpoint ist
-  token-gated, Mutationen zusätzlich origin-geprüft (CSRF/DNS-Rebinding).
-
-Details (Zwei Modi, Server-Lifecycle, Flags, Port-Matrix, Token-Persistenz, Diagnose-Folge, Known Issues, Troubleshooting): `.claude/skills/admin-ui/SKILL.md`.
-
-
-# agent-meta — Schichten-Architektur
-
-Dieses Repo ist das Meta-Repository für Agenten-Standards. Jede Änderung an Templates
-wirkt sich auf alle Projekte aus die dieses Submodul einbinden.
-
-## Abhängigkeitsprinzip
-
-Jede Änderung an einer Quelldatei propagiert in alle instanziierten Projekte
-beim nächsten `sync.py`-Lauf. Daher:
-
-- **1-generic geändert** → alle Projekte neu syncen
-- **2-platform geändert** → alle Projekte auf dieser Plattform neu syncen
-- **config/role-defaults.yaml geändert** → alle Projekte neu syncen
-- **config/skills-registry.yaml geändert** → alle betroffenen Projekte neu syncen
-
-Details (Schichten-Modell, Composition-Syntax, Platzhalter-Escape): `docs/architecture/01-layer-model.md`.
-
-
-# agent-meta — Development Conventions
-
-## Hard Invariants
-
-1. `.gemini/agents bzw. .opencode/agents bzw. .codex/agents bzw. .zcode/agents bzw. .kimi-code/agents` is generated output — never edit manually. Make changes in `agents/` or `.meta-config/project.yaml`.
-2. Bump agent version in frontmatter on every content change:
-   - Major (`X.0.0`): renamed variable, changed behavior, new mandatory section
-   - Minor (`x.Y.0`): new optional section, expanded scope
-   - Patch (`x.y.Z`): text improvements, clarifications, config path fixes
-   - Platform agents (`2-platform/`) also keep `based-on` up to date.
-3. Placeholders are always `{{GROSS_MIT_UNTERSTRICH}}`. Lowercase or mixed case will not match.
-
-Details (Naming-Konvention, Instruction-Bleed-Checkliste, Adding-New-Role/Placeholder, Change-Checklist): `.claude/skills/conventions/SKILL.md`.
-
-
-# Provider-Agnostic Policy
-
-Generische Templates in `1-generic/` müssen provider-agnostisch sein. Keine spezifischen Prompts für Claude, Gemini etc., außer als Fallback/Feature-Flag.
-
-## Syncer-Code (scripts/)
-
-Provider-Unterschiede werden über Capability-Flags/Config-Keys in `config/ai-providers.yaml`
-(und Schwester-Registries wie `provider-capabilities.yaml`) ausgedrückt, nie über
-`if provider == "Name"`-Branches im Python-Code. Ein neuer Provider muss ohne
-Python-Änderung aktivierbar sein, solange er kein wirklich neues Datei-Format oder
-Protokoll braucht. Das bestehende Capability-Flag-Muster (`_has_capability(pc, "...")`,
-`pc.get("commands_dir", ...)`, `frontmatter_strip_fields` aus Issue #505) ist die
-Referenz-Implementierung — dem folgen, keinen neuen `elif` hinzufügen.
-
-
-
-# agent-meta — sync.py Interface
-
-`sync.py` ist der einzige Weg Agenten zu generieren. Nie direkt in `.gemini/agents bzw. .opencode/agents bzw. .codex/agents bzw. .zcode/agents bzw. .kimi-code/agents` schreiben.
-
-Vollständige Referenz (Flags, sync.log, Modulstruktur):
-→ `.agent-meta/agents/1-generic/_wf-sync-interface.md`
-
-## Branch-Guard-Erweiterung für agent-meta
-
-Zusätzlich zu den generischen Branch-Guard-Regeln gilt hier:
-
-- `sync.py` ausführen → immer Branch (Sync propagiert in alle Projekte)
-
-**Faustregel: sync.py ausführen oder >1 Datei anfassen → Branch.**
-
-**NIE direkt auf main:** sync.py-Läufe, Template-Änderungen, Rule-Änderungen — egal wie klein.
-
-## Warum
-
-Direkte Commits auf main propagieren Fehler sofort in alle Projekte beim nächsten Sync.
-
----
-
-Details (Smart Context Regeneration, `--check`, `context-hashes.json`, Provider-Context-Lifecycle): `.claude/skills/sync-interface/SKILL.md`.
-
-
-# MCP: honcho
-
-> Honcho local memory and context server
-
----
-
-## Erlaubte Tools
-
-- `chat`
-- `get_context`
-- `get_representation`
-- `search`
-- `list_conclusions`
-- `create_conclusion`
-
-## Verbotene Tools (ABSOLUT — keine Ausnahmen)
-
-- `delete_conclusion`
-- `set_config`
-
-**Verbindungstyp:** `sse` — Details: `config/mcp-registry.yaml`.
-
-
-
-
-# MCP: playwright
-
-> Playwright MCP Server for browser automation and E2E tests
-
----
-
-## Erlaubte Tools
-
-- `browser_navigate`
-- `browser_navigate_back`
-- `browser_snapshot`
-- `browser_take_screenshot`
-- `browser_click`
-- `browser_type`
-- `browser_hover`
-- `browser_select_option`
-- `browser_press_key`
-- `browser_fill_form`
-- `browser_wait_for`
-- `browser_resize`
-- `browser_tabs`
-- `browser_network_requests`
-- `browser_network_request`
-- `browser_console_messages`
-
-## Verbotene Tools (ABSOLUT — keine Ausnahmen)
-
-- `browser_run_code_unsafe`
-- `browser_evaluate`
-- `browser_file_upload`
-- `browser_handle_dialog`
-
-**Verbindungstyp:** `stdio` — Details: `config/mcp-registry.yaml`.
-
-
-
-
-# MCP: reqogniloom
-
-> ReqogniLoom requirements-engineering platform — requirements, architecture, tests, traceability and AI-assisted derivation
-
----
-
-## Erlaubte Tools
-
-- `requirement.get`
-- `requirement.query`
-- `requirement.create`
-- `requirement.update`
-- `requirement.decompose`
-- `requirement.validate`
-- `requirement.derive`
-- `requirement.check_consistency`
-- `needs.read`
-- `needs.create`
-- `needs.update`
-- `needs.get_traces`
-- `needs.derive_requirements`
-- `architecture.get`
-- `architecture.query`
-- `architecture.create`
-- `architecture.update`
-- `architecture.link`
-- `architecture.decompose`
-- `architecture.decompose_commit`
-- `test.get`
-- `test.query`
-- `test.create`
-- `test.update`
-- `test.link`
-- `test.run_create`
-- `test.run_get`
-- `test.run_report_results`
-- `test.derive_from_requirement`
-- `traceability.query`
-- `traceability.suggest_links`
-- `artifact.search`
-- `artifact.get_tree`
-- `workspace.get_context`
-- `adr.read`
-- `adr.create`
-- `adr.update`
-- `adr.delete`
-- `risk.read`
-- `risk.create`
-- `risk.update`
-- `risk.delete`
-- `issue.read`
-- `issue.create`
-- `issue.update`
-- `issue.delete`
-- `glossary.read`
-- `glossary.create`
-- `glossary.update`
-- `glossary.delete`
-- `prompt_template.get`
-- `ai_derivation.derive_requirements_from_need`
-- `ai_derivation.suggest_architecture_for_requirement`
-- `ai_derivation.decompose_requirement_next_level`
-
-## Verbotene Tools (ABSOLUT — keine Ausnahmen)
-
-- `workspace.close`
-- `workspace.reactivate`
-- `workspace.delete`
-- `permissions.set_rule`
-- `permissions.list`
-- `permissions.revoke`
-- `permissions.check`
-- `admin.backup_create`
-- `admin.backup_list`
-- `admin.restore`
-- `audit.query`
-- `audit.ai_review`
-- `events.dlq_list`
-- `events.dlq_replay`
-- `user.create`
-- `user.assign_role`
-- `user.list`
-- `user.deactivate`
-
-**Verbindungstyp:** `sse` — Details: `config/mcp-registry.yaml`.
-
-
-
-
-# MCP: viz-logger
-
-> agent-meta visualization event logger — tracks agent_start, delegate_out, agent_end for graph generation
-
----
-
-## Erlaubte Tools
-
-- `log_viz_event`
-
-**Verbindungstyp:** `stdio` — Details: `config/mcp-registry.yaml`.
-
-
-
-
-# External Tool: graphify
-
-> graphify — lokal installiertes CLI-Tool. Baut das Repo als Wissensgraph auf (Community Detection, God Nodes, Query/Path/Explain). Wird NICHT von agent-meta bereitgestellt, muss lokal installiert sein.
-
----
-
-Details/Registrierung: `config/external-tools-registry.yaml`.
-Hook-Wrapper: `hooks/0-external/graphify-search-guard.sh`, `hooks/0-external/graphify-read-guard.sh` · Injektionen: `.gemini/skills/graphify bzw. .opencode/skills/graphify bzw. .agents/skills/graphify bzw. .zcode/skills/graphify bzw. .kimi-code/skills/graphify` (skill)
-
-
-
+Nicht-Kern-Regeln werden NICHT in diesen Block eingebettet (Progressive Disclosure, #192):
+sie liegen pro Provider als separate Dateien in .gemini/skills bzw. .opencode/skills bzw. .agents/skills bzw. .zcode/skills bzw. .kimi-code/skills — jeweils `<rule-name>/SKILL.md`.
+Bei Bedarf mit `Read` laden; verfügbare Regeln via `ls` im jeweiligen Verzeichnis.
 
 
 ## Agent Directory

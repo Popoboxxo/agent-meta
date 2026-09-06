@@ -172,7 +172,7 @@ def apply_path_rules(
 
     Reads `pathRules` from config. Each rule has:
       - path: glob pattern (e.g. "*.py", "scripts/**", "agents/**/*.md")
-      - rule: rule file name (stem) to include (e.g. "python-conventions")
+      - rule: rule file name (stem) to include (e.g. "dod-criteria")
       - agents: optional list of agent roles this rule applies to (default: all)
 
     Matching rules are read, variables substituted, and appended as

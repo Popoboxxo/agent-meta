@@ -82,7 +82,10 @@ def resolve_injection_path(entry: dict, pc: dict, project_root: Path) -> Path:
     kind = entry["kind"]
     if kind in _INJECTION_DIR_KEYS:
         dir_key, default_dir = _INJECTION_DIR_KEYS[kind]
-        base = project_root / pc.get(dir_key, default_dir)
+        # Null-valued dir keys (skills_dir: null in ai-providers.yaml) fall
+        # back to the same default an absent key gets — project_root / None
+        # would raise TypeError (found via the #192 weak-sharer test).
+        base = project_root / (pc.get(dir_key) or default_dir)
         return (base / entry["name"]).resolve()
     return (project_root / entry["path"]).resolve()
 
@@ -197,15 +200,23 @@ def generate_external_tool_artifacts(
 ) -> None:
     """Generate external-tool rule files for all active tools.
 
-    For providers with has_rules: writes .claude/rules/tool-<name>.md for every
-    active tool not skipped for this provider — or <skills_dir>/tool-<name>/
-    SKILL.md instead when rules-presets.yaml flags rule stem 'tool-<name>'
-    with channel: skill for a provider that supports it (see
-    scripts/lib/skill_channel.py). Warns when a tool declares a hook stem
-    that has no matching hooks/0-external/<stem>.sh file. The hook wrapper
-    .sh files themselves are deployed independently by sync_hooks() (all
-    0-external hooks are always copied; registration in settings.json stays
-    opt-in per project).
+    Three channels, selected purely by provider config keys (no provider-name
+    branches):
+      - has_rules providers: writes <rules_dir>/tool-<name>.md — or
+        <skills_dir>/tool-<name>/SKILL.md when rules-presets.yaml flags rule
+        stem 'tool-<name>' with channel: skill for a provider with native
+        Skill support (scripts/lib/skill_channel.py PROVIDERS).
+      - has_rules:false providers WITH skills_dir (#192 Phase 2
+        embedded-rules channel): writes <skills_dir>/tool-<name>/SKILL.md for
+        every tool the shared managed block no longer embeds (opts embed:
+        false / channel: skill). No-op (block embeds as fallback) when no
+        tools carry those flags.
+      - has_rules:false providers WITHOUT skills_dir: no-op entirely — the
+        managed block embeds the sections (content-loss protection).
+    Warns when a tool declares a hook stem that has no matching
+    hooks/0-external/<stem>.sh file. The hook wrapper .sh files themselves
+    are deployed independently by sync_hooks() (all 0-external hooks are
+    always copied; registration in settings.json stays opt-in per project).
 
     resolve_rules and the skill-channel helpers are imported at module top
     level (Issue #478): rules depends on registry_query, not on this module,
@@ -238,9 +249,6 @@ def generate_external_tool_artifacts(
 
     # --- Rule file generation (only for providers that use rule files) ---
     pc = provider_config.get(provider, {})
-    if not pc.get("has_rules"):
-        return
-
     rule_options = resolve_rules(config, agent_meta_root)
     supports_skill_channel = provider_supports_skill_channel(provider, pc)
     skills_dir_rel = pc.get("skills_dir")
@@ -250,68 +258,119 @@ def generate_external_tool_artifacts(
     all_tool_rule_stems = {f"{TOOL_RULE_PREFIX}{t}" for t in registry}
     now_managed_skill_rules: set[str] = set()
 
-    effective_rules_dir = rules_dir or DEFAULT_RULES_DIR
-    target_dir = project_root / effective_rules_dir
-    if not dry_run:
-        target_dir.mkdir(parents=True, exist_ok=True)
+    # Issue #192 Phase 2 (selective rule embedding): providers WITHOUT a
+    # native rules_dir but with a skills_dir receive the tool sections the
+    # shared managed block no longer embeds (embed: false / channel: skill in
+    # rules-presets.yaml) as separate SKILL.md files — same channel as mcp.py
+    # and rules.py::sync_embedded_rule_files(). Config-key gating only.
+    embedded_rules_channel_dir: Path | None = None
+    if not pc.get("has_rules"):
+        if not skills_dir_rel:
+            # No rules_dir and no skills_dir: nothing can be rendered — the
+            # managed block embeds these sections as fallback (content-loss
+            # protection), so there is no file work here at all.
+            return
+        embedded_rules_channel_dir = project_root / skills_dir_rel
+        if not dry_run:
+            embedded_rules_channel_dir.mkdir(parents=True, exist_ok=True)
 
-    managed_index_path = target_dir / TOOLS_MANAGED_INDEX_FILENAME
-    previously_managed = bootstrap_previously_managed(
-        target_dir, managed_index_path, f"{TOOL_RULE_PREFIX}*.md",
-        # "tool-*.md" isn't an exclusive namespace — see mcp.py's identical
-        # comment on its own bootstrap call for why an unmarked glob match
-        # is not safe to treat as previously managed.
-        content_marker="config/external-tools-registry.yaml` — "
-                        "nicht manuell bearbeiten",
-    )
+    effective_rules_dir = rules_dir or DEFAULT_RULES_DIR
     now_managed: set[str] = set()
 
-    for tool_name in active_tools:
-        tool_def = registry.get(tool_name)
-        if not tool_def:
-            continue
-        if provider in tool_def.get("provider-skip", []):
-            continue
+    # --- Native rules_dir channel (has_rules providers, e.g. Claude) ---
+    if pc.get("has_rules"):
+        target_dir = project_root / effective_rules_dir
+        if not dry_run:
+            target_dir.mkdir(parents=True, exist_ok=True)
 
-        rule_stem = f"{TOOL_RULE_PREFIX}{tool_name}"
-        opts = rule_options.get(rule_stem, {})
-        content = _generate_tool_rule_content(tool_name, tool_def, pc, project_root)
-        src_label = f"external-tools-registry/{tool_name}"
+        managed_index_path = target_dir / TOOLS_MANAGED_INDEX_FILENAME
+        previously_managed = bootstrap_previously_managed(
+            target_dir, managed_index_path, f"{TOOL_RULE_PREFIX}*.md",
+            # "tool-*.md" isn't an exclusive namespace — see mcp.py's identical
+            # comment on its own bootstrap call for why an unmarked glob match
+            # is not safe to treat as previously managed.
+            content_marker="config/external-tools-registry.yaml` — "
+                            "nicht manuell bearbeiten",
+        )
 
-        if opts.get("channel") == "skill" and skills_target_dir is not None:
+        for tool_name in active_tools:
+            tool_def = registry.get(tool_name)
+            if not tool_def:
+                continue
+            if provider in tool_def.get("provider-skip", []):
+                continue
+
+            rule_stem = f"{TOOL_RULE_PREFIX}{tool_name}"
+            opts = rule_options.get(rule_stem, {})
+            content = _generate_tool_rule_content(tool_name, tool_def, pc, project_root)
+            src_label = f"external-tools-registry/{tool_name}"
+
+            if opts.get("channel") == "skill" and skills_target_dir is not None:
+                now_managed_skill_rules.add(rule_stem)
+                write_skill_channel_rule(
+                    rule_stem, content, opts, skills_target_dir, project_root,
+                    log, dry_run, src_label,
+                )
+                continue
+
+            filename = f"{rule_stem}.md"
+            target_path = safe_path(target_dir, filename)
+            rel_out = str(target_path.relative_to(project_root))
+            now_managed.add(filename)
+
+            if write_checked(target_path, content, log, src_label, config=config, dry_run=dry_run):
+                log.action("WRITE", rel_out, src_label)
+            else:
+                log.skip(rel_out, "unchanged")
+
+        # Remove stale tool-*.md rule files no longer covered by the current
+        # active-tool list (tool deactivated in project.yaml or removed from
+        # external-tools-registry.yaml).
+        cleanup_stale_managed_files(
+            target_dir, project_root, previously_managed, now_managed, log, dry_run,
+            "external tool no longer active/registered",
+        )
+        write_managed_index(managed_index_path, now_managed, dry_run)
+
+    # --- #192 embedded-rules channel (has_rules:false + skills_dir) ---
+    # Writes the tool sections the shared managed block no longer embeds as
+    # <skills_dir>/tool-<name>/SKILL.md (FULL variant — lazy-loaded files are
+    # not subject to embed-side compaction).
+    if embedded_rules_channel_dir is not None:
+        for tool_name in active_tools:
+            tool_def = registry.get(tool_name)
+            if not tool_def:
+                continue
+            if provider in tool_def.get("provider-skip", []):
+                continue
+
+            rule_stem = f"{TOOL_RULE_PREFIX}{tool_name}"
+            opts = rule_options.get(rule_stem, {})
+            if not (opts.get("embed") is False or opts.get("channel") == "skill"):
+                # Preset says embed: the managed block renders the section —
+                # nothing to write into the file channel.
+                continue
             now_managed_skill_rules.add(rule_stem)
             write_skill_channel_rule(
-                rule_stem, content, opts, skills_target_dir, project_root,
-                log, dry_run, src_label,
+                rule_stem,
+                _generate_tool_rule_content(tool_name, tool_def, pc, project_root),
+                opts, embedded_rules_channel_dir, project_root,
+                log, dry_run, f"external-tools-registry/{tool_name}",
             )
-            continue
 
-        filename = f"{rule_stem}.md"
-        target_path = safe_path(target_dir, filename)
-        rel_out = str(target_path.relative_to(project_root))
-        now_managed.add(filename)
-
-        if write_checked(target_path, content, log, src_label, config=config, dry_run=dry_run):
-            log.action("WRITE", rel_out, src_label)
-        else:
-            log.skip(rel_out, "unchanged")
-
-    # Remove stale tool-*.md rule files no longer covered by the current
-    # active-tool list (tool deactivated in project.yaml or removed from
-    # external-tools-registry.yaml).
-    cleanup_stale_managed_files(
-        target_dir, project_root, previously_managed, now_managed, log, dry_run,
-        "external tool no longer active/registered",
-    )
-    write_managed_index(managed_index_path, now_managed, dry_run)
-
-    if skills_target_dir is not None:
+    # Skill-channel stale-cleanup + managed-index merge — covers BOTH the
+    # native skill channel (has_rules + PROVIDERS, e.g. Claude) and the #192
+    # embedded-rules channel (has_rules:false + skills_dir, e.g. Opencode).
+    # Universe-scoped to the tool-* stems so entries owned by other writers
+    # of the same shared skills_dir index are never touched.
+    effective_skill_dir = skills_target_dir or embedded_rules_channel_dir
+    if effective_skill_dir is not None:
         cleanup_stale_skill_channel_rules(
-            skills_target_dir, project_root, all_tool_rule_stems, now_managed_skill_rules,
+            effective_skill_dir, project_root, all_tool_rule_stems, now_managed_skill_rules,
             log, dry_run, "external tool rule no longer routed to channel: skill",
         )
         write_skill_channel_managed_index(
-            skills_target_dir, now_managed_skill_rules, dry_run, universe=all_tool_rule_stems
+            effective_skill_dir, now_managed_skill_rules, dry_run, universe=all_tool_rule_stems
         )
 
 
