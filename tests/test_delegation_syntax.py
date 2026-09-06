@@ -136,3 +136,66 @@ def test_local_project_yaml_handoff_block_has_no_dead_keys():
     handoff_cfg = config.get("orchestrator", {}).get("handoff", {})
     for key in _REMOVED_PROJECT_HANDOFF_KEYS:
         assert key not in handoff_cfg, f"{key} should have been removed from project.yaml (no consumer)"
+
+
+# ---------------------------------------------------------------------------
+# Gemini native dispatch syntax (issue #674 Phase 3.2)
+# ---------------------------------------------------------------------------
+
+def test_gemini_delegate_entries_use_native_invoke_subagent():
+    """The Gemini entries must carry the native `invoke_subagent` toolcall
+    (the dispatch API the runtime exposes and the pipeline renderers already
+    emit) instead of the former free-text instruction."""
+    engine = DelegationSyntaxEngine()
+    syntax = engine.get_syntax("Gemini")
+    for key in ("delegate", "fanout", "parallel_group", "parallel_pattern"):
+        value = syntax.get(key, "")
+        assert "invoke_subagent" in value, (
+            f"Gemini '{key}' must use the native invoke_subagent toolcall "
+            "(issue #674 Phase 3.2)"
+        )
+
+
+def test_gemini_bootstrap_and_fallback_unchanged():
+    """Phase 3.2 replaces ONLY the dispatch syntax — registration stays
+    api-define_subagent (session-start), fallback stays self-processing."""
+    engine = DelegationSyntaxEngine()
+    syntax = engine.get_syntax("Gemini")
+    assert syntax.get("bootstrap") == "api-define_subagent"
+    assert "define_subagent" in syntax["bootstrap_sequence"][0]["template"]
+    assert syntax.get("fallback")  # still present
+
+
+def test_gemini_values_follow_string_encoding_conventions():
+    """No {{var}} inside values (LLM would read them as unresolved sync
+    placeholders); runtime slots use <angle-brackets> in the instructional
+    entries (delegate/fanout/parallel_group). parallel_pattern follows the
+    repo-wide concrete-example style (see the Claude/Codex entries)."""
+    engine = DelegationSyntaxEngine()
+    syntax = engine.get_syntax("Gemini")
+    for key in ("delegate", "fanout", "parallel_group", "parallel_pattern"):
+        value = syntax.get(key, "")
+        assert "{{" not in value, f"Gemini '{key}' must not contain {{...}} tokens"
+    for key in ("delegate", "fanout", "parallel_group"):
+        value = syntax.get(key, "")
+        assert "<" in value and ">" in value, (
+            f"Gemini '{key}' should keep the <angle-brackets> runtime-slot convention"
+        )
+
+
+def test_gemini_pal_placeholders_resolve_without_leftovers():
+    """End-to-end: the PAL engine substitutes all delegation placeholders for
+    Gemini and the output neither carries leftover {{PAL_*}} tokens nor an
+    empty delegate instruction."""
+    engine = DelegationSyntaxEngine()
+    template = (
+        "{{PAL_DELEGATE}}\n"
+        "{{PAL_FANOUT}}\n"
+        "{{PAL_PARALLEL_GROUP}}\n"
+        "{{PAL_FALLBACK}}\n"
+        "{{PAL_PARALLEL_PATTERN}}\n"
+    )
+    import re as _re
+    resolved = engine.apply(template, provider="Gemini")
+    assert not _re.search(r"\{\{PAL_[A-Z_]+\}\}", resolved)
+    assert "invoke_subagent" in resolved

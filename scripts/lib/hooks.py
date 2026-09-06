@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import posixpath
 import re
 from pathlib import Path
 
@@ -11,6 +12,17 @@ from .providers import provider_hooks_supported
 
 HOOKS_DIR = "hooks"
 CLAUDE_HOOKS_DIR = ".claude/hooks"
+
+# The translating adapter every Antigravity-protocol hook registration goes
+# through (issue #674 Phase 3.1). Lives in hooks/1-generic/ and is mirrored
+# next to the hook scripts like any other 1-generic script.
+ANTIGRAVITY_ADAPTER_SCRIPT = "antigravity-json-adapter.sh"
+
+# Antigravity events whose entry shape is a FLAT command list directly under
+# the event key (no matcher, no nested hooks array). PreToolUse/PostToolUse
+# use the matcher + nested hooks shape instead (verified contract,
+# antigravity.google/docs/hooks — issue #674 Phase 3.1).
+ANTIGRAVITY_FLAT_SHAPE_EVENTS = frozenset({"Stop", "PreInvocation", "PostInvocation"})
 
 HOOK_TEMPLATE_SH = """\
 #!/bin/bash
@@ -203,6 +215,148 @@ def _update_settings_hooks(
         settings_path.write_text(new_content, encoding="utf-8")
 
 
+def _antigravity_adapter_command(
+    target_filename: str, hooks_dir_rel: str, config_path_rel: str
+) -> str:
+    """Command string registered in hooks.json for one Antigravity hook.
+
+    Every mirrored hook is executed THROUGH the translating adapter (payload
+    keys, tool names and deny-JSON semantics differ from the Claude contract
+    the hook scripts are written against — see config/ai-providers.yaml,
+    issue #674 Phase 3.1). The command path is relative to the hooks.json
+    directory: Antigravity resolves relative command paths against the
+    location of the hooks.json that declares them (verified AGY IDE behavior
+    — third-party empirical report, P6 real-repo re-check).
+    """
+    config_dir = posixpath.dirname(config_path_rel.rstrip("/")) or "."
+    rel = posixpath.relpath(posixpath.normpath(hooks_dir_rel), posixpath.normpath(config_dir))
+    if not rel.startswith("."):
+        rel = f"./{rel}"
+    return f"bash {rel}/{ANTIGRAVITY_ADAPTER_SCRIPT} {target_filename}"
+
+
+def _update_antigravity_hooks_json(
+    project_root: Path,
+    previously_managed: set[str],
+    now_managed: set[str],
+    active_entries: list[dict],
+    log: SyncLog,
+    dry_run: bool,
+    provider_config: dict,
+) -> None:
+    """Merge managed hook entries into a provider's Antigravity hooks.json.
+
+    Registration artifact for hook_protocol ``antigravity-hooks-json``
+    (issue #674 Phase 3.1). Written in the verified Antigravity schema:
+
+        { "<hook-name>": { "<Event>": [ ...handlers... ] } }
+
+    - PreToolUse/PostToolUse handlers: ``{"matcher": "*", "hooks": [...]}``.
+      The matcher is ALWAYS "*" (match all tools): Claude-contract matcher
+      names (Bash/Edit/Write) would never match AGY's native tool names, and
+      every generic hook script gates on the tool name internally anyway
+      (after the adapter's tool-name translation).
+    - PreInvocation/PostInvocation/Stop handlers: flat
+      ``{"type": "command", "command": ...}`` list (verified flat shape).
+    - Commands go through hooks/1-generic/antigravity-json-adapter.sh, which
+      translates the AGY payload to the Claude contract and maps exit 2 +
+      stderr to ``{"decision": "deny", "reason": ...}``.
+    - Removals/additions are keyed by top-level hook NAME (previously-/now_
+      managed hold hook filenames; the stem is the hooks.json key), so user-
+      authored hooks under other names are preserved untouched.
+    """
+    config_path_rel = provider_config.get("hooks_config_file")
+    hooks_dir_rel = provider_config.get("hooks_dir", CLAUDE_HOOKS_DIR)
+    if not config_path_rel:
+        log.warning(
+            "hooks: hook_protocol 'antigravity-hooks-json' requires a "
+            "'hooks_config_file' key in config/ai-providers.yaml — "
+            "hooks registration skipped"
+        )
+        return
+
+    config_path = project_root / config_path_rel
+    all_managed = previously_managed | now_managed
+    if not all_managed and not config_path.exists():
+        return  # nothing to do
+
+    if config_path.exists():
+        hooks_json = load_json_file(config_path, on_error="default", default=None)
+        if hooks_json is None:
+            log.warning(f"{config_path_rel} could not be parsed — hooks registration not updated")
+            return
+        # Valid-but-non-dict JSON (e.g. [] or "x") must not crash the sync or
+        # be silently overwritten — mirror the _read_existing_json_dict guard
+        # in mcp_provider_config.py: warn + skip, file stays untouched.
+        if not isinstance(hooks_json, dict):
+            log.warning(
+                f"{config_path_rel} is not a JSON object — hooks registration not updated"
+            )
+            return
+    else:
+        if not active_entries:
+            return
+        hooks_json: dict = {}
+
+    # Strip stale/rewritten managed hooks (identified by top-level key = hook
+    # name stem), keep every foreign (user-authored) top-level entry.
+    stale_names = {Path(s).stem for s in (previously_managed - now_managed)}
+    rewritten_names = {e["name"] for e in active_entries}
+    hooks_json = {
+        k: v for k, v in hooks_json.items() if k not in stale_names and k not in rewritten_names
+    }
+
+    for entry_meta in active_entries:
+        event = entry_meta["event"]
+        command = _antigravity_adapter_command(
+            entry_meta["file"], hooks_dir_rel, config_path_rel
+        )
+        handler = {"type": "command", "command": command}
+        if event in ANTIGRAVITY_FLAT_SHAPE_EVENTS:
+            handlers = [handler]
+        else:
+            handlers = [{"matcher": "*", "hooks": [handler]}]
+        hooks_json[entry_meta["name"]] = {event: handlers}
+
+    new_content = json.dumps(hooks_json, indent=2, ensure_ascii=False) + "\n"
+
+    stale = previously_managed - now_managed
+    if not stale and not active_entries:
+        return  # no effective change
+
+    if is_unchanged(config_path, new_content):
+        log.skip(config_path_rel, "hooks registration unchanged")
+        return
+
+    if stale:
+        log.action("UPDATE", config_path_rel,
+                   f"removed stale hooks: {', '.join(sorted(stale_names))}")
+    if active_entries:
+        names = ", ".join(e["name"] for e in active_entries)
+        log.action("UPDATE", config_path_rel, f"registered hooks: {names}")
+
+    if not dry_run:
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(new_content, encoding="utf-8")
+
+
+# Registration writer per hook_protocol (issue #674 Phase 3.1). Keys are
+# `hook_protocol` values from config/ai-providers.yaml — NOT provider names —
+# per the provider-agnostic syncer policy: a new provider speaking an already
+# implemented protocol needs zero Python changes. A missing/unknown protocol
+# falls back to the legacy Claude settings.json writer (which the #630
+# protocol-revocation cleanup path relies on for has_hooks providers without
+# a verified hook_protocol, e.g. Mammouth/Codex).
+#
+# Known limitation: if an adapter-based hook_protocol (e.g. antigravity-hooks-json)
+# is ever revoked, the fallback cleanup deletes stale files but leaves registration
+# keys in hooks_config_file (degraded-but-safe; warnings may reference settings.json wording).
+_HOOK_REGISTRATION_WRITERS: dict = {
+    "claude-code-json": _update_settings_hooks,
+    "antigravity-hooks-json": _update_antigravity_hooks_json,
+}
+
+
 def sync_hooks(
     agent_meta_root: Path,
     project_root: Path,
@@ -342,6 +496,11 @@ def sync_hooks(
                 "event": event,
                 "matcher": meta.get("matcher", ""),
                 "command": _hook_settings_command(output_name, hooks_dir_rel),
+                # Deployed filename — the protocol-specific registration
+                # writers build their own command strings from it (the
+                # Antigravity writer routes every hook through the
+                # translating adapter, issue #674 Phase 3.1).
+                "file": output_name,
             })
             log.note(str(target_path.relative_to(project_root)),
                      f"registered in settings.json (event: {event})")
@@ -368,12 +527,24 @@ def sync_hooks(
             encoding="utf-8",
         )
 
-    # Merge hooks into settings.json
-    _update_settings_hooks(
-        project_root, previously_managed, now_managed, active_entries, log, dry_run,
-        settings_path_rel=settings_file_rel,
-        hooks_dir=hooks_dir_rel,
+    # Merge hooks into the provider's registration artifact. The writer is
+    # selected by `hook_protocol` (dispatch table above — never a provider
+    # name): the Claude contract registers in settings.json, the Antigravity
+    # contract in its hooks.json (issue #674 Phase 3.1).
+    registration_writer = _HOOK_REGISTRATION_WRITERS.get(
+        pc.get("hook_protocol"), _update_settings_hooks
     )
+    if registration_writer is _update_settings_hooks:
+        registration_writer(
+            project_root, previously_managed, now_managed, active_entries, log, dry_run,
+            settings_path_rel=settings_file_rel,
+            hooks_dir=hooks_dir_rel,
+        )
+    else:
+        registration_writer(
+            project_root, previously_managed, now_managed, active_entries, log, dry_run,
+            provider_config=pc,
+        )
 
     # Final verification: check all registered hook files exist on disk
     if not dry_run:

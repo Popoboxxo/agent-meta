@@ -35,9 +35,16 @@ delegation_syntax:
     handoff: *handoff-json
 
   Gemini:
-    delegate: "Rufe den **<ziel-agent>-Agenten** auf mit der Aufgabe: \"<vollständiger-task-text>\". Ersetze `<ziel-agent>` und `<vollständiger-task-text>` entsprechend."
-    fanout: "Bearbeite folgende unabhängige Aufgaben — die Gemini-Runtime parallelisiert automatisch bei separaten Tool-Calls:\n1. <task_1> → <agent_1>\n2. <task_2> → <agent_2>"
-    parallel_group: "Delegiere diese unabhängigen Teilaufgaben — Gemini führt sie automatisch parallel aus:\n1. <task_1> → <agent_1>\n2. <task_2> → <agent_2>"
+    # Native dispatch syntax (issue #674 Phase 3.2): the Gemini/Antigravity
+    # dispatch tool is `invoke_subagent` (verified runtime API — the same
+    # toolcall the pipeline renderers already emit, see
+    # scripts/lib/pipelines.py "gemini" task_fmt). Replaces the former
+    # free-text "rufe den Agenten auf" instruction. Agent REGISTRATION stays
+    # separate: bootstrap remains api-define_subagent (session-start
+    # registration), invoke_subagent is the dispatch tool afterwards.
+    delegate: "Delegiere via nativen `invoke_subagent`-Toolcall: `invoke_subagent(\"<ziel-agent>\", \"<vollständiger-task-text>\")`. Ersetze `<ziel-agent>` mit dem Agenten-Namen (z.B. `developer`) und `<vollständiger-task-text>` mit der vollständigen Aufgabenbeschreibung."
+    fanout: "FANOUT — Alle invoke_subagent-Calls in EINER Antwort absetzen, dann laufen sie parallel:\n```\ninvoke_subagent(\"<agent_1>\", \"<task_1>\")\ninvoke_subagent(\"<agent_2>\", \"<task_2>\")\n# Beide Calls in derselben Antwort → parallele Ausführung\n```"
+    parallel_group: "PARALLEL_GROUP — Mehrere invoke_subagent-Calls in EINER Antwort absetzen; die Gemini-Runtime führt unabhängige Tool-Calls automatisch parallel aus:\n```\ninvoke_subagent(\"<agent_1>\", \"<task_1>\")\ninvoke_subagent(\"<agent_2>\", \"<task_2>\")\n```"
     fallback: "Bearbeite folgende Aufgabe selbst, mit höchster Sorgfalt: <task>"
     bootstrap: "api-define_subagent"
     bootstrap_sequence:
@@ -45,7 +52,7 @@ delegation_syntax:
         template: 'define_subagent(name="<name>", description="<description>", system_prompt="<prompt>")'
     tool_preamble: "false"
     auto_parallel: true
-    parallel_pattern: "**Parallel-Pattern (konkret):**\nGemini Code Assist führt unabhängige Tool-Aufrufe parallel aus.\nDelegiere an mehrere Agenten in einem einzigen Prompt — die Ausführung erfolgt automatisch parallelisiert.\n"
+    parallel_pattern: "**Parallel-Pattern (konkret):**\n```\ninvoke_subagent(\"developer\", \"Fix Bug A\")\ninvoke_subagent(\"tester\", \"Tests für Fix B\")\n# beide Calls in derselben Antwort → parallele Ausführung\n```\nDie Gemini-Runtime führt unabhängige invoke_subagent-Calls automatisch parallel aus.\n"
     handoff: *handoff-json
 
   Continue:

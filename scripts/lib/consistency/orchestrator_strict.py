@@ -3,10 +3,11 @@
 hooks/1-generic/orchestrator-guard.sh is the only runtime enforcement of
 orchestrator.strict -- and scripts/lib/hooks.py only wires PreToolUse hooks
 for providers where providers_lib.provider_hooks_supported() is true, i.e.
-has_hooks: true AND a verified hook_protocol (currently Claude only --
-Mammouth has has_hooks: true but no verified hook_protocol, issue #630). On
-every other active provider (Opencode, Gemini, Continue, Copilot, Mammouth
-as of this writing), orchestrator.strict is a silent no-op: the setting
+has_hooks: true AND a verified hook_protocol (currently Claude and Gemini
+via the Antigravity protocol -- Mammouth has has_hooks: true but no verified
+hook_protocol, issue #630). On every other active provider (Opencode,
+Continue, Copilot, Mammouth as of this writing), orchestrator.strict is a
+silent no-op: the setting
 exists in .meta-config/project.yaml, but nothing enforces it. This mirrors
 the mode-resolution logic in
 hooks/1-generic/orchestrator-guard.sh's resolve_mode() so the two stay in

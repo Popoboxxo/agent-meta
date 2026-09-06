@@ -32,7 +32,7 @@ capabilities:
     parallel_execution: true
     file_based_agents: false
     text_mentions: false
-    hooks: false
+    hooks: true                    # Antigravity hooks.json contract verified (issue #674 Phase 3.1) — mirrored via hook_protocol antigravity-hooks-json + translating adapter
     native_agent_tools: ["define_subagent", "send_message", "invoke_subagent"]
     structured_handoff: true
     handoff_format: "json"
@@ -43,6 +43,7 @@ capabilities:
       - "Agenten müssen bei JEDER Session via define_subagent registriert werden."
       - ".gemini/agents/*.md werden NICHT automatisch geladen."
       - "Kein dateibasiertes Agent-Inventar wie Claude Code."
+      - "Hooks (issue #674 Phase 3.1): Antigravity hooks.json (.agents/hooks.json, Events PreToolUse/PostToolUse/PreInvocation/PostInvocation/Stop, camelCase-Payload, decision-JSON statt Exit-Code-2). Gespiegelt über hook_protocol antigravity-hooks-json + Übersetzungs-Adapter hooks/1-generic/antigravity-json-adapter.sh; Runtime-Ausführung = P6 real-repo-test."
 
   Continue:
     subagent_dispatch: false

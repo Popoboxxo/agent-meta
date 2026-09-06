@@ -69,6 +69,26 @@ def _subst_opencode(value: str, secrets: dict | None) -> str:
     return _subst_with_placeholder(value, secrets, lambda var_name: f"{{env:{var_name}}}")
 
 
+def _subst_vscode(value: str, secrets: dict | None) -> str:
+    """Replace {{VAR}} placeholders with VS Code ${env:VAR} syntax.
+
+    VS Code expands ``${env:VAR}`` natively in ``.vscode/mcp.json`` values
+    (agent-mode MCP), so the committed file can reference environment
+    variables without a secrets file — the same committed-placeholder
+    strategy Claude's ``.mcp.json`` uses (issue #674 Phase 3.3).
+    """
+    return _subst_with_placeholder(value, secrets, lambda var_name: f"${{env:{var_name}}}")
+
+
+def _subst_for_format(fmt: str | None):
+    """Placeholder substitution function for one provider-config format."""
+    if fmt == "opencode-json":
+        return _subst_opencode
+    if fmt == "vscode-settings":
+        return _subst_vscode
+    return _subst
+
+
 def _build_connection_entry(conn: dict, secrets: dict | None, fmt: str | None = None) -> dict:
     """Convert a registry connection block to a provider-config dict.
 
@@ -76,16 +96,28 @@ def _build_connection_entry(conn: dict, secrets: dict | None, fmt: str | None = 
       - command as array (not command + args)
       - "environment" key (not "env")
       - {env:VAR} interpolation (not ${VAR})
+
+    fmt="vscode-settings" uses VS Code agent-mode MCP syntax (issue #674
+    Phase 3.3):
+      - remote (sse) servers are declared with type "http" (VS Code
+        deprecates the legacy "sse" discriminator)
+      - ${env:VAR} interpolation (expanded natively by VS Code in
+        .vscode/mcp.json values)
     """
     conn_type = conn.get("type", "")
     orig_type = conn_type
 
     is_opencode = fmt == "opencode-json"
+    is_vscode = fmt == "vscode-settings"
+    subst = _subst_for_format(fmt)
+
     if is_opencode:
         if conn_type == "sse":
             conn_type = "remote"
         elif conn_type == "stdio":
             conn_type = "local"
+    elif is_vscode and conn_type == "sse":
+        conn_type = "http"
 
     entry: dict = {"type": conn_type}
 
@@ -94,16 +126,10 @@ def _build_connection_entry(conn: dict, secrets: dict | None, fmt: str | None = 
 
     if orig_type == "sse":
         raw_url = conn.get("url", "")
-        if is_opencode:
-            entry["url"] = _subst_opencode(raw_url, secrets)
-        else:
-            entry["url"] = _subst(raw_url, secrets)
+        entry["url"] = subst(raw_url, secrets)
         headers = conn.get("headers", {})
         if headers:
-            if is_opencode:
-                entry["headers"] = {k: _subst_opencode(str(v), secrets) for k, v in headers.items()}
-            else:
-                entry["headers"] = {k: _subst(str(v), secrets) for k, v in headers.items()}
+            entry["headers"] = {k: subst(str(v), secrets) for k, v in headers.items()}
 
     elif orig_type == "stdio":
         cmd = conn.get("command", "")
@@ -118,7 +144,7 @@ def _build_connection_entry(conn: dict, secrets: dict | None, fmt: str | None = 
             entry["command"] = cmd
             entry["args"] = args
             if env:
-                entry["env"] = {k: _subst(str(v), secrets) for k, v in env.items()}
+                entry["env"] = {k: subst(str(v), secrets) for k, v in env.items()}
 
     return entry
 
@@ -561,6 +587,12 @@ def _write_provider_config(
                              verify_gitignored=verify_gitignored)
     elif fmt == "opencode-json":
         _update_json_config(path, "mcp", mcp_entries, log, dry_run, allow_secrets, config=config,
+                             verify_gitignored=verify_gitignored)
+    elif fmt == "vscode-settings":
+        # VS Code agent-mode MCP (.vscode/mcp.json): top-level {"servers": ...}
+        # settings shape — NOT the Claude {"mcpServers": ...} key
+        # (issue #674 Phase 3.3).
+        _update_json_config(path, "servers", mcp_entries, log, dry_run, allow_secrets, config=config,
                              verify_gitignored=verify_gitignored)
     elif fmt == "continue-yaml":
         _update_continue_yaml_config(path, mcp_entries, log, dry_run, allow_secrets, config=config,

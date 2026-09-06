@@ -84,6 +84,9 @@ agent-meta/
     GEMINI.md                ← Kontext-Datei mit managed block
     agents/                  ← generierte Agenten (kein permissionMode/memory)
     settings.json            ← Skeleton (einmalig angelegt)
+    .agents/hooks.json       ← Antigravity-Hooks-Registrierung (issue #674 Phase 3.1;
+                               committed; Hooks laufen via Übersetzungs-Adapter)
+    .agents/hooks/           ← gespiegelte Hook-Skripte (committed)
   .continue/                 ← Continue (nur wenn "Continue" in ai-providers)
     rules/
       project-context.md     ← Projekt-Kontext als Rule (alwaysApply: true, managed block)

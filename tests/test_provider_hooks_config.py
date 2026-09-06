@@ -49,6 +49,65 @@ def test_codex_has_hooks_true_with_reserved_own_hooks_dir():
     assert codex.get("hook_protocol") is None
 
 
+def test_gemini_antigravity_hooks_supported():
+    """Gemini (Antigravity) declares the VERIFIED hooks.json contract with a
+    dedicated hook_protocol value (issue #674 Phase 3.1) — provider_hooks_supported()
+    must return True so the orchestrator-strict.no-hook-support validate
+    finding disappears. The protocol value is registered in
+    scripts/lib/providers.py SUPPORTED_HOOK_PROTOCOLS (not a claude-code-json
+    alias: registration artifact, payload keys and decision-JSON output all
+    deviate from the Claude contract — see the config block comment)."""
+    import sys
+
+    sys.path.insert(0, str(_REPO_ROOT / "scripts"))
+    from lib.providers import SUPPORTED_HOOK_PROTOCOLS, provider_hooks_supported  # noqa: E402
+
+    providers = _load_providers()["providers"]
+    gemini = providers["Gemini"]
+    assert gemini.get("has_hooks") is True
+    assert "hooks" in gemini.get("capabilities", [])
+    assert gemini.get("hook_protocol") == "antigravity-hooks-json"
+    assert gemini.get("hook_protocol") in SUPPORTED_HOOK_PROTOCOLS
+    assert provider_hooks_supported(gemini) is True
+    # Registration artifacts (verified Antigravity workspace locations):
+    # hooks.json at the documented .agents/ customization dir, mirrored
+    # scripts beside it — NOT under .gemini/ (AGY does not read hooks from
+    # Gemini CLI's settings surface there).
+    assert gemini.get("hooks_dir") == ".agents/hooks"
+    assert gemini.get("hooks_config_file") == ".agents/hooks.json"
+
+
+def test_gemini_hooks_paths_do_not_collide_with_gemini_settings():
+    """The Antigravity hook reservation must not collide with anything already
+    owned by the Gemini provider itself (settings_file .gemini/settings.json is
+    Gemini CLI's settings surface AND the MCP committed-file target — the
+    hooks registration artifact is a separate file at the documented AGY
+    workspace location)."""
+    providers = _load_providers()["providers"]
+    gemini = providers["Gemini"]
+    assert gemini["hooks_dir"] != gemini["settings_file"]
+    assert gemini["hooks_config_file"] != gemini["settings_file"]
+    assert gemini["hooks_config_file"] != gemini["mcp-config"]["committed-file"]
+    # And nothing under .gemini/ may be claimed by the hooks reservation —
+    # .gemini/ stays exclusively the Gemini CLI surface (agents, commands,
+    # settings, skills, ...).
+    assert not gemini["hooks_dir"].startswith(".gemini/")
+    assert not gemini["hooks_config_file"].startswith(".gemini/")
+
+
+def test_gemini_hooks_registration_artifact_is_committed():
+    """.agents/hooks.json + .agents/hooks/ are committed artifacts (like
+    .claude/settings.json) — they must NOT appear in gitignore_entries, and
+    `.agents/` must NOT be claimed as a provider root (shared cross-tool
+    directory: Codex claims .agents/skills; whole-dir ignoring would hide
+    other tools' files)."""
+    providers = _load_providers()["providers"]
+    gemini = providers["Gemini"]
+    entries = set(gemini.get("gitignore_entries", []))
+    assert ".agents/hooks.json" not in entries
+    assert ".agents/" not in entries and ".agents/" not in gemini.get("provider_root_dirs", [])
+
+
 @pytest.mark.parametrize("provider", ["ZCode", "KimiCode"])
 def test_no_hooks_providers_reserve_no_hooks_dir(provider):
     """ZCode/KimiCode have has_hooks:false — no hooks_dir may be configured for
@@ -73,8 +132,10 @@ def test_no_hooks_providers_reserve_no_hooks_dir(provider):
 
 # Path keys that must be provider-exclusive. hooks_dir applies hooks.py's
 # .claude/hooks default for has_hooks providers that don't declare it.
+# hooks_config_file (issue #674 Phase 3.1): the Antigravity hooks.json
+# registration artifact — provider-exclusive like hooks_dir/settings_file.
 _COLLISION_PATH_KEYS = (
-    "agents_dir", "hooks_dir", "skills_dir", "snippets_dir",
+    "agents_dir", "hooks_dir", "hooks_config_file", "skills_dir", "snippets_dir",
     "extension_dir", "artifact_dir", "settings_file", "pending_tasks_file",
 )
 
