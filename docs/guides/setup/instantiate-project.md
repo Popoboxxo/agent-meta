@@ -201,6 +201,7 @@ Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 | `.claude/agents/intern-developer.md` | `1-generic/intern-developer.md` (optional, Easter-Egg/Gag-Agent — read-only, nicht für echte Arbeit) |
 | `.claude/agents/tester.md` | `1-generic/tester.md` |
 | `.claude/agents/e2e-tester.md` | `1-generic/e2e-tester.md` (optional, für Web-Projekte mit E2E/visueller Regression/a11y) |
+| `.claude/agents/test-executor.md` | `1-generic/test-executor.md` (optional, Lightweight-Execution bestehender Suites: Pass/Fail-Counts, Exit-Codes, Stdout-Auszüge — Read+Bash only, nano-Tier; Test-Design bleibt bei `tester`) |
 | `.claude/agents/validator.md` | `1-generic/validator.md` |
 | `.claude/agents/requirements.md` | `1-generic/requirements.md` |
 | `.claude/agents/documenter.md` | `1-generic/documenter.md` |

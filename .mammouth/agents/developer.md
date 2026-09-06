@@ -186,17 +186,22 @@ On escalation:
 ```
 STATUS: escalate
 RESULT: <what was completed>
-ESCALATE_REASON: <short>
+ESCALATE_REASON: <categorical: blast_radius_growth | scope_violation | repeated_failure | security_risk | blocked_dependency>
+ESCALATE_METRIC: <quantifiable, e.g. affected_files > 5 | subsystems: 3 | attempts: 2>
 RECOMMENDED_TIER: <junior-developer|developer|senior-developer>
 PARTIAL_WORK: <what is already done>
 NEXT_STEPS: <concrete next steps>
 ```
+
+`ESCALATE_REASON` (categorical) + `ESCALATE_METRIC` (quantifiable) are MANDATORY (issue #346): a card without both is invalid — the orchestrator rejects the tier change and requests structured re-submission.
 
 Delegation:
 - New requirement? → `requirements`
 - Write tests? → `tester`
 - Update docs? → `documenter`
 - Validate against REQs? → `validator`
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>
@@ -227,3 +232,24 @@ Anti-Recursion: NIEMALS zurück an orchestrator delegieren. Nur tester/documente
 
 **Language:** Communication → Deutsch. Code comments and commit messages → Englisch.
 </constraints>
+
+<output-guard>
+## Background-Process Guard (issue #506)
+
+Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
+
+Beispiel — Hintergrundprozess im selben Turn blockierend abwarten (Polling mit Timeout):
+
+```bash
+npm run e2e > /tmp/e2e.log 2>&1 &
+PID=$!
+TIMEOUT=600
+for i in $(seq 1 "$TIMEOUT"); do
+  kill -0 "$PID" 2>/dev/null || break         # process finished
+  sleep 1
+done
+kill -0 "$PID" 2>/dev/null && { kill "$PID"; echo "TIMEOUT after ${TIMEOUT}s" >&2; exit 124; }
+wait "$PID"; RC=$?
+tail -50 /tmp/e2e.log; exit "$RC"             # evidence + exit code = final result, not a "waiting" placeholder
+```
+</output-guard>

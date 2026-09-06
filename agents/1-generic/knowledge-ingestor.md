@@ -1,6 +1,6 @@
 ---
 name: template-knowledge-ingestor
-version: "1.2.0"
+version: "1.3.0"
 description: "Sources einlesen, Key Information extrahieren, Wiki-Seiten erstellen/aktualisieren, Cross-References pflegen."
 hint: "Sources verarbeiten, Wiki-Seiten schreiben, Cross-References pflegen"
 tools:
@@ -98,6 +98,8 @@ STATUS: done|partial|failed
 RESULT: <1-2 Sätze: was ingestiert wurde und welche Seiten neu/aktualisiert sind>
 ARTIFACTS: <erstellte/aktualisierte Wiki-Seiten, kommagetrennt>
 ```
+**Pflicht-Abschluss-Summary (Issue #267):** der strukturierte Block oben ist dein kompletter Rückgabewert — der Orchestrator konsumiert nur dieses Summary, niemals Roh-Output. RESULT: kompaktes Summary (max. 2-3 Sätze) mit was geändert wurde, Erfolg/Misserfolg und dem nächsten Schritt. Roh-Output, Diffs und Logs gehören nie in RESULT — die gehören in ARTIFACTS (Dateipfade).
+
 </output_contract>
 
 ## Anti-Recursion Guard

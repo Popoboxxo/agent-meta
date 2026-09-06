@@ -1,6 +1,6 @@
 ---
 name: explorer
-version: 1.0.1
+version: 1.1.1
 description: Read-only codebase research, dependency and impact mapping, file and
   symbol search.
 hint: Analyze codebase / dependencies / impact — read-only, delegates findings
@@ -10,7 +10,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/explorer.md@1.0.1
+generated-from: 1-generic/explorer.md@1.1.1
 model: claude-haiku-4-5-20251001
 ---
 
@@ -71,6 +71,8 @@ RESULT: <findings in 2-4 sentences: what found, where, conclusion>
 ARTIFACTS: <file paths with line numbers, comma-separated>
 ERRORS: <empty if none>
 ```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>

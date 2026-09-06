@@ -1,6 +1,6 @@
 ---
 name: planner
-version: 1.1.0
+version: 1.2.0
 description: Use when a concept, REQ, or bug needs to be turned into a concrete, ordered
   implementation plan before work starts.
 hint: Nutze planner wenn ein Konzept/REQ/Bug in konkrete, geordnete Umsetzungsschritte
@@ -12,7 +12,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/planner.md@1.1.0
+generated-from: 1-generic/planner.md@1.2.0
 model: gemini-3.1-pro-low
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -91,6 +91,8 @@ ARTIFACTS: <persisted plan path>
 
 **Persisted to:** <knowledge/wiki/plans/<topic>.md | plan-<topic>.md>
 ```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>

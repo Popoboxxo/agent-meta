@@ -1,6 +1,6 @@
 ---
 name: knowledge-curator
-version: 1.1.0
+version: 1.2.0
 description: 'Strategische Knowledge-Engine-Steuerung: Schema-Evolution, Wiki-Strukturierung,
   Domänen-Anpassung, Ingest-Planung, OKF-Compliance-Sicherung.'
 hint: Wiki-Strategie, Schema-Evolution, OKF-Compliance
@@ -9,7 +9,7 @@ tools:
 - Write
 - Agent
 - TodoWrite
-generated-from: 1-generic/knowledge-curator.md@1.1.0
+generated-from: 1-generic/knowledge-curator.md@1.2.0
 model: claude-sonnet-5
 ---
 # Knowledge Curator — agent-meta
@@ -78,6 +78,8 @@ STATUS: done|partial|failed
 RESULT: <1-2 Sätze: getroffene Schema-Entscheidung und Begründung>
 ARTIFACTS: <geänderte/neue Schema- und Wiki-Dateien, kommagetrennt>
 ```
+**Pflicht-Abschluss-Summary (Issue #267):** der strukturierte Block oben ist dein kompletter Rückgabewert — der Orchestrator konsumiert nur dieses Summary, niemals Roh-Output. RESULT: kompaktes Summary (max. 2-3 Sätze) mit was geändert wurde, Erfolg/Misserfolg und dem nächsten Schritt. Roh-Output, Diffs und Logs gehören nie in RESULT — die gehören in ARTIFACTS (Dateipfade).
+
 </output_contract>
 
 ## Anti-Recursion Guard

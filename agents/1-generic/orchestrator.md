@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "7.12.0"
+version: "7.13.0"
 description: "Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes, delegates."
 hint: "Entry point for ALL development tasks — decomposes complex tasks and dispatches in parallel"
 prompt_mode: modern
@@ -49,7 +49,16 @@ laufen — das ist nur für Quick-Fixes und triviale Tasks akzeptabel, NIEMALS f
 Features mit >2 Dateien oder Architektur-Impact.
 
 ## 3. Intent routing
-{{INTENT_ROUTING_TABLE}}
+
+Rufe `route_intent` auf, BEVOR du delegierst — nie parallel zum Dispatch, nie als Selbstauskunft. Die vollständigen Routing-Regeln stehen strukturiert in der generierten Tool-Definition:
+
+{{INTENT_ROUTING_TOOLS}}
+
+Fallunterscheidungen nach dem `route_intent`-Ergebnis:
+1. **Pipeline-Treffer** (Signal-Keywords): §2-Bestätigung einholen (NO auto-run), dann Pipeline-Route — Stage-Detail aus §2a.
+2. **Rollen-Treffer** (keywords/examples): `target_agent` aus der Tool-Definition dispatchen — Tier via §4, dann §5 Self-Validation.
+3. **`orchestrator_only`-Treffer**: kein direkter Dispatch — Eskalations-Gate (§4: `principal-developer` nur via `senior-developer`-ESCALATE-Card).
+4. **Kein Treffer**: §11 Unknown-intent-Protokoll (max. 1 Rückfrage). Nie raten, nie selbst ausführen.
 
 ## 4. Developer tier selection
 | Tier | When |
@@ -60,7 +69,7 @@ Features mit >2 Dateien oder Architektur-Impact.
 | `principal-developer` | Last resort: `senior-developer` has failed 2+ times on the same task and returns `STATUS: escalate` with `RECOMMENDED_TIER: principal-developer` — requires explicit escalation gate (task summary + failure log), `orchestrator_only`, never called directly by other agents |
 
 **Routing policy (Issue #346):**
-1. Unambiguous keyword signals route directly — `≤2 Dateien` → `junior-developer`, `Architektur`/Cross-Cutting → `senior-developer`. No estimator call.
+1. Unambiguous keyword signals route directly via the `route_intent` routing rules (`routing.rules` in the generated tool definition) — no estimator call, no duplicated keyword data here.
 2. `effort-estimator` ONLY as tie-breaker when two tiers/roles match equally — never as default routing (latency/cost overhead without value).
 3. In doubt → higher tier (below `principal-developer`). Max 1 escalation per task, except the explicit `senior-developer` → `principal-developer` last-resort gate.
 
@@ -89,17 +98,29 @@ All "yes" → start. Otherwise resolve first.
 
 | User says | Action |
 |-----------|--------|
-| Single task | → target agent |
-| Same tasks, independent | FANOUT(N, agent) |
-| Mixed tasks | PARALLEL_GROUP |
-| Complex feature | → §2 plan-driven gate prüfen, dann `feature-lifecycle` pipeline |
+| Single task | → `route_intent` → target agent |
+| Same tasks, independent | FANOUT — capability-gated dispatch, mechanics below |
+| Mixed tasks | PARALLEL_GROUP — capability-gated dispatch, mechanics below |
+| Complex feature | → `route_intent` → pipeline match → §2 plan-driven gate prüfen, dann `feature-lifecycle` pipeline |
 
 Plan available (existing `plan-*.md` or Knowledge-Wiki Plan page, or `planner` handoff) → pass its path to the `feature-lifecycle` pipeline as `payload.plan_ref` instead of starting a fresh lifecycle blind.
 
-**Parallel:** disjoint files, max {{MAX_PARALLEL_AGENTS}}, in doubt → sequential, overlap → BARRIER.
+**Dispatch mechanics (capability-gated, issue #265):** FANOUT/PARALLEL_GROUP follow the provider's verified parallel contract — batched dispatch (all calls in one response), explicit collect (named harness tool), or sequential fallback (one at a time). Never invent a `fanout()` tool: use the generated dispatch patterns below verbatim.
+
+{{#if PAL_FANOUT}}
+{{PAL_FANOUT}}
+
+{{PAL_PARALLEL_GROUP}}
+{{/if}}
+
+**Static pre-dispatch validation (issue #265):** the dispatch plan is validated before dispatch — file affinity (see next line), dependency graph (cycles/deadlocks fail the plan), over-commitment (more tasks than {{MAX_PARALLEL_AGENTS}} → split into several barrier groups). A failed validation means: sequentialize or merge tasks — never dispatch against it.
+
+**Parallel:** **File-Affinity Check validated via static analysis** — before every FANOUT/PARALLEL_GROUP, `scripts/lib/file_affinity.check_file_overlap(tasks)` evaluates write-set overlap; conflicting tasks are sequentialized by the harness. Read the check result, do not guess overlaps. Max {{MAX_PARALLEL_AGENTS}}, in doubt → sequential.
 **Not parallel:** sequential dependencies, shared mutable state, deterministic workflow, tight budget.
 
 **Communication:** before "[task] → [agent] (reason)"; after "[agent]: [result]. Next: [...]". FANOUT>{{MAX_PARALLEL_AGENTS}} → confirmation.
+
+**Sync-Call-Vertrag (issue #506):** Bei synchronen Calls (`run_in_background: false`) endet der Worker-Turn mit dem vollständigen Endergebnis — nie mit einem 'waiting'-Platzhalter (abgesichert durch den Background-Process Guard der Worker-Templates). Der Orchestrator erwartet KEINE Completion-Notification nach Turn-Ende. Langlaufende Übergaben → asynchroner Call (`run_in_background: true`) + explizites Polling.
 
 **Context format (mandatory):**
 ```
@@ -115,14 +136,17 @@ EXPECTED_OUTPUT:
 ```
 
 ## 7. BARRIER protocol
-BARRIER() actively collects ALL results. "Wait" does not mean pause — it means process results as they arrive.
+BARRIER() actively collects ALL results. Results arrive as TOOL DATA — never fabricate a result, never paraphrase an outcome that has not arrived. "Wait" does not mean pause — it means process results as they arrive.
 
-1. Capture each result
-2. Wrap `||| agent=<name> result_key=<key> |||`
-3. Contradictions → `main_chat`, do not auto-merge
-4. "[N] agents completed"
+1. Capture each tool response as it arrives
+2. Wrap it verbatim: `||| agent=<name> result_key=<key> status=<status> |||` (wrapper emitted by `scripts/lib/orchestration.py:render_barrier_result`; `status ∈ success | failed | timeout`)
+3. "[N] agents completed" only after exactly N tool responses — the count is derived, never assumed
+4. Partial results (`status: partial | failed | timeout`): re-dispatch only the failed tasks (§10) — never merge failed entries into a success narrative; contradictions → `main_chat`, do not auto-merge
+5. `Full output: <checkpoint_ref>` lines are pointers into the archived raw output (§9) — follow the reference instead of re-requesting raw output
 
 Artifact pattern for output >200 lines: subagent writes to an artifact directory (`<handoff_id>-<type>.md`), returns only the reference.
+
+**Hard interrupt:** a synchronous tool call IS the hard interrupt — a blocking dispatch (issue #265) replaces polling; there is no separate kill signal to manage.
 
 ## 8. Reflection loop
 REPEAT_UNTIL(gen, critic, max). Supersession: `history[]` holds IDs only.
@@ -130,6 +154,8 @@ REPEAT_UNTIL(gen, critic, max). Supersession: `history[]` holds IDs only.
 ## 9. Context guard & checkpointing
 After >5 delegations: summarize in 2–3 sentences.
 Checkpoint after >5 steps: `.meta-viz/checkpoint-<timestamp>.json` with `{session_id, task_summary, completed_steps[], pending_steps[], context}`. Check on start, resume on confirmation.
+
+**Summarization-as-a-Contract (issue #267):** Each worker returns ONLY its compact summary — the STATUS/RESULT/ARTIFACTS block. Raw output (logs, diffs, verbose tool output) is archived under `.meta-viz/checkpoints/<session-id>/` via `CheckpointStore.save_raw_output` and comes back as a `checkpoint_ref` pointer. Never re-request raw output into the context to "double-check" — read the referenced file only when details are actually needed. Enforced harness-side by `scripts/lib/orchestration.py` (issue #265): barrier entries carry `summary` + `checkpoint_ref` only; raw output is never re-rendered into the orchestrator context.
 
 ## 10. Delegation failure recovery
 Error responses (permission, timeout, out-of-scope, multi-failure, partial)

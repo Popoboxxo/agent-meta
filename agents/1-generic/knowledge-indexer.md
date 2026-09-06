@@ -1,6 +1,6 @@
 ---
 name: template-knowledge-indexer
-version: "1.1.0"
+version: "1.2.0"
 description: "Pflegt index.md (Content-Katalog, OKF §6) und log.md (Chronologisches Event-Log, OKF §7) im Knowledge Wiki."
 hint: "index.md und log.md pflegen — nur als Delegationsziel anderer Knowledge-Agenten"
 tools:
@@ -107,6 +107,8 @@ STATUS: done|partial|failed
 RESULT: <1-2 Sätze: Katalog- und Log-Status nach dem Lauf>
 ARTIFACTS: <geänderte index.md-/log.md-Pfade, kommagetrennt>
 ```
+**Pflicht-Abschluss-Summary (Issue #267):** der strukturierte Block oben ist dein kompletter Rückgabewert — der Orchestrator konsumiert nur dieses Summary, niemals Roh-Output. RESULT: kompaktes Summary (max. 2-3 Sätze) mit was geändert wurde, Erfolg/Misserfolg und dem nächsten Schritt. Roh-Output, Diffs und Logs gehören nie in RESULT — die gehören in ARTIFACTS (Dateipfade).
+
 </output_contract>
 
 ## Anti-Recursion Guard

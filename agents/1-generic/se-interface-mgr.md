@@ -1,6 +1,6 @@
 ---
 name: se-interface-mgr
-version: 1.8.0
+version: 1.9.0
 description: Manages generic signal flow and deterministic synchronization across
   systems. Persists interface registry to filesystem.
 hint: Manages generic signal flow, deterministic sync across systems
@@ -171,6 +171,8 @@ STATUS: done|partial|failed|escalate
 RESULT: <1 Satz Ergebnis-Zusammenfassung>
 ARTIFACTS: <persistierte Step-/Report-Dateien (siehe Step Persistence)>
 ```
+**Pflicht-Abschluss-Summary (Issue #267):** der strukturierte Block oben ist dein kompletter Rückgabewert — der Orchestrator konsumiert nur dieses Summary, niemals Roh-Output. RESULT: kompaktes Summary (max. 2-3 Sätze) mit was geändert wurde, Erfolg/Misserfolg und dem nächsten Schritt. Roh-Output, Diffs und Logs gehören nie in RESULT — die gehören in ARTIFACTS (Dateipfade).
+
 </output_contract>
 
 ## Anti-Recursion Guard

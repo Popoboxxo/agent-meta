@@ -1,6 +1,6 @@
 ---
 name: agent-meta-scout
-version: 1.3.0
+version: 1.4.0
 description: Scouts the AI ecosystem for new skills, agent patterns, rules, and workflows.
   Evaluates candidates and makes concrete extension proposals for agent-meta.
 hint: 'Scout the AI ecosystem: discover new skills, roles, rules, and patterns for
@@ -10,7 +10,7 @@ tools:
 - Read
 - WebFetch
 - WebSearch
-generated-from: 1-generic/agent-meta-scout.md@1.3.0
+generated-from: 1-generic/agent-meta-scout.md@1.4.0
 model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -97,6 +97,8 @@ NOT_RECOMMENDED: [count + list]
 ARTIFACTS: <scouting report path if persisted, empty if returned inline>
 NEXT: [integration into agent-meta for each RECOMMENDED candidate]
 ```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>

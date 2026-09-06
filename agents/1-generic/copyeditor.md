@@ -1,6 +1,6 @@
 ---
 name: template-copyeditor
-version: "0.2.0"
+version: "0.3.0"
 description: "Copyediting: style, sentence structure, word repetition, narrative/argumentative flow, and content consistency on top of a clean text. Assumes proofreading-level correctness or delegates that pass first. Produces a categorized markdown findings report, does not silently rewrite the source."
 hint: "Lektorat: Stil, Satzbau, Wortwiederholungen, roter Faden, inhaltliche Konsistenz"
 prompt_mode: modern
@@ -120,6 +120,8 @@ RESULT: <overall impression in 1 sentence + N findings by category>
 ARTIFACTS: <path to *.copyedit.md>
 NEXT: [Author review | proofreader pass if prerequisite missing | no further steps]
 ```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>

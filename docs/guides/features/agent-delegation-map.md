@@ -9,7 +9,7 @@ Zeigt wer an wen delegiert (→) und wer an wen verweist (↗).
 
 | Agent | Delegiert an (→) | Verweist auf (↗) |
 |-------|-------------------|-------------------|
-| **orchestrator** | `ideation`, `requirements`, `developer`, `tester`, `validator`, `documenter`, `docker`, `git`, `agent-meta-scout`, `agent-meta-manager`, `meta-feedback`, `log-analyzer`, `feedback` | — |
+| **orchestrator** | `ideation`, `requirements`, `developer`, `tester`, `validator`, `documenter`, `docker`, `git`, `agent-meta-scout`, `agent-meta-manager`, `meta-feedback`, `log-analyzer`, `feedback`, `test-executor` | — |
 | **feature** | `git`, `requirements`, `tester`, `developer`, `validator`, `documenter` | — |
 | **developer** | — | `requirements`, `tester`, `documenter`, `validator` |
 | **tester** | — | `requirements`, `developer`, `documenter`, `validator` |
@@ -26,6 +26,7 @@ Zeigt wer an wen delegiert (→) und wer an wen verweist (↗).
 | **requirements** | — | `developer`, `tester`, `documenter` |
 | **log-analyzer** | `feedback`, `developer`, `security-auditor`, `requirements`, `orchestrator` | — |
 | **feedback** | — | `git` (für verwandte git-Ops nach Issue-Erstellung) |
+| **test-executor** | — | `developer` (failing code), `tester` (Test-Design) |
 
 **Legende:**
 - **Delegiert an (→):** Startet den Ziel-Agenten aktiv via Agent-Tool
@@ -45,6 +46,7 @@ graph TD
     subgraph "Spezialisten (verweisen nur)"
         DEV[developer]
         TEST[tester]
+        TESTEX[test-executor]
         VAL[validator]
         DOC[documenter]
         GIT[git]
@@ -80,6 +82,7 @@ graph TD
     ORCH -->|delegiert| FB
     ORCH -->|delegiert| LOG
     ORCH -->|delegiert| FBK
+    ORCH -->|delegiert| TESTEX
 
     %% Feature delegiert
     FEAT -->|delegiert| GIT
@@ -174,6 +177,7 @@ graph TD
 |-------|-------------|
 | `developer` | requirements, tester, documenter, validator |
 | `tester` | requirements, developer, documenter, validator |
+| `test-executor` | developer (failing code), tester (Test-Design) |
 | `validator` | developer, tester, requirements, documenter |
 | `documenter` | developer, tester, requirements, validator |
 | `git` | developer, tester, release, documenter |
@@ -201,6 +205,7 @@ und parallel laufen könnten:
 |----------------|-----------------|-----------|
 | Nach Implementierung | `validator` ∥ `documenter` | Beide lesen nur, kein Write-Konflikt |
 | Nach Fix | `tester` ∥ `validator` | Nur wenn Tests + Validation unabhängig |
+| CI/Fix-Verify-Loops | mehrere `test-executor`-Instanzen ∥ | Unabhängige Suites (z. B. Backend ∥ Frontend); 1 Suite pro Instanz — bewusst leichtgewichtig (nano-Tier, Read+Bash) |
 | Nach Scout-Evaluation | `agent-meta-manager` ∥ `meta-feedback` | Verschiedene Aktionen |
 | Feature-Lifecycle Ende | `documenter` ∥ `git` (branch) | Doku + Branch-Erstellung parallel |
 
@@ -209,6 +214,40 @@ und parallel laufen könnten:
 - `developer` → `tester` (Code muss vor Test-Ausführung fertig sein)
 - `validator` → `git` (Validierung muss vor Commit abgeschlossen sein)
 - `requirements` → `tester` (REQ-ID muss vor Test-Schreiben existieren)
+
+---
+
+## Test-Design vs. Test-Execution (issue #517)
+
+Test-Design und Test-Ausführung sind getrennte Rollen. Hintergrund: ein Vorfall mit drei
+parallel gespawnten `tester`/`e2e-tester`-Instanzen auf einem 5,8-GB-RAM-Host erzeugte
+Near-OOM-Bedingungen — Root Cause war die Kopplung von Test-Design (teures Modell-Tier,
+Write-Tools, Analysetiefe) mit reiner Suite-Ausführung in derselben Rolle.
+
+### Delegations-Guidance
+
+| Situation | Richtige Rolle | Warum |
+|-----------|---------------|-------|
+| Neuer/geänderter Test, TDD-Planung, Coverage-Analyse, Test-Struktur | `tester` | Design-Phase: braucht Write/Edit/Glob/Grep-Tiefe und Analysetier |
+| Browser-E2E-Design, visuelle Regression, a11y-Audit | `e2e-tester` | Browser-Design-Phase (MCP-Tools) |
+| **Bestehende Suite ausführen** (Re-Run nach Fix, CI-Verify-Loop, parallele Suite-Verifizierung) | **`test-executor`** | Reine Execution: nano-Tier, Read+Bash, kein Schreiben |
+| Fehlerhafte Produktions-Code-Stelle aus einem Run beheben | `developer` | Code-Änderung gehört nie zur Execution-Rolle |
+
+**Faustregel:** Wer Tests *schreiben oder ändern* will → `tester`/`e2e-tester`.
+Wer eine *fertige* Suite *laufen lassen* will → `test-executor`.
+
+### Verhaltens-Details `test-executor`
+
+- Führt nur die delegierte(n) Suite-Kommandos aus — keine Code-Generierung, keine
+  Architektur-/Context-Modifikation, keine Deployment-Tools
+- Reportet strukturiert: Pass/Fail/Skip-Counts, Exit-Codes, relevante Stdout-Auszüge,
+  Log-Pfade (Output-Contract `STATUS/RESULT/ARTIFACTS` als Pflichtabschluss)
+- **Sync-Turn-Contract (issue #506):** Hintergrundprozesse (z. B. Container-Runs) werden
+  innerhalb des eigenen Turns aktiv abgewartet (`docker wait` / Polling mit Timeout) —
+  der Turn endet niemals mit einem "waiting"-Platzhalter, es gibt keine Reaktivierung
+  nach Turn-Ende
+- Ressourcendisziplin: leichtgewichtig pro Instanz (günstigstes Tier, minimales Toolset);
+  die Host-Kapazität für parallele Läufe bleibt in der Verantwortung des Aufrufers
 
 ---
 

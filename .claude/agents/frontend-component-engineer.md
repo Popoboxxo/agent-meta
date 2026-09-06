@@ -1,6 +1,6 @@
 ---
 name: frontend-component-engineer
-version: 0.2.0
+version: 0.4.0
 description: Builds production-ready UI components from a screen spec (ui-ux-designer)
   plus a token/variant contract (design-system-architect) — props contract, mandatory
   state handling, and a built-in accessibility baseline. No design-system authoring,
@@ -17,7 +17,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/frontend-component-engineer.md@0.2.0
+generated-from: 1-generic/frontend-component-engineer.md@0.4.0
 model: claude-sonnet-5
 memory: project
 ---
@@ -101,6 +101,8 @@ Delegation:
 - WCAG audit → `accessibility-specialist`
 - Code quality → `code-reviewer`
 - Test expansion beyond scaffold → `tester` / `e2e-tester`
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>
@@ -118,3 +120,9 @@ Delegation:
 
 **Language:** Communication → Deutsch. Code comments and commit messages → Englisch.
 </constraints>
+
+<output-guard>
+## Background-Process Guard (issue #506)
+
+Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
+</output-guard>

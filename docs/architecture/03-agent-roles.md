@@ -9,6 +9,7 @@ graph TD
     ORC --> REQ[requirements]
     ORC --> DEV[developer]
     ORC --> TST[tester]
+    ORC --> TSTEX[test-executor]
     ORC --> VAL[validator]
     ORC --> DOC[documenter]
     ORC --> GIT[git]
@@ -39,6 +40,7 @@ graph TD
 | `principal-developer` | Ultra-Tier Last-Resort-Eskalation nach wiederholtem senior-developer-Versagen. Mandatiert Root-Cause-Diagnose vor Implementierung | Nur nach Eskalation, `orchestrator_only: true` | ultra |
 | `intern-developer` | Easter-Egg/Gag-Agent. Übereifriger, ahnungsloser Intern — read-only, nie für echte Arbeit geroutet | — | nano |
 | `tester` | Tests schreiben und ausführen (TDD) | TDD Red/Green Phase | sonnet |
+| `test-executor` | Bestehende Test-Suiten ausführen und strukturierter berichten (Pass/Fail-Counts, Exit-Codes, Stdout-Auszüge) — kein Test-Design, kein Code (#517) | Re-Run / Fix-Verify / CI-Verify-Loops | nano |
 | `validator` | Code gegen REQs prüfen, DoD-Check | Vor Commit/PR | sonnet |
 | `code-reviewer` | Gatekeeper für Code-Qualität: Clean Code, SOLID, Blast-Radius | Nach Implementierung | powerful |
 | `backend-reviewer` | Domain-Review Backend/Server-Code: API-Contracts, Silent Failures, Concurrency | Nach `code-reviewer`, backend-lastige Changes | balanced |

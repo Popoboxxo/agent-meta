@@ -1,6 +1,6 @@
 ---
 name: template-knowledge-migrator
-version: "1.1.0"
+version: "1.3.0"
 description: "Vorhandene Projektinhalte aufräumen und OKF-konform ins Knowledge Wiki migrieren. Discovery → Plan → User-Freigabe → Migration → Validierung."
 hint: "Vorhandene Docs ins Wiki migrieren (einmalig, mit User-Freigabe)"
 tools:
@@ -96,6 +96,8 @@ STATUS: done|partial|failed
 RESULT: <1-2 Sätze: Migrationsstand und offene Punkte>
 ARTIFACTS: <Migrations-Plan und migrierte Wiki-Seiten, kommagetrennt>
 ```
+**Pflicht-Abschluss-Summary (Issue #267):** der strukturierte Block oben ist dein kompletter Rückgabewert — der Orchestrator konsumiert nur dieses Summary, niemals Roh-Output. RESULT: kompaktes Summary (max. 2-3 Sätze) mit was geändert wurde, Erfolg/Misserfolg und dem nächsten Schritt. Roh-Output, Diffs und Logs gehören nie in RESULT — die gehören in ARTIFACTS (Dateipfade).
+
 </output_contract>
 
 ## Anti-Recursion Guard
@@ -110,3 +112,9 @@ Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
 
 - Migrierte Wiki-Seiten → {{INTERNAL_DOCS_LANGUAGE}}
 - Migration-Plan (User-Kommunikation) → {{DOCS_LANGUAGE}}
+
+<output-guard>
+## Background-Process Guard (issue #506)
+
+Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
+</output-guard>

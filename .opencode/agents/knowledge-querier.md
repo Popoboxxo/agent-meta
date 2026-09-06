@@ -1,9 +1,9 @@
 ---
 name: knowledge-querier
-version: 1.1.0
+version: 1.2.0
 description: Fragen gegen das Knowledge Wiki beantworten. Index-First-Strategie, Drill-in,
   Synthese mit Citations. File-Back guter Antworten.
-generated-from: 1-generic/knowledge-querier.md@1.1.0
+generated-from: 1-generic/knowledge-querier.md@1.2.0
 mode: subagent
 permission:
   read: allow
@@ -60,6 +60,8 @@ STATUS: done|partial|failed
 RESULT: <1-2 Sätze: Kernaussage der Antwort, Citations im Text>
 ARTIFACTS: <File-Back-Pfad bei aktivem file-back, sonst leer>
 ```
+**Pflicht-Abschluss-Summary (Issue #267):** der strukturierte Block oben ist dein kompletter Rückgabewert — der Orchestrator konsumiert nur dieses Summary, niemals Roh-Output. RESULT: kompaktes Summary (max. 2-3 Sätze) mit was geändert wurde, Erfolg/Misserfolg und dem nächsten Schritt. Roh-Output, Diffs und Logs gehören nie in RESULT — die gehören in ARTIFACTS (Dateipfade).
+
 </output_contract>
 
 ## Anti-Recursion Guard

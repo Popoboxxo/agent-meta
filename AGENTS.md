@@ -240,6 +240,7 @@ Bei Bedarf mit `Read` laden; verfügbare Regeln via `ls` im jeweiligen Verzeichn
 | `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen |
 | `senior-developer` | Komplexe Features, Architektur-Entscheidungen, schwierige Bugs |
 | `technical-writer` | Externe entwickler, nutzergerichtete Doku: API-Referenzen, Getting-Starte |
+| `test-executor` | Bestehende Test-Suiten ausführen — kein Test-Design, kein Code-Schreiben |
 | `tester` | TDD, Test-Suite ausführen, Testabdeckung sichern |
 | `ui-ux-designer` | UI-Spezifikationen, Mockups, Design-Systeme erstellen |
 | `validator` | Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit |

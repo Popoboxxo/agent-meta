@@ -1,6 +1,6 @@
 ---
 name: template-prompt-engineer
-version: "1.6.0"
+version: "1.8.0"
 description: "The ultimate expert for prompt engineering. Designs, reviews, and optimizes agent definitions based on best practices (OpenAI, Lakera), with secure-prompting guidelines and banned-pattern awareness."
 hint: "Design or review prompts and agents"
 prompt_mode: modern
@@ -138,6 +138,8 @@ SAVINGS: <pct>
 REVIEW_NOTES: [open points]
 ARTIFACTS: <changed template path>
 ```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>
@@ -151,3 +153,9 @@ ARTIFACTS: <changed template path>
 
 **Language:** templates in English (multi-provider capable), reviewer communication in {{INTERNAL_DOCS_LANGUAGE}}.
 </constraints>
+
+<output-guard>
+## Background-Process Guard (issue #506)
+
+Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
+</output-guard>

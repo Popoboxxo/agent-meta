@@ -1,6 +1,6 @@
 ---
 name: template-incident-responder
-version: "1.2.0"
+version: "1.4.0"
 description: "Live incident coordination: ingests logs and metrics, executes runbook steps, drives root-cause analysis (5-Whys, Fishbone), classifies severity (P0/P1/P2) and produces an RCA report plus a prioritized hotfix list under time pressure."
 hint: "Incident coordination: triage logs/metrics, run runbook, produce RCA (5-Whys), prioritize hotfixes — RCA to documenter, fix to developer"
 prompt_mode: modern
@@ -115,6 +115,8 @@ HOTFIXES: <prioritized list for developer>
 ARTIFACTS: <RCA report + hotfix file paths>
 NEXT: [Developer hotfix | Documenter post-mortem]
 ```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>
@@ -131,3 +133,9 @@ NEXT: [Developer hotfix | Documenter post-mortem]
 
 **Language:** RCA report → {{INTERNAL_DOCS_LANGUAGE}}. Code comments → {{CODE_LANGUAGE}}.
 </constraints>
+
+<output-guard>
+## Background-Process Guard (issue #506)
+
+Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
+</output-guard>

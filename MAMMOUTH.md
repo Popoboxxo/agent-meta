@@ -103,6 +103,7 @@ DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Cod
 | `requirements` | Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md |
 | `senior-developer` | High-tier developer: architecture impact, complex/risky changes, hard bugs — analyzes first, then implements |
 | `technical-writer` | Externe Doku: API-Referenz, Getting-Started, SDK-Docs, Tutorials, CLI-Help, User-Release-Notes, Microcopy — für externe Entwickler und Endnutzer |
+| `test-executor` | Run existing test suites and report structured results — no test design, no code changes |
 | `tester` | Write tests (TDD), run the test suite, ensure coverage |
 | `ui-ux-designer` | UI specification, mockup creation, and design-system definition — specifies, does not implement. |
 | `validator` | Internal quality checker: DoD checklist, traceability audit. Invoked by the orchestrator after implementation. Not for direct user questions or setup help. |

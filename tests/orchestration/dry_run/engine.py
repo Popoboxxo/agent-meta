@@ -2,17 +2,117 @@
 # Simulates orchestrator decisions without real agent execution
 
 """
-OrchestratorDryRun — Provider-agnostic orchestration simulation.
+OrchestratorDryRun — Provider-agnostic orchestration simulation and plan
+validator (repurposed per issue #265, spike §2.4).
 
 Usage:
     engine = OrchestratorDryRun(provider="Opencode", config={"max-parallel-agents": 4})
     report = engine.run("Fix Bug A, B, C")
     print(report.to_markdown())
+
+Since issue #265 the engine is a thin SIMULATION wrapper around the
+production plan validator ``scripts.lib.orchestration``:
+
+- Parallel capability is looked up from
+  ``config/provider-capabilities.yaml`` (``fanout_mechanism``) via
+  ``DelegationSyntaxEngine.has_async_fanout`` — no hardcoded provider list
+  (this replaces the former provider-agnostic-policy violation).
+- The task graph (cycles / deadlocks / duplicate ids) is validated through
+  ``orchestration.find_dependency_errors`` BEFORE any dispatch plan is
+  generated; a broken graph fails closed to a fully sequential plan.
+- The static file-affinity gate (issue #266) runs through the
+  ``orchestration.check_plan_file_overlap`` seam; conflicted tasks are
+  sequentialized instead of dispatched in parallel.
+- Emitted FANOUT batches are re-validated through
+  ``orchestration.validate_plan`` (over-commitment, duplicate ids) instead
+  of hand-rolled checks.
+
+Real enforcement (calling the checks before an ACTUAL dispatch) stays
+harness-side — this engine is the dry-run simulation of that gate.
 """
 
 import json
+import sys
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
+
+
+def _ensure_repo_root_on_path() -> None:
+    """Prepend the repo root to sys.path (direct-CLI import fallback)."""
+    repo_root = str(Path(__file__).resolve().parents[3])
+    if repo_root not in sys.path:
+        sys.path.insert(0, repo_root)
+
+
+try:
+    from scripts.lib.orchestration import (  # noqa: F401  (validate_plan used below)
+        FanoutPlan,
+        FanoutTask,
+        check_plan_file_overlap,
+        find_dependency_errors,
+        validate_plan,
+    )
+
+    _FILE_AFFINITY_AVAILABLE = True
+except ImportError:
+    # Direct CLI execution (`python engine.py`) has the script directory —
+    # not the repo root — on sys.path. Retry once with the repo root
+    # prepended so CLI and pytest runs get identical gating behavior.
+    _ensure_repo_root_on_path()
+    try:
+        from scripts.lib.orchestration import (
+            FanoutPlan,
+            FanoutTask,
+            check_plan_file_overlap,
+            find_dependency_errors,
+            validate_plan,
+        )
+
+        _FILE_AFFINITY_AVAILABLE = True
+    except ImportError:
+        _FILE_AFFINITY_AVAILABLE = False
+
+# Capability lookup is INDEPENDENT of the analysis seam (issue #265): the
+# #266 degradation contract ("module unavailable → no gate, no event") must
+# not degrade the fanout capability resolution with it.
+try:
+    from scripts.lib.delegation_syntax import DelegationSyntaxEngine
+
+    _CAPABILITY_ENGINE_AVAILABLE = True
+except ImportError:
+    _ensure_repo_root_on_path()
+    try:
+        from scripts.lib.delegation_syntax import DelegationSyntaxEngine
+
+        _CAPABILITY_ENGINE_AVAILABLE = True
+    except ImportError:
+        _CAPABILITY_ENGINE_AVAILABLE = False
+
+# Shared DelegationSyntaxEngine (lazy singleton — capability YAML is loaded
+# once per process, not once per OrchestratorDryRun instance).
+_SYNTAX_ENGINE: "DelegationSyntaxEngine | None" = None
+
+
+def _shared_syntax_engine() -> "DelegationSyntaxEngine":
+    """Return the process-wide capability/syntax engine (lazy init)."""
+    global _SYNTAX_ENGINE
+    if _SYNTAX_ENGINE is None:
+        _SYNTAX_ENGINE = DelegationSyntaxEngine()
+    return _SYNTAX_ENGINE
+
+
+def _fanout_tasks_from_subtasks(subtasks: "list[SubTask]") -> "tuple[FanoutTask, ...]":
+    """Map dry-run SubTasks to orchestration plan tasks (validation input)."""
+    return tuple(
+        FanoutTask(
+            task_id=st.name,
+            target_agent=st.agent_type,
+            prompt=st.description,
+            dependencies=tuple(st.dependencies),
+        )
+        for st in subtasks
+    )
 
 
 @dataclass
@@ -162,7 +262,20 @@ class OrchestratorDryRun:
         self.config = config
         self.max_parallel = config.get("max-parallel-agents", 4)
         self.events: list[DryRunEvent] = []
-        self._parallel_supported = provider in ["Claude", "Opencode", "Gemini"]
+        # Issue #265: capability-driven parallel support. Replaces the former
+        # hardcoded `provider in ["Claude", "Opencode", "Gemini"]` (a
+        # provider-agnostic-policy violation): the FANOUT mechanism comes
+        # from config/provider-capabilities.yaml. Unknown providers and the
+        # no-capability-engine degradation both fail closed to sequential.
+        self._fanout_mechanism: str | None = None
+        self._parallel_supported = False
+        if _CAPABILITY_ENGINE_AVAILABLE:
+            engine = _shared_syntax_engine()
+            # Invalid mechanism keys raise (config drift must fail loudly in
+            # a dev tool); the post-sync consistency check reports the same
+            # drift as a Finding for production syncs.
+            self._fanout_mechanism = engine.get_fanout_mechanism(provider)
+            self._parallel_supported = engine.has_async_fanout(provider)
 
     def log_event(self, event_type: str, data: dict):
         """Log an event for Viz-Log integration."""
@@ -271,10 +384,69 @@ class OrchestratorDryRun:
         self.log_event("task_decomposed", {"subtasks": 1, "decomposition": "DIRECT"})
         return [SubTask(name="task_1", agent_type=intent, description=user_input)]
 
+    def _validate_task_graph(self, subtasks: list["SubTask"]) -> list[str]:
+        """Cycle / deadlock / duplicate-id validation BEFORE plan generation.
+
+        Delegates to ``orchestration.find_dependency_errors`` (issue #265 —
+        the validation logic lives in scripts/lib, no duplicate here). An
+        empty result means the graph is dispatchable.
+        """
+        if not _FILE_AFFINITY_AVAILABLE or len(subtasks) < 2:
+            return []
+        return find_dependency_errors(_fanout_tasks_from_subtasks(subtasks))
+
+    def _partition_by_file_affinity(
+        self, subtasks: list["SubTask"]
+    ) -> tuple[list["SubTask"], list["SubTask"]]:
+        """Split subtasks by static file-affinity analysis (issue #266).
+
+        Runs the static analysis through the orchestration seam
+        (``check_plan_file_overlap``) BEFORE any simulated FANOUT /
+        PARALLEL_GROUP emission and returns (safe, conflicted) in original
+        input order. Falls back to (all subtasks, []) when the analysis
+        module is unavailable — a real dispatch is gated harness-side; this
+        is only the dry-run simulation.
+        """
+        if _FILE_AFFINITY_AVAILABLE and len(subtasks) >= 2:
+            overlap = check_plan_file_overlap(
+                FanoutPlan(kind="parallel_group", tasks=_fanout_tasks_from_subtasks(subtasks))
+            )
+            conflicted_ids = {
+                task_id
+                for task_a, task_b, _files in overlap["conflict"]
+                for task_id in (task_a, task_b)
+            }
+            safe = [st for st in subtasks if st.name not in conflicted_ids]
+            conflicted = [st for st in subtasks if st.name in conflicted_ids]
+            self.log_event("file_overlap_checked", {
+                "safe": overlap["safe"],
+                "conflicts": overlap["conflict"],
+                "sequentialized": [st.name for st in conflicted],
+                "method": "static-analysis",
+                "enforcement": "harness-side",
+            })
+            return safe, conflicted
+        return subtasks, []
+
     def generate_dispatch_plan(self, subtasks: list[SubTask]) -> DispatchPlan:
         """Generate dispatch plan based on sub-tasks and provider capabilities."""
         plan = DispatchPlan()
-        
+
+        # Issue #265: graph validation (cycles / deadlocks / duplicate ids)
+        # runs BEFORE any dispatch emission — fail closed to a fully
+        # sequential plan instead of dispatching an unresolvable graph.
+        graph_errors = self._validate_task_graph(subtasks)
+        if graph_errors:
+            self.log_event("plan_validation_failed", {"errors": graph_errors})
+            for st in subtasks:
+                plan.operations.append({
+                    "type": "SEQUENTIAL",
+                    "agent": st.agent_type,
+                    "task": st.description,
+                })
+            self.log_event("dispatch_plan_generated", plan.to_dict())
+            return plan
+
         if len(subtasks) == 1:
             plan.operations.append({
                 "type": "DIRECT",
@@ -290,59 +462,107 @@ class OrchestratorDryRun:
                     "task": st.description,
                 })
         else:
-            # Check if all same agent type → FANOUT
-            agent_types = {st.agent_type for st in subtasks}
-            if len(agent_types) == 1:
-                # FANOUT with batching if needed
-                batches = []
-                current_batch = []
-                for st in subtasks:
-                    current_batch.append(st)
-                    if len(current_batch) >= self.max_parallel:
+            # Issue #266: static file-affinity gate BEFORE parallel
+            # emission — conflicted tasks are sequentialized instead of
+            # being dispatched in parallel (race-condition prevention).
+            safe_subtasks, conflicted_subtasks = self._partition_by_file_affinity(subtasks)
+
+            parallel_emitted = False
+            if len(safe_subtasks) >= 2:
+                # Check if all same agent type → FANOUT
+                agent_types = {st.agent_type for st in safe_subtasks}
+                if len(agent_types) == 1:
+                    # FANOUT with batching if needed
+                    batches = []
+                    current_batch = []
+                    for st in safe_subtasks:
+                        current_batch.append(st)
+                        if len(current_batch) >= self.max_parallel:
+                            batches.append(current_batch)
+                            current_batch = []
+                    if current_batch:
                         batches.append(current_batch)
-                        current_batch = []
-                if current_batch:
-                    batches.append(current_batch)
-                
-                for i, batch in enumerate(batches, 1):
+
+                    for i, batch in enumerate(batches, 1):
+                        plan.operations.append({
+                            "type": "FANOUT",
+                            "batch": i,
+                            "agents": [st.agent_type for st in batch],
+                            "tasks": [st.description for st in batch],
+                        })
+                        if i < len(batches):
+                            plan.operations.append({"type": "BARRIER"})
+                    parallel_emitted = True
+                else:
+                    # PARALLEL_GROUP (conflict-free subset only)
                     plan.operations.append({
-                        "type": "FANOUT",
-                        "batch": i,
-                        "agents": [st.agent_type for st in batch],
-                        "tasks": [st.description for st in batch],
+                        "type": "PARALLEL_GROUP",
+                        "agents": [st.agent_type for st in safe_subtasks],
+                        "tasks": [st.description for st in safe_subtasks],
                     })
-                    if i < len(batches):
-                        plan.operations.append({"type": "BARRIER"})
-            else:
-                # PARALLEL_GROUP
+                    parallel_emitted = True
+            elif len(safe_subtasks) == 1:
+                st = safe_subtasks[0]
                 plan.operations.append({
-                    "type": "PARALLEL_GROUP",
-                    "agents": [st.agent_type for st in subtasks],
-                    "tasks": [st.description for st in subtasks],
+                    "type": "SEQUENTIAL",
+                    "agent": st.agent_type,
+                    "task": st.description,
+                })
+
+            # Sequential section: conflicted tasks never race in parallel.
+            if parallel_emitted and conflicted_subtasks:
+                plan.operations.append({"type": "BARRIER"})
+            for st in conflicted_subtasks:
+                plan.operations.append({
+                    "type": "SEQUENTIAL",
+                    "agent": st.agent_type,
+                    "task": st.description,
                 })
         
         self.log_event("dispatch_plan_generated", plan.to_dict())
         return plan
 
+    def _batch_fanout_plan(self, op: dict[str, Any]) -> "FanoutPlan":
+        """Convert an emitted FANOUT operation into a validation plan (issue #265)."""
+        agents = op.get("agents", [])
+        tasks = op.get("tasks", [])
+        return FanoutPlan(
+            kind="fanout",
+            tasks=tuple(
+                FanoutTask(task_id=f"batch_{index}", target_agent=agent, prompt=task)
+                for index, (agent, task) in enumerate(zip(agents, tasks), start=1)
+            ),
+            max_parallel=self.max_parallel,
+        )
+
     def validate_syntax(self, plan: DispatchPlan) -> SyntaxReport:
-        """Validate generated syntax against provider specification."""
+        """Validate generated syntax against provider specification.
+
+        Delegates the FANOUT batch checks (over-commitment, duplicate ids,
+        graph sanity) to ``orchestration.validate_plan`` (issue #265 — no
+        duplicated validation logic in the engine).
+        """
         errors = []
-        
-        # Check provider capability
+
+        # Capability check (issue #265: capability lookup, no provider-name
+        # branch — the mechanism itself is part of the error message).
         if not self._parallel_supported:
             has_parallel = any(op["type"] in ["FANOUT", "PARALLEL_GROUP"] for op in plan.operations)
             if has_parallel:
-                errors.append(f"Provider {self.provider} does not support parallel execution — sequential fallback used")
-        
-        # Basic validation
+                errors.append(
+                    f"Provider {self.provider} does not support parallel execution "
+                    f"(fanout_mechanism={self._fanout_mechanism!r}) — sequential fallback used"
+                )
+
+        # FANOUT batch validation via the production plan validator.
         for op in plan.operations:
-            if op["type"] == "FANOUT":  # noqa: SIM102
-                if self.provider == "Claude" or self.provider == "Opencode":  # noqa: SIM102
-                    if len(op.get("agents", [])) > self.max_parallel:
-                        errors.append(f"FANOUT exceeds MAX_PARALLEL_AGENTS ({self.max_parallel})")
-        
+            if op["type"] == "FANOUT":
+                errors.extend(
+                    validate_plan(self._batch_fanout_plan(op), max_parallel=self.max_parallel)
+                )
+
         valid = len(errors) == 0
-        
+
         report = SyntaxReport(
             valid=valid,
             provider=self.provider,
@@ -351,7 +571,7 @@ class OrchestratorDryRun:
             agent_count=sum(len(op.get("agents", [])) for op in plan.operations if "agents" in op),
             errors=errors,
         )
-        
+
         self.log_event("syntax_validated", {"valid": valid, "errors": errors})
         return report
 

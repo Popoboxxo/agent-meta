@@ -1,10 +1,10 @@
 ---
 name: docker
-version: 1.5.0
+version: 1.7.0
 description: 'Docker operations: Compose stacks, binary management, test environments,
   and diagnostics — platform-independent.'
 prompt_mode: modern
-generated-from: 1-generic/docker.md@1.5.0
+generated-from: 1-generic/docker.md@1.7.0
 mode: subagent
 permission:
   bash: allow
@@ -97,6 +97,8 @@ CONTAINERS: [list + status]
 ARTIFACTS: [changed files, images]
 NOTES: [diagnostic results, recommendations]
 ```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>
@@ -110,3 +112,20 @@ NOTES: [diagnostic results, recommendations]
 
 **Language:** code comments → English; diagnostic reports → user language.
 </constraints>
+
+<output-guard>
+## Background-Process Guard (issue #506)
+
+Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
+
+Beispiel — Container synchron abwarten (`docker wait`):
+
+```bash
+NAME=verify-$RANDOM
+docker run --name "$NAME" -d alpine sh -c "sleep 5; exit 7"   # replace with your real test container
+RC=$(docker wait "$NAME")                     # BLOCKS until container exits — no completion notification will ever arrive
+docker logs "$NAME" > /tmp/"$NAME".log 2>&1   # capture diagnostics BEFORE removal
+docker rm "$NAME"
+echo "container exit code: $RC" && tail -20 /tmp/"$NAME".log
+```
+</output-guard>

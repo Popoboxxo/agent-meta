@@ -1,6 +1,6 @@
 ---
 name: template-prompt-governor
-version: "1.0.0"
+version: "1.2.0"
 description: "Prompt governance: treats prompts as source code — PromptBOM metadata (model + prompt + parameters), append-only audit trail, provenance tracking, prompt version drift detection, and banned unsafe prompting patterns (skip auth, ignore security, bypass validation). Read-only on prompts; complements prompt-engineer (design), does not replace it."
 hint: "Prompt governance: PromptBOM, audit trail, provenance, banned-pattern detection — read-only, findings via feedback"
 prompt_mode: modern
@@ -110,6 +110,8 @@ ARTIFACTS: <BOM/audit-trail file paths, or "none">
 ```
 
 Long reports → write to `/tmp/opencode/prompt-governance-<topic>.md`, return path only.
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>
@@ -126,3 +128,9 @@ Long reports → write to `/tmp/opencode/prompt-governance-<topic>.md`, return p
 
 **Language:** audit reports → {{INTERNAL_DOCS_LANGUAGE}}. Issue text (via feedback) → {{ISSUE_LANGUAGE}}.
 </constraints>
+
+<output-guard>
+## Background-Process Guard (issue #506)
+
+Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
+</output-guard>

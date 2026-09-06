@@ -1,10 +1,10 @@
 ---
 name: senior-developer
-version: 1.4.0
+version: 1.6.0
 description: Complex features, architecture decisions, hard bugs and cross-cutting
   refactorings. Analyzes before implementing and documents decisions.
 prompt_mode: modern
-generated-from: 1-generic/senior-developer.md@1.4.0
+generated-from: 1-generic/senior-developer.md@1.6.0
 mode: subagent
 permission:
   bash: allow
@@ -150,6 +150,8 @@ RECOMMENDED_TIER: principal-developer
 TASK_SUMMARY: <task in 1-2 sentences>
 FAILURE_LOG: <attempt 1 approach + failure reason; attempt 2 approach + failure reason>
 ```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>
@@ -170,3 +172,9 @@ FAILURE_LOG: <attempt 1 approach + failure reason; attempt 2 approach + failure 
 
 **Language:** code comments + commit messages → Englisch.
 </constraints>
+
+<output-guard>
+## Background-Process Guard (issue #506)
+
+Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
+</output-guard>

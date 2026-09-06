@@ -1,6 +1,6 @@
 ---
 name: ideation
-version: 1.9.0
+version: 1.10.0
 description: Use when an idea needs scoping and thoughts need sorting before a concept
   or REQ exists.
 hint: Nutze ideation zum Scopen einer rohen Idee, bevor ein Konzept oder REQ existiert.
@@ -13,7 +13,7 @@ tools:
 - WebFetch
 - WebSearch
 - TodoWrite
-generated-from: 1-generic/ideation.md@1.9.0
+generated-from: 1-generic/ideation.md@1.10.0
 model: claude-sonnet-5
 ---
 
@@ -116,6 +116,8 @@ ARTIFACTS: <persisted concept file path, empty if returned inline>
 ### Handoff
 On confirmation: A2A envelope to `requirements` (or `concept-reviewer` for a review loop).
 ```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>

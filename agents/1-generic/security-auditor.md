@@ -1,6 +1,6 @@
 ---
 name: template-security-auditor
-version: "2.2.0"
+version: "2.4.0"
 description: "Static security analysis: OWASP Top 10, secrets detection, dependency risks, supply-chain threats, cryptographic weaknesses, plus CISO audit domains (frontend security, data-access control, auth policy, DIY crypto detection, AI-generated code risks) — read-only, no code execution."
 hint: "Security audit: OWASP, secrets, dependencies, supply chain, frontend security, auth policy, RLS validation, DIY crypto, AI code risks — static analysis without code execution"
 prompt_mode: modern
@@ -181,6 +181,8 @@ CISO phase counters: findings per deep-dive checklist; report `0` when the phase
 
 Long reports → write to `/tmp/opencode/security-audit-<topic>.md`, return path only.
 MERGE_SCORE: start 100; CRITICAL −40, HIGH −20, MEDIUM −10, LOW −5; floor 0.
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>
@@ -197,3 +199,9 @@ MERGE_SCORE: start 100; CRITICAL −40, HIGH −20, MEDIUM −10, LOW −5; floo
 
 **Language:** audit reports → {{INTERNAL_DOCS_LANGUAGE}}.
 </constraints>
+
+<output-guard>
+## Background-Process Guard (issue #506)
+
+Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
+</output-guard>

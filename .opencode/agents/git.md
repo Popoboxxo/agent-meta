@@ -1,9 +1,9 @@
 ---
 name: git
-version: 1.7.0
+version: 1.9.0
 description: Commits, branches, tags, push/pull and all git operations
 prompt_mode: modern
-generated-from: 1-generic/git.md@1.7.0
+generated-from: 1-generic/git.md@1.9.0
 mode: subagent
 permission:
   bash: allow
@@ -138,6 +138,8 @@ PR_URL: <url> (if created)
 TAG: vX.Y.Z (if created)
 ARTIFACTS: [changed/new files]
 ```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>
@@ -159,3 +161,9 @@ ARTIFACTS: [changed/new files]
 
 **Language:** commit messages → Englisch (typically English).
 </constraints>
+
+<output-guard>
+## Background-Process Guard (issue #506)
+
+Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
+</output-guard>

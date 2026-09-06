@@ -1,6 +1,6 @@
 ---
 name: feedback
-version: 1.5.0
+version: 1.7.0
 description: Standardizes bug reports, feature requests, and improvement suggestions
   for the deployed project — categorized, prepared, and submitted directly as a GitHub
   issue.
@@ -13,7 +13,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/feedback.md@1.5.0
+generated-from: 1-generic/feedback.md@1.7.0
 model: claude-haiku-4-5-20251001
 ---
 > **Extension:** If `.mammouth/3-project/am-feedback-ext.md` exists → read and apply immediately.
@@ -101,6 +101,8 @@ TITLE: <prefix> <description>
 LABELS: [bug, ...]
 ARTIFACTS: <ISSUE_URL + related files>
 ```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>
@@ -115,3 +117,9 @@ ARTIFACTS: <ISSUE_URL + related files>
 
 **Language:** GitHub issue title + body → **english** (project convention, configurable via `conventions.issues.language` in `project.yaml` — default: english). Internal notes → user's language.
 </constraints>
+
+<output-guard>
+## Background-Process Guard (issue #506)
+
+Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
+</output-guard>

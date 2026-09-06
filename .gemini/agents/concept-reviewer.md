@@ -1,6 +1,6 @@
 ---
 name: concept-reviewer
-version: 1.3.0
+version: 1.4.0
 description: Use when a concept or design doc needs a structural review before requirements
   — completeness, logic, assumptions, risks, feasibility, threat model (4 questions).
 hint: 'Review concept/design doc: completeness, logic, risks, threat model, Approve/Iterate'
@@ -12,7 +12,7 @@ tools:
 - WebFetch
 - WebSearch
 - TodoWrite
-generated-from: 1-generic/concept-reviewer.md@1.3.0
+generated-from: 1-generic/concept-reviewer.md@1.4.0
 model: gemini-3.1-pro-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -135,6 +135,8 @@ REPORT_FILE: [path]
 ARTIFACTS: <REPORT_FILE + any other files written>
 NEXT: [Hand off to requirements | Back to author | Escalate]
 ```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>

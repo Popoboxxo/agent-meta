@@ -1,10 +1,10 @@
 ---
 name: agent-meta-manager
-version: 1.16.0
+version: 1.18.0
 description: 'Manage agent-meta: upgrades, sync, feedback delegation, project-specific
   agents, external-skill lifecycle, and creating extensions.'
 prompt_mode: modern
-generated-from: 1-generic/agent-meta-manager.md@1.16.0
+generated-from: 1-generic/agent-meta-manager.md@1.18.0
 mode: subagent
 permission:
   bash: allow
@@ -332,6 +332,8 @@ ARTIFACTS: [new files created, empty if none]
 NEXT: [recommended step for user]
 NOTES: [tradeoffs, warnings, confirmations]
 ```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>
@@ -353,6 +355,12 @@ NOTES: [tradeoffs, warnings, confirmations]
 
 **User proxy:** `main_chat`.
 </constraints>
+
+<output-guard>
+## Background-Process Guard (issue #506)
+
+Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
+</output-guard>
 
 ## Singleton-Regel: Orchestrator-Spawn (auto-generated)
 

@@ -2,16 +2,47 @@
 
 Speichert Task-Fortschritt nach jedem Delegationsschritt.
 Ermöglicht Resume nach Session-Unterbrechung.
+
+Summarization-as-a-Contract (Issue #267): das Session-Layout hat zwei
+Ebenen — ``<session-id>.json`` (strukturierte Checkpoints, Summaries) und
+``<session-id>/`` (Verzeichnis mit dem VOLLSTÄNDIGEN Roh-Output je
+Worker-Task, siehe ``CheckpointStore.save_raw_output``).
+
+**Harness-Grenze (Issue #265):** das Parsen der Worker-Results nach dem
+BARRIER-Marker und das Strippen des Roh-Outputs aus dem Orchestrator-
+Kontext sind harness-seitig — der Backend ``scripts/lib/orchestration.py``
+ist dafür zuständig. Dieses Modul archiviert ausschließlich Bytes: es
+parst, filtert und interpretiert niemals Worker-Content.
 """
 from __future__ import annotations
 
+import logging
+import re
 import time
 import uuid
 from pathlib import Path
 
+from .io import write_atomic
 from .json_persistence import load_json_document, save_json_document
 
 CHECKPOINT_DIR = ".meta-viz/checkpoints"
+
+_RAW_OUTPUT_SUFFIX = ".txt"
+
+_logger = logging.getLogger(__name__)
+
+
+def _sanitize_component(value: str, max_len: int = 64) -> str:
+    """Reduce a free-form id (agent name, task id) to a safe filename component.
+
+    Keeps ``[A-Za-z0-9._-]`` and replaces everything else — including path
+    separators — with ``_``, so a careless or hostile task id can never
+    escape the session directory. Runs of leading/trailing separators are
+    stripped; an empty result collapses to ``unnamed``.
+    """
+    cleaned = re.sub(r"[^A-Za-z0-9._-]", "_", value)
+    cleaned = cleaned.strip("._-")[:max_len].strip("._-")
+    return cleaned or "unnamed"
 
 
 class Checkpoint:
@@ -75,6 +106,71 @@ class CheckpointStore:
 
     def _session_file(self, session_id: str) -> Path:
         return self.checkpoint_dir / f"{session_id}.json"
+
+    def _session_raw_dir(self, session_id: str) -> Path:
+        """Directory holding the archived raw worker outputs of a session."""
+        return self.checkpoint_dir / session_id
+
+    def save_raw_output(
+        self,
+        session_id: str,
+        task_id: str,
+        agent: str,
+        raw_output: str,
+    ) -> Path:
+        """Archive the COMPLETE raw worker output under ``<session-id>/``.
+
+        Summarization-as-a-Contract (issue #267): the worker's structured
+        summary (STATUS/RESULT/ARTIFACTS) travels back as the return value,
+        while the full raw output — command logs, diffs, verbose tool output —
+        is archived here. The orchestrator context stays lean without losing
+        information: details live on disk, retrievable per task.
+
+        The archive is append-only: each call writes a fresh, uniquely
+        named file (uuid suffix) so re-running the same task never silently
+        overwrites an earlier capture. Returns the written path.
+
+        **Harness-Grenze (Issue #265):** this method archives bytes only.
+        Parsing worker results after the BARRIER marker and stripping raw
+        output from the orchestrator context is the orchestration backend's
+        job (``scripts/lib/orchestration.py``) — NOT implemented here.
+        """
+        session_dir = self._session_raw_dir(session_id)
+        session_dir.mkdir(parents=True, exist_ok=True)
+        stem = (
+            f"{_sanitize_component(agent)}"
+            f"-{_sanitize_component(task_id)}"
+            f"-{uuid.uuid4().hex[:8]}"
+        )
+        path = session_dir / f"{stem}{_RAW_OUTPUT_SUFFIX}"
+        write_atomic(path, raw_output)
+        return path
+
+    def load_raw_output(self, session_id: str, filename: str) -> str | None:
+        """Load an archived raw output by session id and filename.
+
+        Returns None when the file is missing or unreadable — same
+        fail-soft contract as the session JSON loader (#576): a damaged
+        archive file must never crash a resume or cleanup pass.
+        """
+        path = self._session_raw_dir(session_id) / filename
+        try:
+            return path.read_text(encoding="utf-8")
+        except OSError as e:
+            _logger.warning(
+                "unreadable raw output %s: %s: %s", path, type(e).__name__, e
+            )
+            return None
+
+    def list_raw_outputs(self, session_id: str) -> list[Path]:
+        """List archived raw-output files of a session (sorted, oldest first).
+
+        Empty list when the session has no raw-output directory.
+        """
+        session_dir = self._session_raw_dir(session_id)
+        if not session_dir.is_dir():
+            return []
+        return sorted(session_dir.glob(f"*{_RAW_OUTPUT_SUFFIX}"))
 
     def save_checkpoint(self, session_id: str, checkpoint: Checkpoint) -> None:
         """Append checkpoint to session file.

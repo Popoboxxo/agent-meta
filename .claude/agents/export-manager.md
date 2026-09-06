@@ -1,6 +1,6 @@
 ---
 name: export-manager
-version: 1.2.0
+version: 1.4.0
 description: Reads .meta-config/export.yaml and routes structured JSON payloads from
   specialist agents to the configured target (markdown, confluence, jira-xray, etc.).
 hint: Use this agent for export routing of structured data to configured targets.
@@ -12,7 +12,7 @@ tools:
 - Bash
 - Glob
 - Grep
-generated-from: 1-generic/export-manager.md@1.2.0
+generated-from: 1-generic/export-manager.md@1.4.0
 model: claude-haiku-4-5-20251001
 ---
 
@@ -117,6 +117,8 @@ ARTIFACTS: <exported file path/URL>
 ERRORS: [if any]
 WARNINGS: [if any]
 ```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>
@@ -131,3 +133,9 @@ WARNINGS: [if any]
 
 **Language:** code comments, commit messages, export metadata → English.
 </constraints>
+
+<output-guard>
+## Background-Process Guard (issue #506)
+
+Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
+</output-guard>

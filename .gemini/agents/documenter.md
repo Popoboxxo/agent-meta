@@ -1,6 +1,6 @@
 ---
 name: documenter
-version: 1.5.0
+version: 1.6.0
 description: Maintains CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md and session
   insights.
 hint: 'Maintain docs: CODEBASE_OVERVIEW, ARCHITECTURE, README, insights'
@@ -12,7 +12,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/documenter.md@1.5.0
+generated-from: 1-generic/documenter.md@1.6.0
 model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -98,6 +98,8 @@ RESULT: <1-2 sentence summary of documentation changes>
 ARTIFACTS: [changed + new doc files]
 NOTES: [short summary of changes]
 ```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>

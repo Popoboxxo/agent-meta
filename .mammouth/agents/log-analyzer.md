@@ -1,6 +1,6 @@
 ---
 name: log-analyzer
-version: 1.3.0
+version: 1.5.0
 description: 'Analyzes system and application logs: frequency clustering, severity
   classification (RFC 5424), root-cause hypotheses, and structured findings with delegation
   routing.'
@@ -15,7 +15,7 @@ tools:
 - WebSearch
 - WebFetch
 - TodoWrite
-generated-from: 1-generic/log-analyzer.md@1.3.0
+generated-from: 1-generic/log-analyzer.md@1.5.0
 model: claude-haiku-4-5-20251001
 ---
 > **Extension:** If `.mammouth/3-project/am-log-analyzer-ext.md` exists → read and apply immediately.
@@ -123,6 +123,8 @@ ARTIFACTS: <persisted report path, empty if returned inline>
 ---
 **Summary:** total findings, highest severity, top-3 patterns
 ```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>
@@ -137,3 +139,9 @@ ARTIFACTS: <persisted report path, empty if returned inline>
 
 **Language:** findings → Deutsch.
 </constraints>
+
+<output-guard>
+## Background-Process Guard (issue #506)
+
+Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
+</output-guard>

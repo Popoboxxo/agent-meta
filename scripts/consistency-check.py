@@ -54,6 +54,7 @@ from lib.consistency.docs import (
     check_ui_help_mappings,
 )
 from lib.consistency.frontmatter import check_agent_frontmatter
+from lib.consistency.fanout_contracts import check_fanout_backend_contract
 from lib.consistency.handoff_contracts import check_handoff_contracts
 from lib.consistency.placeholders import check_placeholders, load_project_vars
 from lib.consistency.python_compat import check_py39_union_syntax
@@ -183,6 +184,7 @@ def run_checks(
         findings += check_duplicate_commands(root)
         findings += check_schema_refs(root)
         findings += check_handoff_contracts(root)
+        findings += check_fanout_backend_contract(root)
         findings += check_py39_union_syntax(root)
 
         # Phase 5: Documentation & UI Consistency

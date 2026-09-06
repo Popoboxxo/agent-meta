@@ -10,7 +10,11 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
-from .agents import build_agent_hints, build_agent_table
+from .agents import (
+    build_agent_hints,
+    build_agent_table,
+    build_routing_tool_definitions_for_providers,
+)
 from .io import SyncError, _load_yaml_or_json, _write_yaml, load_yaml_file
 from .log import SyncLog
 from .variables import (  # re-exported for callers/tests (Issue #565)
@@ -1221,6 +1225,25 @@ def build_variables(config: dict, agent_meta_root: Path, project_root: Path | No
     # using the same `effective` quality-pipelines dict resolved above.
     variables["INTENT_ROUTING_TABLE"] = get_intent_routing_table(
         agent_meta_root, config, variables, pipelines=effective
+    )
+    # INTENT_ROUTING_TOOLS (issue #264): the structured route_intent tool
+    # definition, rendered once per provider via its handoff_format
+    # capability key (config/provider-capabilities.yaml). Two-phase by
+    # design: build_variables is provider-agnostic (one shared dict), so the
+    # provider-mapped prerender is stored under _INTENT_ROUTING_TOOL_DEFS and
+    # resolved to the actual placeholder value in
+    # agent_sync._build_provider_vars — the only place where the provider
+    # name being synced is known. Providers without a handoff_format render
+    # "" (fail-soft, same semantics as the PAL missing-definition handling).
+    # Active providers only: resolve_providers applies the project's
+    # ai-providers list and deactivation filter, matching the per-provider
+    # sync loop's provider set.
+    variables["_INTENT_ROUTING_TOOL_DEFS"] = build_routing_tool_definitions_for_providers(
+        agent_meta_root,
+        config,
+        variables,
+        providers=resolve_providers(config, load_providers_config(agent_meta_root)),
+        pipelines=effective,
     )
     _build_snippet_variables(variables, agent_meta_root)
     _build_convention_variables(variables, config, agent_meta_root)

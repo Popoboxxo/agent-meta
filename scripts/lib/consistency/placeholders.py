@@ -92,6 +92,10 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     "AGENT_DELEGATION_TABLE", "PROJECT_SPECIFIC_AGENTS",
     "PIPELINE_MATCH_TABLE", "INTENT_ROUTING_TABLE", "PIPELINE_DETAIL_BLOCKS",
     "PIPELINE_DETAILS_DIR",
+    # Structured intent-routing tool definition, resolved per provider in
+    # agent_sync._build_provider_vars from build_variables' provider-mapped
+    # prerender (issue #264)
+    "INTENT_ROUTING_TOOLS",
     # Paths
     "AGENTS_DIR",
     # Release / plugin packaging

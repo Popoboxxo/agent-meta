@@ -1,6 +1,6 @@
 ---
 name: se-integration-and-test-manager
-version: 1.3.0
+version: 1.4.0
 description: 'V&V-Orchestrator: Koordiniert Integrationsstrategie, Test-Ebenen und
   Traceability-Feedback über L1-Ln. Persists test plan and V&V report.'
 hint: Orchestriert den gesamten rechten Flügel der V&V-Kaskade — Bottom-Up, Top-Down,
@@ -249,6 +249,8 @@ STATUS: done|partial|failed|escalate
 RESULT: <1 Satz Ergebnis-Zusammenfassung>
 ARTIFACTS: <persistierte Step-/Report-Dateien (siehe Step Persistence)>
 ```
+**Pflicht-Abschluss-Summary (Issue #267):** der strukturierte Block oben ist dein kompletter Rückgabewert — der Orchestrator konsumiert nur dieses Summary, niemals Roh-Output. RESULT: kompaktes Summary (max. 2-3 Sätze) mit was geändert wurde, Erfolg/Misserfolg und dem nächsten Schritt. Roh-Output, Diffs und Logs gehören nie in RESULT — die gehören in ARTIFACTS (Dateipfade).
+
 </output_contract>
 
 ## Anti-Recursion Guard

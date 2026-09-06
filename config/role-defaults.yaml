@@ -24,6 +24,15 @@ roles:
       - Code schreiben
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Bugfix
+      - Refactoring
+      - Implementierung
+      - Code schreiben
+      examples:
+      - "Implementiere das Feature X."
+      - "Fixe den Bug in cache.py."
     handoff:
       input_contracts:
       - task-spec-v1
@@ -55,6 +64,14 @@ roles:
       - ≤2 Dateien
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Trivialer Fix
+      - kleiner Fix
+      - ≤2 Dateien
+      examples:
+      - "Kleiner Fix in maximal zwei Dateien."
+      - "Korrigiere den Tippfehler im README."
     handoff:
       input_contracts:
       - task-spec-v1
@@ -97,6 +114,15 @@ roles:
       - Cross-Cutting
       parallel: false
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Komplex
+      - Architektur
+      - schwieriger Bug
+      - Cross-Cutting
+      examples:
+      - "Triff die Architektur-Entscheidung für das Auth-Modul."
+      - "Analysiere den schwierigen Race-Condition-Bug."
     handoff:
       input_contracts:
       - task-spec-v1
@@ -148,6 +174,13 @@ roles:
       - Requirements
       parallel: false
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Anforderungen
+      - REQ-ID
+      - Requirements
+      examples:
+      - "Nimm diese Anforderung auf und vergib eine REQ-ID."
     handoff:
       input_contracts:
       - ideation-output-v1
@@ -171,6 +204,14 @@ roles:
       - Idee
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Design
+      - Konzept
+      - Architektur
+      - Idee
+      examples:
+      - "Erkunde Ideen für das Plugin-System."
     handoff:
       output_contract: ideation-output-v1
       output_schema: schemas/handoffs/ext/ideation-extension.schema.json
@@ -195,6 +236,20 @@ roles:
       - Implementierungsplan
       parallel: false
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Plan
+      - Planung
+      - Schritte
+      - Umsetzungsplan
+      - "wie setzen wir das um"
+      - plane
+      - Plan erstellen
+      - Umsetzungsplan erstellen
+      - Implementierungsplan
+      examples:
+      - "Plane die Umsetzung in konkrete Schritte."
+      - "Erstelle den Umsetzungsplan für das Feature."
     produces:
       plan:
         pipeline: feature-lifecycle
@@ -213,6 +268,13 @@ roles:
       - Testabdeckung
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Tests
+      - TDD
+      - Testabdeckung
+      examples:
+      - "Schreibe Tests für das Modul (TDD)."
     handoff:
       input_contracts:
       - task-spec-v1
@@ -240,6 +302,16 @@ roles:
       - a11y
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - E2E
+      - End-to-End
+      - Browser-Test
+      - visuelle Regression
+      - Accessibility
+      - a11y
+      examples:
+      - "Führe einen E2E-Browser-Test für den Login-Flow aus."
     handoff:
       input_contracts:
       - task-spec-v1
@@ -248,6 +320,36 @@ roles:
       target_roles:
       - developer
     short_desc: E2E-Tests, visuelle Regression und Accessibility-Audits via Playwright
+  test-executor:
+    model: nano
+    memory: ''
+    workflow_tier: optional
+    description: 'Bestehende Test-Suiten ausführen (Pass/Fail-Counts, Exit-Codes,
+      Stdout-Auszüge) — kein Test-Design, kein Code-Schreiben (#517)'
+    routing:
+      intent_keywords:
+      - Tests ausführen
+      - Test-Suite
+      - Re-Run
+      - Fix-Verify
+      - CI-Verify
+      parallel: true
+      orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Tests ausführen
+      - Test-Suite
+      - Re-Run
+      - Fix-Verify
+      - CI-Verify
+      examples:
+      - "Führe die bestehende Test-Suite aus und melde die Counts."
+    handoff:
+      input_contracts:
+      - task-spec-v1
+      - dev-result-v1
+      output_contract: test-execution-report-v1
+    short_desc: Bestehende Test-Suiten ausführen — kein Test-Design, kein Code-Schreiben
   validator:
     model: balanced
     memory: project
@@ -261,6 +363,13 @@ roles:
       - Traceability
       parallel: false
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Validierung
+      - DoD
+      - Traceability
+      examples:
+      - "Prüfe den Code gegen die REQs und die DoD-Checkliste."
     handoff:
       input_contracts:
       - task-spec-v1
@@ -281,6 +390,14 @@ roles:
       - Doku
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Dokumentation
+      - README
+      - Docs
+      - Doku
+      examples:
+      - "Aktualisiere README und CODEBASE_OVERVIEW."
     handoff:
       input_contracts:
       - slo-report-v1
@@ -300,6 +417,13 @@ roles:
       - OWASP
       parallel: false
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Security
+      - Audit
+      - OWASP
+      examples:
+      - "Prüfe das Projekt auf OWASP-Schwachstellen und Secrets."
     short_desc: 'Sicherheits-Audit: OWASP, Secrets, Dependencies, Supply-Chain'
   dependency-auditor:
     model: balanced
@@ -318,6 +442,17 @@ roles:
       - supply chain
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - dependency
+      - license
+      - SBOM
+      - package audit
+      - vulnerability
+      - outdated
+      - supply chain
+      examples:
+      - "Prüfe die Dependencies auf veraltete und verwundbare Pakete."
     handoff:
       output_contract: dependency-audit-v1
       target_roles:
@@ -346,6 +481,18 @@ roles:
       - phantom endpoints
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - AI code security
+      - vibe coding security
+      - halluzinierte Dependencies
+      - fake packages
+      - fabricated IAM
+      - insecure defaults
+      - brittle logic
+      - phantom endpoints
+      examples:
+      - "Prüfe den KI-Code auf halluzinierte Dependencies."
     handoff:
       output_contract: ai-security-audit-v1
     short_desc: 'KI-spezifische Sicherheitsrisiken: halluzinierte Deps, fabrizierte
@@ -363,6 +510,13 @@ roles:
       - Ökosystem
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Scout
+      - neue Skills
+      - Ökosystem
+      examples:
+      - "Scoute neue Skills und Rollen für Claude Code."
     short_desc: 'Claude-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns
       entdecken'
   prompt-engineer:
@@ -378,6 +532,13 @@ roles:
       - Agenten-Definition
       parallel: false
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Prompt
+      - Prompt Engineering
+      - Agenten-Definition
+      examples:
+      - "Optimiere die Agenten-Definition für weniger Token."
     short_desc: Der ultimative Experte für Prompt-Engineering
   prompt-governor:
     model: balanced
@@ -398,6 +559,16 @@ roles:
       - Prompt Safety
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Prompt Governance
+      - Prompt Audit
+      - PromptBOM
+      - Prompt Provenance
+      - banned prompt pattern
+      - Prompt Safety
+      examples:
+      - "Prüfe die Prompts auf verbotene Unsafe-Patterns."
     handoff:
       output_contract: prompt-governance-v1
       target_roles:
@@ -416,6 +587,13 @@ roles:
       - Agenten verwalten
       parallel: false
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Meta-Fragen
+      - agent-meta
+      - Agenten verwalten
+      examples:
+      - "Upgrade agent-meta im Projekt und sync neu."
     short_desc: 'agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische
       Agenten anl...'
   release:
@@ -430,6 +608,13 @@ roles:
       - Changelog
       parallel: false
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Release
+      - Version
+      - Changelog
+      examples:
+      - "Erstelle den Release mit Changelog."
     short_desc: Versioning, Changelog, Build-Artifact, GitHub Release erstellen
   git:
     model: nano
@@ -445,6 +630,16 @@ roles:
       - Pull
       parallel: false
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Git
+      - Commit
+      - Branch
+      - Push
+      - Pull
+      examples:
+      - "Committe die Änderungen auf einem Feature-Branch."
+      - "Push den Branch und erstelle den PR."
     short_desc: Commits, Branches, Tags, Push/Pull und alle Git-Operationen
   meta-feedback:
     model: fast
@@ -457,6 +652,12 @@ roles:
       - Verbesserung
       parallel: false
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Meta-Feedback
+      - Verbesserung
+      examples:
+      - "Reiche den Verbesserungsvorschlag als Issue ein."
     short_desc: Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen
   docker:
     model: fast
@@ -471,6 +672,13 @@ roles:
       - Container
       parallel: false
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Docker
+      - Dev-Stack
+      - Container
+      examples:
+      - "Starte den Dev-Stack."
     short_desc: Dev-Stack verwalten, Test-Stack starten, Binary-Management, Dockerfiles
       erste...
   log-analyzer:
@@ -486,6 +694,13 @@ roles:
       - Fehleranalyse
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Log
+      - Logs
+      - Fehleranalyse
+      examples:
+      - "Analysiere die Fehler-Logs der letzten Session."
     handoff:
       output_contract: log-analysis-v1
       target_roles:
@@ -511,6 +726,18 @@ roles:
       - P1
       parallel: false
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - incident
+      - outage
+      - RCA
+      - root cause
+      - post-mortem
+      - hotfix
+      - P0
+      - P1
+      examples:
+      - "P0-Incident: Produktion down — koordiniere das RCA."
     handoff:
       input_contracts:
       - log-analysis-v1
@@ -532,6 +759,13 @@ roles:
       - Bug melden
       parallel: false
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Feedback
+      - Issue
+      - Bug melden
+      examples:
+      - "Melde diesen Bug als GitHub-Issue."
     handoff:
       input_contracts:
       - dependency-audit-v1
@@ -552,6 +786,13 @@ roles:
       - klassifizieren
       parallel: true
       orchestrator_only: true
+    routing_patterns:
+      keywords:
+      - Triage
+      - Bug/Feature
+      - klassifizieren
+      examples:
+      - "Triagiere die neue Issue-Meldung."
     short_desc: 'Issue-Triage: Eingehende Bug-Meldungen und Feature-Requests analysieren
       und k...'
   openscad-developer:
@@ -574,6 +815,12 @@ roles:
       - Stakeholder Needs
       parallel: false
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - SE Requirements
+      - Stakeholder Needs
+      examples:
+      - "Erfasse das Stakeholder-Bedürfnis als L1-Requirement."
     handoff:
       input_contracts:
       - task-spec-v1
@@ -595,6 +842,12 @@ roles:
       - Decomposition
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - SE Architektur
+      - Decomposition
+      examples:
+      - "Zerlege die Blackbox in Whiteboxes."
     handoff:
       input_contracts:
       - task-spec-v1
@@ -618,6 +871,12 @@ roles:
       - Architektur Review
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - SE Critic
+      - Architektur Review
+      examples:
+      - "Reviewe die Architektur-Entscheidung auf Konsistenz."
     handoff:
       input_contracts:
       - se-arch-output-v1
@@ -641,6 +900,12 @@ roles:
       - Schnittstellen
       parallel: false
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - SE Interface
+      - Schnittstellen
+      examples:
+      - "Validiere die Schnittstellenverträge."
     handoff:
       input_contracts:
       - critic-result-v1
@@ -660,6 +925,11 @@ roles:
       - SE Termination
       parallel: false
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - SE Termination
+      examples:
+      - "Prüfe die Termination-Bedingung der Zelle."
     handoff:
       input_contracts:
       - interface-result-v1
@@ -680,6 +950,12 @@ roles:
       - SE Leaf
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - SE trivial
+      - SE Leaf
+      examples:
+      - "Implementiere das triviale SE-Leaf mit einem Interface."
     handoff:
       input_contracts:
       - task-spec-v1
@@ -711,6 +987,12 @@ roles:
       - SE Leaf
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - SE Implementierung
+      - SE Leaf
+      examples:
+      - "Implementiere das SE-Leaf mit 2-4 Interfaces."
     handoff:
       input_contracts:
       - task-spec-v1
@@ -743,6 +1025,12 @@ roles:
       - SE Boundary
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - SE komplex
+      - SE Boundary
+      examples:
+      - "Implementiere das komplexe SE-Leaf mit Boundary-Interfaces."
     handoff:
       input_contracts:
       - task-spec-v1
@@ -774,6 +1062,12 @@ roles:
       - MBSE Tests
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - SE Test
+      - MBSE Tests
+      examples:
+      - "Entwirf die Integrationstests für den rechten V-Modell-Flügel."
     short_desc: Entwickelt MBSE-Testmodelle und entwirft Integrationstests für den
       rechten V-...
   se-testreviewer:
@@ -789,6 +1083,11 @@ roles:
       - SE Test Review
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - SE Test Review
+      examples:
+      - "Auditiere die Teststrategie auf Edge-Cases."
     short_desc: Auditiert Teststrategien auf Edge-Cases, Boundary Values, Äquivalenzklassen
       u...
   se-verifier:
@@ -803,6 +1102,11 @@ roles:
       - SE Verification
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - SE Verification
+      examples:
+      - "Verifiziere das integrierte System gegen die Spezifikation."
     short_desc: 'Multi-Level Verification (L1-Ln): Prüft integrierte Systeme gegen
       Architektur...'
   se-validator:
@@ -816,6 +1120,11 @@ roles:
       - SE Validation
       parallel: false
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - SE Validation
+      examples:
+      - "Validiere die User Journey gegen die Stakeholder-Bedürfnisse."
     short_desc: 'L1 System-Validierung: End-to-End User Journeys gegen Stakeholder-Bedürfnisse.'
   se-integration-and-test-manager:
     group: se
@@ -830,6 +1139,12 @@ roles:
       - V&V
       parallel: false
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - SE Integration
+      - V&V
+      examples:
+      - "Bestimme die Integrationsstrategie und koordiniere die Test-Ebenen."
     short_desc: 'V&V-Orchestrator: Bestimmt Integrationsstrategie und koordiniert
       Test-Ebenen.'
   code-reviewer:
@@ -846,6 +1161,13 @@ roles:
       - Audit
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Code Review
+      - Code-Qualität
+      - Audit
+      examples:
+      - "Reviewe den Merge-Request auf Code-Qualität."
     handoff:
       input_contracts:
       - dev-result-v1
@@ -869,6 +1191,12 @@ roles:
       - Design Review
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Konzept Review
+      - Design Review
+      examples:
+      - "Reviewe das Konzept auf Vollständigkeit und Risiken."
     handoff:
       input_contracts:
       - ideation-output-v1
@@ -888,6 +1216,14 @@ roles:
       - Design
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - UI
+      - UX
+      - Mockup
+      - Design
+      examples:
+      - "Erstelle das UI-Mockup für den Screen."
     handoff:
       output_contract: design-spec-v1
       output_schema: schemas/handoffs/ext/design-extension.schema.json
@@ -911,6 +1247,15 @@ roles:
       - Variant-Contract
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Design-System
+      - Design-Token
+      - Design-Tokens
+      - Farbschema
+      - Variant-Contract
+      examples:
+      - "Übersetze das Design-System-Schema in Token-Artefakte."
     handoff:
       input_contracts:
       - design-spec-v1
@@ -933,6 +1278,14 @@ roles:
       - Komponente bauen
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - UI-Komponente
+      - React-Komponente
+      - Frontend-Komponente
+      - Komponente bauen
+      examples:
+      - "Baue die React-Komponente nach der Screen-Spec."
     handoff:
       input_contracts:
       - design-token-contract-v1
@@ -955,6 +1308,13 @@ roles:
       - Contract-First
       parallel: false
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - API
+      - OpenAPI
+      - Contract-First
+      examples:
+      - "Entwirf die OpenAPI-Spec für den Endpoint."
     handoff:
       output_contract: api-spec-v1
       output_schema: schemas/handoffs/ext/api-extension.schema.json
@@ -979,6 +1339,17 @@ roles:
       - db-design
       parallel: false
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - database
+      - schema
+      - migration
+      - query optimization
+      - index
+      - SQL
+      - db-design
+      examples:
+      - "Entwirf das Schema für die Migration."
     handoff:
       input_contracts:
       - req-output-v1
@@ -1000,6 +1371,13 @@ roles:
       - Infrastruktur
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - CI/CD
+      - Kubernetes
+      - Infrastruktur
+      examples:
+      - "Richte die CI/CD-Pipeline ein."
     short_desc: CI/CD, Infrastructure as Code, Kubernetes, Observability.
   sre-engineer:
     model: balanced
@@ -1019,6 +1397,18 @@ roles:
       - post-mortem
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - SLO
+      - SLI
+      - error budget
+      - reliability
+      - runbook
+      - capacity planning
+      - toil
+      - post-mortem
+      examples:
+      - "Definiere SLIs und SLOs für den Service."
     handoff:
       output_contract: slo-report-v1
       target_roles:
@@ -1045,6 +1435,17 @@ roles:
       - App Inventory
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - App Ownership
+      - orphan app
+      - Lifecycle Management
+      - Deprecation Plan
+      - SLA Validation
+      - Data Classification
+      - App Inventory
+      examples:
+      - "Prüfe Ownership und Deprecation-Plan der App."
     handoff:
       output_contract: lifecycle-audit-v1
       target_roles:
@@ -1068,6 +1469,18 @@ roles:
       - microcopy
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - API reference
+      - getting started
+      - tutorial
+      - SDK docs
+      - release notes
+      - quickstart
+      - user guide
+      - microcopy
+      examples:
+      - "Schreibe die Getting-Started-Doku."
     handoff:
       output_contract: external-doc-v1
     short_desc: 'Externe entwickler- und nutzergerichtete Doku: API-Referenzen, Getting-Starte...'
@@ -1087,6 +1500,16 @@ roles:
       - Tippfehler
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Korrektorat
+      - Rechtschreibung
+      - Grammatik prüfen
+      - Zeichensetzung
+      - proofreading
+      - Tippfehler
+      examples:
+      - "Korrigiere Rechtschreibung und Grammatik."
     short_desc: 'Korrektorat: reine Fehlerkorrektur — Rechtschreibung, Grammatik, Zeichensetzung.'
   copyeditor:
     model: balanced
@@ -1104,6 +1527,16 @@ roles:
       - copyediting
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Lektorat
+      - Stil verbessern
+      - Satzbau
+      - Wortwiederholungen
+      - roter Faden
+      - copyediting
+      examples:
+      - "Verbessere Stil und Satzbau des Texts."
     short_desc: 'Lektorat: Stil, Satzbau, Wortwiederholungen, roter Faden, inhaltliche Konsistenz.'
   data-engineer:
     model: balanced
@@ -1123,6 +1556,18 @@ roles:
       - schema registry
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - ETL
+      - ELT
+      - data pipeline
+      - data quality
+      - lineage
+      - streaming
+      - batch
+      - schema registry
+      examples:
+      - "Baue die ETL-Pipeline."
     handoff:
       output_contract: data-pipeline-v1
       target_roles:
@@ -1147,6 +1592,18 @@ roles:
       - focus management
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - accessibility
+      - a11y
+      - WCAG
+      - ARIA
+      - screen reader
+      - keyboard navigation
+      - color contrast
+      - focus management
+      examples:
+      - "Audite die Komponente auf WCAG-Konformität."
     handoff:
       input_contracts:
       - component-build-v1
@@ -1171,6 +1628,16 @@ roles:
       - framework upgrade
       parallel: false
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - refactoring
+      - strangler fig
+      - legacy modernization
+      - code smell
+      - systematic transformation
+      - framework upgrade
+      examples:
+      - "Modernisiere das Legacy-Modul mit Strangler-Fig."
     handoff:
       input_contracts:
       - task-spec-v1
@@ -1199,6 +1666,18 @@ roles:
       - KPI
       parallel: false
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - backlog
+      - user story
+      - sprint planning
+      - prioritization
+      - RICE
+      - MoSCoW
+      - roadmap
+      - KPI
+      examples:
+      - "Priorisiere das Backlog für den Sprint."
     handoff:
       output_contract: backlog-v1
       target_roles:
@@ -1217,6 +1696,13 @@ roles:
       - Optimierung
       parallel: false
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Performance
+      - Bottleneck
+      - Optimierung
+      examples:
+      - "Optimiere die Performance der langsamen Query."
     short_desc: Big-O Bottleneck-Identifikation und datengetriebene Performance-Optimierung.
   export-manager:
     model: fast
@@ -1231,6 +1717,13 @@ roles:
       - Target
       parallel: false
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Export
+      - Routing
+      - Target
+      examples:
+      - "Exportiere den Bericht nach Confluence."
     short_desc: 'Target-agnostischer Output-Router: Markdown, Confluence, Jira-Xray,
       Notion.'
   effort-estimator:
@@ -1246,6 +1739,13 @@ roles:
       - Kosten
       parallel: false
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Aufwand
+      - Schätzung
+      - Kosten
+      examples:
+      - "Schätze den Aufwand für dieses Feature."
     short_desc: Schätzt Aufwände für Entwicklungsaufgaben basierend auf Task-Typ und
       LLM-Kali...
   explorer:
@@ -1262,6 +1762,14 @@ roles:
       - Recherche
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Codebase
+      - Dependencies
+      - Impact
+      - Recherche
+      examples:
+      - "Recherchiere die Codebase-Abhängigkeiten (read-only)."
     handoff:
       input_contracts:
       - task-spec-v1
@@ -1285,6 +1793,12 @@ roles:
       - Claude Code
       parallel: false
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Claude
+      - Claude Code
+      examples:
+      - "Wie konfiguriere ich Hooks in Claude Code?"
     short_desc: 'Absoluter Analyse-Experte für die Plattform Claude Code: Funktionsweise,
       Konf...'
   gemini-expert:
@@ -1300,6 +1814,12 @@ roles:
       - Antigravity
       parallel: false
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Gemini
+      - Antigravity
+      examples:
+      - "Wie registriere ich Agenten in Gemini/Antigravity?"
     short_desc: 'Absoluter Analyse-Experte für die Plattform Gemini (Antigravity):
       Funktionswe...'
   opencode-expert:
@@ -1314,6 +1834,11 @@ roles:
       - Opencode
       parallel: false
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Opencode
+      examples:
+      - "Wie konfiguriere ich das Opencode-Modell?"
     short_desc: 'Absoluter Analyse-Experte für die Plattform Opencode: Funktionsweise,
       Konfigu...'
   continue-expert:
@@ -1328,6 +1853,11 @@ roles:
       - Continue
       parallel: false
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Continue
+      examples:
+      - "Wie konfiguriere ich Continue-Agents?"
     short_desc: 'Absoluter Analyse-Experte für die Plattform Continue: Funktionsweise,
       Konfigu...'
   copilot-expert:
@@ -1343,6 +1873,12 @@ roles:
       - GitHub Copilot
       parallel: false
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Copilot
+      - GitHub Copilot
+      examples:
+      - "Wie richte ich Copilot-Agenten ein?"
     short_desc: 'Absoluter Analyse-Experte für die Plattform GitHub Copilot: Funktionsweise,
       K...'
   mammouth-expert:
@@ -1358,6 +1894,12 @@ roles:
       - Mammouth Code
       parallel: false
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Mammouth
+      - Mammouth Code
+      examples:
+      - "Wie nutze ich die Mammouth-Plan/Build-Modes?"
     short_desc: 'Absoluter Analyse-Experte für die Plattform Mammouth Code: Funktionsweise,
       Ko...'
   knowledge-curator:
@@ -1376,6 +1918,15 @@ roles:
       - Knowledge-Engine
       parallel: false
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Knowledge
+      - Wiki
+      - Wissen
+      - Schema
+      - Knowledge-Engine
+      examples:
+      - "Evolviere das Wiki-Schema."
     handoff:
       input_contracts:
       - task-spec-v1
@@ -1395,6 +1946,13 @@ roles:
       - einlesen
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Ingest
+      - Source verarbeiten
+      - einlesen
+      examples:
+      - "Ingestiere die neue Source ins Wiki."
     handoff:
       input_contracts:
       - task-spec-v1
@@ -1418,6 +1976,14 @@ roles:
       - Recherche im Wiki
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Wiki-Frage
+      - Was wissen wir
+      - Knowledge Query
+      - Recherche im Wiki
+      examples:
+      - "Was wissen wir über das A2A-Protokoll?"
     handoff:
       input_contracts:
       - task-spec-v1
@@ -1439,6 +2005,14 @@ roles:
       - Wiki-Gesundheit
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Wiki-Lint
+      - Wiki-Check
+      - Knowledge Lint
+      - Wiki-Gesundheit
+      examples:
+      - "Prüfe das Wiki auf Orphans und veraltete Claims."
     handoff:
       input_contracts:
       - task-spec-v1
@@ -1459,6 +2033,13 @@ roles:
       - log pflegen
       parallel: true
       orchestrator_only: true
+    routing_patterns:
+      keywords:
+      - Index aktualisieren
+      - Index pflegen
+      - log pflegen
+      examples:
+      - "Aktualisiere den Wiki-Index."
     handoff:
       input_contracts:
       - knowledge-ingest-v1
@@ -1480,6 +2061,14 @@ roles:
       - Wiki aufräumen
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Wiki-Pflege
+      - Links reparieren
+      - Tags aufräumen
+      - Wiki aufräumen
+      examples:
+      - "Repariere die kaputten Wiki-Links."
     handoff:
       input_contracts:
       - knowledge-lint-v1
@@ -1504,6 +2093,15 @@ roles:
       - Vorhandene Docs ins Wiki
       parallel: false
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Migrieren
+      - Aufräumen
+      - Wiki-Migration
+      - Docs migrieren
+      - Vorhandene Docs ins Wiki
+      examples:
+      - "Migriere die vorhandenen Docs ins Knowledge-Wiki."
     handoff:
       input_contracts:
       - task-spec-v1
@@ -1525,6 +2123,13 @@ roles:
       - React/Vue prüfen
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Frontend Review
+      - Komponenten prüfen
+      - React/Vue prüfen
+      examples:
+      - "Reviewe die Frontend-Komponenten auf SSR-Probleme."
   backend-reviewer:
     model: balanced
     memory: project
@@ -1539,6 +2144,13 @@ roles:
       - Silent Failures
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Backend Review
+      - API prüfen
+      - Silent Failures
+      examples:
+      - "Reviewe die API auf Silent Failures."
   database-reviewer:
     model: powerful
     memory: project
@@ -1553,6 +2165,13 @@ roles:
       - SQL Review
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Datenbank Review
+      - Migration prüfen
+      - SQL Review
+      examples:
+      - "Reviewe die Migration auf N+1 und Injection-Risiken."
   ui-reviewer:
     model: balanced
     memory: project
@@ -1567,6 +2186,13 @@ roles:
       - UI-Konsistenz
       parallel: true
       orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - UI Review
+      - Design-Token prüfen
+      - UI-Konsistenz
+      examples:
+      - "Reviewe das UI auf Design-Token-Konformität."
 outcome-caching:
   enabled: false
   ttl_seconds: 3600

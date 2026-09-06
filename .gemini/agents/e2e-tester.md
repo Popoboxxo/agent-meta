@@ -1,6 +1,6 @@
 ---
 name: e2e-tester
-version: 1.2.0
+version: 1.4.0
 description: E2E-Tests, visuelle Regression und Accessibility-Audits via Playwright
   — User-Flows statt isolierter Units.
 hint: 'Browser-Testing-Agent: E2E-Flows, visuelle Regression, Accessibility-Audit
@@ -14,7 +14,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/e2e-tester.md@1.2.0
+generated-from: 1-generic/e2e-tester.md@1.4.0
 model: gemini-3.1-pro-low
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -115,6 +115,8 @@ NEXT: [recommended next step]
 ```
 
 On failed tests or audit violations: return structured findings (affected flow, expected vs. observed behavior, severity, screenshot/snapshot reference).
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>
@@ -137,3 +139,20 @@ On failed tests or audit violations: return structured findings (affected flow, 
 
 **Language:** test descriptions and findings reports → Englisch.
 </constraints>
+
+<output-guard>
+## Background-Process Guard (issue #506)
+
+Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
+
+Beispiel — Container synchron abwarten (`docker wait`):
+
+```bash
+NAME=verify-$RANDOM
+docker run --name "$NAME" -d alpine sh -c "sleep 5; exit 7"   # replace with your real test container
+RC=$(docker wait "$NAME")                     # BLOCKS until container exits — no completion notification will ever arrive
+docker logs "$NAME" > /tmp/"$NAME".log 2>&1   # capture diagnostics BEFORE removal
+docker rm "$NAME"
+echo "container exit code: $RC" && tail -20 /tmp/"$NAME".log
+```
+</output-guard>

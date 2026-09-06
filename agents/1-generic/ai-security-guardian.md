@@ -1,6 +1,6 @@
 ---
 name: template-ai-security-guardian
-version: "1.0.0"
+version: "1.2.0"
 description: "AI-specific security risk detection: hallucinated dependencies (slopsquatting), fabricated IAM actions, insecure AI defaults (debug mode, permissive CORS, default credentials), brittle conditional security checks, phantom API endpoints, leaked training-data patterns — read-only, complements security-auditor (OWASP) and dependency-auditor (supply chain)."
 hint: "AI security review: hallucinated deps, fabricated IAM, insecure defaults, brittle logic, phantom endpoints — static detection of AI-generated risk patterns, read-only"
 prompt_mode: modern
@@ -101,6 +101,8 @@ ARTIFACTS: <report file path, or "none">
 ```
 
 Long reports → write to `/tmp/opencode/ai-security-audit-<topic>.md`, return path only.
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>
@@ -117,3 +119,9 @@ Long reports → write to `/tmp/opencode/ai-security-audit-<topic>.md`, return p
 
 **Language:** audit reports → {{INTERNAL_DOCS_LANGUAGE}}.
 </constraints>
+
+<output-guard>
+## Background-Process Guard (issue #506)
+
+Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
+</output-guard>

@@ -216,3 +216,83 @@ def test_gemini_pal_placeholders_resolve_without_leftovers():
     resolved = engine.apply(template, provider="Gemini")
     assert not _re.search(r"\{\{PAL_[A-Z_]+\}\}", resolved)
     assert "invoke_subagent" in resolved
+
+
+# ---------------------------------------------------------------------------
+# FANOUT/BARRIER capability getters (issue #265)
+# ---------------------------------------------------------------------------
+
+# Capability matrix: provider → (fanout_mechanism, has_async_fanout,
+# barrier_collect). Every provider of config/ai-providers.yaml must be
+# mapped — conservative default for unverified parallelism is
+# sequential-fallback / false.
+_FANOUT_CAPABILITY_MATRIX = {
+    "Claude":     ("native-batch",         True,  True),
+    "Opencode":   ("native-batch",         True,  True),
+    "Gemini":     ("native-batch",         True,  True),
+    "Continue":   ("sequential-fallback",  False, False),
+    "Copilot":    ("sequential-fallback",  False, False),
+    "Mammouth":   ("sequential-fallback",  False, False),
+    "Codex":      ("tool-mediated",        True,  True),
+    "ZCode":      ("sequential-fallback",  False, False),
+    "KimiCode":   ("swarm",                True,  True),
+}
+
+
+def test_get_fanout_mechanism_covers_all_providers():
+    engine = DelegationSyntaxEngine()
+    for provider, (mechanism, _async, _barrier) in _FANOUT_CAPABILITY_MATRIX.items():
+        assert engine.get_fanout_mechanism(provider) == mechanism, provider
+
+
+def test_has_async_fanout_matrix():
+    engine = DelegationSyntaxEngine()
+    for provider, (_mechanism, async_fanout, _barrier) in _FANOUT_CAPABILITY_MATRIX.items():
+        assert engine.has_async_fanout(provider) is async_fanout, provider
+
+
+def test_get_barrier_collect_matrix():
+    engine = DelegationSyntaxEngine()
+    for provider, (_mechanism, _async, barrier) in _FANOUT_CAPABILITY_MATRIX.items():
+        assert engine.get_barrier_collect(provider) is barrier, provider
+
+
+def test_all_ai_providers_have_fanout_mechanism_mapped():
+    """Every provider registry entry must have a fanout_mechanism key — a new
+    provider added to ai-providers.yaml without a mapping is config drift."""
+    from scripts.lib.io import load_yaml_file
+    providers = load_yaml_file(REPO_ROOT / "config" / "ai-providers.yaml") or {}
+    engine = DelegationSyntaxEngine()
+    for provider in (providers.get("providers") or {}):
+        assert engine.get_fanout_mechanism(provider) is not None, (
+            f"provider '{provider}' has no fanout_mechanism mapping "
+            "(issue #265 capability matrix is incomplete)"
+        )
+
+
+def test_get_fanout_mechanism_unknown_key_raises():
+    """Mechanism-key validation must fail loudly on config drift (spike §8
+    step 1 acceptance criterion) — never silently degrade."""
+    engine = DelegationSyntaxEngine()
+    engine._capabilities_registry = {
+        "capabilities": {"X": {"fanout_mechanism": "warp-drive"}},
+    }
+    with pytest.raises(ValueError, match="Unknown fanout_mechanism 'warp-drive'"):
+        engine.get_fanout_mechanism("X")
+
+
+def test_fanout_getters_fail_closed_for_unknown_provider():
+    engine = DelegationSyntaxEngine()
+    assert engine.get_fanout_mechanism("DoesNotExist") is None
+    assert engine.has_async_fanout("DoesNotExist") is False
+    assert engine.get_barrier_collect("DoesNotExist") is False
+
+
+def test_barrier_collect_consistent_with_mechanism():
+    """barrier_collect must be true exactly for async mechanisms — a config
+    invariant the post-sync fanout contract check enforces as an error."""
+    engine = DelegationSyntaxEngine()
+    for provider in _FANOUT_CAPABILITY_MATRIX:
+        mechanism = engine.get_fanout_mechanism(provider)
+        expected = mechanism in ("native-batch", "tool-mediated", "swarm")
+        assert engine.get_barrier_collect(provider) is expected, provider

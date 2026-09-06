@@ -1,6 +1,26 @@
 # Provider Capability Matrix
 # Documents what each provider supports for agent orchestration.
 # Used to drive conditional logic in agent generation and bootstrap.
+#
+# FANOUT/BARRIER keys (issue #265, spike
+# docs/spikes/2026-09-06-issue-265-async-fanout-spike.md §5.2):
+#   fanout_mechanism — HOW the provider dispatches a FANOUT/PARALLEL_GROUP:
+#     native-batch        all dispatch tool-calls in one response; the harness
+#                         runs them in parallel and the turn returns only when
+#                         all complete (BARRIER = turn semantics)
+#     tool-mediated       explicit collect step via a named harness tool
+#                         (wait_agent-style) or a barrier tool
+#     swarm               one tool call fans out N items and returns an
+#                         aggregated report (barrier by construction)
+#     sequential-fallback no verified parallelism — FANOUT renders as a
+#                         sequential list (conservative default)
+#   barrier_collect — whether results are collected at a true barrier (all N
+#     outcomes arrive as tool data before generation continues). false only
+#     for sequential-fallback providers.
+# Values are verified conservatively: an UNVERIFIED parallel contract maps to
+# sequential-fallback/false, never to a speculative mechanism. Consumers:
+# scripts/lib/delegation_syntax.py (getters) and
+# scripts/lib/consistency/fanout_contracts.py (post-sync drift check).
 
 capabilities:
   Claude:
@@ -13,6 +33,11 @@ capabilities:
     structured_handoff: true
     handoff_format: "json"
     handoff_envelope_support: true
+    # Issue #265: multiple Agent()/Task() calls in ONE response run in
+    # parallel and all results arrive as tool results before generation
+    # continues (turn semantics) — native-batch, barrier by construction.
+    fanout_mechanism: native-batch
+    barrier_collect: true
     description: "Vollständige Agent-Orchestrierung mit nativen Tool-Calls und Hooks."
 
   Opencode:
@@ -25,6 +50,11 @@ capabilities:
     structured_handoff: true
     handoff_format: "json"
     handoff_envelope_support: true
+    # Issue #265: all task() calls in one response run in parallel and the
+    # turn completes only when all finish — "BARRIER: Automatisch" is already
+    # documented in the Opencode parallel_pattern (delegation-syntax.yaml).
+    fanout_mechanism: native-batch
+    barrier_collect: true
     description: "Agent-Orchestrierung via task() tool, dateibasierte Agent-Registrierung."
 
   Gemini:
@@ -37,6 +67,11 @@ capabilities:
     structured_handoff: true
     handoff_format: "json"
     handoff_envelope_support: true
+    # Issue #265: the Antigravity runtime runs independent invoke_subagent
+    # tool-calls of one response in parallel automatically (documented in the
+    # Gemini parallel_pattern) — native-batch turn semantics.
+    fanout_mechanism: native-batch
+    barrier_collect: true
     description: "API-basierte Agent-Registrierung, ephemere Runtime."
     bootstrap_required: true
     special_notes:
@@ -55,6 +90,10 @@ capabilities:
     structured_handoff: false
     handoff_format: "yaml_text_block"
     handoff_envelope_support: false
+    # Issue #265: @agent text-mentions have no parallel dispatch contract —
+    # conservative sequential fallback (parallel_execution: false).
+    fanout_mechanism: sequential-fallback
+    barrier_collect: false
     description: "Text-basierte Agent-Mentions (@agent). Keine native Subagent-API."
     special_notes:
       - "@agent Text-Mentions als Subagent-Dispatch."
@@ -71,6 +110,10 @@ capabilities:
     structured_handoff: false
     handoff_format: "yaml_text_block"
     handoff_envelope_support: false
+    # Issue #265: @agent text-mentions, no verified parallel contract —
+    # conservative sequential fallback (parallel_execution: false).
+    fanout_mechanism: sequential-fallback
+    barrier_collect: false
     description: "Dateibasierte Agenten (.github/copilot/agents/). @agent Text-Mentions."
     special_notes:
       - "Dateien in .github/copilot/agents/ werden automatisch geladen."
@@ -94,6 +137,10 @@ capabilities:
     structured_handoff: false
     handoff_format: "yaml_text_block"
     handoff_envelope_support: false
+    # Issue #265: orchestration surface undocumented (see block comment above)
+    # — conservative sequential fallback (parallel_execution: false).
+    fanout_mechanism: sequential-fallback
+    barrier_collect: false
     description: "Dateibasierte Agenten (.mammouth/agents/), CLI-first mit Plan/Build-Modi. Text-basierte Delegation, keine native Subagent-API."
     special_notes:
       - "CLI-first Tool mit Plan- (read-only) und Build-Modus (Ausführung)."
@@ -121,6 +168,12 @@ capabilities:
     structured_handoff: true
     handoff_format: "json"
     handoff_envelope_support: true
+    # Issue #265: dispatch = multiple spawn_agent calls in one response
+    # (multi_agent stable default-on, V7), but collection is an EXPLICIT
+    # named-tool step — wait_agent gathers the results (tool-mediated, not
+    # turn semantics).
+    fanout_mechanism: tool-mediated
+    barrier_collect: true
     description: "Dateibasierte TOML-Agenten (.codex/agents/*.toml) mit nativem spawn_agent-Dispatch und stable-default-on multi_agent-Fanout."
     special_notes:
       - "Agenten sind TOML-Dateien mit name/description/sandbox_mode/model/developer_instructions (Pflichtfeld: developer_instructions, V7)."
@@ -143,6 +196,11 @@ capabilities:
     structured_handoff: true
     handoff_format: "yaml_text_block" # conservative until json support verified
     handoff_envelope_support: false
+    # Issue #265: backgrounding (run_in_background / autoBackgroundMs) is NOT
+    # a verified parallel-subagent contract (see parallel_execution above) —
+    # conservative sequential fallback.
+    fanout_mechanism: sequential-fallback
+    barrier_collect: false
     bootstrap_required: true          # workspace-level .zcode/agents/ consumption via bootstrap injection (Gemini posture, plan §5.8)
     description: "Agent-Orchestrierung via Agent-Toolcall (Legacy-Alias Task), dateibasierte Agent-Definitionen mit Bootstrap-Injection ins Workspace-AGENTS.md."
     special_notes:
@@ -166,6 +224,11 @@ capabilities:
     structured_handoff: true
     handoff_format: "yaml_text_block"
     handoff_envelope_support: false
+    # Issue #265: AgentSwarm fans out N items in ONE tool call and returns an
+    # aggregated report (documented contract, up to 128 items, V16) — the
+    # single return value IS the barrier (swarm semantics).
+    fanout_mechanism: swarm
+    barrier_collect: true
     description: "Custom Agents als Markdown+YAML-Frontmatter mit Auto-Discovery; Dispatch via Agent und AgentSwarm-Fanout (bis 128 Items)."
     special_notes:
       - "AGENTS.md: Projekt-Root + Subdirs auto-geladen (nearest-wins, wie Codex); global ~/.kimi-code/AGENTS.md."

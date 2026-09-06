@@ -3,6 +3,86 @@
 ## [Unreleased]
 
 ### Added
+- **Central orchestrator prompt consolidation for the phase-4b backends** (#264, #265,
+  #266, #267, #506): `template-orchestrator` (v7.12.0 → v7.13.0) merges all five
+  prepared handoff notes into one coherent prompt. §3 intent routing now references
+  the generated `route_intent` tool definition via the new `{{INTENT_ROUTING_TOOLS}}`
+  placeholder (#264 — prose routing table removed, data lives in the structured
+  definition; §4 routing policy points at `routing.rules` instead of duplicating
+  keywords). §6 FANOUT/PARALLEL_GROUP dispatch mechanics are capability-gated via the
+  existing PAL placeholders (`{{#if PAL_FANOUT}}` block renders each provider's
+  verified batched-dispatch / explicit-collect / sequential-fallback patterns — no
+  invented `fanout()` tool) plus static pre-dispatch validation wording (#265); the
+  "Parallel" line now defers to the static file-affinity analysis
+  (`scripts/lib/file_affinity.check_file_overlap`) instead of telling the model to
+  guess overlaps (#266). §7 BARRIER protocol documents results-as-tool-data, the
+  status-aware `||| agent=... |||` wrapper, the "exactly N tool responses" completion
+  rule, partial handling and the hard-interrupt semantics (#265). §9 adds the
+  Summarization-as-a-Contract section: compact worker summaries only, raw output
+  archived via `CheckpointStore.save_raw_output` under
+  `.meta-viz/checkpoints/<session-id>/`, never re-requested (#267). §6 documents the
+  sync-call contract for orchestrator↔worker expectations (#506). Placeholder wiring:
+  `build_variables()` prerenders the per-provider routing tool definition
+  (`_INTENT_ROUTING_TOOL_DEFS`), `agent_sync._build_provider_vars()` resolves it per
+  synced provider (empty for providers without a `handoff_format` capability —
+  fail-soft, drift surfaces via the consistency checks), placeholder registered in
+  `placeholders._BUILTIN_VARS`.
+- **FANOUT/BARRIER backend contract — plan, validation, capability flags** (#265):
+  generation-time half of the hard-interrupt reframe (design spike
+  `docs/spikes/2026-09-06-issue-265-async-fanout-spike.md`). New
+  `scripts/lib/orchestration.py` (FanoutTask/FanoutPlan/BarrierEntry/BarrierResult,
+  `validate_plan` with cycle/deadlock/over-commitment/file-overlap checks,
+  `execute_plan` over an injected `Dispatcher` seam, #267-compatible
+  `summarize_result`, §7-compatible `render_barrier_result`); capability keys
+  `fanout_mechanism` + `barrier_collect` in `config/provider-capabilities.yaml`
+  for all 9 providers (getter trio in `delegation_syntax.py`); dry-run engine
+  repurposed as plan validator (hardcoded provider list removed — capability
+  lookup); new post-sync drift check `scripts/lib/consistency/fanout_contracts.py`;
+  delegation-syntax ZCode/Copilot fanout text aligned to sequential-fallback.
+  Runtime dispatch/injection stays a documented harness dependency.
+- **Static file-affinity analysis for pre-dispatch overlap checks** (#266): new
+  `scripts/lib/file_affinity.py` — deterministic task-level analysis (stdlib-only)
+  replacing the LLM-guided "check file ranges for overlap" step before FANOUT /
+  PARALLEL_GROUP dispatch. `check_file_overlap()` returns the #266 result dict
+  (`{"safe": [...], "conflict": [(task_a, task_b, [files]), ...]}`) from a 4-step
+  pass (regex file references, Python-AST symbol index, Markdown/YAML
+  doc-reference pass, import-graph via `analysis.FileAffinityAnalyzer`);
+  `extract_file_references()` and `format_overlap_report()` support the callers;
+  the `BOUNDARY_NOTE` constant documents the boundary — analysis here, real
+  enforcement (call before actual dispatch) harness-side. The dry-run engine
+  (`tests/orchestration/dry_run/engine.py`) sequentializes conflicted tasks before
+  simulated FANOUT/PARALLEL_GROUP; `orchestration.validate_plan` consumes the
+  result via its `file_overlap` seam.
+- **Raw-output archive for Summarization-as-a-Contract** (#267): `CheckpointStore`
+  gains a two-level session layout — `<session-id>.json` (structured checkpoints,
+  summaries) plus a `<session-id>/` directory holding the COMPLETE raw worker
+  output per task. New API: `save_raw_output()` (append-only, uuid suffix,
+  filename sanitization), `load_raw_output()` (fail-soft), `list_raw_outputs()`;
+  the module archives bytes only (harness boundary per docstring — BARRIER parsing
+  and raw-output stripping stay harness-side). #267's summarization contract itself
+  ships with the #265 backend (`orchestration.summarize_result`, `execute_plan`
+  store/session wiring) and the orchestrator §9 section above.
+- **Intent routing as structured tool definitions** (#264): the per-provider
+  `route_intent` tool definition is generated data, not prose —
+  `build_routing_tool_definitions_for_providers()` /
+  `render_routing_tool_definition()` (`scripts/lib/agents.py`) serialize it
+  mechanism-keyed on the provider's `handoff_format` capability key (fail-closed
+  on unknown formats; empty string for providers without `handoff_format` —
+  currently never visible, every provider defines one). The template side
+  (`{{INTENT_ROUTING_TOOLS}}` wiring, §3 rewrite) ships with the orchestrator
+  consolidation above; consuming the definition as a callable tool is
+  provider/harness behavior (documented follow-up).
+- **Background-Process Guard for all Bash-capable agents** (#506): every
+  `1-generic` template with shell/container capability in its `tools` list
+  (48 templates, each bumped minor) now carries an `<output-guard>` section —
+  an agent that starts a background process MUST actively wait for its
+  completion within its own turn (`docker wait`, polling with timeout,
+  synchronous blocking). Its turn must NEVER end on a "waiting" placeholder:
+  the final tool result is the only channel to deliver evidence and exit
+  codes to a synchronous caller — there is no reactivation after the turn.
+  Concrete blocking examples included: `docker wait` pattern (tester,
+  docker, devops-engineer, e2e-tester) and a polling loop with timeout
+  (developer, code-reviewer).
 - **Post-merge branch cleanup for the generic `git` agent** (#496): after a successful
   merge, `template-git` (v1.5.0 → v1.6.0) now offers to clean up the merged source
   branch — list merged candidates (local + remote), verify merged state
@@ -30,6 +110,23 @@
   lifecycle-stage tracking (prototype → staging → production → deprecated →
   archived) and deprecation-plan verification. Read-only; findings are
   recommendations, not mandates.
+- **`test-executor` agent** (#517): lightweight execution-only role for existing
+  test suites — born from a ReqogniLoom near-OOM incident (3 parallel design-tier
+  test agents on a 5.8 GB host). Cheapest model tier (`nano`), `Read` + `Bash` only,
+  no code generation / architecture-context modification / deployment tools.
+  Structured result reporting (pass/fail/skip counts, exit codes, stdout excerpts)
+  and a mandatory Sync-Turn-Contract (#506): background processes are awaited
+  within the turn (`docker wait` / bounded polling) — never ends the turn with a
+  "waiting" placeholder. Test design stays with `tester`; delegation guidance in
+  `docs/guides/features/agent-delegation-map.md`.
+- **Phase-4b documentation** (#264–#267, #506, #517): consolidated harness-dependency
+  and follow-up documentation `docs/plans/2026-09-06-issue-674-phase4b-harness-dependencies.md`
+  (per issue: implemented in agent-meta vs. harness-side dependency vs. issue-ready
+  follow-up items, plus the cross-issue dependency chain — #267 enforcement hangs
+  off the #265 backend, #266 enforcement off a harness dispatch hook, #264
+  consumption off provider function-calling); design spike #265
+  `docs/spikes/2026-09-06-issue-265-async-fanout-spike.md` (§7 = normative harness
+  dependency); Phase-4b status note in `docs/plans/2026-09-05-issue-674-roadmap.md`.
 
 ## [0.101.0-beta.5] — 2026-09-04
 

@@ -45,6 +45,22 @@ _DEFAULT_SECURITY_CRITICAL_ROLES: frozenset[str] = frozenset(
     {"security-auditor", "code-reviewer"}
 )
 
+# Known FANOUT dispatch mechanisms (issue #265). Config NAMES a mechanism
+# (config/provider-capabilities.yaml: fanout_mechanism) — Python validates the
+# key and gates generation on it, never on a provider name (provider-agnostic
+# policy; same pattern as hook_protocol / isolation-mechanism).
+#   native-batch         all dispatch tool-calls in one response; harness runs
+#                        them in parallel; turn returns when all complete
+#   tool-mediated        explicit collect step via a named harness tool
+#   swarm                one tool call fans out N items, aggregated report
+#   sequential-fallback  no verified parallelism — FANOUT renders sequentially
+FANOUT_MECHANISMS: frozenset[str] = frozenset(
+    {"native-batch", "tool-mediated", "swarm", "sequential-fallback"}
+)
+
+# Mechanisms that actually dispatch in parallel (i.e. an async FANOUT exists).
+_ASYNC_FANOUT_MECHANISMS: frozenset[str] = FANOUT_MECHANISMS - {"sequential-fallback"}
+
 
 class DelegationSyntaxEngine:
     """Substitutes abstract delegation placeholders with provider-specific syntax.
@@ -533,3 +549,51 @@ class DelegationSyntaxEngine:
         """Check if provider uses file-based agent discovery."""
         caps = self.get_capabilities(provider)
         return caps.get("file_based_agents", False)
+
+    # ------------------------------------------------------------------
+    # FANOUT/BARRIER capabilities (issue #265)
+    # ------------------------------------------------------------------
+
+    def get_fanout_mechanism(self, provider: str) -> str | None:
+        """Return the provider's ``fanout_mechanism`` capability key.
+
+        Returns:
+            The mechanism key (one of :data:`FANOUT_MECHANISMS`), or ``None``
+            when the provider has no capability entry / no key — meaning the
+            provider must not receive FANOUT patterns at all.
+
+        Raises:
+            ValueError: when the configured mechanism key is unknown —
+                config drift must fail loudly here, not silently degrade
+                (the post-sync consistency check reports it as a Finding).
+        """
+        caps = self.get_capabilities(provider)
+        mechanism = caps.get("fanout_mechanism")
+        if mechanism is None:
+            return None
+        mechanism = str(mechanism)
+        if mechanism not in FANOUT_MECHANISMS:
+            raise ValueError(
+                f"Unknown fanout_mechanism '{mechanism}' for provider "
+                f"'{provider}' — must be one of {', '.join(sorted(FANOUT_MECHANISMS))}"
+            )
+        return mechanism
+
+    def has_async_fanout(self, provider: str) -> bool:
+        """True when the provider's mechanism dispatches a FANOUT in parallel.
+
+        ``False`` for ``sequential-fallback`` providers and for providers
+        without a mechanism mapping (fail-closed: no verified parallelism →
+        no parallel FANOUT emission).
+        """
+        return self.get_fanout_mechanism(provider) in _ASYNC_FANOUT_MECHANISMS
+
+    def get_barrier_collect(self, provider: str) -> bool:
+        """True when results are collected at a true BARRIER (issue #265).
+
+        All results arrive as tool data before generation continues —
+        ``True`` for every async mechanism, ``False`` for
+        ``sequential-fallback`` providers.
+        """
+        caps = self.get_capabilities(provider)
+        return bool(caps.get("barrier_collect", False))

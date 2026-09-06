@@ -1,6 +1,6 @@
 ---
 name: template-bug-feature-analyzer
-version: "1.2.0"
+version: "1.4.0"
 description: "Analyzes and classifies incoming bug reports and feature requests before resource allocation. Distinguishes: real bug, user error, valid feature, out-of-scope."
 hint: "Issue triage: classify bug vs. user-error vs. feature vs. out-of-scope — before developer/feature-lifecycle delegation"
 prompt_mode: modern
@@ -120,6 +120,8 @@ ARTIFACTS: <persisted triage report path, empty if returned inline>
 - OUT-OF-SCOPE → "No delegation. Reply to the user with: <rejection>"
 - UNCLEAR → "Ask the user the following questions: <list>"
 ```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>
@@ -133,3 +135,9 @@ ARTIFACTS: <persisted triage report path, empty if returned inline>
 
 **Language:** triage reports → {{INTERNAL_DOCS_LANGUAGE}}.
 </constraints>
+
+<output-guard>
+## Background-Process Guard (issue #506)
+
+Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
+</output-guard>

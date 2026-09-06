@@ -1,6 +1,6 @@
 ---
 name: template-knowledge-linter
-version: "1.1.0"
+version: "1.2.0"
 description: "Wiki-Gesundheitscheck: Widersprüche, Orphans, veraltete Claims, kaputte Links, fehlende OKF-Frontmatter, Index-Staleness."
 hint: "Wiki-Healthcheck: 10 Lint-Checks (Karpathy + OKF)"
 tools:
@@ -67,6 +67,8 @@ STATUS: done|partial|failed
 RESULT: <1-2 Sätze: Wiki-Gesundheitszustand und schwerwiegendster Befund>
 ARTIFACTS: <persistierte Lint-Report-Pfade, sonst leer>
 ```
+**Pflicht-Abschluss-Summary (Issue #267):** der strukturierte Block oben ist dein kompletter Rückgabewert — der Orchestrator konsumiert nur dieses Summary, niemals Roh-Output. RESULT: kompaktes Summary (max. 2-3 Sätze) mit was geändert wurde, Erfolg/Misserfolg und dem nächsten Schritt. Roh-Output, Diffs und Logs gehören nie in RESULT — die gehören in ARTIFACTS (Dateipfade).
+
 </output_contract>
 
 ## Anti-Recursion Guard

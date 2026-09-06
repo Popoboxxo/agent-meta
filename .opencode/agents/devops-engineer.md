@@ -1,11 +1,11 @@
 ---
 name: devops-engineer
-version: 1.3.0
+version: 1.5.0
 description: CI/CD pipelines, Infrastructure as Code, container orchestration, observability,
   security best practices, staging validation, MTTG (commit-to-security-feedback)
   tracking, and environment classification.
 prompt_mode: modern
-generated-from: 1-generic/devops-engineer.md@1.3.0
+generated-from: 1-generic/devops-engineer.md@1.5.0
 mode: subagent
 permission:
   read: allow
@@ -166,6 +166,8 @@ RECOMMENDATIONS: [count]
 REPORT_FILE: [path]
 ARTIFACTS: <REPORT_FILE + manifest/report paths>
 ```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>
@@ -180,3 +182,20 @@ ARTIFACTS: <REPORT_FILE + manifest/report paths>
 
 **Language:** code comments, commit messages, infrastructure descriptions → English.
 </constraints>
+
+<output-guard>
+## Background-Process Guard (issue #506)
+
+Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
+
+Beispiel — Container synchron abwarten (`docker wait`):
+
+```bash
+NAME=verify-$RANDOM
+docker run --name "$NAME" -d alpine sh -c "sleep 5; exit 7"   # replace with your real test container
+RC=$(docker wait "$NAME")                     # BLOCKS until container exits — no completion notification will ever arrive
+docker logs "$NAME" > /tmp/"$NAME".log 2>&1   # capture diagnostics BEFORE removal
+docker rm "$NAME"
+echo "container exit code: $RC" && tail -20 /tmp/"$NAME".log
+```
+</output-guard>

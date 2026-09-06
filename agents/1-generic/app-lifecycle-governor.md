@@ -1,6 +1,6 @@
 ---
 name: template-app-lifecycle-governor
-version: "1.0.0"
+version: "1.2.0"
 description: "App lifecycle governance: ownership audit with orphan detection, SLA validation, data classification checks, lifecycle-stage tracking (prototype → staging → production → deprecated → archived), and deprecation-plan verification. Read-only — findings are recommendations, not mandates."
 hint: "App inventory + lifecycle governance: ownership, orphan detection, SLA, data classification, deprecation plans — read-only findings"
 prompt_mode: modern
@@ -96,6 +96,8 @@ ARTIFACTS: <report file path, or "none">
 ```
 
 Long reports → write to `/tmp/opencode/lifecycle-audit-<topic>.md`, return path only.
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>
@@ -111,3 +113,9 @@ Long reports → write to `/tmp/opencode/lifecycle-audit-<topic>.md`, return pat
 
 **Language:** audit reports → {{INTERNAL_DOCS_LANGUAGE}}. Issue text (via feedback) → {{ISSUE_LANGUAGE}}.
 </constraints>
+
+<output-guard>
+## Background-Process Guard (issue #506)
+
+Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
+</output-guard>

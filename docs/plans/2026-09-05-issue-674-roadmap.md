@@ -121,6 +121,13 @@ Order: new agents first, then extensions.
 | 4c Refactor (P3/P4) | #481, #482, #483, #603, #547 | #481–#483 are mechanical splits — good first issues. |
 | 4d SE Cascade (P4) | #339, #364, #338, #334, #332, #330, #329, #370, #207, #527, #534, #548, #452, #523, #317, #318 | Domain backlog; run per-quarter. |
 
+> **Phase 4b status (2026-09-06):** agent-meta-side items implemented (#264, #265, #266,
+> #267, #506, #517 — contract / config / templates / lib). The runtime portions remain
+> documented harness-side dependencies with issue-ready follow-ups — consolidated in
+> `docs/plans/2026-09-06-issue-674-phase4b-harness-dependencies.md`; design spike #265:
+> `docs/spikes/2026-09-06-issue-265-async-fanout-spike.md` (§7 = normative harness
+> dependency). No harness-side enforcement exists yet.
+
 ## 5. Risks & Mitigations
 
 | Risk | Mitigation |

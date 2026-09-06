@@ -438,6 +438,13 @@ def _build_provider_vars(
         'SKILLS_DIR': pc.get('skills_dir', f".{provider.lower()}/skills"),
         'CONTEXT_FILE': pc.get('context_file', f"{provider.upper()}.md"),
         'FILE_BASED_AGENTS': 'true' if file_based else 'false',
+        # INTENT_ROUTING_TOOLS (issue #264): resolve the provider-mapped
+        # routing-tool prerender from build_variables for THIS provider.
+        # "" when the provider has no handoff_format capability or is absent
+        # from the prerender (fail-soft, PAL missing-definition semantics) —
+        # missing placeholder wiring surfaces via the consistency checks,
+        # never as a crashed sync.
+        'INTENT_ROUTING_TOOLS': (variables.get('_INTENT_ROUTING_TOOL_DEFS') or {}).get(provider, ''),
     }
     return {**variables, **provider_vars}
 

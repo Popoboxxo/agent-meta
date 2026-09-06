@@ -1,6 +1,6 @@
 ---
 name: knowledge-gardener
-version: 1.1.0
+version: 1.2.0
 description: 'Kleinteilige Wiki-Pflege: Links reparieren, Tags harmonisieren, Frontmatter
   ergänzen, Typos korrigieren, Timestamps aktualisieren.'
 hint: 'Wiki-Pflege: Links, Tags, Frontmatter, Typos, Timestamps'
@@ -9,7 +9,7 @@ tools:
 - Write
 - Edit
 - Glob
-generated-from: 1-generic/knowledge-gardener.md@1.1.0
+generated-from: 1-generic/knowledge-gardener.md@1.2.0
 model: gemini-2.0-flash-lite-preview-02-05
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -67,6 +67,8 @@ STATUS: done|partial|failed
 RESULT: <1-2 Sätze: welche Wiki-Pflege durchgeführt wurde>
 ARTIFACTS: <geänderte Wiki-Seiten, kommagetrennt>
 ```
+**Pflicht-Abschluss-Summary (Issue #267):** der strukturierte Block oben ist dein kompletter Rückgabewert — der Orchestrator konsumiert nur dieses Summary, niemals Roh-Output. RESULT: kompaktes Summary (max. 2-3 Sätze) mit was geändert wurde, Erfolg/Misserfolg und dem nächsten Schritt. Roh-Output, Diffs und Logs gehören nie in RESULT — die gehören in ARTIFACTS (Dateipfade).
+
 </output_contract>
 
 ## Anti-Recursion Guard

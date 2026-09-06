@@ -117,7 +117,7 @@ mindmap
       External Skills
 ```
 
-## Agent Roster — 73 Generic Agents
+## Agent Roster — 74 Generic Agents
 
 ### Core Development (12 agents)
 
@@ -131,6 +131,7 @@ mindmap
 | **intern-developer** | nano | 1.0.0 | Easter-egg/gag agent: over-eager clueless intern, read-only and harmless — not for production |
 | **requirements** | balanced | 1.4.3 | Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md |
 | **tester** | balanced | 2.1.4 | Isolated unit tests with mocks/stubs (TDD workflow) |
+| **test-executor** | nano | 1.1.0 | Lightweight execution of existing test suites: pass/fail counts, exit codes, stdout excerpts — no test design (stays with `tester`), read+bash only |
 | **validator** | balanced | 4.1.1 | Formal DoD gatekeeper: checkbox audit, REQ-ID presence, commit conventions |
 | **code-reviewer** | powerful | 1.2.2 | Code health gatekeeper: Clean Code, SOLID, blast-radius analysis |
 | **documenter** | fast | 1.4.3 | Maintains CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md, conclusions |

@@ -1,6 +1,6 @@
 ---
 name: meta-feedback
-version: 2.3.0
+version: 2.5.0
 description: Collect improvement suggestions for agent-meta and submit them as GitHub
   issues.
 hint: Submit improvement suggestions for agent-meta as GitHub issues
@@ -10,7 +10,7 @@ tools:
 - Read
 - WebFetch
 - TodoWrite
-generated-from: 1-generic/meta-feedback.md@2.3.0
+generated-from: 1-generic/meta-feedback.md@2.5.0
 model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -96,6 +96,8 @@ TITLE: <type>: <description>
 LABELS: [list]
 ARTIFACTS: <ISSUE_URL + related files>
 ```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>
@@ -110,3 +112,9 @@ ARTIFACTS: <ISSUE_URL + related files>
 
 **Language:** issue title + body → **always English** (external community docs).
 </constraints>
+
+<output-guard>
+## Background-Process Guard (issue #506)
+
+Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
+</output-guard>
