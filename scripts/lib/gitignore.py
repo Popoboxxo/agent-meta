@@ -24,6 +24,8 @@ rewritten in exact mode.
 """
 from __future__ import annotations
 
+from .providers import resolve_providers
+
 # Category fallback for Claude's gitignore_entries when the provider config
 # carries none (mirrors the historical inline default in sync.py).
 _CLAUDE_LOCAL_ENTRIES_FALLBACK: list[str] = [
@@ -210,4 +212,34 @@ def compute_base_gitignore_entries(
     if custom_entries:
         entries.extend(custom_entries)
 
+    return entries
+
+
+def _collect_skill_gitignore_entries(config: dict, ext_config: dict, provider_config: dict) -> list[str]:
+    """Return .gitignore paths for skills with gitignore: true in project config.
+
+    Only generates entries for skills that are approved + enabled (two-gate).
+    Generates one entry per active provider so that skill files in all provider
+    directories are properly gitignored when requested.
+    """
+    entries: list[str] = []
+    project_skills = config.get("external-skills", {})
+    # Reuses resolve_providers() (issue #631) instead of duplicating its
+    # ai-providers/ai-provider/["Claude"]-fallback logic here — filter_deactivated=False
+    # matches this function's prior behavior (it never filtered deactivated providers).
+    providers = resolve_providers(config, provider_config, filter_deactivated=False)
+
+    for skill_name, skill_project_cfg in project_skills.items():
+        if not skill_project_cfg.get("gitignore", False):
+            continue
+        skill_meta = ext_config.get("skills", {}).get(skill_name, {})
+        if not skill_meta.get("approved", False):
+            continue
+        if not skill_project_cfg.get("enabled", False):
+            continue
+        for provider in providers:
+            pc = provider_config.get(provider, {})
+            skills_dir = pc.get("skills_dir")
+            if skills_dir:
+                entries.append(f"{skills_dir}/{skill_name}/")
     return entries

@@ -3,8 +3,12 @@
 Formatting layer of the agent pipeline (Issue #561 split of agents.py): tool
 whitelisting/mapping, XML section wrapping, frontmatter rewriting per provider,
 debug/bootstrap block injection and body slimming. Imports the neutral
-frontmatter layer; the viz prompt-block injector is imported lazily inside
-transform_agent_content_for_provider to avoid a load-time cycle with viz.py.
+frontmatter layer. Dispatch is data-driven since #629: per-provider behavior
+comes from the ``agent-transform:`` block in config/ai-providers.yaml, applied
+by ``_apply_agent_transform`` — there is no Python if/elif dispatch chain.
+The viz prompt-block injector is not imported here at all: the lazy
+``from .viz import inject_viz_prompt_block`` lives in
+``agent_sync._finalize_agent_content`` (avoids a load-time cycle with viz.py).
 """
 from __future__ import annotations
 
@@ -405,11 +409,6 @@ def transform_agent_content_for_provider(
             _strip_fields,
         )
 
-    # Visualization: inject event-logging prompt block when dynamic/full mode is enabled
-    # Applies to ALL providers — every generated agent gets the viz reporting block
-    viz_cfg = config.get('viz', {})
-    if viz_cfg.get('enabled', False) and viz_cfg.get('mode') in ('dynamic', 'full'):
-        from .viz import inject_viz_prompt_block
     return content
 
 _DEBUG_BLOCK_MARKER = "<!-- agent-meta:debug-mode -->"

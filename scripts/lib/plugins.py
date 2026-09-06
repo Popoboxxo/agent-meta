@@ -96,3 +96,19 @@ def probe_plugin_availability(plugin_def: dict) -> bool:
         except Exception:  # noqa: BLE001 - any failure means "not reachable"
             return False
     return False
+
+
+def _probe_inactive_plugins(agent_meta_root: Path, project_root: Path, config: dict) -> list[str]:
+    """Sync-time availability probe (Layer 3 hint): catalog plugins that are
+    locally available (cheap, read-only probe) but not activated in this
+    project. Opt-out-free nudge -- never blocks or alters the sync itself."""
+    catalog = load_plugin_catalog(agent_meta_root=agent_meta_root, config=config, project_root=project_root)
+    active = set(resolve_active_plugins(config, agent_meta_root, project_root, catalog=catalog))
+    lines: list[str] = []
+    for pid, pdef in catalog.items():
+        if pid in active:
+            continue
+        if probe_plugin_availability(pdef):
+            lines.append(f"  [HINWEIS] Plugin '{pid}' lokal verfügbar, aber nicht aktiviert "
+                         f"(--test-plugin {pid} zum Prüfen).")
+    return lines

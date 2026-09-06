@@ -568,12 +568,13 @@ def test_sync_agents_passes_real_dod_resolved_to_inject_pipeline_blocks(monkeypa
         return content
 
     monkeypatch.setattr(agent_sync_mod, "inject_pipeline_blocks", _fake_inject, raising=False)
-    # This test only asserts the call-site wiring, not the full sync pipeline;
-    # if sync_agents_for_provider is not directly unit-testable in isolation,
-    # assert instead via source inspection:
+    # This test only asserts the call-site wiring, not the full sync pipeline.
+    # The pipeline/DoD resolution lives in the per-role content pipeline since
+    # the #483 split (per-role V1 semantics), so the source inspection targets
+    # that call site instead of the sync_agents_for_provider orchestrator:
     import inspect
 
-    source = inspect.getsource(agent_sync_mod.sync_agents_for_provider)
+    source = inspect.getsource(agent_sync_mod._apply_content_pipeline)
     assert "inject_pipeline_blocks(content, effective, provider, {})" not in source
     assert "resolve_dod(" in source
 

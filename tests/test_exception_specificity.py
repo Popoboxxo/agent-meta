@@ -180,12 +180,18 @@ def test_restore_backup_infer_providers_propagates_unexpected_exception(tmp_path
 # --- sync.py: directory-cleanup + AST-analysis except blocks --------------------
 
 def test_sync_provider_cleanup_and_ast_analysis_specific_excepts_present():
-    """Static check that the two sync.py sites use narrowed except clauses
+    """Static check that the two sync-pipeline sites use narrowed except clauses
     instead of bare `except Exception: pass` (both are deep inside
     argument-heavy CLI-dispatch functions that are impractical to unit-test
     in isolation here — see the full-suite + `--validate` run for behavioral
-    coverage of the overall sync flow)."""
-    text = (REPO_ROOT / "scripts" / "sync.py").read_text(encoding="utf-8")
-    assert "except OSError as e:" in text
-    assert 'log.debug("provider-cleanup"' in text
-    assert 'log.debug("ast-analysis"' in text
+    coverage of the overall sync flow).
+
+    Issue #481 moved the provider-cleanup block from sync.py::_handle_sync to
+    lib/sync_pipeline.py::_sync_stage_legacy_cleanup — the assertion follows
+    the code, the contract is unchanged. The same issue moved the AST-analysis
+    block to lib/cli_commands.py::_run_common_tail."""
+    pipeline_text = (REPO_ROOT / "scripts" / "lib" / "sync_pipeline.py").read_text(encoding="utf-8")
+    cli_commands_text = (REPO_ROOT / "scripts" / "lib" / "cli_commands.py").read_text(encoding="utf-8")
+    assert "except OSError as e:" in pipeline_text
+    assert 'log.debug("provider-cleanup"' in pipeline_text
+    assert 'log.debug("ast-analysis"' in cli_commands_text

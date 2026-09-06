@@ -388,300 +388,409 @@ def compose_agent(
 
     return result
 
-def sync_agents_for_provider(
+def _resolve_sync_targets(
+    provider: str,
+    provider_config: dict,
     agent_meta_root: Path,
     project_root: Path,
     config: dict,
-    variables: dict,
-    log: SyncLog,
     dry_run: bool,
-    provider: str,
-    provider_config: dict,
-    platform_vars: dict | None = None,
-    debug_mode: bool = False,
-):
-    """Generate agent files for a specific provider.
+    log: SyncLog,
+) -> tuple[dict | None, dict, dict, Path]:
+    """Resolve provider entry, role map, source overrides and target dir.
 
-    Claude:    .claude/agents/<role>.md   — full frontmatter, all fields
-    Gemini:    .gemini/agents/<role>.md   — frontmatter without permissionMode/memory
-    Continue:  .continue/agents/<role>.md — minimal frontmatter (name, description, alwaysApply: false)
+    ``pc`` is ``None`` when the provider is unknown (the caller aborts this
+    provider's agent sync). Creating the target dir is part of resolution
+    and skipped in dry-run.
     """
-    from .pipelines import (
-        apply_overrides,
-        inject_pipeline_blocks,
-        load_quality_pipelines,
-    )
-    from .platform import substitute_platform
-    from .roles import (
-        build_role_map,
-        load_roles_config,
-        resolve_max_tokens,
-        resolve_memory,
-        resolve_model,
-        resolve_permission_mode,
-        resolve_steps,
-        resolve_temperature,
-    )
-    from .io import _normalize_enabled_config
-    from .skills import _skill_is_active, load_external_skills_config
+    from .roles import build_role_map
 
     pc = provider_config.get(provider)
     if not pc:
         log.warning(f"Unknown provider '{provider}' — skipping agent sync")
-        return
+        return None, None, None, None
 
     role_map = build_role_map(agent_meta_root)
     platforms = config.get('platforms', [])
     overrides, _ = collect_sources(agent_meta_root, platforms)
     target_dir = project_root / pc['agents_dir']
 
-    allowed_roles = set(config['roles']) if 'roles' in config else None
-
     if not dry_run:
         target_dir.mkdir(parents=True, exist_ok=True)
+    return pc, role_map, overrides, target_dir
 
-    expected_filenames: set = set()
-    project_name = config.get('project', {}).get('name', 'unknown')
+def _build_provider_vars(
+    pc: dict,
+    provider: str,
+    variables: dict,
+    agent_meta_root: Path,
+) -> dict:
+    """Merge provider-specific variables (extension paths, snippets dir,
+    parallel patterns, etc.) over the global variables dict."""
+    from .delegation_syntax import DelegationSyntaxEngine
 
-    for role, source_path in overrides.items():
-        filename = target_filename(role, role_map, ext=pc.get('agent_ext', '.md'))
-        if not filename:
-            if provider == 'Claude':
-                log.skip(str(source_path.name), 'role not in ROLE_MAP')
-            continue
+    _ds_engine = DelegationSyntaxEngine(config_dir=agent_meta_root / "config")
+    file_based = _ds_engine.has_file_based_agents(provider)
+    provider_vars = {
+        'EXTENSION_DIR': pc.get('extension_dir', f".{provider.lower()}/3-project"),
+        'SNIPPETS_DIR': pc.get('snippets_dir', f".{provider.lower()}/snippets"),
+        'PENDING_TASKS_FILE': pc.get('pending_tasks_file', f".{provider.lower()}/pending-tasks.md"),
+        'SKILLS_DIR': pc.get('skills_dir', f".{provider.lower()}/skills"),
+        'CONTEXT_FILE': pc.get('context_file', f"{provider.upper()}.md"),
+        'FILE_BASED_AGENTS': 'true' if file_based else 'false',
+    }
+    return {**variables, **provider_vars}
 
-        if allowed_roles is not None and role not in allowed_roles:
-            if provider == 'Claude':
-                rel = (str(target_dir / filename)
-                       .replace(str(project_root) + '/', '')
-                       .replace(str(project_root) + chr(92), ""))
-                log.skip(rel, f"role '{role}' not in config['roles']")
-            continue
+def _should_skip_role(
+    role: str,
+    source_path: Path,
+    provider: str,
+    pc: dict,
+    role_map: dict,
+    allowed_roles: set | None,
+    config: dict,
+    variables: dict,
+    project_root: Path,
+    target_dir: Path,
+    log: SyncLog,
+) -> tuple[bool, str | None]:
+    """Skip-gates for one role in the per-provider agent loop.
 
-        if not _is_role_enabled(role, config):
-            if provider == 'Claude':
-                rel = (str(target_dir / filename)
-                       .replace(str(project_root) + '/', '')
-                       .replace(str(project_root) + chr(92), ""))
-                if role.startswith("knowledge-"):
-                    log.skip(rel, "knowledge-engine is disabled")
-                else:
-                    log.skip(rel, "systems-engineering is disabled")
-            continue
-
-        # Skip orchestrator agent file in main-chat mode — no orchestrator subagent
-        # is spawned; the main chat acts as router + worker. Not added to
-        # expected_filenames so any stale orchestrator.md gets pruned.
-        if role == "orchestrator" and variables.get("ORCH_MODE_MAIN_CHAT") == "true":
-            if provider == 'Claude':
-                rel = (str(target_dir / filename)
-                       .replace(str(project_root) + '/', '')
-                       .replace(str(project_root) + chr(92), ""))
-                log.skip(rel, "orchestrator skipped — ORCH_MODE_MAIN_CHAT active")
-            continue
-
-        expected_filenames.add(filename)
-        target_path = safe_path(target_dir, filename)
-        content = source_path.read_text(encoding='utf-8')
-
-        # Composition mode
-        extends_base = extract_frontmatter_field(content, 'extends')
-        if extends_base:
-            base_path = agent_meta_root / AGENTS_DIR / extends_base
-            content = compose_agent(base_path, content, log)
-            if provider == 'Claude':
-                log.note(
-                    str(target_path.relative_to(project_root)),
-                    f'composed from {extends_base} + {source_path.name}',
-                )
-
-        # Capture spawn capability from the (composed) source frontmatter before
-        # any provider-specific tool transformation mangles the tools field.
-        _can_spawn = _tools_can_spawn(_parse_frontmatter_yaml(content).get('tools'))
-
-        rel_source = str(source_path.relative_to(agent_meta_root))
-        source_version = extract_frontmatter_field(content, 'version')
-        template_description = extract_frontmatter_field(content, 'description')
-        description = (template_description or f'Agent for {project_name}.')
-        description = description.replace('{{PROJECT_NAME}}', project_name)
-
-        # Merge provider-specific variables (extension paths, snippets dir, parallel patterns, etc.)
-        from .delegation_syntax import DelegationSyntaxEngine
-        _ds_engine = DelegationSyntaxEngine(config_dir=agent_meta_root / "config")
-        file_based = _ds_engine.has_file_based_agents(provider)
-        provider_vars = {
-            'EXTENSION_DIR': pc.get('extension_dir', f".{provider.lower()}/3-project"),
-            'SNIPPETS_DIR': pc.get('snippets_dir', f".{provider.lower()}/snippets"),
-            'PENDING_TASKS_FILE': pc.get('pending_tasks_file', f".{provider.lower()}/pending-tasks.md"),
-            'SKILLS_DIR': pc.get('skills_dir', f".{provider.lower()}/skills"),
-            'CONTEXT_FILE': pc.get('context_file', f"{provider.upper()}.md"),
-            'FILE_BASED_AGENTS': 'true' if file_based else 'false',
-        }
-        merged_vars = {**variables, **provider_vars}
-
-        # Inject provider-specific pipeline blocks before standard substitution
-        pipelines = load_quality_pipelines(str(agent_meta_root))
-        pipeline_overrides = config.get("quality-pipelines", {})
-        effective = apply_overrides(pipelines, pipeline_overrides)
-        if effective:
-            from .dod import resolve_dod
-
-            dod_resolved = resolve_dod(config, agent_meta_root)
-            content = inject_pipeline_blocks(content, effective, provider, dod_resolved)
-
-        content = substitute(content, merged_vars, rel_source, log)
-        # Apply PAL delegation syntax per provider (Issue #277).
-        # Must run BEFORE strip_inactive_conditional_blocks — its final cleanup
-        # removes ALL {{#if}} markers, which would strip {{#if PAL_*}} blocks
-        # before the engine can evaluate them per provider.
-        from .delegation_syntax import DelegationSyntaxEngine
-        pal_engine = DelegationSyntaxEngine(config_dir=agent_meta_root / "config")
-        content = pal_engine.apply(content, provider, log=log)
-        content = strip_inactive_conditional_blocks(content, variables)
-        # Apply platform-config substitution ({{platform.*}} placeholders)
-        if platform_vars is not None:
-            content = substitute_platform(content, platform_vars, rel_source, log)
-
-        name = Path(filename).stem
-        layer = source_path.parts[-2]
-        source_label = f'{layer}/{source_path.name}'
-        generated_from = f'{source_label}@{source_version}' if source_version else source_label
-
-        content = transform_agent_content_for_provider(
-            content=content,
-            provider=provider,
-            role=role,
-            name=name,
-            description=description,
-            generated_from=generated_from,
-            config=config,
-            agent_meta_root=agent_meta_root,
-            project_root=project_root,
-            target_path=target_path,
-            provider_config=provider_config,
-            log=log,
-        )
-
-        # MCP toolset: bind the servers this role opted into (issue #467).
-        # Claude-only — `mcp__<server>__<tool>` is Claude Code's namespacing;
-        # other providers surface MCP tools through their own config, not
-        # through agent frontmatter.
+    Returns ``(skip, filename)``; ``filename`` is the provider-specific
+    target filename (``None`` for roles outside ROLE_MAP). The Claude-gated
+    ``log.skip`` messages — including the relative-path form with the
+    ``chr(92)`` backslash fallback — are kept byte-identical.
+    """
+    filename = target_filename(role, role_map, ext=pc.get('agent_ext', '.md'))
+    if not filename:
         if provider == 'Claude':
-            mcp_tools = resolve_mcp_tools_for_role(role, config, agent_meta_root, project_root)
-            if mcp_tools:
-                before = content
-                content = append_frontmatter_tools(content, mcp_tools)
-                if content != before:
-                    servers = ', '.join(sorted({t.split('__')[1] for t in mcp_tools}))
-                    log.note(str(target_path.relative_to(project_root)),
-                             f'mcp tools: +{len(mcp_tools)} from {servers}')
+            log.skip(str(source_path.name), 'role not in ROLE_MAP')
+        return True, filename
 
-        # Visualization: inject event-logging prompt block when dynamic/full mode is enabled
-        # Applies to ALL providers — every generated agent gets the viz reporting block
-        viz_cfg = config.get('viz', {})
-        if viz_cfg.get('enabled', False) and viz_cfg.get('mode') in ('dynamic', 'full'):
-            from .viz import inject_viz_prompt_block
-            content = inject_viz_prompt_block(content, role, provider, viz_enabled=viz_cfg.get('enabled', False), agent_meta_root=agent_meta_root,
-                                              viz_debug=viz_cfg.get("debug", False))
+    if allowed_roles is not None and role not in allowed_roles:
+        if provider == 'Claude':
+            rel = (str(target_dir / filename)
+                   .replace(str(project_root) + '/', '')
+                   .replace(str(project_root) + chr(92), ""))
+            log.skip(rel, f"role '{role}' not in config['roles']")
+        return True, filename
 
-        if debug_mode:
-            content = inject_debug_block(content, name)
+    if not _is_role_enabled(role, config):
+        if provider == 'Claude':
+            rel = (str(target_dir / filename)
+                   .replace(str(project_root) + '/', '')
+                   .replace(str(project_root) + chr(92), ""))
+            if role.startswith("knowledge-"):
+                log.skip(rel, "knowledge-engine is disabled")
+            else:
+                log.skip(rel, "systems-engineering is disabled")
+        return True, filename
 
-        # Critical Rules Footer: append critical rules to end of agent files
-        footer_cfg = config.get('critical-rules-footer', {})
-        if footer_cfg.get('enabled', False):
-            content = _extract_and_append_critical_footer(
-                content, agent_meta_root, config, variables, log, provider
+    # Skip orchestrator agent file in main-chat mode — no orchestrator subagent
+    # is spawned; the main chat acts as router + worker. Not added to
+    # expected_filenames so any stale orchestrator.md gets pruned.
+    if role == "orchestrator" and variables.get("ORCH_MODE_MAIN_CHAT") == "true":
+        if provider == 'Claude':
+            rel = (str(target_dir / filename)
+                   .replace(str(project_root) + '/', '')
+                   .replace(str(project_root) + chr(92), ""))
+            log.skip(rel, "orchestrator skipped — ORCH_MODE_MAIN_CHAT active")
+        return True, filename
+
+    return False, filename
+
+def _compose_role_content(
+    source_path: Path,
+    provider: str,
+    project_name: str,
+    agent_meta_root: Path,
+    project_root: Path,
+    target_path: Path,
+    log: SyncLog,
+) -> tuple[str, bool, str, str | None, str]:
+    """Load the source template, compose it with its ``extends`` base (if any)
+    and derive per-role metadata: spawn capability, relative source label,
+    source version and description.
+    """
+    content = source_path.read_text(encoding='utf-8')
+
+    # Composition mode
+    extends_base = extract_frontmatter_field(content, 'extends')
+    if extends_base:
+        base_path = agent_meta_root / AGENTS_DIR / extends_base
+        content = compose_agent(base_path, content, log)
+        if provider == 'Claude':
+            log.note(
+                str(target_path.relative_to(project_root)),
+                f'composed from {extends_base} + {source_path.name}',
             )
 
-        # Path-based Contextual Rules: inject rules based on path patterns
-        path_rules_cfg = config.get('pathRules', [])
-        if path_rules_cfg:
-            content = apply_path_rules(
-                content, agent_meta_root, config, variables, log, role
-            )
+    # Capture spawn capability from the (composed) source frontmatter before
+    # any provider-specific tool transformation mangles the tools field.
+    _can_spawn = _tools_can_spawn(_parse_frontmatter_yaml(content).get('tools'))
 
-        # XML Section Wrapping: wrap Markdown ## sections in XML tags
-        xml_cfg = config.get('xml-section-wrapping', {})
-        if xml_cfg.get('enabled', False):
-            content = wrap_sections_in_xml(content)
+    rel_source = str(source_path.relative_to(agent_meta_root))
+    source_version = extract_frontmatter_field(content, 'version')
+    template_description = extract_frontmatter_field(content, 'description')
+    description = (template_description or f'Agent for {project_name}.')
+    description = description.replace('{{PROJECT_NAME}}', project_name)
+    return content, _can_spawn, rel_source, source_version, description
 
-        # Singleton-Constraint: inject guard block into all non-orchestrator agent files
-        SINGLETON_CONSTRAINT_BLOCK = (
-            "\n\n## Singleton-Regel: Orchestrator-Spawn (auto-generated)\n\n"
-            "**NIEMALS** `task(subagent_type=\"orchestrator\", ...)` oder "
-            "`Agent(subagent_type=\"orchestrator\", ...)` aufrufen.\n\n"
-            "- Es existiert genau **EIN Orchestrator** pro Session — der vom `main_chat` gespawnte.\n"
-            "- Mehrere Orchestrator-Instanzen verursachen Routing-Konflikte und Session-State-Korruption.\n"
-            "- Bei unklarem Routing: Ergebnis an den Aufrufer zurückgeben, nicht weiter delegieren.\n\n"
-            "> Durchgesetzt via `rules/1-generic/a2a-delegation-gates.md` Gate #5.\n"
-        )
-        # Only agents that can actually spawn sub-agents (Agent/Task tool) need
-        # the singleton guard — injecting it into non-spawning agents is wasted context.
-        if role != "orchestrator" and not role.endswith("-iteration") and _can_spawn:
-            content = content.rstrip() + SINGLETON_CONSTRAINT_BLOCK
+def _apply_content_pipeline(
+    content: str,
+    config: dict,
+    provider: str,
+    merged_vars: dict,
+    rel_source: str,
+    variables: dict,
+    platform_vars: dict | None,
+    agent_meta_root: Path,
+    log: SyncLog,
+) -> str:
+    """Apply the per-role content pipeline: pipeline-block injection →
+    variable substitution → PAL → strip-inactive → platform substitution.
 
-        rel_label = str(source_path.relative_to(agent_meta_root / AGENTS_DIR))
-        rel_out = str(target_path.relative_to(project_root))
-        allow_secrets = config.get("allow-committed-secrets", False) if config else False
-        if write_checked(target_path, content, log, rel_label, config=config, dry_run=dry_run, allow_secrets=allow_secrets):
-            log.action('WRITE', rel_out, rel_label)
-        else:
-            log.skip(rel_out, 'unchanged')
+    Order invariant: the PAL delegation engine runs BEFORE
+    strip_inactive_conditional_blocks — the strip's final cleanup removes ALL
+    ``{{#if}}`` markers, which would strip ``{{#if PAL_*}}`` blocks before the
+    engine can evaluate them per provider (Issue #277).
 
-    # External skill filenames are always in .claude/agents/ (Claude only)
+    The pipeline/DoD resolution intentionally stays per-role (V1 semantics,
+    byte-identical even on the error path): an unknown dod-preset emits its
+    stderr warning once per role. ``load_quality_pipelines()`` is lru_cached,
+    so the per-role load is a cache hit.
+    """
+    from .pipelines import apply_overrides, inject_pipeline_blocks, load_quality_pipelines
+    from .platform import substitute_platform
+    from .delegation_syntax import DelegationSyntaxEngine
+
+    # Inject provider-specific pipeline blocks before standard substitution
+    pipelines = load_quality_pipelines(str(agent_meta_root))
+    pipeline_overrides = config.get("quality-pipelines", {})
+    effective = apply_overrides(pipelines, pipeline_overrides)
+    if effective:
+        from .dod import resolve_dod
+
+        dod_resolved = resolve_dod(config, agent_meta_root)
+        content = inject_pipeline_blocks(content, effective, provider, dod_resolved)
+
+    content = substitute(content, merged_vars, rel_source, log)
+    pal_engine = DelegationSyntaxEngine(config_dir=agent_meta_root / "config")
+    content = pal_engine.apply(content, provider, log=log)
+    content = strip_inactive_conditional_blocks(content, variables)
+    # Apply platform-config substitution ({{platform.*}} placeholders)
+    if platform_vars is not None:
+        content = substitute_platform(content, platform_vars, rel_source, log)
+    return content
+
+def _finalize_agent_content(
+    content: str,
+    role: str,
+    filename: str,
+    source_path: Path,
+    provider: str,
+    provider_config: dict,
+    source_version: str | None,
+    description: str,
+    can_spawn: bool,
+    config: dict,
+    agent_meta_root: Path,
+    project_root: Path,
+    target_path: Path,
+    variables: dict,
+    debug_mode: bool,
+    log: SyncLog,
+) -> str:
+    """Post-pipeline finalization of one agent's content: provider transform,
+    MCP tools, viz block, debug block, critical footer, path rules, XML wrap
+    and the singleton constraint.
+    """
+    name = Path(filename).stem
+    layer = source_path.parts[-2]
+    source_label = f'{layer}/{source_path.name}'
+    generated_from = f'{source_label}@{source_version}' if source_version else source_label
+
+    content = transform_agent_content_for_provider(
+        content=content,
+        provider=provider,
+        role=role,
+        name=name,
+        description=description,
+        generated_from=generated_from,
+        config=config,
+        agent_meta_root=agent_meta_root,
+        project_root=project_root,
+        target_path=target_path,
+        provider_config=provider_config,
+        log=log,
+    )
+
+    # MCP toolset: bind the servers this role opted into (issue #467).
+    # Claude-only — `mcp__<server>__<tool>` is Claude Code's namespacing;
+    # other providers surface MCP tools through their own config, not
+    # through agent frontmatter.
     if provider == 'Claude':
-        ext_config = load_external_skills_config(agent_meta_root)
-        project_skills = _normalize_enabled_config(config.get('external-skills', {}))
-        for skill_name, skill_cfg in ext_config.get('skills', {}).items():
-            if _skill_is_active(skill_name, skill_cfg, project_skills):
-                ext_role = skill_cfg.get('role', skill_name)
-                expected_filenames.add(f'{ext_role}.md')
+        mcp_tools = resolve_mcp_tools_for_role(role, config, agent_meta_root, project_root)
+        if mcp_tools:
+            before = content
+            content = append_frontmatter_tools(content, mcp_tools)
+            if content != before:
+                servers = ', '.join(sorted({t.split('__')[1] for t in mcp_tools}))
+                log.note(str(target_path.relative_to(project_root)),
+                         f'mcp tools: +{len(mcp_tools)} from {servers}')
 
-    # Remove stale agent files
-    if target_dir.exists():
-        managed_index = target_dir / '.agent-meta-managed'
-        previously_managed: set = set()
-        if managed_index.exists():
-            for line in managed_index.read_text(encoding='utf-8').splitlines():
-                if line.strip():
-                    previously_managed.add(line.strip())
+    # Visualization: inject event-logging prompt block when dynamic/full mode is enabled
+    # Applies to ALL providers — every generated agent gets the viz reporting block
+    viz_cfg = config.get('viz', {})
+    if viz_cfg.get('enabled', False) and viz_cfg.get('mode') in ('dynamic', 'full'):
+        from .viz import inject_viz_prompt_block
+        content = inject_viz_prompt_block(content, role, provider, viz_enabled=viz_cfg.get('enabled', False), agent_meta_root=agent_meta_root,
+                                          viz_debug=viz_cfg.get("debug", False))
 
-        # Stale-file detection is ext-aware: a provider with a non-Markdown
-        # agent_ext (Codex: .toml) must have its leftover outputs pruned too,
-        # while the legacy *.md sweep keeps cleaning up files from before a
-        # provider switched its agent_ext. Both globs feed the same
-        # expected_filenames/managed-index check, which is ext-agnostic
-        # (it compares full filenames including the suffix).
-        agent_ext = pc.get('agent_ext', '.md')
-        glob_patterns = ['*.md']
-        if agent_ext != '.md':
-            glob_patterns.append(f'*{agent_ext}')
-        stale_candidates: set = set()
-        for pattern in glob_patterns:
-            stale_candidates.update(target_dir.glob(pattern))
+    if debug_mode:
+        content = inject_debug_block(content, name)
 
-        for existing_file in sorted(stale_candidates):
-            if existing_file.name not in expected_filenames:  # noqa: SIM102
-                if not managed_index.exists() or existing_file.name in previously_managed:
-                    log.action('DELETE', str(existing_file.relative_to(project_root)),
-                               'role removed from config')
-                    if not dry_run:
-                        existing_file.unlink()
+    # Critical Rules Footer: append critical rules to end of agent files
+    footer_cfg = config.get('critical-rules-footer', {})
+    if footer_cfg.get('enabled', False):
+        content = _extract_and_append_critical_footer(
+            content, agent_meta_root, config, variables, log, provider
+        )
 
-        if not dry_run and expected_filenames:
-            managed_index.write_text(
-                '\n'.join(sorted(expected_filenames)) + '\n', encoding='utf-8'
-            )
+    # Path-based Contextual Rules: inject rules based on path patterns
+    path_rules_cfg = config.get('pathRules', [])
+    if path_rules_cfg:
+        content = apply_path_rules(
+            content, agent_meta_root, config, variables, log, role
+        )
 
-    # Provider Bootstrap: session-start agent registration for providers whose
-    # config/provider-bootstrap.yaml entry demands it (Gemini: inject generated
-    # instructions; ZCode: inject static instructions; Continue: update
-    # .continue/config.yaml) — Issue #277, unified call site per #628: the
-    # mechanism/action dispatch lives entirely in BootstrapEngine. The gate is
-    # registry-driven, not a provider-name literal (provider-agnostic policy:
-    # dispatch on config keys, never on `if provider == "Name"`).
+    # XML Section Wrapping: wrap Markdown ## sections in XML tags
+    xml_cfg = config.get('xml-section-wrapping', {})
+    if xml_cfg.get('enabled', False):
+        content = wrap_sections_in_xml(content)
+
+    # Singleton-Constraint: inject guard block into all non-orchestrator agent files
+    SINGLETON_CONSTRAINT_BLOCK = (
+        "\n\n## Singleton-Regel: Orchestrator-Spawn (auto-generated)\n\n"
+        "**NIEMALS** `task(subagent_type=\"orchestrator\", ...)` oder "
+        "`Agent(subagent_type=\"orchestrator\", ...)` aufrufen.\n\n"
+        "- Es existiert genau **EIN Orchestrator** pro Session — der vom `main_chat` gespawnte.\n"
+        "- Mehrere Orchestrator-Instanzen verursachen Routing-Konflikte und Session-State-Korruption.\n"
+        "- Bei unklarem Routing: Ergebnis an den Aufrufer zurückgeben, nicht weiter delegieren.\n\n"
+        "> Durchgesetzt via `rules/1-generic/a2a-delegation-gates.md` Gate #5.\n"
+    )
+    # Only agents that can actually spawn sub-agents (Agent/Task tool) need
+    # the singleton guard — injecting it into non-spawning agents is wasted context.
+    if role != "orchestrator" and not role.endswith("-iteration") and can_spawn:
+        content = content.rstrip() + SINGLETON_CONSTRAINT_BLOCK
+
+    return content
+
+def _write_agent_file(
+    target_path: Path,
+    content: str,
+    source_path: Path,
+    agent_meta_root: Path,
+    project_root: Path,
+    config: dict,
+    dry_run: bool,
+    log: SyncLog,
+) -> None:
+    """Write the generated agent file and log the WRITE action / skip."""
+    rel_label = str(source_path.relative_to(agent_meta_root / AGENTS_DIR))
+    rel_out = str(target_path.relative_to(project_root))
+    allow_secrets = config.get("allow-committed-secrets", False) if config else False
+    if write_checked(target_path, content, log, rel_label, config=config, dry_run=dry_run, allow_secrets=allow_secrets):
+        log.action('WRITE', rel_out, rel_label)
+    else:
+        log.skip(rel_out, 'unchanged')
+
+def _collect_claude_external_skill_filenames(agent_meta_root: Path, config: dict) -> set:
+    """Collect external skill agent filenames — external skill agents always
+    land in .claude/agents/, so only the Claude provider sync adds them.
+    """
+    from .io import _normalize_enabled_config
+    from .skills import _skill_is_active, load_external_skills_config
+
+    ext_config = load_external_skills_config(agent_meta_root)
+    project_skills = _normalize_enabled_config(config.get('external-skills', {}))
+    ext_filenames: set = set()
+    for skill_name, skill_cfg in ext_config.get('skills', {}).items():
+        if _skill_is_active(skill_name, skill_cfg, project_skills):
+            ext_role = skill_cfg.get('role', skill_name)
+            ext_filenames.add(f'{ext_role}.md')
+    return ext_filenames
+
+def _cleanup_stale_agents(
+    target_dir: Path,
+    expected_filenames: set,
+    pc: dict,
+    project_root: Path,
+    dry_run: bool,
+    log: SyncLog,
+) -> None:
+    """Remove stale agent files and refresh the managed index.
+
+    Invariants: the DELETE-log order (sorted candidates) and the managed-index
+    write condition (``not dry_run and expected_filenames``) are exact.
+    """
+    if not target_dir.exists():
+        return
+
+    managed_index = target_dir / '.agent-meta-managed'
+    previously_managed: set = set()
+    if managed_index.exists():
+        for line in managed_index.read_text(encoding='utf-8').splitlines():
+            if line.strip():
+                previously_managed.add(line.strip())
+
+    # Stale-file detection is ext-aware: a provider with a non-Markdown
+    # agent_ext (Codex: .toml) must have its leftover outputs pruned too,
+    # while the legacy *.md sweep keeps cleaning up files from before a
+    # provider switched its agent_ext. Both globs feed the same
+    # expected_filenames/managed-index check, which is ext-agnostic
+    # (it compares full filenames including the suffix).
+    agent_ext = pc.get('agent_ext', '.md')
+    glob_patterns = ['*.md']
+    if agent_ext != '.md':
+        glob_patterns.append(f'*{agent_ext}')
+    stale_candidates: set = set()
+    for pattern in glob_patterns:
+        stale_candidates.update(target_dir.glob(pattern))
+
+    for existing_file in sorted(stale_candidates):
+        if existing_file.name not in expected_filenames:  # noqa: SIM102
+            if not managed_index.exists() or existing_file.name in previously_managed:
+                log.action('DELETE', str(existing_file.relative_to(project_root)),
+                           'role removed from config')
+                if not dry_run:
+                    existing_file.unlink()
+
+    if not dry_run and expected_filenames:
+        managed_index.write_text(
+            '\n'.join(sorted(expected_filenames)) + '\n', encoding='utf-8'
+        )
+
+def _run_provider_bootstrap(
+    provider: str,
+    pc: dict,
+    target_dir: Path,
+    project_root: Path,
+    variables: dict,
+    agent_meta_root: Path,
+    dry_run: bool,
+    log: SyncLog,
+) -> None:
+    """Provider Bootstrap: session-start agent registration for providers whose
+    config/provider-bootstrap.yaml entry demands it (Gemini: inject generated
+    instructions; ZCode: inject static instructions; Continue: update
+    .continue/config.yaml) — Issue #277, unified call site per #628: the
+    mechanism/action dispatch lives entirely in BootstrapEngine. The gate is
+    registry-driven, not a provider-name literal (provider-agnostic policy:
+    dispatch on config keys, never on `if provider == "Name"`).
+    """
     from .bootstrap import BootstrapEngine
+
     bootstrap_engine = BootstrapEngine(config_dir=agent_meta_root / "config")
     bootstrap_cfg = bootstrap_engine.get_bootstrap_config(provider)
     if bootstrap_cfg and bootstrap_cfg.get("action") != "none":
@@ -695,3 +804,55 @@ def sync_agents_for_provider(
         if provider == "Continue" and result.get("status") == "success":
             rel_target = str(target_dir.relative_to(project_root))
             log.note(rel_target, f"Continue config updated: {result.get('agent_count', 0)} agents")
+
+def sync_agents_for_provider(agent_meta_root: Path, project_root: Path, config: dict,
+                             variables: dict, log: SyncLog, dry_run: bool, provider: str,
+                             provider_config: dict, platform_vars: dict | None = None,
+                             debug_mode: bool = False):
+    """Generate agent files for a specific provider.
+
+    Claude:    .claude/agents/<role>.md   — full frontmatter, all fields
+    Gemini:    .gemini/agents/<role>.md   — frontmatter without permissionMode/memory
+    Continue:  .continue/agents/<role>.md — minimal frontmatter (name, description, alwaysApply: false)
+    """
+    pc, role_map, overrides, target_dir = _resolve_sync_targets(
+        provider, provider_config, agent_meta_root, project_root, config, dry_run, log)
+    if pc is None:
+        return
+    allowed_roles = set(config['roles']) if 'roles' in config else None
+
+    expected_filenames: set = set()
+    project_name = config.get('project', {}).get('name', 'unknown')
+
+    for role, source_path in overrides.items():
+        skip, filename = _should_skip_role(
+            role, source_path, provider, pc, role_map, allowed_roles,
+            config, variables, project_root, target_dir, log)
+        if skip:
+            continue
+
+        expected_filenames.add(filename)
+        target_path = safe_path(target_dir, filename)
+        content, _can_spawn, rel_source, source_version, description = _compose_role_content(
+            source_path, provider, project_name, agent_meta_root, project_root, target_path, log)
+
+        # Merge provider-specific variables (extension paths, snippets dir, parallel patterns, etc.)
+        merged_vars = _build_provider_vars(pc, provider, variables, agent_meta_root)
+        content = _apply_content_pipeline(
+            content, config, provider, merged_vars, rel_source,
+            variables, platform_vars, agent_meta_root, log)
+        content = _finalize_agent_content(
+            content, role, filename, source_path, provider, provider_config,
+            source_version, description, _can_spawn, config, agent_meta_root,
+            project_root, target_path, variables, debug_mode, log)
+        _write_agent_file(target_path, content, source_path, agent_meta_root,
+                          project_root, config, dry_run, log)
+
+    # External skill filenames are always in .claude/agents/ (Claude only)
+    if provider == 'Claude':
+        expected_filenames |= _collect_claude_external_skill_filenames(agent_meta_root, config)
+
+    # Remove stale agent files
+    _cleanup_stale_agents(target_dir, expected_filenames, pc, project_root, dry_run, log)
+
+    _run_provider_bootstrap(provider, pc, target_dir, project_root, variables, agent_meta_root, dry_run, log)
