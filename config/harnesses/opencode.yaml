@@ -1,0 +1,25 @@
+# Harness definition: Opencode (issue #547 — cross-harness dev isolation)
+#
+# One file per harness in config/harnesses/. Differences between harnesses
+# are expressed purely as data here — Python code must stay provider- and
+# harness-agnostic (no `if harness == "Name"` branches).
+#
+# Fields:
+#   name              Required. Must equal this file's stem.
+#   description       Optional. Human-readable summary.
+#   checkout-root     Required. Absolute path (or ~/...) of the directory
+#                     holding this harness's Git checkouts. sync.py refuses
+#                     to write when its project root lies outside it.
+#   root-env          Optional. Env var overriding checkout-root
+#                     (default: AGENT_META_HARNESS_ROOT).
+#   branch            Optional. Branch convention for this harness
+#                     (informational, enforced by convention only).
+#   default-providers Optional. Task-partitioning hint: which provider(s)
+#                     this harness normally drives (informational only).
+harness:
+  name: opencode
+  description: "Opencode harness — own checkout under ~/repos-oc"
+  checkout-root: ~/repos-oc
+  branch: agent/opencode
+  default-providers:
+    - Opencode

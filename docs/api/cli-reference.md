@@ -65,6 +65,7 @@ The `sync.py` script is the central entry point of the agent-meta framework. It 
 |------|-------------|
 | `--clear-cache` | Clears the outcome cache. |
 | `--update-models` | Updates the model registry from provider APIs (OpenRouter, Zen, Go). |
+| `--harness NAME` | Activates a harness from `config/harnesses/<NAME>.yaml` and enforces its write isolation: sync refuses to run when the project root lies outside the harness's declared checkout-root. Overrides the `AGENT_META_HARNESS` environment variable. See [Cross-Harness Dev-Isolation](../guides/cross-harness-dev-isolation.md). |
 
 ## Admin UI & External Skills
 

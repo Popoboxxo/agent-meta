@@ -25,7 +25,8 @@ ob ein Gate aktiv ist — das entscheidet jedes Gate-Script an seinem eigenen An
   pre-release-check.sh          # Dispatcher (agent-meta-managed)
   release-gates/
     .agent-meta-managed         # Allowlist Teil 1: eingebaute Gate-Dateinamen (agent-meta-managed)
-    .allowed-gates               # Allowlist Teil 2: projekteigene Gate-Dateinamen (sync.py fasst das NIE an)
+    .allowed-gates              # Allowlist Teil 2: projekteigene Gate-Dateinamen (sync.py fasst das NIE an)
+    .sha256-checksums           # SHA-256-Integritätsmanifest (issue #603) — Built-in-Einträge von sync.py regeneriert, projekteigene Zeilen bleiben unangetastet
     artifact-freshness.sh       # eingebaut (agent-meta-managed)
     docker-image-scan.sh        # eingebaut (agent-meta-managed)
     action-pin-validation.sh    # eingebaut (agent-meta-managed)
@@ -40,7 +41,8 @@ aktive Provider mit Hook-Unterstützung neben Claude, siehe `config/ai-providers
   `scripts/lib/hooks.py::collect_hook_sources()`).
 - `sync.py` kopiert Dispatcher UND eingebaute Gates automatisch in jeden aktiven Provider mit
   Hook-Unterstützung — kein providerspezifischer Zusatzaufwand nötig
-  (`scripts/lib/hooks.py::sync_release_gates()`).
+  (`scripts/lib/hook_plugins.py::sync_release_gates()`), und regeneriert dabei auch das
+  SHA-256-Checksum-Manifest (siehe [Checksum integrity verification](#checksum-integrity-verification-issue-603)).
 - Anders als die übrigen Hooks wird `pre-release-check.sh` **nicht** über native Tool-Events
   (`PreToolUse` etc.) automatisch ausgelöst. Sein Metadata-Header trägt `event: Manual` als
   Konvention. Er wird **nicht** über
@@ -80,11 +82,65 @@ ausgeführt. Um ein eigenes Gate zu aktivieren, zusätzlich zum Ablegen der `.sh
 
 ```bash
 echo "no-todo-in-changelog.sh" >> .claude/hooks/release-gates/.allowed-gates
+(cd .claude/hooks/release-gates && sha256sum no-todo-in-changelog.sh >> .sha256-checksums)
 ```
 
 Danach findet und führt der Dispatcher es automatisch mit aus, weiterhin ganz ohne
-`sync.py`-Lauf oder Framework-Änderung — nur die eine zusätzliche Manifest-Zeile ist neu
-gegenüber früheren Versionen.
+`sync.py`-Lauf oder Framework-Änderung — die zusätzliche Manifest-Zeile in `.allowed-gates`
+plus die Checksum-Zeile in `.sha256-checksums` (issue #603) sind neu gegenüber früheren
+Versionen. Details: [Checksum integrity verification](#checksum-integrity-verification-issue-603).
+
+## Checksum integrity verification (issue #603)
+
+Since dispatcher version 3.1.0, the allowlist alone is not sufficient to run a gate: before
+executing an allowlisted gate script, `pre-release-check.sh` verifies its SHA-256 checksum
+against `release-gates/.sha256-checksums`. The allowlist controls WHICH gate scripts may run —
+the checksum manifest controls that their content is still what was deployed/registered.
+
+**Manifest format** — plain and diffable, `sha256sum`-compatible (one entry per gate script,
+`#`-comments and blank lines allowed):
+
+```
+<64-char-sha256>  <gate-filename>
+```
+
+**Who writes what** (mirrors the issue #598 ownership split):
+
+- Built-in gates: `sync.py` (`scripts/lib/hook_plugins.py::sync_release_gates()`) hashes the
+  *deployed* gate content — i.e. after the sync-time placeholder substitution
+  (`{{RELEASE_GATE_ENABLED_DEFAULT}}`, `{{AGENT_META_PROVIDER}}`) — and regenerates the
+  built-in entries on every sync. Never edit those lines by hand; re-running `sync.py` is the
+  only legitimate way they change. Stale entries for built-in gates removed upstream are
+  dropped automatically.
+- Project-owned gates: the project maintains its own entry lines. Register a new custom gate
+  with `(cd <hooks_dir>/release-gates && sha256sum my-check.sh >> .sha256-checksums)` and
+  REPLACE (do not append a second line — first match wins) the entry after an intentional
+  change.
+
+**Fail-closed semantics** (deliberate decision, issue #603): an allowlisted gate is refused
+and the release blocked (dispatcher exit 1) when
+
+| Condition | Remediation hint printed by the dispatcher |
+|---|---|
+| `.sha256-checksums` is missing | re-run `sync.py` (recreates it with built-in entries); project gates additionally need their own line |
+| gate has no checksum entry | `sync.py` (built-ins) or append the `sha256sum` line (project gates) |
+| checksum mismatch (file changed after deployment) | re-run `sync.py` (built-ins) or replace the stale line via `sha256sum` (project gates); investigate first if the change was NOT intentional |
+| no SHA-256 tool available (`sha256sum`/`shasum`) | none — environment problem, gates stay disabled |
+
+A missing manifest only matters once at least one gate is allowlisted: a project with no
+allowlisted gates still exits 0 ("nothing to run"). A blocked release is recoverable; an
+unnoticed tampered gate in the release path is not — that is the trade-off this fail-closed
+behavior makes.
+
+**Boundary note:** like the allowlist, the checksum manifest is a *convention boundary*, not a
+*security boundary*: anyone able to rewrite a gate script on disk can also rewrite its checksum
+line. The verification catches accidental/drive-by modifications (compromised dependency,
+wrong tool writing into `release-gates/`) and forces an explicit, visible re-registration step
+for intentional changes. For a hard guarantee, protect `.claude/hooks/` via git hygiene
+(review requirements, branch protection) — see the convention-vs-security-boundary
+terminology in the repository rules. GPG/signature-based gate verification remains deferred
+(see FOLLOW_UPS of issue #603 / roadmap Wave 3).
+
 
 **Vertrag für ein Gate-Script** (egal ob eingebaut oder projekteigen):
 
@@ -115,8 +171,9 @@ echo "[INFO] no-todo-in-changelog: OK"
 exit 0
 ```
 
-Kein Eintrag in `project.yaml` nötig, kein `sync.py`-Lauf nötig — Datei ablegen UND ihren Namen in
-`release-gates/.allowed-gates` eintragen (s. o.), dann wird sie beim nächsten
+Kein Eintrag in `project.yaml` nötig, kein `sync.py`-Lauf nötig — Datei ablegen, ihren Namen in
+`release-gates/.allowed-gates` eintragen und ihre Checksum-Zeile in `.sha256-checksums`
+hinzufügen (s. o., issue #603), dann wird sie beim nächsten
 `bash .claude/hooks/pre-release-check.sh` automatisch mitgeführt.
 
 ## Die drei eingebauten Gates
@@ -230,7 +287,7 @@ DoD-Preset-Defaults für die drei eingebauten Gates (spiegelt bewusst das besteh
 | `spec-certified` | **an** | **an** | **an** |
 
 Diese Auflösung passiert **zu `sync.py`-Build-Zeit**: `scripts/lib/dod.py::resolve_release_gates()`
-liefert die effektiven Enabled-Werte, `scripts/lib/hooks.py::sync_release_gates()` schreibt sie als
+liefert die effektiven Enabled-Werte, `scripts/lib/hook_plugins.py::sync_release_gates()` schreibt sie als
 festen `{{RELEASE_GATE_ENABLED_DEFAULT}}`-Wert direkt in jedes kopierte, eingebaute Gate-Script
 (dasselbe sync-time-Platzhalter-Muster wie `{{AGENT_META_PROVIDER}}` bei den anderen Hooks —
 wirkungslos für projekteigene Gates, da sie nie durch `sync.py` laufen). Nach jeder Änderung an
@@ -329,10 +386,12 @@ npx lighthouse-ci autorun --config=.lighthouserc.json
 ```
 
 Zusätzlich einmalig in `.claude/hooks/release-gates/.allowed-gates` eintragen (issue #598 —
-sonst wird die Datei mit `[SKIP] ... not on the release-gates allowlist` übersprungen):
+sonst wird die Datei mit `[SKIP] ... not on the release-gates allowlist` übersprungen) und
+die Checksum-Zeile registrieren (issue #603 — sonst fail-closed, siehe oben):
 
 ```bash
 echo "lighthouse-budget-check.sh" >> .claude/hooks/release-gates/.allowed-gates
+(cd .claude/hooks/release-gates && sha256sum lighthouse-budget-check.sh >> .sha256-checksums)
 ```
 
 Kein `Dockerfile` vorhanden → `docker-image-scan` überspringt sich automatisch (kein Setup nötig,

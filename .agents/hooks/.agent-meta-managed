@@ -1,11 +1,6 @@
 antigravity-json-adapter.sh
 auto-github-release.sh
-dod-push-check.sh
-graphify-read-guard.sh
-graphify-search-guard.sh
-lifecycle-check.sh
 orchestrator-guard-impl.sh
 orchestrator-guard.sh
 pre-release-check.sh
-sync-on-config-change.sh
 viz-log.sh

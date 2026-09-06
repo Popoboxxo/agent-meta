@@ -51,6 +51,7 @@ from lib.deactivation import (
 )
 from lib.dod import resolve_dod
 from lib.extensions import create_extension, update_extensions
+from lib.harnesses import ensure_write_isolation, resolve_active_harness
 from lib.hooks import create_hook
 from lib.io import SyncError
 from lib.log import SyncLog
@@ -276,11 +277,16 @@ class _SyncContext:
     tail depends on: ``mode`` (always) and ``config`` (only handlers that reload
     it). Threading state through one object -- instead of a long local-variable
     tail -- is what makes the individual handlers independently unit-testable.
+
+    ``harness`` is the optional active HarnessConfig (issue #547, None when no
+    harness is active) — read-only for handlers that need extra write-isolation
+    checks (e.g. the --validate test repo).
     """
 
     def __init__(self, *, args, log, agent_meta_root: Path, project_root: Path,
                  config: dict, config_path: Path, variables: dict,
-                 platforms: list, source_version: str, viz_cfg: dict) -> None:
+                 platforms: list, source_version: str, viz_cfg: dict,
+                 harness=None) -> None:
         self.args = args
         self.log = log
         self.agent_meta_root = agent_meta_root
@@ -291,6 +297,7 @@ class _SyncContext:
         self.platforms = platforms
         self.source_version = source_version
         self.viz_cfg = viz_cfg
+        self.harness = harness
         self.mode: str | None = None
 
 
@@ -443,6 +450,15 @@ def _build_context(args, agent_meta_root: Path, log: "SyncLog"):
     else:
         project_root = config_resolved.parent
     config_path = Path(args.config).resolve()
+
+    # Harness write-isolation guard (issue #547): when a harness is active
+    # (--harness flag or AGENT_META_HARNESS env), sync may only write inside
+    # that harness's declared checkout-root. project_root is the single
+    # choke point every sync write flows through, so guarding it here covers
+    # all write-capable modes. No-op (and 100% backwards compatible) when no
+    # harness is active.
+    harness = _resolve_and_guard_harness(args, agent_meta_root, project_root, log)
+
     config = load_config(config_path)
     variables, pre_warnings = build_variables(config, agent_meta_root, project_root)
     platforms = config.get("platforms", [])
@@ -466,7 +482,37 @@ def _build_context(args, agent_meta_root: Path, log: "SyncLog"):
         project_root=project_root, config=config, config_path=config_path,
         variables=variables, platforms=platforms,
         source_version=source_version, viz_cfg=viz_cfg,
+        harness=harness,
     )
+
+
+def _resolve_and_guard_harness(args, agent_meta_root: Path, project_root: Path,
+                               log: "SyncLog"):
+    """Resolve the active harness and enforce its write isolation (issue #547).
+
+    Activation: ``--harness`` CLI flag overrides the ``AGENT_META_HARNESS``
+    environment variable (there is deliberately no project.yaml key — the
+    config travels with the repo across checkouts, so a project-scoped
+    activation would activate the same harness everywhere and defeat the
+    isolation). Returns None when no harness is active; exits with a clean
+    error message when an activated harness is unknown/invalid or when
+    project_root lies outside its declared checkout-root (fail-closed).
+    """
+    try:
+        harness = resolve_active_harness(
+            agent_meta_root, cli_value=getattr(args, "harness", None)
+        )
+        if harness is not None:
+            ensure_write_isolation(harness, project_root, log)
+    except SyncError as exc:
+        print(f"  !  {exc}", file=sys.stderr)
+        sys.exit(1)
+    if harness is None:
+        return None
+    log.note("harness", f"active: {harness.summary()}")
+    if harness.branch:
+        log.note("harness", f"branch convention: {harness.branch}")
+    return harness
 
 
 # ---------------------------------------------------------------------------
@@ -899,6 +945,16 @@ def _handle_validate(ctx: _SyncContext) -> None:
         print_report(_strict_findings, project_root, changed_only=False)
 
     test_repo_path = resolve_test_repo_path(config, project_root, log)
+
+    # Harness write-isolation, warn-only variant (issue #547): the test repo
+    # is a deliberate scratch write outside the normal project root, so a
+    # harness violation here warns instead of refusing — a hard fail would
+    # break CI validation setups that keep the test repo outside all
+    # harness checkouts.
+    if ctx.harness is not None and test_repo_path is not None:
+        ensure_write_isolation(ctx.harness, test_repo_path, log,
+                               label="test-repo", strict=False)
+
     if test_repo_path is None or not test_repo_path.exists():
         reason = (f"configured path {test_repo_path} does not exist"
                   if test_repo_path else

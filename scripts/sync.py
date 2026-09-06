@@ -160,6 +160,14 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--clear-cache", action="store_true",
                         help="Clear the outcome cache")
 
+    # Cross-harness dev isolation (issue #547)
+    parser.add_argument("--harness", metavar="NAME", default=None,
+                        help="Activate a harness from config/harnesses/<NAME>.yaml and "
+                             "enforce its write isolation: sync refuses to run when the "
+                             "project root lies outside the harness's declared checkout-"
+                             "root. Overrides the AGENT_META_HARNESS environment variable. "
+                             "No harness active by default (fully backwards compatible).")
+
     # Provider deactivation
     parser.add_argument("--deactivate-providers", nargs="*", metavar="PROVIDER",
                         default=None,
