@@ -1,3 +1,4 @@
+"""Handlebars-style template rendering for agent-context files (partials, conditionals, loops, placeholder variables)."""
 from __future__ import annotations
 import re
 from pathlib import Path

@@ -95,7 +95,7 @@ delegation_syntax:
   Mammouth:
     delegate: "@<ziel-agent> Führe folgende Aufgabe aus: <vollständiger-task-text>"
     fanout: "Bearbeite diese Aufgaben der Reihe nach:\n1. @<agent_1> <task_1>\n2. @<agent_2> <task_2>"
-    parallel_group: "Bearbeite diese Aufgaben:\n1. @<agent_1> <task_1>\n2. @<agent_2> <task_2>"
+    parallel_group: "Bearbeite diese Aufgaben nacheinander:\n1. @<agent_1> <task_1>\n2. @<agent_2> <task_2>"
     fallback: "Bearbeite: <task>"
     bootstrap: "file-based"
     tool_preamble: "false"

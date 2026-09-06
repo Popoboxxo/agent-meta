@@ -349,6 +349,7 @@ The extensive documentation for Agent-Meta has been reorganized into the `docs/`
 - Setup, CI integration, feature guides, and reflection loops.
 - MCP configurations and quality pipelines.
 - **[Project Instantiation](docs/guides/setup/instantiate-project.md)**: Set up a new project from agent-meta — multi-provider config plus HACS platform preset activation and the release-naming best practice.
+- **[MCP Onboarding Checklist](docs/guides/mcp-onboarding-checklist.md)**: Keep newly registered MCP servers visible to agents — signal hierarchy (Hook > Lazy-Rule > Inline-Docs > generic MCP) and the three onboarding steps (rule entry, context-file reference, optional hook).
 
 ### Admin UI How-Tos (`docs/howto/`)
 - **[Remote Access to the Admin UI](docs/howto/admin-ui-remote-access.md)**: Expose `admin-server.py` beyond localhost with token authentication — lifecycle, flags, ports, troubleshooting.

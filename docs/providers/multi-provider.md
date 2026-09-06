@@ -124,7 +124,18 @@ konfiguriert — nur belegte Fähigkeiten sind aktiviert.
 - `MAMMOUTH.md` — Kontext-Datei (managed block, bei jedem sync aktualisiert; nutzt das
   gemeinsame `AGENTS.project-template.md`)
 - `.mammouth/rules/*.md` — Rules (`has_rules: true`)
-- `.mammouth/hooks/*.sh` — Hooks (`has_hooks: true`, eigenes `.mammouth/settings.json`)
+- `.mammouth/hooks/` — reserviert (`has_hooks: true`): ohne verifizierten
+  `hook_protocol` spiegelt sync.py keine Hook-Skripte (#630-Muster) — Cleanup statt
+  Deploy; das separate `.mammouth/settings.json` wird als Skeleton angelegt
+
+**Commands:** Mammouth setzt `has_commands: true` und listet die Capability
+`commands` — konfiguriert aber weder `commands_dir` noch `commands_ext` (anders als
+Gemini/Opencode). Der Sync-Code (`scripts/lib/commands.py::sync_commands_for_provider`)
+implementiert Zweige für Claude, Continue, Gemini und Opencode; jeder andere Provider
+endet im `else: return`. Für Mammouth wird daher **kein `.mammouth/commands/`**
+generiert — der Sync läuft still durch (kein Fehler, keine Warnung). Der Flag ist
+damit aktuell ein Capability-Versprechen ohne Output (siehe auch den Kommentar zu
+`_INFRA_ROOT_FALLBACK_DIRS` in `scripts/lib/external_tools_drift.py`).
 
 **Fähigkeiten (`config/provider-capabilities.yaml`):**
 - `hooks: true` — belegt durch `has_hooks: true` + `hooks_dir` in `config/ai-providers.yaml`.
@@ -275,18 +286,42 @@ Rule-Content aus `config/plugin-catalog.yaml` (`kind: cli-tool`-Einträge, z.B. 
 
 > **Copilot, Mammouth, Codex, ZCode & KimiCode** folgen demselben Grundmuster (Agenten +
 > Kontext-Datei + Rules überschrieben/aktualisiert, Skeleton einmalig). Abweichungen: Copilot
-> hat keine Hooks/Commands/Settings; Mammouth hat Hooks (`.mammouth/hooks/`) und ein eigenes
-> `.mammouth/settings.json`; Codex spiegelt keine Hooks und hat kein Settings-File; ZCode und
-> KimiCode generieren keine Rules/Commands/Hooks (siehe Provider-Abschnitte oben).
+> hat keine Hooks/Commands/Settings; Mammouth hat eine Hooks-Reservierung ohne Spiegelung
+> (#630-Muster) und ein eigenes `.mammouth/settings.json`, generiert aber keine Commands
+> (`has_commands` gesetzt, kein Sync-Zweig — siehe Mammouth-Abschnitt); Codex spiegelt keine
+> Hooks und hat kein Settings-File; ZCode und KimiCode generieren keine Rules/Commands/Hooks
+> (siehe Provider-Abschnitte oben).
 
 ---
 
 ## Stale-Tracking
 
-Jeder Provider hat sein eigenes `.agent-meta-managed`-Index:
+Jeder Provider verwaltet seinen eigenen `.agent-meta-managed`-Index — für Agenten
+in `<agents_dir>/`, für Rules in `<rules_dir>/`:
+
+**Agenten-Index (alle Provider):**
+
 - `.claude/agents/.agent-meta-managed`
 - `.gemini/agents/.agent-meta-managed`
+- `.continue/agents/.agent-meta-managed`
+- `.opencode/agents/.agent-meta-managed`
+- `.github/copilot/agents/.agent-meta-managed`
+- `.mammouth/agents/.agent-meta-managed`
+- `.codex/agents/.agent-meta-managed`
+- `.zcode/agents/.agent-meta-managed`
+- `.kimi-code/agents/.agent-meta-managed`
+
+**Rules-Index (Provider mit `has_rules: true`):**
+
+- `.claude/rules/.agent-meta-managed`
+- `.gemini/rules/.agent-meta-managed`
 - `.continue/rules/.agent-meta-managed`
+- `.github/copilot/rules/.agent-meta-managed`
+- `.mammouth/rules/.agent-meta-managed`
+- `rules/.agent-meta-managed` (Codex — Projekt-Root)
+
+Generierte MCP-/Tool-Rules nutzen eigene Sidecar-Indizes im selben Rules-Verzeichnis
+(`.agent-meta-managed-mcp` bzw. `.agent-meta-managed-tools`).
 
 Agenten die aus der Rollen-Whitelist entfernt werden, werden beim nächsten sync gelöscht.
 
