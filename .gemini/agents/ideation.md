@@ -1,6 +1,6 @@
 ---
 name: ideation
-version: 1.10.0
+version: 1.11.0
 description: Use when an idea needs scoping and thoughts need sorting before a concept
   or REQ exists.
 hint: Nutze ideation zum Scopen einer rohen Idee, bevor ein Konzept oder REQ existiert.
@@ -13,7 +13,7 @@ tools:
 - WebFetch
 - WebSearch
 - TodoWrite
-generated-from: 1-generic/ideation.md@1.10.0
+generated-from: 1-generic/ideation.md@1.11.0
 model: gemini-3.1-pro-low
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -48,16 +48,23 @@ Research: How do others solve this? Approach A vs. B trade-offs. `WebSearch`/`We
 
 ## 4. Sort & structure
 
+**Concept skeleton (issue #370)** — every concept artifact follows this structure:
+
 ```
 Core idea:       [one-sentence description]
 Goal:            [What changes for whom?]
+Problem:         [What hurts today? What is the trigger?]
+Solution:        [How is it solved? 2-4 sentences]
 Scope v1:        [What does it minimally need?]
 Scope v2+:       [What comes later?]
+Alternatives:    [Which approaches were considered? Why rejected — 1 line each]
+Effort:          [Rough estimate on the task-size scale: S/M/L/XL]
 Open questions:  [What is still unclear?]
 Risks:           [What could become problematic?]
 ```
 
-Artifact: `concept-<topic>.md`.
+Artifact: `concept-<topic>.md` — built strictly from the skeleton above; the
+effort estimate (S/M/L/XL) feeds the orchestrator's task-size routing.
 
 ## 5. Hand off to Requirements
 
@@ -113,6 +120,15 @@ ARTIFACTS: <persisted concept file path, empty if returned inline>
 
 ### Goal + Scope v1
 ...
+
+### Problem + Solution
+<what hurts today · how it is solved>
+
+### Alternatives + Effort
+<rejected approaches, 1 line each · Effort estimate: S/M/L/XL>
+
+### Risks
+<what could become problematic>
 
 ### Handoff
 On confirmation: A2A envelope to `requirements` (or `concept-reviewer` for a review loop).

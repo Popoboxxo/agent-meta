@@ -1,8 +1,9 @@
 ---
 name: se-integration-and-test-manager
-version: 1.4.0
+version: 2.0.0
 description: 'V&V-Orchestrator: Koordiniert Integrationsstrategie, Test-Ebenen und
-  Traceability-Feedback über L1-Ln. Persists test plan and V&V report.'
+  Traceability-Feedback über L1-Ln. Persists test plan and V&V report. Federt Implementierungs-Befunde
+  bottom-up in die Kaskade zurück (Issue #339 B6).'
 hint: Orchestriert den gesamten rechten Flügel der V&V-Kaskade — Bottom-Up, Top-Down,
   Integrationsplanung.
 tools:
@@ -95,7 +96,23 @@ Du startest und koordinierst:
 4. **Traceability-Matrix** nach jedem Integrationsschritt aktualisieren; Lücken/Waisen/Blocker dokumentieren.
 {{/if}}
 
-### 5. TodoWrite für Test-Koordination
+### 5. Bottom-Up-Rückkopplung (Issue #339 B6)
+
+Die Kaskade ist bidirektional — Implementierungs- und Test-Befunde fließen zurück in die Anforderungsebenen. Die Kaskade läuft nicht nur L0→Ln→V&V.
+
+**Rückkopplungspfad bei Befunden:**
+
+1. **Befund erfassen:** Implementierungs-/Verifikations-/Validierungs-Befund mit betroffener REQ-ID dokumentieren (Verweis, nie inline in REQ-Dateien).
+2. **REQ-Frontmatter aktualisieren** (nur Enum-Werte, Issue #339 B2 — kein Freitext):
+   - Implementierung teilaufgelaufen → `implementation_state: partially_implemented` bzw. `implemented`/`not_implemented`
+   - Testlage → `test_status: missing | partial | covered`
+3. **Suspect-Mark-Kette anstoßen:** Befund an `se-critic` weiterleiten (mit `review_id` des zugehörigen Review-Protokolls). `se-critic` setzt `review_state: open` + `suspect_children` auf die Parent-REQs und triggert die Re-Derivation (siehe `se-cascade-review-lifecycle.md`).
+4. **ADR-Impact-Prüfung:** Berührt der Befund eine Architektur-Entscheidung (z. B. Interface-Contract, Topologie, Technologie-Wahl) → ADR-Verweis im REQ-Frontmatter (`open_adrs`) prüfen; Umbau oder Supersede des ADR an `se-architect` verweisen (siehe `se-cascade-adr-standard.md`).
+5. **Begrenzung:** Max. 2 automatische Re-Derivations-Iterationen pro Befund, danach User-Approval erzwingen (Kaskaden-Bomben-Schutz).
+
+**Nie erlaubt:** Befunde als Freitext in REQ-Dateien (`Remarks`-Sünde, Issue #339 B2/B4) — Befunde leben im Review-Protokoll (`reviews/`), REQ-Dateien referenzieren nur IDs.
+
+### 6. TodoWrite für Test-Koordination
 
 Tracke den Status via TodoWrite:
 
@@ -217,6 +234,8 @@ Nach Abschluss aller V&V-Aktivitäten:
 - Komponente verifizieren → `se-verifier`
 - System-Level Validierung → `se-validator`
 - Architektur-Blocker → `se-architect`
+- Implementation-/Test-Befund mit Parent-Impact → `se-critic` (Suspect-Mark auf Parent-REQs, Review-Protokoll)
+- ADR betroffen (Umbau/Supersede) → `se-architect`
 - Unklare Stakeholder-Needs nach Validation-Fail → `se-requirements`
 - Koordinations-Entscheidung → `se-orchestrator`
 

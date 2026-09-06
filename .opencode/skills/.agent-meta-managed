@@ -9,6 +9,9 @@ mcp-playwright
 mcp-reqogniloom
 mcp-viz-logger
 provider-agnostic
+se-cascade-adr-standard
+se-cascade-artifact-taxonomy
+se-cascade-review-lifecycle
 security-paved-roads
 session-conclusion
 submodule-protection

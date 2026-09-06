@@ -212,3 +212,23 @@ def test_se_critic_schema_is_valid_json():
         data = json.load(f)
     checks = data.get("properties", {}).get("checks", {}).get("properties", {})
     assert "role_boundary" in checks
+
+
+def test_se_finding_required_fields_aligned_across_schemas():
+    """se-critic and se-review schemas must declare the same finding shape.
+
+    Both describe the same B5 finding object (se-critic structured output
+    mirrors the review protocol frontmatter) — their findings items must
+    require identical fields, including ``category``.
+    """
+    required: list[list[str]] = []
+    for name in ("se-critic.schema.json", "se-review.schema.json"):
+        schema_path = _AGENT_META_ROOT / "schemas" / name
+        assert schema_path.exists(), f"Schema missing: {schema_path}"
+        with schema_path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        items = data["properties"]["findings"]["items"]
+        assert "category" in items["properties"], f"{name}: category missing"
+        required.append(sorted(items["required"]))
+    assert required[0] == required[1], (
+        f"findings required fields diverge: {required[0]} vs {required[1]}")

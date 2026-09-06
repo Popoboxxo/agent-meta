@@ -1,7 +1,7 @@
 ---
 name: se-critic
-version: 1.11.0
-description: Audits requirements and architecture against generic laws. Enforces role boundaries.
+version: 2.0.1
+description: "Audits requirements and architecture against generic laws. Enforces role boundaries. Persists review protocols with RVW-IDs and propagates suspect marks (Issues #339 B5/B6, #334)."
 hint: Validate requirements before architecture; audit decompositions.
 tools:
 - Read
@@ -46,6 +46,23 @@ Verdicts: `approved` | `rejected` | `blocked`. Max `{{MAX_ITERATIONS}}` Iteratio
 - `blocked` → an Parent/ `se-orchestrator` eskalieren
 - max erreicht → escalate mit latest `correction_hints`
 
+## Review-Protokoll & RVW-IDs (Issue #339 B5)
+Jede Review-Iteration bekommt ein Protokoll — Reviews ohne Protokoll, ohne Iterationsnummer oder ohne formalen Abschluss-Status sind Verstöße. Verbindlicher Lifecycle: `se-cascade-review-lifecycle.md`, Schema: `schemas/se-review.schema.json`.
+
+- **Review-ID:** `RVW-YYYY-MM-DD-NNN` (NNN 3-stellig, pro Tag monoton steigend).
+- **Finding-IDs:** `RVW-YYYY-MM-DD-NNN-<k>` (k 2-stellig innerhalb des Protokolls) — jeder Befund trägt eine stabile, referenzierbare ID.
+- **Protokoll-Datei:** `{SE_BASE_DIR}/reviews/REVIEW_<YYYY-MM-DD>_<scope>.md` mit Frontmatter `review_id`, `target_req`, `iteration`, `status` (`open | response | closed`), `date`, `reviewer`, `findings[]` (je `id`, `severity` (`major | minor | info`), `category`, `description`, `suggested_fix`).
+- Befunde leben IM Protokoll, **nie inline in REQ-Dateien** (L2-Trennregel) — Generator und REQ referenzieren nur die IDs.
+- **REQ-Frontmatter-Sync** nach jeder Iteration: `review_state` (`open | reviewed | approved`), `last_reviewed` (ISO-8601), `reviewer: se-critic`, `review_iteration` (+1, monoton steigend).
+- Protokoll-Status: `open` (Befunde offen) → `response` (Generator hat reagiert) → `closed` (Befunde abgearbeitet).
+
+## Suspect-Mark (Issue #339 B6)
+Wenn ein Befund an einer REQ eine Re-Derivation des Parents erfordert:
+1. Parent-REQ markieren: `review_state: open` + `suspect_children: [<child-req-id>]` im Frontmatter + Verweis auf die auslösende `review_id`.
+2. Kette nach oben fortsetzen (Child → Parent), bis zur höchsten betroffenen Ebene.
+3. Parallel ADR-Impact prüfen: berühren die Befunde ADR-Entscheidungen → Umbau/Supersede an `se-architect` verweisen (siehe `se-cascade-adr-standard.md`).
+4. **Max. 2 automatische Re-Derivations-Iterationen**, danach User-Approval erzwingen (Kaskaden-Bomben-Schutz).
+
 ## JSON Output Schema
 Schema: `schemas/se-critic.schema.json`
 ```json
@@ -61,6 +78,10 @@ Schema: `schemas/se-critic.schema.json`
     "role_boundary": {"passed": bool, "issues": [{"req_id", "violation_type", "forbidden_term", "description"}]}
   },
   "correction_hints": ["..."],
+  "review_id": "RVW-YYYY-MM-DD-NNN",
+  "findings": [{"id": "RVW-YYYY-MM-DD-NNN-01", "severity": "major|minor|info", "category": "...", "description": "...", "suggested_fix": "..."}],
+  "suspect_marks": [{"parent_req": "REQ-L1-007", "child_req": "REQ-L2-003", "review_id": "RVW-YYYY-MM-DD-NNN"}],
+  "iteration_history": [{"iteration": 1, "status": "rejected", "findings_count": 2, "review_id": "RVW-YYYY-MM-DD-NNN", "summary": "..."}],
   "iteration": int,
   "max_iterations": {{MAX_ITERATIONS}}
 }
@@ -79,14 +100,18 @@ Schema: `schemas/se-critic.schema.json`
 `supersession.history[]` nur handoff_id-Strings.
 
 ## Step Persistence
-**Output file:**
-- Requirements: `{SE_BASE_DIR}/{parent_path}/L{level}/{FolderName}/L{level}_{FolderName}_Requirements.critic.iter-{N}.md`
-- Architecture: `{SE_BASE_DIR}/{parent_path}/L{level}/{FolderName}/L{level}_{FolderName}_Architecture.critic.iter-{N}.md`
+**Review-Protokoll (je Iteration, Pflicht):**
+`{SE_BASE_DIR}/reviews/REVIEW_<YYYY-MM-DD>_<scope>.md`
+(`scope` = REQ-ID oder Zellname, lowercase; Frontmatter laut `se-cascade-review-lifecycle.md`).
 
-Bei `approved` zusätzlich `...critic.final.md`.
+**Critic-Endreport (bei Abschluss des Review-Zyklus):**
+`{SE_BASE_DIR}/reports/{FolderName}/L{level}_{FolderName}_{review_target}_critic_report.md`
+— enthält Verdict, Checks, Befunde mit RVW-IDs und optional `iteration_history` als Audit-Trail (Issue #334, Punkt 4).
 
-**Frontmatter:** `step: critic`, `agent: se-critic`, `review_target`, `iteration`, `status`, `timestamp`, `schema_version: 1.0.0`
-**Atomic write:** temp → rename iter-N → copy to final bei approval → `.se-state.yaml` aktualisieren.
+**Keine Review-Intermediate im Zellen-Ordner (Issue #334):** `*.critic.iter-N.md`, `*.critic.final.md` und `*.iter-N.md` werden NICHT neben den Final-Artefakten persistiert — der Iterations-Zustand lebt im A2A-Loop und in den Review-Protokollen. Stale-Intermediate älterer Läufe im Zellen-Ordner entfernen.
+
+**Frontmatter:** `step: critic`, `agent: se-critic`, `review_target`, `review_id`, `iteration`, `status`, `timestamp`, `schema_version: 1.0.0`
+**Atomic write:** temp → rename Protokoll → Endreport → REQ-Frontmatter-Sync (`review_state`, `last_reviewed`, `reviewer`, `review_iteration`, ggf. `suspect_children`) → `.se-state.yaml` aktualisieren.
 
 <output_contract>
 ```

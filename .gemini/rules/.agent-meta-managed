@@ -11,6 +11,9 @@ lifecycle-tasks.md
 mcp-guardrails.md
 no-worktree-isolation.md
 provider-agnostic.md
+se-cascade-adr-standard.md
+se-cascade-artifact-taxonomy.md
+se-cascade-review-lifecycle.md
 security-paved-roads.md
 session-conclusion.md
 speech-mode.md

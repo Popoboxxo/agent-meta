@@ -47,7 +47,7 @@ Kategorien für `docs/REQUIREMENTS.md`:
 
 > **AI ROUTING:** Claude -> CLAUDE.md | Opencode, Gemini -> AGENTS.md | Mammouth -> MAMMOUTH.md
 
-Generiert von agent-meta v0.101.0-beta.5 — `2026-09-06`
+Generiert von agent-meta v0.101.0-beta.5 — `2026-09-07`
 DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben — Ausnahmen siehe Abschnitt »Orchestrator — Universal Router«.
 
@@ -60,7 +60,9 @@ DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Cod
 | `bug-feature-analyzer` | Issue triage: classify bug vs. user-error vs. feature vs. out-of-scope — before developer/feature-lifecycle delegation |
 | `claude-expert` | Claude Code Experte: Funktionsweise, .claude Konfiguration, Best Practices |
 | `code-reviewer` | Checks code quality, blast radius, and Clean Code — not functional correctness (that's validator). |
-| `concept-reviewer` | Review concept/design doc: completeness, logic, risks, threat model, Approve/Iterate |
+| `concept-architect` | System design for complex changes: components, interfaces, trade-offs — never implements |
+| `concept-reviewer` | Review concept/design doc: completeness, logic, risks, threat model, Approve/Request-changes/Block — writes structured review report |
+| `concept-specifier` | Turn a concept into a technical specification: interface contracts, data flow, acceptance criteria — never implements |
 | `continue-expert` | Continue Experte: Funktionsweise, .continue Konfiguration, Best Practices |
 | `copilot-expert` | GitHub Copilot Experte: Funktionsweise, .github/copilot Konfiguration, Best Practices |
 | `data-engineer` | Data-Pipelines: ETL/ELT, Schema-Migration (Datenebene), Data-Quality, Lineage, Pipeline-Monitoring, Streaming/Batch — übergibt Pipeline-Spec an developer |

@@ -78,6 +78,20 @@ presets:
       docker-image-scan: false
       action-pin-validation: false
 
+  concept-driven:       # concept-driven-dev pipeline (#370): spec-first, tests, no REQ-formalization
+    req-traceability: false
+    tests-required: true
+    codebase-overview: false
+    security-audit: false
+    ai-security-review: false
+    prompt-governance: false
+    lifecycle-ownership: false
+    se-required: "false"
+    release-gates:
+      artifact-freshness: false
+      docker-image-scan: false
+      action-pin-validation: false
+
   spec-certified:       # regulated environments
     req-traceability: true
     tests-required: true

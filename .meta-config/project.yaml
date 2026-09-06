@@ -92,6 +92,7 @@ roles:
 - refactoring-specialist
 - technical-writer
 - tester
+- test-executor
 - validator
 - accessibility-specialist
 - data-engineer
@@ -107,6 +108,9 @@ roles:
 - dependency-auditor
 - incident-responder
 - intern-developer
+- concept-specifier
+- concept-architect
+- se-component-requirements
 project:
   name: agent-meta
   prefix: am
@@ -347,5 +351,14 @@ model-source-preference:
 se-focus: false
 debug-mode: false
 allow-committed-secrets: false
-rules: {}
+rules:
+  threat-model-4-questions:
+    channel: skill
+    skill-description: Use before public releases — answer the 4 threat-model questions
+      (what are you building, what could go wrong, mitigations, consequences).
+  security-paved-roads:
+    channel: skill
+    skill-description: Use before commits, deploys and new features — security paved-road
+      block catalog (auth-flow, dependency-check, secret-scanning, ...) and enforcement
+      points.
 conventions-preset: default

@@ -80,6 +80,7 @@ from lib.cli_commands import (
 )
 from lib.config import find_agent_meta_root
 from lib.log import SyncLog
+from lib.se_validate import _handle_validate_se
 # Re-exported for tests: tests/test_knowledge_sync_integration.py reads
 # sync_module.sync_knowledge_engine (kept stable during the #481 split).
 from lib.knowledge import sync_knowledge_engine  # noqa: F401  (deliberate re-export)
@@ -141,6 +142,14 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                              "Resolves test-repo.path from project.yaml (relative or absolute), "
                              "optionally overridden by AGENT_META_TEST_REPO env var. "
                              "Performs a full sync into the test repo and checks sync.log for errors.")
+    parser.add_argument("--validate-se", action="store_true",
+                        help="Standalone SE-cascade validation (issue #338): read-only "
+                             "checks over the project's docs/se artifacts against the "
+                             "#339 conventions (B1-B5): REQ frontmatter enums, taxonomy "
+                             "naming incl. version-suffix ban, ADR lifecycle + open_adrs "
+                             "integrity, L2 separation, review IDs. Exit 0 when clean or "
+                             "when no SE artifacts exist; exit 1 with a findings list "
+                             "otherwise.")
     parser.add_argument("--test-plugin", metavar="ID", default=None,
                         help="Run the health check for one plugin from the catalog and exit.")
     parser.add_argument("--render-standalone", action="store_true",
@@ -264,6 +273,7 @@ _MODE_HANDLERS = [
     (lambda a: a.delete_backup, _handle_delete_backup),
     (lambda a: a.prune_backups, _handle_prune_backups),
     (lambda a: a.validate, _handle_validate),
+    (lambda a: a.validate_se, _handle_validate_se),
 ]
 
 

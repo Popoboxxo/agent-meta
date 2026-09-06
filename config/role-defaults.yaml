@@ -47,6 +47,7 @@ roles:
       - design-spec-v1
       - api-spec-v1
       - explorer-output-v1
+      - concept-spec-v1
       output_contract: dev-result-v1
       input_schema: schemas/handoffs/task-spec.schema.json
       timeout_sec: 300
@@ -137,6 +138,8 @@ roles:
       - design-spec-v1
       - api-spec-v1
       - explorer-output-v1
+      - concept-spec-v1
+      - concept-arch-output-v1
       output_contract: dev-result-v1
       input_schema: schemas/handoffs/task-spec.schema.json
       timeout_sec: 600
@@ -157,6 +160,8 @@ roles:
       - review-output-v1
       - e2e-result-v1
       - blocked-review-v1
+      - concept-spec-v1
+      - concept-arch-output-v1
       output_contract: dev-result-v1
       input_schema: schemas/handoffs/task-spec.schema.json
       timeout_sec: 900
@@ -881,11 +886,13 @@ roles:
       input_contracts:
       - se-arch-output-v1
       - se-req-output-v1
+      - se-comp-req-output-v1
       output_contract: critic-result-v1
       target_roles:
       - se-architect
       - se-requirements
       - se-interface-mgr
+      - se-component-requirements
     short_desc: Prüft Architekturentscheidungen iterativ auf Vollständigkeit, Konsistenz
       und ...
   se-interface-mgr:
@@ -934,8 +941,40 @@ roles:
       input_contracts:
       - interface-result-v1
       output_contract: termination-result-v1
+      target_roles:
+      - se-component-requirements
     short_desc: Entscheidet deterministisch, ob der L3-Component-Leaf-Node erreicht
       wurde.
+  se-component-requirements:
+    group: se
+    model: balanced
+    memory: project
+    workflow_tier: optional
+    description: 'Materialisiert pro Leaf-Component aus der COMP-Tabelle der L2-Architektur
+      eine L3-Component-Requirements-Datei — Responsibility, REQ-L2-Referenzen, interne
+      Interfaces, ≥2 REQ-L3 (#332). Schließt die Lücke zwischen se-termination-LEAF
+      und se-developer-Input.'
+    routing:
+      intent_keywords:
+      - SE Component Requirements
+      - Komponenten-Anforderungen
+      parallel: false
+      orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - SE Component Requirements
+      - Komponenten-Anforderungen
+      examples:
+      - "Erstelle die L3-Component-Requirements aus der COMP-Tabelle der L2-Architektur."
+    handoff:
+      input_contracts:
+      - task-spec-v1
+      - termination-result-v1
+      - critic-result-v1
+      output_contract: se-comp-req-output-v1
+      target_roles:
+      - se-critic
+    short_desc: L3-Component-Requirements pro Leaf-Component (Issue #332)
   se-junior-developer:
     group: se
     model: fast
@@ -1180,7 +1219,6 @@ roles:
   concept-reviewer:
     model: powerful
     memory: ''
-    permission_mode: plan
     workflow_tier: optional
     description: 'Konzept-Critic: reviewt Design-Docs und Konzepte auf Vollständigkeit,
       Logik, Risiken, Machbarkeit und Konsistenz — gibt strukturiertes Critic-Feedback
@@ -1200,9 +1238,80 @@ roles:
     handoff:
       input_contracts:
       - ideation-output-v1
+      - concept-spec-v1
+      - concept-arch-output-v1
       output_contract: concept-review-v1
     short_desc: 'Konzept-Critic: reviewt Design-Docs und Konzepte auf Vollständigkeit,
       Logik, ...'
+  concept-specifier:
+    model: balanced
+    memory: project
+    workflow_tier: optional
+    description: 'Erstellt technische Spezifikationen aus Anforderungen und Codebase-Kontext:
+      Interface-Contracts, Datenfluss, Akzeptanzkriterien. Implementiert nicht (#370).'
+    routing:
+      intent_keywords:
+      - Spezifikation
+      - Konzept-Spezifikation
+      - Interface-Contracts
+      parallel: false
+      orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Spezifikation
+      - Konzept-Spezifikation
+      - Interface-Contracts
+      examples:
+      - "Schreibe die technische Spezifikation aus dem Konzept."
+      - "Spezifiziere Interface-Contracts und Akzeptanzkriterien für die Änderung."
+    handoff:
+      input_contracts:
+      - ideation-output-v1
+      - explorer-output-v1
+      - concept-review-v1
+      - task-spec-v1
+      output_contract: concept-spec-v1
+      target_roles:
+      - concept-reviewer
+      - developer
+      - senior-developer
+    short_desc: 'Technische Spezifikationen aus Anforderungen und Codebase-Kontext —
+      implementiert nicht'
+  concept-architect:
+    model: powerful
+    memory: project
+    workflow_tier: optional
+    description: 'Systemdesign für komplexe Änderungen (XL, >20 Dateien): Komponenten-Grenzen,
+      Schnittstellen-Contracts, Trade-off-Analyse. Implementiert nicht (#370).'
+    routing:
+      intent_keywords:
+      - Systemdesign
+      - Systemarchitektur
+      - Komponenten-Design
+      - Trade-off
+      parallel: false
+      orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Systemdesign
+      - Systemarchitektur
+      - Komponenten-Design
+      - Trade-off
+      examples:
+      - "Entwirf das Systemdesign für die komplexe Änderung."
+      - "Analysiere die Trade-offs für die Komponenten-Grenzen."
+    handoff:
+      input_contracts:
+      - ideation-output-v1
+      - explorer-output-v1
+      - concept-review-v1
+      - task-spec-v1
+      output_contract: concept-arch-output-v1
+      target_roles:
+      - concept-reviewer
+      - senior-developer
+    short_desc: 'Systemdesign für komplexe Änderungen: Komponenten, Schnittstellen,
+      Trade-offs'
   ui-ux-designer:
     model: balanced
     memory: project
@@ -2363,6 +2472,48 @@ quality_pipelines:
       task: Konzept in REQs überführen
       mode: sequential
     on_error: escalate_to_orchestrator
+  concept-driven-dev:
+    description: 'Concept-driven development (#370): explore → specify → review
+      (max 3 iterations) → implement → validate. Developer implementiert nur gegen
+      die freigegebene Spezifikation; Implementierungs-Tier nach Task-Größe S/M/L/XL.'
+    signal_keywords:
+    - concept-driven-dev
+    - Konzept-Pipeline
+    - gegen Spezifikation implementieren
+    - spec-first
+    stages:
+    - id: explore
+      agent: explorer
+      task: 'Codebase-/Kontext-Analyse (read-only): betroffene Dateien, Patterns,
+        Risiko-Zonen, empfohlener Approach'
+      mode: sequential
+    - id: specify
+      agent: concept-specifier
+      task: 'Technische Spezifikation schreiben (Interface-Contracts, Datenfluss,
+        Akzeptanzkriterien) — XL-Tasks: vorab Systemdesign über concept-architect'
+      mode: sequential
+    - id: review
+      agent: concept-reviewer
+      task: Spec/Design reviewen — Verdict APPROVED/CHANGES_REQUESTED/BLOCKED + Findings
+        mit Severity
+      mode: loop
+      loop:
+        generator: concept-specifier
+        critic: concept-reviewer
+        max_iterations: 3
+    - id: implement
+      agent: developer
+      task: 'Implementierung gegen die freigegebene Spezifikation — Tier nach Task-Größe
+        (S/M/L/XL): S junior-developer, M developer, L senior-developer, XL principal-developer'
+      mode: sequential
+    - id: validate
+      mode: parallel_group
+      parallel_group:
+      - agent: validator
+        task: DoD-Check + Traceability
+      - agent: tester
+        task: Tests grün, keine Regression
+    on_error: escalate_to_orchestrator
   refactor:
     description: 'Codebase refactoring: blast-radius analysis → implement → review
       → commit. Use for cross-cutting refactorings, not trivial renames.'
@@ -2487,6 +2638,17 @@ quality_pipelines:
       condition:
         type: agent_decision
         agent: se-termination
+    - id: l3-component-requirements
+      agent: se-component-requirements
+      task: 'For each leaf component (decision: leaf, handoff_target: se-component-requirements)
+        from the termination phase: materialize one L3 component-requirements file
+        per component from the COMP table of the L2 architecture — responsibility
+        (from L2-ARCH), assigned REQ-L2 references, internal interfaces, >= 2 REQ-L3
+        per component (Issue #332)'
+      mode: conditional
+      condition:
+        type: agent_decision
+        agent: se-termination
     - id: implementation
       agent: orchestrator
       allow_orchestrator: true
@@ -2499,8 +2661,9 @@ quality_pipelines:
         - Route to se-senior-developer for complex leafs (5+ interfaces, cross-cutting,
         boundary-level, security/performance-critical)
 
-        Implement each leaf against its Black-Box specification and interface contracts
-        from the interface-registry.
+        Implement each leaf against its L3 component-requirements file (from the
+        l3-component-requirements stage), its Black-Box specification and interface
+        contracts from the interface-registry.
 
         Each implementation must reference its req_id and leaf_id in code artifacts.
 

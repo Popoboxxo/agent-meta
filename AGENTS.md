@@ -197,7 +197,9 @@ Bei Bedarf mit `Read` laden; verfügbare Regeln via `ls` im jeweiligen Verzeichn
 | `bug-feature-analyzer` | Issue-Triage: Eingehende Bug-Meldungen, Feature-Requests analysieren, k |
 | `claude-expert` | Absoluter Analyse-Experte für die Plattform Claude Code: Funktionsweise, Konf |
 | `code-reviewer` | Clean Code Gatekeeper: Blast-Radius-Analyse, SOLID/DRY Prüfung, Code-Qualität |
+| `concept-architect` | Systemdesign für komplexe Änderungen: Komponenten, Schnittstellen, Trade-offs |
 | `concept-reviewer` | Konzept-Critic: reviewt Design-Docs, Konzepte auf Vollständigkeit, Logik |
+| `concept-specifier` | Technische Spezifikationen aus Anforderungen, Codebase-Kontext — implementiert nicht |
 | `continue-expert` | Absoluter Analyse-Experte für die Plattform Continue: Funktionsweise, Konfigu |
 | `copilot-expert` | Absoluter Analyse-Experte für die Plattform GitHub Copilot: Funktionsweise, K |
 | `data-engineer` | ETL/ELT-Pipelines, Schema-Migration (Datenebene), Data-Quality-Checks |

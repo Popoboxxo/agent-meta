@@ -159,3 +159,17 @@ presets:
     integration-development:
       channel: skill
       skill-description: "Use when developing a HACS custom integration — 7-step workflow from live Ist-Analyse to release and dev-instance verification."
+    # SE-Kaskade rules (#339): normative only while an SE cascade is active,
+    # so they stay out of the always-on embed (progressive disclosure, #192).
+    # Bodies render fully into <SKILLS_DIR>/se-cascade-*/SKILL.md for
+    # SE_ENABLED=true projects; SE_ENABLED=false projects keep only the
+    # SKILL.md description in context.
+    se-cascade-artifact-taxonomy:
+      channel: skill
+      skill-description: "Use when working inside an active SE-Kaskade — artifact taxonomy, folder/naming rules and output locations for SE artifacts (ADR, L0-L3, VV, reviews, traceability, reports)."
+    se-cascade-adr-standard:
+      channel: skill
+      skill-description: "Use when recording architecture decision records in an active SE-Kaskade — binding MADR minimal standard for SE ADRs (Issue #339 B1)."
+    se-cascade-review-lifecycle:
+      channel: skill
+      skill-description: "Use when running SE-Kaskade reviews — binding review lifecycle with protocol obligation and RVW finding IDs (Issue #339 B5)."

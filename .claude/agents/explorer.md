@@ -1,6 +1,6 @@
 ---
 name: explorer
-version: 1.1.1
+version: 1.2.0
 description: Read-only codebase research, dependency and impact mapping, file and
   symbol search.
 hint: Analyze codebase / dependencies / impact — read-only, delegates findings
@@ -10,7 +10,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/explorer.md@1.1.1
+generated-from: 1-generic/explorer.md@1.2.0
 model: claude-haiku-4-5-20251001
 ---
 
@@ -41,6 +41,15 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 ## 4. Condense findings
 
 Reduce hits to the essentials (max 10-20 lines output). Paths with line numbers (`src/foo.py:42`). Dependencies as list/map. 1-sentence conclusion on the impact.
+
+**Structured result (issue #370)** — every research result always reports these four items (empty if not applicable, "none" where nothing exists):
+
+| Field | Content |
+|-------|---------|
+| **Affected files** | Paths with line numbers that a change would touch |
+| **Patterns** | Existing conventions/patterns the caller should follow |
+| **Risk zones** | Areas where a change is risky (coupling, side effects, tests) |
+| **Recommended approach** | 1-2 sentences — concrete recommendation, no implementation |
 </workflow>
 
 <context>
@@ -68,7 +77,11 @@ Reduce hits to the essentials (max 10-20 lines output). Paths with line numbers 
 ```
 STATUS: done|partial|failed
 RESULT: <findings in 2-4 sentences: what found, where, conclusion>
-ARTIFACTS: <file paths with line numbers, comma-separated>
+AFFECTED_FILES: <paths with line numbers the change would touch>
+PATTERNS: <existing patterns/conventions to follow>
+RISK_ZONES: <risky areas, empty/none if none>
+RECOMMENDED_APPROACH: <1-2 sentence recommendation>
+ARTIFACTS: <file paths referenced, comma-separated>
 ERRORS: <empty if none>
 ```
 **Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).

@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "7.13.0"
+version: "7.14.0"
 description: "Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes, delegates."
 hint: "Entry point for ALL development tasks — decomposes complex tasks and dispatches in parallel"
 prompt_mode: modern
@@ -72,6 +72,17 @@ Fallunterscheidungen nach dem `route_intent`-Ergebnis:
 1. Unambiguous keyword signals route directly via the `route_intent` routing rules (`routing.rules` in the generated tool definition) — no estimator call, no duplicated keyword data here.
 2. `effort-estimator` ONLY as tie-breaker when two tiers/roles match equally — never as default routing (latency/cost overhead without value).
 3. In doubt → higher tier (below `principal-developer`). Max 1 escalation per task, except the explicit `senior-developer` → `principal-developer` last-resort gate.
+
+**Task-size routing (issue #370):** Für Implementierungs-Tasks — Concept-Agent vorschalten, Developer-Tier nach Größe wählen. Signal-Keywords → Pipeline `concept-driven-dev` (§2). Concept-Agents vorschalten, NICHT selbst analysieren (Router, nicht Worker):
+
+| Task size | Concept agents | Developer tier |
+|:---------:|----------------|:--------------:|
+| S (≤2 files) | *(skipped — solution obvious)* | `junior-developer` |
+| M (3–8 files) | `concept-specifier` (+ review loop) | `developer` |
+| L (9–20 files) | `concept-specifier` + `concept-reviewer` | `senior-developer` |
+| XL (>20 files) | `concept-architect` + `concept-reviewer` | `principal-developer` |
+
+S: Pipeline überspringen, direkt delegieren. M–XL: erst `concept-driven-dev` (explore → specify → review), dann Implementierung gegen die freigegebene Spec. XL-Implementierung → `principal-developer` NUR mit freigegebener Concept-Basis (Approved Spec/Design); ohne Concept-Basis gilt unverändert der Last-Resort-Eskalations-Gate (task summary + failure log, `senior-developer` failed 2+).
 
 **Per-task tier override (A2A, optional):** `payload.tier_override: <tier>` übersteuert die Rolle→Tier-Auflösung nur für genau diesen Dispatch. Guardrails (Rule `a2a-delegation-gates.md`):
 - Tier muss im aktiven tier-preset existieren (config/tier-presets.yaml) — sonst Override verwerfen, Fallback auf Rollen-Default.

@@ -217,8 +217,11 @@ Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 | `.claude/agents/se-architect.md` | `1-generic/se-architect.md` |
 | `.claude/agents/se-critic.md` | `1-generic/se-critic.md` |
 | `.claude/agents/concept-reviewer.md` | `1-generic/concept-reviewer.md` (optional, für concept-development Pipeline) |
+| `.claude/agents/concept-specifier.md` | `1-generic/concept-specifier.md` (optional, für concept-development Pipeline: Konzept → technische Spec — Interface-Verträge, Datenfluss, Acceptance-Kriterien) |
+| `.claude/agents/concept-architect.md` | `1-generic/concept-architect.md` (optional, für concept-development Pipeline: System-Design für komplexe Changes (XL) — Komponenten, Interfaces, Trade-off-Analyse) |
 | `.claude/agents/se-interface-mgr.md` | `1-generic/se-interface-mgr.md` |
 | `.claude/agents/se-termination.md` | `1-generic/se-termination.md` |
+| `.claude/agents/se-component-requirements.md` | `1-generic/se-component-requirements.md` (optional, SE-Kaskade: materialisiert L3-Component-Requirements je Leaf-Component aus der L2-COMP-Tabelle, #332) |
 | `.claude/agents/se-orchestrator.md` | `1-generic/se-orchestrator.md` |
 | `.claude/agents/se-junior-developer.md` | `1-generic/se-junior-developer.md` |
 | `.claude/agents/se-developer.md` | `1-generic/se-developer.md` |
@@ -533,8 +536,11 @@ Vollständige Anleitung: `agent-meta-manager` → Abschnitt "CLAUDE.md Review & 
 - [ ] `.claude/agents/se-architect.md` vorhanden
 - [ ] `.claude/agents/se-critic.md` vorhanden
 - [ ] `.claude/agents/concept-reviewer.md` vorhanden (wenn concept-development Pipeline genutzt)
+- [ ] `.claude/agents/concept-specifier.md` vorhanden (wenn concept-development Pipeline genutzt)
+- [ ] `.claude/agents/concept-architect.md` vorhanden (wenn concept-development Pipeline genutzt)
 - [ ] `.claude/agents/se-interface-mgr.md` vorhanden
 - [ ] `.claude/agents/se-termination.md` vorhanden
+- [ ] `.claude/agents/se-component-requirements.md` vorhanden (SE-Kaskade)
 - [ ] `.claude/agents/se-orchestrator.md` vorhanden
 - [ ] `.claude/agents/se-junior-developer.md` vorhanden
 - [ ] `.claude/agents/se-developer.md` vorhanden
