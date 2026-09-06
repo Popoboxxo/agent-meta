@@ -5,8 +5,9 @@ import json
 import re
 from pathlib import Path
 
+from .agents import build_agent_hints, build_knowledge_engine_hints
 from .frontmatter import _strip_frontmatter
-from .io import content_hash, safe_path
+from .io import content_hash, load_json_file, safe_path
 from .log import SyncLog
 from .plugins import resolve_plugin_compact
 from .variables import (
@@ -36,14 +37,13 @@ def _context_hashes_path(project_root: Path) -> Path:
 
 
 def _load_context_hashes(project_root: Path) -> dict:
-    """Read .meta-config/context-hashes.json; return {} if absent or invalid."""
+    """Read .meta-config/context-hashes.json; return {} if absent or invalid.
+
+    Canonical JSON loader (Issue #479), fail-soft: absent or malformed file
+    yields {} — same contract as the former hand-rolled loader.
+    """
     path = _context_hashes_path(project_root)
-    if not path.exists():
-        return {}
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, ValueError, OSError):
-        return {}
+    data = load_json_file(path, on_error="default", default={})
     hashes = data.get("hashes") if isinstance(data, dict) else None
     return hashes if isinstance(hashes, dict) else {}
 
@@ -454,8 +454,10 @@ def _sync_managed_block_context(
     target_path = safe_path(project_root, context_file)
     template_name = pc.get("context_template")
     template_path = agent_meta_root / template_name if template_name else None
-    
-    from .agents import build_agent_hints
+
+    # build_agent_hints is imported at module top level — the lazy import was
+    # vestigial (agents does not import context; Issue #478 cleanup, guarded
+    # by tests/test_import_acyclicity.py).
     orch_config = config.get("orchestrator", {})
     provider_override = orch_config.get("provider-overrides", {}).get(provider, {})
     _orch_mode = _resolve_orch_mode(orch_config, provider_override)
@@ -1015,8 +1017,10 @@ def _build_managed_block(
 ) -> str:
     from .delegation_table import get_active_agents_data
     from .rules import collect_rule_sources, resolve_rules
-    from .agents import build_knowledge_engine_hints
-    
+
+    # build_knowledge_engine_hints is imported at module top level — the
+    # lazy import was vestigial (agents does not import context; Issue #478
+    # cleanup, guarded by tests/test_import_acyclicity.py).
     pc = (provider_config or {}).get(provider, {})
     has_native_rules = pc.get("has_rules", False)
 

@@ -4,11 +4,15 @@ provider's committed + local secrets config files.
 Split out of ``mcp.py`` (module size limit — see CLAUDE.md "Python
 (scripts/lib/)" conventions, <= 600 lines per module) to keep registry
 loading / rule-doc generation / secrets-template bookkeeping in that module
-separate from the provider-config-writing concern here. This module imports
-the registry helpers it needs from ``.mcp`` only inside function bodies
-(deferred import) — ``mcp.py`` imports ``generate_provider_configs`` from
-here at its own top level, so a top-level import in the other direction here
-would be a circular import.
+separate from the provider-config-writing concern here. The registry
+helpers (``load_mcp_registry``, ``resolve_active_mcp_servers``,
+``SECRETS_LOCAL_FILE``) are imported at module top level from
+``lib.registry_query`` (issue #478) — the plugins-free resolution layer —
+NOT from ``mcp.py``: that direction would recreate the
+mcp/mcp_provider_config/rules import cycle mcp_registry.py was extracted to
+break (#613). ``mcp.py`` imports ``generate_provider_configs`` from here at
+its own top level (ABI re-export); the opposite direction via registry_query
+stays cycle-free.
 
 Public interface:
     generate_provider_configs(...)  → writes committed + local MCP provider
@@ -27,6 +31,11 @@ from .io import (
     write_checked,
 )
 from .log import SyncLog
+from .registry_query import (
+    SECRETS_LOCAL_FILE,
+    load_mcp_registry,
+    resolve_active_mcp_servers,
+)
 from .toml_writer import dumps as _toml_dumps
 
 # ---------------------------------------------------------------------------
@@ -473,11 +482,10 @@ def generate_provider_configs(
     Raises SyncError if actual secrets are found in committed content and
     allow_committed_secrets is False.
     """
-    # Sourced from mcp_registry.py, not mcp.py, so this module never depends
-    # on mcp.py — that direction would recreate the mcp/mcp_provider_config/
-    # rules import cycle mcp_registry.py was extracted to break (#613).
-    from .mcp_registry import SECRETS_LOCAL_FILE, load_mcp_registry, resolve_active_mcp_servers
-
+    # Registry resolution comes from lib.registry_query (Issue #478) — the
+    # plugins-free resolution layer — so this module never depends on mcp.py;
+    # that direction would recreate the mcp/mcp_provider_config/rules import
+    # cycle mcp_registry.py was extracted to break (#613).
     registry = load_mcp_registry(agent_meta_root, config, project_root)
     if not registry:
         return

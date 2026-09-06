@@ -5,7 +5,7 @@ import json
 import re
 from pathlib import Path
 
-from .io import is_unchanged, safe_path, write_checked
+from .io import is_unchanged, load_json_file, safe_path, write_checked
 from .log import SyncLog
 from .providers import provider_hooks_supported
 
@@ -132,12 +132,13 @@ def _update_settings_hooks(
     if not all_managed and not settings_path.exists():
         return  # nothing to do
 
-    # Load or initialise settings
+    # Load or initialise settings. Canonical JSON loader (Issue #479),
+    # fail-soft with the original specific warning message preserved: a
+    # None result (missing → n/a here, unreadable or malformed) keeps the
+    # old "warn and abort the hooks update" behavior.
     if settings_path.exists():
-        try:
-            with settings_path.open(encoding="utf-8") as f:
-                settings = json.load(f)
-        except (json.JSONDecodeError, OSError):
+        settings = load_json_file(settings_path, on_error="default", default=None)
+        if settings is None:
             log.warning("settings.json could not be parsed — hooks section not updated")
             return
     else:

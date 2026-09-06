@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 
 from .report import Finding, Severity
+from ..io import load_yaml_file
 
 # Known built-in variables injected by sync.py / build_variables()
 _BUILTIN_VARS: frozenset[str] = frozenset({
@@ -158,15 +159,13 @@ def check_placeholders(path: Path, content: str, agent_meta_root: Path,
 
 
 def load_project_vars(agent_meta_root: Path) -> set[str]:
-    """Load variable names from .meta-config/project.yaml variables section."""
+    """Load variable names from .meta-config/project.yaml variables section.
+
+    Canonical single-file loader (Issue #479), fail-soft: absent/malformed
+    file or missing PyYAML yields no variables (former broad-except behavior).
+    """
     config_path = agent_meta_root / ".meta-config" / "project.yaml"
-    if not config_path.exists():
-        return set()
-    try:
-        import yaml
-        data = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
-    except (ImportError, Exception):  # noqa: BLE001
-        return set()
+    data = load_yaml_file(config_path, on_error="default", default={})
     return set((data.get("variables") or {}).keys())
 
 

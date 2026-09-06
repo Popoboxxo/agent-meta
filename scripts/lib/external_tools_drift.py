@@ -13,15 +13,19 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .deactivation import get_active_providers
 from .external_tools import (
     DEFAULT_RULES_DIR,
     TOOL_RULE_PREFIX,
-    load_external_tools_registry,
-    resolve_active_external_tools,
     resolve_injection_path,
 )
 from .io import write_checked
 from .log import SyncLog
+from .registry_query import (
+    load_external_tools_registry,
+    resolve_active_external_tools,
+    resolve_active_mcp_servers,
+)
 from .rule_index import read_managed_index
 
 DRIFT_FILENAME = "external-tools-drift.md"
@@ -159,10 +163,13 @@ def scan_injection_drift(
     """Find files/dirs under each active provider's infra root that neither
     agent-meta itself manages (per-directory .agent-meta-managed indexes) nor
     any active external tool's permitted-injections declares. Pure — no writes.
-    """
-    from .deactivation import get_active_providers
-    from .mcp import resolve_active_mcp_servers
 
+    get_active_providers and resolve_active_mcp_servers are imported at module
+    top level (Issue #478): deactivation is a leaf-side module and the MCP
+    activation resolution lives in lib.registry_query, which does not import
+    this module (or mcp) back — the former deferred imports carried no cycle
+    anymore.
+    """
     registry = load_external_tools_registry(agent_meta_root, config, project_root)
     active_tools = resolve_active_external_tools(config, agent_meta_root, project_root, registry=registry)
     active_mcp = set(resolve_active_mcp_servers(config, agent_meta_root, project_root))

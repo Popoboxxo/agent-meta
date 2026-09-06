@@ -8,6 +8,9 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
+from .frontmatter import parse_frontmatter_text, split_frontmatter
+from .io import load_yaml_file
+
 # Module-level logger for fail-soft branches that have no SyncLog instance in
 # scope (Issue #568) — DEBUG-level only, so troubleshooting information isn't
 # lost even though the error itself is deliberately non-fatal.
@@ -48,29 +51,23 @@ def load_quality_pipelines(agent_meta_root: str) -> dict:
 
     Cached per ``agent_meta_root`` (process lifetime) — read-only framework
     config, re-parsed on every call otherwise (#553 perf hotspot).
+
+    Loads via the canonical single-file loader (Issue #479, fail-soft): an
+    absent/malformed file or missing PyYAML yields {} — optional-file
+    semantics, same as the former hand-rolled loader.
     """
-    try:
-        import yaml
-    except ImportError:
-        return {}
     defaults_path = os.path.join(agent_meta_root, "config", "role-defaults.yaml")
-    if not os.path.exists(defaults_path):
-        return {}
-    with open(defaults_path, "r", encoding="utf-8") as f:
-        config = yaml.safe_load(f) or {}
+    config = load_yaml_file(Path(defaults_path), on_error="default", default={})
     return config.get("quality_pipelines", {})
 
 
 def load_pipeline_overrides(config_path: str) -> dict:
-    """Load quality-pipelines Overrides from .meta-config/project.yaml."""
-    try:
-        import yaml
-    except ImportError:
-        return {}
-    if not os.path.exists(config_path):
-        return {}
-    with open(config_path, "r", encoding="utf-8") as f:
-        config = yaml.safe_load(f) or {}
+    """Load quality-pipelines Overrides from .meta-config/project.yaml.
+
+    Fail-soft (Issue #479): absent/malformed overrides file or missing PyYAML
+    yield {} — the overrides are optional by design.
+    """
+    config = load_yaml_file(Path(config_path), on_error="default", default={})
     return config.get("quality-pipelines", {})
 
 
@@ -391,29 +388,23 @@ def parse_plan_ref(plan_path: str) -> dict:
     with open(plan_path, "r", encoding="utf-8") as f:
         content = f.read()
 
-    fm_match = re.match(r'^---\s*\n(.*?)\n---', content, re.DOTALL)
-    if fm_match:
-        try:
-            import yaml
-        except ImportError as e:
-            # PyYAML is an optional dependency project-wide (see e.g.
-            # lib/io.py::_YAML_AVAILABLE) — without it, the pipeline_stages
-            # frontmatter override is simply unavailable; result["stages"]
-            # stays at its already-initialized empty default.
-            _logger.debug("parse_plan_ref: PyYAML unavailable, skipping pipeline_stages frontmatter: %s", e)
-        else:
+    # Frontmatter parsing via the canonical frontmatter module (Issue #473):
+    # replaces the former inline regex + inline `import yaml` duplicate.
+    # parse_frontmatter_text is fail-soft ({}) — a missing/unparseable
+    # pipeline_stages block simply leaves result["stages"] at its
+    # already-initialized empty default.
+    fm_block, _ = split_frontmatter(content)
+    if fm_block:
+        fm = parse_frontmatter_text(content)
+        ps = fm.get("pipeline_stages")
+        if isinstance(ps, dict):
             try:
-                fm = yaml.safe_load(fm_match.group(1)) or {}
-                ps = fm.get("pipeline_stages")
-                if isinstance(ps, dict):
-                    result["stages"] = {str(k): int(v) for k, v in ps.items()}
-            except (yaml.YAMLError, AttributeError, TypeError, ValueError) as e:
-                # An optional `pipeline_stages:` frontmatter override is nice-
-                # to-have only — malformed YAML (YAMLError), a non-mapping
-                # top-level value (AttributeError on fm.get), or a non-numeric
-                # stage value (TypeError/ValueError from int(v)) all fall back
-                # to the already-initialized empty result["stages"] rather
-                # than aborting plan-ref parsing entirely.
+                result["stages"] = {str(k): int(v) for k, v in ps.items()}
+            except (TypeError, ValueError) as e:
+                # A non-numeric stage value (TypeError/ValueError from
+                # int(v)) falls back to the already-initialized empty
+                # result["stages"] rather than aborting plan-ref parsing
+                # entirely.
                 _logger.debug("parse_plan_ref: pipeline_stages frontmatter ignored for %s: %s: %s", plan_path, type(e).__name__, e)
 
     table_pattern = re.compile(

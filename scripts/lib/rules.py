@@ -7,6 +7,11 @@ from pathlib import Path
 from .frontmatter import _split_frontmatter
 from .io import _load_yaml_or_json, safe_path, write_checked
 from .log import SyncLog
+from .registry_query import (
+    build_mcp_guardrails_list,
+    load_mcp_registry,
+    resolve_active_mcp_servers,
+)
 from .variables import (
     _orch_mode_flags,
     _resolve_orch_mode,
@@ -203,12 +208,10 @@ def sync_rules(
     if _orch_mode == "main-chat":
         provider_vars["ORCHESTRATOR_INVOCATION_HINT"] = "- Du bist der Orchestrator! Befolge die Regeln in use-orchestrator.md."
 
-    # Sourced from mcp_registry.py, not mcp.py — mcp.py itself imports
-    # resolve_rules from this module (deferred, for rule/provider-config
-    # generation), so importing back from mcp.py here would recreate the
-    # mcp/mcp_provider_config/rules cycle mcp_registry.py was extracted to
-    # break (#613).
-    from .mcp_registry import build_mcp_guardrails_list, load_mcp_registry, resolve_active_mcp_servers
+    # MCP registry resolution comes from lib.registry_query (Issue #478) —
+    # the plugins-free resolution layer. Importing from mcp.py here would
+    # recreate the mcp/mcp_provider_config/rules cycle mcp_registry.py was
+    # extracted to break (#613); registry_query sits below both.
     mcp_registry = load_mcp_registry(agent_meta_root, config, project_root)
     active_mcp_servers = resolve_active_mcp_servers(config, agent_meta_root, project_root, registry=mcp_registry)
     provider_vars['MCP_GUARDRAILS_LIST'] = build_mcp_guardrails_list(mcp_registry, active_mcp_servers)

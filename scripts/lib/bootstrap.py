@@ -16,10 +16,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-try:
-    import yaml
-except ImportError:
-    yaml = None  # type: ignore[assignment]
+from .io import load_yaml_file
 
 
 class BootstrapEngine:
@@ -34,15 +31,14 @@ class BootstrapEngine:
     @property
     def bootstrap_registry(self) -> dict[str, Any]:
         if self._bootstrap_registry is None:
-            path = self.config_dir / "provider-bootstrap.yaml"
-            try:
-                with open(path, encoding="utf-8") as f:
-                    if yaml is not None:
-                        self._bootstrap_registry = yaml.safe_load(f)
-                    else:
-                        self._bootstrap_registry = {}
-            except (FileNotFoundError, yaml.YAMLError):
-                self._bootstrap_registry = {}
+            # Canonical single-file loader (Issue #479), fail-soft: absent or
+            # malformed registry yields {} — same as the former hand-rolled
+            # loader (FileNotFoundError/yaml.YAMLError → {}).
+            self._bootstrap_registry = load_yaml_file(
+                self.config_dir / "provider-bootstrap.yaml",
+                on_error="default",
+                default={},
+            )
         return self._bootstrap_registry or {}
 
     def get_bootstrap_config(self, provider: str) -> dict[str, Any]:

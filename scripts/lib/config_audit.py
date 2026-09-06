@@ -15,24 +15,15 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from dataclasses import dataclass, field
 from pathlib import Path
 
 from .config_audit_apply import apply_audit  # noqa: F401 -- re-exported, see below
 from .config_audit_providers import find_missing_providers
-from .frontmatter import _YAML_AVAILABLE, parse_frontmatter_file
+from .config_audit_types import AuditIssue, AuditReport  # noqa: F401 -- re-exported for API compat
+from .frontmatter import parse_frontmatter_file
+from .io import load_yaml_file
 from .providers import load_providers_config
 from .roles import load_roles_config
-
-# `_YAML_AVAILABLE` is single-sourced from `.frontmatter` (Issue #571) so the
-# fallback-behavior decision is made in exactly one place project-wide. A
-# local `import yaml as _yaml` is still needed here for `_read_yaml()`, which
-# parses whole project.yaml documents rather than Markdown frontmatter blocks
-# (out of scope for the frontmatter-focused canonical module).
-try:
-    import yaml as _yaml
-except ImportError:
-    _yaml = None
 
 
 # Matches a `based-on:` frontmatter value, e.g. ``1-generic/developer.md@3.1.1``.
@@ -63,103 +54,9 @@ _WRITE_TOOLS = frozenset({"Write", "Edit"})
 _STANDALONE_TAG_RE = re.compile(r"^(</?)([A-Za-z][A-Za-z0-9_-]*)>$")
 
 
-@dataclass(frozen=True)
-class AuditIssue:
-    """A single finding produced by :func:`audit_config`.
-
-    Attributes:
-        category: Machine-readable issue class (e.g. ``"deprecated_roles"``).
-        severity: One of ``"error"``, ``"warning"`` or ``"info"``.
-        role: The role name the issue relates to (empty when not role-scoped).
-        message: Short human-readable summary.
-        detail: Optional additional context (file path, template name, ...).
-    """
-
-    category: str
-    severity: str
-    role: str
-    message: str
-    detail: str = ""
-
-
-@dataclass
-class AuditReport:
-    """Aggregated result of an audit run.
-
-    Attributes:
-        issues: All findings, in discovery order.
-    """
-
-    issues: list[AuditIssue] = field(default_factory=list)
-
-    def add(
-        self,
-        category: str,
-        severity: str,
-        role: str,
-        message: str,
-        detail: str = "",
-    ) -> None:
-        """Append a new :class:`AuditIssue` to the report."""
-        self.issues.append(
-            AuditIssue(
-                category=category,
-                severity=severity,
-                role=role,
-                message=message,
-                detail=detail,
-            )
-        )
-
-    @property
-    def has_issues(self) -> bool:
-        """True when at least one issue was recorded."""
-        return bool(self.issues)
-
-    @property
-    def errors(self) -> list[AuditIssue]:
-        """All issues with severity ``"error"``."""
-        return [i for i in self.issues if i.severity == "error"]
-
-    @property
-    def warnings(self) -> list[AuditIssue]:
-        """All issues with severity ``"warning"``."""
-        return [i for i in self.issues if i.severity == "warning"]
-
-    @property
-    def infos(self) -> list[AuditIssue]:
-        """All issues with severity ``"info"``."""
-        return [i for i in self.issues if i.severity == "info"]
-
-    @property
-    def deprecated_roles(self) -> list[str]:
-        """Role names flagged as deprecated, de-duplicated, in discovery order."""
-        seen: dict[str, None] = {}
-        for issue in self.issues:
-            if issue.category == "deprecated_roles" and issue.role:
-                seen.setdefault(issue.role, None)
-        return list(seen.keys())
-
-    def by_category(self, category: str) -> list[AuditIssue]:
-        """All issues matching ``category``."""
-        return [i for i in self.issues if i.category == category]
-
-
-def _read_yaml(path: Path) -> dict:
-    """Load a YAML file into a dict, returning an empty dict on absence/empty.
-
-    Raises:
-        RuntimeError: When PyYAML is unavailable.
-    """
-    if not _YAML_AVAILABLE:
-        raise RuntimeError(
-            "PyYAML is required for config audit but is not installed. "
-            "Run: pip install pyyaml"
-        )
-    if not path.exists():
-        return {}
-    with path.open(encoding="utf-8") as f:
-        return _yaml.safe_load(f) or {}
+# AuditIssue/AuditReport now live in the config_audit_types leaf module
+# (Issue #478) and are re-exported above for API compatibility — tests and
+# callers import them from this module.
 
 
 def _template_path_for_role(agent_meta_root: Path, role: str) -> Path:
@@ -353,7 +250,10 @@ def audit_config(agent_meta_root: Path, project_config_path: Path) -> AuditRepor
         An :class:`AuditReport` with all discovered issues.
     """
     report = AuditReport()
-    config = _read_yaml(project_config_path)
+    # Canonical single-file loader (Issue #479), fail-closed: raises SyncError
+    # (with file + location) on malformed YAML / missing PyYAML instead of the
+    # former _read_yaml's RuntimeError; missing file still yields {}.
+    config = load_yaml_file(project_config_path, on_error="raise", default={})
 
     project_roles = config.get("roles", [])
     if not isinstance(project_roles, list):

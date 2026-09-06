@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 
 from .report import Finding, Severity
+from ..frontmatter import _fm_inner, split_frontmatter
 
 
 def check_command_frontmatter(path: Path, content: str, agent_meta_root: Path) -> list[Finding]:
@@ -103,30 +104,76 @@ def check_duplicate_commands(agent_meta_root: Path) -> list[Finding]:
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 def _extract_frontmatter_raw(content: str) -> str | None:
-    match = re.match(r'^---\s*\n(.*?)\n---', content, re.DOTALL)
-    return match.group(1) if match else None
+    """Extract the raw inner YAML of a command file's frontmatter block.
+
+    Boundary detection delegates to the canonical ``lib.frontmatter``
+    splitter (Issue #473) — replaces the former inline regex duplicate.
+    Returns None when the content has no frontmatter block.
+
+    A strict opening-fence precheck emulates the old inline regex exactly
+    (``^---\\s*\\n(.*?)\\n---``): the canonical splitter is more lenient on
+    both ends (any ``---``-suffixed opening fence; the fence's own
+    terminator newline doubling as the adjacent closing fence's separator,
+    so a bare ``---\\n---`` block would parse as empty instead of reporting
+    missing). ``[^\\S\\n]*`` (not ``\\s*``) keeps the prefix minimal so a
+    blank line between the fences stays available as the closing fence's
+    separator — same rationale as consistency/frontmatter.py (Issue #473).
+    Kept as a raw-text view (not ``parse_frontmatter_text``) because the
+    line-based fallback in `_parse_frontmatter` must stay reachable for
+    *malformed* YAML too — see its docstring.
+    """
+    opening = re.match(r"^---[^\S\n]*\n", content)
+    if opening is None or content.find("\n---", opening.end()) == -1:
+        return None
+    fm_block, _ = split_frontmatter(content)
+    return _fm_inner(fm_block)
 
 
 def _parse_frontmatter(raw: str) -> dict:
+    """Parse command-file frontmatter YAML. Fail-soft: returns a dict even
+    for unparseable input.
+
+    Deliberately NOT a plain ``parse_frontmatter_text`` call (Issue #473):
+    the canonical fail-soft parse swallows malformed YAML as ``{}``, while
+    this checker historically salvaged whatever simple ``key: value`` lines
+    it could from broken frontmatter — keeping that behavior preserves the
+    exact findings (e.g. a malformed block that still carries a valid
+    ``description:`` line must not start reporting description-missing).
+    Two documented exceptions to the canonical parse remain:
+
+    * with PyYAML available, malformed YAML falls back to the line parser
+      below (not to ``{}``);
+    * without PyYAML the line parser (including JSON-array values) keeps
+      the consistency checker working — PyYAML is an optional dependency.
+    """
     try:
         import yaml
         return yaml.safe_load(raw) or {}
-    except (ImportError, Exception):  # noqa: BLE001
-        result = {}
-        for line in raw.splitlines():
-            m = re.match(r'^([\w-]+):\s*(.*)$', line)
-            if m:
-                key, val = m.group(1), m.group(2).strip()
-                # Try to detect JSON array
-                if val.startswith("["):
-                    try:
-                        import json
-                        result[key] = json.loads(val)
-                        continue
-                    except Exception:  # noqa: BLE001, S110
-                        pass
-                result[key] = val.strip('"').strip("'")
-        return result
+    except Exception:  # noqa: BLE001 -- ImportError (no PyYAML) or YAMLError:
+        return _parse_frontmatter_lines(raw)
+
+
+def _parse_frontmatter_lines(raw: str) -> dict:
+    """Line-based fallback frontmatter parser (no PyYAML / malformed YAML).
+
+    Also understands JSON-array values (``allowed-tools: ["Bash", "Read"]``)
+    that the simple regex line parser would otherwise keep as strings.
+    """
+    result = {}
+    for line in raw.splitlines():
+        m = re.match(r'^([\w-]+):\s*(.*)$', line)
+        if m:
+            key, val = m.group(1), m.group(2).strip()
+            # Try to detect JSON array
+            if val.startswith("["):
+                try:
+                    import json
+                    result[key] = json.loads(val)
+                    continue
+                except Exception:  # noqa: BLE001, S110
+                    pass
+            result[key] = val.strip('"').strip("'")
+    return result
 
 
 def _rel(path: Path, root: Path) -> str:

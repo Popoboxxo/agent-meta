@@ -9,16 +9,21 @@ model. No connection blocks, no secrets, no provider-config injection — a tool
 contributes only rule-content and a declarative list of hook wrappers that live
 in ``hooks/0-external/``.
 
-The tool definitions themselves are no longer read from a standalone
-``config/external-tools-registry.yaml``; they are the ``cli-tool`` slice of the
-unified plugin catalog (``config/plugin-catalog.yaml`` via :mod:`lib.plugins`),
-filtered by kind here.
+The registry loading and activation resolution live in the neutral
+:mod:`lib.registry_query` core since Issue #478 (dependency inversion —
+this module used to import the catalog core from :mod:`lib.plugins` while
+``plugins`` lazily imported ``resolve_active_external_tools`` back, forming
+a 3-cycle). This module keeps the *generation* machinery (rule content,
+injection resolution, artifact writing) and re-exports the registry/
+activation names for backward compatibility (sync.py, tests,
+external_tools_drift).
 
 Public interface:
     load_external_tools_registry(agent_meta_root, config, project_root)
         → dict of tool definitions (cli-tool slice of the plugin catalog)
+          [re-exported from lib.registry_query]
     resolve_active_external_tools(config, agent_meta_root, project_root)
-        → list of active tool names
+        → list of active tool names [re-exported from lib.registry_query]
     generate_external_tool_artifacts(...)
         → writes .claude/rules/tool-<name>.md for providers with has_rules
     scan_injection_drift(...) / render_injection_drift_artifacts(...)
@@ -30,10 +35,21 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .io import SyncError, _normalize_enabled_config, safe_path, write_checked
+from .io import safe_path, write_checked
 from .log import SyncLog
-from .plugins import _activation_from_config, load_plugin_catalog, plugins_of_kind
+from .registry_query import (  # noqa: F401 -- re-exported for API compat (Issue #478)
+    _validate_permitted_injections,
+    load_external_tools_registry,
+    resolve_active_external_tools,
+)
 from .rule_index import bootstrap_previously_managed, cleanup_stale_managed_files, write_managed_index
+from .rules import resolve_rules
+from .skill_channel import (
+    cleanup_stale_skill_channel_rules,
+    provider_supports_skill_channel,
+    write_skill_channel_managed_index,
+    write_skill_channel_rule,
+)
 
 TOOL_RULE_PREFIX = "tool-"
 EXTERNAL_HOOKS_DIR = "hooks/0-external"
@@ -47,64 +63,14 @@ TOOLS_MANAGED_INDEX_FILENAME = ".agent-meta-managed-tools"
 
 
 # ---------------------------------------------------------------------------
-# Registry loading
+# Injection path resolution
 # ---------------------------------------------------------------------------
-
-_INJECTION_KINDS_NAME = {"skill", "hook", "rule"}
-_INJECTION_KINDS_PATH = {"config", "other"}
-
 
 _INJECTION_DIR_KEYS = {
     "skill": ("skills_dir", ".claude/skills"),
     "hook": ("hooks_dir", ".claude/hooks"),
     "rule": ("rules_dir", ".claude/rules"),
 }
-
-
-def _validate_permitted_injections(tool_name: str, entries: list[dict]) -> None:
-    """Validate a tool's ``permitted-injections`` list.
-
-    kind in {skill, hook, rule} requires 'name' (provider-relative);
-    kind in {config, other} requires an explicit 'path'. Mixing either
-    field with the wrong kind group is a SyncError.
-    """
-    if not isinstance(entries, list):
-        raise SyncError(
-            f"external-tools-registry: '{tool_name}'.permitted-injections must be a list"
-        )
-    for entry in entries:
-        if not isinstance(entry, dict):
-            raise SyncError(
-                f"external-tools-registry: '{tool_name}'.permitted-injections entries must be objects"
-            )
-        kind = entry.get("kind")
-        if kind not in _INJECTION_KINDS_NAME | _INJECTION_KINDS_PATH:
-            raise SyncError(
-                f"external-tools-registry: '{tool_name}'.permitted-injections has invalid "
-                f"kind '{kind}' (expected one of skill, hook, rule, config, other)"
-            )
-        if kind in _INJECTION_KINDS_NAME:
-            if not entry.get("name"):
-                raise SyncError(
-                    f"external-tools-registry: '{tool_name}'.permitted-injections entry "
-                    f"with kind '{kind}' requires 'name'"
-                )
-            if entry.get("path"):
-                raise SyncError(
-                    f"external-tools-registry: '{tool_name}'.permitted-injections entry "
-                    f"with kind '{kind}' must not set 'path' (use 'name')"
-                )
-        else:
-            if not entry.get("path"):
-                raise SyncError(
-                    f"external-tools-registry: '{tool_name}'.permitted-injections entry "
-                    f"with kind '{kind}' requires 'path'"
-                )
-            if entry.get("name"):
-                raise SyncError(
-                    f"external-tools-registry: '{tool_name}'.permitted-injections entry "
-                    f"with kind '{kind}' must not set 'name' (use 'path')"
-                )
 
 
 def resolve_injection_path(entry: dict, pc: dict, project_root: Path) -> Path:
@@ -119,83 +85,6 @@ def resolve_injection_path(entry: dict, pc: dict, project_root: Path) -> Path:
         base = project_root / pc.get(dir_key, default_dir)
         return (base / entry["name"]).resolve()
     return (project_root / entry["path"]).resolve()
-
-
-def load_external_tools_registry(
-    agent_meta_root: Path,
-    config: dict | None = None,
-    project_root: Path | None = None,
-) -> dict:
-    """Return the cli-tool slice of the unified plugin catalog.
-
-    Loads config/plugin-catalog.yaml (with its own framework/project/inline
-    deep-merge, see lib.plugins.load_plugin_catalog) and filters to the
-    ``cli-tool`` kind, giving the same flat {tool_name: tool_def} shape the
-    old config/external-tools-registry.yaml `external-tools` map had. Each
-    returned tool's permitted-injections list is validated eagerly.
-    """
-    catalog = load_plugin_catalog(agent_meta_root=agent_meta_root, config=config, project_root=project_root)
-    registry = plugins_of_kind(catalog, "cli-tool")
-
-    for tool_name, tool_def in registry.items():
-        if isinstance(tool_def, dict) and "permitted-injections" in tool_def:
-            _validate_permitted_injections(tool_name, tool_def["permitted-injections"])
-
-    return registry
-
-
-# ---------------------------------------------------------------------------
-# Activation resolution
-# ---------------------------------------------------------------------------
-
-
-def _tool_is_active(name: str, merged_def: dict, project_tools: dict) -> bool:
-    """Return True if an external tool should be rendered for this project.
-
-    Precedence (mirrors skills._skill_is_active):
-      1. Explicit project setting: project_tools[name]['enabled'] (true OR
-         false) always wins, independent of the registry default.
-      2. Otherwise: merged_def['enabled-by-default'] (framework value, possibly
-         replaced via an external-tools-registry project override).
-      3. Fallback: False — external CLI tools are opt-in.
-    """
-    if name in project_tools and "enabled" in project_tools[name]:
-        return bool(project_tools[name]["enabled"])
-    if "enabled-by-default" in merged_def:
-        return bool(merged_def["enabled-by-default"])
-    return False
-
-
-def resolve_active_external_tools(
-    config: dict,
-    agent_meta_root: Path,
-    project_root: Path | None = None,
-    registry: dict | None = None,
-) -> list[str]:
-    """Determine which external tools are active for this project.
-
-    Returns tool names (registry order) for which _tool_is_active is True.
-    Tools named in the project config but absent from the registry are skipped
-    — without a registry definition there is no rule-content to render.
-
-    registry: pass an already-loaded load_external_tools_registry() result to
-    skip re-reading/re-parsing the plugin catalog when the caller has one on
-    hand.
-    """
-    if registry is None:
-        registry = load_external_tools_registry(agent_meta_root, config, project_root)
-    if (config or {}).get("plugins") is not None:
-        project_tools = _activation_from_config(config)
-    else:
-        project_tools = _normalize_enabled_config((config or {}).get("external-tools", {}))
-
-    active: list[str] = []
-    for name, tool_def in registry.items():
-        if not isinstance(tool_def, dict):
-            continue
-        if _tool_is_active(name, tool_def, project_tools):
-            active.append(name)
-    return active
 
 
 # ---------------------------------------------------------------------------
@@ -317,15 +206,11 @@ def generate_external_tool_artifacts(
     .sh files themselves are deployed independently by sync_hooks() (all
     0-external hooks are always copied; registration in settings.json stays
     opt-in per project).
-    """
-    from .rules import resolve_rules
-    from .skill_channel import (
-        cleanup_stale_skill_channel_rules,
-        provider_supports_skill_channel,
-        write_skill_channel_managed_index,
-        write_skill_channel_rule,
-    )
 
+    resolve_rules and the skill-channel helpers are imported at module top
+    level (Issue #478): rules depends on registry_query, not on this module,
+    so the former deferred import is no longer needed.
+    """
     registry = load_external_tools_registry(agent_meta_root, config, project_root)
     if not registry:
         return

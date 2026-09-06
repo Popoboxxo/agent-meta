@@ -2,6 +2,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from ..frontmatter import strip_frontmatter
 from ..substitution import constant_lookup, substitute_placeholders
 
 # Permissive placeholder pattern: group 1 captures the name (stripped by the
@@ -40,11 +41,9 @@ class TemplateBuilder:
                 partial_path = self.fallback_partials_dir / f"{partial_name}.md"
             if not partial_path.exists():
                 return ""
-            content = partial_path.read_text(encoding='utf-8')
-            if content.startswith('---'):
-                parts = content.split('---', 2)
-                if len(parts) >= 3:
-                    content = parts[2].lstrip()
+            # Canonical frontmatter strip (Issue #473) — replaces the former
+            # inline content.split('---', 2) duplicate.
+            content = strip_frontmatter(partial_path.read_text(encoding='utf-8'))
             return self.resolve_partials(content)
             
         return re.sub(r'\{\{>\s*(.+?)\s*\}\}', replace_partial, template_str)
@@ -171,10 +170,9 @@ class TemplateBuilder:
             raise FileNotFoundError(f"Template not found: {template_path}")
             
         content = template_path.read_text(encoding='utf-8')
-        if content.startswith('---'):
-            parts = content.split('---', 2)
-            if len(parts) >= 3:
-                content = parts[2].lstrip()
+        # Canonical frontmatter strip (Issue #473) — replaces the former
+        # inline content.split('---', 2) duplicate.
+        content = strip_frontmatter(content)
                 
         content = self.resolve_partials(content)
         content = self.resolve_loops(content, variables)

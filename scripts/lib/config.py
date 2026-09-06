@@ -8,7 +8,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from .io import SyncError, _load_yaml_or_json, _write_yaml
+from .agents import build_agent_hints, build_agent_table
+from .io import SyncError, _load_yaml_or_json, _write_yaml, load_yaml_file
 from .log import SyncLog
 from .variables import (  # re-exported for callers/tests (Issue #565)
     _orch_mode_flags,
@@ -543,9 +544,10 @@ def _build_core_variables(
     not in variables` — i.e. it must see the user `variables:` entries this
     function loads first.
     """
-    # Import here to avoid circular deps — agents module uses config module
-    from .agents import build_agent_hints, build_agent_table
-
+    # `agents` is imported at module top level: the historic comment claimed
+    # a config↔agents cycle ("agents module uses config module"), but agents
+    # has not imported config since the #561/#565 split — the lazy import was
+    # vestigial (Issue #478 cleanup, guarded by tests/test_import_acyclicity.py).
     project = config.get("project", {})
     variables["PREFIX"]       = project.get("prefix", "")
     variables["PROJECT_SHORT"] = project.get("short", "")
@@ -648,7 +650,6 @@ def _build_provider_variables(variables: dict, config: dict, agent_meta_root: Pa
     hasn't already set them via project.yaml's `variables:` block (loaded by
     the core-variables step).
     """
-    from .agents import build_agent_hints
     from .providers import load_providers_config, resolve_providers
 
     # Build dynamic provider routing string
@@ -1009,14 +1010,17 @@ def _build_pipeline_variables(
             )
             variables["MAX_ITERATIONS"] = str(_main_pair.get("max_iterations", 3))
     except Exception:  # noqa: BLE001
-        # Fallback: keep existing behavior (check role-defaults.yaml directly)
+        # Fallback: keep existing behavior (check role-defaults.yaml directly).
+        # Canonical single-file loader (Issue #479), fail-soft: absent file,
+        # malformed YAML or missing PyYAML all yield {} — mirroring the former
+        # exists()+_YAML_AVAILABLE guards around the manual safe_load.
         try:
             roles_defaults_path = agent_meta_root / "config" / "role-defaults.yaml"
-            if roles_defaults_path.exists() and _YAML_AVAILABLE:
-                with roles_defaults_path.open(encoding="utf-8") as f:
-                    roles_defaults = _yaml.safe_load(f) or {}
-                if roles_defaults.get("reflection_pairs"):
-                    variables["REFLECTION_PAIRS_ENABLED"] = "true"
+            roles_defaults = load_yaml_file(
+                roles_defaults_path, on_error="default", default={},
+            )
+            if roles_defaults.get("reflection_pairs"):
+                variables["REFLECTION_PAIRS_ENABLED"] = "true"
         except Exception as e:  # noqa: BLE001
             unmapped.append(f"reflection-pairs (fallback): {e}")
     # QUALITY_PIPELINES_ENABLED: auto-detect from role-defaults.yaml + project overrides

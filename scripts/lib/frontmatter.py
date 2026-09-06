@@ -56,6 +56,18 @@ def load_provider_tools_config(agent_meta_root: Path) -> dict:
         _provider_tools_cache = {}
     return _provider_tools_cache
 
+def _fm_inner(fm_block: str) -> str:
+    """Strip the surrounding ``---`` delimiters from a frontmatter block.
+
+    Shared by every consumer of :func:`_split_frontmatter` output that needs
+    the raw inner YAML text for ``yaml.safe_load`` — previously duplicated
+    verbatim in `_update_frontmatter_dict` and `_parse_frontmatter_yaml`
+    (Issue #473 dedup).
+    """
+    inner = re.sub(r"^---\n?", "", fm_block)
+    return re.sub(r"\n?---\s*$", "", inner)
+
+
 def _update_frontmatter_dict(content: str, updates: dict, removes: list | None = None) -> str:
     """Update YAML frontmatter fields in content using PyYAML.
 
@@ -68,8 +80,7 @@ def _update_frontmatter_dict(content: str, updates: dict, removes: list | None =
 
     fm_block, body = _split_frontmatter(content)
     if fm_block:
-        inner = re.sub(r"^---\n?", "", fm_block)
-        inner = re.sub(r"\n?---\s*$", "", inner)
+        inner = _fm_inner(fm_block)
         try:
             fm_dict = _yaml.safe_load(inner)
             if not isinstance(fm_dict, dict):
@@ -426,6 +437,17 @@ def _split_frontmatter(content: str) -> tuple[str, str]:
     body = content[end + 4:]        # everything after closing ---
     return fm_block, body
 
+def split_frontmatter(content: str) -> tuple[str, str]:
+    """Public canonical frontmatter splitter (Issue #473).
+
+    Returns ``(frontmatter_block, body)`` where the block includes the
+    surrounding ``---`` delimiters; ``('', content)`` when content has no
+    frontmatter. Thin public alias over `_split_frontmatter` — see it for the
+    exact boundary semantics (opening fence may carry any suffix, closing
+    fence is the first ``\\n---`` occurrence).
+    """
+    return _split_frontmatter(content)
+
 def parse_frontmatter_file(path: Path) -> dict:
     """Parse the YAML frontmatter block of a Markdown file directly from disk.
 
@@ -457,13 +479,24 @@ def _parse_frontmatter_yaml(content: str) -> dict:
     if not fm_block:
         return {}
     # Strip the --- delimiters for yaml.safe_load
-    inner = re.sub(r"^---\n?", "", fm_block)
-    inner = re.sub(r"\n?---\s*$", "", inner)
+    inner = _fm_inner(fm_block)
     try:
         result = _yaml.safe_load(inner)
         return result if isinstance(result, dict) else {}
     except _yaml.YAMLError:
         return {}
+
+def parse_frontmatter_text(content: str) -> dict:
+    """Public fail-soft frontmatter parse of in-memory content (Issue #473).
+
+    Returns the frontmatter mapping; ``{}`` when the content has no
+    frontmatter block, its YAML is malformed, parses to a non-mapping value,
+    or PyYAML is unavailable. Thin public alias over the cached
+    `_parse_frontmatter_yaml` core — results are cached per distinct content
+    value for the process lifetime (existing #553 contract; large files are
+    held by the cache — intentional, see the core's docstring).
+    """
+    return _parse_frontmatter_yaml(content)
 
 def _merge_frontmatter(base_content: str, override_fm: dict) -> str:
     """Replace the frontmatter block in base_content with values from override_fm.
@@ -566,6 +599,16 @@ def _strip_frontmatter(content: str) -> str:
     if end == -1:
         return content
     return content[end + 4:].lstrip('\n')
+
+def strip_frontmatter(content: str) -> str:
+    """Public canonical frontmatter stripper (Issue #473).
+
+    Returns the content without its frontmatter block (leading blank lines
+    right after the closing fence are removed). Content without a
+    frontmatter block is returned unchanged. Thin public alias over
+    `_strip_frontmatter` — see it for the exact semantics.
+    """
+    return _strip_frontmatter(content)
 
 def _remove_frontmatter_fields(content: str, fields: list) -> str:
     """Remove specific fields from YAML frontmatter."""

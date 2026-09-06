@@ -16,6 +16,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from .report import Finding, Severity
+from ..io import load_yaml_file
 
 _ROLE_DEFAULTS = "config/role-defaults.yaml"
 
@@ -28,18 +29,17 @@ _RUNTIME_CONTRACTS = {"task-spec-v1", "blocked-review-v1"}
 
 
 def _load_roles(agent_meta_root: Path) -> dict | None:
-    """Load the ``roles`` mapping from role-defaults.yaml, or None on failure."""
+    """Load the ``roles`` mapping from role-defaults.yaml, or None on failure.
+
+    Canonical single-file loader (Issue #479), fail-soft: absent/malformed
+    file or missing PyYAML yields {} — the ``roles`` mapping is then empty,
+    which the caller treats the same as the former explicit ``None`` (no
+    findings). ``None`` is preserved for the missing-file case only.
+    """
     roles_path = agent_meta_root / "config" / "role-defaults.yaml"
     if not roles_path.exists():
         return None
-    try:
-        import yaml
-    except ImportError:
-        return None
-    try:
-        data = yaml.safe_load(roles_path.read_text(encoding="utf-8")) or {}
-    except Exception:  # noqa: BLE001
-        return None
+    data = load_yaml_file(roles_path, on_error="default", default={})
     roles = data.get("roles", {})
     return roles if isinstance(roles, dict) else {}
 

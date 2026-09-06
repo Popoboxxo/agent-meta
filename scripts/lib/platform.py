@@ -1,8 +1,11 @@
 """Platform-config loading and substitution for {{platform.*}} placeholders."""
+from __future__ import annotations
 
 import re
 from pathlib import Path
 
+from .frontmatter import _YAML_AVAILABLE
+from .io import load_yaml_file
 from .log import SyncLog
 
 PLATFORM_CONFIGS_DIR = "platform-configs"
@@ -48,9 +51,7 @@ def load_platform_config(
       - {{platform.*}} placeholders in source files without a matching config entry
         (checked externally via warn_unresolved_platform_vars)
     """
-    try:
-        import yaml as _yaml
-    except ImportError:
+    if not _YAML_AVAILABLE:
         log.warning(
             'PyYAML not available — platform-config substitution skipped. '
             'Install it with: pip install pyyaml'
@@ -59,15 +60,17 @@ def load_platform_config(
 
     merged_flat: dict = {}
 
-    # Load project overrides once — shared across all platforms
+    # Load project overrides once — shared across all platforms. The canonical
+    # single-file loader (Issue #479) with on_error="warn" keeps the old
+    # warn-and-continue behavior; default=None acts as the failure sentinel
+    # so a broken overrides file still leaves overrides_flat at {} exactly
+    # as before (message wording is unified to the loader's SyncError-style
+    # text — accepted per the #479 migration matrix).
     project_config_path = project_root / CLAUDE_PLATFORM_CONFIG
-    overrides_flat: dict = {}
-    if project_config_path.exists():
-        try:
-            with project_config_path.open(encoding='utf-8') as f:
-                overrides_flat = _flatten_yaml_dict(_yaml.safe_load(f) or {})
-        except (OSError, _yaml.YAMLError) as e:
-            log.warning(f'platform-config: failed to load {CLAUDE_PLATFORM_CONFIG}: {e}')
+    loaded_overrides: dict | None = load_yaml_file(
+        project_config_path, on_error="warn", default=None, log=log,
+    )
+    overrides_flat: dict = {} if loaded_overrides is None else _flatten_yaml_dict(loaded_overrides)
 
     for platform in platforms:
         defaults_path = agent_meta_root / PLATFORM_CONFIGS_DIR / f'{platform}.defaults.yaml'
@@ -75,11 +78,12 @@ def load_platform_config(
             # No defaults file for this platform — skip silently (not all platforms need one)
             continue
 
-        try:
-            with defaults_path.open(encoding='utf-8') as f:
-                defaults_raw = _yaml.safe_load(f) or {}
-        except (OSError, _yaml.YAMLError) as e:
-            log.warning(f'platform-config: failed to load {defaults_path.name}: {e}')
+        defaults_raw = load_yaml_file(
+            defaults_path, on_error="warn", default=None, log=log,
+        )
+        if defaults_raw is None:
+            # Malformed/unreadable defaults file — this platform contributes
+            # nothing (old behavior: warn + continue).
             continue
 
         # Merge: defaults first, then overrides win

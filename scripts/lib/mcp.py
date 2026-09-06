@@ -18,7 +18,7 @@ from .io import (
     write_checked,
 )
 from .log import SyncLog
-from .mcp_registry import (  # noqa: F401 (re-exported for callers/tests, issue #613)
+from .registry_query import (  # noqa: F401 (re-exported for callers/tests; issue #613 ABI, sourced from registry_query since #478)
     SECRETS_LOCAL_FILE,
     build_mcp_guardrails_list,
     load_mcp_registry,
@@ -28,6 +28,13 @@ from .rule_index import (
     bootstrap_previously_managed,
     cleanup_stale_managed_files,
     write_managed_index,
+)
+from .rules import resolve_rules
+from .skill_channel import (
+    cleanup_stale_skill_channel_rules,
+    provider_supports_skill_channel,
+    write_skill_channel_managed_index,
+    write_skill_channel_rule,
 )
 
 MCP_RULE_PREFIX = "mcp-"
@@ -107,9 +114,10 @@ def _generate_rule_content(server_name: str, server_def: dict, compact: bool = F
 # ---------------------------------------------------------------------------
 # Provider config generation — see scripts/lib/mcp_provider_config.py
 # (split out to keep this module under the <=600-line convention). That
-# module now imports load_mcp_registry/resolve_active_mcp_servers/
-# SECRETS_LOCAL_FILE from mcp_registry.py directly, not from here, so this
-# top-level import in the other direction cannot form a cycle (issue #613).
+# module imports load_mcp_registry/resolve_active_mcp_servers/
+# SECRETS_LOCAL_FILE from lib.registry_query directly (issue #478), not from
+# here, so this top-level import in the other direction cannot form a cycle
+# (issue #613).
 # ---------------------------------------------------------------------------
 
 from .mcp_provider_config import (  # noqa: E402, F401 (re-exported for callers/tests)
@@ -261,15 +269,11 @@ def generate_mcp_artifacts(
     Returns a list of paths to add to the .gitignore managed block:
       - Provider-specific secrets-file (from ai-providers.yaml mcp-config)
       - .meta-config/secrets.local.yaml (central secret store)
-    """
-    from .rules import resolve_rules
-    from .skill_channel import (
-        cleanup_stale_skill_channel_rules,
-        provider_supports_skill_channel,
-        write_skill_channel_managed_index,
-        write_skill_channel_rule,
-    )
 
+    resolve_rules and the skill-channel helpers are imported at module top
+    level (Issue #478): rules depends on registry_query, not on this module,
+    so the former deferred import is no longer needed.
+    """
     registry = load_mcp_registry(agent_meta_root, config, project_root)
     if not registry:
         return []

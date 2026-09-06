@@ -1,10 +1,14 @@
-"""Unified plugin catalog: loads config/plugin-catalog.yaml (kind-discriminated
-mcp-server / cli-tool entries), resolves which plugins are active for a project,
-decides the per-provider compact/full channel, and runs a cheap availability
-probe. Replaces the two separate registry loaders (config/mcp-registry.yaml,
-config/external-tools-registry.yaml) — see mcp_registry.py / external_tools.py,
-whose loaders now source from here (kind-filtered) so rendered artifacts stay
-byte-identical.
+"""Unified plugin catalog facade: probe, compact-channel and browse-layer
+logic for the kind-discriminated plugin catalog. The catalog loading,
+kind filtering and registry-backed activation resolution moved to the
+neutral :mod:`lib.registry_query` core (Issue #478 dependency inversion —
+this module may import it top-level without a cycle, since nothing in
+registry_query's import closure reaches back here).
+
+Backward-compatible re-exports: ``load_plugin_catalog``, ``plugins_of_kind``
+and ``_activation_from_config`` keep being importable from this module
+(sync.py, admin-server.py, tests and the registry facades import them via
+``lib.plugins``).
 """
 from __future__ import annotations
 
@@ -12,65 +16,14 @@ import shutil
 import urllib.request
 from pathlib import Path
 
-from .io import _deep_merge, _load_yaml_or_json, _normalize_enabled_config
-
-PLUGIN_CATALOG_YAML = "config/plugin-catalog.yaml"
-
-
-def load_plugin_catalog(
-    agent_meta_root: Path,
-    config: dict | None = None,
-    project_root: Path | None = None,
-) -> dict:
-    """Load config/plugin-catalog.yaml and deep-merge project overrides.
-
-    Sources (later wins, deep-merged):
-      1. Framework: <agent_meta_root>/config/plugin-catalog.yaml
-      2. Project:   <project_root>/.meta-config/plugin-catalog.yaml
-      3. Inline:    config["plugin-catalog"] from project.yaml
-    Returns a flat {plugin_id: plugin_def} dict.
-    """
-    data, _ = _load_yaml_or_json(agent_meta_root / PLUGIN_CATALOG_YAML)
-    catalog: dict = {}
-    if data and isinstance(data, dict):
-        catalog = data.get("plugins", {})
-        if not isinstance(catalog, dict):
-            catalog = {}
-
-    if project_root:
-        proj_data, _ = _load_yaml_or_json(project_root / ".meta-config" / "plugin-catalog.yaml")
-        if proj_data and isinstance(proj_data, dict):
-            proj_plugins = proj_data.get("plugins", proj_data)
-            if isinstance(proj_plugins, dict):
-                _deep_merge(catalog, proj_plugins)
-
-    if config:
-        inline = config.get("plugin-catalog", {})
-        if isinstance(inline, dict):
-            _deep_merge(catalog, inline)
-
-    return catalog
-
-
-def plugins_of_kind(catalog: dict, kind: str) -> dict:
-    """Return the subset of catalog whose 'kind' discriminator equals kind."""
-    return {
-        pid: pdef
-        for pid, pdef in catalog.items()
-        if isinstance(pdef, dict) and pdef.get("kind") == kind
-    }
-
-
-def _activation_from_config(config: dict) -> dict:
-    """Resolve the canonical activation dict. Prefers the unified `plugins:`
-    block; falls back to the legacy `mcp-servers:` list + `external-tools:`
-    dict for un-migrated project.yaml files."""
-    plugins_cfg = config.get("plugins")
-    if plugins_cfg is not None:
-        return _normalize_enabled_config(plugins_cfg)
-    legacy = {s: {"enabled": True} for s in config.get("mcp-servers", []) or []}
-    legacy.update(_normalize_enabled_config(config.get("external-tools", {})))
-    return legacy
+from .registry_query import (  # noqa: F401 -- re-exported for API compat (Issue #478)
+    PLUGIN_CATALOG_YAML,
+    _activation_from_config,
+    load_plugin_catalog,
+    plugins_of_kind,
+    resolve_active_external_tools,
+    resolve_active_mcp_servers,
+)
 
 
 def resolve_active_plugins(
@@ -93,12 +46,11 @@ def resolve_active_plugins(
     mcp-servers look active to the probe/scout layer while being absent from the
     generated .mcp.json — see I5 in the plugin-catalog-unification fix wave.
 
-    Deferred imports break the plugins <- mcp_registry / external_tools cycle
-    (both import _activation_from_config etc. from this module at import time).
+    Both resolvers come from lib.registry_query at module top level (Issue
+    #478): the former deferred imports here existed to break the
+    plugins <- mcp_registry / external_tools import cycle; the cycle is gone
+    now that the catalog core and both resolvers live in registry_query.
     """
-    from .external_tools import resolve_active_external_tools
-    from .mcp_registry import resolve_active_mcp_servers
-
     if catalog is None:
         catalog = load_plugin_catalog(config=config, agent_meta_root=agent_meta_root, project_root=project_root)
     active = set(resolve_active_mcp_servers(config, agent_meta_root, project_root))

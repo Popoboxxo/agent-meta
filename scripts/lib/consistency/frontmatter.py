@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .report import Finding, Severity
 from ..agent_sync import _find_section_bounds
+from ..frontmatter import _fm_inner, split_frontmatter
 
 _SEMVER_RE = re.compile(r'^\d+\.\d+\.\d+$')
 _VALID_WORKFLOW_TIERS = {"required", "recommended", "optional"}
@@ -164,21 +165,45 @@ def _parse_frontmatter(content: str) -> dict | None:
 
     Handles both normal agents (frontmatter + markdown body) and composition-only
     platform files where the entire file is a single frontmatter block.
+
+    Block-boundary detection delegates to the canonical
+    ``lib.frontmatter.split_frontmatter`` (Issue #473). Two behaviors are kept
+    on purpose as documented exceptions to the canonical fail-soft parse:
+
+    * strict malformed-YAML→``None`` semantics — this checker must report
+      ``frontmatter.missing`` (as before) rather than silently treating a
+      malformed block as an empty one;
+    * the no-PyYAML regex fallback (`_parse_frontmatter_regex`) — the
+      consistency checker must never crash just because PyYAML is absent.
+
+    A strict opening-fence guard preserves the old ``^---\\s*\\n`` requirement
+    (fence on its own line): the canonical splitter leniently accepts any
+    ``---``-prefixed opening, which would parse garbage instead of reporting
+    the missing/malformed frontmatter error.
     """
     try:
         import yaml
     except ImportError:
         return _parse_frontmatter_regex(content)
 
-    # Match --- ... --- with optional trailing newline (file may end with ---)
-    match = re.match(r'^---\s*\n(.*?)\n---\s*$', content, re.DOTALL)
-    if not match:
-        # Fallback: frontmatter followed by more content
-        match = re.match(r'^---\s*\n(.*?)\n---\s*\n', content, re.DOTALL)
-    if not match:
+    # Strict opening-fence precheck (exact emulation of the former regex
+    # semantics): the old parser required the opening fence to end in a
+    # newline (`^---\s*\n`) and then a further `\n---` *after* that
+    # terminator. The canonical splitter is more lenient on both ends
+    # (any `---`-suffixed opening fence accepted; the fence's own
+    # terminator newline may double as the closing fence's separator, so
+    # an adjacent-fence block `---\n---` parsed as empty instead of
+    # reporting missing). Reproduce the strict view exactly: `[^\S\n]*`
+    # (not `\s*`) keeps the prefix minimal — a blank line between the
+    # fences must stay available as the closing fence's own separator,
+    # matching the old regex's backtracking behavior (Issue #473).
+    opening = re.match(r"^---[^\S\n]*\n", content)
+    if opening is None or content.find("\n---", opening.end()) == -1:
         return None
+    fm_block, _ = split_frontmatter(content)
+    inner = _fm_inner(fm_block)
     try:
-        return yaml.safe_load(match.group(1)) or {}
+        return yaml.safe_load(inner) or {}
     except yaml.YAMLError:
         return None
 

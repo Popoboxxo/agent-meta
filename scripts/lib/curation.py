@@ -14,13 +14,16 @@ can rely on ``load_curation()`` returning a usable dict in all environments.
 
 import os
 import tempfile
+from pathlib import Path
 from typing import Any
 
+from .frontmatter import _YAML_AVAILABLE
+from .io import load_yaml_file
+
 try:
-    import yaml as _yaml
-    _YAML_AVAILABLE = True
+    import yaml as _yaml  # only used by save_curation's YAML dump
 except ImportError:  # pragma: no cover - exercised in environments without PyYAML
-    _YAML_AVAILABLE = False
+    _yaml = None
 
 CURATION_FILE = os.path.join("config", "model-curation.yaml")
 
@@ -54,17 +57,13 @@ def load_curation(root: str) -> dict[str, list[str]]:
         Curation dict with ``blacklist`` and ``disabled`` keys. Returns the
         default (both empty lists) if the file is missing, unreadable, or
         PyYAML is unavailable.
+
+    Loads via the canonical single-file loader (Issue #479, fail-soft with
+    the curation default as fallback) — identical failure semantics to the
+    former hand-rolled loader.
     """
     path = os.path.join(root, CURATION_FILE)
-    if not os.path.exists(path):
-        return _default()
-    if not _YAML_AVAILABLE:
-        return _default()
-    try:
-        with open(path, "r", encoding="utf-8") as fh:
-            raw = _yaml.safe_load(fh) or {}
-    except (OSError, _yaml.YAMLError):
-        return _default()
+    raw = load_yaml_file(Path(path), on_error="default", default=_default())
     return _normalize(raw)
 
 

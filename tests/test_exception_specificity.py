@@ -26,12 +26,16 @@ from lib.viz import _get_terminal_tool, _infer_tier, read_events
 
 
 # --- lib/viz.py::_infer_tier --------------------------------------------------
+# Patch target is lib.viz (not lib.io): since Issue #478 hoisted the formerly
+# lazy `from .io import _load_yaml_or_json` in viz.py to module top level,
+# _infer_tier resolves the name through lib.viz's module namespace. Patching
+# lib.viz._load_yaml_or_json exercises the identical code path.
 
 def test_infer_tier_falls_back_on_oserror(monkeypatch, tmp_path):
     def _raise_oserror(*_a, **_kw):
         raise OSError("simulated permission error")
 
-    monkeypatch.setattr("lib.io._load_yaml_or_json", _raise_oserror)
+    monkeypatch.setattr("lib.viz._load_yaml_or_json", _raise_oserror)
     assert _infer_tier("developer", {}) == "optional"
 
 
@@ -39,7 +43,7 @@ def test_infer_tier_propagates_unexpected_exception(monkeypatch):
     def _raise_runtime_error(*_a, **_kw):
         raise RuntimeError("unexpected bug")
 
-    monkeypatch.setattr("lib.io._load_yaml_or_json", _raise_runtime_error)
+    monkeypatch.setattr("lib.viz._load_yaml_or_json", _raise_runtime_error)
     with pytest.raises(RuntimeError):
         _infer_tier("developer", {})
 

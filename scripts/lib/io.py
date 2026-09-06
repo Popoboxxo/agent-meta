@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import Any, TypeVar
 
 
 class SyncError(Exception):
@@ -88,6 +89,169 @@ def _load_yaml_or_json(*paths: Path) -> tuple[dict, Path]:
             )
         return data, path
     return {}, preferred  # none found — return empty + preferred path
+
+
+def _yaml_error_location(exc: Exception) -> str:
+    """Format a ``(line X, col Y)`` suffix from a PyYAML error's problem_mark.
+
+    Mirrors the location information config.py::load_config puts into its
+    messages — single-file loaders raise SyncError with the same context
+    (Issue #479).
+    """
+    mark = getattr(exc, "problem_mark", None)
+    if mark is None:
+        return ""
+    return f" (line {mark.line + 1}, col {mark.column + 1})"
+
+
+_DefaultT = TypeVar("_DefaultT")
+
+
+def _validate_on_error(on_error: str) -> None:
+    """Validate the ``on_error`` mode shared by load_yaml_file/load_json_file."""
+    if on_error not in ("raise", "default", "warn"):
+        raise ValueError(
+            f"on_error must be 'raise', 'default' or 'warn', got {on_error!r}"
+        )
+
+
+def _loader_fail(
+    on_error: str,
+    message: str,
+    default: Any,
+    log: "SyncLog | None",  # noqa: F821
+) -> Any:
+    """Shared failure handler for the single-file loaders (Issue #479).
+
+    ``"raise"`` raises SyncError with the given message; ``"warn"`` emits
+    ``log.warning`` (ValueError when no log was supplied); every mode
+    returns ``default`` — silently for ``"default"``, after the warning for
+    ``"warn"``.
+    """
+    if on_error == "raise":
+        raise SyncError(message)
+    if on_error == "warn":
+        if log is None:
+            raise ValueError('on_error="warn" requires a log instance')
+        log.warning(message)
+    return default
+
+
+def load_yaml_file(
+    path: Path,
+    *,
+    on_error: str = "raise",
+    default: "dict | _DefaultT | None" = None,
+    log: "SyncLog | None" = None,  # noqa: F821
+) -> "dict | _DefaultT | None":
+    """Load a single known-path YAML file into a dict (Issue #479).
+
+    Companion to `_load_yaml_or_json` (multi-path YAML-or-JSON dispatch —
+    kept unchanged for its 15+ callers): this loader is for single files at
+    a known path with a well-defined, caller-chosen failure behavior,
+    replacing the ~7 hand-rolled per-module YAML loaders.
+
+    Failure handling (``on_error``) applies to unreadable files (OSError),
+    malformed YAML (``yaml.YAMLError``), non-mapping top-level documents, and
+    missing PyYAML — chosen per call site:
+
+    - ``"raise"``   — SyncError with file + ``problem_mark`` location
+                      (fail-closed; config-audit style).
+    - ``"default"`` — return ``default`` silently (optional-file semantics).
+    - ``"warn"``    — ``log.warning`` + return ``default``.
+
+    Missing file is never an error in any mode: ``default`` is returned
+    (mirrors `_load_yaml_or_json`'s missing-file contract and the
+    ``if not path.exists(): return {}`` guards of the replaced loaders).
+    An *empty* YAML document (parses to ``None``) yields ``{}`` in every
+    mode — it mirrors the ``yaml.safe_load(f) or {}`` idiom of the replaced
+    loaders, independently of ``default``.
+
+    Args:
+        path: YAML file to load.
+        on_error: One of ``"raise"``, ``"default"``, ``"warn"``.
+        default: Failure/missing-file fallback, returned exactly as passed
+            (pass ``{}`` for the common empty-dict case; pass ``None`` to use
+            None as a failure sentinel).
+        log: SyncLog for ``on_error="warn"`` (ignored otherwise).
+
+    Returns:
+        Parsed mapping, ``{}`` for an empty document, or ``default``.
+    """
+    _validate_on_error(on_error)
+    if not path.exists():
+        return default
+    if not _YAML_AVAILABLE:
+        return _loader_fail(
+            on_error,
+            f"PyYAML not installed, cannot load {path} — install it with: pip install pyyaml",
+            default,
+            log,
+        )
+    try:
+        with path.open(encoding="utf-8") as f:
+            data = _yaml.safe_load(f)
+    except OSError as exc:
+        return _loader_fail(on_error, f"Cannot read YAML file '{path}': {exc}", default, log)
+    except _yaml.YAMLError as exc:
+        return _loader_fail(
+            on_error,
+            f"Invalid YAML in '{path}'{_yaml_error_location(exc)}: {exc}",
+            default,
+            log,
+        )
+    if data is None:
+        return {}
+    if not isinstance(data, dict):
+        return _loader_fail(
+            on_error,
+            f"Invalid YAML config '{path}': expected a mapping at the top "
+            f"level, got {type(data).__name__}.",
+            default,
+            log,
+        )
+    return data
+
+
+def load_json_file(
+    path: Path,
+    *,
+    on_error: str = "raise",
+    default: "dict | list | _DefaultT | None" = None,
+    log: "SyncLog | None" = None,  # noqa: F821
+) -> "dict | list | _DefaultT | None":
+    """Load a single known-path JSON file (Issue #479).
+
+    Same ``on_error`` contract as `load_yaml_file` (missing file → ``default``,
+    ``"raise"``/``"default"``/``"warn"`` for OSError/JSONDecodeError). Unlike
+    the YAML loader there is no mapping check — JSON lists/scalars are
+    legitimate documents and are returned as-is. An empty file raises
+    JSONDecodeError (JSON has no empty-document concept).
+
+    Args:
+        path: JSON file to load.
+        on_error: One of ``"raise"``, ``"default"``, ``"warn"``.
+        default: Failure/missing-file fallback, returned exactly as passed.
+        log: SyncLog for ``on_error="warn"`` (ignored otherwise).
+
+    Returns:
+        Parsed JSON document, or ``default``.
+    """
+    _validate_on_error(on_error)
+    if not path.exists():
+        return default
+    try:
+        with path.open(encoding="utf-8") as f:
+            return json.load(f)
+    except OSError as exc:
+        return _loader_fail(on_error, f"Cannot read JSON file '{path}': {exc}", default, log)
+    except json.JSONDecodeError as exc:
+        return _loader_fail(
+            on_error,
+            f"Invalid JSON in '{path}' (line {exc.lineno}, col {exc.colno}): {exc.msg}",
+            default,
+            log,
+        )
 
 
 def strip_jsonc_comments(text: str) -> str:

@@ -12,12 +12,14 @@ import pytest
 import yaml
 
 from scripts.lib.external_tools import (
-    _tool_is_active,
     generate_external_tool_artifacts,
     load_external_tools_registry,
     resolve_active_external_tools,
     resolve_injection_path,
 )
+# _tool_is_active moved to the registry_query core (issue #478) — import it
+# from its new canonical home.
+from scripts.lib.registry_query import _tool_is_active  # noqa: E402
 from scripts.lib.io import SyncError
 from scripts.lib.log import SyncLog
 

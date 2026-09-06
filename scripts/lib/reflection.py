@@ -3,12 +3,10 @@
 import os
 import sys
 from functools import lru_cache
+from pathlib import Path
 
-try:
-    import yaml
-    _YAML_AVAILABLE = True
-except ImportError:
-    _YAML_AVAILABLE = False
+from .frontmatter import _YAML_AVAILABLE
+from .io import load_yaml_file
 
 
 def _require_yaml() -> None:
@@ -28,25 +26,32 @@ def load_reflection_pairs(config_dir=None):
 
     Cached per ``config_dir`` (process lifetime) — read-only framework config
     (#553 perf hotspot: re-parsed on every build_variables() call otherwise).
+
+    Loads via the canonical single-file loader (Issue #479): malformed YAML
+    now raises the project's SyncError (with file + location) instead of a
+    raw ``yaml.YAMLError`` — both were/are caught by the caller's broad
+    fallback in config.py, so behavior is unchanged for valid configs.
     """
     _require_yaml()
     if config_dir is None:
         config_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'config')
     defaults_path = os.path.join(config_dir, 'role-defaults.yaml')
-    with open(defaults_path, 'r', encoding='utf-8') as f:
-        config = yaml.safe_load(f)
+    config = load_yaml_file(Path(defaults_path), on_error="raise", default={})
     return config.get('reflection_pairs', [])
 
 
 def load_project_overrides(project_config=None):
-    """Load project-specific overrides from project.yaml."""
+    """Load project-specific overrides from project.yaml.
+
+    Same loader upgrade as `load_reflection_pairs` (Issue #479): malformed
+    YAML raises SyncError instead of a raw YAMLError.
+    """
     _require_yaml()
     if project_config is None:
         project_config = os.path.join(os.path.dirname(__file__), '..', '..', '.meta-config', 'project.yaml')
     if not os.path.exists(project_config):
         return {}
-    with open(project_config, 'r', encoding='utf-8') as f:
-        config = yaml.safe_load(f)
+    config = load_yaml_file(Path(project_config), on_error="raise", default={})
     return config.get('reflection-pairs', {}).get('overrides', {})
 
 

@@ -4,24 +4,19 @@ import re
 from pathlib import Path
 
 from .report import Finding, Severity
+from ..frontmatter import parse_frontmatter_file
+from ..io import load_yaml_file
 
 
 def _parse_frontmatter_yaml(path: Path) -> dict:
-    """Parse YAML frontmatter from a markdown file. Returns empty dict on failure."""
-    try:
-        import yaml
-    except ImportError:
-        return {}
-    content = path.read_text(encoding="utf-8")
-    if not content.startswith("---"):
-        return {}
-    parts = content.split("---", 2)
-    if len(parts) < 3:
-        return {}
-    try:
-        return yaml.safe_load(parts[1]) or {}
-    except Exception:  # noqa: BLE001
-        return {}
+    """Parse YAML frontmatter from a markdown file. Returns empty dict on failure.
+
+    Delegates to the canonical ``lib.frontmatter.parse_frontmatter_file``
+    (Issue #473) — identical fail-soft contract: ``{}`` on absent frontmatter,
+    malformed YAML, unreadable files, or missing PyYAML. Replaces the former
+    inline ``content.split('---', 2)`` duplicate.
+    """
+    return parse_frontmatter_file(path)
 
 
 def _load_based_on_references(agent_meta_root: Path) -> dict[str, set[str]]:
@@ -270,20 +265,27 @@ def check_schema_refs(agent_meta_root: Path) -> list[Finding]:
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 def _load_role_names(roles_path: Path) -> set[str]:
-    try:
-        import yaml
-        data = yaml.safe_load(roles_path.read_text(encoding="utf-8")) or {}
-    except (ImportError, Exception):  # noqa: BLE001
+    """Load role names from role-defaults.yaml.
+
+    Canonical single-file loader (Issue #479), fail-soft; the regex fallback
+    stays as documented no-PyYAML/malformed-file exception so the checker
+    remains usable without PyYAML (same fallback decision as the former
+    broad-except implementation — malformed files also fell back to regex).
+    """
+    data = load_yaml_file(roles_path, on_error="default", default={})
+    if not data:
         data = _parse_role_names_regex(roles_path)
     return set(data.get("roles", {}).keys())
 
 
 def _load_roles_with_tiers(roles_path: Path) -> dict[str, str]:
-    try:
-        import yaml
-        data = yaml.safe_load(roles_path.read_text(encoding="utf-8")) or {}
-    except (ImportError, Exception):  # noqa: BLE001
-        return {}
+    """Load ``{role: workflow_tier}`` from role-defaults.yaml.
+
+    Canonical single-file loader (Issue #479), fail-soft: absent/malformed
+    file or missing PyYAML yields {} (no regex fallback needed here — the
+    former implementation also returned {} in those cases).
+    """
+    data = load_yaml_file(roles_path, on_error="default", default={})
     return {
         name: (cfg or {}).get("workflow_tier", "")
         for name, cfg in data.get("roles", {}).items()

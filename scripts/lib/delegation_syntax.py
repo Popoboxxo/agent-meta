@@ -16,10 +16,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-try:
-    import yaml
-except ImportError:
-    yaml = None  # type: ignore[assignment]
+from .io import load_yaml_file
 
 # Known A2A schemas shipped with agent-meta (relative to repo root).
 # These paths are intentionally relative so they remain valid when the repo is
@@ -100,29 +97,24 @@ class DelegationSyntaxEngine:
     @property
     def syntax_registry(self) -> dict[str, Any]:
         if self._syntax_registry is None:
-            path = self.config_dir / "delegation-syntax.yaml"
-            try:
-                with open(path, encoding="utf-8") as f:
-                    if yaml is not None:
-                        self._syntax_registry = yaml.safe_load(f)
-                    else:
-                        self._syntax_registry = {}
-            except (FileNotFoundError, yaml.YAMLError):
-                self._syntax_registry = {}
+            # Canonical single-file loader (Issue #479), fail-soft: absent or
+            # malformed registry yields {} — same as the former hand-rolled
+            # loader (FileNotFoundError/yaml.YAMLError → {}).
+            self._syntax_registry = load_yaml_file(
+                self.config_dir / "delegation-syntax.yaml",
+                on_error="default",
+                default={},
+            )
         return self._syntax_registry or {}
 
     @property
     def capabilities_registry(self) -> dict[str, Any]:
         if self._capabilities_registry is None:
-            path = self.config_dir / "provider-capabilities.yaml"
-            try:
-                with open(path, encoding="utf-8") as f:
-                    if yaml is not None:
-                        self._capabilities_registry = yaml.safe_load(f)
-                    else:
-                        self._capabilities_registry = {}
-            except (FileNotFoundError, yaml.YAMLError):
-                self._capabilities_registry = {}
+            self._capabilities_registry = load_yaml_file(
+                self.config_dir / "provider-capabilities.yaml",
+                on_error="default",
+                default={},
+            )
         return self._capabilities_registry or {}
 
     def get_syntax(self, provider: str) -> dict[str, Any]:
