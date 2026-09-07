@@ -68,6 +68,8 @@ _IDENTITY_FALLBACKS: dict[str, str] = {
     "DOCS_LANGUAGE": "the language the user writes in, default to English if unspecified",
     "INTERNAL_DOCS_LANGUAGE": "the language the user writes in, default to English if unspecified",
     "EXTRA_DONTS": "",
+    "README_BADGES": "version, stack, license",
+    "README_SECTIONS": "description, badges, setup, structure",
 }
 
 # Multi-agent / orchestration blocks: no delegation infrastructure exists
@@ -106,6 +108,7 @@ _CONDITIONAL_FALSE_FLAGS: dict[str, str] = {
     "WEB_PROJECT_ENABLED": "false",
     "DEVELOPER_SNIPPETS_PATH_SET": "false",
     "TESTER_SNIPPETS_PATH_SET": "false",
+    "README_WARNINGS_ENABLED": "false",
     "DEV_STACK_START_SET": "false",
     # No A2A infrastructure or knowledge-engine bundle exists standalone —
     # matches the scope note in the rendered header ("no A2A protocol, no

@@ -16,6 +16,8 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     # Agent-meta metadata
     "AGENT_META_VERSION", "AGENT_META_DATE", "AGENT_META_REPO", "AGENT_META_REL_PATH",
     "AGENT_TABLE", "AGENT_HINTS",
+    # README structure standard (issue #682 §3)
+    "README_BADGES", "README_WARNINGS_ENABLED", "README_SECTIONS",
     # Provider / AI
     "AI_PROVIDER", "MAX_PARALLEL_AGENTS", "PARALLEL_PATTERN", "FILE_AFFINITY_HINT", "ANALYSIS_ENABLED",
     # DoD flags

@@ -619,6 +619,20 @@ def _build_core_variables(
         variables["REQ_CATEGORIES"] = variables.get("REQ_CATEGORIES_LIST") or (
             "- Kernfunktionalität\n- Lifecycle\n- Nichtfunktionale Anforderungen"
         )
+    # README structure standard (issue #682 §3): comma-joined strings for
+    # inline use in documenter.md prose (not a {{#if}}-gated block, so no
+    # standalone.py _ORCHESTRATION_FALLBACKS entry needed -- these three go
+    # into _IDENTITY_FALLBACKS/_CONDITIONAL_FALSE_FLAGS instead, see there).
+    _readme_cfg = config.get("readme", {})
+    variables["README_BADGES"] = ", ".join(
+        _readme_cfg.get("badges", ["version", "stack", "license"])
+    )
+    variables["README_WARNINGS_ENABLED"] = (
+        "true" if _readme_cfg.get("warnings", False) else "false"
+    )
+    variables["README_SECTIONS"] = ", ".join(
+        _readme_cfg.get("sections", ["description", "badges", "setup", "structure"])
+    )
     # PROJECT_GOAL: fall back to the project description when not set explicitly
     if not variables.get("PROJECT_GOAL") and variables.get("PROJECT_DESCRIPTION"):
         variables["PROJECT_GOAL"] = variables["PROJECT_DESCRIPTION"]
