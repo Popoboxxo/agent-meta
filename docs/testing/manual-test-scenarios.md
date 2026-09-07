@@ -2258,11 +2258,282 @@ Alle Continue-Szenarien befinden sich in den Abschnitten oben (1.4, 2.4, 3.4, ..
 
 ---
 
+## Simulierte Szenario-Durchläufe (agent-meta v0.101.0, 2026-09-07)
+
+> Unterschied zu den Feature×Provider-Checklisten oben: dies sind keine
+> Platzhalter für menschliche Tester, sondern **tatsächlich ausgeführte**
+> Durchläufe. Für jedes Szenario wurde in einem temporären Verzeichnis
+> (außerhalb dieses Repos) ein eigenständiges `.meta-config/project.yaml`
+> angelegt — als würde ein fremdes Konsumenten-Projekt agent-meta per
+> Submodule einbinden — und `scripts/sync.py` real dagegen ausgeführt.
+> Ergebnisse sind reale Log-Ausschnitte, keine Erwartungen.
+>
+> Methodik: `python3 <agent-meta-root>/scripts/sync.py --config .meta-config/project.yaml --init`
+> je Szenario, in einem frischen, leeren Zielverzeichnis.
+
+### Zusammenfassung
+
+| # | Szenario | Fokus | Ergebnis |
+|---|----------|-------|----------|
+| 1 | Minimal Single-Provider | Claude-only, rapid-prototyping, 3 Rollen | ✅ sauber, erwartete Warnungen |
+| 2 | Multi-Provider | Claude+Gemini+Opencode+Continue gleichzeitig | 🐛 **Bug gefunden** (Continue-Context-Datei falsch als Drift geflaggt) |
+| 3 | Plugin-Catalog-lastig | MCP-Server + CLI-Tool aktiviert, `--test-plugin` | ✅ sauber, Health-Check meldet erwartete FAILs korrekt |
+| 4 | Platform-Bundle | `platforms: [sharkord]` | ✅ 2-platform-Override greift auf allen 3 Rollen |
+| 5 | Knowledge Engine | ungültige vs. gültige Domain | ✅ fail-closed bei ungültiger Domain, sauberes OKF-Bundle bei gültiger |
+| 6 | SE-Kaskade | `systems-engineering.enabled: true` | ✅ SE-Rules + Rolle korrekt generiert |
+| 7 | Neue Provider | Codex + ZCode + KimiCode gleichzeitig | ✅ sauber; Codex konsolidiert in eine AGENTS.md (kein Bug, Architekturunterschied) |
+| 8 | Release-Automation | Release-Gates + auto-github-release Hook | ✅ bestätigt den heutigen `hook_gate_check_enabled()`-Fix live im generierten Projekt |
+| 9 | Legacy-Config | alte `mcp-servers:`/`external-tools:`-Keys (unmigriert) | ✅ Backward-Compat-Fallback funktioniert weiterhin |
+| 10 | Model-Tier-Overrides | `model-overrides` + `model-inherit-main-chat`-Konflikt | ✅ korrekte Präzedenz, klare Warnung |
+
+**Ergebnis:** 9/10 Szenarien fehlerfrei, 1 realer Bug gefunden (#2).
+
+---
+
+### Szenario 1 — Minimal Single-Provider (Claude)
+
+**Zweck:** Baseline-Rauchtest — kleinstmögliche gültige Konfiguration.
+
+**Config-Kern:**
+```yaml
+ai-providers: [Claude]
+dod-preset: rapid-prototyping
+roles: [orchestrator, developer, git]
+```
+
+**Ergebnis:** 86 actions, 81 skipped, 40 Warnungen — alle Warnungen sind erwartbar
+und aussagekräftig: `quality-pipelines: Summary: 11 missing role(s): ...` (Pipelines
+referenzieren Rollen, die hier bewusst nicht aktiviert wurden) und fehlende
+`{{VARIABLE}}`-Werte lassen den Platzhalter unverändert stehen statt zu crashen.
+CLAUDE.md, `.claude/agents/{developer,git,orchestrator}.md`, alle immer-kopierten
+Commands/Hooks/Rules wurden korrekt erzeugt.
+
+**Verdict:** ✅ Sauberer Baseline-Lauf, keine Fehler.
+
+---
+
+### Szenario 2 — Multi-Provider (Claude + Gemini + Opencode + Continue)
+
+**Zweck:** Provider-Isolation und Per-Provider-Frontmatter-Unterschiede bei 4 gleichzeitig aktiven Providern.
+
+**Config-Kern:**
+```yaml
+ai-providers: [Claude, Gemini, Opencode, Continue]
+provider-options:
+  Continue: {generate-prompts: true, prompt-mode: slim}
+```
+
+**Ergebnis:** 263 actions, 91 skipped, 27 Warnungen. Provider-Isolation, Frontmatter-Formate
+und Extension-Hooks je Provider korrekt. **Ein echter Fund:**
+
+```
+[WARN]   external-tools: undeclared artifact '.continue/rules/project-context.md'
+         (rule) for provider 'Continue' — not covered by any active tool's
+         permitted-injections
+```
+
+**Root Cause:** `scan_injection_drift()` (`scripts/lib/external_tools_drift.py`) scannt
+den `rules_dir` jedes aktiven Providers nach unbekannten Fremd-Artefakten. Bei Continue
+liegt der eigene `context_file` (`.continue/rules/project-context.md`) architektonisch
+*innerhalb* des `rules_dir` (bei jedem anderen Provider liegt der Kontext-File-Äquivalent
+außerhalb, z.B. `CLAUDE.md` am Projekt-Root). Der Scanner kennt `project-context.md`
+nicht als eigenes, agent-meta-verwaltetes Artefakt und flaggt es fälschlich als
+Fremd-Injection. Nie zuvor aufgefallen, weil agent-metas eigene `.meta-config/project.yaml`
+Continue nicht aktiviert — kein Dogfooding-Pfad deckt das ab.
+
+**Verdict:** 🐛 **Bug** — False-Positive-Drift-Warnung für Continue, sobald Continue
++ irgendein aktives Tool/MCP-Server kombiniert werden. Kein Datenverlust, keine
+Sicherheitsrelevanz — aber Rauschen, das echte Drift-Funde verwässert. Noch nicht gefixt
+(siehe Empfehlung am Dokumentende).
+
+---
+
+### Szenario 3 — Plugin-Catalog-lastig (MCP + CLI-Tools)
+
+**Zweck:** Den frisch vereinheitlichten `config/plugin-catalog.yaml`-Pfad unter Last testen: 2 MCP-Server + 1 CLI-Tool aktiv, plus die `--test-plugin`-Health-Checks.
+
+**Config-Kern:**
+```yaml
+plugins:
+  home-assistant: {enabled: true}
+  influxdb: {enabled: true}
+  graphify: {enabled: true}
+  honcho: {enabled: false}
+```
+
+**Ergebnis:** 91 actions. `mcp-home-assistant.md`, `mcp-influxdb.md`, `mcp-guardrails.md`,
+`tool-graphify.md` korrekt generiert; `.meta-config/secrets.local.yaml` korrekt mit leeren
+Feldern für beide Server gescaffoldet. `--test-plugin` liefert saubere, aussagekräftige
+Fehlermeldungen statt Crash:
+```
+FAIL  graphify: binary 'graphify' not found on PATH (0ms)
+FAIL  home-assistant: not reachable: unknown url type: '/api/mcp' (0ms)
+```
+
+**Verdict:** ✅ Der komplette 4-Schichten-Empfehlungsflow (Katalog → Aktivierung →
+Rule-Generierung → Health-Check) funktioniert End-to-End in einem frischen Projekt.
+
+---
+
+### Szenario 4 — Platform-Bundle (Sharkord)
+
+**Zweck:** 2-platform-Override-Schicht — überschreibt sie die 1-generic-Basis korrekt?
+
+**Config-Kern:** `platforms: [sharkord]`
+
+**Ergebnis:** 88 actions. Alle 3 generierten Agenten (`developer.md`, `git.md`,
+`orchestrator.md`) enthalten sharkord-spezifische Inhalte aus `agents/2-platform/`.
+
+**Verdict:** ✅ Layer-Priorität korrekt.
+
+---
+
+### Szenario 5 — Knowledge Engine (ungültige → gültige Domain)
+
+**Zweck:** Fail-Closed-Verhalten bei fehlerhafter Konfiguration, danach Happy-Path.
+
+**Lauf 1** (`domain: team` — nicht in der Enum-Liste):
+```
+!!  Knowledge Engine sync aborted: knowledge-engine: Unknown knowledge-engine
+    domain 'team' — must be one of: book, business, custom, internal-docs,
+    personal, research, technical
+```
+Sync bricht sauber ab, keine halb-geschriebenen Artefakte, Fehlermeldung nennt alle
+gültigen Werte.
+
+**Lauf 2** (`domain: internal-docs`): `knowledge/schema.md`, `knowledge/wiki/{index,log}.md`
+und alle OKF-Kategorie-Ordner (`sources/`, `queries/`, `topics/`, `entities/`, `concepts/`)
+korrekt gescaffoldet. Bonus-Beobachtung: der Sync-Time-Probe (Layer 3 des Empfehlungsflows)
+meldete korrekt lokal verfügbare, aber nicht aktivierte Plugins (`influxdb`, `viz-logger`,
+`a2a-handoff`, `playwright`) als Hinweis.
+
+**Verdict:** ✅ Sowohl Fail-Closed- als auch Happy-Path korrekt.
+
+---
+
+### Szenario 6 — Systems-Engineering-Kaskade
+
+**Zweck:** Werden SE-spezifische Rules/Rollen nur bei `systems-engineering.enabled: true` generiert?
+
+**Ergebnis:** 95 actions. `se-cascade-adr-standard.md`, `se-cascade-artifact-taxonomy.md`,
+`se-cascade-review-lifecycle.md` sowie die explizit angeforderte Rolle
+`se-component-requirements.md` korrekt erzeugt.
+
+**Verdict:** ✅ Korrekt gated.
+
+---
+
+### Szenario 7 — Neue Provider (Codex + ZCode + KimiCode)
+
+**Zweck:** Die zuletzt hinzugefügten Provider gemeinsam aktivieren — u.a. Regressionstest
+für den Compact/Full-Context-Fix aus der Plugin-Catalog-Kampagne (Task 4).
+
+**Ergebnis:** 69 actions, nur 14 skipped (deutlich weniger Overlap als bei etablierten
+Providern — erwartbar, da diese Provider weniger Capabilities registrieren). Alle drei
+Provider-Verzeichnisse (`.agents/`, `.zcode/`, `.kimi-code/`) korrekt angelegt, keine
+Crashes. **Architektur-Beobachtung (kein Bug):** Codex konsolidiert alles in eine einzige
+`AGENTS.md` (367 Zeilen) am Projekt-Root statt einzelner `agents/*.md`-Dateien, während
+ZCode/KimiCode das gewohnte Pro-Rolle-Dateimuster verwenden — spiegelt die tatsächlichen
+Produkt-Unterschiede der drei Tools korrekt wider.
+
+**Verdict:** ✅ Keine Regression, saubere Generierung für alle drei.
+
+---
+
+### Szenario 8 — Release-Automation (Release-Gates + auto-github-release)
+
+**Zweck:** Live-Verifikation des **heutigen** Fix-Wave-Commits
+(`hook_gate_check_enabled()` in `hook_common.sh`) in einem echten generierten Projekt.
+
+**Config-Kern:**
+```yaml
+conventions:
+  versioning: {scheme: semver, tag_format: "v{version}"}
+  github_release: {enabled: true}
+release-gates:
+  docker-image-scan: true
+  action-pin-validation: true
+```
+
+**Ergebnis:** Generiertes `action-pin-validation.sh` bakt korrekt
+`PRE_RELEASE_GATE_ENABLED:=true`, sourced `hook_common.sh` korrekt (`../lib/hook_common.sh`),
+`bash -n` (Syntax-Check) grün. Direkter Ausführungstest mit Override:
+```
+$ PRE_RELEASE_GATE_ENABLED=false bash action-pin-validation.sh
+[SKIP] action-pin-validation: gate disabled (release-gates.action-pin-validation.enabled=false)
+```
+— exakt das erwartete Verhalten des neuen gemeinsamen Helpers.
+
+**Verdict:** ✅ Bestätigt den heutigen Fix end-to-end außerhalb der Unit-Tests.
+
+---
+
+### Szenario 9 — Legacy-Config (unmigrierte `mcp-servers:`/`external-tools:`-Keys)
+
+**Zweck:** Funktioniert der Backward-Compat-Pfad (`_activation_from_config`) für Projekte,
+die nie auf den unifizierten `plugins:`-Block migriert wurden?
+
+**Config-Kern:**
+```yaml
+mcp-servers: [home-assistant]
+external-tools:
+  graphify: {enabled: true}
+```
+
+**Ergebnis:** `mcp-home-assistant.md` und `tool-graphify.md` korrekt generiert, `.mcp.json`
+korrekt geschrieben — identisches Verhalten zum unifizierten `plugins:`-Block in Szenario 3.
+
+**Verdict:** ✅ Migrations-Invarianz hält auch für echte (nicht nur Fixture-)Legacy-Configs.
+
+---
+
+### Szenario 10 — Model-Tier-Overrides + `model-inherit-main-chat`-Konflikt
+
+**Zweck:** Präzedenz-Verhalten bei widersprüchlicher Konfiguration (beides für denselben
+Provider gesetzt).
+
+**Config-Kern:**
+```yaml
+model-overrides:
+  Claude: {orchestrator: powerful, developer: powerful, git: nano}
+  Gemini: {orchestrator: balanced, developer: balanced, git: fast}
+model-inherit-main-chat:
+  Claude: true
+```
+
+**Ergebnis:** Klare Warnung dreimal (je Rolle):
+```
+WARNING: 'model-inherit-main-chat' is active for provider 'Claude', so the
+per-role entries under 'model-overrides.Claude' (developer, git, orchestrator)
+are ignored — remove them or disable inheritance.
+```
+Claude-Agenten haben danach korrekt **kein** `model:`-Feld (erben Main-Chat-Modell),
+Gemini-Agenten haben korrekt ihre expliziten Overrides (`orchestrator`/`developer`
+→ `gemini-3.1-pro-low`, `git` → `gemini-3.5-flash-high`).
+
+**Verdict:** ✅ Präzedenz exakt wie in `templates/configs/project.yaml.example`
+dokumentiert, plus hilfreiche Warnung statt stillem Konflikt.
+
+---
+
+### Empfehlung
+
+Einziger offener Punkt aus dieser Serie: **Szenario 2** — der False-Positive in
+`scan_injection_drift()` für Continues `context_file` innerhalb seines eigenen
+`rules_dir`. Empfehlung: `project-context.md` (bzw. generisch: den `context_file`-Namen
+jedes Providers, wenn er innerhalb von `rules_dir` liegt) in der Drift-Scan-Ausnahmeliste
+von `scripts/lib/external_tools_drift.py::scan_injection_drift()` berücksichtigen —
+analog zur bereits bestehenden `.agent-meta-managed*`-Ausnahme. Noch nicht umgesetzt,
+da außerhalb des Auftrags dieser Simulationsreihe (Dokumentation, kein Fix-Wave).
+
+---
+
 ## Änderungshistorie
 
 | Datum | Version | Änderung |
 |-------|---------|----------|
 | 2026-05-24 | 1.0.0 | Initiale Erstellung aller 64 Szenarien (16 Features × 4 Provider) |
+| 2026-09-07 | 1.1.0 | 10 real ausgeführte Simulations-Szenarien ergänzt (AI-ausgeführt, temporäre Konsumenten-Projekte); 1 Bug gefunden (Continue-Context-Datei-Drift-False-Positive) |
 
 ---
 

@@ -460,6 +460,59 @@ def test_scan_injection_drift_flags_stray_agent_file(tmp_path):
     assert ".claude/agents/developer.md" not in paths
 
 
+def test_scan_injection_drift_excuses_providers_own_context_file_inside_rules_dir(tmp_path):
+    """Continue's context_file lives INSIDE its own rules_dir (unlike every
+    other provider, whose context-file equivalent lives at the project
+    root) — it must never read as a foreign injection (issue: found via the
+    2026-09-07 scenario simulation, docs/testing/manual-test-scenarios.md
+    Szenario 2)."""
+    from scripts.lib.external_tools import scan_injection_drift
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write_framework_registry(agent_meta_root, {})
+    rules_dir = project_root / ".continue" / "rules"
+    rules_dir.mkdir(parents=True)
+    (rules_dir / "project-context.md").write_text("context", encoding="utf-8")
+    # A genuinely foreign file in the same directory must still be flagged —
+    # the exclusion is scoped to the exact context_file path, not the dir.
+    (rules_dir / "rogue.md").write_text("x", encoding="utf-8")
+
+    provider_config = {"Continue": {
+        "skills_dir": ".continue/skills", "agents_dir": ".continue/agents",
+        "has_rules": True, "rules_dir": ".continue/rules",
+        "context_file": ".continue/rules/project-context.md",
+    }}
+    findings = scan_injection_drift(
+        agent_meta_root, project_root, {"ai-providers": ["Continue"]}, provider_config,
+    )
+    paths = [f["path"] for f in findings["Continue"]]
+    assert ".continue/rules/project-context.md" not in paths
+    assert ".continue/rules/rogue.md" in paths
+
+
+def test_scan_injection_drift_excuses_its_own_report_file(tmp_path):
+    """external-tools-drift.md (the scanner's own report, written by
+    render_injection_drift_artifacts when findings exist) must not become a
+    drift finding itself on the next sync — a self-referential false
+    positive found alongside the Continue context_file bug (2026-09-07
+    scenario simulation)."""
+    from scripts.lib.external_tools import scan_injection_drift
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write_framework_registry(agent_meta_root, {})
+    rules_dir = project_root / ".claude" / "rules"
+    rules_dir.mkdir(parents=True)
+    (rules_dir / "external-tools-drift.md").write_text("# drift report", encoding="utf-8")
+
+    provider_config = {"Claude": {
+        "skills_dir": ".claude/skills", "agents_dir": ".claude/agents",
+        "has_rules": True, "rules_dir": ".claude/rules",
+    }}
+    findings = scan_injection_drift(agent_meta_root, project_root, {}, provider_config)
+    paths = [f["path"] for f in findings["Claude"]]
+    assert ".claude/rules/external-tools-drift.md" not in paths
+
+
 def test_scan_injection_drift_skips_hook_and_rule_dirs_without_capability(tmp_path):
     from scripts.lib.external_tools import scan_injection_drift
     agent_meta_root = tmp_path / "agent-meta"
