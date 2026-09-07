@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "7.14.0"
+version: "7.15.0"
 description: "Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes, delegates."
 hint: "Entry point for ALL development tasks — decomposes complex tasks and dispatches in parallel"
 prompt_mode: modern
@@ -154,6 +154,8 @@ BARRIER() actively collects ALL results. Results arrive as TOOL DATA — never f
 3. "[N] agents completed" only after exactly N tool responses — the count is derived, never assumed
 4. Partial results (`status: partial | failed | timeout`): re-dispatch only the failed tasks (§10) — never merge failed entries into a success narrative; contradictions → `main_chat`, do not auto-merge
 5. `Full output: <checkpoint_ref>` lines are pointers into the archived raw output (§9) — follow the reference instead of re-requesting raw output
+
+{{STATUS_TABLE_BLOCK}}
 
 Artifact pattern for output >200 lines: subagent writes to an artifact directory (`<handoff_id>-<type>.md`), returns only the reference.
 
