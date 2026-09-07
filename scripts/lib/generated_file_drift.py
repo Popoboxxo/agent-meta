@@ -169,3 +169,23 @@ def scan_generated_file_drift(
             findings.append({"path": rel_path, "provider": provider})
 
     return findings
+
+
+def capture_generated_file_hashes(
+    agent_meta_root: Path, project_root: Path, config: dict, provider_config: dict, dry_run: bool,
+) -> None:
+    """Recompute and persist the complete hash baseline from the CURRENT
+    on-disk state of every active provider's managed files. Called once,
+    at the very end of the sync pipeline, after every writer has run --
+    the on-disk content at this point is exactly what the next sync's
+    scan_generated_file_drift() call should compare against.
+    """
+    active_providers = set(get_active_providers(config, provider_config))
+    hashes: dict[str, str] = {}
+    for provider, pc in provider_config.items():
+        if provider not in active_providers:
+            continue
+        for abs_path in _iter_managed_files(agent_meta_root, project_root, provider, pc):
+            rel_path = abs_path.relative_to(project_root).as_posix()
+            hashes[rel_path] = content_hash(abs_path.read_text(encoding="utf-8"))
+    _save_hashes(project_root, hashes, dry_run)

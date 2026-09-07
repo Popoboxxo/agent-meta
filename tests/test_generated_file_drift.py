@@ -230,3 +230,52 @@ def test_scan_only_covers_active_providers(tmp_path: Path) -> None:
     # ["Claude"] only (see scripts/lib/providers.py) -- Gemini is not active.
     findings = scan_generated_file_drift(tmp_path / "agent-meta", project_root, {}, provider_config)
     assert findings == []
+
+
+from scripts.lib.generated_file_drift import capture_generated_file_hashes, content_hash
+
+
+def test_capture_writes_hash_for_every_managed_file(tmp_path: Path) -> None:
+    project_root = tmp_path / "project"
+    _write(project_root, ".claude/agents/developer.md", "fresh content")
+    _managed_index(project_root, ".claude/agents", "developer.md")
+
+    capture_generated_file_hashes(tmp_path / "agent-meta", project_root, {}, _provider_config(), dry_run=False)
+
+    assert _load_hashes(project_root) == {
+        ".claude/agents/developer.md": content_hash("fresh content"),
+    }
+
+
+def test_capture_is_noop_in_dry_run(tmp_path: Path) -> None:
+    project_root = tmp_path / "project"
+    _write(project_root, ".claude/agents/developer.md", "fresh content")
+    _managed_index(project_root, ".claude/agents", "developer.md")
+
+    capture_generated_file_hashes(tmp_path / "agent-meta", project_root, {}, _provider_config(), dry_run=True)
+
+    assert _load_hashes(project_root) == {}
+
+
+def test_capture_then_scan_round_trip_finds_no_drift(tmp_path: Path) -> None:
+    project_root = tmp_path / "project"
+    _write(project_root, ".claude/agents/developer.md", "content v1")
+    _managed_index(project_root, ".claude/agents", "developer.md")
+
+    capture_generated_file_hashes(tmp_path / "agent-meta", project_root, {}, _provider_config(), dry_run=False)
+    findings = scan_generated_file_drift(tmp_path / "agent-meta", project_root, {}, _provider_config())
+
+    assert findings == []
+
+
+def test_capture_overwrites_stale_hash_for_regenerated_content(tmp_path: Path) -> None:
+    project_root = tmp_path / "project"
+    _write(project_root, ".claude/agents/developer.md", "content v1")
+    _managed_index(project_root, ".claude/agents", "developer.md")
+    _save_hashes(project_root, {".claude/agents/developer.md": content_hash("stale")}, dry_run=False)
+
+    capture_generated_file_hashes(tmp_path / "agent-meta", project_root, {}, _provider_config(), dry_run=False)
+
+    assert _load_hashes(project_root) == {
+        ".claude/agents/developer.md": content_hash("content v1"),
+    }
