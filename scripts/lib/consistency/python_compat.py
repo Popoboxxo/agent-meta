@@ -92,8 +92,32 @@ def check_fstring_backslash_hazard(root: Path) -> list[Finding]:
     for path in _iter_py_files(root):
         try:
             source = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        try:
             tree = ast.parse(source, filename=str(path))
-        except (OSError, SyntaxError):
+        except SyntaxError as exc:
+            # On Python < 3.12 this exact hazard IS a SyntaxError -- the
+            # interpreter running this check may itself be pre-3.12 (CI's
+            # 3.9/3.11 matrix jobs), in which case ast.parse() never
+            # produces a tree to inspect at all. CPython's message for
+            # this specific case ("f-string expression part cannot
+            # include a backslash") is stable across 3.9-3.11; treat a
+            # match as a direct hit instead of silently skipping the file
+            # (any other SyntaxError is out of this check's scope).
+            if exc.msg and "backslash" in exc.msg and "f-string" in exc.msg:
+                findings.append(Finding(
+                    Severity.ERROR,
+                    "python.fstring-backslash-expr",
+                    str(path.relative_to(root)),
+                    f"f-string expression at line {exc.lineno} contains a "
+                    "backslash -- SyntaxError on Python < 3.12 (PEP 701 "
+                    "relaxed this in 3.12; CI's 3.9/3.11 matrix jobs fail "
+                    "at collection, not just one test).",
+                    "Assign the backslash-containing value to a variable "
+                    "first, then reference the variable in the f-string "
+                    "(e.g. `x = r'C:\\\\x'; f'{x}'`).",
+                ))
             continue
 
         for node in ast.walk(tree):

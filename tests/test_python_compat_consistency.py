@@ -18,6 +18,7 @@ _SCRIPTS_DIR = _REPO_ROOT / "scripts"
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
+import lib.consistency.python_compat as python_compat  # noqa: E402
 from lib.consistency.python_compat import (  # noqa: E402
     check_fstring_backslash_hazard,
     check_py39_union_syntax,
@@ -85,4 +86,31 @@ class TestFstringBackslashHazard:
 
     def test_clean_fstring_expression_is_not_flagged(self, tmp_path: Path) -> None:
         _write(tmp_path, "tests/test_foo.py", "def f(name):\n    return f'hello {name}'\n")
+        assert check_fstring_backslash_hazard(tmp_path) == []
+
+    def test_flags_via_syntaxerror_on_pre_312_interpreters(self, tmp_path, monkeypatch) -> None:
+        """On Python < 3.12 this hazard IS a SyntaxError -- ast.parse() never
+        produces a tree to inspect at all. This suite's own interpreter may
+        be 3.12+ (where the pattern parses fine), so the real 3.9/3.11
+        behavior is simulated here instead of relying on the local Python
+        version (issue #674 roadmap: this exact gap made the check pass
+        locally while failing on CI's 3.9/3.11 matrix jobs)."""
+        _write(tmp_path, "tests/test_foo.py", "def f():\n    pass\n")
+
+        def _raise(*_args, **_kwargs):
+            raise SyntaxError("f-string expression part cannot include a backslash")
+
+        monkeypatch.setattr(python_compat.ast, "parse", _raise)
+        findings = check_fstring_backslash_hazard(tmp_path)
+        assert len(findings) == 1
+        assert findings[0].check == "python.fstring-backslash-expr"
+
+    def test_unrelated_syntax_error_is_not_flagged(self, tmp_path, monkeypatch) -> None:
+        """A SyntaxError with a different message is out of this check's scope."""
+        _write(tmp_path, "tests/test_foo.py", "def f():\n    pass\n")
+
+        def _raise(*_args, **_kwargs):
+            raise SyntaxError("invalid syntax")
+
+        monkeypatch.setattr(python_compat.ast, "parse", _raise)
         assert check_fstring_backslash_hazard(tmp_path) == []
