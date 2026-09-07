@@ -1474,7 +1474,7 @@ Checkpoint after >5 steps: `.meta-viz/checkpoint-<timestamp>.json` with `{sessio
 
 **Summarization-as-a-Contract (issue #267):** Each worker returns ONLY its compact summary — the STATUS/RESULT/ARTIFACTS block. Raw output (logs, diffs, verbose tool output) is archived under `.meta-viz/checkpoints/<session-id>/` via `CheckpointStore.save_raw_output` and comes back as a `checkpoint_ref` pointer. Never re-request raw output into the context to "double-check" — read the referenced file only when details are actually needed. Enforced harness-side by `scripts/lib/orchestration.py` (issue #265): barrier entries carry `summary` + `checkpoint_ref` only; raw output is never re-rendered into the orchestrator context.
 
-**Progress file (issue #682 §6):** every `CheckpointStore.save_checkpoint()` call also overwrites `.claude/progress/current.md` (non-historized) with a human-readable `Agent | Task | Status` snapshot — same format as the mandatory status table (§7). Resume logic still reads the JSON checkpoints; `current.md` is for a human glancing at the repo, not parsed by any code path.
+**Progress file (issue #682 §6):** if the runtime calls `CheckpointStore.save_checkpoint()` (the Python API in `scripts/lib/checkpoint.py` — distinct from the manually-written checkpoint format above), it also overwrites `.claude/progress/current.md` (non-historized) with a human-readable `Agent | Task | Status` snapshot — same format as the mandatory status table (§7). Resume logic still reads the JSON checkpoints; `current.md` is for a human glancing at the repo, not parsed by any code path.
 
 ## 10. Delegation failure recovery
 Error responses (permission, timeout, out-of-scope, multi-failure, partial)

@@ -69,7 +69,8 @@ project:
 #   #   true = "generate, don't store"-Prinzip.
 #   generated: false
 #   # settings: false (Default) → Provider-Settings-Dateien (settings.json,
-#   #   GEMINI.md, config.yaml) gitignoren. CLAUDE.md ist nie betroffen.
+#   #   config.yaml) gitignoren. Die Kontextdatei jedes Providers (CLAUDE.md,
+#   #   AGENTS.md, MAMMOUTH.md, ...) ist nie betroffen.
 #   settings: false
 #
 # readme:
