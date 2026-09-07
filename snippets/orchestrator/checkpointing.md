@@ -33,4 +33,10 @@ Fortschritt gegen Context-Reset während laufender Delegation.
 
 **Cleanup:** Checkpoints älter als 24h automatisch löschen (beim nächsten Start).
 Maximale Checkpoint-Größe: 50 KB — große `context`-Felder kürzen.
+
+**Progress-Datei (issue #682 §6):** Bei jedem `CheckpointStore.save_checkpoint()`-Aufruf
+wird zusätzlich `.claude/progress/current.md` überschrieben (nicht historisiert) — ein
+menschenlesbarer Snapshot im selben `Agent | Task | Status`-Format wie die
+Status-Tabelle (§5-Regel). Für Resume-Logik weiterhin die JSON-Checkpoints verwenden,
+`current.md` ist nur für den schnellen menschlichen Blick in den Fortschritt gedacht.
 {{/if}}
