@@ -56,6 +56,7 @@ class Checkpoint:
         status: str,  # "pending", "in_progress", "completed", "failed"
         result: str | None = None,
         next_step: str | None = None,
+        status_summary: str | None = None,
         timestamp: float | None = None,
     ):
         self.id = str(uuid.uuid4())
@@ -65,6 +66,7 @@ class Checkpoint:
         self.status = status
         self.result = result
         self.next_step = next_step
+        self.status_summary = status_summary
         self.timestamp = timestamp or time.time()
 
     def to_dict(self) -> dict:
@@ -76,6 +78,7 @@ class Checkpoint:
             "status": self.status,
             "result": self.result,
             "next_step": self.next_step,
+            "status_summary": self.status_summary,
             "timestamp": self.timestamp,
         }
 
@@ -88,6 +91,7 @@ class Checkpoint:
             status=data["status"],
             result=data.get("result"),
             next_step=data.get("next_step"),
+            status_summary=data.get("status_summary"),
             timestamp=data.get("timestamp"),
         )
         cp.id = data.get("id", cp.id)
