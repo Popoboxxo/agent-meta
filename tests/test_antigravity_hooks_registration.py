@@ -17,6 +17,7 @@ Covers two layers:
 
 Run: python -m pytest tests/test_antigravity_hooks_registration.py -v
 """
+from __future__ import annotations
 
 import json
 import os

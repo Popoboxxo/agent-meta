@@ -1,12 +1,24 @@
-"""Consistency check: PEP 604 ``X | Y`` union syntax vs. Python 3.9 support.
+"""Consistency checks: Python-3.9-floor syntax hazards (CI matrix: 3.9/3.11/3.12).
 
-Python 3.9 (the floor per ``pyproject.toml``/CI matrix) evaluates annotations
-at import time unless ``from __future__ import annotations`` is present --
-``X | Y`` union syntax (PEP 604) only works without that import on Python
-3.10+. This bug class hit ``scripts/lib/`` twice in one campaign (#628, #637):
-a new module was written and tested locally on Python 3.13, where the
-missing future-import goes unnoticed, and only failed in CI's 3.9 matrix
-job. This check closes that gap preventively (#646).
+Two independent hazard classes, both bitten agent-meta repeatedly because
+new code is written and tested locally on a much newer interpreter (3.12+),
+where neither hazard is visible, and only fails in CI's older matrix jobs:
+
+1. PEP 604 ``X | Y`` union syntax in an annotation without
+   ``from __future__ import annotations`` -- Python 3.9 evaluates
+   annotations at import time, and the ``|`` union operator only works
+   without that import on 3.10+. Hit ``scripts/lib/`` twice in one
+   campaign (#628, #637); closed for ``scripts/lib/`` in #646, and hit
+   ``tests/`` on top of that (issue #674 roadmap review) -- this module
+   now scans both trees.
+2. A literal backslash inside an f-string's ``{...}`` expression part
+   (e.g. ``f"{r'C:\\x'}"``) -- PEP 701 (Python 3.12) relaxed the f-string
+   grammar to allow this; 3.9 and 3.11 still raise a SyntaxError at parse
+   time, which fails pytest at collection (whole matrix job red) rather
+   than at a single test. The interpreter running THIS check may itself
+   be 3.12+ (where the pattern parses fine), so detection can't rely on
+   ``ast.parse`` raising -- it inspects each f-string expression's
+   original source text via ``ast.get_source_segment`` instead.
 """
 
 from __future__ import annotations
@@ -16,9 +28,25 @@ from pathlib import Path
 
 from .report import Finding, Severity
 
+# Both hazards apply everywhere the CI matrix actually runs pytest against
+# Python 3.9: scripts/lib (the framework) and tests/ (its test suite).
+# vendored submodules (external/) are excluded -- foreign code, foreign floor.
+_SCAN_DIRS = (("scripts", "lib"), ("tests",))
+
+
+def _iter_py_files(root: Path):
+    for parts in _SCAN_DIRS:
+        scan_dir = root.joinpath(*parts)
+        if not scan_dir.is_dir():
+            continue
+        for path in sorted(scan_dir.rglob("*.py")):
+            if "__pycache__" in path.parts:
+                continue
+            yield path
+
 
 def check_py39_union_syntax(root: Path) -> list[Finding]:
-    """Flag ``scripts/lib/*.py`` modules using ``X | Y`` annotations without the future import.
+    """Flag modules using ``X | Y`` annotations without the future import.
 
     AST-based (stdlib ``ast``, no new dependency): collects every annotation
     node (function args, return type, variable annotations) and looks for an
@@ -27,13 +55,7 @@ def check_py39_union_syntax(root: Path) -> list[Finding]:
     expressions) is untouched since only annotation subtrees are walked.
     """
     findings: list[Finding] = []
-    lib_dir = root / "scripts" / "lib"
-    if not lib_dir.is_dir():
-        return findings
-
-    for path in sorted(lib_dir.rglob("*.py")):
-        if "__pycache__" in path.parts:
-            continue
+    for path in _iter_py_files(root):
         try:
             tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         except (OSError, SyntaxError):
@@ -52,6 +74,48 @@ def check_py39_union_syntax(root: Path) -> list[Finding]:
             "Add `from __future__ import annotations` as the first statement "
             "(after the module docstring, if any).",
         ))
+    return findings
+
+
+def check_fstring_backslash_hazard(root: Path) -> list[Finding]:
+    """Flag f-strings with a literal backslash inside a ``{...}`` expression.
+
+    Python < 3.12 raises ``SyntaxError: f-string expression part cannot
+    include a backslash`` for this -- even for a backslash buried inside a
+    nested raw-string literal (``f"{r'C:\\x'}"``). Detection walks every
+    ``ast.JoinedStr``/``ast.FormattedValue`` pair and checks the ORIGINAL
+    source text of each expression (via ``ast.get_source_segment``) for a
+    backslash, since the AST itself parses fine under a 3.12+ interpreter
+    regardless of the target floor.
+    """
+    findings: list[Finding] = []
+    for path in _iter_py_files(root):
+        try:
+            source = path.read_text(encoding="utf-8")
+            tree = ast.parse(source, filename=str(path))
+        except (OSError, SyntaxError):
+            continue
+
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.JoinedStr):
+                continue
+            for value in node.values:
+                if not isinstance(value, ast.FormattedValue):
+                    continue
+                segment = ast.get_source_segment(source, value.value)
+                if segment and "\\" in segment:
+                    findings.append(Finding(
+                        Severity.ERROR,
+                        "python.fstring-backslash-expr",
+                        str(path.relative_to(root)),
+                        f"f-string expression at line {value.lineno} contains "
+                        "a backslash -- SyntaxError on Python < 3.12 (PEP 701 "
+                        "relaxed this in 3.12; CI's 3.9/3.11 matrix jobs fail "
+                        "at collection, not just one test).",
+                        "Assign the backslash-containing value to a variable "
+                        "first, then reference the variable in the f-string "
+                        "(e.g. `x = r'C:\\\\x'; f'{x}'`).",
+                    ))
     return findings
 
 

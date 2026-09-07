@@ -533,4 +533,5 @@ class TestGoldenBuilderBuild:
         )
         builder = TemplateBuilder(template_dir)
         rendered = builder.build("t3", {"N": "N1", "P": r"C:\Users\x\s"})
-        assert rendered == f"P=N1\npath={r'C:\Users\x\s'}"
+        hazard_value = r"C:\Users\x\s"
+        assert rendered == f"P=N1\npath={hazard_value}"

@@ -127,7 +127,8 @@ class TestReplacementFunction:
     def test_hazard_value_via_replacement_function(self) -> None:
         """The callback itself is escape-safe when fed to re.sub directly."""
         repl = replacement_function(lambda name: r"C:\x\s \1")
-        assert re.sub(r"\{\{(V)\}\}", repl, "p {{V}}") == f"p {r'C:\x\s \1'}"
+        hazard_value = r"C:\x\s \1"
+        assert re.sub(r"\{\{(V)\}\}", repl, "p {{V}}") == f"p {hazard_value}"
 
 
 class TestConstantLookup:

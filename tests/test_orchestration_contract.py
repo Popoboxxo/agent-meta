@@ -15,6 +15,7 @@ step 2/3 acceptance criteria):
     - post-sync consistency check (scripts/lib/consistency/fanout_contracts.py):
       clean repo passes, deliberately broken fixtures produce error findings
 """
+from __future__ import annotations
 
 import shutil
 import sys

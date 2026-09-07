@@ -30,6 +30,7 @@ production plan validator ``scripts.lib.orchestration``:
 Real enforcement (calling the checks before an ACTUAL dispatch) stays
 harness-side — this engine is the dry-run simulation of that gate.
 """
+from __future__ import annotations
 
 import json
 import sys

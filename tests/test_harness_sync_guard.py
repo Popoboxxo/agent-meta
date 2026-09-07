@@ -10,6 +10,8 @@ via CLI flag and AGENT_META_HARNESS env var, verifying:
 - the ``--harness`` flag overrides the env var,
 - an unknown harness name refuses with the available names listed.
 """
+from __future__ import annotations
+
 import sys
 from pathlib import Path
 

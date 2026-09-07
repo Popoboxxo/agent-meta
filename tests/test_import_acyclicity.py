@@ -15,6 +15,7 @@ This is the permanent guard introduced by the #478 retargeting: the historic
 agents ↔ config ↔ viz cycles were already dissolved (Issue #561/#565 agent
 split); the guard keeps it that way for every future refactor.
 """
+from __future__ import annotations
 
 import ast
 import sys
