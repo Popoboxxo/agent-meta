@@ -86,3 +86,147 @@ def test_is_drift_detection_enabled_false_when_explicitly_disabled() -> None:
 
 def test_is_drift_detection_enabled_true_when_explicitly_enabled() -> None:
     assert is_drift_detection_enabled({"drift-detection": {"enabled": True}}) is True
+
+
+from scripts.lib.generated_file_drift import scan_generated_file_drift
+
+
+def _write(root: Path, rel: str, content: str) -> None:
+    path = root / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+
+
+def _managed_index(root: Path, dir_rel: str, *names: str) -> None:
+    index_path = root / dir_rel / ".agent-meta-managed"
+    index_path.parent.mkdir(parents=True, exist_ok=True)
+    index_path.write_text("\n".join(names) + "\n", encoding="utf-8")
+
+
+def _provider_config() -> dict:
+    return {"Claude": {
+        "agents_dir": ".claude/agents", "skills_dir": ".claude/skills",
+        "hooks_dir": ".claude/hooks", "rules_dir": ".claude/rules",
+        "commands_dir": ".claude/commands",
+        "has_hooks": True, "has_rules": True, "has_commands": True,
+    }}
+
+
+def test_scan_flags_agent_file_whose_content_changed_since_last_hash(tmp_path: Path) -> None:
+    project_root = tmp_path / "project"
+    _write(project_root, ".claude/agents/developer.md", "edited by hand")
+    _managed_index(project_root, ".claude/agents", "developer.md")
+    from scripts.lib.generated_file_drift import content_hash
+    _save_hashes(project_root, {".claude/agents/developer.md": content_hash("original content")}, dry_run=False)
+
+    findings = scan_generated_file_drift(tmp_path / "agent-meta", project_root, {}, _provider_config())
+    paths = [f["path"] for f in findings]
+    assert ".claude/agents/developer.md" in paths
+
+
+def test_scan_does_not_flag_file_with_no_stored_hash_yet(tmp_path: Path) -> None:
+    project_root = tmp_path / "project"
+    _write(project_root, ".claude/agents/developer.md", "brand new")
+    _managed_index(project_root, ".claude/agents", "developer.md")
+
+    findings = scan_generated_file_drift(tmp_path / "agent-meta", project_root, {}, _provider_config())
+    assert findings == []
+
+
+def test_scan_does_not_flag_unchanged_file(tmp_path: Path) -> None:
+    from scripts.lib.generated_file_drift import content_hash
+    project_root = tmp_path / "project"
+    _write(project_root, ".claude/agents/developer.md", "same content")
+    _managed_index(project_root, ".claude/agents", "developer.md")
+    _save_hashes(project_root, {".claude/agents/developer.md": content_hash("same content")}, dry_run=False)
+
+    findings = scan_generated_file_drift(tmp_path / "agent-meta", project_root, {}, _provider_config())
+    assert findings == []
+
+
+def test_scan_respects_allowlist(tmp_path: Path) -> None:
+    from scripts.lib.generated_file_drift import content_hash
+    project_root = tmp_path / "project"
+    _write(project_root, ".claude/commands/my-cmd.md", "edited by hand")
+    _managed_index(project_root, ".claude/commands", "my-cmd.md")
+    _save_hashes(project_root, {".claude/commands/my-cmd.md": content_hash("original")}, dry_run=False)
+    meta = project_root / ".meta-config"
+    meta.mkdir(parents=True, exist_ok=True)
+    (meta / "drift-allowlist.yaml").write_text(
+        "allow-edits:\n  - .claude/commands/*.md\n", encoding="utf-8",
+    )
+
+    findings = scan_generated_file_drift(tmp_path / "agent-meta", project_root, {}, _provider_config())
+    assert findings == []
+
+
+def test_scan_covers_rules_dir_hooks_dir_and_pipeline_details(tmp_path: Path) -> None:
+    from scripts.lib.generated_file_drift import content_hash
+    project_root = tmp_path / "project"
+    _write(project_root, ".claude/rules/branch-guard.md", "edited")
+    _managed_index(project_root, ".claude/rules", "branch-guard.md")
+    _write(project_root, ".claude/hooks/dod-push-check.sh", "edited")
+    _managed_index(project_root, ".claude/hooks", "dod-push-check.sh")
+    _write(project_root, ".claude/pipeline-details/bugfix.md", "edited")
+    _managed_index(project_root, ".claude/pipeline-details", "bugfix.md")
+    _save_hashes(project_root, {
+        ".claude/rules/branch-guard.md": content_hash("orig"),
+        ".claude/hooks/dod-push-check.sh": content_hash("orig"),
+        ".claude/pipeline-details/bugfix.md": content_hash("orig"),
+    }, dry_run=False)
+
+    findings = scan_generated_file_drift(tmp_path / "agent-meta", project_root, {}, _provider_config())
+    paths = {f["path"] for f in findings}
+    assert paths == {
+        ".claude/rules/branch-guard.md",
+        ".claude/hooks/dod-push-check.sh",
+        ".claude/pipeline-details/bugfix.md",
+    }
+
+
+def test_scan_covers_nested_managed_subdirs(tmp_path: Path) -> None:
+    """hooks/lib/ and hooks/release-gates/ carry their OWN .agent-meta-managed
+    index (issue #558) -- must be recursed into, not just the top-level hooks/."""
+    from scripts.lib.generated_file_drift import content_hash
+    project_root = tmp_path / "project"
+    _write(project_root, ".claude/hooks/lib/hook_common.sh", "edited")
+    _managed_index(project_root, ".claude/hooks/lib", "hook_common.sh")
+    _managed_index(project_root, ".claude/hooks")  # empty top-level index
+    _save_hashes(project_root, {".claude/hooks/lib/hook_common.sh": content_hash("orig")}, dry_run=False)
+
+    findings = scan_generated_file_drift(tmp_path / "agent-meta", project_root, {}, _provider_config())
+    paths = {f["path"] for f in findings}
+    assert ".claude/hooks/lib/hook_common.sh" in paths
+
+
+def test_scan_unions_rules_sidecar_indexes(tmp_path: Path) -> None:
+    """rules/ has THREE index files (.agent-meta-managed, -mcp, -tools) for
+    three different writers -- all three contribute managed filenames."""
+    from scripts.lib.generated_file_drift import content_hash
+    project_root = tmp_path / "project"
+    _write(project_root, ".claude/rules/mcp-honcho.md", "edited")
+    (project_root / ".claude" / "rules").mkdir(parents=True, exist_ok=True)
+    (project_root / ".claude" / "rules" / ".agent-meta-managed").write_text("", encoding="utf-8")
+    (project_root / ".claude" / "rules" / ".agent-meta-managed-mcp").write_text("mcp-honcho.md\n", encoding="utf-8")
+    _save_hashes(project_root, {".claude/rules/mcp-honcho.md": content_hash("orig")}, dry_run=False)
+
+    findings = scan_generated_file_drift(tmp_path / "agent-meta", project_root, {}, _provider_config())
+    paths = {f["path"] for f in findings}
+    assert ".claude/rules/mcp-honcho.md" in paths
+
+
+def test_scan_only_covers_active_providers(tmp_path: Path) -> None:
+    from scripts.lib.generated_file_drift import content_hash
+    project_root = tmp_path / "project"
+    _write(project_root, ".gemini/agents/developer.md", "edited")
+    _managed_index(project_root, ".gemini/agents", "developer.md")
+    _save_hashes(project_root, {".gemini/agents/developer.md": content_hash("orig")}, dry_run=False)
+
+    provider_config = {
+        "Claude": _provider_config()["Claude"],
+        "Gemini": {"agents_dir": ".gemini/agents", "skills_dir": ".gemini/skills"},
+    }
+    # config has no "ai-providers" key -> resolve_providers() defaults to
+    # ["Claude"] only (see scripts/lib/providers.py) -- Gemini is not active.
+    findings = scan_generated_file_drift(tmp_path / "agent-meta", project_root, {}, provider_config)
+    assert findings == []
