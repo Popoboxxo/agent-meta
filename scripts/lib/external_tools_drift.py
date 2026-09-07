@@ -204,6 +204,17 @@ def scan_injection_drift(
 
         provider_findings: list[dict] = []
 
+        # A provider's own context_file (Continue: .continue/rules/project-context.md)
+        # can live INSIDE its rules_dir -- every other provider's context-file
+        # equivalent (e.g. Claude's CLAUDE.md) lives at the project root, outside
+        # any scanned dir_spec, so this never mattered before Continue was
+        # exercised alongside an active tool/MCP server. context.py writes this
+        # file directly (no .agent-meta-managed entry for it, since it isn't a
+        # rules.py-managed rule), so without this exclusion it reads as a
+        # foreign injection on every sync.
+        context_file_rel = pc.get("context_file")
+        context_file_path = (project_root / context_file_rel).resolve() if context_file_rel else None
+
         # --- managed subdirs: skill / hook / rule (declarable kinds) ---
         # "skill" is unconditional (no has_skills flag exists in
         # ai-providers.yaml). "hook"/"rule" are gated on the provider's own
@@ -224,6 +235,12 @@ def scan_injection_drift(
             if kind == "rule":
                 managed |= {f"{TOOL_RULE_PREFIX}{t}.md" for t in active_tools}
                 managed |= {f"mcp-{s}.md" for s in active_mcp}
+                # render_injection_drift_artifacts() writes DRIFT_FILENAME
+                # into this same dir when findings exist, but never adds it
+                # to the dir's own .agent-meta-managed index -- without this,
+                # the drift report becomes its own drift finding on the next
+                # sync (found via the 2026-09-07 scenario simulation).
+                managed.add(DRIFT_FILENAME)
             for child in sorted(dir_path.iterdir()):
                 # ".agent-meta-managed" (rules.py) plus the per-caller
                 # ".agent-meta-managed-mcp" / "-tools" sidecar indexes
@@ -232,6 +249,8 @@ def scan_injection_drift(
                 if child.name == ".agent-meta-managed" or child.name.startswith(".agent-meta-managed-"):
                     continue
                 if child.name in managed:
+                    continue
+                if context_file_path is not None and child.resolve() == context_file_path:
                     continue
                 # A subdirectory that carries its OWN '.agent-meta-managed'
                 # index (e.g. hooks/release-gates/, sync_release_gates() —
