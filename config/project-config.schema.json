@@ -768,7 +768,7 @@
         "settings": {
           "type": "boolean",
           "default": false,
-          "description": "Gitignore provider settings files (settings.json, GEMINI.md, config.yaml) for all active providers. Default: false (committed). Note: CLAUDE.md is never gitignored (contains handwritten sections)."
+          "description": "Gitignore provider settings files (settings.json, GEMINI.md, config.yaml) for all active providers. Default: false (committed). Note: every provider's own context file (CLAUDE.md, AGENTS.md, MAMMOUTH.md, ...) is never gitignored, regardless of this toggle (contains handwritten sections)."
         },
         "ignore-provider-dirs": {
           "type": "boolean",
