@@ -29,6 +29,8 @@ CHECKPOINT_DIR = ".meta-viz/checkpoints"
 
 _RAW_OUTPUT_SUFFIX = ".txt"
 
+_PROGRESS_DIR = ".claude/progress"
+
 _logger = logging.getLogger(__name__)
 
 
@@ -43,6 +45,32 @@ def _sanitize_component(value: str, max_len: int = 64) -> str:
     cleaned = re.sub(r"[^A-Za-z0-9._-]", "_", value)
     cleaned = cleaned.strip("._-")[:max_len].strip("._-")
     return cleaned or "unnamed"
+
+
+def _render_progress_markdown(session_data: dict) -> str:
+    """Render a session's checkpoints as the same status-table format used
+    by the orchestrator's mandatory status-table rule (issue #678) --
+    human-readable progress snapshot, not the resume-machinery JSON.
+    """
+    session_id = session_data.get("session_id", "unknown")
+    checkpoints = session_data.get("checkpoints", [])
+    lines = [f"# Progress — session `{session_id}`", ""]
+    latest_summary = next(
+        (cp.get("status_summary") for cp in reversed(checkpoints) if cp.get("status_summary")),
+        None,
+    )
+    if latest_summary:
+        lines.append(latest_summary)
+        lines.append("")
+    lines.append("| Agent | Task | Status |")
+    lines.append("|-------|------|--------|")
+    for cp in checkpoints:
+        agent = cp.get("agent", "?")
+        task = cp.get("task_description", "?")
+        status = cp.get("status", "?")
+        lines.append(f"| `{agent}` | {task} | `{status}` |")
+    lines.append("")
+    return "\n".join(lines)
 
 
 class Checkpoint:
@@ -182,6 +210,10 @@ class CheckpointStore:
         A corrupt existing session file (#576) is treated as an empty one —
         the new checkpoint still gets saved instead of crashing the whole
         orchestration on a single damaged file.
+
+        Issue #682 §6: also overwrites .claude/progress/current.md with a
+        human-readable snapshot of the same session data -- non-historized,
+        for a human glancing at the repo, not for resume logic.
         """
         self._ensure_dir()
         path = self._session_file(session_id)
@@ -198,6 +230,13 @@ class CheckpointStore:
             "checkpoints": checkpoints,
         }
         save_json_document(path, session_data)
+        self._write_progress_file(session_data)
+
+    def _write_progress_file(self, session_data: dict) -> None:
+        """Overwrite .claude/progress/current.md -- see _render_progress_markdown."""
+        progress_path = self.project_root / _PROGRESS_DIR / "current.md"
+        progress_path.parent.mkdir(parents=True, exist_ok=True)
+        write_atomic(progress_path, _render_progress_markdown(session_data))
 
     def load_session(self, session_id: str) -> dict | None:
         """Load full session data. Returns None when missing or corrupt (#576)."""
