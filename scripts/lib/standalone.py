@@ -80,6 +80,13 @@ _ORCHESTRATION_FALLBACKS: dict[str, str] = {
     "ANTI_RECURSION_BLOCK": "",
     "DOD_REQ_BLOCK": "",
     "DOD_TESTS_BLOCK": "",
+    # STATUS_TABLE_BLOCK (issue #682 §5): unlike SE_MODE_BLOCK/CHECKPOINTING_BLOCK/
+    # QUALITY_PIPELINES_BLOCK (built but not yet referenced by any template --
+    # pre-existing gap, out of scope here), this one IS referenced unconditionally
+    # in orchestrator.md §7 -- standalone rendering needs the real snippet text,
+    # not an empty string, since it's a mandatory rule the reader must see.
+    "STATUS_TABLE_BLOCK": (Path(__file__).resolve().parents[2] / "snippets" / "orchestrator" / "status-table.md").read_text(encoding="utf-8")
+    if (Path(__file__).resolve().parents[2] / "snippets" / "orchestrator" / "status-table.md").exists() else "",
 }
 
 # Conditional flags gating {{#if VAR}}/{{#unless VAR}} blocks tied to

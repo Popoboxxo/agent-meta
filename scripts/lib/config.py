@@ -1112,6 +1112,7 @@ def _build_snippet_variables(variables: dict, agent_meta_root: Path) -> None:
         ("a2a-protocol", "A2A_PROTOCOL"),
         ("checkpointing", "CHECKPOINTING"),
         ("quality-pipelines", "QUALITY_PIPELINES"),
+        ("status-table", "STATUS_TABLE"),
     ):
         _snippet_path = _snippets_dir / f"{_snippet_name}.md"
         _var_name = f"{_var_stem}_BLOCK"
