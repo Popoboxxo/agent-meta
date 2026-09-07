@@ -1,5 +1,5 @@
 #!/bin/bash
-# version: 1.0.0
+# version: 1.1.0
 # Real orchestrator-guard logic. NOT a standalone hook — invoked by
 # orchestrator-guard.sh (thin self-health wrapper, issue #630), which pipes
 # the PreToolUse JSON payload to this script's stdin after syntax-checking
@@ -27,19 +27,27 @@ set -uo pipefail
 # explanation — the block worked, the reason was lost (issue #396). Every
 # message emitted on a blocking path must go to stderr.
 #
-# Identity note (see agent-meta issue #390): no provider's PreToolUse hook
-# payload identifies which subagent issued the call — Claude Code's
-# documented payload is {session_id, transcript_path, hook_event_name,
-# tool_name, tool_input} only, with no agent/subagent field. The only
-# channel a hook can read without corrupting tool semantics is the `Bash`
-# `command` string itself. Authorized delegates (git, orchestrator agent
-# templates) therefore self-declare by prefixing every Bash command with a
-# sentinel comment line: `#agent-meta:agent=<name>`. This is a soft,
-# self-reported convention (matches the framework's existing A2A trust
-# model, see .claude/rules/a2a-delegation-gates.md) — it is not a security
-# boundary against a malicious agent, only a fix for the identification gap.
-# Write/Edit have no such safe channel (a marker would corrupt file
-# content), so they are never exempted under strict mode.
+# Identity note (see agent-meta issues #390, #683): Claude Code's PreToolUse
+# payload now carries an `agent_id` common input field, harness-set (not
+# self-reported), "present only when the hook fires inside a subagent call"
+# (https://code.claude.com/docs/en/hooks.md) — this was NOT true when this
+# hook was first written (issue #390), which is why the sentinel convention
+# below exists at all. `agent_id` reliably distinguishes ANY dispatched
+# subagent's tool call (Write/Edit/Bash alike) from a main-thread call,
+# without needing a content-embedded marker — see AGENT_ID usage below and
+# in the strict-mode block.
+#
+# The sentinel convention remains for a narrower purpose the harness field
+# doesn't cover: identifying WHICH ROLE a Bash call belongs to (git vs.
+# orchestrator vs. anything else), for the git-mutation/destructive gates
+# below — `agent_id` says "this is some subagent", not "this is the git
+# agent". Authorized delegates (git, orchestrator agent templates)
+# self-declare by prefixing every Bash command with a sentinel comment
+# line: `#agent-meta:agent=<name>`. This remains a soft, self-reported
+# convention (matches the framework's existing A2A trust model, see
+# .claude/rules/a2a-delegation-gates.md) — it is not a security boundary
+# against a malicious agent, only a fix for the role-identification gap
+# `agent_id` alone can't close.
 #
 # Hardening (issue #516): a real-world incident showed a non-git worker
 # self-declaring as `git` via this sentinel to run destructive stash
@@ -116,6 +124,15 @@ TOOL_NAME=$(hook_json_get "$INPUT" "tool_name")
 if [ -z "$TOOL_NAME" ]; then
   exit 0
 fi
+
+# agent_id (issue #683): Claude Code's PreToolUse payload carries this
+# common input field "only when the hook fires inside a subagent call" —
+# "Use this to distinguish subagent hook calls from main-thread calls"
+# (https://code.claude.com/docs/en/hooks.md, Common input fields). This
+# supersedes the "no agent/subagent field" limitation this hook's own
+# comments used to document (see git history) — that was true when this
+# hook was written, not anymore. Empty = main-thread call.
+AGENT_ID=$(hook_json_get "$INPUT" "agent_id")
 
 # Only block mutating tools
 case "$TOOL_NAME" in
@@ -423,7 +440,18 @@ except Exception:
     print('false')
 " "$CONFIG_FILE" "$AGENT_META_PROVIDER" 2>/dev/null)
 
-  if [ "$STRICT" = "true" ]; then
+  # -z "$AGENT_ID": strict-mode main-chat blocking applies ONLY to the
+  # main-thread (issue #683). A dispatched subagent's Write/Edit/Bash call
+  # carries a non-empty agent_id (harness-set, see identity note above) and
+  # skips this whole block — Write/Edit falls through allowed (they never
+  # reach any gate below this one); Bash falls through to the git-mutation
+  # gate just below, exactly like non-strict mode, so a subagent still
+  # cannot mutate git without a valid `git` sentinel. Before this fix,
+  # STRICT MODE blocked Write/Edit and non-sentineled Bash for EVERY
+  # caller, including a properly orchestrator-dispatched implementer
+  # subagent — making delegated implementation infeasible the moment strict
+  # mode was enabled.
+  if [ "$STRICT" = "true" ] && [ -z "$AGENT_ID" ]; then
     # Orchestrator OR git sentinel exempts a Bash call from strict-mode
     # main-chat blocking — never Write/Edit, never the git-mutation gate.
     # Both are recognized delegates (see IS_GIT_SENTINEL/IS_ORCH_SENTINEL
@@ -442,8 +470,10 @@ except Exception:
   fi
 fi
 
-# Non-strict mode: still block direct git mutations in Bash calls. Reuses
-# the unified scan (issue #551) computed above — the destructive gate has
+# Still block direct git mutations in Bash calls — applies whenever the
+# strict-mode main-chat block above didn't already exit (non-strict mode,
+# OR strict mode with a dispatched subagent, issue #683). Reuses the
+# unified scan (issue #551) computed above — the destructive gate has
 # already exited for 'destructive'; a 'mutation' result is a plain git
 # mutation that a non-git caller must delegate to the `git` agent.
 if [ "$TOOL_NAME" = "Bash" ] && [ "$_GIT_SCAN" = "mutation" ] && [ "$IS_GIT_SENTINEL" != "1" ]; then
