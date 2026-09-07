@@ -4,37 +4,24 @@ providers:
     agent_ext: .md
     context_file: CLAUDE.md
     context_template: templates/configs/CLAUDE.project-template.md
-    # Claude is the only provider with its own dedicated context-file handling
-    # (sync_claude_md_static() in sync.py, AGENT_HINTS_CLAUDE variable in
-    # context.py) instead of sharing the generic AGENTS.md path every other
-    # provider uses. Expressed as a capability flag (issue #631) so
-    # resolve_context_filename()/context.py read a data lookup instead of a
-    # literal `provider == "Claude"` string check.
     has_dedicated_context_file: true
     has_rules: true
     has_hooks: true
-    # hook_protocol: the hook event/payload contract a provider speaks. Every
-    # script in hooks/1-generic/ is written against Claude Code's own model
-    # (JSON on stdin, PreToolUse/PostToolUse events, exit-code-2-blocks,
-    # registration in settings.json). `has_hooks: true` alone only means "a
-    # hooks_dir/settings_file path is configured" — sync only actually mirrors
-    # hook scripts to a provider whose hook_protocol matches a known,
-    # implemented one (see providers.py::provider_hooks_supported, issue #630).
     hook_protocol: claude-code-json
     has_commands: true
     has_settings: true
     capabilities:
-      - agents
-      - rules
-      - hooks
-      - commands
-      - settings
-      - snippets
-      - skills
-      - context-managed-block
-      - artifacts
-      - checkpoints
-      - mcp
+    - agents
+    - rules
+    - hooks
+    - commands
+    - settings
+    - snippets
+    - skills
+    - context-managed-block
+    - artifacts
+    - checkpoints
+    - mcp
     artifact_dir: .claude/artifacts
     checkpoint_dir: .meta-viz
     settings_file: .claude/settings.json
@@ -42,83 +29,48 @@ providers:
     settings_local_file: .claude/settings.local.json
     settings_local_template: templates/configs/CLAUDE.settings-local-template.json
     isolation-dirs:
-      - .claude/
-      - CLAUDE.md
-    # Mechanism key consumed by isolation.py's dispatch table (no literal
-    # `if provider == "Claude"` branch — see _ISOLATION_MECHANISM_HANDLERS).
+    - .claude/
+    - CLAUDE.md
     isolation-mechanism: claude-settings-deny
-    # Human-readable name for isolation deny-messages (differs from the
-    # registry key "Claude" — see isolation.py::_isolation_display_name).
-    isolation-display-name: "Claude Code"
-    # Terminal (Bash/command-execution) tool name — used by viz.py's fallback
-    # CLI-logging hint. null means: no known terminal tool for this provider.
+    isolation-display-name: Claude Code
     bash_tool_name: Bash
-    # Provider-root directories for gitignore.ignore-provider-dirs (issue #557).
-    # When that project.yaml toggle is enabled, the managed .gitignore block
-    # ignores these WHOLE directories (with trailing slash) instead of listing
-    # provider-internal sub-paths. Explicit key wins; fallback derivation when
-    # missing: first dot-prefixed segment of agents_dir (here would yield
-    # .claude/ anyway). Repo-root files (CLAUDE.personal.md, sync.log, .mcp.json)
-    # are NOT affected — they keep their per-category gitignore behavior.
     provider_root_dirs:
-      - .claude/
+    - .claude/
     gitignore_entries:
-      - .claude/settings.local.json
-      - .claude/agent-memory-local/
-      - .claude/pending-tasks.md
-      - .claude/progress/
-      - CLAUDE.personal.md
-      - sync.log
-      - .mcp.json
+    - .claude/settings.local.json
+    - .claude/agent-memory-local/
+    - .claude/pending-tasks.md
+    - .claude/progress/
+    - CLAUDE.personal.md
+    - sync.log
+    - .mcp.json
     mcp-config:
-      # Claude Code does NOT read a top-level `mcpServers` key from
-      # settings.json/settings.local.json for MCP server registration — only
-      # from .mcp.json at the project root (or `claude mcp add --scope
-      # project`). Writing here previously produced a fully inert,
-      # silently-broken integration (audit #388, #400). Both entries point
-      # at the same already-gitignored .mcp.json (see gitignore_entries
-      # above): committed-file writes ${VAR}-placeholder entries first (safe
-      # even if this file were ever committed), then secrets-file overwrites
-      # the same mcpServers key with fully resolved values when
-      # secrets.local.yaml exists — matching .mcp.json's own native ${VAR}
-      # expansion as the fallback when it doesn't.
       committed-file: .mcp.json
       secrets-file: .mcp.json
       format: claude-settings
-    # Provider-specific directories for multi-provider orchestration
     skills_dir: .claude/skills
     snippets_dir: .claude/snippets
     pending_tasks_file: .claude/pending-tasks.md
     extension_dir: .claude/3-project
-    orchestrator_hint: "- **In Claude Code (CLI):** Startet den `orchestrator`-Agenten mit `claude -a orchestrator` oder wählt ihn aus."
-    # Model tiers: abstract tier name → provider-specific model ID.
-    # Agents use tier names (nano/fast/balanced/powerful/max) in role-defaults.yaml.
-    # sync.py maps each tier to the model ID written into agent frontmatter.
-    # Source: https://platform.claude.com/docs/en/about-claude/models/overview (verified 2026-06-24)
-    # ID convention: 4.6+ generation uses dateless IDs (claude-sonnet-4-6);
-    # pre-4.6 models use dated snapshot IDs (claude-haiku-4-5-20251001).
+    orchestrator_hint: "- **In Claude Code (CLI):** Startet den `orchestrator`-Agenten\
+      \ mit `claude -a orchestrator` oder w\xE4hlt ihn aus."
     model-tiers:
-      nano:     claude-haiku-4-5-20251001   # cheapest, high-throughput tasks
-      fast:     claude-haiku-4-5-20251001   # quick ops: git, meta-feedback, docker
-      balanced: claude-sonnet-5             # default workhorse: dev, docs, review
-      powerful: claude-opus-4-8             # complex reasoning: architecture, security
-      max:      claude-fable-5              # most capable widely released model
-    # Backward-compat aliases (haiku/sonnet/opus still work in model-overrides)
+      nano: claude-haiku-4-5-20251001
+      fast: claude-haiku-4-5-20251001
+      balanced: claude-sonnet-5
+      powerful: claude-opus-4-8
+      max: claude-fable-5
     model-aliases:
-      haiku:  claude-haiku-4-5-20251001
+      haiku: claude-haiku-4-5-20251001
       sonnet: claude-sonnet-4-6
-      opus:   claude-opus-4-8
-      fable:  claude-fable-5
-    # Data-driven agent transform (issue #629). Claude supports all fields
-    # natively — model/memory/permissionMode injected, tools validated (kept),
-    # body left intact (Claude-specific lines are meaningful here).
+      opus: claude-opus-4-8
+      fable: claude-fable-5
     agent-transform:
       model: inject
       model-note-flat: true
       inject-memory: true
       inject-permission-mode: true
       tools: keep
-
   Gemini:
     agents_dir: .gemini/agents
     agent_ext: .md
@@ -127,84 +79,38 @@ providers:
     has_rules: true
     rules_dir: .gemini/rules
     has_hooks: true
-    # Antigravity lifecycle hooks (issue #674 Phase 3.1). The agent-meta
-    # "Gemini" provider targets VS Code / Antigravity (AGY), whose hook
-    # contract is VERIFIED against the official docs
-    # (antigravity.google/docs/hooks, state 2026-09):
-    #   * Registration artifact: a hooks.json file — workspace location is
-    #     the documented customization dir `.agents/hooks.json` (global:
-    #     ~/.gemini/config/hooks.json). NOT `.gemini/settings.json` — that
-    #     file is Gemini CLI's settings surface, which AGY does not read
-    #     hooks from, and NOT `.gemini/hooks.json` (no documented AGY
-    #     workspace location; `~/.gemini/hooks.json` is only a legacy global
-    #     path). See `hooks_config_file` below.
-    #   * Events: PreToolUse, PostToolUse, PreInvocation, PostInvocation,
-    #     Stop. PreToolUse/PostToolUse take a matcher + nested hooks array;
-    #     PreInvocation/PostInvocation/Stop use a flat command list.
-    #   * Stdin payload: {"hookEventName", "toolCall": {name, args},
-    #     "stepIdx", "conversationId", "workspacePaths", ...} — camelCase
-    #     keys, no `cwd`, NOT Claude's hook_event_name/tool_name/tool_input.
-    #   * Output: {"decision": "allow"|"deny", "reason"} JSON on stdout —
-    #     NOT exit-code-2-blocks + stderr.
-    # All three legs deviate from Claude Code → dedicated protocol value
-    # (option b, #674 brief): hooks/1-generic/*.sh speak the Claude contract,
-    # so every mirrored hook is registered through the translating adapter
-    # hooks/1-generic/antigravity-json-adapter.sh (payload keys, AGY tool
-    # names, and deny-JSON response) instead of being registered raw.
     hook_protocol: antigravity-hooks-json
-    # Hook scripts are mirrored to the hooks.json directory (documented AGY
-    # workspace customization root; relative command paths in hooks.json
-    # resolve against it). The .agent-meta-managed index and the lib/ +
-    # release-gates/ subdirectories live there like for every other provider.
     hooks_dir: .agents/hooks
-    # Registration artifact (consumed by scripts/lib/hooks.py's protocol
-    # dispatch — no provider-name branch anywhere). Path-collision coverage:
-    # tests/test_provider_hooks_config.py sweeps hooks_config_file like
-    # hooks_dir/settings_file.
     hooks_config_file: .agents/hooks.json
     has_commands: true
     commands_dir: .gemini/commands
     commands_ext: .toml
     has_settings: true
     capabilities:
-      - agents
-      - rules
-      - hooks
-      - commands
-      - settings
-      - snippets
-      - skills
-      - context-embedded-rules
-      - mcp
+    - agents
+    - rules
+    - hooks
+    - commands
+    - settings
+    - snippets
+    - skills
+    - context-embedded-rules
+    - mcp
     artifact_dir: .gemini/artifacts
     checkpoint_dir: .meta-viz
     settings_file: .gemini/settings.json
     settings_template: templates/configs/GEMINI.settings-template.json
     settings_local_file: .gemini/settings.local.json
     isolation-dirs:
-      - .gemini/
+    - .gemini/
     isolation-mechanism: gemini-toml-policy
-    isolation-display-name: "Gemini CLI"
+    isolation-display-name: Gemini CLI
     bash_tool_name: code_execution
-    # Provider roots for gitignore.ignore-provider-dirs (issue #557) — see the
-    # Claude block for the full explanation.
-    # NOTE: `.agents/` is deliberately NOT a provider root, even though the
-    # Antigravity hook artifacts (hooks_config_file .agents/hooks.json +
-    # hooks_dir .agents/hooks) live under it: `.agents/` is a shared
-    # cross-tool convention directory (Codex claims `.agents/skills`, other
-    # tools scan it too). Ignoring the whole directory would hide other
-    # tools' files; the two hook artifacts are meant to be COMMITTED anyway
-    # (same policy as .claude/settings.json), so nothing needs ignoring here.
-    # Cross-provider caveat: with Codex active AND project.yaml
-    # gitignore.ignore-provider-dirs enabled, Codex's provider root `.agents/`
-    # ignores the whole directory — projects combining both must add
-    # `gitignore.exceptions: ['.agents/']` (exceptions invert the root
-    # emission in scripts/lib/gitignore.py compute_base_gitignore_entries).
     provider_root_dirs:
-      - .gemini/
+    - .gemini/
     gitignore_entries:
-      - .gemini/settings.local.json
-      - .gemini/pending-tasks.md
+    - .gemini/settings.local.json
+    - .gemini/pending-tasks.md
     mcp-config:
       committed-file: .gemini/settings.json
       secrets-file: .gemini/settings.local.json
@@ -213,74 +119,70 @@ providers:
     snippets_dir: .gemini/snippets
     pending_tasks_file: .gemini/pending-tasks.md
     extension_dir: .gemini/3-project
-    orchestrator_hint: "- **In Gemini (VS Code):** Nutzt `@orchestrator <Eure Aufgabe>` im Chat."
-    planning_mode_hint: "Gemini's `<planning_mode>` hat Vorrang. Wenn der Orchestrator aktiv ist, unterdrückt die Orchestrator-Planning-Phase den nativen Mode. Doppelte Planung vermeiden."
+    orchestrator_hint: '- **In Gemini (VS Code):** Nutzt `@orchestrator <Eure Aufgabe>`
+      im Chat.'
+    planning_mode_hint: "Gemini's `<planning_mode>` hat Vorrang. Wenn der Orchestrator\
+      \ aktiv ist, unterdr\xFCckt die Orchestrator-Planning-Phase den nativen Mode.\
+      \ Doppelte Planung vermeiden."
     model-tiers:
-      nano:     gemini-3.5-flash-medium     # ultra-fast, low-cost tasks
-      fast:     gemini-3.5-flash-high       # quick ops: git, formatting
-      balanced: gemini-3.1-pro-low          # reasoning + code (default)
-      powerful: gemini-3.1-pro-high         # premium reasoning, complex coding
-      max:      gemini-3.1-pro-high         # reserved for future Gemini Ultra
+      nano: gemini-3.5-flash-medium
+      fast: gemini-3.5-flash-high
+      balanced: gemini-3.1-pro-low
+      powerful: gemini-3.1-pro-high
+      max: gemini-3.1-pro-high
     model-aliases: {}
-    # Data-driven agent transform (issue #629). Gemini: provider-mapped model,
-    # tools filtered to native subset, sampling/memory/permissionMode stripped,
-    # Claude-specific body lines removed and a runtime-registration note added.
     agent-transform:
       model: inject
       tools: filter
       strip-fields:
-        - memory
-        - permissionMode
-        - temperature
-        - top_p
-        - top_k
-        - stop_sequences
-        - max_output_tokens
+      - memory
+      - permissionMode
+      - temperature
+      - top_p
+      - top_k
+      - stop_sequences
+      - max_output_tokens
       strip-claude-lines: true
       body-note: gemini-registration
-
   Opencode:
-    display-name: "OpenCode"
+    display-name: OpenCode
     agents_dir: .opencode/agents
     agent_ext: .md
     context_file: AGENTS.md
     context_template: templates/configs/AGENTS.project-template.md
-    has_rules: false         # Rules have no native dir in opencode — embedded into AGENTS.md
+    has_rules: false
     has_hooks: false
     has_commands: true
     commands_dir: .opencode/commands
     has_settings: true
     capabilities:
-      - agents
-      - commands
-      - settings
-      - snippets
-      - skills
-      - context-embedded-rules
-      - artifacts
-      - checkpoints
-      - mcp
+    - agents
+    - commands
+    - settings
+    - snippets
+    - skills
+    - context-embedded-rules
+    - artifacts
+    - checkpoints
+    - mcp
     artifact_dir: .opencode/artifacts
     checkpoint_dir: .meta-viz
     settings_file: opencode.json
     settings_template: templates/configs/OPENCODE.settings-template.json
     settings_local_file: .opencode/settings.local.json
     isolation-dirs:
-      - .opencode/
-      - opencode.json
-      - AGENTS.md
+    - .opencode/
+    - opencode.json
+    - AGENTS.md
     isolation-mechanism: opencode-permissions
     bash_tool_name: bash
-    # Provider roots for gitignore.ignore-provider-dirs (issue #557) — see the
-    # Claude block for the full explanation. opencode.json (repo root) is NOT a
-    # provider root and stays tracked unless gitignore.settings ignores it.
     provider_root_dirs:
-      - .opencode/
+    - .opencode/
     gitignore_entries:
-      - AGENTS.personal.md
-      - .opencode/settings.local.json
-      - .opencode/pending-tasks.md
-      - .opencode/mcp.local.json
+    - AGENTS.personal.md
+    - .opencode/settings.local.json
+    - .opencode/pending-tasks.md
+    - .opencode/mcp.local.json
     mcp-config:
       committed-file: opencode.json
       secrets-file: .opencode/mcp.local.json
@@ -289,30 +191,22 @@ providers:
     snippets_dir: .opencode/snippets
     pending_tasks_file: .opencode/pending-tasks.md
     extension_dir: .opencode/3-project
-    orchestrator_hint: "- **In Opencode (VS Code):** Nutzt `@orchestrator <Eure Aufgabe>` im Chat."
-    # Data-driven agent transform (issue #629). Opencode uses a native agent
-    # frontmatter schema (mode: subagent, permission block, provider/model-id
-    # model refs) built by _transform_frontmatter_for_opencode — selected via
-    # the frontmatter-mechanism key rather than an `if provider == 'Opencode'`
-    # branch. Model/temperature/max_tokens/steps are resolved and folded into
-    # that native frontmatter; tools are validated then mapped to permissions.
+    orchestrator_hint: '- **In Opencode (VS Code):** Nutzt `@orchestrator <Eure Aufgabe>`
+      im Chat.'
     agent-transform:
       frontmatter-mechanism: opencode-native
-    # opencode model IDs — sourced from the Go catalog (opencode-go/).
-    # Full list: https://opencode.ai/zen/go
     model-tiers:
-      nano:     opencode-go/deepseek-v4-flash     # Go (cheapest, high-throughput)
-      fast:     opencode-go/deepseek-v4-flash     # Go (quick ops)
-      balanced: opencode-go/qwen3.7-plus          # Go (default workhorse)
-      powerful: opencode-go/kimi-k2.6             # Go (complex reasoning)
-      max:      opencode-go/kimi-k2.7-code        # Go (top-tier code model)
+      nano: opencode-go/mimo-v2.5
+      fast: opencode-go/mimo-v2.5
+      balanced: opencode-go/omen-alpha
+      powerful: opencode-go/deepseek-v4-pro
+      max: opencode-go/kimi-k2.7-code
     model-aliases:
-      flash:      opencode-go/deepseek-v4-flash
-      qwen:       opencode-go/qwen3.7-plus
-      kimi:       opencode-go/kimi-k2.6
-      kimi-code:  opencode-go/kimi-k2.7-code
-      qwen-max:   opencode-go/qwen3.7-max
-
+      flash: opencode-go/deepseek-v4-flash
+      qwen: opencode-go/qwen3.7-plus
+      kimi: opencode-go/kimi-k2.6
+      kimi-code: opencode-go/kimi-k2.7-code
+      qwen-max: opencode-go/qwen3.7-max
   Continue:
     agents_dir: .continue/agents
     agent_ext: .md
@@ -325,47 +219,40 @@ providers:
     has_settings: true
     has_prompt_commands: true
     capabilities:
-      - agents
-      - rules
-      - commands
-      - settings
-      - snippets
-      - skills
-      - context-managed-block
-      - mcp
+    - agents
+    - rules
+    - commands
+    - settings
+    - snippets
+    - skills
+    - context-managed-block
+    - mcp
     artifact_dir: .continue/artifacts
     checkpoint_dir: .meta-viz
     settings_file: .continue/config.yaml
     settings_template: templates/configs/CONTINUE.config-template.yaml
     settings_local_file: .continue/config.local.yaml
     isolation-dirs:
-      - .continue/
+    - .continue/
     isolation-mechanism: continue-soft-rule
     bash_tool_name: null
-    # Provider roots for gitignore.ignore-provider-dirs (issue #557) — see the
-    # Claude block for the full explanation.
     provider_root_dirs:
-      - .continue/
+    - .continue/
     gitignore_entries:
-      - .continue/config.local.yaml
-      - .continue/pending-tasks.md
+    - .continue/config.local.yaml
+    - .continue/pending-tasks.md
     mcp-config:
       committed-file: .continue/config.yaml
       secrets-file: .continue/config.local.yaml
       format: continue-yaml
-    # Continue manages models centrally in .continue/config.yaml — no per-agent model.
     model-tiers: {}
     model-aliases: {}
     skills_dir: .continue/skills
     snippets_dir: .continue/snippets
     pending_tasks_file: .continue/pending-tasks.md
     extension_dir: .continue/3-project
-    orchestrator_hint: "- **In Continue (IDE):** Tippt `@orchestrator` gefolgt von Eurer Aufgabe ein."
-    # Data-driven agent transform (issue #629). Continue: model/memory/
-    # permissionMode injected (model may inherit main-chat via role-defaults
-    # fallback), alwaysApply pinned false, tools field removed (no frontmatter
-    # tools model), Claude-specific body lines stripped and standalone `---`
-    # sanitized to avoid breaking Continue's YAML parsing.
+    orchestrator_hint: '- **In Continue (IDE):** Tippt `@orchestrator` gefolgt von
+      Eurer Aufgabe ein.'
     agent-transform:
       model: inject
       model-note-flat: true
@@ -377,7 +264,6 @@ providers:
       tools: remove
       strip-claude-lines: true
       body-sanitize-hr: true
-
   Copilot:
     agents_dir: .github/copilot/agents
     agent_ext: .md
@@ -389,46 +275,20 @@ providers:
     has_commands: false
     has_settings: false
     capabilities:
-      - agents
-      - rules
-      - snippets
-      - skills
-      - context-managed-block
-      - mcp
+    - agents
+    - rules
+    - snippets
+    - skills
+    - context-managed-block
+    - mcp
     artifact_dir: .github/copilot/artifacts
     checkpoint_dir: .meta-viz
     isolation-dirs:
-      - .github/copilot/
+    - .github/copilot/
     bash_tool_name: null
-    # Provider roots for gitignore.ignore-provider-dirs (issue #557). Explicit
-    # (NOT derived): the agents_dir fallback would yield ".github/" — ignoring
-    # that whole directory would also exclude GitHub workflows etc. The
-    # provider root is ONLY the copilot subdirectory.
-    #
-    # `.vscode/` is deliberately NOT a provider root, even though the
-    # agent-mode MCP config lives at .vscode/mcp.json: it is a shared editor
-    # directory owned by VS Code itself (user settings, extensions, debug
-    # configs, launch.json — none of it agent-meta-managed). Ignoring it
-    # would hide unrelated editor configuration, and mcp.json is a committed
-    # artifact (see mcp-config below), so nothing under .vscode/ needs
-    # provider-root treatment (same reasoning class as the .github/ case
-    # above). Copilot is the only consumer of .vscode/mcp.json today; the
-    # path-collision sweep in tests/test_provider_hooks_config.py guards it.
     provider_root_dirs:
-      - .github/copilot/
+    - .github/copilot/
     gitignore_entries: []
-    # VS Code agent-mode MCP (issue #674 Phase 3.3): Copilot (agent mode)
-    # reads MCP servers from .vscode/mcp.json in VS Code's own settings
-    # shape — a top-level {"servers": {...}} key, NOT Claude's
-    # {"mcpServers": ...}. Format key `vscode-settings` (dispatch table in
-    # scripts/lib/mcp_provider_config.py, alongside claude-settings /
-    # gemini-settings / continue-yaml / codex-toml-mcp / zcode-json).
-    # Committed file carries ${env:VAR} placeholders — VS Code expands
-    # ${env:VAR} natively in mcp.json values (same strategy as Claude's
-    # .mcp.json). NO secrets-file: .vscode/mcp.json stays committed and
-    # ${env:VAR} keeps secrets out of it (Codex block shows the equivalent
-    # no-secrets-file precedent); gitignore_entries stays empty for the
-    # same reason.
     mcp-config:
       committed-file: .vscode/mcp.json
       format: vscode-settings
@@ -436,24 +296,21 @@ providers:
     snippets_dir: .github/copilot/snippets
     pending_tasks_file: .github/copilot/pending-tasks.md
     extension_dir: .github/copilot/3-project
-    orchestrator_hint: "- **In GitHub Copilot (VS Code):** Nutzt den Chat mit `@orchestrator` oder wählt den Orchestrator-Agenten."
+    orchestrator_hint: "- **In GitHub Copilot (VS Code):** Nutzt den Chat mit `@orchestrator`\
+      \ oder w\xE4hlt den Orchestrator-Agenten."
     model-tiers: {}
     model-aliases: {}
-    # Data-driven agent transform (issue #629) — replaces the per-provider elif
-    # branch in provider_transform.py. Copilot uses IDE-configured models, so no
-    # model/memory/permission fields; sampling params and tools are stripped.
     agent-transform:
       strip-fields:
-        - memory
-        - permissionMode
-        - temperature
-        - top_p
-        - top_k
-        - stop_sequences
-        - max_output_tokens
-        - tools
+      - memory
+      - permissionMode
+      - temperature
+      - top_p
+      - top_k
+      - stop_sequences
+      - max_output_tokens
+      - tools
       strip-claude-lines: true
-
   Mammouth:
     agents_dir: .mammouth/agents
     agent_ext: .md
@@ -462,140 +319,106 @@ providers:
     has_rules: true
     rules_dir: .mammouth/rules
     has_hooks: true
-    # hooks_dir/settings_file stay configured (path-collision test coverage,
-    # see tests/test_provider_hooks_config.py), but NO hook_protocol is set
-    # here deliberately: whether Mammouth actually understands Claude Code's
-    # hook contract is unverified (issue #630). Without a matching
-    # hook_protocol, provider_hooks_supported() (providers.py) skips actually
-    # mirroring hook scripts — set hook_protocol: claude-code-json once
-    # verified.
     hooks_dir: .mammouth/hooks
     has_commands: true
     has_settings: true
     settings_file: .mammouth/settings.json
     capabilities:
-      - agents
-      - rules
-      - hooks
-      - commands
-      - settings
-      - snippets
-      - skills
-      - context-managed-block
+    - agents
+    - rules
+    - hooks
+    - commands
+    - settings
+    - snippets
+    - skills
+    - context-managed-block
     artifact_dir: .mammouth/artifacts
     checkpoint_dir: .meta-viz
     isolation-dirs:
-      - .mammouth/
-      - MAMMOUTH.md
+    - .mammouth/
+    - MAMMOUTH.md
     bash_tool_name: bash
-    # Provider roots for gitignore.ignore-provider-dirs (issue #557) — see the
-    # Claude block for the full explanation.
     provider_root_dirs:
-      - .mammouth/
+    - .mammouth/
     gitignore_entries:
-      - .mammouth/pending-tasks.md
+    - .mammouth/pending-tasks.md
     mcp-config: {}
     skills_dir: .mammouth/skills
     snippets_dir: .mammouth/snippets
     pending_tasks_file: .mammouth/pending-tasks.md
     extension_dir: .mammouth/3-project
-    orchestrator_hint: "- **In Mammouth:** Nutzt den Orchestrator-Agenten."
+    orchestrator_hint: '- **In Mammouth:** Nutzt den Orchestrator-Agenten.'
     model-tiers:
-      nano:     claude-haiku-4-5-20251001
-      fast:     claude-haiku-4-5-20251001
+      nano: claude-haiku-4-5-20251001
+      fast: claude-haiku-4-5-20251001
       balanced: claude-sonnet-5
-      powerful: claude-opus-4-8
-      max:      claude-fable-5
+      powerful: claude-opus-5
+      max: claude-fable-5-1
     model-aliases:
-      haiku:  claude-haiku-4-5-20251001
+      haiku: claude-haiku-4-5-20251001
       sonnet: claude-sonnet-4-6
-      opus:   claude-opus-4-8
-      fable:  claude-fable-5
-    # Data-driven agent transform (issue #629). Mammouth Code supports model,
-    # permissionMode and tools; memory and sampling params are stripped.
+      opus: claude-opus-4-8
+      fable: claude-fable-5
     agent-transform:
       model: inject
       model-note-flat: true
       inject-permission-mode: true
       tools: keep
       strip-fields:
-        - memory
-        - temperature
-        - top_p
-        - top_k
-        - stop_sequences
-        - max_output_tokens
+      - memory
+      - temperature
+      - top_p
+      - top_k
+      - stop_sequences
+      - max_output_tokens
       strip-claude-lines: true
-
   Codex:
     agents_dir: .codex/agents
     agent_ext: .toml
     context_file: AGENTS.md
     context_template: templates/configs/AGENTS.project-template.md
     has_rules: true
-    rules_dir: rules            # Codex reads a project-root rules/ dir (.rules files; exact naming convention = P6 check)
+    rules_dir: rules
     has_hooks: true
-    # hooks_dir is a PATH RESERVATION only (path-collision test coverage, see
-    # tests/test_provider_hooks_config.py). Deliberately NO hook_protocol: the
-    # Codex hook payload contract is verified (V1, 2026-09-04: stdin JSON,
-    # sync blocking, hooks.json + inline [hooks], 12 Claude-identical event
-    # names) but NOT 1:1 Claude-compatible — continue/stopReason/suppressOutput
-    # are unsupported for PreToolUse/PermissionRequest, and Codex skips
-    # non-hash-trusted hooks until an interactive /hooks review, so mirrored
-    # scripts would not run by default (#630 pattern). Set hook_protocol once
-    # the deviations are handled.
     hooks_dir: .codex/hooks
-    has_commands: false         # slash-command surface unverified — P6 item
-    has_settings: false         # no settings.json — everything lives in .codex/config.toml (V8)
+    has_commands: false
+    has_settings: false
     capabilities:
-      - agents
-      - rules
-      - hooks
-      - snippets
-      - skills
-      - context-managed-block
+    - agents
+    - rules
+    - hooks
+    - snippets
+    - skills
+    - context-managed-block
     artifact_dir: .codex/artifacts
     checkpoint_dir: .meta-viz
     isolation-dirs:
-      - .codex/
-      - AGENTS.md
-    bash_tool_name: Bash        # V4 (2026-09-04): canonical hook/matcher name; apply_patch matches as Edit/Write alias
-    # Provider roots for gitignore.ignore-provider-dirs (issue #557). Two roots:
-    # .codex/ plus repo-root .agents/ (skills_dir lives there). rules_dir
-    # "rules" (repo root) must NEVER become a provider root — it is a plain
-    # project directory shared with other tooling.
+    - .codex/
+    - AGENTS.md
+    bash_tool_name: Bash
     provider_root_dirs:
-      - .codex/
-      - .agents/
+    - .codex/
+    - .agents/
     gitignore_entries:
-      - .codex/pending-tasks.md
+    - .codex/pending-tasks.md
     mcp-config:
-      # NO secrets-file: Codex has no include/import mechanism for a second
-      # TOML file (V8, 2026-09-04) — the documented secrets strategy is
-      # env-var indirection in the committed config.toml.
       committed-file: .codex/config.toml
       format: codex-toml-mcp
-    skills_dir: .agents/skills  # Codex reads user -> repo -> directory (repo-level .agents/skills)
+    skills_dir: .agents/skills
     snippets_dir: .codex/snippets
     pending_tasks_file: .codex/pending-tasks.md
     extension_dir: .codex/3-project
-    orchestrator_hint: "- **In Codex:** Use the orchestrator agent."
-    # Model tiers per plan §4.3 (GPT-5.x family, state 2026-09)
+    orchestrator_hint: '- **In Codex:** Use the orchestrator agent.'
     model-tiers:
-      nano:     gpt-5.4-mini
-      fast:     gpt-5.4
+      nano: gpt-5.4-mini
+      fast: gpt-5.4
       balanced: gpt-5.3-codex-spark
       powerful: gpt-5.5
-      max:      gpt-5.6
+      max: gpt-5.6
     model-aliases:
-      sol:   gpt-5.6-sol
+      sol: gpt-5.6-sol
       terra: gpt-5.6-terra
-      luna:  gpt-5.6-luna
-    # Data-driven agent transform (issue #629). Codex agents are TOML files
-    # (.codex/agents/*.toml, auto-loaded — V7): the codex-toml frontmatter
-    # mechanism builds the native TOML document (name, description, model,
-    # sandbox_mode, developer_instructions — V7 correction: the required
-    # body field is developer_instructions, NOT instructions).
+      luna: gpt-5.6-luna
     agent-transform:
       frontmatter-mechanism: codex-toml
       model: inject
@@ -603,119 +426,104 @@ providers:
         sandbox_mode: workspace-write
       tools: skip
       strip-claude-lines: true
-
   ZCode:
     agents_dir: .zcode/agents
     agent_ext: .md
     context_file: AGENTS.md
     context_template: templates/configs/AGENTS.project-template.md
-    has_rules: false            # unverified
-    has_hooks: false            # project-level hooks are IGNORED by the harness (V2: config_project_hooks_ignored) — hooks only via plugin or user level
-    has_commands: false         # commands surface verified (V2) but no sync adapter yet — grows with P6
+    has_rules: false
+    has_hooks: false
+    has_commands: false
     has_settings: true
-    settings_file: .zcode/config.json   # canonical workspace config (V6); models are UI-managed in ~/.zcode/v2/config.json (V9) — no settings_template
+    settings_file: .zcode/config.json
     capabilities:
-      - agents
-      - settings
-      - mcp
-      - context-managed-block
+    - agents
+    - settings
+    - mcp
+    - context-managed-block
     artifact_dir: .zcode/artifacts
     checkpoint_dir: .meta-viz
     isolation-dirs:
-      - .zcode/
-      - AGENTS.md
-    bash_tool_name: Bash        # V5 (2026-09-04): 9 built-ins + Agent dispatch, all 1:1 names
-    # Provider roots for gitignore.ignore-provider-dirs (issue #557) — see the
-    # Claude block for the full explanation.
+    - .zcode/
+    - AGENTS.md
+    bash_tool_name: Bash
     provider_root_dirs:
-      - .zcode/
+    - .zcode/
     gitignore_entries:
-      - .zcode/pending-tasks.md
+    - .zcode/pending-tasks.md
     mcp-config:
-      # ZCode workspace MCP lives under the NESTED key `mcp.servers` in
-      # .zcode/config.json (V2, 2026-09-04). User-level config wins, no merge.
       committed-file: .zcode/config.json
       format: zcode-json
-    skills_dir: .zcode/skills   # verified V2 (workspace scope) — capability growth with P6
+    skills_dir: .zcode/skills
     snippets_dir: .zcode/snippets
     pending_tasks_file: .zcode/pending-tasks.md
     extension_dir: .zcode/3-project
-    orchestrator_hint: "- **In ZCode:** Use the orchestrator agent."
-    # V9 (2026-09-04): verified built-in IDs glm-5.3 + glm-5.3-flash.
-    # model.lite -> nano/fast tier, model.main -> balanced/powerful/max.
+    orchestrator_hint: '- **In ZCode:** Use the orchestrator agent.'
     model-tiers:
-      nano:     glm-5.3-flash
-      fast:     glm-5.3-flash
+      nano: glm-5.3-flash
+      fast: glm-5.3-flash
       balanced: glm-5.3
       powerful: glm-5.3
-      max:      glm-5.3
+      max: glm-5.3
     model-aliases: {}
-    # V9 revision: ZCode subagent files support a `model` frontmatter field
-    # (ID or inherit) — per-role models resolve directly in the generated
-    # agent files, so model is INJECTED (not skipped as plan §5.3 sketched).
-    # Unknown frontmatter keys are ignored by the harness (V2).
     agent-transform:
       model: inject
       tools: skip
-      strip-fields: [memory, permissionMode, temperature, top_p, top_k, stop_sequences, max_output_tokens]
+      strip-fields:
+      - memory
+      - permissionMode
+      - temperature
+      - top_p
+      - top_k
+      - stop_sequences
+      - max_output_tokens
       strip-claude-lines: true
-
   KimiCode:
-    # Registry key KimiCode stays unambiguous vs. the existing Opencode model
-    # aliases kimi/kimi-code (see Opencode block model-aliases). Generated
-    # paths are lowercase .kimi-code/ (V10 cross-cutting correction — NEVER
-    # .kimi/ and never the cross-tool .agents/ convention).
     agents_dir: .kimi-code/agents
     agent_ext: .md
     context_file: AGENTS.md
     context_template: templates/configs/AGENTS.project-template.md
-    has_rules: false            # unverified
-    has_hooks: false            # hooks are configured via [[hooks]] in user-level ~/.kimi-code/config.toml only (V11) — no hooks-dir mechanism, no project-level generation
-    has_commands: false         # unverified
-    has_settings: false         # V15: project-level config (.kimi-code/local.toml) is machine-specific — deferred until a real need is verified
+    has_rules: false
+    has_hooks: false
+    has_commands: false
+    has_settings: false
     capabilities:
-      - agents
-      - mcp
-      - context-managed-block
+    - agents
+    - mcp
+    - context-managed-block
     artifact_dir: .kimi-code/artifacts
     checkpoint_dir: .meta-viz
     isolation-dirs:
-      - .kimi-code/
-      - AGENTS.md
-    bash_tool_name: Bash        # V14 (2026-09-04): exact case-sensitive name, 4 doc sources
-    # Provider roots for gitignore.ignore-provider-dirs (issue #557) — see the
-    # Claude block for the full explanation.
+    - .kimi-code/
+    - AGENTS.md
+    bash_tool_name: Bash
     provider_root_dirs:
-      - .kimi-code/
+    - .kimi-code/
     gitignore_entries:
-      - .kimi-code/pending-tasks.md
+    - .kimi-code/pending-tasks.md
     mcp-config:
-      # Kimi Code reads {"mcpServers": {...}} from .kimi-code/mcp.json —
-      # wire-identical top-level key to the existing claude-settings JSON
-      # branch (V13, 2026-09-04: reuse beats a new format branch). No
-      # separate secrets file — Kimi-native env indirection via
-      # bearerTokenEnvVar / env (P6 detail).
       committed-file: .kimi-code/mcp.json
       format: claude-settings
-    skills_dir: .kimi-code/skills   # verified V12 — capability growth with P6
+    skills_dir: .kimi-code/skills
     snippets_dir: .kimi-code/snippets
     pending_tasks_file: .kimi-code/pending-tasks.md
     extension_dir: .kimi-code/3-project
-    orchestrator_hint: "- **In Kimi Code:** Use the orchestrator agent."
-    # Kimi K2.x model IDs per plan §6.5 / opencode-go catalog — exact IDs verified in P6
+    orchestrator_hint: '- **In Kimi Code:** Use the orchestrator agent.'
     model-tiers:
-      nano:     kimi-k2.6
-      fast:     kimi-k2.6
+      nano: kimi-k2.6
+      fast: kimi-k2.6
       balanced: kimi-k2.7-code
       powerful: kimi-k2.7-code
-      max:      kimi-k2.7-code
+      max: kimi-k2.7-code
     model-aliases: {}
-    # Option A posture (V10 determined, 2026-09-04): Kimi agents are plain
-    # Markdown + YAML frontmatter (name/description/whenToUse/tools/...,
-    # unknown fields ignored) — DEFAULT transform path, no new
-    # frontmatter-mechanism value.
     agent-transform:
       model: inject
       tools: keep
-      strip-fields: [memory, temperature, top_p, top_k, stop_sequences, max_output_tokens]
+      strip-fields:
+      - memory
+      - temperature
+      - top_p
+      - top_k
+      - stop_sequences
+      - max_output_tokens
       strip-claude-lines: true
