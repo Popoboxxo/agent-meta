@@ -57,6 +57,11 @@ from lib.external_tools import (
     render_injection_drift_artifacts,
     scan_injection_drift,
 )
+from lib.generated_file_drift import (
+    capture_generated_file_hashes,
+    is_drift_detection_enabled,
+    scan_generated_file_drift,
+)
 from lib.gitignore import (
     _collect_skill_gitignore_entries,
     collect_provider_roots,
@@ -317,6 +322,27 @@ def _sync_stage_legacy_cleanup(
                     # logging.debug(msg, *args) — same linter false positive
                     # class as pre-#574 SyncLog.info.
                     log.debug("provider-cleanup", f"could not prune '{prov_dir}': {type(e).__name__}: {e}")  # noqa: PLE1205
+
+
+def _sync_stage_generated_file_drift_scan(
+    agent_meta_root: Path, project_root: Path, config: dict,
+    provider_config: dict, args: argparse.Namespace, log: SyncLog,
+) -> None:
+    """Early drift scan -- runs BEFORE _sync_stage_per_provider overwrites
+    anything, so it can still see a manual edit made since the last sync.
+    Warn-only: never changes what gets written (issue: user feature
+    request, 2026-09-07, spec in docs/superpowers/specs/)."""
+    if not is_drift_detection_enabled(config):
+        log.skip("generated-file-drift-scan", "disabled (drift-detection.enabled: false)")
+        return
+    findings = scan_generated_file_drift(agent_meta_root, project_root, config, provider_config)
+    for finding in findings:
+        log.warning(
+            f"generated-file-drift: '{finding['path']}' was manually edited "
+            f"since the last sync (provider '{finding['provider']}') -- this "
+            "sync will overwrite it. Add it to .meta-config/drift-allowlist.yaml "
+            "if this edit should be preserved going forward."
+        )
 
 
 def _skill_channel_universe(
@@ -691,3 +717,15 @@ def _sync_stage_config_audit(agent_meta_root: Path, config_path: Path, log: Sync
     except Exception as exc:  # noqa: BLE001
         # Audit must never break a sync — degrade gracefully.
         log.note("config-audit", f"skipped (error: {exc})")
+
+
+def _sync_stage_generated_file_hash_capture(
+    agent_meta_root: Path, project_root: Path, config: dict,
+    provider_config: dict, args: argparse.Namespace, log: SyncLog,
+) -> None:
+    """Late hash-baseline capture -- runs after every writer has run, so
+    it captures the fully post-write on-disk state for the NEXT sync's
+    drift scan to compare against."""
+    if not is_drift_detection_enabled(config):
+        return
+    capture_generated_file_hashes(agent_meta_root, project_root, config, provider_config, args.dry_run)

@@ -77,6 +77,15 @@ project:
 # Nur auf true setzen wenn absichtlich demo-tokens o.ä. committet werden sollen.
 # allow-committed-secrets: false
 #
+# Generated-file drift detection (default: enabled) — warns when a
+# sync.py-generated file (agent/rule/hook/command/skill/pipeline-detail)
+# was manually edited since the last sync. Warn-only: the file is still
+# regenerated as usual. Paths where manual edits are expected go in
+# .meta-config/drift-allowlist.yaml (allow-edits: list of glob patterns
+# against the deployed path, e.g. ".claude/commands/my-cmd.md").
+# drift-detection:
+#   enabled: false
+#
 # Externe Skills — opt-in pro Skill (muss auch approved: true in skills-registry.yaml sein)
 # external-skills:
 #   home-organization:
