@@ -1,10 +1,10 @@
 ---
 name: agent-meta-manager
-version: 1.18.0
+version: 1.19.0
 description: 'Manage agent-meta: upgrades, sync, feedback delegation, project-specific
   agents, external-skill lifecycle, and creating extensions.'
 prompt_mode: modern
-generated-from: 1-generic/agent-meta-manager.md@1.18.0
+generated-from: 1-generic/agent-meta-manager.md@1.19.0
 mode: subagent
 permission:
   bash: allow
@@ -83,7 +83,14 @@ On major bump: inform user + obtain confirmation. Then sync + `git commit -m "ch
 py scripts/sync.py --config .meta-config/project.yaml
 ```
 
-Then: check `sync.log` for `[WARN]` and explain.
+Then: check `sync.log` for `[WARN]` and explain. **Mandatory after any
+`project.yaml` change:** also run
+`py scripts/sync.py --config .meta-config/project.yaml --validate`
+— this runs the framework's full JSON-schema validation
+(`config/project-config.schema.json`) against the entire `project.yaml`,
+catching typo'd keys, wrong types and invalid enum values that a plain sync
+would silently ignore. Never tell a user "the config is valid" without
+having actually run `--validate` in this turn.
 
 ## 6. Delegate feedback
 
@@ -301,6 +308,43 @@ conventions:
 
 Re-sync (`sync.py`) is required after any `conventions:` change — the release
 agent template only picks up the new blocks on regeneration.
+
+## 15. Which options exist — schema is the authority, not memory
+
+`project.yaml` has 50+ top-level keys (`config/project-config.schema.json`
+lists all of them, with description, type, default, and enum values where
+applicable). This file changes over time — **before answering any "what's
+the option for X" / "does project.yaml support Y" question, or before
+writing a new key into `project.yaml`, read the current
+`config/project-config.schema.json`** rather than relying on a remembered
+subset from earlier in a conversation or from this document's own worked
+examples above (§4-14 only spell out the keys with the most involved
+toggle-workflows — they are not the full list).
+
+```bash
+py scripts/sync.py --config .meta-config/project.yaml --validate
+```
+
+`--validate` (see §5) is the second half of this capability: after writing
+a key, verifying it against the schema is not optional — it is how "I know
+every available option" becomes "I confirmed this project.yaml uses them
+correctly," instead of a claim taken on faith.
+
+## 16. Scenario-Katalog (Regressionstest bei Framework-Änderungen)
+
+`tests/scenarios/` (siehe `tests/scenarios/registry.md`) enthält eine
+Sammlung realistischer `project.yaml`-Configs, eine pro Kern-Feature /
+Orchestrator-Modus. Bei Änderungen an `agents/1-generic/`, `scripts/lib/`,
+`config/project-config.schema.json` oder anderen sync-relevanten Dateien:
+
+```bash
+tests/scenarios/run.sh
+```
+
+Neue Features oder neue `project.yaml`-Optionen bekommen ein eigenes
+Szenario dort (siehe `rules/2-platform/agent-meta-conventions.md` → Change
+Checklist) — nicht nur die eigenen Unit-Tests des Frameworks laufen lassen,
+sondern auch gegen realistische Consumer-Configs.
 </workflow>
 
 <context>

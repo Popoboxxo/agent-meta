@@ -1,0 +1,31 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+dod-preset: standard
+platforms: []
+roles:
+- orchestrator
+- developer
+- git
+orchestrator:
+  mode: strict
+  checkpointing: true
+project:
+  name: scenario-progress-checkpointing
+  prefix: s14
+  short: scenario-progress
+variables:
+  PROJECT_NAME: scenario-progress-checkpointing
+  PROJECT_DESCRIPTION: Non-git progress-file feature test (issue #682 section 6).
+  PROJECT_GOAL: Verify checkpointing.md/orchestrator.md document .claude/progress/current.md correctly, and .claude/progress/ is gitignored. NOTE -- CheckpointStore.save_checkpoint() has no production call site yet (per the whole-branch review, 2026-09-07), so this scenario only exercises the documented/config surface, not an actual runtime-written progress file.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-progress
+  GIT_MAIN_BRANCH: main
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false
