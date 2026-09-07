@@ -69,8 +69,18 @@ project:
 #   #   true = "generate, don't store"-Prinzip.
 #   generated: false
 #   # settings: false (Default) → Provider-Settings-Dateien (settings.json,
-#   #   GEMINI.md, config.yaml) gitignoren. CLAUDE.md ist nie betroffen.
+#   #   config.yaml) gitignoren. Die Kontextdatei jedes Providers (CLAUDE.md,
+#   #   AGENTS.md, MAMMOUTH.md, ...) ist nie betroffen.
 #   settings: false
+#
+# readme:
+#   # badges: Badge-Set für die README-Badges-Zeile. "license" wird nur gerendert
+#   #   wenn eine LICENSE-Datei existiert, "ci" nur wenn eine CI-Config erkennbar ist.
+#   badges: [version, stack, license]
+#   # warnings: false (Default) → kein [!WARNING]-Callout erzwungen.
+#   warnings: false
+#   # sections: Pflicht-Abschnitte in Reihenfolge.
+#   sections: [description, badges, setup, structure]
 #
 # Secrets in committeten Dateien erlauben (NICHT empfohlen).
 # Default: false — sync bricht mit Fehler ab wenn Secrets in nicht-gitignored Dateien erkannt werden.

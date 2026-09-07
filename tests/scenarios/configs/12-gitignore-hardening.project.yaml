@@ -1,0 +1,35 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+- Gemini
+- Opencode
+dod-preset: standard
+platforms: []
+roles:
+- orchestrator
+- developer
+- git
+gitignore:
+  local: true
+  generated: false
+  settings: true
+  ignore-provider-dirs: false
+project:
+  name: scenario-gitignore-hardening
+  prefix: s12
+  short: scenario-gitignore
+variables:
+  PROJECT_NAME: scenario-gitignore-hardening
+  PROJECT_DESCRIPTION: .gitignore context-file protection test (issue #682 section 4).
+  PROJECT_GOAL: Verify every active provider's own context file (CLAUDE.md, AGENTS.md) is never gitignored under settings=true, while settings.json files ARE gitignored.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-gitignore
+  GIT_MAIN_BRANCH: main
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false

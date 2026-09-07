@@ -221,6 +221,16 @@ def run_setup_wizard(
     git_remote = _ask("Remote URL (e.g., https://github.com/owner/repo)", default="")
     git_branch = _ask("Main Branch", default="main")
 
+    print("\n  INFO: Protects against accidentally committed secrets in your own code")
+    print("  (not just framework files) -- .gitignore only affects untracked files;")
+    print("  already-committed secrets still need rotation + history rewrite.")
+    ignore_secrets = _ask_choice(
+        "Automatically .gitignore typical secret patterns "
+        "(.env*, *.pem, *.key, credentials*.json, secret*.y*ml)?",
+        ["yes", "no"],
+        default="yes",
+    )
+
     # ------------------------------------------------------------------
     # Phase 2: Entscheidung
     # ------------------------------------------------------------------
@@ -299,6 +309,13 @@ def run_setup_wizard(
     }
     if platforms:
         config["platforms"] = platforms
+
+    if ignore_secrets == "yes":
+        config["gitignore"] = {
+            "custom_entries": [
+                ".env*", "*.pem", "*.key", "credentials*.json", "secret*.y*ml",
+            ]
+        }
 
     config["dod-preset"] = dod_preset
     config["project"] = {

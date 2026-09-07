@@ -1,0 +1,30 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+dod-preset: standard
+platforms: []
+roles:
+- orchestrator
+- developer
+- git
+orchestrator:
+  mode: advisory
+project:
+  name: scenario-orchestrator-advisory
+  prefix: s16
+  short: scenario-orch-advisory
+variables:
+  PROJECT_NAME: scenario-orchestrator-advisory
+  PROJECT_DESCRIPTION: Orchestrator ADVISORY mode (recommended, user-override allowed).
+  PROJECT_GOAL: Verify a dedicated orchestrator.md subagent is generated and rules/use-orchestrator.md reflects advisory-mode (non-mandatory) gating.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-orch-advisory
+  GIT_MAIN_BRANCH: main
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false

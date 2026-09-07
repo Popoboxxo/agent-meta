@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "7.14.0"
+version: "7.15.0"
 description: "Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes, delegates."
 hint: "Entry point for ALL development tasks — decomposes complex tasks and dispatches in parallel"
 prompt_mode: modern
@@ -155,6 +155,8 @@ BARRIER() actively collects ALL results. Results arrive as TOOL DATA — never f
 4. Partial results (`status: partial | failed | timeout`): re-dispatch only the failed tasks (§10) — never merge failed entries into a success narrative; contradictions → `main_chat`, do not auto-merge
 5. `Full output: <checkpoint_ref>` lines are pointers into the archived raw output (§9) — follow the reference instead of re-requesting raw output
 
+{{STATUS_TABLE_BLOCK}}
+
 Artifact pattern for output >200 lines: subagent writes to an artifact directory (`<handoff_id>-<type>.md`), returns only the reference.
 
 **Hard interrupt:** a synchronous tool call IS the hard interrupt — a blocking dispatch (issue #265) replaces polling; there is no separate kill signal to manage.
@@ -167,6 +169,8 @@ After >5 delegations: summarize in 2–3 sentences.
 Checkpoint after >5 steps: `.meta-viz/checkpoint-<timestamp>.json` with `{session_id, task_summary, completed_steps[], pending_steps[], context}`. Check on start, resume on confirmation.
 
 **Summarization-as-a-Contract (issue #267):** Each worker returns ONLY its compact summary — the STATUS/RESULT/ARTIFACTS block. Raw output (logs, diffs, verbose tool output) is archived under `.meta-viz/checkpoints/<session-id>/` via `CheckpointStore.save_raw_output` and comes back as a `checkpoint_ref` pointer. Never re-request raw output into the context to "double-check" — read the referenced file only when details are actually needed. Enforced harness-side by `scripts/lib/orchestration.py` (issue #265): barrier entries carry `summary` + `checkpoint_ref` only; raw output is never re-rendered into the orchestrator context.
+
+**Progress file (issue #682 §6):** if the runtime calls `CheckpointStore.save_checkpoint()` (the Python API in `scripts/lib/checkpoint.py` — distinct from the manually-written checkpoint format above), it also overwrites `.claude/progress/current.md` (non-historized) with a human-readable `Agent | Task | Status` snapshot — same format as the mandatory status table (§7). Resume logic still reads the JSON checkpoints; `current.md` is for a human glancing at the repo, not parsed by any code path.
 
 ## 10. Delegation failure recovery
 Error responses (permission, timeout, out-of-scope, multi-failure, partial)

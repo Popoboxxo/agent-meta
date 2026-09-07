@@ -16,6 +16,8 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     # Agent-meta metadata
     "AGENT_META_VERSION", "AGENT_META_DATE", "AGENT_META_REPO", "AGENT_META_REL_PATH",
     "AGENT_TABLE", "AGENT_HINTS",
+    # README structure standard (issue #682 §3)
+    "README_BADGES", "README_WARNINGS_ENABLED", "README_SECTIONS",
     # Provider / AI
     "AI_PROVIDER", "MAX_PARALLEL_AGENTS", "PARALLEL_PATTERN", "FILE_AFFINITY_HINT", "ANALYSIS_ENABLED",
     # DoD flags
@@ -73,6 +75,7 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     "COMPACT_MODE",
     # Orchestrator snippet blocks (loaded from snippets/orchestrator/*.md by build_variables)
     "SE_MODE_BLOCK", "A2A_PROTOCOL_BLOCK", "CHECKPOINTING_BLOCK", "QUALITY_PIPELINES_BLOCK",
+    "STATUS_TABLE_BLOCK",
     # Developer-tier shared blocks (loaded from snippets/developer/*.md by build_variables)
     "BROWSER_VERIFICATION_BLOCK", "LANGUAGE_BEST_PRACTICES_BLOCK",
     # Security shared blocks (loaded from snippets/security/*.md by build_variables)

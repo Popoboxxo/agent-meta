@@ -1,0 +1,30 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+dod-preset: standard
+platforms: []
+roles:
+- orchestrator
+- developer
+- git
+orchestrator:
+  mode: main-chat
+project:
+  name: scenario-orchestrator-main-chat
+  prefix: s17
+  short: scenario-orch-mainchat
+variables:
+  PROJECT_NAME: scenario-orchestrator-main-chat
+  PROJECT_DESCRIPTION: Orchestrator MAIN-CHAT mode -- no dedicated orchestrator subagent, main chat acts as router + worker (the mode agent-meta's own project.yaml uses for Claude, via orchestrator.provider-overrides.Claude.mode).
+  PROJECT_GOAL: Verify no .claude/agents/orchestrator.md is generated and rules/use-orchestrator.md carries the main-chat routing table + STATUS_TABLE_BLOCK instead.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-orch-mainchat
+  GIT_MAIN_BRANCH: main
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false

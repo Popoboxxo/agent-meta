@@ -68,6 +68,8 @@ _IDENTITY_FALLBACKS: dict[str, str] = {
     "DOCS_LANGUAGE": "the language the user writes in, default to English if unspecified",
     "INTERNAL_DOCS_LANGUAGE": "the language the user writes in, default to English if unspecified",
     "EXTRA_DONTS": "",
+    "README_BADGES": "version, stack, license",
+    "README_SECTIONS": "description, badges, setup, structure",
 }
 
 # Multi-agent / orchestration blocks: no delegation infrastructure exists
@@ -78,6 +80,13 @@ _ORCHESTRATION_FALLBACKS: dict[str, str] = {
     "ANTI_RECURSION_BLOCK": "",
     "DOD_REQ_BLOCK": "",
     "DOD_TESTS_BLOCK": "",
+    # STATUS_TABLE_BLOCK (issue #682 §5): unlike SE_MODE_BLOCK/CHECKPOINTING_BLOCK/
+    # QUALITY_PIPELINES_BLOCK (built but not yet referenced by any template --
+    # pre-existing gap, out of scope here), this one IS referenced unconditionally
+    # in orchestrator.md §7 -- standalone rendering needs the real snippet text,
+    # not an empty string, since it's a mandatory rule the reader must see.
+    "STATUS_TABLE_BLOCK": (Path(__file__).resolve().parents[2] / "snippets" / "orchestrator" / "status-table.md").read_text(encoding="utf-8")
+    if (Path(__file__).resolve().parents[2] / "snippets" / "orchestrator" / "status-table.md").exists() else "",
 }
 
 # Conditional flags gating {{#if VAR}}/{{#unless VAR}} blocks tied to
@@ -106,6 +115,7 @@ _CONDITIONAL_FALSE_FLAGS: dict[str, str] = {
     "WEB_PROJECT_ENABLED": "false",
     "DEVELOPER_SNIPPETS_PATH_SET": "false",
     "TESTER_SNIPPETS_PATH_SET": "false",
+    "README_WARNINGS_ENABLED": "false",
     "DEV_STACK_START_SET": "false",
     # No A2A infrastructure or knowledge-engine bundle exists standalone —
     # matches the scope note in the rendered header ("no A2A protocol, no

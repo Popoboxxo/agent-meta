@@ -66,6 +66,7 @@ providers:
       - .claude/settings.local.json
       - .claude/agent-memory-local/
       - .claude/pending-tasks.md
+      - .claude/progress/
       - CLAUDE.personal.md
       - sync.log
       - .mcp.json

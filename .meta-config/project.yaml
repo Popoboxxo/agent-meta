@@ -1,4 +1,5 @@
 agent-meta-version: 0.96.0
+_comment: "Szenarien-Katalog & Regressionstests fuer Framework-Aenderungen: tests/scenarios/ (registry.md + run.sh) -- bei neuen Features/Config-Optionen dort ein Szenario ergaenzen (siehe rules/2-platform/agent-meta-conventions.md, Change Checklist)."
 provider-isolation: disabled
 ai-providers:
 - Claude

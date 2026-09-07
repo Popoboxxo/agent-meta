@@ -768,7 +768,7 @@
         "settings": {
           "type": "boolean",
           "default": false,
-          "description": "Gitignore provider settings files (settings.json, GEMINI.md, config.yaml) for all active providers. Default: false (committed). Note: CLAUDE.md is never gitignored (contains handwritten sections)."
+          "description": "Gitignore provider settings files (settings.json, GEMINI.md, config.yaml) for all active providers. Default: false (committed). Note: every provider's own context file (CLAUDE.md, AGENTS.md, MAMMOUTH.md, ...) is never gitignored, regardless of this toggle (contains handwritten sections)."
         },
         "ignore-provider-dirs": {
           "type": "boolean",
@@ -800,6 +800,36 @@
           "type": "boolean",
           "default": true,
           "description": "Set to false to disable drift warnings and hash-baseline tracking entirely."
+        }
+      },
+      "additionalProperties": false
+    },
+    "readme": {
+      "type": "object",
+      "description": "README.md structure standard (issue #682): badges shown, optional warning callout, section selection. Consumed by the `documenter` agent when maintaining README.md — additive only, never overwrites hand-written content.",
+      "properties": {
+        "badges": {
+          "type": "array",
+          "description": "Badge set for the README badges row. 'license' is only ever rendered when a LICENSE file actually exists; 'ci' is only ever rendered when a CI config is actually detected -- both checked at documentation time, never assumed.",
+          "items": {
+            "type": "string",
+            "enum": ["version", "stack", "license", "ci"]
+          },
+          "default": ["version", "stack", "license"]
+        },
+        "warnings": {
+          "type": "boolean",
+          "description": "Whether the README may include a [!WARNING]/[!IMPORTANT] callout. Default off -- most projects are not experiments.",
+          "default": false
+        },
+        "sections": {
+          "type": "array",
+          "description": "Required README sections, in order.",
+          "items": {
+            "type": "string",
+            "enum": ["description", "badges", "setup", "structure"]
+          },
+          "default": ["description", "badges", "setup", "structure"]
         }
       },
       "additionalProperties": false

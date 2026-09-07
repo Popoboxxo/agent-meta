@@ -370,9 +370,9 @@ gitignore:
 |------|----------|-----------------|
 | `local` | `true` | `.claude/settings.local.json`, `CLAUDE.personal.md`, `sync.log` → gitignored |
 | `generated` | `false` | `agents/`, `rules/`, `hooks/`, `commands/` aller aktiven Provider → gitignored |
-| `settings` | `false` | `settings.json`, `GEMINI.md`, `config.yaml` der Provider → gitignored |
+| `settings` | `false` | `settings.json`, `config.yaml` der Provider → gitignored |
 
-**Hinweis:** `CLAUDE.md` wird nie gitignored — sie enthält handgeschriebene Sektionen außerhalb des managed blocks.
+**Hinweis:** die Kontextdatei jedes Providers (`CLAUDE.md`, `AGENTS.md`, `MAMMOUTH.md`, …) wird nie gitignored — sie enthält handgeschriebene Sektionen außerhalb des managed blocks.
 
 **`generated: true` empfohlen wenn:**
 - Das Team sync.py bei jedem Checkout neu ausführt (CI/CD)

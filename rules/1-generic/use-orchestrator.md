@@ -21,6 +21,8 @@ Volle Stage-Details (Agent/Modus je Stage, Loop/Fallback/Approval-Gate) einer ge
 ## A2A Delegation
 {{A2A_HANDOFF_BLOCK}}
 
+{{STATUS_TABLE_BLOCK}}
+
 ## Plan Delegation
 Plan vorhanden (`plan-*.md` oder Knowledge-Wiki Plan-Seite) -> Pipeline `feature-lifecycle` mit `payload.plan_ref`, statt neuen Lifecycle blind zu starten.
 {{/if}}
