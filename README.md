@@ -41,7 +41,8 @@
 > Git submodule embedded in projects. Provides standardized agent templates (1-generic, 2-platform, 0-external).
 > Generates project-ready agent files in `.claude/agents/` via `sync.py`.
 
-> Supports 6 AI providers: Claude Code, Gemini, Opencode, Continue, GitHub Copilot, Mammouth Code.
+> Supports 9 AI providers: Claude Code, Gemini, Opencode, Continue, GitHub Copilot, Mammouth Code, Codex, ZCode, KimiCode.
+> **Tested:** Claude Code, Opencode. **Experimental** (generation works, not yet exercised in a real project): Gemini, Continue, GitHub Copilot, Mammouth Code, Codex, ZCode, KimiCode.
 
 ## Architecture
 
@@ -576,13 +577,22 @@ Sourced from a single snippet (`snippets/orchestrator/status-table.md`) and inje
 
 ## Provider Generation Matrix
 
-| Provider | Context File | Agents Dir | Rules | Hooks | Commands | Settings |
-|----------|-------------|-----------|-------|-------|----------|---------|
-| Claude Code | CLAUDE.md | .claude/agents/ | .claude/rules/ | .claude/hooks/ | .claude/commands/ | .claude/settings.json |
-| Gemini | AGENTS.md | .gemini/agents/ | .gemini/rules/ | — | .gemini/commands/ | .gemini/settings.json |
-| Opencode | AGENTS.md | .opencode/agents/ | (in AGENTS.md) | — | .opencode/commands/ | opencode.json |
-| Continue | CONTINUE.md | .continue/agents/ | .continue/rules/ | — | .continue/prompts/ | .continue/config.yaml |
-| Copilot | .github/copilot/COPILOT.md | .github/copilot/agents/ | .github/copilot/rules/ | — | — | .github/copilot/copilot.json |
+**Status:** Claude Code and Opencode are the two providers this framework is actually exercised
+against day to day (this repo dogfoods itself on Claude Code). The other 7 generate correctly per
+`sync.py --validate` and the test suite, but are **experimental** — not yet run against a real
+project by a maintainer. Treat generation for them as "should work," not "verified to work."
+
+| Provider | Status | Context File | Agents Dir | Rules | Hooks | Commands | Settings |
+|----------|--------|-------------|-----------|-------|-------|----------|---------|
+| Claude Code | Tested | CLAUDE.md | .claude/agents/ | .claude/rules/ | .claude/hooks/ | .claude/commands/ | .claude/settings.json |
+| Opencode | Tested | AGENTS.md | .opencode/agents/ | (in AGENTS.md) | — | .opencode/commands/ | opencode.json |
+| Gemini | Experimental | AGENTS.md | .gemini/agents/ | .gemini/rules/ | — | .gemini/commands/ | .gemini/settings.json |
+| Continue | Experimental | CONTINUE.md | .continue/agents/ | .continue/rules/ | — | .continue/prompts/ | .continue/config.yaml |
+| Copilot | Experimental | .github/copilot/COPILOT.md | .github/copilot/agents/ | .github/copilot/rules/ | — | — | .github/copilot/copilot.json |
+| Mammouth Code | Experimental | MAMMOUTH.md | .mammouth/agents/ | .mammouth/rules/ | .mammouth/hooks/ | — | .mammouth/settings.json |
+| Codex | Experimental | AGENTS.md | .codex/agents/ | rules/ (repo-root) | .codex/hooks/ | — | — |
+| ZCode | Experimental | AGENTS.md | .zcode/agents/ | — | — | — | .zcode/config.json |
+| KimiCode | Experimental | AGENTS.md | .kimi-code/agents/ | — | — | — | — |
 
 Only Claude and Mammouth generate PreToolUse hooks (`config/ai-providers.yaml: has_hooks`).
 `orchestrator.strict` has no runtime effect on the other providers — it's a config value, not an
