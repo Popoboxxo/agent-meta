@@ -75,12 +75,16 @@
           "accessibility-specialist",
           "agent-meta-manager",
           "agent-meta-scout",
+          "ai-security-guardian",
           "api-specialist",
+          "app-lifecycle-governor",
           "backend-reviewer",
           "bug-feature-analyzer",
           "claude-expert",
           "code-reviewer",
+          "concept-architect",
           "concept-reviewer",
+          "concept-specifier",
           "continue-expert",
           "copilot-expert",
           "copyeditor",
@@ -124,11 +128,13 @@
           "principal-developer",
           "product-manager",
           "prompt-engineer",
+          "prompt-governor",
           "proofreader",
           "refactoring-specialist",
           "release",
           "requirements",
           "se-architect",
+          "se-component-requirements",
           "se-critic",
           "se-developer",
           "se-integration-and-test-manager",
@@ -145,6 +151,7 @@
           "senior-developer",
           "sre-engineer",
           "technical-writer",
+          "test-executor",
           "tester",
           "ui-reviewer",
           "ui-ux-designer",
@@ -587,6 +594,21 @@
           "description": "Require security audit before release. Default: false.",
           "default": false
         },
+        "ai-security-review": {
+          "type": "boolean",
+          "description": "Require AI-specific security review of AI-generated code (ai-security-guardian). Default: false.",
+          "default": false
+        },
+        "prompt-governance": {
+          "type": "boolean",
+          "description": "Require prompts to be governed as source code (prompt-governor). Default: false.",
+          "default": false
+        },
+        "lifecycle-ownership": {
+          "type": "boolean",
+          "description": "Require a named owner and deprecation plan for every app/service (app-lifecycle-governor). Default: false.",
+          "default": false
+        },
         "se-required": {
           "type": "string",
           "description": "SE cascade binding strength. 'false' = optional, 'recommended' = advised for complex features, 'true' = mandatory before any code. Default: false.",
@@ -747,6 +769,11 @@
           "type": "boolean",
           "default": false,
           "description": "Gitignore provider settings files (settings.json, GEMINI.md, config.yaml) for all active providers. Default: false (committed). Note: CLAUDE.md is never gitignored (contains handwritten sections)."
+        },
+        "ignore-provider-dirs": {
+          "type": "boolean",
+          "default": false,
+          "description": "Issue #557: switch the agent-meta managed .gitignore block from the provider-internal sub-path allowlist to whole provider-root directories (e.g. .claude/, .gemini/, .github/copilot/), resolved per provider from config/ai-providers.yaml (provider_root_dirs key; fallback derivation: first dot-prefixed segment of agents_dir). Provider-internal entries from the local/generated/settings categories are filtered out as redundant. Repo-root files (sync.log, CLAUDE.personal.md, .mcp.json, opencode.json, top-level context files) keep their per-category behavior, as do non-provider entries (env scripts, MCP extras, skill entries). Default: false (sub-path allowlist, unchanged behavior). Note: the managed block is additive on non-exact sync paths — existing projects may keep previously written sub-path entries (harmless, redundant)."
         },
         "custom_entries": {
           "type": "array",

@@ -18,11 +18,13 @@ label, so ``NEW_ARTIFACTS:`` does NOT satisfy the ``ARTIFACTS:`` marker
 (it is a different label). Localization of the marker itself is a protocol
 violation; only the value after each colon may follow the response language.
 
-Templates with neither signal (the ~28 contract-less templates tracked in
-issue #528) are out of scope here. Templates that have a contract section
-but lack at least one marker are listed in _CONTRACT_EXCEPTIONS below —
-each entry is a named follow-up candidate; the registry is a ratchet:
-newly added deviant templates fail this test until consciously exempted.
+Issue #528/#552 closure: the contract-less templates from #528 and all
+deviant contract sections from #552 (classes A–F) have been brought to full
+marker compliance. _CONTRACT_EXCEPTIONS below is therefore empty; the
+registry stays in place as a ratchet — newly added deviant templates fail
+this test until consciously exempted. Remaining contract-less files are the
+helper docs (_README.md, _wf-orchestrator-reference.md), consciously exempt
+per issue #528 (no required frontmatter fields, not worker roles).
 """
 
 import re
@@ -46,74 +48,40 @@ FLEET_P1_ROLES = (
     "security-auditor.md",
 )
 
-# --- Exception registry (follow-up candidates, out of issue #541 scope) ---
-# Each entry: filename -> deviation reason. Grouped by deviation class.
+# --- Exception registry (ratchet) ------------------------------------------
+# Issue #552/#528 closure (2026-09-06): every previously listed deviation
+# (classes A–F, 34 templates) was brought to full STATUS/RESULT/ARTIFACTS
+# marker compliance; all entries were consciously removed. The empty
+# registry is the ratchet baseline: any template that gains a contract
+# section without all three markers now fails
+# test_contract_templates_contain_all_three_protocol_markers until it is
+# either fixed or consciously registered here with its deviation reason.
 
 # Class A — <output_contract> defines a non-IResult structured report
 #           envelope without any STATUS contract line (different format,
 #           not an incomplete IResult contract):
-_CLASS_A_NO_STATUS_ENVELOPE = {
-    "bug-feature-analyzer.md": "triage report format, no STATUS line",
-    "effort-estimator.md": "estimate table format, no STATUS line",
-    "ideation.md": "concept handoff format, no STATUS line",
-    "log-analyzer.md": "finding report format, no STATUS line",
-    "planner.md": "plan table format, no STATUS line",
-    "provider-expert.md": "analysis report format, no STATUS line",
-}
+_CLASS_A_NO_STATUS_ENVELOPE: dict[str, str] = {}
 
 # Class B — SE-cascade roles: STATUS contract line present but no
 #           RESULT/ARTIFACTS. SE-cascade roles are a deliberate deviation
 #           zone (see .claude/skills/conventions/SKILL.md, Audit #412):
-_CLASS_B_SE_CASCADE = {
-    "se-developer.md": "SE-cascade role, IResult triple incomplete",
-    "se-junior-developer.md": "SE-cascade role, IResult triple incomplete",
-    "se-senior-developer.md": "SE-cascade role, IResult triple incomplete",
-}
+_CLASS_B_SE_CASCADE: dict[str, str] = {}
 
 # Class C — STATUS contract line present, but domain fields replace the
 #           RESULT and ARTIFACTS markers entirely:
-_CLASS_C_DOMAIN_FIELDS = {
-    "agent-meta-manager.md": "FILES_CHANGED/NOTES instead of RESULT/ARTIFACTS",
-    "agent-meta-scout.md": "scouting fields instead of RESULT/ARTIFACTS",
-    "api-specialist.md": "spec fields instead of RESULT/ARTIFACTS",
-    "concept-reviewer.md": "VERDICT/REPORT_FILE instead of RESULT/ARTIFACTS",
-    "devops-engineer.md": "infra fields instead of RESULT/ARTIFACTS",
-    "e2e-tester.md": "test-run fields instead of RESULT/ARTIFACTS",
-    "export-manager.md": "export fields instead of RESULT/ARTIFACTS",
-    "feedback.md": "issue fields instead of RESULT/ARTIFACTS",
-    "meta-feedback.md": "issue fields instead of RESULT/ARTIFACTS",
-    "openscad-developer.md": "model fields instead of RESULT/ARTIFACTS",
-    "performance-optimizer.md": "perf fields instead of RESULT/ARTIFACTS",
-    "prompt-engineer.md": "template fields instead of RESULT/ARTIFACTS",
-    "requirements.md": "REQ fields instead of RESULT/ARTIFACTS",
-    "tester.md": "test-count fields instead of RESULT/ARTIFACTS",
-    "validator.md": "VERDICT/FINDINGS instead of RESULT/ARTIFACTS",
-}
+_CLASS_C_DOMAIN_FIELDS: dict[str, str] = {}
 
 # Class D — STATUS and ARTIFACTS present, RESULT replaced by a domain
 #           verdict/summary field:
-_CLASS_D_NO_RESULT = {
-    "code-reviewer.md": "VERDICT instead of RESULT",
-    "design-system-architect.md": "TOKEN_FILES etc. instead of RESULT",
-    "docker.md": "OPERATION/NOTES instead of RESULT",
-    "frontend-component-engineer.md": "COMPONENTS list instead of RESULT",
-    "git.md": "COMMIT/BRANCH instead of RESULT",
-    "release.md": "VERSION/TAG instead of RESULT",
-    "ui-ux-designer.md": "SCREENS/DESIGN_SYSTEM instead of RESULT",
-}
+_CLASS_D_NO_RESULT: dict[str, str] = {}
 
 # Class E — STATUS and RESULT present, ARTIFACTS missing:
-_CLASS_E_NO_ARTIFACTS = {
-    "dependency-auditor.md": "FINDINGS carries the payload, ARTIFACTS missing",
-    "incident-responder.md": "RCA/HOTFIXES carry the payload, ARTIFACTS missing",
-}
+_CLASS_E_NO_ARTIFACTS: dict[str, str] = {}
 
 # Class F — embedded marker variant: NEW_ARTIFACTS: is a different label
 #           and does not satisfy the bare ARTIFACTS: marker (plus RESULT
 #           missing):
-_CLASS_F_EMBEDDED_VARIANT = {
-    "documenter.md": "NEW_ARTIFACTS: instead of ARTIFACTS:, RESULT missing",
-}
+_CLASS_F_EMBEDDED_VARIANT: dict[str, str] = {}
 
 _CONTRACT_EXCEPTIONS: dict[str, str] = {
     **_CLASS_A_NO_STATUS_ENVELOPE,

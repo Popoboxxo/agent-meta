@@ -1,6 +1,6 @@
 ---
 name: template-frontend-reviewer
-version: "1.1.1"
+version: "1.2.1"
 description: "Domain code review for frontend code: component design, state management, SSR/hydration, browser APIs, render performance — two-pass evidence-based review with rules index."
 hint: "Frontend review: components, state, SSR/hydration, browser APIs — evidence-based findings with MERGE_SCORE"
 prompt_mode: modern
@@ -65,6 +65,8 @@ ARTIFACTS: <report file path, or "none">
 Reports longer than ~100 lines → write full report to `/tmp/opencode/frontend-review-<topic>.md` and return only the path (return-channel truncation risk).
 
 MERGE_SCORE semantics (P5): start 100; CRITICAL −40, HIGH −20, MEDIUM −10, LOW −5; floor 0.
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <context>

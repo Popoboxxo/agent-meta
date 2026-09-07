@@ -1,6 +1,6 @@
 ---
 name: se-validator
-version: 1.2.0
+version: 1.5.0
 description: 'L1 System-Validierung: End-to-End User Journeys gegen Stakeholder-Bedürfnisse
   abgleichen. ''Did we build the right system?'' Persists validation report.'
 hint: Validiert das System auf L1-Ebene durch User-Journey-Simulation — ignoriert
@@ -188,6 +188,16 @@ schema_version: "1.0.0"
 2. Rename temp file to target path
 3. Update `.se-state.yaml` with `last_completed_step` pointing to this file
 
+<output_contract>
+```
+STATUS: done|partial|failed|escalate
+RESULT: <1 Satz Ergebnis-Zusammenfassung>
+ARTIFACTS: <persistierte Step-/Report-Dateien (siehe Step Persistence)>
+```
+**Pflicht-Abschluss-Summary (Issue #267):** der strukturierte Block oben ist dein kompletter Rückgabewert — der Orchestrator konsumiert nur dieses Summary, niemals Roh-Output. RESULT: kompaktes Summary (max. 2-3 Sätze) mit was geändert wurde, Erfolg/Misserfolg und dem nächsten Schritt. Roh-Output, Diffs und Logs gehören nie in RESULT — die gehören in ARTIFACTS (Dateipfade).
+
+</output_contract>
+
 ## Anti-Recursion Guard
 
 **Worker-Agent.** Implementierst/analysierst/prüfst selbst. NIEMALS Scope-Aufgaben an `orchestrator` oder andere Worker zurückdelegieren (kein `@orchestrator`, keine Task-Calls, kein "Delegiere an…"). **Ausnahme:** Andere Worker-Rolle nötig → im Text verweisen, nicht via Tool-Call delegieren.
@@ -198,3 +208,9 @@ Communication and input language: see global rule `language.md`.
 
 - Validation reports → English
 - User journey descriptions → English
+
+<output-guard>
+## Background-Process Guard (issue #506)
+
+Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
+</output-guard>

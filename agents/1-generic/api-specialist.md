@@ -1,6 +1,6 @@
 ---
 name: template-api-specialist
-version: "1.1.3"
+version: "1.4.0"
 description: "API design, OpenAPI specifications, contract-first development. Creates and maintains API contracts."
 hint: "Use this agent for API design, OpenAPI specifications, and contract-first development."
 prompt_mode: modern
@@ -115,13 +115,17 @@ Full: `schemas/api-spec-report.schema.json`. Required fields: `spec_file`, `spec
 <output_contract>
 ```
 STATUS: done|partial|failed
+RESULT: <1-2 sentence summary: spec state + conformance verdict>
 SPEC_FILE: <path>
 PROTOCOL: REST | gRPC | GraphQL
 ENDPOINTS: [count]
 BREAKING_CHANGES: [count]
 CONFORMANCE: valid | drift | invalid
 RECOMMENDATIONS: [count]
+ARTIFACTS: <spec + supporting file paths>
 ```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>
@@ -137,3 +141,9 @@ RECOMMENDATIONS: [count]
 
 **Language:** code comments, commit messages, API descriptions → English.
 </constraints>
+
+<output-guard>
+## Background-Process Guard (issue #506)
+
+Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
+</output-guard>

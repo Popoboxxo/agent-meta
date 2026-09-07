@@ -1,6 +1,6 @@
 # CODEBASE_OVERVIEW — agent-meta
 
-> Letzte Aktualisierung: 2026-08-31 (feat/issue-558-pre-release-gates: Mechanized Pre-Release Gates — Plugin-Architektur für Pre-Release-Checks mit 3 eingebauten Gates (artifact-freshness, docker-image-scan, action-pin-validation), konfigurierbar via release-gates: in project.yaml und dod-presets, sync.py wiring via hooks.py::sync_release_gates() + dod.py::resolve_release_gates(), release.md v1.6.0 Integration; zuvor feat/hacs-platform-preset: HACS Platform Preset — 5 hacs-* Agent-Overrides, integration-development Skill via channel:skill, hacs.defaults.yaml mit Pflicht-Overrides; zuvor fix/admin-ui-model-loading: Admin-UI Model-Loading-Resilienz)
+> Letzte Aktualisierung: 2026-09-06 (feat/issue-674-roadmap: Phase 4b Runtime-Backends — Orchestration-Contract-Modul `scripts/lib/orchestration.py` (#265), statische File-Affinity-Analyse `scripts/lib/file_affinity.py` (#266), Capability-Keys `fanout_mechanism`/`barrier_collect` + Post-sync-Drift-Check `fanout_contracts.py`, Checkpoint-Roh-Output-Archiv (#267), Intent-Routing-Tooldefinition `{{INTENT_ROUTING_TOOLS}}` (#264), neue Rolle `test-executor` (#517), `<output-guard>` in 48 bash-fähigen Templates (#506); zuvor feat/issue-558-pre-release-gates: Mechanized Pre-Release Gates — Plugin-Architektur für Pre-Release-Checks mit 3 eingebauten Gates (artifact-freshness, docker-image-scan, action-pin-validation), konfigurierbar via release-gates: in project.yaml und dod-presets, sync.py wiring via hooks.py::sync_release_gates() + dod.py::resolve_release_gates(), release.md v1.6.0 Integration; zuvor feat/hacs-platform-preset: HACS Platform Preset — 5 hacs-* Agent-Overrides, integration-development Skill via channel:skill, hacs.defaults.yaml mit Pflicht-Overrides; zuvor fix/admin-ui-model-loading: Admin-UI Model-Loading-Resilienz)
 
 ---
 
@@ -22,6 +22,7 @@
 14. [Knowledge Engine](#14-knowledge-engine)
 15. [Review-Agent-Fleet](#15-review-agent-fleet)
 16. [HACS Platform Preset](#16-hacs-platform-preset)
+17. [Phase-4b Orchestration-Backends (Issues #264-#267, #506, #517)](#17-phase-4b-orchestration-backends-issues-264-267-506-517)
 
 ---
 
@@ -443,13 +444,14 @@ Intent-Routing-Tabelle mit {{#if DEVELOPER_TIERS_ENABLED}}-Blöcken:
 
 | Datei | Version | Tools | Kurzbeschreibung |
 |-------|---------|-------|-----------------|
-| `orchestrator.md` | 3.22.0 | read, write, edit, glob, grep | Einstiegspunkt für alle Entwicklungsaufgaben; Pre-Delegation Gate, BARRIER Protocol, Error-Recovery Matrix, In-Context Tracker, Delegation-Syntax mit Laufzeit-Platzhaltern |
+| `orchestrator.md` | 7.13.0 | read, write, edit, glob, grep | Einstiegspunkt für alle Entwicklungsaufgaben; Pre-Delegation Gate, BARRIER Protocol, Error-Recovery Matrix, In-Context Tracker, Delegation-Syntax mit Laufzeit-Platzhaltern; Phase-4b-Backends: §3 `route_intent`-Tooldefinition (`{{INTENT_ROUTING_TOOLS}}`), §6 capability-gated Dispatch + Sync-Call-Contract, §7 BARRIER-Protocol, §9 Summarization-as-a-Contract |
 | `developer.md` | 2.0.1 | read, write, edit, glob, grep | Feature-Implementierung und Bugfixes |
 | `junior-developer.md` | 1.0.0 | read, write, edit, glob, grep | Fast-Tier: triviale Fixes ≤2 Dateien, kein Design nötig |
 | `senior-developer.md` | 1.0.0 | read, write, edit, glob, grep | Max-Tier: Architektur-Impact, komplexe/riskante Änderungen, schwierige Bugs |
 | `principal-developer.md` | 1.0.0 | read, write, edit, glob, grep | Ultra-Tier: Last-Resort-Eskalation nach wiederholtem senior-developer-Versagen; Root-Cause-Diagnose mandatiert; `orchestrator_only: true` |
 | `intern-developer.md` | 1.0.0 | read, glob, grep | Nano-Tier: Easter-Egg/Gag-Agent, read-only, nie für Produktionsarbeit geroutet |
 | `tester.md` | — | read, write, run_command | TDD, Test-Suite, Testabdeckung |
+| `test-executor.md` | 1.1.0 | read, bash | Execution-only: bestehende Test-Suiten ausführen (Pass/Fail-Counts, Exit-Codes, Stdout-Auszüge), Sync-Turn-Contract; kein Test-Design, kein Code (#517) |
 | `validator.md` | 2.0.1 | read, run_command | Code gegen REQs prüfen, DoD-Check |
 | `documenter.md` | — | read, write, edit, glob, grep | CODEBASE_OVERVIEW, ARCHITECTURE, README |
 | `requirements.md` | — | read, write, run_command, ask_question | Anforderungen aufnehmen, REQ-IDs |
@@ -1366,6 +1368,8 @@ delegation_syntax:
 | `hooks` | boolean | Git-Hook-Integration unterstützt |
 | `native_agent_tools` | string[] | Namen der nativen Agent-Tools |
 | `bootstrap_required` | boolean | Session-Bootstrap erforderlich |
+| `fanout_mechanism` | enum | FANOUT/PARALLEL_GROUP-Dispatch-Mechanismus: `native-batch` \| `tool-mediated` \| `swarm` \| `sequential-fallback` (#265, konservativ verifiziert — unverified paralleler Contract → `sequential-fallback`) |
+| `barrier_collect` | boolean | Ergebnisse arrive an einem echten Barrier als Tool-Daten — `false` nur bei `sequential-fallback` (#265) |
 
 ### 10.3 `config/provider-bootstrap.yaml`
 
@@ -1396,6 +1400,9 @@ delegation_syntax:
 | `needs_bootstrap` | `(provider: str) → bool` | Prüft ob Bootstrap erforderlich |
 | `has_native_subagent_dispatch` | `(provider: str) → bool` | Native Dispatch verfügbar? |
 | `has_file_based_agents` | `(provider: str) → bool` | File-based Agent-Discovery? |
+| `get_fanout_mechanism` | `(provider: str) → str \| None` | `fanout_mechanism`-Key des Providers (#265) — fail-closed validiert gegen `FANOUT_MECHANISMS` (unbekannter Key → `ValueError`) |
+| `has_async_fanout` | `(provider: str) → bool` | Parallel-Mechanismus (nicht `sequential-fallback`)? |
+| `get_barrier_collect` | `(provider: str) → bool` | `barrier_collect`-Key des Providers |
 
 **PLACEHOLDERS-Mapping (Klassenkonstante):**
 ```python
@@ -2063,3 +2070,153 @@ Projekt-Override gewinnt — Details in `scripts/lib/platform.py` bzw.
 
 Ausführen: `python -m pytest tests/test_platform_hacs_preset.py -q` (lokal mit
 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1`).
+
+---
+
+## 17. Phase-4b Orchestration-Backends (Issues #264-#267, #506, #517)
+
+> Seit feat/issue-674-roadmap (2026-09-06) · Roadmap: `docs/plans/2026-09-05-issue-674-roadmap.md` (Phase 4b) · Design Spike #265: `docs/spikes/2026-09-06-issue-265-async-fanout-spike.md` · Harness-Abhängigkeiten/Follow-ups: `docs/plans/2026-09-06-issue-674-phase4b-harness-dependencies.md`
+>
+> **Grenze:** agent-meta kontrolliert nur Templates/Configs/Rules/lib. Laufzeit-Anteile
+> (Generation anhalten, Subagent-Dispatch, Blocking-Collect, Tool-Response-Injection,
+> BARRIER-Parsing, Roh-Output-Stripping) sind harness-seitige, dokumentierte
+> Abhängigkeiten — siehe die konsolidierte Harness-Doku (pro Issue: Implemented /
+> Harness-side dependency / Follow-ups).
+
+### 17.1 `scripts/lib/orchestration.py` (neu, #265/#267)
+
+Plan-/Barrier-Contract-Modul (stdlib-only). agent-meta owns PLAN + CONTRACT +
+VALIDATION; Live-Dispatch bleibt Harness-Sache, injiziert über das `Dispatcher`-Protokoll
+(Spike §7: ein synchroner Tool-Call IST der harte Interrupt).
+
+**Exportierte API:**
+
+| Element | Signatur | Zweck |
+|---|---|---|
+| `FanoutTask` | dataclass (frozen) | Ein Sub-Agent-Dispatch: `task_id`, `target_agent`, `prompt`, `files_touched` (#266-Input), `tier_override` (#346), `handoff` (A2A-Envelope), `dependencies` (In-Plan-Prerequisites) |
+| `FanoutPlan` | dataclass (frozen) | Dispatch-Plan für EINE Barrier-Gruppe: `kind`, `tasks`, `barrier`, `max_parallel` (spiegelt project.yaml `max-parallel-agents`) |
+| `BarrierEntry` | dataclass (frozen) | Outcome je Task am Barrier — die NUR orchestrator-sichtbaren Daten: `status`, `summary` (#267), `checkpoint_ref`, `overlap_warnings`, `duration_s`, `raw_output` (transientes Transportfeld — von `execute_plan` konsumiert/geleert, nie gerendert) |
+| `BarrierResult` | dataclass (frozen) | Aggregiertes Barrier-Ergebnis als EINE Tool-Response: `plan_id`, `status`, `entries`, `total_duration_s` |
+| `Dispatcher` | Protocol | Harness-seitiger Dispatch-Adapter: `dispatch(tasks) → Sequence[BarrierEntry]` in Task-Order; Implementierungen: Stub, SubagentBarrierRuntime-Subprocess-Bridge, in-harness native batch |
+| `BARRIER_ENTRY_MARKER` | `= "||| agent="` | §7-Result-Wrapper-Marker (Single Source of Truth; Drift-Check in `fanout_contracts.py`) |
+| `find_dependency_errors` | `(tasks) → list[str]` | Graph-Checks: leerer Plan, doppelte task_ids, Dangling-Dependency (= Deadlock), Zyklen (Kahn Topological Sort) |
+| `validate_plan` | `(plan, *, max_parallel=2, file_overlap=None) → list[str]` | Statische Plan-Validierung ohne Agents/I/O: Graph-Checks, Over-Commitment (> max_parallel → in mehrere Barrier-Gruppen splitten), #266-File-Overlap-Seam (vorberechneter Dict oder Callable; `None` = Check übersprungen — niemals stilles Safety-Claim), `tier_override`-Grobprüfung (vollständige Guardrails bleiben in `resolve_tier_override`) |
+| `check_plan_file_overlap` | `(plan, project_root=None) → dict` | #266-Analyse über die Plan-Tasks (Projektion auf dict-Input-Shape), Rückgabe `{"safe", "conflict"}` |
+| `execute_plan` | `(plan, dispatcher, *, store=None, session_id=None, plan_id=None) → BarrierResult` | Barrier-Aggregation über den injizierten Dispatcher: deterministische Entry-Reihenfolge = Plan-Task-Order, Status-Aggregation (any timeout → `timeout`; all failed → `failed`; some failed → `partial`; sonst `success`), #267-Archivierung (`raw_output` → `CheckpointStore.save_raw_output`, Entry fährt nur mit `checkpoint_ref` weiter) |
+| `summarize_result` | `(raw_output, *, max_sentences=3) → str` | #267-Exit-Summary-Extraktion: `SUMMARY:`-Marker zuerst (Multi-line-Block bis Leerzeile/`KEY:`-Sektion), Fallback erste N Sätze (Soft-Cap 400 Zeichen); reine String-Verarbeitung |
+| `render_barrier_result` | `(result) → str` | Rendert EINEN orchestrator-facing Textblock, §7-kompatibel: `BARRIER <plan_id>: <status>` + je Entry `||| agent=<name> result_key=<task_id> status=<status> |||` + Summary + `Full output: <checkpoint_ref>` + Overlap-Warnings + `[N] agents completed` |
+
+**Deliberate Non-Goals (Spike §3):** kein HTTP/API-Client, kein Provider-CLI-Subprocess,
+kein Provider-Name-Branch.
+
+### 17.2 `scripts/lib/file_affinity.py` (neu, #266)
+
+Deterministische, task-basierte statische File-Affinity-Analyse (stdlib-only) —
+Ersatz für das LLM-geführte "Check file ranges for overlap" vor
+FANOUT/PARALLEL_GROUP-Dispatch. Jeder gemeldete Konflikt basiert auf geparstem
+Datei-/Task-Content, nie auf einer Modell-Schätzung.
+
+**Exportierte API:**
+
+| Element | Signatur | Zweck |
+|---|---|---|
+| `check_file_overlap` | `(tasks, project_root=None) → dict` | `{"safe": [task_id, …], "conflict": [(task_a, task_b, [files]), …]}` — deterministisch (safe in Input-Order, conflict aufsteigend nach Paar), fail-closed; Input: `str` \| `dict` \| duck-getypte Task-Objekte (z. B. Dry-Run `SubTask`) |
+| `extract_file_references` | `(text) → list[str]` | Dateireferenzen aus freiem Task-Text (Regex über bekannte Endungen, Backslash-Normalisierung, dedupliziert) |
+| `format_overlap_report` | `(overlap) → str` | Markdown-Report inkl. `BOUNDARY_NOTE` — Reports schlagen nie vor, dass das Modul selbst dispatcht |
+| `BOUNDARY_NOTE` | Konstante | Dokumentierte Grenze: nur Analyse — echtes Enforcement (Call vor echtem Dispatch) harness-seitig; agent-meta liefert Analyse + Dry-Run-Integration (`tests/orchestration/dry_run/engine.py`: konflikthafte Tasks werden vor simuliertem Fanout sequentialisiert) |
+
+**Analyse (4 Schritte):** (1) Regex-Dateireferenzen aus Task-Text + explizitem
+`files`-Feld, (2) Python-AST: Top-Level-Symbole (min. 6 Zeichen) → Symbol→Datei-Index,
+(3) Markdown/YAML-Referenz-Pass (ein normalisierter Pass deckt Inline-Text,
+Code-Fences und Frontmatter ab), (4) Import-Graph via
+`analysis.FileAffinityAnalyzer`. Konflikt-Semantik konservativ/fail-closed: Hard
+Overlap (gleiche Datei in beiden Write-Sets) gewinnt, sonst Import-/Doc-Referenz-Kopplung
+mit verlinkten Dateipaaren. Kein globaler Cache (Ergebnisse müssen während
+Session-Edits korrekt bleiben); Dateien >1 MB und Junk-Verzeichnisse werden übersprungen.
+
+### 17.3 `scripts/lib/consistency/fanout_contracts.py` (neu, #265)
+
+Post-sync FANOUT/PARALLEL_GROUP-Backend-Contract-Check:
+`check_fanout_backend_contract(agent_meta_root) → list[Finding]`, registriert in
+`scripts/consistency-check.py`. Cross-validiert die drei FANOUT-Oberflächen
+(`config/provider-capabilities.yaml`, `config/delegation-syntax.yaml`,
+`agents/1-generic/orchestrator.md` §7-Marker).
+
+**Checks (alle fail-closed als ERROR, außer explizit WARNING):**
+1. Mechanism-Validity — `fanout_mechanism` ∈ `FANOUT_MECHANISMS`; Provider mit
+   `parallel_execution: true` brauchen einen Mechanismus.
+2. Mechanism-/Capability-Konsistenz — `sequential-fallback` ⊕ `parallel_execution: true`;
+   async Mechanismen ⊕ `parallel_execution: false`; `barrier_collect` exakt bei async Mechanismen.
+3. Syntax-Coverage — async ⇒ nicht-leere `fanout`/`parallel_group`-Syntax;
+   `sequential-fallback` ⇒ Text muss sequenzielle Formulierung tragen (sonst
+   Re-Introduction der "Parallel Illusion"); Syntax ohne Mechanism-Mapping → WARNING.
+4. §7-Marker-Drift — `BARRIER_ENTRY_MARKER` muss im Orchestrator-Template referenziert sein.
+5. Native-Tool-Surface — `tool-mediated`/`swarm` brauchen nicht-leere `native_agent_tools`.
+
+**Einordnung:** Convention boundary (fail-closed gegen akzidentellen Drift, Guard-Terminologie
+AGENTS.md) — keine Security-Boundary.
+
+### 17.4 `scripts/lib/checkpoint.py` — Roh-Output-Archiv (#267)
+
+Session-Layout zweistufig: `<session-id>.json` (strukturierte Checkpoints/Summaries,
+append-only) + `<session-id>/`-Verzeichnis mit dem VOLLSTÄNDIGEN Roh-Output je
+Worker-Task (`.txt`).
+
+| Funktion | Signatur | Zweck |
+|---|---|---|
+| `save_raw_output` | `(session_id, task_id, agent, raw_output) → Path` | Archiviert vollständigen Roh-Output — append-only (uuid-Suffix, nie Overwrite), `_sanitize_component`-Filename-Hygiene (Path-Escape unmöglich), `write_atomic` |
+| `load_raw_output` | `(session_id, filename) → str \| None` | Fail-soft-Load (None bei fehlend/unlesbar + Logger-Warning, wie #576-Session-Loader) |
+| `list_raw_outputs` | `(session_id) → list[Path]` | Sortierte Archiv-Liste (älteste zuerst), leer bei fehlendem Verzeichnis |
+
+**Harness-Grenze (Modul-Docstring):** das Modul archiviert ausschließlich Bytes —
+Parsen der Worker-Results nach dem BARRIER-Marker und Roh-Output-Stripping aus dem
+Orchestrator-Kontext sind harness-seitig (Backend: `scripts/lib/orchestration.py`
+liefert `summarize_result`/`render_barrier_result`).
+
+### 17.5 Capability-Keys & Getter (#265)
+
+`config/provider-capabilities.yaml` um zwei Keys für alle 9 Provider erweitert
+(Werte konservativ verifiziert — unverified paralleler Contract →
+`sequential-fallback`/`false`):
+
+| Key | Werte | Bedeutung |
+|---|---|---|
+| `fanout_mechanism` | `native-batch` \| `tool-mediated` \| `swarm` \| `sequential-fallback` | WIE der Provider FANOUT/PARALLEL_GROUP dispatcht: alle Dispatch-Calls in einer Response (BARRIER = Turn-Semantik) / expliziter Collect-Schritt via benanntem Tool / ein Tool-Call mit Aggregat-Report (Barrier by construction) / konservativer sequentieller Fallback |
+| `barrier_collect` | boolean | Ergebnisse arrive als Tool-Daten an echtem Barrier, bevor Generation weiterläuft — `false` nur bei `sequential-fallback` |
+
+Belegung: Claude/Opencode/Gemini → `native-batch` · Codex → `tool-mediated`
+(`wait_agent`) · KimiCode → `swarm` (`AgentSwarm`) · Continue/Copilot/Mammouth/ZCode →
+`sequential-fallback`. Getter in `DelegationSyntaxEngine`:
+`get_fanout_mechanism()` / `has_async_fanout()` / `get_barrier_collect()` —
+Mechanism-Key-Dispatch statt `if provider ==` (Provider-Agnostik-Policy).
+
+### 17.6 Intent-Routing-Tooldefinition (`{{INTENT_ROUTING_TOOLS}}`, #264)
+
+`build_variables()` prerendert die strukturierte `route_intent`-Tooldefinition pro
+Provider (`_INTENT_ROUTING_TOOL_DEFS` via
+`agents.py::build_routing_tool_definitions_for_providers()`, Serialisierung durch
+`render_routing_tool_definition()` — mechanism-keyed auf den `handoff_format`-Key,
+fail-closed bei unbekanntem Format). Aufgelöst wird der Platzhalter pro synchronisiertem
+Provider in `agent_sync._build_provider_vars()`; Provider ohne `handoff_format`
+rendern `""` (fail-soft, wie PAL-Missing-Definition). Registriert in
+`consistency/placeholders.py`. Der Orchestrator (§3) referenziert die generierte
+Definition statt einer Prose-Routing-Tabelle; §4 verweist auf `routing.rules`.
+**Konsum** der Definition (Registrierung als callable Tool, Routing realer Intent-Calls)
+ist Provider/Harness-Verhalten.
+
+### 17.7 Neue Rolle `test-executor` (#517) & #506-Output-Guard
+
+- `agents/1-generic/test-executor.md` (v1.1.0): execution-only (`Read`+`Bash`),
+  bestehende Suiten unverändert ausführen (kein Test-Design, kein Code, kein
+  Architektur-/Context-Eingriff), Sync-Turn-Contract (§4 — Hintergrundprozesse werden
+  im eigenen Turn awaited, Turn endet nie auf "waiting"), strukturierte Result-Capture
+  (Counts/Exit-Codes/Stdout-Auszüge/Log-Pfade), Pflicht-Zusammenfassung (#267).
+  Rolle in `config/role-defaults.yaml` (`model: nano`, `workflow_tier: optional`,
+  `parallel: true`); Delegation-Guidance in
+  `docs/guides/features/agent-delegation-map.md`.
+- **#506 Background-Process Guard:** alle 48 bash-fähigen `1-generic`-Templates
+  (je minor-bumped) tragen eine `<output-guard>`-Sektion — ein gestarteter
+  Hintergrundprozess MUSS im eigenen Turn awaited werden (`docker wait`, Polling mit
+  Timeout, synchrones Foreground); der Turn endet nie auf einem
+  "waiting"-Platzhalter. Orchestrator §6 dokumentiert den Sync-Call-Contract.
+  Prompt-Konvention = convention boundary; echte Turn-Semantik ist harness-seitig.

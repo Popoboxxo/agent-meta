@@ -1,0 +1,15 @@
+{
+  "orchestrator-guard": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ./hooks/antigravity-json-adapter.sh orchestrator-guard.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

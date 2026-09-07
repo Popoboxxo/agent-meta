@@ -97,6 +97,12 @@ _CONDITIONAL_FALSE_FLAGS: dict[str, str] = {
     "DOD_TESTS_REQUIRED": "false",
     "DOD_CODEBASE_OVERVIEW": "false",
     "DOD_SECURITY_AUDIT": "false",
+    # Governance DoD gates (ai-security-review, prompt-governance,
+    # lifecycle-ownership): standalone mode has no governance agents —
+    # inert here exactly like DOD_SECURITY_AUDIT above.
+    "DOD_AI_SECURITY_REVIEW": "false",
+    "DOD_PROMPT_GOVERNANCE": "false",
+    "DOD_LIFECYCLE_OWNERSHIP": "false",
     "WEB_PROJECT_ENABLED": "false",
     "DEVELOPER_SNIPPETS_PATH_SET": "false",
     "TESTER_SNIPPETS_PATH_SET": "false",

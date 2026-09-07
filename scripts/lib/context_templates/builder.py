@@ -1,6 +1,16 @@
+"""Handlebars-style template rendering for agent-context files (partials, conditionals, loops, placeholder variables)."""
 from __future__ import annotations
 import re
 from pathlib import Path
+
+from ..frontmatter import strip_frontmatter
+from ..substitution import constant_lookup, substitute_placeholders
+
+# Permissive placeholder pattern: group 1 captures the name (stripped by the
+# lookup below). Excludes block markers ({{#if}}, {{/if}}, {{else}}) and
+# partials ({{> name}}) — those are handled by resolve_conditionals(),
+# resolve_loops() and resolve_partials().
+_PLACEHOLDER_RE = re.compile(r"\{\{([^#>/][^}]*)\}\}")
 
 
 class TemplateBuilder:
@@ -32,11 +42,9 @@ class TemplateBuilder:
                 partial_path = self.fallback_partials_dir / f"{partial_name}.md"
             if not partial_path.exists():
                 return ""
-            content = partial_path.read_text(encoding='utf-8')
-            if content.startswith('---'):
-                parts = content.split('---', 2)
-                if len(parts) >= 3:
-                    content = parts[2].lstrip()
+            # Canonical frontmatter strip (Issue #473) — replaces the former
+            # inline content.split('---', 2) duplicate.
+            content = strip_frontmatter(partial_path.read_text(encoding='utf-8'))
             return self.resolve_partials(content)
             
         return re.sub(r'\{\{>\s*(.+?)\s*\}\}', replace_partial, template_str)
@@ -98,7 +106,15 @@ class TemplateBuilder:
                     continue
                 rendered = inner_template
                 for k, v in item.items():
-                    rendered = re.sub(r'\{\{\s*' + re.escape(k) + r'\s*\}\}', str(v), rendered)
+                    # Shared escape-safe core (issue #476): the constant
+                    # lookup inserts str(v) verbatim via function
+                    # replacement. A raw str replacement would interpret
+                    # backslashes as escapes and crash (issue #674).
+                    rendered = substitute_placeholders(
+                        rendered,
+                        r"\{\{\s*(" + re.escape(k) + r")\s*\}\}",
+                        constant_lookup(v),
+                    )
                 result.append(rendered)
             return "".join(result)
             
@@ -109,6 +125,10 @@ class TemplateBuilder:
     def resolve_variables(self, template_str: str, variables: dict) -> str:
         """Resolve {{variable}} placeholders by substituting values from the variables dictionary.
 
+        Delegates to the shared escape-safe substitution core (issue #476):
+        values are injected via function replacement, so backslashes and
+        $-group references are never interpreted (issue #674).
+
         Args:
             template_str: Template string containing variable references.
             variables: Dictionary of variable names to values.
@@ -116,14 +136,19 @@ class TemplateBuilder:
         Returns:
             Template string with {{variable}} placeholders replaced or left unchanged if not found.
         """
-        def repl(match):
-            var_name = match.group(1).strip()
-            val = variables.get(var_name)
-            if val is not None:
-                return str(val)
-            return f"{{{{{var_name}}}}}"
-            
-        return re.sub(r'\{\{([^#>/][^}]*)\}\}', repl, template_str)
+        def lookup(name: str) -> str | None:
+            # Whitespace variants ({{ VAR }}) resolve on the stripped name.
+            val = variables.get(name.strip())
+            if val is None:
+                return None
+            return str(val)
+
+        def keep(matched: str, name: str) -> str:
+            # Unresolved names keep their placeholder form, rebuilt from the
+            # stripped name (whitespace variants collapse to {{NAME}}).
+            return f"{{{{{name.strip()}}}}}"
+
+        return substitute_placeholders(template_str, _PLACEHOLDER_RE, lookup, keep)
 
     def build(self, template_name: str, variables: dict) -> str:
         """Load and render a template with the provided variables.
@@ -146,10 +171,9 @@ class TemplateBuilder:
             raise FileNotFoundError(f"Template not found: {template_path}")
             
         content = template_path.read_text(encoding='utf-8')
-        if content.startswith('---'):
-            parts = content.split('---', 2)
-            if len(parts) >= 3:
-                content = parts[2].lstrip()
+        # Canonical frontmatter strip (Issue #473) — replaces the former
+        # inline content.split('---', 2) duplicate.
+        content = strip_frontmatter(content)
                 
         content = self.resolve_partials(content)
         content = self.resolve_loops(content, variables)

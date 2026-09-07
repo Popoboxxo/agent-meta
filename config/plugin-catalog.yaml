@@ -385,3 +385,34 @@ plugins:
       command: project-atlas
       args: [--mcp]
     secrets: []
+  headroom:
+    kind: mcp-server
+    origin-type: local-process
+    availability-probe: command-v
+    binary: headroom
+    description: Headroom context-compression layer — compresses tool outputs and
+      logs reversibly (CCR), prevents context-window exhaustion in long agent runs
+      (https://github.com/headroomlabs-ai/headroom). Must be installed locally.
+    category: dev-tool
+    enabled-by-default: false
+    tools:
+      allowed:
+      - headroom_compress
+      - headroom_retrieve
+      - headroom_stats
+    agent-hint: 'Headroom komprimiert große Tool-Outputs/Logs reversibel (CCR) — kein Informationsverlust.
+
+      headroom_compress: Wann nutzen? Vor der Kontext-Einspeisung großer Tool-Outputs/Logs, um Tokens zu sparen.
+
+      headroom_retrieve: Wann nutzen? Wenn das komprimierte Material nicht reicht — Original per Hash wiederherstellen.
+
+      headroom_stats: Wann nutzen? Für Kompressions-Statistiken im Agent-Report.
+
+      '
+    connection:
+      type: stdio
+      command: headroom
+      args:
+      - mcp
+      - serve
+    secrets: []

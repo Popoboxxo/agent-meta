@@ -1,6 +1,6 @@
 ---
 name: template-planner
-version: "1.0.2"
+version: "1.2.0"
 description: "Use when a concept, REQ, or bug needs to be turned into a concrete, ordered implementation plan before work starts."
 hint: "Nutze planner wenn ein Konzept/REQ/Bug in konkrete, geordnete Umsetzungsschritte übersetzt werden muss."
 prompt_mode: modern
@@ -70,6 +70,10 @@ Report the plan using `<output_contract>`. Do not auto-trigger the `feature-life
 
 <output_contract>
 ```
+STATUS: done|partial|failed
+RESULT: <plan title + step count in 1 sentence>
+ARTIFACTS: <persisted plan path>
+
 ## Plan: <title>
 
 **Source:** <REQ-ID | concept-<topic>.md | Bug-#NNN>
@@ -82,6 +86,8 @@ Report the plan using `<output_contract>`. Do not auto-trigger the `feature-life
 
 **Persisted to:** <knowledge/wiki/plans/<topic>.md | plan-<topic>.md>
 ```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>

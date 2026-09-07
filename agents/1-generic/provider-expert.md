@@ -4,7 +4,7 @@
 # extend it via `based-on: "1-generic/provider-expert.md@<version>"` in
 # agents/2-platform/. No routing/intent_keywords of its own.
 name: template-provider-expert
-version: "1.1.1"
+version: "1.4.0"
 description: "Absolute analysis expert for an AI provider: how it works, configuration, best practices for optimally adapting agent-meta."
 hint: "Provider expert: how it works, configuration, best practices for optimal agent-meta adaptation"
 prompt_mode: modern
@@ -72,6 +72,10 @@ Record platform-specific findings (for `agent-meta-manager` and project docs).
 
 <output_contract>
 ```
+STATUS: done|partial|failed
+RESULT: <1-2 sentence recommendation summary>
+ARTIFACTS: <persisted analysis path, empty if returned inline>
+
 ## Provider Analysis: [Platform]
 
 ### Findings
@@ -87,6 +91,8 @@ Record platform-specific findings (for `agent-meta-manager` and project docs).
 - [Check against provider-capabilities.yaml: ...]
 - [Sync test result: ...]
 ```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>
@@ -100,3 +106,9 @@ Record platform-specific findings (for `agent-meta-manager` and project docs).
 
 **Language:** communication in user language. Code snippets/config → English.
 </constraints>
+
+<output-guard>
+## Background-Process Guard (issue #506)
+
+Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
+</output-guard>

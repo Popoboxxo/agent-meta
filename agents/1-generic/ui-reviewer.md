@@ -1,6 +1,6 @@
 ---
 name: template-ui-reviewer
-version: "1.1.1"
+version: "1.2.1"
 description: "Domain review for UI consistency and UX completeness: design-token conformance, layout/breakpoints, interaction states, i18n readiness — two-pass evidence-based review; delegates WCAG depth to accessibility-specialist."
 hint: "UI review: design tokens, layout consistency, loading/error/empty states, i18n readiness"
 prompt_mode: modern
@@ -62,6 +62,8 @@ ARTIFACTS: <path or "none">
 Long reports → file under `/tmp/opencode/ui-review-<topic>.md`, return path only.
 
 MERGE_SCORE: start 100; CRITICAL −40, HIGH −20, MEDIUM −10, LOW −5; floor 0.
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <context>

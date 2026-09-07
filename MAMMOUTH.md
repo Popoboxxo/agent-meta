@@ -7,9 +7,9 @@
 **Plattform:** Python CLI (sync.py)
 **Beschreibung:** Zentrales Meta-Repository für die Standardisierung und Wiederverwendung von Claude-Agenten-Rollen über alle Projekte hinweg.
 
-> Stack: Python 3.x · Python 3, Markdown, YAML · Deps: - Python: `>=3.8`
+> Struktur: siehe Verzeichnisstruktur im Repo (`ls`/`find`); deklarativ: `.meta-config/project.yaml` → `variables.PROJECT_STRUCTURE`.
 
-> Struktur: `.meta-config/project.yaml` → `variables.PROJECT_STRUCTURE`.
+> Runtime & Abhängigkeiten: siehe Projekt-Manifest (`pyproject.toml` / `requirements.txt` / `package.json` / `manifest.json`).
 
 **Entry-Point:** `scripts/sync.py — Haupt-CLI für Agent-Generierung`
 
@@ -47,7 +47,7 @@ Kategorien für `docs/REQUIREMENTS.md`:
 
 > **AI ROUTING:** Claude -> CLAUDE.md | Opencode, Gemini -> AGENTS.md | Mammouth -> MAMMOUTH.md
 
-Generiert von agent-meta v0.101.0-beta.5 — `2026-09-05`
+Generiert von agent-meta v0.101.0-beta.5 — `2026-09-07`
 DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben — Ausnahmen siehe Abschnitt »Orchestrator — Universal Router«.
 
@@ -60,7 +60,9 @@ DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Cod
 | `bug-feature-analyzer` | Issue triage: classify bug vs. user-error vs. feature vs. out-of-scope — before developer/feature-lifecycle delegation |
 | `claude-expert` | Claude Code Experte: Funktionsweise, .claude Konfiguration, Best Practices |
 | `code-reviewer` | Checks code quality, blast radius, and Clean Code — not functional correctness (that's validator). |
-| `concept-reviewer` | Review concept/design doc: completeness, logic, risks, Approve/Iterate |
+| `concept-architect` | System design for complex changes: components, interfaces, trade-offs — never implements |
+| `concept-reviewer` | Review concept/design doc: completeness, logic, risks, threat model, Approve/Request-changes/Block — writes structured review report |
+| `concept-specifier` | Turn a concept into a technical specification: interface contracts, data flow, acceptance criteria — never implements |
 | `continue-expert` | Continue Experte: Funktionsweise, .continue Konfiguration, Best Practices |
 | `copilot-expert` | GitHub Copilot Experte: Funktionsweise, .github/copilot Konfiguration, Best Practices |
 | `data-engineer` | Data-Pipelines: ETL/ELT, Schema-Migration (Datenebene), Data-Quality, Lineage, Pipeline-Monitoring, Streaming/Batch — übergibt Pipeline-Spec an developer |
@@ -103,6 +105,7 @@ DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Cod
 | `requirements` | Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md |
 | `senior-developer` | High-tier developer: architecture impact, complex/risky changes, hard bugs — analyzes first, then implements |
 | `technical-writer` | Externe Doku: API-Referenz, Getting-Started, SDK-Docs, Tutorials, CLI-Help, User-Release-Notes, Microcopy — für externe Entwickler und Endnutzer |
+| `test-executor` | Run existing test suites and report structured results — no test design, no code changes |
 | `tester` | Write tests (TDD), run the test suite, ensure coverage |
 | `ui-ux-designer` | UI specification, mockup creation, and design-system definition — specifies, does not implement. |
 | `validator` | Internal quality checker: DoD checklist, traceability audit. Invoked by the orchestrator after implementation. Not for direct user questions or setup help. |

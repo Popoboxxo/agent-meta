@@ -58,9 +58,9 @@ def test_resolve_active_plugins_agrees_with_generation_layer():
     root = REPO_ROOT  # unused by the mocked loaders
 
     with mock.patch.object(plugins, "load_plugin_catalog", return_value=catalog), \
-         mock.patch("lib.mcp_registry.load_mcp_registry",
+         mock.patch("lib.registry_query.load_mcp_registry",
                     return_value={k: v for k, v in catalog.items() if v["kind"] == "mcp-server"}), \
-         mock.patch("lib.external_tools.load_external_tools_registry",
+         mock.patch("lib.registry_query.load_external_tools_registry",
                     return_value={k: v for k, v in catalog.items() if v["kind"] == "cli-tool"}):
         active = set(resolve_active_plugins(config, root, catalog=catalog))
         gen_mcp = set(resolve_active_mcp_servers(config, root))

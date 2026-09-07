@@ -7,6 +7,8 @@ re-introducing the historic agents ↔ config ↔ context import cycle
 (Issue #565):
 
   * Template substitution   — substitute(), strip_inactive_conditional_blocks()
+    (substitute() delegates its replacement pass to the shared escape-safe
+    core in substitution.py — issue #476)
   * Orchestrator-mode flags  — _resolve_orch_mode(), _orch_mode_flags()
 
 This module depends only on the neutral low-level layer (io, log) and the
@@ -20,8 +22,14 @@ import sys
 
 from .io import SyncError
 from .log import SyncLog
+from .substitution import substitute_placeholders
 
 _VALID_ORCH_MODES = {"strict", "advisory", "main-chat"}
+
+# {{VAR}} placeholder pattern for substitute() — uppercase names only, no
+# inner whitespace. Group 1 captures the name (contract of the shared
+# substitution core, issue #476).
+_VAR_PATTERN = re.compile(r"\{\{([A-Z0-9_]+)\}\}")
 
 
 def _resolve_orch_mode(orch_config: dict, provider_override: dict | None = None) -> str:
@@ -204,6 +212,11 @@ def substitute(
 
     Escape syntax: {{%VAR%}} renders as {{VAR}} without substitution (for literal docs).
 
+    The replacement pass delegates to the shared escape-safe substitution
+    core (scripts/lib/substitution.py, issue #476) — function replacement
+    keeps values verbatim, never interpreting backslashes or $-group
+    references as re.sub replacement escapes (issue #674).
+
     Args:
         strict: if True, raise SyncError on the first unknown placeholder
             instead of warning and leaving it unsubstituted. Escaped
@@ -221,15 +234,20 @@ def substitute(
 
     text = re.sub(r"\{\{%([A-Z0-9_]+)%\}\}", stash_escape, text)
 
-    # Second pass: substitute real {{VAR}} placeholders
-    def replacer(match):
-        key = match.group(1)
-        # PAL_* placeholders are handled by the delegation syntax engine,
-        # not by general substitution — skip silently.
+    # Second pass: substitute real {{VAR}} placeholders via the shared
+    # escape-safe core (issue #476). PAL_* placeholders are handled by the
+    # delegation syntax engine, not by general substitution — exempt them
+    # before the variables-dict check.
+    def lookup(key: str) -> str | None:
         if key.startswith("PAL_"):
-            return match.group(0)
+            return None
         if key in variables:
             return str(variables[key])
+        return None
+
+    def keep(matched: str, key: str) -> str:
+        if key.startswith("PAL_"):
+            return matched
         if strict:
             raise SyncError(
                 f"Unknown placeholder {{{{{key}}}}} in {source_label} — "
@@ -237,9 +255,9 @@ def substitute(
             )
         if log:
             log.warn(f"Variable {key} not in config — placeholder remains in: {source_label}")
-        return match.group(0)
+        return matched
 
-    text = re.sub(r"\{\{([A-Z0-9_]+)\}\}", replacer, text)
+    text = substitute_placeholders(text, _VAR_PATTERN, lookup, keep)
 
     # Third pass: restore escaped literals as {{VAR}} (no substitution happened)
     for i, name in enumerate(escaped):

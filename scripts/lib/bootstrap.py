@@ -16,10 +16,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-try:
-    import yaml
-except ImportError:
-    yaml = None  # type: ignore[assignment]
+from .io import load_yaml_file
 
 
 class BootstrapEngine:
@@ -34,15 +31,14 @@ class BootstrapEngine:
     @property
     def bootstrap_registry(self) -> dict[str, Any]:
         if self._bootstrap_registry is None:
-            path = self.config_dir / "provider-bootstrap.yaml"
-            try:
-                with open(path, encoding="utf-8") as f:
-                    if yaml is not None:
-                        self._bootstrap_registry = yaml.safe_load(f)
-                    else:
-                        self._bootstrap_registry = {}
-            except (FileNotFoundError, yaml.YAMLError):
-                self._bootstrap_registry = {}
+            # Canonical single-file loader (Issue #479), fail-soft: absent or
+            # malformed registry yields {} — same as the former hand-rolled
+            # loader (FileNotFoundError/yaml.YAMLError → {}).
+            self._bootstrap_registry = load_yaml_file(
+                self.config_dir / "provider-bootstrap.yaml",
+                on_error="default",
+                default={},
+            )
         return self._bootstrap_registry or {}
 
     def get_bootstrap_config(self, provider: str) -> dict[str, Any]:
@@ -159,7 +155,8 @@ class BootstrapEngine:
 
         if marker_begin in existing:
             pattern = re.compile(re.escape(marker_begin) + ".*?" + re.escape(marker_end), re.DOTALL)
-            new_content = pattern.sub(block, existing, count=1)
+            # Function replacement keeps the generated block verbatim (#674).
+            new_content = pattern.sub(lambda _m: block, existing, count=1)
         else:
             new_content = existing.rstrip("\n") + "\n\n" + block + "\n"
 
@@ -214,7 +211,8 @@ class BootstrapEngine:
                 re.escape(marker) + ".*?" + re.escape(marker_end),
                 re.DOTALL,
             )
-            new_content = pattern.sub(managed_block, existing, count=1)
+            # Function replacement keeps the generated block verbatim (#674).
+            new_content = pattern.sub(lambda _m: managed_block, existing, count=1)
         else:
             new_content = existing.rstrip("\n") + "\n\n" + managed_block + "\n"
 

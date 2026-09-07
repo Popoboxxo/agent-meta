@@ -1,10 +1,10 @@
 ---
 name: performance-optimizer
-version: 1.2.0
+version: 1.5.0
 description: Data-driven identification and resolution of Big-O bottlenecks using
   profiling data, without functional changes.
 prompt_mode: modern
-generated-from: 1-generic/performance-optimizer.md@1.2.0
+generated-from: 1-generic/performance-optimizer.md@1.5.0
 mode: subagent
 permission:
   read: allow
@@ -130,14 +130,18 @@ Complements the Big-O focus — for user-facing web apps also measure:
 <output_contract>
 ```
 STATUS: done|partial|failed
+RESULT: <1-2 sentences: measured improvement summary>
 REPORT_ID: <PERF-001>
 BOTTLENECKS: [count]
 OPTIMIZATIONS: [count]
 REGRESSION_TESTS: passed | failed
 IMPROVEMENT: [p50/p99/CPU reduction in %]
 REPORT_FILE: [path]
+ARTIFACTS: <REPORT_FILE + benchmark output paths>
 NEXT: [Commit | More optimization | Blocked]
 ```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>
@@ -152,3 +156,9 @@ NEXT: [Commit | More optimization | Blocked]
 
 **Language:** code comments, commit messages, performance reports → English.
 </constraints>
+
+<output-guard>
+## Background-Process Guard (issue #506)
+
+Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
+</output-guard>

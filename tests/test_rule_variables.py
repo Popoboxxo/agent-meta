@@ -9,7 +9,10 @@ REQUIRED_VARIABLES = {
         "{{#if DOD_REQ_TRACEABILITY}}",
         "{{#if DOD_TESTS_REQUIRED}}",
         "{{#if DOD_CODEBASE_OVERVIEW}}",
-        "{{#if DOD_SECURITY_AUDIT}}"
+        "{{#if DOD_SECURITY_AUDIT}}",
+        "{{#if DOD_AI_SECURITY_REVIEW}}",
+        "{{#if DOD_PROMPT_GOVERNANCE}}",
+        "{{#if DOD_LIFECYCLE_OWNERSHIP}}"
     ],
     "language.md": [
         "{{COMMUNICATION_LANGUAGE}}",

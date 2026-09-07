@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 
 from .report import Finding, Severity
+from ..io import load_yaml_file
 
 # Known built-in variables injected by sync.py / build_variables()
 _BUILTIN_VARS: frozenset[str] = frozenset({
@@ -20,6 +21,7 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     # DoD flags
     "DOD_REQ_TRACEABILITY", "DOD_TESTS_REQUIRED", "DOD_CODEBASE_OVERVIEW",
     "DOD_SECURITY_AUDIT", "DOD_PRESET",
+    "DOD_AI_SECURITY_REVIEW", "DOD_PROMPT_GOVERNANCE", "DOD_LIFECYCLE_OWNERSHIP",
     "DOD_SE_REQUIRED", "DOD_SE_OPTIONAL", "DOD_SE_RECOMMENDED", "DOD_SE_STRICT",
     # Language
     "DOCS_LANGUAGE", "INTERNAL_DOCS_LANGUAGE", "COMMUNICATION_LANGUAGE",
@@ -90,6 +92,10 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     "AGENT_DELEGATION_TABLE", "PROJECT_SPECIFIC_AGENTS",
     "PIPELINE_MATCH_TABLE", "INTENT_ROUTING_TABLE", "PIPELINE_DETAIL_BLOCKS",
     "PIPELINE_DETAILS_DIR",
+    # Structured intent-routing tool definition, resolved per provider in
+    # agent_sync._build_provider_vars from build_variables' provider-mapped
+    # prerender (issue #264)
+    "INTENT_ROUTING_TOOLS",
     # Paths
     "AGENTS_DIR",
     # Release / plugin packaging
@@ -157,15 +163,13 @@ def check_placeholders(path: Path, content: str, agent_meta_root: Path,
 
 
 def load_project_vars(agent_meta_root: Path) -> set[str]:
-    """Load variable names from .meta-config/project.yaml variables section."""
+    """Load variable names from .meta-config/project.yaml variables section.
+
+    Canonical single-file loader (Issue #479), fail-soft: absent/malformed
+    file or missing PyYAML yields no variables (former broad-except behavior).
+    """
     config_path = agent_meta_root / ".meta-config" / "project.yaml"
-    if not config_path.exists():
-        return set()
-    try:
-        import yaml
-        data = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
-    except (ImportError, Exception):  # noqa: BLE001
-        return set()
+    data = load_yaml_file(config_path, on_error="default", default={})
     return set((data.get("variables") or {}).keys())
 
 

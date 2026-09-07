@@ -135,11 +135,13 @@ _SAMPLE_AGENTS = [
 
 
 def test_agents_table_full_render_keeps_legacy_layout_byte_for_byte():
-    # Legacy layout: blank line between rows, full description column.
+    # Legacy layout: blank line between rows. #540 Fix 1 unified the
+    # DESCRIPTION column to 1-3 keywords in BOTH modes (derive_keywords);
+    # the layout difference (blank-line separation vs dense rows) remains.
     legacy = ("| Agent | Core Capabilities |\n"
               "|-------|-------------------|\n"
-              "\n| `alpha` | Erstes Tool, zweites Feature, drittes Ding, viertes |\n"
-              "\n| `beta` | Zweites Agent kurz |\n\n")
+              "\n| `alpha` | Erstes Tool, zweites Feature, drittes Ding |\n"
+              "\n| `beta` | Zweites Agent |\n\n")
     builder = TemplateBuilder(REPO_ROOT / "templates" / "context")
     body = _agents_table_body()
     rendered = builder.resolve_conditionals(
@@ -147,6 +149,7 @@ def test_agents_table_full_render_keeps_legacy_layout_byte_for_byte():
         {"COMPACT_MODE": "false"},
     )
     assert rendered == legacy
+    assert "kurz" not in rendered  # full description must not leak (Fix 1)
 
 
 def test_agents_table_compact_render_is_dense_with_keywords():
@@ -374,13 +377,17 @@ def test_full_render_is_larger_than_compact_render(seeded_project, tmp_path):
     # Compression is real: rendering the SAME seed in full vs compact mode must
     # yield a strictly larger full output. Mode-independent (does not compare to
     # the committed file, which is itself compact now).
+    # Post-#192 calibration: the big compression moved to the file channel
+    # (rules + MCP/tool sections leave BOTH modes' blocks), so the remaining
+    # mode delta is table layout + knowledge/build density — hence 1.2, not
+    # the pre-#192 1.3.
     full = _render_context("full", seeded_project)
     compact_seed = tmp_path / "AGENTS.md"
     shutil.copy(REPO_ROOT / "AGENTS.md", compact_seed)
     compact = _render_context("compact", tmp_path)
-    # Full carries the OVERVIEW mass the paper flags as discoverable; the delta
-    # is the whole point of #540.
-    assert len(full.splitlines()) > len(compact.splitlines()) * 1.3
+    # Full carries the layout/density mass the paper flags as non-instruction;
+    # the delta must stay positive and meaningful.
+    assert len(full.splitlines()) > len(compact.splitlines()) * 1.2
 
 
 def test_compact_mode_shrinks_and_preserves_mandatory_anchors(seeded_project, tmp_path):
@@ -391,14 +398,12 @@ def test_compact_mode_shrinks_and_preserves_mandatory_anchors(seeded_project, tm
     compact = _render_context("compact", tmp_path)
     lines = compact.splitlines()
 
-    # Compact must shrink substantially vs the full render of the same seed.
-    # Realistic floor (~570 lines) is well ABOVE the plan's <400/<200 stretch
-    # goals: Opencode declares has_rules:false, so ~300 lines of embedded
-    # INSTRUCTION (14 generic rule bodies + MCP allowed/blocked tool lists) can
-    # never leave AGENTS.md without semantic loss. The threshold reflects that
-    # measured floor honestly rather than a goal retrofit — see
-    # docs/plans/issue-540-baseline.md Iteration 2.
-    assert len(full_lines) > len(lines) * 1.3
+    # Compact must shrink vs the full render of the same seed. Post-#192
+    # calibration: the big compression moved to the file channel (rules +
+    # MCP/tool sections leave BOTH modes), so the mode delta is table layout,
+    # knowledge and build density only — hence 1.2, not the pre-#192 1.3. The
+    # hard size guarantee now lives in the block-budget ratchet below.
+    assert len(full_lines) > len(lines) * 1.2
 
     for anchor in _MANDATORY_ANCHORS:
         assert anchor in compact, f"mandatory anchor missing in compact render: {anchor}"
@@ -407,18 +412,26 @@ def test_compact_mode_shrinks_and_preserves_mandatory_anchors(seeded_project, tm
     for overview in ("## Architektur", "## Tech-Stack", "## Build & Development"):
         assert overview not in compact, f"overview still present: {overview}"
 
-    # Issue #546 value retention: compact no longer DELETES stack/build/entry —
-    # it keeps them as dense inline lines (lossless density, not lossy pointers).
-    assert "> Stack: Python 3.x" in compact                    # RUNTIME value
+    # Issue #546 value retention, revised by #437 (derivable content): the
+    # stack VALUE line is derivable from the project manifests and is now a
+    # pointer; build/test commands are instructions and stay as dense values.
+    assert "Runtime & Abhängigkeiten: siehe Projekt-Manifest" in compact   # #437 pointer
     assert "> Build: `python scripts/sync.py`" in compact       # BUILD_COMMAND value
     assert "`python3 scripts/sync.py --validate`" in compact    # TEST_COMMAND value
     assert "**Entry-Point:** `scripts/sync.py — Haupt-CLI" in compact  # ENTRY_POINT_PATTERN
     assert "**Besondere Patterns:**" in compact                 # KEY_PATTERNS section
-    assert "> Struktur: `.meta-config/project.yaml`" in compact # PROJECT_STRUCTURE pointer
+    assert "> Struktur: siehe Verzeichnisstruktur im Repo" in compact  # #437 pointer
 
-    # MCP sections collapsed to listen-only.
+    # MCP/tool sections left the block entirely (#192 Phase 2 file channel):
+    # only the embedded mcp-guardrails one-liners stay always-on; the full
+    # per-server sections live in the separate SKILL.md files.
     assert "## Agent-Hinweise" not in compact
-    assert "**Verbindungstyp:** `sse` — Details: `config/mcp-registry.yaml`." in compact
+    assert "**Verbindungstyp:** `sse` — Details: `config/mcp-registry.yaml`." not in compact
+    assert "# MCP Hard Prohibitions" in compact
+    assert "- **playwright:** `browser_run_code_unsafe`" in compact  # one-liner stays
+    assert "## Erlaubte Tools" not in compact  # full per-server lists are lazy
+    # Pointer to the lazy channel is present.
+    assert "## Übrige Regeln (Lazy-Load)" in compact
 
     # Directory uses dense keyword rows instead of blank-line-separated prose.
     assert "\n\n| `" not in compact
@@ -434,15 +447,37 @@ def test_compact_mode_shrinks_and_preserves_mandatory_anchors(seeded_project, tm
     assert "NICHT in der Runtime" in compact
     assert "define_subagent(name=" not in compact
 
-    # graphify section reduced to title + pointer lines.
+    # graphify section left the block via the file channel (#192 Phase 2);
+    # only the lazy pointer and the guardrails one-liners stay.
     assert "Beziehungsfragen. Bei Bedarf" not in compact
-    assert "Details/Registrierung: `config/external-tools-registry.yaml`." in compact
+    assert "Details/Registrierung: `config/external-tools-registry.yaml`." not in compact
 
 
 def test_compact_mode_render_is_idempotent(seeded_project):
     first = _render_context("compact", seeded_project)
     second = _render_context("compact", seeded_project)
     assert first == second
+
+
+def test_compact_managed_block_stays_within_progressive_disclosure_budget(seeded_project):
+    # Size ratchet for issues #192 Phase 2 + #540 Fix 1: with this repo's own
+    # config (lazy preset, all AGENTS.md sharers having a skills_dir), the
+    # compact managed block MUST stay within the progressive-disclosure
+    # budget. Current measured state: 208 lines (core rules ~122 + agent
+    # directory ~59 + scaffold). Headroom absorbs one more active MCP server
+    # (guardrails one-liner) or a new core rule — a REGRESSION beyond this
+    # budget means non-embedded content leaked back into the block.
+    compact = _render_context("compact", seeded_project)
+    begin = compact.index("<!-- agent-meta:managed-begin -->")
+    end = compact.index("<!-- agent-meta:managed-end -->")
+    block_lines = compact[begin:end].count("\n")
+    assert block_lines <= 220, (
+        f"compact managed block grew to {block_lines} lines (budget 220) — "
+        "content leaked back into the always-on block instead of the file channel"
+    )
+    # And the always-on MCP hard prohibitions stay present as one-liners.
+    assert "# MCP Hard Prohibitions" in compact
+    assert "- **honcho:**" in compact
 
 
 # ---------------------------------------------------------------------------
@@ -487,28 +522,32 @@ def test_540_d3b_compact_claude_renders_managed_block_without_placeholders(tmp_p
     assert "{{" not in block and "}}" not in block
 
 
-def test_540_d3b_opencode_compact_embeds_rules_inline_rather_than_separating(
-        seeded_project):
-    # Compact×Opencode leg of the provider matrix (issue #540 plan D3b).
-    # Opencode declares has_rules:false — rules MUST stay embedded in
-    # AGENTS.md (in compact form), never fall back to a native rules dir or
-    # the pointer-only separation variant used by has_rules providers.
+def test_540_d3b_opencode_core_rules_inline_mcp_sections_lazy(seeded_project):
+    # Compact×Opencode leg of the provider matrix (issue #540 plan D3b,
+    # revised by #192 Phase 2). Opencode declares has_rules:false — CORE
+    # rules (always-on instruction payload: branch-guard, commit-conventions,
+    # language, use-orchestrator, mcp-guardrails) MUST stay embedded in
+    # AGENTS.md verbatim; rules flagged embed:false/channel:skill AND the
+    # per-server MCP/tool sections leave the block via the #192 file channel
+    # (every AGENTS.md sharer has a skills_dir).
     compact = _render_context("compact", seeded_project)
 
-    # Embedded rule bodies survive inline (instruction anchors are real
+    # Embedded core rule bodies survive inline (instruction anchors are real
     # rule-file content, not pointers).
     assert "# Branch-Guard" in compact
     assert "Verwende Conventional Commits (feat, fix, chore)." in compact
     assert "## Regeln" in compact
 
-    # The separation pointer (used when rules live natively per provider)
-    # must NOT appear.
+    # The rules-pointer variant (used when rules live natively per provider)
+    # must NOT appear — Opencode has no native rules dir.
     assert "Alle Regeln werden nativ über den Provider-Rules-Mechanismus geladen." \
         not in compact
 
-    # Embeds arrive in their COMPACT form, not the full variant.
-    assert "**Verbindungstyp:** `sse` — Details: `config/mcp-registry.yaml`." in compact
+    # MCP/tool sections are lazy now: the per-server full variant is gone
+    # from the block; the always-on guardrails one-liners remain.
+    assert "**Verbindungstyp:** `sse` — Details: `config/mcp-registry.yaml`." not in compact
     assert "## Agent-Hinweise" not in compact
+    assert "# MCP Hard Prohibitions" in compact
 
 
 # ---------------------------------------------------------------------------
@@ -616,26 +655,60 @@ def test_540_compact_native_rules_providers_keep_platform_rules_full(provider, t
         )
 
 
-def test_540_compact_opencode_embeds_platform_rules_compacted(seeded_project):
-    # The has_rules:false counterpart: Opencode embeds the three platform rules
-    # in AGENTS.md, and there they MUST arrive compacted — INSTRUCTION anchors
-    # kept, OVERVIEW sections replaced by a pointer line.
+def test_540_compact_opencode_separates_platform_rules_via_file_channel(
+        seeded_project, tmp_path):
+    # Issue #192 Phase 2 (selective rule embedding) revised contract: the
+    # platform rules (sync-interface, architecture, conventions, admin-ui)
+    # are channel: skill in the lazy preset — with the whole AGENTS.md sharer
+    # group having a skills_dir (config/ai-providers.yaml), they leave the
+    # managed block entirely and render as separate SKILL.md files instead.
+    # The block keeps only the one-line pointer (progressive disclosure).
+    import sys
+
+    scripts_dir = str(REPO_ROOT / "scripts")
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    from lib.log import SyncLog
+    from lib.providers import load_providers_config as _load_providers
+    from lib.rules import sync_embedded_rule_files
+
     compact = _render_context("compact", seeded_project)
 
-    # INSTRUCTION anchors survive verbatim.
-    assert "## Branch-Guard-Erweiterung für agent-meta" in compact  # sync-interface
-    assert "## Abhängigkeitsprinzip" in compact                     # architecture
-    assert "## Hard Invariants" in compact                          # conventions
-    assert "## Host-Bindung + Token-Regeln" in compact              # admin-ui
+    # The managed block carries the pointer, not the rule bodies: neither the
+    # INSTRUCTION anchors nor the OVERVIEW sections of the platform rules may
+    # appear in AGENTS.md anymore.
+    assert "## Übrige Regeln (Lazy-Load)" in compact
+    assert "{{SKILLS_DIR}}" not in compact  # pointer resolves to real paths
+    for gone_anchor in (
+        "## Branch-Guard-Erweiterung für agent-meta",   # sync-interface
+        "## Abhängigkeitsprinzip",                      # architecture
+        "## Hard Invariants",                           # conventions
+        "## Host-Bindung + Token-Regeln",               # admin-ui
+    ):
+        assert gone_anchor not in compact, (
+            f"platform rule still embedded in AGENTS.md: {gone_anchor}"
+        )
 
-    # OVERVIEW sections are gone.
-    assert "## Neue Funktionen: Smart Context Regeneration" not in compact
-    assert "## Schichten-Modell" not in compact
-    assert "## Change Checklist" not in compact
-    assert "## Troubleshooting" not in compact                      # admin-ui
+    # The separate-file channel renders the rules for Opencode into
+    # .opencode/skills/<name>/SKILL.md — INSTRUCTION anchors survive there
+    # (the anchors live in the rules' `keep` sections, compact_embedded_rule).
+    from lib.config import build_variables
 
-    # Pointer lines to the full references are present.
-    assert "`.claude/skills/sync-interface/SKILL.md`" in compact
-    assert "`docs/architecture/01-layer-model.md`" in compact
-    assert "`.claude/skills/conventions/SKILL.md`" in compact
-    assert "`.claude/skills/admin-ui/SKILL.md`" in compact
+    config = load_config(REPO_ROOT / ".meta-config" / "project.yaml")
+    variables, _ = build_variables(config, REPO_ROOT)
+    sync_embedded_rule_files(
+        REPO_ROOT, tmp_path, config, SyncLog(), dry_run=False,
+        variables=variables, provider="Opencode",
+        provider_config=_load_providers(REPO_ROOT),
+    )
+    for name, anchor in (
+        ("sync-interface", "## Branch-Guard-Erweiterung für agent-meta"),
+        ("architecture", "## Abhängigkeitsprinzip"),
+        ("conventions", "## Hard Invariants"),
+        ("admin-ui", "## Host-Bindung + Token-Regeln"),
+    ):
+        skill = tmp_path / ".opencode" / "skills" / name / "SKILL.md"
+        assert skill.exists(), f"{name}: separate SKILL.md not rendered for Opencode"
+        assert anchor in skill.read_text(encoding="utf-8"), (
+            f"{name}: INSTRUCTION anchor lost in separate file"
+        )

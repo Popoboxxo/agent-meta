@@ -519,7 +519,7 @@ def test_discover_models_does_not_overwrite_on_empty_result(tmp_path, monkeypatc
     # Should return existing registry unchanged
     assert len(result.get("models", [])) == 20
     # Registry file should still have 20 models
-    on_disk = json.loads(registry_file.read_text())
+    on_disk = json.loads(registry_file.read_text(encoding="utf-8"))
     assert len(on_disk.get("models", [])) == 20
 
 

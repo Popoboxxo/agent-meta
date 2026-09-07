@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .frontmatter import collect_sources, extract_frontmatter_field
-from .io import SyncError, write_checked
+from .io import SyncError, _load_yaml_or_json, write_checked
 from .log import SyncLog
 from .providers import load_providers_config
 from .roles import resolve_model
@@ -116,9 +116,10 @@ def build_agent_hierarchy(agent_meta_root: Path, project_root: Path, config: dic
 
 def _infer_tier(role: str, config: dict) -> str:
     """Inferiere workflow_tier aus role-defaults.yaml oder Config."""
-    # Versuche role-defaults.yaml zu laden
+    # Versuche role-defaults.yaml zu laden (_load_yaml_or_json is imported at
+    # module top level — the lazy import was vestigial; io does not import
+    # viz, Issue #478 cleanup).
     try:
-        from .io import _load_yaml_or_json
         agent_meta_root = Path(__file__).resolve().parent.parent.parent
         defaults_path = agent_meta_root / "config" / "role-defaults.yaml"
         if defaults_path.exists():

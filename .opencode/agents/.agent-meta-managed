@@ -5,7 +5,9 @@ api-specialist.md
 bug-feature-analyzer.md
 claude-expert.md
 code-reviewer.md
+concept-architect.md
 concept-reviewer.md
+concept-specifier.md
 continue-expert.md
 copilot-expert.md
 data-engineer.md
@@ -48,6 +50,7 @@ release.md
 requirements.md
 senior-developer.md
 technical-writer.md
+test-executor.md
 tester.md
 ui-ux-designer.md
 validator.md

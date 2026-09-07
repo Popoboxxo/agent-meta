@@ -144,6 +144,10 @@ gitignore:
   local: true       # persönliche/lokale Dateien gitignoren (.claude/settings.local.json, sync.log, etc.)
   generated: false  # generierte Ordner (.claude/agents/, etc.) in .gitignore aufnehmen (false = im Git committen)
   settings: false   # Provider-Settings (settings.json, GEMINI.md, etc.) gitignoren
+  # Ganze Provider-Verzeichnisse (.claude/, .gemini/, ...) statt Sub-Pfaden gitignoren
+  # (issue #557). Redundante Sub-Pfade innerhalb der Wurzeln entfallen; Repo-Root-Dateien
+  # (sync.log, CLAUDE.personal.md, opencode.json) bleiben wie bisher.
+  ignore-provider-dirs: false
 
 # Generierte Provider-Contextfiles (CLAUDE.md, AGENTS.md, ...) steuern
 # / Control generated provider context files (issue #540):
@@ -153,6 +157,16 @@ context_file:
   #   "compact" = instruktions-erhaltende Komprimierung; Overview-/Referenz-Fläche
   #               wird durch Pointer ersetzt. Fehlender Key → immer "full" (Safe-Side).
   mode: full
+
+  # Context-Files (CLAUDE.md/AGENTS.md & Co.) von sync.py generieren und bei
+  # jedem Sync auffrischen (Default: true — bestehendes Verhalten).
+  # false = "Dev-written"-Modus (Issue #540 Fix 3, Evidence arXiv:2602.11988:
+  # handgeschriebene Context-Files schlagen generierte): sync.py lässt Header
+  # UND Managed Block komplett unangetastet. Agenten-/Regel-/Skill-Sync ist
+  # davon nicht betroffen. Hinweis: agent-meta generiert Context-Content nie
+  # per LLM — ausschliesslich template-basiert (Fix 5 damit per Architektur
+  # erfüllt); der Schalter steuert nur template-basiertes Überschreiben.
+  auto_generate: true
 
   # Weiches Zeilen-Limit: Der Konsistenz-Check warnt (kein Fehler), wenn ein
   # generiertes Contextfile diese Zeilenzahl überschreitet.

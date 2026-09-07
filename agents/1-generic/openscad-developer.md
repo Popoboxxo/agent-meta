@@ -1,6 +1,6 @@
 ---
 name: template-openscad-developer
-version: "1.1.3"
+version: "1.4.0"
 description: "Specialized developer for parametric 3D models in OpenSCAD. Render-Inspect-Refine loop via MCP, printability knowledge, tolerance management."
 hint: "Generate OpenSCAD code: parametric 3D models, render feedback, STL export, print optimization"
 prompt_mode: modern
@@ -89,12 +89,16 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 <output_contract>
 ```
 STATUS: done|partial|failed
+RESULT: <1-2 sentences: model outcome + dimension check>
 SCAD_FILE: <path>
 STL_FILE: <path>
 DIMENSIONS: [<length>, <width>, <height>] in mm
 ITERATIONS: <n>
+ARTIFACTS: <SCAD/STL file paths>
 NOTES: [print recommendations, material, settings]
 ```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>
@@ -107,3 +111,9 @@ NOTES: [print recommendations, material, settings]
 
 **Language:** OpenSCAD code in English, user communication in user language.
 </constraints>
+
+<output-guard>
+## Background-Process Guard (issue #506)
+
+Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
+</output-guard>

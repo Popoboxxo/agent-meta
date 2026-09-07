@@ -3,11 +3,14 @@
 The bulk of the former agents.py was split (Issue #561) into the neutral
 frontmatter layer, the provider_transform formatting layer and the agent_sync
 orchestration layer. This module keeps only the config/context-facing hint
-builders (build_agent_hints/build_agent_table/build_knowledge_engine_hints).
+builders (build_agent_hints/build_agent_table/build_knowledge_engine_hints)
+plus the structured intent-routing tool-definition generators (issue #264).
 """
 from __future__ import annotations
 
+import json
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .frontmatter import (
     _is_role_enabled,
@@ -15,6 +18,37 @@ from .frontmatter import (
     extract_frontmatter_field,
     target_filename,
 )
+
+if TYPE_CHECKING:
+    from .delegation_syntax import DelegationSyntaxEngine
+
+try:
+    import yaml as _yaml  # only used by the yaml_text_block serializer
+except ImportError:  # pragma: no cover — mirrors io.py/frontmatter.py loader guards
+    _yaml = None
+
+# Native function-calling tool name for intent routing (issue #264). The
+# orchestrator dispatches through the harness's own subagent tool; this
+# definition is the structured routing contract consumed per provider format
+# (handoff_format mechanism key from config/provider-capabilities.yaml).
+ROUTING_TOOL_NAME = "route_intent"
+
+# Static, deterministic tool description (English — code artifact convention).
+# Provider-agnostic by design: it names no harness tool and no provider.
+_ROUTING_TOOL_DESCRIPTION = (
+    "Resolve a user request to a dispatch target before delegating. Prefer a "
+    "pipeline route when the intent matches a pipeline's signal_keywords. "
+    "Otherwise match the intent against the routing rules (keywords, example "
+    "phrases) and return the best-fitting target_agent. Never dispatch to "
+    "yourself; orchestrator_only targets require the escalation gate."
+)
+
+# Known serialization formats, keyed exactly like the existing
+# handoff_format mechanism key in config/provider-capabilities.yaml
+# ("json" | "yaml_text_block"). Adding a format = one key here + a branch in
+# render_routing_tool_definition() + config change — never a provider-name
+# branch (provider-agnostic policy).
+_TOOL_FORMAT_KEYS = frozenset({"json", "yaml_text_block"})
 
 
 def build_knowledge_engine_hints(config: dict, compact: bool = False) -> str:
@@ -174,3 +208,173 @@ def build_agent_table(config: dict, agent_meta_root: Path) -> tuple[str, list[st
 
     header = "| Agent | Quelle | Layer |\n|-------|--------|-------|"
     return header + "\n" + "\n".join(rows), unmapped
+
+
+# ---------------------------------------------------------------------------
+# Structured intent-routing tool definitions (issue #264)
+# ---------------------------------------------------------------------------
+#
+# Generation-side replacement for the orchestrator prompt's prose routing
+# tables. Data layer: delegation_table.get_routing_rules() (same activation
+# filters as the existing tables). Emission layer (below): provider-neutral
+# tool definition → per-format serialization via a mechanism-key dispatch
+# table ("json" | "yaml_text_block" — the same keys the existing
+# handoff_format capability uses). No provider names appear anywhere in code.
+
+def build_routing_tool_definition(
+    agent_meta_root: Path,
+    config: dict,
+    variables: dict,
+    pipelines: dict | None = None,
+) -> dict:
+    """Build the provider-neutral intent-routing tool definition (issue #264).
+
+    Args:
+        agent_meta_root: agent-meta source root (for config/role-defaults.yaml).
+        config: loaded project.yaml dict (``roles`` whitelist, read-only).
+        variables: build-time variables (SE_ENABLED/VALIDATOR_ENABLED/
+            KNOWLEDGE_ENGINE_ENABLED/DEVELOPER_TIERS_ENABLED gates).
+        pipelines: effective quality-pipelines dict (same object the
+            INTENT_ROUTING_TABLE builder receives) — pipelines with
+            signal_keywords become structured pipeline routes.
+
+    Returns:
+        A JSON-serializable dict with two members:
+
+        - ``tool``: the native function-calling definition —
+          ``{"name", "description", "input_schema"}`` where
+          ``input_schema.properties.target_agent.enum`` lists every active
+          non-orchestrator role (the structured replacement for the prose
+          routing table's role column).
+        - ``routing``: the embedded routing knowledge —
+          ``{"rules": [<per-role rule dicts>], "pipelines": [<signal-keyword
+          route dicts>]}`` (see :func:`delegation_table.get_routing_rules`).
+
+        Deterministic: sorted roles/pipelines, no timestamps — two calls over
+        unchanged config produce equal dicts (idempotent output guarantee).
+    """
+    # Lazy import — keeps agents.py import-light.
+    from .delegation_table import get_routing_rules
+
+    rules_data = get_routing_rules(agent_meta_root, config, variables, pipelines=pipelines)
+    return {
+        "tool": {
+            "name": ROUTING_TOOL_NAME,
+            "description": _ROUTING_TOOL_DESCRIPTION,
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "intent": {
+                        "type": "string",
+                        "description": "Verbatim user request or task line.",
+                    },
+                    "target_agent": {
+                        "type": "string",
+                        "enum": rules_data["target_agents"],
+                        "description": (
+                            "Active agent role to dispatch to (orchestrator "
+                            "excluded: self-dispatch is forbidden)."
+                        ),
+                    },
+                    "matched_rule": {
+                        "type": "string",
+                        "description": (
+                            "Optional provenance: the matched keyword, example "
+                            "phrase, or pipeline route."
+                        ),
+                    },
+                },
+                "required": ["intent", "target_agent"],
+            },
+        },
+        "routing": {
+            "rules": rules_data["rules"],
+            "pipelines": rules_data["pipelines"],
+        },
+    }
+
+
+def render_routing_tool_definition(definition: dict, tool_format: str) -> str:
+    """Serialize a routing tool definition in a provider's native format.
+
+    Format dispatch is mechanism-keyed: ``tool_format`` uses the same value
+    domain as the existing ``handoff_format`` capability key in
+    ``config/provider-capabilities.yaml`` — ``"json"`` for providers with
+    native tool-call envelopes, ``"yaml_text_block"`` for text-mention
+    providers. Known-key validation is fail-closed (mechanism-key precedent,
+    see docs/spikes/2026-09-06-issue-265-async-fanout-spike.md §5.1).
+
+    Args:
+        definition: dict from :func:`build_routing_tool_definition`.
+        tool_format: mechanism key — ``"json"`` or ``"yaml_text_block"``.
+
+    Returns:
+        The serialized artifact as text (trailing newline for ``json``).
+
+    Raises:
+        ValueError: on an unknown format key (never silently falsifies a
+            provider's format); the message lists known keys only.
+    """
+    if tool_format == "json":
+        return json.dumps(definition, indent=2, ensure_ascii=False) + "\n"
+    if tool_format == "yaml_text_block":
+        if _yaml is None:
+            raise ValueError(
+                "tool_format 'yaml_text_block' requires PyYAML "
+                "(pip install pyyaml)"
+            )
+        return _yaml.safe_dump(
+            definition,
+            allow_unicode=True,
+            sort_keys=False,
+            default_flow_style=False,
+            width=100,
+        )
+    raise ValueError(
+        f"Unknown routing tool format '{tool_format}' — known formats: "
+        f"{', '.join(sorted(_TOOL_FORMAT_KEYS))}"
+    )
+
+
+def build_routing_tool_definitions_for_providers(
+    agent_meta_root: Path,
+    config: dict,
+    variables: dict,
+    providers: list[str],
+    pipelines: dict | None = None,
+    syntax_engine: DelegationSyntaxEngine | None = None,
+) -> dict[str, str]:
+    """Render the routing tool definition once per provider, in its format.
+
+    The format is read from each provider's existing ``handoff_format``
+    capability key (config/provider-capabilities.yaml) via
+    :class:`delegation_syntax.DelegationSyntaxEngine` — config-driven, no
+    provider-name branch. Providers with an empty/absent ``handoff_format``
+    get an empty string (same fail-soft semantics as the PAL engine's
+    missing-definition placeholders; drift detection is the later
+    consistency-check step's job).
+
+    Args:
+        agent_meta_root, config, variables, pipelines: as in
+            :func:`build_routing_tool_definition` (built exactly once).
+        providers: provider registry keys to render for.
+        syntax_engine: optional pre-built engine (reused to avoid re-parsing
+            the capability registry per caller).
+
+    Returns:
+        ``{provider: rendered artifact or ""}``.
+    """
+    from .delegation_syntax import DelegationSyntaxEngine  # lazy import
+
+    engine = syntax_engine or DelegationSyntaxEngine()
+    definition = build_routing_tool_definition(
+        agent_meta_root, config, variables, pipelines=pipelines
+    )
+    rendered: dict[str, str] = {}
+    for provider in providers:
+        caps = engine.get_capabilities(provider)
+        tool_format = str(caps.get("handoff_format") or "")
+        rendered[provider] = (
+            render_routing_tool_definition(definition, tool_format) if tool_format else ""
+        )
+    return rendered

@@ -1,6 +1,6 @@
 ---
 name: template-knowledge-linter
-version: "1.0.0"
+version: "1.2.0"
 description: "Wiki-Gesundheitscheck: Widersprüche, Orphans, veraltete Claims, kaputte Links, fehlende OKF-Frontmatter, Index-Staleness."
 hint: "Wiki-Healthcheck: 10 Lint-Checks (Karpathy + OKF)"
 tools:
@@ -51,7 +51,7 @@ Lint-Reports sind Markdown, ein Abschnitt pro Check-Kategorie mit Severity-Kennz
 ## A2A Handoff — Eingehende Tasks
 
 Tasks können als A2A-Envelope (JSON) ankommen. Extrahiere `payload.t`, `ctx`, `con[]`, `refs[]`, `pri`.
-Dein `output_contract` ist `knowledge-lint-v1` — an `knowledge-gardener` (mechanische Findings) oder `knowledge-ingestor` (inhaltliche Findings) weiterreichen.
+Dein Delegations-Payload ist `knowledge-lint-v1` — an `knowledge-gardener` (mechanische Findings) oder `knowledge-ingestor` (inhaltliche Findings) weiterreichen.
 
 {{/if}}
 ## Don'ts
@@ -60,6 +60,16 @@ Dein `output_contract` ist `knowledge-lint-v1` — an `knowledge-gardener` (mech
 - KEINEN Check auslassen — alle 10 laufen bei jedem vollständigen Lint-Lauf
 - KEINE CRITICAL-Findings (#7) ignorieren oder verzögern
 {{EXTRA_DONTS}}
+
+<output_contract>
+```
+STATUS: done|partial|failed
+RESULT: <1-2 Sätze: Wiki-Gesundheitszustand und schwerwiegendster Befund>
+ARTIFACTS: <persistierte Lint-Report-Pfade, sonst leer>
+```
+**Pflicht-Abschluss-Summary (Issue #267):** der strukturierte Block oben ist dein kompletter Rückgabewert — der Orchestrator konsumiert nur dieses Summary, niemals Roh-Output. RESULT: kompaktes Summary (max. 2-3 Sätze) mit was geändert wurde, Erfolg/Misserfolg und dem nächsten Schritt. Roh-Output, Diffs und Logs gehören nie in RESULT — die gehören in ARTIFACTS (Dateipfade).
+
+</output_contract>
 
 ## Anti-Recursion Guard
 

@@ -1,6 +1,6 @@
 ---
 name: ideation
-version: 1.8.0
+version: 1.11.0
 description: Use when an idea needs scoping and thoughts need sorting before a concept
   or REQ exists.
 hint: Nutze ideation zum Scopen einer rohen Idee, bevor ein Konzept oder REQ existiert.
@@ -13,7 +13,7 @@ tools:
 - WebFetch
 - WebSearch
 - TodoWrite
-generated-from: 1-generic/ideation.md@1.8.0
+generated-from: 1-generic/ideation.md@1.11.0
 model: claude-sonnet-5
 ---
 
@@ -47,16 +47,23 @@ Research: How do others solve this? Approach A vs. B trade-offs. `WebSearch`/`We
 
 ## 4. Sort & structure
 
+**Concept skeleton (issue #370)** — every concept artifact follows this structure:
+
 ```
 Core idea:       [one-sentence description]
 Goal:            [What changes for whom?]
+Problem:         [What hurts today? What is the trigger?]
+Solution:        [How is it solved? 2-4 sentences]
 Scope v1:        [What does it minimally need?]
 Scope v2+:       [What comes later?]
+Alternatives:    [Which approaches were considered? Why rejected — 1 line each]
+Effort:          [Rough estimate on the task-size scale: S/M/L/XL]
 Open questions:  [What is still unclear?]
 Risks:           [What could become problematic?]
 ```
 
-Artifact: `concept-<topic>.md`.
+Artifact: `concept-<topic>.md` — built strictly from the skeleton above; the
+effort estimate (S/M/L/XL) feeds the orchestrator's task-size routing.
 
 ## 5. Hand off to Requirements
 
@@ -98,6 +105,10 @@ When the core idea is clear, scope v1 is defined and no blocker questions remain
 
 <output_contract>
 ```
+STATUS: done|partial|failed
+RESULT: <concept name + maturity in 1 sentence>
+ARTIFACTS: <persisted concept file path, empty if returned inline>
+
 ## Ideation handoff
 **Concept name:** <topic>
 **Maturity:** raw | sketched | structured
@@ -109,9 +120,20 @@ When the core idea is clear, scope v1 is defined and no blocker questions remain
 ### Goal + Scope v1
 ...
 
+### Problem + Solution
+<what hurts today · how it is solved>
+
+### Alternatives + Effort
+<rejected approaches, 1 line each · Effort estimate: S/M/L/XL>
+
+### Risks
+<what could become problematic>
+
 ### Handoff
 On confirmation: A2A envelope to `requirements` (or `concept-reviewer` for a review loop).
 ```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>

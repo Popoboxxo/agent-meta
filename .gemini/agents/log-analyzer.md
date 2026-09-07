@@ -1,6 +1,6 @@
 ---
 name: log-analyzer
-version: 1.2.0
+version: 1.5.0
 description: 'Analyzes system and application logs: frequency clustering, severity
   classification (RFC 5424), root-cause hypotheses, and structured findings with delegation
   routing.'
@@ -15,7 +15,7 @@ tools:
 - WebSearch
 - WebFetch
 - TodoWrite
-generated-from: 1-generic/log-analyzer.md@1.2.0
+generated-from: 1-generic/log-analyzer.md@1.5.0
 model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -109,6 +109,10 @@ Only for unknown error codes / unclear root cause: `WebSearch`/`WebFetch`.
 
 <output_contract>
 ```
+STATUS: done|partial|failed
+RESULT: <1-2 sentence summary: total findings, highest severity, top pattern>
+ARTIFACTS: <persisted report path, empty if returned inline>
+
 ## Finding #N
 **Severity:** CRITICAL|HIGH|MEDIUM|LOW
 **Source:** <file:line or "copy-paste">
@@ -121,6 +125,8 @@ Only for unknown error codes / unclear root cause: `WebSearch`/`WebFetch`.
 ---
 **Summary:** total findings, highest severity, top-3 patterns
 ```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>
@@ -135,3 +141,9 @@ Only for unknown error codes / unclear root cause: `WebSearch`/`WebFetch`.
 
 **Language:** findings → Deutsch.
 </constraints>
+
+<output-guard>
+## Background-Process Guard (issue #506)
+
+Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
+</output-guard>

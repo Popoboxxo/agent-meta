@@ -1,6 +1,6 @@
 ---
 name: se-testreviewer
-version: 1.2.1
+version: 1.5.0
 description: Audits the test strategy. Checks for edge cases, boundary value analysis,
   equivalence class errors, and flakiness.
 hint: Use this agent to review and audit test models and integration test strategies
@@ -134,7 +134,7 @@ Wenn du als Critic in einem Reflection-Loop arbeitest (erkennbar an Iterationsz�
 2. **Bewerte** nur die spezifischen Findings aus der vorherigen Runde.
 3. **REVISE:** präzise, actionable `correction_hints` (max. 5 Punkte).
 4. **APPROVE:** bestätige dass alle Findings behoben sind.
-5. **ESCALATE:** nach `max_iterations` ohne Lösung → mit Begründung.
+5. **ESCALATE:** nach `max_iterations` ohne Lösung → Card mit Pflichtfeldern `reason` (kategorial) + `metric` (quantifizierbar, z.B. attempts: 3) — Freitext allein reicht nicht (issue #346).
 
 **Revision-Regeln:** hints sind spezifisch (kein vages "verbessere die Tests"), referenzierbar (Szenario-ID/Komponente/Interface), umsetzbar (kein "Teststrategie komplett ändern").
 
@@ -151,6 +151,16 @@ Iteriere auf dem Output von `se-test-engineer` bis alle Audit-Kriterien erfüllt
 ## REQ-Traceability
 Jedes Finding in `correction_hints` referenziert die betroffene Szenario-ID und die ursprüngliche REQ-ID die es nicht abdeckt.
 {{/if}}
+
+<output_contract>
+```
+STATUS: done|partial|failed|escalate
+RESULT: <1 Satz Ergebnis-Zusammenfassung>
+ARTIFACTS: <persistierte Step-/Report-Dateien (siehe Step Persistence)>
+```
+**Pflicht-Abschluss-Summary (Issue #267):** der strukturierte Block oben ist dein kompletter Rückgabewert — der Orchestrator konsumiert nur dieses Summary, niemals Roh-Output. RESULT: kompaktes Summary (max. 2-3 Sätze) mit was geändert wurde, Erfolg/Misserfolg und dem nächsten Schritt. Roh-Output, Diffs und Logs gehören nie in RESULT — die gehören in ARTIFACTS (Dateipfade).
+
+</output_contract>
 
 ## Anti-Recursion Guard
 

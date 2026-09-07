@@ -1,6 +1,6 @@
 ---
 name: se-developer
-version: 1.1.0
+version: 1.5.0
 description: Implements standard SE leaf nodes with multiple interfaces. Follows SE interface discipline and contract-first approach. Persists implementation output.
 hint: |
   Standard SE leaf node implementation. Handles multiple interfaces (2-4). Escalates cross-cutting or boundary-level leafs.
@@ -128,11 +128,14 @@ Escalate (`status: escalate`) when:
 ESCALATE
 leaf_id: <leaf identifier>
 req_id: <REQ-ID>
-reason: <single sentence describing the trigger>
+reason: <categorical: scope_violation | blast_radius_growth | repeated_failure | blocked_dependency> — <single sentence describing the trigger>
+metric: <quantifiable, e.g. interfaces: 6 > 4 | subsystems: 3 | attempts: 2>
 recommended_tier: se-senior-developer
 findings: <files inspected, interface analysis, root cause>
 partial_work: none | <what was changed and current state>
 ```
+
+`reason` (categorical) + `metric` (quantifiable) are MANDATORY (issue #346): a card without both is invalid — the orchestrator rejects the tier change and requests structured re-submission.
 
 ## De-Escalation
 
@@ -163,9 +166,12 @@ No envelope → execute the task normally.
 **Output (when returning to orchestrator):**
 ```
 STATUS: done|partial|failed|escalate
-SUMMARY: <one-sentence summary>
+RESULT: <one-sentence summary>
 FILES_CHANGED: <comma-separated list>
+ARTIFACTS: <step persistence files, empty if none>
 ```
+
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
 
 ## Don'ts
 
@@ -221,3 +227,9 @@ Communication and input language: see global rule `language.md`.
 
 - Code comments → {{CODE_LANGUAGE}}
 - Commit messages → {{CODE_LANGUAGE}}
+
+<output-guard>
+## Background-Process Guard (issue #506)
+
+Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
+</output-guard>

@@ -463,14 +463,15 @@ def run_orchestrator_routing_tests(report: TestReport):
 
     content.lower()
 
-    # Intent-Routing and Agent table are auto-generated from role-defaults.yaml.
-    # Verify the placeholders are present in the source template.
-    has_intent_routing_placeholder = "{{INTENT_ROUTING_TABLE}}" in content
+    # Intent routing is emitted as the structured route_intent tool definition
+    # (issue #264 consolidation) — the placeholder resolves per provider via
+    # handoff_format. Agent table is still auto-generated from role-defaults.yaml.
+    has_intent_routing_placeholder = "{{INTENT_ROUTING_TOOLS}}" in content
     report.add(TestResult(
         name="Orchestrator: Intent-Routing placeholder present",
         passed=has_intent_routing_placeholder,
-        details="{{INTENT_ROUTING_TABLE}} placeholder found" if has_intent_routing_placeholder
-        else "Missing {{INTENT_ROUTING_TABLE}} placeholder",
+        details="{{INTENT_ROUTING_TOOLS}} placeholder found" if has_intent_routing_placeholder
+        else "Missing {{INTENT_ROUTING_TOOLS}} placeholder",
     ))
 
     has_agent_table_placeholder = "{{AGENT_DELEGATION_TABLE}}" in content

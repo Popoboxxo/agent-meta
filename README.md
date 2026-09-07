@@ -117,7 +117,7 @@ mindmap
       External Skills
 ```
 
-## Agent Roster — 73 Generic Agents
+## Agent Roster — 74 Generic Agents
 
 ### Core Development (12 agents)
 
@@ -131,6 +131,7 @@ mindmap
 | **intern-developer** | nano | 1.0.0 | Easter-egg/gag agent: over-eager clueless intern, read-only and harmless — not for production |
 | **requirements** | balanced | 1.4.3 | Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md |
 | **tester** | balanced | 2.1.4 | Isolated unit tests with mocks/stubs (TDD workflow) |
+| **test-executor** | nano | 1.1.0 | Lightweight execution of existing test suites: pass/fail counts, exit codes, stdout excerpts — no test design (stays with `tester`), read+bash only |
 | **validator** | balanced | 4.1.1 | Formal DoD gatekeeper: checkbox audit, REQ-ID presence, commit conventions |
 | **code-reviewer** | powerful | 1.2.2 | Code health gatekeeper: Clean Code, SOLID, blast-radius analysis |
 | **documenter** | fast | 1.4.3 | Maintains CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md, conclusions |
@@ -349,6 +350,7 @@ The extensive documentation for Agent-Meta has been reorganized into the `docs/`
 - Setup, CI integration, feature guides, and reflection loops.
 - MCP configurations and quality pipelines.
 - **[Project Instantiation](docs/guides/setup/instantiate-project.md)**: Set up a new project from agent-meta — multi-provider config plus HACS platform preset activation and the release-naming best practice.
+- **[MCP Onboarding Checklist](docs/guides/mcp-onboarding-checklist.md)**: Keep newly registered MCP servers visible to agents — signal hierarchy (Hook > Lazy-Rule > Inline-Docs > generic MCP) and the three onboarding steps (rule entry, context-file reference, optional hook).
 
 ### Admin UI How-Tos (`docs/howto/`)
 - **[Remote Access to the Admin UI](docs/howto/admin-ui-remote-access.md)**: Expose `admin-server.py` beyond localhost with token authentication — lifecycle, flags, ports, troubleshooting.

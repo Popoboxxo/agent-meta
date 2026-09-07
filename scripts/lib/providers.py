@@ -18,11 +18,17 @@ def load_providers_config(agent_meta_root: Path) -> dict:
         agent_meta_root / _PROVIDERS_CONFIG_JSON,
     )
     if not data:
-        # Minimal-but-schema-complete fallback — used only if ai-providers.yaml is
-        # missing entirely. Mirrors the current Claude provider schema (identity,
-        # capability flags, `capabilities` list, `model-tiers`/`model-aliases`) so
-        # downstream code that reads e.g. caps or tiers does not trip over partial
-        # data. Keep field names in sync with config/ai-providers.yaml::Claude.
+        # Minimal fallback — fires only when ai-providers.yaml is missing
+        # entirely. Mirrors *most* of the current Claude provider schema
+        # (identity, capability flags, `capabilities` list,
+        # `model-tiers`/`model-aliases`) so downstream code that reads e.g. caps
+        # or tiers does not trip over partial data. Five fields are intentionally
+        # absent (#492): `orchestrator_hint`, `settings_local_file`,
+        # `settings_local_template`, `isolation-dirs`, `mcp-config`. Every read
+        # site uses `.get()` defaults, so the gap degrades gracefully (MCP stays
+        # disabled, the generic orchestrator_hint applies) instead of crashing.
+        # Keeping field names in sync with config/ai-providers.yaml::Claude
+        # remains a manual convention, not enforced.
         return {
             "Claude": {
                 "agents_dir": ".claude/agents",
@@ -165,7 +171,17 @@ def resolve_context_filename(context_file: str, provider: str, pc: dict | None =
 # hooks/1-generic/*.sh are written against exactly one contract today (JSON on
 # stdin, PreToolUse/PostToolUse, exit-code-2-blocks) — see ai-providers.yaml's
 # `hook_protocol` field comment (issue #630).
-SUPPORTED_HOOK_PROTOCOLS = {"claude-code-json"}
+#
+# `antigravity-hooks-json` (issue #674 Phase 3.1): Google Antigravity's
+# hooks.json contract (verified 2026-09 against antigravity.google/docs/hooks).
+# It deviates from the Claude contract in three verified ways — registration
+# artifact (hooks.json at the workspace .agents/ location, hook-name-keyed
+# schema — NOT settings.json), stdin payload keys (hookEventName/
+# toolCall.{name,args} camelCase, no cwd) and output semantics ({"decision":
+# "deny", "reason"} JSON on stdout instead of exit-code-2 + stderr) — so it is
+# a dedicated protocol value, not a claude-code-json alias. hooks/1-generic/
+# antigravity-json-adapter.sh translates between the two contracts at runtime.
+SUPPORTED_HOOK_PROTOCOLS = {"claude-code-json", "antigravity-hooks-json"}
 
 
 def provider_hooks_supported(pc: dict) -> bool:

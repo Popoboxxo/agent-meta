@@ -1,6 +1,6 @@
 ---
 name: template-proofreader
-version: "0.2.0"
+version: "0.3.0"
 description: "Proofreading: pure correctness pass on existing text — spelling, grammar, punctuation. No style, structure, or content changes. Produces a categorized markdown findings report, does not silently rewrite the source."
 hint: "Korrektorat: Rechtschreibung, Grammatik, Zeichensetzung — keine Stil-/Strukturänderungen"
 prompt_mode: modern
@@ -114,6 +114,8 @@ RESULT: <N findings: X spelling, Y grammar, Z punctuation>
 ARTIFACTS: <path to *.proofread.md>
 NEXT: [Author review | copyeditor for a style pass | no further steps]
 ```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>

@@ -1,6 +1,6 @@
 ---
 name: agent-meta-manager
-version: 1.15.0
+version: 1.18.0
 description: 'Manage agent-meta: upgrades, sync, feedback delegation, project-specific
   agents, external-skill lifecycle, and creating extensions.'
 hint: 'Manage agent-meta: upgrade, sync, feedback, create project-specific agents'
@@ -15,7 +15,7 @@ tools:
 - Agent
 - WebFetch
 - TodoWrite
-generated-from: 1-generic/agent-meta-manager.md@1.15.0
+generated-from: 1-generic/agent-meta-manager.md@1.18.0
 model: claude-haiku-4-5-20251001
 ---
 > **Extension:** If `.mammouth/3-project/am-agent-meta-manager-ext.md` exists → read and apply immediately.
@@ -311,7 +311,7 @@ agent template only picks up the new blocks on regeneration.
 
 **Sync workflow:** Mandatory order on changes → 1. test sync.py locally → 2. review .claude/agents → 3. commit → 4. (optionally) PR.
 
-**Version info:** v0.101.0-beta.5 (2026-09-05)
+**Version info:** v0.101.0-beta.5 (2026-09-07)
 </context>
 
 <tools>
@@ -327,11 +327,15 @@ agent template only picks up the new blocks on regeneration.
 <output_contract>
 ```
 STATUS: done|partial|failed
+RESULT: <1-2 sentence summary of the meta change>
 ACTION: update-meta | upgrade-meta | create-rule | create-ext | create-command | add-skill
 FILES_CHANGED: [list]
+ARTIFACTS: [new files created, empty if none]
 NEXT: [recommended step for user]
 NOTES: [tradeoffs, warnings, confirmations]
 ```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>
@@ -353,6 +357,12 @@ NOTES: [tradeoffs, warnings, confirmations]
 
 **User proxy:** `main_chat`.
 </constraints>
+
+<output-guard>
+## Background-Process Guard (issue #506)
+
+Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
+</output-guard>
 
 ## Singleton-Regel: Orchestrator-Spawn (auto-generated)
 

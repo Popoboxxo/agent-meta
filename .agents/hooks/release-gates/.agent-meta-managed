@@ -1,0 +1,3 @@
+action-pin-validation.sh
+artifact-freshness.sh
+docker-image-scan.sh

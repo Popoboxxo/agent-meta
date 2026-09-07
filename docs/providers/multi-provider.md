@@ -60,10 +60,26 @@ Vollständiger Output — keine Einschränkungen:
 
 - `.gemini/agents/*.md` — generierte Agenten (gleicher Markdown-Body wie Claude)
 - `AGENTS.md` — Kontext-Datei (managed block, bei jedem sync aktualisiert); geteilt mit Opencode
-- `.gemini/settings.json` — Skeleton (einmalig angelegt); Hooks werden bei jedem sync eingetragen
+- `.gemini/settings.json` — Skeleton (einmalig angelegt); MCP wird bei jedem sync eingetragen
 - `.gemini/commands/*.toml` — Slash-Commands (aus `commands/` transformiert, `.md` → `.toml`)
-- `.gemini/hooks/*.sh` — Hook-Skripte (kopiert, stale gelöscht)
+- `.agents/hooks/*.sh` — gespiegelte Hook-Skripte (committed; Registrierung via `.agents/hooks.json`, siehe Hooks-Hinweis)
 - `.gemini/rules/*.md` — Rules (Gemini CLI besitzt ein natives Rules-Verzeichnis, `has_rules: true`)
+
+> **Hooks (issue #674 Phase 3.1):** agent-meta spiegelt Hooks für Gemini über
+> `hook_protocol: antigravity-hooks-json` — den **verifizierten Antigravity-Vertrag**
+> (antigravity.google/docs/hooks): Registrierung in `.agents/hooks.json` (dokumentierter
+> AGY-Workspace-Ort, NICHT `.gemini/`), Skripte in `.agents/hooks/`, Events
+> PreToolUse/PostToolUse/PreInvocation/PostInvocation/Stop, camelCase-Payload
+> (`hookEventName`, `toolCall.{name,args}`) und `{"decision": "deny", "reason"}`-JSON
+> statt Exit-Code-2. Jeder registrierte Hook läuft dadurch durch den Übersetzungs-Adapter
+> `hooks/1-generic/antigravity-json-adapter.sh` (AGY-Payload → Claude-Vertrag, Tool-Namen
+> normalisiert, deny-JSON). Runtime-Ausführung = P6 real-repo-test.
+>
+> **Cross-Provider-Interplay:** Ist zusätzlich Codex aktiv und
+> `gitignore.ignore-provider-dirs: true` in `project.yaml` gesetzt, ignoriert
+> Codex' Provider-Root `.agents/` das gesamte Verzeichnis — Projekte, die
+> beides kombinieren, müssen `gitignore.exceptions: ['.agents/']` setzen
+> (Exceptions invertieren die Root-Emission in `scripts/lib/gitignore.py`).
 
 > **AGENTS.md vs. natives GEMINI.md — nicht verwechseln:**
 > agent-meta schreibt Geminis Projekt-Kontext in `AGENTS.md` (`context_file: AGENTS.md` in
@@ -107,6 +123,11 @@ Schlanker Provider — dateibasierte Agenten und Rules, keine Hooks/Commands/Set
 - `.github/copilot/agents/*.md` — generierte Agenten (werden automatisch geladen)
 - `.github/copilot/COPILOT.md` — Kontext-Datei (managed block, bei jedem sync aktualisiert)
 - `.github/copilot/rules/*.md` — Rules (`has_rules: true`)
+- `.vscode/mcp.json` — Agent-Mode-MCP (issue #674 Phase 3.3): VS Code-eigenes
+  Settings-Shape (Top-Level `{"servers": {...}}`, Format-Writer `vscode-settings`).
+  Committed mit `${env:VAR}`-Platzhaltern (VS Code expandiert sie nativ) — **kein
+  Secrets-File** (Codex-Präzedenz). `.vscode/` ist bewusst KEIN Provider-Root
+  (geteiltes Editor-Verzeichnis).
 
 **Fähigkeiten (`config/provider-capabilities.yaml`):**
 - Keine native Subagent-Dispatch-API und keine parallele Ausführung — Delegation erfolgt
@@ -124,7 +145,18 @@ konfiguriert — nur belegte Fähigkeiten sind aktiviert.
 - `MAMMOUTH.md` — Kontext-Datei (managed block, bei jedem sync aktualisiert; nutzt das
   gemeinsame `AGENTS.project-template.md`)
 - `.mammouth/rules/*.md` — Rules (`has_rules: true`)
-- `.mammouth/hooks/*.sh` — Hooks (`has_hooks: true`, eigenes `.mammouth/settings.json`)
+- `.mammouth/hooks/` — reserviert (`has_hooks: true`): ohne verifizierten
+  `hook_protocol` spiegelt sync.py keine Hook-Skripte (#630-Muster) — Cleanup statt
+  Deploy; das separate `.mammouth/settings.json` wird als Skeleton angelegt
+
+**Commands:** Mammouth setzt `has_commands: true` und listet die Capability
+`commands` — konfiguriert aber weder `commands_dir` noch `commands_ext` (anders als
+Gemini/Opencode). Der Sync-Code (`scripts/lib/commands.py::sync_commands_for_provider`)
+implementiert Zweige für Claude, Continue, Gemini und Opencode; jeder andere Provider
+endet im `else: return`. Für Mammouth wird daher **kein `.mammouth/commands/`**
+generiert — der Sync läuft still durch (kein Fehler, keine Warnung). Der Flag ist
+damit aktuell ein Capability-Versprechen ohne Output (siehe auch den Kommentar zu
+`_INFRA_ROOT_FALLBACK_DIRS` in `scripts/lib/external_tools_drift.py`).
 
 **Fähigkeiten (`config/provider-capabilities.yaml`):**
 - `hooks: true` — belegt durch `has_hooks: true` + `hooks_dir` in `config/ai-providers.yaml`.
@@ -220,9 +252,11 @@ Nur bekannte Provider werden verarbeitet. Unbekannte Werte werden stillschweigen
 **Hinweis:** Rules werden für alle Provider mit `has_rules: true` generiert (Claude →
 `.claude/rules/`, Gemini → `.gemini/rules/`, Continue → `.continue/rules/`, Copilot →
 `.github/copilot/rules/`, Mammouth → `.mammouth/rules/`, Codex → `rules/`; Opencode bettet
-Rules in `AGENTS.md` ein). Hooks werden für Provider mit `has_hooks: true` generiert
-(Claude, Gemini, Mammouth) — Codex reserviert lediglich `.codex/hooks/`, spiegelt aber keine
-Hooks (kein `hook_protocol`, #630-Muster).
+Rules in `AGENTS.md` ein). Hooks werden für Provider mit `has_hooks: true` UND verifiziertem
+`hook_protocol` gespiegelt (Claude → settings.json-Registrierung; Gemini →
+`antigravity-hooks-json`, Registrierung in `.agents/hooks.json` via Übersetzungs-Adapter) —
+Codex reserviert lediglich `.codex/hooks/`, spiegelt aber keine Hooks (kein `hook_protocol`,
+#630-Muster).
 
 ---
 
@@ -270,23 +304,47 @@ Rule-Content aus `config/plugin-catalog.yaml` (`kind: cli-tool`-Einträge, z.B. 
 | Kontext-Datei (Rest) | ❌ Nie angefasst | ❌ Nie angefasst | ❌ Nie angefasst | ❌ Nie angefasst |
 | Settings/Config Skeleton | ❌ Einmalig | ❌ Einmalig | ❌ Einmalig | ❌ Einmalig |
 | Rules | ✅ Sync (stale gelöscht) | ✅ Sync nach `.gemini/rules/` | ✅ Sync nach `.continue/rules/` | ✅ In `AGENTS.md` eingebettet |
-| Hooks | ✅ Sync + registriert | ✅ Sync + registriert | — | — |
+| Hooks | ✅ Sync + registriert | ✅ Sync + registriert (.agents/hooks.json, Antigravity-Protokoll via Adapter) | — | — |
 | Commands | ✅ `.claude/commands/*.md` | ✅ `.gemini/commands/*.toml` | ✅ `.continue/prompts/*.md` | ✅ `.opencode/commands/*.md` |
 
 > **Copilot, Mammouth, Codex, ZCode & KimiCode** folgen demselben Grundmuster (Agenten +
 > Kontext-Datei + Rules überschrieben/aktualisiert, Skeleton einmalig). Abweichungen: Copilot
-> hat keine Hooks/Commands/Settings; Mammouth hat Hooks (`.mammouth/hooks/`) und ein eigenes
-> `.mammouth/settings.json`; Codex spiegelt keine Hooks und hat kein Settings-File; ZCode und
-> KimiCode generieren keine Rules/Commands/Hooks (siehe Provider-Abschnitte oben).
+> hat keine Hooks/Commands/Settings; Mammouth hat eine Hooks-Reservierung ohne Spiegelung
+> (#630-Muster) und ein eigenes `.mammouth/settings.json`, generiert aber keine Commands
+> (`has_commands` gesetzt, kein Sync-Zweig — siehe Mammouth-Abschnitt); Codex spiegelt keine
+> Hooks und hat kein Settings-File; ZCode und KimiCode generieren keine Rules/Commands/Hooks
+> (siehe Provider-Abschnitte oben).
 
 ---
 
 ## Stale-Tracking
 
-Jeder Provider hat sein eigenes `.agent-meta-managed`-Index:
+Jeder Provider verwaltet seinen eigenen `.agent-meta-managed`-Index — für Agenten
+in `<agents_dir>/`, für Rules in `<rules_dir>/`:
+
+**Agenten-Index (alle Provider):**
+
 - `.claude/agents/.agent-meta-managed`
 - `.gemini/agents/.agent-meta-managed`
+- `.continue/agents/.agent-meta-managed`
+- `.opencode/agents/.agent-meta-managed`
+- `.github/copilot/agents/.agent-meta-managed`
+- `.mammouth/agents/.agent-meta-managed`
+- `.codex/agents/.agent-meta-managed`
+- `.zcode/agents/.agent-meta-managed`
+- `.kimi-code/agents/.agent-meta-managed`
+
+**Rules-Index (Provider mit `has_rules: true`):**
+
+- `.claude/rules/.agent-meta-managed`
+- `.gemini/rules/.agent-meta-managed`
 - `.continue/rules/.agent-meta-managed`
+- `.github/copilot/rules/.agent-meta-managed`
+- `.mammouth/rules/.agent-meta-managed`
+- `rules/.agent-meta-managed` (Codex — Projekt-Root)
+
+Generierte MCP-/Tool-Rules nutzen eigene Sidecar-Indizes im selben Rules-Verzeichnis
+(`.agent-meta-managed-mcp` bzw. `.agent-meta-managed-tools`).
 
 Agenten die aus der Rollen-Whitelist entfernt werden, werden beim nächsten sync gelöscht.
 
@@ -326,6 +384,11 @@ CLAUDE.personal.md
 # agent-meta (Continue) — optional
 # .continue/config.yaml  ← ggf. ignorieren wenn Secrets enthalten
 ```
+
+**Alternative (issue #557):** Mit `gitignore.ignore-provider-dirs: true` in
+`project.yaml` verwaltet der managed block ganze Provider-Verzeichnisse
+(`.claude/`, `.gemini/`, `.github/copilot/`, …) statt einzelner Sub-Pfade —
+Details siehe [sync-concept.md](../guides/features/sync-concept.md).
 
 ---
 

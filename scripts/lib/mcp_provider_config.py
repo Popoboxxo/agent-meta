@@ -4,11 +4,15 @@ provider's committed + local secrets config files.
 Split out of ``mcp.py`` (module size limit — see CLAUDE.md "Python
 (scripts/lib/)" conventions, <= 600 lines per module) to keep registry
 loading / rule-doc generation / secrets-template bookkeeping in that module
-separate from the provider-config-writing concern here. This module imports
-the registry helpers it needs from ``.mcp`` only inside function bodies
-(deferred import) — ``mcp.py`` imports ``generate_provider_configs`` from
-here at its own top level, so a top-level import in the other direction here
-would be a circular import.
+separate from the provider-config-writing concern here. The registry
+helpers (``load_mcp_registry``, ``resolve_active_mcp_servers``,
+``SECRETS_LOCAL_FILE``) are imported at module top level from
+``lib.registry_query`` (issue #478) — the plugins-free resolution layer —
+NOT from ``mcp.py``: that direction would recreate the
+mcp/mcp_provider_config/rules import cycle mcp_registry.py was extracted to
+break (#613). ``mcp.py`` imports ``generate_provider_configs`` from here at
+its own top level (ABI re-export); the opposite direction via registry_query
+stays cycle-free.
 
 Public interface:
     generate_provider_configs(...)  → writes committed + local MCP provider
@@ -27,6 +31,11 @@ from .io import (
     write_checked,
 )
 from .log import SyncLog
+from .registry_query import (
+    SECRETS_LOCAL_FILE,
+    load_mcp_registry,
+    resolve_active_mcp_servers,
+)
 from .toml_writer import dumps as _toml_dumps
 
 # ---------------------------------------------------------------------------
@@ -60,6 +69,26 @@ def _subst_opencode(value: str, secrets: dict | None) -> str:
     return _subst_with_placeholder(value, secrets, lambda var_name: f"{{env:{var_name}}}")
 
 
+def _subst_vscode(value: str, secrets: dict | None) -> str:
+    """Replace {{VAR}} placeholders with VS Code ${env:VAR} syntax.
+
+    VS Code expands ``${env:VAR}`` natively in ``.vscode/mcp.json`` values
+    (agent-mode MCP), so the committed file can reference environment
+    variables without a secrets file — the same committed-placeholder
+    strategy Claude's ``.mcp.json`` uses (issue #674 Phase 3.3).
+    """
+    return _subst_with_placeholder(value, secrets, lambda var_name: f"${{env:{var_name}}}")
+
+
+def _subst_for_format(fmt: str | None):
+    """Placeholder substitution function for one provider-config format."""
+    if fmt == "opencode-json":
+        return _subst_opencode
+    if fmt == "vscode-settings":
+        return _subst_vscode
+    return _subst
+
+
 def _build_connection_entry(conn: dict, secrets: dict | None, fmt: str | None = None) -> dict:
     """Convert a registry connection block to a provider-config dict.
 
@@ -67,16 +96,28 @@ def _build_connection_entry(conn: dict, secrets: dict | None, fmt: str | None = 
       - command as array (not command + args)
       - "environment" key (not "env")
       - {env:VAR} interpolation (not ${VAR})
+
+    fmt="vscode-settings" uses VS Code agent-mode MCP syntax (issue #674
+    Phase 3.3):
+      - remote (sse) servers are declared with type "http" (VS Code
+        deprecates the legacy "sse" discriminator)
+      - ${env:VAR} interpolation (expanded natively by VS Code in
+        .vscode/mcp.json values)
     """
     conn_type = conn.get("type", "")
     orig_type = conn_type
 
     is_opencode = fmt == "opencode-json"
+    is_vscode = fmt == "vscode-settings"
+    subst = _subst_for_format(fmt)
+
     if is_opencode:
         if conn_type == "sse":
             conn_type = "remote"
         elif conn_type == "stdio":
             conn_type = "local"
+    elif is_vscode and conn_type == "sse":
+        conn_type = "http"
 
     entry: dict = {"type": conn_type}
 
@@ -85,16 +126,10 @@ def _build_connection_entry(conn: dict, secrets: dict | None, fmt: str | None = 
 
     if orig_type == "sse":
         raw_url = conn.get("url", "")
-        if is_opencode:
-            entry["url"] = _subst_opencode(raw_url, secrets)
-        else:
-            entry["url"] = _subst(raw_url, secrets)
+        entry["url"] = subst(raw_url, secrets)
         headers = conn.get("headers", {})
         if headers:
-            if is_opencode:
-                entry["headers"] = {k: _subst_opencode(str(v), secrets) for k, v in headers.items()}
-            else:
-                entry["headers"] = {k: _subst(str(v), secrets) for k, v in headers.items()}
+            entry["headers"] = {k: subst(str(v), secrets) for k, v in headers.items()}
 
     elif orig_type == "stdio":
         cmd = conn.get("command", "")
@@ -109,7 +144,7 @@ def _build_connection_entry(conn: dict, secrets: dict | None, fmt: str | None = 
             entry["command"] = cmd
             entry["args"] = args
             if env:
-                entry["env"] = {k: _subst(str(v), secrets) for k, v in env.items()}
+                entry["env"] = {k: subst(str(v), secrets) for k, v in env.items()}
 
     return entry
 
@@ -300,7 +335,8 @@ def _update_continue_yaml_config(
             re.MULTILINE | re.DOTALL,
         )
         if block_re.search(existing):
-            new_content = block_re.sub(block_content, existing, count=1)
+            # Function replacement keeps the generated YAML block verbatim (#674).
+            new_content = block_re.sub(lambda _m: block_content, existing, count=1)
         else:
             new_content = existing.rstrip("\n") + "\n\n" + block_content + "\n"
     else:
@@ -395,7 +431,8 @@ def _update_codex_toml_config(
             re.MULTILINE | re.DOTALL,
         )
         if block_re.search(existing):
-            new_content = block_re.sub(block_content, existing, count=1)
+            # Function replacement keeps the generated TOML block verbatim (#674).
+            new_content = block_re.sub(lambda _m: block_content, existing, count=1)
         else:
             # TOML table headers at the end of the document are safe to
             # append — no prior key/value line can be re-attributed to them.
@@ -471,11 +508,10 @@ def generate_provider_configs(
     Raises SyncError if actual secrets are found in committed content and
     allow_committed_secrets is False.
     """
-    # Sourced from mcp_registry.py, not mcp.py, so this module never depends
-    # on mcp.py — that direction would recreate the mcp/mcp_provider_config/
-    # rules import cycle mcp_registry.py was extracted to break (#613).
-    from .mcp_registry import SECRETS_LOCAL_FILE, load_mcp_registry, resolve_active_mcp_servers
-
+    # Registry resolution comes from lib.registry_query (Issue #478) — the
+    # plugins-free resolution layer — so this module never depends on mcp.py;
+    # that direction would recreate the mcp/mcp_provider_config/rules import
+    # cycle mcp_registry.py was extracted to break (#613).
     registry = load_mcp_registry(agent_meta_root, config, project_root)
     if not registry:
         return
@@ -551,6 +587,12 @@ def _write_provider_config(
                              verify_gitignored=verify_gitignored)
     elif fmt == "opencode-json":
         _update_json_config(path, "mcp", mcp_entries, log, dry_run, allow_secrets, config=config,
+                             verify_gitignored=verify_gitignored)
+    elif fmt == "vscode-settings":
+        # VS Code agent-mode MCP (.vscode/mcp.json): top-level {"servers": ...}
+        # settings shape — NOT the Claude {"mcpServers": ...} key
+        # (issue #674 Phase 3.3).
+        _update_json_config(path, "servers", mcp_entries, log, dry_run, allow_secrets, config=config,
                              verify_gitignored=verify_gitignored)
     elif fmt == "continue-yaml":
         _update_continue_yaml_config(path, mcp_entries, log, dry_run, allow_secrets, config=config,

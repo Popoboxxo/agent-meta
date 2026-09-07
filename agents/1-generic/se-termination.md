@@ -1,6 +1,6 @@
 ---
 name: se-termination
-version: 1.7.0
+version: 1.10.0
 description: Deterministic per-system leaf/continue decision with dynamic depth control.
   Sets scope for downstream pipeline routing.
 hint: Dynamic depth termination with SE_MIN_DEPTH/SE_MAX_DEPTH control
@@ -73,7 +73,7 @@ You are the **Termination Agent** (`se-termination`) in the generic systems engi
   "payload": {
     "t": "Termination-Entscheidung",
     "decisions": [
-      {"system_id": "REQ-L2-001", "decision": "leaf", "designation": "component", "reason": "Atomic Code Unit"},
+      {"system_id": "REQ-L2-001", "decision": "leaf", "designation": "component", "handoff_target": "se-component-requirements", "reason": "Atomic Code Unit"},
       {"system_id": "REQ-L2-002", "decision": "continue", "designation": "system", "reason": "Multi-domain"}
     ],
     "summary": "2 systems: 1 leaf, 1 continue"
@@ -97,7 +97,7 @@ You are the **Termination Agent** (`se-termination`) in the generic systems engi
 1. Receive decomposition from architect + check results from critic.
 2. Check leaf/continue criteria per sub-system.
 3. Apply protection rules (`max_depth`, `max_total_cells`, circularity).
-4. Generate decision list per system.
+4. Generate decision list per system; annotate every `leaf` decision with `handoff_target: se-component-requirements` (Issue #332).
 5. Create `termination_summary` (total, leaf_nodes, continue_nodes).
 6. Return structured output per JSON schema.
 
@@ -116,12 +116,14 @@ You are the **Termination Agent** (`se-termination`) in the generic systems engi
       "system_id": "REQ-L2-002",
       "decision": "leaf",
       "designation": "component",
+      "handoff_target": "se-component-requirements",
       "rationale": "PID control algorithm is atomic and implementable as a Python class (single responsibility). Standard PID parameters can be configured."
     },
     {
       "system_id": "REQ-L2-003",
       "decision": "leaf",
       "designation": "component",
+      "handoff_target": "se-component-requirements",
       "rationale": "Water container is a standard mechanical part with defined parameters (500ml, food-safe). Available as COTS component."
     }
   ],
@@ -136,9 +138,11 @@ You are the **Termination Agent** (`se-termination`) in the generic systems engi
 }
 ```
 
-> **Handover:** `decision: leaf` → **designation: "component"** — final leaf system as structured Task/Spec for the implementing discipline (Software-Dev, Hardware-Engineer). `decision: continue` → **designation: "system"** (or "subsystem" when parent context exists) — System definition + Black-Box-Requirement to orchestrator for the next level.
+> **Handover:** `decision: leaf` → **designation: "component"** — final leaf system first to `se-component-requirements` (Issue #332): the conditional `l3-component-requirements` pipeline stage materializes the component's row from the COMP table of the L2 architecture into a standalone L3 component-requirements file (responsibility, REQ-L2 references, internal interfaces, ≥2 REQ-L3). Only the resulting component package continues to the implementing discipline (Software-Dev, Hardware-Engineer). `decision: continue` → **designation: "system"** (or "subsystem" when parent context exists) — System definition + Black-Box-Requirement to orchestrator for the next level.
 >
-> **Pipeline Routing:** For `decision: leaf` nodes, additionally set `scope: "component"` in the output — this signals the downstream orchestrator to use Pipeline B (Component-Level) for implementation dispatch, skipping architect/interface-mgr/termination for these leaves.
+> **LEAF Handoff Trigger (Issue #332):** For every `decision: leaf` entry, set `"handoff_target": "se-component-requirements"` in the decision payload. This annotation is the trigger for the conditional `l3-component-requirements` pipeline stage (decision agent: se-termination) — it closes the gap between this agent's LEAF output and the `se-developer` input. Leaf entries without the annotation are a handoff-contract violation.
+>
+> **Pipeline Routing:** For `decision: leaf` nodes, additionally set `scope: "component"` in the output — this signals the downstream orchestrator to route the leaf through the `l3-component-requirements` stage and then Pipeline B (Component-Level) for implementation dispatch, skipping architect/interface-mgr/termination for these leaves.
 
 ## Step Persistence — Teilresultat-Protokoll
 
@@ -162,6 +166,16 @@ schema_version: "1.0.0"
 1. Write full output (frontmatter + JSON + decision summary) to a temporary file
 2. Rename temp file to target path
 3. Update `.se-state.yaml` with `last_completed_step` pointing to this file
+
+<output_contract>
+```
+STATUS: done|partial|failed|escalate
+RESULT: <1 Satz Ergebnis-Zusammenfassung>
+ARTIFACTS: <persistierte Step-/Report-Dateien (siehe Step Persistence)>
+```
+**Pflicht-Abschluss-Summary (Issue #267):** der strukturierte Block oben ist dein kompletter Rückgabewert — der Orchestrator konsumiert nur dieses Summary, niemals Roh-Output. RESULT: kompaktes Summary (max. 2-3 Sätze) mit was geändert wurde, Erfolg/Misserfolg und dem nächsten Schritt. Roh-Output, Diffs und Logs gehören nie in RESULT — die gehören in ARTIFACTS (Dateipfade).
+
+</output_contract>
 
 ## Anti-Recursion Guard
 

@@ -5,8 +5,9 @@ import json
 import re
 from pathlib import Path
 
+from .agents import build_agent_hints, build_knowledge_engine_hints
 from .frontmatter import _strip_frontmatter
-from .io import content_hash, safe_path
+from .io import content_hash, load_json_file, safe_path
 from .log import SyncLog
 from .plugins import resolve_plugin_compact
 from .variables import (
@@ -36,14 +37,13 @@ def _context_hashes_path(project_root: Path) -> Path:
 
 
 def _load_context_hashes(project_root: Path) -> dict:
-    """Read .meta-config/context-hashes.json; return {} if absent or invalid."""
+    """Read .meta-config/context-hashes.json; return {} if absent or invalid.
+
+    Canonical JSON loader (Issue #479), fail-soft: absent or malformed file
+    yields {} — same contract as the former hand-rolled loader.
+    """
     path = _context_hashes_path(project_root)
-    if not path.exists():
-        return {}
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, ValueError, OSError):
-        return {}
+    data = load_json_file(path, on_error="default", default={})
     hashes = data.get("hashes") if isinstance(data, dict) else None
     return hashes if isinstance(hashes, dict) else {}
 
@@ -284,6 +284,28 @@ def _has_capability(pc: dict, capability: str) -> bool:
     return capability in pc.get("capabilities", [])
 
 
+def _shared_rules_file_channel(
+    pc: dict, provider_config: dict | None, shared_users: list[str]
+) -> bool:
+    """True when every provider sharing this context_file can load rules from
+    separate files (progressive-disclosure file channel, issue #192 Phase 2).
+
+    Expressed purely via config keys: a provider participates when a
+    ``skills_dir`` is configured — the channel that receives non-embedded
+    rules as ``<skills_dir>/<rule-stem>/SKILL.md`` (rendered on demand via
+    Read). Deliberately NOT keyed on provider names (provider-agnostic
+    policy): a future provider joining the shared file converges
+    automatically. When any sharer lacks the channel, the caller embeds the
+    rule instead of dropping it — a rules-preset opt-out must never delete
+    content a provider cannot load from anywhere else.
+    """
+    if provider_config and shared_users:
+        pcs = [provider_config.get(p, {}) for p in shared_users]
+    else:
+        pcs = [pc]
+    return all(bool(p.get("skills_dir")) for p in pcs)
+
+
 def _ensure_context_file(
     project_root: Path,
     agent_meta_root: Path,
@@ -408,7 +430,9 @@ def _update_managed_html_block(
             target_path.write_text(new_content, encoding="utf-8")
         return
 
-    new_content = managed_pattern.sub(new_managed, existing, count=1)
+    # Function replacement: new_managed is rendered template content and
+    # must be inserted verbatim (#674 escape-safety).
+    new_content = managed_pattern.sub(lambda _m: new_managed, existing, count=1)
     if new_content != existing:
         log.action("UPDATE", rel, "managed block")
         if not dry_run:
@@ -452,8 +476,10 @@ def _sync_managed_block_context(
     target_path = safe_path(project_root, context_file)
     template_name = pc.get("context_template")
     template_path = agent_meta_root / template_name if template_name else None
-    
-    from .agents import build_agent_hints
+
+    # build_agent_hints is imported at module top level — the lazy import was
+    # vestigial (agents does not import context; Issue #478 cleanup, guarded
+    # by tests/test_import_acyclicity.py).
     orch_config = config.get("orchestrator", {})
     provider_override = orch_config.get("provider-overrides", {}).get(provider, {})
     _orch_mode = _resolve_orch_mode(orch_config, provider_override)
@@ -568,7 +594,8 @@ def _sync_opencode_context(
         # so match and replacement share the same boundary.
         new_managed = new_managed.rstrip("\n")
         if managed_pattern.search(existing):
-            new_content = managed_pattern.sub(new_managed, existing, count=1)
+            # Function replacement keeps the rendered block verbatim (#674).
+            new_content = managed_pattern.sub(lambda _m: new_managed, existing, count=1)
             if new_content != existing:
                 log.action("UPDATE", context_file, "managed block (agent hints + rules)")
                 if not dry_run:
@@ -877,7 +904,8 @@ def _update_continue_config_managed_block(
         re.MULTILINE | re.DOTALL,
     )
     if managed_re.search(existing):
-        updated = managed_re.sub(new_block, existing, count=1)
+        # Function replacement keeps the generated metadata block verbatim (#674).
+        updated = managed_re.sub(lambda _m: new_block, existing, count=1)
         if updated != existing:
             log.action("UPDATE", rel, "managed comment block")
             if not dry_run:
@@ -1010,9 +1038,11 @@ def _build_managed_block(
     project_root: Path | None = None,
 ) -> str:
     from .delegation_table import get_active_agents_data
-    from .rules import collect_rule_sources, resolve_rules
-    from .agents import build_knowledge_engine_hints
-    
+    from .rules import collect_rule_sources, resolve_rules, rule_opts_lazy_channel
+
+    # build_knowledge_engine_hints is imported at module top level — the
+    # lazy import was vestigial (agents does not import context; Issue #478
+    # cleanup, guarded by tests/test_import_acyclicity.py).
     pc = (provider_config or {}).get(provider, {})
     has_native_rules = pc.get("has_rules", False)
 
@@ -1040,9 +1070,14 @@ def _build_managed_block(
         per-provider-only behaviour in that case.
         """
         values = [
-            provider_config[p].get(dir_key, default_fmt.format(p.lower()))
+            # Null-valued keys (skills_dir: null in ai-providers.yaml) fall
+            # back to the same default an absent key gets — a None would
+            # crash the join below (found via the #192 weak-sharer test).
+            provider_config[p].get(dir_key) or default_fmt.format(p.lower())
             for p in shared_users
-        ] if provider_config else [pc.get(dir_key, default_fmt.format(provider.lower()))]
+        ] if provider_config else [
+            pc.get(dir_key) or default_fmt.format(provider.lower())
+        ]
         return " bzw. ".join(dict.fromkeys(values))
 
     local_vars = dict(variables)
@@ -1068,6 +1103,12 @@ def _build_managed_block(
     local_vars["active_agents"] = get_active_agents_data(agent_meta_root, config, local_vars)
     
     embedded_rules: list[dict] = []
+    # Non-embedded (lazy) rule counter — only populated in the embedded-rules
+    # branch below (has_rules providers never embed, so there is nothing to
+    # count); initialized here so the flag assignment after the branch is
+    # always well-defined.
+    lazy_rule_count = 0
+
     if not has_native_rules:
         rule_options = resolve_rules(config, agent_meta_root)
         platforms = config.get("platforms", [])
@@ -1109,8 +1150,26 @@ def _build_managed_block(
             prov_opt = opts.get(p.lower())
             return prov_opt == "skip" or prov_opt is False
 
+        # Issue #192 Phase 2 (selective rule embedding): a rule flagged
+        # `embed: false` (or routed to `channel: skill`) leaves the managed
+        # block when the whole shared-file group can load rules from separate
+        # files (every sharer has a skills_dir — see
+        # _shared_rules_file_channel). The block then renders a pointer to
+        # <SKILLS_DIR>/<rule-stem>/SKILL.md instead of the rule body;
+        # sync_rules()/sync_embedded_rule_files() write those files. Without
+        # the file channel the rule EMBEDS (never drops): a preset opt-out
+        # must not delete content for a provider with no way to load it.
+        rules_file_channel = _shared_rules_file_channel(pc, provider_config, shared_users)
+
         for src_path, output_name in rule_sources:
-            rule_stem = src_path.stem
+            # Key options by the OUTPUT stem ("admin-ui"), not the raw source
+            # stem ("agent-meta-admin-ui"): rules-presets.yaml keys are output
+            # names (2-platform prefix stripped by collect_rule_sources), and
+            # sync_rules()/compact_embedded_rule() already resolve against the
+            # output stem. The embed loop previously used src_path.stem, which
+            # silently dropped every preset option (channel: skill, embed,
+            # per-provider skip) for 2-platform rules (#192 Phase 2 fix).
+            rule_stem = Path(output_name).stem
             opts = rule_options.get(rule_stem, {})
             # For a shared context_file, a rule is dropped only when EVERY
             # shared user opts out -- one provider's per-provider "skip" must
@@ -1118,8 +1177,17 @@ def _build_managed_block(
             # same physical file (issue #638: union, not current-provider-only).
             if all(_opts_skip(opts, p) for p in shared_users):
                 continue
-            if opts.get("embed") is False:
+            if rules_file_channel and rule_opts_lazy_channel(opts):
+                # Progressive disclosure (issues #192 Phase 2 + #540 Fix 1):
+                # the rule lives as a separate file; the block gets a pointer
+                # via the rules-lazy partial (HAS_LAZY_RULES below).
+                lazy_rule_count += 1
                 continue
+            # No file channel for the group (or an always-embed rule): fall
+            # through to the embed path — a preset opt-out must NEVER delete
+            # content for a provider with no way to load it (issue #192 risk
+            # note: weak providers keep embedding; the former behaviour of
+            # dropping embed:false rules here was silent content loss).
 
             layer = src_path.parts[-2]
             rel_source = f"rules/{layer}/{src_path.name}"
@@ -1136,20 +1204,36 @@ def _build_managed_block(
             embedded_rules.append({"content": rule_content})
         
         try:
-            from .mcp import _generate_rule_content
+            from .mcp import MCP_RULE_PREFIX, _generate_rule_content
             if mcp_registry:
                 for server_name in mcp_active:
                     server_def = mcp_registry.get(server_name)
-                    if server_def:
-                        mcp_content = _generate_rule_content(
-                            server_name, server_def, compact=_compact
-                        )
-                        embedded_rules.append({"content": mcp_content})
+                    if not server_def:
+                        continue
+                    # Same selective-embedding contract as the rules loop
+                    # above (issue #192 Phase 2 + #540 Fix 1): when the whole
+                    # shared-file group can load rules from separate files,
+                    # per-server MCP sections flagged channel: skill /
+                    # embed: false (rules-presets.yaml) leave the block; the
+                    # embedded mcp-guardrails rule keeps the hard-prohibition
+                    # one-liners always-on. generate_mcp_artifacts() writes
+                    # the full section as <skills_dir>/mcp-<server>/SKILL.md.
+                    mcp_opts = rule_options.get(f"{MCP_RULE_PREFIX}{server_name}", {})
+                    if all(_opts_skip(mcp_opts, p) for p in shared_users):
+                        continue
+                    if rules_file_channel and rule_opts_lazy_channel(mcp_opts):
+                        lazy_rule_count += 1
+                        continue
+                    mcp_content = _generate_rule_content(
+                        server_name, server_def, compact=_compact
+                    )
+                    embedded_rules.append({"content": mcp_content})
         except ImportError:
             pass
 
         try:
             from .external_tools import (
+                TOOL_RULE_PREFIX,
                 _generate_tool_rule_content,
                 load_external_tools_registry,
                 resolve_active_external_tools,
@@ -1168,17 +1252,32 @@ def _build_managed_block(
                     skip_list = tool_def.get("provider-skip", []) if tool_def else []
                     # Same union rule as above: only drop the tool for a shared
                     # context_file when every shared user opts out of it.
-                    if tool_def and not all(p in skip_list for p in shared_users):
-                        embedded_rules.append(
-                            {"content": _generate_tool_rule_content(
-                                tool_name, tool_def, pc, project_root, compact=_compact,
-                                shared_pcs=shared_pcs,
-                            )}
-                        )
+                    if not (tool_def and not all(p in skip_list for p in shared_users)):
+                        continue
+                    # Selective embedding (issue #192 Phase 2): the tool
+                    # section leaves the block on the file channel, exactly
+                    # like MCP sections and rules sources; the file is
+                    # written by generate_external_tool_artifacts().
+                    tool_opts = rule_options.get(f"{TOOL_RULE_PREFIX}{tool_name}", {})
+                    if rules_file_channel and rule_opts_lazy_channel(tool_opts):
+                        lazy_rule_count += 1
+                        continue
+                    embedded_rules.append(
+                        {"content": _generate_tool_rule_content(
+                            tool_name, tool_def, pc, project_root, compact=_compact,
+                            shared_pcs=shared_pcs,
+                        )}
+                    )
         except ImportError:
             pass
 
     local_vars["embedded_rules"] = embedded_rules
+    # Composition flags for agents-managed.md: embedded core rules render via
+    # the rules-embedded partial, non-embedded (lazy) rules via the one-line
+    # rules-lazy pointer. Both flags are plain Python bools — truthiness is
+    # resolved by TemplateBuilder.resolve_conditionals().
+    local_vars["HAS_EMBEDDED_RULES"] = bool(embedded_rules)
+    local_vars["HAS_LAZY_RULES"] = bool(lazy_rule_count)
 
     local_vars["KNOWLEDGE_ENGINE_HINTS"] = build_knowledge_engine_hints(
         config, compact=local_vars.get("COMPACT_MODE") == "true"
@@ -1387,7 +1486,8 @@ def ensure_gitignore_entries(
     )
 
     if block_match:
-        new_content = block_pattern.sub(new_block, existing)
+        # Function replacement keeps generated path entries verbatim (#674).
+        new_content = block_pattern.sub(lambda _m: new_block, existing)
     else:
         new_content = existing.rstrip("\n") + "\n\n" + new_block + "\n"
 

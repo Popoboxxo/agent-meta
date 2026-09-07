@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "SE Requirements Output Schema",
-  "description": "Structured output schema for the se-requirements agent. Defines stakeholder requirements with arch-impact flags for role boundary enforcement per ISO/IEC 15288.",
+  "description": "Structured output schema for the se-requirements agent. Defines stakeholder requirements with arch-impact flags for role boundary enforcement per ISO/IEC 15288. Carries the REQ frontmatter vocabulary (Issue #339 B2): enum-typed status fields, ADR links and review iteration tracking.",
   "type": "object",
   "required": ["requirements"],
   "properties": {
@@ -79,9 +79,164 @@
             "type": "string",
             "enum": ["terminal", "decomposable"],
             "description": "Whether further decomposition is expected downstream."
+          },
+          "implementation_state": {
+            "$ref": "#/definitions/implementationState",
+            "description": "Implementation status of this requirement. Default: not_implemented."
+          },
+          "test_status": {
+            "$ref": "#/definitions/testStatus",
+            "description": "Test coverage status of this requirement. Default: missing."
+          },
+          "review_state": {
+            "$ref": "#/definitions/reviewState",
+            "description": "Review lifecycle status of this requirement. Default: open."
+          },
+          "open_adrs": {
+            "type": "array",
+            "description": "ADR-IDs that affect this requirement and are not yet accepted (Issue #339 B1/B6). Empty by default.",
+            "items": {
+              "type": "string",
+              "pattern": "^ADR-\\d{3}$"
+            },
+            "default": []
+          },
+          "review_iteration": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Monotonically increasing review iteration counter. Default: 0.",
+            "default": 0
+          },
+          "suspect_children": {
+            "type": "array",
+            "description": "REQ-IDs of dependent requirements whose findings marked this requirement as suspect (bottom-up re-derivation, Issue #339 B6). Empty by default.",
+            "items": {
+              "type": "string"
+            },
+            "default": []
           }
         }
       }
+    },
+    "document_frontmatter": {
+      "type": "object",
+      "description": "Mandatory YAML frontmatter block for the persisted REQ document (Issue #339 B2/B3). Strict: no free-text fields, no legacy fields (Implementation State, Review Findings, Test Status, Remarks).",
+      "required": [
+        "type",
+        "scope",
+        "status",
+        "date",
+        "author_agent",
+        "implementation_state",
+        "test_status",
+        "review_state",
+        "open_adrs",
+        "review_iteration"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "req_id": {
+          "type": "string",
+          "description": "Requirement ID of the document (e.g., REQ-L1-007)."
+        },
+        "title": {
+          "type": "string",
+          "description": "Requirement title."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["REQ"],
+          "description": "SE document taxonomy type (Issue #339 B3)."
+        },
+        "scope": {
+          "type": "string",
+          "description": "Scope identifier: project or subscope (system/component folder name)."
+        },
+        "level": {
+          "type": "string",
+          "pattern": "^L\\d+$",
+          "description": "Hierarchy level (e.g., L1, L2)."
+        },
+        "status": {
+          "type": "string",
+          "description": "Document status (e.g., draft, approved)."
+        },
+        "date": {
+          "type": "string",
+          "format": "date",
+          "description": "Document date, ISO-8601."
+        },
+        "author_agent": {
+          "type": "string",
+          "description": "Agent that authored this document (e.g., se-requirements)."
+        },
+        "implementation_state": {
+          "$ref": "#/definitions/implementationState",
+          "description": "Enum: not_implemented | partially_implemented | implemented. Default: not_implemented."
+        },
+        "test_status": {
+          "$ref": "#/definitions/testStatus",
+          "description": "Enum: missing | partial | covered. Default: missing."
+        },
+        "review_state": {
+          "$ref": "#/definitions/reviewState",
+          "description": "Enum: open | reviewed | approved. Default: open."
+        },
+        "open_adrs": {
+          "type": "array",
+          "description": "ADR-IDs affecting this REQ that are not yet accepted.",
+          "items": {
+            "type": "string",
+            "pattern": "^ADR-\\d{3}$"
+          },
+          "default": []
+        },
+        "last_reviewed": {
+          "type": ["string", "null"],
+          "format": "date",
+          "description": "Date of the last review, ISO-8601. Null when never reviewed."
+        },
+        "reviewer": {
+          "type": ["string", "null"],
+          "description": "Agent that performed the last review (e.g., se-critic, se-housekeeper). Null when never reviewed."
+        },
+        "review_iteration": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Monotonically increasing review iteration counter. Default: 0.",
+          "default": 0
+        },
+        "arch_impact": {
+          "type": "boolean",
+          "description": "Architecture impact flag. Default: false.",
+          "default": false
+        },
+        "suspect_children": {
+          "type": "array",
+          "description": "REQ-IDs of dependent requirements whose findings marked this REQ as suspect (bottom-up re-derivation, Issue #339 B6).",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        }
+      }
+    }
+  },
+  "definitions": {
+    "implementationState": {
+      "type": "string",
+      "enum": ["not_implemented", "partially_implemented", "implemented"],
+      "description": "Implementation state enum (Issue #339 B2)."
+    },
+    "testStatus": {
+      "type": "string",
+      "enum": ["missing", "partial", "covered"],
+      "description": "Test status enum (Issue #339 B2)."
+    },
+    "reviewState": {
+      "type": "string",
+      "enum": ["open", "reviewed", "approved"],
+      "description": "Review state enum (Issue #339 B2). Separate lifecycle from implementation_state."
     }
   }
 }

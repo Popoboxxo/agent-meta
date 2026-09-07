@@ -1,14 +1,21 @@
 """Config loading, validation, variable building and substitution."""
 from __future__ import annotations
 
+import io
 import json
 import re
 import subprocess
 import sys
+from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
-from .io import SyncError, _load_yaml_or_json, _write_yaml
+from .agents import (
+    build_agent_hints,
+    build_agent_table,
+    build_routing_tool_definitions_for_providers,
+)
+from .io import SyncError, _load_yaml_or_json, _write_yaml, load_yaml_file
 from .log import SyncLog
 from .variables import (  # re-exported for callers/tests (Issue #565)
     _orch_mode_flags,
@@ -23,6 +30,19 @@ from .pipelines import (
     load_quality_pipelines,
     validate_pipelines,
 )
+from .analysis import FileAffinityAnalyzer, analyze_project
+from .consistency.placeholders import _BUILTIN_VARS
+from .context_templates.builder import TemplateBuilder
+from .conventions import render_convention_block, resolve_conventions
+from .delegation_table import get_active_agents_data, get_intent_routing_table
+from .dod import resolve_dod
+from .providers import load_providers_config, resolve_providers
+from .reflection import (
+    apply_project_overrides,
+    load_project_overrides,
+    load_reflection_pairs,
+)
+from .roles import build_role_map, load_roles_config
 
 try:
     import yaml as _yaml
@@ -67,6 +87,9 @@ _DOD_FIELD_DEFAULTS: dict = {
     "tests-required": True,
     "codebase-overview": True,
     "security-audit": False,
+    "ai-security-review": False,
+    "prompt-governance": False,
+    "lifecycle-ownership": False,
     "se-required": "false",
 }
 
@@ -423,7 +446,6 @@ def fill_defaults(
     # (once normally, once silent at the end), so without this guard every
     # warning below fired twice on every sync.
     if not silent:
-        from .consistency.placeholders import _BUILTIN_VARS
         known_vars = _load_schema_variable_keys(agent_meta_root)
         set_vars = set(config.get("variables", {}).keys())
         # Skip vars auto-injected by build_variables() (see _BUILTIN_VARS) —
@@ -441,7 +463,6 @@ def _write_yaml_with_comments(path: Path, data: dict, auto_filled: list[tuple[st
     Since PyYAML does not support comments, we dump to text and inject
     #-style comment lines before each auto-filled top-level key.
     """
-    import io
     buf = io.StringIO()
     _yaml.dump(data, buf, allow_unicode=True, default_flow_style=False,
                sort_keys=False, indent=2)
@@ -540,9 +561,10 @@ def _build_core_variables(
     not in variables` — i.e. it must see the user `variables:` entries this
     function loads first.
     """
-    # Import here to avoid circular deps — agents module uses config module
-    from .agents import build_agent_hints, build_agent_table
-
+    # `agents` is imported at module top level: the historic comment claimed
+    # a config↔agents cycle ("agents module uses config module"), but agents
+    # has not imported config since the #561/#565 split — the lazy import was
+    # vestigial (Issue #478 cleanup, guarded by tests/test_import_acyclicity.py).
     project = config.get("project", {})
     variables["PREFIX"]       = project.get("prefix", "")
     variables["PROJECT_SHORT"] = project.get("short", "")
@@ -645,14 +667,10 @@ def _build_provider_variables(variables: dict, config: dict, agent_meta_root: Pa
     hasn't already set them via project.yaml's `variables:` block (loaded by
     the core-variables step).
     """
-    from .agents import build_agent_hints
-    from .providers import load_providers_config, resolve_providers
-
     # Build dynamic provider routing string
     provider_config = load_providers_config(agent_meta_root)
     providers = resolve_providers(config, provider_config)
 
-    from collections import defaultdict
     routing_groups = defaultdict(list)
     agent_locations = []
 
@@ -774,7 +792,6 @@ def _build_orch_variables(
     variables["ANALYSIS_ENABLED"] = "true" if _analysis_enabled else "false"
     if _analysis_enabled:
         try:
-            from .analysis import FileAffinityAnalyzer, analyze_project
             _deps = analyze_project(agent_meta_root)
             _analyzer = FileAffinityAnalyzer(agent_meta_root)
             variables["FILE_AFFINITY_HINT"] = _analyzer.format_hint(_deps)
@@ -846,9 +863,6 @@ def _build_platform_variables(
     before `_build_dod_variables()`/quality-pipelines (the table only reflects
     role/orchestrator flags known at this point, matching pre-#566 behavior).
     """
-    from .context_templates.builder import TemplateBuilder
-    from .delegation_table import get_active_agents_data
-
     # SYSTEMS_ENGINEERING_ENABLED
     se_config = config.get("systems-engineering", {})
     variables["SE_ENABLED"] = "true" if se_config.get("enabled", False) else "false"
@@ -916,7 +930,9 @@ def _build_dod_variables(variables: dict, config: dict, agent_meta_root: Path) -
     Parameter contract:
         variables: mutated in place — receives DOD_REQ_TRACEABILITY,
             DOD_TESTS_REQUIRED, DOD_CODEBASE_OVERVIEW, DOD_SECURITY_AUDIT,
-            DOD_PRESET, DOD_SE_REQUIRED/OPTIONAL/RECOMMENDED/STRICT,
+            DOD_AI_SECURITY_REVIEW, DOD_PROMPT_GOVERNANCE,
+            DOD_LIFECYCLE_OWNERSHIP, DOD_PRESET,
+            DOD_SE_REQUIRED/OPTIONAL/RECOMMENDED/STRICT,
             DOD_REQ_BLOCK and DOD_TESTS_BLOCK.
         config: the loaded project.yaml dict (read-only).
         agent_meta_root: agent-meta source root (for dod-presets.yaml).
@@ -926,8 +942,6 @@ def _build_dod_variables(variables: dict, config: dict, agent_meta_root: Path) -
         reused by `_build_pipeline_variables()` for `build_pipeline_variables()`,
         so DoD-preset resolution happens exactly once per `build_variables()` call.
     """
-    from .dod import resolve_dod
-
     # DOD_*: resolve from dod-preset (base) + dod (overrides).
     # Precedence: dod (project override) > dod-preset > "full" (implicit default).
     dod_resolved = resolve_dod(config, agent_meta_root)
@@ -935,6 +949,9 @@ def _build_dod_variables(variables: dict, config: dict, agent_meta_root: Path) -
     variables["DOD_TESTS_REQUIRED"]   = "true" if dod_resolved.get("tests-required", True) else "false"
     variables["DOD_CODEBASE_OVERVIEW"] = "true" if dod_resolved.get("codebase-overview", True) else "false"
     variables["DOD_SECURITY_AUDIT"]   = "true" if dod_resolved.get("security-audit", False) else "false"
+    variables["DOD_AI_SECURITY_REVIEW"] = "true" if dod_resolved.get("ai-security-review", False) else "false"
+    variables["DOD_PROMPT_GOVERNANCE"] = "true" if dod_resolved.get("prompt-governance", False) else "false"
+    variables["DOD_LIFECYCLE_OWNERSHIP"] = "true" if dod_resolved.get("lifecycle-ownership", False) else "false"
     variables["DOD_PRESET"]           = config.get("dod-preset", "full")
     # SE-Required mode: derive boolean flags from the se-required string field
     se_required = str(dod_resolved.get("se-required", "false")).lower()
@@ -983,11 +1000,6 @@ def _build_pipeline_variables(
     variables["REFLECTION_PAIRS_ENABLED"] = "false"
     variables["MAX_ITERATIONS"] = "3"  # default for reflection loops
     try:
-        from .reflection import (
-            apply_project_overrides,
-            load_project_overrides,
-            load_reflection_pairs,
-        )
         _refl_pairs = load_reflection_pairs(str(agent_meta_root / "config"))
         _refl_overrides = load_project_overrides(
             str(agent_meta_root / ".meta-config" / "project.yaml")
@@ -1001,14 +1013,17 @@ def _build_pipeline_variables(
             )
             variables["MAX_ITERATIONS"] = str(_main_pair.get("max_iterations", 3))
     except Exception:  # noqa: BLE001
-        # Fallback: keep existing behavior (check role-defaults.yaml directly)
+        # Fallback: keep existing behavior (check role-defaults.yaml directly).
+        # Canonical single-file loader (Issue #479), fail-soft: absent file,
+        # malformed YAML or missing PyYAML all yield {} — mirroring the former
+        # exists()+_YAML_AVAILABLE guards around the manual safe_load.
         try:
             roles_defaults_path = agent_meta_root / "config" / "role-defaults.yaml"
-            if roles_defaults_path.exists() and _YAML_AVAILABLE:
-                with roles_defaults_path.open(encoding="utf-8") as f:
-                    roles_defaults = _yaml.safe_load(f) or {}
-                if roles_defaults.get("reflection_pairs"):
-                    variables["REFLECTION_PAIRS_ENABLED"] = "true"
+            roles_defaults = load_yaml_file(
+                roles_defaults_path, on_error="default", default={},
+            )
+            if roles_defaults.get("reflection_pairs"):
+                variables["REFLECTION_PAIRS_ENABLED"] = "true"
         except Exception as e:  # noqa: BLE001
             unmapped.append(f"reflection-pairs (fallback): {e}")
     # QUALITY_PIPELINES_ENABLED: auto-detect from role-defaults.yaml + project overrides
@@ -1024,7 +1039,6 @@ def _build_pipeline_variables(
             effective = {k: v for k, v in effective.items()
                          if not k.startswith("se-")}
         # Validate pipeline agent references against available roles
-        from .roles import build_role_map, load_roles_config
         all_roles = list(build_role_map(agent_meta_root).keys())
         if "roles" in config:
             available_roles = set(config["roles"])
@@ -1155,8 +1169,6 @@ def _build_convention_variables(variables: dict, config: dict, agent_meta_root: 
     unconditionally (not role-gated like the block variables above) — see the
     inline comment at its assignment for why.
     """
-    from .conventions import render_convention_block, resolve_conventions
-
     _conv_log = SyncLog()
     _roles_list = config.get("roles")
     _active_roles = set(_roles_list) if _roles_list is not None else None
@@ -1211,9 +1223,27 @@ def build_variables(config: dict, agent_meta_root: Path, project_root: Path | No
     effective = _build_pipeline_variables(variables, unmapped, config, agent_meta_root, dod_resolved)
     # INTENT_ROUTING_TABLE: role rows plus pipeline signal_keywords rows,
     # using the same `effective` quality-pipelines dict resolved above.
-    from .delegation_table import get_intent_routing_table
     variables["INTENT_ROUTING_TABLE"] = get_intent_routing_table(
         agent_meta_root, config, variables, pipelines=effective
+    )
+    # INTENT_ROUTING_TOOLS (issue #264): the structured route_intent tool
+    # definition, rendered once per provider via its handoff_format
+    # capability key (config/provider-capabilities.yaml). Two-phase by
+    # design: build_variables is provider-agnostic (one shared dict), so the
+    # provider-mapped prerender is stored under _INTENT_ROUTING_TOOL_DEFS and
+    # resolved to the actual placeholder value in
+    # agent_sync._build_provider_vars — the only place where the provider
+    # name being synced is known. Providers without a handoff_format render
+    # "" (fail-soft, same semantics as the PAL missing-definition handling).
+    # Active providers only: resolve_providers applies the project's
+    # ai-providers list and deactivation filter, matching the per-provider
+    # sync loop's provider set.
+    variables["_INTENT_ROUTING_TOOL_DEFS"] = build_routing_tool_definitions_for_providers(
+        agent_meta_root,
+        config,
+        variables,
+        providers=resolve_providers(config, load_providers_config(agent_meta_root)),
+        pipelines=effective,
     )
     _build_snippet_variables(variables, agent_meta_root)
     _build_convention_variables(variables, config, agent_meta_root)

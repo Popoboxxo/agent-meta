@@ -34,7 +34,10 @@ import json
 import logging
 import os
 import urllib.request
+from pathlib import Path
 from typing import Any
+
+from .io import load_json_file
 
 logger = logging.getLogger(__name__)
 
@@ -721,10 +724,14 @@ def discover_models(_project_root: str | None = None) -> dict[str, Any]:
     # that is almost certainly caused by a network outage rather than real data.
     MIN_MODELS_TO_WRITE = 10
     if len(deduped) < MIN_MODELS_TO_WRITE:
-        # Try to preserve the existing registry
+        # Try to preserve the existing registry. Canonical JSON loader
+        # (Issue #479), strict: a malformed registry now raises SyncError
+        # (with path) instead of a raw JSONDecodeError — same abort-with-
+        # clear-message semantics.
         if os.path.exists(registry_path):
-            with open(registry_path, encoding="utf-8") as _f:
-                _existing = json.loads(_f.read())
+            _existing = load_json_file(
+                Path(registry_path), on_error="raise", default={},
+            )
             existing_count = len(_existing.get("models", []))
             if existing_count >= MIN_MODELS_TO_WRITE:
                 logger.warning(

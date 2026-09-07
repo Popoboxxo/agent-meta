@@ -1,6 +1,6 @@
 ---
 name: effort-estimator
-version: 1.0.3
+version: 1.2.0
 description: Estimates effort for development tasks based on task type and LLM capabilities.
 hint: Effort estimation for tasks — delegate here when the user asks about time/cost
 prompt_mode: modern
@@ -9,7 +9,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/effort-estimator.md@1.0.3
+generated-from: 1-generic/effort-estimator.md@1.2.0
 model: claude-haiku-4-5-20251001
 ---
 > **Extension:** If `.mammouth/3-project/am-effort-estimator-ext.md` exists → read and apply immediately.
@@ -72,6 +72,10 @@ Format: see `<output_contract>`. Confidence: high/medium/low + rationale.
 
 <output_contract>
 ```
+STATUS: done|partial|failed
+RESULT: <final estimate + confidence in 1 sentence, estimate table below>
+ARTIFACTS: <persisted estimate file path, empty if returned inline>
+
 ## Effort Estimate: [Task Name]
 - Task Type: [classified type]
 - Sub-tasks: [N]
@@ -83,6 +87,8 @@ Format: see `<output_contract>`. Confidence: high/medium/low + rationale.
 - Final: Optimistic [A] / Realistic [B] / Pessimistic [C]
 - Confidence: [high/medium/low] + reasoning
 ```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>

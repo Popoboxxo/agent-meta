@@ -81,6 +81,12 @@
       "type": ["object", "array"],
       "description": "The domain-specific data being handed over. Must conform to the schema referenced by schema_ref. When batch is true, payload is an array of task objects — each with a task_id (local to the batch) plus domain-specific fields. source_agent and target_agent apply to ALL tasks in the batch.",
       "additionalProperties": true,
+      "properties": {
+        "tier_override": {
+          "type": "string",
+          "description": "Optional. Per-task tier override (issue #346): overrides the role→tier resolution (config/role-defaults.yaml → model) for exactly this dispatch. Guardrails: (1) preset bounds — the tier must exist in the active tier preset (config/tier-presets.yaml); unknown or out-of-preset tiers are rejected, falling back to the role default; (2) audit-log duty — every override attempt (applied OR rejected) must be recorded in the delegation tracker/checkpoint as 'tier_override=<tier> (applied|rejected: <reason>)'; (3) no downgrade of security-critical roles (config/role-defaults.yaml → tier-override-policy.security-critical-roles, default: security-auditor, code-reviewer). Reference implementation: resolve_tier_override() in scripts/lib/delegation_syntax.py (dormant by design — prompt-enforced via the orchestrator template and rules/1-generic/a2a-delegation-gates.md)."
+        }
+      },
       "items": {
         "type": "object"
       }
@@ -90,7 +96,7 @@
       "minimum": 0,
       "maximum": 50,
       "default": 0,
-      "description": "Depth of this handoff in the delegation chain. 0 = main chat, 1 = orchestrator, 2+ = worker/sub-worker. Envelopes with delegation_depth exceeding the configured max (project.yaml → orchestrator.delegation.max_depth, default 10) MUST be rejected. Self-handoff (source_agent == target_agent) is enforced separately and cannot be disabled."
+      "description": "Depth of this handoff in the delegation chain. 0 = main chat, 1 = orchestrator, 2+ = worker/sub-worker. Depth limits are a documented convention, not a locally enforced gate (issue #346): the platform (e.g. Claude Code) enforces its own subagent depth caps, so the former local max_depth check and the project.yaml configuration (orchestrator.delegation.max_depth, default 10) are documentation-only references — see rules/1-generic/a2a-delegation-gates.md and docs/concepts/a2a-handoff-protocol.md. Self-handoff (source_agent == target_agent) remains a hard reject and cannot be disabled."
     },
     "trace_parent": {
       "type": "string",

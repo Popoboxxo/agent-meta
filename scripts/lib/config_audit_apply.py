@@ -3,7 +3,9 @@
 Split out of ``config_audit.py`` (which crossed the 600-line module limit,
 see ``.claude/skills/conventions`` / CLAUDE.md) -- detection (``audit_config``)
 and remediation (``apply_audit``) are separate concerns and the only coupling
-between them is the :class:`~config_audit.AuditReport` data shape.
+between them is the :class:`~config_audit_types.AuditReport` data shape,
+imported from the ``config_audit_types`` leaf module (Issue #478) so the pair
+never references each other.
 
 Design constraint: :func:`apply_audit` edits ``project.yaml`` line-by-line
 instead of re-dumping via ``yaml.dump`` so hand-written comments survive
@@ -15,12 +17,9 @@ from __future__ import annotations
 import re
 from datetime import date
 from pathlib import Path
-from typing import TYPE_CHECKING
 
+from .config_audit_types import AuditReport
 from .io import write_atomic
-
-if TYPE_CHECKING:
-    from .config_audit import AuditReport
 
 # Marker written into disabled role lines — also used to detect already-disabled
 # lines for idempotency.

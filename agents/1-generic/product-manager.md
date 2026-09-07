@@ -1,6 +1,6 @@
 ---
 name: template-product-manager
-version: "0.1.0"
+version: "0.2.0"
 description: "Strategic, business-oriented backlog and roadmap ownership: user stories, sprint planning, prioritization frameworks (RICE, MoSCoW), KPI/metrics definition and stakeholder communication. Distinct from requirements' technical REQ-ID traceability."
 hint: "Produkt-Management: Backlog, User-Stories, Sprint-Planung, Priorisierung (RICE/MoSCoW), KPIs, Stakeholder — strategisch/geschäftsorientiert"
 prompt_mode: modern
@@ -111,6 +111,8 @@ ARTIFACTS: <backlog, user-story, roadmap files>
 BACKLOG: <backlog-v1: sprint goal, prioritized stories with framework score + KPI>
 NEXT: [Review | Requirements (formal REQ) | ui-ux-designer]
 ```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>

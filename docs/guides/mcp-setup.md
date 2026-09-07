@@ -99,6 +99,9 @@ sync.py generiert automatisch:
 1. Eintrag in `config/plugin-catalog.yaml` anlegen (`kind: mcp-server`; description, tools, connection, secrets)
 2. Optional: In Platform-Bundle `rules/2-platform/<platform>-mcp.yaml` referenzieren
 3. `sync.py` ausführen — Regel-Dateien und gitignore-Einträge werden automatisch generiert
+4. [MCP Onboarding-Checkliste](mcp-onboarding-checklist.md) durchlaufen — ohne kuratierte
+   Lazy-Rule bleibt ein neuer Server für Agenten praktisch unsichtbar (Signal-Hierarchie:
+   Hook > Lazy-Rule > Inline-Docs > generisches MCP)
 
 ---
 

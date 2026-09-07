@@ -53,6 +53,15 @@ providers:
     # Terminal (Bash/command-execution) tool name — used by viz.py's fallback
     # CLI-logging hint. null means: no known terminal tool for this provider.
     bash_tool_name: Bash
+    # Provider-root directories for gitignore.ignore-provider-dirs (issue #557).
+    # When that project.yaml toggle is enabled, the managed .gitignore block
+    # ignores these WHOLE directories (with trailing slash) instead of listing
+    # provider-internal sub-paths. Explicit key wins; fallback derivation when
+    # missing: first dot-prefixed segment of agents_dir (here would yield
+    # .claude/ anyway). Repo-root files (CLAUDE.personal.md, sync.log, .mcp.json)
+    # are NOT affected — they keep their per-category gitignore behavior.
+    provider_root_dirs:
+      - .claude/
     gitignore_entries:
       - .claude/settings.local.json
       - .claude/agent-memory-local/
@@ -116,7 +125,42 @@ providers:
     context_template: templates/configs/AGENTS.project-template.md
     has_rules: true
     rules_dir: .gemini/rules
-    has_hooks: false
+    has_hooks: true
+    # Antigravity lifecycle hooks (issue #674 Phase 3.1). The agent-meta
+    # "Gemini" provider targets VS Code / Antigravity (AGY), whose hook
+    # contract is VERIFIED against the official docs
+    # (antigravity.google/docs/hooks, state 2026-09):
+    #   * Registration artifact: a hooks.json file — workspace location is
+    #     the documented customization dir `.agents/hooks.json` (global:
+    #     ~/.gemini/config/hooks.json). NOT `.gemini/settings.json` — that
+    #     file is Gemini CLI's settings surface, which AGY does not read
+    #     hooks from, and NOT `.gemini/hooks.json` (no documented AGY
+    #     workspace location; `~/.gemini/hooks.json` is only a legacy global
+    #     path). See `hooks_config_file` below.
+    #   * Events: PreToolUse, PostToolUse, PreInvocation, PostInvocation,
+    #     Stop. PreToolUse/PostToolUse take a matcher + nested hooks array;
+    #     PreInvocation/PostInvocation/Stop use a flat command list.
+    #   * Stdin payload: {"hookEventName", "toolCall": {name, args},
+    #     "stepIdx", "conversationId", "workspacePaths", ...} — camelCase
+    #     keys, no `cwd`, NOT Claude's hook_event_name/tool_name/tool_input.
+    #   * Output: {"decision": "allow"|"deny", "reason"} JSON on stdout —
+    #     NOT exit-code-2-blocks + stderr.
+    # All three legs deviate from Claude Code → dedicated protocol value
+    # (option b, #674 brief): hooks/1-generic/*.sh speak the Claude contract,
+    # so every mirrored hook is registered through the translating adapter
+    # hooks/1-generic/antigravity-json-adapter.sh (payload keys, AGY tool
+    # names, and deny-JSON response) instead of being registered raw.
+    hook_protocol: antigravity-hooks-json
+    # Hook scripts are mirrored to the hooks.json directory (documented AGY
+    # workspace customization root; relative command paths in hooks.json
+    # resolve against it). The .agent-meta-managed index and the lib/ +
+    # release-gates/ subdirectories live there like for every other provider.
+    hooks_dir: .agents/hooks
+    # Registration artifact (consumed by scripts/lib/hooks.py's protocol
+    # dispatch — no provider-name branch anywhere). Path-collision coverage:
+    # tests/test_provider_hooks_config.py sweeps hooks_config_file like
+    # hooks_dir/settings_file.
+    hooks_config_file: .agents/hooks.json
     has_commands: true
     commands_dir: .gemini/commands
     commands_ext: .toml
@@ -124,6 +168,7 @@ providers:
     capabilities:
       - agents
       - rules
+      - hooks
       - commands
       - settings
       - snippets
@@ -140,6 +185,22 @@ providers:
     isolation-mechanism: gemini-toml-policy
     isolation-display-name: "Gemini CLI"
     bash_tool_name: code_execution
+    # Provider roots for gitignore.ignore-provider-dirs (issue #557) — see the
+    # Claude block for the full explanation.
+    # NOTE: `.agents/` is deliberately NOT a provider root, even though the
+    # Antigravity hook artifacts (hooks_config_file .agents/hooks.json +
+    # hooks_dir .agents/hooks) live under it: `.agents/` is a shared
+    # cross-tool convention directory (Codex claims `.agents/skills`, other
+    # tools scan it too). Ignoring the whole directory would hide other
+    # tools' files; the two hook artifacts are meant to be COMMITTED anyway
+    # (same policy as .claude/settings.json), so nothing needs ignoring here.
+    # Cross-provider caveat: with Codex active AND project.yaml
+    # gitignore.ignore-provider-dirs enabled, Codex's provider root `.agents/`
+    # ignores the whole directory — projects combining both must add
+    # `gitignore.exceptions: ['.agents/']` (exceptions invert the root
+    # emission in scripts/lib/gitignore.py compute_base_gitignore_entries).
+    provider_root_dirs:
+      - .gemini/
     gitignore_entries:
       - .gemini/settings.local.json
       - .gemini/pending-tasks.md
@@ -209,6 +270,11 @@ providers:
       - AGENTS.md
     isolation-mechanism: opencode-permissions
     bash_tool_name: bash
+    # Provider roots for gitignore.ignore-provider-dirs (issue #557) — see the
+    # Claude block for the full explanation. opencode.json (repo root) is NOT a
+    # provider root and stays tracked unless gitignore.settings ignores it.
+    provider_root_dirs:
+      - .opencode/
     gitignore_entries:
       - AGENTS.personal.md
       - .opencode/settings.local.json
@@ -256,6 +322,7 @@ providers:
     has_hooks: false
     has_commands: true
     has_settings: true
+    has_prompt_commands: true
     capabilities:
       - agents
       - rules
@@ -274,6 +341,10 @@ providers:
       - .continue/
     isolation-mechanism: continue-soft-rule
     bash_tool_name: null
+    # Provider roots for gitignore.ignore-provider-dirs (issue #557) — see the
+    # Claude block for the full explanation.
+    provider_root_dirs:
+      - .continue/
     gitignore_entries:
       - .continue/config.local.yaml
       - .continue/pending-tasks.md
@@ -322,13 +393,44 @@ providers:
       - snippets
       - skills
       - context-managed-block
+      - mcp
     artifact_dir: .github/copilot/artifacts
     checkpoint_dir: .meta-viz
     isolation-dirs:
       - .github/copilot/
     bash_tool_name: null
+    # Provider roots for gitignore.ignore-provider-dirs (issue #557). Explicit
+    # (NOT derived): the agents_dir fallback would yield ".github/" — ignoring
+    # that whole directory would also exclude GitHub workflows etc. The
+    # provider root is ONLY the copilot subdirectory.
+    #
+    # `.vscode/` is deliberately NOT a provider root, even though the
+    # agent-mode MCP config lives at .vscode/mcp.json: it is a shared editor
+    # directory owned by VS Code itself (user settings, extensions, debug
+    # configs, launch.json — none of it agent-meta-managed). Ignoring it
+    # would hide unrelated editor configuration, and mcp.json is a committed
+    # artifact (see mcp-config below), so nothing under .vscode/ needs
+    # provider-root treatment (same reasoning class as the .github/ case
+    # above). Copilot is the only consumer of .vscode/mcp.json today; the
+    # path-collision sweep in tests/test_provider_hooks_config.py guards it.
+    provider_root_dirs:
+      - .github/copilot/
     gitignore_entries: []
-    mcp-config: {}
+    # VS Code agent-mode MCP (issue #674 Phase 3.3): Copilot (agent mode)
+    # reads MCP servers from .vscode/mcp.json in VS Code's own settings
+    # shape — a top-level {"servers": {...}} key, NOT Claude's
+    # {"mcpServers": ...}. Format key `vscode-settings` (dispatch table in
+    # scripts/lib/mcp_provider_config.py, alongside claude-settings /
+    # gemini-settings / continue-yaml / codex-toml-mcp / zcode-json).
+    # Committed file carries ${env:VAR} placeholders — VS Code expands
+    # ${env:VAR} natively in mcp.json values (same strategy as Claude's
+    # .mcp.json). NO secrets-file: .vscode/mcp.json stays committed and
+    # ${env:VAR} keeps secrets out of it (Codex block shows the equivalent
+    # no-secrets-file precedent); gitignore_entries stays empty for the
+    # same reason.
+    mcp-config:
+      committed-file: .vscode/mcp.json
+      format: vscode-settings
     skills_dir: .github/copilot/skills
     snippets_dir: .github/copilot/snippets
     pending_tasks_file: .github/copilot/pending-tasks.md
@@ -385,6 +487,10 @@ providers:
       - .mammouth/
       - MAMMOUTH.md
     bash_tool_name: bash
+    # Provider roots for gitignore.ignore-provider-dirs (issue #557) — see the
+    # Claude block for the full explanation.
+    provider_root_dirs:
+      - .mammouth/
     gitignore_entries:
       - .mammouth/pending-tasks.md
     mcp-config: {}
@@ -453,6 +559,13 @@ providers:
       - .codex/
       - AGENTS.md
     bash_tool_name: Bash        # V4 (2026-09-04): canonical hook/matcher name; apply_patch matches as Edit/Write alias
+    # Provider roots for gitignore.ignore-provider-dirs (issue #557). Two roots:
+    # .codex/ plus repo-root .agents/ (skills_dir lives there). rules_dir
+    # "rules" (repo root) must NEVER become a provider root — it is a plain
+    # project directory shared with other tooling.
+    provider_root_dirs:
+      - .codex/
+      - .agents/
     gitignore_entries:
       - .codex/pending-tasks.md
     mcp-config:
@@ -511,6 +624,10 @@ providers:
       - .zcode/
       - AGENTS.md
     bash_tool_name: Bash        # V5 (2026-09-04): 9 built-ins + Agent dispatch, all 1:1 names
+    # Provider roots for gitignore.ignore-provider-dirs (issue #557) — see the
+    # Claude block for the full explanation.
+    provider_root_dirs:
+      - .zcode/
     gitignore_entries:
       - .zcode/pending-tasks.md
     mcp-config:
@@ -565,6 +682,10 @@ providers:
       - .kimi-code/
       - AGENTS.md
     bash_tool_name: Bash        # V14 (2026-09-04): exact case-sensitive name, 4 doc sources
+    # Provider roots for gitignore.ignore-provider-dirs (issue #557) — see the
+    # Claude block for the full explanation.
+    provider_root_dirs:
+      - .kimi-code/
     gitignore_entries:
       - .kimi-code/pending-tasks.md
     mcp-config:

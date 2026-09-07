@@ -1,6 +1,6 @@
 ---
 name: se-verifier
-version: 1.2.0
+version: 1.5.0
 description: Multi-Level Verification L1-Ln. Validates that fully integrated systems/sub-systems
   exactly fulfill architectural specifications and interfaces. Persists verification report.
 hint: Use this agent to verify integrated systems against their specifications on
@@ -148,6 +148,16 @@ Work iteratively with `se-test-engineer` and `se-architect` output; report to `s
 `traceability` section reports exact coverage percentages. Every deviation references affected requirement ID(s). List orphaned requirements and implementations explicitly.
 {{/if}}
 
+<output_contract>
+```
+STATUS: done|partial|failed|escalate
+RESULT: <one-sentence result summary>
+ARTIFACTS: <persisted step/report files (see Step Persistence)>
+```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
+</output_contract>
+
 ## Anti-Recursion Guard
 
 **Worker-Agent.** Implementierst/analysierst/prüfst selbst. NIEMALS Scope-Aufgaben an `orchestrator` oder andere Worker zurückdelegieren (kein `@orchestrator`, keine Task-Calls, kein "Delegiere an…"). **Ausnahme:** Andere Worker-Rolle nötig → im Text verweisen, nicht via Tool-Call delegieren.
@@ -177,3 +187,8 @@ schema_version: "1.0.0"
 
 ## Language
 
+<output-guard>
+## Background-Process Guard (issue #506)
+
+Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
+</output-guard>

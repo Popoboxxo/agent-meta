@@ -24,9 +24,10 @@ Tiers (mirroring audit Section 7.2):
   3. Temp-project    — a minimal consumer project (built in pytest tmp_path,
                        zero repo pollution) with platforms:[hacs] is synced
                        via the same lib entry points `python scripts/sync.py`
-                       drives on its main path (sync.py:1133-1145, which —
-                       unlike validate_test_repo at sync.py:396-403 — passes
-                       platform_vars into sync_agents_for_provider/sync_rules,
+                       drives on its main path (_handle_sync in
+                       lib/cli_commands.py, which — unlike validate_test_repo
+                       also in lib/cli_commands.py — passes platform_vars into
+                       sync_agents_for_provider/sync_rules,
                        so {{platform.hacs.*}} substitution is exercised):
                        sync_agents_for_provider + sync_rules.
 

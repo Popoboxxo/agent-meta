@@ -442,3 +442,131 @@ def test_write_provider_config_warns_and_skips_unknown_format(tmp_path):
 
     assert not path.exists()
     assert any("unknown provider format 'mystery-format'" in w for w in log.warnings)
+
+
+# ---------------------------------------------------------------------------
+# Copilot agent-mode MCP (vscode-settings) — issue #674 Phase 3.3
+# ---------------------------------------------------------------------------
+
+def test_write_provider_config_vscode_settings_writes_servers_key(tmp_path):
+    """VS Code agent-mode MCP (.vscode/mcp.json) uses a top-level {"servers": ...}
+    key — NOT the Claude {"mcpServers": ...} shape."""
+    path = tmp_path / ".vscode" / "mcp.json"
+    log = SyncLog()
+    entries = {"srv": {"type": "stdio", "command": "npx", "args": ["-y", "fs"]}}
+
+    _write_provider_config(path, entries, "vscode-settings", log, dry_run=False, allow_secrets=True)
+
+    written = json.loads(path.read_text(encoding="utf-8"))
+    assert written["servers"] == entries
+    assert "mcpServers" not in written
+    assert any("servers" in a for a in log.actions)
+
+
+def test_write_provider_config_vscode_settings_idempotent(tmp_path):
+    path = tmp_path / ".vscode" / "mcp.json"
+    log = SyncLog()
+    entries = {"srv": {"type": "stdio", "command": "npx", "args": ["-y", "fs"]}}
+
+    _write_provider_config(path, entries, "vscode-settings", log, dry_run=False, allow_secrets=True)
+    first = path.read_text(encoding="utf-8")
+
+    log2 = SyncLog()
+    _write_provider_config(path, entries, "vscode-settings", log2, dry_run=False, allow_secrets=True)
+    assert any("unchanged" in s for s in log2.skipped)
+    assert path.read_text(encoding="utf-8") == first
+
+
+def test_vscode_settings_replaces_managed_key_preserving_user_keys(tmp_path):
+    """The shared JSON writer replaces the managed "servers" key wholesale
+    (same semantics as mcpServers for every other JSON format) while
+    unrelated top-level keys (e.g. VS Code "inputs") are preserved."""
+    path = tmp_path / ".vscode" / "mcp.json"
+    _write(path, json.dumps({"servers": {"mine": {"type": "stdio", "command": "x"}},
+                             "inputs": [{"type": "promptString", "id": "k"}]}))
+    log = SyncLog()
+
+    _write_provider_config(
+        path, {"srv": {"type": "stdio", "command": "npx"}},
+        "vscode-settings", log, dry_run=False, allow_secrets=True,
+    )
+
+    written = json.loads(path.read_text(encoding="utf-8"))
+    assert set(written["servers"]) == {"srv"}
+    assert written["inputs"] == [{"type": "promptString", "id": "k"}]  # preserved
+
+
+def test_generate_provider_configs_vscode_settings_wires_committed_placeholders(tmp_path):
+    """Full pipeline: {{VAR}} → ${env:VAR} (VS Code-native expansion) in the
+    committed .vscode/mcp.json; sse entries map to VS Code's "http" type;
+    no secrets-file → no local file is generated."""
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+
+    _write_mcp_catalog(agent_meta_root, {
+        "search": {
+            "connection": {
+                "type": "sse",
+                "url": "{{SEARCH_URL}}",
+                "headers": {"Authorization": "Bearer {{SEARCH_TOKEN}}"},
+            },
+        },
+        "local-fs": {
+            "connection": {
+                "type": "stdio",
+                "command": "npx",
+                "args": ["-y", "fs"],
+                "env": {"API_KEY": "{{API_KEY}}"},
+            },
+        },
+    })
+
+    config = {"mcp-servers": ["search", "local-fs"], "platforms": []}
+    provider_config = {
+        "Copilot": {
+            "mcp-config": {
+                "committed-file": ".vscode/mcp.json",
+                "format": "vscode-settings",
+            }
+        }
+    }
+    log = SyncLog()
+
+    generate_provider_configs(
+        agent_meta_root, project_root, config, provider_config, log,
+        dry_run=False, provider="Copilot",
+    )
+
+    mcp_json_path = project_root / ".vscode" / "mcp.json"
+    assert mcp_json_path.exists()
+    written = json.loads(mcp_json_path.read_text(encoding="utf-8"))
+
+    search = written["servers"]["search"]
+    assert search["type"] == "http"  # VS Code deprecates the legacy "sse" type
+    assert search["url"] == "${env:SEARCH_URL}"
+    assert search["headers"]["Authorization"] == "Bearer ${env:SEARCH_TOKEN}"
+
+    local_fs = written["servers"]["local-fs"]
+    assert local_fs["type"] == "stdio"
+    assert local_fs["command"] == "npx"
+    assert local_fs["env"] == {"API_KEY": "${env:API_KEY}"}
+
+    # No secrets-file strategy → no local file may be generated.
+    assert not (project_root / ".vscode" / "mcp.local.json").exists()
+
+
+def test_copilot_mcp_config_wiring_in_real_registry():
+    """The real config/ai-providers.yaml Copilot block: mcp capability on,
+    .vscode/mcp.json committed (VS Code agent-mode shape), NO secrets-file
+    (committed ${env:VAR} placeholders keep secrets out — Codex block shows
+    the equivalent no-secrets-file precedent), and `.vscode/` NOT claimed as
+    a provider root (shared editor directory, not Copilot-only)."""
+    repo_root = Path(__file__).resolve().parents[1]
+    provider_config = load_providers_config(repo_root)
+    copilot = provider_config["Copilot"]
+    assert "mcp" in copilot["capabilities"]
+    mcp_cfg = copilot["mcp-config"]
+    assert mcp_cfg["format"] == "vscode-settings"
+    assert mcp_cfg["committed-file"] == ".vscode/mcp.json"
+    assert "secrets-file" not in mcp_cfg
+    assert ".vscode/" not in copilot.get("provider_root_dirs", [])

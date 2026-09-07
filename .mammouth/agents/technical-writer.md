@@ -1,6 +1,6 @@
 ---
 name: technical-writer
-version: 0.1.0
+version: 0.2.0
 description: 'External developer- and user-facing documentation: API references, getting-started
   guides, SDK docs, tutorials, CLI help pages, user-facing release notes and UX microcopy.
   Distinct from internal team docs owned by documenter.'
@@ -14,7 +14,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/technical-writer.md@0.1.0
+generated-from: 1-generic/technical-writer.md@0.2.0
 model: claude-haiku-4-5-20251001
 ---
 > **Extension:** If `.mammouth/3-project/am-technical-writer-ext.md` exists → read and apply immediately.
@@ -104,6 +104,8 @@ ARTIFACTS: <created/changed doc files>
 DOC_OUTPUT: <external-doc-v1: type, audience, verified examples>
 NEXT: [Review | Developer change | Documenter (internal)]
 ```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>

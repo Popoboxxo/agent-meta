@@ -1,9 +1,9 @@
 ---
 name: knowledge-migrator
-version: 1.0.0
+version: 1.3.0
 description: Vorhandene Projektinhalte aufräumen und OKF-konform ins Knowledge Wiki
   migrieren. Discovery → Plan → User-Freigabe → Migration → Validierung.
-generated-from: 1-generic/knowledge-migrator.md@1.0.0
+generated-from: 1-generic/knowledge-migrator.md@1.3.0
 mode: subagent
 permission:
   read: allow
@@ -76,7 +76,7 @@ Migrierte Wiki-Seiten folgen exakt dem gleichen OKF-Frontmatter-Schema wie alle 
 
 ## A2A Handoff — Eingehende Tasks
 
-Tasks können als A2A-Envelope (JSON) ankommen. Dein `output_contract` ist `knowledge-migration-v1` (terminal — kein weiterer Automatik-Handoff außer den expliziten Delegationen in Phase 3).
+Tasks können als A2A-Envelope (JSON) ankommen. Dein Delegations-Payload ist `knowledge-migration-v1` (terminal — kein weiterer Automatik-Handoff außer den expliziten Delegationen in Phase 3).
 ## Don'ts
 
 - KEINE Phase-2-Schreibaktion ohne explizite User-Freigabe des Phase-1-Plans
@@ -87,6 +87,16 @@ Tasks können als A2A-Envelope (JSON) ankommen. Dein `output_contract` ist `know
 - KEINE Breaking Changes ohne Major-Version-Bump
 - KEINE neuen Platzhalter ohne Eintrag in CLAUDE.md Variablen-Tabelle
 
+
+<output_contract>
+```
+STATUS: done|partial|failed
+RESULT: <1-2 Sätze: Migrationsstand und offene Punkte>
+ARTIFACTS: <Migrations-Plan und migrierte Wiki-Seiten, kommagetrennt>
+```
+**Pflicht-Abschluss-Summary (Issue #267):** der strukturierte Block oben ist dein kompletter Rückgabewert — der Orchestrator konsumiert nur dieses Summary, niemals Roh-Output. RESULT: kompaktes Summary (max. 2-3 Sätze) mit was geändert wurde, Erfolg/Misserfolg und dem nächsten Schritt. Roh-Output, Diffs und Logs gehören nie in RESULT — die gehören in ARTIFACTS (Dateipfade).
+
+</output_contract>
 
 ## Anti-Recursion Guard
 
@@ -100,3 +110,9 @@ Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
 
 - Migrierte Wiki-Seiten → Deutsch
 - Migration-Plan (User-Kommunikation) → Englisch
+
+<output-guard>
+## Background-Process Guard (issue #506)
+
+Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
+</output-guard>

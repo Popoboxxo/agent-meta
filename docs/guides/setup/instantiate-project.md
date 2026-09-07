@@ -201,6 +201,7 @@ Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 | `.claude/agents/intern-developer.md` | `1-generic/intern-developer.md` (optional, Easter-Egg/Gag-Agent — read-only, nicht für echte Arbeit) |
 | `.claude/agents/tester.md` | `1-generic/tester.md` |
 | `.claude/agents/e2e-tester.md` | `1-generic/e2e-tester.md` (optional, für Web-Projekte mit E2E/visueller Regression/a11y) |
+| `.claude/agents/test-executor.md` | `1-generic/test-executor.md` (optional, Lightweight-Execution bestehender Suites: Pass/Fail-Counts, Exit-Codes, Stdout-Auszüge — Read+Bash only, nano-Tier; Test-Design bleibt bei `tester`) |
 | `.claude/agents/validator.md` | `1-generic/validator.md` |
 | `.claude/agents/requirements.md` | `1-generic/requirements.md` |
 | `.claude/agents/documenter.md` | `1-generic/documenter.md` |
@@ -216,8 +217,11 @@ Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 | `.claude/agents/se-architect.md` | `1-generic/se-architect.md` |
 | `.claude/agents/se-critic.md` | `1-generic/se-critic.md` |
 | `.claude/agents/concept-reviewer.md` | `1-generic/concept-reviewer.md` (optional, für concept-development Pipeline) |
+| `.claude/agents/concept-specifier.md` | `1-generic/concept-specifier.md` (optional, für concept-development Pipeline: Konzept → technische Spec — Interface-Verträge, Datenfluss, Acceptance-Kriterien) |
+| `.claude/agents/concept-architect.md` | `1-generic/concept-architect.md` (optional, für concept-development Pipeline: System-Design für komplexe Changes (XL) — Komponenten, Interfaces, Trade-off-Analyse) |
 | `.claude/agents/se-interface-mgr.md` | `1-generic/se-interface-mgr.md` |
 | `.claude/agents/se-termination.md` | `1-generic/se-termination.md` |
+| `.claude/agents/se-component-requirements.md` | `1-generic/se-component-requirements.md` (optional, SE-Kaskade: materialisiert L3-Component-Requirements je Leaf-Component aus der L2-COMP-Tabelle, #332) |
 | `.claude/agents/se-orchestrator.md` | `1-generic/se-orchestrator.md` |
 | `.claude/agents/se-junior-developer.md` | `1-generic/se-junior-developer.md` |
 | `.claude/agents/se-developer.md` | `1-generic/se-developer.md` |
@@ -241,6 +245,9 @@ Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 | `.claude/agents/backend-reviewer.md` | `1-generic/backend-reviewer.md` (optional, Review-Agent-Fleet: API-Contracts, Silent Failures, Concurrency) |
 | `.claude/agents/database-reviewer.md` | `1-generic/database-reviewer.md` (optional, Review-Agent-Fleet: Migration-Safety, N+1, Injection, Transaktionen) |
 | `.claude/agents/ui-reviewer.md` | `1-generic/ui-reviewer.md` (optional, Review-Agent-Fleet: Design-Token, Layout-Konsistenz, Interaction-States) |
+| `.claude/agents/ai-security-guardian.md` | `1-generic/ai-security-guardian.md` (optional, KI-spezifische Sicherheitsrisiken: halluzinierte Deps, fabrizierte IAM, unsichere Defaults — komplementär zu security-auditor/dependency-auditor) |
+| `.claude/agents/prompt-governor.md` | `1-generic/prompt-governor.md` (optional, Prompt-Governance: PromptBOM, Audit-Trail, Provenance, Banned-Patterns) |
+| `.claude/agents/app-lifecycle-governor.md` | `1-generic/app-lifecycle-governor.md` (optional, App-Lifecycle: Ownership, SLA, Data-Classification, Deprecation-Plans) |
 
 ---
 
@@ -529,8 +536,11 @@ Vollständige Anleitung: `agent-meta-manager` → Abschnitt "CLAUDE.md Review & 
 - [ ] `.claude/agents/se-architect.md` vorhanden
 - [ ] `.claude/agents/se-critic.md` vorhanden
 - [ ] `.claude/agents/concept-reviewer.md` vorhanden (wenn concept-development Pipeline genutzt)
+- [ ] `.claude/agents/concept-specifier.md` vorhanden (wenn concept-development Pipeline genutzt)
+- [ ] `.claude/agents/concept-architect.md` vorhanden (wenn concept-development Pipeline genutzt)
 - [ ] `.claude/agents/se-interface-mgr.md` vorhanden
 - [ ] `.claude/agents/se-termination.md` vorhanden
+- [ ] `.claude/agents/se-component-requirements.md` vorhanden (SE-Kaskade)
 - [ ] `.claude/agents/se-orchestrator.md` vorhanden
 - [ ] `.claude/agents/se-junior-developer.md` vorhanden
 - [ ] `.claude/agents/se-developer.md` vorhanden

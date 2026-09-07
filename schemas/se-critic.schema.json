@@ -86,6 +86,100 @@
       "description": "Actionable hints to fix rejected or blocked issues.",
       "items": { "type": "string" }
     },
+    "review_id": {
+      "type": "string",
+      "pattern": "^RVW-\\d{4}-\\d{2}-\\d{2}-\\d{3}$",
+      "description": "Review protocol ID (RVW-YYYY-MM-DD-NNN) of the persisted review protocol in the reviews directory (Issue #339 B5). REQ files reference findings via this ID."
+    },
+    "findings": {
+      "type": "array",
+      "description": "Structured findings of this iteration with stable IDs (Issue #339 B5). Mirrors the review protocol; REQ files reference these IDs instead of inlining findings.",
+      "items": {
+        "type": "object",
+        "required": ["id", "severity", "category", "description"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^RVW-\\d{4}-\\d{2}-\\d{2}-\\d{3}-\\d{2}$",
+            "description": "Finding ID: RVW-YYYY-MM-DD-NNN-<k>."
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["major", "minor", "info"],
+            "description": "Finding severity."
+          },
+          "category": {
+            "type": "string",
+            "description": "Finding category."
+          },
+          "description": {
+            "type": "string",
+            "description": "What was found."
+          },
+          "suggested_fix": {
+            "type": "string",
+            "description": "Concrete fix proposal for the generator."
+          }
+        }
+      }
+    },
+    "suspect_marks": {
+      "type": "array",
+      "description": "Suspect marks set on parent REQs by this review (bottom-up feedback, Issue #339 B6).",
+      "items": {
+        "type": "object",
+        "required": ["parent_req", "child_req", "review_id"],
+        "properties": {
+          "parent_req": {
+            "type": "string",
+            "description": "REQ-ID of the marked parent requirement."
+          },
+          "child_req": {
+            "type": "string",
+            "description": "REQ-ID of the dependent requirement whose findings triggered the mark."
+          },
+          "review_id": {
+            "type": "string",
+            "pattern": "^RVW-\\d{4}-\\d{2}-\\d{2}-\\d{3}$",
+            "description": "Review protocol that triggered the suspect mark."
+          }
+        }
+      }
+    },
+    "iteration_history": {
+      "type": "array",
+      "description": "Per-iteration summary for the audit trail (Issue #334). Lives in the final critic report in the reports directory — iteration intermediates are not persisted beside final artifacts.",
+      "items": {
+        "type": "object",
+        "required": ["iteration", "status"],
+        "properties": {
+          "iteration": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Iteration number."
+          },
+          "status": {
+            "type": "string",
+            "enum": ["approved", "rejected", "blocked"],
+            "description": "Verdict of this iteration."
+          },
+          "findings_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of findings in this iteration."
+          },
+          "review_id": {
+            "type": "string",
+            "pattern": "^RVW-\\d{4}-\\d{2}-\\d{2}-\\d{3}$",
+            "description": "Review protocol of this iteration."
+          },
+          "summary": {
+            "type": "string",
+            "description": "One-line iteration summary."
+          }
+        }
+      }
+    },
     "iteration": {
       "type": "integer",
       "description": "Current critic iteration count."
