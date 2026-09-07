@@ -99,7 +99,7 @@
     ".claude/rules/no-worktree-isolation.md": "c92ffe95d2ae83a7",
     ".claude/rules/speech-mode.md": "ddd075cff1e8ecdb",
     ".claude/rules/use-lazy-rules.md": "5c3c78290435fa9e",
-    ".claude/rules/use-orchestrator.md": "adcf5bb5d2af5ed9",
+    ".claude/rules/use-orchestrator.md": "ba0424cd86834a9a",
     ".claude/commands/add-mcp-server.md": "6203f0928d50f777",
     ".claude/commands/add-project-role.md": "214939f2e11215cb",
     ".claude/commands/add-provider.md": "117ed250e1b3211a",
