@@ -75,6 +75,8 @@ from lib.sync_pipeline import (
     _sync_stage_contexts,
     _sync_stage_drift_and_plugins,
     _sync_stage_external_skills_check,
+    _sync_stage_generated_file_drift_scan,
+    _sync_stage_generated_file_hash_capture,
     _sync_stage_gitignore,
     _sync_stage_knowledge_and_isolation,
     _sync_stage_legacy_cleanup,
@@ -1003,6 +1005,10 @@ def _handle_sync(ctx: _SyncContext) -> None:
     # Stage 5: legacy-provider cleanup.
     _sync_stage_legacy_cleanup(ctx.project_root, config, provider_config,
                                providers, ctx.args, ctx.log)
+    # Stage 5b: generated-file drift scan -- MUST run before stage 6
+    # overwrites anything (see docs/superpowers/specs/2026-09-07-generated-file-drift-detection-design.md).
+    _sync_stage_generated_file_drift_scan(ctx.agent_meta_root, ctx.project_root,
+                                          config, provider_config, ctx.args, ctx.log)
     # Stage 6: per-provider main loop; mcp_gitignore_extras crosses the
     # stage boundary by reference.
     _sync_stage_per_provider(ctx.agent_meta_root, ctx.project_root, config,
@@ -1027,6 +1033,10 @@ def _handle_sync(ctx: _SyncContext) -> None:
                           env_gitignore, ctx.args, ctx.viz_cfg, ctx.log)
     # Stage 12: lightweight config-audit summary.
     _sync_stage_config_audit(ctx.agent_meta_root, ctx.config_path, ctx.log)
+    # Stage 13: generated-file hash-baseline capture -- MUST run last, after
+    # every writer above, so it captures fully post-write state.
+    _sync_stage_generated_file_hash_capture(ctx.agent_meta_root, ctx.project_root,
+                                            config, provider_config, ctx.args, ctx.log)
 
     ctx.config = config
     ctx.mode = mode
