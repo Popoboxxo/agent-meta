@@ -32,10 +32,10 @@
 >    - **Automated Default Init:** `python .agent-meta/scripts/sync.py --init`
 > 3. **Re-Sync After Config Changes:** Re-run `python .agent-meta/scripts/sync.py` whenever `.meta-config/project.yaml` is modified.
 
-[![Version](https://img.shields.io/badge/version-0.101.0--beta.4-blue.svg)]()
+[![Version](https://img.shields.io/badge/version-0.101.0--beta.6-blue.svg)]()
 [![Python](https://img.shields.io/badge/python-3.x-green.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-gray.svg)]()
-| **Date:** 2026-09-03
+| **Date:** 2026-09-07
 
 > Central meta-repository for standardizing and reusing Claude agent roles across all projects.
 > Git submodule embedded in projects. Provides standardized agent templates (1-generic, 2-platform, 0-external).
@@ -70,7 +70,7 @@ graph TD
 ```bash
 # Add as submodule
 git submodule add https://github.com/Popoboxxo/agent-meta .agent-meta
-cd .agent-meta && git checkout v0.101.0-beta.4 && cd ..
+cd .agent-meta && git checkout v0.101.0-beta.6 && cd ..
 
 # Install dependencies
 pip install -r .agent-meta/requirements.txt
@@ -123,7 +123,7 @@ mindmap
 
 | Agent | Tier | Version | Description |
 |-------|------|---------|-------------|
-| **orchestrator** | balanced | 7.7.1 | Provider-agnostic task router: decomposes, parallelizes, delegates with FANOUT/PIPELINE/BARRIER |
+| **orchestrator** | balanced | 7.15.0 | Provider-agnostic task router: decomposes, parallelizes, delegates with FANOUT/PIPELINE/BARRIER |
 | **developer** | powerful | 4.0.1 | Feature implementation and bugfixes |
 | **junior-developer** | fast | 1.2.1 | Trivial changes (1-2 files, no architecture impact) |
 | **senior-developer** | powerful | 1.2.2 | Complex features, architecture decisions, difficult bugs |
@@ -134,7 +134,7 @@ mindmap
 | **test-executor** | nano | 1.1.0 | Lightweight execution of existing test suites: pass/fail counts, exit codes, stdout excerpts — no test design (stays with `tester`), read+bash only |
 | **validator** | balanced | 4.1.1 | Formal DoD gatekeeper: checkbox audit, REQ-ID presence, commit conventions |
 | **code-reviewer** | powerful | 1.2.2 | Code health gatekeeper: Clean Code, SOLID, blast-radius analysis |
-| **documenter** | fast | 1.4.3 | Maintains CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md, conclusions |
+| **documenter** | fast | 1.7.0 | Maintains CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md, conclusions |
 | **git** | fast | 1.4.0 | All git operations: commits, branches, merges, tags, push/pull |
 
 ### Workflow & Framework (9 agents)
@@ -145,7 +145,7 @@ mindmap
 | **release** | balanced | 1.5.0 | Versioning, changelogs, build processes, GitHub releases |
 | **ideation** | balanced | 1.7.0 | Idea exploration, vision sharpening, concept concretization |
 | **feedback** | fast | 1.2.3 | Standardizes bug reports and feature requests as GitHub issues |
-| **agent-meta-manager** | balanced | 1.12.0 | Manage agent-meta: upgrades, sync, feedback, project-specific agents |
+| **agent-meta-manager** | balanced | 1.19.0 | Manage agent-meta: upgrades, sync, feedback, project-specific agents |
 | **agent-meta-scout** | balanced | 1.1.3 | Scout AI ecosystem: new skills, roles, rules, patterns |
 | **meta-feedback** | fast | 2.1.3 | Improvement proposals for agent-meta as GitHub issues |
 | **prompt-engineer** | balanced | 1.3.1 | Expert for prompt engineering, AI security, agent design |
@@ -562,6 +562,18 @@ Structured JSON envelopes for Agent-to-Agent communication:
 
 **Schemas:** `schemas/` directory includes TaskSpec core and 4 extension schemas (Ideation, Design, API, Review + SE Decomposition). Cover 84% of agent routes.
 
+## Orchestrator Status & Progress Reporting
+
+**Mandatory status table (issue #678):** after every FANOUT/PARALLEL_GROUP batch member completes, and at the latest at every BARRIER point, the orchestrator emits a compact status table — not just once at the end of the whole pipeline/session:
+
+| Agent | Task | Status |
+|-------|------|--------|
+| `<agent>` | `<one-line task>` | `pending` \| `in_progress` \| `done` \| `failed` |
+
+Sourced from a single snippet (`snippets/orchestrator/status-table.md`) and injected via the `{{STATUS_TABLE_BLOCK}}` placeholder into both `rules/use-orchestrator.md` (main-chat mode) and `orchestrator.md` §7 (dedicated-subagent modes) — one definition, no drift between modes. Complements, not a replacement for, the BARRIER summary.
+
+**Non-git progress snapshot (issue #682 §6):** `CheckpointStore.save_checkpoint()` additionally overwrites `.claude/progress/current.md` with a human-readable, non-historized `Agent | Task | Status` snapshot (gitignored by default) — useful for a quick glance without digging through checkpoint JSON. Available today; not yet wired into the live orchestration loop's production call sites end-to-end.
+
 ## Provider Generation Matrix
 
 | Provider | Context File | Agents Dir | Rules | Hooks | Commands | Settings |
@@ -649,6 +661,8 @@ Dynamic model registry updated via `sync.py --update-models`:
 
 - **Config Audit Routine:** Run `python scripts/sync.py --audit-config` to deeply inspect and validate your project and provider configurations for inconsistencies. Add `--apply` to auto-fix issues.
 - **Environments & Secrets:** Dynamically scaffold `.meta-config/env.ps1` and `.meta-config/env.sh` based on variables defined in `project.yaml`.
+- **Generated-File Drift Detection:** `sync.py` warns (does not block) when a generated file — agent, rule, hook, command, skill, or pipeline-detail — was manually edited since the last sync. `scripts/lib/generated_file_drift.py` compares each active provider's managed files against a content-hash baseline (`.meta-config/generated-file-hashes.json`), recaptured after every writer runs. Enabled by default; disable via `drift-detection.enabled: false` in `project.yaml`. Expected manual edits can be silenced with glob patterns in `.meta-config/drift-allowlist.yaml`.
+- **Setup-Wizard Secret Patterns:** `sync.py --setup` asks (default: yes) whether to add typical secret-pattern `.gitignore` entries (`.env*`, `*.pem`, `*.key`, `credentials*.json`, `secret*.y*ml`) — offered, never silently applied.
 
 ## Directory Structure
 
@@ -705,7 +719,8 @@ docs/
   agent-graph.html           # Interactive agent visualization
   agent-mindmap.md           # Mermaid mindmap of all agents
 tests/                        # pytest suite (unit + tests/browser Playwright suite)
-VERSION                      # Current version (v0.101.0-beta.4)
+  scenarios/                  # Persisted project.yaml scenario catalog (see Contributing)
+VERSION                      # Current version (v0.101.0-beta.6)
 CHANGELOG.md                 # Version history
 README.md                    # This file
 ```
@@ -829,6 +844,33 @@ variables:
   WEB_PROJECT_ENABLED: true
 ```
 
+### .gitignore Management
+
+`sync.py` maintains a managed `.gitignore` block (Claude-gated) with three toggleable categories under `gitignore:` in `project.yaml`:
+
+| Category | Default | Covers |
+|----------|---------|--------|
+| `local` | ignored | Personal/machine-local files (`.claude/settings.local.json`, `CLAUDE.personal.md`, `sync.log`, ...) |
+| `generated` | committed | Generated directories (`agents_dir`, `rules_dir`, `hooks_dir`, `commands_dir` per provider) |
+| `settings` | committed | Settings/context files (`settings_file`) |
+
+**Context-file protection (issue #682 §4 bugfix):** every active provider's own context file (`CLAUDE.md`, `AGENTS.md`, `MAMMOUTH.md`, ...) is now unconditionally exempt from the `settings` category, regardless of the toggle — the framework's single-source-of-truth premise requires it to always stay tracked in git. Previously the exemption only matched Claude's `CLAUDE.md`, so any non-Claude project running `settings: true` could accidentally gitignore its own `AGENTS.md`/`MAMMOUTH.md`.
+
+`gitignore.ignore-provider-dirs: true` switches to whole provider-root entries (`.claude/`, `.gemini/`, ...) instead of the sub-path allowlist; `gitignore.exceptions` and `gitignore.custom_entries` layer on top. See `templates/configs/project.yaml.example` for the full block.
+
+### README Structure Standard (`readme.*`)
+
+The `documenter` agent maintains a consumer project's `README.md` using the same additive, managed-block principle as `.gitignore` (issue #682 §3): required sections are added when missing, hand-written prose in existing sections is never overwritten wholesale.
+
+```yaml
+readme:
+  badges: [version, stack, license]     # "license" only if a LICENSE file exists; "ci" opt-in, only if a CI config is found
+  warnings: false                       # true renders a [!WARNING] callout — never forced
+  sections: [description, badges, setup, structure]
+```
+
+Reference skeleton: [`templates/configs/README-template.md`](templates/configs/README-template.md) — a structure guide for the documenter agent, not a byte-for-byte template.
+
 ## Workflows
 
 | ID | Workflow | Orchestrator Agent | Stages |
@@ -873,8 +915,20 @@ git push -u origin feat/my-change
 3. Bump the template version in frontmatter (major/minor/patch per semver)
 4. Run consistency check: `python scripts/consistency-check.py`
 5. Verify generation: `python scripts/sync.py --dry-run`
-6. Commit with Conventional Commits format
-7. Create a PR
+6. New feature/config option? Add a scenario to `tests/scenarios/` (see below)
+7. Commit with Conventional Commits format
+8. Create a PR
+
+### Scenario Testing (`tests/scenarios/`)
+
+A persisted catalog of 17 realistic `project.yaml` configs — one per core framework feature, plus one per orchestrator mode (strict/advisory/main-chat) — that regression-tests `sync.py` against real consumer-project shapes:
+
+```bash
+tests/scenarios/run.sh              # all scenarios
+tests/scenarios/run.sh 12 17        # only scenarios whose ID starts with "12" or "17"
+```
+
+Each scenario runs dry-run + a real sync + `--validate` in a fresh temp directory (never against this repo itself); `PASS`/`FAIL` per scenario, temp dir preserved on `FAIL` for inspection. Convention: every new feature/config option gets its own scenario in `tests/scenarios/registry.md`.
 
 ### Conventional Commits
 

@@ -2,7 +2,17 @@
 
 ## [Unreleased]
 
+## [0.101.0-beta.6] — 2026-09-07
+
 ### Added
+- **Scenario-testing catalog & `agent-meta-manager` schema audit** (#690): new
+  `tests/scenarios/` catalog (`registry.md`, `run.sh`, 17 `project.yaml` configs)
+  covering representative provider/preset/feature combinations for manual and
+  CI-adjacent smoke testing. `agent-meta-manager.md` audited against the full
+  `project.yaml` schema — it previously documented only ~10 of the 58 top-level
+  keys and never mentioned `sync.py --validate`; both fixed with new workflow
+  sections that point the agent at the schema as the authority and make
+  `--validate` mandatory after any `project.yaml` change.
 - **Governance quick-wins (#682)**: README structure standard (`readme.badges`/
   `readme.warnings`/`readme.sections` in `project.yaml`, new
   `templates/configs/README-template.md`, additive `documenter.md` §5 rewrite —

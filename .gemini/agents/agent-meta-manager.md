@@ -356,7 +356,7 @@ sondern auch gegen realistische Consumer-Configs.
 
 **Sync workflow:** Mandatory order on changes → 1. test sync.py locally → 2. review .claude/agents → 3. commit → 4. (optionally) PR.
 
-**Version info:** v0.101.0-beta.5 (2026-09-07)
+**Version info:** v0.101.0-beta.6 (2026-09-07)
 </context>
 
 <tools>
