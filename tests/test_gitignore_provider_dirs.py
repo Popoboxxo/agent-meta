@@ -94,15 +94,14 @@ def _legacy_base_entries(
             if _should_ignore(_c + "/", cat_gen):
                 base.append(_c + "/")
 
+    # Issue #682 §4 bugfix: a provider's own context_file is never gitignored,
+    # for any provider — not just Claude's. See scripts/lib/gitignore.py.
     cat_set = gitignore_cfg.get("settings", False)
     for _prov in providers:
         _pc = provider_config.get(_prov, {})
         _sf = _pc.get("settings_file")
         if _sf and _should_ignore(_sf, cat_set):
             base.append(_sf)
-        _ctx = _pc.get("context_file")
-        if _ctx and _ctx != "CLAUDE.md" and _should_ignore(_ctx, cat_set):
-            base.append(_ctx)
 
     custom_entries = gitignore_cfg.get("custom_entries", [])
     if custom_entries:
@@ -289,18 +288,19 @@ def test_toggle_on_context_files_not_blanket_ignored_by_default():
 
 
 def test_toggle_on_settings_category_keeps_top_level_files_individually():
-    """With gitignore.settings=true the top-level context/settings files are
-    still individually ignored exactly as before — the toggle neither drops
-    nor adds them."""
+    """With gitignore.settings=true the top-level settings file (opencode.json)
+    is still individually ignored exactly as before — the toggle neither drops
+    nor adds it. Context files (AGENTS.md, MAMMOUTH.md, ...) are never
+    gitignored for any provider (issue #682 §4 bugfix), same as CLAUDE.md."""
     provider_config = _load_provider_config()
     cfg = _toggle_on_cfg(settings=True)
     entries = compute_base_gitignore_entries(list(ALL_PROVIDERS), provider_config, cfg)
     legacy = _legacy_base_entries(list(ALL_PROVIDERS), provider_config, {"settings": True})
-    for ctx in ("AGENTS.md", "MAMMOUTH.md", "opencode.json"):
-        assert ctx in entries, f"{ctx} must stay individually ignored (settings=true)"
-    # CLAUDE.md is never gitignored (handwritten sections) — before and after.
-    assert "CLAUDE.md" not in entries
-    assert "CLAUDE.md" not in legacy
+    assert "opencode.json" in entries, "settings_file must stay individually ignored (settings=true)"
+    # Context files are never gitignored (handwritten sections) — before and after.
+    for ctx in ("CLAUDE.md", "AGENTS.md", "MAMMOUTH.md"):
+        assert ctx not in entries
+        assert ctx not in legacy
     # Provider-internal settings/context files are redundant now.
     assert ".gemini/settings.json" not in entries
     assert ".continue/rules/project-context.md" not in entries

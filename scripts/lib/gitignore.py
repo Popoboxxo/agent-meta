@@ -196,17 +196,25 @@ def compute_base_gitignore_entries(
                 entries.append(_c + "/")
 
     # Category "settings" (default false): committed settings/context files.
-    # Top-level context files (CLAUDE.md never, AGENTS.md/MAMMOUTH.md via the
-    # settings category) keep their per-category behavior in toggle mode.
+    # A provider's own context_file (CLAUDE.md, AGENTS.md, MAMMOUTH.md, ...)
+    # is NEVER gitignored, for any provider, regardless of the `settings`
+    # toggle -- the framework's single-source-of-truth premise depends on
+    # it always being tracked in git. Only settings_file follows the
+    # category toggle.
+    #
+    # Issue #682 §4 bugfix: the exemption used to compare each provider's
+    # context_file against a hardcoded/resolved "CLAUDE.md" value and only
+    # protect a match, so every non-Claude provider's context file (e.g.
+    # Gemini's AGENTS.md) was still gitignorable under `settings: true`.
+    # That defeated the intended "context file never ignorable" protection
+    # for everyone but Claude projects. Removing the comparison protects
+    # every active provider's own context_file equally.
     cat_set = gitignore_cfg.get("settings", False)
     for _prov in providers:
         _pc = provider_config.get(_prov, {})
         _sf = _pc.get("settings_file")
         if _sf and _keep(_sf, cat_set):
             entries.append(_sf)
-        _ctx = _pc.get("context_file")
-        if _ctx and _ctx != "CLAUDE.md" and _keep(_ctx, cat_set):
-            entries.append(_ctx)
 
     custom_entries = gitignore_cfg.get("custom_entries", [])
     if custom_entries:
