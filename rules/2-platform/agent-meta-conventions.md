@@ -66,3 +66,4 @@ Only `1-generic/<role>.md`, `config/role-defaults.yaml`, and `docs/guides/setup/
 | `config/project-config.schema.json` | test IDE autocomplete / jsonschema |
 | `hint:` in agent template | sync projects (regenerates `AGENT_HINTS`) |
 | `rules/` or `hooks/` | sync projects (overwrites generated copies) |
+| New feature or new `project.yaml` option | add/extend a scenario in `tests/scenarios/` (`registry.md` + a `configs/<id>.project.yaml`), run `tests/scenarios/run.sh` |

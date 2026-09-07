@@ -1,0 +1,48 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+dod-preset: standard
+platforms: []
+roles:
+- orchestrator
+- developer
+- git
+- release
+conventions:
+  versioning:
+    scheme: semver
+    tag_format: v{version}
+  changelog:
+    enabled: true
+  github_release:
+    enabled: true
+release-gates:
+  docker-image-scan: true
+  action-pin-validation: true
+project:
+  name: scenario-release-automation
+  prefix: s8
+  short: scenario-release
+variables:
+  PROJECT_NAME: scenario-release-automation
+  PROJECT_DESCRIPTION: Release-gate + auto-github-release hook activation test.
+  PROJECT_GOAL: Verify pre-release-check.sh gates + auto-github-release.sh hook wiring.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-release
+  GIT_MAIN_BRANCH: main
+# Which rules are active: default (all), minimal (situational off), silent (only essentials)
+rules-preset: default
+# Communication style for all agents. Copied as .claude/rules/speech-mode.md — loaded automatically by Claude Code into every agent context. 'full' = default behavior, no rule generated. 'short' = facts only, no filler. 'childish' = playful, simple language with animal/toy analogies. 'caveman' = brutally short, caveman speech. 'asozial' = technically correct but dripping with contempt — New Kids style, insults the user's intelligence. 'submissive' = completely devoted and submissive, no contradiction, no own opinion, addresses user as master/mistress. 'business' = formal corporate tone. 'bullshit-bingo' = management speak, buzzwords. 'linkedin' = LinkedIn influencer style, inspirational.
+speech-mode: full
+# The active tier preset mapped against config/tier-presets.yaml. Adjusts model selection globally. Use se-focus: true instead of the deprecated '(SE)' suffix variants.
+tier-preset: Normal
+# When true, SE roles (se-architect, se-critic, se-developer, etc.) are upgraded one tier before preset mapping is applied. Replaces the deprecated '(SE)' suffix in tier-preset names.
+se-focus: false
+# Maximum number of agents that a coordinator (orchestrator, feature) may run in parallel via run_in_background. Default: 2. Set to 1 to disable parallelism.
+max-parallel-agents: 2
+# The active naming/versioning conventions preset, matched against config/conventions-presets.yaml. Individual overrides via 'conventions' block. Precedence: conventions > conventions-preset > 'default'.
+conventions-preset: default
+# When true, sync.py injects a debug block into every generated agent. Active agents announce themselves ([Agent: <name>]), log every delegation (→ Delegiere an: ...), and confirm completion (✓ [Agent: <name>] fertig). Default: false — no change to any agent file.
+debug-mode: false
+# Allow sync.py to write files containing detected secrets to committed (non-gitignored) paths. Default: false — sync aborts with an error when a secret is detected in a committed file. Set to true only when you deliberately commit secret-looking values (e.g. static demo tokens). NOT recommended for production projects.
+allow-committed-secrets: false

@@ -1,0 +1,30 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+- Gemini
+- Opencode
+dod-preset: standard
+platforms: []
+roles:
+- orchestrator
+- developer
+- git
+project:
+  name: scenario-status-table
+  prefix: s13
+  short: scenario-statustable
+variables:
+  PROJECT_NAME: scenario-status-table
+  PROJECT_DESCRIPTION: Orchestrator status-table rendering regression anchor (issue #678 / #682 section 5).
+  PROJECT_GOAL: Verify STATUS_TABLE_BLOCK renders with no leftover {{...}} placeholder across every provider's orchestrator.md format (Claude/Gemini/Opencode).
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-statustable
+  GIT_MAIN_BRANCH: main
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false

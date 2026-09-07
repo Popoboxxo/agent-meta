@@ -1,0 +1,33 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+dod-preset: standard
+platforms: []
+roles:
+- orchestrator
+- developer
+- git
+- documenter
+readme:
+  badges: [version, stack, license, ci]
+  warnings: true
+  sections: [description, badges, setup, structure]
+project:
+  name: scenario-readme-standard
+  prefix: s11
+  short: scenario-readme
+variables:
+  PROJECT_NAME: scenario-readme-standard
+  PROJECT_DESCRIPTION: README structure standard test (issue #682 section 3).
+  PROJECT_GOAL: Verify README_BADGES/README_WARNINGS_ENABLED/README_SECTIONS build correctly and documenter.md section 5 references them.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-readme
+  GIT_MAIN_BRANCH: main
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false
