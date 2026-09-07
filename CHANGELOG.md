@@ -3,6 +3,21 @@
 ## [Unreleased]
 
 ### Added
+- **Governance quick-wins (#682)**: README structure standard (`readme.badges`/
+  `readme.warnings`/`readme.sections` in `project.yaml`, new
+  `templates/configs/README-template.md`, additive `documenter.md` §5 rewrite —
+  same managed-block, non-overwriting principle as `.gitignore`); `.gitignore`
+  now protects every active provider's own context file (`CLAUDE.md`,
+  `AGENTS.md`, `MAMMOUTH.md`, ...) from the `settings` category unconditionally,
+  fixing a bug where only Claude's context file was ever exempted; `sync.py
+  --setup` offers (not silently defaults) typical secret-pattern `.gitignore`
+  entries (`.env*`, `*.pem`, `*.key`, `credentials*.json`, `secret*.y*ml`);
+  mandatory orchestrator status-table reporting after every batch member and
+  BARRIER point (issue #678, new `snippets/orchestrator/status-table.md`,
+  `{{STATUS_TABLE_BLOCK}}` in both `use-orchestrator.md` and `orchestrator.md`);
+  `CheckpointStore.save_checkpoint()` now also overwrites
+  `.claude/progress/current.md` with a human-readable, non-historized
+  `Agent | Task | Status` snapshot.
 - **Generated-file drift detection**: `sync.py` now warns when a generated file
   (agent/rule/hook/command/skill/pipeline-detail) was manually edited since the last
   sync -- the file is still regenerated as usual, this is warn-only. New
