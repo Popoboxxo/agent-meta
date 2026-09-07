@@ -322,6 +322,7 @@ providers:
     has_hooks: false
     has_commands: true
     has_settings: true
+    has_prompt_commands: true
     capabilities:
       - agents
       - rules

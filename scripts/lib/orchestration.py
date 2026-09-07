@@ -402,6 +402,15 @@ def execute_plan(
     resolved_plan_id = plan_id or f"{plan.kind.upper()}-{uuid.uuid4().hex[:8]}"
     started = time.perf_counter()
 
+    seen_task_ids: set[str] = set()
+    for task in plan.tasks:
+        if task.task_id in seen_task_ids:
+            raise ValueError(
+                f"execute_plan: duplicate task_id '{task.task_id}' in plan.tasks — "
+                "call validate_plan() before execute_plan() to catch this earlier"
+            )
+        seen_task_ids.add(task.task_id)
+
     returned = list(dispatcher.dispatch(plan.tasks))
     by_task_id: dict[str, BarrierEntry] = {}
     extras: list[BarrierEntry] = []

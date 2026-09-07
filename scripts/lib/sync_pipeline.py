@@ -319,7 +319,10 @@ def _sync_stage_legacy_cleanup(
                     log.debug("provider-cleanup", f"could not prune '{prov_dir}': {type(e).__name__}: {e}")  # noqa: PLE1205
 
 
-def _skill_channel_universe(agent_meta_root: Path, config: dict, project_root: Path) -> set[str]:
+def _skill_channel_universe(
+    agent_meta_root: Path, config: dict, project_root: Path,
+    mcp_registry: dict | None = None, external_tools_registry: dict | None = None,
+) -> set[str]:
     """Union of every writer's possible stems for a shared skills_dir.
 
     Writers of ``<skills_dir>/.agent-meta-managed`` (merge-mode shared index):
@@ -332,6 +335,10 @@ def _skill_channel_universe(agent_meta_root: Path, config: dict, project_root: P
     only within their own current universe, so a stem that disappears from
     ALL sources (e.g. a deleted rule file) would otherwise be orphaned
     forever.
+
+    mcp_registry/external_tools_registry: pass already-loaded registries to
+    skip re-reading/re-parsing the plugin catalog when the caller has one on
+    hand (e.g. sync.py's per-provider loop).
     """
     platforms = config.get("platforms", [])
     universe = {Path(output_name).stem for _, output_name in collect_rule_sources(agent_meta_root, platforms)}
@@ -339,8 +346,12 @@ def _skill_channel_universe(agent_meta_root: Path, config: dict, project_root: P
     from lib.external_tools import load_external_tools_registry
     from lib.skills import load_external_skills_config
 
-    universe |= {f"mcp-{s}" for s in load_mcp_registry(agent_meta_root, config, project_root)}
-    universe |= {f"tool-{t}" for t in load_external_tools_registry(agent_meta_root, config, project_root)}
+    if mcp_registry is None:
+        mcp_registry = load_mcp_registry(agent_meta_root, config, project_root)
+    if external_tools_registry is None:
+        external_tools_registry = load_external_tools_registry(agent_meta_root, config, project_root)
+    universe |= {f"mcp-{s}" for s in mcp_registry}
+    universe |= {f"tool-{t}" for t in external_tools_registry}
     universe |= set((load_external_skills_config(agent_meta_root).get("skills") or {}).keys())
     return universe
 
@@ -360,7 +371,19 @@ def _sync_stage_per_provider(
     ``orchestrator.provider-overrides.<Provider>.mode``; otherwise the shared
     dict is used as-is, so the ``PIPELINE_DETAILS_DIR`` write below mutates
     the shared ``variables`` exactly as the original monolithic handler did.
+
+    The plugin catalog (config/plugin-catalog.yaml) is loaded once here and
+    reused across every active provider's MCP/external-tools/skill-channel
+    steps below, instead of each step re-reading and re-parsing it per
+    provider.
     """
+    from lib.mcp import load_mcp_registry
+    from lib.external_tools import load_external_tools_registry
+
+    mcp_registry = load_mcp_registry(agent_meta_root, config, project_root)
+    external_tools_registry = load_external_tools_registry(agent_meta_root, config, project_root)
+    skill_channel_universe: set[str] | None = None
+
     for provider in providers:
         pc = provider_config[provider]
         if not is_provider_active(config, provider):
@@ -403,7 +426,7 @@ def _sync_stage_per_provider(
                                  log, args.dry_run, provider, provider_config,
                                  platform_vars=platform_vars,
                                  debug_mode=debug_mode)
-        if provider == "Continue":
+        if pc.get("has_prompt_commands", False):
             sync_prompts_for_continue(agent_meta_root, project_root, config,
                                       provider_variables, log, args.dry_run,
                                       provider_config=provider_config)
@@ -431,6 +454,7 @@ def _sync_stage_per_provider(
                 agent_meta_root, project_root, config, provider_config,
                 log, args.dry_run, provider, rules_dir=pc.get("rules_dir"),
                 allow_committed_secrets=allow_committed_secrets,
+                registry=mcp_registry,
             )
         except SyncError as exc:
             print(f"\n  !!  MCP sync aborted: {exc}", file=sys.stderr)
@@ -443,6 +467,7 @@ def _sync_stage_per_provider(
             generate_external_tool_artifacts(
                 agent_meta_root, project_root, config, provider_config,
                 log, args.dry_run, provider, rules_dir=pc.get("rules_dir"),
+                registry=external_tools_registry,
             )
         except SyncError as exc:
             print(f"\n  !!  External-tools sync aborted: {exc}", file=sys.stderr)
@@ -453,9 +478,14 @@ def _sync_stage_per_provider(
         # channel: skill copy would otherwise survive forever). Runs for every
         # provider with a skills_dir; the union protects all live writers.
         if pc.get("skills_dir") and pc.get("context_file"):
+            if skill_channel_universe is None:
+                skill_channel_universe = _skill_channel_universe(
+                    agent_meta_root, config, project_root,
+                    mcp_registry=mcp_registry, external_tools_registry=external_tools_registry,
+                )
             sweep_orphan_skill_channel_rules(
                 project_root, project_root / pc["skills_dir"],
-                _skill_channel_universe(agent_meta_root, config, project_root),
+                skill_channel_universe,
                 log, args.dry_run,
             )
         if pc.get("has_hooks", False):

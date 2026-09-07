@@ -16,6 +16,9 @@ set -uo pipefail
 PROJECT_ROOT="${PROJECT_ROOT:-$PWD}"
 cd "$PROJECT_ROOT" || exit 1
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../lib/hook_common.sh" 2>/dev/null || exit 0
+
 GATE_NAME="docker-image-scan"
 
 # --- Enabled/disabled ---
@@ -24,13 +27,10 @@ GATE_NAME="docker-image-scan"
 # > dod-preset default > this header's `enabled_by_default`). The `:=` form
 # only assigns when the var is still unset, so an explicit
 # `PRE_RELEASE_GATE_ENABLED=false bash release-gates/docker-image-scan.sh`
-# always wins for a one-off, single-gate override.
+# always wins for a one-off, single-gate override. Shared skip/message logic
+# lives in hook_gate_check_enabled() (lib/hook_common.sh).
 : "${PRE_RELEASE_GATE_ENABLED:=false}"
-
-if [ "$PRE_RELEASE_GATE_ENABLED" != "true" ]; then
-  echo "[SKIP] $GATE_NAME: gate disabled (release-gates.docker-image-scan.enabled=false)"
-  exit 0
-fi
+hook_gate_check_enabled "$GATE_NAME" || exit 0
 
 # Dockerfile path — not part of the enabled/disabled resolution above;
 # reserved for direct env var override only (no project.yaml key consumed

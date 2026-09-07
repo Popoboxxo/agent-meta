@@ -255,6 +255,7 @@ def generate_mcp_artifacts(
     provider: str,
     rules_dir: str | None = None,
     allow_committed_secrets: bool = False,
+    registry: dict | None = None,
 ) -> list[str]:
     """Generate MCP rule files + provider configs for all active servers.
 
@@ -276,8 +277,14 @@ def generate_mcp_artifacts(
     resolve_rules and the skill-channel helpers are imported at module top
     level (Issue #478): rules depends on registry_query, not on this module,
     so the former deferred import is no longer needed.
+
+    registry: pass an already-loaded load_mcp_registry() result to skip
+    re-reading/re-parsing the plugin catalog when the caller has one on hand
+    (e.g. sync.py's per-provider loop, which would otherwise reload the same
+    on-disk catalog once per active provider).
     """
-    registry = load_mcp_registry(agent_meta_root, config, project_root)
+    if registry is None:
+        registry = load_mcp_registry(agent_meta_root, config, project_root)
     if not registry:
         return []
 

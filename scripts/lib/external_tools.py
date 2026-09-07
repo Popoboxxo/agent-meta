@@ -197,6 +197,7 @@ def generate_external_tool_artifacts(
     dry_run: bool,
     provider: str,
     rules_dir: str | None = None,
+    registry: dict | None = None,
 ) -> None:
     """Generate external-tool rule files for all active tools.
 
@@ -221,8 +222,14 @@ def generate_external_tool_artifacts(
     resolve_rules and the skill-channel helpers are imported at module top
     level (Issue #478): rules depends on registry_query, not on this module,
     so the former deferred import is no longer needed.
+
+    registry: pass an already-loaded load_external_tools_registry() result to
+    skip re-reading/re-parsing the plugin catalog when the caller has one on
+    hand (e.g. sync.py's per-provider loop, which would otherwise reload the
+    same on-disk catalog once per active provider).
     """
-    registry = load_external_tools_registry(agent_meta_root, config, project_root)
+    if registry is None:
+        registry = load_external_tools_registry(agent_meta_root, config, project_root)
     if not registry:
         return
 

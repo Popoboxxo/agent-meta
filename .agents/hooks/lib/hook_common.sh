@@ -188,6 +188,32 @@ hook_audit_log_append() {
   return 0
 }
 
+# --- Release-gate enabled/disabled check ---------------------------------
+
+# hook_gate_check_enabled <gate_name>
+# Prints "[SKIP] <gate_name>: gate disabled (release-gates.<gate_name>.enabled=false)"
+# and returns 1 when the gate is disabled; returns 0 (silent) when enabled.
+# Caller does `hook_gate_check_enabled "$GATE_NAME" || exit 0`.
+#
+# Baked at sync-time by scripts/lib/hooks.py::sync_release_gates() from
+# dod.resolve_release_gates() (project.yaml `release-gates.<gate_name>.enabled`
+# > dod-preset default > the gate script's own `enabled_by_default` header).
+# The `:=` form only assigns when PRE_RELEASE_GATE_ENABLED is still unset, so
+# an explicit `PRE_RELEASE_GATE_ENABLED=false bash release-gates/<gate>.sh`
+# always wins for a one-off, single-gate override.
+#
+# Replaces the identical block that used to be copy-pasted across every
+# release-gates/*.sh script.
+hook_gate_check_enabled() {
+  local gate_name="$1"
+  : "${PRE_RELEASE_GATE_ENABLED:=false}"
+  if [ "$PRE_RELEASE_GATE_ENABLED" != "true" ]; then
+    echo "[SKIP] $gate_name: gate disabled (release-gates.$gate_name.enabled=false)"
+    return 1
+  fi
+  return 0
+}
+
 # --- GRAPHIFY_BIN validation (issue #599) --------------------------------
 
 # hook_resolve_graphify_bin

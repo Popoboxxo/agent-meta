@@ -16,6 +16,9 @@ set -uo pipefail
 PROJECT_ROOT="${PROJECT_ROOT:-$PWD}"
 cd "$PROJECT_ROOT" || exit 1
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../lib/hook_common.sh" 2>/dev/null || exit 0
+
 GATE_NAME="action-pin-validation"
 
 # --- Enabled/disabled ---
@@ -24,13 +27,10 @@ GATE_NAME="action-pin-validation"
 # > dod-preset default > this header's `enabled_by_default`). The `:=` form
 # only assigns when the var is still unset, so an explicit
 # `PRE_RELEASE_GATE_ENABLED=false bash release-gates/action-pin-validation.sh`
-# always wins for a one-off, single-gate override.
+# always wins for a one-off, single-gate override. Shared skip/message logic
+# lives in hook_gate_check_enabled() (lib/hook_common.sh).
 : "${PRE_RELEASE_GATE_ENABLED:=false}"
-
-if [ "$PRE_RELEASE_GATE_ENABLED" != "true" ]; then
-  echo "[SKIP] $GATE_NAME: gate disabled (release-gates.action-pin-validation.enabled=false)"
-  exit 0
-fi
+hook_gate_check_enabled "$GATE_NAME" || exit 0
 
 if ! compgen -G ".github/workflows/*.yml" >/dev/null 2>&1 && ! compgen -G ".github/workflows/*.yaml" >/dev/null 2>&1; then
   echo "[SKIP] $GATE_NAME: no .github/workflows/*.yml found"

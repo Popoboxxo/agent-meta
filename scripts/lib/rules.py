@@ -212,6 +212,19 @@ def provider_opts_skip(opts: dict, provider: str) -> bool:
     return prov_opt == "skip" or prov_opt is False
 
 
+def rule_opts_lazy_channel(opts: dict) -> bool:
+    """True when a rule's options route it to the lazy file channel instead
+    of the embedded managed block (``embed: false`` or ``channel: skill``).
+
+    Shared by every writer that must agree on which rules embed vs. which
+    leave the block as a separate file (issue #192 Phase 2): the managed
+    block's own embed loop (context.py), its per-server MCP/tool variants,
+    and the file writer here (sync_embedded_rule_files) that must produce
+    exactly the file set the block's pointer promises.
+    """
+    return opts.get("embed") is False or opts.get("channel") == "skill"
+
+
 def sync_embedded_rule_files(
     agent_meta_root: Path,
     project_root: Path,
@@ -275,7 +288,7 @@ def sync_embedded_rule_files(
         # Only rules the managed block does NOT embed land here — exactly the
         # two flags _build_managed_block checks before rendering its pointer
         # (keeping block pointer and file set consistent).
-        if not (opts.get("embed") is False or opts.get("channel") == "skill"):
+        if not rule_opts_lazy_channel(opts):
             continue
 
         source_content = source_path.read_text(encoding="utf-8")

@@ -1038,7 +1038,7 @@ def _build_managed_block(
     project_root: Path | None = None,
 ) -> str:
     from .delegation_table import get_active_agents_data
-    from .rules import collect_rule_sources, resolve_rules
+    from .rules import collect_rule_sources, resolve_rules, rule_opts_lazy_channel
 
     # build_knowledge_engine_hints is imported at module top level — the
     # lazy import was vestigial (agents does not import context; Issue #478
@@ -1160,7 +1160,6 @@ def _build_managed_block(
         # the file channel the rule EMBEDS (never drops): a preset opt-out
         # must not delete content for a provider with no way to load it.
         rules_file_channel = _shared_rules_file_channel(pc, provider_config, shared_users)
-        lazy_rule_count = 0
 
         for src_path, output_name in rule_sources:
             # Key options by the OUTPUT stem ("admin-ui"), not the raw source
@@ -1178,9 +1177,7 @@ def _build_managed_block(
             # same physical file (issue #638: union, not current-provider-only).
             if all(_opts_skip(opts, p) for p in shared_users):
                 continue
-            if rules_file_channel and (
-                opts.get("embed") is False or opts.get("channel") == "skill"
-            ):
+            if rules_file_channel and rule_opts_lazy_channel(opts):
                 # Progressive disclosure (issues #192 Phase 2 + #540 Fix 1):
                 # the rule lives as a separate file; the block gets a pointer
                 # via the rules-lazy partial (HAS_LAZY_RULES below).
@@ -1224,9 +1221,7 @@ def _build_managed_block(
                     mcp_opts = rule_options.get(f"{MCP_RULE_PREFIX}{server_name}", {})
                     if all(_opts_skip(mcp_opts, p) for p in shared_users):
                         continue
-                    if rules_file_channel and (
-                        mcp_opts.get("embed") is False or mcp_opts.get("channel") == "skill"
-                    ):
+                    if rules_file_channel and rule_opts_lazy_channel(mcp_opts):
                         lazy_rule_count += 1
                         continue
                     mcp_content = _generate_rule_content(
@@ -1264,9 +1259,7 @@ def _build_managed_block(
                     # like MCP sections and rules sources; the file is
                     # written by generate_external_tool_artifacts().
                     tool_opts = rule_options.get(f"{TOOL_RULE_PREFIX}{tool_name}", {})
-                    if rules_file_channel and (
-                        tool_opts.get("embed") is False or tool_opts.get("channel") == "skill"
-                    ):
+                    if rules_file_channel and rule_opts_lazy_channel(tool_opts):
                         lazy_rule_count += 1
                         continue
                     embedded_rules.append(
