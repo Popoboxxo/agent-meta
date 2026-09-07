@@ -199,6 +199,24 @@ def test_scan_covers_nested_managed_subdirs(tmp_path: Path) -> None:
     assert ".claude/hooks/lib/hook_common.sh" in paths
 
 
+def test_scan_covers_skill_subdirectory_files(tmp_path: Path) -> None:
+    """The skills_dir .agent-meta-managed index lists DIRECTORY names, not
+    file names (e.g. "a2a-delegation-gates", a subdir containing SKILL.md)
+    -- unlike every other managed dir, whose index lists file names
+    directly. Must still be picked up and hashed/compared."""
+    from scripts.lib.generated_file_drift import content_hash
+    project_root = tmp_path / "project"
+    _write(project_root, ".claude/skills/a2a-delegation-gates/SKILL.md", "edited by hand")
+    _managed_index(project_root, ".claude/skills", "a2a-delegation-gates")
+    _save_hashes(project_root, {
+        ".claude/skills/a2a-delegation-gates/SKILL.md": content_hash("original content"),
+    }, dry_run=False)
+
+    findings = scan_generated_file_drift(tmp_path / "agent-meta", project_root, {}, _provider_config())
+    paths = {f["path"] for f in findings}
+    assert ".claude/skills/a2a-delegation-gates/SKILL.md" in paths
+
+
 def test_scan_unions_rules_sidecar_indexes(tmp_path: Path) -> None:
     """rules/ has THREE index files (.agent-meta-managed, -mcp, -tools) for
     three different writers -- all three contribute managed filenames."""

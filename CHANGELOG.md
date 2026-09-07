@@ -3,6 +3,15 @@
 ## [Unreleased]
 
 ### Added
+- **Generated-file drift detection**: `sync.py` now warns when a generated file
+  (agent/rule/hook/command/skill/pipeline-detail) was manually edited since the last
+  sync -- the file is still regenerated as usual, this is warn-only. New
+  `scripts/lib/generated_file_drift.py` compares each active provider's managed
+  files against a content-hash baseline (`.meta-config/generated-file-hashes.json`)
+  before the write stage, then recaptures the baseline after every writer has run.
+  Enabled by default; set `drift-detection.enabled: false` in `project.yaml` to
+  disable. Expected manual edits can be silenced via glob patterns in
+  `.meta-config/drift-allowlist.yaml`.
 - **Central orchestrator prompt consolidation for the phase-4b backends** (#264, #265,
   #266, #267, #506): `template-orchestrator` (v7.12.0 → v7.13.0) merges all five
   prepared handoff notes into one coherent prompt. §3 intent routing now references

@@ -9,14 +9,18 @@ Split into two halves, mirroring context.py's context-hashes.json pattern:
 - capture_generated_file_hashes() (Task 3): writes a fresh baseline from
   the now-written files, called AFTER every writer has run.
 
-Spec: docs/superpowers/specs/2026-09-05-generated-file-drift-detection-design.md
+Spec: docs/superpowers/specs/2026-09-07-generated-file-drift-detection-design.md
 """
 from __future__ import annotations
 
 import fnmatch
+import json
 from pathlib import Path
 
-from .io import load_json_file, load_yaml_file, write_atomic
+from .deactivation import get_active_providers
+from .io import content_hash, load_json_file, load_yaml_file, safe_path, write_atomic
+from .pipelines import resolve_pipeline_details_dir
+from .rule_index import read_managed_index
 
 GENERATED_FILE_HASHES_DIR = ".meta-config"
 GENERATED_FILE_HASHES_FILE = "generated-file-hashes.json"
@@ -41,7 +45,6 @@ def _save_hashes(project_root: Path, hashes: dict[str, str], dry_run: bool) -> N
         return
     path = _hashes_path(project_root)
     path.parent.mkdir(parents=True, exist_ok=True)
-    import json
     payload = {"version": 1, "hashes": hashes}
     write_atomic(path, json.dumps(payload, indent=2, ensure_ascii=False) + "\n")
 
@@ -67,12 +70,6 @@ def is_allowlisted(rel_path: str, patterns: list[str]) -> bool:
 def is_drift_detection_enabled(config: dict) -> bool:
     """True unless project.yaml explicitly sets drift-detection.enabled: false."""
     return bool(config.get("drift-detection", {}).get("enabled", True))
-
-
-from .deactivation import get_active_providers
-from .io import content_hash
-from .pipelines import resolve_pipeline_details_dir
-from .rule_index import read_managed_index
 
 
 def _managed_names(dir_path: Path, *extra_index_names: str) -> set[str]:
@@ -120,9 +117,17 @@ def _iter_managed_files(agent_meta_root: Path, project_root: Path, provider: str
         if not dir_path.is_dir():
             continue
         for name in sorted(_managed_names(dir_path, *extra_index_names)):
-            candidate = dir_path / name
+            candidate = safe_path(dir_path, name)
             if candidate.is_file():
                 files.append(candidate)
+            elif candidate.is_dir():
+                # Skill-style index entries name a whole subdirectory (e.g.
+                # .claude/skills/.agent-meta-managed lists "a2a-delegation-gates",
+                # a directory containing SKILL.md and possibly further
+                # reference files) rather than a single file -- collect
+                # everything inside recursively so drift is caught for all
+                # of it, today and as skills grow extra files.
+                files.extend(sorted(p for p in candidate.rglob("*") if p.is_file()))
         # Nested self-managed subdirectories (hooks/lib/, hooks/release-gates/,
         # issue #558) carry their OWN .agent-meta-managed index -- recurse
         # one level to pick those up too (mirrors scan_injection_drift's
@@ -130,7 +135,7 @@ def _iter_managed_files(agent_meta_root: Path, project_root: Path, provider: str
         for child in sorted(dir_path.iterdir()):
             if child.is_dir() and (child / ".agent-meta-managed").exists():
                 for name in sorted(_managed_names(child)):
-                    nested_candidate = child / name
+                    nested_candidate = safe_path(child, name)
                     if nested_candidate.is_file():
                         files.append(nested_candidate)
 
