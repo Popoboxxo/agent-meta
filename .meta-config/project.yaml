@@ -1,10 +1,11 @@
 agent-meta-version: 0.96.0
-_comment: "Szenarien-Katalog & Regressionstests fuer Framework-Aenderungen: tests/scenarios/ (registry.md + run.sh) -- bei neuen Features/Config-Optionen dort ein Szenario ergaenzen (siehe rules/2-platform/agent-meta-conventions.md, Change Checklist)."
+_comment: 'Szenarien-Katalog & Regressionstests fuer Framework-Aenderungen: tests/scenarios/
+  (registry.md + run.sh) -- bei neuen Features/Config-Optionen dort ein Szenario ergaenzen
+  (siehe rules/2-platform/agent-meta-conventions.md, Change Checklist).'
 provider-isolation: disabled
 ai-providers:
 - Claude
 - Opencode
-- Mammouth
 - Gemini
 dod-preset: rapid-prototyping
 rules-preset: lazy
@@ -12,29 +13,35 @@ systems-engineering:
   enabled: false
 knowledge-engine:
   enabled: true
-  domain: personal
+  domain: internal-docs
   bundle-path: knowledge
   okf:
     enforce-frontmatter: true
     allowed-types:
-    - note
-    - journal
+    - Concept
+    - Architecture
+    - API Reference
+    - Guide
+    - Session Conclusion
     auto-index: true
     auto-log: true
   operations:
     ingest:
-      auto-cross-reference: false
+      auto-cross-reference: true
       auto-index-update: true
-      batch-mode: false
+      batch-mode: true
     query:
       file-back-results: true
     lint:
-      schedule: on-demand
+      schedule: post-ingest
       checks:
       - broken-links
       - missing-frontmatter
+      - stale-index
+      - orphaned-pages
+      - duplicate-concepts
   migration:
-    auto-detect-sources: false
+    auto-detect-sources: true
     clean-duplicates: false
     preserve-originals: true
   search:
@@ -128,6 +135,9 @@ provider-options:
   Copilot: {}
   Mammouth: {}
   Opencode: {}
+  Codex: {}
+  KimiCode: {}
+  ZCode: {}
 speech-mode: short
 variables:
   PROJECT_NAME: agent-meta
@@ -271,8 +281,10 @@ test-repo:
   env-var: AGENT_META_TEST_REPO
 max-parallel-agents: 4
 context_file:
-  mode: compact
+  mode: full
+  max_lines: 250
   oversize_acknowledged: true
+  auto_generate: true
 orchestrator:
   enabled: true
   strict: true
@@ -287,9 +299,6 @@ orchestrator:
   handoff:
     protocol: a2a-v1
   mode: strict
-  provider-overrides:
-    Claude:
-      mode: main-chat
 viz:
   enabled: false
   mode: 'off'
@@ -312,8 +321,6 @@ analysis:
 quality-pipelines:
   overrides:
     se-cascade:
-      # Deaktiviert seit 2026-09-03 — bewusste Entscheidung, siehe Issue #652.
-      # Reaktivierung/Archivierung nur auf explizite Anfrage.
       enabled: false
   custom-pipelines: {}
 model-override-all: {}

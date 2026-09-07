@@ -2641,10 +2641,10 @@ quality_pipelines:
     - id: l3-component-requirements
       agent: se-component-requirements
       task: 'For each leaf component (decision: leaf, handoff_target: se-component-requirements)
-        from the termination phase: materialize one L3 component-requirements file
-        per component from the COMP table of the L2 architecture — responsibility
-        (from L2-ARCH), assigned REQ-L2 references, internal interfaces, >= 2 REQ-L3
-        per component (Issue #332)'
+        from the termination phase: materialize one L3 component-requirements file per
+        component from the COMP table of the L2 architecture — responsibility (from L2-ARCH),
+        assigned REQ-L2 references, internal interfaces, >= 2 REQ-L3 per component (Issue
+        #332)'
       mode: conditional
       condition:
         type: agent_decision
@@ -2661,9 +2661,8 @@ quality_pipelines:
         - Route to se-senior-developer for complex leafs (5+ interfaces, cross-cutting,
         boundary-level, security/performance-critical)
 
-        Implement each leaf against its L3 component-requirements file (from the
-        l3-component-requirements stage), its Black-Box specification and interface
-        contracts from the interface-registry.
+        Implement each leaf against its L3 component-requirements file (from the l3-component-requirements
+        stage), its Black-Box specification and interface contracts from the interface-registry.
 
         Each implementation must reference its req_id and leaf_id in code artifacts.
 
@@ -2686,6 +2685,8 @@ quality_pipelines:
         task: Multi-Level verification
       - agent: se-integration-and-test-manager
         task: V&V orchestration
+    enabled: false
+
 se_variables:
   SE_BASE_DIR: SE
   SE_MIN_DEPTH: 2
