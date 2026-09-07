@@ -3,16 +3,27 @@
 Background: the hook used to read an `agent_name` field from the
 PreToolUse JSON payload to exempt the `git`/`orchestrator` agents from the
 strict-mode block. That field does not exist in any provider's real
-PreToolUse payload (Claude Code's documented payload is
+PreToolUse payload (Claude Code's documented payload at the time was
 `{session_id, transcript_path, hook_event_name, tool_name, tool_input}`
 only -- see docs/guides/features/hooks.md) -- the exemption never
 triggered (agent-meta issue #390).
 
-v2.0.0 replaces this with a self-declared identity: an authorized Bash
+v2.0.0 replaced this with a self-declared identity: an authorized Bash
 command's first line must be the exact sentinel `#agent-meta:agent=<name>`.
-Write/Edit have no safe equivalent channel (a marker would corrupt file
-content) and are therefore never exempted under strict mode -- this is
-intentional, not a regression.
+Write/Edit had no safe equivalent channel (a marker would corrupt file
+content) and were therefore never exempted under strict mode -- which
+turned out to make delegated implementation infeasible under strict mode
+entirely (issue #683): a properly orchestrator-dispatched implementer
+subagent needs Write/Edit to do its job, and got blocked identically to
+the main thread.
+
+Issue #683's fix uses Claude Code's `agent_id` common input field instead
+(added to the PreToolUse payload since #390 was fixed, harness-set, "present
+only when the hook fires inside a subagent call" --
+https://code.claude.com/docs/en/hooks.md): the strict-mode main-chat block
+now applies only when `agent_id` is absent. The sentinel convention still
+exists for ROLE identification (git vs. orchestrator) on the git-mutation
+gate, which `agent_id` alone doesn't provide.
 
 This also covers two bugs found alongside #390 while fixing it:
 - the git-mutation regex matched substrings anywhere in the command
@@ -103,10 +114,11 @@ def test_strict_mode_sentinel_exemption(command, expected_exit_code):
     )
 
 
-def test_strict_mode_blocks_write_unconditionally():
-    # Write/Edit have no safe self-declaration channel (a marker line would
-    # corrupt file content) -- they must stay blocked even for otherwise
-    # "trusted" content, unlike Bash which can carry a sentinel comment.
+def test_strict_mode_blocks_write_for_main_thread():
+    # A main-thread Write call (no agent_id -- issue #683) has no safe
+    # self-declaration channel (a marker line would corrupt file content)
+    # -- it must stay blocked even for otherwise "trusted" content, unlike
+    # Bash which can carry a sentinel comment.
     payload = {
         "tool_name": "Write",
         "tool_input": {"file_path": "foo.txt", "content": "#agent-meta:agent=git\nirrelevant"},
@@ -114,6 +126,62 @@ def test_strict_mode_blocks_write_unconditionally():
     }
     result = _run_hook(payload)
     assert result.returncode == 2
+
+
+def test_strict_mode_allows_write_for_dispatched_subagent():
+    # Issue #683: a dispatched subagent's Write call carries a non-empty
+    # agent_id (Claude Code common input field, harness-set -- see
+    # https://code.claude.com/docs/en/hooks.md). Before this fix, strict
+    # mode blocked this unconditionally for every caller, making delegated
+    # implementation (Subagent-Driven Development, Executing Plans, etc.)
+    # infeasible the moment a task needed to write a file.
+    payload = {
+        "tool_name": "Write",
+        "tool_input": {"file_path": "foo.txt", "content": "irrelevant"},
+        "cwd": _REPO_ROOT.as_posix(),
+        "agent_id": "subagent-123",
+    }
+    result = _run_hook(payload)
+    assert result.returncode == 0
+
+
+def test_strict_mode_allows_edit_for_dispatched_subagent():
+    payload = {
+        "tool_name": "Edit",
+        "tool_input": {"file_path": "foo.txt", "old_string": "a", "new_string": "b"},
+        "cwd": _REPO_ROOT.as_posix(),
+        "agent_id": "subagent-123",
+    }
+    result = _run_hook(payload)
+    assert result.returncode == 0
+
+
+def test_strict_mode_allows_readonly_bash_for_dispatched_subagent():
+    # Issue #683 point 2: a dispatched subagent (e.g. agent-meta-manager)
+    # was blocked on every Bash call, including plain read-only `git
+    # status`, since it had no reason to self-declare via the sentinel.
+    payload = _bash_payload("git status")
+    payload["agent_id"] = "subagent-123"
+    result = _run_hook(payload)
+    assert result.returncode == 0
+
+
+def test_strict_mode_still_blocks_git_mutation_for_dispatched_subagent_without_sentinel():
+    # Issue #683 fix must NOT weaken the git-mutation gate: agent_id says
+    # "this is some subagent", not "this is the git agent". A dispatched
+    # subagent still needs the `git` sentinel to run a git mutation --
+    # falls through to the same non-strict-mode mutation check.
+    payload = _bash_payload("git commit -m 'x'")
+    payload["agent_id"] = "subagent-123"
+    result = _run_hook(payload)
+    assert result.returncode == 2
+
+
+def test_strict_mode_dispatched_subagent_with_git_sentinel_can_mutate():
+    payload = _bash_payload("#agent-meta:agent=git\ngit commit -m 'x'")
+    payload["agent_id"] = "subagent-123"
+    result = _run_hook(payload)
+    assert result.returncode == 0
 
 
 def test_strict_mode_survives_backslash_cwd():

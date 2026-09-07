@@ -115,6 +115,25 @@ def test_sync_writes_checksum_manifest_matching_deployed_content(
     assert entries == {"demo-gate.sh": _sha256_of(deployed)}
 
 
+def test_sync_does_not_duplicate_header_across_runs(agent_meta_root, project_root):
+    """Regression: comment lines have no _checksum_entry_name(), so they used
+    to always fall into the "preserve verbatim" branch -- including the
+    manifest's own static header, which re-emits itself fresh on every run.
+    Running sync twice must not double the header (found via a same-repo
+    sync.py run during the 2026-09-07 orchestrator-guard/#683 fix)."""
+    _sync(agent_meta_root, project_root)
+    gates_dir = project_root / ".claude" / "hooks" / "release-gates"
+    manifest_path = gates_dir / ".sha256-checksums"
+    first_content = manifest_path.read_text(encoding="utf-8")
+
+    _sync(agent_meta_root, project_root)
+    second_content = manifest_path.read_text(encoding="utf-8")
+
+    assert second_content == first_content
+    header_line = "# SHA-256 checksums for release-gate scripts (issue #603)."
+    assert second_content.count(header_line) == 1
+
+
 def test_checksum_manifest_is_sha256sum_compatible(agent_meta_root, project_root):
     """The manifest must verify with standard `sha256sum -c` (no custom tooling)."""
     if not _SHA256SUM_AVAILABLE:
