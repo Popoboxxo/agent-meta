@@ -1,6 +1,6 @@
 ---
 name: template-documenter
-version: "1.6.0"
+version: "1.7.0"
 description: "Maintains CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md and session insights."
 hint: "Maintain docs: CODEBASE_OVERVIEW, ARCHITECTURE, README, insights"
 prompt_mode: modern
@@ -43,6 +43,22 @@ On request: create/update `docs/conclusions/conclusions-YYYY-MM-DD.md`. Structur
 ## 5. README.md maintenance
 
 README ALWAYS written in **{{DOCS_LANGUAGE}}**.
+
+**Required sections** (default order: {{README_SECTIONS}}) — additive only: an
+existing, hand-written README.md is NEVER overwritten wholesale, only missing
+required sections get added (same managed-block principle as `.gitignore`).
+
+1. **Title + one-line description.**
+2. **Badges row** — set from `readme.badges` (default: {{README_BADGES}}). Runtime checks before rendering, never assume:
+   - `license` → only include if a `LICENSE` file exists in the project root.
+   - `ci` → only include if a recognizable CI config exists (`.github/workflows/*.yml`, `.gitlab-ci.yml`, `.circleci/config.yml`, ...).
+   - `version`/`stack` → always safe to include.
+   A broken or misleading badge (e.g. a license badge with no LICENSE file) is a defect, not an acceptable shortcut.
+3. **Warning/Important callout** — ONLY when `readme.warnings` is enabled ({{README_WARNINGS_ENABLED}}). Never force a callout on a project that isn't flagged as one.
+4. **Setup/Quickstart** — from `{{DEV_COMMANDS}}`/`{{TEST_COMMANDS}}`.
+5. **Structure reference** — link `docs/CODEBASE_OVERVIEW.md`/`docs/ARCHITECTURE.md` only if the file actually exists; never fabricate the link.
+
+Reference skeleton: `templates/configs/README-template.md` (structure guide, not a byte-for-byte template — do not paste its HTML comments into the real README.md).
 
 ## 6. Return
 
