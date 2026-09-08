@@ -146,3 +146,16 @@ def test_zip_directory_does_not_change_cwd(tmp_path, monkeypatch):
     with zipfile.ZipFile(zip_path) as zf:
         names = sorted(zf.namelist())
     assert names == ["a.txt", "sub/b.txt"]
+
+
+# ---------------------------------------------------------------------------
+# #691 -- admin-server's backup/restore/delete handlers must reuse the real
+# SyncLog (which has .note(), called >10x by backup.py) instead of a local
+# stub that only defines info/warn/error and AttributeErrors on first use.
+# ---------------------------------------------------------------------------
+
+def test_admin_server_backup_handlers_use_real_synclog_not_a_stub():
+    source = (_REPO_ROOT / "scripts" / "admin-server.py").read_text(encoding="utf-8")
+    assert "class _Log" not in source
+    assert source.count("from lib.log import SyncLog") == 3
+    assert source.count("log = SyncLog()") == 3

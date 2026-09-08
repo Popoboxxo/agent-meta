@@ -4945,16 +4945,12 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             _ensure_scripts_on_path(root)
             from lib.backup import create_backup  # type: ignore[import]
             from lib.providers import load_providers_config  # type: ignore[import]
+            from lib.log import SyncLog  # type: ignore[import]
 
             project_config = self.__class__.config_manager.read("project")
             provider_config = load_providers_config(root)
 
-            class _Log:
-                def info(self, *a): pass
-                def warn(self, *a): pass
-                def error(self, *a): pass
-
-            log = _Log()
+            log = SyncLog()
             result = create_backup(
                 root, providers, provider_config, project_config, log,
                 label=label, source_version=self.__class__.version
@@ -4978,16 +4974,12 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             _ensure_scripts_on_path(root)
             from lib.backup import restore_backup  # type: ignore[import]
             from lib.providers import load_providers_config  # type: ignore[import]
+            from lib.log import SyncLog  # type: ignore[import]
 
             project_config = self.__class__.config_manager.read("project")
             provider_config = load_providers_config(root)
 
-            class _Log:
-                def info(self, *a): pass
-                def warn(self, *a): pass
-                def error(self, *a): pass
-
-            log = _Log()
+            log = SyncLog()
             result = restore_backup(
                 root, archive_name, provider_config, project_config, log,
                 providers=providers, force=force
@@ -5005,15 +4997,11 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         try:
             _ensure_scripts_on_path(root)
             from lib.backup import delete_backup  # type: ignore[import]
+            from lib.log import SyncLog  # type: ignore[import]
 
             project_config = self.__class__.config_manager.read("project")
 
-            class _Log:
-                def info(self, *a): pass
-                def warn(self, *a): pass
-                def error(self, *a): pass
-
-            log = _Log()
+            log = SyncLog()
             result = delete_backup(root, archive_name, project_config, log)
             return self._send_json(result)
         except Exception as exc:  # noqa: BLE001
