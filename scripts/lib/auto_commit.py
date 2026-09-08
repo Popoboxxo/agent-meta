@@ -52,7 +52,10 @@ def resolve_auto_commit_config(
     mode = ac_cfg.get("mode", "off")
 
     eligible_roles: list[str] = []
-    if mode != "off":
+    # Only 'auto' and 'custom' grant hook-level commit authority. 'suggest'
+    # roles merely propose a commit message, so they must never appear in
+    # the allowlist the guard hook trusts (and 'off' grants nothing).
+    if mode in ("auto", "custom"):
         eligible_roles = sorted(
             role
             for role in active_roles
@@ -112,6 +115,15 @@ def render_auto_commit_block(resolved: dict) -> str:
         )
     elif mode == "custom":
         script = resolved.get("custom_script")
+        if not script:
+            # Defense in depth: the schema already rejects this combination,
+            # but never render the literal word "None" into agent prose.
+            lines.append(
+                "Commit authority is misconfigured: `mode: custom` requires "
+                "`custom_script` to be set, but none is configured. Report "
+                "this as a config error instead of committing."
+            )
+            return "\n".join(lines)
         lines.append(
             f"Commit directly whenever `{script}` exits 0 (the project's "
             "own commit-decision script has full control; no other "

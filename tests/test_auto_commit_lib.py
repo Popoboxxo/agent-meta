@@ -64,6 +64,27 @@ def test_resolve_config_defaults_secret_scan_true():
     assert result["secret_scan"] is True
 
 
+def test_resolve_config_suggest_mode_grants_no_hook_authority():
+    # 'suggest' agents only propose a commit message -- they must never end
+    # up in the allowlist the guard hook trusts to authorize a real commit.
+    result = resolve_auto_commit_config(
+        config={"auto_commit": {"mode": "suggest"}},
+        active_roles=["orchestrator", "developer", "git", "tester"],
+        agent_meta_root=_REPO_ROOT,
+    )
+    assert result["mode"] == "suggest"
+    assert result["eligible_roles"] == []
+
+
+def test_resolve_config_custom_mode_lists_eligible_roles():
+    result = resolve_auto_commit_config(
+        config={"auto_commit": {"mode": "custom", "custom_script": "x.sh"}},
+        active_roles=["orchestrator", "developer", "git"],
+        agent_meta_root=_REPO_ROOT,
+    )
+    assert "developer" in result["eligible_roles"]
+
+
 def test_resolve_config_missing_auto_commit_key_defaults_to_off():
     result = resolve_auto_commit_config(
         config={},

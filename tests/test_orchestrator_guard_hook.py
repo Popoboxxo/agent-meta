@@ -815,3 +815,84 @@ def test_auto_commit_allowlisted_role_does_not_gain_orchestrator_sentinel_scope(
     command = "#agent-meta:agent=developer\necho test"
     result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
     assert result.returncode == 2, f"stderr={result.stderr}"
+
+
+# --- issue #694 follow-up: allowlist sentinel is add/commit-scoped only ---
+# The allowlist sentinel authorizes staging + committing, nothing else. Every
+# other git mutation in the same command must still be blocked, so an
+# auto-committing role can never publish or rewrite refs behind the `git`
+# role's back (README: "auto_commit only ever authorizes `git commit`").
+
+@pytest.mark.parametrize("mutation", [
+    "git push origin main",
+    "git add -A && git commit -m 'x' && git push",
+    "git rm foo.txt",
+    "git tag v1.0.0",
+    "git merge feature",
+    "git checkout other-branch",
+    "git stash pop",
+    # --amend rewrites the previous commit instead of adding one; it can
+    # destroy work an earlier (possibly git-role) commit already recorded.
+    "git commit --amend -m 'x'",
+])
+def test_allowlist_sentinel_blocks_non_addcommit_mutations(tmp_path, mutation):
+    _write_allowlist(tmp_path, "auto", ["developer"])
+    command = f"#agent-meta:agent=developer\n{mutation}"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+    assert "git mutations are forbidden" in result.stderr.lower()
+
+
+def test_git_sentinel_keeps_full_mutation_scope(tmp_path):
+    # Narrowing the allowlist sentinel must not narrow the real `git` role.
+    _write_allowlist(tmp_path, "auto", ["developer"])
+    command = "#agent-meta:agent=git\ngit push origin main"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 0, f"stderr={result.stderr}"
+
+
+# --- issue #694 follow-up: bare '&' is a statement separator -------------
+# statements() used to split only on '&&'/'||'/';'/'|'/newline, so
+# "git add x & git push" was ONE statement -- and since the token loop
+# breaks after the first `git` it finds per statement, the second
+# invocation was never classified at all. That silently bypassed both the
+# mutation gate and the add/commit-only narrowing of the allowlist
+# sentinel above.
+
+
+def test_bare_ampersand_second_git_is_still_classified(tmp_path):
+    # Without any sentinel this used to exit 0 (full bypass of the mutation
+    # gate) because `git push` hid behind the leading `git status`.
+    command = "git status & git push origin main"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+
+
+def test_bare_ampersand_addcommit_still_allowed_for_allowlisted_role(tmp_path):
+    # Both halves are add/commit, so the command stays inside the sentinel's
+    # narrow scope -- splitting on '&' must not over-block this.
+    _write_allowlist(tmp_path, "auto", ["developer"])
+    command = "#agent-meta:agent=developer\ngit add -A & git commit -m 'x'"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 0, f"stderr={result.stderr}"
+
+
+def test_bare_ampersand_cannot_smuggle_push_past_allowlist_sentinel(tmp_path):
+    # The actual bypass: `git push` after a bare '&' escaped the add/commit
+    # narrowing that test_allowlist_sentinel_blocks_non_addcommit_mutations
+    # enforces for the '&&' form.
+    _write_allowlist(tmp_path, "auto", ["developer"])
+    command = "#agent-meta:agent=developer\ngit add -A & git push origin main"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+    assert "git mutations are forbidden" in result.stderr.lower()
+
+
+def test_double_ampersand_addcommit_unchanged_by_bare_ampersand_split(tmp_path):
+    # Regression guard for the alternation order: '&&' must keep matching as
+    # one operator. If '&' were listed first it would split '&&' into two
+    # empty statements and this previously-passing case would change behavior.
+    _write_allowlist(tmp_path, "auto", ["developer"])
+    command = "#agent-meta:agent=developer\ngit add -A && git commit -m 'x'"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 0, f"stderr={result.stderr}"

@@ -329,21 +329,28 @@ def handle_scan_staged() -> int:
     offending file path."""
     from .secrets import scan_for_secrets
 
-    result = subprocess.run(
-        ["git", "diff", "--cached", "--name-only"],
-        capture_output=True, text=True, check=True,
-    )
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--cached", "--name-only"],
+            capture_output=True, text=True, check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError) as exc:
+        print(f"Secret scan skipped -- not a git repository or git unavailable ({exc}).")
+        return 0
     staged_files = [f for f in result.stdout.splitlines() if f.strip()]
 
     any_findings = False
     for rel_path in staged_files:
-        path = Path(rel_path)
-        if not path.is_file():
+        # `git show :<path>` reads the INDEX version -- the content that is
+        # actually about to be committed, not a working-tree copy that may
+        # have been edited (or reverted) after `git add`.
+        show = subprocess.run(["git", "show", f":{rel_path}"], capture_output=True)
+        if show.returncode != 0:
             continue  # deleted/renamed-away files have nothing to scan
         try:
-            content = path.read_text(encoding="utf-8")
-        except (UnicodeDecodeError, OSError):
-            continue  # binary or unreadable -- not a text-secret risk this scanner covers
+            content = show.stdout.decode("utf-8")
+        except UnicodeDecodeError:
+            continue  # binary -- not a text-secret risk this scanner covers
         findings = scan_for_secrets(content)
         if findings:
             any_findings = True

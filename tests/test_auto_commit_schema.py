@@ -65,3 +65,41 @@ def test_file_count_threshold_must_be_positive_int():
             _base_config({"mode": "auto", "triggers": ["file-count-threshold"], "file_count_threshold": 0}),
             _schema(),
         )
+
+
+def test_triggers_without_mode_auto_rejected():
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(
+            _base_config({"mode": "suggest", "triggers": ["task-boundary"]}),
+            _schema(),
+        )
+
+
+def test_empty_triggers_list_allowed_under_any_mode():
+    jsonschema.validate(_base_config({"mode": "suggest", "triggers": []}), _schema())
+
+
+def test_mode_custom_without_custom_script_rejected():
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(_base_config({"mode": "custom"}), _schema())
+
+
+def test_mode_custom_with_null_custom_script_rejected():
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(
+            _base_config({"mode": "custom", "custom_script": None}), _schema(),
+        )
+
+
+def test_mode_custom_with_custom_script_is_valid():
+    jsonschema.validate(
+        _base_config({"mode": "custom", "custom_script": "scripts/should-commit.sh"}),
+        _schema(),
+    )
+
+
+def test_custom_trigger_without_custom_script_rejected():
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(
+            _base_config({"mode": "auto", "triggers": ["custom"]}), _schema(),
+        )

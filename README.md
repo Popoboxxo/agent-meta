@@ -855,18 +855,18 @@ Opt-in `auto_commit` config lets write-capable agents commit directly instead of
 
 | Trigger | Fires when |
 |---------|-----------|
-| `task-boundary` | The agent's current task/subtask completes |
-| `per-edit` | Immediately after each Edit/Write tool call |
-| `context-pressure` | Context window utilization crosses a threshold |
-| `file-count-threshold` | Staged changes exceed a configured file count |
-| `custom` | A project script decides |
+| `task-boundary` | A subtask is complete **and** its tests are green |
+| `per-edit` | After every Write/Edit tool call |
+| `context-pressure` | Just before a checkpoint or context-compaction event |
+| `file-count-threshold` | After `file_count_threshold` files have changed since the last commit |
+| `custom` | The project's `custom_script` also votes to commit |
 
 Set in `.meta-config/project.yaml`:
 ```yaml
 auto_commit:
   mode: auto
   triggers: [task-boundary, file-count-threshold]
-  file-count-threshold: 5
+  file_count_threshold: 5
   secret_scan: true              # default; gates every auto/custom commit
 ```
 

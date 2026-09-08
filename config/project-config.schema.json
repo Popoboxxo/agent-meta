@@ -1196,7 +1196,47 @@
           "description": "Run the project's existing secret scan (scripts/lib/secrets.py::scan_for_secrets) against the staged diff before any auto/custom commit. Default true; set false to skip (explicit opt-out, not a silent gap)."
         }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "description": "A non-empty 'triggers' list is only meaningful under mode 'auto' -- reject it under any other mode instead of silently ignoring it.",
+          "if": {
+            "properties": {
+              "triggers": { "type": "array", "minItems": 1 }
+            },
+            "required": ["triggers"]
+          },
+          "then": {
+            "properties": {
+              "mode": { "const": "auto" }
+            },
+            "required": ["mode"]
+          }
+        },
+        {
+          "description": "mode 'custom', or 'custom' among the triggers, requires a custom_script -- otherwise there is no commit decision to delegate to.",
+          "if": {
+            "anyOf": [
+              {
+                "properties": { "mode": { "const": "custom" } },
+                "required": ["mode"]
+              },
+              {
+                "properties": {
+                  "triggers": { "contains": { "const": "custom" } }
+                },
+                "required": ["triggers"]
+              }
+            ]
+          },
+          "then": {
+            "properties": {
+              "custom_script": { "type": "string", "minLength": 1 }
+            },
+            "required": ["custom_script"]
+          }
+        }
+      ]
     },
     "outcome-caching": {
       "$ref": "#/$defs/outcome-caching"

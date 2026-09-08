@@ -41,6 +41,14 @@ def test_custom_mode_mentions_custom_script():
     assert "scripts/should-commit.sh" in block
 
 
+def test_custom_mode_without_script_renders_config_error_not_none():
+    # The schema rejects this combination, but a hand-edited allowlist must
+    # never leak the literal word "None" into the agent's instructions.
+    block = render_auto_commit_block({"mode": "custom", "secret_scan": True})
+    assert "None" not in block
+    assert "misconfigured" in block.lower()
+
+
 def test_no_mode_ever_mentions_push_tag_or_branch():
     for mode_cfg in (
         {"mode": "suggest", "triggers": [], "secret_scan": True},
