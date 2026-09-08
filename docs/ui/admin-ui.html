@@ -3014,7 +3014,14 @@ async function viewAvailablePlugins() {
       result.textContent = "…";
       try {
         const r = await api.post(`/api/plugins/${encodeURIComponent(id)}/test`, {});
-        result.textContent = `${r.status}: ${r.message} (${r.latency_ms}ms)`;
+        // #693: UNAVAILABLE = local setup gap (not installed / not configured
+        // for this project), not a broken plugin — labeled "Experimental" so
+        // it doesn't read as a scary FAIL.
+        const label = r.status === "UNAVAILABLE" ? "Experimental" : r.status;
+        const color = { PASS: "var(--success, green)", FAIL: "var(--error, red)",
+                        UNAVAILABLE: "var(--warning, orange)" }[r.status] || "inherit";
+        result.style.color = color;
+        result.textContent = `${label}: ${r.message} (${r.latency_ms}ms)`;
       } catch (e) { result.textContent = e.message; }
     };
     row.appendChild(testBtn); row.appendChild(result);

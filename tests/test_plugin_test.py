@@ -23,19 +23,48 @@ def test_local_binary_pass(monkeypatch):
 
 
 def test_local_binary_missing(monkeypatch):
+    """#693: not installed locally is a setup gap (UNAVAILABLE/"Experimental"
+    in the UI), not a plugin FAIL."""
     monkeypatch.setattr(pt.shutil, "which", lambda n: None)
     res = run_plugin_test("graphify", {"origin-type": "local-binary", "binary": "graphify"})
-    assert res["status"] == "FAIL"
-    assert "not found" in res["message"].lower()
+    assert res["status"] == "UNAVAILABLE"
+    assert "not installed" in res["message"].lower()
 
 
 def test_local_process_handshake(monkeypatch):
+    monkeypatch.setattr(pt.shutil, "which", lambda n: "/usr/bin/npx")
     monkeypatch.setattr(pt, "_mcp_initialize_handshake",
                         lambda cmd, args, env: (True, "initialize ok"))
     pdef = {"origin-type": "local-process",
             "connection": {"type": "stdio", "command": "npx", "args": ["-y", "x"]}}
     res = run_plugin_test("influxdb", pdef)
     assert res["status"] == "PASS"
+
+
+def test_local_process_command_missing(monkeypatch):
+    """#693: command not on PATH is a setup gap, not a plugin FAIL — and must
+    short-circuit before attempting the handshake."""
+    monkeypatch.setattr(pt.shutil, "which", lambda n: None)
+    monkeypatch.setattr(pt, "_mcp_initialize_handshake",
+                        lambda cmd, args, env: (_ for _ in ()).throw(AssertionError("should not be called")))
+    pdef = {"origin-type": "local-process",
+            "connection": {"type": "stdio", "command": "npx", "args": ["-y", "x"]}}
+    res = run_plugin_test("influxdb", pdef)
+    assert res["status"] == "UNAVAILABLE"
+    assert "not installed" in res["message"].lower()
+
+
+def test_remote_saas_unresolved_secret(monkeypatch):
+    """#693: a missing per-project secret leaves a `{{VAR}}` placeholder in the
+    URL — that's a config gap, not a broken plugin, and must not even attempt
+    the HTTP probe (an unresolved placeholder is not a valid URL)."""
+    monkeypatch.setattr(pt, "_http_probe",
+                        lambda url, headers: (_ for _ in ()).throw(AssertionError("should not be called")))
+    pdef = {"origin-type": "remote-saas",
+            "connection": {"type": "sse", "url": "{{HOME_ASSISTANT_URL}}/api/mcp"}}
+    res = run_plugin_test("home-assistant", pdef)
+    assert res["status"] == "UNAVAILABLE"
+    assert "secret" in res["message"].lower()
 
 
 def test_remote_saas_reachable(monkeypatch):
@@ -86,6 +115,7 @@ def test_local_process_timeout(monkeypatch):
         def kill(self):
             pass
 
+    monkeypatch.setattr(pt.shutil, "which", lambda n: "/usr/bin/mock")
     monkeypatch.setattr(pt, "_read_line_with_timeout", lambda stream, timeout: None)
     monkeypatch.setattr(pt.subprocess, "Popen", lambda *a, **kw: MockProc())
     pdef = {"origin-type": "local-process",
@@ -111,6 +141,7 @@ def test_local_process_partial_line_timeout(monkeypatch):
         return result
 
     # Mock the thread reader to timeout immediately
+    monkeypatch.setattr(pt.shutil, "which", lambda n: "/usr/bin/true")
     monkeypatch.setattr(pt, "_read_line_with_timeout", lambda stream, timeout: None)
     monkeypatch.setattr(pt, "_mcp_initialize_handshake", _mcp_with_timing)
 
@@ -146,6 +177,7 @@ def test_local_process_env_block_inherits_parent_env(monkeypatch):
         return MockProc()
 
     monkeypatch.setattr(pt.os, "environ", {"PATH": "/usr/bin", "HOME": "/home/x"})
+    monkeypatch.setattr(pt.shutil, "which", lambda n: "/usr/bin/npx")
     monkeypatch.setattr(pt.subprocess, "Popen", _fake_popen)
     monkeypatch.setattr(pt, "_read_line_with_timeout", lambda stream, timeout: '{"result": {}}')
 
