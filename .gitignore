@@ -9,6 +9,12 @@ sync.log
 package-lock.
 graphify-out/
 .ship-safe/
+.backup/
+.claude/
+.gemini/
+.mammouth/
+.opencode/
+.serena/
 /external/*
 !/external/AGENT_META_INFO.md
 
