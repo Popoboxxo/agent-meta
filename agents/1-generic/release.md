@@ -1,6 +1,6 @@
 ---
 name: template-release
-version: "1.9.0"
+version: "1.10.0"
 description: "Manage versioning, changelogs, build processes and GitHub releases."
 hint: "Versioning, changelog, build artifact, create GitHub release"
 prompt_mode: modern
@@ -131,3 +131,7 @@ ARTIFACTS: [list of attached files]
 
 Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
 </output-guard>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

@@ -1,6 +1,6 @@
 ---
 name: template-concept-architect
-version: "1.0.0"
+version: "1.1.0"
 description: "Use when a complex change (XL, >20 files) needs a system design before implementation: components, interfaces, trade-off analysis. Does not implement."
 hint: "System design for complex changes: components, interfaces, trade-offs — never implements"
 prompt_mode: modern
@@ -124,3 +124,7 @@ NEXT: [Review by concept-reviewer | Detail specs via concept-specifier | Hand of
 
 **Language:** design document in project language, communication in {{COMMUNICATION_LANGUAGE}}.
 </constraints>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

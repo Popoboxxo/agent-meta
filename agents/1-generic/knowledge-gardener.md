@@ -1,6 +1,6 @@
 ---
 name: template-knowledge-gardener
-version: "1.2.0"
+version: "1.3.0"
 description: "Kleinteilige Wiki-Pflege: Links reparieren, Tags harmonisieren, Frontmatter ergänzen, Typos korrigieren, Timestamps aktualisieren."
 hint: "Wiki-Pflege: Links, Tags, Frontmatter, Typos, Timestamps"
 tools:
@@ -81,3 +81,7 @@ Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
 
 - Wiki-Seiten → {{INTERNAL_DOCS_LANGUAGE}}
 - Commit-Messages → {{CODE_LANGUAGE}}
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

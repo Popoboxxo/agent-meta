@@ -82,6 +82,23 @@ project:
 #   # sections: Pflicht-Abschnitte in Reihenfolge.
 #   sections: [description, badges, setup, structure]
 #
+# auto_commit:
+#   # mode: off (Default) -> nur die git-Rolle committet, wie bisher.
+#   #   suggest -> Agenten schlagen eine Commit-Message im eigenen Report vor,
+#   #     committen NICHT selbst.
+#   #   auto -> Agenten committen direkt, sobald ein gewaehlter Trigger feuert.
+#   #   custom -> custom_script entscheidet allein, eingebaute Trigger werden ignoriert.
+#   mode: off
+#   # triggers: nur bei mode: auto relevant, ODER-verknuepft, Mehrfachauswahl:
+#   #   task-boundary (Teilaufgabe fertig + Tests gruen), per-edit (nach jedem
+#   #   Write/Edit), context-pressure (vor Checkpoint/Context-Compaction),
+#   #   file-count-threshold (siehe file_count_threshold), custom (custom_script
+#   #   stimmt zusaetzlich mit ab).
+#   triggers: [task-boundary]
+#   file_count_threshold: 5
+#   custom_script: null
+#   secret_scan: true
+#
 # Secrets in committeten Dateien erlauben (NICHT empfohlen).
 # Default: false — sync bricht mit Fehler ab wenn Secrets in nicht-gitignored Dateien erkannt werden.
 # Nur auf true setzen wenn absichtlich demo-tokens o.ä. committet werden sollen.

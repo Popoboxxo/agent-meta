@@ -335,12 +335,27 @@ def test_build_provider_vars_empty_without_prerender(tmp_path):
 def test_intent_routing_tools_placeholder_substitutes_cleanly():
     """End-to-end wiring check: the orchestrator template's
     ``{{INTENT_ROUTING_TOOLS}}`` placeholder substitutes to the rendered
-    definition for a provider with handoff_format — no open placeholder and
-    no missing-variable warning in the output. The parse side mirrors each
-    provider's ``handoff_format`` (json vs yaml_text_block)."""
+    definition for every ACTIVE provider of this repo's config — no open
+    placeholder and no missing-variable warning in the output. The parse
+    side mirrors each provider's ``handoff_format`` (json vs
+    yaml_text_block).
+
+    The provider set is resolved from the config instead of a hardcoded
+    tuple: the prerender (``_INTENT_ROUTING_TOOL_DEFS``) covers active
+    providers only (see
+    ``test_build_variables_prerenders_intent_routing_tools_per_provider``),
+    so an inactive provider legitimately resolves to "" (fail-soft PAL
+    semantics, see ``test_build_for_providers_unknown_provider_fails_soft``).
+    Iterating Mammouth — deactivated in this repo's project.yaml by #695 —
+    made this test compare an empty body against yaml.safe_load("") is None.
+    Format-dispatch coverage for non-active handoff formats lives in
+    test_render_json_round_trip / test_render_yaml_text_block_round_trip /
+    test_build_for_providers_follows_handoff_format_capability.
+    """
     from scripts.lib.config import build_variables, load_config
     from scripts.lib.agent_sync import _build_provider_vars
     from scripts.lib.delegation_syntax import DelegationSyntaxEngine
+    from scripts.lib.providers import load_providers_config, resolve_providers
     from scripts.lib.variables import substitute
     from scripts.lib.log import SyncLog
 
@@ -351,7 +366,12 @@ def test_intent_routing_tools_placeholder_substitutes_cleanly():
     )
     assert "{{INTENT_ROUTING_TOOLS}}" in template, "placeholder missing from template"
     engine = DelegationSyntaxEngine(config_dir=_AGENT_META_ROOT / "config")
-    for provider in ("Opencode", "Gemini", "Mammouth"):
+    provider_config = load_providers_config(_AGENT_META_ROOT)
+    active_providers = resolve_providers(config, provider_config)
+    assert active_providers, "no active providers resolved from this repo's config"
+    # The prerender contract mirrors the active provider set exactly.
+    assert set(variables["_INTENT_ROUTING_TOOL_DEFS"]) == set(active_providers)
+    for provider in active_providers:
         tool_format = str(engine.get_capabilities(provider).get("handoff_format") or "")
         merged = _build_provider_vars({}, provider, variables, _AGENT_META_ROOT)
         log = SyncLog()
@@ -370,7 +390,7 @@ def test_intent_routing_tools_placeholder_substitutes_cleanly():
             parsed = json.loads(body)
         elif tool_format == "yaml_text_block":
             parsed = yaml.safe_load(body)
-        else:  # pragma: no cover — all three fixtures carry a known format
+        else:  # pragma: no cover — all active providers carry a known format
             pytest.fail(f"{provider}: unexpected handoff_format '{tool_format}'")
         assert parsed["tool"]["name"] == ROUTING_TOOL_NAME
         assert not [w for w in log.warnings if "INTENT_ROUTING_TOOLS" in w]

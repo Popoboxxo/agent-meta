@@ -1,6 +1,6 @@
 ---
 name: se-validator
-version: 1.5.0
+version: 1.6.0
 description: 'L1 System-Validierung: End-to-End User Journeys gegen Stakeholder-Bedürfnisse
   abgleichen. ''Did we build the right system?'' Persists validation report.'
 hint: Validiert das System auf L1-Ebene durch User-Journey-Simulation — ignoriert
@@ -214,3 +214,7 @@ Communication and input language: see global rule `language.md`.
 
 Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
 </output-guard>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

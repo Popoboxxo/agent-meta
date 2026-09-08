@@ -9,6 +9,12 @@ sync.log
 package-lock.
 graphify-out/
 .ship-safe/
+.backup/
+.claude/
+.gemini/
+.mammouth/
+.opencode/
+.serena/
 /external/*
 !/external/AGENT_META_INFO.md
 
@@ -19,7 +25,6 @@ graphify-out/
 .claude/settings.local.json
 .gemini/pending-tasks.md
 .gemini/settings.local.json
-.mammouth/pending-tasks.md
 .mcp.json
 .meta-config/env.ps1
 .meta-config/env.sh

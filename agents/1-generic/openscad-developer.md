@@ -1,6 +1,6 @@
 ---
 name: template-openscad-developer
-version: "1.4.0"
+version: "1.5.0"
 description: "Specialized developer for parametric 3D models in OpenSCAD. Render-Inspect-Refine loop via MCP, printability knowledge, tolerance management."
 hint: "Generate OpenSCAD code: parametric 3D models, render feedback, STL export, print optimization"
 prompt_mode: modern
@@ -117,3 +117,7 @@ NOTES: [print recommendations, material, settings]
 
 Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
 </output-guard>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

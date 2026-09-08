@@ -3,7 +3,7 @@
 > Projektbeschreibung für Claude-Agenten. Diese Datei ist die **einzige Quelle**
 > für projektspezifischen Kontext — Agenten lesen sie, statt eigenen Kontext zu haben.
 >
-> Generiert von agent-meta v0.101.0-beta.6 — `2026-09-07`
+> Generiert von agent-meta v0.101.0-beta.6 — `2026-09-08`
 >
 > **Längenempfehlung:** 200–500 Zeilen optimal. Über 500 Zeilen → Detailwissen in
 > `docs/ARCHITECTURE.md`, `docs/API.md` o.ä. auslagern und manuell verlinken.
@@ -51,7 +51,21 @@ Hier kannst du eigene, projektspezifische Notizen eintragen. Dieser Bereich wird
 - Provider-Unterschiede im Syncer-Code über Config-Keys/Capability-Flags ausdrücken, nie über `if provider == "Name"` (siehe `provider-agnostic`-Skill)
 
 
-> Build: `python scripts/sync.py` · Test: `python3 scripts/sync.py --validate` · Dev: `(kein Dev-Stack)` · Reload: `(kein Dev-Stack)`
+## Build & Development
+
+```bash
+# Build
+python scripts/sync.py
+
+# Tests
+python3 scripts/sync.py --validate
+
+# Dev-Stack starten
+(kein Dev-Stack)
+
+# Nach Änderungen neu laden
+(kein Dev-Stack)
+```
 
 ## Anforderungs-Kategorien
 
@@ -69,15 +83,15 @@ Kategorien für `docs/REQUIREMENTS.md`:
 <!-- Dieser Block wird von sync.py bei jedem sync automatisch aktualisiert. -->
 <!-- Manuelle Änderungen hier werden überschrieben. -->
 
-> **AI ROUTING:** Claude -> CLAUDE.md | Opencode, Gemini -> AGENTS.md | Mammouth -> MAMMOUTH.md
+> **AI ROUTING:** Claude -> CLAUDE.md | Opencode, Gemini -> AGENTS.md
 
-Generiert von agent-meta v0.101.0-beta.6 — `2026-09-07`
+Generiert von agent-meta v0.101.0-beta.6 — `2026-09-08`
 DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
-> **Einstiegspunkt:** Du bist im `main-chat` Modus. Du agierst direkt als Router und Worker (siehe `use-orchestrator.md`).
+> **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben — Ausnahmen siehe Abschnitt »Orchestrator — Universal Router«.
 
 ## Knowledge Engine
 
-Die Knowledge Engine ist aktiviert. Domäne: **personal**.
+Die Knowledge Engine ist aktiviert. Domäne: **internal-docs**.
 
 **Bundle-Pfad:** `knowledge/`
 | Pfad | Zweck |

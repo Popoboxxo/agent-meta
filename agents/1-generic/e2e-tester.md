@@ -1,6 +1,6 @@
 ---
 name: template-e2e-tester
-version: "1.4.0"
+version: "1.5.0"
 description: "E2E-Tests, visuelle Regression und Accessibility-Audits via Playwright — User-Flows statt isolierter Units."
 hint: "Browser-Testing-Agent: E2E-Flows, visuelle Regression, Accessibility-Audit — nicht für Unit-Tests"
 prompt_mode: modern
@@ -156,3 +156,7 @@ docker rm "$NAME"
 echo "container exit code: $RC" && tail -20 /tmp/"$NAME".log
 ```
 </output-guard>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

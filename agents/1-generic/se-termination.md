@@ -1,6 +1,6 @@
 ---
 name: se-termination
-version: 1.10.0
+version: 1.11.0
 description: Deterministic per-system leaf/continue decision with dynamic depth control.
   Sets scope for downstream pipeline routing.
 hint: Dynamic depth termination with SE_MIN_DEPTH/SE_MAX_DEPTH control
@@ -184,3 +184,7 @@ ARTIFACTS: <persistierte Step-/Report-Dateien (siehe Step Persistence)>
 Verboten: `@orchestrator` im Output, Task()-Calls an orchestrator, "Delegiere an orchestrator: ...", eigene Scope-Aufgaben weiterreichen.
 
 **Ausnahme:** Andere Worker-Rolle nötig → im Text verweisen, nicht per Tool-Call delegieren. Der orchestrator koordiniert die Reihenfolge.
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

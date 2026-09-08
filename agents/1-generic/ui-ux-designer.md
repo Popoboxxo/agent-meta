@@ -1,6 +1,6 @@
 ---
 name: template-ui-ux-designer
-version: "1.4.0"
+version: "1.5.0"
 description: "Creates UI specifications, mockups, and design systems. Maps REQ-IDs to UI elements."
 hint: "UI specification, mockup creation, and design-system definition — specifies, does not implement."
 prompt_mode: modern
@@ -114,3 +114,7 @@ ARTIFACTS: [files created]
 
 Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
 </output-guard>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

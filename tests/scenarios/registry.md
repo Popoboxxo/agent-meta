@@ -21,6 +21,13 @@ tests/scenarios/run.sh 12 17        # nur Szenarien, deren ID mit "12" oder "17"
 `PASS`/`FAIL` pro Szenario; bei `FAIL` bleibt das Temp-Verzeichnis erhalten
 (Pfad wird ausgegeben) zur Fehleranalyse.
 
+Szenarien mit optionalem Content-Assertions-Script
+(`tests/scenarios/asserts/<szenario-name>.sh`, ausführbar) führen nach dem
+`--validate`-Schritt echte Prüfungen gegen den Sync-Output aus (cwd =
+Temp-Dir, `REPO_ROOT` als Env-Var und `$1`). Ein nicht bestandener Assert
+ergibt `FAIL` und zeigt die Assertion-Ausgabe; Szenarien ohne Assert-File
+verhalten sich exakt wie bisher.
+
 ## Katalog
 
 | ID | Provider | Orchestrator-Mode | Feature unter Test |
@@ -42,6 +49,10 @@ tests/scenarios/run.sh 12 17        # nur Szenarien, deren ID mit "12" oder "17"
 | `15-orchestrator-strict` | Claude | **strict** (explizit) | Dedizierter Orchestrator-Subagent, Pflicht |
 | `16-orchestrator-advisory` | Claude | **advisory** | Dedizierter Orchestrator-Subagent, empfohlen |
 | `17-orchestrator-main-chat` | Claude | **main-chat** | Kein Orchestrator-Subagent — Main Chat routet selbst (agent-metas eigener Modus) |
+| `18-auto-commit` | Claude, Gemini | strict (default) | Auto-commit tiers: role eligibility, AUTO_COMMIT_BLOCK rendering, allowlist generation (#694) |
+| `19-auto-commit-suggest` | Claude, Gemini | strict (default) | Auto-commit suggest tier: propose-not-pause prose, eligibility excludes git/explorer (#694) |
+| `20-auto-commit-custom` | Claude | strict (default) | Auto-commit custom tier: `custom_script` contract + sentinel prefix, no trigger prose (#694) |
+| `21-auto-commit-off-ignores-config` | Claude, Gemini, Opencode | strict (default) | Auto-commit off tier: stray config values ignored, zero block rendering, byte-identical output vs. unconfigured sync (#694) |
 
 ## Bewusste Auslassungen
 

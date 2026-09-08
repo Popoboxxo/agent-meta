@@ -1,6 +1,6 @@
 ---
 name: se-component-requirements
-version: 1.0.1
+version: 1.1.0
 description: Materialisiert pro Leaf-Component aus der COMP-Tabelle der L2-Architektur eine eigenständige L3-Component-Requirements-Datei — Responsibility, REQ-L2-Referenzen, interne Interfaces, ≥2 REQ-L3 (#332). Schließt die Lücke zwischen se-termination-LEAF und se-developer-Input.
 hint: Materialize L3 component requirements per leaf component after termination (#332)
 tools:
@@ -294,3 +294,7 @@ Worker-Agent. Niemals Scope-Aufgaben an `orchestrator` oder andere Worker zurüc
 
 Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
 </output-guard>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

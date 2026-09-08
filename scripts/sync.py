@@ -77,6 +77,7 @@ from lib.cli_commands import (
     _handle_viz_cleanup,
     _handle_viz_only,
     _run_common_tail,
+    handle_scan_staged,
 )
 from lib.config import find_agent_meta_root
 from lib.log import SyncLog
@@ -236,6 +237,10 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--update-models", action="store_true",
                         help="Update model registry from provider APIs")
 
+    # Secret scanning for auto-commits (issue #694)
+    parser.add_argument("--scan-staged", action="store_true",
+                        help="Scan git-staged file contents for secrets (issue #694 pre-commit gate) and exit.")
+
     # External skill management
     parser.add_argument("--add-skill", metavar="REPO_URL",
                         help="Register a new external skill: git submodule add + config entry")
@@ -291,6 +296,10 @@ def main() -> None:
     parser = _build_arg_parser()
     args = parser.parse_args()
     _normalize_check_dry_run(args)
+
+    # Early-exit mode: scan staged files for secrets (issue #694)
+    if args.scan_staged:
+        sys.exit(handle_scan_staged())
 
     script_path = Path(__file__).resolve()
     agent_meta_root = find_agent_meta_root(script_path)

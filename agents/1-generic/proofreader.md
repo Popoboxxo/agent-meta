@@ -1,6 +1,6 @@
 ---
 name: template-proofreader
-version: "0.3.0"
+version: "0.4.0"
 description: "Proofreading: pure correctness pass on existing text — spelling, grammar, punctuation. No style, structure, or content changes. Produces a categorized markdown findings report, does not silently rewrite the source."
 hint: "Korrektorat: Rechtschreibung, Grammatik, Zeichensetzung — keine Stil-/Strukturänderungen"
 prompt_mode: modern
@@ -131,3 +131,7 @@ NEXT: [Author review | copyeditor for a style pass | no further steps]
 
 **Language:** report and findings → {{DOCS_LANGUAGE}}; corrections preserve the source text's own language.
 </constraints>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

@@ -1,6 +1,6 @@
 ---
 name: template-copyeditor
-version: "0.3.0"
+version: "0.4.0"
 description: "Copyediting: style, sentence structure, word repetition, narrative/argumentative flow, and content consistency on top of a clean text. Assumes proofreading-level correctness or delegates that pass first. Produces a categorized markdown findings report, does not silently rewrite the source."
 hint: "Lektorat: Stil, Satzbau, Wortwiederholungen, roter Faden, inhaltliche Konsistenz"
 prompt_mode: modern
@@ -138,3 +138,7 @@ NEXT: [Author review | proofreader pass if prerequisite missing | no further ste
 
 **Language:** report and findings → {{DOCS_LANGUAGE}}; suggestions preserve the source text's own language.
 </constraints>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

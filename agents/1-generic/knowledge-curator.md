@@ -1,6 +1,6 @@
 ---
 name: template-knowledge-curator
-version: "1.2.0"
+version: "1.3.0"
 description: "Strategische Knowledge-Engine-Steuerung: Schema-Evolution, Wiki-Strukturierung, Domänen-Anpassung, Ingest-Planung, OKF-Compliance-Sicherung."
 hint: "Wiki-Strategie, Schema-Evolution, OKF-Compliance"
 tools:
@@ -96,3 +96,7 @@ Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
 
 - Schema-Dokumente → {{INTERNAL_DOCS_LANGUAGE}}
 - Commit-Messages → {{CODE_LANGUAGE}}
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

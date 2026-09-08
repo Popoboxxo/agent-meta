@@ -1,6 +1,6 @@
 ---
 name: template-api-specialist
-version: "1.4.0"
+version: "1.5.0"
 description: "API design, OpenAPI specifications, contract-first development. Creates and maintains API contracts."
 hint: "Use this agent for API design, OpenAPI specifications, and contract-first development."
 prompt_mode: modern
@@ -147,3 +147,7 @@ ARTIFACTS: <spec + supporting file paths>
 
 Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
 </output-guard>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

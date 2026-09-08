@@ -4,6 +4,15 @@
 # temp project directory (never against this repo itself), then dry-run,
 # real sync and --validate are exercised.
 #
+# Per-scenario content assertions (optional):
+#   If tests/scenarios/asserts/<scenario-name>.sh exists and is executable,
+#   it is run after the --validate step (only when dry-run/sync/validate
+#   all passed), with cwd = the scenario's temp project dir, and REPO_ROOT
+#   (path to THIS agent-meta checkout) provided BOTH as env var and as $1.
+#   A non-zero exit marks the scenario FAIL: the assertion's stdout/stderr
+#   is printed and kept in <tmp>/.scenario-logs/assert.log. Scenarios
+#   without an assert file behave exactly as before.
+#
 # Usage:
 #   tests/scenarios/run.sh                # run all scenarios
 #   tests/scenarios/run.sh 01 12 17       # run only the given scenario id prefixes
@@ -59,12 +68,34 @@ for cfg in "$CONFIGS_DIR"/*.project.yaml; do
     sync_rc="$(cat "$log_dir/sync.rc" 2>/dev/null || echo 1)"
     val_rc="$(cat "$log_dir/validate.rc" 2>/dev/null || echo 1)"
 
-    if [ "$dry_rc" = "0" ] && [ "$sync_rc" = "0" ] && [ "$val_rc" = "0" ]; then
+    # Optional per-scenario content assertions (see header comment). Only
+    # run against a fully successful sync; absence of an assert file means
+    # zero behavior change for that scenario.
+    assert_script="$SCRIPT_DIR/asserts/$name.sh"
+    assert_rc=""
+    if [ -x "$assert_script" ] && [ "$dry_rc" = "0" ] && [ "$sync_rc" = "0" ] && [ "$val_rc" = "0" ]; then
+        (
+            cd "$tmp_dir" || exit 1
+            REPO_ROOT="$REPO_ROOT" "$assert_script" "$REPO_ROOT"
+        ) >"$log_dir/assert.log" 2>&1
+        assert_rc=$?
+    fi
+
+    if [ "$dry_rc" = "0" ] && [ "$sync_rc" = "0" ] && [ "$val_rc" = "0" ] && [ "${assert_rc:-0}" = "0" ]; then
         echo "PASS  $name"
         pass=$((pass + 1))
         rm -rf "$tmp_dir"
     else
-        echo "FAIL  $name  (dry-run=$dry_rc sync=$sync_rc validate=$val_rc)  logs kept at: $tmp_dir/.scenario-logs"
+        assert_note=""
+        if [ -x "$assert_script" ]; then
+            assert_note=" assert=${assert_rc:-skipped}"
+        fi
+        echo "FAIL  $name  (dry-run=$dry_rc sync=$sync_rc validate=$val_rc${assert_note})  logs kept at: $log_dir"
+        if [ -n "$assert_rc" ] && [ "$assert_rc" != "0" ]; then
+            echo "------ assertion output ($name) ------"
+            cat "$log_dir/assert.log"
+            echo "--------------------------------------"
+        fi
         fail=$((fail + 1))
         failed_names+=("$name")
     fi

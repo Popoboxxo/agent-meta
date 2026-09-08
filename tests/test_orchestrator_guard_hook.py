@@ -739,3 +739,160 @@ def test_audit_log_rotates_when_over_cap(tmp_path):
     assert len(lines) <= 1000
     assert "old-line-1\n" not in "\n".join(lines[:1])  # oldest entries gone
     assert "git status" in lines[-1]
+
+
+# --- issue #694: config-driven auto_commit allowlist sentinel ------------
+# `json` is already imported at module scope in this file (line 46) -- reuse it.
+
+
+def _write_allowlist(tmp_path, mode, eligible_roles):
+    (tmp_path / ".meta-config").mkdir(parents=True, exist_ok=True)
+    (tmp_path / ".meta-config" / "auto-commit-allowlist.json").write_text(
+        json.dumps({
+            "version": 1, "mode": mode, "eligible_roles": eligible_roles,
+            "triggers": ["task-boundary"], "file_count_threshold": 5,
+            "custom_script": None, "secret_scan": True,
+        }),
+        encoding="utf-8",
+    )
+
+
+def test_allowlisted_role_can_commit_when_auto_commit_enabled(tmp_path):
+    _write_allowlist(tmp_path, "auto", ["developer"])
+    command = "#agent-meta:agent=developer\ngit add -A && git commit -m 'x'"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 0, f"stderr={result.stderr}"
+
+
+def test_auto_commit_non_allowlisted_role_still_blocked(tmp_path):
+    _write_allowlist(tmp_path, "auto", ["developer"])
+    command = "#agent-meta:agent=tester\ngit add -A && git commit -m 'x'"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+    assert "git" in result.stderr.lower()
+
+
+def test_auto_commit_missing_allowlist_file_behaves_like_mode_off(tmp_path):
+    # No auto-commit-allowlist.json written at all.
+    command = "#agent-meta:agent=developer\ngit add -A && git commit -m 'x'"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"  # unchanged from today
+
+
+def test_auto_commit_mode_off_ignores_eligible_roles_list(tmp_path):
+    # A stale allowlist from a previous sync where auto_commit was later
+    # disabled again must not still authorize anyone.
+    _write_allowlist(tmp_path, "off", ["developer"])
+    command = "#agent-meta:agent=developer\ngit add -A && git commit -m 'x'"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+
+
+def test_auto_commit_destructive_gate_still_blocks_an_allowlisted_role(tmp_path):
+    # #516's destructive-gate protections are untouched by this feature --
+    # same assertion shape as test_destructive_ops_blocked_even_with_git_sentinel
+    # above, substituting an allowlisted "developer" sentinel for "git".
+    _write_allowlist(tmp_path, "auto", ["developer"])
+    command = "#agent-meta:agent=developer\ngit push --force origin main"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+    assert "user approval" in result.stderr
+
+
+def test_auto_commit_allowlisted_role_does_not_gain_orchestrator_sentinel_scope(tmp_path):
+    # An allowlisted non-git/orchestrator role must only ever gain the
+    # git-mutation-gate exemption (IS_GIT_SENTINEL), never the strict-mode
+    # main-chat exemption (IS_ORCH_SENTINEL) -- verified with an isolated
+    # fixture project (orchestrator.strict: true) as cwd: with NO agent_id
+    # (a main-thread call), a plain non-mutating Bash command from an
+    # allowlisted role must still be blocked by the strict-mode gate,
+    # exactly like an undeclared caller.
+    (tmp_path / ".meta-config").mkdir(parents=True, exist_ok=True)
+    (tmp_path / ".meta-config" / "project.yaml").write_text(
+        "orchestrator:\n  strict: true\n  enabled: true\n", encoding="utf-8",
+    )
+    _write_allowlist(tmp_path, "auto", ["developer"])
+    command = "#agent-meta:agent=developer\necho test"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+
+
+# --- issue #694 follow-up: allowlist sentinel is add/commit-scoped only ---
+# The allowlist sentinel authorizes staging + committing, nothing else. Every
+# other git mutation in the same command must still be blocked, so an
+# auto-committing role can never publish or rewrite refs behind the `git`
+# role's back (README: "auto_commit only ever authorizes `git commit`").
+
+@pytest.mark.parametrize("mutation", [
+    "git push origin main",
+    "git add -A && git commit -m 'x' && git push",
+    "git rm foo.txt",
+    "git tag v1.0.0",
+    "git merge feature",
+    "git checkout other-branch",
+    "git stash pop",
+    # --amend rewrites the previous commit instead of adding one; it can
+    # destroy work an earlier (possibly git-role) commit already recorded.
+    "git commit --amend -m 'x'",
+])
+def test_allowlist_sentinel_blocks_non_addcommit_mutations(tmp_path, mutation):
+    _write_allowlist(tmp_path, "auto", ["developer"])
+    command = f"#agent-meta:agent=developer\n{mutation}"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+    assert "git mutations are forbidden" in result.stderr.lower()
+
+
+def test_git_sentinel_keeps_full_mutation_scope(tmp_path):
+    # Narrowing the allowlist sentinel must not narrow the real `git` role.
+    _write_allowlist(tmp_path, "auto", ["developer"])
+    command = "#agent-meta:agent=git\ngit push origin main"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 0, f"stderr={result.stderr}"
+
+
+# --- issue #694 follow-up: bare '&' is a statement separator -------------
+# statements() used to split only on '&&'/'||'/';'/'|'/newline, so
+# "git add x & git push" was ONE statement -- and since the token loop
+# breaks after the first `git` it finds per statement, the second
+# invocation was never classified at all. That silently bypassed both the
+# mutation gate and the add/commit-only narrowing of the allowlist
+# sentinel above.
+
+
+def test_bare_ampersand_second_git_is_still_classified(tmp_path):
+    # Without any sentinel this used to exit 0 (full bypass of the mutation
+    # gate) because `git push` hid behind the leading `git status`.
+    command = "git status & git push origin main"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+
+
+def test_bare_ampersand_addcommit_still_allowed_for_allowlisted_role(tmp_path):
+    # Both halves are add/commit, so the command stays inside the sentinel's
+    # narrow scope -- splitting on '&' must not over-block this.
+    _write_allowlist(tmp_path, "auto", ["developer"])
+    command = "#agent-meta:agent=developer\ngit add -A & git commit -m 'x'"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 0, f"stderr={result.stderr}"
+
+
+def test_bare_ampersand_cannot_smuggle_push_past_allowlist_sentinel(tmp_path):
+    # The actual bypass: `git push` after a bare '&' escaped the add/commit
+    # narrowing that test_allowlist_sentinel_blocks_non_addcommit_mutations
+    # enforces for the '&&' form.
+    _write_allowlist(tmp_path, "auto", ["developer"])
+    command = "#agent-meta:agent=developer\ngit add -A & git push origin main"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+    assert "git mutations are forbidden" in result.stderr.lower()
+
+
+def test_double_ampersand_addcommit_unchanged_by_bare_ampersand_split(tmp_path):
+    # Regression guard for the alternation order: '&&' must keep matching as
+    # one operator. If '&' were listed first it would split '&&' into two
+    # empty statements and this previously-passing case would change behavior.
+    _write_allowlist(tmp_path, "auto", ["developer"])
+    command = "#agent-meta:agent=developer\ngit add -A && git commit -m 'x'"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 0, f"stderr={result.stderr}"

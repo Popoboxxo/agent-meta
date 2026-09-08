@@ -1,6 +1,6 @@
 ---
 name: se-requirements
-version: 2.0.0
+version: 2.1.0
 description: Elicits stakeholder needs and captures multi-level requirements. Enforces architecture boundary via arch_impact flag. Fills the standardized REQ frontmatter block.
 hint: Use this agent to clarify requirements and start the SE cascade.
 tools:
@@ -191,3 +191,7 @@ Worker-Agent. Niemals Scope-Aufgaben an `orchestrator` oder andere Worker zurüc
 
 Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
 </output-guard>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

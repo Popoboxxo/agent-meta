@@ -1,6 +1,6 @@
 ---
 name: template-knowledge-ingestor
-version: "1.3.0"
+version: "1.4.0"
 description: "Sources einlesen, Key Information extrahieren, Wiki-Seiten erstellen/aktualisieren, Cross-References pflegen."
 hint: "Sources verarbeiten, Wiki-Seiten schreiben, Cross-References pflegen"
 tools:
@@ -114,3 +114,7 @@ Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
 
 - Wiki-Seiten → {{INTERNAL_DOCS_LANGUAGE}}
 - Commit-Messages → {{CODE_LANGUAGE}}
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

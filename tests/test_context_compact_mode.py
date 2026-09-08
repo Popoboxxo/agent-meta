@@ -19,6 +19,8 @@ Phase B adds end-to-end coverage for the compression itself:
     core bans, short-form bootstrap, keywords directory table)
 """
 
+from __future__ import annotations
+
 import shutil
 import subprocess
 from pathlib import Path
@@ -301,8 +303,14 @@ def test_bootstrap_compact_skips_empty_dir(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def _render_context(mode: str, workdir: Path) -> str:
-    """Run the real opencode strategy for this repo's config into workdir."""
+def _render_context(mode: str | None, workdir: Path) -> str:
+    """Run the real opencode strategy for this repo's config into workdir.
+
+    mode=None renders the repo's configured context_file block verbatim
+    (freshness contract); an explicit mode overrides ONLY the mode key so
+    the other context_file settings (max_lines, oversize_acknowledged)
+    stay in effect exactly as in a real sync run.
+    """
     import sys
 
     scripts_dir = str(REPO_ROOT / "scripts")
@@ -314,10 +322,15 @@ def _render_context(mode: str, workdir: Path) -> str:
     from lib.providers import load_providers_config
 
     config = load_config(REPO_ROOT / ".meta-config" / "project.yaml")
-    # Force the mode explicitly for BOTH legs: the repo's own project.yaml now
-    # ships context_file.mode=compact, so relying on the config default would
-    # make the "full" leg silently render compact.
-    config["context_file"] = {"mode": mode}
+    if mode is not None:
+        # Force the mode explicitly for BOTH legs, but keep the rest of the
+        # context_file block (the repo's own project.yaml ships additional
+        # keys there — replacing the whole block would diverge from a real
+        # sync run). max_lines/oversize are warning-only signals, never
+        # render inputs — verified: identical bytes with and without.
+        context_block = dict(config.get("context_file") or {})
+        context_block["mode"] = mode
+        config["context_file"] = context_block
     variables, _ = build_variables(config, REPO_ROOT)
     provider_config = load_providers_config(REPO_ROOT)
     log = SyncLog()
@@ -362,13 +375,17 @@ _MANDATORY_ANCHORS = (
 )
 
 
-def test_committed_agents_md_equals_compact_render(seeded_project):
-    # THE freshness contract of issue #540 Iteration 2: this repo now ships in
-    # compact mode (.meta-config/project.yaml → context_file.mode: compact), so
-    # the committed AGENTS.md MUST equal a fresh compact render byte-for-byte.
-    # Guards against the Iteration-1 failure mode: config flipped to compact but
-    # the generated output never re-committed (stale full artifact left behind).
-    assert _render_context("compact", seeded_project) == (
+def test_committed_agents_md_equals_configured_mode_render(seeded_project):
+    # THE freshness contract of issue #540 Iteration 2, made mode-agnostic:
+    # the committed AGENTS.md MUST equal a fresh render in the CONFIGURED
+    # context_file.mode, byte-for-byte. Originally pinned to compact (the
+    # mode this repo shipped then); issue #695 flipped the repo's own
+    # project.yaml to `mode: full` (+ max_lines) and the re-sync commit
+    # regenerated the outputs correctly — the hardcoded-compact premise,
+    # not the outputs, had gone stale. Comparing against the configured
+    # mode guards the same Iteration-1 failure mode (config flipped,
+    # generated outputs never re-committed) for WHATEVER mode is active.
+    assert _render_context(None, seeded_project) == (
         REPO_ROOT / "AGENTS.md"
     ).read_text(encoding="utf-8")
 

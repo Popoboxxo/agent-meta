@@ -546,19 +546,35 @@ def generate_provider_configs(
 
     # --- Committed provider config ---
     committed_path = safe_path(project_root, committed_file)
-    _write_provider_config(
-        path=committed_path,
-        mcp_entries=committed_entries,
-        fmt=fmt,
-        log=log,
-        dry_run=dry_run,
-        allow_secrets=allow_committed_secrets,
-        config=config,
+    local_path = safe_path(project_root, secrets_file) if secrets_file else None
+    # Same-file deployment (e.g. Claude: committed-file == secrets-file ==
+    # gitignored .mcp.json — audit #388/#400, Claude Code only reads
+    # .mcp.json at the project root): when secrets resolve, the committed
+    # ${VAR}-placeholder pass would be an intermediate state that the
+    # secrets pass overwrites within the same run. Writing it anyway makes
+    # a lone `sync.py --check` report a permanent, unfixable false
+    # "out of sync" — the dry-run evaluates both renders against the FINAL
+    # on-disk state (placeholder render differs → counted as pending
+    # WRITE; resolved render matches → SKIP) and can never reach exit 0.
+    # Skip the redundant pass and write the final state exactly once;
+    # without secrets the committed pass stays the sole writer (native
+    # ${VAR} expansion fallback, see ai-providers.yaml comment).
+    same_file_secrets_write = (
+        local_path is not None and local_entries and local_path == committed_path
     )
+    if not same_file_secrets_write:
+        _write_provider_config(
+            path=committed_path,
+            mcp_entries=committed_entries,
+            fmt=fmt,
+            log=log,
+            dry_run=dry_run,
+            allow_secrets=allow_committed_secrets,
+            config=config,
+        )
 
     # --- Local/secrets provider config (only when secrets.local.yaml exists) ---
     if secrets_file and local_entries:
-        local_path = safe_path(project_root, secrets_file)
         _write_provider_config(
             path=local_path,
             mcp_entries=local_entries,

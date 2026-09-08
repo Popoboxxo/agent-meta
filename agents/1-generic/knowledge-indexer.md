@@ -1,6 +1,6 @@
 ---
 name: template-knowledge-indexer
-version: "1.2.0"
+version: "1.3.0"
 description: "Pflegt index.md (Content-Katalog, OKF §6) und log.md (Chronologisches Event-Log, OKF §7) im Knowledge Wiki."
 hint: "index.md und log.md pflegen — nur als Delegationsziel anderer Knowledge-Agenten"
 tools:
@@ -121,3 +121,7 @@ Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
 
 - `index.md`/`log.md` → {{INTERNAL_DOCS_LANGUAGE}}
 - Commit-Messages → {{CODE_LANGUAGE}}
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

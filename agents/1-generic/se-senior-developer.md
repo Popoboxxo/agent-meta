@@ -1,6 +1,6 @@
 ---
 name: se-senior-developer
-version: 1.5.0
+version: 1.6.0
 description: Implements complex SE leaf nodes. Pre-analyzes interfaces before coding. Persists output.
 hint: "Complex SE leaf nodes: cross-cutting, boundary, security/performance-critical, 5+ interfaces."
 tools:
@@ -148,3 +148,7 @@ Code comments + Commits → {{CODE_LANGUAGE}}. Communication → Rule `language.
 
 Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
 </output-guard>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

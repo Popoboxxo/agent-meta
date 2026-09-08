@@ -69,6 +69,7 @@ from lib.rules import create_rule
 from lib.schema import update_roles_enum
 from lib.skill_admin import add_skill
 from lib.sync_pipeline import (
+    _sync_stage_auto_commit_allowlist,
     _sync_stage_claude_base,
     _sync_stage_config_and_presets,
     _sync_stage_config_audit,
@@ -320,6 +321,46 @@ def _run_test_plugin(agent_meta_root: Path, project_root: Path, plugin_id: str) 
     res = run_plugin_test(plugin_id, plugin_def, secrets=secrets or {})
     print(f"  {res['status']}  {plugin_id}: {res['message']} ({res['latency_ms']}ms)")
     return 0 if res["status"] == "PASS" else 1
+
+
+def handle_scan_staged() -> int:
+    """issue #694: scan currently-staged file contents for secrets.
+    Returns 0 if clean, 1 if any finding -- printed to stdout with the
+    offending file path."""
+    from .secrets import scan_for_secrets
+
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--cached", "--name-only"],
+            capture_output=True, text=True, check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError) as exc:
+        print(f"Secret scan skipped -- not a git repository or git unavailable ({exc}).")
+        return 0
+    staged_files = [f for f in result.stdout.splitlines() if f.strip()]
+
+    any_findings = False
+    for rel_path in staged_files:
+        # `git show :<path>` reads the INDEX version -- the content that is
+        # actually about to be committed, not a working-tree copy that may
+        # have been edited (or reverted) after `git add`.
+        show = subprocess.run(["git", "show", f":{rel_path}"], capture_output=True)
+        if show.returncode != 0:
+            continue  # deleted/renamed-away files have nothing to scan
+        try:
+            content = show.stdout.decode("utf-8")
+        except UnicodeDecodeError:
+            continue  # binary -- not a text-secret risk this scanner covers
+        findings = scan_for_secrets(content)
+        if findings:
+            any_findings = True
+            print(f"{rel_path}: {', '.join(findings)}")
+
+    if any_findings:
+        print("Secret scan FAILED -- see findings above. Do not commit.")
+        return 1
+    print("Secret scan passed -- no findings in staged files.")
+    return 0
 
 
 def _build_context(args, agent_meta_root: Path, log: "SyncLog"):
@@ -1037,6 +1078,10 @@ def _handle_sync(ctx: _SyncContext) -> None:
     # every writer above, so it captures fully post-write state.
     _sync_stage_generated_file_hash_capture(ctx.agent_meta_root, ctx.project_root,
                                             config, provider_config, ctx.args, ctx.log)
+    # Stage 14: auto-commit allowlist (#694) -- must run after stage 13 so
+    # this file's own write isn't captured into that hash baseline.
+    _sync_stage_auto_commit_allowlist(ctx.agent_meta_root, ctx.project_root,
+                                      config, ctx.args, ctx.log)
 
     ctx.config = config
     ctx.mode = mode

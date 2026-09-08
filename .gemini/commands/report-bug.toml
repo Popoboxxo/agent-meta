@@ -1,9 +1,0 @@
-description = "Report a bug in this project by filing a standardized GitHub issue via the feedback agent"
-prompt = """
-Delegate to the `feedback` agent with this task:
-
-Create a bug report (type: bug) as a GitHub issue for this project. {{args}}
-
-Pre-select issue type `bug`. If {{args}} is provided, use it as the title basis.
-The feedback agent will collect remaining details and file the issue via `gh issue create`.
-"""

@@ -28,10 +28,12 @@ Only stdlib + lib imports at top level (guard:
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
 from lib.agent_sync import sync_agents_for_provider
+from lib.auto_commit import resolve_auto_commit_config
 from lib.commands import sync_commands_for_provider
 from lib.config import (
     _orch_mode_flags,
@@ -70,7 +72,7 @@ from lib.gitignore import (
 )
 from lib.hook_plugins import sync_hook_lib, sync_release_gates
 from lib.hooks import sync_hooks
-from lib.io import SyncError
+from lib.io import SyncError, write_atomic
 from lib.isolation import sync_provider_isolation
 from lib.knowledge import sync_knowledge_engine
 from lib.log import SyncLog
@@ -729,3 +731,21 @@ def _sync_stage_generated_file_hash_capture(
     if not is_drift_detection_enabled(config):
         return
     capture_generated_file_hashes(agent_meta_root, project_root, config, provider_config, args.dry_run)
+
+
+def _sync_stage_auto_commit_allowlist(agent_meta_root, project_root, config, args, log) -> None:
+    """Issue #694: write .meta-config/auto-commit-allowlist.json reflecting
+    the resolved auto_commit config for this sync. Runs on every sync,
+    overwriting the previous allowlist in full (not merged) -- stale
+    entries from a role that's no longer active must not linger. Must run
+    after _sync_stage_generated_file_hash_capture (which the conventions
+    skill's Change Checklist and this repo's own stage-13 comment both
+    call the true last stage) so this file's own write doesn't get
+    captured into that hash baseline a step too early."""
+    active_roles = config.get("roles", [])
+    resolved = resolve_auto_commit_config(config, active_roles, agent_meta_root)
+
+    allowlist_path = project_root / ".meta-config" / "auto-commit-allowlist.json"
+    if getattr(args, "dry_run", False):
+        return
+    write_atomic(allowlist_path, json.dumps(resolved, indent=2, sort_keys=True) + "\n")

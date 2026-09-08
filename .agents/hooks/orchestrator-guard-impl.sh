@@ -1,5 +1,5 @@
 #!/bin/bash
-# version: 1.1.0
+# version: 1.3.0
 # Real orchestrator-guard logic. NOT a standalone hook — invoked by
 # orchestrator-guard.sh (thin self-health wrapper, issue #630), which pipes
 # the PreToolUse JSON payload to this script's stdin after syntax-checking
@@ -172,27 +172,72 @@ fi
 # --- Sentinel elevation: capability-scoped + audited (issue #516) ------
 IS_GIT_SENTINEL=0
 IS_ORCH_SENTINEL=0
+IS_ALLOWLIST_SENTINEL=0
 
 if [ "$TOOL_NAME" = "Bash" ] && [ -n "$DECLARED_AGENT" ]; then
   _ROLE=$(printf '%s' "$DECLARED_AGENT" | tr '[:upper:]' '[:lower:]')
+  _AUDIT_ROLE=""
   case "$_ROLE" in
-    git|orchestrator)
-      # hook_audit_log_append (hooks/1-generic/lib/hook_common.sh) redacts
-      # credential-shaped substrings before writing (issue #596), hardens
-      # the log file to 600 permissions on every write (issue #596), and
-      # caps unbounded growth via truncate-oldest rotation (issue #597).
-      _AUDIT_LOG="$PROJECT_ROOT/.claude/hooks/.guard-audit.log"
-      _AUDIT_LINE=$(printf '%s role=%s cmd=%s' \
-        "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$_ROLE" \
-        "$(printf '%s' "$BASH_CMD" | tr '\n\t' '  ' | head -c 200)")
-      hook_audit_log_append "$_AUDIT_LOG" "$_AUDIT_LINE"
-      if [ "$_ROLE" = "git" ]; then
-        IS_GIT_SENTINEL=1
-      else
-        IS_ORCH_SENTINEL=1
+    git) IS_GIT_SENTINEL=1; _AUDIT_ROLE="$_ROLE" ;;
+    orchestrator) IS_ORCH_SENTINEL=1; _AUDIT_ROLE="$_ROLE" ;;
+    *)
+      # Issue #694: config-driven third sentinel category. Own flag
+      # (IS_ALLOWLIST_SENTINEL), never IS_GIT_SENTINEL -- the git-mutation
+      # gate exempts both, but only IS_GIT_SENTINEL is OR'd into the
+      # strict-mode main-chat exemption below, and that condition is
+      # deliberately left unchanged for the real `git` role. Reusing
+      # IS_GIT_SENTINEL here would silently also grant the strict-mode
+      # exemption to every allowlisted role. Scope: `git add` and a
+      # non-amending `git commit` ONLY -- every other mutation (push, rm,
+      # merge, rebase, reset, restore, tag, branch, checkout,
+      # stash pop|drop|clear, `commit --amend`) stays
+      # blocked and must go through the `git` role, enforced via the
+      # scan's narrow/broad scope word at the mutation gate below. Never
+      # the destructive gate, never the strict-mode main-chat exemption.
+      # Granted to any role sync.py has already determined
+      # is Edit/Write-capable AND that this project's auto_commit
+      # config has enabled. The hook never re-derives role capability
+      # itself -- it only trusts the pre-computed allowlist.
+      _ALLOWLIST="$PROJECT_ROOT/.meta-config/auto-commit-allowlist.json"
+      if [ -f "$_ALLOWLIST" ]; then
+        _AC_MODE=$("$_PY" -c "
+import json, sys
+try:
+    with open(sys.argv[1]) as f:
+        data = json.load(f)
+    print(data.get('mode', 'off'))
+except Exception:
+    print('off')
+" "$_ALLOWLIST" 2>/dev/null)
+        if [ "$_AC_MODE" != "off" ]; then
+          _IS_ELIGIBLE=$("$_PY" -c "
+import json, sys
+try:
+    with open(sys.argv[1]) as f:
+        data = json.load(f)
+    print('1' if sys.argv[2] in data.get('eligible_roles', []) else '0')
+except Exception:
+    print('0')
+" "$_ALLOWLIST" "$_ROLE" 2>/dev/null)
+          if [ "$_IS_ELIGIBLE" = "1" ]; then
+            IS_ALLOWLIST_SENTINEL=1
+            _AUDIT_ROLE="$_ROLE"
+          fi
+        fi
       fi
       ;;
   esac
+  if [ -n "$_AUDIT_ROLE" ]; then
+    # hook_audit_log_append (hooks/1-generic/lib/hook_common.sh) redacts
+    # credential-shaped substrings before writing (issue #596), hardens
+    # the log file to 600 permissions on every write (issue #596), and
+    # caps unbounded growth via truncate-oldest rotation (issue #597).
+    _AUDIT_LOG="$PROJECT_ROOT/.claude/hooks/.guard-audit.log"
+    _AUDIT_LINE=$(printf '%s role=%s cmd=%s' \
+      "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$_AUDIT_ROLE" \
+      "$(printf '%s' "$BASH_CMD" | tr '\n\t' '  ' | head -c 200)")
+    hook_audit_log_append "$_AUDIT_LOG" "$_AUDIT_LINE"
+  fi
 fi
 
 # --- Unified git-statement scan (issue #551): ONE tokenizer feeds BOTH ---
@@ -200,12 +245,19 @@ fi
 # mutation gate (further down) applies only in non-strict mode for non-git
 # callers. Classifying once, with the same tokenizer, keeps the two gates
 # consistent and fixes the raw-regex gaps #590/#591/#602 (see header note).
-# The scan prints exactly one word: 'destructive', 'mutation', or 'none'
-# ('destructive' takes precedence when a statement is both). On any Python
-# error it falls back to 'none' (fail-open, matching the prior gates).
+# The scan prints exactly two words: '<category> <scope>', where category is
+# 'destructive', 'mutation' or 'none' ('destructive' takes precedence when a
+# statement is both) and scope is 'broad' or 'narrow'. Scope only qualifies a
+# 'mutation': 'narrow' means every git mutation found is `add` or a
+# non-amending `commit`, 'broad' means at least one other mutation is present
+# (push/rm/merge/rebase/reset/restore/tag/branch/checkout/stash, or
+# `commit --amend`, which rewrites history). The allowlist sentinel
+# (issue #694) may only pass 'narrow'. On any Python error it falls back to
+# 'none narrow' (fail-open, matching the prior gates).
 _GIT_SCAN="none"
+_GIT_SCAN_SCOPE="narrow"
 if [ "$TOOL_NAME" = "Bash" ]; then
-  _GIT_SCAN=$(printf '%s' "$BASH_CMD" | "$_PY" -c "
+  _GIT_SCAN_RAW=$(printf '%s' "$BASH_CMD" | "$_PY" -c "
 import re, shlex, sys
 
 command = sys.stdin.read()
@@ -240,11 +292,17 @@ RCE_CONFIG_KEYS = {
 
 
 def statements(cmd):
-    # Best-effort split on shell control operators AND newlines (issue #508):
-    # stops scanning past '&&'/';'/'|'/newline so a mutation keyword in an
-    # unrelated later command or a quoted argument is not attributed to an
-    # earlier 'git' invocation, and multi-line commands are not flattened.
-    return re.split(r'&&|\|\||;|\||\n', cmd)
+    # Best-effort split on shell control operators AND newlines (issue #508,
+    # #694-followup): stops scanning past '&&'/'||'/';'/'|'/'&'/newline so a
+    # mutation keyword in an unrelated later command or a quoted argument is
+    # not attributed to an earlier 'git' invocation, and multi-line commands
+    # are not flattened. Bare '&' (background-job separator) must split too --
+    # 'git add x & git push' is two independent statements, not one; without
+    # it the per-statement 'break' below stops at the first 'git' and the
+    # second invocation is never classified (allowlist-sentinel bypass).
+    # '&&' is listed FIRST in the alternation so the longer operator matches
+    # before the single-'&' branch would split it into two empty tokens.
+    return re.split(r'&&|\|\||;|\||&|\n', cmd)
 
 
 def tokens_of(stmt):
@@ -370,8 +428,25 @@ def is_mutation(subcmd, args):
     return subcmd in MUTATING
 
 
+# Issue #694: the allowlist sentinel authorizes staging+committing only, so
+# the scan reports whether every mutation found stays inside that set.
+ADDCOMMIT_ONLY = {'add', 'commit'}
+
+
+def is_addcommit_scope(subcmd, args):
+    if subcmd not in ADDCOMMIT_ONLY:
+        return False
+    # 'commit --amend' REWRITES the previous commit rather than creating a
+    # new one -- it can silently destroy work an earlier commit (possibly
+    # the git role's) already recorded. Not part of the add/commit
+    # authority granted to auto-committing roles.
+    if subcmd == 'commit' and '--amend' in args:
+        return False
+    return True
+
 destructive = False
 mutation = False
+mutation_scope_broad = False
 for stmt in statements(command):
     toks = tokens_of(stmt)
     for i, tok in enumerate(toks):
@@ -382,12 +457,20 @@ for stmt in statements(command):
             destructive = True
         if is_mutation(subcmd, args):
             mutation = True
+            if not is_addcommit_scope(subcmd, args):
+                mutation_scope_broad = True
         break
     if destructive:
         break
 
-print('destructive' if destructive else ('mutation' if mutation else 'none'))
-" 2>/dev/null || echo "none")
+category = 'destructive' if destructive else ('mutation' if mutation else 'none')
+scope = 'broad' if mutation_scope_broad else 'narrow'
+print(f'{category} {scope}')
+" 2>/dev/null || echo "none narrow")
+  _GIT_SCAN=$(printf '%s' "$_GIT_SCAN_RAW" | awk '{print $1}')
+  _GIT_SCAN_SCOPE=$(printf '%s' "$_GIT_SCAN_RAW" | awk '{print $2}')
+  [ -n "$_GIT_SCAN" ] || _GIT_SCAN="none"
+  [ -n "$_GIT_SCAN_SCOPE" ] || _GIT_SCAN_SCOPE="narrow"
 fi
 
 # --- Destructive-operation gate: applies regardless of sentinel --------
@@ -476,7 +559,9 @@ fi
 # unified scan (issue #551) computed above — the destructive gate has
 # already exited for 'destructive'; a 'mutation' result is a plain git
 # mutation that a non-git caller must delegate to the `git` agent.
-if [ "$TOOL_NAME" = "Bash" ] && [ "$_GIT_SCAN" = "mutation" ] && [ "$IS_GIT_SENTINEL" != "1" ]; then
+# The allowlist sentinel (issue #694) only passes a 'narrow' mutation scope
+# (add/commit); any broader mutation still requires the `git` role.
+if [ "$TOOL_NAME" = "Bash" ] && [ "$_GIT_SCAN" = "mutation" ] && [ "$IS_GIT_SENTINEL" != "1" ] && { [ "$IS_ALLOWLIST_SENTINEL" != "1" ] || [ "$_GIT_SCAN_SCOPE" = "broad" ]; }; then
   echo "ORCHESTRATOR_GUARD: Direct git mutations are forbidden in the main chat." >&2
   echo "Detected command: $(printf '%s' "$BASH_CMD" | head -c 200)" >&2
   echo "Delegate git operations to the \`git\` agent." >&2

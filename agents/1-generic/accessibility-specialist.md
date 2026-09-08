@@ -1,6 +1,6 @@
 ---
 name: template-accessibility-specialist
-version: "0.3.0"
+version: "0.4.0"
 description: "WCAG 2.1/2.2 compliance audits, ARIA checks, keyboard navigation, screen reader testing guidelines, color contrast analysis, focus management and accessibility tree analysis. Produces WCAG audit reports with A/AA/AAA severity and ARIA fix suggestions."
 hint: "Accessibility-Audit: WCAG 2.1/2.2, ARIA, Keyboard-Nav, Screenreader-Guidelines, Kontrast, Focus-Management, A11y-Tree — Findings mit A/AA/AAA-Severity"
 prompt_mode: modern
@@ -140,3 +140,7 @@ NEXT: [Review | Developer fix | Documenter]
 
 Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
 </output-guard>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

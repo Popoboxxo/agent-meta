@@ -1159,6 +1159,85 @@
       "description": "Allow sync.py to write files containing detected secrets to committed (non-gitignored) paths. Default: false — sync aborts with an error when a secret is detected in a committed file. Set to true only when you deliberately commit secret-looking values (e.g. static demo tokens). NOT recommended for production projects.",
       "default": false
     },
+    "auto_commit": {
+      "type": "object",
+      "description": "Issue #694: opt-in tiered commit authority for write-capable agents (not just the dedicated git role). Default: mode 'off' -- zero behavior change. 'suggest' has agents propose a commit message in their own report, never running git themselves. 'auto' commits directly when any selected trigger fires. 'custom' hands the entire commit decision to custom_script, ignoring the built-in triggers list entirely.",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["off", "suggest", "auto", "custom"],
+          "default": "off",
+          "description": "off = today's behavior (only the git role commits). suggest = agents propose commit messages in their report, never run git. auto = agents commit directly when a selected trigger (see 'triggers') fires. custom = custom_script alone decides, all built-in triggers ignored."
+        },
+        "triggers": {
+          "type": "array",
+          "description": "Only consulted when mode is 'auto'. Any one firing is enough to commit (OR'd). Ignored (and rejected by validation) when mode is not 'auto'.",
+          "items": {
+            "type": "string",
+            "enum": ["task-boundary", "per-edit", "context-pressure", "file-count-threshold", "custom"]
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "file_count_threshold": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 5,
+          "description": "Only read when 'file-count-threshold' is in triggers. Commit after this many files have changed since the last commit."
+        },
+        "custom_script": {
+          "type": ["string", "null"],
+          "default": null,
+          "description": "Path to a project script. Exit code 0 means 'commit now'. Required when mode is 'custom', or when 'custom' appears in triggers under mode 'auto'."
+        },
+        "secret_scan": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run the project's existing secret scan (scripts/lib/secrets.py::scan_for_secrets) against the staged diff before any auto/custom commit. Default true; set false to skip (explicit opt-out, not a silent gap)."
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "description": "A non-empty 'triggers' list is only meaningful under mode 'auto' -- reject it under any other mode instead of silently ignoring it.",
+          "if": {
+            "properties": {
+              "triggers": { "type": "array", "minItems": 1 }
+            },
+            "required": ["triggers"]
+          },
+          "then": {
+            "properties": {
+              "mode": { "const": "auto" }
+            },
+            "required": ["mode"]
+          }
+        },
+        {
+          "description": "mode 'custom', or 'custom' among the triggers, requires a custom_script -- otherwise there is no commit decision to delegate to.",
+          "if": {
+            "anyOf": [
+              {
+                "properties": { "mode": { "const": "custom" } },
+                "required": ["mode"]
+              },
+              {
+                "properties": {
+                  "triggers": { "contains": { "const": "custom" } }
+                },
+                "required": ["triggers"]
+              }
+            ]
+          },
+          "then": {
+            "properties": {
+              "custom_script": { "type": "string", "minLength": 1 }
+            },
+            "required": ["custom_script"]
+          }
+        }
+      ]
+    },
     "outcome-caching": {
       "$ref": "#/$defs/outcome-caching"
     },

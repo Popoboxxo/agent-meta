@@ -1,6 +1,6 @@
 ---
 name: template-developer
-version: "4.4.0"
+version: "4.5.0"
 description: "Use when a REQ-ID or clearly scoped task needs direct feature/bugfix implementation."
 hint: "Use for feature/bugfix implementation by REQ-ID — Modern Mode, XML structure, TS contracts."
 prompt_mode: modern
@@ -163,3 +163,7 @@ wait "$PID"; RC=$?
 tail -50 /tmp/e2e.log; exit "$RC"             # evidence + exit code = final result, not a "waiting" placeholder
 ```
 </output-guard>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

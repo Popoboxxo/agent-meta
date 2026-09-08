@@ -1,6 +1,6 @@
 ---
 name: se-junior-developer
-version: 1.5.0
+version: 1.6.0
 description: Implements trivial SE leaf nodes (COTS wrappers, single-interface components). Escalates on interface complexity or scope growth. Persists implementation output.
 hint: |
   Use for trivial SE leaf nodes: single component, 0-1 interfaces, no cross-cutting concerns. Escalates if interface complexity grows.
@@ -219,3 +219,7 @@ Communication and input language: see global rule `language.md`.
 
 Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
 </output-guard>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

@@ -1,6 +1,6 @@
 ---
 name: se-test-engineer
-version: 1.5.0
+version: 1.6.0
 description: Develops MBSE test models and designs integration tests (interaction
   of multiple SW units). Right wing of the V-model.
 hint: Use this agent to create model-based test models and integration test strategies
@@ -164,3 +164,7 @@ Verboten: `@orchestrator` im Output, Task()-Calls an orchestrator, "Delegiere an
 
 Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
 </output-guard>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

@@ -1,0 +1,59 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+- Gemini
+dod-preset: standard
+platforms: []
+roles:
+- orchestrator
+- developer
+- tester
+- git
+- explorer
+auto_commit:
+  mode: suggest
+  secret_scan: true
+project:
+  name: scenario-auto-commit-suggest
+  prefix: s19
+  short: scenario-autocommit-suggest
+variables:
+  PROJECT_NAME: scenario-auto-commit-suggest
+  PROJECT_DESCRIPTION: Auto-commit suggest tier test (issue #694).
+  PROJECT_GOAL: Verify suggest mode resolves eligibility and renders propose-only commit prose.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-autocommit-suggest
+  GIT_MAIN_BRANCH: main
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false
+# =====================================================================
+# Prüf-Zettel Szenario 19 — auto_commit mode: suggest (Issue #694)
+# (menschlich lesbar; von sync.py ignoriert. Content-Assertions:
+#  tests/scenarios/asserts/19-auto-commit-suggest.sh)
+# =====================================================================
+# 1. Allowlist (.meta-config/auto-commit-allowlist.json):
+#    mode "suggest"; eligible_roles ["developer", "orchestrator", "tester"]
+#    (capability-abgeleitet: nur Rollen, deren EIGENE
+#    agents/1-generic/<role>.md tools:-Frontmatter Edit oder Write
+#    deklariert — scripts/lib/auto_commit.py::_ELIGIBLE_TOOLS; git
+#    (Bash/Read/Glob/Grep/TodoWrite) und explorer (Read/Glob/Grep/
+#    TodoWrite) haben weder Edit noch Write -> fliegen raus);
+#    secret_scan true; triggers [].
+# 2. AUTO_COMMIT_BLOCK gerendert in .claude/agents/developer.md und
+#    .gemini/agents/developer.md mit Propose-nicht-Pause-Prosa
+#    ("propose a ready-to-use commit message", "do NOT run `git commit`
+#    yourself"); das Wort "pause" darf im gerenderten Block nicht
+#    vorkommen ("do not stop and wait for confirmation" ist gewollt).
+# 3. KEINE Secret-Scan-Zeile im Block: der Scan läuft laut Schema/Kode
+#    nur vor auto/custom-Commits; der suggest-Tier committet nie selbst,
+#    daher hängt render_auto_commit_block die Scan-Zeile nur in den
+#    custom- und auto-Zweig an (scripts/lib/auto_commit.py). Bewusste
+#    Abweichung zur ursprünglichen Szenario-Spec ("Secret-Scan-Zeile
+#    vorhanden"), im Assert-File dokumentiert.
+# =====================================================================

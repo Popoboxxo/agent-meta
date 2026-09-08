@@ -1,6 +1,6 @@
 ---
 name: se-developer
-version: 1.5.0
+version: 1.6.0
 description: Implements standard SE leaf nodes with multiple interfaces. Follows SE interface discipline and contract-first approach. Persists implementation output.
 hint: |
   Standard SE leaf node implementation. Handles multiple interfaces (2-4). Escalates cross-cutting or boundary-level leafs.
@@ -233,3 +233,7 @@ Communication and input language: see global rule `language.md`.
 
 Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
 </output-guard>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

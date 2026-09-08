@@ -1,6 +1,6 @@
 ---
 name: template-design-system-architect
-version: "0.4.0"
+version: "0.5.0"
 description: "Translates a UI design-system schema into real, project-bound design-token artifacts (CSS custom properties / Tailwind config) plus the underlying systematics: color-harmony rules, a design-time contrast gate, spacing/breakpoint methodology, component-variant contracts, and motion tokens."
 hint: "Design-System-Schema → echte Token-Artefakte: Primitive/Semantic/Component-Ebenen, Farbharmonie + Kontrast-Gate (Design-time, kein WCAG-Audit), Spacing/Breakpoint-Methodik, Variant-Contracts, Motion-Tokens."
 prompt_mode: modern
@@ -127,3 +127,7 @@ Delegation:
 
 Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
 </output-guard>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}
