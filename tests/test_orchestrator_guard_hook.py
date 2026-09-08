@@ -764,7 +764,7 @@ def test_allowlisted_role_can_commit_when_auto_commit_enabled(tmp_path):
     assert result.returncode == 0, f"stderr={result.stderr}"
 
 
-def test_non_allowlisted_role_still_blocked(tmp_path):
+def test_auto_commit_non_allowlisted_role_still_blocked(tmp_path):
     _write_allowlist(tmp_path, "auto", ["developer"])
     command = "#agent-meta:agent=tester\ngit add -A && git commit -m 'x'"
     result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
@@ -772,14 +772,14 @@ def test_non_allowlisted_role_still_blocked(tmp_path):
     assert "git" in result.stderr.lower()
 
 
-def test_missing_allowlist_file_behaves_like_mode_off(tmp_path):
+def test_auto_commit_missing_allowlist_file_behaves_like_mode_off(tmp_path):
     # No auto-commit-allowlist.json written at all.
     command = "#agent-meta:agent=developer\ngit add -A && git commit -m 'x'"
     result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
     assert result.returncode == 2, f"stderr={result.stderr}"  # unchanged from today
 
 
-def test_allowlist_mode_off_ignores_eligible_roles_list(tmp_path):
+def test_auto_commit_mode_off_ignores_eligible_roles_list(tmp_path):
     # A stale allowlist from a previous sync where auto_commit was later
     # disabled again must not still authorize anyone.
     _write_allowlist(tmp_path, "off", ["developer"])
@@ -788,7 +788,7 @@ def test_allowlist_mode_off_ignores_eligible_roles_list(tmp_path):
     assert result.returncode == 2, f"stderr={result.stderr}"
 
 
-def test_destructive_gate_still_blocks_an_allowlisted_role(tmp_path):
+def test_auto_commit_destructive_gate_still_blocks_an_allowlisted_role(tmp_path):
     # #516's destructive-gate protections are untouched by this feature --
     # same assertion shape as test_destructive_ops_blocked_even_with_git_sentinel
     # above, substituting an allowlisted "developer" sentinel for "git".
@@ -799,7 +799,7 @@ def test_destructive_gate_still_blocks_an_allowlisted_role(tmp_path):
     assert "user approval" in result.stderr
 
 
-def test_allowlisted_role_does_not_gain_orchestrator_sentinel_scope(tmp_path):
+def test_auto_commit_allowlisted_role_does_not_gain_orchestrator_sentinel_scope(tmp_path):
     # An allowlisted non-git/orchestrator role must only ever gain the
     # git-mutation-gate exemption (IS_GIT_SENTINEL), never the strict-mode
     # main-chat exemption (IS_ORCH_SENTINEL) -- verified with an isolated
