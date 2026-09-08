@@ -130,6 +130,70 @@ def test_generate_provider_configs_writes_resolved_secrets_to_mcp_json(tmp_path)
     assert not (project_root / ".claude" / "settings.local.json").exists()
 
 
+def test_generate_provider_configs_same_file_deployment_writes_final_state_once(tmp_path):
+    # Same-file deployment (committed-file == secrets-file == .mcp.json,
+    # audit #388/#400): with secrets.local.yaml present, the committed
+    # ${VAR}-placeholder pass is an intermediate state the secrets pass
+    # overwrites within the same run. Writing it anyway made a lone
+    # `sync.py --check` report a permanent false "out of sync": the dry-run
+    # evaluates BOTH renders against the final on-disk state — the
+    # placeholder render differs (counted as pending WRITE) while the
+    # resolved render matches (SKIP) — and can never reach exit 0.
+    # Contract: exactly ONE write lands on the shared target (the final,
+    # resolved form), and a follow-up dry-run (--check semantics) finds
+    # no pending write at all.
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+
+    _write_mcp_catalog(agent_meta_root, {
+        "example-server": {
+            "description": "test server",
+            "connection": {
+                "type": "sse",
+                "url": "{{EXAMPLE_URL}}",
+            },
+        }
+    })
+    _write(
+        project_root / ".meta-config" / "secrets.local.yaml",
+        yaml.dump({"EXAMPLE_URL": "https://real.example.com"}),
+    )
+
+    config = {"mcp-servers": ["example-server"], "platforms": []}
+    provider_config = {
+        "Claude": {
+            "mcp-config": {
+                "committed-file": ".mcp.json",
+                "secrets-file": ".mcp.json",
+                "format": "claude-settings",
+            }
+        }
+    }
+
+    log = SyncLog()
+    generate_provider_configs(
+        agent_meta_root, project_root, config, provider_config, log,
+        dry_run=False, provider="Claude",
+    )
+
+    writes = [a for a in log.actions if ".mcp.json" in a and "[WRITE" in a]
+    assert len(writes) == 1, (
+        f"same-file deployment must write the final state exactly once, got: {writes}"
+    )
+    written = json.loads((project_root / ".mcp.json").read_text(encoding="utf-8"))
+    entry = written["mcpServers"]["example-server"]
+    assert entry["url"] == "https://real.example.com"  # resolved, not ${VAR}
+
+    # --check semantics: a dry-run against the settled file must be clean.
+    check_log = SyncLog()
+    generate_provider_configs(
+        agent_meta_root, project_root, config, provider_config, check_log,
+        dry_run=True, provider="Claude",
+    )
+    pending = [a for a in check_log.actions if ".mcp.json" in a and "[WRITE" in a]
+    assert pending == [], f"--check found unfixable pending writes: {pending}"
+
+
 def test_update_json_config_self_heals_empty_file(tmp_path):
     # Regression test for #400 Secondary Finding A: a zero-byte existing
     # file must not be treated as an unparseable conflict that silently
