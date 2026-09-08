@@ -323,6 +323,39 @@ def _run_test_plugin(agent_meta_root: Path, project_root: Path, plugin_id: str) 
     return 0 if res["status"] == "PASS" else 1
 
 
+def handle_scan_staged() -> int:
+    """issue #694: scan currently-staged file contents for secrets.
+    Returns 0 if clean, 1 if any finding -- printed to stdout with the
+    offending file path."""
+    from .secrets import scan_for_secrets
+
+    result = subprocess.run(
+        ["git", "diff", "--cached", "--name-only"],
+        capture_output=True, text=True, check=True,
+    )
+    staged_files = [f for f in result.stdout.splitlines() if f.strip()]
+
+    any_findings = False
+    for rel_path in staged_files:
+        path = Path(rel_path)
+        if not path.is_file():
+            continue  # deleted/renamed-away files have nothing to scan
+        try:
+            content = path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue  # binary or unreadable -- not a text-secret risk this scanner covers
+        findings = scan_for_secrets(content)
+        if findings:
+            any_findings = True
+            print(f"{rel_path}: {', '.join(findings)}")
+
+    if any_findings:
+        print("Secret scan FAILED -- see findings above. Do not commit.")
+        return 1
+    print("Secret scan passed -- no findings in staged files.")
+    return 0
+
+
 def _build_context(args, agent_meta_root: Path, log: "SyncLog"):
     """Run the pre-config CLI modes and build the shared sync context.
 
