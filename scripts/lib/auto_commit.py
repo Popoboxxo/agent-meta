@@ -68,3 +68,85 @@ def resolve_auto_commit_config(
         "custom_script": ac_cfg.get("custom_script"),
         "secret_scan": ac_cfg.get("secret_scan", True),
     }
+
+
+_TRIGGER_PROSE = {
+    "task-boundary": "a subtask is complete AND its tests are green",
+    "per-edit": "after every Write/Edit tool call",
+    "context-pressure": "just before a checkpoint or context-compaction event",
+    "file-count-threshold": "after {n} files have changed since the last commit",
+    "custom": "the project's custom_script (see below) also votes to commit",
+}
+
+
+def render_auto_commit_block(resolved: dict) -> str:
+    """Render the {{AUTO_COMMIT_BLOCK}} prose for the resolved auto_commit
+    config. Empty string when mode is 'off' (nothing to render). Never
+    mentions push/tag/branch -- those remain the git role's exclusive job
+    (issue #694 scope)."""
+    mode = resolved.get("mode", "off")
+    if mode == "off":
+        return ""
+
+    secret_scan = resolved.get("secret_scan", True)
+    scan_line = (
+        "Before committing, run the project's secret scan against your "
+        "staged changes; a finding blocks the commit -- report it and ask "
+        "for manual intervention instead of committing anyway."
+        if secret_scan
+        else "Secret scanning is disabled for this project (secret_scan: false)."
+    )
+
+    lines = [
+        "**Commit authority (issue #694):** this project has "
+        f"`auto_commit.mode: {mode}` enabled for your role.",
+    ]
+
+    if mode == "suggest":
+        lines.append(
+            "When a configured trigger condition is met, propose a "
+            "ready-to-use commit message in your own final report -- do "
+            "NOT run `git commit` yourself, and do not stop and wait for "
+            "confirmation before continuing your work. The user or "
+            "orchestrator decides when to act on your suggestion."
+        )
+    elif mode == "custom":
+        script = resolved.get("custom_script")
+        lines.append(
+            f"Commit directly whenever `{script}` exits 0 (the project's "
+            "own commit-decision script has full control; no other "
+            "trigger applies)."
+        )
+        lines.append(scan_line)
+        lines.append(
+            "Prefix the Bash command with `#agent-meta:agent=<your-role-"
+            "name>` as its first line before `git add`/`git commit` -- "
+            "required for the guard hook to authorize the commit on "
+            "hook-capable providers, harmless elsewhere."
+        )
+    else:  # auto
+        triggers = resolved.get("triggers", [])
+        threshold = resolved.get("file_count_threshold", 5)
+        trigger_descriptions = [
+            f"{t} ({_TRIGGER_PROSE[t].format(n=threshold)})"
+            for t in triggers
+            if t in _TRIGGER_PROSE
+        ]
+        lines.append(
+            "Commit directly as soon as ANY of the following is true: "
+            + "; ".join(trigger_descriptions) + "."
+        )
+        lines.append(scan_line)
+        lines.append(
+            "Prefix the Bash command with `#agent-meta:agent=<your-role-"
+            "name>` as its first line before `git add`/`git commit` -- "
+            "required for the guard hook to authorize the commit on "
+            "hook-capable providers, harmless elsewhere."
+        )
+
+    lines.append(
+        "This commit authority never extends to pushing, tagging, or "
+        "branch management -- those remain exclusively the `git` role's "
+        "job."
+    )
+    return "\n".join(lines)

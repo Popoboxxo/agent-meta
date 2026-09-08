@@ -633,6 +633,27 @@ def _build_core_variables(
     variables["README_SECTIONS"] = ", ".join(
         _readme_cfg.get("sections", ["description", "badges", "setup", "structure"])
     )
+    # Auto-commit tiers (issue #694): AUTO_COMMIT_ENABLED gates the
+    # {{#if}} block in every write-capable role's template;
+    # AUTO_COMMIT_BLOCK is the mode-aware rendered prose. Only Task 2's
+    # active-role list is available here as `config["roles"]` -- role
+    # eligibility itself is resolved again, per-provider, by Task 6's
+    # sync-pipeline stage (this variable only needs mode-level content,
+    # not the per-role allowlist).
+    from .auto_commit import render_auto_commit_block
+
+    _auto_commit_cfg = config.get("auto_commit", {}) or {}
+    _auto_commit_resolved = {
+        "mode": _auto_commit_cfg.get("mode", "off"),
+        "triggers": _auto_commit_cfg.get("triggers", []),
+        "file_count_threshold": _auto_commit_cfg.get("file_count_threshold", 5),
+        "custom_script": _auto_commit_cfg.get("custom_script"),
+        "secret_scan": _auto_commit_cfg.get("secret_scan", True),
+    }
+    variables["AUTO_COMMIT_ENABLED"] = (
+        "true" if _auto_commit_resolved["mode"] != "off" else "false"
+    )
+    variables["AUTO_COMMIT_BLOCK"] = render_auto_commit_block(_auto_commit_resolved)
     # PROJECT_GOAL: fall back to the project description when not set explicitly
     if not variables.get("PROJECT_GOAL") and variables.get("PROJECT_DESCRIPTION"):
         variables["PROJECT_GOAL"] = variables["PROJECT_DESCRIPTION"]

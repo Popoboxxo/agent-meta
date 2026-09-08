@@ -87,6 +87,11 @@ _ORCHESTRATION_FALLBACKS: dict[str, str] = {
     # not an empty string, since it's a mandatory rule the reader must see.
     "STATUS_TABLE_BLOCK": (Path(__file__).resolve().parents[2] / "snippets" / "orchestrator" / "status-table.md").read_text(encoding="utf-8")
     if (Path(__file__).resolve().parents[2] / "snippets" / "orchestrator" / "status-table.md").exists() else "",
+    # AUTO_COMMIT_BLOCK (issue #694): like SE_MODE_BLOCK/CHECKPOINTING_BLOCK/
+    # QUALITY_PIPELINES_BLOCK above -- never referenced unconditionally by
+    # any template, only inside {{#if AUTO_COMMIT_ENABLED}} -- so an empty
+    # string is the correct, harmless standalone fallback.
+    "AUTO_COMMIT_BLOCK": "",
 }
 
 # Conditional flags gating {{#if VAR}}/{{#unless VAR}} blocks tied to
@@ -116,6 +121,7 @@ _CONDITIONAL_FALSE_FLAGS: dict[str, str] = {
     "DEVELOPER_SNIPPETS_PATH_SET": "false",
     "TESTER_SNIPPETS_PATH_SET": "false",
     "README_WARNINGS_ENABLED": "false",
+    "AUTO_COMMIT_ENABLED": "false",
     "DEV_STACK_START_SET": "false",
     # No A2A infrastructure or knowledge-engine bundle exists standalone —
     # matches the scope note in the rendered header ("no A2A protocol, no

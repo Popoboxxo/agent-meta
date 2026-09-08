@@ -63,7 +63,7 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     # Orchestrator (injected by build_variables)
     "ORCHESTRATOR_ENABLED", "ORCHESTRATOR_STRICT", "DIRECT_DISPATCH_ENABLED", "DIRECT_DISPATCH_SECTION", "ORCHESTRATOR_OUTCOME_CACHING",
     "ORCHESTRATOR_CACHE_TTL", "ORCHESTRATOR_CACHE_MAX_ENTRIES",
-    "A2A_PROTOCOL_ENABLED", "CHECKPOINTING_ENABLED",
+    "A2A_PROTOCOL_ENABLED", "CHECKPOINTING_ENABLED", "AUTO_COMMIT_ENABLED",
     "A2A_HANDOFF_BLOCK", "ANTI_RECURSION_BLOCK", "DOD_REQ_BLOCK", "DOD_TESTS_BLOCK",
     "UNKNOWN_FALLBACK_META_FEEDBACK", "UNKNOWN_FALLBACK_MAIN_CHAT",
     "UNKNOWN_FALLBACK_ASK_USER",
@@ -75,7 +75,7 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     "COMPACT_MODE",
     # Orchestrator snippet blocks (loaded from snippets/orchestrator/*.md by build_variables)
     "SE_MODE_BLOCK", "A2A_PROTOCOL_BLOCK", "CHECKPOINTING_BLOCK", "QUALITY_PIPELINES_BLOCK",
-    "STATUS_TABLE_BLOCK",
+    "STATUS_TABLE_BLOCK", "AUTO_COMMIT_BLOCK",
     # Developer-tier shared blocks (loaded from snippets/developer/*.md by build_variables)
     "BROWSER_VERIFICATION_BLOCK", "LANGUAGE_BEST_PRACTICES_BLOCK",
     # Security shared blocks (loaded from snippets/security/*.md by build_variables)
