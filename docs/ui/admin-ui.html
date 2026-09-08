@@ -3595,7 +3595,11 @@ async function viewProjectDodOverrides() {
 
   const knownCols = new Set(["req-traceability", "tests-required", "codebase-overview", "security-audit", "se-required"]);
   for (const p of Object.values(presets)) {
-    if (p && typeof p === "object") for (const k of Object.keys(p)) knownCols.add(k);
+    // release-gates is a nested object (resolved separately via
+    // lib/dod.py::resolve_release_gates()), not a flat DoD criterion --
+    // including it here renders "[object Object]" in the Preset Default
+    // column and a meaningless true/false override for a structured value.
+    if (p && typeof p === "object") for (const k of Object.keys(p)) if (k !== "release-gates") knownCols.add(k);
   }
   const criteria = [...knownCols];
 

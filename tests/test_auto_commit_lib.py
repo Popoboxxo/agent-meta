@@ -10,6 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 from lib.auto_commit import is_role_eligible, resolve_auto_commit_config  # noqa: E402
+from lib.config import load_config  # noqa: E402
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -88,6 +89,29 @@ def test_resolve_config_custom_mode_lists_eligible_roles():
 def test_resolve_config_missing_auto_commit_key_defaults_to_off():
     result = resolve_auto_commit_config(
         config={},
+        active_roles=["orchestrator", "developer", "git"],
+        agent_meta_root=_REPO_ROOT,
+    )
+    assert result["mode"] == "off"
+    assert result["eligible_roles"] == []
+
+
+def test_load_config_normalizes_unquoted_off_bool(tmp_path):
+    # Issue #699: unquoted `mode: off` parses via YAML 1.1 as the Python
+    # bool False, not the string "off" -- every downstream consumer
+    # (AUTO_COMMIT_ENABLED, resolve_auto_commit_config, the JSON allowlist
+    # the bash guard hook trusts) must see the canonical string, or auto-commit
+    # authority silently fail-opens instead of staying off.
+    config_path = tmp_path / "project.yaml"
+    config_path.write_text(
+        "project:\n  name: t\n  prefix: t\n  short: t\n"
+        "auto_commit:\n  mode: off\n"
+    )
+    config = load_config(config_path)
+    assert config["auto_commit"]["mode"] == "off"
+
+    result = resolve_auto_commit_config(
+        config=config,
         active_roles=["orchestrator", "developer", "git"],
         agent_meta_root=_REPO_ROOT,
     )
