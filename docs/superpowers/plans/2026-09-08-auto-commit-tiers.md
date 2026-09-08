@@ -1047,7 +1047,7 @@
 
 **Interfaces:**
 - Consumes: `.meta-config/auto-commit-allowlist.json` from Task 6 (read at hook-execution time, not sync time).
-- Produces: git-mutation-gate authorization for any role in `eligible_roles`, in addition to the existing hardcoded `git`/`orchestrator`.
+- Produces: a dedicated `IS_ALLOWLIST_SENTINEL` sentinel flag granting git-mutation-gate authorization (and nothing else — never the strict-mode main-chat exemption, never the destructive gate) for any role in `eligible_roles`, in addition to the existing hardcoded `git`/`orchestrator`.
 
 - [x] **Step 1: Write the failing test**
 
@@ -1082,7 +1082,7 @@
       assert result.returncode == 0, f"stderr={result.stderr}"
 
 
-  def test_non_allowlisted_role_still_blocked(tmp_path):
+  def test_auto_commit_non_allowlisted_role_still_blocked(tmp_path):
       _write_allowlist(tmp_path, "auto", ["developer"])
       command = "#agent-meta:agent=tester\ngit add -A && git commit -m 'x'"
       result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
@@ -1090,14 +1090,14 @@
       assert "git" in result.stderr.lower()
 
 
-  def test_missing_allowlist_file_behaves_like_mode_off(tmp_path):
+  def test_auto_commit_missing_allowlist_file_behaves_like_mode_off(tmp_path):
       # No auto-commit-allowlist.json written at all.
       command = "#agent-meta:agent=developer\ngit add -A && git commit -m 'x'"
       result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
       assert result.returncode == 2, f"stderr={result.stderr}"  # unchanged from today
 
 
-  def test_allowlist_mode_off_ignores_eligible_roles_list(tmp_path):
+  def test_auto_commit_mode_off_ignores_eligible_roles_list(tmp_path):
       # A stale allowlist from a previous sync where auto_commit was later
       # disabled again must not still authorize anyone.
       _write_allowlist(tmp_path, "off", ["developer"])
@@ -1106,7 +1106,7 @@
       assert result.returncode == 2, f"stderr={result.stderr}"
 
 
-  def test_destructive_gate_still_blocks_an_allowlisted_role(tmp_path):
+  def test_auto_commit_destructive_gate_still_blocks_an_allowlisted_role(tmp_path):
       # #516's destructive-gate protections are untouched by this feature --
       # same assertion shape as test_destructive_ops_blocked_even_with_git_sentinel
       # above, substituting an allowlisted "developer" sentinel for "git".
@@ -1117,10 +1117,11 @@
       assert "user approval" in result.stderr
 
 
-  def test_allowlisted_role_does_not_gain_orchestrator_sentinel_scope(tmp_path):
+  def test_auto_commit_allowlisted_role_does_not_gain_orchestrator_sentinel_scope(tmp_path):
       # An allowlisted non-git/orchestrator role must only ever gain the
-      # git-mutation-gate exemption (IS_GIT_SENTINEL), never the strict-mode
-      # main-chat exemption (IS_ORCH_SENTINEL) -- verified with an isolated
+      # git-mutation-gate exemption (via its own IS_ALLOWLIST_SENTINEL flag),
+      # never the strict-mode main-chat exemption (IS_ORCH_SENTINEL or
+      # IS_GIT_SENTINEL) -- verified with an isolated
       # fixture project (orchestrator.strict: true) as cwd: with NO agent_id
       # (a main-thread call), a plain non-mutating Bash command from an
       # allowlisted role must still be blocked by the strict-mode gate,
@@ -1146,13 +1147,27 @@
 
   In `hooks/1-generic/orchestrator-guard-impl.sh`, extend the sentinel
   block (currently, per the file's own comments, at the `case "$_ROLE" in
-  git|orchestrator)` line). Change:
+  git|orchestrator)` line). Three changes:
+
+  First, initialize the new flag alongside the existing two sentinels:
+
+  ```bash
+  IS_GIT_SENTINEL=0
+  IS_ORCH_SENTINEL=0
+  IS_ALLOWLIST_SENTINEL=0
+  ```
+
+  Second, change the sentinel recognition block:
 
   ```bash
   if [ "$TOOL_NAME" = "Bash" ] && [ -n "$DECLARED_AGENT" ]; then
     _ROLE=$(printf '%s' "$DECLARED_AGENT" | tr '[:upper:]' '[:lower:]')
     case "$_ROLE" in
       git|orchestrator)
+        # hook_audit_log_append (hooks/1-generic/lib/hook_common.sh) redacts
+        # credential-shaped substrings before writing (issue #596), hardens
+        # the log file to 600 permissions on every write (issue #596), and
+        # caps unbounded growth via truncate-oldest rotation (issue #597).
         _AUDIT_LOG="$PROJECT_ROOT/.claude/hooks/.guard-audit.log"
         _AUDIT_LINE=$(printf '%s role=%s cmd=%s' \
           "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$_ROLE" \
@@ -1178,10 +1193,15 @@
       git) IS_GIT_SENTINEL=1; _AUDIT_ROLE="$_ROLE" ;;
       orchestrator) IS_ORCH_SENTINEL=1; _AUDIT_ROLE="$_ROLE" ;;
       *)
-        # Issue #694: config-driven third sentinel category. Grants the
-        # SAME scope as the git sentinel (git-mutation-gate exemption
-        # ONLY -- never the destructive gate, never the strict-mode
-        # main-chat exemption) to any role sync.py has already determined
+        # Issue #694: config-driven third sentinel category. Own flag
+        # (IS_ALLOWLIST_SENTINEL), never IS_GIT_SENTINEL -- the git-mutation
+        # gate exempts both, but only IS_GIT_SENTINEL is OR'd into the
+        # strict-mode main-chat exemption below, and that condition is
+        # deliberately left unchanged for the real `git` role. Reusing
+        # IS_GIT_SENTINEL here would silently also grant the strict-mode
+        # exemption to every allowlisted role. Scope: git-mutation-gate
+        # exemption ONLY -- never the destructive gate, never the strict-mode
+        # main-chat exemption -- to any role sync.py has already determined
         # is Edit/Write-capable AND that this project's auto_commit
         # config has enabled. The hook never re-derives role capability
         # itself -- it only trusts the pre-computed allowlist.
@@ -1207,7 +1227,7 @@
       print('0')
   " "$_ALLOWLIST" "$_ROLE" 2>/dev/null)
             if [ "$_IS_ELIGIBLE" = "1" ]; then
-              IS_GIT_SENTINEL=1
+              IS_ALLOWLIST_SENTINEL=1
               _AUDIT_ROLE="$_ROLE"
             fi
           fi
@@ -1215,6 +1235,10 @@
         ;;
     esac
     if [ -n "$_AUDIT_ROLE" ]; then
+      # hook_audit_log_append (hooks/1-generic/lib/hook_common.sh) redacts
+      # credential-shaped substrings before writing (issue #596), hardens
+      # the log file to 600 permissions on every write (issue #596), and
+      # caps unbounded growth via truncate-oldest rotation (issue #597).
       _AUDIT_LOG="$PROJECT_ROOT/.claude/hooks/.guard-audit.log"
       _AUDIT_LINE=$(printf '%s role=%s cmd=%s' \
         "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$_AUDIT_ROLE" \
@@ -1224,12 +1248,35 @@
   fi
   ```
 
-  Note the deliberate scoping: an allowlisted non-git role sets
-  `IS_GIT_SENTINEL=1` (git-mutation-gate exemption only) — it never touches
-  `IS_ORCH_SENTINEL`, so it can never gain the strict-mode main-chat
+  Third, extend the git-mutation-gate condition so the new flag carries the
+  git-mutation-gate exemption (without this hunk an allowlisted role still
+  could not commit):
+
+  ```bash
+  if [ "$TOOL_NAME" = "Bash" ] && [ "$_GIT_SCAN" = "mutation" ] && [ "$IS_GIT_SENTINEL" != "1" ]; then
+  ```
+
+  to:
+
+  ```bash
+  if [ "$TOOL_NAME" = "Bash" ] && [ "$_GIT_SCAN" = "mutation" ] && [ "$IS_GIT_SENTINEL" != "1" ] && [ "$IS_ALLOWLIST_SENTINEL" != "1" ]; then
+  ```
+
+  Note the deliberate scoping — why a dedicated flag instead of reusing
+  `IS_GIT_SENTINEL` for the third category: the strict-mode main-chat
+  exemption (`[ "$IS_ORCH_SENTINEL" = "1" ] || [ "$IS_GIT_SENTINEL" = "1" ]`)
+  already ORs in `IS_GIT_SENTINEL`, so reusing that flag for allowlisted
+  roles would have silently granted every allowlisted role the strict-mode
+  main-chat exemption — a privilege escalation — and would have made this
+  task's own
+  `test_auto_commit_allowlisted_role_does_not_gain_orchestrator_sentinel_scope`
+  fail (the plan would have contradicted itself). `IS_ALLOWLIST_SENTINEL`
+  therefore exempts ONLY the git-mutation gate; it never touches
+  `IS_ORCH_SENTINEL` and is deliberately absent from the strict-mode
+  exemption, so an allowlisted role can never gain the strict-mode main-chat
   exemption that only `git`/`orchestrator` have. The destructive-operation
-  gate (earlier in the file) runs unconditionally regardless of either flag
-  and is completely unaffected by this change.
+  gate (earlier in the file) runs unconditionally regardless of any sentinel
+  flag and is completely unaffected by this change.
 
   Bump the version comment at the top of the file:
   `# version: 1.1.0` → `# version: 1.2.0`.
@@ -1472,7 +1519,7 @@
 
   Then manually verify (temp dir path printed by `run.sh` on failure, or
   re-run the scenario's sync manually in a scratch dir) that:
-  - `.meta-config/auto-commit-allowlist.json` lists `developer` and `tester`, not `orchestrator`/`git`.
+  - `.meta-config/auto-commit-allowlist.json` lists all Edit/Write-capable active roles — `developer`, `tester` and `orchestrator` (capability-derived: `orchestrator.md` has Write in its `tools:` list), but not `git` (no Edit/Write tools in `git.md`), consistent with `resolve_auto_commit_config()`.
   - `.claude/agents/developer.md` and `.gemini/agents/developer.md` both show the rendered `AUTO_COMMIT_BLOCK` prose with no leftover `{{...}}`.
 
 - [x] **Step 4: Commit**
@@ -1557,3 +1604,4 @@
 - **A capability-rule consequence worth flagging to the plan's approver, not hidden:** `orchestrator.md` itself has `Edit`/`Write` in its `tools:` list (per the capability scan run during planning) and is therefore commit-eligible under this design, even though its role is to decompose and delegate, not implement. This was an explicit, approved outcome of the "capability-derived, no role exclusions" decision during brainstorming — flagged here again because it's easy to overlook, not because it's unresolved.
 - **Type/placeholder consistency:** `resolve_auto_commit_config()`'s return shape (Task 2) is used identically by Task 3 (calling code destructures the same keys), Task 6 (writes it verbatim to JSON), and Task 7's tests (constructs the same shape by hand) — no drift between the four call sites.
 - **No breaking changes:** `auto_commit` defaults to `mode: off` everywhere; a project that never sets this key gets `AUTO_COMMIT_ENABLED = "false"` and an empty rendered block, so the `{{#if}}`-gated append in every one of the 57 templates renders to nothing — byte-for-byte unchanged output for every existing project.
+- **Addendum (2026-09-08) — implementation deviation reviewed:** the hook implementation (a433247f) deviated from this plan's original Task 7 text in two reviewed ways, both security-positive. (1) The third sentinel category sets its own `IS_ALLOWLIST_SENTINEL` flag instead of reusing `IS_GIT_SENTINEL` — the strict-mode main-chat exemption ORs in `IS_GIT_SENTINEL`, so reuse would have silently granted every allowlisted role that exemption (privilege escalation) and would have failed this plan's own sentinel-scope test. (2) The git-mutation gate gained an extra condition (`&& [ "$IS_ALLOWLIST_SENTINEL" != "1" ]`) so the new flag carries the git-mutation-gate exemption. Task 7's text now describes the committed implementation exactly.
