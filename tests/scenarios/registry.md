@@ -42,6 +42,7 @@ tests/scenarios/run.sh 12 17        # nur Szenarien, deren ID mit "12" oder "17"
 | `15-orchestrator-strict` | Claude | **strict** (explizit) | Dedizierter Orchestrator-Subagent, Pflicht |
 | `16-orchestrator-advisory` | Claude | **advisory** | Dedizierter Orchestrator-Subagent, empfohlen |
 | `17-orchestrator-main-chat` | Claude | **main-chat** | Kein Orchestrator-Subagent — Main Chat routet selbst (agent-metas eigener Modus) |
+| `18-auto-commit` | Claude, Gemini | strict (default) | Auto-commit tiers: role eligibility, AUTO_COMMIT_BLOCK rendering, allowlist generation (#694) |
 
 ## Bewusste Auslassungen
 

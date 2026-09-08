@@ -1,0 +1,34 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+- Gemini
+dod-preset: standard
+platforms: []
+roles:
+- orchestrator
+- developer
+- tester
+- git
+auto_commit:
+  mode: auto
+  triggers: [task-boundary, context-pressure]
+  secret_scan: true
+project:
+  name: scenario-auto-commit
+  prefix: s18
+  short: scenario-autocommit
+variables:
+  PROJECT_NAME: scenario-auto-commit
+  PROJECT_DESCRIPTION: Auto-commit tiers test (issue #694).
+  PROJECT_GOAL: Verify auto_commit config resolves eligible roles, renders AUTO_COMMIT_BLOCK, and writes the allowlist correctly.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-autocommit
+  GIT_MAIN_BRANCH: main
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false
