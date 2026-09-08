@@ -69,6 +69,7 @@ from lib.rules import create_rule
 from lib.schema import update_roles_enum
 from lib.skill_admin import add_skill
 from lib.sync_pipeline import (
+    _sync_stage_auto_commit_allowlist,
     _sync_stage_claude_base,
     _sync_stage_config_and_presets,
     _sync_stage_config_audit,
@@ -1037,6 +1038,10 @@ def _handle_sync(ctx: _SyncContext) -> None:
     # every writer above, so it captures fully post-write state.
     _sync_stage_generated_file_hash_capture(ctx.agent_meta_root, ctx.project_root,
                                             config, provider_config, ctx.args, ctx.log)
+    # Stage 14: auto-commit allowlist (#694) -- must run after stage 13 so
+    # this file's own write isn't captured into that hash baseline.
+    _sync_stage_auto_commit_allowlist(ctx.agent_meta_root, ctx.project_root,
+                                      config, ctx.args, ctx.log)
 
     ctx.config = config
     ctx.mode = mode
