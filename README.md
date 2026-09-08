@@ -71,7 +71,7 @@ graph TD
 ```bash
 # Add as submodule
 git submodule add https://github.com/Popoboxxo/agent-meta .agent-meta
-cd .agent-meta && git checkout v0.101.0-beta.6 && cd ..
+cd .agent-meta && git checkout v1.0.0 && cd ..
 
 # Install dependencies
 pip install -r .agent-meta/requirements.txt
@@ -730,7 +730,7 @@ docs/
   agent-mindmap.md           # Mermaid mindmap of all agents
 tests/                        # pytest suite (unit + tests/browser Playwright suite)
   scenarios/                  # Persisted project.yaml scenario catalog (see Contributing)
-VERSION                      # Current version (v0.101.0-beta.6)
+VERSION                      # Current version (v1.0.0)
 CHANGELOG.md                 # Version history
 README.md                    # This file
 ```

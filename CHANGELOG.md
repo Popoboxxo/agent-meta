@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [1.0.0] — 2026-09-08
+
+### Changed
+- First stable release — agent-meta exits its 0.x beta series.
+
 ### Added
 - **Auto-commit tiers (#694)**: opt-in `auto_commit` config (`off`/`suggest`/
   `auto`/`custom`) lets write-capable agents commit directly instead of always
