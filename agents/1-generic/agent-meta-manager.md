@@ -1,6 +1,6 @@
 ---
 name: template-agent-meta-manager
-version: "1.20.0"
+version: "1.21.0"
 description: "Manage agent-meta: upgrades, sync, feedback delegation, project-specific agents, external-skill lifecycle, and creating extensions."
 hint: "Manage agent-meta: upgrade, sync, feedback, create project-specific agents"
 prompt_mode: modern
@@ -62,6 +62,7 @@ Already on latest tag → only `update-meta`, never `upgrade`.
 | Enable/disable agent roles | Changes generated agents |
 | Change DoD preset | Project-wide quality requirements |
 | Enable `conventions.release.github_release.enabled` | Starts auto-creating real GitHub releases on tag push |
+| Enable `auto_commit.mode` (`suggest`/`auto`/`custom`) | Changes commit behavior — `auto`/`custom` let agents commit without any confirmation step at all |
 | Run `sync.py` | Overwrites generated files |
 | Fill values in `project.yaml` | Wrong values corrupt the project |
 | Upgrade to major version | Breaking changes |
@@ -330,7 +331,39 @@ a key, verifying it against the schema is not optional — it is how "I know
 every available option" becomes "I confirmed this project.yaml uses them
 correctly," instead of a claim taken on faith.
 
-## 16. Scenario-Katalog (Regressionstest bei Framework-Änderungen)
+## 16. Auto-Commit Tiers (issue #694)
+
+Opt-in `auto_commit` config lets write-capable agents commit directly
+instead of always delegating to the `git` role. Four modes: `off`
+(default, no behavior change), `suggest` (agent proposes a commit message
+in its report, never runs git), `auto` (agent commits when a selected
+trigger fires), `custom` (a project script decides). Full trigger list,
+schema keys and enforcement details: README.md → "Auto-Commit Tiers".
+
+Eligibility is capability-derived (any role with `Edit`/`Write` in its
+own `tools:` frontmatter), never a hand-maintained list — nothing to
+keep in sync when adding a role.
+
+**Enabling `auto`/`custom` is a behavior change requiring confirmation**
+(see §3): it lets agents commit without asking. Recommend `suggest` first
+for a project new to this feature — same trigger conditions, zero commit
+authority, lets the user see what WOULD have been committed before
+granting real authority.
+
+```yaml
+# .meta-config/project.yaml
+auto_commit:
+  mode: auto
+  triggers: [task-boundary, file-count-threshold]
+  file_count_threshold: 5
+  secret_scan: true              # default; gates every auto/custom commit
+```
+
+Mandatory after enabling/changing: re-sync (`sync.py`), then check
+`.meta-config/auto-commit-allowlist.json` was regenerated with the
+expected `eligible_roles` for this project's active roles.
+
+## 17. Scenario-Katalog (Regressionstest bei Framework-Änderungen)
 
 `tests/scenarios/` (siehe `tests/scenarios/registry.md`) enthält eine
 Sammlung realistischer `project.yaml`-Configs, eine pro Kern-Feature /
