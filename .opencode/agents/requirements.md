@@ -1,10 +1,10 @@
 ---
 name: requirements
-version: 1.6.0
+version: 1.7.0
 description: Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md and check
   traceability.
 prompt_mode: modern
-generated-from: 1-generic/requirements.md@1.6.0
+generated-from: 1-generic/requirements.md@1.7.0
 mode: subagent
 permission:
   read: allow
@@ -102,3 +102,7 @@ NEXT: [recommended step: developer, feature, ...]
 
 **Language:** `docs/REQUIREMENTS.md` → Deutsch.
 </constraints>
+
+
+
+

@@ -1,10 +1,10 @@
 ---
 name: planner
-version: 1.2.0
+version: 1.3.0
 description: Use when a concept, REQ, or bug needs to be turned into a concrete, ordered
   implementation plan before work starts.
 prompt_mode: modern
-generated-from: 1-generic/planner.md@1.2.0
+generated-from: 1-generic/planner.md@1.3.0
 mode: subagent
 permission:
   read: allow
@@ -118,3 +118,7 @@ The synchronous tool-result channel truncates large responses **silently**
   write-out to a write-capable role (e.g., `senior-developer`) via the
   orchestrator instead of streaming it through this channel.
 </output-guard>
+
+
+
+

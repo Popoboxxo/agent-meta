@@ -1,9 +1,9 @@
 ---
 name: knowledge-querier
-version: 1.3.0
+version: 1.4.0
 description: Fragen gegen das Knowledge Wiki beantworten. Index-First-Strategie, Drill-in,
   Synthese mit Citations. File-Back guter Antworten.
-generated-from: 1-generic/knowledge-querier.md@1.3.0
+generated-from: 1-generic/knowledge-querier.md@1.4.0
 mode: subagent
 permission:
   read: allow
@@ -88,3 +88,7 @@ Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
 - Antworten → Englisch
 - File-Back Query-Result-Seiten → Deutsch
 - Commit-Messages → Englisch
+
+
+
+

@@ -1,11 +1,11 @@
 ---
 name: accessibility-specialist
-version: 0.3.0
+version: 0.4.0
 description: WCAG 2.1/2.2 compliance audits, ARIA checks, keyboard navigation, screen
   reader testing guidelines, color contrast analysis, focus management and accessibility
   tree analysis. Produces WCAG audit reports with A/AA/AAA severity and ARIA fix suggestions.
 prompt_mode: modern
-generated-from: 1-generic/accessibility-specialist.md@0.3.0
+generated-from: 1-generic/accessibility-specialist.md@0.4.0
 mode: subagent
 permission:
   bash: allow
@@ -152,3 +152,7 @@ NEXT: [Review | Developer fix | Documenter]
 
 Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
 </output-guard>
+
+
+
+

@@ -1,6 +1,6 @@
 ---
 name: e2e-tester
-version: 1.4.0
+version: 1.5.0
 description: E2E-Tests, visuelle Regression und Accessibility-Audits via Playwright
   — User-Flows statt isolierter Units.
 hint: 'Browser-Testing-Agent: E2E-Flows, visuelle Regression, Accessibility-Audit
@@ -14,7 +14,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/e2e-tester.md@1.4.0
+generated-from: 1-generic/e2e-tester.md@1.5.0
 model: gemini-3.1-pro-low
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -156,3 +156,7 @@ docker rm "$NAME"
 echo "container exit code: $RC" && tail -20 /tmp/"$NAME".log
 ```
 </output-guard>
+
+
+
+

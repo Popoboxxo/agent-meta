@@ -1,6 +1,6 @@
 ---
 name: ideation
-version: 1.11.0
+version: 1.12.0
 description: Use when an idea needs scoping and thoughts need sorting before a concept
   or REQ exists.
 hint: Nutze ideation zum Scopen einer rohen Idee, bevor ein Konzept oder REQ existiert.
@@ -13,7 +13,7 @@ tools:
 - WebFetch
 - WebSearch
 - TodoWrite
-generated-from: 1-generic/ideation.md@1.11.0
+generated-from: 1-generic/ideation.md@1.12.0
 model: gemini-3.1-pro-low
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -150,3 +150,7 @@ On confirmation: A2A envelope to `requirements` (or `concept-reviewer` for a rev
 
 **Language:** communication → Deutsch. Concept docs → project language.
 </constraints>
+
+
+
+

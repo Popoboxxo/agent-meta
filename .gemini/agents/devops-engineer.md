@@ -1,6 +1,6 @@
 ---
 name: devops-engineer
-version: 1.5.0
+version: 1.6.0
 description: CI/CD pipelines, Infrastructure as Code, container orchestration, observability,
   security best practices, staging validation, MTTG (commit-to-security-feedback)
   tracking, and environment classification.
@@ -13,7 +13,7 @@ tools:
 - Bash
 - Glob
 - Grep
-generated-from: 1-generic/devops-engineer.md@1.5.0
+generated-from: 1-generic/devops-engineer.md@1.6.0
 model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -203,3 +203,7 @@ docker rm "$NAME"
 echo "container exit code: $RC" && tail -20 /tmp/"$NAME".log
 ```
 </output-guard>
+
+
+
+

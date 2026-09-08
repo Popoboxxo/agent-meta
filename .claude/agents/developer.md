@@ -254,3 +254,7 @@ wait "$PID"; RC=$?
 tail -50 /tmp/e2e.log; exit "$RC"             # evidence + exit code = final result, not a "waiting" placeholder
 ```
 </output-guard>
+
+
+
+

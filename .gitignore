@@ -19,7 +19,6 @@ graphify-out/
 .claude/settings.local.json
 .gemini/pending-tasks.md
 .gemini/settings.local.json
-.mammouth/pending-tasks.md
 .mcp.json
 .meta-config/env.ps1
 .meta-config/env.sh

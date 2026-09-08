@@ -1,6 +1,6 @@
 ---
 name: knowledge-indexer
-version: 1.2.0
+version: 1.3.0
 description: Pflegt index.md (Content-Katalog, OKF §6) und log.md (Chronologisches
   Event-Log, OKF §7) im Knowledge Wiki.
 hint: index.md und log.md pflegen — nur als Delegationsziel anderer Knowledge-Agenten
@@ -8,7 +8,7 @@ tools:
 - Read
 - Write
 - Edit
-generated-from: 1-generic/knowledge-indexer.md@1.2.0
+generated-from: 1-generic/knowledge-indexer.md@1.3.0
 model: claude-haiku-4-5-20251001
 ---
 
@@ -122,3 +122,7 @@ Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
 
 - `index.md`/`log.md` → Deutsch
 - Commit-Messages → Englisch
+
+
+
+

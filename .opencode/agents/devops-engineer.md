@@ -1,11 +1,11 @@
 ---
 name: devops-engineer
-version: 1.5.0
+version: 1.6.0
 description: CI/CD pipelines, Infrastructure as Code, container orchestration, observability,
   security best practices, staging validation, MTTG (commit-to-security-feedback)
   tracking, and environment classification.
 prompt_mode: modern
-generated-from: 1-generic/devops-engineer.md@1.5.0
+generated-from: 1-generic/devops-engineer.md@1.6.0
 mode: subagent
 permission:
   read: allow
@@ -199,3 +199,7 @@ docker rm "$NAME"
 echo "container exit code: $RC" && tail -20 /tmp/"$NAME".log
 ```
 </output-guard>
+
+
+
+

@@ -1,10 +1,10 @@
 ---
 name: tester
-version: 2.5.0
+version: 2.6.0
 description: Isolated unit tests with mocks/stubs following a TDD workflow. For integration
   tests → se-test-engineer.
 prompt_mode: modern
-generated-from: 1-generic/tester.md@2.5.0
+generated-from: 1-generic/tester.md@2.6.0
 mode: subagent
 permission:
   bash: allow
@@ -142,3 +142,7 @@ docker rm "$NAME"
 echo "container exit code: $RC" && tail -20 /tmp/"$NAME".log
 ```
 </output-guard>
+
+
+
+

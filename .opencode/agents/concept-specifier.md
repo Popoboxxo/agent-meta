@@ -1,10 +1,10 @@
 ---
 name: concept-specifier
-version: 1.0.0
+version: 1.1.0
 description: 'Use when a concept or idea must become a technical specification: interface
   contracts, data flow, acceptance criteria — before implementation. Does not implement.'
 prompt_mode: modern
-generated-from: 1-generic/concept-specifier.md@1.0.0
+generated-from: 1-generic/concept-specifier.md@1.1.0
 mode: subagent
 permission:
   read: allow
@@ -115,3 +115,7 @@ NEXT: [Review by concept-reviewer | Hand off to developer]
 
 **Language:** specification in project language, communication in Deutsch.
 </constraints>
+
+
+
+

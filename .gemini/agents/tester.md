@@ -1,6 +1,6 @@
 ---
 name: tester
-version: 2.5.0
+version: 2.6.0
 description: Isolated unit tests with mocks/stubs following a TDD workflow. For integration
   tests → se-test-engineer.
 hint: Write tests (TDD), run the test suite, ensure coverage
@@ -13,7 +13,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/tester.md@2.5.0
+generated-from: 1-generic/tester.md@2.6.0
 model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -146,3 +146,7 @@ docker rm "$NAME"
 echo "container exit code: $RC" && tail -20 /tmp/"$NAME".log
 ```
 </output-guard>
+
+
+
+

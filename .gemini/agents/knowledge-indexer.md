@@ -1,6 +1,6 @@
 ---
 name: knowledge-indexer
-version: 1.2.0
+version: 1.3.0
 description: Pflegt index.md (Content-Katalog, OKF §6) und log.md (Chronologisches
   Event-Log, OKF §7) im Knowledge Wiki.
 hint: index.md und log.md pflegen — nur als Delegationsziel anderer Knowledge-Agenten
@@ -8,7 +8,7 @@ tools:
 - Read
 - Write
 - Edit
-generated-from: 1-generic/knowledge-indexer.md@1.2.0
+generated-from: 1-generic/knowledge-indexer.md@1.3.0
 model: gemini-2.0-flash-lite-preview-02-05
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -123,3 +123,7 @@ Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
 
 - `index.md`/`log.md` → Deutsch
 - Commit-Messages → Englisch
+
+
+
+

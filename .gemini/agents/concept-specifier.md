@@ -1,6 +1,6 @@
 ---
 name: concept-specifier
-version: 1.0.0
+version: 1.1.0
 description: 'Use when a concept or idea must become a technical specification: interface
   contracts, data flow, acceptance criteria — before implementation. Does not implement.'
 hint: 'Turn a concept into a technical specification: interface contracts, data flow,
@@ -12,7 +12,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/concept-specifier.md@1.0.0
+generated-from: 1-generic/concept-specifier.md@1.1.0
 model: gemini-3.1-pro-low
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -118,3 +118,7 @@ NEXT: [Review by concept-reviewer | Hand off to developer]
 
 **Language:** specification in project language, communication in Deutsch.
 </constraints>
+
+
+
+

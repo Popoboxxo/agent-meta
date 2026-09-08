@@ -1,6 +1,6 @@
 ---
 name: knowledge-gardener
-version: 1.2.0
+version: 1.3.0
 description: 'Kleinteilige Wiki-Pflege: Links reparieren, Tags harmonisieren, Frontmatter
   ergänzen, Typos korrigieren, Timestamps aktualisieren.'
 hint: 'Wiki-Pflege: Links, Tags, Frontmatter, Typos, Timestamps'
@@ -9,7 +9,7 @@ tools:
 - Write
 - Edit
 - Glob
-generated-from: 1-generic/knowledge-gardener.md@1.2.0
+generated-from: 1-generic/knowledge-gardener.md@1.3.0
 model: claude-haiku-4-5-20251001
 ---
 
@@ -82,3 +82,7 @@ Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
 
 - Wiki-Seiten → Deutsch
 - Commit-Messages → Englisch
+
+
+
+

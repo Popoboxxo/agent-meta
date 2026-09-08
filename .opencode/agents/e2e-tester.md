@@ -1,10 +1,10 @@
 ---
 name: e2e-tester
-version: 1.4.0
+version: 1.5.0
 description: E2E-Tests, visuelle Regression und Accessibility-Audits via Playwright
   — User-Flows statt isolierter Units.
 prompt_mode: modern
-generated-from: 1-generic/e2e-tester.md@1.4.0
+generated-from: 1-generic/e2e-tester.md@1.5.0
 mode: subagent
 permission:
   bash: allow
@@ -151,3 +151,7 @@ docker rm "$NAME"
 echo "container exit code: $RC" && tail -20 /tmp/"$NAME".log
 ```
 </output-guard>
+
+
+
+

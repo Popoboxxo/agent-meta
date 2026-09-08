@@ -1,6 +1,6 @@
 ---
 name: frontend-component-engineer
-version: 0.4.0
+version: 0.5.0
 description: Builds production-ready UI components from a screen spec (ui-ux-designer)
   plus a token/variant contract (design-system-architect) — props contract, mandatory
   state handling, and a built-in accessibility baseline. No design-system authoring,
@@ -17,7 +17,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/frontend-component-engineer.md@0.4.0
+generated-from: 1-generic/frontend-component-engineer.md@0.5.0
 model: claude-sonnet-5
 memory: project
 ---
@@ -126,3 +126,7 @@ Delegation:
 
 Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
 </output-guard>
+
+
+
+

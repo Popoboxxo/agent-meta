@@ -1,10 +1,10 @@
 ---
 name: concept-reviewer
-version: 1.5.0
+version: 1.6.0
 description: Use when a concept or design doc needs a structural review before requirements
   — completeness, logic, assumptions, risks, feasibility, threat model (4 questions).
 prompt_mode: modern
-generated-from: 1-generic/concept-reviewer.md@1.5.0
+generated-from: 1-generic/concept-reviewer.md@1.6.0
 mode: subagent
 permission:
   read: allow
@@ -158,3 +158,7 @@ NEXT: [Hand off to requirements | Back to author | Escalate]
 
 **Language:** review findings in the language of the incoming concept, user communication in Deutsch.
 </constraints>
+
+
+
+

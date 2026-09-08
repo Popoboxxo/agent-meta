@@ -1,6 +1,6 @@
 ---
 name: agent-meta-manager
-version: 1.19.0
+version: 1.20.0
 description: 'Manage agent-meta: upgrades, sync, feedback delegation, project-specific
   agents, external-skill lifecycle, and creating extensions.'
 hint: 'Manage agent-meta: upgrade, sync, feedback, create project-specific agents'
@@ -14,7 +14,7 @@ tools:
 - Grep
 - WebFetch
 - TodoWrite
-generated-from: 1-generic/agent-meta-manager.md@1.19.0
+generated-from: 1-generic/agent-meta-manager.md@1.20.0
 model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -356,7 +356,7 @@ sondern auch gegen realistische Consumer-Configs.
 
 **Sync workflow:** Mandatory order on changes → 1. test sync.py locally → 2. review .claude/agents → 3. commit → 4. (optionally) PR.
 
-**Version info:** v0.101.0-beta.6 (2026-09-07)
+**Version info:** v0.101.0-beta.6 (2026-09-08)
 </context>
 
 <tools>

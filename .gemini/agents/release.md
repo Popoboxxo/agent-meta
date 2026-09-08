@@ -1,6 +1,6 @@
 ---
 name: release
-version: 1.9.0
+version: 1.10.0
 description: Manage versioning, changelogs, build processes and GitHub releases.
 hint: Versioning, changelog, build artifact, create GitHub release
 prompt_mode: modern
@@ -12,7 +12,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/release.md@1.9.0
+generated-from: 1-generic/release.md@1.10.0
 model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -153,3 +153,7 @@ ARTIFACTS: [list of attached files]
 
 Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
 </output-guard>
+
+
+
+

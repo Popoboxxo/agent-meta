@@ -1,6 +1,6 @@
 ---
 name: requirements
-version: 1.6.0
+version: 1.7.0
 description: Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md and check
   traceability.
 hint: Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md
@@ -12,7 +12,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/requirements.md@1.6.0
+generated-from: 1-generic/requirements.md@1.7.0
 model: claude-haiku-4-5-20251001
 memory: project
 ---
@@ -105,3 +105,7 @@ NEXT: [recommended step: developer, feature, ...]
 
 **Language:** `docs/REQUIREMENTS.md` → Deutsch.
 </constraints>
+
+
+
+

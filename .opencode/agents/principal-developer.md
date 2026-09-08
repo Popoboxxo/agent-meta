@@ -1,11 +1,11 @@
 ---
 name: principal-developer
-version: 1.3.0
+version: 1.4.0
 description: Last-resort escalation tier. Invoked only after senior-developer has
   failed repeatedly on a task. Root-cause diagnosis before a single line of code.
   Maximum thoroughness, maximum cost.
 prompt_mode: modern
-generated-from: 1-generic/principal-developer.md@1.3.0
+generated-from: 1-generic/principal-developer.md@1.4.0
 mode: subagent
 permission:
   bash: allow
@@ -192,3 +192,7 @@ NEXT: [Review | Tests | Commit]
 
 Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
 </output-guard>
+
+
+
+

@@ -1,6 +1,6 @@
 ---
 name: prompt-engineer
-version: 1.8.0
+version: 1.9.0
 description: The ultimate expert for prompt engineering. Designs, reviews, and optimizes
   agent definitions based on best practices (OpenAI, Lakera), with secure-prompting
   guidelines and banned-pattern awareness.
@@ -14,7 +14,7 @@ tools:
 - Glob
 - Grep
 - WebFetch
-generated-from: 1-generic/prompt-engineer.md@1.8.0
+generated-from: 1-generic/prompt-engineer.md@1.9.0
 model: claude-sonnet-5
 memory: project
 ---
@@ -164,3 +164,7 @@ ARTIFACTS: <changed template path>
 
 Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
 </output-guard>
+
+
+
+

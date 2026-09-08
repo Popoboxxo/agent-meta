@@ -1,6 +1,6 @@
 ---
 name: knowledge-ingestor
-version: 1.3.0
+version: 1.4.0
 description: Sources einlesen, Key Information extrahieren, Wiki-Seiten erstellen/aktualisieren,
   Cross-References pflegen.
 hint: Sources verarbeiten, Wiki-Seiten schreiben, Cross-References pflegen
@@ -10,7 +10,7 @@ tools:
 - Edit
 - Glob
 - Grep
-generated-from: 1-generic/knowledge-ingestor.md@1.3.0
+generated-from: 1-generic/knowledge-ingestor.md@1.4.0
 model: gemini-2.0-flash-lite-preview-02-05
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -30,7 +30,7 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 
 ## Knowledge Engine Kontext
 
-**Domäne:** personal
+**Domäne:** internal-docs
 **Schema:** `knowledge/schema.md`
 **Wiki:** `knowledge/wiki/`
 **Sources:** `knowledge/sources/`
@@ -116,3 +116,7 @@ Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
 
 - Wiki-Seiten → Deutsch
 - Commit-Messages → Englisch
+
+
+
+

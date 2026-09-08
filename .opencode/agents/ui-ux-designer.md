@@ -1,10 +1,10 @@
 ---
 name: ui-ux-designer
-version: 1.4.0
+version: 1.5.0
 description: Creates UI specifications, mockups, and design systems. Maps REQ-IDs
   to UI elements.
 prompt_mode: modern
-generated-from: 1-generic/ui-ux-designer.md@1.4.0
+generated-from: 1-generic/ui-ux-designer.md@1.5.0
 mode: subagent
 permission:
   read: allow
@@ -111,3 +111,7 @@ ARTIFACTS: [files created]
 
 Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
 </output-guard>
+
+
+
+

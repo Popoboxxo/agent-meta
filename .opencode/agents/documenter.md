@@ -1,10 +1,10 @@
 ---
 name: documenter
-version: 1.7.0
+version: 1.8.0
 description: Maintains CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md and session
   insights.
 prompt_mode: modern
-generated-from: 1-generic/documenter.md@1.7.0
+generated-from: 1-generic/documenter.md@1.8.0
 mode: subagent
 permission:
   read: allow
@@ -130,3 +130,7 @@ NOTES: [short summary of changes]
 
 **Language:** README → Englisch · internal docs → Deutsch.
 </constraints>
+
+
+
+

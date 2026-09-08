@@ -1,6 +1,6 @@
 ---
 name: export-manager
-version: 1.4.0
+version: 1.5.0
 description: Reads .meta-config/export.yaml and routes structured JSON payloads from
   specialist agents to the configured target (markdown, confluence, jira-xray, etc.).
 hint: Use this agent for export routing of structured data to configured targets.
@@ -12,7 +12,7 @@ tools:
 - Bash
 - Glob
 - Grep
-generated-from: 1-generic/export-manager.md@1.4.0
+generated-from: 1-generic/export-manager.md@1.5.0
 model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -140,3 +140,7 @@ WARNINGS: [if any]
 
 Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
 </output-guard>
+
+
+
+

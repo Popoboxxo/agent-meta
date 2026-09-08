@@ -1,6 +1,6 @@
 ---
 name: technical-writer
-version: 0.2.0
+version: 0.3.0
 description: 'External developer- and user-facing documentation: API references, getting-started
   guides, SDK docs, tutorials, CLI help pages, user-facing release notes and UX microcopy.
   Distinct from internal team docs owned by documenter.'
@@ -14,7 +14,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/technical-writer.md@0.2.0
+generated-from: 1-generic/technical-writer.md@0.3.0
 model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -127,3 +127,7 @@ NEXT: [Review | Developer change | Documenter (internal)]
 
 **Language:** external docs (README, API reference, release notes) → Englisch.
 </constraints>
+
+
+
+

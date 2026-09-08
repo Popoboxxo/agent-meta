@@ -1,6 +1,6 @@
 ---
 name: concept-architect
-version: 1.0.0
+version: 1.1.0
 description: 'Use when a complex change (XL, >20 files) needs a system design before
   implementation: components, interfaces, trade-off analysis. Does not implement.'
 hint: 'System design for complex changes: components, interfaces, trade-offs — never
@@ -12,7 +12,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/concept-architect.md@1.0.0
+generated-from: 1-generic/concept-architect.md@1.1.0
 model: claude-opus-4-8
 memory: project
 ---
@@ -129,3 +129,7 @@ NEXT: [Review by concept-reviewer | Detail specs via concept-specifier | Hand of
 
 **Language:** design document in project language, communication in Deutsch.
 </constraints>
+
+
+
+

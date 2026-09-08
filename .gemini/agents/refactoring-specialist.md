@@ -1,6 +1,6 @@
 ---
 name: refactoring-specialist
-version: 0.3.0
+version: 0.4.0
 description: 'Systematic large-scale code transformation with safety nets: Strangler
   Fig pattern, incremental refactoring, code smell detection, legacy modernization
   and feature-flag-driven rewrites with backwards-compatibility guarantees. Produces
@@ -16,7 +16,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/refactoring-specialist.md@0.3.0
+generated-from: 1-generic/refactoring-specialist.md@0.4.0
 model: gemini-3.1-pro-low
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -170,3 +170,7 @@ NEXT: [Review | Developer feature work | Documenter]
 
 Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
 </output-guard>
+
+
+
+

@@ -1,10 +1,10 @@
 ---
 name: ideation
-version: 1.11.0
+version: 1.12.0
 description: Use when an idea needs scoping and thoughts need sorting before a concept
   or REQ exists.
 prompt_mode: modern
-generated-from: 1-generic/ideation.md@1.11.0
+generated-from: 1-generic/ideation.md@1.12.0
 mode: subagent
 permission:
   read: allow
@@ -148,3 +148,7 @@ On confirmation: A2A envelope to `requirements` (or `concept-reviewer` for a rev
 
 **Language:** communication → Deutsch. Concept docs → project language.
 </constraints>
+
+
+
+

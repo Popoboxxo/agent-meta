@@ -1,10 +1,10 @@
 ---
 name: api-specialist
-version: 1.4.0
+version: 1.5.0
 description: API design, OpenAPI specifications, contract-first development. Creates
   and maintains API contracts.
 prompt_mode: modern
-generated-from: 1-generic/api-specialist.md@1.4.0
+generated-from: 1-generic/api-specialist.md@1.5.0
 mode: subagent
 permission:
   read: allow
@@ -145,3 +145,7 @@ ARTIFACTS: <spec + supporting file paths>
 
 Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
 </output-guard>
+
+
+
+

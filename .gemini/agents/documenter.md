@@ -1,6 +1,6 @@
 ---
 name: documenter
-version: 1.7.0
+version: 1.8.0
 description: Maintains CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md and session
   insights.
 hint: 'Maintain docs: CODEBASE_OVERVIEW, ARCHITECTURE, README, insights'
@@ -12,7 +12,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/documenter.md@1.7.0
+generated-from: 1-generic/documenter.md@1.8.0
 model: gemini-3.5-flash-high
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -133,3 +133,7 @@ NOTES: [short summary of changes]
 
 **Language:** README → Englisch · internal docs → Deutsch.
 </constraints>
+
+
+
+

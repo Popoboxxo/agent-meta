@@ -1,10 +1,10 @@
 ---
 name: orchestrator
-version: 7.15.0
+version: 7.16.0
 description: 'Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes,
   delegates.'
 prompt_mode: modern
-generated-from: 1-generic/orchestrator.md@7.15.0
+generated-from: 1-generic/orchestrator.md@7.16.0
 mode: subagent
 permission:
   todowrite: allow
@@ -1507,61 +1507,117 @@ SE mode: optional
 |-------|----------------|------|----------|
 | Agent | Core Capabilities |
 |-------|-------------------|
+
 | `accessibility-specialist` | WCAG 2.1/2.2 Compliance-Audit, ARIA-Checks, Keyboard-Navigation |
+
 | `agent-meta-manager` | agent-meta verwalten: Upgrade, Sync, Feedback |
+
 | `agent-meta-scout` | Claude-Ökosystem scouten: neue Skills, Rollen, Rules |
+
 | `api-specialist` | OpenAPI/Contract-First API Design, Schnittstellen-Spezifikationen |
+
 | `bug-feature-analyzer` | Issue-Triage: Eingehende Bug-Meldungen, Feature-Requests analysieren, k |
+
 | `claude-expert` | Absoluter Analyse-Experte für die Plattform Claude Code: Funktionsweise, Konf |
+
 | `code-reviewer` | Clean Code Gatekeeper: Blast-Radius-Analyse, SOLID/DRY Prüfung, Code-Qualität |
+
 | `concept-architect` | Systemdesign für komplexe Änderungen: Komponenten, Schnittstellen, Trade-offs |
+
 | `concept-reviewer` | Konzept-Critic: reviewt Design-Docs, Konzepte auf Vollständigkeit, Logik |
+
 | `concept-specifier` | Technische Spezifikationen aus Anforderungen, Codebase-Kontext — implementiert nicht |
+
 | `continue-expert` | Absoluter Analyse-Experte für die Plattform Continue: Funktionsweise, Konfigu |
+
 | `copilot-expert` | Absoluter Analyse-Experte für die Plattform GitHub Copilot: Funktionsweise, K |
+
 | `data-engineer` | ETL/ELT-Pipelines, Schema-Migration (Datenebene), Data-Quality-Checks |
+
 | `dependency-auditor` | Supply-Chain-Hygiene: SBOM-Analyse, Lizenz-Kompatibilität, Version-Drift und |
+
 | `design-system-architect` | Design-System-Schema → echte Token-Artefakte, Farbharmonie, Variant-Contracts |
+
 | `developer` | Feature-Implementierung, Bugfixes |
+
 | `devops-engineer` | CI/CD, Infrastructure as Code, Kubernetes |
+
 | `docker` | Dev-Stack verwalten, Test-Stack starten, Binary-Management |
+
 | `documenter` | CODEBASE_OVERVIEW, ARCHITECTURE, README |
+
 | `e2e-tester` | E2E-Tests, visuelle Regression, Accessibility-Audits via Playwright |
+
 | `effort-estimator` | Schätzt Aufwände für Entwicklungsaufgaben basierend auf Task-Typ, LLM-Kali |
+
 | `explorer` | Read-only Codebase-Recherche, Dependency, Impact-Mapping |
+
 | `export-manager` | Target-agnostischer Output-Router: Markdown, Confluence, Jira-Xray |
+
 | `feedback` | Projekt-Feedback standardisieren: Bugs, Features, Verbesserungen als GitHub I |
+
 | `frontend-component-engineer` | Screen-Spec + Token-Contract → produktionsreife UI-Komponenten |
+
 | `gemini-expert` | Absoluter Analyse-Experte für die Plattform Gemini (Antigravity): Funktionswe |
+
 | `git` | Commits, Branches, Tags |
+
 | `ideation` | Neue Ideen explorieren, Vision schärfen, Übergabe an requirements |
+
 | `incident-responder` | Live-Incident-Koordination: korreliert Logs, Metriken, führt Runbook-Schri |
+
 | `intern-developer` | Der übereifrige Praktikant |
+
 | `junior-developer` | Triviale Code-Änderungen (≤2 Dateien, kein Architektur-Impact) |
+
 | `knowledge-curator` | Strategische Knowledge-Engine-Steuerung: Schema-Evolution, Wiki-Strukturierun |
+
 | `knowledge-gardener` | Kleinteilige Wiki-Pflege: Links reparieren, Tags harmonisieren, Frontmatter e |
+
 | `knowledge-indexer` | Pflegt index.md (Content-Katalog, OKF §6), log.md (Chronologisches Event-L |
+
 | `knowledge-ingestor` | Sources einlesen, Key Information extrahieren, Wiki-Seiten erstellen/ aktuali |
+
 | `knowledge-linter` | Wiki-Gesundheitscheck: Widersprüche, Orphans, veraltete Claims |
+
 | `knowledge-migrator` | Vorhandene Projektinhalte aufräumen, OKF-konform ins Knowledge Wiki migrieren |
+
 | `knowledge-querier` | Fragen gegen das Knowledge Wiki beantworten |
+
 | `log-analyzer` | System, Applikations-Logs analysieren: Frequency-Clustering, Severity-Kla |
+
 | `mammouth-expert` | Absoluter Analyse-Experte für die Plattform Mammouth Code: Funktionsweise, Ko |
+
 | `meta-feedback` | Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen |
+
 | `opencode-expert` | Absoluter Analyse-Experte für die Plattform Opencode: Funktionsweise, Konfigu |
+
 | `orchestrator` | Einstiegspunkt für alle Entwicklungsaufgaben |
+
 | `performance-optimizer` | Big-O Bottleneck-Identifikation, datengetriebene Performance-Optimierung |
+
 | `planner` | Umsetzungsplanung |
+
 | `principal-developer` | Last-Resort-Eskalationsstufe |
+
 | `prompt-engineer` | Der ultimative Experte für Prompt-Engineering |
+
 | `refactoring-specialist` | Systematische großflächige Code-Transformation mit Sicherheitsnetz: Strangler |
+
 | `release` | Versioning, Changelog, Build-Artifact |
+
 | `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen |
+
 | `senior-developer` | Komplexe Features, Architektur-Entscheidungen, schwierige Bugs |
+
 | `technical-writer` | Externe entwickler, nutzergerichtete Doku: API-Referenzen, Getting-Starte |
+
 | `test-executor` | Bestehende Test-Suiten ausführen — kein Test-Design, kein Code-Schreiben |
+
 | `tester` | TDD, Test-Suite ausführen, Testabdeckung sichern |
+
 | `ui-ux-designer` | UI-Spezifikationen, Mockups, Design-Systeme erstellen |
+
 | `validator` | Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit |
 Parallel: max 4. Not parallel: tester↔developer, code-reviewer→git, requirements→tester.
 <!-- agent-meta:managed-end -->
@@ -1626,3 +1682,7 @@ Verbotene `subagent_type`-Werte beim Dispatchen: `orchestrator`, `orchestrator-i
 
 **Language:** Documents → Englisch | details: Rule `language.md`
 </constraints>
+
+
+
+

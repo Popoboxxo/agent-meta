@@ -1,12 +1,12 @@
 ---
 name: data-engineer
-version: 0.3.0
+version: 0.4.0
 description: ETL/ELT pipeline design, data-layer schema migration, data quality checks,
   lineage analysis, pipeline monitoring and streaming/batch design. Produces pipeline
   specs, data quality reports, lineage diagrams and migration scripts. Distinct from
   database-engineer query/index work.
 prompt_mode: modern
-generated-from: 1-generic/data-engineer.md@0.3.0
+generated-from: 1-generic/data-engineer.md@0.4.0
 mode: subagent
 permission:
   bash: allow
@@ -165,3 +165,7 @@ NEXT: [Review | Developer implementation | Tests]
 
 Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
 </output-guard>
+
+
+
+

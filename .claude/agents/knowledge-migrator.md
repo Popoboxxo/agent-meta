@@ -1,6 +1,6 @@
 ---
 name: knowledge-migrator
-version: 1.3.0
+version: 1.4.0
 description: Vorhandene Projektinhalte aufräumen und OKF-konform ins Knowledge Wiki
   migrieren. Discovery → Plan → User-Freigabe → Migration → Validierung.
 hint: Vorhandene Docs ins Wiki migrieren (einmalig, mit User-Freigabe)
@@ -11,7 +11,7 @@ tools:
 - Glob
 - Grep
 - Bash
-generated-from: 1-generic/knowledge-migrator.md@1.3.0
+generated-from: 1-generic/knowledge-migrator.md@1.4.0
 model: claude-sonnet-5
 ---
 
@@ -119,3 +119,7 @@ Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
 
 Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
 </output-guard>
+
+
+
+

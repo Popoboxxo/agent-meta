@@ -1,6 +1,6 @@
 ---
 name: docker
-version: 1.7.0
+version: 1.8.0
 description: 'Docker operations: Compose stacks, binary management, test environments,
   and diagnostics — platform-independent.'
 hint: Start/stop dev stack, Dockerfiles, binary management
@@ -13,7 +13,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/docker.md@1.7.0
+generated-from: 1-generic/docker.md@1.8.0
 model: claude-haiku-4-5-20251001
 ---
 
@@ -132,3 +132,7 @@ docker rm "$NAME"
 echo "container exit code: $RC" && tail -20 /tmp/"$NAME".log
 ```
 </output-guard>
+
+
+
+

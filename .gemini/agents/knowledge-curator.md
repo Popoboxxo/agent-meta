@@ -1,6 +1,6 @@
 ---
 name: knowledge-curator
-version: 1.2.0
+version: 1.3.0
 description: 'Strategische Knowledge-Engine-Steuerung: Schema-Evolution, Wiki-Strukturierung,
   Domänen-Anpassung, Ingest-Planung, OKF-Compliance-Sicherung.'
 hint: Wiki-Strategie, Schema-Evolution, OKF-Compliance
@@ -8,7 +8,7 @@ tools:
 - Read
 - Write
 - TodoWrite
-generated-from: 1-generic/knowledge-curator.md@1.2.0
+generated-from: 1-generic/knowledge-curator.md@1.3.0
 model: gemini-2.0-flash-lite-preview-02-05
 ---
 > **Registrierung erforderlich:** Dieser Agent wird zur Laufzeit via `define_subagent` registriert — er ist NICHT automatisch aktiv. Bootstrap-Instruktionen: `AGENTS.md` (Block `agent-meta:bootstrap`).
@@ -30,7 +30,7 @@ agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird.
 
 ## Knowledge Engine Kontext
 
-**Domäne:** personal
+**Domäne:** internal-docs
 **Bundle:** `knowledge/`
 **Schema:** `knowledge/schema.md`
 **Wiki:** `knowledge/wiki/`

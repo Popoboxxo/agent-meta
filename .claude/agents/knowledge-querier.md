@@ -1,6 +1,6 @@
 ---
 name: knowledge-querier
-version: 1.3.0
+version: 1.4.0
 description: Fragen gegen das Knowledge Wiki beantworten. Index-First-Strategie, Drill-in,
   Synthese mit Citations. File-Back guter Antworten.
 hint: Wiki-Fragen beantworten, Index-First, Synthese mit Citations
@@ -9,7 +9,7 @@ tools:
 - Write
 - Glob
 - Grep
-generated-from: 1-generic/knowledge-querier.md@1.3.0
+generated-from: 1-generic/knowledge-querier.md@1.4.0
 model: claude-haiku-4-5-20251001
 ---
 
@@ -89,3 +89,7 @@ Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
 - Antworten → Englisch
 - File-Back Query-Result-Seiten → Deutsch
 - Commit-Messages → Englisch
+
+
+
+
