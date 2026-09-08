@@ -1,0 +1,51 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+dod-preset: standard
+platforms: []
+roles:
+- orchestrator
+- developer
+- git
+auto_commit:
+  mode: custom
+  custom_script: scripts/should-commit.sh
+  secret_scan: true
+project:
+  name: scenario-auto-commit-custom
+  prefix: s20
+  short: scenario-autocommit-custom
+variables:
+  PROJECT_NAME: scenario-auto-commit-custom
+  PROJECT_DESCRIPTION: Auto-commit custom tier test (issue #694).
+  PROJECT_GOAL: Verify custom mode renders the custom script contract without trigger prose.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-autocommit-custom
+  GIT_MAIN_BRANCH: main
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false
+# =====================================================================
+# Prüf-Zettel Szenario 20 — auto_commit mode: custom (Issue #694)
+# (menschlich lesbar; von sync.py ignoriert. Content-Assertions:
+#  tests/scenarios/asserts/20-auto-commit-custom.sh)
+# =====================================================================
+# 1. Allowlist (.meta-config/auto-commit-allowlist.json):
+#    mode "custom"; custom_script "scripts/should-commit.sh";
+#    eligible_roles ["developer", "orchestrator"] (capability-abgeleitet,
+#    git hat kein Edit/Write -> raus); secret_scan true; triggers []
+#    (built-in Trigger sind im custom-Modus irrelevant).
+# 2. AUTO_COMMIT_BLOCK gerendert in .claude/agents/developer.md:
+#    erwähnt `scripts/should-commit.sh` ("Commit directly whenever ...
+#    exits 0") und die Sentinel-Präfix-Anweisung
+#    (`#agent-meta:agent=<your-role-name>` vor git add/commit) sowie die
+#    Secret-Scan-Zeile (custom-Modus committet selbst -> Scan greift).
+# 3. KEINE Trigger-Prosa: die Trigger-Namen (task-boundary, per-edit,
+#    context-pressure, file-count-threshold) dürfen im gerenderten Block
+#    nicht vorkommen — custom_script allein entscheidet.
+# =====================================================================

@@ -1,0 +1,62 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+- Gemini
+- Opencode
+dod-preset: standard
+platforms: []
+roles:
+- orchestrator
+- developer
+- tester
+- git
+auto_commit:
+  mode: "off"
+  file_count_threshold: 2
+  secret_scan: false
+project:
+  name: scenario-auto-commit-off
+  prefix: s21
+  short: scenario-autocommit-off
+variables:
+  PROJECT_NAME: scenario-auto-commit-off
+  PROJECT_DESCRIPTION: Auto-commit off tier test (issue #694).
+  PROJECT_GOAL: Verify mode off ignores stray config values and renders nothing anywhere.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-autocommit-off
+  GIT_MAIN_BRANCH: main
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false
+# =====================================================================
+# Prüf-Zettel Szenario 21 — auto_commit mode: off (Issue #694)
+# (menschlich lesbar; von sync.py ignoriert. Content-Assertions:
+#  tests/scenarios/asserts/21-auto-commit-off-ignores-config.sh)
+# =====================================================================
+# 1. mode: "off" ist bewusst QUOTIERT. Unquotiertes `off` wird von
+#    PyYAML (YAML 1.1) als boolesches False geparst; der Framework-Kode
+#    (resolve_auto_commit_config, `mode != "off"`) behandelt False dann
+#    als AKTIV — Folge: nicht-leere eligible_roles + fehlerhafter
+#    Auto-Block. Gemeldeter Framework-Bug (nicht hier gefixt, außerhalb
+#    des Szenario-Scope); schema-valide und semantisch korrekt ist die
+#    String-Form "off".
+# 2. file_count_threshold: 2 und secret_scan: false sind bewusst
+#    gesetzt, obwohl sie im off-Modus IGNORIERT werden müssen: die
+#    Allowlist darf sie maximal als aufgelöste Werte aufzeichnen
+#    (threshold 2, secret_scan false), aber es darf daraus KEIN
+#    Verhalten folgen.
+# 3. Allowlist: mode "off"; eligible_roles [] (off fltert nie —
+#    resolve_auto_commit_config füllt eligible_roles nur bei
+#    mode != "off"); triggers []; custom_script null.
+# 4. AUTO_COMMIT_BLOCK NIRGENDS gerendert ({{#if AUTO_COMMIT_ENABLED}}
+#    stript bei enabled=false): weder in .claude/ noch .gemini/ noch
+#    .opencode/ Agent-Dateien.
+# 5. Byte-Identität: der Sync-Output (alles außer .meta-config- und
+#    sync.log-Buchhaltung) muss identisch sein zu einem Sync ohne
+#    auto_commit-Key (Assert-File fährt den Vergleichs-Sync selbst).
+# =====================================================================
