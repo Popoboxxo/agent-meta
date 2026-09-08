@@ -36,7 +36,7 @@
 - Consumes: nothing new.
 - Produces: the `auto_commit` config shape every later task reads via `config.get("auto_commit", {})`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
   Create `tests/test_auto_commit_schema.py`:
 
@@ -110,14 +110,14 @@
           )
   ```
 
-- [ ] **Step 2: Run test, verify it fails**
+- [x] **Step 2: Run test, verify it fails**
 
   ```
   python3 -m pytest tests/test_auto_commit_schema.py -q
   ```
   Expected failure: `test_mode_off_is_valid_minimal` fails with a jsonschema `ValidationError` about `additionalProperties` — `auto_commit` doesn't exist in the schema yet.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
   In `config/project-config.schema.json`, add a new top-level property (alphabetical position, next to `admin-ui`/`allow-committed-secrets`):
 
@@ -184,13 +184,13 @@
   #   secret_scan: true
   ```
 
-- [ ] **Step 4: Run test, verify it passes**
+- [x] **Step 4: Run test, verify it passes**
 
   ```
   python3 -m pytest tests/test_auto_commit_schema.py -q
   ```
 
-- [ ] **Step 5: Regression-check schema validation end to end**
+- [x] **Step 5: Regression-check schema validation end to end**
 
   There is no single generic "whole schema" test file in this repo —
   per-feature schema tests live in their own file (e.g. `test_readme_schema.py`
@@ -202,7 +202,7 @@
   python3 scripts/sync.py --validate
   ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
   ```bash
   git add config/project-config.schema.json templates/configs/project.yaml.example tests/test_auto_commit_schema.py
@@ -221,7 +221,7 @@
 - Consumes: `parse_frontmatter_file(path: Path) -> dict` (`scripts/lib/frontmatter.py`, already existing — returns a dict including a `tools` key when the frontmatter has one), `resolve_role_template_path()`-equivalent lookup (see Step 3 — this task resolves each active role's template path the same way `agent_sync.py` already does, via `config/role-defaults.yaml` + `agents/1-generic/<role>.md`, falling back to `2-platform` overrides when a platform is active).
 - Produces: `is_role_eligible(role: str, agent_meta_root: Path, platform: str | None) -> bool`, `resolve_auto_commit_config(config: dict, active_roles: list[str], agent_meta_root: Path, platform: str | None = None) -> dict` (returns the exact allowlist shape from the spec: `{"version": 1, "mode": ..., "eligible_roles": [...], "triggers": [...], "secret_scan": ...}`), consumed by Task 6 (sync pipeline wiring).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
   Create `tests/test_auto_commit_lib.py`:
 
@@ -302,14 +302,14 @@
       assert result["eligible_roles"] == []
   ```
 
-- [ ] **Step 2: Run test, verify it fails**
+- [x] **Step 2: Run test, verify it fails**
 
   ```
   python3 -m pytest tests/test_auto_commit_lib.py -q
   ```
   Expected failure: `ModuleNotFoundError: No module named 'lib.auto_commit'`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
   Create `scripts/lib/auto_commit.py`:
 
@@ -386,13 +386,13 @@
       }
   ```
 
-- [ ] **Step 4: Run test, verify it passes**
+- [x] **Step 4: Run test, verify it passes**
 
   ```
   python3 -m pytest tests/test_auto_commit_lib.py -q
   ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
   ```bash
   git add scripts/lib/auto_commit.py tests/test_auto_commit_lib.py
@@ -414,7 +414,7 @@
 - Consumes: `resolve_auto_commit_config()` from Task 2.
 - Produces: `render_auto_commit_block(auto_commit_resolved: dict) -> str`; `variables["AUTO_COMMIT_ENABLED"]` ("true"/"false" string, `{{#if}}`-gate) and `variables["AUTO_COMMIT_BLOCK"]` (rendered prose), consumed by Tasks 4-5.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
   Create `tests/test_auto_commit_block_render.py`:
 
@@ -473,14 +473,14 @@
           assert "git tag" not in block
   ```
 
-- [ ] **Step 2: Run test, verify it fails**
+- [x] **Step 2: Run test, verify it fails**
 
   ```
   python3 -m pytest tests/test_auto_commit_block_render.py -q
   ```
   Expected failure: `ImportError: cannot import name 'render_auto_commit_block'`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
   Append to `scripts/lib/auto_commit.py`:
 
@@ -596,20 +596,20 @@
   - Add `"AUTO_COMMIT_ENABLED": "false"` to `_CONDITIONAL_FALSE_FLAGS` (line ~104) — same dict `README_WARNINGS_ENABLED` is already in; gates the `{{#if}}` block off by default for standalone rendering.
   - Add `"AUTO_COMMIT_BLOCK": ""` to `_ORCHESTRATION_FALLBACKS` (line ~78) — same dict `SE_MODE_BLOCK`/`CHECKPOINTING_BLOCK`/`QUALITY_PIPELINES_BLOCK` already use an empty-string fallback in, because (like those three, and unlike `STATUS_TABLE_BLOCK`) `AUTO_COMMIT_BLOCK` is NEVER referenced unconditionally by any template — only inside `{{#if AUTO_COMMIT_ENABLED}}` — so an empty string is the correct, harmless fallback rather than real rendered content.
 
-- [ ] **Step 4: Run test, verify it passes**
+- [x] **Step 4: Run test, verify it passes**
 
   ```
   python3 -m pytest tests/test_auto_commit_block_render.py -q
   ```
 
-- [ ] **Step 5: Regression-check variable-building and standalone rendering**
+- [x] **Step 5: Regression-check variable-building and standalone rendering**
 
   ```
   python3 -m pytest tests/test_build_variables_decomposition.py tests/test_config_variable_fallbacks.py -q
   python3 scripts/sync.py --validate
   ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
   ```bash
   git add scripts/lib/auto_commit.py scripts/lib/config.py scripts/lib/consistency/placeholders.py scripts/lib/standalone.py tests/test_auto_commit_block_render.py
@@ -628,7 +628,7 @@
 - Consumes: `{{AUTO_COMMIT_ENABLED}}` / `{{AUTO_COMMIT_BLOCK}}` from Task 3.
 - Produces: the exact append pattern Task 5's bulk-rollout script replicates across the remaining 56 templates.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
   Create `tests/test_auto_commit_developer_reference.py`:
 
@@ -654,14 +654,14 @@
       assert content.rindex("{{#if AUTO_COMMIT_ENABLED}}") > content.rindex("<output-guard>")
   ```
 
-- [ ] **Step 2: Run test, verify it fails**
+- [x] **Step 2: Run test, verify it fails**
 
   ```
   python3 -m pytest tests/test_auto_commit_developer_reference.py -q
   ```
   Expected failure: `{{#if AUTO_COMMIT_ENABLED}}` not found in content.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
   Bump `agents/1-generic/developer.md`'s frontmatter `version:` from its current value to the next minor (e.g. `"4.4.0"` → `"4.5.0"` — read the file first to confirm its exact current version before editing, per this repo's convention of never guessing a version number).
 
@@ -674,13 +674,13 @@
   {{/if}}
   ```
 
-- [ ] **Step 4: Run test, verify it passes**
+- [x] **Step 4: Run test, verify it passes**
 
   ```
   python3 -m pytest tests/test_auto_commit_developer_reference.py -q
   ```
 
-- [ ] **Step 5: Re-sync and manually verify rendering in both directions**
+- [x] **Step 5: Re-sync and manually verify rendering in both directions**
 
   ```
   python scripts/sync.py
@@ -689,7 +689,7 @@
 
   Then temporarily set `auto_commit: {mode: auto, triggers: [task-boundary]}` in a throwaway copy of `.meta-config/project.yaml` (do NOT commit this test edit) and re-run `python scripts/sync.py` to confirm `.claude/agents/developer.md` now shows the rendered prose with no leftover `{{...}}`. Revert the throwaway config change and re-sync once more before continuing.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
   ```bash
   git add agents/1-generic/developer.md tests/test_auto_commit_developer_reference.py
@@ -709,7 +709,7 @@
 - Consumes: the exact append pattern from Task 4.
 - Produces: 100% coverage of write-capable `1-generic` templates, verified by the new coverage test — later tasks (hook, scenario) depend on this being complete, not partial.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
   Create `tests/test_auto_commit_coverage.py`:
 
@@ -768,14 +768,14 @@
       ).read_text(encoding="utf-8")
   ```
 
-- [ ] **Step 2: Run test, verify it fails**
+- [x] **Step 2: Run test, verify it fails**
 
   ```
   python3 -m pytest tests/test_auto_commit_coverage.py -q
   ```
   Expected failure: `test_every_eligible_template_references_the_block` lists ~56 missing files (every eligible template except `developer.md`).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
   Create `scripts/_migrations/2026-09-08-inject-auto-commit-block.py`:
 
@@ -859,13 +859,13 @@
   python3 scripts/_migrations/2026-09-08-inject-auto-commit-block.py
   ```
 
-- [ ] **Step 4: Run test, verify it passes**
+- [x] **Step 4: Run test, verify it passes**
 
   ```
   python3 -m pytest tests/test_auto_commit_coverage.py -q
   ```
 
-- [ ] **Step 5: Regression-check the whole template set**
+- [x] **Step 5: Regression-check the whole template set**
 
   ```
   python3 scripts/consistency-check.py --changed
@@ -876,7 +876,7 @@
 
   If `consistency-check.py` flags any template for a malformed version bump (e.g. a file whose `version:` line didn't match the expected pattern), fix that one file's version manually and re-run — do not weaken the migration script's regex to silently accept a malformed match.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
   ```bash
   git add agents/1-generic/*.md scripts/_migrations/2026-09-08-inject-auto-commit-block.py tests/test_auto_commit_coverage.py
@@ -896,7 +896,7 @@
 - Consumes: `resolve_auto_commit_config()` from Task 2.
 - Produces: `.meta-config/auto-commit-allowlist.json` on disk after every `sync.py` run, consumed by Task 7's hook change.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
   Create `tests/test_auto_commit_allowlist_pipeline.py`:
 
@@ -960,14 +960,14 @@
       assert data["eligible_roles"] == []
   ```
 
-- [ ] **Step 2: Run test, verify it fails**
+- [x] **Step 2: Run test, verify it fails**
 
   ```
   python3 -m pytest tests/test_auto_commit_allowlist_pipeline.py -q
   ```
   Expected failure: `assert allowlist_path.exists()` is False.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
   In `scripts/lib/sync_pipeline.py`, add a new stage function near
   `_sync_stage_generated_file_hash_capture` (line ~722), matching its exact
@@ -1009,13 +1009,13 @@
                                         config, ctx.args, ctx.log)
   ```
 
-- [ ] **Step 4: Run test, verify it passes**
+- [x] **Step 4: Run test, verify it passes**
 
   ```
   python3 -m pytest tests/test_auto_commit_allowlist_pipeline.py -q
   ```
 
-- [ ] **Step 5: Regression-check the drift-detection interaction**
+- [x] **Step 5: Regression-check the drift-detection interaction**
 
   The new allowlist file must itself be covered by generated-file drift
   detection consistently (it's a generated artifact like
@@ -1030,7 +1030,7 @@
   python3 -m pytest tests/test_generated_file_drift.py -q
   ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
   ```bash
   git add scripts/lib/sync_pipeline.py scripts/lib/cli_commands.py tests/test_auto_commit_allowlist_pipeline.py
@@ -1049,7 +1049,7 @@
 - Consumes: `.meta-config/auto-commit-allowlist.json` from Task 6 (read at hook-execution time, not sync time).
 - Produces: git-mutation-gate authorization for any role in `eligible_roles`, in addition to the existing hardcoded `git`/`orchestrator`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
   Append to `tests/test_orchestrator_guard_hook.py`, reusing the file's own
   `_run_hook(payload: dict)` and `_bash_payload(command: str) -> dict`
@@ -1135,14 +1135,14 @@
       assert result.returncode == 2, f"stderr={result.stderr}"
   ```
 
-- [ ] **Step 2: Run test, verify it fails**
+- [x] **Step 2: Run test, verify it fails**
 
   ```
   python3 -m pytest tests/test_orchestrator_guard_hook.py -k auto_commit -v
   ```
   Expected failure: `test_allowlisted_role_can_commit_when_auto_commit_enabled` fails with exit code 2 (blocked) — the hook doesn't know about the allowlist yet.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
   In `hooks/1-generic/orchestrator-guard-impl.sh`, extend the sentinel
   block (currently, per the file's own comments, at the `case "$_ROLE" in
@@ -1234,20 +1234,20 @@
   Bump the version comment at the top of the file:
   `# version: 1.1.0` → `# version: 1.2.0`.
 
-- [ ] **Step 4: Run test, verify it passes**
+- [x] **Step 4: Run test, verify it passes**
 
   ```
   python3 -m pytest tests/test_orchestrator_guard_hook.py -q
   ```
 
-- [ ] **Step 5: Re-sync so provider copies of the hook pick up the change**
+- [x] **Step 5: Re-sync so provider copies of the hook pick up the change**
 
   ```
   python scripts/sync.py
   python3 scripts/sync.py --validate
   ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
   ```bash
   git add hooks/1-generic/orchestrator-guard-impl.sh tests/test_orchestrator_guard_hook.py
@@ -1267,7 +1267,7 @@
 - Consumes: `scan_for_secrets(content: str, config: dict | None = None) -> list[str]` (`scripts/lib/secrets.py`, already existing).
 - Produces: `sync.py --scan-staged` — exits 1 and prints findings if any staged file's diff content matches a secret pattern, exits 0 otherwise. This is what the `AUTO_COMMIT_BLOCK` prose (Task 3) instructs agents to run before an auto/custom commit.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
   Create `tests/test_scan_staged.py`:
 
@@ -1316,14 +1316,14 @@
       assert "config.py" in result.stdout or "config.py" in result.stderr
   ```
 
-- [ ] **Step 2: Run test, verify it fails**
+- [x] **Step 2: Run test, verify it fails**
 
   ```
   python3 -m pytest tests/test_scan_staged.py -q
   ```
   Expected failure: `error: unrecognized arguments: --scan-staged`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
   In `scripts/sync.py`'s argument parser, add:
 
@@ -1377,13 +1377,13 @@
   `cli_commands.handle_scan_staged()` and `sys.exit()` with its return
   value, before any other sync logic runs.
 
-- [ ] **Step 4: Run test, verify it passes**
+- [x] **Step 4: Run test, verify it passes**
 
   ```
   python3 -m pytest tests/test_scan_staged.py -q
   ```
 
-- [ ] **Step 5: Regression-check the CLI arg surface**
+- [x] **Step 5: Regression-check the CLI arg surface**
 
   There is no single generic CLI-argument regression file in this repo
   (`tests/test_sync_test_plugin_cli.py` is the closest analog, specific to
@@ -1396,7 +1396,7 @@
   python3 -m pytest tests/test_scan_staged.py -q
   ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
   ```bash
   git add scripts/sync.py scripts/lib/cli_commands.py tests/test_scan_staged.py
@@ -1415,7 +1415,7 @@
 - Consumes: everything from Tasks 1-7.
 - Produces: a regression-tested consumer-project shape exercising `auto_commit`, per this repo's own scenario-catalog convention (`rules/2-platform/agent-meta-conventions.md` → Change Checklist).
 
-- [ ] **Step 1: Create the scenario config**
+- [x] **Step 1: Create the scenario config**
 
   Create `tests/scenarios/configs/18-auto-commit.project.yaml`:
 
@@ -1456,7 +1456,7 @@
   allow-committed-secrets: false
   ```
 
-- [ ] **Step 2: Add the registry row**
+- [x] **Step 2: Add the registry row**
 
   In `tests/scenarios/registry.md`'s catalog table, add:
 
@@ -1464,7 +1464,7 @@
   | `18-auto-commit` | Claude, Gemini | strict (default) | Auto-commit tiers: role eligibility, AUTO_COMMIT_BLOCK rendering, allowlist generation (#694) |
   ```
 
-- [ ] **Step 3: Run the scenario and verify manually**
+- [x] **Step 3: Run the scenario and verify manually**
 
   ```
   tests/scenarios/run.sh 18
@@ -1475,7 +1475,7 @@
   - `.meta-config/auto-commit-allowlist.json` lists `developer` and `tester`, not `orchestrator`/`git`.
   - `.claude/agents/developer.md` and `.gemini/agents/developer.md` both show the rendered `AUTO_COMMIT_BLOCK` prose with no leftover `{{...}}`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
   ```bash
   git add tests/scenarios/configs/18-auto-commit.project.yaml tests/scenarios/registry.md
@@ -1491,14 +1491,14 @@
 - Modify: `README.md` (new subsection under Configuration, matching the existing `.gitignore Management` / `README Structure Standard` subsections' style)
 - No new tests (validates the sum of Tasks 1-9).
 
-- [ ] **Step 1: Run the full test suite**
+- [x] **Step 1: Run the full test suite**
 
   ```
   python3 -m pytest tests/ -o consider_namespace_packages=true -q
   ```
   Verify: 0 new failures (the pre-existing network-dependent model-discovery test and socket-blocked browser tests are known, unrelated — confirm the count matches the baseline from before this plan started, do not chase those).
 
-- [ ] **Step 2: Run the sync validator and re-sync this repo's own generated files**
+- [x] **Step 2: Run the sync validator and re-sync this repo's own generated files**
 
   ```
   python3 scripts/sync.py --validate
@@ -1507,7 +1507,7 @@
   ```
   Verify: `--validate` reports no new errors/warnings; `git status --short` shows only the expected regenerated files plus this task's own doc edits.
 
-- [ ] **Step 3: Write the CHANGELOG entry**
+- [x] **Step 3: Write the CHANGELOG entry**
 
   In `CHANGELOG.md`, under `## [Unreleased]` → `### Added`, prepend:
 
@@ -1531,7 +1531,7 @@
     auto/custom commit.
   ```
 
-- [ ] **Step 4: Update README.md**
+- [x] **Step 4: Update README.md**
 
   Add a new subsection under the existing `## Configuration` section (after
   the `### Orchestrator Modes` subsection, matching that subsection's
@@ -1541,7 +1541,7 @@
   existing `.gitignore Management` subsection `documenter` added in the
   prior release (read it first for the exact style to match).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
   ```bash
   git add CHANGELOG.md README.md
