@@ -24,6 +24,13 @@ def _resolve_secrets(text: str, secrets: dict) -> str:
     return _SECRET_RE.sub(lambda m: str(secrets.get(m.group(1), m.group(0))), text)
 
 
+def _has_unresolved_placeholder(text: str) -> bool:
+    """True if `text` still contains a `{{VAR}}` placeholder after secret
+    resolution — i.e. the project has no value for it (issue #693: this is a
+    per-project setup gap, not a broken plugin)."""
+    return bool(_SECRET_RE.search(text))
+
+
 def _read_line_with_timeout(stream, timeout: float) -> str | None:
     """Read one line from stream with bounded timeout. Returns the line,
     or None on timeout. Uses a daemon thread to avoid select() limitations
@@ -103,7 +110,14 @@ def _result(status: str, message: str, started: float) -> dict:
 
 
 def run_plugin_test(plugin_id: str, plugin_def: dict, secrets: dict | None = None) -> dict:
-    """Test one plugin's reachability. status in {PASS, FAIL, UNKNOWN}."""
+    """Test one plugin's reachability. status in {PASS, FAIL, UNAVAILABLE, UNKNOWN}.
+
+    UNAVAILABLE (issue #693) marks a per-project/per-machine setup gap that is
+    not a plugin bug: a local binary/command not installed on this machine, or
+    a remote-saas plugin missing the secrets needed to build its URL. The
+    admin UI shows these as "Experimental / nicht konfiguriert" instead of a
+    scary FAIL. A real reachability/protocol failure still reports FAIL.
+    """
     secrets = secrets or {}
     started = time.monotonic()
     origin = plugin_def.get("origin-type")
@@ -112,18 +126,24 @@ def run_plugin_test(plugin_id: str, plugin_def: dict, secrets: dict | None = Non
     if origin == "local-binary":
         binary = plugin_def.get("binary") or plugin_id
         if shutil.which(binary) is None:
-            return _result("FAIL", f"binary '{binary}' not found on PATH", started)
+            return _result("UNAVAILABLE", f"binary '{binary}' not installed locally", started)
         ok, msg = _run_version(binary)
         return _result("PASS" if ok else "FAIL", msg, started)
 
     if origin in ("local-process", "repo-owned-process"):
+        command = conn.get("command", "")
+        if command and shutil.which(command) is None:
+            return _result("UNAVAILABLE", f"command '{command}' not installed locally", started)
         env = {_resolve_secrets(k, secrets): _resolve_secrets(str(v), secrets)
                for k, v in (conn.get("env") or {}).items()}
-        ok, msg = _mcp_initialize_handshake(conn.get("command", ""), conn.get("args", []), env)
+        ok, msg = _mcp_initialize_handshake(command, conn.get("args", []), env)
         return _result("PASS" if ok else "FAIL", msg, started)
 
     if origin == "remote-saas":
-        url = _resolve_secrets(conn.get("url", ""), secrets)
+        raw_url = conn.get("url", "")
+        url = _resolve_secrets(raw_url, secrets)
+        if _has_unresolved_placeholder(url):
+            return _result("UNAVAILABLE", "missing secret(s) — not configured for this project", started)
         headers = {k: _resolve_secrets(str(v), secrets) for k, v in (conn.get("headers") or {}).items()}
         try:
             code, _ = _http_probe(url, headers)
