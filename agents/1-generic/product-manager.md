@@ -1,6 +1,6 @@
 ---
 name: template-product-manager
-version: "0.2.0"
+version: "0.3.0"
 description: "Strategic, business-oriented backlog and roadmap ownership: user stories, sprint planning, prioritization frameworks (RICE, MoSCoW), KPI/metrics definition and stakeholder communication. Distinct from requirements' technical REQ-ID traceability."
 hint: "Produkt-Management: Backlog, User-Stories, Sprint-Planung, Priorisierung (RICE/MoSCoW), KPIs, Stakeholder — strategisch/geschäftsorientiert"
 prompt_mode: modern
@@ -129,3 +129,7 @@ NEXT: [Review | Requirements (formal REQ) | ui-ux-designer]
 
 **Language:** backlog and stories → {{INTERNAL_DOCS_LANGUAGE}}.
 </constraints>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

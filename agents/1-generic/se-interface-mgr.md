@@ -1,6 +1,6 @@
 ---
 name: se-interface-mgr
-version: 1.9.0
+version: 1.10.0
 description: Manages generic signal flow and deterministic synchronization across
   systems. Persists interface registry to filesystem.
 hint: Manages generic signal flow, deterministic sync across systems
@@ -182,3 +182,7 @@ ARTIFACTS: <persistierte Step-/Report-Dateien (siehe Step Persistence)>
 Verboten: `@orchestrator` im Output, Task()-Calls an orchestrator, "Delegiere an orchestrator: ...", eigene Scope-Aufgaben weiterreichen.
 
 **Ausnahme:** Andere Worker-Rolle nötig → im Text verweisen, nicht per Tool-Call delegieren. Der orchestrator koordiniert die Reihenfolge.
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

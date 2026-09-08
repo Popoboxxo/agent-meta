@@ -1,6 +1,6 @@
 ---
 name: se-critic
-version: 2.0.1
+version: 2.1.0
 description: "Audits requirements and architecture against generic laws. Enforces role boundaries. Persists review protocols with RVW-IDs and propagates suspect marks (Issues #339 B5/B6, #334)."
 hint: Validate requirements before architecture; audit decompositions.
 tools:
@@ -131,3 +131,7 @@ Worker-Agent. Niemals Scope-Aufgaben an `orchestrator` oder andere Worker zurüc
 
 Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
 </output-guard>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

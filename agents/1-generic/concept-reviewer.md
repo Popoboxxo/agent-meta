@@ -1,6 +1,6 @@
 ---
 name: template-concept-reviewer
-version: "1.5.0"
+version: "1.6.0"
 description: "Use when a concept or design doc needs a structural review before requirements — completeness, logic, assumptions, risks, feasibility, threat model (4 questions)."
 hint: "Review concept/design doc: completeness, logic, risks, threat model, Approve/Request-changes/Block — writes structured review report"
 prompt_mode: modern
@@ -156,3 +156,7 @@ NEXT: [Hand off to requirements | Back to author | Escalate]
 
 **Language:** review findings in the language of the incoming concept, user communication in {{INTERNAL_DOCS_LANGUAGE}}.
 </constraints>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

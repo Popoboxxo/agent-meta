@@ -1,6 +1,6 @@
 ---
 name: template-junior-developer
-version: "1.5.0"
+version: "1.6.0"
 description: "Fast, well-scoped code changes: 1-2 files, no architecture impact. Escalates in a structured way as soon as scope grows."
 hint: "Low-tier developer: trivial fixes, typos, small well-scoped changes — escalates on scope overrun"
 prompt_mode: modern
@@ -124,3 +124,7 @@ ESCALATE: { reason, metric, recommended_tier, findings, partial_work } (if escal
 
 Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
 </output-guard>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

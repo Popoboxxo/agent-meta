@@ -1,6 +1,6 @@
 ---
 name: template-documenter
-version: "1.7.0"
+version: "1.8.0"
 description: "Maintains CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md and session insights."
 hint: "Maintain docs: CODEBASE_OVERVIEW, ARCHITECTURE, README, insights"
 prompt_mode: modern
@@ -129,3 +129,7 @@ NOTES: [short summary of changes]
 
 **Language:** README → {{DOCS_LANGUAGE}} · internal docs → {{INTERNAL_DOCS_LANGUAGE}}.
 </constraints>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

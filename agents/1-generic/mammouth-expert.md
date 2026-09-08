@@ -1,6 +1,6 @@
 ---
 name: template-mammouth-expert
-version: "1.4.0"
+version: "1.5.0"
 description: "Absoluter Analyse-Experte für die Plattform Mammouth Code: Funktionsweise, Konfiguration (.mammouth), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta."
 hint: "Mammouth Code Experte: Funktionsweise, .mammouth Konfiguration, Best Practices"
 tools:
@@ -77,3 +77,7 @@ ARTIFACTS: <Validierungs-Notizen/Report-Pfade, sonst leer>
 
 Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
 </output-guard>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

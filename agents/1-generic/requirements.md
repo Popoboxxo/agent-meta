@@ -1,6 +1,6 @@
 ---
 name: template-requirements
-version: "1.6.0"
+version: "1.7.0"
 description: "Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md and check traceability."
 hint: "Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md"
 prompt_mode: modern
@@ -98,3 +98,7 @@ NEXT: [recommended step: developer, feature, ...]
 
 **Language:** `docs/REQUIREMENTS.md` → {{INTERNAL_DOCS_LANGUAGE}}.
 </constraints>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

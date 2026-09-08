@@ -1,6 +1,6 @@
 ---
 name: template-concept-specifier
-version: "1.0.0"
+version: "1.1.0"
 description: "Use when a concept or idea must become a technical specification: interface contracts, data flow, acceptance criteria — before implementation. Does not implement."
 hint: "Turn a concept into a technical specification: interface contracts, data flow, acceptance criteria — never implements"
 prompt_mode: modern
@@ -113,3 +113,7 @@ NEXT: [Review by concept-reviewer | Hand off to developer]
 
 **Language:** specification in project language, communication in {{COMMUNICATION_LANGUAGE}}.
 </constraints>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

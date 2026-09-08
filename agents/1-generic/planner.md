@@ -1,6 +1,6 @@
 ---
 name: template-planner
-version: "1.2.0"
+version: "1.3.0"
 description: "Use when a concept, REQ, or bug needs to be turned into a concrete, ordered implementation plan before work starts."
 hint: "Nutze planner wenn ein Konzept/REQ/Bug in konkrete, geordnete Umsetzungsschritte übersetzt werden muss."
 prompt_mode: modern
@@ -116,3 +116,7 @@ The synchronous tool-result channel truncates large responses **silently**
   write-out to a write-capable role (e.g., `senior-developer`) via the
   orchestrator instead of streaming it through this channel.
 </output-guard>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

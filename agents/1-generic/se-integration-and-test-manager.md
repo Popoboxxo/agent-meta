@@ -1,6 +1,6 @@
 ---
 name: se-integration-and-test-manager
-version: 2.0.0
+version: 2.1.0
 description: 'V&V-Orchestrator: Koordiniert Integrationsstrategie, Test-Ebenen und
   Traceability-Feedback über L1-Ln. Persists test plan and V&V report. Federt Implementierungs-Befunde
   bottom-up in die Kaskade zurück (Issue #339 B6).'
@@ -287,3 +287,7 @@ Communication and input language: see global rule `language.md`.
 - Integration plans → English
 - V&V reports → English
 - Coordination notes → English
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

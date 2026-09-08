@@ -1,6 +1,6 @@
 ---
 name: template-knowledge-querier
-version: "1.3.0"
+version: "1.4.0"
 description: "Fragen gegen das Knowledge Wiki beantworten. Index-First-Strategie, Drill-in, Synthese mit Citations. File-Back guter Antworten."
 hint: "Wiki-Fragen beantworten, Index-First, Synthese mit Citations"
 tools:
@@ -88,3 +88,7 @@ Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
 - Antworten → {{DOCS_LANGUAGE}}
 - File-Back Query-Result-Seiten → {{INTERNAL_DOCS_LANGUAGE}}
 - Commit-Messages → {{CODE_LANGUAGE}}
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

@@ -1,6 +1,6 @@
 ---
 name: template-technical-writer
-version: "0.2.0"
+version: "0.3.0"
 description: "External developer- and user-facing documentation: API references, getting-started guides, SDK docs, tutorials, CLI help pages, user-facing release notes and UX microcopy. Distinct from internal team docs owned by documenter."
 hint: "Externe Doku: API-Referenz, Getting-Started, SDK-Docs, Tutorials, CLI-Help, User-Release-Notes, Microcopy — für externe Entwickler und Endnutzer"
 prompt_mode: modern
@@ -112,3 +112,7 @@ NEXT: [Review | Developer change | Documenter (internal)]
 
 **Language:** external docs (README, API reference, release notes) → {{DOCS_LANGUAGE}}.
 </constraints>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

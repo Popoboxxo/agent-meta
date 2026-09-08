@@ -1,6 +1,6 @@
 ---
 name: se-architect
-version: 2.0.1
+version: 2.1.0
 description: "Designs system architecture via functional decomposition. Processes arch_trigger flags. Owns ADRs (MADR-minimal standard, Issue #339 B1)."
 hint: Design L1 and L2 architectures from requirements.
 tools:
@@ -130,3 +130,7 @@ Worker-Agent. Niemals Scope-Aufgaben an `orchestrator` oder andere Worker zurüc
 
 Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
 </output-guard>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

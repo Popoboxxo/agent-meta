@@ -1,6 +1,6 @@
 ---
 name: template-database-engineer
-version: "1.2.0"
+version: "1.3.0"
 description: "Relational schema design, database migrations, query optimization and index strategy. Produces backwards-compatible migration scripts with rollback paths and hands a schema contract to the developer."
 hint: "Database design: schema, migrations (Alembic/Flyway style), query optimization, index strategy — hands a schema contract to developer"
 prompt_mode: modern
@@ -144,3 +144,7 @@ NEXT: [Review | Developer implementation | Tests]
 
 Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
 </output-guard>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

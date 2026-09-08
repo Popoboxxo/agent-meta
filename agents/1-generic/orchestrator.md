@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "7.15.0"
+version: "7.16.0"
 description: "Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes, delegates."
 hint: "Entry point for ALL development tasks — decomposes complex tasks and dispatches in parallel"
 prompt_mode: modern
@@ -275,3 +275,7 @@ Verbotene `subagent_type`-Werte beim Dispatchen: `orchestrator`, `orchestrator-i
 
 **Language:** Documents → {{DOCS_LANGUAGE}} | details: Rule `language.md`
 </constraints>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

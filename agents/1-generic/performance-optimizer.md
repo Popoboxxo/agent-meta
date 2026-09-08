@@ -1,6 +1,6 @@
 ---
 name: template-performance-optimizer
-version: "1.5.0"
+version: "1.6.0"
 description: "Data-driven identification and resolution of Big-O bottlenecks using profiling data, without functional changes."
 hint: "Use this agent for performance analysis, Big-O optimization, and bottleneck elimination."
 prompt_mode: modern
@@ -164,3 +164,7 @@ NEXT: [Commit | More optimization | Blocked]
 
 Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
 </output-guard>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

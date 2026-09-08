@@ -4,7 +4,7 @@
 # extend it via `based-on: "1-generic/provider-expert.md@<version>"` in
 # agents/2-platform/. No routing/intent_keywords of its own.
 name: template-provider-expert
-version: "1.4.0"
+version: "1.5.0"
 description: "Absolute analysis expert for an AI provider: how it works, configuration, best practices for optimally adapting agent-meta."
 hint: "Provider expert: how it works, configuration, best practices for optimal agent-meta adaptation"
 prompt_mode: modern
@@ -112,3 +112,7 @@ ARTIFACTS: <persisted analysis path, empty if returned inline>
 
 Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
 </output-guard>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

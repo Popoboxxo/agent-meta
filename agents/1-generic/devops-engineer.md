@@ -1,6 +1,6 @@
 ---
 name: template-devops-engineer
-version: "1.5.0"
+version: "1.6.0"
 description: "CI/CD pipelines, Infrastructure as Code, container orchestration, observability, security best practices, staging validation, MTTG (commit-to-security-feedback) tracking, and environment classification."
 hint: "Use this agent for CI/CD, IaC, Kubernetes, monitoring, and infrastructure tasks."
 prompt_mode: modern
@@ -200,3 +200,7 @@ docker rm "$NAME"
 echo "container exit code: $RC" && tail -20 /tmp/"$NAME".log
 ```
 </output-guard>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

@@ -1,6 +1,6 @@
 ---
 name: template-ideation
-version: "1.11.0"
+version: "1.12.0"
 description: "Use when an idea needs scoping and thoughts need sorting before a concept or REQ exists."
 hint: "Nutze ideation zum Scopen einer rohen Idee, bevor ein Konzept oder REQ existiert."
 prompt_mode: modern
@@ -146,3 +146,7 @@ On confirmation: A2A envelope to `requirements` (or `concept-reviewer` for a rev
 
 **Language:** communication → {{COMMUNICATION_LANGUAGE}}. Concept docs → project language.
 </constraints>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

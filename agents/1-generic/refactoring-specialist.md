@@ -1,6 +1,6 @@
 ---
 name: template-refactoring-specialist
-version: "0.3.0"
+version: "0.4.0"
 description: "Systematic large-scale code transformation with safety nets: Strangler Fig pattern, incremental refactoring, code smell detection, legacy modernization and feature-flag-driven rewrites with backwards-compatibility guarantees. Produces refactoring plan, transformation sequence, rollback strategy and compatibility matrix."
 hint: "Systematische Transformation: Strangler Fig, inkrementelles Refactoring, Legacy-Modernisierung, Feature-Flag-Rewrites — braucht exklusiven Zugriff auf betroffene Module"
 prompt_mode: modern
@@ -150,3 +150,7 @@ NEXT: [Review | Developer feature work | Documenter]
 
 Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
 </output-guard>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

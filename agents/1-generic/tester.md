@@ -1,6 +1,6 @@
 ---
 name: template-tester
-version: "2.5.0"
+version: "2.6.0"
 description: "Isolated unit tests with mocks/stubs following a TDD workflow. For integration tests → se-test-engineer."
 hint: "Write tests (TDD), run the test suite, ensure coverage"
 prompt_mode: modern
@@ -143,3 +143,7 @@ docker rm "$NAME"
 echo "container exit code: $RC" && tail -20 /tmp/"$NAME".log
 ```
 </output-guard>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

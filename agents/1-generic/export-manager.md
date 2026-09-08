@@ -1,6 +1,6 @@
 ---
 name: template-export-manager
-version: "1.4.0"
+version: "1.5.0"
 description: "Reads .meta-config/export.yaml and routes structured JSON payloads from specialist agents to the configured target (markdown, confluence, jira-xray, etc.)."
 hint: "Use this agent for export routing of structured data to configured targets."
 prompt_mode: modern
@@ -136,3 +136,7 @@ WARNINGS: [if any]
 
 Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
 </output-guard>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}
