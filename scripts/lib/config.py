@@ -142,8 +142,24 @@ def load_config(config_path: Path) -> dict:
             )
             sys.exit(1)
 
+    _normalize_auto_commit_mode(config)
     _validate_config(config, config_path)
     return config
+
+
+def _normalize_auto_commit_mode(config: dict) -> None:
+    """Issue #699: an unquoted YAML/JSON `mode: off` (or no/false/on/yes/true)
+    under auto_commit parses as a Python bool, not the string mode name --
+    `False != "off"` then reads as "enabled" everywhere downstream (config.py's
+    AUTO_COMMIT_ENABLED, auto_commit.py's resolve_auto_commit_config, the JSON
+    allowlist the bash guard hook trusts). Canonicalize in place right after
+    parsing -- the single funnel every consumer reads from -- so a stray bool
+    always normalizes to "off" (safe-side default, same convention as
+    COMPACT_MODE below: commit authority must be explicitly opted in with a
+    quoted mode name, never inferred from a YAML boolean)."""
+    ac_cfg = config.get("auto_commit")
+    if isinstance(ac_cfg, dict) and isinstance(ac_cfg.get("mode"), bool):
+        ac_cfg["mode"] = "off"
 
 
 def _validate_config(config: dict, config_path: Path) -> None:
