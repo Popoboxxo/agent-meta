@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+### Added
+- **Auto-commit tiers (#694)**: opt-in `auto_commit` config (`off`/`suggest`/
+  `auto`/`custom`) lets write-capable agents commit directly instead of always
+  delegating to the `git` role. `suggest` has agents propose a commit message
+  in their own report (never blocking, never running git itself); `auto`
+  commits when any of 5 selectable trigger conditions fires
+  (`task-boundary`, `per-edit`, `context-pressure`, `file-count-threshold`,
+  `custom`); `custom` hands the entire decision to a project script. Role
+  eligibility is capability-derived (Edit/Write in a role's own template
+  `tools:`, never a hand-maintained list). Enforced two ways: prompt
+  instructions on all 9 providers, plus hook authorization
+  (`orchestrator-guard-impl.sh` v1.2.0) on the 4 providers with PreToolUse
+  hook support (Claude, Gemini, Mammouth, Codex) via a generated
+  `.meta-config/auto-commit-allowlist.json`. `push`/`tag`/branch management
+  remain exclusively the `git` role's job; the destructive-operation gate
+  (issue #516) is completely unaffected. Optional secret scan
+  (`sync.py --scan-staged`, `secret_scan: true` default) gates every
+  auto/custom commit.
+
 ## [0.101.0-beta.6] — 2026-09-07
 
 ### Added

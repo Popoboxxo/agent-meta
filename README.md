@@ -840,6 +840,42 @@ orchestrator:
 Providers without an entry (or without `mode` set) inherit the global `orchestrator.mode`.
 Configurable via the Admin UI under Orchestrator → Provider Overrides.
 
+### Auto-Commit Tiers (issue #694)
+
+Opt-in `auto_commit` config lets write-capable agents commit directly instead of always delegating to the `git` role:
+
+| Mode | Description |
+|------|-------------|
+| `off` | Default. Agents never commit; every commit goes through the `git` role as before. |
+| `suggest` | Agent proposes a commit message in its own report — never blocks, never runs git itself. |
+| `auto` | Agent commits automatically when any selected trigger condition fires. |
+| `custom` | The commit decision is fully delegated to a project-provided script. |
+
+5 selectable trigger conditions for `auto` mode:
+
+| Trigger | Fires when |
+|---------|-----------|
+| `task-boundary` | The agent's current task/subtask completes |
+| `per-edit` | Immediately after each Edit/Write tool call |
+| `context-pressure` | Context window utilization crosses a threshold |
+| `file-count-threshold` | Staged changes exceed a configured file count |
+| `custom` | A project script decides |
+
+Set in `.meta-config/project.yaml`:
+```yaml
+auto_commit:
+  mode: auto
+  triggers: [task-boundary, file-count-threshold]
+  file-count-threshold: 5
+  secret_scan: true              # default; gates every auto/custom commit
+```
+
+**Eligibility is capability-derived, not a hand-maintained list:** any role whose own template declares `Edit` or `Write` in its `tools:` frontmatter is commit-eligible — adding those tools to a role's template is enough, no separate opt-in list to keep in sync.
+
+**Enforcement is two-layered:** prompt instructions render on all 9 providers; hook authorization (`orchestrator-guard-impl.sh`) additionally checks a generated `.meta-config/auto-commit-allowlist.json` on the 4 providers with PreToolUse hook support (Claude, Gemini, Mammouth, Codex).
+
+**Push/tag/branch management stay exclusively the `git` role's job** — `auto_commit` only ever authorizes `git commit`, never `push`, `tag`, or branch mutations; the destructive-operation gate (issue #516) is unaffected.
+
 ### Synchronization Variables
 
 Custom project variables for conditional feature activation:
