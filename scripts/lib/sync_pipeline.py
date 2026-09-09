@@ -53,7 +53,7 @@ from lib.context import (
     sync_snippets_for_provider,
 )
 from lib.deactivation import is_provider_active
-from lib.dod import resolve_dod, resolve_release_gates
+from lib.dod import resolve_dod, resolve_dod_preset_name, resolve_release_gates
 from lib.external_tools import (
     generate_external_tool_artifacts,
     render_injection_drift_artifacts,
@@ -72,7 +72,7 @@ from lib.gitignore import (
 )
 from lib.hook_plugins import sync_hook_lib, sync_release_gates
 from lib.hooks import sync_hooks
-from lib.io import SyncError, write_atomic
+from lib.io import SyncError, _write_yaml, write_atomic
 from lib.isolation import sync_provider_isolation
 from lib.knowledge import sync_knowledge_engine
 from lib.log import SyncLog
@@ -83,7 +83,7 @@ from lib.pipelines import (
     resolve_pipeline_details_dir,
     sync_pipeline_detail_files,
 )
-from lib.platform import load_platform_config
+from lib.platform import PLATFORM_CONFIGS_DIR, load_platform_config, resolve_platform_defaults
 from lib.plugins import _probe_inactive_plugins
 from lib.providers import (
     load_providers_config,
@@ -135,7 +135,7 @@ def _sync_stage_config_and_presets(
     mode = "init" if args.init else "sync"
     log.note("providers", "active: " + ", ".join(providers))
     # Log resolved DoD
-    preset_name = config.get("dod-preset", "full") or "full"
+    preset_name = resolve_dod_preset_name(config, agent_meta_root)
     dod_resolved = resolve_dod(config, agent_meta_root)
     dod_summary = ", ".join(f"{k}: {v}" for k, v in dod_resolved.items())
     log.note("DoD", f"preset '{preset_name}' -> {dod_summary}")
@@ -154,6 +154,10 @@ def _sync_stage_config_and_presets(
     platform_vars = load_platform_config(agent_meta_root, project_root, platforms, log)
     if platform_vars is not None:
         log.note("platform-config", f"loaded {len(platform_vars)} platform variable(s) for: {', '.join(platforms)}")
+    # The resolved platform-preset snapshot (.meta-config/
+    # platform-defaults.resolved.yaml) is a hash-tracked generated file, so it
+    # is written LATER -- see _sync_stage_platform_defaults_snapshot(), which
+    # runs after the generated-file drift scan.
     return config, provider_config, providers, mode, platform_vars
 
 
@@ -345,6 +349,30 @@ def _sync_stage_generated_file_drift_scan(
             "sync will overwrite it. Add it to .meta-config/drift-allowlist.yaml "
             "if this edit should be preserved going forward."
         )
+
+
+def _sync_stage_platform_defaults_snapshot(
+    agent_meta_root: Path, project_root: Path, platforms: list,
+    args: argparse.Namespace, log: SyncLog,
+) -> None:
+    """Materialize .meta-config/platform-defaults.resolved.yaml -- the
+    human-visible resolved platform-preset snapshot (design spec Architektur
+    §4). Informational only, NOT part of the resolution path itself
+    (apply_platform_variable_cascade()/resolve_dod_preset_name()/
+    resolve_conventions() all call resolve_platform_defaults() directly).
+
+    MUST run AFTER _sync_stage_generated_file_drift_scan: this file is a
+    hash-tracked generated file (generated_file_drift.
+    PLATFORM_DEFAULTS_RESOLVED_REL), so writing it before the scan would
+    overwrite a manual edit before the scan could flag it -- the exact
+    invariant the drift scan documents.
+    """
+    if args.dry_run:
+        return
+    _write_yaml(
+        project_root / ".meta-config" / "platform-defaults.resolved.yaml",
+        resolve_platform_defaults(platforms, agent_meta_root / PLATFORM_CONFIGS_DIR, log=log),
+    )
 
 
 def _skill_channel_universe(

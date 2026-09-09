@@ -15,6 +15,7 @@ from pathlib import Path
 
 from .io import _deep_merge, _load_yaml_or_json
 from .log import SyncLog
+from .platform import PLATFORM_CONFIGS_DIR, resolve_platform_defaults, resolve_preset_name
 
 CONVENTIONS_PRESETS_CONFIG_YAML = "config/conventions-presets.yaml"
 
@@ -44,7 +45,9 @@ def resolve_conventions(config: dict, agent_meta_root: Path) -> dict:
 
     Precedence (highest to lowest):
       1. config["conventions"][domain][field]  — project override
-      2. conventions-preset[domain][field]     — preset default
+      2. conventions-preset[domain][field]     — preset default, itself
+         resolved as: project.yaml explicit `conventions-preset` >
+         platforms: cascade default > 'default'
       3. 'default' preset
 
     Deep-merges the project 'conventions' block over the selected preset,
@@ -56,7 +59,16 @@ def resolve_conventions(config: dict, agent_meta_root: Path) -> dict:
     this, surfaces it via log.warning, and continues with conventions skipped.
     """
     presets = load_conventions_presets(agent_meta_root)
-    preset_name = config.get("conventions-preset", "default") or "default"
+    platforms = config.get("platforms", [])
+    platform_defaults = resolve_platform_defaults(
+        platforms, agent_meta_root / PLATFORM_CONFIGS_DIR,
+    )
+    # Shared precedence with dod.py::resolve_dod_preset_name (explicit >
+    # platform cascade > fallback); honors an explicit `conventions-preset: ""`
+    # opt-out instead of the old `or` chain swallowing it.
+    preset_name = resolve_preset_name(
+        "conventions-preset", config, platform_defaults, "default",
+    )
 
     if preset_name not in presets and preset_name != "default":
         print(f"  !  Unknown conventions-preset '{preset_name}' — falling back to 'default'",

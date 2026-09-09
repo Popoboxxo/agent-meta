@@ -34,8 +34,9 @@ from .analysis import FileAffinityAnalyzer, analyze_project
 from .consistency.placeholders import _BUILTIN_VARS
 from .context_templates.builder import TemplateBuilder
 from .conventions import render_convention_block, resolve_conventions
+from .platform import apply_platform_variable_cascade
 from .delegation_table import get_active_agents_data, get_intent_routing_table
-from .dod import resolve_dod
+from .dod import resolve_dod, resolve_dod_preset_name
 from .providers import load_providers_config, resolve_providers
 from .reflection import (
     apply_project_overrides,
@@ -80,6 +81,14 @@ _CONFIG_FIELD_DESCRIPTIONS: dict = {
     "se-focus": "Systems Engineering mode: stricter validation, formal traceability",
     "max-parallel-agents": "Maximum number of parallel agent spawns (1-5)",
 }
+
+# Preset keys resolved through the platforms: cascade at runtime
+# (platform.resolve_preset_name via resolve_dod_preset_name/resolve_conventions).
+# fill_defaults() must NEVER persist these: writing the raw schema default
+# (dod-preset "full") into project.yaml on the first sync would shadow the
+# cascade on every later sync -- the resolver already has a clean runtime
+# fallback and needs no persisted value (PR #709 finding 1).
+_CASCADE_MANAGED_PRESET_KEYS = frozenset({"dod-preset", "conventions-preset"})
 
 # dod sub-fields with defaults (mirrors the "full" preset in dod-presets.config.yaml)
 _DOD_FIELD_DEFAULTS: dict = {
@@ -415,15 +424,21 @@ def fill_defaults(
     for field, default in effective_defaults.items():
         if "." in field:
             continue  # nested fields handled below
+        if field in _CASCADE_MANAGED_PRESET_KEYS:
+            continue  # resolved via platforms: cascade at runtime -- never persist
         if field not in config:
             config[field] = default
             desc = effective_descriptions.get(field, "")
             added.append((field, desc))
             changed = True
 
-    # --- Fill nested dod.* fields (schema-driven, only for "full"/"strict" preset) ---
-    active_preset = config.get("dod-preset", effective_defaults.get("dod-preset", "rapid-prototyping"))
-    if active_preset in ("full", "strict") or "dod-preset" not in config:
+    # --- Fill nested dod.* fields (schema-driven, only when the user EXPLICITLY
+    # picked a rigorous preset). An absent dod-preset now means "let the
+    # platforms: cascade / runtime fallback decide" -- materializing the "full"
+    # dod.* values then would re-freeze the resolved DoD via the `dod:` block,
+    # the same failure mode finding 1 fixes for the preset key itself. ---
+    active_preset = config.get("dod-preset")
+    if active_preset in ("full", "strict"):
         dod_block = config.get("dod", {})
         for field_path, (default, desc) in schema_defaults.items():
             if not field_path.startswith("dod."):
@@ -1003,7 +1018,7 @@ def _build_dod_variables(variables: dict, config: dict, agent_meta_root: Path) -
     variables["DOD_AI_SECURITY_REVIEW"] = "true" if dod_resolved.get("ai-security-review", False) else "false"
     variables["DOD_PROMPT_GOVERNANCE"] = "true" if dod_resolved.get("prompt-governance", False) else "false"
     variables["DOD_LIFECYCLE_OWNERSHIP"] = "true" if dod_resolved.get("lifecycle-ownership", False) else "false"
-    variables["DOD_PRESET"]           = config.get("dod-preset", "full")
+    variables["DOD_PRESET"]           = resolve_dod_preset_name(config, agent_meta_root)
     # SE-Required mode: derive boolean flags from the se-required string field
     se_required = str(dod_resolved.get("se-required", "false")).lower()
     variables["DOD_SE_REQUIRED"]    = se_required  # "false" | "recommended" | "true"
@@ -1299,5 +1314,6 @@ def build_variables(config: dict, agent_meta_root: Path, project_root: Path | No
     )
     _build_snippet_variables(variables, agent_meta_root)
     _build_convention_variables(variables, config, agent_meta_root)
+    apply_platform_variable_cascade(variables, config, config.get("platforms", []), agent_meta_root)
 
     return variables, unmapped

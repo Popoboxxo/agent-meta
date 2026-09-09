@@ -1,0 +1,29 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+platforms: []
+roles:
+- developer
+- tester
+permission-mode-overrides:
+  developer: acceptEdits
+project:
+  name: scenario-permission-mode-overrides
+  prefix: s35
+  short: permission-mode-overrides
+variables:
+  PROJECT_NAME: scenario-permission-mode-overrides
+  PROJECT_DESCRIPTION: Per-role permissionMode override test.
+  PROJECT_GOAL: Verify permission-mode-overrides injects permissionMode for one role and not for a role without a default.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-permission-mode-overrides
+  GIT_MAIN_BRANCH: main
+  DOCS_LANGUAGE: Deutsch
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false

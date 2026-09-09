@@ -1,0 +1,29 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+platforms:
+- sharkord
+roles:
+- orchestrator
+- tester
+- git
+project:
+  name: scenario-platform-sharkord-explicit-override
+  prefix: s23
+  short: platform-sharkord-override
+variables:
+  PROJECT_NAME: scenario-platform-sharkord-explicit-override
+  PROJECT_DESCRIPTION: Platform-defaults explicit-override test (sharkord).
+  PROJECT_GOAL: Verify an explicit project.yaml variables.TEST_COMMANDS (no '+') fully replaces sharkord's platform default, no concatenation.
+  TEST_COMMANDS: custom-sharkord-test-cmd
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-platform-sharkord-override
+  GIT_MAIN_BRANCH: main
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false

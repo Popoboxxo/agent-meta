@@ -1,0 +1,32 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+platforms: []
+roles:
+- orchestrator
+- developer
+- git
+dod-preset: rapid-prototyping
+dod:
+  req-traceability: true
+  security-audit: true
+project:
+  name: scenario-dod-custom-overrides
+  prefix: s38
+  short: dod-custom-overrides
+variables:
+  PROJECT_NAME: scenario-dod-custom-overrides
+  PROJECT_DESCRIPTION: DoD per-criterion override on top of a preset (rapid-prototyping + two flags flipped on).
+  PROJECT_GOAL: Verify the dod dict overrides individual criteria over the preset while untouched criteria keep preset values.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-dod-custom-overrides
+  GIT_MAIN_BRANCH: main
+  DOCS_LANGUAGE: Deutsch
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false

@@ -1,0 +1,27 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+platforms:
+- hacs
+roles:
+- orchestrator
+- git
+project:
+  name: scenario-platform-dod-preset-platform-fallback
+  prefix: s30
+  short: platform-dod-fallback
+variables:
+  PROJECT_NAME: scenario-platform-dod-preset-platform-fallback
+  PROJECT_DESCRIPTION: Platform-defaults dod-preset fallback test (hacs sets 'standard', project sets nothing).
+  PROJECT_GOAL: Verify hacs' platform-config dod-preset ('standard') wins over the old implicit 'full' default when project.yaml does not set dod-preset at all.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-platform-dod-fallback
+  GIT_MAIN_BRANCH: main
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false

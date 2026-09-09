@@ -1,0 +1,28 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+platforms:
+- hacs
+dod-preset: rapid-prototyping
+roles:
+- orchestrator
+- git
+project:
+  name: scenario-platform-dod-preset-explicit-override
+  prefix: s29
+  short: platform-dod-explicit
+variables:
+  PROJECT_NAME: scenario-platform-dod-preset-explicit-override
+  PROJECT_DESCRIPTION: Platform-defaults dod-preset explicit-override test (hacs sets 'standard', project sets 'rapid-prototyping').
+  PROJECT_GOAL: Verify project.yaml's explicit dod-preset wins over hacs' platform-config dod-preset.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-platform-dod-explicit
+  GIT_MAIN_BRANCH: main
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false

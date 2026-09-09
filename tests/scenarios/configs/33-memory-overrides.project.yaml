@@ -1,0 +1,32 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+platforms: []
+roles:
+- developer
+- tester
+- git
+memory:
+  default_scope: project
+memory-overrides:
+  developer: local
+project:
+  name: scenario-memory-overrides
+  prefix: s33
+  short: memory-overrides
+variables:
+  PROJECT_NAME: scenario-memory-overrides
+  PROJECT_DESCRIPTION: Memory global default + per-role override test.
+  PROJECT_GOAL: Verify memory-overrides wins for one role while others fall back to memory.default_scope.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-memory-overrides
+  GIT_MAIN_BRANCH: main
+  DOCS_LANGUAGE: Deutsch
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false

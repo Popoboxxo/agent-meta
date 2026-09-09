@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 from .io import _load_yaml_or_json
+from .platform import PLATFORM_CONFIGS_DIR, resolve_platform_defaults, resolve_preset_name
 
 DOD_PRESETS_CONFIG_YAML = "config/dod-presets.yaml"
 _DOD_PRESETS_CONFIG_LEGACY = "dod-presets.config.yaml"
@@ -25,16 +26,39 @@ def load_dod_presets(agent_meta_root: Path) -> dict:
             for k, v in presets.items() if not k.startswith("_")}
 
 
+def resolve_dod_preset_name(config: dict, agent_meta_root: Path) -> str:
+    """Resolve the effective dod-preset NAME (not its resolved field
+    values -- see resolve_dod() for that).
+
+    Precedence: project.yaml explicit `dod-preset` > platforms: cascade
+    default > "full". Shared by resolve_dod() (which resolves preset
+    VALUES from this name) and config.py's DOD_PRESET display variable, so
+    both stay consistent -- see this task's plan notes for why a single
+    shared function exists instead of duplicating the precedence.
+
+    Precedence itself is the shared platform.resolve_preset_name() (same
+    helper resolve_conventions() uses), so an explicit `dod-preset: ""`
+    opt-out is honored instead of being swallowed by the old `or` chain.
+    """
+    platforms = config.get("platforms", [])
+    platform_defaults = resolve_platform_defaults(
+        platforms, agent_meta_root / PLATFORM_CONFIGS_DIR,
+    )
+    return resolve_preset_name("dod-preset", config, platform_defaults, "full")
+
+
 def resolve_dod(config: dict, agent_meta_root: Path) -> dict:
     """Resolve effective DoD values from preset + overrides.
 
     Precedence (highest to lowest):
     1. Project override:  config["dod"][key]
     2. Preset default:    dod-presets.config.yaml[preset][key]
+       (preset itself resolved via resolve_dod_preset_name(): project
+       `dod-preset` > platforms: cascade default > "full")
     3. "full" preset:     fallback if preset not found
     """
     presets = load_dod_presets(agent_meta_root)
-    preset_name = config.get("dod-preset", "full") or "full"
+    preset_name = resolve_dod_preset_name(config, agent_meta_root)
 
     # Fallback to "full" preset when named preset not found
     if preset_name not in presets:
@@ -97,7 +121,9 @@ def resolve_release_gates(config: dict, agent_meta_root: Path) -> dict[str, bool
     script's own `enabled_by_default` header in that case.
     """
     presets = load_dod_presets(agent_meta_root)
-    preset_name = config.get("dod-preset", "full") or "full"
+    # Same preset name the rest of the DoD layer sees: honors the platforms:
+    # cascade (and an explicit "" opt-out), not just the raw project.yaml key.
+    preset_name = resolve_dod_preset_name(config, agent_meta_root)
     if preset_name not in presets:
         preset_name = "full"
     preset_gates = presets.get(preset_name, {}).get("release-gates", {}) or {}

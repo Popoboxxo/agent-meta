@@ -1,0 +1,39 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+platforms: []
+roles:
+- orchestrator
+- developer
+- git
+quality-pipelines:
+  custom-pipelines:
+    my-custom-check:
+      description: Custom project pipeline for scenario coverage
+      signal_keywords:
+      - custom probe
+      stages:
+      - id: probe
+        agent: git
+        task: Probe stage task
+        mode: sequential
+project:
+  name: scenario-quality-pipelines-custom
+  prefix: s41
+  short: quality-pipelines-custom
+variables:
+  PROJECT_NAME: scenario-quality-pipelines-custom
+  PROJECT_DESCRIPTION: Custom quality-pipeline added on top of the framework defaults.
+  PROJECT_GOAL: Verify a custom-pipelines entry renders into the orchestrator pipeline detail blocks.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-quality-pipelines-custom
+  GIT_MAIN_BRANCH: main
+  DOCS_LANGUAGE: Deutsch
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false

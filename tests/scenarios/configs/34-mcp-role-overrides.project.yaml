@@ -1,0 +1,33 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+platforms: []
+roles:
+- developer
+- git
+plugins:
+  playwright:
+    enabled: true
+mcp-role-overrides:
+  developer:
+  - playwright
+project:
+  name: scenario-mcp-role-overrides
+  prefix: s34
+  short: mcp-role-overrides
+variables:
+  PROJECT_NAME: scenario-mcp-role-overrides
+  PROJECT_DESCRIPTION: Per-role MCP server override test (developer gains playwright tools).
+  PROJECT_GOAL: Verify mcp-role-overrides binds an active MCP server's tools onto one role and not others.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-mcp-role-overrides
+  GIT_MAIN_BRANCH: main
+  DOCS_LANGUAGE: Deutsch
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false

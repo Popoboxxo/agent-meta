@@ -1,0 +1,27 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+platforms: []
+roles:
+- developer
+- tester
+project:
+  name: scenario-roles-restriction
+  prefix: s32
+  short: roles-restriction
+variables:
+  PROJECT_NAME: scenario-roles-restriction
+  PROJECT_DESCRIPTION: Roles-whitelist restriction test (only developer + tester generated).
+  PROJECT_GOAL: Verify that a roles whitelist generates ONLY the listed roles and no other standard role.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-roles-restriction
+  GIT_MAIN_BRANCH: main
+  DOCS_LANGUAGE: Deutsch
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false

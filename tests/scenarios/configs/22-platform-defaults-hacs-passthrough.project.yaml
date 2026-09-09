@@ -1,0 +1,28 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+platforms:
+- hacs
+roles:
+- orchestrator
+- tester
+- git
+project:
+  name: scenario-platform-hacs-passthrough
+  prefix: s22
+  short: platform-hacs-passthrough
+variables:
+  PROJECT_NAME: scenario-platform-hacs-passthrough
+  PROJECT_DESCRIPTION: Platform-defaults passthrough test (hacs, no overrides).
+  PROJECT_GOAL: Verify hacs' platform-config TEST_COMMANDS/PLATFORM/dod-preset defaults flow through unmodified.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-platform-hacs
+  GIT_MAIN_BRANCH: main
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false

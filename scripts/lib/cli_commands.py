@@ -82,6 +82,7 @@ from lib.sync_pipeline import (
     _sync_stage_knowledge_and_isolation,
     _sync_stage_legacy_cleanup,
     _sync_stage_per_provider,
+    _sync_stage_platform_defaults_snapshot,
 )
 from lib.viz import cleanup_old_sessions, generate_viz
 
@@ -1050,6 +1051,10 @@ def _handle_sync(ctx: _SyncContext) -> None:
     # overwrites anything (see docs/superpowers/specs/2026-09-07-generated-file-drift-detection-design.md).
     _sync_stage_generated_file_drift_scan(ctx.agent_meta_root, ctx.project_root,
                                           config, provider_config, ctx.args, ctx.log)
+    # Stage 5c: write the resolved platform-preset snapshot -- AFTER the drift
+    # scan (it is a hash-tracked generated file) and before the hash capture.
+    _sync_stage_platform_defaults_snapshot(ctx.agent_meta_root, ctx.project_root,
+                                           ctx.platforms, ctx.args, ctx.log)
     # Stage 6: per-provider main loop; mcp_gitignore_extras crosses the
     # stage boundary by reference.
     _sync_stage_per_provider(ctx.agent_meta_root, ctx.project_root, config,

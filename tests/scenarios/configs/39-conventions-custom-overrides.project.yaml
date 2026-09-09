@@ -1,0 +1,30 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+platforms: []
+roles:
+- orchestrator
+- git
+conventions:
+  issues:
+    title_format: "[{type}] {description}"
+project:
+  name: scenario-conventions-custom-overrides
+  prefix: s39
+  short: conventions-custom-overrides
+variables:
+  PROJECT_NAME: scenario-conventions-custom-overrides
+  PROJECT_DESCRIPTION: Conventions per-field override on top of the default preset (issue title format).
+  PROJECT_GOAL: Verify the conventions dict overrides an individual convention field over the conventions-preset default.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-conventions-custom-overrides
+  GIT_MAIN_BRANCH: main
+  DOCS_LANGUAGE: Deutsch
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false

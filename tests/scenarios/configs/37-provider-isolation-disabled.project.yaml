@@ -1,0 +1,29 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+- Gemini
+platforms: []
+roles:
+- developer
+- git
+provider-isolation: disabled
+project:
+  name: scenario-provider-isolation-disabled
+  prefix: s37
+  short: provider-isolation-disabled
+variables:
+  PROJECT_NAME: scenario-provider-isolation-disabled
+  PROJECT_DESCRIPTION: Provider-isolation disabled test (two providers, no cross-provider deny rules).
+  PROJECT_GOAL: Verify provider-isolation disabled suppresses the .claude/settings.json cross-provider deny entries that two active providers would otherwise generate.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-provider-isolation-disabled
+  GIT_MAIN_BRANCH: main
+  DOCS_LANGUAGE: Deutsch
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false
