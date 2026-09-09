@@ -438,26 +438,29 @@ class VizManager:
             except PermissionError:
                 pass
 
-        if sys.platform == "win32":
-            si = subprocess.STARTUPINFO()
-            si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            si.wShowWindow = 0
-            proc = subprocess.Popen(
-                args,
-                stdout=open(log_file, "a", encoding="utf-8"),  # noqa: SIM115
-                stderr=subprocess.STDOUT,
-                startupinfo=si,
-                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
-                cwd=str(self.root),
-            )
-        else:
-            proc = subprocess.Popen(
-                args,
-                stdout=open(log_file, "a", encoding="utf-8"),  # noqa: SIM115
-                stderr=subprocess.STDOUT,
-                start_new_session=True,
-                cwd=str(self.root),
-            )
+        # The child inherits a duplicate of this FD, so the parent closes
+        # its own copy once Popen() returns to avoid a handle leak.
+        with open(log_file, "a", encoding="utf-8") as log_fh:
+            if sys.platform == "win32":
+                si = subprocess.STARTUPINFO()
+                si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                si.wShowWindow = 0
+                proc = subprocess.Popen(
+                    args,
+                    stdout=log_fh,
+                    stderr=subprocess.STDOUT,
+                    startupinfo=si,
+                    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+                    cwd=str(self.root),
+                )
+            else:
+                proc = subprocess.Popen(
+                    args,
+                    stdout=log_fh,
+                    stderr=subprocess.STDOUT,
+                    start_new_session=True,
+                    cwd=str(self.root),
+                )
 
         pid_file.write_text(str(proc.pid), encoding="utf-8")
         time.sleep(1.5)
@@ -5199,21 +5202,23 @@ def _admin_start_detached(args: argparse.Namespace) -> None:
     if args.no_viz:
         cmd.append("--no-viz")
 
-    log_fh = open(log_file, "a", encoding="utf-8")  # noqa: SIM115
-    if sys.platform == "win32":
-        si = subprocess.STARTUPINFO()
-        si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        si.wShowWindow = 0
-        proc = subprocess.Popen(
-            cmd, stdout=log_fh, stderr=subprocess.STDOUT,
-            startupinfo=si, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
-            cwd=str(root),
-        )
-    else:
-        proc = subprocess.Popen(
-            cmd, stdout=log_fh, stderr=subprocess.STDOUT,
-            start_new_session=True, cwd=str(root),
-        )
+    # The child inherits a duplicate of this FD, so the parent closes its
+    # own copy once Popen() returns to avoid a handle leak.
+    with open(log_file, "a", encoding="utf-8") as log_fh:
+        if sys.platform == "win32":
+            si = subprocess.STARTUPINFO()
+            si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            si.wShowWindow = 0
+            proc = subprocess.Popen(
+                cmd, stdout=log_fh, stderr=subprocess.STDOUT,
+                startupinfo=si, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+                cwd=str(root),
+            )
+        else:
+            proc = subprocess.Popen(
+                cmd, stdout=log_fh, stderr=subprocess.STDOUT,
+                start_new_session=True, cwd=str(root),
+            )
 
     pid_file.write_text(str(proc.pid), encoding="utf-8")
     time.sleep(1.5)
