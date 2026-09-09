@@ -36,21 +36,11 @@ platform:
     # Example: "0.0.16"
     min_version: "0.0.16"
 
-    # -------------------------------------------------------------------------
-    # Docker Compose
-    # -------------------------------------------------------------------------
-
-    # Compose service name — identical across all Sharkord projects
-    service_name: "sharkord"
-
-    # -------------------------------------------------------------------------
-    # WebRTC / Mediasoup
-    # -------------------------------------------------------------------------
-
-    # LAN IP for SHARKORD_WEBRTC_ANNOUNCED_ADDRESS
-    # Override with your actual LAN IP for WebRTC to work on the local network
-    # Example: "192.168.1.100"
-    host_lan_ip: "127.0.0.1"
+    # NOTE: service_name/host_lan_ip migrated to variables.SERVICE_NAME/
+    # variables.HOST_LAN_IP below (platform-preset cascade, see the header
+    # comment further down this file) -- {{SERVICE_NAME}}/{{HOST_LAN_IP}} in
+    # templates now resolve via scripts/lib/platform.py::
+    # resolve_platform_defaults(), same values as before this migration.
 
 # =============================================================================
 # Platform-preset cascade -- see hacs.defaults.yaml's header comment above

@@ -47,11 +47,12 @@ def test_sharkord_defaults_migrate_service_name_and_host_lan_ip_into_variables()
     assert data["variables"]["HOST_LAN_IP"] == "127.0.0.1"
     assert data["variables"]["TEST_COMMANDS+"] == "docker compose run --rm test"
     assert data["variables"]["CODE_CONVENTIONS+"] == "TypeScript, ESLint, Prettier"
-    # Old {{platform.sharkord.*}} namespace stays untouched here -- Task 8 removes
-    # the now-duplicate service_name/host_lan_ip sub-keys, not this task.
-    assert data["platform"]["sharkord"]["service_name"] == "sharkord"
-    assert data["platform"]["sharkord"]["host_lan_ip"] == "127.0.0.1"
-    assert data["platform"]["sharkord"]["image_tag"] == "v0.0.16"  # untouched by Task 8 either
+    # Task 8 migration: service_name/host_lan_ip sub-keys removed from the
+    # {{platform.sharkord.*}} namespace (now redundant with variables.* above).
+    assert "service_name" not in data["platform"]["sharkord"]
+    assert "host_lan_ip" not in data["platform"]["sharkord"]
+    assert data["platform"]["sharkord"]["image_tag"] == "v0.0.16"  # untouched
+    assert data["platform"]["sharkord"]["min_version"] == "0.0.16"  # untouched
 
 
 def test_homeassistant_defaults_have_platform_cascade_fields():

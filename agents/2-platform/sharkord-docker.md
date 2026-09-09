@@ -1,6 +1,6 @@
 ---
 name: sharkord-docker
-version: "1.2.2"
+version: "1.2.3"
 based-on: "1-generic/docker.md@1.0.0"
 description: "Sharkord-spezifischer Docker-Agent. Plugin-Mount, Access-Token, Mediasoup-Ports, SYS_NICE, Port-Register."
 hint: "Sharkord Dev-Stack: Plugin-Mount, Access-Token, Mediasoup-Ports, Compose"
@@ -136,7 +136,7 @@ volumes:
 |---------|--------|
 | Token ungültig nach Neustart | `down --volumes` löscht DB → neuen Token aus Logs extrahieren |
 | Plugin lädt nicht | Build? `ls dist/{{PLUGIN_DIR_NAME}}`? Mount korrekt? `package.json` vorhanden? |
-| Mediasoup verbindet nicht | `SHARKORD_WEBRTC_ANNOUNCED_ADDRESS={{platform.sharkord.host_lan_ip}}` (LAN-IP, nicht localhost); UDP-Range exposen |
+| Mediasoup verbindet nicht | `SHARKORD_WEBRTC_ANNOUNCED_ADDRESS={{HOST_LAN_IP}}` (LAN-IP, nicht localhost); UDP-Range exposen |
 | Mediasoup Worker startet nicht | `cap_add: [SYS_NICE]` prüfen |
 | Binaries nicht gefunden | Volume `plugin-binaries` bzw. `.../plugins/{{PLUGIN_DIR_NAME}}/bin/` prüfen |
 
@@ -154,7 +154,7 @@ docker inspect {{CONTAINER_NAME}}
 
 ## Instanziierung (neue Plugins)
 Platzhalter ausfüllen:
-{{PROJECT_NAME}}, {{PREFIX}}, {{platform.sharkord.image_tag}}, {{SYSTEM_DEPENDENCIES}}, {{SYSTEM_URLS}}, {{PLUGIN_DIR_NAME}}, {{CONTAINER_NAME}}, {{SERVICE_NAME}}, {{PRIMARY_PORT}}, {{EXTRA_PORTS}}, {{BUILD_COMMAND}}, {{platform.sharkord.host_lan_ip}}, {{EXTRA_VOLUMES}}, {{EXTRA_STARTUP_INFO}}
+{{PROJECT_NAME}}, {{PREFIX}}, {{platform.sharkord.image_tag}}, {{SYSTEM_DEPENDENCIES}}, {{SYSTEM_URLS}}, {{PLUGIN_DIR_NAME}}, {{CONTAINER_NAME}}, {{SERVICE_NAME}}, {{PRIMARY_PORT}}, {{EXTRA_PORTS}}, {{BUILD_COMMAND}}, {{HOST_LAN_IP}}, {{EXTRA_VOLUMES}}, {{EXTRA_STARTUP_INFO}}
 
 ## Delegation
 - Plugin bauen → `{{PREFIX}}-developer`
