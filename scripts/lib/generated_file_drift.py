@@ -25,6 +25,13 @@ from .rule_index import read_managed_index
 GENERATED_FILE_HASHES_DIR = ".meta-config"
 GENERATED_FILE_HASHES_FILE = "generated-file-hashes.json"
 DRIFT_ALLOWLIST_FILE = "drift-allowlist.yaml"
+# Task 6 (platform-project-defaults feature): the resolved platform-preset
+# snapshot is a generated file too but lives outside every provider's
+# managed-index tree (_iter_managed_files only walks agents_dir/rules_dir/
+# hooks_dir/commands_dir/skills_dir/pipeline_details_dir) -- registered
+# explicitly here rather than teaching _iter_managed_files a project-root-
+# level, non-per-provider file shape for a single caller.
+PLATFORM_DEFAULTS_RESOLVED_REL = ".meta-config/platform-defaults.resolved.yaml"
 
 
 def _hashes_path(project_root: Path) -> Path:
@@ -173,6 +180,13 @@ def scan_generated_file_drift(
                 continue
             findings.append({"path": rel_path, "provider": provider})
 
+    resolved_path = project_root / PLATFORM_DEFAULTS_RESOLVED_REL
+    stored_resolved = stored_hashes.get(PLATFORM_DEFAULTS_RESOLVED_REL)
+    if stored_resolved is not None and resolved_path.is_file():
+        current_resolved = content_hash(resolved_path.read_text(encoding="utf-8"))
+        if current_resolved != stored_resolved and not is_allowlisted(PLATFORM_DEFAULTS_RESOLVED_REL, allowlist):
+            findings.append({"path": PLATFORM_DEFAULTS_RESOLVED_REL, "provider": "platform-defaults"})
+
     return findings
 
 
@@ -193,4 +207,7 @@ def capture_generated_file_hashes(
         for abs_path in _iter_managed_files(agent_meta_root, project_root, provider, pc):
             rel_path = abs_path.relative_to(project_root).as_posix()
             hashes[rel_path] = content_hash(abs_path.read_text(encoding="utf-8"))
+    resolved_path = project_root / PLATFORM_DEFAULTS_RESOLVED_REL
+    if resolved_path.is_file():
+        hashes[PLATFORM_DEFAULTS_RESOLVED_REL] = content_hash(resolved_path.read_text(encoding="utf-8"))
     _save_hashes(project_root, hashes, dry_run)

@@ -72,7 +72,7 @@ from lib.gitignore import (
 )
 from lib.hook_plugins import sync_hook_lib, sync_release_gates
 from lib.hooks import sync_hooks
-from lib.io import SyncError, write_atomic
+from lib.io import SyncError, _write_yaml, write_atomic
 from lib.isolation import sync_provider_isolation
 from lib.knowledge import sync_knowledge_engine
 from lib.log import SyncLog
@@ -83,7 +83,7 @@ from lib.pipelines import (
     resolve_pipeline_details_dir,
     sync_pipeline_detail_files,
 )
-from lib.platform import load_platform_config
+from lib.platform import PLATFORM_CONFIGS_DIR, load_platform_config, resolve_platform_defaults
 from lib.plugins import _probe_inactive_plugins
 from lib.providers import (
     load_providers_config,
@@ -154,6 +154,15 @@ def _sync_stage_config_and_presets(
     platform_vars = load_platform_config(agent_meta_root, project_root, platforms, log)
     if platform_vars is not None:
         log.note("platform-config", f"loaded {len(platform_vars)} platform variable(s) for: {', '.join(platforms)}")
+    # Materialized, human-visible resolved platform-preset defaults (design
+    # spec Architektur §4) -- informational only, NOT part of the resolution
+    # path itself (apply_platform_variable_cascade()/resolve_dod_preset_name()/
+    # resolve_conventions() all call resolve_platform_defaults() directly).
+    if not args.dry_run:
+        _write_yaml(
+            project_root / ".meta-config" / "platform-defaults.resolved.yaml",
+            resolve_platform_defaults(platforms, agent_meta_root / PLATFORM_CONFIGS_DIR),
+        )
     return config, provider_config, providers, mode, platform_vars
 
 
