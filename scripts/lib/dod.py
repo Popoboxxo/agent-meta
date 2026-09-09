@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 from .io import _load_yaml_or_json
+from .platform import PLATFORM_CONFIGS_DIR, resolve_platform_defaults
 
 DOD_PRESETS_CONFIG_YAML = "config/dod-presets.yaml"
 _DOD_PRESETS_CONFIG_LEGACY = "dod-presets.config.yaml"
@@ -25,16 +26,35 @@ def load_dod_presets(agent_meta_root: Path) -> dict:
             for k, v in presets.items() if not k.startswith("_")}
 
 
+def resolve_dod_preset_name(config: dict, agent_meta_root: Path) -> str:
+    """Resolve the effective dod-preset NAME (not its resolved field
+    values -- see resolve_dod() for that).
+
+    Precedence: project.yaml explicit `dod-preset` > platforms: cascade
+    default > "full". Shared by resolve_dod() (which resolves preset
+    VALUES from this name) and config.py's DOD_PRESET display variable, so
+    both stay consistent -- see this task's plan notes for why a single
+    shared function exists instead of duplicating the precedence.
+    """
+    platforms = config.get("platforms", [])
+    platform_dod_preset = resolve_platform_defaults(
+        platforms, agent_meta_root / PLATFORM_CONFIGS_DIR,
+    ).get("dod-preset")
+    return config.get("dod-preset") or platform_dod_preset or "full"
+
+
 def resolve_dod(config: dict, agent_meta_root: Path) -> dict:
     """Resolve effective DoD values from preset + overrides.
 
     Precedence (highest to lowest):
     1. Project override:  config["dod"][key]
     2. Preset default:    dod-presets.config.yaml[preset][key]
+       (preset itself resolved via resolve_dod_preset_name(): project
+       `dod-preset` > platforms: cascade default > "full")
     3. "full" preset:     fallback if preset not found
     """
     presets = load_dod_presets(agent_meta_root)
-    preset_name = config.get("dod-preset", "full") or "full"
+    preset_name = resolve_dod_preset_name(config, agent_meta_root)
 
     # Fallback to "full" preset when named preset not found
     if preset_name not in presets:

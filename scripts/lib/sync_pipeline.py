@@ -53,7 +53,7 @@ from lib.context import (
     sync_snippets_for_provider,
 )
 from lib.deactivation import is_provider_active
-from lib.dod import resolve_dod, resolve_release_gates
+from lib.dod import resolve_dod, resolve_dod_preset_name, resolve_release_gates
 from lib.external_tools import (
     generate_external_tool_artifacts,
     render_injection_drift_artifacts,
@@ -135,7 +135,7 @@ def _sync_stage_config_and_presets(
     mode = "init" if args.init else "sync"
     log.note("providers", "active: " + ", ".join(providers))
     # Log resolved DoD
-    preset_name = config.get("dod-preset", "full") or "full"
+    preset_name = resolve_dod_preset_name(config, agent_meta_root)
     dod_resolved = resolve_dod(config, agent_meta_root)
     dod_summary = ", ".join(f"{k}: {v}" for k, v in dod_resolved.items())
     log.note("DoD", f"preset '{preset_name}' -> {dod_summary}")

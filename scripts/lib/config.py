@@ -36,7 +36,7 @@ from .context_templates.builder import TemplateBuilder
 from .conventions import render_convention_block, resolve_conventions
 from .platform import apply_platform_variable_cascade
 from .delegation_table import get_active_agents_data, get_intent_routing_table
-from .dod import resolve_dod
+from .dod import resolve_dod, resolve_dod_preset_name
 from .providers import load_providers_config, resolve_providers
 from .reflection import (
     apply_project_overrides,
@@ -1004,7 +1004,7 @@ def _build_dod_variables(variables: dict, config: dict, agent_meta_root: Path) -
     variables["DOD_AI_SECURITY_REVIEW"] = "true" if dod_resolved.get("ai-security-review", False) else "false"
     variables["DOD_PROMPT_GOVERNANCE"] = "true" if dod_resolved.get("prompt-governance", False) else "false"
     variables["DOD_LIFECYCLE_OWNERSHIP"] = "true" if dod_resolved.get("lifecycle-ownership", False) else "false"
-    variables["DOD_PRESET"]           = config.get("dod-preset", "full")
+    variables["DOD_PRESET"]           = resolve_dod_preset_name(config, agent_meta_root)
     # SE-Required mode: derive boolean flags from the se-required string field
     se_required = str(dod_resolved.get("se-required", "false")).lower()
     variables["DOD_SE_REQUIRED"]    = se_required  # "false" | "recommended" | "true"
