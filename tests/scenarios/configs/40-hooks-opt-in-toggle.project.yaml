@@ -1,0 +1,33 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+platforms: []
+roles:
+- orchestrator
+- developer
+- git
+hooks:
+  orchestrator-guard:
+    enabled: false
+  dod-push-check:
+    enabled: true
+project:
+  name: scenario-hooks-opt-in-toggle
+  prefix: s40
+  short: hooks-opt-in-toggle
+variables:
+  PROJECT_NAME: scenario-hooks-opt-in-toggle
+  PROJECT_DESCRIPTION: Hook registration toggle test (disable a default-on hook, enable an opt-in hook).
+  PROJECT_GOAL: Verify the hooks block honours per-hook enabled flags for .claude/settings.json registration.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-hooks-opt-in-toggle
+  GIT_MAIN_BRANCH: main
+  DOCS_LANGUAGE: Deutsch
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false

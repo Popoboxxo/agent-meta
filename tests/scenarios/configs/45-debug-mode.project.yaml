@@ -1,0 +1,28 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+platforms: []
+roles:
+- orchestrator
+- developer
+- git
+project:
+  name: scenario-debug-mode
+  prefix: s45
+  short: debug-mode
+variables:
+  PROJECT_NAME: scenario-debug-mode
+  PROJECT_DESCRIPTION: debug-mode true test (debug block injected into every generated agent).
+  PROJECT_GOAL: Verify debug-mode true injects the agent-meta debug-mode block that is absent with the default false.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-debug-mode
+  GIT_MAIN_BRANCH: main
+  DOCS_LANGUAGE: Deutsch
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: true
+allow-committed-secrets: false

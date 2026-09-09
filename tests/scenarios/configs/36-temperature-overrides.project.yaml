@@ -1,0 +1,30 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+- Opencode
+platforms: []
+roles:
+- developer
+- git
+temperature-overrides:
+  developer: 0.33
+project:
+  name: scenario-temperature-overrides
+  prefix: s36
+  short: temperature-overrides
+variables:
+  PROJECT_NAME: scenario-temperature-overrides
+  PROJECT_DESCRIPTION: Per-role sampling-temperature override test (Opencode renders temperature).
+  PROJECT_GOAL: Verify temperature-overrides renders into the Opencode-native agent frontmatter for one role only.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-temperature-overrides
+  GIT_MAIN_BRANCH: main
+  DOCS_LANGUAGE: Deutsch
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false

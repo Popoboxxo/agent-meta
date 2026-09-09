@@ -65,6 +65,12 @@ verhalten sich exakt wie bisher.
   Doku-/Config-Oberfläche (Wortlaut, `.gitignore`-Eintrag), nicht das
   tatsächliche Schreiben von `.claude/progress/current.md` zur Laufzeit.
   Nachziehen, sobald ein Call-Site verdrahtet ist.
+- **`backup:`-Block** (`scripts/lib/backup.py`): steuert ausschließlich den
+  `--backup`/`--restore`-CLI-Pfad und hat während eines normalen `sync.py`-Laufs
+  keinen beobachtbaren Output (keine generierte Config/Doku) — über dieses
+  Szenario-Harness (dry-run + sync + `--validate`) also nicht sinnvoll prüfbar.
+  Ursprünglich als Szenario 43 geplant, ersetzt durch `43-tier-overrides` aus
+  derselben Kategorie (per-role Override mit deterministischem Sync-Footprint).
 
 ## Bekannte, unrelated Eigenheit
 
@@ -84,3 +90,17 @@ so), kein Scenario-Bug.
 | `29-platform-defaults-dod-preset-explicit-override` | Claude | strict (default) | Platform-preset cascade: explicit project `dod-preset` wins over the platform default |
 | `30-platform-defaults-dod-preset-platform-fallback` | Claude | strict (default) | Platform-preset cascade: platform `dod-preset` wins over the old implicit `"full"` |
 | `31-platform-defaults-unknown-platform` | Claude | strict (default) | Platform-preset cascade: unknown platform without a `defaults.yaml` — empty cascade, no crash |
+| `32-roles-restriction` | Claude | strict (default) | `roles:`-Whitelist generiert NUR die gelisteten Rollen (developer+tester); nicht-gelistete Standardrolle (code-reviewer/orchestrator) fehlt |
+| `33-memory-overrides` | Claude | strict (default) | `memory.default_scope` global + `memory-overrides.<role>` — überschriebene Rolle zeigt Override, andere fallen auf globalen Default zurück |
+| `34-mcp-role-overrides` | Claude | strict (default) | `mcp-role-overrides.<role>` bindet Tools eines aktiven MCP-Servers (playwright) an eine Rolle, andere Rolle bleibt ohne |
+| `35-permission-mode-overrides` | Claude | strict (default) | `permission-mode-overrides.<role>` injiziert `permissionMode`; Rolle ohne Override/Default bekommt kein Feld |
+| `36-temperature-overrides` | Claude, Opencode | strict (default) | `temperature-overrides.<role>` rendert in Opencode-Frontmatter (Claude-Markdown hat kein temperature-Feld) für eine Rolle |
+| `37-provider-isolation-disabled` | Claude, Gemini | strict (default) | `provider-isolation: disabled` unterdrückt die Cross-Provider-Deny-Einträge (`.gemini/**`) in `.claude/settings.json` |
+| `38-dod-custom-overrides` | Claude | strict (default) | `dod:`-Dict überschreibt einzelne Kriterien über dem Preset (rapid-prototyping + req-traceability/security-audit an), untouched bleibt Preset-Wert |
+| `39-conventions-custom-overrides` | Claude | strict (default) | `conventions:`-Dict überschreibt Einzelfeld (`issues.title_format`) über dem conventions-preset in `git.md` |
+| `40-hooks-opt-in-toggle` | Claude | strict (default) | `hooks:`-Registrierung: default-on Hook deaktiviert (orchestrator-guard nicht in settings.json), opt-in Hook aktiviert (dod-push-check), Skript stets synchronisiert |
+| `41-quality-pipelines-custom` | Claude | strict (default) | `quality-pipelines.custom-pipelines` fügt Custom-Pipeline hinzu, gerendert in `orchestrator.md` PIPELINE_DETAIL_BLOCKS |
+| `42-external-skills-gitignore` | Claude | strict (default) | Approved+enabled External-Skill mit `gitignore: true` fügt Skill-Dir zum managed `.gitignore`-Block hinzu (offline, config-only) |
+| `43-tier-overrides` | Claude | strict (default) | `tier-overrides.<role>` hebt tester von 'fast' auf 'powerful' (claude-opus); developer behält Default — Ersatz für nicht-testbares `backup:` (siehe Auslassungen) |
+| `44-speech-mode-childish` | Claude | strict (default) | Nicht-Default `speech-mode: childish` kopiert `speech/childish.md` nach `.claude/rules/speech-mode.md` (Default 'full' erzeugt keine Regel) |
+| `45-debug-mode` | Claude | strict (default) | `debug-mode: true` injiziert den Debug-Block-Marker (`<!-- agent-meta:debug-mode -->`) in jeden generierten Agenten |

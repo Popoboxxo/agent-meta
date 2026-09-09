@@ -1,0 +1,29 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+platforms: []
+roles:
+- developer
+- tester
+tier-overrides:
+  tester: powerful
+project:
+  name: scenario-tier-overrides
+  prefix: s43
+  short: tier-overrides
+variables:
+  PROJECT_NAME: scenario-tier-overrides
+  PROJECT_DESCRIPTION: Per-role tier override test (tester lifted from its 'fast' default to 'powerful').
+  PROJECT_GOAL: Verify tier-overrides changes the resolved model for one role while others keep their role-default tier.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-tier-overrides
+  GIT_MAIN_BRANCH: main
+  DOCS_LANGUAGE: Deutsch
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false

@@ -1,0 +1,28 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+platforms: []
+roles:
+- orchestrator
+- developer
+- git
+project:
+  name: scenario-speech-mode-childish
+  prefix: s44
+  short: speech-mode-childish
+variables:
+  PROJECT_NAME: scenario-speech-mode-childish
+  PROJECT_DESCRIPTION: Non-default speech-mode test (childish instead of full).
+  PROJECT_GOAL: Verify a non-default speech-mode copies speech/<mode>.md to .claude/rules/speech-mode.md (default 'full' generates no rule).
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-speech-mode-childish
+  GIT_MAIN_BRANCH: main
+  DOCS_LANGUAGE: Deutsch
+rules-preset: default
+speech-mode: childish
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false

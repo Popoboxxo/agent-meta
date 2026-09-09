@@ -1,0 +1,31 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+platforms: []
+roles:
+- orchestrator
+- git
+external-skills:
+  reqogniloom-change-manager:
+    enabled: true
+    gitignore: true
+project:
+  name: scenario-external-skills-gitignore
+  prefix: s42
+  short: external-skills-gitignore
+variables:
+  PROJECT_NAME: scenario-external-skills-gitignore
+  PROJECT_DESCRIPTION: Approved external skill enabled with gitignore opt-in.
+  PROJECT_GOAL: Verify an approved + enabled external skill with gitignore true adds its provider skills dir to the managed .gitignore block.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-external-skills-gitignore
+  GIT_MAIN_BRANCH: main
+  DOCS_LANGUAGE: Deutsch
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false
