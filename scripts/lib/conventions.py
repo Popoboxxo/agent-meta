@@ -15,7 +15,7 @@ from pathlib import Path
 
 from .io import _deep_merge, _load_yaml_or_json
 from .log import SyncLog
-from .platform import PLATFORM_CONFIGS_DIR, resolve_platform_defaults
+from .platform import PLATFORM_CONFIGS_DIR, resolve_platform_defaults, resolve_preset_name
 
 CONVENTIONS_PRESETS_CONFIG_YAML = "config/conventions-presets.yaml"
 
@@ -60,10 +60,15 @@ def resolve_conventions(config: dict, agent_meta_root: Path) -> dict:
     """
     presets = load_conventions_presets(agent_meta_root)
     platforms = config.get("platforms", [])
-    platform_conventions_preset = resolve_platform_defaults(
+    platform_defaults = resolve_platform_defaults(
         platforms, agent_meta_root / PLATFORM_CONFIGS_DIR,
-    ).get("conventions-preset")
-    preset_name = config.get("conventions-preset") or platform_conventions_preset or "default"
+    )
+    # Shared precedence with dod.py::resolve_dod_preset_name (explicit >
+    # platform cascade > fallback); honors an explicit `conventions-preset: ""`
+    # opt-out instead of the old `or` chain swallowing it.
+    preset_name = resolve_preset_name(
+        "conventions-preset", config, platform_defaults, "default",
+    )
 
     if preset_name not in presets and preset_name != "default":
         print(f"  !  Unknown conventions-preset '{preset_name}' — falling back to 'default'",

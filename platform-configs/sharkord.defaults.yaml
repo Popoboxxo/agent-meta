@@ -36,20 +36,19 @@ platform:
     # Example: "0.0.16"
     min_version: "0.0.16"
 
-    # NOTE: service_name/host_lan_ip migrated to variables.SERVICE_NAME/
-    # variables.HOST_LAN_IP below (platform-preset cascade, see the header
-    # comment further down this file) -- {{SERVICE_NAME}}/{{HOST_LAN_IP}} in
-    # templates now resolve via scripts/lib/platform.py::
-    # resolve_platform_defaults(), same values as before this migration.
+    # NOTE: the former service_name/host_lan_ip sub-keys have been removed --
+    # they now live in variables.SERVICE_NAME/variables.HOST_LAN_IP below
+    # (platform-preset cascade). {{SERVICE_NAME}}/{{HOST_LAN_IP}} in templates
+    # resolve via scripts/lib/platform.py::resolve_platform_defaults(), same
+    # values as before the migration.
 
 # =============================================================================
 # Platform-preset cascade -- see hacs.defaults.yaml's header comment above
 # for the mechanism. variables.SERVICE_NAME/CONTAINER_NAME/HOST_LAN_IP below
-# migrate the platform.sharkord.service_name/host_lan_ip values above into
-# the generic, cascade-aware {{SERVICE_NAME}}/{{HOST_LAN_IP}} placeholders
-# (design spec Architektur §1 -- sharkord config duplication). The
-# platform.sharkord.* keys above stay UNTOUCHED here -- removing the now-
-# redundant service_name/host_lan_ip sub-keys is Task 8, not this task.
+# carry the values formerly held by the now-removed
+# platform.sharkord.service_name/host_lan_ip sub-keys, exposed through the
+# generic, cascade-aware {{SERVICE_NAME}}/{{HOST_LAN_IP}} placeholders
+# (design spec Architektur §1 -- sharkord config duplication).
 #
 # conventions-preset: deliberately omitted -- same reasoning as
 # hacs.defaults.yaml (sharkord plugins already use SemVer via image_tag,

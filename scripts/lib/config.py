@@ -82,6 +82,14 @@ _CONFIG_FIELD_DESCRIPTIONS: dict = {
     "max-parallel-agents": "Maximum number of parallel agent spawns (1-5)",
 }
 
+# Preset keys resolved through the platforms: cascade at runtime
+# (platform.resolve_preset_name via resolve_dod_preset_name/resolve_conventions).
+# fill_defaults() must NEVER persist these: writing the raw schema default
+# (dod-preset "full") into project.yaml on the first sync would shadow the
+# cascade on every later sync -- the resolver already has a clean runtime
+# fallback and needs no persisted value (PR #709 finding 1).
+_CASCADE_MANAGED_PRESET_KEYS = frozenset({"dod-preset", "conventions-preset"})
+
 # dod sub-fields with defaults (mirrors the "full" preset in dod-presets.config.yaml)
 _DOD_FIELD_DEFAULTS: dict = {
     "req-traceability": True,
@@ -416,15 +424,21 @@ def fill_defaults(
     for field, default in effective_defaults.items():
         if "." in field:
             continue  # nested fields handled below
+        if field in _CASCADE_MANAGED_PRESET_KEYS:
+            continue  # resolved via platforms: cascade at runtime -- never persist
         if field not in config:
             config[field] = default
             desc = effective_descriptions.get(field, "")
             added.append((field, desc))
             changed = True
 
-    # --- Fill nested dod.* fields (schema-driven, only for "full"/"strict" preset) ---
-    active_preset = config.get("dod-preset", effective_defaults.get("dod-preset", "rapid-prototyping"))
-    if active_preset in ("full", "strict") or "dod-preset" not in config:
+    # --- Fill nested dod.* fields (schema-driven, only when the user EXPLICITLY
+    # picked a rigorous preset). An absent dod-preset now means "let the
+    # platforms: cascade / runtime fallback decide" -- materializing the "full"
+    # dod.* values then would re-freeze the resolved DoD via the `dod:` block,
+    # the same failure mode finding 1 fixes for the preset key itself. ---
+    active_preset = config.get("dod-preset")
+    if active_preset in ("full", "strict"):
         dod_block = config.get("dod", {})
         for field_path, (default, desc) in schema_defaults.items():
             if not field_path.startswith("dod."):

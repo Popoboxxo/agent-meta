@@ -154,15 +154,10 @@ def _sync_stage_config_and_presets(
     platform_vars = load_platform_config(agent_meta_root, project_root, platforms, log)
     if platform_vars is not None:
         log.note("platform-config", f"loaded {len(platform_vars)} platform variable(s) for: {', '.join(platforms)}")
-    # Materialized, human-visible resolved platform-preset defaults (design
-    # spec Architektur §4) -- informational only, NOT part of the resolution
-    # path itself (apply_platform_variable_cascade()/resolve_dod_preset_name()/
-    # resolve_conventions() all call resolve_platform_defaults() directly).
-    if not args.dry_run:
-        _write_yaml(
-            project_root / ".meta-config" / "platform-defaults.resolved.yaml",
-            resolve_platform_defaults(platforms, agent_meta_root / PLATFORM_CONFIGS_DIR),
-        )
+    # The resolved platform-preset snapshot (.meta-config/
+    # platform-defaults.resolved.yaml) is a hash-tracked generated file, so it
+    # is written LATER -- see _sync_stage_platform_defaults_snapshot(), which
+    # runs after the generated-file drift scan.
     return config, provider_config, providers, mode, platform_vars
 
 
@@ -354,6 +349,30 @@ def _sync_stage_generated_file_drift_scan(
             "sync will overwrite it. Add it to .meta-config/drift-allowlist.yaml "
             "if this edit should be preserved going forward."
         )
+
+
+def _sync_stage_platform_defaults_snapshot(
+    agent_meta_root: Path, project_root: Path, platforms: list,
+    args: argparse.Namespace, log: SyncLog,
+) -> None:
+    """Materialize .meta-config/platform-defaults.resolved.yaml -- the
+    human-visible resolved platform-preset snapshot (design spec Architektur
+    §4). Informational only, NOT part of the resolution path itself
+    (apply_platform_variable_cascade()/resolve_dod_preset_name()/
+    resolve_conventions() all call resolve_platform_defaults() directly).
+
+    MUST run AFTER _sync_stage_generated_file_drift_scan: this file is a
+    hash-tracked generated file (generated_file_drift.
+    PLATFORM_DEFAULTS_RESOLVED_REL), so writing it before the scan would
+    overwrite a manual edit before the scan could flag it -- the exact
+    invariant the drift scan documents.
+    """
+    if args.dry_run:
+        return
+    _write_yaml(
+        project_root / ".meta-config" / "platform-defaults.resolved.yaml",
+        resolve_platform_defaults(platforms, agent_meta_root / PLATFORM_CONFIGS_DIR, log=log),
+    )
 
 
 def _skill_channel_universe(

@@ -1,6 +1,7 @@
 """Platform-config loading and substitution for {{platform.*}} placeholders."""
 from __future__ import annotations
 
+import functools
 import re
 from pathlib import Path
 
@@ -70,7 +71,10 @@ def load_platform_config(
     loaded_overrides: dict | None = load_yaml_file(
         project_config_path, on_error="warn", default=None, log=log,
     )
-    overrides_flat: dict = {} if loaded_overrides is None else _flatten_yaml_dict(loaded_overrides)
+    overrides_flat: dict = (
+        {} if loaded_overrides is None
+        else _flatten_yaml_dict(loaded_overrides.get("platform", {}), "platform")
+    )
 
     for platform in platforms:
         defaults_path = agent_meta_root / PLATFORM_CONFIGS_DIR / f'{platform}.defaults.yaml'
@@ -86,18 +90,17 @@ def load_platform_config(
             # nothing (old behavior: warn + continue).
             continue
 
-        # Merge: defaults first, then overrides win. Keep ONLY the
-        # `platform.*` namespace: the defaults file may now carry sibling
-        # top-level `dod-preset`/`conventions-preset`/`variables` sections
-        # (platform-preset cascade, resolved separately by
+        # Merge: defaults first, then overrides win. Flatten ONLY the
+        # `platform` subtree at the source -- the defaults file may now carry
+        # sibling top-level `dod-preset`/`conventions-preset`/`variables`
+        # sections (platform-preset cascade, resolved separately by
         # resolve_platform_defaults()); those are NOT {{platform.*}}
         # placeholder values and must not pollute this flat dict (they would
         # otherwise break the locked 5-key {{platform.hacs.*}} audit contract
         # and leak into substitute_platform's key space).
         platform_flat = {
-            k: v
-            for k, v in {**_flatten_yaml_dict(defaults_raw), **overrides_flat}.items()
-            if k.startswith("platform.")
+            **_flatten_yaml_dict(defaults_raw.get("platform", {}), "platform"),
+            **overrides_flat,
         }
 
         # Warn for required fields (empty-string default) that are still empty
@@ -151,8 +154,53 @@ _ADDITIVE_JOIN: dict[str, str] = {
 }
 
 
+@functools.lru_cache(maxsize=None)
+def _resolve_platform_defaults_cached(
+    platforms: tuple[str, ...], platform_config_dir: Path,
+) -> dict:
+    """Cached core of resolve_platform_defaults() (see its docstring).
+
+    Keyed on (platforms, platform_config_dir); both hashable. The per-role
+    content pipeline (agent_sync._apply_content_pipeline) resolves this once
+    per role x provider, so caching turns all but the first into a hit --
+    same rationale as pipelines.load_quality_pipelines().
+
+    ponytail: returns a shared dict, cached for the process lifetime; treat
+    it as read-only (every current caller only reads) and expect staleness
+    if platform-configs/*.yaml change mid-process -- matching
+    load_quality_pipelines()'s identical caveat.
+    """
+    result: dict = {"dod-preset": None, "conventions-preset": None, "variables": {}}
+
+    for platform in platforms:
+        defaults_path = platform_config_dir / f'{platform}.defaults.yaml'
+        raw = load_yaml_file(defaults_path, on_error="default", default={})
+        if not raw:
+            continue
+
+        if "dod-preset" in raw:
+            result["dod-preset"] = raw["dod-preset"]
+        if "conventions-preset" in raw:
+            result["conventions-preset"] = raw["conventions-preset"]
+
+        platform_vars = raw.get("variables", {})
+        if not isinstance(platform_vars, dict):
+            continue
+        for key, value in platform_vars.items():
+            if key.endswith("+"):
+                field = key[:-1]
+                base = result["variables"].get(field, "")
+                join_char = _ADDITIVE_JOIN.get(field, " && ")
+                result["variables"][field] = f"{base}{join_char}{value}" if base else str(value)
+            else:
+                result["variables"][key] = value
+
+    return result
+
+
 def resolve_platform_defaults(
     platforms: list[str], platform_config_dir: 'Path | None' = None,
+    log: 'SyncLog | None' = None,
 ) -> dict:
     """Merge dod-preset/conventions-preset/variables across every active
     platform's platform-configs/<name>.defaults.yaml (Task 1's new sections).
@@ -182,43 +230,61 @@ def resolve_platform_defaults(
     explicitly and should pass `agent_meta_root / PLATFORM_CONFIGS_DIR` here
     rather than relying on this default).
 
+    Emits a [WARN] via `log` (when passed) if PyYAML is unavailable and
+    returns the empty result unchanged -- same warn-and-degrade contract as
+    load_platform_config()'s sister check.
+
     Returns {"dod-preset": str | None, "conventions-preset": str | None,
              "variables": dict[str, str]}.
     """
+    if not _YAML_AVAILABLE:
+        if log is not None:
+            log.warning(
+                'PyYAML not available — platform-config defaults skipped. '
+                'Install it with: pip install pyyaml'
+            )
+        return {"dod-preset": None, "conventions-preset": None, "variables": {}}
+
     if platform_config_dir is None:
         platform_config_dir = Path(__file__).resolve().parent.parent.parent / PLATFORM_CONFIGS_DIR
 
-    result: dict = {"dod-preset": None, "conventions-preset": None, "variables": {}}
+    return _resolve_platform_defaults_cached(tuple(platforms), platform_config_dir)
 
-    for platform in platforms:
-        defaults_path = platform_config_dir / f'{platform}.defaults.yaml'
-        raw = load_yaml_file(defaults_path, on_error="default", default={})
-        if not raw:
-            continue
 
-        if "dod-preset" in raw:
-            result["dod-preset"] = raw["dod-preset"]
-        if "conventions-preset" in raw:
-            result["conventions-preset"] = raw["conventions-preset"]
+def resolve_preset_name(
+    field_key: str, config: dict, platform_defaults: dict, fallback: str,
+) -> str:
+    """Resolve a preset NAME by the shared precedence used for both
+    dod-preset (dod.py::resolve_dod_preset_name) and conventions-preset
+    (conventions.py::resolve_conventions):
 
-        platform_vars = raw.get("variables", {})
-        if not isinstance(platform_vars, dict):
-            continue
-        for key, value in platform_vars.items():
-            if key.endswith("+"):
-                field = key[:-1]
-                base = result["variables"].get(field, "")
-                join_char = _ADDITIVE_JOIN.get(field, " && ")
-                result["variables"][field] = f"{base}{join_char}{value}" if base else str(value)
-            else:
-                result["variables"][key] = value
+        project.yaml explicit `field_key` > platforms: cascade default > fallback
 
-    return result
+    An explicit key present in `config` wins by KEY PRESENCE, not truthiness:
+    a deliberate `field_key: ""` opt-out returns "" and is NOT swallowed into
+    the cascade (the old `config.get(k) or platform or fallback` chain treated
+    an empty string like "unset"). Only an absent key or an explicit YAML null
+    (`config.get()` -> None) falls through to the cascade.
+    """
+    explicit = config.get(field_key)
+    if explicit is not None:
+        return explicit
+    platform_value = platform_defaults.get(field_key)
+    if platform_value is not None:
+        return platform_value
+    return fallback
 
 
 # Curated field list (design spec "Kuratierte Feldliste v1") -- ONLY these
 # variables.* fields are platform-cascaded. Every other project.yaml
 # variable stays purely project-individual, no platform coupling.
+#
+# Deliberately a Python constant, NOT YAML-declared (unlike dod-preset,
+# conventions-preset and arbitrary variables.*): the design spec fixed this
+# as a *curated* v1 allowlist -- arbitrary extensibility was explicitly a
+# non-goal, so a data-driven schema would be speculative (YAGNI). To add a
+# field, append its {{VAR}} name here (and give it a value in some
+# platform-configs/<name>.defaults.yaml `variables:` block).
 _CASCADED_VARIABLE_FIELDS = (
     "PLATFORM", "RUNTIME", "LANGUAGE", "PROJECT_LANGUAGES", "SYSTEM_DEPENDENCIES",
     "ENTRY_POINT_PATTERN", "GIT_MAIN_BRANCH", "SERVICE_NAME", "CONTAINER_NAME",
