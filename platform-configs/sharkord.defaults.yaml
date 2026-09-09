@@ -51,3 +51,29 @@ platform:
     # Override with your actual LAN IP for WebRTC to work on the local network
     # Example: "192.168.1.100"
     host_lan_ip: "127.0.0.1"
+
+# =============================================================================
+# Platform-preset cascade -- see hacs.defaults.yaml's header comment above
+# for the mechanism. variables.SERVICE_NAME/CONTAINER_NAME/HOST_LAN_IP below
+# migrate the platform.sharkord.service_name/host_lan_ip values above into
+# the generic, cascade-aware {{SERVICE_NAME}}/{{HOST_LAN_IP}} placeholders
+# (design spec Architektur §1 -- sharkord config duplication). The
+# platform.sharkord.* keys above stay UNTOUCHED here -- removing the now-
+# redundant service_name/host_lan_ip sub-keys is Task 8, not this task.
+#
+# conventions-preset: deliberately omitted -- same reasoning as
+# hacs.defaults.yaml (sharkord plugins already use SemVer via image_tag,
+# i.e. 'default'; no differentiated preset exists to reference).
+# =============================================================================
+
+dod-preset: standard
+
+variables:
+  PLATFORM: "Sharkord Plugin SDK"
+  RUNTIME: "Bun"
+  PROJECT_LANGUAGES: "TypeScript"
+  SERVICE_NAME: "sharkord"
+  CONTAINER_NAME: "sharkord"
+  HOST_LAN_IP: "127.0.0.1"
+  TEST_COMMANDS+: "docker compose run --rm test"
+  CODE_CONVENTIONS+: "TypeScript, ESLint, Prettier"

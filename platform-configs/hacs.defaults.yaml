@@ -53,3 +53,28 @@ platform:
     # Base URL of the development Home Assistant instance (without trailing slash)
     # Used for pre-release E2E and the post-release HACS-update test (workflow step 7)
     dev_instance_url: ""
+
+# =============================================================================
+# Platform-preset cascade (project.yaml `dod-preset`/`variables.*` defaults
+# for projects with `platforms: [hacs]`). Resolved via
+# scripts/lib/platform.py::resolve_platform_defaults() and layered UNDER
+# explicit project.yaml values -- project.yaml always wins.
+# `<FIELD>+` (see CODE_CONVENTIONS below) appends instead of replacing when
+# more than one active platform sets the same field.
+#
+# conventions-preset: deliberately omitted. config/conventions-presets.yaml
+# only defines default/calver/conventional-strict -- HACS integrations
+# already match 'default' (SemVer via hacs.json + GitHub releases), so a
+# dedicated preset adds no information. Not invented for this feature.
+#
+# See: docs/superpowers/specs/2026-09-09-platform-project-defaults-design.md
+# =============================================================================
+
+dod-preset: standard
+
+variables:
+  PLATFORM: "Home Assistant Custom Component"
+  RUNTIME: "Python 3.13 (HA Core)"
+  PROJECT_LANGUAGES: "Python"
+  TEST_COMMANDS: "pytest tests/ --cov"
+  CODE_CONVENTIONS+: "Python, ruff, mypy --strict"

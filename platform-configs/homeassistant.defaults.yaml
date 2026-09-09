@@ -74,3 +74,24 @@ platform:
     # Path to the hass_entities.csv export file (relative to project root or absolute)
     # Used as secondary data source when MCP is unavailable
     entities_csv_path: "hass_entities.csv"
+
+# =============================================================================
+# Platform-preset cascade -- see hacs.defaults.yaml's header comment above
+# for the mechanism.
+#
+# dod-preset: rapid-prototyping -- home-automation YAML config projects are
+# typically single-maintainer, fast-iteration setups (matches this very
+# repo's own dod-preset choice), not the 'standard'/'full' rigor a packaged
+# integration (hacs) or a distributed plugin (sharkord) needs.
+#
+# conventions-preset: deliberately omitted -- there is no packaged release
+# in the SemVer/library sense for a home-automation YAML config at all.
+# =============================================================================
+
+dod-preset: rapid-prototyping
+
+variables:
+  PLATFORM: "Home Assistant Automation Config"
+  RUNTIME: "Home Assistant Core (YAML)"
+  PROJECT_LANGUAGES: "YAML, Jinja2"
+  TEST_COMMANDS: "hass --script check_config"
