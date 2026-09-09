@@ -86,8 +86,19 @@ def load_platform_config(
             # nothing (old behavior: warn + continue).
             continue
 
-        # Merge: defaults first, then overrides win
-        platform_flat = {**_flatten_yaml_dict(defaults_raw), **overrides_flat}
+        # Merge: defaults first, then overrides win. Keep ONLY the
+        # `platform.*` namespace: the defaults file may now carry sibling
+        # top-level `dod-preset`/`conventions-preset`/`variables` sections
+        # (platform-preset cascade, resolved separately by
+        # resolve_platform_defaults()); those are NOT {{platform.*}}
+        # placeholder values and must not pollute this flat dict (they would
+        # otherwise break the locked 5-key {{platform.hacs.*}} audit contract
+        # and leak into substitute_platform's key space).
+        platform_flat = {
+            k: v
+            for k, v in {**_flatten_yaml_dict(defaults_raw), **overrides_flat}.items()
+            if k.startswith("platform.")
+        }
 
         # Warn for required fields (empty-string default) that are still empty
         for key, val in platform_flat.items():
@@ -203,3 +214,62 @@ def resolve_platform_defaults(
                 result["variables"][key] = value
 
     return result
+
+
+# Curated field list (design spec "Kuratierte Feldliste v1") -- ONLY these
+# variables.* fields are platform-cascaded. Every other project.yaml
+# variable stays purely project-individual, no platform coupling.
+_CASCADED_VARIABLE_FIELDS = (
+    "PLATFORM", "RUNTIME", "LANGUAGE", "PROJECT_LANGUAGES", "SYSTEM_DEPENDENCIES",
+    "ENTRY_POINT_PATTERN", "GIT_MAIN_BRANCH", "SERVICE_NAME", "CONTAINER_NAME",
+    "HOST_LAN_IP", "TEST_COMMAND", "TEST_COMMANDS", "DEV_COMMANDS",
+    "BUILD_COMMAND", "BUILD_COMMANDS", "CODE_CONVENTIONS",
+)
+
+
+def apply_platform_variable_cascade(
+    variables: dict, project_config: dict, platforms: list[str], agent_meta_root: 'Path',
+) -> dict:
+    """Layer platform-config variable defaults under explicit project.yaml
+    values, for the curated fields in _CASCADED_VARIABLE_FIELDS only.
+
+    Precedence per field, highest first:
+      1. project_config["variables"][FIELD] explicit -> wins unchanged
+         (already the value in `variables[FIELD]`, set earlier by
+         build_variables()'s own project.yaml `variables:` loop -- left
+         untouched here).
+      2. project_config["variables"][f"{FIELD}+"] set -> the platform
+         default (or whatever `variables[FIELD]` already holds, e.g. a
+         framework default like DEV_COMMANDS's "" from build_variables()'s
+         core stage, if no platform sets it) + join char + the project's
+         `+` value.
+      3. resolve_platform_defaults(platforms)["variables"][FIELD] set ->
+         wins.
+      4. Otherwise: `variables[FIELD]` is left exactly as build_variables()
+         already set it (framework default stays the fallback).
+
+    Called once, at the very end of build_variables(), after every other
+    variable-building stage -- so stage 4's "whatever variables[FIELD]
+    already holds" reflects the full framework-default pipeline, not a
+    partial one.
+    """
+    platform_defaults = resolve_platform_defaults(
+        platforms, agent_meta_root / PLATFORM_CONFIGS_DIR,
+    )
+    platform_vars = platform_defaults.get("variables", {})
+    project_vars = project_config.get("variables", {}) or {}
+
+    for field in _CASCADED_VARIABLE_FIELDS:
+        if field in project_vars:
+            continue  # 1. explicit project override -- already correct in `variables`
+        plus_key = f"{field}+"
+        if plus_key in project_vars:
+            base = platform_vars.get(field, variables.get(field, ""))
+            join_char = _ADDITIVE_JOIN.get(field, " && ")
+            variables[field] = f"{base}{join_char}{project_vars[plus_key]}" if base else str(project_vars[plus_key])
+            continue
+        if field in platform_vars:
+            variables[field] = str(platform_vars[field])
+        # else: leave variables[field] exactly as build_variables() already set it
+
+    return variables

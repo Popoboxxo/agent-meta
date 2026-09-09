@@ -34,6 +34,7 @@ from .analysis import FileAffinityAnalyzer, analyze_project
 from .consistency.placeholders import _BUILTIN_VARS
 from .context_templates.builder import TemplateBuilder
 from .conventions import render_convention_block, resolve_conventions
+from .platform import apply_platform_variable_cascade
 from .delegation_table import get_active_agents_data, get_intent_routing_table
 from .dod import resolve_dod
 from .providers import load_providers_config, resolve_providers
@@ -1299,5 +1300,6 @@ def build_variables(config: dict, agent_meta_root: Path, project_root: Path | No
     )
     _build_snippet_variables(variables, agent_meta_root)
     _build_convention_variables(variables, config, agent_meta_root)
+    apply_platform_variable_cascade(variables, config, config.get("platforms", []), agent_meta_root)
 
     return variables, unmapped
