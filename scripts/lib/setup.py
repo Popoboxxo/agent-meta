@@ -147,6 +147,24 @@ def _section(title: str) -> None:
     print(f"{'─' * 60}")
 
 
+def _platform_prefill(agent_meta_root: Path, platforms: list[str], field: str, fallback: str) -> str:
+    """Return the platform-cascaded default for `field` (either the literal
+    string "dod-preset" or a variables.<FIELD> key) if `platforms` resolves
+    one, else `fallback`.
+
+    Pure helper (Task 7, design spec §5) -- kept separate from the
+    interactive _ask()/_ask_choice() calls so it's unit-testable without
+    mocking stdin/questionary.
+    """
+    if not platforms:
+        return fallback
+    from lib.platform import PLATFORM_CONFIGS_DIR, resolve_platform_defaults
+    resolved = resolve_platform_defaults(platforms, agent_meta_root / PLATFORM_CONFIGS_DIR)
+    if field == "dod-preset":
+        return resolved.get("dod-preset") or fallback
+    return resolved.get("variables", {}).get(field) or fallback
+
+
 # ---------------------------------------------------------------------------
 # Validators
 # ---------------------------------------------------------------------------
@@ -270,7 +288,10 @@ def run_setup_wizard(
         print("  full              — REQ-IDs, tests, CODEBASE_OVERVIEW required")
         print("  standard          — Tests required, REQ-IDs optional")
         print("  rapid-prototyping — All checks disabled for fast iteration")
-        dod_preset = _ask_choice("DoD-Preset", ["full", "standard", "rapid-prototyping"], default="standard")
+        dod_preset = _ask_choice(
+            "DoD-Preset", ["full", "standard", "rapid-prototyping"],
+            default=_platform_prefill(agent_meta_root, platforms, "dod-preset", "standard"),
+        )
 
         _section("6. Languages")
         print("  INFO: Define the languages used by agents for different types of communication.")
@@ -289,7 +310,10 @@ def run_setup_wizard(
         project_context = _ask("Short Project Description (PROJECT_CONTEXT)", default=f"{name} — short description.")
         project_langs = _ask("Programming Languages (PROJECT_LANGUAGES)", default="TypeScript")
         dev_commands = _ask("Build/Dev Command (DEV_COMMANDS)", default="bun run build")
-        test_commands = _ask("Test Command (TEST_COMMANDS)", default="bun test")
+        test_commands = _ask(
+            "Test Command (TEST_COMMANDS)",
+            default=_platform_prefill(agent_meta_root, platforms, "TEST_COMMANDS", "bun test"),
+        )
 
     # ------------------------------------------------------------------
     # Assemble config
