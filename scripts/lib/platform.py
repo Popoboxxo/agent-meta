@@ -127,3 +127,79 @@ def substitute_platform(
         return match.group(0)
 
     return _PLATFORM_VAR_RE.sub(replacer, text)
+
+
+# Fields whose "+"-suffixed variant should be JOINED (not just overridden)
+# when more than one platform in `platforms:` sets it. Command-like fields
+# default to "&&" (matches the existing "cmd-a && cmd-b" convention already
+# used for TEST_COMMANDS in this repo's templates/examples); free-text
+# fields get an explicit, more readable join character. Per-field, not
+# global (design spec "Offene Implementierungs-Punkte" §3).
+_ADDITIVE_JOIN: dict[str, str] = {
+    "CODE_CONVENTIONS": "; ",
+}
+
+
+def resolve_platform_defaults(
+    platforms: list[str], platform_config_dir: 'Path | None' = None,
+) -> dict:
+    """Merge dod-preset/conventions-preset/variables across every active
+    platform's platform-configs/<name>.defaults.yaml (Task 1's new sections).
+
+    Single pass over `platforms` in list order -- for each platform's
+    `variables` entries:
+      - a plain key (no `+`) REPLACES whatever the field currently holds
+        (from an earlier platform's plain key OR an earlier platform's `+`
+        chain) -- "<FIELD> ersetzt komplett" (design spec).
+      - a `<FIELD>+` key APPENDS onto whatever the field currently holds,
+        using _ADDITIVE_JOIN.get(FIELD, " && ") as the join string; if
+        nothing is held yet, it simply becomes the field's value (no
+        leading join string) -- "<FIELD>+ hängt an" (design spec).
+    Top-level `dod-preset`/`conventions-preset` scalars follow the same
+    last-platform-wins rule as plain variables.
+
+    A platform without a matching platform-configs/<name>.defaults.yaml
+    file (or an unreadable/malformed one) contributes nothing and is not an
+    error -- mirrors load_platform_config()'s "not all platforms need one,
+    skip silently" contract (this module, L77-79/84-87).
+
+    platform_config_dir defaults to <agent-meta repo root>/platform-configs
+    -- derived from this file's own location (three parents up: lib -> scripts
+    -> repo root), a convenience default for callers that don't already
+    thread an explicit agent_meta_root (unlike load_platform_config()/
+    resolve_dod()/resolve_conventions(), which always receive agent_meta_root
+    explicitly and should pass `agent_meta_root / PLATFORM_CONFIGS_DIR` here
+    rather than relying on this default).
+
+    Returns {"dod-preset": str | None, "conventions-preset": str | None,
+             "variables": dict[str, str]}.
+    """
+    if platform_config_dir is None:
+        platform_config_dir = Path(__file__).resolve().parent.parent.parent / PLATFORM_CONFIGS_DIR
+
+    result: dict = {"dod-preset": None, "conventions-preset": None, "variables": {}}
+
+    for platform in platforms:
+        defaults_path = platform_config_dir / f'{platform}.defaults.yaml'
+        raw = load_yaml_file(defaults_path, on_error="default", default={})
+        if not raw:
+            continue
+
+        if "dod-preset" in raw:
+            result["dod-preset"] = raw["dod-preset"]
+        if "conventions-preset" in raw:
+            result["conventions-preset"] = raw["conventions-preset"]
+
+        platform_vars = raw.get("variables", {})
+        if not isinstance(platform_vars, dict):
+            continue
+        for key, value in platform_vars.items():
+            if key.endswith("+"):
+                field = key[:-1]
+                base = result["variables"].get(field, "")
+                join_char = _ADDITIVE_JOIN.get(field, " && ")
+                result["variables"][field] = f"{base}{join_char}{value}" if base else str(value)
+            else:
+                result["variables"][key] = value
+
+    return result
