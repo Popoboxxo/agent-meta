@@ -32,6 +32,10 @@ fail() {
     exit 1
 }
 
+# --- Provider marker files (expected: Claude only) ----
+[ -f "CLAUDE.md" ] || fail "root provider file missing: CLAUDE.md"
+[ -d ".claude/agents" ] || fail "agent directory missing for Claude: .claude/agents"
+
 ALLOWLIST=".meta-config/auto-commit-allowlist.json"
 [ -f "$ALLOWLIST" ] || fail "allowlist file missing: $ALLOWLIST"
 
