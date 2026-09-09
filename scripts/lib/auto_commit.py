@@ -51,16 +51,16 @@ def resolve_auto_commit_config(
     ac_cfg = config.get("auto_commit", {}) or {}
     mode = ac_cfg.get("mode", "off")
 
-    eligible_roles: list[str] = []
-    # Only 'auto' and 'custom' grant hook-level commit authority. 'suggest'
-    # roles merely propose a commit message, so they must never appear in
-    # the allowlist the guard hook trusts (and 'off' grants nothing).
-    if mode in ("auto", "custom"):
-        eligible_roles = sorted(
-            role
-            for role in active_roles
-            if is_role_eligible(role, agent_meta_root, platform)
-        )
+    # eligible_roles reflects capability (tools: contract) independent of
+    # mode -- it is the allowlist's data, not a mode-gated grant. Whether
+    # that capability confers actual hook-level commit authority is a
+    # guard-hook decision keyed on `mode` itself ('auto'/'custom' trust it,
+    # 'suggest' does not, 'off' grants nothing regardless of contents).
+    eligible_roles = sorted(
+        role
+        for role in active_roles
+        if is_role_eligible(role, agent_meta_root, platform)
+    )
 
     return {
         "version": ALLOWLIST_VERSION,

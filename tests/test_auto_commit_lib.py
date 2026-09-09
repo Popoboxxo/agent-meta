@@ -33,14 +33,18 @@ def test_explorer_is_not_eligible():
     assert is_role_eligible("explorer", _REPO_ROOT) is False
 
 
-def test_resolve_config_mode_off_returns_empty_allowlist():
+def test_resolve_config_mode_off_still_computes_eligible_roles():
+    # eligible_roles is capability data (tools: contract), independent of
+    # mode; 'off' mode grants no authority via the guard hook, but the
+    # list itself must not be silently empty just because mode is 'off'.
     result = resolve_auto_commit_config(
         config={"auto_commit": {"mode": "off"}},
         active_roles=["orchestrator", "developer", "git"],
         agent_meta_root=_REPO_ROOT,
     )
     assert result["mode"] == "off"
-    assert result["eligible_roles"] == []
+    assert "developer" in result["eligible_roles"]
+    assert "git" not in result["eligible_roles"]
 
 
 def test_resolve_config_auto_mode_lists_only_eligible_active_roles():
@@ -65,16 +69,18 @@ def test_resolve_config_defaults_secret_scan_true():
     assert result["secret_scan"] is True
 
 
-def test_resolve_config_suggest_mode_grants_no_hook_authority():
-    # 'suggest' agents only propose a commit message -- they must never end
-    # up in the allowlist the guard hook trusts to authorize a real commit.
+def test_resolve_config_suggest_mode_still_computes_eligible_roles():
+    # eligible_roles reflects capability regardless of mode; 'suggest'
+    # agents only propose a commit message and never gain hook-level
+    # commit authority -- that gate lives in the guard hook (which checks
+    # mode in ('auto', 'custom')), not in this capability list.
     result = resolve_auto_commit_config(
         config={"auto_commit": {"mode": "suggest"}},
         active_roles=["orchestrator", "developer", "git", "tester"],
         agent_meta_root=_REPO_ROOT,
     )
     assert result["mode"] == "suggest"
-    assert result["eligible_roles"] == []
+    assert result["eligible_roles"] == ["developer", "orchestrator", "tester"]
 
 
 def test_resolve_config_custom_mode_lists_eligible_roles():
@@ -93,7 +99,8 @@ def test_resolve_config_missing_auto_commit_key_defaults_to_off():
         agent_meta_root=_REPO_ROOT,
     )
     assert result["mode"] == "off"
-    assert result["eligible_roles"] == []
+    assert "developer" in result["eligible_roles"]
+    assert "git" not in result["eligible_roles"]
 
 
 def test_load_config_normalizes_unquoted_off_bool(tmp_path):
@@ -116,4 +123,5 @@ def test_load_config_normalizes_unquoted_off_bool(tmp_path):
         agent_meta_root=_REPO_ROOT,
     )
     assert result["mode"] == "off"
-    assert result["eligible_roles"] == []
+    assert "developer" in result["eligible_roles"]
+    assert "git" not in result["eligible_roles"]

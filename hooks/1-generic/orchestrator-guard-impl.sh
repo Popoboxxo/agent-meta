@@ -209,7 +209,12 @@ try:
 except Exception:
     print('off')
 " "$_ALLOWLIST" 2>/dev/null)
-        if [ "$_AC_MODE" != "off" ]; then
+        # Only 'auto'/'custom' grant hook-level commit authority; 'suggest'
+        # roles merely propose a commit message and must never gain the
+        # sentinel even though they may now appear in eligible_roles (that
+        # list reflects capability, not per-mode authority -- see
+        # scripts/lib/auto_commit.py resolve_auto_commit_config()).
+        if [ "$_AC_MODE" = "auto" ] || [ "$_AC_MODE" = "custom" ]; then
           _IS_ELIGIBLE=$("$_PY" -c "
 import json, sys
 try:
