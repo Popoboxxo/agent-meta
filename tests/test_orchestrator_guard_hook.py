@@ -788,6 +788,16 @@ def test_auto_commit_mode_off_ignores_eligible_roles_list(tmp_path):
     assert result.returncode == 2, f"stderr={result.stderr}"
 
 
+def test_auto_commit_suggest_mode_ignores_eligible_roles_list(tmp_path):
+    # eligible_roles now reflects capability in every mode (bugfix); the
+    # guard hook must still withhold authority for 'suggest' -- only
+    # 'auto'/'custom' grant it.
+    _write_allowlist(tmp_path, "suggest", ["developer"])
+    command = "#agent-meta:agent=developer\ngit add -A && git commit -m 'x'"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+
+
 def test_auto_commit_destructive_gate_still_blocks_an_allowlisted_role(tmp_path):
     # #516's destructive-gate protections are untouched by this feature --
     # same assertion shape as test_destructive_ops_blocked_even_with_git_sentinel
