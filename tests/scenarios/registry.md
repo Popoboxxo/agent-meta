@@ -74,3 +74,13 @@ Minimale Szenario-Configs (z.B. `01-minimal-claude`, `13-status-table`), die
 keinen Default in `scripts/lib/config.py`. Vorbestehendes, von diesem Katalog
 unabhängiges Verhalten (bereits in `01-minimal-claude` vor jeder Erweiterung
 so), kein Scenario-Bug.
+| `22-platform-defaults-hacs-passthrough` | Claude | strict (default) | Platform-preset cascade: hacs defaults flow through unmodified (dod-preset/PLATFORM/TEST_COMMANDS) |
+| `23-platform-defaults-sharkord-explicit-override` | Claude | strict (default) | Platform-preset cascade: explicit project `variables.TEST_COMMANDS` fully replaces the platform default |
+| `24-platform-defaults-homeassistant-additive` | Claude | strict (default) | Platform-preset cascade: project `variables.TEST_COMMANDS+` appends onto the platform default with `&&` |
+| `25-platform-defaults-order-hacs-sharkord` | Claude | strict (default) | Platform-preset cascade: `platforms: [hacs, sharkord]` — last platform (sharkord) wins for a plain scalar |
+| `26-platform-defaults-order-sharkord-hacs` | Claude | strict (default) | Platform-preset cascade: swapped order flips the winner (order-sensitivity proof) |
+| `27-platform-defaults-additive-three-platforms` | Claude | strict (default) | Platform-preset cascade: 3 platforms, additive field set by only 2 — concatenation excludes the third |
+| `28-platform-defaults-no-platforms-regression` | Claude | strict (default) | Platform-preset cascade: no `platforms:` key at all — old framework-default behavior unchanged (regression) |
+| `29-platform-defaults-dod-preset-explicit-override` | Claude | strict (default) | Platform-preset cascade: explicit project `dod-preset` wins over the platform default |
+| `30-platform-defaults-dod-preset-platform-fallback` | Claude | strict (default) | Platform-preset cascade: platform `dod-preset` wins over the old implicit `"full"` |
+| `31-platform-defaults-unknown-platform` | Claude | strict (default) | Platform-preset cascade: unknown platform without a `defaults.yaml` — empty cascade, no crash |

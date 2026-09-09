@@ -1,0 +1,28 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+platforms:
+- hacs
+- sharkord
+roles:
+- orchestrator
+- git
+project:
+  name: scenario-platform-order-hacs-sharkord
+  prefix: s25
+  short: platform-order-hacs-sharkord
+variables:
+  PROJECT_NAME: scenario-platform-order-hacs-sharkord
+  PROJECT_DESCRIPTION: Platform-defaults order-sensitivity test ([hacs, sharkord]).
+  PROJECT_GOAL: Verify that with platforms:[hacs, sharkord] the last platform (sharkord) wins for the plain scalar field PLATFORM.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-platform-order-hacs-sharkord
+  GIT_MAIN_BRANCH: main
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false
