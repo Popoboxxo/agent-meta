@@ -35,3 +35,19 @@ def test_platform_prefill_falls_back_when_field_not_set_by_platform():
 def test_platform_prefill_dod_preset():
     result = _platform_prefill(_REPO_ROOT, ["hacs"], "dod-preset", "standard")
     assert result == "standard"
+
+
+def test_platform_prefill_empty_string_is_not_fallback(monkeypatch):
+    """A deliberate empty-string platform default is a real value (opt-out),
+    not "unset" -- same precedence as platform.resolve_preset_name (Finding 5).
+    Truthiness (`value or fallback`) would wrongly swallow "" into fallback.
+    """
+    import lib.platform as platform_mod
+
+    monkeypatch.setattr(
+        platform_mod,
+        "resolve_platform_defaults",
+        lambda platforms, config_dir: {"dod-preset": "", "variables": {"TEST_COMMANDS": ""}},
+    )
+    assert _platform_prefill(_REPO_ROOT, ["hacs"], "dod-preset", "standard") == ""
+    assert _platform_prefill(_REPO_ROOT, ["hacs"], "TEST_COMMANDS", "bun test") == ""

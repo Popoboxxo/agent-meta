@@ -160,9 +160,14 @@ def _platform_prefill(agent_meta_root: Path, platforms: list[str], field: str, f
         return fallback
     from lib.platform import PLATFORM_CONFIGS_DIR, resolve_platform_defaults
     resolved = resolve_platform_defaults(platforms, agent_meta_root / PLATFORM_CONFIGS_DIR)
+    # Key presence wins over the fallback, not truthiness (same precedence
+    # as platform.resolve_preset_name): a deliberate empty-string default in
+    # a platform-config is a real value, not "unset".
     if field == "dod-preset":
-        return resolved.get("dod-preset") or fallback
-    return resolved.get("variables", {}).get(field) or fallback
+        value = resolved.get("dod-preset")
+    else:
+        value = resolved.get("variables", {}).get(field)
+    return value if value is not None else fallback
 
 
 # ---------------------------------------------------------------------------
