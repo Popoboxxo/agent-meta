@@ -24,6 +24,9 @@ rewritten in exact mode.
 """
 from __future__ import annotations
 
+import subprocess
+from pathlib import Path
+
 from .providers import resolve_providers
 
 # Category fallback for Claude's gitignore_entries when the provider config
@@ -251,3 +254,52 @@ def _collect_skill_gitignore_entries(config: dict, ext_config: dict, provider_co
             if skills_dir:
                 entries.append(f"{skills_dir}/{skill_name}/")
     return entries
+
+
+def detect_shadowed_provider_roots(
+    project_root: Path,
+    providers: list[str],
+    provider_config: dict,
+    ignore_provider_dirs: bool,
+) -> list[str]:
+    """Return one warning per provider whose ENTIRE generated output is
+    swallowed by a pre-existing .gitignore rule the managed block did not
+    write itself (issue #713).
+
+    Only meaningful when ``ignore-provider-dirs`` is False (the default):
+    in that mode the managed block never adds a whole-``agents_dir`` entry
+    on its own, so any ``git check-ignore`` match on a probe path under
+    ``agents_dir`` can only come from an unrelated, pre-existing rule that
+    predates our managed block -- exactly the silent-shadowing scenario
+    reported (`git ls-files` shows nothing, no warning anywhere). When the
+    toggle is True the managed block DOES add that whole-root entry itself,
+    so a match there is expected and not reported.
+    """
+    warnings: list[str] = []
+    if ignore_provider_dirs or not (project_root / ".git").is_dir():
+        return warnings
+    for provider in providers:
+        agents_dir = provider_config.get(provider, {}).get("agents_dir")
+        if not agents_dir:
+            continue
+        probe = f"{agents_dir}/__agent_meta_shadow_probe__.md"
+        try:
+            result = subprocess.run(
+                ["git", "check-ignore", "-v", probe],
+                cwd=str(project_root), capture_output=True, text=True, timeout=5,
+            )
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if result.returncode != 0 or not result.stdout.strip():
+            continue  # not ignored at all -- fine
+        # `git check-ignore -v` output: "<source>:<line>:<pattern>\t<path>"
+        source_rule = result.stdout.strip().split("\t", 1)[0]
+        warnings.append(
+            f"gitignore-shadowing: provider '{provider}' output under "
+            f"'{agents_dir}/' is silently ignored by a pre-existing rule "
+            f"({source_rule}) that predates the agent-meta managed block -- "
+            "every generated file is untracked with no warning (`git ls-files` "
+            "shows nothing). Narrow that rule, or add an exception via "
+            "gitignore.exceptions in .meta-config/project.yaml."
+        )
+    return warnings

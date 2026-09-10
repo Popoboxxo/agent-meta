@@ -693,6 +693,13 @@ def _sync_stage_gitignore(
         ensure_gitignore_entries(project_root, log, args.dry_run,
                                  gitignore_entries=extra_provider_entries + mcp_gitignore_extras)
 
+    from .gitignore import detect_shadowed_provider_roots
+    for shadow_warning in detect_shadowed_provider_roots(
+        project_root, providers, provider_config,
+        ignore_provider_dirs=gitignore_cfg.get("ignore-provider-dirs", False),
+    ):
+        log.warning(f"[P0] {shadow_warning}")
+
 
 def _sync_stage_config_audit(agent_meta_root: Path, config_path: Path, log: SyncLog) -> None:
     """Stage 12: lightweight config-audit summary at the end of a sync."""
