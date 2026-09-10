@@ -72,13 +72,16 @@ def _run_version(binary: str) -> tuple[bool, str]:
         return False, str(exc)
 
 
-def _mcp_initialize_handshake(command: str, args: list, env: dict) -> tuple[bool | None, str]:
+def _mcp_initialize_handshake(command: str, args: list, env: dict) -> tuple[bool, str]:
     """Start the stdio MCP process, send an `initialize` request, read one line,
-    terminate. Returns (ok, message) — ok is None for UNAVAILABLE (the binary
-    doesn't exist; classified by exception type, not by matching the
-    platform-specific "[WinError 2]"/"[Errno 2]" message text). Bounded by
-    _TIMEOUT to prevent hangs. Uses _read_line_with_timeout for correct
-    timeout semantics on all platforms."""
+    terminate. `command` must be the path already resolved by shutil.which()
+    (the caller confirms it exists before calling this) — subprocess.Popen(
+    shell=False) does no PATH/PATHEXT resolution of its own, so passing the
+    raw command name instead would silently break on Windows for PATHEXT-only
+    shims (.cmd/.bat, typical for `npm install -g` tools) even though the same
+    name resolves fine in an interactive shell. Bounded by _TIMEOUT to prevent
+    hangs. Uses _read_line_with_timeout for correct timeout semantics on all
+    platforms."""
     proc = None
     try:
         # Merge the plugin's declared vars ON TOP of the parent environment —
@@ -99,11 +102,19 @@ def _mcp_initialize_handshake(command: str, args: list, env: dict) -> tuple[bool
         if line is None:
             return False, f"no response within {_TIMEOUT}s"
         return ("result" in line or "jsonrpc" in line), "initialize responded"
-    except FileNotFoundError:
-        # shutil.which() found the command, but exec still failed (e.g. a
-        # broken PATH entry, or a race where the binary disappeared) — a
-        # setup gap, not a plugin bug (issue #693).
-        return None, f"binary '{command}' not found"
+    except FileNotFoundError as exc:
+        # The caller only calls this function after shutil.which(command)
+        # already confirmed a resolved path exists — the "not installed" case
+        # is short-circuited before we ever get here. So a FileNotFoundError
+        # at this point, despite a resolved path, is an unexpected condition
+        # (permissions, a TOCTOU race, or — on Windows — a resolved .cmd/.bat
+        # shim that CreateProcess cannot exec directly without going through
+        # the command interpreter, i.e. would need shell=True or
+        # ["cmd", "/c", command, *args]; deliberately not implemented here —
+        # no Windows test coverage in this repo, and shell=True on
+        # externally-configured args is a command-injection risk). Report it
+        # as a real FAIL, not silently as UNAVAILABLE (issue #725 misfix).
+        return False, f"'{command}' failed to start despite being resolved: {exc}"
     except Exception as exc:  # noqa: BLE001
         return False, str(exc)
     finally:
@@ -143,20 +154,25 @@ def run_plugin_test(plugin_id: str, plugin_def: dict, secrets: dict | None = Non
 
     if origin == "local-binary":
         binary = plugin_def.get("binary") or plugin_id
-        if shutil.which(binary) is None:
+        # Use the resolved path from which(), not the raw `binary` string —
+        # subprocess.Popen(shell=False) doesn't repeat which()'s PATH/PATHEXT
+        # resolution itself (root cause of issue #725's misfix).
+        resolved = shutil.which(binary)
+        if resolved is None:
             return _result("UNAVAILABLE", f"binary '{binary}' not installed locally", started)
-        ok, msg = _run_version(binary)
+        ok, msg = _run_version(resolved)
         return _result("PASS" if ok else "FAIL", msg, started)
 
     if origin in ("local-process", "repo-owned-process"):
         command = conn.get("command", "")
-        if command and shutil.which(command) is None:
+        # Same reasoning as local-binary above: pass the resolved path on to
+        # the handshake, not the raw command string.
+        resolved_command = shutil.which(command) if command else None
+        if command and resolved_command is None:
             return _result("UNAVAILABLE", f"command '{command}' not installed locally", started)
         env = {_resolve_secrets(k, secrets): _resolve_secrets(str(v), secrets)
                for k, v in (conn.get("env") or {}).items()}
-        ok, msg = _mcp_initialize_handshake(command, conn.get("args", []), env)
-        if ok is None:
-            return _result("UNAVAILABLE", msg, started)
+        ok, msg = _mcp_initialize_handshake(resolved_command or command, conn.get("args", []), env)
         return _result("PASS" if ok else "FAIL", msg, started)
 
     if origin == "remote-saas":
