@@ -24,11 +24,21 @@ def _resolve_secrets(text: str, secrets: dict) -> str:
     return _SECRET_RE.sub(lambda m: str(secrets.get(m.group(1), m.group(0))), text)
 
 
-def _has_unresolved_placeholder(text: str) -> bool:
-    """True if `text` still contains a `{{VAR}}` placeholder after secret
-    resolution — i.e. the project has no value for it (issue #693: this is a
-    per-project setup gap, not a broken plugin)."""
-    return bool(_SECRET_RE.search(text))
+def _unresolved_placeholder_names(text: str, secrets: dict) -> list[str]:
+    """Names of `{{VAR}}` placeholders in `text` with no truthy value in
+    `secrets` — i.e. the project has no value for it (issue #693: this is a
+    per-project setup gap, not a broken plugin).
+
+    Checked pre-substitution, on the raw template text, so it catches both a
+    wholly missing secret (the placeholder text would survive substitution
+    unchanged) AND a scaffolded-but-blank one (the shipped secrets.local
+    template ships empty strings, not missing keys — after substitution that
+    silently becomes just an empty string, no longer matching the `{{VAR}}`
+    pattern at all). A post-substitution regex check on the resolved string
+    would miss the second case, letting a blank/unresolved URL through to the
+    actual connection attempt (e.g. `urllib`'s "unknown url type").
+    """
+    return [name for name in _SECRET_RE.findall(text) if not secrets.get(name)]
 
 
 def _read_line_with_timeout(stream, timeout: float) -> str | None:
@@ -64,8 +74,14 @@ def _run_version(binary: str) -> tuple[bool, str]:
 
 def _mcp_initialize_handshake(command: str, args: list, env: dict) -> tuple[bool, str]:
     """Start the stdio MCP process, send an `initialize` request, read one line,
-    terminate. Returns (ok, message). Bounded by _TIMEOUT to prevent hangs.
-    Uses _read_line_with_timeout for correct timeout semantics on all platforms."""
+    terminate. `command` must be the path already resolved by shutil.which()
+    (the caller confirms it exists before calling this) — subprocess.Popen(
+    shell=False) does no PATH/PATHEXT resolution of its own, so passing the
+    raw command name instead would silently break on Windows for PATHEXT-only
+    shims (.cmd/.bat, typical for `npm install -g` tools) even though the same
+    name resolves fine in an interactive shell. Bounded by _TIMEOUT to prevent
+    hangs. Uses _read_line_with_timeout for correct timeout semantics on all
+    platforms."""
     proc = None
     try:
         # Merge the plugin's declared vars ON TOP of the parent environment —
@@ -86,6 +102,19 @@ def _mcp_initialize_handshake(command: str, args: list, env: dict) -> tuple[bool
         if line is None:
             return False, f"no response within {_TIMEOUT}s"
         return ("result" in line or "jsonrpc" in line), "initialize responded"
+    except FileNotFoundError as exc:
+        # The caller only calls this function after shutil.which(command)
+        # already confirmed a resolved path exists — the "not installed" case
+        # is short-circuited before we ever get here. So a FileNotFoundError
+        # at this point, despite a resolved path, is an unexpected condition
+        # (permissions, a TOCTOU race, or — on Windows — a resolved .cmd/.bat
+        # shim that CreateProcess cannot exec directly without going through
+        # the command interpreter, i.e. would need shell=True or
+        # ["cmd", "/c", command, *args]; deliberately not implemented here —
+        # no Windows test coverage in this repo, and shell=True on
+        # externally-configured args is a command-injection risk). Report it
+        # as a real FAIL, not silently as UNAVAILABLE (issue #725 misfix).
+        return False, f"'{command}' failed to start despite being resolved: {exc}"
     except Exception as exc:  # noqa: BLE001
         return False, str(exc)
     finally:
@@ -125,25 +154,32 @@ def run_plugin_test(plugin_id: str, plugin_def: dict, secrets: dict | None = Non
 
     if origin == "local-binary":
         binary = plugin_def.get("binary") or plugin_id
-        if shutil.which(binary) is None:
+        # Use the resolved path from which(), not the raw `binary` string —
+        # subprocess.Popen(shell=False) doesn't repeat which()'s PATH/PATHEXT
+        # resolution itself (root cause of issue #725's misfix).
+        resolved = shutil.which(binary)
+        if resolved is None:
             return _result("UNAVAILABLE", f"binary '{binary}' not installed locally", started)
-        ok, msg = _run_version(binary)
+        ok, msg = _run_version(resolved)
         return _result("PASS" if ok else "FAIL", msg, started)
 
     if origin in ("local-process", "repo-owned-process"):
         command = conn.get("command", "")
-        if command and shutil.which(command) is None:
+        # Same reasoning as local-binary above: pass the resolved path on to
+        # the handshake, not the raw command string.
+        resolved_command = shutil.which(command) if command else None
+        if command and resolved_command is None:
             return _result("UNAVAILABLE", f"command '{command}' not installed locally", started)
         env = {_resolve_secrets(k, secrets): _resolve_secrets(str(v), secrets)
                for k, v in (conn.get("env") or {}).items()}
-        ok, msg = _mcp_initialize_handshake(command, conn.get("args", []), env)
+        ok, msg = _mcp_initialize_handshake(resolved_command or command, conn.get("args", []), env)
         return _result("PASS" if ok else "FAIL", msg, started)
 
     if origin == "remote-saas":
         raw_url = conn.get("url", "")
-        url = _resolve_secrets(raw_url, secrets)
-        if _has_unresolved_placeholder(url):
+        if _unresolved_placeholder_names(raw_url, secrets):
             return _result("UNAVAILABLE", "missing secret(s) — not configured for this project", started)
+        url = _resolve_secrets(raw_url, secrets)
         headers = {k: _resolve_secrets(str(v), secrets) for k, v in (conn.get("headers") or {}).items()}
         try:
             code, _ = _http_probe(url, headers)
