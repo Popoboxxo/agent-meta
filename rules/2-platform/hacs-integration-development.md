@@ -64,6 +64,7 @@ prüfen, Dev-Instanz und Skills beim User erfragen — und die Werte in
 |---|---|---|
 | `unique_id` + `device_info` ab Entity #1 | Nachträglich ergänzen erzeugt bei HA komplett neue Entity-IDs — der Alt-Bestand bleibt verwaist | Entity-Generation-Chaos; verwaiste Duplikat-Entities |
 | `unique_id` nie ändern | HA koppelt Automatisierungen, Dashboards und History an die unique_id | Beim Update wird jede betroffene Entity neu angelegt; User-Setup bricht |
+| `suggested_object_id` auf den englischen Namen pinnen (`has_entity_name` + `translation_key` für den lokalisierten Anzeigenamen) | HA >= 2026.9 erzeugt object_ids für Sprachen in `NATIVE_ENTITY_IDS` (u.a. Deutsch) aus der lokalisierten Übersetzung statt aus dem Englischen — ohne Pinning wechselt object_id/entity_id mit der Systemsprache | entity_id ändert sich/verwaist bei Sprachwechsel — gleiche Schadensklasse wie die `unique_id`-Regel, nur über einen anderen Mechanismus (`unique_id` != object_id) |
 | Plattform == Dateiname (`PLATFORMS`-Eintrag `<name>` braucht `<name>.py`) | HA lädt Plattform-Module per Dateinamen | `ModuleNotFoundError: custom_components.<domain>.<platform>` |
 
 ### Architektur
@@ -89,6 +90,64 @@ prüfen, Dev-Instanz und Skills beim User erfragen — und die Werte in
 | Diagnostics ohne Geheimnisse/Gesundheitsdaten | Der Diagnostics-Download geht ins öffentliche GitHub Issue | Secret-Leak im Issue-Tracker |
 | Exporte nie nach `/config/www` | `/www` ist über den HA-Webserver öffentlich erreichbar | Datenleck über HTTP |
 | Tokens zentral speichern (Storage/Entry-Data, nicht verteilt) | Verteilte Tokens landen in Entity-Attributen und Logs | Token im State-Objekt/Log sichtbar |
+
+## Sprache, Namen & Identität
+
+Ergänzt die eiserne Regel `suggested_object_id` (Tabelle Entities oben) um Referenz-Code
+und die Etikette für eine geteilte Dev-Instanz.
+
+**Object-ID-Pinning (Referenz-Implementierung):** `Popoboxxo/ha-health-o-mat`,
+`custom_components/health_o_mat/entity.py`, Basisklasse `HealthOMatEntity`:
+
+```python
+@property
+def suggested_object_id(self) -> str | None:
+    """Objekt-IDs (Entity-ID-Suffixe) immer aus dem ENGLISCHEN Namen.
+
+    HA >= 2026.9 erzeugt für Sprachen in NATIVE_ENTITY_IDS (u. a. Deutsch)
+    Objekt-IDs in der Systemsprache — die IDs würden mit der Sprache
+    wechseln (z. B. `melder_sehr_schlecht`). Wir pinnen die Suffixe auf
+    Englisch: stabil, lesbar, sprachunabhängig. Der Anzeigename bleibt
+    davon unberührt (folgt weiterhin der Systemsprache).
+    """
+    platform_data = self.platform_data
+    if (
+        platform_data is not None
+        and type.__getattribute__(self.__class__, "name")
+        is type.__getattribute__(Entity, "name")
+    ):
+        name = self._name_internal(
+            self._object_id_device_class_name,
+            getattr(platform_data, "default_language_platform_translations", None) or {},
+        )
+        if name is not UNDEFINED:
+            return name
+    return super().suggested_object_id
+```
+
+Kombiniert mit `has_entity_name = True` + `_attr_translation_key`: der **Anzeigename**
+bleibt lokalisiert (folgt der Systemsprache), das **object_id/entity_id** ist auf
+Englisch gepinnt — stabil und sprachunabhängig.
+
+**Master/Ableitung:** `strings.json` ist der englische Master; `translations/{de,en}.json`
+sind abgeleitet (siehe Meta-Dateien-Skelett unten) — der Master trägt die Identität,
+Übersetzungen tragen nur den zur Laufzeit angezeigten `friendly_name`.
+
+**Erstregistrierungs-Regel:** Ohne das Pinning oben (oder auf HA < 2026.9) bestimmt die
+zum Zeitpunkt der **Erstregistrierung** aktive Systemsprache das object_id dauerhaft —
+Entities in der beabsichtigten Sprache erstregistrieren, eine spätere Umbenennung ist
+ein Breaking Change (vgl. `unique_id` nie ändern, Tabelle Entities oben).
+
+**Etikette auf einer geteilten Dev-Instanz** (mehrere Integrationen/Domains auf derselben
+Home-Assistant-Instanz):
+
+| Aspekt | Regel |
+|---|---|
+| Sync (Neustart, ~10–30s) | Pro-Domain sicher — die Registry der anderen Domains bleibt erhalten |
+| Reset | Destruktiv für **alle** Domains auf der Instanz — vorher koordinieren, nicht ungefragt ausführen |
+| `unique_id` | Akkumuliert dauerhaft in der geteilten Registry über alle Domains hinweg — nie ändern (Tabelle Entities oben) |
+| Systemsprache wechseln | Instanzweiter Blast-Radius: rendert `friendly_name`s **aller** Domains neu und riskiert Erstregistrierungen laufender Arbeiten anderer Domains — vorher koordinieren |
+| Tokens/State | Nie committen oder zwischen Domains kopieren |
 
 ## Release-Naming-Best-Practice
 
@@ -150,6 +209,36 @@ Generator — Dateien nicht blind übernehmen.
 
 `iot_class` gehört **nur hierhin**, nie ins `hacs.json`. `version` muss beim Release
 dem Git-Tag entsprechen (eiserne Regel Releases).
+
+### Migrations-Rezept: `entry.data` → `entry.options`
+
+Konkretisiert die eiserne Regel „`manifest.VERSION` nur mit registriertem
+`async_migrate_entry`-Handler erhöhen" (Tabelle Releases oben) für den häufigsten Fall:
+strukturelle Daten bleiben in `entry.data`, editierbare Daten wandern verlustfrei nach
+`entry.options`. Worked example: `Popoboxxo/ha-health-o-mat`, `config_flow.py`.
+
+| Version | `entry.data` | `entry.options` |
+|---|---|---|
+| v1 | alles (inkl. editierbarer Werte) | leer |
+| v2 | nur strukturelle Daten (z.B. Host, Domain-Identität) | editierbare Werte (z.B. Schwellwerte, Intervalle) |
+
+```python
+# custom_components/<domain>/__init__.py
+STRUCTURAL_KEYS = {"host"}  # Beispiel: an das eigene Schema anpassen
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Migrate an old entry.data layout to the current version."""
+    if entry.version == 1:
+        new_data = {k: v for k, v in entry.data.items() if k in STRUCTURAL_KEYS}
+        new_options = {
+            **entry.options,
+            **{k: v for k, v in entry.data.items() if k not in STRUCTURAL_KEYS},
+        }
+        hass.config_entries.async_update_entry(
+            entry, data=new_data, options=new_options, version=2
+        )
+    return True
+```
 
 ### `custom_components/<domain>/strings.json` (Master) + `translations/{de,en}.json`
 
