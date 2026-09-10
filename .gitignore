@@ -31,6 +31,7 @@ graphify-out/
 .meta-config/env.unset.ps1
 .meta-config/env.unset.sh
 .meta-config/secrets.local.yaml
+.meta-config/platform-defaults.resolved.yaml
 .opencode/mcp.local.json
 .opencode/pending-tasks.md
 .opencode/settings.local.json
