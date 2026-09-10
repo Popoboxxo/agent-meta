@@ -3991,6 +3991,7 @@ async function viewConventionsPresets() {
     relSec.appendChild(scalarField("changelog.format", changelog, "format"));
     relSec.appendChild(listField("changelog.sections", changelog, "sections"));
     relSec.appendChild(scalarField("changelog.entry_prefix", changelog, "entry_prefix"));
+    relSec.appendChild(scalarField("changelog.cutoff_method", changelog, "cutoff_method"));
     panel.appendChild(relSec);
 
     // issues domain
@@ -4053,6 +4054,7 @@ async function viewProjectConventionsOverrides() {
       [["changelog", "format"], "changelog.format", "scalar"],
       [["changelog", "sections"], "changelog.sections", "list"],
       [["changelog", "entry_prefix"], "changelog.entry_prefix", "scalar"],
+      [["changelog", "cutoff_method"], "changelog.cutoff_method", "scalar"],
     ],
     issues: [
       [["title_format"], "title_format", "scalar"],

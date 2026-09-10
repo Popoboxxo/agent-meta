@@ -105,9 +105,10 @@ def render_convention_block(
     is irrelevant.
 
     Otherwise dispatch to the domain-specific renderer(s) and return a dict of
-    {variable_name: markdown}. The 'release' domain produces two variables
-    (versioning table + changelog code block) from two separate renderers; the
-    concept declares this dict return (Abschnitt 4B signature).
+    {variable_name: markdown}. The 'release' domain produces four variables
+    (versioning table, changelog code block, custom checklist rows, release-
+    cutoff recipe) from separate renderers; the concept declares this dict
+    return (Abschnitt 4B signature).
     """
     declared_roles = spec.get("applies_to_roles", [])
     role = declared_roles[0] if declared_roles else None
@@ -125,6 +126,7 @@ def render_convention_block(
             "RELEASE_VERSIONING_BLOCK": _render_release_versioning(spec),
             "RELEASE_CHANGELOG_BLOCK": _render_release_changelog(spec),
             "RELEASE_CUSTOM_CHECKLIST_BLOCK": _render_release_custom_checklist(spec),
+            "RELEASE_CUTOFF_BLOCK": _render_release_cutoff(spec),
         }
     if domain == "issues":
         return {"GIT_ISSUE_NAMING_BLOCK": _render_git_issue_naming(spec)}
@@ -207,6 +209,43 @@ def _render_release_changelog(spec: dict) -> str:
     if fmt == "angular":
         return _render_changelog_angular(sections)
     return _render_changelog_keep_a_changelog(sections, changelog.get("entry_prefix", ""))
+
+
+def _render_release_cutoff(spec: dict) -> str:
+    """Render the 'since last release' PR/commit cutoff recipe (issue #726).
+
+    spec['changelog']['cutoff_method'] selects the boundary method:
+      - exact-timestamp (default): tag-push timestamp as strict lower bound,
+        the only method immune to duplicate changelog entries when multiple
+        releases happen on the same calendar day.
+      - calendar-day (deprecated): kept as an explicit opt-out for projects
+        that already reviewed and accept the duplicate-entry risk; renders a
+        loud warning instead of silently doing the wrong thing.
+    """
+    cutoff_method = spec.get("changelog", {}).get("cutoff_method", "exact-timestamp")
+    if cutoff_method == "calendar-day":
+        return (
+            "> ⚠️ **`cutoff_method: calendar-day`** (deprecated) — filtert PRs/Commits "
+            "per Kalendertag. Bei mehreren Releases am selben Tag entstehen doppelte "
+            "CHANGELOG-Einträge (siehe Issue #726). Empfehlung: auf `exact-timestamp` "
+            "umstellen.\n"
+            "```bash\n"
+            "gh pr list --base main --search \"merged:>=YYYY-MM-DD\" "
+            "--json number,title,mergedAt\n"
+            "```"
+        )
+    return (
+        "Exakter Timestamp des letzten Release-Tags als Untergrenze — Kalendertag-Filter "
+        "(`merged:>=YYYY-MM-DD`) vermeiden, sonst entstehen doppelte Einträge bei mehreren "
+        "Releases am selben Tag (Issue #726).\n"
+        "```bash\n"
+        "# Exakten Timestamp des letzten Release-Tags ermitteln\n"
+        "git log --format=\"%ai\" -1 <last-tag>\n\n"
+        "# Nur PRs, die STRIKT NACH diesem Zeitpunkt gemerged wurden\n"
+        "gh pr list --base main --search \"merged:>YYYY-MM-DDTHH:MM:SSZ\" "
+        "--json number,title,mergedAt\n"
+        "```"
+    )
 
 
 def _render_changelog_keep_a_changelog(sections: list, entry_prefix: str) -> str:

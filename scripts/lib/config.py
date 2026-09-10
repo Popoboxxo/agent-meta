@@ -1230,8 +1230,8 @@ def _build_convention_variables(variables: dict, config: dict, agent_meta_root: 
     Parameter contract:
         variables: mutated in place — receives ISSUE_LANGUAGE (always set,
             see below) plus whichever RELEASE_VERSIONING_BLOCK/
-            RELEASE_CHANGELOG_BLOCK/GIT_ISSUE_NAMING_BLOCK-style keys
-            `render_convention_block()` returns for the "release"/"issues"
+            RELEASE_CHANGELOG_BLOCK/RELEASE_CUTOFF_BLOCK/GIT_ISSUE_NAMING_BLOCK-
+            style keys `render_convention_block()` returns for the "release"/"issues"
             domains. A role-inactive domain sets NO block variable at all
             (not even an empty string) — its template is not generated
             anyway (Konzept Abschnitt C).
