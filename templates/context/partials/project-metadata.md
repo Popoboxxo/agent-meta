@@ -11,7 +11,12 @@ version: 2.0.0
 
 > Struktur: siehe Verzeichnisstruktur im Repo (`ls`/`find`); deklarativ: `.meta-config/project.yaml` → `variables.PROJECT_STRUCTURE`.
 
-> Runtime & Abhängigkeiten: siehe Projekt-Manifest (`pyproject.toml` / `requirements.txt` / `package.json` / `manifest.json`).
+{{#unless COMPACT_MODE}}{{#if PROJECT_STRUCTURE}}**Verzeichnisstruktur:**
+```
+{{PROJECT_STRUCTURE}}
+```
+
+{{/if}}{{/unless}}> Runtime & Abhängigkeiten: siehe Projekt-Manifest (`pyproject.toml` / `requirements.txt` / `package.json` / `manifest.json`).
 
 **Entry-Point:** `{{ENTRY_POINT_PATTERN}}`
 

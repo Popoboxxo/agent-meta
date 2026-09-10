@@ -9,6 +9,24 @@
 
 > Struktur: siehe Verzeichnisstruktur im Repo (`ls`/`find`); deklarativ: `.meta-config/project.yaml` → `variables.PROJECT_STRUCTURE`.
 
+**Verzeichnisstruktur:**
+```
+agents/
+  0-external/       # Wrapper-Template für externe Skills
+  1-generic/        # Universelle Agent-Templates
+  2-platform/       # Plattform-Overrides (z.B. sharkord, homeassistant, agent-meta)
+scripts/
+  sync.py           # Agent-Generator
+  admin-server.py   # Lokaler Admin-UI developer/)
+external/           # Git Submodule (externe Skill-Repos)
+docs/guides/        # Anleitungen und Beispiel-Config
+docs/ui/            # UI Assets
+  architecture/     # Architektur-Diagramme (Mermaid)
+  admin-ui.html     # Admin-UI Frontend
+tests/              # Test-Suite (automated, manual, orchestration)
+
+```
+
 > Runtime & Abhängigkeiten: siehe Projekt-Manifest (`pyproject.toml` / `requirements.txt` / `package.json` / `manifest.json`).
 
 **Entry-Point:** `scripts/sync.py — Haupt-CLI für Agent-Generierung`
