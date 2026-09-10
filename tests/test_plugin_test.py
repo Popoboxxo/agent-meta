@@ -6,6 +6,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
@@ -197,3 +199,47 @@ def test_local_process_env_block_inherits_parent_env(monkeypatch):
 def test_unknown_origin_type():
     res = run_plugin_test("mystery", {"origin-type": "quantum"})
     assert res["status"] == "UNKNOWN"
+
+
+@pytest.mark.parametrize("message", [
+    "[WinError 2] The system cannot find the file specified",
+    "[Errno 2] No such file or directory: 'graphify'",
+])
+def test_local_process_binary_missing_at_exec_is_unavailable(monkeypatch, message):
+    """Bug fix: shutil.which() can say a command exists (e.g. a stale PATH
+    entry) while the actual exec still raises FileNotFoundError. Must be
+    classified as UNAVAILABLE by exception type — independent of the
+    platform-specific message text ("[WinError 2]" vs "[Errno 2]")."""
+    monkeypatch.setattr(pt.shutil, "which", lambda n: "/usr/bin/mock")
+
+    def _boom(*a, **kw):
+        raise FileNotFoundError(message)
+
+    monkeypatch.setattr(pt.subprocess, "Popen", _boom)
+    pdef = {"origin-type": "local-process",
+            "connection": {"type": "stdio", "command": "project-atlas", "args": []}}
+    res = run_plugin_test("project-atlas", pdef)
+    assert res["status"] == "UNAVAILABLE"
+    assert "not found" in res["message"].lower()
+
+
+def test_remote_saas_placeholder_never_reaches_http_probe(monkeypatch):
+    """Root cause: a scaffolded-but-blank secret (the shipped secrets.local
+    template ships empty strings, not missing keys) resolves the `{{VAR}}`
+    placeholder to "" — no longer matching the placeholder pattern — so a
+    post-substitution regex check would miss it and let the blank/unresolved
+    URL reach the HTTP probe (urllib's "unknown url type"). The guard must
+    catch this pre-substitution instead."""
+    monkeypatch.setattr(pt, "_http_probe",
+                        lambda url, headers: (_ for _ in ()).throw(
+                            AssertionError("must not reach the HTTP probe")))
+    pdef = {"origin-type": "remote-saas",
+            "connection": {"type": "sse", "url": "{{MCP_HONCHO_URL}}"}}
+
+    # Case A: secret entirely absent from secrets.local.yaml.
+    res = run_plugin_test("honcho", pdef, secrets={})
+    assert res["status"] == "UNAVAILABLE"
+
+    # Case B: secret present but blank (the shipped template's default).
+    res = run_plugin_test("honcho", pdef, secrets={"MCP_HONCHO_URL": ""})
+    assert res["status"] == "UNAVAILABLE"

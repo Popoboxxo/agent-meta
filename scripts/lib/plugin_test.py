@@ -24,11 +24,21 @@ def _resolve_secrets(text: str, secrets: dict) -> str:
     return _SECRET_RE.sub(lambda m: str(secrets.get(m.group(1), m.group(0))), text)
 
 
-def _has_unresolved_placeholder(text: str) -> bool:
-    """True if `text` still contains a `{{VAR}}` placeholder after secret
-    resolution — i.e. the project has no value for it (issue #693: this is a
-    per-project setup gap, not a broken plugin)."""
-    return bool(_SECRET_RE.search(text))
+def _unresolved_placeholder_names(text: str, secrets: dict) -> list[str]:
+    """Names of `{{VAR}}` placeholders in `text` with no truthy value in
+    `secrets` — i.e. the project has no value for it (issue #693: this is a
+    per-project setup gap, not a broken plugin).
+
+    Checked pre-substitution, on the raw template text, so it catches both a
+    wholly missing secret (the placeholder text would survive substitution
+    unchanged) AND a scaffolded-but-blank one (the shipped secrets.local
+    template ships empty strings, not missing keys — after substitution that
+    silently becomes just an empty string, no longer matching the `{{VAR}}`
+    pattern at all). A post-substitution regex check on the resolved string
+    would miss the second case, letting a blank/unresolved URL through to the
+    actual connection attempt (e.g. `urllib`'s "unknown url type").
+    """
+    return [name for name in _SECRET_RE.findall(text) if not secrets.get(name)]
 
 
 def _read_line_with_timeout(stream, timeout: float) -> str | None:
@@ -62,10 +72,13 @@ def _run_version(binary: str) -> tuple[bool, str]:
         return False, str(exc)
 
 
-def _mcp_initialize_handshake(command: str, args: list, env: dict) -> tuple[bool, str]:
+def _mcp_initialize_handshake(command: str, args: list, env: dict) -> tuple[bool | None, str]:
     """Start the stdio MCP process, send an `initialize` request, read one line,
-    terminate. Returns (ok, message). Bounded by _TIMEOUT to prevent hangs.
-    Uses _read_line_with_timeout for correct timeout semantics on all platforms."""
+    terminate. Returns (ok, message) — ok is None for UNAVAILABLE (the binary
+    doesn't exist; classified by exception type, not by matching the
+    platform-specific "[WinError 2]"/"[Errno 2]" message text). Bounded by
+    _TIMEOUT to prevent hangs. Uses _read_line_with_timeout for correct
+    timeout semantics on all platforms."""
     proc = None
     try:
         # Merge the plugin's declared vars ON TOP of the parent environment —
@@ -86,6 +99,11 @@ def _mcp_initialize_handshake(command: str, args: list, env: dict) -> tuple[bool
         if line is None:
             return False, f"no response within {_TIMEOUT}s"
         return ("result" in line or "jsonrpc" in line), "initialize responded"
+    except FileNotFoundError:
+        # shutil.which() found the command, but exec still failed (e.g. a
+        # broken PATH entry, or a race where the binary disappeared) — a
+        # setup gap, not a plugin bug (issue #693).
+        return None, f"binary '{command}' not found"
     except Exception as exc:  # noqa: BLE001
         return False, str(exc)
     finally:
@@ -137,13 +155,15 @@ def run_plugin_test(plugin_id: str, plugin_def: dict, secrets: dict | None = Non
         env = {_resolve_secrets(k, secrets): _resolve_secrets(str(v), secrets)
                for k, v in (conn.get("env") or {}).items()}
         ok, msg = _mcp_initialize_handshake(command, conn.get("args", []), env)
+        if ok is None:
+            return _result("UNAVAILABLE", msg, started)
         return _result("PASS" if ok else "FAIL", msg, started)
 
     if origin == "remote-saas":
         raw_url = conn.get("url", "")
-        url = _resolve_secrets(raw_url, secrets)
-        if _has_unresolved_placeholder(url):
+        if _unresolved_placeholder_names(raw_url, secrets):
             return _result("UNAVAILABLE", "missing secret(s) — not configured for this project", started)
+        url = _resolve_secrets(raw_url, secrets)
         headers = {k: _resolve_secrets(str(v), secrets) for k, v in (conn.get("headers") or {}).items()}
         try:
             code, _ = _http_probe(url, headers)
