@@ -494,9 +494,10 @@ def _write_yaml_with_comments(path: Path, data: dict, auto_filled: list[tuple[st
     Since PyYAML does not support comments, we dump to text and inject
     #-style comment lines before each auto-filled top-level key.
     """
+    from .io import yaml_dump_preserving_multiline
     buf = io.StringIO()
-    _yaml.dump(data, buf, allow_unicode=True, default_flow_style=False,
-               sort_keys=False, indent=2)
+    yaml_dump_preserving_multiline(_yaml, data, buf, allow_unicode=True,
+                                   default_flow_style=False, sort_keys=False, indent=2)
     text = buf.getvalue()
 
     auto_filled_keys = {name.split(".")[0] for name, _ in auto_filled}
@@ -1123,7 +1124,8 @@ def _build_pipeline_variables(
             available_roles = set(all_roles)
         roles_cfg_for_coupling = load_roles_config(agent_meta_root)
         pipeline_errors = validate_pipelines(
-            effective, list(available_roles), roles_config=roles_cfg_for_coupling
+            effective, list(available_roles), roles_config=roles_cfg_for_coupling,
+            known_roles=set(all_roles),
         )
         for err in pipeline_errors:
             unmapped.append(f"quality-pipelines: {err}")

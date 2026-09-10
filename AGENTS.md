@@ -9,6 +9,24 @@
 
 > Struktur: siehe Verzeichnisstruktur im Repo (`ls`/`find`); deklarativ: `.meta-config/project.yaml` → `variables.PROJECT_STRUCTURE`.
 
+**Verzeichnisstruktur:**
+```
+agents/
+  0-external/       # Wrapper-Template für externe Skills
+  1-generic/        # Universelle Agent-Templates
+  2-platform/       # Plattform-Overrides (z.B. sharkord, homeassistant, agent-meta)
+scripts/
+  sync.py           # Agent-Generator
+  admin-server.py   # Lokaler Admin-UI-Server
+external/           # Git Submodule (externe Skill-Repos)
+docs/guides/        # Anleitungen und Beispiel-Config
+docs/ui/            # UI Assets
+  architecture/     # Architektur-Diagramme (Mermaid)
+  admin-ui.html     # Admin-UI Frontend
+tests/              # Test-Suite (automated, manual, orchestration)
+
+```
+
 > Runtime & Abhängigkeiten: siehe Projekt-Manifest (`pyproject.toml` / `requirements.txt` / `package.json` / `manifest.json`).
 
 **Entry-Point:** `scripts/sync.py — Haupt-CLI für Agent-Generierung`
@@ -184,6 +202,7 @@ MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`. Keine Ausnahmen.
 Git Mutationen (commit, push, add etc) -> `git` Agent. Read-only (status, log) im Main Chat ok.
 
 Native Extensions (Skills/Hooks) erlaubt, ignorieren nicht Branch-Guard/DoD.
+Skill-getriebene Sub-Agent-Loops (z.B. generische Harness-Skills wie `subagent-driven-development`) sind KEINE dritte Ausnahme von der Orchestrator-Pflicht: ein Skill darf einen bereits vom `orchestrator` gestarteten Loop ausführen, aber niemals selbst zum Einstiegspunkt für einen neuen Dev-Task werden. Einzige Ausnahmen bleiben User-Override.
 
 Anti-Recursion: Worker dürfen nicht an `orchestrator` zurück delegieren.
 

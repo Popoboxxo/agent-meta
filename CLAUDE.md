@@ -3,7 +3,7 @@
 > Projektbeschreibung für Claude-Agenten. Diese Datei ist die **einzige Quelle**
 > für projektspezifischen Kontext — Agenten lesen sie, statt eigenen Kontext zu haben.
 >
-> Generiert von agent-meta v1.0.0 — `2026-09-08`
+> Generiert von agent-meta v1.0.0 — `2026-09-10`
 >
 > **Längenempfehlung:** 200–500 Zeilen optimal. Über 500 Zeilen → Detailwissen in
 > `docs/ARCHITECTURE.md`, `docs/API.md` o.ä. auslagern und manuell verlinken.
@@ -30,6 +30,24 @@ Hier kannst du eigene, projektspezifische Notizen eintragen. Dieser Bereich wird
 **Beschreibung:** Zentrales Meta-Repository für die Standardisierung und Wiederverwendung von Claude-Agenten-Rollen über alle Projekte hinweg.
 
 > Struktur: siehe Verzeichnisstruktur im Repo (`ls`/`find`); deklarativ: `.meta-config/project.yaml` → `variables.PROJECT_STRUCTURE`.
+
+**Verzeichnisstruktur:**
+```
+agents/
+  0-external/       # Wrapper-Template für externe Skills
+  1-generic/        # Universelle Agent-Templates
+  2-platform/       # Plattform-Overrides (z.B. sharkord, homeassistant, agent-meta)
+scripts/
+  sync.py           # Agent-Generator
+  admin-server.py   # Lokaler Admin-UI-Server
+external/           # Git Submodule (externe Skill-Repos)
+docs/guides/        # Anleitungen und Beispiel-Config
+docs/ui/            # UI Assets
+  architecture/     # Architektur-Diagramme (Mermaid)
+  admin-ui.html     # Admin-UI Frontend
+tests/              # Test-Suite (automated, manual, orchestration)
+
+```
 
 > Runtime & Abhängigkeiten: siehe Projekt-Manifest (`pyproject.toml` / `requirements.txt` / `package.json` / `manifest.json`).
 
@@ -85,7 +103,7 @@ Kategorien für `docs/REQUIREMENTS.md`:
 
 > **AI ROUTING:** Claude -> CLAUDE.md | Opencode, Gemini -> AGENTS.md
 
-Generiert von agent-meta v1.0.0 — `2026-09-09`
+Generiert von agent-meta v1.0.0 — `2026-09-10`
 DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben — Ausnahmen siehe Abschnitt »Orchestrator — Universal Router«.
 

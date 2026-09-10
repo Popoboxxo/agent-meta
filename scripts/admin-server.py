@@ -948,10 +948,16 @@ class ConfigManager:
             backup_info = self._backup(path)
             self._prune_backups(path)
 
+        # Preserve block-literal (`|`) style for multi-line string values so an
+        # admin-UI write round-trips them intact, matching sync.py's own YAML
+        # writes (issue #717) — plain yaml.dump() folds embedded newlines away.
+        from lib.io import yaml_dump_preserving_multiline
+
         tmp_path = path.with_suffix(path.suffix + ".tmp")
         try:
             with tmp_path.open("w", encoding="utf-8") as fh:
-                yaml.dump(
+                yaml_dump_preserving_multiline(
+                    yaml,
                     data,
                     fh,
                     default_flow_style=False,

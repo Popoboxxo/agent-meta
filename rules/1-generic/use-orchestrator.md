@@ -42,6 +42,7 @@ Native Extensions (Skills/Hooks) erlaubt, ignorieren nicht Branch-Guard/DoD.
 Erlaubt:
 {{NATIVE_EXTENSIONS_WHITELIST_TABLE}}
 {{/if}}
+Skill-getriebene Sub-Agent-Loops (z.B. generische Harness-Skills wie `subagent-driven-development`) sind KEINE dritte Ausnahme von der Orchestrator-Pflicht: ein Skill darf einen bereits vom `orchestrator` gestarteten Loop ausführen, aber niemals selbst zum Einstiegspunkt für einen neuen Dev-Task werden. Einzige Ausnahmen bleiben User-Override{{#if ORCH_MODE_MAIN_CHAT}} und der aktive Main-Chat-Modus{{/if}}.
 {{/if}}
 {{#unless NATIVE_EXTENSIONS_ENABLED}}
 Native Extensions deaktiviert.

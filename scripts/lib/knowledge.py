@@ -80,6 +80,13 @@ def generate_initial_log() -> str:
 # Sync entry point (moved verbatim from scripts/sync.py, issue #481)
 # ---------------------------------------------------------------------------
 
+# NOTE (issue #720 re-verification): `sources/assets` and `wiki/sources` are
+# NOT a naming collision despite the shared "sources" leaf. `sources/` (top
+# level) is the immutable raw-ingest directory (build_knowledge_engine_hints,
+# lib/agents.py); `wiki/sources/` holds curated "Session Conclusion" wiki
+# pages (knowledge/schema.md concept-type table) -- two different, already
+# documented concept types that legitimately coexist. Do not "fix" this into
+# one directory.
 _KNOWLEDGE_GITKEEP_SUBDIRS = [
     Path("sources", "assets"),
     Path("wiki", "concepts"),

@@ -356,6 +356,23 @@ def _update_continue_yaml_config(
 # becomes a Codex-native bearer_token_env_var reference to the bare env var.
 _BEARER_PLACEHOLDER_RE = re.compile(r"^Bearer \$\{([A-Z0-9_]+)\}$")
 
+def _contains_literal_secret(value, config: dict | None = None) -> bool:
+    """True if `value` (a parsed JSON fragment) embeds a raw secret rather than
+    an env-var placeholder.
+
+    Delegates the actual "is this a real secret" decision to
+    ``lib.secrets.scan_for_secrets`` — the curated, project-configurable
+    detector used everywhere else in sync — instead of a bespoke regex
+    heuristic (issue #719 follow-up). The fragment is serialized to JSON so
+    ``${VAR}``/``{{VAR}}`` placeholders keep matching secrets.py's safe-pattern
+    allowlist and are not misreported as literal secrets.
+    """
+    from .secrets import scan_for_secrets
+
+    serialized = json.dumps(value, ensure_ascii=False, default=str)
+    return bool(scan_for_secrets(serialized, config=config))
+
+
 CODEX_TOML_BLOCK_BEGIN = "# agent-meta:mcp-begin"
 CODEX_TOML_BLOCK_END = "# agent-meta:mcp-end"
 
@@ -463,14 +480,20 @@ def _warn_stale_mcp_servers_key(
     committed_file: str,
     secrets_file: str | None,
     log: SyncLog,
+    dry_run: bool,
+    config: dict | None = None,
 ) -> None:
-    """Warn once if a leftover mcpServers key sits in a file no longer targeted.
+    """Warn about a leftover mcpServers key in a file no longer targeted --
+    escalated to [SECURITY] when it embeds a literal secret (#719).
 
     Migration aid for #388/#400: projects synced before Claude's mcp-config
     moved to .mcp.json can have an inert `mcpServers` block still sitting in
-    settings.json/settings.local.json. sync.py deliberately never strips
-    unrelated keys from those files (manual entries must survive a sync), so
-    this leftover has to be pointed out instead of silently cleaned up.
+    settings.json/settings.local.json. This is detection-only -- the key is
+    NEVER removed automatically, for a detected secret or otherwise; the
+    warning names the file so an operator can review and clean it up by
+    hand. `dry_run` has no effect on this function (nothing is ever
+    written) and is accepted only for call-site compatibility with
+    generate_provider_configs.
     """
     current_targets = {committed_file, secrets_file}
     for key in ("settings_file", "settings_local_file"):
@@ -481,12 +504,18 @@ def _warn_stale_mcp_servers_key(
         if not stale_path.exists():
             continue
         parsed = _read_json_lenient(stale_path)
-        if isinstance(parsed, dict) and "mcpServers" in parsed:
-            log.warning(
-                f"mcp: '{stale_rel}' still has a leftover 'mcpServers' key from "
-                f"before MCP config moved to '{committed_file}' — it has no "
-                "effect there and can be removed manually."
-            )
+        if not isinstance(parsed, dict) or "mcpServers" not in parsed:
+            continue
+
+        is_secret = _contains_literal_secret(parsed["mcpServers"], config)
+        tag = "[SECURITY] " if is_secret else ""
+        log.warning(
+            f"mcp: {tag}found leftover 'mcpServers' key in '{stale_rel}' "
+            f"(inert since MCP config moved to '{committed_file}'); remove it manually"
+            + (" -- it contains what looks like a LITERAL secret, not just an "
+               "env-var reference; rotate that credential if it was ever committed."
+               if is_secret else ".")
+        )
 
 
 def generate_provider_configs(
@@ -532,7 +561,7 @@ def generate_provider_configs(
     if not fmt or not committed_file:
         return
 
-    _warn_stale_mcp_servers_key(project_root, pc, committed_file, secrets_file, log)
+    _warn_stale_mcp_servers_key(project_root, pc, committed_file, secrets_file, log, dry_run, config)
 
     # Load secrets.local.yaml if present
     secrets_path = project_root / SECRETS_LOCAL_FILE

@@ -158,7 +158,12 @@ def _validate_pipeline_composition(pipelines: dict, name: str, pipeline: dict) -
     return errors
 
 
-def validate_pipelines(pipelines: dict, available_roles: list, roles_config: dict | None = None) -> list[str]:
+def validate_pipelines(
+    pipelines: dict,
+    available_roles: list,
+    roles_config: dict | None = None,
+    known_roles: set | None = None,
+) -> list[str]:
     """Validate pipelines and return a list of error messages (empty = valid).
 
     Checks:
@@ -167,7 +172,13 @@ def validate_pipelines(pipelines: dict, available_roles: list, roles_config: dic
     - no circular orchestration (orchestrator agents inside pipelines)
     - providers field is well-formed (default/include/exclude, known providers)
     - run_pipeline composition: referenced pipelines exist, no cycles, depth limit
-    - plan-driven stage roles (fallback_agent, allowed_agents) exist
+    - plan-driven stage roles: fallback_agent must be active; allowed_agents
+      entries must be real roles somewhere in the system (typo guard)
+
+    known_roles: the full set of role names that exist as templates anywhere
+      (not just the per-project active `roles:`). Used only to flag genuine
+      typos in `allowed_agents` — a valid-but-inactive role there is normal
+      (issue #718) and never an error. Omitted → allowed_agents unchecked.
     """
     errors = []
     orchestrator_roles = {"orchestrator"}
@@ -259,12 +270,21 @@ def validate_pipelines(pipelines: dict, available_roles: list, roles_config: dic
                         f"Pipeline '{name}': stage '{stage.get('id')}' plan-driven "
                         f"fallback_agent '{fallback}' not found in available roles."
                     )
-                for allowed in pd.get("allowed_agents", []):
-                    if allowed not in available_roles:
-                        errors.append(
-                            f"Pipeline '{name}': stage '{stage.get('id')}' plan-driven "
-                            f"allowed_agents entry '{allowed}' not found in available roles."
-                        )
+                # allowed_agents is an allowlist of OPTIONAL extra implementers
+                # (issue #718) -- a project simply not having one of them active
+                # (e.g. no frontend-component-engineer in a backend-only repo) is
+                # normal, not a config error, and is filtered at render time.
+                # But an entry that is a real role NOWHERE in the system is a
+                # genuine typo worth catching, so validate against the full
+                # known-role set (not the per-project active set) when available.
+                if known_roles is not None:
+                    for extra in pd.get("allowed_agents", []):
+                        if extra and extra not in known_roles:
+                            errors.append(
+                                f"Pipeline '{name}': stage '{stage.get('id')}' "
+                                f"plan-driven allowed_agents entry '{extra}' is not "
+                                "a known role (typo? — it matches no agent template)."
+                            )
 
             # Circular orchestration guard
             if agent in orchestrator_roles and not stage.get("allow_orchestrator"):

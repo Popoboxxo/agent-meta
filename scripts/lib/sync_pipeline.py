@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -40,6 +41,7 @@ from lib.config import (
     _resolve_orch_mode,
     fill_defaults,
     load_config,
+    read_version,
 )
 from lib.config_audit import audit_config
 from lib.context import (
@@ -264,6 +266,58 @@ def _sync_stage_contexts(
         sync_context_for_provider(agent_meta_root, project_root, config, provider_variables,
                                   log, args.dry_run, provider, provider_config)
     return debug_mode, allow_committed_secrets, mcp_gitignore_extras
+
+
+def sync_version_bookkeeping(
+    agent_meta_root: Path,
+    project_root: Path,
+    config_path: Path,
+    config: dict,
+    log: SyncLog,
+    dry_run: bool,
+) -> None:
+    """Write the actually-deployed agent-meta version back into project.yaml
+    after a successful sync (issue #720 part A).
+
+    Nothing wrote this back before: setup.py only sets it at project init,
+    cli_commands.py/admin-server.py only ever read it -- so the documented
+    version silently falls behind the real one after every submodule
+    upgrade. A single targeted regex substitution (not a full YAML re-dump)
+    keeps every other line -- including comments -- byte-identical; this
+    intentionally does NOT reuse config.py's fill_defaults()/
+    _write_yaml_with_comments() full-file-rewrite machinery, which would
+    strip unrelated comments on every version bump for no reason.
+    """
+    actual_version = read_version(agent_meta_root)
+    if actual_version == "unknown":
+        return  # no VERSION file to trust -- leave the field alone
+    current = config.get("agent-meta-version")
+    if current == actual_version:
+        return
+
+    text = config_path.read_text(encoding="utf-8")
+    # Replace only the value portion, preserving any inline comment
+    # (`agent-meta-version: 0.9  # pinned, see #NNN`) unchanged: group 1 is the
+    # key + spacing, group 2 the value, group 3 the optional trailing comment.
+    new_text, n = re.subn(
+        r'(?m)^(agent-meta-version:\s*)([^\n]*?)(\s*#[^\n]*)?$',
+        rf'\g<1>"{actual_version}"\g<3>',
+        text, count=1,
+    )
+    if n == 0:
+        return  # key not present as a plain top-level scalar line -- don't guess
+    rel = (str(config_path.relative_to(project_root))
+           if project_root in config_path.parents else config_path.name)
+    if dry_run:
+        # Dry-run must be a true no-op: no in-memory mutation, no "UPDATE" log
+        # (that reads as a write that happened). Report intent only.
+        log.action("WOULD-UPDATE", rel,
+                   f"agent-meta-version: {current!r} -> {actual_version!r}")
+        return
+    log.action("UPDATE", rel,
+               f"agent-meta-version: {current!r} -> {actual_version!r}")
+    config["agent-meta-version"] = actual_version
+    config_path.write_text(new_text, encoding="utf-8")
 
 
 def _sync_stage_legacy_cleanup(
@@ -692,6 +746,13 @@ def _sync_stage_gitignore(
         # No Claude active but other providers have gitignore entries to manage
         ensure_gitignore_entries(project_root, log, args.dry_run,
                                  gitignore_entries=extra_provider_entries + mcp_gitignore_extras)
+
+    from .gitignore import detect_shadowed_provider_roots
+    for shadow_warning in detect_shadowed_provider_roots(
+        project_root, providers, provider_config,
+        ignore_provider_dirs=gitignore_cfg.get("ignore-provider-dirs", False),
+    ):
+        log.warning(f"[P0] {shadow_warning}")
 
 
 def _sync_stage_config_audit(agent_meta_root: Path, config_path: Path, log: SyncLog) -> None:

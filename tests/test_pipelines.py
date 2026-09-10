@@ -495,7 +495,11 @@ def test_validate_pipelines_plan_driven_rejects_unknown_fallback_agent():
     assert any("ghost-role" in e for e in errors)
 
 
-def test_validate_pipelines_plan_driven_rejects_unknown_allowed_agent():
+def test_validate_pipelines_plan_driven_ignores_unknown_allowed_agent():
+    # Issue #718: allowed_agents is an allowlist of OPTIONAL extra implementers.
+    # A role in it that the project never enabled is filtered at render time, not
+    # a config error -- so an unknown allowed_agents entry must NOT be rejected.
+    # (Previously this asserted the opposite; that was the #718 bug.)
     pipelines = {
         "p1": {
             "stages": [
@@ -511,7 +515,7 @@ def test_validate_pipelines_plan_driven_rejects_unknown_allowed_agent():
         }
     }
     errors = validate_pipelines(pipelines, available_roles=["developer"])
-    assert any("ghost-role" in e for e in errors)
+    assert not any("ghost-role" in e for e in errors)
 
 
 def test_validate_pipelines_plan_driven_accepts_known_roles():
@@ -927,3 +931,45 @@ def test_feature_lifecycle_pipeline_definition_is_valid():
     all_roles = set(roles_cfg.get("roles", {}).keys())
     errors = validate_pipelines({"feature-lifecycle": fl}, list(all_roles))
     assert errors == [], f"Unexpected validation errors: {errors}"
+
+
+def test_plan_driven_allowed_agents_not_in_roles_is_filtered_not_error():
+    # Issue #718: a backend-only project without frontend-component-engineer
+    # active must not get a permanent, unresolvable validation error for
+    # every sync just because feature-lifecycle's allowed_agents list names
+    # a role the project never enabled.
+    pipelines = {
+        "feature-lifecycle": {
+            "stages": [
+                {"id": "implement", "agent": "developer", "mode": "plan-driven",
+                 "plan-driven": {
+                     "fallback_agent": "developer",
+                     "allowed_agents": ["developer", "frontend-component-engineer"],
+                 }},
+            ],
+        },
+    }
+    errors = validate_pipelines(pipelines, ["developer"])
+    assert errors == []
+
+
+def test_plan_driven_fallback_agent_not_in_roles_is_still_an_error():
+    # fallback_agent is the one role plan-driven ALWAYS falls back to if the
+    # plan names nobody usable -- unlike allowed_agents (an allowlist of
+    # optional extras), a missing fallback_agent is a real config error.
+    pipelines = {
+        "feature-lifecycle": {
+            "stages": [
+                {"id": "implement", "agent": "developer", "mode": "plan-driven",
+                 "plan-driven": {"fallback_agent": "frontend-component-engineer",
+                                 "allowed_agents": ["developer"]}},
+            ],
+        },
+    }
+    errors = validate_pipelines(pipelines, ["developer"])
+    # fallback_agent must still be flagged; allowed_agents must NOT be. (An exact
+    # error count is brittle: validate_pipelines also appends a consolidated
+    # "Summary: N missing role(s)" line whenever any role is missing, so the
+    # fallback error yields two entries, not one.)
+    assert any("fallback_agent" in e for e in errors)
+    assert not any("allowed_agents" in e for e in errors)

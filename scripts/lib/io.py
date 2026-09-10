@@ -338,10 +338,38 @@ def write_atomic(path: Path, content: str, mode: str = "w") -> None:
         raise
 
 
+def yaml_dump_preserving_multiline(yaml_module, data: dict, stream=None, **kwargs):
+    r"""Dump `data` to YAML, forcing block-literal (`|`) style for any string
+    value containing an embedded newline (issue #717).
+
+    PyYAML's default emitter represents a multi-line Python string using
+    single-quoted/folded flow style unless told otherwise. Folded style
+    collapses a single embedded ``\n`` to a space on re-parse (YAML
+    line-folding, spec-conformant) -- so a hand-authored
+    ``variables.SYSTEM_DEPENDENCIES: |`` block survives its FIRST write, but
+    any later full-file re-dump (``fill_defaults()``, ``--audit-config
+    --apply``, provider deactivation, the ``--setup`` wizard) silently merges
+    single-``\n``-separated list items onto one line. Only a value with TWO
+    consecutive newlines (a blank line) survived before this fix, by
+    accident of the folding rule collapsing exactly one break.
+
+    Registering this representer once, here, fixes the round-trip for every
+    current and future multi-line project.yaml variable -- not a per-field
+    patch on just SYSTEM_DEPENDENCIES/EXTRA_DONTS.
+    """
+    def _str_presenter(dumper, value):
+        style = "|" if "\n" in value else None
+        return dumper.represent_scalar("tag:yaml.org,2002:str", value, style=style)
+
+    dumper_cls = type("_MultilineSafeDumper", (yaml_module.Dumper,), {})
+    dumper_cls.add_representer(str, _str_presenter)
+    return yaml_module.dump(data, stream, Dumper=dumper_cls, **kwargs)
+
+
 def _write_yaml(path: Path, data: dict) -> None:
     """Write data as YAML with consistent formatting."""
-    write_atomic(path, _yaml.dump(data, allow_unicode=True, default_flow_style=False,
-                                   sort_keys=False, indent=2))
+    write_atomic(path, yaml_dump_preserving_multiline(
+        _yaml, data, allow_unicode=True, default_flow_style=False, sort_keys=False, indent=2))
 
 
 def content_hash(text: str) -> str:
@@ -425,21 +453,40 @@ def write_checked(
     return True
 
 
+def run_git_check_ignore(
+    target: str, cwd: str, *flags: str
+) -> "subprocess.CompletedProcess | None":
+    """Run ``git check-ignore <flags> <target>`` in `cwd`, capturing output.
+
+    Returns the CompletedProcess, or None if git could not be run at all (not
+    installed, not a repo, timeout). Callers interpret the return code
+    themselves: 0 = ignored, 1 = not ignored, >1 = git error. Central place
+    for the subprocess + error handling so both the write-time gitignore
+    warning here and lib/gitignore.py's shadow-root probe share one
+    implementation (#713).
+    """
+    try:
+        return subprocess.run(  # noqa: S603
+            ["git", "check-ignore", *flags, target],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
 def _warn_if_not_gitignored(path: Path, rel_label: str, log: "SyncLog") -> None:  # noqa: F821
     """Warn when a file expected to be gitignored is not actually ignored (#586).
 
     Fail-safe: any problem running git (not installed, not a repo, timeout)
     is silently ignored — this check is informational, never a hard gate.
     """
-    try:
-        result = subprocess.run(  # noqa: S603
-            ["git", "check-ignore", "-q", str(path)],
-            cwd=str(path.parent) if path.parent.exists() else str(Path.cwd()),
-            capture_output=True,
-            timeout=5,
-            check=False,
-        )
-    except (OSError, subprocess.SubprocessError):
+    cwd = str(path.parent) if path.parent.exists() else str(Path.cwd())
+    result = run_git_check_ignore(str(path), cwd, "-q")
+    if result is None:
         return
     if result.returncode == 1:
         # 0 = ignored, 1 = not ignored, >1 = git error (no repo, bad options, ...)

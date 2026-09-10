@@ -18,6 +18,12 @@ class SyncLog:
         self.infos: list[str] = []
         self.debugs: list[str] = []
         self._seen_warnings: set[str] = set()
+        # Sync-run-scoped signatures of already-reported agent-override
+        # collisions (#703). collect_sources() runs once per active provider,
+        # so a real conflict must be detected once per RUN, not re-reported on
+        # every provider pass — keyed here (log lifetime == one sync run)
+        # instead of on collect_sources' per-call local state.
+        self.seen_collisions: set[tuple] = set()
         self.start_time = datetime.now()  # noqa: DTZ005
 
     def action(self, tag: str, target: str, source: str):
