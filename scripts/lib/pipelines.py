@@ -259,12 +259,12 @@ def validate_pipelines(pipelines: dict, available_roles: list, roles_config: dic
                         f"Pipeline '{name}': stage '{stage.get('id')}' plan-driven "
                         f"fallback_agent '{fallback}' not found in available roles."
                     )
-                for allowed in pd.get("allowed_agents", []):
-                    if allowed not in available_roles:
-                        errors.append(
-                            f"Pipeline '{name}': stage '{stage.get('id')}' plan-driven "
-                            f"allowed_agents entry '{allowed}' not found in available roles."
-                        )
+                # allowed_agents is an allowlist of OPTIONAL extra implementers
+                # (issue #718) -- a project simply not having one of them active
+                # (e.g. no frontend-component-engineer in a backend-only repo) is
+                # normal, not a config error. It is filtered at render time
+                # anyway (only active roles ever get dispatched); nothing here
+                # needs to reject the pipeline over it.
 
             # Circular orchestration guard
             if agent in orchestrator_roles and not stage.get("allow_orchestrator"):
