@@ -16,6 +16,7 @@ parst, filtert und interpretiert niemals Worker-Content.
 """
 from __future__ import annotations
 
+import contextlib
 import logging
 import re
 import time
@@ -24,7 +25,12 @@ from pathlib import Path
 
 from .io import _load_yaml_or_json, write_atomic
 from .json_persistence import load_json_document, save_json_document
-from .providers import load_providers_config, provider_hooks_supported, resolve_providers
+from .providers import (
+    all_providers_support_hooks,
+    load_providers_config,
+    resolve_agent_meta_root,
+    resolve_providers,
+)
 
 CHECKPOINT_DIR = ".meta-viz/checkpoints"
 
@@ -35,18 +41,26 @@ _PROGRESS_DIR = ".meta-viz/progress"
 _PROGRESS_MAX_BYTES = 200_000  # ~4x the 50 KB JSON-checkpoint budget (checkpointing.md) --
                                 # rendered markdown entries run more verbose per checkpoint.
 _ENTRY_MARKER = "\n## "
+# Anchored entry header — matches ONLY the header _render_progress_entry emits
+# ("\n## <YYYY-MM-DD HH:MM:SS> — session `..."), never a bare "\n## " that a
+# task_description happens to contain (PR #721, Finding 3). Used to split the
+# Tier-B log into entries for rotation without tearing an entry apart.
+_ENTRY_HEADER_RE = re.compile(r"\n## \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} — session `")
 
 _logger = logging.getLogger(__name__)
 
 
-def _active_providers(project_root: Path, agent_meta_root: Path) -> list:
+def _active_providers(project_root: Path, provider_config: dict) -> list:
     """Resolve active providers for tier detection. Falls back to the same
     "Claude" default resolve_providers() itself uses when no project.yaml
     is found -- matches the pre-existing CheckpointStore test fixtures that
     use a bare tmp_path with no .meta-config/project.yaml (Task 1).
+
+    Takes an already-loaded ``provider_config`` so the caller parses
+    config/ai-providers.yaml once per save_checkpoint() instead of twice
+    (PR #721, Finding 5).
     """
     config, _ = _load_yaml_or_json(project_root / ".meta-config" / "project.yaml")
-    provider_config = load_providers_config(agent_meta_root)
     return resolve_providers(config or {}, provider_config)
 
 
@@ -58,10 +72,8 @@ def _progress_tier(project_root: Path, agent_meta_root: Path) -> str:
     provider silently loses its only progress signal.
     """
     provider_config = load_providers_config(agent_meta_root)
-    active = _active_providers(project_root, agent_meta_root)
-    if active and all(provider_hooks_supported(provider_config.get(p, {})) for p in active):
-        return "A"
-    return "B"
+    active = _active_providers(project_root, provider_config)
+    return "A" if all_providers_support_hooks(active, provider_config) else "B"
 
 
 def _sanitize_component(value: str, max_len: int = 64) -> str:
@@ -75,6 +87,18 @@ def _sanitize_component(value: str, max_len: int = 64) -> str:
     cleaned = re.sub(r"[^A-Za-z0-9._-]", "_", value)
     cleaned = cleaned.strip("._-")[:max_len].strip("._-")
     return cleaned or "unnamed"
+
+
+def _md_cell(value) -> str:
+    """Render a value as a single-line markdown table cell.
+
+    Collapses newlines/carriage-returns to spaces and escapes ``|`` — a raw
+    newline breaks the table row (and, for Tier-B entries, can forge an entry
+    header that _trim_oldest_entries would split on; PR #721, Finding 3), an
+    unescaped pipe adds a phantom column. Root cause for both is here, at the
+    single place cell values are emitted, rather than in the split logic.
+    """
+    return str(value).replace("\r", " ").replace("\n", " ").replace("|", "\\|")
 
 
 def _render_progress_markdown(session_data: dict) -> str:
@@ -95,12 +119,12 @@ def _render_progress_markdown(session_data: dict) -> str:
     lines.append("| Agent | Task | Status | Pipeline/Stage |")
     lines.append("|-------|------|--------|----------------|")
     for cp in checkpoints:
-        agent = cp.get("agent", "?")
-        task = cp.get("task_description", "?")
-        status = cp.get("status", "?")
+        agent = _md_cell(cp.get("agent", "?"))
+        task = _md_cell(cp.get("task_description", "?"))
+        status = _md_cell(cp.get("status", "?"))
         pipeline = cp.get("pipeline")
         stage = cp.get("stage")
-        pipeline_cell = f"{pipeline} / {stage}" if pipeline and stage else (pipeline or "")
+        pipeline_cell = _md_cell(f"{pipeline} / {stage}" if pipeline and stage else (pipeline or ""))
         lines.append(f"| `{agent}` | {task} | `{status}` | {pipeline_cell} |")
     lines.append("")
     return "\n".join(lines)
@@ -114,12 +138,12 @@ def _render_progress_entry(session_id: str, checkpoint: dict) -> str:
     on disk. Always starts with _ENTRY_MARKER so _trim_oldest_entries
     can split entries unambiguously.
     """
-    agent = checkpoint.get("agent", "?")
-    task = checkpoint.get("task_description", "?")
-    status = checkpoint.get("status", "?")
+    agent = _md_cell(checkpoint.get("agent", "?"))
+    task = _md_cell(checkpoint.get("task_description", "?"))
+    status = _md_cell(checkpoint.get("status", "?"))
     pipeline = checkpoint.get("pipeline")
     stage = checkpoint.get("stage")
-    pipeline_cell = f"{pipeline} / {stage}" if pipeline and stage else (pipeline or "")
+    pipeline_cell = _md_cell(f"{pipeline} / {stage}" if pipeline and stage else (pipeline or ""))
     ts = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(checkpoint.get("timestamp") or time.time()))
     return (
         f"{_ENTRY_MARKER}{ts} — session `{session_id}`\n\n"
@@ -137,10 +161,42 @@ def _trim_oldest_entries(content: str, max_bytes: int) -> str:
     """
     if len(content.encode("utf-8")) <= max_bytes:
         return content
-    entries = content.split(_ENTRY_MARKER)[1:]  # [0] is the "" prefix before the first marker
-    while len(entries) > 1 and len("".join(_ENTRY_MARKER + e for e in entries).encode("utf-8")) > max_bytes:
-        entries.pop(0)
-    return "".join(_ENTRY_MARKER + e for e in entries)
+    # Entry boundaries = anchored header positions (not a naive "\n## " split,
+    # which a task_description could forge — Finding 3). Each entry runs from its
+    # header to the next header's start.
+    starts = [m.start() for m in _ENTRY_HEADER_RE.finditer(content)]
+    if len(starts) <= 1:
+        return content  # 0/1 entry: never truncate mid-entry (broken markdown)
+    for start in starts[1:]:  # drop oldest entries from the front until it fits
+        if len(content[start:].encode("utf-8")) <= max_bytes:
+            return content[start:]
+    return content[starts[-1]:]  # newest entry alone still over budget — keep it whole
+
+
+@contextlib.contextmanager
+def _progress_lock(progress_path: Path):
+    """Serialize the Tier-B read-modify-write of the progress file across
+    concurrent save_checkpoint() calls (PR #721, Finding 2). Without it two
+    parallel appends race on the read()->write() window and one silently
+    overwrites the other's entry.
+
+    ponytail: advisory fcntl.flock, POSIX only. On platforms without fcntl
+    (Windows) it degrades to no locking — acceptable, the orchestrator harness
+    runs on POSIX. Upgrade to msvcrt.locking if Windows ever matters.
+    """
+    try:
+        import fcntl
+    except ImportError:
+        yield
+        return
+    lock_path = progress_path.with_name(progress_path.name + ".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(lock_path, "w") as lock_file:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
 
 class Checkpoint:
@@ -209,7 +265,14 @@ class CheckpointStore:
 
     def __init__(self, project_root: Path | str | None = None, agent_meta_root: Path | str | None = None):
         self.project_root = Path(project_root) if project_root else Path.cwd()
-        self.agent_meta_root = Path(agent_meta_root) if agent_meta_root else self.project_root
+        # When the harness omits agent_meta_root, detect it from the project
+        # root (`.agent-meta/` submodule vs. self-hosting checkout) instead of
+        # silently reading provider config from the project root — the latter
+        # mis-classifies a hook-less provider as Tier A (PR #721, Finding 1).
+        self.agent_meta_root = (
+            Path(agent_meta_root) if agent_meta_root
+            else resolve_agent_meta_root(self.project_root)
+        )
         self.checkpoint_dir = self.project_root / CHECKPOINT_DIR
 
     def _ensure_dir(self) -> None:
@@ -332,10 +395,13 @@ class CheckpointStore:
         latest = checkpoints[-1] if checkpoints else {}
         entry = _render_progress_entry(session_data.get("session_id", "unknown"), latest)
         is_new_session = len(checkpoints) == 1
-        existing = "" if is_new_session or not progress_path.exists() else progress_path.read_text(encoding="utf-8")
-        combined = existing + entry
-        combined = _trim_oldest_entries(combined, _PROGRESS_MAX_BYTES)
-        write_atomic(progress_path, combined)
+        # Lock spans the whole read-modify-write: two concurrent Tier-B appends
+        # must not both read the same "existing" and clobber each other (#721 F2).
+        with _progress_lock(progress_path):
+            existing = "" if is_new_session or not progress_path.exists() else progress_path.read_text(encoding="utf-8")
+            combined = existing + entry
+            combined = _trim_oldest_entries(combined, _PROGRESS_MAX_BYTES)
+            write_atomic(progress_path, combined)
 
     def load_session(self, session_id: str) -> dict | None:
         """Load full session data. Returns None when missing or corrupt (#576)."""
