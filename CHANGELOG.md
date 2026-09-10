@@ -2,6 +2,62 @@
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-09-10
+
+### Added
+- **Platform-preset cascade for project.yaml defaults (#709)**: new `platform` key
+  in `project.yaml` defines a per-provider hierarchy of preset templates (e.g.,
+  Claude defaults differ from Gemini defaults). Cascade resolves in order:
+  provider-default YAML → global platform bundle → project config, allowing
+  projects to opt into sensible provider-specific defaults without boilerplate.
+- **Provider-neutral live progress channel (#721)**: new `.meta-viz/progress/current.md`
+  file (moved from `.claude/progress/`, now provider-neutral). Tier-A providers
+  (Claude, Gemini with verified hook protocols) write a cumulative session table;
+  Tier-B providers (all others) append new checkpoints with automatic rotation at 200KB.
+  Human-readable `Agent | Task | Status | Pipeline/Stage` format, written on every
+  checkpoint save (issue #682 §6).
+- **Scenario testing catalog expansion**: 48 new scenarios in `tests/scenarios/`
+  covering representative provider/preset/feature combinations. All 21 core scenarios
+  now include file-existence assertions.
+
+### Fixed
+- **Security: auto_commit YAML-bool trap, broken backup log stub (#700)**: fixed
+  a parsing bug where `auto_commit: yes`/`no` (YAML booleans) were silently converted
+  to `true`/`false`, breaking admin-server logs and DoD output format. Also fixed
+  missing backup-log timestamp stub that could cause fatal JSON parse errors on rollback.
+- **reconcile use-orchestrator.md with AUTO_COMMIT_BLOCK guard + admin-server FD leaks
+  (#704)**: corrected the documented orchestrator responsibility set to match the
+  AutoCommitBlockGuard activation; fixed file descriptor leaks in admin-server
+  daemonization that prevented graceful shutdown and log rotation.
+- **compute eligible_roles independent of auto-commit mode (#706)**: role eligibility
+  (which write-capable agents can commit) is now computed at role-load time independent
+  of auto_commit config, fixing a regression where role eligibility could flip unexpectedly
+  during config validation runs.
+- **Hook enablement consistency checks (#712, #714)**: added `check_hook_enablement_consistency`
+  to `sync.py --validate`. Hooks marked enabled (in their own YAML header or via project.yaml
+  override) but missing from disk (#712) or unregistered in provider registration artifacts
+  (#714) now fail validation with clear diagnostics, preventing silently-broken hooks.
+- **warn when a pre-existing rule shadows gitignore block (#713)**: added `detect_shadowed_provider_roots`
+  to gitignore sync stage. When a managed provider block is disabled, any pre-existing rule
+  that still matches the provider's agents_dir is now flagged with a warning, preventing
+  silent untracking of generated output.
+- **render actual PROJECT_STRUCTURE in full-mode CLAUDE.md (#715)**: full-mode context files
+  now emit the actual `{{PROJECT_STRUCTURE}}` value when set, instead of just a generic lazy-load
+  pointer. Compact mode preserves the byte-for-byte #437 pinned behavior.
+- **force literal-block YAML style for multiline values (#717)**: PyYAML's default folding
+  of embedded newlines to spaces in multiline strings is now overridden to preserve formatting
+  in generated `.mcp.json` and other multiline configs.
+- **warn (never remove) stale mcpServers key, flag secrets (#719)**: stale `mcpServers` keys
+  from before the `.mcp.json` migration are now flagged for manual cleanup (never auto-removed).
+  Literal secrets (Bearer tokens, API keys) in the key are escalated to `[SECURITY]` warnings.
+- **plugin status experimental instead of FAIL (#701)**: local setup gaps (missing plugin deps,
+  unresolved `snippet://` references) are now marked `Experimental` instead of `FAIL`, allowing
+  plugin use to proceed while flagging incomplete setups in validation reports.
+- **classify FileNotFoundError and unresolved secrets as UNAVAILABLE (#725)**: fixed sync
+  pipeline failure classifications. `FileNotFoundError` on template/rule reads and unresolved
+  secret placeholders now correctly report as `UNAVAILABLE` (data problem) not `ERROR` (internal bug),
+  improving remediation diagnostics.
+
 ## [1.0.0] — 2026-09-08
 
 ### Changed
