@@ -1,0 +1,31 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Opencode
+dod-preset: standard
+platforms: []
+roles:
+- orchestrator
+- developer
+- git
+orchestrator:
+  mode: strict
+  checkpointing: true
+project:
+  name: scenario-progress-provider-neutral-path
+  prefix: s48
+  short: scenario-progress-neutral
+variables:
+  PROJECT_NAME: scenario-progress-provider-neutral-path
+  PROJECT_DESCRIPTION: Provider-neutral progress path regression test (live-progress-channel design, 2026-09-10).
+  PROJECT_GOAL: Verify CheckpointStore never writes .claude/progress/ for a non-Claude provider and always writes .meta-viz/progress/current.md.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-progress-neutral
+  GIT_MAIN_BRANCH: main
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false
