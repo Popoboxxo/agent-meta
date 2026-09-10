@@ -30,6 +30,7 @@ in `conftest.py::browser_ctx`.
 | `conftest.py` | Starts the admin server on :7421 and opens a shared Chromium context. |
 | `test_routing.py` | Dashboard loads, `/#/config-audit` renders (Bug 2), Tier Presets edit tab opens. |
 | `test_tier_presets_save.py` | Save in Edit Mappings does not fail with the legacy `mapping` validation error (Bug 3A) and per-provider override rows render (Bug 3B). |
+| `test_project_form_editors.py` | Issue #318: real click/fill/save interactions (not just rendering) on the Orchestrator mode dropdown + checkbox + number input, the Providers Options KV editor (add/edit/remove row), and the Model Overrides table editor (add row, dropdown selects, remove row). Each test captures the pre-test state and restores + re-saves it in a `finally` block since these pages write straight to this repo's own `.meta-config/project.yaml`. |
 
 ## Notes
 
