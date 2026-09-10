@@ -412,7 +412,7 @@ def _resolve_sync_targets(
 
     role_map = build_role_map(agent_meta_root)
     platforms = config.get('platforms', [])
-    overrides, _ = collect_sources(agent_meta_root, platforms)
+    overrides, _ = collect_sources(agent_meta_root, platforms, log=log)
     target_dir = project_root / pc['agents_dir']
 
     if not dry_run:

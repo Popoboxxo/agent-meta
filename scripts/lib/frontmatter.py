@@ -540,6 +540,7 @@ def _merge_frontmatter(base_content: str, override_fm: dict) -> str:
 def collect_sources(
     agent_meta_root: Path,
     platforms: list[str],
+    log: "SyncLog | None" = None,
 ) -> tuple[dict[str, Path], set[str]]:
     """
     Returns (overrides, known_ext_roles).
@@ -550,9 +551,16 @@ def collect_sources(
     known_ext_roles: roles that have a 3-project/<role>-ext.md in meta-repo.
       These are NOT used as templates — just signals that the role supports extensions.
       (Currently unused since 3-project/ in meta-repo has no templates by design.)
+
+    log: optional SyncLog — when given, a same-role collision between two
+      DIFFERENT active 2-platform overrides is warned (issue #703); last
+      writer (platform iteration order) still wins, unchanged behavior.
+      Kept optional so the module stays dependency-free for callers that
+      don't have a log handy (read-only helpers, admin-server display).
     """
     overrides: dict[str, Path] = {}
     known_ext_roles: set[str] = set()
+    _platform_source: dict[str, tuple[str, Path]] = {}  # role -> (platform, path)
 
     # 1. Generic agents (skip files starting with _ — reserved for resources/templates)
     generic_dir = agent_meta_root / AGENTS_DIR / GENERIC_DIR
@@ -567,6 +575,15 @@ def collect_sources(
         for f in sorted(platform_dir.glob(f"{platform}-*.md")):
             role = role_from_platform_file(f.name, platforms)
             if role:
+                prior = _platform_source.get(role)
+                if log is not None and prior is not None and prior[0] != platform:
+                    log.warning(
+                        f"agent-override-collision: role '{role}' is overridden by "
+                        f"both active platforms '{prior[0]}' ({prior[1].name}) and "
+                        f"'{platform}' ({f.name}) — '{f.name}' wins (last platform "
+                        "in config order)."
+                    )
+                _platform_source[role] = (platform, f)
                 overrides[role] = f
 
     # 3. Project-level agents (in meta-repo 3-project/)
