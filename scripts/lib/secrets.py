@@ -25,6 +25,10 @@ _SECRET_PATTERNS = [
     (r'(?i)password\s*[:=]\s*["\']?[a-zA-Z0-9_\-!@#$%^&*()+]{8,}', "Generic password assignment"),
     # Bearer tokens: JWT format (eyJ...) used by Home Assistant, Keycloak, etc.
     (r'eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}', "JWT / Bearer token"),
+    # Literal `Bearer <token>` credential (Authorization headers). Placeholder
+    # forms (`Bearer ${VAR}` / `Bearer {{VAR}}`) are filtered by _is_safe, so
+    # only a hard-coded token trips this.
+    (r'Bearer\s+[^\s"\']{12,}', "Literal Bearer token"),
     # InfluxDB-style long tokens: disabled like the broad base64 pattern
     # above (#586) -- `[a-zA-Z0-9_\-]{80,}` also matches long hashes,
     # minified/bundled code and random base64 blobs with a very high false
@@ -38,6 +42,7 @@ _SECRET_PATTERNS = [
 _SAFE_PATTERNS = [
     r'\{\{[A-Z0-9_]+\}\}',       # {{PLACEHOLDER}}
     r'\$\{[A-Z0-9_]+\}',         # ${ENV_VAR}
+    r'\{env:[A-Za-z0-9_]+\}',    # {env:VAR} (opencode) / ${env:VAR} (VS Code) provider syntax
     r'<[A-Z_]+>',                 # <PLACEHOLDER>
     r'your[_-]',                  # your_api_key
     r'example',

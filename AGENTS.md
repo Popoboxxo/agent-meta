@@ -17,7 +17,7 @@ agents/
   2-platform/       # Plattform-Overrides (z.B. sharkord, homeassistant, agent-meta)
 scripts/
   sync.py           # Agent-Generator
-  admin-server.py   # Lokaler Admin-UI developer/)
+  admin-server.py   # Lokaler Admin-UI-Server
 external/           # Git Submodule (externe Skill-Repos)
 docs/guides/        # Anleitungen und Beispiel-Config
 docs/ui/            # UI Assets

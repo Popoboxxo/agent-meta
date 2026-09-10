@@ -13,10 +13,14 @@ source bump keeps running the old script version indefinitely, unnoticed.
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
-from ..hooks import CLAUDE_HOOKS_DIR, collect_hook_sources, parse_hook_metadata
+from ..hooks import (
+    CLAUDE_HOOKS_DIR,
+    collect_hook_sources,
+    parse_hook_metadata,
+    parse_hook_settings_command,
+)
 from ..io import read_json_lenient
 from .report import Finding, Severity
 
@@ -116,6 +120,12 @@ def check_hook_enablement_consistency(
     if not sources:
         return findings
     project_hooks_cfg = config.get("hooks", {})
+    # Parse each source's metadata once up front, not once per provider inside
+    # the loop below (matching check_stale_deployed_hooks' source_versions).
+    source_metas = {
+        source_path: parse_hook_metadata(source_path.read_text(encoding="utf-8"))
+        for source_path, _ in sources
+    }
 
     seen_dirs: set[Path] = set()
     for pc in provider_config.values():
@@ -138,7 +148,7 @@ def check_hook_enablement_consistency(
         for source_path, output_name in sources:
             if output_name not in managed:
                 continue  # not managed for this project -- not our call
-            meta = parse_hook_metadata(source_path.read_text(encoding="utf-8"))
+            meta = source_metas[source_path]
             hook_stem = Path(output_name).stem
             should_be_active = project_hooks_cfg.get(hook_stem, {}).get(
                 "enabled", meta.get("enabled_by_default", "false").lower() == "true"
@@ -208,7 +218,6 @@ def _registered_hook_stems(
     data = read_json_lenient(settings_path)
     if not isinstance(data, dict):
         return set()
-    pattern = re.compile(r"^bash\s+" + re.escape(hooks_dir_rel) + r"/(\S+)\s*$")
     stems: set[str] = set()
     for event_entries in data.get("hooks", {}).values():
         if not isinstance(event_entries, list):
@@ -219,7 +228,9 @@ def _registered_hook_stems(
             for h in entry.get("hooks", []):
                 if not isinstance(h, dict):
                     continue
-                m = pattern.match(str(h.get("command", "")).strip())
-                if m:
-                    stems.add(Path(m.group(1)).stem)
+                filename = parse_hook_settings_command(
+                    str(h.get("command", "")), hooks_dir_rel
+                )
+                if filename:
+                    stems.add(Path(filename).stem)
     return stems

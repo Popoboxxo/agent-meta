@@ -296,20 +296,28 @@ def sync_version_bookkeeping(
         return
 
     text = config_path.read_text(encoding="utf-8")
+    # Replace only the value portion, preserving any inline comment
+    # (`agent-meta-version: 0.9  # pinned, see #NNN`) unchanged: group 1 is the
+    # key + spacing, group 2 the value, group 3 the optional trailing comment.
     new_text, n = re.subn(
-        r'(?m)^agent-meta-version:\s*.*$',
-        f'agent-meta-version: "{actual_version}"',
+        r'(?m)^(agent-meta-version:\s*)([^\n]*?)(\s*#[^\n]*)?$',
+        rf'\g<1>"{actual_version}"\g<3>',
         text, count=1,
     )
     if n == 0:
         return  # key not present as a plain top-level scalar line -- don't guess
     rel = (str(config_path.relative_to(project_root))
            if project_root in config_path.parents else config_path.name)
+    if dry_run:
+        # Dry-run must be a true no-op: no in-memory mutation, no "UPDATE" log
+        # (that reads as a write that happened). Report intent only.
+        log.action("WOULD-UPDATE", rel,
+                   f"agent-meta-version: {current!r} -> {actual_version!r}")
+        return
     log.action("UPDATE", rel,
                f"agent-meta-version: {current!r} -> {actual_version!r}")
     config["agent-meta-version"] = actual_version
-    if not dry_run:
-        config_path.write_text(new_text, encoding="utf-8")
+    config_path.write_text(new_text, encoding="utf-8")
 
 
 def _sync_stage_legacy_cleanup(

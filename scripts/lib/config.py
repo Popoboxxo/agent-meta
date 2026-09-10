@@ -1124,7 +1124,8 @@ def _build_pipeline_variables(
             available_roles = set(all_roles)
         roles_cfg_for_coupling = load_roles_config(agent_meta_root)
         pipeline_errors = validate_pipelines(
-            effective, list(available_roles), roles_config=roles_cfg_for_coupling
+            effective, list(available_roles), roles_config=roles_cfg_for_coupling,
+            known_roles=set(all_roles),
         )
         for err in pipeline_errors:
             unmapped.append(f"quality-pipelines: {err}")

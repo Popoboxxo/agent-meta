@@ -577,12 +577,19 @@ def collect_sources(
             if role:
                 prior = _platform_source.get(role)
                 if log is not None and prior is not None and prior[0] != platform:
-                    log.warning(
-                        f"agent-override-collision: role '{role}' is overridden by "
-                        f"both active platforms '{prior[0]}' ({prior[1].name}) and "
-                        f"'{platform}' ({f.name}) — '{f.name}' wins (last platform "
-                        "in config order)."
-                    )
+                    # Detect once per sync run, not once per provider: dedupe on
+                    # a stable signature held by the (run-scoped) log, so a real
+                    # conflict is reported a single time regardless of how many
+                    # active providers each re-invoke collect_sources (#703).
+                    signature = (role, prior[0], platform)
+                    if signature not in log.seen_collisions:
+                        log.seen_collisions.add(signature)
+                        log.warning(
+                            f"agent-override-collision: role '{role}' is overridden by "
+                            f"both active platforms '{prior[0]}' ({prior[1].name}) and "
+                            f"'{platform}' ({f.name}) — '{f.name}' wins (last platform "
+                            "in config order)."
+                        )
                 _platform_source[role] = (platform, f)
                 overrides[role] = f
 

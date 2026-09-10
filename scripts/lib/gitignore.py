@@ -24,9 +24,9 @@ rewritten in exact mode.
 """
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 
+from .io import run_git_check_ignore
 from .providers import resolve_providers
 
 # Category fallback for Claude's gitignore_entries when the provider config
@@ -283,12 +283,8 @@ def detect_shadowed_provider_roots(
         if not agents_dir:
             continue
         probe = f"{agents_dir}/__agent_meta_shadow_probe__.md"
-        try:
-            result = subprocess.run(
-                ["git", "check-ignore", "-v", probe],
-                cwd=str(project_root), capture_output=True, text=True, timeout=5,
-            )
-        except (OSError, subprocess.SubprocessError):
+        result = run_git_check_ignore(probe, str(project_root), "-v")
+        if result is None:
             continue
         if result.returncode != 0 or not result.stdout.strip():
             continue  # not ignored at all -- fine

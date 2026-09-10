@@ -119,6 +119,19 @@ def _hook_settings_command(output_filename: str, hooks_dir: str = CLAUDE_HOOKS_D
     return f"bash {hooks_dir}/{output_filename}"
 
 
+def parse_hook_settings_command(command: str, hooks_dir: str = CLAUDE_HOOKS_DIR) -> str | None:
+    """Inverse of `_hook_settings_command`: extract the hook filename from a
+    registered ``bash <hooks_dir>/<filename>`` command string.
+
+    Returns the filename, or None if `command` does not match the canonical
+    format this module writes. Kept here next to the writer so both sides of
+    the format live in one place (consumers like consistency.hook_drift must
+    not re-derive the format with their own regex — a format change would
+    silently desync otherwise)."""
+    m = re.match(r"^bash\s+" + re.escape(hooks_dir) + r"/(\S+)\s*$", command.strip())
+    return m.group(1) if m else None
+
+
 def _update_settings_hooks(
     project_root: Path,
     previously_managed: set[str],

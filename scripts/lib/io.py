@@ -453,21 +453,40 @@ def write_checked(
     return True
 
 
+def run_git_check_ignore(
+    target: str, cwd: str, *flags: str
+) -> "subprocess.CompletedProcess | None":
+    """Run ``git check-ignore <flags> <target>`` in `cwd`, capturing output.
+
+    Returns the CompletedProcess, or None if git could not be run at all (not
+    installed, not a repo, timeout). Callers interpret the return code
+    themselves: 0 = ignored, 1 = not ignored, >1 = git error. Central place
+    for the subprocess + error handling so both the write-time gitignore
+    warning here and lib/gitignore.py's shadow-root probe share one
+    implementation (#713).
+    """
+    try:
+        return subprocess.run(  # noqa: S603
+            ["git", "check-ignore", *flags, target],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
 def _warn_if_not_gitignored(path: Path, rel_label: str, log: "SyncLog") -> None:  # noqa: F821
     """Warn when a file expected to be gitignored is not actually ignored (#586).
 
     Fail-safe: any problem running git (not installed, not a repo, timeout)
     is silently ignored — this check is informational, never a hard gate.
     """
-    try:
-        result = subprocess.run(  # noqa: S603
-            ["git", "check-ignore", "-q", str(path)],
-            cwd=str(path.parent) if path.parent.exists() else str(Path.cwd()),
-            capture_output=True,
-            timeout=5,
-            check=False,
-        )
-    except (OSError, subprocess.SubprocessError):
+    cwd = str(path.parent) if path.parent.exists() else str(Path.cwd())
+    result = run_git_check_ignore(str(path), cwd, "-q")
+    if result is None:
         return
     if result.returncode == 1:
         # 0 = ignored, 1 = not ignored, >1 = git error (no repo, bad options, ...)
