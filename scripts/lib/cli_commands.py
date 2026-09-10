@@ -985,8 +985,14 @@ def _handle_validate(ctx: _SyncContext) -> None:
     # the current hooks/1-generic/ source -- sibling check to
     # stale_platform_overrides above, for hooks instead of agent templates.
     _strict_findings += check_stale_deployed_hooks(project_root, agent_meta_root, config, _provider_config)
+    # Enabled-but-unguarded hooks (issues #712, #714): a hook that should be
+    # active per its own header / project.yaml override but is missing from
+    # disk or unregistered in settings.json fails OPEN otherwise.
+    from lib.consistency.hook_drift import check_hook_enablement_consistency
+    _strict_findings += check_hook_enablement_consistency(project_root, agent_meta_root, config, _provider_config)
+    _strict_exit_code = 0
     if _strict_findings:
-        print_report(_strict_findings, project_root, changed_only=False)
+        _strict_exit_code = print_report(_strict_findings, project_root, changed_only=False)
 
     test_repo_path = resolve_test_repo_path(config, project_root, log)
 
@@ -1007,9 +1013,9 @@ def _handle_validate(ctx: _SyncContext) -> None:
         log.note("test-repo",
                  f"Skipping test-repo sync validation — {reason}. "
                  "Consistency checks still ran.")
-        sys.exit(1 if consistency_errors else 0)
+        sys.exit(1 if (consistency_errors or _strict_exit_code) else 0)
     success = validate_test_repo(test_repo_path, agent_meta_root, config, log, args.dry_run)
-    if not success or consistency_errors:
+    if not success or consistency_errors or _strict_exit_code:
         sys.exit(1)
 
     ctx.config = config
