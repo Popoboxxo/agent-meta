@@ -7,9 +7,22 @@
 > Szenario, in einem frischen Temp-Verzeichnis, nie gegen dieses Repo selbst).
 >
 > **Konvention:** Jedes neue Feature/jede neue Config-Option bekommt ein
-> eigenes Szenario hier (siehe `rules/2-platform/agent-meta-conventions.md` →
+> eigenes Szenario hier (siehe `.claude/skills/conventions/SKILL.md` →
 > Change Checklist). `agent-meta-manager` kennt diesen Katalog und verweist
 > bei Framework-Änderungen darauf.
+
+## Framework-Szenario-Konvention
+
+Jedes neue Framework-Feature oder jede neue `project.yaml`-Option erhält **zeitgleich** mit der Implementierung mindestens ein neues Testszenario:
+
+1. **Nicht nachträglich**: Szenario und Feature sind Teil **desselben PRs/Commits** — nicht als separater Nachzug.
+2. **Konkrete Assertions**: Das Szenario prüft den tatsächlichen Effekt, nicht nur Datei-Existenz:
+   - Neue `project.yaml`-Option → `tests/scenarios/asserts/<szenario-name>.sh` validiert die generierte Agent/Config/Regel
+   - Neue Agent-Rolle → Szenario prüft erwartete Tools und Settings im generierten Agent
+3. **Katalog aktualisieren**: Entry in der Tabelle unten (ID, Beschreibung) + korrespondierendes `configs/<id>.project.yaml`
+4. **Lokale Validierung vor Commit**: `tests/scenarios/run.sh` ausführen — `PASS` für alle Szenarien ist Teil der DoD
+
+Diese Konvention stellt sicher, dass Framework-Änderungen durch konkrete, ausführbare Tests validiert werden und nicht nachträglich vergessen.
 
 ## Ausführen
 
