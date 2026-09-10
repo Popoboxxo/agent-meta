@@ -1,0 +1,590 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e4]:
+        - heading "agent-meta" [level=1] [ref=e5]
+        - generic [ref=e6]: super_admin
+      - navigation [ref=e7]:
+        - generic [ref=e8]: Workspace
+        - generic [ref=e9] [cursor=pointer]:
+          - generic [ref=e10]: ■
+          - text: Dashboard
+        - generic [ref=e11] [cursor=pointer]:
+          - generic [ref=e12]: ▦
+          - text: Viz Dashboard
+        - generic [ref=e13] [cursor=pointer]:
+          - generic [ref=e14]: ↻
+          - text: Sync
+        - generic [ref=e15] [cursor=pointer]:
+          - generic [ref=e16]: ≡
+          - text: Live events
+        - generic [ref=e17]: Project instance
+        - generic [ref=e18] [cursor=pointer]:
+          - generic [ref=e19]: ⚙
+          - text: General
+        - generic [ref=e20] [cursor=pointer]:
+          - generic [ref=e21]: ☁
+          - text: Providers & Platforms
+        - generic [ref=e22] [cursor=pointer]:
+          - generic [ref=e23]: ⊘
+          - text: Provider Deactivation
+        - generic [ref=e24] [cursor=pointer]:
+          - generic [ref=e25]: 💾
+          - text: Backups
+        - generic [ref=e26] [cursor=pointer]:
+          - generic [ref=e27]: ⍟
+          - text: Roles
+        - generic [ref=e28] [cursor=pointer]:
+          - generic [ref=e29]: ⎈
+          - text: Orchestrator
+        - generic [ref=e30] [cursor=pointer]:
+          - generic [ref=e31]: 👁
+          - text: Viz & Admin
+        - generic [ref=e32] [cursor=pointer]:
+          - generic [ref=e33]: ★
+          - text: Model Overrides
+        - generic [ref=e34] [cursor=pointer]:
+          - generic [ref=e35]: ❖
+          - text: Provider Tier Overrides
+        - generic [ref=e36] [cursor=pointer]:
+          - generic [ref=e37]: ⊞
+          - text: Model Mapping
+        - generic [ref=e38] [cursor=pointer]:
+          - generic [ref=e39]: ☑
+          - text: DoD Overrides
+        - generic [ref=e40] [cursor=pointer]:
+          - generic [ref=e41]: ⚖
+          - text: Rules Overrides
+        - generic [ref=e42] [cursor=pointer]:
+          - generic [ref=e43]: 🏷
+          - text: Conventions Overrides
+        - generic [ref=e44] [cursor=pointer]:
+          - generic [ref=e45]: 🌐
+          - text: Environment Variables
+        - generic [ref=e46] [cursor=pointer]:
+          - generic [ref=e47]: 🧭
+          - text: Verfügbare Plugins
+        - generic [ref=e48] [cursor=pointer]:
+          - generic [ref=e49]: 🔌
+          - text: Plugin Overrides
+        - generic [ref=e50] [cursor=pointer]:
+          - generic [ref=e51]: 🧩
+          - text: External Skills
+        - generic [ref=e52] [cursor=pointer]:
+          - generic [ref=e53]: 🚫
+          - text: Gitignore Rules
+        - generic [ref=e54] [cursor=pointer]:
+          - generic [ref=e55]: 🧠
+          - text: Knowledge Engine
+        - generic [ref=e56] [cursor=pointer]:
+          - generic [ref=e57]: ⌨
+          - text: Advanced (raw YAML)
+        - generic [ref=e58]: Framework defaults
+        - generic [ref=e59] [cursor=pointer]:
+          - generic [ref=e60]: 💲
+          - text: Models & Pricing
+        - generic [ref=e61] [cursor=pointer]:
+          - generic [ref=e62]: 🚫
+          - text: Gitignore Defaults
+        - generic [ref=e63] [cursor=pointer]:
+          - generic [ref=e64]: 💲
+          - text: Models & Pricing (Legacy)
+        - generic [ref=e65] [cursor=pointer]:
+          - generic [ref=e66]: ❖
+          - text: Provider Tier Mappings
+        - generic [ref=e67] [cursor=pointer]:
+          - generic [ref=e68]: ★
+          - text: Tier Presets
+        - generic [ref=e69] [cursor=pointer]:
+          - generic [ref=e70]: ⍟
+          - text: role-defaults
+        - generic [ref=e71] [cursor=pointer]:
+          - generic [ref=e72]: ☁
+          - text: ai-providers
+        - generic [ref=e73] [cursor=pointer]:
+          - generic [ref=e74]: 🧩
+          - text: Skills Registry
+        - generic [ref=e75] [cursor=pointer]:
+          - generic [ref=e76]: ☑
+          - text: dod presets
+        - generic [ref=e77] [cursor=pointer]:
+          - generic [ref=e78]: ⚖
+          - text: rules presets
+        - generic [ref=e79] [cursor=pointer]:
+          - generic [ref=e80]: 🏷
+          - text: conventions presets
+        - generic [ref=e81] [cursor=pointer]:
+          - generic [ref=e82]: ↬
+          - text: delegation
+        - generic [ref=e83] [cursor=pointer]:
+          - generic [ref=e84]: ⇱
+          - text: export
+        - generic [ref=e85]: Workflows
+        - generic [ref=e86] [cursor=pointer]:
+          - generic [ref=e87]: ▣
+          - text: Roles & graph
+        - generic [ref=e88] [cursor=pointer]:
+          - generic [ref=e89]: ↦
+          - text: Pipelines
+        - generic [ref=e90] [cursor=pointer]:
+          - generic [ref=e91]: ↻
+          - text: Reflection pairs
+        - generic [ref=e92] [cursor=pointer]:
+          - generic [ref=e93]: ✎
+          - text: Agent templates
+        - generic [ref=e94] [cursor=pointer]:
+          - generic [ref=e95]: 🛡️
+          - text: System Health & Audit
+    - main [ref=e96]:
+      - generic [ref=e668]:
+        - heading "Project — Roles" [level=1] [ref=e669]
+        - generic [ref=e670]: 57 roles selected.
+        - generic [ref=e671]:
+          - heading "Groups" [level=2] [ref=e672]
+          - paragraph [ref=e673]:
+            - text: Bulk-select every role tagged with the same
+            - code [ref=e674]: "group:"
+            - text: in role-defaults.yaml.
+          - generic [ref=e675]:
+            - button "− Remove knowledge (7)" [ref=e676] [cursor=pointer]
+            - button "+ Add se (14)" [ref=e677] [cursor=pointer]
+        - generic [ref=e679]:
+          - generic [ref=e680]:
+            - heading "Available" [level=2] [ref=e681]
+            - generic [ref=e682]:
+              - generic [ref=e683]:
+                - button "→" [ref=e684] [cursor=pointer]
+                - generic [ref=e685]:
+                  - generic [ref=e686]: ai-security-guardian
+                  - generic [ref=e687]: "KI-spezifische Sicherheitsrisiken: halluzinierte Dependencies (Slopsquatting), fabrizierte IAM-Aktionen, unsichere AI-Defaults (Debug-Mode, permissive CORS, Default-Credentials), bypassbare Bedingungslogik, Phantom-Endpoints und Leaked-Training-Data-Patterns — read-only, komplementär zu security-auditor (OWASP) und dependency-auditor (Supply-Chain)."
+              - generic [ref=e688]:
+                - button "→" [ref=e689] [cursor=pointer]
+                - generic [ref=e690]:
+                  - generic [ref=e691]: app-lifecycle-governor
+                  - generic [ref=e692]: "App-Lifecycle-Governance: Ownership-Audit mit Orphan-Detection, SLA-Validierung, Data-Classification-Checks (public/internal/confidential/restricted), Lifecycle-Stage-Tracking (prototype → production → deprecated → archived) und Deprecation-Plan-Prüfung — read-only, Findings als Empfehlungen via feedback."
+              - generic [ref=e693]:
+                - button "→" [ref=e694] [cursor=pointer]
+                - generic [ref=e695]:
+                  - generic [ref=e696]: backend-reviewer
+                  - generic [ref=e697]: "Backend-Domain-Review: API-Contracts, Silent Failures, Concurrency, Middleware-Ketten."
+              - generic [ref=e698]:
+                - button "→" [ref=e699] [cursor=pointer]
+                - generic [ref=e700]:
+                  - generic [ref=e701]: copyeditor
+                  - generic [ref=e702]: "Lektorat: Stil, Satzbau, Wortwiederholungen, roter Faden und inhaltliche Konsistenz — aufbauend auf sauberem Korrektorat. Liefert kategorisierten Markdown-Findings-Report."
+              - generic [ref=e703]:
+                - button "→" [ref=e704] [cursor=pointer]
+                - generic [ref=e705]:
+                  - generic [ref=e706]: database-engineer
+                  - generic [ref=e707]: Relationales Schema-Design, Datenbank-Migrationen, Query-Optimierung und Index-Strategie — übergibt einen rückwärtskompatiblen Schema-Vertrag an developer.
+              - generic [ref=e708]:
+                - button "→" [ref=e709] [cursor=pointer]
+                - generic [ref=e710]:
+                  - generic [ref=e711]: database-reviewer
+                  - generic [ref=e712]: "Datenbank-Domain-Review: Migration-Safety, N+1, Injection-Vektoren, Indexing, Transaktionen."
+              - generic [ref=e713]:
+                - button "→" [ref=e714] [cursor=pointer]
+                - generic [ref=e715]:
+                  - generic [ref=e716]: frontend-reviewer
+                  - generic [ref=e717]: "Frontend-Domain-Review: Komponenten, State, SSR/Hydration, Browser-APIs, Render-Performance."
+              - generic [ref=e718]:
+                - button "→" [ref=e719] [cursor=pointer]
+                - generic [ref=e720]:
+                  - generic [ref=e721]: openscad-developer
+                  - generic [ref=e722]: Parametrische 3D-Modelle in OpenSCAD generieren, Render-Inspect-Refine via MCP, Druck-Optimierung
+              - generic [ref=e723]:
+                - button "→" [ref=e724] [cursor=pointer]
+                - generic [ref=e725]:
+                  - generic [ref=e726]: product-manager
+                  - generic [ref=e727]: "Strategisches Produkt-Management: Backlog, User-Stories, Sprint-Planung, Priorisierung (RICE/MoSCoW), KPI-Definition und Stakeholder-Kommunikation."
+              - generic [ref=e728]:
+                - button "→" [ref=e729] [cursor=pointer]
+                - generic [ref=e730]:
+                  - generic [ref=e731]: prompt-governor
+                  - generic [ref=e732]: "Prompt-Governance: Prompts als Source Code behandeln — PromptBOM-Metadaten (Model + Prompt + Parameter), append-only Audit-Trail, Provenance-Tracking, Version-Drift-Erkennung und Banned-Unsafe-Prompting-Patterns (Skip Auth, Ignore Security, Bypass Validation). Read-only auf Prompts; komplementär zu prompt-engineer (Design)."
+              - generic [ref=e733]:
+                - button "→" [ref=e734] [cursor=pointer]
+                - generic [ref=e735]:
+                  - generic [ref=e736]: proofreader
+                  - generic [ref=e737]: "Korrektorat: reine Fehlerkorrektur — Rechtschreibung, Grammatik, Zeichensetzung. Keine Stil- oder Strukturänderungen. Liefert kategorisierten Markdown-Findings-Report."
+              - generic [ref=e738]:
+                - button "→" [ref=e739] [cursor=pointer]
+                - generic [ref=e740]:
+                  - generic [ref=e741]: se-architect
+                  - generic [ref=e742]: Zerlegt Blackboxes in Whiteboxes nach strengen Architekturgesetzen (CQRS, Orthogonalität).
+              - generic [ref=e743]:
+                - button "→" [ref=e744] [cursor=pointer]
+                - generic [ref=e745]:
+                  - generic [ref=e746]: se-critic
+                  - generic [ref=e747]: Prüft Architekturentscheidungen iterativ auf Vollständigkeit, Konsistenz und Testbarkeit.
+              - generic [ref=e748]:
+                - button "→" [ref=e749] [cursor=pointer]
+                - generic [ref=e750]:
+                  - generic [ref=e751]: se-developer
+                  - generic [ref=e752]: Standard SE-Leaf-Implementierung (2-4 Interfaces) mit strikter Interface-Disziplin
+              - generic [ref=e753]:
+                - button "→" [ref=e754] [cursor=pointer]
+                - generic [ref=e755]:
+                  - generic [ref=e756]: se-integration-and-test-manager
+                  - generic [ref=e757]: "V&V-Orchestrator: Bestimmt Integrationsstrategie und koordiniert Test-Ebenen."
+              - generic [ref=e758]:
+                - button "→" [ref=e759] [cursor=pointer]
+                - generic [ref=e760]:
+                  - generic [ref=e761]: se-interface-mgr
+                  - generic [ref=e762]: Verwaltet und validiert alle Schnittstellenverträge domänenübergreifend.
+              - generic [ref=e763]:
+                - button "→" [ref=e764] [cursor=pointer]
+                - generic [ref=e765]:
+                  - generic [ref=e766]: se-junior-developer
+                  - generic [ref=e767]: Triviale SE-Leaf-Implementierung (0-1 Interfaces, kein cross-cutting) — eskaliert strukturiert
+              - generic [ref=e768]:
+                - button "→" [ref=e769] [cursor=pointer]
+                - generic [ref=e770]:
+                  - generic [ref=e771]: se-requirements
+                  - generic [ref=e772]: Nimmt Stakeholder-Bedürfnisse auf und erstellt das formale L1-Blackbox-Requirement.
+              - generic [ref=e773]:
+                - button "→" [ref=e774] [cursor=pointer]
+                - generic [ref=e775]:
+                  - generic [ref=e776]: se-senior-developer
+                  - generic [ref=e777]: Komplexe SE-Leaf-Implementierung (5+ Interfaces, cross-cutting, boundary-level, security/performance-critical) mit Pre-Implementation Interface-Analyse
+              - generic [ref=e778]:
+                - button "→" [ref=e779] [cursor=pointer]
+                - generic [ref=e780]:
+                  - generic [ref=e781]: se-termination
+                  - generic [ref=e782]: Entscheidet deterministisch, ob der L3-Component-Leaf-Node erreicht wurde.
+              - generic [ref=e783]:
+                - button "→" [ref=e784] [cursor=pointer]
+                - generic [ref=e785]:
+                  - generic [ref=e786]: se-test-engineer
+                  - generic [ref=e787]: Entwickelt MBSE-Testmodelle und entwirft Integrationstests für den rechten V-Modell-Flügel.
+              - generic [ref=e788]:
+                - button "→" [ref=e789] [cursor=pointer]
+                - generic [ref=e790]:
+                  - generic [ref=e791]: se-testreviewer
+                  - generic [ref=e792]: Auditiert Teststrategien auf Edge-Cases, Boundary Values, Äquivalenzklassen und Flakiness.
+              - generic [ref=e793]:
+                - button "→" [ref=e794] [cursor=pointer]
+                - generic [ref=e795]:
+                  - generic [ref=e796]: se-validator
+                  - generic [ref=e797]: "L1 System-Validierung: End-to-End User Journeys gegen Stakeholder-Bedürfnisse."
+              - generic [ref=e798]:
+                - button "→" [ref=e799] [cursor=pointer]
+                - generic [ref=e800]:
+                  - generic [ref=e801]: se-verifier
+                  - generic [ref=e802]: "Multi-Level Verification (L1-Ln): Prüft integrierte Systeme gegen Architektur-Spezifikationen."
+              - generic [ref=e803]:
+                - button "→" [ref=e804] [cursor=pointer]
+                - generic [ref=e805]:
+                  - generic [ref=e806]: security-auditor
+                  - generic [ref=e807]: "Sicherheits-Audit: OWASP, Secrets, Dependencies, Supply-Chain — statische Analyse"
+              - generic [ref=e808]:
+                - button "→" [ref=e809] [cursor=pointer]
+                - generic [ref=e810]:
+                  - generic [ref=e811]: sre-engineer
+                  - generic [ref=e812]: "Proaktive Reliability-Disziplin: SLI/SLO-Definition, Error-Budgets, Capacity-Planning, Toil-Reduktion, Runbooks und Reliability-Reviews vor Deployment."
+              - generic [ref=e813]:
+                - button "→" [ref=e814] [cursor=pointer]
+                - generic [ref=e815]:
+                  - generic [ref=e816]: ui-reviewer
+                  - generic [ref=e817]: "UI-Review: Design-Token-Conformance, Layout-Konsistenz, Interaction-States, i18n-Readiness."
+          - generic [ref=e818]:
+            - heading "Active" [level=2] [ref=e819]
+            - generic [ref=e820]:
+              - generic [ref=e821]:
+                - button "←" [ref=e822] [cursor=pointer]
+                - generic [ref=e823]:
+                  - generic [ref=e824]: orchestrator
+                  - generic [ref=e825]: Einstiegspunkt für alle Entwicklungsaufgaben — koordiniert alle anderen Agenten. Wählt automatisch das kosteneffizienteste Model-Tier für jede Delegation (nano/fast/balanced/powerful/max).
+              - generic [ref=e826]:
+                - button "←" [ref=e827] [cursor=pointer]
+                - generic [ref=e828]:
+                  - generic [ref=e829]: developer
+                  - generic [ref=e830]: Feature-Implementierung und Bugfixes
+              - generic [ref=e831]:
+                - button "←" [ref=e832] [cursor=pointer]
+                - generic [ref=e833]:
+                  - generic [ref=e834]: junior-developer
+                  - generic [ref=e835]: Triviale Code-Änderungen (≤2 Dateien, kein Architektur-Impact) — eskaliert strukturiert
+              - generic [ref=e836]:
+                - button "←" [ref=e837] [cursor=pointer]
+                - generic [ref=e838]:
+                  - generic [ref=e839]: senior-developer
+                  - generic [ref=e840]: Komplexe Features, Architektur-Entscheidungen, schwierige Bugs, Cross-Cutting-Refactorings
+              - generic [ref=e841]:
+                - button "←" [ref=e842] [cursor=pointer]
+                - generic [ref=e843]:
+                  - generic [ref=e844]: requirements
+                  - generic [ref=e845]: Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen
+              - generic [ref=e846]:
+                - button "←" [ref=e847] [cursor=pointer]
+                - generic [ref=e848]:
+                  - generic [ref=e849]: documenter
+                  - generic [ref=e850]: CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse pflegen
+              - generic [ref=e851]:
+                - button "←" [ref=e852] [cursor=pointer]
+                - generic [ref=e853]:
+                  - generic [ref=e854]: git
+                  - generic [ref=e855]: Commits, Branches, Tags, Push/Pull und alle Git-Operationen
+              - generic [ref=e856]:
+                - button "←" [ref=e857] [cursor=pointer]
+                - generic [ref=e858]:
+                  - generic [ref=e859]: release
+                  - generic [ref=e860]: Versioning, Changelog, Build-Artifact, GitHub Release erstellen
+              - generic [ref=e861]:
+                - button "←" [ref=e862] [cursor=pointer]
+                - generic [ref=e863]:
+                  - generic [ref=e864]: meta-feedback
+                  - generic [ref=e865]: Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen
+              - generic [ref=e866]:
+                - button "←" [ref=e867] [cursor=pointer]
+                - generic [ref=e868]:
+                  - generic [ref=e869]: ideation
+                  - generic [ref=e870]: Neue Ideen explorieren, Vision schärfen, Übergabe an requirements
+              - generic [ref=e871]:
+                - button "←" [ref=e872] [cursor=pointer]
+                - generic [ref=e873]:
+                  - generic [ref=e874]: planner
+                  - generic [ref=e875]: Erzeugt konkrete, geordnete Umsetzungspläne aus Konzepten/REQs/Bugs
+              - generic [ref=e876]:
+                - button "←" [ref=e877] [cursor=pointer]
+                - generic [ref=e878]:
+                  - generic [ref=e879]: agent-meta-manager
+                  - generic [ref=e880]: "agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische Agenten anlegen"
+              - generic [ref=e881]:
+                - button "←" [ref=e882] [cursor=pointer]
+                - generic [ref=e883]:
+                  - generic [ref=e884]: agent-meta-scout
+                  - generic [ref=e885]: "Claude-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns entdecken"
+              - generic [ref=e886]:
+                - button "←" [ref=e887] [cursor=pointer]
+                - generic [ref=e888]:
+                  - generic [ref=e889]: log-analyzer
+                  - generic [ref=e890]: "System- und Applikations-Logs analysieren: Frequency-Clustering, Severity-Klassifikation (RFC 5424), Root-Cause-Hypothesen, Delegation an feedback/developer/security-auditor"
+              - generic [ref=e891]:
+                - button "←" [ref=e892] [cursor=pointer]
+                - generic [ref=e893]:
+                  - generic [ref=e894]: feedback
+                  - generic [ref=e895]: "Projekt-Feedback standardisieren: Bugs, Features, Verbesserungen als GitHub Issues einreichen — immer vor git für Issue-Erstellung"
+              - generic [ref=e896]:
+                - button "←" [ref=e897] [cursor=pointer]
+                - generic [ref=e898]:
+                  - generic [ref=e899]: code-reviewer
+                  - generic [ref=e900]: "Clean Code Gatekeeper: Blast-Radius-Analyse, SOLID/DRY Prüfung, Code-Qualitäts-Audit."
+              - generic [ref=e901]:
+                - button "←" [ref=e902] [cursor=pointer]
+                - generic [ref=e903]:
+                  - generic [ref=e904]: concept-reviewer
+                  - generic [ref=e905]: "Konzept-Critic: reviewt Design-Docs und Konzepte auf Vollständigkeit, Logik, Risiken, Machbarkeit und Konsistenz — gibt strukturiertes Critic-Feedback für Review-Loops"
+              - generic [ref=e906]:
+                - button "←" [ref=e907] [cursor=pointer]
+                - generic [ref=e908]:
+                  - generic [ref=e909]: ui-ux-designer
+                  - generic [ref=e910]: UI-Spezifikationen, Mockups und Design-Systeme erstellen.
+              - generic [ref=e911]:
+                - button "←" [ref=e912] [cursor=pointer]
+                - generic [ref=e913]:
+                  - generic [ref=e914]: api-specialist
+                  - generic [ref=e915]: OpenAPI/Contract-First API Design, Schnittstellen-Spezifikationen.
+              - generic [ref=e916]:
+                - button "←" [ref=e917] [cursor=pointer]
+                - generic [ref=e918]:
+                  - generic [ref=e919]: design-system-architect
+                  - generic [ref=e920]: Übersetzt Design-System-Schema (ui-ux-designer) in echte Token-Artefakte (CSS/Tailwind), Farbharmonie-Systematik, Component-Variant-Contracts, Spacing-/Breakpoint-Methodik und Motion-Tokens.
+              - generic [ref=e921]:
+                - button "←" [ref=e922] [cursor=pointer]
+                - generic [ref=e923]:
+                  - generic [ref=e924]: frontend-component-engineer
+                  - generic [ref=e925]: Baut produktionsreife UI-Komponenten aus Screen-Spec (ui-ux-designer) und Token-/Variant-Contract (design-system-architect) — Props-Contract, State-Matrix, A11y-Baseline, Motion-/Responsive-Umsetzung.
+              - generic [ref=e926]:
+                - button "←" [ref=e927] [cursor=pointer]
+                - generic [ref=e928]:
+                  - generic [ref=e929]: devops-engineer
+                  - generic [ref=e930]: CI/CD, Infrastructure as Code, Kubernetes, Observability.
+              - generic [ref=e931]:
+                - button "←" [ref=e932] [cursor=pointer]
+                - generic [ref=e933]:
+                  - generic [ref=e934]: performance-optimizer
+                  - generic [ref=e935]: Big-O Bottleneck-Identifikation und datengetriebene Performance-Optimierung.
+              - generic [ref=e936]:
+                - button "←" [ref=e937] [cursor=pointer]
+                - generic [ref=e938]:
+                  - generic [ref=e939]: explorer
+                  - generic [ref=e940]: Read-only Codebase-Recherche, Dependency- und Impact-Mapping, Datei- und Symbol-Suche.
+              - generic [ref=e941]:
+                - button "←" [ref=e942] [cursor=pointer]
+                - generic [ref=e943]:
+                  - generic [ref=e944]: export-manager
+                  - generic [ref=e945]: "Target-agnostischer Output-Router: Markdown, Confluence, Jira-Xray, Notion."
+              - generic [ref=e946]:
+                - button "←" [ref=e947] [cursor=pointer]
+                - generic [ref=e948]:
+                  - generic [ref=e949]: effort-estimator
+                  - generic [ref=e950]: Schätzt Aufwände für Entwicklungsaufgaben basierend auf Task-Typ und LLM-Kalibrierung
+              - generic [ref=e951]:
+                - button "←" [ref=e952] [cursor=pointer]
+                - generic [ref=e953]:
+                  - generic [ref=e954]: bug-feature-analyzer
+                  - generic [ref=e955]: "Issue-Triage: Eingehende Bug-Meldungen und Feature-Requests analysieren und klassifizieren (Bug, User-Error, Feature, Out-of-Scope) vor Ressourcen-Allokation"
+              - generic [ref=e956]:
+                - button "←" [ref=e957] [cursor=pointer]
+                - generic [ref=e958]:
+                  - generic [ref=e959]: claude-expert
+                  - generic [ref=e960]: "Absoluter Analyse-Experte für die Plattform Claude Code: Funktionsweise, Konfiguration (.claude), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta."
+              - generic [ref=e961]:
+                - button "←" [ref=e962] [cursor=pointer]
+                - generic [ref=e963]:
+                  - generic [ref=e964]: gemini-expert
+                  - generic [ref=e965]: "Absoluter Analyse-Experte für die Plattform Gemini (Antigravity): Funktionsweise, Konfiguration (.gemini), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta."
+              - generic [ref=e966]:
+                - button "←" [ref=e967] [cursor=pointer]
+                - generic [ref=e968]:
+                  - generic [ref=e969]: opencode-expert
+                  - generic [ref=e970]: "Absoluter Analyse-Experte für die Plattform Opencode: Funktionsweise, Konfiguration (.opencode), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta."
+              - generic [ref=e971]:
+                - button "←" [ref=e972] [cursor=pointer]
+                - generic [ref=e973]:
+                  - generic [ref=e974]: continue-expert
+                  - generic [ref=e975]: "Absoluter Analyse-Experte für die Plattform Continue: Funktionsweise, Konfiguration (.continue), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta."
+              - generic [ref=e976]:
+                - button "←" [ref=e977] [cursor=pointer]
+                - generic [ref=e978]:
+                  - generic [ref=e979]: copilot-expert
+                  - generic [ref=e980]: "Absoluter Analyse-Experte für die Plattform GitHub Copilot: Funktionsweise, Konfiguration (.github/copilot), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta."
+              - generic [ref=e981]:
+                - button "←" [ref=e982] [cursor=pointer]
+                - generic [ref=e983]:
+                  - generic [ref=e984]: prompt-engineer
+                  - generic [ref=e985]: Der ultimative Experte für Prompt-Engineering. Entwirft, prüft und optimiert Agentendefinitionen basierend auf Best Practices (OpenAI, Lakera).
+              - generic [ref=e986]:
+                - button "←" [ref=e987] [cursor=pointer]
+                - generic [ref=e988]:
+                  - generic [ref=e989]: e2e-tester
+                  - generic [ref=e990]: E2E-Tests, visuelle Regression und Accessibility-Audits via Playwright — User-Flows statt isolierter Units
+              - generic [ref=e991]:
+                - button "←" [ref=e992] [cursor=pointer]
+                - generic [ref=e993]:
+                  - generic [ref=e994]: principal-developer
+                  - generic [ref=e995]: Last-Resort-Eskalationsstufe — nur wenn senior-developer mehrfach gescheitert ist. Root-Cause-Diagnose vor jeder Zeile Code. Maximale Gründlichkeit, maximale Kosten.
+              - generic [ref=e996]:
+                - button "←" [ref=e997] [cursor=pointer]
+                - generic [ref=e998]:
+                  - generic [ref=e999]: refactoring-specialist
+                  - generic [ref=e1000]: "Systematische großflächige Code-Transformation mit Sicherheitsnetz: Strangler Fig, inkrementelles Refactoring, Legacy-Modernisierung und Feature-Flag-getriebene Rewrites."
+              - generic [ref=e1001]:
+                - button "←" [ref=e1002] [cursor=pointer]
+                - generic [ref=e1003]:
+                  - generic [ref=e1004]: technical-writer
+                  - generic [ref=e1005]: "Externe entwickler- und nutzergerichtete Doku: API-Referenzen, Getting-Started, SDK-Docs, Tutorials, CLI-Help, User-Release-Notes und UX-Microcopy."
+              - generic [ref=e1006]:
+                - button "←" [ref=e1007] [cursor=pointer]
+                - generic [ref=e1008]:
+                  - generic [ref=e1009]: tester
+                  - generic [ref=e1010]: TDD, Test-Suite ausführen, Testabdeckung sichern
+              - generic [ref=e1011]:
+                - button "←" [ref=e1012] [cursor=pointer]
+                - generic [ref=e1013]:
+                  - generic [ref=e1014]: test-executor
+                  - generic [ref=e1015]: Bestehende Test-Suiten ausführen (Pass/Fail-Counts, Exit-Codes, Stdout-Auszüge) — kein Test-Design, kein Code-Schreiben (#517)
+              - generic [ref=e1016]:
+                - button "←" [ref=e1017] [cursor=pointer]
+                - generic [ref=e1018]:
+                  - generic [ref=e1019]: validator
+                  - generic [ref=e1020]: Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit
+              - generic [ref=e1021]:
+                - button "←" [ref=e1022] [cursor=pointer]
+                - generic [ref=e1023]:
+                  - generic [ref=e1024]: accessibility-specialist
+                  - generic [ref=e1025]: WCAG 2.1/2.2 Compliance-Audit, ARIA-Checks, Keyboard-Navigation, Screenreader-Guidelines, Farbkontrast, Focus-Management und Accessibility-Tree-Analyse.
+              - generic [ref=e1026]:
+                - button "←" [ref=e1027] [cursor=pointer]
+                - generic [ref=e1028]:
+                  - generic [ref=e1029]: data-engineer
+                  - generic [ref=e1030]: ETL/ELT-Pipelines, Schema-Migration (Datenebene), Data-Quality-Checks, Lineage-Analyse und Pipeline-Monitoring — übergibt eine Pipeline-Spec an developer.
+              - generic [ref=e1031]:
+                - button "←" [ref=e1032] [cursor=pointer]
+                - generic [ref=e1033]:
+                  - generic [ref=e1034]: docker
+                  - generic [ref=e1035]: Dev-Stack verwalten, Test-Stack starten, Binary-Management, Dockerfiles erstellen
+              - generic [ref=e1036]:
+                - button "←" [ref=e1037] [cursor=pointer]
+                - generic [ref=e1038]:
+                  - generic [ref=e1039]: mammouth-expert
+                  - generic [ref=e1040]: "Absoluter Analyse-Experte für die Plattform Mammouth Code: Funktionsweise, Konfiguration (.mammouth), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta."
+              - generic [ref=e1041]:
+                - button "←" [ref=e1042] [cursor=pointer]
+                - generic [ref=e1043]:
+                  - generic [ref=e1044]: knowledge-curator
+                  - generic [ref=e1045]: "Strategische Knowledge-Engine-Steuerung: Schema-Evolution, Wiki-Strukturierung, Domänen-Anpassung, Ingest-Planung, OKF-Compliance."
+              - generic [ref=e1046]:
+                - button "←" [ref=e1047] [cursor=pointer]
+                - generic [ref=e1048]:
+                  - generic [ref=e1049]: knowledge-ingestor
+                  - generic [ref=e1050]: "Sources einlesen, Key Information extrahieren, Wiki-Seiten erstellen/ aktualisieren, Cross-References pflegen. Touch-Radius: ~10-15 Dateien/Ingest."
+              - generic [ref=e1051]:
+                - button "←" [ref=e1052] [cursor=pointer]
+                - generic [ref=e1053]:
+                  - generic [ref=e1054]: knowledge-querier
+                  - generic [ref=e1055]: Fragen gegen das Knowledge Wiki beantworten. Index-First-Strategie, Drill-in, Synthese mit Citations. File-Back guter Antworten.
+              - generic [ref=e1056]:
+                - button "←" [ref=e1057] [cursor=pointer]
+                - generic [ref=e1058]:
+                  - generic [ref=e1059]: knowledge-linter
+                  - generic [ref=e1060]: "Wiki-Gesundheitscheck: Widersprüche, Orphans, veraltete Claims, kaputte Links, fehlende OKF-Frontmatter, Index-Staleness."
+              - generic [ref=e1061]:
+                - button "←" [ref=e1062] [cursor=pointer]
+                - generic [ref=e1063]:
+                  - generic [ref=e1064]: knowledge-indexer
+                  - generic [ref=e1065]: Pflegt index.md (Content-Katalog, OKF §6) und log.md (Chronologisches Event-Log, OKF §7) im Knowledge Wiki.
+              - generic [ref=e1066]:
+                - button "←" [ref=e1067] [cursor=pointer]
+                - generic [ref=e1068]:
+                  - generic [ref=e1069]: knowledge-gardener
+                  - generic [ref=e1070]: "Kleinteilige Wiki-Pflege: Links reparieren, Tags harmonisieren, Frontmatter ergänzen, Typos korrigieren, Timestamps aktualisieren."
+              - generic [ref=e1071]:
+                - button "←" [ref=e1072] [cursor=pointer]
+                - generic [ref=e1073]:
+                  - generic [ref=e1074]: knowledge-migrator
+                  - generic [ref=e1075]: Vorhandene Projektinhalte aufräumen und OKF-konform ins Knowledge Wiki migrieren. Discovery → Plan → User-Freigabe → Migration → Validierung. Schützt documenter- und requirements-eigene Dateien.
+              - generic [ref=e1076]:
+                - button "←" [ref=e1077] [cursor=pointer]
+                - generic [ref=e1078]:
+                  - generic [ref=e1079]: dependency-auditor
+                  - generic [ref=e1080]: "Supply-Chain-Hygiene: SBOM-Analyse, Lizenz-Kompatibilität, Version-Drift und veraltete/verwundbare Pakete — reicht Findings über feedback ein."
+              - generic [ref=e1081]:
+                - button "←" [ref=e1082] [cursor=pointer]
+                - generic [ref=e1083]:
+                  - generic [ref=e1084]: incident-responder
+                  - generic [ref=e1085]: "Live-Incident-Koordination: korreliert Logs und Metriken, führt Runbook-Schritte aus, liefert RCA-Report und priorisierte Hotfix-Liste unter Zeitdruck."
+              - generic [ref=e1086]:
+                - button "←" [ref=e1087] [cursor=pointer]
+                - generic [ref=e1088]:
+                  - generic [ref=e1089]: intern-developer
+                  - generic [ref=e1090]: "[EASTER EGG / GAG] Der übereifrige Praktikant — liest Code, versteht fast nichts, kommentiert alles mit unerschütterlichem Selbstvertrauen. Read-only, technisch harmlos. NICHT für echte Arbeit routen."
+              - generic [ref=e1091]:
+                - button "←" [ref=e1092] [cursor=pointer]
+                - generic [ref=e1093]:
+                  - generic [ref=e1094]: concept-specifier
+                  - generic [ref=e1095]: "Erstellt technische Spezifikationen aus Anforderungen und Codebase-Kontext: Interface-Contracts, Datenfluss, Akzeptanzkriterien. Implementiert nicht (#370)."
+              - generic [ref=e1096]:
+                - button "←" [ref=e1097] [cursor=pointer]
+                - generic [ref=e1098]:
+                  - generic [ref=e1099]: concept-architect
+                  - generic [ref=e1100]: "Systemdesign für komplexe Änderungen (XL, >20 Dateien): Komponenten-Grenzen, Schnittstellen-Contracts, Trade-off-Analyse. Implementiert nicht (#370)."
+              - generic [ref=e1101]:
+                - button "←" [ref=e1102] [cursor=pointer]
+                - generic [ref=e1103]:
+                  - generic [ref=e1104]: se-component-requirements
+                  - generic [ref=e1105]: Materialisiert pro Leaf-Component aus der COMP-Tabelle der L2-Architektur eine L3-Component-Requirements-Datei — Responsibility, REQ-L2-Referenzen, interne Interfaces, ≥2 REQ-L3 (#332). Schließt die Lücke zwischen se-termination-LEAF und se-developer-Input.
+        - generic [ref=e1106]:
+          - text: Drag cards between columns or use the arrow buttons. Active roles are saved in their current order to
+          - code [ref=e1107]: project.yaml
+          - text: under the
+          - code [ref=e1108]: roles
+          - text: key.
+        - generic [ref=e1109]:
+          - button "Save" [ref=e1110] [cursor=pointer]
+          - button "Dry-run" [ref=e1111] [cursor=pointer]
+  - generic [ref=e98]:
+    - generic [ref=e99] [cursor=pointer]: "Help: Off"
+    - generic [ref=e100] [cursor=pointer]: Icons
+    - generic [ref=e101] [cursor=pointer]: Full

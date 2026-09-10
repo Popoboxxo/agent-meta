@@ -1,0 +1,406 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e4]:
+        - heading "agent-meta" [level=1] [ref=e5]
+        - generic [ref=e6]: super_admin
+      - navigation [ref=e7]:
+        - generic [ref=e8]: Workspace
+        - generic [ref=e9] [cursor=pointer]:
+          - generic [ref=e10]: ■
+          - text: Dashboard
+        - generic [ref=e11] [cursor=pointer]:
+          - generic [ref=e12]: ▦
+          - text: Viz Dashboard
+        - generic [ref=e13] [cursor=pointer]:
+          - generic [ref=e14]: ↻
+          - text: Sync
+        - generic [ref=e15] [cursor=pointer]:
+          - generic [ref=e16]: ≡
+          - text: Live events
+        - generic [ref=e17]: Project instance
+        - generic [ref=e18] [cursor=pointer]:
+          - generic [ref=e19]: ⚙
+          - text: General
+        - generic [ref=e20] [cursor=pointer]:
+          - generic [ref=e21]: ☁
+          - text: Providers & Platforms
+        - generic [ref=e22] [cursor=pointer]:
+          - generic [ref=e23]: ⊘
+          - text: Provider Deactivation
+        - generic [ref=e24] [cursor=pointer]:
+          - generic [ref=e25]: 💾
+          - text: Backups
+        - generic [ref=e26] [cursor=pointer]:
+          - generic [ref=e27]: ⍟
+          - text: Roles
+        - generic [ref=e28] [cursor=pointer]:
+          - generic [ref=e29]: ⎈
+          - text: Orchestrator
+        - generic [ref=e30] [cursor=pointer]:
+          - generic [ref=e31]: 👁
+          - text: Viz & Admin
+        - generic [ref=e32] [cursor=pointer]:
+          - generic [ref=e33]: ★
+          - text: Model Overrides
+        - generic [ref=e34] [cursor=pointer]:
+          - generic [ref=e35]: ❖
+          - text: Provider Tier Overrides
+        - generic [ref=e36] [cursor=pointer]:
+          - generic [ref=e37]: ⊞
+          - text: Model Mapping
+        - generic [ref=e38] [cursor=pointer]:
+          - generic [ref=e39]: ☑
+          - text: DoD Overrides
+        - generic [ref=e40] [cursor=pointer]:
+          - generic [ref=e41]: ⚖
+          - text: Rules Overrides
+        - generic [ref=e42] [cursor=pointer]:
+          - generic [ref=e43]: 🏷
+          - text: Conventions Overrides
+        - generic [ref=e44] [cursor=pointer]:
+          - generic [ref=e45]: 🌐
+          - text: Environment Variables
+        - generic [ref=e46] [cursor=pointer]:
+          - generic [ref=e47]: 🧭
+          - text: Verfügbare Plugins
+        - generic [ref=e48] [cursor=pointer]:
+          - generic [ref=e49]: 🔌
+          - text: Plugin Overrides
+        - generic [ref=e50] [cursor=pointer]:
+          - generic [ref=e51]: 🧩
+          - text: External Skills
+        - generic [ref=e52] [cursor=pointer]:
+          - generic [ref=e53]: 🚫
+          - text: Gitignore Rules
+        - generic [ref=e54] [cursor=pointer]:
+          - generic [ref=e55]: 🧠
+          - text: Knowledge Engine
+        - generic [ref=e56] [cursor=pointer]:
+          - generic [ref=e57]: ⌨
+          - text: Advanced (raw YAML)
+        - generic [ref=e58]: Framework defaults
+        - generic [ref=e59] [cursor=pointer]:
+          - generic [ref=e60]: 💲
+          - text: Models & Pricing
+        - generic [ref=e61] [cursor=pointer]:
+          - generic [ref=e62]: 🚫
+          - text: Gitignore Defaults
+        - generic [ref=e63] [cursor=pointer]:
+          - generic [ref=e64]: 💲
+          - text: Models & Pricing (Legacy)
+        - generic [ref=e65] [cursor=pointer]:
+          - generic [ref=e66]: ❖
+          - text: Provider Tier Mappings
+        - generic [ref=e67] [cursor=pointer]:
+          - generic [ref=e68]: ★
+          - text: Tier Presets
+        - generic [ref=e69] [cursor=pointer]:
+          - generic [ref=e70]: ⍟
+          - text: role-defaults
+        - generic [ref=e71] [cursor=pointer]:
+          - generic [ref=e72]: ☁
+          - text: ai-providers
+        - generic [ref=e73] [cursor=pointer]:
+          - generic [ref=e74]: 🧩
+          - text: Skills Registry
+        - generic [ref=e75] [cursor=pointer]:
+          - generic [ref=e76]: ☑
+          - text: dod presets
+        - generic [ref=e77] [cursor=pointer]:
+          - generic [ref=e78]: ⚖
+          - text: rules presets
+        - generic [ref=e79] [cursor=pointer]:
+          - generic [ref=e80]: 🏷
+          - text: conventions presets
+        - generic [ref=e81] [cursor=pointer]:
+          - generic [ref=e82]: ↬
+          - text: delegation
+        - generic [ref=e83] [cursor=pointer]:
+          - generic [ref=e84]: ⇱
+          - text: export
+        - generic [ref=e85]: Workflows
+        - generic [ref=e86] [cursor=pointer]:
+          - generic [ref=e87]: ▣
+          - text: Roles & graph
+        - generic [ref=e88] [cursor=pointer]:
+          - generic [ref=e89]: ↦
+          - text: Pipelines
+        - generic [ref=e90] [cursor=pointer]:
+          - generic [ref=e91]: ↻
+          - text: Reflection pairs
+        - generic [ref=e92] [cursor=pointer]:
+          - generic [ref=e93]: ✎
+          - text: Agent templates
+        - generic [ref=e94] [cursor=pointer]:
+          - generic [ref=e95]: 🛡️
+          - text: System Health & Audit
+    - main [ref=e96]:
+      - generic [ref=e294]:
+        - heading "Project — General" [level=1] [ref=e295]
+        - generic [ref=e296]: Loaded from project.yaml.
+        - generic [ref=e297]:
+          - generic [ref=e298]:
+            - generic [ref=e299]: Project name
+            - textbox [ref=e300]: agent-meta
+          - generic [ref=e301]:
+            - generic [ref=e302]: Project prefix
+            - textbox [ref=e303]: am
+          - generic [ref=e304]:
+            - generic [ref=e305]: Project short name
+            - textbox [ref=e306]: agent-meta
+          - generic [ref=e307]:
+            - generic [ref=e308]: DoD preset
+            - combobox [ref=e309]:
+              - option "full"
+              - option "standard"
+              - option "rapid-prototyping" [selected]
+              - option "spec-optional"
+              - option "spec-driven"
+              - option "concept-driven"
+              - option "spec-certified"
+          - generic [ref=e310]:
+            - generic [ref=e311]: Rules preset
+            - combobox [ref=e312]:
+              - option "default"
+              - option "minimal"
+              - option "silent"
+              - option "lazy" [selected]
+          - generic [ref=e313]:
+            - generic [ref=e314]: Speech mode
+            - combobox [ref=e315]:
+              - option "full"
+              - option "short" [selected]
+              - option "childish"
+              - option "caveman"
+              - option "asozial"
+              - option "submissive"
+              - option "business"
+              - option "bullshit-bingo"
+              - option "linkedin"
+          - generic [ref=e316]:
+            - generic [ref=e317]: Tier preset
+            - combobox [ref=e318]:
+              - option "Cheap"
+              - option "Normal" [selected]
+              - option "Advanced"
+              - option "Expensive"
+              - option "Expensive as Hell"
+          - generic [ref=e319]:
+            - generic [ref=e320]: Conventions preset
+            - combobox [ref=e321]:
+              - option "default" [selected]
+              - option "calver"
+              - option "conventional-strict"
+          - generic [ref=e322]:
+            - generic [ref=e323]: SE focus
+            - generic [ref=e324]:
+              - checkbox
+              - generic [ref=e325] [cursor=pointer]
+        - generic [ref=e326]:
+          - heading "Context File (CLAUDE.md / AGENTS.md / ...)" [level=2] [ref=e327]
+          - paragraph [ref=e328]: Density and size-guard for sync.py-generated provider context files. 'compact' keeps every INSTRUCTION anchor (CRITICAL GATE, Branch-Guard, MCP prohibitions, ...) verbatim and collapses OVERVIEW/reference prose to pointers.
+          - generic [ref=e329]:
+            - generic [ref=e330]: Mode
+            - combobox [ref=e331]:
+              - option "full" [selected]
+              - option "compact"
+            - generic [ref=e332]: "full = current behavior (default, every rule fully spelled out). compact = ~30-50% smaller: INSTRUCTION anchors stay verbatim, OVERVIEW/reference prose collapses to pointer sentences. Only affects the shared AGENTS.md (Opencode + Gemini) — providers with native rule files (Claude, Continue, Copilot, Mammouth) are unaffected."
+          - generic [ref=e333]:
+            - generic [ref=e334]: Max lines (soft limit)
+            - textbox [ref=e335]: "250"
+            - generic [ref=e336]: sync.py --validate warns when a generated context file exceeds this many lines without acknowledgment below.
+          - generic [ref=e337]:
+            - generic [ref=e338]: Oversize acknowledged
+            - generic [ref=e339]:
+              - checkbox [checked]
+              - generic [ref=e340] [cursor=pointer]
+            - generic [ref=e341]: Suppresses the size-guard warning for all providers — set this deliberately, not to silence a real regression.
+          - generic [ref=e342]:
+            - generic [ref=e343]: Auto-generate
+            - generic [ref=e344]:
+              - checkbox [checked]
+              - generic [ref=e345] [cursor=pointer]
+            - generic [ref=e346]: "Declarative only (sync.py still regenerates managed blocks on every run regardless — see issue #540 Fix 5, not yet enforced)."
+        - generic [ref=e347]:
+          - generic [ref=e348]:
+            - strong [ref=e349]: Rules Preset Matrix
+            - generic [ref=e350]: lazy | 23 rules | 0 suppressed | 2 overridden
+          - paragraph [ref=e351]:
+            - text: One row per rule, evaluated for the preset selected below.
+            - strong [ref=e352]: apply
+            - text: = alwaysApply (Claude/Continue always load the rule),
+            - strong [ref=e353]: emb
+            - text: = embed (Opencode includes the rule in its managed block),
+            - strong [ref=e354]: ovr
+            - text: = a project-level override exists for this rule,
+            - strong [ref=e355]: eff
+            - text: "= the effective apply/embed after merging preset + override. Icons: ✓ on, ✗ off, —/· preset default (nothing set), ★ overridden. Click a row to toggle a project override for that rule (creates one if none exists, removes it if one does)."
+          - table [ref=e356]:
+            - rowgroup [ref=e357]:
+              - row [ref=e358]:
+                - columnheader "Rule" [ref=e359]
+                - columnheader "apply" [ref=e360]
+                - columnheader "emb" [ref=e361]
+                - columnheader "ovr" [ref=e362]
+                - columnheader "eff" [ref=e363]
+            - rowgroup [ref=e364]:
+              - row [ref=e365]:
+                - cell "a2a-delegation-gates" [ref=e366]
+                - cell "—" [ref=e367]
+                - cell "—" [ref=e368]
+                - cell "·" [ref=e369]
+                - cell "✓ / ✓" [ref=e370]
+              - row [ref=e372]:
+                - cell "admin-ui" [ref=e373]
+                - cell "—" [ref=e374]
+                - cell "—" [ref=e375]
+                - cell "·" [ref=e376]
+                - cell "✓ / ✓" [ref=e377]
+              - row [ref=e379]:
+                - cell "architecture" [ref=e380]
+                - cell "—" [ref=e381]
+                - cell "—" [ref=e382]
+                - cell "·" [ref=e383]
+                - cell "✓ / ✓" [ref=e384]
+              - row [ref=e386]:
+                - cell "conventions" [ref=e387]
+                - cell "—" [ref=e388]
+                - cell "—" [ref=e389]
+                - cell "·" [ref=e390]
+                - cell "✓ / ✓" [ref=e391]
+              - row [ref=e393]:
+                - cell "dod-criteria" [ref=e394]
+                - cell "—" [ref=e395]
+                - cell "—" [ref=e396]
+                - cell "·" [ref=e397]
+                - cell "✓ / ✓" [ref=e398]
+              - row [ref=e400]:
+                - cell "integration-development" [ref=e401]
+                - cell "—" [ref=e402]
+                - cell "—" [ref=e403]
+                - cell "·" [ref=e404]
+                - cell "✓ / ✓" [ref=e405]
+              - row [ref=e407]:
+                - cell "issue-lifecycle" [ref=e408]
+                - cell "—" [ref=e409]
+                - cell "—" [ref=e410]
+                - cell "·" [ref=e411]
+                - cell "✓ / ✓" [ref=e412]
+              - row [ref=e414]:
+                - cell "lifecycle-tasks" [ref=e415]
+                - cell "—" [ref=e416]
+                - cell "—" [ref=e417]
+                - cell "·" [ref=e418]
+                - cell "✓ / ✓" [ref=e419]
+              - row [ref=e421]:
+                - cell "mcp-honcho" [ref=e422]
+                - cell "—" [ref=e423]
+                - cell "—" [ref=e424]
+                - cell "·" [ref=e425]
+                - cell "✓ / ✓" [ref=e426]
+              - row [ref=e428]:
+                - cell "mcp-playwright" [ref=e429]
+                - cell "—" [ref=e430]
+                - cell "—" [ref=e431]
+                - cell "·" [ref=e432]
+                - cell "✓ / ✓" [ref=e433]
+              - row [ref=e435]:
+                - cell "mcp-reqogniloom" [ref=e436]
+                - cell "—" [ref=e437]
+                - cell "—" [ref=e438]
+                - cell "·" [ref=e439]
+                - cell "✓ / ✓" [ref=e440]
+              - row [ref=e442]:
+                - cell "mcp-viz-logger" [ref=e443]
+                - cell "—" [ref=e444]
+                - cell "—" [ref=e445]
+                - cell "·" [ref=e446]
+                - cell "✓ / ✓" [ref=e447]
+              - row [ref=e449]:
+                - cell "no-worktree-isolation" [ref=e450]
+                - cell "—" [ref=e451]
+                - cell "—" [ref=e452]
+                - cell "·" [ref=e453]
+                - cell "✓ / ✓" [ref=e454]
+              - row [ref=e456]:
+                - cell "provider-agnostic" [ref=e457]
+                - cell "—" [ref=e458]
+                - cell "—" [ref=e459]
+                - cell "·" [ref=e460]
+                - cell "✓ / ✓" [ref=e461]
+              - row [ref=e463]:
+                - cell "se-cascade-adr-standard" [ref=e464]
+                - cell "—" [ref=e465]
+                - cell "—" [ref=e466]
+                - cell "·" [ref=e467]
+                - cell "✓ / ✓" [ref=e468]
+              - row [ref=e470]:
+                - cell "se-cascade-artifact-taxonomy" [ref=e471]
+                - cell "—" [ref=e472]
+                - cell "—" [ref=e473]
+                - cell "·" [ref=e474]
+                - cell "✓ / ✓" [ref=e475]
+              - row [ref=e477]:
+                - cell "se-cascade-review-lifecycle" [ref=e478]
+                - cell "—" [ref=e479]
+                - cell "—" [ref=e480]
+                - cell "·" [ref=e481]
+                - cell "✓ / ✓" [ref=e482]
+              - row [ref=e484]:
+                - cell "security-paved-roads" [ref=e485]
+                - cell "—" [ref=e486]
+                - cell "—" [ref=e487]
+                - cell "★" [ref=e488]
+                - cell "✓ / ✓" [ref=e489]
+              - row [ref=e491]:
+                - cell "session-conclusion" [ref=e492]
+                - cell "—" [ref=e493]
+                - cell "—" [ref=e494]
+                - cell "·" [ref=e495]
+                - cell "✓ / ✓" [ref=e496]
+              - row [ref=e498]:
+                - cell "submodule-protection" [ref=e499]
+                - cell "—" [ref=e500]
+                - cell "—" [ref=e501]
+                - cell "·" [ref=e502]
+                - cell "✓ / ✓" [ref=e503]
+              - row [ref=e505]:
+                - cell "sync-interface" [ref=e506]
+                - cell "—" [ref=e507]
+                - cell "—" [ref=e508]
+                - cell "·" [ref=e509]
+                - cell "✓ / ✓" [ref=e510]
+              - row [ref=e512]:
+                - cell "threat-model-4-questions" [ref=e513]
+                - cell "—" [ref=e514]
+                - cell "—" [ref=e515]
+                - cell "★" [ref=e516]
+                - cell "✓ / ✓" [ref=e517]
+              - row [ref=e519]:
+                - cell "tool-graphify" [ref=e520]
+                - cell "—" [ref=e521]
+                - cell "—" [ref=e522]
+                - cell "·" [ref=e523]
+                - cell "✓ / ✓" [ref=e524]
+        - generic [ref=e526]:
+          - generic [ref=e527]:
+            - heading "Submodule Protection" [level=3] [ref=e528]
+            - generic [ref=e529]: Framework Default
+          - paragraph [ref=e530]: "Enforces submodule boundaries: no direct edits to .agent-meta, no gitmodules mutation, no source code scaffolding."
+          - textbox [ref=e531]: "# Submodule-Schutzkonzept Regeln für den Umgang mit dem `.agent-meta`-Submodul und `.gitmodules`: - **Keine direkten Änderungen in `.agent-meta/`:** Dateien in `.agent-meta/` dürfen in Konsumenten-Repositories niemals direkt editiert oder committet werden. - **Keine Mutation von `.gitmodules` / Git Staging:** `.gitmodules` darf nicht automatisch modifiziert werden und Submodule dürfen nicht automatisch via `git add` gestaged werden. - **Kein Source-Code-Scaffolding in Konsumenten-Projekten:** In Konsumenten-Projekten wird kein Anwendungscode generiert/gerüstet; verwaltet werden ausschließlich `.meta-config/project.yaml` und die Managed Blocks. - **Framework-Änderungen nur im agent-meta Repo:** Änderungen am agent-meta Framework müssen auf Feature-Branches im agent-meta Repository selbst durchgeführt werden."
+          - generic [ref=e532]:
+            - button "Disable Protection" [ref=e533] [cursor=pointer]
+            - button "Save Project Override" [ref=e534] [cursor=pointer]
+        - generic [ref=e535]:
+          - heading "Global Framework Setup" [level=2] [ref=e536]
+          - paragraph [ref=e537]: Configure provider model tiers, tier mappings and other global settings.
+          - link "Open ai-providers.yaml →" [ref=e538] [cursor=pointer]:
+            - /url: "#/config/ai-providers"
+        - generic [ref=e539]:
+          - button "Save" [ref=e540] [cursor=pointer]
+          - button "Dry-run" [ref=e541] [cursor=pointer]
+  - generic [ref=e98]:
+    - generic [ref=e99] [cursor=pointer]: "Help: Off"
+    - generic [ref=e100] [cursor=pointer]: Icons
+    - generic [ref=e101] [cursor=pointer]: Full

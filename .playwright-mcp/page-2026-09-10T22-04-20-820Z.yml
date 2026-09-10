@@ -1,0 +1,232 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e4]:
+        - heading "agent-meta" [level=1] [ref=e5]
+        - generic [ref=e6]: super_admin
+      - navigation [ref=e7]:
+        - generic [ref=e8]: Workspace
+        - generic [ref=e9] [cursor=pointer]:
+          - generic [ref=e10]: ■
+          - text: Dashboard
+        - generic [ref=e11] [cursor=pointer]:
+          - generic [ref=e12]: ▦
+          - text: Viz Dashboard
+        - generic [ref=e13] [cursor=pointer]:
+          - generic [ref=e14]: ↻
+          - text: Sync
+        - generic [ref=e15] [cursor=pointer]:
+          - generic [ref=e16]: ≡
+          - text: Live events
+        - generic [ref=e17]: Project instance
+        - generic [ref=e18] [cursor=pointer]:
+          - generic [ref=e19]: ⚙
+          - text: General
+        - generic [ref=e20] [cursor=pointer]:
+          - generic [ref=e21]: ☁
+          - text: Providers & Platforms
+        - generic [ref=e22] [cursor=pointer]:
+          - generic [ref=e23]: ⊘
+          - text: Provider Deactivation
+        - generic [ref=e24] [cursor=pointer]:
+          - generic [ref=e25]: 💾
+          - text: Backups
+        - generic [ref=e26] [cursor=pointer]:
+          - generic [ref=e27]: ⍟
+          - text: Roles
+        - generic [ref=e28] [cursor=pointer]:
+          - generic [ref=e29]: ⎈
+          - text: Orchestrator
+        - generic [ref=e30] [cursor=pointer]:
+          - generic [ref=e31]: 👁
+          - text: Viz & Admin
+        - generic [ref=e32] [cursor=pointer]:
+          - generic [ref=e33]: ★
+          - text: Model Overrides
+        - generic [ref=e34] [cursor=pointer]:
+          - generic [ref=e35]: ❖
+          - text: Provider Tier Overrides
+        - generic [ref=e36] [cursor=pointer]:
+          - generic [ref=e37]: ⊞
+          - text: Model Mapping
+        - generic [ref=e38] [cursor=pointer]:
+          - generic [ref=e39]: ☑
+          - text: DoD Overrides
+        - generic [ref=e40] [cursor=pointer]:
+          - generic [ref=e41]: ⚖
+          - text: Rules Overrides
+        - generic [ref=e42] [cursor=pointer]:
+          - generic [ref=e43]: 🏷
+          - text: Conventions Overrides
+        - generic [ref=e44] [cursor=pointer]:
+          - generic [ref=e45]: 🌐
+          - text: Environment Variables
+        - generic [ref=e46] [cursor=pointer]:
+          - generic [ref=e47]: 🧭
+          - text: Verfügbare Plugins
+        - generic [ref=e48] [cursor=pointer]:
+          - generic [ref=e49]: 🔌
+          - text: Plugin Overrides
+        - generic [ref=e50] [cursor=pointer]:
+          - generic [ref=e51]: 🧩
+          - text: External Skills
+        - generic [ref=e52] [cursor=pointer]:
+          - generic [ref=e53]: 🚫
+          - text: Gitignore Rules
+        - generic [ref=e54] [cursor=pointer]:
+          - generic [ref=e55]: 🧠
+          - text: Knowledge Engine
+        - generic [ref=e56] [cursor=pointer]:
+          - generic [ref=e57]: ⌨
+          - text: Advanced (raw YAML)
+        - generic [ref=e58]: Framework defaults
+        - generic [ref=e59] [cursor=pointer]:
+          - generic [ref=e60]: 💲
+          - text: Models & Pricing
+        - generic [ref=e61] [cursor=pointer]:
+          - generic [ref=e62]: 🚫
+          - text: Gitignore Defaults
+        - generic [ref=e63] [cursor=pointer]:
+          - generic [ref=e64]: 💲
+          - text: Models & Pricing (Legacy)
+        - generic [ref=e65] [cursor=pointer]:
+          - generic [ref=e66]: ❖
+          - text: Provider Tier Mappings
+        - generic [ref=e67] [cursor=pointer]:
+          - generic [ref=e68]: ★
+          - text: Tier Presets
+        - generic [ref=e69] [cursor=pointer]:
+          - generic [ref=e70]: ⍟
+          - text: role-defaults
+        - generic [ref=e71] [cursor=pointer]:
+          - generic [ref=e72]: ☁
+          - text: ai-providers
+        - generic [ref=e73] [cursor=pointer]:
+          - generic [ref=e74]: 🧩
+          - text: Skills Registry
+        - generic [ref=e75] [cursor=pointer]:
+          - generic [ref=e76]: ☑
+          - text: dod presets
+        - generic [ref=e77] [cursor=pointer]:
+          - generic [ref=e78]: ⚖
+          - text: rules presets
+        - generic [ref=e79] [cursor=pointer]:
+          - generic [ref=e80]: 🏷
+          - text: conventions presets
+        - generic [ref=e81] [cursor=pointer]:
+          - generic [ref=e82]: ↬
+          - text: delegation
+        - generic [ref=e83] [cursor=pointer]:
+          - generic [ref=e84]: ⇱
+          - text: export
+        - generic [ref=e85]: Workflows
+        - generic [ref=e86] [cursor=pointer]:
+          - generic [ref=e87]: ▣
+          - text: Roles & graph
+        - generic [ref=e88] [cursor=pointer]:
+          - generic [ref=e89]: ↦
+          - text: Pipelines
+        - generic [ref=e90] [cursor=pointer]:
+          - generic [ref=e91]: ↻
+          - text: Reflection pairs
+        - generic [ref=e92] [cursor=pointer]:
+          - generic [ref=e93]: ✎
+          - text: Agent templates
+        - generic [ref=e94] [cursor=pointer]:
+          - generic [ref=e95]: 🛡️
+          - text: System Health & Audit
+    - main [ref=e96]:
+      - generic [ref=e1112]:
+        - heading "Project — DoD Overrides" [level=1] [ref=e1113]
+        - paragraph [ref=e1114]: "Override individual DoD criteria on top of the selected dod-preset. Precedence: dod override > dod-preset > full."
+        - generic [ref=e1115]: "Active preset: rapid-prototyping. 0 overrides active."
+        - generic [ref=e1117]:
+          - heading "Overrides (on top of \"rapid-prototyping\" preset)" [level=2] [ref=e1118]
+          - table [ref=e1119]:
+            - rowgroup [ref=e1120]:
+              - row [ref=e1121]:
+                - columnheader "Criterion" [ref=e1122]
+                - columnheader "Preset Default" [ref=e1123]
+                - columnheader "Override" [ref=e1124]
+                - columnheader "Active Value" [ref=e1125]
+            - rowgroup [ref=e1126]:
+              - row [ref=e1127]:
+                - cell "req-traceability" [ref=e1128]
+                - cell "false" [ref=e1129]
+                - cell "(no override)" [ref=e1130]:
+                  - combobox [ref=e1131]:
+                    - option "(no override)" [selected]
+                    - option "true"
+                    - option "false"
+                - cell "false" [ref=e1132]
+              - row [ref=e1134]:
+                - cell "tests-required" [ref=e1135]
+                - cell "false" [ref=e1136]
+                - cell "(no override)" [ref=e1137]:
+                  - combobox [ref=e1138]:
+                    - option "(no override)" [selected]
+                    - option "true"
+                    - option "false"
+                - cell "false" [ref=e1139]
+              - row [ref=e1141]:
+                - cell "codebase-overview" [ref=e1142]
+                - cell "false" [ref=e1143]
+                - cell "(no override)" [ref=e1144]:
+                  - combobox [ref=e1145]:
+                    - option "(no override)" [selected]
+                    - option "true"
+                    - option "false"
+                - cell "false" [ref=e1146]
+              - row [ref=e1148]:
+                - cell "security-audit" [ref=e1149]
+                - cell "false" [ref=e1150]
+                - cell "(no override)" [ref=e1151]:
+                  - combobox [ref=e1152]:
+                    - option "(no override)" [selected]
+                    - option "true"
+                    - option "false"
+                - cell "false" [ref=e1153]
+              - row [ref=e1155]:
+                - cell "se-required" [ref=e1156]
+                - cell "false" [ref=e1157]
+                - cell "(no override)" [ref=e1158]:
+                  - combobox [ref=e1159]:
+                    - option "(no override)" [selected]
+                    - option "false"
+                    - option "recommended"
+                    - option "true"
+                - cell "false" [ref=e1160]
+              - row [ref=e1162]:
+                - cell "ai-security-review" [ref=e1163]
+                - cell "false" [ref=e1164]
+                - cell "(no override)" [ref=e1165]:
+                  - combobox [ref=e1166]:
+                    - option "(no override)" [selected]
+                    - option "true"
+                    - option "false"
+                - cell "false" [ref=e1167]
+              - row [ref=e1169]:
+                - cell "prompt-governance" [ref=e1170]
+                - cell "false" [ref=e1171]
+                - cell "(no override)" [ref=e1172]:
+                  - combobox [ref=e1173]:
+                    - option "(no override)" [selected]
+                    - option "true"
+                    - option "false"
+                - cell "false" [ref=e1174]
+              - row [ref=e1176]:
+                - cell "lifecycle-ownership" [ref=e1177]
+                - cell "false" [ref=e1178]
+                - cell "(no override)" [ref=e1179]:
+                  - combobox [ref=e1180]:
+                    - option "(no override)" [selected]
+                    - option "true"
+                    - option "false"
+                - cell "false" [ref=e1181]
+        - generic [ref=e1183]:
+          - button "Save" [ref=e1184] [cursor=pointer]
+          - button "Dry-run" [ref=e1185] [cursor=pointer]
+  - generic [ref=e98]:
+    - generic [ref=e99] [cursor=pointer]: "Help: Off"
+    - generic [ref=e100] [cursor=pointer]: Icons
+    - generic [ref=e101] [cursor=pointer]: Full
