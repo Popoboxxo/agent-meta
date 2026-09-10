@@ -1093,6 +1093,12 @@ def _handle_sync(ctx: _SyncContext) -> None:
     # this file's own write isn't captured into that hash baseline.
     _sync_stage_auto_commit_allowlist(ctx.agent_meta_root, ctx.project_root,
                                       config, ctx.args, ctx.log)
+    # Stage 15: version bookkeeping (#720) -- write the actually-deployed
+    # agent-meta version back into project.yaml so it never silently drifts
+    # behind a submodule upgrade.
+    from lib.sync_pipeline import sync_version_bookkeeping
+    sync_version_bookkeeping(ctx.agent_meta_root, ctx.project_root, ctx.config_path,
+                             config, ctx.log, ctx.args.dry_run)
 
     ctx.config = config
     ctx.mode = mode
