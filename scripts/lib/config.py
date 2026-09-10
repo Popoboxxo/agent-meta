@@ -37,7 +37,7 @@ from .conventions import render_convention_block, resolve_conventions
 from .platform import apply_platform_variable_cascade
 from .delegation_table import get_active_agents_data, get_intent_routing_table
 from .dod import resolve_dod, resolve_dod_preset_name
-from .providers import load_providers_config, resolve_providers
+from .providers import all_providers_support_hooks, load_providers_config, resolve_providers
 from .reflection import (
     apply_project_overrides,
     load_project_overrides,
@@ -838,6 +838,17 @@ def _build_orch_variables(
     # Default on; disable via orchestrator.checkpointing: false for lightweight projects.
     variables["CHECKPOINTING_ENABLED"] = (
         "false" if orch_config.get("checkpointing", True) is False else "true"
+    )
+    # PROGRESS_CHAT_PUSH_ENABLED (design doc 2026-09-10-live-progress-channel-
+    # design.md, Architecture §1 Tier A): true only when EVERY active
+    # provider has a verified hook_protocol (providers.provider_hooks_supported)
+    # -- gates the Tier-A "also SendMessage(to:"main")" instruction in
+    # orchestrator.md §7 so hook-less providers never see an instruction
+    # they cannot follow.
+    _pcpe_provider_config = load_providers_config(agent_meta_root)
+    _pcpe_active = resolve_providers(config, _pcpe_provider_config)
+    variables["PROGRESS_CHAT_PUSH_ENABLED"] = (
+        "true" if all_providers_support_hooks(_pcpe_active, _pcpe_provider_config) else "false"
     )
     # NATIVE_EXTENSIONS_ENABLED: exempt platform-native extension mechanisms
     # (Skills, Plugins, Lifecycle-Hooks) from the STRICT-mode orchestrator gate.

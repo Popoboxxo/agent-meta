@@ -10,6 +10,34 @@ _PROVIDERS_CONFIG_LEGACY = "providers.config.yaml"
 _PROVIDERS_CONFIG_JSON = "providers.config.json"  # legacy fallback
 
 
+def resolve_agent_meta_root(project_root: Path) -> Path:
+    """Resolve the agent-meta framework root from a project root.
+
+    agent-meta is embedded in downstream projects as a ``.agent-meta/``
+    submodule, but self-hosts inside its own checkout. Mirrors the layout
+    detection every other asset lookup uses (admin-server ServiceContext.
+    agent_meta_root, viz-report, consistency-check):
+
+    1. ``project_root`` itself when it is a framework checkout
+       (``agents/1-generic`` present) — self-hosting / super-admin.
+    2. ``project_root/.agent-meta`` when that is a framework checkout —
+       submodule layout in a downstream project.
+    3. ``project_root`` as a last-resort fallback.
+
+    Without this, a caller that omits ``agent_meta_root`` silently reads
+    provider config from the PROJECT root, finds none, falls back to the
+    embedded Claude-only default and mis-classifies a hook-less provider as
+    Tier A (issue: live-progress-channel PR #721, Finding 1).
+    """
+    project_root = Path(project_root)
+    if (project_root / "agents" / "1-generic").is_dir():
+        return project_root
+    submodule = project_root / ".agent-meta"
+    if (submodule / "agents" / "1-generic").is_dir():
+        return submodule
+    return project_root
+
+
 def load_providers_config(agent_meta_root: Path) -> dict:
     """Load config/ai-providers.yaml with fallback to legacy paths."""
     data, _ = _load_yaml_or_json(
@@ -194,6 +222,22 @@ def provider_hooks_supported(pc: dict) -> bool:
     `SUPPORTED_HOOK_PROTOCOLS` get hooks mirrored (issue #630).
     """
     return bool(pc.get("has_hooks", False)) and pc.get("hook_protocol") in SUPPORTED_HOOK_PROTOCOLS
+
+
+def all_providers_support_hooks(active: list, provider_config: dict) -> bool:
+    """Tier-A gate: True only when the active set is non-empty AND every
+    active provider has a verified hook_protocol (provider_hooks_supported).
+
+    Single source of truth for the "Tier A iff all active providers support
+    hooks" rule, shared by the runtime tier decision (checkpoint._progress_tier)
+    and the sync-time PROGRESS_CHAT_PUSH_ENABLED variable
+    (config._build_orch_variables) — see the live-progress-channel design doc
+    2026-09-10, Architecture §1. A mixed Tier-A/Tier-B provider set returns
+    False so no hook-less provider silently loses its only progress signal.
+    """
+    return bool(active) and all(
+        provider_hooks_supported(provider_config.get(p, {})) for p in active
+    )
 
 
 def resolve_provider_options(config: dict, provider: str) -> dict:

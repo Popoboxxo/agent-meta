@@ -117,3 +117,6 @@ so), kein Scenario-Bug.
 | `43-tier-overrides` | Claude | strict (default) | `tier-overrides.<role>` hebt tester von 'fast' auf 'powerful' (claude-opus); developer behält Default — Ersatz für nicht-testbares `backup:` (siehe Auslassungen) |
 | `44-speech-mode-childish` | Claude | strict (default) | Nicht-Default `speech-mode: childish` kopiert `speech/childish.md` nach `.claude/rules/speech-mode.md` (Default 'full' erzeugt keine Regel) |
 | `45-debug-mode` | Claude | strict (default) | `debug-mode: true` injiziert den Debug-Block-Marker (`<!-- agent-meta:debug-mode -->`) in jeden generierten Agenten |
+| `46-progress-tierb-append-rotation` | Opencode | strict (default), `checkpointing: true` | Tier-B (hook-less provider) progress file appends per checkpoint + rotates on new session (live-progress-channel design, 2026-09-10) |
+| `47-progress-pipeline-stage-field` | Opencode | strict (default), `checkpointing: true` | `Pipeline/Stage`-Spalte unterscheidet gleichzeitige `se-cascade`/`concept-driven-dev`-Einträge in der Tier-B-Datei (live-progress-channel design) |
+| `48-progress-provider-neutral-path` | Opencode | strict (default), `checkpointing: true` | Root-Cause-Fix: `.meta-viz/progress/current.md` statt hartcodiertem `.claude/progress/` für einen Nicht-Claude-Provider (live-progress-channel design) |

@@ -157,6 +157,10 @@ BARRIER() actively collects ALL results. Results arrive as TOOL DATA — never f
 
 {{STATUS_TABLE_BLOCK}}
 
+{{#if PROGRESS_CHAT_PUSH_ENABLED}}
+**Tier-A chat push (live-progress-channel design, 2026-09-10):** on this hook-capable provider, additionally call `SendMessage(to:"main", content:<the status table above>)` once per batch-member completion / BARRIER cycle — same cadence as the status table above, never per individual tool call.
+{{/if}}
+
 Artifact pattern for output >200 lines: subagent writes to an artifact directory (`<handoff_id>-<type>.md`), returns only the reference.
 
 **Hard interrupt:** a synchronous tool call IS the hard interrupt — a blocking dispatch (issue #265) replaces polling; there is no separate kill signal to manage.
@@ -170,7 +174,7 @@ Checkpoint after >5 steps: `.meta-viz/checkpoint-<timestamp>.json` with `{sessio
 
 **Summarization-as-a-Contract (issue #267):** Each worker returns ONLY its compact summary — the STATUS/RESULT/ARTIFACTS block. Raw output (logs, diffs, verbose tool output) is archived under `.meta-viz/checkpoints/<session-id>/` via `CheckpointStore.save_raw_output` and comes back as a `checkpoint_ref` pointer. Never re-request raw output into the context to "double-check" — read the referenced file only when details are actually needed. Enforced harness-side by `scripts/lib/orchestration.py` (issue #265): barrier entries carry `summary` + `checkpoint_ref` only; raw output is never re-rendered into the orchestrator context.
 
-**Progress file (issue #682 §6):** if the runtime calls `CheckpointStore.save_checkpoint()` (the Python API in `scripts/lib/checkpoint.py` — distinct from the manually-written checkpoint format above), it also overwrites `.claude/progress/current.md` (non-historized) with a human-readable `Agent | Task | Status` snapshot — same format as the mandatory status table (§7). Resume logic still reads the JSON checkpoints; `current.md` is for a human glancing at the repo, not parsed by any code path.
+**Progress file (issue #682 §6, Tier model — live-progress-channel design, 2026-09-10):** if the runtime calls `CheckpointStore.save_checkpoint()` (the Python API in `scripts/lib/checkpoint.py` — distinct from the manually-written checkpoint format above), it writes `.meta-viz/progress/current.md` — overwritten (non-historized) on Tier-A providers (verified `hook_protocol`, e.g. Claude/Gemini — see the chat-push instruction in §7), appended with session-start rotation on every Tier-B provider, since the file is their only live channel. Resume logic still reads the JSON checkpoints; `current.md` is for a human glancing at the repo, not parsed by any code path.
 
 ## 10. Delegation failure recovery
 Error responses (permission, timeout, out-of-scope, multi-failure, partial)

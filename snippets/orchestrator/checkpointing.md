@@ -34,11 +34,13 @@ Fortschritt gegen Context-Reset während laufender Delegation.
 **Cleanup:** Checkpoints älter als 24h automatisch löschen (beim nächsten Start).
 Maximale Checkpoint-Größe: 50 KB — große `context`-Felder kürzen.
 
-**Progress-Datei (issue #682 §6):** Falls die Laufzeit `CheckpointStore.save_checkpoint()`
-(Python-API in `scripts/lib/checkpoint.py`, kein manuell vom Agenten geschriebenes Format)
-aufruft, wird zusätzlich `.claude/progress/current.md` überschrieben (nicht historisiert) —
-ein menschenlesbarer Snapshot im selben `Agent | Task | Status`-Format wie die
-Status-Tabelle (§5-Regel). Für Resume-Logik weiterhin die JSON-Checkpoints verwenden,
-`current.md` ist nur für den schnellen menschlichen Blick in den Fortschritt gedacht —
-kein Ersatz für das oben beschriebene, manuell geschriebene Checkpoint-Format.
+**Progress-Datei (issue #682 §6, Tier-Modell — live-progress-channel, 2026-09-10):** Falls die
+Laufzeit `CheckpointStore.save_checkpoint()` (Python-API in `scripts/lib/checkpoint.py`,
+kein manuell vom Agenten geschriebenes Format) aufruft, schreibt sie `.meta-viz/progress/current.md`
+— auf Tier-A-Providern (verifiziertes `hook_protocol`, z.B. Claude/Gemini) überschreibend
+(nicht historisiert), auf allen anderen (Tier-B-)Providern anhängend mit Rotation beim
+Start einer neuen Session, weil die Datei dort der einzige Live-Kanal ist. Für Resume-Logik
+weiterhin die JSON-Checkpoints verwenden, `current.md` ist nur für den schnellen menschlichen
+Blick in den Fortschritt gedacht — kein Ersatz für das oben beschriebene, manuell geschriebene
+Checkpoint-Format.
 {{/if}}
