@@ -439,5 +439,7 @@ def _write_config(path: Path, config: dict) -> None:
         "# Edit this file to customize variables and settings.\n"
         "# Then run: py .agent-meta/scripts/sync.py\n\n"
     )
-    body = yaml.dump(config, allow_unicode=True, sort_keys=False, default_flow_style=False)
+    from .io import yaml_dump_preserving_multiline
+    body = yaml_dump_preserving_multiline(yaml, config, allow_unicode=True,
+                                          sort_keys=False, default_flow_style=False)
     path.write_text(header + body, encoding="utf-8")
