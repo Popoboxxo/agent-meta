@@ -217,6 +217,34 @@ PROJECT_FILES: dict[str, str] = {
 }
 
 
+# Top-level sections of ``.meta-config/project.yaml`` writable through the Admin
+# API. Every project.yaml write path validates against this single set via
+# :meth:`AdminRequestHandler._assert_project_sections_writable` /
+# :meth:`AdminRequestHandler._assert_project_update_writable`, so a non-writable
+# section yields an explicit HTTP 400 instead of a silent no-op or a partial
+# write (issue #730 / WP3).
+#
+# Keep in sync with ``config/project-config.schema.json``. ``backup`` and
+# ``submodule-protection`` are runtime sections that predate/reach beyond the
+# schema; both are consumed by sync.py (lib/backup.py, lib/hooks.py).
+PROJECT_WRITABLE_SECTIONS: frozenset[str] = frozenset({
+    "agent-prompts", "model-overrides", "model-override-all",
+    "model-inherit-main-chat", "memory-overrides", "permission-mode-overrides",
+    "steps-overrides", "dod", "rules", "roles", "orchestrator", "viz",
+    "admin-ui", "provider-tier-overrides", "project", "dod-preset",
+    "rules-preset", "speech-mode", "conventions", "conventions-preset",
+    "tier-preset", "se-focus", "ai-providers", "platforms", "provider-options",
+    "provider-isolation", "environments", "model-source-preference",
+    "knowledge-engine", "gitignore", "external-skills", "skills-registry",
+    "context_file", "plugins",
+    # WP3 (#730): newly exposed project.yaml sections.
+    "hooks", "debug-mode", "tier-overrides", "mcp-role-overrides", "backup",
+    # Written internally by the fixed-section endpoints
+    # (_write_submodule_protection).
+    "submodule-protection",
+})
+
+
 # --------------------------------------------------------------------------- #
 # Asset resolution                                                            #
 # --------------------------------------------------------------------------- #
@@ -3530,6 +3558,9 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             project_config = {}
             
         restore_default = body.get("restore_default", False)
+        # Validate before any mutation/unlink so a non-writable section never
+        # causes a partial write (WP3 / #730).
+        self._assert_project_sections_writable(("submodule-protection", "rules"))
         enabled = body.get("enabled", True)
         override_text = body.get("override_text", "")
         
@@ -3609,8 +3640,15 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             self._validate_permitted_injections_overrides(body.get("plugins", {}))
         if key == "project":
             existing = self.__class__.config_manager.read("project")
-            self._deep_merge(existing, body)
-            result = self.__class__.config_manager.write("project", existing)
+            if not isinstance(existing, dict):
+                existing = {}
+            # Validate before mutating so a rejected section never leaves a
+            # partial write (WP3 / #730). The merge result must be persisted
+            # explicitly — it used to be discarded, silently dropping every
+            # full-document save while still reporting success.
+            self._assert_project_update_writable(body, existing)
+            result = self.__class__.config_manager.write(
+                "project", self._deep_merge(existing, body))
         else:
             result = self.__class__.config_manager.write(key, body)
         return self._send_json(result)
@@ -4159,6 +4197,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 prefs = {}
             prefs[provider] = source
             project["model-source-preference"] = prefs
+            self._assert_project_sections_writable(("model-source-preference",))
             self.__class__.config_manager.write("project", project)
 
             return self._send_json({
@@ -4206,6 +4245,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             for provider, source in incoming.items():
                 prefs[str(provider)] = str(source)
             project["model-source-preference"] = prefs
+            self._assert_project_sections_writable(("model-source-preference",))
             self.__class__.config_manager.write("project", project)
 
             return self._send_json({
@@ -4295,6 +4335,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 project["model-inherit-main-chat"] = inherit
             else:
                 project.pop("model-inherit-main-chat", None)
+            self._assert_project_sections_writable(("model-inherit-main-chat",))
             self.__class__.config_manager.write("project", project)
 
             return self._send_json({
@@ -4609,6 +4650,41 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             return result
         return override
 
+    def _assert_project_sections_writable(self, sections: Iterable[str]) -> None:
+        """Reject writes to non-writable project.yaml sections (WP3 / #730).
+
+        Single validation choke point shared by every project.yaml write path
+        (partial section POST, full-document PUT and the fixed-section internal
+        writers). Raises ``ValueError`` — mapped to HTTP 400 by ``do_PUT`` /
+        ``do_POST`` — *before* any disk write, so a rejected request never
+        leaves a partial write.
+        """
+        rejected = sorted({
+            str(s) for s in sections
+            if not isinstance(s, str) or s not in PROJECT_WRITABLE_SECTIONS
+        })
+        if rejected:
+            raise ValueError("section not allowed: " + ", ".join(rejected))
+
+    def _assert_project_update_writable(self, updates: Any, existing: Any) -> None:
+        """Validate a full-document project.yaml update before mutating.
+
+        ``PUT /api/config/project`` is used by the Admin UI for GET-then-PUT
+        round trips, so read-only sections that are present and *unchanged*
+        pass through. Any non-writable section whose incoming value would
+        change the persisted value is rejected (WP3 / #730) — closing the
+        deep-merge bypass while keeping legitimate full-document saves working.
+        """
+        if not isinstance(updates, dict):
+            raise ValueError("expected a JSON object for project config")
+        current = existing if isinstance(existing, dict) else {}
+        changed_readonly = [
+            section for section, value in updates.items()
+            if section not in PROJECT_WRITABLE_SECTIONS
+            and (section not in current or current[section] != value)
+        ]
+        self._assert_project_sections_writable(changed_readonly)
+
     def _write_project_section(self) -> None:
         """Partial update of one top-level section of ``project.yaml``."""
         body = self._read_body()
@@ -4620,18 +4696,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             data = body["value"]
         else:
             raise ValueError("expected JSON body with 'section' and 'data', or 'key' and 'value'")
-        allowed = {
-            "agent-prompts",             "model-overrides", "model-override-all", "model-inherit-main-chat", "memory-overrides", "permission-mode-overrides",
-            "steps-overrides", "dod", "rules", "roles", "orchestrator", "viz", "admin-ui",
-            "provider-tier-overrides", "project", "dod-preset", "rules-preset", "speech-mode",
-            "conventions", "conventions-preset",
-            "tier-preset", "se-focus", "ai-providers", "platforms", "provider-options",
-            "provider-isolation", "environments", "model-source-preference", "knowledge-engine",
-            "gitignore", "external-skills", "skills-registry",
-            "context_file", "plugins",
-        }
-        if section not in allowed:
-            raise ValueError(f"section not allowed: {section}")
+        self._assert_project_sections_writable([section])
         existing = self.__class__.config_manager.read("project")
         if not isinstance(existing, dict):
             existing = {}
@@ -4883,6 +4948,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
     def _delete_environment(self, name: str) -> dict:
         """Remove a single env var from the environments section of project.yaml."""
+        self._assert_project_sections_writable(("environments",))
         project_config = self.__class__.config_manager.read("project")
         if not isinstance(project_config, dict):
             return {"error": "project config not found"}

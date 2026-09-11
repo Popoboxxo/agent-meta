@@ -1937,5 +1937,109 @@ class TestPluginCatalogInjectionValidation(unittest.TestCase):
             self.assertIn("graphify", persisted["plugins"])
 
 
+class TestWriteProjectSectionWp3Sections(unittest.TestCase):
+    """WP3 (#730): the Admin UI exposes ``hooks``, ``debug-mode``,
+    ``tier-overrides``, ``mcp-role-overrides`` and ``backup`` as editable
+    project.yaml sections. Each must round-trip through the guarded
+    partial-update route, and a non-writable section must raise (HTTP 400)
+    without touching the persisted file."""
+
+    def _make_handler(self, root: Path):
+        (root / ".meta-config").mkdir(exist_ok=True)
+        handler = admin_server.AdminRequestHandler.__new__(admin_server.AdminRequestHandler)
+        admin_server.AdminRequestHandler.root = root
+        admin_server.AdminRequestHandler.config_manager = admin_server.ConfigManager(
+            root, mode="project_admin")
+        handler._send_json = lambda result: None
+        return handler
+
+    def test_new_sections_round_trip(self) -> None:
+        samples = {
+            "hooks": {"dod-push-check": {"enabled": True}},
+            "debug-mode": True,
+            "tier-overrides": {"tester": "powerful"},
+            "mcp-role-overrides": {"developer": ["playwright"]},
+            "backup": {"enabled": True, "dir": ".backup/x",
+                       "retention": {"max_backups": 3}},
+        }
+        for section, data in samples.items():
+            with self.subTest(section=section), tempfile.TemporaryDirectory() as tmp:
+                handler = self._make_handler(Path(tmp))
+                handler._read_body = (
+                    lambda section=section, data=data: {"section": section, "data": data})
+                handler._write_project_section()
+                persisted = handler.config_manager.read("project")
+                self.assertEqual(persisted[section], data)
+
+    def test_disallowed_section_raises_without_partial_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            handler = self._make_handler(Path(tmp))
+            handler.config_manager.write(
+                "project", {"hooks": {"keep": {"enabled": True}}})
+            handler._read_body = lambda: {"section": "variables", "data": {"EVIL": "1"}}
+            with self.assertRaises(ValueError):
+                handler._write_project_section()
+            persisted = handler.config_manager.read("project")
+            self.assertNotIn("variables", persisted)
+            self.assertEqual(persisted["hooks"], {"keep": {"enabled": True}})
+
+
+class TestProjectFullPutGuardWp3(unittest.TestCase):
+    """WP3 (#730): ``PUT /api/config/project`` used to discard the deep-merge
+    result (silent no-op) and never consulted the writable-section allow-set.
+    It must persist allowed sections, reject non-writable ones with an explicit
+    error *before* any write, and still allow unchanged read-only sections
+    through for full-document GET-then-PUT round trips."""
+
+    def _make_handler(self, root: Path):
+        (root / ".meta-config").mkdir(exist_ok=True)
+        handler = admin_server.AdminRequestHandler.__new__(admin_server.AdminRequestHandler)
+        admin_server.AdminRequestHandler.root = root
+        admin_server.AdminRequestHandler.config_manager = admin_server.ConfigManager(
+            root, mode="project_admin")
+        handler._send_json = lambda result: None
+        return handler
+
+    def test_allowed_section_persists(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            handler = self._make_handler(Path(tmp))
+            payload = {"hooks": {"dod-push-check": {"enabled": True}}}
+            handler._read_body = lambda: payload
+            handler._route_put_config("project")
+            self.assertEqual(
+                handler.config_manager.read("project")["hooks"], payload["hooks"])
+
+    def test_disallowed_section_rejected_without_partial_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            handler = self._make_handler(Path(tmp))
+            handler.config_manager.write("project", {"roles": ["keep"]})
+            handler._read_body = lambda: {
+                "roles": ["changed"], "variables": {"EVIL": "1"}}
+            with self.assertRaises(ValueError):
+                handler._route_put_config("project")
+            # Neither the allowed nor the disallowed change may land.
+            self.assertEqual(
+                handler.config_manager.read("project"), {"roles": ["keep"]})
+
+    def test_unchanged_readonly_section_round_trips(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            handler = self._make_handler(Path(tmp))
+            handler.config_manager.write(
+                "project", {"variables": {"A": "1"}, "roles": ["old"]})
+            handler._read_body = lambda: {
+                "variables": {"A": "1"}, "roles": ["new"]}
+            handler._route_put_config("project")
+            persisted = handler.config_manager.read("project")
+            self.assertEqual(persisted["variables"], {"A": "1"})
+            self.assertEqual(persisted["roles"], ["new"])
+
+    def test_non_object_body_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            handler = self._make_handler(Path(tmp))
+            handler._read_body = lambda: ["not", "a", "dict"]
+            with self.assertRaises(ValueError):
+                handler._route_put_config("project")
+
+
 if __name__ == "__main__":
     unittest.main()
