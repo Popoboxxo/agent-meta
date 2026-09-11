@@ -66,7 +66,7 @@ from lib.plugins import load_plugin_catalog
 from lib.providers import load_providers_config, resolve_providers
 from lib.roles import build_role_map
 from lib.rules import create_rule
-from lib.schema import update_roles_enum
+from lib.schema import update_providers_enum, update_roles_enum
 from lib.skill_admin import add_skill
 from lib.sync_pipeline import (
     _sync_stage_auto_commit_allowlist,
@@ -435,6 +435,7 @@ def _build_context(args, agent_meta_root: Path, log: "SyncLog"):
     # pick up the latest enum. Honors --dry-run.
     if agent_meta_root.resolve() == Path.cwd().resolve():
         update_roles_enum(agent_meta_root, log, dry_run=args.dry_run)
+        update_providers_enum(agent_meta_root, log, dry_run=args.dry_run)
     else:
         log.skip("schema", "skipped enum update (running as submodule)")
 

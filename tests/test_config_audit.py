@@ -6,16 +6,21 @@ Covers:
 - apply_audit: line-based commenting, comment preservation, idempotency
 """
 
+import json
 from pathlib import Path
 
 import pytest
 
+from scripts.lib.config import load_config
 from scripts.lib.config_audit import (
     AuditIssue,
     AuditReport,
     apply_audit,
     audit_config,
 )
+from scripts.lib.providers import registered_provider_names
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # ---------------------------------------------------------------------------
 # Fixture: a minimal agent-meta root with templates + role-defaults + config
@@ -456,3 +461,49 @@ def test_audit_issue_is_frozen() -> None:
     issue = AuditIssue("cat", "info", "role", "msg")
     with pytest.raises(Exception):  # noqa: B017
         issue.role = "other"  # type: ignore[misc]
+
+
+# --- issue #732: provider enum derived from registry + fail loud -------------
+
+
+def test_schema_provider_enums_cover_registry() -> None:
+    """Every registry provider must appear in all three schema enums (9/9)."""
+    registry = registered_provider_names(_REPO_ROOT)
+    assert len(registry) == 9
+
+    schema = json.loads(
+        (_REPO_ROOT / "config" / "project-config.schema.json").read_text(encoding="utf-8")
+    )
+    enums = [
+        schema["properties"]["ai-provider"]["enum"],
+        schema["properties"]["default-provider"]["enum"],
+        schema["properties"]["ai-providers"]["items"]["enum"],
+    ]
+    for enum in enums:
+        assert set(enum) == set(registry)
+    # The old hand-maintained list wrongly contained a non-registered provider.
+    assert "GitHub" not in enums[0]
+
+
+def test_unknown_provider_fails_validation(tmp_path: Path, capsys) -> None:
+    config_path = tmp_path / ".meta-config" / "project.yaml"
+    config_path.parent.mkdir(parents=True)
+    config_path.write_text(
+        "project:\n  name: p\n  prefix: p\n  short: p\n"
+        "ai-providers:\n  - Claud\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SystemExit) as exc:
+        load_config(config_path)
+
+    assert exc.value.code == 1
+    err = capsys.readouterr().err
+    assert "unknown provider" in err
+    assert "Claud" in err
+
+
+def test_provider_registry_completeness_green_on_repo() -> None:
+    """The real framework must report zero provider-registry gaps."""
+    report = audit_config(_REPO_ROOT, _REPO_ROOT / ".meta-config" / "project.yaml")
+    assert report.by_category("provider_registry_completeness") == []

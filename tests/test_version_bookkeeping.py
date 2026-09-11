@@ -9,6 +9,7 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 import yaml
 
+from lib.config import config_field_defaults, fill_defaults
 from lib.log import SyncLog
 from lib.sync_pipeline import sync_version_bookkeeping
 
@@ -71,3 +72,37 @@ def test_dry_run_does_not_write(tmp_path):
     sync_version_bookkeeping(agent_meta_root, project_root, config_path, config, log, dry_run=True)
 
     assert config_path.read_text(encoding="utf-8") == text
+
+
+def _version_file_content(root: Path) -> str:
+    """Read the single source of truth — never hardcode a version literal."""
+    return (root / "VERSION").read_text(encoding="utf-8").strip()
+
+
+def test_default_version_comes_from_version_file():
+    """Issue #731: the fill-defaults value must equal VERSION, not a literal."""
+    repo_root = Path(__file__).resolve().parent.parent
+    assert config_field_defaults(repo_root)["agent-meta-version"] == _version_file_content(repo_root)
+
+
+def test_default_version_derives_from_supplied_root(tmp_path):
+    agent_meta_root = _agent_meta_root_with_version(tmp_path, "9.9.9")
+    expected = _version_file_content(agent_meta_root)
+    assert config_field_defaults(agent_meta_root)["agent-meta-version"] == expected
+
+
+def test_fill_defaults_writes_version_file_content(tmp_path):
+    """The `--fill-defaults` write path must persist exactly VERSION."""
+    repo_root = Path(__file__).resolve().parent.parent
+    expected = _version_file_content(repo_root)
+    config_path = tmp_path / "project.yaml"
+    config_path.write_text(
+        "project:\n  name: demo\n  prefix: dm\n  short: demo\n"
+        "ai-providers:\n  - Claude\n",
+        encoding="utf-8",
+    )
+
+    fill_defaults(config_path, repo_root, SyncLog(), dry_run=False)
+
+    reloaded = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    assert reloaded["agent-meta-version"] == expected
