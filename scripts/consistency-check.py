@@ -50,6 +50,7 @@ from lib.consistency.crossrefs import (
 )
 from lib.consistency.docs import (
     check_readme_docs_index,
+    check_requirements_no_plan_sections,
     check_sync_cli_docs,
     check_ui_help_mappings,
 )
@@ -192,6 +193,7 @@ def run_checks(
         findings.extend(check_sync_cli_docs(_AGENT_META_ROOT))
         findings.extend(check_ui_help_mappings(_AGENT_META_ROOT))
         findings.extend(check_readme_docs_index(_AGENT_META_ROOT))
+        findings.extend(check_requirements_no_plan_sections(_AGENT_META_ROOT))
 
         # Context size guard (issue #540, C2): warn on oversized generated
         # provider context files without acknowledgment (WARNING only).

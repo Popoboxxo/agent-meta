@@ -97,6 +97,55 @@ def check_ui_help_mappings(root: Path) -> list[Finding]:
     return findings
 
 
+_PLAN_SECTION_PATTERNS = [
+    re.compile(r'(?im)^#{1,6}\s*(?:Implementation\s+)?Plan\b'),
+    re.compile(r'(?im)^#{1,6}\s*Step-by-Step\b'),
+    re.compile(r'(?im)^#{1,6}\s*Step\s+\d+\s'),
+    re.compile(r'(?m)^\s*pipeline_stages:\s*$'),
+]
+
+
+def check_requirements_no_plan_sections(root: Path) -> list[Finding]:
+    """Check that docs/REQUIREMENTS.md carries no implementation-plan chapter.
+
+    Fix for issue #677: REQUIREMENTS.md captures WHAT is needed, never
+    HOW/WHEN it gets implemented. Ordered-step / agent-assignment /
+    effort-estimate chapters (and the `pipeline_stages:` frontmatter field
+    used by plan docs, see agents/1-generic/planner.md) belong to a separate
+    document owned by `planner` (plan-<topic>.md or
+    knowledge/wiki/plans/<topic>.md) -- see "Boundary to `planner`" in
+    agents/1-generic/requirements.md. This was previously only a prose
+    convention with nothing enforcing it structurally.
+    """
+    findings = []
+    req_md = root / "docs" / "REQUIREMENTS.md"
+    if not req_md.exists():
+        return findings
+
+    content = req_md.read_text(encoding="utf-8")
+    for pattern in _PLAN_SECTION_PATTERNS:
+        match = pattern.search(content)
+        if match:
+            line_no = content.count("\n", 0, match.start()) + 1
+            findings.append(Finding(
+                severity=Severity.WARNING,
+                check="docs.requirements_no_plan_sections",
+                file="docs/REQUIREMENTS.md",
+                message=(
+                    f"REQUIREMENTS.md:{line_no} looks like an implementation-plan "
+                    f"chapter: {match.group(0).strip()!r}"
+                ),
+                suggestion=(
+                    "Move implementation plans to a separate document owned by "
+                    "`planner` (plan-<topic>.md or knowledge/wiki/plans/<topic>.md) "
+                    "-- see 'Boundary to `planner`' in agents/1-generic/requirements.md."
+                ),
+            ))
+            break  # one finding is enough signal, avoid duplicate noise per file
+
+    return findings
+
+
 def check_readme_docs_index(root: Path) -> list[Finding]:
     """Check that all markdown files in docs/api/ are linked in README.md."""
     findings = []
