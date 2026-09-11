@@ -19,6 +19,14 @@ from .platform import PLATFORM_CONFIGS_DIR, resolve_platform_defaults, resolve_p
 
 CONVENTIONS_PRESETS_CONFIG_YAML = "config/conventions-presets.yaml"
 
+# Valid changelog.format / changelog.cutoff_method values — enforced by
+# resolve_conventions() (Finding 2, PR #742 review) so a typo in project.yaml's
+# `conventions:` override or a hand-edited preset fails loudly instead of
+# silently falling back to the default. Also the single source of truth for
+# the admin-ui.html <select> options and for the renderer defaults below.
+CHANGELOG_FORMATS = ("keep-a-changelog", "angular")
+CHANGELOG_CUTOFF_METHODS = ("exact-timestamp", "calendar-day")
+
 # Per keep-a-changelog section: the descriptive example bullet used today in
 # release.md. Kept as an explicit map so the 'default' preset stays byte-
 # identical (each section has its own wording). Unknown sections fall back to a
@@ -88,6 +96,21 @@ def resolve_conventions(config: dict, agent_meta_root: Path) -> dict:
                 f"conventions domain '{domain}': applies_to_roles must declare "
                 f"exactly one role in v1, got {declared_roles!r}"
             )
+        if domain == "release":
+            changelog = spec.get("changelog", {})
+            changelog = changelog if isinstance(changelog, dict) else {}
+            fmt = changelog.get("format", CHANGELOG_FORMATS[0])
+            if fmt not in CHANGELOG_FORMATS:
+                raise ValueError(
+                    f"conventions domain '{domain}': changelog.format must be one "
+                    f"of {CHANGELOG_FORMATS}, got {fmt!r}"
+                )
+            cutoff_method = changelog.get("cutoff_method", CHANGELOG_CUTOFF_METHODS[0])
+            if cutoff_method not in CHANGELOG_CUTOFF_METHODS:
+                raise ValueError(
+                    f"conventions domain '{domain}': changelog.cutoff_method must be "
+                    f"one of {CHANGELOG_CUTOFF_METHODS}, got {cutoff_method!r}"
+                )
 
     return resolved
 
@@ -203,7 +226,7 @@ def _render_release_changelog(spec: dict) -> str:
     Angular-style changelog example.
     """
     changelog = spec.get("changelog", {})
-    fmt = changelog.get("format", "keep-a-changelog")
+    fmt = changelog.get("format", CHANGELOG_FORMATS[0])
     sections = changelog.get("sections", [])
 
     if fmt == "angular":
@@ -222,7 +245,7 @@ def _render_release_cutoff(spec: dict) -> str:
         that already reviewed and accept the duplicate-entry risk; renders a
         loud warning instead of silently doing the wrong thing.
     """
-    cutoff_method = spec.get("changelog", {}).get("cutoff_method", "exact-timestamp")
+    cutoff_method = spec.get("changelog", {}).get("cutoff_method", CHANGELOG_CUTOFF_METHODS[0])
     if cutoff_method == "calendar-day":
         return (
             "> ⚠️ **`cutoff_method: calendar-day`** (deprecated) — filtert PRs/Commits "

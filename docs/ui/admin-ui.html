@@ -3882,6 +3882,12 @@ async function viewProjectRulesOverrides() {
 /* =========================================================================
  * Views — Conventions presets (Convention Profiles)
  * ========================================================================= */
+// Mirrors CHANGELOG_FORMATS / CHANGELOG_CUTOFF_METHODS in
+// scripts/lib/conventions.py — resolve_conventions() is the hard-validation
+// source of truth, these are only the dropdown's allowed choices.
+const CHANGELOG_FORMATS = ["keep-a-changelog", "angular"];
+const CHANGELOG_CUTOFF_METHODS = ["exact-timestamp", "calendar-day"];
+
 async function viewConventionsPresets() {
   const wrap = el("div");
   wrap.appendChild(el("h1", {}, ["conventions-presets.yaml"]));
@@ -3988,10 +3994,14 @@ async function viewConventionsPresets() {
     relSec.appendChild(scalarField("versioning.tag_format", versioning, "tag_format"));
     relSec.appendChild(bumpRulesField(versioning));
     const changelog = release.changelog = (release.changelog && typeof release.changelog === "object") ? release.changelog : {};
-    relSec.appendChild(scalarField("changelog.format", changelog, "format"));
+    relSec.appendChild(dropdownField("changelog.format", CHANGELOG_FORMATS,
+      changelog.format || CHANGELOG_FORMATS[0],
+      v => { changelog.format = v; markDirty(); }));
     relSec.appendChild(listField("changelog.sections", changelog, "sections"));
     relSec.appendChild(scalarField("changelog.entry_prefix", changelog, "entry_prefix"));
-    relSec.appendChild(scalarField("changelog.cutoff_method", changelog, "cutoff_method"));
+    relSec.appendChild(dropdownField("changelog.cutoff_method", CHANGELOG_CUTOFF_METHODS,
+      changelog.cutoff_method || CHANGELOG_CUTOFF_METHODS[0],
+      v => { changelog.cutoff_method = v; markDirty(); }));
     panel.appendChild(relSec);
 
     // issues domain
@@ -4051,10 +4061,10 @@ async function viewProjectConventionsOverrides() {
     release: [
       [["versioning", "scheme"], "versioning.scheme", "scalar"],
       [["versioning", "tag_format"], "versioning.tag_format", "scalar"],
-      [["changelog", "format"], "changelog.format", "scalar"],
+      [["changelog", "format"], "changelog.format", "enum", CHANGELOG_FORMATS],
       [["changelog", "sections"], "changelog.sections", "list"],
       [["changelog", "entry_prefix"], "changelog.entry_prefix", "scalar"],
-      [["changelog", "cutoff_method"], "changelog.cutoff_method", "scalar"],
+      [["changelog", "cutoff_method"], "changelog.cutoff_method", "enum", CHANGELOG_CUTOFF_METHODS],
     ],
     issues: [
       [["title_format"], "title_format", "scalar"],
@@ -4122,7 +4132,7 @@ async function viewProjectConventionsOverrides() {
         el("tr", {}, ["Field", "Preset Default", "Override", "Active Value"].map(h => el("th", {}, [h]))),
       ]));
       const tbody = el("tbody");
-      for (const [path, label, type] of DOMAIN_FIELDS[domain]) {
+      for (const [path, label, type, enumOptions] of DOMAIN_FIELDS[domain]) {
         const fullPath = [domain, ...path];
         // presetSpec is the FULL multi-domain preset object ({release:{...},
         // issues:{...}}) — path is domain-relative (e.g. ["versioning",
@@ -4137,23 +4147,41 @@ async function viewProjectConventionsOverrides() {
         tr.appendChild(el("td", { class: "muted" }, [fmt(presetVal) || "—"]));
 
         const overrideTd = el("td");
-        const inp = el("input", {
-          type: "text", style: "min-width:220px;",
-          placeholder: type === "list" ? "comma-separated (replaces list)" : "(no override)",
-        });
-        inp.value = fmt(overrideVal);
-        inp.addEventListener("change", () => {
-          const raw = inp.value.trim();
-          if (raw === "") {
-            delPath(overrides, fullPath);
-          } else if (type === "list") {
-            setPath(overrides, fullPath, raw.split(",").map(s => s.trim()).filter(Boolean));
-          } else {
-            setPath(overrides, fullPath, raw);
+        if (type === "enum") {
+          // "(inherit preset)" plus the fixed enum choices — never free text,
+          // so an override can't silently drift into an invalid value.
+          const sel = el("select", { style: "min-width:220px;" });
+          sel.appendChild(el("option", { value: "" }, ["(inherit preset)"]));
+          for (const opt of enumOptions) {
+            const o = el("option", { value: opt }, [opt]);
+            if (overrideVal === opt) o.selected = true;
+            sel.appendChild(o);
           }
-          render();
-        });
-        overrideTd.appendChild(inp);
+          sel.addEventListener("change", () => {
+            if (sel.value === "") delPath(overrides, fullPath);
+            else setPath(overrides, fullPath, sel.value);
+            render();
+          });
+          overrideTd.appendChild(sel);
+        } else {
+          const inp = el("input", {
+            type: "text", style: "min-width:220px;",
+            placeholder: type === "list" ? "comma-separated (replaces list)" : "(no override)",
+          });
+          inp.value = fmt(overrideVal);
+          inp.addEventListener("change", () => {
+            const raw = inp.value.trim();
+            if (raw === "") {
+              delPath(overrides, fullPath);
+            } else if (type === "list") {
+              setPath(overrides, fullPath, raw.split(",").map(s => s.trim()).filter(Boolean));
+            } else {
+              setPath(overrides, fullPath, raw);
+            }
+            render();
+          });
+          overrideTd.appendChild(inp);
+        }
         tr.appendChild(overrideTd);
 
         const isOverridden = overrideVal !== undefined;
