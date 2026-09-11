@@ -41,18 +41,20 @@ allow-committed-secrets: false
 # 1. mode: "off" ist bewusst QUOTIERT. Unquotiertes `off` wird von
 #    PyYAML (YAML 1.1) als boolesches False geparst; der Framework-Kode
 #    (resolve_auto_commit_config, `mode != "off"`) behandelt False dann
-#    als AKTIV — Folge: nicht-leere eligible_roles + fehlerhafter
-#    Auto-Block. Gemeldeter Framework-Bug (nicht hier gefixt, außerhalb
-#    des Szenario-Scope); schema-valide und semantisch korrekt ist die
-#    String-Form "off".
+#    als AKTIV — Folge: der AUTO_COMMIT_BLOCK wird gerendert (fehlerhafter
+#    Auto-Block), obwohl off gemeint war. Gemeldeter Framework-Bug (nicht
+#    hier gefixt, außerhalb des Szenario-Scope); schema-valide und
+#    semantisch korrekt ist die String-Form "off".
 # 2. file_count_threshold: 2 und secret_scan: false sind bewusst
 #    gesetzt, obwohl sie im off-Modus IGNORIERT werden müssen: die
 #    Allowlist darf sie maximal als aufgelöste Werte aufzeichnen
 #    (threshold 2, secret_scan false), aber es darf daraus KEIN
 #    Verhalten folgen.
-# 3. Allowlist: mode "off"; eligible_roles [] (off fltert nie —
-#    resolve_auto_commit_config füllt eligible_roles nur bei
-#    mode != "off"); triggers []; custom_script null.
+# 3. Allowlist: mode "off"; eligible_roles ist capability-derived und
+#    MODE-UNABHÄNGIG = ["developer", "orchestrator", "tester"] (jede aktive
+#    Rolle mit Edit/Write im eigenen Template); off unterdrückt nur den
+#    gerenderten AUTO_COMMIT_BLOCK, nicht die Allowlist-Daten;
+#    triggers []; custom_script null.
 # 4. AUTO_COMMIT_BLOCK NIRGENDS gerendert ({{#if AUTO_COMMIT_ENABLED}}
 #    stript bei enabled=false): weder in .claude/ noch .gemini/ noch
 #    .opencode/ Agent-Dateien.
