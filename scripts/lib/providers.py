@@ -236,6 +236,20 @@ def resolve_providers(config: dict, provider_config: dict, filter_deactivated: b
     return providers
 
 
+def _framework_provider_entry(provider: str) -> dict:
+    """Look up a provider's entry from the framework's config/ai-providers.yaml.
+
+    Fallback for `resolve_context_filename` callers that only pass a provider
+    name (no `pc`): the dedicated-context capability is read from the
+    provider registry instead of branching on the provider name. The framework
+    root is the checkout containing this module
+    (``<root>/scripts/lib/providers.py``), which also holds when embedded as a
+    submodule (``<project>/.agent-meta/scripts/lib/providers.py``).
+    """
+    root = Path(__file__).resolve().parents[2]
+    return load_providers_config(root).get(provider, {}) or {}
+
+
 def resolve_context_filename(context_file: str, provider: str, pc: dict | None = None) -> str:
     """Resolve the effective context filename for a provider.
 
@@ -250,20 +264,25 @@ def resolve_context_filename(context_file: str, provider: str, pc: dict | None =
     provider with that flag set today, but any future provider with its own
     dedicated context-file handling (like Claude's sync_claude_md_static())
     can opt in via config/ai-providers.yaml alone, no code change needed.
+    When `pc` is omitted, the capability is looked up from the provider
+    registry via `_framework_provider_entry` (still config-driven, never a
+    provider-name comparison).
 
     Args:
         context_file: The raw context filename, e.g. from
             `provider_config[provider].get("context_file", f"{provider.upper()}.md")`.
-        provider: The provider name (e.g. "Claude", "Opencode"). Kept for
-            signature compatibility; behavior is resolved solely from `pc`
-            (issue #735 — no `provider == "Claude"` fallback).
+        provider: The provider name (e.g. "Claude", "Opencode"). Used only to
+            resolve the registry entry when `pc` is not supplied — behavior is
+            still resolved from the `has_dedicated_context_file` capability.
         pc: This provider's config/ai-providers.yaml entry, if available.
 
     Returns:
         "AGENTS.md" if `context_file == "CLAUDE.md"` and the provider has no
         dedicated context file, otherwise `context_file` unchanged.
     """
-    has_dedicated = (pc or {}).get("has_dedicated_context_file", False)
+    if pc is None:
+        pc = _framework_provider_entry(provider)
+    has_dedicated = pc.get("has_dedicated_context_file", False)
     if context_file == "CLAUDE.md" and not has_dedicated:
         return "AGENTS.md"
     return context_file
