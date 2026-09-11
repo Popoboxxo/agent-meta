@@ -3,11 +3,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .io import _load_yaml_or_json
+from .io import _load_yaml_or_json, load_yaml_file
 
 PROVIDERS_CONFIG_YAML = "config/ai-providers.yaml"
 _PROVIDERS_CONFIG_LEGACY = "providers.config.yaml"
-_PROVIDERS_CONFIG_JSON = "providers.config.json"  # legacy fallback
+_PROVIDERS_CONFIG_JSON = "providers.config.json"
+PROVIDER_CAPABILITIES_YAML = "config/provider-capabilities.yaml"  # legacy fallback
 
 
 def resolve_agent_meta_root(project_root: Path) -> Path:
@@ -116,6 +117,37 @@ def load_providers_config(agent_meta_root: Path) -> dict:
     return data.get("providers", data)
 
 
+def load_provider_capabilities(agent_meta_root: Path) -> dict:
+    """Load the `capabilities:` block of config/provider-capabilities.yaml.
+
+    Framework config; a missing or malformed file yields ``{}`` (optional-file
+    semantics — callers fall back to ai-providers.yaml).
+    """
+    data = load_yaml_file(
+        agent_meta_root / PROVIDER_CAPABILITIES_YAML,
+        on_error="default",
+        default={},
+    )
+    if not isinstance(data, dict):
+        return {}
+    caps = data.get("capabilities", {})
+    return caps if isinstance(caps, dict) else {}
+
+
+def registered_provider_names(agent_meta_root: Path) -> list[str]:
+    """Return the canonical, sorted provider registry (issue #732).
+
+    Union of the provider names declared in ``config/provider-capabilities.yaml``
+    and ``config/ai-providers.yaml`` — the two framework registries kept in
+    sync by tests/test_provider_three_file_invariant.py. Consumed by schema
+    generation (schema.update_providers_enum) and load-time validation
+    (config._validate_providers).
+    """
+    names = set(load_provider_capabilities(agent_meta_root).keys())
+    names.update(load_providers_config(agent_meta_root).keys())
+    return sorted(names)
+
+
 def resolve_providers(config: dict, provider_config: dict, filter_deactivated: bool = True) -> list:
     """Resolve active AI providers from config.
 
@@ -130,22 +162,44 @@ def resolve_providers(config: dict, provider_config: dict, filter_deactivated: b
     When filter_deactivated is True (default), providers marked as deactivated in
     provider-deactivation config are excluded.
     """
+    registered = set(provider_config)
+
+    def _reject(value: object, field: str) -> None:
+        # Issue #732: an unknown provider used to be silently dropped, which
+        # then fell back to Claude. Fail loud instead of producing a silent
+        # Claude run (load_config._validate_providers catches this earlier for
+        # the normal sync path; this guards direct resolve_providers() callers).
+        raise ValueError(
+            f"Unknown provider {value!r} in '{field}' — registered providers: "
+            f"{', '.join(sorted(registered)) or '(none)'}. "
+            "Use a provider from config/provider-capabilities.yaml."
+        )
+
     providers: list[str] = []
     if "ai-providers" in config:
         raw = config["ai-providers"]
         if isinstance(raw, list):
-            providers = [p for p in raw if p in provider_config]
-        elif isinstance(raw, str) and raw in provider_config:
+            for item in raw:
+                if not isinstance(item, str) or item not in registered:
+                    _reject(item, "ai-providers")
+            providers = list(raw)
+        elif isinstance(raw, str):
+            if raw not in registered:
+                _reject(raw, "ai-providers")
             providers = [raw]
 
     if not providers and "ai-provider" in config:
         p = config["ai-provider"]
-        if isinstance(p, str) and p in provider_config:
+        if isinstance(p, str):
+            if p not in registered:
+                _reject(p, "ai-provider")
             providers = [p]
 
     if not providers:
         default_provider = config.get("default-provider", "Claude")
-        providers = [default_provider] if default_provider in provider_config else ["Claude"]
+        if default_provider not in registered:
+            _reject(default_provider, "default-provider")
+        providers = [default_provider]
 
     if filter_deactivated:
         dc = config.get("provider-deactivation", {})

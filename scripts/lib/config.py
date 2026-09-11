@@ -37,7 +37,12 @@ from .conventions import render_convention_block, resolve_conventions
 from .platform import apply_platform_variable_cascade
 from .delegation_table import get_active_agents_data, get_intent_routing_table
 from .dod import resolve_dod, resolve_dod_preset_name
-from .providers import all_providers_support_hooks, load_providers_config, resolve_providers
+from .providers import (
+    all_providers_support_hooks,
+    load_providers_config,
+    registered_provider_names,
+    resolve_providers,
+)
 from .reflection import (
     apply_project_overrides,
     load_project_overrides,
@@ -63,7 +68,9 @@ except ImportError:
 # Schema-driven defaults take precedence; these are fallbacks for fields
 # that don't have defaults in project-config.schema.json.
 _CONFIG_FIELD_DEFAULTS: dict = {
-    "agent-meta-version": "0.90.10",
+    # "agent-meta-version" is intentionally NOT hardcoded here — it is derived
+    # from the VERSION file via config_field_defaults() (issue #731) so the
+    # default can never drift behind the framework version again.
     "rules-preset": "default",
     "dod-preset": "rapid-prototyping",
     "speech-mode": "full",
@@ -101,6 +108,72 @@ _DOD_FIELD_DEFAULTS: dict = {
     "lifecycle-ownership": False,
     "se-required": "false",
 }
+
+
+# Top-level keys whose project-config.schema.json type is scalar/array. An
+# explicit YAML null for these means "unset" (absent), NOT an empty mapping.
+# Mirrors the schema and acts as a fallback when the schema is unavailable;
+# see _non_object_top_level_keys().
+_KNOWN_NON_OBJECT_KEYS = frozenset({
+    "$schema", "_comment", "agent-meta-version", "ai-provider",
+    "default-provider", "ai-providers", "platforms", "roles", "tier-preset",
+    "se-focus", "dod-preset", "conventions-preset", "debug-mode",
+    "max-parallel-agents", "speech-mode", "provider-isolation",
+    "allow-committed-secrets", "mcp-servers",
+})
+
+
+def _framework_root() -> Path:
+    """Return the agent-meta framework root that contains this module.
+
+    In a downstream project this resolves to the ``.agent-meta/`` submodule
+    checkout (where ``config/`` and ``agents/`` live), in self-hosting mode to
+    the repository root itself.
+    """
+    return Path(__file__).resolve().parent.parent.parent
+
+
+def _non_object_top_level_keys() -> frozenset[str]:
+    """Top-level schema keys that are NOT mappings (scalar/array typed).
+
+    Read from ``config/project-config.schema.json`` so the set cannot drift
+    when a new scalar key is added; ``_KNOWN_NON_OBJECT_KEYS`` is unioned in
+    as a fallback for a missing/unreadable schema.
+    """
+    schema_path = _framework_root() / "config" / "project-config.schema.json"
+    props: dict = {}
+    try:
+        with schema_path.open(encoding="utf-8") as f:
+            props = json.load(f).get("properties", {})
+    except (OSError, json.JSONDecodeError):
+        props = {}
+    derived = {
+        key for key, prop in props.items()
+        if isinstance(prop, dict) and prop.get("type") not in (None, "object")
+    }
+    return frozenset(derived) | _KNOWN_NON_OBJECT_KEYS
+
+
+def _normalize_null_blocks(config: dict) -> None:
+    """Treat an explicit YAML null like an absent key (issue #741).
+
+    Readers fetch mapping blocks with ``config.get("block", {})``. When the
+    key is present with a null value, ``.get()`` returns ``None`` instead of
+    the default and the following ``.get(...)`` raises
+    ``AttributeError: 'NoneType' object has no attribute 'get'``.
+
+    Mapping blocks are rewritten to an empty mapping so ``config["block"]`` /
+    ``config.get("block")`` is always a safe dict. Scalar/array keys keep
+    their documented "null == unset" semantics (e.g.
+    ``platform.resolve_preset_name`` falls through to the platform cascade for
+    a null ``dod-preset``), so they are dropped instead of coerced to ``{}``.
+    """
+    non_object = _non_object_top_level_keys()
+    for key in [k for k, value in config.items() if value is None]:
+        if key in non_object:
+            del config[key]
+        else:
+            config[key] = {}
 
 
 def load_config(config_path: Path) -> dict:
@@ -151,6 +224,7 @@ def load_config(config_path: Path) -> dict:
             )
             sys.exit(1)
 
+    _normalize_null_blocks(config)
     _normalize_auto_commit_mode(config)
     _validate_config(config, config_path)
     return config
@@ -174,7 +248,7 @@ def _normalize_auto_commit_mode(config: dict) -> None:
 def _validate_config(config: dict, config_path: Path) -> None:
     """Validate config before sync.
 
-    Two kinds of checks:
+    Three kinds of checks:
 
     1. Hard-fatal model inheritance checks (_validate_model_inheritance):
        wrong-typed 'model-inherit-main-chat' entries and per-provider
@@ -183,12 +257,17 @@ def _validate_config(config: dict, config_path: Path) -> None:
        the inheritance feature. Runs unconditionally — stdlib only, does
        NOT require jsonschema.
 
-    2. Schema validation against agent-meta.schema.json if jsonschema is
+    2. Hard-fatal provider-registry checks (_validate_providers): unknown
+       'ai-provider'/'ai-providers'/'default-provider' names abort the sync
+       instead of silently falling back to Claude (issue #732).
+
+    3. Schema validation against agent-meta.schema.json if jsonschema is
        available. Schema violations are printed as warnings — never
        hard-fails so existing projects without the dependency continue to
        work unchanged.
     """
     _validate_model_inheritance(config, config_path)
+    _validate_providers(config, config_path)
 
     if not _JSONSCHEMA_AVAILABLE:
         return
@@ -214,6 +293,58 @@ def _validate_config(config: dict, config_path: Path) -> None:
                 print(f"       ... and {len(errors) - 5} more", file=sys.stderr)
     except (ImportError, TypeError, ValueError):
         pass  # jsonschema not installed or validation error — best-effort
+
+
+def _validate_providers(config: dict, config_path: Path) -> None:
+    """Hard-reject unknown provider names (issue #732).
+
+    ``ai-provider``, ``ai-providers`` and ``default-provider`` must only
+    contain names registered in the provider registry
+    (``config/provider-capabilities.yaml`` / ``config/ai-providers.yaml``).
+    Before this check an unknown name was silently dropped by
+    ``resolve_providers()``, which then fell back to Claude — a typo like
+    ``ai-providers: [Claud]`` produced a silent Claude run. Fail loud with the
+    registered provider list instead.
+    """
+    try:
+        registry = registered_provider_names(_framework_root())
+    except (OSError, ValueError):
+        # Optional-file semantics: if the framework registry is unreadable,
+        # don't turn that into a config error — resolve_providers() still has
+        # its own guard.
+        return
+    if not registry:
+        return
+    known = set(registry)
+
+    def _reject(value: object, field: str) -> None:
+        print(
+            f"ERROR: {config_path}: unknown provider {value!r} in '{field}'.",
+            file=sys.stderr,
+        )
+        print(
+            f"  Registered providers: {', '.join(registry)}",
+            file=sys.stderr,
+        )
+        print(
+            "  Fix: use one of the registered provider names "
+            "(see config/provider-capabilities.yaml).",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    for field in ("ai-provider", "default-provider"):
+        value = config.get(field)
+        if isinstance(value, str) and value not in known:
+            _reject(value, field)
+
+    raw = config.get("ai-providers")
+    if isinstance(raw, list):
+        for item in raw:
+            if isinstance(item, str) and item not in known:
+                _reject(item, "ai-providers")
+    elif isinstance(raw, str) and raw not in known:
+        _reject(raw, "ai-providers")
 
 
 def _validate_model_inheritance(config: dict, config_path: Path) -> None:
@@ -388,6 +519,19 @@ def _load_schema_defaults(agent_meta_root: Path) -> dict:
     return result
 
 
+def config_field_defaults(agent_meta_root: Path) -> dict:
+    """Structural config field defaults, with the version derived from VERSION.
+
+    ``agent-meta-version`` is intentionally not a literal in
+    ``_CONFIG_FIELD_DEFAULTS`` — it is read from the ``VERSION`` file
+    (single source of truth) so `--fill-defaults` can never pin a stale
+    version again (issue #731).
+    """
+    defaults = dict(_CONFIG_FIELD_DEFAULTS)
+    defaults["agent-meta-version"] = read_version(agent_meta_root)
+    return defaults
+
+
 def fill_defaults(
     config_path: Path,
     agent_meta_root: Path,
@@ -414,7 +558,7 @@ def fill_defaults(
 
     # Build effective defaults: schema wins, hardcoded fallbacks for missing
     effective_defaults: dict[str, tuple] = {}
-    effective_defaults.update(_CONFIG_FIELD_DEFAULTS)
+    effective_defaults.update(config_field_defaults(agent_meta_root))
     effective_defaults.update({k: v[0] for k, v in schema_defaults.items()})
     effective_descriptions: dict[str, str] = {}
     effective_descriptions.update(_CONFIG_FIELD_DESCRIPTIONS)
