@@ -1,0 +1,3 @@
+# Force LF for orchestrator-guard hook scripts (residual of #712): CRLF would
+# risk a "bad interpreter" failure if a deployed hook is executed directly.
+hooks/1-generic/orchestrator-guard*.sh text eol=lf
