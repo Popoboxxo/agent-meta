@@ -1,6 +1,6 @@
 ---
 name: developer
-version: "1.1.3"
+version: "1.2.0"
 based-on: "1-generic/developer.md@4.0.2"
 description: "HACS Integration Developer — Python-basierte Home Assistant Custom Components (custom_components/<domain>), HACS-Meta, manifest, Config/Options-Flow, Coordinator, Store, Services."
 hint: "Feature-Implementierung und Bugfixes für HACS-Integrationen (Python, custom_components, manifest.json, Config-Flow)"
@@ -87,7 +87,7 @@ patches:
       | Meta | `iot_class` nur im manifest, nicht in hacs.json; Domain snake_case ohne Bindestriche |
       | CI | `hacs/action` + `hassfest` von Tag 1 |
       | Releases | Tag↔manifest synchron; `VERSION` nur mit Migrator |
-      | Entities | `unique_id` + `device_info` ab Entity #1, `unique_id` nie ändern, Plattform==Dateiname |
+      | Entities | `unique_id` + `device_info` ab Entity #1, `unique_id` nie ändern, `suggested_object_id` auf Englisch pinnen (HA >= 2026.9), Plattform==Dateiname |
       | Architektur | Entry-Registry in `hass.data`, dynamische Anzahl, on-read statt Reset-Job |
       | Flows | Nie blockierend validieren; Korrigierbares in Options; strukturelle Daten explizit in `entry.data` |
       | Datenschutz | Diagnostics ohne Geheimnisse; Exporte nie nach `/www`; Tokens zentral |

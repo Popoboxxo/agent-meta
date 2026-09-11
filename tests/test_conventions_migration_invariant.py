@@ -105,6 +105,28 @@ def test_default_custom_checklist_block_is_empty(base_config):
     assert variables["RELEASE_CUSTOM_CHECKLIST_BLOCK"] == ""
 
 
+def test_default_cutoff_block_uses_exact_timestamp(base_config):
+    # Issue #726: default cutoff method must be the duplicate-safe exact
+    # timestamp recipe, not the calendar-day filter that causes duplicate
+    # CHANGELOG entries on multi-release days.
+    config = copy.deepcopy(base_config)
+    config.pop("conventions-preset", None)
+    variables = _build(config)
+    assert "merged:>YYYY-MM-DDTHH:MM:SSZ" in variables["RELEASE_CUTOFF_BLOCK"]
+    assert "deprecated" not in variables["RELEASE_CUTOFF_BLOCK"]
+
+
+def test_calendar_day_cutoff_renders_deprecation_warning(base_config):
+    config = copy.deepcopy(base_config)
+    config.pop("conventions-preset", None)
+    config.setdefault("conventions", {}).setdefault("release", {})["changelog"] = {
+        "cutoff_method": "calendar-day",
+    }
+    variables = _build(config)
+    assert "deprecated" in variables["RELEASE_CUTOFF_BLOCK"]
+    assert "merged:>=YYYY-MM-DD" in variables["RELEASE_CUTOFF_BLOCK"]
+
+
 def test_custom_checklist_block_renders_rows(base_config):
     config = copy.deepcopy(base_config)
     config.pop("conventions-preset", None)

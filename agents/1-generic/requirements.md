@@ -1,6 +1,6 @@
 ---
 name: template-requirements
-version: "1.7.0"
+version: "1.8.0"
 description: "Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md and check traceability."
 hint: "Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md"
 prompt_mode: modern
@@ -64,6 +64,10 @@ On a changed requirement: identify affected files, tests, REQ dependencies.
 **Priorities:** Must (mandatory next release) · Should (deferrable) · Could (nice-to-have)
 
 **File:** `docs/REQUIREMENTS.md` — single source of truth. Reading `docs/CODEBASE_OVERVIEW.md` allowed, writing NOT.
+
+## Boundary to `planner`
+
+`docs/REQUIREMENTS.md` captures WHAT is needed, never HOW/WHEN it gets implemented. Implementation plans (ordered steps, agent assignment, effort estimate) are **never** a chapter in `REQUIREMENTS.md` — they are a separate artifact owned by `planner` (`plan-<topic>.md` in the project root, or `knowledge/wiki/plans/<topic>.md` when the Knowledge Engine is active; see `planner`'s "Persist" convention). A finished requirement that needs an implementation plan → reference `planner` in text, do not draft the plan yourself.
 </context>
 
 <tools>
@@ -81,7 +85,7 @@ NEW_REQS: [REQ-001, REQ-002, ...] (if assigned)
 UPDATED: [changes to existing REQs]
 TRACEABILITY_MATRIX: [if created]
 ARTIFACTS: <REQUIREMENTS.md + traceability matrix paths>
-NEXT: [recommended step: developer, feature, ...]
+NEXT: [recommended step: planner, developer, feature, ...]
 ```
 **Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
 
@@ -93,6 +97,7 @@ NEXT: [recommended step: developer, feature, ...]
 - No vague phrasing ("should work well")
 - No implementation details (WHAT, not HOW)
 - Never write code
+- No implementation-plan chapters in `REQUIREMENTS.md` — plans are a separate document owned by `planner`
 
 **User proxy:** `main_chat`. Ask back on ambiguity.
 

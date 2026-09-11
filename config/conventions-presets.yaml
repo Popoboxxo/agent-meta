@@ -32,6 +32,9 @@ presets:
         format: keep-a-changelog
         sections: [Added, Fixed, Changed, Removed]
         entry_prefix: "REQ-xxx: "   # bewusst unverändert ggü. heute (siehe Konzept Abschnitt 8)
+        # exact-timestamp (default) | calendar-day (deprecated, siehe Issue #726:
+        # Kalendertag-Filter erzeugt doppelte Changelog-Einträge bei >1 Release/Tag).
+        cutoff_method: exact-timestamp
       # Opt-in GitHub-Release-Automatik (Issue #518/#622). Ausgewertet vom
       # PostToolUse-Hook auto-github-release.sh nach einem `git push <tag>`,
       # NICHT in release.md gerendert. enabled:false = kein Verhaltenswechsel
@@ -76,6 +79,7 @@ presets:
         format: keep-a-changelog
         sections: [Added, Fixed, Changed, Removed]
         entry_prefix: ""
+        cutoff_method: exact-timestamp
       github_release:
         enabled: false
         title_pattern: "{tag}"
@@ -107,6 +111,7 @@ presets:
         format: angular
         sections: [Features, "Bug Fixes", "Performance Improvements", "Breaking Changes"]
         entry_prefix: ""
+        cutoff_method: exact-timestamp
       github_release:
         enabled: false
         title_pattern: "{tag}"

@@ -1,6 +1,6 @@
 ---
 name: template-release
-version: "1.10.0"
+version: "1.11.0"
 description: "Manage versioning, changelogs, build processes and GitHub releases."
 hint: "Versioning, changelog, build artifact, create GitHub release"
 prompt_mode: modern
@@ -62,6 +62,10 @@ Check before every release:
 {{RELEASE_VERSIONING_BLOCK}}
 
 ## 3. CHANGELOG.md format
+
+**Cutoff — was zählt als "seit letztem Release"?**
+
+{{RELEASE_CUTOFF_BLOCK}}
 
 {{RELEASE_CHANGELOG_BLOCK}}
 

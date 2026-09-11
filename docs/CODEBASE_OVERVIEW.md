@@ -910,6 +910,7 @@ Ruft das Modul `scripts/lib/model_discovery.py` auf, um aktuelle Modelle von den
 | `QUALITY_PIPELINES_BLOCK` | string | Quality-Pipelines-Sektion aus `snippets/orchestrator/quality-pipelines.md` |
 | `RELEASE_VERSIONING_BLOCK` | string | Versionierungs-Tabelle in `release.md`, gerendert aus `config/conventions-presets.yaml` (Domain `release`). Nicht gesetzt wenn `release` nicht aktiv |
 | `RELEASE_CHANGELOG_BLOCK` | string | CHANGELOG-Format-Codeblock in `release.md`, gerendert aus `config/conventions-presets.yaml` (Domain `release`). Nicht gesetzt wenn `release` nicht aktiv |
+| `RELEASE_CUTOFF_BLOCK` | string | "Seit letztem Release"-Cutoff-Rezept in `release.md`, gerendert aus `changelog.cutoff_method` (`config/conventions-presets.yaml`, Domain `release`). `exact-timestamp` (Default) liefert die Duplikat-sichere Recipe (Tag-Timestamp als Untergrenze), `calendar-day` rendert eine Deprecation-Warnung (Issue #726). Nicht gesetzt wenn `release` nicht aktiv |
 | `GIT_ISSUE_NAMING_BLOCK` | string | Issue-Naming-Block in `git.md`, gerendert aus `config/conventions-presets.yaml` (Domain `issues`). Nicht gesetzt wenn `git` nicht aktiv |
 | `ISSUE_LANGUAGE` | string | Sprache für GitHub-Issues, die `feedback` für dieses Projekt erstellt (`feedback.md`, `dependency-auditor.md`). Aus `config/conventions-presets.yaml` (Domain `issues`, Feld `language`), überschreibbar via `conventions.issues.language` in `project.yaml`. Immer gesetzt (nicht rollen-gegated), Default `"english"`. `meta-feedback` bleibt unverändert immer Englisch (Issue #579) |
 

@@ -92,6 +92,26 @@ Der gerenderte Stage-Detail-Block (`_generate_pipeline_block`) erreicht Agenten 
 
 Für `main-chat` schreibt `sync_pipeline_detail_files()` (`scripts/lib/pipelines.py`) bei jedem Sync eine `<pipeline-name>.md`-Datei pro aktiver Pipeline nach `<PIPELINE_DETAILS_DIR>/` (Default: Geschwisterverzeichnis von `agents_dir`, z.B. `.claude/pipeline-details/`) — inklusive Stale-Cleanup über einen `.agent-meta-managed`-Index (gleiches Muster wie `mcp.py`/`external_tools.py`, siehe `scripts/lib/rule_index.py`). `main_chat` liest die passende Datei erst, wenn eine Pipeline tatsächlich gematcht wurde — die immer geladene `use-orchestrator.md` wächst dadurch nur um einen fixen Hinweis-Satz, unabhängig von der Anzahl der Pipelines.
 
+## Voraussetzung für `plan-driven`-Stages: eigenständiges Plan-Dokument
+
+Eine `plan-driven`-Stage (z.B. `feature-lifecycle` → `implement`) liest die Agent-Zuweisung aus
+`payload.plan_ref` — das setzt ein **eigenständiges Plan-Dokument** voraus, kein Kapitel in
+`docs/REQUIREMENTS.md` oder einem anderen Anforderungsdokument. Die Konvention (Quelle:
+`agents/1-generic/planner.md` §4 „Persist"):
+
+- Knowledge Engine aktiv: `knowledge/wiki/plans/<topic>.md` mit Frontmatter `type: Plan`
+- Knowledge Engine inaktiv: `plan-<topic>.md` im Projekt-Root
+- Pflicht-Frontmatter für `plan-driven`-Pipelines: `pipeline_stages:` (Mapping Stage-ID → Schrittnummer), z.B.:
+  ```yaml
+  pipeline_stages:
+    implement: 3
+  ```
+
+Ohne dieses Dokument gibt es kein gültiges `plan_ref` — die Stage fällt auf `fallback_agent` zurück
+(siehe `parse_plan_ref()`/`validate_plan_ref()` in `scripts/lib/pipelines.py`). Eingebettete
+Umsetzungspläne (z.B. ein Plan-Kapitel in `REQUIREMENTS.md`) werden von der Pipeline nicht erkannt
+und sind für `plan-driven`-Stages wirkungslos (Issue #677).
+
 ## SE-Kaskade als Pipeline
 
 Die Systems-Engineering-Kaskade ist als `se-cascade` Pipeline definiert:

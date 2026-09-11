@@ -26,6 +26,7 @@ graphify-out/
 .gemini/pending-tasks.md
 .gemini/settings.local.json
 .mcp.json
+.playwright-mcp/
 .meta-config/env.ps1
 .meta-config/env.sh
 .meta-config/env.unset.ps1
