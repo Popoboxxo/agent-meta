@@ -134,6 +134,29 @@ def load_provider_capabilities(agent_meta_root: Path) -> dict:
     return caps if isinstance(caps, dict) else {}
 
 
+def provider_has_capability(pc: dict | None, capability: str) -> bool:
+    """True when a provider's config/ai-providers.yaml ``capabilities`` list
+    declares ``capability`` (issue #735).
+
+    The provider-agnostic replacement for per-dimension
+    ``if provider == "Name"`` checks. An absent entry or an absent provider is
+    an explicit ``False`` — never a silent Claude fallback.
+    """
+    return capability in ((pc or {}).get("capabilities") or [])
+
+
+def provider_commands_supported(caps: dict | None) -> bool:
+    """Whether slash-commands sync is enabled for a provider (issue #735).
+
+    ``caps`` is the provider's entry from config/provider-capabilities.yaml
+    (see ``load_provider_capabilities``). Only an explicit ``commands: true``
+    enables the path; absent or false is an explicit "unsupported" that
+    scripts/lib/commands.py reports, instead of silently returning — the old
+    silent else-branch is what left 5/9 providers without any commands.
+    """
+    return (caps or {}).get("commands") is True
+
+
 def registered_provider_names(agent_meta_root: Path) -> list[str]:
     """Return the canonical, sorted provider registry (issue #732).
 
@@ -231,19 +254,16 @@ def resolve_context_filename(context_file: str, provider: str, pc: dict | None =
     Args:
         context_file: The raw context filename, e.g. from
             `provider_config[provider].get("context_file", f"{provider.upper()}.md")`.
-        provider: The provider name (e.g. "Claude", "Opencode"), used only
-            when `pc` is not supplied (falls back to `provider == "Claude"`
-            for callers that haven't been updated to pass `pc` yet).
+        provider: The provider name (e.g. "Claude", "Opencode"). Kept for
+            signature compatibility; behavior is resolved solely from `pc`
+            (issue #735 — no `provider == "Claude"` fallback).
         pc: This provider's config/ai-providers.yaml entry, if available.
 
     Returns:
         "AGENTS.md" if `context_file == "CLAUDE.md"` and the provider has no
         dedicated context file, otherwise `context_file` unchanged.
     """
-    has_dedicated = (
-        pc.get("has_dedicated_context_file", False) if pc is not None
-        else provider == "Claude"
-    )
+    has_dedicated = (pc or {}).get("has_dedicated_context_file", False)
     if context_file == "CLAUDE.md" and not has_dedicated:
         return "AGENTS.md"
     return context_file

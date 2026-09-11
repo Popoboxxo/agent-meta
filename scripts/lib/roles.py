@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 from .io import _load_yaml_or_json
+from .providers import provider_has_capability
 
 if TYPE_CHECKING:
     from .log import SyncLog
@@ -166,7 +167,9 @@ def resolve_model(
     elif isinstance(provider_overrides, dict) and role in provider_overrides:
         flat_value = provider_overrides[role]
         if not isinstance(flat_value, dict):  # noqa: SIM102
-            if provider == "Claude":
+            if provider_has_capability(
+                (provider_config or {}).get(provider), "model-overrides-flat"
+            ):
                 tier_or_id = str(flat_value)
                 explicit_override = True
                 if log:

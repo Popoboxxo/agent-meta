@@ -186,13 +186,21 @@ def _sync_stage_claude_base(
     provider_config: dict, providers: list, variables: dict,
     args: argparse.Namespace, log: SyncLog,
 ) -> tuple[bool, dict, list, list]:
-    """Stage 3: Claude-gated base syncs + gitignore/env baselines.
+    """Stage 3: dedicated-context base syncs + gitignore/env baselines.
 
     Returns ``(is_claude, gitignore_cfg, base_gitignore_entries,
     env_gitignore)``; the two lists are later mutated by the gitignore
     stage (stage 11) through the same object references.
     """
-    is_claude = "Claude" in providers
+    # Capability-driven gate (issue #735): the dedicated CLAUDE.md/personal-file
+    # and exact-managed-.gitignore path runs when any active provider declares
+    # `has_dedicated_context_file` (today: Claude only) — no provider-name
+    # branch. The returned flag keeps its historical name for its downstream
+    # consumers but no longer literal-matches "Claude".
+    is_claude = any(
+        provider_config.get(p, {}).get("has_dedicated_context_file", False)
+        for p in providers
+    )
     gitignore_cfg = config.get("gitignore", {})
     # Base entries of the managed .gitignore block (local/generated/settings
     # categories, custom entries and — when gitignore.ignore-provider-dirs is
@@ -710,12 +718,14 @@ def _sync_stage_gitignore(
     exactly like the original local-variable flow.
     """
     # Update .gitignore managed block: base entries + per-provider entries + skill entries
-    # Collect gitignore_entries from all active non-Claude providers
+    # Collect gitignore_entries from all active providers whose base entries are
+    # NOT already handled by the dedicated-context path above (issue #735:
+    # capability-driven, no provider-name branch).
     extra_provider_entries: list[str] = []
     for _p in providers:
-        if _p == "Claude":
-            continue  # already in base_gitignore_entries
         _pc = provider_config.get(_p, {})
+        if _pc.get("has_dedicated_context_file", False):
+            continue  # already in base_gitignore_entries
         if _pc.get("has_settings") and not _pc.get("gitignore_entries"):
             log.warning(f"provider '{_p}' has has_settings=true but no gitignore_entries — local settings may be accidentally committed")
         extra_provider_entries.extend(_pc.get("gitignore_entries", []))

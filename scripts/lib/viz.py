@@ -712,8 +712,14 @@ def _get_terminal_tool(provider: str, agent_meta_root: Path | None = None) -> st
     return load_providers_config(agent_meta_root).get(provider, {}).get("bash_tool_name")
 
 
-def _parse_opencode_permissions(agent_content: str) -> dict[str, str]:
-    """Extrahiere opencode permission block aus dem Frontmatter-YAML."""
+def _parse_agent_permissions(agent_content: str) -> dict[str, str]:
+    """Extract the frontmatter ``permission:`` block (provider-agnostic).
+
+    The block is injected by the provider transform for permission-based
+    providers (e.g. Opencode). Any agent without such a block returns ``{}``,
+    so callers can gate on the content instead of branching on the provider
+    name (issue #735).
+    """
     fm_match = re.search(r"^---\s*\n(.*?)\n---", agent_content, re.DOTALL)
     if not fm_match:
         return {}
@@ -738,9 +744,8 @@ def inject_viz_prompt_block(agent_content: str, role: str, provider: str,
     Nutzt bevorzugt das native MCP-Tool `log_viz_event` oder als Fallback das
     cross-platform CLI-Skript `scripts/viz-logger.py`.
 
-    Provider-spezifisch: Jeder Provider bekommt das korrekte Terminal-Tool
-    genannt. Bei Opencode-Agenten mit ``bash: deny`` wird der CLI-Fallback
-    weggelassen (nur MCP-Tool).
+    Provider-agnostic (issue #735): the CLI fallback is suppressed only when the
+    agent's own frontmatter declares ``bash: deny`` — no provider-name branch.
     """
     if not viz_enabled:
         return agent_content
@@ -748,11 +753,8 @@ def inject_viz_prompt_block(agent_content: str, role: str, provider: str,
     cli_cmd = f"python scripts/viz-logger.py --agent {role} --provider {provider}"
     terminal_tool = _get_terminal_tool(provider, agent_meta_root)
 
-    has_terminal = True
-    if provider == "Opencode":
-        perms = _parse_opencode_permissions(agent_content)
-        if perms.get("bash") == "deny":
-            has_terminal = False
+    perms = _parse_agent_permissions(agent_content)
+    has_terminal = perms.get("bash") != "deny"
 
     if has_terminal and terminal_tool:
         fallback = (

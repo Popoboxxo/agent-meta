@@ -92,6 +92,12 @@ _ORCHESTRATION_FALLBACKS: dict[str, str] = {
     # any template, only inside {{#if AUTO_COMMIT_ENABLED}} -- so an empty
     # string is the correct, harmless standalone fallback.
     "AUTO_COMMIT_BLOCK": "",
+    # CHECKPOINTING_BLOCK (issue #743): now referenced unconditionally in
+    # orchestrator.md §9, but its text is only meaningful with a project
+    # config (checkpointing toggle, live-progress tier). Standalone has no
+    # config, so an empty string avoids leaking the raw placeholder without
+    # inventing a checkpointing policy.
+    "CHECKPOINTING_BLOCK": "",
 }
 
 # Conditional flags gating {{#if VAR}}/{{#unless VAR}} blocks tied to

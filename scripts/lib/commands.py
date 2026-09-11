@@ -5,12 +5,11 @@ import re
 from pathlib import Path
 
 from .frontmatter import _split_frontmatter
-from .io import safe_path, write_checked
+from .io import SyncError, safe_path, write_checked
 from .log import SyncLog
 
 COMMANDS_DIR = "commands"
 CLAUDE_COMMANDS_DIR = ".claude/commands"
-CONTINUE_COMMANDS_DIR = ".continue/prompts"
 
 
 def collect_command_sources(agent_meta_root: Path, platforms: list[str]) -> list[tuple[Path, str]]:
@@ -105,44 +104,53 @@ def sync_commands_for_provider(
 ):
     """Copy command files to the provider-specific target directory.
 
-    Claude   → .claude/commands/      (.md, as-is)
-    Continue → .continue/prompts/     (.md, invokable: true injected)
-    Gemini   → .gemini/commands/      (.toml, converted from .md)
+    Dispatch is capability-driven (issue #735): the boolean ``commands`` flag in
+    config/provider-capabilities.yaml gates the path, and the target directory,
+    output extension and content format come from config/ai-providers.yaml
+    (``commands_dir`` / ``commands_ext`` / ``commands_format`` /
+    ``commands_managed_index``). No provider-name branching:
+      - ``commands_format: markdown`` — copied as-is (.md)
+      - ``commands_format: continue`` — ``invokable: true`` injected into frontmatter
+      - ``commands_format: toml``     — converted from .md to provider TOML
+
+    An unsupported provider gets one explicit INFO line instead of the old
+    silent ``return``; a provider that declares support without a
+    ``commands_dir`` fails loudly.
 
     Variables substitution: {{VAR}} placeholders are substituted like rules.
-    Stale-tracking via .agent-meta-managed in the target directory.
+    Stale-tracking via the managed index in the target directory.
     """
     from .config import substitute
+    from .providers import load_provider_capabilities, provider_commands_supported
 
     pc = (provider_config or {}).get(provider, {})
+    capabilities = load_provider_capabilities(agent_meta_root).get(provider, {})
+    if not provider_commands_supported(capabilities):
+        log.note(
+            "commands",
+            f"{provider}: not supported "
+            "(config/provider-capabilities.yaml commands: false) — no commands written",
+        )
+        return
+
     platforms = config.get("platforms", [])
     sources = collect_command_sources(agent_meta_root, platforms)
 
     if not sources:
         return
 
-    if provider == "Claude":
-        target_dir = project_root / CLAUDE_COMMANDS_DIR
-        managed_index_path = target_dir / ".agent-meta-managed"
-        output_ext = ".md"
-    elif provider == "Continue":
-        target_dir = project_root / CONTINUE_COMMANDS_DIR
-        # Use a separate managed index to avoid collision with sync_prompts_for_continue
-        managed_index_path = target_dir / ".agent-meta-commands-managed"
-        output_ext = ".md"
-    elif provider == "Gemini":
-        commands_dir = pc.get("commands_dir", ".gemini/commands")
-        target_dir = project_root / commands_dir
-        managed_index_path = target_dir / ".agent-meta-managed"
-        output_ext = pc.get("commands_ext", ".toml")
-    elif provider == "Opencode":
-        # Opencode auto-scans .opencode/commands/ — same .md format as Claude, same $ARGUMENTS syntax
-        commands_dir = pc.get("commands_dir", ".opencode/commands")
-        target_dir = project_root / commands_dir
-        managed_index_path = target_dir / ".agent-meta-managed"
-        output_ext = ".md"
-    else:
-        return
+    commands_dir_rel = pc.get("commands_dir")
+    if not commands_dir_rel:
+        raise SyncError(
+            f"Provider '{provider}' declares commands support "
+            "(config/provider-capabilities.yaml: commands: true) but has no "
+            "commands_dir in config/ai-providers.yaml — refusing to guess a "
+            "target directory (issue #735)."
+        )
+    target_dir = project_root / commands_dir_rel
+    managed_index_path = target_dir / pc.get("commands_managed_index", ".agent-meta-managed")
+    output_ext = pc.get("commands_ext", ".md")
+    commands_format = pc.get("commands_format", "markdown")
 
     previously_managed: set[str] = set()
     if managed_index_path.exists():
@@ -168,10 +176,16 @@ def sync_commands_for_provider(
         if variables is not None:
             content = substitute(content, variables, rel_source, log)
 
-        if provider == "Continue":
+        if commands_format == "continue":
             content = _add_frontmatter_field(content, "invokable", "true")
-        elif provider == "Gemini":
+        elif commands_format == "toml":
             content = _md_to_toml(content, stem)
+        elif commands_format != "markdown":
+            raise SyncError(
+                f"Provider '{provider}': unknown commands_format "
+                f"{commands_format!r} — supported: markdown, continue, toml "
+                "(issue #735)."
+            )
 
         now_managed.add(final_name)
         rel_out = str(target_path.relative_to(project_root))

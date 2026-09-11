@@ -21,6 +21,16 @@
 # sequential-fallback/false, never to a speculative mechanism. Consumers:
 # scripts/lib/delegation_syntax.py (getters) and
 # scripts/lib/consistency/fanout_contracts.py (post-sync drift check).
+#
+# commands (issue #735): whether the provider receives the generated slash
+# commands (/commit, /feedback, ...) from commands/*.md. Every registered
+# provider MUST carry an explicit `commands: true` or `commands: false` —
+# scripts/lib/commands.py gates on this flag and emits an explicit
+# "not supported" line instead of silently falling through (the silent
+# else-branch is what left 5/9 providers without commands). A `commands:
+# false` entry is a verified statement of no command surface; do not flip it
+# to true without confirming the provider's command directory/format in
+# config/ai-providers.yaml (commands_dir/commands_ext/commands_format).
 
 capabilities:
   Claude:
@@ -29,6 +39,7 @@ capabilities:
     file_based_agents: true
     text_mentions: true
     hooks: true
+    commands: true
     native_agent_tools: ["Agent", "Task"]
     structured_handoff: true
     handoff_format: "json"
@@ -46,6 +57,7 @@ capabilities:
     file_based_agents: true
     text_mentions: false
     hooks: false
+    commands: true
     native_agent_tools: ["task"]
     structured_handoff: true
     handoff_format: "json"
@@ -63,6 +75,7 @@ capabilities:
     file_based_agents: false
     text_mentions: false
     hooks: true                    # Antigravity hooks.json contract verified (issue #674 Phase 3.1) — mirrored via hook_protocol antigravity-hooks-json + translating adapter
+    commands: true                 # .gemini/commands/*.toml (commands_dir/commands_ext/commands_format in ai-providers.yaml)
     native_agent_tools: ["define_subagent", "send_message", "invoke_subagent"]
     structured_handoff: true
     handoff_format: "json"
@@ -86,6 +99,7 @@ capabilities:
     file_based_agents: false
     text_mentions: true
     hooks: false
+    commands: true
     native_agent_tools: []
     structured_handoff: false
     handoff_format: "yaml_text_block"
@@ -106,6 +120,7 @@ capabilities:
     file_based_agents: true
     text_mentions: true
     hooks: false
+    commands: false
     native_agent_tools: []
     structured_handoff: false
     handoff_format: "yaml_text_block"
@@ -133,6 +148,7 @@ capabilities:
     file_based_agents: true
     text_mentions: true
     hooks: false
+    commands: false                 # verified: no command surface upstream (ai-providers.yaml has_commands: false)
     native_agent_tools: []
     structured_handoff: false
     handoff_format: "yaml_text_block"
@@ -164,6 +180,7 @@ capabilities:
     file_based_agents: true           # .codex/agents/*.toml auto-loaded as config layers, personal + project-scoped, no registration step (V7)
     text_mentions: false
     hooks: false                      # contract verified (V1) but NOT mirrored: payload deviations vs Claude Code + hash-trust review gate (#630 pattern)
+    commands: false                   # no verified command surface (ai-providers.yaml has_commands: false)
     native_agent_tools: ["spawn_agent", "send_input", "resume_agent", "wait_agent", "close_agent"]   # documented dispatch surface (V7)
     structured_handoff: true
     handoff_format: "json"
@@ -192,6 +209,7 @@ capabilities:
     file_based_agents: true           # REVISED per V18: user-level ~/.zcode/agents/*.md auto-load is verified; workspace-level auto-load = P6 real-repo-test; plugin route verified
     text_mentions: false
     hooks: false                      # project-level hooks are completely ignored by the harness (V2)
+    commands: false                   # no verified command surface (ai-providers.yaml has_commands: false)
     native_agent_tools: ["Agent", "Task"]   # V17: Agent + legacy alias Task
     structured_handoff: true
     handoff_format: "yaml_text_block" # conservative until json support verified
@@ -220,6 +238,7 @@ capabilities:
     file_based_agents: true           # Option A determined (V10): plain Markdown + YAML frontmatter, auto-discovery (project .kimi-code/agents/ > user > plugin > built-in)
     text_mentions: false
     hooks: false                      # hooks exist (20 events, V11) but only user-level ~/.kimi-code/config.toml [[hooks]] documented — no project-level hook generation (#630 pattern)
+    commands: false                   # no verified command surface (ai-providers.yaml has_commands: false)
     native_agent_tools: ["Agent", "AgentSwarm"]   # V16: Agent (prompt/description/subagent_type/resume/run_in_background) + AgentSwarm (prompt_template + items)
     structured_handoff: true
     handoff_format: "yaml_text_block"

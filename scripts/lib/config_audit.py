@@ -22,7 +22,11 @@ from .config_audit_providers import find_missing_providers
 from .config_audit_types import AuditIssue, AuditReport  # noqa: F401 -- re-exported for API compat
 from .frontmatter import parse_frontmatter_file
 from .io import load_yaml_file
-from .providers import load_providers_config
+from .providers import (
+    PROVIDER_CAPABILITIES_YAML,
+    load_provider_capabilities,
+    load_providers_config,
+)
 from .roles import load_roles_config
 
 
@@ -420,6 +424,28 @@ def audit_config(agent_meta_root: Path, project_config_path: Path) -> AuditRepor
             message=f"Provider '{provider}' is missing from {touchpoint.description}",
             detail=touchpoint.file,
         )
+
+    # --- 8b. commands capability completeness (issue #735) ------------------
+    # Every registered provider MUST declare an explicit `commands: true|false`
+    # in config/provider-capabilities.yaml: scripts/lib/commands.py gates the
+    # whole commands path on it, and an absent key used to fall through to a
+    # silent `return` (5/9 providers received zero commands with no signal).
+    # Skipped when the registry file is absent (minimal audit fixtures).
+    if (agent_meta_root / PROVIDER_CAPABILITIES_YAML).is_file():
+        provider_caps = load_provider_capabilities(agent_meta_root)
+        for provider in sorted(registered_providers):
+            if "commands" not in provider_caps.get(provider, {}):
+                report.add(
+                    category="provider_registry_completeness",
+                    severity="warning",
+                    role=provider,
+                    message=(
+                        f"Provider '{provider}' has no explicit 'commands' capability "
+                        f"in {PROVIDER_CAPABILITIES_YAML} (issue #735) — commands "
+                        "sync silently falls back to unsupported"
+                    ),
+                    detail=PROVIDER_CAPABILITIES_YAML,
+                )
 
     return report
 
