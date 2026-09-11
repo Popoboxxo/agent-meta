@@ -84,3 +84,34 @@ def browser_ctx(admin_server):
         finally:
             ctx.close()
             browser.close()
+
+
+@pytest.fixture
+def page(browser_ctx):
+    """Function-scoped Page: one fresh tab per test, closed afterwards.
+
+    Replaces the hand-rolled ``page = ctx.new_page(); try/finally: page.close()``
+    boilerplate that used to live in every test.
+    """
+    ctx, _base = browser_ctx
+    pg = ctx.new_page()
+    try:
+        yield pg
+    finally:
+        pg.close()
+
+
+def save_and_wait(page, save_btn):
+    """Click Save and block until the PUT to project/section actually completes.
+
+    All project-form pages route saves through ``saveProjectSection()`` ->
+    ``PUT /api/config/project/section`` (see docs/ui/admin-ui.html). Waiting on
+    that response — instead of a fixed ``page.wait_for_timeout(...)`` — is the
+    real completion signal: it prevents ``page.close()`` from racing an
+    in-flight restore-save and aborting it, which could leave the git-tracked
+    .meta-config/project.yaml permanently polluted with test data.
+    """
+    with page.expect_response(
+        lambda r: r.url.endswith("/api/config/project/section") and r.request.method == "PUT"
+    ):
+        save_btn.click()
