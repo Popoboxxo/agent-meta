@@ -129,7 +129,14 @@ def test_providers_option_add_edit_remove_roundtrip(browser_ctx, page):
             row.locator(".btn-danger").click()
             page.get_by_role("button", name="Delete", exact=True).click()
             expect(persisted_key).to_have_count(0)
-            save_and_wait(page, page.get_by_role("button", name="Save", exact=True))
+            # Providers page fires 3 sequential PUTs (ai-providers, platforms,
+            # provider-options) to the same endpoint via saveProjectSections();
+            # the row removal only lands in the provider-options one, so wait
+            # for that specific PUT rather than the first response.
+            save_and_wait(
+                page, page.get_by_role("button", name="Save", exact=True),
+                section="provider-options",
+            )
 
 
 def test_model_overrides_add_row_select_and_save_roundtrip(browser_ctx, page):

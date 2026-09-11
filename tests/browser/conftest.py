@@ -5,6 +5,7 @@ multiple tests can reuse the same browser context without colliding with a
 developer-run server on 7420.
 """
 
+import json
 import os
 import subprocess
 import sys
@@ -101,17 +102,35 @@ def page(browser_ctx):
         pg.close()
 
 
-def save_and_wait(page, save_btn):
-    """Click Save and block until the PUT to project/section actually completes.
+def save_and_wait(page, save_btn, section=None):
+    """Click Save and block until the relevant PUT to project/section completes.
 
-    All project-form pages route saves through ``saveProjectSection()`` ->
-    ``PUT /api/config/project/section`` (see docs/ui/admin-ui.html). Waiting on
-    that response — instead of a fixed ``page.wait_for_timeout(...)`` — is the
-    real completion signal: it prevents ``page.close()`` from racing an
-    in-flight restore-save and aborting it, which could leave the git-tracked
-    .meta-config/project.yaml permanently polluted with test data.
+    Most project-form pages route saves through a single ``saveProjectSection()``
+    call -> one ``PUT /api/config/project/section``. The Providers & Platforms
+    page instead calls ``saveProjectSections()`` (see docs/ui/admin-ui.html),
+    which fires several sequential PUTs to that *same* URL, one per section
+    (``ai-providers``, ``platforms``, ``provider-options``, ...). Waiting on the
+    first response there resolves too early and lets ``page.close()`` in fixture
+    teardown race an in-flight later PUT — the exact race this helper exists to
+    prevent, just moved further downstream.
+
+    Pass ``section=`` (matching the ``section`` key in the PUT's JSON body) to
+    block until that specific save round-trips instead of the first one. This
+    is the real completion signal — not a fixed ``page.wait_for_timeout(...)`` —
+    and prevents ``page.close()`` from aborting an in-flight save, which could
+    leave the git-tracked .meta-config/project.yaml permanently polluted with
+    test data.
     """
-    with page.expect_response(
-        lambda r: r.url.endswith("/api/config/project/section") and r.request.method == "PUT"
-    ):
+    def _matches(r):
+        if not (r.url.endswith("/api/config/project/section") and r.request.method == "PUT"):
+            return False
+        if section is None:
+            return True
+        try:
+            body = json.loads(r.request.post_data or "{}")
+        except ValueError:
+            return False
+        return body.get("section") == section
+
+    with page.expect_response(_matches):
         save_btn.click()
