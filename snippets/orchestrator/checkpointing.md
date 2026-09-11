@@ -1,46 +1,41 @@
 {{#if CHECKPOINTING_ENABLED}}
-## Checkpointing
-
-Persistente Session-Checkpoints für lange Orchestrierungen (>5 Schritte).
-
-**Format** — `.meta-viz/checkpoint-<timestamp>.json`:
+**Checkpoint after >5 steps** — `.meta-viz/checkpoint-<timestamp>.json`:
 ```json
 {
   "session_id": "<YYYYMMDD-HHMMSS>",
   "created_at": "<ISO-8601>",
-  "task_summary": "<Ein-Satz-Beschreibung der Gesamtaufgabe>",
+  "task_summary": "<one-sentence description of the overall task>",
   "completed_steps": [
     { "step": 1, "agent": "<agent>", "result_key": "<key>", "status": "done" }
   ],
   "pending_steps": [
     { "step": 2, "agent": "<agent>", "task": "<task-summary>" }
   ],
-  "context": "<Zusammenfassung relevanter Zwischenergebnisse, max. 3 Sätze>"
+  "context": "<summary of relevant intermediate results, max 3 sentences>"
 }
 ```
 
-**Wann schreiben:** Vor jedem BARRIER-Punkt — also nachdem alle parallelen Sub-Tasks
-gestartet wurden, aber bevor auf ihre Ergebnisse gewartet wird. Sichert den
-Fortschritt gegen Context-Reset während laufender Delegation.
+**When to write:** before every BARRIER point — after all parallel sub-tasks were
+started but before their results are awaited. Protects progress against a context
+reset during ongoing delegation.
 
-**Wann lesen:** Beim Start einer neuen Session prüfen ob Checkpoints existieren:
-1. `.meta-viz/checkpoint-*.json` scannen (neuester zuerst nach `created_at`)
-2. Wenn Checkpoint gefunden → User informieren:
-   > "Es gibt einen unvollständigen Checkpoint vom `<created_at>`: `<task_summary>`.
-   > Fortsetzen ab Schritt `<nächster pending_step>`?"
-3. Bei Bestätigung → `pending_steps` sequentiell abarbeiten, `completed_steps` überspringen
-4. Nach Abschluss: Checkpoint-Datei löschen
+**When to read:** on session start, check whether checkpoints exist:
+1. Scan `.meta-viz/checkpoint-*.json` (newest by `created_at` first)
+2. On a hit, inform the user:
+   > "There is an unfinished checkpoint from `<created_at>`: `<task_summary>`.
+   > Resume from step `<next pending_step>`?"
+3. On confirmation, work through `pending_steps` sequentially, skip `completed_steps`
+4. After completion, delete the checkpoint file
 
-**Cleanup:** Checkpoints älter als 24h automatisch löschen (beim nächsten Start).
-Maximale Checkpoint-Größe: 50 KB — große `context`-Felder kürzen.
+**Cleanup:** delete checkpoints older than 24h automatically (on next start).
+Max checkpoint size: 50 KB — truncate large `context` fields.
 
-**Progress-Datei (issue #682 §6, Tier-Modell — live-progress-channel, 2026-09-10):** Falls die
-Laufzeit `CheckpointStore.save_checkpoint()` (Python-API in `scripts/lib/checkpoint.py`,
-kein manuell vom Agenten geschriebenes Format) aufruft, schreibt sie `.meta-viz/progress/current.md`
-— auf Tier-A-Providern (verifiziertes `hook_protocol`, z.B. Claude/Gemini) überschreibend
-(nicht historisiert), auf allen anderen (Tier-B-)Providern anhängend mit Rotation beim
-Start einer neuen Session, weil die Datei dort der einzige Live-Kanal ist. Für Resume-Logik
-weiterhin die JSON-Checkpoints verwenden, `current.md` ist nur für den schnellen menschlichen
-Blick in den Fortschritt gedacht — kein Ersatz für das oben beschriebene, manuell geschriebene
-Checkpoint-Format.
+**Progress file (issue #682 §6, Tier model — live-progress-channel design, 2026-09-10):** if the
+runtime calls `CheckpointStore.save_checkpoint()` (the Python API in `scripts/lib/checkpoint.py`,
+distinct from the manually-written checkpoint format above), it writes `.meta-viz/progress/current.md`
+— overwritten (non-historized) on Tier-A providers (verified `hook_protocol`, e.g. Claude/Gemini —
+see the chat-push instruction in §7), appended with session-start rotation on every Tier-B provider,
+since the file is their only live channel. Resume logic still reads the JSON checkpoints; `current.md`
+is for a human glancing at the repo, not parsed by any code path — no replacement for the manually
+written checkpoint format above.
 {{/if}}

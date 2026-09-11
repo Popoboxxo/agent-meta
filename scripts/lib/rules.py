@@ -390,10 +390,11 @@ def sync_rules(
         rule_stem = Path(output_name).stem
         opts = rule_options.get(rule_stem, {})
 
-        # Provider-aware: skip rule entirely for Gemini if gemini: skip
-        if provider == "Gemini" and opts.get("gemini") == "skip":
+        # Provider-aware: skip rule entirely when the rule opts out for this
+        # provider (`<provider-lowercase>: skip` in rules-presets.yaml), issue #735.
+        if provider_opts_skip(opts, provider):
             log.skip(str((target_dir / output_name).relative_to(project_root)),
-                     f"rules-preset: gemini: skip for '{rule_stem}'")
+                     f"rules-preset: {provider.lower()}: skip for '{rule_stem}'")
             continue
 
         source_content = source_path.read_text(encoding="utf-8")

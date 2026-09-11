@@ -375,7 +375,7 @@ def _update_managed_html_block(
     )
     rel = str(target_path.relative_to(project_root))
     render_vars = variables
-    _has_dedicated = (pc or {}).get("has_dedicated_context_file", provider == "Claude")
+    _has_dedicated = (pc or {}).get("has_dedicated_context_file", False)
     if _has_dedicated and "AGENT_HINTS_CLAUDE" in variables:
         render_vars = {**variables, "AGENT_HINTS": variables["AGENT_HINTS_CLAUDE"]}
 
@@ -802,7 +802,7 @@ def sync_context_for_provider(
       - context-embedded-rules → Opencode strategy
       - shares a context_file with an embedded-rules provider → Opencode strategy
         (the shared physical file must converge to one managed block, #638)
-      - provider == Continue   → Continue strategy (managed block + config.yaml comment)
+      - context-config-comment → Continue strategy (managed block + config.yaml comment)
       - context-managed-block  → generic HTML managed-block strategy
     """
     pc = provider_config.get(provider)
@@ -816,7 +816,7 @@ def sync_context_for_provider(
             agent_meta_root, project_root, config, variables, log, dry_run,
             provider, provider_config,
         )
-    elif provider == "Continue":
+    elif _has_capability(pc, "context-config-comment"):
         _sync_continue_context(
             agent_meta_root, project_root, config, variables, log, dry_run,
             provider, provider_config,

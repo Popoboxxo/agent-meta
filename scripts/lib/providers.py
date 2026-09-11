@@ -134,6 +134,29 @@ def load_provider_capabilities(agent_meta_root: Path) -> dict:
     return caps if isinstance(caps, dict) else {}
 
 
+def provider_has_capability(pc: dict | None, capability: str) -> bool:
+    """True when a provider's config/ai-providers.yaml ``capabilities`` list
+    declares ``capability`` (issue #735).
+
+    The provider-agnostic replacement for per-dimension
+    ``if provider == "Name"`` checks. An absent entry or an absent provider is
+    an explicit ``False`` — never a silent Claude fallback.
+    """
+    return capability in ((pc or {}).get("capabilities") or [])
+
+
+def provider_commands_supported(caps: dict | None) -> bool:
+    """Whether slash-commands sync is enabled for a provider (issue #735).
+
+    ``caps`` is the provider's entry from config/provider-capabilities.yaml
+    (see ``load_provider_capabilities``). Only an explicit ``commands: true``
+    enables the path; absent or false is an explicit "unsupported" that
+    scripts/lib/commands.py reports, instead of silently returning — the old
+    silent else-branch is what left 5/9 providers without any commands.
+    """
+    return (caps or {}).get("commands") is True
+
+
 def registered_provider_names(agent_meta_root: Path) -> list[str]:
     """Return the canonical, sorted provider registry (issue #732).
 
@@ -213,6 +236,20 @@ def resolve_providers(config: dict, provider_config: dict, filter_deactivated: b
     return providers
 
 
+def _framework_provider_entry(provider: str) -> dict:
+    """Look up a provider's entry from the framework's config/ai-providers.yaml.
+
+    Fallback for `resolve_context_filename` callers that only pass a provider
+    name (no `pc`): the dedicated-context capability is read from the
+    provider registry instead of branching on the provider name. The framework
+    root is the checkout containing this module
+    (``<root>/scripts/lib/providers.py``), which also holds when embedded as a
+    submodule (``<project>/.agent-meta/scripts/lib/providers.py``).
+    """
+    root = Path(__file__).resolve().parents[2]
+    return load_providers_config(root).get(provider, {}) or {}
+
+
 def resolve_context_filename(context_file: str, provider: str, pc: dict | None = None) -> str:
     """Resolve the effective context filename for a provider.
 
@@ -227,23 +264,25 @@ def resolve_context_filename(context_file: str, provider: str, pc: dict | None =
     provider with that flag set today, but any future provider with its own
     dedicated context-file handling (like Claude's sync_claude_md_static())
     can opt in via config/ai-providers.yaml alone, no code change needed.
+    When `pc` is omitted, the capability is looked up from the provider
+    registry via `_framework_provider_entry` (still config-driven, never a
+    provider-name comparison).
 
     Args:
         context_file: The raw context filename, e.g. from
             `provider_config[provider].get("context_file", f"{provider.upper()}.md")`.
-        provider: The provider name (e.g. "Claude", "Opencode"), used only
-            when `pc` is not supplied (falls back to `provider == "Claude"`
-            for callers that haven't been updated to pass `pc` yet).
+        provider: The provider name (e.g. "Claude", "Opencode"). Used only to
+            resolve the registry entry when `pc` is not supplied — behavior is
+            still resolved from the `has_dedicated_context_file` capability.
         pc: This provider's config/ai-providers.yaml entry, if available.
 
     Returns:
         "AGENTS.md" if `context_file == "CLAUDE.md"` and the provider has no
         dedicated context file, otherwise `context_file` unchanged.
     """
-    has_dedicated = (
-        pc.get("has_dedicated_context_file", False) if pc is not None
-        else provider == "Claude"
-    )
+    if pc is None:
+        pc = _framework_provider_entry(provider)
+    has_dedicated = pc.get("has_dedicated_context_file", False)
     if context_file == "CLAUDE.md" and not has_dedicated:
         return "AGENTS.md"
     return context_file
