@@ -35,6 +35,17 @@ narrow to catch this in general:
   still overwritten exactly as today. Preserving the edit (skip-overwrite)
   is an explicit non-goal for this phase — a possible v2 follow-up.
 
+> **Post-implementation update (2026-09-11, issue #734):** the
+> "Changing write behavior" non-goal above still holds for *which* files
+> get written and what they contain — a drifted generated file is still
+> overwritten in place. #734 adds a **backup safety-net**: before the
+> writers run, `backup_drifted_files()` (`scripts/lib/generated_file_drift.py`)
+> writes a `<file>.sync-backup-<YYYYmmdd-HHMMSS>` sibling for every finding,
+> holding exactly the pre-overwrite (drifted) content. One timestamp per
+> sync; no write in `--dry-run`. The warning below now also names the
+> backup (`Backup written to <name>.`). This is a safety net, not
+> skip-overwrite preservation — the follow-ups remain open.
+
 ## Data model
 
 **`.meta-config/generated-file-hashes.json`** (new, committed — same
@@ -117,10 +128,12 @@ state:
   managed file) is never a finding — nothing to compare against.
 
 **2. Warning emission** — one `log.warning(...)` per finding, format:
-`"generated-file-drift: '<path>' was manually edited since the last sync (provider '<provider>') — this sync will overwrite it. Add it to .meta-config/drift-allowlist.yaml if this edit should be preserved going forward."`
+`"generated-file-drift: '<path>' was manually edited since the last sync (provider '<provider>') — this sync will overwrite it. Backup written to <name>. Add it to .meta-config/drift-allowlist.yaml if this edit should be preserved going forward."`
 No new artifact file is rendered (unlike `external-tools-drift.md`) — the
 warning itself, surfaced through the same `SyncLog` every other sync
-warning uses, is the complete deliverable for this phase.
+warning uses, is the complete deliverable. (The `.sync-backup-<ts>` file
+named in it is the #734 safety net, not a report artifact; see the
+post-implementation note in "Scope".)
 
 **3. Late stage — `capture_generated_file_hashes()`**, inserted at the
 very end of the sync pipeline (after every writer has run): re-walks the

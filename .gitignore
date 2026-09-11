@@ -19,6 +19,7 @@ graphify-out/
 !/external/AGENT_META_INFO.md
 
 # --- agent-meta managed (do not edit) ---
+*.sync-backup-*
 .claude/agent-memory-local/
 .claude/pending-tasks.md
 .claude/progress/
