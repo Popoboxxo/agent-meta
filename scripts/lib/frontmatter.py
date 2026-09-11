@@ -33,6 +33,16 @@ SKILL_WRAPPER = "_skill-wrapper.md"
 
 EXT_SUFFIX = "-ext"
 
+# Generic templates that are real files but are intentionally never
+# instantiated as a standalone role -- they exist only as an `extends:`/
+# `based-on:` base for other roles (e.g. the five 2-platform *-expert
+# overrides extend provider-expert.md). Excluded from collect_sources() so
+# they never appear in AGENT_TABLE/AGENT_HINTS, get synced, or raise the
+# misleading "Role 'provider-expert' ... not in ROLE_MAP" warning on every
+# sync (issue #736). Lives here (the cycle-free discovery layer) so every
+# consumer -- and config_audit -- shares one definition.
+WRAPPER_TEMPLATES: frozenset[str] = frozenset({"provider-expert"})
+
 PROVIDER_TOOLS_CONFIG = "config/provider-tools.yaml"
 
 _provider_tools_cache: dict | None = None
@@ -562,10 +572,11 @@ def collect_sources(
     known_ext_roles: set[str] = set()
     _platform_source: dict[str, tuple[str, Path]] = {}  # role -> (platform, path)
 
-    # 1. Generic agents (skip files starting with _ — reserved for resources/templates)
+    # 1. Generic agents (skip files starting with _ — reserved for resources/templates
+    #    — and WRAPPER_TEMPLATES, which are base-only files, not roles)
     generic_dir = agent_meta_root / AGENTS_DIR / GENERIC_DIR
     for f in sorted(generic_dir.glob("*.md")):
-        if not f.name.startswith("_"):
+        if not f.name.startswith("_") and f.stem not in WRAPPER_TEMPLATES:
             role = f.stem
             overrides[role] = f
 
