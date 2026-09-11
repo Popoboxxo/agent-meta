@@ -112,7 +112,6 @@ roles:
   - meta-feedback
   - ideation
   - agent-meta-manager
-  - feature
   - agent-meta-scout
   - log-analyzer
   - bug-feature-analyzer

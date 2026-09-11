@@ -20,7 +20,7 @@ from pathlib import Path
 from .config_audit_apply import apply_audit  # noqa: F401 -- re-exported, see below
 from .config_audit_providers import find_missing_providers
 from .config_audit_types import AuditIssue, AuditReport  # noqa: F401 -- re-exported for API compat
-from .frontmatter import parse_frontmatter_file
+from .frontmatter import WRAPPER_TEMPLATES, parse_frontmatter_file
 from .io import load_yaml_file
 from .providers import load_providers_config
 from .roles import load_roles_config
@@ -64,12 +64,12 @@ def _template_path_for_role(agent_meta_root: Path, role: str) -> Path:
     return agent_meta_root / "agents" / "1-generic" / f"{role}.md"
 
 
-# Generic templates that are intentionally never instantiated as a standalone
-# role -- they exist only as an `extends:` base for other, real roles (see
-# their referencing 2-platform overrides). Flagging them under
-# "templates_without_default" on every --audit-config run is a known false
-# positive, not a gap to fix (audit #415).
-WRAPPER_TEMPLATES = frozenset({"provider-expert"})
+# WRAPPER_TEMPLATES (generic templates intentionally never instantiated as a
+# standalone role -- e.g. provider-expert, the base for the 2-platform
+# *-expert overrides) is defined once in frontmatter.py, the cycle-free
+# discovery layer, and imported above for the template-role checks below.
+# Flagging wrappers under "templates_without_default" on every --audit-config
+# run is a known false positive, not a gap to fix (audit #415).
 
 
 def _is_role_template(path: Path) -> bool:
@@ -225,6 +225,10 @@ def audit_config(agent_meta_root: Path, project_config_path: Path) -> AuditRepor
           no ``agents/1-generic/<role>.md`` template.
         * ``templates_without_default`` (info): a generic role template has no
           entry in ``config/role-defaults.yaml`` (underscore files ignored).
+        * ``role_defaults_without_template`` (warning): a role entry in
+          ``config/role-defaults.yaml`` has no matching 1-generic template and
+          is not generated via a 2-platform ``based-on:`` override
+          (framework-level drift, issue #736).
         * ``deprecated_roles`` (warning): a listed role points to a template
           whose frontmatter has ``deprecated: true``.
         * ``orphaned_pipelines`` (warning): a quality pipeline references a role
@@ -312,6 +316,36 @@ def audit_config(agent_meta_root: Path, project_config_path: Path) -> AuditRepor
                     ),
                     detail=str(template),
                 )
+
+    # --- 2b. role_defaults_without_template (framework-level drift, #736) ---
+    # Reverse of templates_without_default: a role-defaults.yaml entry that
+    # resolves to neither a 1-generic template nor a role produced by a
+    # 2-platform `based-on:` override. Without this, --audit-config only ever
+    # checked the current project's `roles:` list and stayed blind to
+    # framework-level drift (e.g. a role entry whose template was renamed or
+    # deleted). The WRAPPER_TEMPLATES exemption is honoured symmetrically:
+    # wrappers are templates without a role entry, so they never appear in
+    # role-defaults and cannot produce a false positive here.
+    generic_role_stems = {
+        t.stem for t in generic_dir.glob("*.md") if _is_role_template(t)
+    } if generic_dir.is_dir() else set()
+    for role_name in sorted(role_defaults):
+        if role_name in generic_role_stems:
+            continue
+        if role_name in based_on_roles:
+            continue
+        if role_name in WRAPPER_TEMPLATES:
+            continue
+        report.add(
+            category="role_defaults_without_template",
+            severity="warning",
+            role=role_name,
+            message=(
+                f"Role '{role_name}' has no 1-generic template and is not "
+                f"generated via a 2-platform based-on override"
+            ),
+            detail=str(_template_path_for_role(agent_meta_root, role_name)),
+        )
 
     # --- 4. orphaned_pipelines ---------------------------------------------
     pipeline_refs = _collect_pipeline_role_refs(config)
@@ -440,6 +474,7 @@ def format_report(report: AuditReport) -> str:
         ("deprecated_roles", "Deprecated Roles [auto-fixable with --apply]", "[WARN] "),
         ("roles_without_template", "Roles Without Template", "[ERROR]"),
         ("templates_without_default", "Templates Without Role-Default", "[INFO] "),
+        ("role_defaults_without_template", "Role-Default Entries Without Template (framework drift)", "[WARN] "),
         ("orphaned_pipelines", "Orphaned Pipeline References", "[WARN] "),
         ("stale_platform_overrides", "Stale Platform Overrides (based-on drift)", "[WARN] "),
         ("unpaired_closing_tags", "Unpaired Closing Tags", "[ERROR]"),
@@ -470,6 +505,7 @@ def report_to_dict(report: AuditReport) -> dict:
         "deprecated_roles",
         "roles_without_template",
         "templates_without_default",
+        "role_defaults_without_template",
         "orphaned_pipelines",
         "stale_platform_overrides",
         "unpaired_closing_tags",
