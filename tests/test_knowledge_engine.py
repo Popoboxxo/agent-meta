@@ -407,10 +407,14 @@ def test_admin_server_allows_knowledge_engine_section_write():
     tree = ast.parse(source.read_text(encoding="utf-8"))
     found = False
     for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef) and node.name == "_write_project_section":
-            found = "knowledge-engine" in ast.dump(node)
+        # The writable-section allow-set is a module-level constant (issue
+        # #730 / WP3); _write_project_section validates against it instead of
+        # holding the literal inline.
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) \
+                and node.target.id == "PROJECT_WRITABLE_SECTIONS":
+            found = "knowledge-engine" in ast.dump(node.value)
             break
-    assert found, "'knowledge-engine' not found in _write_project_section's allowed set"
+    assert found, "'knowledge-engine' not found in PROJECT_WRITABLE_SECTIONS"
 
 
 # ---------------------------------------------------------------------------
