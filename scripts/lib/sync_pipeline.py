@@ -62,6 +62,7 @@ from lib.external_tools import (
     scan_injection_drift,
 )
 from lib.generated_file_drift import (
+    backup_drifted_files,
     capture_generated_file_hashes,
     is_drift_detection_enabled,
     scan_generated_file_drift,
@@ -398,18 +399,27 @@ def _sync_stage_generated_file_drift_scan(
 ) -> None:
     """Early drift scan -- runs BEFORE _sync_stage_per_provider overwrites
     anything, so it can still see a manual edit made since the last sync.
-    Warn-only: never changes what gets written (issue: user feature
-    request, 2026-09-07, spec in docs/superpowers/specs/)."""
+    Warn-only for the drift signal itself: the edit is still overwritten
+    (skip-overwrite is an explicit non-goal), but a timestamped
+    `.sync-backup-<ts>` sibling of every drifted file is written first as a
+    safety net (issue #734)."""
     if not is_drift_detection_enabled(config):
         log.skip("generated-file-drift-scan", "disabled (drift-detection.enabled: false)")
         return
     findings = scan_generated_file_drift(agent_meta_root, project_root, config, provider_config)
+    backups = backup_drifted_files(findings, project_root, log, args.dry_run)
+    backup_name_by_source = {
+        backup.rsplit(".sync-backup-", 1)[0]: Path(backup).name for backup in backups
+    }
     for finding in findings:
+        backup_name = backup_name_by_source.get(finding["path"])
+        backup_note = f" Backup written to {backup_name}." if backup_name else ""
         log.warning(
             f"generated-file-drift: '{finding['path']}' was manually edited "
             f"since the last sync (provider '{finding['provider']}') -- this "
-            "sync will overwrite it. Add it to .meta-config/drift-allowlist.yaml "
-            "if this edit should be preserved going forward."
+            f"sync will overwrite it.{backup_note} Add it to "
+            ".meta-config/drift-allowlist.yaml if this edit should be "
+            "preserved going forward."
         )
 
 

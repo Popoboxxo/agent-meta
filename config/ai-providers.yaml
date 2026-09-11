@@ -54,6 +54,7 @@ providers:
     - .claude/progress/
     - CLAUDE.personal.md
     - sync.log
+    - '*.sync-backup-*'
     - .mcp.json
     mcp-config:
       committed-file: .mcp.json
