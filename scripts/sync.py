@@ -310,7 +310,8 @@ def main() -> None:
         return
 
     _dispatch(ctx)
-    _run_common_tail(ctx)
+    if not getattr(ctx, "read_only", False):
+        _run_common_tail(ctx)
 
 
 if __name__ == "__main__":

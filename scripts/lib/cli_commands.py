@@ -303,6 +303,9 @@ class _SyncContext:
         self.viz_cfg = viz_cfg
         self.harness = harness
         self.mode: str | None = None
+        # Report-only modes (e.g. --audit-config) set this so main() skips the
+        # common tail, which writes env.* scripts and sync.log (issue #738).
+        self.read_only = False
 
 
 
@@ -586,6 +589,10 @@ def _handle_audit_config(ctx: _SyncContext) -> None:
     config_path = ctx.config_path
 
     mode = "audit-config"
+    # --audit-config is documented as report-only: it must not write env.*
+    # scripts or sync.log via the common tail, even with --apply (the apply
+    # path only comments out deprecated role lines) (issue #738).
+    ctx.read_only = True
     report = audit_config(agent_meta_root, config_path)
     print(format_report(report))
     if args.apply:
