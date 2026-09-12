@@ -1,7 +1,10 @@
 # Konzept — agent-meta Version-Badge
 
-- **Status:** Draft (Force-vs-Offer-Frage, Tag-vs.-`/releases`-Linkziel und Code-Health-Badge für
-  Zielprojekte noch offen, §9; Ownership B1 entschieden: `documenter` ist einziger Badge-Schreiber, §5.3)
+- **Status:** Draft (entschieden: Q1 Offer statt Force, Q2 tag-spezifisches Linkziel, Q4 kein
+  Code-Health-Badge-Typ für Zielprojekte, Q5 generisches `version`-Badge bleibt, Q6 `unknown`
+  wird gerendert, §9; noch offen: nur Q3 (Offline-/Private-Repos) und Q7 (Marker vs.
+  section-driven, B1 legt section-driven faktisch nahe); Ownership B1 entschieden: `documenter`
+  ist einziger Badge-Schreiber, §5.3)
 - **Betroffener Bereich:** README-Standard (`readme.badges`), `documenter`-Template,
   `agent-meta-manager`-Template, Config-Schema, agent-meta-README, Tests/Szenarien
 - **Umfang:** 1 neuer Badge-Typ `agent-meta`, 1 Schema-Enum-Erweiterung, 1 Render-Regel im
@@ -39,7 +42,8 @@ Badge-Anzeige ist:
 - **managed-block-konform**: ein handgeschriebenes README wird nie überschrieben.
 
 Zusätzlich wird das README des Meta-Repos selbst angepasst: Badge-Zeile an den Anfang, neues
-RepoWise-Code-Health-Badge, Korrektur des veralteten Versions-Badges (§6).
+RepoWise-Code-Health-Badge, Korrektur des veralteten generischen Versions-Badges (`version-1.1.0`,
+D4/Q5) **und** Ergänzung des neuen `agent-meta`-Badges (§6).
 
 ### 1.2 Nicht-Scope
 
@@ -49,8 +53,10 @@ RepoWise-Code-Health-Badge, Korrektur des veralteten Versions-Badges (§6).
   (`scripts/lib/config.py:1259-1268`, `scripts/lib/consistency/placeholders.py:20`,
   `scripts/lib/standalone.py:71`). Es ist **keine** dritte Registrierungsstelle nötig.
 - **Kein Runtime-Netzwerk-Check** durch agent-meta, ob das Badge-Bild oder das Link-Ziel
-  tatsächlich erreichbar ist (Offline-/Private-Repos, §9/Q3).
-- **Kein generischer Code-Health-Badge-Typ für Zielprojekte** in v1 (§9/Q4).
+  (tag-spezifische URL, D1/§2.3) tatsächlich erreichbar ist bzw. ob das verlinkte Tag existiert
+  (Offline-/Private-Repos, §9/Q3). Das Restrisiko eines (noch) nicht existierenden Tags wird
+  dokumentiert und bewusst akzeptiert (§8).
+- **Kein generischer Code-Health-Badge-Typ für Zielprojekte** in v1 (entschieden, D3/§9/Q4).
 - Keine Änderung an `.agent-meta/`-Submodul, `external/` oder `.gitmodules`; kein Push/Tag/Release.
 
 > **Geltungsbereich:** Projekte **ohne** `readme`-Block oder **ohne** die `documenter`-Rolle
@@ -68,7 +74,7 @@ RepoWise-Code-Health-Badge, Korrektur des veralteten Versions-Badges (§6).
 | `templates/configs/README-template.md:17-29` | Badge-Kommentar/Skelett um `agent-meta` ergänzen (inkl. Escaping-Hinweis + Pre-Release-Beispiel) |
 | `agents/1-generic/agent-meta-manager.md` §4 `:70-79`, §5 `:81-94` | **Kein README-Schreiber (B1)**: nur Wert-Pflege (`agent-meta-version`, live gelesen) + Re-Render-Trigger |
 | `templates/configs/project.yaml.example:76-83` | Badge-Typen-Kommentar (`readme.badges`) um `agent-meta` ergänzen (m1) |
-| `README.md:1-38`, `README.md:911-916` (Meta-Repo) | Badge-Zeile an den Anfang, RepoWise-Badge, Stale-Version-Fix; Badge-Config-Beispiel um `agent-meta` ergänzen (m1) |
+| `README.md:1-38`, `README.md:911-916` (Meta-Repo) | Badge-Zeile an den Anfang, RepoWise-Badge, Stale-Version-Fix + neues `agent-meta`-Badge (D4/Q5); Badge-Config-Beispiel um `agent-meta` ergänzen (m1) |
 | `tests/test_readme_variables.py`, `tests/test_documenter_readme_section.py`, `tests/test_readme_schema.py` (existiert bereits, m1), `tests/scenarios/configs/11-readme-standard.project.yaml`, `tests/scenarios/registry.md:58` | Test-/Szenario-Erweiterung (statisch, ohne Netzwerk) |
 
 **Feststellung Validierungsstelle:** Es **existiert** eine Schema-/Validierungsstelle für
@@ -117,15 +123,15 @@ verifiziert: `0.101.0-beta.6` → 404, `0.101.0--beta.6` → korrekt).
 ### 2.3 Exact example badge line
 
 ```markdown
-[![agent-meta v1.1.0](https://img.shields.io/badge/agent--meta-v1.1.0-blue.svg)](https://github.com/Popoboxxo/agent-meta/releases)
+[![agent-meta v1.1.0](https://img.shields.io/badge/agent--meta-v1.1.0-blue.svg)](https://github.com/Popoboxxo/agent-meta/releases/tag/v1.1.0)
 ```
 
 - **Bild:** `https://img.shields.io/badge/agent--meta-v1.1.0-blue.svg`
-- **Link-Ziel (Default, M3):** `https://github.com/Popoboxxo/agent-meta/releases` — **immer
-  gültig**, unabhängig davon, ob ein bestimmtes Tag existiert. Das Release-Tag
-  (`.../releases/tag/v1.1.0`) wird **nur** verwendet, wenn das Tag garantiert existiert
-  (kein Netzwerk-Check nach §1.2/Q3); andernfalls gilt der Default plus dokumentiertes
-  Restrisiko (§8, §9/Q2).
+- **Link-Ziel (D1, Q2 entschieden):** tagspezifisch
+  `https://github.com/Popoboxxo/agent-meta/releases/tag/v<AGENT_META_VERSION>` — das Badge
+  verlinkt direkt das zu seiner Version gehörende Release-Tag. Es gibt **keinen** zusätzlichen
+  Netzwerk-Check (Runtime-Check, §1.2/Q3); existiert das Tag (noch) nicht, ist das Restrisiko
+  eines toten Links bewusst akzeptiert und dokumentiert (§8).
 
 Platzhalter-Form für den `documenter` (Zielprojekt, Wert aus `AGENT_META_VERSION`).
 **Der Wert MUSS vor dem Einsetzen in die URL `-`→`--` gemappt werden** — verbindlich auch
@@ -133,7 +139,7 @@ Platzhalter-Form für den `documenter` (Zielprojekt, Wert aus `AGENT_META_VERSIO
 liefert Shields.io ein `404: badge not found`-SVG (live verifiziert):
 
 ```markdown
-[![agent-meta v{{AGENT_META_VERSION}}](https://img.shields.io/badge/agent--meta-v{{AGENT_META_VERSION}}-blue.svg)](https://github.com/{{AGENT_META_REPO}}/releases)
+[![agent-meta v{{AGENT_META_VERSION}}](https://img.shields.io/badge/agent--meta-v{{AGENT_META_VERSION}}-blue.svg)](https://github.com/{{AGENT_META_REPO}}/releases/tag/v{{AGENT_META_VERSION}})
 ```
 
 > Hinweis: Der generische `{{VERSION}}`-Platzhalter im Badge-Skelett
@@ -184,20 +190,22 @@ bereits die einzige Quelle, und README-Pflege ist die `documenter`-Domäne — z
 auf derselben Region erzeugten einen Doppel-Badge-Konflikt.
 
 Regel:
-- **Render nur, wenn** `agent-meta` in `{{README_BADGES}}` enthalten ist **und**
-  `{{AGENT_META_VERSION}}` einen echten Wert trägt (nicht leer, nicht `unknown`).
-- **Sonst nie** — kein Badge, kein Platzhalter, kein Broken-Image (konsistent mit der
-  Defekt-Regel in `:56`).
+- **Render nur, wenn** `agent-meta` in `{{README_BADGES}}` enthalten ist (Opt-in).
+- **Wert (D5, Q6 entschieden):** Fehlt `{{AGENT_META_VERSION}}` oder ist sie leer, wird der
+  Badge-Wert `unknown` gerendert (`agent-meta unknown`) — das Badge wird **nicht** still
+  weggelassen. Nur das fehlende Opt-in in `{{README_BADGES}}` verhindert das Badge.
 - **Escaping Pflicht (M1):** Den Versionswert vor dem URL-Einsatz `-`→`--` mappen
   (`v1.1.0` unverändert; `v0.101.0-beta.6` → `v0.101.0--beta.6`). Gilt insbesondere für
   Pre-Release-Versionen und ist durch einen Test abzudecken (§7).
 - **Guard Link-Ziel (m2):** `{{AGENT_META_REPO}}` nur verwenden, wenn nicht leer **und**
-  es ein `/` enthält (sonst entstünde `https://github.com//releases`); andernfalls Badge
-  ohne Link rendern oder ganz weglassen.
-- **Link-Ziel:** Default `https://github.com/{{AGENT_META_REPO}}/releases` (immer gültig);
-  Release-Tag nur bei garantiert existierendem Tag (§2.3/M3).
+  es ein `/` enthält (sonst entstünde `https://github.com//releases/tag/v...`); andernfalls
+  Badge ohne Link rendern.
+- **Link-Ziel (D1, Q2 entschieden):** tagspezifisch
+  `https://github.com/{{AGENT_META_REPO}}/releases/tag/v{{AGENT_META_VERSION}}` — das Badge
+  verlinkt das zu seiner Version gehörende Release-Tag (§2.3/D1); kein Netzwerk-Check, das
+  Tag-Restrisiko ist dokumentiert (§1.2, §8).
 - Der Badge-Typ ist datengetrieben (kein Provider-/Projekt-Sonderfall), er wird wie
-  `version`/`stack` behandelt („always safe", sofern die Version real ist).
+  `version`/`stack` behandelt.
 
 ---
 
@@ -253,7 +261,8 @@ Bedarf einen Re-Render an.
 - **Konsequenz für den `manager`:** niemals Badge-Markup erzeugen oder patchen; nur Wert
   pflegen und Re-Render triggern.
 - **Konsequenz für den `documenter`:** `agent-meta` wie `ci` als opt-in-Typ behandeln; Render
-  nur bei Opt-in **und** realem Wert; ohne Opt-in/`unknown` **kein** Badge. Der
+  nur bei Opt-in in `README_BADGES`; fehlt/ist die Version leer, wird `unknown` als Badge-Wert
+  gerendert (D5/Q6) — **kein** stilles Weglassen. Ohne Opt-in **kein** Badge. Der
   managed-block-Grundsatz (`:47-49`) schützt handgeschriebenen Text weiterhin.
 
 **Verworfen (war B1-Ursache):** Der frühere Vorschlag, dass der `manager` einen eigenen
@@ -272,7 +281,7 @@ unverändertem Wert keine inhaltliche Änderung. Ein automatisierter Idempotenz-
 
 ### 5.4 Verhalten, wenn `readme.badges` den Typ nicht enthält — DECISION (Offer vs. Force)
 
-**Empfehlung (Offer):** Der Manager erkennt, dass das Projekt agent-meta nutzt, und **bietet**
+**Entschieden (Offer, D2/Q1):** Der Manager erkennt, dass das Projekt agent-meta nutzt, und **bietet**
 das Badge an: „`readme.badges` um `agent-meta` erweitern?" Die Config-Änderung wird erst nach
 expliziter Bestätigung angewandt und löst dann einen `documenter`-Re-Render aus
 (Konfig-/Sync-Regeln `:56-68`). Dies erfüllt das geforderte Opt-in (Anforderung 2) ohne
@@ -282,8 +291,8 @@ stillen Eingriff.
 handgeschriebene READMEs verändern — abgelehnt. Auch im Force-Fall würde unter B1 **der
 `documenter`** rendern: der Manager dürfte lediglich `readme.badges` erweitern und den
 Re-Render triggern, **nie** README-Markup schreiben. Damit bleibt Q1 orthogonal zur
-Ownership-Entscheidung. Vollständig als **offene Frage Q1** geführt, da die Anforderung nur
-„opt-in, kein Default" fixiert, nicht den Vorschlagsmechanismus.
+Ownership-Entscheidung. **Entschieden (D2/Q1):** Offer — die Anforderung fixiert „opt-in, kein
+Default"; der Vorschlagsmechanismus ist damit als Offer festgelegt, nicht als Force.
 
 ---
 
@@ -306,7 +315,8 @@ Reale Version: `VERSION:1` = **`1.1.0`** (verifiziert). Das Badge zeigt
 ```markdown
 # agent-meta
 
-[![agent-meta v1.1.0](https://img.shields.io/badge/agent--meta-v1.1.0-blue.svg)](https://github.com/Popoboxxo/agent-meta/releases)
+[![agent-meta v1.1.0](https://img.shields.io/badge/agent--meta-v1.1.0-blue.svg)](https://github.com/Popoboxxo/agent-meta/releases/tag/v1.1.0)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)]()
 [![Code health](https://api.repowise.dev/badge/health/popoboxxo/agent-meta.svg)](https://repowise.dev/repo/popoboxxo/agent-meta)
 [![Python](https://img.shields.io/badge/python-3.x-green.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-gray.svg)]()
@@ -323,16 +333,20 @@ Reale Version: `VERSION:1` = **`1.1.0`** (verifiziert). Das Badge zeigt
 Änderungen:
 1. Badge-Block von `:35-37` direkt hinter H1 (`:1`) verschoben, **vor** die Callouts.
 2. RepoWise-Code-Health-Badge ergänzt (exakte Zeile wie oben, Anforderung fix).
-3. Stale-Version-Badge `0.101.0--beta.6` **ersetzt** durch das neue `agent-meta`-Badge
-   (gleiche Information, korrekte Quelle `AGENT_META_VERSION`). Python-/License-Badges bleiben.
+3. Stale-Version-Badge `0.101.0--beta.6` **korrigiert behalten** (`version-1.1.0`, D4/Q5:
+   Projektversion ≠ Frameworkversion = zwei Informationen) **und** um das neue
+   `agent-meta`-Badge (Quelle `AGENT_META_VERSION`, Tag-Link nach D1) **ergänzt**.
+   Python-/License-Badges bleiben.
 4. Der alte Standort `:35-37` entfällt (keine Doppelung der Badges).
 
 > Nebenbefund: `:38` (`| **Date:** 2026-09-07`) ist eine verirrte Tabellenzeile direkt hinter
 > dem Badge-Block. Sie ist **nicht** Teil dieses Konzepts; bei der Umsetzung entscheiden, ob
 > sie entfernt/verschoben wird (eigenes Mini-Issue).
 
-> Alternative zu 3: einen korrigierten generischen `Version`-Badge (`version-1.1.0`) behalten
-> **und** das `agent-meta`-Badge ergänzen — dann doppelte Versionsinformation. Siehe Q5.
+> Hinweis zu 3 (aufgelöst, D4/Q5): Der korrigierte generische `Version`-Badge
+> (`version-1.1.0`) bleibt **erhalten** und das `agent-meta`-Badge wird **ergänzt**. Die
+> scheinbare Doppelung ist gewollt — Projektversion und Frameworkversion sind zwei
+> unterschiedliche Informationen.
 
 ---
 
@@ -341,7 +355,7 @@ Reale Version: `VERSION:1` = **`1.1.0`** (verifiziert). Das Badge zeigt
 | Test | Inhalt |
 |---|---|
 | `tests/test_readme_variables.py` | Erweitern: `badges: ["version","agent-meta"]` → `README_BADGES == "version, agent-meta"`; Default-Test (`:12`) bleibt grün (kein Default-on) |
-| `tests/test_documenter_readme_section.py` | Statische Assertions: `documenter`-§5 nennt den Typ `agent-meta`, `AGENT_META_VERSION`, die Render-nur-bei-Opt-in-Regel, die Pflicht zum `-`→`--`-Escaping (inkl. Pre-Release) und den `AGENT_META_REPO`-Guard; zudem ist der `documenter` als **einziger** Badge-Schreiber benannt (B1) |
+| `tests/test_documenter_readme_section.py` | Statische Assertions: `documenter`-§5 nennt den Typ `agent-meta`, `AGENT_META_VERSION`, die Render-nur-bei-Opt-in-Regel, den `unknown`-Fall (fehlende/leere Version → Badge-Wert `unknown`, D5/Q6), die Pflicht zum `-`→`--`-Escaping (inkl. Pre-Release) und den `AGENT_META_REPO`-Guard; zudem ist der `documenter` als **einziger** Badge-Schreiber benannt (B1) |
 | `tests/test_readme_schema.py` (existiert bereits, m1) | `config/project-config.schema.json`: `readme.badges: ["agent-meta"]` akzeptiert, unbekannter Typ abgelehnt (Draft7) |
 | `templates/configs/README-template.md` (statisch) | Der Badge-Kommentar dokumentiert `agent-meta` und enthält ein korrekt escapetes Pre-Release-Beispiel (`0.101.0--beta.6`) |
 | Link-/Escaping-Check (deterministisch, ohne Netzwerk) | Statische Assertion auf die dokumentierte Regel + Beispiel: `agent--meta` (Label) und `-`→`--` für die Version, mit Pre-Release-Fall `0.101.0-beta.6` → `0.101.0--beta.6` |
@@ -360,13 +374,14 @@ Reale Version: `VERSION:1` = **`1.1.0`** (verifiziert). Das Badge zeigt
    ladbar — es gibt **zwei** externe Bild-Abhängigkeiten: Shields.io (Version-Badge) und
    RepoWise (`api.repowise.dev`, Code-Health-Badge, Format/Outage-Risiko, m3); (d)
    handgeschriebenes README wird durch Auto-Insert beschädigt; (e) `AGENT_META_REPO` leer →
-   malformtes Link-Ziel `https://github.com//releases` (m2).
+   malformtes Link-Ziel `https://github.com//releases/tag/v...` (m2).
 3. **Mitigations:** Eine einzige Wert-Quelle (`AGENT_META_VERSION` ← `VERSION`, gespiegelt in
-   `agent-meta-version`); **ein** Badge-Schreiber (`documenter`, B1); kein Badge bei
-   `unknown`/leer; `-`→`--`-Escaping der Version (M1); Link-Ziel standardmäßig auf
-   `/releases` (immer gültig), Release-Tag **nur** bei garantiert existierendem Tag, sonst
-   Fallback → Restrisiko dokumentiert (M3); Guard auf nicht-leeres `AGENT_META_REPO` mit `/`
-   (m2); Opt-in statt Force; managed-block-Grundsatz schützt fremden Text.
+   `agent-meta-version`); **ein** Badge-Schreiber (`documenter`, B1); fehlende/leere Version
+   wird als `unknown`-Badge-Wert gerendert statt weggelassen (D5/Q6); `-`→`--`-Escaping der
+   Version (M1); tag-spezifisches Link-Ziel
+   `https://github.com/<repo>/releases/tag/v<version>` (D1/Q2) mit dokumentiertem
+   Tag-Restrisiko (§1.2, §8); Guard auf nicht-leeres `AGENT_META_REPO` mit `/` (m2); Opt-in
+   statt Force (D2/Q1); managed-block-Grundsatz schützt fremden Text.
 4. **Konsequenzen:** Ein falsches oder totes Badge ist ein **Dokumentationsdefekt** und
    untergräbt Vertrauen (analog zur Defekt-Regel in `documenter.md:56`). agent-meta kann die
    Erreichbarkeit **beider** externer Badge-Anbieter (Shields.io, RepoWise) und die Existenz
@@ -377,29 +392,30 @@ Reale Version: `VERSION:1` = **`1.1.0`** (verifiziert). Das Badge zeigt
 
 ## 9. Offene Fragen
 
-1. **Force vs. Offer bei fehlendem `agent-meta` in `readme.badges`?** Empfehlung: Offer
-   (Vorschlag + Bestätigung), kein stilles Eintragen (§5.4). **Zu entscheiden.**
-2. **Link-Ziel:** Default ist jetzt `.../releases` (immer gültig, M3). Verbleibende
-   Entscheidung: Wann darf pro Projekt das Release-Tag `.../releases/tag/v<version>` genutzt
-   werden (nur bei garantiertem Tag; ohne Netzwerk-Check nach Q3 nicht verifizierbar)? Ohne
-   Tag-Garantie gilt der Default + Fallback auf `/releases`. **Vor Implementierung zu
-   entscheiden** — sonst widerspricht es §1.2.
+1. **Force vs. Offer bei fehlendem `agent-meta` in `readme.badges`?** **Entschieden (D2/Q1):**
+   Offer (Vorschlag + Bestätigung), kein stilles Eintragen (§5.4).
+2. **Link-Ziel:** **Entschieden (D1/Q2):** tag-spezifisches Link-Ziel
+   `https://github.com/Popoboxxo/agent-meta/releases/tag/v<AGENT_META_VERSION>`. Kein Default
+   auf `/releases` mehr; das Tag-Restrisiko (kein Netzwerk-Check, Q3) wird dokumentiert und
+   bewusst akzeptiert (§1.2, §2.3, §8).
 3. **Offline-/Private-Ziel-Repos:** Shields.io ist extern und kann in privaten/offline Umgebungen
    blockiert sein. Badge trotzdem anbieten, warnen, oder für private Repos gar nicht rendern?
-4. **Code-Health-Badge für Zielprojekte?** RepoWise deckt nur registrierte Repos ab. Soll ein
-   generischer Code-Health-Badge-Typ für Zielprojekte angeboten werden (ja/nein)? Empfehlung:
-   **nein** für v1 (Meta-Repo-spezifisch).
-5. **Doppelte Versionsinformation:** Generisches `version`-Badge behalten oder durch
-   `agent-meta` ersetzen (Meta-Repo, §6.1)? Bei Zielprojekten sind es zwei verschiedene
-   Versionen (Projekt vs. Framework) — Reihenfolge im Badge-Block festlegen?
-6. **`unknown`-Verhalten:** Wenn kein `VERSION`-File vorliegt (`read_version` →
-   `"unknown"`, `scripts/lib/config.py:1046`), Badge ganz weglassen (Empfehlung) oder
-   `agent-meta unknown` rendern?
+   **Offen.**
+4. **Code-Health-Badge für Zielprojekte?** **Entschieden (D3/Q4):** **nein** für v1 —
+   RepoWise deckt nur registrierte Repos ab, der Typ bleibt Meta-Repo-spezifisch (§1.2).
+5. **Doppelte Versionsinformation:** **Entschieden (D4/Q5):** Das generische `version`-Badge
+   bleibt **erhalten** (Projektversion ≠ Frameworkversion = zwei Informationen) und wird im
+   Meta-README um das neue `agent-meta`-Badge **ergänzt** (§6.1). Im Meta-README stehen damit
+   der korrigierte `version-1.1.0`-Badge **und** das `agent-meta`-Badge.
+6. **`unknown`-Verhalten:** **Entschieden (D5/Q6):** Bei fehlendem/leerem `VERSION`
+   (`read_version` → `"unknown"`, `scripts/lib/config.py:1046`) wird der Badge-Wert `unknown`
+   gerendert (`agent-meta unknown`) — das Badge wird **nicht** still weggelassen (§4, §5.3).
 7. **Marker vs. section-driven:** Braucht die Badges-Zeile einen maschinenlesbaren Marker
    (z. B. `agent-meta:version-badge:begin/end`) oder genügt die `README_BADGES`-getriebene
    Neu-Erzeugung der Zeile durch den `documenter`? Nach der B1-Ownership entfällt der
    manager-eigene Marker-Block; Empfehlung: **kein** eigener Marker, section-driven
-   (konsistent mit dem bestehenden `documenter`-Prinzip `:47-49`). **Zu entscheiden.**
+   (konsistent mit dem bestehenden `documenter`-Prinzip `:47-49`). **Weiter offen** — B1 legt
+   section-driven faktisch nahe, die formale Schließung steht aber noch aus. **Zu entscheiden.**
 
 ---
 
