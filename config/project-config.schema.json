@@ -822,14 +822,15 @@
       "properties": {
         "badges": {
           "type": "array",
-          "description": "Badge set for the README badges row. 'license' is only ever rendered when a LICENSE file actually exists; 'ci' is only ever rendered when a CI config is actually detected -- both checked at documentation time, never assumed.",
+          "description": "Badge set for the README badges row. 'license' is only ever rendered when a LICENSE file actually exists; 'ci' is only ever rendered when a CI config is actually detected -- both checked at documentation time, never assumed. 'agent-meta' is opt-in only: it is rendered only when it is explicitly listed here; when AGENT_META_VERSION is missing, empty, or the non-empty sentinel 'unknown'/'vunknown', the badge value is rendered as 'unknown' rather than silently omitted.",
           "items": {
             "type": "string",
             "enum": [
               "version",
               "stack",
               "license",
-              "ci"
+              "ci",
+              "agent-meta"
             ]
           },
           "default": [
