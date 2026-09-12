@@ -72,7 +72,7 @@ Der Modus ist:
 ### 2.1 Schema-Vorschlag
 
 **Landepunkt:** `config/project-config.schema.json`, neues Top-Level-Property (Stil analog
-`orchestrator` bzw. `subagent_permissions`). Der Root-Eintrag besitzt kein
+`orchestrator`). Der Root-Eintrag besitzt kein
 `additionalProperties: false`; das neue Property ist rein additiv.
 
 ```json
@@ -152,10 +152,9 @@ repo_containment:
 Framework-Default `true`.**
 
 Diese dreistufige Kettenlogik spiegelt bewusst die bereits etablierte Auflösung für
-`orchestrator.mode`/`subagent_permissions.mode` (siehe
-[`../../scripts/lib/consistency/orchestrator_strict.py`](../../scripts/lib/consistency/orchestrator_strict.py)
-und [`subagent-permissions-git-admin-ui.md`](subagent-permissions-git-admin-ui.md)). Alle
-Verschachtelungszugriffe erfolgen defensiv (`config.get(...)` + `isinstance(..., dict)`-Guards),
+`orchestrator.mode` (siehe
+[`../../scripts/lib/consistency/orchestrator_strict.py`](../../scripts/lib/consistency/orchestrator_strict.py)).
+Alle Verschachtelungszugriffe erfolgen defensiv (`config.get(...)` + `isinstance(..., dict)`-Guards),
 der Resolver ist **nicht-exitierend**; der einzige Hard-Exit liegt im Sync-Validator (§4.3).
 
 **YAML-1.1-Falle:** Unquoted `enabled: off|no|false|on|yes|true` wird als `bool` geparst. Der
@@ -190,8 +189,9 @@ Die neue Sektion folgt dem Muster bestehender Projekt-Instanz-Sektionen (z. B.
 
 **Bekannte Grenze:** Die Admin-UI schreibt ohne Schema-Validierung (`ConfigManager.write`); ein
 ungültiger Wert wird erst beim nächsten Sync hart erkannt. Client-Selects mildern das — dieselbe
-bereits akzeptierte Grenze wie in
-[`subagent-permissions-git-admin-ui.md`](subagent-permissions-git-admin-ui.md) §5.7.
+bereits akzeptierte Grenze wie im Admin-UI-Konzept, in dem das Schema ebenfalls nur über
+`sync.py` validiert wird und Fehler erst beim Sync sichtbar werden
+([`planned/admin-ui-concept.md`](planned/admin-ui-concept.md)).
 
 ---
 
@@ -222,7 +222,10 @@ der Wrapper den Guard nicht stillschweigend öffnen; der Fail-Mode ist eine offe
 
 `scripts/lib/hooks.py` liest `enabled_by_default` und registriert den Hook **capability-getrieben**:
 Ein Provider erhält den Hook nur, wenn `provider_hooks_supported(pc)` (`has_hooks: true` **und**
-verifiziertes `hook_protocol`) zutrifft. Die Registrierung läuft über `pc.get("hook_protocol")`
+verifiziertes `hook_protocol`) zutrifft. Die Funktion ist in
+[`../../scripts/lib/providers.py`](../../scripts/lib/providers.py) definiert und wird von
+[`../../scripts/lib/hooks.py`](../../scripts/lib/hooks.py) bei der Registrierung aufgerufen.
+Die Registrierung läuft über `pc.get("hook_protocol")`
 (Claude: `claude-code-json` → `_update_settings_hooks`; Gemini: `antigravity-hooks-json` →
 `antigravity-json-adapter.sh`). **Kein `if provider == "Name"`** — ein neuer Provider wird ohne
 Python-Änderung unterstützt, sobald er `has_hooks` + `hook_protocol` deklariert.
@@ -243,19 +246,19 @@ PreToolUse-Payloads, wie `orchestrator-guard`) und wendet die Precedence aus §2
 
 | Frage | Registry | Zugriff |
 |---|---|---|
-| Unterstützt der Provider Hooks **und** sind sie gespiegelt? | `config/ai-providers.yaml` | `providers.provider_hooks_supported(pc)` (`has_hooks` + verifiziertes `hook_protocol`) |
+| Unterstützt der Provider Hooks **und** sind sie gespiegelt? | `config/ai-providers.yaml` | `provider_hooks_supported(pc)` — definiert in `scripts/lib/providers.py`, aufgerufen bei der Hook-Registrierung in `scripts/lib/hooks.py` (`has_hooks` + verifiziertes `hook_protocol`) |
 | Wird der neue Hook per Config an-/ausgeschaltet? | `config/project-config.schema.json` | `hooks.repo-containment.enabled` (bestehender `hooks`-Block) |
 | Ist Subagent-Dispatch vorhanden? (nur Kontext) | `config/provider-capabilities.yaml` | Top-Level-Boolean `load_provider_capabilities(...)` |
 
 `provider_has_capability(pc, "hooks")` ist **falsch** für diese Frage: `pc` ist der
 `ai-providers.yaml`-Eintrag, dessen `capabilities: [...]`-Liste `hooks` als Listeneintrag führt,
 während die Spiegelung über `has_hooks` + `hook_protocol` entschieden wird (analog
-[`../../scripts/lib/consistency/subagent_permissions.py`](../../scripts/lib/consistency/subagent_permissions.py)).
+[`../../scripts/lib/consistency/orchestrator_strict.py`](../../scripts/lib/consistency/orchestrator_strict.py)).
 
 ### 4.3 Sync-Time-Validator
 
 **`_validate_repo_containment(config, config_path)`** in `scripts/lib/config.py`, aufgerufen aus
-`_validate_config` (dort schon `_validate_providers` + `_validate_subagent_permissions`). Muster:
+`_validate_config` (dort schon `_validate_providers`). Muster:
 Meldung auf `stderr`, dann `sys.exit(1)`. **Einziger** Ort mit Hard-Exit für Containment.
 
 Geprüft wird:
@@ -275,7 +278,7 @@ keine schlafende Fehlkonfiguration freilegt.
 ### 4.4 Consistency-Check
 
 `scripts/lib/consistency/repo_containment.py` mit zwei Funktionen, analog
-`orchestrator_strict.py` / `subagent_permissions.py`:
+`orchestrator_strict.py`:
 
 - **`check_repo_containment_support(project_root, config, provider_config)`** — WARNING-only.
   Meldet, wenn Containment für einen aktiven Provider effektiv aktiv ist, dieser aber keinen
@@ -284,9 +287,12 @@ keine schlafende Fehlkonfiguration freilegt.
   `_handle_validate` ([`../../scripts/lib/cli_commands.py`](../../scripts/lib/cli_commands.py)) neben
   `check_orchestrator_strict_hook_support`.
 - **`check_repo_containment_templates(agent_meta_root)`** — ERROR-only Framework-Drift. Prüft,
-  dass Hook und Prompt-Template die erwarteten Marker/Variablen tragen. Registrierung in
-  [`../../scripts/consistency-check.py`](../../scripts/consistency-check.py) neben
-  `check_subagent_permission_templates`.
+  dass Hook und Prompt-Template die erwarteten Marker/Variablen tragen. Ein solcher
+  Template-Drift-Check existiert bisher nicht und ist damit **neu**. Als Registrierungsstelle
+  dient der bestehende Aufrufblock in
+  [`../../scripts/consistency-check.py`](../../scripts/consistency-check.py), in dem die
+  Framework-Checks importiert und aufgerufen werden (z. B.
+  [`check_placeholders`](../../scripts/lib/consistency/placeholders.py)).
 
 ### 4.5 Prompt-/Template-Ebene (Convention)
 
@@ -444,14 +450,14 @@ Zusätzlich: `python scripts/consistency-check.py` muss grün bleiben (inkl.
 | Wrapper/Impl-Split + `bash -n`-Selbstheilung (#630) | [`../../hooks/1-generic/orchestrator-guard.sh`](../../hooks/1-generic/orchestrator-guard.sh), [`../../hooks/1-generic/orchestrator-guard-impl.sh`](../../hooks/1-generic/orchestrator-guard-impl.sh) |
 | Hook-Test-Muster | [`../../tests/test_orchestrator_guard_hook.py`](../../tests/test_orchestrator_guard_hook.py) |
 | Support-/Drift-Check-Muster für Guards | [`../../scripts/lib/consistency/orchestrator_strict.py`](../../scripts/lib/consistency/orchestrator_strict.py) |
-| Sync-Time-Validator-Muster (Hard-Exit) | [`../../scripts/lib/config.py`](../../scripts/lib/config.py) (`_validate_config`, `_validate_subagent_permissions`) |
-| Capability-getriebene Hook-Registrierung | [`../../scripts/lib/hooks.py`](../../scripts/lib/hooks.py), [`../../config/ai-providers.yaml`](../../config/ai-providers.yaml) |
+| Sync-Time-Validator-Muster (Hard-Exit) | [`../../scripts/lib/config.py`](../../scripts/lib/config.py) (`_validate_config`, `_validate_providers`) |
+| Capability-getriebene Hook-Registrierung | [`../../scripts/lib/hooks.py`](../../scripts/lib/hooks.py), [`../../scripts/lib/providers.py`](../../scripts/lib/providers.py), [`../../config/ai-providers.yaml`](../../config/ai-providers.yaml) |
 | Provider-Agnostik-Policy | [`../../.opencode/skills/provider-agnostic/SKILL.md`](../../.opencode/skills/provider-agnostic/SKILL.md) |
 | 0/1/2/3-Schichten-Modell | [`../../.opencode/skills/architecture/SKILL.md`](../../.opencode/skills/architecture/SKILL.md) |
 | Sync-CLI/`--check`/Drift | [`../../.opencode/skills/sync-interface/SKILL.md`](../../.opencode/skills/sync-interface/SKILL.md) |
 | `.gitignore`-Handling | [`../../scripts/lib/gitignore.py`](../../scripts/lib/gitignore.py) |
 | Hooks-Doku (Provider-Payload) | [`../guides/features/hooks.md`](../guides/features/hooks.md) |
-| Vorgänger-Konzept mit identischem Precedence-/Validator-Muster | [`subagent-permissions-git-admin-ui.md`](subagent-permissions-git-admin-ui.md) |
+| Etabliertes Precedence-/Validator-Muster für `orchestrator.mode` | [`../../scripts/lib/consistency/orchestrator_strict.py`](../../scripts/lib/consistency/orchestrator_strict.py), [`active/main-chat-orchestrator-mode.md`](active/main-chat-orchestrator-mode.md), [`active/singleton-orchestrator-architecture.md`](active/singleton-orchestrator-architecture.md) |
 | Bestehende Provider-Isolation (`isolation-dirs`, `isolation-mechanism`) | [`../../config/ai-providers.yaml`](../../config/ai-providers.yaml) — **Abgrenzung:** Isolation beschreibt, welche Verzeichnisse ein Provider besitzt; Repo-Containment beschränkt zur Laufzeit Schreibziele auf den Repo-Root. Beide ergänzen sich, ersetzen sich nicht. |
 
 ---
