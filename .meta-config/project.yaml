@@ -1,4 +1,4 @@
-agent-meta-version: "1.1.0"
+agent-meta-version: 1.1.0
 _comment: 'Szenarien-Katalog & Regressionstests fuer Framework-Aenderungen: tests/scenarios/
   (registry.md + run.sh) -- bei neuen Features/Config-Optionen dort ein Szenario ergaenzen
   (siehe rules/2-platform/agent-meta-conventions.md, Change Checklist).'
@@ -163,11 +163,9 @@ variables:
   BUILD_COMMAND: python scripts/sync.py
   TEST_COMMAND: python3 scripts/sync.py --validate
   TEST_COMMANDS: python scripts/sync.py --dry-run && python scripts/sync.py --validate
-  DEV_COMMANDS: 'python scripts/sync.py
-
+  DEV_COMMANDS: |
+    python scripts/sync.py
     python scripts/sync.py --dry-run
-
-    '
   DEV_STACK_START: (kein Dev-Stack)
   DEV_STACK_RELOAD: (kein Dev-Stack)
   PROJECT_CONTEXT: agent-meta ist ein Git-Repository das als Submodul in Projekte
@@ -190,59 +188,39 @@ variables:
       admin-ui.html     # Admin-UI Frontend
     tests/              # Test-Suite (automated, manual, orchestration)
   ENTRY_POINT_PATTERN: scripts/sync.py — Haupt-CLI für Agent-Generierung
-  KEY_PATTERNS: '- Agent-Templates haben YAML-Frontmatter (name, version, description,
-    tools)
-
+  KEY_PATTERNS: |
+    - Agent-Templates haben YAML-Frontmatter (name, version, description, tools)
     - Platzhalter {{VARIABLE}} werden von sync.py substituiert
-
     - Extensions (.claude/3-project/*-ext.md) werden vom Agenten zur Laufzeit gelesen
-
-    - Snippet-Dateien haben eigenes YAML-Frontmatter (snippet, version, language,
-    runtime)
-
-    '
-  ARCHITECTURE: "agents/\n  0-external/  1-generic/  2-platform/\nscripts/sync.py\
-    \  scripts/admin-server.py\nsnippets/tester/ snippets/developer/\nexternal/<repo>/\n\
-    tests/  docs/architecture/  docs/ui/admin-ui.html\n"
-  CODE_CONVENTIONS: '- Python: PEP 8, snake_case, klare Funktionsnamen
-
+    - Snippet-Dateien haben eigenes YAML-Frontmatter (snippet, version, language, runtime)
+  ARCHITECTURE: |
+    agents/
+      0-external/  1-generic/  2-platform/
+    scripts/sync.py  scripts/admin-server.py
+    snippets/tester/ snippets/developer/
+    external/<repo>/
+    tests/  docs/architecture/  docs/ui/admin-ui.html
+  CODE_CONVENTIONS: |
+    - Python: PEP 8, snake_case, klare Funktionsnamen
     - Keine externen Python-Dependencies außer Stdlib
-
     - Markdown-Dateien: GitHub Flavored Markdown
-
     - YAML Frontmatter in allen Agent-Templates
-
-    - Provider-Unterschiede im Syncer-Code über Config-Keys/Capability-Flags ausdrücken,
-    nie über `if provider == "Name"` (siehe `provider-agnostic`-Skill)
-
-    '
-  EXTRA_DONTS: '- KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
-
+    - Provider-Unterschiede im Syncer-Code über Config-Keys/Capability-Flags ausdrücken, nie über `if provider == "Name"` (siehe `provider-agnostic`-Skill)
+  EXTRA_DONTS: |
+    - KEIN manuelles Bearbeiten von .claude/agents/ (generierter Output)
     - KEINE Breaking Changes ohne Major-Version-Bump
-
     - KEINE neuen Platzhalter ohne Eintrag in CLAUDE.md Variablen-Tabelle
-
-    '
-  CODE_QUALITY_RULES: '- sync.py muss nach jeder Änderung mit --dry-run fehlerfrei
-    laufen
-
-    - Alle neuen Platzhalter müssen in agent-meta.config.example.yaml dokumentiert
-    sein
-
-    - Änderungs-Workflow: Einfacher Wert -> project.yaml, Projektwissen -> 3-project-ext,
-    Neue Rolle -> 1-generic, Neuer Skill -> sync.py --add-skill
-
-    '
+  CODE_QUALITY_RULES: |
+    - sync.py muss nach jeder Änderung mit --dry-run fehlerfrei laufen
+    - Alle neuen Platzhalter müssen in agent-meta.config.example.yaml dokumentiert sein
+    - Änderungs-Workflow: Einfacher Wert -> project.yaml, Projektwissen -> 3-project-ext, Neue Rolle -> 1-generic, Neuer Skill -> sync.py --add-skill
   TESTER_SNIPPETS_PATH: ''
   DEVELOPER_SNIPPETS_PATH: ''
   BUILD_COMMANDS: python scripts/sync.py
-  REQ_CATEGORIES: '- Framework-Features (sync.py, neue Agenten-Rollen, Variablen)
-
+  REQ_CATEGORIES: |
+    - Framework-Features (sync.py, neue Agenten-Rollen, Variablen)
     - Agenten-Templates (Workflows, Sprach-Sektionen, Versionierung)
-
     - Entwickler-Experience (Howto, Beispiele, Doku)
-
-    '
   SERVICE_NAME: (kein Service)
   CONTAINER_NAME: (kein Container)
   PRIMARY_PORT: ''
@@ -376,3 +354,11 @@ rules:
       block catalog (auth-flow, dependency-check, secret-scanning, ...) and enforcement
       points.
 conventions-preset: default
+# Repo-Containment ('Gefängnis-Modus'): confines agent WRITE access to the project root (plus the tmp-sink). Opt-out: enabled: false.
+repo_containment:
+  enabled: true
+  tmp-sink:
+    enabled: true
+    path: .tmp
+    gitignore: true
+    cleanup: manual
