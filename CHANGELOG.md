@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- **Repo-Containment PreToolUse hooks (`repo-containment.sh`, `repo-containment-impl.sh`)**: wrapper/impl pair confining Write/Edit to the project root, with the `.tmp` scratch sink as the sanctioned exception (PR #781).
 - **Provider-agnostic `commands` capability for all 9 providers (#735, #743)**: added a
   `commands` flag to `config/provider-capabilities.yaml` (Claude/Gemini/Opencode/Continue `true`;
   Copilot/Mammouth/Codex/ZCode/KimiCode explicit `false`), replacing 22 `if provider ==`
