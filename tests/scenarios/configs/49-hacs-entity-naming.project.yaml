@@ -1,0 +1,30 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+platforms:
+- hacs
+roles:
+- orchestrator
+- developer
+- code-reviewer
+- release
+- git
+project:
+  name: scenario-hacs-entity-naming
+  prefix: s49
+  short: hacs-entity-naming
+variables:
+  PROJECT_NAME: scenario-hacs-entity-naming
+  PROJECT_DESCRIPTION: HACS entity naming + rename-migration rule test.
+  PROJECT_GOAL: Verify entity-naming contract, rename migration and reviewer gate render.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-hacs-entity-naming
+  GIT_MAIN_BRANCH: main
+rules-preset: lazy
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false

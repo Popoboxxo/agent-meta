@@ -3,9 +3,12 @@
 ## STATUS
 
 - **Datum:** 2026-09-12
-- **Branch:** `docs/issue-763-hacs-entity-rules-plan` (base `main` @ `e2b15aa3`)
-- **Mode:** Plan-only — dieser Branch enthält ausschließlich dieses Dokument.
-  Keine Code-/Agent-/Rule-/Test-Änderung; Implementierung ist explizit out of scope.
+- **Branch:** `feat/763-hacs-entity-naming` (base `59d397e0`) — Implementierungs-PR;
+  dieses Plandokument wird im selben PR mitgeführt.
+- **Mode:** Implementierung — R1–R4 in `rules/2-platform/hacs-integration-development.md`,
+  Gate 11 in `hacs-code-reviewer`, Release-Regel in `hacs-release`, always-on-Anker in
+  `hacs-developer`; Test-Szenario 49 liegt bei einem separaten Agenten (nicht Teil dieses
+  Branches).
 - **Quelle:** GitHub Issue #763 (`improvement`, P2) — „HACS preset — enforce English entity names
   via translation_key and entity-registry migration on rename".
 - **Methode:** direkte Datei-Reads auf Verifikations-Basis. `ripgrep`/`grep` ist in dieser
@@ -104,9 +107,9 @@ Verbots-Regel (explizit, mit Begründung/Fehlerklasse):
 |---|---|---|
 | `_attr_has_entity_name = True` + `_attr_translation_key` statt hartcodiertem `_attr_name`/`name`-Literal | Nur dann zieht HA den Anzeigenamen aus `strings.json`/`translations` und respektiert die Systemsprache; ein Literal friert eine Sprache ein | `friendly_name` wechselt nicht mit der Sprache; identische Schadensklasse wie das Object-ID-Pinning (`unique_id` ≠ object_id) |
 
-> **Scope-Hinweis:** Das Verbot gilt für Entities, die lokalisierbar sein sollen
-> (`has_entity_name = True`). Device-Level-Entities mit `has_entity_name = False`
-> dürfen legitimerweise einen Literal-Namen tragen — siehe Offene Frage 1.
+> **Verbot (absolut/global, Q1 DECIDED):** Jedes hartcodierte `_attr_name`/`name`-Literal
+> ist verboten — **keine** Ausnahme für `has_entity_name = False`. Der Anzeigename kommt
+> ausschließlich aus `strings.json`/`translations`.
 
 ### R2 — Entity-Registry-Migration bei Rename (Draft)
 
@@ -216,11 +219,17 @@ den Anzeigenamen trägt.
 | Datei | Änderung | Version | `based-on` |
 |---|---|---|---|
 | `rules/2-platform/hacs-integration-development.md` | R1–R4 (Abschnitt 2). Keine Frontmatter vorhanden → kein Versionsfeld | n/a | n/a |
-| `agents/2-platform/hacs-code-reviewer.md` | Gate 11 ergänzen (Abschnitt 4); bestehenden `append-after`-Patch auf `<persona>` um Gate-Row + Fail-Predicate erweitern | **1.0.0 → 2.0.0** (neuer harter Pflicht-Gate = Verhaltensänderung/Major per `conventions`) | `code-reviewer.md@1.2.2` → **`@1.7.0`** (aktueller Basis-Stand; siehe Offene Frage 3) |
-| `agents/2-platform/hacs-release.md` | SemVer-Bullet `:23` + Release-Notes-Bullet `:24` um expliziten Rename-Breaking-Trigger + 💥-Pflicht ergänzen (Abschnitt 5) | **1.0.1 → 1.1.0** (Scope-Erweiterung/MINOR) | `release.md@1.5.0` → **`@1.11.0`** |
-| `tests/scenarios/configs/49-hacs-entity-naming.project.yaml` | Neues Szenario | n/a | n/a |
-| `tests/scenarios/asserts/49-hacs-entity-naming.sh` | Content-Assertions | n/a | n/a |
-| `tests/scenarios/registry.md` | Katalog-Zeile `49-hacs-entity-naming` | n/a | n/a |
+| `agents/2-platform/hacs-code-reviewer.md` | Gate 11 ergänzen (Abschnitt 4); bestehenden `append-after`-Patch auf `<persona>` um Gate-Row + Fail-Predicate erweitern | **1.0.0 → 2.0.0** (neuer harter Pflicht-Gate = Verhaltensänderung/Major per `conventions`) | `code-reviewer.md@1.2.2` → **`@1.7.0`** (Q3 DECIDED) |
+| `agents/2-platform/hacs-release.md` | SemVer-Bullet `:23` + Release-Notes-Bullet `:24` um expliziten Rename-Breaking-Trigger + 💥-Pflicht ergänzen (Abschnitt 5) | **1.0.1 → 1.1.0** (Scope-Erweiterung/MINOR) | `release.md@1.5.0` → **`@1.11.0`** (Q3 DECIDED) |
+| `agents/2-platform/hacs-developer.md` | always-on `Entities`-Zeile `:90` um `_attr_has_entity_name`/`_attr_translation_key` + absolutes Literal-Verbot ergänzen (Q4 DECIDED) | **1.2.0 → 1.3.0** (additiv/MINOR) | `developer.md@4.0.2` → **`@4.5.0`** (Q3 DECIDED) |
+| `docs/plans/2026-09-12-issue-763-hacs-entity-rules-plan.md` | STATUS/§2/§3/§7 auf bestätigten Implementierungsstand (Q1–Q4) aktualisieren | n/a | n/a |
+| `tests/scenarios/configs/49-hacs-entity-naming.project.yaml` | Neues Szenario (separater Agent, nicht Teil dieses Branches) | n/a | n/a |
+| `tests/scenarios/asserts/49-hacs-entity-naming.sh` | Content-Assertions (separater Agent) | n/a | n/a |
+| `tests/scenarios/registry.md` | Katalog-Zeile `49-hacs-entity-naming` (separater Agent) | n/a | n/a |
+
+**`based-on`-Refresh (Q3 DECIDED):** Die drei 2-platform-Agenten werden im selben PR auf
+den aktuellen Generic-Stand gezogen (nur Präsenz wird geprüft, keine Aktualität —
+Konventionspflicht, kein CI-Gate).
 
 **Composition-Folgen:** Alle HACS-Agenten nutzen Composition (`extends` + `patches`,
 `append-after`, Anker `<persona>`). Die Änderungen werden **additiv in die bestehenden
@@ -233,9 +242,7 @@ Konventionspflicht, kein CI-Gate.
 
 ### Optional / nicht erforderlich
 
-| Datei | Bewertung |
-|---|---|
-| `agents/2-platform/hacs-developer.md` | Die Entities-Zeile `:90` nennt `suggested_object_id`-Pinning. Ein always-on-Anker für `_attr_has_entity_name`/`_attr_translation_key` wäre konsistent, ist für die 4 Regeln aber **nicht erforderlich**. Nur aufnehmen, wenn Offene Frage 6 = ja. Sonst out of scope. |
+Keine — `agents/2-platform/hacs-developer.md` ist nach Q4 DECIDED in scope (siehe oben).
 
 ### Out of scope
 
@@ -243,8 +250,7 @@ Konventionspflicht, kein CI-Gate.
   ist bereits als `channel: skill` gemappt (`config/rules-presets.yaml:157–161`), kein
   Sync-Eingriff nötig.
 - `agents/1-generic/**` — rein HACS-spezifische Thematik.
-- Pre-existing `based-on`-Drift (`hacs-developer.md` 4.0.2 vs. Generic 4.5.0; siehe Offene Frage 3).
-- Jegliche Implementierung (Abschnitt „STATUS").
+- `tests/scenarios/**` — Szenario 49 besitzt ein separater Agent (nicht Teil dieses Branches).
 
 ---
 
@@ -399,43 +405,41 @@ Plan-Umgebung defekt — daher hier nicht ausgeführt).
 | Risiko | Eintritt | Mitigation |
 |---|---|---|
 | Instruction Bleed durch neuen Patch | niedrig | Nur additive Erweiterung **bestehender** `<persona>`-Patches, kein neuer Anker/kein `replace` |
-| Über-breites `_attr_name`-Verbot | mittel | Scope auf lokalisierbare Entities begrenzen (Offene Frage 1) |
+| Über-breites `_attr_name`-Verbot | niedrig | Q1 DECIDED: bewusst absolut/global; Verbot im Skill mit Begründung + Fehlerklasse dokumentiert |
 | Falsche HA-API-Annahme (`async_migrate_entries` / `new_entity_id`) | mittel | Bei Implementierung gegen Ziel-HA-Version validieren (Offene Frage 4) |
 | Szenario rendert Skill nicht (Preset/Provider) | niedrig–mittel | `rules-preset: lazy` + Claude im Szenario; im Assert zuerst Datei-Existenz prüfen |
 | Doppelte Regelprosa (Gate vs. Skill) driften auseinander | niedrig | Gate nur als Prüfaussage, Skill als Referenz (kein Wort-Duplikat) |
-| `based-on`-Drift bleibt unbemerkt | niedrig | In Change-Liste adressiert bzw. als eigenes Chore (Offene Frage 3) |
+| `based-on`-Drift bleibt unbemerkt | niedrig | Q3 DECIDED: im selben PR refresht (in Change-Liste adressiert) |
 
 ### Offene Fragen
 
-1. **Scope des `_attr_name`-Verbots:** absolut, oder nur für Entities mit
-   `has_entity_name=True`? Device-Level-Entities (`has_entity_name=False`) dürfen
-   legitimerweise Literale tragen — der Draft schlägt die eingeschränkte Variante vor.
-2. **Versions-Magnitude `hacs-code-reviewer`:** 2.0.0 (neuer harter Gate = Major per
-   `conventions`) vs. 1.1.0 (additiv/MINOR)? Der Plan schlägt 2.0.0 vor.
-3. **`based-on`-Refresh:** im selben PR oder separates `chore:`? Pre-existing Drift:
-   `hacs-developer` 4.0.2 vs. Generic 4.5.0, `hacs-code-reviewer` 1.2.2 vs. 1.7.0,
-   `hacs-release` 1.5.0 vs. 1.11.0 (nur Präsenz wird geprüft, keine Aktualität).
-4. **HA-API-Verifikation:** Bestätigt die Ziel-HA-Minimalversion `er.async_migrate_entries`
-   mit `new_entity_id`/`original_name` im Callback-Return? Nicht in dieser Umgebung prüfbar.
-5. **`strings.json`-`entity`-Schema:** Entspricht `entity.<platform>.<translation_key>.name`
-   dem hassfest-Stand? Nicht in dieser Umgebung prüfbar.
-6. **`hacs-developer.md`-Anker:** Soll die always-on-Entities-Zeile `:90` um
-   `_attr_has_entity_name`/`_attr_translation_key` ergänzt werden (Konsistenz) oder bleibt
-   es beim lazy Skill + Reviewer-Gate?
+1. **Scope des `_attr_name`-Verbots — DECIDED:** absolut/global. Jedes hartcodierte
+   `_attr_name`/`name`-Literal ist verboten — auch bei `has_entity_name = False`.
+2. **Versions-Magnitude `hacs-code-reviewer` — DECIDED:** `2.0.0` (neuer harter
+   Pflicht-Gate = Verhaltensänderung/Major per `conventions`).
+3. **`based-on`-Refresh — DECIDED:** im selben PR. `hacs-developer` 4.0.2 → 4.5.0,
+   `hacs-code-reviewer` 1.2.2 → 1.7.0, `hacs-release` 1.5.0 → 1.11.0 (gegen den aktuellen
+   Generic-Stand verifiziert).
+4. **HA-API-Verifikation — OFFEN:** Bestätigt die Ziel-HA-Minimalversion
+   `er.async_migrate_entries` mit `new_entity_id`/`original_name` im Callback-Return?
+   Nicht in dieser Umgebung prüfbar.
+5. **`strings.json`-`entity`-Schema — OFFEN:** Entspricht
+   `entity.<platform>.<translation_key>.name` dem hassfest-Stand? Nicht in dieser
+   Umgebung prüfbar.
+6. **`hacs-developer.md`-Anker — DECIDED:** ja — die always-on-`Entities`-Zeile `:90`
+   wird um `_attr_has_entity_name`/`_attr_translation_key` + absolutes Literal-Verbot
+   ergänzt (Konsistenz, Q4).
 
 ### Branch-/PR-Cut
 
-- **Dieser Branch** `docs/issue-763-hacs-entity-rules-plan` (base `main @ e2b15aa3`
-  bereits ausgecheckt): enthält ausschließlich dieses Plandokument. Kein Commit/Push
-  durch diesen Task.
-- **Implementierungs-Follow-up:** neuer Feature-Branch off `main`, z. B.
-  `feat/763-hacs-entity-naming`, mit R1–R4 + Gate 11 + Release-Regel + Szenario 49.
-  Branch-Guard verbietet direkte `main`-Commits; PR gegen `main`, Conventional Commits
+- **Dieser Branch** `feat/763-hacs-entity-naming` (base `59d397e0`) ist der
+  Implementierungs-Branch: R1–R4 + Gate 11 + Release-Regel + `hacs-developer`-Anker +
+  dieses Plandokument. Kein Commit/Push durch diesen Task (übernimmt der `git`-Agent).
+- **Test-Szenario 49:** separater Agent, nicht Teil dieses Branches.
+- **Branch-Guard:** keine direkten `main`-Commits; PR gegen `main`, Conventional Commits
   (Englisch), DoD `rapid-prototyping`.
-- **Empfohlene Reihenfolge:** R1/R2/R4 → Gate 11 + Release-Regel → Szenario 49
-  (im selben PR, `registry.md:16–19`) → `tests/scenarios/run.sh 49` + `sync.py --validate`.
-- **Nicht Teil dieses Plans:** Pre-existing `based-on`-Drift (ggf. eigenes Issue),
-  `hacs-developer`-Anker (Offene Frage 6).
+- **Umgesetzte Reihenfolge:** R1/R2/R4 → Gate 11 + Release-Regel + `hacs-developer` →
+  `sync.py` + `--validate`/`--check`.
 
 ---
 
