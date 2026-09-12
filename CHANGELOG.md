@@ -23,6 +23,16 @@
   `role_defaults_without_template` for registry roles whose template file is missing.
 
 ### Changed
+- **Repo-Containment ("prison mode") is active by default (behavior change)**: agent write
+  access is now confined to the project root, with the auto-provisioned `.tmp` scratch sink as
+  the only sanctioned exception. On the next sync, hook-capable **active** providers
+  register the `repo_containment` PreToolUse hook, so existing projects get a blocking guard
+  without opting in. Opt out per project with `repo_containment.enabled: false` in
+  `.meta-config/project.yaml`, or per provider with
+  `repo_containment.provider-overrides.<Provider>.enabled: false`. The first sync materializes
+  an explicit `repo_containment` block (defaults `enabled: true` plus tmp-sink defaults) into
+  `.meta-config/project.yaml` when it is missing — idempotent, and it makes both the behavior
+  change and the opt-out visible instead of hiding them behind a schema default.
 - **Null config blocks, version and provider enum (#741, #731, #732)**: explicit `null`
   blocks (e.g. `project: null`) are normalized so config loading no longer raises
   `AttributeError`; the `agent-meta-version` default is derived from `VERSION`; the
