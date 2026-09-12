@@ -35,6 +35,7 @@ graphify-out/
 .opencode/mcp.local.json
 .opencode/pending-tasks.md
 .opencode/settings.local.json
+.tmp/
 AGENTS.personal.md
 CLAUDE.personal.md
 sync.log

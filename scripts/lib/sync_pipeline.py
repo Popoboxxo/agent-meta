@@ -93,6 +93,12 @@ from lib.providers import (
     resolve_context_filename,
     resolve_providers,
 )
+from lib.repo_containment import (
+    cleanup_tmp_sink,
+    ensure_tmp_sink,
+    ensure_tmp_sink_gitignore,
+    resolve_effective_repo_containment,
+)
 from lib.rules import (
     collect_rule_sources,
     resolve_rules,
@@ -164,6 +170,81 @@ def _sync_stage_config_and_presets(
     return config, provider_config, providers, mode, platform_vars
 
 
+def _tmp_sink_project_root(config_path: Path, project_root: Path) -> Path:
+    """Return the project root = directory containing ``.meta-config/`` (§5.2).
+
+    Mirrors config discovery in ``lib/cli_commands.py``: a config at
+    ``<root>/.meta-config/project.yaml`` yields its grandparent; any other
+    config path falls back to the caller-provided project root.
+    """
+    resolved = config_path.resolve()
+    if resolved.parent.name == ".meta-config":
+        return resolved.parent.parent
+    return project_root
+
+
+def _rel_display(path: Path, root: Path) -> str:
+    """Best-effort project-relative display path (absolute path as fallback)."""
+    try:
+        return str(path.relative_to(root))
+    except ValueError:
+        return str(path)
+
+
+def _sync_stage_tmp_sink(
+    project_root: Path, config_path: Path, config: dict,
+    args: argparse.Namespace, log: SyncLog,
+) -> None:
+    """Stage 2b: provision the repo-containment tmp sink (spec §5.1–5.4).
+
+    Never exits. Order is significant: an explicit ``cleanup: on-sync`` runs
+    BEFORE provisioning, so the self-ignoring fallback file is always
+    (re)created after the destructive pruning. The sink directory itself is
+    never removed and the default ``cleanup: manual`` never deletes anything.
+    All filesystem mutations are suppressed in dry-run (report only).
+
+    The tmp-sink settings are not provider-scoped (only the master switch is
+    provider-overridable), so resolution runs once with ``provider=None``.
+    """
+    dry_run = bool(getattr(args, "dry_run", False))
+    effective = resolve_effective_repo_containment(config)
+    for finding in effective.findings:
+        log.warn(f"repo-containment: {finding.message}")
+
+    if not effective.tmp_sink_enabled:
+        log.skip("repo-containment", "tmp-sink disabled — no scratch sink provisioned")
+        return
+
+    root = _tmp_sink_project_root(config_path, project_root)
+
+    cleanup = cleanup_tmp_sink(root, effective, dry_run=dry_run)
+    if cleanup is not None:
+        rel = _rel_display(cleanup.sink_path, root)
+        verb = "would remove" if dry_run else "removed"
+        log.warning(
+            "repo-containment: cleanup 'on-sync' is DESTRUCTIVE — "
+            f"{verb} {len(cleanup.removed)} top-level entr(ies) from {rel}"
+        )
+
+    sink_dir = ensure_tmp_sink(root, effective, dry_run=dry_run)
+    if sink_dir is not None:
+        rel = _rel_display(sink_dir, root) + "/"
+        if dry_run:
+            log.note("repo-containment", f"DRY-RUN: would provision tmp-sink {rel}")
+        else:
+            log.action("MKDIR", rel, "repo-containment tmp-sink")
+
+    gitignore = ensure_tmp_sink_gitignore(root, effective, dry_run=dry_run)
+    if gitignore.path is not None:
+        rel = _rel_display(gitignore.path, root)
+        if not gitignore.changed:
+            log.skip(rel, "unchanged")
+        elif dry_run:
+            log.note("repo-containment", f"DRY-RUN: would write self-ignoring {rel}")
+        else:
+            log.action("WRITE", rel, "self-ignoring tmp-sink fallback")
+
+
 def _context_auto_generate(config: dict) -> bool:
     """Read context_file.auto_generate from project.yaml (issue #540 Fix 3).
 
@@ -209,7 +290,8 @@ def _sync_stage_claude_base(
     # for unit-testability (issue #557); Claude-gated exactly as before: without
     # Claude only the additive per-provider path further below runs.
     base_gitignore_entries: list[str] = (
-        compute_base_gitignore_entries(providers, provider_config, gitignore_cfg)
+        compute_base_gitignore_entries(providers, provider_config, gitignore_cfg,
+                                       config.get("repo_containment"))
         if is_claude
         else []
     )

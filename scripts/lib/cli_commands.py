@@ -83,6 +83,7 @@ from lib.sync_pipeline import (
     _sync_stage_legacy_cleanup,
     _sync_stage_per_provider,
     _sync_stage_platform_defaults_snapshot,
+    _sync_stage_tmp_sink,
 )
 from lib.viz import cleanup_old_sessions, generate_viz
 
@@ -983,11 +984,13 @@ def _handle_validate(ctx: _SyncContext) -> None:
 
     from lib.consistency.hook_drift import check_stale_deployed_hooks
     from lib.consistency.orchestrator_strict import check_orchestrator_strict_hook_support
+    from lib.consistency.repo_containment import check_repo_containment_support
     from lib.consistency.report import print_report
     from lib.providers import load_providers_config as _load_pc
 
     _provider_config = _load_pc(agent_meta_root)
     _strict_findings = check_orchestrator_strict_hook_support(project_root, config, _provider_config)
+    _strict_findings += check_repo_containment_support(project_root, config, _provider_config)
     # Deployed-hook version drift (issue #630): warns when a project's
     # .claude/hooks/*.sh (or another provider's hooks_dir) has fallen behind
     # the current hooks/1-generic/ source -- sibling check to
@@ -1047,6 +1050,11 @@ def _handle_sync(ctx: _SyncContext) -> None:
         _sync_stage_config_and_presets(
             ctx.agent_meta_root, ctx.project_root, ctx.config_path, ctx.config,
             ctx.platforms, ctx.args, ctx.log)
+
+    # Stage 2b: repo-containment tmp-sink provisioning + cleanup.
+    _sync_stage_tmp_sink(ctx.project_root, ctx.config_path, config,
+                         ctx.args, ctx.log)
+
     # Stage 3: Claude-gated base syncs + gitignore/env baselines.
     is_claude, gitignore_cfg, base_gitignore_entries, env_gitignore = \
         _sync_stage_claude_base(ctx.agent_meta_root, ctx.project_root, config,
