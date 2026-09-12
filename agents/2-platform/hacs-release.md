@@ -1,7 +1,7 @@
 ---
 name: release
-version: "1.0.1"
-based-on: "1-generic/release.md@1.5.0"
+version: "1.1.0"
+based-on: "1-generic/release.md@1.11.0"
 description: "HACS Integration Release — Versioning, Release-Naming (Tag-Format, Pre-Release, Immutabilität), Tag↔manifest-Sync, VERSION nur mit Migrator, GitHub Release."
 hint: "Versioning, changelog, Build-Artifact und GitHub Release für HACS-Integrationen"
 prompt_mode: modern
@@ -20,6 +20,6 @@ patches:
 
       - **Tag-Format:** Stable `vMAJOR.MINOR.PATCH`, Beta `vX.Y.Zb<N>` (z.B. `v1.3.0b0` als GitHub-**Pre-Release**). Der `v`-Prefix gehört nur in den Tag — `manifest.version` ist bare SemVer ohne `v` (`v1.2.3` ↔ `"version": "1.2.3"`, `v1.3.0b0` ↔ `"version": "1.3.0b0"`), sonst `Invalid version`/Sortierfehler.
       - **Immutabilität:** Tags/Releases nie verschieben, löschen oder wiederverwenden (HACS cacht Versionen); Promotion beta→stable = neuer Release, nie Tag mutieren — sonst bleiben User auf Alt-Stand.
-      - **SemVer:** MAJOR = Breaking (`unique_id`-/Entity-Änderungen sind IMMER breaking → MAJOR), MINOR = Feature, PATCH = Fix; `v0.x` nicht ohne Hinweis als „stabil" deklarieren.
-      - **Release-Notes:** Summary + ✨ New features + 💥 Breaking changes (je mit Migration-Hinweis, Pflicht bei MAJOR) + Full-Changelog-Link.
+      - **SemVer:** MAJOR = Breaking (**Entity-Umbenennung** (`entity_id`, `original_name`, `translation_key`), Object-ID-/Pinning-Änderungen und `unique_id`-Änderungen sind IMMER breaking → MAJOR), MINOR = Feature, PATCH = Fix; `v0.x` nicht ohne Hinweis als „stabil" deklarieren.
+      - **Release-Notes:** Summary + ✨ New features + 💥 Breaking changes (**bei MAJOR Pflicht**; je mit Migration-Hinweis via `async_migrate_entries`-Rezept und Verweis auf den Post-Release-Orphan-Cleanup aus Workflow-Schritt 7 der Integration-Development-Regel) + Full-Changelog-Link.
 ---

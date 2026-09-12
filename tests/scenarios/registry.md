@@ -120,3 +120,4 @@ so), kein Scenario-Bug.
 | `46-progress-tierb-append-rotation` | Opencode | strict (default), `checkpointing: true` | Tier-B (hook-less provider) progress file appends per checkpoint + rotates on new session (live-progress-channel design, 2026-09-10) |
 | `47-progress-pipeline-stage-field` | Opencode | strict (default), `checkpointing: true` | `Pipeline/Stage`-Spalte unterscheidet gleichzeitige `se-cascade`/`concept-driven-dev`-Einträge in der Tier-B-Datei (live-progress-channel design) |
 | `48-progress-provider-neutral-path` | Opencode | strict (default), `checkpointing: true` | Root-Cause-Fix: `.meta-viz/progress/current.md` statt hartcodiertem `.claude/progress/` für einen Nicht-Claude-Provider (live-progress-channel design) |
+| `49-hacs-entity-naming` | Claude | strict (default) | HACS entity-naming: `_attr_has_entity_name`+`_attr_translation_key`, English-master `strings.json`, `async_migrate_entries`-Rename, reviewer Gate 11 |

@@ -129,6 +129,22 @@ Kombiniert mit `has_entity_name = True` + `_attr_translation_key`: der **Anzeige
 bleibt lokalisiert (folgt der Systemsprache), das **object_id/entity_id** ist auf
 Englisch gepinnt — stabil und sprachunabhängig.
 
+**Namenslokalisierung (Referenz-Implementierung):** Der Anzeigename kommt ausschließlich
+aus den Übersetzungen — der Code trägt **kein** Namens-Literal:
+
+```python
+class HealthOMatPowerSensor(HealthOMatEntity):
+    _attr_has_entity_name = True
+    _attr_translation_key = "power"
+    # VERBOTEN (nicht lokalisierbar, bricht den Sprachwechsel):
+    # _attr_name = "Leistung"
+    # name = "Leistung"  # Property-Override mit Literal
+```
+
+| Regel | Begründung | Fehlerklasse |
+|---|---|---|
+| Jedes hartcodierte `_attr_name`/`name`-Literal ist **absolut verboten** — stattdessen `_attr_has_entity_name = True` + `_attr_translation_key`. Keine Ausnahme für `has_entity_name = False`. | Nur so zieht HA den Anzeigenamen aus `strings.json`/`translations` und respektiert den Sprachwechsel; ein Literal friert eine Sprache dauerhaft ein | `friendly_name` wechselt nicht mit der Systemsprache — identische Schadensklasse wie das Object-ID-Pinning (`unique_id` != object_id) |
+
 **Master/Ableitung:** `strings.json` ist der englische Master; `translations/{de,en}.json`
 sind abgeleitet (siehe Meta-Dateien-Skelett unten) — der Master trägt die Identität,
 Übersetzungen tragen nur den zur Laufzeit angezeigten `friendly_name`.
@@ -137,6 +153,14 @@ sind abgeleitet (siehe Meta-Dateien-Skelett unten) — der Master trägt die Ide
 zum Zeitpunkt der **Erstregistrierung** aktive Systemsprache das object_id dauerhaft —
 Entities in der beabsichtigten Sprache erstregistrieren, eine spätere Umbenennung ist
 ein Breaking Change (vgl. `unique_id` nie ändern, Tabelle Entities oben).
+
+**Rename = Breaking Change:** Jede Änderung, die die `entity_id`-Erzeugung verschiebt
+(`entity_id`, `original_name`, `translation_key`, Object-ID-Pinning), ist ein Breaking
+Change → **MAJOR** + **💥-Eintrag mit Migrationshinweis** (Entity-Registry-Migration
+unten, `manifest.VERSION`-Bump; Release-Naming-Best-Practice). Für den Umgang mit dem
+Alt-Bestand gilt der Verweis auf den **Post-Release-Orphan-Cleanup** in Workflow-Schritt
+7: verwaiste Alt-Entities werden erst **nach** dem Release entfernt, nie durch Ändern der
+`unique_id`.
 
 **Etikette auf einer geteilten Dev-Instanz** (mehrere Integrationen/Domains auf derselben
 Home-Assistant-Instanz):
@@ -148,6 +172,40 @@ Home-Assistant-Instanz):
 | `unique_id` | Akkumuliert dauerhaft in der geteilten Registry über alle Domains hinweg — nie ändern (Tabelle Entities oben) |
 | Systemsprache wechseln | Instanzweiter Blast-Radius: rendert `friendly_name`s **aller** Domains neu und riskiert Erstregistrierungen laufender Arbeiten anderer Domains — vorher koordinieren |
 | Tokens/State | Nie committen oder zwischen Domains kopieren |
+
+### Entity-Registry-Migration bei Umbenennung
+
+Ein Rename ändert **nie** die `unique_id` (eiserne Regel Entities oben). Geändert werden
+ausschließlich `entity_id` und `original_name` — über den HA-Entity-Registry-Helper
+`er.async_migrate_entries`, aufgerufen **innerhalb** des registrierten
+`async_migrate_entry`-Handlers, zusammen mit einem `manifest.VERSION`-Bump
+(Breaking → MAJOR, siehe Release-Naming-Best-Practice unten). Das ist **nicht** das
+`entry.data → entry.options`-Rezept weiter oben: dort wandern Entry-Daten, hier werden
+Entity-Registry-Einträge umbenannt.
+
+```python
+# custom_components/<domain>/__init__.py
+from homeassistant.helpers import entity_registry as er
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """v1 -> v2: Entity umbenennen, unique_id bleibt stabil."""
+    if entry.version < 2:
+        def _rename(reg_entry: er.RegistryEntry) -> dict[str, str] | None:
+            if reg_entry.unique_id == "health_o_mat_power_old":
+                return {
+                    "new_entity_id": "sensor.health_o_mat_power",
+                    "original_name": "Power",
+                }
+            return None
+
+        er.async_migrate_entries(hass, entry.entry_id, _rename)
+        hass.config_entries.async_update_entry(entry, version=2)
+    return True
+```
+
+`manifest.json`: `"version": "2.0.0"` (Breaking), GitHub-Release mit 💥-Entry und
+Migrationshinweis. Verwaiste Alt-Entities werden erst im **Post-Release-Cleanup**
+(Workflow-Schritt 7) entfernt — nie durch Ändern der `unique_id`.
 
 ## Release-Naming-Best-Practice
 
@@ -242,35 +300,58 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 ### `custom_components/<domain>/strings.json` (Master) + `translations/{de,en}.json`
 
+Master `strings.json` ist **englisch** (hassfest-Konvention) — der Master trägt die
+Identität, allein `translations/*.json` tragen die lokalisierten Anzeigewerte:
+
+```json
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up connection",
+        "data": { "host": "Host or IP address" }
+      }
+    },
+    "error": { "cannot_connect": "Connection failed" }
+  },
+  "options": {
+    "step": {
+      "init": { "data": { "scan_interval": "Update interval (seconds)" } }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "power": { "name": "Power" }
+    }
+  }
+}
+```
+
+Abgeleitet `translations/de.json` (nur Anzeige-Werte; die Identität bleibt im Master).
+Der `entity`-Key muss exakt zum `_attr_translation_key` der Entity passen:
+
 ```json
 {
   "config": {
     "step": {
       "user": {
         "title": "Verbindung einrichten",
-        "data": {
-          "host": "Host oder IP-Adresse"
-        }
+        "data": { "host": "Host oder IP-Adresse" }
       }
     },
-    "error": {
-      "cannot_connect": "Verbindung fehlgeschlagen"
-    }
+    "error": { "cannot_connect": "Verbindung fehlgeschlagen" }
   },
-  "options": {
-    "step": {
-      "init": {
-        "data": {
-          "scan_interval": "Aktualisierungsintervall (Sekunden)"
-        }
-      }
-    }
+  "entity": {
+    "sensor": { "power": { "name": "Leistung" } }
   }
 }
 ```
 
-Master ist `strings.json`; `translations/de.json` und `translations/en.json` sind
-abgeleitet und bei jeder Änderung mitzupflegen (hassfest prüft die Konsistenz).
+Master ist `strings.json` (englisch); `translations/de.json` und `translations/en.json`
+sind abgeleitet und bei jeder Änderung mitzupflegen (hassfest prüft die Konsistenz).
+`entity.<platform>.<translation_key>.name` trägt den lokalisierten Anzeigenamen
+(z.B. `entity.sensor.power.name` für `_attr_translation_key = "power"`); die
+`entity_id` bleibt davon unberührt.
 
 ### `.github/workflows/validate.yml`
 
