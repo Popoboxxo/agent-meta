@@ -102,6 +102,9 @@ S: Pipeline überspringen, direkt delegieren. M–XL: erst `concept-driven-dev` 
 
 All "yes" → start. Otherwise resolve first.
 
+{{#if SUBAGENT_PERMISSIONS_ENABLED}}
+{{SUBAGENT_PERMISSIONS_BLOCK}}
+{{/if}}
 ## 6. Task decomposition & delegation
 {{#if DIRECT_DISPATCH_ENABLED}}
 {{DIRECT_DISPATCH_SECTION}}

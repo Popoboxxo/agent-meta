@@ -33,6 +33,8 @@ _TOUCHED_MODULES = (
     "context",
     "providers",
     "agent_sync",
+    "subagent_permissions",
+    "consistency/subagent_permissions",
 )
 
 

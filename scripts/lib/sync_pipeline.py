@@ -79,6 +79,7 @@ from lib.io import SyncError, _write_yaml, write_atomic
 from lib.isolation import sync_provider_isolation
 from lib.knowledge import sync_knowledge_engine
 from lib.log import SyncLog
+from lib.subagent_permissions import resolve_subagent_permission_provider_vars
 from lib.mcp import generate_mcp_artifacts, sync_secrets_template
 from lib.pipelines import (
     apply_overrides,
@@ -519,11 +520,41 @@ def _sync_stage_per_provider(
 
         _orch_config = config.get("orchestrator", {})
         _provider_override = _orch_config.get("provider-overrides", {}).get(provider)
-        if _provider_override and _provider_override.get("mode") is not None:
+        _orch_override_active = bool(
+            _provider_override and _provider_override.get("mode") is not None
+        )
+
+        # Feature A: subagent-permission provider override. Defensive .get()
+        # chain (M1) — a missing/None/non-dict entry simply means "inherit".
+        _sub_cfg = config.get("subagent_permissions")
+        _sub_overrides = (
+            _sub_cfg.get("provider-overrides") if isinstance(_sub_cfg, dict) else None
+        )
+        _sub_override = (
+            _sub_overrides.get(provider) if isinstance(_sub_overrides, dict) else None
+        )
+        _sub_override_active = bool(
+            isinstance(_sub_override, dict) and _sub_override.get("mode") is not None
+        )
+
+        if _orch_override_active or _sub_override_active:
+            # Shared shallow-copy point (M-5): when either override is active,
+            # `provider_variables` is a per-provider copy, so the
+            # PIPELINE_DETAILS_DIR write below mutates the copy, not the shared
+            # `variables`. That is the historic behavior for the orchestrator
+            # override; the subagent override reuses the same single copy point
+            # instead of introducing a second one. Providers without any
+            # override keep sharing `variables`.
             provider_variables = dict(variables)
-            provider_variables.update(
-                _orch_mode_flags(_resolve_orch_mode(_orch_config, _provider_override))
-            )
+            if _orch_override_active:
+                provider_variables.update(
+                    _orch_mode_flags(_resolve_orch_mode(_orch_config, _provider_override))
+                )
+            if _sub_override_active:
+                # Flags AND SUBAGENT_PERMISSIONS_BLOCK from one resolver (M2).
+                provider_variables.update(
+                    resolve_subagent_permission_provider_vars(config, provider)
+                )
         else:
             provider_variables = variables
 

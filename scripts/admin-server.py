@@ -239,6 +239,10 @@ PROJECT_WRITABLE_SECTIONS: frozenset[str] = frozenset({
     "context_file", "plugins",
     # WP3 (#730): newly exposed project.yaml sections.
     "hooks", "debug-mode", "tier-overrides", "mcp-role-overrides", "backup",
+    # Feature: subagent permissions + git repo settings + auto-commit (Admin UI).
+    # The whitelist is mode-independent -- both super_admin and project_admin
+    # may write these sections (they are project-instance settings).
+    "subagent_permissions", "git", "auto_commit",
     # Written internally by the fixed-section endpoints
     # (_write_submodule_protection).
     "submodule-protection",

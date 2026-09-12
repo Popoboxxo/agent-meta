@@ -425,9 +425,18 @@ def _build_provider_vars(
     provider: str,
     variables: dict,
     agent_meta_root: Path,
+    config: dict | None = None,
 ) -> dict:
     """Merge provider-specific variables (extension paths, snippets dir,
-    parallel patterns, etc.) over the global variables dict."""
+    parallel patterns, etc.) over the global variables dict.
+
+    ``config`` (optional, Feature A) is the loaded project.yaml dict — when
+    given, the per-provider subagent-permission bundle (flags AND
+    ``SUBAGENT_PERMISSIONS_BLOCK``, M2) is resolved here so agent generation
+    sees the provider-correct policy even when called directly without the
+    sync-pipeline pre-merge. Omitting ``config`` keeps the historic behavior
+    (the bundle, if any, is inherited from ``variables``).
+    """
     from .delegation_syntax import DelegationSyntaxEngine
 
     _ds_engine = DelegationSyntaxEngine(config_dir=agent_meta_root / "config")
@@ -453,6 +462,13 @@ def _build_provider_vars(
         # never as a crashed sync.
         'INTENT_ROUTING_TOOLS': (variables.get('_INTENT_ROUTING_TOOL_DEFS') or {}).get(provider, ''),
     }
+    if config is not None:
+        # Feature A (M2): flags and SUBAGENT_PERMISSIONS_BLOCK travel together
+        # from one resolver, so the orchestrator block can never diverge from
+        # the boolean flags for this provider.
+        from .subagent_permissions import resolve_subagent_permission_provider_vars
+
+        provider_vars.update(resolve_subagent_permission_provider_vars(config, provider))
     return {**variables, **provider_vars}
 
 def _should_skip_role(
@@ -862,7 +878,7 @@ def sync_agents_for_provider(agent_meta_root: Path, project_root: Path, config: 
             source_path, provider, project_name, agent_meta_root, project_root, target_path, log, pc=pc)
 
         # Merge provider-specific variables (extension paths, snippets dir, parallel patterns, etc.)
-        merged_vars = _build_provider_vars(pc, provider, variables, agent_meta_root)
+        merged_vars = _build_provider_vars(pc, provider, variables, agent_meta_root, config=config)
         content = _apply_content_pipeline(
             content, config, provider, merged_vars, rel_source,
             platform_vars, agent_meta_root, log)

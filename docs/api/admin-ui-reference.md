@@ -142,6 +142,24 @@ Defines whether the Orchestrator runs sub-agents `synchronously` (one after anot
 <!-- author: Agent Meta Admin -->
 Defines what the Orchestrator should do if a user requests a task but no specialized sub-agent is available (or they are all disabled). `graceful_decline` forces the Orchestrator to reject the task. `generic_attempt` allows the Orchestrator to try and solve the problem itself using its baseline coding tools.
 
+### Subagent Permissions
+<!-- help-id: project_instance-subagent_permissions -->
+<!-- last-updated: 2026-09-12 -->
+<!-- author: Agent Meta Admin -->
+Configures the `subagent_permissions` policy for this project. `mode` is one of `strict`, `warn` or `off` (framework default: `off` — zero behaviour change). `strict` rejects subagent dispatches for roles whose resolved template declares no explicit allow/deny `tools:` list and requires every subagent result to follow the structured `STATUS`/`RESULT`/`ARTIFACTS` format (one retry, then escalation). `warn` reports violations in the delegating agent's own report but never blocks. Resolution order is provider override (`provider-overrides.<Provider>.mode`) > project value (`mode`) > framework default. The policy is prompt-based on every provider — there is no runtime dispatch gate. Note: YAML 1.1 parses an unquoted `off`/`on`/`yes`/`no` as a boolean, which normalizes to `off` (safe side); keep mode values quoted.
+
+### Git
+<!-- help-id: project_instance-git -->
+<!-- last-updated: 2026-09-12 -->
+<!-- author: Agent Meta Admin -->
+Repository and branch conventions surfaced in the `git` section of `project.yaml`. `platform` (`GitHub`, `GitLab`, `Gitea`, `Codeberg`), `remote-url` and `main-branch` are the canonical source for the generated `{{GIT_PLATFORM}}`, `{{GIT_REMOTE_URL}}` and `{{GIT_MAIN_BRANCH}}` variables — an explicit `variables.GIT_*` entry in `project.yaml` still wins over this section. `branch-prefixes` (`feat`, `fix`, `chore`) are stored and displayed only; the branch-guard enforcement wiring is a follow-up issue and the historic `feat/ fix/ chore/` prefixes in `branch-guard.md` remain unchanged.
+
+### Auto-Commit
+<!-- help-id: project_instance-auto_commit -->
+<!-- last-updated: 2026-09-12 -->
+<!-- author: Agent Meta Admin -->
+Controls the opt-in tiered commit authority for write-capable agents (issue #694). `off` (default) keeps today's behaviour where only the dedicated `git` role commits. `suggest` has agents propose a commit message in their own report but never run git. `auto` lets agents commit directly when any selected trigger (`task-boundary`, `per-edit`, `context-pressure`, `file-count-threshold`, `custom`) fires — any one is enough (OR). `custom` hands the entire decision to `custom_script` and ignores the built-in triggers. `file_count_threshold` (default 5) is only read for the `file-count-threshold` trigger. `secret_scan` (default true) runs the project's secret scan against the staged diff before any auto/custom commit. A `custom` mode, or `custom` among the triggers, requires `custom_script`.
+
 ### Viz & Admin
 <!-- help-id: project_instance-viz_admin -->
 <!-- last-updated: 2026-07-19 -->

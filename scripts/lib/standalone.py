@@ -98,6 +98,10 @@ _ORCHESTRATION_FALLBACKS: dict[str, str] = {
     # config, so an empty string avoids leaking the raw placeholder without
     # inventing a checkpointing policy.
     "CHECKPOINTING_BLOCK": "",
+    # SUBAGENT_PERMISSIONS_BLOCK (Feature A): like AUTO_COMMIT_BLOCK, only ever
+    # referenced inside {{#if SUBAGENT_PERMISSIONS_ENABLED}} — an empty string
+    # is the correct standalone fallback (no policy outside a project install).
+    "SUBAGENT_PERMISSIONS_BLOCK": "",
 }
 
 # Conditional flags gating {{#if VAR}}/{{#unless VAR}} blocks tied to
@@ -129,6 +133,13 @@ _CONDITIONAL_FALSE_FLAGS: dict[str, str] = {
     "README_WARNINGS_ENABLED": "false",
     "AUTO_COMMIT_ENABLED": "false",
     "DEV_STACK_START_SET": "false",
+    # Feature A: the subagent-permission policy is project config only —
+    # standalone has none, so every mode flag is inert (the {{#if}} gate stays
+    # closed and SUBAGENT_PERMISSIONS_BLOCK is empty in _ORCHESTRATION_FALLBACKS).
+    "SUBAGENT_PERMISSIONS_STRICT": "false",
+    "SUBAGENT_PERMISSIONS_WARN": "false",
+    "SUBAGENT_PERMISSIONS_OFF": "false",
+    "SUBAGENT_PERMISSIONS_ENABLED": "false",
     # No A2A infrastructure or knowledge-engine bundle exists standalone —
     # matches the scope note in the rendered header ("no A2A protocol, no
     # project-specific config").
