@@ -1955,6 +1955,60 @@
         }
       },
       "additionalProperties": false
+    },
+    "repo_containment": {
+      "type": "object",
+      "description": "Repo-Containment ('Gefängnis-Modus'): confines agent WRITE access to the project root. Default enabled: true. The optional tmp-sink additionally sanctions a framework-provisioned scratch directory (default .tmp/) as the single exception outside an otherwise root-confined policy.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Master switch. true = writes are confined to the repo root (plus the tmp-sink when enabled). false = today's unrestricted behavior."
+        },
+        "provider-overrides": {
+          "type": "object",
+          "description": "Override repo_containment.enabled per provider. Keys are registered provider names (Claude, Codex, Gemini, Opencode, ...). Providers without an entry inherit the project value. Resolution: provider override > project value > framework default true.",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "description": "Containment switch for this provider only. When unset, inherits the global repo_containment.enabled."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "tmp-sink": {
+          "type": "object",
+          "description": "Optional scratch sink. When enabled, sync.py provisions <project-root>/<path> and the containment hook permits writes inside it as the only exception outside the repo root. The directory is gitignored by the framework.",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "Provision the scratch directory and widen the containment exception to it. When false, containment stays strictly root-only."
+            },
+            "path": {
+              "type": "string",
+              "default": ".tmp",
+              "description": "Relative path of the scratch directory, resolved against the project root. MUST be relative and MUST NOT contain '..' segments (enforced by the sync-time validator)."
+            },
+            "gitignore": {
+              "type": "boolean",
+              "default": true,
+              "description": "Add the scratch directory to the agent-meta managed .gitignore block and to a self-ignoring <path>/.gitignore fallback."
+            },
+            "cleanup": {
+              "type": "string",
+              "enum": ["manual", "on-sync"],
+              "default": "manual",
+              "description": "manual = never delete contents automatically (safe default). on-sync = prune the directory on each sync run (opt-in, destructive)."
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     }
   },
   "required": [

@@ -124,6 +124,23 @@ project:
 #     enabled: true
 
 # ---------------------------------------------------------------------------
+# Repo-Containment ("Gefängnis-Modus") — standardmäßig AN
+# ---------------------------------------------------------------------------
+# Beschränkt Agenten-Schreibzugriffe auf die Projekt-Wurzel (repo root).
+# Der optionale tmp-sink erlaubt zusätzlich Schreibzugriffe unterhalb <path>
+# (Default .tmp/) und wird vom Sync automatisch angelegt.
+# Opt-out: enabled: false (oder gezielt pro Provider über provider-overrides).
+repo_containment:
+  enabled: true
+  tmp-sink:
+    enabled: true
+    path: ".tmp"
+    gitignore: true
+    cleanup: "manual"          # "on-sync" leert .tmp bei jedem Sync (destruktiv!)
+  # provider-overrides:
+  #   Continue: { enabled: false }
+
+# ---------------------------------------------------------------------------
 # Modell-Tiers — provider-agnostisch (empfohlen)
 # ---------------------------------------------------------------------------
 # Tiers:  nano | fast | balanced | powerful | max
