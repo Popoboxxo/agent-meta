@@ -7,8 +7,13 @@
   dieses Plandokument wird im selben PR mitgeführt.
 - **Mode:** Implementierung — R1–R4 in `rules/2-platform/hacs-integration-development.md`,
   Gate 11 in `hacs-code-reviewer`, Release-Regel in `hacs-release`, always-on-Anker in
-  `hacs-developer`; Test-Szenario 49 liegt bei einem separaten Agenten (nicht Teil dieses
-  Branches).
+  `hacs-developer` und Test-Szenario 49 (`tests/scenarios/configs/`, `asserts/`,
+  `registry.md`) werden im selben PR auf dem Branch `feat/763-hacs-entity-naming`
+  (base `59d397e0`) ausgeliefert: **Plan + Implementierung + Tests in einem PR**.
+  Es gibt keinen out-of-scope-Nachzug.
+- **Umsetzungs-Status:** ausgeliefert in Commit `019d2985` (`feat(hacs): enforce localized
+  entity names and rename migration (#763)`) — R1–R4, Gate 11 (`hacs-code-reviewer`
+  v2.0.0), `hacs-release` v1.1.0, `hacs-developer` v1.3.0 und Szenario 49.
 - **Quelle:** GitHub Issue #763 (`improvement`, P2) — „HACS preset — enforce English entity names
   via translation_key and entity-registry migration on rename".
 - **Methode:** direkte Datei-Reads auf Verifikations-Basis. `ripgrep`/`grep` ist in dieser
@@ -223,9 +228,9 @@ den Anzeigenamen trägt.
 | `agents/2-platform/hacs-release.md` | SemVer-Bullet `:23` + Release-Notes-Bullet `:24` um expliziten Rename-Breaking-Trigger + 💥-Pflicht ergänzen (Abschnitt 5) | **1.0.1 → 1.1.0** (Scope-Erweiterung/MINOR) | `release.md@1.5.0` → **`@1.11.0`** (Q3 DECIDED) |
 | `agents/2-platform/hacs-developer.md` | always-on `Entities`-Zeile `:90` um `_attr_has_entity_name`/`_attr_translation_key` + absolutes Literal-Verbot ergänzen (Q4 DECIDED) | **1.2.0 → 1.3.0** (additiv/MINOR) | `developer.md@4.0.2` → **`@4.5.0`** (Q3 DECIDED) |
 | `docs/plans/2026-09-12-issue-763-hacs-entity-rules-plan.md` | STATUS/§2/§3/§7 auf bestätigten Implementierungsstand (Q1–Q4) aktualisieren | n/a | n/a |
-| `tests/scenarios/configs/49-hacs-entity-naming.project.yaml` | Neues Szenario (separater Agent, nicht Teil dieses Branches) | n/a | n/a |
-| `tests/scenarios/asserts/49-hacs-entity-naming.sh` | Content-Assertions (separater Agent) | n/a | n/a |
-| `tests/scenarios/registry.md` | Katalog-Zeile `49-hacs-entity-naming` (separater Agent) | n/a | n/a |
+| `tests/scenarios/configs/49-hacs-entity-naming.project.yaml` | Neues Szenario `49-hacs-entity-naming` (Claude, `rules-preset: lazy`, HACS-Preset) — im selben PR | n/a | n/a |
+| `tests/scenarios/asserts/49-hacs-entity-naming.sh` | Ausführbare Content-Assertions gegen den Sync-Output (Skill-Token, English-Master, Gate-11-/Release-Marker) — im selben PR | n/a | n/a |
+| `tests/scenarios/registry.md` | Katalog-Zeile `49-hacs-entity-naming` ergänzen — im selben PR | n/a | n/a |
 
 **`based-on`-Refresh (Q3 DECIDED):** Die drei 2-platform-Agenten werden im selben PR auf
 den aktuellen Generic-Stand gezogen (nur Präsenz wird geprüft, keine Aktualität —
@@ -250,7 +255,6 @@ Keine — `agents/2-platform/hacs-developer.md` ist nach Q4 DECIDED in scope (si
   ist bereits als `channel: skill` gemappt (`config/rules-presets.yaml:157–161`), kein
   Sync-Eingriff nötig.
 - `agents/1-generic/**` — rein HACS-spezifische Thematik.
-- `tests/scenarios/**` — Szenario 49 besitzt ein separater Agent (nicht Teil dieses Branches).
 
 ---
 
@@ -270,8 +274,8 @@ per Cross-Reference ergänzt.
 formuliert als prüfbare Prädikate, damit der Gate nicht nur Prosa ist:
 
 - **F1** — In `custom_components/<domain>/**/*.py` setzt eine Entity-Klasse ein
-  Literal `_attr_name = "..."` (oder ein `name`-Property-Literal), **ohne**
-  `_attr_has_entity_name = True` **und** `_attr_translation_key`.
+  Literal `_attr_name = "..."` oder ein `name`-Property-Literal. **Absolutes Verbot —
+  keine `has_entity_name`-Ausnahme** (Q1 DECIDED).
 - **F2** — Ein im Code verwendeter `_attr_translation_key`/`translation_key` hat
   keinen korrespondierenden Key unter `entity.<platform>.<key>.name` in `strings.json`.
 - **F3** — `strings.json` (Master) enthält nicht-englische Strings (Master MUSS englisch
@@ -359,7 +363,12 @@ den Sync-Output (`cwd` = Temp-Dir):
 2. Skill-Body enthält die exakten Token: `_attr_has_entity_name`, `_attr_translation_key`,
    `async_migrate_entries`, `new_entity_id`, `original_name`.
 3. Master-Skelett ist englisch: enthält `"Set up connection"`; enthält **nicht** mehr
-   `Verbindung einrichten` (Negativ-Assertion gegen den alten deutschen Master).
+   `Aktualisierungsintervall` (Negativ-Assertion gegen den alten deutschen Master).
+   Begründung: Das abgeleitete `translations/de.json`-Beispiel in der Regel enthält
+   weiterhin legitim `Verbindung einrichten`, ein Whole-File-Negativ-Grep darauf würde
+   also false-failen. Robuster Negativ-Marker ist stattdessen der `options`-String
+   `Aktualisierungsintervall` des alten deutschen Masters (im Master durch
+   `Update interval (seconds)` ersetzt und im `de.json`-Beispiel ausgelassen).
 4. `.claude/agents/code-reviewer.md` enthält den Gate-11-Marker
    (`Namenslokalisierung` o. ä. stabiler String).
 5. `.claude/agents/release.md` enthält `Umbenennung` und `💥`.
@@ -433,13 +442,15 @@ Plan-Umgebung defekt — daher hier nicht ausgeführt).
 ### Branch-/PR-Cut
 
 - **Dieser Branch** `feat/763-hacs-entity-naming` (base `59d397e0`) ist der
-  Implementierungs-Branch: R1–R4 + Gate 11 + Release-Regel + `hacs-developer`-Anker +
-  dieses Plandokument. Kein Commit/Push durch diesen Task (übernimmt der `git`-Agent).
-- **Test-Szenario 49:** separater Agent, nicht Teil dieses Branches.
-- **Branch-Guard:** keine direkten `main`-Commits; PR gegen `main`, Conventional Commits
-  (Englisch), DoD `rapid-prototyping`.
+  Implementierungs-Branch: **ein** PR mit Plandokument + R1–R4 + Gate 11 + Release-Regel +
+  `hacs-developer`-Anker + Test-Szenario 49 (`configs/`, `asserts/`, `registry.md`).
+- **Session-Constraint (User-Regel):** Diese Implementierungs-Session committet/pusht
+  nicht und eröffnet **keinen** PR. Stattdessen wird der Issue-Kommentar zu #763 gepostet.
+  Ship-Commit: `019d2985`.
+- **Branch-Guard:** keine direkten `main`-Commits; Conventional Commits (Englisch),
+  DoD `rapid-prototyping`.
 - **Umgesetzte Reihenfolge:** R1/R2/R4 → Gate 11 + Release-Regel + `hacs-developer` →
-  `sync.py` + `--validate`/`--check`.
+  Szenario 49 → `sync.py` + `--validate`/`--check`.
 
 ---
 
