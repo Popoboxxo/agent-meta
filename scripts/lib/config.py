@@ -21,9 +21,18 @@ from .log import SyncLog
 from .variables import (  # re-exported for callers/tests (Issue #565)
     _orch_mode_flags,
     _resolve_orch_mode,
+    _subagent_permission_flags,
+    _VALID_SUBAGENT_PERMISSION_MODES,
+    normalize_subagent_permission_mode,
     repo_containment_variables,
     strip_inactive_conditional_blocks,  # noqa: F401
     substitute,  # noqa: F401
+)
+from .frontmatter import _is_role_enabled, collect_sources
+from .subagent_permissions import (
+    missing_tools_roles,
+    render_subagent_permission_block,
+    resolve_effective_subagent_permission_mode,
 )
 from .pipelines import (
     apply_overrides,
@@ -259,6 +268,7 @@ def load_config(config_path: Path) -> dict:
 
     _normalize_null_blocks(config)
     _normalize_auto_commit_mode(config)
+    _normalize_subagent_permissions_mode(config)
     _validate_config(config, config_path)
     return config
 
@@ -276,6 +286,27 @@ def _normalize_auto_commit_mode(config: dict) -> None:
     ac_cfg = config.get("auto_commit")
     if isinstance(ac_cfg, dict) and isinstance(ac_cfg.get("mode"), bool):
         ac_cfg["mode"] = "off"
+
+
+def _normalize_subagent_permissions_mode(config: dict) -> None:
+    """Canonicalize YAML-1.1 booleans in ``subagent_permissions`` to ``"off"``.
+
+    An unquoted ``mode: off|no|false|on|yes|true`` parses as a Python bool; the
+    policy must be opted in with a quoted enum name, so every bool normalizes to
+    the safe-side default ``"off"`` (both the global mode and every
+    ``provider-overrides.<Provider>.mode``). AC-A3: no bool ever reaches the
+    resolver. Runs in the single ``load_config`` funnel after parsing.
+    """
+    block = config.get("subagent_permissions")
+    if not isinstance(block, dict):
+        return
+    if isinstance(block.get("mode"), bool):
+        block["mode"] = "off"
+    overrides = block.get("provider-overrides")
+    if isinstance(overrides, dict):
+        for entry in overrides.values():
+            if isinstance(entry, dict) and isinstance(entry.get("mode"), bool):
+                entry["mode"] = "off"
 
 
 def _validate_config(config: dict, config_path: Path) -> None:
@@ -307,6 +338,7 @@ def _validate_config(config: dict, config_path: Path) -> None:
     _validate_model_inheritance(config, config_path)
     _validate_providers(config, config_path)
     _validate_repo_containment(config, config_path)
+    _validate_subagent_permissions(config, config_path)
 
     if not _JSONSCHEMA_AVAILABLE:
         # Explicit, correctly-worded pointer: jsonschema ENABLES this check
@@ -500,6 +532,166 @@ def _validate_repo_containment(config: dict, config_path: Path) -> None:
             _fail(
                 f"invalid 'repo_containment.tmp-sink.path' {path!r}: {error}."
             )
+
+
+def _validate_subagent_permissions(config: dict, config_path: Path) -> None:
+    """Hard-validate ``subagent_permissions`` (Feature A, §4.2).
+
+    The ONLY place with a hard exit for the policy; every read path
+    (consistency, Admin UI) uses the non-exiting resolver in
+    ``subagent_permissions.py`` instead.
+
+    Always validates structure/enum. When the effective mode is ``strict`` for
+    at least one active provider, every active role's RESOLVED template (real
+    override chain via ``collect_sources`` + ``extends:`` composition) must
+    declare a non-empty ``tools:`` list (B2/Q2). The structured return format is
+    intentionally not checked here — it is not verifiable at config time.
+    """
+    block = config.get("subagent_permissions")
+    if block is None:
+        return
+    if not isinstance(block, dict):
+        print(
+            f"ERROR: {config_path}: 'subagent_permissions' must be a mapping, "
+            f"got {type(block).__name__}.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    # ── 1. Structure / enum (always) ─────────────────────────────────────
+    mode_value = block.get("mode")
+    if mode_value is not None and normalize_subagent_permission_mode(mode_value) is None:
+        print(
+            f"ERROR: {config_path}: invalid subagent_permissions.mode "
+            f"{mode_value!r}. Valid values are: "
+            f"{sorted(_VALID_SUBAGENT_PERMISSION_MODES)}.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    overrides = block.get("provider-overrides")
+    if overrides is not None and not isinstance(overrides, dict):
+        print(
+            f"ERROR: {config_path}: 'subagent_permissions.provider-overrides' "
+            f"must be a mapping, got {type(overrides).__name__}.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    if isinstance(overrides, dict) and overrides:
+        try:
+            registry = registered_provider_names(_framework_root())
+        except (OSError, ValueError):
+            registry = []
+        known = set(registry)
+        for provider, entry in sorted(overrides.items()):
+            if registry and provider not in known:
+                print(
+                    f"ERROR: {config_path}: unknown provider {provider!r} in "
+                    "'subagent_permissions.provider-overrides'.",
+                    file=sys.stderr,
+                )
+                print(
+                    f"  Registered providers: {', '.join(registry)}",
+                    file=sys.stderr,
+                )
+                print(
+                    "  Fix: use one of the registered provider names "
+                    "(see config/provider-capabilities.yaml).",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            if not isinstance(entry, dict):
+                print(
+                    f"ERROR: {config_path}: "
+                    f"'subagent_permissions.provider-overrides.{provider}' must "
+                    f"be a mapping, got {type(entry).__name__}.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            entry_mode = entry.get("mode")
+            if entry_mode is not None and normalize_subagent_permission_mode(entry_mode) is None:
+                print(
+                    f"ERROR: {config_path}: invalid "
+                    f"subagent_permissions.provider-overrides.{provider}.mode "
+                    f"{entry_mode!r}. Valid values are: "
+                    f"{sorted(_VALID_SUBAGENT_PERMISSION_MODES)}.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+
+    # ── 2. Strict obligation on active roles ─────────────────────────────
+    agent_meta_root = _framework_root()
+    try:
+        provider_config = load_providers_config(agent_meta_root)
+        active_providers = resolve_providers(config, provider_config)
+    except ValueError:
+        # _validate_providers() already hard-failed on unknown provider names;
+        # this guard only protects direct callers.
+        return
+
+    strict_active = any(
+        resolve_effective_subagent_permission_mode(config, provider) == "strict"
+        for provider in active_providers
+    )
+    if not strict_active:
+        return
+
+    platforms = config.get("platforms", [])
+    role_map = build_role_map(agent_meta_root)
+    role_sources, _ = collect_sources(agent_meta_root, platforms)
+    configured_roles = config.get("roles")
+    orch_mode = _resolve_orch_mode(config.get("orchestrator", {}))
+
+    active_roles: list[str] = []
+    for role in role_map:
+        # Only roles the provider sync actually generates as files are in
+        # scope (a role without a resolved source file is never written).
+        if role not in role_sources:
+            continue
+        if configured_roles is not None and role not in configured_roles:
+            continue
+        if not _is_role_enabled(role, config):
+            continue
+        if role == "orchestrator" and orch_mode == "main-chat":
+            continue
+        active_roles.append(role)
+
+    missing = missing_tools_roles(active_roles, agent_meta_root, platforms)
+    if not missing:
+        return
+
+    def _rel_source(path: Path) -> str:
+        try:
+            return str(path.relative_to(agent_meta_root)).replace("\\", "/")
+        except ValueError:
+            return str(path)
+
+    print(
+        f"ERROR: {config_path}: subagent_permissions.mode='strict' requires an "
+        "explicit",
+        file=sys.stderr,
+    )
+    print(
+        "  allow/deny declaration (a non-empty `tools:` list) for every active "
+        "role.",
+        file=sys.stderr,
+    )
+    print("  Missing tools:", file=sys.stderr)
+    width = max((len(role) for role in missing), default=0)
+    for role in missing:
+        source = role_sources.get(role)
+        source_label = _rel_source(source) if source is not None else "(unresolved)"
+        print(f"    {role:<{width}}  -> {source_label}", file=sys.stderr)
+    print(
+        "  Fix: add a `tools:` list to the resolved template path above, or set",
+        file=sys.stderr,
+    )
+    print(
+        "  subagent_permissions.mode to 'warn' or 'off'.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
 
 
 def _validate_model_inheritance(config: dict, config_path: Path) -> None:
@@ -1025,6 +1217,17 @@ def _build_core_variables(
     # PROJECT_DESCRIPTION exists.
     for _fallback_var, _fallback_value in _VARIABLE_FALLBACKS.items():
         variables.setdefault(_fallback_var, _fallback_value)
+    # GIT_* fallbacks from the top-level `git` repo-settings section (Feature B).
+    # Precedence: an explicit `variables.GIT_*` entry (loaded above) wins over
+    # the `git` section, which wins over the historic hardcoded default — hence
+    # setdefault. `git.branch-prefixes` is deliberately NOT translated into
+    # BRANCH_PREFIX_* variables (Q3: data/UI-only this iteration).
+    _git_cfg = config.get("git")
+    if not isinstance(_git_cfg, dict):
+        _git_cfg = {}
+    variables.setdefault("GIT_PLATFORM", _git_cfg.get("platform", "GitHub"))
+    variables.setdefault("GIT_REMOTE_URL", _git_cfg.get("remote-url", ""))
+    variables.setdefault("GIT_MAIN_BRANCH", _git_cfg.get("main-branch", "main"))
     # Optional, project-specific string variables (#425): unlike ARCHITECTURE/
     # DEV_COMMANDS below, an empty-string fallback is wrong here because the
     # referencing templates interpolate the value inline (e.g.
@@ -1322,6 +1525,20 @@ def _build_orch_variables(
         "Anti-Recursion: NIEMALS zurück an orchestrator delegieren. "
         "Nur tester/documenter/requirements/validator aus Kontext verweisen."
     )
+
+
+def _build_subagent_permission_variables(variables: dict, config: dict) -> None:
+    """Populate the global subagent-permission policy variables (Feature A).
+
+    Mirrors ``_build_orch_variables``: the flat boolean flags plus the
+    pre-rendered ``SUBAGENT_PERMISSIONS_BLOCK`` prose. The global mode is
+    resolved through the same non-exiting resolver as the per-provider bundle;
+    the hard fail lives in ``_validate_subagent_permissions`` (already run by
+    ``load_config`` before this function).
+    """
+    mode = resolve_effective_subagent_permission_mode(config)
+    variables.update(_subagent_permission_flags(mode))
+    variables["SUBAGENT_PERMISSIONS_BLOCK"] = render_subagent_permission_block(mode)
 
 
 def _build_platform_variables(
@@ -1703,6 +1920,7 @@ def build_variables(config: dict, agent_meta_root: Path, project_root: Path | No
     unmapped = _build_core_variables(variables, config, agent_meta_root, project_root)
     _build_provider_variables(variables, config, agent_meta_root)
     _build_orch_variables(variables, unmapped, config, agent_meta_root)
+    _build_subagent_permission_variables(variables, config)
     _build_platform_variables(variables, unmapped, config, agent_meta_root)
     dod_resolved = _build_dod_variables(variables, config, agent_meta_root)
     effective = _build_pipeline_variables(variables, unmapped, config, agent_meta_root, dod_resolved)

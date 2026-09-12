@@ -60,6 +60,7 @@ from lib.consistency.placeholders import check_placeholders, load_project_vars
 from lib.consistency.python_compat import check_fstring_backslash_hazard, check_py39_union_syntax
 from lib.consistency.repo_containment import check_repo_containment_templates
 from lib.consistency.report import Finding, Severity, print_json_report, print_report
+from lib.consistency.subagent_permissions import check_subagent_permission_templates
 
 # ── git helpers ───────────────────────────────────────────────────────────────
 
@@ -186,6 +187,7 @@ def run_checks(
         findings += check_schema_refs(root)
         findings += check_handoff_contracts(root)
         findings += check_fanout_backend_contract(root)
+        findings += check_subagent_permission_templates(root)
         findings += check_py39_union_syntax(root)
         findings += check_fstring_backslash_hazard(root)
         findings += check_repo_containment_templates(_AGENT_META_ROOT)

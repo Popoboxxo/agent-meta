@@ -19,6 +19,7 @@ from .variables import (
     strip_inactive_conditional_blocks,
     substitute,
 )
+from .subagent_permissions import resolve_subagent_permission_provider_vars
 from .skill_channel import (
     cleanup_stale_skill_channel_rules,
     provider_supports_skill_channel,
@@ -191,6 +192,12 @@ def _merged_rule_vars(
     # provider-scoped wiring as the ORCH_MODE_* flags above (provider-override
     # > project > framework default, spec §2.3/§4.5).
     provider_vars.update(repo_containment_variables(config, provider))
+
+    # Provider-specific subagent-permission override (M1: defensive chain).
+    # Always re-resolved here (idempotent when `variables` already carries the
+    # global bundle) so direct sync_rules/sync_embedded_rule_files callers —
+    # including `variables=None` — see the provider-correct mode and block.
+    provider_vars.update(resolve_subagent_permission_provider_vars(config, provider))
 
     # Override hint if main-chat mode is active
     if _orch_mode == "main-chat":

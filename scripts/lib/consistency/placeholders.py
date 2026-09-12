@@ -81,6 +81,11 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     # Orchestrator snippet blocks (loaded from snippets/orchestrator/*.md by build_variables)
     "SE_MODE_BLOCK", "A2A_PROTOCOL_BLOCK", "CHECKPOINTING_BLOCK", "QUALITY_PIPELINES_BLOCK",
     "STATUS_TABLE_BLOCK", "AUTO_COMMIT_BLOCK",
+    # Subagent permission policy (Feature A, injected by build_variables / the
+    # per-provider bundle in subagent_permissions.py)
+    "SUBAGENT_PERMISSIONS_MODE", "SUBAGENT_PERMISSIONS_STRICT",
+    "SUBAGENT_PERMISSIONS_WARN", "SUBAGENT_PERMISSIONS_OFF",
+    "SUBAGENT_PERMISSIONS_ENABLED", "SUBAGENT_PERMISSIONS_BLOCK",
     # Developer-tier shared blocks (loaded from snippets/developer/*.md by build_variables)
     "BROWSER_VERIFICATION_BLOCK", "LANGUAGE_BEST_PRACTICES_BLOCK",
     # Security shared blocks (loaded from snippets/security/*.md by build_variables)

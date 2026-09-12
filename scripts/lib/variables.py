@@ -26,6 +26,21 @@ from .substitution import substitute_placeholders
 
 _VALID_ORCH_MODES = {"strict", "advisory", "main-chat"}
 
+# Subagent-permission policy (Feature A). Neutral, stdlib-only layer so
+# config.py/rules.py/standalone.py can share one resolution without
+# re-introducing the historic import cycle (Issue #565).
+_VALID_SUBAGENT_PERMISSION_MODES: frozenset[str] = frozenset({"strict", "warn", "off"})
+
+# Only these are safe as {{#if}} conditionals: strip_inactive_conditional_blocks
+# treats every value except the literal "false" as active, so a mode STRING
+# (SUBAGENT_PERMISSIONS_MODE) must never be used as a conditional.
+_BOOLEAN_SUBAGENT_PERMISSION_FLAGS: frozenset[str] = frozenset({
+    "SUBAGENT_PERMISSIONS_STRICT",
+    "SUBAGENT_PERMISSIONS_WARN",
+    "SUBAGENT_PERMISSIONS_OFF",
+    "SUBAGENT_PERMISSIONS_ENABLED",
+})
+
 # {{VAR}} placeholder pattern for substitute() — uppercase names only, no
 # inner whitespace. Group 1 captures the name (contract of the shared
 # substitution core, issue #476).
@@ -142,6 +157,62 @@ def repo_containment_variables(config: dict, provider: str | None = None) -> dic
     }
 
 
+def normalize_subagent_permission_mode(value: object) -> str | None:
+    """Canonicalize a subagent-permission mode value to ``strict``/``warn``/``off``.
+
+    Pure and non-exiting. Returns ``None`` when ``value`` is missing or not one
+    of the three canonical strings. Strings are lowercased and stripped; every
+    bool normalizes to ``None`` (safe-side: the policy must be opted in with a
+    quoted mode name, never inferred from a YAML 1.1 boolean such as an
+    unquoted ``off``/``on``).
+    """
+    if isinstance(value, bool):
+        return None
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip().lower()
+    if normalized in _VALID_SUBAGENT_PERMISSION_MODES:
+        return normalized
+    return None
+
+
+def _resolve_subagent_permissions_mode(
+    cfg: dict,
+    provider_override: dict | None = None,
+) -> str:
+    """Effective subagent-permission mode for ``cfg`` + optional override.
+
+    Precedence: ``provider_override['mode']`` > ``cfg['mode']`` > ``"off"``.
+    This resolver NEVER calls ``sys.exit`` — an invalid/absent value resolves
+    to the safe-side default ``"off"``. All nested access goes through
+    ``.get()`` with ``isinstance`` guards (M1); the hard fail lives only in
+    ``config._validate_subagent_permissions``.
+    """
+    mode: object = None
+    if isinstance(provider_override, dict) and provider_override.get("mode") is not None:
+        mode = provider_override.get("mode")
+    elif isinstance(cfg, dict) and cfg.get("mode") is not None:
+        mode = cfg.get("mode")
+
+    normalized = normalize_subagent_permission_mode(mode)
+    return normalized if normalized is not None else "off"
+
+
+def _subagent_permission_flags(mode: str) -> dict:
+    """Return the flat ``SUBAGENT_PERMISSIONS_*`` flags for a resolved mode.
+
+    Exactly one of STRICT/WARN/OFF is ``"true"``; MODE carries the mode string
+    itself. ``SUBAGENT_PERMISSIONS_ENABLED`` is ``"false"`` only for ``off``.
+    """
+    return {
+        "SUBAGENT_PERMISSIONS_MODE": mode,
+        "SUBAGENT_PERMISSIONS_STRICT": "true" if mode == "strict" else "false",
+        "SUBAGENT_PERMISSIONS_WARN": "true" if mode == "warn" else "false",
+        "SUBAGENT_PERMISSIONS_OFF": "true" if mode == "off" else "false",
+        "SUBAGENT_PERMISSIONS_ENABLED": "false" if mode == "off" else "true",
+    }
+
+
 
 def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
     """Remove conditional blocks that are inactive in this project.
@@ -162,6 +233,7 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
     conditional_vars.update({k for k in variables if k in ("ORCHESTRATOR_ENABLED", "ORCHESTRATOR_STRICT", "DIRECT_DISPATCH_ENABLED", "UNKNOWN_FALLBACK_ASK_USER", "UNKNOWN_FALLBACK_META_FEEDBACK", "UNKNOWN_FALLBACK_MAIN_CHAT", "A2A_PROTOCOL_ENABLED", "ORCHESTRATOR_OUTCOME_CACHING", "CHECKPOINTING_ENABLED", "NATIVE_EXTENSIONS_ENABLED", "NATIVE_EXTENSIONS_WHITELIST_ACTIVE", "ANALYSIS_ENABLED", "FILE_BASED_AGENTS", "AUTO_COMMIT_ENABLED", "PROGRESS_CHAT_PUSH_ENABLED")})
     conditional_vars.update({k for k in variables if k.startswith("ORCH_MODE_")})
     conditional_vars.update({k for k in variables if k.startswith("REPO_CONTAINMENT_")})
+    conditional_vars.update({k for k in variables if k.startswith("SUBAGENT_PERMISSIONS_")})
     conditional_vars.update({k for k in variables if k.endswith("_SET")})
 
     if not conditional_vars:

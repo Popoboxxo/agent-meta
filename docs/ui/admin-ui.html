@@ -1569,6 +1569,9 @@ function buildSidebar() {
         { route: "/project/orchestrator", label: "Orchestrator", icon: "⎈" },
         { route: "/project/repo-containment", label: "Repo Containment", icon: "🔒" },
         { route: "/project/hooks", label: "Hooks", icon: "🪝" },
+        { route: "/project/subagent-permissions", label: "Subagent Permissions", icon: "🛡" },
+        { route: "/project/git",                  label: "Git",                  icon: "⑂" },
+        { route: "/project/auto-commit",          label: "Auto-Commit",          icon: "⏱" },
 
         { route: "/project/viz-admin", label: "Viz & Admin", icon: "👁" },
         { route: "/project/debug-mode", label: "Debug Mode", icon: "🐞" },
@@ -7109,6 +7112,319 @@ async function viewProjectRepoContainment() {
   return wrap;
 }
 
+/* ------------------------- Subagent Permissions -------------------------- */
+
+/** Labelled text input with placeholder support (Git / Auto-Commit views). */
+function textInputEl(id, value, placeholder, onInput) {
+  const inp = el("input", { type: "text", id, value: value || "", placeholder: placeholder || "" });
+  inp.addEventListener("input", () => onInput(inp.value));
+  return inp;
+}
+
+async function viewProjectSubagentPermissions() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Project — Subagent Permissions"]));
+  wrap.appendChild(el("p", { class: "help-text" }, [
+    "Declarative allow/deny policy for subagent dispatches. Effective mode resolution: " +
+    "provider override > project value > framework default “off”. The policy is prompt-based " +
+    "on every provider (there is no runtime dispatch gate). A YAML 1.1 unquoted off/on/yes/no " +
+    "parses as a boolean and normalizes to “off” (safe side) — keep mode values quoted.",
+  ]));
+
+  const data = await loadProject();
+  const sp = (data.subagent_permissions && typeof data.subagent_permissions === "object")
+    ? clone(data.subagent_permissions) : {};
+
+  const status = el("p", {
+    id: "subagent-permissions-status", class: "muted", role: "status", "aria-live": "polite",
+  }, ["Loaded from project.yaml."]);
+  wrap.appendChild(status);
+
+  // ── Global mode ──────────────────────────────────────────────────────────
+  const modePanel = el("div", { class: "panel" });
+  modePanel.appendChild(el("h2", {}, ["Global Mode"]));
+  modePanel.appendChild(dropdownField(
+    "Mode",
+    ["strict", "warn", "off"],
+    sp.mode || "off",
+    v => { sp.mode = v; },
+    {
+      strict: "strict — reject dispatches for roles without an explicit tools: declaration; require STATUS/RESULT/ARTIFACTS",
+      warn: "warn — report violations in the delegating agent's report, never block",
+      off: "off — today's behaviour, unconstrained dispatch (framework default)",
+    },
+    "Applies to every provider without an explicit override below."
+  ));
+  wrap.appendChild(modePanel);
+
+  // ── Provider overrides ───────────────────────────────────────────────────
+  const provOverrides = (sp["provider-overrides"] && typeof sp["provider-overrides"] === "object")
+    ? clone(sp["provider-overrides"]) : {};
+  const activeProviders = Array.isArray(data["ai-providers"]) ? data["ai-providers"] : [];
+  const povPanel = el("div", { class: "panel" });
+  povPanel.appendChild(el("h2", {}, ["Provider Overrides"]));
+  povPanel.appendChild(el("p", { class: "muted" }, [
+    "Override the mode for a single provider. Leave at “(inherit project mode)” to use the global mode above.",
+  ]));
+  const SUBAGENT_MODE_OPTIONS = ["", "strict", "warn", "off"];
+  for (const prov of activeProviders) {
+    const provEntry = (provOverrides[prov] && typeof provOverrides[prov] === "object") ? provOverrides[prov] : {};
+    const row = el("div", { class: "field-row" });
+    row.appendChild(el("label", { class: "field-label" }, [prov]));
+    const sel = el("select", { class: "select" });
+    for (const opt of SUBAGENT_MODE_OPTIONS) {
+      const o = el("option", { value: opt }, [opt || "(inherit project mode)"]);
+      if ((provEntry.mode || "") === opt) o.setAttribute("selected", "");
+      sel.appendChild(o);
+    }
+    sel.addEventListener("change", () => {
+      if (sel.value) {
+        provOverrides[prov] = { ...provEntry, mode: sel.value };
+      } else {
+        delete provOverrides[prov];
+      }
+    });
+    row.appendChild(sel);
+    povPanel.appendChild(row);
+  }
+  if (activeProviders.length === 0) {
+    povPanel.appendChild(el("p", { class: "empty" }, ["No active providers configured — set ai-providers first."]));
+  }
+  wrap.appendChild(povPanel);
+
+  // ── Save ─────────────────────────────────────────────────────────────────
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: async () => {
+      const out = {};
+      if (sp.mode) out.mode = sp.mode;
+      if (Object.keys(provOverrides).length > 0) out["provider-overrides"] = provOverrides;
+      // Keep project.yaml clean when the policy is empty: mode "off" + no
+      // overrides is written as null (normalizes back to {} / "off").
+      const payload = (out.mode && out.mode !== "off") || out["provider-overrides"]
+        ? out : null;
+      try { await saveProjectSection("subagent_permissions", payload, status); }
+      catch { /* toast + inline status are surfaced by saveProjectSection */ }
+    } }, ["Save"]),
+  ]));
+  return wrap;
+}
+
+/* --------------------------------- Git ----------------------------------- */
+async function viewProjectGit() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Project — Git"]));
+  wrap.appendChild(el("p", { class: "help-text" }, [
+    "Repository and branch conventions. These values are the canonical source for the " +
+    "generated {{GIT_PLATFORM}}, {{GIT_REMOTE_URL}} and {{GIT_MAIN_BRANCH}} variables — an " +
+    "explicit variables.GIT_* entry in project.yaml still wins. branch-prefixes are " +
+    "stored/displayed only; branch-guard wiring is a follow-up (not enforced yet).",
+  ]));
+
+  const data = await loadProject();
+  const git = (data.git && typeof data.git === "object") ? clone(data.git) : {};
+  const prefixes = (git["branch-prefixes"] && typeof git["branch-prefixes"] === "object")
+    ? clone(git["branch-prefixes"]) : {};
+
+  const status = el("p", {
+    id: "git-status", class: "muted", role: "status", "aria-live": "polite",
+  }, ["Loaded from project.yaml."]);
+  wrap.appendChild(status);
+
+  const saveBtn = el("button", { class: "btn btn-primary", onclick: async () => {
+    const out = {
+      platform: git.platform || "GitHub",
+      "remote-url": git["remote-url"] || "",
+      "main-branch": git["main-branch"] || "main",
+      "branch-prefixes": {
+        feat: prefixes.feat || "feat/",
+        fix: prefixes.fix || "fix/",
+        chore: prefixes.chore || "chore/",
+      },
+    };
+    try { await saveProjectSection("git", out, status); }
+    catch { /* toast + inline status are surfaced by saveProjectSection */ }
+  } }, ["Save"]);
+
+  // ── Repository ───────────────────────────────────────────────────────────
+  const repoPanel = el("div", { class: "panel" });
+  repoPanel.appendChild(el("h2", {}, ["Repository"]));
+  repoPanel.appendChild(dropdownField(
+    "Platform",
+    ["GitHub", "GitLab", "Gitea", "Codeberg"],
+    git.platform || "GitHub",
+    v => { git.platform = v; },
+    null,
+    "Git hosting platform. Mirrors variables.GIT_PLATFORM (default: GitHub)."
+  ));
+  repoPanel.appendChild(a11yField({
+    id: "git-remote-url", label: "Remote URL",
+    help: "Canonical remote URL, e.g. https://github.com/owner/repo. Leave empty to fall back to variables.GIT_REMOTE_URL.",
+    control: textInputEl("git-remote-url", git["remote-url"] || "", "https://github.com/owner/repo",
+      v => { git["remote-url"] = v; }),
+  }));
+  repoPanel.appendChild(a11yField({
+    id: "git-main-branch", label: "Main branch",
+    help: "Default/main branch name. Mirrors variables.GIT_MAIN_BRANCH (default: main).",
+    control: textInputEl("git-main-branch", git["main-branch"] || "", "main",
+      v => { git["main-branch"] = v; }),
+  }));
+  wrap.appendChild(repoPanel);
+
+  // ── Branch prefixes (data/UI only) ───────────────────────────────────────
+  const prefixPanel = el("div", { class: "panel" });
+  prefixPanel.appendChild(el("h2", {}, ["Branch Prefixes"]));
+  prefixPanel.appendChild(el("p", { class: "muted" }, [
+    "Convention defaults for branch names. Data/UI only in this iteration — not yet consumed by branch-guard.",
+  ]));
+  const prefixDefs = [
+    ["feat", "feat/", "Prefix for feature branches."],
+    ["fix", "fix/", "Prefix for bugfix branches."],
+    ["chore", "chore/", "Prefix for maintenance branches."],
+  ];
+  for (const [key, dflt, help] of prefixDefs) {
+    const id = `git-prefix-${key}`;
+    prefixPanel.appendChild(a11yField({
+      id, label: `${key} prefix`, help,
+      control: textInputEl(id, prefixes[key] ?? dflt, dflt, v => { prefixes[key] = v; }),
+    }));
+  }
+  wrap.appendChild(prefixPanel);
+
+  // ── Save ─────────────────────────────────────────────────────────────────
+  wrap.appendChild(el("div", { class: "btn-row" }, [saveBtn]));
+  return wrap;
+}
+
+/* ----------------------------- Auto-Commit ------------------------------- */
+async function viewProjectAutoCommit() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Project — Auto-Commit"]));
+  wrap.appendChild(el("p", { class: "help-text" }, [
+    "Opt-in tiered commit authority for write-capable agents (issue #694). off = only the git " +
+    "role commits. suggest = agents propose a commit message, never run git. auto = agents " +
+    "commit directly when any selected trigger fires. custom = custom_script alone decides " +
+    "(built-in triggers are ignored).",
+  ]));
+
+  const data = await loadProject();
+  const ac = (data.auto_commit && typeof data.auto_commit === "object") ? clone(data.auto_commit) : {};
+
+  const status = el("p", {
+    id: "auto-commit-status", class: "muted", role: "status", "aria-live": "polite",
+  }, ["Loaded from project.yaml."]);
+  wrap.appendChild(status);
+
+  const TRIGGERS = ["task-boundary", "per-edit", "context-pressure", "file-count-threshold", "custom"];
+
+  const customScriptInput = textInputEl(
+    "auto-commit-custom-script", ac.custom_script || "", "scripts/my-commit-gate.sh",
+    v => { ac.custom_script = v; });
+
+  const setError = (msg) => {
+    toast(msg, "error");
+    status.textContent = msg;
+    status.style.color = "var(--accent-red)";
+  };
+
+  // ── Mode ─────────────────────────────────────────────────────────────────
+  const modePanel = el("div", { class: "panel" });
+  modePanel.appendChild(el("h2", {}, ["Mode"]));
+  modePanel.appendChild(dropdownField(
+    "Mode",
+    ["off", "suggest", "auto", "custom"],
+    ac.mode || "off",
+    v => { ac.mode = v; },
+    {
+      off: "off — only the git role commits (default)",
+      suggest: "suggest — propose a commit message, never run git",
+      auto: "auto — commit when any selected trigger fires",
+      custom: "custom — custom_script alone decides",
+    },
+    "Only the selected mode's fields below take effect."
+  ));
+  wrap.appendChild(modePanel);
+
+  // ── Triggers (mode: auto) ────────────────────────────────────────────────
+  const thresholdInput = el("input", {
+    type: "number", id: "auto-commit-threshold", min: "1",
+    value: String(ac.file_count_threshold ?? 5),
+  });
+  thresholdInput.addEventListener("change", () => {
+    const v = parseInt(thresholdInput.value, 10);
+    ac.file_count_threshold = isNaN(v) ? 5 : Math.max(1, v);
+    thresholdInput.value = String(ac.file_count_threshold);
+  });
+
+  const triggerPanel = el("div", { class: "panel" });
+  triggerPanel.appendChild(el("h2", {}, ["Triggers (mode: auto)"]));
+  triggerPanel.appendChild(tagEditorField(
+    "Triggers",
+    Array.isArray(ac.triggers) ? ac.triggers : [],
+    v => { ac.triggers = v; },
+    `Any one firing commits (OR'd). Allowed: ${TRIGGERS.join(", ")}. Only consulted under mode "auto".`
+  ));
+  triggerPanel.appendChild(a11yField({
+    id: "auto-commit-threshold", label: "File count threshold",
+    help: "Only read when the file-count-threshold trigger is active. Commit after this many changed files (default: 5).",
+    control: thresholdInput,
+  }));
+  wrap.appendChild(triggerPanel);
+
+  // ── Custom script & secret scan ──────────────────────────────────────────
+  const scriptPanel = el("div", { class: "panel" });
+  scriptPanel.appendChild(el("h2", {}, ["Custom Script & Secret Scan"]));
+  scriptPanel.appendChild(a11yField({
+    id: "auto-commit-custom-script", label: "Custom script",
+    help: "Path to a project script. Exit code 0 means “commit now”. Required when mode is custom, or when “custom” appears in triggers under mode auto.",
+    control: customScriptInput,
+  }));
+  scriptPanel.appendChild(checkboxField(
+    "Secret scan",
+    ac.secret_scan !== false,
+    v => { ac.secret_scan = v; },
+    "Run the project's secret scan against the staged diff before any auto/custom commit (default: true)."
+  ));
+  wrap.appendChild(scriptPanel);
+
+  // ── Save ─────────────────────────────────────────────────────────────────
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: async () => {
+      const mode = ac.mode || "off";
+      const script = customScriptInput.value.trim();
+      const triggers = [...new Set(Array.isArray(ac.triggers) ? ac.triggers : [])];
+      const unknown = triggers.filter(t => !TRIGGERS.includes(t));
+      if (unknown.length > 0) {
+        setError(`Unknown trigger(s): ${unknown.join(", ")}. Allowed: ${TRIGGERS.join(", ")}.`);
+        return;
+      }
+      // Schema allOf: a non-empty triggers list is only valid under mode "auto".
+      if (mode !== "auto" && triggers.length > 0) {
+        setError(`Triggers are only valid under mode "auto" (currently "${mode}").`);
+        return;
+      }
+      const needsScript = mode === "custom" || (mode === "auto" && triggers.includes("custom"));
+      if (needsScript && !script) {
+        setError(mode === "custom"
+          ? "mode “custom” requires a custom_script."
+          : "trigger “custom” requires a custom_script.");
+        customScriptInput.focus();
+        return;
+      }
+      const out = { mode };
+      if (mode === "auto") {
+        out.triggers = triggers;
+        const thr = parseInt(thresholdInput.value, 10);
+        out.file_count_threshold = isNaN(thr) ? 5 : Math.max(1, thr);
+      }
+      if (script) out.custom_script = script;
+      out.secret_scan = ac.secret_scan !== false;
+      try { await saveProjectSection("auto_commit", out, status); }
+      catch { /* toast + inline status are surfaced by saveProjectSection */ }
+    } }, ["Save"]),
+  ]));
+  return wrap;
+}
+
 /* ------------------------------- Prompt Modes ----------------------------- */
 
 
@@ -10159,6 +10475,9 @@ async function init() {
   router.register("/project/orchestrator",    viewProjectOrchestrator);
   router.register("/project/repo-containment", viewProjectRepoContainment);
   router.register("/project/hooks",           viewProjectHooks);
+  router.register("/project/subagent-permissions", viewProjectSubagentPermissions);
+  router.register("/project/git",                  viewProjectGit);
+  router.register("/project/auto-commit",          viewProjectAutoCommit);
 
   router.register("/project/viz-admin",       viewProjectVizAdmin);
   router.register("/project/debug-mode",      viewProjectDebugMode);
@@ -10270,6 +10589,10 @@ init();
     "project/roles": "project_instance-roles",
     "project/orchestrator": "project_instance-orchestrator",
     "project/repo-containment": "project_instance-repo_containment",
+
+    "project/subagent-permissions": "project_instance-subagent_permissions",
+    "project/git": "project_instance-git",
+    "project/auto-commit": "project_instance-auto_commit",
 
     "project/viz-admin": "project_instance-viz_admin",
     "project/model-overrides": "project_instance-model_overrides",

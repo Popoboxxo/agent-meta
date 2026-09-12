@@ -1984,6 +1984,65 @@ class TestWriteProjectSectionWp3Sections(unittest.TestCase):
             self.assertEqual(persisted["hooks"], {"keep": {"enabled": True}})
 
 
+class TestWriteProjectSectionFeatureBSections(unittest.TestCase):
+    """Feature ``subagent-permissions-git-admin-ui``: ``subagent_permissions``,
+    ``git`` and ``auto_commit`` are exposed as editable project.yaml sections.
+    Each must round-trip through the guarded partial-update route; ``variables``
+    stays outside the whitelist (issue #730 invariant)."""
+
+    def _make_handler(self, root: Path):
+        (root / ".meta-config").mkdir(exist_ok=True)
+        handler = admin_server.AdminRequestHandler.__new__(admin_server.AdminRequestHandler)
+        admin_server.AdminRequestHandler.root = root
+        admin_server.AdminRequestHandler.config_manager = admin_server.ConfigManager(
+            root, mode="project_admin")
+        handler._send_json = lambda result: None
+        return handler
+
+    def test_new_sections_round_trip(self) -> None:
+        samples = {
+            "subagent_permissions": {
+                "mode": "warn",
+                "provider-overrides": {"Opencode": {"mode": "strict"}},
+            },
+            "git": {
+                "platform": "GitHub",
+                "remote-url": "https://github.com/owner/repo",
+                "main-branch": "main",
+                "branch-prefixes": {"feat": "feat/", "fix": "fix/", "chore": "chore/"},
+            },
+            "auto_commit": {
+                "mode": "auto",
+                "triggers": ["task-boundary"],
+                "file_count_threshold": 5,
+                "secret_scan": True,
+            },
+        }
+        for section, data in samples.items():
+            with self.subTest(section=section), tempfile.TemporaryDirectory() as tmp:
+                handler = self._make_handler(Path(tmp))
+                handler._read_body = (
+                    lambda section=section, data=data: {"section": section, "data": data})
+                handler._write_project_section()
+                persisted = handler.config_manager.read("project")
+                self.assertEqual(persisted[section], data)
+
+    def test_new_sections_are_whitelisted(self) -> None:
+        for section in ("subagent_permissions", "git", "auto_commit"):
+            with self.subTest(section=section):
+                self.assertIn(section, admin_server.PROJECT_WRITABLE_SECTIONS)
+
+    def test_variables_stays_unwritable(self) -> None:
+        # Widening the whitelist must not accidentally expose `variables`.
+        self.assertNotIn("variables", admin_server.PROJECT_WRITABLE_SECTIONS)
+        with tempfile.TemporaryDirectory() as tmp:
+            handler = self._make_handler(Path(tmp))
+            handler._read_body = lambda: {"section": "variables", "data": {"EVIL": "1"}}
+            with self.assertRaises(ValueError):
+                handler._write_project_section()
+            self.assertNotIn("variables", handler.config_manager.read("project"))
+
+
 class TestProjectFullPutGuardWp3(unittest.TestCase):
     """WP3 (#730): ``PUT /api/config/project`` used to discard the deep-merge
     result (silent no-op) and never consulted the writable-section allow-set.

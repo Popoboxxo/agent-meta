@@ -38,6 +38,8 @@ _TOUCHED_MODULES = (
     # literal `provider == "Name"` branch.
     "repo_containment",
     "consistency/repo_containment",
+    "subagent_permissions",
+    "consistency/subagent_permissions",
 )
 
 
