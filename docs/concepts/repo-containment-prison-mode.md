@@ -167,13 +167,14 @@ WARNING-Finding.
 ## 3. Admin-UI-Sektion „Repo Containment"
 
 Die neue Sektion folgt dem Muster bestehender Projekt-Instanz-Sektionen (z. B.
-`project_instance-git`, `project_instance-orchestrator`).
+`project_instance-general`, `project_instance-orchestrator`).
 
 | Ort | Änderung |
 |---|---|
-| `docs/ui/admin-ui.html` → `buildSidebar()` (Gruppe „Project instance") | Eintrag `{ route: "/project/repo-containment", label: "Repo Containment", icon: "🔒" }` |
-| `docs/ui/admin-ui.html` → `routeMap` (in `init()`) | `"project/repo-containment": "project_instance-repo_containment"` |
-| `docs/api/admin-ui-reference.md` | `<!-- help-id: project_instance-repo_containment -->` (sonst schlägt `check_ui_help_mappings` fehl) |
+| `docs/ui/admin-ui.html` → `buildSidebar()` (:1548, Gruppe „Project instance") | Sidebar-Eintrag `{ route: "/project/repo-containment", label: "Repo Containment", icon: "🔒" }` |
+| `docs/ui/admin-ui.html` → `init()` → `router.register(...)` (:10001–10052) | **Neue View-Registrierung** `router.register("/project/repo-containment", viewProjectRepoContainment)` — fehlt im aktuellen Bestand und ist zwingend, sonst Blank-Page |
+| `docs/ui/admin-ui.html` → Help-`routeMap` im zweiten `<script>`-Block (:10117) — **nicht** in `init()` | `"project/repo-containment": "project_instance-repo_containment"` |
+| `docs/api/admin-ui-reference.md` | `<!-- help-id: project_instance-repo_containment -->` ergänzen (sonst schlägt `check_ui_help_mappings` fehl) |
 | `scripts/admin-server.py` → `PROJECT_WRITABLE_SECTIONS` | `"repo_containment"` ergänzen |
 | Neue View-Funktion | Master-Toggle, `.tmp`-Sink-Toggle, Pfad-Feld (validiert), Gitignore-Toggle, Cleanup-Select, Provider-Override-Tabelle |
 
@@ -207,7 +208,7 @@ Keine davon ist eine vollständige Security Boundary (§6).
 (Logik). Der Wrapper-/Impl-Split übernimmt das etablierte Muster aus
 [`../../hooks/1-generic/orchestrator-guard.sh`](../../hooks/1-generic/orchestrator-guard.sh)
 inkl. `bash -n`-Selbstcheck (Issue #630): Ist `repo-containment-impl.sh` syntaktisch kaputt, darf
-der Wrapper den Guard nicht stillschweigend öffnen; der Fail-Mode ist eine offene Frage (§10, Q7).
+der Wrapper den Guard nicht stillschweigend öffnen; der Fail-Mode ist eine offene Frage (§10, Q6).
 
 **Hook-Header (Registrierung):**
 
@@ -225,9 +226,13 @@ Ein Provider erhält den Hook nur, wenn `provider_hooks_supported(pc)` (`has_hoo
 verifiziertes `hook_protocol`) zutrifft. Die Funktion ist in
 [`../../scripts/lib/providers.py`](../../scripts/lib/providers.py) definiert und wird von
 [`../../scripts/lib/hooks.py`](../../scripts/lib/hooks.py) bei der Registrierung aufgerufen.
-Die Registrierung läuft über `pc.get("hook_protocol")`
-(Claude: `claude-code-json` → `_update_settings_hooks`; Gemini: `antigravity-hooks-json` →
-`antigravity-json-adapter.sh`). **Kein `if provider == "Name"`** — ein neuer Provider wird ohne
+Die Registrierung läuft über `pc.get("hook_protocol")` und die datengetriebene Zuordnung
+`_HOOK_REGISTRATION_WRITERS` (`scripts/lib/hooks.py` :375–378): Claude (`claude-code-json`)
+→ `_update_settings_hooks`; Gemini (`antigravity-hooks-json`) → Writer
+`_update_antigravity_hooks_json` (`scripts/lib/hooks.py` :255), der als registrierten
+Command-String den Adapter `antigravity-json-adapter.sh` einträgt (erzeugt von
+`_antigravity_adapter_command`, `scripts/lib/hooks.py` :235–252) — der Adapter ist also nur der
+Command-String, nicht der Writer. **Kein `if provider == "Name"`** — ein neuer Provider wird ohne
 Python-Änderung unterstützt, sobald er `has_hooks` + `hook_protocol` deklariert.
 
 **Was der Hook prüft:**
@@ -248,7 +253,7 @@ PreToolUse-Payloads, wie `orchestrator-guard`) und wendet die Precedence aus §2
 |---|---|---|
 | Unterstützt der Provider Hooks **und** sind sie gespiegelt? | `config/ai-providers.yaml` | `provider_hooks_supported(pc)` — definiert in `scripts/lib/providers.py`, aufgerufen bei der Hook-Registrierung in `scripts/lib/hooks.py` (`has_hooks` + verifiziertes `hook_protocol`) |
 | Wird der neue Hook per Config an-/ausgeschaltet? | `config/project-config.schema.json` | `hooks.repo-containment.enabled` (bestehender `hooks`-Block) |
-| Ist Subagent-Dispatch vorhanden? (nur Kontext) | `config/provider-capabilities.yaml` | Top-Level-Boolean `load_provider_capabilities(...)` |
+| Ist Subagent-Dispatch vorhanden? (nur Kontext) | `config/provider-capabilities.yaml` | Capability-Wert im Dict von `load_provider_capabilities(...)` (`scripts/lib/providers.py` :120) — der Loader liefert das Capabilities-Dict, der Boolean ist der jeweilige Wert darin (kein Top-Level-Boolean) |
 
 `provider_has_capability(pc, "hooks")` ist **falsch** für diese Frage: `pc` ist der
 `ai-providers.yaml`-Eintrag, dessen `capabilities: [...]`-Liste `hooks` als Listeneintrag führt,
@@ -259,7 +264,9 @@ während die Spiegelung über `has_hooks` + `hook_protocol` entschieden wird (an
 
 **`_validate_repo_containment(config, config_path)`** in `scripts/lib/config.py`, aufgerufen aus
 `_validate_config` (dort schon `_validate_providers`). Muster:
-Meldung auf `stderr`, dann `sys.exit(1)`. **Einziger** Ort mit Hard-Exit für Containment.
+Meldung auf `stderr`, dann `sys.exit(1)`. **Einziger Hard-Exit im Sync-Prozess** für
+Containment — der PreToolUse-Hook kann per `exit 2` ebenfalls hart blocken, ist aber kein
+Sync-Exit.
 
 Geprüft wird:
 
@@ -287,12 +294,18 @@ keine schlafende Fehlkonfiguration freilegt.
   `_handle_validate` ([`../../scripts/lib/cli_commands.py`](../../scripts/lib/cli_commands.py)) neben
   `check_orchestrator_strict_hook_support`.
 - **`check_repo_containment_templates(agent_meta_root)`** — ERROR-only Framework-Drift. Prüft,
-  dass Hook und Prompt-Template die erwarteten Marker/Variablen tragen. Ein solcher
-  Template-Drift-Check existiert bisher nicht und ist damit **neu**. Als Registrierungsstelle
-  dient der bestehende Aufrufblock in
-  [`../../scripts/consistency-check.py`](../../scripts/consistency-check.py), in dem die
-  Framework-Checks importiert und aufgerufen werden (z. B.
-  [`check_placeholders`](../../scripts/lib/consistency/placeholders.py)).
+  dass Hook und Prompt-Template die erwarteten Marker/Variablen tragen. Ein **markerbasierter
+  Hook↔Rule-Template-Drift-Check existiert bisher nicht** und ist damit **neu**; die bereits
+  bestehenden Deployment-Drift-Checks (`check_stale_deployed_hooks`,
+  `check_hook_enablement_consistency` in
+  [`../../scripts/lib/consistency/hook_drift.py`](../../scripts/lib/consistency/hook_drift.py),
+  aufgerufen in [`../../scripts/lib/cli_commands.py`](../../scripts/lib/cli_commands.py)
+  (`_handle_validate`, dort :984–1000)) werden dabei **nicht dupliziert** — jene prüfen
+  deployte Hook-Dateien und deren Enablement, nicht den Template-Marker-Abgleich. Als
+  Registrierungsstelle dient der modulweite Framework-Aufrufblock in
+  [`../../scripts/consistency-check.py`](../../scripts/consistency-check.py) (:181–203, nur
+  wenn kein `specific_file`; dort z. B.
+  [`check_role_defaults_coverage`](../../scripts/lib/consistency/crossrefs.py)).
 
 ### 4.5 Prompt-/Template-Ebene (Convention)
 
@@ -303,8 +316,10 @@ keine schlafende Fehlkonfiguration freilegt.
 - **Pflicht:** Der `REPO_CONTAINMENT_`-Präfix muss in die fest verdrahtete
   Conditional-Allowlist von `strip_inactive_conditional_blocks` (`scripts/lib/variables.py`)
   aufgenommen werden, sonst werden die Blöcke nie gestrippt.
-- **Pflicht:** Neue Platzhalter müssen in der CLAUDE.md-Variablen-Tabelle registriert werden
-  (Framework-Konvention, sonst kein Sync).
+- **Pflicht:** Neue Platzhalter müssen in der `_BUILTIN_VARS`-Allowlist in
+  [`../../scripts/lib/consistency/placeholders.py`](../../scripts/lib/consistency/placeholders.py)
+  (:11–106) registriert werden. Der Sync bricht bei unbekannten Platzhaltern **nicht** ab; sie
+  erzeugen lediglich ein `placeholders.unknown`-WARNING (:159–164).
 
 ### 4.6 Hart vs. Konvention — ehrliche Einordnung
 
@@ -390,7 +405,7 @@ Definition einer **Convention boundary** in
 3. **Symlink-/TOCTOU-Escape.** Ein Agent legt einen Symlink innerhalb des Repo-Roots auf ein
    Ziel außerhalb an und schreibt durch ihn. Ein `realpath`-Check mildert das, hat aber ein
    TOCTOU-Fenster (Ziel ändert sich zwischen Check und Write). Ob Symlinks ganz verboten werden,
-   ist offene Frage §10/Q6.
+   ist offene Frage §10/Q5.
 4. **Direkte Nicht-Tool-Schreibpfade.** MCP-Filesystem-Server, Editor-Plugins oder externe CLIs
    laufen ggf. an PreToolUse vorbei. Der Hook sieht nur die Tool-Aufrufe des Providers.
 5. **Guard-Deaktivierung durch den Agenten selbst.** Ein Agent mit Write-Zugriff auf
@@ -416,6 +431,27 @@ Shell-Hook:
   Schreibrechte außerhalb des Repo-Roots.
 
 Das ist ausdrücklich **nicht** Scope dieses Konzepts (§1.2).
+
+### 6.4 Konsequenzen
+
+Die Kombination aus Default AN und bewusst begrenzter Durchsetzung hat direkte Folgen, die das
+Design in Kauf nimmt und die vor der Implementierung sichtbar sein müssen (Threat-Model-Frage 4):
+
+- **Worst Case: Default AN blockiert legitime Writes.** Ein falsch positiver Treffer trifft
+  nicht einen Angreifer, sondern den normalen Arbeitsfluss: Ein Agent kann eine beabsichtigte,
+  legitime Schreiboperation außerhalb des Repo-Roots nicht mehr ausführen und erhält einen
+  harten Deny. Das ist der bewusste Preis des fail-closed-Defaults.
+- **Destruktiver `on-sync`-Cleanup.** Wird der Cleanup-Modus auf `on-sync` gestellt, kann jeder
+  Sync-Lauf Artefakte aus `.tmp/` unwiederbringlich entfernen. Der Default bleibt deshalb
+  `manual` (§5.4); `on-sync` ist ein bewusster, destruktiver Opt-in.
+- **Vertrauensverlust durch „Default AN ohne Runtime-Gate" auf hook-losen Providern.** Provider
+  ohne gespiegelten Hook (§6.2 Punkt 6) erhalten Containment nur als Prompt-Konvention. Wird der
+  Modus dort als „aktiv" kommuniziert, ohne technisch erzwungen zu werden, entsteht eine
+  trügerische Sicherheitserwartung — der WARNING-Check (§4.4) und die ehrliche Einordnung (§4.6)
+  machen das sichtbar, beseitigen die Lücke aber nicht.
+
+Diese Konsequenzen sind bewusst dokumentiert, nicht behoben: Eine Abschwächung des Defaults wäre
+eine Design-Umkehr und ist nicht Teil dieses Konzepts.
 
 ---
 
@@ -476,7 +512,7 @@ Zusätzlich: `python scripts/consistency-check.py` muss grün bleiben (inkl.
 - **Bash-Erkennung ist best-effort** (§6.2) — nicht als Sicherheitsgarantie kommunizieren.
 - **Guard-Selbstblockade.** Ein defekter Impl-Script darf nicht dazu führen, dass alle
   Tool-Aufrufe blockiert werden (Reparatur unmöglich) — deshalb Wrapper-Muster wie #630;
-  Fail-Mode ist Q7.
+  Fail-Mode ist Q6.
 - **`on-sync`-Cleanup** ist destruktiv; Default bleibt `manual`.
 
 ### 9.2 Nicht-Ziele
@@ -495,6 +531,19 @@ Zusätzlich: `python scripts/consistency-check.py` muss grün bleiben (inkl.
   über den self-ignoring Fallback (§5.3), da der exakte Managed-Block Claude-gated ist.
 - **Admin-UI:** Rein additive Nav/Route/View/Help-ID; bestehende Sektionen unberührt.
 - **CHANGELOG-Eintrag** unter `## [Unreleased]`; keine Versionserhöhung in diesem Konzept.
+
+**Abnahmekriterien (DoD für die Implementierung):**
+
+1. `python scripts/sync.py --validate` läuft grün (inkl. neuem `_validate_repo_containment`).
+2. Die neue Hook-Test-Suite (§7) läuft grün; `python scripts/consistency-check.py` bleibt grün
+   (inkl. `check_ui_help_mappings` für die neue Route).
+3. Der Opt-out ist dokumentiert: `repo_containment.enabled: false` (bzw. ein Provider-Override)
+   deaktiviert Containment nach einem Sync nachweislich.
+4. CHANGELOG-Eintrag unter `## [Unreleased]` beschreibt den Verhaltenswechsel ehrlich.
+
+**Rollback-Pfad:** `repo_containment.enabled: false` in `.meta-config/project.yaml` setzen und
+`sync.py` erneut ausführen. Der Hook wird deregistriert und die Schreibbeschränkung entfällt;
+`.tmp/`-Inhalte bleiben unberührt (Cleanup-Default `manual`), es entsteht kein Datenverlust.
 
 ---
 
