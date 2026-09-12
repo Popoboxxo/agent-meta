@@ -99,6 +99,35 @@ project:
 #   custom_script: null
 #   secret_scan: true
 #
+# git:
+#   # Repo-Settings für die Admin-UI-Sektion "Git". Kanonische Quelle der
+#   # generierten {{GIT_*}}-Variablen; ein expliziter variables.GIT_*-Eintrag
+#   # (siehe unten) gewinnt weiterhin.
+#   platform: GitHub               # GitHub | GitLab | Gitea | Codeberg
+#   remote-url: https://github.com/owner/repo
+#   main-branch: main
+#   # branch-prefixes: Daten/UI-only in dieser Iteration (noch nicht vom
+#   #   branch-guard konsumiert) — speichern/anzeigen, Defaults unten.
+#   branch-prefixes:
+#     feat: "feat/"
+#     fix: "fix/"
+#     chore: "chore/"
+#
+# subagent_permissions:
+#   # Subagent-Permission-Policy. Default: mode: off (keine Verhaltensänderung).
+#   #   warn -> Verstöße werden im Report des delegierenden Agenten gemeldet,
+#   #     aber nicht blockiert.
+#   #   strict -> Subagenten ohne explizite allow/deny-Deklaration (nicht-leere
+#   #     tools:-Liste) werden nicht dispatcht; jedes Ergebnis MUSS dem Format
+#   #     STATUS/RESULT/ARTIFACTS folgen. Der Sync-Validator bricht ab, wenn
+#   #     eine aktive Rolle keine tools:-Liste deklariert.
+#   # Werte MÜSSEN gequotet sein (unquoted off/on/true/false parst als YAML-Bool
+#   # und wird safe-side auf "off" normalisiert).
+#   mode: "off"
+#   # provider-overrides:
+#   #   Opencode: { mode: strict }
+#   #   Gemini: {}                   # kein mode -> erbt den globalen Mode
+#
 # Secrets in committeten Dateien erlauben (NICHT empfohlen).
 # Default: false — sync bricht mit Fehler ab wenn Secrets in nicht-gitignored Dateien erkannt werden.
 # Nur auf true setzen wenn absichtlich demo-tokens o.ä. committet werden sollen.

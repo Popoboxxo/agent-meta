@@ -1312,6 +1312,93 @@
     "outcome-caching": {
       "$ref": "#/$defs/outcome-caching"
     },
+    "subagent_permissions": {
+      "type": "object",
+      "description": "Subagent permission policy. Default: mode 'off' -- zero behavior change. 'warn' reports dispatch/return-format violations in the delegating agent's own report but never blocks. 'strict' instructs the orchestrator to reject subagent dispatches for roles without an explicit allow/deny declaration (a non-empty `tools:` list in the role template) and to require the structured STATUS/RESULT/ARTIFACTS return format; sync-time validation additionally aborts when an active role template declares no explicit tools list.",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "strict",
+            "warn",
+            "off"
+          ],
+          "default": "off",
+          "description": "off = today's behavior (subagent dispatch is unconstrained). warn = violations are reported in the delegating agent's report, dispatch continues. strict = subagents without an explicit allow/deny declaration (`tools:` frontmatter) are not dispatched, and every subagent result MUST follow the structured STATUS/RESULT/ARTIFACTS format."
+        },
+        "provider-overrides": {
+          "type": "object",
+          "description": "Override subagent_permissions.mode per provider. Keys are provider names (Claude, Codex, Gemini, Opencode, ...). Providers without an entry (or without 'mode' set) inherit the global subagent_permissions.mode. Resolution: provider override > project value > framework default 'off'.",
+          "additionalProperties": {
+            "type": "object",
+            "description": "Per-provider subagent permission overrides.",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "strict",
+                  "warn",
+                  "off"
+                ],
+                "description": "Subagent permission mode for this provider only. Same semantics as subagent_permissions.mode. When unset, inherits the global mode."
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "git": {
+      "type": "object",
+      "description": "Repository and branch conventions surfaced in the Admin UI 'Git' section. Values are the canonical source for the generated {{GIT_PLATFORM}}/{{GIT_REMOTE_URL}}/{{GIT_MAIN_BRANCH}} variables. Backward compatible: an explicit variables.GIT_* entry in project.yaml still wins over this section. branch-prefixes are stored/displayed but not yet consumed (follow-up: branch-guard wiring, see design doc).",
+      "properties": {
+        "platform": {
+          "type": "string",
+          "enum": [
+            "GitHub",
+            "GitLab",
+            "Gitea",
+            "Codeberg"
+          ],
+          "default": "GitHub",
+          "description": "Git hosting platform. Mirrors variables.GIT_PLATFORM."
+        },
+        "remote-url": {
+          "type": "string",
+          "default": "",
+          "description": "Canonical remote URL (e.g. https://github.com/owner/repo). Mirrors variables.GIT_REMOTE_URL."
+        },
+        "main-branch": {
+          "type": "string",
+          "default": "main",
+          "description": "Default/main branch name. Mirrors variables.GIT_MAIN_BRANCH."
+        },
+        "branch-prefixes": {
+          "type": "object",
+          "description": "Branch prefix conventions (data/UI only in this iteration — not yet consumed by branch-guard). Defaults reproduce the historic feat/ fix/ chore/ prefixes.",
+          "properties": {
+            "feat": {
+              "type": "string",
+              "default": "feat/",
+              "description": "Prefix for feature branches."
+            },
+            "fix": {
+              "type": "string",
+              "default": "fix/",
+              "description": "Prefix for bugfix branches."
+            },
+            "chore": {
+              "type": "string",
+              "default": "chore/",
+              "description": "Prefix for maintenance branches."
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "cascades": {
       "description": "SE-Kaskaden-Definitionen (Phase 3+). First-Class neben quality-pipelines.",
       "type": "object",
