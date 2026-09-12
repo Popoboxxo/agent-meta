@@ -1,6 +1,6 @@
 # CODEBASE_OVERVIEW — agent-meta
 
-> Letzte Aktualisierung: 2026-09-06 (feat/issue-674-roadmap: Phase 4b Runtime-Backends — Orchestration-Contract-Modul `scripts/lib/orchestration.py` (#265), statische File-Affinity-Analyse `scripts/lib/file_affinity.py` (#266), Capability-Keys `fanout_mechanism`/`barrier_collect` + Post-sync-Drift-Check `fanout_contracts.py`, Checkpoint-Roh-Output-Archiv (#267), Intent-Routing-Tooldefinition `{{INTENT_ROUTING_TOOLS}}` (#264), neue Rolle `test-executor` (#517), `<output-guard>` in 48 bash-fähigen Templates (#506); zuvor feat/issue-558-pre-release-gates: Mechanized Pre-Release Gates — Plugin-Architektur für Pre-Release-Checks mit 3 eingebauten Gates (artifact-freshness, docker-image-scan, action-pin-validation), konfigurierbar via release-gates: in project.yaml und dod-presets, sync.py wiring via hooks.py::sync_release_gates() + dod.py::resolve_release_gates(), release.md v1.6.0 Integration; zuvor feat/hacs-platform-preset: HACS Platform Preset — 5 hacs-* Agent-Overrides, integration-development Skill via channel:skill, hacs.defaults.yaml mit Pflicht-Overrides; zuvor fix/admin-ui-model-loading: Admin-UI Model-Loading-Resilienz)
+> Letzte Aktualisierung: 2026-09-11 (docs/audit-batch-730-743-update: Audit-Batch #712/#730–#743 — Provider-Agnostik mit `commands`-Capability (22 `if provider ==`-Zweige entfernt, AST-verifiziert 0), read-only `--audit-config`, Drift-Backup via `generated_file_drift.py::backup_drifted_files()`, `.gitattributes`-LF-Regel; zuvor feat/issue-674-roadmap: Phase 4b Runtime-Backends — Orchestration-Contract-Modul `scripts/lib/orchestration.py` (#265), statische File-Affinity-Analyse `scripts/lib/file_affinity.py` (#266), Capability-Keys `fanout_mechanism`/`barrier_collect` + Post-sync-Drift-Check `fanout_contracts.py`, Checkpoint-Roh-Output-Archiv (#267), Intent-Routing-Tooldefinition `{{INTENT_ROUTING_TOOLS}}` (#264), neue Rolle `test-executor` (#517), `<output-guard>` in 48 bash-fähigen Templates (#506); zuvor feat/issue-558-pre-release-gates: Mechanized Pre-Release Gates — Plugin-Architektur für Pre-Release-Checks mit 3 eingebauten Gates (artifact-freshness, docker-image-scan, action-pin-validation), konfigurierbar via release-gates: in project.yaml und dod-presets, sync.py wiring via hooks.py::sync_release_gates() + dod.py::resolve_release_gates(), release.md v1.6.0 Integration; zuvor feat/hacs-platform-preset: HACS Platform Preset — 5 hacs-* Agent-Overrides, integration-development Skill via channel:skill, hacs.defaults.yaml mit Pflicht-Overrides; zuvor fix/admin-ui-model-loading: Admin-UI Model-Loading-Resilienz)
 
 ---
 
@@ -891,6 +891,11 @@ disabled: []                         # hidden in UI, aber in registry
 **Dynamisches Crawling (`--update-models`):**
 Ruft das Modul `scripts/lib/model_discovery.py` auf, um aktuelle Modelle von den Provider-APIs zu laden und lokal in der `model-registry.json` zu cachen.
 
+**Audit- und Check-Verhalten (Audit-Batch #730–#743):**
+- `--check` behandelt legitim fehlende, gitignorierte Provider-Wurzeln als Non-Drift (fail-open, #752).
+- `--audit-config` arbeitet read-only: keine `env.*`-Dateien, kein `sync.log` (#738, WP7).
+- `AGENT_META_DATE` ist reproduzierbar aufgelöst: `SOURCE_DATE_EPOCH` → CHANGELOG-Release-Datum → `now()` (#752).
+
 ### `scripts/lib/config.py` — `build_variables()`
 
 **Zweck:** Zentrale Template-Variablen-Auflösung für alle Placeholder-Substitutionen in Agent-Templates.
@@ -1100,6 +1105,22 @@ in das `model:`-Frontmatter → die persistierte ID muss die lauffähige ID sein
 | `load_pipeline_overrides` | `(config_path: str) → dict` | Lädt `.meta-config/project.yaml` → `quality-pipelines` |
 | `apply_overrides` | `(base: dict, overrides: dict) → dict` | Merged base+overrides, Stage-Level-Merging unterstützt |
 | `validate_pipelines` | `(pipelines: dict, available_roles: list) → list[str]` | Validiert Agent-Existenz, Loop-Definition, Circular-Checks |
+
+### `scripts/lib/generated_file_drift.py`
+
+**Zweck:** Drift-Erkennung für sync.py-eigene Dateien (über `.agent-meta-managed`-Indizes getrackt) gegen eine Hash-Baseline (`.meta-config/generated-file-hashes.json`) — und Sicherung manuell editierter Dateien vor dem Überschreiben. Die Datei wird weiterhin in-place überschrieben; das Backup ist ein Sicherheitsnetz, keine Preservation.
+
+**Exportierte API:**
+
+| Funktion | Signatur | Zweck |
+|----------|----------|-------|
+| `scan_generated_file_drift` | `(agent_meta_root, project_root, config, provider_config) → list[dict]` | Vergleicht Managed-Dateien aktiver Provider + `.meta-config/platform-defaults.resolved.yaml` mit der Baseline; rein lesend (keine Writes/Warnungen — der Sync-Pipeline-Stage loggt). Dateien ohne Baseline sind kein Finding; `drift-allowlist.yaml` (`allow-edits`) und `drift-detection.enabled: false` werden respektiert |
+| `backup_drifted_files` | `(findings, project_root, log, dry_run=False) → list[str]` | **Neu in #734 (WP6):** schreibt pro Finding ein `<datei>.sync-backup-<YYYYmmdd-HHMMSS>`-Sibling mit exakt dem Pre-Overwrite-Inhalt; ein Zeitstempel pro Sync-Lauf. Fail-soft (unlesbare/unschreibbare Datei → debug-Log + skip); dry-run schreibt nichts, liefert aber die geplanten Backup-Pfade |
+| `capture_generated_file_hashes` | `(agent_meta_root, project_root, config, provider_config, dry_run) → None` | Schreibt die frische Baseline aus dem On-Disk-Zustand aller aktiven Provider, nachdem alle Writer gelaufen sind |
+
+**Flow (Sync-Pipeline):** `scan_generated_file_drift()` (vor der Per-Provider-Write-Phase, sieht den Pre-Overwrite-Zustand) → `backup_drifted_files()` → Warnungen → Writer → `capture_generated_file_hashes()`.
+
+**`.gitignore`:** Managed-Block-Eintrag `*.sync-backup-*` hält die Backup-Siblings aus dem Repo (#734).
 
 ### `scripts/lib/delegation_syntax.py` & `scripts/lib/bootstrap.py`
 
@@ -1367,6 +1388,7 @@ delegation_syntax:
 | `file_based_agents` | boolean | Agenten werden aus Dateien automatisch geladen |
 | `text_mentions` | boolean | `@agent` Text-Mentions als Dispatch |
 | `hooks` | boolean | Git-Hook-Integration unterstützt |
+| `commands` | boolean | Provider erhält die generierten Slash-Commands aus `commands/*.md`; Gate in `scripts/lib/commands.py::sync_commands_for_provider()` — ein nicht unterstützter Provider erhält eine explizite "not supported"-Info-Zeile statt des früheren stillen `return`; ein Provider, der Support deklariert aber keine `commands_dir` hat, bricht hart ab (#735/#743). Belegung: Claude/Gemini/Opencode/Continue `true`; Copilot/Mammouth/Codex/ZCode/KimiCode explizit `false` (verifizierte Aussage "keine Command-Oberfläche"); alle 9 Provider tragen den Key explizit |
 | `native_agent_tools` | string[] | Namen der nativen Agent-Tools |
 | `bootstrap_required` | boolean | Session-Bootstrap erforderlich |
 | `fanout_mechanism` | enum | FANOUT/PARALLEL_GROUP-Dispatch-Mechanismus: `native-batch` \| `tool-mediated` \| `swarm` \| `sequential-fallback` (#265, konservativ verifiziert — unverified paralleler Contract → `sequential-fallback`) |
