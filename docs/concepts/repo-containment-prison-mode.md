@@ -1,6 +1,6 @@
 # Konzept — Repo-Containment („Gefängnis-Modus") & `.tmp`-Scratch-Sink
 
-- **Status:** Draft v1 (Konzept, keine Implementierung)
+- **Status:** Accepted (Implementierung freigegeben; Umsetzung in diesem Lauf, §10/Q10)
 - **Betroffener Bereich:** Sync-Config, Provider-Hooks, Consistency-Checks, `.gitignore`, Admin-UI
 - **Umfang:** 1 neuer Config-Block `repo_containment`, 1 neuer PreToolUse-Hook, 1 Sync-Time-Validator,
   1 Consistency-Check, 1 Admin-UI-Sektion, `.tmp`-Bereitstellung
@@ -45,8 +45,8 @@ Der Modus ist:
 - **Kein Abfangen von Lese-Zugriffen.** Containment beschränkt Schreibzugriffe (`Write`/`Edit`
   plus schreibende Bash-Kommandos). Read-Tools (`Read`, `Glob`, `Grep`) bleiben unberührt.
 - **Keine automatische Löschung von `.tmp`-Inhalten per Default** (Datenverlust-Risiko, §5.4).
-- **Keine Änderung an `orchestrator-guard.sh` / `branch-guard`** in dieser Iteration; ein
-  Zusammenlegen der beiden PreToolUse-Hooks ist eine offene Frage (§10).
+- **Keine Änderung an `orchestrator-guard.sh` / `branch-guard`** in dieser Iteration; die beiden
+  PreToolUse-Hooks koexistieren unabhängig (§10/Q7, entschieden).
 - Kein Push/Tag/Release, keine neue externe Python-Dependency (nur Stdlib + PyYAML).
 
 ### 1.3 Betroffene Subsysteme
@@ -132,6 +132,12 @@ Der Modus ist:
 }
 ```
 
+**Master-Switch-Klarstellung:** `repo_containment.enabled` ist der **einzige** Master-Switch.
+Es existiert **kein** separater `hooks.repo-containment.enabled`-Eintrag. Die Hook-Registrierung
+erfolgt rein capability-getrieben über den Hook-Header `enabled_by_default: true` plus
+`provider_hooks_supported` (§4.2); den effektiven An/Aus-Zustand liest der Hook zur Laufzeit
+direkt aus `.meta-config/project.yaml` (nicht aus einem `hooks`-Block).
+
 ### 2.2 Beispiel in `.meta-config/project.yaml`
 
 ```yaml
@@ -157,10 +163,13 @@ Diese dreistufige Kettenlogik spiegelt bewusst die bereits etablierte Auflösung
 Alle Verschachtelungszugriffe erfolgen defensiv (`config.get(...)` + `isinstance(..., dict)`-Guards),
 der Resolver ist **nicht-exitierend**; der einzige Hard-Exit liegt im Sync-Validator (§4.3).
 
-**YAML-1.1-Falle:** Unquoted `enabled: off|no|false|on|yes|true` wird als `bool` geparst. Der
-Resolver interpretiert einen echten `bool` direkt; nur bei explizit nicht-booleschen,
-nicht auflösbaren Werten fällt er safe-side auf `true` (Default AN) zurück und erzeugt ein
-WARNING-Finding.
+**YAML-1.1-Falle (F4 — eine Regel, konsistent referenziert aus §4.1 und §4.3):** Unquoted
+`enabled: off|no|false|on|yes|true` wird als `bool` geparst — das ist gültig und wird direkt
+interpretiert. Ein **nicht-boolescher** `enabled`-Wert (z. B. String oder Number) ist hingegen
+ein harter Fehler: Der Sync-Time-Validator `_validate_repo_containment` bricht mit klarer
+Fehlermeldung ab (§4.3). Zur Laufzeit gilt für den Hook eine defensive Safe-Side-Regel: Bei
+fehlender, unlesbarer oder unparsebarer Config fällt er auf ENABLED zurück und öffnet **nie**
+stillschweigend (§4.1). Es gibt keine dritte, widersprechende Fallback-Regel.
 
 ---
 
@@ -207,8 +216,16 @@ Keine davon ist eine vollständige Security Boundary (§6).
 **Neuer Hook:** `hooks/1-generic/repo-containment.sh` (Wrapper) + `hooks/1-generic/repo-containment-impl.sh`
 (Logik). Der Wrapper-/Impl-Split übernimmt das etablierte Muster aus
 [`../../hooks/1-generic/orchestrator-guard.sh`](../../hooks/1-generic/orchestrator-guard.sh)
-inkl. `bash -n`-Selbstcheck (Issue #630): Ist `repo-containment-impl.sh` syntaktisch kaputt, darf
-der Wrapper den Guard nicht stillschweigend öffnen; der Fail-Mode ist eine offene Frage (§10, Q6).
+inkl. `bash -n`-Selbstcheck (Issue #630). **Fail-Mode (Q6, entschieden): narrow carve-out.**
+Ist `repo-containment-impl.sh` syntaktisch kaputt, **failt der Guard CLOSED** für `Write`/`Edit`
+(er blockt die Tool-Aufrufe), öffnet also nicht stillschweigend — bietet aber einen
+**dokumentierten Reparatur-Kanal**, damit sich der Guard nicht selbst aussperrt. Der Reparatur-
+Kanal ist im Hook dokumentiert (analog #630); Details siehe §9.1.
+
+**Fail-safe bei unklarem `enabled` (F4):** Fehlt die Config, ist sie unlesbar oder unparsebar,
+fällt der Hook defensive safe-side auf **ENABLED** zurück und öffnet **nie** stillschweigend.
+Ein explizit nicht-boolescher `enabled`-Wert ist bereits auf Sync-Ebene ein Hard-Exit (§4.3);
+dieselbe Regel wird hier nicht widersprüchlich dupliziert.
 
 **Hook-Header (Registrierung):**
 
@@ -252,7 +269,7 @@ PreToolUse-Payloads, wie `orchestrator-guard`) und wendet die Precedence aus §2
 | Frage | Registry | Zugriff |
 |---|---|---|
 | Unterstützt der Provider Hooks **und** sind sie gespiegelt? | `config/ai-providers.yaml` | `provider_hooks_supported(pc)` — definiert in `scripts/lib/providers.py`, aufgerufen bei der Hook-Registrierung in `scripts/lib/hooks.py` (`has_hooks` + verifiziertes `hook_protocol`) |
-| Wird der neue Hook per Config an-/ausgeschaltet? | `config/project-config.schema.json` | `hooks.repo-containment.enabled` (bestehender `hooks`-Block) |
+| Wird der neue Hook per Config an-/ausgeschaltet? | `config/project-config.schema.json` | **`repo_containment.enabled` ist der einzige Master-Switch.** Es gibt **keinen** separaten `hooks.repo-containment.enabled`-Eintrag. Die Registrierung erfolgt ausschließlich über den Hook-Header `enabled_by_default: true` plus Capability (`providers.provider_hooks_supported`); der Hook liest den An/Aus-Zustand zur Laufzeit direkt aus `.meta-config/project.yaml` |
 | Ist Subagent-Dispatch vorhanden? (nur Kontext) | `config/provider-capabilities.yaml` | Capability-Wert im Dict von `load_provider_capabilities(...)` (`scripts/lib/providers.py` :120) — der Loader liefert das Capabilities-Dict, der Boolean ist der jeweilige Wert darin (kein Top-Level-Boolean) |
 
 `provider_has_capability(pc, "hooks")` ist **falsch** für diese Frage: `pc` ist der
@@ -271,7 +288,11 @@ Sync-Exit.
 Geprüft wird:
 
 1. `repo_containment` ist ein Mapping (falls gesetzt).
-2. `enabled` ist boolean (falls gesetzt).
+2. `enabled` ist boolean (falls gesetzt). **F4:** Ein nicht-boolescher `enabled`-Wert (String/
+   Number) → **Hard-Exit** `sys.exit(1)` mit klarer Fehlermeldung, die den erwarteten Typ nennt.
+   Dieselbe Regel wird aus §2.3 und §4.1 referenziert; die Runtime-Safe-Side-Fallback-Logik des
+   Hooks (fehlende/unlesbare/unparsebare Config → ENABLED) gilt hier nicht, weil der Validator
+   bei vorliegender, aber falsch typisierter Config hart abbricht.
 3. `provider-overrides` ist ein Mapping; jeder Key ist ein registrierter Provider
    (`registered_provider_names(...)`); jeder Eintrag ist ein Mapping; dessen `enabled` ist boolean.
 4. `tmp-sink.path` ist ein **relativer**, nicht-leerer Pfad, kein `.`/Absolutpfad, kein
@@ -349,7 +370,8 @@ genügt; dry-run meldet nur.
 - Konfigurierbar über `tmp-sink.path` (relativ, `..`-frei, durch §4.3 hart validiert).
 - `repo root` ist der Projekt-Instanz-Root (das Verzeichnis, in dem `.meta-config/` liegt),
   **nicht** das Git-Toplevel bei Submodul-Layout. `.agent-meta/`-Framework-Dateien liegen
-  innerhalb des Projekt-Roots und sind daher ohnehin erlaubt.
+  innerhalb des Projekt-Roots und sind daher ohnehin erlaubt. Diese Definition ist bestätigt
+  (§10/Q8).
 
 ### 5.3 Gitignore-Handling
 
@@ -376,7 +398,7 @@ managed-Block-Logik geführt.
 - **Opt-in `on-sync`:** Vor jedem Lauf wird der Inhalt geleert. Im Sync-Log und in der Admin-UI
   explizit als destruktiv markiert.
 - Kein Cleanup beim Session-Start in dieser Iteration (mangels provider-agnostischem,
-  verlässlichem Session-Start-Hook; als offene Frage §10/Q3 notiert).
+  verlässlichem Session-Start-Hook; Q3 entschieden: nur `manual`/`on-sync`, §10/Q3).
 - Das Verzeichnis bleibt via Gitignore ungetrackt und ist damit nicht Teil des Repo-Zustands.
 
 ---
@@ -403,9 +425,9 @@ Definition einer **Convention boundary** in
    Pipes können außerhalb eines strukturierten Zielpfads schreiben. Der Hook erkennt
    `Write`/`Edit` präzise, schreibende `Bash`-Muster nur best-effort.
 3. **Symlink-/TOCTOU-Escape.** Ein Agent legt einen Symlink innerhalb des Repo-Roots auf ein
-   Ziel außerhalb an und schreibt durch ihn. Ein `realpath`-Check mildert das, hat aber ein
-   TOCTOU-Fenster (Ziel ändert sich zwischen Check und Write). Ob Symlinks ganz verboten werden,
-   ist offene Frage §10/Q5.
+   Ziel außerhalb an und schreibt durch ihn. Der **entschiedene** `realpath`-Check mildert das
+   (Q5), hat aber ein TOCTOU-Fenster (Ziel ändert sich zwischen Check und Write); dieses
+   Restrisiko wird dokumentiert, Symlinks werden nicht pauschal gesperrt (§10/Q5).
 4. **Direkte Nicht-Tool-Schreibpfade.** MCP-Filesystem-Server, Editor-Plugins oder externe CLIs
    laufen ggf. an PreToolUse vorbei. Der Hook sieht nur die Tool-Aufrufe des Providers.
 5. **Guard-Deaktivierung durch den Agenten selbst.** Ein Agent mit Write-Zugriff auf
@@ -511,8 +533,9 @@ Zusätzlich: `python scripts/consistency-check.py` muss grün bleiben (inkl.
   Prompt-Konvention; der WARNING-Check (§4.4) muss das sichtbar machen.
 - **Bash-Erkennung ist best-effort** (§6.2) — nicht als Sicherheitsgarantie kommunizieren.
 - **Guard-Selbstblockade.** Ein defekter Impl-Script darf nicht dazu führen, dass alle
-  Tool-Aufrufe blockiert werden (Reparatur unmöglich) — deshalb Wrapper-Muster wie #630;
-  Fail-Mode ist Q6.
+  Tool-Aufrufe blockiert werden (Reparatur unmöglich). **Entschieden (Q6):** narrow carve-out wie
+  #630 — `bash -n`-Selbstcheck; bei kaputtem `repo-containment-impl.sh` failt der Guard CLOSED
+  für `Write`/`Edit`, bietet aber einen dokumentierten Reparatur-Kanal (§4.1, §10/Q6).
 - **`on-sync`-Cleanup** ist destruktiv; Default bleibt `manual`.
 
 ### 9.2 Nicht-Ziele
@@ -526,11 +549,19 @@ Zusätzlich: `python scripts/consistency-check.py` muss grün bleiben (inkl.
 ### 9.3 Migrations- & Rückwärtskompatibilität
 
 - **Additives Schema:** Bestehende Configs bleiben gültig; ohne Block greift der Default.
-- **Default AN:** Verhaltensänderung (siehe 9.1) — bewusst, mit Opt-out.
+- **Materialisierung bei Bestandsprojekten (Q1, entschieden):** Beim Sync wird für
+  Bestandsprojekte ein **expliziter** `repo_containment`-Block (Default `enabled: true` plus
+  tmp-sink-Defaults) in `.meta-config/project.yaml` materialisiert. Das ist **idempotent** und
+  geschieht **nur, wenn der Block fehlt**. Dadurch ist der Verhaltenswechsel sichtbar und der
+  Opt-out direkt auffindbar (statt eines reinen unsichtbaren Schema-Defaults).
+- **Default AN:** Verhaltensänderung (siehe 9.1) — bewusst, mit sichtbarem Opt-out.
 - **`.gitignore`:** `.tmp/` kommt additiv in den Managed-Block; auf Claude-losen Projekten nur
   über den self-ignoring Fallback (§5.3), da der exakte Managed-Block Claude-gated ist.
 - **Admin-UI:** Rein additive Nav/Route/View/Help-ID; bestehende Sektionen unberührt.
-- **CHANGELOG-Eintrag** unter `## [Unreleased]`; keine Versionserhöhung in diesem Konzept.
+- **CHANGELOG-Note** unter `## [Unreleased]`; keine Versionserhöhung in diesem Konzept. Inhalt:
+  (a) Verhaltenswechsel — Bestandsprojekte erhalten erstmals einen blockierenden Hook,
+  (b) sichtbarer Opt-out `repo_containment.enabled: false` (bzw. Provider-Override),
+  (c) einmalige Materialisierung des `repo_containment`-Blocks in `.meta-config/project.yaml`.
 
 **Abnahmekriterien (DoD für die Implementierung):**
 
@@ -547,31 +578,36 @@ Zusätzlich: `python scripts/consistency-check.py` muss grün bleiben (inkl.
 
 ---
 
-## 10. Offene Fragen
+## 10. Entschiedene Fragen (ehemals offene Fragen)
 
-1. **Default-AN-Migration.** Sollen Bestandsprojekte den Hook automatisch erhalten (reiner
-   Schema-Default, wie oben beschrieben) oder soll `sync.py` einmalig einen expliziten
-   `repo_containment`-Block in `.meta-config/project.yaml` materialisieren, damit der
-   Verhaltenswechsel sichtbar/überprüfbar ist?
-2. **Provider-Override-Semantik bei hook-losen Providern.** Wird `enabled: true` dort
-   trotzdem als Prompt-Konvention ausgespielt (Empfehlung: ja, plus WARNING), oder soll der
-   Resolver auf hook-losen Providern automatisch auf `false` fallen?
-3. **Cleanup-Trigger Session-Start.** Gibt es einen provider-agnostisch verlässlichen
-   Session-Start-Hook, oder bleibt es bei `manual`/`on-sync`?
-4. **Bash-Umfang.** Wird die schreibende Bash-Erkennung bewusst als best-effort (analog #592)
-   dokumentiert, oder sollen Redirection-Häufungen wie `cat > /path` aktiv erkannt werden?
-5. **Symlink-Politik.** `realpath`-Auflösung mit TOCTOU-Restrisiko, oder Symlinks innerhalb des
-   Repo-Roots pauschal sperren?
-6. **Hook-Selbstheilung.** Welcher Fail-Mode bei kaputtem `repo-containment-impl.sh`? Narrow
-   Carve-out (analog #630) oder separater Reparatur-Kanal?
-7. **Hook-Interaktion.** `orchestrator-guard.sh` und `repo-containment.sh` sind zwei
-   PreToolUse-Hooks mit `matcher: ""`. Reicht Koexistenz (unabhängige Registrierung), oder soll
-   ein gemeinsamer Wrapper die Reihenfolge/Short-Circuit-Logik garantieren?
-8. **`repo root`-Definition im Submodul-Layout.** Ist die Wurzel immer der Projekt-Root
-   (Verzeichnis mit `.meta-config/`) — auch wenn agent-meta unter `.agent-meta/` liegt? Diese
-   Definition liegt dem Konzept zugrunde und ist zu bestätigen.
-9. **MCP-/Nicht-Tool-Schreibpfade.** Sollen MCP-Filesystem-Server in die Bedrohungsanalyse
-   aufgenommen und ggf. durch eine separate MCP-Allowlist eingeschränkt werden (Folge-Issue)?
-10. **Issue-Aufteilung.** Empfehlung: ein Implementierungs-Issue mit den Teilen Config+Validator,
-    Hook, `.tmp`-Sink/Gitignore, Consistency und Admin-UI — oder getrennte Issues pro Subsystem?
-    Klärung durch `main_chat`, kein Blocker.
+Alle vormals offenen Fragen sind entschieden; das Dokument ist damit **Accepted**.
+
+1. **Default-AN-Migration. [entschieden]** Bestandsprojekte erhalten beim Sync einen
+   **expliziten** `repo_containment`-Block in `.meta-config/project.yaml` materialisiert
+   (Default `enabled: true` plus tmp-sink-Defaults), **idempotent** und nur wenn der Block fehlt.
+   Der Verhaltenswechsel und der sichtbare Opt-out werden im CHANGELOG benannt (§9.3).
+2. **Provider-Override-Semantik bei hook-losen Providern. [entschieden]** `enabled: true`
+   bleibt dort als **Prompt-Konvention** bestehen und wird **nicht** automatisch auf `false`
+   gesetzt; der Consistency-Check (§4.4) meldet die Support-Lücke als **WARNING**.
+3. **Cleanup-Trigger. [entschieden]** Nur `manual` (Default) und `on-sync` (Opt-in, explizit als
+   destruktiv markiert); kein Session-Start-Cleanup (§5.4).
+4. **Bash-Umfang. [entschieden]** Schreibende Bash-Erkennung bleibt **best-effort** und wird
+   bewusst als solche dokumentiert (analog #592, §6.2).
+5. **Symlink-Politik. [entschieden]** `realpath`-Check wird angewendet; das verbleibende
+   **TOCTOU-Restrisiko** wird dokumentiert (§6.2 Punkt 3), Symlinks werden nicht pauschal
+   gesperrt.
+6. **Hook-Selbstheilung. [entschieden]** **Narrow carve-out** (analog #630): `bash -n`-Selbstcheck
+   im Wrapper; bei kaputtem `repo-containment-impl.sh` failt der Guard CLOSED für `Write`/`Edit`,
+   aber mit dokumentiertem Reparatur-Kanal, damit er sich nicht selbst aussperrt (§4.1, §9.1).
+7. **Hook-Interaktion. [entschieden]** `orchestrator-guard.sh` und `repo-containment.sh`
+   koexistieren **unabhängig** (getrennte Registrierung, keine gemeinsame Wrapper-Logik in dieser
+   Iteration).
+8. **`repo root`-Definition im Submodul-Layout. [entschieden]** `repo root` ist immer das
+   Verzeichnis, das `.meta-config/` enthält — auch im Submodul-Layout (agent-meta unter
+   `.agent-meta/`), nicht das Git-Toplevel (§5.2).
+9. **MCP-/Nicht-Tool-Schreibpfade. [entschieden]** Bleiben eine dokumentierte Grenze (§6.2
+   Punkt 4) und werden in dieser Iteration **nicht** implementiert; eine separate
+   MCP-Allowlist ist ein **Folge-Issue**.
+10. **Issue-Aufteilung. [entschieden]** **Ein** Implementierungs-Task mit **5 Sub-Tasks**:
+    (1) Config+Validator, (2) Hook, (3) `.tmp`-Sink/Gitignore, (4) Consistency, (5) Admin-UI —
+    umgesetzt in diesem Lauf.
