@@ -19,6 +19,7 @@
 | REQ-CMD-07 | Das Repository enthält einen generischen Claude-Slash-Command `commands/1-generic/doc-now.md`. Der Command `/doc-now` delegiert an den `documenter`-Agenten und veranlasst diesen, `CODEBASE_OVERVIEW.md` sofort zu aktualisieren. Der Command akzeptiert ein optionales `$ARGUMENTS`-Token, mit dem der Nutzer den zu dokumentierenden Bereich eingrenzen kann. | Should |
 | REQ-CMD-08 | `sync.py --create-command <name>` legt eine projektspezifische Command-Datei unter `.claude/commands/<name>.md` an. Die so erstellte Datei wird von sync.py bei späteren Syncs nie überschrieben oder gelöscht. Das Verhalten ist analog zu `--create-rule <name>`. | Should |
 | REQ-CMD-09 | Das Commands-System ist vollständig dokumentiert in `howto/commands.md` (Schichten-Modell, Sync-Verhalten, Frontmatter-Felder, Anleitung zum Anlegen eines projektspezifischen Commands). Zusätzlich werden `CLAUDE.md` (Verzeichnisstruktur, Sync-Verhalten-Tabelle) und `howto/instantiate-project.md` (Verweis auf Commands) aktualisiert. | Should |
+| REQ-CMD-10 | Jeder registrierte Provider trägt explizit ein `commands`-Capability-Feld (`commands: true|false`). Bei `commands: false` gibt sync.py eine explizite "not supported"-Information aus; bei `commands: true` ohne konfiguriertes `commands_dir` bricht sync.py mit einem harten Fehler ab. (Quelle: WP2) | Must |
 
 ---
 
@@ -27,6 +28,23 @@
 | ID | Anforderung | Priorität |
 |----|-------------|-----------|
 | REQ-GEN-01 | Agent-Templates mit `deprecated: true` im YAML-Frontmatter werden von sync.py aus der Generierung ausgeschlossen — sie erzeugen keine Agent-Datei und erscheinen nicht in CLAUDE.md-Tabelle/-Hints oder Visualisierung. Die Filterung erfolgt zentral in `collect_sources()` nach Auflösung der Layer-Override-Kette (1-generic < 2-platform < 3-project), sodass ein nicht-deprecated Override ein deprecated Basis-Template ersetzen kann. Fehlt das Feld oder ist es nicht explizit `true`, gilt das Template als aktiv (rückwärtskompatibler Default). | Must |
+
+---
+
+## Provider-Agnostik & Capability-Contracts
+
+| ID | Anforderung | Priorität |
+|----|-------------|-----------|
+| REQ-PROV-01 | In Dispatch-Pfaden darf keine Verhaltensverzweigung über `if provider ==` erfolgen. Jede Provider-spezifische Verzweigung ist über einen expliziten Capability- oder Config-Key auszudrücken; stille Defaults sind unzulässig. (Quelle: Issue #735) | Must |
+
+---
+
+## Sync-Sicherheit — Backup & Read-only-Audit
+
+| ID | Anforderung | Priorität |
+|----|-------------|-----------|
+| REQ-SYNC-01 | Vor jedem Sync-Overwrite einer von agent-meta verwalteten Datei legt sync.py ein zeitgestempeltes Backup an (fail-soft: ein fehlgeschlagenes Backup darf den Sync nicht abbrechen). Backup-Dateien sind gitignored. (Quelle: Issue #734) | Must |
+| REQ-SYNC-02 | Der Audit-Modus `sync.py --audit-config` ist strikt read-only und darf weder `env.*`-Dateien noch `sync.log` schreiben. (Quelle: Issue #738) | Should |
 
 ---
 
@@ -85,6 +103,7 @@
 |----|-------------|-----------|
 | REQ-ADM-01 | Wenn `admin-server.py` in einem Projekt gestartet wird, in dem noch keine `.meta-config/project.yaml` existiert, bricht der Server nicht mehr ab, sondern startet in einem interaktiven Setup/Onboarding-Modus. | Must |
 | REQ-ADM-02 | Im Setup-Modus bietet die Admin UI einen geführten Assistenten (Wizard) an, mit dem die initiale `.meta-config/project.yaml` schrittweise visuell konfiguriert und anschließend `sync.py` zur Erst-Instanziierung ausgeführt werden kann. | Must |
+| REQ-ADM-03 | Ein Schreibversuch auf eine nicht-schreibbare Section der Admin UI wird mit einem expliziten 4xx-Status beantwortet. Die UI zeigt einen fehlgeschlagenen Save-Vorgang sichtbar als Fehler an. (Quelle: Issue #730) | Should |
 
 ---
 
