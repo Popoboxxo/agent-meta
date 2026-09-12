@@ -88,6 +88,60 @@ def _orch_mode_flags(orch_mode: str) -> dict:
     }
 
 
+def _repo_containment_block(enabled: bool, sink_active: bool, tmp_path: str) -> str:
+    """Render the effective repo-containment policy text (spec §4.5).
+
+    Mirrors ``A2A_HANDOFF_BLOCK``: a non-empty German policy sentence when
+    containment is active, the empty string when it is off. Keeping the text
+    derived (rather than hand-written per template) means agent prompts and the
+    ``repo-containment`` rule always describe the same effective policy.
+    """
+    if not enabled:
+        return ""
+    if sink_active:
+        return (
+            "Repo-Containment ist AKTIV: Schreibzugriffe sind auf die Projekt-Wurzel "
+            f"beschränkt; einziger sanktionierter Ausnahmebereich ist `{tmp_path}/`."
+        )
+    return (
+        "Repo-Containment ist AKTIV: Schreibzugriffe sind strikt auf die "
+        "Projekt-Wurzel beschränkt (kein Scratch-Sink aktiv)."
+    )
+
+
+def repo_containment_variables(config: dict, provider: str | None = None) -> dict:
+    """Compute the flat ``REPO_CONTAINMENT_*`` variables for a config/provider pair.
+
+    Mirrors ``_orch_mode_flags``: the flag derivation is pure and the actual
+    precedence resolution is delegated to the non-exiting resolver
+    :func:`scripts.lib.repo_containment.resolve_effective_repo_containment`
+    (``provider-override > project > framework default``; spec §2.3) — it is
+    never re-implemented here. Pass ``provider=None`` for the project/default
+    state (the tmp-sink settings are not provider-scoped).
+
+    Returns:
+        REPO_CONTAINMENT_ENABLED: ``"true"``/``"false"`` effective master switch.
+        REPO_CONTAINMENT_TMP_SINK_ENABLED: ``"true"`` when the tmp sink is
+            enabled. Mirroring the resolver, the tmp-sink settings are resolved
+            **independently** of the master switch (the sink is provisioned even
+            when containment is off).
+        REPO_CONTAINMENT_TMP_PATH: validated project-relative scratch path.
+        REPO_CONTAINMENT_BLOCK: rendered policy text when active, else ``""``.
+    """
+    from .repo_containment import resolve_effective_repo_containment
+
+    effective = resolve_effective_repo_containment(config, provider)
+    sink_enabled = bool(effective.tmp_sink_enabled)
+    return {
+        "REPO_CONTAINMENT_ENABLED": "true" if effective.enabled else "false",
+        "REPO_CONTAINMENT_TMP_SINK_ENABLED": "true" if sink_enabled else "false",
+        "REPO_CONTAINMENT_TMP_PATH": effective.tmp_sink_path,
+        "REPO_CONTAINMENT_BLOCK": _repo_containment_block(
+            effective.enabled, sink_enabled, effective.tmp_sink_path
+        ),
+    }
+
+
 
 def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
     """Remove conditional blocks that are inactive in this project.
@@ -107,6 +161,7 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
     conditional_vars.update({k for k in variables if k.startswith("PIPELINE_") and k.endswith("_ENABLED")})
     conditional_vars.update({k for k in variables if k in ("ORCHESTRATOR_ENABLED", "ORCHESTRATOR_STRICT", "DIRECT_DISPATCH_ENABLED", "UNKNOWN_FALLBACK_ASK_USER", "UNKNOWN_FALLBACK_META_FEEDBACK", "UNKNOWN_FALLBACK_MAIN_CHAT", "A2A_PROTOCOL_ENABLED", "ORCHESTRATOR_OUTCOME_CACHING", "CHECKPOINTING_ENABLED", "NATIVE_EXTENSIONS_ENABLED", "NATIVE_EXTENSIONS_WHITELIST_ACTIVE", "ANALYSIS_ENABLED", "FILE_BASED_AGENTS", "AUTO_COMMIT_ENABLED", "PROGRESS_CHAT_PUSH_ENABLED")})
     conditional_vars.update({k for k in variables if k.startswith("ORCH_MODE_")})
+    conditional_vars.update({k for k in variables if k.startswith("REPO_CONTAINMENT_")})
     conditional_vars.update({k for k in variables if k.endswith("_SET")})
 
     if not conditional_vars:

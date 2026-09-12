@@ -13,6 +13,7 @@ from .plugins import resolve_plugin_compact
 from .variables import (
     _orch_mode_flags,
     _resolve_orch_mode,
+    repo_containment_variables,
     strip_inactive_conditional_blocks,
     substitute,
 )
@@ -1111,7 +1112,12 @@ def _build_managed_block(
     provider_override = orch_config.get("provider-overrides", {}).get(provider, {})
     _orch_mode = _resolve_orch_mode(orch_config, provider_override)
     local_vars.update(_orch_mode_flags(_orch_mode))
-    
+
+    # Repo-containment ("prison mode") flags for THIS provider — same
+    # provider-scoped wiring as the ORCH_MODE_* flags above (provider-override
+    # > project > framework default, spec §2.3/§4.5).
+    local_vars.update(repo_containment_variables(config, provider))
+
     local_vars["active_agents"] = get_active_agents_data(agent_meta_root, config, local_vars)
     
     embedded_rules: list[dict] = []

@@ -15,6 +15,7 @@ from .registry_query import (
 from .variables import (
     _orch_mode_flags,
     _resolve_orch_mode,
+    repo_containment_variables,
     strip_inactive_conditional_blocks,
     substitute,
 )
@@ -185,6 +186,11 @@ def _merged_rule_vars(
     provider_override = orch_config.get("provider-overrides", {}).get(provider, {})
     _orch_mode = _resolve_orch_mode(orch_config, provider_override)
     provider_vars.update(_orch_mode_flags(_orch_mode))
+
+    # Repo-containment ("prison mode") flags for THIS provider: same
+    # provider-scoped wiring as the ORCH_MODE_* flags above (provider-override
+    # > project > framework default, spec §2.3/§4.5).
+    provider_vars.update(repo_containment_variables(config, provider))
 
     # Override hint if main-chat mode is active
     if _orch_mode == "main-chat":
