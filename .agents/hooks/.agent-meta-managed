@@ -3,4 +3,6 @@ auto-github-release.sh
 orchestrator-guard-impl.sh
 orchestrator-guard.sh
 pre-release-check.sh
+repo-containment-impl.sh
+repo-containment.sh
 viz-log.sh
