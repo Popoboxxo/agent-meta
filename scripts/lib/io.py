@@ -432,6 +432,12 @@ def write_checked(
     if dry_run:
         # Change detected but do not touch the filesystem (or scan secrets —
         # dry-run must never fail on secrets it would not write).
+        if not path.exists() and _is_gitignored_target(path):
+            # Legitimately absent: the target root is gitignored, so a fresh
+            # checkout (or CI clone) simply has no such generated file.
+            # Counting it as drift would make `sync.py --check` fail on every
+            # clean checkout (#752). Callers log this as a skip, not a write.
+            return False
         return True
     from .secrets import scan_for_secrets
     findings = scan_for_secrets(content, config=config)
@@ -494,6 +500,83 @@ def _warn_if_not_gitignored(path: Path, rel_label: str, log: "SyncLog") -> None:
             f"{rel_label} looks like a local secrets file but is not covered by "
             ".gitignore — verify it is excluded from version control."
         )
+
+
+# Memoized per-directory gitignore probes for one process run: maps a probed
+# directory (absolute path string) to whether git positively confirmed it as
+# ignored. One probe per directory answers for every generated file below it,
+# so a fresh checkout does not spawn one `git check-ignore` per agent file
+# (#752). Cleared implicitly on process exit — sync runs are single-shot.
+_gitignored_dir_cache: dict[str, bool] = {}
+
+
+def clear_gitignore_cache() -> None:
+    """Reset the per-directory gitignore probe cache.
+
+    Sync is normally a single-shot process, but long-lived callers (e.g. the
+    admin server) may run multiple syncs; clearing at the start of a run keeps
+    a stale ignore decision from surviving a `.gitignore` change (#752).
+    """
+    _gitignored_dir_cache.clear()
+
+
+def _git_probe_cwd(path: Path) -> str:
+    """Return the closest existing ancestor of `path` to use as git cwd.
+
+    The file (and its parent directories) may not exist yet on a fresh
+    checkout, so walk up to the first existing directory. Probing from inside
+    the target repository is required: `git check-ignore` on a path outside the
+    current repository fails with rc 128 instead of matching ignore rules.
+    """
+    anchor = path.parent
+    while not anchor.exists() and anchor != anchor.parent:
+        anchor = anchor.parent
+    return str(anchor) if anchor.exists() else str(Path.cwd())
+
+
+def _is_gitignored_target(path: Path) -> bool:
+    """Return True only when git positively confirms `path` is ignored.
+
+    Used by ``write_checked``'s dry-run branch to tell a target that is
+    legitimately absent (its provider root is gitignored, so a fresh checkout
+    simply has no such file) from genuine drift (a missing *committed* file,
+    whose directory is not ignored).
+
+    Fail-open: any problem running git (not installed, not a repo, timeout,
+    unexpected return code) yields False, preserving the previous "missing file
+    would be written" behaviour for non-git projects. Only rc 0 counts.
+    """
+    cwd = _git_probe_cwd(path)
+    cache_key = str(path.parent)
+    if cache_key not in _gitignored_dir_cache:
+        # Probe the file's directory even when it does not exist yet:
+        # `git check-ignore` matches ignore patterns on the path name. A
+        # positively-ignored directory ignores every child as well (git cannot
+        # re-include a file below an excluded directory), so one probe answers
+        # for all files beneath it.
+        probe = run_git_check_ignore(str(path.parent), cwd, "-q")
+        _gitignored_dir_cache[cache_key] = probe is not None and probe.returncode == 0
+    if _gitignored_dir_cache[cache_key]:
+        return True
+    # The directory itself is not ignored — a file-specific rule may still
+    # match the individual path (e.g. `settings.local.json`).
+    result = run_git_check_ignore(str(path), cwd, "-q")
+    return result is not None and result.returncode == 0
+
+
+def is_absent_gitignored_target(path: Path, dry_run: bool) -> bool:
+    """Return True when a generated target should be skipped in dry-run mode.
+
+    A target that does not exist because its root is gitignored (fresh
+    checkout / CI clone) is not drift: ``--check``/``--dry-run`` must not report
+    it as a pending action (#752). Direct writers that bypass ``write_checked``
+    call this before logging their INIT/UPDATE action.
+
+    Real runs (``dry_run=False``) are deliberately unaffected, so ``sync.py``
+    still creates the file on a fresh checkout. Fail-open when git cannot
+    confirm the ignore rule.
+    """
+    return dry_run and not path.exists() and _is_gitignored_target(path)
 
 
 def safe_path(base: Path, *parts: str) -> Path:

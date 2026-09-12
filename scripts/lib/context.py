@@ -7,7 +7,7 @@ from pathlib import Path
 
 from .agents import build_agent_hints, build_knowledge_engine_hints
 from .frontmatter import _strip_frontmatter
-from .io import content_hash, load_json_file, safe_path
+from .io import content_hash, is_absent_gitignored_target, load_json_file, safe_path
 from .log import SyncLog
 from .plugins import resolve_plugin_compact
 from .variables import (
@@ -693,11 +693,15 @@ def _sync_continue_context(
     if context_file:
         ctx_path = project_root / context_file
         template_path = agent_meta_root / pc["context_template"]
-        if not ctx_path.exists():
+        rel_ctx = str(ctx_path.relative_to(project_root))
+        if is_absent_gitignored_target(ctx_path, dry_run):
+            log.skip(rel_ctx, "absent (target root gitignored)")
+        elif not ctx_path.exists():
             if template_path.exists():
                 fallback_partials = template_path.parent.parent / "context" / "partials"
                 builder = TemplateBuilder(template_path.parent, fallback_partials_dir=fallback_partials)
                 ccontent = builder.build(template_path.stem, variables)
+                source_label = pc["context_template"]
             else:
                 ccontent = (
                     f"# {variables.get('PROJECT_NAME', 'Project Context')}\n\n"
@@ -708,10 +712,8 @@ def _sync_continue_context(
                     "Agent context files are in `.continue/rules/`.\n"
                     "Continue loads all Markdown files in this directory automatically as context.\n"
                 )
-                log.action("INIT", str(ctx_path.relative_to(project_root)),
-                           "minimal fallback (CONTINUE.project-template.md not found)")
-            log.action("INIT", str(ctx_path.relative_to(project_root)),
-                       pc["context_template"])
+                source_label = "minimal fallback (CONTINUE.project-template.md not found)"
+            log.action("INIT", rel_ctx, source_label)
             if not dry_run:
                 ctx_path.parent.mkdir(parents=True, exist_ok=True)
                 ctx_path.write_text(ccontent, encoding="utf-8")
@@ -735,28 +737,32 @@ def _sync_continue_context(
                 settings_path, variables, log, dry_run, project_root
             )
         else:
-            settings_template_rel = pc.get("settings_template")
-            settings_template_path = (
-                agent_meta_root / settings_template_rel if settings_template_rel else None
-            )
-            if settings_template_path and settings_template_path.exists():
-                yaml_content = settings_template_path.read_text(encoding="utf-8")
-                source_label = settings_template_rel
+            rel_settings = str(settings_path.relative_to(project_root))
+            if is_absent_gitignored_target(settings_path, dry_run):
+                log.skip(rel_settings, "absent (target root gitignored)")
             else:
-                yaml_content = (
-                    "# Continue configuration\n"
-                    "# See https://docs.continue.dev for full documentation\n"
-                    "\n"
-                    "# Agents are in .continue/agents/ - managed by agent-meta\n"
-                    "# Project rules are in .continue/rules/ - managed by agent-meta\n"
+                settings_template_rel = pc.get("settings_template")
+                settings_template_path = (
+                    agent_meta_root / settings_template_rel if settings_template_rel else None
                 )
-                source_label = "minimal fallback"
-                if settings_template_rel:
-                    log.warning(f"{settings_template_rel} not found — using minimal fallback for {settings_file}")
-            log.action("INIT", str(settings_path.relative_to(project_root)), source_label)
-            if not dry_run:
-                settings_path.parent.mkdir(parents=True, exist_ok=True)
-                settings_path.write_text(yaml_content, encoding="utf-8")
+                if settings_template_path and settings_template_path.exists():
+                    yaml_content = settings_template_path.read_text(encoding="utf-8")
+                    source_label = settings_template_rel
+                else:
+                    yaml_content = (
+                        "# Continue configuration\n"
+                        "# See https://docs.continue.dev for full documentation\n"
+                        "\n"
+                        "# Agents are in .continue/agents/ - managed by agent-meta\n"
+                        "# Project rules are in .continue/rules/ - managed by agent-meta\n"
+                    )
+                    source_label = "minimal fallback"
+                    if settings_template_rel:
+                        log.warning(f"{settings_template_rel} not found — using minimal fallback for {settings_file}")
+                log.action("INIT", rel_settings, source_label)
+                if not dry_run:
+                    settings_path.parent.mkdir(parents=True, exist_ok=True)
+                    settings_path.write_text(yaml_content, encoding="utf-8")
 
 
 def _shares_context_with_embedded_rules(
@@ -846,6 +852,10 @@ def _init_provider_settings_json(
         log.skip(str(settings_path.relative_to(project_root)),
                  "already exists — not overwritten")
         return
+    if is_absent_gitignored_target(settings_path, dry_run):
+        log.skip(str(settings_path.relative_to(project_root)),
+                 "absent (target root gitignored)")
+        return
 
     settings_template_rel = pc.get("settings_template")
     settings_template_path = (
@@ -887,7 +897,9 @@ def _update_continue_config_managed_block(
     """
     from datetime import date
     version = variables.get("AGENT_META_VERSION", "?")
-    today = date.today().isoformat()  # noqa: DTZ011
+    # Same reproducible source as the managed blocks (#752) — a raw date.today()
+    # would make the committed managed comment block drift daily.
+    today = variables.get("AGENT_META_DATE") or date.today().isoformat()  # noqa: DTZ011
     new_block = (
         f"{_CONTINUE_MANAGED_BEGIN}\n"
         f"# Managed by agent-meta v{version} — {today}\n"
@@ -1299,6 +1311,9 @@ def init_claude_personal(
     if target_path.exists():
         log.skip("CLAUDE.personal.md", "already exists")
         return
+    if is_absent_gitignored_target(target_path, dry_run):
+        log.skip("CLAUDE.personal.md", "absent (target root gitignored)")
+        return
 
     if not template_path.exists():
         log.warning("CLAUDE.personal-template.md not found — skipping CLAUDE.personal.md creation")
@@ -1326,6 +1341,9 @@ def init_opencode_personal(
 
     if target_path.exists():
         log.skip("AGENTS.personal.md", "already exists")
+        return
+    if is_absent_gitignored_target(target_path, dry_run):
+        log.skip("AGENTS.personal.md", "absent (target root gitignored)")
         return
 
     if not template_path.exists():
@@ -1391,6 +1409,10 @@ def init_settings_local_json(
         target_path = safe_path(project_root, local_file)
         if target_path.exists():
             log.skip(str(target_path.relative_to(project_root)), "already exists")
+            continue
+        if is_absent_gitignored_target(target_path, dry_run):
+            log.skip(str(target_path.relative_to(project_root)),
+                     "absent (target root gitignored)")
             continue
 
         template_rel = prov_cfg.get("settings_local_template")

@@ -6,7 +6,7 @@ import posixpath
 import re
 from pathlib import Path
 
-from .io import is_unchanged, load_json_file, safe_path, write_checked
+from .io import is_absent_gitignored_target, is_unchanged, load_json_file, safe_path, write_checked
 from .log import SyncLog
 from .providers import provider_hooks_supported
 
@@ -216,6 +216,10 @@ def _update_settings_hooks(
         log.skip(settings_rel, "hooks registration unchanged")
         return
 
+    if is_absent_gitignored_target(settings_path, dry_run):
+        log.skip(settings_rel, "absent (target root gitignored)")
+        return
+
     if stale:
         log.action("UPDATE", settings_rel,
                    f"removed stale hooks: {', '.join(Path(s).stem for s in sorted(stale))}")
@@ -339,6 +343,10 @@ def _update_antigravity_hooks_json(
 
     if is_unchanged(config_path, new_content):
         log.skip(config_path_rel, "hooks registration unchanged")
+        return
+
+    if is_absent_gitignored_target(config_path, dry_run):
+        log.skip(config_path_rel, "absent (target root gitignored)")
         return
 
     if stale:

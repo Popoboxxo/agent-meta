@@ -80,6 +80,7 @@ from lib.cli_commands import (
     handle_scan_staged,
 )
 from lib.config import find_agent_meta_root
+from lib.io import clear_gitignore_cache
 from lib.log import SyncLog
 from lib.se_validate import _handle_validate_se
 # Re-exported for tests: tests/test_knowledge_sync_integration.py reads
@@ -296,6 +297,9 @@ def main() -> None:
     parser = _build_arg_parser()
     args = parser.parse_args()
     _normalize_check_dry_run(args)
+    # Start every run with a fresh gitignore probe cache (#752): a long-lived
+    # process must not reuse an ignore decision from a previous run.
+    clear_gitignore_cache()
 
     # Early-exit mode: scan staged files for secrets (issue #694)
     if args.scan_staged:

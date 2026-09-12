@@ -3,11 +3,12 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import re
 import subprocess
 import sys
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .agents import (
@@ -743,6 +744,70 @@ def read_git_version(agent_meta_root: Path) -> str:
     return "unknown"
 
 
+def _resolve_agent_meta_date(agent_meta_root: Path) -> str:
+    """Return a reproducible generation date for ``AGENT_META_DATE``.
+
+    ``AGENT_META_DATE`` is rendered into committed context managed blocks, so a
+    non-deterministic value (``datetime.now()``) makes any drift/``--check``
+    fail on every day after the last sync (#752). Resolution order:
+
+    1. ``SOURCE_DATE_EPOCH`` env var (integer seconds since the Unix epoch) →
+       UTC ``YYYY-MM-DD`` — the reproducible-builds standard.
+    2. Release date of the current version from ``CHANGELOG.md``: heading
+       ``## [<version>] — YYYY-MM-DD`` (em-dash, en-dash or hyphen, with an
+       optional markdown link after the version). If that exact heading is
+       missing — e.g. VERSION was bumped before the CHANGELOG entry landed —
+       the most recent dated release heading is used instead, so the value
+       stays stable across that window.
+    3. Fallback: today's local date — preserves the previous behaviour when no
+       dated heading exists at all.
+
+    ``--check`` contract: validate a committed baseline WITHOUT
+    ``SOURCE_DATE_EPOCH`` set. The env var is for reproducible *builds*; setting
+    it during a check changes the generated date relative to the committed
+    hashes and reports false drift.
+
+    Any parse/lookup error falls through to the next option and never raises;
+    a generation date must not be able to break a sync run.
+    """
+    try:
+        epoch = os.environ.get("SOURCE_DATE_EPOCH")
+        if epoch is not None:
+            try:
+                return datetime.fromtimestamp(
+                    int(epoch), tz=timezone.utc
+                ).strftime("%Y-%m-%d")
+            except (TypeError, ValueError, OverflowError, OSError):
+                pass
+
+        changelog = agent_meta_root / "CHANGELOG.md"
+        if changelog.exists():
+            text = changelog.read_text(encoding="utf-8")
+            version = read_version(agent_meta_root).lstrip("v")
+            if version and version != "unknown":
+                exact = re.compile(
+                    rf"^##\s*\[{re.escape(version)}\](?:\([^)]*\))?"
+                    r"\s*[—–-]\s*(\d{4}-\d{2}-\d{2})",
+                    re.MULTILINE,
+                )
+                match = exact.search(text)
+                if match:
+                    return match.group(1)
+            # No exact heading: use the most recent dated release heading.
+            release = re.compile(
+                r"^##\s*\[[^\]]+\](?:\([^)]*\))?\s*[—–-]\s*(\d{4}-\d{2}-\d{2})",
+                re.MULTILINE,
+            )
+            match = release.search(text)
+            if match:
+                return match.group(1)
+    except (OSError, UnicodeError):
+        pass
+
+    return datetime.now().strftime("%Y-%m-%d")  # noqa: DTZ005
+
+
+
 def _load_se_variable_defaults(agent_meta_root: Path, warnings: list[str] | None = None) -> dict:
     """Load SE cascade variable defaults from config/role-defaults.yaml se_variables block.
 
@@ -800,7 +865,7 @@ def _build_core_variables(
     variables["PROJECT_SHORT"] = project.get("short", "")
     variables["PROJECT_NAME"]  = project.get("name", "")
     variables["AGENT_META_VERSION"] = read_version(agent_meta_root)
-    variables["AGENT_META_DATE"]    = datetime.now().strftime("%Y-%m-%d")  # noqa: DTZ005
+    variables["AGENT_META_DATE"]    = _resolve_agent_meta_date(agent_meta_root)
     if project_root is not None:
         try:
             rel = agent_meta_root.resolve().relative_to(project_root.resolve())

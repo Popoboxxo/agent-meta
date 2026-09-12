@@ -15,12 +15,12 @@ rather than invented facts.
 from __future__ import annotations
 
 import re
-from datetime import datetime
 from pathlib import Path
 
 from .frontmatter import _YAML_AVAILABLE, _parse_frontmatter_yaml, is_deprecated_template
 from .config import (
     _orch_mode_flags,
+    _resolve_agent_meta_date,
     _resolve_orch_mode,
     read_version,
     strip_inactive_conditional_blocks,
@@ -171,7 +171,7 @@ def _standalone_variables(agent_meta_root: Path) -> dict:
     variables.update(_ORCHESTRATION_FALLBACKS)
     variables.update(_CONDITIONAL_FALSE_FLAGS)
     variables["AGENT_META_VERSION"] = read_version(agent_meta_root)
-    variables["AGENT_META_DATE"] = datetime.now().strftime("%Y-%m-%d")  # noqa: DTZ005
+    variables["AGENT_META_DATE"] = _resolve_agent_meta_date(agent_meta_root)
     # Convention blocks: render the 'default' preset so a standalone release/git
     # persona keeps its versioning table / issue-naming block instead of degrading
     # to a "not available" safety-net note. active_roles=None => all roles active.
