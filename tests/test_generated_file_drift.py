@@ -265,6 +265,52 @@ def test_capture_writes_hash_for_every_managed_file(tmp_path: Path) -> None:
     }
 
 
+def test_capture_skips_sync_backup_siblings(tmp_path: Path) -> None:
+    """`.sync-backup-<ts>` siblings must never enter the tracked hash baseline.
+
+    They are ephemeral safety copies listed alongside generated files in a
+    managed dir. Pinning them in the baseline would make the next sync report
+    their (correct) removal as drift forever.
+    """
+    project_root = tmp_path / "project"
+    _write(project_root, ".claude/agents/developer.md", "fresh content")
+    _write(
+        project_root,
+        ".claude/agents/developer.md.sync-backup-20260912-170235",
+        "old content",
+    )
+    _managed_index(
+        project_root,
+        ".claude/agents",
+        "developer.md",
+        "developer.md.sync-backup-20260912-170235",
+    )
+
+    capture_generated_file_hashes(tmp_path / "agent-meta", project_root, {}, _provider_config(), dry_run=False)
+
+    hashes = _load_hashes(project_root)
+    assert ".claude/agents/developer.md" in hashes
+    assert not any(".sync-backup-" in rel for rel in hashes)
+
+
+def test_capture_skips_sync_backup_inside_managed_skill_dir(tmp_path: Path) -> None:
+    """The skills dir index lists directory names; its rglob must skip backups."""
+    project_root = tmp_path / "project"
+    _write(project_root, ".claude/skills/a2a-delegation-gates/SKILL.md", "fresh content")
+    _write(
+        project_root,
+        ".claude/skills/a2a-delegation-gates/SKILL.md.sync-backup-20260912-170235",
+        "old content",
+    )
+    _managed_index(project_root, ".claude/skills", "a2a-delegation-gates")
+
+    capture_generated_file_hashes(tmp_path / "agent-meta", project_root, {}, _provider_config(), dry_run=False)
+
+    hashes = _load_hashes(project_root)
+    assert ".claude/skills/a2a-delegation-gates/SKILL.md" in hashes
+    assert not any(".sync-backup-" in rel for rel in hashes)
+
+
 def test_capture_is_noop_in_dry_run(tmp_path: Path) -> None:
     project_root = tmp_path / "project"
     _write(project_root, ".claude/agents/developer.md", "fresh content")

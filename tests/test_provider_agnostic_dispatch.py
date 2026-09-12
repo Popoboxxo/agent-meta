@@ -33,6 +33,11 @@ _TOUCHED_MODULES = (
     "context",
     "providers",
     "agent_sync",
+    # Repo-containment ("prison mode") modules — provider dispatch goes through
+    # repo_containment.provider-overrides keyed by registry name, never a
+    # literal `provider == "Name"` branch.
+    "repo_containment",
+    "consistency/repo_containment",
 )
 
 
