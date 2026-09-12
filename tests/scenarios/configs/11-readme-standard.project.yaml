@@ -9,7 +9,7 @@ roles:
 - git
 - documenter
 readme:
-  badges: [version, stack, license, ci]
+  badges: [version, stack, license, ci, agent-meta]
   warnings: true
   sections: [description, badges, setup, structure]
 project:

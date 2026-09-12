@@ -55,7 +55,7 @@ verhalten sich exakt wie bisher.
 | `08-release-automation` | Claude | strict (default) | Release-Gates + Auto-GitHub-Release-Hook |
 | `09-legacy-config` | Claude | strict (default) | Legacy `mcp-servers`/`external-tools`-Fallback |
 | `10-model-tiers` | Claude, Gemini | strict (default) | Model-Override-Präzedenz + `model-inherit-main-chat` |
-| `11-readme-standard` | Claude | strict (default) | README-Struktur-Standard (#682 §3): `readme.badges/warnings/sections` |
+| `11-readme-standard` | Claude | strict (default) | README-Struktur-Standard (#682 §3): `readme.badges/warnings/sections` inkl. opt-in-Typ `agent-meta` |
 | `12-gitignore-hardening` | Claude, Gemini, Opencode | strict (default) | `.gitignore`-Context-File-Schutz unter `settings: true` (#682 §4) |
 | `13-status-table` | Claude, Gemini, Opencode | strict (default) | `STATUS_TABLE_BLOCK`-Rendering über alle Provider-Formate (#678/#682 §5) |
 | `14-progress-checkpointing` | Claude | strict (default), `checkpointing: true` | Progress-File-Dokumentation + `.gitignore`-Eintrag (#682 §6) |
