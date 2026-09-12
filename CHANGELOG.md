@@ -2,6 +2,58 @@
 
 ## [Unreleased]
 
+### Added
+- **Provider-agnostic `commands` capability for all 9 providers (#735, #743)**: added a
+  `commands` flag to `config/provider-capabilities.yaml` (Claude/Gemini/Opencode/Continue `true`;
+  Copilot/Mammouth/Codex/ZCode/KimiCode explicit `false`), replacing 22 `if provider ==`
+  equality branches (AST-verified: 0 remaining) with capability-driven dispatch.
+- **Checkpointing and per-provider chat push (#743)**: wired `CHECKPOINTING_BLOCK` into
+  `agents/1-generic/orchestrator.md` and its snippet (`true` renders, `false` suppresses);
+  chat push is now resolved per provider via the `hook_protocol` capability instead of a
+  global hook-support check.
+- **Backup-before-overwrite for drifted generated files (#734)**: new `backup_drifted_files()`
+  in `scripts/lib/generated_file_drift.py` writes a `.sync-backup-<YYYYmmdd-HHMMSS>` sibling
+  before overwriting a drifted file (fail-soft; no-op in dry-run). A managed `.gitignore`
+  entry `*.sync-backup-*` keeps the backups untracked.
+- **Admin-UI writable config sections and accessibility (#730)**: `scripts/admin-server.py`
+  accepts `hooks`, `debug-mode`, `tier-overrides`, `mcp-role-overrides` and `backup` as
+  writable sections; `docs/ui/admin-ui.html` gains views for them plus labels, `aria-live`,
+  focus handling and visible save errors.
+- **Reverse role-registry drift check (#736)**: `--audit-config` now reports
+  `role_defaults_without_template` for registry roles whose template file is missing.
+
+### Changed
+- **Null config blocks, version and provider enum (#741, #731, #732)**: explicit `null`
+  blocks (e.g. `project: null`) are normalized so config loading no longer raises
+  `AttributeError`; the `agent-meta-version` default is derived from `VERSION`; the
+  `ai-providers` enum is generated from `config/provider-capabilities.yaml` (9/9). An unknown
+  provider is now rejected with a clear error instead of silently falling back to Claude.
+- **Config defaults and warnings hardening (#733, #737, #736)**: added `_VARIABLE_FALLBACKS`
+  for the 8 leaking variables (`COMMUNICATION_LANGUAGE`, `USER_INPUT_LANGUAGE`,
+  `DOCS_LANGUAGE`, `INTERNAL_DOCS_LANGUAGE`, `CODE_LANGUAGE`, `PROJECT_GOAL`,
+  `PROJECT_LANGUAGES`, `CODE_CONVENTIONS`); `fill_defaults()` now populates `project.short`;
+  removed the stale `feature` role reference and documented `provider-expert` as a wrapper
+  base (not a selectable role).
+- **CI scenario and drift gates (#740, #739)**: corrected scenario 21 to the mode-independent
+  auto-commit contract and wired the scenario suite into CI; added `sync.py --check` to
+  `validate.yml`; added `VERSION`/`CHANGELOG` to the `orchestration-test.yml` paths-filter.
+- **LF enforcement for orchestrator-guard hooks (#712)**: added a `.gitattributes` rule for
+  `hooks/1-generic/orchestrator-guard*.sh`.
+- **Reproducible `AGENT_META_DATE` (#752)**: the generated date resolves via
+  `SOURCE_DATE_EPOCH`, then the release date from `CHANGELOG.md`, then `now()`.
+
+### Fixed
+- **`--check` false-positive drift on absent provider roots (#752)**: `sync.py --check` no
+  longer counts legitimately absent gitignored provider target roots as drift (fail-open);
+  the direct-writer paths were aligned to match.
+- **Silent admin config rejection and partial writes (#730)**: writes to non-writable
+  sections now return an explicit 4xx instead of being silently dropped, and the previously
+  discarded `PUT /api/config/project` merge result is now validated and persisted.
+- **Inverted jsonschema hint (#737)**: corrected the warning that instructed users to
+  "fix or install jsonschema" in the wrong direction.
+- **`--audit-config` side effects removed (#738)**: `--audit-config` is now read-only
+  (`_SyncContext.read_only`) and no longer creates `env.*` or `sync.log` files.
+
 ## [1.1.0] — 2026-09-10
 
 ### Added
