@@ -24,7 +24,7 @@ from .frontmatter import (
     extract_frontmatter_field,
     target_filename,
 )
-from .io import safe_path, write_checked
+from .io import is_absent_gitignored_target, safe_path, write_checked
 from .log import SyncLog
 from .providers import provider_has_capability, provider_hooks_supported
 from .provider_transform import (
@@ -723,6 +723,10 @@ def _write_agent_file(
     allow_secrets = config.get("allow-committed-secrets", False) if config else False
     if write_checked(target_path, content, log, rel_label, config=config, dry_run=dry_run, allow_secrets=allow_secrets):
         log.action('WRITE', rel_out, rel_label)
+    elif is_absent_gitignored_target(target_path, dry_run):
+        # Absent on a fresh checkout because the provider root is gitignored —
+        # not drift (#752). write_checked already returned False for this case.
+        log.skip(rel_out, 'absent (target root gitignored)')
     else:
         log.skip(rel_out, 'unchanged')
 

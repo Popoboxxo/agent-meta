@@ -14,6 +14,7 @@ from pathlib import Path
 
 from .io import (
     _load_yaml_or_json,
+    is_absent_gitignored_target,
     safe_path,
     write_checked,
 )
@@ -199,6 +200,9 @@ def sync_secrets_template(
     target_path = project_root / SECRETS_LOCAL_FILE
 
     if not target_path.exists():
+        if is_absent_gitignored_target(target_path, dry_run):
+            log.skip(SECRETS_LOCAL_FILE, "absent (target root gitignored)")
+            return
         content = _render_secrets_template(required)
         log.action("INIT", SECRETS_LOCAL_FILE, "MCP secrets template (gitignored)")
         if not dry_run:
