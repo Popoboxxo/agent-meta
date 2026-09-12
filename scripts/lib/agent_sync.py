@@ -24,8 +24,9 @@ from .frontmatter import (
     extract_frontmatter_field,
     target_filename,
 )
-from .io import safe_path, write_checked
+from .io import is_absent_gitignored_target, safe_path, write_checked
 from .log import SyncLog
+from .providers import provider_has_capability, provider_hooks_supported
 from .provider_transform import (
     inject_debug_block,
     transform_agent_content_for_provider,
@@ -438,6 +439,12 @@ def _build_provider_vars(
         'SKILLS_DIR': pc.get('skills_dir', f".{provider.lower()}/skills"),
         'CONTEXT_FILE': pc.get('context_file', f"{provider.upper()}.md"),
         'FILE_BASED_AGENTS': 'true' if file_based else 'false',
+        # Per-provider Tier-A gate (issue #743): the global
+        # PROGRESS_CHAT_PUSH_ENABLED from build_variables() ANDs across all
+        # active providers; here each provider's own verified hook_protocol
+        # decides, so a hook-less provider never blanks the chat-push block in
+        # a hook-capable provider's generated orchestrator.
+        'PROGRESS_CHAT_PUSH_ENABLED': 'true' if provider_hooks_supported(pc) else 'false',
         # INTENT_ROUTING_TOOLS (issue #264): resolve the provider-mapped
         # routing-tool prerender from build_variables for THIS provider.
         # "" when the provider has no handoff_format capability or is absent
@@ -464,18 +471,21 @@ def _should_skip_role(
     """Skip-gates for one role in the per-provider agent loop.
 
     Returns ``(skip, filename)``; ``filename`` is the provider-specific
-    target filename (``None`` for roles outside ROLE_MAP). The Claude-gated
-    ``log.skip`` messages — including the relative-path form with the
-    ``chr(92)`` backslash fallback — are kept byte-identical.
+    target filename (``None`` for roles outside ROLE_MAP). The verbose
+    ``log.skip`` messages are emitted for providers declaring the
+    ``verbose-sync-log`` capability (issue #735 — capability-driven, no
+    provider-name branch), kept byte-identical to the historical Claude-only
+    output.
     """
     filename = target_filename(role, role_map, ext=pc.get('agent_ext', '.md'))
+    log_verbose = provider_has_capability(pc, "verbose-sync-log")
     if not filename:
-        if provider == 'Claude':
+        if log_verbose:
             log.skip(str(source_path.name), 'role not in ROLE_MAP')
         return True, filename
 
     if allowed_roles is not None and role not in allowed_roles:
-        if provider == 'Claude':
+        if log_verbose:
             rel = (str(target_dir / filename)
                    .replace(str(project_root) + '/', '')
                    .replace(str(project_root) + chr(92), ""))
@@ -483,7 +493,7 @@ def _should_skip_role(
         return True, filename
 
     if not _is_role_enabled(role, config):
-        if provider == 'Claude':
+        if log_verbose:
             rel = (str(target_dir / filename)
                    .replace(str(project_root) + '/', '')
                    .replace(str(project_root) + chr(92), ""))
@@ -497,7 +507,7 @@ def _should_skip_role(
     # is spawned; the main chat acts as router + worker. Not added to
     # expected_filenames so any stale orchestrator.md gets pruned.
     if role == "orchestrator" and variables.get("ORCH_MODE_MAIN_CHAT") == "true":
-        if provider == 'Claude':
+        if log_verbose:
             rel = (str(target_dir / filename)
                    .replace(str(project_root) + '/', '')
                    .replace(str(project_root) + chr(92), ""))
@@ -514,6 +524,7 @@ def _compose_role_content(
     project_root: Path,
     target_path: Path,
     log: SyncLog,
+    pc: dict | None = None,
 ) -> tuple[str, bool, str, str | None, str]:
     """Load the source template, compose it with its ``extends`` base (if any)
     and derive per-role metadata: spawn capability, relative source label,
@@ -526,7 +537,7 @@ def _compose_role_content(
     if extends_base:
         base_path = agent_meta_root / AGENTS_DIR / extends_base
         content = compose_agent(base_path, content, log)
-        if provider == 'Claude':
+        if provider_has_capability(pc, "verbose-sync-log"):
             log.note(
                 str(target_path.relative_to(project_root)),
                 f'composed from {extends_base} + {source_path.name}',
@@ -549,7 +560,6 @@ def _apply_content_pipeline(
     provider: str,
     merged_vars: dict,
     rel_source: str,
-    variables: dict,
     platform_vars: dict | None,
     agent_meta_root: Path,
     log: SyncLog,
@@ -584,7 +594,11 @@ def _apply_content_pipeline(
     content = substitute(content, merged_vars, rel_source, log)
     pal_engine = DelegationSyntaxEngine(config_dir=agent_meta_root / "config")
     content = pal_engine.apply(content, provider, log=log)
-    content = strip_inactive_conditional_blocks(content, variables)
+    # Evaluate {{#if}} gates against the provider-merged variables, so
+    # per-provider overrides (e.g. PROGRESS_CHAT_PUSH_ENABLED, issue #743)
+    # take effect in the rendered agent. merged_vars is a superset of
+    # `variables`, so non-overridden gates behave identically.
+    content = strip_inactive_conditional_blocks(content, merged_vars)
     # Apply platform-config substitution ({{platform.*}} placeholders)
     if platform_vars is not None:
         content = substitute_platform(content, platform_vars, rel_source, log)
@@ -633,10 +647,10 @@ def _finalize_agent_content(
     )
 
     # MCP toolset: bind the servers this role opted into (issue #467).
-    # Claude-only — `mcp__<server>__<tool>` is Claude Code's namespacing;
-    # other providers surface MCP tools through their own config, not
-    # through agent frontmatter.
-    if provider == 'Claude':
+    # Capability-gated — `mcp__<server>__<tool>` frontmatter binding is only
+    # meaningful for providers declaring `mcp-agent-frontmatter-tools` (issue
+    # #735); other providers surface MCP tools through their own config.
+    if provider_has_capability((provider_config or {}).get(provider), "mcp-agent-frontmatter-tools"):
         mcp_tools = resolve_mcp_tools_for_role(role, config, agent_meta_root, project_root)
         if mcp_tools:
             before = content
@@ -709,6 +723,10 @@ def _write_agent_file(
     allow_secrets = config.get("allow-committed-secrets", False) if config else False
     if write_checked(target_path, content, log, rel_label, config=config, dry_run=dry_run, allow_secrets=allow_secrets):
         log.action('WRITE', rel_out, rel_label)
+    elif is_absent_gitignored_target(target_path, dry_run):
+        # Absent on a fresh checkout because the provider root is gitignored —
+        # not drift (#752). write_checked already returned False for this case.
+        log.skip(rel_out, 'absent (target root gitignored)')
     else:
         log.skip(rel_out, 'unchanged')
 
@@ -808,9 +826,9 @@ def _run_provider_bootstrap(
             compact=variables.get("COMPACT_MODE") == "true",
             agents_label=pc.get("agents_dir", f".{provider.lower()}/agents"),
         )
-        if provider == "Continue" and result.get("status") == "success":
+        if bootstrap_cfg.get("action") == "update-config" and result.get("status") == "success":
             rel_target = str(target_dir.relative_to(project_root))
-            log.note(rel_target, f"Continue config updated: {result.get('agent_count', 0)} agents")
+            log.note(rel_target, f"{provider} config updated: {result.get('agent_count', 0)} agents")
 
 def sync_agents_for_provider(agent_meta_root: Path, project_root: Path, config: dict,
                              variables: dict, log: SyncLog, dry_run: bool, provider: str,
@@ -841,13 +859,13 @@ def sync_agents_for_provider(agent_meta_root: Path, project_root: Path, config: 
         expected_filenames.add(filename)
         target_path = safe_path(target_dir, filename)
         content, _can_spawn, rel_source, source_version, description = _compose_role_content(
-            source_path, provider, project_name, agent_meta_root, project_root, target_path, log)
+            source_path, provider, project_name, agent_meta_root, project_root, target_path, log, pc=pc)
 
         # Merge provider-specific variables (extension paths, snippets dir, parallel patterns, etc.)
         merged_vars = _build_provider_vars(pc, provider, variables, agent_meta_root)
         content = _apply_content_pipeline(
             content, config, provider, merged_vars, rel_source,
-            variables, platform_vars, agent_meta_root, log)
+            platform_vars, agent_meta_root, log)
         content = _finalize_agent_content(
             content, role, filename, source_path, provider, provider_config,
             source_version, description, _can_spawn, config, agent_meta_root,
@@ -855,8 +873,9 @@ def sync_agents_for_provider(agent_meta_root: Path, project_root: Path, config: 
         _write_agent_file(target_path, content, source_path, agent_meta_root,
                           project_root, config, dry_run, log)
 
-    # External skill filenames are always in .claude/agents/ (Claude only)
-    if provider == 'Claude':
+    # External skill filenames live in the provider's agents dir only for
+    # providers declaring `external-skill-agent-files` (issue #735).
+    if provider_has_capability(pc, "external-skill-agent-files"):
         expected_filenames |= _collect_claude_external_skill_filenames(agent_meta_root, config)
 
     # Remove stale agent files

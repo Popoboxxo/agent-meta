@@ -62,6 +62,7 @@ from lib.external_tools import (
     scan_injection_drift,
 )
 from lib.generated_file_drift import (
+    backup_drifted_files,
     capture_generated_file_hashes,
     is_drift_detection_enabled,
     scan_generated_file_drift,
@@ -186,13 +187,21 @@ def _sync_stage_claude_base(
     provider_config: dict, providers: list, variables: dict,
     args: argparse.Namespace, log: SyncLog,
 ) -> tuple[bool, dict, list, list]:
-    """Stage 3: Claude-gated base syncs + gitignore/env baselines.
+    """Stage 3: dedicated-context base syncs + gitignore/env baselines.
 
     Returns ``(is_claude, gitignore_cfg, base_gitignore_entries,
     env_gitignore)``; the two lists are later mutated by the gitignore
     stage (stage 11) through the same object references.
     """
-    is_claude = "Claude" in providers
+    # Capability-driven gate (issue #735): the dedicated CLAUDE.md/personal-file
+    # and exact-managed-.gitignore path runs when any active provider declares
+    # `has_dedicated_context_file` (today: Claude only) — no provider-name
+    # branch. The returned flag keeps its historical name for its downstream
+    # consumers but no longer literal-matches "Claude".
+    is_claude = any(
+        provider_config.get(p, {}).get("has_dedicated_context_file", False)
+        for p in providers
+    )
     gitignore_cfg = config.get("gitignore", {})
     # Base entries of the managed .gitignore block (local/generated/settings
     # categories, custom entries and — when gitignore.ignore-provider-dirs is
@@ -390,18 +399,27 @@ def _sync_stage_generated_file_drift_scan(
 ) -> None:
     """Early drift scan -- runs BEFORE _sync_stage_per_provider overwrites
     anything, so it can still see a manual edit made since the last sync.
-    Warn-only: never changes what gets written (issue: user feature
-    request, 2026-09-07, spec in docs/superpowers/specs/)."""
+    Warn-only for the drift signal itself: the edit is still overwritten
+    (skip-overwrite is an explicit non-goal), but a timestamped
+    `.sync-backup-<ts>` sibling of every drifted file is written first as a
+    safety net (issue #734)."""
     if not is_drift_detection_enabled(config):
         log.skip("generated-file-drift-scan", "disabled (drift-detection.enabled: false)")
         return
     findings = scan_generated_file_drift(agent_meta_root, project_root, config, provider_config)
+    backups = backup_drifted_files(findings, project_root, log, args.dry_run)
+    backup_name_by_source = {
+        backup.rsplit(".sync-backup-", 1)[0]: Path(backup).name for backup in backups
+    }
     for finding in findings:
+        backup_name = backup_name_by_source.get(finding["path"])
+        backup_note = f" Backup written to {backup_name}." if backup_name else ""
         log.warning(
             f"generated-file-drift: '{finding['path']}' was manually edited "
             f"since the last sync (provider '{finding['provider']}') -- this "
-            "sync will overwrite it. Add it to .meta-config/drift-allowlist.yaml "
-            "if this edit should be preserved going forward."
+            f"sync will overwrite it.{backup_note} Add it to "
+            ".meta-config/drift-allowlist.yaml if this edit should be "
+            "preserved going forward."
         )
 
 
@@ -710,12 +728,14 @@ def _sync_stage_gitignore(
     exactly like the original local-variable flow.
     """
     # Update .gitignore managed block: base entries + per-provider entries + skill entries
-    # Collect gitignore_entries from all active non-Claude providers
+    # Collect gitignore_entries from all active providers whose base entries are
+    # NOT already handled by the dedicated-context path above (issue #735:
+    # capability-driven, no provider-name branch).
     extra_provider_entries: list[str] = []
     for _p in providers:
-        if _p == "Claude":
-            continue  # already in base_gitignore_entries
         _pc = provider_config.get(_p, {})
+        if _pc.get("has_dedicated_context_file", False):
+            continue  # already in base_gitignore_entries
         if _pc.get("has_settings") and not _pc.get("gitignore_entries"):
             log.warning(f"provider '{_p}' has has_settings=true but no gitignore_entries — local settings may be accidentally committed")
         extra_provider_entries.extend(_pc.get("gitignore_entries", []))

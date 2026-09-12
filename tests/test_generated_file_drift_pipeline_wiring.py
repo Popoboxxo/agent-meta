@@ -97,3 +97,65 @@ def test_hash_capture_stage_writes_nothing_when_disabled(tmp_path) -> None:
     )
 
     assert not (project_root / ".meta-config" / "generated-file-hashes.json").exists()
+
+
+def _drifted_agent_project(tmp_path):
+    from scripts.lib.generated_file_drift import content_hash
+
+    project_root = tmp_path / "project"
+    _write(project_root, ".claude/agents/developer.md", "edited by hand")
+    index_path = project_root / ".claude" / "agents" / ".agent-meta-managed"
+    index_path.write_text("developer.md\n", encoding="utf-8")
+    hashes_path = project_root / ".meta-config" / "generated-file-hashes.json"
+    hashes_path.parent.mkdir(parents=True, exist_ok=True)
+    hashes_path.write_text(
+        '{"version": 1, "hashes": {".claude/agents/developer.md": "'
+        + content_hash("original") + '"}}',
+        encoding="utf-8",
+    )
+    provider_config = {"Claude": {"agents_dir": ".claude/agents", "skills_dir": ".claude/skills"}}
+    return project_root, provider_config
+
+
+def test_drift_scan_stage_writes_backup_and_names_it_in_warning(tmp_path) -> None:
+    """Issue #734: the stage writes the `.sync-backup-<ts>` sibling BEFORE
+    the writers run and names it in the warning."""
+    from scripts.lib.log import SyncLog
+    from scripts.lib.sync_pipeline import _sync_stage_generated_file_drift_scan
+    import argparse
+
+    project_root, provider_config = _drifted_agent_project(tmp_path)
+    log = SyncLog()
+    args = argparse.Namespace(dry_run=False)
+
+    _sync_stage_generated_file_drift_scan(
+        tmp_path / "agent-meta", project_root, {}, provider_config, args, log,
+    )
+
+    backup_files = list(
+        (project_root / ".claude" / "agents").glob("developer.md.sync-backup-*")
+    )
+    assert len(backup_files) == 1
+    assert backup_files[0].read_text(encoding="utf-8") == "edited by hand"
+    assert any(
+        f"Backup written to {backup_files[0].name}." in warning
+        for warning in log.warnings
+    ), log.warnings
+
+
+def test_drift_scan_stage_writes_no_backup_in_dry_run(tmp_path) -> None:
+    from scripts.lib.log import SyncLog
+    from scripts.lib.sync_pipeline import _sync_stage_generated_file_drift_scan
+    import argparse
+
+    project_root, provider_config = _drifted_agent_project(tmp_path)
+    log = SyncLog()
+    args = argparse.Namespace(dry_run=True)
+
+    _sync_stage_generated_file_drift_scan(
+        tmp_path / "agent-meta", project_root, {}, provider_config, args, log,
+    )
+
+    assert list((project_root / ".claude" / "agents").glob("*.sync-backup-*")) == []
+    assert any("Backup written to" in warning for warning in log.warnings), log.warnings
+

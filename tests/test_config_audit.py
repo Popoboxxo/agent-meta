@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 
 import pytest
+import yaml
 
 from scripts.lib.config import load_config
 from scripts.lib.config_audit import (
@@ -338,6 +339,97 @@ def test_unpaired_closing_tag_scans_platform_overrides(meta_root: Path) -> None:
     unpaired = report.by_category("unpaired_closing_tags")
     assert len(unpaired) == 1
     assert unpaired[0].role == "acme-developer"
+
+
+# ---------------------------------------------------------------------------
+# role_defaults_without_template — framework-level drift (issue #736)
+# ---------------------------------------------------------------------------
+
+def test_role_defaults_without_template_detected(meta_root: Path) -> None:
+    """A role-defaults entry with neither a 1-generic template nor a
+    2-platform based-on source is framework-level drift."""
+    _write(
+        meta_root / "config" / "role-defaults.yaml",
+        "roles:\n  developer:\n    model: powerful\n  git:\n    model: fast\n"
+        "  orphan-role:\n    model: fast\n",
+    )
+    cfg = _config_path(meta_root, "roles:\n  - developer\n")
+    report = audit_config(meta_root, cfg)
+    flagged = {i.role for i in report.by_category("role_defaults_without_template")}
+    assert flagged == {"orphan-role"}
+    assert report.by_category("role_defaults_without_template")[0].severity == "warning"
+
+
+def test_role_defaults_without_template_exempts_based_on_roles(meta_root: Path) -> None:
+    """Roles generated via ``based-on:`` from a 2-platform override are
+    legitimately template-less and must not be reported."""
+    _write(
+        meta_root / "agents" / "1-generic" / "provider-expert.md",
+        _template("provider-expert"),
+    )
+    _write(
+        meta_root / "agents" / "2-platform" / "agent-meta-claude-expert.md",
+        "---\n"
+        "name: \"{{PREFIX}}claude-expert\"\n"
+        "version: 1.0.0\n"
+        "description: \"Claude expert (test).\"\n"
+        "based-on: \"1-generic/provider-expert.md@1.0.0\"\n"
+        "---\n\n# claude-expert\n",
+    )
+    _write(
+        meta_root / "config" / "role-defaults.yaml",
+        "roles:\n  developer:\n    model: powerful\n  git:\n    model: fast\n"
+        "  claude-expert:\n    model: powerful\n",
+    )
+    cfg = _config_path(meta_root, "roles:\n  - developer\n")
+    report = audit_config(meta_root, cfg)
+    assert report.by_category("role_defaults_without_template") == []
+
+
+def test_role_defaults_without_template_ignores_wrapper_entries(meta_root: Path) -> None:
+    """WRAPPER_TEMPLATES (e.g. provider-expert) have no role-defaults entry by
+    design; even a hypothetical entry must not be treated as drift."""
+    _write(
+        meta_root / "agents" / "1-generic" / "provider-expert.md",
+        _template("provider-expert"),
+    )
+    _write(
+        meta_root / "config" / "role-defaults.yaml",
+        "roles:\n  developer:\n    model: powerful\n  git:\n    model: fast\n"
+        "  provider-expert:\n    model: fast\n",
+    )
+    cfg = _config_path(meta_root, "roles:\n  - developer\n")
+    report = audit_config(meta_root, cfg)
+    assert report.by_category("role_defaults_without_template") == []
+
+
+def test_real_repo_has_no_framework_role_drift() -> None:
+    """The shipped framework must pass its own reverse audit (issue #736)."""
+    report = audit_config(
+        _REPO_ROOT, _REPO_ROOT / ".meta-config" / "project.yaml"
+    )
+    assert report.by_category("role_defaults_without_template") == []
+
+
+# ---------------------------------------------------------------------------
+# Shipped example config must stay schema-valid (issue #736)
+# ---------------------------------------------------------------------------
+
+def test_shipped_example_config_validates_against_schema() -> None:
+    pytest.importorskip("jsonschema")
+    import jsonschema
+
+    schema = json.loads(
+        (_REPO_ROOT / "config" / "project-config.schema.json").read_text(encoding="utf-8")
+    )
+    example = yaml.safe_load(
+        (_REPO_ROOT / "howto" / "configs" / "project.yaml.example").read_text(encoding="utf-8")
+    )
+    errors = sorted(
+        jsonschema.Draft7Validator(schema).iter_errors(example),
+        key=lambda e: list(e.path),
+    )
+    assert errors == [], [f"{'.'.join(str(p) for p in e.path)}: {e.message}" for e in errors]
 
 
 # ---------------------------------------------------------------------------

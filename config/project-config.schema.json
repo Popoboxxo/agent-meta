@@ -674,7 +674,7 @@
     },
     "max-parallel-agents": {
       "type": "integer",
-      "description": "Maximum number of agents that a coordinator (orchestrator, feature) may run in parallel via run_in_background. Default: 2. Set to 1 to disable parallelism.",
+      "description": "Maximum number of agents that a coordinator (orchestrator) may run in parallel via run_in_background. Default: 2. Set to 1 to disable parallelism.",
       "minimum": 1,
       "maximum": 5,
       "default": 2

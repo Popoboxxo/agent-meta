@@ -297,3 +297,88 @@ def test_capture_overwrites_stale_hash_for_regenerated_content(tmp_path: Path) -
     assert _load_hashes(project_root) == {
         ".claude/agents/developer.md": content_hash("content v1"),
     }
+
+
+from scripts.lib.generated_file_drift import backup_drifted_files
+
+
+def _backup_siblings(project_root: Path, rel: str) -> list[Path]:
+    path = project_root / rel
+    return sorted(path.parent.glob(f"{path.name}.sync-backup-*"))
+
+
+def test_backup_writes_sibling_with_drifted_content(tmp_path: Path) -> None:
+    """Issue #734: a drifted file gets a `.sync-backup-<ts>` sibling holding
+    exactly the pre-overwrite content."""
+    from scripts.lib.log import SyncLog
+    project_root = tmp_path / "project"
+    _write(project_root, ".claude/agents/developer.md", "edited by hand")
+    findings = [{"path": ".claude/agents/developer.md", "provider": "Claude"}]
+
+    backups = backup_drifted_files(findings, project_root, SyncLog(), dry_run=False)
+
+    assert len(backups) == 1
+    assert backups[0].startswith(".claude/agents/developer.md.sync-backup-")
+    siblings = _backup_siblings(project_root, ".claude/agents/developer.md")
+    assert len(siblings) == 1
+    assert siblings[0].read_text(encoding="utf-8") == "edited by hand"
+
+
+def test_backup_uses_one_timestamp_across_all_findings(tmp_path: Path) -> None:
+    from scripts.lib.log import SyncLog
+    project_root = tmp_path / "project"
+    _write(project_root, ".claude/agents/a.md", "A")
+    _write(project_root, ".claude/agents/b.md", "B")
+    findings = [
+        {"path": ".claude/agents/a.md", "provider": "Claude"},
+        {"path": ".claude/agents/b.md", "provider": "Claude"},
+    ]
+
+    backups = backup_drifted_files(findings, project_root, SyncLog(), dry_run=False)
+
+    timestamps = {name.rsplit(".sync-backup-", 1)[1] for name in backups}
+    assert len(timestamps) == 1
+    assert len(backups) == 2
+
+
+def test_backup_writes_nothing_without_findings(tmp_path: Path) -> None:
+    """No drift -> the scan yields no findings -> no backup sibling."""
+    from scripts.lib.log import SyncLog
+    project_root = tmp_path / "project"
+    _write(project_root, ".claude/agents/developer.md", "unchanged")
+    _managed_index(project_root, ".claude/agents", "developer.md")
+    from scripts.lib.generated_file_drift import content_hash
+    _save_hashes(project_root, {
+        ".claude/agents/developer.md": content_hash("unchanged"),
+    }, dry_run=False)
+
+    findings = scan_generated_file_drift(tmp_path / "agent-meta", project_root, {}, _provider_config())
+    assert findings == []
+    assert backup_drifted_files(findings, project_root, SyncLog(), dry_run=False) == []
+    assert list(project_root.rglob("*.sync-backup-*")) == []
+
+
+def test_backup_writes_nothing_in_dry_run(tmp_path: Path) -> None:
+    from scripts.lib.log import SyncLog
+    project_root = tmp_path / "project"
+    _write(project_root, ".claude/agents/developer.md", "edited by hand")
+    findings = [{"path": ".claude/agents/developer.md", "provider": "Claude"}]
+
+    backups = backup_drifted_files(findings, project_root, SyncLog(), dry_run=True)
+
+    assert list(project_root.rglob("*.sync-backup-*")) == []
+    # dry-run still reports where a backup would have been written
+    assert backups and backups[0].startswith(".claude/agents/developer.md.sync-backup-")
+
+
+def test_backup_is_fail_soft_when_target_is_missing(tmp_path: Path) -> None:
+    from scripts.lib.log import SyncLog
+    project_root = tmp_path / "project"
+
+    backups = backup_drifted_files(
+        [{"path": ".claude/agents/gone.md", "provider": "Claude"}],
+        project_root, SyncLog(), dry_run=False,
+    )
+
+    assert backups == []
+

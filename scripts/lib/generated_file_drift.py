@@ -1,24 +1,32 @@
 """Generated-file drift detection: warn when a sync.py-owned file
 (anything tracked via .agent-meta-managed) was manually edited since the
-last sync. Warn-only for this phase -- write behavior is unaffected.
+last sync, and write a timestamped `.sync-backup-<...>` sibling of every
+drifted file before the writers overwrite it (issue #734). The edit is
+still overwritten in place -- the backup is a safety net, not preservation.
 
-Split into two halves, mirroring context.py's context-hashes.json pattern:
-- scan_generated_file_drift() (Task 2): pure, compares current file
-  content hashes against the stored baseline, called BEFORE the
-  per-provider write stage so it sees pre-overwrite state.
-- capture_generated_file_hashes() (Task 3): writes a fresh baseline from
-  the now-written files, called AFTER every writer has run.
+Split into three parts, mirroring context.py's context-hashes.json pattern:
+- scan_generated_file_drift(): pure, compares current file content hashes
+  against the stored baseline, called BEFORE the per-provider write stage
+  so it sees pre-overwrite state.
+- backup_drifted_files(): writes one timestamped backup per finding from
+  the pre-overwrite content, called right after the scan and before the
+  warnings and the writers.
+- capture_generated_file_hashes(): writes a fresh baseline from the
+  now-written files, called AFTER every writer has run.
 
 Spec: docs/superpowers/specs/2026-09-07-generated-file-drift-detection-design.md
+(see its "Post-implementation update (2026-09-11, #734)" note).
 """
 from __future__ import annotations
 
 import fnmatch
 import json
+from datetime import datetime
 from pathlib import Path
 
 from .deactivation import get_active_providers
 from .io import content_hash, load_json_file, load_yaml_file, safe_path, write_atomic
+from .log import SyncLog
 from .pipelines import resolve_pipeline_details_dir
 from .rule_index import read_managed_index
 
@@ -188,6 +196,57 @@ def scan_generated_file_drift(
             findings.append({"path": PLATFORM_DEFAULTS_RESOLVED_REL, "provider": "platform-defaults"})
 
     return findings
+
+
+def backup_drifted_files(
+    findings: list[dict], project_root: Path, log: SyncLog, dry_run: bool = False,
+) -> list[str]:
+    """Write a `<file>.sync-backup-<YYYYmmdd-HHMMSS>` sibling for every
+    finding, containing exactly the current (pre-overwrite) drifted
+    content. One timestamp per invocation, so every backup written by the
+    same sync shares the same suffix (mirrors context.py's
+    _backup_context_file).
+
+    Fail-soft: a file that cannot be read, or whose backup cannot be
+    written, is logged at debug level and skipped -- matching this
+    module's optional-config/optional-sidecar style. In dry_run nothing is
+    written, but the would-be backup paths are still returned so the
+    caller can surface them in its warnings. Returns the project-relative
+    posix paths of the backups.
+    """
+    if not findings:
+        return []
+
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    backups: list[str] = []
+    for finding in findings:
+        rel_path = finding.get("path")
+        if not rel_path:
+            continue
+        target = project_root / rel_path
+        try:
+            existing_content = target.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            log.debug(
+                "generated-file-drift",
+                f"could not read '{rel_path}' for backup: {type(exc).__name__}: {exc}",
+            )
+            continue
+        backup = target.with_name(f"{target.name}.sync-backup-{ts}")
+        if not dry_run:
+            try:
+                backup.write_text(existing_content, encoding="utf-8")
+            except OSError as exc:
+                log.debug(
+                    "generated-file-drift",
+                    f"could not write backup for '{rel_path}': {type(exc).__name__}: {exc}",
+                )
+                continue
+        try:
+            backups.append(backup.relative_to(project_root).as_posix())
+        except ValueError:
+            backups.append(str(backup))
+    return backups
 
 
 def capture_generated_file_hashes(

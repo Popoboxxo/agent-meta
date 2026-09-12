@@ -44,6 +44,11 @@ _ROLE_MAP = {
     "se-architect": "se-architect",
 }
 
+# Issue #735: the verbose skip/note logging is now capability-gated instead of
+# provider-name gated. Claude declares `verbose-sync-log`; Opencode does not.
+_CLAUDE_PC = {"agent_ext": ".md", "capabilities": ["verbose-sync-log"]}
+_NO_LOG_PC = {"agent_ext": ".md"}
+
 
 def _skip_call(provider="Claude", role="developer", pc=None, allowed=None,
                config=None, variables=None, tmp_path=None):
@@ -53,7 +58,7 @@ def _skip_call(provider="Claude", role="developer", pc=None, allowed=None,
         role=role,
         source_path=tmp / "agents" / "1-generic" / f"{role}.md",
         provider=provider,
-        pc=pc or {"agent_ext": ".md"},
+        pc=pc or _CLAUDE_PC,
         role_map=_ROLE_MAP,
         allowed_roles=allowed,
         config=config or {},
@@ -84,7 +89,7 @@ def test_skip_role_not_in_role_map_logs_claude_only(tmp_path):
         role="unknown-role",
         source_path=tmp_path / "agents" / "1-generic" / "unknown-role.md",
         provider="Claude",
-        pc={"agent_ext": ".md"},
+        pc=_CLAUDE_PC,
         role_map=_ROLE_MAP,
         allowed_roles=None,
         config={},
@@ -100,7 +105,7 @@ def test_skip_role_not_in_role_map_logs_claude_only(tmp_path):
         role="unknown-role",
         source_path=tmp_path / "agents" / "1-generic" / "unknown-role.md",
         provider="Opencode",
-        pc={"agent_ext": ".md"},
+        pc=_NO_LOG_PC,
         role_map=_ROLE_MAP,
         allowed_roles=None,
         config={},
@@ -118,7 +123,7 @@ def test_skip_role_not_in_allowed_roles(tmp_path):
         role="developer",
         source_path=tmp_path / "agents" / "1-generic" / "developer.md",
         provider="Claude",
-        pc={"agent_ext": ".md"},
+        pc=_CLAUDE_PC,
         role_map=_ROLE_MAP,
         allowed_roles={"tester"},
         config={},
@@ -148,7 +153,7 @@ def test_knowledge_role_log_message(tmp_path):
         role="knowledge-gardener",
         source_path=tmp_path / "agents" / "1-generic" / "knowledge-gardener.md",
         provider="Claude",
-        pc={"agent_ext": ".md"},
+        pc=_CLAUDE_PC,
         role_map=_ROLE_MAP,
         allowed_roles=None,
         config={},
@@ -167,7 +172,7 @@ def test_se_role_log_message_when_disabled(tmp_path):
         role="se-architect",
         source_path=tmp_path / "agents" / "1-generic" / "se-architect.md",
         provider="Claude",
-        pc={"agent_ext": ".md"},
+        pc=_CLAUDE_PC,
         role_map=_ROLE_MAP,
         allowed_roles=None,
         config={"systems-engineering": {"enabled": False}},
@@ -196,7 +201,7 @@ def test_orchestrator_skipped_in_main_chat_mode(tmp_path):
         role="orchestrator",
         source_path=tmp_path / "agents" / "1-generic" / "orchestrator.md",
         provider="Claude",
-        pc={"agent_ext": ".md"},
+        pc=_CLAUDE_PC,
         role_map=_ROLE_MAP,
         allowed_roles=None,
         config={},

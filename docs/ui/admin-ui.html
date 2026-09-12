@@ -1564,13 +1564,18 @@ function buildSidebar() {
         { route: "/project/providers", label: "Providers & Platforms", icon: "☁" },
         { route: "/project/provider-deactivation", label: "Provider Deactivation", icon: "⊘" },
         { route: "/project/backups", label: "Backups", icon: "💾" },
+        { route: "/project/backup", label: "Backup Settings", icon: "💾" },
         { route: "/project/roles",     label: "Roles", icon: "⍟" },
         { route: "/project/orchestrator", label: "Orchestrator", icon: "⎈" },
+        { route: "/project/hooks", label: "Hooks", icon: "🪝" },
 
         { route: "/project/viz-admin", label: "Viz & Admin", icon: "👁" },
+        { route: "/project/debug-mode", label: "Debug Mode", icon: "🐞" },
         { route: "/project/model-overrides", label: "Model Overrides", icon: "★" },
         { route: "/project/provider-tier-overrides", label: "Provider Tier Overrides", icon: "❖" },
+        { route: "/project/tier-overrides", label: "Tier Overrides", icon: "❖" },
         { route: "/project/model-mapping", label: "Model Mapping", icon: "⊞" },
+        { route: "/project/mcp-role-overrides", label: "MCP Role Overrides", icon: "🔌" },
         { route: "/project/dod-overrides", label: "DoD Overrides", icon: "☑" },
         { route: "/project/rules-overrides", label: "Rules Overrides", icon: "⚖" },
         { route: "/project/conventions-overrides", label: "Conventions Overrides", icon: "🏷" },
@@ -5727,6 +5732,201 @@ async function saveProjectSections(entries, statusEl) {
   if (statusEl) { statusEl.textContent = "Saved."; statusEl.style.color = "var(--accent-green)"; }
 }
 
+/* =========================================================================
+ * Views — project.yaml sections added for issue #730 / WP3
+ * (hooks, debug-mode, tier-overrides, mcp-role-overrides, backup)
+ * ========================================================================= */
+
+/**
+ * Accessible labelled-control wrapper (WP3 / #730): links <label for> to the
+ * control id and, when help text is supplied, wires it up via
+ * aria-describedby. New section editors use this instead of the older
+ * label-less field helpers so touched controls do not repeat the a11y gap.
+ */
+function a11yField({ id, label, help, control }) {
+  const helpId = help ? `${id}-help` : null;
+  if (helpId) control.setAttribute("aria-describedby", helpId);
+  const field = el("div", { class: "field" }, [
+    el("label", { for: id, class: "field-label" }, [label]),
+    control,
+  ]);
+  if (helpId) field.appendChild(el("div", { id: helpId, class: "field-help" }, [help]));
+  return field;
+}
+
+/** Shared JSON editor for one project.yaml section (WP3 / #730). */
+async function viewProjectSectionJson({ title, section, help, placeholder }) {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, [title]));
+  if (help) wrap.appendChild(el("p", { class: "help-text" }, [help]));
+
+  let project;
+  try { project = await api.get("/api/config/project"); }
+  catch (err) { wrap.appendChild(renderError(err)); return wrap; }
+
+  const current = project[section] !== undefined ? project[section] : placeholder;
+  const id = `project-section-${section}`;
+  const ta = el("textarea", {
+    id, rows: 16, spellcheck: "false",
+    style: "width:100%; min-height:280px; font-family: var(--font-mono, monospace);",
+  });
+  ta.value = JSON.stringify(current, null, 2);
+
+  const status = el("p", {
+    id: `${id}-status`, class: "muted", role: "status", "aria-live": "polite",
+  }, ["Loaded from project.yaml."]);
+  const setStatus = (msg, color) => { status.textContent = msg; status.style.color = color || ""; };
+
+  wrap.appendChild(el("div", { class: "panel" }, [
+    a11yField({
+      id, label: `project.${section} (JSON)`, control: ta,
+      help: "Edit the JSON value for this section. Saving writes only this section; the server rejects unknown or non-writable sections with an error.",
+    }),
+    status,
+  ]));
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: async () => {
+      let parsed;
+      try { parsed = JSON.parse(ta.value); }
+      catch (e) {
+        const msg = `Invalid JSON: ${e.message}`;
+        toast(msg, "error"); setStatus(msg, "var(--accent-red)"); ta.focus();
+        return;
+      }
+      try { await saveProjectSection(section, parsed, status); }
+      catch { /* toast + inline status are surfaced by saveProjectSection */ ta.focus(); }
+    } }, ["Save section"]),
+    el("button", { class: "btn", onclick: async () => {
+      try {
+        const fresh = await api.get("/api/config/project");
+        const value = fresh[section] !== undefined ? fresh[section] : placeholder;
+        ta.value = JSON.stringify(value, null, 2);
+        setStatus("Reloaded from project.yaml.", "var(--accent-green)");
+        ta.focus();
+      } catch (err) { toast(`Reload failed: ${err.message}`, "error"); }
+    } }, ["Reload"]),
+  ]));
+  return wrap;
+}
+
+async function viewProjectHooks() {
+  return viewProjectSectionJson({
+    title: "Project — Hooks",
+    section: "hooks",
+    help: "Enable or disable registered hooks (e.g. dod-push-check, pre-release-check) for this project.",
+    placeholder: {},
+  });
+}
+
+async function viewProjectTierOverrides() {
+  return viewProjectSectionJson({
+    title: "Project — Tier Overrides",
+    section: "tier-overrides",
+    help: 'Per-role tier overrides, e.g. {"tester": "powerful"} — lifts a single role without changing its default.',
+    placeholder: {},
+  });
+}
+
+async function viewProjectMcpRoleOverrides() {
+  return viewProjectSectionJson({
+    title: "Project — MCP Role Overrides",
+    section: "mcp-role-overrides",
+    help: 'Bind an active MCP server to specific roles, e.g. {"developer": ["playwright"]}.',
+    placeholder: {},
+  });
+}
+
+async function viewProjectDebugMode() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Project — Debug Mode"]));
+  wrap.appendChild(el("p", { class: "help-text" }, [
+    "When enabled, sync injects the debug-mode block (marker '<!-- agent-meta:debug-mode -->') into every generated agent.",
+  ]));
+
+  let project;
+  try { project = await api.get("/api/config/project"); }
+  catch (err) { wrap.appendChild(renderError(err)); return wrap; }
+
+  const id = "project-debug-mode-toggle";
+  const cb = el("input", { type: "checkbox", id });
+  cb.checked = project["debug-mode"] === true;
+
+  const status = el("p", {
+    id: `${id}-status`, class: "muted", role: "status", "aria-live": "polite",
+  }, [`Currently ${cb.checked ? "enabled" : "disabled"}.`]);
+
+  wrap.appendChild(el("div", { class: "panel" }, [
+    a11yField({
+      id, label: "Enable debug mode", control: cb,
+      help: "Adds verbose debug instructions to every generated agent template.",
+    }),
+    status,
+  ]));
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: async () => {
+      try { await saveProjectSection("debug-mode", cb.checked, status); }
+      catch { cb.focus(); }
+    } }, ["Save debug mode"]),
+  ]));
+  return wrap;
+}
+
+async function viewProjectBackup() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Project — Backup Settings"]));
+  wrap.appendChild(el("p", { class: "help-text" }, [
+    "Controls the automatic backup of project configuration performed before sync.",
+  ]));
+
+  let project;
+  try { project = await api.get("/api/config/project"); }
+  catch (err) { wrap.appendChild(renderError(err)); return wrap; }
+
+  const cur = (project.backup && typeof project.backup === "object") ? project.backup : {};
+  const retention = (cur.retention && typeof cur.retention === "object") ? cur.retention : {};
+
+  const enabled = el("input", { type: "checkbox", id: "backup-enabled" });
+  enabled.checked = cur.enabled !== false;
+  const dir = el("input", { type: "text", id: "backup-dir", value: cur.dir || "" });
+  const maxBackups = el("input", { type: "number", id: "backup-max", min: "0", value: retention.max_backups ?? "" });
+  const maxAge = el("input", { type: "number", id: "backup-max-age", min: "0", value: retention.max_age_days ?? "" });
+  const auto = el("input", { type: "checkbox", id: "backup-auto" });
+  auto.checked = cur["auto-backup-before-sync"] === true;
+
+  const status = el("p", {
+    id: "backup-status", class: "muted", role: "status", "aria-live": "polite",
+  }, ["Loaded from project.yaml."]);
+
+  wrap.appendChild(el("div", { class: "panel" }, [
+    a11yField({ id: "backup-enabled", label: "Enable backups", control: enabled,
+      help: "Master switch for project.yaml backups." }),
+    a11yField({ id: "backup-dir", label: "Backup directory", control: dir,
+      help: "Relative path where backups are stored." }),
+    a11yField({ id: "backup-max", label: "Maximum backups to retain", control: maxBackups }),
+    a11yField({ id: "backup-max-age", label: "Maximum age in days", control: maxAge }),
+    a11yField({ id: "backup-auto", label: "Auto-backup before sync", control: auto,
+      help: "Create a backup automatically before each sync run." }),
+    status,
+  ]));
+
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: async () => {
+      const retentionOut = {};
+      if (maxBackups.value !== "") retentionOut.max_backups = Number(maxBackups.value);
+      if (maxAge.value !== "") retentionOut.max_age_days = Number(maxAge.value);
+      const out = {
+        enabled: enabled.checked,
+        dir: dir.value,
+        retention: retentionOut,
+        "auto-backup-before-sync": auto.checked,
+      };
+      try { await saveProjectSection("backup", out, status); }
+      catch { enabled.focus(); }
+    } }, ["Save backup settings"]),
+  ]));
+  return wrap;
+}
+
 function labeledTextField(label, value, onInput, help) {
   const field = el("div", { class: "field" });
   field.appendChild(el("label", { class: "field-label" }, [label]));
@@ -9807,12 +10007,17 @@ async function init() {
   router.register("/project/providers",       viewProjectProviders);
   router.register("/project/provider-deactivation", viewProviderDeactivation);
   router.register("/project/backups", viewBackups);
+  router.register("/project/backup", viewProjectBackup);
   router.register("/project/roles",           viewProjectRoles);
   router.register("/project/orchestrator",    viewProjectOrchestrator);
+  router.register("/project/hooks",           viewProjectHooks);
 
   router.register("/project/viz-admin",       viewProjectVizAdmin);
+  router.register("/project/debug-mode",      viewProjectDebugMode);
   router.register("/project/model-overrides", viewProjectModelOverrides);
   router.register("/project/provider-tier-overrides", viewProjectProviderTierOverrides);
+  router.register("/project/tier-overrides",  viewProjectTierOverrides);
+  router.register("/project/mcp-role-overrides", viewProjectMcpRoleOverrides);
   router.register("/project/dod-overrides", viewProjectDodOverrides);
   router.register("/project/rules-overrides", viewProjectRulesOverrides);
   router.register("/project/conventions-overrides", viewProjectConventionsOverrides);

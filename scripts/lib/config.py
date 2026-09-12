@@ -3,11 +3,12 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import re
 import subprocess
 import sys
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .agents import (
@@ -107,6 +108,32 @@ _DOD_FIELD_DEFAULTS: dict = {
     "prompt-governance": False,
     "lifecycle-ownership": False,
     "se-required": "false",
+}
+
+# Fallback values for variables that MUST always resolve, even in a minimal
+# hand-written project.yaml that never ran the interactive `--setup` wizard
+# (issue #733). They are applied as `setdefault` AFTER the project's own
+# `variables:` entries are loaded, so an explicit project value always wins.
+#
+# The five language variables mirror the framework's own Sprachregeln table
+# (AGENTS.md): user communication/input German, external docs English, internal
+# docs German, code/commits English. Without them the always-copied
+# rules/1-generic/language.md and commit-conventions.md shipped literal
+# `{{COMMUNICATION_LANGUAGE}}` tokens to every consumer project.
+#
+# PROJECT_GOAL / PROJECT_LANGUAGES / CODE_CONVENTIONS get an empty-string
+# fallback so agent personas render a blank field instead of a leaked
+# placeholder; PROJECT_GOAL is additionally re-derived from PROJECT_DESCRIPTION
+# below when one is available.
+_VARIABLE_FALLBACKS: dict[str, str] = {
+    "COMMUNICATION_LANGUAGE": "Deutsch",
+    "USER_INPUT_LANGUAGE": "Deutsch",
+    "DOCS_LANGUAGE": "Englisch",
+    "INTERNAL_DOCS_LANGUAGE": "Deutsch",
+    "CODE_LANGUAGE": "Englisch",
+    "PROJECT_GOAL": "",
+    "PROJECT_LANGUAGES": "",
+    "CODE_CONVENTIONS": "",
 }
 
 
@@ -270,6 +297,14 @@ def _validate_config(config: dict, config_path: Path) -> None:
     _validate_providers(config, config_path)
 
     if not _JSONSCHEMA_AVAILABLE:
+        # Explicit, correctly-worded pointer: jsonschema ENABLES this check
+        # (issue #737). Kept on stderr and non-fatal so projects without the
+        # optional dependency are not broken, only informed.
+        print(
+            "  i  jsonschema not installed — schema validation skipped "
+            "(install jsonschema to enable it).",
+            file=sys.stderr,
+        )
         return
 
     schema_path = Path(__file__).resolve().parent.parent.parent / "config/project-config.schema.json"
@@ -284,8 +319,13 @@ def _validate_config(config: dict, config_path: Path) -> None:
         validator = _jsonschema.Draft7Validator(schema)
         errors = sorted(validator.iter_errors(config), key=lambda e: list(e.path))
         if errors:
+            # The hint must NOT read like jsonschema enables suppression: this
+            # branch only runs when jsonschema IS installed (the unavailable
+            # case returned above), so installing it produces the warnings, not
+            # their removal (issue #737).
             print(f"  !  Config validation warnings ({len(errors)}) — "
-                  f"fix or install jsonschema to suppress this check:", file=sys.stderr)
+                  f"fix the reported fields (or run --fill-defaults) to clear "
+                  f"them:", file=sys.stderr)
             for err in errors[:5]:  # cap at 5 to avoid noise
                 path = ".".join(str(p) for p in err.path) or "(root)"
                 print(f"       {path}: {err.message}", file=sys.stderr)
@@ -576,6 +616,21 @@ def fill_defaults(
             added.append((field, desc))
             changed = True
 
+    # --- Fill schema-required project.short (issue #737) ---
+    # project.short is marked `required` in project-config.schema.json but has
+    # no schema `default`, so --fill-defaults could never clear the permanent
+    # "'short' is a required property" warning. It is a display name with an
+    # obvious derivation, so fall back to project.name, then project.prefix.
+    project_block = config.get("project")
+    if isinstance(project_block, dict) and not project_block.get("short"):
+        derived_short = project_block.get("name") or project_block.get("prefix")
+        if derived_short:
+            project_block["short"] = derived_short
+            added.append(
+                ("project.short", "Anzeigename / Display name (derived from project.name)")
+            )
+            changed = True
+
     # --- Fill nested dod.* fields (schema-driven, only when the user EXPLICITLY
     # picked a rigorous preset). An absent dod-preset now means "let the
     # platforms: cascade / runtime fallback decide" -- materializing the "full"
@@ -689,6 +744,70 @@ def read_git_version(agent_meta_root: Path) -> str:
     return "unknown"
 
 
+def _resolve_agent_meta_date(agent_meta_root: Path) -> str:
+    """Return a reproducible generation date for ``AGENT_META_DATE``.
+
+    ``AGENT_META_DATE`` is rendered into committed context managed blocks, so a
+    non-deterministic value (``datetime.now()``) makes any drift/``--check``
+    fail on every day after the last sync (#752). Resolution order:
+
+    1. ``SOURCE_DATE_EPOCH`` env var (integer seconds since the Unix epoch) →
+       UTC ``YYYY-MM-DD`` — the reproducible-builds standard.
+    2. Release date of the current version from ``CHANGELOG.md``: heading
+       ``## [<version>] — YYYY-MM-DD`` (em-dash, en-dash or hyphen, with an
+       optional markdown link after the version). If that exact heading is
+       missing — e.g. VERSION was bumped before the CHANGELOG entry landed —
+       the most recent dated release heading is used instead, so the value
+       stays stable across that window.
+    3. Fallback: today's local date — preserves the previous behaviour when no
+       dated heading exists at all.
+
+    ``--check`` contract: validate a committed baseline WITHOUT
+    ``SOURCE_DATE_EPOCH`` set. The env var is for reproducible *builds*; setting
+    it during a check changes the generated date relative to the committed
+    hashes and reports false drift.
+
+    Any parse/lookup error falls through to the next option and never raises;
+    a generation date must not be able to break a sync run.
+    """
+    try:
+        epoch = os.environ.get("SOURCE_DATE_EPOCH")
+        if epoch is not None:
+            try:
+                return datetime.fromtimestamp(
+                    int(epoch), tz=timezone.utc
+                ).strftime("%Y-%m-%d")
+            except (TypeError, ValueError, OverflowError, OSError):
+                pass
+
+        changelog = agent_meta_root / "CHANGELOG.md"
+        if changelog.exists():
+            text = changelog.read_text(encoding="utf-8")
+            version = read_version(agent_meta_root).lstrip("v")
+            if version and version != "unknown":
+                exact = re.compile(
+                    rf"^##\s*\[{re.escape(version)}\](?:\([^)]*\))?"
+                    r"\s*[—–-]\s*(\d{4}-\d{2}-\d{2})",
+                    re.MULTILINE,
+                )
+                match = exact.search(text)
+                if match:
+                    return match.group(1)
+            # No exact heading: use the most recent dated release heading.
+            release = re.compile(
+                r"^##\s*\[[^\]]+\](?:\([^)]*\))?\s*[—–-]\s*(\d{4}-\d{2}-\d{2})",
+                re.MULTILINE,
+            )
+            match = release.search(text)
+            if match:
+                return match.group(1)
+    except (OSError, UnicodeError):
+        pass
+
+    return datetime.now().strftime("%Y-%m-%d")  # noqa: DTZ005
+
+
+
 def _load_se_variable_defaults(agent_meta_root: Path, warnings: list[str] | None = None) -> dict:
     """Load SE cascade variable defaults from config/role-defaults.yaml se_variables block.
 
@@ -746,7 +865,7 @@ def _build_core_variables(
     variables["PROJECT_SHORT"] = project.get("short", "")
     variables["PROJECT_NAME"]  = project.get("name", "")
     variables["AGENT_META_VERSION"] = read_version(agent_meta_root)
-    variables["AGENT_META_DATE"]    = datetime.now().strftime("%Y-%m-%d")  # noqa: DTZ005
+    variables["AGENT_META_DATE"]    = _resolve_agent_meta_date(agent_meta_root)
     if project_root is not None:
         try:
             rel = agent_meta_root.resolve().relative_to(project_root.resolve())
@@ -771,6 +890,13 @@ def _build_core_variables(
             variables[key] = str(value)
         else:
             variables[key] = value
+    # Guarantee placeholder resolution for the minimal-project variable set
+    # (issue #733): an explicit `variables:` entry above wins; otherwise the
+    # framework fallback is used. Placed before the PROJECT_GOAL-from-description
+    # refinement below, which still upgrades an empty PROJECT_GOAL when a
+    # PROJECT_DESCRIPTION exists.
+    for _fallback_var, _fallback_value in _VARIABLE_FALLBACKS.items():
+        variables.setdefault(_fallback_var, _fallback_value)
     # Optional, project-specific string variables (#425): unlike ARCHITECTURE/
     # DEV_COMMANDS below, an empty-string fallback is wrong here because the
     # referencing templates interpolate the value inline (e.g.
