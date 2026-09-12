@@ -91,7 +91,7 @@ def _managed_names(dir_path: Path, *extra_index_names: str) -> set[str]:
     """Union of every managed-index file's entries for dir_path.
 
     A directory can carry more than one index (rules/ has
-    .agent-meta-managed, -mcp, -tools -- one per writer, issue #478/#613);
+    .agent-meta-managed, -mcp, -tools -- one per writer, issue
     extra_index_names lists the sidecar suffixes beyond the base
     .agent-meta-managed.
     """
@@ -99,6 +99,19 @@ def _managed_names(dir_path: Path, *extra_index_names: str) -> set[str]:
     for suffix in extra_index_names:
         names |= read_managed_index(dir_path / f".agent-meta-managed-{suffix}")
     return names
+
+
+# `<file>.sync-backup-<YYYYmmdd-HHMMSS>` siblings written by
+# backup_drifted_files(). They are ephemeral safety copies, never generated
+# artifacts, so they must never enter the tracked hash baseline -- doing so
+# would pin them forever (and scan_generated_file_drift would then flag their
+# removal as drift).
+_SYNC_BACKUP_PATTERN = "*.sync-backup-*"
+
+
+def _is_sync_backup_name(name: str) -> bool:
+    """True when *name* is a ``.sync-backup-<ts>`` sibling (never managed)."""
+    return fnmatch.fnmatch(name, _SYNC_BACKUP_PATTERN)
 
 
 def _iter_managed_files(agent_meta_root: Path, project_root: Path, provider: str, pc: dict) -> list[Path]:
@@ -132,6 +145,8 @@ def _iter_managed_files(agent_meta_root: Path, project_root: Path, provider: str
         if not dir_path.is_dir():
             continue
         for name in sorted(_managed_names(dir_path, *extra_index_names)):
+            if _is_sync_backup_name(name):
+                continue
             candidate = safe_path(dir_path, name)
             if candidate.is_file():
                 files.append(candidate)
@@ -142,7 +157,10 @@ def _iter_managed_files(agent_meta_root: Path, project_root: Path, provider: str
                 # reference files) rather than a single file -- collect
                 # everything inside recursively so drift is caught for all
                 # of it, today and as skills grow extra files.
-                files.extend(sorted(p for p in candidate.rglob("*") if p.is_file()))
+                files.extend(sorted(
+                    p for p in candidate.rglob("*")
+                    if p.is_file() and not _is_sync_backup_name(p.name)
+                ))
         # Nested self-managed subdirectories (hooks/lib/, hooks/release-gates/,
         # issue #558) carry their OWN .agent-meta-managed index -- recurse
         # one level to pick those up too (mirrors scan_injection_drift's
@@ -150,6 +168,8 @@ def _iter_managed_files(agent_meta_root: Path, project_root: Path, provider: str
         for child in sorted(dir_path.iterdir()):
             if child.is_dir() and (child / ".agent-meta-managed").exists():
                 for name in sorted(_managed_names(child)):
+                    if _is_sync_backup_name(name):
+                        continue
                     nested_candidate = safe_path(child, name)
                     if nested_candidate.is_file():
                         files.append(nested_candidate)
