@@ -142,6 +142,30 @@ Defines whether the Orchestrator runs sub-agents `synchronously` (one after anot
 <!-- author: Agent Meta Admin -->
 Defines what the Orchestrator should do if a user requests a task but no specialized sub-agent is available (or they are all disabled). `graceful_decline` forces the Orchestrator to reject the task. `generic_attempt` allows the Orchestrator to try and solve the problem itself using its baseline coding tools.
 
+### Repo Containment
+<!-- help-id: project_instance-repo_containment -->
+<!-- last-updated: 2026-09-12 -->
+<!-- author: Agent Meta Admin -->
+Repo Containment ("prison mode") confines agent **write** access to the project root — the directory containing `.meta-config/` (in the submodule layout this is *not* the Git toplevel). It is enabled by default and is the only master switch (`repo_containment.enabled`); the pre-tool-use hook reads it at runtime, and the optional tmp-sink provides one sanctioned scratch exception. Because the hook runs at PreToolUse on providers with a verified `hook_protocol`, this is a convention boundary against accidental misuse, not an OS sandbox.
+
+#### Field: Path
+<!-- help-id: field-path -->
+<!-- last-updated: 2026-09-12 -->
+<!-- author: Agent Meta Admin -->
+The relative path of the scratch tmp-sink, resolved against the repo root (default: `.tmp`). It must stay relative and must not contain `..` segments; the Admin UI validates this client-side and the sync-time validator rejects an unsafe path before anything is generated. When the sink is disabled, containment stays strictly root-only.
+
+#### Field: Gitignore
+<!-- help-id: field-gitignore -->
+<!-- last-updated: 2026-09-12 -->
+<!-- author: Agent Meta Admin -->
+When enabled, the framework adds the scratch directory to the agent-meta managed `.gitignore` block and writes a self-ignoring `<path>/.gitignore` fallback, so scratch contents never enter the repository state.
+
+#### Field: Cleanup
+<!-- help-id: field-cleanup -->
+<!-- last-updated: 2026-09-12 -->
+<!-- author: Agent Meta Admin -->
+How the scratch directory is pruned. `manual` (default) never deletes contents automatically. `on-sync` is a destructive opt-in: the directory contents are pruned on every sync run, so only choose it when the scratch data is truly disposable.
+
 ### Viz & Admin
 <!-- help-id: project_instance-viz_admin -->
 <!-- last-updated: 2026-07-19 -->
