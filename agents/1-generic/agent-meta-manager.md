@@ -1,6 +1,6 @@
 ---
 name: template-agent-meta-manager
-version: "1.21.1"
+version: "1.21.2"
 description: "Manage agent-meta: upgrades, sync, feedback delegation, project-specific agents, external-skill lifecycle, and creating extensions."
 hint: "Manage agent-meta: upgrade, sync, feedback, create project-specific agents"
 prompt_mode: modern
@@ -73,13 +73,13 @@ Already on latest tag → only `update-meta`, never `upgrade`.
 cd .agent-meta && git fetch --tags && git tag --sort=-version:refname | head -10
 git checkout v<TARGET>
 git add .agent-meta
-# set agent-meta-version in .meta-config/project.yaml
+# agent-meta-version is rewritten automatically by the re-sync below
 ```
 
 Order of operations (M2):
 1. `git checkout v<TARGET>` in the submodule. Afterwards the `{{AGENT_META_VERSION}}` value embedded in the generated agent files is stale — it only refreshes on the next sync.
 2. **Re-sync first:** `py {{AGENT_META_REL_PATH}}scripts/sync.py --config .meta-config/project.yaml`. The sync writes `agent-meta-version` from the real `VERSION` back into `project.yaml` and refreshes the embedded `{{AGENT_META_VERSION}}` values.
-3. **Then** trigger a re-render of the README badges row (documenter.md §5). The `documenter` reads the value live from `agent-meta-version`/`VERSION` — never the placeholder embedded in this prompt (it can be stale between checkout and re-sync).
+3. **Then** trigger a re-render of the README badges row (documenter.md §5). The `documenter` uses the sync-embedded `{{AGENT_META_VERSION}}` value, which the preceding re-sync (step 2) has just refreshed — never treat this prompt's (possibly stale) copy as the value source.
 4. Check whether `readme.badges` contains `agent-meta`: yes → re-render; no → do **not** add it automatically, only offer it (confirmation required, D2).
 
 This agent never writes README markup — the `documenter` is the sole writer of the badges row (B1).
@@ -103,7 +103,7 @@ having actually run `--validate` in this turn.
 
 After a successful sync / `--validate` run:
 1. Trigger a re-render of the README badges row (documenter.md §5). The `documenter` is the **only** writer of that row (B1) — this agent never writes or patches README markup itself.
-2. The value source is the live `agent-meta-version`/`VERSION`, never the placeholder embedded in this prompt.
+2. The value source is the sync-embedded `{{AGENT_META_VERSION}}`, refreshed by the re-sync above — never a separate live read and never this prompt's (possibly stale) copy.
 3. If `agent-meta` is not in `readme.badges`: change nothing, only offer it ("extend `readme.badges` with `agent-meta`?"). Apply the config change only after explicit user confirmation (D2), then trigger the re-render.
 4. Include the badge check result in the sync summary.
 
