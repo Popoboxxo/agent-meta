@@ -70,6 +70,16 @@ def test_readme_contains_agent_meta_badge_with_tag_link():
     assert agent_meta_badge in content
 
 
+def test_readme_agent_meta_badge_never_double_escapes_label():
+    """The label must be escaped exactly once: the image URL is
+    `badge/agent--meta-v<version>-blue.svg`, never `badge/agent----meta`
+    (M1/F4/F5)."""
+    version = _repo_version()
+    content = _README.read_text(encoding="utf-8")
+    assert "badge/agent----meta" not in content
+    assert f"badge/agent--meta-v{version}-blue.svg" in content
+
+
 def test_readme_generic_version_badge_fresh_and_no_stale_version():
     """Both the generic version badge and the agent-meta badge must show the
     real `VERSION` (read at runtime, not hard-coded); the old stale
