@@ -9,6 +9,18 @@ on:
     - cron: '0 3 * * *'
 
 jobs:
+  scenarios:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install pyyaml
+      - name: Run scenario suite
+        run: bash tests/scenarios/run.sh
+
   validate:
     runs-on: ubuntu-latest
     steps:
@@ -20,6 +32,13 @@ jobs:
         run: pip install pyyaml
       - name: Validate sync output
         run: python scripts/sync.py --validate
+      # Drift gate (#739). Read-only: --check forces --dry-run. Note that on
+      # agent-meta self-hosting the generated provider dirs are gitignored, so
+      # a fresh CI checkout additionally reports [INIT] actions for files that
+      # are absent by design (issue #739, defect 4); the gate becomes fully
+      # green once that defect is fixed.
+      - name: Check generated files are in sync (drift gate)
+        run: python3 scripts/sync.py --check
       - name: Lint agent frontmatter
         run: |
           python3 -c "

@@ -8,14 +8,21 @@
 #
 # Verified expectations -- derived from the framework code, not guessed:
 #   Allowlist (scripts/lib/auto_commit.py::resolve_auto_commit_config):
-#     mode != "off" gates the eligible_roles computation, so mode "off"
-#     yields eligible_roles [] regardless of other keys; the resolved
-#     values (file_count_threshold 2, secret_scan false from the config)
-#     are still recorded. scripts/lib/sync_pipeline.py::
-#     _sync_stage_auto_commit_allowlist writes the allowlist on EVERY
-#     sync -- hence the byte-identity diff below excludes .meta-config
-#     (the compare sync's allowlist legitimately differs: defaults
-#     threshold 5 / secret_scan true) and sync.log (absolute paths).
+#     eligible_roles is capability-derived and MODE-INDEPENDENT: it lists
+#     every active role whose own agents/1-generic/<role>.md tools:
+#     frontmatter contains Edit or Write (_ELIGIBLE_TOOLS). Mode "off"
+#     does NOT empty it -- off suppresses rendered behavior (empty
+#     AUTO_COMMIT_BLOCK / no commit authority), not the allowlist's data.
+#     Scenario-21 roles: orchestrator (Write), developer (Write+Edit),
+#     tester (Write+Edit) -> eligible; git (no Edit/Write) -> filtered
+#     out. -> eligible_roles = ["developer", "orchestrator", "tester"].
+#     The other resolved values (file_count_threshold 2, secret_scan
+#     false from the config) are recorded but inert in off mode.
+#     scripts/lib/sync_pipeline.py::_sync_stage_auto_commit_allowlist
+#     writes the allowlist on EVERY sync -- hence the byte-identity diff
+#     below excludes .meta-config (the compare sync's allowlist
+#     legitimately differs: it has no auto_commit key) and sync.log
+#     (absolute paths).
 #   Rendering (scripts/lib/config.py): AUTO_COMMIT_ENABLED = "false" for
 #     mode "off", AUTO_COMMIT_BLOCK = "" -> the {{#if}} gate strips the
 #     block from every generated agent file, in every provider dir.
@@ -64,9 +71,10 @@ def check(cond: bool, msg: str) -> None:
 
 check(data.get("mode") == "off", "mode must be the string 'off' "
       "(unquoted YAML `off` parses to boolean False -- scenario config quotes it)")
-check(data.get("eligible_roles") == [],
-      "eligible_roles must be empty (mode 'off' must not grant commit authority "
-      "to any role, regardless of active roles)")
+check(data.get("eligible_roles") == ["developer", "orchestrator", "tester"],
+      "eligible_roles must be ['developer', 'orchestrator', 'tester'] "
+      "(capability-derived and mode-independent: off mode suppresses the "
+      "rendered AUTO_COMMIT_BLOCK, not the allowlist's eligible_roles data)")
 check(data.get("triggers") == [], "triggers must be empty")
 check(data.get("custom_script") is None, "custom_script must be null")
 # Stray values from the config must be recorded but stay inert (nothing

@@ -11,6 +11,8 @@ on:
       - 'tests/**'
       - 'config/**'
       - 'agents/**'
+      - 'VERSION'
+      - 'CHANGELOG.md'
       - '.github/workflows/orchestration-test.yml'
   pull_request:
     paths:
@@ -18,6 +20,8 @@ on:
       - 'tests/**'
       - 'config/**'
       - 'agents/**'
+      - 'VERSION'
+      - 'CHANGELOG.md'
       - '.github/workflows/orchestration-test.yml'
 
 jobs:
