@@ -1,5 +1,11 @@
 # agent-meta
 
+[![agent-meta v1.1.0](https://img.shields.io/badge/agent--meta-v1.1.0-blue.svg)](https://github.com/Popoboxxo/agent-meta/releases/tag/v1.1.0)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)]()
+[![Code health](https://api.repowise.dev/badge/health/popoboxxo/agent-meta.svg)](https://repowise.dev/repo/popoboxxo/agent-meta)
+[![Python](https://img.shields.io/badge/python-3.x-green.svg)]()
+[![License](https://img.shields.io/badge/license-MIT-gray.svg)]()
+
 > [!WARNING]
 > ## VibeCoding Experiment — Read Before Using
 > This repository is intentionally run as a **VibeCoding experiment**.
@@ -32,9 +38,6 @@
 >    - **Automated Default Init:** `python .agent-meta/scripts/sync.py --init`
 > 3. **Re-Sync After Config Changes:** Re-run `python .agent-meta/scripts/sync.py` whenever `.meta-config/project.yaml` is modified.
 
-[![Version](https://img.shields.io/badge/version-0.101.0--beta.6-blue.svg)]()
-[![Python](https://img.shields.io/badge/python-3.x-green.svg)]()
-[![License](https://img.shields.io/badge/license-MIT-gray.svg)]()
 | **Date:** 2026-09-07
 
 > Central meta-repository for standardizing and reusing Claude agent roles across all projects.
@@ -910,7 +913,7 @@ The `documenter` agent maintains a consumer project's `README.md` using the same
 
 ```yaml
 readme:
-  badges: [version, stack, license]     # "license" only if a LICENSE file exists; "ci" opt-in, only if a CI config is found
+  badges: [version, stack, license]     # "license" only if a LICENSE file exists; "ci" opt-in, only if a CI config is found; "agent-meta" opt-in, renders AGENT_META_VERSION (or "unknown")
   warnings: false                       # true renders a [!WARNING] callout — never forced
   sections: [description, badges, setup, structure]
 ```
