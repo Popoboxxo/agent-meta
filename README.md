@@ -38,8 +38,6 @@
 >    - **Automated Default Init:** `python .agent-meta/scripts/sync.py --init`
 > 3. **Re-Sync After Config Changes:** Re-run `python .agent-meta/scripts/sync.py` whenever `.meta-config/project.yaml` is modified.
 
-| **Date:** 2026-09-07
-
 > Central meta-repository for standardizing and reusing Claude agent roles across all projects.
 > Git submodule embedded in projects. Provides standardized agent templates (1-generic, 2-platform, 0-external).
 > Generates project-ready agent files in `.claude/agents/` via `sync.py`.
