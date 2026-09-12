@@ -1,6 +1,6 @@
 ---
 name: template-documenter
-version: "1.8.0"
+version: "1.8.1"
 description: "Maintains CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md and session insights."
 hint: "Maintain docs: CODEBASE_OVERVIEW, ARCHITECTURE, README, insights"
 prompt_mode: modern
@@ -53,6 +53,11 @@ required sections get added (same managed-block principle as `.gitignore`).
    - `license` → only include if a `LICENSE` file exists in the project root.
    - `ci` → only include if a recognizable CI config exists (`.github/workflows/*.yml`, `.gitlab-ci.yml`, `.circleci/config.yml`, ...).
    - `version`/`stack` → always safe to include.
+   - `agent-meta` → opt-in only: render the badge ONLY when `agent-meta` is listed in `{{README_BADGES}}`; without that opt-in no badge is emitted. This type is data-driven, treated exactly like `version`/`stack` — no provider/project special case.
+     - **Value (D5/Q6):** taken from `{{AGENT_META_VERSION}}`; if it is missing or empty, the badge message is exactly `unknown` — label `agent-meta unknown` and image URL `https://img.shields.io/badge/agent--meta-unknown-blue.svg` (no `v` prefix). Never silently omit the badge; only the missing opt-in in `{{README_BADGES}}` suppresses it.
+     - **Escaping (M1, mandatory):** map a literal `-` to `--` **only in the inserted version value**. The label is already literal `agent--meta` and must NOT be escaped a second time (double escaping would yield `agent----meta`). So a pre-release like `v0.101.0-beta.6` becomes `v0.101.0--beta.6` in the image segment (`https://img.shields.io/badge/agent--meta-v<escaped-version>-blue.svg`); a plain `v1.1.0` stays unchanged.
+     - **Link target (D1):** the tag-specific link `https://github.com/{{AGENT_META_REPO}}/releases/tag/v<version>` is used only when a real version value exists. When the version is missing/empty, never fabricate a `vunknown` tag link — fall back to the always-valid releases page `https://github.com/{{AGENT_META_REPO}}/releases`. Either link (tag or releases page) requires `{{AGENT_META_REPO}}` to be non-empty and contains a `/`; otherwise render the badge without a link.
+   You are the ONLY writer of the badges row — never let another agent generate or patch it.
    A broken or misleading badge (e.g. a license badge with no LICENSE file) is a defect, not an acceptable shortcut.
 3. **Warning/Important callout** — ONLY when `readme.warnings` is enabled ({{README_WARNINGS_ENABLED}}). Never force a callout on a project that isn't flagged as one.
 4. **Setup/Quickstart** — from `{{DEV_COMMANDS}}`/`{{TEST_COMMANDS}}`.

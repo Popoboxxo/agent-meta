@@ -76,6 +76,9 @@ project:
 # readme:
 #   # badges: Badge-Set für die README-Badges-Zeile. "license" wird nur gerendert
 #   #   wenn eine LICENSE-Datei existiert, "ci" nur wenn eine CI-Config erkennbar ist.
+#   #   "agent-meta" ist opt-in: nur wenn explizit hier gelistet, wird das
+#   #   agent-meta-Versions-Badge gerendert (Wert aus AGENT_META_VERSION,
+#   #   fehlend/leer -> "unknown").
 #   badges: [version, stack, license]
 #   # warnings: false (Default) → kein [!WARNING]-Callout erzwungen.
 #   warnings: false

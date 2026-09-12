@@ -23,10 +23,29 @@ placeholder that resolves to a broken image:
 - ci:      ONLY if a recognizable CI config exists (.github/workflows/*.yml,
            .gitlab-ci.yml, .circleci/config.yml, ...) -- not part of the
            default badge set, opt-in only (readme.badges: [..., ci])
+- agent-meta: opt-in only -- rendered ONLY when `agent-meta` is explicitly
+           listed in readme.badges. Value comes from AGENT_META_VERSION.
+           - missing/empty version -> the badge message is exactly `unknown`
+             (no `v` prefix): [![agent-meta unknown](https://img.shields.io/badge/agent--meta-unknown-blue.svg)](https://github.com/{{AGENT_META_REPO}}/releases)
+             The releases page is the always-valid link fallback; omit the link
+             entirely when the repo guard below is not met. Never fabricate a
+             `.../releases/tag/vunknown` link -- the tag link is valid only for
+             a real version.
+           - escaping is mandatory, but applies ONLY to the substituted version
+             value: a literal `-` becomes `--` there. The label is already
+             literal `agent--meta` and must NOT be escaped again (double
+             escaping yields `agent----meta`). Raw 0.101.0-beta.6 -> escaped
+             0.101.0--beta.6.
+           - link target: the tag-specific
+             https://github.com/{{AGENT_META_REPO}}/releases/tag/v<version>
+             -- only when AGENT_META_REPO is non-empty and contains a `/`;
+             otherwise render the badge without a link.
 -->
 [![Version](https://img.shields.io/badge/version-{{VERSION}}-blue.svg)]()
 [![Stack](https://img.shields.io/badge/stack-{{PROJECT_LANGUAGES}}-green.svg)]()
 <!-- [![License](https://img.shields.io/badge/license-{{LICENSE_NAME}}-gray.svg)]() -- only if LICENSE file exists -->
+<!-- [![agent-meta v{{AGENT_META_VERSION}}](https://img.shields.io/badge/agent--meta-v{{AGENT_META_VERSION}}-blue.svg)](https://github.com/{{AGENT_META_REPO}}/releases/tag/v{{AGENT_META_VERSION}}) -- opt-in only: emit only when `agent-meta` is listed in readme.badges -->
+<!-- example note: the label `agent--meta` above is already escaped and is NOT escaped again -- only the substituted version value is `-`->`--` mapped in the image segment, so a pre-release renders as `v0.101.0--beta.6` (raw `v0.101.0-beta.6`). The tag link is used only for a real version; for a missing/empty version emit the badge with message `unknown` and the releases-page link fallback, never a `vunknown` tag link. -->
 
 <!--
 Optional warning/important callout -- only if readme.warnings: true in
