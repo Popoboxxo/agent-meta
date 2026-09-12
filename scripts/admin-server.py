@@ -236,7 +236,7 @@ PROJECT_WRITABLE_SECTIONS: frozenset[str] = frozenset({
     "tier-preset", "se-focus", "ai-providers", "platforms", "provider-options",
     "provider-isolation", "environments", "model-source-preference",
     "knowledge-engine", "gitignore", "external-skills", "skills-registry",
-    "context_file", "plugins",
+    "context_file", "plugins", "repo_containment",
     # WP3 (#730): newly exposed project.yaml sections.
     "hooks", "debug-mode", "tier-overrides", "mcp-role-overrides", "backup",
     # Feature: subagent permissions + git repo settings + auto-commit (Admin UI).

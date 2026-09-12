@@ -28,6 +28,7 @@ from pathlib import Path
 
 from .io import run_git_check_ignore
 from .providers import resolve_providers
+from .repo_containment import resolve_effective_repo_containment
 
 # Category fallback for Claude's gitignore_entries when the provider config
 # carries none (mirrors the historical inline default in sync.py).
@@ -126,6 +127,7 @@ def compute_base_gitignore_entries(
     providers: list[str],
     provider_config: dict,
     gitignore_cfg: dict,
+    repo_containment_cfg: dict | None = None,
 ) -> list[str]:
     """Compute the base entries of the agent-meta managed .gitignore block.
 
@@ -141,6 +143,11 @@ def compute_base_gitignore_entries(
       provider-internal entries from the categories are filtered out as
       redundant. Repo-root files keep their category behavior;
       `custom_entries` are never filtered (user-explicit).
+
+    ``repo_containment_cfg`` is the optional ``repo_containment`` config block.
+    When its tmp-sink is enabled and ``tmp-sink.gitignore`` is true, the sink
+    path (default ``.tmp/``) is appended additively (spec §5.3). A missing
+    block adds nothing, preserving the historical entry set.
 
     Note: sync.py applies the result only when Claude is an active provider
     (the exact-managed-block path is Claude-gated) — the same guard is kept
@@ -223,7 +230,30 @@ def compute_base_gitignore_entries(
     if custom_entries:
         entries.extend(custom_entries)
 
+    sink_entry = _tmp_sink_gitignore_entry(repo_containment_cfg)
+    if sink_entry and sink_entry not in entries:
+        entries.append(sink_entry)
+
     return entries
+
+
+def _tmp_sink_gitignore_entry(repo_containment_cfg: dict | None) -> str | None:
+    """Return the tmp-sink managed-block entry, or None when not applicable.
+
+    Additive on top of the Claude-gated managed block: only an explicitly
+    present ``repo_containment`` mapping (materialized by sync.py, spec §9.3)
+    with an enabled sink and ``tmp-sink.gitignore: true`` yields an entry. A
+    missing/non-mapping block adds nothing, so the historical entry set is
+    preserved for projects that never materialized the block.
+    """
+    if not isinstance(repo_containment_cfg, dict):
+        return None
+    effective = resolve_effective_repo_containment(
+        {"repo_containment": repo_containment_cfg}, None
+    )
+    if not (effective.tmp_sink_enabled and effective.tmp_sink_gitignore):
+        return None
+    return _ensure_trailing_slash(effective.tmp_sink_path)
 
 
 def _collect_skill_gitignore_entries(config: dict, ext_config: dict, provider_config: dict) -> list[str]:

@@ -58,6 +58,7 @@ from lib.consistency.fanout_contracts import check_fanout_backend_contract
 from lib.consistency.handoff_contracts import check_handoff_contracts
 from lib.consistency.placeholders import check_placeholders, load_project_vars
 from lib.consistency.python_compat import check_fstring_backslash_hazard, check_py39_union_syntax
+from lib.consistency.repo_containment import check_repo_containment_templates
 from lib.consistency.report import Finding, Severity, print_json_report, print_report
 from lib.consistency.subagent_permissions import check_subagent_permission_templates
 
@@ -189,6 +190,7 @@ def run_checks(
         findings += check_subagent_permission_templates(root)
         findings += check_py39_union_syntax(root)
         findings += check_fstring_backslash_hazard(root)
+        findings += check_repo_containment_templates(_AGENT_META_ROOT)
 
         # Phase 5: Documentation & UI Consistency
         findings.extend(check_sync_cli_docs(_AGENT_META_ROOT))

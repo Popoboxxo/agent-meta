@@ -24,6 +24,7 @@ from .variables import (  # re-exported for callers/tests (Issue #565)
     _subagent_permission_flags,
     _VALID_SUBAGENT_PERMISSION_MODES,
     normalize_subagent_permission_mode,
+    repo_containment_variables,
     strip_inactive_conditional_blocks,  # noqa: F401
     substitute,  # noqa: F401
 )
@@ -57,6 +58,11 @@ from .reflection import (
     apply_project_overrides,
     load_project_overrides,
     load_reflection_pairs,
+)
+from .repo_containment import (
+    TMP_SINK_CLEANUP_MODES,
+    default_repo_containment_block,
+    tmp_sink_path_error,
 )
 from .roles import build_role_map, load_roles_config
 
@@ -306,7 +312,7 @@ def _normalize_subagent_permissions_mode(config: dict) -> None:
 def _validate_config(config: dict, config_path: Path) -> None:
     """Validate config before sync.
 
-    Three kinds of checks:
+    Four kinds of checks:
 
     1. Hard-fatal model inheritance checks (_validate_model_inheritance):
        wrong-typed 'model-inherit-main-chat' entries and per-provider
@@ -319,13 +325,19 @@ def _validate_config(config: dict, config_path: Path) -> None:
        'ai-provider'/'ai-providers'/'default-provider' names abort the sync
        instead of silently falling back to Claude (issue #732).
 
-    3. Schema validation against agent-meta.schema.json if jsonschema is
+    3. Hard-fatal repo-containment checks (_validate_repo_containment):
+       wrong types and unsafe tmp-sink paths abort the sync (stderr + exit 1).
+       Structure/path checks always run, even when the mode is disabled, so a
+       later opt-in never surfaces a dormant misconfiguration.
+
+    4. Schema validation against agent-meta.schema.json if jsonschema is
        available. Schema violations are printed as warnings — never
        hard-fails so existing projects without the dependency continue to
        work unchanged.
     """
     _validate_model_inheritance(config, config_path)
     _validate_providers(config, config_path)
+    _validate_repo_containment(config, config_path)
     _validate_subagent_permissions(config, config_path)
 
     if not _JSONSCHEMA_AVAILABLE:
@@ -417,6 +429,109 @@ def _validate_providers(config: dict, config_path: Path) -> None:
                 _reject(item, "ai-providers")
     elif isinstance(raw, str) and raw not in known:
         _reject(raw, "ai-providers")
+
+
+def _validate_repo_containment(config: dict, config_path: Path) -> None:
+    """Hard-validate the optional 'repo_containment' block (spec §4.3).
+
+    Structure and path checks run ALWAYS — even when the mode is disabled
+    (``enabled: false``) — so enabling it later never surfaces a dormant
+    misconfiguration. Any violation prints a clear stderr message (including
+    the offending value/path) and aborts the sync via ``sys.exit(1)``: the
+    only hard exit for containment.
+    """
+    rc = config.get("repo_containment")
+    if rc is None:
+        return
+
+    def _fail(message: str) -> None:
+        print(f"ERROR: {config_path}: {message}", file=sys.stderr)
+        sys.exit(1)
+
+    if not isinstance(rc, dict):
+        _fail(
+            "invalid 'repo_containment': expected a mapping, "
+            f"got {type(rc).__name__}."
+        )
+
+    if "enabled" in rc and not isinstance(rc["enabled"], bool):
+        _fail(
+            "invalid 'repo_containment.enabled': expected true/false (bool), "
+            f"got {rc['enabled']!r} ({type(rc['enabled']).__name__})."
+        )
+
+    overrides = rc.get("provider-overrides")
+    if overrides is not None:
+        if not isinstance(overrides, dict):
+            _fail(
+                "invalid 'repo_containment.provider-overrides': expected a "
+                f"mapping, got {type(overrides).__name__}."
+            )
+        try:
+            registry = registered_provider_names(_framework_root())
+        except (OSError, ValueError) as exc:
+            registry = []
+            # Degraded state: an empty registry makes the `if known and ...`
+            # guard below skip the unknown-provider check entirely, silently
+            # accepting a typo'd provider name. Make that visible instead.
+            print(
+                f"  !  WARNING: {config_path}: provider registry could not be "
+                "read — skipping the unknown-provider check for "
+                f"'repo_containment.provider-overrides' ({exc}).",
+                file=sys.stderr,
+            )
+        known = set(registry)
+        for provider, entry in overrides.items():
+            if known and provider not in known:
+                _fail(
+                    f"unknown provider {provider!r} in "
+                    "'repo_containment.provider-overrides'. "
+                    f"Registered providers: {', '.join(registry)}"
+                )
+            if not isinstance(entry, dict):
+                _fail(
+                    f"invalid 'repo_containment.provider-overrides.{provider}': "
+                    f"expected a mapping, got {type(entry).__name__}."
+                )
+            if "enabled" in entry and not isinstance(entry["enabled"], bool):
+                _fail(
+                    "invalid 'repo_containment.provider-overrides."
+                    f"{provider}.enabled': expected true/false (bool), got "
+                    f"{entry['enabled']!r} ({type(entry['enabled']).__name__})."
+                )
+
+    sink = rc.get("tmp-sink")
+    if sink is None:
+        return
+    if not isinstance(sink, dict):
+        _fail(
+            "invalid 'repo_containment.tmp-sink': expected a mapping, "
+            f"got {type(sink).__name__}."
+        )
+
+    for key in ("enabled", "gitignore"):
+        if key in sink and not isinstance(sink[key], bool):
+            _fail(
+                f"invalid 'repo_containment.tmp-sink.{key}': expected "
+                f"true/false (bool), got {sink[key]!r} "
+                f"({type(sink[key]).__name__})."
+            )
+
+    cleanup = sink.get("cleanup")
+    if cleanup is not None and cleanup not in TMP_SINK_CLEANUP_MODES:
+        _fail(
+            "invalid 'repo_containment.tmp-sink.cleanup': expected one of "
+            f"{', '.join(TMP_SINK_CLEANUP_MODES)}, got {cleanup!r}."
+        )
+
+    path = sink.get("path")
+    if path is not None:
+        project_root = config_path.parent.parent
+        error = tmp_sink_path_error(path, project_root)
+        if error:
+            _fail(
+                f"invalid 'repo_containment.tmp-sink.path' {path!r}: {error}."
+            )
 
 
 def _validate_subagent_permissions(config: dict, config_path: Path) -> None:
@@ -842,6 +957,19 @@ def fill_defaults(
         if dod_block:
             config["dod"] = dod_block
 
+    # Q1 (repo-containment migration, spec §9.3): materialize an explicit block
+    # once for existing projects so the default-ON behavior change and its
+    # opt-out are visible in .meta-config/project.yaml. Idempotent — only when
+    # the key is entirely absent; a partial user block is left untouched.
+    if "repo_containment" not in config:
+        config["repo_containment"] = default_repo_containment_block()
+        added.append((
+            "repo_containment",
+            "Repo-Containment ('Gefängnis-Modus'): confines agent WRITE access "
+            "to the project root (plus the tmp-sink). Opt-out: enabled: false.",
+        ))
+        changed = True
+
     # --- Write back if changed ---
     if changed and not dry_run:
         if config_path.suffix.lower() in (".yaml", ".yml"):
@@ -1266,7 +1394,8 @@ def _build_orch_variables(
 
     Parameter contract:
         variables: mutated in place — receives ORCHESTRATOR_*, ORCH_MODE_*,
-            A2A_*, DIRECT_DISPATCH_*, ORCHESTRATOR_OUTCOME_CACHING/CACHE_*,
+            REPO_CONTAINMENT_*, A2A_*, DIRECT_DISPATCH_*,
+            ORCHESTRATOR_OUTCOME_CACHING/CACHE_*,
             CHECKPOINTING_ENABLED, NATIVE_EXTENSIONS_*, ANALYSIS_ENABLED,
             FILE_AFFINITY_HINT, UNKNOWN_FALLBACK_*, A2A_HANDOFF_BLOCK and
             ANTI_RECURSION_BLOCK.
@@ -1288,6 +1417,12 @@ def _build_orch_variables(
     # can reuse the same logic in scripts/sync.py.
     _orch_mode = _resolve_orch_mode(orch_config)
     variables.update(_orch_mode_flags(_orch_mode))
+
+    # REPO_CONTAINMENT_*: base (provider-independent) flags, wired exactly like
+    # the ORCH_MODE_* flags above. The per-provider render paths
+    # (context.py::_build_context_vars, rules.py::_merged_rule_vars) re-resolve
+    # with provider=... and overwrite these, so a provider override wins.
+    variables.update(repo_containment_variables(config))
     # A2A_PROTOCOL_ENABLED: structured agent-to-agent handoff envelope.
     # Active when orchestrator.handoff.protocol is set (default "a2a-v1").
     # Disable via handoff.protocol: none/false to drop the ~90-line A2A section.

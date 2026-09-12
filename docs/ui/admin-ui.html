@@ -1567,6 +1567,7 @@ function buildSidebar() {
         { route: "/project/backup", label: "Backup Settings", icon: "💾" },
         { route: "/project/roles",     label: "Roles", icon: "⍟" },
         { route: "/project/orchestrator", label: "Orchestrator", icon: "⎈" },
+        { route: "/project/repo-containment", label: "Repo Containment", icon: "🔒" },
         { route: "/project/hooks", label: "Hooks", icon: "🪝" },
         { route: "/project/subagent-permissions", label: "Subagent Permissions", icon: "🛡" },
         { route: "/project/git",                  label: "Git",                  icon: "⑂" },
@@ -6965,6 +6966,152 @@ async function viewProjectOrchestrator() {
   return wrap;
 }
 
+/* --------------------------- Repo Containment ----------------------------- */
+async function viewProjectRepoContainment() {
+  const wrap = el("div");
+  wrap.appendChild(el("h1", {}, ["Project — Repo Containment"]));
+  const data = await loadProject();
+  const rc = (data.repo_containment && typeof data.repo_containment === "object")
+    ? clone(data.repo_containment) : {};
+
+  const status = el("div", { class: "muted" }, ["Loaded from project.yaml."]);
+  wrap.appendChild(status);
+
+  // Framework defaults (config/project-config.schema.json): enabled true,
+  // tmp-sink enabled true, path .tmp, gitignore true, cleanup manual.
+  if (typeof rc.enabled !== "boolean") rc.enabled = true;
+  if (!rc["tmp-sink"] || typeof rc["tmp-sink"] !== "object") rc["tmp-sink"] = {};
+  const sink = rc["tmp-sink"];
+  if (typeof sink.enabled !== "boolean") sink.enabled = true;
+  if (typeof sink.path !== "string" || sink.path === "") sink.path = ".tmp";
+  if (typeof sink.gitignore !== "boolean") sink.gitignore = true;
+  if (sink.cleanup !== "manual" && sink.cleanup !== "on-sync") sink.cleanup = "manual";
+  const provOverrides = (rc["provider-overrides"] && typeof rc["provider-overrides"] === "object")
+    ? clone(rc["provider-overrides"]) : {};
+
+  // Client-side mirror of the sync-time path validator (spec §3/§4.3):
+  // must be relative and free of '..' segments. The hard gate stays in sync.py.
+  const validateSinkPath = (p) => {
+    if (typeof p !== "string" || p.trim() === "") return "Path must not be empty.";
+    const norm = p.replace(/\\/g, "/");
+    if (norm.startsWith("/") || /^[A-Za-z]:/.test(norm)) return "Path must be relative to the repo root.";
+    if (norm.split("/").some(seg => seg === "..")) return "Path must not contain '..' segments.";
+    return "";
+  };
+
+  // ── General (master switch) ───────────────────────────────────────────────
+  const genPanel = el("div", { class: "panel" });
+  genPanel.appendChild(el("h2", {}, ["General"]));
+  const masterHint = el("div", { class: "muted", style: "font-size:12px; margin-top:var(--space-1);" });
+  function refreshMasterHint() {
+    masterHint.textContent = rc.enabled
+      ? "Containment is ON — agent writes are confined to the repo root."
+      : "Containment is OFF for this project — the former, unrestricted write behavior applies.";
+  }
+  genPanel.appendChild(checkboxField(
+    "Enabled (master switch)", rc.enabled,
+    v => { rc.enabled = v; refreshMasterHint(); },
+    "Default ON. Off disables repo containment completely for this project. This is the only master switch; the hook reads it at runtime."
+  ));
+  genPanel.appendChild(masterHint);
+  refreshMasterHint();
+  wrap.appendChild(genPanel);
+
+  // ── Tmp-sink (scratch) ────────────────────────────────────────────────────
+  const sinkPanel = el("div", { class: "panel" });
+  sinkPanel.appendChild(el("h2", {}, ["Tmp-sink (scratch)"]));
+
+  const pathField = el("div", { class: "field" });
+  pathField.appendChild(el("label", { class: "field-label" }, ["Path"]));
+  const pathInput = el("input", { type: "text", value: sink.path });
+  const pathHelp = el("div", { class: "field-help" }, [
+    "Relative path of the scratch directory, resolved against the repo root. Must not be absolute or contain '..'."
+  ]);
+  const pathError = el("div", { class: "field-help", style: "color:var(--accent-red); display:none;" });
+  const refreshPathError = () => {
+    const msg = validateSinkPath(sink.path);
+    pathError.textContent = msg || "";
+    pathError.style.display = msg ? "" : "none";
+  };
+  pathInput.addEventListener("input", () => { sink.path = pathInput.value; refreshPathError(); });
+  pathField.appendChild(pathInput);
+  pathField.appendChild(pathHelp);
+  pathField.appendChild(pathError);
+  refreshPathError();
+
+  const sinkFields = el("div");
+  sinkFields.appendChild(pathField);
+  sinkFields.appendChild(checkboxField(
+    "Gitignore", sink.gitignore, v => { sink.gitignore = v; },
+    "Default ON. Adds the scratch directory to the agent-meta managed .gitignore block plus a self-ignoring <path>/.gitignore fallback."
+  ));
+  sinkFields.appendChild(dropdownField(
+    "Cleanup", ["manual", "on-sync"], sink.cleanup, v => { sink.cleanup = v; },
+    { "manual": "manual (default)", "on-sync": "on-sync (DESTRUCTIVE)" },
+    "manual = never delete contents automatically (safe default). on-sync = prune the directory on every sync run — opt-in and destructive."
+  ));
+  function refreshSinkFields() {
+    sinkFields.style.opacity = sink.enabled ? "" : "0.5";
+    sinkFields.style.pointerEvents = sink.enabled ? "" : "none";
+  }
+  sinkPanel.appendChild(checkboxField(
+    "Enabled", sink.enabled,
+    v => { sink.enabled = v; refreshSinkFields(); },
+    "Default ON. When ON, sync provisions the scratch directory and the containment hook permits writes inside it — the only sanctioned exception outside the repo root. OFF keeps containment strictly root-only."
+  ));
+  sinkPanel.appendChild(sinkFields);
+  refreshSinkFields();
+  wrap.appendChild(sinkPanel);
+
+  // ── Provider Overrides ────────────────────────────────────────────────────
+  const activeProviders = Array.isArray(data["ai-providers"]) ? data["ai-providers"] : [];
+  const povPanel = el("div", { class: "panel" });
+  povPanel.appendChild(el("h2", {}, ["Provider Overrides"]));
+  povPanel.appendChild(el("p", { class: "muted" }, [
+    "Override the master switch for a single provider. \"(inherit)\" keeps the project value above. Providers without verified hook support get containment only as a prompt convention (the consistency check warns)."
+  ]));
+  for (const prov of activeProviders) {
+    const entry = (provOverrides[prov] && typeof provOverrides[prov] === "object") ? clone(provOverrides[prov]) : {};
+    const current = (typeof entry.enabled === "boolean") ? String(entry.enabled) : "";
+    const row = el("div", { class: "field-row" });
+    row.appendChild(el("label", { class: "field-label" }, [prov]));
+    const sel = el("select", { class: "select" });
+    for (const [val, label] of [["", "(inherit)"], ["true", "enabled (true)"], ["false", "disabled (false)"]]) {
+      const o = el("option", { value: val }, [label]);
+      if (current === val) o.setAttribute("selected", "");
+      sel.appendChild(o);
+    }
+    sel.addEventListener("change", () => {
+      if (sel.value === "") delete provOverrides[prov];
+      else provOverrides[prov] = { ...entry, enabled: sel.value === "true" };
+    });
+    row.appendChild(sel);
+    povPanel.appendChild(row);
+  }
+  if (activeProviders.length === 0) {
+    povPanel.appendChild(el("p", { class: "empty" }, ["No active providers configured — set ai-providers first."]));
+  }
+  wrap.appendChild(povPanel);
+
+  // ── Save ──────────────────────────────────────────────────────────────────
+  wrap.appendChild(el("div", { class: "btn-row" }, [
+    el("button", { class: "btn btn-primary", onclick: async () => {
+      const pathMsg = validateSinkPath(sink.path);
+      if (pathMsg) {
+        refreshPathError();
+        toast("Repo Containment: " + pathMsg, "error");
+        return;
+      }
+      rc["tmp-sink"] = sink;
+      if (Object.keys(provOverrides).length > 0) rc["provider-overrides"] = provOverrides;
+      else delete rc["provider-overrides"];
+      try { await saveProjectSection("repo_containment", rc, status); } catch { /* toast shown */ }
+    } }, ["Save"]),
+    el("button", { class: "btn", onclick: () => runDryRun() }, ["Dry-run"]),
+  ]));
+  return wrap;
+}
+
 /* ------------------------- Subagent Permissions -------------------------- */
 
 /** Labelled text input with placeholder support (Git / Auto-Commit views). */
@@ -10326,6 +10473,7 @@ async function init() {
   router.register("/project/backup", viewProjectBackup);
   router.register("/project/roles",           viewProjectRoles);
   router.register("/project/orchestrator",    viewProjectOrchestrator);
+  router.register("/project/repo-containment", viewProjectRepoContainment);
   router.register("/project/hooks",           viewProjectHooks);
   router.register("/project/subagent-permissions", viewProjectSubagentPermissions);
   router.register("/project/git",                  viewProjectGit);
@@ -10440,6 +10588,8 @@ init();
     "project/backups": "project_instance-backups",
     "project/roles": "project_instance-roles",
     "project/orchestrator": "project_instance-orchestrator",
+    "project/repo-containment": "project_instance-repo_containment",
+
     "project/subagent-permissions": "project_instance-subagent_permissions",
     "project/git": "project_instance-git",
     "project/auto-commit": "project_instance-auto_commit",

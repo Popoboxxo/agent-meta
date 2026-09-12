@@ -11,5 +11,18 @@
         ]
       }
     ]
+  },
+  "repo-containment": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ./hooks/antigravity-json-adapter.sh repo-containment.sh"
+          }
+        ]
+      }
+    ]
   }
 }
