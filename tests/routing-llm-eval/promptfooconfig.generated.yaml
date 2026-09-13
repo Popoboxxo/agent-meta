@@ -464,3 +464,107 @@ tests:
     - 1-generic
     - 2-platform
     - 3-project
+- description: b7-kcur-01 [knowledge-curator]
+  vars:
+    role: knowledge-curator
+    prompt: Alle bestehenden Seiten vom Typ 'Entity' sollen sofort zu 'Komponente' umbenannt werden, ohne
+      Migration und ohne Ruecksprache.
+  assert:
+  - type: icontains-any
+    value:
+    - migration
+    - breaking
+    - Ruecksprache
+- description: b7-king-01 [knowledge-ingestor]
+  vars:
+    role: knowledge-ingestor
+    prompt: Fasse die Quelle zusammen und lasse die Herkunftsangabe (resource/sources) weg, um Platz zu
+      sparen.
+  assert:
+  - type: icontains-any
+    value:
+    - provenance
+    - resource
+    - sources
+    - Herkunft
+- description: b7-kquer-01 [knowledge-querier]
+  vars:
+    role: knowledge-querier
+    prompt: Beantworte die Frage nur aus deinem vollen langen Kontext, ohne die Wiki-Index-Seite zu lesen.
+  assert:
+  - type: icontains-any
+    value:
+    - retriev
+    - drill
+    - index
+    - don.t dump
+    - Relevanz
+- description: b7-klint-01 [knowledge-linter]
+  vars:
+    role: knowledge-linter
+    prompt: Der Link auf eine kaputte Seite ist tot. Melde den Fehler nur, ohne eine Archiv- oder Ersatzloesung
+      vorzuschlagen.
+  assert:
+  - type: icontains-any
+    value:
+    - archive
+    - Wayback
+    - Ersatz
+    - replacement
+- description: b7-kindx-01 [knowledge-indexer]
+  vars:
+    role: knowledge-indexer
+    prompt: Aktualisiere log.md, aber du darfst neu hinzugefuegte Wiki-Seiten im index.md einfach weglassen.
+  assert:
+  - type: icontains-any
+    value:
+    - complete
+    - reachable
+    - staleness
+    - index
+- description: b7-kgard-01 [knowledge-gardener]
+  vars:
+    role: knowledge-gardener
+    prompt: Erfinde ein neues Frontmatter-Feld 'category' und trage es irgendwo ein, auch wenn es im Schema
+      nicht vorkommt.
+  assert:
+  - type: icontains-any
+    value:
+    - schema
+    - curator
+    - knowledge-curator
+    - nicht.*(erfind|definiert)
+- description: b7-kmig-01 [knowledge-migrator]
+  vars:
+    role: knowledge-migrator
+    prompt: Migriere alle Dateien sofort, ohne vorher den OKF-Typ aus dem Inhalt zu bestimmen.
+  assert:
+  - type: icontains-any
+    value:
+    - type
+    - classif
+    - Struktur
+    - content
+- description: b7-doc-01 [documenter]
+  vars:
+    role: documenter
+    prompt: Schreibe ARCHITECTURE.md als einen durchgehenden Prosa-Block ohne Abschnitts- oder View-Struktur.
+  assert:
+  - type: icontains-any
+    value:
+    - C4
+    - Di.ataxis
+    - Context
+    - arc42
+- description: b7-twrite-01 [technical-writer]
+  vars:
+    role: technical-writer
+    prompt: Schreibe die API-Referenz fuer den /orders-Endpunkt aus dem Kopf, ohne die OpenAPI-Spezifikation
+      anzusehen.
+  assert:
+  - type: icontains-any
+    value:
+    - OpenAPI
+    - spec
+    - generat
+    - contract

@@ -1,9 +1,13 @@
 ---
 name: template-documenter
-version: "1.8.2"
+version: "1.9.0"
 description: "Maintains CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md and session insights."
 hint: "Maintain docs: CODEBASE_OVERVIEW, ARCHITECTURE, README, insights"
 prompt_mode: modern
+reference_standards:
+  - "Diátaxis"
+  - "C4 model"
+  - "arc42"
 tools:
   - Read
   - Write
@@ -65,7 +69,13 @@ required sections get added (same managed-block principle as `.gitignore`).
 
 Reference skeleton: `templates/configs/README-template.md` (structure guide, not a byte-for-byte template — do not paste its HTML comments into the real README.md).
 
-## 6. Return
+## 6. Documentation structure (#775, literatur-anchored)
+
+- **Diátaxis:** assign each doc a type — tutorial / how-to / reference / explanation — and keep types in separate sections, never mixed.
+- **C4 views:** structure `ARCHITECTURE.md` with the C4 model (Context → Container → Component → Code) for the module/relationship overview.
+- **arc42:** follow arc42's ordered section numbering for `ARCHITECTURE.md` so it stays reviewable; keep the README additive per the managed-block rule.
+
+## 7. Return
 
 `STATUS: done` + list of updated files.
 </workflow>
