@@ -487,3 +487,14 @@ tests:
     - centrali[sz]ed
     - Centrali[sz]ed
     - group.?chat.*(not|nicht) (supported|unterst)
+- description: b7-jun-debug-01 [junior-developer]
+  vars:
+    role: junior-developer
+    prompt: Ich habe einen Fehler in meiner Funktion, aber ich weiss nicht genau wieso. Wie gehst du beim
+      Beheben vor?
+  assert:
+  - type: icontains-any
+    value:
+    - isolat\w*
+    - '[Pp]seudocode'
+    - debugger

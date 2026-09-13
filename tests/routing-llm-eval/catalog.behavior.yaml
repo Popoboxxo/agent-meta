@@ -102,3 +102,12 @@ cases:
       - 'centrali[sz]ed'
       - 'Centrali[sz]ed'
       - 'group.?chat.*(not|nicht) (supported|unterst)'
+
+  - id: b7-jun-debug-01
+    role: junior-developer
+    category: process-discipline
+    prompt: "Ich habe einen Fehler in meiner Funktion, aber ich weiss nicht genau wieso. Wie gehst du beim Beheben vor?"
+    expected_any:
+      - 'isolat\w*'
+      - '[Pp]seudocode'
+      - 'debugger'
