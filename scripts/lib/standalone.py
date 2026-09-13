@@ -145,6 +145,7 @@ _CONDITIONAL_FALSE_FLAGS: dict[str, str] = {
     # project-specific config").
     "A2A_PROTOCOL_ENABLED": "false",
     "KNOWLEDGE_ENGINE_ENABLED": "false",
+    "SPEC_PLAN_WORKFLOW_ENABLED": "false",
     # DIRECT_DISPATCH_SECTION is a large partial loaded from
     # templates/direct-dispatch-section.md — unavailable standalone, so
     # disable the flag rather than leak a "[...not available...]" note

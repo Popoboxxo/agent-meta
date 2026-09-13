@@ -1,0 +1,32 @@
+agent-meta-version: "1.1.0"
+ai-providers:
+- Claude
+dod-preset: concept-driven
+platforms: []
+rules-preset: lazy
+knowledge-engine:
+  enabled: true
+spec-plan-workflow:
+  enabled: true
+  paths:
+    specs: docs/specs
+    plans: docs/plans
+    spikes: docs/spikes
+  index:
+    mode: knowledge-engine
+    fallback-index: docs/INDEX.md
+  external-system-override:
+    enabled: true
+    system: external-pm
+    note: external system owns indexing — KE write paths must be skipped
+project:
+  name: scenario-spec-plan-override
+  prefix: s54
+  short: scenario-spec-plan-override
+variables:
+  PROJECT_NAME: scenario-spec-plan-override
+  PROJECT_DESCRIPTION: external-system-override.enabled=true with the KE active.
+  PROJECT_GOAL: Verify KE write paths are skipped and the file-index fallback takes over.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-spec-plan-override
+  GIT_MAIN_BRANCH: main

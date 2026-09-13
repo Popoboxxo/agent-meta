@@ -578,6 +578,7 @@
         "rapid-prototyping",
         "spec-optional",
         "spec-driven",
+        "concept-driven",
         "spec-certified"
       ],
       "default": "full"
@@ -619,6 +620,21 @@
         "lifecycle-ownership": {
           "type": "boolean",
           "description": "Require a named owner and deprecation plan for every app/service (app-lifecycle-governor). Default: false.",
+          "default": false
+        },
+        "spec-plan-required": {
+          "type": "boolean",
+          "description": "Require the native spec/plan workflow for feature-level changes. Default: false (preset-coupled).",
+          "default": false
+        },
+        "spec-plan-traceability": {
+          "type": "boolean",
+          "description": "Require spec<->plan<->task<->test traceability. Default: false (preset-coupled).",
+          "default": false
+        },
+        "root-cause-required": {
+          "type": "boolean",
+          "description": "Require a documented root cause (cause + prior attempts) before any fix. Consumed by the root-cause rule gate (IC-09/G-10). Default: false (preset-coupled).",
           "default": false
         },
         "se-required": {
@@ -1808,6 +1824,165 @@
       },
       "additionalProperties": false
     },
+    "spec-plan-workflow": {
+      "type": "object",
+      "description": "Native feature-level spec→plan→execution workflow (opt-in). No-op when effective_enabled=false.",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "paths": {
+          "type": "object",
+          "properties": {
+            "specs": {
+              "type": "string",
+              "default": "docs/specs"
+            },
+            "plans": {
+              "type": "string",
+              "default": "docs/plans"
+            },
+            "spikes": {
+              "type": "string",
+              "default": "docs/spikes"
+            },
+            "legacy": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            }
+          },
+          "additionalProperties": false
+        },
+        "scan": {
+          "type": "object",
+          "properties": {
+            "include": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "*.md"
+              ]
+            },
+            "changed-files-only": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          "additionalProperties": false
+        },
+        "index": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "knowledge-engine",
+                "file-index",
+                "off"
+              ],
+              "default": "knowledge-engine"
+            },
+            "fallback-index": {
+              "type": "string",
+              "default": "docs/INDEX.md"
+            }
+          },
+          "additionalProperties": false
+        },
+        "archive": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "auto",
+                "ask",
+                "off"
+              ],
+              "default": "ask"
+            },
+            "agent": {
+              "type": "string",
+              "enum": [
+                "documenter",
+                "knowledge-ingestor"
+              ],
+              "default": "documenter"
+            },
+            "trigger": {
+              "type": "string",
+              "enum": [
+                "plan-complete"
+              ],
+              "default": "plan-complete"
+            },
+            "target": {
+              "type": "string",
+              "default": "docs/plans/archive"
+            }
+          },
+          "additionalProperties": false
+        },
+        "external-system-override": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false
+            },
+            "system": {
+              "type": "string",
+              "default": ""
+            },
+            "note": {
+              "type": "string",
+              "default": ""
+            }
+          },
+          "additionalProperties": false
+        },
+        "recovery": {
+          "type": "object",
+          "description": "Session recovery / resume resolver configuration (IC-03/IC-04). Required because spec-plan-workflow is a closed object; additionalProperties:false additionally turns it into a strict typo guard.",
+          "properties": {
+            "rehydrate": {
+              "type": "boolean",
+              "description": "Enable the read-only rehydrate (resume-context) mode. Consumed via spec-plan-workflow.recovery.rehydrate."
+            },
+            "max-age-seconds": {
+              "type": "integer",
+              "description": "Age horizon for resumable sessions; negative disables the age filter."
+            },
+            "include-legacy": {
+              "type": "boolean",
+              "description": "Include legacy .meta-viz/checkpoint-<ts>.json files; only an explicit false disables it."
+            }
+          },
+          "additionalProperties": false
+        },
+        "ledger-drift": {
+          "type": "object",
+          "description": "Plan-ledger <-> checkpoint drift check (IC-07, M2). Required because spec-plan-workflow is a closed object; additionalProperties:false additionally turns it into a strict typo guard.",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Drift check is opt-out: only an explicit false disables it."
+            },
+            "severity": {
+              "type": "string",
+              "description": "Severity of emitted spec_plan_ledger_drift findings (default WARNING)."
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "viz": {
       "type": "object",
       "description": "Visualization / session tracking configuration. Controls the Viz dashboard (viz-report.py) and the MCP SSE server (viz-logger.py) that the Admin UI supervises.",
@@ -2097,6 +2272,23 @@
         }
       },
       "additionalProperties": false
+    },
+    "progress": {
+      "type": "object",
+      "description": "Storage location of the progress / checkpoint store. Relative paths are resolved against the project root; the framework defaults keep the historical .meta-viz layout.",
+      "properties": {
+        "dir": {
+          "type": "string",
+          "default": ".meta-viz/progress",
+          "description": "Directory (relative to the project root) for progress files such as current.md. Framework default: .meta-viz/progress."
+        },
+        "checkpoint-dir": {
+          "type": "string",
+          "default": ".meta-viz/checkpoints",
+          "description": "Directory (relative to the project root) for per-session checkpoint files. Framework default: .meta-viz/checkpoints."
+        }
+      },
+      "additionalProperties": false
     }
   },
   "required": [
@@ -2162,6 +2354,14 @@
             },
             "agent": {
               "type": "string"
+            },
+            "dod_flag": {
+              "type": "string",
+              "description": "Name of the resolved DoD flag that activates this stage (consumed at sync time)."
+            },
+            "payload_flag": {
+              "type": "string",
+              "description": "Name of the payload flag that activates this stage (annotated for runtime skip)."
             }
           }
         }
@@ -2195,6 +2395,16 @@
         },
         "on_error": {
           "type": "string"
+        },
+        "task-review": {
+          "type": "object",
+          "description": "Round cap for the two-stage task review (IC-08/IC-09). Declared explicitly for documentation and as a typo guard (F7).",
+          "properties": {
+            "max-rounds": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
         }
       },
       "additionalProperties": true

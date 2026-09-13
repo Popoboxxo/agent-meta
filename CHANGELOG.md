@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+## [1.2.0-beta.2] - 2026-09-13
+
+### Added
+- **Native Spec/Plan workflow**: requests are classified up front (Spike / Bounded /
+  Architectural) and routed through an explicit approval gate before implementation. Plans are
+  authored against a fixed contract, tracked in a plan-ledger, and pipelines act as the single
+  routing source. Request grouping is configurable via `config/spec-plan-groups.yaml` and
+  resolved by a bundle resolver; `sync.py --validate-spec-plan` validates the configuration.
+  Artifacts use provider-neutral paths (`docs/specs`, `docs/plans`, `docs/spikes`), and a
+  coverage matrix maps requests to the plan/spec artifacts they produce.
+- **Progress and ledger system**: sessions automatically re-hydrate and resume from the persisted
+  progress state, backed by stable cross-session plan/task identities. A machine-written plan
+  ledger with a drift check keeps plan status honest, a two-stage task review with a rounds cap
+  gates task completion, and a mandatory root-cause gate precedes every bugfix.
+- **Configurable progress and checkpoint paths**: new `progress.dir` and
+  `progress.checkpoint-dir` project keys (defaults `.meta-viz/progress` and
+  `.meta-viz/checkpoints`) let projects relocate the runtime progress store and the
+  per-session checkpoint files; relative paths resolve against the project root, and the
+  framework defaults keep the historical layout.
+
 ## [1.2.0] — 2026-09-12
 
 ### Added

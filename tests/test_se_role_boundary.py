@@ -1,6 +1,19 @@
 """Test SE Role Boundary: se-critic detects forbidden terms in requirements output."""
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from scripts.lib.consistency.se_cascade import (  # noqa: E402
+    has_se_artifacts,
+    run_se_cascade_checks,
+)
+from scripts.lib.frontmatter import _is_role_enabled  # noqa: E402
+
 
 # ---------------------------------------------------------------------------
 # Fixtures: sample requirement payloads
@@ -253,3 +266,42 @@ def test_scope_component_for_leaf():
     req = _make_req("REQ-L3-042", "Validate auth token format.", domain="software")
     req["scope"] = "component"
     assert req["scope"] == "component"
+
+
+# ---------------------------------------------------------------------------
+# SE boundary for the spec/plan workflow: it must not enable systems-engineering
+# nor produce SE output. Regression guard for spec §10.1 ("KE/SE unberührt").
+# ---------------------------------------------------------------------------
+
+def _project_config() -> dict:
+    """Load this repo's real .meta-config/project.yaml."""
+    import yaml
+
+    return yaml.safe_load(
+        (_REPO_ROOT / ".meta-config" / "project.yaml").read_text(encoding="utf-8")
+    )
+
+
+def test_systems_engineering_stays_disabled():
+    """The spec/plan workflow must not flip systems-engineering on."""
+    config = _project_config()
+    assert config["systems-engineering"]["enabled"] is False
+
+
+def test_se_roles_emit_no_output_when_disabled():
+    """With SE disabled, sync's role gate skips every se-* agent file."""
+    config = _project_config()
+    for role in (
+        "se-architect",
+        "se-critic",
+        "se-requirements",
+        "se-component-requirements",
+    ):
+        assert _is_role_enabled(role, config) is False
+
+
+def test_no_se_output_without_se_artifacts():
+    """sync's SE-cascade checks are no-ops while no SE artifacts exist."""
+    config = _project_config()
+    assert has_se_artifacts(_REPO_ROOT, config) is False
+    assert run_se_cascade_checks(_REPO_ROOT, config) == []

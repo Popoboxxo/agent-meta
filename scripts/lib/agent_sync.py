@@ -126,7 +126,7 @@ def _extract_and_append_critical_footer(
 
     rule_options = resolve_rules(config, agent_meta_root)
     platforms = config.get("platforms", [])
-    sources = collect_rule_sources(agent_meta_root, platforms)
+    sources = collect_rule_sources(agent_meta_root, platforms, config=config)
 
     # Build a lookup: rule_stem -> source_path
     source_map: dict[str, Path] = {}
@@ -187,7 +187,7 @@ def apply_path_rules(
 
     # Build rule lookup: stem -> source_path
     platforms = config.get("platforms", [])
-    sources = collect_rule_sources(agent_meta_root, platforms)
+    sources = collect_rule_sources(agent_meta_root, platforms, config=config)
     rule_options = resolve_rules(config, agent_meta_root)
     source_map: dict[str, Path] = {}
     for source_path, output_name in sources:
@@ -605,7 +605,9 @@ def _apply_content_pipeline(
         from .dod import resolve_dod
 
         dod_resolved = resolve_dod(config, agent_meta_root)
-        content = inject_pipeline_blocks(content, effective, provider, dod_resolved)
+        content = inject_pipeline_blocks(
+            content, effective, provider, dod_resolved, agent_meta_root=agent_meta_root
+        )
 
     content = substitute(content, merged_vars, rel_source, log)
     pal_engine = DelegationSyntaxEngine(config_dir=agent_meta_root / "config")

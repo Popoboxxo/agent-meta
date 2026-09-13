@@ -45,6 +45,7 @@ _MAPPING_BLOCKS = [
     "max-tokens-overrides",
     "dod",
     "release-gates",
+    "spec-plan-workflow",
     "conventions",
     "hooks",
     "provider-options",

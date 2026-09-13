@@ -13,6 +13,7 @@ The `sync.py` script is the central entry point of the agent-meta framework. It 
 | `--check` | Exits with code 1 if context files (`CLAUDE.md`, `AGENTS.md`) are out of sync, otherwise 0. (Crucial for CI/CD). |
 | `--validate` | Performs a full sync into a test repository. Results are in `sync.log`. |
 | `--validate-se` | Standalone, read-only SE-cascade validation (issue #338): checks the project's `docs/se` artifacts against the #339 conventions (B1–B5). Exit 0 when clean or when no SE artifacts exist; exit 1 with a findings list otherwise. |
+| `--validate-spec-plan` | Standalone, read-only spec/plan-workflow validation (F12): checks the project's configured spec/plan/spike directories (defaults `docs/specs`, `docs/plans`, `docs/spikes`, plus configured legacy dirs) for required sections, placeholders, traceability, approval markers, ledger format and the plan task graph; unchanged artifacts are skipped when `scan.changed-files-only` is true. Exit 0 when clean, when no artifacts exist, or when the workflow is disabled; exit 1 with a findings list otherwise. |
 | `--scan-staged` | Scans git-staged file contents for secrets (issue #694 pre-commit gate) and exits. |
 | `--test-plugin ID` | Runs the health check for one plugin from the plugin catalog and exits. |
 | `--render-standalone` | Renders fully self-contained, English-only copies of the pilot `1-generic` agent templates into `standalone/agents/` — no Python/`project.yaml` needed to use them. Combine with `--check` for a read-only CI drift gate. |
@@ -20,6 +21,30 @@ The `sync.py` script is the central entry point of the agent-meta framework. It 
 | `--setup` | Starts an interactive setup wizard for guided creation of the `project.yaml` and then runs `--init`. |
 | `--audit-config` | Compares the project configuration against the templates (checks for `roles_without_template`, `deprecated_roles`). |
 | `--apply` | Used in combination with `--audit-config`: Rewrites the `project.yaml` and comments out deprecated roles. |
+
+## Session Resume & Checkpointing
+
+| Flag | Description |
+|------|-------------|
+| `--rehydrate` | Read-only resume path: prints the resume context of the newest unfinished session (plan/task/checkpoint identity, next open task, drift). Writes nothing, runs no sync, and exits 0 even when there is nothing to resume. |
+| `--checkpoint` | Write mode: appends one checkpoint to the session store (`.meta-viz/checkpoints/` — the framework default of `progress.checkpoint-dir` — plus its progress write-through under `.meta-viz/progress/`, the default of `progress.dir`; both are overridable via the top-level `progress` block in `.meta-config/project.yaml`). Requires `--session-id`, `--task`, `--agent` and `--status`; plan identity is explicit only via `--plan-id` or `--plan <path>`. Exit 1 on missing arguments or a store error, 0 after a successful write. |
+| `--session-id ID` | Session id for `--checkpoint` (one file per session under `.meta-viz/checkpoints/`, the framework default of `progress.checkpoint-dir`). |
+| `--agent NAME` | Agent name for `--checkpoint`. |
+| `--plan PATH` | Plan path for `--checkpoint`; its plan id is derived from the document (or its file-stem slug), never random. Ignored when `--plan-id` is given. |
+| `--plan-id ID` | Explicit plan id for `--checkpoint`. Takes precedence over `--plan`. |
+| `--description TEXT` | Task description for `--checkpoint`. |
+| `--summary TEXT` | Status summary for `--checkpoint`. |
+| `--next-step TEXT` | Next step for `--checkpoint`. |
+| `--status STATUS` | With `--checkpoint`: one of `completed`, `failed`, `timeout`, `in_progress`. With `--update-plan-ledger`: value for the first `Status:` header line of the plan. |
+
+## Plan Ledger
+
+| Flag | Description |
+|------|-------------|
+| `--update-plan-ledger PLAN` | Write mode: rewrites the leading task checkboxes and/or the first `Status:` header of `PLAN` (path inside the project root). Mark tasks done with `--task <id>...`, reset them with `--open`, set the status via `--status <s>`. Combine with `--dry-run` for a preview; exit 1 on missing arguments, a missing plan or an unmatched task id. |
+| `--task ID...` | Task id(s) for `--update-plan-ledger` (normalized, e.g. `1` or `task-1`); for `--checkpoint` the first id is normalized and recorded. |
+| `--open` | With `--update-plan-ledger --task`: reset the task checkboxes to `- [ ]` instead of marking them done. |
+| `--status STATUS` | With `--update-plan-ledger`: value for the first `Status:` header line of the plan. See also the Session Resume & Checkpointing section. |
 
 ## Extensions, Rules, Hooks
 

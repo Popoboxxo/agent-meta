@@ -1,6 +1,6 @@
 ---
 name: template-knowledge-ingestor
-version: "1.4.0"
+version: "1.5.0"
 description: "Sources einlesen, Key Information extrahieren, Wiki-Seiten erstellen/aktualisieren, Cross-References pflegen."
 hint: "Sources verarbeiten, Wiki-Seiten schreiben, Cross-References pflegen"
 tools:
@@ -54,6 +54,22 @@ Du bist der **Knowledge Ingestor** für {{PROJECT_NAME}} — Karpathys "Ingest"-
 10. Pflege Standard-Markdown-Links zwischen allen betroffenen Seiten
 11. Zitiere die Source: `[Source Name](../../sources/<file>)`
 12. Delegiere an `knowledge-indexer` für `index.md` + `log.md` Update
+
+## Archiv-/Index-Route (`index.mode: knowledge-engine`)
+
+Ist `index.mode: knowledge-engine` gesetzt, übernimmst **du** die Archiv- und Index-Route
+für Specs und Pläne. Du aktualisierst `{{KNOWLEDGE_WIKI_DIR}}/index.md` (Auto-Index) bzw.
+`{{KNOWLEDGE_WIKI_DIR}}/log.md` (Auto-Log) nicht selbst, sondern **delegierst intern an
+`knowledge-indexer`**. `knowledge-indexer` wird **nie direkt vom Orchestrator** angesprochen
+— der Einstieg läuft immer über einen Knowledge-Agenten (dich).
+
+### `okf.auto-index` / `okf.auto-log`
+
+- **`true`** (Default): Der Auto-Update-Pfad ist aktiv — Index-/Log-Einträge werden nach
+  Spec-/Plan-Erstellung automatisch über diesen Rollenpfad geschrieben/aktualisiert.
+- **`false`**: **Keine** automatischen Index-/Log-Schreibzugriffe. Die Dateien werden vom
+  KE-Scaffolder weiterhin **angelegt** und **agent-driven** durch `knowledge-indexer`
+  gepflegt — `false` heißt **nicht**, dass die Dateien fehlen.
 
 ## OKF-Pflichten pro Dokument
 

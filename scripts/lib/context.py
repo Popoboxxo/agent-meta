@@ -1130,7 +1130,7 @@ def _build_managed_block(
     if not has_native_rules:
         rule_options = resolve_rules(config, agent_meta_root)
         platforms = config.get("platforms", [])
-        rule_sources = collect_rule_sources(agent_meta_root, platforms)
+        rule_sources = collect_rule_sources(agent_meta_root, platforms, config=config)
 
         # Compact mode (issue #540): embedded MCP/external-tool sections and
         # knowledge hints render in the compressed, pointer-based variant.

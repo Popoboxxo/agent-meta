@@ -23,6 +23,9 @@ docs/guides/        # Anleitungen und Beispiel-Config
 docs/ui/            # UI Assets
   architecture/     # Architektur-Diagramme (Mermaid)
   admin-ui.html     # Admin-UI Frontend
+docs/specs/         # Feature-Specs (Spec/Plan-Workflow, §5.1)
+docs/plans/         # Feature-Pläne + archive/ (docs/plans/README.md)
+docs/spikes/        # Wegwerf-Untersuchungen (explorer-Spike-Modus, F10)
 tests/              # Test-Suite (automated, manual, orchestration)
 
 ```
@@ -79,7 +82,7 @@ Kategorien für `docs/REQUIREMENTS.md`:
  Opencode->AGENTS.md |
  Gemini->AGENTS.md
 > **ENTRY:** `orchestrator`-Agent (für alle Dev-Tasks).
-`agent-meta v1.2.0` | DoD: `rapid-prototyping` | REQ-Trace: `false`
+`agent-meta v1.2.0-beta.2` | DoD: `rapid-prototyping` | REQ-Trace: `false`
 
 
 
@@ -205,6 +208,7 @@ Harte MCP-Tool-Verbote: siehe `mcp-guardrails.md` (always-on).
 # CRITICAL GATE
 MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`. Keine Ausnahmen.
 
+**Spec/Plan-Gate (Convention boundary):** Auch Nicht-Pipeline-Anfragen (Ad-hoc-Dispatch, `quick-fix`, `bugfix`) erst über die Classify-Route (`S`/`M`/`L`/`XL`) führen — kein Direkteinstieg in die Implementierung ohne freigegebene Spec/Plan (`Status: APPROVED`). Details: Master-Rule `spec-plan-workflow`.
 ## Git Delegation
 Git Mutationen (commit, push, add etc) -> `git` Agent. Read-only (status, log) im Main Chat ok.
 

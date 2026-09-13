@@ -2340,6 +2340,21 @@ reflection_pairs:
   critic: code-reviewer
   max_iterations: 3
   on_blocked: escalate_to_orchestrator
+- id: concept-specify-loop
+  generator: concept-specifier
+  critic: concept-reviewer
+  max_iterations: 3
+  on_blocked: escalate_to_orchestrator
+- id: task-req-review-loop
+  generator: developer
+  critic: validator
+  max_iterations: 2
+  on_blocked: escalate_to_orchestrator
+- id: task-quality-review-loop
+  generator: developer
+  critic: code-reviewer
+  max_iterations: 2
+  on_blocked: escalate_to_orchestrator
 quality_pipelines:
   feature-lifecycle:
     description: Vollständiger Feature-Lifecycle mit optionalem Plan-Input, REQ, TDD, Review, PR
@@ -2407,6 +2422,13 @@ quality_pipelines:
     - schneller Fix
     - Hotfix
     stages:
+    - id: root-cause
+      agent: bug-feature-analyzer
+      task: 'Root-Cause belegen: root_cause + prior_attempts. Ein Symptom-Fix erfüllt
+        das Gate nicht — ohne belegte Ursache wird fix nicht betreten.'
+      mode: conditional
+      condition:
+        dod_flag: root-cause-required
     - id: fix
       agent: developer
       task: Bugfix
@@ -2428,6 +2450,11 @@ quality_pipelines:
       agent: bug-feature-analyzer
       task: Bug klassifizieren (Bug/User-Error/Feature/Out-of-Scope). Bei User-Error/Out-of-Scope
         → Pipeline stoppen.
+      mode: sequential
+    - id: root-cause
+      agent: bug-feature-analyzer
+      task: 'Root-Cause belegen: root_cause + prior_attempts. Ein Symptom-Fix erfüllt
+        das Gate nicht — ohne belegte Ursache wird fix nicht betreten.'
       mode: sequential
     - id: fix
       agent: developer
@@ -2473,20 +2500,30 @@ quality_pipelines:
       mode: sequential
     on_error: escalate_to_orchestrator
   concept-driven-dev:
-    description: 'Concept-driven development (#370): explore → specify → review
-      (max 3 iterations) → implement → validate. Developer implementiert nur gegen
-      die freigegebene Spezifikation; Implementierungs-Tier nach Task-Größe S/M/L/XL.'
+    description: 'Concept-driven development (#370): explore → classify → specify
+      → review (max 3 iterations) → approve → plan → implement → validate.
+      classify/approve/plan sind an das spec-plan-Gate (spec-plan-enabled) gebunden;
+      Developer implementiert nur gegen die freigegebene Spezifikation;
+      Implementierungs-Tier nach Task-Größe S/M/L/XL.'
     signal_keywords:
     - concept-driven-dev
     - Konzept-Pipeline
     - gegen Spezifikation implementieren
     - spec-first
+    task-review:
+      max-rounds: 4
     stages:
     - id: explore
       agent: explorer
       task: 'Codebase-/Kontext-Analyse (read-only): betroffene Dateien, Patterns,
         Risiko-Zonen, empfohlener Approach'
       mode: sequential
+    - id: classify
+      agent: ideation
+      task: 'Klassifikation Spike/Bounded/Architectural inkl. S/M/L/XL-Mapping (F7-Zusatzkriterium)'
+      mode: conditional
+      condition:
+        dod_flag: spec-plan-enabled
     - id: specify
       agent: concept-specifier
       task: 'Technische Spezifikation schreiben (Interface-Contracts, Datenfluss,
@@ -2497,15 +2534,36 @@ quality_pipelines:
       task: Spec/Design reviewen — Verdict APPROVED/CHANGES_REQUESTED/BLOCKED + Findings
         mit Severity
       mode: loop
-      loop:
-        generator: concept-specifier
-        critic: concept-reviewer
-        max_iterations: 3
+      loop_ref: concept-specify-loop
+    - id: approve
+      agent: concept-reviewer
+      task: 'Abnahme der Spec (Status: APPROVED) — explizite Nutzerfreigabe'
+      mode: conditional
+      requires_approval: true
+      condition:
+        dod_flag: spec-plan-enabled
+    - id: plan
+      agent: planner
+      task: 'Umsetzungsplan gegen die freigegebene Spec (Plan-Template, pipeline_stages, F6-Graph-Validator)'
+      mode: conditional
+      condition:
+        dod_flag: spec-plan-enabled
     - id: implement
       agent: developer
       task: 'Implementierung gegen die freigegebene Spezifikation — Tier nach Task-Größe
         (S/M/L/XL): S junior-developer, M developer, L senior-developer, XL principal-developer'
       mode: sequential
+    - id: review-req
+      agent: validator
+      task: 'Task-Review Stufe 1 — Requirement-Treue gegen die Akzeptanzkriterien
+        des Tasks (vor der Qualitätsprüfung)'
+      mode: loop
+      loop_ref: task-req-review-loop
+    - id: review-quality
+      agent: code-reviewer
+      task: 'Task-Review Stufe 2 — Code-Qualität und Blast-Radius'
+      mode: loop
+      loop_ref: task-quality-review-loop
     - id: validate
       mode: parallel_group
       parallel_group:

@@ -50,7 +50,7 @@ new_functions = '''def _build_managed_block(
     if not has_native_rules:
         rule_options = resolve_rules(config, agent_meta_root)
         platforms = config.get("platforms", [])
-        rule_sources = collect_rule_sources(agent_meta_root, platforms)
+        rule_sources = collect_rule_sources(agent_meta_root, platforms, config=config)
         
         embedded_rules = []
         for src_path, _ in rule_sources:

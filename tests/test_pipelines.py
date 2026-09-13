@@ -1,11 +1,18 @@
 """Test suite for quality pipeline configuration management."""
 
+from pathlib import Path
+
+import pytest
+
 from scripts.lib.pipelines import (
     KNOWN_PROVIDERS,
     _pipeline_active_for_provider,
+    _validate_task_review_rounds,
     build_pipeline_variables,
     validate_pipelines,
 )
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_known_providers_constant():
@@ -669,12 +676,16 @@ def test_validate_pipelines_rejects_non_bool_requires_approval():
 
 
 def test_role_defaults_pipelines_render_no_approval_gate_by_default():
-    # Backward-compat guard: no shipped base pipeline sets approval_default/
-    # requires_approval, so no generated block may contain a gate line.
+    # Backward-compat guard: under the DEFAULT DoD no shipped base pipeline may
+    # emit a gate line. The spec-plan `approve` stage ships
+    # `requires_approval: true` behind `dod_flag: spec-plan-enabled`, which the
+    # `full` preset leaves disabled — so the default render stays gate-free.
+    from scripts.lib.dod import resolve_dod
     from scripts.lib.pipelines import build_pipeline_variables, load_quality_pipelines
 
     pipelines = load_quality_pipelines(".")
-    variables = build_pipeline_variables(pipelines, active_dod={})
+    active_dod = resolve_dod({"platforms": []}, Path("."))
+    variables = build_pipeline_variables(pipelines, active_dod=active_dod)
     for var_name, value in variables.items():
         if not var_name.endswith("_PROVIDER_BLOCKS"):
             continue
@@ -973,3 +984,419 @@ def test_plan_driven_fallback_agent_not_in_roles_is_still_an_error():
     # fallback error yields two entries, not one.)
     assert any("fallback_agent" in e for e in errors)
     assert not any("allowed_agents" in e for e in errors)
+
+
+def test_concept_driven_dev_spec_plan_stage_order():
+    from scripts.lib.pipelines import inject_pipeline_blocks, load_quality_pipelines
+    from scripts.lib.dod import resolve_dod
+    pipelines = load_quality_pipelines(str(REPO_ROOT))
+    dod = resolve_dod({"platforms": [], "spec-plan-workflow": {"enabled": True}}, REPO_ROOT)
+    rendered = inject_pipeline_blocks(
+        "{{PIPELINE_CONCEPT_DRIVEN_DEV_BLOCK}}", pipelines, "Claude", dod,
+    )
+    # Exakte Claude-Render-Strings (pipelines.py:639 sequential_item):
+    #   {index}. background(agent="{agent}", prompt="{task}")
+    assert 'background(agent="ideation"' in rendered
+    order = [
+        rendered.index('background(agent="ideation"'),
+        rendered.index('background(agent="concept-specifier"'),
+        rendered.index('background(agent="planner"'),
+        rendered.index('prompt="Implementierung'),
+    ]
+    assert order == sorted(order)
+    assert "Abnahme erforderlich vor Stage 'approve'" in rendered
+
+
+def test_concept_driven_dev_spec_plan_hidden_when_disabled():
+    from scripts.lib.pipelines import inject_pipeline_blocks, load_quality_pipelines
+    from scripts.lib.dod import resolve_dod
+    pipelines = load_quality_pipelines(str(REPO_ROOT))
+    dod = resolve_dod({"platforms": [], "spec-plan-workflow": {"enabled": False}}, REPO_ROOT)
+    rendered = inject_pipeline_blocks(
+        "{{PIPELINE_CONCEPT_DRIVEN_DEV_BLOCK}}", pipelines, "Claude", dod,
+    )
+    assert "Abnahme erforderlich" not in rendered
+    assert 'background(agent="planner"' not in rendered
+    assert 'background(agent="ideation"' not in rendered
+
+
+def test_planner_template_mentions_pipeline_stages_mandate(tmp_path):
+    text = (REPO_ROOT / "agents" / "1-generic" / "planner.md").read_text(encoding="utf-8")
+    assert "pipeline_stages" in text
+    assert "fallback_agent" in text
+    # A minimal generated plan with the documented frontmatter parses.
+    plan = tmp_path / "2026-09-13-demo.md"
+    plan.write_text("---\npipeline_stages:\n  implement: 1\n---\n# Demo\n", encoding="utf-8")
+    from scripts.lib.pipelines import parse_plan_ref
+    assert parse_plan_ref(str(plan))["stages"] == {"implement": 1}
+
+
+# ---------------------------------------------------------------------------
+# Task 21 (spec §Revision v6 A.3): concept-specify-loop + loop_ref support
+# ---------------------------------------------------------------------------
+
+_CONCEPT_PAIRS = [
+    {
+        "id": "concept-specify-loop",
+        "generator": "concept-specifier",
+        "critic": "concept-reviewer",
+        "max_iterations": 3,
+        "on_blocked": "escalate_to_orchestrator",
+    }
+]
+
+
+def test_loop_ref_renders_resolved_generator_critic_and_max_iterations():
+    """(a) A `loop_ref` stage renders the resolved pair's generator/critic/max."""
+    from scripts.lib.pipelines import _generate_pipeline_block
+
+    pipeline = {
+        "stages": [
+            {
+                "id": "review",
+                "agent": "concept-reviewer",
+                "task": "Spec/Design reviewen",
+                "mode": "loop",
+                "loop_ref": "concept-specify-loop",
+            }
+        ]
+    }
+    block = _generate_pipeline_block(
+        pipeline, "Opencode", reflection_pairs=_CONCEPT_PAIRS
+    )
+    assert 'subagent_type="concept-specifier"' in block
+    assert 'subagent_type="concept-reviewer"' in block
+    assert "Max iterations: 3" in block
+
+
+def test_loop_ref_renders_from_real_role_defaults_without_explicit_pairs():
+    """(a) Real config resolves without an explicit reflection_pairs argument."""
+    from scripts.lib.pipelines import _generate_pipeline_block, load_quality_pipelines
+
+    pipelines = load_quality_pipelines(str(REPO_ROOT))
+    stage_pipeline = {"stages": [
+        s for s in pipelines["concept-driven-dev"]["stages"] if s["id"] == "review"
+    ]}
+    block = _generate_pipeline_block(stage_pipeline, "Opencode")
+    assert 'subagent_type="concept-specifier"' in block
+    assert 'subagent_type="concept-reviewer"' in block
+    assert "Max iterations: 3" in block
+
+
+def test_validate_pipelines_rejects_unknown_loop_ref():
+    """(b) An unknown `loop_ref` id is a validation error."""
+    pipelines = {
+        "p1": {
+            "stages": [
+                {
+                    "id": "review",
+                    "agent": "concept-reviewer",
+                    "mode": "loop",
+                    "loop_ref": "does-not-exist",
+                }
+            ]
+        }
+    }
+    errors = validate_pipelines(
+        pipelines, available_roles=["concept-reviewer"], reflection_pairs=_CONCEPT_PAIRS
+    )
+    assert any("does-not-exist" in e for e in errors)
+
+
+def test_validate_pipelines_rejects_both_loop_and_loop_ref():
+    """(c) `loop` and `loop_ref` must not be combined on one stage."""
+    pipelines = {
+        "p1": {
+            "stages": [
+                {
+                    "id": "review",
+                    "agent": "concept-reviewer",
+                    "mode": "loop",
+                    "loop": {"generator": "concept-specifier", "critic": "concept-reviewer"},
+                    "loop_ref": "concept-specify-loop",
+                }
+            ]
+        }
+    }
+    errors = validate_pipelines(
+        pipelines, available_roles=["concept-reviewer", "concept-specifier"],
+        reflection_pairs=_CONCEPT_PAIRS,
+    )
+    assert any("both" in e and "loop_ref" in e for e in errors)
+
+
+def test_validate_pipelines_requires_loop_source_for_loop_mode():
+    """(d) `mode: loop` with neither `loop` nor `loop_ref` is an error."""
+    pipelines = {
+        "p1": {
+            "stages": [
+                {"id": "review", "agent": "concept-reviewer", "mode": "loop"}
+            ]
+        }
+    }
+    errors = validate_pipelines(pipelines, available_roles=["concept-reviewer"])
+    assert any("requires" in e and "loop" in e for e in errors)
+
+
+def test_validate_pipelines_checks_resolved_loop_ref_roles():
+    """Resolved generator/critic of a `loop_ref` are checked against roles."""
+    pipelines = {
+        "p1": {
+            "stages": [
+                {
+                    "id": "review",
+                    "agent": "concept-reviewer",
+                    "mode": "loop",
+                    "loop_ref": "concept-specify-loop",
+                }
+            ]
+        }
+    }
+    errors = validate_pipelines(
+        pipelines, available_roles=["concept-reviewer"], reflection_pairs=_CONCEPT_PAIRS
+    )
+    assert any("concept-specifier" in e for e in errors)
+
+
+def test_resolve_stage_loop_concept_driven_dev_review_ratchet():
+    """(e) Equivalence ratchet: the migrated stage resolves to the pair values."""
+    from scripts.lib.pipelines import load_quality_pipelines
+    from scripts.lib.reflection import load_reflection_pairs, resolve_stage_loop
+
+    pipelines = load_quality_pipelines(str(REPO_ROOT))
+    pairs = load_reflection_pairs(str(REPO_ROOT / "config"))
+    stage = next(
+        s for s in pipelines["concept-driven-dev"]["stages"] if s["id"] == "review"
+    )
+    assert resolve_stage_loop(stage, pairs) == {
+        "generator": "concept-specifier",
+        "critic": "concept-reviewer",
+        "max_iterations": 3,
+    }
+
+
+def test_find_pair_returns_none_for_unknown_and_missing_id():
+    from scripts.lib.reflection import find_pair
+
+    assert find_pair(_CONCEPT_PAIRS, "concept-specify-loop") is not None
+    assert find_pair(_CONCEPT_PAIRS, "nope") is None
+    assert find_pair(_CONCEPT_PAIRS, None) is None
+    assert find_pair(None, "concept-specify-loop") is None
+
+
+def test_generate_pipeline_block_raises_on_unknown_loop_ref():
+    """M5: an unresolved `loop_ref` is fatal at render (no silent crit='')."""
+    from scripts.lib.io import SyncError
+    from scripts.lib.pipelines import _generate_pipeline_block
+
+    pipeline = {
+        "stages": [
+            {
+                "id": "review",
+                "agent": "concept-reviewer",
+                "task": "Spec/Design reviewen",
+                "mode": "loop",
+                "loop_ref": "does-not-exist",
+            }
+        ]
+    }
+    with pytest.raises(SyncError):
+        _generate_pipeline_block(pipeline, "Opencode", reflection_pairs=_CONCEPT_PAIRS)
+
+
+def test_inject_pipeline_blocks_honours_project_reflection_pair_overrides(tmp_path):
+    """M4: a project override of a pair reaches the render path.
+
+    ``inject_pipeline_blocks`` is the single resolution point: without an
+    explicit list it must load the *effective* pairs (framework + project
+    ``reflection-pairs.overrides``), not the framework-only fallback.
+    """
+    from scripts.lib.pipelines import inject_pipeline_blocks
+
+    root = tmp_path / "agent-meta"
+    (root / "config").mkdir(parents=True)
+    (root / "config" / "role-defaults.yaml").write_text(
+        "reflection_pairs:\n"
+        "  - id: concept-specify-loop\n"
+        "    generator: concept-specifier\n"
+        "    critic: concept-reviewer\n"
+        "    max_iterations: 3\n"
+        "quality_pipelines: {}\n",
+        encoding="utf-8",
+    )
+    (root / ".meta-config").mkdir(parents=True)
+    (root / ".meta-config" / "project.yaml").write_text(
+        "reflection-pairs:\n"
+        "  overrides:\n"
+        "    concept-specify-loop:\n"
+        "      max_iterations: 7\n",
+        encoding="utf-8",
+    )
+    pipelines = {
+        "p": {
+            "stages": [
+                {
+                    "id": "review",
+                    "agent": "concept-reviewer",
+                    "task": "review",
+                    "mode": "loop",
+                    "loop_ref": "concept-specify-loop",
+                }
+            ]
+        }
+    }
+    rendered = inject_pipeline_blocks(
+        "{{PIPELINE_DETAIL_BLOCKS}}", pipelines, "Opencode", {},
+        agent_meta_root=root,
+    )
+    assert "Max iterations: 7" in rendered
+
+
+def test_main_reflection_pair_is_pinned_to_dev_review_loop():
+    """L2: MAX_ITERATIONS must follow `dev-review-loop`, not the first pair."""
+    from scripts.lib.config import _select_main_reflection_pair
+
+    pairs = [
+        {"id": "concept-specify-loop", "max_iterations": 9},
+        {"id": "dev-review-loop", "max_iterations": 4},
+    ]
+    assert _select_main_reflection_pair(pairs)["id"] == "dev-review-loop"
+    assert _select_main_reflection_pair([{"id": "other", "max_iterations": 2}])["id"] == "other"
+    assert _select_main_reflection_pair([]) is None
+
+
+_TASK_REVIEW_PAIRS = [
+    {
+        "id": "task-req-review-loop",
+        "generator": "developer",
+        "critic": "validator",
+        "max_iterations": 2,
+        "on_blocked": "escalate_to_orchestrator",
+    },
+    {
+        "id": "task-quality-review-loop",
+        "generator": "developer",
+        "critic": "code-reviewer",
+        "max_iterations": 2,
+        "on_blocked": "escalate_to_orchestrator",
+    },
+]
+
+
+def _task_review_pipeline(max_rounds=4):
+    pipeline = {
+        "stages": [
+            {"id": "implement", "agent": "developer", "mode": "sequential"},
+            {
+                "id": "review-req",
+                "agent": "validator",
+                "mode": "loop",
+                "loop_ref": "task-req-review-loop",
+            },
+            {
+                "id": "review-quality",
+                "agent": "code-reviewer",
+                "mode": "loop",
+                "loop_ref": "task-quality-review-loop",
+            },
+        ],
+    }
+    if max_rounds is not None:
+        pipeline["task-review"] = {"max-rounds": max_rounds}
+    return pipeline
+
+
+def test_task_review_rounds_cap_enforced():
+    """AC-22: a cap below the sum of both review pairs is an error naming the pipeline."""
+    pipelines = {"concept-driven-dev": _task_review_pipeline(max_rounds=3)}
+    errors = _validate_task_review_rounds(pipelines, _TASK_REVIEW_PAIRS)
+    assert any("concept-driven-dev" in e and "max-rounds" in e for e in errors), errors
+
+
+def test_task_review_rounds_default_ok():
+    """AC-22: 2 + 2 iterations fit the explicit cap of 4 and the implicit default."""
+    pipelines = {"concept-driven-dev": _task_review_pipeline(max_rounds=4)}
+    assert _validate_task_review_rounds(pipelines, _TASK_REVIEW_PAIRS) == []
+
+    without_cap = {"concept-driven-dev": _task_review_pipeline(max_rounds=None)}
+    assert _validate_task_review_rounds(without_cap, _TASK_REVIEW_PAIRS) == []
+
+
+def test_task_review_rounds_missing_loop_ref_errors():
+    """Fail-closed: a review stage without a loop_ref is rejected."""
+    pipelines = {
+        "p1": {
+            "stages": [{"id": "review-req", "agent": "validator", "mode": "loop"}],
+        }
+    }
+    errors = _validate_task_review_rounds(pipelines, _TASK_REVIEW_PAIRS)
+    assert any("p1" in e and "review-req" in e for e in errors), errors
+
+
+def test_task_review_rounds_missing_max_iterations_errors():
+    """Fail-closed: an explicit max_iterations >= 1 is required on the pair."""
+    pipelines = {
+        "p1": {
+            "stages": [
+                {
+                    "id": "review-quality",
+                    "agent": "code-reviewer",
+                    "mode": "loop",
+                    "loop_ref": "task-quality-review-loop",
+                }
+            ],
+        }
+    }
+    pairs = [
+        {
+            "id": "task-quality-review-loop",
+            "generator": "developer",
+            "critic": "code-reviewer",
+        }
+    ]
+    errors = _validate_task_review_rounds(pipelines, pairs)
+    assert any("p1" in e and "review-quality" in e for e in errors), errors
+
+
+def test_task_review_rounds_shipped_config_is_clean():
+    """AC-21: the shipped concept-driven-dev review stages satisfy the round cap."""
+    from scripts.lib.pipelines import load_quality_pipelines
+    from scripts.lib.reflection import load_reflection_pairs
+
+    pipelines = load_quality_pipelines(str(REPO_ROOT))
+    pairs = load_reflection_pairs(str(REPO_ROOT / "config"))
+    assert _validate_task_review_rounds(pipelines, pairs) == []
+
+
+def test_bugfix_has_mandatory_root_cause_stage():
+    """AC-23: bugfix gates the fix behind an unconditional root-cause stage."""
+    from scripts.lib.pipelines import load_quality_pipelines
+
+    pipelines = load_quality_pipelines(str(REPO_ROOT))
+    stages = pipelines["bugfix"]["stages"]
+    ids = [stage["id"] for stage in stages]
+
+    assert "root-cause" in ids, ids
+    assert ids.index("triage") < ids.index("root-cause") < ids.index("fix")
+
+    root_cause = stages[ids.index("root-cause")]
+    assert root_cause["agent"] == "bug-feature-analyzer"
+    assert root_cause["mode"] == "sequential"
+    assert "condition" not in root_cause
+
+
+def test_quick_fix_root_cause_is_conditional():
+    """AC-23: quick-fix keeps the root-cause stage behind the DoD flag."""
+    from scripts.lib.pipelines import load_quality_pipelines
+
+    pipelines = load_quality_pipelines(str(REPO_ROOT))
+    stages = pipelines["quick-fix"]["stages"]
+    ids = [stage["id"] for stage in stages]
+
+    assert "root-cause" in ids, ids
+    assert ids.index("root-cause") < ids.index("fix")
+
+    root_cause = stages[ids.index("root-cause")]
+    assert root_cause["agent"] == "bug-feature-analyzer"
+    assert root_cause["mode"] == "conditional"
+    assert root_cause["condition"] == {"dod_flag": "root-cause-required"}

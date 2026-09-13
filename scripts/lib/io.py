@@ -16,6 +16,10 @@ class SyncError(Exception):
     """Fatal sync error — sync cannot continue safely."""
 
 
+class SyncConfigError(SyncError):
+    """Invalid framework configuration (e.g. a malformed ``enabled-when``)."""
+
+
 def _normalize_enabled_config(raw) -> dict:
     """Normalize a project activation config to dict format.
 

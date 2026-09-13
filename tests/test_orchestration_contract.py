@@ -50,24 +50,34 @@ def _ensure_repo_scripts_importable() -> None:
 
 _ensure_repo_scripts_importable()
 
-from scripts.lib.checkpoint import CheckpointStore  # noqa: E402
-from scripts.lib.consistency.fanout_contracts import (  # noqa: E402
+from scripts.lib.checkpoint import CheckpointStore
+from scripts.lib.consistency.fanout_contracts import (
     check_fanout_backend_contract,
 )
-from scripts.lib.orchestration import (  # noqa: E402
+from scripts.lib.consistency.report import Severity
+from scripts.lib.consistency.spec_plan import (
+    check_spec_plan_workflow,
+    parse_plan_ledger,
+)
+from scripts.lib.orchestration import (
     BARRIER_ENTRY_MARKER,
     BarrierEntry,
     BarrierResult,
     FanoutPlan,
     FanoutTask,
     check_plan_file_overlap,
+    checkpoint_from_barrier_entry,
     execute_plan,
     find_dependency_errors,
     render_barrier_result,
     summarize_result,
     validate_plan,
 )
-from tests.orchestration.dry_run.engine import DispatchPlan, OrchestratorDryRun, SubTask  # noqa: E402
+from tests.orchestration.dry_run.engine import (
+    DispatchPlan,
+    OrchestratorDryRun,
+    SubTask,
+)
 
 
 def _task(task_id: str, agent: str = "developer", prompt: str | None = None, **overrides) -> FanoutTask:
@@ -391,6 +401,163 @@ def test_execute_without_store_keeps_raw_output_and_no_checkpoint_ref():
     result = execute_plan(_two_task_plan(), StubDispatcher(raw="RAW"))
     assert all(e.raw_output == "RAW" for e in result.entries)
     assert all(e.checkpoint_ref is None for e in result.entries)
+
+
+def test_execute_writes_plan_identity_checkpoints(tmp_path):
+    """IC-06/AC-11: one durable checkpoint per entry carrying the explicit identity."""
+    store = CheckpointStore(project_root=tmp_path)
+    result = execute_plan(
+        _two_task_plan(), StubDispatcher(),
+        store=store, session_id="orch-id1", plan_id="p",
+    )
+
+    assert result.status == "success"
+    session = store.load_session("orch-id1")
+    assert session is not None
+    checkpoints = session["checkpoints"]
+    assert len(checkpoints) == 2
+    for checkpoint, entry in zip(checkpoints, result.entries):
+        assert checkpoint["plan_id"] == "p"
+        assert checkpoint["task_ref"] == f"p#{entry.task_id}"
+        assert checkpoint["status"] == "completed"
+        assert checkpoint["agent"] == entry.agent
+        assert checkpoint["task_description"] == f"do {entry.task_id}"
+
+
+def test_execute_write_checkpoints_false_is_legacy(tmp_path):
+    """IC-06/AC-12: opting out restores the raw-output-only behaviour."""
+    store = CheckpointStore(project_root=tmp_path)
+    raws = {"t1": "RAW ONE", "t2": "RAW TWO"}
+    dispatcher = StubDispatcher()
+    dispatcher.dispatch = lambda tasks: [
+        BarrierEntry(
+            task_id=t.task_id, agent=t.target_agent, status="success",
+            summary=f"did {t.task_id}", raw_output=raws[t.task_id],
+        )
+        for t in tasks
+    ]
+
+    result = execute_plan(
+        _two_task_plan(), dispatcher,
+        store=store, session_id="orch-legacy", write_checkpoints=False,
+    )
+
+    assert store.load_session("orch-legacy") is None
+    assert [e.task_id for e in result.entries] == ["t1", "t2"]
+    for entry in result.entries:
+        assert entry.raw_output is None
+        assert entry.checkpoint_ref is not None
+
+
+def test_execute_without_plan_id_writes_null_identity(tmp_path):
+    """IC-06/AC-13 (F1): no explicit plan_id -> no derived checkpoint identity."""
+    store = CheckpointStore(project_root=tmp_path)
+    result = execute_plan(
+        _two_task_plan(), StubDispatcher(),
+        store=store, session_id="orch-noid",
+    )
+
+    assert result.plan_id.startswith("FANOUT-")
+    session = store.load_session("orch-noid")
+    checkpoints = session["checkpoints"]
+    assert len(checkpoints) == 2
+    assert all(cp["plan_id"] is None for cp in checkpoints)
+    assert all(cp["task_ref"] is None for cp in checkpoints)
+
+
+def test_checkpoint_from_barrier_entry_normalizes_task_id():
+    """MINOR-8 (F1/IC-06): a non-normalized entry id must not produce a
+    false-drift ref -- ``1`` has to become ``p#task-1``, matching the ledger.
+    """
+    entry = BarrierEntry(
+        task_id="1", agent="developer", status="success", summary="done",
+    )
+
+    checkpoint = checkpoint_from_barrier_entry(entry, plan_id="p")
+    assert checkpoint.task_id == "task-1"
+    assert checkpoint.task_ref == "p#task-1"
+
+    null_identity = checkpoint_from_barrier_entry(entry)
+    assert null_identity.task_id == "task-1"
+    assert null_identity.task_ref is None
+
+
+def test_checkpoint_write_oserror_is_fail_soft(tmp_path, monkeypatch):
+    """IC-06: a checkpoint write failure is logged, never fatal."""
+    store = CheckpointStore(project_root=tmp_path)
+
+    def _boom(session_id, checkpoint):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(store, "save_checkpoint", _boom)
+    result = execute_plan(
+        _two_task_plan(), StubDispatcher(),
+        store=store, session_id="orch-err", plan_id="p",
+    )
+
+    assert result.status == "success"
+    assert [e.task_id for e in result.entries] == ["t1", "t2"]
+
+
+_LEDGER_PLAN = """# Ledger Test Plan
+
+> Status: geplant
+
+### Task t1: first
+
+- [ ] Step 1: do the first thing
+
+### Task t2: second
+
+- [ ] Step 1: do the second thing
+"""
+
+
+def _write_ledger_plan(tmp_path) -> Path:
+    plan_path = tmp_path / "plan.md"
+    plan_path.write_text(_LEDGER_PLAN, encoding="utf-8")
+    return plan_path
+
+
+def test_execute_with_ledger_path_closes_success_tasks(tmp_path):
+    """IC-06/AC-14: a fully successful run closes the ledger."""
+    plan_path = _write_ledger_plan(tmp_path)
+    result = execute_plan(
+        _two_task_plan(), StubDispatcher(), plan_id="p", ledger_path=plan_path,
+    )
+
+    assert result.status == "success"
+    text = plan_path.read_text(encoding="utf-8")
+    assert "- [ ]" not in text
+    assert text.count("- [x]") == 2
+    ledger = parse_plan_ledger(plan_path)
+    assert ledger["complete"] is True
+    assert ledger["status"] == "complete"
+
+
+def test_execute_with_failing_entry_keeps_task_open(tmp_path):
+    """IC-06/AC-14: only success entries are ticked; the plan stays open."""
+    plan_path = _write_ledger_plan(tmp_path)
+    result = execute_plan(
+        _two_task_plan(), MixedDispatcher({"t1": "success", "t2": "failed"}),
+        plan_id="p", ledger_path=plan_path,
+    )
+
+    assert result.status == "partial"
+    text = plan_path.read_text(encoding="utf-8")
+    assert text.count("- [x]") == 1
+    assert text.count("- [ ]") == 1
+    ledger = parse_plan_ledger(plan_path)
+    assert ledger["complete"] is False
+    assert ledger["status"] == "IN PROGRESS"
+
+
+def test_execute_without_ledger_path_no_write(tmp_path):
+    """IC-06/AC-14: no ledger_path = legacy behaviour, the file is untouched."""
+    plan_path = _write_ledger_plan(tmp_path)
+    before = plan_path.read_text(encoding="utf-8")
+    execute_plan(_two_task_plan(), StubDispatcher(), plan_id="p")
+    assert plan_path.read_text(encoding="utf-8") == before
 
 
 def test_execute_defensive_against_missing_and_extra_entries():
@@ -746,3 +913,107 @@ def test_fanout_contract_tool_surface_missing(tmp_path):
     findings = check_fanout_backend_contract(root)
     checks = {f.check for f in _error_findings(findings)}
     assert "fanout.tool-surface-missing" in checks
+
+
+def test_concept_driven_dev_spec_plan_phase_order():
+    """Spec-plan wiring (spec §9 / IC-08, AC-32): the concept-driven-dev stages are
+    ordered explore → classify → specify → review → approve → plan →
+    implement → review-req → review-quality → validate."""
+    from scripts.lib.pipelines import load_quality_pipelines
+
+    pipelines = load_quality_pipelines(str(_REPO_ROOT))
+    stage_ids = [stage["id"] for stage in pipelines["concept-driven-dev"]["stages"]]
+    expected = [
+        "explore",
+        "classify",
+        "specify",
+        "review",
+        "approve",
+        "plan",
+        "implement",
+        "review-req",
+        "review-quality",
+        "validate",
+    ]
+    assert stage_ids == expected
+
+
+_SPEC_PLAN_ENABLED = {"spec-plan-workflow": {"enabled": True}}
+
+_SPEC_PLAN_GOOD_SPEC = (
+    "# Demo — Spec\n> Status: APPROVED (2026-09-13)\n"
+    "## Problem\nDemo-Problem\n"
+    "## Ziel\nDemo-Ziel\n"
+    "## Nicht-Ziele\nDemo-Nicht-Ziel\n"
+    "## Interface Contracts\n"
+    "## Datenfluss\n"
+    "## Acceptance Criteria\n1. AC-1\n"
+    "## Offene Fragen + Risiken\n"
+    "## Trace-Anker: spec-id: SPEC-demo\n"
+)
+
+
+def _spec_plan_fixture(tmp_path: Path, tasks: str) -> Path:
+    (tmp_path / "docs" / "specs").mkdir(parents=True)
+    (tmp_path / "docs" / "plans").mkdir(parents=True)
+    (tmp_path / "docs" / "specs" / "2026-09-13-demo-design.md").write_text(
+        _SPEC_PLAN_GOOD_SPEC, encoding="utf-8",
+    )
+    plan = (
+        "# Demo Implementation Plan\n> Status: geplant\n"
+        "**Goal:** demo\n**Architecture:** demo\n**Tech Stack:** demo\n"
+        "**Spec:** docs/specs/2026-09-13-demo-design.md\n"
+        "## Global Constraints\n- stdlib only\n"
+        "## File Structure\n- Create: docs/specs/x.md\n"
+        "## Trace-Anker: spec-id: SPEC-demo\n"
+        "---\npipeline_stages:\n  implement: 1\n---\n"
+        + tasks
+    )
+    (tmp_path / "docs" / "plans" / "2026-09-13-demo.md").write_text(
+        plan, encoding="utf-8",
+    )
+    return tmp_path
+
+
+def _spec_plan_graph_errors(findings):
+    return [
+        f for f in findings
+        if f.check == "spec_plan_plan_graph" and f.severity == Severity.ERROR
+    ]
+
+
+def test_spec_plan_graph_cycle_is_error(tmp_path):
+    root = _spec_plan_fixture(
+        tmp_path,
+        "### Task 1: alpha\n**Agent:** developer\n**Files:** Modify: a.py\n"
+        "**Depends on:** task-2\n"
+        "### Task 2: beta\n**Agent:** tester\n**Files:** Modify: b.py\n"
+        "**Depends on:** task-1\n",
+    )
+    findings = check_spec_plan_workflow(
+        root, _SPEC_PLAN_ENABLED, agent_meta_root=_REPO_ROOT,
+    )
+    errors = _spec_plan_graph_errors(findings)
+    assert errors, str(findings)
+    assert any("cycle" in f.message.lower() for f in errors)
+
+
+def test_spec_plan_graph_three_acyclic_tasks_has_no_budget_error(tmp_path):
+    root = _spec_plan_fixture(
+        tmp_path,
+        "### Task 1: a\n**Agent:** developer\n**Files:** Modify: a.py\n"
+        "### Task 2: b\n**Agent:** developer\n**Files:** Modify: b.py\n"
+        "**Depends on:** task-1\n"
+        "### Task 3: c\n**Agent:** tester\n**Files:** Modify: c.py\n"
+        "**Depends on:** task-2\n",
+    )
+    findings = check_spec_plan_workflow(
+        root, _SPEC_PLAN_ENABLED, agent_meta_root=_REPO_ROOT,
+    )
+    assert _spec_plan_graph_errors(findings) == [], str(findings)
+
+
+def test_orchestrator_prompt_documents_spec_plan_phases():
+    text = (_REPO_ROOT / "agents" / "1-generic" / "orchestrator.md").read_text(encoding="utf-8")
+    for marker in ("classify", "approve", "plan", "frischer Subagent"):
+        assert marker in text

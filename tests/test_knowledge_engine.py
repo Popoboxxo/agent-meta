@@ -441,3 +441,66 @@ def test_admin_ui_has_view_project_knowledge_engine_function():
         assert f'{preset_name}: {{' in html or f'"{preset_name}": {{' in html
     assert 'saveProjectSection("knowledge-engine", ke, status)' in html
     assert '"project/knowledge-engine": "project_instance-knowledge_engine",' in html
+
+
+# ---------------------------------------------------------------------------
+# Task 12 — Plan/Spec concept types + okf.auto-index/auto-log semantics
+# ---------------------------------------------------------------------------
+
+import sys  # noqa: E402
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT / "scripts") not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT / "scripts"))
+
+
+def test_internal_docs_contains_plan_and_spec():
+    from lib.knowledge import DOMAIN_CONCEPT_TYPES
+    types = DOMAIN_CONCEPT_TYPES["internal-docs"]
+    assert "plan" in types
+    assert "spec" in types
+
+
+def test_gitkeep_subdirs_contain_plans_and_specs():
+    from lib.knowledge import _KNOWLEDGE_GITKEEP_SUBDIRS
+    rel = {p.as_posix() for p in _KNOWLEDGE_GITKEEP_SUBDIRS}
+    assert "wiki/plans" in rel
+    assert "wiki/specs" in rel
+
+
+def test_auto_flags_false_keep_scaffolded_files(tmp_path):
+    from lib.knowledge import sync_knowledge_engine
+    from lib.log import SyncLog
+    log = SyncLog()
+    config = {
+        "knowledge-engine": {
+            "enabled": True, "domain": "internal-docs", "bundle-path": "knowledge",
+            "okf": {"auto-index": False, "auto-log": False},
+        }
+    }
+    sync_knowledge_engine(REPO_ROOT, tmp_path, config, log, dry_run=False)
+    # Dateien bleiben nutzbar (weiterhin gescaffoldet) ...
+    assert (tmp_path / "knowledge" / "wiki" / "index.md").exists()
+    assert (tmp_path / "knowledge" / "wiki" / "log.md").exists()
+    # ... aber die automatische Pflege ist aus -> agent-driven.
+    infos = " ".join(log.infos)
+    assert "agent-driven" in infos
+
+
+def test_auto_flags_true_keep_scaffolded_files_without_agent_driven_note(tmp_path):
+    from lib.knowledge import sync_knowledge_engine
+    from lib.log import SyncLog
+    log = SyncLog()
+    config = {
+        "knowledge-engine": {
+            "enabled": True, "domain": "internal-docs", "bundle-path": "knowledge",
+            "okf": {"auto-index": True, "auto-log": True},
+        }
+    }
+    sync_knowledge_engine(REPO_ROOT, tmp_path, config, log, dry_run=False)
+    # Dateien werden auch im true-Fall gescaffoldet ...
+    assert (tmp_path / "knowledge" / "wiki" / "index.md").exists()
+    assert (tmp_path / "knowledge" / "wiki" / "log.md").exists()
+    # ... aber die agent-driven-Notiz wird nur bei auto-*: false emittiert.
+    infos = " ".join(log.infos)
+    assert "agent-driven" not in infos

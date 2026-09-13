@@ -1,9 +1,15 @@
 import time
+from pathlib import Path
 
+from scripts.lib.consistency.report import Severity
+from scripts.lib.consistency.spec_plan import check_spec_plan_workflow
 from scripts.lib.runtime import (
     SubagentBarrierRuntime,
     SubagentTask,
 )
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+_SPEC_PLAN_ENABLED = {"spec-plan-workflow": {"enabled": True}}
 
 
 def test_basic_parallel_execution():
@@ -108,3 +114,39 @@ def test_global_timeout():
     assert barrier_res.results[1].status == "timeout"
     assert "Global timeout exceeded" in barrier_res.results[1].error
     assert barrier_res.results[1].output is None
+
+
+def test_spec_plan_graph_cycle_is_error(tmp_path):
+    """Graph-validator wiring (spec §7.3 / F6): a cyclic plan surfaces as a
+    spec_plan_plan_graph ERROR — the barrier runtime's dependency contract
+    starts here."""
+    (tmp_path / "docs" / "specs").mkdir(parents=True)
+    (tmp_path / "docs" / "plans").mkdir(parents=True)
+    (tmp_path / "docs" / "specs" / "2026-09-13-demo-design.md").write_text(
+        "# Demo — Spec\n> Status: APPROVED (2026-09-13)\n"
+        "## Problem\np\n## Ziel\nz\n## Nicht-Ziele\nn\n"
+        "## Interface Contracts\n## Datenfluss\n## Acceptance Criteria\n1. a\n"
+        "## Offene Fragen + Risiken\n## Trace-Anker: spec-id: SPEC-demo\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "docs" / "plans" / "2026-09-13-demo.md").write_text(
+        "# Demo Implementation Plan\n> Status: geplant\n"
+        "**Goal:** demo\n**Architecture:** demo\n**Tech Stack:** demo\n"
+        "**Spec:** docs/specs/2026-09-13-demo-design.md\n"
+        "## Global Constraints\n- stdlib only\n"
+        "## File Structure\n- Create: docs/specs/x.md\n"
+        "## Trace-Anker: spec-id: SPEC-demo\n"
+        "---\npipeline_stages:\n  implement: 1\n---\n"
+        "### Task 1: alpha\n**Agent:** developer\n**Files:** Modify: a.py\n"
+        "**Depends on:** task-2\n"
+        "### Task 2: beta\n**Agent:** tester\n**Files:** Modify: b.py\n"
+        "**Depends on:** task-1\n",
+        encoding="utf-8",
+    )
+    findings = check_spec_plan_workflow(
+        tmp_path, _SPEC_PLAN_ENABLED, agent_meta_root=_REPO_ROOT,
+    )
+    assert any(
+        f.check == "spec_plan_plan_graph" and f.severity == Severity.ERROR
+        for f in findings
+    ), str(findings)

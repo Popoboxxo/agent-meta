@@ -1,0 +1,36 @@
+agent-meta-version: "1.1.0"
+ai-providers:
+- Claude
+# concept-driven sets spec-plan-required:true and root-cause-required:true, so
+# the gated plan-ledger/session-recovery/root-cause-gate rules are delivered.
+# rehydrate + ledger-drift are the two consumers this scenario exercises.
+dod-preset: concept-driven
+platforms: []
+rules-preset: lazy
+knowledge-engine:
+  enabled: false
+spec-plan-workflow:
+  enabled: true
+  paths:
+    specs: docs/specs
+    plans: docs/plans
+    spikes: docs/spikes
+  index:
+    mode: file-index
+    fallback-index: docs/INDEX.md
+  recovery:
+    rehydrate: true
+  ledger-drift:
+    enabled: true
+    severity: WARNING
+project:
+  name: scenario-progress-ledger
+  prefix: s59
+  short: scenario-progress-ledger
+variables:
+  PROJECT_NAME: scenario-progress-ledger
+  PROJECT_DESCRIPTION: Progress/ledger wiring (SPEC-PROGRESS-LEDGER-2026-09-13, AC-28).
+  PROJECT_GOAL: Verify execute_plan checkpoints + ledger close-out, the --update-plan-ledger writer, a spec_plan_ledger_drift WARNING for a synthetic mismatch and the --rehydrate next_task_ref path.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-progress-ledger
+  GIT_MAIN_BRANCH: main

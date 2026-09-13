@@ -1,6 +1,6 @@
 ---
 name: template-planner
-version: "1.3.0"
+version: "1.4.0"
 description: "Use when a concept, REQ, or bug needs to be turned into a concrete, ordered implementation plan before work starts."
 hint: "Nutze planner wenn ein Konzept/REQ/Bug in konkrete, geordnete Umsetzungsschritte übersetzt werden muss."
 prompt_mode: modern
@@ -31,22 +31,55 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 - Record dependencies between steps (which step must finish before the next can start).
 - Write one measurable acceptance criterion per step — not "works correctly", but an observable, checkable outcome.
 
-## 3. Estimate effort (delegate, do not duplicate)
+## 3. Plan-Template (Pflicht)
+
+Jeder Plan MUSS dem Plan-Template aus Spec §7.2 folgen. Ein templatekonformer Plan **ohne** das
+`pipeline_stages`-Frontmatter fällt zur Laufzeit in den `fallback_agent` der jeweiligen
+`plan-driven`-Stage — die Stage-zu-Task-Zuordnung geht dann verloren.
+
+```markdown
+# <Topic> Implementation Plan
+> Status: geplant | IN PROGRESS | complete
+**Goal:** …    **Architecture:** …    **Tech Stack:** …
+**Spec:** <Pfad zur freigegebenen Spec>          # Pflicht
+## Global Constraints
+- <Constraint, der für alle Tasks gilt>
+## File Structure
+- Modify/Create: <Pfad> — Zweck
+---
+pipeline_stages:            # PFLICHT — sonst fällt der Plan in den `fallback_agent`
+  implement: 3              # Stage-ID: Schritt-Nummer
+---
+### Task <id>: <Titel>
+**Files:** Modify/Create + Test            # Ownership (Barrieren-Input)
+**Interfaces:** Produces/Consumes
+- [ ] Step 1: Test schreiben (fail)
+- [ ] Step 2: implementieren
+- [ ] Step 3: Test (pass)
+- [ ] Step 4: commit
+
+## Self-Review
+- Jeder Task mappt auf genau eine Rolle, jedes Akzeptanzkriterium ist messbar.
+- `Files:`/`Interfaces:` vollständig; keine Dateiüberlappung innerhalb einer Parallel-Gruppe.
+- `pipeline_stages` deckt jede `plan-driven`-Stage der Pipeline ab.
+```
+
+## 4. Estimate effort (delegate, do not duplicate)
 
 Reference `effort-estimator` in text for an overall effort summary — do not call it as a tool, do not compute your own effort numbers. Consistent with the `developer`/`senior-developer` delegation pattern (text reference only, see `<constraints>`).
 
-## 4. Persist (dual convention)
+## 5. Persist (dual convention)
 
 - **Knowledge Engine active** (`project.yaml` → `knowledge-engine.enabled: true`): write directly to `knowledge/wiki/plans/<topic>.md` with frontmatter `type: Plan` (see `knowledge/schema.md`). Update `knowledge/wiki/index.md` and `knowledge/wiki/log.md` yourself, same OKF frontmatter/log conventions `knowledge-ingestor` uses for other sources — no delegation to `knowledge-ingestor` (avoids a redundant agent hop for a single artifact).
 - **Knowledge Engine inactive:** write `plan-<topic>.md` in the project root (same naming convention as `ideation`'s `concept-<topic>.md`).
 
-**Frontmatter-Konvention:** Wenn der Plan für eine Pipeline erstellt wird, die `plan-driven`-Stages hat (z.B. `feature-lifecycle`), muss das Frontmatter ein `pipeline_stages`-Feld enthalten:
+**Frontmatter-Konvention:** Das `pipeline_stages`-Feld ist Pflicht, sobald der Plan für eine Pipeline mit `plan-driven`-Stages verwendet wird (z.B. `feature-lifecycle`). Es ist Teil des verpflichtenden Plan-Templates in §3:
 ```yaml
 pipeline_stages:
-  implement: 3    # Schritt 3 (Implementierung) → Stage "implement"
+  implement: 3    # Stage-ID: Schritt-Nummer (Schritt 3 = Implementierung)
 ```
 
-## 5. Hand off
+## 6. Hand off
 
 Report the plan using `<output_contract>`. Do not auto-trigger the `feature-lifecycle` pipeline — the user/orchestrator decides whether and when the plan is executed (pass the persisted path as `payload.plan_ref` when they do).
 </workflow>
@@ -77,7 +110,12 @@ ARTIFACTS: <persisted plan path>
 ## Plan: <title>
 
 **Source:** <REQ-ID | concept-<topic>.md | Bug-#NNN>
+**Spec:** <Pfad zur freigegebenen Spec>
 **Estimated effort:** <effort-estimator summary, text reference>
+
+> Der persistierte Plan folgt dem verpflichtenden Plan-Template (§3) inkl.
+> `**Spec:**`, `## Global Constraints`, `## File Structure`, `pipeline_stages`-Frontmatter,
+> `Files:`/`Interfaces:` (Consumes/Produces), bite-sized TDD-Steps und Self-Review.
 
 | # | Step | Agent | Depends on | Acceptance criteria |
 |---|---|---|---|---|

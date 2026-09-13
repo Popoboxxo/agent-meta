@@ -35,3 +35,22 @@ def test_orchestrator_section_7_documents_tier_a_chat_push():
     section_7 = content[section_7_start:section_8_start]
     assert "PROGRESS_CHAT_PUSH_ENABLED" in section_7
     assert 'SendMessage(to:"main"' in section_7
+
+
+def test_configurable_paths_are_documented():
+    """The progress/checkpoint locations must be documented as configurable
+    (``progress.dir`` / ``progress.checkpoint-dir``) with ``.meta-viz`` only as
+    the framework default (SPEC-PROGRESS-PATHS-CONFIG-2026-09-13, AC-14)."""
+    files = [
+        _REPO_ROOT / "snippets" / "orchestrator" / "checkpointing.md",
+        _REPO_ROOT / "rules" / "1-generic" / "plan-ledger.md",
+        _REPO_ROOT / "rules" / "1-generic" / "session-recovery.md",
+        _REPO_ROOT / "docs" / "api" / "cli-reference.md",
+    ]
+    for path in files:
+        content = path.read_text(encoding="utf-8")
+        assert "progress.dir" in content, path
+        assert "progress.checkpoint-dir" in content, path
+        assert ".meta-viz" in content, path
+        lowered = content.lower()
+        assert "framework" in lowered and "default" in lowered, path

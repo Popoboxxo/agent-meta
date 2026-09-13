@@ -83,6 +83,10 @@ from lib.config import find_agent_meta_root
 from lib.io import clear_gitignore_cache
 from lib.log import SyncLog
 from lib.se_validate import _handle_validate_se
+from lib.spec_plan_validate import _handle_validate_spec_plan
+from lib.checkpoint_record import _handle_checkpoint
+from lib.plan_ledger import handle_update_plan_ledger
+from lib.rehydrate import _handle_rehydrate
 # Re-exported for tests: tests/test_knowledge_sync_integration.py reads
 # sync_module.sync_knowledge_engine (kept stable during the #481 split).
 from lib.knowledge import sync_knowledge_engine  # noqa: F401  (deliberate re-export)
@@ -152,6 +156,64 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                              "integrity, L2 separation, review IDs. Exit 0 when clean or "
                              "when no SE artifacts exist; exit 1 with a findings list "
                              "otherwise.")
+    parser.add_argument("--validate-spec-plan", action="store_true",
+                        help="Standalone spec/plan-workflow validation (F12): checks the "
+                             "project's docs/specs and docs/plans artifacts for required "
+                             "sections, placeholders, traceability, approval markers, ledger "
+                             "format and the plan task graph. Exit 0 when clean, when no "
+                             "artifacts exist, or when the workflow is disabled; exit 1 with "
+                             "a findings list otherwise.")
+    parser.add_argument("--rehydrate", action="store_true",
+                        help="Read-only resume path: print the resume context of the "
+                             "newest unfinished session (plan/task/checkpoint identity, "
+                             "next open task, drift). Writes nothing, runs no sync, and "
+                             "exits 0 even when there is nothing to resume.")
+    parser.add_argument("--checkpoint", action="store_true",
+                        help="Write mode: append one checkpoint to the session "
+                             "store (.meta-viz/checkpoints/ and its progress "
+                             "write-through). Requires --session-id, --task, "
+                             "--agent and --status "
+                             "(completed|failed|timeout|in_progress). Plan "
+                             "identity is explicit only: --plan-id, or --plan "
+                             "<path> to derive it. Exit 1 on missing arguments "
+                             "or a store error, 0 after a successful write.")
+    parser.add_argument("--session-id", metavar="ID", default=None,
+                        help="Session id for --checkpoint (one file per session "
+                             "under .meta-viz/checkpoints/).")
+    parser.add_argument("--agent", metavar="NAME", default=None,
+                        help="Agent name for --checkpoint.")
+    parser.add_argument("--plan", metavar="PATH", default=None,
+                        help="Plan path for --checkpoint; its plan id is derived "
+                             "from the document (or its file-stem slug). Never "
+                             "random. Ignored when --plan-id is given.")
+    parser.add_argument("--plan-id", metavar="ID", default=None,
+                        help="Explicit plan id for --checkpoint. Takes precedence "
+                             "over --plan.")
+    parser.add_argument("--description", metavar="TEXT", default=None,
+                        help="Task description for --checkpoint.")
+    parser.add_argument("--summary", metavar="TEXT", default=None,
+                        help="Status summary for --checkpoint.")
+    parser.add_argument("--next-step", metavar="TEXT", default=None,
+                        help="Next step for --checkpoint.")
+    parser.add_argument("--update-plan-ledger", metavar="PLAN", nargs="?",
+                        default=None, const="",
+                        help="Write mode: rewrite the leading task checkboxes and/or the "
+                             "first 'Status:' header of PLAN (path inside the project root). "
+                             "Mark tasks done with --task <id>..., reset them with --open, "
+                             "set the status via --status <s>. Combine with --dry-run for a "
+                             "preview; exit 1 on missing arguments, a missing plan or an "
+                             "unmatched task id.")
+    parser.add_argument("--task", nargs="*", default=None, metavar="ID",
+                        help="Task id(s) for --update-plan-ledger (normalized, "
+                             "e.g. '1' or 'task-1'); for --checkpoint the first "
+                             "id is normalized and recorded.")
+    parser.add_argument("--open", action="store_true",
+                        help="With --update-plan-ledger --task: reset the task checkboxes "
+                             "to '- [ ]' instead of marking them done.")
+    parser.add_argument("--status", metavar="STATUS", default=None,
+                        help="With --update-plan-ledger: value for the first 'Status:' "
+                             "header line of the plan. With --checkpoint: one of "
+                             "completed|failed|timeout|in_progress.")
     parser.add_argument("--test-plugin", metavar="ID", default=None,
                         help="Run the health check for one plugin from the catalog and exit.")
     parser.add_argument("--render-standalone", action="store_true",
@@ -280,6 +342,10 @@ _MODE_HANDLERS = [
     (lambda a: a.prune_backups, _handle_prune_backups),
     (lambda a: a.validate, _handle_validate),
     (lambda a: a.validate_se, _handle_validate_se),
+    (lambda a: a.validate_spec_plan, _handle_validate_spec_plan),
+    (lambda a: a.rehydrate, _handle_rehydrate),
+    (lambda a: a.checkpoint, _handle_checkpoint),
+    (lambda a: a.update_plan_ledger is not None, handle_update_plan_ledger),
 ]
 
 

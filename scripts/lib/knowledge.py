@@ -9,13 +9,14 @@ from pathlib import Path
 
 from .io import SyncError, safe_path, write_checked
 from .log import SyncLog
+from .spec_plan_scaffold import resolve_index_mode
 
 DOMAIN_CONCEPT_TYPES: dict[str, list[str]] = {
     "research": ["paper", "finding", "method", "dataset"],
     "personal": ["person", "event", "place", "memory"],
     "business": ["customer", "deal", "product", "decision"],
     "book": ["character", "location", "theme", "chapter"],
-    "internal-docs": ["concept", "architecture", "guide", "reference"],
+    "internal-docs": ["concept", "architecture", "guide", "reference", "plan", "spec"],
     "technical": ["architecture", "component", "interface", "protocol"],
     "custom": ["concept"],
 }
@@ -94,6 +95,8 @@ _KNOWLEDGE_GITKEEP_SUBDIRS = [
     Path("wiki", "topics"),
     Path("wiki", "sources"),
     Path("wiki", "queries"),
+    Path("wiki", "plans"),
+    Path("wiki", "specs"),
 ]
 
 
@@ -111,9 +114,23 @@ def sync_knowledge_engine(
     missing .gitkeep markers in empty subdirectories on subsequent runs.
     """
     ke_config = config.get("knowledge-engine") or {}
+    sp = config.get("spec-plan-workflow") or {}
+    override = sp.get("external-system-override") or {}
+    if override.get("enabled", False):
+        log.skip(
+            "knowledge-engine",
+            "external-system-override enabled — KE write paths skipped "
+            "(file-index fallback active)",
+        )
+        return
+
     if not ke_config.get("enabled", False):
         log.skip("knowledge-engine", "disabled in project.yaml")
         return
+
+    okf = ke_config.get("okf", {}) or {}
+    auto_index = bool(okf.get("auto-index", True))
+    auto_log = bool(okf.get("auto-log", True))
 
     domain = ke_config.get("domain", "research")
     bundle_rel = ke_config.get("bundle-path", "knowledge")
@@ -157,6 +174,26 @@ def sync_knowledge_engine(
             "regenerated. If domain changed, verify schema.md manually "
             "(not auto-migrated in Phase A)."
         )
+
+    # okf.auto-index/auto-log control the automatic index.md/log.md
+    # write/update path. When false there are no automatic entry writes; the
+    # files stay scaffolded above and are maintained agent-driven (planner /
+    # knowledge-ingestor -> knowledge-indexer), per design spec 6.2/8. The
+    # agent-driven semantics are scoped to the effective index mode
+    # `knowledge-engine` (spec 6.2); under the file-index fallback/off they do
+    # not apply.
+    index_mode, _ = resolve_index_mode(config)
+    if index_mode == "knowledge-engine":
+        if not auto_index:
+            log.note(
+                "knowledge-engine",
+                "index.md maintenance is agent-driven (okf.auto-index: false)",
+            )
+        if not auto_log:
+            log.note(
+                "knowledge-engine",
+                "log.md maintenance is agent-driven (okf.auto-log: false)",
+            )
 
     for rel_subdir in _KNOWLEDGE_GITKEEP_SUBDIRS:
         target_dir = bundle_dir / rel_subdir

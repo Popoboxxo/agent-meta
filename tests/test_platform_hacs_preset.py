@@ -402,7 +402,7 @@ class TestTier2CollectionAndRoleMapping:
         _make_synthetic_agent_meta(agent_meta_root)
 
         sources = dict(
-            (name, src) for src, name in collect_rule_sources(agent_meta_root, ["hacs"])
+            (name, src) for src, name in collect_rule_sources(agent_meta_root, ["hacs"], config={})
         )
         assert "integration-development.md" in sources  # hacs- prefix stripped (rules.py:141)
         assert sources["integration-development.md"].name == "hacs-integration-development.md"
@@ -413,7 +413,7 @@ class TestTier2CollectionAndRoleMapping:
         _make_synthetic_agent_meta(agent_meta_root)
 
         for platforms in ([], ["homeassistant"], ["agent-meta"]):
-            names = [name for _, name in collect_rule_sources(agent_meta_root, platforms)]
+            names = [name for _, name in collect_rule_sources(agent_meta_root, platforms, config={})]
             assert "integration-development.md" not in names, f"platforms={platforms}"
             assert not any("hacs" in name for name in names), f"platforms={platforms}"
 
@@ -487,7 +487,7 @@ class TestTier2CollectionAndRoleMapping:
         (audit Section 10.2.4) can never match and is inert — this assertion
         pins the workable contract.
         """
-        sources = collect_rule_sources(_REPO_ROOT, ["hacs"])
+        sources = collect_rule_sources(_REPO_ROOT, ["hacs"], config={})
         stems = {Path(name).stem for _, name in sources}
         assert "integration-development" in stems
 
