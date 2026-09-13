@@ -632,6 +632,11 @@
           "description": "Require spec<->plan<->task<->test traceability. Default: false (preset-coupled).",
           "default": false
         },
+        "root-cause-required": {
+          "type": "boolean",
+          "description": "Require a documented root cause (cause + prior attempts) before any fix. Consumed by the root-cause rule gate (IC-09/G-10). Default: false (preset-coupled).",
+          "default": false
+        },
         "se-required": {
           "type": "string",
           "description": "SE cascade binding strength. 'false' = optional, 'recommended' = advised for complex features, 'true' = mandatory before any code. Default: false.",
@@ -1940,6 +1945,40 @@
             }
           },
           "additionalProperties": false
+        },
+        "recovery": {
+          "type": "object",
+          "description": "Session recovery / resume resolver configuration (IC-03/IC-04). Required because spec-plan-workflow is a closed object; additionalProperties:false additionally turns it into a strict typo guard.",
+          "properties": {
+            "rehydrate": {
+              "type": "boolean",
+              "description": "Enable the read-only rehydrate (resume-context) mode. Consumed via spec-plan-workflow.recovery.rehydrate."
+            },
+            "max-age-seconds": {
+              "type": "integer",
+              "description": "Age horizon for resumable sessions; negative disables the age filter."
+            },
+            "include-legacy": {
+              "type": "boolean",
+              "description": "Include legacy .meta-viz/checkpoint-<ts>.json files; only an explicit false disables it."
+            }
+          },
+          "additionalProperties": false
+        },
+        "ledger-drift": {
+          "type": "object",
+          "description": "Plan-ledger <-> checkpoint drift check (IC-07, M2). Required because spec-plan-workflow is a closed object; additionalProperties:false additionally turns it into a strict typo guard.",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Drift check is opt-out: only an explicit false disables it."
+            },
+            "severity": {
+              "type": "string",
+              "description": "Severity of emitted spec_plan_ledger_drift findings (default WARNING)."
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
@@ -2298,6 +2337,14 @@
             },
             "agent": {
               "type": "string"
+            },
+            "dod_flag": {
+              "type": "string",
+              "description": "Name of the resolved DoD flag that activates this stage (consumed at sync time)."
+            },
+            "payload_flag": {
+              "type": "string",
+              "description": "Name of the payload flag that activates this stage (annotated for runtime skip)."
             }
           }
         }
@@ -2331,6 +2378,16 @@
         },
         "on_error": {
           "type": "string"
+        },
+        "task-review": {
+          "type": "object",
+          "description": "Round cap for the two-stage task review (IC-08/IC-09). Declared explicitly for documentation and as a typo guard (F7).",
+          "properties": {
+            "max-rounds": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
         }
       },
       "additionalProperties": true

@@ -10,7 +10,7 @@ from pathlib import Path
 
 from .frontmatter import parse_frontmatter_text, split_frontmatter
 from .io import SyncError, load_yaml_file
-from .reflection import effective_reflection_pairs, resolve_stage_loop
+from .reflection import effective_reflection_pairs, find_pair, resolve_stage_loop
 
 # Module-level logger for fail-soft branches that have no SyncLog instance in
 # scope (Issue #568) — DEBUG-level only, so troubleshooting information isn't
@@ -177,6 +177,74 @@ def _safe_load_reflection_pairs(agent_meta_root=None) -> list:
         return []
 
 
+_TASK_REVIEW_STAGE_IDS = ("review-req", "review-quality")
+_TASK_REVIEW_DEFAULT_MAX_ROUNDS = 4
+
+
+def _validate_task_review_rounds(pipelines: dict, reflection_pairs: list) -> list[str]:
+    """Validate the two-stage task review round cap (IC-08, AC-21/AC-22).
+
+    Each stage whose id is ``review-req`` or ``review-quality`` must resolve a
+    ``loop_ref`` pointing at a reflection pair with an explicit
+    ``max_iterations >= 1``. The sum of the resolved iterations across those
+    stages must not exceed the pipeline's ``task-review.max-rounds`` (default
+    ``4``). Violations are returned as error strings (fail-closed), each naming
+    the offending pipeline.
+    """
+    errors: list[str] = []
+    for name, pipeline in pipelines.items():
+        if not isinstance(pipeline, dict):
+            continue
+        stages = pipeline.get("stages", [])
+        if not isinstance(stages, list):
+            continue
+        review_stages = [
+            stage
+            for stage in stages
+            if isinstance(stage, dict) and stage.get("id") in _TASK_REVIEW_STAGE_IDS
+        ]
+        if not review_stages:
+            continue
+
+        max_rounds = _TASK_REVIEW_DEFAULT_MAX_ROUNDS
+        task_review = pipeline.get("task-review")
+        if isinstance(task_review, dict):
+            configured = task_review.get("max-rounds", _TASK_REVIEW_DEFAULT_MAX_ROUNDS)
+            if isinstance(configured, int) and not isinstance(configured, bool) and configured >= 0:
+                max_rounds = configured
+
+        total = 0
+        complete = True
+        for stage in review_stages:
+            stage_id = stage.get("id")
+            loop_ref = stage.get("loop_ref")
+            if not loop_ref:
+                errors.append(
+                    f"Pipeline '{name}': task-review stage '{stage_id}' must define a "
+                    f"'loop_ref' resolving an explicit 'max_iterations' >= 1."
+                )
+                complete = False
+                continue
+            pair = find_pair(reflection_pairs, loop_ref)
+            iterations = pair.get("max_iterations") if pair else None
+            if not isinstance(iterations, int) or isinstance(iterations, bool) or iterations < 1:
+                errors.append(
+                    f"Pipeline '{name}': task-review stage '{stage_id}' loop_ref "
+                    f"'{loop_ref}' must resolve an explicit 'max_iterations' >= 1."
+                )
+                complete = False
+                continue
+            total += iterations
+
+        if complete and total > max_rounds:
+            errors.append(
+                f"Pipeline '{name}': task-review round cap exceeded — the review "
+                f"stages resolve {total} iterations but 'task-review.max-rounds' is "
+                f"{max_rounds}."
+            )
+    return errors
+
+
 def validate_pipelines(
     pipelines: dict,
     available_roles: list,
@@ -195,6 +263,9 @@ def validate_pipelines(
     - run_pipeline composition: referenced pipelines exist, no cycles, depth limit
     - plan-driven stage roles: fallback_agent must be active; allowed_agents
       entries must be real roles somewhere in the system (typo guard)
+    - two-stage task review (`review-req`/`review-quality`): each stage needs a
+      `loop_ref` with an explicit `max_iterations >= 1`; their sum must fit the
+      pipeline's `task-review.max-rounds` (default 4)
 
     known_roles: the full set of role names that exist as templates anywhere
       (not just the per-project active `roles:`). Used only to flag genuine
@@ -363,6 +434,8 @@ def validate_pipelines(
     if roles_config is not None:
         coupling_warnings = check_plan_producer_coupling(pipelines, roles_config)
         errors.extend(coupling_warnings)
+
+    errors.extend(_validate_task_review_rounds(pipelines, reflection_pairs))
 
     return errors
 

@@ -37,6 +37,11 @@ groups:
         config-path: spec-plan-workflow.enabled
         enabled-when: seed
         consumer: scripts/lib/consistency/spec_plan.py::check_spec_plan_workflow
+      - id: recovery-rehydrate
+        mechanism: pipeline-stage-condition
+        config-path: spec-plan-workflow.recovery.rehydrate
+        enabled-when: seed
+        consumer: scripts/lib/recovery.py::find_resumable_session
       - id: ke-auto-index
         mechanism: knowledge-engine-auto-write
         config-path: knowledge-engine.okf.auto-index

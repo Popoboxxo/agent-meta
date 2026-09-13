@@ -54,6 +54,7 @@ _SPEC_PLAN_FALLBACK_ASPECTS = (
     ("scaffold", "seed"),
     ("template-conditional", "seed"),
     ("consistency-noop", "seed"),
+    ("recovery-rehydrate", "seed"),
     ("ke-auto-index", _KE_WHEN),
     ("ke-auto-log", _KE_WHEN),
     ("dod-traceability", _DOD_TRACEABILITY_WHEN),
