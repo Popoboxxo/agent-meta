@@ -108,6 +108,27 @@ def test_spec_plan_workflow_has_no_schema_default():
     assert "default" not in block["properties"]["enabled"]
 
 
+def _iter_defaults(node):
+    """Yield every ``default`` value found recursively in a schema node."""
+    if isinstance(node, dict):
+        if "default" in node:
+            yield node["default"]
+        for value in node.values():
+            yield from _iter_defaults(value)
+    elif isinstance(node, list):
+        for item in node:
+            yield from _iter_defaults(item)
+
+
+def test_spec_plan_workflow_defaults_contain_no_legacy_path():
+    """Design-Addendum §D.3: no schema default may point at a legacy path."""
+    block = _schema()["properties"]["spec-plan-workflow"]
+    defaults = list(_iter_defaults(block))
+    assert defaults, "expected at least one default in the spec-plan-workflow block"
+    offending = [d for d in defaults if "docs/superpowers" in json.dumps(d)]
+    assert offending == [], f"legacy path in schema default(s): {offending}"
+
+
 def test_project_structure_lists_spec_plan_paths():
     from lib.io import _load_yaml_or_json
     data, _ = _load_yaml_or_json(REPO_ROOT / ".meta-config" / "project.yaml")
