@@ -136,3 +136,12 @@ cases:
       - 'journey catalog'
       - 'edge cases'
       - 'acceptance criterion'
+
+  - id: b7-se-test-engineer-01
+    role: se-test-engineer
+    category: process-discipline
+    prompt: "Welche Testtechnik wählst du für einen numerischen Bereichs-Input und welches Modell-Coverage-Kriterium nennst du pro Szenario?"
+    expected_any:
+      - 'equivalence partitioning'
+      - 'boundary value'
+      - 'model-based coverage'

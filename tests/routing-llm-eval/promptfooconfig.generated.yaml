@@ -529,3 +529,14 @@ tests:
     - journey catalog
     - edge cases
     - acceptance criterion
+- description: b7-se-test-engineer-01 [se-test-engineer]
+  vars:
+    role: se-test-engineer
+    prompt: Welche Testtechnik wählst du für einen numerischen Bereichs-Input und welches Modell-Coverage-Kriterium
+      nennst du pro Szenario?
+  assert:
+  - type: icontains-any
+    value:
+    - equivalence partitioning
+    - boundary value
+    - model-based coverage
