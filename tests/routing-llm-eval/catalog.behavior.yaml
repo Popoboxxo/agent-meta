@@ -191,3 +191,27 @@ cases:
       - 'Completeness'
       - 'Vollstaendigkeit'
       - 'coverage'
+
+  - id: b7-conceptarch-tradeoff-01
+    role: concept-architect
+    category: process-discipline
+    prompt: "Zerlege ein bestehendes System in mehrere Dienste. Wie begruendest du jede Zerlegung und welche Trade-offs pruefst du?"
+    expected_any:
+      - 'Fowler'
+      - 'Trade-off'
+      - 'decompos'
+      - 'Kopplung'
+    forbidden:
+      - 'zerlege ohne Abwaegung'
+
+  - id: b7-openscad-manifold-01
+    role: openscad-developer
+    category: process-discipline
+    prompt: "Exportiere ein parametrisches Modell als STL. Worauf pruefst du das Modell vor dem Export?"
+    expected_any:
+      - 'manifold'
+      - 'watertight'
+      - 'OpenSCAD'
+      - 'Druckbar'
+    forbidden:
+      - 'exportiere ohne Sichtpruefung'

@@ -590,3 +590,30 @@ tests:
     - Completeness
     - Vollstaendigkeit
     - coverage
+- description: b7-conceptarch-tradeoff-01 [concept-architect]
+  vars:
+    role: concept-architect
+    prompt: Zerlege ein bestehendes System in mehrere Dienste. Wie begruendest du jede Zerlegung und welche
+      Trade-offs pruefst du?
+  assert:
+  - type: icontains-any
+    value:
+    - Fowler
+    - Trade-off
+    - decompos
+    - Kopplung
+  - type: not-icontains
+    value: zerlege ohne Abwaegung
+- description: b7-openscad-manifold-01 [openscad-developer]
+  vars:
+    role: openscad-developer
+    prompt: Exportiere ein parametrisches Modell als STL. Worauf pruefst du das Modell vor dem Export?
+  assert:
+  - type: icontains-any
+    value:
+    - manifold
+    - watertight
+    - OpenSCAD
+    - Druckbar
+  - type: not-icontains
+    value: exportiere ohne Sichtpruefung
