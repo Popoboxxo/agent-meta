@@ -50,11 +50,13 @@ def _ensure_repo_scripts_importable() -> None:
 
 _ensure_repo_scripts_importable()
 
-from scripts.lib.checkpoint import CheckpointStore  # noqa: E402
-from scripts.lib.consistency.fanout_contracts import (  # noqa: E402
+from scripts.lib.checkpoint import CheckpointStore
+from scripts.lib.consistency.fanout_contracts import (
     check_fanout_backend_contract,
 )
-from scripts.lib.orchestration import (  # noqa: E402
+from scripts.lib.consistency.report import Severity
+from scripts.lib.consistency.spec_plan import check_spec_plan_workflow
+from scripts.lib.orchestration import (
     BARRIER_ENTRY_MARKER,
     BarrierEntry,
     BarrierResult,
@@ -67,7 +69,11 @@ from scripts.lib.orchestration import (  # noqa: E402
     summarize_result,
     validate_plan,
 )
-from tests.orchestration.dry_run.engine import DispatchPlan, OrchestratorDryRun, SubTask  # noqa: E402
+from tests.orchestration.dry_run.engine import (
+    DispatchPlan,
+    OrchestratorDryRun,
+    SubTask,
+)
 
 
 def _task(task_id: str, agent: str = "developer", prompt: str | None = None, **overrides) -> FanoutTask:
@@ -767,3 +773,78 @@ def test_concept_driven_dev_spec_plan_phase_order():
         "validate",
     ]
     assert stage_ids == expected
+
+
+_SPEC_PLAN_ENABLED = {"spec-plan-workflow": {"enabled": True}}
+
+_SPEC_PLAN_GOOD_SPEC = (
+    "# Demo — Spec\n> Status: APPROVED (2026-09-13)\n"
+    "## Problem\nDemo-Problem\n"
+    "## Ziel\nDemo-Ziel\n"
+    "## Nicht-Ziele\nDemo-Nicht-Ziel\n"
+    "## Interface Contracts\n"
+    "## Datenfluss\n"
+    "## Acceptance Criteria\n1. AC-1\n"
+    "## Offene Fragen + Risiken\n"
+    "## Trace-Anker: spec-id: SPEC-demo\n"
+)
+
+
+def _spec_plan_fixture(tmp_path: Path, tasks: str) -> Path:
+    (tmp_path / "docs" / "specs").mkdir(parents=True)
+    (tmp_path / "docs" / "plans").mkdir(parents=True)
+    (tmp_path / "docs" / "specs" / "2026-09-13-demo-design.md").write_text(
+        _SPEC_PLAN_GOOD_SPEC, encoding="utf-8",
+    )
+    plan = (
+        "# Demo Implementation Plan\n> Status: geplant\n"
+        "**Goal:** demo\n**Architecture:** demo\n**Tech Stack:** demo\n"
+        "**Spec:** docs/specs/2026-09-13-demo-design.md\n"
+        "## Global Constraints\n- stdlib only\n"
+        "## File Structure\n- Create: docs/specs/x.md\n"
+        "## Trace-Anker: spec-id: SPEC-demo\n"
+        "---\npipeline_stages:\n  implement: 1\n---\n"
+        + tasks
+    )
+    (tmp_path / "docs" / "plans" / "2026-09-13-demo.md").write_text(
+        plan, encoding="utf-8",
+    )
+    return tmp_path
+
+
+def _spec_plan_graph_errors(findings):
+    return [
+        f for f in findings
+        if f.check == "spec_plan_plan_graph" and f.severity == Severity.ERROR
+    ]
+
+
+def test_spec_plan_graph_cycle_is_error(tmp_path):
+    root = _spec_plan_fixture(
+        tmp_path,
+        "### Task 1: alpha\n**Agent:** developer\n**Files:** Modify: a.py\n"
+        "**Depends on:** task-2\n"
+        "### Task 2: beta\n**Agent:** tester\n**Files:** Modify: b.py\n"
+        "**Depends on:** task-1\n",
+    )
+    findings = check_spec_plan_workflow(
+        root, _SPEC_PLAN_ENABLED, agent_meta_root=_REPO_ROOT,
+    )
+    errors = _spec_plan_graph_errors(findings)
+    assert errors, str(findings)
+    assert any("cycle" in f.message.lower() for f in errors)
+
+
+def test_spec_plan_graph_three_acyclic_tasks_has_no_budget_error(tmp_path):
+    root = _spec_plan_fixture(
+        tmp_path,
+        "### Task 1: a\n**Agent:** developer\n**Files:** Modify: a.py\n"
+        "### Task 2: b\n**Agent:** developer\n**Files:** Modify: b.py\n"
+        "**Depends on:** task-1\n"
+        "### Task 3: c\n**Agent:** tester\n**Files:** Modify: c.py\n"
+        "**Depends on:** task-2\n",
+    )
+    findings = check_spec_plan_workflow(
+        root, _SPEC_PLAN_ENABLED, agent_meta_root=_REPO_ROOT,
+    )
+    assert _spec_plan_graph_errors(findings) == [], str(findings)
