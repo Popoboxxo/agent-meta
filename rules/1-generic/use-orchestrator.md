@@ -27,6 +27,13 @@ Volle Stage-Details (Agent/Modus je Stage, Loop/Fallback/Approval-Gate) einer ge
 Plan vorhanden (`plan-*.md` oder Knowledge-Wiki Plan-Seite) -> Pipeline `feature-lifecycle` mit `payload.plan_ref`, statt neuen Lifecycle blind zu starten.
 {{/if}}
 
+{{#if SPEC_PLAN_WORKFLOW_ENABLED}}
+## Spec/Plan-Gate (Convention boundary)
+Auch Nicht-Pipeline-Anfragen (Ad-hoc-Dispatch, `quick-fix`, `bugfix`) erst über die
+Classify-Route (`S`/`M`/`L`/`XL`) führen — kein Direkteinstieg in die Implementierung ohne
+freigegebene Spec/Plan (`Status: APPROVED`). Master-Rule: `spec-plan-workflow`.
+{{/if}}
+
 ## Git Delegation
 {{#unless AUTO_COMMIT_ENABLED}}
 Git Mutationen (commit, push, add etc) -> `git` Agent. Read-only (status, log) im Main Chat ok.

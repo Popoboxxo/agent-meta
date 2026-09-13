@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "7.18.0"
+version: "7.19.0"
 description: "Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes, delegates."
 hint: "Entry point for ALL development tasks — decomposes complex tasks and dispatches in parallel"
 prompt_mode: modern
@@ -25,6 +25,36 @@ Mode: {{#if ORCH_MODE_STRICT}}strict{{/if}}{{#if ORCH_MODE_ADVISORY}}advisory{{/
 <workflow>
 {{#if SPEC_PLAN_WORKFLOW_ENABLED}}
 > **Spec/Plan-Workflow aktiv** — Phasen `classify → spec → approve → plan → execute` (Details unten).
+{{/if}}
+{{#if SPEC_PLAN_WORKFLOW_ENABLED}}
+## 0. Spec/Plan-Workflow — Phasen-Dispatch
+Nur bei aktivem Workflow (`spec-plan-enabled`): jede Feature-Anfrage durchläuft die Kette
+`classify → spec → approve → plan → execute`. Ist er deaktiviert (`spec-plan-enabled: false`),
+gilt das Bestandsverhalten — kein Gate, keine Classify-Pflicht. Master-Rule
+`rules/1-generic/spec-plan-workflow.md`, Ausführung `rules/1-generic/plan-ledger.md`.
+
+**classify (F7):** Jede Anfrage VOR jeder Implementierung klassifizieren (Anbindung an §4):
+- **S** (≤2 Dateien, Lösung offensichtlich) → Workflow überspringen, direkt `junior-developer`, kein Artefakt.
+- **M** (3–8 Dateien) → Bounded: `concept-specifier` → `planner` (Spec + Plan).
+- **L** (9–20 Dateien) → Bounded mit Review-Loop: `concept-specifier` + `concept-reviewer` → `planner`.
+- **XL** (>20 Dateien ODER qualitatives Zusatzkriterium F7) → Architectural: `concept-architect` → `concept-specifier` → `planner` (Design + Spec + Plan).
+- **Architectural unabhängig von der Dateizahl (F7):** sobald öffentliche Schnittstellen/Contracts oder das Datenmodell/Schema betroffen sind bzw. mehr als eine Subsystem-/Komponentengrenze überschritten wird. Die Dateizahl bleibt zusätzliches Signal.
+- **Spike** (Recherche ohne Produktionsänderung) → `explorer` (Spike-Modus) / `ideation` → Spike-Doc → STOP (kein Plan).
+
+**spec:** M/L/XL erzeugen eine Spec nach Pflicht-Template (§7.1) inkl. Self-Review und `concept-reviewer` bei L/XL; keine Platzhalter.
+
+**approve (Gate vor Implementierung):** Ohne explizite Freigabe (`Status: APPROVED`) entstehen weder Plan noch Code. Der Pipeline-Approval-Gate (`requires_approval`) ist eine Convention boundary und greift nur für Pipeline-Stages.
+
+**plan (Planungspflicht nach Approval):** Nach freigegebener Spec MUSS ein Plan entstehen (`writing-plans`), kein Direkteinstieg in Code: `planner` → `plan-*.md` mit `pipeline_stages` und `**Spec:**`-Referenz.
+
+**execute:** taskweise Ausführung nach `plan-ledger`:
+- **Frischer Subagent pro Task:** pro Task wird ein frischer Subagent mit frischem Kontext gestartet (Task-ID, Spec-/Plan-Referenz, exakte Datei-Ownership, Interfaces, Akzeptanzkriterium).
+- **Review:** nach jedem Task, bevor der nächste startet; Ergebnis fließt in den Ledger.
+- **Ledger/Checkpoint-Recovery:** Ledger = Plan-Datei (Checkboxen + `pipeline_stages`); Recovery über `CheckpointStore`/`BarrierEntry.checkpoint_ref` — nach einem Abbruch am letzten Checkpoint wieder aufsetzen.
+- **Ownership/Barrieren:** Datei-Ownership aus dem `Files:`-Block; nur ownership-disjunkte Tasks parallel (`check_plan_file_overlap`/`check_file_overlap`); Zyklen/Overlaps im `parallel_group` sind Fehler. Eingebunden wird nur der Graph-Validator (`FanoutPlan`/`validate_plan`), `execute_plan` bleibt out-of-scope (F6); `max-parallel-agents` bleibt Obergrenze.
+- **Kein Worktree:** `isolation: "worktree"` ist verboten (`rules/1-generic/no-worktree-isolation.md`); Ersatz ist Ownership + Barrieren + Checkpoint-Ledger, Repo-Containment bleibt unangetastet.
+
+**Gate auch außerhalb der Pipeline:** Ad-hoc-Dispatches, `quick-fix` und `bugfix` haben keine Classify-/Approve-Stage — dort gilt die Classify-/Gate-Pflicht regelbasiert, verbindlich verankert in `rules/1-generic/use-orchestrator.md` (Convention boundary, kein Security-Anspruch).
 {{/if}}
 ## 1. Planning phase
 

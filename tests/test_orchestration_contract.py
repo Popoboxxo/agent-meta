@@ -848,3 +848,9 @@ def test_spec_plan_graph_three_acyclic_tasks_has_no_budget_error(tmp_path):
         root, _SPEC_PLAN_ENABLED, agent_meta_root=_REPO_ROOT,
     )
     assert _spec_plan_graph_errors(findings) == [], str(findings)
+
+
+def test_orchestrator_prompt_documents_spec_plan_phases():
+    text = (_REPO_ROOT / "agents" / "1-generic" / "orchestrator.md").read_text(encoding="utf-8")
+    for marker in ("classify", "approve", "plan", "frischer Subagent"):
+        assert marker in text

@@ -36,3 +36,21 @@ def test_orchestrator_uses_the_conditional():
     text = (REPO_ROOT / "agents" / "1-generic" / "orchestrator.md").read_text(encoding="utf-8")
     assert "{{#if SPEC_PLAN_WORKFLOW_ENABLED}}" in text
     assert "{{/if}}" in text
+    assert "> **Spec/Plan-Workflow aktiv**" in text
+    start = text.index("{{#if SPEC_PLAN_WORKFLOW_ENABLED}}")
+    end = text.index("{{/if}}", start)
+    assert start < end
+
+
+def test_use_orchestrator_rule_uses_the_conditional():
+    """The classify/gate obligation from spec 2.1 must be anchored in the
+    orchestrator rule (not only in the pipeline), so non-pipeline requests are
+    forced onto the classify route too. Gated by the same master switch."""
+    text = (REPO_ROOT / "rules" / "1-generic" / "use-orchestrator.md").read_text(encoding="utf-8")
+    start = text.index("{{#if SPEC_PLAN_WORKFLOW_ENABLED}}")
+    end = text.index("{{/if}}", start)
+    assert start < end
+    block = text[start:end]
+    assert "Classify-Route" in block
+    assert "APPROVED" in block
+    assert "spec-plan-workflow" in block
