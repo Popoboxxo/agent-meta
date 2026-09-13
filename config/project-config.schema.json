@@ -578,6 +578,7 @@
         "rapid-prototyping",
         "spec-optional",
         "spec-driven",
+        "concept-driven",
         "spec-certified"
       ],
       "default": "full"
@@ -619,6 +620,16 @@
         "lifecycle-ownership": {
           "type": "boolean",
           "description": "Require a named owner and deprecation plan for every app/service (app-lifecycle-governor). Default: false.",
+          "default": false
+        },
+        "spec-plan-required": {
+          "type": "boolean",
+          "description": "Require the native spec/plan workflow for feature-level changes. Default: false (preset-coupled).",
+          "default": false
+        },
+        "spec-plan-traceability": {
+          "type": "boolean",
+          "description": "Require spec<->plan<->task<->test traceability. Default: false (preset-coupled).",
           "default": false
         },
         "se-required": {

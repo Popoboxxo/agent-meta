@@ -18,6 +18,8 @@ presets:
     ai-security-review: false
     prompt-governance: false
     lifecycle-ownership: false
+    spec-plan-required: false
+    spec-plan-traceability: false
     se-required: "false"
     release-gates:
       artifact-freshness: false
@@ -32,6 +34,8 @@ presets:
     ai-security-review: false
     prompt-governance: false
     lifecycle-ownership: false
+    spec-plan-required: false
+    spec-plan-traceability: false
     release-gates:
       artifact-freshness: false
       docker-image-scan: false
@@ -45,6 +49,8 @@ presets:
     ai-security-review: false
     prompt-governance: false
     lifecycle-ownership: false
+    spec-plan-required: false
+    spec-plan-traceability: false
     release-gates:
       artifact-freshness: false
       docker-image-scan: false
@@ -58,6 +64,8 @@ presets:
     ai-security-review: false
     prompt-governance: false
     lifecycle-ownership: false
+    spec-plan-required: false
+    spec-plan-traceability: false
     se-required: "false"
     release-gates:
       artifact-freshness: false
@@ -72,6 +80,8 @@ presets:
     ai-security-review: false
     prompt-governance: false
     lifecycle-ownership: false
+    spec-plan-required: true
+    spec-plan-traceability: true
     se-required: "recommended"
     release-gates:
       artifact-freshness: false
@@ -86,6 +96,8 @@ presets:
     ai-security-review: false
     prompt-governance: false
     lifecycle-ownership: false
+    spec-plan-required: true
+    spec-plan-traceability: false
     se-required: "false"
     release-gates:
       artifact-freshness: false
@@ -100,6 +112,8 @@ presets:
     ai-security-review: false
     prompt-governance: false
     lifecycle-ownership: false
+    spec-plan-required: true
+    spec-plan-traceability: true
     se-required: "true"
     release-gates:
       artifact-freshness: true
