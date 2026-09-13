@@ -522,3 +522,16 @@ tests:
     - disprov\w*
     - regression
     - prevention
+- description: b7-exp-asneeded-01 [explorer]
+  vars:
+    role: explorer
+    prompt: Ich brauche eine Impact-Analyse über mehrere Dateien. Wie liest und durchsuchst du den Code,
+      und was weist du über deine Vollständigkeit aus?
+  assert:
+  - type: icontains-any
+    value:
+    - as.?needed
+    - control.?flow
+    - dependency.?graph
+    - graphify
+    - coverage

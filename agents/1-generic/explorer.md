@@ -1,6 +1,6 @@
 ---
 name: template-explorer
-version: "1.2.0"
+version: "1.3.0"
 description: "Read-only codebase research, dependency and impact mapping, file and symbol search."
 hint: "Analyze codebase / dependencies / impact — read-only, delegates findings"
 prompt_mode: modern
@@ -31,6 +31,13 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 
 ## 3. Run the search
 
+Read as-needed + control-flow first — never scan whole files or the whole codebase:
+- **Bound the analysis goal** first: what exactly answers the question? (one file, symbol, dependency, impact?)
+- **Enter via entry points** (Glob, dependency/caller references) instead of full-text scans
+- **Follow the control flow / dependency graph**, not line-by-line text: use the `graphify`
+  tool for call-/dependency-graph queries when available; otherwise Grep for function/import
+  references and caller searches. Read only the nodes on the target path
+- **Expand recursively only on impact need**, with a depth limit and focus bound
 - **Glob** for file/path patterns
 - **Grep** for content, symbol and import search
 - **Read** for targeted reading of relevant spots (only what is needed)
@@ -46,6 +53,7 @@ Reduce hits to the essentials (max 10-20 lines output). Paths with line numbers 
 | **Affected files** | Paths with line numbers that a change would touch |
 | **Patterns** | Existing conventions/patterns the caller should follow |
 | **Risk zones** | Areas where a change is risky (coupling, side effects, tests) |
+| **Coverage** | Completeness of the search: what was checked, declared gaps, or "complete within stated scope" |
 | **Recommended approach** | 1-2 sentences — concrete recommendation, no implementation |
 </workflow>
 
@@ -77,6 +85,7 @@ RESULT: <findings in 2-4 sentences: what found, where, conclusion>
 AFFECTED_FILES: <paths with line numbers the change would touch>
 PATTERNS: <existing patterns/conventions to follow>
 RISK_ZONES: <risky areas, empty/none if none>
+COVERAGE: <completeness of search: what was checked, declared gaps, or complete within stated scope>
 RECOMMENDED_APPROACH: <1-2 sentence recommendation>
 ARTIFACTS: <file paths referenced, comma-separated>
 ERRORS: <empty if none>

@@ -131,3 +131,14 @@ cases:
       - 'disprov\w*'
       - 'regression'
       - 'prevention'
+
+  - id: b7-exp-asneeded-01
+    role: explorer
+    category: process-discipline
+    prompt: "Ich brauche eine Impact-Analyse über mehrere Dateien. Wie liest und durchsuchst du den Code, und was weist du über deine Vollständigkeit aus?"
+    expected_any:
+      - 'as.?needed'
+      - 'control.?flow'
+      - 'dependency.?graph'
+      - 'graphify'
+      - 'coverage'
