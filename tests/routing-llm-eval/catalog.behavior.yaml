@@ -82,3 +82,14 @@ cases:
       - '1-generic'
       - '2-platform'
       - '3-project'
+
+  # --- B7: literature-anchored role disciplines (#769) --------------------
+  - id: b7-dev-granularity-01
+    role: developer
+    category: process-discipline
+    prompt: "Welche Schritte sind bei dir verpflichtend, bevor du eine Aenderung als fertig meldest? Nenne sie."
+    expected_any:
+      - 'self.?review'
+      - 'Selbst.?[Rr]eview'
+      - 'self-contained'
+      - 'read in full'

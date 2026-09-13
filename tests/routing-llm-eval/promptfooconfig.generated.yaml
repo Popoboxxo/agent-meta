@@ -464,3 +464,15 @@ tests:
     - 1-generic
     - 2-platform
     - 3-project
+- description: b7-dev-granularity-01 [developer]
+  vars:
+    role: developer
+    prompt: Welche Schritte sind bei dir verpflichtend, bevor du eine Aenderung als fertig meldest? Nenne
+      sie.
+  assert:
+  - type: icontains-any
+    value:
+    - self.?review
+    - Selbst.?[Rr]eview
+    - self-contained
+    - read in full
