@@ -464,3 +464,14 @@ tests:
     - 1-generic
     - 2-platform
     - 3-project
+- description: b7-tester-01 [tester]
+  vars:
+    role: tester
+    prompt: Schreibe Unit-Tests für [REQ-004]. Wie grenzt du die Testverantwortung zwischen Unit- und
+      Integrationsebene ab und wie bewertest du die Abdeckung?
+  assert:
+  - type: icontains-any
+    value:
+    - test pyramid
+    - behavioral coverage
+    - unit-first

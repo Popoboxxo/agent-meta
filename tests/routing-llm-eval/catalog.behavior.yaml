@@ -82,3 +82,13 @@ cases:
       - '1-generic'
       - '2-platform'
       - '3-project'
+
+  # --- B7: literature-anchored role disciplines (#771) ---------------------
+  - id: b7-tester-01
+    role: tester
+    category: process-discipline
+    prompt: "Schreibe Unit-Tests für [REQ-004]. Wie grenzt du die Testverantwortung zwischen Unit- und Integrationsebene ab und wie bewertest du die Abdeckung?"
+    expected_any:
+      - 'test pyramid'
+      - 'behavioral coverage'
+      - 'unit-first'
