@@ -68,7 +68,7 @@ def rehydrate(project_root: Path, config: Optional[dict], log: SyncLog) -> int:
         print("\n  i  {}: {}".format(MODE, _DISABLED_NOTE))
         return 0
 
-    store = CheckpointStore(project_root=project_root)
+    store = CheckpointStore.from_config(project_root, config)
     source = find_resumable_session(project_root, store=store)
     if source is None:
         log.note(MODE, _NO_SESSION_NOTE)

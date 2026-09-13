@@ -27,6 +27,11 @@ from typing import List, Optional
 from .io import _load_yaml_or_json, write_atomic
 from .json_persistence import load_json_document, save_json_document
 from .plan_identity import make_task_ref
+from .progress_paths import (
+    DEFAULT_CHECKPOINT_DIR,
+    DEFAULT_PROGRESS_DIR,
+    resolve_progress_paths,
+)
 from .providers import (
     all_providers_support_hooks,
     load_providers_config,
@@ -34,11 +39,14 @@ from .providers import (
     resolve_providers,
 )
 
-CHECKPOINT_DIR = ".meta-viz/checkpoints"
+# Deprecated compatibility aliases. The historical defaults now live in
+# ``scripts/lib/progress_paths.py`` and are no longer the source of truth for
+# path building: an explicit (or resolved) directory is injected instead.
+CHECKPOINT_DIR = DEFAULT_CHECKPOINT_DIR
 
 _RAW_OUTPUT_SUFFIX = ".txt"
 
-_PROGRESS_DIR = ".meta-viz/progress"
+_PROGRESS_DIR = DEFAULT_PROGRESS_DIR
 
 _PROGRESS_MAX_BYTES = 200_000  # ~4x the 50 KB JSON-checkpoint budget (checkpointing.md) --
                                 # rendered markdown entries run more verbose per checkpoint.
@@ -321,7 +329,13 @@ def _iter_valid_checkpoints(checkpoints) -> list:
 class CheckpointStore:
     """Persistiert und lädt Checkpoints."""
 
-    def __init__(self, project_root: Path | str | None = None, agent_meta_root: Path | str | None = None):
+    def __init__(
+        self,
+        project_root: Path | str | None = None,
+        agent_meta_root: Path | str | None = None,
+        progress_dir: Path | str | None = None,
+        checkpoint_dir: Path | str | None = None,
+    ):
         self.project_root = Path(project_root) if project_root else Path.cwd()
         # When the harness omits agent_meta_root, detect it from the project
         # root (`.agent-meta/` submodule vs. self-hosting checkout) instead of
@@ -331,7 +345,36 @@ class CheckpointStore:
             Path(agent_meta_root) if agent_meta_root
             else resolve_agent_meta_root(self.project_root)
         )
-        self.checkpoint_dir = self.project_root / CHECKPOINT_DIR
+        self.progress_dir = (
+            Path(progress_dir) if progress_dir is not None
+            else self.project_root / DEFAULT_PROGRESS_DIR
+        )
+        self.checkpoint_dir = (
+            Path(checkpoint_dir) if checkpoint_dir is not None
+            else self.project_root / DEFAULT_CHECKPOINT_DIR
+        )
+
+    @classmethod
+    def from_config(
+        cls,
+        project_root: Path | str,
+        config: Optional[dict] = None,
+        agent_meta_root: Path | str | None = None,
+    ) -> "CheckpointStore":
+        """Build a store whose directories respect the ``progress`` config.
+
+        Supersedes direct ``CheckpointStore(project_root=...)`` construction at
+        the production call sites so writes and reads observe the same resolved
+        directories (no split-brain). Without a ``progress`` block the resolved
+        paths are byte-identical to the framework defaults.
+        """
+        resolved = resolve_progress_paths(Path(project_root), config)
+        return cls(
+            project_root=project_root,
+            agent_meta_root=agent_meta_root,
+            progress_dir=resolved.progress_dir,
+            checkpoint_dir=resolved.checkpoint_dir,
+        )
 
     def _ensure_dir(self) -> None:
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -461,7 +504,7 @@ class CheckpointStore:
         self._write_progress_file(session_data)
 
     def _write_progress_file(self, session_data: dict) -> None:
-        """Write .meta-viz/progress/current.md -- see _render_progress_markdown
+        """Write <progress_dir>/current.md -- see _render_progress_markdown
         and _render_progress_entry. Tier A: overwrite (unchanged pre-existing
         behavior). Tier B: append the newest checkpoint only, with a rotation
         reset on the first checkpoint of a new session, and a running byte
@@ -470,7 +513,17 @@ class CheckpointStore:
         Provider-neutral path (live-progress-channel design, 2026-09-10) --
         was hardcoded to the Claude-specific .claude/progress/ before.
         """
-        progress_path = self.project_root / _PROGRESS_DIR / "current.md"
+        progress_path = self.progress_dir / "current.md"
+        # Defense-in-depth (IC-03): never write outside the resolved progress
+        # directory, e.g. when ``current.md`` is a symlink pointing elsewhere.
+        try:
+            progress_path.resolve().relative_to(self.progress_dir.resolve())
+        except ValueError:
+            _logger.warning(
+                "refusing to write progress file outside %s: %s",
+                self.progress_dir, progress_path,
+            )
+            return
         progress_path.parent.mkdir(parents=True, exist_ok=True)
         tier = _progress_tier(self.project_root, self.agent_meta_root)
         if tier == "A":

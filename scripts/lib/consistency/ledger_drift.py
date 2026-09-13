@@ -151,4 +151,4 @@ def check_ledger_drift(
 def _store(project_root: Path) -> "CheckpointStore":
     from ..checkpoint import CheckpointStore
 
-    return CheckpointStore(project_root=project_root)
+    return CheckpointStore.from_config(project_root)

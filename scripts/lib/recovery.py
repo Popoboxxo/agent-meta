@@ -360,7 +360,7 @@ def _merge_sources(
 def _store_for(project_root: Path, store: Optional[CheckpointStore]) -> CheckpointStore:
     if store is not None:
         return store
-    return CheckpointStore(project_root=project_root)
+    return CheckpointStore.from_config(project_root)
 
 
 def resolve_recovery_sources(

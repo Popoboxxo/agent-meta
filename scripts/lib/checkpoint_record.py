@@ -66,7 +66,8 @@ def record_checkpoint(
 
     Returns ``0`` on a successful write and ``1`` when the store raises
     ``OSError`` (nothing half-written: the store's atomic write is unchanged).
-    ``config`` is accepted for handler symmetry and unused here.
+    ``config`` is passed to ``CheckpointStore.from_config`` so a project
+    ``progress`` override applies to the write path.
     """
     normalized_task_id = normalize_task_id(str(task_id))
     checkpoint = Checkpoint(
@@ -80,7 +81,7 @@ def record_checkpoint(
         next_step=next_step,
     )
 
-    store = CheckpointStore(project_root=project_root)
+    store = CheckpointStore.from_config(project_root, config)
     try:
         store.save_checkpoint(session_id, checkpoint)
     except OSError as exc:

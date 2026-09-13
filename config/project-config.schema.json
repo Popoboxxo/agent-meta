@@ -2272,6 +2272,23 @@
         }
       },
       "additionalProperties": false
+    },
+    "progress": {
+      "type": "object",
+      "description": "Storage location of the progress / checkpoint store. Relative paths are resolved against the project root; the framework defaults keep the historical .meta-viz layout.",
+      "properties": {
+        "dir": {
+          "type": "string",
+          "default": ".meta-viz/progress",
+          "description": "Directory (relative to the project root) for progress files such as current.md. Framework default: .meta-viz/progress."
+        },
+        "checkpoint-dir": {
+          "type": "string",
+          "default": ".meta-viz/checkpoints",
+          "description": "Directory (relative to the project root) for per-session checkpoint files. Framework default: .meta-viz/checkpoints."
+        }
+      },
+      "additionalProperties": false
     }
   },
   "required": [
