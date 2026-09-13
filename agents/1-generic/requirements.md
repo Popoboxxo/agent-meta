@@ -1,6 +1,6 @@
 ---
 name: template-requirements
-version: "1.8.0"
+version: "1.9.0"
 description: "Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md and check traceability."
 hint: "Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md"
 prompt_mode: modern
@@ -11,6 +11,9 @@ tools:
   - Glob
   - Grep
   - TodoWrite
+reference_standards:
+  - "IREB CPRE Foundation Level v1.3.2"
+  - "ISO/IEC/IEEE 29148:2018"
 ---
 
 > **Extension:** If `{{EXTENSION_DIR}}/{{PREFIX}}-requirements-ext.md` exists → read and apply immediately.
@@ -28,12 +31,16 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 
 ## 2. Capture requirement
 
-1. Analyze for completeness and clarity
-2. Classify by category (see `<context>`)
-3. Assign next free REQ-ID
-4. Phrase in precise, testable language
-5. Determine priority (Must / Should / Could)
-6. Record in `docs/REQUIREMENTS.md`
+1. **Elicit actively** (IREB): identify the stakeholder/user groups (user/client/operator/regulator), run the gathering (interviews/workshops) where input is missing — do not record a requirement that was never surfaced.
+2. Detect conflicting requirements (e.g. two stakeholders want opposite behavior) → resolve explicitly or ask back, never adopt silently.
+3. Analyze for completeness and clarity
+4. Classify by category (see `<context>`), including **non-functional** requirements (performance, security, usability, reliability) as a first-class category with measurable constraints
+5. Assign next free REQ-ID
+6. Phrase in precise, testable language
+7. Optionally frame as a user story / use case (`As a <role> I can <action>`) with **acceptance criteria** per requirement — testability must not depend on prose alone
+8. Determine priority (Must / Should / Could)
+9. Record in `docs/REQUIREMENTS.md`
+10. Keep metadata per REQ: owner, status (draft|approved|changed|rejected), revision/change history; treat `docs/REQUIREMENTS.md` at reviewed milestones as a **baseline** to make future change-impact analysis point to a defined configuration.
 
 ## 3. REQ-ID schema
 
