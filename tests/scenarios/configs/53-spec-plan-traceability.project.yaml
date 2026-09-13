@@ -1,0 +1,29 @@
+agent-meta-version: "1.1.0"
+ai-providers:
+- Claude
+# spec-driven sets spec-plan-required: true AND spec-plan-traceability: true.
+dod-preset: spec-driven
+platforms: []
+rules-preset: lazy
+knowledge-engine:
+  enabled: false
+spec-plan-workflow:
+  enabled: true
+  paths:
+    specs: docs/specs
+    plans: docs/plans
+    spikes: docs/spikes
+  index:
+    mode: file-index
+    fallback-index: docs/INDEX.md
+project:
+  name: scenario-spec-plan-traceability
+  prefix: s53
+  short: scenario-spec-plan-trace
+variables:
+  PROJECT_NAME: scenario-spec-plan-traceability
+  PROJECT_DESCRIPTION: spec-plan-traceability ERROR path validation.
+  PROJECT_GOAL: Verify --validate-spec-plan is clean for a valid spec/plan pair and reports ERRORs for an invalid one.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-spec-plan-traceability
+  GIT_MAIN_BRANCH: main

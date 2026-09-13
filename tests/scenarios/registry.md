@@ -66,33 +66,6 @@ verhalten sich exakt wie bisher.
 | `19-auto-commit-suggest` | Claude, Gemini | strict (default) | Auto-commit suggest tier: propose-not-pause prose, eligibility excludes git/explorer (#694) |
 | `20-auto-commit-custom` | Claude | strict (default) | Auto-commit custom tier: `custom_script` contract + sentinel prefix, no trigger prose (#694) |
 | `21-auto-commit-off-ignores-config` | Claude, Gemini, Opencode | strict (default) | Auto-commit off tier: stray config values ignored, zero block rendering, byte-identical output vs. unconfigured sync (#694) |
-
-## Bewusste Auslassungen
-
-- **Setup-Wizard-Secret-Patterns** (`sync.py --setup`, #682 §4.3): interaktiver
-  CLI-Flow, kein `project.yaml`-gesteuertes Szenario möglich. Bereits
-  abgedeckt durch `tests/test_setup_wizard_secrets_prompt.py`.
-- **`CheckpointStore.save_checkpoint()` selbst**: hat laut finalem
-  Whole-Branch-Review (2026-09-07, PR #689) noch KEINEN produktiven
-  Call-Site — Szenario `14-progress-checkpointing` prüft nur die
-  Doku-/Config-Oberfläche (Wortlaut, `.gitignore`-Eintrag), nicht das
-  tatsächliche Schreiben von `.claude/progress/current.md` zur Laufzeit.
-  Nachziehen, sobald ein Call-Site verdrahtet ist.
-- **`backup:`-Block** (`scripts/lib/backup.py`): steuert ausschließlich den
-  `--backup`/`--restore`-CLI-Pfad und hat während eines normalen `sync.py`-Laufs
-  keinen beobachtbaren Output (keine generierte Config/Doku) — über dieses
-  Szenario-Harness (dry-run + sync + `--validate`) also nicht sinnvoll prüfbar.
-  Ursprünglich als Szenario 43 geplant, ersetzt durch `43-tier-overrides` aus
-  derselben Kategorie (per-role Override mit deterministischem Sync-Footprint).
-
-## Bekannte, unrelated Eigenheit
-
-Minimale Szenario-Configs (z.B. `01-minimal-claude`, `13-status-table`), die
-`variables.DOCS_LANGUAGE` nicht explizit setzen, behalten ein unaufgelöstes
-`{{DOCS_LANGUAGE}}` im generierten `orchestrator.md` — `DOCS_LANGUAGE` hat
-keinen Default in `scripts/lib/config.py`. Vorbestehendes, von diesem Katalog
-unabhängiges Verhalten (bereits in `01-minimal-claude` vor jeder Erweiterung
-so), kein Scenario-Bug.
 | `22-platform-defaults-hacs-passthrough` | Claude | strict (default) | Platform-preset cascade: hacs defaults flow through unmodified (dod-preset/PLATFORM/TEST_COMMANDS) |
 | `23-platform-defaults-sharkord-explicit-override` | Claude | strict (default) | Platform-preset cascade: explicit project `variables.TEST_COMMANDS` fully replaces the platform default |
 | `24-platform-defaults-homeassistant-additive` | Claude | strict (default) | Platform-preset cascade: project `variables.TEST_COMMANDS+` appends onto the platform default with `&&` |
@@ -122,3 +95,46 @@ so), kein Scenario-Bug.
 | `48-progress-provider-neutral-path` | Opencode | strict (default), `checkpointing: true` | Root-Cause-Fix: `.meta-viz/progress/current.md` statt hartcodiertem `.claude/progress/` für einen Nicht-Claude-Provider (live-progress-channel design) |
 | `49-hacs-entity-naming` | Claude | strict (default) | HACS entity-naming: `_attr_has_entity_name`+`_attr_translation_key`, English-master `strings.json`, `async_migrate_entries`-Rename, reviewer Gate 11 |
 | `50-spec-plan-workflow` | Claude | strict (default) | Nativer Spec/Plan-Workflow: Scaffolding, Rule-Gate/Skill-Channel, Approval-Stage, file-index-Fallback, `--validate-spec-plan`-No-op (F2–F12) |
+| `51-spec-plan-disabled` | Claude | strict (default) | `spec-plan-workflow.enabled:false` schlägt das `concept-driven`-Preset: No-op für gated Rules, Scaffold, file-index-Fallback und Conditional-/Approval-Flags; allgemeine read-only Rollen-Capabilities (z.B. explorer-Spike-Modus) bleiben bestehen |
+| `52-spec-plan-enabled` | Claude | strict (default) | `enabled:true` + KE aktiv: alle 4 gated Rules, `docs/specs|plans|spikes` gescaffoldet, `spec-plan-enabled`-Gate/Approval-Stage an, KE-Index autoritativ (kein file-index) |
+| `53-spec-plan-traceability` | Claude | strict (default) | `spec-driven` (spec-plan-traceability:true) → `--validate-spec-plan` ist für ein gültiges Spec/Plan-Paar clean (rc 0) und meldet für ein ungültiges Paar ERRORs (`required_sections`/`no_placeholder`/`traceability`, rc 1) |
+| `54-spec-plan-external-override` | Claude | strict (default) | `external-system-override.enabled:true` + KE aktiv: alle KE-Schreibpfade übersprungen (kein `knowledge/`), `docs/INDEX.md`-Fallback geschrieben |
+| `55-spec-plan-ke-off-fallback` | Claude | strict (default) | KE deaktiviert (`enabled:false`, kein Override): `index.mode:knowledge-engine` degradiert zum file-index-Fallback, kein `knowledge/`-Bundle |
+| `56-spec-plan-preset-coupling` | Claude | strict (default) | Absenz-Semantik: ohne expliziten Block aktiviert `dod-preset:concept-driven` (spec-plan-required) den Workflow, `rapid-prototyping` bleibt No-op |
+| `57-spec-plan-provider-agnostic` | Claude, Gemini, Opencode | strict (default) | Gated Rules je Provider (Claude/Opencode Skill-Channel, Gemini Rules-Channel), identischer Body ohne Provider-Literale in Output und Rule-Quelle |
+| `58-spec-plan-spike` | Claude | strict (default) | Spike-Route in der gated Master-Rule; read-only `explorer`-Spike-Modus (allgemeine Rollen-Capability, nicht am Master-Switch gegated — prüft nur den enabled-Pfad) mit SPIKE-CODE-Marker/Spike-Doc-Pfad, Plan-/Spec-Templates sichtbar |
+
+## Bewusste Auslassungen
+
+- **Setup-Wizard-Secret-Patterns** (`sync.py --setup`, #682 §4.3): interaktiver
+  CLI-Flow, kein `project.yaml`-gesteuertes Szenario möglich. Bereits
+  abgedeckt durch `tests/test_setup_wizard_secrets_prompt.py`.
+- **`CheckpointStore.save_checkpoint()` selbst**: hat laut finalem
+  Whole-Branch-Review (2026-09-07, PR #689) noch KEINEN produktiven
+  Call-Site — Szenario `14-progress-checkpointing` prüft nur die
+  Doku-/Config-Oberfläche (Wortlaut, `.gitignore`-Eintrag), nicht das
+  tatsächliche Schreiben von `.claude/progress/current.md` zur Laufzeit.
+  Nachziehen, sobald ein Call-Site verdrahtet ist.
+- **`backup:`-Block** (`scripts/lib/backup.py`): steuert ausschließlich den
+  `--backup`/`--restore`-CLI-Pfad und hat während eines normalen `sync.py`-Laufs
+  keinen beobachtbaren Output (keine generierte Config/Doku) — über dieses
+  Szenario-Harness (dry-run + sync + `--validate`) also nicht sinnvoll prüfbar.
+  Ursprünglich als Szenario 43 geplant, ersetzt durch `43-tier-overrides` aus
+  derselben Kategorie (per-role Override mit deterministischem Sync-Footprint).
+- **`explorer`-Spike-Modus** (`agents/1-generic/explorer.md:51-67`, Plan-Task 14):
+  Der Spike-Modus ist eine allgemeine, strikt **read-only Rollen-Capability**
+  ohne Write-Side-Effect und ist bewusst **nicht** am Master-Switch
+  `spec-plan-workflow.enabled` gegated — spec-konform, da §10.1 mindestens
+  `orchestrator.md` als Pflicht-Conditional nennt und Plan-Task 14 keine
+  Gating-Pflicht verlangt. Szenario `58-spec-plan-spike` prüft deshalb nur den
+  **enabled-Pfad**; der disabled-Pfad wird über die gated Master-Rule in
+  `51-spec-plan-disabled` abgedeckt (dort fehlen die gated Rules vollständig).
+
+## Bekannte, unrelated Eigenheit
+
+Minimale Szenario-Configs (z.B. `01-minimal-claude`, `13-status-table`), die
+`variables.DOCS_LANGUAGE` nicht explizit setzen, behalten ein unaufgelöstes
+`{{DOCS_LANGUAGE}}` im generierten `orchestrator.md` — `DOCS_LANGUAGE` hat
+keinen Default in `scripts/lib/config.py`. Vorbestehendes, von diesem Katalog
+unabhängiges Verhalten (bereits in `01-minimal-claude` vor jeder Erweiterung
+so), kein Scenario-Bug.

@@ -1,0 +1,34 @@
+agent-meta-version: "1.1.0"
+ai-providers:
+- Claude
+dod-preset: concept-driven
+platforms: []
+rules-preset: lazy
+knowledge-engine:
+  enabled: false
+# Explicit bool wins over the concept-driven preset (which sets
+# spec-plan-required: true) — the hard no-op is the point of this scenario.
+spec-plan-workflow:
+  enabled: false
+  paths:
+    specs: docs/specs
+    plans: docs/plans
+    spikes: docs/spikes
+  index:
+    mode: knowledge-engine
+    fallback-index: docs/INDEX.md
+  external-system-override:
+    enabled: true
+    system: external-pm
+    note: must be ignored while the workflow is disabled
+project:
+  name: scenario-spec-plan-disabled
+  prefix: s51
+  short: scenario-spec-plan-disabled
+variables:
+  PROJECT_NAME: scenario-spec-plan-disabled
+  PROJECT_DESCRIPTION: Explicit spec-plan-workflow.enabled=false hard no-op.
+  PROJECT_GOAL: Verify no gated rules, no scaffolding and no conditional flags when disabled.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-spec-plan-disabled
+  GIT_MAIN_BRANCH: main

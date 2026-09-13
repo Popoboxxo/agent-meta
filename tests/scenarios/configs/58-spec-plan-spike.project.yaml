@@ -1,0 +1,33 @@
+agent-meta-version: "1.1.0"
+ai-providers:
+- Claude
+dod-preset: concept-driven
+platforms: []
+rules-preset: lazy
+knowledge-engine:
+  enabled: false
+spec-plan-workflow:
+  enabled: true
+  paths:
+    specs: docs/specs
+    plans: docs/plans
+    spikes: docs/spikes
+  index:
+    mode: file-index
+    fallback-index: docs/INDEX.md
+  archive:
+    mode: ask
+    agent: documenter
+    trigger: plan-complete
+    target: docs/plans/archive
+project:
+  name: scenario-spec-plan-spike
+  prefix: s58
+  short: scenario-spec-plan-spike
+variables:
+  PROJECT_NAME: scenario-spec-plan-spike
+  PROJECT_DESCRIPTION: Spike route and explorer spike mode.
+  PROJECT_GOAL: Verify the Spike classification is documented and the generated explorer carries the read-only spike mode.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-spec-plan-spike
+  GIT_MAIN_BRANCH: main
