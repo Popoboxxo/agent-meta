@@ -486,3 +486,14 @@ tests:
     - targeted E2E
     - quarantine
     - baseline governance
+- description: b7-test-executor-01 [test-executor]
+  vars:
+    role: test-executor
+    prompt: Eine Testsuite ist rot. Wie gehst du vor, bevor du den Fehlschlag meldest, und wie klassifizierst
+      du die Fehler?
+  assert:
+  - type: icontains-any
+    value:
+    - flakiness triage
+    - infrastructure
+    - environment

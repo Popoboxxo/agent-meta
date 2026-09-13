@@ -101,3 +101,12 @@ cases:
       - 'targeted E2E'
       - 'quarantine'
       - 'baseline governance'
+
+  - id: b7-test-executor-01
+    role: test-executor
+    category: process-discipline
+    prompt: "Eine Testsuite ist rot. Wie gehst du vor, bevor du den Fehlschlag meldest, und wie klassifizierst du die Fehler?"
+    expected_any:
+      - 'flakiness triage'
+      - 'infrastructure'
+      - 'environment'
