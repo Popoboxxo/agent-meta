@@ -173,3 +173,16 @@ presets:
     se-cascade-review-lifecycle:
       channel: skill
       skill-description: "Use when running SE-Kaskade reviews — binding review lifecycle with protocol obligation and RVW finding IDs (Issue #339 B5)."
+
+# Preset-unabhaengige Gates: eine Rule wird nur ausgeliefert, wenn ihre
+# `requires`-Bedingung erfuellt ist. Fail-closed: unbekannte Bedingung oder
+# config=None => Rule bleibt draussen. Zuordnung greift in collect_rule_sources.
+rule-gates:
+  spec-plan-workflow:
+    requires: spec-plan-workflow.enabled
+  brainstorming-gate:
+    requires: spec-plan-workflow.enabled
+  writing-plans:
+    requires: spec-plan-workflow.enabled
+  plan-ledger:
+    requires: spec-plan-workflow.enabled

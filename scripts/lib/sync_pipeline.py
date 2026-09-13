@@ -553,7 +553,7 @@ def _skill_channel_universe(
     hand (e.g. sync.py's per-provider loop).
     """
     platforms = config.get("platforms", [])
-    universe = {Path(output_name).stem for _, output_name in collect_rule_sources(agent_meta_root, platforms)}
+    universe = {Path(output_name).stem for _, output_name in collect_rule_sources(agent_meta_root, platforms, config=config)}
     from lib.mcp import load_mcp_registry
     from lib.external_tools import load_external_tools_registry
     from lib.skills import load_external_skills_config

@@ -56,6 +56,28 @@ def load_rules_presets(agent_meta_root: Path) -> dict:
     return {k: v for k, v in presets.items() if not k.startswith("_")}
 
 
+def load_rule_gates(agent_meta_root: Path) -> dict:
+    """Load the preset-independent top-level `rule-gates` section."""
+    data, _ = _load_yaml_or_json(agent_meta_root / RULES_PRESETS_CONFIG_YAML)
+    if not data:
+        return {}
+    gates = data.get("rule-gates", {})
+    return {k: v for k, v in gates.items() if not k.startswith("_")}
+
+
+def _rule_gate_satisfied(requires: str, config: dict | None,
+                         agent_meta_root: Path) -> bool:
+    """Fail-closed evaluation of one rule-gate requirement.
+
+    Unknown requirements never activate a rule; config=None never does."""
+    if config is None:
+        return False
+    if requires == "spec-plan-workflow.enabled":
+        from .dod import resolve_spec_plan_enabled
+        return resolve_spec_plan_enabled(config, agent_meta_root)
+    return False
+
+
 def resolve_rules(config: dict, agent_meta_root: Path) -> dict:
     """Resolve effective rule options from preset + project overrides.
 
@@ -124,12 +146,17 @@ def _build_always_apply_frontmatter(content: str, description: str = "") -> str:
     return "---\n" + "\n".join(fm_lines) + "\n---\n" + content
 
 
-def collect_rule_sources(agent_meta_root: Path, platforms: list[str]) -> list[tuple[Path, str]]:
+def collect_rule_sources(agent_meta_root: Path, platforms: list[str], *,
+                         config: dict | None) -> list[tuple[Path, str]]:
     """Collect rule files from 0-external, 1-generic and 2-platform layers.
 
     Returns list of (source_path, output_filename) tuples.
     Later entries override earlier ones with the same output filename —
     platform rules override generic rules of the same name.
+
+    Gated rules (config/rules-presets.yaml `rule-gates` section) are only
+    collected when their requirement is satisfied. Fail-closed: config=None
+    or an unknown requirement leaves the rule out.
     """
     seen: dict[str, Path] = {}
 
@@ -140,11 +167,19 @@ def collect_rule_sources(agent_meta_root: Path, platforms: list[str]) -> list[tu
             seen[f.name] = f
 
     # 1-generic (skip _ prefix — reserved for lazy-load knowledge files)
+    gates = load_rule_gates(agent_meta_root)
+
     generic_dir = agent_meta_root / RULES_DIR / "1-generic"
     if generic_dir.exists():
         for f in sorted(generic_dir.glob("*.md")):
-            if not f.name.startswith("_"):
-                seen[f.name] = f
+            if f.name.startswith("_"):
+                continue
+            gate = gates.get(f.stem)
+            if f.stem in gates and not _rule_gate_satisfied(
+                (gate or {}).get("requires", ""), config, agent_meta_root,
+            ):
+                continue
+            seen[f.name] = f
 
     # 2-platform (platform-prefixed, e.g. sharkord-security.md → security.md)
     # Skip _ prefix files — reserved for lazy-load knowledge files
@@ -279,7 +314,7 @@ def sync_embedded_rule_files(
     )
 
     platforms = config.get("platforms", [])
-    sources = collect_rule_sources(agent_meta_root, platforms)
+    sources = collect_rule_sources(agent_meta_root, platforms, config=config)
     if not sources:
         return
 
@@ -367,7 +402,7 @@ def sync_rules(
     )
 
     platforms = config.get("platforms", [])
-    sources = collect_rule_sources(agent_meta_root, platforms)
+    sources = collect_rule_sources(agent_meta_root, platforms, config=config)
 
     if not sources:
         return
