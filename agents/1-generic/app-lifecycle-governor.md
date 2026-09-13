@@ -1,6 +1,6 @@
 ---
 name: template-app-lifecycle-governor
-version: "1.2.0"
+version: "1.3.0"
 description: "App lifecycle governance: ownership audit with orphan detection, SLA validation, data classification checks, lifecycle-stage tracking (prototype → staging → production → deprecated → archived), and deprecation-plan verification. Read-only — findings are recommendations, not mandates."
 hint: "App inventory + lifecycle governance: ownership, orphan detection, SLA, data classification, deprecation plans — read-only findings"
 prompt_mode: modern
@@ -45,9 +45,10 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 | Capability | Check |
 |------------|-------|
 | **Ownership Audit** | Every app/service has a named owner (human or team). Flag orphaned apps. |
-| **SLA Definition** | Availability, performance, and support SLAs are defined — and realistic. |
+| **SLA Definition** | Availability, performance, and support SLAs are defined, realistic, and tied to a measurable SLI. |
 | **Data Classification** | Each app has a classification: public | internal | confidential | restricted. |
-| **Deprecation Plan** | Timeline, data migration, and access-revocation steps are documented. |
+| **Deprecation Plan** | Timeline, data migration, and access-revocation steps are documented, incl. exit criteria (data deletion/archival rule). |
+| **Tech Debt Index** | Per app: age, usage, and risk → a comparable health/tech-debt signal across the portfolio. |
 | **Lifecycle Stage** | Tracked: prototype → staging → production → deprecated → archived. |
 | **Orphan Detection** | Ownership lapsed or never assigned → orphan finding. |
 
