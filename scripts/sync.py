@@ -83,6 +83,7 @@ from lib.config import find_agent_meta_root
 from lib.io import clear_gitignore_cache
 from lib.log import SyncLog
 from lib.se_validate import _handle_validate_se
+from lib.spec_plan_validate import _handle_validate_spec_plan
 # Re-exported for tests: tests/test_knowledge_sync_integration.py reads
 # sync_module.sync_knowledge_engine (kept stable during the #481 split).
 from lib.knowledge import sync_knowledge_engine  # noqa: F401  (deliberate re-export)
@@ -152,6 +153,13 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                              "integrity, L2 separation, review IDs. Exit 0 when clean or "
                              "when no SE artifacts exist; exit 1 with a findings list "
                              "otherwise.")
+    parser.add_argument("--validate-spec-plan", action="store_true",
+                        help="Standalone spec/plan-workflow validation (F12): checks the "
+                             "project's docs/specs and docs/plans artifacts for required "
+                             "sections, placeholders, traceability, approval markers, ledger "
+                             "format and the plan task graph. Exit 0 when clean, when no "
+                             "artifacts exist, or when the workflow is disabled; exit 1 with "
+                             "a findings list otherwise.")
     parser.add_argument("--test-plugin", metavar="ID", default=None,
                         help="Run the health check for one plugin from the catalog and exit.")
     parser.add_argument("--render-standalone", action="store_true",
@@ -280,6 +288,7 @@ _MODE_HANDLERS = [
     (lambda a: a.prune_backups, _handle_prune_backups),
     (lambda a: a.validate, _handle_validate),
     (lambda a: a.validate_se, _handle_validate_se),
+    (lambda a: a.validate_spec_plan, _handle_validate_spec_plan),
 ]
 
 
