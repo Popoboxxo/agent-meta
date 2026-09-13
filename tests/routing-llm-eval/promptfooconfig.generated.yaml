@@ -516,3 +516,16 @@ tests:
     - revert to the prior tag
     - prior tag
     - re-sync
+- description: b7-me-01 [mammouth-expert]
+  vars:
+    role: mammouth-expert
+    prompt: Wie loest Mammouth einen Delegations-/FANOUT-Aufruf auf und was ist deren Parallelitaets-Charakteristik?
+  assert:
+  - type: icontains-any
+    value:
+    - sequential
+    - text-based
+    - '@<'
+    - no native parallel
+    - PAL
+    - delegation-syntax

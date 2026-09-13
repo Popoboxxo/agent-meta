@@ -1,0 +1,8 @@
+feat(agents): mammouth-expert official-docs & effort mapping (#776)
+
+Add official-docs primary-source mandate (info.mammouth.ai,
+mammouth-ai/code), model effort-level mapping (Default/Low/Medium/High,
+extended thinking) and PAL delegation contract (sequential, text-based,
+delegation-syntax.yaml) per Mammouth official docs.
+
+Refs #776

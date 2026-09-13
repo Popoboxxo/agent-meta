@@ -128,3 +128,15 @@ cases:
       - 'revert to the prior tag'
       - 'prior tag'
       - 're-sync'
+
+  - id: b7-me-01
+    role: mammouth-expert
+    category: interface-knowledge
+    prompt: "Wie loest Mammouth einen Delegations-/FANOUT-Aufruf auf und was ist deren Parallelitaets-Charakteristik?"
+    expected_any:
+      - 'sequential'
+      - 'text-based'
+      - '@<'
+      - 'no native parallel'
+      - 'PAL'
+      - 'delegation-syntax'
