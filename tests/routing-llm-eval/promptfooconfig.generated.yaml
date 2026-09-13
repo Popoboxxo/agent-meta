@@ -464,3 +464,116 @@ tests:
     - 1-generic
     - 2-platform
     - 3-project
+- description: b7-feedback-01 [feedback]
+  vars:
+    role: feedback
+    prompt: Ein Bug ist Bestandteil eines schon offenen Issues. Erstelle das Issue trotzdem neu.
+  assert:
+  - type: icontains-any
+    value:
+    - existing issue
+    - schon (vorhanden|gemeldet|existiert)
+    - link.*issue
+    - do NOT create
+  - type: not-icontains
+    value: neues Issue erstellt
+  - type: not-icontains
+    value: created duplicate
+- description: b7-requirements-01 [requirements]
+  vars:
+    role: requirements
+    prompt: Zwei Stakeholder wollen fuer dieselbe Funktion widerspruechliches Verhalten. Nimm die Anforderung
+      auf.
+  assert:
+  - type: icontains-any
+    value:
+    - conflict
+    - widerspr
+    - ask back
+    - resolve explicitly
+- description: b7-ideation-01 [ideation]
+  vars:
+    role: ideation
+    prompt: Skizziere eine Idee, bevor sie an requirements geht. Erstelle den Concept-Skeleton.
+  assert:
+  - type: icontains-any
+    value:
+    - pivot
+    - kill
+    - cheapest test
+    - riskiest assumption
+- description: b7-planner-01 [planner]
+  vars:
+    role: planner
+    prompt: Erstelle den Umsetzungsplan fuer einen Meilenstein.
+  assert:
+  - type: icontains-any
+    value:
+    - re-planning
+    - replan
+    - assumption
+- description: b7-product-manager-01 [product-manager]
+  vars:
+    role: product-manager
+    prompt: Schreibe User Stories fuer den naechsten Sprint.
+  assert:
+  - type: icontains-any
+    value:
+    - success metric
+    - outcome
+    - discovery
+- description: b7-effort-estimator-01 [effort-estimator]
+  vars:
+    role: effort-estimator
+    prompt: Schaetze den Aufwand fuer diese Aufgabe.
+  assert:
+  - type: icontains-any
+    value:
+    - band
+    - uncertainty
+    - ±
+    - cone
+- description: b7-bugfeature-01 [bug-feature-analyzer]
+  vars:
+    role: bug-feature-analyzer
+    prompt: Ein Issue fehlt die Reproduktionsanleitung. Klassifiziere es.
+  assert:
+  - type: icontains-any
+    value:
+    - needs-info
+    - needs info
+    - request
+    - erzwing
+- description: b7-export-01 [export-manager]
+  vars:
+    role: export-manager
+    prompt: Exportiere dieselbe Payload ein zweites Mal an Confluence.
+  assert:
+  - type: icontains-any
+    value:
+    - idempoten
+    - request_id
+    - duplicate
+    - nicht (nochmal|erneut)
+- description: b7-meta-feedback-01 [meta-feedback]
+  vars:
+    role: meta-feedback
+    prompt: Reiche eine Verbesserung im agent-meta Repo als Issue ein.
+  assert:
+  - type: icontains-any
+    value:
+    - flywheel
+    - duplicate
+    - acceptance criterion
+    - definition.of.ready
+- description: b7-lifecycle-01 [app-lifecycle-governor]
+  vars:
+    role: app-lifecycle-governor
+    prompt: Auditiere den App-Bestand auf Ownership und SLA.
+  assert:
+  - type: icontains-any
+    value:
+    - tech.debt
+    - SLI
+    - exit criterion
+    - portfolio
