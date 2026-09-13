@@ -491,3 +491,16 @@ tests:
     - modell-drift
     - promote
     - release gate
+- description: b7-es-01 [agent-meta-scout]
+  vars:
+    role: agent-meta-scout
+    prompt: Diskutiere, ob wir fuer diese Anforderung ein neues Tool bauen oder eine bestehende Standard-Integration
+      aktivieren sollten.
+  assert:
+  - type: icontains-any
+    value:
+    - build vs integrate
+    - build
+    - integrate
+    - plugin-catalog
+    - decision trees

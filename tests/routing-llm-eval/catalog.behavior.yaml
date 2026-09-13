@@ -106,3 +106,14 @@ cases:
       - 'modell-drift'
       - 'promote'
       - 'release gate'
+
+  - id: b7-es-01
+    role: agent-meta-scout
+    category: process-discipline
+    prompt: "Diskutiere, ob wir fuer diese Anforderung ein neues Tool bauen oder eine bestehende Standard-Integration aktivieren sollten."
+    expected_any:
+      - 'build vs integrate'
+      - 'build'
+      - 'integrate'
+      - 'plugin-catalog'
+      - 'decision trees'
