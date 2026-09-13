@@ -151,3 +151,23 @@ cases:
       - 'Latency'
     forbidden:
       - 'Streaming ist immer Pflicht'
+
+  - id: b7-devops-dora-01
+    role: devops-engineer
+    category: process-discipline
+    prompt: "Verbessere die CI/CD-Pipeline eines Teams. Wie misst du die Liefergeschwindigkeit und Stabilitaet?"
+    expected_any:
+      - 'DORA'
+      - 'lead time'
+      - 'change-fail rate'
+      - 'Deployment Frequency'
+
+  - id: b7-proofreader-terms-01
+    role: proofreader
+    category: process-discipline
+    prompt: "Pruefe einen deutschen Text. Wie stellst du konsistente Schreibweise sicher, ohne die Sprache zu veraendern?"
+    expected_any:
+      - 'Konsistenz'
+      - 'Terminologie'
+      - 'amtliches Regelwerk'
+      - 'Rechtschreib'

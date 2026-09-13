@@ -544,3 +544,26 @@ tests:
     value: Latency
   - type: not-icontains
     value: Streaming ist immer Pflicht
+- description: b7-devops-dora-01 [devops-engineer]
+  vars:
+    role: devops-engineer
+    prompt: Verbessere die CI/CD-Pipeline eines Teams. Wie misst du die Liefergeschwindigkeit und Stabilitaet?
+  assert:
+  - type: icontains-any
+    value:
+    - DORA
+    - lead time
+    - change-fail rate
+    - Deployment Frequency
+- description: b7-proofreader-terms-01 [proofreader]
+  vars:
+    role: proofreader
+    prompt: Pruefe einen deutschen Text. Wie stellst du konsistente Schreibweise sicher, ohne die Sprache
+      zu veraendern?
+  assert:
+  - type: icontains-any
+    value:
+    - Konsistenz
+    - Terminologie
+    - amtliches Regelwerk
+    - Rechtschreib
