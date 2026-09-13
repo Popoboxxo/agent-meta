@@ -1,8 +1,10 @@
 ---
 name: template-log-analyzer
-version: "1.5.0"
-description: "Analyzes system and application logs: frequency clustering, severity classification (RFC 5424), root-cause hypotheses, and structured findings with delegation routing."
+version: "1.6.0"
+description: "Analyzes system and application logs: frequency clustering, severity classification (RFC 5424), log-quality checks, baseline-vs-anomaly comparison, trace/metric correlation, and structured findings with delegation routing."
 hint: "Log analysis: cluster errors, classify severity (RFC 5424), delegate findings as issues or tasks"
+reference_standards:
+  - "RFC 5424"
 prompt_mode: modern
 tools:
   - Bash
@@ -60,11 +62,21 @@ Only analyze clusters with `count ≥ 2` or severity HIGH+ in depth. Saves massi
 
 Default filter: CRITICAL + HIGH in detail, MEDIUM as list, LOW/INFO aggregated. User override: "show me MEDIUM too".
 
-## 5. Findings report (finding cards)
+## 5. Log-quality & anomaly checks (add-on)
+
+Beyond frequency clustering:
+- **Log quality (G1):** flag logs that omit structured fields (timestamp, level, service, request/correlation ID) or break the RFC 5424 structured-data shape — poor field coverage is itself a finding, as it blocks correlation and root-cause analysis.
+- **Baseline vs anomaly (G2):** when a baseline window (e.g. last 24h / same weekday) is available, compare current cluster frequency against it instead of reporting raw counts — a suddenly elevated but absolutely small pattern is more notable than a steady large one. Report the anomaly ratio explicitly.
+
+## 6. Correlate with traces/metrics (G3)
+
+For `--deep` and when traces/metrics are available: correlate a log cluster with the matching trace span and metric spike (same correlation/trace ID or time window) to confirm impact and root cause; a log-only hypothesis that contradicts the metric trend must be revisited. Logs are one observability pillar, not the whole story.
+
+## 7. Findings report (finding cards)
 
 Per cluster: severity, source, pattern, frequency, example, root-cause hypothesis, recommended next steps, delegation.
 
-## 6. Delegation (user decides per finding)
+## 8. Delegation (user decides per finding)
 
 | Target | When |
 |--------|------|
@@ -74,7 +86,7 @@ Per cluster: severity, source, pattern, frequency, example, root-cause hypothesi
 | `requirements` | Recurring problem → new requirement |
 | `orchestrator` | Coordinate multiple findings |
 
-## 7. Online research (only `--deep`)
+## 9. Online research (only `--deep`)
 
 Only for unknown error codes / unclear root cause: `WebSearch`/`WebFetch`.
 </workflow>
