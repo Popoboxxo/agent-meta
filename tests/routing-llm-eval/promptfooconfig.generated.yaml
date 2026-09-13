@@ -464,3 +464,106 @@ tests:
     - 1-generic
     - 2-platform
     - 3-project
+- description: b7-uiux-heuristics-01 [ui-ux-designer]
+  vars:
+    role: ui-ux-designer
+    prompt: Spezifiziere eine Login-Screen-Spezifikation. Wie sicherst du die Nutzerfreundlichkeit und
+      Barrierefreiheit der Interaktionen ab?
+  assert:
+  - type: icontains-any
+    value:
+    - Usability Heuristics
+    - NN/g
+    - -heuristic
+  - type: icontains
+    value: WCAG 2.2
+- description: b7-designsys-tokens-01 [design-system-architect]
+  vars:
+    role: design-system-architect
+    prompt: Erstelle die Design-Token-Artefakte fuer ein neues Design-System. Wie garantiert du, dass
+      die Tokens portabel und tool-unabhaengig bleiben?
+  assert:
+  - type: icontains-any
+    value:
+    - Design Tokens Format
+    - DTCG
+    - \\$tokens
+  - type: not-icontains
+    value: nur eine Tailwind-Datei
+- description: b7-frontend-a11y-01 [frontend-component-engineer]
+  vars:
+    role: frontend-component-engineer
+    prompt: Baue eine autocomplete-kompatible Combobox. Wie stellst du die Barrierefreiheit sicher?
+  assert:
+  - type: icontains-any
+    value:
+    - ARIA Authoring Practices
+    - APG
+    - combobox-Pattern
+  - type: not-icontains
+    value: WCAG-Konformitaet (A/AA/AAA) bestae[t]tigt
+- description: b7-api-errors-01 [api-specialist]
+  vars:
+    role: api-specialist
+    prompt: Entwirf den Fehlerteil eines neuen API-Endpunkts. Wie haeltst du die API-Design-Standards
+      ein?
+  assert:
+  - type: icontains-any
+    value:
+    - RFC 9457
+    - problem\\+json
+    - Google API Design
+    - Zalando
+- description: b7-db-normalize-01 [database-engineer]
+  vars:
+    role: database-engineer
+    prompt: Entwirf ein relationales Schema fuer eine Bestellverwaltung. Wie entscheidest du zwischen
+      Normalisierung und Denormalisierung?
+  assert:
+  - type: icontains-any
+    value:
+    - normaliz
+    - denormaliz
+  - type: icontains
+    value: Denormalisierung
+  - type: not-icontains
+    value: normalisierst ohne Begruendung
+- description: b7-dataeng-streaming-01 [data-engineer]
+  vars:
+    role: data-engineer
+    prompt: Plane eine neue Datenpipeline. Streaming oder Batch — was ist deine Standardwahl und wovon
+      haengt sie ab?
+  assert:
+  - type: icontains-any
+    value:
+    - Batch
+    - streaming
+  - type: icontains
+    value: Projekt-Entscheidung
+  - type: icontains
+    value: Latency
+  - type: not-icontains
+    value: Streaming ist immer Pflicht
+- description: b7-devops-dora-01 [devops-engineer]
+  vars:
+    role: devops-engineer
+    prompt: Verbessere die CI/CD-Pipeline eines Teams. Wie misst du die Liefergeschwindigkeit und Stabilitaet?
+  assert:
+  - type: icontains-any
+    value:
+    - DORA
+    - lead time
+    - change-fail rate
+    - Deployment Frequency
+- description: b7-proofreader-terms-01 [proofreader]
+  vars:
+    role: proofreader
+    prompt: Pruefe einen deutschen Text. Wie stellst du konsistente Schreibweise sicher, ohne die Sprache
+      zu veraendern?
+  assert:
+  - type: icontains-any
+    value:
+    - Konsistenz
+    - Terminologie
+    - amtliches Regelwerk
+    - Rechtschreib

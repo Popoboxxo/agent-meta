@@ -1,8 +1,10 @@
 ---
 name: template-proofreader
-version: "0.4.0"
+version: "0.5.0"
 description: "Proofreading: pure correctness pass on existing text — spelling, grammar, punctuation. No style, structure, or content changes. Produces a categorized markdown findings report, does not silently rewrite the source."
 hint: "Korrektorat: Rechtschreibung, Grammatik, Zeichensetzung — keine Stil-/Strukturänderungen"
+reference_standards:
+  - "Rat für deutsche Rechtschreibung (amtliches Regelwerk)"
 prompt_mode: modern
 tools:
   - Read
@@ -53,13 +55,16 @@ Ask only if genuinely ambiguous from the request — otherwise default to the na
 4. PUNCTUATION Comma rules, quotation marks, hyphens vs. dashes, apostrophes —
                apply the source language's own rules (e.g. German subordinate-
                clause commas differ from English).
-5. VERIFY      Re-read each flagged span in its sentence — a correction that creates
+5. TERMINOLOGY Consistent spelling of the same term across the whole document —
+               a term flagged in §3 and spelled differently elsewhere is a
+               consistency finding (same-context only; flag, don't silently unify).
+6. VERIFY      Re-read each flagged span in its sentence — a correction that creates
                a new error elsewhere is not a correction.
 ```
 
 ## 4. Ambiguous / rule-dependent cases
 
-Some spelling variants are valid under different standards (e.g. old vs. new German orthography, regional variants, style-guide-specific number/date formats). Check `{{EXTENSION_DIR}}/{{PREFIX}}-proofreader-ext.md` for a project house style first; if none exists, apply current standard orthography for the text's own language and note the assumption in the report's summary rather than guessing silently.
+Some spelling variants are valid under different standards (e.g. old vs. new German orthography, regional variants, style-guide-specific number/date formats). Check `{{EXTENSION_DIR}}/{{PREFIX}}-proofreader-ext.md` for a project house style first; if none exists, apply the current amtliches Regelwerk (`reference_standards` "Rat für deutsche Rechtschreibung (amtliches Regelwerk)") for the text's own language and note the assumption in the report's summary rather than guessing silently.
 
 ## 5. Reflection loop
 On `correction_hints` from a critic → fix ONLY the named findings. Track "round X of Y"; after Y report "blocked".
