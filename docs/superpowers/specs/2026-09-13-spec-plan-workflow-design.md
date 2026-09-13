@@ -4,11 +4,12 @@
 > Implementierungsplan liegt vor unter
 > `docs/superpowers/plans/2026-09-13-spec-plan-workflow.md`. Der frühere Status
 > „Entwurf — nicht implementiert“ (v2) ist damit überholt; die Implementierung selbst ist
-> noch nicht erfolgt. Brainstormed 2026-09-13, überarbeitet 2026-09-13 (v2/v3/v4/v5).
+> noch nicht erfolgt. Brainstormed 2026-09-13, überarbeitet 2026-09-13 (v2/v3/v4/v5/v6).
 > Dieses Dokument definiert einen *nativen* Prozess-Workflow (Spec → Plan → Execution) auf
 > Feature-Ebene, vollständig abhängig von agent-meta-Bordmitteln (Rules, Rollen, Pipelines,
-> Config, Sync). Superpowers (obra/superpowers) dient **nur als Referenz-Zielbild** — es wird
-> nichts extern eingebunden und nichts blind kopiert.
+> Config, Sync). Ein externes Referenzmodell dient **nur als Zielbild** — es wird
+> nichts extern eingebunden und nichts blind kopiert; der Name des Referenzmodells ist
+> bewusst nicht Teil dieses Dokuments (Naming-Purge, §v6/D).
 >
 > **Hinweis zur Ablage:** Dieses Design-Doc liegt bewusst noch unter der bestehenden Konvention
 > `docs/superpowers/specs/`. Es ist damit letzter Nutzer der Altkonvention und definiert in
@@ -111,7 +112,7 @@ Für die **Feature-Ebene** fehlt dagegen ein durchgängiger, erzwingbarer Weg:
 
 Ein **abschaltbarer, nativer Prozess** mit drei Bausteinen, ISO-agent-meta übersetzt:
 
-| Superpowers-Baustein | agent-meta-Übersetzung |
+| Prozess-Baustein (Referenz) | agent-meta-Umsetzung |
 |---|---|
 | brainstorming | `ideation` + `concept-specifier/architect`, **Klassifikation** (Spike/Bounded/Architectural), **Approval-Gate**, Einzelfragen, 2–3 Optionen mit Trade-offs, Design-Doc, Self-Review, User-Review, **danach zwingend → Plan** |
 | writing-plans | `planner` mit striktem Plan-Header, File-Structure-Map, bite-sized TDD-Tasks, Interfaces (consumes/produces), No-Placeholder, Self-Review |
@@ -228,7 +229,7 @@ Zwingend: Nach freigegebener Spec **muss** ein Plan entstehen (kein Direkteinsti
 
 ## 3. Zentraler Konflikt: Worktree-Isolation vs. agent-meta (M1)
 
-Superpowers-Execution nutzt **Worktree-Isolation** pro Task. agent-meta **verbietet** das hart:
+Das Referenzmodell nutzt **Worktree-Isolation** pro Task. agent-meta **verbietet** das hart:
 
 - `rules/1-generic/no-worktree-isolation.md:1-4`: „Niemals das Argument `isolation: "worktree"`
   beim Spawnen von Subagenten verwenden“ — Agenten schreiben sonst in
@@ -413,7 +414,7 @@ Das ist reiner Placeholder-Text für den Kontext und hat **keinen** Scaffolding-
         "plans":  { "type": "string", "default": "docs/plans" },
         "spikes": { "type": "string", "default": "docs/spikes" },
         "legacy": { "type": "array", "items": { "type": "string" },
-                    "default": ["docs/superpowers/specs", "docs/superpowers/plans"] }
+                    "default": [] }
       },
       "additionalProperties": false
     },
@@ -914,10 +915,10 @@ Stellen registriert. Die **Werte** setzt `_build_dod_variables()` (§5.4).
 
 ```
 DECISION D1 — Verankerung
-context: Spec/Plan-Workflow soll Superpowers adaptieren.
+context: Spec/Plan-Workflow soll ein etabliertes Referenzvorgehen adaptieren.
 choice: Rein nativ: neue rules/1-generic/* + Erweiterung bestehender Rollen/Pipelines.
 alternatives:
-  - Externer Pack (obra/superpowers einbinden) → Abhängigkeit, Versions-Drift, nicht nativ.
+  - Externen Fremd-Pack einbinden → Abhängigkeit, Versions-Drift, nicht nativ.
   - Neues Parallel-System → Duplikation, Wartungslast.
 consequences: Einmal definieren, überall nutzbar; Wartung im eigenen Repo.
 ```
@@ -937,7 +938,7 @@ consequences: Bestands-Infrastruktur wird genutzt; orchestration.py wird NUR als
 
 ```
 DECISION D3 — Isolation
-context: Superpowers nutzt Worktree-Isolation; agent-meta verbietet sie hart.
+context: Das Referenzvorgehen nutzt Worktree-Isolation; agent-meta verbietet sie hart.
 choice: Frischer Subagent/Task + Datei-Ownership + Barrieren via check_file_overlap.
 alternatives:
   - Worktree-Isolation übernehmen → verstößt gegen no-worktree-isolation.md/AGENTS.md.
@@ -964,7 +965,7 @@ context: Bestands-Konvention ist informell/nicht konfigurierbar.
 choice: Neutral docs/specs + docs/plans; Legacy lesbar; optionale Einzel-Migration;
         Scan-Scope via Glob + changed_files.
 alternatives:
-  - superpowers-Pfad als Default → Namenskopplung an externes Tool.
+  - Fremd-Pfad als Default → Namenskopplung an externes Tool.
   - Massen-Umzug → bricht Bestandslinks (docs/plans/README.md, 28+ Dateien).
 consequences: Neue Artefakte sauber; Altbestand unangetastet; Template-Scope nötig.
 ```
@@ -1128,3 +1129,401 @@ Alle vormals offenen Fragen sind **verbindlich entschieden** (F1–F12). Es verb
 
 **Einziges offenes Folge-Issue:** F1 (`systems-engineering`-Schema-Deklaration). Alle übrigen
 Punkte sind entschieden und in die genannten Abschnitte eingearbeitet.
+
+---
+
+## Revision v6 — Design-Addendum (2026-09-13)
+
+> **Status:** Design-Addendum, **nicht implementiert**. Verbindliche Entscheidungen A/C/D/E.
+> Alle v1–v5-Entscheidungen (F1–F12) bleiben gültig, soweit sie hier nicht ausdrücklich
+> überschrieben werden. Umsetzung siehe Plan `docs/superpowers/plans/2026-09-13-spec-plan-workflow.md`
+> (§Revision v6, Tasks 20–24). Kein Produktionscode in diesem Schritt.
+>
+> **Warum v6:** Die Implementierung hat Routing-Wahrheiten dupliziert (Rollen-Tabellen in
+> Rule + Agent), den Review-Loop inline statt zentral geführt, den Workflow-Enable-Zustand
+> über mehrere unabhängige Config-Pfade verstreut und den Namen des externen Referenzmodells
+> in der Prosa mitgeschleppt. v6 zieht dafür je **eine** Quelle der Wahrheit ein.
+
+### A. Pipelines sind die einzige Routing-Quelle
+
+#### A.1 Regel (verbindlich)
+
+Für den Spec/Plan-Workflow gilt: **Rollen-Routing wird ausschließlich in
+`config/role-defaults.yaml` (`quality_pipelines`) und `reflection_pairs` deklariert.** Die
+Templates in `agents/1-generic/*` und `rules/1-generic/*` enthalten **keine** Route-Tabellen,
+keine `→ <role>`-Ketten, keine `hand off to <role>`/`delegiert an <role>`-Anweisungen und
+keine `NEXT:`-Rollenlabels für diesen Workflow. Jede betroffene Rolle erhält stattdessen:
+
+1. eine **Selbstbeschränkung**: `**Routing:** Ich dispatche nicht selbst.`
+2. einen **Pipeline-/Pair-Verweis**: `Route: quality_pipelines.concept-driven-dev` bzw.
+   `Route: quality_pipelines.concept-development` (Spike) bzw.
+   `Review-Loop: reflection_pairs.concept-specify-loop`.
+
+Klassifikationstabellen bleiben erhalten, verlieren aber die Routen-Spalte: die Spalte
+`Route` wird durch `Pipeline-Stage` ersetzt (Werte wie `specify`, `review + approve`, `plan`)
+oder die Tabelle nennt nur `Task-Size | Klasse | Artefakt` plus einen Satz `Route: …`.
+
+#### A.2 Route → Pipeline/Reflection-Pair-Mapping (jede entfernte Route)
+
+| Klasse / Stage | Entfernte Route (Ist, verifiziert) | Ersatz (Soll) | Quelle der Route |
+|---|---|---|---|
+| **S** (≤2 Dateien) | `direkt junior-developer` (`rules/1-generic/spec-plan-workflow.md:29`, `agents/1-generic/ideation.md:52`) | Workflow übersprungen; Implementierung über bestehende Pipeline, Tier über `plan-driven.allowed_agents` (`fallback_agent`) | `quality_pipelines.feature-lifecycle:2372-2382` |
+| **M** (3–8 Dateien) | `concept-specifier` → `planner` | Stages `specify → approve → plan` | `quality_pipelines.concept-driven-dev:2486-2537` |
+| **L** (9–20 Dateien) | `concept-specifier` + `concept-reviewer` → `planner` | `specify → review (Loop) → approve → plan` | `quality_pipelines.concept-driven-dev` + `reflection_pairs.concept-specify-loop` (§A.3) |
+| **XL** (>20 Dateien) | `concept-architect` → `concept-specifier` → `planner` | Stage `specify` mit vorgelagertem Systemdesign (Task-Text der Stage); danach `approve → plan` | `quality_pipelines.concept-driven-dev:2498-2502` |
+| **Spike** (Recherche) | `explorer` (Spike-Modus) / `ideation` (terminal) | Recherche-Stage; Ergebnis Spike-Doc, **kein** Plan | `quality_pipelines.concept-development:2457-2473` |
+
+Betroffene Einzelfundstellen (alle ersetzt nach §A.1):
+
+| Fundstelle | Ist | Ersatz (exakt) |
+|---|---|---|
+| `rules/1-generic/spec-plan-workflow.md:27-33` | Route-Tabelle mit `→ <role>` | Spalte `Pipeline-Stage` + `Route: quality_pipelines.concept-driven-dev` |
+| `agents/1-generic/ideation.md:50-56` | Duplikat der Route-Tabelle | entfällt; Verweis auf Master-Rule + `Route: quality_pipelines.concept-driven-dev` |
+| `agents/1-generic/concept-specifier.md:73-75` | „you are the reflection-loop generator (…max 3 iterations)“ | `Review-Loop: reflection_pairs.concept-specify-loop (generator: concept-specifier, critic: concept-reviewer, max 3). Route: quality_pipelines.concept-driven-dev.` |
+| `agents/1-generic/concept-specifier.md:77-82` | „The orchestrator routes the approved spec to `planner`“ | `On APPROVED: emit spec path + spec-id; der Orchestrator schreitet die Pipeline concept-driven-dev (specify → approve → plan) fort. Ich dispatche nicht selbst.` |
+| `agents/1-generic/concept-specifier.md:115` | `NEXT: [Review by concept-reviewer \| After APPROVED: route to planner]` | `NEXT: [Pipeline-Stage-Fortschritt (concept-driven-dev)]` |
+| `rules/1-generic/brainstorming-gate.md:15` | `concept-architect` → Spec → Plan | `Pipeline-Stage: specify/explore; Route: quality_pipelines.concept-driven-dev` |
+| `rules/1-generic/plan-ledger.md:55` | `auto` → `orchestrator` delegiert an `archive.agent` | `auto → Stage archive; archive.agent ist Config-Wert, ausgeführt über die Pipeline. Kein direkter Dispatch.` |
+| `agents/1-generic/ideation.md:94-101, 159` | „hand off … to `requirements`“ | `Route (Requirements-Pfad): quality_pipelines.concept-development. Ich dispatche nicht selbst.` |
+
+**Abgrenzung zu ausdrücklich erlaubten Formen (Dokumentation, kein Routing):**
+
+- `**Delegation (reference only):**`-Zeilen (z. B. `code-reviewer.md:172`, `data-engineer.md:141`)
+  — explizit als Referenzindex markiert, ohne Dispatch-Semantik.
+- `**Not your job:**`-Boundary-Zeilen und `Role and boundary`-Tabellen (z. B.
+  `concept-specifier.md:90-98`) — negative Abgrenzung, beschreibt Zuständigkeit statt Ausführung.
+- Pfeile zwischen **Nicht-Rollen**-Tokens (Pfade, Status-Lebenszyklen, Template-Variablen).
+
+Begründung: Routing erzeugt einen **Ausführungspfad** (wer sendet wohin); Dokumentation
+beschreibt **Zuständigkeit** (wer besitzt welches Anliegen). Die obigen Muster sind an
+`NEXT:`, einer Route-Spalte oder einer imperativen Richtungsangabe erkennbar; die erlaubten
+Formen sind als Referenz bzw. Negation markiert und enthalten keine Dispatch-Semantik.
+
+#### A.3 Reflection-Loop-Zentralisierung (`concept-specify-loop`, `loop_ref`)
+
+Neuer `reflection_pairs`-Eintrag in `config/role-defaults.yaml` (nach `se-dev-review-loop:2338-2342`):
+
+```yaml
+- id: concept-specify-loop
+  generator: concept-specifier
+  critic: concept-reviewer
+  max_iterations: 3
+  on_blocked: escalate_to_orchestrator
+```
+
+Die Pipeline-Stage `concept-driven-dev.review` (`role-defaults.yaml:2503-2511`) referenziert
+den Pair statt den Loop inline zu wiederholen:
+
+```yaml
+- id: review
+  agent: concept-reviewer
+  task: Spec/Design reviewen — Verdict APPROVED/CHANGES_REQUESTED/BLOCKED + Findings mit Severity
+  mode: loop
+  loop_ref: concept-specify-loop     # löst generator/critic/max_iterations aus reflection_pairs
+```
+
+**Minimales, rückwärtskompatibles Repräsentationsschema:** `mode: loop` akzeptiert **genau
+eine** von zwei Quellen:
+
+- `loop: {generator, critic, max_iterations, on_blocked?}` — Bestand, **unverändert gültig**
+  (keine Migration von `bugfix.review:2439-2443` oder `concept-development.concept:2465-2469`).
+- `loop_ref: <pair-id>` — neu; Auflösung gegen `reflection_pairs`.
+
+Validierungs-/Render-Impact (fail-closed):
+
+1. `scripts/lib/pipelines.py::validate_pipelines` (`:161`, Loop-Block `:238-252`): `loop` **und**
+   `loop_ref` zugleich → Fehler; `mode: loop` ohne beides → Fehler; unbekannte `loop_ref`-ID →
+   Fehler; generator/critic des aufgelösten Pairs werden weiterhin gegen `available_roles` geprüft.
+2. `scripts/lib/pipelines.py`-Rendering (`:775-793`) nutzt neuen Helper
+   `resolve_stage_loop(stage, reflection_pairs) -> dict` (Rückgabe: effektives
+   **3-Key**-Objekt `{generator, critic, max_iterations}`) statt direkt `stage.get("loop", {})`.
+   `on_blocked` bleibt im `reflection_pairs`-Registry-Eintrag für andere Tooling-Pfade
+   erhalten, ist aber **nicht** Teil des aufgelösten Render-Contracts (der Renderer rendert
+   Generator/Critic/Max-Iterations und nutzt `on_blocked` nicht).
+3. `scripts/lib/reflection.py`: neuer Helper `find_pair(pairs, pair_id)`/`resolve_stage_loop`;
+   `validate_reflection_pairs` prüft zusätzlich die Rollen des neuen Pairs.
+4. `scripts/lib/config_audit.py::_collect_pipeline_role_refs` (`:193-221`) löst `loop_ref` auf,
+   damit die Rollen-Referenzsammlung vollständig bleibt.
+5. `config.py:1714-1725` (`MAX_ITERATIONS`-Hauptpair) bleibt unverändert auf `dev-review-loop`
+   — der neue Pair darf die Hauptpair-Auswahl nicht verschieben.
+6. Äquivalenz-Ratchet: `resolve_stage_loop(concept-driven-dev.review)` **muss** exakt
+   `{generator: concept-specifier, critic: concept-reviewer, max_iterations: 3}` liefern.
+
+Kein JSON-Schema-Impact: `role-defaults.yaml` (inkl. `quality_pipelines`/`reflection_pairs`)
+wird nicht über `project-config.schema.json` validiert; die Durchsetzung erfolgt in
+`validate_pipelines`/`validate_reflection_pairs`.
+
+#### A.4 Detection-Heuristik für den Guard-Test
+
+Neuer Test `tests/test_no_role_routes_in_templates.py`. **Scope:** `agents/1-generic/*.md`,
+`rules/1-generic/*.md` (Quell-Templates; generierte `.claude`/`.opencode`/… bleiben außen vor).
+
+Ein **Routing-Konstrukt** liegt vor, wenn eine Zeile einem der Muster entspricht:
+
+| ID | Muster |
+|---|---|
+| `T-ROUTE-COL` | Tabellenkopf mit Spalte `Route` (`\|\s*Route\s*\|`, case-insensitive) in den Workflow-Dokumenten |
+| `T-ROLE-ARROW` | `<roleA>\s*(?:→\|->)\s*<roleB>`, Backticks je Seite **optional**, beide Tokens in der Rollenliste aus `config/role-defaults.yaml` |
+| `T-HANDOFF` | `(?i)(hand[ -]?off to\|hand back to\|delegiert an\|route to\|dispatch(?:e)? an\|weiter(?:leiten)? an)\s+(?:the\|der\|die\|das\|den\|dem\|einen)?\s*\x60<role>\x60`, Backticks optional |
+| `T-NEXT` | `(?m)^\s*NEXT:\s*\[[^\]]*\x60<role>\x60[^\]]*\]` |
+
+Eine Fundstelle ist **erlaubt (Dokumentation)** genau dann, wenn mindestens eine der
+folgenden Bedingungen zutrifft:
+
+- `D-BOUNDARY`: liegt in einem `<context>`-Block mit Überschrift `Role and boundary` oder auf
+  einer mit `**Not your job:**` beginnenden Zeile;
+- `D-REFERENCE`: die Zeile beginnt mit `**Delegation (reference only):**`;
+- `D-PIPELINE`: **das erkannte Konstrukt selbst** nennt eine Pipeline-/Pair-ID
+  (`quality_pipelines.*`, `reflection_pairs.*`) statt einer nackten Rolle. Die Regel ist
+  konstrukt- statt zeilenweit: eine Zeile, die irgendwo eine Pipeline-ID erwähnt, ist **kein**
+  Freibrief für eine Rollen-Route auf derselben Zeile;
+- `D-NONROLE`: der Pfeil/Handoff verbindet Nicht-Rollen-Tokens (Pfad/Status/Variable);
+- `D-ORCHESTRATOR`: die ganze Datei `agents/1-generic/orchestrator.md`. Der Orchestrator ist
+  **der** Router (Decision A): seine Task-Size-Routing-Tabelle und sein Tier-/Eskalations-Routing
+  sind beabsichtigt und dokumentiert. Diese datei-weite Ausnahme ist die eine bewusste,
+  begründete Ausnahme vom Routing-Verbot;
+- `D-ESCALATION`: **eng gefasst** — nur ein Handoff, dessen Ziel `principal-developer` ist
+  **und** dessen Zeile die Eskalations-Policy nennt (`escalat`/`last-resort`/`eskalation`).
+  Ersetzt die frühere zeilenweite Ausnahme, sodass andere Rollen-Routen auf solchen Zeilen
+  weiterhin gedeckt werden müssen.
+
+Der Guard-Test schlägt fehl, wenn ein Routing-Konstrukt im Scope durch **keine** D-*-Bedingung
+gedeckt ist (Ausgabe `file:line`). Zusätzlich asserted er:
+
+1. jede `**Delegation (reference only):**`-Zeile enthält **keines** von `background(`,
+   `invoke_subagent`, `task(subagent_type` (keine Dispatch-Semantik);
+2. `T-NEXT` liefert im Workflow-Scope **null** Treffer (Rollenlabels in `NEXT:` sind verboten);
+3. **Negativ-Anker (L3):** eine kanonische Offender-Zeile (`roleA → roleB`, `delegiert an den
+   <role>`, `hand back to the <role>`) wird von `classify_line` weiterhin als ungedeckt
+   gemeldet — eine spätere Aufweichung der D-*-Regeln kann den Guard damit nicht still
+   abschalten.
+
+### C. Declarative Gruppierung `config/spec-plan-groups.yaml` + Bundle-Resolver
+
+#### C.1 Schema (YAML)
+
+Neue Framework-Config (nicht Projekt-Config) `config/spec-plan-groups.yaml` — **ein** Seed,
+**alle** Aspekte:
+
+```yaml
+# Declarative grouping for the native spec/plan workflow ("Plan-Modus").
+# One seed, many aspects: the resolver derives every aspect from the seed so no
+# aspect can drift independently. Framework config (agent-meta source), not project config.
+groups:
+  plan-mode:
+    title: "Plan-Modus"
+    description: "Bündelt alle Spec/Plan-Workflow-Aspekte unter einem Seed."
+    seed:
+      # First present source wins (highest first). Neither source -> `default`.
+      sources:
+        - {config-path: spec-plan-workflow.enabled, kind: explicit}  # explicit project.yaml bool
+        - {config-path: dod.spec-plan-required,       kind: dod}     # resolved DoD flag
+      default: false
+    aspects:
+      - id: rules-channel
+        mechanism: rule-gate
+        config-path: config/rules-presets.yaml#rule-gates
+        enabled-when: seed
+        consumer: scripts/lib/rules.py::_rule_gate_satisfied
+      - id: pipeline-gating
+        mechanism: pipeline-stage-condition
+        config-path: config/role-defaults.yaml#quality_pipelines.concept-driven-dev
+        enabled-when: seed
+        consumer: scripts/lib/pipelines.py::inject_pipeline_blocks
+      - id: scaffold
+        mechanism: sync-scaffold
+        config-path: spec-plan-workflow.paths
+        enabled-when: seed
+        consumer: scripts/lib/spec_plan_scaffold.py::scaffold_spec_plan_dirs
+      - id: template-conditional
+        mechanism: template-conditional
+        config-path: variables.SPEC_PLAN_WORKFLOW_ENABLED
+        enabled-when: seed
+        consumer: scripts/lib/config.py::_build_dod_variables
+      - id: consistency-noop
+        mechanism: validator-noop
+        config-path: spec-plan-workflow.enabled
+        enabled-when: seed
+        consumer: scripts/lib/consistency/spec_plan.py::check_spec_plan_workflow
+      - id: ke-auto-index
+        mechanism: knowledge-engine-auto-write
+        config-path: knowledge-engine.okf.auto-index
+        enabled-when: "seed and ke.enabled and index.mode=='knowledge-engine'"
+        consumer: agents/1-generic/knowledge-ingestor.md
+      - id: ke-auto-log
+        mechanism: knowledge-engine-auto-write
+        config-path: knowledge-engine.okf.auto-log
+        enabled-when: "seed and ke.enabled and index.mode=='knowledge-engine'"
+        consumer: agents/1-generic/planner.md
+      - id: dod-traceability
+        mechanism: dod-flag
+        config-path: dod.spec-plan-traceability
+        enabled-when: "seed and dod.spec-plan-traceability"
+        consumer: scripts/lib/consistency/spec_plan.py::check_spec_plan_workflow
+```
+
+Feld-Semantik: `id` (eindeutig), `mechanism` (geschlossene Enum, s. u.), `config-path`
+(Pfad/`#`-Anker der gelesenen Deklaration), `enabled-when` (Mini-Ausdruck, §C.2), `consumer`
+(Modul::Symbol oder Template, das den Aspekt liest). Pflichtfelder: `id`, `mechanism`,
+`config-path`, `enabled-when`, `consumer`.
+
+#### C.2 Bundle-Resolver
+
+Neue Funktion in `scripts/lib/dod.py`:
+
+```python
+def resolve_spec_plan_bundle(config: dict, agent_meta_root: Path,
+                             *, dod: dict | None = None) -> dict[str, bool]:
+    """Derive ALL Plan-Modus aspects from ONE seed.
+
+    Seed precedence: explicit `spec-plan-workflow.enabled` > resolved DoD
+    `spec-plan-required` > False. Every aspect is a pure function of the seed
+    and the resolved config; no aspect may be set independently.
+    Keys: "enabled" (seed) plus one bool per aspect id.
+    """
+```
+
+- Der Seed wird aus `config/spec-plan-groups.yaml → seed.sources` in Reihenfolge aufgelöst
+  (explizit > DoD, sonst `default: false`).
+- `enabled-when` wird von einem **geschlossenen** Mini-Interpreter ausgewertet (kein
+  `eval`/`exec`): erlaubte Operanden `seed`, `ke.enabled`, `index.mode`,
+  `dod.spec-plan-traceability`, Verknüpfungen `and`/`or`, Vergleiche `==`; alles andere →
+  `SyncConfigError`.
+- `resolve_spec_plan_enabled(...)` bleibt als dünner Wrapper bestehen:
+  `return resolve_spec_plan_bundle(...)["enabled"]` (Signatur/Semantik unverändert,
+  Rückwärtskompatibilität).
+- **Invariante:** `bundle["enabled"] == bundle["rules-channel"] == bundle["pipeline-gating"]
+  == bundle["scaffold"] == bundle["template-conditional"] == bundle["consistency-noop"]`.
+  Die KE-Aspekte sind zusätzlich an KE-Config gekoppelt und daher nicht seed-gleich, aber
+  **seed-abhängig** (`seed=False` ⇒ `False`). `dod-traceability` ist ebenfalls **nicht**
+  seed-gleich: `seed and dod.spec-plan-traceability` (siehe C.3) — bei `seed=False` aber
+  dennoch `False`.
+- Wird ein DoD-Operand verwendet und kein aufgelöstes `dod` übergeben, löst der Resolver es
+  einmal fail-closed selbst auf (`resolve_dod` reicht sein Ergebnis immer durch, daher keine
+  Rekursion).
+
+#### C.3 Resolver-Consumer-Map (ein Seed)
+
+| Aspekt-ID | Mechanismus | Lesender Consumer (heute) | Nach v6 |
+|---|---|---|---|
+| `rules-channel` | rule-gate | `rules.py:75-77` `_rule_gate_satisfied` ruft `resolve_spec_plan_enabled` | `resolve_spec_plan_bundle(…)["rules-channel"]` |
+| `pipeline-gating` | pipeline-stage-condition | `resolve_dod()` injiziert `spec-plan-enabled`; `pipelines.py::inject_pipeline_blocks` (via `_generate_pipeline_block`) liest `active_dod` | unverändert; Seed == `bundle["enabled"]` |
+| `scaffold` | sync-scaffold | `spec_plan_scaffold.py:49` `resolve_spec_plan_enabled` | `bundle["scaffold"]` |
+| `template-conditional` | template-conditional | `config.py::_build_dod_variables` leitet `SPEC_PLAN_WORKFLOW_ENABLED` ab | aus Seed-Projektion |
+| `consistency-noop` | validator-noop | `consistency/spec_plan.py:96+` `check_spec_plan_workflow` | `bundle["consistency-noop"]` |
+| `ke-auto-index` | knowledge-engine-auto-write | `okf.auto-index` (heute wirkungslos, F2) | `bundle["ke-auto-index"]` |
+| `ke-auto-log` | knowledge-engine-auto-write | `okf.auto-log` (heute wirkungslos, F2) | `bundle["ke-auto-log"]` |
+| `dod-traceability` | dod-flag | `consistency/spec_plan.py::check_spec_plan_workflow` liest `bundle["dod-traceability"]` (statt des rohen DoD-Keys) | `bundle["dod-traceability"]` = `seed and dod.spec-plan-traceability` |
+
+Damit ist der Seed die **einzige** Autorität für die seed-gleichen Aspekte; die
+KE-Aspekte hängen zusätzlich an KE-Config, `dod-traceability` zusätzlich am aufgelösten
+DoD-Flag. Beide bleiben seed-abhängig. Die Rule-Gate-Sektion (`rule-gates`) nennt
+weiterhin `requires: spec-plan-workflow.enabled`, aber die Auswertung läuft über den Bundle.
+
+#### C.4 Guard-/Ratchet-Tests
+
+Neuer Test `tests/test_spec_plan_group_consistency.py`:
+
+1. **Schema-Validierung:** `config/spec-plan-groups.yaml` ist parsebar; jede Group/jeder Aspekt
+   hat die Pflichtfelder; `mechanism` ∈ geschlossener Enum; `enabled-when` nutzt nur erlaubte
+   Operanden; `config-path` wird vom deklarierten `consumer` referenziert (statischer Textcheck).
+2. **Seed-Konsistenz:** parametrisierte Config-Matrix (explizit `true`/`false`, abwesend +
+   Preset `true`/`false`, `dod.spec-plan-required`-Override) → `resolve_spec_plan_bundle`
+   liefert die erwarteten Aspekt-Bools; die seed-gleichen Aspekte sind identisch; `seed=False`
+   ⇒ **kein** Aspekt `True`.
+3. **Consumer-Ratchet:** für **jeden** der 8 Aspekte wird der reale Consumer beobachtet —
+   Rule-Gate via `collect_rule_sources`, Pipeline via `resolve_dod` + `inject_pipeline_blocks`,
+   Scaffold via `scaffold_spec_plan_dirs(..., dry_run=True)`, Template-Conditional via
+   `_build_dod_variables`, Consistency-Noop via `check_spec_plan_workflow`, die beiden
+   KE-Aspekte via `sync_knowledge_engine(dry_run=True)` und `dod-traceability` via die
+   `spec_plan_traceability`-Severity aus `check_spec_plan_workflow` — und die Beobachtung
+   gegen den Aspekt-Bool asserted. So kann kein Aspekt unabhängig inkonsistent werden.
+4. **Route-Ratchet:** §A.4-Test deckt direkte Rollen-Routen in `agents/1-generic/*` und
+   `rules/1-generic/*` ab.
+
+### D. Naming-Purge + neutrale Pfade
+
+#### D.1 Purge-Liste (Prosa) — in diesem Schritt bereits ausgeführt
+
+| Datei | Fundstelle | Ersatz |
+|---|---|---|
+| Spec | Kopfzeile (Referenz-Zielbild) | neutrales „externes Referenzmodell“ |
+| Spec | §1.2 Tabellenkopf | `Prozess-Baustein (Referenz)` |
+| Spec | §3 Einleitung | „Das Referenzmodell nutzt Worktree-Isolation“ |
+| Spec | D1 `context`/Alternative | neutrales Referenzvorgehen / „Externen Fremd-Pack“ |
+| Spec | D3 `context` | „Das Referenzvorgehen nutzt Worktree-Isolation“ |
+| Spec | D3 Alternative | „Fremd-Pfad als Default“ |
+| Plan | Kopfzeile (Agentic-Workers-Block) | agent-meta-native Mechanik (§D.2) |
+| Plan | Execution Handoff | Pipeline-/Subagent-Dispatch + `plan-ledger` (§D.2) |
+
+**Pfad-Sonderregel (bleibt):** `docs/superpowers/*`-Pfade sind **Pfade**, kein Prosa-Name, und
+bleiben in diesem Schritt unverändert (Purge der Pfade ist ein späterer Task). Der
+Purge-Test darf Vorkommen innerhalb von Repo-Pfad-Tokens (`docs/superpowers/…`) nicht flaggen.
+
+#### D.2 Plan-Header → agent-meta-native Mechanik
+
+Der Fremd-Skill-Header wird ersetzt durch:
+
+```markdown
+> **Für Agenten-Ausführung:** Ausführung über die Pipeline `quality_pipelines.concept-driven-dev`
+> (Subagent-Dispatch pro Task) und die Rule `plan-ledger`; Fortschritt über das Checkbox-Ledger
+> (`- [ ]`) und `CheckpointStore`/`barrier.checkpoint_ref`. Kein Worktree.
+```
+
+Im Execution-Handoff werden beide Wege agent-meta-native benannt:
+1. **Pipeline-/Subagent-Dispatch** (empfohlen): `payload.plan_ref`, Task-für-Task an frische
+   Subagenten, Review nach jedem Task, Ownership/Barrieren über `Files:`, Recovery über
+   `CheckpointStore`.
+2. **Sequenzielle Einzelagent-Ausführung** nach `plan-ledger`; Review nach jedem Task Pflicht.
+
+#### D.3 Neutrale Pfade + Schema-Default
+
+- Primär-Defaults bleiben `docs/specs`/`docs/plans`/`docs/spikes`.
+- **Kein Schema-`default` darf auf einen Legacy-Pfad zeigen.** Konkret: der Default des Feldes
+  `spec-plan-workflow.paths.legacy` in `config/project-config.schema.json:1849-1852` wird auf
+  `[]` gesetzt; Legacy-Wurzeln müssen Projekte **explizit** deklarieren (weiterhin nur lesbar).
+  `.meta-config/project.yaml:63-65` behält seine explizite `legacy`-Deklaration (Projekt-Config,
+  nicht Schema-Default).
+- Legacy-Artefakte bleiben **read-only**: kein Massen-Umzug, Scan-Scope unverändert (§5.1).
+- Guard: `tests/test_spec_plan_config_schema.py` asserted, dass **kein** `default` im
+  `spec-plan-workflow`-Schema-Block den Substring `docs/superpowers` enthält.
+
+#### D.4 Erlaubte Ausnahme (bewusst, dokumentationspflichtig)
+
+Einzige erlaubte Nennung des externen Plugin-Namens ist das **Whitelist-Beispiel** in der
+`native-extensions`-Doku (real: `docs/superpowers/plans/2026-07-23-native-extensions-whitelist.md:152`,
+`…whitelist: ["<plugin>", "code-simplifier"]`). Diese Nennung ist **kein** Prozess-Routing und
+**kein** Bezug des Spec/Plan-Workflows. Sie ist als bewusste Ausnahme in
+`docs/spec-plan-workflow-coverage.md` (§E, Abschnitt „Bewusste Ausnahmen“) zu protokollieren.
+
+### E. Coverage-Matrix `docs/spec-plan-workflow-coverage.md`
+
+Neues Dokument; die Matrix verbindet **Prozess-Aspekt → agent-meta-Mechanismus**.
+
+**Sektionen:**
+
+1. **Zweck & Scope** — warum die Matrix existiert (Nachweis der Abdeckung, kein Ersatz für Tests).
+2. **Legende** — Mechanismustypen: `rule` | `pipeline` | `reflection-pair` | `role` | `resolver` | `config` | `test`.
+3. **Matrix** mit exakt diesen Spalten:
+   `Prozess-Aspekt | Typ | agent-meta-Mechanismus | Fundstelle (file:symbol) | Consumer | Nachweis (Test) | Status`.
+   Zeilen (mindestens): classification, spec-authoring, review-loop, approval-gate,
+   plan-authoring, execution/ledger, recovery/checkpoint, archive, index, KE-concept-types,
+   rule-gating, pipeline-gating, scaffold, DoD-coupling, template-conditional,
+   routing-single-source, grouping/bundle-seed, naming/paths.
+4. **Bewusste Ausnahmen** — `native-extensions`-Whitelist-Beispiel (§D.4);
+   `docs/superpowers/*`-Pfade bis zum Pfad-Purge; read-only Legacy-Artefakte.
+5. **Lücken / Follow-ups** — u. a. F1 (`systems-engineering`-Schema).
+6. **Pflege-Regel** — neue Prozess-Aspekte erfordern eine Matrixzeile; der Guard aus §C.4/§A.4
+   verweist auf genau diese Matrix.
+
+### F. Offene Punkte / Risiken (v6)
+
+- **R6-1 (Offen):** `enabled-when`-Mini-Interpreter — bewusst kein `eval`; eine Erweiterung um
+  neue Prädikate braucht eine explizite Registry-Ergänzung. Bewertung: geringes Risiko, da die
+  Oberfläche geschlossen ist.
+- **R6-2 (Offen):** Der Route-Guard ist heuristisch (Regex/Scope), keine vollständige
+  Sprach-analyse — bewusster Trade-off analog `orchestrator-guard.sh` (Convention boundary).
+- **R6-3 (Offen):** `loop_ref` ist additiv; ob `bugfix`/`concept-development` später migriert
+  werden, ist **nicht** Teil dieses Vorhabens (inline `loop:` bleibt gültig).
+- **R6-4 (Ausnahme, dokumentiert):** Der `native-extensions`-Whitelist-Ausnahmefall (§D.4) wird
+  nicht gepurged und muss in der Coverage-Matrix (§E) protokolliert bleiben.

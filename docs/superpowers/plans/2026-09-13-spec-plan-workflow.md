@@ -1,10 +1,39 @@
 # Nativer Spec/Plan-Workflow Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Für Agenten-Ausführung:** Ausführung über die Pipeline `quality_pipelines.concept-driven-dev`
+> (Subagent-Dispatch pro Task) und die Rule `plan-ledger`; Fortschritt über das Checkbox-Ledger
+> (`- [ ]`) und `CheckpointStore`/`barrier.checkpoint_ref`. Kein Worktree. Steps als Checkbox
+> (`- [ ]`) zur Nachverfolgung.
+
+## Revision v6 — Design-Addendum (2026-09-13)
+
+> Übernimmt die verbindlichen Entscheidungen A/C/D/E aus
+> `docs/superpowers/specs/2026-09-13-spec-plan-workflow-design.md` (§Revision v6 — Design-Addendum).
+> **Kein Produktionscode in diesem Schritt** — die Tasks 20–24 sind der Umsetzungsplan; die
+> Prosa-Purge (Name des externen Referenzmodells) ist bereits in beiden Dokumenten ausgeführt.
+
+| Punkt | Umsetzung im Plan |
+|---|---|
+| A Routing-Single-Source + Reflection-Pair | Task 20 (Route-Purge + Guard), Task 21 (`concept-specify-loop` + `loop_ref`) |
+| C Gruppierung + Bundle-Resolver + Guards | Task 22 (`config/spec-plan-groups.yaml` + `resolve_spec_plan_bundle`) |
+| D Naming-Purge + neutrale Pfade | Prosa bereits gepurged; Schema-Legacy-Default + Test → Task 23 |
+| E Coverage-Matrix | Task 24 (`docs/spec-plan-workflow-coverage.md`) |
+
+**Geänderte/neue Dateien (v6, Ergänzung zur Datei-Struktur unten):**
+`config/spec-plan-groups.yaml` (Create), `scripts/lib/dod.py` (Bundle-Resolver),
+`scripts/lib/reflection.py` (`resolve_stage_loop`/`find_pair`), `scripts/lib/pipelines.py`
+(`loop_ref`-Validierung/Render), `scripts/lib/config_audit.py` (`loop_ref`-Rollen-Refs),
+`config/role-defaults.yaml` (`concept-specify-loop` + `loop_ref`),
+`config/project-config.schema.json` (`paths.legacy`-Default `[]`),
+`docs/spec-plan-workflow-coverage.md` (Create),
+`tests/test_no_role_routes_in_templates.py` (Create),
+`tests/test_spec_plan_group_consistency.py` (Create),
+sowie Prosa-/Routing-Rewrites in `rules/1-generic/{spec-plan-workflow,brainstorming-gate,plan-ledger,writing-plans}.md`
+und `agents/1-generic/{ideation,concept-specifier,concept-reviewer,planner,orchestrator}.md`.
 
 **Goal:** Die Entscheidungen F2–F12 der Design-Spezifikation als nativen, abschaltbaren Feature-Workflow (Spec → Plan → Execution) implementieren: ein zentraler Master-Switch, DoD-Kopplung, Config+Schema, Rule-Gating, Pipeline-Wiring, eigenständiger Validator, Knowledge-Engine-Anbindung, Rollen-/Regel-Erweiterung und Szenario/CI — stdlib-only, ohne Worktree, provider-agnostisch.
 
-**Architecture:** Fundament ist eine einzige Helper-Funktion `resolve_spec_plan_enabled` in `scripts/lib/dod.py`, deren Ergebnis am Ende von `resolve_dod()` als synthetischer Key `spec-plan-enabled` injiziert wird. Aus diesem einen Seed leiten sich Rule-Auslieferung (intrinsisches, fail-closed Gate in `collect_rule_sources`), Pipeline-Stage-Gating (`condition: {dod_flag: spec-plan-enabled}`), Agent-Template-Conditional (`SPEC_PLAN_WORKFLOW_ENABLED`, als strippbares Flag registriert) und der Consistency-No-op ab. Config, Schema und DoD-Presets deklarieren die Oberfläche; ein neuer Validator-Modus `--validate-spec-plan` nutzt ausschließlich den Graph-Validator aus `orchestration.py`; ein Sync-Scaffold-Schritt legt die neutralen Zielpfade `docs/specs`/`docs/plans`/`docs/spikes` inkl. `.gitkeep` an (analog KE-Scaffolding); Rules und Rollen tragen den Prozess; ein Szenario plus CI-Anbindung pinnen das Verhalten.
+**Architecture:** Fundament ist der Seed des Bundle-Resolvers (`resolve_spec_plan_bundle`, dünner Wrapper `resolve_spec_plan_enabled`) in `scripts/lib/dod.py`, dessen Ergebnis am Ende von `resolve_dod()` als synthetischer Key `spec-plan-enabled` injiziert wird. Aus diesem einen Seed leiten sich Rule-Auslieferung (intrinsisches, fail-closed Gate in `collect_rule_sources`), Pipeline-Stage-Gating (`condition: {dod_flag: spec-plan-enabled}`), Agent-Template-Conditional (`SPEC_PLAN_WORKFLOW_ENABLED`, als strippbares Flag registriert) und der Consistency-No-op ab. Config, Schema und DoD-Presets deklarieren die Oberfläche; ein neuer Validator-Modus `--validate-spec-plan` nutzt ausschließlich den Graph-Validator aus `orchestration.py`; ein Sync-Scaffold-Schritt legt die neutralen Zielpfade `docs/specs`/`docs/plans`/`docs/spikes` inkl. `.gitkeep` an (analog KE-Scaffolding); Rules und Rollen tragen den Prozess; ein Szenario plus CI-Anbindung pinnen das Verhalten.
 
 **Tech Stack:** Python 3.9+ stdlib only (PyYAML bleibt optionale Soft-Dependency via `scripts/lib/io._load_yaml_or_json`), pytest (inkl. test-only `jsonschema`), `tests/scenarios/`-Harness, Markdown-Templates (Rules/Rollen) mit YAML-Frontmatter.
 
@@ -93,6 +122,28 @@
 | Modify | `tests/test_frontmatter_parity.py` | Rollen-Frontmatter-Parität |
 | Modify | `tests/test_agents_frontmatter.py` | Frontmatter/Bumps + Archiv-Doku |
 | Modify | `tests/test_barrier_runtime.py` | `FanoutPlan`-Nutzung |
+| Create | `config/spec-plan-groups.yaml` | Deklarative Gruppierung „Plan-Modus“ (v6/C) |
+| Modify | `scripts/lib/dod.py` | zusätzl. `resolve_spec_plan_bundle` (v6/C; `resolve_spec_plan_enabled` bleibt Wrapper) |
+| Modify | `scripts/lib/reflection.py` | `find_pair`/`resolve_stage_loop` für `loop_ref` (v6/A) |
+| Modify | `scripts/lib/pipelines.py` | `loop_ref`-Validierung + Render via `resolve_stage_loop` (v6/A) |
+| Modify | `scripts/lib/config_audit.py` | `loop_ref` in `_collect_pipeline_role_refs` (v6/A) |
+| Modify | `config/role-defaults.yaml` | `reflection_pairs.concept-specify-loop` + `loop_ref` in `concept-driven-dev.review` (v6/A) |
+| Modify | `config/project-config.schema.json` | `spec-plan-workflow.paths.legacy`-Default `[]` (v6/D) |
+| Modify | `rules/1-generic/spec-plan-workflow.md` | Route-Tabelle → `Pipeline-Stage` + `Route:`-Verweis (v6/A) |
+| Modify | `rules/1-generic/brainstorming-gate.md` | Route-Zelle → Pipeline-Stage-Referenz (v6/A) |
+| Modify | `rules/1-generic/plan-ledger.md` | `delegiert an` → Pipeline-/Config-Verweis (v6/A) |
+| Modify | `rules/1-generic/writing-plans.md` | Naming/Routing-Purge falls betroffen (v6/A) |
+| Modify | `agents/1-generic/ideation.md` | Duplikat-Route-Tabelle → Pipeline-Verweis (v6/A) |
+| Modify | `agents/1-generic/concept-specifier.md` | Handoff/NEXT/Review-Loop → Pipeline-/Pair-Verweis (v6/A) |
+| Modify | `agents/1-generic/concept-reviewer.md` | Routing-/Naming-Purge falls betroffen (v6/A) |
+| Modify | `agents/1-generic/planner.md` | Routing-/Naming-Purge falls betroffen (v6/A) |
+| Modify | `agents/1-generic/orchestrator.md` | Routing-/Naming-Purge falls betroffen (v6/A) |
+| Create | `tests/test_no_role_routes_in_templates.py` | Route-Guard-Heuristik (v6/A.4) |
+| Create | `tests/test_spec_plan_group_consistency.py` | Schema-/Seed-/Consumer-Ratchet (v6/C.4) |
+| Create | `docs/spec-plan-workflow-coverage.md` | Prozess-Aspekt→Mechanismus-Matrix (v6/E) |
+| Modify | `tests/test_pipelines.py` | `loop_ref`-Validierung/Render (v6/A) |
+| Modify | `tests/test_spec_plan_config_schema.py` | kein Legacy-`default` im Schema (v6/D.3) |
+| Modify | `tests/test_spec_plan_resolve_enabled.py` | Bundle-Wrapper-Äquivalenz (v6/C) |
 
 **Reine Verifikationsläufe (kein Edit):** `tests/test_embed_rules_channel.py` und `tests/test_dod_platform_cascade.py` werden in Step-4-Kommandos ausgeführt, aber **nicht** geändert — sie stehen deshalb nicht als `Modify` in der Map.
 
@@ -2341,6 +2392,250 @@
 
 ---
 
+## Phase J — Routing-Purge, Gruppierung, Naming & Coverage (v6)
+
+> Übernimmt Design-Addendum A/C/D/E (Spec §Revision v6). Tasks 20–24 sind additiv zu Phase A–I;
+> keine dieser Tasks ändert das Master-Switch-Verhalten aus Phase A.
+
+### Task 20: Route-Purge in Rules/Agents + Route-Guard-Test
+
+**Files:**
+- Modify: `rules/1-generic/spec-plan-workflow.md:27-33`
+- Modify: `rules/1-generic/brainstorming-gate.md:13-15`
+- Modify: `rules/1-generic/plan-ledger.md:55`
+- Modify: `rules/1-generic/writing-plans.md` (nur falls Route-/Naming-Fundstellen)
+- Modify: `agents/1-generic/ideation.md:50-56,94-101,159`
+- Modify: `agents/1-generic/concept-specifier.md:73-82,115`
+- Modify: `agents/1-generic/{concept-reviewer,planner,orchestrator}.md` (nur falls betroffen)
+- Create: `tests/test_no_role_routes_in_templates.py`
+
+**Interfaces:**
+- Consumes: Design-Addendum §A.1/A.2 (Rewrite-Regel + Mapping-Tabelle).
+- Produces: keine Route-Tabellen/`→ <role>`/`hand off to`/`delegiert an`/`NEXT:`-Rollenlabels
+  für den Spec/Plan-Workflow; stattdessen `**Routing:** Ich dispatche nicht selbst.` +
+  `Route: quality_pipelines.concept-driven-dev` bzw. `…concept-development`.
+  `tests/test_no_role_routes_in_templates.py` erzwingt die Heuristik aus §A.4.
+
+- [ ] **Step 1: Write the failing test**
+
+  `tests/test_no_role_routes_in_templates.py` implementiert §A.4: Scope `agents/1-generic/*.md`
+  und `rules/1-generic/*.md`; Flags `T-ROUTE-COL`/`T-ROLE-ARROW`/`T-HANDOFF`/`T-NEXT`; erlaubt
+  über `D-BOUNDARY`/`D-REFERENCE`/`D-PIPELINE`/`D-NONROLE`; Rollenliste aus
+  `config/role-defaults.yaml`. Erwartung: FAIL gegen den Ist-Stand (min. `spec-plan-workflow.md`
+  Route-Tabelle, `ideation.md` Duplikat-Tabelle, `concept-specifier.md` Handoff/NEXT).
+
+- [ ] **Step 2: Run the test, confirm it fails**
+
+  Run: `pytest tests/test_no_role_routes_in_templates.py -v`
+  Expected: FAIL (mind. 4 Fundstellen).
+
+- [ ] **Step 3: Apply the rewrite rule**
+
+  Ersetze jede Fundstelle gemäß Addendum-Tabelle §A.2:
+  - `rules/1-generic/spec-plan-workflow.md`: Spalte `Route` → `Pipeline-Stage`; Satz
+    `Route: quality_pipelines.concept-driven-dev` (+ `Route (Spike): quality_pipelines.concept-development`).
+  - `agents/1-generic/ideation.md`: Duplikat-Tabelle auf Klassen+Artefakt reduzieren, Verweis auf
+    Master-Rule + `Route: quality_pipelines.concept-driven-dev`; Handoff-Zeilen → `Route (Requirements-Pfad): quality_pipelines.concept-development. Ich dispatche nicht selbst.`
+  - `agents/1-generic/concept-specifier.md`: Review-Loop → `reflection_pairs.concept-specify-loop`;
+    Handoff → Pipeline-Kette; `NEXT:` → `NEXT: [Pipeline-Stage-Fortschritt (concept-driven-dev)]`.
+  - `rules/1-generic/brainstorming-gate.md:15` → Pipeline-Stage-Referenz.
+  - `rules/1-generic/plan-ledger.md:55` → Pipeline-/Config-Verweis statt `delegiert an`.
+  - Betroffene Rollen zusätzlich `**Routing:** Ich dispatche nicht selbst.` erhalten.
+  - Frontmatter-`version` jeder geänderten Rolle/Rule bumpen (Minor).
+
+- [ ] **Step 4: Run the tests again, confirm they pass**
+
+  Run: `pytest tests/test_no_role_routes_in_templates.py tests/test_frontmatter_parity.py tests/test_agents_frontmatter.py -q`
+  Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+  ```bash
+  git add rules/1-generic agents/1-generic tests/test_no_role_routes_in_templates.py
+  git commit -m "refactor: make pipelines the single routing source"
+  ```
+
+---
+
+### Task 21: `concept-specify-loop` + `loop_ref`-Unterstützung
+
+**Files:**
+- Modify: `config/role-defaults.yaml:2320-2342` (Pair) und `:2503-2511` (`loop_ref`)
+- Modify: `scripts/lib/reflection.py` (`find_pair`/`resolve_stage_loop`)
+- Modify: `scripts/lib/pipelines.py` (`validate_pipelines` `:238-252`, Render `:775-793`)
+- Modify: `scripts/lib/config_audit.py:193-221`
+- Modify: `tests/test_pipelines.py`
+
+**Interfaces:**
+- Consumes: `load_reflection_pairs` (`scripts/lib/reflection.py:24`); `validate_pipelines` (`pipelines.py:161`).
+- Produces: `find_pair(pairs, pair_id) -> dict | None`; `resolve_stage_loop(stage, reflection_pairs) -> dict` mit **3 Keys** `{generator, critic, max_iterations}` (`on_blocked` bleibt nur im `reflection_pairs`-Registry-Eintrag, nicht im aufgelösten Render-Contract); `loop_ref` in `mode: loop`; `reflection_pairs.concept-specify-loop` (generator `concept-specifier`, critic `concept-reviewer`, max 3).
+
+- [ ] **Step 1: Write the failing tests**
+
+  In `tests/test_pipelines.py`: (a) `loop_ref: concept-specify-loop` rendert Loop mit
+  generator/critic/`Max iterations: 3`; (b) unbekannte `loop_ref`-ID → Validierungsfehler;
+  (c) `loop` **und** `loop_ref` zugleich → Fehler; (d) `mode: loop` ohne beides → Fehler;
+  (e) `resolve_stage_loop(concept-driven-dev.review)` == `{generator: concept-specifier, critic: concept-reviewer, max_iterations: 3}`.
+
+- [ ] **Step 2: Run the tests, confirm they fail**
+
+  Run: `pytest tests/test_pipelines.py -q`
+  Expected: FAIL — `loop_ref` unbekannt / `resolve_stage_loop` nicht importierbar.
+
+- [ ] **Step 3: Implement pair + resolver + validation**
+
+  - `config/role-defaults.yaml`: Pair `concept-specify-loop` ergänzen; `concept-driven-dev.review`
+    von `loop:` auf `loop_ref: concept-specify-loop` umstellen.
+  - `scripts/lib/reflection.py`: `find_pair` + `resolve_stage_loop` (fail-closed bei unbekannter ID).
+  - `scripts/lib/pipelines.py`: `validate_pipelines` erzwingt exakt eine Loop-Quelle und prüft die
+    aufgelösten generator/critic gegen `available_roles`; Render nutzt `resolve_stage_loop`.
+  - `scripts/lib/config_audit.py`: `_collect_pipeline_role_refs` löst `loop_ref` auf.
+  - `bugfix.review` und `concept-development.concept` bleiben inline (keine Migration).
+
+- [ ] **Step 4: Run the tests again, confirm they pass**
+
+  Run: `pytest tests/test_pipelines.py tests/test_orchestration_contract.py tests/ -q`
+  Expected: PASS (inkl. Regressions).
+
+- [ ] **Step 5: Commit**
+
+  ```bash
+  git add config/role-defaults.yaml scripts/lib/reflection.py scripts/lib/pipelines.py scripts/lib/config_audit.py tests/test_pipelines.py
+  git commit -m "feat: add concept-specify-loop reflection pair and loop_ref support"
+  ```
+
+---
+
+### Task 22: `config/spec-plan-groups.yaml` + `resolve_spec_plan_bundle` + Consumer-Ratchet
+
+**Files:**
+- Create: `config/spec-plan-groups.yaml`
+- Modify: `scripts/lib/dod.py` (Bundle-Resolver neben `resolve_spec_plan_enabled`)
+- Modify: `scripts/lib/rules.py:75-77` (Rule-Gate liest `rules-channel`)
+- Modify: `scripts/lib/spec_plan_scaffold.py:49` (liest `scaffold`)
+- Modify: `scripts/lib/consistency/spec_plan.py` (liest `consistency-noop`)
+- Modify: `scripts/lib/config.py::_build_dod_variables` (Seed-Projektion)
+- Create: `tests/test_spec_plan_group_consistency.py`
+- Modify: `tests/test_spec_plan_resolve_enabled.py`
+
+**Interfaces:**
+- Consumes: `resolve_dod` (`dod.py:68`), `_load_yaml_or_json`, `config/role-defaults.yaml`.
+- Produces: `resolve_spec_plan_bundle(config, agent_meta_root, *, dod=None) -> dict[str, bool]`
+  mit Keys `enabled`, `rules-channel`, `pipeline-gating`, `scaffold`, `template-conditional`,
+  `consistency-noop`, `ke-auto-index`, `ke-auto-log`, `dod-traceability`.
+  `resolve_spec_plan_enabled(...)` wird zum Wrapper `bundle["enabled"]` (Signatur unverändert).
+
+- [ ] **Step 1: Write the failing tests**
+
+  `tests/test_spec_plan_group_consistency.py` gemäß Design-Addendum §C.4: Schema-Validierung,
+  Seed-Matrix, Seed-Invariante, Consumer-Ratchet (Rule-Gate/`collect_rule_sources`,
+  Pipeline via `resolve_dod`+`inject_pipeline_blocks`, Scaffold `dry_run=True`).
+  In `tests/test_spec_plan_resolve_enabled.py` ergänzen: `resolve_spec_plan_enabled(…) == resolve_spec_plan_bundle(…)["enabled"]`.
+
+- [ ] **Step 2: Run the tests, confirm they fail**
+
+  Run: `pytest tests/test_spec_plan_group_consistency.py tests/test_spec_plan_resolve_enabled.py -v`
+  Expected: FAIL — `resolve_spec_plan_bundle` fehlt, `config/spec-plan-groups.yaml` fehlt.
+
+- [ ] **Step 3: Implement grouping config + resolver + consumer migration**
+
+  - `config/spec-plan-groups.yaml` exakt nach Addendum §C.1 (Group `plan-mode`, Seed-Sources
+    `spec-plan-workflow.enabled` > `dod.spec-plan-required`, `default: false`; Aspekte §C.1).
+  - `scripts/lib/dod.py`: geschlossener `enabled-when`-Mini-Interpreter + `resolve_spec_plan_bundle`;
+    `resolve_spec_plan_enabled` delegiert.
+  - Consumer gemäß §C.3 auf die Aspekt-Keys umstellen (Rule-Gate, Scaffold, Consistency;
+    Pipeline-Condition + Template-Conditional bleiben Seed-projiziert).
+
+- [ ] **Step 4: Run the tests again, confirm they pass**
+
+  Run: `pytest tests/test_spec_plan_group_consistency.py tests/test_spec_plan_resolve_enabled.py tests/test_rules_activation_gate.py tests/test_spec_plan_scaffold.py -q`
+  Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+  ```bash
+  git add config/spec-plan-groups.yaml scripts/lib/dod.py scripts/lib/rules.py scripts/lib/spec_plan_scaffold.py scripts/lib/consistency/spec_plan.py scripts/lib/config.py tests/test_spec_plan_group_consistency.py tests/test_spec_plan_resolve_enabled.py
+  git commit -m "feat: add plan-mode group bundle resolver with one seed"
+  ```
+
+---
+
+### Task 23: Naming-Purge (Schema-Default) + Purge-Guard
+
+**Files:**
+- Modify: `config/project-config.schema.json:1849-1852` (`paths.legacy`-Default → `[]`)
+- Modify: `tests/test_spec_plan_config_schema.py`
+
+**Interfaces:**
+- Consumes: Design-Addendum §D.3 (kein Legacy-`default`).
+- Produces: Schema-Block ohne `docs/superpowers` in irgendeinem `default`.
+
+> Hinweis: Die Prosa-Purge in Spec/Plan ist **bereits ausgeführt** (Revision v6). Dieser Task
+> sichert nur den Schema-Default und den Guard ab; er ändert **keine** `docs/superpowers/*`-Pfade.
+
+- [ ] **Step 1: Write the failing test**
+
+  In `tests/test_spec_plan_config_schema.py`: für alle `default`-Werte im
+  `spec-plan-workflow`-Block asserted, dass `"docs/superpowers"` **nicht** enthalten ist
+  (Default `paths.legacy` == `[]`).
+
+- [ ] **Step 2: Run the test, confirm it fails**
+
+  Run: `pytest tests/test_spec_plan_config_schema.py -v`
+  Expected: FAIL — `paths.legacy`-Default enthält `docs/superpowers/specs|plans`.
+
+- [ ] **Step 3: Fix the schema default**
+
+  In `config/project-config.schema.json` den `default` von `spec-plan-workflow.paths.legacy`
+  auf `[]` setzen; `.meta-config/project.yaml:63-65` behält seine explizite `legacy`-Deklaration
+  (Projekt-Config, kein Schema-Default, weiterhin read-only).
+
+- [ ] **Step 4: Run the test again, confirm it passes**
+
+  Run: `pytest tests/test_spec_plan_config_schema.py tests/test_config_null_blocks.py -q`
+  Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+  ```bash
+  git add config/project-config.schema.json tests/test_spec_plan_config_schema.py
+  git commit -m "fix: drop legacy path default from spec-plan schema"
+  ```
+
+---
+
+### Task 24: Coverage-Matrix-Dokument
+
+**Files:**
+- Create: `docs/spec-plan-workflow-coverage.md`
+- Modify: `docs/superpowers/specs/2026-09-13-spec-plan-workflow-design.md` (Rückverweis, falls nötig)
+
+**Interfaces:**
+- Consumes: Design-Addendum §E (Sektionen + Spalten); tatsächliche Consumer-Symbole aus Task 20–23.
+- Produces: Matrix `Prozess-Aspekt | Typ | agent-meta-Mechanismus | Fundstelle (file:symbol) | Consumer | Nachweis (Test) | Status` mit den Mindestzeilen aus §E.3, Abschnitt „Bewusste Ausnahmen“ (§D.4) und „Pflege-Regel“.
+
+- [ ] **Step 1: Write the doc**
+
+  `docs/spec-plan-workflow-coverage.md` mit Sektionen: Zweck & Scope; Legende (Typen
+  `rule|pipeline|reflection-pair|role|resolver|config|test`); Matrix (Mindestzeilen §E.3);
+  Bewusste Ausnahmen (native-extensions-Whitelist-Beispiel, `docs/superpowers/*`-Pfade bis zum
+  Pfad-Purge, read-only Legacy); Lücken/Follow-ups (F1); Pflege-Regel.
+
+- [ ] **Step 2: Verify matrix completeness**
+
+  Jede Matrixzeile referenziert eine reale Fundstelle (file:symbol) und mindestens einen Test;
+  alle Aspekte aus `config/spec-plan-groups.yaml` besitzen eine Zeile. Manuelle Verifikation,
+  kein eigenes Testfile (dokumentarischer Guard über Task 22, Testfall 1).
+
+- [ ] **Step 3: Commit**
+
+  ```bash
+  git add docs/spec-plan-workflow-coverage.md docs/superpowers/specs/2026-09-13-spec-plan-workflow-design.md
+  git commit -m "docs: add spec-plan workflow coverage matrix"
+  ```
+
+---
+
 ## Out-of-Scope-Follow-up (F1)
 
 `systems-engineering`-Schema-Deklaration: bewusst **nicht** Teil dieses Vorhabens (§5.2, §10.2, §13).
@@ -2369,6 +2664,11 @@ Die **Issue-Erstellung für dieses Folge-Issue ist nicht Teil dieses Vorhabens**
 | §11 Trade-offs D1–D10 | D1→3,4; D2→9,10; D3→Global,17; D4→1,2; D5→4; D6→6; D7→10,11; D8→5b,12b; D9→10,11; D10→12,13 |
 | §12 Test-/Verifikationsstrategie | 1, 2, 2b, 3, 4, 5, 5b, 6, 7, 8, 9, 10, 11, 12, 12b, 13, 14, 15, 16, 17, 18, 19 |
 | §13 Offene Fragen F1–F12 | F1→Out-of-Scope-Abschnitt; F2→12; F3→6; F4→4,12b; F5→13; F6→10; F7→15; F8→1,3; F9→5,5b; F10→14; F11→13; F12→11,18 |
+| §Revision v6/A (Routing-Single-Source + `concept-specify-loop`/`loop_ref`) | 20, 21 |
+| §Revision v6/C (Gruppierung + Bundle-Resolver + Guards) | 22 |
+| §Revision v6/D (Naming-Purge + neutrale Pfade; Prosa bereits ausgeführt) | 23 |
+| §Revision v6/E (Coverage-Matrix) | 24 |
+| §Revision v6/F (Risiken R6-1…R6-4) | dokumentiert; R6-2/R6-3 als bewusste Trade-offs |
 
 ### (b) Placeholder-Scan
 
@@ -2384,6 +2684,10 @@ Bestätigt: **keine** Platzhalter. Kein `TBD`, kein `TODO`, kein alleinstehender
 - Flag-Namen `spec-plan-required`, `spec-plan-traceability`, synthetisch `spec-plan-enabled` (F8) — durchgängig. Conditional-Variable `SPEC_PLAN_WORKFLOW_ENABLED` in Task 2/2b.
 - Stage-IDs: `classify`, `specify`, `approve`, `plan`, `implement`, `validate` — konsistent in Task 8/17 und Szenario.
 - Pfade `docs/specs`/`docs/plans`/`docs/spikes`, Archiv-Ziel `docs/plans/archive` — konsistent in Task 4/5/5b/13/18.
+- `resolve_spec_plan_bundle(config, agent_meta_root, *, dod=None) -> dict[str, bool]` — Task 22; `resolve_spec_plan_enabled` bleibt Wrapper `bundle["enabled"]` (Signatur unverändert, Task 1/22).
+- `find_pair(pairs, pair_id) -> dict | None` / `resolve_stage_loop(stage, reflection_pairs) -> dict` — identisch in Task 21 (Definition) und `pipelines.py`/`config_audit.py`.
+- `loop_ref` als einzige Alternative zu inline `loop:`; Pair-ID `concept-specify-loop` — konsistent in Task 20/21.
+- Group-ID `plan-mode` und Aspekt-IDs `rules-channel`/`pipeline-gating`/`scaffold`/`template-conditional`/`consistency-noop`/`ke-auto-index`/`ke-auto-log`/`dod-traceability` — konsistent in `config/spec-plan-groups.yaml`, `resolve_spec_plan_bundle` und Consumer-Ratchet (Task 22/24).
 
 ### (d) Offene Punkte
 
@@ -2394,10 +2698,10 @@ Bestätigt: **keine** Platzhalter. Kein `TBD`, kein `TODO`, kein alleinstehender
 
 ## Execution Handoff
 
-Zwei Ausführungswege stehen zur Wahl:
+Zwei agent-meta-native Ausführungswege stehen zur Wahl:
 
-1. **`superpowers:subagent-driven-development` (empfohlen):** Der Orchestrator nimmt diesen Plan als `payload.plan_ref`, dispatcht Task für Task an frische Subagenten und lässt nach jedem Task reviewen. Ownership/Barrieren pro Task über die `Files:`-Blöcke; Recovery über `CheckpointStore`/`BarrierEntry.checkpoint_ref`. Kein Worktree.
-2. **`superpowers:executing-plans`:** Ein einzelner Agent arbeitet die Checkbox-Steps sequenziell ab; Review nach jedem Task bleibt Pflicht.
+1. **Pipeline-/Subagent-Dispatch (empfohlen):** Der Orchestrator nimmt diesen Plan als `payload.plan_ref`, schreitet die Pipeline `quality_pipelines.concept-driven-dev` fort und dispatcht Task für Task an frische Subagenten; nach jedem Task Review gemäß `plan-ledger`. Ownership/Barrieren pro Task über die `Files:`-Blöcke; Recovery über `CheckpointStore`/`BarrierEntry.checkpoint_ref`. Kein Worktree.
+2. **Sequenzielle Einzelagent-Ausführung nach `plan-ledger`:** Ein einzelner Agent arbeitet die Checkbox-Steps sequenziell ab; Review nach jedem Task bleibt Pflicht.
 
 Bevorzugt wird Weg 1, weil die Tasks aufeinander aufbauen (Foundation zuerst) und pro Task genau ein Agent verantwortlich ist.
 
