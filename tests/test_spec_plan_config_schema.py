@@ -231,3 +231,38 @@ def test_condition_payload_flag_accepted():
         }),
         _schema(),
     )
+
+
+def test_progress_block_accepted():
+    jsonschema = pytest.importorskip("jsonschema")
+    jsonschema.validate(
+        _base_config(progress={"dir": ".run/progress", "checkpoint-dir": ".run/checkpoints"}),
+        _schema(),
+    )
+
+
+def test_progress_partial_block_accepted():
+    jsonschema = pytest.importorskip("jsonschema")
+    jsonschema.validate(_base_config(progress={"dir": ".run/progress"}), _schema())
+    jsonschema.validate(_base_config(progress={"checkpoint-dir": ".run/checkpoints"}), _schema())
+
+
+def test_progress_unknown_subkey_rejected():
+    jsonschema = pytest.importorskip("jsonschema")
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(_base_config(progress={"bogus": "x"}), _schema())
+
+
+def test_progress_non_string_dir_rejected():
+    jsonschema = pytest.importorskip("jsonschema")
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(_base_config(progress={"dir": 1}), _schema())
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(_base_config(progress={"checkpoint-dir": ["x"]}), _schema())
+
+
+def test_progress_defaults_documented_in_schema():
+    block = _schema()["properties"]["progress"]
+    assert block["additionalProperties"] is False
+    assert block["properties"]["dir"]["default"] == ".meta-viz/progress"
+    assert block["properties"]["checkpoint-dir"]["default"] == ".meta-viz/checkpoints"

@@ -215,6 +215,10 @@ def test_store_oserror_exits_1(tmp_path, monkeypatch):
         def __init__(self, *args, **kwargs):
             pass
 
+        @classmethod
+        def from_config(cls, *args, **kwargs):
+            return cls()
+
         def save_checkpoint(self, *args, **kwargs):
             raise OSError("boom")
 
@@ -238,6 +242,10 @@ def test_handler_store_oserror_exits_1(tmp_path, monkeypatch):
     class _BoomStore:
         def __init__(self, *args, **kwargs):
             pass
+
+        @classmethod
+        def from_config(cls, *args, **kwargs):
+            return cls()
 
         def save_checkpoint(self, *args, **kwargs):
             raise OSError("boom")
