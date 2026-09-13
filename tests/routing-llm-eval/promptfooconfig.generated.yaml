@@ -464,3 +464,29 @@ tests:
     - 1-generic
     - 2-platform
     - 3-project
+- description: b7-uiux-heuristics-01 [ui-ux-designer]
+  vars:
+    role: ui-ux-designer
+    prompt: Spezifiziere eine Login-Screen-Spezifikation. Wie sicherst du die Nutzerfreundlichkeit und
+      Barrierefreiheit der Interaktionen ab?
+  assert:
+  - type: icontains-any
+    value:
+    - Usability Heuristics
+    - NN/g
+    - -heuristic
+  - type: icontains
+    value: WCAG 2.2
+- description: b7-designsys-tokens-01 [design-system-architect]
+  vars:
+    role: design-system-architect
+    prompt: Erstelle die Design-Token-Artefakte fuer ein neues Design-System. Wie garantiert du, dass
+      die Tokens portabel und tool-unabhaengig bleiben?
+  assert:
+  - type: icontains-any
+    value:
+    - Design Tokens Format
+    - DTCG
+    - \\$tokens
+  - type: not-icontains
+    value: nur eine Tailwind-Datei

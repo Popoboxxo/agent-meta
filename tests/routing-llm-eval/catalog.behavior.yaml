@@ -82,3 +82,26 @@ cases:
       - '1-generic'
       - '2-platform'
       - '3-project'
+
+  # --- B7: literature-anchored role disciplines (#777) --------------------
+  - id: b7-uiux-heuristics-01
+    role: ui-ux-designer
+    category: process-discipline
+    prompt: "Spezifiziere eine Login-Screen-Spezifikation. Wie sicherst du die Nutzerfreundlichkeit und Barrierefreiheit der Interaktionen ab?"
+    expected_any:
+      - 'Usability Heuristics'
+      - 'NN/g'
+      - '-heuristic'
+    expected_all:
+      - 'WCAG 2.2'
+
+  - id: b7-designsys-tokens-01
+    role: design-system-architect
+    category: process-discipline
+    prompt: "Erstelle die Design-Token-Artefakte fuer ein neues Design-System. Wie garantiert du, dass die Tokens portabel und tool-unabhaengig bleiben?"
+    expected_any:
+      - 'Design Tokens Format'
+      - 'DTCG'
+      - '\\$tokens'
+    forbidden:
+      - 'nur eine Tailwind-Datei'
