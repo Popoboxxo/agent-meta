@@ -65,3 +65,61 @@ def test_changed_artifact_in_scope_detects_placeholder(tmp_path, monkeypatch):
         tmp_path, {"platforms": [], "spec-plan-workflow": {"enabled": True}}, _log(tmp_path),
     )
     assert code == 1
+
+
+_DRIFT_SPEC = (
+    "# Demo — Spec\n> Status: APPROVED (2026-09-13)\n"
+    "## Problem\nDemo-Problem\n"
+    "## Ziel\nDemo-Ziel\n"
+    "## Nicht-Ziele\nDemo-Nicht-Ziel\n"
+    "## Interface Contracts\n"
+    "## Datenfluss\n"
+    "## Acceptance Criteria\n1. AC-1\n"
+    "## Offene Fragen + Risiken\n"
+    "## Trace-Anker: spec-id: SPEC-demo\n"
+)
+
+_DRIFT_PLAN = (
+    "# Demo Implementation Plan\n> Status: geplant\n"
+    "**Goal:** demo\n**Architecture:** demo\n**Tech Stack:** demo\n"
+    "**Spec:** docs/specs/2026-09-13-demo-design.md\n"
+    "## Global Constraints\n- stdlib only\n"
+    "## File Structure\n- Create: docs/specs/x.md\n"
+    "## Trace-Anker: spec-id: SPEC-demo\n"
+    "---\npipeline_stages:\n  implement: 1\n---\n"
+    "### Task 1: First\n- [x] Step a\n"
+)
+
+
+def test_drift_finding_sets_exit_1(tmp_path, monkeypatch):
+    """AC-16: a completed-checkpoint/ledger mismatch makes the gate exit 1."""
+    from lib.checkpoint import Checkpoint, CheckpointStore
+
+    specs = tmp_path / "docs" / "specs"
+    plans = tmp_path / "docs" / "plans"
+    specs.mkdir(parents=True, exist_ok=True)
+    plans.mkdir(parents=True, exist_ok=True)
+    (specs / "2026-09-13-demo-design.md").write_text(_DRIFT_SPEC, encoding="utf-8")
+    (plans / "2026-09-13-demo.md").write_text(_DRIFT_PLAN, encoding="utf-8")
+
+    store = CheckpointStore(project_root=tmp_path)
+    store.save_checkpoint(
+        "sess-drift",
+        Checkpoint(
+            task_id="task-1",
+            agent="developer",
+            task_description="demo",
+            status="in_progress",
+            plan_id="2026-09-13-demo",
+        ),
+    )
+
+    monkeypatch.setattr(
+        "lib.spec_plan_validate._changed_files",
+        lambda root: {"docs/plans/2026-09-13-demo.md"},
+    )
+
+    code = validate_spec_plan(
+        tmp_path, {"platforms": [], "spec-plan-workflow": {"enabled": True}}, _log(tmp_path),
+    )
+    assert code == 1
