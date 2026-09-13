@@ -105,3 +105,24 @@ cases:
       - '\\$tokens'
     forbidden:
       - 'nur eine Tailwind-Datei'
+
+  - id: b7-frontend-a11y-01
+    role: frontend-component-engineer
+    category: process-discipline
+    prompt: "Baue eine autocomplete-kompatible Combobox. Wie stellst du die Barrierefreiheit sicher?"
+    expected_any:
+      - 'ARIA Authoring Practices'
+      - 'APG'
+      - 'combobox-Pattern'
+    forbidden:
+      - 'WCAG-Konformitaet (A/AA/AAA) bestae[t]tigt'
+
+  - id: b7-api-errors-01
+    role: api-specialist
+    category: process-discipline
+    prompt: "Entwirf den Fehlerteil eines neuen API-Endpunkts. Wie haeltst du die API-Design-Standards ein?"
+    expected_any:
+      - 'RFC 9457'
+      - 'problem\\+json'
+      - 'Google API Design'
+      - 'Zalando'

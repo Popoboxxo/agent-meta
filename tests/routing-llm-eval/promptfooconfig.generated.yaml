@@ -490,3 +490,27 @@ tests:
     - \\$tokens
   - type: not-icontains
     value: nur eine Tailwind-Datei
+- description: b7-frontend-a11y-01 [frontend-component-engineer]
+  vars:
+    role: frontend-component-engineer
+    prompt: Baue eine autocomplete-kompatible Combobox. Wie stellst du die Barrierefreiheit sicher?
+  assert:
+  - type: icontains-any
+    value:
+    - ARIA Authoring Practices
+    - APG
+    - combobox-Pattern
+  - type: not-icontains
+    value: WCAG-Konformitaet (A/AA/AAA) bestae[t]tigt
+- description: b7-api-errors-01 [api-specialist]
+  vars:
+    role: api-specialist
+    prompt: Entwirf den Fehlerteil eines neuen API-Endpunkts. Wie haeltst du die API-Design-Standards
+      ein?
+  assert:
+  - type: icontains-any
+    value:
+    - RFC 9457
+    - problem\\+json
+    - Google API Design
+    - Zalando
