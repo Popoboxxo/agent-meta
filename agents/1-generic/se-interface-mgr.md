@@ -1,6 +1,6 @@
 ---
 name: se-interface-mgr
-version: 1.10.0
+version: 1.11.0
 description: Manages generic signal flow and deterministic synchronization across
   systems. Persists interface registry to filesystem.
 hint: Manages generic signal flow, deterministic sync across systems
@@ -99,6 +99,10 @@ Every internal interface is a **contract** between caller and implementer with f
 - **`invariants`** — properties that hold both before AND after every call (e.g. monotonic counters, registry consistency, no-leak of internal state).
 
 Define these explicitly per interface — they become the binding test oracle for `se-test-engineer` and the audit basis for `se-critic`.
+
+**Versioning & compatibility (#772):** additive changes (new field, optional parameter) are backward compatible → `minor` bump; breaking changes (signature, payload type, semantics) require a `major` bump **plus** an explicit migration rule. Flag any unversioned drift against a pinned consumer as a contract violation.
+
+**Collision & deadlock checks (checklist, #772):** for each new interface verify (a) unique `interface_id`, no type/payload conflict with an existing contract, (b) no circular dependency cycle across `source→target` edges, (c) no deadlock-prone ordering inversion in call chains. Report findings; never auto-resolve architecture-level collisions — escalate contradictions to `se-architect`.
 
 ## JSON Output Schema
 
