@@ -1,5 +1,7 @@
 """DoD preset loading and resolution."""
 
+from __future__ import annotations
+
 import sys
 from pathlib import Path
 
@@ -45,6 +47,22 @@ def resolve_dod_preset_name(config: dict, agent_meta_root: Path) -> str:
         platforms, agent_meta_root / PLATFORM_CONFIGS_DIR,
     )
     return resolve_preset_name("dod-preset", config, platform_defaults, "full")
+
+
+def resolve_spec_plan_enabled(config: dict, agent_meta_root: Path,
+                              *, dod: dict | None = None) -> bool:
+    """Single source of truth for the native spec/plan workflow master switch.
+
+    Precedence: explicit `spec-plan-workflow.enabled` bool > resolved DoD
+    `spec-plan-required` > False. Pass `dod=` when the caller already holds
+    the resolved DoD dict -- this avoids a second resolve_dod() call and the
+    resolve_dod <-> resolve_spec_plan_enabled recursion.
+    """
+    block = config.get("spec-plan-workflow")
+    if isinstance(block, dict) and "enabled" in block:
+        return bool(block["enabled"])
+    resolved_dod = dod if dod is not None else resolve_dod(config, agent_meta_root)
+    return bool(resolved_dod.get("spec-plan-required", False))
 
 
 def resolve_dod(config: dict, agent_meta_root: Path) -> dict:
@@ -97,6 +115,12 @@ def resolve_dod(config: dict, agent_meta_root: Path) -> dict:
             resolved[key] = preset_values[key]
         else:
             resolved[key] = default_val
+
+    # Synthetic render key -- MUST pass dod=resolved to avoid recursion
+    # (resolve_spec_plan_enabled would otherwise call resolve_dod again).
+    resolved["spec-plan-enabled"] = resolve_spec_plan_enabled(
+        config, agent_meta_root, dod=resolved,
+    )
     return resolved
 
 
