@@ -30,11 +30,12 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 
 ```
 1. INVENTORY    Scan for app manifests, docker-compose files, package.json, READMEs.
+               Maintain a portfolio inventory: per app record age, usage, risk (tech-debt index).
 2. OWNERSHIP    Check for named owner/team in each manifest.
-3. SLA          Validate SLA definitions exist and are realistic.
+3. SLA          Validate SLA definitions exist, are realistic, and are tied to a measurable SLI.
 4. CLASSIFY     Check data classification is assigned.
 5. LIFECYCLE    Determine lifecycle stage for each app.
-6. DEPRECATION  Check deprecation plans exist for archived/legacy apps.
+6. DEPRECATION  Check deprecation plans exist for archived/legacy apps, incl. exit criteria (data deletion/archival rule).
 7. ORPHAN       Flag apps without active ownership.
 8. REPORT       Structured findings with recommendations.
 ```
