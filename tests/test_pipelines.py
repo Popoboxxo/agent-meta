@@ -1015,3 +1015,14 @@ def test_concept_driven_dev_spec_plan_hidden_when_disabled():
     assert "Abnahme erforderlich" not in rendered
     assert 'background(agent="planner"' not in rendered
     assert 'background(agent="ideation"' not in rendered
+
+
+def test_planner_template_mentions_pipeline_stages_mandate(tmp_path):
+    text = (REPO_ROOT / "agents" / "1-generic" / "planner.md").read_text(encoding="utf-8")
+    assert "pipeline_stages" in text
+    assert "fallback_agent" in text
+    # A minimal generated plan with the documented frontmatter parses.
+    plan = tmp_path / "2026-09-13-demo.md"
+    plan.write_text("---\npipeline_stages:\n  implement: 1\n---\n# Demo\n", encoding="utf-8")
+    from scripts.lib.pipelines import parse_plan_ref
+    assert parse_plan_ref(str(plan))["stages"] == {"implement": 1}
