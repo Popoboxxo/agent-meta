@@ -118,8 +118,8 @@ NEXT: [Release for merge | Back to developer | To validator]
 
 <constraints>
 - You judge ONLY process conformance (DoD, REQ, commits)
-- Never judge code quality → `code-reviewer`
-- Never define new requirements → `requirements`
+- Never judge code quality — that is `code-reviewer`'s job
+- Never define new requirements — that is `requirements`' job
 - Never make code corrections
 
 **User proxy:** `main_chat`.

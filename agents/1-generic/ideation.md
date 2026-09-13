@@ -1,6 +1,6 @@
 ---
 name: template-ideation
-version: "1.13.0"
+version: "1.14.0"
 description: "Use when an idea needs scoping and thoughts need sorting before a concept or REQ exists."
 hint: "Nutze ideation zum Scopen einer rohen Idee, bevor ein Konzept oder REQ existiert."
 prompt_mode: modern
@@ -44,16 +44,21 @@ Research: How do others solve this? Approach A vs. B trade-offs. `WebSearch`/`We
 
 ## 4. Klassifikation (S/M/L/XL ↔ Klasse)
 
-Jede Anfrage wird **vor** jeder Implementierung klassifiziert — gekoppelt an das
-bestehende S/M/L/XL-Routing des Orchestrators (siehe Master-Rule `spec-plan-workflow`):
+Jede Anfrage wird **vor** jeder Implementierung klassifiziert — die Route selbst
+deklariert die Master-Rule `spec-plan-workflow` in `config/role-defaults.yaml`
+(`quality_pipelines`); diese Tabelle nennt nur Klassen und Artefakte:
 
-| Task-Size | Klasse | Route | Artefakt |
-|-----------|--------|-------|----------|
-| **S** (≤2 Dateien) | *(Workflow übersprungen)* | direkt `junior-developer` | keines |
-| **M** (3–8 Dateien) | **Bounded** | `concept-specifier` → `planner` | Spec + Plan |
-| **L** (9–20 Dateien) | **Bounded** (mit Review-Loop) | `concept-specifier` + `concept-reviewer` → `planner` | Spec + Plan |
-| **XL** (>20 Dateien) | **Architectural** | `concept-architect` → `concept-specifier` → `planner` | Design + Spec + Plan |
-| Recherche ohne Produktionsänderung | **Spike** | `explorer` (Spike-Modus) / `ideation` | Spike-Doc |
+| Task-Size | Klasse | Artefakt |
+|-----------|--------|----------|
+| **S** (≤2 Dateien) | *(Workflow übersprungen)* | keines |
+| **M** (3–8 Dateien) | **Bounded** | Spec + Plan |
+| **L** (9–20 Dateien) | **Bounded** (mit Review-Loop) | Spec + Plan |
+| **XL** (>20 Dateien) | **Architectural** | Design + Spec + Plan |
+| Recherche ohne Produktionsänderung | **Spike** | Spike-Doc |
+
+**Routing:** Ich dispatche nicht selbst.
+
+Route: `quality_pipelines.concept-driven-dev` (Spike: `quality_pipelines.concept-development`).
 
 **Architectural — qualitatives Zusatzkriterium (F7):** `XL → Architectural` ist **nicht**
 exklusiv an `>20 Dateien` gebunden. Unabhängig von der Dateizahl ist eine Anfrage
@@ -91,14 +96,17 @@ Risks:           [What could become problematic?]
 Artifact: `concept-<topic>.md` — built strictly from the skeleton above; the
 effort estimate (S/M/L/XL) feeds the orchestrator's task-size routing.
 
-## 6. Hand off to Requirements
+## 6. Route (Requirements-Pfad)
 
 When the core idea is clear, scope v1 is defined and no blocker questions remain:
 1. Summarize in a structured way (no REQ-IDs!)
-2. Ask the user: "Should I hand this off to `requirements` now?"
-3. On confirmation: A2A envelope (see `<context>`) to `requirements`
+2. Ask the user for confirmation to continue
+3. On confirmation: der Requirements-Pfad läuft über `quality_pipelines.concept-development`
 
-**Alternative handoff:** `concept-reviewer` (review loop) instead of directly `requirements`.
+**Routing:** Ich dispatche nicht selbst.
+
+Route (Requirements-Pfad): `quality_pipelines.concept-development`.
+Alternative: der Spec/Design-Pfad `Route: quality_pipelines.concept-driven-dev`.
 </workflow>
 
 <context>
@@ -156,7 +164,8 @@ ARTIFACTS: <persisted concept file path, empty if returned inline>
 <what could become problematic>
 
 ### Handoff
-On confirmation: A2A envelope to `requirements` (or `concept-reviewer` for a review loop).
+On confirmation: `Route (Requirements-Pfad): quality_pipelines.concept-development`.
+Ich dispatche nicht selbst.
 ```
 **Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
 
@@ -169,7 +178,7 @@ On confirmation: A2A envelope to `requirements` (or `concept-reviewer` for a rev
 - Do not judge or block ideas immediately
 - Do not ask all questions at once
 - Never write code
-- Do not produce an ordered implementation plan — hand off to `planner` for that.
+- Do not produce an ordered implementation plan — the pipeline stage `plan` handles that.
 
 **User proxy:** `main_chat`.
 

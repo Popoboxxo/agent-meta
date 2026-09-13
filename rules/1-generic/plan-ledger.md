@@ -52,10 +52,13 @@ Normativ nur bei aktiviertem Spec/Plan-Workflow.
 - Ziel `archive.target` (Default `docs/plans/archive`, Basis `{{SPEC_PLAN_PLANS_DIR}}/archive`).
   Die bestehende Konvention des Plan-Verzeichnisses bleibt maßgeblich.
 - Modus `archive.mode`:
-  - `auto` → `orchestrator` delegiert an `archive.agent`; Spec + Plan verschieben, loggen.
+  - `auto` → Stage `archive`; `archive.agent` ist Config-Wert, ausgeführt über die Pipeline. Kein direkter Dispatch.
   - `ask` → Rückfrage; erst nach Zustimmung archivieren.
   - `off` → nichts.
 - `archive.agent`: `documenter` (Default, KE-unabhängig) bzw. `knowledge-ingestor` bei
   KE-Route (`index.mode: knowledge-engine`).
 - Die Archivierung erfolgt **agentenbasiert** — ein **Sync-Schritt** zur Archivierung ist
   explizit **Nicht-Ziel** (F11).
+
+**Routing:** Ich dispatche nicht selbst. `archive.agent` ist ein Config-Wert und wird
+über die Pipeline ausgeführt.

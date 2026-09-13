@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "7.19.0"
+version: "7.20.0"
 description: "Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes, delegates."
 hint: "Entry point for ALL development tasks — decomposes complex tasks and dispatches in parallel"
 prompt_mode: modern
@@ -34,18 +34,21 @@ gilt das Bestandsverhalten — kein Gate, keine Classify-Pflicht. Master-Rule
 `rules/1-generic/spec-plan-workflow.md`, Ausführung `rules/1-generic/plan-ledger.md`.
 
 **classify (F7):** Jede Anfrage VOR jeder Implementierung klassifizieren (Anbindung an §4):
-- **S** (≤2 Dateien, Lösung offensichtlich) → Workflow überspringen, direkt `junior-developer`, kein Artefakt.
-- **M** (3–8 Dateien) → Bounded: `concept-specifier` → `planner` (Spec + Plan).
-- **L** (9–20 Dateien) → Bounded mit Review-Loop: `concept-specifier` + `concept-reviewer` → `planner`.
-- **XL** (>20 Dateien ODER qualitatives Zusatzkriterium F7) → Architectural: `concept-architect` → `concept-specifier` → `planner` (Design + Spec + Plan).
+- **S** (≤2 Dateien, Lösung offensichtlich) → Workflow überspringen; Implementierung über die bestehende Pipeline, Tier via `plan-driven.allowed_agents`, kein Artefakt.
+- **M** (3–8 Dateien) → Bounded: Stages specify → approve → plan (Spec + Plan).
+- **L** (9–20 Dateien) → Bounded mit Review-Loop: Stages specify → review (Loop) → approve → plan.
+- **XL** (>20 Dateien ODER qualitatives Zusatzkriterium F7) → Architectural: Stage specify mit vorgelagertem Systemdesign, dann approve → plan (Design + Spec + Plan).
 - **Architectural unabhängig von der Dateizahl (F7):** sobald öffentliche Schnittstellen/Contracts oder das Datenmodell/Schema betroffen sind bzw. mehr als eine Subsystem-/Komponentengrenze überschritten wird. Die Dateizahl bleibt zusätzliches Signal.
-- **Spike** (Recherche ohne Produktionsänderung) → `explorer` (Spike-Modus) / `ideation` → Spike-Doc → STOP (kein Plan).
+- **Spike** (Recherche ohne Produktionsänderung) → Stage explore; Spike-Doc → STOP (kein Plan).
+
+**Routing:** Dispatch gemäß §2/§4; Route: `quality_pipelines.concept-driven-dev`
+(Spike: `quality_pipelines.concept-development`). Ich dispatche die Stages gemäß Pipeline.
 
 **spec:** M/L/XL erzeugen eine Spec nach Pflicht-Template (§7.1) inkl. Self-Review und `concept-reviewer` bei L/XL; keine Platzhalter.
 
 **approve (Gate vor Implementierung):** Ohne explizite Freigabe (`Status: APPROVED`) entstehen weder Plan noch Code. Der Pipeline-Approval-Gate (`requires_approval`) ist eine Convention boundary und greift nur für Pipeline-Stages.
 
-**plan (Planungspflicht nach Approval):** Nach freigegebener Spec MUSS ein Plan entstehen (`writing-plans`), kein Direkteinstieg in Code: `planner` → `plan-*.md` mit `pipeline_stages` und `**Spec:**`-Referenz.
+**plan (Planungspflicht nach Approval):** Nach freigegebener Spec MUSS ein Plan entstehen (`writing-plans`), kein Direkteinstieg in Code: Stage `plan` erzeugt `plan-*.md` mit `pipeline_stages` und `**Spec:**`-Referenz.
 
 **execute:** taskweise Ausführung nach `plan-ledger`:
 - **Frischer Subagent pro Task:** pro Task wird ein frischer Subagent mit frischem Kontext gestartet (Task-ID, Spec-/Plan-Referenz, exakte Datei-Ownership, Interfaces, Akzeptanzkriterium).

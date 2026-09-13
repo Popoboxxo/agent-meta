@@ -24,13 +24,19 @@ classify → spec → approve → plan → execute
 
 Angekoppelt an das bestehende S/M/L/XL-Routing des Orchestrators:
 
-| Task-Size | Klasse | Route | Artefakt |
+| Task-Size | Klasse | Pipeline-Stage | Artefakt |
 |---|---|---|---|
-| **S** (≤2 Dateien) | *(Workflow übersprungen)* | direkt `junior-developer` | keines |
-| **M** (3–8 Dateien) | **Bounded** | `concept-specifier` → `planner` | Spec + Plan |
-| **L** (9–20 Dateien) | **Bounded** (mit Review-Loop) | `concept-specifier` + `concept-reviewer` → `planner` | Spec + Plan |
-| **XL** (>20 Dateien) | **Architectural** | `concept-architect` → `concept-specifier` → `planner` | Design + Spec + Plan |
-| Recherche ohne Produktionsänderung | **Spike** | `explorer` (Spike-Modus) / `ideation` | Spike-Doc |
+| **S** (≤2 Dateien) | *(Workflow übersprungen)* | — (bestehende Pipeline, Tier via `plan-driven.allowed_agents`) | keines |
+| **M** (3–8 Dateien) | **Bounded** | specify → approve → plan | Spec + Plan |
+| **L** (9–20 Dateien) | **Bounded** (mit Review-Loop) | specify → review (Loop) → approve → plan | Spec + Plan |
+| **XL** (>20 Dateien) | **Architectural** | specify (vorgelagertes Systemdesign) → approve → plan | Design + Spec + Plan |
+| Recherche ohne Produktionsänderung | **Spike** | explore | Spike-Doc |
+
+**Routing:** Ich dispatche nicht selbst.
+
+Route: `quality_pipelines.concept-driven-dev` (Spike: `quality_pipelines.concept-development`).
+Die Pipeline-/Pair-Deklaration in `config/role-defaults.yaml` ist die einzige Routing-Quelle;
+diese Klassifikation nennt nur die Stage-Ergebnisse.
 
 **Architectural — qualitatives Zusatzkriterium (F7):** `XL → Architectural` ist NICHT
 exklusiv an `>20 Dateien` gebunden. Unabhängig von der Dateizahl ist eine Anfrage

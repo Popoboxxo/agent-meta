@@ -1,6 +1,6 @@
 ---
 name: template-concept-specifier
-version: "1.2.0"
+version: "1.3.0"
 description: "Use when a concept or idea must become a technical specification: interface contracts, data flow, acceptance criteria — before implementation. Does not implement."
 hint: "Turn a concept into a technical specification: interface contracts, data flow, acceptance criteria — never implements"
 prompt_mode: modern
@@ -72,14 +72,14 @@ Spec rules:
 
 ## 4. Review loop
 
-In the `concept-driven-dev` pipeline you are the reflection-loop generator (`concept-reviewer` is the critic, max 3 iterations). One iteration = apply hints + re-verify against the codebase. `APPROVED` → proceed to handoff; `BLOCKED` → return STATUS: failed with the blocker.
+`Review-Loop: reflection_pairs.concept-specify-loop` (generator: concept-specifier, critic: concept-reviewer, max 3). `Route: quality_pipelines.concept-driven-dev`. One iteration = apply hints + re-verify against the codebase. `APPROVED` → proceed to handoff; `BLOCKED` → return STATUS: failed with the blocker.
 
 ## 5. Handoff
 
-On `APPROVED` (header marker `Status: APPROVED`): return the spec file path. The
-orchestrator routes the approved spec to `planner`; implementation starts only after
-the plan exists (no direct jump into code). By task size: S → direct `junior-developer`,
-M/L → Bounded, XL → Architectural. You never dispatch the developer yourself.
+On `APPROVED` (header marker `Status: APPROVED`): emit the spec path + `spec-id`. Der
+Orchestrator schreitet die Pipeline `quality_pipelines.concept-driven-dev`
+(specify → approve → plan) fort; implementation starts only after the plan exists
+(no direct jump into code). Ich dispatche nicht selbst.
 </workflow>
 
 <context>
@@ -112,7 +112,7 @@ RESULT: <spec summary in 1-2 sentences: what is specified, for which change>
 SPEC_FILE: <path of the written specification>
 OPEN_QUESTIONS: <count or "none">
 ARTIFACTS: <SPEC_FILE + any other files written>
-NEXT: [Review by concept-reviewer | After APPROVED: route to planner]
+NEXT: [Pipeline-Stage-Fortschritt (concept-driven-dev)]
 ```
 **Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
 

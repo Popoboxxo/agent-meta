@@ -8,11 +8,14 @@ noch unklar sind. Normativ nur, solange der Spec/Plan-Workflow aktiviert ist.
 
 Vor der Spezifikation wird die Anfrage grob eingeordnet:
 
-| Klasse | Merkmal | Konsequenz |
+| Klasse | Merkmal | Konsequenz (Pipeline-Stage) |
 |---|---|---|
-| **Spike** | reine Recherche, keine Produktionsänderung | `explorer` (Spike-Modus) / `ideation`; Ergebnis ist ein Spike-Doc, danach **STOP** (kein Plan) |
-| **Bounded** | klar abgegrenzter Umfang, 3–20 Dateien, eine Komponente | Spec nach `spec-plan-workflow`, dann Plan |
-| **Architectural** | öffentliche Schnittstellen/Contracts, Datenmodell/Schema oder mehr als eine Subsystem-/Komponentengrenze betroffen | `concept-architect` → Spec → Plan; SE-Aufstieg optional, nie automatisch |
+| **Spike** | reine Recherche, keine Produktionsänderung | Stage explore; Ergebnis ist ein Spike-Doc, danach **STOP** (kein Plan) |
+| **Bounded** | klar abgegrenzter Umfang, 3–20 Dateien, eine Komponente | Stage specify → review → approve, dann Plan, nach `spec-plan-workflow` |
+| **Architectural** | öffentliche Schnittstellen/Contracts, Datenmodell/Schema oder mehr als eine Subsystem-/Komponentengrenze betroffen | vorgelagertes Systemdesign → Stage specify → approve, dann Plan; SE-Aufstieg optional, nie automatisch |
+
+**Routing:** Ich dispatche nicht selbst. Route: `quality_pipelines.concept-driven-dev`
+(Spike: `quality_pipelines.concept-development`).
 
 Ist die Einordnung unmöglich, bleiben die offenen Punkte explizit als
 Spike/Recherche-Auftrag.
