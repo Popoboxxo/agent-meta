@@ -50,6 +50,33 @@ knowledge-engine:
   sources-dir: sources
   wiki-dir: wiki
   schema-language: auto
+spec-plan-workflow:
+  # enabled bewusst OHNE Schema-Default (Absenz-Semantik, §5.4).
+  # Fehlt der Key, greift die DoD-Preset-Kopplung. Expliziter bool gewinnt.
+  enabled: true
+  paths:
+    specs: docs/specs
+    plans: docs/plans
+    spikes: docs/spikes
+    legacy:
+    - docs/superpowers/specs
+    - docs/superpowers/plans
+  scan:
+    include:
+    - '*.md'
+    changed-files-only: true
+  index:
+    mode: knowledge-engine
+    fallback-index: docs/INDEX.md
+  archive:
+    mode: ask
+    agent: documenter
+    trigger: plan-complete
+    target: docs/plans/archive
+  external-system-override:
+    enabled: false
+    system: ''
+    note: ''
 platforms:
 - agent-meta
 plugins:

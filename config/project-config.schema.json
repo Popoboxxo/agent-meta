@@ -1819,6 +1819,134 @@
       },
       "additionalProperties": false
     },
+    "spec-plan-workflow": {
+      "type": "object",
+      "description": "Native feature-level spec→plan→execution workflow (opt-in). No-op when effective_enabled=false.",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "paths": {
+          "type": "object",
+          "properties": {
+            "specs": {
+              "type": "string",
+              "default": "docs/specs"
+            },
+            "plans": {
+              "type": "string",
+              "default": "docs/plans"
+            },
+            "spikes": {
+              "type": "string",
+              "default": "docs/spikes"
+            },
+            "legacy": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "docs/superpowers/specs",
+                "docs/superpowers/plans"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "scan": {
+          "type": "object",
+          "properties": {
+            "include": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "*.md"
+              ]
+            },
+            "changed-files-only": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          "additionalProperties": false
+        },
+        "index": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "knowledge-engine",
+                "file-index",
+                "off"
+              ],
+              "default": "knowledge-engine"
+            },
+            "fallback-index": {
+              "type": "string",
+              "default": "docs/INDEX.md"
+            }
+          },
+          "additionalProperties": false
+        },
+        "archive": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "auto",
+                "ask",
+                "off"
+              ],
+              "default": "ask"
+            },
+            "agent": {
+              "type": "string",
+              "enum": [
+                "documenter",
+                "knowledge-ingestor"
+              ],
+              "default": "documenter"
+            },
+            "trigger": {
+              "type": "string",
+              "enum": [
+                "plan-complete"
+              ],
+              "default": "plan-complete"
+            },
+            "target": {
+              "type": "string",
+              "default": "docs/plans/archive"
+            }
+          },
+          "additionalProperties": false
+        },
+        "external-system-override": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false
+            },
+            "system": {
+              "type": "string",
+              "default": ""
+            },
+            "note": {
+              "type": "string",
+              "default": ""
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "viz": {
       "type": "object",
       "description": "Visualization / session tracking configuration. Controls the Viz dashboard (viz-report.py) and the MCP SSE server (viz-logger.py) that the Admin UI supervises.",

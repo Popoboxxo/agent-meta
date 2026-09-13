@@ -57,3 +57,52 @@ def test_concept_driven_preset_requires_spec_plan():
     presets = load_dod_presets(REPO_ROOT)
     assert presets["concept-driven"]["spec-plan-required"] is True
     assert presets["concept-driven"]["spec-plan-traceability"] is False
+
+
+def test_spec_plan_workflow_block_valid():
+    jsonschema = pytest.importorskip("jsonschema")
+    jsonschema.validate(
+        _base_config(**{
+            "spec-plan-workflow": {
+                "enabled": True,
+                "paths": {
+                    "specs": "docs/specs",
+                    "plans": "docs/plans",
+                    "spikes": "docs/spikes",
+                    "legacy": ["docs/superpowers/specs", "docs/superpowers/plans"],
+                },
+                "scan": {"include": ["*.md"], "changed-files-only": True},
+                "index": {"mode": "file-index", "fallback-index": "docs/INDEX.md"},
+                "archive": {
+                    "mode": "ask", "agent": "documenter",
+                    "trigger": "plan-complete", "target": "docs/plans/archive",
+                },
+                "external-system-override": {"enabled": False, "system": "", "note": ""},
+            }
+        }),
+        _schema(),
+    )
+
+
+@pytest.mark.parametrize(
+    "block",
+    [
+        {"bogus": 1},
+        {"paths": {"bogus": 1}},
+        {"scan": {"bogus": 1}},
+        {"index": {"bogus": 1}},
+        {"archive": {"bogus": 1}},
+        {"external-system-override": {"bogus": 1}},
+    ],
+    ids=["top-level", "paths", "scan", "index", "archive", "external-system-override"],
+)
+def test_spec_plan_workflow_block_rejects_unknown_key(block):
+    jsonschema = pytest.importorskip("jsonschema")
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(_base_config(**{"spec-plan-workflow": block}), _schema())
+
+
+def test_spec_plan_workflow_has_no_schema_default():
+    block = _schema()["properties"]["spec-plan-workflow"]
+    assert "default" not in block
+    assert "default" not in block["properties"]["enabled"]
