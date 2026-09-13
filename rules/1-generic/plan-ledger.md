@@ -8,8 +8,19 @@ Normativ nur bei aktiviertem Spec/Plan-Workflow.
 - Jeder Task wird von einem **frischen Subagenten** mit frischem Kontext ausgeführt.
 - Der Handoff enthält: Task-ID, Spec-/Plan-Referenz, exakte Datei-Ownership
   (`Files:`), Interfaces (`Produces`/`Consumes`) und Akzeptanzkriterium.
-- Nach dem Task folgt ein **Review**, bevor der nächste Task startet. Ergebnisse
-  fließen in den Ledger.
+- Nach dem Task folgt ein **zweistufiges Review**, bevor der nächste Task startet;
+  die Ergebnisse fließen in den Ledger:
+  1. **Stufe 1 — Requirement-Treue** (Pipeline-Stage `review-req`, Reflection-Pair
+     `task-req-review-loop`): Prüfung gegen die Akzeptanzkriterien des Tasks — **vor**
+     der Qualitätsprüfung.
+  2. **Stufe 2 — Qualität** (Pipeline-Stage `review-quality`, Reflection-Pair
+     `task-quality-review-loop`): Code-Qualität und Blast-Radius.
+- Beide Stufen laufen als Loop mit je `max_iterations: 2`. Der aggregierte Runden-Cap
+  `task-review.max-rounds: 4` (Pipeline-Override in `config/role-defaults.yaml`)
+  begrenzt die Gesamtzahl der Review-Runden; ist der Cap erreicht, wird **nicht** weiter
+  iteriert, sondern der Stand bleibt offen und wird an den Menschen gemeldet.
+- Das Routing bleibt ausschließlich deklarativ in `config/role-defaults.yaml`
+  (`quality_pipelines`/`reflection_pairs`); diese Rule nennt nur Stage-/Pair-IDs.
 
 ## Ledger
 
@@ -18,6 +29,12 @@ Normativ nur bei aktiviertem Spec/Plan-Workflow.
 - Zusätzlich wird der Task-Fortschritt an die bestehende Recovery-Infrastruktur
   gebunden: `CheckpointStore` (`scripts/lib/checkpoint.py`) über
   `barrier.checkpoint_ref` (z. B. `.meta-viz/checkpoints/...`).
+- **Writer-Pflicht statt reiner Handarbeit:** Der Checkbox-Zustand wird nach jedem Task
+  vom Ledger-Writer (`scripts/lib/plan_ledger.py`, Modus `--update-plan-ledger`)
+  geschrieben; die manuelle Pflege ist nur der Fallback. Der geschriebene Zustand muss
+  exakt der `parse_plan_ledger`-Semantik entsprechen.
+- `execute_plan` (IC-06) schreibt zusätzlich pro Entry einen Checkpoint und schließt den
+  Ledger über `ledger_path` ab (nur `success`-Entries; Ledger-Fehler sind fail-soft).
 - **Kein neues Ledger-Format:** Checkbox-Zustand ist die menschliche Sicht, der
   Checkpoint die maschinenlesbare Recovery-Quelle. Nach einem Abbruch wird aus dem
   Checkpoint wieder aufgesetzt.
@@ -30,8 +47,11 @@ Normativ nur bei aktiviertem Spec/Plan-Workflow.
   `check_file_overlap`) geprüft. Nur **ownership-disjunkte** Tasks laufen parallel.
 - Der Task-Graph stützt sich auf `FanoutPlan`/`validate_plan`; Zyklen und Overlaps
   im `parallel_group` sind Fehler.
-- `max-parallel-agents` bleibt die Obergrenze der Parallelität. `execute_plan` bleibt
-  out-of-scope — eingebunden wird nur der Graph-Validator.
+- `max-parallel-agents` bleibt die Obergrenze der Parallelität.
+- `execute_plan` ist verdrahtet (IC-06): Es schreibt pro Entry einen Checkpoint
+  (`checkpoint_from_barrier_entry`, Identität nur aus explizitem `plan_id`) und schließt
+  über `ledger_path` den Plan-Ledger ab. **Nur** der G-08-Dispatcher-Backend
+  (automatischer In-Harness-Dispatch) bleibt out-of-scope.
 
 ## Worktree-Verbot (Adaption)
 
