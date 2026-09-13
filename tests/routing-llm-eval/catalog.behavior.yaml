@@ -154,3 +154,12 @@ cases:
       - 'fault-detection'
       - 'negative_path_coverage'
       - 'mutation'
+
+  - id: b7-seitm-01
+    role: se-integration-and-test-manager
+    category: process-discipline
+    prompt: "Dokumentiere die Strategie-Begründung und den V&V-Prozess. Was ist dabei das Pflichtartefakt und welche Traceability verlangst du?"
+    expected_any:
+      - '29119-2'
+      - 'Pflichtartefakt'
+      - 'Begründungsraster'

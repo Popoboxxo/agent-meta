@@ -550,3 +550,14 @@ tests:
     - fault-detection
     - negative_path_coverage
     - mutation
+- description: b7-seitm-01 [se-integration-and-test-manager]
+  vars:
+    role: se-integration-and-test-manager
+    prompt: Dokumentiere die Strategie-Begründung und den V&V-Prozess. Was ist dabei das Pflichtartefakt
+      und welche Traceability verlangst du?
+  assert:
+  - type: icontains-any
+    value:
+    - 29119-2
+    - Pflichtartefakt
+    - Begründungsraster
