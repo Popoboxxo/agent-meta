@@ -127,3 +127,12 @@ cases:
       - 'inspection'
       - 'demonstration'
       - 'integrity'
+
+  - id: b7-se-validator-01
+    role: se-validator
+    category: process-discipline
+    prompt: "Erstelle die User Journeys für die Stakeholder-Needs. Wie deckst du Randfälle ab und koppelst jede Journey an ein Akzeptanzkriterium?"
+    expected_any:
+      - 'journey catalog'
+      - 'edge cases'
+      - 'acceptance criterion'

@@ -518,3 +518,14 @@ tests:
     - inspection
     - demonstration
     - integrity
+- description: b7-se-validator-01 [se-validator]
+  vars:
+    role: se-validator
+    prompt: Erstelle die User Journeys für die Stakeholder-Needs. Wie deckst du Randfälle ab und koppelst
+      jede Journey an ein Akzeptanzkriterium?
+  assert:
+  - type: icontains-any
+    value:
+    - journey catalog
+    - edge cases
+    - acceptance criterion
