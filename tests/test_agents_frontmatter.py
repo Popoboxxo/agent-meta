@@ -184,3 +184,9 @@ def test_build_frontmatter_strip_fields_empty_list_is_noop():
         generated_from="1-generic/code-reviewer.md@1.2.2",
     )
     assert content_stripped_empty == content_default
+
+
+def test_documenter_documents_plan_archive_target():
+    text = (_REPO_ROOT / "agents" / "1-generic" / "documenter.md").read_text(encoding="utf-8")
+    assert "docs/plans/archive" in text
+    assert "plan-complete" in text

@@ -44,11 +44,18 @@ Normativ nur bei aktiviertem Spec/Plan-Workflow.
 
 ## Archiv-Trigger
 
-- Trigger `plan-complete`: **alle Checkboxen gesetzt** UND der Plan ist **gemergt**.
+- Trigger `archive.trigger: plan-complete`: **alle Checkboxen gesetzt** UND der Plan ist
+  **gemergt** (F5).
 - Die Merge-Erkennung ist **rein manuell**: Der Orchestrator/das Team bestätigt den
-  Merge-Status, bevor archiviert wird. Es gibt keine automatische Merge-Erkennung.
-- Die Archivierung erfolgt **agentenbasiert** (kein Sync-Schritt): `orchestrator`
-  delegiert an den konfigurierten Archiv-Agenten (`documenter` als Default,
-  KE-Route `knowledge-ingestor`).
-- Ziel: `{{SPEC_PLAN_PLANS_DIR}}/archive`. Die bestehende Konvention des
-  Plan-Verzeichnisses bleibt maßgeblich.
+  Merge-Status, bevor archiviert wird. Es gibt **keine** automatische Merge-Erkennung und
+  **keine** Provider-Abstraktion.
+- Ziel `archive.target` (Default `docs/plans/archive`, Basis `{{SPEC_PLAN_PLANS_DIR}}/archive`).
+  Die bestehende Konvention des Plan-Verzeichnisses bleibt maßgeblich.
+- Modus `archive.mode`:
+  - `auto` → `orchestrator` delegiert an `archive.agent`; Spec + Plan verschieben, loggen.
+  - `ask` → Rückfrage; erst nach Zustimmung archivieren.
+  - `off` → nichts.
+- `archive.agent`: `documenter` (Default, KE-unabhängig) bzw. `knowledge-ingestor` bei
+  KE-Route (`index.mode: knowledge-engine`).
+- Die Archivierung erfolgt **agentenbasiert** — ein **Sync-Schritt** zur Archivierung ist
+  explizit **Nicht-Ziel** (F11).

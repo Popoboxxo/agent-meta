@@ -1,6 +1,6 @@
 ---
 name: template-documenter
-version: "1.8.2"
+version: "1.9.0"
 description: "Maintains CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md and session insights."
 hint: "Maintain docs: CODEBASE_OVERVIEW, ARCHITECTURE, README, insights"
 prompt_mode: modern
@@ -65,7 +65,31 @@ required sections get added (same managed-block principle as `.gitignore`).
 
 Reference skeleton: `templates/configs/README-template.md` (structure guide, not a byte-for-byte template — do not paste its HTML comments into the real README.md).
 
-## 6. Return
+## 6. Plan-Archivierung
+
+Du bist der Default-Archiv-Agent für abgeschlossene Pläne. Die Archivierung ist
+**agentenbasiert** — es gibt **keinen Sync-Schritt** zur Archivierung.
+
+**Trigger `archive.trigger: plan-complete`** — beide Bedingungen müssen erfüllt sein:
+
+1. **Alle Checkboxen** des Plans sind gesetzt (`- [x]`).
+2. Der **Merge ist manuell bestätigt** (F5). Es gibt **keine automatische Merge-Erkennung**:
+   `orchestrator` bzw. das Team bestätigt den Merge-Status, bevor du archivierst.
+
+**Ziel `archive.target`** (Default: `docs/plans/archive`) — Spec und Plan werden dorthin
+verschoben.
+
+**Modus `archive.mode`:**
+
+- `auto` → verschieben und den Vorgang loggen.
+- `ask` → erst nach ausdrücklicher Zustimmung archivieren.
+- `off` → nichts tun.
+
+**Agent `archive.agent`:** Default `documenter`. Bei KE-Route
+(`index.mode: knowledge-engine`) übernimmt `knowledge-ingestor` die Archiv-/Index-Route
+und delegiert intern an `knowledge-indexer`.
+
+## 7. Return
 
 `STATUS: done` + list of updated files.
 </workflow>
