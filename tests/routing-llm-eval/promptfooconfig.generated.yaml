@@ -497,3 +497,13 @@ tests:
     - flakiness triage
     - infrastructure
     - environment
+- description: b7-validator-01 [validator]
+  vars:
+    role: validator
+    prompt: Was prüfst du bei der Validierung bezüglich DoD versus Akzeptanzkriterien und wie weist du
+      Traceability nach?
+  assert:
+  - type: icontains-any
+    value:
+    - acceptance criteria
+    - traceability

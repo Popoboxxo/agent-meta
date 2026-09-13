@@ -110,3 +110,11 @@ cases:
       - 'flakiness triage'
       - 'infrastructure'
       - 'environment'
+
+  - id: b7-validator-01
+    role: validator
+    category: process-discipline
+    prompt: "Was prüfst du bei der Validierung bezüglich DoD versus Akzeptanzkriterien und wie weist du Traceability nach?"
+    expected_any:
+      - 'acceptance criteria'
+      - 'traceability'
