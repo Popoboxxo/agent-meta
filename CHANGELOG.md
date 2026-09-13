@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-## [1.2.0-beta.1] - 2026-09-13
+## [1.2.0-beta.2] - 2026-09-13
 
 ### Added
 - **Native Spec/Plan workflow**: requests are classified up front (Spike / Bounded /
@@ -16,6 +16,15 @@
   progress state, backed by stable cross-session plan/task identities. A machine-written plan
   ledger with a drift check keeps plan status honest, a two-stage task review with a rounds cap
   gates task completion, and a mandatory root-cause gate precedes every bugfix.
+- **Configurable progress and checkpoint paths**: new `progress.dir` and
+  `progress.checkpoint-dir` project keys (defaults `.meta-viz/progress` and
+  `.meta-viz/checkpoints`) let projects relocate the runtime progress store and the
+  per-session checkpoint files; relative paths resolve against the project root, and the
+  framework defaults keep the historical layout.
+
+## [1.2.0] — 2026-09-12
+
+### Added
 - **Repo-Containment PreToolUse hooks (`repo-containment.sh`, `repo-containment-impl.sh`)**: wrapper/impl pair confining Write/Edit to the project root, with the `.tmp` scratch sink as the sanctioned exception (PR #781).
 - **Provider-agnostic `commands` capability for all 9 providers (#735, #743)**: added a
   `commands` flag to `config/provider-capabilities.yaml` (Claude/Gemini/Opencode/Continue `true`;
@@ -35,6 +44,27 @@
   focus handling and visible save errors.
 - **Reverse role-registry drift check (#736)**: `--audit-config` now reports
   `role_defaults_without_template` for registry roles whose template file is missing.
+- **Subagent permission policy and Admin-UI Git/Auto-Commit sections (#768)**: new
+  `subagent_permissions` mode (`strict`/`warn`/`off`, default `off`, provider overrides)
+  wired into prompt rendering, the sync validator and the consistency check (declarative,
+  no runtime dispatch gate); the Admin UI gains Subagent-Permissions, Git and Auto-Commit
+  sections backed by a new top-level `git` config block whose values are the canonical
+  source of the generated `GIT_*` variables.
+- **Opt-in `agent-meta` README version badge (#782)**: new `readme.badges` type
+  `agent-meta`, rendered from the sync-embedded `{{AGENT_META_VERSION}}` by the
+  `documenter` role (single writer); unknown values render as `unknown` and link to
+  `/releases`.
+- **HACS entity-name localization contract and rename migration (#763)**: 2-platform HACS
+  rules now require `_attr_has_entity_name`/`_attr_translation_key` (hardcoded
+  `_attr_name`/`name` literals banned) and an entity-registry rename migration
+  (`async_migrate_entries`) as a MAJOR/breaking-change trigger; `hacs-code-reviewer` 2.0.0,
+  `hacs-release` 1.1.0, `hacs-developer` 1.3.0 plus scenario 49.
+- **Conventions-migration framework, HACS developer guide, quality-gate docs and browser
+  editor tests (#742, #726, #675, #677, #318)**: extensible `config/conventions-presets.yaml`
+  framework with a duplicate-safe `exact-timestamp` release cutoff (#726); HACS
+  integration-development rule and scaffolding-agent updates (#675, #728, #729);
+  quality-gate/release-candidate pipeline documentation (#677); Playwright browser tests for
+  the admin project form editors (#318).
 
 ### Changed
 - **Repo-Containment ("prison mode") is active by default (behavior change)**: agent write
