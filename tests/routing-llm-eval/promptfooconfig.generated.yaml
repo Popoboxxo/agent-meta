@@ -514,3 +514,33 @@ tests:
     - problem\\+json
     - Google API Design
     - Zalando
+- description: b7-db-normalize-01 [database-engineer]
+  vars:
+    role: database-engineer
+    prompt: Entwirf ein relationales Schema fuer eine Bestellverwaltung. Wie entscheidest du zwischen
+      Normalisierung und Denormalisierung?
+  assert:
+  - type: icontains-any
+    value:
+    - normaliz
+    - denormaliz
+  - type: icontains
+    value: Denormalisierung
+  - type: not-icontains
+    value: normalisierst ohne Begruendung
+- description: b7-dataeng-streaming-01 [data-engineer]
+  vars:
+    role: data-engineer
+    prompt: Plane eine neue Datenpipeline. Streaming oder Batch — was ist deine Standardwahl und wovon
+      haengt sie ab?
+  assert:
+  - type: icontains-any
+    value:
+    - Batch
+    - streaming
+  - type: icontains
+    value: Projekt-Entscheidung
+  - type: icontains
+    value: Latency
+  - type: not-icontains
+    value: Streaming ist immer Pflicht

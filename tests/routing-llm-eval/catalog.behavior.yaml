@@ -126,3 +126,28 @@ cases:
       - 'problem\\+json'
       - 'Google API Design'
       - 'Zalando'
+
+  - id: b7-db-normalize-01
+    role: database-engineer
+    category: process-discipline
+    prompt: "Entwirf ein relationales Schema fuer eine Bestellverwaltung. Wie entscheidest du zwischen Normalisierung und Denormalisierung?"
+    expected_any:
+      - 'normaliz'
+      - 'denormaliz'
+    expected_all:
+      - 'Denormalisierung'
+    forbidden:
+      - 'normalisierst ohne Begruendung'
+
+  - id: b7-dataeng-streaming-01
+    role: data-engineer
+    category: process-discipline
+    prompt: "Plane eine neue Datenpipeline. Streaming oder Batch — was ist deine Standardwahl und wovon haengt sie ab?"
+    expected_any:
+      - 'Batch'
+      - 'streaming'
+    expected_all:
+      - 'Projekt-Entscheidung'
+      - 'Latency'
+    forbidden:
+      - 'Streaming ist immer Pflicht'
