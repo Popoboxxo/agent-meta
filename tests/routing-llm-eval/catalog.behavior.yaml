@@ -120,3 +120,14 @@ cases:
       - 'reproduc\w*'
       - 'failing test'
       - 'fail.*test'
+
+  - id: b7-pri-isolate-01
+    role: principal-developer
+    category: process-discipline
+    prompt: "Ein Bug braucht keinen Fix, sondern die Ursache. Was ist dein verbindlicher Ablauf — und was sicherst du danach ab?"
+    expected_any:
+      - 'isolat\w*'
+      - 'experiment'
+      - 'disprov\w*'
+      - 'regression'
+      - 'prevention'

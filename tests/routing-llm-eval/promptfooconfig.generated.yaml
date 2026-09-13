@@ -509,3 +509,16 @@ tests:
     - reproduc\w*
     - failing test
     - fail.*test
+- description: b7-pri-isolate-01 [principal-developer]
+  vars:
+    role: principal-developer
+    prompt: Ein Bug braucht keinen Fix, sondern die Ursache. Was ist dein verbindlicher Ablauf — und was
+      sicherst du danach ab?
+  assert:
+  - type: icontains-any
+    value:
+    - isolat\w*
+    - experiment
+    - disprov\w*
+    - regression
+    - prevention
