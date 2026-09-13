@@ -1,6 +1,6 @@
 ---
 name: template-knowledge-indexer
-version: "1.3.0"
+version: "1.4.0"
 description: "Pflegt index.md (Content-Katalog, OKF §6) und log.md (Chronologisches Event-Log, OKF §7) im Knowledge Wiki."
 hint: "index.md und log.md pflegen — nur als Delegationsziel anderer Knowledge-Agenten"
 tools:
@@ -83,6 +83,11 @@ title: "Knowledge Wiki — Changelog"
 - Operationen: `ingest`, `query`, `lint`, `garden`, `schema-update`, `migration`
 - Parseable: `grep "^## \[" wiki/log.md | tail -5`
 - Append-only: NIEMALS bestehende Einträge löschen oder ändern
+
+## Catalog completeness & staleness (#775, literatur-anchored)
+
+- **IA completeness (Designing Information Architecture):** every wiki page must be reachable from `index.md`, and every index row must point to an existing page — reconcile any gap (missing row or dangling entry).
+- **Staleness:** a page changed after its index-row `timestamp` makes the row stale — refresh the row, don't let `index.md` drift from the real page set.
 
 ## Code-Konventionen
 

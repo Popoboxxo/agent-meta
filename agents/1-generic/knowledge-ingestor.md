@@ -1,6 +1,6 @@
 ---
 name: template-knowledge-ingestor
-version: "1.4.0"
+version: "1.5.0"
 description: "Sources einlesen, Key Information extrahieren, Wiki-Seiten erstellen/aktualisieren, Cross-References pflegen."
 hint: "Sources verarbeiten, Wiki-Seiten schreiben, Cross-References pflegen"
 tools:
@@ -71,6 +71,12 @@ sources:                                           # KARPATHY EXTENSION
 ```
 
 **Touch-Radius:** 10-15 Dateien pro Ingest (Karpathy-Konvention) — überschreitest du das deutlich, informiere den `knowledge-curator`.
+
+## Extraction & provenance (#775, literatur-anchored)
+
+- **Extraction methodology (information extraction + summarization):** identify named entities + relations first, then compress progressively (key info → synthesis); keep the source→claim mapping intact at every step.
+- **Atomic notes (Zettelkasten):** one idea per page; split compound content into linked pages instead of one long page.
+- **Provenance:** every claim carries its origin (`resource:` / `sources:`); never drop it when summarizing — mark gaps as `[NEEDS INPUT]` instead of inventing content (AI for Everyday Automation).
 
 ## Code-Konventionen
 
