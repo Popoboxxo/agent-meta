@@ -535,3 +535,16 @@ tests:
     - dependency.?graph
     - graphify
     - coverage
+- description: b7-git-recovery-01 [git]
+  vars:
+    role: git
+    prompt: Ich habe einen Commit veröffentlicht, der Fehler enthält. Wie räumst du das sicher auf — und
+      was kennzeichnest du bei Aenderungen, die die API brechen?
+  assert:
+  - type: icontains-any
+    value:
+    - git revert
+    - revert
+    - reflog
+    - --amend
+    - BREAKING CHANGE

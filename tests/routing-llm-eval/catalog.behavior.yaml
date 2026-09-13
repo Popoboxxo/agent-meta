@@ -142,3 +142,14 @@ cases:
       - 'dependency.?graph'
       - 'graphify'
       - 'coverage'
+
+  - id: b7-git-recovery-01
+    role: git
+    category: process-discipline
+    prompt: "Ich habe einen Commit veröffentlicht, der Fehler enthält. Wie räumst du das sicher auf — und was kennzeichnest du bei Aenderungen, die die API brechen?"
+    expected_any:
+      - 'git revert'
+      - 'revert'
+      - 'reflog'
+      - '--amend'
+      - 'BREAKING CHANGE'
