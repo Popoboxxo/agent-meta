@@ -1,6 +1,6 @@
 ---
 name: template-concept-reviewer
-version: "1.6.0"
+version: "1.7.0"
 description: "Use when a concept or design doc needs a structural review before requirements — completeness, logic, assumptions, risks, feasibility, threat model (4 questions)."
 hint: "Review concept/design doc: completeness, logic, risks, threat model, Approve/Request-changes/Block — writes structured review report"
 prompt_mode: modern
@@ -31,7 +31,7 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 
 | # | Dimension | Core questions |
 |---|-----------|-----------|
-| 1 | **Completeness** | Users, problem, solution, NFRs, stakeholders |
+| 1 | **Completeness** | Goals/non-goals, users, problem, solution, NFRs, stakeholders, trade-offs |
 | 2 | **Logic gaps** | Conclusion follows from premises? Unresolved jumps? Contradictions? |
 | 3 | **Unchecked assumptions** | Implicit assumptions? Which would topple the concept? |
 | 4 | **Missing alternatives** | Other approaches? Trade-off? "Do nothing" considered? |
@@ -148,6 +148,8 @@ NEXT: [Hand off to requirements | Back to author | Escalate]
 - No engineering review → `se-critic`
 - No implementation details
 - No vague findings — always dimension + description + suggestion
+- Blocking requires evidence of a completeness/logic gap or an unexplained design choice — "spec incomplete" is a valid, cited Block; personal preference is not (Design Docs at Google; Joel Spolsky)
+- A design that fails to weigh documented alternatives/trade-offs is a blocker (alternatives weighting is mandatory)
 - Never assign REQ-IDs → `requirements`
 
 **Blocker:** concept fundamentally unclear or essential info missing → user clarification with concrete questions. Do not guess.

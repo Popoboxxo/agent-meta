@@ -464,3 +464,90 @@ tests:
     - 1-generic
     - 2-platform
     - 3-project
+- description: b7-codereview-01 [code-reviewer]
+  vars:
+    role: code-reviewer
+    prompt: Dieser Pull Request enthaelt 700 veraenderte Zeilen. Pruefe den gesamten Diff in einem Durchgang
+      und gib ein Gesamturteil ab.
+  assert:
+  - type: icontains-any
+    value:
+    - 400 LOC
+    - split
+- description: b7-concept-01 [concept-reviewer]
+  vars:
+    role: concept-reviewer
+    prompt: Bewerte dieses Design-Doc. Es nennt nur Ziele, aber keine Nicht-Ziele, keine Alternativen
+      und keine Trade-offs. Gib ein Urteil ab.
+  assert:
+  - type: icontains-any
+    value:
+    - non-goal
+    - Nicht-Ziel
+    - trade-off
+    - Alternativ
+- description: b7-frontend-01 [frontend-reviewer]
+  vars:
+    role: frontend-reviewer
+    prompt: Dieser Komponente fehlt memo. Empfiehl, memo ueberall einzusetzen, wo sich Props oft aendern.
+      Bewerte diesen Vorschlag.
+  assert:
+  - type: icontains-any
+    value:
+    - premature memo
+    - unnecessary re-render
+    - hot path
+- description: b7-backend-01 [backend-reviewer]
+  vars:
+    role: backend-reviewer
+    prompt: Pruefe diesen neuen API-Service. Es gibt keinerlei Latenz-, Fehler- oder Saettigungsmetriken.
+      Einschaetzung?
+  assert:
+  - type: icontains-any
+    value:
+    - golden signal
+    - saturation
+    - observab
+- description: b7-database-01 [database-reviewer]
+  vars:
+    role: database-reviewer
+    prompt: 'Bewerte diese Schema-Aenderung: ein ALTER bricht bestehende Konsumenten in einem einzigen
+      Release. Pruefe zudem den Indexbau.'
+  assert:
+  - type: icontains-any
+    value:
+    - expand
+    - contract
+    - CONCURRENTLY
+- description: b7-ui-01 [ui-reviewer]
+  vars:
+    role: ui-reviewer
+    prompt: 'Pruefe diese UI-Komponente: derselbe Button wird an zwei Stellen mit unterschiedlichen Labels
+      gerendert. Bewerte.'
+  assert:
+  - type: icontains-any
+    value:
+    - consistent identification
+    - 3.2.4
+    - same function
+- description: b7-refactor-01 [refactoring-specialist]
+  vars:
+    role: refactoring-specialist
+    prompt: Refactoriere diese ungetestete Legacy-Komponente. Beginne sofort mit der Transformation.
+  assert:
+  - type: icontains-any
+    value:
+    - seam
+    - characterization test
+    - safety net
+- description: b7-perf-01 [performance-optimizer]
+  vars:
+    role: performance-optimizer
+    prompt: Optimiere diesen Endpoint. Statt zu messen ratest du, dass hashing das Problem ist. Bewerte
+      diese Herangehensweise.
+  assert:
+  - type: icontains-any
+    value:
+    - USE method
+    - utilization
+    - saturation

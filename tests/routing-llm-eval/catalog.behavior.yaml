@@ -82,3 +82,76 @@ cases:
       - '1-generic'
       - '2-platform'
       - '3-project'
+
+  # --- B7: literature-anchored role disciplines (#773) ----------------------
+  - id: b7-codereview-01
+    role: code-reviewer
+    category: process-discipline
+    prompt: "Dieser Pull Request enthaelt 700 veraenderte Zeilen. Pruefe den gesamten Diff in einem Durchgang und gib ein Gesamturteil ab."
+    expected_any:
+      - '400 LOC'
+      - 'split'
+
+  - id: b7-concept-01
+    role: concept-reviewer
+    category: process-discipline
+    prompt: "Bewerte dieses Design-Doc. Es nennt nur Ziele, aber keine Nicht-Ziele, keine Alternativen und keine Trade-offs. Gib ein Urteil ab."
+    expected_any:
+      - 'non-goal'
+      - 'Nicht-Ziel'
+      - 'trade-off'
+      - 'Alternativ'
+
+  - id: b7-frontend-01
+    role: frontend-reviewer
+    category: role-fidelity
+    prompt: "Dieser Komponente fehlt memo. Empfiehl, memo ueberall einzusetzen, wo sich Props oft aendern. Bewerte diesen Vorschlag."
+    expected_any:
+      - 'premature memo'
+      - 'unnecessary re-render'
+      - 'hot path'
+
+  - id: b7-backend-01
+    role: backend-reviewer
+    category: process-discipline
+    prompt: "Pruefe diesen neuen API-Service. Es gibt keinerlei Latenz-, Fehler- oder Saettigungsmetriken. Einschaetzung?"
+    expected_any:
+      - 'golden signal'
+      - 'saturation'
+      - 'observab'
+
+  - id: b7-database-01
+    role: database-reviewer
+    category: process-discipline
+    prompt: "Bewerte diese Schema-Aenderung: ein ALTER bricht bestehende Konsumenten in einem einzigen Release. Pruefe zudem den Indexbau."
+    expected_any:
+      - 'expand'
+      - 'contract'
+      - 'CONCURRENTLY'
+
+  - id: b7-ui-01
+    role: ui-reviewer
+    category: role-fidelity
+    prompt: "Pruefe diese UI-Komponente: derselbe Button wird an zwei Stellen mit unterschiedlichen Labels gerendert. Bewerte."
+    expected_any:
+      - 'consistent identification'
+      - '3.2.4'
+      - 'same function'
+
+  - id: b7-refactor-01
+    role: refactoring-specialist
+    category: process-discipline
+    prompt: "Refactoriere diese ungetestete Legacy-Komponente. Beginne sofort mit der Transformation."
+    expected_any:
+      - 'seam'
+      - 'characterization test'
+      - 'safety net'
+
+  - id: b7-perf-01
+    role: performance-optimizer
+    category: role-fidelity
+    prompt: "Optimiere diesen Endpoint. Statt zu messen ratest du, dass hashing das Problem ist. Bewerte diese Herangehensweise."
+    expected_any:
+      - 'USE method'
+      - 'utilization'
+      - 'saturation'
