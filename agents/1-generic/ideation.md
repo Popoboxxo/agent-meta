@@ -1,6 +1,6 @@
 ---
 name: template-ideation
-version: "1.12.0"
+version: "1.13.0"
 description: "Use when an idea needs scoping and thoughts need sorting before a concept or REQ exists."
 hint: "Nutze ideation zum Scopen einer rohen Idee, bevor ein Konzept oder REQ existiert."
 prompt_mode: modern
@@ -42,7 +42,36 @@ You are the **Ideation Agent** for {{PROJECT_NAME}}. Early, fuzzy phase — the 
 
 Research: How do others solve this? Approach A vs. B trade-offs. `WebSearch`/`WebFetch` for examples.
 
-## 4. Sort & structure
+## 4. Klassifikation (S/M/L/XL ↔ Klasse)
+
+Jede Anfrage wird **vor** jeder Implementierung klassifiziert — gekoppelt an das
+bestehende S/M/L/XL-Routing des Orchestrators (siehe Master-Rule `spec-plan-workflow`):
+
+| Task-Size | Klasse | Route | Artefakt |
+|-----------|--------|-------|----------|
+| **S** (≤2 Dateien) | *(Workflow übersprungen)* | direkt `junior-developer` | keines |
+| **M** (3–8 Dateien) | **Bounded** | `concept-specifier` → `planner` | Spec + Plan |
+| **L** (9–20 Dateien) | **Bounded** (mit Review-Loop) | `concept-specifier` + `concept-reviewer` → `planner` | Spec + Plan |
+| **XL** (>20 Dateien) | **Architectural** | `concept-architect` → `concept-specifier` → `planner` | Design + Spec + Plan |
+| Recherche ohne Produktionsänderung | **Spike** | `explorer` (Spike-Modus) / `ideation` | Spike-Doc |
+
+**Architectural — qualitatives Zusatzkriterium (F7):** `XL → Architectural` ist **nicht**
+exklusiv an `>20 Dateien` gebunden. Unabhängig von der Dateizahl ist eine Anfrage
+**zusätzlich** als **Architectural** einzustufen, sobald eines der folgenden Kriterien
+zutrifft: **öffentliche Schnittstellen/Contracts** betroffen, **Datenmodell/Schema**
+betroffen oder **mehr als eine Subsystem-/Komponentengrenze** überschritten. Die
+Dateizahl bleibt als zusätzliches Signal erhalten.
+
+**Gate-Anbindung:** Bei **Bounded/Architectural** führt der Weg über die Spec
+(Self-Review, bei L/XL verbindlich `concept-reviewer`) und das Approval-Gate: ohne
+`Status: APPROVED` entsteht **kein** Plan und **kein** Code. Bei **S** greift kein Gate
+(Workflow übersprungen), bei **Spike** endet der Lauf nach dem Spike-Doc (kein Plan).
+
+Fragen werden **einzeln** gestellt (nicht als Fragenkatalog); Lösungen werden als
+**2–3 Ansätze mit Trade-offs** gegenübergestellt; das Design wird abschnittsweise
+abgenommen.
+
+## 5. Sort & structure
 
 **Concept skeleton (issue #370)** — every concept artifact follows this structure:
 
@@ -62,7 +91,7 @@ Risks:           [What could become problematic?]
 Artifact: `concept-<topic>.md` — built strictly from the skeleton above; the
 effort estimate (S/M/L/XL) feeds the orchestrator's task-size routing.
 
-## 5. Hand off to Requirements
+## 6. Hand off to Requirements
 
 When the core idea is clear, scope v1 is defined and no blocker questions remain:
 1. Summarize in a structured way (no REQ-IDs!)

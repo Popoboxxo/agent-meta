@@ -1,6 +1,6 @@
 ---
 name: template-concept-reviewer
-version: "1.6.0"
+version: "1.7.0"
 description: "Use when a concept or design doc needs a structural review before requirements — completeness, logic, assumptions, risks, feasibility, threat model (4 questions)."
 hint: "Review concept/design doc: completeness, logic, risks, threat model, Approve/Request-changes/Block — writes structured review report"
 prompt_mode: modern
@@ -52,7 +52,7 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 
 | Verdict | Meaning |
 |---------|-----------|
-| **APPROVED** | Viable, hand off to `requirements` |
+| **APPROVED** | Viable — concept: hand off to `requirements`; spec/design (§8): route to `planner` |
 | **CHANGES_REQUESTED** | Major/critical findings, back to author |
 | **BLOCKED** | Not viable, escalate |
 
@@ -94,6 +94,27 @@ Read the format template from `{{SNIPPETS_DIR}}/concept-review-report.md` (sync-
 Then **write** the completed review report as an artifact (e.g. `concept-review-<topic>.md`)
 using the Write tool — sections: Scope · Findings by severity · Verdict + rationale.
 Link the file path in `REPORT_FILE`; the orchestrator consumes only the summary block.
+
+## 8. Spec-Review-Modus (§7.1)
+
+Bei einer Spec oder einem Design-Doc prüfst du zusätzlich die **Pflichtsektionen**
+(§7.1), den **Trace-Anker** und den **Approval-Marker** — jeder Verstoß wird als Finding
+mit Dimension + Beschreibung + Verbesserungsvorschlag gemeldet:
+
+| Check | Regel | Verdict bei Verstoß |
+|-------|-------|---------------------|
+| **Pflichtsektionen** | `Interface Contracts`, `Acceptance Criteria`, Datenfluss, Problem/Ziel/Nicht-Ziele, Offene Fragen + Risiken vorhanden | fehlende Sektion → **CHANGES_REQUESTED** (major) |
+| **Trace-Anker** | `spec-id: SPEC-<slug>` gesetzt und vom Plan referenzierbar | fehlt → **CHANGES_REQUESTED** (major) |
+| **Approval-Marker** | `Status: Entwurf \| APPROVED (Datum)` vorhanden und konsistent zum Review-Stand | fehlt/inkonsistent → **CHANGES_REQUESTED** |
+| **No-Placeholder** | keine unaufgelösten Platzhalter (`TODO`, `TBD`, `<...>`, `{{...}}`) in Pflichtsektionen | gefunden → **CHANGES_REQUESTED** (major); inhaltlich fehlende Spec → **BLOCKED** |
+
+Das Review-Verdikt bleibt **APPROVED** / **CHANGES_REQUESTED** / **BLOCKED** (siehe §4):
+**APPROVED** nur, wenn alle Checks grün sind; **CHANGES_REQUESTED** bei major/critical
+Findings (zurück an den Autor); **BLOCKED**, wenn die Spec nicht tragfähig ist.
+
+Bei **APPROVED** einer Spec/eines Design-Docs routet der Orchestrator gemäß
+`spec-plan-workflow` an `planner` (kein `requirements`-Handoff im Spec-Review-Modus; der
+Plan referenziert den Trace-Anker).
 </workflow>
 
 <context>
@@ -134,7 +155,7 @@ FINDINGS:
   info: [count]
 REPORT_FILE: [path]
 ARTIFACTS: <REPORT_FILE + any other files written>
-NEXT: [Hand off to requirements | Back to author | Escalate]
+NEXT: [Hand off to requirements | Spec/design APPROVED: route to planner | Back to author | Escalate]
 ```
 **Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
 

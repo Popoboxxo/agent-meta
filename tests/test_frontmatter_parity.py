@@ -301,3 +301,17 @@ def test_parse_frontmatter_text_fail_soft_contract():
 def test_strip_frontmatter_without_fm_returns_content_unchanged():
     assert strip_frontmatter("plain content") == "plain content"
     assert strip_frontmatter("---\nunclosed") == "---\nunclosed"
+
+
+def test_concept_specifier_uses_spec_template_sections():
+    text = (REPO_ROOT / "agents" / "1-generic" / "concept-specifier.md").read_text(encoding="utf-8")
+    assert "Interface Contracts" in text
+    assert "Acceptance Criteria" in text
+    assert "spec-id: SPEC-" in text
+    assert "Status: APPROVED" in text
+
+
+def test_ideation_maps_task_sizes_to_classes():
+    text = (REPO_ROOT / "agents" / "1-generic" / "ideation.md").read_text(encoding="utf-8")
+    for marker in ("Bounded", "Architectural", "Spike", "S/M/L/XL"):
+        assert marker in text
