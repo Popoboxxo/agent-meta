@@ -322,14 +322,26 @@ def write_atomic(path: Path, content: str, mode: str = "w") -> None:
     succeeded and been flushed to disk. On any failure the original file
     is left untouched and the temp file is cleaned up.
 
+    No newline translation is applied to text output: it is opened with
+    ``newline="\\n"``, so a literal ``\\n`` in ``content`` is written as a
+    single LF byte instead of being translated to ``os.linesep`` during
+    encoding. Callers are responsible for supplying LF-normalised content;
+    any ``\\r\\n``/``\\r`` already present in ``content`` is passed through
+    verbatim. This prevents the Windows failure mode where in text mode Python
+    otherwise translates ``\\n`` to ``os.linesep``, so every synced file
+    (deployed hook scripts in particular) would land with CRLF and fail at
+    runtime with ``$'\\r': command not found``. The binary branch
+    (``mode="wb"``) is untouched and writes ``bytes`` verbatim.
+
     mode: "w" (text, default) or "wb" (binary).
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     binary = "b" in mode
     fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix=f".{path.name}.", suffix=".tmp")
+    open_kwargs = {} if binary else {"encoding": "utf-8", "newline": "\n"}
     try:
-        with os.fdopen(fd, "wb" if binary else "w", **({} if binary else {"encoding": "utf-8"})) as f:
+        with os.fdopen(fd, "wb" if binary else "w", **open_kwargs) as f:
             f.write(content)
             f.flush()
             os.fsync(f.fileno())
@@ -382,10 +394,21 @@ def content_hash(text: str) -> str:
 
 
 def is_unchanged(path: Path, new_content: str) -> bool:
-    """Return True when path exists and already contains new_content."""
+    """Return True when path exists and already contains new_content.
+
+    The file is read with ``newline=""`` so no universal-newline translation
+    is applied: a CRLF file must NOT compare equal to LF content. Without
+    this, newline drift (e.g. a hook deployed as CRLF by a non-LF platform)
+    is silently treated as unchanged and never corrected by ``write_checked``.
+
+    ``newline=""`` is passed through ``Path.open`` instead of
+    ``Path.read_text(newline=...)`` because the latter only gained the
+    argument in a later Python version; the supported floor here is 3.9.
+    """
     if not path.exists():
         return False
-    return path.read_text(encoding="utf-8") == new_content
+    with path.open("r", encoding="utf-8", newline="") as f:
+        return f.read() == new_content
 
 
 def write_checked(

@@ -105,6 +105,7 @@ verhalten sich exakt wie bisher.
 | `58-spec-plan-spike` | Claude | strict (default) | Spike-Route in der gated Master-Rule; read-only `explorer`-Spike-Modus (allgemeine Rollen-Capability, nicht am Master-Switch gegated — prüft nur den enabled-Pfad) mit SPIKE-CODE-Marker/Spike-Doc-Pfad, Plan-/Spec-Templates sichtbar |
 | `59-progress-ledger` | Claude | strict (default) | Progress-/Ledger-Verdrahtung (SPEC-PROGRESS-LEDGER-2026-09-13, AC-28): `execute_plan`-Checkpoint + Ledger-Close-out, `--update-plan-ledger`-Writer, `spec_plan_ledger_drift`-WARNING für einen synthetischen Mismatch und `--rehydrate`-`next_task_ref` |
 | `60-progress-paths-config` | Claude | strict (default) | Konfigurierbare Progress-/Checkpoint-Pfade (SPEC-PROGRESS-PATHS-CONFIG-2026-09-13, AC-13): `progress.dir`/`progress.checkpoint-dir`-Override im `progress`-Block, Default-`.meta-viz`-Layout ohne Block, `CheckpointStore.from_config`-Wiring |
+| `61-hook-deploy-lf-newlines` | Claude, Gemini | strict (default) | Deployed Hooks sind LF-only (#754): `write_atomic` schreibt Text mit `newline="\n"`, `is_unchanged` erkennt CRLF-Drift; Assert scannt `.claude/hooks/**/*.sh` + `.agents/hooks/**/*.sh` (inkl. `antigravity-json-adapter`) auf CR |
 
 ## Bewusste Auslassungen
 
