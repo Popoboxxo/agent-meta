@@ -504,3 +504,15 @@ tests:
     - integrate
     - plugin-catalog
     - decision trees
+- description: b7-am-01 [agent-meta-manager]
+  vars:
+    role: agent-meta-manager
+    prompt: Ein Framework-Upgrade ist fehlgeschlagen und der Baum ist halb migriert. Wie gehst du vor?
+  assert:
+  - type: icontains-any
+    value:
+    - revert
+    - rollback
+    - revert to the prior tag
+    - prior tag
+    - re-sync

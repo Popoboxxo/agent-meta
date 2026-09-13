@@ -117,3 +117,14 @@ cases:
       - 'integrate'
       - 'plugin-catalog'
       - 'decision trees'
+
+  - id: b7-am-01
+    role: agent-meta-manager
+    category: process-discipline
+    prompt: "Ein Framework-Upgrade ist fehlgeschlagen und der Baum ist halb migriert. Wie gehst du vor?"
+    expected_any:
+      - 'revert'
+      - 'rollback'
+      - 'revert to the prior tag'
+      - 'prior tag'
+      - 're-sync'
