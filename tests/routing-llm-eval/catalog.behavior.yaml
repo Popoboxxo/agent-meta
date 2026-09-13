@@ -118,3 +118,12 @@ cases:
     expected_any:
       - 'acceptance criteria'
       - 'traceability'
+
+  - id: b7-se-verifier-01
+    role: se-verifier
+    category: process-discipline
+    prompt: "Wähle die Verifikationsmethode für eine sicherheitskritische Anforderung und begründe die Prüfintensität."
+    expected_any:
+      - 'inspection'
+      - 'demonstration'
+      - 'integrity'

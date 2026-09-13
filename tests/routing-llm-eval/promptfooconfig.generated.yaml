@@ -507,3 +507,14 @@ tests:
     value:
     - acceptance criteria
     - traceability
+- description: b7-se-verifier-01 [se-verifier]
+  vars:
+    role: se-verifier
+    prompt: Wähle die Verifikationsmethode für eine sicherheitskritische Anforderung und begründe die
+      Prüfintensität.
+  assert:
+  - type: icontains-any
+    value:
+    - inspection
+    - demonstration
+    - integrity
