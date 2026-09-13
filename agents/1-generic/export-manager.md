@@ -1,6 +1,6 @@
 ---
 name: template-export-manager
-version: "1.5.0"
+version: "1.6.0"
 description: "Reads .meta-config/export.yaml and routes structured JSON payloads from specialist agents to the configured target (markdown, confluence, jira-xray, etc.)."
 hint: "Use this agent for export routing of structured data to configured targets."
 prompt_mode: modern
@@ -73,9 +73,10 @@ Full: `{{SNIPPETS_DIR}}/export-transformations.md`.
 | Phase | Steps |
 |-------|-------|
 | 1. Configuration | Read `.meta-config/export.yaml`, determine default target, check credentials |
-| 2. Receive payload | Validate JSON, determine target |
-| 3. Transform + send | Payload to target format, send, verify |
-| 4. Status report | Target URL/path, log errors |
+| 2. Receive payload | Validate JSON, determine target, derive **idempotency key** (`request_id`, or `source_agent + payload_type`) |
+| 3. Validate target | Check payload against target-specific constraints (field lengths, required blocks, schema) before sending |
+| 4. Transform + send | Payload to target format, send, verify. Re-run with same key does NOT duplicate a prior success |
+| 5. Audit log | Record export outcome (target, status, errors) in the export log; token rotation is a security-config concern, not runtime |
 
 ## 7. Error handling
 
