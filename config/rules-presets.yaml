@@ -173,6 +173,21 @@ presets:
     se-cascade-review-lifecycle:
       channel: skill
       skill-description: "Use when running SE-Kaskade reviews — binding review lifecycle with protocol obligation and RVW finding IDs (Issue #339 B5)."
+    # Spec/Plan-Workflow rules: gated preset-independently via `rule-gates`
+    # below (fail-closed on `spec-plan-workflow.enabled`). channel: skill keeps
+    # only the name + description in context when the workflow is enabled.
+    spec-plan-workflow:
+      channel: skill
+      skill-description: "Use when a feature-level request needs spec→plan→execution with an approval gate — classification, spec authoring, SE boundary."
+    brainstorming-gate:
+      channel: skill
+      skill-description: "Use before any feature implementation to classify Spike/Bounded/Architectural and enforce the no-implementation-without-approval gate."
+    writing-plans:
+      channel: skill
+      skill-description: "Use when turning an approved spec into a plan — required header, file-structure map, bite-sized TDD tasks, interfaces, no-placeholder self-review."
+    plan-ledger:
+      channel: skill
+      skill-description: "Use when executing a plan task-by-task — fresh subagent per task, review, ledger/checkpoint recovery, ownership/barrier isolation (no worktree)."
 
 # Preset-unabhaengige Gates: eine Rule wird nur ausgeliefert, wenn ihre
 # `requires`-Bedingung erfuellt ist. Fail-closed: unbekannte Bedingung oder

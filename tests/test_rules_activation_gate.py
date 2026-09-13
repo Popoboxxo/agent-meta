@@ -77,3 +77,33 @@ def test_unknown_requires_never_activates_rule(tmp_path):
     assert "unknown-gate-rule.md" not in names
     # sanity: the known gate is still delivered when its switch is on
     assert "spec-plan-workflow.md" in names
+
+
+_NEW_STEMS = (
+    "spec-plan-workflow",
+    "brainstorming-gate",
+    "writing-plans",
+    "plan-ledger",
+)
+
+
+def test_new_rule_files_exist():
+    for stem in _NEW_STEMS:
+        assert (REPO_ROOT / "rules" / "1-generic" / f"{stem}.md").is_file()
+
+
+def test_lazy_preset_routes_new_rules_to_skill_channel():
+    from lib.io import _load_yaml_or_json
+    data, _ = _load_yaml_or_json(REPO_ROOT / "config" / "rules-presets.yaml")
+    lazy = data["presets"]["lazy"]
+    for stem in _NEW_STEMS:
+        assert lazy[stem]["channel"] == "skill"
+        assert lazy[stem]["skill-description"].strip()
+
+
+def test_rule_gates_section_declares_all_new_stems():
+    from lib.io import _load_yaml_or_json
+    data, _ = _load_yaml_or_json(REPO_ROOT / "config" / "rules-presets.yaml")
+    gates = data["rule-gates"]
+    for stem in _NEW_STEMS:
+        assert gates[stem]["requires"] == "spec-plan-workflow.enabled"
