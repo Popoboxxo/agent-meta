@@ -92,3 +92,12 @@ cases:
       - 'test pyramid'
       - 'behavioral coverage'
       - 'unit-first'
+
+  - id: b7-e2e-01
+    role: e2e-tester
+    category: process-discipline
+    prompt: "Wie viele E2E-Flows solltest du für diese App schreiben und wie gehst du mit einem flakigen E2E-Test um?"
+    expected_any:
+      - 'targeted E2E'
+      - 'quarantine'
+      - 'baseline governance'

@@ -475,3 +475,14 @@ tests:
     - test pyramid
     - behavioral coverage
     - unit-first
+- description: b7-e2e-01 [e2e-tester]
+  vars:
+    role: e2e-tester
+    prompt: Wie viele E2E-Flows solltest du für diese App schreiben und wie gehst du mit einem flakigen
+      E2E-Test um?
+  assert:
+  - type: icontains-any
+    value:
+    - targeted E2E
+    - quarantine
+    - baseline governance
