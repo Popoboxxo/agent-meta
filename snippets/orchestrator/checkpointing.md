@@ -25,7 +25,9 @@ backward compatibility.
 rehydrate path `python3 scripts/sync.py --rehydrate` (`scripts/lib/rehydrate.py`).
 It resolves the newest unfinished session from the authoritative machine recovery
 source, the `CheckpointStore` session files under
-`.meta-viz/checkpoints/<session>.json` (`scripts/lib/checkpoint.py`), and prints the
+`.meta-viz/checkpoints/<session>.json` (`scripts/lib/checkpoint.py`) — the framework
+default of the configurable `progress.checkpoint-dir` (override via the top-level
+`progress` block in `.meta-config/project.yaml`) — and prints the
 resume context. It writes nothing. The manual `.meta-viz/checkpoint-<ts>.json` format
 documented above remains readable for backward compatibility, but the runtime does not
 write it. On a hit, inform the user:
@@ -40,7 +42,8 @@ are never deleted automatically (neither by age nor on session start).
 **Progress file (issue #682 §6, Tier model — live-progress-channel design, 2026-09-10):** if the
 runtime calls `CheckpointStore.save_checkpoint()` (the Python API in `scripts/lib/checkpoint.py`,
 distinct from the manually-written checkpoint format above), it writes `.meta-viz/progress/current.md`
-— overwritten (non-historized) on Tier-A providers (verified `hook_protocol`, e.g. Claude/Gemini —
+— the framework default of the configurable `progress.dir` (override via the top-level `progress` block in
+`.meta-config/project.yaml`) — overwritten (non-historized) on Tier-A providers (verified `hook_protocol`, e.g. Claude/Gemini —
 see the chat-push instruction in §7), appended with session-start rotation on every Tier-B provider,
 since the file is their only live channel. Resume logic still reads the JSON checkpoints; `current.md`
 is for a human glancing at the repo, not parsed by any code path — no replacement for the manually

@@ -21,7 +21,10 @@ ist (Rule-Gate `session-recovery`, `requires: spec-plan-workflow.enabled`).
 
 - Autoritative maschinelle Recovery-Quelle ist der `CheckpointStore`
   (`scripts/lib/checkpoint.py`) mit seinen Session-Dateien unter
-  `.meta-viz/checkpoints/<session>.json`.
+  `.meta-viz/checkpoints/<session>.json`. Die Checkpoint-Wurzel ist über
+  `progress.checkpoint-dir` konfigurierbar, der Progress-Dateipfad über
+  `progress.dir`; `.meta-viz` ist nur der Framework-Default (Top-Level-`progress`-Block
+  in `.meta-config/project.yaml`).
 - Das manuelle Legacy-Format `.meta-viz/checkpoint-<ts>.json` bleibt **lesbar**
   (Abwärtskompatibilität), wird von der Runtime aber **nicht** geschrieben und **nicht**
   automatisch gelöscht.

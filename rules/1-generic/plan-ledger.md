@@ -28,7 +28,11 @@ Normativ nur bei aktiviertem Spec/Plan-Workflow.
   menschlich lesbare Sicht auf den Fortschritt.
 - Zusätzlich wird der Task-Fortschritt an die bestehende Recovery-Infrastruktur
   gebunden: `CheckpointStore` (`scripts/lib/checkpoint.py`) über
-  `barrier.checkpoint_ref` (z. B. `.meta-viz/checkpoints/...`).
+  `barrier.checkpoint_ref` (z. B. `.meta-viz/checkpoints/...` — illustratives
+  Beispiel). Die Checkpoint-Wurzel ist über `progress.checkpoint-dir`
+  konfigurierbar, der Progress-Dateipfad über `progress.dir`; `.meta-viz/checkpoints`
+  bzw. `.meta-viz/progress` sind nur die Framework-Defaults (Top-Level-`progress`-Block
+  in `.meta-config/project.yaml`).
 - **Writer-Pflicht statt reiner Handarbeit:** Der Checkbox-Zustand wird nach jedem Task
   vom Ledger-Writer (`scripts/lib/plan_ledger.py`, Modus `--update-plan-ledger`)
   geschrieben; die manuelle Pflege ist nur der Fallback. Der geschriebene Zustand muss

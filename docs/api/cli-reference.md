@@ -27,8 +27,8 @@ The `sync.py` script is the central entry point of the agent-meta framework. It 
 | Flag | Description |
 |------|-------------|
 | `--rehydrate` | Read-only resume path: prints the resume context of the newest unfinished session (plan/task/checkpoint identity, next open task, drift). Writes nothing, runs no sync, and exits 0 even when there is nothing to resume. |
-| `--checkpoint` | Write mode: appends one checkpoint to the session store (`.meta-viz/checkpoints/` plus its progress write-through). Requires `--session-id`, `--task`, `--agent` and `--status`; plan identity is explicit only via `--plan-id` or `--plan <path>`. Exit 1 on missing arguments or a store error, 0 after a successful write. |
-| `--session-id ID` | Session id for `--checkpoint` (one file per session under `.meta-viz/checkpoints/`). |
+| `--checkpoint` | Write mode: appends one checkpoint to the session store (`.meta-viz/checkpoints/` — the framework default of `progress.checkpoint-dir` — plus its progress write-through under `.meta-viz/progress/`, the default of `progress.dir`; both are overridable via the top-level `progress` block in `.meta-config/project.yaml`). Requires `--session-id`, `--task`, `--agent` and `--status`; plan identity is explicit only via `--plan-id` or `--plan <path>`. Exit 1 on missing arguments or a store error, 0 after a successful write. |
+| `--session-id ID` | Session id for `--checkpoint` (one file per session under `.meta-viz/checkpoints/`, the framework default of `progress.checkpoint-dir`). |
 | `--agent NAME` | Agent name for `--checkpoint`. |
 | `--plan PATH` | Plan path for `--checkpoint`; its plan id is derived from the document (or its file-stem slug), never random. Ignored when `--plan-id` is given. |
 | `--plan-id ID` | Explicit plan id for `--checkpoint`. Takes precedence over `--plan`. |
