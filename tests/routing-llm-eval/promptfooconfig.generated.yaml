@@ -477,3 +477,17 @@ tests:
     - regression
     - eval
     - few-shot
+- description: b7-pg-01 [prompt-governor]
+  vars:
+    role: prompt-governor
+    prompt: Ein Prompt wurde geaendert und soll in Produktion gehen. Welchen Schritt darfst du als Governor
+      nicht ueberspringen?
+  assert:
+  - type: icontains-any
+    value:
+    - eval/regression
+    - regression
+    - model drift
+    - modell-drift
+    - promote
+    - release gate

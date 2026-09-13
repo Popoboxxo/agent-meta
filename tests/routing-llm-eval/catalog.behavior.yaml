@@ -94,3 +94,15 @@ cases:
       - 'regression'
       - 'eval'
       - 'few-shot'
+
+  - id: b7-pg-01
+    role: prompt-governor
+    category: process-discipline
+    prompt: "Ein Prompt wurde geaendert und soll in Produktion gehen. Welchen Schritt darfst du als Governor nicht ueberspringen?"
+    expected_any:
+      - 'eval/regression'
+      - 'regression'
+      - 'model drift'
+      - 'modell-drift'
+      - 'promote'
+      - 'release gate'
