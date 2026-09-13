@@ -47,7 +47,7 @@ from .context_templates.builder import TemplateBuilder
 from .conventions import render_convention_block, resolve_conventions
 from .platform import apply_platform_variable_cascade
 from .delegation_table import get_active_agents_data, get_intent_routing_table
-from .dod import resolve_dod, resolve_dod_preset_name
+from .dod import resolve_dod, resolve_dod_preset_name, resolve_spec_plan_enabled
 from .providers import (
     all_providers_support_hooks,
     load_providers_config,
@@ -1645,6 +1645,17 @@ def _build_dod_variables(variables: dict, config: dict, agent_meta_root: Path) -
     # DOD_*: resolve from dod-preset (base) + dod (overrides).
     # Precedence: dod (project override) > dod-preset > "full" (implicit default).
     dod_resolved = resolve_dod(config, agent_meta_root)
+
+    sp_block = config.get("spec-plan-workflow") or {}
+    sp_paths = sp_block.get("paths") or {}
+    variables["SPEC_PLAN_SPECS_DIR"] = sp_paths.get("specs", "docs/specs")
+    variables["SPEC_PLAN_PLANS_DIR"] = sp_paths.get("plans", "docs/plans")
+    variables["SPEC_PLAN_WORKFLOW_ENABLED"] = (
+        "true" if resolve_spec_plan_enabled(
+            config, agent_meta_root, dod=dod_resolved,
+        ) else "false"
+    )
+
     variables["DOD_REQ_TRACEABILITY"] = "true" if dod_resolved.get("req-traceability", True) else "false"
     variables["DOD_TESTS_REQUIRED"]   = "true" if dod_resolved.get("tests-required", True) else "false"
     variables["DOD_CODEBASE_OVERVIEW"] = "true" if dod_resolved.get("codebase-overview", True) else "false"
