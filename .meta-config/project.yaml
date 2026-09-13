@@ -23,6 +23,8 @@ knowledge-engine:
     - API Reference
     - Guide
     - Session Conclusion
+    - Plan
+    - Spec
     auto-index: true
     auto-log: true
   operations:
