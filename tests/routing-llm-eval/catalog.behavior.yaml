@@ -171,3 +171,23 @@ cases:
       - 'Terminologie'
       - 'amtliches Regelwerk'
       - 'Rechtschreib'
+
+  - id: b7-copyeditor-plainlang-01
+    role: copyeditor
+    category: process-discipline
+    prompt: "Lektoriere einen deutschen Fachtext fuer breite Leserschaft. Worauf achtest du bei der Verstaendlichkeit?"
+    expected_any:
+      - 'Plain Language'
+      - 'ISO 24495'
+      - 'Verstaendlich'
+      - 'Leser'
+
+  - id: b7-conceptspec-adr-01
+    role: concept-specifier
+    category: process-discipline
+    prompt: "Spezifiziere einen neuen Datenfluss. Wie dokumentierst du deine Design-Entscheidungen und sicherst die Vollstaendigkeit der Spezifikation?"
+    expected_any:
+      - 'ADR'
+      - 'Completeness'
+      - 'Vollstaendigkeit'
+      - 'coverage'

@@ -567,3 +567,26 @@ tests:
     - Terminologie
     - amtliches Regelwerk
     - Rechtschreib
+- description: b7-copyeditor-plainlang-01 [copyeditor]
+  vars:
+    role: copyeditor
+    prompt: Lektoriere einen deutschen Fachtext fuer breite Leserschaft. Worauf achtest du bei der Verstaendlichkeit?
+  assert:
+  - type: icontains-any
+    value:
+    - Plain Language
+    - ISO 24495
+    - Verstaendlich
+    - Leser
+- description: b7-conceptspec-adr-01 [concept-specifier]
+  vars:
+    role: concept-specifier
+    prompt: Spezifiziere einen neuen Datenfluss. Wie dokumentierst du deine Design-Entscheidungen und
+      sicherst die Vollstaendigkeit der Spezifikation?
+  assert:
+  - type: icontains-any
+    value:
+    - ADR
+    - Completeness
+    - Vollstaendigkeit
+    - coverage
