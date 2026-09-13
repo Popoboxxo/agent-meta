@@ -1,11 +1,15 @@
 """Test suite for quality pipeline configuration management."""
 
+from pathlib import Path
+
 from scripts.lib.pipelines import (
     KNOWN_PROVIDERS,
     _pipeline_active_for_provider,
     build_pipeline_variables,
     validate_pipelines,
 )
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_known_providers_constant():
@@ -669,12 +673,16 @@ def test_validate_pipelines_rejects_non_bool_requires_approval():
 
 
 def test_role_defaults_pipelines_render_no_approval_gate_by_default():
-    # Backward-compat guard: no shipped base pipeline sets approval_default/
-    # requires_approval, so no generated block may contain a gate line.
+    # Backward-compat guard: under the DEFAULT DoD no shipped base pipeline may
+    # emit a gate line. The spec-plan `approve` stage ships
+    # `requires_approval: true` behind `dod_flag: spec-plan-enabled`, which the
+    # `full` preset leaves disabled — so the default render stays gate-free.
+    from scripts.lib.dod import resolve_dod
     from scripts.lib.pipelines import build_pipeline_variables, load_quality_pipelines
 
     pipelines = load_quality_pipelines(".")
-    variables = build_pipeline_variables(pipelines, active_dod={})
+    active_dod = resolve_dod({"platforms": []}, Path("."))
+    variables = build_pipeline_variables(pipelines, active_dod=active_dod)
     for var_name, value in variables.items():
         if not var_name.endswith("_PROVIDER_BLOCKS"):
             continue
@@ -973,3 +981,37 @@ def test_plan_driven_fallback_agent_not_in_roles_is_still_an_error():
     # fallback error yields two entries, not one.)
     assert any("fallback_agent" in e for e in errors)
     assert not any("allowed_agents" in e for e in errors)
+
+
+def test_concept_driven_dev_spec_plan_stage_order():
+    from scripts.lib.pipelines import inject_pipeline_blocks, load_quality_pipelines
+    from scripts.lib.dod import resolve_dod
+    pipelines = load_quality_pipelines(str(REPO_ROOT))
+    dod = resolve_dod({"platforms": [], "spec-plan-workflow": {"enabled": True}}, REPO_ROOT)
+    rendered = inject_pipeline_blocks(
+        "{{PIPELINE_CONCEPT_DRIVEN_DEV_BLOCK}}", pipelines, "Claude", dod,
+    )
+    # Exakte Claude-Render-Strings (pipelines.py:639 sequential_item):
+    #   {index}. background(agent="{agent}", prompt="{task}")
+    assert 'background(agent="ideation"' in rendered
+    order = [
+        rendered.index('background(agent="ideation"'),
+        rendered.index('background(agent="concept-specifier"'),
+        rendered.index('background(agent="planner"'),
+        rendered.index('prompt="Implementierung'),
+    ]
+    assert order == sorted(order)
+    assert "Abnahme erforderlich vor Stage 'approve'" in rendered
+
+
+def test_concept_driven_dev_spec_plan_hidden_when_disabled():
+    from scripts.lib.pipelines import inject_pipeline_blocks, load_quality_pipelines
+    from scripts.lib.dod import resolve_dod
+    pipelines = load_quality_pipelines(str(REPO_ROOT))
+    dod = resolve_dod({"platforms": [], "spec-plan-workflow": {"enabled": False}}, REPO_ROOT)
+    rendered = inject_pipeline_blocks(
+        "{{PIPELINE_CONCEPT_DRIVEN_DEV_BLOCK}}", pipelines, "Claude", dod,
+    )
+    assert "Abnahme erforderlich" not in rendered
+    assert 'background(agent="planner"' not in rendered
+    assert 'background(agent="ideation"' not in rendered

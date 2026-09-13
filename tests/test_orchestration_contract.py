@@ -746,3 +746,24 @@ def test_fanout_contract_tool_surface_missing(tmp_path):
     findings = check_fanout_backend_contract(root)
     checks = {f.check for f in _error_findings(findings)}
     assert "fanout.tool-surface-missing" in checks
+
+
+def test_concept_driven_dev_spec_plan_phase_order():
+    """Spec-plan wiring (spec §9 / Task 8): the concept-driven-dev stages are
+    ordered explore → classify → specify → review → approve → plan →
+    implement → validate."""
+    from scripts.lib.pipelines import load_quality_pipelines
+
+    pipelines = load_quality_pipelines(str(_REPO_ROOT))
+    stage_ids = [stage["id"] for stage in pipelines["concept-driven-dev"]["stages"]]
+    expected = [
+        "explore",
+        "classify",
+        "specify",
+        "review",
+        "approve",
+        "plan",
+        "implement",
+        "validate",
+    ]
+    assert stage_ids == expected

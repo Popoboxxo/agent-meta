@@ -2473,9 +2473,11 @@ quality_pipelines:
       mode: sequential
     on_error: escalate_to_orchestrator
   concept-driven-dev:
-    description: 'Concept-driven development (#370): explore → specify → review
-      (max 3 iterations) → implement → validate. Developer implementiert nur gegen
-      die freigegebene Spezifikation; Implementierungs-Tier nach Task-Größe S/M/L/XL.'
+    description: 'Concept-driven development (#370): explore → classify → specify
+      → review (max 3 iterations) → approve → plan → implement → validate.
+      classify/approve/plan sind an das spec-plan-Gate (spec-plan-enabled) gebunden;
+      Developer implementiert nur gegen die freigegebene Spezifikation;
+      Implementierungs-Tier nach Task-Größe S/M/L/XL.'
     signal_keywords:
     - concept-driven-dev
     - Konzept-Pipeline
@@ -2487,6 +2489,12 @@ quality_pipelines:
       task: 'Codebase-/Kontext-Analyse (read-only): betroffene Dateien, Patterns,
         Risiko-Zonen, empfohlener Approach'
       mode: sequential
+    - id: classify
+      agent: ideation
+      task: 'Klassifikation Spike/Bounded/Architectural inkl. S/M/L/XL-Mapping (F7-Zusatzkriterium)'
+      mode: conditional
+      condition:
+        dod_flag: spec-plan-enabled
     - id: specify
       agent: concept-specifier
       task: 'Technische Spezifikation schreiben (Interface-Contracts, Datenfluss,
@@ -2501,6 +2509,19 @@ quality_pipelines:
         generator: concept-specifier
         critic: concept-reviewer
         max_iterations: 3
+    - id: approve
+      agent: concept-reviewer
+      task: 'Abnahme der Spec (Status: APPROVED) — explizite Nutzerfreigabe'
+      mode: conditional
+      requires_approval: true
+      condition:
+        dod_flag: spec-plan-enabled
+    - id: plan
+      agent: planner
+      task: 'Umsetzungsplan gegen die freigegebene Spec (Plan-Template, pipeline_stages, F6-Graph-Validator)'
+      mode: conditional
+      condition:
+        dod_flag: spec-plan-enabled
     - id: implement
       agent: developer
       task: 'Implementierung gegen die freigegebene Spezifikation — Tier nach Task-Größe
