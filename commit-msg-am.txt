@@ -1,8 +1,0 @@
-feat(agents): agent-meta-manager upgrade-safe workflow (#776)
-
-Add upgrade-safety migration/rollback (Anthropic managed-agents),
-extend config/docs consistency via existing sync --check/--audit-config
-path (A Common Sense Guide), reference submodule-protection rule
-instead of duplicating.
-
-Refs #776
