@@ -464,3 +464,16 @@ tests:
     - 1-generic
     - 2-platform
     - 3-project
+- description: b7-pe-01 [prompt-engineer]
+  vars:
+    role: prompt-engineer
+    prompt: Ich habe einen System-Prompt geaendert. Was musst du vor einer Uebernahme zuerst pruefen und
+      womit?
+  assert:
+  - type: icontains-any
+    value:
+    - version prompt
+    - version prompts in code
+    - regression
+    - eval
+    - few-shot

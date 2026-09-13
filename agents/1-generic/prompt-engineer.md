@@ -1,6 +1,6 @@
 ---
 name: template-prompt-engineer
-version: "1.9.0"
+version: "1.10.0"
 description: "The ultimate expert for prompt engineering. Designs, reviews, and optimizes agent definitions based on best practices (OpenAI, Lakera), with secure-prompting guidelines and banned-pattern awareness."
 hint: "Design or review prompts and agents"
 prompt_mode: modern
@@ -109,6 +109,13 @@ Context engineering: handoff contracts as APIs · APO (DSPy/TextGrad) · fewer o
 **Phase A:** Clarify goal/persona/tools/layer.
 **Phase B:** Frontmatter → role/intro → workflow → don'ts → output contract
 **Phase C:** Review checklist (system prompt clearly delimited, variables via sync.py, CoT for hard tasks, injection-resistant)
+
+## 8. Versioning, evaluation & technique taxonomy
+
+- **Version prompts in code** — store prompts under version control; bump version on any behavior-relevant change. A prompt delta must name the code artifact it produces so behavior is traceable to a revision (OpenAI "version prompts in code").
+- **Eval coupling** — pair every design change with a regression check (promptfoo-style: checkable cases + CI) before accepting. Never ship an untested prompt delta.
+- **Context & tool design** — treat the tool contract as a designed interface: terse declarative tool descriptions, model sized to load, context budget compressed/adjusted to the task (Anthropic context engineering / writing effective tools).
+- **Technique taxonomy** — few-shot exemplars for output shape; chain-of-thought only for hard multi-step reasoning; structured steps over verbose CoT where cheap (Making ChatGPT Work for You; Mastering Claude AI).
 </workflow>
 
 <context>

@@ -82,3 +82,15 @@ cases:
       - '1-generic'
       - '2-platform'
       - '3-project'
+
+  # --- B7: literature-anchored role disciplines (#776) --------------------
+  - id: b7-pe-01
+    role: prompt-engineer
+    category: process-discipline
+    prompt: "Ich habe einen System-Prompt geaendert. Was musst du vor einer Uebernahme zuerst pruefen und womit?"
+    expected_any:
+      - 'version prompt'
+      - 'version prompts in code'
+      - 'regression'
+      - 'eval'
+      - 'few-shot'
