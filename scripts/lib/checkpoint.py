@@ -22,9 +22,11 @@ import re
 import time
 import uuid
 from pathlib import Path
+from typing import List, Optional
 
 from .io import _load_yaml_or_json, write_atomic
 from .json_persistence import load_json_document, save_json_document
+from .plan_identity import make_task_ref
 from .providers import (
     all_providers_support_hooks,
     load_providers_config,
@@ -87,6 +89,34 @@ def _sanitize_component(value: str, max_len: int = 64) -> str:
     cleaned = re.sub(r"[^A-Za-z0-9._-]", "_", value)
     cleaned = cleaned.strip("._-")[:max_len].strip("._-")
     return cleaned or "unnamed"
+
+
+def validate_session_id(session_id: str) -> None:
+    """Fail-closed validation of a session id used as a path component.
+
+    ``<checkpoint-dir>/<session-id>.json`` must never escape the checkpoint
+    directory (path traversal, IC-11). Empty ids, path separators, ``..``
+    components and absolute paths are rejected with ``ValueError``; the caller
+    decides how to surface the violation (the CLI handler turns it into exit
+    ``1`` before any write, ``CheckpointStore._session_file`` re-checks it as
+    defense-in-depth).
+    """
+    if not session_id:
+        raise ValueError("checkpoint session id must not be empty")
+    if session_id in (".", "..") or ".." in session_id:
+        raise ValueError(
+            f"unsafe checkpoint session id {session_id!r}: '..' is not allowed"
+        )
+    if "/" in session_id or "\\" in session_id:
+        raise ValueError(
+            f"unsafe checkpoint session id {session_id!r}: "
+            "path separators are not allowed"
+        )
+    if Path(session_id).is_absolute():
+        raise ValueError(
+            f"unsafe checkpoint session id {session_id!r}: "
+            "absolute paths are not allowed"
+        )
 
 
 def _md_cell(value) -> str:
@@ -214,6 +244,8 @@ class Checkpoint:
         pipeline: str | None = None,
         stage: str | None = None,
         timestamp: float | None = None,
+        plan_id: Optional[str] = None,
+        task_ref: Optional[str] = None,
     ):
         self.id = str(uuid.uuid4())
         self.task_id = task_id
@@ -226,6 +258,8 @@ class Checkpoint:
         self.pipeline = pipeline
         self.stage = stage
         self.timestamp = timestamp or time.time()
+        self.plan_id = plan_id
+        self.task_ref = task_ref
 
     def to_dict(self) -> dict:
         return {
@@ -240,6 +274,8 @@ class Checkpoint:
             "pipeline": self.pipeline,
             "stage": self.stage,
             "timestamp": self.timestamp,
+            "plan_id": self.plan_id,
+            "task_ref": self.task_ref,
         }
 
     @classmethod
@@ -255,9 +291,31 @@ class Checkpoint:
             pipeline=data.get("pipeline"),
             stage=data.get("stage"),
             timestamp=data.get("timestamp"),
+            plan_id=data.get("plan_id"),
+            task_ref=data.get("task_ref")
+            or make_task_ref(data.get("plan_id"), data["task_id"]),
         )
         cp.id = data.get("id", cp.id)
         return cp
+
+
+def _iter_valid_checkpoints(checkpoints) -> list:
+    """Return valid checkpoints from a raw list; corrupt entries are skipped.
+
+    Fail-soft (MINOR-A): non-list containers, non-dict entries and entries
+    missing hard-required fields are skipped, never raised.
+    """
+    if not isinstance(checkpoints, list):
+        return []
+    valid = []
+    for raw in checkpoints:
+        if not isinstance(raw, dict):
+            continue
+        try:
+            valid.append(Checkpoint.from_dict(raw))
+        except (KeyError, TypeError, ValueError):
+            continue
+    return valid
 
 
 class CheckpointStore:
@@ -279,11 +337,38 @@ class CheckpointStore:
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
     def _session_file(self, session_id: str) -> Path:
-        return self.checkpoint_dir / f"{session_id}.json"
+        """Resolve the session JSON path, confined to the checkpoint directory.
+
+        Defense-in-depth for IC-11: the session id is validated here as well
+        (not only in the CLI handler) and the resolved path must stay under
+        ``checkpoint_dir`` — a traversal id can never create or read a file
+        outside it.
+        """
+        validate_session_id(session_id)
+        path = (self.checkpoint_dir / f"{session_id}.json").resolve()
+        root = self.checkpoint_dir.resolve()
+        try:
+            path.relative_to(root)
+        except ValueError:
+            raise ValueError(f"checkpoint path {path} escapes {root}")
+        return path
 
     def _session_raw_dir(self, session_id: str) -> Path:
-        """Directory holding the archived raw worker outputs of a session."""
-        return self.checkpoint_dir / session_id
+        """Resolve the per-session raw-output directory, confined to
+        ``checkpoint_dir`` (defense-in-depth like ``_session_file``).
+
+        Also closes a Windows drive-relative id without a separator
+        (e.g. ``C:foo``) that the id validation alone cannot catch. The path is
+        returned unresolved so callers compose it exactly as before.
+        """
+        validate_session_id(session_id)
+        path = self.checkpoint_dir / session_id
+        root = self.checkpoint_dir.resolve()
+        try:
+            path.resolve().relative_to(root)
+        except ValueError:
+            raise ValueError(f"checkpoint raw dir {path} escapes {root}")
+        return path
 
     def save_raw_output(
         self,
@@ -408,22 +493,43 @@ class CheckpointStore:
         return load_json_document(self._session_file(session_id), default=None)
 
     def get_last_checkpoint(self, session_id: str) -> Checkpoint | None:
-        """Get the most recent checkpoint for a session."""
+        """Get the most recent checkpoint for a session.
+
+        Fail-soft (MINOR-A): corrupt/missing sessions or entries are skipped,
+        so the most recent *valid* checkpoint is returned.
+        """
         session = self.load_session(session_id)
-        if not session or not session.get("checkpoints"):
-            return None
-        return Checkpoint.from_dict(session["checkpoints"][-1])
+        valid = _iter_valid_checkpoints(session.get("checkpoints") if session else None)
+        return valid[-1] if valid else None
 
     def get_completed_steps(self, session_id: str) -> list[Checkpoint]:
-        """Get all completed checkpoints."""
+        """Get all completed checkpoints.
+
+        Fail-soft (MINOR-A): corrupt/missing sessions or entries are skipped.
+        The drift check (``consistency/ledger_drift.py``) calls this on
+        possibly tampered sessions and must never crash ``--validate-spec-plan``.
+        """
         session = self.load_session(session_id)
-        if not session:
-            return []
-        return [
-            Checkpoint.from_dict(cp)
-            for cp in session.get("checkpoints", [])
-            if cp.get("status") == "completed"
-        ]
+        valid = _iter_valid_checkpoints(session.get("checkpoints") if session else None)
+        return [cp for cp in valid if cp.status == "completed"]
+
+    def get_checkpoint_for_task(self, session_id: str, task_ref: str) -> Optional[Checkpoint]:
+        """Return the most recent checkpoint belonging to ``task_ref``.
+
+        Matches on the stored ``task_ref``; entries written before the
+        schema extension (no ``task_ref``) are matched by reconstructing the
+        ref from their ``plan_id`` + ``task_id`` (IC-02 back-compat path).
+        Fail-soft: returns ``None`` for a missing/corrupt session, an empty
+        ``task_ref`` or no match.
+        """
+        if not task_ref:
+            return None
+        session = self.load_session(session_id)
+        checkpoints = session.get("checkpoints") if session else None
+        for checkpoint in reversed(_iter_valid_checkpoints(checkpoints)):
+            if checkpoint.task_ref == task_ref:
+                return checkpoint
+        return None
 
     def list_sessions(self) -> list[str]:
         """List all session IDs that have checkpoints."""
@@ -432,6 +538,33 @@ class CheckpointStore:
         return [
             p.stem for p in self.checkpoint_dir.glob("*.json")
         ]
+
+    def find_sessions_for_plan(self, plan_id: str) -> List[str]:
+        """Return session ids that contain a checkpoint for ``plan_id``.
+
+        Newest ``updated_at`` first; corrupt session files are skipped and
+        never raise. An empty/falsy ``plan_id`` yields an empty list.
+        """
+        if not plan_id:
+            return []
+        matches = []
+        for session_id in self.list_sessions():
+            session = self.load_session(session_id)
+            if not session:
+                continue
+            checkpoints = session.get("checkpoints")
+            if not isinstance(checkpoints, list):
+                continue
+            if any(
+                isinstance(cp, dict) and cp.get("plan_id") == plan_id
+                for cp in checkpoints
+            ):
+                updated_at = session.get("updated_at", 0)
+                if not isinstance(updated_at, (int, float)):
+                    updated_at = 0
+                matches.append((updated_at, session_id))
+        matches.sort(key=lambda item: (item[0], item[1]), reverse=True)
+        return [session_id for _, session_id in matches]
 
     def delete_session(self, session_id: str) -> bool:
         """Delete a session's checkpoint file."""

@@ -25,17 +25,22 @@ provider CLI, no provider-name branch. Provider differences live in
 """
 from __future__ import annotations
 
+import logging
 import re
 import time
 import uuid
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, Literal, Protocol
+from typing import Any, Literal, Optional, Protocol
 
-from .checkpoint import CheckpointStore
+from .checkpoint import Checkpoint, CheckpointStore
 from .file_affinity import check_file_overlap
+from .plan_closeout import close_out_plan_ledger
+from .plan_identity import make_task_ref, normalize_task_id
 from .roles import _TIER_SEQUENCE
+
+_logger = logging.getLogger(__name__)
 
 __all__ = [
     "BARRIER_ENTRY_MARKER",
@@ -45,6 +50,7 @@ __all__ = [
     "FanoutPlan",
     "FanoutTask",
     "check_plan_file_overlap",
+    "checkpoint_from_barrier_entry",
     "execute_plan",
     "find_dependency_errors",
     "render_barrier_result",
@@ -369,6 +375,42 @@ def _overlap_errors(overlap: Any) -> list[str]:
 # Execution — barrier aggregation over the injected dispatcher
 # ---------------------------------------------------------------------------
 
+_CHECKPOINT_STATUS_MAP = {
+    "success": "completed",
+    "failed": "failed",
+    "timeout": "timeout",
+}
+
+
+def checkpoint_from_barrier_entry(
+    entry: BarrierEntry,
+    *,
+    plan_id: Optional[str] = None,
+    task_description: str = "",
+) -> Checkpoint:
+    """Build a durable :class:`Checkpoint` from one barrier entry (IC-06).
+
+    Identity rule (F1): ``plan_id``/``task_ref`` derive **only** from the
+    explicit ``plan_id`` argument. A falsy ``plan_id`` yields ``None`` for
+    both fields — the random ``KIND-<uuid>`` fallback carried on
+    ``BarrierResult.plan_id`` is deliberately never copied here, because a
+    per-run display id is not a durable cross-session key. When no
+    ``task_description`` is supplied the ``entry.task_id`` is used as the
+    fallback; the task id is normalized before the ref is built (M1).
+    """
+    resolved_plan_id = plan_id if plan_id else None
+    normalized_task_id = normalize_task_id(str(entry.task_id))
+    return Checkpoint(
+        task_id=normalized_task_id,
+        agent=entry.agent,
+        task_description=task_description or entry.task_id,
+        status=_CHECKPOINT_STATUS_MAP.get(entry.status, entry.status),
+        status_summary=entry.summary,
+        plan_id=resolved_plan_id,
+        task_ref=make_task_ref(resolved_plan_id, normalized_task_id),
+    )
+
+
 def execute_plan(
     plan: FanoutPlan,
     dispatcher: Dispatcher,
@@ -376,6 +418,8 @@ def execute_plan(
     store: CheckpointStore | None = None,
     session_id: str | None = None,
     plan_id: str | None = None,
+    write_checkpoints: bool = True,
+    ledger_path: Path | None = None,
 ) -> BarrierResult:
     """Execute a plan through the injected dispatcher with BARRIER semantics.
 
@@ -398,6 +442,14 @@ def execute_plan(
     - all entries ``failed`` → ``"failed"``
     - some ``failed`` (with successes present) → ``"partial"``
     - otherwise → ``"success"``
+
+    When ``store`` and ``session_id`` are given and ``write_checkpoints`` is
+    true, one checkpoint is appended per resolved entry via
+    ``store.save_checkpoint`` (IC-06). Checkpoint identity derives only from
+    the explicit ``plan_id`` argument; the random ``BarrierResult.plan_id``
+    fallback is never copied into a checkpoint (F1). A checkpoint write
+    ``OSError`` is logged and never changes the aggregated status
+    (fail-soft).
     """
     resolved_plan_id = plan_id or f"{plan.kind.upper()}-{uuid.uuid4().hex[:8]}"
     started = time.perf_counter()
@@ -436,6 +488,24 @@ def execute_plan(
             entry = replace(entry, checkpoint_ref=ref, raw_output=None)
         resolved_entries.append(entry)
 
+    if store is not None and session_id and write_checkpoints:
+        prompts = {task.task_id: task.prompt for task in plan.tasks}
+        for entry in resolved_entries:
+            checkpoint = checkpoint_from_barrier_entry(
+                entry,
+                plan_id=plan_id,
+                task_description=prompts.get(entry.task_id, ""),
+            )
+            try:
+                store.save_checkpoint(session_id, checkpoint)
+            except OSError as exc:
+                _logger.warning(
+                    "execute_plan: could not persist checkpoint for task %s: %s: %s",
+                    entry.task_id,
+                    type(exc).__name__,
+                    exc,
+                )
+
     statuses = [entry.status for entry in resolved_entries]
     if "timeout" in statuses:
         status: Literal["success", "partial", "failed", "timeout"] = "timeout"
@@ -446,6 +516,7 @@ def execute_plan(
     else:
         status = "success"
 
+    close_out_plan_ledger(ledger_path, resolved_entries)
     return BarrierResult(
         plan_id=resolved_plan_id,
         status=status,

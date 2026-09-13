@@ -22,6 +22,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .report import Finding, Severity
+from .ledger_drift import check_ledger_drift as _check_ledger_drift
+from ..plan_identity import TASK_HEADER_RE, normalize_task_id
 
 if TYPE_CHECKING:
     from ..orchestration import FanoutTask
@@ -48,9 +50,10 @@ _SPIKE_RE = re.compile(r".*-spike\.md$")
 _DESIGN_RE = re.compile(r"^\d{4}-\d{2}-\d{2}-.+-design\.md$")
 _DATED_RE = re.compile(r"^\d{4}-\d{2}-\d{2}-.+\.md$")
 
-_TASK_HEADER_RE = re.compile(
-    r"(?m)^###[ \t]+Task[ \t]+([^\s:—–-]+)[ \t]*(?:[:—–-][ \t]*(.*?))?[ \t]*$"
-)
+# Hyphen-aware task header. The single source of truth lives in
+# ``plan_identity`` so parser, ledger writer and validator cannot drift (IC-07).
+_TASK_HEADER_RE = TASK_HEADER_RE
+
 _AGENT_FIELD_RE = re.compile(
     r"(?im)^[ \t]*(?:\*\*)?Agent:(?:\*\*)?[ \t]*([\w.-]+)"
 )
@@ -91,6 +94,39 @@ def parse_plan_ledger(plan_path: Path) -> dict:
         "complete": bool(checkboxes) and checked == len(checkboxes),
         "status": status,
     }
+
+
+def parse_task_ledgers(plan_path: Path) -> dict:
+    """Return the per-task ledger counts of a plan document.
+
+    The document is split on the hyphen-aware
+    :data:`~lib.plan_identity.TASK_HEADER_RE`; inside each task block only
+    line-leading ``- [ ]`` / ``- [x]`` checkboxes are counted. Task ids are
+    normalized with :func:`~lib.plan_identity.normalize_task_id`.
+
+    Result: ``{"<task-id>": {"total": int, "checked": int, "complete": bool,
+    "start": int, "end": int}}`` where ``start``/``end`` are character offsets
+    of the whole block (the matching header up to the next header, or the end
+    of the document for the last block).
+    """
+    text = plan_path.read_text(encoding="utf-8") if plan_path.exists() else ""
+    ledgers: dict = {}
+    headers = list(TASK_HEADER_RE.finditer(text))
+    for index, header in enumerate(headers):
+        start = header.start()
+        end = headers[index + 1].start() if index + 1 < len(headers) else len(text)
+        block = text[start:end]
+        checkboxes = re.findall(r"^- \[( |x|X)\]", block, flags=re.MULTILINE)
+        checked = sum(1 for box in checkboxes if box.lower() == "x")
+        task_id = normalize_task_id(header.group(1).strip())
+        ledgers[task_id] = {
+            "total": len(checkboxes),
+            "checked": checked,
+            "complete": bool(checkboxes) and checked == len(checkboxes),
+            "start": start,
+            "end": end,
+        }
+    return ledgers
 
 
 def check_spec_plan_workflow(
@@ -145,6 +181,7 @@ def check_spec_plan_workflow(
     )
     _check_approval_markers(project_root, plans, texts, findings)
     _check_ledger_format(project_root, plans, findings)
+    _check_ledger_drift(project_root, plans, texts, findings, block.get("ledger-drift"))
     _check_plan_graph(project_root, plans, texts, findings)
     return findings
 
@@ -547,11 +584,8 @@ def _parse_plan_tasks(text: str) -> list[FanoutTask]:
 
 
 def _normalize_task_id(raw: str) -> str:
-    if re.fullmatch(r"\d+", raw):
-        return f"task-{raw}"
-    if re.fullmatch(r"task-\d+", raw, flags=re.IGNORECASE):
-        return raw.lower()
-    return raw
+    """Delegate to the single shared implementation (IC-07)."""
+    return normalize_task_id(raw)
 
 
 def _id_tokens(task_id: str) -> tuple[str, ...]:
