@@ -540,3 +540,13 @@ tests:
     - equivalence partitioning
     - boundary value
     - model-based coverage
+- description: b7-se-testreviewer-01 [se-testreviewer]
+  vars:
+    role: se-testreviewer
+    prompt: Bewerte die Teststärke des Testmodells und wie quantifizierst du die Negativ- bzw. Fehlerpfad-Abdeckung?
+  assert:
+  - type: icontains-any
+    value:
+    - fault-detection
+    - negative_path_coverage
+    - mutation

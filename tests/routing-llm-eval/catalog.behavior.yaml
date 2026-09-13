@@ -145,3 +145,12 @@ cases:
       - 'equivalence partitioning'
       - 'boundary value'
       - 'model-based coverage'
+
+  - id: b7-se-testreviewer-01
+    role: se-testreviewer
+    category: process-discipline
+    prompt: "Bewerte die Teststärke des Testmodells und wie quantifizierst du die Negativ- bzw. Fehlerpfad-Abdeckung?"
+    expected_any:
+      - 'fault-detection'
+      - 'negative_path_coverage'
+      - 'mutation'
