@@ -561,3 +561,17 @@ tests:
     - Breaking
     - immutab\w*
     - re.?tag
+- description: b7-dkr-freshness-01 [docker]
+  vars:
+    role: docker
+    prompt: Neues Release-Image fuer die Registry. Wann ist ein Rebuild faellig, wie taggst du reproducibly,
+      und welche Image-Security-Scans ziehst du optional vor dem Push heran?
+  assert:
+  - type: icontains-any
+    value:
+    - --pull
+    - immutab\w*
+    - digest
+    - '@sha256'
+    - trivy
+    - scout

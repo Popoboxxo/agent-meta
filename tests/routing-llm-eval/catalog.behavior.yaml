@@ -164,3 +164,15 @@ cases:
       - 'Breaking'
       - 'immutab\w*'
       - 're.?tag'
+
+  - id: b7-dkr-freshness-01
+    role: docker
+    category: process-discipline
+    prompt: "Neues Release-Image fuer die Registry. Wann ist ein Rebuild faellig, wie taggst du reproducibly, und welche Image-Security-Scans ziehst du optional vor dem Push heran?"
+    expected_any:
+      - '--pull'
+      - 'immutab\w*'
+      - 'digest'
+      - '@sha256'
+      - 'trivy'
+      - 'scout'
