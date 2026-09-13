@@ -64,6 +64,7 @@ SEED_EQUAL_ASPECTS = (
     "scaffold",
     "template-conditional",
     "consistency-noop",
+    "recovery-rehydrate",
 )
 # Neither seed-equal nor KE-coupled: depends on an additional resolved DoD flag.
 DOD_ASPECTS = ("dod-traceability",)

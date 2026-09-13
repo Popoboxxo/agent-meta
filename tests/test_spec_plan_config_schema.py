@@ -136,3 +136,98 @@ def test_project_structure_lists_spec_plan_paths():
     assert "docs/specs/" in structure
     assert "docs/plans/" in structure
     assert "docs/spikes/" in structure
+
+
+def test_recovery_and_ledger_drift_accepted():
+    """AC-25/IC-09: the recovery and ledger-drift declaration keys are accepted."""
+    jsonschema = pytest.importorskip("jsonschema")
+    jsonschema.validate(
+        _base_config(**{
+            "spec-plan-workflow": {
+                "recovery": {
+                    "rehydrate": True,
+                    "max-age-seconds": 3600,
+                    "include-legacy": False,
+                },
+                "ledger-drift": {"enabled": True, "severity": "WARNING"},
+            }
+        }),
+        _schema(),
+    )
+
+
+def test_unknown_recovery_key_rejected():
+    """The recovery object stays a strict typo guard (F7)."""
+    jsonschema = pytest.importorskip("jsonschema")
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(
+            _base_config(**{
+                "spec-plan-workflow": {"recovery": {"rehydrate": True, "bogus": 1}}
+            }),
+            _schema(),
+        )
+
+
+def test_root_cause_required_accepted():
+    """AC-25: the resolved dod object accepts the root-cause-required flag."""
+    jsonschema = pytest.importorskip("jsonschema")
+    jsonschema.validate(_base_config(dod={"root-cause-required": True}), _schema())
+    jsonschema.validate(_base_config(dod={"root-cause-required": False}), _schema())
+
+
+def test_task_review_max_rounds_accepted():
+    """IC-08/IC-09: the pipeline override schema declares task-review.max-rounds."""
+    jsonschema = pytest.importorskip("jsonschema")
+    jsonschema.validate(
+        _base_config(**{
+            "quality-pipelines": {
+                "overrides": {
+                    "concept-driven-dev": {"task-review": {"max-rounds": 4}}
+                }
+            }
+        }),
+        _schema(),
+    )
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(
+            _base_config(**{
+                "quality-pipelines": {
+                    "overrides": {
+                        "concept-driven-dev": {"task-review": {"max-rounds": 0}}
+                    }
+                }
+            }),
+            _schema(),
+        )
+
+
+def test_condition_payload_flag_accepted():
+    """AC-25: stageItem.condition declares the consumed dod_flag/payload_flag keys."""
+    jsonschema = pytest.importorskip("jsonschema")
+    jsonschema.validate(
+        _base_config(**{
+            "quality-pipelines": {
+                "overrides": {
+                    "demo-pipeline": {
+                        "stages": [
+                            {
+                                "id": "scope",
+                                "agent": "orchestrator",
+                                "task": "Scope the feature",
+                                "mode": "conditional",
+                                "condition": {"payload_flag": "needs_scoping"},
+                            },
+                            {
+                                "id": "tests",
+                                "agent": "tester",
+                                "task": "Write tests",
+                                "mode": "conditional",
+                                "condition": {"dod_flag": "tests-required"},
+                            },
+                        ]
+                    }
+                }
+            }
+        }),
+        _schema(),
+    )

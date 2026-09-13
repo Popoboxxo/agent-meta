@@ -480,10 +480,10 @@ def test_compact_managed_block_stays_within_progressive_disclosure_budget(seeded
     # Size ratchet for issues #192 Phase 2 + #540 Fix 1: with this repo's own
     # config (lazy preset, all AGENTS.md sharers having a skills_dir), the
     # compact managed block MUST stay within the progressive-disclosure
-    # budget. Current measured state: 208 lines (core rules ~122 + agent
-    # directory ~59 + scaffold). Headroom absorbs one more active MCP server
-    # (guardrails one-liner) or a new core rule — a REGRESSION beyond this
-    # budget means non-embedded content leaked back into the block.
+    # budget. Current measured state: 220 lines — at the budget ceiling
+    # (core rules ~122 + agent directory ~59 + scaffold). No headroom is left:
+    # reclaim lines before embedding more always-on content — a REGRESSION
+    # beyond this budget means non-embedded content leaked back into the block.
     compact = _render_context("compact", seeded_project)
     begin = compact.index("<!-- agent-meta:managed-begin -->")
     end = compact.index("<!-- agent-meta:managed-end -->")

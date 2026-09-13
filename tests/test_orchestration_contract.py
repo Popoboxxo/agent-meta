@@ -55,7 +55,10 @@ from scripts.lib.consistency.fanout_contracts import (
     check_fanout_backend_contract,
 )
 from scripts.lib.consistency.report import Severity
-from scripts.lib.consistency.spec_plan import check_spec_plan_workflow
+from scripts.lib.consistency.spec_plan import (
+    check_spec_plan_workflow,
+    parse_plan_ledger,
+)
 from scripts.lib.orchestration import (
     BARRIER_ENTRY_MARKER,
     BarrierEntry,
@@ -63,6 +66,7 @@ from scripts.lib.orchestration import (
     FanoutPlan,
     FanoutTask,
     check_plan_file_overlap,
+    checkpoint_from_barrier_entry,
     execute_plan,
     find_dependency_errors,
     render_barrier_result,
@@ -397,6 +401,163 @@ def test_execute_without_store_keeps_raw_output_and_no_checkpoint_ref():
     result = execute_plan(_two_task_plan(), StubDispatcher(raw="RAW"))
     assert all(e.raw_output == "RAW" for e in result.entries)
     assert all(e.checkpoint_ref is None for e in result.entries)
+
+
+def test_execute_writes_plan_identity_checkpoints(tmp_path):
+    """IC-06/AC-11: one durable checkpoint per entry carrying the explicit identity."""
+    store = CheckpointStore(project_root=tmp_path)
+    result = execute_plan(
+        _two_task_plan(), StubDispatcher(),
+        store=store, session_id="orch-id1", plan_id="p",
+    )
+
+    assert result.status == "success"
+    session = store.load_session("orch-id1")
+    assert session is not None
+    checkpoints = session["checkpoints"]
+    assert len(checkpoints) == 2
+    for checkpoint, entry in zip(checkpoints, result.entries):
+        assert checkpoint["plan_id"] == "p"
+        assert checkpoint["task_ref"] == f"p#{entry.task_id}"
+        assert checkpoint["status"] == "completed"
+        assert checkpoint["agent"] == entry.agent
+        assert checkpoint["task_description"] == f"do {entry.task_id}"
+
+
+def test_execute_write_checkpoints_false_is_legacy(tmp_path):
+    """IC-06/AC-12: opting out restores the raw-output-only behaviour."""
+    store = CheckpointStore(project_root=tmp_path)
+    raws = {"t1": "RAW ONE", "t2": "RAW TWO"}
+    dispatcher = StubDispatcher()
+    dispatcher.dispatch = lambda tasks: [
+        BarrierEntry(
+            task_id=t.task_id, agent=t.target_agent, status="success",
+            summary=f"did {t.task_id}", raw_output=raws[t.task_id],
+        )
+        for t in tasks
+    ]
+
+    result = execute_plan(
+        _two_task_plan(), dispatcher,
+        store=store, session_id="orch-legacy", write_checkpoints=False,
+    )
+
+    assert store.load_session("orch-legacy") is None
+    assert [e.task_id for e in result.entries] == ["t1", "t2"]
+    for entry in result.entries:
+        assert entry.raw_output is None
+        assert entry.checkpoint_ref is not None
+
+
+def test_execute_without_plan_id_writes_null_identity(tmp_path):
+    """IC-06/AC-13 (F1): no explicit plan_id -> no derived checkpoint identity."""
+    store = CheckpointStore(project_root=tmp_path)
+    result = execute_plan(
+        _two_task_plan(), StubDispatcher(),
+        store=store, session_id="orch-noid",
+    )
+
+    assert result.plan_id.startswith("FANOUT-")
+    session = store.load_session("orch-noid")
+    checkpoints = session["checkpoints"]
+    assert len(checkpoints) == 2
+    assert all(cp["plan_id"] is None for cp in checkpoints)
+    assert all(cp["task_ref"] is None for cp in checkpoints)
+
+
+def test_checkpoint_from_barrier_entry_normalizes_task_id():
+    """MINOR-8 (F1/IC-06): a non-normalized entry id must not produce a
+    false-drift ref -- ``1`` has to become ``p#task-1``, matching the ledger.
+    """
+    entry = BarrierEntry(
+        task_id="1", agent="developer", status="success", summary="done",
+    )
+
+    checkpoint = checkpoint_from_barrier_entry(entry, plan_id="p")
+    assert checkpoint.task_id == "task-1"
+    assert checkpoint.task_ref == "p#task-1"
+
+    null_identity = checkpoint_from_barrier_entry(entry)
+    assert null_identity.task_id == "task-1"
+    assert null_identity.task_ref is None
+
+
+def test_checkpoint_write_oserror_is_fail_soft(tmp_path, monkeypatch):
+    """IC-06: a checkpoint write failure is logged, never fatal."""
+    store = CheckpointStore(project_root=tmp_path)
+
+    def _boom(session_id, checkpoint):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(store, "save_checkpoint", _boom)
+    result = execute_plan(
+        _two_task_plan(), StubDispatcher(),
+        store=store, session_id="orch-err", plan_id="p",
+    )
+
+    assert result.status == "success"
+    assert [e.task_id for e in result.entries] == ["t1", "t2"]
+
+
+_LEDGER_PLAN = """# Ledger Test Plan
+
+> Status: geplant
+
+### Task t1: first
+
+- [ ] Step 1: do the first thing
+
+### Task t2: second
+
+- [ ] Step 1: do the second thing
+"""
+
+
+def _write_ledger_plan(tmp_path) -> Path:
+    plan_path = tmp_path / "plan.md"
+    plan_path.write_text(_LEDGER_PLAN, encoding="utf-8")
+    return plan_path
+
+
+def test_execute_with_ledger_path_closes_success_tasks(tmp_path):
+    """IC-06/AC-14: a fully successful run closes the ledger."""
+    plan_path = _write_ledger_plan(tmp_path)
+    result = execute_plan(
+        _two_task_plan(), StubDispatcher(), plan_id="p", ledger_path=plan_path,
+    )
+
+    assert result.status == "success"
+    text = plan_path.read_text(encoding="utf-8")
+    assert "- [ ]" not in text
+    assert text.count("- [x]") == 2
+    ledger = parse_plan_ledger(plan_path)
+    assert ledger["complete"] is True
+    assert ledger["status"] == "complete"
+
+
+def test_execute_with_failing_entry_keeps_task_open(tmp_path):
+    """IC-06/AC-14: only success entries are ticked; the plan stays open."""
+    plan_path = _write_ledger_plan(tmp_path)
+    result = execute_plan(
+        _two_task_plan(), MixedDispatcher({"t1": "success", "t2": "failed"}),
+        plan_id="p", ledger_path=plan_path,
+    )
+
+    assert result.status == "partial"
+    text = plan_path.read_text(encoding="utf-8")
+    assert text.count("- [x]") == 1
+    assert text.count("- [ ]") == 1
+    ledger = parse_plan_ledger(plan_path)
+    assert ledger["complete"] is False
+    assert ledger["status"] == "IN PROGRESS"
+
+
+def test_execute_without_ledger_path_no_write(tmp_path):
+    """IC-06/AC-14: no ledger_path = legacy behaviour, the file is untouched."""
+    plan_path = _write_ledger_plan(tmp_path)
+    before = plan_path.read_text(encoding="utf-8")
+    execute_plan(_two_task_plan(), StubDispatcher(), plan_id="p")
+    assert plan_path.read_text(encoding="utf-8") == before
 
 
 def test_execute_defensive_against_missing_and_extra_entries():
@@ -755,9 +916,9 @@ def test_fanout_contract_tool_surface_missing(tmp_path):
 
 
 def test_concept_driven_dev_spec_plan_phase_order():
-    """Spec-plan wiring (spec §9 / Task 8): the concept-driven-dev stages are
+    """Spec-plan wiring (spec §9 / IC-08, AC-32): the concept-driven-dev stages are
     ordered explore → classify → specify → review → approve → plan →
-    implement → validate."""
+    implement → review-req → review-quality → validate."""
     from scripts.lib.pipelines import load_quality_pipelines
 
     pipelines = load_quality_pipelines(str(_REPO_ROOT))
@@ -770,6 +931,8 @@ def test_concept_driven_dev_spec_plan_phase_order():
         "approve",
         "plan",
         "implement",
+        "review-req",
+        "review-quality",
         "validate",
     ]
     assert stage_ids == expected

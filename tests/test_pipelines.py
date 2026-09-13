@@ -7,6 +7,7 @@ import pytest
 from scripts.lib.pipelines import (
     KNOWN_PROVIDERS,
     _pipeline_active_for_provider,
+    _validate_task_review_rounds,
     build_pipeline_variables,
     validate_pipelines,
 )
@@ -1262,3 +1263,140 @@ def test_main_reflection_pair_is_pinned_to_dev_review_loop():
     assert _select_main_reflection_pair(pairs)["id"] == "dev-review-loop"
     assert _select_main_reflection_pair([{"id": "other", "max_iterations": 2}])["id"] == "other"
     assert _select_main_reflection_pair([]) is None
+
+
+_TASK_REVIEW_PAIRS = [
+    {
+        "id": "task-req-review-loop",
+        "generator": "developer",
+        "critic": "validator",
+        "max_iterations": 2,
+        "on_blocked": "escalate_to_orchestrator",
+    },
+    {
+        "id": "task-quality-review-loop",
+        "generator": "developer",
+        "critic": "code-reviewer",
+        "max_iterations": 2,
+        "on_blocked": "escalate_to_orchestrator",
+    },
+]
+
+
+def _task_review_pipeline(max_rounds=4):
+    pipeline = {
+        "stages": [
+            {"id": "implement", "agent": "developer", "mode": "sequential"},
+            {
+                "id": "review-req",
+                "agent": "validator",
+                "mode": "loop",
+                "loop_ref": "task-req-review-loop",
+            },
+            {
+                "id": "review-quality",
+                "agent": "code-reviewer",
+                "mode": "loop",
+                "loop_ref": "task-quality-review-loop",
+            },
+        ],
+    }
+    if max_rounds is not None:
+        pipeline["task-review"] = {"max-rounds": max_rounds}
+    return pipeline
+
+
+def test_task_review_rounds_cap_enforced():
+    """AC-22: a cap below the sum of both review pairs is an error naming the pipeline."""
+    pipelines = {"concept-driven-dev": _task_review_pipeline(max_rounds=3)}
+    errors = _validate_task_review_rounds(pipelines, _TASK_REVIEW_PAIRS)
+    assert any("concept-driven-dev" in e and "max-rounds" in e for e in errors), errors
+
+
+def test_task_review_rounds_default_ok():
+    """AC-22: 2 + 2 iterations fit the explicit cap of 4 and the implicit default."""
+    pipelines = {"concept-driven-dev": _task_review_pipeline(max_rounds=4)}
+    assert _validate_task_review_rounds(pipelines, _TASK_REVIEW_PAIRS) == []
+
+    without_cap = {"concept-driven-dev": _task_review_pipeline(max_rounds=None)}
+    assert _validate_task_review_rounds(without_cap, _TASK_REVIEW_PAIRS) == []
+
+
+def test_task_review_rounds_missing_loop_ref_errors():
+    """Fail-closed: a review stage without a loop_ref is rejected."""
+    pipelines = {
+        "p1": {
+            "stages": [{"id": "review-req", "agent": "validator", "mode": "loop"}],
+        }
+    }
+    errors = _validate_task_review_rounds(pipelines, _TASK_REVIEW_PAIRS)
+    assert any("p1" in e and "review-req" in e for e in errors), errors
+
+
+def test_task_review_rounds_missing_max_iterations_errors():
+    """Fail-closed: an explicit max_iterations >= 1 is required on the pair."""
+    pipelines = {
+        "p1": {
+            "stages": [
+                {
+                    "id": "review-quality",
+                    "agent": "code-reviewer",
+                    "mode": "loop",
+                    "loop_ref": "task-quality-review-loop",
+                }
+            ],
+        }
+    }
+    pairs = [
+        {
+            "id": "task-quality-review-loop",
+            "generator": "developer",
+            "critic": "code-reviewer",
+        }
+    ]
+    errors = _validate_task_review_rounds(pipelines, pairs)
+    assert any("p1" in e and "review-quality" in e for e in errors), errors
+
+
+def test_task_review_rounds_shipped_config_is_clean():
+    """AC-21: the shipped concept-driven-dev review stages satisfy the round cap."""
+    from scripts.lib.pipelines import load_quality_pipelines
+    from scripts.lib.reflection import load_reflection_pairs
+
+    pipelines = load_quality_pipelines(str(REPO_ROOT))
+    pairs = load_reflection_pairs(str(REPO_ROOT / "config"))
+    assert _validate_task_review_rounds(pipelines, pairs) == []
+
+
+def test_bugfix_has_mandatory_root_cause_stage():
+    """AC-23: bugfix gates the fix behind an unconditional root-cause stage."""
+    from scripts.lib.pipelines import load_quality_pipelines
+
+    pipelines = load_quality_pipelines(str(REPO_ROOT))
+    stages = pipelines["bugfix"]["stages"]
+    ids = [stage["id"] for stage in stages]
+
+    assert "root-cause" in ids, ids
+    assert ids.index("triage") < ids.index("root-cause") < ids.index("fix")
+
+    root_cause = stages[ids.index("root-cause")]
+    assert root_cause["agent"] == "bug-feature-analyzer"
+    assert root_cause["mode"] == "sequential"
+    assert "condition" not in root_cause
+
+
+def test_quick_fix_root_cause_is_conditional():
+    """AC-23: quick-fix keeps the root-cause stage behind the DoD flag."""
+    from scripts.lib.pipelines import load_quality_pipelines
+
+    pipelines = load_quality_pipelines(str(REPO_ROOT))
+    stages = pipelines["quick-fix"]["stages"]
+    ids = [stage["id"] for stage in stages]
+
+    assert "root-cause" in ids, ids
+    assert ids.index("root-cause") < ids.index("fix")
+
+    root_cause = stages[ids.index("root-cause")]
+    assert root_cause["agent"] == "bug-feature-analyzer"
+    assert root_cause["mode"] == "conditional"
+    assert root_cause["condition"] == {"dod_flag": "root-cause-required"}
