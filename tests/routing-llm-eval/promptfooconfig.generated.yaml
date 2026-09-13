@@ -464,3 +464,106 @@ tests:
     - 1-generic
     - 2-platform
     - 3-project
+- description: b7-se-req-01 [se-requirements]
+  vars:
+    role: se-requirements
+    prompt: Ein Stakeholder formuliert einen Bedarf vage. Mit welchen Techniken erhebst du den Bedarf
+      und welche Qualitätskriterien muss eine Anforderung erfuellen, bevor du sie formalisierst?
+  assert:
+  - type: icontains-any
+    value:
+    - interview
+    - workshop
+    - unambiguous
+    - verifiable
+    - atomic
+- description: b7-se-arch-01 [se-architect]
+  vars:
+    role: se-architect
+    prompt: Wie zerlegst du ein Black-Box-System in Sub-Systeme? Welches Prinzip stellst du sicher, damit
+      je Sub-System genau eine Verantwortung verborgen bleibt?
+  assert:
+  - type: icontains-any
+    value:
+    - information hiding
+    - orthogonal
+- description: b7-se-critic-01 [se-critic]
+  vars:
+    role: se-critic
+    prompt: Wie verwaltest du Review-Findings? Welches Normverfahren verankerst du, welche Angaben muss
+      jedes Finding tragen, und ab wann darf eine Zerlegungsebene durchgereicht werden?
+  assert:
+  - type: icontains-any
+    value:
+    - IEEE 1028
+    - severity
+    - gate-kriterien
+    - evidenz
+- description: b7-se-ifmgr-01 [se-interface-mgr]
+  vars:
+    role: se-interface-mgr
+    prompt: Ein registriertes Interface aendert seine Payload-Struktur. Wie behandelst du Versionierung
+      und Kompatibilitaet, und welche Kollisions-/Deadlock-Pruefungen fuehrst du je neuer Schnittstelle
+      durch?
+  assert:
+  - type: icontains-any
+    value:
+    - migration rule
+    - collision
+    - deadlock
+    - major
+- description: b7-se-term-01 [se-termination]
+  vars:
+    role: se-termination
+    prompt: Woran erkennst du, ob ein Sub-System ein Leaf ist? Wie passt du die Zerlegungstiefe bei sicherheitskritischen
+      Systemen an und was dokumentierst du als Abstraktions-Endpunkt?
+  assert:
+  - type: icontains-any
+    value:
+    - independently verifiable
+    - risk-based depth
+    - ' rigor'
+- description: b7-se-comp-req-01 [se-component-requirements]
+  vars:
+    role: se-component-requirements
+    prompt: Wie ordnest du REQ-L2-Verantwortlichkeiten Komponenten zu, und was pruefst du gegen die Interface-Registry,
+      bevor eine L3-Datei finalisiert wird?
+  assert:
+  - type: icontains-any
+    value:
+    - fragmented allocation
+    - registry cross-check
+    - exactly one
+- description: b7-se-jdev-01 [se-junior-developer]
+  vars:
+    role: se-junior-developer
+    prompt: Du implementierst ein triviales Leaf mit einem Interface. Wann liest du die Interface-Spec,
+      und was musst du fuer jedes implementierte Interface liefern?
+  assert:
+  - type: icontains-any
+    value:
+    - before writing code
+    - at least one test
+    - test oracle
+- description: b7-se-dev-01 [se-developer]
+  vars:
+    role: se-developer
+    prompt: Du implementierst eine Standard-Komponente mit drei Interfaces. Womit beginnst du, und welche
+      Orthogonalitaets-Regel gilt fuer Lese- und Schreibpfade der Schnittstellen?
+  assert:
+  - type: icontains-any
+    value:
+    - cohesion check
+    - query/command
+    - orthogon
+- description: b7-se-sdev-01 [se-senior-developer]
+  vars:
+    role: se-senior-developer
+    prompt: Ein komplexes Leaf hat sechs kohaesionslose Interfaces. Wie entscheidest du ueber die Zerlegung,
+      und welche Interface-Definition pruefst du vor dem Codieren?
+  assert:
+  - type: icontains-any
+    value:
+    - fat interface
+    - ISP
+    - ICD
