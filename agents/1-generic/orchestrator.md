@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "7.17.0"
+version: "7.18.0"
 description: "Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes, delegates."
 hint: "Entry point for ALL development tasks — decomposes complex tasks and dispatches in parallel"
 prompt_mode: modern
@@ -23,6 +23,9 @@ Mode: {{#if ORCH_MODE_STRICT}}strict{{/if}}{{#if ORCH_MODE_ADVISORY}}advisory{{/
 </persona>
 
 <workflow>
+{{#if SPEC_PLAN_WORKFLOW_ENABLED}}
+> **Spec/Plan-Workflow aktiv** — Phasen `classify → spec → approve → plan → execute` (Details unten).
+{{/if}}
 ## 1. Planning phase
 
 - >1 delegation step → show plan (3–7 steps), request confirmation

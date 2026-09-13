@@ -78,6 +78,8 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     "A2A_T_SIZE_LIMIT", "A2A_T_SIZE_LIMIT_TOKENS", "A2A_MAX_DEPTH",
     # Context density flag (derived from context_file.mode by build_variables, issue #540)
     "COMPACT_MODE",
+
+    "SPEC_PLAN_WORKFLOW_ENABLED", "SPEC_PLAN_SPECS_DIR", "SPEC_PLAN_PLANS_DIR",
     # Orchestrator snippet blocks (loaded from snippets/orchestrator/*.md by build_variables)
     "SE_MODE_BLOCK", "A2A_PROTOCOL_BLOCK", "CHECKPOINTING_BLOCK", "QUALITY_PIPELINES_BLOCK",
     "STATUS_TABLE_BLOCK", "AUTO_COMMIT_BLOCK",
