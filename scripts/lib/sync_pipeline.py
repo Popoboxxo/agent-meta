@@ -113,6 +113,7 @@ from lib.skills import (
     load_external_skills_config,
     sync_external_skills_for_provider,
 )
+from lib.spec_plan_scaffold import scaffold_spec_plan_dirs
 from lib.viz import (
     get_gitignore_entries as viz_gitignore_entries,
 )
@@ -793,6 +794,13 @@ def _sync_stage_knowledge_and_isolation(
     except SyncError as exc:
         print(f"\n  !!  Knowledge Engine sync aborted: {exc}", file=sys.stderr)
         sys.exit(1)
+
+    try:
+        scaffold_spec_plan_dirs(agent_meta_root, project_root, config, log, args.dry_run)
+    except SyncError as exc:
+        print(f"\n  !!  Spec/plan scaffolding aborted: {exc}", file=sys.stderr)
+        sys.exit(1)
+
     # Provider isolation: hard-block cross-provider directory access
     isolation_mode = config.get("provider-isolation")
     if isolation_mode != "disabled":
