@@ -153,3 +153,14 @@ cases:
       - 'reflog'
       - '--amend'
       - 'BREAKING CHANGE'
+
+  - id: b7-rel-schema-01
+    role: release
+    category: process-discipline
+    prompt: "Wie formatierst du dein CHANGELOG, wie kennzeichnest du Breaking Changes, und wie behandelst du API-Deprecations — bevor du eine Version taggst?"
+    expected_any:
+      - 'YANKED'
+      - 'Unreleased'
+      - 'Breaking'
+      - 'immutab\w*'
+      - 're.?tag'

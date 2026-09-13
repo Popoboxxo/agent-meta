@@ -548,3 +548,16 @@ tests:
     - reflog
     - --amend
     - BREAKING CHANGE
+- description: b7-rel-schema-01 [release]
+  vars:
+    role: release
+    prompt: Wie formatierst du dein CHANGELOG, wie kennzeichnest du Breaking Changes, und wie behandelst
+      du API-Deprecations — bevor du eine Version taggst?
+  assert:
+  - type: icontains-any
+    value:
+    - YANKED
+    - Unreleased
+    - Breaking
+    - immutab\w*
+    - re.?tag
