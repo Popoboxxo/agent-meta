@@ -114,6 +114,16 @@ def sync_knowledge_engine(
     missing .gitkeep markers in empty subdirectories on subsequent runs.
     """
     ke_config = config.get("knowledge-engine") or {}
+    sp = config.get("spec-plan-workflow") or {}
+    override = sp.get("external-system-override") or {}
+    if override.get("enabled", False):
+        log.skip(
+            "knowledge-engine",
+            "external-system-override enabled — KE write paths skipped "
+            "(file-index fallback active)",
+        )
+        return
+
     if not ke_config.get("enabled", False):
         log.skip("knowledge-engine", "disabled in project.yaml")
         return
