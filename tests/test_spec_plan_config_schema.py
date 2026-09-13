@@ -106,3 +106,12 @@ def test_spec_plan_workflow_has_no_schema_default():
     block = _schema()["properties"]["spec-plan-workflow"]
     assert "default" not in block
     assert "default" not in block["properties"]["enabled"]
+
+
+def test_project_structure_lists_spec_plan_paths():
+    from lib.io import _load_yaml_or_json
+    data, _ = _load_yaml_or_json(REPO_ROOT / ".meta-config" / "project.yaml")
+    structure = data["variables"]["PROJECT_STRUCTURE"]
+    assert "docs/specs/" in structure
+    assert "docs/plans/" in structure
+    assert "docs/spikes/" in structure

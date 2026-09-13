@@ -213,6 +213,9 @@ variables:
     docs/ui/            # UI Assets
       architecture/     # Architektur-Diagramme (Mermaid)
       admin-ui.html     # Admin-UI Frontend
+    docs/specs/         # Feature-Specs (Spec/Plan-Workflow, §5.1)
+    docs/plans/         # Feature-Pläne + archive/ (docs/plans/README.md)
+    docs/spikes/        # Wegwerf-Untersuchungen (explorer-Spike-Modus, F10)
     tests/              # Test-Suite (automated, manual, orchestration)
   ENTRY_POINT_PATTERN: scripts/sync.py — Haupt-CLI für Agent-Generierung
   KEY_PATTERNS: |
