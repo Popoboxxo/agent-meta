@@ -47,7 +47,11 @@ from .context_templates.builder import TemplateBuilder
 from .conventions import render_convention_block, resolve_conventions
 from .platform import apply_platform_variable_cascade
 from .delegation_table import get_active_agents_data, get_intent_routing_table
-from .dod import resolve_dod, resolve_dod_preset_name, resolve_spec_plan_enabled
+from .dod import (
+    resolve_dod,
+    resolve_dod_preset_name,
+    resolve_spec_plan_bundle,
+)
 from .providers import (
     all_providers_support_hooks,
     load_providers_config,
@@ -1651,9 +1655,9 @@ def _build_dod_variables(variables: dict, config: dict, agent_meta_root: Path) -
     variables["SPEC_PLAN_SPECS_DIR"] = sp_paths.get("specs", "docs/specs")
     variables["SPEC_PLAN_PLANS_DIR"] = sp_paths.get("plans", "docs/plans")
     variables["SPEC_PLAN_WORKFLOW_ENABLED"] = (
-        "true" if resolve_spec_plan_enabled(
+        "true" if resolve_spec_plan_bundle(
             config, agent_meta_root, dod=dod_resolved,
-        ) else "false"
+        )["template-conditional"] else "false"
     )
 
     variables["DOD_REQ_TRACEABILITY"] = "true" if dod_resolved.get("req-traceability", True) else "false"
@@ -1683,6 +1687,18 @@ def _build_dod_variables(variables: dict, config: dict, agent_meta_root: Path) -
     return dod_resolved
 
 
+def _select_main_reflection_pair(pairs: list[dict]) -> dict | None:
+    """Pick the reflection pair that drives the global ``MAX_ITERATIONS`` variable.
+
+    Pinned to ``dev-review-loop`` (the developer workflow's main loop) so a newly
+    added pair never silently becomes the main pair; falls back to the first pair
+    when ``dev-review-loop`` is absent. Returns ``None`` for an empty list.
+    """
+    if not pairs:
+        return None
+    return next((pair for pair in pairs if pair.get("id") == "dev-review-loop"), pairs[0])
+
+
 def _build_pipeline_variables(
     variables: dict, unmapped: list[str], config: dict, agent_meta_root: Path, dod_resolved: dict
 ) -> dict:
@@ -1709,7 +1725,8 @@ def _build_pipeline_variables(
     """
     # REFLECTION_PAIRS_ENABLED: auto-detect from role-defaults.yaml + project overrides
     variables["REFLECTION_PAIRS_ENABLED"] = "false"
-    variables["MAX_ITERATIONS"] = "3"  # default for reflection loops
+    variables["MAX_ITERATIONS"] = "3"
+    _effective_pairs = []
     try:
         _refl_pairs = load_reflection_pairs(str(agent_meta_root / "config"))
         _refl_overrides = load_project_overrides(
@@ -1718,10 +1735,7 @@ def _build_pipeline_variables(
         _effective_pairs = apply_project_overrides(_refl_pairs, _refl_overrides)
         if _effective_pairs:
             variables["REFLECTION_PAIRS_ENABLED"] = "true"
-            _main_pair = next(
-                (p for p in _effective_pairs if p.get("id") == "dev-review-loop"),
-                _effective_pairs[0],
-            )
+            _main_pair = _select_main_reflection_pair(_effective_pairs)
             variables["MAX_ITERATIONS"] = str(_main_pair.get("max_iterations", 3))
     except Exception:  # noqa: BLE001
         # Fallback: keep existing behavior (check role-defaults.yaml directly).
@@ -1758,7 +1772,7 @@ def _build_pipeline_variables(
         roles_cfg_for_coupling = load_roles_config(agent_meta_root)
         pipeline_errors = validate_pipelines(
             effective, list(available_roles), roles_config=roles_cfg_for_coupling,
-            known_roles=set(all_roles),
+            known_roles=set(all_roles), reflection_pairs=_effective_pairs,
         )
         for err in pipeline_errors:
             unmapped.append(f"quality-pipelines: {err}")
@@ -1774,7 +1788,7 @@ def _build_pipeline_variables(
             variables["QUALITY_PIPELINES_ENABLED"] = "true"
         # Build variables for active pipelines; also set BLOCK="" for disabled
         # base pipelines so substitute() never warns about missing placeholders.
-        active_vars = build_pipeline_variables(effective, dod_resolved)
+        active_vars = build_pipeline_variables(effective, dod_resolved, _effective_pairs)
         variables.update(active_vars)
         variables["PIPELINE_MATCH_TABLE"] = generate_pipeline_match_table(effective)
         for name in pipelines:

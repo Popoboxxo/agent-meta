@@ -9,7 +9,8 @@ from functools import lru_cache
 from pathlib import Path
 
 from .frontmatter import parse_frontmatter_text, split_frontmatter
-from .io import load_yaml_file
+from .io import SyncError, load_yaml_file
+from .reflection import effective_reflection_pairs, resolve_stage_loop
 
 # Module-level logger for fail-soft branches that have no SyncLog instance in
 # scope (Issue #568) — DEBUG-level only, so troubleshooting information isn't
@@ -158,17 +159,37 @@ def _validate_pipeline_composition(pipelines: dict, name: str, pipeline: dict) -
     return errors
 
 
+def _safe_load_reflection_pairs(agent_meta_root=None) -> list:
+    """Load *effective* reflection pairs (framework + project overrides).
+
+    Default source for `loop_ref` resolution when the caller does not pass an
+    explicit list. Mirrors the broad fallback already applied in config.py so a
+    malformed role-defaults.yaml cannot crash rendering.
+
+    Catches ``BaseException`` on purpose: the PyYAML-absent path in
+    ``_require_yaml()`` raises ``SystemExit`` (not ``Exception``), which must not
+    abort sync rendering (L7). Project overrides are applied here so a project
+    override of a pair actually reaches the render path (M4).
+    """
+    try:
+        return list(effective_reflection_pairs(agent_meta_root))
+    except BaseException:
+        return []
+
+
 def validate_pipelines(
     pipelines: dict,
     available_roles: list,
     roles_config: dict | None = None,
     known_roles: set | None = None,
+    reflection_pairs: list | None = None,
 ) -> list[str]:
     """Validate pipelines and return a list of error messages (empty = valid).
 
     Checks:
     - agent exists in available_roles
-    - loop.generator / loop.critic exist
+    - loop.generator / loop.critic exist (inline `loop` or resolved `loop_ref`)
+    - a `mode: loop` stage uses exactly one loop source (`loop` XOR `loop_ref`)
     - no circular orchestration (orchestrator agents inside pipelines)
     - providers field is well-formed (default/include/exclude, known providers)
     - run_pipeline composition: referenced pipelines exist, no cycles, depth limit
@@ -178,10 +199,15 @@ def validate_pipelines(
     known_roles: the full set of role names that exist as templates anywhere
       (not just the per-project active `roles:`). Used only to flag genuine
       typos in `allowed_agents` — a valid-but-inactive role there is normal
-      (issue #718) and never an error. Omitted → allowed_agents unchecked.
+      (issue
+    reflection_pairs: optional pre-resolved `reflection_pairs` list for
+      `loop_ref` resolution; defaults to the framework role-defaults.
     """
     errors = []
     orchestrator_roles = {"orchestrator"}
+    if reflection_pairs is None:
+        reflection_pairs = _safe_load_reflection_pairs()
+
 
     for name, pipeline in pipelines.items():
         stages = pipeline.get("stages", [])
@@ -237,19 +263,39 @@ def validate_pipelines(
 
             mode = stage.get("mode")
             if mode == "loop":
-                loop = stage.get("loop", {})
-                gen = loop.get("generator")
-                crit = loop.get("critic")
-                if gen and gen not in available_roles:
+                inline_loop = stage.get("loop")
+                loop_ref = stage.get("loop_ref")
+                has_inline = isinstance(inline_loop, dict)
+                has_ref = bool(loop_ref)
+                if has_inline and has_ref:
                     errors.append(
-                        f"Pipeline '{name}': loop generator '{gen}' not found in available roles. "
-                        f"Add '{gen}' to roles: in .meta-config/project.yaml to enable this pipeline."
+                        f"Pipeline '{name}': stage '{stage.get('id')}' defines "
+                        f"both 'loop' and 'loop_ref' — use exactly one loop source."
                     )
-                if crit and crit not in available_roles:
+                elif not has_inline and not has_ref:
                     errors.append(
-                        f"Pipeline '{name}': loop critic '{crit}' not found in available roles. "
-                        f"Add '{crit}' to roles: in .meta-config/project.yaml to enable this pipeline."
+                        f"Pipeline '{name}': stage '{stage.get('id')}' mode 'loop' "
+                        f"requires 'loop' or 'loop_ref'."
                     )
+                else:
+                    loop = resolve_stage_loop(stage, reflection_pairs)
+                    if has_ref and not loop:
+                        errors.append(
+                            f"Pipeline '{name}': stage '{stage.get('id')}' loop_ref "
+                            f"'{loop_ref}' not found in reflection_pairs."
+                        )
+                    gen = loop.get("generator")
+                    crit = loop.get("critic")
+                    if gen and gen not in available_roles:
+                        errors.append(
+                            f"Pipeline '{name}': loop generator '{gen}' not found in available roles. "
+                            f"Add '{gen}' to roles: in .meta-config/project.yaml to enable this pipeline."
+                        )
+                    if crit and crit not in available_roles:
+                        errors.append(
+                            f"Pipeline '{name}': loop critic '{crit}' not found in available roles. "
+                            f"Add '{crit}' to roles: in .meta-config/project.yaml to enable this pipeline."
+                        )
 
             if mode == "parallel_group":
                 pg = stage.get("parallel_group", [])
@@ -512,7 +558,9 @@ def generate_pipeline_match_table(pipelines: dict) -> str:
     return "\n".join(lines)
 
 
-def build_pipeline_variables(pipelines: dict, active_dod: dict) -> dict:
+def build_pipeline_variables(
+    pipelines: dict, active_dod: dict, reflection_pairs: list | None = None
+) -> dict:
     """Build Mustache variables for template substitution.
 
     Returns:
@@ -543,7 +591,8 @@ def build_pipeline_variables(pipelines: dict, active_dod: dict) -> dict:
         for provider in KNOWN_PROVIDERS:
             if _pipeline_active_for_provider(pipeline, provider):
                 provider_blocks[provider] = _generate_pipeline_block(
-                    pipeline, provider, all_pipelines=pipelines, active_dod=active_dod
+                    pipeline, provider, all_pipelines=pipelines, active_dod=active_dod,
+                    reflection_pairs=reflection_pairs,
                 )
             else:
                 provider_blocks[provider] = ""
@@ -551,16 +600,30 @@ def build_pipeline_variables(pipelines: dict, active_dod: dict) -> dict:
     return variables
 
 
-def inject_pipeline_blocks(content: str, pipelines: dict, provider: str, active_dod: dict) -> str:
+def inject_pipeline_blocks(
+    content: str,
+    pipelines: dict,
+    provider: str,
+    active_dod: dict,
+    reflection_pairs: list | None = None,
+    agent_meta_root=None,
+) -> str:
     """Replace {{PIPELINE_<NAME>_BLOCK}} in template with provider-optimised notation.
 
     Also replaces the aggregate {{PIPELINE_DETAIL_BLOCKS}} marker (all active
     pipelines, one after another) where present — see
     `generate_pipeline_detail_blocks()`.
 
+    ``reflection_pairs`` is the single resolution point for ``loop_ref``
+    rendering (M4): when the caller does not pass a list, the *effective* pairs
+    (framework + project ``reflection-pairs.overrides``) are resolved once here
+    and threaded to every nested block, so a project override actually renders.
+
     Runs *before* standard variable substitution so the placeholder does not
     trigger a "missing variable" warning.
     """
+    if reflection_pairs is None:
+        reflection_pairs = _safe_load_reflection_pairs(agent_meta_root)
     pattern = re.compile(r"\{\{PIPELINE_([A-Z0-9_]+)_BLOCK\}\}")
 
     def _replacer(match):
@@ -571,19 +634,27 @@ def inject_pipeline_blocks(content: str, pipelines: dict, provider: str, active_
         if not _pipeline_active_for_provider(pipeline, provider):
             return ""
         return _generate_pipeline_block(
-            pipeline, provider, all_pipelines=pipelines, active_dod=active_dod
+            pipeline, provider, all_pipelines=pipelines, active_dod=active_dod,
+            reflection_pairs=reflection_pairs,
         )
 
     content = pattern.sub(_replacer, content)
     if "{{PIPELINE_DETAIL_BLOCKS}}" in content:
         content = content.replace(
             "{{PIPELINE_DETAIL_BLOCKS}}",
-            generate_pipeline_detail_blocks(pipelines, provider, active_dod),
+            generate_pipeline_detail_blocks(
+                pipelines, provider, active_dod, reflection_pairs=reflection_pairs
+            ),
         )
     return content
 
 
-def generate_pipeline_detail_blocks(pipelines: dict, provider: str, active_dod: dict) -> str:
+def generate_pipeline_detail_blocks(
+    pipelines: dict,
+    provider: str,
+    active_dod: dict,
+    reflection_pairs: list | None = None,
+) -> str:
     """Concatenate provider-specific stage-detail blocks for every active pipeline.
 
     Companion to `generate_pipeline_match_table()` (which only lists signal →
@@ -598,7 +669,8 @@ def generate_pipeline_detail_blocks(pipelines: dict, provider: str, active_dod: 
         if not _pipeline_active_for_provider(pipeline, provider):
             continue
         block = _generate_pipeline_block(
-            pipeline, provider, all_pipelines=pipelines, active_dod=active_dod
+            pipeline, provider, all_pipelines=pipelines, active_dod=active_dod,
+            reflection_pairs=reflection_pairs,
         )
         if block:
             sections.append(f"### `{name}`\n{block}")
@@ -698,6 +770,7 @@ def _generate_pipeline_block(
     provider: str,
     all_pipelines: dict | None = None,
     active_dod: dict | None = None,
+    reflection_pairs: list | None = None,
     _depth: int = 0,
     _max_depth: int | None = None,
 ) -> str:
@@ -773,7 +846,20 @@ def _generate_pipeline_block(
             lines.append("")
 
         elif mode == "loop":
-            loop = stage.get("loop", {})
+            pairs = (
+                reflection_pairs
+                if reflection_pairs is not None
+                else _safe_load_reflection_pairs()
+            )
+            loop = resolve_stage_loop(stage, pairs)
+            if stage.get("loop_ref") and not loop:
+                # Fail-closed at render (M5): an unresolved `loop_ref` must not
+                # silently render a critic-less loop (`crit=""`).
+                raise SyncError(
+                    f"Pipeline stage '{stage_id}' (agent '{agent}') references "
+                    f"unknown loop_ref '{stage.get('loop_ref')}' — no matching "
+                    f"reflection pair."
+                )
             max_iter = loop.get("max_iterations", 3)
             gen = loop.get("generator", agent)
             crit = loop.get("critic", "")
@@ -840,6 +926,7 @@ def _generate_pipeline_block(
                     provider,
                     all_pipelines=all_pipelines,
                     active_dod=active_dod,
+                    reflection_pairs=reflection_pairs,
                     _depth=_depth + 1,
                     _max_depth=_max_depth,
                 )

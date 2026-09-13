@@ -27,6 +27,7 @@ from .providers import (
     load_provider_capabilities,
     load_providers_config,
 )
+from .reflection import load_reflection_pairs, resolve_stage_loop
 from .roles import load_roles_config
 
 
@@ -190,20 +191,29 @@ def _collect_template_files(agent_meta_root: Path) -> list[Path]:
     return files
 
 
-def _collect_pipeline_role_refs(config: dict) -> set[str]:
-    """Return every role referenced by a quality pipeline ``agent:`` field.
+def _collect_pipeline_role_refs(config: dict, reflection_pairs: list | None = None) -> set[str]:
+    """Return every role referenced by a quality pipeline.
 
     Handles both the project-override shape (``quality-pipelines.overrides``)
     and a fully-specified ``quality_pipelines`` block. Nested ``loop`` and
-    ``parallel_group`` agent references are included.
+    ``parallel_group`` agent references are included. ``loop_ref`` stages are
+    resolved against ``reflection_pairs`` so the generator/critic of the
+    referenced pair are not lost (spec §Revision v6 A.3).
     """
     refs: set[str] = set()
+    pairs = reflection_pairs or []
 
     def _walk(node: object) -> None:
         if isinstance(node, dict):
             agent = node.get("agent")
             if isinstance(agent, str) and agent:
                 refs.add(agent)
+            if node.get("loop_ref"):
+                resolved = resolve_stage_loop(node, pairs)
+                for key in ("generator", "critic"):
+                    val = resolved.get(key)
+                    if isinstance(val, str) and val:
+                        refs.add(val)
             for key in ("generator", "critic"):
                 val = node.get(key)
                 if isinstance(val, str) and val:
@@ -352,7 +362,11 @@ def audit_config(agent_meta_root: Path, project_config_path: Path) -> AuditRepor
         )
 
     # --- 4. orphaned_pipelines ---------------------------------------------
-    pipeline_refs = _collect_pipeline_role_refs(config)
+    try:
+        reflection_pairs = load_reflection_pairs(str(agent_meta_root / "config"))
+    except Exception:
+        reflection_pairs = []
+    pipeline_refs = _collect_pipeline_role_refs(config, reflection_pairs)
     for ref in sorted(pipeline_refs):
         if project_roles_set and ref not in project_roles_set:
             report.add(

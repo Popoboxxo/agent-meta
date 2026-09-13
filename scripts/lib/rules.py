@@ -73,8 +73,8 @@ def _rule_gate_satisfied(requires: str, config: dict | None,
     if config is None:
         return False
     if requires == "spec-plan-workflow.enabled":
-        from .dod import resolve_spec_plan_enabled
-        return resolve_spec_plan_enabled(config, agent_meta_root)
+        from .dod import resolve_spec_plan_bundle
+        return resolve_spec_plan_bundle(config, agent_meta_root)["rules-channel"]
     return False
 
 

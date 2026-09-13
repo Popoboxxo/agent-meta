@@ -106,9 +106,9 @@ def check_spec_plan_workflow(
     spec↔plan↔task↔test traceability, approval markers, ledger checkbox
     format, and the plan dependency graph (``FanoutPlan``/``validate_plan``).
 
-    Effective activation via ``resolve_spec_plan_enabled(config,
-    agent_meta_root)``; when it resolves to ``false`` this is a no-op that
-    returns ``[]`` (§10.1).
+    Effective activation via the Plan-Modus bundle aspect
+    ``consistency-noop`` (``resolve_spec_plan_bundle(...)``); when it resolves
+    to ``false`` this is a no-op that returns ``[]`` (§10.1).
     """
     project_root = Path(project_root)
     if config is None:
@@ -118,7 +118,8 @@ def check_spec_plan_workflow(
 
     root = _resolve_agent_meta_root(project_root, agent_meta_root)
     dod = _resolve_dod(config, root)
-    if not _spec_plan_enabled(config, root, dod):
+    bundle = _spec_plan_bundle(config, root, dod)
+    if not bundle["consistency-noop"]:
         return []
 
     block = config.get(_WORKFLOW_BLOCK)
@@ -126,7 +127,9 @@ def check_spec_plan_workflow(
         block = {}
 
     required = bool(dod.get("spec-plan-required", False))
-    task_test_traceability = bool(dod.get("spec-plan-traceability", False))
+    # Single source: the resolved `dod-traceability` aspect (seed AND the DoD
+    # flag). Reading the raw DoD key here would let aspect and enforcement drift.
+    task_test_traceability = bool(bundle["dod-traceability"])
 
     findings: list[Finding] = []
     artifacts = _collect_artifacts(project_root, block, changed_files, findings)
@@ -176,10 +179,10 @@ def _resolve_dod(config: dict, agent_meta_root: Path) -> dict:
     return resolve_dod(config, agent_meta_root)
 
 
-def _spec_plan_enabled(config: dict, agent_meta_root: Path, dod: dict) -> bool:
-    from ..dod import resolve_spec_plan_enabled
+def _spec_plan_bundle(config: dict, agent_meta_root: Path, dod: dict) -> dict:
+    from ..dod import resolve_spec_plan_bundle
 
-    return resolve_spec_plan_enabled(config, agent_meta_root, dod=dod)
+    return resolve_spec_plan_bundle(config, agent_meta_root, dod=dod)
 
 
 def _collect_artifacts(

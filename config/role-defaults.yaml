@@ -2340,6 +2340,11 @@ reflection_pairs:
   critic: code-reviewer
   max_iterations: 3
   on_blocked: escalate_to_orchestrator
+- id: concept-specify-loop
+  generator: concept-specifier
+  critic: concept-reviewer
+  max_iterations: 3
+  on_blocked: escalate_to_orchestrator
 quality_pipelines:
   feature-lifecycle:
     description: Vollständiger Feature-Lifecycle mit optionalem Plan-Input, REQ, TDD, Review, PR
@@ -2505,10 +2510,7 @@ quality_pipelines:
       task: Spec/Design reviewen — Verdict APPROVED/CHANGES_REQUESTED/BLOCKED + Findings
         mit Severity
       mode: loop
-      loop:
-        generator: concept-specifier
-        critic: concept-reviewer
-        max_iterations: 3
+      loop_ref: concept-specify-loop
     - id: approve
       agent: concept-reviewer
       task: 'Abnahme der Spec (Status: APPROVED) — explizite Nutzerfreigabe'

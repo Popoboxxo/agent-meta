@@ -605,7 +605,9 @@ def _apply_content_pipeline(
         from .dod import resolve_dod
 
         dod_resolved = resolve_dod(config, agent_meta_root)
-        content = inject_pipeline_blocks(content, effective, provider, dod_resolved)
+        content = inject_pipeline_blocks(
+            content, effective, provider, dod_resolved, agent_meta_root=agent_meta_root
+        )
 
     content = substitute(content, merged_vars, rel_source, log)
     pal_engine = DelegationSyntaxEngine(config_dir=agent_meta_root / "config")

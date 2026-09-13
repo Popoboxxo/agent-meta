@@ -1,0 +1,59 @@
+# Declarative grouping for the native spec/plan workflow ("Plan-Modus").
+# One seed, many aspects: the resolver derives every aspect from the seed so no
+# aspect can drift independently. Framework config (agent-meta source), not project config.
+groups:
+  plan-mode:
+    title: "Plan-Modus"
+    description: "Bündelt alle Spec/Plan-Workflow-Aspekte unter einem Seed."
+    seed:
+      # First present source wins (highest first). Neither source -> `default`.
+      sources:
+        - {config-path: spec-plan-workflow.enabled, kind: explicit}  # explicit project.yaml bool
+        - {config-path: dod.spec-plan-required,       kind: dod}     # resolved DoD flag
+      default: false
+    aspects:
+      - id: rules-channel
+        mechanism: rule-gate
+        config-path: config/rules-presets.yaml#rule-gates
+        enabled-when: seed
+        consumer: scripts/lib/rules.py::_rule_gate_satisfied
+      - id: pipeline-gating
+        mechanism: pipeline-stage-condition
+        config-path: config/role-defaults.yaml#quality_pipelines.concept-driven-dev
+        enabled-when: seed
+        consumer: scripts/lib/pipelines.py::inject_pipeline_blocks
+      - id: scaffold
+        mechanism: sync-scaffold
+        config-path: spec-plan-workflow.paths
+        enabled-when: seed
+        consumer: scripts/lib/spec_plan_scaffold.py::scaffold_spec_plan_dirs
+      - id: template-conditional
+        mechanism: template-conditional
+        config-path: variables.SPEC_PLAN_WORKFLOW_ENABLED
+        enabled-when: seed
+        consumer: scripts/lib/config.py::_build_dod_variables
+      - id: consistency-noop
+        mechanism: validator-noop
+        config-path: spec-plan-workflow.enabled
+        enabled-when: seed
+        consumer: scripts/lib/consistency/spec_plan.py::check_spec_plan_workflow
+      - id: ke-auto-index
+        mechanism: knowledge-engine-auto-write
+        config-path: knowledge-engine.okf.auto-index
+        enabled-when: "seed and ke.enabled and index.mode=='knowledge-engine'"
+        consumer: agents/1-generic/knowledge-ingestor.md
+      - id: ke-auto-log
+        mechanism: knowledge-engine-auto-write
+        config-path: knowledge-engine.okf.auto-log
+        enabled-when: "seed and ke.enabled and index.mode=='knowledge-engine'"
+        consumer: agents/1-generic/planner.md
+      # dod-traceability ist NICHT seed-gleich: die strikte Task<->Test-Traceability
+      # greift nur, wenn der Workflow aktiv ist UND das aufgelöste DoD-Flag
+      # `spec-plan-traceability: true` gesetzt ist (dod-presets.yaml bzw.
+      # project.yaml `dod`). Der Aspekt modelliert exakt diese effektive
+      # Bedingung; der Check konsumiert den Aspekt-Bool (kein Drift mehr).
+      - id: dod-traceability
+        mechanism: dod-flag
+        config-path: dod.spec-plan-traceability
+        enabled-when: "seed and dod.spec-plan-traceability"
+        consumer: scripts/lib/consistency/spec_plan.py::check_spec_plan_workflow

@@ -15,7 +15,7 @@ from pathlib import Path
 
 from .io import safe_path, write_checked
 from .log import SyncLog
-from .dod import resolve_spec_plan_enabled
+from .dod import resolve_spec_plan_bundle
 
 DEFAULT_SPECS_DIR = "docs/specs"
 DEFAULT_PLANS_DIR = "docs/plans"
@@ -46,7 +46,7 @@ def resolve_index_mode(config: dict) -> tuple[str, str]:
 
 def scaffold_spec_plan_dirs(agent_meta_root: Path, project_root: Path,
                             config: dict, log: SyncLog, dry_run: bool) -> None:
-    if not resolve_spec_plan_enabled(config, agent_meta_root):
+    if not resolve_spec_plan_bundle(config, agent_meta_root)["scaffold"]:
         log.skip("spec-plan-workflow", "disabled")
         return
     block = config.get("spec-plan-workflow") or {}
