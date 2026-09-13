@@ -476,3 +476,14 @@ tests:
     - Selbst.?[Rr]eview
     - self-contained
     - read in full
+- description: b7-orch-center-01 [orchestrator]
+  vars:
+    role: orchestrator
+    prompt: Wie routingest du eine Aufgabe mit mehreren unabhaengigen Teilaufgaben an mehrere Agenten?
+      Beschreibe deinen Orchestrierungs-Ansatz.
+  assert:
+  - type: icontains-any
+    value:
+    - centrali[sz]ed
+    - Centrali[sz]ed
+    - group.?chat.*(not|nicht) (supported|unterst)

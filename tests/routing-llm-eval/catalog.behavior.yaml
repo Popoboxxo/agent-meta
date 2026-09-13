@@ -93,3 +93,12 @@ cases:
       - 'Selbst.?[Rr]eview'
       - 'self-contained'
       - 'read in full'
+
+  - id: b7-orch-center-01
+    role: orchestrator
+    category: process-discipline
+    prompt: "Wie routingest du eine Aufgabe mit mehreren unabhaengigen Teilaufgaben an mehrere Agenten? Beschreibe deinen Orchestrierungs-Ansatz."
+    expected_any:
+      - 'centrali[sz]ed'
+      - 'Centrali[sz]ed'
+      - 'group.?chat.*(not|nicht) (supported|unterst)'
