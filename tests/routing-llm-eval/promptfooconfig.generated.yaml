@@ -498,3 +498,14 @@ tests:
     - isolat\w*
     - '[Pp]seudocode'
     - debugger
+- description: b7-sen-repro-01 [senior-developer]
+  vars:
+    role: senior-developer
+    prompt: Ein seltsamer Race-Condition-Bug in der Produktion. Wie gehst du an die Behebung dieses Hard-Bugs
+      heran?
+  assert:
+  - type: icontains-any
+    value:
+    - reproduc\w*
+    - failing test
+    - fail.*test

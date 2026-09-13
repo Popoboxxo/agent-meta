@@ -111,3 +111,12 @@ cases:
       - 'isolat\w*'
       - '[Pp]seudocode'
       - 'debugger'
+
+  - id: b7-sen-repro-01
+    role: senior-developer
+    category: process-discipline
+    prompt: "Ein seltsamer Race-Condition-Bug in der Produktion. Wie gehst du an die Behebung dieses Hard-Bugs heran?"
+    expected_any:
+      - 'reproduc\w*'
+      - 'failing test'
+      - 'fail.*test'
