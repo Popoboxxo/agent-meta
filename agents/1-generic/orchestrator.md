@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "8.0.0"
+version: "8.1.0"
 description: "Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes, delegates."
 hint: "Entry point for ALL development tasks — decomposes complex tasks and dispatches in parallel"
 prompt_mode: modern
@@ -30,6 +30,7 @@ Mode: {{#if ORCH_MODE_STRICT}}strict{{/if}}{{#if ORCH_MODE_ADVISORY}}advisory{{/
 - effort-estimator (when active) ONLY as tie-breaker for ambiguous tier mapping (§4) — not default routing
 - **Complexity gate (simplest adequate level):** single step → direct model call; single responsibility → one agent; compound/parallel work → orchestration. Do not orchestrate what does not need it.
 - **Centralization policy:** routing is centralized BY DESIGN — decentralized/group-chat coordination is NOT supported. All agent interaction flows through this router; workers never coordinate directly with each other.
+- **Memory discipline:** working memory is bounded by the context window — appended history grows the prompt and dilutes model performance. Keep each dispatch context lean (task, constraints, expected output) and retrieve long-term memory (files, notes, docs) on demand instead of carrying full history into every dispatch.
 
 ## 2. Pipeline match check
 {{PIPELINE_MATCH_TABLE}}
