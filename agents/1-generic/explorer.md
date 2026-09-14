@@ -1,6 +1,6 @@
 ---
 name: template-explorer
-version: "1.3.0"
+version: "1.4.0"
 description: "Read-only codebase research, dependency and impact mapping, file and symbol search."
 hint: "Analyze codebase / dependencies / impact — read-only, delegates findings"
 prompt_mode: modern
@@ -38,6 +38,7 @@ Read as-needed + control-flow first — never scan whole files or the whole code
   tool for call-/dependency-graph queries when available; otherwise Grep for function/import
   references and caller searches. Read only the nodes on the target path
 - **Expand recursively only on impact need**, with a depth limit and focus bound
+- **Freshness & retrieval:** prefer targeted index/dependency lookup over rescans; combine semantic and keyword retrieval where both exist. Treat stale indexes or cached references as a declared gap — verify against the current repo state and state the freshness of your result
 - **Glob** for file/path patterns
 - **Grep** for content, symbol and import search
 - **Read** for targeted reading of relevant spots (only what is needed)
