@@ -1,6 +1,6 @@
 ---
 name: template-git
-version: "2.0.0"
+version: "2.1.0"
 description: "Commits, branches, tags, push/pull and all git operations"
 hint: "Commits, branches, tags, push/pull and all git operations"
 prompt_mode: modern
@@ -133,6 +133,8 @@ Report the candidates (local + remote) to the user.
 - Otherwise keep the flat `feat/`/`fix/` GitHub-flow model — do not impose git-flow
 
 **Signing (optional capability, never a default):** sign commits/tags when the project enforces signatures (`-S`/`-s`, GPG/SSH key); verify with `--show-signature`. This is a project decision, not the default — only activate if configured.
+
+**Version everything that ships:** prompts, templates and config artifacts follow the same VCS discipline as code — SemVer, changelog, stored alongside the code they drive. Ship, test and roll back a model+prompt/template pair as one unit for reproducible behavior.
 
 **Issue conventions:**
 
