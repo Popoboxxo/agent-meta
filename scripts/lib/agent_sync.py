@@ -10,6 +10,7 @@ imported lazily inside functions to avoid load-time import cycles.
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from pathlib import Path
 
 from .frontmatter import (
@@ -31,6 +32,12 @@ from .provider_transform import (
     inject_debug_block,
     transform_agent_content_for_provider,
     wrap_sections_in_xml,
+)
+from .rule_index import (
+    bootstrap_previously_managed,
+    cleanup_stale_managed_files,
+    read_managed_index,
+    write_managed_index,
 )
 from .variables import strip_inactive_conditional_blocks, substitute
 
@@ -748,9 +755,68 @@ def _write_agent_file(
     else:
         log.skip(rel_out, 'unchanged')
 
-def _collect_claude_external_skill_filenames(agent_meta_root: Path, config: dict) -> set:
-    """Collect external skill agent filenames — external skill agents always
-    land in .claude/agents/, so only the Claude provider sync adds them.
+_MANAGED_INDEX_FILENAME = '.agent-meta-managed'
+
+_EXTERNAL_SKILL_ORIGIN_PREFIX = '0-external/'
+
+
+def _agent_has_provenance(path: Path, text: str) -> bool:
+    """True iff *text* carries an agent-meta generation marker. Recognises, in
+    order of preference:
+      - YAML frontmatter ``generated-from:`` (frontmatter.py:244, 278-294)
+      - HTML comment ``<!-- agent-meta-provenance: ... -->``
+        (provider_transform.py:554-561; frontmatter.py:230-238)
+      - TOML comment ``# generated-from:`` (agent_toml.py:75)
+      - YAML frontmatter ``based-on:`` (secondary; 2-platform overrides)
+    Never True for a user-authored file. Pure, no writes.
+
+    Fail-soft: an invalid/unparseable frontmatter block simply contributes no
+    marker (the HTML/TOML checks still run on the raw text)."""
+    frontmatter = _parse_frontmatter_yaml(text)
+    if frontmatter.get('generated-from') or frontmatter.get('based-on'):
+        return True
+    if '<!-- agent-meta-provenance:' in text:
+        return True
+    if path.suffix == '.toml' and '# generated-from:' in text:
+        return True
+    return False
+
+
+def _agent_provenance_is_external_skill(path: Path, text: str) -> bool:
+    """True iff *text* carries a **primary** provenance marker whose generation
+    origin identifies an external-skill wrapper (origin prefix ``0-external/``,
+    skills.py:500 ``generated_from=f"0-external/{skill_name}@{commit}"``).
+
+    This is the bounded reconciliation predicate (F-01): only primary markers
+    (frontmatter ``generated-from:``, HTML ``<!-- agent-meta-provenance: ... -->``,
+    TOML ``# generated-from:``) qualify; the secondary ``based-on:`` marker does
+    NOT. Pure, no writes; a file with no recognisable external-skill origin
+    returns False."""
+    generated_from = _parse_frontmatter_yaml(text).get('generated-from')
+    if isinstance(generated_from, str) and generated_from.startswith(_EXTERNAL_SKILL_ORIGIN_PREFIX):
+        return True
+    if path.suffix == '.toml':
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith('# generated-from:'):
+                origin = stripped[len('# generated-from:'):].strip()
+                if origin.startswith(_EXTERNAL_SKILL_ORIGIN_PREFIX):
+                    return True
+    for match in re.finditer(r'<!--\s*agent-meta-provenance:\s*(.*?)-->', text, flags=re.DOTALL):
+        if f'generated-from={_EXTERNAL_SKILL_ORIGIN_PREFIX}' in match.group(1):
+            return True
+    return False
+
+
+def _collect_active_skill_wrapper_filenames(agent_meta_root: Path, config: dict) -> set:
+    """Filenames of ``<role>.md`` wrappers skills.py will write this run.
+
+    Derived from the SAME source of truth as ``skills.py``: the registry in
+    ``config/skills-registry.yaml`` filtered by ``_skill_is_active`` (role
+    defaults to the skill name). Provider-independent — the wrapper filename is
+    always ``.md`` regardless of the provider's ``agent_ext`` — so no
+    capability gate applies. Replaces the capability-gated
+    ``_collect_claude_external_skill_filenames`` (issue #735).
     """
     from .io import _normalize_enabled_config
     from .skills import _skill_is_active, load_external_skills_config
@@ -764,9 +830,163 @@ def _collect_claude_external_skill_filenames(agent_meta_root: Path, config: dict
             ext_filenames.add(f'{ext_role}.md')
     return ext_filenames
 
+
+def _collect_all_registry_wrapper_filenames(agent_meta_root: Path) -> set:
+    """Filenames of ``<role>.md`` wrappers for every skill in the registry,
+    active AND inactive (role defaults to the skill name), independent of
+    capability. Used only to classify a stale entry's ``reason`` (IC-04): a
+    tracked stale file whose name is in this set is a deactivated skill, not a
+    removed role.
+    """
+    from .skills import load_external_skills_config
+
+    ext_config = load_external_skills_config(agent_meta_root)
+    ext_filenames: set = set()
+    for skill_name, skill_cfg in ext_config.get('skills', {}).items():
+        ext_role = skill_cfg.get('role', skill_name)
+        ext_filenames.add(f'{ext_role}.md')
+    return ext_filenames
+
+
+@dataclass(frozen=True)
+class StaleAgentEntry:
+    """One removable stale agent file, as planned by :func:`plan_agent_cleanup`."""
+
+    provider: str
+    path: str        # project-relative posix path
+    reason: str      # "role removed from config" | "skill deactivated"
+    tracked: bool    # True = index entry, False = provenance-adopted/reconciled
+    adopted: bool    # True = admitted by the reconciliation branch (F-01), not the index
+
+
+def _agent_glob_patterns(pc: dict) -> list:
+    """Candidate glob patterns for a provider's agent dir (IC-04).
+
+    ``*.md`` always, plus ``*<agent_ext>`` when the provider uses a non-markdown
+    extension (e.g. ``.toml``), so leftover outputs of an agent_ext switch are
+    still seen. Both globs feed the same filename/predicate check, which is
+    ext-agnostic (it compares full filenames including the suffix).
+    """
+    agent_ext = pc.get('agent_ext', '.md')
+    patterns = ['*.md']
+    if agent_ext != '.md':
+        patterns.append(f'*{agent_ext}')
+    return patterns
+
+
+def _iter_agent_candidates(target_dir: Path, pc: dict) -> list:
+    """Sorted, de-duplicated files in *target_dir* matching the candidate globs."""
+    seen: dict = {}
+    for pattern in _agent_glob_patterns(pc):
+        for path in target_dir.glob(pattern):
+            if path.is_file():
+                seen[path.name] = path
+    return [seen[name] for name in sorted(seen)]
+
+
+def _relative_posix(path: Path, project_root: Path) -> str:
+    """Project-relative posix path; falls back to the absolute posix form."""
+    try:
+        return path.relative_to(project_root).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
+def _read_text_or_none(path: Path) -> str | None:
+    """Fail-soft UTF-8 read: ``None`` when the file cannot be read."""
+    try:
+        return path.read_text(encoding='utf-8')
+    except (OSError, UnicodeDecodeError):
+        return None
+
+
+def plan_agent_cleanup(
+    target_dir: Path,
+    expected_filenames: set,
+    provider: str,
+    wrapper_filenames: set,
+    pc: dict,
+    project_root: Path,
+) -> list:
+    """PURE. Return the ``StaleAgentEntry`` list of agent files that would be
+    deleted. Reads the managed index + candidate files only; never writes.
+
+    Single source of truth for the cleanup preview and for
+    :func:`_cleanup_stale_agents`. ``provider`` is forwarded verbatim into the
+    entries and ``wrapper_filenames`` is used only for reason precedence — no
+    provider literal is inspected, so the contract stays provider-agnostic.
+
+    ``previously_managed`` is index-first: a readable index wins even when
+    empty; only an absent or unreadable index falls back to the fail-closed
+    provenance bootstrap (``_agent_has_provenance``). Foreign files are not
+    returned at all.
+    """
+    if not target_dir.is_dir():
+        return []
+
+    index_path = target_dir / _MANAGED_INDEX_FILENAME
+    index_readable = False
+    previously_managed: set = set()
+    if index_path.exists():
+        try:
+            previously_managed = read_managed_index(index_path)
+            index_readable = True
+        except (OSError, UnicodeDecodeError):
+            index_readable = False
+
+    if not index_readable:
+        previously_managed = set()
+        for pattern in _agent_glob_patterns(pc):
+            previously_managed |= bootstrap_previously_managed(
+                target_dir, index_path, pattern,
+                content_predicate=_agent_has_provenance,
+            )
+
+    entries: list = []
+    for candidate in _iter_agent_candidates(target_dir, pc):
+        if candidate.name in expected_filenames:
+            continue
+        if candidate.name in previously_managed:
+            # Reason precedence 2/3 (IC-04): a tracked wrapper name means the
+            # skill was deactivated; otherwise the role was removed. Step 2
+            # keeps tracked=True, step 3 mirrors the admission source (index vs
+            # no-index provenance bootstrap).
+            if candidate.name in wrapper_filenames:
+                reason = 'skill deactivated'
+                tracked = True
+            else:
+                reason = 'role removed from config'
+                tracked = index_readable
+            entries.append(StaleAgentEntry(
+                provider=provider,
+                path=_relative_posix(candidate, project_root),
+                reason=reason,
+                tracked=tracked,
+                adopted=False,
+            ))
+            continue
+        if index_readable:
+            # Reason precedence 1 (IC-04, F-01): reconciliation branch — an
+            # index-unlisted file is adopted only when a *primary* provenance
+            # marker names an 0-external/ origin; based-on/marker-less files
+            # stay foreign.
+            text = _read_text_or_none(candidate)
+            if text is not None and _agent_provenance_is_external_skill(candidate, text):
+                entries.append(StaleAgentEntry(
+                    provider=provider,
+                    path=_relative_posix(candidate, project_root),
+                    reason='skill deactivated',
+                    tracked=False,
+                    adopted=True,
+                ))
+    return entries
+
+
 def _cleanup_stale_agents(
     target_dir: Path,
     expected_filenames: set,
+    provider: str,
+    wrapper_filenames: set,
     pc: dict,
     project_root: Path,
     dry_run: bool,
@@ -774,45 +994,35 @@ def _cleanup_stale_agents(
 ) -> None:
     """Remove stale agent files and refresh the managed index.
 
-    Invariants: the DELETE-log order (sorted candidates) and the managed-index
-    write condition (``not dry_run and expected_filenames``) are exact.
+    Uses the pure :func:`plan_agent_cleanup` planner (single source of truth),
+    deletes backup-first via ``cleanup_stale_managed_files(backup=True)`` and
+    writes the managed index unconditionally (including the empty set). The
+    DELETE log reason and sorted order stay byte-identical to the previous
+    implementation, so existing log assertions keep holding.
     """
     if not target_dir.exists():
         return
 
-    managed_index = target_dir / '.agent-meta-managed'
-    previously_managed: set = set()
+    managed_index = target_dir / _MANAGED_INDEX_FILENAME
     if managed_index.exists():
-        for line in managed_index.read_text(encoding='utf-8').splitlines():
-            if line.strip():
-                previously_managed.add(line.strip())
+        try:
+            read_managed_index(managed_index)
+        except (OSError, UnicodeDecodeError) as exc:
+            log.warning(
+                f"agent_sync: managed index '{managed_index}' is unreadable "
+                f"({type(exc).__name__}: {exc}) — falling back to provenance "
+                f"bootstrap; non-provenance files are left untouched"
+            )
 
-    # Stale-file detection is ext-aware: a provider with a non-Markdown
-    # agent_ext (Codex: .toml) must have its leftover outputs pruned too,
-    # while the legacy *.md sweep keeps cleaning up files from before a
-    # provider switched its agent_ext. Both globs feed the same
-    # expected_filenames/managed-index check, which is ext-agnostic
-    # (it compares full filenames including the suffix).
-    agent_ext = pc.get('agent_ext', '.md')
-    glob_patterns = ['*.md']
-    if agent_ext != '.md':
-        glob_patterns.append(f'*{agent_ext}')
-    stale_candidates: set = set()
-    for pattern in glob_patterns:
-        stale_candidates.update(target_dir.glob(pattern))
+    entries = plan_agent_cleanup(
+        target_dir, expected_filenames, provider, wrapper_filenames, pc, project_root)
+    removable = {Path(entry.path).name for entry in entries}
+    cleanup_stale_managed_files(
+        target_dir, project_root, removable, set(), log, dry_run,
+        'role removed from config', backup=True,
+    )
 
-    for existing_file in sorted(stale_candidates):
-        if existing_file.name not in expected_filenames:  # noqa: SIM102
-            if not managed_index.exists() or existing_file.name in previously_managed:
-                log.action('DELETE', str(existing_file.relative_to(project_root)),
-                           'role removed from config')
-                if not dry_run:
-                    existing_file.unlink()
-
-    if not dry_run and expected_filenames:
-        managed_index.write_text(
-            '\n'.join(sorted(expected_filenames)) + '\n', encoding='utf-8'
-        )
+    write_managed_index(managed_index, expected_filenames, dry_run)
 
 def _run_provider_bootstrap(
     provider: str,
@@ -891,12 +1101,15 @@ def sync_agents_for_provider(agent_meta_root: Path, project_root: Path, config: 
         _write_agent_file(target_path, content, source_path, agent_meta_root,
                           project_root, config, dry_run, log)
 
-    # External skill filenames live in the provider's agents dir only for
-    # providers declaring `external-skill-agent-files` (issue #735).
-    if provider_has_capability(pc, "external-skill-agent-files"):
-        expected_filenames |= _collect_claude_external_skill_filenames(agent_meta_root, config)
+    # External-skill wrappers are provider-independent (skills.py writes
+    # ``.claude/agents``-style ``<role>.md`` files for every provider), so the
+    # union is unconditional — no ``external-skill-agent-files`` capability
+    # gate. The all-registry set feeds reason precedence only (issue #735).
+    expected_filenames |= _collect_active_skill_wrapper_filenames(agent_meta_root, config)
+    wrapper_filenames = _collect_all_registry_wrapper_filenames(agent_meta_root)
 
-    # Remove stale agent files
-    _cleanup_stale_agents(target_dir, expected_filenames, pc, project_root, dry_run, log)
+    _cleanup_stale_agents(target_dir, expected_filenames, provider, wrapper_filenames,
+                          pc, project_root, dry_run, log)
+
 
     _run_provider_bootstrap(provider, pc, target_dir, project_root, variables, agent_meta_root, dry_run, log)
