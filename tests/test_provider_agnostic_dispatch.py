@@ -46,6 +46,8 @@ _TOUCHED_MODULES = (
     "consistency/repo_containment",
     "subagent_permissions",
     "consistency/subagent_permissions",
+    "runtime_gate",
+    "isolation",
 )
 
 
@@ -138,6 +140,30 @@ def test_every_provider_has_explicit_commands_capability(provider):
     )
     assert isinstance(caps["commands"], bool), (
         f"Provider '{provider}'.commands must be a boolean, got {caps['commands']!r}"
+    )
+
+
+@pytest.mark.parametrize("provider", _registered_providers())
+def test_every_provider_has_explicit_runtime_gate_capability(provider):
+    """AC-01 (SPEC-OPENCODE-RUNTIME-GATE-2026-09-13): every registered provider
+    must carry an explicit ``runtime_gate`` tier in
+    ``config/provider-capabilities.yaml``, and its value must be one of the
+    canonical tiers from ``scripts/lib/runtime_gate.py``. An absent key
+    resolves fail-safe to ``advisory`` at runtime, but omitting it would
+    silently document a weaker gate than intended — this test turns the
+    omission into a failure (same obligation as ``commands``)."""
+    from lib.runtime_gate import RUNTIME_GATE_TIERS
+
+    caps = _provider_capabilities().get(provider, {})
+    assert "runtime_gate" in caps, (
+        f"Provider '{provider}' has no explicit 'runtime_gate' entry in "
+        "config/provider-capabilities.yaml — an absent key silently resolves "
+        "to 'advisory' (fail-safe), which would understate or overstate the "
+        "gate. Declare one of: " + ", ".join(RUNTIME_GATE_TIERS)
+    )
+    assert caps["runtime_gate"] in RUNTIME_GATE_TIERS, (
+        f"Provider '{provider}'.runtime_gate={caps['runtime_gate']!r} is not a "
+        "canonical tier — expected one of: " + ", ".join(RUNTIME_GATE_TIERS)
     )
 
 

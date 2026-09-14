@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Optional
 
 from .io import _load_yaml_or_json, load_yaml_file
 
@@ -304,6 +305,12 @@ def resolve_context_filename(context_file: str, provider: str, pc: dict | None =
 # antigravity-json-adapter.sh translates between the two contracts at runtime.
 SUPPORTED_HOOK_PROTOCOLS = {"claude-code-json", "antigravity-hooks-json"}
 
+# Plugin analogue of SUPPORTED_HOOK_PROTOCOLS: only a `plugin_protocol` listed
+# here counts as a verified native plugin runtime. Phase 0 ships the machine
+# flag surface; no provider declares `has_plugins`/`plugin_protocol` yet, so
+# the plugin tier stays unreachable until the P6 verification (Phase 1).
+SUPPORTED_PLUGIN_PROTOCOLS = {"opencode-plugin-js"}
+
 
 def provider_hooks_supported(pc: dict) -> bool:
     """Whether a provider's hooks should actually be synced/mirrored.
@@ -331,6 +338,89 @@ def all_providers_support_hooks(active: list, provider_config: dict) -> bool:
     return bool(active) and all(
         provider_hooks_supported(provider_config.get(p, {})) for p in active
     )
+
+
+def provider_runtime_gate_supported(pc: Optional[dict]) -> bool:
+    """Whether a provider has a verified native plugin runtime for the gate.
+
+    Mirrors `provider_hooks_supported`: `has_plugins: true` alone only records
+    that a plugin dir/protocol could be emitted — it does NOT mean the plugin
+    runtime is verified. Only a `plugin_protocol` in
+    `SUPPORTED_PLUGIN_PROTOCOLS` counts. A non-mapping `pc` is an explicit
+    ``False`` (fail-safe), never a silent fallback.
+    """
+    if not isinstance(pc, dict):
+        return False
+    return bool(pc.get("has_plugins", False)) and pc.get("plugin_protocol") in SUPPORTED_PLUGIN_PROTOCOLS
+
+
+def provider_runtime_gate_tier(pc: Optional[dict], capabilities: Optional[dict] = None) -> str:
+    """Resolve the provider's runtime-gate tier (IC-03), fail-safe.
+
+    Precedence, first match wins:
+
+    1. ``provider_hooks_supported(pc)``                          -> ``hook``
+    2. ``provider_runtime_gate_supported(pc)``                   -> ``plugin``
+    3. ``(capabilities or {}).get("runtime_gate") == "permission"`` -> ``permission``
+    4. otherwise                                                 -> ``advisory``
+
+    The two registries are split (D-C1): the machine flags come from the
+    `ai-providers.yaml` entry (`pc`), the declared tier from the
+    `provider-capabilities.yaml` entry (`capabilities`). Only `permission` is
+    read at runtime beyond the flags; `hook`/`plugin` are derived from the
+    machine flags, so an unverified declaration can never yield a stronger
+    tier than the flags support.
+
+    This function never raises, never calls `sys.exit`, and never falls back
+    to a hook/Claude truth. `pc`/`capabilities` that are not mappings are
+    treated as ``{}``.
+    """
+    if not isinstance(pc, dict):
+        pc = {}
+    if provider_hooks_supported(pc):
+        return "hook"
+    if provider_runtime_gate_supported(pc):
+        return "plugin"
+    if isinstance(capabilities, dict) and capabilities.get("runtime_gate") == "permission":
+        return "permission"
+    return "advisory"
+
+
+def runtime_gate_vars(
+    pc: Optional[dict], capabilities: Optional[dict], config: Optional[dict]
+) -> dict:
+    """Return the per-provider rendering bundle for the resolved gate tier.
+
+    Single source of truth for the ``GATE_*`` variables consumed by the
+    rules/context renderers (IC-04). Every value is a string so the bundle
+    merges into any ``provider_variables`` dict unchanged:
+
+    - ``ENFORCEMENT_TIER``     — resolved tier name
+    - ``GATE_ENFORCED``        — ``"true"`` iff tier in ``(hook, plugin)``
+    - ``GATE_PARTIAL``         — ``"true"`` iff tier ``permission``
+    - ``GATE_ADVISORY``        — ``"true"`` iff tier ``advisory``
+    - ``RUNTIME_GATE_PLUGIN_MODE`` — ``config["runtime-gate"]["plugin-mode"]``
+      validated against ``{observe, enforce}``, fail-safe ``"observe"``
+
+    Never raises: a non-mapping `config` is treated as ``{}`` and the tier
+    comes from the fail-safe `provider_runtime_gate_tier`.
+    """
+    tier = provider_runtime_gate_tier(pc, capabilities)
+    if not isinstance(config, dict):
+        config = {}
+    runtime_gate = config.get("runtime-gate", {})
+    if not isinstance(runtime_gate, dict):
+        runtime_gate = {}
+    plugin_mode = runtime_gate.get("plugin-mode", "observe")
+    if plugin_mode not in ("observe", "enforce"):
+        plugin_mode = "observe"
+    return {
+        "ENFORCEMENT_TIER": tier,
+        "GATE_ENFORCED": "true" if tier in ("hook", "plugin") else "false",
+        "GATE_PARTIAL": "true" if tier == "permission" else "false",
+        "GATE_ADVISORY": "true" if tier == "advisory" else "false",
+        "RUNTIME_GATE_PLUGIN_MODE": plugin_mode,
+    }
 
 
 def resolve_provider_options(config: dict, provider: str) -> dict:
