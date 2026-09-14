@@ -2198,6 +2198,11 @@
             },
             "additionalProperties": false
           }
+        },
+        "require-runtime-gate": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, the orchestrator-strict consistency check treats a provider that is only prompt-enforced (tier 'advisory') as an ERROR instead of a WARNING. Default: false (backwards compatible)."
         }
       },
       "additionalProperties": true
@@ -2215,6 +2220,22 @@
           "type": "boolean",
           "default": false,
           "description": "Enable AST dependency analysis during sync. Activates analysis.py scanning and prints a summary after sync completes. Default: false."
+        }
+      },
+      "additionalProperties": false
+    },
+    "runtime-gate": {
+      "type": "object",
+      "description": "Native runtime-gate plugin configuration (Phase 1). The plugin artifact is generated only for a provider with a verified plugin runtime; Phase 0 ships the schema key only (IC-16, AC-24).",
+      "properties": {
+        "plugin-mode": {
+          "type": "string",
+          "enum": [
+            "observe",
+            "enforce"
+          ],
+          "default": "observe",
+          "description": "Baked into the generated native gate plugin at sync time. 'observe' logs only; 'enforce' is unlocked only after the P6 real-repo verification (AC-21). Default: observe."
         }
       },
       "additionalProperties": false
