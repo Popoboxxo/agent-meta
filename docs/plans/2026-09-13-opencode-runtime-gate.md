@@ -5,7 +5,18 @@ pipeline_stages:
 
 # Implementierungsplan — OpenCode Runtime Gate (Problem A)
 
-> Status: geplant
+> Status: IN PROGRESS
+
+> **Revision / Status (2026-09-14):**
+> (a) Phase 0, Tasks 1–6, ist implementiert und getestet (Unit-Tests + Repo-Gate grün).
+> (b) Das abschließende Phase-0-Verifikations-Gate (Task 7) ist noch offen: `scripts/sync.py --check`
+> liefert rc 1, bis die generierten Artefakte per HITL-`sync.py`-Lauf regeneriert sind.
+> (c) Das Phase-1-Szenario wurde von `62` auf `63-opencode-runtime-gate` umnummeriert, weil
+> `62-stale-role-cleanup` die ID `62` inzwischen belegt.
+> (d) Offener Reconcile-Punkt: Der AC-24-Schema-Key `runtime-gate.plugin-mode` wurde bereits in
+> Phase 0 (Task 5) implementiert, obwohl die Global Constraints den Root-Key `runtime-gate` (IC-16)
+> der zurückgestellten Phase-1-Task 8 zuordnen. Bewusst keine stille Umschreibung der Global
+> Constraints — User-Entscheidung ausstehend.
 
 **Spec:** `docs/specs/2026-09-13-opencode-runtime-gate-design.md`
 
@@ -80,7 +91,7 @@ Neue und geänderte Symbole als `file:Symbol`. Phase-0-Symbole sind jetzt implem
 - Create: `tests/test_runtime_gate_rendering.py` — gestufte Rules-Ausgabe + Byte-Identität der Hook-Variante.
 - Create: `tests/test_runtime_gate_schema.py` — Schemafälle `orchestrator.require-runtime-gate`.
 - Create: `tests/test_runtime_gate_docs.py` — Präsenz/Wortlaut der Tier-Doku.
-- Create (Phase 1, DEFERRED): `templates/plugins/runtime-gate.opencode-plugin.js.tmpl`, `tests/test_runtime_gate_plugins.py`, `tests/scenarios/configs/62-opencode-runtime-gate.project.yaml`, `tests/scenarios/asserts/62-opencode-runtime-gate.sh`.
+- Create (Phase 1, DEFERRED): `templates/plugins/runtime-gate.opencode-plugin.js.tmpl`, `tests/test_runtime_gate_plugins.py`, `tests/scenarios/configs/63-opencode-runtime-gate.project.yaml`, `tests/scenarios/asserts/63-opencode-runtime-gate.sh`.
 
 ### Geänderte Dateien
 
@@ -135,10 +146,10 @@ Neue und geänderte Symbole als `file:Symbol`. Phase-0-Symbole sind jetzt implem
 **Depends on:** —
 
 **Steps:**
-- [ ] Step 1: Test schreiben (fail) — `tests/test_provider_agnostic_dispatch.py` um `test_every_provider_has_explicit_runtime_gate_capability` (AC-01, parametrisiert über `_registered_providers()`, Wert muss in `RUNTIME_GATE_TIERS` liegen) ergänzen und `"runtime_gate"` + `"isolation"` in `_TOUCHED_MODULES` (AC-04) aufnehmen. `tests/test_runtime_gate_config.py` neu mit `::test_declared_tier_matches_machine_flags` (AC-02: `hook` iff `provider_hooks_supported`; `plugin` iff supported **and not** hooks), `::test_resolver_precedence` (AC-03: hook/plugin/permission/advisory), `::test_resolver_failsafe_never_raises` (AC-03: `provider_runtime_gate_tier(None)` und `({}, None)` → `advisory`), `::test_plugin_tier_unreachable_without_has_plugins` (AC-22), `::test_runtime_gate_vars_bundle_is_strings` (IC-03/IC-04).
-- [ ] Step 2: Implementieren — `scripts/lib/runtime_gate.py` mit `from __future__ import annotations`, Modul-Docstring (Seam-Abgrenzung: Tier-Vokabel hier, Resolver in `providers.py` per IC-03) und `RUNTIME_GATE_TIERS`. In `providers.py` `SUPPORTED_PLUGIN_PROTOCOLS`, `provider_runtime_gate_supported` (Spiegel von `provider_hooks_supported`, `providers.py:308-317`), `provider_runtime_gate_tier` exakt mit der IC-03-Präzedenz und fail-safer Behandlung von `None`/Nicht-Mapping, `runtime_gate_vars` mit den fünf String-Keys (`ENFORCEMENT_TIER`; `GATE_ENFORCED` `'true'` iff Tier in `(hook, plugin)`; `GATE_PARTIAL` iff `permission`; `GATE_ADVISORY` iff `advisory`; `RUNTIME_GATE_PLUGIN_MODE` aus `config.get("runtime-gate", {}).get("plugin-mode", "observe")`, validiert gegen `{"observe","enforce"}`, fail-safe `observe`). `config/provider-capabilities.yaml`: je Providerblock explizit `runtime_gate` (`hook` für Claude, Gemini/Antigravity; `permission` für Opencode; `advisory` sonst) plus Kopf-Kommentar zur Pflicht (analog `commands`).
-- [ ] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_runtime_gate_config.py tests/test_provider_agnostic_dispatch.py -q` → rc 0; `rtk python3 scripts/sync.py --validate` → rc 0.
-- [ ] Step 4: Commit — `feat: add provider-agnostic runtime-gate tier resolver`.
+- [x] Step 1: Test schreiben (fail) — `tests/test_provider_agnostic_dispatch.py` um `test_every_provider_has_explicit_runtime_gate_capability` (AC-01, parametrisiert über `_registered_providers()`, Wert muss in `RUNTIME_GATE_TIERS` liegen) ergänzen und `"runtime_gate"` + `"isolation"` in `_TOUCHED_MODULES` (AC-04) aufnehmen. `tests/test_runtime_gate_config.py` neu mit `::test_declared_tier_matches_machine_flags` (AC-02: `hook` iff `provider_hooks_supported`; `plugin` iff supported **and not** hooks), `::test_resolver_precedence` (AC-03: hook/plugin/permission/advisory), `::test_resolver_failsafe_never_raises` (AC-03: `provider_runtime_gate_tier(None)` und `({}, None)` → `advisory`), `::test_plugin_tier_unreachable_without_has_plugins` (AC-22), `::test_runtime_gate_vars_bundle_is_strings` (IC-03/IC-04).
+- [x] Step 2: Implementieren — `scripts/lib/runtime_gate.py` mit `from __future__ import annotations`, Modul-Docstring (Seam-Abgrenzung: Tier-Vokabel hier, Resolver in `providers.py` per IC-03) und `RUNTIME_GATE_TIERS`. In `providers.py` `SUPPORTED_PLUGIN_PROTOCOLS`, `provider_runtime_gate_supported` (Spiegel von `provider_hooks_supported`, `providers.py:308-317`), `provider_runtime_gate_tier` exakt mit der IC-03-Präzedenz und fail-safer Behandlung von `None`/Nicht-Mapping, `runtime_gate_vars` mit den fünf String-Keys (`ENFORCEMENT_TIER`; `GATE_ENFORCED` `'true'` iff Tier in `(hook, plugin)`; `GATE_PARTIAL` iff `permission`; `GATE_ADVISORY` iff `advisory`; `RUNTIME_GATE_PLUGIN_MODE` aus `config.get("runtime-gate", {}).get("plugin-mode", "observe")`, validiert gegen `{"observe","enforce"}`, fail-safe `observe`). `config/provider-capabilities.yaml`: je Providerblock explizit `runtime_gate` (`hook` für Claude, Gemini/Antigravity; `permission` für Opencode; `advisory` sonst) plus Kopf-Kommentar zur Pflicht (analog `commands`).
+- [x] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_runtime_gate_config.py tests/test_provider_agnostic_dispatch.py -q` → rc 0; `rtk python3 scripts/sync.py --validate` → rc 0.
+- [x] Step 4: Commit — `feat: add provider-agnostic runtime-gate tier resolver`.
 
 **Acceptance:** AC-01, AC-02, AC-03, AC-04, AC-22.
 
@@ -158,10 +169,10 @@ Neue und geänderte Symbole als `file:Symbol`. Phase-0-Symbole sind jetzt implem
 **Depends on:** 1
 
 **Steps:**
-- [ ] Step 1: Test schreiben (fail) — `tests/test_opencode_runtime_gate.py` neu mit `::test_read_write_state_preserves_sibling_namespaces` (AC-23: `isolation-deny`-Liste bleibt neben `runtime-gate-deny` erhalten), `::test_runtime_gate_entries_mapping_form_under_strict` (AC-10: `{'edit': {'**': 'deny'}, 'bash': {'**': 'deny'}}` nur bei Tier `permission`, sonst `{}`), `::test_scalar_permission_family_tolerated` (D-C4/AC-10: `permission.edit: "ask"` wird über `_permission_mapping` normalisiert, kein Raise), `::test_prior_user_value_recorded_and_restored` (AC-10/AC-11: User-Wert an `"**"` wird im Namespace gespeichert und bei non-strict exakt restauriert), `::test_second_strict_sync_is_idempotent_and_byte_identical` (AC-11), `::test_isolation_and_runtime_gate_coexist` (AC-23: beide Glob-Familien und beide Namespaces überleben beide Writer).
-- [ ] Step 2: Implementieren — `isolation.py`: `_read_state`/`_write_state` auf namespaced Keys generalisieren (Default-Key `isolation-deny`, Signaturen abwärtskompatibel für bestehende Positionsaufrufer); `_write_state` liest das bestehende JSON, ersetzt **nur** `key` und schreibt alle Sibling-Namespaces unverändert zurück. `_permission_mapping` implementieren. `_opencode_runtime_gate_entries` liefert Mapping-Deny nur, wenn `provider_runtime_gate_tier(pc, caps) == "permission"` **und** Strict effektiv aktiv ist (`_resolve_effective_strict`-Präzedenz), sonst `{}`. `_sync_opencode_runtime_gate` merged über `_read_json_safe`/`write_checked`, setzt `"**"` in `permission.edit`/`permission.bash`, zeichnet den vorherigen Wert auf, entfernt bei non-strict nur den managed `"deny"` und restauriert den Prior-Wert. `_sync_opencode_isolation` auf `_permission_mapping(permission.get("read"))`/`edit` umstellen. Kein Provider-Literal, kein Schreiben von Skalaren, `dry_run` schreibt nie, unparsebare JSON → Warnung + Skip.
-- [ ] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_opencode_runtime_gate.py -q` → rc 0; `rtk python3 scripts/sync.py --validate` → rc 0.
-- [ ] Step 4: Commit — `feat: merge opencode runtime-gate deny via isolation state`.
+- [x] Step 1: Test schreiben (fail) — `tests/test_opencode_runtime_gate.py` neu mit `::test_read_write_state_preserves_sibling_namespaces` (AC-23: `isolation-deny`-Liste bleibt neben `runtime-gate-deny` erhalten), `::test_runtime_gate_entries_mapping_form_under_strict` (AC-10: `{'edit': {'**': 'deny'}, 'bash': {'**': 'deny'}}` nur bei Tier `permission`, sonst `{}`), `::test_scalar_permission_family_tolerated` (D-C4/AC-10: `permission.edit: "ask"` wird über `_permission_mapping` normalisiert, kein Raise), `::test_prior_user_value_recorded_and_restored` (AC-10/AC-11: User-Wert an `"**"` wird im Namespace gespeichert und bei non-strict exakt restauriert), `::test_second_strict_sync_is_idempotent_and_byte_identical` (AC-11), `::test_isolation_and_runtime_gate_coexist` (AC-23: beide Glob-Familien und beide Namespaces überleben beide Writer).
+- [x] Step 2: Implementieren — `isolation.py`: `_read_state`/`_write_state` auf namespaced Keys generalisieren (Default-Key `isolation-deny`, Signaturen abwärtskompatibel für bestehende Positionsaufrufer); `_write_state` liest das bestehende JSON, ersetzt **nur** `key` und schreibt alle Sibling-Namespaces unverändert zurück. `_permission_mapping` implementieren. `_opencode_runtime_gate_entries` liefert Mapping-Deny nur, wenn `provider_runtime_gate_tier(pc, caps) == "permission"` **und** Strict effektiv aktiv ist (`_resolve_effective_strict`-Präzedenz), sonst `{}`. `_sync_opencode_runtime_gate` merged über `_read_json_safe`/`write_checked`, setzt `"**"` in `permission.edit`/`permission.bash`, zeichnet den vorherigen Wert auf, entfernt bei non-strict nur den managed `"deny"` und restauriert den Prior-Wert. `_sync_opencode_isolation` auf `_permission_mapping(permission.get("read"))`/`edit` umstellen. Kein Provider-Literal, kein Schreiben von Skalaren, `dry_run` schreibt nie, unparsebare JSON → Warnung + Skip.
+- [x] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_opencode_runtime_gate.py -q` → rc 0; `rtk python3 scripts/sync.py --validate` → rc 0.
+- [x] Step 4: Commit — `feat: merge opencode runtime-gate deny via isolation state`.
 
 **Acceptance:** AC-10, AC-11, AC-23.
 
@@ -185,10 +196,10 @@ Neue und geänderte Symbole als `file:Symbol`. Phase-0-Symbole sind jetzt implem
 **Depends on:** 1, 2
 
 **Steps:**
-- [ ] Step 1: Test schreiben (fail) — `tests/test_runtime_gate_wiring.py` neu mit `::test_tier_vars_reach_context_render` und `::test_tier_vars_reach_rule_render` (IC-04/F-02: Spy auf `sync_context_for_provider` bzw. `sync_rules` sieht die `GATE_*`-Keys), `::test_strict_sync_writes_mapping_deny` (AC-08), `::test_single_provider_strict_writes_deny` (AC-09: `len(providers) == 1`, Dispatch nicht durch die ≥2-Guard blockiert), `::test_advisory_sync_writes_no_deny_and_no_plugin` (AC-22), `::test_gate_vars_registered_in_builtin_vars` (AC-07). `tests/test_config_variable_fallbacks.py` um `::test_gate_conditional_blocks_stripped` (AC-06) ergänzen.
-- [ ] Step 2: Implementieren — In `_sync_stage_contexts` nach dem `provider_variables`-Aufbau und **vor** `sync_context_for_provider` `caps = load_provider_capabilities(agent_meta_root).get(provider, {})` laden und `provider_variables.update(runtime_gate_vars(pc, caps, config))` mergen; identisch in `_sync_stage_per_provider` **vor** `sync_rules`/`sync_embedded_rule_files`. Denselben Scope für den A2-Dispatch nutzen: `if provider_runtime_gate_tier(pc, caps) == "permission": _sync_opencode_runtime_gate(...)` — nicht unter `has_hooks`, nicht in `sync_provider_isolation`, kein Provider-Literal. `cli_commands.py`-Test-Repo-Syncpfad analog spiegeln. `variables.py` `GATE_ENFORCED`/`GATE_PARTIAL`/`GATE_ADVISORY` in `conditional_vars`; `placeholders.py::_BUILTIN_VARS` um die fünf Variablen erweitern.
-- [ ] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_runtime_gate_wiring.py tests/test_config_variable_fallbacks.py tests/test_rule_variables.py -q` → rc 0; `rtk python3 scripts/consistency-check.py` → rc 0.
-- [ ] Step 4: Commit — `feat: inject runtime-gate vars and dispatch opencode deny`.
+- [x] Step 1: Test schreiben (fail) — `tests/test_runtime_gate_wiring.py` neu mit `::test_tier_vars_reach_context_render` und `::test_tier_vars_reach_rule_render` (IC-04/F-02: Spy auf `sync_context_for_provider` bzw. `sync_rules` sieht die `GATE_*`-Keys), `::test_strict_sync_writes_mapping_deny` (AC-08), `::test_single_provider_strict_writes_deny` (AC-09: `len(providers) == 1`, Dispatch nicht durch die ≥2-Guard blockiert), `::test_advisory_sync_writes_no_deny_and_no_plugin` (AC-22), `::test_gate_vars_registered_in_builtin_vars` (AC-07). `tests/test_config_variable_fallbacks.py` um `::test_gate_conditional_blocks_stripped` (AC-06) ergänzen.
+- [x] Step 2: Implementieren — In `_sync_stage_contexts` nach dem `provider_variables`-Aufbau und **vor** `sync_context_for_provider` `caps = load_provider_capabilities(agent_meta_root).get(provider, {})` laden und `provider_variables.update(runtime_gate_vars(pc, caps, config))` mergen; identisch in `_sync_stage_per_provider` **vor** `sync_rules`/`sync_embedded_rule_files`. Denselben Scope für den A2-Dispatch nutzen: `if provider_runtime_gate_tier(pc, caps) == "permission": _sync_opencode_runtime_gate(...)` — nicht unter `has_hooks`, nicht in `sync_provider_isolation`, kein Provider-Literal. `cli_commands.py`-Test-Repo-Syncpfad analog spiegeln. `variables.py` `GATE_ENFORCED`/`GATE_PARTIAL`/`GATE_ADVISORY` in `conditional_vars`; `placeholders.py::_BUILTIN_VARS` um die fünf Variablen erweitern.
+- [x] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_runtime_gate_wiring.py tests/test_config_variable_fallbacks.py tests/test_rule_variables.py -q` → rc 0; `rtk python3 scripts/consistency-check.py` → rc 0.
+- [x] Step 4: Commit — `feat: inject runtime-gate vars and dispatch opencode deny`.
 
 **Acceptance:** AC-06, AC-07, AC-08, AC-09, AC-22.
 
@@ -209,10 +220,10 @@ Neue und geänderte Symbole als `file:Symbol`. Phase-0-Symbole sind jetzt implem
 **Depends on:** 3
 
 **Steps:**
-- [ ] Step 1: Test schreiben (fail) — `tests/test_runtime_gate_rendering.py` neu mit `::test_hook_tier_renders_enforced_verbatim` (AC-05/AC-15: Block byte-identisch zu `# CRITICAL GATE` + `MAIN CHAT darf nicht selbst editieren. ALLES -> \`orchestrator\`. Keine Ausnahmen.`), `::test_permission_tier_renders_partial` (AC-05: PARTIAL-Variante, enthält **nicht** die unbedingte Runtime-Zusage), `::test_advisory_tier_renders_advisory` (AC-05), `::test_only_one_gate_block_survives` (AC-06).
-- [ ] Step 2: Implementieren — `use-orchestrator.md`: den bestehenden unbedingten Strict-Block (`:1-4`) durch die drei `GATE_*`-Blöcke exakt nach IC-07 ersetzen; die `GATE_ENFORCED`-Variante reproduziert den heutigen Wortlaut verbatim. `a2a-delegation-gates.md`: tier-gestuften Hinweis mit `{{ENFORCEMENT_TIER}}` und Verweis auf `## Bekannte Grenzen` ergänzen. Kein Provider-Literal, keine Rollen-Routen.
-- [ ] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_runtime_gate_rendering.py tests/test_rule_variables.py tests/test_no_role_routes_in_templates.py -q` → rc 0.
-- [ ] Step 4: Commit — `feat: render tiered CRITICAL GATE wording`.
+- [x] Step 1: Test schreiben (fail) — `tests/test_runtime_gate_rendering.py` neu mit `::test_hook_tier_renders_enforced_verbatim` (AC-05/AC-15: Block byte-identisch zu `# CRITICAL GATE` + `MAIN CHAT darf nicht selbst editieren. ALLES -> \`orchestrator\`. Keine Ausnahmen.`), `::test_permission_tier_renders_partial` (AC-05: PARTIAL-Variante, enthält **nicht** die unbedingte Runtime-Zusage), `::test_advisory_tier_renders_advisory` (AC-05), `::test_only_one_gate_block_survives` (AC-06).
+- [x] Step 2: Implementieren — `use-orchestrator.md`: den bestehenden unbedingten Strict-Block (`:1-4`) durch die drei `GATE_*`-Blöcke exakt nach IC-07 ersetzen; die `GATE_ENFORCED`-Variante reproduziert den heutigen Wortlaut verbatim. `a2a-delegation-gates.md`: tier-gestuften Hinweis mit `{{ENFORCEMENT_TIER}}` und Verweis auf `## Bekannte Grenzen` ergänzen. Kein Provider-Literal, keine Rollen-Routen.
+- [x] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_runtime_gate_rendering.py tests/test_rule_variables.py tests/test_no_role_routes_in_templates.py -q` → rc 0.
+- [x] Step 4: Commit — `feat: render tiered CRITICAL GATE wording`.
 
 **Acceptance:** AC-05, AC-15.
 
@@ -235,10 +246,10 @@ Neue und geänderte Symbole als `file:Symbol`. Phase-0-Symbole sind jetzt implem
 **Depends on:** 1
 
 **Steps:**
-- [ ] Step 1: Test schreiben (fail) — `tests/test_orchestrator_strict_visibility.py` um `::test_permission_tier_yields_info`, `::test_advisory_tier_warning_by_default_error_with_optin`, `::test_hook_tier_yields_no_finding` ergänzen und die sechs bestehenden Opencode-Fälle (AC-13: `test_warns_for_active_provider_without_hook_support`, `test_provider_override_turns_strict_on_despite_global_off`, `test_global_mode_key_triggers_warning_without_legacy_booleans`, `test_malformed_provider_overrides_null_does_not_crash`, `test_malformed_provider_override_null_entry_does_not_crash`, `test_gemini_and_opencode_active_warning_only_for_opencode`) auf INFO für Opencode aktualisieren. `tests/test_runtime_gate_schema.py` neu mit `::test_require_runtime_gate_boolean_accepted`, `::test_require_runtime_gate_non_boolean_rejected`, `::test_require_runtime_gate_absent_defaults_false` (AC-14, `pytest.importorskip("jsonschema")`).
-- [ ] Step 2: Implementieren — `check_orchestrator_strict_hook_support` von `provider_hooks_supported` auf `provider_runtime_gate_tier(pc, caps)` umstellen: `advisory`+strict → WARNING, bei `orchestrator.require-runtime-gate` `true` → ERROR; `permission` → INFO „partially enforced; delegation provenance not enforced"; `hook`/`plugin` → kein Finding. `agent_meta_root` als expliziten Parameter ergänzen, Registry via `load_provider_capabilities` laden, unlesbare Registry → `advisory` (fail-safe). `scripts/consistency-check.py` den bereits bekannten `agent_meta_root` übergeben. Schema: `require-runtime-gate` als Sibling im `orchestrator`-Block (`additionalProperties`-Politik unverändert).
-- [ ] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_orchestrator_strict_visibility.py tests/test_runtime_gate_schema.py tests/test_repo_containment_consistency.py -q` → rc 0; `rtk python3 scripts/consistency-check.py` → rc 0.
-- [ ] Step 4: Commit — `feat: derive orchestrator-strict severity from gate tier`.
+- [x] Step 1: Test schreiben (fail) — `tests/test_orchestrator_strict_visibility.py` um `::test_permission_tier_yields_info`, `::test_advisory_tier_warning_by_default_error_with_optin`, `::test_hook_tier_yields_no_finding` ergänzen und die sechs bestehenden Opencode-Fälle (AC-13: `test_warns_for_active_provider_without_hook_support`, `test_provider_override_turns_strict_on_despite_global_off`, `test_global_mode_key_triggers_warning_without_legacy_booleans`, `test_malformed_provider_overrides_null_does_not_crash`, `test_malformed_provider_override_null_entry_does_not_crash`, `test_gemini_and_opencode_active_warning_only_for_opencode`) auf INFO für Opencode aktualisieren. `tests/test_runtime_gate_schema.py` neu mit `::test_require_runtime_gate_boolean_accepted`, `::test_require_runtime_gate_non_boolean_rejected`, `::test_require_runtime_gate_absent_defaults_false` (AC-14, `pytest.importorskip("jsonschema")`).
+- [x] Step 2: Implementieren — `check_orchestrator_strict_hook_support` von `provider_hooks_supported` auf `provider_runtime_gate_tier(pc, caps)` umstellen: `advisory`+strict → WARNING, bei `orchestrator.require-runtime-gate` `true` → ERROR; `permission` → INFO „partially enforced; delegation provenance not enforced"; `hook`/`plugin` → kein Finding. `agent_meta_root` als expliziten Parameter ergänzen, Registry via `load_provider_capabilities` laden, unlesbare Registry → `advisory` (fail-safe). `scripts/consistency-check.py` den bereits bekannten `agent_meta_root` übergeben. Schema: `require-runtime-gate` als Sibling im `orchestrator`-Block (`additionalProperties`-Politik unverändert).
+- [x] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_orchestrator_strict_visibility.py tests/test_runtime_gate_schema.py tests/test_repo_containment_consistency.py -q` → rc 0; `rtk python3 scripts/consistency-check.py` → rc 0.
+- [x] Step 4: Commit — `feat: derive orchestrator-strict severity from gate tier`.
 
 **Acceptance:** AC-12, AC-13, AC-14.
 
@@ -259,10 +270,10 @@ Neue und geänderte Symbole als `file:Symbol`. Phase-0-Symbole sind jetzt implem
 **Depends on:** 3, 4, 5
 
 **Steps:**
-- [ ] Step 1: Test schreiben (fail) — `tests/test_runtime_gate_docs.py` neu mit `::test_tier_concept_doc_lists_four_tiers` (`hook`, `plugin`, `permission`, `advisory` je benannt) und `::test_tier_concept_doc_states_partial_not_fully_enforced` (kein „fully enforced" für `permission`), `::test_capability_gaps_doc_reflects_opencode_status`.
-- [ ] Step 2: Implementieren — `docs/concepts/runtime-gate-tiers.md` als knappe interne Doku (Tier-Definitionen, Resolver-Präzedenz, PARTIAL-Grenze, Phase-1-`observe`-Vorbehalt/P6, #747-Avoidance). `docs/process-capability-gaps.md` um den tatsächlichen OpenCode-Status (`permission`, PARTIAL, Phase 1 offen) nachführen. Keine Provider-Logik, keine Rollen-Routen, keine Modellnamen.
-- [ ] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_runtime_gate_docs.py -q` → rc 0.
-- [ ] Step 4: Commit — `docs: document runtime-gate tiers and opencode partial guarantee`.
+- [x] Step 1: Test schreiben (fail) — `tests/test_runtime_gate_docs.py` neu mit `::test_tier_concept_doc_lists_four_tiers` (`hook`, `plugin`, `permission`, `advisory` je benannt) und `::test_tier_concept_doc_states_partial_not_fully_enforced` (kein „fully enforced" für `permission`), `::test_capability_gaps_doc_reflects_opencode_status`.
+- [x] Step 2: Implementieren — `docs/concepts/runtime-gate-tiers.md` als knappe interne Doku (Tier-Definitionen, Resolver-Präzedenz, PARTIAL-Grenze, Phase-1-`observe`-Vorbehalt/P6, #747-Avoidance). `docs/process-capability-gaps.md` um den tatsächlichen OpenCode-Status (`permission`, PARTIAL, Phase 1 offen) nachführen. Keine Provider-Logik, keine Rollen-Routen, keine Modellnamen.
+- [x] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_runtime_gate_docs.py -q` → rc 0.
+- [x] Step 4: Commit — `docs: document runtime-gate tiers and opencode partial guarantee`.
 
 **Acceptance:** AC-15.
 
@@ -285,7 +296,7 @@ Neue und geänderte Symbole als `file:Symbol`. Phase-0-Symbole sind jetzt implem
 - [ ] Step 2: Repo-Gate — `rtk python3 scripts/sync.py --validate` → rc 0 und `rtk python3 scripts/sync.py --check` → rc 0 (Rules-Churn/Hashes bewusst aktualisiert).
 - [ ] Step 3: Konsistenz inkl. Py3.9/Provider-Agnostik — `rtk python3 scripts/consistency-check.py` → rc 0.
 - [ ] Step 4: Bestands-Suiten unverändert grün — `rtk python3 -m pytest tests/test_provider_agnostic_dispatch.py tests/test_orchestrator_strict_visibility.py tests/test_provider_hooks_config.py tests/test_no_role_routes_in_templates.py tests/test_provider_three_file_invariant.py -q` → rc 0.
-- [ ] Step 5: Szenario-Harness vollständig — `rtk tests/scenarios/run.sh` → alle Szenarien `PASS` (insbesondere `57`, `59`, `60`, `61`; Szenario `62` ist Phase 1/DEFERRED und in Phase 0 nicht aktiv).
+- [ ] Step 5: Szenario-Harness vollständig — `rtk tests/scenarios/run.sh` → alle Szenarien `PASS` (insbesondere `57`, `59`, `60`, `61`; Szenario `63` ist Phase 1/DEFERRED und in Phase 0 nicht aktiv).
 - [ ] Step 6: Plan-Validierung (Ausgabe dokumentieren, **kein Pass-Gate**) — `rtk python3 scripts/sync.py --validate-spec-plan` für diesen Plan ausführen und die Ausgabe festhalten; erwarteter rc ggf. **1** wegen der bekannten `validate_plan`-`file_overlap`-Limitierung (ohne `kind`-Gate über sequenzielle `Depends on:`-Kanten), dokumentiert in `docs/plans/2026-09-13-progress-paths-config.md` (Abschnitt Self-Review).
 - [ ] Step 7: Commit — `test: verify opencode runtime-gate phase 0 end to end`.
 
@@ -328,12 +339,12 @@ Neue und geänderte Symbole als `file:Symbol`. Phase-0-Symbole sind jetzt implem
 > **NICHT Teil der Phase-0-Abnahme.** Manuelle/Real-Repo-Aufgabe, nicht unit-testbar (AC-21). Erst wenn P6 bestätigt, dass `tool.execute.before` in OpenCode-Subagent-Sessions feuert **und** der Main Chat in `input` unterscheidbar ist, darf ein Provider auf `runtime_gate: plugin` + `has_plugins: true` + `MODE=enforce` umgestellt werden. Bis dahin bleibt alles `observe`/`permission`.
 
 **Files:**
-- Create: `tests/scenarios/configs/62-opencode-runtime-gate.project.yaml`
-- Create: `tests/scenarios/asserts/62-opencode-runtime-gate.sh`
+- Create: `tests/scenarios/configs/63-opencode-runtime-gate.project.yaml`
+- Create: `tests/scenarios/asserts/63-opencode-runtime-gate.sh`
 - Modify: `tests/scenarios/registry.md`
 
 **Interfaces:** (Produces / Consumes)
-- Produces: dokumentierter P6-Nachweis; Szenario `62-opencode-runtime-gate` (nächste freie ID; `tests/scenarios/registry.md` endet aktuell bei `61-hook-deploy-lf-newlines`) samt Config + Assert-Script + Registry-Zeile.
+- Produces: dokumentierter P6-Nachweis; Szenario `63-opencode-runtime-gate` (ID `62` ist inzwischen durch `62-stale-role-cleanup` belegt; `63` ist die nächste freie ID) samt Config + Assert-Script + Registry-Zeile.
 - Consumes: Task 8 (Plugin-Artefakt, `observe`), Task 1 (Tier-Resolver), `tests/scenarios/run.sh`-Vertrag.
 
 **Agent:** developer
@@ -341,9 +352,9 @@ Neue und geänderte Symbole als `file:Symbol`. Phase-0-Symbole sind jetzt implem
 
 **Steps:**
 - [ ] Step 1: Real-Repo-Nachweis führen — P6 beantwortet AN-3/AN-4/AN-5 (Subagent-Feuern, Main-Chat-Unterscheidbarkeit, Permission-Präzedenz AN-6/OQ-3); Ergebnis festhalten; bei negativem AN-6 den Fine-Glob-Fallback anwenden (Global Constraints) statt eines gröberen Blocks.
-- [ ] Step 2: Szenario anlegen — `tests/scenarios/configs/62-opencode-runtime-gate.project.yaml`, `tests/scenarios/asserts/62-opencode-runtime-gate.sh` (ausführbar), Registry-Zeile `| \`62-opencode-runtime-gate\` | … |`; auf `dry_rc=0 && sync_rc=0 && val_rc=0 && assert_rc=0` auslegen.
-- [ ] Step 3: Test (pass) — `rtk tests/scenarios/run.sh 62` → `PASS` (rc 0); danach `rtk tests/scenarios/run.sh` vollständig → alle `PASS`.
-- [ ] Step 4: Commit — `test: add scenario 62 for opencode runtime-gate promotion`.
+- [ ] Step 2: Szenario anlegen — `tests/scenarios/configs/63-opencode-runtime-gate.project.yaml`, `tests/scenarios/asserts/63-opencode-runtime-gate.sh` (ausführbar), Registry-Zeile `| \`63-opencode-runtime-gate\` | … |`; auf `dry_rc=0 && sync_rc=0 && val_rc=0 && assert_rc=0` auslegen.
+- [ ] Step 3: Test (pass) — `rtk tests/scenarios/run.sh 63` → `PASS` (rc 0); danach `rtk tests/scenarios/run.sh` vollständig → alle `PASS`.
+- [ ] Step 4: Commit — `test: add scenario 63 for opencode runtime-gate promotion`.
 
 **Acceptance (DEFERRED, P6-gated):** AC-21.
 
