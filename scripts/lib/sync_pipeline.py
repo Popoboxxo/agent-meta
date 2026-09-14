@@ -13,8 +13,9 @@ original order. Extraction is purely mechanical (byte-identical behavior):
   original local variables,
 - ``provider_variables`` reference-sharing semantics (shallow copy only for
   ``orchestrator.provider-overrides.<Provider>.mode``; the shared
-  ``variables`` dict is never mutated except ``PIPELINE_DETAILS_DIR``) are
-  preserved verbatim.
+  ``variables`` dict is otherwise mutated only by the per-provider
+  ``PIPELINE_DETAILS_DIR`` write and the per-provider runtime-gate tier
+  bundle, both overwritten before each provider renders) are preserved.
 
 Moved helpers found domain homes elsewhere: ``sync_knowledge_engine`` in
 ``lib/knowledge.py``, ``_probe_inactive_plugins`` in ``lib/plugins.py``,
@@ -77,7 +78,7 @@ from lib.gitignore import (
 from lib.hook_plugins import sync_hook_lib, sync_release_gates
 from lib.hooks import sync_hooks
 from lib.io import SyncError, _write_yaml, write_atomic
-from lib.isolation import sync_provider_isolation
+from lib.isolation import _sync_opencode_runtime_gate, sync_provider_isolation
 from lib.knowledge import sync_knowledge_engine
 from lib.log import SyncLog
 from lib.subagent_permissions import resolve_subagent_permission_provider_vars
@@ -91,9 +92,12 @@ from lib.pipelines import (
 from lib.platform import PLATFORM_CONFIGS_DIR, load_platform_config, resolve_platform_defaults
 from lib.plugins import _probe_inactive_plugins
 from lib.providers import (
+    load_provider_capabilities,
     load_providers_config,
+    provider_runtime_gate_tier,
     resolve_context_filename,
     resolve_providers,
+    runtime_gate_vars,
 )
 from lib.repo_containment import (
     cleanup_tmp_sink,
@@ -366,6 +370,9 @@ def _sync_stage_contexts(
                 "context files left untouched; managed block not refreshed"
             )
             continue
+        caps = load_provider_capabilities(agent_meta_root).get(provider, {})
+        provider_variables = dict(provider_variables)
+        provider_variables.update(runtime_gate_vars(pc, caps, config))
         sync_context_for_provider(agent_meta_root, project_root, config, provider_variables,
                                   log, args.dry_run, provider, provider_config)
     return debug_mode, allow_committed_secrets, mcp_gitignore_extras
@@ -733,6 +740,13 @@ def _sync_stage_per_provider(
         else:
             provider_variables = variables
 
+        # IC-04: inject the resolved tier bundle before any renderer consumes
+        # ``provider_variables`` (agents/rules/context). In the no-override case
+        # this is the shared dict, so every key is overwritten per provider
+        # before it renders — no provider sees another provider's gate tier.
+        caps = load_provider_capabilities(agent_meta_root).get(provider, {})
+        provider_variables.update(runtime_gate_vars(pc, caps, config))
+
         # PIPELINE_DETAILS_DIR + on-demand pipeline stage-detail files —
         # the lean, always-on-token-saving counterpart to
         # PIPELINE_DETAIL_BLOCKS (which inlines every pipeline's full
@@ -836,6 +850,14 @@ def _sync_stage_per_provider(
                                 release_gates_resolved=resolve_release_gates(config, agent_meta_root))
         else:
             log.note("hooks", f"skipped for {provider} — not supported")
+        # IC-13: A2 dispatch, independent of the hook branch and of the
+        # provider-isolation >=2 guard. Keys off the IC-03 resolver, never a
+        # provider literal and never ``isolation-mechanism`` (F-07).
+        if provider_runtime_gate_tier(pc, caps) == "permission":
+            _sync_opencode_runtime_gate(
+                project_root, config, provider, provider_config,
+                agent_meta_root, log, args.dry_run,
+            )
         if pc.get("has_commands", False):
             sync_commands_for_provider(agent_meta_root, project_root, config, log,
                                        args.dry_run, provider,

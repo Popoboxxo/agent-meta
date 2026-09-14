@@ -13,7 +13,11 @@ from pathlib import Path
 
 import yaml
 
-from scripts.lib.config import build_variables, fill_defaults
+from scripts.lib.config import (
+    build_variables,
+    fill_defaults,
+    strip_inactive_conditional_blocks,
+)
 from scripts.lib.log import SyncLog
 
 # The real leaking set for a minimal hand-written project (issue #733),
@@ -163,3 +167,33 @@ def test_fill_defaults_project_short_is_reported(tmp_path):
     fill_defaults(config_path, repo_root, log, dry_run=False)
 
     assert any("project.short" in entry for entry in log.actions)
+
+
+def test_gate_conditional_blocks_stripped():
+    """AC-06: the three runtime-gate tier blocks are mutually exclusive.
+
+    Exactly the active ``GATE_*`` block survives; the two inactive ones are
+    removed by ``strip_inactive_conditional_blocks``.
+    """
+    template = (
+        "start\n"
+        "{{#if GATE_ENFORCED}}\nENFORCED\n{{/if}}\n"
+        "{{#if GATE_PARTIAL}}\nPARTIAL\n{{/if}}\n"
+        "{{#if GATE_ADVISORY}}\nADVISORY\n{{/if}}\n"
+        "end\n"
+    )
+    rendered = strip_inactive_conditional_blocks(
+        template,
+        {"GATE_ENFORCED": "false", "GATE_PARTIAL": "true", "GATE_ADVISORY": "false"},
+    )
+    assert "PARTIAL" in rendered
+    assert "ENFORCED" not in rendered
+    assert "ADVISORY" not in rendered
+
+    advisory = strip_inactive_conditional_blocks(
+        template,
+        {"GATE_ENFORCED": "false", "GATE_PARTIAL": "false", "GATE_ADVISORY": "true"},
+    )
+    assert "ADVISORY" in advisory
+    assert "ENFORCED" not in advisory
+    assert "PARTIAL" not in advisory
