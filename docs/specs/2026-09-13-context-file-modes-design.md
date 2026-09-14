@@ -59,25 +59,35 @@ Phase-1/2 criteria as deferred from Phase 0, exactly as
   the already-committed `GATE_*` vocabulary, introduces no unverified provider
   API, and is the criteria the implementation is signed off against first:
   **AC-01 … AC-09, AC-25**. The invariant is **scoped**: IC-03 neutralises the
-  `GATE_*` family only (AC-25, R7, OQ-13).
+  `GATE_*` family only (AC-25, R7, OQ-13). **Phase 0 is unaffected by the
+  Revision-2 Gemini/Antigravity correction:** the active `AGENTS.md` sharer set
+  stays `{Opencode, Gemini}` → `weakest(permission, hook) = permission`; the
+  F-RULESLOC channel question concerns `per-provider` only (R2-04).
 - **Phase 1 — `per-provider` core (gated/deferred from Phase 0).** Canonical
-  `AGENTS.md` core + provider-native adapters with their own tier, for the two
-  **VERIFIED-RESEARCH** adapter providers (Claude `@AGENTS.md`, Gemini
-  `@`/`context.fileName`). Config resolver, schema, adapter render and rollback:
-  **AC-10 … AC-18, AC-26**. The adapter-loading semantics for these two providers are
-  VERIFIED-RESEARCH; the remaining adapters are HYPOTHESIS and stay in Phase 2.
+  `AGENTS.md` core + provider-native dedicated tier channels that carry their own
+  tier. Claude's `@AGENTS.md` adapter is **VERIFIED-RESEARCH**;
+  Gemini/Antigravity (**one** provider, `config/ai-providers.yaml:89-162`) carries
+  its gate tier over its existing provider-native `rules_dir` channel
+  (`.gemini/rules`, `:95`), which is **HYPOTHESIS** pending the F-RULESLOC
+  real-repo check (open verification point, OQ-3/R8). Config resolver, schema,
+  adapter render and rollback: **AC-10 … AC-18**. The `context.fileName`
+  dedicated context file for Gemini/Antigravity is candidate (b), explicitly
+  deferred to **Phase 2** (AC-26); the remaining Codex/Copilot/Continue/Mammouth
+  adapters are HYPOTHESIS and stay in Phase 2.
 - **Phase 2 — remaining adapters + config/validation/UI (gated/deferred from
   Phase 0 and from Phase 1).** Codex, Copilot, Continue, Mammouth adapters behind
-  capability flags after their HYPOTHESIS checks pass, consistency check,
-  size-guard extension, Admin-UI/Server: **AC-19 … AC-24**. No Phase-2 provider
-  may be switched to an adapter before its HYPOTHESIS (A5/§9.3 of the design) is
-  verified in a real repo and recorded.
+  capability flags after their HYPOTHESIS checks pass, the Gemini/Antigravity
+  `context.fileName` option (candidate (b), AC-26), consistency check, size-guard
+  extension, Admin-UI/Server: **AC-19 … AC-24, AC-26**. No Phase-2 provider may be
+  switched to an adapter before its HYPOTHESIS (A5/§9.3 of the design) is verified
+  in a real repo and recorded.
 
 The design's OQ-1 … OQ-12 (design §12) are carried over in
 [Offene Fragen + Risiken](#offene-fragen--risiken); each has a recommended
 default and a flag for whether it needs explicit user approval. OQ-13 is added
-by this revision (F-01, `[User approval]`) and R7 is added to the design's risk
-list.
+by this revision (F-01, `[User approval]`), OQ-3 is **replaced** by the
+Gemini/Antigravity dedicated-channel question (R2-02), and R7/R8/R9 are added to
+the design's risk list.
 
 ### Revision — incorporated review findings
 
@@ -90,14 +100,14 @@ list.
 | F-04 (MAJOR) | Claude carrier corrected: IC-09 states Claude is `context-managed-block` (`ai-providers.yaml:24`), `templates/context/claude-managed.md` has no `GATE_*`, and the `hook` wording lives in `.claude/rules/use-orchestrator.md:1` (`sync_rules` `sync_pipeline.py:782`, vars `:748`). AC-14 observable changed to "the Claude provider surface contains the verbatim hook wording", not "the CLAUDE.md managed block carries it". |
 | F-05 (MINOR) | IC-02/AC-02 fail-safe: `provider_config.get(u, {})`, non-dict → `{}`, degrades to `advisory`, no `KeyError`. |
 | F-07 (MINOR) | Line numbers refreshed: `_sync_stage_contexts` `:328-378` + loop `:345-377`; `cli_commands.py` print `:1218`, exit `:1219`; rules seam `sync_pipeline.py:748` (consumed by `sync_rules :782` / `sync_embedded_rule_files :796`) added to the impact table. |
-| F-08 (MINOR) | AC-13 scoped to the resolver set (Claude→`CLAUDE.md`, Gemini→`GEMINI.md`, rest direct readers of the core); the Antigravity dual-reader sub-case moved entirely into OQ-3. |
+| F-08 (MINOR) | AC-13 scoped to the resolver set (Claude→`CLAUDE.md`, Gemini→`GEMINI.md`, rest direct readers of the core); the Antigravity dual-reader sub-case moved entirely into OQ-3. **Superseded by R2-01/R2-02:** Gemini/Antigravity is one provider, so there is no dual-reader sub-case; AC-13 no longer names `GEMINI.md` and OQ-3 is re-derived (dedicated channel, F-RULESLOC). |
 | F-09 (MINOR) | `context_mode` removed from IC-02 (Phase 0); IC-05 declares it solely as a Phase-1 symbol. |
-| F-10 (MINOR) | `context_adapter_settings` added to IC-07; IC-09 names the provider-native settings write (Gemini `context.fileName` in `.gemini/settings.json`) as capability/`settings_file`-gated; new AC-26 observes activation (or default-context-file semantics). |
+| F-10 (MINOR) | `context_adapter_settings` added to IC-07; IC-09 names the provider-native settings write (Gemini `context.fileName` in `.gemini/settings.json`) as capability/`settings_file`-gated; new AC-26 observes activation (or default-context-file semantics). **Re-scoped by R2-02:** for Gemini/Antigravity this is candidate (b) and moves to **Phase 2**; the Phase-1 dedicated channel is the `rules_dir` channel (OQ-3). |
 | N-01 (MINOR, non-blocking) | `orchestrator_hint` / `ORCHESTRATOR_INVOCATION_HINT` removed from the divergence enumerations (IC-03, Datenfluss §1, AC-07, AC-25, R7, OQ-13) and annotated there as currently unrendered / no consumer: no rule/template reads `{{ORCHESTRATOR_INVOCATION_HINT}}` (the variable is only assigned, at `context.py:1131` and `rules.py:227/249`), so a differing value cannot make the two shared renders differ and AC-25's clause about it was unsatisfiable. `ORCH_MODE_*` and `REPO_CONTAINMENT_*` stay (genuinely consumed). |
-
----
-
-## Problem
+| R2-01 (MAJOR) | **Revision-2 alignment (user correction, authoritative).** Gemini and Antigravity are **one provider** (`config/ai-providers.yaml:89-162`), not a dual reader. All dual-reader language is removed. The provider matrix is corrected: the Gemini/Antigravity row is merged into a single row and opencode, Codex, Claude, Copilot, Continue, Mammouth, KimiCode and ZCode are re-verified against `config/ai-providers.yaml` / `config/provider-capabilities.yaml`. |
+| R2-02 (MAJOR) | **OQ-3 replaced.** The former "Gemini dual reader" question is re-derived as the dedicated-channel question for the single Gemini/Antigravity provider: recommended **(a)** its own `rules_dir` (`.gemini/rules`) as an Always-On rule (Phase 1, gated on FINDING F-RULESLOC), fallback **(c)** shared `AGENTS.md` + hook enforcement, with **(b)** the `context.fileName` file deferred to Phase 2. Decisive fact carried: this provider has hooks (`hook_protocol: antigravity-hooks-json`, `:97`; `runtime_gate: hook`, `provider-capabilities.yaml:94`), so the gate is **natively enforced** and the prompt text is documentation. |
+| R2-03 (MAJOR) | **FINDING F-RULESLOC folded in as an open verification point** (HYPOTHESIS, **no config change**): `config/ai-providers.yaml:95` sets `rules_dir: .gemini/rules` while Antigravity documents workspace rules in `.agents/rules` (backwards-compatible `.agent/rules`); `hooks_dir`/`hooks_config_file` (`:98-99`) already use `.agents/...`. Recorded as a real-repo verification task; adds R8/R9. Affects `per-provider` only. |
+| R2-04 (confirm) | **Phase 0 unchanged.** The `unified` fix is unaffected: the active `AGENTS.md` sharer set stays `{Opencode, Gemini}` → `weakest(permission, hook) = permission`; the F-RULESLOC question only concerns the `per-provider` channel. No approval marker is set by this revision. |
 
 `AGENTS.md` is the shared context file of Opencode (`runtime_gate: permission`,
 `config/provider-capabilities.yaml:75`) and Gemini/Antigravity
@@ -140,7 +150,7 @@ making a shared-block-invariant quantity provider-dependent. The structural
 conflict (design §1.2) is that one file can carry only one honest gate wording,
 while two sharers have different tiers. This spec resolves it deterministically:
 `unified` (default) renders the shared file at the weakest sharer; `per-provider`
-restores per-provider tier honesty through real file separation.
+restores per-provider tier honesty through real channel/file separation.
 
 ## Ziel
 
@@ -151,8 +161,11 @@ restores per-provider tier honesty through real file separation.
    active sharer; the `GATE_*` family is neutralised — AC-25/R7). `sync.py
    --check` converges on rc 0; divergent non-gate provider-scoped inputs remain
    a documented limitation (F-01).
-3. `per-provider`: canonical core in `AGENTS.md` plus provider-native adapter
-   files that reference/import the core and carry **their own** gate tier.
+3. `per-provider`: canonical core in `AGENTS.md` plus provider-native dedicated
+   tier channels — an adapter file that references/imports the core, or a
+   provider-owned `rules_dir` channel — each carrying **its own** gate tier
+   (provider-agnostic channel dispatch: `context-adapter` > `has_rules`/`rules_dir`
+   > direct reader).
 4. Provider-agnostic: exclusively config keys / capability flags, never
    `if provider == "..."`.
 5. Backward compatible: the default `context.mode: unified` needs no new config,
@@ -164,8 +177,9 @@ restores per-provider tier honesty through real file separation.
 - **No self-identification mechanism.** A second mechanism based on
   "if you are X" conditional blocks inside one file is explicitly excluded: the
   NeurIPS 2024 SAD benchmark shows self-identification instruction selection is
-  unreliable. `per-provider` solves the problem exclusively through **real file
-  separation** (config-driven adapters), never through in-file conditionals.
+  unreliable. `per-provider` solves the problem exclusively through **real
+  channel/file separation** (config-driven adapters / provider-native rules
+  channels), never through in-file conditionals.
 - **No Security boundary.** All guards stay a Convention boundary
   (terminology:
   `.claude/rules/branch-guard.md#guard-terminologie-convention-boundary-vs-security-boundary`).
@@ -393,20 +407,39 @@ Per adapter-capable provider block:
 ```yaml
 <Provider>:
   context_adapter: true|false                 # provider can read its own adapter file
-  context_adapter_file: "<rel-path>"          # native file, e.g. "GEMINI.md"; Claude: existing CLAUDE.md
+  context_adapter_file: "<rel-path>"          # native file, e.g. Claude's existing CLAUDE.md
   context_adapter_import: "@{core}"           # provider-native import syntax; "" = pointer line
   context_adapter_import_supported: true|false
-  context_adapter_settings: true|false        # default context file needs a settings key (F-10)
+  context_adapter_settings: true|false        # default context file needs a settings key (F-10; candidate (b), Phase 2)
 ```
 
 - `context_adapter` may equivalently be a capability `context-adapter` in
   `config/provider-capabilities.yaml` (same pattern as `context-embedded-rules` /
   `context-managed-block`).
 - `context_adapter_settings: true` means the provider only reads the adapter when
-  a provider-native settings key names it (e.g. `context.fileName` in
+  a provider-native settings key names it (worked example: `context.fileName` in
   `.gemini/settings.json`); the write is capability-gated in IC-09. When absent
   or `false`, the adapter file is the provider's default context file and no
-  settings write is required (F-10).
+  settings write is required (F-10, candidate (b), Phase 2).
+- **Rules channel — no new key (Revision 2).** A provider with `has_rules: true`
+  and a `rules_dir` carries its gate tier over the existing per-provider rules
+  seam (`sync_pipeline.py:373-375`, `:747-748`, IC-04) and needs **no**
+  `context_adapter*` key. Gemini/Antigravity (**one** provider,
+  `config/ai-providers.yaml:89-162`) uses this channel; the channel choice is
+  purely key-/capability-driven (`context-adapter` > `has_rules`/`rules_dir` >
+  direct reader).
+- **FINDING F-RULESLOC (HYPOTHESIS — open verification point; no config change in
+  this spec).** The configured `rules_dir: .gemini/rules`
+  (`config/ai-providers.yaml:95`) diverges from the documented Antigravity
+  workspace-rules location `.agents/rules` (backwards-compatible `.agent/rules`),
+  while `hooks_dir`/`hooks_config_file` (`:98-99`) already use `.agents/...`. Repo
+  evidence: `.gemini/rules/` exists (39 generated rules incl.
+  `use-orchestrator.md:1` = `# CRITICAL GATE`); `.agents/` contains only
+  `hooks.json` + `hooks/`, no `rules/`; `.gemini/settings.json` has no
+  `context.fileName` key. If the runtime reads only `.agents/rules`, the
+  `per-provider` channel (a) would be a no-op; the fallback is (c) shared
+  `AGENTS.md` with hook enforcement (text = documentation). Real-repo
+  verification is required before enabling channel (a) (OQ-3, R8/R9).
 - `context_adapter_file` is the provider's **native** file; it may stay unused in
   `unified`.
 - Missing keys ⇒ the provider is a **direct reader of the core** (opencode,
@@ -416,6 +449,24 @@ Per adapter-capable provider block:
 - **Error path:** a capability registry invariant (AC-12) flags an
   adapter-capable provider that lacks `context_adapter_file` or
   `context_adapter_import_supported`.
+
+#### Provider matrix (`per-provider`, Revision 2)
+
+Re-verified against `config/ai-providers.yaml` and
+`config/provider-capabilities.yaml`. Gemini and Antigravity are **one provider**
+(merged row); there is no dual reader.
+
+| Provider | Dedicated channel in `per-provider` | Tier | Status |
+|---|---|---|---|
+| opencode | direct reader of core `AGENTS.md` (no adapter) | `permission` | VERIFIED-RESEARCH (`ai-providers.yaml:167`; `provider-capabilities.yaml:75`) |
+| Claude | adapter `CLAUDE.md` (`@AGENTS.md` import + managed block) | `hook` | VERIFIED-RESEARCH (`:5`, `:7`; `provider-capabilities.yaml:56`) |
+| Gemini/Antigravity (**one provider**) | own `rules_dir` channel `.gemini/rules` (Always-On rule, existing seam; **no adapter file**) | `hook` | HYPOTHESIS — F-RULESLOC (`:89-162`, `:95`, `:97`; `provider-capabilities.yaml:94`) |
+| Codex | candidate `AGENTS.override.md` (fallback/override); `rules_dir: rules` | `advisory` | HYPOTHESIS, Phase 2 (`:400`, `:403`; `provider-capabilities.yaml:203`) |
+| Copilot | candidate pointer `.github/copilot/COPILOT.md`; `rules_dir: .github/copilot/rules` | `advisory` | HYPOTHESIS, Phase 2 (`:293`, `:295-296`; `provider-capabilities.yaml:141`) |
+| Continue | candidate pointer `.continue/rules/project-context.md`; `rules_dir: .continue/rules` | `advisory` | HYPOTHESIS, Phase 2 (`:231`, `:234`; `provider-capabilities.yaml:119`) |
+| Mammouth | candidate pointer `MAMMOUTH.md`; `rules_dir: .mammouth/rules` | `advisory` | HYPOTHESIS, Phase 2 (`:340`, `:343`; `provider-capabilities.yaml:170`) |
+| KimiCode | direct reader of core `AGENTS.md` (no adapter) | `advisory` | VERIFIED-RESEARCH (`:506`; `provider-capabilities.yaml:263`) |
+| ZCode | direct reader of core `AGENTS.md` (no adapter) | `advisory` | VERIFIED-RESEARCH (`:454`; `provider-capabilities.yaml:233`) |
 
 ### IC-08 — `scripts/lib/providers.py::resolve_context_filename` (legacy-cleanup scope only; Phase 1)
 
@@ -469,13 +520,16 @@ def sync_context_adapters_for_provider(
     adapter index (IC-10/design §5.4). Idempotent: unchanged content => log.skip,
     no write.
 
-    Settings activation (F-10): when context_adapter_settings is true, also write
-    the provider-native settings key that names the adapter file (Gemini:
-    context.fileName in .gemini/settings.json, whose template
+    Settings activation (F-10, candidate (b), Phase 2): when
+    context_adapter_settings is true, also write the provider-native settings key
+    that names the adapter file (worked example: context.fileName in
+    .gemini/settings.json, whose template
     templates/configs/GEMINI.settings-template.json currently has no such key),
     capability/`settings_file`-gated through the existing settings writer; when
     false/absent, the adapter file is the provider's default context file and no
-    settings write happens.
+    settings write happens. For Gemini/Antigravity this is the deferred Phase-2
+    option; its Phase-1 dedicated channel is the rules channel (IC-07), not an
+    adapter file.
     """
 
 def sync_context_for_provider(...) -> None:
@@ -604,10 +658,14 @@ sync.py
         |           |              │    context-managed-block  -> native rules file (Claude:
         |           |              │                             .claude/rules/use-orchestrator.md)
         |           |              ├─ context_adapter_settings -> provider settings key
-        |           |              │    (Gemini: context.fileName in .gemini/settings.json)
+        |           |              │    (candidate (b), Phase 2, worked example:
+        |           |              │     context.fileName in .gemini/settings.json)
         |           |              └─ rule_index lifecycle + context-hashes
-        |           └-- false -> direct reader of the core
-        |                          (opencode / KimiCode / ZCode; Gemini dual-reader = OQ-3)
+        |           └-- false -> has_rules/rules_dir channel (IC-04, no new code):
+        |                          provider's own tier in its rules file
+        |                          (Gemini/Antigravity, one provider: .gemini/rules;
+        |                           gated on F-RULESLOC, OQ-3/R8)
+        |                          else direct reader of the core (opencode / KimiCode / ZCode)
         |     └─ cleanup_stale_managed_files on mode switch / rollback (IC-09/§5.4)
         └─ unified: flow 1 above
 ```
@@ -715,10 +773,13 @@ Each criterion is testable and observable and names the test that covers it.
 
 ### Phase 1 — `per-provider` core (gated/deferred from Phase 0)
 
-> AC-10 … AC-18 and AC-26 are deferred until Phase 0 is implemented and the
-> mixed-tier shared-file rc1 is fixed. The Claude and Gemini adapter semantics are
-> VERIFIED-RESEARCH; the Codex/Copilot/Continue/Mammouth adapters (AC-22) stay in
-> Phase 2 behind their HYPOTHESIS checks.
+> AC-10 … AC-18 are deferred until Phase 0 is implemented and the
+> mixed-tier shared-file rc1 is fixed. Claude's adapter semantics are
+> VERIFIED-RESEARCH; Gemini/Antigravity (**one** provider) carries its tier over
+> the existing `rules_dir` channel, which is HYPOTHESIS pending the F-RULESLOC
+> real-repo check (OQ-3, R8). The Gemini/Antigravity `context.fileName` adapter
+> (candidate (b), AC-26) and the Codex/Copilot/Continue/Mammouth adapters (AC-22)
+> stay in Phase 2 behind their HYPOTHESIS checks.
 
 10. **AC-10 (`context.mode` precedence and fail-safe).** Given
     `context.provider-overrides.Gemini.mode: unified` with `context.mode:
@@ -745,15 +806,19 @@ Each criterion is testable and observable and names the test that covers it.
 13. **AC-13 (topology: which providers stay on `AGENTS.md`).** Given
     `context.mode: per-provider`, when sync runs, then opencode, KimiCode and
     ZCode stay direct readers of `context.core_file` (`AGENTS.md`) with **no**
-    adapter file written, while Claude is written to its dedicated `CLAUDE.md`
-    adapter and Gemini to `GEMINI.md`. The assertion is bound to the file the
-    dispatch (`sync_context_for_provider`/`sync_context_adapters_for_provider`,
-    IC-09) **actually writes**, not to `resolve_context_filename` (which only
-    feeds legacy cleanup, IC-08). The distinction is derived only from the IC-07
-    keys / `has_dedicated_context_file`, never from a provider name. The Gemini
-    dual-reader (Antigravity runtime vs. Gemini CLI on one provider entry) is
-    **not** asserted here — it stays OQ-3 (F-08). Test: new
-    `tests/test_context_adapters.py` (write paths); extend
+    adapter file written, Claude is written to its dedicated `CLAUDE.md` adapter,
+    and **Gemini/Antigravity** (**one** provider) also stays a direct reader of
+    the core with **no** `context_adapter_file` — its dedicated gate channel is
+    its existing `rules_dir` channel (`.gemini/rules`), rendered by the unchanged
+    per-provider rules seam (IC-04), gated on the F-RULESLOC real-repo check
+    (OQ-3, R8). The assertion is bound to the file the dispatch
+    (`sync_context_for_provider`/`sync_context_adapters_for_provider`, IC-09)
+    **actually writes**, not to `resolve_context_filename` (which only feeds
+    legacy cleanup, IC-08). The distinction is derived only from the IC-07 keys /
+    `has_rules`+`rules_dir` / `has_dedicated_context_file`, never from a provider
+    name. The `context.fileName` dedicated context file for Gemini/Antigravity
+    (candidate (b)) is **not** asserted here — it is deferred to Phase 2 (AC-26).
+    Test: new `tests/test_context_adapters.py` (write paths); extend
     `tests/test_provider_context_filename.py` (legacy-cleanup resolver only).
 14. **AC-14 (adapter render and per-adapter tier correctness).** Given mode
     `per-provider`, when sync runs, then the core `AGENTS.md` carries the neutral
@@ -762,8 +827,10 @@ Each criterion is testable and observable and names the test that covers it.
     `GATE_*`), and the verbatim `hook` wording (`# CRITICAL GATE`, per
     `SPEC-OPENCODE-RUNTIME-GATE-2026-09-13` F-05/IC-07) is on Claude's provider
     surface in its native rules file `.claude/rules/use-orchestrator.md`
-    (rendered by `sync_rules`, `sync_pipeline.py:782`/`:748`); the Gemini adapter
-    carries `hook` in its embedded-rules managed block; and an `advisory` adapter
+    (rendered by `sync_rules`, `sync_pipeline.py:782`/`:748`); Gemini/Antigravity
+    (**one** provider) carries `hook` in its provider-native rules file
+    (`.gemini/rules/use-orchestrator.md:1`, rendered by the unchanged
+    per-provider rules seam, IC-04; gated on F-RULESLOC); and an `advisory` adapter
     provider (Codex/Copilot/Continue/Mammouth, Phase 2) would carry
     `GATE_ADVISORY`. The observable for Claude is "the provider surface contains
     the verbatim hook wording", not "the `CLAUDE.md` managed block carries it"
@@ -795,17 +862,6 @@ Each criterion is testable and observable and names the test that covers it.
     index is removed, foreign/user files without an index entry are untouched,
     `--check` reports `pending == 0`, and no orphaned adapter remains. Test: new
     `tests/test_context_adapters.py`.
-26. **AC-26 (adapter settings activation).** Given an adapter provider with
-    `context_adapter_settings: true`, when the adapter is rendered in
-    `per-provider`, then the provider-native settings key that activates the
-    adapter file is written capability/`settings_file`-gated (worked example:
-    `context.fileName` in `.gemini/settings.json`, whose shipped template
-    `templates/configs/GEMINI.settings-template.json` currently carries no such
-    key), and the Phase-1 real-repo check observes that the provider actually
-    reads the adapter. Given `context_adapter_settings` absent/`false`, then no
-    settings write happens and the adapter file is the provider's default context
-    file (F-10). Test: extend `tests/test_context_adapters.py`; documented
-    real-repo verification task for the Gemini/`context.fileName` case.
 
 ### Phase 2 — remaining adapters + consistency + UI (gated/deferred)
 
@@ -840,12 +896,14 @@ Each criterion is testable and observable and names the test that covers it.
     (`AGENTS.override.md` vs. `project_doc_fallback_filenames`), Copilot (path
     `.github/copilot-instructions.md` vs. the configured
     `ai-providers.yaml:293` path), Continue/Mammouth (pointer semantics) and the
-    Gemini dual-reader risk, when sync runs, then none of these providers uses an
-    adapter unless the corresponding HYPOTHESIS (design §9.3, A5) is verified in
-    a real repository and recorded; Codex, Copilot, Continue and Mammouth stay
-    direct readers of the core by default. Test: new `tests/test_context_adapters.py`
-    (default-not-enabled assertions) plus a documented real-repo verification
-    task.
+    Gemini/Antigravity `context.fileName` option (candidate (b)), when sync runs,
+    then none of these providers uses an adapter unless the corresponding
+    HYPOTHESIS (design §9.3, A5) is verified in a real repository and recorded;
+    Codex, Copilot, Continue, Mammouth and Gemini/Antigravity stay direct readers
+    of the core by default (Gemini/Antigravity additionally carries its tier in
+    its `rules_dir` channel, gated on F-RULESLOC). Test: new
+    `tests/test_context_adapters.py` (default-not-enabled assertions) plus a
+    documented real-repo verification task.
 23. **AC-23 (neutral core render state).** Given `GATE_NEUTRAL` as a render state
     (not a value in `RUNTIME_GATE_TIERS`, `runtime_gate.py:35` unchanged), when
     the core is rendered in `per-provider`, then it states the directive
@@ -858,6 +916,20 @@ Each criterion is testable and observable and names the test that covers it.
     path (separately from the core), and `context_file.max_lines` applies; an
     acknowledged override suppresses it. Test: extend
     `tests/test_context_size_guard.py`.
+26. **AC-26 (adapter settings activation — candidate (b), Phase 2).** Given an
+    adapter provider with `context_adapter_settings: true`, when the adapter is
+    rendered in `per-provider`, then the provider-native settings key that
+    activates the adapter file is written capability/`settings_file`-gated
+    (worked example: `context.fileName` in `.gemini/settings.json` for
+    Gemini/Antigravity's deferred dedicated context file, whose shipped template
+    `templates/configs/GEMINI.settings-template.json` currently carries no such
+    key), and the real-repo check observes that the provider actually reads the
+    adapter. Given `context_adapter_settings` absent/`false`, then no settings
+    write happens and the adapter file is the provider's default context file
+    (F-10). This is the deferred Phase-2 candidate (b): Gemini/Antigravity's
+    Phase-1 dedicated channel is the `rules_dir` channel (OQ-3), not this adapter.
+    Test: extend `tests/test_context_adapters.py`; documented real-repo
+    verification task for the Gemini/`context.fileName` case.
 
 ---
 
@@ -875,7 +947,7 @@ implemented. Impact of this change on that code:
 | `context.py::_build_managed_block` (`:1066`) | **changed (behaviour for shared files)** | core of the Phase-0 fix (IC-03). |
 | `context.py::_sync_opencode_context` (`:553`, reads `pc["context_file"]` `:566`), `_sync_managed_block_context` (`:483`, reads `pc.get("context_file")` `:496`), `sync_context_for_provider` (`:818-857`) | Phase 0 **untouched**; Phase 1/2 dispatch extension | the core-vs-adapter target selection (IC-09) is threaded here; `resolve_context_filename` (IC-08) is not on this path. |
 | `sync_pipeline.py` context seam (`:373-375`) | **untouched** (Phase 0) | per-provider injection still feeds per-provider artefacts; the shared render overrides in `_build_managed_block`. |
-| `sync_pipeline.py` rules seam (`:748` `runtime_gate_vars`, consumed by `sync_rules` `:782` / `sync_embedded_rule_files` `:796`) | **untouched** (Phase 0) | second injection point; supplies the per-provider `GATE_*` to the native rules file `.claude/rules/use-orchestrator.md` (Claude's hook wording, F-04). |
+| `sync_pipeline.py` rules seam (`:748` `runtime_gate_vars`, consumed by `sync_rules` `:782` / `sync_embedded_rule_files` `:796`) | **untouched** (Phase 0) | second injection point; supplies the per-provider `GATE_*` to the native rules files — `.claude/rules/use-orchestrator.md` (Claude's hook wording, F-04) and `.gemini/rules/use-orchestrator.md` (Gemini/Antigravity's Phase-1 dedicated channel, gated on F-RULESLOC, OQ-3). |
 | `isolation.py` (`_sync_opencode_runtime_gate`) | **untouched** | the `opencode.json` runtime enforcement stays exactly as implemented. |
 | `consistency/orchestrator_strict.py` | **untouched** | keeps reading `provider_runtime_gate_tier`. |
 | `rules/1-generic/use-orchestrator.md`, `a2a-delegation-gates.md`, `variables.py:235`, `consistency/placeholders.py` | Phase 0 **untouched**; Phase 1 adds `GATE_NEUTRAL` | the three `GATE_*` conditionals already ship. |
@@ -886,10 +958,16 @@ implemented. Impact of this change on that code:
    last-writer tier to the weakest tier. With active opencode (`permission`),
    Gemini/Antigravity reads the `permission`/partial variant in `AGENTS.md`
    instead of `# CRITICAL GATE` (`hook`). This is intended: one file cannot carry
-   two honest guarantees. The `hook` honesty for Claude (`CLAUDE.md`, dedicated)
-   is untouched; Gemini regains it in Phase 1 through the `GEMINI.md` adapter.
-   **The regenerated `AGENTS.md` must be committed with the change** so that
-   `--check` is rc 0 (AC-06).
+   two honest guarantees. For Gemini/Antigravity the shared-file text is
+   **documentation anyway**: the provider has a verified hook contract
+   (`hook_protocol: antigravity-hooks-json`, `config/ai-providers.yaml:97`;
+   `runtime_gate: hook`, `config/provider-capabilities.yaml:94`), so the gate is
+   enforced natively at runtime, independent of the prompt text. Its `hook`
+   wording is additionally carried by `.gemini/rules/use-orchestrator.md:1`
+   (`# CRITICAL GATE`), which the unchanged per-provider rules seam already
+   renders (IC-04), gated on F-RULESLOC (OQ-3, R8). The `hook` honesty for Claude
+   (`CLAUDE.md`, dedicated) is untouched. **The regenerated `AGENTS.md` must be
+   committed with the change** so that `--check` is rc 0 (AC-06).
 2. `sync.py --check` switches from rc 1 to rc 0 — the goal.
 3. `tests/test_runtime_gate_rendering.py` stays valid: it renders the **rule
    template**, not the shared file.
@@ -904,11 +982,13 @@ additive invariant over its already-committed `GATE_*` vocabulary.
 
 ## Offene Fragen + Risiken
 
-The design's OQ-1 … OQ-12 (design §12) are carried over; OQ-3 is extended with
-the Gemini dual-reader limitation (F-08) and OQ-13 is added (F-01). Each has a
-recommended default and the design's risk list becomes R1 … R7. Items marked
-**[User approval]** need an explicit user decision because they affect the
-shipped guarantee, a public config contract or a provider enablement.
+The design's OQ-1 … OQ-12 (design §12, revision 2) are carried over; **OQ-3 is
+replaced** by the re-derived Gemini/Antigravity dedicated-channel question
+(FINDING F-RULESLOC) and OQ-13 is added (F-01). Each has a recommended default
+and the design's risk list becomes R1 … R7, extended by R8/R9 (F-RULESLOC /
+Always-On activation metadata). Items marked **[User approval]** need an explicit
+user decision because they affect the shipped guarantee, a public config contract
+or a provider enablement.
 
 1. **OQ-1 — collision `context.mode` vs. `context_file.mode`.** Recommended
    default: keep `context.mode` (commission decision); mitigate with an explicit
@@ -917,16 +997,40 @@ shipped guarantee, a public config contract or a provider enablement.
 2. **OQ-2 — core content in `per-provider`: neutral (`GATE_NEUTRAL`) vs.
    weakest tier.** Recommended default: neutral (design §5.2, DECISION-4).
    **[User approval]** — it determines that direct readers of the core (opencode,
-   KimiCode, ZCode, Antigravity runtime) receive a conservative, advisory-near
-   statement instead of a concrete tier.
-3. **OQ-3 — Gemini dual reader.** `GEMINI.md` adapter plus the Antigravity
-   runtime reading `.agents/AGENTS.md`. Recommended default (HYPOTHESIS): Gemini
-   CLI adapter only via `context.fileName`, Antigravity runtime keeps the core;
-   real-repo test before enabling. **[User approval]** for the go/no-go on the
-   Gemini adapter (Phase 1). The dual-reader sub-case lives **entirely here**
-   (F-08): the single registered `Gemini` entry (`config/ai-providers.yaml:89`)
-   cannot be simultaneously `context_adapter: true` (→ `GEMINI.md`) and a direct
-   core reader, so AC-13 does not assert both outcomes.
+   KimiCode, ZCode, and Gemini/Antigravity while it reads the shared core)
+   receive a conservative, advisory-near statement instead of a concrete tier.
+   Gemini/Antigravity's concrete `hook` tier is carried by its dedicated channel
+   (OQ-3), not by the neutral core.
+3. **OQ-3 (re-derived, Revision 2) — which dedicated channel carries the
+   Gemini/Antigravity gate tier in `per-provider`?** Gemini and Antigravity are
+   **one provider** (`config/ai-providers.yaml:89-162`); the former "dual reader"
+   construct was wrong and is removed. Recommended default (DECISION-7,
+   HYPOTHESIS, Phase 1): **(a)** the provider's own `rules_dir` channel
+   (`.gemini/rules`, `config/ai-providers.yaml:95`) as an Always-On rule, fed by
+   the existing per-provider rules seam (`sync_pipeline.py:373-375`, `:747-748`)
+   — no new artefact, no settings mutation. **Gated on FINDING F-RULESLOC**
+   (below). If the real-repo check is negative, the Phase-1 fallback is **(c)**
+   the shared `AGENTS.md` with the tier enforced only by the hook (text =
+   documentation). **(b)** a `context.fileName`-configured dedicated context file
+   (`GEMINI.md` via `.gemini/settings.json`) is deferred to **Phase 2**, not
+   Phase 1 (AC-26). **Decisive fact:** this provider has hooks
+   (`hook_protocol: antigravity-hooks-json`, `:97`; `runtime_gate: hook`,
+   `config/provider-capabilities.yaml:94`), so the gate is **natively enforced at
+   runtime** and the prompt text is documentation — an under-claiming text is not
+   an honesty problem. **[User approval]** for the go/no-go on enabling the
+   channel after the F-RULESLOC test.
+   - **FINDING F-RULESLOC (HYPOTHESIS — open verification point; no config change
+     in this spec).** `config/ai-providers.yaml:95` sets
+     `rules_dir: .gemini/rules`, while Antigravity documents workspace rules in
+     `.agents/rules` (backwards-compatible `.agent/rules`);
+     `hooks_dir`/`hooks_config_file` (`:98-99`) already use `.agents/...`. Repo
+     evidence: `.gemini/rules/` exists (39 generated rules incl.
+     `use-orchestrator.md:1` = `# CRITICAL GATE`); `.agents/` contains only
+     `hooks.json` + `hooks/`, no `rules/`. If the runtime reads only
+     `.agents/rules`, channel (a) is a no-op and the fallback (c) applies.
+     Verifying this (which path, which activation) is a real-repo task required
+     before enabling channel (a) (R8/R9). Correcting `rules_dir` is a separate
+     change and **not** part of this spec.
 4. **OQ-4 — Codex adapter mechanics.** `AGENTS.override.md` vs.
    `project_doc_fallback_filenames`. Recommended default: leave Codex a direct
    reader in Phase 1; adapter only after HYPOTHESIS verification. **[User
@@ -981,8 +1085,13 @@ shipped guarantee, a public config contract or a provider enablement.
   `--check` at rc 1.** Mitigation: the canonicalized file is committed with the
   change (AC-06). No new config is needed.
 - **R2: one-time content change of the shared `AGENTS.md` (hook → permission
-  wording).** Intended and documented (design §2 Backward Compatibility, §11);
-  Gemini's `hook` honesty returns with the Phase-1 adapter. Needs the user's
+  wording).** Intended and documented (design §2 Backward Compatibility, §11).
+  For the shared file the prompt text is documentation for Gemini/Antigravity
+  anyway: the gate is natively enforced by its verified hook contract
+  (`hook_protocol: antigravity-hooks-json`, `:97`; `runtime_gate: hook`,
+  `provider-capabilities.yaml:94`), and its `hook` wording is additionally
+  carried by `.gemini/rules/use-orchestrator.md:1`. Its Phase-1 dedicated channel
+  is the `rules_dir` channel (OQ-3), gated on F-RULESLOC. Needs the user's
   awareness via OQ-2.
 - **R3: residual second (no-op) render per sharer.** The double-write is
   eliminated; a second `log.skip` call remains per sharer (design §4.3). A
@@ -1005,6 +1114,20 @@ shipped guarantee, a public config contract or a provider enablement.
   `orchestrator_hint` is not part of this risk — it is currently unrendered / has
   no consumer (N-01). This repository has no such divergent overrides, so the
   Phase-0 rc1 fix (AC-06) is unaffected.
+- **R8 (F-RULESLOC, Phase 1, HYPOTHESIS): the `per-provider` rules channel for
+  Gemini/Antigravity may be inert.** `config/ai-providers.yaml:95` sets
+  `rules_dir: .gemini/rules`; Antigravity documents workspace rules in
+  `.agents/rules`. If the runtime only loads `.agents/rules`, the gate text for
+  this provider would live in a file that is never read and channel (a) would be
+  a no-op. Mitigation: real-repo verification (which path? which activation?)
+  before enabling channel (a); on a negative result use the fallback (c) (shared
+  `AGENTS.md`, hook-enforced, text = documentation) or correct `rules_dir`
+  separately (not part of this spec). Phase 0 is unaffected.
+- **R9 (R-CHANNEL, Phase 1, HYPOTHESIS): the rules render may lack Always-On
+  activation metadata.** Even if the location is correct, the generated rule may
+  not be activated as intended, so the dedicated channel would not carry the
+  tier. Mitigation: the same real-repo test; rendering the activation metadata is
+  a Phase-1 task. Phase 0 is unaffected.
 
 ---
 

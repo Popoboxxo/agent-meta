@@ -2,7 +2,7 @@
 spec-id: SPEC-CONTEXT-FILE-MODES-2026-09-13
 title: Context-File Modes — System Design
 status: Entwurf
-revision: 1
+revision: 2
 source-design: docs/specs/2026-09-13-opencode-runtime-gate-system-design.md
 related:
   - scripts/lib/context.py
@@ -41,6 +41,7 @@ related:
 | Datum | Autor | Änderung |
 |---|---|---|
 | 2026-09-14 | concept-architect | Erstfassung. Zwei Modi (`unified` default / `per-provider`), Weakest-Tier-Regel für geteilte Kontextdateien, Fix des AGENTS.md-Doppelschreib-Defekts (Phase 0), Adapter-Topologie (Phase 1/2). |
+| 2026-09-14 | concept-architect | **Revision 2 (User-Korrektur, autoritativ).** (1) **Gemini und Antigravity sind EIN Provider** (`config/ai-providers.yaml:89-162`); das bisherige „Gemini-Dual-Leser"-Konstrukt (altes OQ-3, A6) war falsch und ist entfernt. (2) OQ-3 durch eine **Re-Derivation des dedizierten Tier-Kanals** ersetzt (Rules-Kanal vs. `context.fileName` vs. geteilter `AGENTS.md` + Hook) — Empfehlung Rules-Kanal (`DECISION-7`, §5.1.1). (3) Provider-Matrix gegen `config/ai-providers.yaml` re-verifiziert, Gemini/Antigravity-Zeile zusammengeführt. (4) **FINDING F-RULESLOC:** `rules_dir: .gemini/rules` (`config/ai-providers.yaml:95`) weicht von der dokumentierten Antigravity-Workspace-Rules-Lokation `.agents/rules` ab; nur dokumentiert, **keine Config-Änderung**. |
 
 ---
 
@@ -52,6 +53,16 @@ related:
 `config/provider-capabilities.yaml:75`) und Gemini/Antigravity (`runtime_gate: hook`,
 `:94`). Beide sind im Projekt aktiv (`.meta-config/project.yaml:6-9` → `Claude`,
 `Opencode`, `Gemini`; `Claude` rendert `CLAUDE.md`, nicht `AGENTS.md`).
+
+> **Scope-Korrektur (Revision 2, autoritativ):** „Gemini" und „Antigravity" sind
+> in diesem Repo **derselbe Provider** — der eine Registry-Eintrag `Gemini`
+> (`config/ai-providers.yaml:89-162`) *ist* der Antigravity-Agent-Runtime. Es gibt
+> **keinen** zweiten Leser und **kein** „Dual-Leser"-Problem. Alle Aussagen in
+> diesem Dokument über „Gemini/Antigravity" meinen genau diesen einen Provider.
+> Diese Korrektur betrifft nur den `per-provider`-Kanal (§5) und die
+> Provider-Matrix (§5.1); der Phase-0-`unified`-Fix (§4) und sein Defekt sind
+> davon **nicht** betroffen (sie beruhen auf der Zwei-Sharer-Kollision
+> Opencode ∩ Gemini, die auch bei einem einzigen Gemini-Provider identisch ist).
 
 Pro Sync-Lauf wird `AGENTS.md` **zweimal** geschrieben:
 
@@ -112,8 +123,10 @@ verschiedene Tiers haben, ist „byte-identisch für beide" **unmöglich**:
 
 - Eine Datei, ein Render → der geteilte Block muss auf den schwächsten Sharer
   abgeschwächt werden.
-- Volle Tier-Ehrlichkeit pro Provider → echte Dateitrennung (Adapter), was
-  Provider erfordert, die zusätzlich zur Kerndatei eine eigene Datei lesen.
+- Volle Tier-Ehrlichkeit pro Provider → echte Kanaltrennung, was Provider
+  erfordert, die zusätzlich zur Kerndatei einen **eigenen nativen Kanal** lesen:
+  eine Adapter-Datei (z. B. `CLAUDE.md`) oder einen provider-eigenen Rules-Kanal
+  (`has_rules: true`, `rules_dir`, z. B. Gemini/Antigravity, §5.1.1).
 
 Dieses Design löst beides: `unified` (default) stellt Determinismus her, indem
 der geteilte Render den **schwächsten** Sharer abbildet; `per-provider` stellt die
@@ -129,9 +142,10 @@ Tier-Ehrlichkeit datengetrieben über echte Dateitrennung wieder her.
    `context.mode` (Enum `unified` | `per-provider`).
 2. `unified`: **ein** deterministischer Render pro geteilter Kontextdatei, Tier =
    schwächster Sharer; `sync.py --check` konvergiert auf rc 0.
-3. `per-provider`: kanonischer Kern in `AGENTS.md` + provider-native
-   Adapter-Dateien, die den Kern referenzieren/importieren und **ihren eigenen**
-   Gate-Tier tragen.
+3. `per-provider`: kanonischer Kern in `AGENTS.md` + **provider-native
+   dedizierte Kanäle**, die den Kern referenzieren/importieren und **ihren
+   eigenen** Gate-Tier tragen — entweder eine Adapter-Datei (Import/Pointer) oder
+   ein provider-eigener Rules-Kanal (`has_rules`/`rules_dir`, §5.1.1).
 4. Provider-Agnostik: ausschließlich Config-Keys/Capability-Flags, niemals
    `if provider == "…"`.
 
@@ -140,7 +154,7 @@ Tier-Ehrlichkeit datengetrieben über echte Dateitrennung wieder her.
 - Kein zweiter Mechanismus, der auf Self-Identification-Bloecken („if you are
   X") beruht. Forschung (NeurIPS 2024 SAD-Benchmark) zeigt, dass
   Self-Identification-Instruktionsselektion unzuverlässig ist; `per-provider`
-  löst das Problem ausschließlich über **echte Dateitrennung**.
+  löst das Problem ausschließlich über **echte Kanal-/Dateitrennung**.
 - Keine Security Boundary. Alle Guards bleiben **Convention boundary**
   (Terminologie: `.claude/rules/branch-guard.md#guard-terminologie-convention-boundary-vs-security-boundary`).
 - Kein Umbau des Runtime-Gate-Kernresolvers `provider_runtime_gate_tier`
@@ -169,10 +183,10 @@ Change** im Sinne der Commit-Konventionen.
 
 ### 3.1 Enum und Semantik
 
-| Wert | Semantik | Dateien pro Provider-Gruppe |
+| Wert | Semantik | Artefakte pro Provider-Gruppe |
 |---|---|---|
 | `unified` (default) | Ein geteilter Kontextfile pro Provider-Gruppe; effektiver Tier = **schwächster Sharer**; genau ein deterministischer Render. | bestehende Dateien, unverändert |
-| `per-provider` | Kanonischer Kern (`context.core_file`, default `AGENTS.md`) + provider-native Adapter-Dateien, die den Kern referenzieren und **ihren eigenen** Tier tragen. | Kern + 0..n Adapter |
+| `per-provider` | Kanonischer Kern (`context.core_file`, default `AGENTS.md`) + provider-native **dedizierte Tier-Kanäle** (Adapter-Datei oder eigener Rules-Kanal), die den Kern referenzieren und **ihren eigenen** Tier tragen. | Kern + 0..n Adapter-/Rules-Kanäle |
 
 ### 3.2 Präzedenz (deterministisch, fail-safe)
 
@@ -404,34 +418,106 @@ AGENTS.md                    <- kanonischer KERN (provider-neutral, genau 1 Rend
   ├─ Regel-Inhalte (embedded) OHNE provider-spezifische Gate-Behauptung
   └─ neutrale Gate-Direktive (kein Runtime-Tier-Satz)
 
-Provider-Adapter (nur adapter-fähige Provider):
-  CLAUDE.md        -> @AGENTS.md               + Tier hook      (eigener Managed Block)
-  GEMINI.md        -> @AGENTS.md               + Tier hook
-  <codex adapter>  -> fallback/override        + Tier advisory  (HYPOTHESIS, s. §5.4)
-  .github/copilot-instructions.md / COPILOT.md -> pointer       + Tier advisory
-  .continue/rules/project-context.md           -> pointer       + Tier advisory
-  MAMMOUTH.md                                  -> pointer       + Tier advisory
+Dedizierte Tier-Kanäle (nur kanal-fähige Provider):
+  Claude        CLAUDE.md                          -> @AGENTS.md               + Tier hook      (Adapter, eigener Managed Block)
+  Gemini        rules_dir (.gemini/rules)          -> Always-On-Regel          + Tier hook      (Rules-Kanal, §5.1.1; HYPOTHESIS Lokation, F-RULESLOC)
+  Codex         ggf. AGENTS.override.md            -> fallback/override        + Tier advisory  (HYPOTHESIS, §5.4)
+  Copilot       .github/copilot/COPILOT.md         -> pointer                  + Tier advisory
+  Continue      .continue/rules/project-context.md -> pointer                  + Tier advisory
+  Mammouth      MAMMOUTH.md                        -> pointer                  + Tier advisory
 ```
 
-Provider, die **auf `AGENTS.md` bleiben müssen** (kein Adapter möglich):
+Provider, die den Kern **direkt** lesen (kein Adapter möglich):
 
-| Provider | Grund (VERIFIED-RESEARCH) |
+| Provider | Grund (VERIFIED-RESEARCH / `config/ai-providers.yaml`) |
 |---|---|
-| opencode | liest in V2 **nur** `AGENTS.md`; das `instructions`-Array wird in V2 nicht aufgelöst |
-| KimiCode | nur Projekt-`AGENTS.md` (pro Subdir), keine globale Datei |
-| ZCode | Projekt-`AGENTS.md` |
-| Antigravity agent-runtime | lädt `.agents/AGENTS.md` als System-Instruktionen (zusätzlich zu `GEMINI.md`) |
+| opencode | liest in V2 **nur** `AGENTS.md`; das `instructions`-Array wird in V2 nicht aufgelöst (`:167`) |
+| KimiCode | nur Projekt-`AGENTS.md` (pro Subdir), keine globale Datei (`:506`) |
+| ZCode | Projekt-`AGENTS.md` (`:454`) |
 
-Adapter-fähige Provider und ihre Referenz-/Import-Semantik:
+Dedizierter Tier-Kanal, Referenz-/Import-Semantik und Tier (re-verifiziert gegen `config/ai-providers.yaml`):
 
-| Provider | Adapter-Datei | Referenz-/Import-Semantik | Tier | Status |
+| Provider | Dedizierter Kanal | Referenz-/Import-Semantik | Tier | Status |
 |---|---|---|---|---|
-| Claude | `CLAUDE.md` (`context_file`, `ai-providers.yaml:5`; `has_dedicated_context_file: true`, `:7`) | `@AGENTS.md`-Import (Claude Code) oder Symlink | `hook` (`provider-capabilities.yaml:56`) | VERIFIED-RESEARCH (`@`-Import) |
-| Gemini/Antigravity CLI | `GEMINI.md` | `@`-Import + `context.fileName` (string **oder** Liste) in `.gemini/settings.json` | `hook` (`:94`) | VERIFIED-RESEARCH; Dual-Leser-Risiko s. §5.4 |
-| Codex | ggf. `AGENTS.override.md` | `project_doc_fallback_filenames` in `~/.codex/config.toml`; max 1 Datei/Dir, nested merge root→cwd, 32 KiB-Cap | `advisory` (`:203`) | HYPOTHESIS (Präzedenz Override vs. `AGENTS.md`) |
-| Copilot | `.github/copilot-instructions.md` (Repo-weit) bzw. konfigurierter Pfad `ai-providers.yaml:293` | „nearest wins" zwischen `AGENTS.md`/`CLAUDE.md`/`GEMINI.md`; Pointer-Zeile | `advisory` (`:141`) | HYPOTHESIS (Pfad-Abgleich) |
-| Continue | `.continue/rules/project-context.md` (`:231`) | Pointer-Zeile auf `AGENTS.md` (Import-Semantik unverifiziert) | `advisory` (`:119`) | HYPOTHESIS |
+| Claude | `CLAUDE.md` (`context_file`, `:5`; `has_dedicated_context_file: true`, `:7`) | `@AGENTS.md`-Import (Claude Code) oder Symlink | `hook` (`provider-capabilities.yaml:56`) | VERIFIED-RESEARCH (`@`-Import) |
+| Gemini/Antigravity | `rules_dir` = `.gemini/rules` (`:94-95`, `has_rules: true`), als Always-On-Regel | provider-eigener Rules-Kanal; `@file`-Referenzen relativ zur Rule-Datei | `hook` (`:94`) | HYPOTHESIS — §5.1.1 / FINDING F-RULESLOC |
+| Codex | ggf. `AGENTS.override.md` (`context_file: AGENTS.md`, `:400`; `rules_dir: rules`, `:403`) | `project_doc_fallback_filenames` in `~/.codex/config.toml`; max 1 Datei/Dir, nested merge root→cwd, 32 KiB-Cap | `advisory` (`:203`) | HYPOTHESIS (Präzedenz Override vs. `AGENTS.md`) |
+| Copilot | `.github/copilot/COPILOT.md` (`context_file`, `:293`) bzw. Repo-weit `.github/copilot-instructions.md` | „nearest wins"; Pointer-Zeile | `advisory` (`:141`) | HYPOTHESIS (Pfad-Abgleich, OQ-5) |
+| Continue | `.continue/rules/project-context.md` (`context_file`, `:231`; `rules_dir: .continue/rules`, `:234`) | Pointer-Zeile auf `AGENTS.md` (Import-Semantik unverifiziert) | `advisory` (`:119`) | HYPOTHESIS |
 | Mammouth | `MAMMOUTH.md` (`:340`) | Pointer-Zeile auf `AGENTS.md` (Semantik unverifiziert) | `advisory` (`:170`) | HYPOTHESIS |
+
+> **Hinweis zur Tier-Vokabel (Mammouth/Codex):** `config/ai-providers.yaml` setzt
+> für Mammouth (`:344-345`) und Codex (`:404-405`) zwar `has_hooks: true` +
+> `hooks_dir`, aber **kein** `hook_protocol`. `provider_runtime_gate_tier` wertet
+> das als `advisory` (`provider-capabilities.yaml:170,203`); `has_hooks` ist dort
+> nur eine Pfad-Kollisions-Bremse, keine Enforcement-Aussage. Gemini/Antigravity
+> trägt dagegen `hook_protocol: antigravity-hooks-json` (`:97`) und ist deshalb
+> echter `hook`-Tier — der Unterschied ist ausschlaggebend für §5.1.1.
+
+#### 5.1.1 Dedizierter Tier-Kanal für Gemini/Antigravity (Re-Derivation, ersetzt „Dual-Leser"-OQ-3)
+
+**Autoritative Fakten.** Gemini und Antigravity sind **ein** Provider
+(`config/ai-providers.yaml:89-162`). Der Eintrag trägt: `context_file: AGENTS.md`
+(`:92`), `has_rules: true` (`:94`), `rules_dir: .gemini/rules` (`:95`),
+`has_hooks: true` (`:96`), `hook_protocol: antigravity-hooks-json` (`:97`),
+`hooks_dir: .agents/hooks` (`:98`), `hooks_config_file: .agents/hooks.json`
+(`:99`), `settings_file: .gemini/settings.json` (`:117`); Capabilities `rules`,
+`context-embedded-rules`, `hooks` (`:107-113`); `runtime_gate: hook`
+(`provider-capabilities.yaml:94`). Antigravity-Doku (VERIFIED-RESEARCH):
+Workspace-Rules in `.agents/rules` (rückwärtskompatibel `.agent/rules`), globale
+Rules `~/.gemini/GEMINI.md`; Aktivierung Always-On/Glob/Model/Manual; `@file`-
+Referenzen relativ zur Rule-Datei; die Runtime lädt zusätzlich `.agents/AGENTS.md`
+als System-Instruktionen.
+
+**Entscheidender Hebel (User-Korrektur):** Weil dieser Provider `has_hooks` **mit
+verifiziertem `hook_protocol`** hat, wird der Gate zur Laufzeit **nativ
+erzwungen** (`runtime_gate: hook`). Der Prompt-Text ist damit **Dokumentation**,
+nicht die Garantie. Das ändert die Ehrlichkeits-Kalkulation: ein unterclaimender
+Text ist kein Ehrlichkeitsproblem, weil die Durchsetzung nicht am Text hängt.
+
+**Repo-Belege:** `.gemini/rules/` existiert und enthält die generierten Regeln
+inkl. `use-orchestrator.md` mit `# CRITICAL GATE`
+(`.gemini/rules/use-orchestrator.md:1`). `.agents/` enthält **nur** `hooks.json` +
+`hooks/` — **kein** `rules/`. `.gemini/settings.json` hat **keinen**
+`context.fileName`-Key. Der bestehende per-Provider-Seam
+(`sync_pipeline.py:373-375`, `:747-748`, IC-04) injiziert die provider-eigene Tier
+bereits in die Rules-Dateien von `has_rules`-Providern — Gemini/Antigravity trägt
+`hook` damit **heute schon** in diesem Kanal.
+
+**Kandidaten-Bewertung (nicht blind gewählt):**
+
+| # | Kandidat | Vorteile | Nachteile / Risiken | Bewertung |
+|---|---|---|---|---|
+| (a) | eigener `rules_dir`-Kanal (`.gemini/rules`) als Always-On-Regel | Provider-nativ und **bereits vorhanden**; Tier wird vom bestehenden Seam schon injiziert; kein neues File-Topologie-Element; rein `has_rules`/`rules_dir`-getrieben; `@file` relativ zur Rule-Datei | **F-RULESLOC**: `.gemini/rules` weicht von der dokumentierten Antigravity-Lokation `.agents/rules` ab; Always-On-Aktivierungsmetadaten im Render nicht sichtbar (**HYPOTHESIS**) | **EMPFOHLEN — Phase 1**, gated auf F-RULESLOC-Verifikation |
+| (b) | `context.fileName`-konfigurierte dedizierte Kontextdatei (`GEMINI.md`) | echte Kontext-Trennung; explizites Opt-in | benötigt Settings-Write in `.gemini/settings.json` (heute **kein** `context.fileName`); zweite Kontextfläche neben den `.agents/AGENTS.md`-System-Instruktionen → Widerspruchs-/Reihenfolgerisiko; neues File + Lifecycle | **Phase-2-Option**, nicht Phase 1 |
+| (c) | geteilter `AGENTS.md`, Tier nur per Hook erzwungen (Text = Doku) | kein neues Artefakt; Hook-Enforcement ist vom Text unabhängig; bewusst konservativ | Prompt-Text benennt den Tier nicht; bei ungeprüftem Hook-Read wäre die Garantie textlos | **Fallback** für Phase 1, falls F-RULESLOC nicht verifizierbar |
+
+**Empfehlung (DECISION-7, §9.1): Kanal (a), Phase 1.** Begründung: (a) nutzt
+einen bereits existierenden, provider-nativen und bereits tier-injizierten Kanal;
+es entsteht kein neues Artefakt und keine Settings-Mutation. Da der Provider
+Hooks hat, ist (a) kein Ehrlichkeits-, sondern ein Präzisionsgewinn: der Text
+benennt denselben Tier, den der Hook ohnehin erzwingt. (c) bleibt als
+risikoarmer Phase-1-Fallback gültig (der Text ist dann bewusst Dokumentation),
+(b) wird auf Phase 2 verschoben, weil es eine zweite Kontextfläche eröffnet und
+die `.agents/AGENTS.md`-System-Instruktionen nicht ersetzt.
+
+**FINDING F-RULESLOC (dokumentiert, KEINE Config-Änderung in diesem Design):**
+
+| Punkt | Beleg | Befund |
+|---|---|---|
+| Repo-Config nennt `.gemini/rules` | `config/ai-providers.yaml:95` (`rules_dir: .gemini/rules`) | weicht von der Doku-Lokation ab |
+| Repo-Config nutzt `.agents/` für Hooks | `config/ai-providers.yaml:98-99` (`hooks_dir: .agents/hooks`, `hooks_config_file: .agents/hooks.json`) | entspricht der Antigravity-Konvention |
+| Antigravity-Doku: Workspace-Rules | `.agents/rules` (rückwärtskompatibel `.agent/rules`) | Ziel-Lokation der Doku |
+| Repo-Beleg | `.gemini/rules/` existiert (39 Einträge, generiert); `.agents/rules/` existiert **nicht** (`.agents/` = `hooks.json` + `hooks/`) | generierte Rules und Doku-Lokation divergieren |
+
+**Bewertung:** **HYPOTHESIS** — `rules_dir: .gemini/rules` ist möglicherweise
+stale. Falls die Antigravity-Runtime nur `.agents/rules` lädt, wird der
+`.gemini/rules`-Kanal zur Laufzeit nicht gelesen; Kandidat (a) wäre dann
+wirkungslos und der Gate-Text läge in einer nicht geladenen Datei.
+**Empfehlung:** vor Scharfschaltung von (a) real-repo verifizieren (Liest
+Antigravity `.gemini/rules` oder `.agents/rules`? Mit welcher Aktivierung?); bei
+Abweichung `rules_dir` separat auf `.agents/rules` korrigieren (**nicht** Teil
+dieses Designs) oder auf Kandidat (c) ausweichen.
 
 ### 5.2 Kern-Inhalt und Tier-Neutralität
 
@@ -439,23 +525,31 @@ Der Kern trägt **keine** provider-spezifische Gate-Behauptung, weil er von
 mehreren Providern direkt gelesen wird. Die Gate-Direktive selbst bleibt im Kern
 (niemals abschwächen bis „keine Instruktion"), aber der Runtime-Garantiesatz
 wird neutralisiert: der Kern rendert eine `GATE_NEUTRAL`-Variante der Regel
-(`rules/1-generic/use-orchestrator.md`), der Adapter trägt den konkreten
-`{{ENFORCEMENT_TIER}}`-Satz.
+(`rules/1-generic/use-orchestrator.md`), der **dedizierte Tier-Kanal** trägt den
+konkreten `{{ENFORCEMENT_TIER}}`-Satz — beim Adapter (Claude) dessen Managed
+Block, bei Gemini/Antigravity die provider-eigene Rules-Datei (§5.1.1).
 
 - `GATE_NEUTRAL` ist ein **Render-State**, kein Tier
   (`RUNTIME_GATE_TIERS` bleibt `hook|plugin|permission|advisory`).
 - Der neutrale Kern sagt die Direktive (`MAIN CHAT darf nicht selbst editieren.
   ALLES -> orchestrator.`) ohne Runtime-Zusage; der Tier-Hinweis
   (`a2a-delegation-gates.md:50-56`) verweist im Kern auf „mehrere Provider,
-  siehe Adapter".
-- Direkt-Leser (opencode/KimiCode/ZCode/Antigravity runtime) erhalten damit eine
-  ehrliche, konservative (advisory-nahe) Aussage. opencode bleibt beim
+  siehe dedizierter Tier-Kanal".
+- Direkt-Leser ohne dedizierten Kanal (opencode/KimiCode/ZCode) erhalten damit
+  eine ehrliche, konservative (advisory-nahe) Aussage. opencode bleibt beim
   `permission`-Runtime-Enforcement (unverändert, `opencode.json`), die Prompt-
   Aussage überclaimt aber nicht.
+- **Gemini/Antigravity** liest den Kern zwar direkt (`context_file: AGENTS.md`,
+  `:92`), trägt seinen `hook`-Tier aber im eigenen Rules-Kanal (§5.1.1). Der
+  neutrale Kern und die `hook`-Rules-Datei widersprechen sich nicht: der Kern
+  sagt die Direktive, die Rules-Datei benennt den Runtime-Tier.
+- **Kein Dual-Leser:** Der frühere Hinweis auf zwei getrennte Lesepfade
+  (`GEMINI.md`-Adapter vs. Antigravity-`.agents/AGENTS.md`) ist mit Revision 2
+  entfernt; es gibt genau einen Provider und genau einen dedizierten Kanal.
 
 Alternativ verworfen: Kern = Weakest-Tier. Dann wäre der Kern identisch zum
-`unified`-Render und Adapter bräuchten keinen eigenen Tier — widerspricht der
-Auftragsanforderung „per-adapter gate tier".
+`unified`-Render und der dedizierte Kanal bräuchte keinen eigenen Tier —
+widerspricht der Auftragsanforderung „per-adapter gate tier".
 
 ### 5.3 Adapter-Contract (Datei:Symbol)
 
@@ -501,7 +595,7 @@ def context_mode(config: Optional[dict], provider: str) -> str:
 ```yaml
 <Provider>:
   context_adapter: true|false            # Provider kann eine eigene Adapter-Datei lesen
-  context_adapter_file: "<rel-Pfad>"     # z. B. "GEMINI.md"; Claude: bestehendes CLAUDE.md
+  context_adapter_file: "<rel-Pfad>"     # z. B. "CLAUDE.md"; Claude: bestehendes CLAUDE.md
   context_adapter_import: "@{core}"      # provider-native Import-Syntax; "" = Pointer-Zeile
   context_adapter_import_supported: true|false
 ```
@@ -512,6 +606,13 @@ def context_mode(config: Optional[dict], provider: str) -> str:
   `unified` ungenutzt bleiben.
 - Fehlende Keys ⇒ Provider ist Direkt-Leser des Kerns (opencode/KimiCode/ZCode
   benötigen **keine** Keys).
+- **Rules-Kanal als gleichwertiger dedizierter Kanal (Revision 2):** Ein Provider
+  mit `has_rules: true` und `rules_dir` trägt seinen Tier bereits über die
+  bestehende per-Provider-Rules-Injektion (IC-04, `sync_pipeline.py:373-375`,
+  `:747-748`) und braucht dafür **keinen** neuen Key. Gemini/Antigravity nutzt
+  diesen Kanal (§5.1.1); `context_adapter*` bleibt für Provider mit einer echten
+  Kontextdatei (Claude) reserviert. Damit ist die Kanalwahl rein capability-/
+  key-getrieben (`context-adapter` > `has_rules`/`rules_dir` > Direkt-Leser).
 - `context.core_file` default `AGENTS.md`; Provider mit
   `has_dedicated_context_file` (Claude, `:7`) behalten ihre Datei als Adapter.
 
@@ -548,6 +649,20 @@ def sync_context_for_provider(...) -> None:
     heutiger Pfad (unverändert)."""
 ```
 
+**Kanal-Dispatch (Revision 2):** `sync_context_adapters_for_provider` ist nur für
+Provider mit `context-adapter`-Capability/Key zuständig. Für Provider mit
+`has_rules: true` und `rules_dir` (Gemini/Antigravity, §5.1.1) wird **keine**
+Adapter-Datei geschrieben; der dedizierte Tier-Kanal ist die bestehende
+Rules-Datei, die der unveränderte Seam `sync_pipeline.py:373-375`/`:747-748`
+bereits mit der provider-eigenen Tier rendert (IC-04). Die Wahl ist damit rein
+key-/capability-getrieben, ohne Provider-Namen:
+
+```
+context-adapter  -> Adapter-Datei (IC-09)
+sonst has_rules  -> Rules-Kanal (IC-04, kein neuer Code)
+sonst            -> Direkt-Leser des Kerns
+```
+
 ### 5.4 Drift / Managed-Index / Idempotenz
 
 - **Adapter-Managed-Index:** ein eigener Index
@@ -574,7 +689,9 @@ def sync_context_for_provider(...) -> None:
 2. Sync rendert den Kern (`AGENTS.md`) einmalig neutral (ein Write).
 3. Sync legt für jeden adapter-fähigen, aktiven Provider die Adapter-Datei an
    (INIT) und trägt sie in den Adapter-Index ein.
-4. Nicht-adapter-fähige Provider bleiben Direkt-Leser des Kerns.
+4. Nicht-adapter-fähige Provider bleiben Direkt-Leser des Kerns; Provider mit
+   `has_rules`/`rules_dir` (Gemini/Antigravity) tragen ihren Tier unverändert im
+   bestehenden Rules-Kanal (§5.1.1), ohne dass eine Datei angelegt wird.
 5. `--check`: nach dem ersten Lauf `pending == 0`.
 
 **`per-provider` → `unified`** (Rollback):
@@ -717,9 +834,10 @@ flowchart TD
 flowchart TD
   A["sync.py"] --> B["context_mode(config, provider)<br/>IC-05"]
   B -->|per-provider| C["Kern-Render AGENTS.md<br/>GATE_NEUTRAL, 1 Write"]
-  B --> D{"context_adapter?"}
-  D -->|true| E["Adapter-Render<br/>Import/Pointer + eigener Tier<br/>runtime_gate_vars"]
-  D -->|false| F["Direkt-Leser des Kerns<br/>opencode/KimiCode/ZCode/Antigravity"]
+  B --> D{"dedizierter Kanal?"}
+  D -->|"context-adapter"| E["Adapter-Render<br/>Import/Pointer + eigener Tier<br/>runtime_gate_vars"]
+  D -->|"has_rules (rules_dir)"| J["bestehender Rules-Seam<br/>sync_pipeline.py:373-375,747-748<br/>Rules-Datei mit eigenem Tier (IC-04)"]
+  D -->|"sonst"| F["Direkt-Leser des Kerns<br/>opencode/KimiCode/ZCode"]
   E --> G["Managed-Index + context-hashes"]
   C --> H["cleanup_stale_managed_files<br/>bei Rollback/Mode-Wechsel"]
   G --> H
@@ -801,6 +919,31 @@ alternatives:
 consequences:
   leicht: minimaler Eingriff, bestehender Konvergenz-Vertrag wird nur erfuellt.
   schwer: es bleibt ein zweiter (No-op-)Aufruf pro Sharer — kein Write.
+
+DECISION-7
+context:  Welchen dedizierten Kanal nutzt Gemini/Antigravity in per-provider fuer
+          seinen gate tier? (Revision 2: Gemini == Antigravity, EIN Provider;
+          das fruehere Dual-Leser-Modell war falsch.)
+choice:   (a) der provider-eigene rules_dir-Kanal (.gemini/rules) als
+          Always-On-Regel, gespeist vom bestehenden per-Provider-Rules-Seam
+          (sync_pipeline.py:373-375,747-748). Phase 1, gated auf FINDING
+          F-RULESLOC (Verifikation der rules_dir-Lokation).
+alternatives:
+  - (b) context.fileName-dedizierte Kontextdatei (GEMINI.md): benoetigt
+    Settings-Write (heute kein context.fileName) + zweite Kontextflaeche neben
+    den .agents/AGENTS.md-System-Instruktionen -> Widerspruchs-/Reihenfolge-
+    risiko, neues File + Lifecycle. -> PHASE 2.
+  - (c) geteilter AGENTS.md, Tier nur per Hook erzwingen (Text = Dokumentation):
+    tragfaehig/risikoarm (Hook ist vom Text unabhaengig), nutzt aber den
+    vorhandenen Rules-Kanal nicht. -> Phase-1-FALLBACK bei negativem F-RULESLOC.
+  - Dual-Read-Modell (GEMINI.md-Adapter + Antigravity-.agents/AGENTS.md):
+    falsch, Gemini und Antigravity sind ein Provider. VERWORFEN.
+consequences:
+  leicht: kein neues Artefakt, keine Settings-Mutation, Tier-Honesty ueber einen
+          bereits existierenden, bereits tier-injizierten Kanal; Kanalwahl rein
+          key-/capability-getrieben (context-adapter > has_rules > Direkt-Leser).
+  schwer: Kanalwirksamkeit haengt an der unverifizierten rules_dir-Lokation
+          (F-RULESLOC); ohne real-repo-Nachweis greift Fallback (c).
 ```
 
 ### 9.2 Annahmen
@@ -811,20 +954,26 @@ consequences:
   Format-/Template-Fehler.
 - **A2 (VERIFIED):** `--check` wertet jede `log.action` als Drift
   (`cli_commands.py:1209-1217`).
-- **A3 (VERIFIED-RESEARCH):** `AGENTS.md` ist die einzige universelle Datei;
-  opencode liest in V2 nur sie; Claude liest `CLAUDE.md`; Gemini CLI `GEMINI.md`
-  (konfigurierbar); Codex fallback/override mit 32-KiB-Cap; Copilot
-  Repo-weit; KimiCode/ZCode Projekt-`AGENTS.md`; Antigravity Runtime
-  `.agents/AGENTS.md`.
+- **A3 (VERIFIED-REPO):** `AGENTS.md` ist die einzige universelle Datei;
+  opencode liest in V2 nur sie (`ai-providers.yaml:167`); Claude liest als
+  dedizierte Datei `CLAUDE.md` (`:5`); Codex fallback/override mit 32-KiB-Cap
+  (`:400`); Copilot konfiguriert `.github/copilot/COPILOT.md` (`:293`);
+  KimiCode/ZCode Projekt-`AGENTS.md` (`:506`/`:454`). **Gemini und Antigravity
+  sind EIN Provider** (`:89-162`): `context_file: AGENTS.md` (`:92`) plus eigener
+  Rules-Kanal `rules_dir: .gemini/rules` (`:95`) — kein zweiter Leser, kein
+  `AGENTS.md`-System-Instruktions-Dualpfad.
 - **A4 (VERIFIED):** Alle AGENTS.md-Sharer des Repos laufen über
   `_sync_opencode_context` (embedded-rules bzw. shares-with-embedded-rules).
 - **A5 (HYPOTHESIS):** Adapter-Dateien werden von den jeweiligen Providern
   tatsächlich zusätzlich zum Kern geladen (Import/Pointer-Semantik), ohne den
   Kern zu duplizieren oder zu überschreiben.
-- **A6 (HYPOTHESIS):** `GEMINI.md`-Adapter kollidiert nicht schädlich mit dem
-  Antigravity-Runtime-Pfad `.agents/AGENTS.md`.
+- **A6 (HYPOTHESIS, ersetzt Dual-Leser-Annahme):** Die generierten Rules-Dateien
+  unter `.gemini/rules` werden von der Antigravity-Runtime als Always-On-Regeln
+  geladen und aktiviert. **Nicht** verifiziert ist, ob die Runtime `.gemini/rules`
+  oder die dokumentierte Lokation `.agents/rules` liest (FINDING F-RULESLOC,
+  §5.1.1) und ob die Render-Ausgabe die nötigen Aktivierungs-Metadaten trägt.
 - **A7 (HYPOTHESIS):** Die Provider-Ausgaben sind stabil genug, dass ein
-  Adapter-Render deterministisch und idempotent ist.
+  Adapter-/Kanal-Render deterministisch und idempotent ist.
 
 ### 9.3 Explizit HYPOTHESIS (nicht in Phase 0/1 scharf schalten)
 
@@ -832,14 +981,34 @@ consequences:
 - Copilot-Pfad `.github/copilot-instructions.md` vs. konfigurierter
   `ai-providers.yaml:293`-Pfad.
 - Continue-/Mammouth-Import-Semantik (Pointer-Zeile ausreichend?).
-- Gemini-Dual-Leser (CLI-Adapter + Antigravity-Runtime).
+- **Rules-Kanal für Gemini/Antigravity (F-RULESLOC):** Lokation `.gemini/rules`
+  vs. dokumentierte `.agents/rules` und die Always-On-Aktivierung des
+  generierten Rules-Renders (§5.1.1). Ohne Verifikation ist der Kandidat (c)
+  der Phase-1-Fallback.
 - 32-KiB-Cap-Auswirkung auf Adapter + Kern bei Codex.
+
+> **Risiko-Liste (R, Revision 2).** Die bestehende R-Liste aus
+> `docs/specs/2026-09-13-context-file-modes-design.md` (Abschnitt „Offene Fragen
+> + Risiken") bleibt unverändert gültig. Revision 2 ergänzt:
+>
+> | ID | Risiko | Wirkung | Mitigation |
+> |---|---|---|---|
+> | **R-RULESLOC** | `.gemini/rules` ist nicht die von Antigravity gelesene Lokation | Gate-Text für Gemini/Antigravity läge in einer zur Laufzeit nicht geladenen Datei; Kanal (a) wirkungslos | F-RULESLOC real-repo verifizieren; sonst Fallback (c) (Hook erzwingt, Text = Doku) oder separater `rules_dir`-Fix |
+> | **R-CHANNEL** | Rules-Render trägt keine Always-On-Aktivierungsmetadaten | Regel wird nie aktiviert, obwohl die Datei existiert | Verifikation mit demselben Real-Repo-Test; Metadaten-Render als Phase-1-Aufgabe |
+> | **R-DUAL (aufgelöst)** | — | — | Früheres Dual-Leser-Risiko existierte nur aufgrund falscher Provider-Annahme; mit Revision 2 **geschlossen** |
 
 ---
 
 ## 10. Phasen
 
 ### Phase 0 — `unified`-Fix (sofort implementierbar, rc1-Blocker)
+
+> **Von Revision 2 unberührt.** Phase 0 behandelt die Zwei-Sharer-Kollision
+> `weakest(Opencode=permission, Gemini=hook) = permission` in der geteilten
+> `AGENTS.md`. Ob Gemini und Antigravity ein oder zwei Leser sind, ändert weder
+> die Sharer-Menge `{Opencode, Gemini}` noch die Weakest-Rechnung; die
+> Kanal-/Rules-Lokations-Frage (F-RULESLOC) betrifft ausschließlich `per-provider`
+> (§5.1.1). Phase 0 bleibt damit unverändert umsetzbar und blockiert nicht.
 
 **Berührt:**
 
@@ -867,15 +1036,20 @@ UI.
 - `scripts/lib/config.py` (`fill_defaults`, Default `unified`).
 - `scripts/lib/providers.py` (`context_mode`, IC-05; `resolve_context_filename`
   Adapter-Regel, IC-08).
-- `config/ai-providers.yaml` (Adapter-Keys für Claude + Gemini, IC-07).
+- `config/ai-providers.yaml` (Adapter-Keys für **Claude**, IC-07). Gemini/Antigravity
+  benötigt **keine** neuen Keys: sein dedizierter Tier-Kanal ist der bestehende
+  Rules-Kanal (`has_rules`/`rules_dir`, §5.1.1) — vorausgesetzt der F-RULESLOC-
+  Real-Repo-Test bestätigt die Lokation; sonst greift der Phase-1-Fallback (c).
 - `rules/1-generic/use-orchestrator.md` (GATE_NEUTRAL-Render-State),
   `scripts/lib/variables.py` (`conditional_vars`, `:235`),
   `scripts/lib/consistency/placeholders.py` (`_BUILTIN_VARS`, `:84-85`).
 - `scripts/lib/context.py` (Kern-/Adapter-Render, IC-09; `sync_context_for_provider`
   Dispatch-Erweiterung).
-- `tests/` (Mode-Resolver-Präzedenz, Adapter-Render, Idempotenz, Rollback).
+- `tests/` (Mode-Resolver-Präzedenz, Adapter-Render, Idempotenz, Rollback;
+  F-RULESLOC-Real-Repo-Test für den Rules-Kanal).
 
-**Ergebnis:** `per-provider` funktioniert für Claude + Gemini; alle anderen
+**Ergebnis:** `per-provider` funktioniert für Claude (Adapter) und — nach
+bestandenem F-RULESLOC-Test — für Gemini/Antigravity (Rules-Kanal); alle anderen
 bleiben Direkt-Leser des Kerns.
 
 ### Phase 2 — Remaining-Provider + Admin-UI + Consistency
@@ -884,6 +1058,9 @@ bleiben Direkt-Leser des Kerns.
 
 - `config/ai-providers.yaml` (Adapter-Keys für Codex/Copilot/Continue/Mammouth,
   hinter Flags; HYPOTHESIS-Verifikation).
+- **Optional (Kandidat (b), §5.1.1):** Gemini/Antigravity `context.fileName`
+  (dedizierte Kontextdatei via `.gemini/settings.json`) — nur falls eine echte
+  Kontext-Trennung nötig wird; nicht nötig für den Tier-Träger (Rules-Kanal).
 - `scripts/lib/consistency/context_mode.py` (IC-10) + Registrierung in
   `scripts/consistency-check.py:43,202`.
 - `scripts/lib/consistency/context_size.py` (Adapter-Pfade mitzählen).
@@ -922,8 +1099,18 @@ implementiert. Auswirkung dieses Designs:
    (`permission`) liest Gemini/Antigravity in `AGENTS.md` künftig die
    `permission`-/partielle Variante statt `# CRITICAL GATE` (`hook`). Das ist
    beabsichtigt: eine Datei kann nicht zwei ehrliche Garantien tragen. Die
-   `hook`-Ehrlichkeit für Claude (`CLAUDE.md`, dedicated) bleibt unberührt; für
-   Gemini stellt Phase 1 sie über einen `GEMINI.md`-Adapter wieder her.
+   `hook`-Ehrlichkeit für Claude (`CLAUDE.md`, dedicated) bleibt unberührt.
+   **Für Gemini/Antigravity ist der Prompt-Text ohnehin Dokumentation:** der
+   Provider hat `hook_protocol: antigravity-hooks-json` (`ai-providers.yaml:97`)
+   und `runtime_gate: hook` (`provider-capabilities.yaml:94`), d. h. der Gate
+   wird zur Laufzeit nativ erzwungen, unabhängig vom geteilten Text. Zusätzlich
+   trägt `.gemini/rules/use-orchestrator.md` bereits `# CRITICAL GATE`
+   (`.gemini/rules/use-orchestrator.md:1`); Phase 1 formalisiert diesen
+   Rules-Kanal als dedizierten Tier-Träger (§5.1.1), gated auf F-RULESLOC.
+   *Hinweis:* Da der Rules-Kanal auch in `unified` unverändert gerendert wird
+   (IC-04), geht der `hook`-Wortlaut für Gemini/Antigravity selbst in Phase 0
+   **nicht verloren** — vorausgesetzt, die Runtime liest `.gemini/rules`
+   (F-RULESLOC, HYPOTHESIS).
 2. `sync.py --check` wechselt von rc 1 auf rc 0 — das Ziel.
 3. `tests/test_runtime_gate_rendering.py` (F-05, byte-identischer Hook-Wortlaut)
    bleibt gültig, weil er das **Regel-Template** rendert, nicht die geteilte
@@ -946,10 +1133,20 @@ Weakest-Regel ist eine additive Invariante über dessen bereits committeten
    explizit gegensätzlich texten.
 2. **Kern-Inhalt in `per-provider`** — neutral (GATE_NEUTRAL) vs.
    Weakest-Tier. *Empfehlung:* neutral (§5.2, DECISION-4).
-3. **Gemini Dual-Leser** — `GEMINI.md`-Adapter + Antigravity-Runtime liest
-   `.agents/AGENTS.md`. *Empfehlung (HYPOTHESIS):* Gemini-CLI-Adapter nur über
-   `context.fileName`; Antigravity-Runtime behält den Kern; vor Scharfschaltung
-   Real-Repo-Test.
+3. **Dedizierter Tier-Kanal für Gemini/Antigravity (ersetzt Dual-Leser-OQ-3).**
+   Gemini und Antigravity sind **ein** Provider (§5.1.1); das frühere
+   Dual-Leser-Modell war falsch. *Empfehlung (DECISION-7, Phase 1):* Kandidat
+   (a), der provider-eigene Rules-Kanal (`rules_dir`, Always-On-Regel), gespeist
+   vom bestehenden per-Provider-Seam (`sync_pipeline.py:373-375`, `:747-748`) —
+   kein neues Artefakt, keine Settings-Mutation; da der Provider Hooks hat
+   (`hook_protocol: antigravity-hooks-json`, `:97`) ist der Text Dokumentation
+   und die Runtime-Garantie vom Text unabhängig. *Offen (FINDING F-RULESLOC):*
+   liest die Antigravity-Runtime `.gemini/rules` (`ai-providers.yaml:95`) oder
+   die dokumentierte Lokation `.agents/rules`? Trägt der Render die
+   Always-On-Aktivierung? → Real-Repo-Test vor Scharfschaltung; bei negativem
+   Test Phase-1-Fallback (c) (geteilter `AGENTS.md` + Hook-Enforcement).
+   Kandidat (b) (`context.fileName` in `.gemini/settings.json`) ist
+   Phase-2-Option, nicht Phase 1.
 4. **Codex Adapter-Mechanik** — `AGENTS.override.md` vs.
    `project_doc_fallback_filenames`. *Empfehlung:* Phase 1 Codex als
    Direkt-Leser lassen; Adapter erst nach HYPOTHESIS-Verifikation.
