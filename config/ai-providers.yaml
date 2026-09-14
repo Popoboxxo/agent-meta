@@ -32,6 +32,9 @@ providers:
     - model-overrides-flat
     - verbose-sync-log
     - mcp-agent-frontmatter-tools
+    # Deprecated (R-12, SPEC-STALE-ROLE-CLEANUP-2026-09-13): no consumer remains
+    # since the external-skill wrapper union became unconditional (IC-03).
+    # Retained for config compatibility; no code branches on this capability.
     - external-skill-agent-files
     artifact_dir: .claude/artifacts
     checkpoint_dir: .meta-viz

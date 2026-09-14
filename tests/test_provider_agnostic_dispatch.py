@@ -33,6 +33,12 @@ _TOUCHED_MODULES = (
     "context",
     "providers",
     "agent_sync",
+    # Stale-role-cleanup modules (SPEC-STALE-ROLE-CLEANUP-2026-09-13): the
+    # managed-index helper, the backup pruner and the skill-wrapper writer must
+    # stay provider-agnostic too (AC-20).
+    "rule_index",
+    "generated_file_drift",
+    "skills",
     # Repo-containment ("prison mode") modules — provider dispatch goes through
     # repo_containment.provider-overrides keyed by registry name, never a
     # literal `provider == "Name"` branch.
@@ -83,6 +89,42 @@ def test_no_literal_provider_equality_branches_in_touched_modules():
         "Literal provider-name equality branch(es) reintroduced — dispatch via "
         "config/ai-providers.yaml capabilities (provider_has_capability) or the "
         "provider-capabilities.yaml registry instead:\n" + "\n".join(offenders)
+    )
+
+
+def test_cleanup_preview_documented():
+    """AC-20 (SPEC-STALE-ROLE-CLEANUP-2026-09-13, Task 8): the planning-only
+    ``--cleanup-preview`` mode must be documented in the CLI reference together
+    with its rc semantics (0 even for a non-empty stale set, 1 only on
+    internal failure)."""
+    cli_ref = (_REPO_ROOT / "docs" / "api" / "cli-reference.md").read_text(encoding="utf-8")
+    assert "--cleanup-preview" in cli_ref, (
+        "docs/api/cli-reference.md must document the --cleanup-preview flag"
+    )
+    lowered = cli_ref.lower()
+    assert "exit code 0" in lowered, (
+        "docs/api/cli-reference.md must state the rc-0 semantics of "
+        "--cleanup-preview (a non-empty stale set still exits 0)"
+    )
+
+
+def test_admin_cleanup_routes_documented():
+    """AC-20 (SPEC-STALE-ROLE-CLEANUP-2026-09-13, Task 8): both cleanup POST
+    routes and the mandatory confirm/fingerprint handshake must be documented
+    in the Admin-UI reference."""
+    ref = (_REPO_ROOT / "docs" / "api" / "admin-ui-reference.md").read_text(encoding="utf-8")
+    assert "/api/roles/cleanup/preview" in ref, (
+        "docs/api/admin-ui-reference.md must document the preview route"
+    )
+    assert "/api/roles/cleanup/apply" in ref, (
+        "docs/api/admin-ui-reference.md must document the apply route"
+    )
+    lowered = ref.lower()
+    assert "confirm" in lowered, (
+        "docs/api/admin-ui-reference.md must document the confirm requirement"
+    )
+    assert "fingerprint" in lowered, (
+        "docs/api/admin-ui-reference.md must document the fingerprint check"
     )
 
 
