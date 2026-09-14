@@ -234,3 +234,20 @@ def test_commands_capable_provider_without_dir_fails_loudly(tmp_path):
             _REPO_ROOT, tmp_path, {}, log, dry_run=True,
             provider="Opencode", provider_config={"Opencode": {}},
         )
+
+
+def test_context_adapter_dispatch_is_key_driven_without_provider_literals():
+    """AC-12: the adapter filename dispatch is driven purely by the
+    ``context_adapter`` keys, never by a provider-name branch."""
+    from lib.providers import resolve_context_filename
+
+    adapter_pc = {"context_adapter": True, "context_adapter_file": "ADAPTER.md"}
+    assert (
+        resolve_context_filename("AGENTS.md", "SomeFutureProvider", adapter_pc)
+        == "ADAPTER.md"
+    )
+    direct_pc = {"context_file": "AGENTS.md"}
+    assert (
+        resolve_context_filename("AGENTS.md", "SomeFutureProvider", direct_pc)
+        == "AGENTS.md"
+    )

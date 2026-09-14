@@ -42,3 +42,21 @@ def test_agents_md_providers_passthrough_codex_zcode_kimicode():
 
 def test_empty_and_none_like_values_pass_through():
     assert resolve_context_filename("", "Opencode") == ""
+
+
+def test_adapter_flag_returns_adapter_file():
+    """IC-08: an adapter-capable provider resolves to its native adapter file."""
+    pc = {"context_adapter": True, "context_adapter_file": "CLAUDE.md"}
+    assert resolve_context_filename("AGENTS.md", "Claude", pc) == "CLAUDE.md"
+
+
+def test_adapter_flag_empty_file_falls_back_to_existing_resolution():
+    """IC-08: a missing/blank adapter file falls back to the existing rule."""
+    pc = {"context_adapter": True, "context_adapter_file": ""}
+    assert resolve_context_filename("CLAUDE.md", "Opencode", pc) == "AGENTS.md"
+    pc = {
+        "context_adapter": True,
+        "context_adapter_file": "   ",
+        "has_dedicated_context_file": True,
+    }
+    assert resolve_context_filename("CLAUDE.md", "Claude", pc) == "CLAUDE.md"

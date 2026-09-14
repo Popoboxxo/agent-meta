@@ -22,6 +22,7 @@ from lib.config import load_config
 from lib.context import _build_managed_block
 from lib.log import SyncLog
 from lib.providers import (
+    context_topology,
     load_provider_capabilities,
     load_providers_config,
     provider_runtime_gate_tier,
@@ -591,3 +592,67 @@ def test_single_agents_md_managed_block_write_per_sync_run(tmp_path, loaded_conf
             f"{provider}: dry-run reports AGENTS.md as changed after convergence"
         )
 
+
+# --- IC-05: context_file.topology resolver (AC-10) ---
+
+
+def test_context_topology_provider_override_wins():
+    """AC-10: provider override > project value."""
+    config = {
+        "context_file": {
+            "topology": "per-provider",
+            "provider-overrides": {"Gemini": {"topology": "unified"}},
+        }
+    }
+    assert context_topology(config, "Gemini") == "unified"
+    assert context_topology(config, "Opencode") == "per-provider"
+
+
+def test_context_topology_default_when_absent():
+    """AC-10: missing key resolves to the safe-side default 'unified'."""
+    assert context_topology({}, "Claude") == "unified"
+    assert context_topology({"context_file": {}}, "Claude") == "unified"
+
+
+def test_context_topology_out_of_enum_falls_back():
+    """AC-10: an invalid value never leaks through."""
+    assert context_topology(
+        {"context_file": {"topology": "garbage"}}, "Claude"
+    ) == "unified"
+    # An invalid provider override must not mask a valid project value.
+    config = {
+        "context_file": {
+            "topology": "per-provider",
+            "provider-overrides": {"Gemini": {"topology": "garbage"}},
+        }
+    }
+    assert context_topology(config, "Gemini") == "per-provider"
+
+
+def test_context_topology_non_mapping_config_never_raises():
+    """AC-10: malformed inputs degrade to 'unified' without raising."""
+    assert context_topology(None, "Claude") == "unified"
+    assert context_topology("not-a-mapping", "Claude") == "unified"
+    assert context_topology({"context_file": "not-a-mapping"}, "Claude") == "unified"
+    assert context_topology(
+        {"context_file": {"provider-overrides": "x"}}, "Claude"
+    ) == "unified"
+    assert context_topology(
+        {"context_file": {"provider-overrides": {"Gemini": "x"}}}, "Gemini"
+    ) == "unified"
+    assert context_topology(
+        {"context_file": {"topology": "per-provider", "provider-overrides": None}},
+        "Claude",
+    ) == "per-provider"
+
+
+def test_context_topology_provider_none_uses_project_value():
+    """AC-10: provider=None consults only the project-level value."""
+    config = {
+        "context_file": {
+            "topology": "per-provider",
+            "provider-overrides": {"Gemini": {"topology": "unified"}},
+        }
+    }
+    assert context_topology(config) == "per-provider"
+    assert context_topology(config, None) == "per-provider"

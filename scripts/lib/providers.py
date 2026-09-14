@@ -284,10 +284,53 @@ def resolve_context_filename(context_file: str, provider: str, pc: dict | None =
     """
     if pc is None:
         pc = _framework_provider_entry(provider)
+    adapter_file = pc.get("context_adapter_file")
+    if (
+        pc.get("context_adapter") is True
+        and isinstance(adapter_file, str)
+        and adapter_file.strip()
+    ):
+        return adapter_file
     has_dedicated = pc.get("has_dedicated_context_file", False)
     if context_file == "CLAUDE.md" and not has_dedicated:
         return "AGENTS.md"
     return context_file
+
+
+def context_topology(config: Optional[dict], provider: Optional[str] = None) -> str:
+    """Resolve ``context_file.topology`` (topology, not density).
+
+    Precedence (SPEC-CONTEXT-FILE-MODES-2026-09-13, IC-05):
+
+    1. ``context_file.provider-overrides.<provider>.topology``
+    2. ``context_file.topology``
+    3. ``"unified"``
+
+    Fail-safe: a non-mapping config/block, a non-string value or a value
+    outside the enum falls through to the next level and finally to
+    ``"unified"``. Never raises. Pass ``provider=None`` for the project-level
+    value (no provider override is consulted). Fully config-driven — no
+    provider-name literal.
+    """
+    valid = ("unified", "per-provider")
+    cfg = config if isinstance(config, dict) else {}
+    block = cfg.get("context_file")
+    if not isinstance(block, dict):
+        return "unified"
+
+    if isinstance(provider, str):
+        overrides = block.get("provider-overrides")
+        if isinstance(overrides, dict):
+            entry = overrides.get(provider)
+            if isinstance(entry, dict):
+                override = entry.get("topology")
+                if override in valid:
+                    return override
+
+    value = block.get("topology")
+    if value in valid:
+        return value
+    return "unified"
 
 
 # Hook event/payload contracts sync.py knows how to mirror hook scripts for.

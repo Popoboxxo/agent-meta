@@ -5,6 +5,15 @@ providers:
     context_file: CLAUDE.md
     context_template: templates/configs/CLAUDE.project-template.md
     has_dedicated_context_file: true
+    # Context-adapter capability (SPEC-CONTEXT-FILE-MODES-2026-09-13, IC-07):
+    # only used in the `context_file.topology: per-provider` mode. Claude reads
+    # its native CLAUDE.md adapter, which imports the canonical core. Detection
+    # is key-driven — no provider-name branch in scripts/lib/.
+    context_adapter: true
+    context_adapter_file: CLAUDE.md
+    context_adapter_import: "@{core}"
+    context_adapter_import_supported: true
+    context_adapter_settings: false
     has_rules: true
     has_hooks: true
     hook_protocol: claude-code-json

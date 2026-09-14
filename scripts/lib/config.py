@@ -961,6 +961,14 @@ def fill_defaults(
         if dod_block:
             config["dod"] = dod_block
 
+    # context_file.topology (SPEC-CONTEXT-FILE-MODES-2026-09-13, IC-12) is
+    # deliberately NOT materialised into user config. Absence is the canonical
+    # unified state: the JSON-schema `default: "unified"` documents it and
+    # `providers.context_topology()` fails safe to "unified" for a missing key.
+    # Persisting the default would rewrite every existing project.yaml on the
+    # first sync (behaviour change + `--check` rc1 drift), so the safe-side
+    # default stays virtual.
+
     # Q1 (repo-containment migration, spec §9.3): materialize an explicit block
     # once for existing projects so the default-ON behavior change and its
     # opt-out are visible in .meta-config/project.yaml. Idempotent — only when
