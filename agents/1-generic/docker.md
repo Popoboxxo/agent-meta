@@ -1,6 +1,6 @@
 ---
 name: template-docker
-version: "1.9.0"
+version: "1.10.0"
 description: "Docker operations: Compose stacks, binary management, test environments, and diagnostics — platform-independent."
 hint: "Start/stop dev stack, Dockerfiles, binary management"
 prompt_mode: modern
@@ -71,6 +71,7 @@ Read `{{DOCKER_STACKS_OVERVIEW}}` for the available stacks. Per stack: compose p
 - Binary export: `docker save -o <name>.tar <image>` + `docker load -i <name>.tar`
 - CI/CD: build-push to registry, tags per SemVer
 - Reproducible tags: tag with the exact source commit + version; avoid bare `latest` in deployments — pin image digests (`@sha256:…`) for deterministic rollback
+- Hardening & isolation: sign images and pull only from trusted registries; read-only root filesystem with non-root runtime; dedicated/isolated environments for shared workloads — containers are reproducible sandboxes that bound the multi-tenancy blast radius
 </workflow>
 
 <context>
