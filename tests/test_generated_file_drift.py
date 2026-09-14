@@ -428,3 +428,180 @@ def test_backup_is_fail_soft_when_target_is_missing(tmp_path: Path) -> None:
 
     assert backups == []
 
+
+from datetime import datetime, timedelta
+
+from scripts.lib.generated_file_drift import prune_sync_backups
+
+
+def _stamp(days_ago: int) -> str:
+    return (datetime.now() - timedelta(days=days_ago)).strftime("%Y%m%d-%H%M%S")
+
+
+def _write_backup(project_root: Path, rel: str, stamp: str) -> Path:
+    path = project_root / f"{rel}.sync-backup-{stamp}"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("old content", encoding="utf-8")
+    return path
+
+
+def _backup_count(target_dir: Path) -> int:
+    return len([p for p in target_dir.iterdir() if p.is_file() and ".sync-backup-" in p.name])
+
+
+def test_prune_noop_in_dry_run(tmp_path: Path) -> None:
+    """AC-09: in dry_run nothing is pruned and no filesystem mutation occurs."""
+    from scripts.lib.log import SyncLog
+    project_root = tmp_path / "project"
+    target_dir = project_root / ".claude" / "agents"
+    for days in (100, 90, 80, 70, 60, 50):
+        _write_backup(project_root, ".claude/agents/a.md", _stamp(days))
+
+    pruned = prune_sync_backups(
+        target_dir, project_root, SyncLog(), dry_run=True,
+        max_age_days=30, max_per_source=3,
+    )
+
+    assert pruned == []
+    assert _backup_count(target_dir) == 6
+
+
+def test_prune_never_deletes_newest_backup(tmp_path: Path) -> None:
+    """AC-09: the most recent backup of a source is never pruned."""
+    from scripts.lib.log import SyncLog
+    project_root = tmp_path / "project"
+    target_dir = project_root / ".claude" / "agents"
+    for days in (100, 90, 80, 70, 60, 50):
+        _write_backup(project_root, ".claude/agents/a.md", _stamp(days))
+    newest = _write_backup(project_root, ".claude/agents/a.md", _stamp(0))
+
+    pruned = prune_sync_backups(
+        target_dir, project_root, SyncLog(), dry_run=False,
+        max_age_days=30, max_per_source=3,
+    )
+
+    assert newest.exists()
+    assert newest.name not in {Path(p).name for p in pruned}
+    assert pruned  # older, over-threshold backups are still pruned
+
+
+def test_prune_requires_both_thresholds(tmp_path: Path) -> None:
+    """AC-09: prune only when age > max_age_days AND > max_per_source newer exist."""
+    from scripts.lib.log import SyncLog
+    project_root = tmp_path / "project"
+    target_dir = project_root / ".claude" / "agents"
+
+    # (a) Age threshold NOT exceeded: many recent backups survive.
+    for days in (1, 2, 3, 4, 5, 6):
+        _write_backup(project_root, ".claude/agents/recent.md", _stamp(days))
+
+    # (b) Count threshold NOT exceeded: fewer than (> max_per_source) newer backups.
+    _write_backup(project_root, ".claude/agents/few.md", _stamp(100))
+    _write_backup(project_root, ".claude/agents/few.md", _stamp(90))
+
+    # (c) Both thresholds exceeded for the oldest of five old siblings.
+    many_stamps = [_stamp(days) for days in (100, 90, 80, 70, 60)]
+    for stamp in many_stamps:
+        _write_backup(project_root, ".claude/agents/many.md", stamp)
+
+    # (d) Age boundary: exactly 30 days old is not > 30, 31 days is.
+    boundary_stamps = [_stamp(days) for days in (31, 30, 29, 28, 27, 26)]
+    for stamp in boundary_stamps:
+        _write_backup(project_root, ".claude/agents/boundary.md", stamp)
+
+    pruned = prune_sync_backups(
+        target_dir, project_root, SyncLog(), dry_run=False,
+        max_age_days=30, max_per_source=3,
+    )
+
+    pruned_names = {Path(p).name for p in pruned}
+    assert pruned_names == {
+        f"many.md.sync-backup-{many_stamps[0]}",
+        f"boundary.md.sync-backup-{boundary_stamps[0]}",
+    }
+    assert _backup_count(target_dir) == 6 + 2 + 5 + 6 - 2
+
+
+def test_prune_ignores_non_backup_names(tmp_path: Path) -> None:
+    """AC-09: no name other than `*.sync-backup-*` is ever a candidate."""
+    from scripts.lib.log import SyncLog
+    project_root = tmp_path / "project"
+    target_dir = project_root / ".claude" / "agents"
+    _write(project_root, ".claude/agents/a.md", "generated")
+    _write(project_root, ".claude/agents/notes.txt", "notes")
+    _write(project_root, ".claude/agents/config.yaml", "key: value")
+
+    pruned = prune_sync_backups(
+        target_dir, project_root, SyncLog(), dry_run=False,
+        max_age_days=30, max_per_source=3,
+    )
+
+    assert pruned == []
+    assert (target_dir / "a.md").exists()
+    assert (target_dir / "notes.txt").exists()
+    assert (target_dir / "config.yaml").exists()
+
+
+def test_prune_skips_unparsable_timestamp(tmp_path: Path) -> None:
+    """AC-09: a `*.sync-backup-*` name with an unparsable timestamp is never pruned."""
+    from scripts.lib.log import SyncLog
+    project_root = tmp_path / "project"
+    target_dir = project_root / ".claude" / "agents"
+    # Force the count threshold: the unparsable sibling shares the source with
+    # six old, parsable backups.
+    for days in (100, 90, 80, 70, 60, 50):
+        _write_backup(project_root, ".claude/agents/a.md", _stamp(days))
+    unparsable = _write_backup(project_root, ".claude/agents/a.md", "not-a-timestamp")
+    orphan = _write_backup(project_root, ".claude/agents/b.md", "garbage")
+
+    pruned = prune_sync_backups(
+        target_dir, project_root, SyncLog(), dry_run=False,
+        max_age_days=30, max_per_source=3,
+    )
+
+    assert unparsable.exists()
+    assert orphan.exists()
+    assert unparsable.name not in {Path(p).name for p in pruned}
+    assert orphan.name not in {Path(p).name for p in pruned}
+
+
+def test_prune_default_policy_three_and_thirty(tmp_path: Path) -> None:
+    """OQ-2: with max_per_source=3 and max_age_days=30 the newest four survive."""
+    from scripts.lib.log import SyncLog
+    project_root = tmp_path / "project"
+    target_dir = project_root / ".claude" / "agents"
+    stamps = {days: _stamp(days) for days in (100, 90, 80, 70, 60, 50, 1)}
+    for stamp in stamps.values():
+        _write_backup(project_root, ".claude/agents/a.md", stamp)
+
+    pruned = prune_sync_backups(
+        target_dir, project_root, SyncLog(), dry_run=False,
+        max_age_days=30, max_per_source=3,
+    )
+
+    assert {Path(p).name for p in pruned} == {
+        f"a.md.sync-backup-{stamps[100]}",
+        f"a.md.sync-backup-{stamps[90]}",
+        f"a.md.sync-backup-{stamps[80]}",
+    }
+    remaining = {p.name for p in target_dir.iterdir()}
+    assert remaining == {
+        f"a.md.sync-backup-{stamps[70]}",
+        f"a.md.sync-backup-{stamps[60]}",
+        f"a.md.sync-backup-{stamps[50]}",
+        f"a.md.sync-backup-{stamps[1]}",
+    }
+
+
+def test_prune_fail_soft_when_dir_missing(tmp_path: Path) -> None:
+    from scripts.lib.log import SyncLog
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+
+    pruned = prune_sync_backups(
+        project_root / ".claude" / "agents", project_root, SyncLog(), dry_run=False,
+        max_age_days=30, max_per_source=3,
+    )
+
+    assert pruned == []
+
