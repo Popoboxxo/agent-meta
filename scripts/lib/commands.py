@@ -7,6 +7,7 @@ from pathlib import Path
 from .frontmatter import _split_frontmatter
 from .io import SyncError, safe_path, write_checked
 from .log import SyncLog
+from .rule_index import write_managed_index
 
 COMMANDS_DIR = "commands"
 CLAUDE_COMMANDS_DIR = ".claude/commands"
@@ -136,11 +137,13 @@ def sync_commands_for_provider(
     platforms = config.get("platforms", [])
     sources = collect_command_sources(agent_meta_root, platforms)
 
-    if not sources:
-        return
-
     commands_dir_rel = pc.get("commands_dir")
     if not commands_dir_rel:
+        # No target directory to manage: keep the previous silent no-op when
+        # there is nothing to write at all; only a provider that declares
+        # commands support *and* has commands to write fails loudly.
+        if not sources:
+            return
         raise SyncError(
             f"Provider '{provider}' declares commands support "
             "(config/provider-capabilities.yaml: commands: true) but has no "
@@ -204,8 +207,10 @@ def sync_commands_for_provider(
             if not dry_run:
                 stale_path.unlink()
 
-    if not dry_run and now_managed:
-        managed_index_path.write_text("\n".join(sorted(now_managed)) + "\n", encoding="utf-8")
+    # OQ-4/IC-08: write the managed index unconditionally (including the empty
+    # set) so a removed command can no longer strand a stale index entry.
+    # write_managed_index() is a no-op only for dry_run.
+    write_managed_index(managed_index_path, now_managed, dry_run)
 
 
 def create_command(

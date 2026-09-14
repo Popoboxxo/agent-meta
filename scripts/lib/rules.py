@@ -7,6 +7,7 @@ from pathlib import Path
 from .frontmatter import _split_frontmatter
 from .io import _load_yaml_or_json, safe_path, write_checked
 from .log import SyncLog
+from .rule_index import write_managed_index
 from .registry_query import (
     build_mcp_guardrails_list,
     load_mcp_registry,
@@ -518,8 +519,10 @@ def sync_rules(
             skills_target_dir, now_managed_skill_rules, dry_run, universe=all_rule_stems
         )
 
-    if not dry_run and now_managed:
-        managed_index_path.write_text("\n".join(sorted(now_managed)) + "\n", encoding="utf-8")
+    # OQ-4/IC-08: the managed index is written unconditionally after cleanup
+    # (including the empty set), so a removed preset/rule can no longer strand
+    # a stale index entry. write_managed_index() is a no-op only for dry_run.
+    write_managed_index(managed_index_path, now_managed, dry_run)
 
 
 def sync_speech_mode(

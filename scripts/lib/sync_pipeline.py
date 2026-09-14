@@ -65,6 +65,7 @@ from lib.generated_file_drift import (
     backup_drifted_files,
     capture_generated_file_hashes,
     is_drift_detection_enabled,
+    prune_sync_backups,
     scan_generated_file_drift,
 )
 from lib.gitignore import (
@@ -302,6 +303,10 @@ def _sync_stage_claude_base(
             sync_claude_md_static(agent_meta_root, project_root, config, variables, log, args.dry_run)
         else:
             log.note("CLAUDE.md", "context_file.auto_generate: false — static header left untouched")
+            log.warning(
+                "context_file.auto_generate: false (S1) — static context "
+                "header left untouched; managed block not refreshed"
+            )
         init_claude_personal(agent_meta_root, project_root, log, args.dry_run)
     init_settings_json(agent_meta_root, project_root, log, args.dry_run,
                        providers=providers, provider_config=provider_config,
@@ -338,6 +343,7 @@ def _sync_stage_contexts(
         log.provider_header(provider)
         if not is_provider_active(config, provider):
             log.note("deactivation", f"provider '{provider}' is deactivated — skipping all output")
+            log.warning(_deactivated_provider_warning(provider))
             continue
         # Per-provider orchestrator.mode override: orchestrator.provider-overrides.<Provider>.mode
         # takes precedence over the global orchestrator.mode for this provider's
@@ -355,6 +361,10 @@ def _sync_stage_contexts(
         if not _context_auto_generate(config):
             log.note("context_file", "auto_generate: false — context files left untouched "
                                      "(dev-written mode, issue #540 Fix 3)")
+            log.warning(
+                f"context_file.auto_generate: false (S1) — provider '{provider}': "
+                "context files left untouched; managed block not refreshed"
+            )
             continue
         sync_context_for_provider(agent_meta_root, project_root, config, provider_variables,
                                   log, args.dry_run, provider, provider_config)
@@ -477,6 +487,81 @@ def _sync_stage_legacy_cleanup(
                     log.debug("provider-cleanup", f"could not prune '{prov_dir}': {type(e).__name__}: {e}")  # noqa: PLE1205
 
 
+# OQ-2 (frozen): bounded backup retention. Both thresholds must be exceeded;
+# the newest backup of a source is never pruned.
+SYNC_BACKUP_MAX_AGE_DAYS = 30
+SYNC_BACKUP_MAX_PER_SOURCE = 3
+
+
+def _deactivated_provider_warning(provider: str) -> str:
+    """Shared S2 message; identical text dedupes across pipeline stages."""
+    return (
+        f"provider '{provider}' is deactivated (S2) — output skipped; "
+        "managed context/index not refreshed"
+    )
+
+
+def _managed_dirs_for_prune(
+    project_root: Path, config: dict, provider_config: dict,
+) -> list[Path]:
+    """Managed directories per active provider, for backup pruning.
+
+    Mirrors the ``dir_specs`` of ``generated_file_drift._iter_managed_files``
+    (the single source of truth for which directories carry a managed index)
+    so the prune wiring needs no second public API on the drift module. A
+    directory that was fully emptied by cleanup (all roles removed) is still
+    enumerated, which a managed-file-derived listing would miss.
+    """
+    dirs: list[Path] = []
+    seen: set[Path] = set()
+    for provider, pc in provider_config.items():
+        if not is_provider_active(config, provider):
+            continue
+        specs: list[str] = [
+            pc.get("skills_dir", ".claude/skills"),
+            pc.get("agents_dir", ".claude/agents"),
+        ]
+        if pc.get("has_hooks", False):
+            specs.append(pc.get("hooks_dir", ".claude/hooks"))
+        if pc.get("has_rules", False):
+            specs.append(pc.get("rules_dir", ".claude/rules"))
+        if pc.get("has_commands", False):
+            specs.append(pc.get("commands_dir", ".claude/commands"))
+        specs.append(resolve_pipeline_details_dir(pc, provider))
+        for rel in specs:
+            if not rel:
+                continue
+            base = project_root / rel
+            if not base.is_dir():
+                continue
+            candidates = [base]
+            try:
+                candidates += [
+                    child for child in sorted(base.iterdir())
+                    if child.is_dir() and (child / ".agent-meta-managed").exists()
+                ]
+            except OSError:
+                pass
+            for candidate in candidates:
+                if candidate not in seen:
+                    seen.add(candidate)
+                    dirs.append(candidate)
+    return dirs
+
+
+def _prune_managed_sync_backups(
+    project_root: Path, config: dict, provider_config: dict,
+    args: argparse.Namespace, log: SyncLog,
+) -> None:
+    """Bound ``*.sync-backup-*`` growth after the drift stage (AC-09/OQ-2)."""
+    for managed_dir in _managed_dirs_for_prune(project_root, config, provider_config):
+        prune_sync_backups(
+            managed_dir, project_root, log, args.dry_run,
+            max_age_days=SYNC_BACKUP_MAX_AGE_DAYS,
+            max_per_source=SYNC_BACKUP_MAX_PER_SOURCE,
+        )
+
+
 def _sync_stage_generated_file_drift_scan(
     agent_meta_root: Path, project_root: Path, config: dict,
     provider_config: dict, args: argparse.Namespace, log: SyncLog,
@@ -505,6 +590,10 @@ def _sync_stage_generated_file_drift_scan(
             ".meta-config/drift-allowlist.yaml if this edit should be "
             "preserved going forward."
         )
+
+    # AC-09/OQ-2: after the drift stage, bound `*.sync-backup-*` growth per
+    # managed directory (same retention policy for drift and cleanup backups).
+    _prune_managed_sync_backups(project_root, config, provider_config, args, log)
 
 
 def _sync_stage_platform_defaults_snapshot(
@@ -599,6 +688,7 @@ def _sync_stage_per_provider(
     for provider in providers:
         pc = provider_config[provider]
         if not is_provider_active(config, provider):
+            log.warning(_deactivated_provider_warning(provider))
             continue
 
         _orch_config = config.get("orchestrator", {})
