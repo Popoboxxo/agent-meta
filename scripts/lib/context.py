@@ -10,6 +10,11 @@ from .frontmatter import _strip_frontmatter
 from .io import content_hash, is_absent_gitignored_target, load_json_file, safe_path
 from .log import SyncLog
 from .plugins import resolve_plugin_compact
+from .rule_index import (
+    bootstrap_previously_managed,
+    cleanup_stale_managed_files,
+    write_managed_index,
+)
 from .variables import (
     _orch_mode_flags,
     _resolve_orch_mode,
@@ -31,6 +36,17 @@ _MANAGED_BLOCK_RE = re.compile(
     r"<!--\s*agent-meta:managed-begin\s*-->.*?<!--\s*agent-meta:managed-end\s*-->",
     re.DOTALL,
 )
+
+
+def _has_duplicate_managed_block(text: str) -> bool:
+    """Return True when *text* contains more than one managed-begin/end pair.
+
+    ``_update_managed_html_block`` only ever replaces the first match
+    (``count=1``). A second pair therefore stays behind untouched; surfacing it
+    as a duplicate lets the caller warn instead of silently half-updating the
+    file (AC-17 / OQ-6).
+    """
+    return len(_MANAGED_BLOCK_RE.findall(text)) > 1
 
 
 def _context_hashes_path(project_root: Path) -> Path:
@@ -375,6 +391,12 @@ def _update_managed_html_block(
         re.DOTALL,
     )
     rel = str(target_path.relative_to(project_root))
+    if _has_duplicate_managed_block(existing):
+        log.warning(
+            f"{rel}: contains more than one agent-meta managed block — only the "
+            "first block is replaced; remove the duplicate marker pair to keep "
+            "the file consistent."
+        )
     render_vars = variables
     _has_dedicated = (pc or {}).get("has_dedicated_context_file", False)
     if _has_dedicated and "AGENT_HINTS_CLAUDE" in variables:
@@ -1597,6 +1619,12 @@ def only_variables(
             continue
         found_any = True
         content = target_path.read_text(encoding="utf-8")
+        if _MANAGED_BLOCK_RE.search(content):
+            log.warning(
+                f"{context_file}: --only-variables substitutes placeholders only — "
+                "the agent-meta managed block is not re-rendered (S3); run a full "
+                "sync to refresh it."
+            )
         new_content = substitute(content, variables, context_file, log)
 
         if new_content == content:
@@ -1721,23 +1749,25 @@ def sync_prompts_for_continue(
 
     # Stale cleanup
     managed_index = prompts_dir / ".agent-meta-managed"
-    previously_managed: set[str] = set()
-    if managed_index.exists():
-        for line in managed_index.read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                previously_managed.add(line.strip())
+    # IC-08/OQ-9: prompt files carry no agent-meta provenance marker, so the
+    # fail-closed bootstrap (no marker/predicate) adopts nothing when the
+    # index is absent — an unmanaged prompt is never swept by a fail-open
+    # "delete everything unexpected" fallback.
+    previously_managed = bootstrap_previously_managed(
+        prompts_dir, managed_index, "*.md"
+    )
 
-    if prompts_dir.exists():
-        for existing_file in sorted(prompts_dir.glob("*.md")):
-            if existing_file.name not in expected:  # noqa: SIM102
-                if not managed_index.exists() or existing_file.name in previously_managed:
-                    log.action("DELETE", str(existing_file.relative_to(project_root)),
-                               "role removed from config")
-                    if not dry_run:
-                        existing_file.unlink()
+    cleanup_stale_managed_files(
+        prompts_dir,
+        project_root,
+        previously_managed,
+        expected,
+        log,
+        dry_run,
+        "role removed from config",
+    )
 
-    if not dry_run and expected:
-        managed_index.write_text("\n".join(sorted(expected)) + "\n", encoding="utf-8")
+    write_managed_index(managed_index, expected, dry_run)
 
 
 def sync_snippets_for_provider(
