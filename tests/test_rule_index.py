@@ -199,14 +199,14 @@ def test_cleanup_backup_failure_prevents_unlink(project_root, monkeypatch):
     stale.write_text("pre-delete content\n", encoding="utf-8")
     log = _LogRecorder()
 
-    real_write_text = Path.write_text
+    real_write_bytes = Path.write_bytes
 
-    def failing_write_text(self, *args, **kwargs):
+    def failing_write_bytes(self, *args, **kwargs):
         if ".sync-backup-" in self.name:
             raise OSError("backup device full")
-        return real_write_text(self, *args, **kwargs)
+        return real_write_bytes(self, *args, **kwargs)
 
-    monkeypatch.setattr(Path, "write_text", failing_write_text)
+    monkeypatch.setattr(Path, "write_bytes", failing_write_bytes)
 
     backups = ri.cleanup_stale_managed_files(
         target, project_root, {"x.md"}, set(), log,
@@ -217,6 +217,57 @@ def test_cleanup_backup_failure_prevents_unlink(project_root, monkeypatch):
     assert stale.exists()
     assert stale.read_text(encoding="utf-8") == "pre-delete content\n"
     assert any("backup" in warning for warning in log.warnings)
+
+
+def test_cleanup_fail_soft_unlink_continues_with_remaining_files(project_root, monkeypatch):
+    """IC-01/R-01: one undeletable file warns and is left in place; the loop
+    keeps going and still unlinks the remaining stale files (no sync abort)."""
+    target = project_root / "agents"
+    target.mkdir()
+    undeletable = target / "locked.md"
+    undeletable.write_text("locked\n", encoding="utf-8")
+    removable = target / "other.md"
+    removable.write_text("other\n", encoding="utf-8")
+    log = _LogRecorder()
+
+    real_unlink = Path.unlink
+
+    def flaky_unlink(self, *args, **kwargs):
+        if self.name == "locked.md":
+            raise OSError("read-only filesystem")
+        return real_unlink(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", flaky_unlink)
+
+    backups = ri.cleanup_stale_managed_files(
+        target, project_root, {"locked.md", "other.md"}, set(), log,
+        dry_run=False, reason="role removed from config", backup=False,
+    )
+
+    assert backups == []
+    assert undeletable.exists()
+    assert not removable.exists()
+    assert any("could not delete" in warning and "locked.md" in warning
+               for warning in log.warnings)
+    assert [action[1] for action in log.actions] == ["agents/locked.md", "agents/other.md"]
+
+
+def test_cleanup_backup_is_byte_exact_for_crlf(project_root):
+    """R-14: the backup preserves bytes exactly (CRLF line endings survived)."""
+    target = project_root / "agents"
+    target.mkdir()
+    stale = target / "x.md"
+    original_bytes = b"line one\r\nline two\r\n\xc3\xa4\r\n"
+    stale.write_bytes(original_bytes)
+    log = _LogRecorder()
+
+    backups = ri.cleanup_stale_managed_files(
+        target, project_root, {"x.md"}, set(), log,
+        dry_run=False, reason="role removed from config", backup=True,
+    )
+
+    assert len(backups) == 1
+    assert (project_root / backups[0]).read_bytes() == original_bytes
 
 
 def test_cleanup_returns_backup_paths(project_root):

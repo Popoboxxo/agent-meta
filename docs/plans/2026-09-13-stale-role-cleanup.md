@@ -15,8 +15,22 @@ pipeline_stages:
 > exponiert werden (F-10 / AC-24); die Task-Numerik setzt diese Ordnung erzwungen um.
 
 **Goal:** Drei konfligierende Sub-Symptome desselben User-Erlebnisses („Rolle entfernt, Datei bleibt") beheben: (B1) den fail-open-Löschpfad durch ein provenance-basiertes, fail-closed Prädikat ersetzen, den Index immer schreiben, Skill-Wrapper für alle Provider tracken und `*.sync-backup-*` begrenzt prunen; (B3) den Managed-Block-Shrink per Regressionstest beweisen und die sechs Stale-Pfade sichtbar machen, ohne S1/S2-Opt-outs zu übersteuern; (B2) einen expliziten `preview → confirm → apply`-Pfad in der Admin-UI über den bestehenden `SyncExecutor` bereitstellen.
-**Architecture:** Ein policy-freier Shared-Helper (`rule_index.py`, IC-01) besitzt die zwei sicherheitskritischen Semantiken (Provenance-Bootstrap bei fehlendem Index, Empty-Index-Write). `agent_sync.py` stellt einen **reinen** Planner `plan_agent_cleanup` als Single Source of Truth für Vorschau und echtes Cleanup bereit; Löschen ist immer backup-first. Prompt-Index (`context.py`, IC-08) nutzt denselben Helper fail-closed. B3 ist **kein** Shrink-Defekt (die Hypothese ist widerlegt): `_update_managed_html_block` ersetzt den Block bereits wholesale — bewiesen wird nur der Beweis-Gap plus Duplikat-Marker-/Stale-Pfad-Sichtbarkeit. B2 reicht die planende Traversierung als `--cleanup-preview` (seiteneffektfrei) an HTTP-Routen und ein UI-Control weiter.
+**Architecture:** Ein policy-freier Shared-Helper (`rule_index.py`, IC-01) besitzt die zwei sicherheitskritischen Semantiken (Provenance-Bootstrap bei fehlendem Index, Empty-Index-Write). `agent_sync.py` stellt einen **reinen** Planner `plan_agent_cleanup` als Single Source of Truth für Vorschau und echtes Cleanup bereit; das Löschen von Agent-Dateien ist immer backup-first (R-07-scoping). Prompt-Index (`context.py`, IC-08) nutzt denselben Helper fail-closed. B3 ist **kein** Shrink-Defekt (die Hypothese ist widerlegt): `_update_managed_html_block` ersetzt den Block bereits wholesale — bewiesen wird nur der Beweis-Gap plus Duplikat-Marker-/Stale-Pfad-Sichtbarkeit. B2 reicht die planende Traversierung als `--cleanup-preview` (seiteneffektfrei) an HTTP-Routen und ein UI-Control weiter.
 **Tech Stack:** Python 3.9 (Stdlib only, `from __future__ import annotations`, `typing.Optional`/`List`; keine PEP-604-Union in neuen Modulen), pytest, Bash/DOM-Assertions über Textmuster, JavaScript inline (`docs/ui/admin-ui.html`), Markdown/YAML/JSON.
+
+### Revision
+
+> Code-Review-Nachträge (2026-09-14) zum B1+B3-Block. Keine freigegebenen ACs geändert.
+
+| Rev | Datum | Änderung |
+|---|---|---|
+| 0.2 | 2026-09-14 | R-03: `_agent_has_provenance` auf Primärmarker beschränkt (`based-on:` kein No-Index-Bootstrap-Signal); IC-02 entsprechend korrigiert. |
+| 0.2 | 2026-09-14 | R-04: `commands.py` Zero-Source-Widening als beabsichtigt dokumentiert (OQ-4) und per Regressionstest abgesichert. |
+| 0.2 | 2026-09-14 | R-05: `pipelines.py` Fail-Closed bei fehlendem Index dokumentiert + Index-Absent-Test ergänzt. |
+| 0.2 | 2026-09-14 | R-07: Backup-first global auf Agent-Dateien beschränkt; Prompt-Index bewusst `backup=False` (`prompts_dir` nicht im Pruner-Set). |
+| 0.2 | 2026-09-14 | R-08: OQ-6-Sichtbarkeit = `log.warning` im Sync-Report; kein statisches `consistency/`-Finding für eine Laufzeitbedingung. |
+| 0.2 | 2026-09-14 | R-13: Symbolname `sync_prompts_for_provider` → `sync_prompts_for_continue` (echtes `context.py`-Symbol) in Spec und Plan korrigiert. |
+| 0.2 | 2026-09-14 | Code-Fixes B1+B3 (keine Doc-Semantik): R-01 fail-soft Unlink, R-02 Pruner unbedingt, R-06 `rules.py`/`commands.py` über IC-01-Helper, R-10 geteilter `_relative_posix`, R-14 byte-exakter Backup. |
 
 ## Global Constraints
 
@@ -31,7 +45,7 @@ pipeline_stages:
 - **OQ-7 (freeze):** Stale-Pfad-Sichtbarkeit = **nur Warnungen**; `context_file.auto_generate: false` (S1) und Provider-Deaktivierung (S2) werden **nie** übersteuert; **kein** `--force-context`-Escape-Hatch.
 - **OQ-8 (freeze, user override):** In der UI ist ein Backup **vor** `apply` **verpflichtend**; das optionale Default wird zugunsten dieser User-Entscheidung verworfen.
 - **OQ-9 (freeze):** Kein Prompt-Provenance-Marker in dieser Änderung; die fail-closed Migration des Prompt-Index (IC-08) ist **unbedingt**.
-- **Backup-first / Rollback:** Jeder Cleanup-Delete schreibt zuerst ein `<name>.sync-backup-<YYYYmmdd-HHMMSS>`-Sibling; scheitert das Backup, unterbleibt der Unlink. Re-Sync-Recoverability generierter Rollen bleibt erhalten.
+- **Backup-first / Rollback (R-07 scoping):** Jeder **Agent-Datei**-Cleanup-Delete schreibt zuerst ein `<name>.sync-backup-<YYYYmmdd-HHMMSS>`-Sibling; scheitert das Backup, unterbleibt der Unlink. Nur `agent_sync._cleanup_stale_agents` ruft `cleanup_stale_managed_files(backup=True)` auf. Der Prompt-Index (`context.py`, IC-08) nutzt `backup=False`, weil `prompts_dir` **nicht** in `_managed_dirs_for_prune` liegt — Backup-first dort würde unbegrenzt wachsen. `rules.py`/`commands.py`/`pipelines.py`/`mcp.py`/`external_tools.py` behalten `backup=False` (Verhalten unverändert). Re-Sync-Recoverability generierter Rollen bleibt erhalten.
 - **Single Source of Truth:** `plan_agent_cleanup` ist rein und speist Vorschau **und** echtes Cleanup; die Vorschau ist seiteneffektfrei (kein Index-Write, kein Unlink, kein Backup, kein Clone/Submodule).
 - **Ownership-Disjunktheit:** Keine Datei wird von zwei Tasks angelegt/geändert; `context.py` und `sync_pipeline.py` liegen bewusst in je genau einer Task (siehe Task 4/5).
 - **Py3.9 & Stdlib:** neue/geänderte Module `from __future__ import annotations`, keine externen Abhängigkeiten; `scripts/consistency-check.py` muss rc 0 liefern.
@@ -61,7 +75,7 @@ Neue und geänderte Symbole als `file:Symbol`; Signaturen sind Contracts, keine 
 | `scripts/lib/rules.py` / `commands.py` | geändert | Index unbedingt schreiben (OQ-4). |
 | `scripts/lib/context.py:_has_duplicate_managed_block` | neu | `(text: str) -> bool`; zählt Marker-Paare nahe `_MANAGED_BLOCK_RE`. |
 | `scripts/lib/context.py:_update_managed_html_block` | geändert | Shrink-Replacement (`count=1`) unverändert; bei Duplikat `log.warning` + Konsistenz-Finding. |
-| `scripts/lib/context.py:sync_prompts_for_provider` | geändert | IC-01 fail-closed Bootstrap (adopt nothing bei fehlendem Index) + `write_managed_index` unbedingt. |
+| `scripts/lib/context.py:sync_prompts_for_continue` | geändert | IC-01 fail-closed Bootstrap (adopt nothing bei fehlendem Index) + `write_managed_index` unbedingt. |
 | `scripts/lib/skills.py:ensure_skill_repo` / `deinit_skill_repo` | geändert | Callsite auf `not dry_run` gaten (F-04). |
 | `scripts/sync.py:_handle_cleanup_preview` + `--cleanup-preview` | neu | planning-only; genau ein JSON-Objekt auf stdout; rc 0. |
 | `scripts/admin-server.py:SyncExecutor.cleanup_preview` | neu | `() -> dict`; subprocess `--cleanup-preview`, JSON geparst. |
@@ -213,7 +227,7 @@ Neue und geänderte Symbole als `file:Symbol`; Signaturen sind Contracts, keine 
 - Test: `tests/test_context_managed_block_shrink.py`, `tests/test_context_prompt_index.py`
 
 **Interfaces:** (Produces / Consumes)
-- Produces: `sync_prompts_for_provider` IC-01-basiert (fail-closed Bootstrap „adopt nothing", unbedingter Index-Write); `_has_duplicate_managed_block`; `_update_managed_html_block` unverändert im Shrink + Duplikat-Warnung; S3-Warnung bei `--only-variables`.
+- Produces: `sync_prompts_for_continue` IC-01-basiert (fail-closed Bootstrap „adopt nothing", unbedingter Index-Write); `_has_duplicate_managed_block`; `_update_managed_html_block` unverändert im Shrink + Duplikat-Warnung; S3-Warnung bei `--only-variables`.
 - Consumes: IC-01-Helper (Task 1); bestehende `_MANAGED_BLOCK_RE` (`:30–33`), Regex `:372–376`, Replacement `:436`, `_regenerate_static_context` (`:186–276`), `only_variables` (`:1578–1607`).
 
 **Agent:** developer
@@ -221,7 +235,7 @@ Neue und geänderte Symbole als `file:Symbol`; Signaturen sind Contracts, keine 
 
 **Steps:**
 - [ ] Step 1: Test schreiben (fail) — `tests/test_context_managed_block_shrink.py::test_managed_block_shrinks_when_role_hint_removed` (AC-16: `A` verschwindet, `B` erscheint, Fremdinhalt byte-identisch), `::test_duplicate_marker_keeps_second_block_and_warns` (AC-17: nur erster Block ersetzt, Datei parsebar, `log.warning`/Finding), `::test_only_variables_warns_managed_block_not_refreshed` (AC-18/S3). `tests/test_context_prompt_index.py::test_absent_prompt_index_adopts_nothing` (AC-23: `orphan.md` überlebt, Index wird geschrieben), `::test_empty_expected_writes_zero_byte_index` (AC-23), `::test_present_prompt_index_deletes_stale_and_rewrites` (AC-23), `::test_prompt_fail_open_clause_gone` (AC-24 context-Klausel).
-- [ ] Step 2: Implementieren — `sync_prompts_for_provider` (`:1723–1740`) auf IC-01 umstellen: `bootstrap_previously_managed` mit fail-closed Predicate (kein Adoption bei fehlendem Index), `cleanup_stale_managed_files`, `write_managed_index` unbedingt; keine Reconciliation (Prompt-Dateien tragen keinen Marker, OQ-9). `_has_duplicate_managed_block` nahe `_MANAGED_BLOCK_RE`; `_update_managed_html_block` bei Duplikat `log.warning` + Konsistenz-Finding, Replacement bei `count=1` unverändert lassen. `--only-variables`-Pfad um sichtbare Warnung ergänzen, ohne den Managed Block zu re-rendern. Das `:436`-Replacement und `_regenerate_static_context` dürfen **nicht** verändert werden (Review-Reject, siehe Spec „Corrected hypothesis").
+- [ ] Step 2: Implementieren — `sync_prompts_for_continue` (`:1723–1740`) auf IC-01 umstellen: `bootstrap_previously_managed` mit fail-closed Predicate (kein Adoption bei fehlendem Index), `cleanup_stale_managed_files`, `write_managed_index` unbedingt; keine Reconciliation (Prompt-Dateien tragen keinen Marker, OQ-9). `_has_duplicate_managed_block` nahe `_MANAGED_BLOCK_RE`; `_update_managed_html_block` bei Duplikat `log.warning` + Konsistenz-Finding, Replacement bei `count=1` unverändert lassen. `--only-variables`-Pfad um sichtbare Warnung ergänzen, ohne den Managed Block zu re-rendern. Das `:436`-Replacement und `_regenerate_static_context` dürfen **nicht** verändert werden (Review-Reject, siehe Spec „Corrected hypothesis").
 - [ ] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_context_managed_block_shrink.py tests/test_context_prompt_index.py tests/test_context_agents_md_idempotency.py -q`.
 - [ ] Step 4: Commit — `feat: prove managed-block shrink and migrate prompt index fail-closed`.
 
@@ -344,7 +358,7 @@ Neue und geänderte Symbole als `file:Symbol`; Signaturen sind Contracts, keine 
 
 ## Rollback / Safety-Net
 
-- **Backup-first:** Jeder Cleanup-Delete schreibt `<name>.sync-backup-<YYYYmmdd-HHMMSS>` mit dem Pre-Delete-Inhalt; scheitert das Backup, unterbleibt der Unlink (IC-01). Rename-back stellt Byte-Gleichheit her (AC-19).
+- **Backup-first (Agent-Dateien, R-07):** Jeder **Agent-Datei**-Cleanup-Delete schreibt `<name>.sync-backup-<YYYYmmdd-HHMMSS>` mit dem Pre-Delete-Inhalt; scheitert das Backup, unterbleibt der Unlink (IC-01). Prompt-Index und die übrigen IC-01-Caller nutzen `backup=False` (siehe Global Constraints). Rename-back stellt Byte-Gleichheit her (AC-19).
 - **Re-Sync-Idempotenz:** Ein versehentlich gelöschtes generiertes Rollenfile wird durch erneutes Aufnehmen der Rolle in `project.yaml → roles` + Sync deterministisch wiederhergestellt.
 - **Dry-Run-Vorschau:** `--cleanup-preview` und die Admin-`preview`-Route sind seiteneffektfrei (kein Write/Unlink/Backup/Clone); `apply` verlangt `confirm: true` und einen frischen Fingerprint (409 bei TOCTOU).
 - **Pruner fail-safe:** löscht nie den jüngsten Backup je Quelle, nie bei unparsbarem Timestamp, nie in `dry_run` (AC-09).

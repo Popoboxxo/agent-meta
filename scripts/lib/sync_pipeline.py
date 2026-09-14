@@ -574,25 +574,27 @@ def _sync_stage_generated_file_drift_scan(
     safety net (issue #734)."""
     if not is_drift_detection_enabled(config):
         log.skip("generated-file-drift-scan", "disabled (drift-detection.enabled: false)")
-        return
-    findings = scan_generated_file_drift(agent_meta_root, project_root, config, provider_config)
-    backups = backup_drifted_files(findings, project_root, log, args.dry_run)
-    backup_name_by_source = {
-        backup.rsplit(".sync-backup-", 1)[0]: Path(backup).name for backup in backups
-    }
-    for finding in findings:
-        backup_name = backup_name_by_source.get(finding["path"])
-        backup_note = f" Backup written to {backup_name}." if backup_name else ""
-        log.warning(
-            f"generated-file-drift: '{finding['path']}' was manually edited "
-            f"since the last sync (provider '{finding['provider']}') -- this "
-            f"sync will overwrite it.{backup_note} Add it to "
-            ".meta-config/drift-allowlist.yaml if this edit should be "
-            "preserved going forward."
-        )
+    else:
+        findings = scan_generated_file_drift(agent_meta_root, project_root, config, provider_config)
+        backups = backup_drifted_files(findings, project_root, log, args.dry_run)
+        backup_name_by_source = {
+            backup.rsplit(".sync-backup-", 1)[0]: Path(backup).name for backup in backups
+        }
+        for finding in findings:
+            backup_name = backup_name_by_source.get(finding["path"])
+            backup_note = f" Backup written to {backup_name}." if backup_name else ""
+            log.warning(
+                f"generated-file-drift: '{finding['path']}' was manually edited "
+                f"since the last sync (provider '{finding['provider']}') -- this "
+                f"sync will overwrite it.{backup_note} Add it to "
+                ".meta-config/drift-allowlist.yaml if this edit should be "
+                "preserved going forward."
+            )
 
-    # AC-09/OQ-2: after the drift stage, bound `*.sync-backup-*` growth per
-    # managed directory (same retention policy for drift and cleanup backups).
+    # AC-09/OQ-2 (R-02): the backup pruner runs **unconditionally** -- also when
+    # drift detection is disabled -- because cleanup backups (IC-05) are written
+    # outside this stage. Gating it behind the drift-enabled guard left the
+    # `.sync-backup-*` growth unbounded with `drift-detection.enabled: false`.
     _prune_managed_sync_backups(project_root, config, provider_config, args, log)
 
 

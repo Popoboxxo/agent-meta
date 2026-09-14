@@ -462,6 +462,31 @@ def test_markerless_and_based_only_files_are_foreign(tmp_path):
     assert log.events == []
 
 
+def test_no_index_based_only_file_survives(tmp_path):
+    """R-03/AC-21: with **no** readable index, a ``based-on:``-only file is not
+    adopted by the provenance bootstrap and is never deleted; a primary-marker
+    file is still swept."""
+    target_dir = tmp_path / "agents"
+    target_dir.mkdir()
+    (target_dir / "based-only.md").write_text(
+        "---\nname: based-only\nbased-on: 1-generic/developer.md@1.0.0\n---\n",
+        encoding="utf-8")
+    (target_dir / "primary.md").write_text(
+        "---\ngenerated-from: 1-generic/developer.md@1.0.0\n---\n",
+        encoding="utf-8")
+
+    entries = plan_agent_cleanup(
+        target_dir, set(), _PROVIDER, set(), _CLEANUP_PC, tmp_path)
+    assert [e.path for e in entries] == ["agents/primary.md"]
+
+    log = _LogRecorder()
+    _cleanup(target_dir, set(), tmp_path, log)
+
+    assert (target_dir / "based-only.md").exists()
+    assert not (target_dir / "primary.md").exists()
+    assert [e[2] for e in log.events if e[0] == "action"] == ["agents/primary.md"]
+
+
 def test_reconciled_external_skill_wrapper_adopted(tmp_path):
     """AC-21 (F-01): an index-unlisted file with a primary ``0-external/``
     provenance marker is adopted, deleted backup-first and the index is
@@ -615,9 +640,10 @@ def test_no_fail_open_managed_index_clause_in_agent_sync():
 
 
 def test_provenance_marker_forms_recognised(tmp_path):
-    """IC-02: all primary marker forms plus the secondary ``based-on:`` are
-    recognised by ``_agent_has_provenance``; only primary ``0-external/``
-    origins satisfy ``_agent_provenance_is_external_skill``."""
+    """IC-02/R-03: only **primary** marker forms are recognised by
+    ``_agent_has_provenance``; the secondary ``based-on:`` is not a bootstrap
+    provenance signal and only primary ``0-external/`` origins satisfy
+    ``_agent_provenance_is_external_skill``."""
     fm = tmp_path / "a.md"
     toml = tmp_path / "b.toml"
     comment = tmp_path / "c.md"
@@ -627,7 +653,7 @@ def test_provenance_marker_forms_recognised(tmp_path):
     assert _agent_has_provenance(fm, "---\ngenerated-from: 1-generic/x.md@1\n---\n")
     assert _agent_has_provenance(toml, "# generated-from: 1-generic/x.md@1\n")
     assert _agent_has_provenance(comment, "<!-- agent-meta-provenance: generated-from=1-generic/x.md@1 -->\n")
-    assert _agent_has_provenance(based, "---\nbased-on: 1-generic/x.md@1\n---\n")
+    assert not _agent_has_provenance(based, "---\nbased-on: 1-generic/x.md@1\n---\n")
     assert not _agent_has_provenance(none, "hand-authored\n")
 
     assert _agent_provenance_is_external_skill(

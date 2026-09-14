@@ -37,6 +37,12 @@ related:
 | 0.1 | 2026-09-13 | Initial specification: B-I cleanup hardening, B-II Admin-UI remove path, B-III managed-block shrink proof + stale-path closure | concept-specifier |
 | 0.2 | 2026-09-13 | Incorporated review findings F-01…F-11 from `docs/specs/2026-09-13-stale-role-cleanup-review.md` (reconciliation branch, complete planner signature, `deleted` derivation, mutation-free preview, prompt-index fail-open, AC disambiguation) | concept-specifier |
 | Approval | 2026-09-13 | User approval 2026-09-13 — all recommended defaults accepted | concept-reviewer |
+| 0.3 | 2026-09-14 | Code-review R-03: IC-02 `_agent_has_provenance` restricted to the three primary markers; the secondary `based-on:` is not a no-index bootstrap provenance signal (aligns IC-02 with the approved AC-21). No AC change. | senior-developer |
+| 0.3 | 2026-09-14 | Code-review R-04: OQ-4 scope note — `commands.py` zero-source sweep/empty-index write documented as intended and regression-tested. No AC change. | senior-developer |
+| 0.3 | 2026-09-14 | Code-review R-05: IC-01 note — `pipelines.py` pipeline-detail files adopt nothing on an absent/corrupt index (documented fail-closed) and are regression-tested. No AC change. | senior-developer |
+| 0.3 | 2026-09-14 | Code-review R-07: IC-08 note — prompt-index cleanup uses `backup=False`; backup-first is scoped to agent files (`prompts_dir` is outside the pruner's managed-dir set). No AC change. | senior-developer |
+| 0.3 | 2026-09-14 | Code-review R-08: OQ-6 note — the `log.warning` surfaced in the sync report satisfies the OQ-6 visibility; no static `consistency/` Finding for a runtime condition. No AC change. | senior-developer |
+| 0.3 | 2026-09-14 | Code-review R-13: corrected the symbol name `sync_prompts_for_provider` → `sync_prompts_for_continue` (the real `context.py` symbol) throughout this spec. No AC change. | senior-developer |
 
 ### Revision — incorporated review findings
 
@@ -51,7 +57,7 @@ against the working tree (`agent_sync.py`, `skills.py`, `context.py`, `admin-ser
 | F-02 | MAJOR | **Resolved:** `plan_agent_cleanup` / `_cleanup_stale_agents` gain `provider: str` and `wrapper_filenames: set[str]`; `StaleAgentEntry` gains `adopted`; explicit reason precedence defined. | IC-04, AC-06, AC-22 |
 | F-03 | MAJOR | **Resolved:** `deleted` is defined as the stale paths of the server-side recomputed preview used for the fingerprint check; AC-14 made consistent and testable. Residual softness documented. | IC-07, Datenfluss (c), AC-14, R8 |
 | F-04 | MAJOR | **Resolved:** preview routed through a side-effect-free planning traversal; `ensure_skill_repo`/`deinit_skill_repo` gated on `not dry_run`; AC-10 amended to assert no filesystem/network mutation. | IC-06, Datenfluss (b), AC-10 |
-| F-05 | MAJOR | **Resolved:** `context.py::sync_prompts_for_provider` migrated to the IC-01 helpers (fail-closed bootstrap, always-write index). Provenance asymmetry recorded as OQ-9. | IC-01, IC-08, AC-23, OQ-9 |
+| F-05 | MAJOR | **Resolved:** `context.py::sync_prompts_for_continue` migrated to the IC-01 helpers (fail-closed bootstrap, always-write index). Provenance asymmetry recorded as OQ-9. | IC-01, IC-08, AC-23, OQ-9 |
 | F-06 | MINOR | **Resolved:** AC-02 and AC-04 given distinct fixtures/tests; both no longer reference the same test. | AC-02, AC-04 |
 | F-07 | MINOR | **Resolved:** AC-15 wording narrowed to non-index, non-provenance files; explicit index-listed phantom test added; backup-first accepted as the mitigation. | AC-15, AC-21 |
 | F-08 | MINOR | **Resolved:** `legacy_unmarked` added to the IC-06 foreign-entry schema and AC-10, gated on OQ-3 approval. | IC-06, AC-10, OQ-3 |
@@ -156,7 +162,7 @@ This spec covers exactly the user-required scope, stated explicitly:
    safety-critical semantics: no-index provenance bootstrap and empty-index write.
 2. Replace the fail-open no-index delete with a **provenance-based safety predicate**;
    always write the index, including the empty set. Apply the same two semantics to the
-   second fail-open instance in `context.py::sync_prompts_for_provider` (`:1733`/`:1739`).
+   second fail-open instance in `context.py::sync_prompts_for_continue` (`:1733`/`:1739`).
 3. Track external-skill wrapper filenames for **every** provider from the same source of
    truth `skills.py` uses (`_skill_is_active` + skills-registry role names), with no
    capability gate, and additionally **reconcile** already-stale provenance-carrying
@@ -270,6 +276,14 @@ equivalent explicit "adopt nothing" mode) so that an absent index never becomes 
 "delete everything unexpected" fallback. IC-01 stays policy-free: the caller chooses between
 provenance adoption (agent files) and fail-closed no-adoption (prompt files).
 
+**R-05 (pipeline-detail files):** `pipelines.py::sync_pipeline_detail_files` also calls
+`bootstrap_previously_managed` with neither marker nor predicate. Pipeline-detail files carry
+no provenance marker, so the shared-helper change intentionally makes this caller fail-closed
+too: on an absent/corrupt index no pre-existing pipeline detail file is adopted (and therefore
+none is swept). This is the documented intended behaviour, asserted by
+`tests/test_pipelines.py::test_sync_pipeline_detail_files_index_absent_is_fail_closed`; the
+next run with an index tracks and cleans up normally.
+
 Error paths:
 
 - `read_managed_index` on an unreadable/corrupt index must **not** propagate. The caller
@@ -292,14 +306,19 @@ Pure, no writes.
 
 ```python
 def _agent_has_provenance(path: Path, text: str) -> bool:
-    """True iff *text* carries an agent-meta generation marker. Recognises, in
-    order of preference:
+    """True iff *text* carries a **primary** agent-meta generation marker.
+    Recognises, in order of preference:
       - YAML frontmatter `generated-from:` (frontmatter.py:244, 278–294)
       - HTML comment `<!-- agent-meta-provenance: ... -->`
         (provider_transform.py:554–561; frontmatter.py:230–238)
       - TOML comment `# generated-from:` (agent_toml.py:75)
-      - YAML frontmatter `based-on:` (secondary; 2-platform overrides)
-    Never True for a user-authored file. Pure, no writes."""
+    Never True for a user-authored file. Pure, no writes.
+
+    The secondary `based-on:` marker is deliberately NOT accepted here
+    (R-03, AC-21): this predicate is the no-index bootstrap fallback, and a
+    hand-authored file carrying only `based-on:` must never be adopted and
+    deleted. `based-on:` may only matter when a readable index already tracks
+    the file — and then the index decides, not this predicate."""
 
 def _agent_provenance_is_external_skill(path: Path, text: str) -> bool:
     """True iff *text* carries a **primary** provenance marker whose generation
@@ -313,14 +332,15 @@ def _agent_provenance_is_external_skill(path: Path, text: str) -> bool:
     returns False."""
 ```
 
-All four marker forms were verified in the working tree. `based-on:` as a *provenance*
-signal is secondary — `HYPOTHESIS` on completeness: it appears in generated content only
-for providers that do not strip it (design A4). It must not be the **only** accepted
-marker for a provider known to strip `generated-from` (those carry
-`<!-- agent-meta-provenance: ... -->` instead, per `provider_transform.py:554–561`).
-Likewise, `based-on:` must **never** satisfy `_agent_provenance_is_external_skill`
-(F-01): reconciliation is restricted to primary markers with an `0-external/` origin so a
-provider-stripped or user-emitted `based-on:` line cannot widen the delete surface.
+The three primary marker forms were verified in the working tree. The secondary
+`based-on:` line is **not** accepted by `_agent_has_provenance` (R-03): it is the only
+signal a 2-platform override carries in generated content for providers that do not strip
+it (design A4), but accepting it in the *no-index* bootstrap would let a hand-authored
+`based-on:`-only file be adopted and deleted (AC-21). `based-on:` may only matter when a
+readable index already tracks the file. Likewise, `based-on:` must **never**
+satisfy `_agent_provenance_is_external_skill` (F-01): reconciliation is restricted to
+primary markers with an `0-external/` origin so a provider-stripped or user-emitted
+`based-on:` line cannot widen the delete surface.
 
 ### IC-03 — External-skill expected-filename set, all providers (B-I)
 
@@ -688,7 +708,7 @@ nothing here") are unchanged. Ownership rule:
 | `<rules_dir>/.agent-meta-managed` | `rules.py` | Own index; out of scope for the required change, alignment recommended (OQ-4). |
 | `<commands_dir>/.agent-meta-managed` | `commands.py` | Own index; index key configurable (`commands_managed_index`, `commands.py:151`). Out of scope (OQ-4). |
 | `<hooks_dir>/.agent-meta-managed` | `hooks.py` | Own index; already writes even when empty (533–549). |
-| `<prompts_dir>/.agent-meta-managed` | `context.py::sync_prompts_for_provider` | Own index. **In scope (F-05):** migrate the identical fail-open delete (`context.py:1733`) and conditional write (`:1739`) to IC-01 with a fail-closed bootstrap (no provenance marker exists on prompt files — adopt nothing on absent index) and an unconditional index write. |
+| `<prompts_dir>/.agent-meta-managed` | `context.py::sync_prompts_for_continue` | Own index. **In scope (F-05):** migrate the identical fail-open delete (`context.py:1733`) and conditional write (`:1739`) to IC-01 with a fail-closed bootstrap (no provenance marker exists on prompt files — adopt nothing on absent index) and an unconditional index write. **R-07:** the prompt-index cleanup uses `backup=False`; `prompts_dir` is not in the pruner's `_managed_dirs_for_prune` set, so backup-first is scoped to agent files (the only caller that passes `backup=True`) to avoid unbounded prompt backups. |
 | `<skills_dir>/.agent-meta-managed` | merge-mode multi-writer: `rules.py`, `mcp.py`, `external_tools.py`, `skills.py` | Genuine shared index handled by skill-channel merge logic (`sync_pipeline.py:534–568`). **Out of scope** except as reference pattern. |
 
 **Consistency rule:** every writer of its own `.agent-meta-managed` must (a) write the index
@@ -696,7 +716,7 @@ nothing here") are unchanged. Ownership rule:
 IC-01. Today `rules.py:521–522` and `commands.py:207–208` write only `if now_managed`,
 which strands stale index entries; aligning them is recommended but its breadth is OQ-4.
 
-**F-05 migration (binding for the prompt index).** `sync_prompts_for_provider`
+**F-05 migration (binding for the prompt index).** `sync_prompts_for_continue`
 (`context.py:1723–1740`) has the byte-identical fail-open pattern: delete every unexpected
 `*.md` when no index exists (`:1733`) and write the index only `if expected` (`:1739`). It is
 migrated in this change: `previously_managed` via IC-01 `bootstrap_previously_managed` with a
@@ -967,13 +987,13 @@ new `tests/test_admin_cleanup_endpoint.py`, following the `importlib` module-loa
   precedence order of IC-04.*
 - **AC-23 (F-05 prompt index)** (IC-01, IC-08) Given a Continue prompts dir with **no**
   `.agent-meta-managed` index and an unexpected `orphan.md` lacking a provenance marker,
-  when `sync_prompts_for_provider` runs, then `orphan.md` survives (no fail-open) and the
+  when `sync_prompts_for_continue` runs, then `orphan.md` survives (no fail-open) and the
   index is written; given `expected == set()` and a non-dry-run, then the index becomes
   0 bytes; given a present index listing `stale.md`, then `stale.md` is deleted and the
   index rewritten. *New test.*
 - **AC-24 (F-10 ordering guard)** (IC-07) A static test asserts the fail-open clause
   `not managed_index.exists() or` no longer appears in `agent_sync.py` (and the equivalent
-  clause is gone from `context.py::sync_prompts_for_provider`), and the plan must sequence
+  clause is gone from `context.py::sync_prompts_for_continue`), and the plan must sequence
   the B-I tasks before the B-II route/UI tasks. *New static guard test; the plan-gate note
   is part of the plan, not this spec.*
 - **AC-25 (F-09 UI control)** (IC-10) A DOM-level test (or a source assertion where no DOM
@@ -1015,6 +1035,13 @@ implementation starts.
   because it is the exact same stale-index bug. Alternative: defer to a separate spec to
   keep the blast radius minimal. **NEEDS USER APPROVAL** (scope decision; IC-08 states the
   rule, AC-01..AC-05 test only the `agent_sync` instance unless approved otherwise).
+  **R-04 (widening, intended):** removing the earlier `if not sources: return` from
+  `commands.py` means a configured `commands_dir` with a transiently/actually empty source
+  set now sweeps the previously-managed command files and writes the empty index. This is the
+  OQ-4 "always write the index" contract (a project that removed all commands must lose its
+  stale files), is regression-tested by
+  `tests/test_managed_index_alignment.py::test_commands_write_empty_index_and_clean_stale_entry`,
+  and is documented at the call site. `rules.py` keeps its `if not sources: return` guard.
 - **OQ-5 — Module shape of the shared helper.** Recommended default: extend
   `rule_index.py` in place (minimal, reversible); alternative: extract a dedicated
   `managed_index.py` and make `rule_index` a thin re-export shim. IC-01 follows the
@@ -1025,6 +1052,12 @@ implementation starts.
   Alternative: fail the context update and require manual repair. AC-17 asserts the
   default; preview/consistency visibility is non-negotiable, the write-vs-refuse choice is
   the open part. **NEEDS USER APPROVAL**.
+  **R-08 (scope decision):** the "consistency check" is satisfied by the `log.warning`
+  emitted by `_update_managed_html_block`, which is surfaced in the sync report. No
+  `scripts/lib/consistency/` `Finding` is emitted: that framework is a *static
+  repository* check (`scripts/consistency-check.py`), whereas the duplicate marker is a
+  per-consumer-project *runtime* condition discovered during sync; the sync report is the
+  correct channel. The write-vs-refuse choice remains the open part.
 - **OQ-7 — Stale-path visibility (S1–S4).** Recommended default: emit consistency
   warnings only; never override `context_file.auto_generate: false` (S1) or provider
   deactivation (S2), because those are deliberate user opt-outs. Alternative: a
@@ -1109,7 +1142,7 @@ Primary source references (verified 2026-09-13):
 - `scripts/lib/context.py` — `_update_managed_html_block` 347–442, regex 372–376, replace
   436, `_regenerate_static_context` 186–276 (existing_managed 225/272),
   `_insert_managed_block_above_foreign_content` 445–458, `_MANAGED_BLOCK_RE` 30–33,
-  `only_variables` 1578–1607, `sync_prompts_for_provider` fail-open 1723–1740 (delete guard
+  `only_variables` 1578–1607, `sync_prompts_for_continue` fail-open 1723–1740 (delete guard
   1733, write condition 1739), prompt frontmatter 1707–1714 (no provenance marker).
 - `scripts/lib/skills.py` — `ensure_skill_repo` 212–301 (git submodule add/clone, no
   `dry_run`), unconditional call site 410–412, `deinit_skill_repo` 304–321, wrapper

@@ -87,6 +87,34 @@ def test_commands_write_empty_index_and_clean_stale_entry(tmp_path: Path) -> Non
     assert not (commands_dir / "stale.md").exists()
 
 
+def test_commands_corrupt_index_is_fail_closed(tmp_path: Path) -> None:
+    """R-06 (corrupt-index handling): an unreadable commands index warns and
+    adopts nothing — no tracked file is swept and the index is rewritten."""
+    from scripts.lib.commands import sync_commands_for_provider
+
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write(
+        agent_meta_root, "config/provider-capabilities.yaml",
+        "capabilities:\n  Claude:\n    commands: true\n",
+    )
+    commands_dir = project_root / ".claude" / "commands"
+    commands_dir.mkdir(parents=True, exist_ok=True)
+    (commands_dir / "keep.md").write_text("keep\n", encoding="utf-8")
+    (commands_dir / ".agent-meta-managed").write_bytes(b"\xff\xfe not utf-8\n")
+
+    provider_config = {"Claude": {"commands_dir": ".claude/commands"}}
+    log = SyncLog()
+    sync_commands_for_provider(
+        agent_meta_root, project_root, {}, log, dry_run=False,
+        provider="Claude", provider_config=provider_config,
+    )
+
+    assert (commands_dir / "keep.md").exists()
+    assert any("unreadable" in warning for warning in log.warnings), log.warnings
+    assert (commands_dir / ".agent-meta-managed").read_bytes() == b""
+
+
 # --- AC-09 / IC-05: prune wiring after the drift stage ---------------------
 
 
@@ -120,6 +148,41 @@ def test_pipeline_invokes_prune_after_drift(tmp_path: Path, monkeypatch) -> None
     assert project_root / ".claude" / "agents" in pruned_dirs, calls
     assert all(
         call[2] is False and call[3] == 30 and call[4] == 3 for call in calls
+    ), calls
+
+
+def test_pipeline_prunes_when_drift_detection_disabled(tmp_path: Path, monkeypatch) -> None:
+    """R-02: the pruner is **not** gated behind the drift-enabled guard — with
+    ``drift-detection.enabled: false`` every managed dir is still pruned so
+    cleanup backups cannot grow unbounded."""
+    import scripts.lib.sync_pipeline as sync_pipeline
+
+    project_root = tmp_path / "project"
+    _write(project_root, ".claude/agents/developer.md", "edited by hand")
+    (project_root / ".claude" / "agents" / ".agent-meta-managed").write_text(
+        "developer.md\n", encoding="utf-8",
+    )
+    provider_config = {
+        "Claude": {"agents_dir": ".claude/agents", "skills_dir": ".claude/skills"},
+    }
+    calls: list[tuple] = []
+
+    def _spy(target_dir, prj_root, log, dry_run, max_age_days, max_per_source):
+        calls.append((Path(target_dir), dry_run, max_age_days, max_per_source))
+        return []
+
+    monkeypatch.setattr(sync_pipeline, "prune_sync_backups", _spy)
+
+    sync_pipeline._sync_stage_generated_file_drift_scan(
+        tmp_path / "agent-meta", project_root,
+        {"drift-detection": {"enabled": False}}, provider_config,
+        argparse.Namespace(dry_run=False), SyncLog(),
+    )
+
+    assert calls, "pruner must run even with drift detection disabled"
+    assert project_root / ".claude" / "agents" in {call[0] for call in calls}, calls
+    assert all(
+        call[1] is False and call[2] == 30 and call[3] == 3 for call in calls
     ), calls
 
 

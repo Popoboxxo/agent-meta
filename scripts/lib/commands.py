@@ -7,7 +7,11 @@ from pathlib import Path
 from .frontmatter import _split_frontmatter
 from .io import SyncError, safe_path, write_checked
 from .log import SyncLog
-from .rule_index import write_managed_index
+from .rule_index import (
+    cleanup_stale_managed_files,
+    read_managed_index,
+    write_managed_index,
+)
 
 COMMANDS_DIR = "commands"
 CLAUDE_COMMANDS_DIR = ".claude/commands"
@@ -155,12 +159,17 @@ def sync_commands_for_provider(
     output_ext = pc.get("commands_ext", ".md")
     commands_format = pc.get("commands_format", "markdown")
 
-    previously_managed: set[str] = set()
-    if managed_index_path.exists():
-        for line in managed_index_path.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if line:
-                previously_managed.add(line)
+    # IC-01/IC-08 (R-06): route the index read through the shared helper so a
+    # corrupt/unreadable index is fail-closed (warn + treat as empty).
+    try:
+        previously_managed: set[str] = read_managed_index(managed_index_path)
+    except (OSError, UnicodeDecodeError) as exc:
+        log.warning(
+            f"commands: managed index '{managed_index_path}' is unreadable "
+            f"({type(exc).__name__}: {exc}) — treating as empty (fail-closed); "
+            f"non-tracked files are left untouched"
+        )
+        previously_managed = set()
 
     now_managed: set[str] = set()
 
@@ -199,13 +208,18 @@ def sync_commands_for_provider(
         else:
             log.skip(rel_out, "unchanged")
 
-    for stale_name in sorted(previously_managed - now_managed):
-        stale_path = target_dir / stale_name
-        if stale_path.exists():
-            log.action("DELETE", str(stale_path.relative_to(project_root)),
-                       "command removed from agent-meta sources")
-            if not dry_run:
-                stale_path.unlink()
+    # IC-01/IC-08 (R-06): deletion routed through cleanup_stale_managed_files
+    # (fail-soft per file, byte-identical DELETE log line).
+    # R-04 (documented as intended): with a configured commands_dir and a
+    # transiently/actually empty source set, previously-managed command files are
+    # swept and the empty index is written. That is the OQ-4 "always write the
+    # index" contract (a project that removed all commands must lose its stale
+    # files); it is regression-tested by
+    # test_managed_index_alignment.py::test_commands_write_empty_index_and_clean_stale_entry.
+    cleanup_stale_managed_files(
+        target_dir, project_root, previously_managed, now_managed,
+        log, dry_run, "command removed from agent-meta sources",
+    )
 
     # OQ-4/IC-08: write the managed index unconditionally (including the empty
     # set) so a removed command can no longer strand a stale index entry.

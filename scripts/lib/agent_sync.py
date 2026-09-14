@@ -34,6 +34,7 @@ from .provider_transform import (
     wrap_sections_in_xml,
 )
 from .rule_index import (
+    _relative_posix,
     bootstrap_previously_managed,
     cleanup_stale_managed_files,
     read_managed_index,
@@ -761,19 +762,24 @@ _EXTERNAL_SKILL_ORIGIN_PREFIX = '0-external/'
 
 
 def _agent_has_provenance(path: Path, text: str) -> bool:
-    """True iff *text* carries an agent-meta generation marker. Recognises, in
-    order of preference:
+    """True iff *text* carries a **primary** agent-meta generation marker.
+    Recognises, in order of preference:
       - YAML frontmatter ``generated-from:`` (frontmatter.py:244, 278-294)
       - HTML comment ``<!-- agent-meta-provenance: ... -->``
         (provider_transform.py:554-561; frontmatter.py:230-238)
       - TOML comment ``# generated-from:`` (agent_toml.py:75)
-      - YAML frontmatter ``based-on:`` (secondary; 2-platform overrides)
     Never True for a user-authored file. Pure, no writes.
+
+    The secondary ``based-on:`` marker is deliberately **not** accepted here
+    (R-03, AC-21): this predicate is the no-index bootstrap fallback, and a
+    hand-authored file carrying only ``based-on:`` must never be adopted and
+    deleted. ``based-on:`` may only ever matter when a readable index already
+    tracks the file — and then the index (not this predicate) decides.
 
     Fail-soft: an invalid/unparseable frontmatter block simply contributes no
     marker (the HTML/TOML checks still run on the raw text)."""
     frontmatter = _parse_frontmatter_yaml(text)
-    if frontmatter.get('generated-from') or frontmatter.get('based-on'):
+    if frontmatter.get('generated-from'):
         return True
     if '<!-- agent-meta-provenance:' in text:
         return True
@@ -882,14 +888,6 @@ def _iter_agent_candidates(target_dir: Path, pc: dict) -> list:
             if path.is_file():
                 seen[path.name] = path
     return [seen[name] for name in sorted(seen)]
-
-
-def _relative_posix(path: Path, project_root: Path) -> str:
-    """Project-relative posix path; falls back to the absolute posix form."""
-    try:
-        return path.relative_to(project_root).as_posix()
-    except ValueError:
-        return path.as_posix()
 
 
 def _read_text_or_none(path: Path) -> str | None:

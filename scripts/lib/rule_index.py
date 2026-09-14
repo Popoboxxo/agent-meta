@@ -121,8 +121,14 @@ def cleanup_stale_managed_files(
 
     With ``backup=True`` a ``<name>.sync-backup-<YYYYmmdd-HHMMSS>`` sibling is
     written (one timestamp per invocation) *before* the unlink, containing the
-    pre-delete content. If the backup cannot be read/written, the file's unlink
-    is skipped and a warning is logged, so one bad file cannot abort the sync.
+    pre-delete content **byte-exactly** (``read_bytes``/``write_bytes``, so
+    CRLF/BOM/encoding are preserved). If the backup cannot be read/written, the
+    file's unlink is skipped and a warning is logged, so one bad file cannot
+    abort the sync.
+
+    Fail-soft per file (IC-01): an ``OSError`` on the unlink itself is logged
+    as a warning and iteration continues — the remaining stale files are still
+    processed, one undeletable file never aborts the sync.
 
     Returns the project-relative posix paths of the backups (written backups,
     or the would-be paths in ``dry_run``). Empty when ``backup=False``. The
@@ -144,15 +150,15 @@ def cleanup_stale_managed_files(
             continue
         if backup:
             try:
-                existing_content = stale_path.read_text(encoding="utf-8")
-            except (OSError, UnicodeDecodeError) as exc:
+                existing_bytes = stale_path.read_bytes()
+            except OSError as exc:
                 log.warning(
                     f"managed-index: could not read '{rel}' for backup: "
                     f"{type(exc).__name__}: {exc} — unlink skipped"
                 )
                 continue
             try:
-                backup_path.write_text(existing_content, encoding="utf-8")
+                backup_path.write_bytes(existing_bytes)
             except OSError as exc:
                 log.warning(
                     f"managed-index: could not write backup for '{rel}': "
@@ -160,7 +166,14 @@ def cleanup_stale_managed_files(
                 )
                 continue
             backups.append(_relative_posix(backup_path, project_root))
-        stale_path.unlink()
+        try:
+            stale_path.unlink()
+        except OSError as exc:
+            log.warning(
+                f"managed-index: could not delete '{rel}': "
+                f"{type(exc).__name__}: {exc} — file left in place"
+            )
+            continue
     return backups
 
 

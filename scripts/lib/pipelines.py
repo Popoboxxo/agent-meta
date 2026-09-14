@@ -1069,6 +1069,14 @@ def sync_pipeline_detail_files(
     directory. Stale files (pipeline renamed/removed/disabled) are cleaned up
     via the same previously_managed/now_managed index pattern used by
     `mcp.py`/`external_tools.py` (`scripts/lib/rule_index.py`).
+
+    Fail-closed (R-05): when the managed index is absent, the shared
+    ``bootstrap_previously_managed`` is called with neither a marker nor a
+    predicate, so it adopts **nothing**. Pipeline-detail files carry no
+    provenance marker, so a pre-index legacy file is never swept — the same
+    safe-but-conservative behaviour the IC-01 contract mandates for every
+    marker-less caller. The next run (index now present) tracks and cleans up
+    normally. See ``tests/test_pipelines.py::test_sync_pipeline_detail_files_index_absent_is_fail_closed``.
     """
     from .io import safe_path, write_checked
     from .rule_index import (

@@ -907,6 +907,31 @@ def test_sync_pipeline_detail_files_removes_stale_file_when_pipeline_deactivated
     assert set(index_path.read_text(encoding="utf-8").split()) == {"p1.md"}
 
 
+def test_sync_pipeline_detail_files_index_absent_is_fail_closed(tmp_path):
+    """R-05: with no managed index, a pre-existing marker-less pipeline-detail
+    file is never adopted/swept (fail-closed bootstrap); the current run's file
+    is written and the index is created."""
+    from scripts.lib.log import SyncLog
+    from scripts.lib.pipelines import sync_pipeline_detail_files
+
+    project_root = tmp_path / "project"
+    target_dir = project_root / ".claude" / "pipeline-details"
+    target_dir.mkdir(parents=True)
+    legacy = target_dir / "legacy-orphan.md"
+    legacy.write_text("legacy, no index\n", encoding="utf-8")
+    pipelines = {
+        "p1": {"stages": [{"id": "x", "agent": "developer", "task": "Task A", "mode": "sequential"}]},
+    }
+
+    sync_pipeline_detail_files(
+        pipelines, "Opencode", target_dir, project_root, {}, SyncLog(), dry_run=False)
+
+    assert legacy.exists()
+    assert (target_dir / "p1.md").exists()
+    index_path = target_dir / ".agent-meta-managed"
+    assert set(index_path.read_text(encoding="utf-8").split()) == {"p1.md"}
+
+
 def test_feature_lifecycle_pipeline_definition_is_valid():
     import yaml
     from scripts.lib.pipelines import load_quality_pipelines, validate_pipelines
