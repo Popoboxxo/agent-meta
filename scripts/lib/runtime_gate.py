@@ -25,6 +25,12 @@ Seam boundary (IC-03): this module owns the vocabulary only. The tier
 other capability resolvers, so there is exactly one source of truth. Phase 1
 extends this module with the plugin generator (IC-08); Phase 0 ships only the
 vocabulary below.
+
+This module also owns the weak→strong ordering ``RUNTIME_GATE_TIER_RANK`` and
+``weakest_runtime_gate_tier``, which folds several tiers to the weakest one.
+That fold is the shared-context-file guarantee: a context file rendered for
+several providers is only as strong as its weakest reader, so every sharer
+must render the same (weakest) gate bundle.
 """
 from __future__ import annotations
 
@@ -54,8 +60,12 @@ def weakest_runtime_gate_tier(tiers: Iterable[str]) -> str:
     reader, so the effective gate tier is the minimum over all provided tiers.
     Unknown names are ignored for the minimum but do not raise; ``None``, an
     empty iterable or a non-iterable input yields ``"advisory"`` (the weakest
-    assumed tier — fail-safe). This function never raises.
+    assumed tier — fail-safe). A bare tier-name string is treated as a single
+    tier (``"hook"`` -> ``"hook"``), never iterated character by character.
+    This function never raises.
     """
+    if isinstance(tiers, str):
+        tiers = (tiers,)
     try:
         known = [t for t in tiers if t in RUNTIME_GATE_TIER_RANK]
     except TypeError:

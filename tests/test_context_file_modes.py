@@ -83,6 +83,10 @@ def test_rank_orders_advisory_permission_plugin_hook():
         (["unknown", "bogus"], "advisory"),
         (["hook", "unknown"], "hook"),
         (5, "advisory"),
+        # CR-06: a bare tier-name string is a single tier, not iterated per char.
+        ("hook", "hook"),
+        ("advisory", "advisory"),
+        ("bogus", "advisory"),
     ],
 )
 def test_weakest_runtime_gate_tier(tiers, expected):
@@ -354,6 +358,183 @@ def test_gate_only_neutralised_orch_mode_still_diverges(loaded_config):
     assert "UNIQUE-GEMINI-HINT-SENTINEL" not in _render_with(op, "Gemini")
     assert "UNIQUE-OPENCODE-HINT-SENTINEL" not in _render_with(op, "Opencode")
     assert _render_with(op, "Gemini") == _render_with(op, "Opencode")
+
+
+# ``_build_managed_block`` assigns a few provider-scoped ``local_vars`` beyond
+# the gate bundle. Two of them never count as rendered divergence sources:
+#
+# * ``ORCHESTRATOR_INVOCATION_HINT`` — assigned from ``pc["orchestrator_hint"]``
+#   but no rule/template consumes it (N-01), so it cannot make renders differ.
+# * ``embedded_rules`` — the pre-rendered rule aggregate whose content diverges
+#   *because of* the families below, not as an input of its own.
+_DERIVED_DIVERGENCE_KEYS = {"embedded_rules"}
+_UNRENDERED_PROVIDER_SCOPED = {"ORCHESTRATOR_INVOCATION_HINT"}
+
+
+def _provider_scope_family(name: str) -> str:
+    """Fold a provider-scoped variable name onto its ``ORCH_MODE``/``REPO_`` family."""
+    if name.startswith("ORCH_MODE_"):
+        return "ORCH_MODE"
+    if name.startswith("REPO_CONTAINMENT_"):
+        return "REPO_CONTAINMENT"
+    return name
+
+
+def _provider_scoped_local_var_diff(monkeypatch, loaded_config, cfg) -> set:
+    """Keys of ``local_vars`` whose value differs between the two sharers.
+
+    Captures the final ``local_vars`` handed to ``TemplateBuilder.build`` for
+    each provider — every provider-scoped input of the shared managed block
+    before template resolution. Callers subtract ``_DERIVED_DIVERGENCE_KEYS``
+    and ``_UNRENDERED_PROVIDER_SCOPED`` to assert the *rendered* scope.
+    """
+    from lib.context_templates.builder import TemplateBuilder
+
+    _, provider_config, capabilities = loaded_config
+
+    def _capture(provider: str) -> dict:
+        box: dict = {}
+        real_build = TemplateBuilder.build
+
+        def _wrap(self, template_name, variables):
+            box.clear()
+            box.update(variables)
+            return real_build(self, template_name, variables)
+
+        with monkeypatch.context() as patch:
+            patch.setattr(TemplateBuilder, "build", _wrap)
+            variables = _per_provider_vars(
+                cfg,
+                provider_config.get(provider, {}),
+                capabilities.get(provider, {}),
+            )
+            _build_managed_block(
+                _REPO_ROOT,
+                cfg,
+                variables,
+                SyncLog(),
+                provider=provider,
+                provider_config=provider_config,
+                project_root=_REPO_ROOT,
+            )
+        return box
+
+    opencode = _capture("Opencode")
+    gemini = _capture("Gemini")
+    keys = set(opencode) | set(gemini)
+    return {k for k in keys if opencode.get(k) != gemini.get(k)}
+
+
+def test_gate_only_neutralised_repo_containment_still_diverges(
+    loaded_config, monkeypatch
+):
+    """AC-25: divergent ``REPO_CONTAINMENT_*`` differs (outside the guarantee).
+
+    IC-03 neutralises the ``GATE_*`` family only. A provider-scoped
+    repo-containment override
+    (``repo_containment.provider-overrides.<P>.enabled``) is still rendered
+    per-provider, so the two shared renders differ — explicitly outside the
+    determinism guarantee (R7, OQ-13). Together with
+    ``orchestrator.provider-overrides.<P>.mode`` these are the *sole remaining
+    rendered* provider-scoped inputs; ``ORCHESTRATOR_INVOCATION_HINT`` is
+    assigned but unrendered (N-01).
+    """
+    import copy
+
+    config, provider_config, capabilities = loaded_config
+
+    def _render(provider: str, cfg: dict, extra_vars: dict | None = None) -> str:
+        variables = _per_provider_vars(
+            cfg, provider_config.get(provider, {}), capabilities.get(provider, {})
+        )
+        if extra_vars:
+            variables.update(extra_vars)
+        return _build_managed_block(
+            _REPO_ROOT,
+            cfg,
+            variables,
+            SyncLog(),
+            provider=provider,
+            provider_config=provider_config,
+            project_root=_REPO_ROOT,
+        )
+
+    # Baseline: identical provider-scoped config -> byte-identical render.
+    assert _render("Opencode", config) == _render("Gemini", config)
+
+    # GATE_* are neutralised: divergent per-provider gate bundles injected via
+    # the IC-04 seam cannot make the shared render differ.
+    divergent_gate = {
+        "Opencode": {
+            "ENFORCEMENT_TIER": "hook",
+            "GATE_ENFORCED": "true",
+            "GATE_PARTIAL": "false",
+            "GATE_ADVISORY": "false",
+            "RUNTIME_GATE_PLUGIN_MODE": "observe",
+        },
+        "Gemini": {
+            "ENFORCEMENT_TIER": "advisory",
+            "GATE_ENFORCED": "false",
+            "GATE_PARTIAL": "false",
+            "GATE_ADVISORY": "true",
+            "RUNTIME_GATE_PLUGIN_MODE": "observe",
+        },
+    }
+    assert (
+        _render("Opencode", config, divergent_gate["Opencode"])
+        == _render("Gemini", config, divergent_gate["Gemini"])
+    )
+
+    # Scope of the guarantee: with GATE_* neutralised, no *rendered*
+    # provider-scoped input diverges at baseline. The only per-provider
+    # ``local_vars`` difference is the unrendered ORCHESTRATOR_INVOCATION_HINT.
+    baseline_rendered = (
+        _provider_scoped_local_var_diff(monkeypatch, loaded_config, config)
+        - _UNRENDERED_PROVIDER_SCOPED
+        - _DERIVED_DIVERGENCE_KEYS
+    )
+    assert baseline_rendered == set(), (
+        "no rendered provider-scoped input may diverge once GATE_* is neutralised"
+    )
+
+    # Divergent repo-containment override -> the renders differ (outside scope).
+    rc_divergent = copy.deepcopy(config)
+    rc_divergent.setdefault("repo_containment", {}).setdefault(
+        "provider-overrides", {}
+    ).setdefault("Gemini", {})["enabled"] = False
+    assert _render("Opencode", rc_divergent) != _render("Gemini", rc_divergent)
+
+    rc_diff = (
+        _provider_scoped_local_var_diff(monkeypatch, loaded_config, rc_divergent)
+        - _UNRENDERED_PROVIDER_SCOPED
+        - _DERIVED_DIVERGENCE_KEYS
+    )
+    assert rc_diff and all(k.startswith("REPO_CONTAINMENT_") for k in rc_diff)
+
+    # Divergent ORCH mode override -> the renders differ (existing AC-25 case).
+    orch_divergent = copy.deepcopy(config)
+    orch_divergent.setdefault("orchestrator", {}).setdefault(
+        "provider-overrides", {}
+    ).setdefault("Gemini", {})["mode"] = "advisory"
+    assert _render("Opencode", orch_divergent) != _render("Gemini", orch_divergent)
+
+    orch_diff = (
+        _provider_scoped_local_var_diff(monkeypatch, loaded_config, orch_divergent)
+        - _UNRENDERED_PROVIDER_SCOPED
+        - _DERIVED_DIVERGENCE_KEYS
+    )
+    assert orch_diff and all(k.startswith("ORCH_MODE_") for k in orch_diff)
+
+    # SOLE remaining rendered provider-scoped inputs: the two divergence
+    # sources above are exactly the ORCH_MODE_* and REPO_CONTAINMENT_* families
+    # (context.py:1165 / :1170). Nothing else is a rendered provider-scoped
+    # input that a config can push apart.
+    assert {
+        _provider_scope_family(name) for name in (rc_diff | orch_diff)
+    } == {"ORCH_MODE", "REPO_CONTAINMENT"}, (
+        "ORCH_MODE_* and REPO_CONTAINMENT_* must be the sole remaining rendered "
+        "provider-scoped inputs after IC-03 neutralises GATE_*"
+    )
 
 
 # --- AC-05: single render / no double write -------------------------------

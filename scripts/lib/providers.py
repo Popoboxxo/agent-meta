@@ -453,16 +453,22 @@ def shared_runtime_gate_vars(
     with ``resolve_providers`` — this function does not filter. Fail-safe and
     never raises: a provider absent from ``provider_config`` is looked up as
     ``{}``, a non-mapping entry, ``capabilities_config`` or ``config`` degrades
-    to ``{}`` (which resolves to ``advisory``).
+    to ``{}`` (which resolves to ``advisory``). A non-iterable ``shared_users``
+    is treated as no sharers (``advisory``) instead of raising ``TypeError``
+    from the eager outer iterable of the tier generator (CR-04).
     """
     pcs = provider_config if isinstance(provider_config, dict) else {}
     caps = capabilities_config if isinstance(capabilities_config, dict) else {}
+    try:
+        users = list(shared_users) if shared_users else []
+    except TypeError:
+        users = []
     tiers = (
         provider_runtime_gate_tier(
             pcs.get(user, {}),
             caps.get(user),
         )
-        for user in (shared_users if shared_users else [])
+        for user in users
     )
     return _runtime_gate_bundle(weakest_runtime_gate_tier(tiers), config)
 

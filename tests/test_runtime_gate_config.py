@@ -34,7 +34,7 @@ from lib.providers import (  # noqa: E402
     provider_runtime_gate_tier,
     runtime_gate_vars,
 )
-from lib.runtime_gate import RUNTIME_GATE_TIERS  # noqa: E402
+from lib.runtime_gate import RUNTIME_GATE_TIER_RANK, RUNTIME_GATE_TIERS  # noqa: E402
 
 
 def _ai_providers() -> dict:
@@ -56,6 +56,23 @@ def _registered_providers() -> list:
 def test_runtime_gate_tiers_vocabulary_is_canonical():
     """The canonical vocabulary is the single contract consumers import."""
     assert RUNTIME_GATE_TIERS == ("hook", "plugin", "permission", "advisory")
+
+
+def test_runtime_gate_tier_rank_covers_every_canonical_tier():
+    """CR-03: ``RUNTIME_GATE_TIER_RANK`` keys must match ``RUNTIME_GATE_TIERS``.
+
+    ``weakest_runtime_gate_tier`` ignores any tier missing from the rank map,
+    so a future vocabulary entry without a matching rank would silently resolve
+    to ``advisory`` (fail-open). The keys must therefore equal the canonical
+    vocabulary, and the values must be a dense weak→strong ordering.
+    """
+    assert set(RUNTIME_GATE_TIER_RANK) == set(RUNTIME_GATE_TIERS), (
+        "every RUNTIME_GATE_TIERS entry needs a RUNTIME_GATE_TIER_RANK entry, "
+        "otherwise it silently degrades to 'advisory'"
+    )
+    assert sorted(RUNTIME_GATE_TIER_RANK.values()) == list(
+        range(len(RUNTIME_GATE_TIERS))
+    ), "RUNTIME_GATE_TIER_RANK must be a dense strict ordering"
 
 
 @pytest.mark.parametrize("provider", _registered_providers())
