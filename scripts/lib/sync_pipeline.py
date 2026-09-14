@@ -50,6 +50,7 @@ from lib.context import (
     init_claude_personal,
     init_settings_json,
     init_settings_local_json,
+    rollback_context_adapters,
     sync_claude_md_static,
     sync_context_for_provider,
     sync_prompts_for_continue,
@@ -286,6 +287,19 @@ def _sync_stage_claude_base(
     # `has_dedicated_context_file` (today: Claude only) — no provider-name
     # branch. The returned flag keeps its historical name for its downstream
     # consumers but no longer literal-matches "Claude".
+    # Topology rollback (SPEC-CONTEXT-FILE-MODES-2026-09-13, AC-18): a switch
+    # back to `unified` (or a config that never opted in) tears down the adapter
+    # artifacts the previous run indexed *before* the unified context writes
+    # below, so the shared render is the final state of this run and a following
+    # `--check` reports pending == 0. Only index-tracked adapter paths are ever
+    # removed (foreign/user files are never touched); a still-needed context
+    # file is re-created by the unified render in the same run.
+    if _context_auto_generate(config):
+        active_providers = [p for p in providers if is_provider_active(config, p)]
+        rollback_context_adapters(
+            project_root, config, provider_config, active_providers, log, args.dry_run
+        )
+
     is_claude = any(
         provider_config.get(p, {}).get("has_dedicated_context_file", False)
         for p in providers

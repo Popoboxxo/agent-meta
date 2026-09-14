@@ -360,6 +360,61 @@ def _ensure_context_file(
         target_path.write_text(content, encoding="utf-8")
 
 
+def _core_context_filename(config: dict) -> str:
+    """Resolve the canonical core context file (``context_file.core_file``).
+
+    Config-driven with the spec default ``AGENTS.md``; a missing/non-mapping
+    ``context_file`` block or a blank/non-string value degrades to the default
+    without raising (IC-09).
+    """
+    block = config.get("context_file") if isinstance(config, dict) else None
+    if isinstance(block, dict):
+        core = block.get("core_file")
+        if isinstance(core, str) and core.strip():
+            return core
+    return "AGENTS.md"
+
+
+def _adapter_reference_line(config: dict, pc: dict) -> str | None:
+    """Return the provider-native core reference line for an adapter file.
+
+    Returns ``None`` when the provider is not adapter-capable. An explicit
+    ``context_adapter_import_supported: true`` with a non-blank
+    ``context_adapter_import`` renders that syntax with ``{core}`` substituted
+    by ``context_file.core_file`` (e.g. ``@AGENTS.md``); any other combination
+    (unsupported, absent, blank) falls back to a pointer line. Purely
+    key-driven — no provider-name literal.
+    """
+    if pc.get("context_adapter") is not True:
+        return None
+    core_file = _core_context_filename(config)
+    syntax = pc.get("context_adapter_import")
+    if (
+        pc.get("context_adapter_import_supported") is True
+        and isinstance(syntax, str)
+        and syntax.strip()
+    ):
+        line = syntax.replace("{core}", core_file).strip()
+        if line:
+            return line
+    return f"Read `{core_file}` for the shared project context."
+
+
+def _inject_adapter_line(managed_block: str, adapter_line: str) -> str:
+    """Insert the provider-native core reference line into a managed block.
+
+    Placed directly after the managed-begin marker — i.e. inside the
+    regenerated block, never the static header — so the static-part hash stays
+    stable across syncs (no backup oscillation) and the render is idempotent.
+    A block without the marker is returned unchanged.
+    """
+    marker = "<!-- agent-meta:managed-begin -->"
+    line = adapter_line.strip()
+    if not line or marker not in managed_block:
+        return managed_block
+    return managed_block.replace(marker, f"{marker}\n{line}", 1)
+
+
 def _update_managed_html_block(
     target_path: Path,
     project_root: Path,
@@ -369,6 +424,7 @@ def _update_managed_html_block(
     agent_meta_root: Path,
     provider: str = "Claude",
     pc: dict | None = None,
+    adapter_line: str | None = None,
 ) -> None:
     """Update the HTML-style managed block in a context file.
 
@@ -433,6 +489,9 @@ def _update_managed_html_block(
             '\n## Regeln\n\n> **Regeln:** Alle Regeln werden nativ über den Provider-Rules-Mechanismus geladen.\n\n<!-- agent-meta:managed-end -->',
         )
 
+    if adapter_line:
+        new_managed = _inject_adapter_line(new_managed, adapter_line)
+
     if not managed_pattern.search(existing):
         if not new_managed.strip():
             log.warning(
@@ -489,11 +548,19 @@ def _sync_managed_block_context(
     dry_run: bool,
     provider: str,
     provider_config: dict,
+    target_name: str | None = None,
+    adapter_line: str | None = None,
 ) -> None:
-    """Strategy for providers with a context file using HTML managed blocks."""
+    """Strategy for providers with a context file using HTML managed blocks.
+
+    ``target_name`` overrides the physical filename chosen by the
+    ``per-provider`` dispatch (IC-09); ``adapter_line`` is the provider-native
+    core reference injected into the managed block when the provider reads an
+    adapter file. Both default to the legacy single-file behaviour.
+    """
 
     pc = provider_config[provider]
-    context_file = pc.get("context_file")
+    context_file = target_name or pc.get("context_file")
     if not context_file:
         return
     target_path = safe_path(project_root, context_file)
@@ -543,7 +610,10 @@ def _sync_managed_block_context(
                 rebuild_footer=True,
             )
     if target_path.exists():
-        _update_managed_html_block(target_path, project_root, variables, log, dry_run, agent_meta_root, provider, pc)
+        _update_managed_html_block(
+            target_path, project_root, variables, log, dry_run, agent_meta_root,
+            provider, pc, adapter_line=adapter_line,
+        )
 
     # Claude settings files are initialized by the dedicated helpers in sync.py.
     if not has_dedicated:
@@ -559,11 +629,17 @@ def _sync_opencode_context(
     dry_run: bool,
     provider: str,
     provider_config: dict,
+    target_name: str | None = None,
 ) -> None:
-    """Strategy for Opencode: rules embedded into AGENTS.md managed block."""
+    """Strategy for Opencode: rules embedded into AGENTS.md managed block.
+
+    ``target_name`` overrides the physical filename chosen by the
+    ``per-provider`` dispatch (IC-09); it defaults to the provider's
+    ``context_file``.
+    """
 
     pc = provider_config[provider]
-    context_file = pc["context_file"]  # AGENTS.md
+    context_file = target_name or pc["context_file"]  # AGENTS.md
     target_path = safe_path(project_root, context_file)
     template_name = pc.get("context_template")
     template_path = agent_meta_root / template_name if template_name else None
@@ -606,7 +682,8 @@ def _sync_opencode_context(
         existing = target_path.read_text(encoding="utf-8")
         new_managed = _build_managed_block(
             agent_meta_root, config, variables, log,
-            provider=provider, provider_config=provider_config, project_root=project_root
+            provider=provider, provider_config=provider_config, project_root=project_root,
+            target_name=target_name,
         )
         # The "agents-managed" template ends with a trailing newline after its
         # own closing marker, but managed_pattern's match never consumes any
@@ -815,6 +892,198 @@ def _shares_context_with_embedded_rules(
     )
 
 
+_ADAPTER_MANAGED_INDEX = ".agent-meta-context-adapters-managed"
+
+
+def _adapter_index_path(project_root: Path) -> Path:
+    """Path of the managed index that authorizes generated adapter files."""
+    return project_root / _ADAPTER_MANAGED_INDEX
+
+
+def _record_adapter_managed(
+    project_root: Path, adapter_file: str, log: SyncLog, dry_run: bool
+) -> None:
+    """Register a generated adapter file in the adapter managed index.
+
+    The index is the rollback authorization (Task 6): only files listed here
+    may be removed when the topology switches back to ``unified``. Existing
+    entries are preserved so a multi-adapter catalog does not lose siblings
+    across the per-provider calls of one sync run.
+    """
+    index_path = _adapter_index_path(project_root)
+    previously_managed = bootstrap_previously_managed(
+        project_root, index_path, glob_pattern="*",
+    )
+    write_managed_index(index_path, previously_managed | {adapter_file}, dry_run)
+
+
+def _record_adapter_hash(project_root: Path, adapter_file: str, dry_run: bool) -> None:
+    """Record the adapter's static-part hash for static-drift detection.
+
+    Mirrors ``sync_claude_md_static``'s hash key/signature so a manual edit to
+    the adapter's static header is detected the same way as the core context
+    file. A missing/unreadable adapter is a silent no-op (nothing to hash).
+    """
+    target_path = safe_path(project_root, adapter_file)
+    if not target_path.exists():
+        return
+    header, _managed, _footer = _split_context_file(
+        target_path.read_text(encoding="utf-8")
+    )
+    _record_static_hash(
+        project_root, adapter_file,
+        _normalize_static_sig(_strip_user_notes(header)), dry_run,
+    )
+
+
+def _expected_adapter_files(
+    config: dict, provider_config: dict, active_providers: list
+) -> set[str]:
+    """Adapter files still expected because ``per-provider`` is active.
+
+    Empty in ``unified`` mode (the rollback case). Only providers opting in
+    via ``context_adapter: true`` whose resolved topology is ``per-provider``
+    contribute; every lookup is key-driven and fail-safe.
+    """
+    from .providers import context_topology
+
+    expected: set[str] = set()
+    if not isinstance(provider_config, dict):
+        return expected
+    for provider in active_providers:
+        pc = provider_config.get(provider)
+        if not isinstance(pc, dict) or pc.get("context_adapter") is not True:
+            continue
+        if context_topology(config, provider) != "per-provider":
+            continue
+        adapter_file = pc.get("context_adapter_file")
+        if isinstance(adapter_file, str) and adapter_file.strip():
+            expected.add(adapter_file)
+    return expected
+
+
+def rollback_context_adapters(
+    project_root: Path,
+    config: dict,
+    provider_config: dict,
+    active_providers: list,
+    log: SyncLog,
+    dry_run: bool,
+) -> list[str]:
+    """Tear down adapter artifacts that are no longer expected.
+
+    The adapter managed index (``.agent-meta-context-adapters-managed``) is the
+    sole authorization: only project-relative paths listed in it are ever
+    deleted — a foreign/user file without an index entry is never touched. The
+    switch ``per-provider`` -> ``unified`` therefore converges idempotently:
+    every indexed adapter is removed backup-first via
+    ``cleanup_stale_managed_files`` (its file content is preserved in a
+    ``.sync-backup-<ts>`` sibling), and the index is dropped once no adapter
+    remains managed. Each adapter file is re-created by the unified render if
+    the provider still owns it. Returns the written backup paths.
+    """
+    index_path = _adapter_index_path(project_root)
+    expected = _expected_adapter_files(config, provider_config, active_providers)
+    tracked = bootstrap_previously_managed(project_root, index_path, glob_pattern="*")
+
+    backups: list[str] = []
+    if tracked:
+        backups = cleanup_stale_managed_files(
+            project_root, project_root, tracked, expected, log, dry_run,
+            reason="context adapter no longer expected (topology rollback)",
+            backup=True,
+        )
+
+    if expected:
+        if tracked != expected:
+            write_managed_index(index_path, expected, dry_run)
+    elif not dry_run and index_path.exists():
+        # No adapter remains: drop the now-empty index entirely so `unified`
+        # stays byte-identical to a project that never opted in.
+        try:
+            index_path.unlink()
+        except OSError as exc:
+            log.warning(
+                f"context adapter index '{index_path.name}': could not remove: "
+                f"{type(exc).__name__}: {exc} — file left in place"
+            )
+    return backups
+
+
+def _dispatch_context_strategy(
+    agent_meta_root: Path,
+    project_root: Path,
+    config: dict,
+    variables: dict,
+    log: SyncLog,
+    dry_run: bool,
+    provider: str,
+    provider_config: dict,
+    target_name: str | None = None,
+    adapter_line: str | None = None,
+) -> None:
+    """Capability-driven render dispatch shared by both topology modes."""
+    pc = provider_config.get(provider, {})
+    if _has_capability(pc, "context-embedded-rules") or _shares_context_with_embedded_rules(
+        provider, pc, provider_config
+    ):
+        _sync_opencode_context(
+            agent_meta_root, project_root, config, variables, log, dry_run,
+            provider, provider_config, target_name=target_name,
+        )
+    elif _has_capability(pc, "context-config-comment"):
+        _sync_continue_context(
+            agent_meta_root, project_root, config, variables, log, dry_run,
+            provider, provider_config,
+        )
+    elif _has_capability(pc, "context-managed-block"):
+        _sync_managed_block_context(
+            agent_meta_root, project_root, config, variables, log, dry_run,
+            provider, provider_config, target_name=target_name,
+            adapter_line=adapter_line,
+        )
+
+
+def sync_context_adapters_for_provider(
+    agent_meta_root: Path,
+    project_root: Path,
+    config: dict,
+    variables: dict,
+    log: SyncLog,
+    dry_run: bool,
+    provider: str,
+    provider_config: dict,
+) -> None:
+    """Write the adapter file of an adapter-capable provider (``per-provider``).
+
+    The physical filename is selected here (IC-09, the render switch): an
+    adapter-capable provider renders its ``context_adapter_file`` with the
+    provider-native core reference line; a provider without the capability is
+    never routed here. ``resolve_context_filename`` (IC-08) is not consulted —
+    it feeds legacy cleanup only. A missing/blank adapter file is a
+    ``log.warning`` + return (never silent); ``dry_run`` never writes.
+    """
+    pc = provider_config.get(provider, {})
+    if pc.get("context_adapter") is not True:
+        return
+    adapter_file = pc.get("context_adapter_file")
+    if not (isinstance(adapter_file, str) and adapter_file.strip()):
+        log.warning(
+            f"context_adapter enabled for provider '{provider}' but "
+            "context_adapter_file is missing/empty — adapter render skipped"
+        )
+        return
+    _dispatch_context_strategy(
+        agent_meta_root, project_root, config, variables, log, dry_run,
+        provider, provider_config,
+        target_name=adapter_file,
+        adapter_line=_adapter_reference_line(config, pc),
+    )
+    if safe_path(project_root, adapter_file).exists():
+        _record_adapter_managed(project_root, adapter_file, log, dry_run)
+        _record_adapter_hash(project_root, adapter_file, dry_run)
+
+
 def sync_context_for_provider(
     agent_meta_root: Path,
     project_root: Path,
@@ -833,28 +1102,37 @@ def sync_context_for_provider(
         (the shared physical file must converge to one managed block, #638)
       - context-config-comment → Continue strategy (managed block + config.yaml comment)
       - context-managed-block  → generic HTML managed-block strategy
+
+    In ``context_file.topology: per-provider`` the render target is selected
+    per provider (IC-09): adapter-capable providers render their
+    ``context_adapter_file`` via ``sync_context_adapters_for_provider``, every
+    other provider renders the canonical core (``context_file.core_file``).
+    The default ``unified`` topology keeps the exact legacy path.
     """
     pc = provider_config.get(provider)
     if not pc:
         return
 
-    if _has_capability(pc, "context-embedded-rules") or _shares_context_with_embedded_rules(
-        provider, pc, provider_config
-    ):
-        _sync_opencode_context(
-            agent_meta_root, project_root, config, variables, log, dry_run,
-            provider, provider_config,
-        )
-    elif _has_capability(pc, "context-config-comment"):
-        _sync_continue_context(
-            agent_meta_root, project_root, config, variables, log, dry_run,
-            provider, provider_config,
-        )
-    elif _has_capability(pc, "context-managed-block"):
-        _sync_managed_block_context(
-            agent_meta_root, project_root, config, variables, log, dry_run,
-            provider, provider_config,
-        )
+    from .providers import context_topology
+
+    if context_topology(config, provider) == "per-provider":
+        if pc.get("context_adapter") is True:
+            sync_context_adapters_for_provider(
+                agent_meta_root, project_root, config, variables, log, dry_run,
+                provider, provider_config,
+            )
+        else:
+            _dispatch_context_strategy(
+                agent_meta_root, project_root, config, variables, log, dry_run,
+                provider, provider_config,
+                target_name=_core_context_filename(config),
+            )
+        return
+
+    _dispatch_context_strategy(
+        agent_meta_root, project_root, config, variables, log, dry_run,
+        provider, provider_config,
+    )
 
 
 def _init_provider_settings_json(
@@ -1071,6 +1349,7 @@ def _build_managed_block(
     provider: str,
     provider_config: dict | None = None,
     project_root: Path | None = None,
+    target_name: str | None = None,
 ) -> str:
     from .delegation_table import get_active_agents_data
     from .rules import collect_rule_sources, resolve_rules, rule_opts_lazy_channel
@@ -1089,10 +1368,11 @@ def _build_managed_block(
     # each sync overwrites the other's version forever (issue #638: infinite
     # oscillation, permanent false "out of sync" on --check).
     shared_users = [provider]
-    if provider_config and pc.get("context_file"):
+    shared_name = target_name or pc.get("context_file")
+    if provider_config and shared_name:
         shared_users = [
             p for p, cfg in provider_config.items()
-            if cfg.get("context_file") == pc.get("context_file")
+            if cfg.get("context_file") == shared_name
         ]
         if not all(provider_config[p].get("has_rules", False) for p in shared_users):
             has_native_rules = False

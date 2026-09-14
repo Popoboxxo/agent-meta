@@ -211,7 +211,33 @@ def prune_sync_backups(
     return pruned
 
 
-def _iter_managed_files(agent_meta_root: Path, project_root: Path, provider: str, pc: dict) -> list[Path]:
+def _adapter_file_for_provider(
+    config: dict, provider: str, pc: dict
+) -> Optional[str]:
+    """Project-relative adapter path when ``per-provider`` topology is active.
+
+    An adapter file is a provider's native context file (e.g. Claude's
+    ``CLAUDE.md`` at the project root) — outside the per-provider
+    managed-index dirs walked below — so it is opted into the drift baseline
+    explicitly. Only ``per-provider`` mode opts in, keeping the default
+    ``unified`` baseline byte-identical. Purely key-driven (no provider name).
+    """
+    if not isinstance(config, dict):
+        return None
+    adapter_file = pc.get("context_adapter_file")
+    if not (isinstance(adapter_file, str) and adapter_file.strip()):
+        return None
+    from .providers import context_topology
+
+    if context_topology(config, provider) != "per-provider":
+        return None
+    return adapter_file
+
+
+def _iter_managed_files(
+    agent_meta_root: Path, project_root: Path, provider: str, pc: dict,
+    config: Optional[dict] = None,
+) -> list[Path]:
     """Absolute paths of every file this provider's writers track via a
     .agent-meta-managed index (or its -mcp/-tools sidecars), across
     agents/rules/hooks(+lib+release-gates)/commands/skills/pipeline-details.
@@ -271,6 +297,12 @@ def _iter_managed_files(agent_meta_root: Path, project_root: Path, provider: str
                     if nested_candidate.is_file():
                         files.append(nested_candidate)
 
+    adapter_file = _adapter_file_for_provider(config, provider, pc)
+    if adapter_file:
+        adapter_path = project_root / adapter_file
+        if adapter_path.is_file():
+            files.append(adapter_path)
+
     return files
 
 
@@ -293,7 +325,7 @@ def scan_generated_file_drift(
     for provider, pc in provider_config.items():
         if provider not in active_providers:
             continue
-        for abs_path in _iter_managed_files(agent_meta_root, project_root, provider, pc):
+        for abs_path in _iter_managed_files(agent_meta_root, project_root, provider, pc, config):
             rel_path = abs_path.relative_to(project_root).as_posix()
             stored = stored_hashes.get(rel_path)
             if stored is None:
@@ -380,7 +412,7 @@ def capture_generated_file_hashes(
     for provider, pc in provider_config.items():
         if provider not in active_providers:
             continue
-        for abs_path in _iter_managed_files(agent_meta_root, project_root, provider, pc):
+        for abs_path in _iter_managed_files(agent_meta_root, project_root, provider, pc, config):
             rel_path = abs_path.relative_to(project_root).as_posix()
             hashes[rel_path] = content_hash(abs_path.read_text(encoding="utf-8"))
     resolved_path = project_root / PLATFORM_DEFAULTS_RESOLVED_REL

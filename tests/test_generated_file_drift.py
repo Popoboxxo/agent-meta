@@ -250,6 +250,50 @@ def test_scan_only_covers_active_providers(tmp_path: Path) -> None:
     assert findings == []
 
 
+def test_scan_covers_context_adapter_in_per_provider_mode(tmp_path: Path) -> None:
+    """AC-17: a generated context adapter is tracked for drift."""
+    from scripts.lib.generated_file_drift import content_hash
+    project_root = tmp_path / "project"
+    _write(project_root, "CLAUDE.md", "edited by hand")
+    _save_hashes(project_root, {"CLAUDE.md": content_hash("original")}, dry_run=False)
+
+    config = {"context_file": {"topology": "per-provider", "core_file": "AGENTS.md"}}
+    provider_config = {
+        "Claude": {
+            **_provider_config()["Claude"],
+            "context_adapter": True,
+            "context_adapter_file": "CLAUDE.md",
+        }
+    }
+
+    findings = scan_generated_file_drift(
+        tmp_path / "agent-meta", project_root, config, provider_config
+    )
+    assert [f["path"] for f in findings] == ["CLAUDE.md"]
+
+
+def test_scan_ignores_context_adapter_in_unified_mode(tmp_path: Path) -> None:
+    """The default ``unified`` topology never opts adapters into the baseline."""
+    from scripts.lib.generated_file_drift import content_hash
+    project_root = tmp_path / "project"
+    _write(project_root, "CLAUDE.md", "edited by hand")
+    _save_hashes(project_root, {"CLAUDE.md": content_hash("original")}, dry_run=False)
+
+    config = {"context_file": {"topology": "unified", "core_file": "AGENTS.md"}}
+    provider_config = {
+        "Claude": {
+            **_provider_config()["Claude"],
+            "context_adapter": True,
+            "context_adapter_file": "CLAUDE.md",
+        }
+    }
+
+    findings = scan_generated_file_drift(
+        tmp_path / "agent-meta", project_root, config, provider_config
+    )
+    assert findings == []
+
+
 from scripts.lib.generated_file_drift import capture_generated_file_hashes, content_hash
 
 
