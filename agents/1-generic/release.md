@@ -1,6 +1,6 @@
 ---
 name: template-release
-version: "1.12.0"
+version: "1.13.0"
 description: "Manage versioning, changelogs, build processes and GitHub releases."
 reference_standards:
   - "SemVer 2.0.0"
@@ -65,6 +65,8 @@ Check before every release:
 {{RELEASE_VERSIONING_BLOCK}}
 
 **SemVer (mandatory):** `MAJOR` = backward-incompatible, `MINOR` = new backward-compatible feature, `PATCH` = backward-compatible fix; `0.y.z` = unstable, anything may change. Dev builds use pre-release/-build metadata (`-alpha.1`, `+metadata`) — build metadata never affects precedence. Released tags are immutable: no re-tag/re-push after the tag exists.
+
+**Controlled rollout (risky releases):** prefer a canary or blue-green path — deploy the new version alongside the current one, validate on a subset, then roll out. Roll back by reverting or redeploying the pinned previous artifact, never by patching live; a broken release must not stand while a fix is built.
 
 ## 3. CHANGELOG.md format
 
