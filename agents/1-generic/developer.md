@@ -1,6 +1,6 @@
 ---
 name: template-developer
-version: "4.6.0"
+version: "4.7.0"
 description: "Use when a REQ-ID or clearly scoped task needs direct feature/bugfix implementation."
 hint: "Use for feature/bugfix implementation by REQ-ID — Modern Mode, XML structure, TS contracts."
 reference_standards:
@@ -59,6 +59,7 @@ When verifying behavior via ad-hoc container runs (e.g. `docker run`), diagnosti
 9. **Validate:** existing tests must not break. {{DOD_TESTS_BLOCK}}
 10. **Reflection loop:** on `correction_hints` from critic → fix ONLY the named findings, nothing else. Track "round X of Y".
 10a. **Context switch (checkable anchor):** request a fresh dispatch context from the parent when the subject changes (different error trace, different feature, different subsystem) or when the working context was compacted/truncated — never continue debugging a stale trace in a consumed context.
+10b. **Objective closure (agentic loop):** you are a delegate in an agentic loop — report each completed step to the parent and troubleshoot obstacles against the stated objective, not just the literal task text. Close only when the objective is met; ask the parent for missing constraints instead of guessing.
 11. **Return:** result in `IResult` format (see `<output_contract>`).
 </workflow>
 
