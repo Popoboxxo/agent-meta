@@ -5,7 +5,14 @@ pipeline_stages:
 
 # Implementierungsplan — Context-File Modes (Phase 1 / Phase 2)
 
-> Status: geplant — **nicht implementiert.** Dieser Plan wird erst nach explizitem Start ausgeführt.
+> Status: **Phase 1 (Tasks 1–6) implementiert** — Stand 2026-09-14 im Arbeitsbaum (Branch `feat/spec-plan-workflow`). **Phase 2 (Tasks 8–15) ist geplant/zurückgestellt.**
+>
+> **Revision / Status (2026-09-14):**
+> (a) Tasks 1–6 sind implementiert: Schema/Defaults (`context_file.topology`/`core_file`/`provider-overrides`), Resolver `context_topology` + Legacy-Filename-Regel, Adapter-Capability-Registry, F-RULESLOC, `per-provider`-Kern-/Adapter-Render + Dispatch, Rollback auf `unified`. Die zugehörigen Schritte sind unten abgehakt.
+> (b) Task 7 (Phase-1-Verifikations-Gate) ist gelaufen: `sync.py --validate/--check` rc 0, `consistency-check.py` rc 0, Phase-1-Unit-Suiten grün (Gate-Notiz in Task 7).
+> (c) FINDING F-RULESLOC: Verdict **channel (a) `.gemini/rules` CONTRADICTED as an Antigravity workspace-rules location** → **Fallback (c)**. Spike: `docs/spikes/2026-09-14-f-rulesloc-gemini-rules-channel.md`; reproduzierbares Protokoll: `tests/manual/f-rulesloc-gemini-rules-channel.md`. Der **Live-Real-Repo-Lauf** dieses Protokolls bleibt als Follow-up offen (Task 4 Step 2).
+> (d) `fill_defaults` persistiert den `topology`-Default **nicht** (Schema-`default` + Resolver-Fail-safe; Byte-Identität) — Interface-Tabelle, Task-1-Step-2 und Inventar sind entsprechend korrigiert.
+> (e) Bekannte Limitierung (dokumentiert, **nicht** gefixt): `rollback_context_adapters` läuft unter `_context_auto_generate(config)`; bei `context_file.auto_generate: false` werden Adapter beim Wechsel `per-provider` → `unified` **nicht** abgeräumt (S1-Contract „auto_generate: false wird nie übersteuert" bleibt gewahrt).
 
 **Spec:** `docs/specs/2026-09-13-context-file-modes-design.md` (Status **APPROVED 2026-09-14**)
 
@@ -35,7 +42,7 @@ pipeline_stages:
 - **Bite-sized & TDD:** Jede Task ist einzeln testbar/committbar (Test fail → implementieren → Test pass → Commit); kein Task ist „done" ohne beobachteten Test.
 - **Befehle:** Ausschließlich `rtk`-präfigierte Kommandos in diesem Plan.
 - **Keine Rollen-Routen:** `agents/1-generic/*` und `rules/1-generic/*` erhalten keine Route-Tabellen/`roleA → roleB`-Ketten; `tests/test_no_role_routes_in_templates.py` bleibt grün.
-- **Keine Implementierung jetzt:** Dieser Plan ändert keinen Code. Phase 1/2 startet erst auf expliziten User-/Orchestrator-Entscheid.
+- **Implementierungsstand:** Phase 1 (Tasks 1–6) ist implementiert (2026-09-14, Arbeitsbaum `feat/spec-plan-workflow`); Phase 2 (Tasks 8–15) bleibt geplant/zurückgestellt und startet erst auf expliziten User-/Orchestrator-Entscheid.
 
 ## Interfaces
 
@@ -48,7 +55,7 @@ Neue und geänderte Symbole als `file:Symbol`. Alle nicht gelisteten, bereits ex
 | `config/project-config.schema.json:context_file.topology` | neu | `type: string`, `enum: ["unified","per-provider"]`, `default: "unified"`. |
 | `config/project-config.schema.json:context_file.core_file` | neu | `type: string`, `default: "AGENTS.md"`. |
 | `config/project-config.schema.json:context_file.provider-overrides` | neu | Objekt `<Provider> → { topology: enum }`, `additionalProperties: false` pro Eintrag. |
-| `scripts/lib/config.py:fill_defaults` | geändert (IC-12) | Schreibt fehlenden Default `context_file.topology: unified`; fügt keinen Pflicht-Key hinzu; ein vorhandener `context_file`-Block wird nicht über das Schema hinaus geweitet. |
+| `scripts/lib/config.py:fill_defaults` | **unverändert** (IC-12) | Persistiert den Default **nicht**: `context_file.topology` bleibt bei Absenz virtuell (JSON-Schema-`default: "unified"` + Resolver-Fail-safe in `providers.context_topology`). Kein neuer Pflicht-Key; Absenz bleibt der kanonische `unified`-Zustand (Byte-Identität, `--check` rc 0). |
 | `config/ai-providers.yaml:<Provider>.context_adapter` | neu (IC-07) | `true|false`; provider kann eine eigene Adapter-Datei lesen. |
 | `config/ai-providers.yaml:<Provider>.context_adapter_file` | neu | nativer Dateipfad, z. B. `CLAUDE.md`. |
 | `config/ai-providers.yaml:<Provider>.context_adapter_import` | neu | provider-native Import-Syntax, `"{core}"`-Platzhalter, `""` = Pointer-Zeile. |
@@ -80,11 +87,12 @@ Neue und geänderte Symbole als `file:Symbol`. Alle nicht gelisteten, bereits ex
 ### Geänderte Dateien
 
 - Modify: `config/project-config.schema.json` — `context_file`-Block um `topology`/`core_file`/`provider-overrides` erweitern (`:885-916`, `additionalProperties: false` bleibt).
-- Modify: `scripts/lib/config.py` — `fill_defaults` (`:886`) persistiert Default `unified`.
+- Modify: `scripts/lib/config.py` — `fill_defaults` (`:886`) lässt den `topology`-Default **virtuell** (kein Persistieren; Schema-`default` + Resolver-Fail-safe, siehe Interface-Tabelle).
 - Modify: `scripts/lib/providers.py` — `context_topology` (IC-05) + `resolve_context_filename`-Adapter-Regel (IC-08).
 - Modify: `config/ai-providers.yaml` — Adapter-Keys für Claude (Phase 1), dann Codex/Copilot/Continue/Mammouth + Gemini `context_adapter_settings` (Phase 2).
 - Modify: `scripts/lib/context.py` — `per-provider`-Render/Dispatch (IC-09), Kern-/Adapter-Ziel-Selektion.
-- Modify: `scripts/lib/sync_pipeline.py` — Rollback-Cleanup-Wiring (moduswechsel-getriebene Adapter-Entfernung).
+- Modify: `scripts/lib/sync_pipeline.py` — Rollback-Cleanup-Wiring (moduswechsel-getriebene Adapter-Entfernung). Bekannte Limitierung: der Aufruf liegt unter `_context_auto_generate(config)`; bei `context_file.auto_generate: false` werden Adapter beim Wechsel auf `unified` **nicht** abgeräumt (bewusst dokumentiert, nicht gefixt — S1-Contract „auto_generate: false wird nie übersteuert").
+- Modify: `scripts/lib/generated_file_drift.py` — Adapter-Pfade (`context_adapter_file`) bei aktivem `per-provider` in die Drift-Baseline aufnehmen (AC-17: Drift-Tracking der Adapter; `unified`-Baseline byte-identisch).
 - Modify: `scripts/lib/variables.py` — `GATE_NEUTRAL` in `conditional_vars` (`:235`).
 - Modify: `scripts/lib/consistency/placeholders.py` — `GATE_NEUTRAL` in `_BUILTIN_VARS` (`:84-85`).
 - Modify: `rules/1-generic/use-orchestrator.md` — Neutral-Render-State des Kerns.
@@ -136,17 +144,17 @@ Neue und geänderte Symbole als `file:Symbol`. Alle nicht gelisteten, bereits ex
 - Create: `tests/test_context_topology_schema.py`
 
 **Interfaces:** (Produces / Consumes)
-- Produces: Schema-Member `context_file.topology` (`enum`, `default "unified"`), `context_file.core_file` (`string`, `default "AGENTS.md"`), `context_file.provider-overrides` (`<Provider> → {topology}`, `additionalProperties: false`); `fill_defaults`-Default.
+- Produces: Schema-Member `context_file.topology` (`enum`, `default "unified"`), `context_file.core_file` (`string`, `default "AGENTS.md"`), `context_file.provider-overrides` (`<Provider> → {topology}`, `additionalProperties: false`); `fill_defaults` **ohne** persistierten `topology`-Default (Absenz = kanonisch `unified`).
 - Consumes: bestehender `context_file`-Block (`config/project-config.schema.json:885-916`); `fill_defaults` (`scripts/lib/config.py:886`).
 
 **Agent:** senior-developer
 **Depends on:** —
 
 **Steps:**
-- [ ] Step 1: Test schreiben (fail) — `tests/test_context_topology_schema.py::test_topology_enum_accepted` (AC-11: `topology: per-provider` + `core_file: "AGENTS.md"` + `provider-overrides: {Gemini: {topology: unified}}` validiert), `::test_topology_out_of_enum_rejected`, `::test_topology_unknown_subkey_rejected` (AC-11: `additionalProperties: false`), `::test_core_file_non_string_rejected`, `::test_provider_overrides_unknown_subkey_rejected`, `::test_absence_resolves_unified` (AC-11: fehlender Key gültig). `pytest.importorskip("jsonschema")` wie `tests/test_subagent_permissions_schema.py`.
-- [ ] Step 2: Implementieren — im `context_file`-Block (`:885-916`) `topology`, `core_file`, `provider-overrides` als Geschwister von `mode` ergänzen; `additionalProperties: false` (`:915`) unverändert lassen. `provider-overrides` als `additionalProperties: {type: object, additionalProperties: false, properties: {topology: {enum}}}` (Muster `orchestrator.provider-overrides`). In `scripts/lib/config.py::fill_defaults` den Default `context_file.topology: unified` nur bei fehlendem Key persistieren; kein neues Pflichtfeld.
-- [ ] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_context_topology_schema.py tests/test_spec_plan_config_schema.py tests/test_config_null_blocks.py -q` → rc 0; danach `rtk python3 scripts/sync.py --validate` → rc 0.
-- [ ] Step 4: Commit — `feat: declare context_file topology keys in project schema`.
+- [x] Step 1: Test schreiben (fail) — `tests/test_context_topology_schema.py::test_topology_enum_accepted` (AC-11: `topology: per-provider` + `core_file: "AGENTS.md"` + `provider-overrides: {Gemini: {topology: unified}}` validiert), `::test_topology_out_of_enum_rejected`, `::test_topology_unknown_subkey_rejected` (AC-11: `additionalProperties: false`), `::test_core_file_non_string_rejected`, `::test_provider_overrides_unknown_subkey_rejected`, `::test_absence_resolves_unified` (AC-11: fehlender Key gültig). `pytest.importorskip("jsonschema")` wie `tests/test_subagent_permissions_schema.py`.
+- [x] Step 2: Implementieren — im `context_file`-Block (`:885-916`) `topology`, `core_file`, `provider-overrides` als Geschwister von `mode` ergänzen; `additionalProperties: false` (`:915`) unverändert lassen. `provider-overrides` als `additionalProperties: {type: object, additionalProperties: false, properties: {topology: {enum}}}` (Muster `orchestrator.provider-overrides`). In `scripts/lib/config.py::fill_defaults` bleibt der Default **virtuell**: `context_file.topology` wird **nicht** persistiert (Absenz = kanonisch `unified`; Schema-`default` + Resolver-Fail-safe sichern Byte-Identität und `--check` rc 0). Kein neues Pflichtfeld.
+- [x] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_context_topology_schema.py tests/test_spec_plan_config_schema.py tests/test_config_null_blocks.py -q` → rc 0; danach `rtk python3 scripts/sync.py --validate` → rc 0.
+- [x] Step 4: Commit — `feat: declare context_file topology keys in project schema`.
 
 **Acceptance:** AC-11.
 
@@ -167,10 +175,10 @@ Neue und geänderte Symbole als `file:Symbol`. Alle nicht gelisteten, bereits ex
 **Depends on:** 1
 
 **Steps:**
-- [ ] Step 1: Test schreiben (fail) — in `tests/test_context_file_modes.py`: `::test_context_topology_provider_override_wins` (AC-10: Override `Gemini: unified` + Projekt `per-provider` → `unified` für `Gemini`, `per-provider` für `Opencode`), `::test_context_topology_default_when_absent` (AC-10), `::test_context_topology_out_of_enum_falls_back` (AC-10: `"garbage"` → `unified`), `::test_context_topology_non_mapping_config_never_raises` (AC-10), `::test_context_topology_provider_none_uses_project_value`. In `tests/test_provider_context_filename.py`: `::test_adapter_flag_returns_adapter_file`, `::test_adapter_flag_empty_file_falls_back_to_existing_resolution`.
-- [ ] Step 2: Implementieren — in `scripts/lib/providers.py` `context_topology` als Leaf-Resolver (Muster `variables._resolve_orch_mode`): `cfg = config if isinstance(config, dict) else {}`; `block = cfg.get("context_file")`; `block` nicht-Mapping → `"unified"`; Override `block.get("provider-overrides", {}).get(provider, {}).get("topology")` prüfen, dann `block.get("topology")`, jeweils nur bei `in ("unified","per-provider")`; sonst `"unified"`. `resolve_context_filename` um die IC-08-Regel ergänzen (`pc.get("context_adapter") is True` und nicht-leeres `context_adapter_file` → dieses zurückgeben). Keine Provider-Literale.
-- [ ] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_context_file_modes.py tests/test_provider_context_filename.py tests/test_runtime_gate_config.py tests/test_runtime_gate_wiring.py -q` → rc 0.
-- [ ] Step 4: Commit — `feat: resolve context_file topology and adapter filename`.
+- [x] Step 1: Test schreiben (fail) — in `tests/test_context_file_modes.py`: `::test_context_topology_provider_override_wins` (AC-10: Override `Gemini: unified` + Projekt `per-provider` → `unified` für `Gemini`, `per-provider` für `Opencode`), `::test_context_topology_default_when_absent` (AC-10), `::test_context_topology_out_of_enum_falls_back` (AC-10: `"garbage"` → `unified`), `::test_context_topology_non_mapping_config_never_raises` (AC-10), `::test_context_topology_provider_none_uses_project_value`. In `tests/test_provider_context_filename.py`: `::test_adapter_flag_returns_adapter_file`, `::test_adapter_flag_empty_file_falls_back_to_existing_resolution`.
+- [x] Step 2: Implementieren — in `scripts/lib/providers.py` `context_topology` als Leaf-Resolver (Muster `variables._resolve_orch_mode`): `cfg = config if isinstance(config, dict) else {}`; `block = cfg.get("context_file")`; `block` nicht-Mapping → `"unified"`; Override `block.get("provider-overrides", {}).get(provider, {}).get("topology")` prüfen, dann `block.get("topology")`, jeweils nur bei `in ("unified","per-provider")`; sonst `"unified"`. `resolve_context_filename` um die IC-08-Regel ergänzen (`pc.get("context_adapter") is True` und nicht-leeres `context_adapter_file` → dieses zurückgeben). Keine Provider-Literale.
+- [x] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_context_file_modes.py tests/test_provider_context_filename.py tests/test_runtime_gate_config.py tests/test_runtime_gate_wiring.py -q` → rc 0.
+- [x] Step 4: Commit — `feat: resolve context_file topology and adapter filename`.
 
 **Acceptance:** AC-10.
 
@@ -191,10 +199,10 @@ Neue und geänderte Symbole als `file:Symbol`. Alle nicht gelisteten, bereits ex
 **Depends on:** 2
 
 **Steps:**
-- [ ] Step 1: Test schreiben (fail) — `tests/test_context_adapters.py::test_adapter_providers_have_file_and_import_support` (AC-12), `::test_no_two_adapters_share_a_file` (AC-12), `::test_non_adapter_providers_have_no_adapter_keys` (AC-12), `::test_claude_is_the_only_phase1_adapter`. In `tests/test_provider_agnostic_dispatch.py` einen Fall ergänzen, der `context_adapter`-Keys ohne Provider-Literal prüft.
-- [ ] Step 2: Implementieren — die fünf Keys im Claude-Block ergänzen. Keine Keys für Gemini/Antigravity (Kanal ist `has_rules`/`rules_dir`, kein Adapter) und keine für opencode/KimiCode/ZCode (Direkt-Leser). Keine Provider-Namen im Python-Code; die Test-Invariante liest die Registries datengetrieben.
-- [ ] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_context_adapters.py tests/test_provider_agnostic_dispatch.py tests/test_provider_hooks_config.py -q` → rc 0; danach `rtk python3 scripts/sync.py --validate` → rc 0.
-- [ ] Step 4: Commit — `feat: add context adapter capability keys for claude`.
+- [x] Step 1: Test schreiben (fail) — `tests/test_context_adapters.py::test_adapter_providers_have_file_and_import_support` (AC-12), `::test_no_two_adapters_share_a_file` (AC-12), `::test_non_adapter_providers_have_no_adapter_keys` (AC-12), `::test_claude_is_the_only_phase1_adapter`. In `tests/test_provider_agnostic_dispatch.py` einen Fall ergänzen, der `context_adapter`-Keys ohne Provider-Literal prüft.
+- [x] Step 2: Implementieren — die fünf Keys im Claude-Block ergänzen. Keine Keys für Gemini/Antigravity (Kanal ist `has_rules`/`rules_dir`, kein Adapter) und keine für opencode/KimiCode/ZCode (Direkt-Leser). Keine Provider-Namen im Python-Code; die Test-Invariante liest die Registries datengetrieben.
+- [x] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_context_adapters.py tests/test_provider_agnostic_dispatch.py tests/test_provider_hooks_config.py -q` → rc 0; danach `rtk python3 scripts/sync.py --validate` → rc 0.
+- [x] Step 4: Commit — `feat: add context adapter capability keys for claude`.
 
 **Acceptance:** AC-12.
 
@@ -206,18 +214,24 @@ Neue und geänderte Symbole als `file:Symbol`. Alle nicht gelisteten, bereits ex
 - Create: `docs/spikes/2026-09-14-f-rulesloc-gemini-rules-channel.md`
 - Create: `tests/manual/f-rulesloc-gemini-rules-channel.md`
 
+> **Spike/Verdict (2026-09-14):** Siehe `docs/spikes/2026-09-14-f-rulesloc-gemini-rules-channel.md`.
+> Verdict: **channel (a) `.gemini/rules` CONTRADICTED as an Antigravity workspace-rules location**
+> → Empfehlung **Fallback (c)** (geteilte `AGENTS.md` + native Hook-Erzwingung; Text = Dokumentation).
+> Das reproduzierbare Real-Repo-Protokoll liegt in `tests/manual/f-rulesloc-gemini-rules-channel.md`;
+> der Live-Antigravity-Lauf bleibt als bestätigender Follow-up offen.
+
 **Interfaces:** (Produces / Consumes)
 - Produces: reproduzierbares Verifikationsprotokoll + **Verdict** (`PASS` = Kanal (a) `.gemini/rules` wird gelesen; `FAIL` = Fallback (c)); dokumentierte Entscheidung, welcher Kanal Gemini/Antigravity in `per-provider` trägt.
-- Consumes: `config/ai-providers.yaml:95` (`rules_dir: .gemini/rules`), `:97-99` (`hook_protocol`, `hooks_dir`/`hooks_config_file` = `.agents/...`), `config/provider-capabilities.yaml:94` (`runtime_gate: hook`); Repository-Evidenz `.gemini/rules/` vs. `.agents/`.
+- Consumes: `config/ai-providers.yaml:104` (`rules_dir: .gemini/rules`; die Spec/Plan-Altangabe `:95` ist Zeilendrift), `:106-108` (`hook_protocol`, `hooks_dir`/`hooks_config_file` = `.agents/...`; Altangabe `:97-99`), `config/provider-capabilities.yaml:94` (`runtime_gate: hook`); Repository-Evidenz `.gemini/rules/` (39 Einträge, inkl. `use-orchestrator.md`) vs. `.agents/` (nur `hooks.json` + `hooks/`).
 
 **Agent:** explorer
 **Depends on:** 3
 
 **Steps:**
-- [ ] Step 1: Evidenz erheben (fail-first dokumentieren) — `rtk grep -n "rules_dir\\|hooks_dir\\|hooks_config_file" config/ai-providers.yaml`; `rtk find .agents -maxdepth 3`; `rtk find .gemini -maxdepth 2`; `rtk read .gemini/rules/use-orchestrator.md`. Ergebnis: `rules_dir: .gemini/rules` weicht von der dokumentierten Antigravity-Lokation `.agents/rules` ab; `.agents/` enthält kein `rules/`. Protokoll in `tests/manual/f-rulesloc-gemini-rules-channel.md` anlegen.
-- [ ] Step 2: Real-Repo-Check definieren und ausführen — Prozedur: in einem echten Antigravity-Workspace eine Always-On-Rule unter `.gemini/rules/` **und** `.agents/rules/` mit unverwechselbarem Marker ablegen, Session starten, beobachten welche Datei geladen wird; zuerst `PASS`/`FAIL` pro Kanal festhalten. Ergebnis + Rohbeobachtung im Spike-Doc.
-- [ ] Step 3: Verdict setzen + Kanalentscheidung dokumentieren — `Verdict: PASS` → Kanal (a) (`.gemini/rules`, bestehender Seam, keine neuen Keys) oder `Verdict: FAIL` → Fallback (c) (geteilte `AGENTS.md`, Tier nativ per Hook; Prompt-Text = Dokumentation). Das Verdict ist bindend für Task 5 (AC-13/AC-14) und Task 8.
-- [ ] Step 4: Commit — `docs: verify gemini/antigravity rules channel (F-RULESLOC)`.
+- [x] Step 1: Evidenz erheben (fail-first dokumentieren) — `rtk grep -n "rules_dir\\|hooks_dir\\|hooks_config_file" config/ai-providers.yaml`; `rtk find .agents -maxdepth 3`; `rtk find .gemini -maxdepth 2`; `rtk read .gemini/rules/use-orchestrator.md`. Ergebnis: `rules_dir: .gemini/rules` weicht von der dokumentierten Antigravity-Lokation `.agents/rules` ab; `.agents/` enthält kein `rules/`. Protokoll in `tests/manual/f-rulesloc-gemini-rules-channel.md` anlegen.
+- [x] Step 2: Real-Repo-Check definieren und ausführen — Prozedur: in einem echten Antigravity-Workspace eine Always-On-Rule unter `.gemini/rules/` **und** `.agents/rules/` mit unverwechselbarem Marker ablegen, Session starten, beobachten welche Datei geladen wird; zuerst `PASS`/`FAIL` pro Kanal festhalten. Ergebnis + Rohbeobachtung im Spike-Doc. **Hinweis (2026-09-14):** Das Protokoll ist definiert und abgelegt (`tests/manual/f-rulesloc-gemini-rules-channel.md`); der Live-Antigravity-Lauf war in dieser Umgebung nicht ausführbar und bleibt als bestätigender Follow-up offen — das Evidenz-Verdict steht im Spike.
+- [x] Step 3: Verdict setzen + Kanalentscheidung dokumentieren — `Verdict: PASS` → Kanal (a) (`.gemini/rules`, bestehender Seam, keine neuen Keys) oder `Verdict: FAIL` → Fallback (c) (geteilte `AGENTS.md`, Tier nativ per Hook; Prompt-Text = Dokumentation). Das Verdict ist bindend für Task 5 (AC-13/AC-14) und Task 8.
+- [x] Step 4: Commit — `docs: verify gemini/antigravity rules channel (F-RULESLOC)`.
 
 **Acceptance:** Gate für AC-13/AC-14 (Gemini/Antigravity-Kanal); kein numerischer AC — Verifikationspunkt ist OQ-3/R8, Ergebnis ist Voraussetzung für die Kanal-(a)-Beanspruchung.
 
@@ -238,10 +252,10 @@ Neue und geänderte Symbole als `file:Symbol`. Alle nicht gelisteten, bereits ex
 **Depends on:** 4
 
 **Steps:**
-- [ ] Step 1: Test schreiben (fail) — `tests/test_context_adapters.py::test_per_provider_direct_readers_stay_on_core` (AC-13: opencode/KimiCode/ZCode ohne Adapter; Gemini/Antigravity ohne `context_adapter_file`), `::test_claude_adapter_written_to_claude_md` (AC-13: gebunden an die tatsächlich geschriebene Datei), `::test_adapter_import_line_when_supported` (AC-15: `@AGENTS.md`), `::test_adapter_pointer_line_when_unsupported` (AC-15), `::test_empty_import_falls_back_to_pointer` (AC-15), `::test_claude_managed_block_has_no_gate_vars` (AC-14, F-04), `::test_per_provider_render_idempotent` (AC-16: zweiter Lauf byte-identisch, `pending == 0`), `::test_adapters_recorded_in_index_and_context_hashes` (AC-17). In `tests/test_generated_file_drift.py` einen Adapter-Drift-Fall ergänzen (AC-17).
-- [ ] Step 2: Implementieren — in `scripts/lib/context.py` `sync_context_adapters_for_provider` und die `sync_context_for_provider`-Dispatch-Extension (IC-09) implementieren: Kern-Render (`context_file.core_file`) plus optionale Adapter-Datei; Import-Syntax aus `context_adapter_import`/`context_adapter_import_supported` (Fallback Pointer); der Claude-Adapters wird als `CLAUDE.md`-`context-managed-block` gerendert (keine `GATE_*` im Managed Block) und sein `hook`-Wortlaut liegt in `.claude/rules/use-orchestrator.md` (bestehender `sync_rules`-Seam); Gemini/Antigravity bleibt Direkt-Leser des Kerns, sein Tier-Träger ist `.gemini/rules` (Kanal (a), gated auf Task 4) bzw. Fallback (c). Lifecycle über `rule_index`-Helfer, Hash über `_record_static_hash`/`_save_context_hashes`; idempotent (`log.skip` bei unverändertem Inhalt); `dry_run` schreibt nie; kein `context_adapter_file` → `log.warning` + return. Kein Provider-Literal.
-- [ ] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_context_adapters.py tests/test_generated_file_drift.py tests/test_context_agents_md_idempotency.py tests/test_provider_context_filename.py -q` → rc 0.
-- [ ] Step 4: Commit — `feat: render per-provider context core and adapters`.
+- [x] Step 1: Test schreiben (fail) — `tests/test_context_adapters.py::test_per_provider_direct_readers_stay_on_core` (AC-13: opencode/KimiCode/ZCode ohne Adapter; Gemini/Antigravity ohne `context_adapter_file`), `::test_claude_adapter_written_to_claude_md` (AC-13: gebunden an die tatsächlich geschriebene Datei), `::test_adapter_import_line_when_supported` (AC-15: `@AGENTS.md`), `::test_adapter_pointer_line_when_unsupported` (AC-15), `::test_empty_import_falls_back_to_pointer` (AC-15), `::test_claude_managed_block_has_no_gate_vars` (AC-14, F-04), `::test_per_provider_render_idempotent` (AC-16: zweiter Lauf byte-identisch, `pending == 0`), `::test_adapters_recorded_in_index_and_context_hashes` (AC-17). In `tests/test_generated_file_drift.py` einen Adapter-Drift-Fall ergänzen (AC-17).
+- [x] Step 2: Implementieren — in `scripts/lib/context.py` `sync_context_adapters_for_provider` und die `sync_context_for_provider`-Dispatch-Extension (IC-09) implementieren: Kern-Render (`context_file.core_file`) plus optionale Adapter-Datei; Import-Syntax aus `context_adapter_import`/`context_adapter_import_supported` (Fallback Pointer); der Claude-Adapters wird als `CLAUDE.md`-`context-managed-block` gerendert (keine `GATE_*` im Managed Block) und sein `hook`-Wortlaut liegt in `.claude/rules/use-orchestrator.md` (bestehender `sync_rules`-Seam); Gemini/Antigravity bleibt Direkt-Leser des Kerns, sein Tier-Träger ist `.gemini/rules` (Kanal (a), gated auf Task 4) bzw. Fallback (c). Lifecycle über `rule_index`-Helfer, Hash über `_record_static_hash`/`_save_context_hashes`; idempotent (`log.skip` bei unverändertem Inhalt); `dry_run` schreibt nie; kein `context_adapter_file` → `log.warning` + return. Kein Provider-Literal.
+- [x] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_context_adapters.py tests/test_generated_file_drift.py tests/test_context_agents_md_idempotency.py tests/test_provider_context_filename.py -q` → rc 0.
+- [x] Step 4: Commit — `feat: render per-provider context core and adapters`.
 
 **Acceptance:** AC-13, AC-14, AC-15, AC-16, AC-17.
 
@@ -261,10 +275,10 @@ Neue und geänderte Symbole als `file:Symbol`. Alle nicht gelisteten, bereits ex
 **Depends on:** 5
 
 **Steps:**
-- [ ] Step 1: Test schreiben (fail) — `tests/test_context_adapters.py::test_rollback_removes_indexed_adapters` (AC-18), `::test_rollback_keeps_foreign_adapter_files` (AC-18), `::test_rollback_restores_weakest_tier_core` (AC-18), `::test_rollback_check_reports_no_pending` (AC-18: kein verwaister Adapter, `pending == 0`).
-- [ ] Step 2: Implementieren — in `scripts/lib/sync_pipeline.py` den Legacy-Cleanup-/Moduswechsel-Pfad so verdrahten, dass Adapter-Dateien aus dem Managed-Index bei Rückkehr zu `unified` entfernt werden (backup-first wie bestehender Cleanup), ohne Dateien ohne Index-Eintrag zu löschen. Bestehenden `resolve_context_filename`-Pfad (IC-08) nicht auf den Render-Pfad ziehen.
-- [ ] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_context_adapters.py tests/test_cleanup_preview_cli.py tests/test_generated_file_drift.py -q` → rc 0.
-- [ ] Step 4: Commit — `feat: roll back per-provider adapters on topology switch`.
+- [x] Step 1: Test schreiben (fail) — `tests/test_context_adapters.py::test_rollback_removes_indexed_adapters` (AC-18), `::test_rollback_keeps_foreign_adapter_files` (AC-18), `::test_rollback_restores_weakest_tier_core` (AC-18), `::test_rollback_check_reports_no_pending` (AC-18: kein verwaister Adapter, `pending == 0`).
+- [x] Step 2: Implementieren — in `scripts/lib/sync_pipeline.py` den Legacy-Cleanup-/Moduswechsel-Pfad so verdrahten, dass Adapter-Dateien aus dem Managed-Index bei Rückkehr zu `unified` entfernt werden (backup-first wie bestehender Cleanup), ohne Dateien ohne Index-Eintrag zu löschen. Bestehenden `resolve_context_filename`-Pfad (IC-08) nicht auf den Render-Pfad ziehen.
+- [x] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_context_adapters.py tests/test_cleanup_preview_cli.py tests/test_generated_file_drift.py -q` → rc 0.
+- [x] Step 4: Commit — `feat: roll back per-provider adapters on topology switch`.
 
 **Acceptance:** AC-18.
 
@@ -288,6 +302,16 @@ Neue und geänderte Symbole als `file:Symbol`. Alle nicht gelisteten, bereits ex
 - [ ] Step 3: Konsistenz & Provider-Agnostik — `rtk python3 scripts/consistency-check.py` → rc 0; `rtk python3 -m pytest tests/test_provider_agnostic_dispatch.py tests/test_no_role_routes_in_templates.py -q` → rc 0.
 - [ ] Step 4: Szenario-Harness (Bestand) — `rtk bash tests/scenarios/run.sh` → alle vorhandenen Szenarien `PASS` (Szenario 63 existiert erst in Phase 2).
 - [ ] Step 5: Commit — `test: verify context file modes phase 1 end to end`.
+
+> **Gate-Lauf (2026-09-14, `feat/spec-plan-workflow`):** Step 1 (Phase-1-Unit-Suiten
+> `test_context_topology_schema`/`test_context_file_modes`/`test_context_adapters`/
+> `test_provider_context_filename`/`test_generated_file_drift`) → **107 passed, rc 0**;
+> Step 2 `sync.py --validate` rc 0 **und** `sync.py --check` rc 0; Step 3
+> `consistency-check.py` rc 0 und `test_provider_agnostic_dispatch`/`test_no_role_routes_in_templates`
+> rc 0. Die Checkboxen bleiben bewusst offen (Step 4 vollständiger Szenario-Harness und Step 5
+> Commit wurden in diesem Lauf nicht ausgeführt; der Ledger bildet den Rohzustand ab) — das Gate
+> gilt inhaltlich als **gelaufen**. Offener Follow-up bleibt der **Live-Real-Repo-Lauf des
+> Task-4-Protokolls** (`tests/manual/f-rulesloc-gemini-rules-channel.md`).
 
 **Acceptance:** AC-10 bis AC-18 (Abnahmenachweis).
 
@@ -520,6 +544,7 @@ Neue und geänderte Symbole als `file:Symbol`. Alle nicht gelisteten, bereits ex
 
 - **Default ist `unified`:** Ohne explizites `context_file.topology: per-provider` ändert sich das Layout nicht; der Schalter kann pro Provider über `context_file.provider-overrides.<Provider>.topology` zurückgestellt werden.
 - **Rollback-Pfad (AC-18):** `per-provider` → `unified` entfernt index-getrackte Adapter über `cleanup_stale_managed_files` (backup-first), lässt fremde/user-Dateien ohne Index-Eintrag unberührt und konvergiert auf `pending == 0`. Kein manueller Dateieingriff nötig.
+- **Bekannte Limitierung (Rollback-Gating, dokumentiert):** `rollback_context_adapters` läuft in `_sync_stage_claude_base` unter `_context_auto_generate(config)`. Bei `context_file.auto_generate: false` (S1/dev-written-Modus) werden Adapter beim Wechsel `per-provider` → `unified` **nicht** abgeräumt — der Managed-Index und die Adapter-Datei bleiben liegen; ein manueller Eingriff oder ein temporäres `auto_generate: true` ist nötig. Bewusst **nicht** gefixt: das Entfernen eines Kontext-Adapter-Files würde den S1-Contract „`auto_generate: false` wird nie übersteuert" verletzen. Fix-Kandidat für Phase 2: Rollback vom `auto_generate`-Guard entkoppeln und mit einem eigenen Test absichern.
 - **F-RULESLOC-Fallback (c):** Schlägt Task 4 fehl, wird Kanal (a) nicht beansprucht; Gemini/Antigravity bleibt auf der geteilten `AGENTS.md` mit nativer Hook-Erzwingung (Prompt-Text = Dokumentation). Kein Config-Bruch, kein Rollback nötig — die Kanalentscheidung ist datengetrieben.
 - **Phase-0-Schutz:** `runtime_gate.py` wird nicht berührt; `providers.py::runtime_gate_vars`-Contract und `_build_managed_block`-Shared-Override bleiben byte-identisch; `sync.py --check` bleibt rc 0.
 - **Phase-2-Provider bleiben aus:** Codex/Copilot/Continue/Mammouth und Gemini `context.fileName` werden erst nach dokumentierter HYPOTHESIS-Verifikation scharfgeschaltet; andernfalls bleiben sie Direkt-Leser (AC-22).
@@ -535,7 +560,7 @@ Neue und geänderte Symbole als `file:Symbol`. Alle nicht gelisteten, bereits ex
 - **Datei-Ownership:** Keine Datei wird von zwei **parallelen** Tasks geschrieben. Sequenzielle Mehrfachnutzung (nur `scripts/lib/context.py` in Task 5/8/9, `config/ai-providers.yaml` in Task 3/9, `tests/test_context_adapters.py` in Task 3…9) ist über strikt vorwärtsgerichtete `Depends on`-Kanten entkoppelt. Die bekannte Validator-Limitierung (`validate_plan` wendet `file_overlap` ohne `kind`-Gate an) kann gekoppelte Dateien über sequenzielle Kanten hinweg melden — dokumentierte Limitierung, keine Ownership-Verletzung.
 - **Rahmenbedingungen:** Provider-agnostisch (kein Provider-Literal; Adapter-Dispatch über Keys/Capability), Stdlib-only, Py3.9-konform, byte-identischer `unified`-Default, Phase-0-Contracts unberührt, keine Rollen-Routen, keine Modellnamen.
 - **No-Placeholder:** Keine `TODO`/`TBD`/`...`-Marker, keine leeren `Interfaces:`; exakte Pfade, Symbole, Signaturen, Testnamen und Commit-Messages.
-- **Keine Implementierung:** Dieser Plan ändert keinen Code; Phase 1/2 startet erst auf expliziten Start.
+- **Implementierungsstand:** Phase 1 (Tasks 1–6) ist implementiert und durch das Phase-1-Gate (Task 7) belegt; Phase 2 (Tasks 8–15) ist noch nicht implementiert und startet erst auf expliziten Start.
 
 ## Ausführungs-Handoff
 
