@@ -319,7 +319,11 @@ def _render_context(mode: str | None, workdir: Path) -> str:
 
     from lib.context import sync_context_for_provider
     from lib.log import SyncLog
-    from lib.providers import load_providers_config
+    from lib.providers import (
+        load_provider_capabilities,
+        load_providers_config,
+        runtime_gate_vars,
+    )
 
     config = load_config(REPO_ROOT / ".meta-config" / "project.yaml")
     if mode is not None:
@@ -333,20 +337,43 @@ def _render_context(mode: str | None, workdir: Path) -> str:
         config["context_file"] = context_block
     variables, _ = build_variables(config, REPO_ROOT)
     provider_config = load_providers_config(REPO_ROOT)
+    capabilities = load_provider_capabilities(REPO_ROOT)
     log = SyncLog()
+
+    def provider_variables_for(provider: str) -> dict:
+        # Mirror the production runtime-gate seam exactly: both
+        # sync_pipeline._sync_stage_contexts and _sync_stage_per_provider copy
+        # the shared variables and merge runtime_gate_vars(pc, caps, config)
+        # per provider BEFORE every renderer call (IC-04,
+        # SPEC-OPENCODE-RUNTIME-GATE-2026-09-13). Calling
+        # sync_context_for_provider with the bare shared dict bypassed that
+        # seam, so the mutually-exclusive {{#if GATE_*}} blocks in
+        # use-orchestrator.md were resolved with the fail-open
+        # "missing => true" default and ALL THREE tiers rendered at once.
+        # Resolve the tier through the real capability registry — never pin
+        # one in the test.
+        pc = provider_config[provider]
+        provider_vars = dict(variables)
+        provider_vars.update(
+            runtime_gate_vars(pc, capabilities.get(provider, {}), config)
+        )
+        return provider_vars
+
     # Order mirrors how the committed AGENTS.md was produced: Gemini last
     # (its PENDING_TASKS_FILE/SKILLS_DIR flavor wins in the shared file).
     for provider in ("Opencode", "Gemini"):
         sync_context_for_provider(
-            REPO_ROOT, workdir, config, variables, log,
+            REPO_ROOT, workdir, config, provider_variables_for(provider), log,
             dry_run=False, provider=provider, provider_config=provider_config,
         )
     if mode == "compact":
         # The bootstrap block lives in the AGENTS.md injected footer and is
-        # written by the agents step (B6 wiring) — run it like sync.py does.
+        # written by the agents step (B6 wiring) — run it like sync.py does,
+        # using the same per-provider gate variables as the context leg.
         from lib.agent_sync import sync_agents_for_provider
 
-        gemini_vars = {**variables, "PIPELINE_DETAILS_DIR": ".gemini/pipeline-details"}
+        gemini_vars = provider_variables_for("Gemini")
+        gemini_vars["PIPELINE_DETAILS_DIR"] = ".gemini/pipeline-details"
         sync_agents_for_provider(
             REPO_ROOT, workdir, config, gemini_vars, log,
             dry_run=False, provider="Gemini", provider_config=provider_config,
@@ -484,6 +511,16 @@ def test_compact_managed_block_stays_within_progressive_disclosure_budget(seeded
     # (core rules ~122 + agent directory ~59 + scaffold). No headroom is left:
     # reclaim lines before embedding more always-on content — a REGRESSION
     # beyond this budget means non-embedded content leaked back into the block.
+    #
+    # Runtime-gate tiers (SPEC-OPENCODE-RUNTIME-GATE-2026-09-13): the three
+    # {{#if GATE_ENFORCED}} / {{#if GATE_PARTIAL}} / {{#if GATE_ADVISORY}}
+    # blocks in use-orchestrator.md are mutually exclusive and resolve through
+    # the per-provider runtime_gate_vars seam that _render_context now mirrors.
+    # Only the resolved tier contributes, so the measured block stays at 220 —
+    # no budget bump was needed. (Before this helper mirrored the seam, the
+    # GATE_* vars were absent; the fail-open "missing => true" default in
+    # strip_inactive_conditional_blocks activated ALL THREE blocks and the
+    # block inflated to 227.)
     compact = _render_context("compact", seeded_project)
     begin = compact.index("<!-- agent-meta:managed-begin -->")
     end = compact.index("<!-- agent-meta:managed-end -->")
