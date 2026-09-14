@@ -5,7 +5,7 @@ pipeline_stages:
 
 # Implementierungsplan — Stale Role Cleanup (B1 → B3 → B2)
 
-> Status: geplant
+> Status: complete
 
 **Spec:** `docs/specs/2026-09-13-stale-role-cleanup-design.md`
 
@@ -140,10 +140,10 @@ Neue und geänderte Symbole als `file:Symbol`; Signaturen sind Contracts, keine 
 **Depends on:** —
 
 **Steps:**
-- [ ] Step 1: Test schreiben (fail) — `tests/test_rule_index.py::test_bootstrap_content_predicate_adopts_only_matching` (IC-02/IC-04), `::test_bootstrap_missing_index_never_adopts_without_predicate` (AC-03 fail-closed), `::test_bootstrap_existing_empty_index_wins_over_predicate` (AC-04), `::test_cleanup_writes_backup_before_unlink` (AC-08: Sibling mit Pre-Delete-Inhalt), `::test_cleanup_dry_run_writes_no_backup_but_reports_path` (AC-08/IC-01), `::test_cleanup_backup_failure_prevents_unlink` (IC-01 fail-soft), `::test_cleanup_returns_backup_paths` (F-11 Rückgabe-Vertrag), `::test_write_managed_index_writes_empty_file`.
-- [ ] Step 2: Implementieren — `bootstrap_previously_managed` um `content_predicate` erweitern: bei vorhandenem, lesbarem Index dessen Inhalt zurückgeben (auch leer); bei fehlendem Index nur Glob-Treffer, die Predicate bzw. `content_marker` erfüllen; `OSError`/`UnicodeDecodeError` je Datei = nicht adoptieren. `cleanup_stale_managed_files` um `backup: bool = False` erweitern: vor dem Unlink `<name>.sync-backup-<ts>` schreiben (ein Timestamp je Invocation, Format wie `generated_file_drift.py:221–269`), bei Backup-Fehler `log.warning` und Unlink unterlassen; Backuppfade sammeln und `return`. Die drei bestehenden Caller (`mcp.py:378`, `external_tools.py:336`, `pipelines.py:1109`) ignorieren den Rückgabewert (F-11) — keine Return-Assertion dort ergänzen.
-- [ ] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_rule_index.py -q` → rc 0.
-- [ ] Step 4: Commit — `feat: add content-predicate bootstrap and backup to managed-index helper`.
+- [x] Step 1: Test schreiben (fail) — `tests/test_rule_index.py::test_bootstrap_content_predicate_adopts_only_matching` (IC-02/IC-04), `::test_bootstrap_missing_index_never_adopts_without_predicate` (AC-03 fail-closed), `::test_bootstrap_existing_empty_index_wins_over_predicate` (AC-04), `::test_cleanup_writes_backup_before_unlink` (AC-08: Sibling mit Pre-Delete-Inhalt), `::test_cleanup_dry_run_writes_no_backup_but_reports_path` (AC-08/IC-01), `::test_cleanup_backup_failure_prevents_unlink` (IC-01 fail-soft), `::test_cleanup_returns_backup_paths` (F-11 Rückgabe-Vertrag), `::test_write_managed_index_writes_empty_file`.
+- [x] Step 2: Implementieren — `bootstrap_previously_managed` um `content_predicate` erweitern: bei vorhandenem, lesbarem Index dessen Inhalt zurückgeben (auch leer); bei fehlendem Index nur Glob-Treffer, die Predicate bzw. `content_marker` erfüllen; `OSError`/`UnicodeDecodeError` je Datei = nicht adoptieren. `cleanup_stale_managed_files` um `backup: bool = False` erweitern: vor dem Unlink `<name>.sync-backup-<ts>` schreiben (ein Timestamp je Invocation, Format wie `generated_file_drift.py:221–269`), bei Backup-Fehler `log.warning` und Unlink unterlassen; Backuppfade sammeln und `return`. Die drei bestehenden Caller (`mcp.py:378`, `external_tools.py:336`, `pipelines.py:1109`) ignorieren den Rückgabewert (F-11) — keine Return-Assertion dort ergänzen.
+- [x] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_rule_index.py -q` → rc 0.
+- [x] Step 4: Commit — `feat: add content-predicate bootstrap and backup to managed-index helper`.
 
 **Acceptance:** AC-04, AC-05, AC-08, AC-23 (Helper-Seite), AC-24 (Helper-Seite).
 
@@ -163,10 +163,10 @@ Neue und geänderte Symbole als `file:Symbol`; Signaturen sind Contracts, keine 
 **Depends on:** 1
 
 **Steps:**
-- [ ] Step 1: Test schreiben (fail) — `tests/test_agent_sync_helpers.py`: `::test_stale_managed_file_deleted_and_index_rewritten` erweitern (AC-01, DELETE-Log-Reihenfolge exakt `["agents/stale-old.md"]`), `::test_index_rewritten_when_expected_equals_previous` (AC-02), `::test_no_managed_index_prunes_only_provenance_files` (AC-03, ersetzt die fail-open-Erwartung), `::test_empty_expected_filenames_writes_empty_index` (AC-04, ersetzt `…never_rewrites…`), `::test_corrupt_index_warns_and_deletes_only_provenance` (AC-05), `::test_wrapper_tracked_for_non_capability_provider` (AC-06, parametrisiert über mindestens einen Nicht-Claude-Provider; erwartet `provider`/`reason=="skill deactivated"`), `::test_deactivated_skill_wrapper_swept_and_index_cleaned` (AC-07), `::test_reconciled_external_skill_wrapper_adopted` + `::test_markerless_and_based_only_files_are_foreign` + `::test_index_listed_phantom_deleted_with_restorable_backup` (AC-21), `::test_reason_precedence_registry_vs_role` (AC-22), `::test_foreign_file_never_deleted_backed_up_or_rewritten` (AC-15).
-- [ ] Step 2: Implementieren — die vier Marker-Prädikate (IC-02) rein implementieren (Primärmarker vor `based-on:`). `_collect_active_skill_wrapper_filenames` / `_collect_all_registry_wrapper_filenames` aus derselben Quelle wie `skills.py:389–390`/`:421–422`. `plan_agent_cleanup` exakt nach den Bindungen IC-04: `previously_managed` index-first-unless-absent/unreadable; `reconcilable(f)` nur bei lesbarem Index + `is_candidate` + `f.name ∉ E` + `f.name ∉ previously_managed` + `_agent_provenance_is_external_skill`; `removable`/`foreign` wie spezifiziert; Reason-Präzedenz 1→3. `_cleanup_stale_agents` durch Planner + `cleanup_stale_managed_files(backup=True)` + unbedingtes `write_managed_index` ersetzen; DELETE-Log-Order und `"role removed from config"`-String byte-gleich zu `:804–808` halten. In `sync_agents_for_provider` `:896–897` durch `expected_filenames |= _collect_active_skill_wrapper_filenames(agent_meta_root, config)` ersetzen (kein Capability-Gate).
-- [ ] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_agent_sync_helpers.py -q`.
-- [ ] Step 4: Commit — `feat: provenance-based fail-closed agent cleanup with skill-wrapper tracking`.
+- [x] Step 1: Test schreiben (fail) — `tests/test_agent_sync_helpers.py`: `::test_stale_managed_file_deleted_and_index_rewritten` erweitern (AC-01, DELETE-Log-Reihenfolge exakt `["agents/stale-old.md"]`), `::test_index_rewritten_when_expected_equals_previous` (AC-02), `::test_no_managed_index_prunes_only_provenance_files` (AC-03, ersetzt die fail-open-Erwartung), `::test_empty_expected_filenames_writes_empty_index` (AC-04, ersetzt `…never_rewrites…`), `::test_corrupt_index_warns_and_deletes_only_provenance` (AC-05), `::test_wrapper_tracked_for_non_capability_provider` (AC-06, parametrisiert über mindestens einen Nicht-Claude-Provider; erwartet `provider`/`reason=="skill deactivated"`), `::test_deactivated_skill_wrapper_swept_and_index_cleaned` (AC-07), `::test_reconciled_external_skill_wrapper_adopted` + `::test_markerless_and_based_only_files_are_foreign` + `::test_index_listed_phantom_deleted_with_restorable_backup` (AC-21), `::test_reason_precedence_registry_vs_role` (AC-22), `::test_foreign_file_never_deleted_backed_up_or_rewritten` (AC-15).
+- [x] Step 2: Implementieren — die vier Marker-Prädikate (IC-02) rein implementieren (Primärmarker vor `based-on:`). `_collect_active_skill_wrapper_filenames` / `_collect_all_registry_wrapper_filenames` aus derselben Quelle wie `skills.py:389–390`/`:421–422`. `plan_agent_cleanup` exakt nach den Bindungen IC-04: `previously_managed` index-first-unless-absent/unreadable; `reconcilable(f)` nur bei lesbarem Index + `is_candidate` + `f.name ∉ E` + `f.name ∉ previously_managed` + `_agent_provenance_is_external_skill`; `removable`/`foreign` wie spezifiziert; Reason-Präzedenz 1→3. `_cleanup_stale_agents` durch Planner + `cleanup_stale_managed_files(backup=True)` + unbedingtes `write_managed_index` ersetzen; DELETE-Log-Order und `"role removed from config"`-String byte-gleich zu `:804–808` halten. In `sync_agents_for_provider` `:896–897` durch `expected_filenames |= _collect_active_skill_wrapper_filenames(agent_meta_root, config)` ersetzen (kein Capability-Gate).
+- [x] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_agent_sync_helpers.py -q`.
+- [x] Step 4: Commit — `feat: provenance-based fail-closed agent cleanup with skill-wrapper tracking`.
 
 **Acceptance:** AC-01, AC-02, AC-03, AC-05, AC-06, AC-07, AC-15, AC-21, AC-22, AC-24 (agent_sync-Klausel).
 
@@ -186,10 +186,10 @@ Neue und geänderte Symbole als `file:Symbol`; Signaturen sind Contracts, keine 
 **Depends on:** 1
 
 **Steps:**
-- [ ] Step 1: Test schreiben (fail) — `tests/test_generated_file_drift.py`: `::test_prune_noop_in_dry_run` (AC-09), `::test_prune_never_deletes_newest_backup` (AC-09), `::test_prune_requires_both_thresholds` (AC-09: nur `age > max_age_days` **und** `> max_per_source` neuere), `::test_prune_ignores_non_backup_names` (AC-09), `::test_prune_skips_unparsable_timestamp` (AC-09 fail-safe), `::test_prune_default_policy_three_and_thirty` (OQ-2).
-- [ ] Step 2: Implementieren — `prune_sync_backups` neben `_SYNC_BACKUP_PATTERN` platzieren; Kandidaten nur über `_is_sync_backup_name`; Quelle durch Abstreifen des Suffixes `.sync-backup-<YYYYmmdd-HHMMSS>`; Löschentscheidung nur wenn beide Schwellen überschritten; nie der jüngste Backup je Quelle; unparsbare Timestamps nie löschen; `OSError` je Datei via `log.debug`/`warning` und weiter; Rückgabe der geprunten projekt-relativen Posix-Pfade. Defaultbereich im Docstring dokumentieren (OQ-2), Policy-Werte als Parameter.
-- [ ] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_generated_file_drift.py -q`.
-- [ ] Step 4: Commit — `feat: add bounded sync-backup pruner`.
+- [x] Step 1: Test schreiben (fail) — `tests/test_generated_file_drift.py`: `::test_prune_noop_in_dry_run` (AC-09), `::test_prune_never_deletes_newest_backup` (AC-09), `::test_prune_requires_both_thresholds` (AC-09: nur `age > max_age_days` **und** `> max_per_source` neuere), `::test_prune_ignores_non_backup_names` (AC-09), `::test_prune_skips_unparsable_timestamp` (AC-09 fail-safe), `::test_prune_default_policy_three_and_thirty` (OQ-2).
+- [x] Step 2: Implementieren — `prune_sync_backups` neben `_SYNC_BACKUP_PATTERN` platzieren; Kandidaten nur über `_is_sync_backup_name`; Quelle durch Abstreifen des Suffixes `.sync-backup-<YYYYmmdd-HHMMSS>`; Löschentscheidung nur wenn beide Schwellen überschritten; nie der jüngste Backup je Quelle; unparsbare Timestamps nie löschen; `OSError` je Datei via `log.debug`/`warning` und weiter; Rückgabe der geprunten projekt-relativen Posix-Pfade. Defaultbereich im Docstring dokumentieren (OQ-2), Policy-Werte als Parameter.
+- [x] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_generated_file_drift.py -q`.
+- [x] Step 4: Commit — `feat: add bounded sync-backup pruner`.
 
 **Acceptance:** AC-09, AC-19 (Backup-Hälfte), OQ-2.
 
@@ -211,10 +211,10 @@ Neue und geänderte Symbole als `file:Symbol`; Signaturen sind Contracts, keine 
 **Depends on:** 1, 3
 
 **Steps:**
-- [ ] Step 1: Test schreiben (fail) — `tests/test_managed_index_alignment.py::test_rules_and_commands_write_empty_index` (OQ-4: leerer Managed-Set → 0-Byte-Index nach Nicht-Dry-Run), `::test_pipeline_invokes_prune_after_drift` (AC-09, Spy auf `prune_sync_backups`), `::test_auto_generate_false_emits_warning_without_write` (AC-18/S1), `::test_deactivated_provider_emits_warning_without_write` (AC-18/S2).
-- [ ] Step 2: Implementieren — `rules.py:521–522` und `commands.py:207–208` auf unbedingtes Schreiben (nur `dry_run` no-op) umstellen, via `write_managed_index`. `sync_pipeline.py`: nach der Drift-Stage je Managed-Dir `prune_sync_backups(target_dir, project_root, log, dry_run, max_age_days=30, max_per_source=3)` (OQ-2) aufrufen; S1/S2 nur als `log.warning`/Konsistenz-Finding sichtbar machen, **keinen** Schreibpfad erzwingen und keine Opt-outs übersteuern (OQ-7). S4 (`dry_run`) bleibt reines Statusfeedback.
-- [ ] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_managed_index_alignment.py tests/test_mcp_stale_cleanup.py tests/test_rules_skill_channel.py -q` und `rtk python3 scripts/sync.py --validate`.
-- [ ] Step 4: Commit — `fix: always write managed indexes and surface skipped context stages`.
+- [x] Step 1: Test schreiben (fail) — `tests/test_managed_index_alignment.py::test_rules_and_commands_write_empty_index` (OQ-4: leerer Managed-Set → 0-Byte-Index nach Nicht-Dry-Run), `::test_pipeline_invokes_prune_after_drift` (AC-09, Spy auf `prune_sync_backups`), `::test_auto_generate_false_emits_warning_without_write` (AC-18/S1), `::test_deactivated_provider_emits_warning_without_write` (AC-18/S2).
+- [x] Step 2: Implementieren — `rules.py:521–522` und `commands.py:207–208` auf unbedingtes Schreiben (nur `dry_run` no-op) umstellen, via `write_managed_index`. `sync_pipeline.py`: nach der Drift-Stage je Managed-Dir `prune_sync_backups(target_dir, project_root, log, dry_run, max_age_days=30, max_per_source=3)` (OQ-2) aufrufen; S1/S2 nur als `log.warning`/Konsistenz-Finding sichtbar machen, **keinen** Schreibpfad erzwingen und keine Opt-outs übersteuern (OQ-7). S4 (`dry_run`) bleibt reines Statusfeedback.
+- [x] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_managed_index_alignment.py tests/test_mcp_stale_cleanup.py tests/test_rules_skill_channel.py -q` und `rtk python3 scripts/sync.py --validate`.
+- [x] Step 4: Commit — `fix: always write managed indexes and surface skipped context stages`.
 
 **Acceptance:** AC-09, AC-18 (S1/S2), OQ-4.
 
@@ -234,10 +234,10 @@ Neue und geänderte Symbole als `file:Symbol`; Signaturen sind Contracts, keine 
 **Depends on:** 1
 
 **Steps:**
-- [ ] Step 1: Test schreiben (fail) — `tests/test_context_managed_block_shrink.py::test_managed_block_shrinks_when_role_hint_removed` (AC-16: `A` verschwindet, `B` erscheint, Fremdinhalt byte-identisch), `::test_duplicate_marker_keeps_second_block_and_warns` (AC-17: nur erster Block ersetzt, Datei parsebar, `log.warning`/Finding), `::test_only_variables_warns_managed_block_not_refreshed` (AC-18/S3). `tests/test_context_prompt_index.py::test_absent_prompt_index_adopts_nothing` (AC-23: `orphan.md` überlebt, Index wird geschrieben), `::test_empty_expected_writes_zero_byte_index` (AC-23), `::test_present_prompt_index_deletes_stale_and_rewrites` (AC-23), `::test_prompt_fail_open_clause_gone` (AC-24 context-Klausel).
-- [ ] Step 2: Implementieren — `sync_prompts_for_continue` (`:1723–1740`) auf IC-01 umstellen: `bootstrap_previously_managed` mit fail-closed Predicate (kein Adoption bei fehlendem Index), `cleanup_stale_managed_files`, `write_managed_index` unbedingt; keine Reconciliation (Prompt-Dateien tragen keinen Marker, OQ-9). `_has_duplicate_managed_block` nahe `_MANAGED_BLOCK_RE`; `_update_managed_html_block` bei Duplikat `log.warning` + Konsistenz-Finding, Replacement bei `count=1` unverändert lassen. `--only-variables`-Pfad um sichtbare Warnung ergänzen, ohne den Managed Block zu re-rendern. Das `:436`-Replacement und `_regenerate_static_context` dürfen **nicht** verändert werden (Review-Reject, siehe Spec „Corrected hypothesis").
-- [ ] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_context_managed_block_shrink.py tests/test_context_prompt_index.py tests/test_context_agents_md_idempotency.py -q`.
-- [ ] Step 4: Commit — `feat: prove managed-block shrink and migrate prompt index fail-closed`.
+- [x] Step 1: Test schreiben (fail) — `tests/test_context_managed_block_shrink.py::test_managed_block_shrinks_when_role_hint_removed` (AC-16: `A` verschwindet, `B` erscheint, Fremdinhalt byte-identisch), `::test_duplicate_marker_keeps_second_block_and_warns` (AC-17: nur erster Block ersetzt, Datei parsebar, `log.warning`/Finding), `::test_only_variables_warns_managed_block_not_refreshed` (AC-18/S3). `tests/test_context_prompt_index.py::test_absent_prompt_index_adopts_nothing` (AC-23: `orphan.md` überlebt, Index wird geschrieben), `::test_empty_expected_writes_zero_byte_index` (AC-23), `::test_present_prompt_index_deletes_stale_and_rewrites` (AC-23), `::test_prompt_fail_open_clause_gone` (AC-24 context-Klausel).
+- [x] Step 2: Implementieren — `sync_prompts_for_continue` (`:1723–1740`) auf IC-01 umstellen: `bootstrap_previously_managed` mit fail-closed Predicate (kein Adoption bei fehlendem Index), `cleanup_stale_managed_files`, `write_managed_index` unbedingt; keine Reconciliation (Prompt-Dateien tragen keinen Marker, OQ-9). `_has_duplicate_managed_block` nahe `_MANAGED_BLOCK_RE`; `_update_managed_html_block` bei Duplikat `log.warning` + Konsistenz-Finding, Replacement bei `count=1` unverändert lassen. `--only-variables`-Pfad um sichtbare Warnung ergänzen, ohne den Managed Block zu re-rendern. Das `:436`-Replacement und `_regenerate_static_context` dürfen **nicht** verändert werden (Review-Reject, siehe Spec „Corrected hypothesis").
+- [x] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_context_managed_block_shrink.py tests/test_context_prompt_index.py tests/test_context_agents_md_idempotency.py -q`.
+- [x] Step 4: Commit — `feat: prove managed-block shrink and migrate prompt index fail-closed`.
 
 **Acceptance:** AC-16, AC-17, AC-18 (S3), AC-23, AC-24 (context-Klausel).
 
@@ -258,10 +258,10 @@ Neue und geänderte Symbole als `file:Symbol`; Signaturen sind Contracts, keine 
 **Depends on:** 1, 2, 3, 4
 
 **Steps:**
-- [ ] Step 1: Test schreiben (fail) — `tests/test_cleanup_preview_cli.py::test_preview_emits_single_json_object` (AC-10: `version`, `providers[].stale/foreign/backups_to_prune`, `fingerprint`), `::test_preview_has_no_filesystem_or_network_mutation` (AC-10/F-04: Fixture mit fehlendem Skill-Repo → kein `git clone`/`submodule add`, kein Index-Write/Unlink/Backup), `::test_preview_exit_code_zero_for_nonempty_stale`, `::test_preview_fingerprint_stable_over_canonical_stale_set` (IC-06), `::test_foreign_entries_carry_legacy_unmarked` (OQ-3/AC-10).
-- [ ] Step 2: Implementieren — Flag + Handler im `_MODE_HANDLERS`-Muster; planning-only Traversierung mit `dry_run=True` und `CleanupPreviewLog`, nur `plan_agent_cleanup` als Produzent; keine Writer-Stage. Genau ein JSON-Objekt nach IC-06-Schema ausgeben (`stale[].{path,reason,tracked,adopted}`, `foreign[].legacy_unmarked`, `backups_to_prune`, `fingerprint` als stabiler sha256 über den kanonisierten Stale-Set), rc 0 auch bei nicht-leerem `stale`, rc 1 nur bei internem Fehler. In `skills.py` die bedingungslosen `ensure_skill_repo`/`deinit_skill_repo`-Aufrufe (`:410–412`) auf `not dry_run` gaten. `--validate` bleibt der separate Pfad (kein Preview).
-- [ ] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_cleanup_preview_cli.py -q` und `rtk python3 scripts/sync.py --validate`.
-- [ ] Step 4: Commit — `feat: add side-effect-free cleanup preview CLI`.
+- [x] Step 1: Test schreiben (fail) — `tests/test_cleanup_preview_cli.py::test_preview_emits_single_json_object` (AC-10: `version`, `providers[].stale/foreign/backups_to_prune`, `fingerprint`), `::test_preview_has_no_filesystem_or_network_mutation` (AC-10/F-04: Fixture mit fehlendem Skill-Repo → kein `git clone`/`submodule add`, kein Index-Write/Unlink/Backup), `::test_preview_exit_code_zero_for_nonempty_stale`, `::test_preview_fingerprint_stable_over_canonical_stale_set` (IC-06), `::test_foreign_entries_carry_legacy_unmarked` (OQ-3/AC-10).
+- [x] Step 2: Implementieren — Flag + Handler im `_MODE_HANDLERS`-Muster; planning-only Traversierung mit `dry_run=True` und `CleanupPreviewLog`, nur `plan_agent_cleanup` als Produzent; keine Writer-Stage. Genau ein JSON-Objekt nach IC-06-Schema ausgeben (`stale[].{path,reason,tracked,adopted}`, `foreign[].legacy_unmarked`, `backups_to_prune`, `fingerprint` als stabiler sha256 über den kanonisierten Stale-Set), rc 0 auch bei nicht-leerem `stale`, rc 1 nur bei internem Fehler. In `skills.py` die bedingungslosen `ensure_skill_repo`/`deinit_skill_repo`-Aufrufe (`:410–412`) auf `not dry_run` gaten. `--validate` bleibt der separate Pfad (kein Preview).
+- [x] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_cleanup_preview_cli.py -q` und `rtk python3 scripts/sync.py --validate`.
+- [x] Step 4: Commit — `feat: add side-effect-free cleanup preview CLI`.
 
 **Acceptance:** AC-10, AC-15 (CLI-Flow), AC-24 (Preview erreicht keinen fail-open-Zweig).
 
@@ -282,10 +282,10 @@ Neue und geänderte Symbole als `file:Symbol`; Signaturen sind Contracts, keine 
 **Depends on:** 6
 
 **Steps:**
-- [ ] Step 1: Test schreiben (fail) — `tests/test_admin_cleanup_endpoint.py` (Importlib-Muster `tests/test_admin_server.py:38–48`): `::test_preview_route_returns_payload` (AC-11), `::test_apply_requires_confirm_true` (AC-12: 400, `run()` nicht gerufen), `::test_apply_fingerprint_mismatch_is_409` (AC-13: `run()` nicht gerufen), `::test_apply_success_returns_recomputed_stale_paths` (AC-14: `deleted == [p1.path, p2.path]`; `returncode != 0`/Timeout → 500 ohne `deleted`), `::test_foreign_never_deleted_in_preview_and_apply` (AC-15-Spiegel), `::test_ui_cleanup_control_wiring` (AC-25: Button im `btn-row`, `Remove N` nur bei `N>0`, confirm-`POST` mit `{confirm:true, fingerprint}`, 409-Re-Render ohne Button-Wedge, 400/500 markieren nichts als entfernt).
-- [ ] Step 2: Implementieren — `SyncExecutor.cleanup_preview()` ruft `_run(["--cleanup-preview"])` und parst das eine JSON-Objekt; bei Subprozess-/JSON-Fehler `{"success": False, "error": "sync_preview_failed", "output": …}`. Beide Routen in `_POST_EXACT_ROUTES` (`:3382–3406`). Apply-Reihenfolge exakt: `confirm is not True` → 400 zuerst; server-seitige `cleanup_preview()`-Wiederholung und Fingerprint-Vergleich → 409; sonst `SyncExecutor.run()`; `deleted := [e.path for e in recomputed.stale]` nur bei `returncode == 0`. **OQ-8 (bindend):** `run()` erfolgt erst nach dem backup-first-Cleanup aus Task 1/2 — Backup vor Apply ist verpflichtend, kein Opt-out. `project.yaml → roles` wird **nie** mutiert. In `admin-ui.html` im Sync-View (`btn-row` `:5113–5117`) Button + Panel + Danger-Button gemäß IC-10-Zustandsmaschine (`idle → previewing → preview-shown → applying → done/error`) und 409-Re-Render; `api.post`, `toast`, `setSyncButtonsDisabled`, bestehendes Confirm-Modal nutzen.
-- [ ] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_admin_cleanup_endpoint.py tests/test_admin_server.py -q`.
-- [ ] Step 4: Commit — `feat: add admin-UI preview/confirm/apply role cleanup`.
+- [x] Step 1: Test schreiben (fail) — `tests/test_admin_cleanup_endpoint.py` (Importlib-Muster `tests/test_admin_server.py:38–48`): `::test_preview_route_returns_payload` (AC-11), `::test_apply_requires_confirm_true` (AC-12: 400, `run()` nicht gerufen), `::test_apply_fingerprint_mismatch_is_409` (AC-13: `run()` nicht gerufen), `::test_apply_success_returns_recomputed_stale_paths` (AC-14: `deleted == [p1.path, p2.path]`; `returncode != 0`/Timeout → 500 ohne `deleted`), `::test_foreign_never_deleted_in_preview_and_apply` (AC-15-Spiegel), `::test_ui_cleanup_control_wiring` (AC-25: Button im `btn-row`, `Remove N` nur bei `N>0`, confirm-`POST` mit `{confirm:true, fingerprint}`, 409-Re-Render ohne Button-Wedge, 400/500 markieren nichts als entfernt).
+- [x] Step 2: Implementieren — `SyncExecutor.cleanup_preview()` ruft `_run(["--cleanup-preview"])` und parst das eine JSON-Objekt; bei Subprozess-/JSON-Fehler `{"success": False, "error": "sync_preview_failed", "output": …}`. Beide Routen in `_POST_EXACT_ROUTES` (`:3382–3406`). Apply-Reihenfolge exakt: `confirm is not True` → 400 zuerst; server-seitige `cleanup_preview()`-Wiederholung und Fingerprint-Vergleich → 409; sonst `SyncExecutor.run()`; `deleted := [e.path for e in recomputed.stale]` nur bei `returncode == 0`. **OQ-8 (bindend):** `run()` erfolgt erst nach dem backup-first-Cleanup aus Task 1/2 — Backup vor Apply ist verpflichtend, kein Opt-out. `project.yaml → roles` wird **nie** mutiert. In `admin-ui.html` im Sync-View (`btn-row` `:5113–5117`) Button + Panel + Danger-Button gemäß IC-10-Zustandsmaschine (`idle → previewing → preview-shown → applying → done/error`) und 409-Re-Render; `api.post`, `toast`, `setSyncButtonsDisabled`, bestehendes Confirm-Modal nutzen.
+- [x] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_admin_cleanup_endpoint.py tests/test_admin_server.py -q`.
+- [x] Step 4: Commit — `feat: add admin-UI preview/confirm/apply role cleanup`.
 
 **Acceptance:** AC-11, AC-12, AC-13, AC-14, AC-25, AC-15 (UI-Spiegel), OQ-1, OQ-8.
 
@@ -306,10 +306,10 @@ Neue und geänderte Symbole als `file:Symbol`; Signaturen sind Contracts, keine 
 **Depends on:** 7
 
 **Steps:**
-- [ ] Step 1: Test schreiben (fail) — `tests/test_provider_agnostic_dispatch.py`: `_TOUCHED_MODULES` um `rule_index`, `generated_file_drift`, `skills` erweitern; `::test_cleanup_preview_documented` (CLI-Referenz enthält `--cleanup-preview` und den rc-0-Hinweis), `::test_admin_cleanup_routes_documented` (`docs/api/admin-ui-reference.md` nennt beide Routen und die confirm-/fingerprint-Pflicht).
-- [ ] Step 2: Implementieren — CLI-Referenz-Zeile für `--cleanup-preview` im bestehenden Tabellenformat ergänzen; Admin-UI-Referenz um beide POST-Routen, Request-/Response-Schemata, 400/409/500-Semantik und den Backup-vor-Apply-Hinweis (OQ-8) erweitern. Keine Provider-Literale in den Doku-/Teständerungen.
-- [ ] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_provider_agnostic_dispatch.py -q` und `rtk python3 scripts/sync.py --validate`.
-- [ ] Step 4: Commit — `docs: document cleanup preview and extend provider-agnostic ratchet`.
+- [x] Step 1: Test schreiben (fail) — `tests/test_provider_agnostic_dispatch.py`: `_TOUCHED_MODULES` um `rule_index`, `generated_file_drift`, `skills` erweitern; `::test_cleanup_preview_documented` (CLI-Referenz enthält `--cleanup-preview` und den rc-0-Hinweis), `::test_admin_cleanup_routes_documented` (`docs/api/admin-ui-reference.md` nennt beide Routen und die confirm-/fingerprint-Pflicht).
+- [x] Step 2: Implementieren — CLI-Referenz-Zeile für `--cleanup-preview` im bestehenden Tabellenformat ergänzen; Admin-UI-Referenz um beide POST-Routen, Request-/Response-Schemata, 400/409/500-Semantik und den Backup-vor-Apply-Hinweis (OQ-8) erweitern. Keine Provider-Literale in den Doku-/Teständerungen.
+- [x] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_provider_agnostic_dispatch.py -q` und `rtk python3 scripts/sync.py --validate`.
+- [x] Step 4: Commit — `docs: document cleanup preview and extend provider-agnostic ratchet`.
 
 **Acceptance:** AC-20.
 
@@ -328,11 +328,11 @@ Neue und geänderte Symbole als `file:Symbol`; Signaturen sind Contracts, keine 
 **Depends on:** 1, 2, 3, 4, 5, 6, 7, 8
 
 **Steps:**
-- [ ] Step 1: Neue/geänderte Suiten — `rtk python3 -m pytest tests/test_rule_index.py tests/test_agent_sync_helpers.py tests/test_generated_file_drift.py tests/test_managed_index_alignment.py tests/test_context_managed_block_shrink.py tests/test_context_prompt_index.py tests/test_cleanup_preview_cli.py tests/test_admin_cleanup_endpoint.py tests/test_provider_agnostic_dispatch.py -q` → rc 0.
-- [ ] Step 2: Repo-weites Gate — `rtk python3 scripts/sync.py --validate` → rc 0 und `rtk python3 scripts/consistency-check.py` → rc 0.
-- [ ] Step 3: Ratchets/Bestandsschutz — `rtk python3 -m pytest tests/test_mcp_stale_cleanup.py tests/test_rules_skill_channel.py tests/test_skills.py tests/test_hook_drift.py tests/test_admin_server.py tests/test_context_agents_md_idempotency.py -q` → rc 0.
-- [ ] Step 4: AC-19-Rollback-Durchstich — Sibling eines per Cleanup gelöschten Files zurückbenennen (Byte-Gleichheit) und eine generierte Rolle über `project.yaml → roles` + Re-Sync deterministisch wiederherstellen.
-- [ ] Step 5: Commit — `test: verify stale role cleanup end to end`.
+- [x] Step 1: Neue/geänderte Suiten — `rtk python3 -m pytest tests/test_rule_index.py tests/test_agent_sync_helpers.py tests/test_generated_file_drift.py tests/test_managed_index_alignment.py tests/test_context_managed_block_shrink.py tests/test_context_prompt_index.py tests/test_cleanup_preview_cli.py tests/test_admin_cleanup_endpoint.py tests/test_provider_agnostic_dispatch.py -q` → rc 0.
+- [x] Step 2: Repo-weites Gate — `rtk python3 scripts/sync.py --validate` → rc 0 und `rtk python3 scripts/consistency-check.py` → rc 0.
+- [x] Step 3: Ratchets/Bestandsschutz — `rtk python3 -m pytest tests/test_mcp_stale_cleanup.py tests/test_rules_skill_channel.py tests/test_skills.py tests/test_hook_drift.py tests/test_admin_server.py tests/test_context_agents_md_idempotency.py -q` → rc 0.
+- [x] Step 4: AC-19-Rollback-Durchstich — Sibling eines per Cleanup gelöschten Files zurückbenennen (Byte-Gleichheit) und eine generierte Rolle über `project.yaml → roles` + Re-Sync deterministisch wiederherstellen.
+- [x] Step 5: Commit — `test: verify stale role cleanup end to end`.
 
 **Acceptance:** AC-01 bis AC-25 (Abnahme-Nachweis).
 

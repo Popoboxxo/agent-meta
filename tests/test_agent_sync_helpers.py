@@ -28,6 +28,7 @@ from lib.agent_sync import (
     sync_agents_for_provider,
 )
 from lib.log import SyncLog
+from lib.providers import load_providers_config
   # noqa: E402
 
 
@@ -666,4 +667,50 @@ def test_provenance_marker_forms_recognised(tmp_path):
         fm, "---\ngenerated-from: 1-generic/x.md@1\n---\n")
     assert not _agent_provenance_is_external_skill(
         based, "---\nbased-on: 0-external/foo@abc\n---\n")
+
+
+def test_ac19_removed_role_backup_restore_and_resync(tmp_path):
+    """AC-19 (rollback): removing a role from ``project.yaml → roles`` deletes
+    its generated agent file backup-first, the ``.sync-backup-<ts>`` sibling
+    restores the exact pre-delete content, and re-adding the role re-syncs it
+    deterministically byte-for-byte."""
+    agent_meta_root = _REPO_ROOT
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    agents_dir = project_root / ".claude" / "agents"
+    provider_config = load_providers_config(agent_meta_root)
+    variables = {"PROJECT_NAME": "ac19"}
+    with_developer = {"roles": ["developer", "git"], "project": {"name": "ac19"}}
+    without_developer = {"roles": ["git"], "project": {"name": "ac19"}}
+
+    def _sync(config):
+        sync_agents_for_provider(
+            agent_meta_root, project_root, config, variables, SyncLog(),
+            dry_run=False, provider="Claude", provider_config=provider_config)
+
+    # Generated role file exists and is byte-deterministic across re-syncs.
+    _sync(with_developer)
+    agent_path = agents_dir / "developer.md"
+    assert agent_path.exists()
+    original = agent_path.read_bytes()
+
+    # Role removed from the config → generated file removed, backup-first.
+    _sync(without_developer)
+    assert not agent_path.exists()
+    backups = list(agents_dir.glob("developer.md.sync-backup-*"))
+    assert len(backups) == 1
+    assert backups[0].read_bytes() == original
+    assert _read_managed_index(agents_dir) == "git.md\n"
+
+    # Role re-added → deterministic regeneration of the exact same content.
+    _sync(with_developer)
+    assert agent_path.exists()
+    assert agent_path.read_bytes() == original
+
+    # The backup sibling restores the deleted file's pre-delete content.
+    agent_path.unlink()
+    backups = list(agents_dir.glob("developer.md.sync-backup-*"))
+    assert len(backups) == 1
+    backups[0].rename(agent_path)
+    assert agent_path.read_bytes() == original
 
