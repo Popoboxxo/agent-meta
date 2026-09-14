@@ -294,6 +294,53 @@ def test_scan_ignores_context_adapter_in_unified_mode(tmp_path: Path) -> None:
     assert findings == []
 
 
+def _plugin_provider_config(**overrides) -> dict:
+    # The provider name is "Claude" only so the default-provider resolver in
+    # get_active_providers() finds it; the code under test is purely key-driven
+    # (has_plugins / plugin_dir), so the name carries no meaning here.
+    pc = dict(_provider_config()["Claude"])
+    pc.update({"has_plugins": True, "plugin_dir": ".opencode/plugins"})
+    pc.update(overrides)
+    return {"Claude": pc}
+
+
+def test_scan_covers_plugin_dir_when_capability_declared(tmp_path: Path) -> None:
+    """AC-20: a generated plugin artifact is drift-tracked via the plugin_dir
+    dir_spec (gated on ``has_plugins``)."""
+    from scripts.lib.generated_file_drift import content_hash
+    project_root = tmp_path / "project"
+    _write(project_root, ".opencode/plugins/agent-meta-runtime-gate.js", "edited by hand")
+    _managed_index(project_root, ".opencode/plugins", "agent-meta-runtime-gate.js")
+    _save_hashes(project_root, {
+        ".opencode/plugins/agent-meta-runtime-gate.js": content_hash("original"),
+    }, dry_run=False)
+
+    findings = scan_generated_file_drift(
+        tmp_path / "agent-meta", project_root, {}, _plugin_provider_config()
+    )
+    assert [f["path"] for f in findings] == [
+        ".opencode/plugins/agent-meta-runtime-gate.js"
+    ]
+
+
+def test_scan_ignores_plugin_dir_without_capability(tmp_path: Path) -> None:
+    """AC-20/AC-16: without ``has_plugins`` the plugin dir never enters the
+    drift baseline, so a stray file there is not reported."""
+    from scripts.lib.generated_file_drift import content_hash
+    project_root = tmp_path / "project"
+    _write(project_root, ".opencode/plugins/agent-meta-runtime-gate.js", "edited by hand")
+    _managed_index(project_root, ".opencode/plugins", "agent-meta-runtime-gate.js")
+    _save_hashes(project_root, {
+        ".opencode/plugins/agent-meta-runtime-gate.js": content_hash("original"),
+    }, dry_run=False)
+
+    findings = scan_generated_file_drift(
+        tmp_path / "agent-meta", project_root, {},
+        _plugin_provider_config(has_plugins=False),
+    )
+    assert findings == []
+
+
 from scripts.lib.generated_file_drift import capture_generated_file_hashes, content_hash
 
 

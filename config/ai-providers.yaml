@@ -202,6 +202,18 @@ providers:
     - opencode.json
     - AGENTS.md
     isolation-mechanism: opencode-permissions
+    # Runtime-gate plugin capability (SPEC-OPENCODE-RUNTIME-GATE-2026-09-13,
+    # IC-02). has_plugins stays false until the P6 real-repo verification
+    # (Task 9) records that tool.execute.before fires in subagent sessions and
+    # that the Main Chat is distinguishable — until then the resolved tier
+    # stays `permission` and no plugin artifact is generated. plugin_dir/
+    # plugin_ext/plugin_protocol document the capability the generator uses
+    # once the flag is unlocked.
+    has_plugins: false
+    plugin_dir: .opencode/plugins
+    plugin_ext: .js
+    plugin_protocol: opencode-plugin-js
+    runtime_gate-mechanism: opencode-plugin
     bash_tool_name: bash
     provider_root_dirs:
     - .opencode/

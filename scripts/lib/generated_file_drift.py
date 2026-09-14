@@ -261,6 +261,10 @@ def _iter_managed_files(
         dir_specs.append((pc.get("rules_dir", ".claude/rules"), ["mcp", "tools"]))
     if pc.get("has_commands", False):
         dir_specs.append((pc.get("commands_dir", ".claude/commands"), []))
+    if pc.get("has_plugins", False) and pc.get("plugin_dir"):
+        # Runtime-gate plugin artifact (SPEC-OPENCODE-RUNTIME-GATE-2026-09-13,
+        # IC-14): tracked only when the provider declares the plugin capability.
+        dir_specs.append((pc["plugin_dir"], []))
     dir_specs.append((resolve_pipeline_details_dir(pc, provider), []))
 
     for dir_rel, extra_index_names in dir_specs:
