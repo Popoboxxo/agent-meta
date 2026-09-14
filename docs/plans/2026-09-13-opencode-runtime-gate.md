@@ -9,8 +9,8 @@ pipeline_stages:
 
 > **Revision / Status (2026-09-14):**
 > (a) Phase 0, Tasks 1–6, ist implementiert und getestet (Unit-Tests + Repo-Gate grün).
-> (b) Das abschließende Phase-0-Verifikations-Gate (Task 7) ist noch offen: `scripts/sync.py --check`
-> liefert rc 1, bis die generierten Artefakte per HITL-`sync.py`-Lauf regeneriert sind.
+> (b) Das abschließende Phase-0-Verifikations-Gate (Task 7) ist geschlossen: die generierten
+> Artefakte wurden per HITL-`sync.py`-Lauf regeneriert; `scripts/sync.py --check` liefert jetzt rc 0.
 > (c) Das Phase-1-Szenario wurde von `62` auf `63-opencode-runtime-gate` umnummeriert, weil
 > `62-stale-role-cleanup` die ID `62` inzwischen belegt.
 > (d) Entschieden (User, 2026-09-14): Der AC-24-Schema-Key `runtime-gate.plugin-mode` (IC-16) bleibt
