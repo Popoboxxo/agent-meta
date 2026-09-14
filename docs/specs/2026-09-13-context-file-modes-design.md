@@ -1,7 +1,7 @@
 ---
 spec-id: SPEC-CONTEXT-FILE-MODES-2026-09-13
 title: Context-File Modes (unified / per-provider) — Technical Specification
-status: Entwurf
+status: APPROVED
 related-spec: SPEC-OPENCODE-RUNTIME-GATE-2026-09-13
 source-design: docs/specs/2026-09-13-context-file-modes-system-design.md
 related-issue: "#794"
@@ -9,10 +9,15 @@ related-issue: "#794"
 
 # Context-File Modes (unified / per-provider) — Spec
 
-> Status: **Entwurf** — this document is a specification only. It defines interface
+> Status: **APPROVED (2026-09-14)** — approved by the user on **2026-09-14**,
+> recorded by the `concept-reviewer` role; the recommended defaults were accepted
+> unchanged (including the `per-provider` channel choice **(a)**: the
+> Gemini/Antigravity `rules_dir` channel `.gemini/rules`, Phase 1, gated on
+> FINDING F-RULESLOC). This document
+> is a specification only. It defines interface
 > contracts and acceptance criteria; it contains no implementation and no plan.
-> The final approval marker `Status: APPROVED` is set by `concept-reviewer` after
-> review — never by this document.
+> The approval marker is set here and in the frontmatter `status:` field by
+> `concept-reviewer` after review — never by the authoring role.
 > Trace anchor (adopted unchanged from the system design):
 > `spec-id: SPEC-CONTEXT-FILE-MODES-2026-09-13`.
 > Source design: `docs/specs/2026-09-13-context-file-modes-system-design.md`
@@ -101,13 +106,15 @@ the design's risk list.
 | F-05 (MINOR) | IC-02/AC-02 fail-safe: `provider_config.get(u, {})`, non-dict → `{}`, degrades to `advisory`, no `KeyError`. |
 | F-07 (MINOR) | Line numbers refreshed: `_sync_stage_contexts` `:328-378` + loop `:345-377`; `cli_commands.py` print `:1218`, exit `:1219`; rules seam `sync_pipeline.py:748` (consumed by `sync_rules :782` / `sync_embedded_rule_files :796`) added to the impact table. |
 | F-08 (MINOR) | AC-13 scoped to the resolver set (Claude→`CLAUDE.md`, Gemini→`GEMINI.md`, rest direct readers of the core); the Antigravity dual-reader sub-case moved entirely into OQ-3. **Superseded by R2-01/R2-02:** Gemini/Antigravity is one provider, so there is no dual-reader sub-case; AC-13 no longer names `GEMINI.md` and OQ-3 is re-derived (dedicated channel, F-RULESLOC). |
-| F-09 (MINOR) | `context_mode` removed from IC-02 (Phase 0); IC-05 declares it solely as a Phase-1 symbol. |
+| F-09 (MINOR) | `context_topology` removed from IC-02 (Phase 0); IC-05 declares it solely as a Phase-1 symbol (originally drafted as `context_mode`, renamed by R3-01). |
 | F-10 (MINOR) | `context_adapter_settings` added to IC-07; IC-09 names the provider-native settings write (Gemini `context.fileName` in `.gemini/settings.json`) as capability/`settings_file`-gated; new AC-26 observes activation (or default-context-file semantics). **Re-scoped by R2-02:** for Gemini/Antigravity this is candidate (b) and moves to **Phase 2**; the Phase-1 dedicated channel is the `rules_dir` channel (OQ-3). |
 | N-01 (MINOR, non-blocking) | `orchestrator_hint` / `ORCHESTRATOR_INVOCATION_HINT` removed from the divergence enumerations (IC-03, Datenfluss §1, AC-07, AC-25, R7, OQ-13) and annotated there as currently unrendered / no consumer: no rule/template reads `{{ORCHESTRATOR_INVOCATION_HINT}}` (the variable is only assigned, at `context.py:1131` and `rules.py:227/249`), so a differing value cannot make the two shared renders differ and AC-25's clause about it was unsatisfiable. `ORCH_MODE_*` and `REPO_CONTAINMENT_*` stay (genuinely consumed). |
 | R2-01 (MAJOR) | **Revision-2 alignment (user correction, authoritative).** Gemini and Antigravity are **one provider** (`config/ai-providers.yaml:89-162`), not a dual reader. All dual-reader language is removed. The provider matrix is corrected: the Gemini/Antigravity row is merged into a single row and opencode, Codex, Claude, Copilot, Continue, Mammouth, KimiCode and ZCode are re-verified against `config/ai-providers.yaml` / `config/provider-capabilities.yaml`. |
 | R2-02 (MAJOR) | **OQ-3 replaced.** The former "Gemini dual reader" question is re-derived as the dedicated-channel question for the single Gemini/Antigravity provider: recommended **(a)** its own `rules_dir` (`.gemini/rules`) as an Always-On rule (Phase 1, gated on FINDING F-RULESLOC), fallback **(c)** shared `AGENTS.md` + hook enforcement, with **(b)** the `context.fileName` file deferred to Phase 2. Decisive fact carried: this provider has hooks (`hook_protocol: antigravity-hooks-json`, `:97`; `runtime_gate: hook`, `provider-capabilities.yaml:94`), so the gate is **natively enforced** and the prompt text is documentation. |
 | R2-03 (MAJOR) | **FINDING F-RULESLOC folded in as an open verification point** (HYPOTHESIS, **no config change**): `config/ai-providers.yaml:95` sets `rules_dir: .gemini/rules` while Antigravity documents workspace rules in `.agents/rules` (backwards-compatible `.agent/rules`); `hooks_dir`/`hooks_config_file` (`:98-99`) already use `.agents/...`. Recorded as a real-repo verification task; adds R8/R9. Affects `per-provider` only. |
 | R2-04 (confirm) | **Phase 0 unchanged.** The `unified` fix is unaffected: the active `AGENTS.md` sharer set stays `{Opencode, Gemini}` → `weakest(permission, hook) = permission`; the F-RULESLOC question only concerns the `per-provider` channel. No approval marker is set by this revision. |
+| R3-01 (rename) | **Switch renamed to `context_file.topology` (user decision, authoritative).** Every occurrence of the previously proposed top-level switch `context.mode` / symbol `context_mode` is replaced by `context_file.topology` (enum `unified` \| `per-provider`, default `unified`), declared as a **sibling key inside the existing `context_file` block** (`config/project-config.schema.json:885-915`), next to the density `context_file.mode` (`full`\|`compact`, #540). The proposed new top-level `context` object is **dropped**; `context_file.core_file` and `context_file.provider-overrides.<Provider>.topology` carry the remaining topology settings. Resolver/consistency symbols renamed: `providers.py::context_topology`, `consistency/context_topology.py::check_context_topology_consistency`. Precedence stays deterministic: provider-override > project > default. **OQ-1 is RESOLVED** by this naming. Status stays `Entwurf` — no approval marker is set by this revision. |
+| APPROVED (2026-09-14) | **Approved by the user on 2026-09-14, recorded by the `concept-reviewer` role.** All recommended defaults accepted unchanged, including the `per-provider` channel choice **(a)** (Gemini/Antigravity `rules_dir` channel `.gemini/rules`, Phase 1, gated on FINDING F-RULESLOC). Frontmatter `status:` set to `APPROVED`. The system design keeps its own status (`Entwurf`) — no approval marker is set there. |
 
 `AGENTS.md` is the shared context file of Opencode (`runtime_gate: permission`,
 `config/provider-capabilities.yaml:75`) and Gemini/Antigravity
@@ -154,8 +161,8 @@ restores per-provider tier honesty through real channel/file separation.
 
 ## Ziel
 
-1. Two switchable modes, default = today's layout, configured via `context.mode`
-   (`unified | per-provider`).
+1. Two switchable modes, default = today's layout, configured via
+   `context_file.topology` (`unified | per-provider`).
 2. `unified`: exactly **one** deterministic render per shared `context_file`
    when the active sharers differ only in gate tier (effective tier = weakest
    active sharer; the `GATE_*` family is neutralised — AC-25/R7). `sync.py
@@ -168,7 +175,7 @@ restores per-provider tier honesty through real channel/file separation.
    > direct reader).
 4. Provider-agnostic: exclusively config keys / capability flags, never
    `if provider == "..."`.
-5. Backward compatible: the default `context.mode: unified` needs no new config,
+5. Backward compatible: the default `context_file.topology: unified` needs no new config,
    adds no files, and is byte-identical to today for every provider whose
    `context_file` is not shared with a different-tier sharer.
 
@@ -269,8 +276,8 @@ def shared_runtime_gate_vars(
   to `advisory`. `provider_runtime_gate_tier` already treats a non-mapping `pc`
   as `{}` (`providers.py:378-379`), so the `.get(u, {})` default keeps the
   never-raises contract intact. The function never raises.
-- `context_mode` is **not** declared here — it is a Phase-1 symbol, declared
-  solely in [IC-05](#ic-05--scriptslipproviderspycontext_mode-phase-1) (F-09).
+- `context_topology` is **not** declared here — it is a Phase-1 symbol, declared
+  solely in [IC-05](#ic-05--scriptslipproviderspycontext_topology-phase-1) (F-09).
 - `SUPPORTED_PLUGIN_PROTOCOLS` (`:312`), `provider_hooks_supported` (`:315`),
   `provider_runtime_gate_supported`, `provider_runtime_gate_tier` (`:357-386`)
   are untouched.
@@ -343,48 +350,61 @@ continues to supply per-provider artefacts (rules files for `has_rules`
 providers); for the shared context file IC-03 overrides it inside
 `_build_managed_block`.
 
-### IC-05 — `scripts/lib/providers.py::context_mode` (Phase 1)
+### IC-05 — `scripts/lib/providers.py::context_topology` (Phase 1)
 
 Declared **here only**; the IC-02 sketch is removed so the Phase-0 section cannot
-be read as wiring this Phase-1 symbol early (F-09). Precedence (deterministic,
-fail-safe), mirroring
+be read as wiring this Phase-1 symbol early (F-09). Resolves the **topology**
+switch — not the density mode of `context_file.mode` (`full|compact`). Precedence
+(deterministic, fail-safe), mirroring
 `variables._resolve_orch_mode` (`scripts/lib/variables.py:50-85`):
 
 ```
-context.provider-overrides.<Provider>.mode   (highest)
-        > context.mode
-        > "unified"                          (default)
+context_file.provider-overrides.<Provider>.topology   (highest)
+        > context_file.topology
+        > "unified"                                   (default)
 ```
 
 - Absent, `None`, non-string or out-of-enum values → `"unified"` (safe side: no
   new files and no new behaviour without explicit opt-in), never raises.
 
-### IC-06 — `config/project-config.schema.json:context` (new top-level object; Phase 1)
+### IC-06 — `config/project-config.schema.json:context_file` (extended; Phase 1)
 
-Insert one new member into the root `properties` object as a sibling of
-`context_file` (`:885-916`), i.e. next to it and before `"required"` (`:2315`).
-Root `additionalProperties` stays `true` (`:2318`); the new block itself is
-closed.
+The topology switch is **not** a new top-level object: it is added **inside the
+existing `context_file` block** (`:885-915`), as a sibling of
+`context_file.mode` (density `full|compact`, #540). Three members are added to
+that block — `topology`, `core_file` and `provider-overrides` — next to the
+existing `mode`, `max_lines`, `oversize_acknowledged`, `auto_generate`. The
+block's `additionalProperties: false` (`:915`) stays.
 
 ```json
-"context": {
+"context_file": {
   "type": "object",
-  "description": "Context-file topology mode (unified default). Sibling of context_file (density modes full/compact).",
   "properties": {
     "mode": {
       "type": "string",
+      "enum": ["full", "compact"],
+      "default": "full",
+      "description": "existing density mode (#540) — UNCHANGED"
+    },
+    "topology": {
+      "type": "string",
       "enum": ["unified", "per-provider"],
       "default": "unified",
-      "description": "Topology (one shared file vs. canonical core + adapters). NOT the density mode of context_file.mode (full/compact)."
+      "description": "Context-file topology (one shared file vs. canonical core + adapters). Sibling of the density mode above — NOT the same axis: mode=full|compact, topology=unified|per-provider."
     },
-    "core_file": { "type": "string", "default": "AGENTS.md" },
+    "core_file": {
+      "type": "string",
+      "default": "AGENTS.md",
+      "description": "Path of the canonical core in per-provider topology."
+    },
     "provider-overrides": {
       "type": "object",
+      "description": "Override context_file.topology per provider. Keys are provider names; providers without an entry inherit the project-wide context_file.topology.",
       "additionalProperties": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "mode": { "type": "string", "enum": ["unified", "per-provider"] }
+          "topology": { "type": "string", "enum": ["unified", "per-provider"] }
         }
       }
     }
@@ -393,12 +413,22 @@ closed.
 }
 ```
 
-- `context_file` (`:885-916`) is **unchanged** (density/size guard, #540). The two
-  keys stay distinct namespaces.
+- **Naming rationale:** `context_file.mode` already means **density**
+  (`full`/`compact`, #540). The topology switch is therefore a distinct sibling
+  key `topology`, not a second `mode` and not a new top-level `context` block —
+  the collision that motivated OQ-1 is resolved by this naming.
+- **Provider-override shape:** nested `provider-overrides.<Provider>.topology`,
+  consistent with the established
+  `orchestrator.provider-overrides.<Provider>.mode` convention
+  (`config/project-config.schema.json:2182-2201`, `variables.py:50-85`).
+- **Precedence (deterministic):**
+  `context_file.provider-overrides.<Provider>.topology` >
+  `context_file.topology` > `"unified"`.
 - **Error paths:** `additionalProperties: false` rejects typos and unknown
-  sub-keys; a non-string `mode`, an out-of-enum `mode` or a non-string
-  `core_file` is rejected by validation. Absence of the whole block keeps the
-  default (`unified`) with no new required key.
+  sub-keys; a non-string `topology`, an out-of-enum `topology`, a non-string
+  `core_file` or a malformed `provider-overrides` entry is rejected by
+  validation. Absence of the `topology` key keeps the default (`unified`) with no
+  new required key.
 
 ### IC-07 — `config/ai-providers.yaml` (new optional provider keys; Phase 1/2)
 
@@ -444,7 +474,7 @@ Per adapter-capable provider block:
   `unified`.
 - Missing keys ⇒ the provider is a **direct reader of the core** (opencode,
   KimiCode, ZCode need no keys).
-- `context.core_file` default `AGENTS.md`; a provider with
+- `context_file.core_file` default `AGENTS.md`; a provider with
   `has_dedicated_context_file` (Claude, `:7`) keeps its file as the adapter.
 - **Error path:** a capability registry invariant (AC-12) flags an
   adapter-capable provider that lacks `context_adapter_file` or
@@ -503,7 +533,7 @@ def sync_context_adapters_for_provider(
 
     Target selection (this is the render switch, F-02): the dispatch chooses the
     physical filename from the IC-03/IC-07 keys -- context_adapter_file when
-    context_adapter is true, otherwise context.core_file -- and hands it to the
+    context_adapter is true, otherwise context_file.core_file -- and hands it to the
     existing render strategies; resolve_context_filename (IC-08) is NOT used here.
     Concretely the target filename must be threaded into _sync_opencode_context
     (context.py:553, reads pc["context_file"] :566) and
@@ -511,7 +541,7 @@ def sync_context_adapters_for_provider(
     those readers must take the selected name instead of the raw key.
 
     Content:
-      - provider-native import line to context.core_file when supported,
+      - provider-native import line to context_file.core_file when supported,
         otherwise a pointer line;
       - the provider's own tier via runtime_gate_vars(pc, caps, config) where the
         provider's tier is carried by its render channel (see Claude note below).
@@ -533,7 +563,7 @@ def sync_context_adapters_for_provider(
     """
 
 def sync_context_for_provider(...) -> None:
-    """Dispatch extension (:818-857): context_mode(config, provider) ==
+    """Dispatch extension (:818-857): context_topology(config, provider) ==
     "per-provider" -> core render path + optionally
     sync_context_adapters_for_provider(); otherwise the current path unchanged.
     The core-vs-adapter filename selection happens here, never in IC-08."""
@@ -554,21 +584,21 @@ def sync_context_for_provider(...) -> None:
   silent); an unsupported/empty import syntax → pointer line; `dry_run` never
   writes; a provider that is not adapter-capable is never routed here.
 
-### IC-10 — `scripts/lib/consistency/context_mode.py` (new; Phase 2)
+### IC-10 — `scripts/lib/consistency/context_topology.py` (new; Phase 2)
 
 ```python
-def check_context_mode_consistency(
+def check_context_topology_consistency(
     root: Path,
     config: Optional[dict] = None,
     provider_config: Optional[dict] = None,
 ) -> list[Finding]:
-    """Findings (Severity.WARNING/INFO) for the context-file mode:
+    """Findings (Severity.WARNING/INFO) for the context-file topology:
 
-    - context.mode is a valid enum value (otherwise WARNING);
+    - context_file.topology is a valid enum value (otherwise WARNING);
     - per-provider: every adapter-capable active provider has a
       context_adapter_file; no two providers point at the same adapter file
       (collision => WARNING);
-    - per-provider: the adapter file contains a reference to context.core_file
+    - per-provider: the adapter file contains a reference to context_file.core_file
       (or the pointer) (WARNING otherwise);
     - unified: no orphaned adapter files without a managed-index entry (WARNING;
       points at the rollback).
@@ -583,24 +613,26 @@ Finding/severity pattern as `context_size.py:114-127` (`Finding`, `Severity`,
 
 ### IC-11 — Admin-UI / Server (Phase 2)
 
-- `scripts/admin-server.py::PROJECT_WRITABLE_SECTIONS` (`:230-249`): add
-  `"context"`. Without it `_assert_project_sections_writable` (`:4792-4806`)
-  rejects every write with HTTP 400. No new endpoint — `_write_project_section`
-  (`:4827`) is generic.
-- `docs/ui/admin-ui.html::viewProject`: build a `context` object with defaults
-  (`mode: unified`, `core_file: AGENTS.md`) analogous to the `contextFile` block
-  (`:6170-6180`, save at `:6480`), add it to `saveProjectSections([...])`
-  (`:6472-6481`) as `["context", contextCfg]`, render the mode as a dropdown and
-  add a help text that explains the difference to `context_file.mode`.
-- `check_ui_help_mappings` (`consistency-check.py:197`) needs a help entry for
-  the new key (otherwise WARNING); pattern as in
+- `scripts/admin-server.py::PROJECT_WRITABLE_SECTIONS` (`:230-249`): ensure
+  `"context_file"` is writable — the topology switch lives inside the existing
+  `context_file` section, so **no new section** is added. If `"context_file"` is
+  not already listed, add it; otherwise `_assert_project_sections_writable`
+  (`:4792-4806`) rejects every write with HTTP 400. No new endpoint —
+  `_write_project_section` (`:4827`) is generic.
+- `docs/ui/admin-ui.html::viewProject`: extend the existing `contextFile` block
+  (`:6170-6180`, save at `:6480`) with defaults (`topology: unified`,
+  `core_file: AGENTS.md`) instead of creating a new top-level `context` section;
+  render `topology` as a dropdown and add a help text that explains the
+  difference to the density `context_file.mode` (`full|compact`).
+- `check_ui_help_mappings` (`consistency-check.py:197`) needs help entries for
+  the added keys (otherwise WARNING); pattern as in
   `tests/test_admin_ui_git_section.py:63-67`.
 
 ### IC-12 — `scripts/lib/config.py::fill_defaults` (Phase 1)
 
-`fill_defaults` (`:886`) must write missing `context.mode` defaults without
-introducing a new mandatory key: absence of the whole `context` block resolves to
-`unified`; a present block is not widened beyond the schema.
+`fill_defaults` (`:886`) must write a missing `context_file.topology` default
+without introducing a new mandatory key: absence of the `topology` key resolves
+to `unified`; a present `context_file` block is not widened beyond the schema.
 
 ### IC-13 — `scripts/lib/consistency/context_size.py::check_context_file_size` (Phase 2)
 
@@ -646,9 +678,9 @@ sync.py --check / sync
 
 ```
 sync.py
-  └─> context_mode(config, provider)            providers.py (IC-05)
+  └─> context_topology(config, provider)         providers.py (IC-05)
         |-- per-provider:
-        |     ├─ core render: AGENTS.md (context.core_file), GATE_NEUTRAL, exactly 1 write
+        |     ├─ core render: AGENTS.md (context_file.core_file), GATE_NEUTRAL, exactly 1 write
         |     └─ sync_context_for_provider dispatch (IC-09) selects the physical target:
         |           core_file vs context_adapter_file  <- render switch lives HERE, not in IC-08
         |           |-- context_adapter true  -> sync_context_adapters_for_provider (IC-09)
@@ -732,7 +764,7 @@ Each criterion is testable and observable and names the test that covers it.
    criterion — the scenario is created only in Phase 2 and is asserted by AC-21
    (F-03).
 7. **AC-07 (backward-compatible default / no-op).** Given a project without
-   `context.mode` and without a mixed-tier shared file (e.g. a Claude-only
+   `context_file.topology` and without a mixed-tier shared file (e.g. a Claude-only
    project, or a hook-only shared group), when sync runs, then the render is
    byte-identical to the pre-change behaviour and no additional file is created;
    for a mixed-tier shared group the render is lowered to the weakest tier exactly
@@ -753,7 +785,7 @@ Each criterion is testable and observable and names the test that covers it.
    runs, then no module contains a provider-name literal equality branch;
    `runtime_gate` and `isolation` are already in `_TOUCHED_MODULES`
    (`tests/test_provider_agnostic_dispatch.py:27-51`) and
-   `consistency/context_mode` is added if that module exists. Test: extend
+    `consistency/context_topology` is added if that module exists. Test: extend
    `tests/test_provider_agnostic_dispatch.py`.
 25. **AC-25 (determinism scope — only `GATE_*` is neutralised).** Given two
     active sharers of one `context_file` that differ only in gate tier, when each
@@ -781,20 +813,22 @@ Each criterion is testable and observable and names the test that covers it.
 > (candidate (b), AC-26) and the Codex/Copilot/Continue/Mammouth adapters (AC-22)
 > stay in Phase 2 behind their HYPOTHESIS checks.
 
-10. **AC-10 (`context.mode` precedence and fail-safe).** Given
-    `context.provider-overrides.Gemini.mode: unified` with `context.mode:
-    per-provider`, when `context_mode(config, "Gemini")` is called, then it
-    returns `"unified"` (provider override wins); for `Opencode` it returns
-    `"per-provider"`; with no `context` block it returns `"unified"`; with
-    `context.mode: "garbage"` or a non-mapping config it returns `"unified"`
-    without raising. Test: new `tests/test_context_file_modes.py`.
-11. **AC-11 (schema validation for `context`).** Given the shipped
-    `config/project-config.schema.json`, when a config with a valid `context`
-    block (`mode` in enum, string `core_file`, nested `provider-overrides`) is
-    validated, then it is accepted; when `context.mode` is out of enum, a
-    sub-key is unknown (`additionalProperties: false`), or `core_file` is not a
-    string, then validation rejects it; absence of the block is accepted and
-    resolves to `unified`. Test: new `tests/test_context_mode_schema.py`, pattern
+10. **AC-10 (`context_file.topology` precedence and fail-safe).** Given
+    `context_file.provider-overrides.Gemini.topology: unified` with
+    `context_file.topology: per-provider`, when
+    `context_topology(config, "Gemini")` is called, then it returns `"unified"`
+    (provider override wins); for `Opencode` it returns `"per-provider"`; with
+    no `context_file.topology` key it returns `"unified"`; with
+    `context_file.topology: "garbage"` or a non-mapping config it returns
+    `"unified"` without raising. Test: new `tests/test_context_file_modes.py`.
+11. **AC-11 (schema validation for `context_file.topology`).** Given the shipped
+    `config/project-config.schema.json`, when a config with a valid
+    `context_file` block (`topology` in enum, string `core_file`, nested
+    `provider-overrides.<Provider>.topology`) is validated, then it is accepted;
+    when `context_file.topology` is out of enum, a sub-key is unknown
+    (`additionalProperties: false`), or `core_file` is not a string, then
+    validation rejects it; absence of the key is accepted and resolves to
+    `unified`. Test: new `tests/test_context_topology_schema.py`, pattern
     as `tests/test_runtime_gate_schema.py` / `tests/test_subagent_permissions_schema.py`.
 12. **AC-12 (adapter-capability registry invariant).** Given the two registries,
     when cross-checked, then every provider with `context_adapter: true` (or the
@@ -804,8 +838,8 @@ Each criterion is testable and observable and names the test that covers it.
     `tests/test_provider_agnostic_dispatch.py` and add cases in
     `tests/test_context_adapters.py`.
 13. **AC-13 (topology: which providers stay on `AGENTS.md`).** Given
-    `context.mode: per-provider`, when sync runs, then opencode, KimiCode and
-    ZCode stay direct readers of `context.core_file` (`AGENTS.md`) with **no**
+    `context_file.topology: per-provider`, when sync runs, then opencode, KimiCode and
+    ZCode stay direct readers of `context_file.core_file` (`AGENTS.md`) with **no**
     adapter file written, Claude is written to its dedicated `CLAUDE.md` adapter,
     and **Gemini/Antigravity** (**one** provider) also stays a direct reader of
     the core with **no** `context_adapter_file` — its dedicated gate channel is
@@ -840,7 +874,7 @@ Each criterion is testable and observable and names the test that covers it.
     `context_adapter_import_supported: true` and `context_adapter_import:
     "@{core}"`, when the adapter is rendered, then it contains the provider-native
     import line `@AGENTS.md`; with `context_adapter_import_supported: false` it
-    contains a pointer line to `context.core_file`; an empty/unsupported syntax
+    contains a pointer line to `context_file.core_file`; an empty/unsupported syntax
     falls back to the pointer line and never crashes. Test: new
     `tests/test_context_adapters.py`.
 16. **AC-16 (idempotency of the `per-provider` render).** Given a `per-provider`
@@ -849,7 +883,7 @@ Each criterion is testable and observable and names the test that covers it.
     `--check` reports `pending == 0`. Test: new `tests/test_context_adapters.py`.
 17. **AC-17 (managed index and drift tracking).** Given generated adapters, when
     the managed-index helpers (`rule_index.py:45,110,180`) and
-    `consistency/context_mode.py` run, then every adapter is recorded in the
+    `consistency/context_topology.py` run, then every adapter is recorded in the
     adapter index, receives a context-hash entry
     (`context.py::_record_static_hash`/`_save_context_hashes`) and is found by
     `generated_file_drift`; a modified/orphaned adapter is reported. The
@@ -865,22 +899,23 @@ Each criterion is testable and observable and names the test that covers it.
 
 ### Phase 2 — remaining adapters + consistency + UI (gated/deferred)
 
-19. **AC-19 (mode consistency check).** Given the new
-    `check_context_mode_consistency`, when registered in
+19. **AC-19 (topology consistency check).** Given the new
+    `check_context_topology_consistency`, when registered in
     `scripts/consistency-check.py` beside `check_context_file_size` (`:202`), then
-    an invalid `context.mode` yields a WARNING, two providers pointing at the same
-    adapter file yield a WARNING, a `per-provider` adapter missing its core
-    reference yields a WARNING, and an orphaned adapter in `unified` yields a
+    an invalid `context_file.topology` yields a WARNING, two providers pointing at
+    the same adapter file yield a WARNING, a `per-provider` adapter missing its
+    core reference yields a WARNING, and an orphaned adapter in `unified` yields a
     WARNING — while a consistent configuration yields none. Test: new
-    `tests/test_context_mode_consistency.py`.
+    `tests/test_context_topology_consistency.py`.
 20. **AC-20 (Admin-UI / Server).** Given the running admin server, when the
-    project `context` section is written through the existing endpoint, then the
-    write is accepted (the section is in `PROJECT_WRITABLE_SECTIONS`) rather than
-    rejected with HTTP 400; the UI renders a `mode` dropdown with the default
-    `unified` and a help text distinct from `context_file.mode`; and
-    `check_ui_help_mappings` produces no finding for `context`. Test: extend
+    project `context_file` section is written through the existing endpoint, then
+    the write is accepted (`"context_file"` is in `PROJECT_WRITABLE_SECTIONS`)
+    rather than rejected with HTTP 400; the UI renders a `topology` dropdown with
+    the default `unified` and a help text distinct from the density
+    `context_file.mode`; and `check_ui_help_mappings` produces no finding for
+    `context_file.topology`. Test: extend
     `tests/test_admin_server.py` and `tests/test_admin_ui_git_section.py`
-    (help-mapping pattern); new `tests/test_context_mode_admin.py` for the UI
+    (help-mapping pattern); new `tests/test_context_topology_admin.py` for the UI
     shape.
 21. **AC-21 (scenario `63-context-file-modes`).** Given the scenario registry
     ends at `62-stale-role-cleanup` (`tests/scenarios/registry.md:109`), when the
@@ -982,18 +1017,24 @@ additive invariant over its already-committed `GATE_*` vocabulary.
 
 ## Offene Fragen + Risiken
 
-The design's OQ-1 … OQ-12 (design §12, revision 2) are carried over; **OQ-3 is
-replaced** by the re-derived Gemini/Antigravity dedicated-channel question
-(FINDING F-RULESLOC) and OQ-13 is added (F-01). Each has a recommended default
-and the design's risk list becomes R1 … R7, extended by R8/R9 (F-RULESLOC /
-Always-On activation metadata). Items marked **[User approval]** need an explicit
-user decision because they affect the shipped guarantee, a public config contract
-or a provider enablement.
+The design's OQ-1 … OQ-12 (design §12, revision 2) are carried over; **OQ-1 is
+RESOLVED** by the `context_file.topology` naming (R3-01) and no longer counts as
+an open question, **OQ-3 is replaced** by the re-derived Gemini/Antigravity
+dedicated-channel question (FINDING F-RULESLOC), and OQ-13 is added (F-01). Each
+remaining item has a recommended default and the design's risk list becomes
+R1 … R7, extended by R8/R9 (F-RULESLOC / Always-On activation metadata). Items
+marked **[User approval]** need an explicit user decision because they affect the
+shipped guarantee, a public config contract or a provider enablement.
 
-1. **OQ-1 — collision `context.mode` vs. `context_file.mode`.** Recommended
-   default: keep `context.mode` (commission decision); mitigate with an explicit
-   schema `description` and a UI help label "context topology (not density)".
-   No user approval needed.
+1. **OQ-1 — collision `context.mode` vs. `context_file.mode` — RESOLVED
+   (R3-01).** The previously proposed top-level `context.mode` is dropped; the
+   switch is `context_file.topology` (enum `unified | per-provider`, default
+   `unified`), a **sibling key** of the density `context_file.mode`
+   (`full|compact`, #540). Rationale: `context_file.mode` already means density,
+   so the topology axis must not reuse the name `mode`; declaring it as a sibling
+   inside the existing `context_file` block — rather than as a new top-level
+   `context` key — removes the collision and keeps the switch on the established
+   context-file config surface. No user approval needed and **no open flag**.
 2. **OQ-2 — core content in `per-provider`: neutral (`GATE_NEUTRAL`) vs.
    weakest tier.** Recommended default: neutral (design §5.2, DECISION-4).
    **[User approval]** — it determines that direct readers of the core (opencode,
@@ -1061,10 +1102,11 @@ or a provider enablement.
     provider? Recommended default: yes, via the existing
     `_sync_stage_legacy_cleanup` logic (`sync_pipeline.py:433`) plus the adapter
     index. No user approval needed.
-12. **OQ-12 — `provider-overrides` shape.** Flat `mode` field vs. nested object.
-    Recommended default: nested (`{mode: …}`), analogous to
-    `orchestrator.provider-overrides` (`variables.py:50-85`). No user approval
-    needed.
+12. **OQ-12 — `provider-overrides` shape.** Flat key vs. nested object.
+    Recommended default: nested
+    (`context_file.provider-overrides.<Provider>.topology`), analogous to
+    `orchestrator.provider-overrides.<Provider>.mode`
+    (`variables.py:50-85`). No user approval needed.
 13. **OQ-13 — non-gate provider-scoped inputs in the shared block (F-01).**
     IC-03 neutralises only `GATE_*`; the rendered non-gate inputs
     `ORCH_MODE_*` and `REPO_CONTAINMENT_*` still come from the rendering sharer
@@ -1102,9 +1144,9 @@ or a provider enablement.
 - **R5: Phase-1/2 adapter lifecycle.** Adapter creation, import semantics and
   cleanup are provider-specific and partly HYPOTHESIS (design §5.4, §9.3); the
   managed index authorizes deletion, foreign files stay untouched.
-- **R6: `provider-overrides` for `context` is a new public contract.** A nested
-  object with `additionalProperties: false` per IC-06 prevents typos; the
-  precedence must be tested (AC-10).
+- **R6: `provider-overrides` under `context_file` is an extended public
+  contract.** A nested object with `additionalProperties: false` per IC-06
+  prevents typos; the precedence must be tested (AC-10).
 - **R7 (F-01): the determinism guarantee is scoped to `GATE_*`.** If two active
   sharers diverge in a **rendered** non-gate provider-scoped input
   (`orchestrator.provider-overrides.<P>.mode`, provider-scoped repo-containment),

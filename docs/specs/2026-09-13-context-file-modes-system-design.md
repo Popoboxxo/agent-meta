@@ -2,7 +2,7 @@
 spec-id: SPEC-CONTEXT-FILE-MODES-2026-09-13
 title: Context-File Modes — System Design
 status: Entwurf
-revision: 2
+revision: 3
 source-design: docs/specs/2026-09-13-opencode-runtime-gate-system-design.md
 related:
   - scripts/lib/context.py
@@ -42,6 +42,7 @@ related:
 |---|---|---|
 | 2026-09-14 | concept-architect | Erstfassung. Zwei Modi (`unified` default / `per-provider`), Weakest-Tier-Regel für geteilte Kontextdateien, Fix des AGENTS.md-Doppelschreib-Defekts (Phase 0), Adapter-Topologie (Phase 1/2). |
 | 2026-09-14 | concept-architect | **Revision 2 (User-Korrektur, autoritativ).** (1) **Gemini und Antigravity sind EIN Provider** (`config/ai-providers.yaml:89-162`); das bisherige „Gemini-Dual-Leser"-Konstrukt (altes OQ-3, A6) war falsch und ist entfernt. (2) OQ-3 durch eine **Re-Derivation des dedizierten Tier-Kanals** ersetzt (Rules-Kanal vs. `context.fileName` vs. geteilter `AGENTS.md` + Hook) — Empfehlung Rules-Kanal (`DECISION-7`, §5.1.1). (3) Provider-Matrix gegen `config/ai-providers.yaml` re-verifiziert, Gemini/Antigravity-Zeile zusammengeführt. (4) **FINDING F-RULESLOC:** `rules_dir: .gemini/rules` (`config/ai-providers.yaml:95`) weicht von der dokumentierten Antigravity-Workspace-Rules-Lokation `.agents/rules` ab; nur dokumentiert, **keine Config-Änderung**. |
+| 2026-09-14 | concept-specifier | **Revision 3 (Naming-Korrektur, autoritative User-Entscheidung).** Der Topologie-Schalter heißt `context_file.topology` (Enum `unified` \| `per-provider`, Default `unified`) und liegt **innerhalb des bestehenden `context_file`-Blocks** (`config/project-config.schema.json:885-915`), als Sibling des Dichte-`mode` (`full\|compact`, #540) — **nicht** als neues Top-Level-`context`-Objekt. Begründung: `context_file.mode` bedeutet bereits Dichte; die Topologie-Achse darf den Namen `mode` nicht wiederverwenden. Alle Vorkommen von `context.mode`/`context_mode` sind ersetzt; Resolver/Consistency umbenannt (`providers.py::context_topology`, `consistency/context_topology.py::check_context_topology_consistency`); Provider-Override verschachtelt als `context_file.provider-overrides.<Provider>.topology` (Muster `orchestrator.provider-overrides`). Präzedenz unverändert deterministisch: Provider-Override > Projekt > Default. OQ-1 damit gelöst. Status bleibt `Entwurf`. |
 
 ---
 
@@ -139,7 +140,7 @@ Tier-Ehrlichkeit datengetrieben über echte Dateitrennung wieder her.
 **Ziel**
 
 1. Zwei umschaltbare Modi, default = heutiges Layout, konfigurierbar über
-   `context.mode` (Enum `unified` | `per-provider`).
+   `context_file.topology` (Enum `unified` | `per-provider`).
 2. `unified`: **ein** deterministischer Render pro geteilter Kontextdatei, Tier =
    schwächster Sharer; `sync.py --check` konvergiert auf rc 0.
 3. `per-provider`: kanonischer Kern in `AGENTS.md` + **provider-native
@@ -166,7 +167,7 @@ Tier-Ehrlichkeit datengetrieben über echte Dateitrennung wieder her.
   §5.3, `GATE_NEUTRAL` ist ein Render-State, kein Runtime-Tier).
 - Keine Implementierung, keine Spec, kein Plan; keine REQ-ID-Vergabe.
 
-**Backward Compatibility (explizit):** Der Default `context.mode: unified`
+**Backward Compatibility (explizit):** Der Default `context_file.topology: unified`
 verlangt **keine** neue Config und ändert das **Layout** nicht (keine zusätzlichen
 Dateien). Für jeden Provider, dessen `context_file` **nicht** mit einem Sharer
 eines anderen Tiers geteilt wird, ist der Render byte-identisch zu heute
@@ -179,21 +180,21 @@ Change** im Sinne der Commit-Konventionen.
 
 ---
 
-## 3. Modell: `context.mode`
+## 3. Modell: `context_file.topology`
 
 ### 3.1 Enum und Semantik
 
 | Wert | Semantik | Artefakte pro Provider-Gruppe |
 |---|---|---|
 | `unified` (default) | Ein geteilter Kontextfile pro Provider-Gruppe; effektiver Tier = **schwächster Sharer**; genau ein deterministischer Render. | bestehende Dateien, unverändert |
-| `per-provider` | Kanonischer Kern (`context.core_file`, default `AGENTS.md`) + provider-native **dedizierte Tier-Kanäle** (Adapter-Datei oder eigener Rules-Kanal), die den Kern referenzieren und **ihren eigenen** Tier tragen. | Kern + 0..n Adapter-/Rules-Kanäle |
+| `per-provider` | Kanonischer Kern (`context_file.core_file`, default `AGENTS.md`) + provider-native **dedizierte Tier-Kanäle** (Adapter-Datei oder eigener Rules-Kanal), die den Kern referenzieren und **ihren eigenen** Tier tragen. | Kern + 0..n Adapter-/Rules-Kanäle |
 
 ### 3.2 Präzedenz (deterministisch, fail-safe)
 
 ```
 Provider-Override  >  Projekt  >  Default
-context.provider-overrides.<Provider>.mode
-        > context.mode
+context_file.provider-overrides.<Provider>.topology
+        > context_file.topology
         > "unified"
 ```
 
@@ -207,17 +208,17 @@ schlägt Default. Ungültige/fehlende Werte fallen **immer** auf `unified` zurü
 
 | Kandidat | Bewertung | Entscheidung |
 |---|---|---|
-| `context.mode` | Vom Auftrag vorgegeben; kurz; spiegelt die bestehende Enum-Schreibweise in `project-config.schema.json` (`context_file.mode`, `:889-897`). Kollisionsrisiko: `context_file.mode` bedeutet bereits `full|compact` (Dichte, #540) — ein zweiter `mode`-Key mit anderer Enum-Domäne auf Top-Level-Ebene kann verwechselt werden. | **gewählt** (Auftragsentscheidung), Verwechslung durch Doku + Schema-`description` + UI-Label entschärft |
-| `context.layout` | Semantisch präziser (Layout vs. Dichte), kollisionsfrei zu `context_file.mode`. | verworfen (Auftragsvorgabe; inkonsistent zu `_resolve_*`-Namensmustern) |
-| `context_file.mode` (erweitern) | Wäre am kollisionsärmsten, würde aber eine bestehende Enum (`full|compact`) um fachfremde Werte erweitern. | verworfen (breaking für den Dichte-Contract) |
+| `context_file.topology` | **Sibling-Key im bestehenden `context_file`-Block** (`project-config.schema.json:885-915`), direkt neben dem Dichte-`mode` (`full|compact`, #540). Semantisch präzise (Topologie vs. Dichte) und kollisionsfrei, weil der bestehende `mode`-Name nicht wiederverwendet wird. | **gewählt** (autoritative User-Entscheidung) |
+| `context.mode` (Top-Level) | Vorgängervorschlag: kurz, aber eigener Top-Level-Namespace und zweiter `mode`-Key mit fachfremder Enum-Domäne → Verwechslung mit `context_file.mode` (Dichte). Genau die Kollision, die OQ-1 aufwirft. | **verworfen** (löst OQ-1 nicht) |
+| `context_file.mode` (erweitern) | Würde die bestehende Dichte-Enum (`full|compact`) um fachfremde Werte erweitern. | verworfen (breaking für den Dichte-Contract) |
+| `context.layout` | Semantisch präziser (Layout vs. Dichte), kollisionsfrei — aber außerhalb des etablierten `context_file`-Blocks. | verworfen (Namens-/Namespace-Inkonsistenz) |
 | `context.rendering` | Beschreibt nur den Render, nicht die Dateitopologie. | verworfen (zu eng) |
-| `context.file_mode` | Explizit, aber redundant mit dem `context`-Namespace. | verworfen (Redundanz) |
 
-Unterstützende Keys des neuen `context`-Objekts:
+Unterstützende Keys im (erweiterten) `context_file`-Block:
 
-- `context.mode` — Enum `unified|per-provider`, default `unified`.
-- `context.core_file` — Pfad des kanonischen Kerns, default `AGENTS.md`.
-- `context.provider-overrides.<Provider>.mode` — Provider-Override.
+- `context_file.topology` — Enum `unified|per-provider`, default `unified`.
+- `context_file.core_file` — Pfad des kanonischen Kerns, default `AGENTS.md`.
+- `context_file.provider-overrides.<Provider>.topology` — Provider-Override.
 
 ---
 
@@ -553,42 +554,64 @@ widerspricht der Auftragsanforderung „per-adapter gate tier".
 
 ### 5.3 Adapter-Contract (Datei:Symbol)
 
-**IC-05 — `scripts/lib/providers.py::context_mode`**
+**IC-05 — `scripts/lib/providers.py::context_topology`**
 
 ```python
-def context_mode(config: Optional[dict], provider: str) -> str:
-    """Auflösung context.mode nach §3.2.
+def context_topology(config: Optional[dict], provider: str) -> str:
+    """Auflösung context_file.topology nach §3.2 (Topologie, nicht Dichte).
 
-    precedence: context.provider-overrides.<provider>.mode
-                > context.mode
+    precedence: context_file.provider-overrides.<provider>.topology
+                > context_file.topology
                 > "unified"
     Fail-safe "unified" bei unbekanntem/ungültigem Wert. Wirft nie.
     """
 ```
 
-**IC-06 — `config/project-config.schema.json` (neues Top-Level-Objekt `context`)**
+**IC-06 — `config/project-config.schema.json` (bestehender `context_file`-Block erweitert)**
+
+Kein neues Top-Level-Objekt `context`: der Topologie-Schalter ist ein **Sibling**
+des Dichte-`mode` im bestehenden `context_file`-Block (`:885-915`).
+`additionalProperties: false` (`:915`) bleibt; ergänzt werden `topology`,
+`core_file` und `provider-overrides`:
 
 ```json
-"context": {
+"context_file": {
   "type": "object",
-  "description": "Context-file topology modes (unified default). Sibling of context_file (density modes full/compact).",
-  "additionalProperties": false,
   "properties": {
-    "mode": { "type": "string", "enum": ["unified", "per-provider"], "default": "unified" },
+    "mode": {
+      "type": "string",
+      "enum": ["full", "compact"],
+      "default": "full",
+      "description": "bestehende Dichte (#540) — UNVERAENDERT"
+    },
+    "topology": {
+      "type": "string",
+      "enum": ["unified", "per-provider"],
+      "default": "unified",
+      "description": "Kontext-Topologie (eine geteilte Datei vs. Kern + Adapter). Sibling des Dichte-mode — NICHT dieselbe Achse."
+    },
     "core_file": { "type": "string", "default": "AGENTS.md" },
     "provider-overrides": {
       "type": "object",
       "additionalProperties": {
         "type": "object",
         "additionalProperties": false,
-        "properties": { "mode": { "type": "string", "enum": ["unified", "per-provider"] } }
+        "properties": { "topology": { "type": "string", "enum": ["unified", "per-provider"] } }
       }
     }
-  }
+  },
+  "additionalProperties": false
 }
 ```
 
-`context_file` (`:885-916`) bleibt unverändert (Dichte/Size-Guard, #540).
+- **Provider-Override-Form:** verschachtelt
+  `context_file.provider-overrides.<Provider>.topology`, konsistent zum etablierten
+  Muster `orchestrator.provider-overrides.<Provider>.mode`
+  (`project-config.schema.json:2182-2201`, `variables.py:50-85`).
+- **Präzedenz:** `context_file.provider-overrides.<Provider>.topology` >
+  `context_file.topology` > `"unified"`.
+- Der Dichte-/Size-Guard-Teil von `context_file` (`max_lines`,
+  `oversize_acknowledged`, `auto_generate`, #540) bleibt inhaltlich unverändert.
 
 **IC-07 — `config/ai-providers.yaml` (neue, optionale Provider-Keys)**
 
@@ -613,7 +636,7 @@ def context_mode(config: Optional[dict], provider: str) -> str:
   diesen Kanal (§5.1.1); `context_adapter*` bleibt für Provider mit einer echten
   Kontextdatei (Claude) reserviert. Damit ist die Kanalwahl rein capability-/
   key-getrieben (`context-adapter` > `has_rules`/`rules_dir` > Direkt-Leser).
-- `context.core_file` default `AGENTS.md`; Provider mit
+- `context_file.core_file` default `AGENTS.md`; Provider mit
   `has_dedicated_context_file` (Claude, `:7`) behalten ihre Datei als Adapter.
 
 **IC-08 — `scripts/lib/providers.py::resolve_context_filename` (Interaktion)**
@@ -635,7 +658,7 @@ def sync_context_adapters_for_provider(
     adapter-fähigen Provider im Modus per-provider.
 
     Inhalt:
-      - Provider-native Import-Zeile auf context.core_file (falls unterstützt)
+      - Provider-native Import-Zeile auf context_file.core_file (falls unterstützt)
         bzw. Pointer-Zeile.
       - Managed Block mit runtime_gate_vars(pc, caps, config) dieses Providers.
     Managed via rule_index (bootstrap_previously_managed / cleanup_stale_managed_files /
@@ -644,7 +667,7 @@ def sync_context_adapters_for_provider(
     """
 
 def sync_context_for_provider(...) -> None:
-    """Dispatch erweitert: context_mode(config, provider) == "per-provider"
+    """Dispatch erweitert: context_topology(config, provider) == "per-provider"
     -> Kern-Render Pfad + ggf. sync_context_adapters_for_provider(); sonst
     heutiger Pfad (unverändert)."""
 ```
@@ -685,7 +708,7 @@ sonst            -> Direkt-Leser des Kerns
 
 **`unified` → `per-provider`** (Opt-in):
 
-1. User setzt `context.mode: per-provider`.
+1. User setzt `context_file.topology: per-provider`.
 2. Sync rendert den Kern (`AGENTS.md`) einmalig neutral (ein Write).
 3. Sync legt für jeden adapter-fähigen, aktiven Provider die Adapter-Datei an
    (INIT) und trägt sie in den Adapter-Index ein.
@@ -696,7 +719,7 @@ sonst            -> Direkt-Leser des Kerns
 
 **`per-provider` → `unified`** (Rollback):
 
-1. User setzt `context.mode: unified` (bzw. entfernt den Key).
+1. User setzt `context_file.topology: unified` (bzw. entfernt den Key).
 2. Sync rendert `AGENTS.md` wieder als geteilten Weakest-Tier-Block.
 3. `cleanup_stale_managed_files` löscht alle nicht mehr erwarteten Adapter-Dateien
    (der Index ist die Autorisierung); `cleanup_stale_managed_files` schützt
@@ -712,9 +735,9 @@ irreversible Schritt (Adapter-Löschung) ist durch den Index authorisiert.
 
 | Key/Flag | Ort | Zweck | Interaktion |
 |---|---|---|---|
-| `context.mode` | `project.yaml` | Modus-Enum, default `unified` | IC-05 |
-| `context.core_file` | `project.yaml` | Kanonischer Kern (default `AGENTS.md`) | IC-09 |
-| `context.provider-overrides.<P>.mode` | `project.yaml` | Provider-Override (höchste Präzedenz) | IC-05 |
+| `context_file.topology` | `project.yaml` | Topologie-Enum, default `unified` (Sibling von `context_file.mode` = Dichte) | IC-05 |
+| `context_file.core_file` | `project.yaml` | Kanonischer Kern (default `AGENTS.md`) | IC-09 |
+| `context_file.provider-overrides.<P>.topology` | `project.yaml` | Provider-Override (höchste Präzedenz) | IC-05 |
 | `context_adapter` / Capability `context-adapter` | `ai-providers.yaml` | Provider kann eigene Adapter-Datei lesen | IC-07/IC-08 |
 | `context_adapter_file` | `ai-providers.yaml` | Nativer Adapter-Pfad | IC-08; ersetzt `context_file` im per-provider-Modus |
 | `context_adapter_import` / `context_adapter_import_supported` | `ai-providers.yaml` | Import-Syntax (`@AGENTS.md`) vs. Pointer-Zeile | IC-09 |
@@ -734,30 +757,31 @@ Alle vier Layer folgen dem etablierten Repo-Muster.
 
 ### 7.1 Schema
 
-`config/project-config.schema.json`: neues `context`-Objekt (IC-06) neben
-`context_file` (`:885-916`). `additionalProperties: false` verhindert Tippfehler.
+`config/project-config.schema.json`: der bestehende `context_file`-Block wird um
+`topology`/`core_file`/`provider-overrides` erweitert (IC-06, `:885-915`);
+`additionalProperties: false` verhindert Tippfehler.
 `fill_defaults` in `scripts/lib/config.py:886` schreibt fehlende Defaults; die
-Absenz-Semantik bleibt gewahrt (fehlendes `context` ⇒ `unified`, kein neuer
-Pflicht-Key).
+Absenz-Semantik bleibt gewahrt (fehlendes `context_file.topology` ⇒ `unified`,
+kein neuer Pflicht-Key).
 
 ### 7.2 Validator (Consistency)
 
-**IC-10 — neu `scripts/lib/consistency/context_mode.py`**
+**IC-10 — neu `scripts/lib/consistency/context_topology.py`**
 
 ```python
-def check_context_mode_consistency(
+def check_context_topology_consistency(
     root: Path,
     config: Optional[dict] = None,
     provider_config: Optional[dict] = None,
 ) -> list[Finding]:
-    """Findings (Severity.WARNING/INFO) für den Context-File-Modus:
+    """Findings (Severity.WARNING/INFO) für die Context-File-Topologie:
 
-    - context.mode ist ein gültiger Enum-Wert (sonst WARNING).
+    - context_file.topology ist ein gültiger Enum-Wert (sonst WARNING).
     - per-provider: jeder adapter-fähige aktive Provider hat
       context_adapter_file; keine zwei Provider zeigen auf dieselbe
       Adapter-Datei (Kollision => WARNING).
     - per-provider: die Adapter-Datei enthält eine Referenz auf
-      context.core_file (bzw. den Pointer) (WARNING).
+      context_file.core_file (bzw. den Pointer) (WARNING).
     - unified: keine verwaisten Adapter-Dateien ohne Managed-Index-Eintrag
       (WARNING; verweist auf Rollback).
     """
@@ -775,16 +799,17 @@ Convention-boundary-Durchsetzung der Modus-Konsistenz.
 ### 7.3 Admin-UI / Server
 
 - **Server-Allowlist:** `PROJECT_WRITABLE_SECTIONS` (`admin-server.py:230-249`)
-  um `"context"` ergänzen — sonst lehnt
-  `_assert_project_sections_writable` (`:4792-4806`) jeden Write mit HTTP 400 ab.
-  Dies ist der einzige Server-Code-Change (kein neuer Endpoint:
+  muss `"context_file"` enthalten — der Topologie-Schalter liegt im bestehenden
+  `context_file`-Abschnitt, es wird **kein neuer Abschnitt** ergänzt. Fehlt der
+  Eintrag, lehnt `_assert_project_sections_writable` (`:4792-4806`) jeden Write
+  mit HTTP 400 ab. Dies ist der einzige Server-Code-Change (kein neuer Endpoint:
   `_write_project_section` `:4827-4844` ist generisch).
-- **UI:** In `viewProject` analog zum bestehenden `contextFile`-Block
-  (`docs/ui/admin-ui.html:6170-6180`) ein `context`-Objekt mit
-  Defaults bauen (`mode: unified`, `core_file: AGENTS.md`) und in
-  `saveProjectSections([...])` (`:6472-6481`) als `["context", contextCfg]`
-  aufnehmen. Dropdown-Feld für `mode` (Muster: `dropdownField`, z. B.
-  `:6202`), Help-Text erklärt den Unterschied zu `context_file.mode`.
+- **UI:** In `viewProject` den bestehenden `contextFile`-Block
+  (`docs/ui/admin-ui.html:6170-6180`) um Defaults erweitern
+  (`topology: unified`, `core_file: AGENTS.md`) statt ein neues Top-Level-Objekt
+  `context` zu bauen. Dropdown-Feld für `topology` (Muster: `dropdownField`, z. B.
+  `:6202`) innerhalb des `contextFile`-Objekts; Help-Text erklärt den Unterschied
+  zum Dichte-`context_file.mode`.
 - `check_ui_help_mappings` (`consistency-check.py:197`) prüft UI-Help-Mappings;
   der neue Key braucht einen Help-Eintrag nach bestehendem Muster (sonst
   WARNING).
@@ -797,14 +822,14 @@ Convention-boundary-Durchsetzung der Modus-Konsistenz.
 
 | # | Komponente | Verantwortung | Artefakt |
 |---|---|---|---|
-| K1 | Mode-Resolver | Löst `context.mode` mit Präzedenz auf, fail-safe `unified` | `providers.py::context_mode` (IC-05) |
+| K1 | Topologie-Resolver | Löst `context_file.topology` mit Präzedenz auf, fail-safe `unified` | `providers.py::context_topology` (IC-05) |
 | K2 | Tier-Vokabel | Kanonische Tier-Ordnung + Weakest-Auflösung | `runtime_gate.py::weakest_runtime_gate_tier` (IC-01) |
 | K3 | Shared-Tier-Resolver | Weakest-Tier-Bundle über alle Sharer | `providers.py::shared_runtime_gate_vars` (IC-02) |
 | K4 | Shared-Render | Ein deterministischer Managed-Block pro `context_file` | `context.py::_build_managed_block` (IC-03) |
 | K5 | Kern-Render (per-provider) | Neutraler kanonischer Kern | `context.py` per-provider-Pfad (IC-09) |
 | K6 | Adapter-Render | Adapter-Datei mit Referenz + eigenem Tier | `context.py::sync_context_adapters_for_provider` (IC-09) |
 | K7 | Managed-Index | Lifecycle/Cleanup der Adapter | `rule_index.py` (IC-09/§5.4) |
-| K8 | Consistency | Modus-Konsistenz + Größe | `consistency/context_mode.py` (IC-10), `context_size.py` |
+| K8 | Consistency | Topologie-Konsistenz + Größe | `consistency/context_topology.py` (IC-10), `context_size.py` |
 | K9 | Admin-UI | Modus anzeigen/speichern | `admin-ui.html`, `admin-server.py:230` |
 
 ### 8.2 Datenfluss `unified` (Phase 0)
@@ -832,7 +857,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  A["sync.py"] --> B["context_mode(config, provider)<br/>IC-05"]
+  A["sync.py"] --> B["context_topology(config, provider)<br/>IC-05"]
   B -->|per-provider| C["Kern-Render AGENTS.md<br/>GATE_NEUTRAL, 1 Write"]
   B --> D{"dedizierter Kanal?"}
   D -->|"context-adapter"| E["Adapter-Render<br/>Import/Pointer + eigener Tier<br/>runtime_gate_vars"]
@@ -868,14 +893,18 @@ consequences:
           Wortlaut (F-05) — in unified bewusst; per-provider stellt ihn wieder her.
 
 DECISION-2
-context:  Wie wird der Modus konfiguriert?
-choice:   context.mode (enum), default unified; Overrides provider-spezifisch.
+context:  Wie wird die Topologie konfiguriert?
+choice:   context_file.topology (enum unified|per-provider), default unified;
+          Overrides provider-spezifisch
+          (context_file.provider-overrides.<P>.topology).
 alternatives:
   - context_file.mode erweitern: breaking fuer Dichte-Enum (full/compact). VERWORFEN.
-  - context.layout: kollisionsfrei, aber nicht Auftragsvorgabe. VERWORFEN.
+  - context.mode (Top-Level): loest die Kollision mit context_file.mode nicht. VERWORFEN.
+  - context.layout: kollisionsfrei, aber ausserhalb des context_file-Blocks. VERWORFEN.
 consequences:
-  leicht: ein neuer Namespace, klar dokumentierbar.
-  schwer: Verwechslungsrisiko mit context_file.mode -> Doku/UI-Label Pflicht.
+  leicht: kein neuer Top-Level-Namespace; Schalter sitzt neben der Dichte-Achse,
+          klar dokumentierbar.
+  schwer: Doku/UI-Label muessen Topologie vs. Dichte (context_file.mode) trennen.
 
 DECISION-3
 context:  Wie wird per-provider-Tier-Ehrlichkeit erreicht?
@@ -1032,9 +1061,9 @@ UI.
 
 **Berührt:**
 
-- `config/project-config.schema.json` (`context`-Objekt, IC-06).
+- `config/project-config.schema.json` (erweiterter `context_file`-Block, IC-06).
 - `scripts/lib/config.py` (`fill_defaults`, Default `unified`).
-- `scripts/lib/providers.py` (`context_mode`, IC-05; `resolve_context_filename`
+- `scripts/lib/providers.py` (`context_topology`, IC-05; `resolve_context_filename`
   Adapter-Regel, IC-08).
 - `config/ai-providers.yaml` (Adapter-Keys für **Claude**, IC-07). Gemini/Antigravity
   benötigt **keine** neuen Keys: sein dedizierter Tier-Kanal ist der bestehende
@@ -1061,11 +1090,13 @@ bleiben Direkt-Leser des Kerns.
 - **Optional (Kandidat (b), §5.1.1):** Gemini/Antigravity `context.fileName`
   (dedizierte Kontextdatei via `.gemini/settings.json`) — nur falls eine echte
   Kontext-Trennung nötig wird; nicht nötig für den Tier-Träger (Rules-Kanal).
-- `scripts/lib/consistency/context_mode.py` (IC-10) + Registrierung in
+- `scripts/lib/consistency/context_topology.py` (IC-10) + Registrierung in
   `scripts/consistency-check.py:43,202`.
 - `scripts/lib/consistency/context_size.py` (Adapter-Pfade mitzählen).
-- `scripts/admin-server.py` (`PROJECT_WRITABLE_SECTIONS` + `"context"`, `:230-249`).
-- `docs/ui/admin-ui.html` (`viewProject` `context`-Abschnitt, `:6170-6481`).
+- `scripts/admin-server.py` (`PROJECT_WRITABLE_SECTIONS` muss `"context_file"`
+  enthalten, `:230-249`).
+- `docs/ui/admin-ui.html` (`viewProject` `contextFile`-Abschnitt erweitert,
+  `:6170-6481`).
 - `tests/scenarios/` (neues Szenario nach Registry-Muster,
   `tests/scenarios/registry.md`).
 
@@ -1127,10 +1158,16 @@ Weakest-Regel ist eine additive Invariante über dessen bereits committeten
 
 ## 12. Offene Fragen
 
-1. **Kollision `context.mode` vs. `context_file.mode`** — Verwechslungsgefahr
-   trotz Doku. *Empfehlung:* bei `context.mode` bleiben (Auftragsvorgabe),
-   Schema-`description` und UI-Help-Label „Kontext-Topologie (nicht Dichte)"
-   explizit gegensätzlich texten.
+1. **Kollision `context.mode` vs. `context_file.mode` — GELÖST (Revision 3).**
+   Der Topologie-Schalter heißt `context_file.topology` (Enum
+   `unified|per-provider`, Default `unified`) und liegt als **Sibling** direkt
+   neben dem Dichte-`mode` (`full|compact`, #540) im bestehenden
+   `context_file`-Block (`project-config.schema.json:885-915`) — **nicht** als
+   neues Top-Level-`context`-Objekt. Begründung: `context_file.mode` bedeutet
+   bereits Dichte; die Topologie-Achse darf den Namen `mode` nicht wiederverwenden.
+   Der Provider-Override ist verschachtelt
+   (`context_file.provider-overrides.<P>.topology`, Muster
+   `orchestrator.provider-overrides`). Kein offener Punkt, kein Approval-Flag.
 2. **Kern-Inhalt in `per-provider`** — neutral (GATE_NEUTRAL) vs.
    Weakest-Tier. *Empfehlung:* neutral (§5.2, DECISION-4).
 3. **Dedizierter Tier-Kanal für Gemini/Antigravity (ersetzt Dual-Leser-OQ-3).**
