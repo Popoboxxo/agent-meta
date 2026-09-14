@@ -507,7 +507,7 @@ def test_compact_managed_block_stays_within_progressive_disclosure_budget(seeded
     # Size ratchet for issues #192 Phase 2 + #540 Fix 1: with this repo's own
     # config (lazy preset, all AGENTS.md sharers having a skills_dir), the
     # compact managed block MUST stay within the progressive-disclosure
-    # budget. Current measured state: 220 lines — at the budget ceiling
+    # budget. Current measured state: 222 lines — at the budget ceiling
     # (core rules ~122 + agent directory ~59 + scaffold). No headroom is left:
     # reclaim lines before embedding more always-on content — a REGRESSION
     # beyond this budget means non-embedded content leaked back into the block.
@@ -515,18 +515,21 @@ def test_compact_managed_block_stays_within_progressive_disclosure_budget(seeded
     # Runtime-gate tiers (SPEC-OPENCODE-RUNTIME-GATE-2026-09-13): the three
     # {{#if GATE_ENFORCED}} / {{#if GATE_PARTIAL}} / {{#if GATE_ADVISORY}}
     # blocks in use-orchestrator.md are mutually exclusive and resolve through
-    # the per-provider runtime_gate_vars seam that _render_context now mirrors.
-    # Only the resolved tier contributes, so the measured block stays at 220 —
-    # no budget bump was needed. (Before this helper mirrored the seam, the
-    # GATE_* vars were absent; the fail-open "missing => true" default in
+    # the per-provider runtime_gate_vars seam that _render_context mirrors.
+    # Phase 0 of SPEC-CONTEXT-FILE-MODES-2026-09-13 (unified shared render) makes
+    # the shared AGENTS.md canonical at the WEAKEST active sharer tier --
+    # permission, not the previously last-written hook variant -- so the 2-line
+    # enforced block is replaced by the 4-line partial block (+2 => 222). That is
+    # the documented one-time canonicalization, not leaked content. (Before the
+    # helper mirrored the seam, the fail-open "missing => true" default in
     # strip_inactive_conditional_blocks activated ALL THREE blocks and the
     # block inflated to 227.)
     compact = _render_context("compact", seeded_project)
     begin = compact.index("<!-- agent-meta:managed-begin -->")
     end = compact.index("<!-- agent-meta:managed-end -->")
     block_lines = compact[begin:end].count("\n")
-    assert block_lines <= 220, (
-        f"compact managed block grew to {block_lines} lines (budget 220) — "
+    assert block_lines <= 222, (
+        f"compact managed block grew to {block_lines} lines (budget 222) — "
         "content leaked back into the always-on block instead of the file channel"
     )
     # And the always-on MCP hard prohibitions stay present as one-liners.

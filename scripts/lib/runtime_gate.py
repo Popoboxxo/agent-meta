@@ -28,8 +28,38 @@ vocabulary below.
 """
 from __future__ import annotations
 
-from typing import Tuple
+from typing import Iterable, Mapping, Tuple
 
 #: Canonical gate tiers, ordered strongest first. Consumers must treat any
 #: value outside this tuple as an unknown tier and fail safe to ``advisory``.
 RUNTIME_GATE_TIERS: Tuple[str, ...] = ("hook", "plugin", "permission", "advisory")
+
+#: Explicit weak -> strong order for the weakest-tier resolution of a shared
+#: context file (SPEC-CONTEXT-FILE-MODES-2026-09-13, IC-01). ``RUNTIME_GATE_TIERS``
+#: keeps its historic strong -> weak order and is intentionally NOT reordered.
+RUNTIME_GATE_TIER_RANK: Mapping[str, int] = {
+    "advisory": 0,
+    "permission": 1,
+    "plugin": 2,
+    "hook": 3,
+}
+
+_ADVISORY_TIER = "advisory"
+
+
+def weakest_runtime_gate_tier(tiers: Iterable[str]) -> str:
+    """Return the minimum tier by ``RUNTIME_GATE_TIER_RANK`` (weak -> strong).
+
+    A context file shared by several providers is only as strong as its weakest
+    reader, so the effective gate tier is the minimum over all provided tiers.
+    Unknown names are ignored for the minimum but do not raise; ``None``, an
+    empty iterable or a non-iterable input yields ``"advisory"`` (the weakest
+    assumed tier — fail-safe). This function never raises.
+    """
+    try:
+        known = [t for t in tiers if t in RUNTIME_GATE_TIER_RANK]
+    except TypeError:
+        return _ADVISORY_TIER
+    if not known:
+        return _ADVISORY_TIER
+    return min(known, key=RUNTIME_GATE_TIER_RANK.__getitem__)

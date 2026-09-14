@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 from .io import _load_yaml_or_json, load_yaml_file
+from .runtime_gate import weakest_runtime_gate_tier
 
 PROVIDERS_CONFIG_YAML = "config/ai-providers.yaml"
 _PROVIDERS_CONFIG_LEGACY = "providers.config.yaml"
@@ -386,14 +387,15 @@ def provider_runtime_gate_tier(pc: Optional[dict], capabilities: Optional[dict] 
     return "advisory"
 
 
-def runtime_gate_vars(
-    pc: Optional[dict], capabilities: Optional[dict], config: Optional[dict]
-) -> dict:
-    """Return the per-provider rendering bundle for the resolved gate tier.
+def _runtime_gate_bundle(tier: str, config: Optional[dict]) -> dict:
+    """Build the ``GATE_*`` bundle for an already-resolved ``tier``.
 
-    Single source of truth for the ``GATE_*`` variables consumed by the
-    rules/context renderers (IC-04). Every value is a string so the bundle
-    merges into any ``provider_variables`` dict unchanged:
+    Byte-identical to the historic ``runtime_gate_vars`` body
+    (SPEC-CONTEXT-FILE-MODES-2026-09-13, IC-02). Internal helper; the public
+    contract lives in ``runtime_gate_vars`` / ``shared_runtime_gate_vars``.
+
+    Every value is a string so the bundle merges into any ``provider_variables``
+    dict unchanged:
 
     - ``ENFORCEMENT_TIER``     — resolved tier name
     - ``GATE_ENFORCED``        — ``"true"`` iff tier in ``(hook, plugin)``
@@ -402,10 +404,8 @@ def runtime_gate_vars(
     - ``RUNTIME_GATE_PLUGIN_MODE`` — ``config["runtime-gate"]["plugin-mode"]``
       validated against ``{observe, enforce}``, fail-safe ``"observe"``
 
-    Never raises: a non-mapping `config` is treated as ``{}`` and the tier
-    comes from the fail-safe `provider_runtime_gate_tier`.
+    Never raises: a non-mapping ``config`` is treated as ``{}``.
     """
-    tier = provider_runtime_gate_tier(pc, capabilities)
     if not isinstance(config, dict):
         config = {}
     runtime_gate = config.get("runtime-gate", {})
@@ -421,6 +421,50 @@ def runtime_gate_vars(
         "GATE_ADVISORY": "true" if tier == "advisory" else "false",
         "RUNTIME_GATE_PLUGIN_MODE": plugin_mode,
     }
+
+
+def runtime_gate_vars(
+    pc: Optional[dict], capabilities: Optional[dict], config: Optional[dict]
+) -> dict:
+    """Return the per-provider rendering bundle for the resolved gate tier.
+
+    Single source of truth for the ``GATE_*`` variables consumed by the
+    rules/context renderers (IC-04). Delegates to ``_runtime_gate_bundle`` with
+    the fail-safe `provider_runtime_gate_tier`; the public contract is unchanged
+    (the five string keys documented on ``_runtime_gate_bundle``).
+    """
+    return _runtime_gate_bundle(provider_runtime_gate_tier(pc, capabilities), config)
+
+
+def shared_runtime_gate_vars(
+    shared_users: list,
+    provider_config: dict,
+    capabilities_config: Optional[dict],
+    config: Optional[dict],
+) -> dict:
+    """Return the ``GATE_*`` bundle of a shared context file.
+
+    The effective tier of a physical file shared by several providers is the
+    **weakest** tier over its active sharers (``advisory < permission < plugin <
+    hook``), so every sharer renders a byte-identical gate block
+    (SPEC-CONTEXT-FILE-MODES-2026-09-13, IC-02).
+
+    ``shared_users`` are the **active** sharers of the file; the caller filters
+    with ``resolve_providers`` — this function does not filter. Fail-safe and
+    never raises: a provider absent from ``provider_config`` is looked up as
+    ``{}``, a non-mapping entry, ``capabilities_config`` or ``config`` degrades
+    to ``{}`` (which resolves to ``advisory``).
+    """
+    pcs = provider_config if isinstance(provider_config, dict) else {}
+    caps = capabilities_config if isinstance(capabilities_config, dict) else {}
+    tiers = (
+        provider_runtime_gate_tier(
+            pcs.get(user, {}),
+            caps.get(user),
+        )
+        for user in (shared_users if shared_users else [])
+    )
+    return _runtime_gate_bundle(weakest_runtime_gate_tier(tiers), config)
 
 
 def resolve_provider_options(config: dict, provider: str) -> dict:

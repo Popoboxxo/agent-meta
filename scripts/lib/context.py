@@ -1118,6 +1118,35 @@ def _build_managed_block(
     local_vars = dict(variables)
     local_vars["AGENTS_DIR"] = _shared("agents_dir", ".{}/agents")
 
+    # Shared-file gate tier (SPEC-CONTEXT-FILE-MODES-2026-09-13, IC-03): a
+    # physical context_file shared by more than one ACTIVE provider must render
+    # exactly one deterministic GATE_* bundle. Otherwise each active sharer
+    # overwrites the other's managed block forever and --check never converges
+    # (issue #794). Resolve the tier from the weakest active sharer once, so the
+    # first write lands and every later sharer is a byte-identical no-op skip.
+    # A single active sharer keeps the per-provider runtime_gate_vars injected
+    # by sync_pipeline (IC-04). Only the GATE_* family is neutralised -- the
+    # remaining rendered provider-scoped inputs (ORCH_MODE_*, REPO_CONTAINMENT_*)
+    # stay per-provider by design (determinism scope AC-25 / R7).
+    if provider_config:
+        from .providers import (
+            load_provider_capabilities,
+            resolve_providers,
+            shared_runtime_gate_vars,
+        )
+
+        active = set(resolve_providers(config, provider_config))
+        active_shared_users = [p for p in shared_users if p in active]
+        if len(active_shared_users) > 1:
+            local_vars.update(
+                shared_runtime_gate_vars(
+                    active_shared_users,
+                    provider_config,
+                    load_provider_capabilities(agent_meta_root),
+                    config,
+                )
+            )
+
     if len(shared_users) > 1:
         for p in shared_users:
             local_vars[f"PLATFORM_{p.upper()}"] = True
