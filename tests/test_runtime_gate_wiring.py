@@ -44,17 +44,28 @@ def _framework_root(tmp_path: Path, provider: str, tier: str) -> Path:
     return root
 
 
-def _provider_config() -> dict:
-    """Provider entry with only rules enabled (all other sync paths skipped)."""
-    return {
-        PROVIDER: {
-            "has_rules": True,
-            "rules_dir": ".test/rules",
-            "has_hooks": False,
-            "has_commands": False,
-            "agents_dir": ".test/agents",
-        }
+def _provider_config(has_plugins: bool = False) -> dict:
+    """Provider entry with only rules enabled (all other sync paths skipped).
+
+    ``has_plugins`` adds the IC-08/IC-14 runtime-gate plugin capability keys so
+    the dispatch can be exercised with a fixture, independent of any real
+    provider (Opencode still ships ``has_plugins: false``).
+    """
+    pc = {
+        "has_rules": True,
+        "rules_dir": ".test/rules",
+        "has_hooks": False,
+        "has_commands": False,
+        "agents_dir": ".test/agents",
     }
+    if has_plugins:
+        pc.update({
+            "has_plugins": True,
+            "plugin_dir": ".opencode/plugins",
+            "plugin_ext": ".js",
+            "plugin_protocol": "opencode-plugin-js",
+        })
+    return {PROVIDER: pc}
 
 
 def _run_per_provider(
@@ -64,15 +75,24 @@ def _run_per_provider(
     config: dict,
     *,
     record_writer: bool = False,
+    has_plugins: bool = False,
+    agent_meta_root: Path | None = None,
+    plugin_calls: list | None = None,
 ):
     """Drive ``_sync_stage_per_provider`` with every unrelated writer stubbed.
 
-    Returns ``(captured_rule_vars, writer_calls)``.
+    ``has_plugins`` selects the capability fixture (IC-13). ``agent_meta_root``
+    overrides the framework root (the real repo root is needed when the real
+    plugin generator must find its template); the default fake root only
+    resolves the tier capability. When ``plugin_calls`` is given, the plugin
+    writer is replaced by a recorder so the dispatch itself can be asserted.
+
+    Returns ``(captured_rule_vars, writer_calls, project_root)``.
     """
-    root = _framework_root(tmp_path, PROVIDER, tier)
+    root = agent_meta_root or _framework_root(tmp_path, PROVIDER, tier)
     project_root = tmp_path / "project"
     project_root.mkdir(parents=True, exist_ok=True)
-    provider_config = _provider_config()
+    provider_config = _provider_config(has_plugins=has_plugins)
     captured: dict = {}
     writer_calls: list = []
 
@@ -102,6 +122,11 @@ def _run_per_provider(
         monkeypatch.setattr(
             sync_pipeline, "_sync_opencode_runtime_gate",
             lambda *a, **k: writer_calls.append((a, k)),
+        )
+    if plugin_calls is not None:
+        monkeypatch.setattr(
+            sync_pipeline, "sync_runtime_gate_plugins",
+            lambda *a, **k: plugin_calls.append((a, k)),
         )
 
     sync_pipeline._sync_stage_per_provider(
@@ -189,6 +214,60 @@ def test_advisory_sync_writes_no_deny_and_no_plugin(tmp_path, monkeypatch):
     assert writer_calls == []
     assert not (project_root / "opencode.json").exists()
     assert not (project_root / ".opencode" / "plugins").exists()
+
+
+def test_plugin_dispatch_noop_without_capability(tmp_path, monkeypatch):
+    """IC-13 / AC-16: no ``has_plugins`` -> writer not dispatched, no artifact.
+
+    Proves the dispatch is capability-gated (config-key driven), not merely
+    inert: the writer call itself must not happen.
+    """
+    plugin_calls: list = []
+    _, _, project_root = _run_per_provider(
+        tmp_path, monkeypatch, "advisory", {}, plugin_calls=plugin_calls,
+    )
+
+    assert plugin_calls == []
+    assert not (project_root / ".opencode" / "plugins").exists()
+
+
+def test_plugin_dispatch_fires_with_capability(tmp_path, monkeypatch):
+    """IC-13 / AC-16: a ``has_plugins`` fixture dispatches the plugin writer."""
+    plugin_calls: list = []
+    _run_per_provider(
+        tmp_path, monkeypatch, "plugin", {},
+        has_plugins=True, agent_meta_root=_REPO_ROOT, plugin_calls=plugin_calls,
+    )
+
+    assert len(plugin_calls) == 1
+    args, _kwargs = plugin_calls[0]
+    assert args[0] == _REPO_ROOT
+    assert args[5] == PROVIDER
+
+
+def test_plugin_artifact_generated_with_capability(tmp_path, monkeypatch):
+    """IC-13 / AC-16 / AC-19: the real generator writes the observe artifact."""
+    _, _, project_root = _run_per_provider(
+        tmp_path, monkeypatch, "plugin", {},
+        has_plugins=True, agent_meta_root=_REPO_ROOT,
+    )
+
+    artifact = project_root / ".opencode" / "plugins" / "agent-meta-runtime-gate.js"
+    assert artifact.is_file()
+    content = artifact.read_text(encoding="utf-8")
+    assert 'MODE = "observe"' in content
+    assert 'MODE = "enforce"' not in content
+
+
+def test_context_file_modes_paths_untouched_without_capability(tmp_path, monkeypatch):
+    """IC-13 (c): the committed context-file-modes paths stay a no-op default.
+
+    With the shipped ``has_plugins: false`` the per-provider stage dispatches no
+    plugin writer and writes no plugin artifact, so the committed paths are
+    untouched by the new dispatch.
+    """
+    _, _, project_root = _run_per_provider(tmp_path, monkeypatch, "advisory", {})
+    assert not (project_root / ".opencode").exists()
 
 
 def test_gate_vars_registered_in_builtin_vars():

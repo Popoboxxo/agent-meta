@@ -113,6 +113,7 @@ from lib.rules import (
     sync_rules,
     sync_speech_mode,
 )
+from lib.runtime_gate import sync_runtime_gate_plugins
 from lib.skill_channel import sweep_orphan_skill_channel_rules
 from lib.skills import (
     check_pinned_commits,
@@ -864,9 +865,16 @@ def _sync_stage_per_provider(
                                 release_gates_resolved=resolve_release_gates(config, agent_meta_root))
         else:
             log.note("hooks", f"skipped for {provider} — not supported")
-        # IC-13: A2 dispatch, independent of the hook branch and of the
-        # provider-isolation >=2 guard. Keys off the IC-03 resolver, never a
-        # provider literal and never ``isolation-mechanism`` (F-07).
+
+        # IC-13: dispatch the two runtime-gate writers independent of the hook
+        # branch and of the provider-isolation >=2 guard. Both key off config
+        # capability (has_plugins) / the IC-03 resolver, never a provider literal
+        # and never ``isolation-mechanism`` (F-07).
+        if pc.get("has_plugins", False):
+            sync_runtime_gate_plugins(
+                agent_meta_root, project_root, config, log, args.dry_run,
+                provider, provider_config,
+            )
         if provider_runtime_gate_tier(pc, caps) == "permission":
             _sync_opencode_runtime_gate(
                 project_root, config, provider, provider_config,

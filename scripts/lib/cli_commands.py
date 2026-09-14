@@ -210,6 +210,7 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
         runtime_gate_vars,
     )
     from lib.rules import sync_rules, sync_speech_mode
+    from lib.runtime_gate import sync_runtime_gate_plugins
     from lib.skills import sync_external_skills_for_provider
 
     test_variables, _pre_warnings = build_variables(config, agent_meta_root, test_repo_path)
@@ -259,7 +260,15 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
             sync_release_gates(agent_meta_root, test_repo_path, config, log, dry_run,
                                 provider=provider, provider_config=provider_config,
                                 release_gates_resolved=resolve_release_gates(config, agent_meta_root))
-        # IC-13: mirror the A2 dispatch of the production per-provider stage.
+        # IC-13: mirror the production per-provider dispatch in the test-repo
+        # path so a --test-generated repo matches a normal sync. The plugin
+        # writer is capability-gated (has_plugins); the A2 writer keys off the
+        # IC-03 resolver — never a provider literal.
+        if pc.get("has_plugins", False):
+            sync_runtime_gate_plugins(
+                agent_meta_root, test_repo_path, config, log, dry_run,
+                provider, provider_config,
+            )
         if provider_runtime_gate_tier(pc, caps) == "permission":
             _sync_opencode_runtime_gate(
                 test_repo_path, config, provider, provider_config,
