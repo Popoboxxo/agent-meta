@@ -1140,6 +1140,63 @@ class SyncExecutor:
         """Execute a real ``sync.py`` run (no extra flags)."""
         return self._run([])
 
+    def cleanup_preview(self) -> dict:
+        """Run ``sync.py --cleanup-preview`` and parse its single JSON object.
+
+        The CLI mode is a planning-only, side-effect-free traversal (IC-06):
+        it writes no index, unlinks nothing and creates no backup. The single
+        JSON object on stdout is flattened across providers so callers receive
+        one ``stale``/``foreign`` list whose entries each carry their
+        ``provider`` (IC-07). On subprocess failure or unparseable stdout the
+        method returns ``{"success": False, "error": "sync_preview_failed",
+        "output": "..."}``.
+        """
+        result = self._run(["--cleanup-preview"])
+        output = result.get("output", "") or ""
+        if not result.get("success"):
+            return {
+                "success": False,
+                "error": "sync_preview_failed",
+                "output": output,
+            }
+        try:
+            payload, _end = json.JSONDecoder().raw_decode(output.lstrip())
+        except (ValueError, TypeError):
+            return {
+                "success": False,
+                "error": "sync_preview_failed",
+                "output": output,
+            }
+        if not isinstance(payload, dict) or not isinstance(
+            payload.get("providers"), list
+        ):
+            return {
+                "success": False,
+                "error": "sync_preview_failed",
+                "output": output,
+            }
+        stale: list = []
+        foreign: list = []
+        backups: list = []
+        for provider_entry in payload.get("providers", []):
+            if not isinstance(provider_entry, dict):
+                continue
+            provider = provider_entry.get("provider")
+            for item in provider_entry.get("stale") or []:
+                if isinstance(item, dict):
+                    stale.append({"provider": provider, **item})
+            for item in provider_entry.get("foreign") or []:
+                if isinstance(item, dict):
+                    foreign.append({"provider": provider, **item})
+            backups.extend(provider_entry.get("backups_to_prune") or [])
+        return {
+            "success": True,
+            "stale": stale,
+            "foreign": foreign,
+            "backups_to_prune": backups,
+            "fingerprint": payload.get("fingerprint", ""),
+        }
+
     def render_standalone(self) -> dict:
         """Execute ``sync.py --render-standalone``: regenerate the fully
         self-contained, English-only agent personas under ``standalone/``
@@ -3403,6 +3460,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         "/api/provider-deactivation/activate": "_handle_activate_providers",
         "/api/backups/create": "_handle_create_backup",
         "/api/backups/restore": "_handle_restore_backup",
+        "/api/roles/cleanup/preview": "_route_post_roles_cleanup_preview",
+        "/api/roles/cleanup/apply": "_route_post_roles_cleanup_apply",
     }
 
     _DELETE_PREFIX_ROUTES: ClassVar[tuple[tuple[str, str], ...]] = (
@@ -3721,6 +3780,82 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
 
     def _route_post_sync_run(self) -> None:
         return self._send_json(self.__class__.sync_executor.run())
+
+    def _route_post_roles_cleanup_preview(self) -> None:
+        """Return the side-effect-free cleanup preview (IC-07).
+
+        The preview subprocess is the IC-06 planning-only mode: it never writes
+        an index, never unlinks and never creates a backup. A subprocess/JSON
+        failure surfaces as ``500 sync_preview_failed``.
+        """
+        preview = self.__class__.sync_executor.cleanup_preview()
+        if not preview.get("success"):
+            return self._send_json(
+                {
+                    "success": False,
+                    "error": preview.get("error", "sync_preview_failed"),
+                },
+                status=500,
+            )
+        return self._send_json({
+            "success": True,
+            "stale": preview.get("stale", []),
+            "foreign": preview.get("foreign", []),
+            "fingerprint": preview.get("fingerprint", ""),
+        })
+
+    def _route_post_roles_cleanup_apply(self) -> None:
+        """Confirm an explicit preview and run the backup-first cleanup (IC-07).
+
+        Order is binding (IC-07): ``confirm is not True`` -> 400 first; the
+        fingerprint is then compared against a freshly recomputed preview ->
+        409 on drift; only then is the real ``sync.py`` run started. OQ-8: that
+        run performs the mandatory backup before each unlink. ``deleted`` is
+        derived from the same recomputed preview that produced the compared
+        fingerprint (F-03) and is emitted only on ``returncode == 0``.
+        """
+        body = self._read_body()
+        if not isinstance(body, dict):
+            body = {}
+        if body.get("confirm") is not True:
+            return self._send_json({"error": "confirmation_required"}, status=400)
+
+        requested_fingerprint = body.get("fingerprint")
+        recomputed = self.__class__.sync_executor.cleanup_preview()
+        if not recomputed.get("success"):
+            return self._send_json(
+                {
+                    "error": "sync_preview_failed",
+                    "output": recomputed.get("output", ""),
+                },
+                status=500,
+            )
+        if requested_fingerprint != recomputed.get("fingerprint"):
+            return self._send_json(
+                {
+                    "error": "preview_stale",
+                    "stale": recomputed.get("stale", []),
+                },
+                status=409,
+            )
+
+        result = self.__class__.sync_executor.run()
+        if result.get("returncode") != 0:
+            return self._send_json(
+                {"error": "sync_failed", "output": result.get("output", "")},
+                status=500,
+            )
+        deleted = [
+            entry.get("path")
+            for entry in recomputed.get("stale", [])
+            if isinstance(entry, dict)
+        ]
+        return self._send_json({
+            "success": True,
+            "returncode": result.get("returncode"),
+            "output": result.get("output", ""),
+            "deleted": deleted,
+        })
 
     def _route_post_sync_render_standalone(self) -> None:
         return self._send_json(self.__class__.sync_executor.render_standalone())
