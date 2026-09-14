@@ -9,6 +9,7 @@ The `sync.py` script is the central entry point of the agent-meta framework. It 
 | `--config CONFIG` | Path to the `project.yaml` (Default: `.meta-config/project.yaml`) |
 | `--init` | Generates the provider-specific configuration (e.g., `CLAUDE.md`) from templates if they do not already exist. |
 | `--only-variables` | Substitutes variables (`{{VARIABLE}}`) in the existing configuration without generating new agents. |
+| `--cleanup-preview` | Planning-only, side-effect-free JSON preview of the stale agent files a sync would remove (dry-run gate). Emits exactly one JSON object on stdout and writes nothing (no index write, no unlink, no backup, no clone/submodule). Exit 0 even for a non-empty stale set, 1 only on internal failure. |
 | `--dry-run` | Simulates the sync process without writing any files to disk. |
 | `--check` | Exits with code 1 if context files (`CLAUDE.md`, `AGENTS.md`) are out of sync, otherwise 0. (Crucial for CI/CD). |
 | `--validate` | Performs a full sync into a test repository. Results are in `sync.log`. |
@@ -21,6 +22,56 @@ The `sync.py` script is the central entry point of the agent-meta framework. It 
 | `--setup` | Starts an interactive setup wizard for guided creation of the `project.yaml` and then runs `--init`. |
 | `--audit-config` | Compares the project configuration against the templates (checks for `roles_without_template`, `deprecated_roles`). |
 | `--apply` | Used in combination with `--audit-config`: Rewrites the `project.yaml` and comments out deprecated roles. |
+
+### `--cleanup-preview` output contract
+
+`--cleanup-preview` runs the planning half of the agent sync for every active provider
+and prints **exactly one JSON object** on stdout (indent 2, UTF-8). It is side-effect-free:
+it writes no managed index, unlinks no file, creates no `.sync-backup-*` sibling and neither
+clones nor de-inits a skill submodule. Diagnostics are collected, never written to stderr,
+so stdout stays machine-consumable.
+
+Exit code 0 even when the stale set is non-empty; exit code 1 only on an internal failure
+(then stdout is `{"version": 1, "error": "<ExceptionType>: <message>"}`).
+
+```json
+{
+  "version": 1,
+  "generated_at": "2026-09-14T12:00:00Z",
+  "providers": [
+    {
+      "provider": "<active-provider>",
+      "stale": [
+        {
+          "path": ".claude/agents/stale-role.md",
+          "reason": "role removed from config",
+          "tracked": true,
+          "adopted": false
+        }
+      ],
+      "foreign": [
+        {
+          "path": ".claude/agents/handwritten.md",
+          "legacy_unmarked": true
+        }
+      ],
+      "backups_to_prune": [".claude/agents/bar.md.sync-backup-20260801-101010"]
+    }
+  ],
+  "fingerprint": "sha256:<64 hex chars>"
+}
+```
+
+- `stale[]` — project-relative `path`, `reason` (`"role removed from config"` or
+  `"skill deactivated"`), `tracked` (listed in the managed index) and `adopted` (a
+  provenance-carrying external-skill wrapper reconciled despite a readable index).
+- `foreign[]` — files that survive by design; `legacy_unmarked` is `true` for files
+  without a recognised agent-meta provenance marker (OQ-3: manual removal only).
+- `backups_to_prune[]` — recomputed would-be prune set for the provider's agent dir
+  (the backup pruner itself is a no-op during a preview).
+- `fingerprint` — stable `sha256:…` hash over the canonical stale set (sorted by
+  provider/path/reason/tracked/adopted). Pass it to `POST /api/roles/cleanup/apply` so
+  the server can reject a stale preview.
 
 ## Session Resume & Checkpointing
 
