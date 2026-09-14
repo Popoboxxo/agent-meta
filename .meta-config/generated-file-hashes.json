@@ -1,7 +1,7 @@
 {
   "version": 1,
   "hashes": {
-    ".claude/skills/a2a-delegation-gates/SKILL.md": "d8c31ca29882605e",
+    ".claude/skills/a2a-delegation-gates/SKILL.md": "bb878b0561b30f6f",
     ".claude/skills/admin-ui/SKILL.md": "fd5e40431ace6c1a",
     ".claude/skills/architecture/SKILL.md": "e7cd8fbdd187db70",
     ".claude/skills/brainstorming-gate/SKILL.md": "8c53ada19d30f5a0",
@@ -206,7 +206,7 @@
     ".agents/hooks/release-gates/action-pin-validation.sh": "74f1b9c42d850260",
     ".agents/hooks/release-gates/artifact-freshness.sh": "9fec8adf29202e99",
     ".agents/hooks/release-gates/docker-image-scan.sh": "2d10e973a5da9236",
-    ".gemini/rules/a2a-delegation-gates.md": "90d3928047a6f437",
+    ".gemini/rules/a2a-delegation-gates.md": "45f1c84dfe922f89",
     ".gemini/rules/admin-ui.md": "1fcb4c988324646c",
     ".gemini/rules/architecture.md": "317f08513fa09c90",
     ".gemini/rules/brainstorming-gate.md": "b450c15d7f98383a",
@@ -270,7 +270,7 @@
     ".gemini/pipeline-details/feature-lifecycle.md": "c36f326f780fa18b",
     ".gemini/pipeline-details/quick-fix.md": "aa50d06e9194d355",
     ".gemini/pipeline-details/refactor.md": "6b949cae56e0e8c4",
-    ".opencode/skills/a2a-delegation-gates/SKILL.md": "d8c31ca29882605e",
+    ".opencode/skills/a2a-delegation-gates/SKILL.md": "971de6f72d0c6b27",
     ".opencode/skills/admin-ui/SKILL.md": "fd5e40431ace6c1a",
     ".opencode/skills/architecture/SKILL.md": "e7cd8fbdd187db70",
     ".opencode/skills/brainstorming-gate/SKILL.md": "8c53ada19d30f5a0",

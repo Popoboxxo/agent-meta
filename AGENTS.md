@@ -205,8 +205,10 @@ Harte MCP-Tool-Verbote: siehe `mcp-guardrails.md` (always-on).
 
 
 
-# CRITICAL GATE
-MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`. Keine Ausnahmen.
+# CRITICAL GATE (runtime-partially enforced)
+MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`.
+Provider-native Permissions block Main-Chat-Writes; Delegations-Provenienz ist
+NICHT erzwungen (Prompt + Permission-Layer).
 
 **Spec/Plan-Gate (Convention boundary):** Auch Nicht-Pipeline-Anfragen (Ad-hoc-Dispatch, `quick-fix`, `bugfix`) erst über die Classify-Route (`S`/`M`/`L`/`XL`) führen — kein Direkteinstieg in die Implementierung ohne freigegebene Spec/Plan (`Status: APPROVED`). Details: Master-Rule `spec-plan-workflow`.
 ## Git Delegation
