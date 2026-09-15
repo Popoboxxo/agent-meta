@@ -153,3 +153,79 @@ def test_config_loaded_from_project_yaml():
         assert len(findings) == 1
         assert findings[0].file == "CLAUDE.md"
         assert "(limit: 5)" in findings[0].message
+
+
+# AC-24: adapter files count against the size guard separately from the core.
+ADAPTER_PROVIDER = {
+    "Provider": {
+        "context_file": "AGENTS.md",
+        "context_adapter": True,
+        "context_adapter_file": "ADAPTER.md",
+    },
+}
+
+
+def test_oversized_adapter_warns_separately():
+    """An oversized adapter warns with its own path, not the core's."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        _write(root, "AGENTS.md", 10)
+        _write(root, "ADAPTER.md", 300)
+        findings = check_context_file_size(
+            root,
+            config={"context_file": {}},
+            provider_config=ADAPTER_PROVIDER,
+        )
+        assert len(findings) == 1
+        assert findings[0].severity == Severity.WARNING
+        assert findings[0].file == "ADAPTER.md"
+        assert "adapter" in findings[0].message
+        assert str(DEFAULT_MAX_LINES) in findings[0].message
+
+
+def test_adapter_respects_max_lines():
+    """context_file.max_lines applies to the adapter path too."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        _write(root, "AGENTS.md", 5)
+        _write(root, "ADAPTER.md", 20)
+        under = check_context_file_size(
+            root,
+            config={"context_file": {"max_lines": 50}},
+            provider_config=ADAPTER_PROVIDER,
+        )
+        assert under == []
+        over = check_context_file_size(
+            root,
+            config={"context_file": {"max_lines": 10}},
+            provider_config=ADAPTER_PROVIDER,
+        )
+        assert len(over) == 1 and over[0].file == "ADAPTER.md"
+        assert "(limit: 10)" in over[0].message
+
+
+def test_acknowledged_adapter_suppressed():
+    """oversize_acknowledged: true suppresses the adapter warning too."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        _write(root, "AGENTS.md", 300)
+        _write(root, "ADAPTER.md", 300)
+        findings = check_context_file_size(
+            root,
+            config={"context_file": {"oversize_acknowledged": True}},
+            provider_config=ADAPTER_PROVIDER,
+        )
+        assert findings == []
+
+
+def test_missing_adapter_is_not_reported():
+    """A configured but absent adapter path is not a finding."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        _write(root, "AGENTS.md", 10)
+        findings = check_context_file_size(
+            root,
+            config={"context_file": {}},
+            provider_config=ADAPTER_PROVIDER,
+        )
+        assert findings == []
