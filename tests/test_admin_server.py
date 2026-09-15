@@ -2100,5 +2100,31 @@ class TestProjectFullPutGuardWp3(unittest.TestCase):
                 handler._route_put_config("project")
 
 
+class TestWriteProjectSectionContextFile(unittest.TestCase):
+    """AC-20 (SPEC-CONTEXT-FILE-MODES-2026-09-13): the ``context_file`` section
+    (``topology``/``core_file``/density) is writable through the guarded
+    partial-update route — an HTTP 400 here would break the Admin UI Save
+    button, which PUTs exactly this section."""
+
+    def _make_handler(self, root: Path):
+        (root / ".meta-config").mkdir(exist_ok=True)
+        handler = admin_server.AdminRequestHandler.__new__(admin_server.AdminRequestHandler)
+        admin_server.AdminRequestHandler.root = root
+        admin_server.AdminRequestHandler.config_manager = admin_server.ConfigManager(
+            root, mode="project_admin")
+        handler._send_json = lambda result: None
+        return handler
+
+    def test_context_file_section_write_accepted(self) -> None:
+        self.assertIn("context_file", admin_server.PROJECT_WRITABLE_SECTIONS)
+        with tempfile.TemporaryDirectory() as tmp:
+            handler = self._make_handler(Path(tmp))
+            data = {"topology": "per-provider", "core_file": "AGENTS.md", "mode": "full"}
+            handler._read_body = lambda: {"section": "context_file", "data": data}
+            handler._write_project_section()  # must not raise (HTTP 400 otherwise)
+            persisted = handler.config_manager.read("project")
+            self.assertEqual(persisted["context_file"], data)
+
+
 if __name__ == "__main__":
     unittest.main()
