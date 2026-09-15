@@ -33,6 +33,17 @@ SKILL_WRAPPER = "_skill-wrapper.md"
 
 EXT_SUFFIX = "-ext"
 
+# Neutral field name for the optional `reference_standards` agent-frontmatter
+# field (SPEC-REFERENCE-STANDARDS-2026-09-15, IC-01). Single source of truth
+# for the accessor, the quiet-strip set and the consistency check.
+REFERENCE_STANDARDS_FIELD: str = "reference_standards"
+
+# Fields that are stripped quietly: they never appear in the
+# `agent-meta-provenance` comment either (SPEC-REFERENCE-STANDARDS-2026-09-15,
+# IC-04). The values stay findable in the template source, so no consumer in a
+# generated file needs them.
+FRONTMATTER_QUIET_STRIP_FIELDS: frozenset[str] = frozenset({REFERENCE_STANDARDS_FIELD})
+
 # Generic templates that are real files but are intentionally never
 # instantiated as a standalone role -- they exist only as an `extends:`/
 # `based-on:` base for other roles (e.g. the five 2-platform *-expert
@@ -208,9 +219,25 @@ def is_deprecated_template(content: str) -> bool:
     )
     return match is not None
 
+def _quiet_field_set(quiet_fields: frozenset[str] | None) -> frozenset[str]:
+    """Normalise the quiet-strip parameter (fail-safe, never raises).
+
+    ``None`` -> ``FRONTMATTER_QUIET_STRIP_FIELDS``; a real set/frozenset is
+    used as-is; any other type (e.g. a list) falls back to an empty set, i.e.
+    the regular loud provenance path (AC-07).
+    """
+    if quiet_fields is None:
+        return FRONTMATTER_QUIET_STRIP_FIELDS
+    if isinstance(quiet_fields, frozenset):
+        return quiet_fields
+    if isinstance(quiet_fields, set):
+        return frozenset(quiet_fields)
+    return frozenset()
+
 def build_frontmatter(content: str, name: str, description: str,
                       generated_from: str | None = None,
-                      strip_fields: list[str] | None = None) -> str:
+                      strip_fields: list[str] | None = None,
+                      quiet_fields: frozenset[str] | None = None) -> str:
     """Replace name and description in YAML frontmatter.
 
     Preserves existing version/based-on fields.
@@ -226,12 +253,27 @@ def build_frontmatter(content: str, name: str, description: str,
     frontmatter, so traceability and version-bump enforcement (Hard
     Invariant #2) survive the strip. A field absent from the source is
     silently skipped, not fabricated into the comment.
+
+    quiet_fields: keys that are stripped but must NOT be named in the
+    provenance comment (IC-04). ``None`` uses the default
+    ``FRONTMATTER_QUIET_STRIP_FIELDS``; a non-set value falls back to the
+    regular loud path. Without this parameter the output is byte-identical to
+    before.
     """
     provenance_comment = None
     if strip_fields:
+        quiet = _quiet_field_set(quiet_fields)
         existing_fm = _parse_frontmatter_yaml(content)
-        preserved = {k: existing_fm[k] for k in strip_fields if k in existing_fm}
-        if generated_from and "generated-from" in strip_fields:
+        preserved = {
+            k: existing_fm[k]
+            for k in strip_fields
+            if k in existing_fm and k not in quiet
+        }
+        if (
+            generated_from
+            and "generated-from" in strip_fields
+            and "generated-from" not in quiet
+        ):
             preserved["generated-from"] = generated_from
         if preserved:
             pairs = " ".join(f"{k}={v}" for k, v in preserved.items())
@@ -507,6 +549,22 @@ def parse_frontmatter_text(content: str) -> dict:
     held by the cache — intentional, see the core's docstring).
     """
     return _parse_frontmatter_yaml(content)
+
+def parse_reference_standards(content: str) -> object | None:
+    """Raw YAML value of the `reference_standards` field, or None when absent.
+
+    No validation: structure/format checks live in
+    `scripts/lib/consistency/reference_standards.py` (IC-02). Absent field ->
+    None. No frontmatter, malformed YAML or unavailable PyYAML -> None too
+    (PyYAML absence falls back to `extract_frontmatter_field`'s string repr).
+    This accessor never raises.
+    """
+    if not _YAML_AVAILABLE:
+        return extract_frontmatter_field(content, REFERENCE_STANDARDS_FIELD)
+    fm = _parse_frontmatter_yaml(content)
+    if not isinstance(fm, dict):
+        return None
+    return fm.get(REFERENCE_STANDARDS_FIELD)
 
 def _merge_frontmatter(base_content: str, override_fm: dict) -> str:
     """Replace the frontmatter block in base_content with values from override_fm.

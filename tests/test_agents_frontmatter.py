@@ -12,12 +12,19 @@ values preserved in an HTML comment so traceability/version-bump enforcement
 
 from pathlib import Path
 
-from scripts.lib.frontmatter import build_frontmatter
+from scripts.lib.frontmatter import (
+    FRONTMATTER_QUIET_STRIP_FIELDS,
+    REFERENCE_STANDARDS_FIELD,
+    build_frontmatter,
+    parse_frontmatter_text,
+    parse_reference_standards,
+)
+from scripts.lib.log import SyncLog
 from scripts.lib.provider_transform import (
     _transform_frontmatter_for_opencode,
     transform_agent_content_for_provider,
 )
-from scripts.lib.log import SyncLog
+from scripts.lib.providers import load_providers_config, registered_provider_names
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -197,3 +204,225 @@ def test_explorer_documents_spike_mode():
     assert "Spike-Modus" in text or "Spike mode" in text
     assert "docs/spikes/" in text
     assert "read-only" in text
+
+
+def test_reference_standards_field_constant():
+    # IC-01: the field name lives in one neutral constant, consumed by the
+    # accessor, the quiet-strip set and the consistency check.
+    assert REFERENCE_STANDARDS_FIELD == "reference_standards"
+
+
+def test_parse_reference_standards_reads_raw_list():
+    content = (
+        "---\n"
+        "name: template-code-reviewer\n"
+        "reference_standards:\n"
+        '  - "Diátaxis"\n'
+        '  - "C4 model"\n'
+        '  - "arc42"\n'
+        "---\n"
+        "\n"
+        "Body content.\n"
+    )
+    assert parse_reference_standards(content) == ["Diátaxis", "C4 model", "arc42"]
+
+
+def test_parse_reference_standards_absent_is_none():
+    # Both a frontmatter block without the field and content without any
+    # frontmatter yield None -- the field is optional (IC-01).
+    assert parse_reference_standards(_sample_content()) is None
+    assert parse_reference_standards("no frontmatter here\n") is None
+
+
+def test_parse_reference_standards_scalar_value_is_returned_raw():
+    # The bottom layer does no validation: a scalar comes back as-is (OQ-6).
+    content = "---\nname: template-code-reviewer\nreference_standards: arc42\n---\n\nBody.\n"
+    assert parse_reference_standards(content) == "arc42"
+
+
+def test_parse_reference_standards_yaml_error_is_none():
+    # A malformed frontmatter must never raise from the accessor.
+    content = "---\nname: t\nreference_standards: [unterminated\n---\n\nBody.\n"
+    assert parse_reference_standards(content) is None
+
+
+def _sample_content_with_reference_standards():
+    return (
+        "---\n"
+        "name: template-code-reviewer\n"
+        'version: "1.2.2"\n'
+        "description: old description\n"
+        "prompt_mode: modern\n"
+        "reference_standards:\n"
+        '  - "arc42"\n'
+        "tools:\n"
+        "  - Read\n"
+        "---\n"
+        "\n"
+        "Body content.\n"
+    )
+
+
+def test_build_frontmatter_quiet_fields_omitted_from_provenance():
+    # AC-07: a quiet field is stripped and stays out of the provenance
+    # comment; a loud field (version) is still recorded.
+    content = build_frontmatter(
+        _sample_content_with_reference_standards(), "code-reviewer", "new description",
+        generated_from="1-generic/code-reviewer.md@1.2.2",
+        strip_fields=["reference_standards", "version"],
+        quiet_fields=FRONTMATTER_QUIET_STRIP_FIELDS,
+    )
+    fm = content.split("---")[1]
+    body = content.split("---", 2)[2]
+    assert "reference_standards" not in fm
+    assert "reference_standards=" not in body
+    assert "version=1.2.2" in body
+
+
+def test_build_frontmatter_quiet_none_uses_default_set():
+    # AC-07: quiet_fields=None applies FRONTMATTER_QUIET_STRIP_FIELDS.
+    content = build_frontmatter(
+        _sample_content_with_reference_standards(), "code-reviewer", "new description",
+        generated_from="1-generic/code-reviewer.md@1.2.2",
+        strip_fields=["reference_standards", "version"],
+    )
+    body = content.split("---", 2)[2]
+    assert "reference_standards=" not in body
+    assert "version=1.2.2" in body
+
+
+def test_build_frontmatter_quiet_non_set_falls_back_loudly():
+    # AC-07: a non-set (here: list) falls back to the regular loud path without
+    # raising -- the quiet field is then named again.
+    content = build_frontmatter(
+        _sample_content_with_reference_standards(), "code-reviewer", "new description",
+        generated_from="1-generic/code-reviewer.md@1.2.2",
+        strip_fields=["reference_standards", "version"],
+        quiet_fields=["reference_standards"],
+    )
+    body = content.split("---", 2)[2]
+    assert "reference_standards=" in body
+    assert "version=1.2.2" in body
+
+
+def test_opencode_provenance_omits_quiet_fields():
+    # AC-07, same matrix for the opencode-native builder.
+    content = _transform_frontmatter_for_opencode(
+        _sample_content_with_reference_standards(), "code-reviewer", "new description",
+        model="", steps="", generated_from="1-generic/code-reviewer.md@1.2.2",
+        agent_meta_root=_REPO_ROOT,
+        strip_fields=["reference_standards", "version"],
+    )
+    fm = content.split("---")[1]
+    body = content.split("---", 2)[2]
+    assert "reference_standards" not in fm
+    assert "reference_standards=" not in body
+    assert "version=1.2.2" in body
+
+    loud = _transform_frontmatter_for_opencode(
+        _sample_content_with_reference_standards(), "code-reviewer", "new description",
+        model="", steps="", generated_from="1-generic/code-reviewer.md@1.2.2",
+        agent_meta_root=_REPO_ROOT,
+        strip_fields=["reference_standards", "version"],
+        quiet_fields=["reference_standards"],
+    )
+    assert "reference_standards=" in loud.split("---", 2)[2]
+
+
+def test_existing_strip_channel_provenance_is_byte_identical():
+    # AC-05: the existing strip channel keeps its exact provenance; the quiet
+    # default is a no-op for every field outside FRONTMATTER_QUIET_STRIP_FIELDS.
+    quiet_default = build_frontmatter(
+        _sample_content(), "code-reviewer", "new description",
+        generated_from="1-generic/code-reviewer.md@1.2.2",
+        strip_fields=["version", "prompt_mode", "generated-from"],
+    )
+    explicit_loud = build_frontmatter(
+        _sample_content(), "code-reviewer", "new description",
+        generated_from="1-generic/code-reviewer.md@1.2.2",
+        strip_fields=["version", "prompt_mode", "generated-from"],
+        quiet_fields=frozenset(),
+    )
+    assert quiet_default == explicit_loud
+    body = quiet_default.split("---", 2)[2]
+    assert "version=1.2.2" in body
+    assert "prompt_mode=modern" in body
+    assert "generated-from=1-generic/code-reviewer.md@1.2.2" in body
+
+
+# --- Task 5: end-to-end keep / existing-channel pins -----------------------
+
+def _no_mechanism_providers() -> list[str]:
+    _pc = load_providers_config(_REPO_ROOT)
+    return [
+        p for p in registered_provider_names(_REPO_ROOT)
+        if not (((_pc.get(p) or {}).get("agent-transform") or {}).get("frontmatter-mechanism"))
+    ]
+
+
+def _render_for(provider, tmp_path, *, config=None, provider_config=None) -> str:
+    return transform_agent_content_for_provider(
+        _sample_content_with_reference_standards(), provider, "code-reviewer",
+        "code-reviewer", "new description", "1-generic/code-reviewer.md@1.2.2",
+        config if config is not None else {}, _REPO_ROOT, tmp_path,
+        tmp_path / "agent.out",
+        provider_config if provider_config is not None else load_providers_config(_REPO_ROOT),
+        SyncLog(),
+    )
+
+
+def test_project_keep_channel_preserves_reference_standards(tmp_path):
+    """AC-04: `frontmatter-keep-fields` keeps the field (value intact)."""
+    provider = _no_mechanism_providers()[0]
+    config = {"provider-options": {provider: {
+        "frontmatter-keep-fields": [REFERENCE_STANDARDS_FIELD],
+    }}}
+    out = _render_for(provider, tmp_path, config=config)
+    assert parse_frontmatter_text(out).get(REFERENCE_STANDARDS_FIELD) == ["arc42"]
+
+
+def test_ai_providers_keep_channel_preserves_reference_standards(tmp_path):
+    """AC-04: `frontmatter_keep_fields` (ai-providers channel) keeps it too."""
+    pc = load_providers_config(_REPO_ROOT)
+    provider = _no_mechanism_providers()[0]
+    pc = dict(pc)
+    pc[provider] = {**(pc.get(provider) or {}),
+                    "frontmatter_keep_fields": [REFERENCE_STANDARDS_FIELD]}
+    out = _render_for(provider, tmp_path, provider_config=pc)
+    assert parse_frontmatter_text(out).get(REFERENCE_STANDARDS_FIELD) == ["arc42"]
+
+
+def test_keep_wins_over_conflicting_strip_end_to_end(tmp_path):
+    """AC-04: conflicting strip/keep across the two channels → keep wins;
+    an unrelated provider stays stripped."""
+    pc = load_providers_config(_REPO_ROOT)
+    providers = _no_mechanism_providers()
+    keep_provider, other_provider = providers[0], providers[1]
+    pc = dict(pc)
+    pc[keep_provider] = {**(pc.get(keep_provider) or {}),
+                         "frontmatter_keep_fields": [REFERENCE_STANDARDS_FIELD]}
+    conflicting = {"provider-options": {keep_provider: {
+        "frontmatter-strip-fields": [REFERENCE_STANDARDS_FIELD],
+    }}}
+    kept = _render_for(keep_provider, tmp_path, config=conflicting, provider_config=pc)
+    assert parse_frontmatter_text(kept).get(REFERENCE_STANDARDS_FIELD) == ["arc42"]
+
+    other = _render_for(other_provider, tmp_path, config=conflicting, provider_config=pc)
+    assert REFERENCE_STANDARDS_FIELD not in other
+
+
+def test_existing_strip_channel_provenance_unchanged_by_new_default(tmp_path):
+    """AC-05: the pre-existing bookkeeping strip channel keeps its
+    byte-identical provenance; the new default adds no reference_standards
+    token."""
+    provider = _no_mechanism_providers()[0]
+    config = {"provider-options": {provider: {
+        "frontmatter-strip-fields": ["version", "prompt_mode", "generated-from"],
+    }}}
+    out = _render_for(provider, tmp_path, config=config)
+    body = out.split("---", 2)[2]
+    assert "version=1.2.2" in body
+    assert "prompt_mode=modern" in body
+    assert "generated-from=1-generic/code-reviewer.md@1.2.2" in body
+    assert "reference_standards=" not in body
+    assert REFERENCE_STANDARDS_FIELD not in out
