@@ -141,6 +141,38 @@ tests:
   - type: equals-any
     value:
     - concept-development
+- description: kw-concept-driven-dev-01 [orchestrator]
+  vars:
+    role: orchestrator
+    prompt: 'Bitte concept-driven-dev: kümmere dich darum.'
+  assert:
+  - type: equals-any
+    value:
+    - concept-driven-dev
+- description: kw-concept-driven-dev-02 [orchestrator]
+  vars:
+    role: orchestrator
+    prompt: 'Bitte Konzept-Pipeline: kümmere dich darum.'
+  assert:
+  - type: equals-any
+    value:
+    - concept-driven-dev
+- description: kw-concept-driven-dev-03 [orchestrator]
+  vars:
+    role: orchestrator
+    prompt: 'Bitte gegen Spezifikation implementieren: kümmere dich darum.'
+  assert:
+  - type: equals-any
+    value:
+    - concept-driven-dev
+- description: kw-concept-driven-dev-04 [orchestrator]
+  vars:
+    role: orchestrator
+    prompt: 'Bitte spec-first: kümmere dich darum.'
+  assert:
+  - type: equals-any
+    value:
+    - concept-driven-dev
 - description: kw-refactor-01 [orchestrator]
   vars:
     role: orchestrator
