@@ -40,6 +40,43 @@ Wichtig: Obwohl Gemini `has_rules: true` hat, erzeugen **alle** AGENTS.md-Provid
 embedded Block (`scripts/lib/context.py` — Ping-Pong-Vermeidung beim geteilten File).
 Der `rules-pointer`-Zweig ist in diesem Repo damit inaktiv.
 
+## Topologie-Achse: `context_file.topology` (`unified` / `per-provider`)
+
+> Trace-Anker: `SPEC-CONTEXT-FILE-MODES-2026-09-13`. Provider-Übersicht und Kanal-Matrix:
+> `../providers/multi-provider.md` → „Kontext-Topologie".
+
+Diese Inventory beschreibt den **Inhalt** des managed blocks. Davon unabhängig steuert die
+Topologie-Achse `context_file.topology`, **welche Datei** den Block erhält. Sie ist ein
+Sibling des Dichte-Schalters `context_file.mode` und wird nicht mit ihm verwechselt:
+
+| Key | Achse | Werte | Default |
+|---|---|---|---|
+| `context_file.mode` | **Dichte** (wie viel Inhalt im Block steht) | `full` \| `compact` | `full` |
+| `context_file.topology` | **Topologie** (eine gemeinsame Datei vs. Kern + Adapter) | `unified` \| `per-provider` | `unified` |
+
+| Topologie | Wirkung auf die oben beschriebene Kompositions-Kette |
+|---|---|
+| `unified` (**Default**, **nicht persistiert**) | Unverändert: alle `AGENTS.md`-Provider rendern denselben embedded Block (`rules-embedded`), `CLAUDE.md` den managed block. Fehlt der Key, bleibt alles byte-identisch zum Bestand. |
+| `per-provider` | Kanonischer Kern `context_file.core_file` (Default `AGENTS.md`) rendert den **neutralen** `GATE_NEUTRAL`-Zustand anstelle eines Provider-Tiers (kein Runtime-Versprechen im Kern). Adapter-fähige Provider erhalten eine eigene Adapter-Datei; deren Tier liegt auf dem provider-eigenen Kanal, **nicht** im Adapter-managed-block. |
+
+- Claude (einziger heute aktiver Adapter): `CLAUDE.md` mit `@AGENTS.md`-Import; die verbindliche
+  Hook-Wortwahl bleibt in der nativen `.claude/rules/use-orchestrator.md`, **nicht** im
+  `CLAUDE.md`-managed-block.
+- Gemini/Antigravity (ein Provider): kein Adapter — **Fallback (c):** geteilter `AGENTS.md` +
+  nativer Hook-Kanal. Kanal (a) `.gemini/rules` ist als Antigravity-Workspace-Rules-Lokation
+  **widerlegt** (Spike `docs/spikes/2026-09-14-f-rulesloc-gemini-rules-channel.md`). Die obige
+  Aussage „alle AGENTS.md-Provider teilen denselben Block" bleibt damit unter `per-provider`
+  für Gemini gültig.
+- Codex/Copilot/Continue/Mammouth: `context_adapter: false` (HYPOTHESIS, Phase 2) → bleiben
+  Direkt-Leser des Kerns.
+
+Präzedenz: `context_file.provider-overrides.<Provider>.topology` > `context_file.topology` >
+`"unified"`. Der Default wird nicht persistiert — bestehende Projekte bleiben ohne Opt-in
+unverändert. Für Adapter gelten derselbe `context_file.max_lines`-Size-Guard (Adapter-Pfade
+separat gemeldet), der Topologie-Consistency-Check
+(`check_context_topology_consistency`, WARNING-only) und `rollback_context_adapters`
+(Adapter-Teardown backup-first, nur index-getrackte Pfade).
+
 ## Inventory: Partials und injizierte Quellen
 
 ### 1. `project-metadata.md` — AGENTS.md Z1–79 (außerhalb Managed Block)
