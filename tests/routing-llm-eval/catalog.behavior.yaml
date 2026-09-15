@@ -82,3 +82,84 @@ cases:
       - '1-generic'
       - '2-platform'
       - '3-project'
+
+  # --- B7: literature-anchored role disciplines (#771) ---------------------
+  - id: b7-tester-01
+    role: tester
+    category: process-discipline
+    prompt: "Schreibe Unit-Tests für [REQ-004]. Wie grenzt du die Testverantwortung zwischen Unit- und Integrationsebene ab und wie bewertest du die Abdeckung?"
+    expected_any:
+      - 'test pyramid'
+      - 'behavioral coverage'
+      - 'unit-first'
+
+  - id: b7-e2e-01
+    role: e2e-tester
+    category: process-discipline
+    prompt: "Wie viele E2E-Flows solltest du für diese App schreiben und wie gehst du mit einem flakigen E2E-Test um?"
+    expected_any:
+      - 'targeted E2E'
+      - 'quarantine'
+      - 'baseline governance'
+
+  - id: b7-test-executor-01
+    role: test-executor
+    category: process-discipline
+    prompt: "Eine Testsuite ist rot. Wie gehst du vor, bevor du den Fehlschlag meldest, und wie klassifizierst du die Fehler?"
+    expected_any:
+      - 'flakiness triage'
+      - 'infrastructure'
+      - 'environment'
+
+  - id: b7-validator-01
+    role: validator
+    category: process-discipline
+    prompt: "Was prüfst du bei der Validierung bezüglich DoD versus Akzeptanzkriterien und wie weist du Traceability nach?"
+    expected_any:
+      - 'acceptance criteria'
+      - 'traceability'
+
+  - id: b7-se-verifier-01
+    role: se-verifier
+    category: process-discipline
+    prompt: "Wähle die Verifikationsmethode für eine sicherheitskritische Anforderung und begründe die Prüfintensität."
+    expected_any:
+      - 'inspection'
+      - 'demonstration'
+      - 'integrity'
+
+  - id: b7-se-validator-01
+    role: se-validator
+    category: process-discipline
+    prompt: "Erstelle die User Journeys für die Stakeholder-Needs. Wie deckst du Randfälle ab und koppelst jede Journey an ein Akzeptanzkriterium?"
+    expected_any:
+      - 'journey catalog'
+      - 'edge cases'
+      - 'acceptance criterion'
+
+  - id: b7-se-test-engineer-01
+    role: se-test-engineer
+    category: process-discipline
+    prompt: "Welche Testtechnik wählst du für einen numerischen Bereichs-Input und welches Modell-Coverage-Kriterium nennst du pro Szenario?"
+    expected_any:
+      - 'equivalence partitioning'
+      - 'boundary value'
+      - 'model-based coverage'
+
+  - id: b7-se-testreviewer-01
+    role: se-testreviewer
+    category: process-discipline
+    prompt: "Bewerte die Teststärke des Testmodells und wie quantifizierst du die Negativ- bzw. Fehlerpfad-Abdeckung?"
+    expected_any:
+      - 'fault-detection'
+      - 'negative_path_coverage'
+      - 'mutation'
+
+  - id: b7-seitm-01
+    role: se-integration-and-test-manager
+    category: process-discipline
+    prompt: "Dokumentiere die Strategie-Begründung und den V&V-Prozess. Was ist dabei das Pflichtartefakt und welche Traceability verlangst du?"
+    expected_any:
+      - '29119-2'
+      - 'Pflichtartefakt'
+      - 'Begründungsraster'
