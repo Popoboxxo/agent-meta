@@ -1,6 +1,6 @@
 # Prozess-/Capability-Gaps — Fortschritts-, Ausführungs- und Verifikationssystem
 
-> Stand: 2026-09-14 · Status: Read-only Analyse, keine Implementierung (Nachtrag §6.1: umgesetzter Phase-0-Status)
+> Stand: 2026-09-15 · Status: Read-only Analyse, keine Implementierung (Nachtrag §6.1: umgesetzter Phase-0-Status; nativer OpenCode-Plugin-Tier-Flip **DECLINED (won't-do)**)
 > Bezug: internes Spec/Plan-Workflow-Vorhaben; Coverage-Matrix `docs/spec-plan-workflow-coverage.md`
 > Terminologie: „Ziel-Prozessprofil" = externes Referenz-Prozessmodell; „Referenz-Fähigkeiten";
 > „Capability-Gap". Keine Externalität/Abhängigkeit wird eingeführt.
@@ -158,7 +158,7 @@ Entscheidung, kein Gap.
 - **Referenzspezifische Pack-/Vendor-Abhängigkeit** ist ausgeschlossen; keine Externalität
   oder Abhängigkeit wird eingeführt.
 
-### 6.1 Provider-Runtime-Gate (CRITICAL GATE) — Status
+### 6.1 Provider-Runtime-Gate (CRITICAL GATE) — Status (P6/Plugin-Tier DECLINED)
 
 Nachtrag zum umgesetzten Phase-0-Stand (SPEC-OPENCODE-RUNTIME-GATE-2026-09-13). Die
 Tier-Semantik und die Verträge stehen in
@@ -167,24 +167,30 @@ ehrliche Ist-Stand. Der `# CRITICAL GATE` ist nur so stark wie das Runtime des
 aktiven Providers:
 
 - **`hook`** — verifizierter PreToolUse-Hook-Vertrag; Runtime-Gate vorhanden
-  (`GATE_ENFORCED`). Unverändert.
+  (`GATE_ENFORCED`). Unverändert; der einzige verifizierte Runtime-Gate.
 - **`permission`** — native Permission-Schicht blockiert Main-Chat-Writes über den
-  bestehenden `isolation.py`-Merge-Pfad (A2-Mapping-Deny). **PARTIAL**: die
-  Delegations-Provenienz ist nicht erzwungen, und die Child-Session-Propagation
-  (`deriveSubagentSessionPermission`, **#765**) ist **unverifiziert**. Das ist der
-  aktuelle Phase-0-Status des OpenCode-Blocks (`runtime_gate: permission` in
-  `config/provider-capabilities.yaml`); kein
-  „vollständig erzwungen".
-- **`plugin`** — die native Plugin-Tier ist **Phase 1** und läuft nur im Modus
-  `observe`; `MODE=enforce` und der Tier-Flip sind hinter die Real-Repo-Verifikation
-  (P6) gesperrt. In Phase 0 deklariert kein Provider `runtime_gate: plugin`.
+  bestehenden `isolation.py`-Merge-Pfad (A2-Mapping-Deny). **PARTIAL** und
+  **best-effort, nicht garantiert**: die Delegations-Provenienz ist nicht erzwungen,
+  und die Child-Session-Propagation (`deriveSubagentSessionPermission`, **#765**) ist
+  **unverifiziert**. Das ist der aktuelle Status des OpenCode-Blocks
+  (`runtime_gate: permission` in `config/provider-capabilities.yaml`).
+- **`plugin`** — die native Plugin-Tier ist **Phase 1** und wurde **DECLINED
+  (won't-do)**: Der P6-Real-Repo-Test ist in dieser Umgebung nicht durchführbar
+  (`tool.execute.before` kann nur per `throw` verweigern und trägt keine
+  Agent-Identität), ein unverifizierter „enforce"-Flip wird ausdrücklich **nicht**
+  ausgeliefert. Die Artefakte (Plugin-Template, `has_plugins: false`, Tests) bleiben
+  als dormantes **inaktives Inventar** ausschließlich im Modus `observe` erhalten;
+  `MODE=enforce` und der Tier-Flip sind dauerhaft gesperrt. Kein Provider deklariert
+  `runtime_gate: plugin`.
 - **`advisory`** — rein prompt-basiert (fail-safe Default für unbekannte oder
-  fehlende Konfiguration).
+  fehlende Konfiguration); die Garantie auf hook-losen Providern.
 
-A2 schreibt keinen neuen Root-Key und umgeht den create-only Settings-Initializer
-(**#747**); der Managed-State ist reversibel und namespaced. Insgesamt bleibt der
-Gate eine **Convention boundary**, keine **security boundary** (Definition:
-`.claude/rules/branch-guard.md`).
+Damit ist die Garantie ehrlich fixiert: **OpenCode = `permission` (best-effort, nicht
+garantiert), hook-lose Provider = `advisory`**; nirgends wird eine vollständig
+erzwungene Zusage behauptet. A2 schreibt keinen neuen Root-Key und umgeht den
+create-only Settings-Initializer (**#747**); der Managed-State ist reversibel und
+namespaced. Insgesamt bleibt der Gate eine **Convention boundary**, keine
+**security boundary** (Definition: `.claude/rules/branch-guard.md`).
 
 ## 7. Nicht-Ziele & Nicht-Implementierung
 
