@@ -583,4 +583,20 @@ Details siehe [sync-concept.md](../guides/features/sync-concept.md).
   ```
 → Die gestrippten Werte gehen nicht verloren — sie landen als `<!-- agent-meta-provenance: ... -->`
   HTML-Kommentar direkt nach dem Frontmatter, damit Traceability/Version-Bump-Enforcement erhalten bleibt.
-→ Default (kein `frontmatter-strip-fields` gesetzt) ist für alle Provider unverändert — reines Opt-in.
+→ Für die **Bookkeeping-Felder** (`version`, `prompt_mode`, `generated-from`) heißt das: Default
+  (kein `frontmatter-strip-fields` gesetzt) bleibt für alle Provider unverändert — reines Opt-in.
+
+**`reference_standards` wird per Default gestrippt (SPEC-REFERENCE-STANDARDS-2026-09-15)**
+→ Das optionale Agent-Frontmatter-Feld `reference_standards` (Liste von Strings, Format
+  `<STANDARD>[@<version>][#<section>]`) wird framework-seitig **aus jedem Provider gestrippt**.
+  Der Default kommt aus einem Config-Resolver (provider-agnostisch, kein Provider-Sonderfall);
+  der Strip ist **lautlos**: das Feld erscheint weder als YAML-Key noch im
+  `agent-meta-provenance`-Kommentar.
+→ **Opt-in „keep" je Provider** (keep schlägt strip) — über den Projekt-Kanal:
+  ```yaml
+  provider-options:
+    Claude:
+      frontmatter-keep-fields: [reference_standards]
+  ```
+  oder den ai-providers-Kanal `providers.<Provider>.frontmatter_keep_fields`.
+→ Für `version`/`prompt_mode`/`generated-from` bleibt die Provenance unverändert.
