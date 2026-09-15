@@ -48,6 +48,9 @@ _TOUCHED_MODULES = (
     "consistency/subagent_permissions",
     "runtime_gate",
     "isolation",
+    # Context-file topology consistency (SPEC-CONTEXT-FILE-MODES-2026-09-13,
+    # AC-19): adapter dispatch is key-driven, never a provider-name branch.
+    "consistency/context_topology",
 )
 
 

@@ -70,6 +70,24 @@ def test_help_mappings_checker_reports_no_findings_for_new_routes():
     assert offenders == [], offenders
 
 
+def test_help_mappings_checker_accepts_context_file_topology():
+    """AC-20: the ``context_file.topology`` control lives on the existing
+    ``project/general`` route, so the routeMap/help-id checker reports no
+    finding for it (no new route/help-id needed)."""
+    sys.path.insert(0, str(REPO_ROOT / "scripts"))
+    try:
+        from lib.consistency.docs import check_ui_help_mappings  # noqa: E402
+    finally:
+        sys.path.pop(0)
+
+    assert "contextFile" in HTML
+    findings = check_ui_help_mappings(REPO_ROOT)
+    offenders = [
+        f.message for f in findings if "project_instance-general" in f.message
+    ]
+    assert offenders == [], offenders
+
+
 def test_auto_commit_client_gate_and_enums():
     # mode enum + default off
     for mode in ('"off"', '"suggest"', '"auto"', '"custom"'):

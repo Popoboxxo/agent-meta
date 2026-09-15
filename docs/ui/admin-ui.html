@@ -6174,6 +6174,8 @@ async function viewProjectGeneral() {
   const contextFileSrc = (data.context_file && typeof data.context_file === "object") ? data.context_file : {};
   const contextFile = {
     mode: contextFileSrc.mode || "full",
+    topology: contextFileSrc.topology || "unified",
+    core_file: contextFileSrc.core_file || "AGENTS.md",
     max_lines: Number.isInteger(contextFileSrc.max_lines) ? contextFileSrc.max_lines : 250,
     oversize_acknowledged: !!contextFileSrc.oversize_acknowledged,
     auto_generate: contextFileSrc.auto_generate !== false,
@@ -6351,6 +6353,17 @@ async function viewProjectGeneral() {
     v => { contextFile.mode = v; },
     null,
     "full = current behavior (default, every rule fully spelled out). compact = ~30-50% smaller: INSTRUCTION anchors stay verbatim, OVERVIEW/reference prose collapses to pointer sentences. Only affects the shared AGENTS.md (Opencode + Gemini) — providers with native rule files (Claude, Continue, Copilot, Mammouth) are unaffected.",
+  ));
+  cfPanel.appendChild(dropdownField(
+    "Topology", ["unified", "per-provider"], contextFile.topology,
+    v => { contextFile.topology = v; },
+    null,
+    "Topology axis — independent of the density 'Mode' above (context_file.mode: full|compact). unified = one shared context file for every active provider (default). per-provider = a canonical core file plus provider-native adapter files.",
+  ));
+  cfPanel.appendChild(labeledTextField(
+    "Core file", contextFile.core_file,
+    v => { contextFile.core_file = v || "AGENTS.md"; },
+    "Canonical shared core file used in the 'per-provider' topology (default: AGENTS.md). Ignored in 'unified'.",
   ));
   cfPanel.appendChild(labeledTextField(
     "Max lines (soft limit)", String(contextFile.max_lines),

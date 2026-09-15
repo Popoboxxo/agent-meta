@@ -1,0 +1,30 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+- Gemini
+- Opencode
+dod-preset: rapid-prototyping
+platforms: []
+roles:
+- orchestrator
+- developer
+- git
+project:
+  name: scenario-context-file-modes
+  prefix: s63
+  short: context-file-modes
+variables:
+  PROJECT_NAME: scenario-context-file-modes
+  PROJECT_DESCRIPTION: Context-file topology switch scenario (SPEC-CONTEXT-FILE-MODES-2026-09-13, AC-21).
+  PROJECT_GOAL: Verify the unified default is byte-stable and the per-provider opt-in renders a canonical core plus the Claude adapter, with a backup-first rollback back to unified.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-context-file-modes
+  GIT_MAIN_BRANCH: main
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false

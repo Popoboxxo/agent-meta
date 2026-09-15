@@ -14,6 +14,13 @@ NICHT erzwungen (Prompt + Permission-Layer).
 MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`.
 ACHTUNG: Auf diesem Provider ist der Gate rein prompt-basiert, ohne Runtime-Gate.
 {{/if}}
+{{#if GATE_NEUTRAL}}
+# CRITICAL GATE (neutral)
+MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`.
+Dieser geteilte Kontext wird von mehreren Providern gelesen; die Runtime-Erzwingung
+ist provider-spezifisch und steht im jeweiligen dedizierten Tier-Kanal (Adapter-
+bzw. Rules-Datei) — siehe `a2a-delegation-gates`.
+{{/if}}
 {{/if}}
 {{#if ORCH_MODE_ADVISORY}}
 # Orchestrator

@@ -41,6 +41,7 @@ _AGENT_META_ROOT = _SCRIPTS_DIR.parent
 
 from lib.consistency.commands import check_command_frontmatter, check_duplicate_commands
 from lib.consistency.context_size import check_context_file_size
+from lib.consistency.context_topology import check_context_topology_consistency
 from lib.consistency.crossrefs import (
     check_changelog_mentions_new_files,
     check_orchestrator_table,
@@ -200,6 +201,10 @@ def run_checks(
         # Context size guard (issue #540, C2): warn on oversized generated
         # provider context files without acknowledgment (WARNING only).
         findings.extend(check_context_file_size(root))
+
+        # Context topology consistency (SPEC-CONTEXT-FILE-MODES, AC-19):
+        # WARNING-only validation of context_file.topology / adapter keys.
+        findings.extend(check_context_topology_consistency(root))
 
         # Changelog check: only meaningful when checking changed/new files
         new_files = get_new_files_vs_main(root)

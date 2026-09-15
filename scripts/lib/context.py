@@ -8,6 +8,7 @@ from pathlib import Path
 from .agents import build_agent_hints, build_knowledge_engine_hints
 from .frontmatter import _strip_frontmatter
 from .io import content_hash, is_absent_gitignored_target, load_json_file, safe_path
+from .json_persistence import save_json_document
 from .log import SyncLog
 from .plugins import resolve_plugin_compact
 from .rule_index import (
@@ -1044,6 +1045,83 @@ def _dispatch_context_strategy(
         )
 
 
+def _adapter_settings_activation(pc: dict) -> dict | None:
+    """Resolve the provider-native settings activation for an adapter file.
+
+    Capability/``settings_file``-gated (AC-26, F-10):
+
+    * ``context_adapter_settings`` absent/``False`` (the default) → ``None``: no
+      settings write; the adapter file is the provider's default context file.
+    * ``context_adapter_settings: true`` additionally requires a native
+      ``settings_file`` and the provider-native key name in
+      ``context_adapter_settings_key`` (worked example: ``context.fileName`` in
+      ``.gemini/settings.json``); a missing piece degrades to ``None`` instead of
+      guessing (never writes an unspecified key).
+
+    Purely key-driven — no provider-name literal in any branch.
+    """
+    if pc.get("context_adapter_settings") is not True:
+        return None
+    settings_file = pc.get("settings_file")
+    settings_key = pc.get("context_adapter_settings_key")
+    adapter_file = pc.get("context_adapter_file")
+    if not (isinstance(settings_file, str) and settings_file.strip()):
+        return None
+    if not (isinstance(settings_key, str) and settings_key.strip()):
+        return None
+    if not (isinstance(adapter_file, str) and adapter_file.strip()):
+        return None
+    return {
+        "settings_file": settings_file,
+        "settings_key": settings_key.strip(),
+        "adapter_file": adapter_file,
+    }
+
+
+def _write_adapter_settings_activation(
+    project_root: Path, activation: dict, log: SyncLog, dry_run: bool
+) -> None:
+    """Merge the provider-native settings key that activates an adapter file.
+
+    Only reached through ``_adapter_settings_activation`` (an explicit provider
+    opt-in). The dotted native key is set on the existing settings document,
+    preserving sibling keys. A missing or non-mapping settings file is a
+    ``log.warning`` — never a silent no-op and never a create-and-guess.
+    """
+    settings_file = activation["settings_file"]
+    settings_key = activation["settings_key"]
+    adapter_file = activation["adapter_file"]
+    settings_path = safe_path(project_root, settings_file)
+    if not settings_path.exists():
+        log.warning(
+            f"context_adapter_settings for '{adapter_file}' requires '{settings_file}' "
+            "— settings file missing, activation skipped"
+        )
+        return
+    document = load_json_file(settings_path, on_error="warn", default=None, log=log)
+    if not isinstance(document, dict):
+        log.warning(f"{settings_file}: not a JSON object — adapter activation skipped")
+        return
+    cursor = document
+    parts = [part for part in settings_key.split(".") if part]
+    if not parts:
+        log.warning(f"{settings_file}: invalid settings key '{settings_key}' — activation skipped")
+        return
+    for part in parts[:-1]:
+        branch = cursor.get(part)
+        if not isinstance(branch, dict):
+            branch = {}
+            cursor[part] = branch
+        cursor = branch
+    cursor[parts[-1]] = adapter_file
+    if not dry_run:
+        save_json_document(settings_path, document)
+    log.action(
+        "UPDATE", settings_file,
+        f"context adapter activation: {settings_key}={adapter_file}",
+    )
+
+
 def sync_context_adapters_for_provider(
     agent_meta_root: Path,
     project_root: Path,
@@ -1082,6 +1160,9 @@ def sync_context_adapters_for_provider(
     if safe_path(project_root, adapter_file).exists():
         _record_adapter_managed(project_root, adapter_file, log, dry_run)
         _record_adapter_hash(project_root, adapter_file, dry_run)
+        activation = _adapter_settings_activation(pc)
+        if activation is not None:
+            _write_adapter_settings_activation(project_root, activation, log, dry_run)
 
 
 def sync_context_for_provider(
@@ -1430,6 +1511,26 @@ def _build_managed_block(
     if len(shared_users) > 1:
         for p in shared_users:
             local_vars[f"PLATFORM_{p.upper()}"] = True
+
+    from .providers import context_topology
+
+    # ``per-provider``: the canonical core is read by several providers, so it
+    # must not carry a provider-specific runtime promise. Render the neutral
+    # ``GATE_NEUTRAL`` state instead — each provider states its own tier in its
+    # dedicated channel (adapter file / native rules file, AC-23). ``unified``
+    # keeps the shared weakest-tier bundle set above, byte-identical to the
+    # legacy render. Keyed on the topology + the physical core target only,
+    # never on a provider name.
+    if (
+        context_topology(config, provider) == "per-provider"
+        and target_name == _core_context_filename(config)
+    ):
+        local_vars.update({
+            "GATE_NEUTRAL": "true",
+            "GATE_ENFORCED": "false",
+            "GATE_PARTIAL": "false",
+            "GATE_ADVISORY": "false",
+        })
 
     local_vars["HAS_NATIVE_RULES"] = has_native_rules
     local_vars[f"PLATFORM_{provider.upper()}"] = True

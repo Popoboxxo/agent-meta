@@ -47,6 +47,14 @@ Rolle→Tier-Auflösung (`role-defaults.yaml` → `model`) nur für genau diesen
 - Protokolliere Verstöße als Zeile `SUBAGENT_PERMISSION_WARNING: <role> — <reason>` im
   eigenen Abschluss-Report und fahre fort.
 {{/if}}
+{{#if GATE_NEUTRAL}}
+## Runtime-Enforcement-Tier (multiple providers, see adapter)
+
+Dieser geteilte Kontext wird von mehreren Providern gelesen und nennt deshalb
+kein einzelnes Tier. Der konkrete `# CRITICAL GATE`-Tier steht im
+provider-eigenen Kanal (Adapter- bzw. Rules-Datei, siehe Adapter) und ist dort
+benannt. Die konkreten Grenzen dieses Schutzes stehen unter „Bekannte Grenzen".
+{{else}}
 ## Runtime-Enforcement-Tier: `{{ENFORCEMENT_TIER}}`
 
 Ob der `# CRITICAL GATE` („MAIN CHAT darf nicht selbst editieren") auf diesem
@@ -55,6 +63,7 @@ Permission-Layer (`permission`, ohne Delegations-Provenienz) oder rein
 prompt-basiert (`advisory`) durchgesetzt wird, nennt das Tier
 `{{ENFORCEMENT_TIER}}`. Die konkreten Grenzen dieses Schutzes stehen unter
 „Bekannte Grenzen".
+{{/if}}
 
 ## Bekannte Grenzen
 

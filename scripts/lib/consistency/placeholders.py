@@ -82,6 +82,7 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     "SPEC_PLAN_WORKFLOW_ENABLED", "SPEC_PLAN_SPECS_DIR", "SPEC_PLAN_PLANS_DIR",
 
     "ENFORCEMENT_TIER", "GATE_ENFORCED", "GATE_PARTIAL", "GATE_ADVISORY",
+    "GATE_NEUTRAL",
     "RUNTIME_GATE_PLUGIN_MODE",
     # Orchestrator snippet blocks (loaded from snippets/orchestrator/*.md by build_variables)
     "SE_MODE_BLOCK", "A2A_PROTOCOL_BLOCK", "CHECKPOINTING_BLOCK", "QUALITY_PIPELINES_BLOCK",

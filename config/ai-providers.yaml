@@ -250,6 +250,11 @@ providers:
     agents_dir: .continue/agents
     agent_ext: .md
     context_file: .continue/rules/project-context.md
+    # Phase-2 context adapter — HYPOTHESIS, UNVERIFIED (candidate pointer file).
+    # Disabled until tests/manual/phase2-adapter-hypothesis.md records a real-repo
+    # PASS: `context_adapter: false` keeps Continue a direct reader of the core.
+    context_adapter: false
+    context_adapter_file: .continue/rules/project-context.md
     context_template: templates/configs/CONTINUE.project-template.md
     has_rules: true
     rules_dir: .continue/rules
@@ -312,6 +317,12 @@ providers:
     agents_dir: .github/copilot/agents
     agent_ext: .md
     context_file: .github/copilot/COPILOT.md
+    # Phase-2 context adapter — HYPOTHESIS, UNVERIFIED (candidate pointer file;
+    # the native path, `.github/copilot-instructions.md`, is not confirmed).
+    # Disabled until tests/manual/phase2-adapter-hypothesis.md records a real-repo
+    # PASS: `context_adapter: false` keeps Copilot a direct reader of the core.
+    context_adapter: false
+    context_adapter_file: .github/copilot/COPILOT.md
     context_template: templates/configs/COPILOT.project-template.md
     has_rules: true
     rules_dir: .github/copilot/rules
@@ -359,6 +370,11 @@ providers:
     agents_dir: .mammouth/agents
     agent_ext: .md
     context_file: MAMMOUTH.md
+    # Phase-2 context adapter — HYPOTHESIS, UNVERIFIED (candidate pointer file).
+    # Disabled until tests/manual/phase2-adapter-hypothesis.md records a real-repo
+    # PASS: `context_adapter: false` keeps Mammouth a direct reader of the core.
+    context_adapter: false
+    context_adapter_file: MAMMOUTH.md
     context_template: templates/configs/AGENTS.project-template.md
     has_rules: true
     rules_dir: .mammouth/rules
@@ -419,6 +435,11 @@ providers:
     agents_dir: .codex/agents
     agent_ext: .toml
     context_file: AGENTS.md
+    # Phase-2 context adapter — HYPOTHESIS, UNVERIFIED (candidate `AGENTS.override.md`).
+    # Disabled until tests/manual/phase2-adapter-hypothesis.md records a real-repo
+    # PASS: `context_adapter: false` keeps Codex a direct reader of the core.
+    context_adapter: false
+    context_adapter_file: AGENTS.override.md
     context_template: templates/configs/AGENTS.project-template.md
     has_rules: true
     rules_dir: rules
