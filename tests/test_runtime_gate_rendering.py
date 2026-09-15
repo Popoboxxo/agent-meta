@@ -49,6 +49,7 @@ _ENFORCED_STRICT_BLOCK = (
 _PARTIAL_HEADING = "# CRITICAL GATE (runtime-partially enforced)"
 _ADVISORY_HEADING = "# CRITICAL GATE (advisory)"
 _ENFORCED_HEADING = "# CRITICAL GATE"
+_NEUTRAL_HEADING = "# CRITICAL GATE (neutral)"
 
 
 def _tier_pc(tier: str) -> dict:
@@ -148,3 +149,33 @@ def test_a2a_tier_note_names_tier_and_points_to_known_limits():
         rendered = _render(_A2A_GATES, _gate_flags(tier))
         assert f"## Runtime-Enforcement-Tier: `{tier}`" in rendered
         assert "{{ENFORCEMENT_TIER}}" not in rendered
+
+
+def test_neutral_core_renders_directive_without_runtime_promise():
+    """AC-23: ``GATE_NEUTRAL`` states the directive, no runtime promise."""
+    flags = _gate_flags("permission")
+    flags.update({"GATE_NEUTRAL": "true", "GATE_PARTIAL": "false"})
+    rendered = _render(_USE_ORCHESTRATOR, flags)
+    assert rendered.startswith(_NEUTRAL_HEADING + "\n"), rendered[:80]
+    assert "MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`." in rendered
+    assert _PARTIAL_HEADING not in rendered
+    assert "NICHT erzwungen" not in rendered
+    assert "Keine Ausnahmen." not in rendered
+    assert "rein prompt-basiert" not in rendered
+    assert _gate_headings(rendered) == [_NEUTRAL_HEADING]
+
+    a2a = _render(_A2A_GATES, flags)
+    assert "multiple providers" in a2a
+    assert "Adapter" in a2a
+    assert "{{ENFORCEMENT_TIER}}" not in a2a
+
+
+def test_neutral_core_state_is_opt_in_by_default():
+    """AC-23: an absent ``GATE_NEUTRAL`` never renders the neutral block.
+
+    The render state must be asked for explicitly; the engine's generic
+    absent-means-on default must not leak it into the tier renders.
+    """
+    for tier in ("hook", "plugin", "permission", "advisory"):
+        assert _NEUTRAL_HEADING not in _render(_USE_ORCHESTRATOR, _gate_flags(tier))
+        assert _NEUTRAL_HEADING not in _render(_A2A_GATES, _gate_flags(tier))

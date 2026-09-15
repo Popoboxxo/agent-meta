@@ -13,6 +13,12 @@ SPEC-CONTEXT-FILE-MODES-2026-09-13:
 - AC-15: import/pointer semantics.
 - AC-16: the ``per-provider`` render is idempotent.
 - AC-17: adapters are recorded in the adapter managed index + context hashes.
+- AC-23: the canonical core renders the neutral ``GATE_NEUTRAL`` state in
+  ``per-provider`` (directive without a runtime promise, no "if you are X"
+  block); ``GATE_NEUTRAL`` is a render state, not a ``RUNTIME_GATE_TIERS``
+  value.
+- AC-22/AC-26: Codex/Copilot/Continue/Mammouth/Gemini stay direct readers of
+  the core (Phase-2 adapters dormant behind their HYPOTHESIS).
 
 Run: python -m pytest tests/test_context_adapters.py -v
 """
@@ -114,8 +120,24 @@ def test_no_two_adapters_share_a_file():
 
 
 def test_non_adapter_providers_have_no_adapter_keys():
+    """A provider that does not opt in carries no adapter keys.
+
+    Phase 2 exception: an explicitly **disabled** candidate
+    (``context_adapter: false``) is a documented dormant registry entry (see
+    ``tests/manual/phase2-adapter-hypothesis.md``) and may name its candidate
+    file. It is never treated as an adapter.
+    """
     for name, pc in _providers().items():
         if _is_adapter(pc):
+            continue
+        if "context_adapter" in pc:
+            assert pc.get("context_adapter") is False, (
+                f"Provider '{name}' has a non-boolean context_adapter "
+                f"({pc.get('context_adapter')!r}) — use true/false only"
+            )
+            assert pc.get("context_adapter_settings") is not True, (
+                f"Dormant candidate '{name}' must not enable context_adapter_settings"
+            )
             continue
         present = [key for key in _ADAPTER_KEYS if key in pc]
         assert not present, (
@@ -449,4 +471,230 @@ def test_rollback_check_reports_no_pending(tmp_path, loaded_config):
     assert not backups
     assert not (tmp_path / "ADAPTER.md").exists()
     assert not (tmp_path / _ADAPTER_INDEX).exists()
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 — neutral core render state (AC-23)
+# ---------------------------------------------------------------------------
+
+_USE_ORCHESTRATOR = _REPO_ROOT / "rules" / "1-generic" / "use-orchestrator.md"
+_A2A_GATES = _REPO_ROOT / "rules" / "1-generic" / "a2a-delegation-gates.md"
+_NEUTRAL_DIRECTIVE = "MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`."
+_GATE_NEUTRAL_HEADING = "# CRITICAL GATE (neutral)"
+_PROVIDER_IDENTIFICATION_RE = re.compile(
+    r"(?i)\b(if you are|you are|wenn du)\b[^.\n]{0,30}?"
+    r"\b(Claude|Gemini|Opencode|Copilot|Codex|Continue|Mammouth|KimiCode|ZCode)\b"
+)
+
+
+def _neutral_flags() -> dict:
+    """Render flags for the neutral core state (``per-provider``)."""
+    from lib.variables import _orch_mode_flags
+
+    flags = _orch_mode_flags("strict")
+    flags.update({
+        "ENFORCEMENT_TIER": "permission",
+        "GATE_NEUTRAL": "true",
+        "GATE_ENFORCED": "false",
+        "GATE_PARTIAL": "false",
+        "GATE_ADVISORY": "false",
+    })
+    return flags
+
+
+def _render_rule(path: Path, flags: dict) -> str:
+    from lib.variables import strip_inactive_conditional_blocks, substitute
+
+    text = substitute(path.read_text(encoding="utf-8"), flags, path.name, None)
+    return strip_inactive_conditional_blocks(text, flags)
+
+
+def test_core_carries_neutral_directive(tmp_path, loaded_config):
+    """AC-23: the ``per-provider`` core states the directive, no runtime promise."""
+    config, provider_config, capabilities = loaded_config
+    cfg = _per_provider_config(config)
+    _seed(tmp_path, "AGENTS.md")
+    pc = provider_config["Opencode"]
+
+    _sync(tmp_path, cfg, "Opencode", pc, capabilities.get("Opencode", {}), provider_config)
+
+    managed = _MANAGED_BLOCK_RE.search(
+        (tmp_path / "AGENTS.md").read_text(encoding="utf-8")
+    )
+    assert managed, "the canonical core must carry a managed block"
+    block = managed.group(0)
+    assert _NEUTRAL_DIRECTIVE in block
+    assert _GATE_NEUTRAL_HEADING in block
+    # no provider-specific runtime promise / tier wording leaks into the core
+    assert "runtime-partially enforced" not in block
+    assert "Keine Ausnahmen" not in block
+    assert "rein prompt-basiert" not in block
+    # the neutral core points at the dedicated channel rule (AC-23)
+    assert "siehe `a2a-delegation-gates`" in block
+
+
+def test_core_neutral_state_is_not_a_runtime_tier():
+    """AC-23: ``GATE_NEUTRAL`` is a render state, not a ``RUNTIME_GATE_TIERS`` value."""
+    from lib.runtime_gate import RUNTIME_GATE_TIERS
+
+    assert "neutral" not in RUNTIME_GATE_TIERS
+    assert "GATE_NEUTRAL" not in RUNTIME_GATE_TIERS
+    assert tuple(RUNTIME_GATE_TIERS) == ("hook", "plugin", "permission", "advisory")
+
+
+def test_a2a_gates_point_at_adapter():
+    """AC-23: the neutral core points at "multiple providers, see adapter"."""
+    neutral = _render_rule(_A2A_GATES, _neutral_flags())
+    assert "multiple providers" in neutral
+    assert "Adapter" in neutral
+    assert "{{ENFORCEMENT_TIER}}" not in neutral
+    assert "Runtime-Enforcement-Tier: `permission`" not in neutral
+
+    tiered_flags = _neutral_flags()
+    tiered_flags.update({"GATE_NEUTRAL": "false", "GATE_PARTIAL": "true"})
+    tiered = _render_rule(_A2A_GATES, tiered_flags)
+    assert "Runtime-Enforcement-Tier: `permission`" in tiered
+    assert "multiple providers" not in tiered
+
+
+def test_no_self_identification_blocks():
+    """AC-23/non-goal: no "if you are X" provider self-identification block."""
+    sources = sorted((_REPO_ROOT / "rules").rglob("*.md"))
+    assert sources, "expected the rule templates"
+    for path in sources:
+        text = path.read_text(encoding="utf-8")
+        assert "{{#if PLATFORM_" not in text, (
+            f"{path.relative_to(_REPO_ROOT)} branches on a provider platform flag "
+            "(self-identification)"
+        )
+        assert not _PROVIDER_IDENTIFICATION_RE.search(text), (
+            f"{path.relative_to(_REPO_ROOT)} contains a provider self-identification phrase"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 — remaining adapters stay behind their HYPOTHESIS (AC-22, AC-26)
+# ---------------------------------------------------------------------------
+
+_HYPOTHESIS_DOC = _REPO_ROOT / "tests" / "manual" / "phase2-adapter-hypothesis.md"
+_PHASE2_PROVIDERS = ("Codex", "Copilot", "Continue", "Mammouth", "Gemini")
+
+
+def _hypothesis_statuses() -> dict:
+    """Parse the provider-matrix rows (``| Provider | Status | ...``) of the doc.
+
+    Only rows whose second cell is a known gate status are considered, so the
+    key-reference and metadata tables cannot pollute the map.
+    """
+    statuses: dict = {}
+    for line in _HYPOTHESIS_DOC.read_text(encoding="utf-8").splitlines():
+        if not line.startswith("|"):
+            continue
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if len(cells) < 2:
+            continue
+        name, status = cells[0], cells[1]
+        if not name or name == "Provider" or set(name) <= {"-"}:
+            continue
+        if status == "VERIFIED" or status == "HYPOTHESIS" or status.startswith("FALLBACK"):
+            statuses[name] = status
+    return statuses
+
+
+def test_no_adapter_without_verified_hypothesis():
+    """AC-22: only providers recorded as ``VERIFIED`` may be active adapters."""
+    statuses = _hypothesis_statuses()
+    assert statuses, "the hypothesis doc must list the provider matrix"
+    verified = {name for name, status in statuses.items() if "VERIFIED" in status}
+    assert verified == set(_adapter_providers()), (
+        "active adapters must match the VERIFIED rows of "
+        "tests/manual/phase2-adapter-hypothesis.md; unverified HYPOTHESIS rows "
+        "must stay direct readers"
+    )
+    for name in _PHASE2_PROVIDERS:
+        assert name in statuses, f"{name} missing from the hypothesis matrix"
+
+
+def test_phase2_providers_default_to_direct_core_reader(tmp_path, loaded_config):
+    """AC-22: Codex/Copilot/Continue/Mammouth/Gemini write no adapter by default."""
+    config, provider_config, capabilities = loaded_config
+    cfg = _per_provider_config(config)
+    _seed(tmp_path, "AGENTS.md")
+
+    for provider in _PHASE2_PROVIDERS:
+        pc = provider_config[provider]
+        assert _is_adapter(pc) is False, f"{provider} must not be an active adapter"
+        assert pc.get("context_adapter") is not True
+        assert pc.get("context_adapter_settings") is not True
+
+    # A per-provider run keeps them direct readers of the core: no candidate file.
+    codex = provider_config["Codex"]
+    _sync(tmp_path, cfg, "Codex", codex, capabilities.get("Codex", {}), provider_config)
+    assert (tmp_path / "AGENTS.md").read_text(encoding="utf-8")
+    assert not (tmp_path / codex["context_adapter_file"]).exists(), (
+        "a dormant candidate adapter must never be written"
+    )
+
+
+def test_gemini_context_filename_only_with_settings_flag(loaded_config):
+    """AC-26: Gemini's fallback (c) writes no ``context.fileName`` settings key.
+
+    Gemini/Antigravity has no ``context_adapter_settings`` opt-in, so no native
+    settings key is written and the shipped settings template carries no
+    ``context.fileName`` — the dedicated-file candidate (b) stays deferred.
+    """
+    _config, provider_config, _capabilities = loaded_config
+    gemini = provider_config["Gemini"]
+    assert gemini.get("context_adapter_settings") is not True
+    assert gemini.get("context_adapter") is not True
+
+    template = (
+        _REPO_ROOT / "templates" / "configs" / "GEMINI.settings-template.json"
+    ).read_text(encoding="utf-8")
+    assert "fileName" not in template, (
+        "candidate (b) context.fileName must stay out of the shipped template "
+        "until a real-repo verification passes"
+    )
+
+
+def test_settings_write_is_capability_gated(tmp_path, loaded_config):
+    """AC-26: a settings activation requires the opt-in **and** a settings file."""
+    from lib.context import (
+        _adapter_settings_activation,
+        _write_adapter_settings_activation,
+    )
+    from lib.log import SyncLog
+
+    # Off by default / incomplete triples never activate.
+    assert _adapter_settings_activation({}) is None
+    assert _adapter_settings_activation({"context_adapter_settings": False}) is None
+    assert _adapter_settings_activation({
+        "context_adapter_settings": True, "context_adapter_file": "A.md",
+    }) is None  # no settings_file
+    assert _adapter_settings_activation({
+        "context_adapter_settings": True, "context_adapter_file": "A.md",
+        "settings_file": "s.json",
+    }) is None  # no native key name
+    activation = _adapter_settings_activation({
+        "context_adapter_settings": True, "context_adapter_file": "A.md",
+        "settings_file": "s.json", "context_adapter_settings_key": "context.fileName",
+    })
+    assert activation == {
+        "settings_file": "s.json", "settings_key": "context.fileName",
+        "adapter_file": "A.md",
+    }
+
+    settings = tmp_path / "s.json"
+    settings.write_text('{"sibling": true}\n', encoding="utf-8")
+    _write_adapter_settings_activation(tmp_path, activation, SyncLog(), dry_run=False)
+    document = json.loads(settings.read_text(encoding="utf-8"))
+    assert document["context"]["fileName"] == "A.md"
+    assert document["sibling"] is True, "sibling settings keys must be preserved"
+
+    # A missing settings file is a warning, never a create-and-guess.
+    missing = dict(activation, settings_file="missing.json")
+    log = SyncLog()
+    _write_adapter_settings_activation(tmp_path, missing, log, dry_run=False)
+    assert not (tmp_path / "missing.json").exists()
+    assert log.warnings, "a missing settings file must be reported"
 
