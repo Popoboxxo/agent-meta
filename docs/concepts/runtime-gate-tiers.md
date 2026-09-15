@@ -1,6 +1,6 @@
 # Konzept — Runtime-Gate-Tiers des CRITICAL GATE
 
-- **Status:** Accepted (Phase 0 implementiert; End-to-End-Verifikation in Task 7; Phase 1 zurückgestellt)
+- **Status:** Accepted (Phase 0 implementiert und abgenommen; **Phase 1 / Plugin-Tier-Flip DECLINED (won't-do)**; Artefakte dormant als inaktives Inventar)
 - **Spec:** [`../specs/2026-09-13-opencode-runtime-gate-design.md`](../specs/2026-09-13-opencode-runtime-gate-design.md)
   (`spec-id: SPEC-OPENCODE-RUNTIME-GATE-2026-09-13`, Status APPROVED)
 - **Plan:** [`../plans/2026-09-13-opencode-runtime-gate.md`](../plans/2026-09-13-opencode-runtime-gate.md)
@@ -34,13 +34,20 @@ Kanonische Vokabel: `scripts/lib/runtime_gate.py::RUNTIME_GATE_TIERS =
 | Tier | Runtime-Zusage | Stand |
 |---|---|---|
 | `hook` | Verifizierter PreToolUse-Hook-Vertrag: das Runtime blockiert den Tool-Call (`GATE_ENFORCED`). | Phase 0 aktiv, wo `hooks: true` + verifiziertes `hook_protocol` deklariert ist. |
-| `plugin` | Native Plugin-Tier; Artefakt läuft im Modus `observe` (nur Logging). | **Phase 1, DEFERRED**, capability-gated; erst nach der Real-Repo-Verifikation (P6). In Phase 0 deklariert kein Provider `runtime_gate: plugin`. |
-| `permission` | Native Permission-Schicht blockiert Main-Chat-Writes (A2-Root-Deny). **PARTIAL**: keine Delegations-Provenienz. | Phase 0 (aktueller Status des permission-fähigen Providers). |
+| `plugin` | Native Plugin-Tier; das Artefakt war ausschließlich auf den Modus `observe` (nur Logging) ausgelegt. | **Phase 1 — DECLINED (won't-do).** Der P6-Real-Repo-Test ist in dieser Umgebung nicht durchführbar; ein unverifizierter „enforce"-Flip wird ausdrücklich **nicht** ausgeliefert. Kein Provider deklariert `runtime_gate: plugin`. |
+| `permission` | Native Permission-Schicht blockiert Main-Chat-Writes (A2-Root-Deny). **PARTIAL**: keine Delegations-Provenienz. | Phase 0 (aktueller Status des permission-fähigen Providers), **best-effort — nicht garantiert**. |
 | `advisory` | Rein prompt-basiert, ohne Runtime-Gate. | Fail-safe-Default für unbekannte/fehlende Konfiguration. |
 
 - `advisory` schreibt **nie** einen Permission-Eintrag und deployt **nie** ein Plugin.
-- `plugin` ist ohne `has_plugins`/verifiziertes `plugin_protocol` unerreichbar;
-  `MODE=enforce` ist zusätzlich gesperrt (siehe §7).
+- `plugin` ist ohne `has_plugins`/verifiziertes `plugin_protocol` unerreichbar; da der
+  Tier-Flip DECLINED ist, bleibt `has_plugins: false` und `MODE=enforce` **dauerhaft**
+  gesperrt (siehe §7).
+
+**Fixierte, ehrliche Garantie.** Auf OpenCode gilt die Zusage `permission` —
+**best-effort, nicht garantiert** (PARTIAL: keine Delegations-Provenienz, Child-Session-
+Propagation unverifiziert). Auf Providern ohne Hook gilt `advisory` (rein prompt-basiert).
+Nirgends wird eine vollständig erzwungene Zusage behauptet; der einzige verifizierte
+Runtime-Gate bleibt der `hook`-Tier.
 
 ## 3. Resolver-Präzedenz & Fail-safe
 
@@ -97,7 +104,9 @@ Offene Phase-0-Risiken (dokumentiert, nicht versteckt):
 `RUNTIME_GATE_PLUGIN_MODE`. Es wird an beiden Renderer-Seams in die
 `provider_variables` injiziert (Context und Rules).
 
-- `GATE_ENFORCED` = `true` für `hook` (Phase 0) und `plugin` (Phase 1, observe).
+- `GATE_ENFORCED` = `true` für `hook` (Phase 0). Die `plugin`-Verzweigung bleibt im
+  Code vorhanden, ist aber mit dem DECLINED-Beschluss unerreichbar (kein Provider
+  deklariert `runtime_gate: plugin`).
 - `GATE_PARTIAL` = `true` nur für `permission`.
 - `GATE_ADVISORY` = `true` nur für `advisory`.
 
@@ -123,17 +132,34 @@ leitet die Severity aus derselben Tier ab (Check-ID unverändert
 
 `orchestrator.require-runtime-gate` ist ein Boolean-Sibling-Key (Default `false`,
 D-C2). `runtime-gate.plugin-mode` (`enum: [observe, enforce]`, Default `observe`) ist
-der Phase-1-Schema-Key (IC-16) und beeinflusst das Phase-0-Rendering nicht.
+der Phase-1-Schema-Key (IC-16) und beeinflusst das Phase-0-Rendering nicht; da der
+Tier-Flip DECLINED ist, bleibt `enforce` unerreichbar und der Key rein deklarativ.
 
-## 7. Phase-1-Vorbehalt (P6, #765)
+## 7. Phase-1-Vorbehalt (P6) — DECLINED (won't-do)
 
-Die Plugin-Tier ist bewusst zurückgestellt und capability-gated:
+Die native OpenCode-Plugin-Tier ist **abgelehnt (won't-do)**, nicht nur zurückgestellt:
 
-- Der Plugin-Generator ist Phase 1 (DEFERRED); das Artefakt ist `MODE=observe`.
+- Der P6-Real-Repo-Test ist in dieser Umgebung nicht durchführbar. Ein unverifizierter
+  „enforce"-Flip würde einen „erzwungen"-Anspruch ohne Nachweis ausliefern; das wird
+  ausdrücklich **nicht** getan.
 - `runtime_gate: plugin`, `has_plugins: true`, `MODE=enforce` und der Tier-Flip sind
-  erst nach bestandener Real-Repo-Verifikation (P6) freigeschaltet.
-- Kein Provider darf vorher `plugin` deklarieren; es wird nie „vollständig erzwungen"
-  behauptet.
+  **dauerhaft** gesperrt. Kein Provider deklariert `runtime_gate: plugin`; der Resolver
+  liefert auf OpenCode weiterhin `permission`.
+- Die Artefakte bleiben als **inaktives Inventar** erhalten und dokumentiert: das
+  Plugin-Template `templates/plugins/runtime-gate.opencode-plugin.js.tmpl` (nur für
+  `observe` ausgelegt), die Konfiguration `has_plugins: false` und ihre Tests. Sie sind
+  dormant und tragen keine Zusage.
+- Es wird nie „vollständig erzwungen" behauptet; die fixierte Zusage ist auf OpenCode
+  `permission` (best-effort, nicht garantiert) und auf hook-losen Providern `advisory`.
+
+**P6-Befunde (read-only Verifikation, belegen den Beschluss):**
+
+- `tool.execute.before` kann nur per `throw` verweigern (kein anderer Blockier-Kanal).
+- Das Hook-`input` trägt **keine Agent-Identität** (`{tool, sessionID, callID}`); die
+  Bedingung „Main Chat im `input` unterscheidbar" (AN-5/OQ-2) ist damit **widerlegt**.
+- AN-3/AN-4 (Child-Session-Propagation bzw. Feuern in Subagent-Sessions) sind nur
+  ableitbar, **nicht bewiesen**; AN-6 (Root-Deny vs. Per-Agent-Frontmatter-Präzedenz)
+  bleibt **ungeklärt**.
 
 ## 8. #747-Avoidance
 

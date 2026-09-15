@@ -13,6 +13,10 @@ related-issue: "#794"
 > defaults for the open questions were accepted unchanged. This document is a
 > specification only: it defines interface contracts and acceptance criteria and
 > contains no implementation and no plan.
+> **Post-approval decision (2026-09-15):** the Phase-1 plugin tier flip
+> (`runtime_gate: plugin` / `has_plugins: true` / `MODE=enforce`) is **DECLINED
+> (won't-do)** — see "Decision Record — P6 / Plugin Tier DECLINED" below.
+> `status: APPROVED` is retained; no approved AC is silently rewritten.
 > Trace anchor (unchanged from the system design):
 > `spec-id: SPEC-OPENCODE-RUNTIME-GATE-2026-09-13`.
 > Source design: `docs/specs/2026-09-13-opencode-runtime-gate-system-design.md`
@@ -24,7 +28,7 @@ related-issue: "#794"
 The system design phases the work; this spec inherits the phasing.
 
 - **Phase 0** (`A2` permission-path tightening + `A3` honest tiered guarantee +
-  `A4` consistency severity) is **implementable now**. It introduces no
+  `A4` consistency severity) is **implemented and signed off**. It introduces no
   dependency on the unverified *plugin* runtime API. It does, however, ship
   with two **open provider-behaviour hypotheses as documented Phase-0 risks**:
   AN-6/permission precedence (OQ-3 — does agent frontmatter permission override
@@ -33,16 +37,16 @@ The system design phases the work; this spec inherits the phasing.
   the fallback is to narrow A2 to fine-grained globs for `bash`/`edit` (OQ-3).
   **AC-01 … AC-15 and AC-23** cover Phase 0 and are the criteria the
   implementation is signed off against first.
-- **Phase 1** (`A1` native plugin behind a capability flag) splits into two
-  sub-stages. The **plugin generator, managed state, drift tracking and
-  observe-mode artifact** — **AC-16 … AC-20 and AC-22** — are **implementable
-  now**: the design requires the plugin to exist and run in `MODE=observe`
-  *before* P6 (design §6.2 "Bis dahin läuft das Plugin im Modus observe"; D8
-  "observe first"). Only the **tier flip** (`runtime_gate: plugin`), the
-  `MODE=enforce` opt-in and the **P6 real-repo verification (AC-21)** depend on
-  P6: no provider may declare `runtime_gate: plugin` or `MODE=enforce` before P6
-  is recorded as passed. The design lists the four plugin hypotheses
-  (AN-3 … AN-6, design §7.3) that P6 must resolve.
+- **Phase 1** (`A1` native plugin behind a capability flag) is **DECLINED
+  (won't-do)** — see the Decision Record above. The **plugin generator, managed
+  state, drift tracking and observe-mode artifact** — **AC-16 … AC-20 and the
+  plugin side of AC-22** — and the **tier flip** (`runtime_gate: plugin`), the
+  `MODE=enforce` opt-in and the **P6 real-repo verification (AC-21)** are
+  therefore **not shipping criteria**. No provider declares
+  `runtime_gate: plugin`; the observe-mode artifacts remain dormant, inactive
+  inventory. The design's four plugin hypotheses (AN-3 … AN-6, design §7.3) were
+  the P6 precondition; the read-only verification refuted AN-5 and left
+  AN-3/AN-4/AN-6 unresolved.
 
 The design's OQ-1 … OQ-10 (design §11) are carried over in
 [Offene Fragen + Risiken](#offene-fragen--risiken); each has a recommended
@@ -60,7 +64,7 @@ default and a flag for whether it needs explicit user approval.
 | D-C5 | Scenario ID: the design names scenario `60`; the registry now ends at `61-hook-deploy-lf-newlines` (`tests/scenarios/registry.md:108`). The Phase 1 scenario is therefore `62-opencode-runtime-gate` (see AC-21). |
 | F-01 (BLOCKER) | A2 merge shape fixed to mapping-form deny globs inside `permission.edit`/`permission.bash`: `{'edit': {'**': 'deny'}, 'bash': {'**': 'deny'}}`, disjoint from isolation's glob keys; `_read_state`/`_write_state` generalised to namespaced keys (`isolation-deny`, `runtime-gate-deny`) with read-modify-write preserving sibling namespaces; ownership/rollback + writer ordering specified; AC-10 repaired; AC-23 (multi-provider coexistence) added; OQ-11 resolved (IC-09, AC-10, AC-11, AC-23, OQ-11). |
 | F-02 (MAJOR) | Tier vars no longer wired through `agent_sync._build_provider_vars` (which the rule/context renderers never call). New `providers.runtime_gate_vars(...)` (IC-03) is injected into `provider_variables` at both actual seams: `sync_pipeline._sync_stage_contexts` (before `sync_context_for_provider`) and `_sync_stage_per_provider` (before `sync_rules`/`sync_embedded_rule_files`); `rules.py::_merged_rule_vars` and `context.py::_build_managed_block` named as verified (unchanged) propagation points; Datenfluss §2 arrows retargeted (IC-03, IC-04, Datenfluss §2). |
-| F-03 (MAJOR) | P6 gate narrowed: only the tier flip + `MODE=enforce` + AC-21 depend on P6; AC-16 … AC-20 and AC-22 are implementable now in observe mode, matching the design's observe-before-P6 phasing (Scope, Phase-1 AC header, Datenfluss §3). |
+| F-03 (MAJOR) | P6 gate narrowed: only the tier flip + `MODE=enforce` + AC-21 depend on P6; AC-16 … AC-20 and AC-22 are implementable now in observe mode, matching the design's observe-before-P6 phasing (Scope, Phase-1 AC header, Datenfluss §3). **Superseded by the Decision Record below (2026-09-15): the Phase-1 flip is DECLINED (won't-do).** |
 | F-04 (MAJOR) | Phase-0 "no unverified API" claim narrowed to the *plugin* runtime API; AN-6 (permission precedence, OQ-3) and AN-3 (child-session propagation, OQ-4) explicitly documented as Phase-0 risks with the fine-glob fallback (Scope). |
 | F-05 (MAJOR) | `GATE_ENFORCED` branch now reproduces the current strict wording verbatim (`# CRITICAL GATE`, `… ALLES -> \`orchestrator\`. Keine Ausnahmen.`); provenance is carried by the adjacent tier note, keeping hook-provider output byte-identical (IC-07, AC-05, AC-15). |
 | F-06 (MINOR) | AC-02 plugin biconditional qualified with `and not provider_hooks_supported(pc)` to resolve hook/plugin precedence overlap. |
@@ -71,6 +75,49 @@ default and a flag for whether it needs explicit user approval.
 | F-11 (INFO) | System design revision note added pointing at spec D-C1 … D-C5 (system-design `### Revision` table). |
 | F-12 (INFO) | `agent_meta_root` made an explicit parameter of `check_orchestrator_strict_hook_support` (and of the two new isolation symbols), with callers named (IC-09, IC-11). |
 | Approval | User approval 2026-09-13 — all recommended defaults accepted |
+| Decision | **P6 / plugin tier flip DECLINED (won't-do), 2026-09-15** — post-approval decision record with evidence; Phase-1 criteria AC-16 … AC-21 and the plugin side of AC-22 marked DECLINED (not shipping); honest guarantee fixed to `permission` (best-effort, NOT guaranteed) on OpenCode and `advisory` on hook-less providers. See "Decision Record — P6 / Plugin Tier DECLINED". |
+
+### Decision Record — P6 / Plugin Tier DECLINED (post-approval, 2026-09-15)
+
+> Status **APPROVED** is retained. This is a **post-approval decision record**: it does
+> not rewrite the approved acceptance criteria. It records which Phase-1 criteria are
+> **DECLINED** and why, so the approved AC text stays readable as history. The Phase-0
+> criteria (AC-01 … AC-15, AC-23, AC-24) are unaffected.
+
+**Decision (user, authoritative).** The native OpenCode plugin tier flip
+(`runtime_gate: plugin`, `has_plugins: true`, `MODE=enforce`) is **DECLINED (won't-do)** —
+not deferred. Rationale: the P6 real-repo verification is not achievable in this
+environment, and shipping an unverified "enforced" claim is explicitly rejected.
+
+**Evidence (read-only P6 verification).**
+
+- `tool.execute.before` can only deny via `throw` (no other blocking channel).
+- The hook input carries **no agent identity** (`{tool, sessionID, callID}`), so the
+  "Main Chat is distinguishable in `input`" condition (AN-5 / OQ-2) is **refuted**.
+- AN-3/AN-4 (child-session propagation / firing in subagent sessions) are only
+  inferable, **not proven**; AN-6 (root permission deny vs. per-agent frontmatter
+  precedence) is **unresolved**.
+- Protocol source: OpenCode plugin documentation
+  (`https://opencode.ai/docs/plugins/`, 2026-09-13); hypotheses AN-3 … AN-6 in the
+  system design §7.3 ("VERIFIED-DOCS" / "HYPOTHESIS" legend).
+
+**Consequence — honest guarantee (fixed).**
+
+- On OpenCode the guarantee is `permission` — **best-effort, NOT guaranteed** (PARTIAL:
+  no delegation provenance; child-session propagation unverified).
+- On hook-less providers the guarantee is `advisory` (prompt-only).
+- No document, rendered rule or finding states or implies a complete runtime guarantee.
+  The `hook` tier remains the only verified runtime gate (Claude, Gemini/Antigravity).
+
+**DECLINED acceptance criteria (Phase 1 / plugin tier).** AC-16, AC-17, AC-18, AC-19,
+AC-20, AC-21, and the plugin side of AC-22. They remain documented but are **not
+shipping criteria**. AC-24 (`runtime-gate.plugin-mode` schema key) stays a Phase-0,
+purely declarative key and has no enforcement effect.
+
+**Dormant artifacts (inactive inventory, retained).**
+`templates/plugins/runtime-gate.opencode-plugin.js.tmpl`, `has_plugins: false` in
+`config/ai-providers.yaml`, and their tests (`tests/test_runtime_gate_plugins.py`). They
+stay as documented, dormant capability inventory — no tier flip, no artifact generation.
 
 ## Problem
 
@@ -129,11 +176,13 @@ way, without treating an unverified provider API as given.
    from the same tier resolver: `advisory` + strict stays a WARNING (with an
    opt-in ERROR), `permission` becomes an INFO ("partially enforced, no
    provenance"), `hook`/`plugin` produce no finding.
-4. **Phase 1 capability-flagged plugin (A1).** A provider-agnostic generator
-   deploys a native plugin artifact only when the provider config declares
-   `has_plugins: true` with a verified `plugin_protocol`. The plugin starts in
-   `observe` mode; `enforce` and the `plugin` tier are unlocked only after the
-   P6 real-repo test.
+4. **Phase 1 capability-flagged plugin (A1) — DECLINED (won't-do).** The
+   provider-agnostic generator contract remains documented (it deploys a native
+   plugin artifact only when the provider config declares `has_plugins: true`
+   with a verified `plugin_protocol`, starting in `observe` mode). The P6
+   real-repo verification is not achievable in this environment, so the
+   `runtime_gate: plugin` / `MODE=enforce` flip is **declined** and no tier flip
+   ships. The artifacts remain dormant, inactive inventory (Decision Record).
 5. **Single source of truth for tier questions.**
    `scripts/lib/providers.py::provider_runtime_gate_tier` is the only place that
    maps config to a tier; rendering, consistency and the plugin gate consume it.
@@ -189,16 +238,21 @@ runtime_gate: hook | plugin | permission | advisory
   consistency check and the config invariant test (AC-01) must flag a missing
   key.
 - Tier semantics: `hook` = verified PreToolUse hook contract (Claude,
-  Gemini/Antigravity); `plugin` = verified native plugin (OpenCode, only after
-  P6); `permission` = native permission layer blocks Main-Chat writes without
-  delegation provenance (OpenCode, Phase 0); `advisory` = prompt-only (default).
-- Phase 0 values: `hook` for the hook-capable providers, `permission` for
-  OpenCode, `advisory` for the remainder. Phase 1 flips OpenCode to `plugin`
-  only after P6 (AC-21).
+  Gemini/Antigravity); `plugin` = native plugin tier, **DECLINED (won't-do)** and
+  therefore unreachable; `permission` = native permission layer blocks Main-Chat
+  writes without delegation provenance (OpenCode, Phase 0, **best-effort, not
+  guaranteed**); `advisory` = prompt-only (default).
+- Values: `hook` for the hook-capable providers, `permission` for OpenCode,
+  `advisory` for the remainder. The Phase-1 flip of OpenCode to `plugin` is
+  **declined**; OpenCode stays at `permission`.
 
-### IC-02 — `config/ai-providers.yaml:providers.Opencode` (new keys, Phase 1)
+### IC-02 — `config/ai-providers.yaml:providers.Opencode` (new keys, Phase 1 — DECLINED)
 
-The OpenCode block (`config/ai-providers.yaml:160-224`) gains, values
+> **DECLINED (won't-do).** These keys are **not activated**: `has_plugins` stays
+> `false`, no plugin artifact is generated, and the `plugin` tier is unreachable.
+> The contract is retained as dormant, inactive inventory only (Decision Record).
+
+The OpenCode block (`config/ai-providers.yaml:160-224`) would gain, values
 effective only after P6:
 
 ```yaml
@@ -214,8 +268,9 @@ runtime_gate-mechanism: opencode-plugin
 - `runtime_gate-mechanism` is the human-readable label, mirroring
   `isolation-mechanism: opencode-permissions` (`config/ai-providers.yaml:192`).
 - **No `hook_protocol` for OpenCode** — it stays hook-less.
-- Phase 0 ships **without** these keys (or with `has_plugins` absent/false), so
-  the plugin tier is unreachable until Phase 1.
+- Phase 0 ships **without** these keys (or with `has_plugins` absent/false); with
+  the Phase-1 flip declined, the plugin tier is **permanently** unreachable and
+  `has_plugins` stays `false`.
 
 ### IC-03 — `scripts/lib/providers.py` (resolver, changed/new)
 
@@ -366,7 +421,10 @@ ACHTUNG: Auf diesem Provider ist der Gate rein prompt-basiert, ohne Runtime-Gate
 (`:50-55`), so the delegation-gates rule states the active guarantee instead of
 implying a full runtime gate.
 
-### IC-08 — `scripts/lib/runtime_gate.py` (new module, Phase 1)
+### IC-08 — `scripts/lib/runtime_gate.py` (new module, Phase 1 — DECLINED)
+
+> **DECLINED (won't-do).** The generator exists as dormant, inactive inventory;
+> it is never dispatched because `has_plugins` stays `false` (Decision Record).
 
 New provider-agnostic generator module; it knows no provider name and maps
 `plugin_protocol` to a template via a config key.
@@ -577,10 +635,14 @@ Add a `dir_specs` entry for `pc.get("plugin_dir")`, gated on
 `pc.get("has_plugins", False)` (`scripts/lib/generated_file_drift.py:117-141`).
 Without it, generated plugin artifacts are not drift-tracked.
 
-### IC-15 — `templates/plugins/runtime-gate.opencode-plugin.js.tmpl` (new, Phase 1)
+### IC-15 — `templates/plugins/runtime-gate.opencode-plugin.js.tmpl` (new, Phase 1 — DECLINED)
+
+> **DECLINED (won't-do).** The template is retained as dormant, inactive
+> inventory (only ever `observe`); it is never rendered because no provider
+> declares `has_plugins: true` (Decision Record).
 
 Template contract only — no implementation in this spec. The generated artifact
-is an exported OpenCode plugin with sync-time-baked constants:
+would be an exported OpenCode plugin with sync-time-baked constants:
 
 ```js
 // exported plugin; sync-time-baked constants: STRICT, MODE, AGENT_ALLOWLIST
@@ -592,8 +654,8 @@ export const AgentMetaRuntimeGate = async (ctx) => ({
 });
 ```
 
-- `MODE` defaults to `observe` (log/report only). `enforce` is unlocked only by
-  config after P6 (AC-19, AC-21).
+- `MODE` defaults to `observe` (log/report only). With the plugin tier declined,
+  `enforce` is **permanently** locked (AC-19, AC-21 DECLINED).
 - `AGENT_ALLOWLIST` is baked at sync time so the orchestrator/git subagents are
   not blocked; it is a list, not a provider literal.
 - The artifact is written to `.opencode/plugins/` (project plugin directory,
@@ -602,10 +664,11 @@ export const AgentMetaRuntimeGate = async (ctx) => ({
   therefore avoids #747 constructively. `.opencode/package.json:3` already
   lists `@opencode-ai/plugin`, so no new dependency is introduced.
 
-### IC-16 — `config/project-config.schema.json:runtime-gate` (new root key, Phase 1)
+### IC-16 — `config/project-config.schema.json:runtime-gate` (new root key, Phase 1 — DECLINED enforcement)
 
 Typed schema entry for the plugin mode (F-08), added to the root `properties`
-alongside `orchestrator` / `analysis`:
+alongside `orchestrator` / `analysis`. The key ships as a declarative Phase-0
+entry; the enforcement effect it once gated is **declined**:
 
 ```json
 "runtime-gate": {
@@ -627,8 +690,12 @@ alongside `orchestrator` / `analysis`:
   IC the root key would be silently accepted (`additionalProperties: true` at
   the root, `project-config.schema.json:2297`) and could carry an invalid value.
 - Fail-safe: a missing key or an out-of-enum value falls back to `observe`
-  (never `enforce`). Phase 0 may ship the schema key with the `observe`
-  resolution only; the plugin artifact is Phase 1 (AC-16 … AC-22).
+  (never `enforce`). Phase 0 ships the schema key with the `observe` resolution
+  only; the plugin artifact is Phase 1 (AC-16 … AC-22).
+- **DECLINED (won't-do):** with the plugin tier declined, `enforce` is
+  **permanently** locked. The key resolves to `observe` and has no enforcement
+  effect; IC-16/AC-24 remain a Phase-0 declarative entry (no tier flip, no
+  artifact generation).
 
 ## Datenfluss
 
@@ -695,7 +762,7 @@ through `isolation.py`'s merge path: an existing `permission` block is preserved
 a missing one is created, and only the managed entries are rewritten. Managed
 state (`.opencode/agent-meta-state.json`) makes the change reversible.
 
-### 3. Phase 1 flow (A1) — plugin behind a capability flag
+### 3. Phase 1 flow (A1) — plugin behind a capability flag — DECLINED (won't-do)
 
 ```
 ai-providers.yaml[has_plugins=true, plugin_protocol]
@@ -725,14 +792,15 @@ ai-providers.yaml[has_plugins=true, plugin_protocol]
 npm route (`"plugin": [...]` in `opencode.json`) would require a new root key and
 is deliberately not used (design D3).
 
-**P6 dependency (F-03).** The generator, managed state, drift tracking and
-observe-mode artifact (AC-16 … AC-20, AC-22) are implementable **before** P6, as
-the design requires observe-before-P6 (design §6.2, D8). Until the real-repo
-test confirms that `tool.execute.before` fires for subagent sessions and that
-the Main Chat is distinguishable in `input` (design AN-3/AN-4/AN-5), the plugin
-runs with `MODE=observe` and the provider stays at tier `permission`. Only the
-tier flip to `plugin`, the `MODE=enforce` opt-in and the P6 verification
-(AC-21) are gated.
+**P6 dependency (F-03) — DECLINED (won't-do).** The generator, managed state,
+drift tracking and observe-mode artifact (AC-16 … AC-20, AC-22) were designed to
+be implementable **before** P6 (design §6.2, D8). The read-only P6 verification
+could not be completed: `tool.execute.before` carries no agent identity, so the
+Main Chat is **not** distinguishable in `input` (AN-5 refuted), and AN-3/AN-4
+(child-session propagation) remain inferable only. The tier flip to `plugin`, the
+`MODE=enforce` opt-in and AC-21 are therefore **declined** rather than gated: the
+OpenCode tier stays `permission` (best-effort, not guaranteed) and the plugin
+artifacts remain dormant, inactive inventory.
 
 ### 4. Hook-less / plugin-less fallback
 
@@ -879,11 +947,14 @@ files to add or extend.
     a second sync is byte-identical. Test: new
     `tests/test_opencode_runtime_gate.py`.
 
-### Phase 1 — plugin generator
+### Phase 1 — plugin generator — DECLINED (won't-do)
 
-> AC-16 … AC-20 and AC-22 are implementable now in `MODE=observe`; only the tier
-> flip, the `MODE=enforce` opt-in and AC-21 are gated behind the P6 real-repo
-> verification task.
+> **All criteria below (AC-16 … AC-21 and the plugin side of AC-22) are DECLINED
+> (won't-do)** and are **not shipping criteria** — see the Decision Record above.
+> The P6 real-repo verification is not achievable in this environment and an
+> unverified "enforced" claim is explicitly rejected. The criteria and their
+> dormant artifacts are retained as documented, inactive inventory; no provider
+> declares `runtime_gate: plugin` and `MODE=enforce` is permanently locked.
 
 16. **AC-16 (plugin generation gated on the verified capability).** Given
     `has_plugins: true` with a supported `plugin_protocol`, when sync runs, then
@@ -908,7 +979,7 @@ files to add or extend.
     `generated_file_drift` scans, then the artifact is iterated via the
     `plugin_dir` `dir_spec` gated on `has_plugins` and reported when modified or
     orphaned. Test: extend `tests/test_generated_file_drift.py`.
-21. **AC-21 (P6 gate before the tier flip).** Given the P6 real-repo
+21. **AC-21 (P6 gate before the tier flip) — DECLINED (won't-do).** Given the P6 real-repo
     verification task, when it is executed, then it records whether
     `tool.execute.before` fires in OpenCode subagent sessions and whether the
     Main Chat is distinguishable in `input`; the provider may be flipped to
@@ -941,21 +1012,24 @@ recommended default. Items marked **[User approval]** need an explicit user
 decision because they affect the shipped guarantee or a public contract.
 
 1. **OQ-1 — does `tool.execute.before` fire for OpenCode subagent sessions?**
-   Recommended default: treat as unverified; the P6 test is a mandatory gate
-   before any Phase-1 flip (AC-21). **[User approval]** for the go/no-go on
-   Phase 1.
+   **Resolved by the Decision Record (2026-09-15):** the P6 real-repo test is not
+   achievable in this environment, so the plugin tier flip (AC-21) is **DECLINED
+   (won't-do)**; no unverified flip ships.
 2. **OQ-2 — is the Main Chat distinguishable in `input` (e.g. `input.agent` /
-   `sessionID`) from a dispatched subagent?** Recommended default: assume not;
-   the plugin starts and may stay in `observe`. **[User approval]** together with
-   OQ-1.
+   `sessionID`) from a dispatched subagent?** **Refuted** in the read-only P6
+   verification: the hook input carries no agent identity (`{tool, sessionID,
+   callID}`). The plugin tier is therefore declined; the plugin never ships an
+   `enforce` mode.
 3. **OQ-3 — does agent frontmatter permission override the root deny for
-   `orchestrator`/`git`?** Recommended default: assume yes, but verify in P6;
-   otherwise narrow A2 to finer globs for `bash`/`edit`. **[User approval]**
-   because A2 could otherwise block the orchestrator itself.
+   `orchestrator`/`git`?** **Still open (AN-6 unresolved)** and remains a
+   documented Phase-0 risk: if the root deny blocks those roles, A2 is narrowed to
+   finer globs for `bash`/`edit` — never a coarser block. **[User approval]** if a
+   correction is needed.
 4. **OQ-4 — does `deriveSubagentSessionPermission` propagate the root deny into
-   child sessions (#765)?** Recommended default: assume the risk and never label
-   A2 "fully enforced"; tier `permission` is PARTIAL (design §7.1). **[User
-   approval]** only if the project wants to rely on propagation.
+   child sessions (#765)?** **Still unverified**: the tier `permission` is PARTIAL
+   (design §7.1) and is never labelled as a complete runtime guarantee. Do not
+   rely on propagation. **[User approval]** only if the project wants to rely on
+   it.
 5. **OQ-5 — default severity for A4: WARNING or ERROR?** Recommended default:
    WARNING; ERROR only with `orchestrator.require-runtime-gate: true` (IC-12,
    AC-12). No user approval needed; the opt-in is the escape hatch.
@@ -995,9 +1069,9 @@ decision because they affect the shipped guarantee or a public contract.
     the same change or a follow-up sync.
 13. **`runtime_gate: permission` without a verified #765 propagation (risk).**
     A2 may not protect child sessions; the tier is deliberately named
-    `permission` (partial), not `hook`/`plugin`. If P6 finds propagation broken,
-    the recommended fallback is to keep the PARTIAL label and not strengthen it
-    (OQ-4).
+    `permission` (partial), not `hook`/`plugin`. With P6 declined the PARTIAL
+    label is fixed — the guarantee is **best-effort, not guaranteed** and is
+    never strengthened to a plugin/enforced claim (OQ-4, Decision Record).
 14. **Missing `runtime_gate` on a new provider (risk, low).** Fail-safe is
     `advisory`, so a newly registered provider can never silently appear
     stronger than it is; AC-01 turns the omission into a test failure.
@@ -1012,9 +1086,11 @@ spec-id: SPEC-OPENCODE-RUNTIME-GATE-2026-09-13
   is authored separately and is out of scope for this document.
 - Source design: `docs/specs/2026-09-13-opencode-runtime-gate-system-design.md`
   — same anchor, adopted unchanged. This spec keeps the design's phasing
-  (Phase 0 = A2+A3+A4, Phase 1 = A1 behind the capability flag) and its seam
-  decision (new `scripts/lib/runtime_gate.py`).
-- Interface-contract to acceptance-criteria mapping:
+  (Phase 0 = A2+A3+A4; Phase 1 = A1 behind the capability flag, **DECLINED
+  (won't-do)** per the Decision Record) and its seam decision (new
+  `scripts/lib/runtime_gate.py`).
+- Interface-contract to acceptance-criteria mapping (Phase-1 rows AC-16 … AC-21
+  and the plugin side of AC-22 are **DECLINED**, documented but not shipping):
 
   | Interface contract | Acceptance criteria |
   |---|---|

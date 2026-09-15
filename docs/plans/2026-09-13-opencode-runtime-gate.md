@@ -5,7 +5,7 @@ pipeline_stages:
 
 # Implementierungsplan — OpenCode Runtime Gate (Problem A)
 
-> Status: IN PROGRESS
+> Status: PHASE 0 COMPLETE — PHASE 1 (Tasks 8-9) DECLINED (won't-do)
 
 > **Revision / Status (2026-09-14):**
 > (a) Phase 0, Tasks 1–6, ist implementiert und getestet (Unit-Tests + Repo-Gate grün).
@@ -17,6 +17,14 @@ pipeline_stages:
 > in Phase 0 (Task 5) — rein deklarativ, Default `observe`, **ohne Enforcement-Wirkung** (kein
 > Plugin-Artefakt, kein Tier `plugin`). Global Constraints, Interfaces-Tabelle, AC-Mapping und
 > Task-8-Notiz sind an diese Entscheidung angeglichen; Task 8 produziert nur noch das Plugin-Artefakt.
+> (e) **DECLINED (won't-do), 2026-09-15 (User, autoritativ):** Task 9 (P6-Real-Repo-Verifikation)
+> und damit der Plugin-Tier-Flip (`runtime_gate: plugin`, `has_plugins: true`, `MODE=enforce`)
+> werden **nicht** ausgeliefert. Der P6-Test ist in dieser Umgebung nicht führbar, und ein
+> unverifizierter „erzwungen"-Anspruch wird abgelehnt. Task 8 (Plugin-Generator) bleibt als
+> **dormantes, inaktives Inventar** erhalten (Template + `has_plugins: false` + Tests), wird aber
+> nie dispatcht. Fixierte Zusage: OpenCode = `permission` (best-effort, **nicht garantiert**),
+> hook-lose Provider = `advisory`. Phase 0 (Tasks 1–7) ist abgeschlossen und unverändert
+> gültig; die Phase-1-Checkboxen bleiben bewusst offen (declined ≠ completed).
 
 **Spec:** `docs/specs/2026-09-13-opencode-runtime-gate-design.md`
 
@@ -24,25 +32,25 @@ pipeline_stages:
 > Systemdesign: `docs/specs/2026-09-13-opencode-runtime-gate-system-design.md` (Entwurf; an D-C1 … D-C5 stale, normativ ist die Spec)
 > Verwandte Issues: #794 (Problem A), #747 (create-only Settings-Initializer), #765 (`deriveSubagentSessionPermission`).
 
-**Goal:** Den in `rules/1-generic/use-orchestrator.md` unbedingt versprochenen CRITICAL GATE auf OpenCode ehrlich und gestuft ausliefern — Phase 0 (A2+A3+A4): eine provider-agnostische Tier-Auflösung (`hook|plugin|permission|advisory`), eine Main-Chat-Write/Bash-Deny-Schicht über den **bestehenden** `isolation.py`-Merge-Pfad (nie über den create-only `context._init_provider_settings_json`, #747), eine gestufte Rules-/Context-Ausgabe (byte-identisch für Hook-Provider) und eine tier-abgeleitete Consistency-Severity. Die native Plugin-Tier (A1) wird nur als capability-gegatete, **zurückgestellte** Phase-1-Aufgabe geplant (`observe`, kein „fully enforced").
-**Architecture:** Ein provider-agnostisches Leaf-Modul `scripts/lib/runtime_gate.py` trägt in Phase 0 die kanonische Tier-Vokabel (`RUNTIME_GATE_TIERS`); der Tier-Resolver bleibt per IC-03 die einzige Wahrheitsquelle in `scripts/lib/providers.py` (`provider_runtime_gate_supported`, `provider_runtime_gate_tier`, `runtime_gate_vars`) und liest die Maschinen-Flags aus `ai-providers.yaml` (`pc`) plus die deklarierte Tier aus `provider-capabilities.yaml` (`capabilities`, Zwei-Registry-Split D-C1). `sync_pipeline.py` injiziert das Variablen-Bundle an **beiden** Renderer-Seams (`_sync_stage_contexts` vor `sync_context_for_provider`, `_sync_stage_per_provider` vor `sync_rules`/`sync_embedded_rule_files`, F-02) und dispatcht den A2-Writer. A2 sitzt im `isolation.py`-Merge-Pfad (Namespaced Managed State `isolation-deny`/`runtime-gate-deny`, Mapping-Deny `{"**": "deny"}`, F-01). A4 liest dieselbe Tier. Phase 1 erweitert `runtime_gate.py` um den Plugin-Generator (IC-08) — hinter `has_plugins`/`plugin_protocol`, default `observe`, gesperrt bis P6.
+**Goal:** Den in `rules/1-generic/use-orchestrator.md` unbedingt versprochenen CRITICAL GATE auf OpenCode ehrlich und gestuft ausliefern — Phase 0 (A2+A3+A4): eine provider-agnostische Tier-Auflösung (`hook|plugin|permission|advisory`), eine Main-Chat-Write/Bash-Deny-Schicht über den **bestehenden** `isolation.py`-Merge-Pfad (nie über den create-only `context._init_provider_settings_json`, #747), eine gestufte Rules-/Context-Ausgabe (byte-identisch für Hook-Provider) und eine tier-abgeleitete Consistency-Severity. Die native Plugin-Tier (A1) ist capability-gegatet und **DECLINED (won't-do)**: Der P6-Real-Repo-Nachweis ist nicht führbar, der Tier-Flip (`has_plugins: true`, `MODE=enforce`) wird nicht ausgeliefert; die Artefakte bleiben `observe`/dormant, und es wird nie eine vollständig erzwungene Zusage behauptet.
+**Architecture:** Ein provider-agnostisches Leaf-Modul `scripts/lib/runtime_gate.py` trägt in Phase 0 die kanonische Tier-Vokabel (`RUNTIME_GATE_TIERS`); der Tier-Resolver bleibt per IC-03 die einzige Wahrheitsquelle in `scripts/lib/providers.py` (`provider_runtime_gate_supported`, `provider_runtime_gate_tier`, `runtime_gate_vars`) und liest die Maschinen-Flags aus `ai-providers.yaml` (`pc`) plus die deklarierte Tier aus `provider-capabilities.yaml` (`capabilities`, Zwei-Registry-Split D-C1). `sync_pipeline.py` injiziert das Variablen-Bundle an **beiden** Renderer-Seams (`_sync_stage_contexts` vor `sync_context_for_provider`, `_sync_stage_per_provider` vor `sync_rules`/`sync_embedded_rule_files`, F-02) und dispatcht den A2-Writer. A2 sitzt im `isolation.py`-Merge-Pfad (Namespaced Managed State `isolation-deny`/`runtime-gate-deny`, Mapping-Deny `{"**": "deny"}`, F-01). A4 liest dieselbe Tier. Phase 1 (Plugin-Generator IC-08) ist **DECLINED (won't-do)**: Der Code bleibt dormant (`has_plugins: false`, `observe`), der Tier-Flip wird nicht freigeschaltet.
 **Tech Stack:** Python 3.9 (Stdlib only, `from __future__ import annotations`, `typing.Optional`/`Dict`/`List`/`Tuple`, keine PEP-604-Union-Annotationen), YAML (`config/*.yaml`), JSON Schema (`config/project-config.schema.json`), Markdown (Rules), pytest, Bash-Szenario-Harness (`tests/scenarios/run.sh`), `rtk`-präfixierte Kommandos.
 
 ## Global Constraints
 
 - **Provider-Agnostik (hart):** Kein Provider-Literal und kein `if provider == "…"` in neuen/geänderten Modulen. Unterschiede ausschließlich über Config-Keys/Capability-Flags. `runtime_gate` und `isolation` werden in `tests/test_provider_agnostic_dispatch.py::_TOUCHED_MODULES` aufgenommen (AC-04). Der Trigger prüft `provider_runtime_gate_tier(pc, caps) == "permission"`, nie `isolation-mechanism` und nie einen Provider-Namen.
-- **Phase-0-Grenze (Scope):** Implementiert werden jetzt nur A2 (Permission-Tightening), A3 (gestufte Zusage) und A4 (Consistency-Severity) plus die dafür nötigen Seams. Der Root-Key `runtime-gate` (IC-16) gehört als **rein deklarativer** Schema-Key zu Phase 0: `runtime-gate.plugin-mode` (Default `observe`) wird validiert und aufgelöst, hat aber **keine Enforcement-Wirkung**. Keine `has_plugins`/`plugin_protocol`-Keys (IC-02), kein Plugin-Artefakt, kein Template, kein Tier `plugin`. Diese liegen in den als **DEFERRED** markierten Phase-1-Aufgaben und zählen **nicht** zu den Phase-0-Abnahmekriterien.
+- **Phase-0-Grenze (Scope):** Implementiert werden jetzt nur A2 (Permission-Tightening), A3 (gestufte Zusage) und A4 (Consistency-Severity) plus die dafür nötigen Seams. Der Root-Key `runtime-gate` (IC-16) gehört als **rein deklarativer** Schema-Key zu Phase 0: `runtime-gate.plugin-mode` (Default `observe`) wird validiert und aufgelöst, hat aber **keine Enforcement-Wirkung**. Keine `has_plugins`/`plugin_protocol`-Keys (IC-02), kein Plugin-Artefakt, kein Template, kein Tier `plugin`. Diese liegen in den als **DECLINED (won't-do)** markierten Phase-1-Aufgaben (dormantes Inventar) und zählen **nicht** zu den Phase-0-Abnahmekriterien.
 - **Seam-Zuschnitt:** Das neue Modul `scripts/lib/runtime_gate.py` ist der Gate-Seam. Phase 0 legt darin die kanonische Tier-Vokabel `RUNTIME_GATE_TIERS = ("hook", "plugin", "permission", "advisory")` an; der Tier-Resolver selbst bleibt per IC-03/AC-03 in `providers.py`. Phase 1 (IC-08) erweitert dasselbe Modul um den Plugin-Generator.
 - **#747-Vermeidung (hart):** A2 liest und schreibt `opencode.json` ausschließlich über den bestehenden Merge-Pfad `isolation.py` (`_read_json_safe` / `write_checked`). `context._init_provider_settings_json` (`context.py:838-880`, rendert nur wenn die Datei fehlt) ist **nicht** der Schreibpfad; es wird kein neuer Root-Key erzwungen.
 - **A2-Merge-Shape (F-01, hart):** A2 schreibt nie einen Skalar auf `permission.edit`/`permission.bash`, sondern genau einen Deny-Glob `"**"` **innerhalb** der jeweiligen Family-Map (`{"edit": {"**": "deny"}, "bash": {"**": "deny"}}`). `"**"` ist disjunkt zu allen `_dir_to_glob`-Keys des Isolation-Writers. Beide Writer normalisieren eine Family über `_permission_mapping` vor `.items()` (Skalar-Toleranz, D-C4).
 - **Namespaced Managed State:** Der gemeinsame State `.opencode/agent-meta-state.json` wird in Namespaces geschrieben (`isolation-deny` bestehend, `runtime-gate-deny` neu) und per Read-Modify-Write aktualisiert; ein Writer darf den Sibling-Namespace nie überschreiben. Ownership/Rollback stellt einen vorbestehenden User-Wert am Glob `"**"` exakt wieder her.
 - **Fine-Glob-Fallback (OQ-3, akzeptierte Default-Entscheidung):** Falls die Real-Repo-Verifikation zeigt, dass ein Root-Deny `orchestrator`/`git` blockiert (AN-6/OQ-3), wird A2 auf feinere `bash`/`edit`-Globs verengt — niemals auf einen gröberen Block. Bis dahin gilt die Annahme „Agent-Frontmatter-Permission übersteuert den Root-Deny".
 - **Effektiver Strict-Scope (OQ-6):** A2 und die Strict-Blockade gelten nur, wenn `orchestrator.strict` für den Provider effektiv aktiv ist — dieselbe Drei-Stufen-Präzedenz wie `orchestrator_strict._resolve_effective_strict` (`provider-overrides.<p>.mode` → `orchestrator.mode` → Legacy `strict`+`enabled`). `provider-overrides` kann Strict verengen/abschalten; dann entfallen die Deny-Einträge und der Managed-State-Cleanup greift.
-- **Tier-Semantik (OQ-4, hart):** `permission` = **PARTIAL** („partially enforced; delegation provenance not enforced"), niemals „fully enforced". `GATE_ENFORCED` ist nur für `hook`/`plugin` `'true'`. `advisory` schreibt nie einen Permission-Eintrag und deployt nie ein Plugin.
+- **Tier-Semantik (OQ-4, hart):** `permission` = **PARTIAL** („partially enforced; delegation provenance not enforced"), **best-effort, nicht garantiert**; niemals als vollständig erzwungen. `GATE_ENFORCED` ist nur für `hook`/`plugin` `'true'`. `advisory` schreibt nie einen Permission-Eintrag und deployt nie ein Plugin.
 - **Consistency-Severity (OQ-5, D-C2):** Default WARNING für `advisory`+strict; ERROR nur bei `orchestrator.require-runtime-gate: true` (Sibling-Key, bool, Default `false`). `permission` → INFO. `hook`/`plugin` → kein Finding. Check-ID `orchestrator-strict.no-hook-support` und die effektive-Strict-Auflösung bleiben erhalten.
 - **Hook-Byte-Identität (F-05):** Die `GATE_ENFORCED`-Variante reproduziert den heutigen Strict-Wortlaut verbatim (`# CRITICAL GATE` + `MAIN CHAT darf nicht selbst editieren. ALLES -> \`orchestrator\`. Keine Ausnahmen.`), sodass die Claude-/Gemini-Ausgabe byte-identisch bleibt. Die Provenienz trägt der benachbarte Tier-Hinweis in `a2a-delegation-gates.md`, nicht eine Abschwächung des Satzes.
 - **Fail-safe:** Unbekannter/fehlender Provider, `None`/Nicht-Mapping `pc`, absentes `runtime_gate`, unlesbare Registry → `advisory`. Der Resolver wirft nie, ruft nie `sys.exit`, fällt nie auf eine Claude/Hook-Wahrheit zurück.
-- **Phase 1 bleibt zurückgestellt (P6, #765):** Der Plugin-Generator und das `observe`-Artefakt werden als **DEFERRED** geplant; `runtime_gate: plugin`, `has_plugins: true`, `MODE=enforce` und AC-21 werden erst nach bestandener Real-Repo-Verifikation (P6) freigeschaltet. Kein Provider darf vorher `plugin` deklarieren; es wird nie „fully enforced" behauptet.
+- **Phase 1 ist DECLINED (won't-do) (P6, #765):** Der Plugin-Generator und das `observe`-Artefakt bleiben als **dormantes, inaktives Inventar** erhalten; `runtime_gate: plugin`, `has_plugins: true`, `MODE=enforce` und AC-21 sind **dauerhaft gesperrt**. Kein Provider deklariert `plugin`; es wird nie eine vollständig erzwungene Zusage behauptet. Die fixierte Zusage ist OpenCode `permission` (best-effort, nicht garantiert) und hook-los `advisory`.
 - **Py3.9 & Stdlib:** Neue Module nutzen `from __future__ import annotations`; keine externen Abhängigkeiten; `rtk python3 scripts/consistency-check.py` muss rc 0 liefern.
 - **Ownership & Reihenfolge:** Jede Datei wird in genau einer Task geändert (Phase-0/Phase-1-Doppelbesitz wird explizit als sequenziell markiert), `Depends on:` referenziert immer eine frühere Task, der Graph ist azyklisch und vorwärtsgerichtet.
 - **Bite-sized & TDD:** Jede Task ist einzeln testbar und committbar (Test fail → implementieren → Test pass → Commit); kein Task ist „done" ohne beobachteten Test und `rtk python3 scripts/sync.py --validate` rc 0 als Repo-Gate.
@@ -52,7 +60,7 @@ pipeline_stages:
 
 ## Interfaces
 
-Neue und geänderte Symbole als `file:Symbol`. Phase-0-Symbole sind jetzt implementierbar; Phase-1-Symbole sind klar als DEFERRED markiert.
+Neue und geänderte Symbole als `file:Symbol`. Phase-0-Symbole sind implementiert und abgenommen; Phase-1-Symbole sind klar als DECLINED (won't-do) markiert und bleiben dormantes, inaktives Inventar.
 
 | Symbol | Art | Phase | Vertrag |
 |---|---|---|---|
@@ -74,11 +82,11 @@ Neue und geänderte Symbole als `file:Symbol`. Phase-0-Symbole sind jetzt implem
 | `config/project-config.schema.json:orchestrator.require-runtime-gate` | neu | 0 | `{"type": "boolean", "default": false}` (Sibling, D-C2) |
 | `rules/1-generic/use-orchestrator.md` | geändert | 0 | drei mutually-exclusive Tier-Blöcke (`GATE_ENFORCED`/`GATE_PARTIAL`/`GATE_ADVISORY`) innerhalb `{{#if ORCH_MODE_STRICT}}` (IC-07) |
 | `rules/1-generic/a2a-delegation-gates.md` | geändert | 0 | Tier-Hinweis mit `{{ENFORCEMENT_TIER}}` + Verweis auf „Bekannte Grenzen" (IC-07) |
-| `scripts/lib/runtime_gate.py:PLUGIN_TEMPLATE_BY_PROTOCOL` / `runtime_gate_plugin_relpath` / `sync_runtime_gate_plugins` | neu | 1 (DEFERRED) | Plugin-Generator (IC-08), nur bei `provider_runtime_gate_supported(pc)` |
-| `config/ai-providers.yaml:providers.Opencode.has_plugins/plugin_dir/plugin_ext/plugin_protocol/runtime_gate-mechanism` | neu | 1 (DEFERRED) | Machinen-Wahrheit + Human-Label (IC-02); erst nach P6 wirksam |
+| `scripts/lib/runtime_gate.py:PLUGIN_TEMPLATE_BY_PROTOCOL` / `runtime_gate_plugin_relpath` / `sync_runtime_gate_plugins` | neu | 1 (DECLINED, won't-do) | Plugin-Generator (IC-08), nur bei `provider_runtime_gate_supported(pc)` |
+| `config/ai-providers.yaml:providers.Opencode.has_plugins/plugin_dir/plugin_ext/plugin_protocol/runtime_gate-mechanism` | neu | 1 (DECLINED, won't-do) | Machinen-Wahrheit + Human-Label (IC-02); **nicht wirksam** — `has_plugins: false`, kein Dispatch |
 | `config/project-config.schema.json:runtime-gate.plugin-mode` | neu | 0 (deklarativ) | `{"type":"string","enum":["observe","enforce"],"default":"observe"}`, `additionalProperties:false` (IC-16); nur Schema/Auflösung, keine Enforcement-Wirkung |
-| `templates/plugins/runtime-gate.opencode-plugin.js.tmpl` | neu | 1 (DEFERRED) | Exportiertes Plugin mit sync-time baked `STRICT`/`MODE`/`AGENT_ALLOWLIST` (IC-15) |
-| `scripts/lib/generated_file_drift.py:_iter_managed_files` | geändert | 1 (DEFERRED) | `plugin_dir`-`dir_spec` gated auf `has_plugins` (IC-14) |
+| `templates/plugins/runtime-gate.opencode-plugin.js.tmpl` | neu | 1 (DECLINED, won't-do) | Exportiertes Plugin mit sync-time baked `STRICT`/`MODE`/`AGENT_ALLOWLIST` (IC-15) |
+| `scripts/lib/generated_file_drift.py:_iter_managed_files` | geändert | 1 (DECLINED, won't-do) | `plugin_dir`-`dir_spec` gated auf `has_plugins` (IC-14) |
 
 ## File Structure
 
@@ -91,7 +99,7 @@ Neue und geänderte Symbole als `file:Symbol`. Phase-0-Symbole sind jetzt implem
 - Create: `tests/test_runtime_gate_rendering.py` — gestufte Rules-Ausgabe + Byte-Identität der Hook-Variante.
 - Create: `tests/test_runtime_gate_schema.py` — Schemafälle `orchestrator.require-runtime-gate`.
 - Create: `tests/test_runtime_gate_docs.py` — Präsenz/Wortlaut der Tier-Doku.
-- Create (Phase 1, DEFERRED): `templates/plugins/runtime-gate.opencode-plugin.js.tmpl`, `tests/test_runtime_gate_plugins.py`, `tests/scenarios/configs/63-opencode-runtime-gate.project.yaml`, `tests/scenarios/asserts/63-opencode-runtime-gate.sh`.
+- Create (Phase 1, DECLINED — dormant inventory): `templates/plugins/runtime-gate.opencode-plugin.js.tmpl` und `tests/test_runtime_gate_plugins.py` bleiben als inaktives Inventar erhalten; `tests/scenarios/configs/63-opencode-runtime-gate.project.yaml` und `tests/scenarios/asserts/63-opencode-runtime-gate.sh` werden **nicht** angelegt.
 
 ### Geänderte Dateien
 
@@ -111,7 +119,7 @@ Neue und geänderte Symbole als `file:Symbol`. Phase-0-Symbole sind jetzt implem
 - Modify: `tests/test_config_variable_fallbacks.py` — Conditional-Stripping.
 - Modify: `tests/test_orchestrator_strict_visibility.py` — Opencode-Erwartungen auf `permission` (INFO) umgestellt.
 - Modify: `docs/process-capability-gaps.md` — OpenCode-Gate-Status ehrlich nachführen.
-- Modify (Phase 1, DEFERRED): `config/ai-providers.yaml`, `scripts/lib/generated_file_drift.py`, `tests/test_generated_file_drift.py`, `tests/scenarios/registry.md`.
+- Modify (Phase 1, DECLINED — dormant inventory): `config/ai-providers.yaml` (`has_plugins: false`), `scripts/lib/generated_file_drift.py`, `tests/test_generated_file_drift.py`, `tests/scenarios/registry.md`.
 
 ### Step-Agent-Map (plan-driven `implement`)
 
@@ -124,8 +132,8 @@ Neue und geänderte Symbole als `file:Symbol`. Phase-0-Symbole sind jetzt implem
 | 5 | A4 Consistency-Severity + Schema-Key | developer | 0 |
 | 6 | Doku der Tier-Semantik | documenter | 0 |
 | 7 | Vollständiges Phase-0-Verifikations-Gate | developer | 0 |
-| 8 | Plugin-Generator (`observe`) + Drift — DEFERRED | developer | 1 |
-| 9 | P6 Real-Repo-Verifikation + Tier-Flip — DEFERRED | developer | 1 |
+| 8 | Plugin-Generator (`observe`) + Drift — DECLINED (won't-do, dormant inventory) | developer | 1 |
+| 9 | P6 Real-Repo-Verifikation + Tier-Flip — DECLINED (won't-do) | developer | 1 |
 
 ---
 
@@ -270,7 +278,7 @@ Neue und geänderte Symbole als `file:Symbol`. Phase-0-Symbole sind jetzt implem
 **Depends on:** 3, 4, 5
 
 **Steps:**
-- [x] Step 1: Test schreiben (fail) — `tests/test_runtime_gate_docs.py` neu mit `::test_tier_concept_doc_lists_four_tiers` (`hook`, `plugin`, `permission`, `advisory` je benannt) und `::test_tier_concept_doc_states_partial_not_fully_enforced` (kein „fully enforced" für `permission`), `::test_capability_gaps_doc_reflects_opencode_status`.
+- [x] Step 1: Test schreiben (fail) — `tests/test_runtime_gate_docs.py` neu mit `::test_tier_concept_doc_lists_four_tiers` (`hook`, `plugin`, `permission`, `advisory` je benannt) und `::test_tier_concept_doc_states_partial_not_fully_enforced` (PARTIAL, `permission` nie als vollständig erzwungen), `::test_capability_gaps_doc_reflects_opencode_status`.
 - [x] Step 2: Implementieren — `docs/concepts/runtime-gate-tiers.md` als knappe interne Doku (Tier-Definitionen, Resolver-Präzedenz, PARTIAL-Grenze, Phase-1-`observe`-Vorbehalt/P6, #747-Avoidance). `docs/process-capability-gaps.md` um den tatsächlichen OpenCode-Status (`permission`, PARTIAL, Phase 1 offen) nachführen. Keine Provider-Logik, keine Rollen-Routen, keine Modellnamen.
 - [x] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_runtime_gate_docs.py -q` → rc 0.
 - [x] Step 4: Commit — `docs: document runtime-gate tiers and opencode partial guarantee`.
@@ -292,21 +300,21 @@ Neue und geänderte Symbole als `file:Symbol`. Phase-0-Symbole sind jetzt implem
 **Depends on:** 1, 2, 3, 4, 5, 6
 
 **Steps:**
-- [ ] Step 1: Alle neuen Unit-Tests grün — `rtk python3 -m pytest tests/test_runtime_gate_config.py tests/test_opencode_runtime_gate.py tests/test_runtime_gate_wiring.py tests/test_runtime_gate_rendering.py tests/test_runtime_gate_schema.py tests/test_runtime_gate_docs.py -q` → rc 0.
-- [ ] Step 2: Repo-Gate — `rtk python3 scripts/sync.py --validate` → rc 0 und `rtk python3 scripts/sync.py --check` → rc 0 (Rules-Churn/Hashes bewusst aktualisiert).
-- [ ] Step 3: Konsistenz inkl. Py3.9/Provider-Agnostik — `rtk python3 scripts/consistency-check.py` → rc 0.
-- [ ] Step 4: Bestands-Suiten unverändert grün — `rtk python3 -m pytest tests/test_provider_agnostic_dispatch.py tests/test_orchestrator_strict_visibility.py tests/test_provider_hooks_config.py tests/test_no_role_routes_in_templates.py tests/test_provider_three_file_invariant.py -q` → rc 0.
-- [ ] Step 5: Szenario-Harness vollständig — `rtk tests/scenarios/run.sh` → alle Szenarien `PASS` (insbesondere `57`, `59`, `60`, `61`; Szenario `63` ist Phase 1/DEFERRED und in Phase 0 nicht aktiv).
-- [ ] Step 6: Plan-Validierung (Ausgabe dokumentieren, **kein Pass-Gate**) — `rtk python3 scripts/sync.py --validate-spec-plan` für diesen Plan ausführen und die Ausgabe festhalten; erwarteter rc ggf. **1** wegen der bekannten `validate_plan`-`file_overlap`-Limitierung (ohne `kind`-Gate über sequenzielle `Depends on:`-Kanten), dokumentiert in `docs/plans/2026-09-13-progress-paths-config.md` (Abschnitt Self-Review).
-- [ ] Step 7: Commit — `test: verify opencode runtime-gate phase 0 end to end`.
+- [x] Step 1: Alle neuen Unit-Tests grün — `rtk python3 -m pytest tests/test_runtime_gate_config.py tests/test_opencode_runtime_gate.py tests/test_runtime_gate_wiring.py tests/test_runtime_gate_rendering.py tests/test_runtime_gate_schema.py tests/test_runtime_gate_docs.py -q` → rc 0.
+- [x] Step 2: Repo-Gate — `rtk python3 scripts/sync.py --validate` → rc 0 und `rtk python3 scripts/sync.py --check` → rc 0 (Rules-Churn/Hashes bewusst aktualisiert).
+- [x] Step 3: Konsistenz inkl. Py3.9/Provider-Agnostik — `rtk python3 scripts/consistency-check.py` → rc 0.
+- [x] Step 4: Bestands-Suiten unverändert grün — `rtk python3 -m pytest tests/test_provider_agnostic_dispatch.py tests/test_orchestrator_strict_visibility.py tests/test_provider_hooks_config.py tests/test_no_role_routes_in_templates.py tests/test_provider_three_file_invariant.py -q` → rc 0.
+- [x] Step 5: Szenario-Harness vollständig — `rtk tests/scenarios/run.sh` → alle Szenarien `PASS` (insbesondere `57`, `59`, `60`, `61`; Szenario `63` ist Phase 1 und **DECLINED**, in Phase 0 nicht aktiv).
+- [x] Step 6: Plan-Validierung (Ausgabe dokumentieren, **kein Pass-Gate**) — `rtk python3 scripts/sync.py --validate-spec-plan` für diesen Plan ausführen und die Ausgabe festhalten; erwarteter rc ggf. **1** wegen der bekannten `validate_plan`-`file_overlap`-Limitierung (ohne `kind`-Gate über sequenzielle `Depends on:`-Kanten), dokumentiert in `docs/plans/2026-09-13-progress-paths-config.md` (Abschnitt Self-Review).
+- [x] Step 7: Commit — `test: verify opencode runtime-gate phase 0 end to end`.
 
 **Acceptance:** AC-01 bis AC-15, AC-23 (Phase-0-Abnahme).
 
 ---
 
-### Task 8: Plugin-Generator (`observe`) + Drift — DEFERRED (Phase 1, capability-gated)
+### Task 8: Plugin-Generator (`observe`) + Drift — DECLINED (won't-do) (Phase 1, dormant inventory)
 
-> **NICHT Teil der Phase-0-Abnahme.** Erst nach gemergter Phase 0 und **vor** jeder Tier-Flip-Freigabe. Artefakt bleibt `MODE=observe`; kein „fully enforced". `runtime_gate: plugin`, `has_plugins: true`, `MODE=enforce` und AC-21 hängen an Task 9 (P6). Der Schema-Key `runtime-gate.plugin-mode` (IC-16/AC-24) ist **bereits Phase 0** (Task 5, rein deklarativ) und wird hier **nicht** erneut angelegt — Task 8 erzeugt nur das Plugin-Artefakt.
+> **NICHT Teil der Phase-0-Abnahme und KEIN Shipping-Scope.** Der P6-Nachweis (Task 9) ist in dieser Umgebung nicht führbar; der Tier-Flip ist **DECLINED (won't-do)**, nicht deferred. Der Generator/Drift-Code bleibt als **dormantes, inaktives Inventar** erhalten: `MODE=observe`, keine „vollständig erzwungen"-Zusage, kein Dispatch (`has_plugins: false`). `runtime_gate: plugin`, `has_plugins: true`, `MODE=enforce` und AC-21 sind **dauerhaft gesperrt**. Der Schema-Key `runtime-gate.plugin-mode` (IC-16/AC-24) ist **bereits Phase 0** (Task 5, rein deklarativ, ohne Enforcement-Wirkung). Die offenen Step-Checkboxen unten bleiben bewusst offen (declined ≠ completed).
 
 **Files:**
 - Modify: `scripts/lib/runtime_gate.py` (Erweiterung des Phase-0-Seams um IC-08)
@@ -329,13 +337,13 @@ Neue und geänderte Symbole als `file:Symbol`. Phase-0-Symbole sind jetzt implem
 - [ ] Step 3: Test (pass) — `rtk python3 -m pytest tests/test_runtime_gate_plugins.py tests/test_generated_file_drift.py -q` → rc 0; `rtk python3 scripts/sync.py --validate` → rc 0.
 - [ ] Step 4: Commit — `feat: add capability-gated runtime-gate plugin generator (observe)`.
 
-**Acceptance (DEFERRED):** AC-16, AC-17, AC-18, AC-19, AC-20.
+**Acceptance (DECLINED, won't-do):** AC-16, AC-17, AC-18, AC-19, AC-20 — dokumentiert, nicht im Shipping-Scope.
 
 ---
 
-### Task 9: P6 Real-Repo-Verifikation + Tier-Flip — DEFERRED (Phase 1, P6-gated)
+### Task 9: P6 Real-Repo-Verifikation + Tier-Flip — DECLINED (won't-do) (Phase 1)
 
-> **NICHT Teil der Phase-0-Abnahme.** Manuelle/Real-Repo-Aufgabe, nicht unit-testbar (AC-21). Erst wenn P6 bestätigt, dass `tool.execute.before` in OpenCode-Subagent-Sessions feuert **und** der Main Chat in `input` unterscheidbar ist, darf ein Provider auf `runtime_gate: plugin` + `has_plugins: true` + `MODE=enforce` umgestellt werden. Bis dahin bleibt alles `observe`/`permission`.
+> **NICHT Teil der Phase-0-Abnahme und KEIN Shipping-Scope.** Manuelle/Real-Repo-Aufgabe, nicht unit-testbar (AC-21). Der P6-Test ist in dieser Umgebung nicht führbar; ein unverifizierter „enforce"-Flip wird ausdrücklich abgelehnt. Damit ist der Flip auf `runtime_gate: plugin` + `has_plugins: true` + `MODE=enforce` **dauerhaft gesperrt**. Read-only-Befund: `tool.execute.before` kann nur per `throw` verweigern und trägt **keine Agent-Identität** (`{tool, sessionID, callID}`) — die Bedingung „Main Chat unterscheidbar" ist **widerlegt**; AN-3/AN-4 nur ableitbar, AN-6 offen. Es bleibt bei `observe`/`permission`; die Zusage ist best-effort, nicht garantiert.
 
 **Files:**
 - Create: `tests/scenarios/configs/63-opencode-runtime-gate.project.yaml`
@@ -355,13 +363,13 @@ Neue und geänderte Symbole als `file:Symbol`. Phase-0-Symbole sind jetzt implem
 - [ ] Step 3: Test (pass) — `rtk tests/scenarios/run.sh 63` → `PASS` (rc 0); danach `rtk tests/scenarios/run.sh` vollständig → alle `PASS`.
 - [ ] Step 4: Commit — `test: add scenario 63 for opencode runtime-gate promotion`.
 
-**Acceptance (DEFERRED, P6-gated):** AC-21.
+**Acceptance (DECLINED, won't-do):** AC-21 — dokumentiert, nicht im Shipping-Scope.
 
 ---
 
 ## Acceptance-Criteria → Task-Mapping
 
-Phase 0 (implementierbar jetzt; Abnahme-Gate = Task 7):
+Phase 0 (implementiert und abgenommen; Abnahme-Gate = Task 7):
 
 | AC | Task(s) |
 |----|---------|
@@ -384,9 +392,10 @@ Phase 0 (implementierbar jetzt; Abnahme-Gate = Task 7):
 | AC-23 | 2 |
 | AC-24 (deklarativer Schema-Key) | 5 |
 
-Phase 1 / DEFERRED (nicht Teil der Phase-0-Abnahme):
+Phase 1 — DECLINED (won't-do) (nicht Teil der Phase-0-Abnahme, **kein Shipping-Scope**;
+die Zeilen bleiben als Herkunftsnachweis stehen):
 
-| AC | Task(s) | Gate |
+| AC | Task(s) | Gate (historisch) |
 |----|---------|------|
 | AC-16 | 8 | capability: `has_plugins`+`plugin_protocol` |
 | AC-17 | 8 | capability |
@@ -408,7 +417,7 @@ Phase 1 / DEFERRED (nicht Teil der Phase-0-Abnahme):
 
 ## Self-Review
 
-- **AC-Abdeckung:** Phase 0 deckt AC-01 … AC-15, AC-22 (no-plugin-Seite), AC-23 und AC-24 (deklarativer `runtime-gate.plugin-mode`-Schema-Key, Task 5) über Task 1–7 ab; AC-16 … AC-21 sind explizit als DEFERRED (Task 8/9) markiert und **nicht** Teil der Phase-0-Abnahme. Kein Phase-0-AC hängt an einer P6-gated Aufgabe.
+- **AC-Abdeckung:** Phase 0 deckt AC-01 … AC-15, AC-22 (no-plugin-Seite), AC-23 und AC-24 (deklarativer `runtime-gate.plugin-mode`-Schema-Key, Task 5) über Task 1–7 ab und ist abgenommen; AC-16 … AC-21 sind explizit als **DECLINED (won't-do)** (Task 8/9) markiert und **nicht** Teil des Shipping-Scopes. Kein Phase-0-AC hängt an einer Phase-1-Aufgabe.
 - **Test je Task:** Jede Task besitzt konkrete, benannte Testfälle und ein `rtk`-präfixiertes Verifikationskommando mit erwartetem rc; kein Task ist ohne beobachtbaren Test „done". Task 7 fährt zusätzlich das Repo-Gate `rtk python3 scripts/sync.py --validate`.
 - **Traceability:** `spec-id: SPEC-OPENCODE-RUNTIME-GATE-2026-09-13` ↔ `**Spec:**`-Pfad ↔ Task-ID ↔ Testname ist durchgängig; `pipeline_stages.implement` zeigt auf Step 1 (Task 1, Agent `senior-developer`).
 - **Interface-Vollständigkeit:** Jede Task hat nicht-leere `Produces`/`Consumes`; alle neuen Symbole sind mit Datei, Name und Signatur benannt; die Zwei-Registry-Signatur (D-C1) und der Seam-Zuschnitt (`runtime_gate.py` Vokabel vs. `providers.py` Resolver) sind explizit.
@@ -419,8 +428,8 @@ Phase 1 / DEFERRED (nicht Teil der Phase-0-Abnahme):
 
 ## Ausführungs-Handoff
 
-- **Reihenfolge:** Task 1 → Task 7 in aufsteigender Numerik. Phase 0 endet mit Task 7; Task 8/9 bleiben gesperrt (DEFERRED) und werden nur auf ausdrückliche Entscheidung nach gemergter Phase 0 begonnen.
+- **Reihenfolge:** Task 1 → Task 7 in aufsteigender Numerik. Phase 0 endet mit Task 7 und ist abgenommen; Task 8/9 sind **DECLINED (won't-do)** und werden **nicht** begonnen. Die dormant-Artefakte bleiben als inaktives Inventar.
 - **Task-für-Task (SDD):** Jede Task von einem frischen Subagenten mit frischem Kontext, Review der Requirements-Treue und Qualität, Ledger-Checkboxen nach Abschluss; kein Task ohne Test und Commit. Kein Worktree, keine Rollen-Routen.
 - **Blocked-Regel:** Kann eine Task ihre Akzeptanz nicht belegen, bleibt sie offen (`- [ ]`) und blockiert Nachfolger; nie stillschweigend überspringen oder umsortieren.
-- **Phase-1-Sperre:** Task 8/9 dürfen ohne bestandenen P6 (Real-Repo, #765) keine Tier-Flip-/`enforce`-Änderung committen; das Plugin bleibt `observe`, die Zusage bleibt `permission` (PARTIAL).
+- **Phase-1-Sperre (dauerhaft):** Task 8/9 sind DECLINED (won't-do); es wird **keine** Tier-Flip-/`enforce`-Änderung committet. Das Plugin bleibt `observe`/dormant, die Zusage bleibt `permission` (PARTIAL, best-effort, nicht garantiert).
 - **Abschluss-Gate Phase 0:** `rtk python3 -m pytest <sechs neue Testmodule> -q`, `rtk python3 scripts/sync.py --validate` (rc 0), `rtk python3 scripts/sync.py --check` (rc 0), `rtk python3 scripts/consistency-check.py` (rc 0), `rtk tests/scenarios/run.sh` (alle `PASS`) sowie die genannten Ratchet-Suiten (rc 0).
