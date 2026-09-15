@@ -33,6 +33,7 @@ _TOUCHED_MODULES = (
     "context",
     "providers",
     "agent_sync",
+    "provider_transform",
     # Stale-role-cleanup modules (SPEC-STALE-ROLE-CLEANUP-2026-09-13): the
     # managed-index helper, the backup pruner and the skill-wrapper writer must
     # stay provider-agnostic too (AC-20).
@@ -51,6 +52,7 @@ _TOUCHED_MODULES = (
     # Context-file topology consistency (SPEC-CONTEXT-FILE-MODES-2026-09-13,
     # AC-19): adapter dispatch is key-driven, never a provider-name branch.
     "consistency/context_topology",
+    "consistency/reference_standards",
 )
 
 
@@ -254,3 +256,12 @@ def test_context_adapter_dispatch_is_key_driven_without_provider_literals():
         resolve_context_filename("AGENTS.md", "SomeFutureProvider", direct_pc)
         == "AGENTS.md"
     )
+
+
+def test_reference_standards_seams_are_in_touched_modules():
+    """AC-14: the reference_standards production seams are covered by the
+    provider-agnostic AST guard above — no provider-name literal may creep
+    into the new strip resolver call site or the consistency module."""
+    for module in ("provider_transform", "consistency/reference_standards"):
+        assert module in _TOUCHED_MODULES, module
+        assert (_REPO_ROOT / "scripts" / "lib" / f"{module}.py").exists(), module

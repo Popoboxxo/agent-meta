@@ -116,6 +116,34 @@ cases:
   expected:
   - concept-development
   source_keyword: Trade-offs
+- id: kw-concept-driven-dev-01
+  pipeline: concept-driven-dev
+  category: keyword
+  task: 'Bitte concept-driven-dev: kümmere dich darum.'
+  expected:
+  - concept-driven-dev
+  source_keyword: concept-driven-dev
+- id: kw-concept-driven-dev-02
+  pipeline: concept-driven-dev
+  category: keyword
+  task: 'Bitte Konzept-Pipeline: kümmere dich darum.'
+  expected:
+  - concept-driven-dev
+  source_keyword: Konzept-Pipeline
+- id: kw-concept-driven-dev-03
+  pipeline: concept-driven-dev
+  category: keyword
+  task: 'Bitte gegen Spezifikation implementieren: kümmere dich darum.'
+  expected:
+  - concept-driven-dev
+  source_keyword: gegen Spezifikation implementieren
+- id: kw-concept-driven-dev-04
+  pipeline: concept-driven-dev
+  category: keyword
+  task: 'Bitte spec-first: kümmere dich darum.'
+  expected:
+  - concept-driven-dev
+  source_keyword: spec-first
 - id: kw-refactor-01
   pipeline: refactor
   category: keyword

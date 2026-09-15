@@ -1,11 +1,15 @@
 """Provider configuration loading and resolution."""
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Optional
 
+from .frontmatter import REFERENCE_STANDARDS_FIELD
 from .io import _load_yaml_or_json, load_yaml_file
 from .runtime_gate import weakest_runtime_gate_tier
+
+_logger = logging.getLogger(__name__)
 
 PROVIDERS_CONFIG_YAML = "config/ai-providers.yaml"
 _PROVIDERS_CONFIG_LEGACY = "providers.config.yaml"
@@ -530,3 +534,87 @@ def resolve_provider_options(config: dict, provider: str) -> dict:
         }
     """
     return config.get("provider-options", {}).get(provider, {})
+
+
+# Provider-agnostic frontmatter strip policy (SPEC-REFERENCE-STANDARDS-2026-09-15,
+# IC-03). Module constant (not an ai-providers top-level key) because
+# load_providers_config() returns `data.get("providers", data)` and would drop it.
+FRONTMATTER_STRIP_DEFAULTS: tuple[str, ...] = (REFERENCE_STANDARDS_FIELD,)
+
+# Malformed strip/keep channel values already warned about, keyed by
+# (provider, key) so a broken config warns at most once per process.
+_WARNED_MALFORMED_STRIP_KEYS: set[tuple[str, str]] = set()
+
+
+def _as_str_list(value: object, provider: str, key: str) -> list[str]:
+    """Coerce one strip/keep channel value to a list of strings (fail-safe).
+
+    ``None`` and any non-list value contribute nothing. A non-list value also
+    logs at most one WARNING per ``(provider, key)``; non-string items inside a
+    list are dropped silently (they cannot be frontmatter field names). This
+    helper never raises.
+    """
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, str)]
+    marker = (provider, key)
+    if marker not in _WARNED_MALFORMED_STRIP_KEYS:
+        _WARNED_MALFORMED_STRIP_KEYS.add(marker)
+        _logger.warning(
+            "provider '%s': '%s' must be a list of strings (got %s) — ignoring "
+            "this channel; the default frontmatter strip stays active",
+            provider,
+            key,
+            type(value).__name__,
+        )
+    return []
+
+
+def resolve_frontmatter_strip_fields(
+    provider: str,
+    config: dict,
+    provider_config: dict,
+) -> list[str]:
+    """Effective frontmatter strip set for ``provider`` (provider-agnostic).
+
+    ``strip = FRONTMATTER_STRIP_DEFAULTS ∪ project ∪ ai-providers`` and
+    ``keep = project ∪ ai-providers``; the result is the stable-ordered
+    ``strip \\ keep`` (keep wins). The two config channels are combined as a
+    union (spec F-02). Every source is optional and malformed values are
+    fail-safe (see ``_as_str_list``) — this function never raises. No provider
+    name literal is involved: the policy comes only from these config keys.
+    """
+    if not isinstance(config, dict):
+        config = {}
+    if not isinstance(provider_config, dict):
+        provider_config = {}
+
+    project_options = config.get("provider-options")
+    if not isinstance(project_options, dict):
+        project_options = {}
+    project_options = project_options.get(provider)
+    if not isinstance(project_options, dict):
+        project_options = {}
+
+    provider_entry = provider_config.get(provider)
+    if not isinstance(provider_entry, dict):
+        provider_entry = {}
+
+    strip_fields: list[str] = list(FRONTMATTER_STRIP_DEFAULTS)
+    for value, key in (
+        (project_options.get("frontmatter-strip-fields"), "frontmatter-strip-fields"),
+        (provider_entry.get("frontmatter_strip_fields"), "frontmatter_strip_fields"),
+    ):
+        for field in _as_str_list(value, provider, key):
+            if field not in strip_fields:
+                strip_fields.append(field)
+
+    keep_fields: set[str] = set()
+    for value, key in (
+        (project_options.get("frontmatter-keep-fields"), "frontmatter-keep-fields"),
+        (provider_entry.get("frontmatter_keep_fields"), "frontmatter_keep_fields"),
+    ):
+        keep_fields.update(_as_str_list(value, provider, key))
+
+    return [field for field in strip_fields if field not in keep_fields]
