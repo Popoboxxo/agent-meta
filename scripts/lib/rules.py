@@ -7,6 +7,11 @@ from pathlib import Path
 from .frontmatter import _split_frontmatter
 from .io import _load_yaml_or_json, safe_path, write_checked
 from .log import SyncLog
+from .rule_index import (
+    cleanup_stale_managed_files,
+    read_managed_index,
+    write_managed_index,
+)
 from .registry_query import (
     build_mcp_guardrails_list,
     load_mcp_registry,
@@ -417,12 +422,18 @@ def sync_rules(
     target_dir = project_root / (rules_dir or CLAUDE_RULES_DIR)
     managed_index_path = target_dir / ".agent-meta-managed"
 
-    previously_managed: set[str] = set()
-    if managed_index_path.exists():
-        for line in managed_index_path.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if line:
-                previously_managed.add(line)
+    # IC-01/IC-08 (R-06): route the index read through the shared helper so a
+    # corrupt/unreadable index is fail-closed (warn + treat as empty) instead of
+    # propagating and aborting the sync.
+    try:
+        previously_managed: set[str] = read_managed_index(managed_index_path)
+    except (OSError, UnicodeDecodeError) as exc:
+        log.warning(
+            f"rules: managed index '{managed_index_path}' is unreadable "
+            f"({type(exc).__name__}: {exc}) — treating as empty (fail-closed); "
+            f"non-tracked files are left untouched"
+        )
+        previously_managed = set()
 
     now_managed: set[str] = set()
 
@@ -491,19 +502,17 @@ def sync_rules(
         else:
             log.skip(rel_out, "unchanged")
 
-    # Remove stale managed rules no longer in current sources
+    # Remove stale managed rules no longer in current sources.
     # speech-mode.md is owned by sync_speech_mode (speech/ layer), not the rules/
     # hierarchy — never treat it as stale here or it gets deleted and recreated
-    # on every sync (infinite drift).
-    for stale_name in sorted(previously_managed - now_managed):
-        if stale_name == SPEECH_RULE_FILENAME:
-            continue
-        stale_path = safe_path(target_dir, stale_name)
-        if stale_path.exists():
-            log.action("DELETE", str(stale_path.relative_to(project_root)),
-                       "rule removed from agent-meta sources")
-            if not dry_run:
-                stale_path.unlink()
+    # on every sync (infinite drift); exclude it before calling the helper.
+    # IC-01/IC-08 (R-06): deletion routed through cleanup_stale_managed_files
+    # (fail-soft per file, byte-identical DELETE log line).
+    cleanup_stale_managed_files(
+        target_dir, project_root,
+        previously_managed - {SPEECH_RULE_FILENAME}, now_managed,
+        log, dry_run, "rule removed from agent-meta sources",
+    )
 
     # channel: skill stale-cleanup + shared managed-index merge in skills_dir.
     # Scoped to `all_rule_stems` (this caller's full possible name-space) so
@@ -518,8 +527,10 @@ def sync_rules(
             skills_target_dir, now_managed_skill_rules, dry_run, universe=all_rule_stems
         )
 
-    if not dry_run and now_managed:
-        managed_index_path.write_text("\n".join(sorted(now_managed)) + "\n", encoding="utf-8")
+    # OQ-4/IC-08: the managed index is written unconditionally after cleanup
+    # (including the empty set), so a removed preset/rule can no longer strand
+    # a stale index entry. write_managed_index() is a no-op only for dry_run.
+    write_managed_index(managed_index_path, now_managed, dry_run)
 
 
 def sync_speech_mode(

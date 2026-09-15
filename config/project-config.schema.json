@@ -895,6 +895,39 @@
           ],
           "default": "full"
         },
+        "topology": {
+          "type": "string",
+          "description": "Context topology: one shared file ('unified') vs. a canonical core plus provider-native adapters ('per-provider'). Sibling of the density 'mode' above — NOT the same axis. Missing or invalid value always resolves to 'unified' (safe-side default: per-provider must be explicitly opted in).",
+          "enum": [
+            "unified",
+            "per-provider"
+          ],
+          "default": "unified"
+        },
+        "core_file": {
+          "type": "string",
+          "description": "Canonical shared context file (the core) used in the 'per-provider' topology. Default: AGENTS.md.",
+          "default": "AGENTS.md"
+        },
+        "provider-overrides": {
+          "type": "object",
+          "description": "Override context_file.topology per provider. Keys are provider names. Providers without an entry (or without 'topology' set) inherit the global context_file.topology.",
+          "additionalProperties": {
+            "type": "object",
+            "description": "Per-provider context topology override.",
+            "properties": {
+              "topology": {
+                "type": "string",
+                "description": "Context topology for this provider only. Same semantics as context_file.topology. When unset, inherits the global context_file.topology.",
+                "enum": [
+                  "unified",
+                  "per-provider"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
         "max_lines": {
           "type": "integer",
           "description": "Soft size limit for generated provider context files. The consistency check (sync.py --validate / consistency-check.py) emits a WARNING when a generated file exceeds this many lines without context_file.oversize_acknowledged. Default: 250.",
@@ -2198,6 +2231,11 @@
             },
             "additionalProperties": false
           }
+        },
+        "require-runtime-gate": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, the orchestrator-strict consistency check treats a provider that is only prompt-enforced (tier 'advisory') as an ERROR instead of a WARNING. Default: false (backwards compatible)."
         }
       },
       "additionalProperties": true
@@ -2215,6 +2253,22 @@
           "type": "boolean",
           "default": false,
           "description": "Enable AST dependency analysis during sync. Activates analysis.py scanning and prints a summary after sync completes. Default: false."
+        }
+      },
+      "additionalProperties": false
+    },
+    "runtime-gate": {
+      "type": "object",
+      "description": "Native runtime-gate plugin configuration (Phase 1). The plugin artifact is generated only for a provider with a verified plugin runtime; Phase 0 ships the schema key only (IC-16, AC-24).",
+      "properties": {
+        "plugin-mode": {
+          "type": "string",
+          "enum": [
+            "observe",
+            "enforce"
+          ],
+          "default": "observe",
+          "description": "Baked into the generated native gate plugin at sync time. 'observe' logs only; 'enforce' is unlocked only after the P6 real-repo verification (AC-21). Default: observe."
         }
       },
       "additionalProperties": false

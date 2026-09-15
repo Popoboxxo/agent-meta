@@ -33,6 +33,12 @@ _TOUCHED_MODULES = (
     "context",
     "providers",
     "agent_sync",
+    # Stale-role-cleanup modules (SPEC-STALE-ROLE-CLEANUP-2026-09-13): the
+    # managed-index helper, the backup pruner and the skill-wrapper writer must
+    # stay provider-agnostic too (AC-20).
+    "rule_index",
+    "generated_file_drift",
+    "skills",
     # Repo-containment ("prison mode") modules — provider dispatch goes through
     # repo_containment.provider-overrides keyed by registry name, never a
     # literal `provider == "Name"` branch.
@@ -40,6 +46,8 @@ _TOUCHED_MODULES = (
     "consistency/repo_containment",
     "subagent_permissions",
     "consistency/subagent_permissions",
+    "runtime_gate",
+    "isolation",
 )
 
 
@@ -86,6 +94,42 @@ def test_no_literal_provider_equality_branches_in_touched_modules():
     )
 
 
+def test_cleanup_preview_documented():
+    """AC-20 (SPEC-STALE-ROLE-CLEANUP-2026-09-13, Task 8): the planning-only
+    ``--cleanup-preview`` mode must be documented in the CLI reference together
+    with its rc semantics (0 even for a non-empty stale set, 1 only on
+    internal failure)."""
+    cli_ref = (_REPO_ROOT / "docs" / "api" / "cli-reference.md").read_text(encoding="utf-8")
+    assert "--cleanup-preview" in cli_ref, (
+        "docs/api/cli-reference.md must document the --cleanup-preview flag"
+    )
+    lowered = cli_ref.lower()
+    assert "exit code 0" in lowered, (
+        "docs/api/cli-reference.md must state the rc-0 semantics of "
+        "--cleanup-preview (a non-empty stale set still exits 0)"
+    )
+
+
+def test_admin_cleanup_routes_documented():
+    """AC-20 (SPEC-STALE-ROLE-CLEANUP-2026-09-13, Task 8): both cleanup POST
+    routes and the mandatory confirm/fingerprint handshake must be documented
+    in the Admin-UI reference."""
+    ref = (_REPO_ROOT / "docs" / "api" / "admin-ui-reference.md").read_text(encoding="utf-8")
+    assert "/api/roles/cleanup/preview" in ref, (
+        "docs/api/admin-ui-reference.md must document the preview route"
+    )
+    assert "/api/roles/cleanup/apply" in ref, (
+        "docs/api/admin-ui-reference.md must document the apply route"
+    )
+    lowered = ref.lower()
+    assert "confirm" in lowered, (
+        "docs/api/admin-ui-reference.md must document the confirm requirement"
+    )
+    assert "fingerprint" in lowered, (
+        "docs/api/admin-ui-reference.md must document the fingerprint check"
+    )
+
+
 @pytest.mark.parametrize("provider", _registered_providers())
 def test_every_provider_has_explicit_commands_capability(provider):
     caps = _provider_capabilities().get(provider, {})
@@ -96,6 +140,30 @@ def test_every_provider_has_explicit_commands_capability(provider):
     )
     assert isinstance(caps["commands"], bool), (
         f"Provider '{provider}'.commands must be a boolean, got {caps['commands']!r}"
+    )
+
+
+@pytest.mark.parametrize("provider", _registered_providers())
+def test_every_provider_has_explicit_runtime_gate_capability(provider):
+    """AC-01 (SPEC-OPENCODE-RUNTIME-GATE-2026-09-13): every registered provider
+    must carry an explicit ``runtime_gate`` tier in
+    ``config/provider-capabilities.yaml``, and its value must be one of the
+    canonical tiers from ``scripts/lib/runtime_gate.py``. An absent key
+    resolves fail-safe to ``advisory`` at runtime, but omitting it would
+    silently document a weaker gate than intended — this test turns the
+    omission into a failure (same obligation as ``commands``)."""
+    from lib.runtime_gate import RUNTIME_GATE_TIERS
+
+    caps = _provider_capabilities().get(provider, {})
+    assert "runtime_gate" in caps, (
+        f"Provider '{provider}' has no explicit 'runtime_gate' entry in "
+        "config/provider-capabilities.yaml — an absent key silently resolves "
+        "to 'advisory' (fail-safe), which would understate or overstate the "
+        "gate. Declare one of: " + ", ".join(RUNTIME_GATE_TIERS)
+    )
+    assert caps["runtime_gate"] in RUNTIME_GATE_TIERS, (
+        f"Provider '{provider}'.runtime_gate={caps['runtime_gate']!r} is not a "
+        "canonical tier — expected one of: " + ", ".join(RUNTIME_GATE_TIERS)
     )
 
 
@@ -166,3 +234,20 @@ def test_commands_capable_provider_without_dir_fails_loudly(tmp_path):
             _REPO_ROOT, tmp_path, {}, log, dry_run=True,
             provider="Opencode", provider_config={"Opencode": {}},
         )
+
+
+def test_context_adapter_dispatch_is_key_driven_without_provider_literals():
+    """AC-12: the adapter filename dispatch is driven purely by the
+    ``context_adapter`` keys, never by a provider-name branch."""
+    from lib.providers import resolve_context_filename
+
+    adapter_pc = {"context_adapter": True, "context_adapter_file": "ADAPTER.md"}
+    assert (
+        resolve_context_filename("AGENTS.md", "SomeFutureProvider", adapter_pc)
+        == "ADAPTER.md"
+    )
+    direct_pc = {"context_file": "AGENTS.md"}
+    assert (
+        resolve_context_filename("AGENTS.md", "SomeFutureProvider", direct_pc)
+        == "AGENTS.md"
+    )

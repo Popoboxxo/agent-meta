@@ -1,6 +1,19 @@
 {{#if ORCH_MODE_STRICT}}
+{{#if GATE_ENFORCED}}
 # CRITICAL GATE
 MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`. Keine Ausnahmen.
+{{/if}}
+{{#if GATE_PARTIAL}}
+# CRITICAL GATE (runtime-partially enforced)
+MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`.
+Provider-native Permissions block Main-Chat-Writes; Delegations-Provenienz ist
+NICHT erzwungen (Prompt + Permission-Layer).
+{{/if}}
+{{#if GATE_ADVISORY}}
+# CRITICAL GATE (advisory)
+MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`.
+ACHTUNG: Auf diesem Provider ist der Gate rein prompt-basiert, ohne Runtime-Gate.
+{{/if}}
 {{/if}}
 {{#if ORCH_MODE_ADVISORY}}
 # Orchestrator

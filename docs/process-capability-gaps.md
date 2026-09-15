@@ -1,6 +1,6 @@
 # Prozess-/Capability-Gaps — Fortschritts-, Ausführungs- und Verifikationssystem
 
-> Stand: 2026-09-13 · Status: Read-only Analyse, keine Implementierung
+> Stand: 2026-09-14 · Status: Read-only Analyse, keine Implementierung (Nachtrag §6.1: umgesetzter Phase-0-Status)
 > Bezug: internes Spec/Plan-Workflow-Vorhaben; Coverage-Matrix `docs/spec-plan-workflow-coverage.md`
 > Terminologie: „Ziel-Prozessprofil" = externes Referenz-Prozessmodell; „Referenz-Fähigkeiten";
 > „Capability-Gap". Keine Externalität/Abhängigkeit wird eingeführt.
@@ -157,6 +157,34 @@ Entscheidung, kein Gap.
   Capability-Flags (Provider-Agnostik), nie über `if provider == …`.
 - **Referenzspezifische Pack-/Vendor-Abhängigkeit** ist ausgeschlossen; keine Externalität
   oder Abhängigkeit wird eingeführt.
+
+### 6.1 Provider-Runtime-Gate (CRITICAL GATE) — Status
+
+Nachtrag zum umgesetzten Phase-0-Stand (SPEC-OPENCODE-RUNTIME-GATE-2026-09-13). Die
+Tier-Semantik und die Verträge stehen in
+[`concepts/runtime-gate-tiers.md`](concepts/runtime-gate-tiers.md); hier nur der
+ehrliche Ist-Stand. Der `# CRITICAL GATE` ist nur so stark wie das Runtime des
+aktiven Providers:
+
+- **`hook`** — verifizierter PreToolUse-Hook-Vertrag; Runtime-Gate vorhanden
+  (`GATE_ENFORCED`). Unverändert.
+- **`permission`** — native Permission-Schicht blockiert Main-Chat-Writes über den
+  bestehenden `isolation.py`-Merge-Pfad (A2-Mapping-Deny). **PARTIAL**: die
+  Delegations-Provenienz ist nicht erzwungen, und die Child-Session-Propagation
+  (`deriveSubagentSessionPermission`, **#765**) ist **unverifiziert**. Das ist der
+  aktuelle Phase-0-Status des OpenCode-Blocks (`runtime_gate: permission` in
+  `config/provider-capabilities.yaml`); kein
+  „vollständig erzwungen".
+- **`plugin`** — die native Plugin-Tier ist **Phase 1** und läuft nur im Modus
+  `observe`; `MODE=enforce` und der Tier-Flip sind hinter die Real-Repo-Verifikation
+  (P6) gesperrt. In Phase 0 deklariert kein Provider `runtime_gate: plugin`.
+- **`advisory`** — rein prompt-basiert (fail-safe Default für unbekannte oder
+  fehlende Konfiguration).
+
+A2 schreibt keinen neuen Root-Key und umgeht den create-only Settings-Initializer
+(**#747**); der Managed-State ist reversibel und namespaced. Insgesamt bleibt der
+Gate eine **Convention boundary**, keine **security boundary** (Definition:
+`.claude/rules/branch-guard.md`).
 
 ## 7. Nicht-Ziele & Nicht-Implementierung
 

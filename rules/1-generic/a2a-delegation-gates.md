@@ -47,6 +47,15 @@ Rolle→Tier-Auflösung (`role-defaults.yaml` → `model`) nur für genau diesen
 - Protokolliere Verstöße als Zeile `SUBAGENT_PERMISSION_WARNING: <role> — <reason>` im
   eigenen Abschluss-Report und fahre fort.
 {{/if}}
+## Runtime-Enforcement-Tier: `{{ENFORCEMENT_TIER}}`
+
+Ob der `# CRITICAL GATE` („MAIN CHAT darf nicht selbst editieren") auf diesem
+Provider per Runtime-Gate (`hook`/`plugin`), nur partiell über den
+Permission-Layer (`permission`, ohne Delegations-Provenienz) oder rein
+prompt-basiert (`advisory`) durchgesetzt wird, nennt das Tier
+`{{ENFORCEMENT_TIER}}`. Die konkreten Grenzen dieses Schutzes stehen unter
+„Bekannte Grenzen".
+
 ## Bekannte Grenzen
 
 - **Singleton-Orchestrator (Punkt 2) wird nur über eine Selbstdeklaration der Agenten-Identität gestützt** (`#agent-meta:agent=<name>` in `.claude/hooks/orchestrator-guard.sh`), die im Hook-Quelltext selbst als "soft, self-reported convention, not a security boundary" dokumentiert ist. Jeder Agent kann sich technisch als privilegiert deklarieren. **Das ist eine bewusste Design-Grenze, kein behebbarer Bug:** Claude Code liefert seit Kurzem zwar ein `agent_id`-Feld im PreToolUse-Payload (harness-gesetzt, nicht selbst-deklariert — seit Issue #683 genutzt, um Write/Edit/Bash für JEDEN dispatchten Subagenten von der Strict-Mode-Main-Chat-Blockade freizustellen), aber das sagt nur "irgendein Subagent", nicht "welche Rolle". Für die ROLLEN-Identität (git vs. orchestrator, für den Git-Mutation-Gate) liefert kein Provider ein echtes Feld — der Hook kann die Sentinel-Behauptung also weiterhin nicht verifizieren. Der Guard ist ein Konventions-Schutz gegen Versehen, kein Schutz gegen einen Agenten, der die Regel bewusst umgeht. Wer eine harte Grenze braucht, muss Git-Mutationen außerhalb des Agenten-Systems absichern (Branch-Protection, Pre-Receive-Hooks, Review-Pflicht) — zerstörerische Operationen (`push --force`, `reset --hard`, `clean -fd`, `branch -D`) bleiben deshalb ausdrücklich zustimmungspflichtig durch den Nutzer.

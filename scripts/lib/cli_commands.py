@@ -201,8 +201,16 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
     from lib.dod import resolve_release_gates
     from lib.hook_plugins import sync_hook_lib, sync_release_gates
     from lib.hooks import sync_hooks
-    from lib.providers import load_providers_config, resolve_providers
+    from lib.isolation import _sync_opencode_runtime_gate
+    from lib.providers import (
+        load_provider_capabilities,
+        load_providers_config,
+        provider_runtime_gate_tier,
+        resolve_providers,
+        runtime_gate_vars,
+    )
     from lib.rules import sync_rules, sync_speech_mode
+    from lib.runtime_gate import sync_runtime_gate_plugins
     from lib.skills import sync_external_skills_for_provider
 
     test_variables, _pre_warnings = build_variables(config, agent_meta_root, test_repo_path)
@@ -211,11 +219,17 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
 
     provider_config = load_providers_config(agent_meta_root)
     providers = resolve_providers(config, provider_config)
+    capabilities = load_provider_capabilities(agent_meta_root)
 
     validation_errors = 0
     for provider in providers:
         pc = provider_config[provider]
+        caps = capabilities.get(provider, {}) if isinstance(capabilities, dict) else {}
         log.note("test-repo", f"syncing agents for provider: {provider}")
+
+        # IC-04: mirror the production seam so the test repo renders the same
+        # tier bundle as a normal sync.
+        test_variables.update(runtime_gate_vars(pc, caps, config))
 
         pipeline_details_dir = resolve_pipeline_details_dir(pc, provider)
         test_variables["PIPELINE_DETAILS_DIR"] = pipeline_details_dir
@@ -246,6 +260,20 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
             sync_release_gates(agent_meta_root, test_repo_path, config, log, dry_run,
                                 provider=provider, provider_config=provider_config,
                                 release_gates_resolved=resolve_release_gates(config, agent_meta_root))
+        # IC-13: mirror the production per-provider dispatch in the test-repo
+        # path so a --test-generated repo matches a normal sync. The plugin
+        # writer is capability-gated (has_plugins); the A2 writer keys off the
+        # IC-03 resolver — never a provider literal.
+        if pc.get("has_plugins", False):
+            sync_runtime_gate_plugins(
+                agent_meta_root, test_repo_path, config, log, dry_run,
+                provider, provider_config,
+            )
+        if provider_runtime_gate_tier(pc, caps) == "permission":
+            _sync_opencode_runtime_gate(
+                test_repo_path, config, provider, provider_config,
+                agent_meta_root, log, dry_run,
+            )
         if pc.get("has_commands", False):
             sync_commands_for_provider(agent_meta_root, test_repo_path, config, log,
                                        dry_run, provider, provider_config=provider_config,
@@ -989,7 +1017,8 @@ def _handle_validate(ctx: _SyncContext) -> None:
     from lib.providers import load_providers_config as _load_pc
 
     _provider_config = _load_pc(agent_meta_root)
-    _strict_findings = check_orchestrator_strict_hook_support(project_root, config, _provider_config)
+    _strict_findings = check_orchestrator_strict_hook_support(
+        project_root, config, _provider_config, agent_meta_root)
     _strict_findings += check_repo_containment_support(project_root, config, _provider_config)
     # Deployed-hook version drift (issue #630): warns when a project's
     # .claude/hooks/*.sh (or another provider's hooks_dir) has fallen behind

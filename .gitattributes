@@ -1,3 +1,6 @@
-# Force LF for orchestrator-guard hook scripts (residual of #712): CRLF would
-# risk a "bad interpreter" failure if a deployed hook is executed directly.
-hooks/1-generic/orchestrator-guard*.sh text eol=lf
+# Force LF for hook scripts (broadened from orchestrator-guard only in #754,
+# original rule #712): a CRLF in a deployed/executed hook causes a
+# "bad interpreter" failure or `$'\r': command not found`. Applies to the
+# template source and to the self-hosted deployment of this repo.
+hooks/**/*.sh text eol=lf
+.agents/hooks/**/*.sh text eol=lf

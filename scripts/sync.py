@@ -35,6 +35,7 @@ External skills (config/skills-registry.yaml in agent-meta):
 from __future__ import annotations
 
 import argparse
+import contextlib
 import sys
 from pathlib import Path
 
@@ -116,6 +117,12 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                         help="Also generate CLAUDE.md from template (only if not present)")
     parser.add_argument("--only-variables", action="store_true",
                         help="Only substitute {{VARIABLE}} in existing CLAUDE.md")
+    parser.add_argument("--cleanup-preview", action="store_true",
+                        help="Planning-only, side-effect-free JSON preview of the stale "
+                             "agent files a sync would remove. Emits exactly "
+                             "one JSON object on stdout; writes nothing (no index write, "
+                             "no unlink, no backup, no clone/submodule). Exit code 0 even "
+                             "for a non-empty stale set, 1 only on internal failure.")
     parser.add_argument("--create-ext", metavar="ROLE",
                         help="Create extension file for ROLE (or 'all'). "
                              "Does not overwrite existing files.")
@@ -318,6 +325,270 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
+# ---------------------------------------------------------------------------
+# --cleanup-preview (IC-06): planning-only, side-effect-free JSON preview
+# ---------------------------------------------------------------------------
+
+_PREVIEW_VERSION = 1
+# Mirrors the OQ-2 default policy wired into the sync pipeline (IC-05).
+_PREVIEW_PRUNE_MAX_AGE_DAYS = 30
+_PREVIEW_PRUNE_MAX_PER_SOURCE = 3
+
+
+class CleanupPreviewLog(SyncLog):
+    """Collecting ``SyncLog`` variant for ``--cleanup-preview`` (IC-06).
+
+    Records exactly like :class:`SyncLog` but never writes to stderr: the
+    preview's stdout is a machine-consumed JSON contract, so diagnostic noise
+    must not bleed into the process output. The retained lists keep the
+    planning traversal inspectable in tests.
+    """
+
+    def warn(self, message: str) -> None:
+        if message in self._seen_warnings:
+            return
+        self._seen_warnings.add(message)
+        self.warnings.append(f"[WARN]   {message}")
+
+    def error(self, target: str, message: str) -> None:
+        self.errors.append(f"[ERROR]  {target:<50}  {message}")
+
+
+def _preview_expected_filenames(
+    config: dict,
+    variables: dict,
+    provider: str,
+    pc: dict,
+    role_map: dict,
+    overrides: dict,
+    target_dir: Path,
+    project_root: Path,
+    agent_meta_root: Path,
+    log: SyncLog,
+) -> set:
+    """Filenames the provider's agent sync would (re)write this run.
+
+    Mirrors the planning half of ``sync_agents_for_provider`` without composing
+    or writing any content: the skip-gates decide membership, the IC-03
+    collector adds the active external-skill wrappers (unconditional, no
+    capability gate).
+    """
+    from lib.agent_sync import (
+        _collect_active_skill_wrapper_filenames,
+        _should_skip_role,
+    )
+
+    allowed_roles = set(config["roles"]) if "roles" in config else None
+    expected: set = set()
+    for role, source_path in overrides.items():
+        skip, filename = _should_skip_role(
+            role, source_path, provider, pc, role_map, allowed_roles,
+            config, variables, project_root, target_dir, log)
+        if skip:
+            continue
+        expected.add(filename)
+    expected |= _collect_active_skill_wrapper_filenames(agent_meta_root, config)
+    return expected
+
+
+def _preview_foreign_entries(
+    target_dir: Path,
+    pc: dict,
+    expected: set,
+    stale_names: set,
+    project_root: Path,
+) -> list:
+    """Enumerate the candidate files that would survive (IC-06 ``foreign``).
+
+    ``plan_agent_cleanup`` returns only the removable set, so the foreign set is
+    derived here as the complement over the provider's candidate globs:
+    candidates that are neither expected (managed) nor stale (removable).
+    ``legacy_unmarked`` is the OQ-3 flag: True when the file carries no
+    recognised primary agent-meta provenance marker (marker-less legacy file
+    awaiting user-approved manual removal).
+    """
+    from lib.agent_sync import (
+        _agent_has_provenance,
+        _iter_agent_candidates,
+        _read_text_or_none,
+    )
+    from lib.rule_index import _relative_posix
+
+    foreign: list = []
+    for candidate in _iter_agent_candidates(target_dir, pc):
+        if candidate.name in expected or candidate.name in stale_names:
+            continue
+        text = _read_text_or_none(candidate)
+        foreign.append({
+            "path": _relative_posix(candidate, project_root),
+            "legacy_unmarked": text is None or not _agent_has_provenance(candidate, text),
+        })
+    return foreign
+
+
+def _preview_backups_to_prune(
+    target_dir: Path,
+    project_root: Path,
+    max_age_days: int = _PREVIEW_PRUNE_MAX_AGE_DAYS,
+    max_per_source: int = _PREVIEW_PRUNE_MAX_PER_SOURCE,
+) -> list:
+    """Pure would-be-prune list for ``target_dir`` (IC-06 ``backups_to_prune``).
+
+    ``generated_file_drift.prune_sync_backups`` is a no-op in dry-run (IC-05),
+    so the preview recomputes the very same dual-threshold candidate set without
+    deleting anything: age strictly greater than *max_age_days* AND strictly
+    more than *max_per_source* newer backups for the same source. The naming /
+    timestamp helpers are imported from the pruner module so only the threshold
+    decision is mirrored here.
+    """
+    from datetime import datetime
+
+    from lib.generated_file_drift import (
+        _is_sync_backup_name,
+        _sync_backup_source,
+        _sync_backup_timestamp,
+    )
+    from lib.rule_index import _relative_posix
+
+    if not target_dir.is_dir():
+        return []
+    try:
+        entries = sorted(target_dir.iterdir())
+    except OSError:
+        return []
+
+    backups: list = []
+    for path in entries:
+        if not path.is_file() or not _is_sync_backup_name(path.name):
+            continue
+        stamp = _sync_backup_timestamp(path.name)
+        if stamp is None:
+            continue
+        backups.append((path, _sync_backup_source(path.name), stamp))
+
+    now = datetime.now()
+    prunable: list = []
+    for path, source, stamp in backups:
+        if (now - stamp).days <= max_age_days:
+            continue
+        newer = sum(
+            1 for _other, other_source, other_stamp in backups
+            if other_source == source and other_stamp > stamp
+        )
+        if newer <= max_per_source:
+            continue
+        prunable.append(_relative_posix(path, project_root))
+    return sorted(prunable)
+
+
+def _cleanup_fingerprint(stale_entries: list) -> str:
+    """Stable ``sha256:…`` hash over the canonicalized stale set (IC-06).
+
+    Canonicalization sorts by ``(provider, path, reason, tracked, adopted)`` so
+    the fingerprint is order-independent and changes whenever the apply handler
+    would see a different stale set (TOCTOU detection, IC-07).
+    """
+    import hashlib
+    import json
+
+    canonical = sorted(
+        (
+            {
+                "provider": entry.provider,
+                "path": entry.path,
+                "reason": entry.reason,
+                "tracked": entry.tracked,
+                "adopted": entry.adopted,
+            }
+            for entry in stale_entries
+        ),
+        key=lambda item: (
+            item["provider"], item["path"], item["reason"],
+            item["tracked"], item["adopted"],
+        ),
+    )
+    blob = json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return "sha256:" + hashlib.sha256(blob).hexdigest()
+
+
+def _handle_cleanup_preview(ctx: _SyncContext) -> None:
+    """Handle ``--cleanup-preview`` (IC-06).
+
+    Runs a planning-only traversal over every active provider, reusing the pure
+    computation (``_resolve_sync_targets``, ``_should_skip_role``, IC-03
+    collectors, ``plan_agent_cleanup``) and calling no writer stage. Emits
+    exactly one JSON object on stdout; rc 0 even for a non-empty stale set, rc 1
+    only on internal failure.
+    """
+    import json
+    from datetime import datetime, timezone
+
+    from lib.agent_sync import (
+        _collect_all_registry_wrapper_filenames,
+        _resolve_sync_targets,
+        plan_agent_cleanup,
+    )
+    from lib.providers import load_providers_config, resolve_providers
+
+    log = CleanupPreviewLog()
+    agent_meta_root = ctx.agent_meta_root
+    project_root = ctx.project_root
+    config = ctx.config
+    variables = ctx.variables
+
+    try:
+        provider_config = load_providers_config(agent_meta_root)
+        providers = resolve_providers(config, provider_config)
+        wrapper_filenames = _collect_all_registry_wrapper_filenames(agent_meta_root)
+
+        provider_payload: list = []
+        stale_entries: list = []
+        for provider in providers:
+            pc, role_map, overrides, target_dir = _resolve_sync_targets(
+                provider, provider_config, agent_meta_root, project_root,
+                config, True, log)
+            if pc is None:
+                continue
+            expected = _preview_expected_filenames(
+                config, variables, provider, pc, role_map, overrides,
+                target_dir, project_root, agent_meta_root, log)
+            stale = plan_agent_cleanup(
+                target_dir, expected, provider, wrapper_filenames, pc, project_root)
+            stale_entries.extend(stale)
+            stale_names = {Path(entry.path).name for entry in stale}
+            provider_payload.append({
+                "provider": provider,
+                "stale": [
+                    {
+                        "path": entry.path,
+                        "reason": entry.reason,
+                        "tracked": entry.tracked,
+                        "adopted": entry.adopted,
+                    }
+                    for entry in stale
+                ],
+                "foreign": _preview_foreign_entries(
+                    target_dir, pc, expected, stale_names, project_root),
+                "backups_to_prune": _preview_backups_to_prune(target_dir, project_root),
+            })
+
+        payload = {
+            "version": _PREVIEW_VERSION,
+            "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "providers": provider_payload,
+            "fingerprint": _cleanup_fingerprint(stale_entries),
+        }
+    except Exception as exc:  # noqa: BLE001 — any internal failure → rc 1
+        print(json.dumps(
+            {"version": _PREVIEW_VERSION, "error": f"{type(exc).__name__}: {exc}"},
+            ensure_ascii=False))
+        sys.exit(1)
+
+    print(json.dumps(payload, indent=2, ensure_ascii=False))
+    ctx.read_only = True
+    ctx.mode = "cleanup-preview"
+
+
 # Ordered (predicate, handler) table. Order mirrors the original if/elif
 # chain exactly -- the first matching predicate wins, so flag precedence is
 # preserved. The default (no predicate matches) is _handle_sync.
@@ -325,6 +596,7 @@ _MODE_HANDLERS = [
     (lambda a: a.fill_defaults, _handle_fill_defaults),
     (lambda a: a.audit_config, _handle_audit_config),
     (lambda a: a.only_variables, _handle_only_variables),
+    (lambda a: a.cleanup_preview, _handle_cleanup_preview),
     (lambda a: a.create_ext, _handle_create_ext),
     (lambda a: a.update_ext, _handle_update_ext),
     (lambda a: a.create_rule, _handle_create_rule),
@@ -375,7 +647,18 @@ def main() -> None:
     agent_meta_root = find_agent_meta_root(script_path)
     log = SyncLog()
 
-    ctx = _build_context(args, agent_meta_root, log)
+    if getattr(args, "cleanup_preview", False):
+        # IC-06: the preview must emit exactly one JSON object on stdout and
+        # write nothing. Context building is shared CLI plumbing that can print
+        # (auto-detect banner) and, when self-hosting, touch the schema enum —
+        # so run it with dry_run forced on and stdout redirected to stderr.
+        saved_dry_run = args.dry_run
+        args.dry_run = True
+        with contextlib.redirect_stdout(sys.stderr):
+            ctx = _build_context(args, agent_meta_root, log)
+        args.dry_run = saved_dry_run
+    else:
+        ctx = _build_context(args, agent_meta_root, log)
     if ctx is None:
         return
 

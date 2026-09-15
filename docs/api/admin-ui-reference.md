@@ -397,3 +397,72 @@ Pipelines define rigid, linear sequences of agent execution designed for standar
 <!-- last-updated: 2026-07-19 -->
 <!-- author: Agent Meta Admin -->
 The Consistency Check is a powerful architectural validation tool. It executes the core `consistency-check.py` script to rigorously scan the entire framework for discrepancies. It verifies that all CLI arguments are documented, that UI routes match their help blocks, that the README.md is up-to-date, and that the XML structures are strictly maintained. Always run this check before committing changes to ensure the framework's integrity.
+
+---
+
+## 4. Role Cleanup API
+
+The Sync view exposes an explicit stale-role cleanup as a strict **preview → confirm →
+apply** flow (`SPEC-STALE-ROLE-CLEANUP-2026-09-13`, IC-07/IC-10). It removes agent files
+whose role was deleted from `project.yaml → roles`, deactivated external-skill wrappers
+and stale index entries. Both endpoints are POST-only and are registered in the server's
+exact-route table; neither mutates `project.yaml → roles`.
+
+### `POST /api/roles/cleanup/preview`
+
+Runs `sync.py --cleanup-preview` — a planning-only, side-effect-free traversal (no index
+write, no unlink, no backup, no submodule clone). No request body is required. The server
+flattens the per-provider payload into one list, so every entry carries its `provider`.
+
+**200** response:
+
+```json
+{
+  "success": true,
+  "stale": [
+    {"provider": "<active-provider>", "path": ".claude/agents/stale-role.md", "reason": "role removed from config", "tracked": true, "adopted": false}
+  ],
+  "foreign": [
+    {"provider": "<active-provider>", "path": ".claude/agents/handwritten.md", "legacy_unmarked": true}
+  ],
+  "fingerprint": "sha256:<64 hex chars>"
+}
+```
+
+`stale[]` entries are exactly the files an apply would delete; `reason` is
+`"role removed from config"` or `"skill deactivated"`. `foreign[]` entries survive by
+design and are never removed (`legacy_unmarked` flags marker-less legacy files). The
+`fingerprint` is the TOCTOU guard that must be echoed back on apply.
+
+On a subprocess failure or unparseable/non-object stdout the route returns **500**
+`{"success": false, "error": "sync_preview_failed"}`.
+
+### `POST /api/roles/cleanup/apply`
+
+Request body: `{"confirm": true, "fingerprint": "<sha256:… from the preview>"}`.
+
+The ordering is binding:
+
+1. `confirm` must be literally `true`, otherwise **400** `{"error": "confirmation_required"}`
+   and no sync run is started.
+2. The server recomputes the preview and compares its `fingerprint` with the submitted
+   one; on mismatch **409** `{"error": "preview_stale", "stale": [...]}` with the freshly
+   recomputed stale list (the UI re-renders from it) and still no sync run.
+3. Only then a real `sync.py` run is started. A non-zero return code yields **500**
+   `{"error": "sync_failed", "output": "..."}`.
+4. On success **200** `{"success": true, "returncode": 0, "output": "...", "deleted": [...]}`,
+   where `deleted` is the stale paths of the same recomputed preview that passed the
+   fingerprint check.
+
+**Backup before apply (OQ-8).** The run performs the backup-first agent-file cleanup: a
+`<name>.sync-backup-<YYYYmmdd-HHMMSS>` sibling is written before every unlink and there is
+no opt-out. A cleanup started from the Admin UI therefore always leaves a restorable
+backup, and `project.yaml → roles` is never edited.
+
+### UI control
+
+The Sync page adds a **Preview cleanup** button to the sync button row. A successful
+preview renders the stale and foreign lists and enables **Remove N stale file(s)** only
+when `N > 0`. Confirming posts `{confirm: true, fingerprint}`; a 409 re-renders from the
+returned `stale` list without wedging the controls, while 400/500 never mark any file as
+removed.

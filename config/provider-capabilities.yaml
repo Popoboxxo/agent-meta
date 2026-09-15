@@ -31,6 +31,19 @@
 # false` entry is a verified statement of no command surface; do not flip it
 # to true without confirming the provider's command directory/format in
 # config/ai-providers.yaml (commands_dir/commands_ext/commands_format).
+#
+# runtime_gate (SPEC-OPENCODE-RUNTIME-GATE-2026-09-13, IC-01): how the
+# provider actually enforces the CRITICAL GATE ("MAIN CHAT darf nicht selbst
+# editieren"), one of hook | plugin | permission | advisory. Every registered
+# provider MUST carry the key explicitly (same obligation as `commands`); an
+# absent key resolves fail-safe to `advisory` at runtime, but
+# tests/test_provider_agnostic_dispatch.py AC-01 turns the omission into a
+# failure. Values are the *declared contract*, cross-checked against the
+# machine flags in config/ai-providers.yaml by scripts/lib/providers.py
+# (provider_runtime_gate_tier): `hook` requires a verified hook_protocol,
+# `plugin` a verified plugin_protocol, `permission` a native permission layer
+# (partial — no delegation provenance), `advisory` prompt-only. Never claim a
+# stronger tier than the flags support.
 
 capabilities:
   Claude:
@@ -40,6 +53,7 @@ capabilities:
     text_mentions: true
     hooks: true
     commands: true
+    runtime_gate: hook                  # verified PreToolUse hook contract (hook_protocol claude-code-json)
     native_agent_tools: ["Agent", "Task"]
     structured_handoff: true
     handoff_format: "json"
@@ -58,6 +72,7 @@ capabilities:
     text_mentions: false
     hooks: false
     commands: true
+    runtime_gate: permission            # native permission layer blocks Main-Chat writes; PARTIAL (no delegation provenance) — Phase 0, flips to plugin only after P6
     native_agent_tools: ["task"]
     structured_handoff: true
     handoff_format: "json"
@@ -76,6 +91,7 @@ capabilities:
     text_mentions: false
     hooks: true                    # Antigravity hooks.json contract verified (issue #674 Phase 3.1) — mirrored via hook_protocol antigravity-hooks-json + translating adapter
     commands: true                 # .gemini/commands/*.toml (commands_dir/commands_ext/commands_format in ai-providers.yaml)
+    runtime_gate: hook             # verified Antigravity hooks.json contract (hook_protocol antigravity-hooks-json)
     native_agent_tools: ["define_subagent", "send_message", "invoke_subagent"]
     structured_handoff: true
     handoff_format: "json"
@@ -100,6 +116,7 @@ capabilities:
     text_mentions: true
     hooks: false
     commands: true
+    runtime_gate: advisory
     native_agent_tools: []
     structured_handoff: false
     handoff_format: "yaml_text_block"
@@ -121,6 +138,7 @@ capabilities:
     text_mentions: true
     hooks: false
     commands: false
+    runtime_gate: advisory
     native_agent_tools: []
     structured_handoff: false
     handoff_format: "yaml_text_block"
@@ -149,6 +167,7 @@ capabilities:
     text_mentions: true
     hooks: false
     commands: false                 # verified: no command surface upstream (ai-providers.yaml has_commands: false)
+    runtime_gate: advisory          # hook paths configured but no verified hook_protocol (#630) — no runtime enforcement
     native_agent_tools: []
     structured_handoff: false
     handoff_format: "yaml_text_block"
@@ -181,6 +200,7 @@ capabilities:
     text_mentions: false
     hooks: false                      # contract verified (V1) but NOT mirrored: payload deviations vs Claude Code + hash-trust review gate (#630 pattern)
     commands: false                   # no verified command surface (ai-providers.yaml has_commands: false)
+    runtime_gate: advisory            # hook contract verified but not mirrored + hash-trust gate (#630) — no runtime enforcement
     native_agent_tools: ["spawn_agent", "send_input", "resume_agent", "wait_agent", "close_agent"]   # documented dispatch surface (V7)
     structured_handoff: true
     handoff_format: "json"
@@ -210,6 +230,7 @@ capabilities:
     text_mentions: false
     hooks: false                      # project-level hooks are completely ignored by the harness (V2)
     commands: false                   # no verified command surface (ai-providers.yaml has_commands: false)
+    runtime_gate: advisory            # project-level hooks ignored by the harness (V2) — no runtime enforcement
     native_agent_tools: ["Agent", "Task"]   # V17: Agent + legacy alias Task
     structured_handoff: true
     handoff_format: "yaml_text_block" # conservative until json support verified
@@ -239,6 +260,7 @@ capabilities:
     text_mentions: false
     hooks: false                      # hooks exist (20 events, V11) but only user-level ~/.kimi-code/config.toml [[hooks]] documented — no project-level hook generation (#630 pattern)
     commands: false                   # no verified command surface (ai-providers.yaml has_commands: false)
+    runtime_gate: advisory            # hooks exist but user-level only, no project mirror (#630) — no runtime enforcement
     native_agent_tools: ["Agent", "AgentSwarm"]   # V16: Agent (prompt/description/subagent_type/resume/run_in_background) + AgentSwarm (prompt_template + items)
     structured_handoff: true
     handoff_format: "yaml_text_block"

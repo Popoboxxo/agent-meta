@@ -5113,10 +5113,13 @@ async function viewSync() {
   const runBtn = el("button", { class: "btn btn-primary" }, ["Run sync.py"]);
   const dryBtn = el("button", { class: "btn" }, ["Dry-run (--validate)"]);
   const standaloneBtn = el("button", { class: "btn" }, ["Render standalone agents"]);
+  const cleanupPreviewBtn = el("button", { class: "btn" }, ["Preview cleanup"]);
   const statsWrap = el("div", { style: "margin-top: var(--space-4); display: none;" });
-  wrap.appendChild(el("div", { class: "btn-row", style: "margin-bottom: var(--space-3);" }, [runBtn, dryBtn, standaloneBtn]));
+  const cleanupPanel = el("div", { style: "margin-top: var(--space-3); display: none;" });
+  wrap.appendChild(el("div", { class: "btn-row", style: "margin-bottom: var(--space-3);" }, [runBtn, dryBtn, standaloneBtn, cleanupPreviewBtn]));
   wrap.appendChild(consoleEl);
   wrap.appendChild(statsWrap);
+  wrap.appendChild(cleanupPanel);
 
   loadStatus();
 
@@ -5221,6 +5224,115 @@ async function viewSync() {
       toast(r.success ? "Standalone agents regenerated" : "Standalone render failed", r.success ? "success" : "error");
     } catch (err) { setOutput(err.message); toast(err.message, "error"); }
     finally { setSyncButtonsDisabled(false); loadStatus(); }
+  });
+
+  // --- Stale role cleanup (IC-10: preview -> confirm -> apply) -----------
+  // OQ-1: the UI always previews first — there is no direct apply path.
+  // OQ-8: the server writes a backup before each unlink, so the UI only ever
+  // confirms an explicit, fingerprinted preview.
+  let cleanupFingerprint = null;
+  let cleanupStaleCount = 0;
+
+  const cleanupRemoveBtn = el("button", { class: "btn btn-danger" }, ["Remove 0 stale file(s)"]);
+  cleanupRemoveBtn.disabled = true;
+
+  const setCleanupRemoveState = (count, canRemove) => {
+    cleanupStaleCount = count;
+    cleanupRemoveBtn.textContent = `Remove ${count} stale file(s)`;
+    cleanupRemoveBtn.disabled = !(canRemove && count > 0);
+  };
+
+  const renderCleanupPanel = (stale, foreign, canRemove) => {
+    cleanupPanel.style.display = "block";
+    cleanupPanel.replaceChildren();
+    const staleList = stale || [];
+    const foreignList = foreign || [];
+
+    if (staleList.length === 0 && foreignList.length === 0) {
+      cleanupPanel.appendChild(el("p", { class: "muted" }, ["No stale agent files detected."]));
+    }
+
+    if (staleList.length > 0) {
+      cleanupPanel.appendChild(el("p", {}, [`${staleList.length} stale file(s) can be removed (a backup is written before each removal):`]));
+      const list = el("ul", { class: "cleanup-stale-list" });
+      for (const entry of staleList) {
+        list.appendChild(el("li", {}, [
+          el("code", {}, [entry.path || ""]),
+          ` — ${entry.provider || "?"} — ${entry.reason || ""}${entry.adopted ? " (adopted)" : ""}`,
+        ]));
+      }
+      cleanupPanel.appendChild(list);
+    }
+
+    if (foreignList.length > 0) {
+      cleanupPanel.appendChild(el("p", { class: "muted" }, [`${foreignList.length} foreign file(s) — never removed:`]));
+      const list = el("ul", { class: "cleanup-foreign-list" });
+      for (const entry of foreignList) {
+        list.appendChild(el("li", {}, [
+          el("code", {}, [entry.path || ""]),
+          ` — ${entry.provider || "?"}${entry.legacy_unmarked ? " (legacy, unmarked)" : ""}`,
+        ]));
+      }
+      cleanupPanel.appendChild(list);
+    }
+
+    cleanupPanel.appendChild(cleanupRemoveBtn);
+    setCleanupRemoveState(staleList.length, canRemove);
+  };
+
+  const showCleanupPreview = (payload) => {
+    cleanupFingerprint = payload && payload.fingerprint ? payload.fingerprint : null;
+    renderCleanupPanel(
+      payload && payload.stale,
+      payload && payload.foreign,
+      cleanupFingerprint !== null,
+    );
+  };
+
+  cleanupPreviewBtn.addEventListener("click", async () => {
+    setSyncButtonsDisabled(true);
+    cleanupPanel.style.display = "block";
+    cleanupPanel.replaceChildren(el("p", {}, ["Loading cleanup preview …"]));
+    try {
+      const r = await api.post("/api/roles/cleanup/preview");
+      showCleanupPreview(r);
+    } catch (err) {
+      cleanupFingerprint = null;
+      cleanupPanel.replaceChildren(el("p", { class: "line-error" }, [err.message]));
+      setCleanupRemoveState(0, false);
+      toast(err.message, "error");
+    } finally { setSyncButtonsDisabled(false); }
+  });
+
+  const applyCleanup = async () => {
+    setSyncButtonsDisabled(true);
+    try {
+      const r = await api.post("/api/roles/cleanup/apply", { confirm: true, fingerprint: cleanupFingerprint });
+      toast(`Removed ${(r.deleted || []).length} stale file(s)`, "success");
+      setOutput(r.output);
+      cleanupFingerprint = null;
+      renderCleanupPanel([], [], false);
+      loadStatus();
+    } catch (err) {
+      if (err.status === 409) {
+        // TOCTOU: discard the stale fingerprint and re-render the fresh list
+        // from the response; a new preview is required before retrying.
+        cleanupFingerprint = null;
+        renderCleanupPanel((err.body && err.body.stale) || [], [], false);
+        toast("Cleanup preview changed — review and preview again", "warning");
+      } else {
+        // 400 confirmation_required / 500 sync_failed: never mark files as removed.
+        toast(err.message, "error");
+      }
+    } finally { setSyncButtonsDisabled(false); }
+  };
+
+  cleanupRemoveBtn.addEventListener("click", () => {
+    confirmDestructive(
+      `Remove ${cleanupStaleCount} stale agent file(s)? A backup is written before each deletion.`,
+      applyCleanup,
+      { title: "Remove stale role files", confirmLabel: "Remove" },
+    );
   });
   return wrap;
 }

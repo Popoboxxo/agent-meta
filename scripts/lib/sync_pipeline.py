@@ -13,8 +13,9 @@ original order. Extraction is purely mechanical (byte-identical behavior):
   original local variables,
 - ``provider_variables`` reference-sharing semantics (shallow copy only for
   ``orchestrator.provider-overrides.<Provider>.mode``; the shared
-  ``variables`` dict is never mutated except ``PIPELINE_DETAILS_DIR``) are
-  preserved verbatim.
+  ``variables`` dict is otherwise mutated only by the per-provider
+  ``PIPELINE_DETAILS_DIR`` write and the per-provider runtime-gate tier
+  bundle, both overwritten before each provider renders) are preserved.
 
 Moved helpers found domain homes elsewhere: ``sync_knowledge_engine`` in
 ``lib/knowledge.py``, ``_probe_inactive_plugins`` in ``lib/plugins.py``,
@@ -49,6 +50,7 @@ from lib.context import (
     init_claude_personal,
     init_settings_json,
     init_settings_local_json,
+    rollback_context_adapters,
     sync_claude_md_static,
     sync_context_for_provider,
     sync_prompts_for_continue,
@@ -65,6 +67,7 @@ from lib.generated_file_drift import (
     backup_drifted_files,
     capture_generated_file_hashes,
     is_drift_detection_enabled,
+    prune_sync_backups,
     scan_generated_file_drift,
 )
 from lib.gitignore import (
@@ -76,7 +79,7 @@ from lib.gitignore import (
 from lib.hook_plugins import sync_hook_lib, sync_release_gates
 from lib.hooks import sync_hooks
 from lib.io import SyncError, _write_yaml, write_atomic
-from lib.isolation import sync_provider_isolation
+from lib.isolation import _sync_opencode_runtime_gate, sync_provider_isolation
 from lib.knowledge import sync_knowledge_engine
 from lib.log import SyncLog
 from lib.subagent_permissions import resolve_subagent_permission_provider_vars
@@ -90,9 +93,12 @@ from lib.pipelines import (
 from lib.platform import PLATFORM_CONFIGS_DIR, load_platform_config, resolve_platform_defaults
 from lib.plugins import _probe_inactive_plugins
 from lib.providers import (
+    load_provider_capabilities,
     load_providers_config,
+    provider_runtime_gate_tier,
     resolve_context_filename,
     resolve_providers,
+    runtime_gate_vars,
 )
 from lib.repo_containment import (
     cleanup_tmp_sink,
@@ -107,6 +113,7 @@ from lib.rules import (
     sync_rules,
     sync_speech_mode,
 )
+from lib.runtime_gate import sync_runtime_gate_plugins
 from lib.skill_channel import sweep_orphan_skill_channel_rules
 from lib.skills import (
     check_pinned_commits,
@@ -281,6 +288,19 @@ def _sync_stage_claude_base(
     # `has_dedicated_context_file` (today: Claude only) — no provider-name
     # branch. The returned flag keeps its historical name for its downstream
     # consumers but no longer literal-matches "Claude".
+    # Topology rollback (SPEC-CONTEXT-FILE-MODES-2026-09-13, AC-18): a switch
+    # back to `unified` (or a config that never opted in) tears down the adapter
+    # artifacts the previous run indexed *before* the unified context writes
+    # below, so the shared render is the final state of this run and a following
+    # `--check` reports pending == 0. Only index-tracked adapter paths are ever
+    # removed (foreign/user files are never touched); a still-needed context
+    # file is re-created by the unified render in the same run.
+    if _context_auto_generate(config):
+        active_providers = [p for p in providers if is_provider_active(config, p)]
+        rollback_context_adapters(
+            project_root, config, provider_config, active_providers, log, args.dry_run
+        )
+
     is_claude = any(
         provider_config.get(p, {}).get("has_dedicated_context_file", False)
         for p in providers
@@ -302,6 +322,10 @@ def _sync_stage_claude_base(
             sync_claude_md_static(agent_meta_root, project_root, config, variables, log, args.dry_run)
         else:
             log.note("CLAUDE.md", "context_file.auto_generate: false — static header left untouched")
+            log.warning(
+                "context_file.auto_generate: false (S1) — static context "
+                "header left untouched; managed block not refreshed"
+            )
         init_claude_personal(agent_meta_root, project_root, log, args.dry_run)
     init_settings_json(agent_meta_root, project_root, log, args.dry_run,
                        providers=providers, provider_config=provider_config,
@@ -338,6 +362,7 @@ def _sync_stage_contexts(
         log.provider_header(provider)
         if not is_provider_active(config, provider):
             log.note("deactivation", f"provider '{provider}' is deactivated — skipping all output")
+            log.warning(_deactivated_provider_warning(provider))
             continue
         # Per-provider orchestrator.mode override: orchestrator.provider-overrides.<Provider>.mode
         # takes precedence over the global orchestrator.mode for this provider's
@@ -355,7 +380,14 @@ def _sync_stage_contexts(
         if not _context_auto_generate(config):
             log.note("context_file", "auto_generate: false — context files left untouched "
                                      "(dev-written mode, issue #540 Fix 3)")
+            log.warning(
+                f"context_file.auto_generate: false (S1) — provider '{provider}': "
+                "context files left untouched; managed block not refreshed"
+            )
             continue
+        caps = load_provider_capabilities(agent_meta_root).get(provider, {})
+        provider_variables = dict(provider_variables)
+        provider_variables.update(runtime_gate_vars(pc, caps, config))
         sync_context_for_provider(agent_meta_root, project_root, config, provider_variables,
                                   log, args.dry_run, provider, provider_config)
     return debug_mode, allow_committed_secrets, mcp_gitignore_extras
@@ -477,6 +509,81 @@ def _sync_stage_legacy_cleanup(
                     log.debug("provider-cleanup", f"could not prune '{prov_dir}': {type(e).__name__}: {e}")  # noqa: PLE1205
 
 
+# OQ-2 (frozen): bounded backup retention. Both thresholds must be exceeded;
+# the newest backup of a source is never pruned.
+SYNC_BACKUP_MAX_AGE_DAYS = 30
+SYNC_BACKUP_MAX_PER_SOURCE = 3
+
+
+def _deactivated_provider_warning(provider: str) -> str:
+    """Shared S2 message; identical text dedupes across pipeline stages."""
+    return (
+        f"provider '{provider}' is deactivated (S2) — output skipped; "
+        "managed context/index not refreshed"
+    )
+
+
+def _managed_dirs_for_prune(
+    project_root: Path, config: dict, provider_config: dict,
+) -> list[Path]:
+    """Managed directories per active provider, for backup pruning.
+
+    Mirrors the ``dir_specs`` of ``generated_file_drift._iter_managed_files``
+    (the single source of truth for which directories carry a managed index)
+    so the prune wiring needs no second public API on the drift module. A
+    directory that was fully emptied by cleanup (all roles removed) is still
+    enumerated, which a managed-file-derived listing would miss.
+    """
+    dirs: list[Path] = []
+    seen: set[Path] = set()
+    for provider, pc in provider_config.items():
+        if not is_provider_active(config, provider):
+            continue
+        specs: list[str] = [
+            pc.get("skills_dir", ".claude/skills"),
+            pc.get("agents_dir", ".claude/agents"),
+        ]
+        if pc.get("has_hooks", False):
+            specs.append(pc.get("hooks_dir", ".claude/hooks"))
+        if pc.get("has_rules", False):
+            specs.append(pc.get("rules_dir", ".claude/rules"))
+        if pc.get("has_commands", False):
+            specs.append(pc.get("commands_dir", ".claude/commands"))
+        specs.append(resolve_pipeline_details_dir(pc, provider))
+        for rel in specs:
+            if not rel:
+                continue
+            base = project_root / rel
+            if not base.is_dir():
+                continue
+            candidates = [base]
+            try:
+                candidates += [
+                    child for child in sorted(base.iterdir())
+                    if child.is_dir() and (child / ".agent-meta-managed").exists()
+                ]
+            except OSError:
+                pass
+            for candidate in candidates:
+                if candidate not in seen:
+                    seen.add(candidate)
+                    dirs.append(candidate)
+    return dirs
+
+
+def _prune_managed_sync_backups(
+    project_root: Path, config: dict, provider_config: dict,
+    args: argparse.Namespace, log: SyncLog,
+) -> None:
+    """Bound ``*.sync-backup-*`` growth after the drift stage (AC-09/OQ-2)."""
+    for managed_dir in _managed_dirs_for_prune(project_root, config, provider_config):
+        prune_sync_backups(
+            managed_dir, project_root, log, args.dry_run,
+            max_age_days=SYNC_BACKUP_MAX_AGE_DAYS,
+            max_per_source=SYNC_BACKUP_MAX_PER_SOURCE,
+        )
+
+
 def _sync_stage_generated_file_drift_scan(
     agent_meta_root: Path, project_root: Path, config: dict,
     provider_config: dict, args: argparse.Namespace, log: SyncLog,
@@ -489,22 +596,28 @@ def _sync_stage_generated_file_drift_scan(
     safety net (issue #734)."""
     if not is_drift_detection_enabled(config):
         log.skip("generated-file-drift-scan", "disabled (drift-detection.enabled: false)")
-        return
-    findings = scan_generated_file_drift(agent_meta_root, project_root, config, provider_config)
-    backups = backup_drifted_files(findings, project_root, log, args.dry_run)
-    backup_name_by_source = {
-        backup.rsplit(".sync-backup-", 1)[0]: Path(backup).name for backup in backups
-    }
-    for finding in findings:
-        backup_name = backup_name_by_source.get(finding["path"])
-        backup_note = f" Backup written to {backup_name}." if backup_name else ""
-        log.warning(
-            f"generated-file-drift: '{finding['path']}' was manually edited "
-            f"since the last sync (provider '{finding['provider']}') -- this "
-            f"sync will overwrite it.{backup_note} Add it to "
-            ".meta-config/drift-allowlist.yaml if this edit should be "
-            "preserved going forward."
-        )
+    else:
+        findings = scan_generated_file_drift(agent_meta_root, project_root, config, provider_config)
+        backups = backup_drifted_files(findings, project_root, log, args.dry_run)
+        backup_name_by_source = {
+            backup.rsplit(".sync-backup-", 1)[0]: Path(backup).name for backup in backups
+        }
+        for finding in findings:
+            backup_name = backup_name_by_source.get(finding["path"])
+            backup_note = f" Backup written to {backup_name}." if backup_name else ""
+            log.warning(
+                f"generated-file-drift: '{finding['path']}' was manually edited "
+                f"since the last sync (provider '{finding['provider']}') -- this "
+                f"sync will overwrite it.{backup_note} Add it to "
+                ".meta-config/drift-allowlist.yaml if this edit should be "
+                "preserved going forward."
+            )
+
+    # AC-09/OQ-2 (R-02): the backup pruner runs **unconditionally** -- also when
+    # drift detection is disabled -- because cleanup backups (IC-05) are written
+    # outside this stage. Gating it behind the drift-enabled guard left the
+    # `.sync-backup-*` growth unbounded with `drift-detection.enabled: false`.
+    _prune_managed_sync_backups(project_root, config, provider_config, args, log)
 
 
 def _sync_stage_platform_defaults_snapshot(
@@ -599,6 +712,7 @@ def _sync_stage_per_provider(
     for provider in providers:
         pc = provider_config[provider]
         if not is_provider_active(config, provider):
+            log.warning(_deactivated_provider_warning(provider))
             continue
 
         _orch_config = config.get("orchestrator", {})
@@ -640,6 +754,13 @@ def _sync_stage_per_provider(
                 )
         else:
             provider_variables = variables
+
+        # IC-04: inject the resolved tier bundle before any renderer consumes
+        # ``provider_variables`` (agents/rules/context). In the no-override case
+        # this is the shared dict, so every key is overwritten per provider
+        # before it renders — no provider sees another provider's gate tier.
+        caps = load_provider_capabilities(agent_meta_root).get(provider, {})
+        provider_variables.update(runtime_gate_vars(pc, caps, config))
 
         # PIPELINE_DETAILS_DIR + on-demand pipeline stage-detail files —
         # the lean, always-on-token-saving counterpart to
@@ -744,6 +865,21 @@ def _sync_stage_per_provider(
                                 release_gates_resolved=resolve_release_gates(config, agent_meta_root))
         else:
             log.note("hooks", f"skipped for {provider} — not supported")
+
+        # IC-13: dispatch the two runtime-gate writers independent of the hook
+        # branch and of the provider-isolation >=2 guard. Both key off config
+        # capability (has_plugins) / the IC-03 resolver, never a provider literal
+        # and never ``isolation-mechanism`` (F-07).
+        if pc.get("has_plugins", False):
+            sync_runtime_gate_plugins(
+                agent_meta_root, project_root, config, log, args.dry_run,
+                provider, provider_config,
+            )
+        if provider_runtime_gate_tier(pc, caps) == "permission":
+            _sync_opencode_runtime_gate(
+                project_root, config, provider, provider_config,
+                agent_meta_root, log, args.dry_run,
+            )
         if pc.get("has_commands", False):
             sync_commands_for_provider(agent_meta_root, project_root, config, log,
                                        args.dry_run, provider,
