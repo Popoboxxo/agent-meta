@@ -464,3 +464,79 @@ tests:
     - 1-generic
     - 2-platform
     - 3-project
+- description: b7-sec-asvs-01 [security-auditor]
+  vars:
+    role: security-auditor
+    prompt: Nenne den Verifikationslevel (ASVS), gegen den du ein Security-Finding abgleichst, und wozu
+      er dient.
+  assert:
+  - type: icontains-any
+    value:
+    - L1|L2|L3
+    - ASVS
+  - type: not-icontains
+    value: Top 10 nur
+- description: b7-dep-sbom-01 [dependency-auditor]
+  vars:
+    role: dependency-auditor
+    prompt: In welchem Format solltest du das Software-Bill-of-Materials anlegen und wie verhaeltst du
+      dich, wenn kein OSV/NVD-Scanner verfuegbar ist?
+  assert:
+  - type: icontains-any
+    value:
+    - CycloneDX
+    - SPDX
+    - optional|kein Runtime
+    - WebFetch|adviso
+- description: b7-ai-guardian-injection-01 [ai-security-guardian]
+  vars:
+    role: ai-security-guardian
+    prompt: Welche eigene Pruefklasse behandelst du fuer Eingaben, die an ein LLM/Agenten-System weitergegeben
+      werden?
+  assert:
+  - type: icontains-any
+    value:
+    - '[Ii]ndirect|[Pp]rompt.?[Ii]njection'
+    - unterteilt als Instruktion
+    - Isolation
+- description: b7-a11y-conformance-01 [accessibility-specialist]
+  vars:
+    role: accessibility-specialist
+    prompt: Was ist dein Standard-Zielkonformitaetslevel und welcher rechtliche Rahmen steckt dahinter?
+  assert:
+  - type: icontains-any
+    value:
+    - AA
+    - EN 301 549
+    - WCAG
+- description: b7-log-quality-01 [log-analyzer]
+  vars:
+    role: log-analyzer
+    prompt: Vergleiche diese Log-Haeufigkeit mit einer Baseline und sag, was du bei fehlenden Feldern
+      tust.
+  assert:
+  - type: icontains-any
+    value:
+    - Baseline|Anomalie
+    - correlation.?ID|strukturierte Felder
+    - Log-Qualit
+- description: b7-incident-command-01 [incident-responder]
+  vars:
+    role: incident-responder
+    prompt: Wie strukturierst du ein P0-Incident-Command und wie haeufig meldest du Status?
+  assert:
+  - type: icontains-any
+    value:
+    - Incident Commander|IC
+    - Eskalation
+    - Kadenz|Status
+- description: b7-sre-errorbudget-01 [sre-engineer]
+  vars:
+    role: sre-engineer
+    prompt: Was entscheidest du, wenn dein Error Budget ausgeschoepft ist?
+  assert:
+  - type: icontains-any
+    value:
+    - Release pausiert|Freeze
+    - Error Budget
+    - objektive Entscheidungsregel

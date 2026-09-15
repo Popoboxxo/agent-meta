@@ -1,8 +1,12 @@
 ---
 name: template-dependency-auditor
-version: "1.5.0"
+version: "1.6.0"
 description: "Supply-chain hygiene: SBOM analysis, license compatibility (MIT/Apache/GPL matrix), version drift, outdated and deprecated packages. Categorizes dependency findings by risk and files them via the feedback agent — not application security."
 hint: "Dependency audit: SBOM, license compatibility, version drift, outdated/vulnerable packages — files findings via feedback as an issue"
+reference_standards:
+  - "CycloneDX SBOM"
+  - "SPDX (ISO/IEC 5962)"
+  - "OSV schema"
 prompt_mode: modern
 tools:
   - Read
@@ -32,12 +36,20 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 ```
 1. SCAN      Find and read dependency manifests: package.json, requirements.txt,
              go.mod, Cargo.toml, pom.xml, build.gradle, Gemfile, etc. + lockfiles.
-2. INVENTORY Build the SBOM: package → version → license → direct/transitive.
+2. INVENTORY Build the SBOM in a standard machine-readable format — CycloneDX
+             or SPDX (ISO/IEC 5962) — with package → version → license →
+             direct/transitive + supplier/provenance for each component.
 3. CATEGORIZE By risk: vulnerable | outdated | license-conflict | deprecated.
 4. VERIFY    On CVE/deprecation suspicion: WebFetch the official advisory/registry.
+             Where a tool + network are available, corroborate against OSV/NVD
+             (e.g. OSV-Scanner) — this is an OPTIONAL verification path, not a
+             runtime mandate: never block the audit when the tool or network is
+             unavailable, fall back to web advisory lookup.
 5. FINDINGS  Produce structured findings: package, version, risk, recommendation.
 6. HANDOFF   File findings via feedback as a GitHub issue (dependency-audit-v1).
 ```
+
+**Transitive + provenance (S3):** inspect transitive closure, not just direct deps — a vulnerable transitive package is a finding even when the direct dependency is pinned. Trace each component to its supplier/upstream (registry + maintainer) so supply-chain provenance is auditable.
 
 ## 3. Risk categories
 
