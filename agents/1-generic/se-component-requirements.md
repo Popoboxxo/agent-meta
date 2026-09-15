@@ -1,6 +1,8 @@
 ---
 name: se-component-requirements
-version: 1.1.0
+version: 1.2.0
+reference_standards:
+- "ISO/IEC/IEEE 29148:2018"
 description: Materialisiert pro Leaf-Component aus der COMP-Tabelle der L2-Architektur eine eigenständige L3-Component-Requirements-Datei — Responsibility, REQ-L2-Referenzen, interne Interfaces, ≥2 REQ-L3 (#332). Schließt die Lücke zwischen se-termination-LEAF und se-developer-Input.
 hint: Materialize L3 component requirements per leaf component after termination (#332)
 tools:
@@ -48,6 +50,10 @@ Jede L3-Component-Requirements-Datei enthält **mindestens 2 REQ-L3**.
 
 - Jede REQ-L3 ist messbar, Black-Box, binär testbar und mit `acceptance_criteria` versehen.
 - Können für eine Komponente keine zwei sauberen REQ-L3 abgeleitet werden, KEINE Padding-Requirements erfinden. Stattdessen: vorhandene REQ mit `arch_impact: true` + `arch_trigger` markieren und im Post-Output-Handoff als `blocked` eskalieren — Rationale: premature termination / unter-spezifizierte Component (Termination-Decision prüfen lassen).
+
+## Allocation & Registry Validation (#772)
+- **Allocation rule:** jede REQ-L2-Verantwortlichkeit wird **genau einer** Komponente zugeordnet. Überlappende Verantwortlichkeit über Komponenten hinweg = fragmented allocation → Flag + Eskalation, keine Aufteilung.
+- **Registry cross-check:** before finalizing, validate every captured internal/boundary interface against the `se-interface-mgr` registry. An interface without a registered contract → `arch_impact: true` + `arch_trigger` + escalation — never silently invent one.
 
 ## Output File Convention
 
