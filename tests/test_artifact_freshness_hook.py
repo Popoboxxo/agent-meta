@@ -62,8 +62,15 @@ def _run_gate(repo: Path) -> subprocess.CompletedProcess:
 
 
 def _write_config(repo: Path) -> None:
-    (repo / ".agent-meta").mkdir(exist_ok=True)
-    (repo / ".agent-meta" / "generated-artifacts.yaml").write_text(
+    (repo / ".meta-config").mkdir(exist_ok=True)
+    (repo / ".meta-config" / "generated-artifacts.yaml").write_text(
+        "artifacts:\n  - source: source.txt\n    generated: generated.txt\n",
+        encoding="utf-8",
+    )
+
+
+def _write_fallback_config(repo: Path) -> None:
+    (repo / "generated-artifacts.yaml").write_text(
         "artifacts:\n  - source: source.txt\n    generated: generated.txt\n",
         encoding="utf-8",
     )
@@ -125,7 +132,7 @@ def test_untracked_generated_artifact_falls_back_to_filesystem_mtime(repo):
     unconditionally reported as missing just because git_mtime() is None."""
     (repo / "source.txt").write_text("v1", encoding="utf-8")
     _write_config(repo)
-    _git(repo, "add", "source.txt", ".agent-meta")
+    _git(repo, "add", "source.txt", ".meta-config")
     _git(repo, "commit", "-q", "-m", "v1")
 
     # generated.txt is written to disk AFTER the commit and never committed
@@ -137,3 +144,81 @@ def test_untracked_generated_artifact_falls_back_to_filesystem_mtime(repo):
     result = _run_gate(repo)
     assert result.returncode == 0, result.stdout
     assert "[FAIL]" not in result.stdout
+
+
+def test_fallback_config_path_is_used_when_meta_config_absent(repo):
+    """Without a .meta-config/ directory the gate reads the project-root
+    generated-artifacts.yaml fallback and actually runs."""
+    (repo / "source.txt").write_text("v1", encoding="utf-8")
+    (repo / "generated.txt").write_text("gen v1", encoding="utf-8")
+    _write_fallback_config(repo)
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "v1")
+
+    result = _run_gate(repo)
+    assert result.returncode == 0, result.stdout
+    assert "[INFO] artifact-freshness: checked 1 artifact pair(s), all fresh" in result.stdout
+
+
+def test_primary_config_path_wins_over_fallback(repo):
+    """Both configs present: the primary .meta-config/ path wins
+    deterministically, even when the fallback would pass."""
+    (repo / "source.txt").write_text("v1", encoding="utf-8")
+    (repo / "generated.txt").write_text("gen v1", encoding="utf-8")
+    _write_fallback_config(repo)
+    (repo / "stale-generated.txt").write_text("gen v1", encoding="utf-8")
+    (repo / ".meta-config").mkdir(exist_ok=True)
+    (repo / ".meta-config" / "generated-artifacts.yaml").write_text(
+        "artifacts:\n  - source: stale-source.txt\n    generated: stale-generated.txt\n",
+        encoding="utf-8",
+    )
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "v1")
+
+    time.sleep(1.1)
+    (repo / "stale-source.txt").write_text("v2", encoding="utf-8")
+    _git(repo, "add", "stale-source.txt")
+    _git(repo, "commit", "-q", "-m", "v2 primary source change")
+
+    result = _run_gate(repo)
+    assert result.returncode == 1, result.stdout
+    assert "[FAIL] artifact-freshness:" in result.stdout
+    assert "stale-generated.txt" in result.stdout
+
+
+def test_submodule_path_is_not_read(repo):
+    """The old submodule path .agent-meta/generated-artifacts.yaml is no longer
+    a config source: the gate self-skips instead of reading it."""
+    (repo / "source.txt").write_text("v1", encoding="utf-8")
+    (repo / "generated.txt").write_text("gen v1", encoding="utf-8")
+    (repo / ".agent-meta").mkdir(exist_ok=True)
+    (repo / ".agent-meta" / "generated-artifacts.yaml").write_text(
+        "artifacts:\n  - source: source.txt\n    generated: generated.txt\n",
+        encoding="utf-8",
+    )
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "v1")
+
+    time.sleep(1.1)
+    (repo / "source.txt").write_text("v2", encoding="utf-8")
+    _git(repo, "add", "source.txt")
+    _git(repo, "commit", "-q", "-m", "v2 source change")
+
+    result = _run_gate(repo)
+    assert result.returncode == 0, result.stdout
+    assert "[SKIP] artifact-freshness:" in result.stdout
+    # Pin the config-skip reason: both candidate paths must be named, so a
+    # "python3 not available" skip can no longer satisfy this assertion.
+    assert (
+        "[SKIP] artifact-freshness: no .meta-config/generated-artifacts.yaml "
+        "or generated-artifacts.yaml found" in result.stdout
+    )
+
+
+def test_gate_source_names_project_owned_config_path():
+    """Guard against the submodule path creeping back into the gate source."""
+    text = (
+        _REPO_ROOT / "hooks" / "1-generic" / "release-gates" / "artifact-freshness.sh"
+    ).read_text(encoding="utf-8")
+    assert ".agent-meta/generated-artifacts.yaml" not in text
+    assert text.count('".meta-config/generated-artifacts.yaml"') >= 1
