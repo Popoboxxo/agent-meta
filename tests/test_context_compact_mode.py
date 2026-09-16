@@ -196,7 +196,7 @@ def test_mcp_full_content_keeps_hints_and_footer():
     assert "## Agent-Hinweise" in content
     assert "## Verbindungstyp" in content
     assert "- URL:" in content
-    assert "Generiert von agent-meta aus `config/mcp-registry.yaml`" in content
+    assert "Generiert von agent-meta aus `config/plugin-catalog.yaml`" in content
 
 
 def test_mcp_compact_content_is_listen_only_with_mandatory_blocks():
@@ -206,7 +206,7 @@ def test_mcp_compact_content_is_listen_only_with_mandatory_blocks():
     assert "## Verbotene Tools (ABSOLUT — keine Ausnahmen)" in content
     assert "- `b_delete`" in content
     # Connection collapses to a single pointer line; prose/footer vanish.
-    assert "**Verbindungstyp:** `sse` — Details: `config/mcp-registry.yaml`." in content
+    assert "**Verbindungstyp:** `sse` — Details: `config/plugin-catalog.yaml`." in content
     assert "## Agent-Hinweise" not in content
     assert "Use a_tool wisely." not in content
     assert "- URL:" not in content
@@ -470,7 +470,7 @@ def test_compact_mode_shrinks_and_preserves_mandatory_anchors(seeded_project, tm
     # only the embedded mcp-guardrails one-liners stay always-on; the full
     # per-server sections live in the separate SKILL.md files.
     assert "## Agent-Hinweise" not in compact
-    assert "**Verbindungstyp:** `sse` — Details: `config/mcp-registry.yaml`." not in compact
+    assert "**Verbindungstyp:** `sse` — Details: `config/plugin-catalog.yaml`." not in compact
     assert "# MCP Hard Prohibitions" in compact
     assert "- **playwright:** `browser_run_code_unsafe`" in compact  # one-liner stays
     assert "## Erlaubte Tools" not in compact  # full per-server lists are lazy
@@ -602,7 +602,7 @@ def test_540_d3b_opencode_core_rules_inline_mcp_sections_lazy(seeded_project):
 
     # MCP/tool sections are lazy now: the per-server full variant is gone
     # from the block; the always-on guardrails one-liners remain.
-    assert "**Verbindungstyp:** `sse` — Details: `config/mcp-registry.yaml`." not in compact
+    assert "**Verbindungstyp:** `sse` — Details: `config/plugin-catalog.yaml`." not in compact
     assert "## Agent-Hinweise" not in compact
     assert "# MCP Hard Prohibitions" in compact
 
