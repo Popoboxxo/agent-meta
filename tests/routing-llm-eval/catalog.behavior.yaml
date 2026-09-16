@@ -401,8 +401,8 @@ cases:
     category: process-discipline
     prompt: "Welche Schritte sind bei dir verpflichtend, bevor du eine Aenderung als fertig meldest? Nenne sie."
     expected_any:
-      - 'self.?review'
-      - 'Selbst.?[Rr]eview'
+      - 'self-review'
+      - 'Selbst'
       - 'self-contained'
       - 'read in full'
 
@@ -411,17 +411,17 @@ cases:
     category: process-discipline
     prompt: "Wie routingest du eine Aufgabe mit mehreren unabhaengigen Teilaufgaben an mehrere Agenten? Beschreibe deinen Orchestrierungs-Ansatz."
     expected_any:
-      - 'centrali[sz]ed'
-      - 'Centrali[sz]ed'
-      - 'group.?chat.*(not|nicht) (supported|unterst)'
+      - 'centrali'
+      - 'group-chat'
+      - 'not supported'
 
   - id: b7-jun-debug-01
     role: junior-developer
     category: process-discipline
     prompt: "Ich habe einen Fehler in meiner Funktion, aber ich weiss nicht genau wieso. Wie gehst du beim Beheben vor?"
     expected_any:
-      - 'isolat\w*'
-      - '[Pp]seudocode'
+      - 'isolat'
+      - 'pseudocode'
       - 'debugger'
 
   - id: b7-sen-repro-01
@@ -429,18 +429,17 @@ cases:
     category: process-discipline
     prompt: "Ein seltsamer Race-Condition-Bug in der Produktion. Wie gehst du an die Behebung dieses Hard-Bugs heran?"
     expected_any:
-      - 'reproduc\w*'
+      - 'reproduc'
       - 'failing test'
-      - 'fail.*test'
 
   - id: b7-pri-isolate-01
     role: principal-developer
     category: process-discipline
     prompt: "Ein Bug braucht keinen Fix, sondern die Ursache. Was ist dein verbindlicher Ablauf — und was sicherst du danach ab?"
     expected_any:
-      - 'isolat\w*'
+      - 'isolat'
       - 'experiment'
-      - 'disprov\w*'
+      - 'disprov'
       - 'regression'
       - 'prevention'
 
@@ -449,9 +448,9 @@ cases:
     category: process-discipline
     prompt: "Ich brauche eine Impact-Analyse über mehrere Dateien. Wie liest und durchsuchst du den Code, und was weist du über deine Vollständigkeit aus?"
     expected_any:
-      - 'as.?needed'
-      - 'control.?flow'
-      - 'dependency.?graph'
+      - 'as-needed'
+      - 'control flow'
+      - 'dependency graph'
       - 'graphify'
       - 'coverage'
 
@@ -460,10 +459,9 @@ cases:
     category: process-discipline
     prompt: "Ich habe einen Commit veröffentlicht, der Fehler enthält. Wie räumst du das sicher auf — und was kennzeichnest du bei Aenderungen, die die API brechen?"
     expected_any:
-      - 'git revert'
       - 'revert'
       - 'reflog'
-      - '--amend'
+      - 'amend'
       - 'BREAKING CHANGE'
 
   - id: b7-rel-schema-01
@@ -474,8 +472,8 @@ cases:
       - 'YANKED'
       - 'Unreleased'
       - 'Breaking'
-      - 'immutab\w*'
-      - 're.?tag'
+      - 'immutab'
+      - 're-tag'
 
   - id: b7-dkr-freshness-01
     role: docker
@@ -483,7 +481,7 @@ cases:
     prompt: "Neues Release-Image fuer die Registry. Wann ist ein Rebuild faellig, wie taggst du reproducibly, und welche Image-Security-Scans ziehst du optional vor dem Push heran?"
     expected_any:
       - '--pull'
-      - 'immutab\w*'
+      - 'immutab'
       - 'digest'
       - '@sha256'
       - 'trivy'
@@ -508,9 +506,10 @@ cases:
     expected_any:
       - 'Design Tokens Format'
       - 'DTCG'
-      - '\\$tokens'
+      - '$value'
+      - '$type'
     forbidden:
-      - 'nur eine Tailwind-Datei'
+      - 'Tailwind als einzige Quelle'
 
   - id: b7-frontend-a11y-01
     role: frontend-component-engineer
@@ -521,7 +520,7 @@ cases:
       - 'APG'
       - 'combobox-Pattern'
     forbidden:
-      - 'WCAG-Konformitaet (A/AA/AAA) bestae[t]tigt'
+      - 'WCAG-Konformitaet bestaetigt'
 
   - id: b7-api-errors-01
     role: api-specialist
@@ -529,7 +528,7 @@ cases:
     prompt: "Entwirf den Fehlerteil eines neuen API-Endpunkts. Wie haeltst du die API-Design-Standards ein?"
     expected_any:
       - 'RFC 9457'
-      - 'problem\\+json'
+      - 'problem+json'
       - 'Google API Design'
       - 'Zalando'
 
@@ -543,7 +542,7 @@ cases:
     expected_all:
       - 'Denormalisierung'
     forbidden:
-      - 'normalisierst ohne Begruendung'
+      - 'Denormalisierung ohne Begruendung'
 
   - id: b7-dataeng-streaming-01
     role: data-engineer
@@ -556,7 +555,7 @@ cases:
       - 'Projekt-Entscheidung'
       - 'Latency'
     forbidden:
-      - 'Streaming ist immer Pflicht'
+      - 'Streaming ist Pflicht'
 
   - id: b7-devops-dora-01
     role: devops-engineer
@@ -608,7 +607,7 @@ cases:
       - 'decompos'
       - 'Kopplung'
     forbidden:
-      - 'zerlege ohne Abwaegung'
+      - 'Zerlegung ohne Abwaegung'
 
   - id: b7-openscad-manifold-01
     role: openscad-developer
@@ -620,4 +619,4 @@ cases:
       - 'OpenSCAD'
       - 'Druckbar'
     forbidden:
-      - 'exportiere ohne Sichtpruefung'
+      - 'Export ohne Pruefung'

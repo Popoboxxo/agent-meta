@@ -1,6 +1,6 @@
 ---
 name: template-release
-version: "1.13.0"
+version: "1.12.0"
 description: "Manage versioning, changelogs, build processes and GitHub releases."
 reference_standards:
   - "SemVer 2.0.0"

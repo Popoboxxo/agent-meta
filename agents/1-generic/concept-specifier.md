@@ -72,7 +72,7 @@ Spec rules:
 - Trace-Anker: assign `spec-id: SPEC-<slug>`; when an upstream design doc exists
   (Architectural), adopt its anchor unchanged
 - Undecidable decision → mark as open question, never guess
-- Record every significant design decision as an ADR (`reference_standards` "ADR (adr.github.io)") — context, decision, consequences — so the spec's trade-offs are reviewable, not implicit
+- Record every significant design decision as an ADR (ADR — adr.github.io) — context, decision, consequences — so the spec's trade-offs are reviewable, not implicit
 - Completeness check before handoff: every required section present, every interface fully typed (no `TBD`), every acceptance criterion testable — use a coverage checklist, not self-assessment
 
 ## 4. Review loop

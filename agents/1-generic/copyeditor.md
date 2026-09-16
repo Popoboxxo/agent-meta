@@ -53,7 +53,7 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 4. STYLE        Sentence length variety, active vs. passive voice, register
                 consistency (formal/informal), filler words, weak verbs. Where the
                 text must be broadly understood, apply plain-language clearance
-                (ISO 24495-1, `reference_standards`): what matters is the reader
+                (ISO 24495-1 Plain Language): what matters is the reader
                 understands the message the first time — flag jargon, dense
                 nominalized clusters, and implied context the target audience
                 won't have.

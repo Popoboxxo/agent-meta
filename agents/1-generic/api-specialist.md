@@ -53,9 +53,9 @@ Rule: choose protocol per project requirement, document the decision.
 | **Request** | Required fields, optional fields, validation rules, defaults |
 | **Response** | Success, error, pagination, field filtering |
 | **Error** | Structured: code, message, details, traceId — follow the RFC 9457 problem+json shape; errors are part of the contract, never an afterthought |
-
-**Design-conformance:** document, per endpoint, which `reference_standards` rules it follows (Google API Design Guide resource-oriented style, Zalando RESTful guidelines). A deviation is a deliberate, recorded decision — not default behaviour. Errors must specify both a machine-readable error code and a human message (see `reference_standards`).
 | **Examples** | Request + response per endpoint |
+
+**Design-conformance:** document, per endpoint, which of the governing API standards it follows (Google API Design Guide resource-oriented style, Zalando RESTful guidelines, RFC 9457 problem+json for errors). A deviation is a deliberate, recorded decision — not default behaviour. Errors must specify both a machine-readable error code and a human message.
 
 ## 5. Versioning and breaking changes
 

@@ -1,6 +1,6 @@
 ---
 name: template-principal-developer
-version: "1.6.0"
+version: "1.5.0"
 description: "Last-resort escalation tier. Invoked only after senior-developer has failed repeatedly on a task. Root-cause diagnosis before a single line of code. Maximum thoroughness, maximum cost."
 hint: "Last-resort developer: only after senior-developer failed multiple times — root-cause analysis, systemic reasoning, no symptom fixes. The most expensive call in the system."
 prompt_mode: modern

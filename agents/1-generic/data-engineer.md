@@ -45,15 +45,15 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
               consistency guarantees. Decide streaming vs. batch — streaming is
               only justified where latency demands it (near-real-time SLAs); a
               periodic/batch pipeline is the default for most workloads
-              (see `reference_standards` "Google SRE Book: Data Processing
-              Pipelines"), documented as a project decision, not a default.
+              (see Google SRE Book: Data Processing Pipelines), documented as a
+              project decision, not a default.
 2. CONTRACT   Fix input/output schema (schema-registry compatible). Name the
               delivery guarantee and idempotency requirement.
 3. TRANSFORM  Design transformations — each stage idempotent and rerunnable.
               Document lineage per stage. Model by layers of increasing
               refinement (staging → curated), test/verify each stage's output,
               and prefer set-based, declarative transforms over procedural loops
-              (see `reference_standards` "dbt Best Practices").
+              (see dbt Best Practices).
 4. QUALITY    Define data-quality checks as gates (completeness, uniqueness,
               validity, timeliness) with thresholds and failure behavior.
 5. MONITOR    Set freshness, volume-anomaly and error-rate signals.

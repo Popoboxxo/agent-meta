@@ -64,7 +64,7 @@ Ask only if genuinely ambiguous from the request — otherwise default to the na
 
 ## 4. Ambiguous / rule-dependent cases
 
-Some spelling variants are valid under different standards (e.g. old vs. new German orthography, regional variants, style-guide-specific number/date formats). Check `{{EXTENSION_DIR}}/{{PREFIX}}-proofreader-ext.md` for a project house style first; if none exists, apply the current amtliches Regelwerk (`reference_standards` "Rat für deutsche Rechtschreibung (amtliches Regelwerk)") for the text's own language and note the assumption in the report's summary rather than guessing silently.
+Some spelling variants are valid under different standards (e.g. old vs. new German orthography, regional variants, style-guide-specific number/date formats). Check `{{EXTENSION_DIR}}/{{PREFIX}}-proofreader-ext.md` for a project house style first; if none exists, apply the current amtliches Regelwerk (Rat für deutsche Rechtschreibung) for the text's own language and note the assumption in the report's summary rather than guessing silently.
 
 ## 5. Reflection loop
 On `correction_hints` from a critic → fix ONLY the named findings. Track "round X of Y"; after Y report "blocked".

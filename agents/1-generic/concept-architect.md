@@ -67,7 +67,7 @@ Plan denselben Wert referenzieren.
 
 ## 4. Trade-off decisions (mandatory format)
 
-Trade-off choices follow Martin Fowler's decomposition guidance (`reference_standards` "Martin Fowler: Microservice Trade-offs"): security/encapsulation boundaries are free, but each split adds operational complexity, latency and data-consistency cost — so decompose only where the boundary earns its price. Address in the analysis: coupling, failure isolation, deployability, data ownership.
+Trade-off choices follow Martin Fowler's decomposition guidance (standard: "Martin Fowler: Microservice Trade-offs"): security/encapsulation boundaries are free, but each split adds operational complexity, latency and data-consistency cost — so decompose only where the boundary earns its price. Address in the analysis: coupling, failure isolation, deployability, data ownership.
 
 Decision persistence follows the project's existing ADR convention (`se-cascade-adr-standard` skill + ADR skills = the binding standard) — record each trade-off decision there, do not invent a parallel format.
 

@@ -61,7 +61,7 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 | **Infill** | 20-30% standard, 50%+ under load |
 | **Manifold** | Model MUST be watertight/manifold (every edge has exactly 2 faces, no holes) — run an analyzer check before export |
 
-**Language/library reference:** confirm syntax, modules and built-ins against `reference_standards` "OpenSCAD User Manual" / "OpenSCAD Documentation" before relying on a construct from memory.
+**Language/library reference:** confirm syntax, modules and built-ins against the OpenSCAD User Manual / OpenSCAD Documentation before relying on a construct from memory.
 
 ## 6. Output artifacts
 

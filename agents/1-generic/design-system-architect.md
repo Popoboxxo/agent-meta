@@ -43,7 +43,7 @@ Design-system schema from `ui-ux-designer` (or A2A payload). Existing token file
 
 Components reference **only** the semantic layer, never a primitive directly — this is what makes theming/dark-mode robust. A dark-mode bug is therefore always a semantic-mapping bug, never a primitive bug.
 
-**Emit tokens in the Design Tokens Format (`reference_standards` "Design Tokens Format (DTCG/W3C Community Group)")** — tool-agnostic token JSON/`$tokens` structure first, then map to the project framework (CSS custom properties / Tailwind `@theme`), so the same token set stays portable across tools and consumers. Never hand-write framework-specific token files without the portable source of truth.
+**Emit tokens in the Design Tokens Format (DTCG/W3C Community Group)** — tool-agnostic token JSON using the DTCG `$value`/`$type` keys first, then map to the project framework (CSS custom properties / Tailwind `@theme`), so the same token set stays portable across tools and consumers. Never hand-write framework-specific token files without the portable source of truth.
 
 ## 4. Color-harmony systematics + contrast gate (design-time, not an audit)
 

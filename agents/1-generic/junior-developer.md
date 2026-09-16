@@ -1,6 +1,6 @@
 ---
 name: template-junior-developer
-version: "1.8.0"
+version: "1.7.0"
 description: "Fast, well-scoped code changes: 1-2 files, no architecture impact. Escalates in a structured way as soon as scope grows."
 hint: "Low-tier developer: trivial fixes, typos, small well-scoped changes — escalates on scope overrun"
 prompt_mode: modern

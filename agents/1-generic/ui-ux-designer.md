@@ -45,7 +45,7 @@ Specify per screen/view:
 | **Validation rules** | Input validation, error messages |
 | **Accessibility** | ARIA, keyboard, screen reader, contrast |
 
-**Usability heuristics:** validate each interaction decision against the NN/g 10 Usability Heuristics (see `reference_standards`); name the heuristic each decision satisfies (system-status feedback, consistency, error prevention, recognition-over-recall). Do not restate WCAG prose — for accessibility decisions reference `reference_standards` "WCAG 2.2" plus the relevant success criterion (e.g. contrast → SC 1.4.3).
+**Usability heuristics:** validate each interaction decision against the NN/g 10 Usability Heuristics; name the heuristic each decision satisfies (system-status feedback, consistency, error prevention, recognition-over-recall). Do not restate WCAG prose — for accessibility decisions reference WCAG 2.2 plus the relevant success criterion (e.g. contrast → SC 1.4.3).
 {{#if DOD_REQ_TRACEABILITY}}| **REQ references** | REQ-IDs the screen fulfills |{{/if}}
 
 ## 3. Mockup creation

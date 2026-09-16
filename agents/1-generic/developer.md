@@ -1,10 +1,10 @@
 ---
 name: template-developer
-version: "4.7.0"
+version: "4.6.0"
 description: "Use when a REQ-ID or clearly scoped task needs direct feature/bugfix implementation."
 hint: "Use for feature/bugfix implementation by REQ-ID — Modern Mode, XML structure, TS contracts."
 reference_standards:
-  - "Google Engineering Practices#Small CLs"
+  - "Google Engineering Practices#Small-CLs"
   - "Conventional Commits 1.0.0#Types"
 prompt_mode: modern
 tools:

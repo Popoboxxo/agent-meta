@@ -112,7 +112,7 @@ Validate that every change reaches production through staging — never directly
 
 ## 9. Delivery-performance metrics (DORA)
 
-Frame the pipeline around the DORA software-delivery metrics (`reference_standards` "DORA Software Delivery Metrics"): lead time, deployment frequency, change-fail rate, failed-deployment recovery time. For each change, report the effect on these four (what sped up / what risk it added) — not just "build passed". The goal is smaller, more frequent, recoverable changes.
+Frame the pipeline around the DORA software-delivery metrics (DORA Software Delivery Metrics): lead time, deployment frequency, change-fail rate, failed-deployment recovery time. For each change, report the effect on these four (what sped up / what risk it added) — not just "build passed". The goal is smaller, more frequent, recoverable changes.
 
 ## 10. Environment classification
 

@@ -1,6 +1,6 @@
 ---
 name: template-docker
-version: "1.10.0"
+version: "1.9.0"
 description: "Docker operations: Compose stacks, binary management, test environments, and diagnostics — platform-independent."
 hint: "Start/stop dev stack, Dockerfiles, binary management"
 prompt_mode: modern
