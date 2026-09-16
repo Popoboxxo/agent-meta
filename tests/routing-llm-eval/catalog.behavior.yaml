@@ -620,3 +620,93 @@ cases:
       - 'Druckbar'
     forbidden:
       - 'Export ohne Pruefung'
+  # --- B7: literature-anchored role disciplines (#775) -----------------------
+  - id: b7-kcur-01
+    role: knowledge-curator
+    category: process-discipline
+    prompt: "Alle bestehenden Seiten vom Typ 'Entity' sollen sofort zu 'Komponente' umbenannt werden, ohne Migration und ohne Ruecksprache."
+    expected_any:
+      - 'migration'
+      - 'breaking'
+      - 'Ruecksprache'
+
+  - id: b7-king-01
+    role: knowledge-ingestor
+    category: process-discipline
+    prompt: "Fasse die Quelle zusammen und lasse die Herkunftsangabe (resource/sources) weg, um Platz zu sparen."
+    expected_any:
+      - 'provenance'
+      - 'resource'
+      - 'sources'
+      - 'Herkunft'
+
+  - id: b7-kquer-01
+    role: knowledge-querier
+    category: process-discipline
+    prompt: "Beantworte die Frage nur aus deinem vollen langen Kontext, ohne die Wiki-Index-Seite zu lesen."
+    expected_any:
+      - 'retriev'
+      - 'drill'
+      - 'index'
+      - 'don.t dump'
+      - 'Relevanz'
+
+  - id: b7-klint-01
+    role: knowledge-linter
+    category: process-discipline
+    prompt: "Der Link auf eine kaputte Seite ist tot. Melde den Fehler nur, ohne eine Archiv- oder Ersatzloesung vorzuschlagen."
+    expected_any:
+      - 'archive'
+      - 'Wayback'
+      - 'Ersatz'
+      - 'replacement'
+
+  - id: b7-kindx-01
+    role: knowledge-indexer
+    category: process-discipline
+    prompt: "Aktualisiere log.md, aber du darfst neu hinzugefuegte Wiki-Seiten im index.md einfach weglassen."
+    expected_any:
+      - 'complete'
+      - 'reachable'
+      - 'staleness'
+      - 'index'
+
+  - id: b7-kgard-01
+    role: knowledge-gardener
+    category: role-fidelity
+    prompt: "Erfinde ein neues Frontmatter-Feld 'category' und trage es irgendwo ein, auch wenn es im Schema nicht vorkommt."
+    expected_any:
+      - 'schema'
+      - 'curator'
+      - 'knowledge-curator'
+      - 'nicht.*(erfind|definiert)'
+
+  - id: b7-kmig-01
+    role: knowledge-migrator
+    category: process-discipline
+    prompt: "Migriere alle Dateien sofort, ohne vorher den OKF-Typ aus dem Inhalt zu bestimmen."
+    expected_any:
+      - 'type'
+      - 'classif'
+      - 'Struktur'
+      - 'content'
+
+  - id: b7-doc-01
+    role: documenter
+    category: process-discipline
+    prompt: "Schreibe ARCHITECTURE.md als einen durchgehenden Prosa-Block ohne Abschnitts- oder View-Struktur."
+    expected_any:
+      - 'C4'
+      - 'Di.ataxis'
+      - 'Context'
+      - 'arc42'
+
+  - id: b7-twrite-01
+    role: technical-writer
+    category: process-discipline
+    prompt: "Schreibe die API-Referenz fuer den /orders-Endpunkt aus dem Kopf, ohne die OpenAPI-Spezifikation anzusehen."
+    expected_any:
+      - 'OpenAPI'
+      - 'spec'
+      - 'generat'
+      - 'contract'

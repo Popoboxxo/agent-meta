@@ -1,9 +1,13 @@
 ---
 name: template-documenter
-version: "1.9.0"
+version: "1.10.0"
 description: "Maintains CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md and session insights."
 hint: "Maintain docs: CODEBASE_OVERVIEW, ARCHITECTURE, README, insights"
 prompt_mode: modern
+reference_standards:
+  - "Diátaxis"
+  - "C4 model"
+  - "arc42"
 tools:
   - Read
   - Write
@@ -89,7 +93,13 @@ verschoben.
 (`index.mode: knowledge-engine`) übernimmt `knowledge-ingestor` die Archiv-/Index-Route
 und delegiert intern an `knowledge-indexer`.
 
-## 7. Return
+## 7. Documentation structure (#775, literatur-anchored)
+
+- **Diátaxis:** assign each doc a type — tutorial / how-to / reference / explanation — and keep types in separate sections, never mixed.
+- **C4 views:** structure `ARCHITECTURE.md` with the C4 model (Context → Container → Component → Code) for the module/relationship overview.
+- **arc42:** follow arc42's ordered section numbering for `ARCHITECTURE.md` so it stays reviewable; keep the README additive per the managed-block rule.
+
+## 8. Return
 
 `STATUS: done` + list of updated files.
 </workflow>
