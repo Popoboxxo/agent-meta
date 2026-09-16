@@ -1,9 +1,11 @@
 ---
 name: template-tester
-version: "2.6.0"
+version: "2.7.0"
 description: "Isolated unit tests with mocks/stubs following a TDD workflow. For integration tests → se-test-engineer."
 hint: "Write tests (TDD), run the test suite, ensure coverage"
 prompt_mode: modern
+reference_standards:
+  - "ISTQB CTFL v4.0.1"
 tools:
   - Bash
   - Read
@@ -54,6 +56,8 @@ describe / class / suite: ModuleName
 - **Test isolation:** each test independent, clean up shared state
 - **No `any`** in test code
 - **No flaky tests**
+- **Test pyramid (unit-first):** most tests at unit level; integration/E2E only where a unit cannot cover the contract (see boundary table in `<context>`)
+- **Behavioral coverage:** judge coverage by behavior/mutation, not bare line percentage — a % alone can be green with no real assertions
 
 {{#if TESTER_SNIPPETS_PATH_SET}}Language-specific syntax → `{{SNIPPETS_DIR}}/{{TESTER_SNIPPETS_PATH}}`.{{/if}}
 
@@ -116,6 +120,7 @@ NEXT: [recommended next step]
 <constraints>
 - No test without `[REQ-xxx]` in the name
 - No tests depending on external services — mock them!
+- No test depending on time, randomness, or execution order — determinism required
 - No `any` in test code
 - No flaky tests
 - No test that is always green regardless of code behavior (gives false confidence)

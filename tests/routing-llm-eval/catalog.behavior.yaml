@@ -82,3 +82,169 @@ cases:
       - '1-generic'
       - '2-platform'
       - '3-project'
+
+  # --- B7: literature-anchored role disciplines (#771) ---------------------
+  - id: b7-tester-01
+    role: tester
+    category: process-discipline
+    prompt: "Schreibe Unit-Tests für [REQ-004]. Wie grenzt du die Testverantwortung zwischen Unit- und Integrationsebene ab und wie bewertest du die Abdeckung?"
+    expected_any:
+      - 'test pyramid'
+      - 'behavioral coverage'
+      - 'unit-first'
+
+  - id: b7-e2e-01
+    role: e2e-tester
+    category: process-discipline
+    prompt: "Wie viele E2E-Flows solltest du für diese App schreiben und wie gehst du mit einem flakigen E2E-Test um?"
+    expected_any:
+      - 'targeted E2E'
+      - 'quarantine'
+      - 'baseline governance'
+
+  - id: b7-test-executor-01
+    role: test-executor
+    category: process-discipline
+    prompt: "Eine Testsuite ist rot. Wie gehst du vor, bevor du den Fehlschlag meldest, und wie klassifizierst du die Fehler?"
+    expected_any:
+      - 'flakiness triage'
+      - 'infrastructure'
+      - 'environment'
+
+  - id: b7-validator-01
+    role: validator
+    category: process-discipline
+    prompt: "Was prüfst du bei der Validierung bezüglich DoD versus Akzeptanzkriterien und wie weist du Traceability nach?"
+    expected_any:
+      - 'acceptance criteria'
+      - 'traceability'
+
+  - id: b7-se-verifier-01
+    role: se-verifier
+    category: process-discipline
+    prompt: "Wähle die Verifikationsmethode für eine sicherheitskritische Anforderung und begründe die Prüfintensität."
+    expected_any:
+      - 'inspection'
+      - 'demonstration'
+      - 'integrity'
+
+  - id: b7-se-validator-01
+    role: se-validator
+    category: process-discipline
+    prompt: "Erstelle die User Journeys für die Stakeholder-Needs. Wie deckst du Randfälle ab und koppelst jede Journey an ein Akzeptanzkriterium?"
+    expected_any:
+      - 'journey catalog'
+      - 'edge cases'
+      - 'acceptance criterion'
+
+  - id: b7-se-test-engineer-01
+    role: se-test-engineer
+    category: process-discipline
+    prompt: "Welche Testtechnik wählst du für einen numerischen Bereichs-Input und welches Modell-Coverage-Kriterium nennst du pro Szenario?"
+    expected_any:
+      - 'equivalence partitioning'
+      - 'boundary value'
+      - 'model-based coverage'
+
+  - id: b7-se-testreviewer-01
+    role: se-testreviewer
+    category: process-discipline
+    prompt: "Bewerte die Teststärke des Testmodells und wie quantifizierst du die Negativ- bzw. Fehlerpfad-Abdeckung?"
+    expected_any:
+      - 'fault-detection'
+      - 'negative_path_coverage'
+      - 'mutation'
+
+  - id: b7-seitm-01
+    role: se-integration-and-test-manager
+    category: process-discipline
+    prompt: "Dokumentiere die Strategie-Begründung und den V&V-Prozess. Was ist dabei das Pflichtartefakt und welche Traceability verlangst du?"
+    expected_any:
+      - '29119-2'
+      - 'Pflichtartefakt'
+      - 'Begründungsraster'
+
+  # --- B7: literature-anchored SE role disciplines (#772) -------------------
+  - id: b7-se-req-01
+    role: se-requirements
+    category: process-discipline
+    prompt: "Ein Stakeholder formuliert einen Bedarf vage. Mit welchen Techniken erhebst du den Bedarf und welche Qualitätskriterien muss eine Anforderung erfuellen, bevor du sie formalisierst?"
+    expected_any:
+      - 'interview'
+      - 'workshop'
+      - 'unambiguous'
+      - 'verifiable'
+      - 'atomic'
+
+  - id: b7-se-arch-01
+    role: se-architect
+    category: role-fidelity
+    prompt: "Wie zerlegst du ein Black-Box-System in Sub-Systeme? Welches Prinzip stellst du sicher, damit je Sub-System genau eine Verantwortung verborgen bleibt?"
+    expected_any:
+      - 'information hiding'
+      - 'orthogonal'
+
+  - id: b7-se-critic-01
+    role: se-critic
+    category: process-discipline
+    prompt: "Wie verwaltest du Review-Findings? Welches Normverfahren verankerst du, welche Angaben muss jedes Finding tragen, und ab wann darf eine Zerlegungsebene durchgereicht werden?"
+    expected_any:
+      - 'IEEE 1028'
+      - 'severity'
+      - 'gate-kriterien'
+      - 'evidenz'
+
+  - id: b7-se-ifmgr-01
+    role: se-interface-mgr
+    category: process-discipline
+    prompt: "Ein registriertes Interface aendert seine Payload-Struktur. Wie behandelst du Versionierung und Kompatibilitaet, und welche Kollisions-/Deadlock-Pruefungen fuehrst du je neuer Schnittstelle durch?"
+    expected_any:
+      - 'migration rule'
+      - 'collision'
+      - 'deadlock'
+      - 'major'
+
+  - id: b7-se-term-01
+    role: se-termination
+    category: process-discipline
+    prompt: "Woran erkennst du, ob ein Sub-System ein Leaf ist? Wie passt du die Zerlegungstiefe bei sicherheitskritischen Systemen an und was dokumentierst du als Abstraktions-Endpunkt?"
+    expected_any:
+      - 'independently verifiable'
+      - 'risk-based depth'
+      - ' rigor'
+
+  - id: b7-se-comp-req-01
+    role: se-component-requirements
+    category: process-discipline
+    prompt: "Wie ordnest du REQ-L2-Verantwortlichkeiten Komponenten zu, und was pruefst du gegen die Interface-Registry, bevor eine L3-Datei finalisiert wird?"
+    expected_any:
+      - 'fragmented allocation'
+      - 'registry cross-check'
+      - 'exactly one'
+
+  - id: b7-se-jdev-01
+    role: se-junior-developer
+    category: process-discipline
+    prompt: "Du implementierst ein triviales Leaf mit einem Interface. Wann liest du die Interface-Spec, und was musst du fuer jedes implementierte Interface liefern?"
+    expected_any:
+      - 'before writing code'
+      - 'at least one test'
+      - 'test oracle'
+
+  - id: b7-se-dev-01
+    role: se-developer
+    category: role-fidelity
+    prompt: "Du implementierst eine Standard-Komponente mit drei Interfaces. Womit beginnst du, und welche Orthogonalitaets-Regel gilt fuer Lese- und Schreibpfade der Schnittstellen?"
+    expected_any:
+      - 'cohesion check'
+      - 'query/command'
+      - 'orthogon'
+
+  - id: b7-se-sdev-01
+    role: se-senior-developer
+    category: role-fidelity
+    prompt: "Ein komplexes Leaf hat sechs kohaesionslose Interfaces. Wie entscheidest du ueber die Zerlegung, und welche Interface-Definition pruefst du vor dem Codieren?"
+    expected_any:
+      - 'fat interface'
+      - 'ISP'
+      - 'ICD'

@@ -1,6 +1,6 @@
 ---
 name: se-termination
-version: 1.11.0
+version: 1.12.0
 description: Deterministic per-system leaf/continue decision with dynamic depth control.
   Sets scope for downstream pipeline routing.
 hint: Dynamic depth termination with SE_MIN_DEPTH/SE_MAX_DEPTH control
@@ -29,6 +29,7 @@ You are the **Termination Agent** (`se-termination`) in the generic systems engi
    - **Standard Part (COTS):** commercial off-the-shelf.
    - **Exhausted Domain:** no meaningful further decomposition at this level.
    - **Explicit Boundary:** requirement defines this as external purchased part.
+   - **Independently Verifiable:** the leaf has a pass/fail Definition-of-Done or acceptance criteria in isolation (testable leaf).
 
 3. **Continue Criteria:** multiple distinguishable sub-tasks (>1 responsibility), spans multiple domains, or too complex for atomic implementation.
 
@@ -37,6 +38,8 @@ You are the **Termination Agent** (`se-termination`) in the generic systems engi
    - `spec-certified gate`: When `{{DOD_SE_STRICT}}` is "true", `decision: continue` is ONLY allowed when `current_depth < min_depth`. If `current_depth >= min_depth` and normal criteria would say `continue`, override to `leaf` with rationale "spec-certified: minimum depth reached, forced termination".
    - `max_total_cells`: enforce leaf when total cell count >= limit.
    - **Circular Reference:** enforce leaf when `parent_id` chain contains a cycle.
+
+**Depth rationale & rigor (#772):** document the abstraction endpoint per system — why this domain stops at this level (atomicity, COTS, verifiability). Apply risk-based depth: safety-/security-/integrity-critical systems decompose deeper (rigor ↔ depth), lower-risk domains may leaf earlier. Record the rationale with every leaf/continue decision.
 
 ## A2A Handoff — Input/Output
 
