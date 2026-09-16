@@ -488,3 +488,136 @@ cases:
       - '@sha256'
       - 'trivy'
       - 'scout'
+
+  # --- B7: literature-anchored role disciplines (#777) --------------------
+  - id: b7-uiux-heuristics-01
+    role: ui-ux-designer
+    category: process-discipline
+    prompt: "Spezifiziere eine Login-Screen-Spezifikation. Wie sicherst du die Nutzerfreundlichkeit und Barrierefreiheit der Interaktionen ab?"
+    expected_any:
+      - 'Usability Heuristics'
+      - 'NN/g'
+      - '-heuristic'
+    expected_all:
+      - 'WCAG 2.2'
+
+  - id: b7-designsys-tokens-01
+    role: design-system-architect
+    category: process-discipline
+    prompt: "Erstelle die Design-Token-Artefakte fuer ein neues Design-System. Wie garantiert du, dass die Tokens portabel und tool-unabhaengig bleiben?"
+    expected_any:
+      - 'Design Tokens Format'
+      - 'DTCG'
+      - '\\$tokens'
+    forbidden:
+      - 'nur eine Tailwind-Datei'
+
+  - id: b7-frontend-a11y-01
+    role: frontend-component-engineer
+    category: process-discipline
+    prompt: "Baue eine autocomplete-kompatible Combobox. Wie stellst du die Barrierefreiheit sicher?"
+    expected_any:
+      - 'ARIA Authoring Practices'
+      - 'APG'
+      - 'combobox-Pattern'
+    forbidden:
+      - 'WCAG-Konformitaet (A/AA/AAA) bestae[t]tigt'
+
+  - id: b7-api-errors-01
+    role: api-specialist
+    category: process-discipline
+    prompt: "Entwirf den Fehlerteil eines neuen API-Endpunkts. Wie haeltst du die API-Design-Standards ein?"
+    expected_any:
+      - 'RFC 9457'
+      - 'problem\\+json'
+      - 'Google API Design'
+      - 'Zalando'
+
+  - id: b7-db-normalize-01
+    role: database-engineer
+    category: process-discipline
+    prompt: "Entwirf ein relationales Schema fuer eine Bestellverwaltung. Wie entscheidest du zwischen Normalisierung und Denormalisierung?"
+    expected_any:
+      - 'normaliz'
+      - 'denormaliz'
+    expected_all:
+      - 'Denormalisierung'
+    forbidden:
+      - 'normalisierst ohne Begruendung'
+
+  - id: b7-dataeng-streaming-01
+    role: data-engineer
+    category: process-discipline
+    prompt: "Plane eine neue Datenpipeline. Streaming oder Batch — was ist deine Standardwahl und wovon haengt sie ab?"
+    expected_any:
+      - 'Batch'
+      - 'streaming'
+    expected_all:
+      - 'Projekt-Entscheidung'
+      - 'Latency'
+    forbidden:
+      - 'Streaming ist immer Pflicht'
+
+  - id: b7-devops-dora-01
+    role: devops-engineer
+    category: process-discipline
+    prompt: "Verbessere die CI/CD-Pipeline eines Teams. Wie misst du die Liefergeschwindigkeit und Stabilitaet?"
+    expected_any:
+      - 'DORA'
+      - 'lead time'
+      - 'change-fail rate'
+      - 'Deployment Frequency'
+
+  - id: b7-proofreader-terms-01
+    role: proofreader
+    category: process-discipline
+    prompt: "Pruefe einen deutschen Text. Wie stellst du konsistente Schreibweise sicher, ohne die Sprache zu veraendern?"
+    expected_any:
+      - 'Konsistenz'
+      - 'Terminologie'
+      - 'amtliches Regelwerk'
+      - 'Rechtschreib'
+
+  - id: b7-copyeditor-plainlang-01
+    role: copyeditor
+    category: process-discipline
+    prompt: "Lektoriere einen deutschen Fachtext fuer breite Leserschaft. Worauf achtest du bei der Verstaendlichkeit?"
+    expected_any:
+      - 'Plain Language'
+      - 'ISO 24495'
+      - 'Verstaendlich'
+      - 'Leser'
+
+  - id: b7-conceptspec-adr-01
+    role: concept-specifier
+    category: process-discipline
+    prompt: "Spezifiziere einen neuen Datenfluss. Wie dokumentierst du deine Design-Entscheidungen und sicherst die Vollstaendigkeit der Spezifikation?"
+    expected_any:
+      - 'ADR'
+      - 'Completeness'
+      - 'Vollstaendigkeit'
+      - 'coverage'
+
+  - id: b7-conceptarch-tradeoff-01
+    role: concept-architect
+    category: process-discipline
+    prompt: "Zerlege ein bestehendes System in mehrere Dienste. Wie begruendest du jede Zerlegung und welche Trade-offs pruefst du?"
+    expected_any:
+      - 'Fowler'
+      - 'Trade-off'
+      - 'decompos'
+      - 'Kopplung'
+    forbidden:
+      - 'zerlege ohne Abwaegung'
+
+  - id: b7-openscad-manifold-01
+    role: openscad-developer
+    category: process-discipline
+    prompt: "Exportiere ein parametrisches Modell als STL. Worauf pruefst du das Modell vor dem Export?"
+    expected_any:
+      - 'manifold'
+      - 'watertight'
+      - 'OpenSCAD'
+      - 'Druckbar'
+    forbidden:
+      - 'exportiere ohne Sichtpruefung'

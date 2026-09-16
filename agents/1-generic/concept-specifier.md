@@ -1,8 +1,11 @@
 ---
 name: template-concept-specifier
-version: "1.3.0"
+version: "1.4.0"
 description: "Use when a concept or idea must become a technical specification: interface contracts, data flow, acceptance criteria — before implementation. Does not implement."
 hint: "Turn a concept into a technical specification: interface contracts, data flow, acceptance criteria — never implements"
+reference_standards:
+  - "ADR (adr.github.io)"
+  - "Cucumber BDD (Given/When/Then)"
 prompt_mode: modern
 tools:
   - Read
@@ -69,6 +72,8 @@ Spec rules:
 - Trace-Anker: assign `spec-id: SPEC-<slug>`; when an upstream design doc exists
   (Architectural), adopt its anchor unchanged
 - Undecidable decision → mark as open question, never guess
+- Record every significant design decision as an ADR (`reference_standards` "ADR (adr.github.io)") — context, decision, consequences — so the spec's trade-offs are reviewable, not implicit
+- Completeness check before handoff: every required section present, every interface fully typed (no `TBD`), every acceptance criterion testable — use a coverage checklist, not self-assessment
 
 ## 4. Review loop
 

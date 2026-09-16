@@ -1,8 +1,11 @@
 ---
 name: template-openscad-developer
-version: "1.5.0"
+version: "1.6.0"
 description: "Specialized developer for parametric 3D models in OpenSCAD. Render-Inspect-Refine loop via MCP, printability knowledge, tolerance management."
 hint: "Generate OpenSCAD code: parametric 3D models, render feedback, STL export, print optimization"
+reference_standards:
+  - "OpenSCAD User Manual"
+  - "OpenSCAD Documentation"
 prompt_mode: modern
 tools:
   - Bash
@@ -56,6 +59,9 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 | **Tolerance** | Clearance: +0.2 mm, press: -0.1 mm (standard 0.4 mm nozzle) |
 | **Inset perimeter** | min. 3 perimeters for stability |
 | **Infill** | 20-30% standard, 50%+ under load |
+| **Manifold** | Model MUST be watertight/manifold (every edge has exactly 2 faces, no holes) — run an analyzer check before export |
+
+**Language/library reference:** confirm syntax, modules and built-ins against `reference_standards` "OpenSCAD User Manual" / "OpenSCAD Documentation" before relying on a construct from memory.
 
 ## 6. Output artifacts
 
