@@ -5,7 +5,7 @@ description: "Vorhandene Projektinhalte aufräumen und OKF-konform ins Knowledge
 hint: "Vorhandene Docs ins Wiki migrieren (einmalig, mit User-Freigabe)"
 reference_standards:
   - "OKF"
-  - "Frictionless Data @optional-interop"
+  - "Frictionless Data"
 tools:
   - Read
   - Write
