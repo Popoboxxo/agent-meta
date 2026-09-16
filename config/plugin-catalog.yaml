@@ -367,23 +367,33 @@ plugins:
       - kind: skill
         name: graphify
         description: "Claude-Code-Skill (SKILL.md + references), vom graphify-Installer selbst verwaltet"
-  project-atlas:
+  projectatlas:
     kind: mcp-server
     origin-type: local-process
     availability-probe: command-v
-    binary: project-atlas
+    binary: projectatlas
     description: >-
       Project Atlas — local MCP-based repo knowledge-graph tool
-      (https://github.com/styler-ai/ProjectAtlas). Placeholder entry; exact
-      connection.command/args verified at first real integration.
+      (upstream project: https://github.com/styler-ai/ProjectAtlas; see issue
+      #749). Per upstream docs (v0.4.4), the binary is `projectatlas` (no
+      hyphen). Per upstream docs the real host invocation is NOT a static
+      catalog pair: it is generated per repository by `projectatlas init` and
+      carries --require-version <version>, --db <repo>/.projectatlas/
+      projectatlas.db, --config <repo>/.projectatlas/config.toml and cwd=<repo>.
+      `projectatlas init` writes version-matched host configs (per upstream
+      docs, for example .projectatlas/projectatlas.opencode.json,
+      .projectatlas/projectatlas.claude.mcp.json,
+      .projectatlas/projectatlas.mcp.json). This catalog entry only records the
+      binary and that host config generation is delegated to `projectatlas init`.
+    config-generated-by: projectatlas init
     category: dev-tool
     enabled-by-default: false
     tools:
       allowed: []
     connection:
       type: stdio
-      command: project-atlas
-      args: [--mcp]
+      command: projectatlas
+      args: []
     secrets: []
   headroom:
     kind: mcp-server
