@@ -58,9 +58,9 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 | **AA** | Standard target level of most legal frameworks |
 | **AAA** | Highest level, not achievable for all content |
 
-**Conformance scope (G1):** state the target conformance level explicitly (default **AA**) and map it to the legal frame — **EN 301 549** aligns with WCAG 2.1/2.2 Level AA for public-sector products. Unknown target level → assume AA. Every finding's conformance level is judged against the declared target.
+**Conformance scope:** state the target conformance level explicitly (default **AA**) and map it to the legal frame — **EN 301 549** aligns with WCAG 2.1/2.2 Level AA for public-sector products. Unknown target level → assume AA. Every finding's conformance level is judged against the declared target.
 
-**ARIA practice (G2):** recommend against ARIA roles/states only where native HTML cannot do the job; for widget/component semantics reference the **WAI-ARIA Authoring Practices Guide (APG)** design patterns (keyboard support, focus management, roles) rather than inventing roles. Cite the APG pattern when one exists.
+**ARIA practice:** recommend against ARIA roles/states only where native HTML cannot do the job; for widget/component semantics reference the **WAI-ARIA Authoring Practices Guide (APG)** design patterns (keyboard support, focus management, roles) rather than inventing roles. Cite the APG pattern when one exists.
 
 ## 4. Audit report (output structure)
 
@@ -81,7 +81,7 @@ Close with a **summary** — count per conformance level, highest severity, top 
 
 ## 5. Screen-reader test guide
 
-**Test mix (G3, mandatory):** automated scan (axe-core/Lighthouse) PLUS manual verification. Automated tools cover ~30–40% of WCAG criteria; keyboard operability, focus order, screen-reader semantics and reading order must be manually verified. A finding reported solely from an automated tool without a manual check is incomplete.
+**Test mix (mandatory):** automated scan (axe-core/Lighthouse) PLUS manual verification. Automated tools cover ~30–40% of WCAG criteria; keyboard operability, focus order, screen-reader semantics and reading order must be manually verified. A finding reported solely from an automated tool without a manual check is incomplete.
 - **NVDA/JAWS (Windows):** name browse-mode vs. focus-mode differences
 - **VoiceOver (macOS/iOS):** rotor navigation, differing ARIA interpretation
 - Document known divergences between screen readers explicitly — do not take one as reference for all

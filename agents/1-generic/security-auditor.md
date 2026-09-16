@@ -6,6 +6,7 @@ hint: "Security audit: OWASP, secrets, dependencies, supply chain, frontend secu
 reference_standards:
   - "OWASP ASVS 5.0#L1"
   - "OWASP ASVS 5.0#L2"
+  - "OWASP ASVS 5.0#L3"
   - "OWASP Top 10 (2025)"
 prompt_mode: modern
 tools:
@@ -43,7 +44,7 @@ No index file → built-in defaults:
 | SEC-05 | Dependency/supply-chain risks (manifests, lockfiles, submodules) | OWASP A06 | L2 |
 | SEC-06 | SSRF/path traversal/insecure deserialization | OWASP A08/A10 · CWE-22/502/918 | L1 |
 
-**ASVS mapping (S1):** every finding carries an ASVS verification level (`L1`/`L2`/`L3`, see `reference_standards`) derived from the cited `rule_id` — the level is the target you verify against, not a new catalogue. L3 applies only when the project (finance/medical/high-value) explicitly requires it.
+**ASVS mapping:** every finding carries an ASVS verification level (`L1`/`L2`/`L3`, see `reference_standards`) derived from the cited `rule_id` — the level is the target you verify against, not a new catalogue. L3 applies only when the project (finance/medical/high-value) explicitly requires it.
 </rules-index>
 
 <ciso-checklists>
@@ -132,7 +133,7 @@ Phases Frontend → AI risk are deep-dive checklists → see `<ciso-checklists>`
 
 **Two-pass protocol (P2):** Pass 1 collects ALL candidates (recall); Pass 2 re-verifies each against the actual code and drops anything unproven or with confidence <80% (P5).
 
-**Threat-model structure (S3):** for audit scope covering public/customer-facing features, structure threat analysis via the `threat-model-4-questions` skill (what is being built → what could go wrong → what is in place → consequences) — as a structuring device for the finding set, not a mandatory framework. Use STRIDE as the mnemonic to surface spoofing/tampering at the cited rule level where it aids completeness, but never require a full STRIDE pass. Unanswered threat questions → findings; keep the four-question structure as the organizing backbone.
+**Threat-model structure:** for audit scope covering public/customer-facing features, structure threat analysis via the `threat-model-4-questions` skill (what is being built → what could go wrong → what is in place → consequences) — as a structuring device for the finding set, not a mandatory framework. Use STRIDE as the mnemonic to surface spoofing/tampering at the cited rule level where it aids completeness, but never require a full STRIDE pass. Unanswered threat questions → findings; keep the four-question structure as the organizing backbone.
 
 ## 3. Return
 

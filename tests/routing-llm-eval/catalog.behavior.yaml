@@ -254,7 +254,9 @@ cases:
     category: role-fidelity
     prompt: "Nenne den Verifikationslevel (ASVS), gegen den du ein Security-Finding abgleichst, und wozu er dient."
     expected_any:
-      - 'L1|L2|L3'
+      - 'L1'
+      - 'L2'
+      - 'L3'
       - 'ASVS'
     forbidden:
       - 'Top 10 nur'
@@ -266,15 +268,18 @@ cases:
     expected_any:
       - 'CycloneDX'
       - 'SPDX'
-      - 'optional|kein Runtime'
-      - 'WebFetch|adviso'
+      - 'optional'
+      - 'kein Runtime'
+      - 'WebFetch'
+      - 'advisory'
 
   - id: b7-ai-guardian-injection-01
     role: ai-security-guardian
     category: process-discipline
     prompt: "Welche eigene Pruefklasse behandelst du fuer Eingaben, die an ein LLM/Agenten-System weitergegeben werden?"
     expected_any:
-      - '[Ii]ndirect|[Pp]rompt.?[Ii]njection'
+      - 'indirect'
+      - 'prompt injection'
       - 'unterteilt als Instruktion'
       - 'Isolation'
 
@@ -292,8 +297,10 @@ cases:
     category: process-discipline
     prompt: "Vergleiche diese Log-Haeufigkeit mit einer Baseline und sag, was du bei fehlenden Feldern tust."
     expected_any:
-      - 'Baseline|Anomalie'
-      - 'correlation.?ID|strukturierte Felder'
+      - 'Baseline'
+      - 'Anomalie'
+      - 'correlation'
+      - 'strukturierte Felder'
       - 'Log-Qualit'
 
   - id: b7-incident-command-01
@@ -301,16 +308,18 @@ cases:
     category: process-discipline
     prompt: "Wie strukturierst du ein P0-Incident-Command und wie haeufig meldest du Status?"
     expected_any:
-      - 'Incident Commander|IC'
+      - 'Incident Commander'
       - 'Eskalation'
-      - 'Kadenz|Status'
+      - 'Kadenz'
+      - 'Status'
 
   - id: b7-sre-errorbudget-01
     role: sre-engineer
     category: role-fidelity
     prompt: "Was entscheidest du, wenn dein Error Budget ausgeschoepft ist?"
     expected_any:
-      - 'Release pausiert|Freeze'
+      - 'Release pausiert'
+      - 'Freeze'
       - 'Error Budget'
       - 'objektive Entscheidungsregel'
 
@@ -347,7 +356,7 @@ cases:
     category: process-discipline
     prompt: "Pruefe diesen neuen API-Service. Es gibt keinerlei Latenz-, Fehler- oder Saettigungsmetriken. Einschaetzung?"
     expected_any:
-      - 'golden signal'
+      - 'golden-signal'
       - 'saturation'
       - 'observab'
 

@@ -60,9 +60,9 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 
 **Two-pass protocol** — Pass 1 collects ALL candidates (recall); Pass 2 re-verifies each against the actual code and the referenced registry/route/IAM documentation, and drops anything unproven. A flagged package name must be confirmed non-existent (or a flagged endpoint unrouted) before it becomes a finding — false positives on typos erode trust faster than missed theoretical risks.
 
-**Prompt-injection surface (S1):** check whether agent/MCP-facing inputs (tool-call instructions, retrieved context, file contents fed to an LLM) treat untrusted data as instructions — per arXiv 2302.12173 indirect prompt injection, data retrieved or injected can override controls. Flag application code that passes raw external content into a model/system prompt without isolation; do NOT generate attack payloads.
+**Prompt-injection surface:** check whether agent/MCP-facing inputs (tool-call instructions, retrieved context, file contents fed to an LLM) treat untrusted data as instructions — per arXiv 2302.12173 indirect prompt injection, data retrieved or injected can override controls. Flag application code that passes raw external content into a model/system prompt without isolation; do NOT generate attack payloads.
 
-**Hallucination quantification (S2):** list suspicious/unresolvable dependency imports systematically (registry check per candidate, group into AIS-01). Report the confirmed hallucinated-import count per manifest so slopsquatting exposure is actionable — per arXiv 2406.10279, 5.2% (commercial) to 21.7% (open-source) of LLM code samples contain hallucinated packages.
+**Hallucination quantification:** list suspicious/unresolvable dependency imports systematically (registry check per candidate, group into AIS-01). Report the confirmed hallucinated-import count per manifest so slopsquatting exposure is actionable — per arXiv 2406.10279, 5.2% (commercial) to 21.7% (open-source) of LLM code samples contain hallucinated packages.
 
 ## 5. Finding format
 

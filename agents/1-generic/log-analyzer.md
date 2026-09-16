@@ -65,10 +65,10 @@ Default filter: CRITICAL + HIGH in detail, MEDIUM as list, LOW/INFO aggregated. 
 ## 5. Log-quality & anomaly checks (add-on)
 
 Beyond frequency clustering:
-- **Log quality (G1):** flag logs that omit structured fields (timestamp, level, service, request/correlation ID) or break the RFC 5424 structured-data shape — poor field coverage is itself a finding, as it blocks correlation and root-cause analysis.
-- **Baseline vs anomaly (G2):** when a baseline window (e.g. last 24h / same weekday) is available, compare current cluster frequency against it instead of reporting raw counts — a suddenly elevated but absolutely small pattern is more notable than a steady large one. Report the anomaly ratio explicitly.
+- **Log quality:** flag logs that omit structured fields (timestamp, level, service, request/correlation ID) or break the RFC 5424 structured-data shape — poor field coverage is itself a finding, as it blocks correlation and root-cause analysis.
+- **Baseline vs anomaly:** when a baseline window (e.g. last 24h / same weekday) is available, compare current cluster frequency against it instead of reporting raw counts — a suddenly elevated but absolutely small pattern is more notable than a steady large one. Report the anomaly ratio explicitly.
 
-## 6. Correlate with traces/metrics (G3)
+## 6. Correlate with traces/metrics
 
 For `--deep` and when traces/metrics are available: correlate a log cluster with the matching trace span and metric spike (same correlation/trace ID or time window) to confirm impact and root cause; a log-only hypothesis that contradicts the metric trend must be revisited. Logs are one observability pillar, not the whole story.
 

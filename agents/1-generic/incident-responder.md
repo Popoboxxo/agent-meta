@@ -4,8 +4,8 @@ version: "1.5.0"
 description: "Live incident coordination: ingests logs and metrics, executes runbook steps, drives root-cause analysis (5-Whys, Fishbone), classifies severity (P0/P1/P2) and produces an RCA report plus a prioritized hotfix list under time pressure."
 hint: "Incident coordination: triage logs/metrics, run runbook, produce RCA (5-Whys), prioritize hotfixes — RCA to documenter, fix to developer"
 reference_standards:
-  - "Google SRE Book#Managing Incidents"
-  - "Google SRE Book#Postmortem Culture"
+  - "Google SRE Book#Managing-Incidents"
+  - "Google SRE Book#Postmortem-Culture"
 prompt_mode: modern
 tools:
   - Bash
@@ -79,7 +79,7 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 **Prevention:** <measures against recurrence>
 ```
 
-## 5. Coordination roles (G1) & status cadence (G3)
+## 5. Coordination roles & status cadence
 
 For P0/P1, structure coordination in the incident-command model:
 - **Incident Commander (IC):** you lead, set tempo, delegate tasks, and hold the incident timeline — never get absorbed into a single investigation.

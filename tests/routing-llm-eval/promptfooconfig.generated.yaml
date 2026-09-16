@@ -704,7 +704,9 @@ tests:
   assert:
   - type: icontains-any
     value:
-    - L1|L2|L3
+    - L1
+    - L2
+    - L3
     - ASVS
   - type: not-icontains
     value: Top 10 nur
@@ -718,8 +720,10 @@ tests:
     value:
     - CycloneDX
     - SPDX
-    - optional|kein Runtime
-    - WebFetch|adviso
+    - optional
+    - kein Runtime
+    - WebFetch
+    - advisory
 - description: b7-ai-guardian-injection-01 [ai-security-guardian]
   vars:
     role: ai-security-guardian
@@ -728,7 +732,8 @@ tests:
   assert:
   - type: icontains-any
     value:
-    - '[Ii]ndirect|[Pp]rompt.?[Ii]njection'
+    - indirect
+    - prompt injection
     - unterteilt als Instruktion
     - Isolation
 - description: b7-a11y-conformance-01 [accessibility-specialist]
@@ -749,8 +754,10 @@ tests:
   assert:
   - type: icontains-any
     value:
-    - Baseline|Anomalie
-    - correlation.?ID|strukturierte Felder
+    - Baseline
+    - Anomalie
+    - correlation
+    - strukturierte Felder
     - Log-Qualit
 - description: b7-incident-command-01 [incident-responder]
   vars:
@@ -759,9 +766,10 @@ tests:
   assert:
   - type: icontains-any
     value:
-    - Incident Commander|IC
+    - Incident Commander
     - Eskalation
-    - Kadenz|Status
+    - Kadenz
+    - Status
 - description: b7-sre-errorbudget-01 [sre-engineer]
   vars:
     role: sre-engineer
@@ -769,7 +777,8 @@ tests:
   assert:
   - type: icontains-any
     value:
-    - Release pausiert|Freeze
+    - Release pausiert
+    - Freeze
     - Error Budget
     - objektive Entscheidungsregel
 - description: b7-codereview-01 [code-reviewer]
@@ -813,7 +822,7 @@ tests:
   assert:
   - type: icontains-any
     value:
-    - golden signal
+    - golden-signal
     - saturation
     - observab
 - description: b7-database-01 [database-reviewer]

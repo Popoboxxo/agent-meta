@@ -49,7 +49,7 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 6. HANDOFF   File findings via feedback as a GitHub issue (dependency-audit-v1).
 ```
 
-**Transitive + provenance (S3):** inspect transitive closure, not just direct deps — a vulnerable transitive package is a finding even when the direct dependency is pinned. Trace each component to its supplier/upstream (registry + maintainer) so supply-chain provenance is auditable.
+**Transitive + provenance:** inspect transitive closure, not just direct deps — a vulnerable transitive package is a finding even when the direct dependency is pinned. Trace each component to its supplier/upstream (registry + maintainer) so supply-chain provenance is auditable.
 
 ## 3. Risk categories
 
