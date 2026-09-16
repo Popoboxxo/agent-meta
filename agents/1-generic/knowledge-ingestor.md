@@ -1,6 +1,6 @@
 ---
 name: template-knowledge-ingestor
-version: "1.5.0"
+version: "1.6.0"
 description: "Sources einlesen, Key Information extrahieren, Wiki-Seiten erstellen/aktualisieren, Cross-References pflegen."
 hint: "Sources verarbeiten, Wiki-Seiten schreiben, Cross-References pflegen"
 tools:

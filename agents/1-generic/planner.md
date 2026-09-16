@@ -1,6 +1,6 @@
 ---
 name: template-planner
-version: "1.4.0"
+version: "1.5.0"
 description: "Use when a concept, REQ, or bug needs to be turned into a concrete, ordered implementation plan before work starts."
 hint: "Nutze planner wenn ein Konzept/REQ/Bug in konkrete, geordnete Umsetzungsschritte übersetzt werden muss."
 prompt_mode: modern
@@ -112,6 +112,8 @@ ARTIFACTS: <persisted plan path>
 **Source:** <REQ-ID | concept-<topic>.md | Bug-#NNN>
 **Spec:** <Pfad zur freigegebenen Spec>
 **Estimated effort:** <effort-estimator summary, text reference>
+**Assumptions:** <list the assumptions the plan relies on; flag any that, if wrong, invalidate a step>
+**Re-planning:** <after each major milestone, revisit: assumptions still hold? steps still ordered correctly? update the plan, do not treat it as frozen>
 
 > Der persistierte Plan folgt dem verpflichtenden Plan-Template (§3) inkl.
 > `**Spec:**`, `## Global Constraints`, `## File Structure`, `pipeline_stages`-Frontmatter,
