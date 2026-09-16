@@ -1,6 +1,6 @@
 ---
 name: template-backend-reviewer
-version: "1.2.1"
+version: "1.3.0"
 description: "Domain code review for backend/server code: API contracts, silent-failure hunting, concurrency pitfalls, middleware chains, boundary validation — two-pass evidence-based review with rules index."
 hint: "Backend review: API contracts, silent failures, concurrency, middleware — evidence-based findings with MERGE_SCORE"
 prompt_mode: modern
@@ -29,11 +29,12 @@ No index file → built-in defaults:
 | ID | Rule |
 |----|------|
 | BE-01 | Silent failure hunt: swallowed exceptions, empty catch blocks, errors without user feedback/logging |
-| BE-02 | API contract consistency: stable shapes, versioning respected, breaking changes flagged |
-| BE-03 | Concurrency/async pitfalls: race conditions, unawaited promises, shared mutable state |
+| BE-02 | API contract consistency against OpenAPI (stable shapes, versioning respected, breaking changes flagged) |
+| BE-03 | Concurrency/async pitfalls: race conditions, unawaited promises, shared mutable state, missing idempotency/retry safety |
 | BE-04 | Middleware chain order correctness (auth before handlers, error handler last) |
 | BE-05 | Input validation at system boundaries (no trust of external payloads) |
 | BE-06 | Observability: no secrets in logs, errors carry context |
+| BE-07 | Golden-signal observability: no latency/traffic/error/saturation metric where required; silent behavior is a finding (#773) |
 </rules-index>
 
 <workflow>
