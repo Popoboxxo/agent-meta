@@ -868,3 +868,114 @@ tests:
     - USE method
     - utilization
     - saturation
+- description: b7-dev-granularity-01 [developer]
+  vars:
+    role: developer
+    prompt: Welche Schritte sind bei dir verpflichtend, bevor du eine Aenderung als fertig meldest? Nenne
+      sie.
+  assert:
+  - type: icontains-any
+    value:
+    - self.?review
+    - Selbst.?[Rr]eview
+    - self-contained
+    - read in full
+- description: b7-orch-center-01 [orchestrator]
+  vars:
+    role: orchestrator
+    prompt: Wie routingest du eine Aufgabe mit mehreren unabhaengigen Teilaufgaben an mehrere Agenten?
+      Beschreibe deinen Orchestrierungs-Ansatz.
+  assert:
+  - type: icontains-any
+    value:
+    - centrali[sz]ed
+    - Centrali[sz]ed
+    - group.?chat.*(not|nicht) (supported|unterst)
+- description: b7-jun-debug-01 [junior-developer]
+  vars:
+    role: junior-developer
+    prompt: Ich habe einen Fehler in meiner Funktion, aber ich weiss nicht genau wieso. Wie gehst du beim
+      Beheben vor?
+  assert:
+  - type: icontains-any
+    value:
+    - isolat\w*
+    - '[Pp]seudocode'
+    - debugger
+- description: b7-sen-repro-01 [senior-developer]
+  vars:
+    role: senior-developer
+    prompt: Ein seltsamer Race-Condition-Bug in der Produktion. Wie gehst du an die Behebung dieses Hard-Bugs
+      heran?
+  assert:
+  - type: icontains-any
+    value:
+    - reproduc\w*
+    - failing test
+    - fail.*test
+- description: b7-pri-isolate-01 [principal-developer]
+  vars:
+    role: principal-developer
+    prompt: Ein Bug braucht keinen Fix, sondern die Ursache. Was ist dein verbindlicher Ablauf — und was
+      sicherst du danach ab?
+  assert:
+  - type: icontains-any
+    value:
+    - isolat\w*
+    - experiment
+    - disprov\w*
+    - regression
+    - prevention
+- description: b7-exp-asneeded-01 [explorer]
+  vars:
+    role: explorer
+    prompt: Ich brauche eine Impact-Analyse über mehrere Dateien. Wie liest und durchsuchst du den Code,
+      und was weist du über deine Vollständigkeit aus?
+  assert:
+  - type: icontains-any
+    value:
+    - as.?needed
+    - control.?flow
+    - dependency.?graph
+    - graphify
+    - coverage
+- description: b7-git-recovery-01 [git]
+  vars:
+    role: git
+    prompt: Ich habe einen Commit veröffentlicht, der Fehler enthält. Wie räumst du das sicher auf — und
+      was kennzeichnest du bei Aenderungen, die die API brechen?
+  assert:
+  - type: icontains-any
+    value:
+    - git revert
+    - revert
+    - reflog
+    - --amend
+    - BREAKING CHANGE
+- description: b7-rel-schema-01 [release]
+  vars:
+    role: release
+    prompt: Wie formatierst du dein CHANGELOG, wie kennzeichnest du Breaking Changes, und wie behandelst
+      du API-Deprecations — bevor du eine Version taggst?
+  assert:
+  - type: icontains-any
+    value:
+    - YANKED
+    - Unreleased
+    - Breaking
+    - immutab\w*
+    - re.?tag
+- description: b7-dkr-freshness-01 [docker]
+  vars:
+    role: docker
+    prompt: Neues Release-Image fuer die Registry. Wann ist ein Rebuild faellig, wie taggst du reproducibly,
+      und welche Image-Security-Scans ziehst du optional vor dem Push heran?
+  assert:
+  - type: icontains-any
+    value:
+    - --pull
+    - immutab\w*
+    - digest
+    - '@sha256'
+    - trivy
+    - scout
