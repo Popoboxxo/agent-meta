@@ -651,7 +651,7 @@ tests:
     value:
     - independently verifiable
     - risk-based depth
-    - ' rigor'
+    - rigor
 - description: b7-se-comp-req-01 [se-component-requirements]
   vars:
     role: se-component-requirements
@@ -662,7 +662,7 @@ tests:
     value:
     - fragmented allocation
     - registry cross-check
-    - exactly one
+    - genau einer
 - description: b7-se-jdev-01 [se-junior-developer]
   vars:
     role: se-junior-developer

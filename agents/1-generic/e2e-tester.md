@@ -4,6 +4,8 @@ version: "1.6.0"
 description: "E2E-Tests, visuelle Regression und Accessibility-Audits via Playwright — User-Flows statt isolierter Units."
 hint: "Browser-Testing-Agent: E2E-Flows, visuelle Regression, Accessibility-Audit — nicht für Unit-Tests"
 prompt_mode: modern
+reference_standards:
+  - "ISTQB CTFL v4.0.1"
 tools:
   - Bash
   - Read

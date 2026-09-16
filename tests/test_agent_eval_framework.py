@@ -79,7 +79,7 @@ def test_catalog_ids_unique_across_files():
 
 def test_behavioral_cases_have_role_and_asserts():
     for name, case in _all_cases():
-        if not str(case.get("id", "")).startswith(("b2-", "b3-", "b5-", "b6-")):
+        if not str(case.get("id", "")).startswith(("b2-", "b3-", "b5-", "b6-", "b7-")):
             continue
         assert case.get("role"), f"{case['id']}: behavioral case without role"
         has_assert = any(
@@ -87,7 +87,8 @@ def test_behavioral_cases_have_role_and_asserts():
         )
         assert has_assert, f"{case['id']}: no assert criterion"
         if case.get("forbidden") or case.get("expected_any"):
-            # B2/B3 rely on substring/regex semantics, never on one-word equals
+            # B2/B3/B7 grade on substrings, never on one-word equals; keep the
+            # literals plain — promptfoo's `icontains-any` matches literally.
             assert case.get("prompt"), f"{case['id']}: raw prompt required"
 
 

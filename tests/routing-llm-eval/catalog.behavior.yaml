@@ -211,7 +211,7 @@ cases:
     expected_any:
       - 'independently verifiable'
       - 'risk-based depth'
-      - ' rigor'
+      - 'rigor'
 
   - id: b7-se-comp-req-01
     role: se-component-requirements
@@ -220,7 +220,7 @@ cases:
     expected_any:
       - 'fragmented allocation'
       - 'registry cross-check'
-      - 'exactly one'
+      - 'genau einer'
 
   - id: b7-se-jdev-01
     role: se-junior-developer
