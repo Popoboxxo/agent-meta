@@ -10,6 +10,8 @@ Covers:
 
 import json
 import subprocess
+import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -117,12 +119,34 @@ def test_generated_promptfoo_config_is_fresh_and_valid():
     )
     assert check.returncode == 0, f"stale generated config: {check.stderr}"
 
-    data = yaml.safe_load((EVAL_DIR / "promptfooconfig.generated.yaml").read_text(encoding="utf-8"))
+    raw = (EVAL_DIR / "promptfooconfig.generated.yaml").read_text(encoding="utf-8")
+    # AC-18: the generated file carries the GENERATED header ("do not edit by hand").
+    assert "do not edit by hand" in raw, "missing GENERATED header"
+    data = yaml.safe_load(raw)
     assert data["providers"], "no providers in generated config"
     for provider in data["providers"]:
         command = " ".join(provider["command"])
         assert "{{prompt}}" not in command, "W4: no inline {{prompt}} allowed"
     assert len(data["tests"]) >= len(_all_cases()) - 1, "config lost cases during merge"
+
+
+def test_generated_routing_catalog_is_fresh():
+    """AC-17: `catalog.generated.yaml` must be a byte-exact regeneration of
+    `config/role-defaults.yaml` — regenerate into a temp dir and compare.
+    A changed `signal_keywords` source without regeneration fails here."""
+    gen = _REPO_ROOT / "scripts" / "gen_routing_llm_eval_catalog.py"
+    committed = EVAL_DIR / "catalog.generated.yaml"
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "catalog.generated.yaml"
+        result = subprocess.run(
+            [sys.executable, str(gen), "--out", str(out)],
+            capture_output=True, text=True, cwd=str(_REPO_ROOT), timeout=120,
+        )
+        assert result.returncode == 0, result.stderr
+        assert out.read_bytes() == committed.read_bytes(), (
+            "catalog.generated.yaml is stale — regenerate with "
+            "python3 scripts/gen_routing_llm_eval_catalog.py"
+        )
 
 
 def test_structured_sidecar_contract_shape():

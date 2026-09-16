@@ -59,6 +59,7 @@ from lib.consistency.fanout_contracts import check_fanout_backend_contract
 from lib.consistency.handoff_contracts import check_handoff_contracts
 from lib.consistency.placeholders import check_placeholders, load_project_vars
 from lib.consistency.python_compat import check_fstring_backslash_hazard, check_py39_union_syntax
+from lib.consistency.reference_standards import check_reference_standards
 from lib.consistency.repo_containment import check_repo_containment_templates
 from lib.consistency.report import Finding, Severity, print_json_report, print_report
 from lib.consistency.subagent_permissions import check_subagent_permission_templates
@@ -170,6 +171,7 @@ def run_checks(
         if content is None:
             continue
         findings += check_agent_frontmatter(path, content, root, changed_files)
+        findings += check_reference_standards(path, content, root, changed_files)
         findings += check_placeholders(path, content, root, project_vars)
 
     # ── per-file: command checks ──────────────────────────────────────────────

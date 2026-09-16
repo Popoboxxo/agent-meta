@@ -736,13 +736,43 @@
           "type": "object",
           "description": "Options for the Claude provider.",
           "additionalProperties": false,
-          "properties": {}
+          "properties": {
+            "frontmatter-keep-fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Frontmatter keys that must NOT be stripped for this provider, even when they appear in the global defaults or in frontmatter-strip-fields. Wins over strip. Default: empty."
+            },
+            "frontmatter-strip-fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Frontmatter keys to strip for this provider, in addition to the global defaults (reference_standards). Combined by union with ai-providers.yaml's frontmatter_strip_fields; frontmatter-keep-fields wins. Default: empty."
+            }
+          }
         },
         "Gemini": {
           "type": "object",
           "description": "Options for the Gemini provider.",
           "additionalProperties": false,
-          "properties": {}
+          "properties": {
+            "frontmatter-keep-fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Frontmatter keys that must NOT be stripped for this provider, even when they appear in the global defaults or in frontmatter-strip-fields. Wins over strip. Default: empty."
+            },
+            "frontmatter-strip-fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Frontmatter keys to strip for this provider, in addition to the global defaults (reference_standards). Combined by union with ai-providers.yaml's frontmatter_strip_fields; frontmatter-keep-fields wins. Default: empty."
+            }
+          }
         },
         "Continue": {
           "type": "object",
@@ -760,21 +790,65 @@
                 "full",
                 "slim"
               ],
-              "default": "full"
+                "default": "full"
+              },
+              "frontmatter-keep-fields": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Frontmatter keys that must NOT be stripped for this provider, even when they appear in the global defaults or in frontmatter-strip-fields. Wins over strip. Default: empty."
+              },
+              "frontmatter-strip-fields": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Frontmatter keys to strip for this provider, in addition to the global defaults (reference_standards). Combined by union with ai-providers.yaml's frontmatter_strip_fields; frontmatter-keep-fields wins. Default: empty."
+              }
             }
-          }
         },
         "Opencode": {
           "type": "object",
           "description": "Options for the Opencode provider.",
           "additionalProperties": false,
-          "properties": {}
+          "properties": {
+            "frontmatter-keep-fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Frontmatter keys that must NOT be stripped for this provider, even when they appear in the global defaults or in frontmatter-strip-fields. Wins over strip. Default: empty."
+            },
+            "frontmatter-strip-fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Frontmatter keys to strip for this provider, in addition to the global defaults (reference_standards). Combined by union with ai-providers.yaml's frontmatter_strip_fields; frontmatter-keep-fields wins. Default: empty."
+            }
+          }
         },
         "Mammouth": {
           "type": "object",
           "description": "Options for the Mammouth Code provider.",
           "additionalProperties": false,
-          "properties": {}
+          "properties": {
+            "frontmatter-keep-fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Frontmatter keys that must NOT be stripped for this provider, even when they appear in the global defaults or in frontmatter-strip-fields. Wins over strip. Default: empty."
+            },
+            "frontmatter-strip-fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Frontmatter keys to strip for this provider, in addition to the global defaults (reference_standards). Combined by union with ai-providers.yaml's frontmatter_strip_fields; frontmatter-keep-fields wins. Default: empty."
+            }
+          }
         }
       },
       "additionalProperties": true
