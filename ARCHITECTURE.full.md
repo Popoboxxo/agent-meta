@@ -444,7 +444,7 @@ Der Orchestrator ist die primäre Envelope-Fabrik:
 
 → Full spec: `docs/concepts/a2a-handoff-protocol.md`
 → Envelope schema: `schemas/a2a-handoff.schema.json`
-→ MCP tools: `config/mcp-registry.yaml` (a2a-handoff server: validate_handoff, resolve_handoff_schema, resolve_handoff)
+→ MCP tools: `config/plugin-catalog.yaml` (a2a-handoff server: validate_handoff, resolve_handoff_schema, resolve_handoff)
 
 ---
 

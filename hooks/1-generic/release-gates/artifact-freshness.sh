@@ -2,7 +2,7 @@
 # hook: artifact-freshness
 # version: 1.1.0
 # event: Manual
-# description: Pre-release gate — blocks release if a generated artifact is older than the source it was built from (config: .agent-meta/generated-artifacts.yaml)
+# description: Pre-release gate — blocks release if a generated artifact is older than the source it was built from (config: .meta-config/generated-artifacts.yaml; fallback when that file does not exist: generated-artifacts.yaml)
 # enabled_by_default: false
 
 # --- Gate contract (see docs/RELEASE_GATES.md) ---
@@ -33,7 +33,10 @@ GATE_NAME="artifact-freshness"
 hook_gate_check_enabled "$GATE_NAME" || exit 0
 
 # --- Config convention ---
-# .agent-meta/generated-artifacts.yaml at the consumer project root.
+# .meta-config/generated-artifacts.yaml at the consumer project root, falling
+# back to generated-artifacts.yaml when that file does not exist (the fallback
+# is chosen by file absence, not by the absence of the .meta-config/
+# directory). The primary path wins when both exist.
 # Supported subset (stdlib-only, NOT a full YAML parser):
 #
 #   artifacts:
@@ -45,9 +48,15 @@ hook_gate_check_enabled "$GATE_NAME" || exit 0
 # One list under a single top-level `artifacts:` key; each entry is a
 # `- source: <path-or-glob>` / `generated: <path-or-glob>` pair on two
 # consecutive lines. No nesting, no anchors, no multi-line scalars.
-CONFIG_FILE=".agent-meta/generated-artifacts.yaml"
-if [ ! -f "$CONFIG_FILE" ]; then
-  echo "[SKIP] $GATE_NAME: no $CONFIG_FILE found — opt-in check not configured"
+CONFIG_FILE=""
+for candidate in ".meta-config/generated-artifacts.yaml" "generated-artifacts.yaml"; do
+  if [ -f "$candidate" ]; then
+    CONFIG_FILE="$candidate"
+    break
+  fi
+done
+if [ -z "$CONFIG_FILE" ]; then
+  echo "[SKIP] $GATE_NAME: no .meta-config/generated-artifacts.yaml or generated-artifacts.yaml found — opt-in check not configured"
   exit 0
 fi
 

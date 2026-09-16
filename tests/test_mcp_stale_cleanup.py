@@ -125,7 +125,7 @@ def test_mcp_rule_file_bootstrap_sweeps_legacy_orphan_without_prior_index(tmp_pa
     _write(
         orphan_path,
         "# MCP: reqflow\n\nstale leftover\n\n---\n\n"
-        "*Generiert von agent-meta aus `config/mcp-registry.yaml` — nicht manuell bearbeiten.*\n",
+        "*Generiert von agent-meta aus `config/plugin-catalog.yaml` — nicht manuell bearbeiten.*\n",
     )
     assert not (project_root / ".claude" / "rules" / ".agent-meta-managed-mcp").exists()
 

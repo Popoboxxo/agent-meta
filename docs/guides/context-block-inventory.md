@@ -146,7 +146,7 @@ Lifecycle-Diagramm). Plan-Ist: „Changelog-Charakter = Ballast". Ersatz: Pointe
 
 #### 4d. MCP-Sektionen — generiert, Z514–730, ~217 Zeilen
 
-Quelle: `scripts/lib/mcp.py::_generate_rule_content()` aus `config/mcp-registry.yaml`,
+Quelle: `scripts/lib/mcp.py::_generate_rule_content()` aus `config/plugin-catalog.yaml`,
 eingebettet über den Rules-Loop (Registry: `rules/2-platform/agent-meta-mcp.yaml`).
 
 Server: honcho (514–549), playwright (551–602), reqogniloom (604–703), viz-logger (705–729).
