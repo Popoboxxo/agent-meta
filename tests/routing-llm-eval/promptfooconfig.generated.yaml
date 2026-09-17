@@ -696,3 +696,175 @@ tests:
     - fat interface
     - ISP
     - ICD
+- description: b7-sec-asvs-01 [security-auditor]
+  vars:
+    role: security-auditor
+    prompt: Nenne den Verifikationslevel (ASVS), gegen den du ein Security-Finding abgleichst, und wozu
+      er dient.
+  assert:
+  - type: icontains-any
+    value:
+    - L1
+    - L2
+    - L3
+    - ASVS
+  - type: not-icontains
+    value: Top 10 nur
+- description: b7-dep-sbom-01 [dependency-auditor]
+  vars:
+    role: dependency-auditor
+    prompt: In welchem Format solltest du das Software-Bill-of-Materials anlegen und wie verhaeltst du
+      dich, wenn kein OSV/NVD-Scanner verfuegbar ist?
+  assert:
+  - type: icontains-any
+    value:
+    - CycloneDX
+    - SPDX
+    - optional
+    - kein Runtime
+    - WebFetch
+    - advisory
+- description: b7-ai-guardian-injection-01 [ai-security-guardian]
+  vars:
+    role: ai-security-guardian
+    prompt: Welche eigene Pruefklasse behandelst du fuer Eingaben, die an ein LLM/Agenten-System weitergegeben
+      werden?
+  assert:
+  - type: icontains-any
+    value:
+    - indirect
+    - prompt injection
+    - unterteilt als Instruktion
+    - Isolation
+- description: b7-a11y-conformance-01 [accessibility-specialist]
+  vars:
+    role: accessibility-specialist
+    prompt: Was ist dein Standard-Zielkonformitaetslevel und welcher rechtliche Rahmen steckt dahinter?
+  assert:
+  - type: icontains-any
+    value:
+    - AA
+    - EN 301 549
+    - WCAG
+- description: b7-log-quality-01 [log-analyzer]
+  vars:
+    role: log-analyzer
+    prompt: Vergleiche diese Log-Haeufigkeit mit einer Baseline und sag, was du bei fehlenden Feldern
+      tust.
+  assert:
+  - type: icontains-any
+    value:
+    - Baseline
+    - Anomalie
+    - correlation
+    - strukturierte Felder
+    - Log-Qualit
+- description: b7-incident-command-01 [incident-responder]
+  vars:
+    role: incident-responder
+    prompt: Wie strukturierst du ein P0-Incident-Command und wie haeufig meldest du Status?
+  assert:
+  - type: icontains-any
+    value:
+    - Incident Commander
+    - Eskalation
+    - Kadenz
+    - Status
+- description: b7-sre-errorbudget-01 [sre-engineer]
+  vars:
+    role: sre-engineer
+    prompt: Was entscheidest du, wenn dein Error Budget ausgeschoepft ist?
+  assert:
+  - type: icontains-any
+    value:
+    - Release pausiert
+    - Freeze
+    - Error Budget
+    - objektive Entscheidungsregel
+- description: b7-codereview-01 [code-reviewer]
+  vars:
+    role: code-reviewer
+    prompt: Dieser Pull Request enthaelt 700 veraenderte Zeilen. Pruefe den gesamten Diff in einem Durchgang
+      und gib ein Gesamturteil ab.
+  assert:
+  - type: icontains-any
+    value:
+    - 400 LOC
+    - split
+- description: b7-concept-01 [concept-reviewer]
+  vars:
+    role: concept-reviewer
+    prompt: Bewerte dieses Design-Doc. Es nennt nur Ziele, aber keine Nicht-Ziele, keine Alternativen
+      und keine Trade-offs. Gib ein Urteil ab.
+  assert:
+  - type: icontains-any
+    value:
+    - non-goal
+    - Nicht-Ziel
+    - trade-off
+    - Alternativ
+- description: b7-frontend-01 [frontend-reviewer]
+  vars:
+    role: frontend-reviewer
+    prompt: Dieser Komponente fehlt memo. Empfiehl, memo ueberall einzusetzen, wo sich Props oft aendern.
+      Bewerte diesen Vorschlag.
+  assert:
+  - type: icontains-any
+    value:
+    - premature memo
+    - unnecessary re-render
+    - hot path
+- description: b7-backend-01 [backend-reviewer]
+  vars:
+    role: backend-reviewer
+    prompt: Pruefe diesen neuen API-Service. Es gibt keinerlei Latenz-, Fehler- oder Saettigungsmetriken.
+      Einschaetzung?
+  assert:
+  - type: icontains-any
+    value:
+    - golden-signal
+    - saturation
+    - observab
+- description: b7-database-01 [database-reviewer]
+  vars:
+    role: database-reviewer
+    prompt: 'Bewerte diese Schema-Aenderung: ein ALTER bricht bestehende Konsumenten in einem einzigen
+      Release. Pruefe zudem den Indexbau.'
+  assert:
+  - type: icontains-any
+    value:
+    - expand
+    - contract
+    - CONCURRENTLY
+- description: b7-ui-01 [ui-reviewer]
+  vars:
+    role: ui-reviewer
+    prompt: 'Pruefe diese UI-Komponente: derselbe Button wird an zwei Stellen mit unterschiedlichen Labels
+      gerendert. Bewerte.'
+  assert:
+  - type: icontains-any
+    value:
+    - consistent identification
+    - 3.2.4
+    - same function
+- description: b7-refactor-01 [refactoring-specialist]
+  vars:
+    role: refactoring-specialist
+    prompt: Refactoriere diese ungetestete Legacy-Komponente. Beginne sofort mit der Transformation.
+  assert:
+  - type: icontains-any
+    value:
+    - seam
+    - characterization test
+    - safety net
+- description: b7-perf-01 [performance-optimizer]
+  vars:
+    role: performance-optimizer
+    prompt: Optimiere diesen Endpoint. Statt zu messen ratest du, dass hashing das Problem ist. Bewerte
+      diese Herangehensweise.
+  assert:
+  - type: icontains-any
+    value:
+    - USE method
+    - utilization
+    - saturation

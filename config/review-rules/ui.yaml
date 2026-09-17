@@ -11,7 +11,7 @@ rules:
     severity_hint: low
     standard_ref:
   - id: UI-03
-    title: Interaction states present (loading/error/empty)
+    title: Interaction states present (loading/error/empty; focus/hover/disabled variants defined)
     severity_hint: medium
     standard_ref:
   - id: UI-04
@@ -21,4 +21,12 @@ rules:
   - id: UI-05
     title: Surface WCAG basics (deep audits -> accessibility-specialist)
     severity_hint: high
-    standard_ref: WCAG-2.2
+    standard_ref: "WCAG@2.2"
+  - id: UI-06
+    title: Consistent identification - same function maps to same label/icon (SC 3.2.4)
+    severity_hint: medium
+    standard_ref: "WCAG@2.2#3.2.4"
+  - id: UI-07
+    title: Accessible semantics on interactive elements (roles/labels/landmarks/alt)
+    severity_hint: high
+    standard_ref: "WCAG@2.2"

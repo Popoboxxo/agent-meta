@@ -26,3 +26,7 @@ rules:
     title: No inline secrets/keys in client bundles
     severity_hint: critical
     standard_ref: CWE-798
+  - id: FE-07
+    title: Premature memoization / unnecessary re-renders (memo only on measured hot paths)
+    severity_hint: medium
+    standard_ref:
