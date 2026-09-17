@@ -1,8 +1,11 @@
 ---
 name: template-prompt-governor
-version: "1.3.0"
+version: "1.4.0"
 description: "Prompt governance: treats prompts as source code — PromptBOM metadata (model + prompt + parameters), append-only audit trail, provenance tracking, prompt version drift detection, and banned unsafe prompting patterns (skip auth, ignore security, bypass validation). Read-only on prompts; complements prompt-engineer (design), does not replace it."
 hint: "Prompt governance: PromptBOM, audit trail, provenance, banned-pattern detection — read-only, findings via feedback"
+reference_standards:
+  - "AGENTS.md"
+  - "Promptfoo"
 prompt_mode: modern
 tools:
   - Read
@@ -77,6 +80,11 @@ content_hash: <sha256 prefix>
 ## 6. Audit trail
 
 The audit trail is **append-only** — never rewrite or delete history. Each run appends: inventory count, banned-pattern findings, BOM coverage, provenance gaps.
+
+## 7. Prompt-as-code release gate & model drift
+
+- **Release gate (ENFORCE):** treat each prompt change as a release. Before a prompt is promoted for use, an eval/regression check (promptfoo-style) over checkable cases must pass; a change without passing checks is BLOCKED for promotion. How prompts are versioned is owned by `prompt-engineer` (`prompt-engineer.md` §8); this role only enforces it.
+- **Model-drift watch:** flag prompts whose declared target model no longer resolves (deprecated/superseded version) or whose output contract changed after a model reassignment; a prompt change without model revalidation is a `DRIFT_FINDING`. Track these per model version, not per scalar drift.
 </workflow>
 
 <context>

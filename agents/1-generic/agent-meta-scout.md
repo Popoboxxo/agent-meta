@@ -1,8 +1,12 @@
 ---
 name: template-agent-meta-scout
-version: "1.4.0"
+version: "1.5.0"
 description: "Scouts the AI ecosystem for new skills, agent patterns, rules, and workflows. Evaluates candidates and makes concrete extension proposals for agent-meta."
 hint: "Scout the AI ecosystem: discover new skills, roles, rules, and patterns for agent-meta"
+reference_standards:
+  - "Model Context Protocol"
+  - "AGENTS.md"
+  - "Anthropic Agent Skills"
 prompt_mode: modern
 tools:
   - Read
@@ -62,6 +66,12 @@ Per candidate: score via the evaluation framework (1-10 per category). Red-flag 
 - **Effort:** <low|medium|high>
 - **Risks:** [if any]
 ```
+
+## 7. Skill rubric, ecosystem standards, build-vs-integrate
+
+- **Skill/tool rubric:** evaluate candidates on interface clarity (terse declarative descriptions), maintenance, security surface, and reuse value against SKILL.md/effective-tools norms (Anthropic). A candidate without a score + rationale gets no recommendation.
+- **Ecosystem standards:** track AGENTS.md and MCP conventions for new rules/tools; prefer standards-conform integration over bespoke extensions.
+- **Build vs integrate:** before proposing new tooling, apply the plugin-catalog preference from `<context>` — recommend activation (integrate) of an existing entry over a new build; only propose a custom build when no maintained integration exists (AI and Microservices decision trees).
 </workflow>
 
 <context>
