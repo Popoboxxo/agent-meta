@@ -1,6 +1,7 @@
 # Stacking-Note — `feat/lit-cluster-product-planning` (Cluster aus PR #787 + #793)
 
-**Status:** aktiv, vorwärtsgerichtet. Keine abgeschlossene Arbeit.
+**Status:** aufgelöst — Branch auf `origin/main` rebased, PR-Basis auf `main` umgestellt
+(nach dem Merge von #801).
 
 ## Was
 
@@ -13,26 +14,27 @@ bleiben offen; sie werden nicht kommentiert oder geschlossen.
 - Ausgangs-PRs: [#787](https://github.com/Popoboxxo/agent-meta/pull/787), [#793](https://github.com/Popoboxxo/agent-meta/pull/793)
 - Abhängigkeit: [#801](https://github.com/Popoboxxo/agent-meta/pull/801) (`feat/reference-standards-support`)
 
-## Stacking
+## Stacking (aufgelöst)
 
 | | |
 |---|---|
-| Basis-Commit des Branches | `a59623c2` — Head von PR #801 |
-| PR-Basis | `feat/reference-standards-support` (**nicht** `main`) |
-| Grund | `reference_standards` (#801) ist die Grammatik, gegen die die Einträge aus #787/#793 validiert werden |
+| Ehemalige Basis | `a59623c2` — Head von PR #801 (`feat/reference-standards-support`) |
+| **Aktuelle Basis** | `main` (PR-Basis umgestellt) |
+| Rebase-Ziel | `origin/main` @ `cfb4d40f` — Merge-Commit von #801 |
+| Grund für die Stacking-Phase | `reference_standards` (#801) war die Grammatik, gegen die die Einträge aus #787/#793 validiert werden |
 
-## Pflicht-Schritt nach dem Merge von #801
+## Erledigter Rebase-Schritt
 
 ```bash
 git fetch origin
 git switch feat/lit-cluster-product-planning
-git rebase origin/main                 # #801-Inhalte sind dann bereits in main
+git rebase origin/main                 # die 4 #801-Commits wurden als bereits-upstream übersprungen
 git push --force-with-lease origin feat/lit-cluster-product-planning
 # danach: PR-Basis von feat/reference-standards-support auf main umstellen
 ```
 
-Nach dem Rebase ist der Diff des Cluster-PRs gegen `main` frei von den #801-Änderungen;
-der Stacking-Absatz im PR-Body ist dann zu entfernen.
+Der Rebase lief konfliktfrei; der Diff des Cluster-PRs gegen `main` ist frei von den
+#801-Änderungen. Der Stacking-Absatz im PR-Body wurde entsprechend ersetzt.
 
 ## Belege (Stand des Branches)
 
@@ -69,11 +71,21 @@ der Stacking-Absatz im PR-Body ist dann zu entfernen.
   (`test_model_discovery.py::test_fetch_anthropic_models_respects_blacklist`) ist
   umgebungsbedingt (Live-Fetch per `pytest-socket` blockiert → curated fallback).
 
+## Post-Rebase-Verifikation (gegen `cfb4d40f`)
+
+- `python3 scripts/gen_promptfoo_config.py --check` = rc 0.
+- `python3 scripts/sync.py --check` = rc 0, `--validate` = rc 0.
+- `python3 scripts/consistency-check.py` = rc 0.
+- `pytest tests --ignore=tests/browser`: 2993 passed, 1 failed (bekannter, netzwerkbedingter
+  `test_model_discovery`-Fehlschlag).
+- `bash tests/scenarios/run.sh`: 63/63 bestanden, rc 0.
+
 ## Abgrenzung zu den Schwester-Clustern
 
-- `feat/lit-cluster-review-security` (PR #816, aus #790 + #792) ist ein **eigener** gestackter
+- `feat/lit-cluster-review-security` (PR #816, aus #790 + #792) war ein **eigener** gestackter
   Branch auf derselben Basis `a59623c2`. Der B7-Hygiene-Gate (`"b7-"` in der ID-Präfix-Liste
   von `tests/test_agent_eval_framework.py`) wird dort eingeführt und hier bewusst **nicht**
-  dupliziert, um keinen Konflikt zwischen den gestackten Cluster-PRs zu erzeugen.
-- `feat/lit-cluster-core-agents` (PR #817, aus #795 + #791) ist ebenfalls ein eigener
-  gestackter Branch auf `a59623c2`.
+  dupliziert, um keinen Konflikt zwischen den gestackten Cluster-PRs zu erzeugen. Der Branch
+  ist inzwischen ebenfalls auf `origin/main` rebased (PR-Basis `main`).
+- `feat/lit-cluster-core-agents` (PR #817, aus #795 + #791) war ebenfalls ein eigener
+  gestackter Branch auf `a59623c2`; inzwischen ebenfalls auf `main` rebased.
