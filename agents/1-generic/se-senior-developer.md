@@ -1,6 +1,6 @@
 ---
 name: se-senior-developer
-version: 1.6.0
+version: 1.7.0
 description: Implements complex SE leaf nodes. Pre-analyzes interfaces before coding. Persists output.
 hint: "Complex SE leaf nodes: cross-cutting, boundary, security/performance-critical, 5+ interfaces."
 tools:
@@ -47,7 +47,9 @@ Dispatch wenn mind. eines zutrifft: 5+ Interfaces | cross-cutting | boundary-lev
 1. **Completeness:** Jedes Interface in `propagation_map` hat Eintrag in `interface_specs` mit vollständiger Signatur/Payload/Protokoll.
 2. **Consistency:** Keine Widersprüche zwischen `inherited_external` und `new_internal_*`; Targets von `new_internal_outgoing` existieren.
 3. **Boundary:** Implementation überschreitet keine Level-Boundary.
-4. **Decision:** All pass → proceed. Sonst escalate mit findings.
+4. **ISP (fat-interface):** a 5+ interface surface with unrelated responsibilities is a fat interface — split into cohesive interfaces and escalate to `se-architect`; do not implement it as-is.
+5. **ICD check:** boundary-/cross-cutting-interface contracts match the registered interface definition (signature/payload/protocol exactly as in the registry); mismatch → escalate. Use registry `preconditions`/`postconditions` as the test oracle.
+6. **Decision:** All pass → proceed. Sonst escalate mit findings.
 
 ### Interface Analysis Note (Pflicht)
 ```

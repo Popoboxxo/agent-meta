@@ -6,7 +6,13 @@ Provider-Sessions. Zwei Klassen:
 | Klasse | Kataloge | Grading | Zweck |
 |--------|----------|---------|-------|
 | Routing (B1) | `catalog.generated.yaml` + `catalog.manual.yaml` | exakter normalisierter Ein-Wort-Match auf `pipeline` | Intent-Routing-Tabelle des orchestrator |
-| Behavioral (#535) | `catalog.behavior.yaml` | `contains_any` (Regex) / `contains_all` / `forbidden` | Delegation-Gates (B3), Rollen-Treue (B2), Output-Contract (B5), Interface-Wissen (B6) |
+| Behavioral (#535) | `catalog.behavior.yaml` | `contains_any` (Regex) / `contains_all` / `forbidden` | Delegation-Gates (B3), Rollen-Treue (B2), Output-Contract (B5), Interface-Wissen (B6), Prozess-Disziplin (B7) |
+
+> **`expected_any`-Semantik:** `run_eval.sh` wertet die Liste als **Regex** aus
+> (`grep -qiE`), promptfoo als **Literal-Substring** (`icontains-any`). Katalog-
+> Einträge bleiben daher **einfache Literale** — ein Regex wie
+> `'nicht (moeglich|erlaubt)'` ist unter promptfoo tot; Alternationen in
+> separate Listen-Einträge aufteilen.
 
 ## Nutzung
 
@@ -27,7 +33,8 @@ und beenden sich mit **exit 2 bei unbekannter/fehlender Rollen-Datei**
 
 **Handgepflegt (nur diese beiden):**
 - `catalog.manual.yaml` — Disambiguierungs-, Negativ- und Ambiguous-Fälle.
-- `catalog.behavior.yaml` — behaviorale Asserts (Rollen-Treue, Gates, Output-Contract).
+- `catalog.behavior.yaml` — behaviorale Asserts (Rollen-Treue, Gates, Output-Contract,
+  Prozess-Disziplin B7).
 
 **Generiert — niemals von Hand editieren:**
 - `catalog.generated.yaml` ← `scripts/gen_routing_llm_eval_catalog.py`

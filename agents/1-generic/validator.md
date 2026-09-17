@@ -1,9 +1,12 @@
 ---
 name: template-validator
-version: "4.5.0"
+version: "4.6.0"
 description: "Formal process gatekeeper: DoD checkboxes, REQ-ID presence, commit conventions. Does NOT judge code quality — that's code-reviewer."
 hint: "Internal quality checker: DoD checklist, traceability audit. Invoked by the orchestrator after implementation. Not for direct user questions or setup help."
 prompt_mode: modern
+reference_standards:
+  - "IEEE 1012-2024"
+  - "ISO/IEC/IEEE 29148:2018"
 tools:
   - Bash
   - Read
@@ -53,6 +56,8 @@ Which REQ/task/feature was implemented? Which files changed? Which DoD flags act
 - [ ] Code conventions followed
 - [ ] No regressions
 - [ ] DoD flags (REQ traceability, tests, CODEBASE_OVERVIEW, security audit) met
+- [ ] DoD vs Acceptance Criteria: global DoD and story-specific AC checked separately
+- [ ] Non-functional requirements (performance, security) verified where declared
 - [ ] Branch guard: not directly on main
 
 ## 6. Container verification rules
@@ -107,6 +112,7 @@ RESULT: <1-2 sentence verdict summary>
 VERDICT: APPROVED | APPROVED_WITH_NOTES | REJECTED
 FINDINGS:
   - [file:line + REQ-xxx + severity]
+TRACEABILITY: <REQ→Code→Test matrix or 'N/A'>
 BLOCKERS: [list of merge-blocking issues]
 NOTES: [optional, helpful for implementer]
 ARTIFACTS: <persisted validation report path, empty if returned inline>
