@@ -160,9 +160,12 @@ damit aktuell ein Capability-Versprechen ohne Output (siehe auch den Kommentar z
 
 **Fähigkeiten (`config/provider-capabilities.yaml`):**
 - `hooks: true` — belegt durch `has_hooks: true` + `hooks_dir` in `config/ai-providers.yaml`.
-- Keine native Subagent-Dispatch-API und keine parallele Ausführung (konservativ auf `false`,
-  da Mammouths native Orchestrierungs-Oberfläche nicht dokumentiert ist) — Delegation
-  text-basiert per `@agent`-Mention, sequentiell, YAML-Text-Block-Handoff.
+- Keine verifizierte/dokumentierte native Subagent-Dispatch-API und keine verifizierte
+  parallele Ausführung (konservativ auf `false`) — Delegation text-basiert per
+  `@agent`-Mention, sequentiell, YAML-Text-Block-Handoff.
+- Modell-Effort-Level (extended thinking) sind modellabhängig: nicht jedes
+  Mammouth-Modell unterstützt Effort-Stufen — vor einer Empfehlung pro Modell
+  verifizieren.
 - MCP-Integration ist in `config/ai-providers.yaml` (noch) nicht konfiguriert (`mcp-config: {}`).
 
 **Frontmatter:** reduziert (`model`).

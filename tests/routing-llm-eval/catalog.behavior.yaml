@@ -815,3 +815,60 @@ cases:
       - 'SLI'
       - 'exit criterion'
       - 'portfolio'
+
+  # --- B7: literature-anchored platform-expert & meta roles (#776) ---------
+  - id: b7-pe-01
+    role: prompt-engineer
+    category: process-discipline
+    prompt: "Ich habe einen System-Prompt geaendert. Was musst du vor einer Uebernahme zuerst pruefen und womit?"
+    expected_any:
+      - 'version prompt'
+      - 'version prompts in code'
+      - 'regression'
+      - 'eval'
+      - 'few-shot'
+
+  - id: b7-pg-01
+    role: prompt-governor
+    category: process-discipline
+    prompt: "Ein Prompt wurde geaendert und soll in Produktion gehen. Welchen Schritt darfst du als Governor nicht ueberspringen?"
+    expected_any:
+      - 'eval/regression'
+      - 'regression'
+      - 'model drift'
+      - 'modell-drift'
+      - 'promote'
+      - 'release gate'
+
+  - id: b7-es-01
+    role: agent-meta-scout
+    category: process-discipline
+    prompt: "Diskutiere, ob wir fuer diese Anforderung ein neues Tool bauen oder eine bestehende Standard-Integration aktivieren sollten."
+    expected_any:
+      - 'build vs integrate'
+      - 'build-vs-integrate'
+      - 'plugin-catalog'
+      - 'decision trees'
+
+  - id: b7-am-01
+    role: agent-meta-manager
+    category: process-discipline
+    prompt: "Ein Framework-Upgrade ist fehlgeschlagen und der Baum ist halb migriert. Wie gehst du vor?"
+    expected_any:
+      - 'revert'
+      - 'rollback'
+      - 'revert to the prior tag'
+      - 'prior tag'
+      - 're-sync'
+
+  - id: b7-me-01
+    role: mammouth-expert
+    category: interface-knowledge
+    prompt: "Wie loest Mammouth einen Delegations-/FANOUT-Aufruf auf und was ist deren Parallelitaets-Charakteristik?"
+    expected_any:
+      - 'sequential'
+      - 'text-based'
+      - '@<'
+      - 'no verified'
+      - 'PAL_FANOUT'
+      - 'delegation-syntax'

@@ -1351,3 +1351,67 @@ tests:
     - SLI
     - exit criterion
     - portfolio
+- description: b7-pe-01 [prompt-engineer]
+  vars:
+    role: prompt-engineer
+    prompt: Ich habe einen System-Prompt geaendert. Was musst du vor einer Uebernahme zuerst pruefen und
+      womit?
+  assert:
+  - type: icontains-any
+    value:
+    - version prompt
+    - version prompts in code
+    - regression
+    - eval
+    - few-shot
+- description: b7-pg-01 [prompt-governor]
+  vars:
+    role: prompt-governor
+    prompt: Ein Prompt wurde geaendert und soll in Produktion gehen. Welchen Schritt darfst du als Governor
+      nicht ueberspringen?
+  assert:
+  - type: icontains-any
+    value:
+    - eval/regression
+    - regression
+    - model drift
+    - modell-drift
+    - promote
+    - release gate
+- description: b7-es-01 [agent-meta-scout]
+  vars:
+    role: agent-meta-scout
+    prompt: Diskutiere, ob wir fuer diese Anforderung ein neues Tool bauen oder eine bestehende Standard-Integration
+      aktivieren sollten.
+  assert:
+  - type: icontains-any
+    value:
+    - build vs integrate
+    - build-vs-integrate
+    - plugin-catalog
+    - decision trees
+- description: b7-am-01 [agent-meta-manager]
+  vars:
+    role: agent-meta-manager
+    prompt: Ein Framework-Upgrade ist fehlgeschlagen und der Baum ist halb migriert. Wie gehst du vor?
+  assert:
+  - type: icontains-any
+    value:
+    - revert
+    - rollback
+    - revert to the prior tag
+    - prior tag
+    - re-sync
+- description: b7-me-01 [mammouth-expert]
+  vars:
+    role: mammouth-expert
+    prompt: Wie loest Mammouth einen Delegations-/FANOUT-Aufruf auf und was ist deren Parallelitaets-Charakteristik?
+  assert:
+  - type: icontains-any
+    value:
+    - sequential
+    - text-based
+    - '@<'
+    - no verified
+    - PAL_FANOUT
+    - delegation-syntax

@@ -3,6 +3,8 @@ name: template-agent-meta-manager
 version: "1.22.0"
 description: "Manage agent-meta: upgrades, sync, feedback delegation, project-specific agents, external-skill lifecycle, and creating extensions."
 hint: "Manage agent-meta: upgrade, sync, feedback, create project-specific agents"
+reference_standards:
+  - "Anthropic: Scaling Managed Agents"
 prompt_mode: modern
 tools:
   - Bash
@@ -89,10 +91,10 @@ This agent never writes README markup — the `documenter` is the sole writer of
 On major bump: inform user + obtain confirmation. Then sync + `git commit -m "chore: upgrade agent-meta to v<TARGET>"`.
 
 **Upgrade safety (migration/rollback):** before switching tags record the current
-tag and confirm a rollback point is reachable. Swap components independently, never
-nurse one coupled container in place (Anthropic managed-agents: decouple brain from
-hands; the session log is the durable recovery record). On failure revert to the
-prior tag and re-sync — fix by reverting, not by patching a half-upgraded tree.
+tag and confirm a rollback point is reachable. Upgrade components independently
+rather than as one coupled bundle; the session log is the durable recovery record
+(Anthropic managed-agents). On failure revert to the prior tag and re-sync — fix by
+reverting, not by patching a half-upgraded tree.
 
 ## 5. Update (`update-meta` / re-sync)
 
@@ -243,12 +245,12 @@ py {{AGENT_META_REL_PATH}}scripts/consistency-check.py --changed --json       # 
 
 Checks: frontmatter (version, semver, based-on, extends, patch-anchors), cross-references, placeholders, commands.
 
-**Config/docs consistency** is covered by the sync path itself — do not build a
-separate ad-hoc check. After any generated-config or docs change run
-`sync.py --check` (read-only CI gate) and `sync.py --audit-config` (report-only,
-flags deprecated roles / orphans); combine with `--validate` (§5) so generated
-configs and docs stay consistent with the schema (A Common Sense Guide: route
-related rework through one consistency gate, not scattered checks).
+**Config/docs consistency** is covered by the sync path — do not build a separate
+ad-hoc check. After any generated-config or docs change run `sync.py --check`
+(read-only CI gate) and `sync.py --audit-config` (report-only, flags deprecated
+roles / orphans), plus `--validate` (§5), so generated configs and docs stay
+consistent with the schema (A Common Sense Guide: one consistency gate, not
+scattered checks).
 
 **Finding:** ERROR → must fix, WARNING → recommended.
 
