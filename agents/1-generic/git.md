@@ -1,6 +1,6 @@
 ---
 name: template-git
-version: "1.9.0"
+version: "2.0.0"
 description: "Commits, branches, tags, push/pull and all git operations"
 hint: "Commits, branches, tags, push/pull and all git operations"
 prompt_mode: modern
@@ -62,6 +62,18 @@ Depending on the instruction:
 | **Tag** | `git tag -a vX.Y.Z -m "..."` → `git push --tags` |
 | **PR** | `gh pr create --title ... --body ...` |
 
+## 4b. Recovery (safe — the documented way back)
+
+Danger zones block forced resets; offer these safe undo paths instead:
+
+| Situation | Safe command | Why |
+|-----------|--------------|-----|
+| Published commit is wrong | `git revert <hash>` | new commit, history intact, safe to push |
+| Last commit has an error | `git commit --amend` | rewrite your own unpublished last commit only |
+| HEAD/ref moved wrongly | `git reflog` then `git checkout <hash>` | retrieve any recent ref state, no data loss |
+
+Rules: `--amend` only for the last, unpushed commit; `revert` for anything already pushed; never force-push after any of these.
+
 ## 5. Return
 
 `STATUS: done` + commit hash + branch name + PR URL if any.
@@ -112,6 +124,17 @@ Report the candidates (local + remote) to the user.
 - `chore/<topic>` — maintenance
 
 **Commit format:** `<type>(REQ-xxx): <description>`, first line ≤ 72 characters — types/REQ-ID rules: Rule `commit-conventions.md` (auto-loaded).
+
+**Conventional Commits (extended):** mark breaking changes with `!` after `type/scope` or a `BREAKING CHANGE:` footer (maps to MAJOR). Prefer **multiple focused commits** over one mixed commit. Optional `scope` when REQ-ID is not the target.
+
+**Branching model (optional project convention, only if the project uses versioned releases):**
+- Use `--no-ff` on feature merges to preserve feature-branch history
+- `release/<vX.Y>` and `hotfix/<topic>` branches for release/pre-release fixes
+- Otherwise keep the flat `feat/`/`fix/` GitHub-flow model — do not impose git-flow
+
+**Signing (optional capability, never a default):** sign commits/tags when the project enforces signatures (`-S`/`-s`, GPG/SSH key); verify with `--show-signature`. This is a project decision, not the default — only activate if configured.
+
+**Version everything that ships:** prompts, templates and config artifacts follow the same VCS discipline as code — SemVer, changelog, stored alongside the code they drive. Ship, test and roll back a model+prompt/template pair as one unit for reproducible behavior.
 
 **Issue conventions:**
 

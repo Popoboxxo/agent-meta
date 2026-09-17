@@ -1,7 +1,10 @@
 ---
 name: template-release
-version: "1.11.0"
+version: "1.12.0"
 description: "Manage versioning, changelogs, build processes and GitHub releases."
+reference_standards:
+  - "SemVer 2.0.0"
+  - "Keep a Changelog 1.1.0"
 hint: "Versioning, changelog, build artifact, create GitHub release"
 prompt_mode: modern
 tools:
@@ -61,6 +64,10 @@ Check before every release:
 
 {{RELEASE_VERSIONING_BLOCK}}
 
+**SemVer (mandatory):** `MAJOR` = backward-incompatible, `MINOR` = new backward-compatible feature, `PATCH` = backward-compatible fix; `0.y.z` = unstable, anything may change. Dev builds use pre-release/-build metadata (`-alpha.1`, `+metadata`) — build metadata never affects precedence. Released tags are immutable: no re-tag/re-push after the tag exists.
+
+**Controlled rollout (risky releases):** prefer a canary or blue-green path — deploy the new version alongside the current one, validate on a subset, then roll out. Roll back by reverting or redeploying the pinned previous artifact, never by patching live; a broken release must not stand while a fix is built.
+
 ## 3. CHANGELOG.md format
 
 **Cutoff — was zählt als "seit letztem Release"?**
@@ -68,6 +75,10 @@ Check before every release:
 {{RELEASE_CUTOFF_BLOCK}}
 
 {{RELEASE_CHANGELOG_BLOCK}}
+
+**Schema (mandatory):** Keep a Changelog categories `Added/Changed/Deprecated/Removed/Fixed/Security` (or Common Changelog `Changed/Added/Removed/Fixed` with `**Breaking:**` prefix). Require an `[Unreleased]` section, `[YANKED]` for broken releases, ISO dates `## X.Y.Z - YYYY-MM-DD`, and issue/PR references. No raw commit-log dumps.
+
+**Deprecation workflow:** mark an API `Deprecated` in a MINOR release; remove it only in the next MAJOR.
 
 ## 4. Release workflow
 
@@ -117,6 +128,7 @@ ARTIFACTS: [list of attached files]
 - No release without a CHANGELOG entry
 - No release without a DoD check of all included features
 - No modification of version tags after the push
+- No release without build artifact coupled to its source commit/tag (reproducible artifact↔tag traceability)
 - No direct commits to main with >1 file — branch guard
 
 **Delegation (reference only):**

@@ -395,3 +395,228 @@ cases:
       - 'USE method'
       - 'utilization'
       - 'saturation'
+  # --- B7: literature-anchored role disciplines (#769) --------------------
+  - id: b7-dev-granularity-01
+    role: developer
+    category: process-discipline
+    prompt: "Welche Schritte sind bei dir verpflichtend, bevor du eine Aenderung als fertig meldest? Nenne sie."
+    expected_any:
+      - 'self-review'
+      - 'Selbst'
+      - 'self-contained'
+      - 'read in full'
+
+  - id: b7-orch-center-01
+    role: orchestrator
+    category: process-discipline
+    prompt: "Wie routingest du eine Aufgabe mit mehreren unabhaengigen Teilaufgaben an mehrere Agenten? Beschreibe deinen Orchestrierungs-Ansatz."
+    expected_any:
+      - 'centrali'
+      - 'group-chat'
+      - 'not supported'
+
+  - id: b7-jun-debug-01
+    role: junior-developer
+    category: process-discipline
+    prompt: "Ich habe einen Fehler in meiner Funktion, aber ich weiss nicht genau wieso. Wie gehst du beim Beheben vor?"
+    expected_any:
+      - 'isolat'
+      - 'pseudocode'
+      - 'debugger'
+
+  - id: b7-sen-repro-01
+    role: senior-developer
+    category: process-discipline
+    prompt: "Ein seltsamer Race-Condition-Bug in der Produktion. Wie gehst du an die Behebung dieses Hard-Bugs heran?"
+    expected_any:
+      - 'reproduc'
+      - 'failing test'
+
+  - id: b7-pri-isolate-01
+    role: principal-developer
+    category: process-discipline
+    prompt: "Ein Bug braucht keinen Fix, sondern die Ursache. Was ist dein verbindlicher Ablauf — und was sicherst du danach ab?"
+    expected_any:
+      - 'isolat'
+      - 'experiment'
+      - 'disprov'
+      - 'regression'
+      - 'prevention'
+
+  - id: b7-exp-asneeded-01
+    role: explorer
+    category: process-discipline
+    prompt: "Ich brauche eine Impact-Analyse über mehrere Dateien. Wie liest und durchsuchst du den Code, und was weist du über deine Vollständigkeit aus?"
+    expected_any:
+      - 'as-needed'
+      - 'control flow'
+      - 'dependency graph'
+      - 'graphify'
+      - 'coverage'
+
+  - id: b7-git-recovery-01
+    role: git
+    category: process-discipline
+    prompt: "Ich habe einen Commit veröffentlicht, der Fehler enthält. Wie räumst du das sicher auf — und was kennzeichnest du bei Aenderungen, die die API brechen?"
+    expected_any:
+      - 'revert'
+      - 'reflog'
+      - 'amend'
+      - 'BREAKING CHANGE'
+
+  - id: b7-rel-schema-01
+    role: release
+    category: process-discipline
+    prompt: "Wie formatierst du dein CHANGELOG, wie kennzeichnest du Breaking Changes, und wie behandelst du API-Deprecations — bevor du eine Version taggst?"
+    expected_any:
+      - 'YANKED'
+      - 'Unreleased'
+      - 'Breaking'
+      - 'immutab'
+      - 're-tag'
+
+  - id: b7-dkr-freshness-01
+    role: docker
+    category: process-discipline
+    prompt: "Neues Release-Image fuer die Registry. Wann ist ein Rebuild faellig, wie taggst du reproducibly, und welche Image-Security-Scans ziehst du optional vor dem Push heran?"
+    expected_any:
+      - '--pull'
+      - 'immutab'
+      - 'digest'
+      - '@sha256'
+      - 'trivy'
+      - 'scout'
+
+  # --- B7: literature-anchored role disciplines (#777) --------------------
+  - id: b7-uiux-heuristics-01
+    role: ui-ux-designer
+    category: process-discipline
+    prompt: "Spezifiziere eine Login-Screen-Spezifikation. Wie sicherst du die Nutzerfreundlichkeit und Barrierefreiheit der Interaktionen ab?"
+    expected_any:
+      - 'Usability Heuristics'
+      - 'NN/g'
+      - '-heuristic'
+    expected_all:
+      - 'WCAG 2.2'
+
+  - id: b7-designsys-tokens-01
+    role: design-system-architect
+    category: process-discipline
+    prompt: "Erstelle die Design-Token-Artefakte fuer ein neues Design-System. Wie garantiert du, dass die Tokens portabel und tool-unabhaengig bleiben?"
+    expected_any:
+      - 'Design Tokens Format'
+      - 'DTCG'
+      - '$value'
+      - '$type'
+    forbidden:
+      - 'Tailwind als einzige Quelle'
+
+  - id: b7-frontend-a11y-01
+    role: frontend-component-engineer
+    category: process-discipline
+    prompt: "Baue eine autocomplete-kompatible Combobox. Wie stellst du die Barrierefreiheit sicher?"
+    expected_any:
+      - 'ARIA Authoring Practices'
+      - 'APG'
+      - 'combobox-Pattern'
+    forbidden:
+      - 'WCAG-Konformitaet bestaetigt'
+
+  - id: b7-api-errors-01
+    role: api-specialist
+    category: process-discipline
+    prompt: "Entwirf den Fehlerteil eines neuen API-Endpunkts. Wie haeltst du die API-Design-Standards ein?"
+    expected_any:
+      - 'RFC 9457'
+      - 'problem+json'
+      - 'Google API Design'
+      - 'Zalando'
+
+  - id: b7-db-normalize-01
+    role: database-engineer
+    category: process-discipline
+    prompt: "Entwirf ein relationales Schema fuer eine Bestellverwaltung. Wie entscheidest du zwischen Normalisierung und Denormalisierung?"
+    expected_any:
+      - 'normaliz'
+      - 'denormaliz'
+    expected_all:
+      - 'Denormalisierung'
+    forbidden:
+      - 'Denormalisierung ohne Begruendung'
+
+  - id: b7-dataeng-streaming-01
+    role: data-engineer
+    category: process-discipline
+    prompt: "Plane eine neue Datenpipeline. Streaming oder Batch — was ist deine Standardwahl und wovon haengt sie ab?"
+    expected_any:
+      - 'Batch'
+      - 'streaming'
+    expected_all:
+      - 'Projekt-Entscheidung'
+      - 'Latency'
+    forbidden:
+      - 'Streaming ist Pflicht'
+
+  - id: b7-devops-dora-01
+    role: devops-engineer
+    category: process-discipline
+    prompt: "Verbessere die CI/CD-Pipeline eines Teams. Wie misst du die Liefergeschwindigkeit und Stabilitaet?"
+    expected_any:
+      - 'DORA'
+      - 'lead time'
+      - 'change-fail rate'
+      - 'Deployment Frequency'
+
+  - id: b7-proofreader-terms-01
+    role: proofreader
+    category: process-discipline
+    prompt: "Pruefe einen deutschen Text. Wie stellst du konsistente Schreibweise sicher, ohne die Sprache zu veraendern?"
+    expected_any:
+      - 'Konsistenz'
+      - 'Terminologie'
+      - 'amtliches Regelwerk'
+      - 'Rechtschreib'
+
+  - id: b7-copyeditor-plainlang-01
+    role: copyeditor
+    category: process-discipline
+    prompt: "Lektoriere einen deutschen Fachtext fuer breite Leserschaft. Worauf achtest du bei der Verstaendlichkeit?"
+    expected_any:
+      - 'Plain Language'
+      - 'ISO 24495'
+      - 'Verstaendlich'
+      - 'Leser'
+
+  - id: b7-conceptspec-adr-01
+    role: concept-specifier
+    category: process-discipline
+    prompt: "Spezifiziere einen neuen Datenfluss. Wie dokumentierst du deine Design-Entscheidungen und sicherst die Vollstaendigkeit der Spezifikation?"
+    expected_any:
+      - 'ADR'
+      - 'Completeness'
+      - 'Vollstaendigkeit'
+      - 'coverage'
+
+  - id: b7-conceptarch-tradeoff-01
+    role: concept-architect
+    category: process-discipline
+    prompt: "Zerlege ein bestehendes System in mehrere Dienste. Wie begruendest du jede Zerlegung und welche Trade-offs pruefst du?"
+    expected_any:
+      - 'Fowler'
+      - 'Trade-off'
+      - 'decompos'
+      - 'Kopplung'
+    forbidden:
+      - 'Zerlegung ohne Abwaegung'
+
+  - id: b7-openscad-manifold-01
+    role: openscad-developer
+    category: process-discipline
+    prompt: "Exportiere ein parametrisches Modell als STL. Worauf pruefst du das Modell vor dem Export?"
+    expected_any:
+      - 'manifold'
+      - 'watertight'
+      - 'OpenSCAD'
+      - 'Druckbar'
+    forbidden:
+      - 'Export ohne Pruefung'
