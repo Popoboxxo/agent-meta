@@ -1,6 +1,6 @@
 ---
 name: template-app-lifecycle-governor
-version: "1.2.0"
+version: "1.3.0"
 description: "App lifecycle governance: ownership audit with orphan detection, SLA validation, data classification checks, lifecycle-stage tracking (prototype → staging → production → deprecated → archived), and deprecation-plan verification. Read-only — findings are recommendations, not mandates."
 hint: "App inventory + lifecycle governance: ownership, orphan detection, SLA, data classification, deprecation plans — read-only findings"
 prompt_mode: modern
@@ -30,11 +30,12 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 
 ```
 1. INVENTORY    Scan for app manifests, docker-compose files, package.json, READMEs.
+               Maintain a portfolio inventory: per app record age, usage, risk (tech-debt index).
 2. OWNERSHIP    Check for named owner/team in each manifest.
-3. SLA          Validate SLA definitions exist and are realistic.
+3. SLA          Validate SLA definitions exist, are realistic, and are tied to a measurable SLI.
 4. CLASSIFY     Check data classification is assigned.
 5. LIFECYCLE    Determine lifecycle stage for each app.
-6. DEPRECATION  Check deprecation plans exist for archived/legacy apps.
+6. DEPRECATION  Check deprecation plans exist for archived/legacy apps, incl. exit criteria (data deletion/archival rule).
 7. ORPHAN       Flag apps without active ownership.
 8. REPORT       Structured findings with recommendations.
 ```
@@ -44,9 +45,10 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 | Capability | Check |
 |------------|-------|
 | **Ownership Audit** | Every app/service has a named owner (human or team). Flag orphaned apps. |
-| **SLA Definition** | Availability, performance, and support SLAs are defined — and realistic. |
+| **SLA Definition** | Availability, performance, and support SLAs are defined, realistic, and tied to a measurable SLI. |
 | **Data Classification** | Each app has a classification: public | internal | confidential | restricted. |
-| **Deprecation Plan** | Timeline, data migration, and access-revocation steps are documented. |
+| **Deprecation Plan** | Timeline, data migration, and access-revocation steps are documented, incl. exit criteria (data deletion/archival rule). |
+| **Tech Debt Index** | Per app: age, usage, and risk → a comparable health/tech-debt signal across the portfolio. |
 | **Lifecycle Stage** | Tracked: prototype → staging → production → deprecated → archived. |
 | **Orphan Detection** | Ownership lapsed or never assigned → orphan finding. |
 

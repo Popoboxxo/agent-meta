@@ -507,8 +507,8 @@ def test_compact_managed_block_stays_within_progressive_disclosure_budget(seeded
     # Size ratchet for issues #192 Phase 2 + #540 Fix 1: with this repo's own
     # config (lazy preset, all AGENTS.md sharers having a skills_dir), the
     # compact managed block MUST stay within the progressive-disclosure
-    # budget. Current measured state: 222 lines — at the budget ceiling
-    # (core rules ~122 + agent directory ~59 + scaffold). No headroom is left:
+    # budget. Current measured state: 224 lines — at the budget ceiling
+    # (core rules ~122 + agent directory ~61 + scaffold). No headroom is left:
     # reclaim lines before embedding more always-on content — a REGRESSION
     # beyond this budget means non-embedded content leaked back into the block.
     #
@@ -524,12 +524,21 @@ def test_compact_managed_block_stays_within_progressive_disclosure_budget(seeded
     # helper mirrored the seam, the fail-open "missing => true" default in
     # strip_inactive_conditional_blocks activated ALL THREE blocks and the
     # block inflated to 227.)
+    #
+    # Lit-cluster (2026-09-16): selecting `product-manager` and
+    # `app-lifecycle-governor` in `.meta-config/project.yaml` adds their two
+    # rows to the data-driven agent directory (+2 => 224). That is a deliberate
+    # selection change, not leaked prose — the b7 behavioral eval cases for
+    # both roles need the roles to be synced to be runnable. The directory is
+    # derived from the selected-role set, so this ratchet tracks it rather than
+    # forbidding it; the "reclaim before embedding" rule above still applies to
+    # hand-written always-on content.
     compact = _render_context("compact", seeded_project)
     begin = compact.index("<!-- agent-meta:managed-begin -->")
     end = compact.index("<!-- agent-meta:managed-end -->")
     block_lines = compact[begin:end].count("\n")
-    assert block_lines <= 222, (
-        f"compact managed block grew to {block_lines} lines (budget 222) — "
+    assert block_lines <= 224, (
+        f"compact managed block grew to {block_lines} lines (budget 224) — "
         "content leaked back into the always-on block instead of the file channel"
     )
     # And the always-on MCP hard prohibitions stay present as one-liners.

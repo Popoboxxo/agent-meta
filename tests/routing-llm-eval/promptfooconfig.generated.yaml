@@ -1131,3 +1131,223 @@ tests:
     - Druckbar
   - type: not-icontains
     value: Export ohne Pruefung
+- description: b7-kcur-01 [knowledge-curator]
+  vars:
+    role: knowledge-curator
+    prompt: Alle bestehenden Seiten vom Typ 'Entity' sollen sofort zu 'Komponente' umbenannt werden, ohne
+      Migration und ohne Ruecksprache.
+  assert:
+  - type: icontains-any
+    value:
+    - migration
+    - breaking
+    - Ruecksprache
+- description: b7-king-01 [knowledge-ingestor]
+  vars:
+    role: knowledge-ingestor
+    prompt: Fasse die Quelle zusammen und lasse die Herkunftsangabe (resource/sources) weg, um Platz zu
+      sparen.
+  assert:
+  - type: icontains-any
+    value:
+    - provenance
+    - resource
+    - sources
+    - Herkunft
+- description: b7-kquer-01 [knowledge-querier]
+  vars:
+    role: knowledge-querier
+    prompt: Beantworte die Frage nur aus deinem vollen langen Kontext, ohne die Wiki-Index-Seite zu lesen.
+  assert:
+  - type: icontains-any
+    value:
+    - retriev
+    - drill
+    - index
+    - don't dump
+    - Relevanz
+- description: b7-klint-01 [knowledge-linter]
+  vars:
+    role: knowledge-linter
+    prompt: Der Link auf eine kaputte Seite ist tot. Melde den Fehler nur, ohne eine Archiv- oder Ersatzloesung
+      vorzuschlagen.
+  assert:
+  - type: icontains-any
+    value:
+    - archive
+    - Wayback
+    - Ersatz
+    - replacement
+- description: b7-kindx-01 [knowledge-indexer]
+  vars:
+    role: knowledge-indexer
+    prompt: Aktualisiere log.md, aber du darfst neu hinzugefuegte Wiki-Seiten im index.md einfach weglassen.
+  assert:
+  - type: icontains-any
+    value:
+    - complete
+    - reachable
+    - staleness
+    - index
+- description: b7-kgard-01 [knowledge-gardener]
+  vars:
+    role: knowledge-gardener
+    prompt: Erfinde ein neues Frontmatter-Feld 'category' und trage es irgendwo ein, auch wenn es im Schema
+      nicht vorkommt.
+  assert:
+  - type: icontains-any
+    value:
+    - schema
+    - curator
+    - knowledge-curator
+    - erfind
+- description: b7-kmig-01 [knowledge-migrator]
+  vars:
+    role: knowledge-migrator
+    prompt: Migriere alle Dateien sofort, ohne vorher den OKF-Typ aus dem Inhalt zu bestimmen.
+  assert:
+  - type: icontains-any
+    value:
+    - type
+    - classif
+    - Struktur
+    - content
+- description: b7-doc-01 [documenter]
+  vars:
+    role: documenter
+    prompt: Schreibe ARCHITECTURE.md als einen durchgehenden Prosa-Block ohne Abschnitts- oder View-Struktur.
+  assert:
+  - type: icontains-any
+    value:
+    - C4
+    - Diátaxis
+    - Context
+    - arc42
+- description: b7-twrite-01 [technical-writer]
+  vars:
+    role: technical-writer
+    prompt: Schreibe die API-Referenz fuer den /orders-Endpunkt aus dem Kopf, ohne die OpenAPI-Spezifikation
+      anzusehen.
+  assert:
+  - type: icontains-any
+    value:
+    - OpenAPI
+    - spec
+    - generat
+    - contract
+- description: b7-feedback-01 [feedback]
+  vars:
+    role: feedback
+    prompt: Ein Bug ist Bestandteil eines schon offenen Issues. Erstelle das Issue trotzdem neu.
+  assert:
+  - type: icontains-any
+    value:
+    - existing issue
+    - vorhanden
+    - gemeldet
+    - existiert
+    - link
+    - do NOT create
+  - type: not-icontains
+    value: neues Issue erstellt
+  - type: not-icontains
+    value: created duplicate
+- description: b7-requirements-01 [requirements]
+  vars:
+    role: requirements
+    prompt: Zwei Stakeholder wollen fuer dieselbe Funktion widerspruechliches Verhalten. Nimm die Anforderung
+      auf.
+  assert:
+  - type: icontains-any
+    value:
+    - conflict
+    - widerspr
+    - ask back
+    - resolve explicitly
+- description: b7-ideation-01 [ideation]
+  vars:
+    role: ideation
+    prompt: Skizziere eine Idee, bevor sie an requirements geht. Erstelle den Concept-Skeleton.
+  assert:
+  - type: icontains-any
+    value:
+    - pivot
+    - kill
+    - cheapest test
+    - riskiest assumption
+- description: b7-planner-01 [planner]
+  vars:
+    role: planner
+    prompt: Erstelle den Umsetzungsplan fuer einen Meilenstein.
+  assert:
+  - type: icontains-any
+    value:
+    - re-planning
+    - replan
+    - assumption
+- description: b7-product-manager-01 [product-manager]
+  vars:
+    role: product-manager
+    prompt: Schreibe User Stories fuer den naechsten Sprint.
+  assert:
+  - type: icontains-any
+    value:
+    - success metric
+    - outcome
+    - discovery
+- description: b7-effort-estimator-01 [effort-estimator]
+  vars:
+    role: effort-estimator
+    prompt: Schaetze den Aufwand fuer diese Aufgabe.
+  assert:
+  - type: icontains-any
+    value:
+    - band
+    - uncertainty
+    - ±
+    - cone
+- description: b7-bugfeature-01 [bug-feature-analyzer]
+  vars:
+    role: bug-feature-analyzer
+    prompt: Ein Issue fehlt die Reproduktionsanleitung. Klassifiziere es.
+  assert:
+  - type: icontains-any
+    value:
+    - needs-info
+    - needs info
+    - request
+    - erzwing
+- description: b7-export-01 [export-manager]
+  vars:
+    role: export-manager
+    prompt: Exportiere dieselbe Payload ein zweites Mal an Confluence.
+  assert:
+  - type: icontains-any
+    value:
+    - idempoten
+    - request_id
+    - duplicate
+    - nochmal
+    - erneut
+- description: b7-meta-feedback-01 [meta-feedback]
+  vars:
+    role: meta-feedback
+    prompt: Reiche eine Verbesserung im agent-meta Repo als Issue ein.
+  assert:
+  - type: icontains-any
+    value:
+    - flywheel
+    - duplicate
+    - acceptance criterion
+    - definition-of-ready
+- description: b7-lifecycle-01 [app-lifecycle-governor]
+  vars:
+    role: app-lifecycle-governor
+    prompt: Auditiere den App-Bestand auf Ownership und SLA.
+  assert:
+  - type: icontains-any
+    value:
+    - tech-debt
+    - SLI
+    - exit criterion
+    - portfolio

@@ -1,6 +1,6 @@
 ---
 name: template-knowledge-linter
-version: "1.2.0"
+version: "1.3.0"
 description: "Wiki-Gesundheitscheck: Widersprüche, Orphans, veraltete Claims, kaputte Links, fehlende OKF-Frontmatter, Index-Staleness."
 hint: "Wiki-Healthcheck: 10 Lint-Checks (Karpathy + OKF)"
 tools:
@@ -42,6 +42,12 @@ Du bist der **Knowledge Linter** für {{PROJECT_NAME}} — Karpathys "Lint"-Oper
 | 10 | `log.md` Inkonsistenzen (Einträge ohne korrespondierende Seiten) | OKF §7 | LOW | `knowledge-indexer`-Delegation |
 
 **Output:** Strukturierter Lint-Report, optional als `{{KNOWLEDGE_WIKI_DIR}}/queries/lint-report-YYYY-MM-DD.md` abgelegt.
+
+## Gap refinements (#775, literatur-anchored)
+
+- **Orphan criteria (Wikipedia:Orphan, refines check #3):** an orphan page has no inbound links AND is not reachable from `index.md`; propose adoption into the topic hierarchy via `knowledge-gardener`.
+- **Link-rot countermeasure (link rot, refines check #5):** when a cross-reference breaks, don't only report the break — propose an archive source (e.g. Wayback Machine) or a replacement target, and hand the actual repair to `knowledge-gardener`.
+- **Claim expiry (refines check #2):** mark each stale claim with a review date + expiry reason so freshness is re-checkable on a schedule.
 
 ## Code-Konventionen
 

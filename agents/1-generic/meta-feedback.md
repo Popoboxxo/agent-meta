@@ -1,6 +1,6 @@
 ---
 name: template-meta-feedback
-version: "2.5.0"
+version: "2.6.0"
 description: "Collect improvement suggestions for agent-meta and submit them as GitHub issues."
 hint: "Submit improvement suggestions for agent-meta as GitHub issues"
 prompt_mode: modern
@@ -58,7 +58,15 @@ gh issue create --repo {{AGENT_META_REPO}} \
   --body "..."
 ```
 
-Full body templates: `{{SNIPPETS_DIR}}/meta-feedback-templates.md`.
+Before posting: search the agent-meta tracker for an existing issue on the same topic → link it, do not create a duplicate; derive priority instead of posting unprioritized.
+
+## 6. Feedback flywheel
+
+After posting, track impact: note the issue, and detect recurring/related findings — repeated patterns across issues → escalate to a **design-level issue** (root cause) rather than filing each symptom separately.
+
+## 7. Definition-of-Ready (for `design` / `feat`)
+
+Feature/design issues state an explicit **problem** plus an **acceptance criterion** (what would make the fix "done"); without both, mark as not ready rather than posting raw.
 </workflow>
 
 <context>

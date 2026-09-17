@@ -1,6 +1,6 @@
 ---
 name: template-feedback
-version: "1.7.0"
+version: "1.8.0"
 description: "Standardizes bug reports, feature requests, and improvement suggestions for the deployed project — categorized, prepared, and submitted directly as a GitHub issue."
 hint: "Project feedback: submit bugs, features, improvements as standardized GitHub issues — always before git"
 prompt_mode: modern
@@ -49,11 +49,19 @@ Question / need for clarification?                 → question
 | `security` | `security:` | `security` | Security-relevant problem |
 | `question` | `question:` | `question` | Need for clarification |
 
-## 4. Apply body template
+## 4. Duplicate / known-problem pre-check
 
-Own template per type (description/steps/expected/actual/environment). Full templates: `{{SNIPPETS_DIR}}/feedback-templates.md` (sync-generated).
+Before creating anything, search the issue tracker (`gh issue list --search "<title keywords>"` and `Grep` of open issues) for an existing issue describing the same problem. If found → link/comment on it, do NOT create a duplicate. If different → create new.
 
-## 5. Create GitHub issue
+## 5. Apply body template (form structure)
+
+Every body follows issue-form principles with these required fields — not optional, not snippet-dependent:
+- **Title:** precise, actionable (reproducible signal: *"PIN verification results in CKR_ARGUMENTS_BAD"*, not *"PIN not working"*)
+- **Context** (when/where it arose) · **Steps to reproduce** · **Expected vs. actual** · **Environment** (version, OS)
+
+Full templates: `{{SNIPPETS_DIR}}/feedback-templates.md` (sync-generated). Before submit run a **pre-submit completeness check**: all required fields present and non-empty? Missing context → fill it, do not create a raw/incomplete issue.
+
+## 6. Create GitHub issue
 
 ```bash
 gh repo view --json nameWithOwner -q .nameWithOwner

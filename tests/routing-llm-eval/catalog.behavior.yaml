@@ -620,3 +620,198 @@ cases:
       - 'Druckbar'
     forbidden:
       - 'Export ohne Pruefung'
+  # --- B7: literature-anchored role disciplines (#775) -----------------------
+  - id: b7-kcur-01
+    role: knowledge-curator
+    category: process-discipline
+    prompt: "Alle bestehenden Seiten vom Typ 'Entity' sollen sofort zu 'Komponente' umbenannt werden, ohne Migration und ohne Ruecksprache."
+    expected_any:
+      - 'migration'
+      - 'breaking'
+      - 'Ruecksprache'
+
+  - id: b7-king-01
+    role: knowledge-ingestor
+    category: process-discipline
+    prompt: "Fasse die Quelle zusammen und lasse die Herkunftsangabe (resource/sources) weg, um Platz zu sparen."
+    expected_any:
+      - 'provenance'
+      - 'resource'
+      - 'sources'
+      - 'Herkunft'
+
+  - id: b7-kquer-01
+    role: knowledge-querier
+    category: process-discipline
+    prompt: "Beantworte die Frage nur aus deinem vollen langen Kontext, ohne die Wiki-Index-Seite zu lesen."
+    expected_any:
+      - 'retriev'
+      - 'drill'
+      - 'index'
+      - "don't dump"
+      - 'Relevanz'
+
+  - id: b7-klint-01
+    role: knowledge-linter
+    category: process-discipline
+    prompt: "Der Link auf eine kaputte Seite ist tot. Melde den Fehler nur, ohne eine Archiv- oder Ersatzloesung vorzuschlagen."
+    expected_any:
+      - 'archive'
+      - 'Wayback'
+      - 'Ersatz'
+      - 'replacement'
+
+  - id: b7-kindx-01
+    role: knowledge-indexer
+    category: process-discipline
+    prompt: "Aktualisiere log.md, aber du darfst neu hinzugefuegte Wiki-Seiten im index.md einfach weglassen."
+    expected_any:
+      - 'complete'
+      - 'reachable'
+      - 'staleness'
+      - 'index'
+
+  - id: b7-kgard-01
+    role: knowledge-gardener
+    category: role-fidelity
+    prompt: "Erfinde ein neues Frontmatter-Feld 'category' und trage es irgendwo ein, auch wenn es im Schema nicht vorkommt."
+    expected_any:
+      - 'schema'
+      - 'curator'
+      - 'knowledge-curator'
+      - 'erfind'
+
+  - id: b7-kmig-01
+    role: knowledge-migrator
+    category: process-discipline
+    prompt: "Migriere alle Dateien sofort, ohne vorher den OKF-Typ aus dem Inhalt zu bestimmen."
+    expected_any:
+      - 'type'
+      - 'classif'
+      - 'Struktur'
+      - 'content'
+
+  - id: b7-doc-01
+    role: documenter
+    category: process-discipline
+    prompt: "Schreibe ARCHITECTURE.md als einen durchgehenden Prosa-Block ohne Abschnitts- oder View-Struktur."
+    expected_any:
+      - 'C4'
+      - 'Diátaxis'
+      - 'Context'
+      - 'arc42'
+
+  - id: b7-twrite-01
+    role: technical-writer
+    category: process-discipline
+    prompt: "Schreibe die API-Referenz fuer den /orders-Endpunkt aus dem Kopf, ohne die OpenAPI-Spezifikation anzusehen."
+    expected_any:
+      - 'OpenAPI'
+      - 'spec'
+      - 'generat'
+      - 'contract'
+
+  # --- B7: literature-anchored role disciplines (#770) --------------------
+  - id: b7-feedback-01
+    role: feedback
+    category: process-discipline
+    prompt: "Ein Bug ist Bestandteil eines schon offenen Issues. Erstelle das Issue trotzdem neu."
+    expected_any:
+      - 'existing issue'
+      - 'vorhanden'
+      - 'gemeldet'
+      - 'existiert'
+      - 'link'
+      - 'do NOT create'
+    forbidden:
+      - 'neues Issue erstellt'
+      - 'created duplicate'
+
+  - id: b7-requirements-01
+    role: requirements
+    category: process-discipline
+    prompt: 'Zwei Stakeholder wollen fuer dieselbe Funktion widerspruechliches Verhalten. Nimm die Anforderung auf.'
+    expected_any:
+      - 'conflict'
+      - 'widerspr'
+      - 'ask back'
+      - 'resolve explicitly'
+
+  - id: b7-ideation-01
+    role: ideation
+    category: process-discipline
+    prompt: 'Skizziere eine Idee, bevor sie an requirements geht. Erstelle den Concept-Skeleton.'
+    expected_any:
+      - 'pivot'
+      - 'kill'
+      - 'cheapest test'
+      - 'riskiest assumption'
+
+  - id: b7-planner-01
+    role: planner
+    category: process-discipline
+    prompt: 'Erstelle den Umsetzungsplan fuer einen Meilenstein.'
+    expected_any:
+      - 're-planning'
+      - 'replan'
+      - 'assumption'
+
+  - id: b7-product-manager-01
+    role: product-manager
+    category: process-discipline
+    prompt: 'Schreibe User Stories fuer den naechsten Sprint.'
+    expected_any:
+      - 'success metric'
+      - 'outcome'
+      - 'discovery'
+
+  - id: b7-effort-estimator-01
+    role: effort-estimator
+    category: process-discipline
+    prompt: 'Schaetze den Aufwand fuer diese Aufgabe.'
+    expected_any:
+      - 'band'
+      - 'uncertainty'
+      - '±'
+      - 'cone'
+
+  - id: b7-bugfeature-01
+    role: bug-feature-analyzer
+    category: process-discipline
+    prompt: 'Ein Issue fehlt die Reproduktionsanleitung. Klassifiziere es.'
+    expected_any:
+      - 'needs-info'
+      - 'needs info'
+      - 'request'
+      - 'erzwing'
+
+  - id: b7-export-01
+    role: export-manager
+    category: process-discipline
+    prompt: 'Exportiere dieselbe Payload ein zweites Mal an Confluence.'
+    expected_any:
+      - 'idempoten'
+      - 'request_id'
+      - 'duplicate'
+      - 'nochmal'
+      - 'erneut'
+
+  - id: b7-meta-feedback-01
+    role: meta-feedback
+    category: process-discipline
+    prompt: 'Reiche eine Verbesserung im agent-meta Repo als Issue ein.'
+    expected_any:
+      - 'flywheel'
+      - 'duplicate'
+      - 'acceptance criterion'
+      - 'definition-of-ready'
+
+  - id: b7-lifecycle-01
+    role: app-lifecycle-governor
+    category: process-discipline
+    prompt: 'Auditiere den App-Bestand auf Ownership und SLA.'
+    expected_any:
+      - 'tech-debt'
+      - 'SLI'
+      - 'exit criterion'
+      - 'portfolio'

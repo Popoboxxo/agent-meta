@@ -1,6 +1,6 @@
 ---
 name: template-ideation
-version: "1.14.0"
+version: "1.15.0"
 description: "Use when an idea needs scoping and thoughts need sorting before a concept or REQ exists."
 hint: "Nutze ideation zum Scopen einer rohen Idee, bevor ein Konzept oder REQ existiert."
 prompt_mode: modern
@@ -83,14 +83,15 @@ abgenommen.
 ```
 Core idea:       [one-sentence description]
 Goal:            [What changes for whom?]
-Problem:         [What hurts today? What is the trigger?]
+Problem:         [What hurts today? What unmet user need / opportunity does it serve? What is the trigger?]
 Solution:        [How is it solved? 2-4 sentences]
 Scope v1:        [What does it minimally need?]
 Scope v2+:       [What comes later?]
-Alternatives:    [Which approaches were considered? Why rejected — 1 line each]
+Alternatives:    [Which approaches were considered? Why rejected — 1 line each. At least 3 variants, incl. one outsider idea]
 Effort:          [Rough estimate on the task-size scale: S/M/L/XL]
-Open questions:  [What is still unclear?]
+Open questions:  [What is still unclear? + When to pivot/kill: the observable signal that makes this idea not worth pursuing]
 Risks:           [What could become problematic?]
+Assumptions:     [Risk-test the idea before handoff: name the riskiest assumptions + cheapest test for each]
 ```
 
 Artifact: `concept-<topic>.md` — built strictly from the skeleton above; the

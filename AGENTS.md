@@ -245,6 +245,8 @@ Bei Bedarf mit `Read` laden; verfügbare Regeln via `ls` im jeweiligen Verzeichn
 
 | `api-specialist` | OpenAPI/Contract-First API Design, Schnittstellen-Spezifikationen |
 
+| `app-lifecycle-governor` | App-Lifecycle-Governance: Ownership, SLA, Data-Classification |
+
 | `bug-feature-analyzer` | Issue-Triage: Eingehende Bug-Meldungen, Feature-Requests analysieren, k |
 
 | `claude-expert` | Absoluter Analyse-Experte für die Plattform Claude Code: Funktionsweise, Konf |
@@ -329,6 +331,8 @@ Bei Bedarf mit `Read` laden; verfügbare Regeln via `ls` im jeweiligen Verzeichn
 
 | `principal-developer` | Last-Resort-Eskalationsstufe |
 
+| `product-manager` | Strategisches Produkt-Management: Backlog, User-Stories, Sprint-Planung |
+
 | `prompt-engineer` | Der ultimative Experte für Prompt-Engineering |
 
 | `refactoring-specialist` | Systematische großflächige Code-Transformation mit Sicherheitsnetz: Strangler |
@@ -391,6 +395,7 @@ Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
    - `agent-meta-manager.md` → registriere als `agent-meta-manager`
    - `agent-meta-scout.md` → registriere als `agent-meta-scout`
    - `api-specialist.md` → registriere als `api-specialist`
+   - `app-lifecycle-governor.md` → registriere als `app-lifecycle-governor`
    - `bug-feature-analyzer.md` → registriere als `bug-feature-analyzer`
    - `claude-expert.md` → registriere als `claude-expert`
    - `code-reviewer.md` → registriere als `code-reviewer`
@@ -433,6 +438,7 @@ Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
    - `performance-optimizer.md` → registriere als `performance-optimizer`
    - `planner.md` → registriere als `planner`
    - `principal-developer.md` → registriere als `principal-developer`
+   - `product-manager.md` → registriere als `product-manager`
    - `prompt-engineer.md` → registriere als `prompt-engineer`
    - `refactoring-specialist.md` → registriere als `refactoring-specialist`
    - `release.md` → registriere als `release`
@@ -450,6 +456,7 @@ Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
    define_subagent(name="agent-meta-manager", ...)
    define_subagent(name="agent-meta-scout", ...)
    define_subagent(name="api-specialist", ...)
+   define_subagent(name="app-lifecycle-governor", ...)
    define_subagent(name="bug-feature-analyzer", ...)
    define_subagent(name="claude-expert", ...)
    define_subagent(name="code-reviewer", ...)
@@ -492,6 +499,7 @@ Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
    define_subagent(name="performance-optimizer", ...)
    define_subagent(name="planner", ...)
    define_subagent(name="principal-developer", ...)
+   define_subagent(name="product-manager", ...)
    define_subagent(name="prompt-engineer", ...)
    define_subagent(name="refactoring-specialist", ...)
    define_subagent(name="release", ...)

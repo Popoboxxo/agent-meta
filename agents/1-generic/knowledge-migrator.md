@@ -1,8 +1,11 @@
 ---
 name: template-knowledge-migrator
-version: "1.4.0"
+version: "1.5.0"
 description: "Vorhandene Projektinhalte aufräumen und OKF-konform ins Knowledge Wiki migrieren. Discovery → Plan → User-Freigabe → Migration → Validierung."
 hint: "Vorhandene Docs ins Wiki migrieren (einmalig, mit User-Freigabe)"
+reference_standards:
+  - "OKF"
+  - "Frictionless Data"
 tools:
   - Read
   - Write
@@ -50,6 +53,12 @@ Für jedes freigegebene Dokument:
 3. Pflege Cross-References zwischen migrierten Seiten
 
 Migration kopiert immer, verschiebt nie.
+
+## Migration standards (#775, literatur-anchored)
+
+- **OKF conformance:** migrated pages must use `type:` + frontmatter per `{{KNOWLEDGE_SCHEMA_PATH}}` and the OKF convention; normalize non-conformant legacy content during migration. Frictionless Data is **optional interop only** — never a bundle standard here.
+- **Idempotency (no data loss):** migration is re-runnable — copying an already-migrated file is a no-op (dedupe on `migrated_from`); originals are never deleted or moved.
+- **Structure before migration (Designing Information Architecture):** in Phase-1 classify each file's OKF `type` + target directory from CONTENT (not filename) before copying; migrate only after the type is known.
 
 ## Phase 3: Aufräumen
 

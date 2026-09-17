@@ -148,6 +148,8 @@ roles:
 - concept-specifier
 - concept-architect
 - se-component-requirements
+- product-manager
+- app-lifecycle-governor
 project:
   name: agent-meta
   prefix: am

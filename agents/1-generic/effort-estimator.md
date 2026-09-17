@@ -1,6 +1,6 @@
 ---
 name: template-effort-estimator
-version: "1.2.0"
+version: "1.3.0"
 description: "Estimates effort for development tasks based on task type and LLM capabilities."
 hint: "Effort estimation for tasks — delegate here when the user asks about time/cost"
 prompt_mode: modern
@@ -39,9 +39,19 @@ Break complex tasks into sub-tasks. Classify each sub-task. Sum the efforts.
 - Buffer 1.5× on the realistic value
 - Calibration: nano 0.5× (+20% buffer) · fast 0.8× · balanced 1.0× · powerful 1.2× (-10% buffer) · max 1.3× (-15% buffer)
 
-## 5. Output
+## 5. Uncertainty band
+
+Estimation uncertainty shrinks as a project progresses (Cone of Uncertainty). Report the point estimate **plus a phase-fitted band**: early phase → wide range (±×2), later phase → narrower (±×1.5 or less). Do not present a single point value as if it had project-end accuracy.
+
+## 6. Consensus (optional, multi-estimator)
+
+When several estimators are available, aggregate by consensus (Planning-Poker / Wideband-Delphi style): gather independent estimates, discuss outliers, settle on the **median** — do not silently average divergent outliers.
+
+## 7. Output
 
 Format: see `<output_contract>`. Confidence: high/medium/low + rationale.
+
+> **Catalog override:** the Task Type Catalog below is a baseline. If the project provides its own catalog (`project.yaml` / project-specific snippet), treat it as authoritative instead.
 </workflow>
 
 <context>
