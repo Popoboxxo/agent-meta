@@ -114,6 +114,7 @@
           "explorer",
           "export-manager",
           "feedback",
+          "fraud-risk-assessor",
           "frontend-component-engineer",
           "frontend-reviewer",
           "gemini-expert",
@@ -2391,7 +2392,10 @@
             },
             "cleanup": {
               "type": "string",
-              "enum": ["manual", "on-sync"],
+              "enum": [
+                "manual",
+                "on-sync"
+              ],
               "default": "manual",
               "description": "manual = never delete contents automatically (safe default). on-sync = prune the directory on each sync run (opt-in, destructive)."
             }

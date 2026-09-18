@@ -776,6 +776,7 @@ roles:
       - dependency-audit-v1
       - prompt-governance-v1
       - lifecycle-audit-v1
+      - fraud-risk-assessment-v1
     short_desc: 'Projekt-Feedback standardisieren: Bugs, Features, Verbesserungen
       als GitHub I...'
   bug-feature-analyzer:
@@ -2302,6 +2303,58 @@ roles:
       - UI-Konsistenz
       examples:
       - "Reviewe das UI auf Design-Token-Konformität."
+
+  fraud-risk-assessor:
+    model: powerful
+    memory: project
+    permission_mode: plan
+    workflow_tier: optional
+    description: Assesses occupational fraud risk and appraises the anti-fraud program across deterrence,
+      prevention, detection and investigation, with red-flag indicators.
+    routing:
+      intent_keywords:
+      - Betrugsrisiko bewerten
+      - fraud risk assessment
+      - Betrugsdreieck
+      - Fraud Triangle
+      - Red Flags bewerten
+      - Anti-Fraud-Programm
+      - Hinweisgeber-Hotline
+      - Betrugspraevention
+      - occupational fraud
+      - Fraud Hexagon
+      parallel: true
+      orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Betrugsrisiko bewerten
+      - fraud risk assessment
+      - Betrugsdreieck
+      - Fraud Triangle
+      - Red Flags bewerten
+      - Anti-Fraud-Programm
+      - Hinweisgeber-Hotline
+      - Betrugspraevention
+      - occupational fraud
+      - Fraud Hexagon
+      examples:
+      - Bewerte das Betrugsrisiko unserer Zahlungsprozesse inklusive Szenarien und Red Flags.
+      - Pruefe, ob unser Anti-Fraud-Programm ueber Abschreckung, Praevention, Aufdeckung und Untersuchung
+        tragfaehig ist.
+      - Bewerte die Wirksamkeit unserer Hinweisgeber-Hotline und der Meldeprozesse.
+    handoff:
+      input_contracts:
+      - lifecycle-audit-v1
+      - dependency-audit-v1
+      - ai-security-audit-v1
+      - log-analysis-v1
+      - rca-report-v1
+      output_contract: fraud-risk-assessment-v1
+      target_roles:
+      - feedback
+      - orchestrator
+    short_desc: Assesses occupational fraud risk and appraises the anti-fraud program across det...
+
 outcome-caching:
   enabled: false
   ttl_seconds: 3600
