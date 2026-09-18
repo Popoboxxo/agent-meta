@@ -776,6 +776,7 @@ roles:
       - dependency-audit-v1
       - prompt-governance-v1
       - lifecycle-audit-v1
+      - control-assessment-v1
     short_desc: 'Projekt-Feedback standardisieren: Bugs, Features, Verbesserungen
       als GitHub I...'
   bug-feature-analyzer:
@@ -2302,6 +2303,112 @@ roles:
       - UI-Konsistenz
       examples:
       - "Reviewe das UI auf Design-Token-Konformität."
+
+  risk-based-audit-planner:
+    model: balanced
+    memory: project
+    permission_mode: plan
+    workflow_tier: optional
+    description: 'Risk-based audit scoping: auditable area to objectives, risks, key controls and tests
+      (RCM), with inherent/residual risk, scope, timing and resource plan.'
+    routing:
+      intent_keywords:
+      - risikobasierte Pruefungsplanung
+      - Pruefungsuniversum
+      - audit universe
+      - Auditable Area
+      - Pruefungsumfang festlegen
+      - Kontrollmatrix
+      - Pruefungsprogramm erstellen
+      - Fraud-Brainstorming
+      - Inhaerentes und Restrisiko
+      - risikobasierter Pruefungsplan
+      parallel: true
+      orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - risikobasierte Pruefungsplanung
+      - Pruefungsuniversum
+      - audit universe
+      - Auditable Area
+      - Pruefungsumfang festlegen
+      - Kontrollmatrix
+      - Pruefungsprogramm erstellen
+      - Fraud-Brainstorming
+      - Inhaerentes und Restrisiko
+      - risikobasierter Pruefungsplan
+      examples:
+      - Plane eine risikobasierte Pruefung unseres Release-Prozesses und lege Umfang, Timing und Ressourcen
+        fest.
+      - Baue aus dem Pruefungsuniversum die Kandidaten fuer dieses Quartal und begruende die Priorisierung.
+      - Erstelle die Risiko-Kontroll-Matrix fuer den Deployment-Pfad inklusive Betrugs-Brainstorming.
+    handoff:
+      input_contracts:
+      - lifecycle-audit-v1
+      - dependency-audit-v1
+      - ai-security-audit-v1
+      - slo-report-v1
+      - log-analysis-v1
+      - rca-report-v1
+      - explorer-output-v1
+      output_contract: audit-plan-v1
+      target_roles:
+      - control-framework-assessor
+    short_desc: 'Risk-based audit scoping: auditable area to objectives, risks, key controls and...'
+
+  control-framework-assessor:
+    model: powerful
+    memory: project
+    permission_mode: plan
+    workflow_tier: optional
+    description: Assesses governance, risk and control processes against a named framework (COSO ICIF, COBIT,
+      CARES/Standard 2120, ITGCs) and reports evidence-anchored findings.
+    routing:
+      intent_keywords:
+      - Kontrollrahmen pruefen
+      - COSO
+      - COBIT
+      - ITGC
+      - Kontrollaktivitaeten bewerten
+      - Wirksamkeit der Kontrollen
+      - Kontrollumfeld
+      - Pruefungsfeststellung
+      - Restrisiko bewerten
+      - Three Lines
+      parallel: true
+      orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Kontrollrahmen pruefen
+      - COSO
+      - COBIT
+      - ITGC
+      - Kontrollaktivitaeten bewerten
+      - Wirksamkeit der Kontrollen
+      - Kontrollumfeld
+      - Pruefungsfeststellung
+      - Restrisiko bewerten
+      - Three Lines
+      examples:
+      - Bewerte unsere Governance- und Kontrollprozesse gegen das COSO-Rahmenwerk und liefere belegte Feststellungen.
+      - Pruefe die IT general controls des Deployment-Pfads und bewerte das Restrisiko je Feststellung.
+      - Verifiziere im Follow-up, ob die vereinbarten Korrekturmassnahmen tatsaechlich wirksam sind.
+    handoff:
+      input_contracts:
+      - audit-plan-v1
+      - lifecycle-audit-v1
+      - dependency-audit-v1
+      - ai-security-audit-v1
+      - slo-report-v1
+      - log-analysis-v1
+      - review-output-v1
+      - rca-report-v1
+      output_contract: control-assessment-v1
+      target_roles:
+      - feedback
+      - orchestrator
+    short_desc: Assesses governance, risk and control processes against a named framework (COSO...
+
 outcome-caching:
   enabled: false
   ttl_seconds: 3600
