@@ -462,6 +462,11 @@ def _build_provider_vars(
         # decides, so a hook-less provider never blanks the chat-push block in
         # a hook-capable provider's generated orchestrator.
         'PROGRESS_CHAT_PUSH_ENABLED': 'true' if provider_hooks_supported(pc) else 'false',
+        # ROUTE_INTENT_CALLABLE (issue #264 runtime follow-up): gates the §3
+        # route_intent mandate vs. its routing-rules fallback. Fail-safe false
+        # unless the harness registers route_intent as a callable tool
+        # (provider-capabilities.yaml route_intent_tool, live-proof only).
+        'ROUTE_INTENT_CALLABLE': 'true' if _ds_engine.has_route_intent_tool(provider) else 'false',
         # INTENT_ROUTING_TOOLS (issue #264): resolve the provider-mapped
         # routing-tool prerender from build_variables for THIS provider.
         # "" when the provider has no handoff_format capability or is absent

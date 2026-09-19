@@ -394,3 +394,80 @@ def test_intent_routing_tools_placeholder_substitutes_cleanly():
             pytest.fail(f"{provider}: unexpected handoff_format '{tool_format}'")
         assert parsed["tool"]["name"] == ROUTING_TOOL_NAME
         assert not [w for w in log.warnings if "INTENT_ROUTING_TOOLS" in w]
+
+
+def test_has_route_intent_tool_defaults_false_for_every_provider():
+    """``route_intent_tool`` is fail-safe false until a harness registers the
+    generated definition as a callable tool (live proof only). No provider may
+    ship ``true`` without that proof, so the runtime default is the routing-rules
+    fallback."""
+    from scripts.lib.delegation_syntax import DelegationSyntaxEngine
+
+    capabilities = yaml.safe_load(
+        (_AGENT_META_ROOT / "config" / "provider-capabilities.yaml").read_text(
+            encoding="utf-8"
+        )
+    )["capabilities"]
+    assert capabilities, "capability matrix is empty"
+    engine = DelegationSyntaxEngine(config_dir=_AGENT_META_ROOT / "config")
+    for provider in capabilities:
+        assert engine.has_route_intent_tool(provider) is False, (
+            f"{provider}: route_intent_tool must be false — no harness registers "
+            "route_intent as a callable tool (live proof required to flip)"
+        )
+    assert engine.has_route_intent_tool("NotAProvider") is False
+
+
+def test_build_provider_vars_route_intent_callable_defaults_false(tmp_path):
+    """``_build_provider_vars`` resolves ``ROUTE_INTENT_CALLABLE`` from the
+    capability getter; without a capability entry it is the fail-safe ``false``."""
+    from scripts.lib.agent_sync import _build_provider_vars
+
+    merged = _build_provider_vars({}, "Opencode", {}, tmp_path)
+    assert merged["ROUTE_INTENT_CALLABLE"] == "false"
+
+
+def _render_intent_routing_section(provider, monkeypatch=None, callable_value=None):
+    """Render the template's §3 exactly like the sync pipeline (substitute,
+    then strip inactive conditionals) so the capability branch is observable."""
+    from scripts.lib.agent_sync import _build_provider_vars
+    from scripts.lib.delegation_syntax import DelegationSyntaxEngine
+    from scripts.lib.log import SyncLog
+    from scripts.lib.variables import strip_inactive_conditional_blocks, substitute
+
+    if callable_value is not None:
+        monkeypatch.setattr(
+            DelegationSyntaxEngine, "has_route_intent_tool",
+            lambda self, _provider: callable_value,
+        )
+    template = (
+        _AGENT_META_ROOT / "agents" / "1-generic" / "orchestrator.md"
+    ).read_text(encoding="utf-8")
+    section = template[
+        template.index("## 3. Intent routing"):
+        template.index("## 4. Developer tier selection")
+    ]
+    merged = _build_provider_vars({}, provider, dict(_BASE_VARIABLES), _AGENT_META_ROOT)
+    rendered = substitute(section, merged, "test", SyncLog())
+    return strip_inactive_conditional_blocks(rendered, merged)
+
+
+def test_orchestrator_section3_renders_fallback_without_route_intent_tool(monkeypatch):
+    """``ROUTE_INTENT_CALLABLE=false`` (all providers today) must render the
+    routing-rules fallback and must NOT mandate a call to an unregistered tool."""
+    rendered = _render_intent_routing_section("Opencode", monkeypatch, callable_value=False)
+    assert "kein** natives `route_intent`-Tool registriert" in rendered
+    assert "Rufe `route_intent` auf, BEVOR du delegierst" not in rendered
+    assert "ROUTE_INTENT_CALLABLE" not in rendered
+    assert "{{else}}" not in rendered
+
+
+def test_orchestrator_section3_renders_mandate_with_route_intent_tool(monkeypatch):
+    """``ROUTE_INTENT_CALLABLE=true`` (only after a live proof) renders the
+    mandate and suppresses the fallback branch."""
+    rendered = _render_intent_routing_section("Opencode", monkeypatch, callable_value=True)
+    assert "Rufe `route_intent` auf, BEVOR du delegierst" in rendered
+    assert "kein** natives `route_intent`-Tool registriert" not in rendered
+    assert "ROUTE_INTENT_CALLABLE" not in rendered
+    assert "{{else}}" not in rendered
+
