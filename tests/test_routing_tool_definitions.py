@@ -65,12 +65,31 @@ def test_role_defaults_routing_patterns_match_intent_keywords():
 
 
 def test_roles_without_routing_stay_patternless():
-    """Roles that were never keyword-routed (easter egg, no-routing) keep no patterns."""
+    """Non-keyword roles carry the new ``addressability`` semantics (AC A5).
+
+    Migrated for SPEC dynamic-routing-template-slimming: previously this pinned
+    four patternless roles. Now ``openscad-developer`` HAS real routing_patterns
+    (addressability keyword), ``intern-developer``/``principal-developer`` are
+    ``name_only`` (reason required, no patterns) and ``orchestrator`` is
+    ``excluded``. Only keyword roles may carry a routable patterns block.
+    """
     roles = load_roles_config(_AGENT_META_ROOT)["roles"]
+
     assert "routing_patterns" not in roles["intern-developer"]
     assert "routing_patterns" not in roles["orchestrator"]
-    assert "routing_patterns" not in roles["openscad-developer"]
     assert "routing_patterns" not in roles["principal-developer"]
+
+    openscad = roles["openscad-developer"]
+    patterns = openscad["routing_patterns"]
+    assert openscad["routing"]["addressability"] == "keyword"
+    assert patterns.get("keywords") or patterns.get("examples")
+
+    for role in ("intern-developer", "principal-developer"):
+        routing = roles[role]["routing"]
+        assert routing["addressability"] == "name_only"
+        assert routing["name_only_reason"].strip()
+
+    assert roles["orchestrator"]["routing"]["addressability"] == "excluded"
 
 
 # ---------------------------------------------------------------------------
@@ -78,7 +97,11 @@ def test_roles_without_routing_stay_patternless():
 # ---------------------------------------------------------------------------
 
 def test_get_routing_rules_excludes_orchestrator_and_inactive_groups():
-    rules = get_routing_rules(_AGENT_META_ROOT, {}, dict(_BASE_VARIABLES))
+    # ``validator`` is a config-only gate (activation_groups.validator:
+    # roles_membership any ["validator"]); VALIDATOR_ENABLED is not a gate source
+    # anymore (RVW-24). Drive the membership through the project config fixture.
+    config = {"roles": ["validator"]}
+    rules = get_routing_rules(_AGENT_META_ROOT, config, dict(_BASE_VARIABLES))
     enum = rules["target_agents"]
     assert "orchestrator" not in enum, "anti-recursion: no self-route target"
     assert not [n for n in enum if n.startswith("se-")]
@@ -86,8 +109,19 @@ def test_get_routing_rules_excludes_orchestrator_and_inactive_groups():
     assert "junior-developer" not in enum
     assert "senior-developer" not in enum
     assert "principal-developer" not in enum
-    assert "validator" in enum  # VALIDATOR_ENABLED=true in fixture (no whitelist)
+    assert "validator" in enum
     assert not [r["agent"] for r in rules["rules"] if r["agent"] == "orchestrator"]
+
+
+def test_validator_gate_is_config_driven():
+    """Complement to the migrated validator assertion: the gate itself is
+    resolved from ``roles_membership`` config, not from the legacy variable."""
+    from scripts.lib.roles import resolve_activation_gates
+
+    assert resolve_activation_gates(_AGENT_META_ROOT, {})["validator"]["enabled"] is False
+    assert resolve_activation_gates(
+        _AGENT_META_ROOT, {"roles": ["validator"]}
+    )["validator"]["enabled"] is True
 
 
 def test_get_routing_rules_respects_roles_whitelist():
