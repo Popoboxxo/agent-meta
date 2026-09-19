@@ -276,10 +276,13 @@ def test_layer2_intersects_explicit_template_roles(agent_meta_root: Path):
         agent_meta_root,
         config,
         require_template=True,
-        template_roles={"developer", "knowledge-curator"},
+        template_roles={"developer", "knowledge-curator", "validator"},
     )
-    # knowledge-curator has no template -> dropped, developer kept
-    assert active == ["developer"]
+    # The explicit universe IS the Layer-2 set: active roles outside it are
+    # dropped (orchestrator, tester), an inactive role inside it is dropped
+    # (validator), and active roles inside it are kept (developer,
+    # knowledge-curator).
+    assert active == ["developer", "knowledge-curator"]
 
 
 def test_layer2_template_roles_none_is_resolved_lazily(agent_meta_root: Path):
