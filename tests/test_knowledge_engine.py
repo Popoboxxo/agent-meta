@@ -1,5 +1,7 @@
 """Tests for scripts/lib/knowledge.py — Knowledge Engine Phase A scaffolding helpers."""
 import json
+import os
+import shutil
 from pathlib import Path
 
 import pytest
@@ -13,6 +15,83 @@ from scripts.lib.knowledge import (
 )
 
 _AGENT_META_ROOT = Path(__file__).resolve().parent.parent
+
+# --- repo-copy helpers ------------------------------------------------------
+#
+# `test_self_hosting_sync_with_knowledge_engine_enabled` copies the whole repo.
+# That copy used to grow without bound and took the host disk down twice
+# (16 GB / 432,138 entries on 2026-09-20; 13 GB in /var/tmp on 2026-09-19):
+#
+#   1. pytest's basetemp may live INSIDE the repo (e.g. `--basetemp=.tmp/pyt`).
+#      The copy destination then sits inside the copied tree, so `copytree`
+#      copies its own output back into itself — unbounded recursion.
+#   2. `shutil.copytree` defaults to `symlinks=False`, which *follows* symlinks.
+#      pytest maintains `<basetemp>/pytest-current` -> `pytest-<n>`, so the
+#      clone ended up holding a self-referential symlink chain.
+#
+# Fix, in order of importance:
+#   * never copy `.tmp` (the sanctioned scratch sink, inside the copy root),
+#     plus the other local-only trees (`.venv`, `graphify-out`, `.opencode`, ...);
+#   * copy symlinks as symlinks (`symlinks=True`);
+#   * fail loud when the destination would land inside a copied subtree.
+_COPY_IGNORE = (
+    ".git",
+    "__pycache__",
+    "*.pyc",
+    ".superpowers",
+    "external",
+    ".tmp",
+    ".venv",
+    ".pytest_cache",
+    "node_modules",
+    "graphify-out",
+    ".opencode",
+)
+
+#: Top-level entries the copy skips on purpose — used by the fail-loud guard.
+_COPY_IGNORED_TOP_LEVEL = frozenset(
+    name for name in _COPY_IGNORE if not name.startswith("*") and "/" not in name
+)
+
+
+def _is_within(path, root):
+    """Python 3.8-compatible stand-in for ``Path.is_relative_to`` (3.9+)."""
+    path = Path(path).resolve()
+    root = Path(root).resolve()
+    return path == root or root in path.parents
+
+
+def _assert_copy_dest_is_safe(src, dest):
+    """Fail loud if ``dest`` would be copied back into itself.
+
+    A destination under an ignored top-level entry (``.tmp``) is safe, because
+    that subtree is never copied. Anything else inside the source is not.
+
+    Deliberately ``raise`` instead of a bare ``assert``: ``python -O`` strips
+    assertions, which would turn this guard into a silent fail-open.
+    """
+    if not _is_within(dest, src):
+        return
+    rel = Path(dest).resolve().relative_to(Path(src).resolve())
+    if not rel.parts or rel.parts[0] not in _COPY_IGNORED_TOP_LEVEL:
+        raise AssertionError(
+            f"refusing to copy {src} into {dest}: the destination is inside the "
+            f"copied source tree but not under an ignored path, so copytree "
+            f"would recurse without bound. Put pytest's basetemp outside the "
+            f"repo (e.g. --basetemp=/tmp/<user>) or under one of "
+            f"{sorted(_COPY_IGNORED_TOP_LEVEL)}."
+        )
+
+
+def _copy_repo_tree(src, dest):
+    """Copy a repo tree for self-hosting tests; never follows symlinks."""
+    _assert_copy_dest_is_safe(src, dest)
+    shutil.copytree(
+        src, dest,
+        ignore=shutil.ignore_patterns(*_COPY_IGNORE),
+        symlinks=True,
+    )
+    return dest
 
 
 # ---------------------------------------------------------------------------
@@ -364,17 +443,15 @@ def test_schema_knowledge_engine_has_phase_c_properties():
 
 
 def test_self_hosting_sync_with_knowledge_engine_enabled(tmp_path):
-    import shutil
     import subprocess
 
     import yaml
 
     # Copy the whole repo into a temp dir so we don't mutate the real working tree.
+    # `_copy_repo_tree` never copies `.tmp` and never follows symlinks — see the
+    # module-level helpers for why both are mandatory.
     dest = tmp_path / "agent-meta-copy"
-    shutil.copytree(
-        _AGENT_META_ROOT, dest,
-        ignore=shutil.ignore_patterns(".git", "__pycache__", "*.pyc", ".superpowers", "external", ".tmp"),
-    )
+    _copy_repo_tree(_AGENT_META_ROOT, dest)
 
     project_yaml_path = dest / ".meta-config" / "project.yaml"
     with project_yaml_path.open(encoding="utf-8") as f:
@@ -402,6 +479,71 @@ def test_self_hosting_sync_with_knowledge_engine_enabled(tmp_path):
     for role in ["knowledge-curator", "knowledge-ingestor", "knowledge-querier",
                  "knowledge-linter", "knowledge-indexer", "knowledge-gardener", "knowledge-migrator"]:
         assert (dest / ".claude" / "agents" / f"{role}.md").exists(), f"{role} not generated"
+
+
+# --- regression: a pytest basetemp must never leak into the repo copy --------
+
+def test_repo_copy_never_leaks_in_repo_basetemp(tmp_path):
+    """Regression for the unbounded `.tmp` recursion (2026-09-19/20 incident).
+
+    Reproduces the shape of an in-repo pytest basetemp: a `.tmp/` subtree
+    holding `pytest-of-<user>/pytest-<n>/` plus a `pytest-current` symlink.
+    The copy destination is kept *outside* the source tree on purpose, so a
+    regression fails with an assertion instead of eating the host disk.
+    """
+    # Fail fast if `.tmp` ever drops out of the ignore set — the copy below
+    # would then recurse without bound, which is exactly the incident.
+    assert ".tmp" in _COPY_IGNORE
+    assert ".tmp" in _COPY_IGNORED_TOP_LEVEL
+
+    src = tmp_path / "src"
+    pytest_dir = src / ".tmp" / "pyt" / "pytest-of-x" / "pytest-0" / "test_self_hosting0"
+    pytest_dir.mkdir(parents=True)
+    (pytest_dir / "scratch.bin").write_bytes(b"x" * 512)
+    # pytest's own `pytest-current` pointer — self-referential on purpose.
+    (pytest_dir / "pytest-current").symlink_to(pytest_dir, target_is_directory=True)
+    (src / "marker.txt").write_text("keep me", encoding="utf-8")
+
+    # A symlink pointing *outside* the source tree: it must be copied as a
+    # symlink, never dereferenced. (A self-referential one would hang the test
+    # if `symlinks` regressed, so this is the safe probe for that behaviour.)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "payload.txt").write_text("outside", encoding="utf-8")
+    (src / "link_outside").symlink_to(outside, target_is_directory=True)
+
+    dest = tmp_path / "clone"
+    _copy_repo_tree(src, dest)
+
+    assert (dest / "marker.txt").read_text(encoding="utf-8") == "keep me"
+    assert not (dest / ".tmp").exists(), "in-repo basetemp leaked into the copy"
+    assert (dest / "link_outside").is_symlink(), "symlinks must not be followed"
+
+    leaked = []
+    for root, dirs, files in os.walk(dest, followlinks=False):
+        for name in dirs + files:
+            if name == "pytest-current" or name.startswith("pytest-of-"):
+                leaked.append(os.path.join(root, name))
+    assert leaked == [], f"pytest basetemp artifacts leaked into the copy: {leaked}"
+
+
+def test_repo_copy_fails_loud_when_dest_inside_copied_tree(tmp_path):
+    """A destination inside a *copied* subtree must abort, not recurse."""
+    src = tmp_path / "src"
+    (src / "build").mkdir(parents=True)
+    (src / "marker.txt").write_text("x", encoding="utf-8")
+
+    with pytest.raises(AssertionError, match="recurse without bound"):
+        _copy_repo_tree(src, src / "build" / "agent-meta-copy")
+
+
+def test_repo_copy_allows_dest_under_ignored_tmp(tmp_path):
+    """An in-repo basetemp under the ignored `.tmp` sink is allowed."""
+    src = tmp_path / "src"
+    (src / ".tmp").mkdir(parents=True)
+
+    # Must not raise: `.tmp` is never copied, so no recursion is possible.
+    _assert_copy_dest_is_safe(src, src / ".tmp" / "pytest-of-x" / "clone")
 
 
 # ---------------------------------------------------------------------------

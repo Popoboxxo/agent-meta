@@ -246,6 +246,7 @@ variables:
     - sync.py muss nach jeder Änderung mit --dry-run fehlerfrei laufen
     - Alle neuen Platzhalter müssen in agent-meta.config.example.yaml dokumentiert sein
     - Änderungs-Workflow: Einfacher Wert -> project.yaml, Projektwissen -> 3-project-ext, Neue Rolle -> 1-generic, Neuer Skill -> sync.py --add-skill
+    - pytest-Basetemp NIE im Arbeitsbaum (--basetemp=/tmp/<user>); Repo-Kopien in Tests müssen .tmp/ ausschließen und Symlinks unverfolgt kopieren (siehe docs/concepts/repo-containment-prison-mode.md §5.5)
   TESTER_SNIPPETS_PATH: ''
   DEVELOPER_SNIPPETS_PATH: ''
   BUILD_COMMANDS: python scripts/sync.py
