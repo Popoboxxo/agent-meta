@@ -420,6 +420,13 @@ Self-Hosting-Tests in `tests/`):
 4. **Fail loud statt rekursieren.** Vor dem Kopieren prüfen, ob das Ziel innerhalb des
    Quellbaums und außerhalb eines ignorierten Pfades liegt; in dem Fall abbrechen, statt zu
    kopieren.
+5. **Sichtbar warnen, nicht hart abbrechen.** `tests/conftest.py` warnt zur
+   Collection-/Session-Start-Zeit (warning-only, kein `pytest.exit`/`pytest.fail`), wenn der
+   effektive Basetemp (`--basetemp`, sonst `TMPDIR`/`tempfile.gettempdir()`) innerhalb der
+   Repo-Wurzel liegt. Der In-Repo-Lauf bleibt damit erlaubt — er ist ein legitimer
+   Diagnose-Lauf für die Plattenplatz-Sicherheit. Der kanonische Aufruf steht in
+   `.meta-config/project.yaml` (`TEST_COMMANDS`): `python3 -m pytest tests/
+   --basetemp=/tmp/$USER/pytest-agent-meta`.
 
 Punkt 1 hat **zwei** Gründe, nicht nur den Plattenplatz: liegt der Basetemp im Arbeitsbaum,
 dann liegt auch `tmp_path` im Arbeitsbaum. Tests, die die Repo-Wurzel-Erkennung prüfen (sie

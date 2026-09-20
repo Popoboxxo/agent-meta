@@ -437,6 +437,10 @@ Vor einem Release läuft die volle Test-Suite. Dafür gilt eine harte Methodik-R
   eigenen Output und wächst unbegrenzt — Vorfall 2026-09-19/20: 16 GB, 432.138 Einträge.
 - **Symlinks unverfolgt kopieren** (`shutil.copytree(..., symlinks=True)`), sonst wird der
   `pytest-current`-Symlink dereferenziert.
+- **Der Guard ist warning-only.** `tests/conftest.py` warnt sichtbar (pytest-Warnung), wenn der
+  effektive Basetemp im Repo liegt — er bricht den Lauf aber nie ab. Der kanonische Aufruf steht
+  in `.meta-config/project.yaml` (`TEST_COMMANDS`):
+  `python3 -m pytest tests/ --basetemp=/tmp/$USER/pytest-agent-meta`.
 
 Vollständige Regel und Begründung:
 [`concepts/repo-containment-prison-mode.md`](concepts/repo-containment-prison-mode.md) §5.5.
