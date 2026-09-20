@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .frontmatter import (
-    _is_role_enabled,
     collect_sources,
     extract_frontmatter_field,
     target_filename,
@@ -102,7 +101,14 @@ def build_knowledge_engine_hints(config: dict, compact: bool = False) -> str:
         
     return "\n".join(lines)
 
-def build_agent_hints(config: dict, agent_meta_root: Path, include_table: bool = True) -> str:
+def build_agent_hints(
+    config: dict,
+    agent_meta_root: Path,
+    include_table: bool = True,
+    *,
+    template_roles: set[str] | None = None,
+    warn_sink: list[str] | None = None,
+) -> str:
     """Generate agent usage hints for {{AGENT_HINTS}}.
 
     Reads hint (preferred) or description from each active agent's template frontmatter.
@@ -112,15 +118,21 @@ def build_agent_hints(config: dict, agent_meta_root: Path, include_table: bool =
       True  → full output: entry-point hint + per-agent role/description table.
       False → entry-point hint only. Used for providers (e.g. Claude) that inject
               agent descriptions natively — the table would be a ~1.5 KB duplication.
+
+    The active set is the shared Layer-2 resolution (gates + whitelist ∩
+    generatable templates), identical to the routing targets.
     """
-    from .roles import build_role_map
+    from .roles import resolve_active_roles
 
     platforms = config.get("platforms", [])
     overrides, _ = collect_sources(agent_meta_root, platforms)
-    role_map = build_role_map(agent_meta_root)
-    allowed_roles: set[str] | None = None
-    if "roles" in config:
-        allowed_roles = set(config["roles"])
+    active_roles = set(resolve_active_roles(
+        agent_meta_root,
+        config,
+        require_template=True,
+        template_roles=template_roles,
+        warn_sink=warn_sink,
+    ))
 
     lines = []
     # Determine if main-chat mode is active (no orchestrator subagent in this mode)
@@ -132,11 +144,7 @@ def build_agent_hints(config: dict, agent_meta_root: Path, include_table: bool =
         # Legacy fallback: enabled=false was the old way to disable orchestrator
         _is_main_chat_mode = not _orch_cfg.get("enabled", True)
 
-    has_orchestrator = (
-        "orchestrator" in overrides
-        and (allowed_roles is None or "orchestrator" in allowed_roles)
-        and not _is_main_chat_mode
-    )
+    has_orchestrator = "orchestrator" in active_roles and not _is_main_chat_mode
     if has_orchestrator:
         lines.append(
             "> **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben — Ausnahmen siehe Abschnitt »Orchestrator — Universal Router«."
@@ -152,11 +160,7 @@ def build_agent_hints(config: dict, agent_meta_root: Path, include_table: bool =
         lines.append("| Agent | Zuständigkeit |")
         lines.append("|-------|--------------|")
         for role, source_path in sorted(overrides.items()):
-            if allowed_roles is not None and role not in allowed_roles:
-                continue
-            if not _is_role_enabled(role, config):
-                continue
-            if not target_filename(role, role_map):
+            if role not in active_roles:
                 continue
             content = source_path.read_text(encoding="utf-8")
             hint = extract_frontmatter_field(content, "hint") \
@@ -175,36 +179,43 @@ def build_agent_hints(config: dict, agent_meta_root: Path, include_table: bool =
 
     return "\n".join(lines)
 
-def build_agent_table(config: dict, agent_meta_root: Path) -> tuple[str, list[str]]:
+def build_agent_table(
+    config: dict,
+    agent_meta_root: Path,
+    *,
+    template_roles: set[str] | None = None,
+    warn_sink: list[str] | None = None,
+) -> tuple[str, list[str]]:
     """Generate markdown table for {{AGENT_TABLE}}. Returns (table, unmapped_warnings).
 
-    Only includes roles present in config['roles'] whitelist (if set).
+    Rows follow the shared Layer-2 activation set (config whitelist/gates ∩
+    generatable templates); templates without a ROLE_MAP entry are reported in
+    the returned ``unmapped`` list.
     """
-    from .roles import build_role_map
+    from .roles import build_role_map, resolve_active_roles
 
     platforms = config.get("platforms", [])
     overrides, _ = collect_sources(agent_meta_root, platforms)
     role_map = build_role_map(agent_meta_root)
-    allowed_roles: set[str] | None = None
-    if "roles" in config:
-        allowed_roles = set(config["roles"])
+    active_roles = set(resolve_active_roles(
+        agent_meta_root,
+        config,
+        require_template=True,
+        template_roles=template_roles,
+        warn_sink=warn_sink,
+    ))
 
     rows = []
     unmapped = []
     for role, source_path in sorted(overrides.items()):
-        if allowed_roles is not None and role not in allowed_roles:
+        if role not in active_roles:
+            if not target_filename(role, role_map):
+                unmapped.append(
+                    f"Role '{role}' ({source_path.name}) not in ROLE_MAP — skipped in AGENT_TABLE"
+                )
             continue
-        if not _is_role_enabled(role, config):
-            continue
-        filename = target_filename(role, role_map)
-        if not filename:
-            unmapped.append(
-                f"Role '{role}' ({source_path.name}) not in ROLE_MAP — skipped in AGENT_TABLE"
-            )
-            continue
-        agent_name = Path(filename).stem
         layer = source_path.parts[-2]
-        rows.append(f"| `{agent_name}` | `{source_path.name}` | {layer} |")
+        rows.append(f"| `{role}` | `{source_path.name}` | {layer} |")
 
     header = "| Agent | Quelle | Layer |\n|-------|--------|-------|"
     return header + "\n" + "\n".join(rows), unmapped
@@ -226,6 +237,9 @@ def build_routing_tool_definition(
     config: dict,
     variables: dict,
     pipelines: dict | None = None,
+    *,
+    template_roles: set[str] | None = None,
+    warn_sink: list[str] | None = None,
 ) -> dict:
     """Build the provider-neutral intent-routing tool definition (issue #264).
 
@@ -248,15 +262,24 @@ def build_routing_tool_definition(
           routing table's role column).
         - ``routing``: the embedded routing knowledge —
           ``{"rules": [<per-role rule dicts>], "pipelines": [<signal-keyword
-          route dicts>]}`` (see :func:`delegation_table.get_routing_rules`).
+          route dicts>], "name_index": [<name-dispatch entries>]}`` (see
+          :func:`delegation_table.get_routing_rules`).
 
-        Deterministic: sorted roles/pipelines, no timestamps — two calls over
-        unchanged config produce equal dicts (idempotent output guarantee).
+        Deterministic: sorted roles/pipelines/name_index, no timestamps — two
+        calls over unchanged config produce equal dicts (idempotent output
+        guarantee).
     """
     # Lazy import — keeps agents.py import-light.
     from .delegation_table import get_routing_rules
 
-    rules_data = get_routing_rules(agent_meta_root, config, variables, pipelines=pipelines)
+    rules_data = get_routing_rules(
+        agent_meta_root,
+        config,
+        variables,
+        pipelines=pipelines,
+        template_roles=template_roles,
+        warn_sink=warn_sink,
+    )
     return {
         "tool": {
             "name": ROUTING_TOOL_NAME,
@@ -290,6 +313,7 @@ def build_routing_tool_definition(
         "routing": {
             "rules": rules_data["rules"],
             "pipelines": rules_data["pipelines"],
+            "name_index": rules_data["name_index"],
         },
     }
 
@@ -343,6 +367,9 @@ def build_routing_tool_definitions_for_providers(
     providers: list[str],
     pipelines: dict | None = None,
     syntax_engine: DelegationSyntaxEngine | None = None,
+    *,
+    template_roles: set[str] | None = None,
+    warn_sink: list[str] | None = None,
 ) -> dict[str, str]:
     """Render the routing tool definition once per provider, in its format.
 
@@ -368,7 +395,12 @@ def build_routing_tool_definitions_for_providers(
 
     engine = syntax_engine or DelegationSyntaxEngine()
     definition = build_routing_tool_definition(
-        agent_meta_root, config, variables, pipelines=pipelines
+        agent_meta_root,
+        config,
+        variables,
+        pipelines=pipelines,
+        template_roles=template_roles,
+        warn_sink=warn_sink,
     )
     rendered: dict[str, str] = {}
     for provider in providers:

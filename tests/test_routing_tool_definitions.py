@@ -144,10 +144,13 @@ def test_get_routing_rules_includes_role_metadata():
     triage = next(r for r in rules["rules"] if r["agent"] == "bug-feature-analyzer")
     assert triage["orchestrator_only"] is True
     # Patternless escalation role: in the enum (dispatchable through the
-    # escalation gate) but without a keyword rule — matching the prose status
-    # quo where principal-developer has no intent-keyword row either.
+    # escalation gate) but without a keyword rule. ``developer_tiers`` is a
+    # config-driven group (roles_membership all junior+senior) — enabled via
+    # the project role list, not the legacy variable gate (RVW-14).
     with_tiers = get_routing_rules(
-        _AGENT_META_ROOT, {}, dict(_BASE_VARIABLES, DEVELOPER_TIERS_ENABLED="true")
+        _AGENT_META_ROOT,
+        {"roles": ["junior-developer", "senior-developer", "principal-developer"]},
+        dict(_BASE_VARIABLES),
     )
     assert "principal-developer" in with_tiers["target_agents"]
     assert not [r for r in with_tiers["rules"] if r["agent"] == "principal-developer"]
@@ -209,7 +212,8 @@ def test_get_routing_rules_keyword_fallback_and_precedence(tmp_path):
         encoding="utf-8",
     )
     variables = {k: "false" for k in _BASE_VARIABLES}
-    rules = get_routing_rules(root, {}, variables)
+    template_roles = {"legacy-role", "explicit-role", "patternless-role"}
+    rules = get_routing_rules(root, {}, variables, template_roles=template_roles)
     agents = {r["agent"]: r for r in rules["rules"]}
     assert agents["legacy-role"]["keywords"] == ["Legacy-Keyword"]
     assert agents["legacy-role"]["examples"] == []
