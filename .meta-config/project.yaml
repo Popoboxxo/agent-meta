@@ -191,7 +191,7 @@ variables:
   SYSTEM_URLS: ''
   BUILD_COMMAND: python scripts/sync.py
   TEST_COMMAND: python3 scripts/sync.py --validate
-  TEST_COMMANDS: python scripts/sync.py --dry-run && python scripts/sync.py --validate
+  TEST_COMMANDS: python scripts/sync.py --dry-run && python scripts/sync.py --validate && python3 -m pytest tests/ --basetemp=/tmp/$USER/pytest-agent-meta
   DEV_COMMANDS: |
     python scripts/sync.py
     python scripts/sync.py --dry-run
