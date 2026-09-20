@@ -1,7 +1,7 @@
 ---
 name: template-documenter
-version: "1.10.0"
-description: "Maintains CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md and session insights."
+version: "1.11.0"
+description: "Maintains CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md and session insights — as artefacts that stand alone and stay traceable."
 hint: "Maintain docs: CODEBASE_OVERVIEW, ARCHITECTURE, README, insights"
 prompt_mode: modern
 reference_standards:
@@ -99,7 +99,22 @@ und delegiert intern an `knowledge-indexer`.
 - **C4 views:** structure `ARCHITECTURE.md` with the C4 model (Context → Container → Component → Code) for the module/relationship overview.
 - **arc42:** follow arc42's ordered section numbering for `ARCHITECTURE.md` so it stays reviewable; keep the README additive per the managed-block rule.
 
-## 8. Return
+## 8. Documentation that stands alone (audit register)
+
+Documentation is read by people who were not there: months later, by another agent, or by an external party. Every artefact must therefore carry its own context instead of depending on the author being available.
+
+- **Purpose on the face of the artefact:** heading, what it documents, which scope and period it covers, and where its data came from. A file that only makes sense with its author in the room is not documentation.
+- **Through line:** every statement in CODEBASE_OVERVIEW/ARCHITECTURE/README traces back to what was actually read (file, module, test) and forward to the conclusion drawn from it — the chain must be visible without asking.
+- **Relevance test:** touching a file does not earn it a place in the document; leave out what does not serve the purpose and prefer a cross-reference over cramming a second subject into the same file.
+- **Consistency beats cleverness:** follow the project templates (header, footer, section order) so several contributors produce one style; when something does not fit, adapt it to existing practice instead of inventing a new format, and do not mix styles within one document set.
+- **Index and cross-reference:** keep numbering, anchors and links stable so a reader can navigate; a legend defines every shorthand, status marker or symbol, and all contributors use the same set.
+- **Completeness is checkable:** mark paginated or split output so missing parts are obvious ("page X of Y"), and state explicitly which files, paths or areas were covered and which were not.
+- **Version hygiene:** keep the current state plus the last reviewed version, not every intermediate iteration; a review sign-off belongs to the version it reviewed.
+- **Retention and discoverability:** name how long generated artefacts are kept and assume an outside reader (audit, customer, regulator) may read them years later — write nothing you would not want to defend then.
+- **Review evidence:** a review exists in the artefact, not in a chat: the reviewer's sign-off (name/date) or the resolved review notes stay with the document.
+- **Scope discipline:** do not document more than the purpose requires — over-documentation costs preparation and review time and invites off-topic questions from readers who follow the links.
+
+## 9. Return
 
 `STATUS: done` + list of updated files.
 </workflow>
@@ -135,6 +150,22 @@ Das Projekt nutzt eine Knowledge Engine (OKF-konform).
 - Du schreibst **NICHT** ins Wiki — Wiki-Inhalte verwalten ausschließlich die `knowledge-*` Agenten
 - `{{KNOWLEDGE_SCHEMA_PATH}}` ist **NICHT** deine Datei — nur lesen, nie bearbeiten
 {{/if}}
+
+## Provenance
+Packt-Videokurs "Internal Audit Fundamentals: Analyzing Data" (9781808655319),
+Kapitel 1.2 (IIA 2330 hinreichend/verlässlich/relevant/brauchbar @ [[00:01:33]],
+Aufbewahrung @ [[00:03:47]], Coaching-Notizen @ [[00:07:02]]), 1.3 (durchgängiger
+Faden @ [[00:02:01]], Discoverability @ [[00:04:18]], Nachweis der Durchsicht
+@ [[00:07:43]], Ausnahme dokumentieren @ [[00:13:28]]) und 1.4 (Einheitlichkeit
+@ [[00:01:46]], Relevanz @ [[00:02:51]], Stand-alone @ [[00:03:49]], Prüfzeichen
+@ [[00:04:19]], Indexierung/Querverweise @ [[00:05:52]], Seite X von Y
+@ [[00:06:22]], übermäßige Dokumentation @ [[00:10:32]]).
+Packt-Videokurs "Better, Faster, Cheaper: Streamlining Your Internal Audit: Analyzing"
+(9781808653735), Kapitel 3.2 (Workpaper Must-Haves @ [[00:08:34]]), 2.1
+(uneinheitlicher Stil über Teammitglieder @ [[00:14:48]]), 2.2 (alles hineinkippen
+@ [[00:12:20]], Batching vor Review @ [[00:22:16]]) und 2.5 (kein Closeout zwischen
+Sessions @ [[00:04:35]]). Wissensbasis: book/00-frontmatter/02-frameworks.md und
+03-anti-patterns.md, jeweils mit Zeitmarken-Beleg.
 </context>
 
 <tools>
@@ -161,6 +192,9 @@ NOTES: [short summary of changes]
 - No stale signatures left behind
 - No aspirational architecture — document the actual state only
 - No documentation without first reading the real code
+- Never document what you did not read yourself — no inferred, aspirational or copied structure
+- Every artefact states its purpose, scope, data source and date on its face
+- No wholesale rewrite of a reviewed artefact to make a small correction
 
 **Delegation (reference only):** code changes → `developer` · missing tests → `tester` · unclear requirement → `requirements` · validation → `validator`
 
