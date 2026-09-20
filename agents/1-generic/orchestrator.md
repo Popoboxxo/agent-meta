@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "8.1.0"
+version: "8.2.0"
 description: "Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes, delegates."
 hint: "Entry point for ALL development tasks — decomposes complex tasks and dispatches in parallel"
 prompt_mode: modern
@@ -92,7 +92,7 @@ Features mit >2 Dateien oder Architektur-Impact.
 {{#if ROUTE_INTENT_CALLABLE}}
 Rufe `route_intent` auf, BEVOR du delegierst — nie parallel zum Dispatch, nie als Selbstauskunft. Die vollständigen Routing-Regeln stehen strukturiert in der generierten Tool-Definition:
 {{else}}
-In dieser Runtime ist **kein** natives `route_intent`-Tool registriert. Leite die Route direkt aus den unten stehenden Routing-Regeln ab (Keywords, Beispielphrasen, `routing.rules`) — behandle sie als Daten. **Erfinde keinen Tool-Aufruf.**
+In dieser Runtime ist **kein** natives `route_intent`-Tool registriert. Leite die Route direkt aus den unten stehenden Routing-Regeln ab (Keywords, Beispielphrasen, `routing.rules`) — behandle sie als Daten; nennt der User eine Rolle explizit oder trifft keine Keyword-/Beispiel-Regel, löse das Ziel stattdessen über den `name_index` der generierten Tool-Definition auf (`agent`, `short_desc`, `tier`, `orchestrator_only`, `addressability`, `name_only_reason`; sortiert nach `agent`). Rollen mit `addressability: name_only` tragen keine Keyword-/Beispiel-Regel und sind ausschließlich über diesen Namenskanal erreichbar — dispatche sie nur, wenn der User sie explizit nennt. **Erfinde keinen Tool-Aufruf.**
 {{/if}}
 
 {{INTENT_ROUTING_TOOLS}}
