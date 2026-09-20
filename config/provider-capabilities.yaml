@@ -44,6 +44,18 @@
 # `plugin` a verified plugin_protocol, `permission` a native permission layer
 # (partial — no delegation provenance), `advisory` prompt-only. Never claim a
 # stronger tier than the flags support.
+#
+# route_intent_tool (issue #264 runtime follow-up): whether the harness registers
+# the generated `route_intent` definition as a CALLABLE tool. The definition is
+# rendered into the orchestrator prompt ({{INTENT_ROUTING_TOOLS}}), but rendering
+# text does NOT make it invocable. Every registered provider MUST carry the key
+# explicitly; the fail-safe default is `false`, and NO harness currently
+# registers the tool (conservative, same "unverified → conservative" precedent as
+# fanout_mechanism). `true` may only be set after a live acceptance proof: one
+# session in which a `route_intent` call resolves to the correct agent. Consumers:
+# scripts/lib/delegation_syntax.py (has_route_intent_tool) → agent_sync.py
+# (ROUTE_INTENT_CALLABLE), which gates the orchestrator §3 mandate against its
+# routing-rules fallback.
 
 capabilities:
   Claude:
@@ -54,6 +66,7 @@ capabilities:
     hooks: true
     commands: true
     runtime_gate: hook                  # verified PreToolUse hook contract (hook_protocol claude-code-json)
+    route_intent_tool: false            # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: ["Agent", "Task"]
     structured_handoff: true
     handoff_format: "json"
@@ -73,6 +86,7 @@ capabilities:
     hooks: false
     commands: true
     runtime_gate: permission            # native permission layer blocks Main-Chat writes; PARTIAL (no delegation provenance) — Phase 0, flips to plugin only after P6
+    route_intent_tool: false            # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: ["task"]
     structured_handoff: true
     handoff_format: "json"
@@ -92,6 +106,7 @@ capabilities:
     hooks: true                    # Antigravity hooks.json contract verified (issue #674 Phase 3.1) — mirrored via hook_protocol antigravity-hooks-json + translating adapter
     commands: true                 # .gemini/commands/*.toml (commands_dir/commands_ext/commands_format in ai-providers.yaml)
     runtime_gate: hook             # verified Antigravity hooks.json contract (hook_protocol antigravity-hooks-json)
+    route_intent_tool: false       # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: ["define_subagent", "send_message", "invoke_subagent"]
     structured_handoff: true
     handoff_format: "json"
@@ -117,6 +132,7 @@ capabilities:
     hooks: false
     commands: true
     runtime_gate: advisory
+    route_intent_tool: false           # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: []
     structured_handoff: false
     handoff_format: "yaml_text_block"
@@ -139,6 +155,7 @@ capabilities:
     hooks: false
     commands: false
     runtime_gate: advisory
+    route_intent_tool: false           # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: []
     structured_handoff: false
     handoff_format: "yaml_text_block"
@@ -168,6 +185,7 @@ capabilities:
     hooks: false
     commands: false                 # verified: no command surface upstream (ai-providers.yaml has_commands: false)
     runtime_gate: advisory          # hook paths configured but no verified hook_protocol (#630) — no runtime enforcement
+    route_intent_tool: false        # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: []
     structured_handoff: false
     handoff_format: "yaml_text_block"
@@ -201,6 +219,7 @@ capabilities:
     hooks: false                      # contract verified (V1) but NOT mirrored: payload deviations vs Claude Code + hash-trust review gate (#630 pattern)
     commands: false                   # no verified command surface (ai-providers.yaml has_commands: false)
     runtime_gate: advisory            # hook contract verified but not mirrored + hash-trust gate (#630) — no runtime enforcement
+    route_intent_tool: false          # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: ["spawn_agent", "send_input", "resume_agent", "wait_agent", "close_agent"]   # documented dispatch surface (V7)
     structured_handoff: true
     handoff_format: "json"
@@ -231,6 +250,7 @@ capabilities:
     hooks: false                      # project-level hooks are completely ignored by the harness (V2)
     commands: false                   # no verified command surface (ai-providers.yaml has_commands: false)
     runtime_gate: advisory            # project-level hooks ignored by the harness (V2) — no runtime enforcement
+    route_intent_tool: false          # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: ["Agent", "Task"]   # V17: Agent + legacy alias Task
     structured_handoff: true
     handoff_format: "yaml_text_block" # conservative until json support verified
@@ -261,6 +281,7 @@ capabilities:
     hooks: false                      # hooks exist (20 events, V11) but only user-level ~/.kimi-code/config.toml [[hooks]] documented — no project-level hook generation (#630 pattern)
     commands: false                   # no verified command surface (ai-providers.yaml has_commands: false)
     runtime_gate: advisory            # hooks exist but user-level only, no project mirror (#630) — no runtime enforcement
+    route_intent_tool: false          # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: ["Agent", "AgentSwarm"]   # V16: Agent (prompt/description/subagent_type/resume/run_in_background) + AgentSwarm (prompt_template + items)
     structured_handoff: true
     handoff_format: "yaml_text_block"

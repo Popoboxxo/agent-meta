@@ -115,6 +115,8 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     # agent_sync._build_provider_vars from build_variables' provider-mapped
     # prerender (issue #264)
     "INTENT_ROUTING_TOOLS",
+
+    "ROUTE_INTENT_CALLABLE",
     # Paths
     "AGENTS_DIR",
     # Release / plugin packaging

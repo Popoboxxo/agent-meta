@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Added
+- **Capability-gated intent-routing mandate (#264)**: `route_intent` is only mandated
+  in the orchestrator's §3 when the harness registers it as a callable tool
+  (`route_intent_tool` in `config/provider-capabilities.yaml`); otherwise the
+  orchestrator derives the route from the generated routing rules and must not invent
+  a tool call. All 9 providers ship explicit `route_intent_tool: false` (conservative;
+  a live `route_intent` acceptance proof is required to flip one to `true`), so no
+  runtime blocks on an unregistered tool.
+
 ## [1.2.0-beta.2] - 2026-09-13
 
 ### Added
