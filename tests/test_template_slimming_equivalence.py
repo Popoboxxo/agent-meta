@@ -7,13 +7,18 @@ Claude provider) and must never be regenerated or edited.
 
 This module is the single B2 gate. It is written once (Task 12) and consumed by
 the later migration tasks (13 knowledge, 14/15 generic + platform). Every
-migration task extends the two module-level registries below — that is the
+migration task extends the module-level registries below — that is the
 agreed, documented shared-gate convention:
 
 * ``_MIGRATED`` — template paths that had their inline ``## Anti-Recursion
   Guard`` prose replaced by ``{{ANTI_RECURSION_BLOCK}}``.
 * ``_OUTPUT_GUARD_MIGRATED`` — template paths that had an inline canonical
   ``<output-guard>`` region replaced by ``{{OUTPUT_GUARD_BLOCK}}``.
+* ``_PARSE_INPUT_MIGRATED`` — template paths that had an inline ``## 1. Parse
+  input`` block replaced by ``{{PARSE_INPUT_BLOCK}}``.
+* ``_KIND_REGISTRY`` — block kind → the registry above; the registries are
+  independent (a template may migrate several kinds, or only one) and
+  ``_MIGRATED_PATHS`` is their union.
 * ``_NORMALIZATIONS`` — the declarative classification table (block kind →
   inline variants → expected post-migration text). A migration that produces a
   difference not attributable to exactly one declared entry fails the gate; a
@@ -68,6 +73,11 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 _GOLDEN_DIR = _REPO_ROOT / "tests" / "fixtures" / "slimming-golden"
 _PROVIDER = "Claude"
 
+#: Pinned size of the frozen golden corpus (active roles, excluding README.md).
+#: Asserted by ``test_golden_role_set_is_pinned`` so a deleted or renamed
+#: fixture cannot silently shrink the gate's coverage.
+_GOLDEN_ROLE_COUNT = 58
+
 # ---------------------------------------------------------------------------
 # Shared-gate registries (extended by Tasks 13/14/15)
 # ---------------------------------------------------------------------------
@@ -75,6 +85,7 @@ _PROVIDER = "Claude"
 #: Templates whose inline ``## Anti-Recursion Guard`` prose was replaced by
 #: ``{{ANTI_RECURSION_BLOCK}}`` (Task 12: the 14 ``se-*`` templates; Task 13:
 #: the 7 ``knowledge-*`` templates — the ``AR-K1`` … ``AR-K7`` variants).
+#: This is the ``ANTI_RECURSION`` entry of ``_KIND_REGISTRY`` below.
 _MIGRATED = frozenset(
     {
         "agents/1-generic/se-architect.md",
@@ -117,7 +128,121 @@ _OUTPUT_GUARD_MIGRATED = frozenset(
         "agents/1-generic/se-validator.md",
         "agents/1-generic/se-verifier.md",
         "agents/1-generic/knowledge-migrator.md",
+        # Task 14 — generic templates (37). ``developer``/``devops-engineer``/
+        # ``docker``/``e2e-tester``/``tester`` additionally retain a role-specific
+        # polling example (OG-TAIL-*); the rest were byte-identical (OG-CANON).
+        "agents/1-generic/accessibility-specialist.md",
+        "agents/1-generic/agent-meta-manager.md",
+        "agents/1-generic/ai-security-guardian.md",
+        "agents/1-generic/api-specialist.md",
+        "agents/1-generic/app-lifecycle-governor.md",
+        "agents/1-generic/bug-feature-analyzer.md",
+        "agents/1-generic/data-engineer.md",
+        "agents/1-generic/database-engineer.md",
+        "agents/1-generic/dependency-auditor.md",
+        "agents/1-generic/design-system-architect.md",
+        "agents/1-generic/developer.md",
+        "agents/1-generic/devops-engineer.md",
+        "agents/1-generic/docker.md",
+        "agents/1-generic/e2e-tester.md",
+        "agents/1-generic/export-manager.md",
+        "agents/1-generic/feedback.md",
+        "agents/1-generic/frontend-component-engineer.md",
+        "agents/1-generic/git.md",
+        "agents/1-generic/incident-responder.md",
+        "agents/1-generic/junior-developer.md",
+        "agents/1-generic/log-analyzer.md",
+        "agents/1-generic/mammouth-expert.md",
+        "agents/1-generic/meta-feedback.md",
+        "agents/1-generic/openscad-developer.md",
+        "agents/1-generic/performance-optimizer.md",
+        "agents/1-generic/principal-developer.md",
+        "agents/1-generic/prompt-engineer.md",
+        "agents/1-generic/prompt-governor.md",
+        "agents/1-generic/provider-expert.md",
+        "agents/1-generic/refactoring-specialist.md",
+        "agents/1-generic/release.md",
+        "agents/1-generic/security-auditor.md",
+        "agents/1-generic/senior-developer.md",
+        "agents/1-generic/sre-engineer.md",
+        "agents/1-generic/tester.md",
+        "agents/1-generic/ui-ux-designer.md",
+        "agents/1-generic/validator.md",
     }
+)
+
+#: Templates whose inline ``## 1. Parse input`` block was replaced by
+#: ``{{PARSE_INPUT_BLOCK}}`` (Task 14 — generic templates). Templates whose
+#: parse-input deviates mid-sentence from the canonical text are *not* listed:
+#: they keep the region inline verbatim (``PI-PASS-*`` passthrough variants).
+_PARSE_INPUT_MIGRATED = frozenset(
+    {
+        "agents/1-generic/_reference-agent.md",
+        "agents/1-generic/accessibility-specialist.md",
+        "agents/1-generic/api-specialist.md",
+        "agents/1-generic/code-reviewer.md",
+        "agents/1-generic/concept-architect.md",
+        "agents/1-generic/concept-reviewer.md",
+        "agents/1-generic/concept-specifier.md",
+        "agents/1-generic/data-engineer.md",
+        "agents/1-generic/database-engineer.md",
+        "agents/1-generic/design-system-architect.md",
+        "agents/1-generic/developer.md",
+        "agents/1-generic/devops-engineer.md",
+        "agents/1-generic/docker.md",
+        "agents/1-generic/documenter.md",
+        "agents/1-generic/e2e-tester.md",
+        "agents/1-generic/explorer.md",
+        "agents/1-generic/export-manager.md",
+        "agents/1-generic/feedback.md",
+        "agents/1-generic/frontend-component-engineer.md",
+        "agents/1-generic/git.md",
+        "agents/1-generic/junior-developer.md",
+        "agents/1-generic/meta-feedback.md",
+        "agents/1-generic/openscad-developer.md",
+        "agents/1-generic/performance-optimizer.md",
+        "agents/1-generic/planner.md",
+        "agents/1-generic/product-manager.md",
+        "agents/1-generic/refactoring-specialist.md",
+        "agents/1-generic/requirements.md",
+        "agents/1-generic/security-auditor.md",
+        "agents/1-generic/senior-developer.md",
+        "agents/1-generic/sre-engineer.md",
+        "agents/1-generic/technical-writer.md",
+        "agents/1-generic/test-executor.md",
+        "agents/1-generic/tester.md",
+        "agents/1-generic/ui-ux-designer.md",
+    }
+)
+
+#: Block kind → registry of templates whose occurrence of that kind was migrated.
+#: A template can appear in more than one registry (several kinds canonicalized);
+#: the registries are intentionally independent (no subset relation).
+_KIND_REGISTRY: dict[str, frozenset[str]] = {
+    "ANTI_RECURSION": _MIGRATED,
+    "OUTPUT_GUARD": _OUTPUT_GUARD_MIGRATED,
+    "PARSE_INPUT": _PARSE_INPUT_MIGRATED,
+}
+
+#: 2-platform overrides that reuse a migrated 1-generic base via ``extends:``.
+#: Their golden must be normalized too, but the migrated block bytes live in the
+#: base template — so they join the golden comparison only, never the per-kind
+#: structural checks (5a/5b operate on the template that carries the block).
+_EXTENDS_MIGRATED = frozenset(
+    {
+        # extends: 1-generic/developer.md — its Output-Guard is OG-TAIL-DEV; the
+        # role's workflow / parse-input come from the platform patch.
+        "agents/2-platform/agent-meta-developer.md",
+    }
+)
+
+#: Union of every migrated template across all block kinds — the set of templates
+#: whose golden is compared after applying the declared normalizations.
+_MIGRATED_PATHS: frozenset[str] = (
+    _MIGRATED
+    | _OUTPUT_GUARD_MIGRATED
+    | _PARSE_INPUT_MIGRATED
+    | _EXTENDS_MIGRATED
 )
 
 # ---------------------------------------------------------------------------
@@ -155,6 +280,11 @@ def _dedent(text: str) -> str:
     return textwrap.dedent(text).strip("\n")
 
 
+def _normalize_whitespace(text: str) -> str:
+    """Collapse all whitespace runs to a single space (fragment comparison)."""
+    return re.sub(r"\s+", " ", text).strip()
+
+
 def _heading_regions(text: str, heading_re: re.Pattern[str]) -> list[Region]:
     regions: list[Region] = []
     for match in heading_re.finditer(text):
@@ -178,19 +308,48 @@ def _background_process_guard_regions(text: str) -> list[Region]:
 
     The same heading commonly appears *inside* an ``<output-guard>`` tag; those
     occurrences belong to the OUTPUT_GUARD kind and are excluded here so the two
-    kinds never normalize the same bytes twice.
+    kinds never normalize the same bytes twice. The exclusion is keyed on the
+    heading *start* (not on full containment): the generic section locator runs
+    past a closing ``</output-guard>`` because that tag is not a section stopper,
+    so a heading inside the tag is not fully contained in the tag span.
     """
     tag_spans = [(r.start, r.end) for r in _output_guard_regions(text)]
     standalone: list[Region] = []
     for region in _heading_regions(text, _BGP_HEADING_RE):
-        if any(region.start >= s and region.end <= e for s, e in tag_spans):
+        if any(start <= region.start < end for start, end in tag_spans):
             continue
         standalone.append(region)
     return standalone
 
 
 def _parse_input_regions(text: str) -> list[Region]:
-    return _heading_regions(text, _PARSE_INPUT_HEADING_RE)
+    """Regions of the parse-input block.
+
+    The block is a heading plus its single following sentence paragraph (blank
+    lines between heading and sentence are part of the region). Unlike the
+    generic ``_heading_regions`` this stops at the first blank line, so a role's
+    numbered workflow that follows the block stays *outside* the region — the
+    Task-14 migration canonicalizes the heading+sentence only and never touches
+    the role-specific continuation.
+    """
+    regions: list[Region] = []
+    for match in _PARSE_INPUT_HEADING_RE.finditer(text):
+        start = match.start()
+        line_end = text.find("\n", match.end())
+        if line_end == -1:
+            line_end = len(text)
+        cursor = line_end + 1
+        while cursor < len(text) and text[cursor] == "\n":
+            cursor += 1
+        rest = text[cursor:]
+        blank = re.search(r"\n[ \t]*\n", rest)
+        end = cursor + blank.start() if blank else len(text)
+        top = _SECTION_STOP_RE.search(rest)
+        if top is not None and cursor + top.start() < end:
+            end = cursor + top.start()
+        raw = text[start:end].rstrip("\n")
+        regions.append(Region(start, start + len(raw), raw))
+    return regions
 
 
 _LOCATORS = {
@@ -214,6 +373,11 @@ class Variant:
     (semantic-loss rule); ``expected`` is derived from the canonical variable at
     comparison time. ``paths`` names the templates that carry the variant — used
     by the inverse ("no dead entry") check and for documentation.
+
+    ``passthrough=True`` marks a region that is deliberately **left inline**
+    (e.g. a silent-truncation-only guard that is not the canonical block); its
+    ``expected`` text is the region itself, so normalization is an identity.
+    Such a template is registered only for the kinds it actually migrated.
     """
 
     id: str
@@ -221,6 +385,7 @@ class Variant:
     inline: str
     classification: str  # "B2a" (byte-identical) | "B2b" (normalized)
     retained: tuple[str, ...] = ()
+    passthrough: bool = False
     paths: tuple[str, ...] = field(default=())
 
 
@@ -500,6 +665,312 @@ _NORMALIZATIONS: tuple[Variant, ...] = (
         classification="B2a",
         inline="__CANONICAL__",
     ),
+    Variant(
+        id="PI-BLANK",
+        kind="PARSE_INPUT",
+        classification="B2b",
+        inline=(
+            '## 1. Parse input' "\n"
+            '' "\n"
+            'A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: plain directive from `main_chat`.'
+        ),
+        paths=(
+            "agents/1-generic/code-reviewer.md",
+            "agents/1-generic/concept-architect.md",
+            "agents/1-generic/concept-reviewer.md",
+            "agents/1-generic/concept-specifier.md",
+            "agents/1-generic/documenter.md",
+            "agents/1-generic/e2e-tester.md",
+            "agents/1-generic/export-manager.md",
+            "agents/1-generic/feedback.md",
+            "agents/1-generic/meta-feedback.md",
+            "agents/1-generic/requirements.md",
+            "agents/1-generic/security-auditor.md",
+            "agents/1-generic/test-executor.md",
+            "agents/1-generic/tester.md",
+        ),
+    ),
+    # Retained inline (passthrough): the canonical sentence continues inline with
+    # ' / orchestrator.' — splitting it would orphan a fragment, so these four
+    # templates keep their parse-input verbatim (semantic-loss rule).
+    Variant(
+        id="PI-PASS-ORCH",
+        kind="PARSE_INPUT",
+        classification="B2b",
+        inline=(
+            '## 1. Parse input' "\n"
+            'A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: plain directive from `main_chat` / orchestrator.'
+        ),
+        passthrough=True,
+        paths=(
+            "agents/1-generic/ai-security-guardian.md",
+            "agents/1-generic/app-lifecycle-governor.md",
+            "agents/1-generic/prompt-governor.md",
+        ),
+    ),
+    Variant(
+        id="PI-PASS-DEP",
+        kind="PARSE_INPUT",
+        classification="B2b",
+        inline=(
+            '## 1. Parse input' "\n"
+            'A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: plain directive from `main_chat` / orchestrator. This role takes direct delegation — no upstream input contract required.'
+        ),
+        passthrough=True,
+        paths=(
+            "agents/1-generic/dependency-auditor.md",
+        ),
+    ),
+    Variant(
+        id="PI-TAIL-BATCH",
+        kind="PARSE_INPUT",
+        classification="B2b",
+        inline=(
+            '## 1. Parse input' "\n"
+            'A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: plain directive from `main_chat`. `batch: true` → process array sequentially via `batch_task_id`.'
+        ),
+        retained=(
+            '`batch: true` → process array sequentially via `batch_task_id`.',
+        ),
+        paths=(
+            "agents/1-generic/junior-developer.md",
+        ),
+    ),
+    Variant(
+        id="PI-TAIL-ESC",
+        kind="PARSE_INPUT",
+        classification="B2b",
+        inline=(
+            '## 1. Parse input' "\n"
+            'A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: plain directive from `main_chat`. On escalations, `payload.ctx` holds the `findings` of the previous tier — read those FIRST.'
+        ),
+        retained=(
+            'On escalations, `payload.ctx` holds the `findings` of the previous tier — read those FIRST.',
+        ),
+        paths=(
+            "agents/1-generic/senior-developer.md",
+        ),
+    ),
+    Variant(
+        id="PI-TAIL-CONTRACTS-DB",
+        kind="PARSE_INPUT",
+        classification="B2b",
+        inline=(
+            '## 1. Parse input' "\n"
+            'A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: plain directive from `main_chat`. Input contracts: `req-output-v1` (requirements), `api-spec-v1` (api-specialist).'
+        ),
+        retained=(
+            'Input contracts: `req-output-v1` (requirements), `api-spec-v1` (api-specialist).',
+        ),
+        paths=(
+            "agents/1-generic/database-engineer.md",
+        ),
+    ),
+    Variant(
+        id="PI-TAIL-CONTRACTS-REF",
+        kind="PARSE_INPUT",
+        classification="B2b",
+        inline=(
+            '## 1. Parse input' "\n"
+            'A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: plain directive from `main_chat`. Input contracts: `task-spec-v1`, `explorer-output-v1` (blast-radius map).'
+        ),
+        retained=(
+            'Input contracts: `task-spec-v1`, `explorer-output-v1` (blast-radius map).',
+        ),
+        paths=(
+            "agents/1-generic/refactoring-specialist.md",
+        ),
+    ),
+    Variant(
+        id="PI-BLANK-SOURCES",
+        kind="PARSE_INPUT",
+        classification="B2b",
+        inline=(
+            '## 1. Parse input' "\n"
+            '' "\n"
+            'A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: plain directive from `main_chat`. Accepted sources: a concept (`concept-<topic>.md` or Knowledge-Wiki `Concept` page), a REQ-ID (`docs/REQUIREMENTS.md`), or a bug description.'
+        ),
+        retained=(
+            'Accepted sources: a concept (`concept-<topic>.md` or Knowledge-Wiki `Concept` page), a REQ-ID (`docs/REQUIREMENTS.md`), or a bug description.',
+        ),
+        paths=(
+            "agents/1-generic/planner.md",
+        ),
+    ),
+    Variant(
+        id="OG-TAIL-DOCKER",
+        kind="OUTPUT_GUARD",
+        classification="B2b",
+        inline=(
+            '<output-guard>' "\n"
+            '## Background-Process Guard (issue #506)' "\n"
+            '' "\n"
+            "Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis." "\n"
+            '' "\n"
+            'Beispiel — Container synchron abwarten (`docker wait`):' "\n"
+            '' "\n"
+            '```bash' "\n"
+            'NAME=verify-$RANDOM' "\n"
+            'docker run --name "$NAME" -d alpine sh -c "sleep 5; exit 7"   # replace with your real test container' "\n"
+            'RC=$(docker wait "$NAME")                     # BLOCKS until container exits — no completion notification will ever arrive' "\n"
+            'docker logs "$NAME" > /tmp/"$NAME".log 2>&1   # capture diagnostics BEFORE removal' "\n"
+            'docker rm "$NAME"' "\n"
+            'echo "container exit code: $RC" && tail -20 /tmp/"$NAME".log' "\n"
+            '```' "\n"
+            '</output-guard>'
+        ),
+        retained=(
+            'Beispiel — Container synchron abwarten (`docker wait`):' "\n"
+            '' "\n"
+            '```bash' "\n"
+            'NAME=verify-$RANDOM' "\n"
+            'docker run --name "$NAME" -d alpine sh -c "sleep 5; exit 7"   # replace with your real test container' "\n"
+            'RC=$(docker wait "$NAME")                     # BLOCKS until container exits — no completion notification will ever arrive' "\n"
+            'docker logs "$NAME" > /tmp/"$NAME".log 2>&1   # capture diagnostics BEFORE removal' "\n"
+            'docker rm "$NAME"' "\n"
+            'echo "container exit code: $RC" && tail -20 /tmp/"$NAME".log' "\n"
+            '```',
+        ),
+        paths=(
+            "agents/1-generic/devops-engineer.md",
+            "agents/1-generic/docker.md",
+            "agents/1-generic/e2e-tester.md",
+            "agents/1-generic/tester.md",
+        ),
+    ),
+    Variant(
+        id="OG-TAIL-DEV",
+        kind="OUTPUT_GUARD",
+        classification="B2b",
+        inline=(
+            '<output-guard>' "\n"
+            '## Background-Process Guard (issue #506)' "\n"
+            '' "\n"
+            "Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis." "\n"
+            '' "\n"
+            'Beispiel — Hintergrundprozess im selben Turn blockierend abwarten (Polling mit Timeout):' "\n"
+            '' "\n"
+            '```bash' "\n"
+            'npm run e2e > /tmp/e2e.log 2>&1 &' "\n"
+            'PID=$!' "\n"
+            'TIMEOUT=600' "\n"
+            'for i in $(seq 1 "$TIMEOUT"); do' "\n"
+            '  kill -0 "$PID" 2>/dev/null || break         # process finished' "\n"
+            '  sleep 1' "\n"
+            'done' "\n"
+            'kill -0 "$PID" 2>/dev/null && { kill "$PID"; echo "TIMEOUT after ${TIMEOUT}s" >&2; exit 124; }' "\n"
+            'wait "$PID"; RC=$?' "\n"
+            'tail -50 /tmp/e2e.log; exit "$RC"             # evidence + exit code = final result, not a "waiting" placeholder' "\n"
+            '```' "\n"
+            '</output-guard>'
+        ),
+        retained=(
+            'Beispiel — Hintergrundprozess im selben Turn blockierend abwarten (Polling mit Timeout):' "\n"
+            '' "\n"
+            '```bash' "\n"
+            'npm run e2e > /tmp/e2e.log 2>&1 &' "\n"
+            'PID=$!' "\n"
+            'TIMEOUT=600' "\n"
+            'for i in $(seq 1 "$TIMEOUT"); do' "\n"
+            '  kill -0 "$PID" 2>/dev/null || break         # process finished' "\n"
+            '  sleep 1' "\n"
+            'done' "\n"
+            'kill -0 "$PID" 2>/dev/null && { kill "$PID"; echo "TIMEOUT after ${TIMEOUT}s" >&2; exit 124; }' "\n"
+            'wait "$PID"; RC=$?' "\n"
+            'tail -50 /tmp/e2e.log; exit "$RC"             # evidence + exit code = final result, not a "waiting" placeholder' "\n"
+            '```',
+        ),
+        paths=(
+            "agents/1-generic/developer.md",
+        ),
+    ),
+    Variant(
+        id="OG-PASS-PLANNER",
+        kind="OUTPUT_GUARD",
+        classification="B2b",
+        inline=(
+            '<output-guard>' "\n"
+            '## Silent truncation guard (issue #514)' "\n"
+            '' "\n"
+            'The synchronous tool-result channel truncates large responses **silently**' "\n"
+            '(loss from the beginning, no error signal). Therefore:' "\n"
+            '' "\n"
+            '- Hard-cap any single response at ~400 lines.' "\n"
+            '- For larger plans: return a compact executive summary + numbered task' "\n"
+            '  outline + **only the first task in full**, then offer `chunk k/n`' "\n"
+            '  continuation on request.' "\n"
+            '- If the caller needs the full plan in one piece, recommend delegating the' "\n"
+            '  write-out to a write-capable role (e.g., `senior-developer`) via the' "\n"
+            '  orchestrator instead of streaming it through this channel.' "\n"
+            '</output-guard>'
+        ),
+        passthrough=True,
+        paths=(
+            "agents/1-generic/planner.md",
+        ),
+    ),
+    Variant(
+        id="OG-PASS-EXPLORER",
+        kind="OUTPUT_GUARD",
+        classification="B2b",
+        inline=(
+            '<output-guard>' "\n"
+            '## Silent truncation guard (issue #514)' "\n"
+            '' "\n"
+            'The synchronous tool-result channel truncates large responses **silently**' "\n"
+            '(loss from the beginning, no error signal). Therefore:' "\n"
+            '' "\n"
+            '- Hard-cap any single response at ~400 lines.' "\n"
+            '- Larger digests: return a structured summary (paths + one-liners) and' "\n"
+            '  offer `chunk k/n` continuation on request instead of dumping everything.' "\n"
+            '</output-guard>'
+        ),
+        passthrough=True,
+        paths=(
+            "agents/1-generic/explorer.md",
+        ),
+    ),
+    Variant(
+        id="OG-PASS-CODE-REVIEWER",
+        kind="OUTPUT_GUARD",
+        classification="B2b",
+        inline=(
+            '<output-guard>' "\n"
+            '## Silent truncation guard (issue #514)' "\n"
+            '' "\n"
+            'The synchronous tool-result channel truncates large responses **silently**' "\n"
+            '(loss from the beginning, no error signal). Therefore:' "\n"
+            '' "\n"
+            '- Hard-cap any single response at ~400 lines.' "\n"
+            '- Larger reviews: return verdict + severity counts + top findings first,' "\n"
+            '  then offer `chunk k/n` continuation on request.' "\n"
+            '- For full-length reports, recommend a write-capable role persisting them' "\n"
+            '  to a file via the orchestrator instead.' "\n"
+            '' "\n"
+            '## Background-Process Guard (issue #506)' "\n"
+            '' "\n"
+            "Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis." "\n"
+            '' "\n"
+            'Beispiel — prüfenden Prozess im selben Turn blockierend abwarten (Polling mit Timeout):' "\n"
+            '' "\n"
+            '```bash' "\n"
+            'npm run lint > /tmp/lint.log 2>&1 &' "\n"
+            'PID=$!' "\n"
+            'for i in $(seq 1 300); do' "\n"
+            '  kill -0 "$PID" 2>/dev/null || break         # lint finished' "\n"
+            '  sleep 1' "\n"
+            'done' "\n"
+            'kill -0 "$PID" 2>/dev/null && { kill "$PID"; echo "lint TIMEOUT after 300s" >&2; exit 124; }' "\n"
+            'wait "$PID"; RC=$?' "\n"
+            'tail -50 /tmp/lint.log; exit "$RC"            # evidence + exit code = final result, not a "waiting" placeholder' "\n"
+            '```' "\n"
+            '</output-guard>'
+        ),
+        passthrough=True,
+        paths=(
+            "agents/1-generic/code-reviewer.md",
+        ),
+    ),
 )
 
 _NORMALIZATION_INDEX: dict[tuple[str, str], Variant] = {
@@ -577,6 +1048,8 @@ def _canonical(variables: dict, kind: str) -> str:
 
 
 def _expected_text(variant: Variant, variables: dict) -> str:
+    if variant.passthrough:
+        return variant.inline
     if variant.inline == "__CANONICAL__":
         return _canonical(variables, variant.kind)
     expected = _canonical(variables, variant.kind)
@@ -644,7 +1117,7 @@ def test_golden_equivalence_and_normalization_marking(render_env: RenderEnv):
         golden = (_GOLDEN_DIR / f"{role}.md").read_text(encoding="utf-8")
         current = render_env.rendered[role]
         template = render_env.source_paths[role]
-        if template not in _MIGRATED:
+        if template not in _MIGRATED_PATHS:
             if golden != current:
                 failures.append(
                     f"{role} ({template}): unexpected diff on an unmigrated role\n"
@@ -685,7 +1158,13 @@ def test_no_declared_normalization_is_dead(render_env: RenderEnv):
     """Inverse: every declared normalization is used by some template."""
     dead: list[str] = []
     for variant in _NORMALIZATIONS:
-        alive = any(path in _MIGRATED for path in variant.paths)
+        registry = _KIND_REGISTRY.get(variant.kind, frozenset())
+        alive = any(path in registry for path in variant.paths)
+        if not alive and variant.inline == "__CANONICAL__":
+            # The canonical variant is the terminal fallback for its kind: it is
+            # used whenever at least one template migrated that kind (the concrete
+            # attribution is asserted by the golden-equivalence test).
+            alive = bool(registry)
         if not alive:
             for template in sorted((_REPO_ROOT / "agents").rglob("*.md")):
                 text = template.read_text(encoding="utf-8")
@@ -749,12 +1228,18 @@ def _render_template(path: Path, variables: dict) -> str:
 
 
 def test_migrated_templates_have_no_inline_variant_regions(render_env: RenderEnv):
-    """(a) No inline variant region of any of the four block kinds remains."""
+    """(a) No inline region remains for a block kind a template was migrated for.
+
+    Registry-driven: a template that deliberately keeps another kind inline
+    (``planner``/``explorer``/``code-reviewer`` retain their silent-truncation
+    guard) is only checked for the kinds it actually migrated.
+    """
     leftovers: list[str] = []
-    for rel in sorted(_MIGRATED):
-        path = _REPO_ROOT / rel
-        text = path.read_text(encoding="utf-8")
-        for kind, locator in _LOCATORS.items():
+    for kind, registry in _KIND_REGISTRY.items():
+        locator = _LOCATORS[kind]
+        for rel in sorted(registry):
+            path = _REPO_ROOT / rel
+            text = path.read_text(encoding="utf-8")
             for region in locator(text):
                 leftovers.append(
                     f"{rel}: {kind} inline region still present:\n{region.text[:200]}"
@@ -763,30 +1248,31 @@ def test_migrated_templates_have_no_inline_variant_regions(render_env: RenderEnv
 
 
 def test_migrated_templates_render_canonical_blocks(render_env: RenderEnv):
-    """(b)+(c) Canonical block text and mandatory markers appear after render."""
+    """(b)+(c) Canonical block text replaces every migrated placeholder."""
     problems: list[str] = []
-    for rel in sorted(_MIGRATED):
-        path = _REPO_ROOT / rel
-        rendered = _render_template(path, render_env.variables)
-        ar_text = _canonical(render_env.variables, "ANTI_RECURSION")
-        if ar_text not in rendered:
-            problems.append(f"{rel}: canonical ANTI_RECURSION_BLOCK missing")
-        if "{{ANTI_RECURSION_BLOCK}}" in rendered:
-            problems.append(f"{rel}: ANTI_RECURSION placeholder left unsubstituted")
-        if rel in _OUTPUT_GUARD_MIGRATED:
-            og_text = _canonical(render_env.variables, "OUTPUT_GUARD")
-            if og_text not in rendered:
-                problems.append(f"{rel}: canonical OUTPUT_GUARD_BLOCK missing")
-            if "{{OUTPUT_GUARD_BLOCK}}" in rendered:
-                problems.append(f"{rel}: OUTPUT_GUARD placeholder left unsubstituted")
+    for kind, registry in _KIND_REGISTRY.items():
+        canonical_text = _canonical(render_env.variables, kind)
+        placeholder = "{{" + _KIND_CANONICAL_VAR[kind] + "}}"
+        for rel in sorted(registry):
+            path = _REPO_ROOT / rel
+            rendered = _render_template(path, render_env.variables)
+            if canonical_text not in rendered:
+                problems.append(f"{rel}: canonical {placeholder} missing")
+            if placeholder in rendered:
+                problems.append(f"{rel}: {placeholder} placeholder left unsubstituted")
     assert not problems, "\n".join(problems)
 
 
 def test_migration_registries_are_consistent():
     """Registry guardrails for the shared-gate convention."""
-    assert _OUTPUT_GUARD_MIGRATED <= _MIGRATED, (
-        "_OUTPUT_GUARD_MIGRATED must be a subset of _MIGRATED"
-    )
+    assert set(_KIND_REGISTRY) <= set(_KIND_CANONICAL_VAR), _KIND_REGISTRY
+    assert _MIGRATED_PATHS == (
+        _MIGRATED | _OUTPUT_GUARD_MIGRATED | _PARSE_INPUT_MIGRATED | _EXTENDS_MIGRATED
+    ), "_MIGRATED_PATHS must be the union of the kind registries + extends set"
+    for kind, registry in _KIND_REGISTRY.items():
+        assert registry, f"empty registry for {kind}"
+        for rel in registry:
+            assert (_REPO_ROOT / rel).is_file(), f"{kind}: missing template {rel}"
     seeds = [v.id for v in _NORMALIZATIONS]
     assert len(seeds) == len(set(seeds)), "duplicate variant ids in the table"
     keys = [(v.kind, v.inline) for v in _NORMALIZATIONS]
@@ -794,3 +1280,36 @@ def test_migration_registries_are_consistent():
     for variant in _NORMALIZATIONS:
         assert variant.kind in _KIND_CANONICAL_VAR, variant
         assert variant.classification in {"B2a", "B2b"}, variant
+
+
+def test_golden_role_set_is_pinned():
+    """The frozen golden corpus must contain exactly the expected role files.
+
+    Guards against a deleted/renamed fixture silently shrinking the gate: a
+    missing role would drop out of ``_golden_roles()`` without any failure.
+    """
+    roles = _golden_roles()
+    assert len(roles) == _GOLDEN_ROLE_COUNT, (
+        f"golden fixture set changed: expected {_GOLDEN_ROLE_COUNT} roles "
+        f"(excluding README.md), found {len(roles)}: {roles}"
+    )
+
+
+def test_retained_normalizations_are_verbatim_fragments():
+    """Every declared ``retained`` clause must really come from ``inline``.
+
+    Closes the "declare less retention than was dropped" hole for the
+    verbatim-retention cases (``PI-TAIL-*`` / ``OG-TAIL-*``): the clause is
+    compared whitespace-normalized against the pre-migration region text, so an
+    invented or mis-derived remainder fails instead of silently passing.
+    """
+    problems: list[str] = []
+    for variant in _NORMALIZATIONS:
+        for idx, retained in enumerate(variant.retained):
+            if _normalize_whitespace(retained) not in _normalize_whitespace(variant.inline):
+                problems.append(
+                    f"{variant.id}: retained[{idx}] is not a fragment of inline\n"
+                    f"  retained: {retained[:200]!r}\n"
+                    f"  inline:   {variant.inline[:200]!r}"
+                )
+    assert not problems, "\n\n".join(problems)

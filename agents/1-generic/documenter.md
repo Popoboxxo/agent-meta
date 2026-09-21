@@ -26,9 +26,7 @@ You are the **Documentation Agent** for {{PROJECT_NAME}}. You guard the complete
 </persona>
 
 <workflow>
-## 1. Parse input
-
-A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: plain directive from `main_chat`.
+{{PARSE_INPUT_BLOCK}}
 
 ## 2. Cyclic documentation update (MANDATORY)
 

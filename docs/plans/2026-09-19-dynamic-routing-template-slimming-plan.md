@@ -468,10 +468,10 @@ pipeline_stages:
 **Akzeptanz:** In allen 52 Dateien ist jedes vorhandene Vorkommen des jeweiligen Blocks durch die zugehörige Referenz ersetzt; kein migrierter Block bleibt wörtlich. Die vorhandene `{{ANTI_RECURSION_BLOCK}}`-Referenz in `_reference-agent.md` und `developer.md` bleibt unverändert. Äquivalenz-Gate grün; Route-Guard 0 Verstöße.
 
 **Steps:**
-- [ ] Step 1: Vorkommen je Datei erfassen.
-- [ ] Step 2: Blöcke durch Referenzen ersetzen.
-- [ ] Step 3: Äquivalenz- und Guard-Tests grün.
-- [ ] Step 4: Commit via `git`-Agent: `refactor(templates): centralize repeated generic blocks`.
+- [x] Step 1: Vorkommen je Datei erfassen.
+- [x] Step 2: Blöcke durch Referenzen ersetzen.
+- [x] Step 3: Äquivalenz- und Guard-Tests grün.
+- [x] Step 4: Commit via `git`-Agent: `refactor(templates): centralize repeated generic blocks`.
 
 ---
 

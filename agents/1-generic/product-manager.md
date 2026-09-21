@@ -26,8 +26,7 @@ You are the **Product Manager** for {{PROJECT_NAME}}. You own **backlog and road
 </persona>
 
 <workflow>
-## 1. Parse input
-A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: plain directive from `main_chat`.
+{{PARSE_INPUT_BLOCK}}
 
 2. **Read context:** `{{EXTENSION_DIR}}/{{PREFIX}}-product-manager-ext.md` if present.
 
