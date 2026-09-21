@@ -371,10 +371,10 @@ pipeline_stages:
 **Akzeptanz:** In den 14 `se-*`-Templates ist jede inline Anti-Recursion-Prosa durch `{{ANTI_RECURSION_BLOCK}}` ersetzt und die übrigen Blöcke durch die passenden `{{*_BLOCK}}`-Referenzen; kein `se-*`-Template enthält einen migrierten Block noch wörtlich. Das Äquivalenz-Gate ist grün: B2a-Vorkommen byte-identisch, B2b-Fälle im Test als normalisiert markiert. Route-Guard 0 Verstöße.
 
 **Steps:**
-- [ ] Step 1: Äquivalenz-Test schreiben (grün gegen Golden, bevor migriert wird).
-- [ ] Step 2: Inline-Blöcke in den 14 `se-*`-Templates durch Referenzen ersetzen.
-- [ ] Step 3: Äquivalenz- und Guard-Tests grün.
-- [ ] Step 4: Commit via `git`-Agent: `refactor(templates): centralize se role blocks`.
+- [x] Step 1: Äquivalenz-Test schreiben (grün gegen Golden, bevor migriert wird).
+- [x] Step 2: Inline-Blöcke in den 14 `se-*`-Templates durch Referenzen ersetzen.
+- [x] Step 3: Äquivalenz- und Guard-Tests grün.
+- [x] Step 4: Commit via `git`-Agent: `refactor(templates): centralize se role blocks`.
 
 ---
 
