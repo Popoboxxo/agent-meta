@@ -337,10 +337,10 @@ pipeline_stages:
 **Akzeptanz:** Für jede aktive Rolle existiert genau eine Golden-Datei; das `README.md` dokumentiert Erzeugungskommando, Freeze-Zeitpunkt (nach Block A, vor Block B) und den Hinweis, dass Updates nur bewusst mit Diff-Manifest erfolgen. Diese Task ist eine harte Barriere vor jeder Migration.
 
 **Steps:**
-- [ ] Step 1: Golden-Dateien über den bestehenden Render-/Sync-Pfad erzeugen.
-- [ ] Step 2: `README.md` mit Freeze-Punkt und Erzeugungskommando schreiben.
-- [ ] Step 3: Reproduzierbarkeit prüfen (erneuter Render identisch).
-- [ ] Step 4: Commit via `git`-Agent: `test(slimming): freeze golden baseline before extraction`.
+- [x] Step 1: Golden-Dateien über den bestehenden Render-/Sync-Pfad erzeugen.
+- [x] Step 2: `README.md` mit Freeze-Punkt und Erzeugungskommando schreiben.
+- [x] Step 3: Reproduzierbarkeit prüfen (erneuter Render identisch).
+- [x] Step 4: Commit via `git`-Agent: `test(slimming): freeze golden baseline before extraction`.
 
 ---
 
