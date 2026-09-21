@@ -397,10 +397,10 @@ pipeline_stages:
 **Akzeptanz:** Kein `knowledge-*`-Template enthält einen migrierten Block wörtlich; Anti-Recursion inline = 0; Äquivalenz-Gate grün; Route-Guard 0 Verstöße.
 
 **Steps:**
-- [ ] Step 1: Vorkommen je Datei erfassen (inline Anti-Recursion, Output-Guard, Background-Process, Parse-Input).
-- [ ] Step 2: Blöcke durch Referenzen ersetzen.
-- [ ] Step 3: Äquivalenz- und Guard-Tests grün.
-- [ ] Step 4: Commit via `git`-Agent: `refactor(templates): centralize knowledge role blocks`.
+- [x] Step 1: Vorkommen je Datei erfassen (inline Anti-Recursion, Output-Guard, Background-Process, Parse-Input).
+- [x] Step 2: Blöcke durch Referenzen ersetzen.
+- [x] Step 3: Äquivalenz- und Guard-Tests grün.
+- [x] Step 4: Commit via `git`-Agent: `refactor(templates): centralize knowledge role blocks`.
 
 ---
 

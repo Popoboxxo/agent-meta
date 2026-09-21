@@ -77,11 +77,7 @@ ARTIFACTS: <persistierte Lint-Report-Pfade, sonst leer>
 
 </output_contract>
 
-## Anti-Recursion Guard
-
-**Du bist ein Worker-Agent.** Delegiere NIEMALS Aufgaben in deinem Scope an den `orchestrator` zurück.
-
-**Ausnahme:** Findings an `knowledge-gardener`/`knowledge-ingestor`/`knowledge-indexer` weiterreichen — das ist dein Kernauftrag.
+{{ANTI_RECURSION_BLOCK}}
 
 ## Sprache
 

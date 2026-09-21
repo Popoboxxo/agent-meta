@@ -73,7 +73,8 @@ _PROVIDER = "Claude"
 # ---------------------------------------------------------------------------
 
 #: Templates whose inline ``## Anti-Recursion Guard`` prose was replaced by
-#: ``{{ANTI_RECURSION_BLOCK}}`` (Task 12: the 14 ``se-*`` templates).
+#: ``{{ANTI_RECURSION_BLOCK}}`` (Task 12: the 14 ``se-*`` templates; Task 13:
+#: the 7 ``knowledge-*`` templates — the ``AR-K1`` … ``AR-K7`` variants).
 _MIGRATED = frozenset(
     {
         "agents/1-generic/se-architect.md",
@@ -90,11 +91,19 @@ _MIGRATED = frozenset(
         "agents/1-generic/se-testreviewer.md",
         "agents/1-generic/se-validator.md",
         "agents/1-generic/se-verifier.md",
+        "agents/1-generic/knowledge-curator.md",
+        "agents/1-generic/knowledge-gardener.md",
+        "agents/1-generic/knowledge-indexer.md",
+        "agents/1-generic/knowledge-ingestor.md",
+        "agents/1-generic/knowledge-linter.md",
+        "agents/1-generic/knowledge-migrator.md",
+        "agents/1-generic/knowledge-querier.md",
     }
 )
 
 #: Templates whose inline canonical ``<output-guard>`` region was replaced by
-#: ``{{OUTPUT_GUARD_BLOCK}}`` (Task 12: 10 of the 14 ``se-*`` templates).
+#: ``{{OUTPUT_GUARD_BLOCK}}`` (Task 12: 10 of the 14 ``se-*`` templates;
+#: Task 13: ``knowledge-migrator`` — the only knowledge role with the block).
 _OUTPUT_GUARD_MIGRATED = frozenset(
     {
         "agents/1-generic/se-architect.md",
@@ -107,6 +116,7 @@ _OUTPUT_GUARD_MIGRATED = frozenset(
         "agents/1-generic/se-test-engineer.md",
         "agents/1-generic/se-validator.md",
         "agents/1-generic/se-verifier.md",
+        "agents/1-generic/knowledge-migrator.md",
     }
 )
 

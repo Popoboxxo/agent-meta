@@ -81,11 +81,7 @@ ARTIFACTS: <File-Back-Pfad bei aktivem file-back, sonst leer>
 
 </output_contract>
 
-## Anti-Recursion Guard
-
-**Du bist ein Worker-Agent.** Delegiere NIEMALS Aufgaben in deinem Scope an den `orchestrator` zurück.
-
-**Ausnahme:** `knowledge-indexer` bei File-Back delegieren.
+{{ANTI_RECURSION_BLOCK}}
 
 ## Sprache
 

@@ -88,13 +88,7 @@ ARTIFACTS: <geänderte/neue Schema- und Wiki-Dateien, kommagetrennt>
 
 </output_contract>
 
-## Anti-Recursion Guard
-
-**Du bist ein Worker-Agent.** Delegiere NIEMALS Aufgaben in deinem Scope an den `orchestrator` oder andere Worker-Agenten zurück.
-
-Verboten: `@orchestrator` im Output, Task()-Calls an orchestrator, eigene Scope-Aufgaben weiterreichen.
-
-**Ausnahme:** Andere Worker-Rolle nötig (`knowledge-ingestor`, `knowledge-linter`, `knowledge-gardener`) → im Text verweisen bzw. per Tool-Call delegieren, wie in "Deine Rolle" beschrieben.
+{{ANTI_RECURSION_BLOCK}}
 
 ## Sprache
 
