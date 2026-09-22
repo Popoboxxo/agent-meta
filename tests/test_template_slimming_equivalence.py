@@ -172,7 +172,7 @@ _OUTPUT_GUARD_MIGRATED = frozenset(
 )
 
 #: Templates whose inline ``## 1. Parse input`` block was replaced by
-#: ``{{PARSE_INPUT_BLOCK}}`` (Task 14 — generic templates). Templates whose
+#: ``{{PARSE_INPUT_BLOCK}}`` (Task 14 generic + Task 15 platform overrides). Templates whose
 #: parse-input deviates mid-sentence from the canonical text are *not* listed:
 #: they keep the region inline verbatim (``PI-PASS-*`` passthrough variants).
 _PARSE_INPUT_MIGRATED = frozenset(
@@ -212,6 +212,10 @@ _PARSE_INPUT_MIGRATED = frozenset(
         "agents/1-generic/test-executor.md",
         "agents/1-generic/tester.md",
         "agents/1-generic/ui-ux-designer.md",
+        "agents/2-platform/agent-meta-developer.md",
+        "agents/2-platform/homeassistant-developer.md",
+        "agents/2-platform/homeassistant-documenter.md",
+        "agents/2-platform/sharkord-developer.md",
     }
 )
 
@@ -224,25 +228,12 @@ _KIND_REGISTRY: dict[str, frozenset[str]] = {
     "PARSE_INPUT": _PARSE_INPUT_MIGRATED,
 }
 
-#: 2-platform overrides that reuse a migrated 1-generic base via ``extends:``.
-#: Their golden must be normalized too, but the migrated block bytes live in the
-#: base template — so they join the golden comparison only, never the per-kind
-#: structural checks (5a/5b operate on the template that carries the block).
-_EXTENDS_MIGRATED = frozenset(
-    {
-        # extends: 1-generic/developer.md — its Output-Guard is OG-TAIL-DEV; the
-        # role's workflow / parse-input come from the platform patch.
-        "agents/2-platform/agent-meta-developer.md",
-    }
-)
-
 #: Union of every migrated template across all block kinds — the set of templates
 #: whose golden is compared after applying the declared normalizations.
 _MIGRATED_PATHS: frozenset[str] = (
     _MIGRATED
     | _OUTPUT_GUARD_MIGRATED
     | _PARSE_INPUT_MIGRATED
-    | _EXTENDS_MIGRATED
 )
 
 # ---------------------------------------------------------------------------
@@ -688,6 +679,7 @@ _NORMALIZATIONS: tuple[Variant, ...] = (
             "agents/1-generic/security-auditor.md",
             "agents/1-generic/test-executor.md",
             "agents/1-generic/tester.md",
+            "agents/2-platform/homeassistant-documenter.md",
         ),
     ),
     # Retained inline (passthrough): the canonical sentence continues inline with
@@ -1267,8 +1259,8 @@ def test_migration_registries_are_consistent():
     """Registry guardrails for the shared-gate convention."""
     assert set(_KIND_REGISTRY) <= set(_KIND_CANONICAL_VAR), _KIND_REGISTRY
     assert _MIGRATED_PATHS == (
-        _MIGRATED | _OUTPUT_GUARD_MIGRATED | _PARSE_INPUT_MIGRATED | _EXTENDS_MIGRATED
-    ), "_MIGRATED_PATHS must be the union of the kind registries + extends set"
+        _MIGRATED | _OUTPUT_GUARD_MIGRATED | _PARSE_INPUT_MIGRATED
+    ), "_MIGRATED_PATHS must be the union of the kind registries"
     for kind, registry in _KIND_REGISTRY.items():
         assert registry, f"empty registry for {kind}"
         for rel in registry:
