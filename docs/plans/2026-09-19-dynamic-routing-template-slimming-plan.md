@@ -115,10 +115,10 @@ pipeline_stages:
 **Akzeptanz:** Der Report führt jede dirty Datei auf und markiert Plan-Ziel-Überschneidungen. Bei Überschneidung mit `agents/1-generic/orchestrator.md`, `tests/test_routing_tool_definitions.py` oder einer anderen Ziel-Datei wird **gestoppt und an User/Orchestrator eskaliert** (fremde Änderungen separat committen/stashen lassen). Es wird nichts committet und keine fremde Datei angefasst.
 
 **Steps:**
-- [ ] Step 1: `git status --porcelain=v1` und `git diff --stat` erfassen.
-- [ ] Step 2: Dirty-Dateien gegen die Plan-Ziel-Dateien (File Structure) abgleichen.
-- [ ] Step 3: Report schreiben; bei Überschneidung Blocker dokumentieren und eskalieren.
-- [ ] Step 4: Commit nur des Reports via `git`-Agent: `docs(repo): add worktree preflight for routing slimming`.
+- [x] Step 1: `git status --porcelain=v1` und `git diff --stat` erfassen.
+- [x] Step 2: Dirty-Dateien gegen die Plan-Ziel-Dateien (File Structure) abgleichen.
+- [x] Step 3: Report schreiben; bei Überschneidung Blocker dokumentieren und eskalieren.
+- [x] Step 4: Commit nur des Reports via `git`-Agent: `docs(repo): add worktree preflight for routing slimming`.
 
 ---
 
@@ -137,10 +137,10 @@ pipeline_stages:
 **Akzeptanz:** Der Report enthält 0 nicht-`D-NONROLE`-belegte Treffer. Etwaige nicht-exempte Treffer sind ausschließlich durch Umschreiben der betroffenen Snippet-Datei (keine Detektoränderung) beseitigt; sind keine nötig, bleiben die beiden Dateien unverändert.
 
 **Steps:**
-- [ ] Step 1: Detektor-Logik über `snippets/**/*.md` trockenlaufen lassen (Bestands-Scope).
-- [ ] Step 2: Treffer klassifizieren (`D-NONROLE`-Beleg vs. echte Verletzung).
-- [ ] Step 3: Echte Verletzungen per Snippet-Umschreibung beseitigen (nur bei Bedarf).
-- [ ] Step 4: Report schreiben; Commit via `git`-Agent: `chore(guard): preflight snippet corpus for route guard scope`.
+- [x] Step 1: Detektor-Logik über `snippets/**/*.md` trockenlaufen lassen (Bestands-Scope).
+- [x] Step 2: Treffer klassifizieren (`D-NONROLE`-Beleg vs. echte Verletzung).
+- [x] Step 3: Echte Verletzungen per Snippet-Umschreibung beseitigen (nur bei Bedarf).
+- [x] Step 4: Report schreiben; Commit via `git`-Agent: `chore(guard): preflight snippet corpus for route guard scope`.
 
 ---
 
@@ -158,10 +158,10 @@ pipeline_stages:
 **Akzeptanz:** Resolver-Tests decken ab: `config_flag` mit fehlendem Pfad → `default`; `roles_membership` `any`/`all`; `config` schlägt `default`; `require_template=False` liefert Layer 1 ohne ValueError; `template_roles=None` wird lazy aufgelöst; `warn_sink` erhält deterministisch sortierte, deduplizierte Strings.
 
 **Steps:**
-- [ ] Step 1: Tests schreiben (rot) für alle Resolver-Fälle inkl. Determinismus.
-- [ ] Step 2: Resolver implementieren; `activation_groups` im Rollen-Loader verfügbar machen (abwärtskompatibel für bestehende `roles`-Leser).
-- [ ] Step 3: Tests grün.
-- [ ] Step 4: Commit via `git`-Agent: `feat(routing): add canonical activation resolver`.
+- [x] Step 1: Tests schreiben (rot) für alle Resolver-Fälle inkl. Determinismus.
+- [x] Step 2: Resolver implementieren; `activation_groups` im Rollen-Loader verfügbar machen (abwärtskompatibel für bestehende `roles`-Leser).
+- [x] Step 3: Tests grün.
+- [x] Step 4: Commit via `git`-Agent: `feat(routing): add canonical activation resolver`.
 
 ---
 
@@ -182,10 +182,10 @@ pipeline_stages:
 **Akzeptanz:** Verteilung exakt `81 keyword / 2 name_only / 1 excluded`; `excluded` genau `orchestrator`; jede `keyword`-Rolle hat nicht-leere `routing_patterns.keywords` oder `.examples`; `principal-developer`/`intern-developer` sind `name_only` mit nicht-leerem `name_only_reason`; `orchestrator` ist unabhängig von der Ableitung `excluded`; `openscad-developer` hat Patterns. Der bisherige Patternless-Test ist auf die neue Semantik aktualisiert (nicht gelöscht); die `validator`-Erwartung ist auf ein `config={"roles": ["validator"]}`-Fixture migriert.
 
 **Steps:**
-- [ ] Step 1: Schema-/Coverage-/Overlap-Tests schreiben (rot); Patternless- und Validator-Assertions migrieren.
-- [ ] Step 2: `activation_groups` und `routing.addressability` in der Config ergänzen; `openscad-developer`-Patterns + `name_only_reason` setzen.
-- [ ] Step 3: Tests grün.
-- [ ] Step 4: Commit via `git`-Agent: `feat(routing): add activation groups and role addressability`.
+- [x] Step 1: Schema-/Coverage-/Overlap-Tests schreiben (rot); Patternless- und Validator-Assertions migrieren.
+- [x] Step 2: `activation_groups` und `routing.addressability` in der Config ergänzen; `openscad-developer`-Patterns + `name_only_reason` setzen.
+- [x] Step 3: Tests grün.
+- [x] Step 4: Commit via `git`-Agent: `feat(routing): add activation groups and role addressability`.
 
 ---
 
@@ -206,10 +206,10 @@ pipeline_stages:
 **Akzeptanz:** Routing-Ziele sind exakt die Layer-2-Menge ohne `orchestrator`; Hints/Tabelle nutzen dieselbe Menge; jede Abweichung erzeugt einen deterministischen `warn_sink`-Eintrag, nie einen stillen Drop. `name_index` enthält genau einen Eintrag pro Zielrolle (inkl. `name_only`), ist nach `agent` sortiert und über zwei Aufrufe identisch. Aufrufe ohne explizite Template-Rollen lösen lazy auf und werfen keinen ValueError.
 
 **Steps:**
-- [ ] Step 1: Tests schreiben (rot) für Unified Set, Call-Sites und `name_index`.
-- [ ] Step 2: Aktivmengen vereinheitlichen, Parameter ergänzen, `name_index` bauen und durchreichen.
-- [ ] Step 3: Tests grün; bestehende Delegation-Tests unverändert grün.
-- [ ] Step 4: Commit via `git`-Agent: `feat(routing): unify active set and expose name index`.
+- [x] Step 1: Tests schreiben (rot) für Unified Set, Call-Sites und `name_index`.
+- [x] Step 2: Aktivmengen vereinheitlichen, Parameter ergänzen, `name_index` bauen und durchreichen.
+- [x] Step 3: Tests grün; bestehende Delegation-Tests unverändert grün.
+- [x] Step 4: Commit via `git`-Agent: `feat(routing): unify active set and expose name index`.
 
 ---
 
@@ -227,10 +227,10 @@ pipeline_stages:
 **Akzeptanz:** Der Test rendert den Fallback-Zweig und weist die `name_index`-Anweisung im Prompt-Text nach; der gerenderte `INTENT_ROUTING_TOOLS`-Payload enthält die `name_only`-Einträge. Der Route-Guard bleibt für diese Datei grün.
 
 **Steps:**
-- [ ] Step 1: Test schreiben (rot) für Prompt-Text und Payload-Assert.
-- [ ] Step 2: Fallback-Zweig um den `name_index`-Contract erweitern.
-- [ ] Step 3: Tests grün; `tests/test_no_role_routes_in_templates.py` grün.
-- [ ] Step 4: Commit via `git`-Agent: `feat(orchestrator): consume name index in routing fallback`.
+- [x] Step 1: Test schreiben (rot) für Prompt-Text und Payload-Assert.
+- [x] Step 2: Fallback-Zweig um den `name_index`-Contract erweitern.
+- [x] Step 3: Tests grün; `tests/test_no_role_routes_in_templates.py` grün.
+- [x] Step 4: Commit via `git`-Agent: `feat(orchestrator): consume name index in routing fallback`.
 
 ---
 
@@ -247,10 +247,10 @@ pipeline_stages:
 **Akzeptanz:** Beide Zustände (aktiv `all` junior+senior / inaktiv per Default) sind als je ein Testfall abgedeckt; die inaktive Erwartung ist deckungsgleich mit dem bestehenden `principal`-Gate-Fall.
 
 **Steps:**
-- [ ] Step 1: Testfälle (rot) für aktiv und inaktiv schreiben.
-- [ ] Step 2: Falls nötig Test-Fixtures präzisieren (keine Produktionsänderung in dieser Task).
-- [ ] Step 3: Tests grün.
-- [ ] Step 4: Commit via `git`-Agent: `test(routing): cover developer tiers gate complement`.
+- [x] Step 1: Testfälle (rot) für aktiv und inaktiv schreiben.
+- [x] Step 2: Falls nötig Test-Fixtures präzisieren (keine Produktionsänderung in dieser Task).
+- [x] Step 3: Tests grün.
+- [x] Step 4: Commit via `git`-Agent: `test(routing): cover developer tiers gate complement`.
 
 ---
 
@@ -268,10 +268,10 @@ pipeline_stages:
 **Akzeptanz:** 0 Verstöße der Detektoren `T-ROUTE-COL`, `T-ROLE-ARROW`, `T-HANDOFF`, `T-NEXT` in Templates, Rules **und** Snippets; die `D-*`-Ausnahmen und die Detektor-Regexe sind unverändert.
 
 **Steps:**
-- [ ] Step 1: Scope-Test erweitern; neuen Snippet-Scope-Test schreiben (rot vor Scope-Erweiterung).
-- [ ] Step 2: Scope-Globs um `snippets/**/*.md` erweitern (Detektoren unangetastet).
-- [ ] Step 3: Tests grün.
-- [ ] Step 4: Commit via `git`-Agent: `test(guard): extend route guard scope to snippets`.
+- [x] Step 1: Scope-Test erweitern; neuen Snippet-Scope-Test schreiben (rot vor Scope-Erweiterung).
+- [x] Step 2: Scope-Globs um `snippets/**/*.md` erweitern (Detektoren unangetastet).
+- [x] Step 3: Tests grün.
+- [x] Step 4: Commit via `git`-Agent: `test(guard): extend route guard scope to snippets`.
 
 ---
 
@@ -290,10 +290,10 @@ pipeline_stages:
 **Akzeptanz:** Der Helper delegiert an den Resolver; es existiert kein zweiter SE-Default mehr. Die Tests sind auf die neue Signatur migriert; der SE-Default-Test ist an `activation_groups.se.default: false` angeglichen (nicht ersatzlos entfernt). Keine versteckte Global-/Cache-Abhängigkeit.
 
 **Steps:**
-- [ ] Step 1: Tests auf die neue Signatur und die neue SE-Default-Semantik migrieren (rot).
-- [ ] Step 2: Helper als dünnen Re-Export implementieren.
-- [ ] Step 3: Tests grün.
-- [ ] Step 4: Commit via `git`-Agent: `refactor(frontmatter): route role gate through activation resolver`.
+- [x] Step 1: Tests auf die neue Signatur und die neue SE-Default-Semantik migrieren (rot).
+- [x] Step 2: Helper als dünnen Re-Export implementieren.
+- [x] Step 3: Tests grün.
+- [x] Step 4: Commit via `git`-Agent: `refactor(frontmatter): route role gate through activation resolver`.
 
 ---
 
@@ -316,10 +316,10 @@ pipeline_stages:
 **Akzeptanz:** Die drei neuen Block-Variablen werden deterministisch aus den Snippet-Dateien geladen und durchlaufen den Transform; der bestehende Snippet-Ladepfad bleibt output-neutral (keine Byte-Änderung generierter SE-/A2A-/Checkpoint-Blöcke). `warn_sink` erhält die Builder-Warnungen statt eines stillen Drops. Der Sync-Rollen-Gate-Aufruf nutzt den Resolver (kein 2-Parameter-Aufruf mehr). Die drei Snippet-Dateien sind route-guard-sauber.
 
 **Steps:**
-- [ ] Step 1: Transform-Tests und Wiring-Tests schreiben (rot).
-- [ ] Step 2: Transform + Loader für die drei Block-Variablen implementieren; Mirror-Variablen und `warn_sink`-Injektion verdrahten; Sync-Aufruf migrieren.
-- [ ] Step 3: Tests grün; bestehende Block-Outputs unverändert.
-- [ ] Step 4: Commit via `git`-Agent: `feat(config): wire activation variables and block snippet loader`.
+- [x] Step 1: Transform-Tests und Wiring-Tests schreiben (rot).
+- [x] Step 2: Transform + Loader für die drei Block-Variablen implementieren; Mirror-Variablen und `warn_sink`-Injektion verdrahten; Sync-Aufruf migrieren.
+- [x] Step 3: Tests grün; bestehende Block-Outputs unverändert.
+- [x] Step 4: Commit via `git`-Agent: `feat(config): wire activation variables and block snippet loader`.
 
 ---
 
@@ -491,10 +491,10 @@ pipeline_stages:
 **Akzeptanz:** Die eingebetteten Parse-Input-/Output-Guard-/Background-Process-Blöcke sind durch Referenzen ersetzt; abweichende Original-Einrückung ist als B2b normalisiert markiert (keine Byte-Identität zugesichert); die bestehenden `{{ANTI_RECURSION_BLOCK}}`-Referenzen bleiben. Äquivalenz-Gate grün; Route-Guard 0 Verstöße.
 
 **Steps:**
-- [ ] Step 1: Einrückung je Vorkommen erfassen und B2a/B2b klassifizieren.
-- [ ] Step 2: Blöcke durch Referenzen ersetzen.
-- [ ] Step 3: Äquivalenz- und Guard-Tests grün.
-- [ ] Step 4: Commit via `git`-Agent: `refactor(templates): centralize platform override blocks`.
+- [x] Step 1: Einrückung je Vorkommen erfassen und B2a/B2b klassifizieren.
+- [x] Step 2: Blöcke durch Referenzen ersetzen.
+- [x] Step 3: Äquivalenz- und Guard-Tests grün.
+- [x] Step 4: Commit via `git`-Agent: `refactor(templates): centralize platform override blocks`.
 
 ---
 
@@ -512,10 +512,10 @@ pipeline_stages:
 **Akzeptanz:** Jedes normalisierte Near-Duplikat ist im Manifest mit Datei, Block und Nachweis gelistet; kein Pflichtsatz ist verloren. Der Kopiervertrag testet, dass genau referenzierte Snippets kopiert werden und Block-Snippet-Dateien (Inlining-Pfad) dem Transform folgen.
 
 **Steps:**
-- [ ] Step 1: Normalisierte Diffs aus den Migrationen erfassen.
-- [ ] Step 2: Manifest und Kopiervertrag-Test schreiben.
-- [ ] Step 3: Tests grün.
-- [ ] Step 4: Commit via `git`-Agent: `docs(slimming): add diff manifest and snippet copy contract`.
+- [x] Step 1: Normalisierte Diffs aus den Migrationen erfassen.
+- [x] Step 2: Manifest und Kopiervertrag-Test schreiben.
+- [x] Step 3: Tests grün.
+- [x] Step 4: Commit via `git`-Agent: `docs(slimming): add diff manifest and snippet copy contract`.
 
 ---
 
@@ -524,18 +524,18 @@ pipeline_stages:
 **Files:**
 - Create: docs/plans/2026-09-19-dynamic-routing-template-slimming-verification.md
 
-**Interfaces:** Produces: Abschlussreport mit Befehlsnachweisen zu `sync.py --validate`, `sync.py --dry-run`, der vollständigen relevanten Test-Suite, dem Äquivalenz-Gate und dem Capability-Unchanged-Nachweis (A7). Consumes: alle Tasks.
+**Interfaces:** Produces: Abschlussreport mit Befehlsnachweisen zu `python3 scripts/sync.py --validate --dry-run` und zur vollständigen bestehenden Test-Suite, dem Äquivalenz-Gate und dem Capability-Unchanged-Nachweis (A7). Consumes: alle Tasks.
 **Agent:** validator
 **Depends on:** Task 16
 **Ziel-AK:** A7, B4, B5
-**Verifikation:** `python3 scripts/sync.py --validate && python3 scripts/sync.py --dry-run`; `python3 -m pytest tests/test_no_role_routes_in_templates.py tests/test_routing_tool_definitions.py tests/test_delegation_table.py tests/test_provider_agnostic_dispatch.py tests/test_template_slimming_equivalence.py tests/test_route_guard_snippets.py -q`
-**Akzeptanz:** Alle Befehle sind fehlerfrei; `route_intent_tool` ist für alle 9 Provider unverändert `false`, keine Capability-Keys neu/entfernt; der Fallback-`{{#if ROUTE_INTENT_CALLABLE}}`-Zweig besteht. Der Report weist die informativen Zeilen-/Byte-Reduktionszahlen als Metrik aus (kein Hard-Gate).
+**Verifikation:** `python3 -m pytest tests/ -q && python3 scripts/sync.py --validate --dry-run`
+**Akzeptanz:** Die vollständige bestehende Test-Suite und der Befehl `python3 -m pytest tests/ -q && python3 scripts/sync.py --validate --dry-run` sind fehlerfrei; `route_intent_tool` ist für alle 9 Provider unverändert `false`, keine Capability-Keys neu/entfernt; der Fallback-`{{#if ROUTE_INTENT_CALLABLE}}`-Zweig besteht. Der Report weist die informativen Zeilen-/Byte-Reduktionszahlen als Metrik aus (kein Hard-Gate).
 
 **Steps:**
-- [ ] Step 1: Relevante Test-Suite ausführen und Ergebnis protokollieren.
-- [ ] Step 2: `sync.py --validate` und `--dry-run` ausführen.
-- [ ] Step 3: Capability-Diff und Reduktionsmetrik dokumentieren.
-- [ ] Step 4: Commit via `git`-Agent: `docs(verify): add routing slimming verification report`.
+- [x] Step 1: Vollständige bestehende Test-Suite mit `python3 -m pytest tests/ -q` ausführen und Ergebnis protokollieren.
+- [x] Step 2: `python3 scripts/sync.py --validate --dry-run` ausführen und Ergebnis protokollieren.
+- [x] Step 3: Capability-Diff und Reduktionsmetrik dokumentieren.
+- [x] Step 4: Commit via `git`-Agent: `docs(verify): add routing slimming verification report`.
 
 ## Parallelisierung / Barrieren
 
