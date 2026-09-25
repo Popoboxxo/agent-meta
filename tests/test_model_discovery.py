@@ -31,6 +31,28 @@ def _make_urlopen_mock(payload):
     return cm
 
 
+def _make_text_urlopen_mock(
+    body: str,
+    content_type: str = "text/markdown; charset=utf-8",
+):
+    """urlopen mock returning a raw text body with an explicit Content-Type.
+
+    ``fetch_anthropic_models`` picks its source from the response, not from the
+    ambient environment: a markdown Content-Type (or a body starting with
+    ``#``) drives the live-parse branch, anything else drives the curated
+    fallback.  Pinning the transport here keeps these tests hermetic — they
+    describe the documented contract instead of whatever the live
+    platform.claude.com catalog happens to contain on the day they run.
+    """
+    response = MagicMock()
+    response.headers = {"Content-Type": content_type}
+    response.read.return_value = body.encode("utf-8")
+    cm = MagicMock()
+    cm.__enter__.return_value = response
+    cm.__exit__.return_value = False
+    return cm
+
+
 def _sample_openrouter_payload():
     return {
         "data": [
@@ -531,14 +553,14 @@ def test_fetch_anthropic_models_uses_curated_fallback():
     The fetcher falls back to ANTHROPIC_FALLBACK_MODELS regardless."""
     from scripts.lib.model_discovery import ANTHROPIC_DOCS_URL
 
-    # Pretend urllib returns the SPA shell (no model ids in the body).
+
     spa_shell = "<html><body><div id='__next'></div></body></html>"
-    response = MagicMock()
-    response.read.return_value = spa_shell.encode("utf-8")
-    cm = MagicMock()
-    cm.__enter__.return_value = response
-    cm.__exit__.return_value = False
-    with patch("urllib.request.urlopen", return_value=cm):
+    with patch(
+        "urllib.request.urlopen",
+        return_value=_make_text_urlopen_mock(
+            spa_shell, content_type="text/html; charset=utf-8"
+        ),
+    ):
         models = fetch_anthropic_models()
 
     assert len(models) > 0
@@ -553,25 +575,98 @@ def test_fetch_anthropic_models_uses_curated_fallback():
 
 
 def test_fetch_anthropic_models_respects_blacklist():
+    """Blacklist filtering is exact-id and applies to the live-parsed catalog.
+
+    The transport is mocked, so the source is pinned to the live markdown
+    branch.  This asserts the *contract* (a blacklisted id is dropped, a
+    non-blacklisted one is kept) rather than the current content of a
+    continuously changing upstream page — the live catalog has already moved
+    on more than once (e.g. ``claude-opus-4-8`` -> ``claude-opus-5`` ->
+    ``claude-opus-5-5``), and pinning those ids here would make this test a
+    catalog-drift alarm instead of a blacklist test.
+    """
     blacklist = ["claude-fable-5", "claude-opus-4-1-20250805"]
-    models = fetch_anthropic_models(blacklist=blacklist)
+
+    with patch(
+        "urllib.request.urlopen",
+        return_value=_make_text_urlopen_mock(_SAMPLE_OVERVIEW_MD),
+    ):
+        models = fetch_anthropic_models(blacklist=blacklist)
+
     ids = {m["id"] for m in models}
     assert "claude-fable-5" not in ids
     assert "claude-opus-4-1-20250805" not in ids
     assert "claude-haiku-4-5-20251001" in ids
-    # claude-opus-4-8 was superseded by claude-opus-5 in the live
-    # platform.claude.com models doc (verified 2026-08-26) -- this asserts
-    # against the LIVE catalog (fetch_anthropic_models() discards the
-    # curated fallback entirely on any successful live fetch, by design),
-    # so the expected id must track upstream reality, not agent-meta's own
-    # tier-preset defaults elsewhere in this repo (those may lag
-    # intentionally and are a separate concern from this test).
-    assert "claude-opus-5" in ids
+    assert "claude-opus-4-8" in ids
 
 
-def test_fetch_anthropic_models_pricing_shape():
-    """Each model has both input_cost_api and output_cost_api as positive floats."""
-    models = fetch_anthropic_models()
+def test_fetch_anthropic_models_offline_fallback_respects_blacklist():
+    """Offline: the curated fallback is served *and* the blacklist still applies.
+
+    The blacklist filter runs after source selection, so it must hold for
+    both branches.  Expectations are derived from ANTHROPIC_FALLBACK_MODELS
+    instead of being hardcoded, so adding a model to the canonical fallback
+    does not break this test.
+    """
+    blacklist = ["claude-fable-5", "claude-opus-4-1-20250805"]
+
+    with patch("urllib.request.urlopen", side_effect=OSError("network down")):
+        models = fetch_anthropic_models(blacklist=blacklist)
+
+    ids = {m["id"] for m in models}
+    expected = {m["id"] for m in ANTHROPIC_FALLBACK_MODELS} - set(blacklist)
+
+    assert expected, "canonical fallback unexpectedly empty"
+    assert ids == expected
+
+
+def test_fetch_anthropic_models_blacklist_is_exact_not_alias_aware():
+    """A canonical id and its ``(alias)`` row are independent registry entries.
+
+    Blacklist matching is exact (``m["id"] in blacklist_set``), so listing one
+    form must not silently remove the other.  Aliases are separate runnable
+    model ids, hence separately curate-able.
+    """
+    with patch(
+        "urllib.request.urlopen",
+        return_value=_make_text_urlopen_mock(_SAMPLE_OVERVIEW_MD),
+    ):
+        canonical_dropped = fetch_anthropic_models(
+            blacklist=["claude-haiku-4-5-20251001"],
+        )
+    canonical_ids = {m["id"] for m in canonical_dropped}
+    assert "claude-haiku-4-5-20251001" not in canonical_ids
+    assert "claude-haiku-4-5" in canonical_ids
+
+    with patch(
+        "urllib.request.urlopen",
+        return_value=_make_text_urlopen_mock(_SAMPLE_OVERVIEW_MD),
+    ):
+        alias_dropped = fetch_anthropic_models(blacklist=["claude-haiku-4-5"])
+    alias_ids = {m["id"] for m in alias_dropped}
+    assert "claude-haiku-4-5" not in alias_ids
+    assert "claude-haiku-4-5-20251001" in alias_ids
+
+
+@pytest.mark.parametrize("source", ["live_markdown", "curated_fallback"])
+def test_fetch_anthropic_models_pricing_shape(source):
+    """Each model has both input_cost_api and output_cost_api as positive floats.
+
+    Parametrized over both documented sources so the invariant is verified on
+    the live-parsed catalog *and* the curated fallback, without either
+    depending on real network access.
+    """
+    if source == "live_markdown":
+        with patch(
+            "urllib.request.urlopen",
+            return_value=_make_text_urlopen_mock(_SAMPLE_OVERVIEW_MD),
+        ):
+            models = fetch_anthropic_models()
+    else:
+        with patch("urllib.request.urlopen", side_effect=OSError("network down")):
+            models = fetch_anthropic_models()
+
+    assert models
     for m in models:
         assert isinstance(m["input_cost_api"], (int, float))
         assert isinstance(m["output_cost_api"], (int, float))
@@ -756,12 +851,7 @@ def test_parse_anthropic_markdown_ignores_non_claude_columns():
 
 def test_fetch_anthropic_models_uses_live_markdown_endpoint():
     """fetch_anthropic_models hits the .md endpoint and parses the response."""
-    response = MagicMock()
-    response.read.return_value = _SAMPLE_OVERVIEW_MD.encode("utf-8")
-    response.headers.get.return_value = "text/markdown; charset=utf-8"
-    cm = MagicMock()
-    cm.__enter__.return_value = response
-    cm.__exit__.return_value = False
+    cm = _make_text_urlopen_mock(_SAMPLE_OVERVIEW_MD)
 
     with patch("urllib.request.urlopen", return_value=cm) as mocked:
         models = fetch_anthropic_models()
@@ -795,15 +885,14 @@ def test_fetch_anthropic_models_falls_back_on_network_error():
 
 def test_fetch_anthropic_models_falls_back_on_non_markdown_response():
     """If the live response is HTML (SPA shell slipped through), fall back."""
-    spa_shell = b"<html><body><div id='__next'></div></body></html>"
-    response = MagicMock()
-    response.read.return_value = spa_shell
-    response.headers.get.return_value = "text/html; charset=utf-8"
-    cm = MagicMock()
-    cm.__enter__.return_value = response
-    cm.__exit__.return_value = False
-    with patch("urllib.request.urlopen", return_value=cm):
+    spa_shell = "<html><body><div id='__next'></div></body></html>"
+    with patch(
+        "urllib.request.urlopen",
+        return_value=_make_text_urlopen_mock(
+            spa_shell, content_type="text/html; charset=utf-8"
+        ),
+    ):
         models = fetch_anthropic_models()
-    # Parser yields nothing for SPA shell; fallback kicks in
+
     assert len(models) > 0
     assert "claude-opus-4-8" in {m["id"] for m in models}
