@@ -2,25 +2,162 @@
 
 Covers:
 - Source toggle (Registry ↔ models.dev)
-- Configured provider filters (models.dev table defaults to the 4 providers
+- Configured provider filters (models.dev table defaults to the providers
   configured in .meta-config/project.yaml → ai-providers)
 - "Show all providers" toggle (lifts the configured-provider default filter)
 - Registry table rendering
 - models.dev table rendering with import buttons and Source provenance badges
-- Curated-provider treatment (Mammouth, sourced from pricing-overlay.yaml)
+- Curated-provider treatment (registry-only providers such as Mammouth,
+  synthesized by admin-server.py from config/pricing-overlay.yaml)
 - Capability filter toggles
 - Legacy page
+
+The provider roster is deliberately NOT hardcoded: the models.dev view is
+scoped by whatever ``.meta-config/project.yaml`` → ``ai-providers`` declares
+for the project under test, so every provider expectation below is derived
+from that live contract (see :func:`provider_contract`). A hardcoded roster
+would assert providers the project does not enable.
 """
+import importlib.util
+import json
 import re
+import sys
+import urllib.request
+from pathlib import Path
 
 import pytest
 pytest.importorskip('playwright')
 from playwright.sync_api import expect
 
-# Providers configured under `ai-providers:` in .meta-config/project.yaml —
-# these are the ones the models.dev table shows by default (state.showAllProviders
-# starts false). Keep in sync with that file.
-CONFIGURED_PROVIDER_LABELS = ["Anthropic", "Google", "Mammouth Code", "OpenCode Go"]
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _admin_server_module():
+    """Load ``scripts/admin-server.py`` as a module (hyphenated filename).
+
+    Gives the tests the server-side provider mapping constants instead of a
+    second, drift-prone copy of them.
+    """
+    name = "am_admin_server_for_models_page_tests"
+    if name not in sys.modules:
+        spec = importlib.util.spec_from_file_location(
+            name, REPO_ROOT / "scripts" / "admin-server.py"
+        )
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
+        spec.loader.exec_module(module)
+    return sys.modules[name]
+
+
+_API_CACHE: dict = {}
+
+
+def api_json(url: str, path: str) -> dict:
+    """GET a JSON route from the running admin server, cached per session."""
+    key = (url, path)
+    if key not in _API_CACHE:
+        with urllib.request.urlopen(url + path, timeout=60) as resp:
+            _API_CACHE[key] = json.loads(resp.read().decode("utf-8"))
+    return _API_CACHE[key]
+
+
+def provider_contract(url: str) -> dict:
+    """Derive the active provider contract from the live project config.
+
+    Mirrors what ``docs/ui/admin-ui.html`` resolves at runtime:
+    ``.meta-config/project.yaml`` → ``ai-providers`` (served by
+    ``/api/config/project``) mapped onto models.dev catalog ids via
+    ``PROVIDER_MODELSDEV_SLUGS``, plus the ``source: "curated"`` nodes
+    admin-server.py synthesizes for the registry-only providers listed in
+    ``config/pricing-overlay.yaml``.
+
+    Returns ``{"configured": [names], "providers": [{name, id, label,
+    model_count}], "curated": {id: label}}``.
+    """
+    admin = _admin_server_module()
+    project = api_json(url, "/api/config/project")
+    configured = project.get("ai-providers")
+    assert isinstance(configured, list) and configured, (
+        f"project.yaml must configure at least one AI provider, got {configured!r}"
+    )
+
+    catalog = (api_json(url, "/api/models-dev") or {}).get("providers") or {}
+    registry_only = {k.capitalize() for k in admin.ModelsService.CURATED_ONLY_PROVIDER_KEYS}
+
+    providers = []
+    for name in configured:
+        pid = admin.PROVIDER_MODELSDEV_SLUGS.get(name)
+        if pid is None and name in registry_only:
+            pid = name.lower()
+        if pid is None:
+            continue  # no models.dev view -> the strip cannot offer it
+        node = catalog.get(pid) or {}
+        providers.append({
+            "name": name,
+            "id": pid,
+            "label": node.get("name") or name,
+            "model_count": len(node.get("models") or {}),
+        })
+    assert providers, (
+        f"None of the configured providers {configured!r} resolve to a models.dev "
+        f"catalog id (known slugs: {sorted(admin.PROVIDER_MODELSDEV_SLUGS)})"
+    )
+
+    curated = {
+        pid: (node.get("name") or pid)
+        for pid, node in catalog.items()
+        if node.get("source") == "curated"
+    }
+    assert curated, (
+        "Expected at least one curated provider node synthesized by "
+        "admin-server.py from config/pricing-overlay.yaml"
+    )
+    return {"configured": configured, "providers": providers, "curated": curated}
+
+
+def open_models_dev_table(page, url: str) -> None:
+    """Open the Models page, switch to the models.dev source, await the strip."""
+    page.goto(f"{url}/#/models", wait_until="networkidle")
+    page.get_by_role("button", name="models.dev").click()
+    expect(page.locator(".quick-filter-strip").first).to_be_visible(timeout=10000)
+
+
+def enable_show_all_providers(page) -> None:
+    """Flip the strip's "Show all providers" toggle into full-catalog mode."""
+    strip = page.locator(".quick-filter-strip").first
+    toggle = strip.locator(".toggle")
+    if not toggle.locator("input").is_checked():
+        toggle.click()
+    expect(strip.get_by_role("button", name="All Providers")).to_be_visible(timeout=10000)
+
+
+def select_other_provider(page, provider_id: str) -> None:
+    """Pick a provider from the strip's "Other providers" dropdown.
+
+    Providers outside ``ai-providers`` are not strip buttons; in full-catalog
+    mode they move into this ``<select>``.
+    """
+    strip = page.locator(".quick-filter-strip").first
+    sel = strip.locator("select")
+    expect(sel).to_be_visible(timeout=10000)
+    options = sel.locator("option")
+    values = [options.nth(i).get_attribute("value") for i in range(options.count())]
+    assert provider_id in values, (
+        f"Provider {provider_id!r} must be reachable through the "
+        "'Other providers' dropdown in full-catalog mode"
+    )
+    sel.select_option(provider_id)
+
+
+def source_badges(page) -> set:
+    """The distinct Source-column badges of the currently rendered rows."""
+    rows = page.locator("table.data tbody tr")
+    badges = set()
+    for i in range(rows.count()):
+        cells = rows.nth(i).locator("td")
+        badges.add(cells.nth(cells.count() - 2).inner_text().strip())
+    return badges
 
 
 def test_models_page_loads(browser_ctx, admin_server):
@@ -98,37 +235,35 @@ def test_switch_to_models_dev(browser_ctx, admin_server):
 
 def test_configured_providers_in_filter_strip(browser_ctx, admin_server):
     """Configured AI providers appear prominently in the quick-filter strip,
-    and the table defaults to showing only those providers' models."""
+    and the table defaults to showing only those providers' models.
+
+    The expected roster comes from the live project contract: the strip offers
+    "All Configured" plus one badge per provider that ``ai-providers`` enables
+    AND that has a models.dev catalog view.
+    """
     ctx, url = browser_ctx
+    contract = provider_contract(url)
     page = ctx.new_page()
     try:
-        page.goto(f"{url}/#/models", wait_until="networkidle")
-        page.wait_for_timeout(1000)
-
-        # Switch to models.dev
-        page.get_by_role("button", name="models.dev").click()
-        page.wait_for_timeout(2000)
+        open_models_dev_table(page, url)
 
         strip = page.locator(".quick-filter-strip").first
-        expect(strip).to_be_visible(timeout=5000)
-
-        # Default ("show all providers" off) — the catch-all button reads
-        # "All Configured".
         all_btn = page.get_by_role("button", name="All Configured")
         expect(all_btn).to_be_visible()
 
-        # Every provider configured in .meta-config/project.yaml (Claude/anthropic,
-        # Opencode/opencode-go, Mammouth [curated], Gemini/google) has its own
-        # button in the strip.
-        for label in CONFIGURED_PROVIDER_LABELS:
-            expect(strip.get_by_role("button", name=re.compile(re.escape(label)))).to_be_visible()
+        for provider in contract["providers"]:
+            expect(
+                strip.get_by_role("button", name=re.compile(re.escape(provider["label"])))
+            ).to_be_visible()
 
-        # Without "Show all providers" there should be exactly one "all"
-        # button + the 4 configured-provider buttons — no unrelated
-        # providers (e.g. from the full ~150+ models.dev catalog) leak in.
         provider_buttons = strip.locator("button")
         count = provider_buttons.count()
-        assert count == 5, f"Expected 'All Configured' + 4 configured providers, got {count}"
+        expected = 1 + len(contract["providers"])
+        assert count == expected, (
+            f"Expected 'All Configured' + {len(contract['providers'])} configured "
+            f"provider buttons for {contract['configured']!r}, got {count}: "
+            f"{provider_buttons.all_inner_texts()}"
+        )
 
     finally:
         page.close()
@@ -174,40 +309,47 @@ def test_show_all_providers_toggle(browser_ctx, admin_server):
 
 
 def test_mammouth_curated_provider_treatment(browser_ctx, admin_server):
-    """Mammouth has no real models.dev catalog entry — admin-server.py
-    synthesizes a 'curated' provider from config/pricing-overlay.yaml. The UI
-    must show it with a 'Registry (curated)' Source badge and 'No pricing' in
-    the Actions cell rather than a fabricated per-token cost."""
+    """Curated (registry-only) providers get a synthesized catalog node.
+
+    admin-server.py adds a ``source: "curated"`` node for every
+    ``CURATED_ONLY_PROVIDER_KEYS`` entry present in
+    ``config/pricing-overlay.yaml`` (Mammouth being the canonical one). Such a
+    provider is normally *not* part of ``ai-providers``, so it is not a strip
+    button in the configured-provider default scope -- it only becomes
+    selectable in the full-catalog ("Show all providers") mode, where it moves
+    into the "Other providers" dropdown. The UI must then show it with a
+    "Registry (curated)" Source badge and "No pricing" in the Actions cell
+    rather than a fabricated per-token cost.
+    """
     ctx, url = browser_ctx
+    contract = provider_contract(url)
     page = ctx.new_page()
     try:
-        page.goto(f"{url}/#/models", wait_until="networkidle")
-        page.wait_for_timeout(1000)
+        open_models_dev_table(page, url)
+        enable_show_all_providers(page)
 
-        page.get_by_role("button", name="models.dev").click()
-        page.wait_for_timeout(2000)
+        catalog = (api_json(url, "/api/models-dev") or {}).get("providers") or {}
+        for pid, label in contract["curated"].items():
+            select_other_provider(page, pid)
 
-        strip = page.locator(".quick-filter-strip").first
-        expect(strip).to_be_visible(timeout=5000)
+            rows = page.locator("table.data tbody tr")
+            expect(rows.first).to_be_visible(timeout=5000)
+            expected_rows = len((catalog[pid] or {}).get("models") or {})
+            assert rows.count() == expected_rows, (
+                f"Expected the {expected_rows} curated model row(s) of {label!r} "
+                f"({pid}), got {rows.count()}"
+            )
 
-        # Filter down to the Mammouth Code provider via its strip button.
-        strip.get_by_role("button", name=re.compile("Mammouth Code")).click()
-        page.wait_for_timeout(500)
+            row_text = rows.first.inner_text()
+            assert "Registry (curated)" in row_text, f"Expected curated Source badge, got: {row_text}"
+            assert "No pricing" in row_text, f"Expected 'No pricing' Actions cell, got: {row_text}"
 
-        rows = page.locator("table.data tbody tr")
-        expect(rows.first).to_be_visible(timeout=5000)
-        assert rows.count() == 1, f"Expected exactly the curated Mammouth model row, got {rows.count()}"
-
-        row_text = rows.first.inner_text()
-        assert "Registry (curated)" in row_text, f"Expected curated Source badge, got: {row_text}"
-        assert "No pricing" in row_text, f"Expected 'No pricing' Actions cell, got: {row_text}"
-
-        # No fabricated per-token cost — Input/Output cost columns render the
-        # em-dash placeholder, not a synthesized number.
-        cost_cells = rows.first.locator("td.mono")
-        for i in range(cost_cells.count()):
-            text = cost_cells.nth(i).inner_text().strip()
-            assert "$" not in text, f"Did not expect a fabricated $-cost for curated Mammouth, got: {text}"
+            cost_cells = rows.first.locator("td.mono")
+            for i in range(cost_cells.count()):
+                text = cost_cells.nth(i).inner_text().strip()
+                assert "$" not in text, (
+                    f"Did not expect a fabricated $-cost for curated {label!r}, got: {text}"
+                )
     finally:
         page.close()
 
@@ -279,32 +421,35 @@ def test_import_button_visible_on_models_dev(browser_ctx, admin_server):
 
 def test_source_column_provenance_badges(browser_ctx, admin_server):
     """The Source column badges communicate model-provenance: plain
-    'models.dev' for untouched entries, 'models.dev (overlay)' for entries
+    "models.dev" for untouched entries, "models.dev (overlay)" for entries
     whose price was overridden by config/pricing-overlay.yaml, and
-    'Registry (curated)' for synthesized registry-only providers (Mammouth)."""
+    "Registry (curated)" for synthesized registry-only providers.
+
+    The configured-provider default scope only contains real models.dev
+    providers, so the curated badge is asserted in the full-catalog scope,
+    where the synthesized node is reachable.
+    """
     ctx, url = browser_ctx
+    contract = provider_contract(url)
     page = ctx.new_page()
     try:
-        page.goto(f"{url}/#/models", wait_until="networkidle")
-        page.wait_for_timeout(1000)
-
-        page.get_by_role("button", name="models.dev").click()
-        page.wait_for_timeout(2000)
+        open_models_dev_table(page, url)
 
         rows = page.locator("table.data tbody tr")
         expect(rows.first).to_be_visible(timeout=5000)
 
-        source_texts = set()
-        for i in range(rows.count()):
-            cells = rows.nth(i).locator("td")
-            source_texts.add(cells.nth(cells.count() - 2).inner_text().strip())
+        badges = source_badges(page)
+        assert "models.dev" in badges, f"Expected plain 'models.dev' badge, got: {badges}"
+        assert "models.dev (overlay)" in badges, f"Expected overlay-override badge, got: {badges}"
 
-        # Default configured-provider scope (Claude/Anthropic overlays are
-        # configured in pricing-overlay.yaml) should show at least the plain
-        # and curated variants.
-        assert "models.dev" in source_texts, f"Expected plain 'models.dev' badge, got: {source_texts}"
-        assert "models.dev (overlay)" in source_texts, f"Expected overlay-override badge, got: {source_texts}"
-        assert "Registry (curated)" in source_texts, f"Expected curated badge, got: {source_texts}"
+        enable_show_all_providers(page)
+        for pid in contract["curated"]:
+            select_other_provider(page, pid)
+            curated_badges = source_badges(page)
+            assert curated_badges == {"Registry (curated)"}, (
+                f"Curated provider {pid!r} must be the only provenance in its "
+                f"own scope, got: {curated_badges}"
+            )
     finally:
         page.close()
 
