@@ -42,8 +42,11 @@ from .rule_index import (
 from .variables import strip_inactive_conditional_blocks, substitute
 
 # Repository root of this checked-out framework — the activation-gate fallback
-# for direct `_should_skip_role()` calls that cannot pass a resolved gate map
-# (production always resolves gates against the real `agent_meta_root`).
+# for direct `_should_skip_role()` calls that cannot pass a resolved gate map.
+# Every in-tree production caller (`sync_agents_for_provider` and the
+# cleanup/preview planner in `sync.py`) now resolves the gate map itself against
+# its own `agent_meta_root` and passes it in, so this fallback only serves
+# out-of-tree/test callers of the private helper.
 _AGENT_META_ROOT_FALLBACK = Path(__file__).resolve().parents[2]
 
 def _tools_can_spawn(tools) -> bool:
@@ -511,7 +514,9 @@ def _should_skip_role(
     provider-name branch), kept byte-identical to the historical Claude-only
     output. ``gates`` is the pre-resolved activation map
     (``roles.resolve_activation_gates``) of the caller; when omitted (direct
-    helper calls) it is resolved against the framework's own role defaults.
+    out-of-tree helper calls) it is resolved against
+    ``_AGENT_META_ROOT_FALLBACK`` — the framework checkout this module was
+    loaded from, not necessarily the caller's ``agent_meta_root``.
     """
     filename = target_filename(role, role_map, ext=pc.get('agent_ext', '.md'))
     log_verbose = provider_has_capability(pc, "verbose-sync-log")

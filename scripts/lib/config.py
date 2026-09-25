@@ -1623,11 +1623,14 @@ def _build_platform_variables(
     variables["KNOWLEDGE_SCHEMA_PATH"] = f"{variables['KNOWLEDGE_BUNDLE_PATH']}/schema.md"
     variables["KNOWLEDGE_WIKI_DIR"] = f"{variables['KNOWLEDGE_BUNDLE_PATH']}/wiki"
     variables["KNOWLEDGE_SOURCES_DIR"] = f"{variables['KNOWLEDGE_BUNDLE_PATH']}/sources"
-    # VALIDATOR_ENABLED: auto-detect from project roles list
+    # VALIDATOR_ENABLED: activation mirror of the `validator` group (the group's
+    # own config_predicate decides the default — roles_membership by default).
     variables["VALIDATOR_ENABLED"] = _mirror("validator")
 
-
     _roles = config.get("roles", [])
+    # DEVELOPER_TIERS_ENABLED: activation mirror of the `developer_tiers` group.
+    # One flag for the whole junior/senior/principal tier set — the group keeps
+    # them addressable as a unit instead of gating each tier separately.
     variables["DEVELOPER_TIERS_ENABLED"] = _mirror("developer_tiers")
     # EFFORT_ESTIMATOR_ENABLED: auto-detect from project roles list
     # — orchestrator gates effort-estimator routes behind this flag to avoid dead routes
@@ -1871,7 +1874,6 @@ def _build_snippet_variables(variables: dict, agent_meta_root: Path) -> None:
         agent_meta_root: agent-meta source root (snippet file location).
     """
 
-
     _snippets_dir = agent_meta_root / "snippets" / "orchestrator"
     for _snippet_name, _var_stem in (
         ("se-mode", "SE_MODE"),
@@ -1924,6 +1926,12 @@ def _build_snippet_variables(variables: dict, agent_meta_root: Path) -> None:
         _pid_path.read_text(encoding="utf-8").rstrip("\n") if _pid_path.exists() else ""
     )
 
+    # Block-inlining variables (spec §3.7). `_load_block_snippet` strips the
+    # frontmatter, normalizes line endings and strip("\n")-trims the result, so
+    # the stored value carries no leading indentation. `substitute()` re-indents
+    # a multi-line value to the indentation of the placeholder's line, so a
+    # reference nested in a YAML literal `content: |` patch block keeps that
+    # indentation on every line instead of falling back to column 0.
     _block_snippets_dir = agent_meta_root / "snippets" / "agents"
     for _snippet_name, _var_stem in (
         ("output-guard", "OUTPUT_GUARD"),
