@@ -130,7 +130,7 @@ andere Eingabe-Zeilenenden abgeleitet. Sie werden über die Terminierungs-Varian
 > LF-text-identisch zum Kanon → `PI-CANON` (B2a); es ist **keine** B2b-Normalisierung nötig.
 > `agents/2-platform/homeassistant-documenter.md` trägt dagegen eine Leerzeile und ist deshalb
 > als `PI-BLANK` (B2b) registriert. Der Vergleich entfernt die YAML-Einrückung über
-> `_dedent` (`tests/test_template_slimming_equivalence.py:269-271`), ohne den Inhalt zu ändern.
+> `_dedent` (`tests/test_template_slimming_equivalence.py:271-273`), ohne den Inhalt zu ändern.
 
 ## 5. Pflichtsatz-Nachweis (kein verlorener Pflichtsatz)
 

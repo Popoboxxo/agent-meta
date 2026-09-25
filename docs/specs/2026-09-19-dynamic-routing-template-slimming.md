@@ -3,7 +3,9 @@
 > Status: APPROVED (2026-09-19)
 > Klasse: XL / Architectural
 > Vorgelagertes Systemdesign: Kernentscheidungen liegen vor (Concept-Architect)
-> Revision: 4 (nach finalem Re-Review `2026-09-19-dynamic-routing-template-slimming-final-rereview.md`; RVW-24 gefixt, RVW-25–28 adressiert)
+> Revision: 5 (Amendment zum Code-Review Runde 2 — RVW-22-Norm in §3.7 und AK B2a
+> geändert, siehe §8.4; vorher: Revision 4 nach finalem Re-Review
+> `2026-09-19-dynamic-routing-template-slimming-final-rereview.md`)
 
 ## Trace-Anker
 
@@ -520,11 +522,15 @@ Block-Variablen über `_build_snippet_variables` (Inlining, Mechanismus 1):
 2. Zeilenenden werden auf `\n` normalisiert.
 3. Ergebnis wird mit `text.strip("\n")` (führende/abschließende Leerzeilen entfernt)
    eingebettet; die Einrückung am Verwendungsort liefert das Template.
-   **Mehrzeilige Blöcke (RVW-22):** Bei String-Substitution wird nur die **erste** Zeile
-   an der Template-Einrückung positioniert; Folgezeilen übernehmen die Snippet-interne
-   Einrückung. Byte-Identität (B2a) gilt daher nur für Vorkommen, deren
-   Original-Einrückung mit der Snippet-Einrückung **übereinstimmt**; alle übrigen sind
-   B2b-Fälle (dokumentiert normalisiert).
+   **Mehrzeilige Blöcke (RVW-22, in Rev. 5 geändert — siehe Amendment §8.4):** Bei
+   String-Substitution positioniert der Kern **jede Inhaltszeile** eines mehrzeiligen
+   Wertes an der Template-Einrückung der Verwendungsstelle; Folgezeilen folgen also der
+   Verwendungsstelle, nicht der Snippet-internen Einrückung. Leerzeilen bleiben leer
+   (kein whitespace-only Output). Vorkommen in **column-0** oder **inline** (kein
+   zeileninitialer Platzhalter) sind davon unberührt: dort ist die Einrückung leer bzw.
+   nicht vorhanden, das Verhalten ist identisch zum Stand vor Rev. 5. Byte-Identität
+   (B2a) gilt damit für **alle** Vorkommen, nicht nur für solche mit übereinstimmender
+   Original-Einrückung.
 4. **Alternative zulässig:** Block-Snippet-Dateien tragen **kein** Frontmatter; dann
    entfällt Schritt 1 (siehe offene Entscheidung O-D).
 
@@ -640,8 +646,10 @@ kein Template enthält den migrierten Block mehr wörtlich (für Anti-Recursion:
 Given ein Golden-Set, das **nach Block A und vor Block B** eingefroren wurde, when der
 Sync nach der Slimming-Änderung läuft, then gilt:
 - **B2a:** Jedes Vorkommen, das vorab als byte-identisch zum kanonischen Snippet-Text
-  klassifiziert wurde — inklusive übereinstimmender Original-Einrückung (§3.7/RVW-22) —,
-  ist im generierten Output byte-identisch zur Baseline.
+  klassifiziert wurde, ist im generierten Output byte-identisch zur Baseline. Die
+  Einrückungs-Einschränkung aus Rev. 4 entfällt: der Inlining-Transform setzt die
+  Einrückung der Verwendungsstelle auch auf Folgezeilen (§3.7/RVW-22, Amendment §8.4),
+  sodass column-0-, Inline- UND eingerückte Vorkommen B2a-Fälle sind.
 - **B2b:** Jedes normalisierte Near-Duplikat ist in einem Diff-Manifest gelistet und
   abschnittsweise semantisch äquivalent (kein verlorener Pflichtsatz: Input-Parsing,
   Output-Guard, Handoff-Format, Anti-Recursion bleiben erhalten).
@@ -867,7 +875,7 @@ O1 (SE-Default) und O2 (Resolver-Injektion) sind geschlossen: O1 =
 | RVW-19 (MINOR) | **gefixt** | §3.3 listet die `warn_sink`/`template_roles`-Injektionspunkte für alle sechs Builder-Signaturen auf |
 | RVW-20 (MINOR) | **gefixt** | §1.8 dokumentiert Bestands-Snippet-Audit (se-mode.md/a2a-protocol.md), erwartete `D-NONROLE`-Exemption + verpflichtendes Pre-Flight-Gate; A6 verlangt 0 Verstöße |
 | RVW-21 (MINOR) | **gefixt** | §3.4: `orchestrator` ist unabhängig von der Ableitung immer `excluded` |
-| RVW-22 (NIT) | **gefixt** | §3.7 Schritt 3 + B2a: Byte-Identität nur bei übereinstimmender Original-Einrückung; sonst B2b |
+| RVW-22 (NIT) | **gefixt** | §3.7 Schritt 3 + B2a: Byte-Identität nur bei übereinstimmender Original-Einrückung; sonst B2b — *diese Norm ist in Rev. 5 superseded, siehe Amendment §8.4* |
 | RVW-23 (NIT) | **gefixt** | A3 von `config`/`variables` auf `config` (+ optionale `template_roles`-Fixture) reduziert |
 
 **Rest-Lücken / bewusst offen:**
@@ -900,3 +908,59 @@ RVW-20-Pre-Flight (Gate statt Vorab-Beweis) beziehen.
 **Offene NITs, vor Plan/Merge adressieren:** keine — RVW-25/26/28 sind gefixt, RVW-27 ist
 gefixt. Verbleibend nur die bewusst informativen Punkte (Reduktionsreport B5; Diff-Manifest
 im Plan) sowie das RVW-20-Pre-Flight-Gate als Implementierungsschritt.
+
+### 8.4 Amendment Rev. 5 (v4 → v5) — RVW-22-Norm an die Implementierung nachgezogen
+
+**Auslöser:** Finding B1 aus Code-Review Runde 2 (Spec-/Implementierungs-Divergenz am
+Abnahmekriterium). Betroffen sind genau zwei Stellen: §3.7 Schritt 3 (RVW-22) und AK B2a.
+Alle übrigen Abschnitte, AKNummern und Revisions-Deltas bleiben unverändert.
+
+| | Norm |
+|---|---|
+| **Alt (Rev. 4, abgeschafft)** | „Bei String-Substitution wird nur die **erste** Zeile an der Template-Einrückung positioniert; Folgezeilen übernehmen die Snippet-interne Einrückung." Byte-Identität (B2a) nur bei übereinstimmender Original-Einrückung, sonst B2b. |
+| **Neu (Rev. 5)** | Jede **Inhaltszeile** eines mehrzeiligen Wertes wird an der Template-Einrückung der Verwendungsstelle positioniert; Folgezeilen folgen der Verwendungsstelle. Leerzeilen bleiben leer. Column-0- und Inline-Vorkommen unverändert (gleiches Verhalten wie Rev. 4). |
+
+**Warum (b) — die Engine garantierte den Einrückungsvertrag nie über den Kern:** Rev. 4
+hatte den Einrückungsvertrag implizit über die *Aufrufkonvention* des Inlining-Transforms
+festgeschrieben (`text.strip("\n")` + „das Template liefert die Einrückung"), nicht über
+eine Zusicherung in `substitute()`. Ein mehrzeiliger Wert an einer eingerückten
+Verwendungsstelle war damit nicht abgesichert. Der Runde-1-Fix
+(`_reindent_to_placeholder` in `scripts/lib/variables.py`, verdrahtet über den optionalen
+`transform`-Parameter in `scripts/lib/substitution.py`) macht den Vertrag explizit — es
+handelt sich um ein **Hardening, nicht um die Korrektur eines beobachteten Fehloutputs**:
+für den agent-meta-eigenen Render gab es keinen fehlerhaften Output, die Golden-Baseline
+ist unverändert. Die alte Norm war damit nicht „falsch beschrieben“, sondern eine
+Zusicherung, die der Kern nicht trug; die Spec wird nachgezogen, statt die
+Festlegung zurückzunehmen.
+
+**Auswirkung auf den Produktionsrender (c) — unverändert:** Im Korpus `agents/` gibt es
+32 Platzhalter-Vorkommen mit Einrückung (verifiziert per Scan der Muster
+`^[ \t]+\{\{[A-Z0-9_]+\}\}`); alle rendern für agent-meta unverändert:
+28 davon liegen in `extends:`-Dateien, wo der YAML-Decoder den Patch-Text vor der
+Substitution auf column 0 dedentiert — der Transform ist dort No-op. Die restlichen 4
+(`EXTRA_VOLUMES`, `EXTRA_ENV_VARS`, `EXTRA_VOLUME_DEFINITIONS` in
+`agents/2-platform/sharkord-docker.md`, `GH_ASSETS` in `agents/2-platform/sharkord-release.md`)
+liegen in `extends:`-losen Dateien im Body innerhalb eines Code-Fence und sind für
+agent-meta leer (kein Output-Delta). Consumer-sichtbar ist die Änderung nur für ein echtes
+sharkord-Projekt mit mehrzeiligen `variables:`-Werten — dort ist sie eine **Korrektur**
+(docker-compose-Listenitems bzw. Shell-Continuations behalten ihre Einrückung). Der
+`### Changed`-Eintrag im `CHANGELOG.md` benennt das explizit.
+
+**Nachweise (d):**
+- *Verifiziert den Transform:* `tests/test_block_inlining_indentation.py` —
+  `test_multiline_value_is_reindented_to_the_placeholder_indent` und
+  `test_reindenting_keeps_the_yaml_literal_block_parseable` (fehlschlagen ohne den Fix),
+  ergänzt um `test_reindenting_does_not_indent_blank_lines` (Leerzeile + Trailing-Newline
+  ohne whitespace-only Zeile), `test_column_zero_placeholder_is_untouched`,
+  `test_single_line_value_at_indent_is_untouched`,
+  `test_inline_placeholder_in_a_sentence_is_untouched`.
+- *Belegt den No-op in Produktion (grün mit **und** ohne Fix):* dieselbe Datei,
+  `test_platform_override_renders_block_at_column_zero` (parametrisiert über
+  `sharkord`/`homeassistant`/`agent-meta`),
+  `test_homeassistant_documenter_override_renders_same_block_structure` und
+  `test_source_templates_reference_the_block_inside_a_yaml_literal`; dazu die
+  Golden-Vergleiche in `tests/test_template_slimming_equivalence.py` gegen
+  `tests/fixtures/slimming-golden/**`.
+- *Leer-zeilen-Regression:* `test_reindenting_does_not_indent_blank_lines` (Blank-Line
+  und Trailing-Newline) — schützt vor `git diff --check`/Trailing-Whitespace-Hooks in
+  Zielprojekten.
