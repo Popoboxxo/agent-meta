@@ -101,6 +101,15 @@ ANTHROPIC_FALLBACK_MODELS: list[dict[str, Any]] = [
         "tier": "Standard",
     },
     {
+        "id": "claude-opus-5",
+        "name": "Claude Opus 5",
+        "provider": "anthropic",
+        "input_cost_api": 5.00,
+        "output_cost_api": 25.00,
+        "context_length": 1000000,
+        "tier": "Standard",
+    },
+    {
         "id": "claude-opus-4-7",
         "name": "Claude Opus 4.7",
         "provider": "anthropic",
