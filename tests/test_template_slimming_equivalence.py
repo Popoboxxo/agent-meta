@@ -62,8 +62,10 @@ from scripts.lib.agent_sync import (
     _finalize_agent_content,
     _resolve_sync_targets,
     _should_skip_role,
+    compose_agent,
 )
 from scripts.lib.config import build_variables, load_config
+from scripts.lib.frontmatter import extract_frontmatter_field
 from scripts.lib.log import SyncLog
 from scripts.lib.providers import load_providers_config
 from scripts.lib.roles import resolve_activation_gates
@@ -1214,8 +1216,23 @@ def test_pflichtsaetze_survive(render_env: RenderEnv):
 
 
 def _render_template(path: Path, variables: dict) -> str:
+    """Render one agent template the way the sync pipeline does.
+
+    A template with ``extends:`` is first composed with its base: the
+    ``patches:`` frontmatter is YAML-parsed and its ``content: |`` literal is
+    spliced into the base body, so a ``{{..._BLOCK}}`` placeholder that sits
+    at 6 spaces *inside the YAML* ends up at column 0 of the body. Rendering
+    the raw file text instead would substitute into the frontmatter and
+    measure a state the pipeline never produces.
+
+    No dedent normalization: callers assert on the exact rendered bytes.
+    """
     log = SyncLog()
-    rendered = substitute(path.read_text(encoding="utf-8"), variables, str(path), log)
+    text = path.read_text(encoding="utf-8")
+    extends = extract_frontmatter_field(text, "extends")
+    if extends:
+        text = compose_agent(_REPO_ROOT / "agents" / extends, text, log)
+    rendered = substitute(text, variables, str(path), log)
     return strip_inactive_conditional_blocks(rendered, variables)
 
 
