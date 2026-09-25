@@ -10413,7 +10413,8 @@ async function viewTierPresets() {
     // source of truth used by the Models & Pricing view. The server decides
     // registry vs. models.dev per provider (model-source-preference in
     // project.yaml), so there is no client-side merging of catalogs here.
-    await Promise.all(providerNames.map(async pName => {
+    // This optional enrichment must not gate the mapping table on remote I/O.
+    void Promise.all(providerNames.map(async pName => {
       const pData = providersMap[pName] || {};
       const tierVals = Object.values(pData["model-tiers"] || {}).filter(Boolean);
 
@@ -10422,6 +10423,7 @@ async function viewTierPresets() {
         const res = await api.get(`/api/model-suggestions?provider=${encodeURIComponent(pName)}`);
         suggestions = (res && res.models) || [];
       } catch { suggestions = []; }
+      if (!table.isConnected) return;
 
       const dlId = `tp-dl-${pName.replace(/[^a-zA-Z0-9]/g, "-")}`;
       let dl = document.getElementById(dlId);
@@ -10442,7 +10444,10 @@ async function viewTierPresets() {
           addedIds.add(val);
         }
       });
-    }));
+    })).catch((err) => {
+      // Suggestions are optional datalist enrichment; never block the editor table.
+      console.warn("Tier preset model suggestions unavailable", err);
+    });
 
     const tbody = el("tbody");
     Object.keys(tierPresetsData).forEach(presetId => {
