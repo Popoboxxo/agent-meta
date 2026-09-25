@@ -464,15 +464,12 @@ def role_from_platform_file(filename: str, platforms: list[str]) -> str | None:
             return stem[len(platform) + 1:]
     return None
 
-def _is_role_enabled(role: str, config: dict) -> bool:
-    """Check if a role is enabled based on project config (e.g. systems-engineering flag)."""
-    if role.startswith("se-"):
-        se_config = config.get("systems-engineering") or {}
-        return se_config.get("enabled", True)
-    if role.startswith("knowledge-"):
-        ke_config = config.get("knowledge-engine") or {}
-        return ke_config.get("enabled", False)
-    return True
+def _is_role_enabled(role: str, config: dict, agent_meta_root: Path) -> bool:
+    """Check whether ``role`` passes the canonical activation gates."""
+    from .roles import is_role_enabled, resolve_activation_gates
+
+    gates = resolve_activation_gates(agent_meta_root, config)
+    return is_role_enabled(role, config, gates)
 
 def _split_frontmatter(content: str) -> tuple[str, str]:
     """Split content into (frontmatter_block, body).
