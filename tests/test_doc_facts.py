@@ -84,8 +84,10 @@ from pathlib import Path
 import pytest
 import yaml
 
+from scripts.lib import config as config_lib
 from scripts.lib import doc_facts
 from scripts.lib import roles as roles_lib
+from scripts.lib.consistency import placeholders as placeholders_lib
 from scripts.lib.doc_facts import (
     AGENT_HELPER_PREFIX,
     AGENTS_CAPABILITY,
@@ -1270,6 +1272,118 @@ def test_repo_facts_block_renders_the_stable_scalars(facts):
     for name, value in rendered.items():
         assert value == facts[name], f"{name}: block disagrees with the scalar"
 
+
+# ---------------------------------------------------------------------------
+# W1-6 (IC-11) — the snippet bridge and the DOCS_ placeholder namespace
+# ---------------------------------------------------------------------------
+
+DOCS_SNIPPET_DIR = REPO_ROOT / "snippets" / "docs"
+
+#: IC-11 enumerates exactly six (file stem, variable stem) pairs. Spelled out
+#: here as a literal so a seventh snippet has to be a deliberate spec change.
+IC11_SNIPPETS: tuple[tuple[str, str], ...] = (
+    ("repo-facts", "DOCS_REPO_FACTS"),
+    ("agent-roster", "DOCS_AGENT_ROSTER"),
+    ("pipelines", "DOCS_PIPELINES"),
+    ("hooks", "DOCS_HOOKS"),
+    ("providers", "DOCS_PROVIDERS"),
+    ("tier-presets", "DOCS_TIER_PRESET"),
+)
+
+_DOCS_FRONTMATTER_RE = re.compile(r"\A---\r?\n(?P<fm>.*?)\r?\n---(?:\r?\n|\Z)", re.DOTALL)
+
+
+def _docs_snippet_body(path: Path) -> str:
+    """Re-derive the inlined body from the file, independently of config.py.
+
+    Same contract as ``config.py:_load_block_snippet`` (frontmatter strip, CRLF
+    normalisation, ``strip("\\n")``) but re-stated here, so the assertion does
+    not pass by calling the implementation under test.
+    """
+    text = path.read_text(encoding="utf-8")
+    match = _DOCS_FRONTMATTER_RE.match(text)
+    assert match is not None, f"{path.name} has no YAML frontmatter"
+    return text[match.end():].replace("\r\n", "\n").replace("\r", "\n").strip("\n")
+
+
+def test_docs_snippet_inlining_contract():
+    """AC-25 (IC-11): frontmatter in, frontmatter-free variable out.
+
+    Both halves are proven per snippet: the file on disk carries its own YAML
+    frontmatter, and ``variables[var]`` is that body without the frontmatter,
+    CRLF-normalised and without a leading/trailing newline. ``QUALITY_PIPELINES_BLOCK``
+    is asserted byte-equal to its source file to pin the no-regression half.
+    """
+    variables: dict = {}
+    config_lib._build_snippet_variables(variables, REPO_ROOT)
+
+    for stem, var_stem in IC11_SNIPPETS:
+        path = DOCS_SNIPPET_DIR / f"{stem}.md"
+        var = f"{var_stem}_BLOCK"
+        assert path.is_file(), f"missing snippet {path}"
+        raw = path.read_text(encoding="utf-8")
+        assert raw.startswith("---"), f"{path.name} lost its frontmatter on disk"
+        assert "\n---" in raw, f"{path.name} frontmatter is not terminated"
+        body = _docs_snippet_body(path)
+        assert body, f"{path.name} has an empty body after the frontmatter"
+
+        value = variables[var]
+        assert value == body, f"{var}: inlined value != frontmatter-free body"
+        assert not value.startswith("---"), f"{var} still starts with frontmatter"
+        assert "\r" not in value, f"{var} is not CRLF-normalised"
+        assert value == value.strip("\n"), f"{var} has a leading/trailing newline"
+        for key in ("snippet:", "version:", "language:", "runtime:"):
+            assert key not in value, f"{var} leaked frontmatter key {key!r}"
+        assert f"{{{{{var}}}}}" in body, f"{path.name} does not reference {var}"
+
+    # AC-25, no-regression half: the pre-existing orchestrator block is untouched.
+    quality = (REPO_ROOT / "snippets" / "orchestrator" / "quality-pipelines.md").read_text(
+        encoding="utf-8"
+    )
+    assert variables["QUALITY_PIPELINES_BLOCK"] == quality
+
+    # The bridge is additive: exactly the six files of IC-11 exist, and the DoD
+    # preset block has no snippet target (open gap, fail-soft per IC-01).
+    assert len(sorted(DOCS_SNIPPET_DIR.glob("*.md"))) == 6, sorted(
+        DOCS_SNIPPET_DIR.glob("*.md")
+    )
+    assert not (DOCS_SNIPPET_DIR / "dod-presets.md").exists()
+    assert variables.get("DOCS_DOD_PRESET_BLOCK", "") == ""
+
+    # R12: the docs snippets must not touch the built-in language variables.
+    for name in ("DOCS_LANGUAGE", "INTERNAL_DOCS_LANGUAGE"):
+        assert name not in variables
+        assert name in placeholders_lib._BUILTIN_VARS
+
+
+def test_docs_prefix_registered_in_placeholders():
+    """AC-06 (IC-06): ``^DOCS_`` is a dynamic prefix, so a DOCS_ name is known.
+
+    Asserted three ways: the anchored regex from IC-06 is registered, every
+    block/scalar fact name matches it, and ``check_placeholders`` produces **no**
+    ``placeholders.unknown`` finding for a template using ``{{DOCS_PROVIDERS_BLOCK}}``.
+    The lowercase near-miss keeps the prefix from degrading to a bare ``^DOCS_``.
+    """
+    assert any(p.pattern == r"^DOCS_[A-Z0-9_]+$" for p in placeholders_lib._DYNAMIC_PREFIXES)
+
+    matched = [
+        name for name in IC02_KEYS
+        if any(p.match(name) for p in placeholders_lib._DYNAMIC_PREFIXES)
+    ]
+    assert set(matched) == set(IC02_KEYS), sorted(set(IC02_KEYS) - set(matched))
+    assert not any(p.match("docs_providers_block") for p in placeholders_lib._DYNAMIC_PREFIXES)
+
+    body = "---\nname: doc-fact-consumer\n---\n\n{{DOCS_PROVIDERS_BLOCK}}\n"
+    findings = placeholders_lib.check_placeholders(
+        Path("agents/1-generic/developer.md"), body, REPO_ROOT
+    )
+    assert not [f for f in findings if f.check == "placeholders.unknown"], [
+        (f.check, f.severity, f.message) for f in findings
+    ]
+
+    # DOCS_LANGUAGE stays a built-in (R12) — the prefix does not take it over.
+    assert "DOCS_LANGUAGE" in placeholders_lib._BUILTIN_VARS
+    assert "INTERNAL_DOCS_LANGUAGE" in placeholders_lib._BUILTIN_VARS
 
 
 # --------------------------------------------------------------------------
