@@ -2413,6 +2413,12 @@ def test_v1_sees_the_readme_directory_structure_facts(monkeypatch):
         "premise: the untyped directory-structure fence no longer opens at "
         f"README.md:680, found {lines[679]!r}"
     )
+    assert lines[736:737] == ["```"], (
+        "premise: the directory-structure block no longer closes untyped at "
+        "README.md:737 (a typed fence between :681 and :736 would leave the "
+        "four sites visible but prove less than claimed; README.md has "
+        f"{len(lines)} lines, found {lines[736:737]!r})"
+    )
 
     for lineno, branch, needle in V1_README_DIRECTORY_SITES:
         line = lines[lineno - 1]

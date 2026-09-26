@@ -289,12 +289,13 @@ def _v1_suppressed_lines(text: str) -> set[int]:
     carry no number.
 
     Rule 3 is narrowed to **typed** fences (K16 / B-4 / E-14, §5.1.1). An
-    opening fence **without** an info string is not a code block in the
-    CommonMark sense — it is an untyped literal block — and in the entry
-    documents it is exactly where the hand-maintained inventory lives: the
-    ``README.md`` directory structure opens untyped at ``:680``, closes at
-    ``:737`` and carries the IC-05 sites F2 (``:688``), F3-Site-2 (``:690``)
-    and F4 (``:734``). Suppressing it made rule 3 incompatible with IC-05.
+    opening fence **without** an info string is a fenced code block just like
+    every other one — it only declares no language — so V1 scans its content as
+    a literal transcript. In the entry documents that is exactly where the
+    hand-maintained inventory lives: the ``README.md`` directory structure
+    opens untyped at ``:680``, closes at ``:737`` and carries the IC-05 sites
+    F2 (``:688``), F3-Site-2 (``:690``) and F4 (``:734``). Suppressing it made
+    rule 3 incompatible with IC-05.
 
     The narrowing is keyed on the Markdown info string only — no language
     allowlist, no path or section heuristic, no per-line number rule — so it

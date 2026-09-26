@@ -1685,9 +1685,10 @@ Schritt darf W3-4 `checks.strict: true` nicht setzen** (Vorbedingung, siehe Task
 > (Commit) abgeschlossen.** Der Absatz oben bleibt unverändert Historie; additiv folgt der Stand
 > nach der Korrektur.
 > **Gewählter Mechanismus: Suppressionsregel 3 unterdrückt nur noch Fences *mit*
-> Info-String** (Sprachangabe) — ein öffnender Fence **ohne** Info-String ist laut CommonMark kein
-> Code-Block, sondern ein untypisierter Literal-Block, und genau dort steht in den Einstiegsdokumenten
-> das handgepflegte Inventar. Umsetzung: `_v1_suppressed_lines` (`scripts/lib/consistency/docs.py`)
+> Info-String** (Sprachangabe) — ein Fence **ohne** Info-String ist zwar ebenfalls ein fenced
+> code block, declares aber **keine** Sprache; V1 durchsucht seinen Inhalt als
+> Literal-Transkript, und genau dort steht in den Einstiegsdokumenten das handgepflegte
+> Inventar. Umsetzung: `_v1_suppressed_lines` (`scripts/lib/consistency/docs.py`)
 > merkt sich je Fence `fence_suppresses = bool(line[opening.end():].strip())`; die
 > Fence-Zustandsmaschine läuft **unverändert** weiter, ein untypisierter Block wird also weiterhin
 > verfolgt (sonst würde sein schließendes ```` ``` ```` als öffnender Fence gelesen und Regel 3
