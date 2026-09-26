@@ -410,3 +410,191 @@ def check_no_manual_counts(root: Path, config: dict | None = None) -> list[Findi
                         f"{versions[0][2]!r} on a 'version' line",
                     ))
     return findings
+
+
+
+V3_CHECK_ID = "docs.internal_links"
+
+V3_SUGGESTION = "Point the reference at a path that exists, or drop it."
+
+#: Entry documents (also the only place a layout block is read, see below).
+V3_ENTRY_RELPATHS: tuple[str, ...] = ("README.md", "llms.txt")
+V3_DOCS_RELDIR = "docs"
+V3_DOC_SUFFIXES: tuple[str, ...] = (".md", ".markdown", ".txt")
+
+#: R6 — a target carrying one of these is never resolved.
+V3_INERT_PREFIXES = ("http://", "https://", "mailto:", "tel:", "ftp://",
+                     "data:", "//", "/", "#")
+
+V3_INERT_CHARS = ("<", ">", "{", "}", "*", " ", "\\")
+V3_INLINE_LINK_RE = re.compile(r"\]\(\s*(?P<target>[^()\s]+)(?:\s+[^()]*)?\)")
+
+V3_REFERENCE_DEF_RE = re.compile(
+    r"^[ ]{0,3}\[[^\]]+\]:[ \t]*(?P<target>\S+)[ \t]*$")
+V3_HTML_HREF_RE = re.compile(
+    r"<a\b[^>]*\bhref=[\"'](?P<target>[^\"']+)[\"']", re.IGNORECASE)
+V3_FENCE_OPEN_RE = re.compile(r"^[ ]{0,3}(?P<fence>`{3,}|~{3,})")
+V3_CODE_SPAN_RE = re.compile(r"(?P<ticks>`+)(?:(?!(?P=ticks)).)*(?P=ticks)")
+V3_LAYOUT_ENTRY_RE = re.compile(
+    r"^(?P<indent>[ \t]*)(?P<name>[A-Za-z0-9._@+-]+/)[ \t]*(?:#.*)?$")
+
+
+def _v3_finding(severity: Severity, relpath: str, lineno: int, branch: str,
+                message: str) -> Finding:
+    """Build a V3 ``Finding`` — the two instance attributes, exactly as V1 does.
+
+    ``Finding`` (``report.py``) has neither field and that module is not owned
+    by W2-2, so both are set on the instance, as V1 does. W2-7 owns the runner
+    registration and should promote them to dataclass fields.
+    """
+    finding = Finding(
+        severity=severity, check=V3_CHECK_ID, file=relpath, message=message,
+        suggestion=V3_SUGGESTION,
+    )
+    finding.line = lineno
+    finding.branch = branch
+    return finding
+
+
+def _v3_scan_relpaths(root: Path) -> list[str]:
+    """Every document V3 reads: entry documents plus ``docs/**`` (IC-05)."""
+    relpaths = [rel for rel in V3_ENTRY_RELPATHS if (root / rel).is_file()]
+    docs_dir = root / V3_DOCS_RELDIR
+    if docs_dir.is_dir():
+        relpaths += [p.relative_to(root).as_posix() for p in docs_dir.rglob("*")
+                     if p.is_file() and p.suffix in V3_DOC_SUFFIXES]
+    return sorted(set(relpaths))
+
+
+def _v3_scanned_lines(text: str) -> list[tuple[int, str, int | None]]:
+    """``(lineno, line, block)`` per line; ``block`` is its fence, ``None`` in
+    prose — the split the two extractors need: a link is a claim in prose, a
+    layout entry is a claim inside a fenced block."""
+    scanned: list[tuple[int, str, int | None]] = []
+    fence: str | None = None
+    block = 0
+    for lineno, line in enumerate(text.splitlines(), start=1):
+        opening = V3_FENCE_OPEN_RE.match(line)
+        if fence is not None:
+            if (opening is not None
+                    and opening.group("fence")[0] == fence[0]
+                    and len(opening.group("fence")) >= len(fence)
+                    and not line[opening.end():].strip()):
+                fence = None
+            scanned.append((lineno, line, block))
+            continue
+        if opening is not None:
+            fence, block = opening.group("fence"), block + 1
+            scanned.append((lineno, line, block))
+            continue
+        scanned.append((lineno, line, None))
+    return scanned
+
+
+def _v3_link_targets(line: str) -> list[str]:
+    """Link targets of a prose line: inline links, reference defs, ``href``."""
+    targets = [m.group("target") for m in V3_INLINE_LINK_RE.finditer(line)]
+    targets += [m.group("target") for m in V3_HTML_HREF_RE.finditer(line)]
+    reference = V3_REFERENCE_DEF_RE.match(line)
+    return targets + ([reference.group("target")] if reference else [])
+
+
+def _v3_resolve(root: Path, doc: Path, target: str) -> Path | None:
+    """The repository-internal path a target claims, else ``None``.
+
+    R6 draws the boundary: a scheme, a site-root-absolute path, an anchor-only
+    target, a placeholder (``{{…}}``, ``<file>``) and a target that climbs out of
+    the repository are never resolved. ``page.md#section`` drops the anchor.
+    """
+    if (not target or any(target.startswith(p) for p in V3_INERT_PREFIXES)
+            or any(char in target for char in V3_INERT_CHARS)):
+        return None
+    base = target.split("#", 1)[0].split("?", 1)[0]
+    if not base:
+        return None
+    resolved = (doc.parent / base).resolve()
+    try:
+        resolved.relative_to(root.resolve())
+    except ValueError:
+        return None
+    return resolved
+
+
+def _v3_layout_entries(scanned: list[tuple[int, str, int | None]]) -> list[tuple[int, str]]:
+    """Directory entries of documented layout blocks, composed by indentation.
+
+    Only a line whose entire content is ``name/`` plus an optional ``#`` comment
+    counts, which keeps prose and command lines out. A deeper entry composes onto
+    the closest shallower one — ``howto/`` then ``setup/`` becomes the claim
+    ``howto/setup/`` — and the stack resets per fence, so a block never inherits
+    the parent of an earlier one.
+    """
+    entries: list[tuple[int, str]] = []
+    stack: list[tuple[int, str]] = []
+    current: int | None = None
+    for lineno, line, block in scanned:
+        match = V3_LAYOUT_ENTRY_RE.match(line) if block is not None else None
+        if match is None:
+            if block != current:
+                stack.clear()
+                current = block
+            continue
+        indent = len(match.group("indent").expandtabs(4))
+        while stack and stack[-1][0] >= indent:
+            stack.pop()
+        name = match.group("name")
+        composed = (stack[-1][1] if stack else "") + name
+        stack.append((indent, composed))
+        current = block
+        entries.append((lineno, composed))
+    return entries
+
+
+def check_internal_links(root: Path, config: dict | None = None) -> list[Finding]:
+    """V3: documented relative repository paths that do not exist (AC-09, R6).
+
+    Two claim forms, and both are needed for AC-09: a Markdown or HTML link
+    target in the prose of any in-scope file (branch ``"link"``) and a directory
+    entry of a documented layout block (branch ``"layout"``). ``README.md``
+    carries the repository map and claims ``howto/setup/`` and
+    ``howto/features/`` at ``:721-723``; neither exists.
+
+    The layout form is read **only** in the entry documents: a bare directory
+    entry inside ``docs/**`` illustrates a *consumer* project (``Zielprojekt/``,
+    ``agent-meta/`` as a submodule checkout, ``src/backend/``) and is
+    lexically indistinguishable from a claim about this repository — of 70
+    documented entries here, all 20 unverifiable ones in ``docs/**`` are
+    illustrations.
+
+    ``config`` is accepted for the runner's uniform call signature; V3 reads no
+    key and has one severity (ERROR, IC-05). The common gate and the
+    registration are W2-7's — until then this is a no-op (AC-38).
+    """
+    findings: list[Finding] = []
+    for relpath in _v3_scan_relpaths(root):
+        path = root / relpath
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        scanned = _v3_scanned_lines(text)
+        for lineno, line, block in scanned:
+            if block is not None:
+                continue
+            prose = V3_CODE_SPAN_RE.sub(lambda m: " " * len(m.group(0)), line)
+            for target in _v3_link_targets(prose):
+                resolved = _v3_resolve(root, path, target)
+                if resolved is None or resolved.exists():
+                    continue
+                findings.append(_v3_finding(
+                    Severity.ERROR, relpath, lineno, "link",
+                    f"line {lineno}: link target {target!r} does not exist"))
+        if relpath not in V3_ENTRY_RELPATHS:
+            continue
+        for lineno, composed in _v3_layout_entries(scanned):
+            if (root / composed).exists():
+                continue
+            findings.append(_v3_finding(
+                Severity.ERROR, relpath, lineno, "layout",
+                f"line {lineno}: directory {composed!r} does not exist"))
+    return findings

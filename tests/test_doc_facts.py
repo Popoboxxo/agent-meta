@@ -2562,3 +2562,224 @@ def test_existing_docs_checks_keep_signature_and_severity(tmp_path):
     assert [(f.check, f.severity) for f in index] == [
         ("docs.readme_index", docs_lib.Severity.ERROR)
     ], index
+
+
+# --- W2-2: V3 ``check_internal_links`` (AC-09, IC-05, R6) ---------------------
+#
+# V3 answers one question: does a documented *relative* repository path exist?
+# Two claim forms are recognised, and the pair is what makes AC-09 decidable:
+#
+# ``link``   — a Markdown/HTML link target (``[t](p)``, ``[t]: p``,
+#              ``href="p"``) in the prose of any in-scope file. These are the
+#              classical link forms.
+# ``layout`` — a *directory* entry of a documented repository layout block: a
+#              line whose only content is ``name/`` plus an optional ``#``
+#              comment, nested by indentation. ``README.md`` claims
+#              ``howto/setup/`` and ``howto/features/`` at ``:721-723``;
+#              neither exists, which is what AC-09 pins.
+#
+# R6 makes the exclusions first-class, so each of them gets its own negative
+# case: ``http(s)://``, ``mailto:`` and ``#anchor`` are never resolved. A
+# target with a scheme is inert even when its path does not exist locally.
+
+
+V3_DEAD_LAYOUT_SITES = ((722, "howto/setup/"), (723, "howto/features/"))
+
+V3_INERT_LINK_CASES = (
+    ("https", "[ext](https://example.invalid/missing/page.md)"),
+    ("http", "[ext](http://example.invalid/missing/page.md)"),
+    ("mailto", "[mail](mailto:nobody@example.invalid)"),
+    ("anchor", "[jump](#kein-solcher-anker)"),
+    ("anchor-on-existing-doc", "[jump](../api/cli-reference.md#kein-solcher-anker)"),
+)
+
+
+def test_v3_flags_dead_howto_links():
+    """AC-09: ``README.md:721-723`` yields ERROR findings with ``file="README.md"``.
+
+    Run against the real, unmarked ``README.md`` — this task does not touch the
+    document, so the premise guards carry the weight: the directory map must
+    still claim the two missing directories, the surviving sibling
+    (``howto/configs/``) must still exist, and ``:724`` must not be reported.
+    Without the sibling the test could pass because V3 flags *every* entry of
+    that fence, which would be a different (and wrong) defect.
+    """
+    readme_lines = (REPO_ROOT / "README.md").read_text(encoding="utf-8").splitlines()
+    for lineno, composed in V3_DEAD_LAYOUT_SITES:
+        entry = composed.rsplit("/", 1)[1]
+        assert entry in readme_lines[lineno - 1], (
+            f"premise: README.md:{lineno} no longer documents {composed!r}, "
+            f"found {readme_lines[lineno - 1]!r}"
+        )
+        assert "agent-meta:docs-" not in readme_lines[lineno - 1], (
+            f"premise: README.md:{lineno} is marked — the AC-09 sites must stay "
+            "unmarked for this proof to be about the dead directory"
+        )
+        assert not (REPO_ROOT / composed).exists(), (
+            f"premise: {composed!r} exists again — W8-2 has already fixed it"
+        )
+    assert (REPO_ROOT / "howto" / "configs").is_dir(), (
+        "premise: the surviving sibling directory is gone"
+    )
+
+    findings = docs_lib.check_internal_links(REPO_ROOT)
+    in_readme = [f for f in findings if f.file == "README.md"]
+
+    assert in_readme, "AC-09: the dead howto/ layout claims produced no finding"
+    for finding in findings:
+        assert finding.check == "docs.internal_links"
+        assert finding.severity == docs_lib.Severity.ERROR
+    assert {lineno for lineno, _ in V3_DEAD_LAYOUT_SITES} <= {f.line for f in in_readme}, (
+        "AC-09: the finding no longer points at the layout lines, got "
+        f"{[(f.line, f.message) for f in in_readme]}"
+    )
+    for finding in in_readme:
+        assert finding.branch == "layout"
+        assert str(finding.line) in finding.message, (
+            "the console report has no line column — the number belongs in the "
+            "message until Finding grows a line field"
+        )
+    assert not [f for f in in_readme if f.line == 724], (
+        "howto/configs/ exists — flagging it would be a false positive"
+    )
+
+
+def test_v3_flags_a_dead_relative_link(tmp_path):
+    """The classical form: a Markdown link whose relative target is missing.
+
+    Every pin in one assertion, because this is the fixture the R6 negatives
+    are measured against: ERROR, ``docs.internal_links``, the *document* as
+    ``file``, branch ``link``.
+    """
+    root = _v1_tree(tmp_path, "docs/guides/page.md",
+                    "[a](present.md) [b](missing/page.md)\n")
+    _v1_tree(root, "docs/guides/present.md", "# present\n")
+
+    findings = docs_lib.check_internal_links(root)
+
+    assert [(f.check, f.severity, f.file, f.branch, f.line) for f in findings] == [
+        ("docs.internal_links", docs_lib.Severity.ERROR,
+         "docs/guides/page.md", "link", 1)
+    ], findings
+    assert "missing/page.md" in findings[0].message
+
+
+@pytest.mark.parametrize(
+    ("link",),
+    [(text,) for _case_id, text in V3_INERT_LINK_CASES],
+    ids=[case_id for case_id, _text in V3_INERT_LINK_CASES],
+)
+def test_v3_ignores_external_and_anchor_links(tmp_path, link):
+    """R6: ``http(s)://``, ``mailto:`` and ``#anchor`` are not resolved.
+
+    Each case is a target that does **not** exist — or, for the last one, a
+    document that exists with an anchor in it that does not — so a check that
+    resolved them anyway would report it. The control on the same tree — a dead
+    relative link in the same file, same directory — is what stops this test
+    from passing vacuously.
+    """
+    root = _v1_tree(tmp_path, "README.md", f"{link}\n")
+    _v1_tree(root, "docs/guides/page.md",
+             f"{link}\n[dead](missing/page.md)\n")
+    _v1_tree(root, "docs/api/cli-reference.md", "# cli\n")
+
+    findings = docs_lib.check_internal_links(root)
+
+    assert [(f.file, f.line) for f in findings] == [
+        ("docs/guides/page.md", 2)
+    ], f"{link!r} must not be resolved, got {findings}"
+
+
+def test_v3_resolves_targets_relative_to_the_document(tmp_path):
+    """Standard Markdown resolution: against the *document*, not the repo root.
+
+    ``../../scripts/sync.py`` exists in the repository but not below
+    ``docs/guides/``, so a repo-root-relative implementation would report it;
+    the dead sibling on the very same line is the control that the check is
+    still able to fire.
+    """
+    root = _v1_tree(tmp_path, "docs/guides/page.md",
+                    "[a](../../scripts/sync.py) [b](missing/page.md)\n")
+    _v1_tree(root, "scripts/sync.py", "# sync\n")
+
+    findings = docs_lib.check_internal_links(root)
+
+    assert [f.message for f in findings] == [
+        "line 1: link target 'missing/page.md' does not exist",
+    ], findings
+
+
+def test_v3_ignores_links_in_code_spans_and_fences(tmp_path):
+    """A link shown as an example is not a link this repository makes.
+
+    Inline code spans and fenced code blocks carry *illustrations* — badge
+    markup, a snippet from another repository. Resolving them is the
+    false-positive class R6 names, so both forms are blanked out before
+    extraction; the dead relative link after them is the control.
+    """
+    root = _v1_tree(tmp_path, "docs/guides/page.md", (
+        "`[x](missing/inline.md)`\n"
+        "```markdown\n"
+        "[y](missing/fenced.md)\n"
+        "```\n"
+        "[dead](missing/live.md)\n"
+    ))
+
+    findings = docs_lib.check_internal_links(root)
+
+    assert [f.message for f in findings] == [
+        "line 5: link target 'missing/live.md' does not exist",
+    ], findings
+
+
+def test_v3_layout_claims_are_scoped_to_the_entry_documents(tmp_path):
+    """The layout extractor is deliberately asymmetric — pinned on both sides.
+
+    A bare directory entry means "this repository has this directory" only in
+    the entry documents, which carry the repository map. The same line inside
+    ``docs/**`` is a consumer-project illustration (``Zielprojekt/``,
+    ``agent-meta/`` as a submodule checkout, ``src/backend/``) and is lexically
+    indistinguishable, so V3 does not treat it as a claim about this
+    repository. The README case on the same tree is the control: the extractor
+    itself still works.
+    """
+    _v1_tree(tmp_path, "docs/guides/setup.md",
+             "```\nZielprojekt/\n  src/\n  backend/\n```\n")
+    _v1_tree(tmp_path, "README.md", "```\nhowto/\n  kaputt/\n```\n")
+    (tmp_path / "howto").mkdir()
+
+    findings = docs_lib.check_internal_links(tmp_path)
+
+    assert [(f.file, f.branch, f.line) for f in findings] == [
+        ("README.md", "layout", 3)
+    ], findings
+    assert "howto/kaputt/" in findings[0].message
+
+
+def test_v3_ignores_targets_outside_the_repository(tmp_path):
+    """``../../`` may not climb out of the repository — that is no internal link.
+
+    The control resolves a ``../`` target that *is* inside the root and is
+    missing, so the guard cannot pass by suppressing every ``../`` target.
+    """
+    (tmp_path / "outside.md").write_text("# outside\n", encoding="utf-8")
+    repo = _v1_tree(tmp_path / "repo", "docs/page.md", "[x](../../outside.md)\n")
+
+    assert docs_lib.check_internal_links(repo) == []
+
+    _v1_tree(tmp_path, "docs/page.md", "[x](../missing/page.md)\n")
+    findings = docs_lib.check_internal_links(tmp_path)
+    assert [f.file for f in findings] == ["docs/page.md"], findings
+
+
+def test_v3_is_not_wired_into_the_runner_yet():
+    """AC-38: V3 is a no-op in every scenario until W2-7 registers it.
+
+    Same argument as the V1 pin: the common gate
+    (``docs-consolidation.enabled``) and the registration in ``run_checks()``
+    are W2-7's task, so scenarios 50-56 cannot regress from W2-2 either.
+    """
+    runner = (REPO_ROOT / "scripts" / "consistency-check.py").read_text(encoding="utf-8")
+    assert "check_internal_links" not in runner, (
+        "W2-2 must not register the check — registration is W2-7"
+    )
