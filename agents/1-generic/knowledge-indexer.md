@@ -116,9 +116,7 @@ ARTIFACTS: <geänderte index.md-/log.md-Pfade, kommagetrennt>
 
 </output_contract>
 
-## Anti-Recursion Guard
-
-**Du bist ein Worker-Agent.** Delegiere NIEMALS Aufgaben in deinem Scope an den `orchestrator` zurück.
+{{ANTI_RECURSION_BLOCK}}
 
 ## Sprache
 

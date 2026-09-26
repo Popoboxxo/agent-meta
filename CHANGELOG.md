@@ -2,6 +2,43 @@
 
 ## [Unreleased]
 
+### Added
+- **Capability-gated intent-routing mandate (#264)**: `route_intent` is only mandated
+  in the orchestrator's §3 when the harness registers it as a callable tool
+  (`route_intent_tool` in `config/provider-capabilities.yaml`); otherwise the
+  orchestrator derives the route from the generated routing rules and must not invent
+  a tool call. All 9 providers ship explicit `route_intent_tool: false` (conservative;
+  a live `route_intent` acceptance proof is required to flip one to `true`), so no
+  runtime blocks on an unregistered tool.
+
+### Changed
+- **Role activation is gate-driven for `validator` and the developer tiers (consumer-visible —
+  audit your `project.yaml` before upgrading)**: the per-role activation decision now resolves
+  from the single `activation_groups` default table in `config/role-defaults.yaml` instead of the
+  historic name-prefix heuristic. Two defaults are off unless the project opts in:
+  - `validator` is gated by `roles_membership: any [validator]`. A project whose `project.yaml`
+    has **no** `roles:` list (the key is optional in `config/project-config.schema.json`) used to
+    get a generated `validator.md` anyway — every role outside the `se-`/`knowledge-` prefixes was
+    unconditionally enabled. It is no longer generated unless `validator` is listed.
+  - `principal-developer` is now a member of the `developer_tiers` group
+    (`role_patterns: [junior-developer, senior-developer, principal-developer]`). The membership
+    change is routing-side; it also reaches the **generation** path, so a project listing
+    `principal-developer` without `junior-developer` and `senior-developer` (the `mode: all`
+    predicate) loses the generated file.
+  No project.yaml change is required for projects that already list their roles explicitly;
+  run `sync.py --validate` after upgrading to see which roles the gates drop.
+- **Multi-line `variables:` values now keep the indentation of their use site (consumer-visible
+  only if you set multi-line values)**: a multi-line value substituted at an *indented*
+  placeholder is emitted with every content line carrying the placeholder's indentation —
+  previously only the first line did. The affected production placeholders are
+  `EXTRA_VOLUMES` / `EXTRA_ENV_VARS` / `EXTRA_VOLUME_DEFINITIONS` in
+  `agents/2-platform/sharkord-docker.md` and `GH_ASSETS` in
+  `agents/2-platform/sharkord-release.md` (both files have no `extends:`, so their body is
+  not YAML-dedented before substitution). For docker-compose list items and shell line
+  continuations this is a correction; blank lines stay blank, so no trailing whitespace is
+  emitted. Single-line values and column-0 / inline placeholders are unchanged — the default
+  render stays byte-identical.
+
 ## [1.2.0-beta.2] - 2026-09-13
 
 ### Added

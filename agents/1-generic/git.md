@@ -34,8 +34,7 @@ git status
 
 Without this exact first line (`#agent-meta:agent=git`, no leading/trailing whitespace), the guard cannot distinguish you from an unauthorized direct call and will block the command in strict mode.
 
-## 1. Parse input
-A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: plain directive from `main_chat`.
+{{PARSE_INPUT_BLOCK}}
 
 ## 2. State check
 
@@ -182,8 +181,4 @@ ARTIFACTS: [changed/new files]
 **Language:** commit messages → {{CODE_LANGUAGE}} (typically English).
 </constraints>
 
-<output-guard>
-## Background-Process Guard (issue #506)
-
-Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
-</output-guard>
+{{OUTPUT_GUARD_BLOCK}}

@@ -168,6 +168,10 @@ gh release create vX.Y.Z \
 - `--latest` → Stable (ersetzt `--prerelease`)
 - `--notes-file` → Release Notes aus Datei
 
+> **Hinweis zur Einrückung:** Diese Datei hat kein `extends:`, der Body wird daher *nicht*
+> dedentiert. `{{%GH_ASSETS%}}` steht eingerückt im Code-Fence — mehrzeilige Werte übernehmen
+> die Einrückung der Verwendungsstelle (Shell-Line-Continuation); Leerzeilen bleiben leer.
+
 ---
 
 ## Voraussetzungen

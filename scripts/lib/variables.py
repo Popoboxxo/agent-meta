@@ -55,6 +55,51 @@ _BOOLEAN_SUBAGENT_PERMISSION_FLAGS: frozenset[str] = frozenset({
 # substitution core, issue #476).
 _VAR_PATTERN = re.compile(r"\{\{([A-Z0-9_]+)\}\}")
 
+_LINE_LEADING_WS_RE = re.compile(r"^[ \t]*\Z")
+
+
+def _placeholder_line_indent(match: "re.Match[str]") -> str:
+    """Return the indentation of the line the placeholder sits on.
+
+    Returns ``""`` unless the placeholder starts its own line, i.e. unless
+    everything between the start of its line and the match is whitespace. An
+    inline placeholder inside a sentence (``prefix {{VAR}}``) has no line
+    indentation of its own and is never re-indented.
+    """
+    line_start = match.string.rfind("\n", 0, match.start()) + 1
+    prefix = match.string[line_start:match.start()]
+    return prefix if _LINE_LEADING_WS_RE.match(prefix) else ""
+
+
+def _reindent_to_placeholder(match: "re.Match[str]", value: str) -> str:
+    """Re-indent the continuation lines of a multi-line value.
+
+    A block value (``{{SOME_BLOCK}}``) whose placeholder is indented at the
+    use site — a YAML literal block, a nested list item — must keep that
+    indentation on *every* content line, otherwise the first line is indented
+    and the rest lands on column 0. Single-line values and column-0
+    placeholders are returned unchanged, so this is a no-op for the normal
+    (column-0) case.
+
+    Blank lines are exempt: indenting them would emit whitespace-only lines
+    that trip ``git diff --check`` and trailing-whitespace hooks in consumer
+    projects. A value's own whitespace is never altered — only non-blank
+    continuation lines receive the use-site indentation.
+
+    Only continuation lines are touched. The first line is emitted verbatim
+    because ``re.sub`` replaces the placeholder text only — the indentation
+    that precedes it in the template is still in place for that line.
+    """
+    if "\n" not in value:
+        return value
+    indent = _placeholder_line_indent(match)
+    if not indent:
+        return value
+    first, *rest = value.split("\n")
+    return "\n".join(
+        [first] + [indent + line if line.strip() else line for line in rest]
+    )
+
 
 def _resolve_orch_mode(orch_config: dict, provider_override: dict | None = None) -> str:
     """Compute the effective orchestrator mode ('strict'|'advisory'|'main-chat').
@@ -252,7 +297,7 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
     """
     conditional_vars = {k for k in variables if (k.startswith("DOD_") or k in ("SE_ENABLED", "VALIDATOR_ENABLED", "QUALITY_PIPELINES_ENABLED", "DEVELOPER_TIERS_ENABLED", "EFFORT_ESTIMATOR_ENABLED", "WEB_PROJECT_ENABLED", "KNOWLEDGE_ENGINE_ENABLED")) and k != "DOD_PRESET"}
     conditional_vars.update({k for k in variables if k.startswith("PIPELINE_") and k.endswith("_ENABLED")})
-    conditional_vars.update({k for k in variables if k in ("ORCHESTRATOR_ENABLED", "ORCHESTRATOR_STRICT", "DIRECT_DISPATCH_ENABLED", "UNKNOWN_FALLBACK_ASK_USER", "UNKNOWN_FALLBACK_META_FEEDBACK", "UNKNOWN_FALLBACK_MAIN_CHAT", "A2A_PROTOCOL_ENABLED", "ORCHESTRATOR_OUTCOME_CACHING", "CHECKPOINTING_ENABLED", "NATIVE_EXTENSIONS_ENABLED", "NATIVE_EXTENSIONS_WHITELIST_ACTIVE", "ANALYSIS_ENABLED", "FILE_BASED_AGENTS", "AUTO_COMMIT_ENABLED", "PROGRESS_CHAT_PUSH_ENABLED", "SPEC_PLAN_WORKFLOW_ENABLED")})
+    conditional_vars.update({k for k in variables if k in ("ORCHESTRATOR_ENABLED", "ORCHESTRATOR_STRICT", "DIRECT_DISPATCH_ENABLED", "UNKNOWN_FALLBACK_ASK_USER", "UNKNOWN_FALLBACK_META_FEEDBACK", "UNKNOWN_FALLBACK_MAIN_CHAT", "A2A_PROTOCOL_ENABLED", "ORCHESTRATOR_OUTCOME_CACHING", "CHECKPOINTING_ENABLED", "NATIVE_EXTENSIONS_ENABLED", "NATIVE_EXTENSIONS_WHITELIST_ACTIVE", "ANALYSIS_ENABLED", "FILE_BASED_AGENTS", "AUTO_COMMIT_ENABLED", "PROGRESS_CHAT_PUSH_ENABLED", "SPEC_PLAN_WORKFLOW_ENABLED", "ROUTE_INTENT_CALLABLE")})
     # IC-05: mutually-exclusive runtime-gate tiers are strippable conditionals.
     conditional_vars.update({"GATE_ENFORCED", "GATE_PARTIAL", "GATE_ADVISORY", "GATE_NEUTRAL"})
     conditional_vars.update({k for k in variables if k.startswith("ORCH_MODE_")})
@@ -363,6 +408,11 @@ def substitute(
 
     Escape syntax: {{%VAR%}} renders as {{VAR}} without substitution (for literal docs).
 
+    A multi-line value is re-indented to the line indentation of its
+    placeholder (``_reindent_to_placeholder``), so a ``{{..._BLOCK}}``
+    placeholder nested in a YAML literal block or a list item keeps that
+    indentation on every line.
+
     The replacement pass delegates to the shared escape-safe substitution
     core (scripts/lib/substitution.py, issue #476) — function replacement
     keeps values verbatim, never interpreting backslashes or $-group
@@ -408,7 +458,9 @@ def substitute(
             log.warn(f"Variable {key} not in config — placeholder remains in: {source_label}")
         return matched
 
-    text = substitute_placeholders(text, _VAR_PATTERN, lookup, keep)
+    text = substitute_placeholders(
+        text, _VAR_PATTERN, lookup, keep, _reindent_to_placeholder
+    )
 
     # Third pass: restore escaped literals as {{VAR}} (no substitution happened)
     for i, name in enumerate(escaped):

@@ -23,9 +23,7 @@ You are the **Code Reviewer** for {{PROJECT_NAME}}. Gatekeeper for code health, 
 </persona>
 
 <workflow>
-## 1. Parse input
-
-A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: plain directive from `main_chat`.
+{{PARSE_INPUT_BLOCK}}
 
 ## 2. Quick review (single file)
 

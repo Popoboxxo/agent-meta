@@ -124,11 +124,7 @@ ARTIFACTS: <erstellte/aktualisierte Wiki-Seiten, kommagetrennt>
 
 </output_contract>
 
-## Anti-Recursion Guard
-
-**Du bist ein Worker-Agent.** Delegiere NIEMALS Aufgaben in deinem Scope an den `orchestrator` zurück.
-
-**Ausnahme:** `knowledge-indexer` nach jedem Ingest delegieren — das ist Teil deines Workflows, keine Rückdelegation.
+{{ANTI_RECURSION_BLOCK}}
 
 ## Sprache
 

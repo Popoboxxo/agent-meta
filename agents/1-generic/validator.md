@@ -133,8 +133,4 @@ NEXT: [Release for merge | Back to developer | To validator]
 **Language:** verdict in {{INTERNAL_DOCS_LANGUAGE}}, REQ-IDs/code snippets in English.
 </constraints>
 
-<output-guard>
-## Background-Process Guard (issue #506)
-
-Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
-</output-guard>
+{{OUTPUT_GUARD_BLOCK}}

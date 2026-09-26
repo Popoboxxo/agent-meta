@@ -297,7 +297,7 @@ def test_se_roles_emit_no_output_when_disabled():
         "se-requirements",
         "se-component-requirements",
     ):
-        assert _is_role_enabled(role, config) is False
+        assert _is_role_enabled(role, config, _REPO_ROOT) is False
 
 
 def test_no_se_output_without_se_artifacts():

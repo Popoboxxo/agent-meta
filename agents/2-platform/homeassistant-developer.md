@@ -47,8 +47,7 @@ patches:
     anchor: "<workflow>"
     content: |
       <workflow>
-      ## 1. Parse input
-      A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: plain directive from `main_chat`.
+      {{PARSE_INPUT_BLOCK}}
 
       2. **REQ check:** {{DOD_REQ_BLOCK}}
       3. **Scope:** identify the minimal change — only what the task requires.

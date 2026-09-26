@@ -11,9 +11,12 @@ _DEVELOPER = _REPO_ROOT / "agents" / "1-generic" / "developer.md"
 def test_developer_references_auto_commit_block():
     content = _DEVELOPER.read_text(encoding="utf-8")
     assert "{{#if AUTO_COMMIT_ENABLED}}" in content
+    assert "{{OUTPUT_GUARD_BLOCK}}" in content
     assert "{{AUTO_COMMIT_BLOCK}}" in content
     assert "{{/if}}" in content
     # Appended at/near the end of the file, after the existing
     # <output-guard> block (issue #506 precedent) -- not spliced into the
     # middle of <workflow>/<persona>.
-    assert content.rindex("{{#if AUTO_COMMIT_ENABLED}}") > content.rindex("<output-guard>")
+    assert content.rindex("{{AUTO_COMMIT_BLOCK}}") > content.rindex(
+        "{{OUTPUT_GUARD_BLOCK}}"
+    )

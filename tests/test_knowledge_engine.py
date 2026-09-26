@@ -82,30 +82,34 @@ from scripts.lib.frontmatter import _is_role_enabled
 
 def test_knowledge_role_enabled_when_config_true():
     config = {"knowledge-engine": {"enabled": True}}
-    assert _is_role_enabled("knowledge-curator", config) is True
+    assert _is_role_enabled("knowledge-curator", config, _AGENT_META_ROOT) is True
 
 
 def test_knowledge_role_disabled_when_config_false():
     config = {"knowledge-engine": {"enabled": False}}
-    assert _is_role_enabled("knowledge-curator", config) is False
+    assert _is_role_enabled("knowledge-curator", config, _AGENT_META_ROOT) is False
 
 
 def test_knowledge_role_disabled_when_config_missing():
-    assert _is_role_enabled("knowledge-curator", {}) is False
+    assert _is_role_enabled("knowledge-curator", {}, _AGENT_META_ROOT) is False
 
 
 def test_knowledge_role_disabled_when_block_present_but_empty():
-    assert _is_role_enabled("knowledge-curator", {"knowledge-engine": {}}) is False
+    assert _is_role_enabled(
+        "knowledge-curator", {"knowledge-engine": {}}, _AGENT_META_ROOT
+    ) is False
 
 
-def test_se_role_still_defaults_to_enabled_unaffected():
-    """Regression: existing se- behavior must not change."""
-    assert _is_role_enabled("se-architect", {}) is True
+def test_se_role_defaults_to_disabled_from_activation_group():
+    """SE follows activation_groups.se.default: false when config is absent."""
+    assert _is_role_enabled("se-architect", {}, _AGENT_META_ROOT) is False
 
 
 def test_non_prefixed_role_always_enabled():
     """Regression: roles without se-/knowledge- prefix are unaffected."""
-    assert _is_role_enabled("developer", {"knowledge-engine": {"enabled": False}}) is True
+    assert _is_role_enabled(
+        "developer", {"knowledge-engine": {"enabled": False}}, _AGENT_META_ROOT
+    ) is True
 
 
 # ---------------------------------------------------------------------------
@@ -237,7 +241,11 @@ def test_delegation_table_omits_knowledge_roles_when_disabled():
 
 def test_delegation_table_includes_knowledge_roles_when_enabled():
     variables = {"SE_ENABLED": "false", "VALIDATOR_ENABLED": "false", "KNOWLEDGE_ENGINE_ENABLED": "true"}
-    table = get_active_agents_data(_AGENT_META_ROOT, {}, variables)
+    table = get_active_agents_data(
+        _AGENT_META_ROOT,
+        {"knowledge-engine": {"enabled": True}},
+        variables,
+    )
     for role in ["knowledge-curator", "knowledge-ingestor", "knowledge-querier",
                  "knowledge-linter", "knowledge-indexer", "knowledge-gardener", "knowledge-migrator"]:
         assert role in [a['name'] for a in table]
@@ -365,7 +373,7 @@ def test_self_hosting_sync_with_knowledge_engine_enabled(tmp_path):
     dest = tmp_path / "agent-meta-copy"
     shutil.copytree(
         _AGENT_META_ROOT, dest,
-        ignore=shutil.ignore_patterns(".git", "__pycache__", "*.pyc", ".superpowers", "external"),
+        ignore=shutil.ignore_patterns(".git", "__pycache__", "*.pyc", ".superpowers", "external", ".tmp"),
     )
 
     project_yaml_path = dest / ".meta-config" / "project.yaml"

@@ -65,12 +65,31 @@ def test_role_defaults_routing_patterns_match_intent_keywords():
 
 
 def test_roles_without_routing_stay_patternless():
-    """Roles that were never keyword-routed (easter egg, no-routing) keep no patterns."""
+    """Non-keyword roles carry the new ``addressability`` semantics (AC A5).
+
+    Migrated for SPEC dynamic-routing-template-slimming: previously this pinned
+    four patternless roles. Now ``openscad-developer`` HAS real routing_patterns
+    (addressability keyword), ``intern-developer``/``principal-developer`` are
+    ``name_only`` (reason required, no patterns) and ``orchestrator`` is
+    ``excluded``. Only keyword roles may carry a routable patterns block.
+    """
     roles = load_roles_config(_AGENT_META_ROOT)["roles"]
+
     assert "routing_patterns" not in roles["intern-developer"]
     assert "routing_patterns" not in roles["orchestrator"]
-    assert "routing_patterns" not in roles["openscad-developer"]
     assert "routing_patterns" not in roles["principal-developer"]
+
+    openscad = roles["openscad-developer"]
+    patterns = openscad["routing_patterns"]
+    assert openscad["routing"]["addressability"] == "keyword"
+    assert patterns.get("keywords") or patterns.get("examples")
+
+    for role in ("intern-developer", "principal-developer"):
+        routing = roles[role]["routing"]
+        assert routing["addressability"] == "name_only"
+        assert routing["name_only_reason"].strip()
+
+    assert roles["orchestrator"]["routing"]["addressability"] == "excluded"
 
 
 # ---------------------------------------------------------------------------
@@ -78,7 +97,11 @@ def test_roles_without_routing_stay_patternless():
 # ---------------------------------------------------------------------------
 
 def test_get_routing_rules_excludes_orchestrator_and_inactive_groups():
-    rules = get_routing_rules(_AGENT_META_ROOT, {}, dict(_BASE_VARIABLES))
+    # ``validator`` is a config-only gate (activation_groups.validator:
+    # roles_membership any ["validator"]); VALIDATOR_ENABLED is not a gate source
+    # anymore (RVW-24). Drive the membership through the project config fixture.
+    config = {"roles": ["validator"]}
+    rules = get_routing_rules(_AGENT_META_ROOT, config, dict(_BASE_VARIABLES))
     enum = rules["target_agents"]
     assert "orchestrator" not in enum, "anti-recursion: no self-route target"
     assert not [n for n in enum if n.startswith("se-")]
@@ -86,8 +109,19 @@ def test_get_routing_rules_excludes_orchestrator_and_inactive_groups():
     assert "junior-developer" not in enum
     assert "senior-developer" not in enum
     assert "principal-developer" not in enum
-    assert "validator" in enum  # VALIDATOR_ENABLED=true in fixture (no whitelist)
+    assert "validator" in enum
     assert not [r["agent"] for r in rules["rules"] if r["agent"] == "orchestrator"]
+
+
+def test_validator_gate_is_config_driven():
+    """Complement to the migrated validator assertion: the gate itself is
+    resolved from ``roles_membership`` config, not from the legacy variable."""
+    from scripts.lib.roles import resolve_activation_gates
+
+    assert resolve_activation_gates(_AGENT_META_ROOT, {})["validator"]["enabled"] is False
+    assert resolve_activation_gates(
+        _AGENT_META_ROOT, {"roles": ["validator"]}
+    )["validator"]["enabled"] is True
 
 
 def test_get_routing_rules_respects_roles_whitelist():
@@ -110,10 +144,13 @@ def test_get_routing_rules_includes_role_metadata():
     triage = next(r for r in rules["rules"] if r["agent"] == "bug-feature-analyzer")
     assert triage["orchestrator_only"] is True
     # Patternless escalation role: in the enum (dispatchable through the
-    # escalation gate) but without a keyword rule — matching the prose status
-    # quo where principal-developer has no intent-keyword row either.
+    # escalation gate) but without a keyword rule. ``developer_tiers`` is a
+    # config-driven group (roles_membership all junior+senior) — enabled via
+    # the project role list, not the legacy variable gate (RVW-14).
     with_tiers = get_routing_rules(
-        _AGENT_META_ROOT, {}, dict(_BASE_VARIABLES, DEVELOPER_TIERS_ENABLED="true")
+        _AGENT_META_ROOT,
+        {"roles": ["junior-developer", "senior-developer", "principal-developer"]},
+        dict(_BASE_VARIABLES),
     )
     assert "principal-developer" in with_tiers["target_agents"]
     assert not [r for r in with_tiers["rules"] if r["agent"] == "principal-developer"]
@@ -175,7 +212,8 @@ def test_get_routing_rules_keyword_fallback_and_precedence(tmp_path):
         encoding="utf-8",
     )
     variables = {k: "false" for k in _BASE_VARIABLES}
-    rules = get_routing_rules(root, {}, variables)
+    template_roles = {"legacy-role", "explicit-role", "patternless-role"}
+    rules = get_routing_rules(root, {}, variables, template_roles=template_roles)
     agents = {r["agent"]: r for r in rules["rules"]}
     assert agents["legacy-role"]["keywords"] == ["Legacy-Keyword"]
     assert agents["legacy-role"]["examples"] == []
@@ -394,3 +432,80 @@ def test_intent_routing_tools_placeholder_substitutes_cleanly():
             pytest.fail(f"{provider}: unexpected handoff_format '{tool_format}'")
         assert parsed["tool"]["name"] == ROUTING_TOOL_NAME
         assert not [w for w in log.warnings if "INTENT_ROUTING_TOOLS" in w]
+
+
+def test_has_route_intent_tool_defaults_false_for_every_provider():
+    """``route_intent_tool`` is fail-safe false until a harness registers the
+    generated definition as a callable tool (live proof only). No provider may
+    ship ``true`` without that proof, so the runtime default is the routing-rules
+    fallback."""
+    from scripts.lib.delegation_syntax import DelegationSyntaxEngine
+
+    capabilities = yaml.safe_load(
+        (_AGENT_META_ROOT / "config" / "provider-capabilities.yaml").read_text(
+            encoding="utf-8"
+        )
+    )["capabilities"]
+    assert capabilities, "capability matrix is empty"
+    engine = DelegationSyntaxEngine(config_dir=_AGENT_META_ROOT / "config")
+    for provider in capabilities:
+        assert engine.has_route_intent_tool(provider) is False, (
+            f"{provider}: route_intent_tool must be false — no harness registers "
+            "route_intent as a callable tool (live proof required to flip)"
+        )
+    assert engine.has_route_intent_tool("NotAProvider") is False
+
+
+def test_build_provider_vars_route_intent_callable_defaults_false(tmp_path):
+    """``_build_provider_vars`` resolves ``ROUTE_INTENT_CALLABLE`` from the
+    capability getter; without a capability entry it is the fail-safe ``false``."""
+    from scripts.lib.agent_sync import _build_provider_vars
+
+    merged = _build_provider_vars({}, "Opencode", {}, tmp_path)
+    assert merged["ROUTE_INTENT_CALLABLE"] == "false"
+
+
+def _render_intent_routing_section(provider, monkeypatch=None, callable_value=None):
+    """Render the template's §3 exactly like the sync pipeline (substitute,
+    then strip inactive conditionals) so the capability branch is observable."""
+    from scripts.lib.agent_sync import _build_provider_vars
+    from scripts.lib.delegation_syntax import DelegationSyntaxEngine
+    from scripts.lib.log import SyncLog
+    from scripts.lib.variables import strip_inactive_conditional_blocks, substitute
+
+    if callable_value is not None:
+        monkeypatch.setattr(
+            DelegationSyntaxEngine, "has_route_intent_tool",
+            lambda self, _provider: callable_value,
+        )
+    template = (
+        _AGENT_META_ROOT / "agents" / "1-generic" / "orchestrator.md"
+    ).read_text(encoding="utf-8")
+    section = template[
+        template.index("## 3. Intent routing"):
+        template.index("## 4. Developer tier selection")
+    ]
+    merged = _build_provider_vars({}, provider, dict(_BASE_VARIABLES), _AGENT_META_ROOT)
+    rendered = substitute(section, merged, "test", SyncLog())
+    return strip_inactive_conditional_blocks(rendered, merged)
+
+
+def test_orchestrator_section3_renders_fallback_without_route_intent_tool(monkeypatch):
+    """``ROUTE_INTENT_CALLABLE=false`` (all providers today) must render the
+    routing-rules fallback and must NOT mandate a call to an unregistered tool."""
+    rendered = _render_intent_routing_section("Opencode", monkeypatch, callable_value=False)
+    assert "kein** natives `route_intent`-Tool registriert" in rendered
+    assert "Rufe `route_intent` auf, BEVOR du delegierst" not in rendered
+    assert "ROUTE_INTENT_CALLABLE" not in rendered
+    assert "{{else}}" not in rendered
+
+
+def test_orchestrator_section3_renders_mandate_with_route_intent_tool(monkeypatch):
+    """``ROUTE_INTENT_CALLABLE=true`` (only after a live proof) renders the
+    mandate and suppresses the fallback branch."""
+    rendered = _render_intent_routing_section("Opencode", monkeypatch, callable_value=True)
+    assert "Rufe `route_intent` auf, BEVOR du delegierst" in rendered
+    assert "kein** natives `route_intent`-Tool registriert" not in rendered
+    assert "ROUTE_INTENT_CALLABLE" not in rendered
+    assert "{{else}}" not in rendered
+
