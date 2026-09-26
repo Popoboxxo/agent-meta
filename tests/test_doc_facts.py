@@ -40,7 +40,33 @@ AC-04 (fail-soft) and AC-05 (gate-aware active roles) are W1-3. The rule behind
 the moment the fact starts reading it** — otherwise the no-write invariant
 (AC-01) is silently void for that source. ``scripts`` therefore entered the list
 with the first fact that imports ``scripts/lib/roles.py``; ``knowledge`` arrives
-with W1-4.
+with W1-4, whose IC-03 staleness resolver is the first reader of
+``knowledge/wiki/``.
+
+W1-4 adds the IC-03 resolver and its ``test_v7_missing_and_stale_derived_from``
+coverage. The V7 **check** itself is W2-3 and is deliberately *not* implemented
+here — the resolver only has to produce the machine state the check will consume,
+and it must be able to name ``missing-derived-from`` and ``stale-source``
+without a single ``SyncError``. Two properties get their own pinned tests
+because they are the ones a future refactor would break silently: the resolver is
+**not** wired into ``_FACT_COMPUTERS`` (no IC-02 fact consumes it yet), and the
+``status:stale-upstream`` marker is **extracted from the Langfassung**, never
+read from the hand-maintained wiki tag and never from the ``ARCHITECTURE.md``
+stub that loses its prose after W4 (Spec A12, M-5/M-7).
+
+**PLAN DEBT (F7) — the IC-03 block below is split out at W2-1.** This file
+carries the IC-02 fact contract *and* the IC-03 wiki-staleness contract, and the
+plan keeps naming it for W2-1, W2-2, W2-6 and W8-4, so it only grows from here.
+W1-4 already extracted the shared fixture helper (``_derived_page``) to stop the
+duplication, but the file itself is past comfortable review size. **W2-1 owns
+the split**: move the whole IC-03 staleness block — everything from the
+``WIKI_ROOT_RELPATH`` constants down to the end of this file, including the
+``stale_upstream_status`` cases — into a new
+``tests/test_doc_facts_wiki_staleness.py`` with its own module docstring, and
+leave the IC-02 fact contract here. Do not do that split before W2-1: the new
+file does not exist yet, and creating it here would hand W2-1 a half-moved
+block. Nothing about the assertions changes in the move — this is a file
+boundary, not a behaviour change.
 """
 
 from __future__ import annotations
@@ -48,9 +74,11 @@ from __future__ import annotations
 import copy
 import fnmatch
 import hashlib
+import os
 import re
 import shutil
 from collections.abc import Callable
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -61,17 +89,29 @@ from scripts.lib import roles as roles_lib
 from scripts.lib.doc_facts import (
     AGENT_HELPER_PREFIX,
     AGENTS_CAPABILITY,
+    ARCHITECTURE_STUB_RELPATH,
     BLOCK_FACT_KEYS,
+    DERIVED_AT_KEY,
+    DERIVED_FROM_KEY,
     FACT_KEYS,
     HOOK_EXCLUDED_DIRS,
     HOOK_EXCLUDED_SUFFIXES,
+    LANGFASSUNG_RELPATHS,
     PENDING_FACTS,
     SCALAR_FACT_KEYS,
+    STALE_UPSTREAM_STATUS,
     VOLATILE_FACTS,
+    WIKI_AGE_PREFIX,
+    WIKI_ARCHITECTURE_TYPE,
+    WIKI_FRESH,
+    WIKI_MISSING_DERIVED_FROM,
+    WIKI_STALE_SOURCE,
     compute_active_roles,
     compute_doc_facts,
+    compute_wiki_staleness,
     is_volatile,
     stable_facts,
+    stale_upstream_status,
 )
 from scripts.lib.roles import is_role_enabled, resolve_activation_gates
 
@@ -114,10 +154,18 @@ FACT_SOURCE_PATHS = (
     # Read by the ``*_BLOCK`` facts via the W1-6 snippet bridge. The digest
     # helper skips a non-existent entry, so the root is covered by the digest
     # from the moment it exists — which is exactly the moment a fact starts
-    # reading it (F-2). ``scripts`` (W1-3) and ``knowledge`` (W1-4) are added
-    # by the tasks that start reading them, in their own commits.
+    # reading it (F-2). ``scripts`` joined in W1-3, ``knowledge`` in W1-4, each
+    # in the commit that started reading it.
     "scripts",
     "snippets",
+    # F-2 (W1-4): the IC-03 staleness resolver is the first reader of the
+    # knowledge bundle, so ``knowledge`` enters the digest **in this commit**.
+    # The governing rule: a fact's source root must be covered by the
+    # write-invariance digest at the moment the fact starts reading it —
+    # otherwise the AC-01 no-write invariant is silently void for that source.
+    # ``knowledge/sources/`` is immutable raw data (NG-2) and is never written;
+    # the resolver reads ``knowledge/wiki/`` only.
+    "knowledge",
     "tests/scenarios/asserts",
 )
 
@@ -1222,3 +1270,783 @@ def test_repo_facts_block_renders_the_stable_scalars(facts):
     for name, value in rendered.items():
         assert value == facts[name], f"{name}: block disagrees with the scalar"
 
+
+
+# --------------------------------------------------------------------------
+# IC-03 — the wiki staleness resolver (W1-4)
+# --------------------------------------------------------------------------
+#
+# The expected side is always re-derived from a synthetic wiki built in
+# ``tmp_path`` or from the frontmatter itself — never from a hand-written
+# expected-value table (Spec NEW-8: the only place in the tree that may hold
+# expected *numbers* is ``config/doc-facts-expected.yaml``, W1-5). The
+# ``mtime``/``derived-at`` pair is set with ``os.utime`` so the
+# ``stale-source`` verdict is produced by the filesystem, not by a stubbed
+# comparator.
+
+WIKI_ROOT_RELPATH = "knowledge/wiki"
+LANGFASSUNG_RELPATH = LANGFASSUNG_RELPATHS[0]
+LEGACY_LANGFASSUNG_RELPATH = LANGFASSUNG_RELPATHS[-1]
+
+STALE_DECLARATION = (
+    "> Repo version: 9.9.9 — content last substantively reviewed: 2026-01-01 "
+    "(predates several releases; a full architecture re-review is due — marker)"
+)
+FRESH_DECLARATION = (
+    "> Repo version: 9.9.9 — content last substantively reviewed: 2026-01-01"
+)
+
+
+def _wiki_page(
+    root: Path,
+    relpage: str,
+    frontmatter: dict,
+    *,
+    body: str = "# page\n",
+) -> Path:
+    """Write a Markdown page with YAML frontmatter below ``root``."""
+    page = root / relpage
+    page.parent.mkdir(parents=True, exist_ok=True)
+    lines = ["---"]
+    for key, value in frontmatter.items():
+        if isinstance(value, (list, tuple)):
+            rendered = "[" + ", ".join(f'"{item}"' for item in value) + "]"
+        elif isinstance(value, bool):
+            rendered = "true" if value else "false"
+        elif isinstance(value, (int, float)):
+            rendered = str(value)
+        else:
+            rendered = f'"{value}"'
+        lines.append(f"{key}: {rendered}")
+    lines += ["---", "", body]
+    page.write_text("\n".join(lines), encoding="utf-8")
+    return page
+
+
+def _make_project(root: Path, *, langfassung_body: str | None = STALE_DECLARATION) -> Path:
+    """A minimal project root: ``knowledge/wiki/concepts/`` + a Langfassung."""
+    (root / WIKI_ROOT_RELPATH / "concepts").mkdir(parents=True, exist_ok=True)
+    if langfassung_body is not None:
+        langfassung = root / LANGFASSUNG_RELPATH
+        langfassung.parent.mkdir(parents=True, exist_ok=True)
+        langfassung.write_text(
+            f"# Langfassung\n\n{langfassung_body}\n", encoding="utf-8"
+        )
+    return root
+
+
+def _set_mtime(path: Path, moment: datetime) -> None:
+    epoch = moment.timestamp()
+    os.utime(path, (epoch, epoch))
+
+
+def _days_ago(days: int) -> datetime:
+    return datetime.now(timezone.utc) - timedelta(days=days)
+
+
+SOURCE_RELPATH = "docs/source.md"
+"""The canonical ``derived-from`` target of the IC-03 fixtures."""
+
+_ABSENT = object()
+"""Sentinel: write **no** ``derived-at`` key — not an *unusable* one."""
+
+
+def _write_source(
+    root: Path,
+    relpath: str = SOURCE_RELPATH,
+    mtime: datetime | None = None,
+) -> Path:
+    """Create ``relpath`` under ``root`` with a **pinned** mtime.
+
+    ``stale-source`` is a filesystem comparison, so a fixture that left the mtime
+    at "now" would answer differently depending on how fast the suite runs. The
+    call is idempotent, so one source can back several pages.
+    """
+    source = root / relpath
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_text("# source\n", encoding="utf-8")
+    if mtime is not None:
+        _set_mtime(source, mtime)
+    return source
+
+
+def _derived_page(
+    root: Path,
+    name: str,
+    derived_at: object = _ABSENT,
+    *,
+    source_mtime: datetime,
+    derived_from: str | None = None,
+) -> Path:
+    """The IC-03 fixture in one call: a dated source plus an Architecture page.
+
+    Spelling out "write a source, stamp its mtime, declare a page" in every test
+    is what grew this block past review size (F7), so each test now states only
+    its own premise: when the source changed (``source_mtime``), when the page
+    was derived (``derived_at``, or ``_ABSENT`` to omit the key) and which
+    ``derived-from`` spelling to use. Expected values are never passed in — Spec
+    NEW-8 keeps every assertion re-deriving its own expectation from the same two
+    timestamps.
+
+    A fixture with a genuinely different shape (the real ``knowledge/sources/``
+    page with its extra ``resource:`` key) stays explicit rather than growing a
+    knob here.
+    """
+    _write_source(root, SOURCE_RELPATH, source_mtime)
+    frontmatter: dict = {
+        "type": WIKI_ARCHITECTURE_TYPE,
+        DERIVED_FROM_KEY: SOURCE_RELPATH if derived_from is None else derived_from,
+    }
+    if derived_at is not _ABSENT:
+        frontmatter[DERIVED_AT_KEY] = (
+            derived_at.isoformat() if isinstance(derived_at, datetime) else derived_at
+        )
+    return _wiki_page(root / WIKI_ROOT_RELPATH / "concepts", name, frontmatter)
+
+
+def test_v7_missing_and_stale_derived_from(tmp_path):
+    """AC-10 shape, resolver half: both V7 inputs are named by the resolver.
+
+    IC-03's rule: a ``type: Architecture`` page **without** ``derived-from`` is
+    ``missing-derived-from``; a page whose ``derived-from`` target was modified
+    **after** its ``derived-at`` is ``stale-source``. The finding text W2-3 will
+    render has to come out of these two values, so they must carry the reason
+    themselves — a bare boolean would force the check to re-derive the
+    distinction.
+
+    The V7 check is **not** implemented here (W2-3); this pins the state the
+    check consumes.
+    """
+    root = _make_project(tmp_path)
+    concepts = tmp_path / WIKI_ROOT_RELPATH / "concepts"
+
+    _wiki_page(
+        concepts,
+        "no-provenance.md",
+        {"type": WIKI_ARCHITECTURE_TYPE, "title": "no provenance"},
+    )
+
+    derived_at = _days_ago(10)
+    _derived_page(
+        root, "stale.md", derived_at,
+        source_mtime=derived_at + timedelta(days=1),
+    )
+
+    states = compute_wiki_staleness(tmp_path / WIKI_ROOT_RELPATH, root)
+
+    assert states["concepts/no-provenance.md"] == WIKI_MISSING_DERIVED_FROM
+    assert states["concepts/stale.md"] == WIKI_STALE_SOURCE
+    assert WIKI_MISSING_DERIVED_FROM != WIKI_STALE_SOURCE, (
+        "the two V7 reasons must be distinguishable values, not one boolean"
+    )
+
+
+def test_resolver_states_are_exactly_the_four_documented_values():
+    """IC-03: the value domain is closed — no fifth state can leak out.
+
+    The four are ``""`` / ``missing-derived-from`` / ``stale-source`` /
+    ``age-<n>d``. A closed domain is what lets W2-3 map values to severities
+    with an exhaustive match instead of a default branch.
+    """
+    states = compute_wiki_staleness(REPO_ROOT / WIKI_ROOT_RELPATH, REPO_ROOT)
+    assert states, "premise: the real wiki has pages"
+    allowed = {WIKI_FRESH, WIKI_MISSING_DERIVED_FROM, WIKI_STALE_SOURCE}
+    for relpage, value in states.items():
+        assert isinstance(value, str), relpage
+        assert value in allowed or re.fullmatch(rf"{WIKI_AGE_PREFIX}\d+d", value), (
+            f"{relpage}: undocumented state {value!r}"
+        )
+        assert value != "age-0d", (
+            f"{relpage}: a zero age is the absence of an observation"
+        )
+
+
+def test_resolver_reports_every_wiki_page_exactly_once():
+    """The key set is the wiki page set, re-derived from disk (not a count)."""
+    wiki = REPO_ROOT / WIKI_ROOT_RELPATH
+    expected = {
+        p.relative_to(wiki).as_posix() for p in wiki.rglob("*.md") if p.is_file()
+    }
+    assert expected, "premise: the real wiki has pages"
+    states = compute_wiki_staleness(wiki, REPO_ROOT)
+    assert set(states) == expected
+    assert all(key == key.strip() and "\\" not in key for key in states), (
+        "keys must be relative POSIX paths, not absolute or platform-specific"
+    )
+
+
+def test_missing_derived_from_is_only_reported_for_architecture_pages(tmp_path):
+    """A page that never claimed a provenance must not be given a finding.
+
+    ``missing-derived-from`` is a statement about a *duty* that
+    ``knowledge/schema.md`` imposes on ``type: Architecture`` pages. Applying it
+    to every page would turn "has no provenance" into a repo-wide alarm — the
+    permanent-false-alarm shape (F21) this module exists to avoid.
+    """
+    root = _make_project(tmp_path)
+    concepts = tmp_path / WIKI_ROOT_RELPATH / "concepts"
+    for page_type in ("Concept", "Guide", "API Reference", "Plan", "Spec"):
+        _wiki_page(concepts, f"{page_type}.md", {"type": page_type})
+    _wiki_page(
+        concepts, "arch.md", {"type": WIKI_ARCHITECTURE_TYPE}
+    )
+
+    states = compute_wiki_staleness(tmp_path / WIKI_ROOT_RELPATH, root)
+    assert states["concepts/arch.md"] == WIKI_MISSING_DERIVED_FROM
+    for page_type in ("Concept", "Guide", "API Reference", "Plan", "Spec"):
+        assert states[f"concepts/{page_type}.md"] == WIKI_FRESH, page_type
+
+
+def test_stale_source_is_the_mtime_comparison_against_derived_at(tmp_path):
+    """The verdict is the *filesystem* comparison, not a date heuristic.
+
+    Two pages, same ``derived-from``, opposite ``derived-at``: one whose source
+    is newer must be ``stale-source``, one whose source is older must not. If
+    the implementation compared the source mtime against ``now`` instead, both
+    would answer the same and the first assertion would pass alone.
+    """
+    root = _make_project(tmp_path)
+    pivot = _days_ago(30)
+    _derived_page(
+        root, "newer-source.md", pivot - timedelta(days=1), source_mtime=pivot
+    )
+    _derived_page(
+        root, "older-source.md", pivot + timedelta(days=1), source_mtime=pivot
+    )
+
+    states = compute_wiki_staleness(tmp_path / WIKI_ROOT_RELPATH, root)
+    assert states["concepts/newer-source.md"] == WIKI_STALE_SOURCE
+    assert states["concepts/older-source.md"] != WIKI_STALE_SOURCE
+
+
+def test_age_state_is_derived_from_derived_at_not_hardcoded(tmp_path):
+    """``age-<n>d`` is a whole-day observation, computed from ``derived-at``.
+
+    Per Spec NEW-8 the expected ``n`` is re-derived here from the same
+    ``derived-at`` the fixture writes, not written as a literal.
+    """
+    root = _make_project(tmp_path)
+    ages = (3, 40)
+    for age in ages:
+        derived_at = _days_ago(age)
+        _derived_page(
+            root, f"age-{age}.md", derived_at,
+            source_mtime=derived_at - timedelta(days=1),
+        )
+
+    states = compute_wiki_staleness(tmp_path / WIKI_ROOT_RELPATH, root)
+    for age in ages:
+        value = states[f"concepts/age-{age}.md"]
+        assert value == f"{WIKI_AGE_PREFIX}{age}d", (
+            f"age {age}: got {value!r} — the day count is not re-derived"
+        )
+
+
+def test_age_state_is_not_reported_for_a_sub_day_derivation(tmp_path):
+    """A derivation from today is fresh, not ``age-0d``.
+
+    ``age-0d`` would be indistinguishable from a real measurement, and a check
+    that renders it as a status would report a staleness that does not exist.
+    """
+    root = _make_project(tmp_path)
+    now = datetime.now(timezone.utc)
+    _derived_page(root, "today.md", now, source_mtime=now - timedelta(hours=2))
+
+    states = compute_wiki_staleness(tmp_path / WIKI_ROOT_RELPATH, root)
+    assert states["concepts/today.md"] == WIKI_FRESH
+
+
+def test_stale_source_wins_over_the_age_observation(tmp_path):
+    """Precedence: a stale source is a *status*, the age is only an observation.
+
+    Without an explicit precedence the page carrying both facts could render as
+    ``age-12d`` and the V7 check would never see the ``stale-source`` it needs.
+    """
+    root = _make_project(tmp_path)
+    derived_at = _days_ago(12)
+    _derived_page(
+        root, "both.md", derived_at, source_mtime=derived_at + timedelta(days=1)
+    )
+
+    states = compute_wiki_staleness(tmp_path / WIKI_ROOT_RELPATH, root)
+    assert states["concepts/both.md"] == WIKI_STALE_SOURCE
+
+
+def test_missing_derived_from_target_is_fail_soft(tmp_path):
+    """IC-01: a missing source is ``""`` plus exactly one ``log.debug``.
+
+    The forbidden outcomes are named explicitly because each is a plausible
+    wrong answer: a ``SyncError`` would abort a sync over a documentation
+    annotation, and ``0``/``age-0d`` would render a fabricated measurement.
+    """
+    root = _make_project(tmp_path)
+    concepts = tmp_path / WIKI_ROOT_RELPATH / "concepts"
+    _wiki_page(
+        concepts,
+        "gone.md",
+        {
+            "type": WIKI_ARCHITECTURE_TYPE,
+            DERIVED_FROM_KEY: "docs/does-not-exist.md",
+            DERIVED_AT_KEY: _days_ago(5).isoformat(),
+        },
+    )
+
+    log = _StubLog()
+    states = compute_wiki_staleness(tmp_path / WIKI_ROOT_RELPATH, root, log=log)
+
+    assert states["concepts/gone.md"] == WIKI_FRESH
+    assert states["concepts/gone.md"] not in ("0", "age-0d")
+    assert len(log.calls) == 1, f"expected exactly one debug call: {log.calls}"
+    target, message = log.calls[0]
+    assert target == "docs"
+    assert "concepts/gone.md" in message
+    assert "does-not-exist" in message, "the message must name the missing source"
+
+
+def test_unusable_derived_at_is_fail_soft_and_never_epoch(tmp_path):
+    """An unparsable ``derived-at`` degrades; it must not become ``epoch``.
+
+    Falling back to the epoch would make the page look ~56 years stale and turn
+    the resolver into the repo's loudest false alarm.
+    """
+    root = _make_project(tmp_path)
+    source_mtime = _days_ago(5)
+    for name, derived_at in (("garbage", "not-a-date"), ("absent", _ABSENT)):
+        _derived_page(root, f"{name}.md", derived_at, source_mtime=source_mtime)
+
+    log = _StubLog()
+    states = compute_wiki_staleness(tmp_path / WIKI_ROOT_RELPATH, root, log=log)
+
+    for name in ("garbage", "absent"):
+        value = states[f"concepts/{name}.md"]
+        assert value == WIKI_FRESH, f"{name}: {value!r}"
+        assert not value.startswith(WIKI_AGE_PREFIX), f"{name}: fabricated age"
+    assert len(log.calls) == 2, f"one debug per unusable page: {log.calls}"
+    assert all(DERIVED_AT_KEY in message for _t, message in log.calls)
+
+
+def test_missing_wiki_root_is_fail_soft_and_yields_no_pages(tmp_path):
+    """A missing ``wiki_root`` is an empty map plus one debug, never a raise."""
+    log = _StubLog()
+    states = compute_wiki_staleness(tmp_path / "no-such-wiki", tmp_path, log=log)
+    assert states == {}
+    assert len(log.calls) == 1
+    assert log.calls[0][0] == "docs"
+
+
+def test_resolver_writes_nothing_under_either_root(tmp_path):
+    """The resolver is a pure reader — including under ``knowledge/``.
+
+    ``knowledge/sources/`` is immutable raw data (NG-2); nothing in this module
+    may write there. The digest is taken over both roots before and after.
+    """
+
+    def _digest(*roots: Path) -> str:
+        acc = hashlib.sha256()
+        for root in roots:
+            for path in sorted(root.rglob("*")) if root.exists() else []:
+                stat = path.lstat()
+                acc.update(str(path).encode("utf-8"))
+                acc.update(str(stat.st_size).encode("utf-8"))
+                acc.update(str(stat.st_mtime_ns).encode("utf-8"))
+        return acc.hexdigest()
+
+    root = _make_project(tmp_path)
+    (root / "knowledge" / "sources").mkdir(parents=True, exist_ok=True)
+    (root / "knowledge" / "sources" / "immutable.md").write_text(
+        "# raw\n", encoding="utf-8"
+    )
+    concepts = root / WIKI_ROOT_RELPATH / "concepts"
+    _wiki_page(concepts, "arch.md", {"type": WIKI_ARCHITECTURE_TYPE})
+
+    wiki = root / WIKI_ROOT_RELPATH
+    before = _digest(wiki, root / "knowledge" / "sources")
+    compute_wiki_staleness(wiki, root)
+    assert _digest(wiki, root / "knowledge" / "sources") == before
+
+
+def test_resolver_is_not_registered_as_a_fact_computer():
+    """W1-4 scope: no IC-02 fact consumes the resolver yet (that is W2-3).
+
+    Registering it would claim a ``DOCS_*`` placeholder the IC-02 table does not
+    enumerate and would put a per-wiki-page value into the fact dict, where
+    every value is a single scalar.
+    """
+    assert compute_wiki_staleness not in doc_facts._FACT_COMPUTERS.values()
+    assert stale_upstream_status not in doc_facts._FACT_COMPUTERS.values()
+    assert not any("wiki" in name.lower() for name in FACT_KEYS), (
+        "an IC-02 placeholder would need a spec row; W1-4 adds none"
+    )
+    assert set(FACT_KEYS) == IC02_KEYS, "the fact key set must not have grown"
+
+
+def test_resolver_has_no_module_global_memo():
+    """The per-call memo contract: no cache survives a call.
+
+    ``FactContext.sources`` is per call for the same reason — a
+    process-lifetime cache would hand a second call data from a checkout that no
+    longer exists on disk. The resolver must not reintroduce that through a
+    module-level dict.
+    """
+    globals_ = vars(doc_facts)
+    suspicious = [
+        name
+        for name, value in globals_.items()
+        if name.startswith("_") and not name.startswith("__")
+        and isinstance(value, dict)
+        and value
+        and name
+        not in {
+            "_FACT_COMPUTERS",
+            "VOLATILE_FACTS",
+            "FACT_KEYS",
+            "PENDING_FACTS",
+            "BLOCK_FACT_KEYS",
+            "SCALAR_FACT_KEYS",
+            "_STABLE_SCALAR_FACT_KEYS",
+            "LANGFASSUNG_RELPATHS",
+        }
+    ]
+    assert not suspicious, f"possible module-global cache: {suspicious}"
+
+
+def test_resolver_observes_a_change_between_two_calls(tmp_path):
+    """Two calls, an annotated page in between — the second must see it.
+
+    The negative control for the memo contract: a module-global cache would
+    answer ``missing-derived-from`` here forever, and the suite would stay
+    green because the first call is the one being asserted.
+    """
+    root = _make_project(tmp_path)
+    concepts = root / WIKI_ROOT_RELPATH / "concepts"
+    page = _wiki_page(concepts, "arch.md", {"type": WIKI_ARCHITECTURE_TYPE})
+
+    first = compute_wiki_staleness(root / WIKI_ROOT_RELPATH, root)
+    assert first["concepts/arch.md"] == WIKI_MISSING_DERIVED_FROM
+
+    derived_at = _days_ago(4)
+    _derived_page(
+        root, "arch.md", derived_at, source_mtime=derived_at - timedelta(days=1)
+    )
+
+    second = compute_wiki_staleness(root / WIKI_ROOT_RELPATH, root)
+    assert second["concepts/arch.md"] == f"{WIKI_AGE_PREFIX}4d", (
+        "a module-global cache leaked across calls — the annotation was ignored"
+    )
+    assert first["concepts/arch.md"] == WIKI_MISSING_DERIVED_FROM, (
+        "the earlier result was mutated"
+    )
+    assert page.exists()
+
+
+def test_a_failing_source_is_reported_on_every_call(tmp_path):
+    """A failure is never cached: the second call logs again.
+
+    Memoising the *degraded* answer would make the problem invisible after the
+    first run — a sync would silently stop reporting a missing source.
+    """
+    root = _make_project(tmp_path)
+    concepts = root / WIKI_ROOT_RELPATH / "concepts"
+    _wiki_page(
+        concepts,
+        "gone.md",
+        {
+            "type": WIKI_ARCHITECTURE_TYPE,
+            DERIVED_FROM_KEY: "docs/does-not-exist.md",
+            DERIVED_AT_KEY: _days_ago(2).isoformat(),
+        },
+    )
+
+    for _ in range(2):
+        log = _StubLog()
+        states = compute_wiki_staleness(root / WIKI_ROOT_RELPATH, root, log=log)
+        assert states["concepts/gone.md"] == WIKI_FRESH
+        assert len(log.calls) == 1, f"a cached failure went quiet: {log.calls}"
+
+
+def test_wiki_relative_derived_from_reaches_the_same_source(tmp_path):
+    """Both ``derived-from`` spellings resolve to the same file.
+
+    The migrated pages carry wiki-relative values (``resource: "../../sources/…"``
+    — from ``knowledge/wiki/concepts/`` that is ``knowledge/sources/…``). The
+    resolver rewrites such a value against the **project root**, so both
+    spellings reach the same file. If only the project-relative spelling worked,
+    the annotated pages would report a missing source and V7 would alarm on
+    pages that are perfectly annotated.
+    """
+    root = _make_project(tmp_path)
+    derived_at = _days_ago(6)
+    # ``concepts/`` is three levels below the project root, so the wiki-relative
+    # spelling of a project-relative path needs three ``..`` — exactly the shape
+    # the real ``resource:`` values have.
+    for name, value in (
+        ("project-relative.md", "docs/source.md"),
+        ("wiki-relative.md", "../../../docs/source.md"),
+    ):
+        _derived_page(
+            root, name, derived_at,
+            source_mtime=derived_at - timedelta(days=1), derived_from=value,
+        )
+
+    states = compute_wiki_staleness(root / WIKI_ROOT_RELPATH, root)
+    assert states["concepts/project-relative.md"] == f"{WIKI_AGE_PREFIX}6d"
+    assert states["concepts/wiki-relative.md"] == states[
+        "concepts/project-relative.md"
+    ], "the two spellings must not disagree"
+
+
+def test_wiki_relative_derived_from_matches_the_real_resource_convention(tmp_path):
+    """The ``knowledge/sources/`` spelling the real pages actually use.
+
+    ``knowledge/wiki/concepts/architecture.md`` carries
+    ``resource: "../../sources/ARCHITECTURE.full.md"`` — two levels up from
+    ``concepts/`` lands in ``knowledge/``, i.e. **inside** the project root but
+    not at its top. A resolver that resolved such a value against the project
+    root would look for ``<root>/sources/…``, miss, and report the page as
+    having a missing source.
+    """
+    root = _make_project(tmp_path)
+    concepts = root / WIKI_ROOT_RELPATH / "concepts"
+    raw = root / "knowledge" / "sources" / "ARCHITECTURE.full.md"
+    raw.parent.mkdir(parents=True, exist_ok=True)
+    raw.write_text(f"# raw\n\n{STALE_DECLARATION}\n", encoding="utf-8")
+
+    derived_at = _days_ago(8)
+    _set_mtime(raw, derived_at - timedelta(days=1))
+    _wiki_page(
+        concepts,
+        "architecture.md",
+        {
+            "type": WIKI_ARCHITECTURE_TYPE,
+            "resource": "../../sources/ARCHITECTURE.full.md",
+            DERIVED_FROM_KEY: "../../sources/ARCHITECTURE.full.md",
+            DERIVED_AT_KEY: derived_at.isoformat(),
+        },
+    )
+
+    log = _StubLog()
+    states = compute_wiki_staleness(root / WIKI_ROOT_RELPATH, root, log=log)
+    assert states["concepts/architecture.md"] == f"{WIKI_AGE_PREFIX}8d", (
+        f"the real ``resource:`` shape must resolve; debug said {log.calls}"
+    )
+    assert log.calls == []
+
+
+def test_derived_from_pointing_outside_the_project_is_fail_soft(tmp_path):
+    """A ``derived-from`` that escapes the project root is unusable, not fresh.
+
+    ``..`` traversal out of the repository has no legitimate reading here: the
+    staleness question is "is the source this page was derived from newer than
+    the derivation", and a file outside the project cannot answer it for this
+    project. Resolving it anyway would let an annotation point at ``/etc`` and
+    produce a confident verdict from it.
+    """
+    root = _make_project(tmp_path)
+    _write_source(tmp_path.parent, "outside.md", datetime.now(timezone.utc))
+
+    concepts = root / WIKI_ROOT_RELPATH / "concepts"
+    # Four ``..`` from ``concepts/`` leaves the project root entirely.
+    _wiki_page(
+        concepts,
+        "escape.md",
+        {
+            "type": WIKI_ARCHITECTURE_TYPE,
+            DERIVED_FROM_KEY: "../../../../outside.md",
+            DERIVED_AT_KEY: _days_ago(1).isoformat(),
+        },
+    )
+
+    log = _StubLog()
+    states = compute_wiki_staleness(root / WIKI_ROOT_RELPATH, root, log=log)
+    value = states["concepts/escape.md"]
+    assert value in (WIKI_FRESH, WIKI_MISSING_DERIVED_FROM), value
+    assert not value.startswith(WIKI_AGE_PREFIX)
+
+
+def test_symlink_escaping_the_project_root_is_fail_soft(tmp_path):
+    """F6: a symlink out of the project root must never be *read*.
+
+    ``_resolve_derived_source`` calls ``.resolve()`` on **both** sides before
+    ``relative_to(root.resolve())``. Those two ``.resolve()`` calls are the only
+    thing standing between a ``derived-from`` annotation and the whole
+    filesystem, and nothing pinned them: a refactor that "simplified" the
+    resolution to a plain ``root / relpath`` join would keep every other case in
+    this file green and start reporting a confident ``stale-source`` verdict
+    derived from a file outside the repository.
+
+    The negative control is built into the fixture. The escape target is stamped
+    with **now**, while ``derived-at`` is a day ago — so a resolver that followed
+    the link would answer ``stale-source``, and a resolver that reached it by
+    any other route would answer ``age-<n>d``. Only the containment check answers
+    ``""``. A ``..`` escape is already covered above; this is the spelling that
+    *looks* entirely innocent, which is exactly why it needed its own case.
+    """
+    project = tmp_path / "project"
+    root = _make_project(project)
+
+    outside = tmp_path / "outside"
+    _write_source(outside, "source.md", datetime.now(timezone.utc))
+    (project / SOURCE_RELPATH).symlink_to(outside / "source.md")
+    assert (project / SOURCE_RELPATH).is_symlink(), (
+        "premise: the fixture target must be reached *through* a symlink"
+    )
+
+    _wiki_page(
+        root / WIKI_ROOT_RELPATH / "concepts",
+        "linked.md",
+        {
+            "type": WIKI_ARCHITECTURE_TYPE,
+            DERIVED_FROM_KEY: SOURCE_RELPATH,
+            DERIVED_AT_KEY: _days_ago(1).isoformat(),
+        },
+    )
+
+    log = _StubLog()
+    states = compute_wiki_staleness(root / WIKI_ROOT_RELPATH, root, log=log)
+
+    value = states["concepts/linked.md"]
+    assert value == WIKI_FRESH, (
+        f"the symlink was followed instead of rejected: {value!r} "
+        f"(debug: {log.calls})"
+    )
+    assert not value.startswith(WIKI_AGE_PREFIX), "no measurement from outside"
+    assert len(log.calls) == 1, f"expected exactly one debug call: {log.calls}"
+    target, message = log.calls[0]
+    assert target == "docs"
+    assert "concepts/linked.md" in message
+    assert SOURCE_RELPATH in message, "the message must name the rejected target"
+
+
+# --------------------------------------------------------------------------
+# IC-03 — machine-side extraction of ``status:stale-upstream``
+# --------------------------------------------------------------------------
+
+
+def test_stale_upstream_is_extracted_from_the_langfassung(tmp_path):
+    """The marker is **read**, not declared: only the Langfassung carries it.
+
+    The wiki page's hand-maintained ``status:stale-upstream`` tag is the thing
+    this extraction replaces. The fixture therefore puts the self-declaration in
+    the Langfassung and *nowhere else* — no tag, no marker in the stub — so an
+    implementation that read the wiki frontmatter or the stub could not answer.
+    """
+    root = _make_project(tmp_path, langfassung_body=STALE_DECLARATION)
+    assert stale_upstream_status(root) == STALE_UPSTREAM_STATUS
+
+
+def test_stale_upstream_is_fresh_without_the_self_declaration(tmp_path):
+    """A Langfassung that does not declare itself stale is fresh."""
+    root = _make_project(tmp_path, langfassung_body=FRESH_DECLARATION)
+    assert stale_upstream_status(root) == WIKI_FRESH
+
+
+def test_stale_upstream_never_reads_the_architecture_stub(tmp_path):
+    """Spec A12 / M-5: the stub is not a source, even when it holds the line.
+
+    The stub is what the pre-A12 design read. If it were still accepted, W4
+    (M-2) would strip its prose and the extraction would silently answer
+    ``""`` — the marker would disappear from the repo without any error, and V7
+    would lose its carrier. Pinning the rejection here is what keeps W4 from
+    reintroducing the circularity.
+    """
+    root = _make_project(tmp_path, langfassung_body=None)
+    stub = root / ARCHITECTURE_STUB_RELPATH
+    stub.write_text(f"# stub\n\n{STALE_DECLARATION}\n", encoding="utf-8")
+
+    assert ARCHITECTURE_STUB_RELPATH not in LANGFASSUNG_RELPATHS
+    assert doc_facts._langfassung_path(root) is None
+    assert stale_upstream_status(root) == WIKI_FRESH, (
+        "the stub must not answer the extraction — it is a pointer, not a source"
+    )
+
+
+def test_stale_upstream_prefers_the_post_w4_location(tmp_path):
+    """After W4 the declaration lives in ``docs/architecture/`` — and wins.
+
+    Both spellings exist during the wave: the new location and the legacy one
+    still on disk. The post-W4 path must take precedence, otherwise a stale
+    copy left behind at the old path would keep answering after the migration.
+    """
+    root = _make_project(tmp_path, langfassung_body=FRESH_DECLARATION)
+    legacy = root / LEGACY_LANGFASSUNG_RELPATH
+    legacy.write_text(f"# legacy\n\n{STALE_DECLARATION}\n", encoding="utf-8")
+
+    assert doc_facts._langfassung_path(root) == root / LANGFASSUNG_RELPATH
+    assert stale_upstream_status(root) == WIKI_FRESH
+
+
+def test_stale_upstream_accepts_the_legacy_location_before_w4(tmp_path):
+    """Between W1-4 and W4-1 the Langfassung still sits at its old path.
+
+    Without the legacy spelling the marker would read ``""`` for the whole
+    window — a silent regression that only shows up as "the tag disappeared".
+    """
+    root = _make_project(tmp_path, langfassung_body=None)
+    legacy = root / LEGACY_LANGFASSUNG_RELPATH
+    legacy.write_text(f"# legacy\n\n{STALE_DECLARATION}\n", encoding="utf-8")
+
+    assert doc_facts._langfassung_path(root) == legacy
+    assert stale_upstream_status(root) == STALE_UPSTREAM_STATUS
+
+
+def test_stale_upstream_missing_langfassung_is_fail_soft(tmp_path):
+    """No Langfassung at all: ``""`` plus one debug, never a raise."""
+    log = _StubLog()
+    assert stale_upstream_status(tmp_path, log=log) == WIKI_FRESH
+    assert len(log.calls) == 1
+    target, message = log.calls[0]
+    assert target == "docs"
+    assert LANGFASSUNG_RELPATH in message, "the message must name what was looked for"
+
+
+def test_stale_upstream_matches_the_declaration_the_real_wiki_index_cites():
+    """The real bundle: the machine extraction agrees with the hand-written tag.
+
+    ``knowledge/wiki/index.md:24`` and the wiki frontmatter carry
+    ``status:stale-upstream`` by hand today. Until W5 removes those hand-written
+    tags, the extraction must **agree** with them — a disagreement means the
+    hand tag or the extraction is wrong, and both are load-bearing for AC-29(c).
+
+    The oracle reads the hand-written tag from the files themselves; the literal
+    ``status:stale-upstream`` string is the tag's *name* (a contract value from
+    IC-03), not an expected count.
+    """
+    hand_tagged: set[str] = set()
+    for page in sorted((REPO_ROOT / WIKI_ROOT_RELPATH).rglob("*.md")):
+        frontmatter = yaml.safe_load(
+            _frontmatter_segment(page.read_text(encoding="utf-8")) or "{}"
+        )
+        for tag in (frontmatter or {}).get("tags") or []:
+            if isinstance(tag, str) and tag.startswith("status:"):
+                hand_tagged.add(tag)
+
+    assert hand_tagged, "premise: the real wiki still carries hand-written status tags"
+    extracted = stale_upstream_status(REPO_ROOT)
+    assert extracted in hand_tagged, (
+        f"machine extraction {extracted!r} is not among the hand-written tags "
+        f"{sorted(hand_tagged)}"
+    )
+
+
+def test_real_wiki_architecture_page_is_reported_missing_derived_from():
+    """AC-10's live instance: the real bundle has unannotated Architecture pages.
+
+    This is the observation W2-3 turns into a V7 finding. Asserting it here
+    keeps the resolver honest against the real tree (the synthetic fixtures
+    prove the logic; this proves the premise that there is something to find).
+    """
+    states = compute_wiki_staleness(REPO_ROOT / WIKI_ROOT_RELPATH, REPO_ROOT)
+    unannotated = {
+        relpage for relpage, value in states.items() if value == WIKI_MISSING_DERIVED_FROM
+    }
+    assert unannotated, (
+        "premise broken: no Architecture page lacks derived-from — W5 has "
+        "annotated the whole bundle, so the V7 fixture must be re-derived"
+    )
+    for relpage in unannotated:
+        page = REPO_ROOT / WIKI_ROOT_RELPATH / relpage
+        frontmatter = yaml.safe_load(
+            _frontmatter_segment(page.read_text(encoding="utf-8")) or "{}"
+        ) or {}
+        assert frontmatter.get("type") == WIKI_ARCHITECTURE_TYPE, relpage
+        assert not frontmatter.get(DERIVED_FROM_KEY), relpage

@@ -7,11 +7,76 @@ is identical before and after a call (IC-01, AC-01). Every fact that cannot be
 computed yields ``""`` (fail-soft, the contract of ``_load_block_snippet``,
 ``config.py``); the generator must never abort a sync over a number.
 
-Scope of this revision (plan tasks W1-2 + W1-3): the scalar formulas of the
-IC-02 table, the ``volatile`` marking, the seven ``*_BLOCK`` bodies and the
-gate-aware active-role set (IC-04). ``FACT_KEYS`` plus ``_FACT_COMPUTERS`` is the
-sanctioned extension point; a fact that is not registered there keeps the
-fail-soft default ``""``.
+Scope of this revision (plan tasks W1-2 … W1-4): the scalar formulas of the
+IC-02 table, the ``volatile`` marking, the seven ``*_BLOCK`` bodies, the
+gate-aware active-role set (IC-04) and the wiki staleness resolver (IC-03).
+``FACT_KEYS`` plus ``_FACT_COMPUTERS`` is the sanctioned extension point for
+*facts*; a fact that is not registered there keeps the fail-soft default ``""``.
+
+**IC-03: the staleness resolver is a direct reader, not a fact.** No IC-02 fact
+consumes it yet (the V7 check that would is plan task W2-3), so it is
+deliberately **not** wired into ``_FACT_COMPUTERS`` — that registry claims a
+placeholder the IC-02 table does not enumerate. It keeps the same two
+disciplines as the fact path: pure reader (no write under either root) and
+fail-soft (a missing source answers ``""`` plus exactly one ``log.debug``,
+never a ``SyncError``, never a fabricated ``0`` or ``age-0d``), with no
+module-global cache and no memoisation of a failure.
+
+**IC-03 KNOWN NON-DETERMINISM (F4 + F5) — escalated to the plan owner, not
+decided here.** Two of the four states are decided by the *environment* or by
+the *clock* rather than by the content, so the same commit can answer two
+different ways. Neither is repaired in this module: IC-03 mandates the formulas
+and the spec is not this task's to edit. Both are recorded here so that no
+consumer (W2-3's check, W3's generated documentation) treats a value as stable
+without reading this first, and so that a later "fix" is a deliberate spec
+decision rather than an accident.
+
+* **F4 — ``stale-source`` is not clone-stable.** The verdict is
+  ``mtime(derived-from) > derived-at``, and ``git clone`` rewrites every
+  ``mtime`` to checkout time. On a **fresh clone** essentially every annotated
+  ``type: Architecture`` page therefore reports ``stale-source``, while a
+  long-lived checkout of the *same commit* reports ``age-<n>d`` or ``""`` for
+  the very same pages: one commit, two opposite verdicts, decided by how the
+  working copy was obtained. The deterministic alternative is the **tracked**
+  last-commit date (``git log -1 --format=%cI -- <path>``) instead of the
+  filesystem, which travels with the commit — but IC-03 mandates ``mtime``, so
+  that swap is a spec change. Escalated to the plan owner **before W2-3**
+  (which renders the value into a finding) and **W3**.
+* **F5 — ``age-<n>d`` changes every day.** It depends only on ``derived-at``
+  plus the wall clock, so it *is* clone-stable — but ``n`` moves with the day
+  the resolver runs. Once W3 renders it into **tracked** documentation that
+  becomes guaranteed daily hand-edit drift: a run of the check produces a diff
+  for pages whose content did not change, and the diff is a wall-clock artefact
+  masquerading as a content change. Whether W3 renders the day count, renders
+  the state with the number suppressed, or omits the state entirely is a **W3
+  decision**. Escalated to the plan owner.
+
+**F8 — ``missing-derived-from`` means "no *usable* ``derived-from``".** A
+``type: Architecture`` page whose ``derived-from`` is **present but unusable**
+(non-string, empty, or not expressible relative to the project root) takes the
+same branch as a page that declares nothing, and is reported
+``missing-derived-from``. The reading is accepted: it cannot mislabel a healthy
+page (a *usable* value never reaches this branch, and a non-Architecture page
+is unaffected either way), but the **label is imprecise** — a V7 finding text
+built from it would claim a value is missing when one is present. IC-03 pins
+the value domain to exactly **four** states, so no fifth
+``unusable-derived-from`` state may be introduced here; the distinction belongs
+in the *finding text* that W2-3 renders, not in the state. Recorded for W2-3.
+
+**F9 — the ``status:stale-upstream`` extraction is a match on prose.**
+:func:`_extract_stale_upstream` recognises the marker by a **string match**
+("re-review is due" / "re-review is overdue") against a line the Langfassung
+writes about **itself**. There is no structured marker, and none is introduced
+here: IC-03 deliberately makes the upstream's own self-wording the source of
+truth, and a machine marker would pre-empt the W4-1 rewrite that decision is
+waiting for. The consequence is an **ownership obligation**: *W4-1 owns that
+prose, and in the same commit it must update :func:`_extract_stale_upstream`
+and re-derive the oracle test*
+(``test_stale_upstream_matches_the_declaration_the_real_wiki_index_cites`` in
+``tests/test_doc_facts.py``). A rewording that leaves the extractor alone
+flips the behaviour **silently** — the marker simply stops being extracted, with
+no error anywhere; the suite goes red only if a human happens to reword the
+fixture in the same change.
 
 **``DOCS_AGENTS_ACTIVE_COUNT`` is gate-aware, never ``len(roles)`` (F13/F21).**
 The number comes from :func:`compute_active_roles`, which intersects the
@@ -63,6 +128,15 @@ digest (``scripts/``, ``config/``, ``agents/1-generic/``, ``agents/2-platform/``
 ``agents/2-platform/`` (templates). The per-call memo keeps every one of them a
 single read per call.
 
+**The governing rule for the digest, and why ``knowledge/`` joins it in W1-4.**
+A source root must be inside ``FACT_SOURCE_PATHS`` **at the moment the fact
+starts reading it**; a root added afterwards voids the AC-01 no-write invariant
+for everything already read. The staleness resolver is the first reader of
+``knowledge/wiki/``, so W1-4 is the commit that adds ``knowledge`` to the digest
+in the same breath. ``knowledge/sources/`` is immutable raw data (NG-2) and is
+never written by anything in this module — the resolver only ever reads
+``knowledge/wiki/``.
+
 **Consumer obligation for W2-4 (recorded, not implemented here).**
 :class:`FactUnavailable` is a module-local exception, deliberately leaked (there
 is no ``__all__``): it signals *a source is missing or unreadable* and nothing
@@ -89,6 +163,7 @@ entry in the test oracle ``IC02_KEYS`` (``tests/test_doc_facts.py``).
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import NamedTuple
 
@@ -904,6 +979,342 @@ def _doc_repo_facts_block(context: FactContext) -> str:
         for name in _STABLE_SCALAR_FACT_KEYS
     ]
     return _md_table(("Fact", "Value"), rows)
+
+
+# --------------------------------------------------------------------------
+# wiki staleness resolver (IC-03)
+# --------------------------------------------------------------------------
+#
+# This is a **direct reader**, not a fact computer: no IC-02 fact consumes it
+# yet (the V7 check that would is plan task W2-3), so registering it in
+# ``_FACT_COMPUTERS`` would claim a placeholder the IC-02 table does not
+# enumerate. Like the rest of the module it is a pure reader — it writes nothing
+# under either root and never raises a ``SyncError``.
+
+WIKI_ARCHITECTURE_TYPE: str = "Architecture"
+"""``knowledge/schema.md`` ``type:`` value that carries the derived-from duty.
+
+Only this type is *required* to declare a ``derived-from``. Every other page type
+is reported ``""`` when it has none: a stale-provenance finding on a page that
+never claimed a provenance would be an invented finding — the F21 failure mode
+in a new costume.
+"""
+
+#: Machine-extracted marker that replaces the hand-maintained
+#: ``status:stale-upstream`` wiki tag (IC-03). Derived from the **Langfassung**
+#: header — see :data:`LANGFASSUNG_RELPATHS`.
+STALE_UPSTREAM_STATUS: str = "status:stale-upstream"
+
+#: The **Langfassung** (full architecture text), in resolution order.
+#:
+#: ``docs/architecture/00-overview-full.md`` is its location **after** W4
+#: (M-1/M-7); ``ARCHITECTURE.full.md`` is where it lives until that wave has
+#: run, so both are accepted rather than reporting "source missing" for the
+#: whole window between W1-4 and W4-1.
+#:
+#: ``ARCHITECTURE.md`` is deliberately **absent**. It is the generated stub, and
+#: after W4 it carries no prose of its own (M-2) — the stale declaration moves
+#: out of it. Reading the stub is exactly the circularity Spec A12 / M5
+#: describes: once W4 has run the extraction source would simply be gone and V7
+#: would have no carrier left. :data:`ARCHITECTURE_STUB_RELPATH` names the stub
+#: so the exclusion stays assertable.
+LANGFASSUNG_RELPATHS: tuple[str, ...] = (
+    "docs/architecture/00-overview-full.md",
+    "ARCHITECTURE.full.md",
+)
+
+#: The generated stub — named for that assertion, never read as a source.
+ARCHITECTURE_STUB_RELPATH: str = "ARCHITECTURE.md"
+
+#: Frontmatter keys of the W5 provenance annotation (M-9, AC-31).
+DERIVED_FROM_KEY: str = "derived-from"
+DERIVED_AT_KEY: str = "derived-at"
+
+#: IC-03's four states. ``""`` is "fresh" and doubles as the fail-soft default.
+WIKI_FRESH: str = ""
+WIKI_MISSING_DERIVED_FROM: str = "missing-derived-from"
+WIKI_STALE_SOURCE: str = "stale-source"
+WIKI_AGE_PREFIX: str = "age-"
+
+
+def _langfassung_path(project_root: Path) -> Path | None:
+    """First existing Langfassung below ``project_root``, else ``None``.
+
+    Never the :data:`ARCHITECTURE_STUB_RELPATH` stub (Spec A12, IC-03).
+    """
+    root = Path(project_root)
+    for relpath in LANGFASSUNG_RELPATHS:
+        candidate = root / relpath
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _extract_stale_upstream(langfassung: Path) -> str:
+    """The Langfassung's self-declared upstream-stale marker, or ``""``.
+
+    The Langfassung states its own review state in its header::
+
+        > Repo version: 0.92.0 — content last substantively reviewed:
+        > 2026-07-20 (predates several releases; a full architecture re-review
+        > is due — …)
+
+    Reading that sentence **is** the machine-side extraction IC-03 asks for: the
+    ``status:stale-upstream`` wiki tag stops being a hand declaration and
+    becomes a derived value.
+
+    The signal is the upstream's own wording about *itself*, not a repo-wide
+    comparison. A version or date heuristic would re-flag the page on every
+    ``VERSION`` bump — a permanent false alarm, which is precisely the failure
+    mode this module exists to remove (F21). "A full re-review is due" is a
+    deliberate, human-authored statement about that one document; a version bump
+    is not.
+
+    Fails soft: an unreadable or marker-free Langfassung yields ``""`` (fresh),
+    never a fabricated marker.
+    """
+    try:
+        text = langfassung.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    for line in text.splitlines():
+        stripped = line.strip().lstrip(">").strip()
+        if not stripped.lower().startswith("repo version:"):
+            continue
+        lowered = stripped.lower()
+        if "re-review is due" in lowered or "re-review is overdue" in lowered:
+            return STALE_UPSTREAM_STATUS
+    return ""
+
+
+def _parse_iso_date(value: object) -> datetime | None:
+    """Parse an ISO-8601 date/timestamp from frontmatter, ``None`` if unusable.
+
+    YAML resolves an unquoted ``2026-09-03`` to a ``datetime.date`` and a full
+    timestamp to a ``datetime``; a quoted value stays a ``str``. All three are
+    accepted. A naive value is read as UTC so the comparison against a
+    filesystem ``mtime`` (epoch seconds, UTC) is apples-to-apples.
+
+    Returns ``None`` — never ``epoch`` — for an unusable value: a fabricated
+    timestamp would make every page look either ancient or brand new.
+    """
+    parsed: datetime | None
+    if isinstance(value, datetime):
+        parsed = value
+    elif isinstance(value, date):
+        # Naive on purpose: UTC is attached once, at the single normalisation
+        # point below, so all three accepted spellings share one tz decision.
+        parsed = datetime(value.year, value.month, value.day)  # noqa: DTZ001 — naive by design
+    elif isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        try:
+            parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    else:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def _normalise_derived_from(raw: object, page: Path, wiki_root: Path) -> str:
+    """The ``derived-from`` value as a project-root-relative path, or ``""``.
+
+    A wiki-relative value (``../..``-prefixed — the convention the migrated
+    pages already use for their ``resource:`` field) is rewritten against the
+    **project root**, so both spellings reach the same file. A value that is not
+    a non-empty string, or one that cannot be expressed relative to the project
+    root, yields ``""``; the caller maps that to ``missing-derived-from``.
+    """
+    if not isinstance(raw, str):
+        return ""
+    text = raw.strip().strip("\"'")
+    if not text:
+        return ""
+    candidate = Path(text)
+    if not candidate.is_absolute() and not text.startswith(".."):
+        return candidate.as_posix()
+    try:
+        # knowledge/wiki/<page> -> up two levels is the project root.
+        base = Path(wiki_root).resolve().parent.parent
+        return (page.parent / candidate).resolve().relative_to(base).as_posix()
+    except (OSError, ValueError):
+        # Unresolvable, or outside the project root: unusable, not fresh.
+        return ""
+
+
+def _resolve_derived_source(project_root: Path, relpath: str) -> Path | None:
+    """Resolve a page's ``derived-from`` against ``project_root``.
+
+    ``None`` when the target does not exist, cannot be resolved, or escapes the
+    project root. The caller then degrades to ``""`` plus exactly one
+    ``log.debug`` (IC-01) — never to a fabricated age, never to a ``SyncError``.
+    """
+    root = Path(project_root)
+    try:
+        base = root.resolve()
+        resolved = (root / relpath).resolve()
+    except OSError:
+        return None
+    try:
+        resolved.relative_to(base)
+    except ValueError:
+        return None
+    return resolved if resolved.is_file() else None
+
+
+def _source_mtime(path: Path) -> float | None:
+    """``mtime`` of ``path`` in epoch seconds, ``None`` when unreadable."""
+    try:
+        return path.stat().st_mtime
+    except OSError:
+        return None
+
+
+def _wiki_pages(wiki_root: Path) -> list[Path]:
+    """Every Markdown page below ``wiki_root``, sorted — deterministic order."""
+    return sorted(p for p in Path(wiki_root).rglob("*.md") if p.is_file())
+
+
+def _wiki_page_staleness(
+    page: Path,
+    wiki_root: Path,
+    project_root: Path,
+    log: object | None,
+) -> str:
+    """One page's state — see :func:`compute_wiki_staleness`."""
+    frontmatter = parse_frontmatter_file(page)
+    relpage = page.relative_to(wiki_root).as_posix()
+    derived_from = _normalise_derived_from(
+        frontmatter.get(DERIVED_FROM_KEY), page, wiki_root
+    )
+    if not derived_from:
+        page_type = frontmatter.get("type")
+        if isinstance(page_type, str) and page_type.strip() == WIKI_ARCHITECTURE_TYPE:
+            return WIKI_MISSING_DERIVED_FROM
+        return WIKI_FRESH
+
+    source = _resolve_derived_source(project_root, derived_from)
+    if source is None:
+        _debug(
+            log,
+            "docs",
+            f"wiki_staleness: {relpage}: derived-from target missing: {derived_from}",
+        )
+        return WIKI_FRESH
+
+    derived_at = _parse_iso_date(frontmatter.get(DERIVED_AT_KEY))
+    if derived_at is None:
+        _debug(
+            log,
+            "docs",
+            f"wiki_staleness: {relpage}: no usable {DERIVED_AT_KEY} "
+            f"({frontmatter.get(DERIVED_AT_KEY)!r})",
+        )
+        return WIKI_FRESH
+
+    mtime = _source_mtime(source)
+    if mtime is None:
+        _debug(log, "docs", f"wiki_staleness: {relpage}: cannot stat {derived_from}")
+        return WIKI_FRESH
+
+    if mtime > derived_at.timestamp():
+        return WIKI_STALE_SOURCE
+
+    age_days = (datetime.now(timezone.utc) - derived_at).days
+    if age_days < 1:
+        # A zero age is the *absence* of an observation, not a measurement.
+        return WIKI_FRESH
+    return f"{WIKI_AGE_PREFIX}{age_days}d"
+
+
+def compute_wiki_staleness(
+    wiki_root: Path,
+    project_root: Path,
+    *,
+    log: object | None = None,
+) -> dict[str, str]:
+    """Map every wiki page to its computed staleness state (IC-03).
+
+    Keys are the page paths relative to ``wiki_root`` in POSIX form (e.g.
+    ``concepts/architecture.md``). Every value is exactly one of
+
+    * ``""`` — fresh, *or* not answerable (the fail-soft default, IC-01),
+    * ``"missing-derived-from"`` — a ``type: Architecture`` page with no
+      ``derived-from``; this is the V7-ERROR source (checked in W2-3),
+    * ``"stale-source"`` — ``mtime(derived-from) > derived-at``,
+    * ``"age-<n>d"`` — an **observation, not a status**: the page's derivation
+      is ``n`` whole days old. ``n == 0`` is reported fresh rather than as
+      ``age-0d``, because a zero age is the absence of an observation.
+
+    Precedence when several apply: ``missing-derived-from`` beats
+    ``stale-source`` beats ``age-<n>d``.
+
+    **``status:stale-upstream`` is machine-extracted, not declared** — see
+    :func:`stale_upstream_status`, which is the single extraction point for the
+    field that used to be hand-maintained in the wiki frontmatter
+    (``knowledge/wiki/index.md:24``).
+
+    **Fail-soft (IC-01).** A missing or unreadable source yields ``""`` plus
+    exactly one ``log.debug`` — never a ``SyncError``, never a fabricated ``0``
+    or ``age-0d``. A missing ``wiki_root`` yields ``{}``.
+
+    **Pure reader.** Nothing is written under either root, and nothing is cached
+    across calls: a second invocation re-reads the wiki and the sources, so a
+    change on disk between two calls is observed (the same per-call discipline
+    ``FactContext.sources`` follows — no module-global cache, and a failing
+    source is never memoised, so it is re-reported on every call instead of
+    going quiet after the first).
+    """
+    wiki = Path(wiki_root)
+    project = Path(project_root)
+    try:
+        pages = _wiki_pages(wiki)
+    except OSError as exc:
+        _debug(log, "docs", f"wiki_staleness: cannot list {wiki}: {exc}")
+        return {}
+
+    if not pages:
+        _debug(log, "docs", f"wiki_staleness: no wiki pages below {wiki}")
+        return {}
+
+    result: dict[str, str] = {}
+    for page in pages:
+        relpage = page.relative_to(wiki).as_posix()
+        result[relpage] = _wiki_page_staleness(page, wiki, project, log)
+    return result
+
+
+def stale_upstream_status(
+    project_root: Path,
+    *,
+    log: object | None = None,
+) -> str:
+    """The machine-extracted ``status:stale-upstream`` marker, or ``""``.
+
+    The public extraction point for the field that used to be a hand-maintained
+    wiki tag (IC-03). It reads the **Langfassung**
+    (:data:`LANGFASSUNG_RELPATHS`) and never the ``ARCHITECTURE.md`` stub —
+    see that constant for why the distinction is load-bearing after W4
+    (Spec A12, M-5).
+
+    Fail-soft: no Langfassung, an unreadable one, or one without the
+    self-declaration all answer ``""`` (fresh) plus at most one ``log.debug``.
+    Never a ``SyncError`` and never a fabricated marker.
+    """
+    langfassung = _langfassung_path(Path(project_root))
+    if langfassung is None:
+        _debug(
+            log,
+            "docs",
+            f"stale_upstream: no Langfassung below {project_root} "
+            f"(looked for {', '.join(LANGFASSUNG_RELPATHS)})",
+        )
+        return ""
+    return _extract_stale_upstream(langfassung)
 
 
 #: Sanctioned extension point. A key that is absent keeps ``FACT_UNAVAILABLE``.
