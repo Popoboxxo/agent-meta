@@ -87,6 +87,7 @@ import yaml
 from scripts.lib import config as config_lib
 from scripts.lib import doc_facts
 from scripts.lib import roles as roles_lib
+from scripts.lib.consistency import docs as docs_lib
 from scripts.lib.consistency import placeholders as placeholders_lib
 from scripts.lib.doc_facts import (
     AGENT_HELPER_PREFIX,
@@ -2164,3 +2165,302 @@ def test_real_wiki_architecture_page_is_reported_missing_derived_from():
         ) or {}
         assert frontmatter.get("type") == WIKI_ARCHITECTURE_TYPE, relpage
         assert not frontmatter.get(DERIVED_FROM_KEY), relpage
+
+
+# ---------------------------------------------------------------------------
+# W2-1 — V1 ``check_no_manual_counts`` (AC-07, AC-08; spec IC-05 §5.1.1)
+# ---------------------------------------------------------------------------
+#
+# **Fixture reconciliation (plan defect, reported not papered over).** The
+# plan's W2-1 acceptance describes one fixture that holds the positive block
+# *plus* one case per suppression *plus* the counter-probe, while the same
+# task's verification demands ``wc -l < tests/fixtures/docs_v1_fixtures.md``
+# → **4**. Both cannot hold in one file. The machine-checkable gate wins: the
+# committed fixture is **exactly** the four quoted lines and nothing else, and
+# the three suppression cases plus the counter-probe are built as tmp trees
+# inside the tests below. The reconciliation is deliberately *not* written into
+# the fixture as a comment, because a fifth line would break the very gate the
+# fixture exists to satisfy — this comment is the fixture's documentation.
+#
+# **No expected fact values here (Spec NEW-8).** The four fixture lines are
+# *input* text quoted verbatim from the spec (§5.1.1, itself quoted 1:1 from
+# ``README.md``) and are contract values, not computed numbers. The numbers
+# this test asserts are structural: how many findings a four-line document
+# produces, and which line each belongs to. Expected *facts* live in
+# ``config/doc-facts-expected.yaml`` (IC-23).
+#
+# **Line 4 and the spec's own regex.** §5.1.1 writes V1b as
+# ``\b\d+\.\d+\.\d+...\b``. That pattern cannot match its own positive fixture
+# line ``VERSION   # Current version (v1.0.0)`` — a word character sits in
+# front of the leading digit, so ``\b`` fails. The implementation uses a
+# lookbehind that tolerates the ``v`` prefix instead; without that the mandated
+# line 4 finding is unreachable. See ``_V1_SEMVER_RE``.
+
+V1_FIXTURE_RELPATH = "tests/fixtures/docs_v1_fixtures.md"
+V1_FIXTURE = REPO_ROOT / V1_FIXTURE_RELPATH
+
+#: The four lines §5.1.1 mandates, in order, byte for byte.
+V1_QUOTED_LINES = (
+    "## Agent Roster — 74 Generic Agents",
+    "## Hooks (7 hooks, propagated to all providers)",
+    "  ai-providers.yaml          # 6 provider configs (Claude, Gemini, "
+    "Opencode, Continue, Copilot, Mammouth)",
+    "VERSION                      # Current version (v1.0.0)",
+)
+
+#: §5.1.1 negative fixture, one case per suppression, plus the counter-probe.
+V1_REGION_CASE = (
+    "<!-- agent-meta:docs-begin facts -->\n"
+    "| Agents | 74 |\n"
+    "<!-- agent-meta:docs-end facts -->\n"
+)
+V1_EXEMPT_CASE = (
+    "## Agent Roster — 74 Generic Agents "
+    "<!-- agent-meta:docs-exempt: Beispiel -->\n"
+)
+V1_FENCE_CASE = "```text\n## Hooks (7 hooks)\n```\n"
+V1_COUNTER_PROBE = "| Agents | 74 |\n"
+
+
+def _v1_findings(monkeypatch, root: Path, relpaths: tuple[str, ...],
+                 config: dict | None = None) -> list:
+    """Run V1 over exactly ``relpaths`` — the scan list is a module constant so
+    the test can point the check at a fixture without a repo-root heuristic."""
+    monkeypatch.setattr(docs_lib, "V1_SCAN_RELPATHS", relpaths)
+    return docs_lib.check_no_manual_counts(root, config)
+
+
+def _v1_tree(tmp_path: Path, relpath: str, body: str) -> Path:
+    path = tmp_path / relpath
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(body, encoding="utf-8")
+    return tmp_path
+
+
+def test_v1_fixture_is_exactly_the_four_quoted_lines():
+    """The plan's hard gate: four lines, verbatim, nothing else in the file.
+
+    ``wc -l`` counts newlines, so the file has to end in one — asserted here
+    rather than left to the shell, because a fixture without a trailing
+    newline would report 3 and every other assertion in this section would
+    still pass.
+    """
+    text = V1_FIXTURE.read_text(encoding="utf-8")
+    assert text.endswith("\n"), "the fixture must be newline-terminated for wc -l"
+    assert text.count("\n") == len(V1_QUOTED_LINES)
+    assert text.splitlines() == list(V1_QUOTED_LINES)
+
+
+def test_v1_positive_fixture_yields_exactly_four_findings(monkeypatch):
+    """AC-07: four findings, WARNING, correct check, line and branch each.
+
+    Lines 1-3 are the counted-thing branch, line 4 the version branch — the
+    heading case the rev-0.1 regex never covered is line 1.
+    """
+    findings = _v1_findings(monkeypatch, REPO_ROOT, (V1_FIXTURE_RELPATH,))
+
+    assert len(findings) == 4
+    assert [f.line for f in findings] == [1, 2, 3, 4]
+    assert [f.branch for f in findings] == ["V1a", "V1a", "V1a", "V1b"]
+    assert {f.severity for f in findings} == {docs_lib.Severity.WARNING}
+    assert {f.check for f in findings} == {"docs.no_manual_counts"}
+    assert {f.file for f in findings} == {V1_FIXTURE_RELPATH}
+    for finding in findings:
+        assert str(finding.line) in finding.message, (
+            "the console report has no line column — the number belongs in the "
+            "message until Finding grows a line field"
+        )
+
+
+def test_v1_reports_the_number_and_the_noun(monkeypatch):
+    """§5.1.1: the finding names the number token and the noun, not the value.
+
+    A V1 finding is about the *absence of a marker region*, so the message has
+    to point at the two tokens that made it fire — otherwise the author cannot
+    tell a count from a line-number reference without re-reading the regex.
+    """
+    findings = _v1_findings(monkeypatch, REPO_ROOT, (V1_FIXTURE_RELPATH,))
+    counted = [f for f in findings if f.branch == "V1a"]
+
+    assert len(counted) == 3
+    for finding, line in zip(counted, V1_QUOTED_LINES[:3], strict=True):
+        number = line.split("—")[-1].split("#")[-1].split()[0]
+        assert f"{number!r}" in finding.message, finding.message
+    assert "v1.0.0" in findings[-1].message
+
+
+@pytest.mark.parametrize(
+    ("body", "why"),
+    [
+        (V1_REGION_CASE, "marker region"),
+        (V1_EXEMPT_CASE, "docs-exempt marker"),
+        (V1_FENCE_CASE, "fenced code block"),
+    ],
+    ids=["marker-region", "docs-exempt", "fenced-code"],
+)
+def test_v1_suppression_cases_produce_no_finding(monkeypatch, tmp_path, body, why):
+    """§5.1.1 suppression rules 1-3, one case each, zero findings.
+
+    Each body carries a *different* counted number, so a suppression that
+    works by accident — e.g. by swallowing the whole file — cannot pass all
+    three. The bodies are written to ``README.md`` so the check needs no scan
+    list override.
+    """
+    root = _v1_tree(tmp_path, "README.md", body)
+    assert _v1_findings(monkeypatch, root, ("README.md",)) == [], why
+
+
+def test_v1_generated_file_is_suppressed(monkeypatch, tmp_path):
+    """§5.1.1 suppression rule 4: a generated file cannot hold a manual count.
+
+    ``docs/INDEX.md`` is written by the generator, so every number in it is
+    computed; V1 reporting there would be a permanent false positive. The
+    control on the same tree is what makes this a test of the *file* rule and
+    not of the line rules: byte-identical content in ``README.md`` must fire.
+    """
+    generated_body = V1_COUNTER_PROBE
+    root = _v1_tree(tmp_path, "docs/INDEX.md", generated_body)
+    _v1_tree(tmp_path, "README.md", generated_body)
+
+    assert _v1_findings(monkeypatch, root, ("docs/INDEX.md",)) == []
+    control = _v1_findings(monkeypatch, root, ("README.md",))
+    assert len(control) == 1, "the control must fire, else the test proves nothing"
+
+
+def test_v1_counter_probe_outside_every_region_yields_exactly_one(monkeypatch, tmp_path):
+    """§5.1.1: ``| Agents | 74 |`` outside every region is exactly one finding.
+
+    The noun stands *before* the number here, which is the half of the token
+    gap rule the three positive lines do not exercise.
+    """
+    root = _v1_tree(tmp_path, "README.md", V1_COUNTER_PROBE)
+    findings = _v1_findings(monkeypatch, root, ("README.md",))
+
+    assert len(findings) == 1
+    assert findings[0].branch == "V1a"
+    assert findings[0].line == 1
+    assert findings[0].file == "README.md"
+
+
+def test_v1_branches_are_disjoint(monkeypatch, tmp_path):
+    """V1a and V1b can never claim the same characters.
+
+    The property is structural — ``v1a_count_spans`` drops every bare integer
+    that lies inside a dotted numeric token, and every V1b span *is* a dotted
+    numeric token — so it is checked as a span overlap over the fixture and
+    over every real document the check scans, not on four hand-picked lines.
+    """
+    root = _v1_tree(tmp_path, "README.md", V1_QUOTED_LINES[-1] + "\n")
+    assert _v1_findings(monkeypatch, root, ("README.md",))[0].branch == "V1b", (
+        "a version line must not also produce a V1a finding"
+    )
+
+    scanned = 0
+    for relpath in (*docs_lib.V1_SCAN_RELPATHS, V1_FIXTURE_RELPATH):
+        path = REPO_ROOT / relpath
+        if not path.is_file():
+            continue
+        for line in path.read_text(encoding="utf-8").splitlines():
+            scanned += 1
+            for a_start, a_end, _a in docs_lib.v1a_count_spans(line):
+                for b_start, b_end, _b in docs_lib.v1b_version_spans(line):
+                    assert not (a_start < b_end and b_start < a_end), (
+                        f"{relpath}: {line!r} — V1a and V1b overlap"
+                    )
+    assert scanned > 0, "premise: nothing was scanned"
+
+
+def test_v1_severity_follows_checks_strict(monkeypatch, tmp_path):
+    """AC-08: WARNING by default, ERROR once ``checks.strict`` is true.
+
+    Absence and an explicit ``false`` must stay observationally identical
+    (IC-22, the ``knowledge.py:127`` precedence) — a check that invented a
+    third default would be the one place where that promise breaks.
+    """
+    root = _v1_tree(tmp_path, "README.md", V1_QUOTED_LINES[0] + "\n")
+    strict = {"docs-consolidation": {"enabled": True, "checks": {"strict": True}}}
+
+    for config in (None, {}, {"docs-consolidation": {}},
+                   {"docs-consolidation": {"checks": {"strict": False}}}):
+        findings = _v1_findings(monkeypatch, root, ("README.md",), config)
+        assert [f.severity for f in findings] == [docs_lib.Severity.WARNING], config
+
+    findings = _v1_findings(monkeypatch, root, ("README.md",), strict)
+    assert [f.severity for f in findings] == [docs_lib.Severity.ERROR]
+
+
+def test_v1_strict_leaves_the_finding_count_untouched(monkeypatch):
+    """The promotion is a severity change, not a detection change."""
+    strict = {"docs-consolidation": {"checks": {"strict": True}}}
+    warned = _v1_findings(monkeypatch, REPO_ROOT, (V1_FIXTURE_RELPATH,))
+    errored = _v1_findings(monkeypatch, REPO_ROOT, (V1_FIXTURE_RELPATH,), strict)
+
+    assert [(f.line, f.branch) for f in errored] == [
+        (f.line, f.branch) for f in warned
+    ]
+
+
+def test_v1_is_not_wired_into_the_runner_yet():
+    """AC-38: V1 is a no-op in every scenario until W2-7 registers it.
+
+    The common gate (``docs-consolidation.enabled``) and the registration in
+    ``run_checks()`` are W2-7's task. Until then the only way V1 can affect a
+    run is a direct call, which is what this file does — and that is exactly
+    why scenarios 50-56 cannot regress from W2-1.
+    """
+    runner = (REPO_ROOT / "scripts" / "consistency-check.py").read_text(encoding="utf-8")
+    assert "check_no_manual_counts" not in runner, (
+        "W2-1 must not register the check — registration is W2-7"
+    )
+    scenario_configs = sorted(
+        (REPO_ROOT / "tests" / "scenarios" / "configs").glob(
+            "5[0-6]-*.project.yaml"
+        )
+    )
+    assert scenario_configs, "premise: the scenario configs are gone"
+    for path in scenario_configs:
+        assert "docs-consolidation" not in path.read_text(encoding="utf-8"), path
+
+
+def test_existing_docs_checks_keep_signature_and_severity(tmp_path):
+    """W2-7's contract: the three pre-existing checks are untouched.
+
+    IC-05 requires them to keep *signature and severity*; a rename, a new
+    required parameter or a demoted severity would silently change what
+    ``run_checks()`` collects. Both halves are pinned — the parameter list by
+    introspection, the severity by a tree that makes each one fire.
+    """
+    import inspect
+
+    for func in (docs_lib.check_sync_cli_docs, docs_lib.check_ui_help_mappings,
+                 docs_lib.check_readme_docs_index):
+        assert list(inspect.signature(func).parameters) == ["root"], func.__name__
+
+    # Three separate roots: each check needs two files, and a shared root
+    # would let one check's fixture satisfy another's precondition.
+    sync_root = _v1_tree(tmp_path / "cli", "scripts/sync.py", (
+        'parser.add_argument("--validate", action="store_true")\n'
+    ))
+    _v1_tree(sync_root, "docs/api/cli-reference.md", "# CLI reference\n")
+    cli = docs_lib.check_sync_cli_docs(sync_root)
+    assert [(f.check, f.severity) for f in cli] == [
+        ("docs.cli_reference", docs_lib.Severity.ERROR)
+    ], cli
+
+    ui_root = _v1_tree(tmp_path / "ui", "docs/ui/admin-ui.html", (
+        "const routeMap = {\n"
+        '  "/a": "admin-ui-a",\n'
+        "};\n"
+    ))
+    _v1_tree(ui_root, "docs/api/admin-ui-reference.md", "<!-- help-id: other -->\n")
+    ui = docs_lib.check_ui_help_mappings(ui_root)
+    assert [(f.check, f.severity) for f in ui] == [
+        ("docs.ui_help_mappings", docs_lib.Severity.ERROR)
+    ], ui
+
+    index_root = _v1_tree(tmp_path / "index", "docs/api/orphan.md", "# orphan\n")
+    _v1_tree(index_root, "README.md", "# readme\n")
+    index = docs_lib.check_readme_docs_index(index_root)
+    assert [(f.check, f.severity) for f in index] == [
+        ("docs.readme_index", docs_lib.Severity.ERROR)
+    ], index
