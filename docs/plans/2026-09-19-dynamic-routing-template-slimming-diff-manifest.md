@@ -195,3 +195,199 @@ durch Task 17 (Abschluss-Verifikation) konsumiert. Ändert eine spätere Migrati
 muss zuerst `_NORMALIZATIONS` in `tests/test_template_slimming_equivalence.py` und danach dieses
 Manifest aktualisiert werden; ein undeklariertes Near-Duplikat lässt das Äquivalenz-Gate
 fehlschlagen.
+
+## 8. Re-Baseline der Golden-Baseline (außerhalb der Slimming-Migration)
+
+Dieser Abschnitt ist der von der Update-Regel der Golden-Baseline verlangte Manifest-Eintrag für
+eine **bewusste Baseline-Aktualisierung** (Vertrag: `tests/fixtures/slimming-golden/README.md:73-77`;
+Risiko R8: `docs/specs/2026-09-19-dynamic-routing-template-slimming.md:689`). Er ist **keine**
+B2b-Near-Duplikat-Variante und erscheint daher bewusst nicht in den Inventar-Tabellen 3.1–3.3:
+Es wurde kein Block migriert, sondern eine eingefrorene Fixture an eine bereits stattgefundene,
+vorgelagerte Template-Änderung nachgezogen.
+
+> **Autor:** Doku-Agent `documenter` (Orchestrator-Delegation); namentliche Autorschaft wird hier
+> nicht geführt — Nachweis ist der Commit `3874c74b`.
+> **Commit:** `3874c74b` — `fix(tests): re-baseline effort-estimator golden fixture to 1.4.0`
+> (nur `tests/fixtures/slimming-golden/effort-estimator.md`, +39/−4 laut Commit-Stat — Diff-Stat in
+> dieser Doku-Runde nicht neu gemessen; nachgeholt, weil `docs/` zum Commit-Zeitpunkt gesperrt war).
+> **Datum:** 2026-09-26 (Commit-Datum von `3874c74b`; belegt über den Reflog-Eintrag
+> `.git/logs/refs/heads/feat/dynamic-routing-template-slimming:37`, Zeitstempel `1790375112 +0200`,
+> aufgelöst zu 2026-09-26 00:25:12 +0200).
+> **Primärbeleg:** CI zu PR #833 auf Head-SHA `3874c74b` (alle 5 Checks grün, siehe 8.5). Der lokale
+> Wegwerf-Klon `/var/tmp/opencode/ci833-verify2` ist nur reproduzierbarer Zusatz und trägt allein
+> nicht als Nachweis, weil er flüchtig und maschinenlokal ist und nicht Teil dieses Repos ist.
+> **Voraussetzung für 8.2/8.5/8.7:** Diese Abschnitte setzen den Merge-Zustand voraus, der lokal erst
+> nach `git fetch origin main` auflösbar ist, solange `2e8b1708` fehlt (rc 128; Ref-Lage siehe 8.1).
+> **Gegenstand:** `tests/fixtures/slimming-golden/effort-estimator.md` — 1 von **58** eingefrorenen
+> Golden-Fixtures (Aktive-Rollen-Menge, `tests/fixtures/slimming-golden/README.md:36-38`).
+> **Klassifikation:** **Baseline-Update nach Update-Regel**
+> (`tests/fixtures/slimming-golden/README.md:73-77`) — **kein B2a-/B2b-Fall**; siehe 8.2 und 8.7.
+
+### 8.1 Auslöser
+
+Base-Commit `2e8b1708` (`feat(agents): estimation discipline for effort-estimator (#829) (#830)`)
+hob `agents/1-generic/effort-estimator.md` von `version: "1.3.0"` auf `version: "1.4.0"`
+(+37/−3). Inhaltliche Änderungen — **vollständig, 7 Deltas**:
+
+1. Frontmatter-`description` **umformuliert** (… „based on task type and LLM capabilities **— with named
+   assumptions, lead time and slack instead of a bare point value.**").
+2. Versionsfeld `1.3.0` → `1.4.0`.
+3. Neuer Abschnitt `## 7. Provision for the unknowns (audit planning register)`.
+4. **Umnummerierung** des bestehenden Output-Abschnitts `## 7. Output` → `## 8. Output`. Das ist
+   **kein neuer Abschnitt** — der Abschnitt bestand bereits und rutscht durch den eingefügten
+   Abschnitt 3 um eine Nummer.
+5. Neuer `## Provenance`-Block im `<context>` (hinter `## Task Type Catalog`).
+6. Zusätzliche Zeile `Unknowns & Assumptions: [named assumptions, lead time, slack, unproven parts]`
+   im Output-Block.
+7. Drei zusätzliche `<constraints>`-Klauseln (Planungs-Reserve, Scope-Change, Qualitäts-/Termin-Konflikt).
+
+Die Golden-Fixture blieb auf 1.3.0 (eingefrorener Stand nach Block A, vor Block B,
+`tests/fixtures/slimming-golden/README.md:16-20`). Der Versionssprung ist **orthogonal** zur
+Slimming-Änderung: er betrifft den Inhalt der Rolle, nicht die Block-Extraktion.
+
+> **Reproduktionsfalle — nicht „Commit fehlt", sondern veralteter lokaler Ref:** Sowohl der lokale
+> `main`-Ref als auch der Remote-Tracking-Ref `origin/main` stehen auf `deb115aa` und sind gegenüber
+> dem echten Upstream-`main` (`2e8b1708`) **veraltet**. Deshalb scheitern sowohl
+> `git cat-file -t 2e8b1708` als auch `git fetch origin 2e8b1708`, obwohl der Commit upstream
+> existiert (per `git ls-remote` verifiziert; Subject wortgleich zu `2e8b1708`). Der inhaltsgleiche
+> Parent vor dem Squash ist `d45b5bfb` auf `origin/feat/audit-effort-estimator-planning` (dieser Ref
+> ist lokal vorhanden). **Folge:** der Merge-Zustand ist lokal nicht reproduzierbar; der Nachweis
+> erfolgt über CI bzw. nach `git fetch origin main`.
+
+### 8.2 Mechanismus des Fehlschlags
+
+`effort-estimator` steht in **keiner** Registry des Äquivalenz-Moduls (0 Treffer in
+`tests/test_template_slimming_equivalence.py`). Damit greift der Byte-Identitäts-Zweig für
+nicht migrierte Rollen (`tests/test_template_slimming_equivalence.py:1114-1126`, Assertion
+`:1148`): `golden != current` wird als „unexpected diff on an unmigrated role" gewertet.
+
+Eine Markierung als migriert (B2b) war **strukturell nicht möglich**: `_LOCATORS`
+(`tests/test_template_slimming_equivalence.py:348-353`) und `_normalize()`
+(`tests/test_template_slimming_equivalence.py:1073-1097`) arbeiten ausschließlich auf den vier
+Block-Kinds aus `_KIND_CANONICAL_VAR` (`tests/test_template_slimming_equivalence.py:245-250`)
+(`ANTI_RECURSION`, `OUTPUT_GUARD`, `BACKGROUND_PROCESS_GUARD`, `PARSE_INPUT`). Sie erkennen
+Sektionen anhand von Heading-/Tag-Regexen, **keine Versionsstrings** — ein 1.3.0→1.4.0-Delta
+liegt außerhalb des Modells. Eine erfundene `retained`-Klausel oder eine neue Variante hätte den
+Vertrag verletzt statt eingehalten.
+
+### 8.3 Gewählte Fix-Route und Vertragsbeleg
+
+Bewusste, über den **echten Sync-Pfad** erzeugte Re-Baseline nach dem Verfahrensvertrag
+(`tests/fixtures/slimming-golden/README.md:22-41`), ausdrücklich **nicht** als „incidental
+re-render" (`:18-20`) und **nicht** als Handedit. Die Optionen waren damit:
+
+| Option | Bewertung |
+|---|---|
+| Golden-Fixture auf 1.3.0 belassen | Nicht möglich — Template `2e8b1708` ist Vorgänger im Merge-Ref, der Render ist 1.4.0 |
+| Rolle künstlich migrieren / B2b-Variante erfinden | Vertragsbruch (8.2) |
+| `{{AGENT_META_DATE}}`-Sonderregel ausweiten | Nicht anwendbar — der Platzhalter rendert ausschließlich in `agent-meta-manager.md` (`:57-71`) |
+| **Bewusste Re-Baseline + Manifest-Eintrag** | **Gewählt** — genau der in R8 und in der Update-Regel vorgesehene Weg |
+
+### 8.4 Nachweis der Herkunft (keine Handpflege)
+
+- sha256 der Fixture identisch in Arbeitsbaum, Verify-Klon und frischem Sync-Render:
+  `936c2b78556d901fa25129edd094e2d24eef629dc2b5cbdde52ffda00337b8b5`.
+- **Determinismus-Nachweis (Zweitrender) — durchgeführt.** Der Verfahrensvertrag
+  `tests/fixtures/slimming-golden/README.md:43-55` schreibt einen Vergleich zweier Render-Läufe vor
+  (`diff -r` über zwei Zielverzeichnisse, rc 0). Umgesetzt als zwei frische Sync-Läufe des
+  **echten Sync-Pfads** in zwei getrennte temporäre Zielverzeichnisse, anschließend `cmp` über den
+  gesamten Zielbaum: **byte-identisch, `sync` rc 0**. (Vergleichsform `cmp` je Datei statt `diff -r`
+  — gleiche Byte-Aussage, siehe Verfahrensfundstelle oben.)
+- Die Fixture enthält **keinen** Absolutpfad, **keinen** Hostnamen, **keinen** Commit-SHA und
+  **kein** `{{AGENT_META_DATE}}` (geprüft über das gesamte Verzeichnis
+  `tests/fixtures/slimming-golden/`; der einzige Treffer liegt in dessen `README.md`).
+- Frontmatter konsistent: `version: 1.4.0` und `generated-from: 1-generic/effort-estimator.md@1.4.0`
+  (`tests/fixtures/slimming-golden/effort-estimator.md:3` und `:13`).
+
+### 8.5 Verifikation
+
+Verifikationslauf im **Merge-Zustand** (base + head, Wegwerf-Klon `/var/tmp/opencode/ci833-verify2`
+auf dem Merge-Commit, identisch zum CI-Ref):
+
+| Prüfung | Ergebnis |
+|---|---|
+| `pytest tests/test_template_slimming_equivalence.py -q -rs` | **8 passed**, rc 0 |
+| `pytest tests/ -q -rs` (Merge-Klon) | **3118 passed, 0 failed, 18 skipped**, rc 0 — *in der Fix-Runde gemessen, in der Verifikationsrunde **nicht** mit voller Suite wiederholt; umgebungsabhängig* (lokal können Admin-UI-/Django-Setup-Fehler hinzukommen, s. u.) |
+| `python scripts/sync.py --validate` | rc 0 |
+| `python scripts/sync.py --check` | rc 0 |
+| CI (PR #833, Head `3874c74b`) | alle 5 Checks grün |
+
+> **Bewusste Abweichung auf dem ungemergten Branch-Head:** Auf dem ungemergten Head ist das Gate
+> **rot** (inverse Diff: Golden 1.4.0 gegen Render 1.3.0). Das ist kein Regression, sondern
+> notwendige Konsequenz: `2e8b1708` ist Base des PRs und im lokalen Arbeitsbaum nicht enthalten —
+> `agents/1-generic/effort-estimator.md:3` steht dort weiterhin auf `version: "1.3.0"`. Eine
+> Golden-Datei kann nicht 1.3.0 und 1.4.0 gleichzeitig matchen. Da die CI auf dem Merge-Ref rechnet,
+> ist der Merge-Zustand maßgeblich (zur veralteten Ref-Lage siehe 8.1).
+>
+> **Grenze der Aussage (module-genau, nicht suite-weit):** Im B2-Gate-Modul
+> `tests/test_template_slimming_equivalence.py` zeigt ein lokaler Lauf ohne Merge des Base-Branches
+> **genau diesen einen** Fehlschlag: `::test_golden_equivalence_and_normalization_marking` (`:1148`),
+> gemessen 1 failed / 7 passed. Für `pytest tests/` gilt diese Aussage **nicht**: dort kommen
+> umgebungsbedingte Admin-UI-/Django-Setup-Fehler hinzu (lokal gemessen 1 failed / 3131 passed /
+> 35 errors) — unabhängig von dieser Änderung und ohne Bezug zum Golden-Baseline-Vertrag.
+>
+> **Die suite-weiten Summen der beiden Läufe sind nicht gegeneinander zu rechnen:** Merge-Klon und
+> lokaler Lauf sammeln **unterschiedliche Testkollektionen** (unterschiedliche Umgebung →
+> unterschiedliche Collection-/Import-Fehler → verschiedene `passed`-Zahlen). Die Differenz ist damit
+> kein Widerspruch zwischen zwei Messungen derselben Kollektion, sondern ein Umgebungsunterschied.
+
+### 8.6 Bestandsaufnahme aller 58 Goldens
+
+Vorsorge gegen weiteren Skew, vollständig über alle 58 Fixtures (Byte-Vergleich Fixture ↔ gerenderte
+Rolle, Aufteilung nach `_MIGRATED_PATHS`, `tests/test_template_slimming_equivalence.py:235-239`).
+**Zahlenbasis:** eigenständige Nachmessung des test-executors über alle 58 Fixtures; in dieser
+Doku-Runde **nicht** erneut ausgeführt (kein Shell-Tool) — daher als Nachmessung gekennzeichnet, nicht
+als frisch gemessen.
+
+Es existieren **zwei verschiedene Partitionen**; die jeweilige Definition wird hier ausdrücklich
+benannt, weil beide Zahlen jeweils „richtig", aber nur unter ihrer Definition sind:
+
+**(a) Test-native — die Definition, die das Gate durchsetzt** (Zweig
+`tests/test_template_slimming_equivalence.py:1114-1126`): hier gilt „byte-identisch" nur für Rollen
+**außerhalb** von `_MIGRATED_PATHS`; migrierte Rollen werden über `_normalize()` (`:1073-1097`)
+bewertet, nicht byteweise.
+
+| Kategorie | Anzahl | Bedeutung |
+|---|---|---|
+| byte-identisch (unmigriert) | 11 | nicht in `_MIGRATED_PATHS`, Golden == Render |
+| deklariert migriert | 47 | in `_MIGRATED_PATHS`, Abweichung wird von `_NORMALIZATIONS` absorbiert (3.1–3.3) |
+| **echter Skew** | **0** | — |
+
+`_MIGRATED_PATHS` umfasst 74 Pfade, davon **47 aktive Rollen** (Pfad- und Rollenmenge weichen ab,
+weil die Registry auch nicht aktive Pfade enthält).
+
+**(b) Raw-Byte — ohne Normalisierung** (Fixture-Text byteweise gegen den unnormalisierten Render):
+
+| Kategorie | Anzahl | Bedeutung |
+|---|---|---|
+| byte-identisch zum Render | 32 | die 11 unmigrierten aus (a) plus 21 weitere Rollen, deren Delta die Normalisierung nicht berührt (11 + 21 = 32; die Aufteilung 11/21 ist aus der Differenz 32 − 11 abgeleitet, nicht separat gemessen) |
+| raw-abweichend — **alle deklariert migriert** | 26 | werden von `_NORMALIZATIONS` absorbiert (3.1–3.3) |
+| **echter Skew** | **0** | — |
+
+**Stand nach dem Fix (Merge-Zustand, Post-Fix): (b) 32 / 26 / 0 — kein Skew**; in der
+gate-durchgesetzten Definition (a) 11 / 47 / 0.
+
+**Vorher-Zustand / Ausgangslage (Pre-Fix): 31 / 26 / 1.** Genau dieser eine Skew — `effort-estimator`,
+Golden 1.4.0 gegen Render 1.3.0 im ungemergten Baum — war der **Anlass dieses Eintrags**; 31 = 32 −
+`effort-estimator`, also dieselbe Zählweise wie (b). Er ist mit `3874c74b` behoben. Die 31/26/1 sind
+ausdrücklich **Vorher-Stand**, nicht das Ergebnis des Fixes.
+
+Zusätzlich bestätigt: **keine Orphan-Fixture** und **kein Golden ohne Render-Gegenstück** — jede der
+58 Fixtures hat eine gerenderte Rolle, jede gerenderte Rolle eine Fixture.
+
+`agent-meta-manager.md` — die **einzige** Fixture mit `{{AGENT_META_DATE}}`-Sonderfall
+(`tests/fixtures/slimming-golden/README.md:57-71`) — ist durch den Fix **unverändert** geblieben: der
+Re-Baseline-Commit `3874c74b` fasst ausschließlich `tests/fixtures/slimming-golden/effort-estimator.md`
+an, die `{{AGENT_META_DATE}}`-Ausnahme wird also weder neu justiert noch erweitert (8.3).
+
+### 8.7 Status B2a
+
+B2a (Output-Äquivalenz gegen die eingefrorene Baseline) ist durch den Fix **wiederhergestellt**,
+nicht abgeschwächt: das 1.3.0→1.4.0-Delta ist orthogonal zur Slimming-Änderung, und die Fixture
+enthält nach dem Re-Baseline exakt den vom migrierten Template erzeugten Output. Die
+Update-Regel ist erfüllt (Eintrag vorhanden), das Gate ist im Merge-Zustand grün.
+
+Klarstellung zur Einordnung: dies ist eine **Statusaussage** über B2a, keine Klassifikation der
+Änderung als B2a-Fall. Die Änderung selbst ist ein Baseline-Update nach Update-Regel (Kopf-Block
+dieses Abschnitts, Vertrag `tests/fixtures/slimming-golden/README.md:73-77`), weil keine
+Near-Duplikat-Variante und keine Block-Migration vorliegt (8.2).
