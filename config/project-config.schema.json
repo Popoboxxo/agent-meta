@@ -2417,6 +2417,57 @@
         }
       },
       "additionalProperties": false
+    },
+    "docs-consolidation": {
+      "type": "object",
+      "description": "Documentation consolidation (generator + docs checks V1-V9). Convention block for autocomplete and a strict typo guard: the root schema is permissive (additionalProperties: true), so this block closes itself. Fail-off — every key below defaults to its absence default, so a config without the block is unaffected.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Master switch for the doc generator and the docs checks. Fail-off: absent means false, only an explicit true activates."
+        },
+        "index-mode": {
+          "type": "string",
+          "enum": [
+            "full",
+            "skeleton"
+          ],
+          "default": "full",
+          "description": "full = a full index replaces the scaffold skeleton; skeleton = the scaffold skeleton is always kept."
+        },
+        "checks": {
+          "type": "object",
+          "description": "Docs-check severity switches.",
+          "properties": {
+            "strict": {
+              "type": "boolean",
+              "default": false,
+              "description": "Promote the docs checks from WARNING to ERROR. Fail-off: absent means false."
+            }
+          },
+          "additionalProperties": false
+        },
+        "sources": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "description": "Paths of the hybrid (generated + handwritten) files the generator renders into. An empty list means no rendering."
+        },
+        "volatile-facts": {
+          "type": "array",
+          "default": [
+            "DOCS_SCENARIO_COUNT"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "Fact names suppressed inside the hybrid files and excluded from the facts hash, so volatile values do not produce doc churn."
+        }
+      },
+      "additionalProperties": false
     }
   },
   "required": [
