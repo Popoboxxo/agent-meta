@@ -1747,10 +1747,10 @@ Die Zeile bleibt als Historie sichtbar; maßgeblich sind **W2-GATE-V1** und **W2
 (beide im Wellenblock **W2 — Verifikation**). **Diese Task-Zeile ist für sich genommen kein
 Welle-Gate** (RVW-3) — sie prüft die Implementierung, nicht den Wellenabschluss.
 **Steps:**
-- [ ] 1: Test schreiben (fail).
-- [ ] 2: V3 implementieren; Scope `docs/**` + `README.md` + `llms.txt`.
-- [ ] 3: Test grün beobachten; Fehlalarm-Probe auf `http(s)://` und Anker.
-- [ ] 4: commit via `git`-Agent: `feat: add V3 internal link check`.
+- [x] 1: Test schreiben (fail).
+- [x] 2: V3 implementieren; Scope `docs/**` + `README.md` + `llms.txt`.
+- [x] 3: Test grün beobachten; Fehlalarm-Probe auf `http(s)://` und Anker.
+- [x] 4: commit via `git`-Agent: `feat: add V3 internal link check`.
 
 ### W2-3: V7 `check_wiki_staleness`
 
