@@ -395,3 +395,5 @@ repo_containment:
     path: .tmp
     gitignore: true
     cleanup: manual
+docs-consolidation:
+  enabled: true
