@@ -22,20 +22,22 @@ related:
 > Spec. **Kein** `APPROVED` wird erfunden — es liegt eine dokumentierte User-Freigabe vor.
 >
 > **Genehmigungsumfang:** Die Freigabe umfasst die **Ausführung dieses Plans** (W0–W8, 47
-> Tasks) inklusive der im Plan mit Owner und Entscheidungsweg versehenen Entscheidungs-Tasks
-> W0-1/W0-3/W0-6/W0-7/W5-1/W8-1. Die **Checkboxen sind bewusst nicht abgehakt** — das
+> Tasks) inklusive der im Plan mit Owner und Entscheidungsweg versehenen Entscheidungs-Points
+> W0-1/W0-3/W0-6 (davon **OQ2/OQ6/OQ8 bereits entschieden** — Ergebnis-Records) und der noch
+> offenen Entscheidungs-Tasks W0-7/W5-1/W8-1. Die **Checkboxen sind bewusst nicht abgehakt** — das
 > Plan-Ledger bleibt offen, die Genehmigung betrifft den Plan, nicht den Fortschritt. Die
 > Task-Checkboxen werden erst während der Ausführung gesetzt.
 >
 > **Offene Entscheidungen aus der Spec** (bleiben offen, Entscheidung liegt bei den
-> jeweiligen Ownern): **OQ1, OQ2, OQ3, OQ4, OQ9** (Spec §11.1). Durch den Nutzer am
-> 2026-09-26 entschieden und damit geschlossen: **OQ6** (`docs/INDEX.md` = **tracked**) und
-> **OQ8** (Regenerierung deterministisch über **Sync/Validator**, kein Commit-Hook) — Spec
-> §11.2. **Konsequenz für diesen Plan:** die auf OQ6/OQ8 bezogenen Punkte (u. a.
-> `docs/plans/2026-09-25-docs-consolidation-oq6.md` / `-oq8.md`) sind **keine offenen
-> Entscheidungs-Tasks mehr**; sie werden als **Ergebnis-Dokumentation** der getroffenen
-> Entscheidung geführt, nicht als offene Frage. Die Task-Beschreibungen selbst bleiben
-> unverändert und sind bei Ausführungsbeginn gegen diese Entscheidung zu prüfen.
+> jeweiligen Ownern): **OQ1, OQ3, OQ4, OQ9** (Spec §11.1). Durch den Nutzer am
+> 2026-09-26 entschieden und damit geschlossen: **OQ2** (`llms.txt` = **Hybrid**),
+> **OQ6** (`docs/INDEX.md` = **tracked**) und **OQ8** (Regenerierung deterministisch über
+> **Sync/Validator**, kein Commit-Hook) — Spec §11.2. **Konsequenz für diesen Plan:** die auf
+> OQ2/OQ6/OQ8 bezogenen Punkte (u. a. `docs/plans/2026-09-25-docs-consolidation-oq2.md` /
+> `-oq6.md` / `-oq8.md`) sind **keine offenen Entscheidungs-Tasks mehr**; sie werden als
+> **Ergebnis-Dokumentation** der getroffenen Entscheidung geführt, nicht als offene Frage.
+> Die betroffenen Task-Beschreibungen (W0-1, W0-3, W0-6, W1-6, W3-6, W3-7) sind gegen diese
+> Entscheidung **korrigiert** und bei Ausführungsbeginn nochmals abzugleichen.
 >
 > **Ablage:** aktiv in `docs/plans/`, nicht `archive/` — `docs/plans/README.md:3-7`. Archivierung
 > erst nach `STATUS: done` (Merge manuell bestätigt, Skill `plan-ledger`).
@@ -70,8 +72,9 @@ Klassifikation **XL / Architectural** (Spec:62-66).
 
 - **Ausführung freigegeben (2026-09-26).** Das Gate ist erfüllt: die Spec trägt
   `Status: APPROVED` (Freigabe 2026-09-26), dieser Plan trägt `Status: APPROVED (2026-09-26)`.
-  Kein Task startet **vor** der Bestätigung, dass W0-2 (Track-A-Merge-Status) grün ist — der
-  Gate-Task W0-4 bleibt unberührt. Dieser Plan ist ab der Freigabe ein **Startsignal**; die
+  Kein Task startet **vor** der Bestätigung, dass **W0-4** (Track-A-Merge-Status) grün ist —
+  **W0-4 ist das Track-A-Gate** und sperrt W1 und W2; W0-2 ist der Design-Freeze und **kein**
+  Gate. Dieser Plan ist ab der Freigabe ein **Startsignal**; die
   Task-Checkboxen sind zum Freigabezeitpunkt **bewusst alle offen** (Ledger-Start).
 - **Datei-Ownership:** Jede Datei wird in genau **einer** Task geschrieben. `Files:` ist der Input
   für `check_plan_file_overlap` (`scripts/lib/orchestration.py`) und die Barrieren-Gruppen.
@@ -102,7 +105,8 @@ Klassifikation **XL / Architectural** (Spec:62-66).
   mit expliziten Pfaden (`git add <pfad>`; verboten: `git add -A`, `git add .`, `git commit -a`).
 - **Kein Worktree**, Repo-Containment, ein frischer Subagent pro Task (Skill `plan-ledger`).
 - **Keine Platzhalter** (`TODO`/`TBD`/`…`) in diesem Plan. Offene Punkte sind ausschließlich die
-  Entscheidungs-Tasks W0-1/W0-3/W0-6/W0-7/W5-1/W8-1 mit Owner und Entscheidungsweg.
+  Entscheidungs-Tasks W0-7/W5-1/W8-1 (OQ1/OQ9/OQ4) mit Owner und Entscheidungsweg sowie die
+  Ergebnis-Records W0-1/W0-3/W0-6 zu den bereits entschiedenen OQ6/OQ2/OQ8 (Spec §11.2).
 
 ## File Structure
 
@@ -152,8 +156,11 @@ Klassifikation **XL / Architectural** (Spec:62-66).
 - Modify: `.meta-config/project.yaml` — W1-10 fünf additive Keys; W3-4 `checks.strict: true`;
   W6-2 `legacy:` +2 Zeilen (`:61-63`); W7-2/W7-5 `okf.index-mode`; W8-4 `PROJECT_STRUCTURE`
   (`:205-221`).
-- Modify: `.gitignore` — W3-6 **nur** bei OQ6-Entscheidung `untracked`. Bei `tracked` (Empfehlung)
-  unverändert; verifiziert wird stattdessen `git check-ignore -q docs/INDEX.md` → Exit **1**.
+- **Unverändert:** `.gitignore` — OQ6 ist entschieden (2026-09-26): `docs/INDEX.md` ist
+  **tracked**, also gibt es **keinen** `.gitignore`-Eintrag für `docs/INDEX.md`; die Datei
+  `.gitignore` selbst wird von **keinem** Task geschrieben oder verändert. **W3-6 legt
+  `docs/INDEX.md` an und committet sie (tracked)** — W3-6 schreibt **nicht** in `.gitignore`.
+  Verifiziert wird stattdessen `git check-ignore -q docs/INDEX.md` → Exit **1**.
 - Modify: `README.md` — W3-7 Marker-Regionen, W8-2 Totverweise (`:721-724`), W8-3 Providerzahl.
 - Modify: `llms.txt` — W3-7 `:5`/`:24`, W8-3 Providerzahl.
 - Modify: `ARCHITECTURE.md` — W3-7 `:3` als Region, W4-2 Stub.
@@ -196,12 +203,12 @@ Klassifikation **XL / Architectural** (Spec:62-66).
 
 ```
 W0 (6 Tasks, kein Code)
- |- W0-1 DEC-OQ6 -----> blockiert W1-10 und W3-6 (.gitignore)
- |- W0-3 DEC-OQ2 -----> blockiert Abschluss W1
+ |- W0-1 REC-OQ6 -----> Ergebnis-Record, entschieden 2026-09-26: tracked, kein .gitignore-Eintrag
+ |- W0-3 REC-OQ2 -----> Ergebnis-Record, entschieden 2026-09-26: Hybrid (2 Blöcke, Rest Handtext)
  |- W0-4 Track-A-Gate -> blockiert W1 und W2
- |- W0-6 DEC-OQ8 -----> blockiert Abschluss W3
- |- W0-7 DEC-OQ1 -----> blockiert Abschluss W5
- `- W0-2 Freeze -------> blockiert alles
+ |- W0-6 REC-OQ8 -----> Ergebnis-Record, entschieden 2026-09-26: Sync/Validator, kein Hook
+ |- W0-7 DEC-OQ1 -----> blockiert Abschluss W5 (offen)
+ `- W0-2 Freeze -------> blockiert alle W0-Folge-Tasks (W0-1, W0-3, W0-4, W0-6, W0-7)
         v
 PG-1 (3 Ketten parallel, max 3 Agents)
  |- W1-A: W1-1 -> W1-2 -> W1-3 -> W1-4 -> W1-5 -> W1-6   (doc_facts + Config-Bridge)
@@ -239,7 +246,8 @@ PG-5 (1 Agent)                    W8-1 -> W8-2 -> W8-3 -> W8-4
   `scripts/lib/sync_pipeline.py`, `scripts/lib/spec_plan_scaffold.py`,
   `scripts/lib/generated_file_drift.py`, `tests/test_doc_renderer.py`,
   `tests/test_generated_file_drift_docs.py`, `docs/INDEX.md`, `README.md`, `llms.txt`,
-  `ARCHITECTURE.md`, `.meta-config/project.yaml`, `.gitignore`. Überschneidung: keine. Spec §9.2
+  `ARCHITECTURE.md`, `.meta-config/project.yaml`. Überschneidung: keine (`.gitignore` bleibt
+  unberührt, OQ6 entschieden). Spec §9.2
   bestätigt diese Parallelität.
 - **W4/W5/W6 seriell (bewusste Abweichung von Spec §9.2 „Parallel mit“):** die Spec bindet die
   Testdateinamen (§7-Einleitung). AC-28, AC-29, AC-31 und AC-32 verweisen **alle** per `::` auf
@@ -285,23 +293,29 @@ alle Folgewellen bis zur Auflösung.
 **Rollback W0:** `git rm docs/plans/2026-09-25-docs-consolidation-*.md`, Branches löschen; kein
 Code berührt, keine andere Welle invalidiert.
 
-### W0-1: DEC-OQ6 — `docs/INDEX.md` tracked oder untracked
+### W0-1: REC-OQ6 — `docs/INDEX.md` tracked (Ergebnis-Record, entschieden 2026-09-26)
 
 **Files:** Create `docs/plans/2026-09-25-docs-consolidation-oq6.md`
-**Interfaces:** Produces: Entscheidung `tracked|untracked` + Begründung + Folge für `.gitignore`.
-Consumes: Spec §11.1 OQ6, `scripts/lib/spec_plan_scaffold.py:23`, `.meta-config/project.yaml:70`.
-**Agent:** orchestrator · **Depends on:** W0-2 · **parallel_group:** — (sequenziell, Gate-Task)
+**Interfaces:** Produces: **Ergebnis-Record** der Tracking-Entscheidung (**tracked**) +
+Begründung + Folge für `.gitignore`. Consumes: Spec §11.2 **OQ6** (entschieden 2026-09-26),
+`scripts/lib/spec_plan_scaffold.py:23`, `.meta-config/project.yaml:70`.
+**Agent:** orchestrator · **Depends on:** W0-2 · **parallel_group:** — (sequenziell, OQ6-Ergebnis-Record; das Track-A-Gate ist **W0-4**)
 **Ziel-AK (AC):** AC-20, AC-21 (Index-Writer-Vertrag), AC-12 (Index im Repo).
-**Akzeptanz:** Record nennt Entscheidung, Owner, Datum und die exakte `.gitignore`-Folge. Bei
-`tracked` (Spec-Empfehlung, Spec:1705) bleibt `.gitignore` unverändert.
-**Verifikation:** `git check-ignore -q docs/INDEX.md; echo $?` → **1** (nicht ignoriert) bei
-`tracked`, **0** bei `untracked`. Der Exit-Code ist **entscheidungsabhängig und im Record
-dokumentiert** — kein Fehlerfall.
+**Akzeptanz:** Record nennt die **bereits getroffene** Entscheidung (**tracked**), Entscheider,
+Datum 2026-09-26 und die exakte `.gitignore`-Folge: **kein** `.gitignore`-Eintrag,
+`.gitignore` bleibt unverändert. **Diese Task trifft die Entscheidung nicht**, sie dokumentiert
+sie (Spec §11.2).
+**Verifikation:** `git check-ignore -q docs/INDEX.md; echo $?` → **1** (nicht ignoriert). Die
+gesicherte Entscheidung ist `tracked`, also ist **1 der Sollwert**; **0** (ignoriert) wäre ein
+**Widerspruch zur Entscheidung** und ist im Record als solcher zu melden. **Kein**
+entscheidungsabhängiger Offenstand mehr.
 **Steps:**
-- [ ] 1: OQ6-Optionen mit Traces aus Spec §11.1 und `project.yaml:70` zusammenstellen.
-- [ ] 2: Entscheidung treffen (Empfehlung Spec: **tracked**), Auswirkung auf `.gitignore` festschreiben.
-- [ ] 3: Record schreiben inkl. „Folge für W3-6“.
-- [ ] 4: commit via `git`-Agent: `docs: decide OQ6 index tracking for docs/INDEX.md`.
+- [ ] 1: Die getroffene Entscheidung aus Spec §11.2 OQ6 übernehmen: **tracked**; Traces aus
+      `scripts/lib/spec_plan_scaffold.py:23` und `project.yaml:70` im Record belegen.
+- [ ] 2: `.gitignore`-Folge festschreiben (**kein** Eintrag) und die verworfene Alternative
+      (`untracked` wie `.claude/`) benennen.
+- [ ] 3: Record schreiben inkl. „Folge für W3-6“ und des gewählten `index-mode`-Werts.
+- [ ] 4: commit via `git`-Agent: `docs: record OQ6 index tracking decision`.
 
 ### W0-2: Design-Freeze, Contract-Liste, Branch-Scaffold
 
@@ -321,62 +335,102 @@ die 8 Wellen-Branches; `git branch --list 'chore/docs-consolidation-w*'` zeigt m
 - [ ] 3: Commit-Reihenfolge und Merge-Regel („`git mv`-Wellen zuerst mergen“) festschreiben.
 - [ ] 4: commit via `git`-Agent: `docs: freeze docs-consolidation contracts and wave branches`.
 
-### W0-3: DEC-OQ2 — `llms.txt` hybrid oder generiert
+### W0-3: REC-OQ2 — `llms.txt` Hybrid (Ergebnis-Record, entschieden 2026-09-26)
 
 **Files:** Create `docs/plans/2026-09-25-docs-consolidation-oq2.md`
-**Interfaces:** Produces: Modusentscheidung für `llms.txt` + Eintrag in IC-22
-`docs-consolidation.sources`. Consumes: Spec §11.1 OQ2 (`llms.txt:3-12`), IC-08, IC-22.
+**Interfaces:** Produces: **Ergebnis-Record** der Modusentscheidung + Eintrag in IC-22
+`docs-consolidation.sources`. Consumes: Spec §11.2 **OQ2** (entschieden 2026-09-26), IC-08,
+IC-22, `llms.txt:3-12`.
 **Agent:** agent-meta-manager · **Depends on:** W0-2 · **parallel_group:** W0-PG-B
 **Ziel-AK (AC):** AC-25, AC-40.
-**Akzeptanz:** Entscheidung **vor Abschluss von W1** dokumentiert (Spec:1702); die gewählte Quelle
-ist ein Wert von `docs-consolidation.sources`; Prosa-Ton `llms.txt:3-12` bleibt erhalten.
+**Akzeptanz:** Record hält die **bereits getroffene** Entscheidung fest — `llms.txt` bleibt
+**handgepflegt** (Handtext-Einleitung und Linkliste unverändert), generiert werden
+**ausschließlich** `{{DOCS_PROVIDERS_BLOCK}}` und `{{DOCS_REPO_FACTS_BLOCK}}`; ein
+**Vollgenerieren** der Datei ist **nicht** entschieden. `llms.txt` ist ein Wert von
+`docs-consolidation.sources`; Prosa-Ton `llms.txt:3-12` bleibt erhalten. **Diese Task trifft
+die Entscheidung nicht** — sie dokumentiert sie (Spec §11.2).
 **Verifikation:** `grep -n 'llms.txt' docs/plans/2026-09-25-docs-consolidation-oq2.md` → **0**
 (mindestens ein Treffer).
 **Steps:**
-- [ ] 1: Hybrid-Option (nur `{{DOCS_PROVIDERS_BLOCK}}` + `{{DOCS_REPO_FACTS_BLOCK}}`) gegen
-      Vollgeneration abwägen (Spec-Empfehlung: Hybrid).
-- [ ] 2: Entscheidung festschreiben und den Folge-Edit in W1-10 benennen.
-- [ ] 3: Record schreiben.
-- [ ] 4: commit via `git`-Agent: `docs: decide OQ2 llms.txt generation mode`.
+- [ ] 1: Die getroffene Entscheidung aus Spec §11.2 OQ2 übernehmen: **Hybrid** — Handtext
+      bleibt, generiert werden nur `{{DOCS_PROVIDERS_BLOCK}}` + `{{DOCS_REPO_FACTS_BLOCK}}`.
+      Die verworfene Vollgenerierung **benennen, nicht wählen**.
+- [ ] 2: Folge für `docs-consolidation.sources` (IC-22) festschreiben und den Folge-Edit in
+      **W1-6** (Snippet-Bridge) und **W3-7** (Marker-Regionen, `llms.txt:5`) benennen.
+- [ ] 3: Record schreiben (Entscheidung, Entscheider, Datum 2026-09-26, Gewähltes/Verworfenes).
+- [ ] 4: commit via `git`-Agent: `docs: record OQ2 llms.txt hybrid decision`.
 
 ### W0-4: Track-A-Kollisionsgate (R3, R15)
 
 **Files:** Create `docs/plans/2026-09-25-docs-consolidation-track-a-gate.md`
 **Interfaces:** Produces: go/no-go-Freigabe für W1 und W2 + Liste der zuletzt von Track A
-berührten `scripts/lib/`-Dateien. Consumes: Spec §2.3, §9.2 (R3), Git-Historie.
+berührten `scripts/lib/`-Dateien. Consumes: Spec §2.3, §9.2 (R3), Git-Historie **von
+`origin/main`** (nicht des Feature-Branches).
 **Agent:** orchestrator · **Depends on:** W0-2 · **parallel_group:** W0-PG-B
 **Ziel-AK (AC):** AC-07, AC-08 (Fixture-Kollision), AC-39 (Schema-Datei).
-**Akzeptanz:** Record belegt, dass `tests/fixtures/slimming-golden/` **gemergt** ist und
-`tests/fixtures/docs_v1_fixtures.md` **noch nicht existiert**; ohne diesen Nachweis bleiben W1 und
-W2 gesperrt.
-**Verifikation:** `git log --oneline -20 -- scripts/lib/` → **0**;
-`git log --oneline -20 -- tests/fixtures/slimming-golden/` → **0**;
-`ls tests/fixtures/docs_v1_fixtures.md` → **1** (noch nicht vorhanden — gewünschter Vorlauf).
+**Akzeptanz:** Der Record belegt den Track-A-Merge-Status **gegen `origin/main`** — nicht gegen
+einen Feature-Branch: (a) `git ls-tree -d origin/main -- tests/fixtures/slimming-golden/` ergibt
+einen Treffer (Verzeichnis in `main` vorhanden), (b) `git ls-tree origin/main --
+tests/fixtures/docs_v1_fixtures.md` ist **leer**, (c) `tests/fixtures/docs_v1_fixtures.md`
+existiert auch im Arbeitsbaum nicht. **Erst dieser Nachweis gegen `origin/main`** gilt als
+Track-A-Merge; ohne ihn bleiben W1 und W2 gesperrt. Branch und `origin/main` müssen dabei
+synchron sein (`git rev-list --left-right --count origin/main...HEAD` → `0 0`), damit der
+Gate-Record nicht über einen veralteten Stand entscheidet. Inhaltlich unverändert geprüft wird
+dieselbe Aussage wie bisher: Fixture-Verzeichnis in `main` vorhanden, V1-Fixture
+`docs_v1_fixtures.md` nicht vorhanden.
+**Verifikation:** `git fetch origin` → **0**; `git ls-tree -r --name-only origin/main --
+tests/fixtures/slimming-golden/` → **nicht leer**; `git ls-tree origin/main --
+tests/fixtures/docs_v1_fixtures.md` → **leer**; `ls tests/fixtures/docs_v1_fixtures.md` → **1**
+(nicht vorhanden); `git rev-list --left-right --count origin/main...HEAD` → `0 0`.
+**Ausdrücklich kein Merge-Nachweis:** `git log --oneline -20 --
+tests/fixtures/slimming-golden/` (und `git log --oneline -20 -- scripts/lib/`) führen nur die
+zuletzt von Track A berührten Dateien auf — sie sind **kein** Nachweis des Merges nach `main`.
+Der Merge-Nachweis ist ausschließlich der `git ls-tree`-Befehl gegen `origin/main` oben.
 **Steps:**
-- [ ] 1: `git log --oneline -20 -- scripts/lib/` und `-- tests/fixtures/` auswerten.
-- [ ] 2: Track-A-Merge-Status feststellen; bei offen **stoppen** und an `main_chat` eskalieren.
+- [ ] 1: `git fetch origin`; dann `git ls-tree -d origin/main -- tests/fixtures/slimming-golden/`
+      und `git ls-tree origin/main -- tests/fixtures/docs_v1_fixtures.md` auswerten (Nachweis
+      **gegen `origin/main`**, nicht gegen den Feature-Branch) und `git rev-list --left-right
+      --count origin/main...HEAD` → `0 0` (Stand-Synchronität) prüfen.
+- [ ] 2: Track-A-Merge-Status **gegen `origin/main`** feststellen; bei offen **stoppen** und an
+      `main_chat` eskalieren.
 - [ ] 3: Record mit go/no-go und Rebase-Pflicht vor jedem Merge schreiben.
 - [ ] 4: commit via `git`-Agent: `docs: record track-a collision gate for docs consolidation`.
 
-### W0-6: DEC-OQ8 — wer re-generiert `docs/INDEX.md` bei neuer Doku-Datei
+### W0-6: REC-OQ8 — wer re-generiert `docs/INDEX.md` bei neuer Doku-Datei (Ergebnis-Record)
 
 **Files:** Create `docs/plans/2026-09-25-docs-consolidation-oq8.md`
-**Interfaces:** Produces: Workflow-Vertrag (Commit-Hook vs. CONTRIBUTING-Regel vs.
-Severity-Downgrade) + benannter Umsetzungsschritt für W3-6. Consumes: Spec §10, §11.1 OQ8, IC-05 (V2).
-**Agent:** orchestrator (+ `git` für die Hook-Implementierung) · **Depends on:** W0-2 ·
-**parallel_group:** W0-PG-B
+**Interfaces:** Produces: **Ergebnis-Record** des Workflow-Vertrags — **gewählt:**
+deterministischer **Sync-/Validator-Lauf** (`sync.py` im Default-Sync, `--validate` als
+`TEST_COMMAND`, `.meta-config/project.yaml:193`); **verworfen:** `pre-commit`-Hook,
+CONTRIBUTING-Regel, Severity-Downgrade; **gewählter Umsetzungsschritt:** W3-6 (W3-7 braucht
+keinen, da keine neue Doku-Datei entsteht).
+Consumes: Spec §10, §11.2 **OQ8** (entschieden 2026-09-26), IC-05 (V2), IC-22.
+**Agent:** orchestrator · **Depends on:** W0-2 · **parallel_group:** W0-PG-B
 **Ziel-AK (AC):** AC-12, AC-38.
-**Akzeptanz:** Entscheidung **vor Abschluss von W3** (Spec:1706); gewählter Weg benennt Owner,
-Auslöser und Kosten. V2 bleibt **ERROR** (Spec-Empfehlung), damit die Vertragsverletzung sichtbar
-bleibt; **kein** neues `sync.py`-CLI-Flag (NG-4) — ein Hook ruft vorhandene Flags auf.
-**Verifikation:** `grep -n 'pre-commit\|CONTRIBUTING\|index-mode' docs/plans/2026-09-25-docs-consolidation-oq8.md`
-→ **0** (mindestens ein Treffer).
+**Akzeptanz:** Der Record hält die **bereits getroffene** Entscheidung fest: Auslöser ist der
+Sync-/Validator-Lauf, **kein** `pre-commit`-Hook und **keine** CONTRIBUTING-Regel. **V2 bleibt
+ERROR** (Spec-Empfehlung), damit die Vertragsverletzung sichtbar bleibt; **kein** neues
+`sync.py`-CLI-Flag (NG-4) und **kein** neuer Hook — der vorhandene Sync-Pfad genügt. **Diese Task
+trifft die Entscheidung nicht**, sie dokumentiert sie (Spec §11.2).
+**Verifikation:** `grep -n 'pre-commit\|CONTRIBUTING' docs/plans/2026-09-25-docs-consolidation-oq8.md`
+→ **0** (mindestens ein Treffer). **Scharfung der Erwartung:** `pre-commit` und `CONTRIBUTING`
+müssen im Record als **verworfene** Alternative erscheinen (die Spec-Empfehlung war der
+`pre-commit`-Hook); der **Sync-/Validator-Lauf** muss als **gewählter** Weg erscheinen. Der
+Treffer belegt also die Entscheidungsdokumentation, **nicht** eine Hook-Implementierung.
+**Abgrenzung:** `index-mode` (IC-22, `docs-consolidation.index-mode`) ist **kein** Mechanismus
+von OQ8 und gehört **nicht** in die Verifikationserwartung. Es ist der **IC-22-Rollback-Schalter**
+(für W7, `index-mode: llm`); im OQ8-Record darf er allenfalls als dieser IC-22-Verweis genannt
+werden, **nicht** als der gewählte Weg dieser Entscheidung.
 **Steps:**
-- [ ] 1: Varianten mit ihren Reibungskosten gegenstellen (Spec-Empfehlung: `pre-commit` →
-      `sync.py --dry-run` als Schnellcheck).
-- [ ] 2: Entscheidung festschreiben.
-- [ ] 3: Umsetzungsschritt in W3-6 referenzieren; W3-7 dokumentiert den Vertrag in der Doku.
-- [ ] 4: commit via `git`-Agent: `docs: decide OQ8 index regeneration contract`.
+- [ ] 1: Die getroffene Entscheidung aus Spec §11.2 OQ8 übernehmen: Sync-/Validator-Lauf;
+      die **verworfene** Spec-Empfehlung (`pre-commit`-Hook → `sync.py --dry-run`) und die
+      Alternative CONTRIBUTING-Regel als **verworfen** benennen.
+- [ ] 2: Entscheidung als Workflow-Vertrag festschreiben (Owner, Auslöser, Kosten).
+- [ ] 3: Umsetzungsschritt in W3-6 referenzieren. **W3-7 braucht keinen Doku-Schritt** für
+      OQ8: gewählt ist der Sync-/Validator-Lauf, also entsteht **kein** Hook, **keine**
+      CONTRIBUTING-Regel und **keine** neue Doku-Datei (Spec §11.2) — der Vertrag lebt im
+      W0-6-Record und in Spec §10.
+- [ ] 4: commit via `git`-Agent: `docs: record OQ8 index regeneration contract`.
 
 ### W0-7: DEC-OQ1 — Wiki-Topics vs. `docs/guides/` (Produktentscheidung)
 
@@ -520,7 +574,8 @@ Sollwert-Parameter (keine Kopplung, kein Zirkel).
 `pipelines.md`, `hooks.md`, `providers.md`, `tier-presets.md`
 **Interfaces:** Produces: `variables["DOCS_*_BLOCK"]` aus `snippets/docs/*.md` über den
 **unveränderten** `_load_block_snippet` (`config.py:1842-1858`); `^DOCS_` in `_DYNAMIC_PREFIXES`
-(`placeholders.py:128-131`). Consumes: W1-4, OQ2-Entscheidung (W0-3).
+(`placeholders.py:128-131`). Consumes: W1-4, OQ2-Entscheidung (**Hybrid**, Spec §11.2; Record
+W0-3).
 **Agent:** developer · **Depends on:** W1-4, W0-3 · **parallel_group:** PG-1 / W1-A
 **Ziel-AK (AC):** **AC-25** (IC-11), **AC-06** (IC-06) · **V-Check:** — (Unit-Test)
 **Akzeptanz:** `test_docs_snippet_inlining_contract` und
@@ -913,15 +968,17 @@ werden symmetrisch ergänzt. Kein Eintritt in `_iter_managed_files` (`:240-310`)
 
 ### W3-6: `docs/INDEX.md` tracked, Erstgenerierung, OQ6/OQ8-Umsetzung
 
-**Files:** Create `docs/INDEX.md`; Modify `.gitignore` (nur bei `untracked`), `README.md`,
-`.meta-config/project.yaml`, `tests/test_doc_renderer.py`
-**Interfaces:** Produces: getrackte, 100 % generierte `docs/INDEX.md`; OQ6-Folge in `.gitignore`;
-OQ8-Workflow-Vertrag (Hook oder Doku-Regel) gemäß W0-6. Consumes: W3-5, W0-1, W0-6, W2-6.
+**Files:** Create `docs/INDEX.md`; Modify `.meta-config/project.yaml`, `README.md`,
+`tests/test_doc_renderer.py` — **kein** `.gitignore`-Eintrag (OQ6 entschieden: `tracked`)
+**Interfaces:** Produces: getrackte, 100 % generierte `docs/INDEX.md`; OQ6-Folge: `.gitignore`
+bleibt **unverändert**; OQ8-Workflow-Vertrag (**Sync-/Validator-Lauf**, kein Hook) gemäß W0-6.
+Consumes: W3-5, W0-1, W0-6, W2-6.
 **Agent:** senior-developer · **Depends on:** W3-5, W0-1, W0-6 · **parallel_group:** PG-2 / W3
 **Ziel-AK (AC):** **AC-20**, **AC-12** (E2E), **AC-38** · **V-Check:** **V2**, **V4**
 **Akzeptanz:** `test_skeleton_replaced_once` grün: Skeleton wird **einmalig** ersetzt
 (`log.action("UPDATE","docs/INDEX.md",…)` genau einmal), zweiter Lauf meldet `unchanged` mit
-**null** Schreibvorgängen; `git check-ignore -q docs/INDEX.md` → **1** bei `tracked`; V2 und V4
+**null** Schreibvorgängen; `git check-ignore -q docs/INDEX.md` → **1** (entschieden: `tracked`);
+V2 und V4
 sind gegen das reale `docs/INDEX.md` grün; `docs/architecture/INDEX.md` wird in W3 **nicht**
 erzeugt (W4-3), die Datei erscheint daher noch nicht im Index.
 **Verifikation:** `python3 scripts/sync.py --check` → **0**;
@@ -929,7 +986,9 @@ erzeugt (W4-3), die Datei erscheint daher noch nicht im Index.
 `bash tests/scenarios/run.sh 50 51 52 54 55 56` → **0**.
 **Steps:**
 - [ ] 1: E2E-Test schreiben (fail).
-- [ ] 2: Sync mit `enabled: true` ⇒ `docs/INDEX.md` erzeugen; OQ6-Folge anwenden; OQ8-Vertrag umsetzen.
+- [ ] 2: Sync mit `enabled: true` ⇒ `docs/INDEX.md` erzeugen; OQ6-Folge anwenden (kein
+      `.gitignore`-Eintrag); OQ8-Vertrag umsetzen — der Sync-/Validator-Lauf ist der Auslöser,
+      **kein** Hook und keine Doku-Regel.
 - [ ] 3: Tests grün beobachten; zweiten Lauf auf `unchanged` beobachten.
 - [ ] 4: commit via `git`-Agent: `feat: generate and track docs index`.
 
@@ -942,7 +1001,10 @@ erzeugt (W4-3), die Datei erscheint daher noch nicht im Index.
 `se-cascade` als deaktiviert kennzeichnen), `README.md:501` (`DOCS_HOOKS_COUNT`),
 `README.md:688-696` (`DOCS_DOD_PRESET_COUNT`, `DOCS_TIER_PRESET_COUNT`, `DOCS_HOOKS_1GENERIC_COUNT`),
 `README.md:734` (`DOCS_VERSION`), `ARCHITECTURE.md:3` (Stale-Deklaration wandert in W4-1 mit),
-`llms.txt:5` (Proverbenamen-Liste). Consumes: W3-6, W1-6 (Snippets), W0-3 (OQ2).
+`llms.txt:5` (Proverbenamen-Liste). **Hybrid-Scope (OQ2, Spec §11.2):** in `llms.txt` werden
+**ausschließlich** `{{DOCS_PROVIDERS_BLOCK}}` und `{{DOCS_REPO_FACTS_BLOCK}}` generiert —
+Handtext-Einleitung und Linkliste bleiben handgepflegt, **kein** Vollgenerieren. Consumes:
+W3-6, W1-6 (Snippets), W0-3 (OQ2-Record, **Hybrid**).
 **Agent:** developer · **Depends on:** W3-6 · **parallel_group:** PG-2 / W3
 **Ziel-AK (AC):** **AC-40** (Teil: `README.md:690`, `llms.txt:5`), **AC-07** (Wirkung: V1 wird grün)
 · **V-Check:** **V1a**, **V1b**, **V6**
@@ -1060,7 +1122,7 @@ revertieren (je annotierter Wiki-Seite `git checkout`, commitweise rückwärts).
 Consumes: Spec §11.1 OQ9, F24, NG-1.
 **Agent:** technical-writer · **Depends on:** W4-3, W0-7 · **parallel_group:** PG-3 (seriell)
 **Ziel-AK (AC):** **AC-28** (Teil, M-5-Ziel) · **V-Check:** **V2**
-**Akzeptanz:** Entscheidung **vor** W5-2 (Spec:1707); Ergebnis ist eine Zeile in
+**Akzeptanz:** Entscheidung **vor** W5-2 (Spec §11.1 OQ9, Blockade W5); Ergebnis ist eine Zeile in
 `docs/guides/INDEX.md` plus ein Pointer in **beiden** Dateien — **kein** Merge, **keine** Löschung
 (NG-1: eine Löschung würde Beispielkonfiguration entfernen).
 **Verifikation:** `wc -l docs/guides/project.yaml.example docs/guides/configs/project.yaml.example`
@@ -1317,7 +1379,7 @@ Kein `git mv` betroffen ⇒ keine andere Welle invalidiert.
 Requirements-Master-ID, Einweg-Verweis“; **keine** Umbenennung (NG-6). Consumes: F16.
 **Agent:** requirements · **Depends on:** W7-5 · **parallel_group:** PG-5
 **Ziel-AK (AC):** **AC-40** (IC-02, IC-22 — Deklaration F16 gehört in W8) · **V-Check:** **V8**
-**Akzeptanz:** Entscheidung **vor** W8-3 (Spec:1704); Deklarationsabschnitt **additiv** in
+**Akzeptanz:** Entscheidung **vor** W8-3 (Spec §11.1 OQ4, Blockade W8); Deklarationsabschnitt **additiv** in
 `docs/REQUIREMENTS.md` ergänzt; **keine** bestehende `SPEC-*`-ID umbenannt; Szenario
 `53-spec-plan-traceability` bleibt grün.
 **Verifikation:** `grep -n 'REQ-\|SPEC-' docs/REQUIREMENTS.md` → **0** (beide Muster vorhanden);
@@ -1351,7 +1413,8 @@ Links; V3 liefert **keine** Findings mehr (`exit 0`); keine Umbenennung von Date
 **Files:** Modify `llms.txt`, `README.md`, `tests/test_docs_consolidation_migration.py`
 **Interfaces:** Produces: Providerzahl in `llms.txt` und `README.md:690` **ausschließlich** aus
 einem `agent-meta:docs-*-Block`; `docs/INDEX.md` führt `DOCS_PROVIDERS_BLOCK`;
-`test_provider_count_is_generated_in_readme_llms_index`. Consumes: W8-2, W0-3 (OQ2).
+`test_provider_count_is_generated_in_readme_llms_index`. Consumes: W8-2, W0-3 (OQ2-Record,
+**Hybrid**, Spec §11.2).
 **Agent:** developer · **Depends on:** W8-2 · **parallel_group:** PG-5
 **Ziel-AK (AC):** **AC-40** (IC-02, IC-22) · **V-Check:** **V1a**, **V6**
 **Akzeptanz:** keine handgeschriebene Providerzahl mehr im Fließtext; Wert entspricht
@@ -1426,7 +1489,7 @@ sowie FI-10 („Abbau der 179 Altlasten ist lokale Aufräumaktion, kein Spec-Geg
 | W3-3 | W3 | senior-developer | W3-2 | PG-2/W3 | AC-21 | V4 | + `scripts/lib/spec_plan_scaffold.py` |
 | W3-4 | W3 | senior-developer | W3-3 | PG-2/W3 | AC-22 | V1 | + `scripts/lib/sync_pipeline.py`, `.meta-config/project.yaml` |
 | W3-5 | W3 | developer | W3-4 | PG-2/W3 | AC-19, AC-37 | — | + `scripts/lib/generated_file_drift.py`, `tests/test_generated_file_drift_docs.py` |
-| W3-6 | W3 | senior-developer | W3-5, W0-1, W0-6 | PG-2/W3 | AC-20, AC-12, AC-38 | V2, V4 | + `docs/INDEX.md`, `.gitignore`, `README.md` |
+| W3-6 | W3 | senior-developer | W3-5, W0-1, W0-6 | PG-2/W3 | AC-20, AC-12, AC-38 | V2, V4 | + `docs/INDEX.md`, `README.md` (kein `.gitignore` — OQ6 entschieden) |
 | W3-7 | W3 | developer | W3-6 | PG-2/W3 | AC-40 (Teil), AC-07 | V1a, V1b, V6 | + `llms.txt`, `ARCHITECTURE.md`, `README.md` |
 | W4-1 | W4 | developer | W3-6 | PG-3 (seriell) | AC-28 (Teil), AC-29b | V3 | `ARCHITECTURE.full.md` → `docs/architecture/00-overview-full.md` |
 | W4-2 | W4 | developer | W4-1 | PG-3 | AC-29a | V3 | `ARCHITECTURE.md` |
@@ -1455,13 +1518,13 @@ W4→W5→W6 durchgehend, W7-1→…→W7-5 und W8-1→…→W8-4. **Keine Zykle
 
 | OQ | Task | Owner | Position | Folge, wenn nicht entschieden |
 |---|---|---|---|---|
-| **OQ6** | **W0-1** (vor W1-10 und W3-6) | `orchestrator` | W0, vor jedem Code-Task | W1-10 kann `enabled: true` nicht belastbar setzen, W3-6 kann `.gitignore` nicht korrekt führen; zusätzlicher Commit am falschen Ort (Spec:1709-1713, Korrektur der Rev.-0.1-Fassung) |
-| **OQ8** | **W0-6** (vor Abschluss W3) | `orchestrator` + `git` | W0, Umsetzung in W3-6/W3-7 | V2 ist ab W3 **ERROR** ⇒ jede neue Doku-Datei blockiert `--validate` = `TEST_COMMAND` ohne dokumentierten Auslöser (Spec:1706) |
-| OQ2 | W0-3 (vor Abschluss W1) | `agent-meta-manager` | W0 | `docs-consolidation.sources` (IC-22) unbestimmt ⇒ W1-10 unvollständig |
-| OQ1 | W0-7 (vor Abschluss W5) | `orchestrator` → `main_chat` | W0 | W5-3 annotiert ohne Scope-Grenze; FI-4 bliebe ungebunden |
-| OQ9 | W5-1 (vor W5-2) | `technical-writer` + `documenter` | W5 | zwei SSoT-Kandidaten unter `docs/guides/` ohne Kennzeichnung (F24) |
-| OQ4 | W8-1 (vor W8-3) | `requirements` + `validator` | W8 | F16 (zwei ID-Systeme) bleibt undokumentiert |
-| OQ3 | — (nach W8) | `requirements` via `main_chat` | außerhalb dieses Plans | eigene REQ (Spec:1703) |
+| **OQ6** — **ENTSCHIEDEN 2026-09-26** (`tracked`, kein `.gitignore`-Eintrag) | **W0-1** = Ergebnis-Record (vor W1-10 und W3-6) | `orchestrator` | W0, vor jedem Code-Task | **entfällt** — entschieden; W0-1 dokumentiert, W3-6 schreibt `docs/INDEX.md` tracked ohne `.gitignore`-Diff (Spec §11.2) |
+| **OQ8** — **ENTSCHIEDEN 2026-09-26** (Sync/Validator, kein Hook) | **W0-6** = Ergebnis-Record (vor Abschluss W3) | `orchestrator` | W0, Umsetzung in W3-6 | **entfällt** — entschieden; V2 bleibt **ERROR**, Auslöser ist der Sync-/Validator-Lauf (Spec §11.2) |
+| **OQ2** — **ENTSCHIEDEN 2026-09-26** (**Hybrid**: `{{DOCS_PROVIDERS_BLOCK}}` + `{{DOCS_REPO_FACTS_BLOCK}}`, Rest Handtext) | **W0-3** = Ergebnis-Record (vor Abschluss W1) | `agent-meta-manager` | W0 | **entfällt** — entschieden; `llms.txt` ist Wert von `docs-consolidation.sources` (IC-22), Prosa bleibt handgepflegt (Spec §11.2) |
+| OQ1 (offen) | W0-7 (vor Abschluss W5) | `orchestrator` → `main_chat` | W0 | W5-3 annotiert ohne Scope-Grenze; FI-4 bliebe ungebunden |
+| OQ9 (offen) | W5-1 (vor W5-2) | `technical-writer` + `documenter` | W5 | zwei SSoT-Kandidaten unter `docs/guides/` ohne Kennzeichnung (F24) |
+| OQ4 (offen) | W8-1 (vor W8-3) | `requirements` + `validator` | W8 | F16 (zwei ID-Systeme) bleibt undokumentiert |
+| OQ3 | — (nach W8) | `requirements` via `main_chat` | außerhalb dieses Plans | eigene REQ (Spec §11.1 OQ3, nach W8) |
 | OQ5, OQ7 | — | — | geschlossen (Spec §11.2) | kein Task |
 
 ## Coverage-Matrix Task → AC → Welle → V-Check
@@ -1570,7 +1633,9 @@ AC-24, AC-25, AC-26, AC-34, AC-35, AC-37, AC-38, AC-39, AC-41.
    fail-closed), User-Sign-off zu `knowledge/schema.md` liegt vor, `index-mode: llm` als Rollback
    dokumentiert.
 9. **Alle sechs Entscheidungs-Records** (OQ1, OQ2, OQ4, OQ6, OQ8, OQ9) existieren mit Owner,
-   Entscheidung und Datum; OQ3 ist als Folge-REQ geführt.
+   Entscheidung und Datum. **OQ2/OQ6/OQ8** sind bereits **entschieden (2026-09-26, Nutzer)** — ihre
+   Records dokumentieren die getroffene Entscheidung (Gewähltes **und** Verworfenes), nicht eine
+   offene Wahl. OQ3 ist als Folge-REQ geführt.
 10. **Provider-Agnostik**: `python3 -m pytest tests/test_provider_agnostic_dispatch.py -q` → **0**;
     kein `if provider == "Name"` in M1–M4; kein Config-Key mit Providernamen.
 11. **NFA-07** eingehalten: M1, M2, M4 importieren nur Stdlib + `scripts/lib`.
@@ -1584,7 +1649,9 @@ AC-24, AC-25, AC-26, AC-34, AC-35, AC-37, AC-38, AC-39, AC-41.
 ## Self-Review (kein Platzhalter, Konsistenz gegen die Spec)
 
 - **No-Placeholder:** kein `TODO`, kein `TBD`, kein `???`, kein leeres Feld. Offene Punkte sind
-  ausschließlich die sechs Entscheidungs-Tasks mit Owner, Entscheidungsweg und Folge. Jede
+  ausschließlich die Entscheidungs-Tasks W0-7/W5-1/W8-1 (OQ1/OQ9/OQ4) mit Owner, Entscheidungsweg
+  und Folge sowie die Ergebnis-Records W0-1/W0-3/W0-6 (OQ6/OQ2/OQ8, entschieden 2026-09-26).
+  Jede
   Interface-Signature ist vollständig, jeder Task nennt exakte Pfade, Symbole und eine
   Commit-Message. `Interfaces:` ist in **jedem** Task gefüllt (Produces **und** Consumes).
 - **AC-Vollständigkeit:** AC-01…AC-41 lückenlos, jede Zahl genau einmal in der Coverage-Matrix;
@@ -1592,9 +1659,12 @@ AC-24, AC-25, AC-26, AC-34, AC-35, AC-37, AC-38, AC-39, AC-41.
 - **Wellen-Konsistenz:** W0–W8 vollständig, Reihenfolge aus Spec §9.2 übernommen; die beiden
   Umordnungen (W4/W5/W6 seriell, W8 nach W7) sind **begründet** und markiert.
 - **V-Checks:** V1–V9 implementiert; V9 ohne AC ist als Lücke **benannt**, nicht kaschiert.
-- **Entscheidungen:** OQ6 (W0-1) blockiert W1-10/W3-6, OQ8 (W0-6) blockiert W3 — beide als
-  benannte Tasks **vor** der abhängigen Welle, nicht als Fußnote. OQ1/OQ2/OQ4/OQ9 ebenfalls;
-  OQ3 außerhalb, OQ5/OQ7 geschlossen.
+- **Entscheidungen:** OQ6 (W0-1) und OQ8 (W0-6) sowie OQ2 (W0-3) sind **entschieden**
+  (Nutzer, 2026-09-26, Spec §11.2) und als benannte Tasks **vor** der abhängigen Welle
+  geführt, nicht als Fußnote: W0-1/W0-3/W0-6 sind **Ergebnis-Records** (Gewähltes **und**
+  Verworfenes), W0-6 nennt den Sync-/Validator-Lauf und **ausdrücklich nicht** den
+  `pre-commit`-Hook. OQ1/OQ9/OQ4 bleiben offen (W0-7/W5-1/W8-1); OQ3 außerhalb,
+  OQ5/OQ7 geschlossen.
 - **Ownership:** Jede Datei erscheint in höchstens einer Task-`Files:`-Liste **pro Parallelgruppe**.
   `.meta-config/project.yaml` wird von fünf Tasks geschrieben — diese liegen in fünf
   **sequenziell geordneten** Wellen, also nie gleichzeitig.
