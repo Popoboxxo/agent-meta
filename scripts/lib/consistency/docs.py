@@ -284,23 +284,43 @@ def _v1_suppressed_lines(text: str) -> set[int]:
     Rule 1 — inside an ``agent-meta:docs-begin`` … ``agent-meta:docs-end``
     region (both delimiters included).
     Rule 2 — the line carries an ``agent-meta:docs-exempt`` marker.
-    Rule 3 — the line is inside a Markdown fenced code block (```` ``` ```` or
-    ``~~~``); the fence delimiters themselves carry no number.
+    Rule 3 — the line is inside a Markdown fenced code block that declares a
+    language (```` ```text ```` or ``~~~yaml``); the fence delimiters themselves
+    carry no number.
+
+    Rule 3 is narrowed to **typed** fences (K16 / B-4 / E-14, §5.1.1). An
+    opening fence **without** an info string is not a code block in the
+    CommonMark sense — it is an untyped literal block — and in the entry
+    documents it is exactly where the hand-maintained inventory lives: the
+    ``README.md`` directory structure opens untyped at ``:680``, closes at
+    ``:737`` and carries the IC-05 sites F2 (``:688``), F3-Site-2 (``:690``)
+    and F4 (``:734``). Suppressing it made rule 3 incompatible with IC-05.
+
+    The narrowing is keyed on the Markdown info string only — no language
+    allowlist, no path or section heuristic, no per-line number rule — so it
+    cannot special-case the four sites. The fence state machine is unaffected:
+    an untyped block is still tracked, which keeps a tagged fence that follows
+    it from being misread as its closing delimiter (i.e. rule 3 is narrowed,
+    never switched off).
     """
     suppressed: set[int] = set()
     in_region = False
     fence: str | None = None
+    fence_suppresses = False
     for lineno, line in enumerate(text.splitlines(), start=1):
         if fence is not None:
             closing = re.fullmatch(rf" {{0,3}}{re.escape(fence[0])}{{{len(fence)},}}\s*", line)
             if closing is None:
-                suppressed.add(lineno)
+                if fence_suppresses:
+                    suppressed.add(lineno)
                 continue
             fence = None
+            fence_suppresses = False
             continue
         opening = _V1_FENCE_OPEN_RE.match(line)
         if opening is not None:
             fence = opening.group(1)
+            fence_suppresses = bool(line[opening.end():].strip())
             continue
         if V1_REGION_BEGIN in line:
             in_region = True

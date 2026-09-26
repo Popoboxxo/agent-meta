@@ -1643,11 +1643,11 @@ Schritt darf W3-4 `checks.strict: true` nicht setzen** (Vorbedingung, siehe Task
 - [x] 2: V1a (Zahl-Token ohne `\d+\.\d+` + Nomen auf derselben Zeile) und V1b (Versions-Literal)
       implementieren. Die Rev.-0.1-Regex wird **nicht** verwendet (sie matchte keine Fundstelle).
 - [x] 3: Suppressionen implementieren; Tests grün beobachten.
-- [ ] 4: **K16 / B-4 — Suppressionsregel 3 so eingrenzen, dass die vier README-Fundstellen
+- [x] 4: **K16 / B-4 — Suppressionsregel 3 so eingrenzen, dass die vier README-Fundstellen
       `:688/:690/:696/:734` für V1 sichtbar werden**, ohne AC-08 (Fence-Fall bleibt ohne
       Finding) und ohne die Regeln 1, 2 und 4 zu verletzen; Negativ-Test gegen die unmarkierte
       Ist-Fassung schreiben; Mechanismus-Wahl in der LEDGER-Stand-Notiz begründet festhalten.
-- [ ] 5: commit via `git`-Agent: `feat: add V1 manual count detection with fixtures`. Die
+- [x] 5: commit via `git`-Agent: `feat: add V1 manual count detection with fixtures`. Die
       Regel-3-Eingrenzung aus Schritt 4 wird als **eigener** Commit geliefert, damit
       W2-1-Umsetzung und K16-Korrektur getrennt revertierbar bleiben.
 
@@ -1680,6 +1680,51 @@ Schritt darf W3-4 `checks.strict: true` nicht setzen** (Vorbedingung, siehe Task
 > derzeit **kein** `docs.no_manual_counts`-Finding ausgibt; und die Severity ist im
 > Ist-Zustand **WARNING**, nicht ERROR (`docs.py:359`, `.meta-config/project.yaml:398-399`).
 > Das verbindliche Abnahmekriterium steht als **W2-GATE-V1** im Wellenblock **W2 — Verifikation**.
+>
+> **Nachtrag 2026-09-26 — Schritt 4 (K16 / B-4 / E-14) ist umgesetzt und mit Schritt 5
+> (Commit) abgeschlossen.** Der Absatz oben bleibt unverändert Historie; additiv folgt der Stand
+> nach der Korrektur.
+> **Gewählter Mechanismus: Suppressionsregel 3 unterdrückt nur noch Fences *mit*
+> Info-String** (Sprachangabe) — ein öffnender Fence **ohne** Info-String ist laut CommonMark kein
+> Code-Block, sondern ein untypisierter Literal-Block, und genau dort steht in den Einstiegsdokumenten
+> das handgepflegte Inventar. Umsetzung: `_v1_suppressed_lines` (`scripts/lib/consistency/docs.py`)
+> merkt sich je Fence `fence_suppresses = bool(line[opening.end():].strip())`; die
+> Fence-Zustandsmaschine läuft **unverändert** weiter, ein untypisierter Block wird also weiterhin
+> verfolgt (sonst würde sein schließendes ```` ``` ```` als öffnender Fence gelesen und Regel 3
+> verlöre eine ganze Region statt einer Zeile).
+> **Begründung der Wahl (warum gerade dieser Kandidat):** (a) die Verengung hängt **allein** am
+> Markdown-Info-String — keine Sprach-Allowlist, kein Pfad-/Abschnitts-/Zeilen-Shape-Heuristik,
+> damit kann sie die vier Fundstellen nicht aussondern, sondern nur den Blindfleck schließen;
+> (b) AC-08 bleibt per Konstruktion grün, denn der Fence-Fall der Negativ-Fixture trägt die
+> Info-Angabe ```` ```text ````; (c) sie verändert Regeln 1, 2 und 4 **nicht** — die gemeinsame
+> Suppression entscheidet weiterhin zuerst an Region/Marker/Datei; (d) sie ist additiv in einer
+> Funktion und ohne Zeilenverlust revertierbar. **Empirische Stütze:** von den 23 Fences in
+> `README.md` sind 21 typisiert (Code/Config-Beispiele) und genau **2** untypisiert — der
+> Directory-Structure-Block (`:680`…`:737`) und das Conventional-Commit-Literal (`:982`…`:985`);
+> beide gehören zu dem, was V1 sehen muss.
+> **Verifikationsbeleg:** `python3 -m pytest tests/test_doc_facts.py -q` → **106 passed** (vor der
+> Änderung 104, +2 neue Tests); `… -k v1` → **14 passed**; AC-07 unveraendert grün (genau 4
+> Findings, `WARNING`, `docs.no_manual_counts`, `line` 1/2/3 = `V1a`, `line` 4 = `V1b`), AC-08
+> unveraendert grün (Fence-Fall ohne Finding), Gegenprobe `| Agents | 74 |` → genau 1 Finding;
+> `wc -l < tests/fixtures/docs_v1_fixtures.md` → **4**; `python3 -m ruff check
+> scripts/lib/consistency/docs.py tests/test_doc_facts.py` → **0**; `python3 -m py_compile
+> scripts/lib/consistency/docs.py` → **0**. **Sichtbarkeitsnachweis (negativ, gegen die unmarkierte
+> Ist-Fassung, nicht über den Runner — V1 ist noch nicht registriert):** `check_no_manual_counts`
+> direkt auf dem Repo-Baum liefert **52** Findings gesamt, davon in `README.md:680`…`:737` genau
+> die IC-05-**Fundstellen** `README.md:688` (`V1a`, `'6'`/`'presets'`), `:690` (`V1a`,
+> `'6'`/`'provider'`), `:696` (`V1a`, `'1'`/`'hook'`) und `:734` (`V1b`, `'v1.0.0'`) — jede
+> Fundstelle mit mindestens einem Befund. **Negativer Nachweis belegt:** mit temporär auf
+> Vor-K16-Verhalten zurückgesetzter `fence_suppresses`-Belegung fallen **beide** neuen Tests um
+> (`test_v1_sees_the_readme_directory_structure_facts`: „`README.md:688` is invisible to V1";
+> `test_v1_fence_suppression_covers_typed_fences_only`: `[] == ['V1a']`), nach Rückbau wieder
+> grün. **Beobachtung, ausdrücklich nicht in diesem Schritt behoben (Scope W2-1 Schritt 4 ist
+> Regel 3, nicht die V1a-Präzision):** der nun sichtbare Block meldet zusätzlich `README.md:682`
+> (`'0'`/`'skill'`) und `:683` (`'1'`/`'templates'`) — das sind **Pfad-Komponenten** aus
+> `0-external/` bzw. `1-generic/`, keine Handzahlen, und `:696` meldet die Ziffer `1` aus
+> `hooks/1-generic/` statt der eigentlichen Zahl `5` aus `# 5 hook scripts`. Das sind
+> Präzisionsbefunde des V1a-Branches (Fehlalarm-Katalog §12.1 R4) und müssen **vor** der
+> Hochstufung auf `ERROR` (W3-4) bewertet werden; die Sichtbarkeit der IC-05-Fundstellen war
+> davon unberührt.
 
 ### W2-2: V3 `check_internal_links`
 

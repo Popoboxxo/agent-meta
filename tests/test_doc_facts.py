@@ -2203,8 +2203,10 @@ V1_FIXTURE = REPO_ROOT / V1_FIXTURE_RELPATH
 V1_QUOTED_LINES = (
     "## Agent Roster — 74 Generic Agents",
     "## Hooks (7 hooks, propagated to all providers)",
-    "  ai-providers.yaml          # 6 provider configs (Claude, Gemini, "
-    "Opencode, Continue, Copilot, Mammouth)",
+    (
+        "  ai-providers.yaml          # 6 provider configs (Claude, Gemini, "
+        "Opencode, Continue, Copilot, Mammouth)"
+    ),
     "VERSION                      # Current version (v1.0.0)",
 )
 
@@ -2220,6 +2222,18 @@ V1_EXEMPT_CASE = (
 )
 V1_FENCE_CASE = "```text\n## Hooks (7 hooks)\n```\n"
 V1_COUNTER_PROBE = "| Agents | 74 |\n"
+
+#: IC-05 sites inside the ``README.md`` directory-structure fence, which opens
+#: untyped at ``:680`` and closes at ``:737``: ``(line, branch, needle)``.
+#: The line numbers are fixed by the plan (W2-1 step 4, K16) and the ``needle``
+#: is the premise guard — if the document ever shifts, the test has to say so
+#: instead of failing with an unexplained "invisible to V1".
+V1_README_DIRECTORY_SITES = (
+    (688, "V1a", "# 6 DoD presets"),
+    (690, "V1a", "# 6 provider configs"),
+    (696, "V1a", "# 5 hook scripts"),
+    (734, "V1b", "# Current version (v1.0.0)"),
+)
 
 
 def _v1_findings(monkeypatch, root: Path, relpaths: tuple[str, ...],
@@ -2340,6 +2354,84 @@ def test_v1_counter_probe_outside_every_region_yields_exactly_one(monkeypatch, t
     assert findings[0].branch == "V1a"
     assert findings[0].line == 1
     assert findings[0].file == "README.md"
+
+
+def test_v1_fence_suppression_covers_typed_fences_only(monkeypatch, tmp_path):
+    """Rule 3 after the K16 narrowing: typed fence suppresses, untyped one does not.
+
+    Same payload, only the info string differs — that *is* the mechanism, so
+    the pair pins it from both sides and neither case can pass by accident. The
+    third tree is the state-machine guard: the untyped block is skipped, yet
+    the typed fence behind it must still be tracked, or the closing delimiter
+    of the untyped block would be read as an opener and rule 3 would lose a
+    whole region instead of one.
+    """
+    payload = "## Hooks (7 hooks, propagated to all providers)\n"
+    typed = _v1_tree(tmp_path / "typed", "README.md",
+                     "```text\n" + payload + "```\n")
+    untyped = _v1_tree(tmp_path / "untyped", "README.md",
+                       "```\n" + payload + "```\n")
+    chained = _v1_tree(tmp_path / "chained", "README.md",
+                       "```\n| Agents | 74 |\n```\n```text\n" + payload + "```\n")
+
+    assert _v1_findings(monkeypatch, typed, ("README.md",)) == [], (
+        "AC-08: a fence with a language stays suppressed"
+    )
+
+    untyped_findings = _v1_findings(monkeypatch, untyped, ("README.md",))
+    assert [f.branch for f in untyped_findings] == ["V1a"]
+    assert untyped_findings[0].line == 2
+
+    chained_findings = _v1_findings(monkeypatch, chained, ("README.md",))
+    assert [f.line for f in chained_findings] == [2], (
+        "the untyped block is visible and the typed block behind it is still "
+        f"suppressed, got {[(f.line, f.branch) for f in chained_findings]}"
+    )
+
+
+def test_v1_sees_the_readme_directory_structure_facts(monkeypatch):
+    """K16 / B-4 / E-14: negative proof that IC-05's sites are visible again.
+
+    Rule 3 used to suppress *every* fenced line, which hid F2, F3-Site-2 and F4
+    inside the ``README.md`` directory-structure fence — rule 3 and IC-05 were
+    mutually exclusive. Reverting the narrowing makes this test fail, which is
+    the whole point of a negative proof.
+
+    It runs against the real, unmarked document instead of a synthetic tree, so
+    the premise guards carry the weight: the fence at ``:680`` must still open
+    untyped, each site line must still hold its quoted fact, and no site line
+    may carry a ``agent-meta:docs-*`` marker — otherwise the sites would be
+    hidden by rule 1 or 2 and the test would pass for the wrong reason.
+    """
+    findings = _v1_findings(monkeypatch, REPO_ROOT, ("README.md",))
+    lines = (REPO_ROOT / "README.md").read_text(encoding="utf-8").splitlines()
+    by_line: dict[int, list] = {}
+    for finding in findings:
+        by_line.setdefault(finding.line, []).append(finding)
+
+    assert lines[679].strip() == "```", (
+        "premise: the untyped directory-structure fence no longer opens at "
+        f"README.md:680, found {lines[679]!r}"
+    )
+
+    for lineno, branch, needle in V1_README_DIRECTORY_SITES:
+        line = lines[lineno - 1]
+        assert needle in line, (
+            f"premise: README.md:{lineno} no longer holds {needle!r}, found {line!r}"
+        )
+        assert "agent-meta:docs-" not in line, (
+            f"premise: README.md:{lineno} is marked — the IC-05 sites must stay "
+            "unmarked for this proof to be about suppression rule 3"
+        )
+        site = by_line.get(lineno, [])
+        assert any(f.branch == branch for f in site), (
+            f"README.md:{lineno} is invisible to V1 (expected branch {branch}, "
+            f"got {[(f.branch, f.message) for f in site]}) — suppression rule 3 "
+            "covers the site again"
+        )
+        for finding in site:
+            assert finding.check == "docs.no_manual_counts"
+            assert finding.severity == docs_lib.Severity.WARNING
 
 
 def test_v1_branches_are_disjoint(monkeypatch, tmp_path):
