@@ -3,7 +3,7 @@ plan-id: PLAN-DOCS-CONSOLIDATION-2026-09-25
 spec-id: SPEC-DOCS-CONSOLIDATION-2026-09-25
 title: Repository-weite Doku-Konsolidierung agent-meta — Implementation Plan
 status: APPROVED
-revision: 0.3
+revision: 0.4
 pipeline_stages:
   implement: 3
 related:
@@ -44,8 +44,55 @@ related:
 >
 > **System-Design (verbindliche Eingangsgrundlage):**
 > `docs/specs/2026-09-25-repository-documentation-consolidation-design.md`
-> (concept-architect, 2026-09-25, 397 Zeilen; Trace-Anker
+> (concept-architect, 2026-09-25; Trace-Anker
 > `spec-id: SPEC-DOCS-CONSOLIDATION-2026-09-25`).
+>
+> **Änderungsnotiz — Rev. 0.4 (2026-09-26): K12 nachgezogen, dazu belegte Faktenkorrekturen
+> aus der Commit-Blocker-Prüfung — keine Neuerfindung.** Der Rev.-0.3-Block ist **inhaltlich
+> unverändert**; K12 war dort nachträglich eingetragen und ist mit dem Revisions-Bump in diesen
+> Block verschoben (wortgleich, nur die Falschangabe zur Zeilenzahl korrigiert). Rev. 0.4
+> enthält **ausschließlich** belegte Korrekturen von Zahlen- und Tatsachenaussagen — **keine**
+> inhaltliche Änderung. **Betroffene Stellen:** K12 (dieser Block), System-Design-Notiz,
+> **Spec:**-Kopf, Self-Review „Offener Punkt OP-1". **Kein** Task-, Wellen-, AC-, IC-, NFA-,
+> Risiko-, Entscheidungs- (OQ2/OQ6/OQ8) oder Gate-Inhalt (W1/W2) geändert, **keine** neue ID.
+> Katalog:
+>
+> - **K12 (aus dem Rev.-0.3-Block hierher verschoben)** — die drei numerischen
+>   `Spec:<Zeile>`-Anker dieses Plans wurden durch **Abschnittsanker** ersetzt, weil die Spec
+>   zwischen Rev. 0.3 und Rev. 0.4 **net +232 Zeilen** gewachsen ist (gemessen am 2026-09-26
+>   gegen Basis `35bb176f`: **2051** Zeilen → **2283** Zeilen, `git diff --numstat` 258/26) und
+>   damit alle drei Anker sofort veraltet waren: (a) `Spec:62-66` (Klassifikation) →
+>   Spec-Statuskopf, Abschnitt „Klassifikation (Master-Rule `spec-plan-workflow`)"; (b) `Spec:1105`
+>   (Sollwertzahl elf) → Spec §5.5, IC-23; (c) `Spec:907` (R18) → Spec §5.2 IC-16 (M8-Tabelle)
+>   bzw. §12.2 R18. Zusätzlich entfällt die Zeilenangabe „2015 Zeilen im Rev.-0.3-Stand" im
+>   **Spec:**-Kopf dieses Plans — eine Zeilenzahl eines Vorstands ist driftanfällig und ohne
+>   Aussagewert. **Kein** Task-, Wellen-, AC-, IC-, NFA- oder Gate-Inhalt geändert.
+> - **Zeilenzahl „+133" → „+232" (Plan, zwei Stellen).** Der Zuwachs der Spec wurde mit **133**
+>   Zeilen angegeben; gemessen sind es **net +232** (2051 → 2283, `git diff --numstat` 258/26,
+>   Basis `35bb176f`). Betroffen: K12 oben und der **Spec:**-Kopf dieses Plans.
+> - **Driftanfällige Design-Zeilenzahl entfernt (Plan + Spec).** Die Notiz „System-Design
+>   (verbindliche Eingangsgrundlage)" nannte eine Zeilenzahl des Designs („397 Zeilen"). Sie ist
+>   **entfallen** — dieselbe Begründung wie bei K12: eine Zeilenzahl eines fremden Dokuments ist
+>   driftanfällig und ohne Aussagewert; die Design-**Entscheidungen** (T-1…T-6) und Komponenten
+>   (C1…C8) bleiben unverändert genannt. Die gleiche Angabe ist auch im Spec-Kopf entfernt.
+> - **Überholte Aussage im Self-Review (offener Punkt OP-1, Plan).** „Ausgeführt: nein" — das
+>   Concept-Review hat nicht stattgefunden" war überholt: das Concept-Review **ist erfolgt**
+>   (2026-09-26, `VERDICT: BLOCKED`, Befund **F-1**), die Spec-Rev. 0.4 ist am 2026-09-26 durch den
+>   Nutzer bestätigt (Spec §17.6/§17.7). Korrigiert auf diesen Stand; der **formale Abschluss von
+>   OP-1 in Plan und W0-Records** bleibt ein **Folgeschritt** mit exaktem Änderungsauftrag in Spec
+>   §17.6/§17.7 — er ist **nicht** Teil dieser Revision.
+> - **Ownership-Aussage in §16 präzisiert (Spec).** „Plan, Design und die sechs W0-Records wurden
+>   gelesen, nicht geändert" war im Working Tree unzutreffend (der Plan wurde in diesem Durchgang
+>   geändert); korrigiert auf den tatsächlichen Umfang.
+> - **Normativitätsstellen-Zahl: zwei → drei (Spec).** Kopfblock, Revisionszeile 0.4 und §17.6
+>   nannten „**zwei** Normativitätsstellen"; Rev. 0.4 hat **drei** korrigiert (§9.2 W0-Zeile,
+>   §9.2-Absatz „PR-/Branch-Kollision", §12.2 R16-Mitigation).
+> - **OP1-2/OP1-3 konsistent zugeordnet (Spec).** Revisionszeile und §17.6 widersprachen sich in
+>   der Reihenfolge; die Zuordnung ist jetzt in beiden Tabellen identisch und folgt der
+>   Dokumentreihenfolge (§9.2 vor §12.2).
+> - **Beleg W4/W5/W6-Parallelität vervollständigt (Spec).** §9.2, §13 A14, §17.6 und §17.8 belegten
+>   mit `design:269-271`; `design:275` führt W5 zusätzlich als gleichzeitig ausführbar mit
+>   W2 ‖ W3 („W2 ‖ W3 ‖ W5") und ist nun mitzitiert.
 >
 > **Änderungsnotiz — Rev. 0.3 (2026-09-26): Korrekturen K7–K10 aus dem Review der W0-Records.**
 > Diese Revision korrigiert ausschließlich **Verifikations-Kommandos, Erwartungswerte und
@@ -79,7 +126,7 @@ related:
 >   (offener Punkt **OP-1**), nicht verdeckt.
 > - **K11** — ein Formfehler im Verifikationstext von W0-4 wurde behoben (unbalanciertes
 >   Backtick/Bold in `1`/`**1**`).
-
+>
 > **Änderungsnotiz — Rev. 0.2 (2026-09-26): Ausführungskorrekturen K1–K6, keine Neuerfindung.**
 > Diese Revision korrigiert **ausschließlich Kommandos, Exit-Code-Erwartungen und die
 > Branch-Strategie** an den Stellen, an denen die Ausführung von **W0-2** und **W0-4** die
@@ -109,9 +156,15 @@ Schichtungs-Invariante `scripts/lib/variables.py:9-17` — keine Zyklen. Absenz-
 `scripts/sync.py`, `scripts/consistency-check.py`, Bash (`tests/scenarios/run.sh`).
 
 **Spec:** `docs/specs/2026-09-25-repository-documentation-consolidation.md`
-(`spec-id: SPEC-DOCS-CONSOLIDATION-2026-09-25`, Rev. 0.3, `status: APPROVED` (2026-09-26),
-2015 Zeilen im Rev.-0.3-Stand).
-Klassifikation **XL / Architectural** (Spec:62-66).
+(`spec-id: SPEC-DOCS-CONSOLIDATION-2026-09-25`, Rev. 0.4, `status: APPROVED` (2026-09-26)).
+**Keine Zeilenangabe:** eine Zeilenzahl der Spec ist per Definition driftanfällig — die Spec ist in
+dieser Sitzung mehrfach gewachsen (Rev. 0.4: **net +232 Zeilen** gegenüber Rev. 0.3; gemessen am
+2026-09-26 gegen die Basis `35bb176f`: **2051** Zeilen → **2283** Zeilen,
+`git diff --numstat` 258/26), wodurch drei
+numerische `Spec:<Zeile>`-Anker dieses Plans (Klassifikation, IC-23-Sollwertzahl, R18) bereits beim
+Schreiben dieses Plans veraltet waren. Sie sind deshalb **Abschnittsanker** (Stand 2026-09-26).
+Klassifikation **XL / Architectural** (Spec: Statuskopf, Abschnitt „Klassifikation
+(Master-Rule `spec-plan-workflow`)").
 
 ## Global Constraints
 
@@ -747,7 +800,9 @@ Modify `scripts/lib/doc_facts.py`
 `kind ∈ {mismatch, missing-in-expected}`). Consumes: W1-2.
 **Agent:** senior-developer · **Depends on:** W1-2 · **parallel_group:** PG-1 / W1-A
 **Ziel-AK (AC):** **AC-36** (IC-23), **NFA-11** · **V-Check:** **V6** (`expected-mismatch`)
-**Akzeptanz:** YAML enthält **elf** Einträge (Spec:1105); `test_expected_values_match` grün;
+**Akzeptanz:** YAML enthält **elf** Einträge (Spec: §5.5 „Querschnitts-Contracts", IC-23
+`config/doc-facts-expected.yaml` — Abschnittsanker, ersetzt den Former `Spec:1105`, der im
+Rev.-0.4-Stand nicht mehr traf); `test_expected_values_match` grün;
 `test_mismatch_is_reported` liefert bei manipuliertem Wert **genau einen**
 `kind == "expected-mismatch"` mit beiden Werten; `compute_doc_facts()` nimmt **keinen**
 Sollwert-Parameter (keine Kopplung, kein Zirkel).
@@ -1800,7 +1855,7 @@ AC-24, AC-25, AC-26, AC-34, AC-35, AC-37, AC-38, AC-39, AC-41.
 | R15 Kollision über Track A hinaus | mittel | W0-4 Fixture-Gate, W1-9 Schema-Block in W1, W2-1 Fixtures nach Track-A-Merge; Szenario-Fixtures unverändert (NG-10) | **niedrig** |
 | R16 PR-/Branch-Kollision | mittel | W0-2 **ein** Wellen-Branch mit sequenziellen W-Commits und Wellenkennung im Commit-Titel (Ausführungskorrektur 2026-09-26 statt acht Wellen-Branches, s. W0-2-Akzeptanz), `git mv`-Wellen zuerst mergen, ein Commit pro Datei | **niedrig** |
 | R17 Downstream-Asymmetrie | mittel | Absenz-Default `false` (IC-22) für Writer **und** Checks; W2-7 Common-Gate in jedem Check; W3-1 Besitzregel | **niedrig** |
-| R18 Auto-Commit-Interaktion | — | als **analysiert und nicht zutreffend** geführt (Spec:907, `sync_pipeline.py:1102-1117` liest den Drift-Store nicht); kein Plan-Task nötig | **keines** |
+| R18 Auto-Commit-Interaktion | — | als **analysiert und nicht zutreffend** geführt (Spec: §5.2 **IC-16** (M8-Tabelle) und §12.2 **R18** — Abschnittsanker, ersetzen den Former `Spec:907`, der im Rev.-0.4-Stand nicht mehr traf; `sync_pipeline.py:1102-1117` liest den Drift-Store nicht); kein Plan-Task nötig | **keines** |
 | R19 `knowledge-indexer`-Kollision | mittel | W7-4 als **letzter** Commit von W7, erst nach Rollenpflege-Merge; Rollback `git checkout` | **niedrig** |
 | R20 V2-ERROR vs. menschliche Doku-Erstellung | mittel | **W0-6** entscheidet den Auslöser **vor** W3; W3-6 setzt ihn um; W3-7 dokumentiert den Vertrag | **niedrig** nach W0-6 |
 
@@ -1878,17 +1933,22 @@ AC-24, AC-25, AC-26, AC-34, AC-35, AC-37, AC-38, AC-39, AC-41.
   5. W0-Tasks verweisen als **Gate-Anker** auf ACs, obwohl W0 laut Spec §9.2 kein eigenes AC trägt.
   6. **Ein** Wellen-Branch statt acht Wellen-Branches (Nutzer-Vorgabe; Ausführungskorrektur
      2026-09-26, Global Constraints, W0-2-Akzeptanz, R16).
-- **Offener Punkt OP-1 — Spec-Rev. 0.4 nicht ausgeführt (Stand 2026-09-26):** Die **Spec**
-  verlangt in **§9.2 W0** und **R16** weiterhin **verbindlich** „**ein Branch pro Welle**
-  (`chore/docs-consolidation-w<N>`), gestapelte PRs". Umgesetzt ist **ein** Branch
-  (`feat/repository-documentation-consolidation-main`, PR #839). Da W0-2-Record und Plan die Spec
-  zur **normativen Quelle** erklären, gilt nach dieser eigenen Regel die Spec — der
-  eingefrorene Zustand verletzt damit die normative Quelle. **Beauftragt: Korrektur der Spec auf
-  Rev. 0.4 mit Concept-Review. Ausgeführt: nein** — das Concept-Review hat nicht stattgefunden,
-  und eine Spec-Inhaltsänderung ist nicht Teil des Dokumentationsauftrags. **Bis dahin gilt die
-  umgesetzte Strategie**; der Widerspruch ist in Global Constraints, W0-2, W0-2-Record Kapitel 7
-  und §10, Track-A-Gate-Record §10 sowie OQ6-Record sichtbar dokumentiert und **nicht verdeckt**.
-  Owner des Concept-Reviews: `orchestrator`; Entscheidung über die Rev. 0.4: `main_chat`.
+- **Offener Punkt OP-1 — Spec-Korrektur auf Rev. 0.4 ausgeführt (Stand 2026-09-26); offen ist
+  nur noch der formale Abschluss in Plan und W0-Records:** Die **Spec** verlangte im
+  Rev.-0.3-Stand in **§9.2 W0** und **R16** weiterhin **verbindlich** „**ein Branch pro Welle**
+  (`chore/docs-consolidation-w<N>`), gestapelte PRs", während **ein** Branch umgesetzt war
+  (`feat/repository-documentation-consolidation-main`, PR #839) — der eingefrorene Spec-Stand
+  verletzte damit die normative Quelle. **Die Korrektur der Spec auf Rev. 0.4 ist ausgeführt:**
+  das **Concept-Review ist erfolgt** (2026-09-26, `VERDICT: BLOCKED`, Befund **F-1**) und Rev. 0.4
+  ist am 2026-09-26 **durch den Nutzer bestätigt** (Spec §17.6/§17.7). Die frühere Angabe
+  „Ausgeführt: nein — das Concept-Review hat nicht stattgefunden" ist damit **überholt** und
+  entfernt. **Offen** bleibt ausschließlich der **formale Abschluss von OP-1** (K1-Liste im
+  Änderungsblock, Global Constraints, Self-Review, W0-2-Spezifikationsabweichungs-Box sowie die
+  sechs W0-Records); er ist als **Folgeschritt mit exaktem Änderungsauftrag** in Spec §17.6/§17.7
+  geführt und **nicht** Teil dieser Revision. **Geltende Strategie:** die ausgeführte (ein Branch,
+  ein PR); der Widerspruch ist in Global Constraints, W0-2, W0-2-Record Kapitel 7 und §10,
+  Track-A-Gate-Record §10 sowie OQ6-Record sichtbar dokumentiert und **nicht verdeckt**.
+  Owner des formalen Abschlusses: `orchestrator`.
 - **Ehrliche Lücken:** V9 ohne AC; `docs/CODEBASE_OVERVIEW.md` ohne AC und NG-3; `llms.txt:5`
   Providernamen-Liste ist inhaltlich (AC-40), aber keine „manuell gepflegte Zahl“ (Spec Rev. 0.3,
   NF-9) und daher nicht Teil der 11.
