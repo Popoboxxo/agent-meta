@@ -2,7 +2,9 @@
 spec-id: SPEC-DOCS-CONSOLIDATION-2026-09-25
 title: Repository-weite Doku-Konsolidierung agent-meta — Technical Specification
 status: APPROVED
-revision: 0.3
+approved: 2026-09-26
+approved-scope: Ausführung W0–W8; Rev. 0.4 (Commit-/Branch-Normativität) am 2026-09-26 durch den Nutzer bestätigt; A13 und A14 als offene, dokumentierte Abweichungen registriert
+revision: 0.4
 related:
   - docs/specs/2026-09-25-repository-documentation-consolidation-design.md
   - docs/REQUIREMENTS.md
@@ -18,11 +20,17 @@ related:
 > keinen Plan**. Der Approval-Marker wurde nach dem Review durch `concept-reviewer`
 > gesetzt (Approval-Gate, Master-Rule `spec-plan-workflow`).
 >
+> **Rev. 0.4 ist am 2026-09-26 durch den Nutzer bestätigt** — über den Entscheidungsweg laut
+> Plan Rev. 0.4, K1 (`main_chat`). Das Concept-Review von Rev. 0.4 endete zuvor mit
+> `VERDICT: BLOCKED` (F-1: neue normative Pflichten ohne erneute User-Freigabe); die
+> Bestätigung liegt nun **extern** vor, die Auflösung ist in **§17.7** protokolliert.
+> **Offen und bewusst nicht aufgelöst:** die W4/W5/W6-Serialität (**A14**, **§17.8**).
+>
 > Trace-Anker (aus dem Systemdesign **unverändert** übernommen und vom Plan zu referenzieren):
 > `spec-id: SPEC-DOCS-CONSOLIDATION-2026-09-25`.
 >
 > **Verbindliche Eingangsgrundlage:** `docs/specs/2026-09-25-repository-documentation-consolidation-design.md`
-> (concept-architect, 2026-09-25, 397 Zeilen, Entscheidungen T-1…T-6, Komponenten C1…C8,
+> (concept-architect, 2026-09-25, Entscheidungen T-1…T-6, Komponenten C1…C8,
 > Checks V1…V9, Wellen W0…W8, Risiken R1…R11, offene Fragen OQ1…OQ6, Downstream-Impacts B1…B6).
 > Alle `Datei:Zeile`-Angaben zu `scripts/lib/`, `scripts/`, `config/`, `.meta-config/`,
 > `tests/scenarios/`, `knowledge/` und zur Root-Doku wurden am 2026-09-26 gegen den Working
@@ -55,6 +63,37 @@ related:
 > sind als behoben **bestätigt** und wurden nicht angefasst. Die Frontmatter blieb
 > zu diesem Zeitpunkt `status: Entwurf` — es lag keine User-Freigabe vor.
 >
+> **Rev. 0.4 (2026-09-26) — Ausführungskorrektur der Branch-/PR-Strategie (offener Punkt OP-1
+> der Ausführungs-Records).** Diese Revision korrigiert **drei Normativitätsstellen** und deren
+> Folgeverweise: die in Rev. 0.1–0.3 wörtlich „**Verbindlich**" geforderte Strategie „**ein Branch
+> pro Welle** (`chore/docs-consolidation-w<N>`), gestapelte PRs" — geführt in der **W0-Zeile von
+> §9.2** (OP1-1), im **§9.2-Absatz „PR-/Branch-Kollision"** (OP1-2) und in der **Mitigation von R16**
+> (§12.2, OP1-3) — trug die **tatsächlich ausgeführte** Strategie nicht.
+> Umgesetzt ist **ein** Wellen-Branch `feat/repository-documentation-consolidation-main` (Basis
+> `origin/main`) mit **einem** PR gegen `main`; die Wellen laufen als **sequenzielle Commits** mit
+> Wellenkennung im Commit-Titel. Da dieses Dokument sich zur **normativen Quelle** erklärt
+> (Kopfzeile „stillschweigende Abweichungen gibt es nicht"; §2.2 „hart — Abweichung gilt als
+> Spec-Verstoß"), wäre der eingefrorene Stand eine Verletzung der eigenen Norm — die Korrektur ist
+> deshalb **hier** und **sichtbar** erfolgt, nicht in den Ausführungs-Records. **Keine inhaltliche
+> Neuerfindung:** unverändert bleiben
+> AC-01…AC-41, IC-01…IC-24, NFA-01…NFA-11, R1…R20 (R16 **nur** im Lösungsansatz), F1…F25,
+> M-1…M-13, NG-1…NG-11, FI-1…FI-10, OQ1…OQ9, W0…W8, die Modulaufteilung M1–M4, die Welleninhalte
+> und die SSoT-Zielstruktur; **keine** neue Welle, **kein** neues AC/IC/NFA/Risiko, **keine**
+> geänderte Architektur. **A13 (neu, rev. 0.4): das Design nennt in seiner W0-Zeile einen
+> Branch mit anderem Namen** — `chore/docs-consolidation`
+> (`docs/specs/2026-09-25-repository-documentation-consolidation-design.md:265`) gegenüber
+> `feat/repository-documentation-consolidation-main` (Basis `origin/main`) hier. Das Design
+> verlangt an keiner Stelle gestapelte PRs; die **Zahl** der Branches stimmt, der **Name**
+> nicht — das ist eine bewusste Abweichung (**§13 A13**), keine stille. **A14 (neu, rev. 0.4):
+> offene Abweichung** — §9.2 führte W4/W5/W6 paarweise parallel, ausgeführt werden sie
+> **sequenziell** (**§13 A14**, **§17.8**). §13 umfasst damit **14** Abweichungen
+> (A1…A12 unverändert, A13/A14 neu). Volltext, betroffene Stellen und Ausführungsbelege:
+> **§17.6**, Freigabe-Auflösung **§17.7**, offener Punkt **§17.8**. Der **formale Abschluss von
+> OP-1 in Plan und W0-Records ist ein Folgeschritt** und nicht Teil dieser Revision; das
+> **Concept-Review über Rev. 0.4 ist erfolgt** (2026-09-26, `VERDICT: BLOCKED`, F-1) und der
+> **Entscheidungsweg `main_chat`** (Plan Rev. 0.4, K1) hat am 2026-09-26 entschieden
+> (**§17.7**).
+>
 > **Freigabevermerk (2026-09-26).** Freigebende Instanz: **Nutzer-Freigabe**, über `main_chat`
 > an den `orchestrator` weitergeleitet und hier durch die Rolle `documenter` auf Veranlassung
 > des Orchestrators formalisiert. Review-Stand: **Runde 1** (Concept-Review vom 2026-09-26)
@@ -66,10 +105,33 @@ related:
 > in §11.1 weiterhin offenen, mit Owner und Wellen-Blockade versehenen Entscheidungen.
 > **Datumsabweichung (dokumentiert):** der Nutzer hat den 2026-09-25 genannt; das ist das
 > Datum der **Anfrage**, nicht das der Freigabe. Der Freigabevermerk trägt daher korrekt
-> **2026-09-26**. Die inhaltliche Revisionshistorie endet bei **Rev. 0.3** — die Freigabe ist
-> eine **Statuszeile**, keine Inhaltsrevision (Konvention: `docs/specs/2026-09-13-stale-role-cleanup-design.md:39`,
+> **2026-09-26**.
+>
+> **Rev. 0.4 — gesonderte Bestätigung (2026-09-26, extern).** Rev. 0.4 ist eine
+> **Inhaltsrevision**: Sie führt neue normative Pflichten ein (verbindliche
+> Commit-Titel-/Body-Konvention, Branch-Aufbewahrung als Scope-Aussage). Das Concept-Review
+> von Rev. 0.4 endete deshalb mit `VERDICT: BLOCKED` (**F-1**) — die Normativität wurde ohne
+> erneute User-Freigabe mit derselben Verbindlichkeitstiefe installiert, obwohl §15 `APPROVED`
+> nur nach Concept-Review **und** User-Freigabe zulässt. **F-1 ist damit aufgelöst:** Rev. 0.4
+> ist am **2026-09-26 durch den Nutzer ausdrücklich bestätigt**, über den Entscheidungsweg
+> laut Plan Rev. 0.4, K1 (`main_chat`). **Worauf sich die Bestätigung bezieht:**
+>
+> - **unverändert:** der Umfang der Ausführungsmechanik **W0–W8** — der Freigabeumfang der
+>   Erstfreigabe bleibt unberührt; keine Welle, kein AC/IC/NFA/Risiko wurde verschoben.
+> - **neu bestätigt:** die in Rev. 0.4 aufgenommenen **Normativitätsaussagen** — die
+>   verbindliche **Commit-Titel-/Body-Konvention** (§9.2 Punkt 2, R16-Mitigation) und die
+>   **Branch-Aufbewahrung** als Scope-Aussage (§9.2 Punkt 4, „diese Spec schreibt weder
+>   Löschung noch Aufbewahrung eines Branches vor").
+> - **Bedingung der Bestätigung:** **A13** (Branch-Namensabweichung) und die
+>   **W4/W5/W6-Serialität** (A14) sind als **offene, dokumentierte Abweichungen**
+>   registriert — A13 in §13, A14 zusätzlich in **§17.8** mit Status **offen**.
+>
+> Die zuvor im Dokument selbst ausgerichtete Ausnahme („Inhaltsrevision ohne erneute
+> Freigabe") ist damit **entfallen** — sie ist nicht mehr nötig, weil die Freigabe extern
+> vorliegt. `status: APPROVED` besteht unverändert; die inhaltliche Revisionshistorie endet
+> bei **Rev. 0.4**. (Konvention: `docs/specs/2026-09-13-stale-role-cleanup-design.md:39`,
 > `docs/specs/2026-09-15-reference-standards-design.md:67` — beide führen die Freigabe als
-> eigene Zeile, **ohne** Revisions-Bump).
+> eigene Zeile, **ohne** Revisions-Bump; hier liegt sie zusätzlich als Rev. 0.4 vor.)
 >
 > **Zusätzlich am 2026-09-26 durch den Nutzer entschieden:** **OQ2**, **OQ6** und **OQ8** (§11.2).
 > Alle drei sind damit **geschlossen** und nicht mehr als offene Frage zu führen; §16
@@ -102,7 +164,9 @@ related:
 | 0.1 | 2026-09-26 | Initiale Spezifikation aus `docs/specs/2026-09-25-repository-documentation-consolidation-design.md`; alle `scripts/lib/`-, `config/`-, `.meta-config/`-, `knowledge/`- und Root-Doku-Referenzen re-verifiziert; Modulaufteilung M1–M4; AC-01…AC-35; Trace-Matrix; R1…R13; OQ1…OQ7 | concept-specifier |
 | 0.2 | 2026-09-26 | **Review-Überarbeitung (CHANGES_REQUESTED, 16/16 Findings behoben).** **K1** V1-Regel neu spezifiziert (2 Branches, Positiv-/Negativ-Fixture, AC-07/AC-08 ersetzt). **K2** F19 **gestrichen** — Tier-Presets = 5, `README.md:689` ist korrekt (Reviewer bestätigt). **K3** neuer Befund **F22** — DoD-Presets = 7, `README.md:688` ist Drift (Reviewer bestätigt). **K4** F14 erweitert — 8 Pipelines / 7 aktiv, `concept-driven-dev` fehlt in `README.md:479-489` (Reviewer bestätigt). **K5** Absenz-Default = **aus** für Writer **und** Checks (Präzedenz `knowledge.py:127`), `knowledge-engine`-Schreibverbot, Besitzregel für `docs/INDEX.md`; **Anzahl der brechenden Szenarien von 6 auf 3 harte Fehlschläge korrigiert** (§17.2). **M1** Hook-Zählung in zwei benannte Keys getrennt (11 / 17). **M2/M3** Trace-Matrix und W8-ACs repariert. **M4** F6 = vier Orte, Migrationen M-6/M-7 ergänzt, **F23/F24** erfasst. **M5** AC-29 entzirkelt (Stale-Quelle wandert mit der Langfassung). **M6** Restore-Pfad als **IC-24** spezifiziert, AC-35 entsprechend. **M7** R1 auf `docs/INDEX.md` ausgedehnt. **M8** Allowlist-Interaktion **analysiert statt vermutet** (verifiziert: `fnmatch` matcht den Basis-Pfad nicht). **N1–N3** Selbstwidersprüche korrigiert, OQ5/OQ7 als geschlossen markiert, `knowledge-indexer`-Kollision als R19. **Neu:** §12 Threat Model, **R14** (unabhängige Sollwert-Fixture → IC-23 + AC-36/AC-37), **R15** (Schema → M-11), **R16** (PR-/Branch-Kollision), **R17** (Downstream-Asymmetrie), **R18** (Auto-Commit-Interaktion), **R20** (V2-ERROR vs. menschliche Doku-Erstellung), **OQ8** (Index-Regenerierung), **OQ9** (zwei Beispiel-Configs), **§17** (Review-Auflösung + eigene Befunde), AC-01…AC-41, F1…F25 (F19 gestrichen), M-1…M-13, R1…R20, NFA-11, IC-23/IC-24 | concept-specifier |
 | 0.3 | 2026-09-26 | **Re-Review-Überarbeitung (CHANGES_REQUESTED, 8/8 Findings + 1 Gegenkorrektur behoben).** **NEW-1** `DOCS_HOOK_SCRIPT_FILES_COUNT == 17` **entfällt** (die 17 zählen `hooks/**`, nicht `hooks/1-generic/`); neu `DOCS_HOOKS_1GENERIC_COUNT == 9` mit der Regel `hooks/1-generic/*.sh` minus `*-impl.sh`, exklusiv für `README.md:696`; `DOCS_HOOKS_COUNT == 11` bleibt unverändert exklusiv für `README.md:501`. **NEW-2** F22 um `README.md:381` erweitert (zweite Falschzahl: Überschrift „6 presets" **und** fehlende `concept-driven`-Zeile). **NEW-3** §1/§1.2-Zählung neu gerechnet: **11** falsche Zahlen (10 in `README.md`, 1 in `ARCHITECTURE.md:3`), `llms.txt:5` ist Prosa, keine Zahl. **NEW-4** Sollwerte einheitlich **elf**. **NEW-5** §9.2-Wellensummen korrigiert (W1: **10**, W3: **14**). **NEW-6** §16-Liste der AC ohne V-Check vervollständigt (**18**). **NEW-7** AC-38-Begründung für `51:32` auf Absenz-Default (IC-13/IC-22) umgestellt. **NEW-8** AC-02 ohne `xfail` Snapshot **durchsetzbar**; Zahlen-Sollwerte liegen ausschließlich in IC-23/AC-36. **Gegenkorrektur** §17.2: **0** Szenarien brechen unter der spezifizierten Abschirmung, **3** in der naiven Variante (nur als Begründung der Abschirmung genannt, kein Arbeitsauftrag — NG-10). **Neu:** NF-9 (Falschzahlenzählung), NF-10 (Sollwertzahl), NF-11 (`README.md:381` als Beleg des Designs), **NF-12** (`HOOK_EXCLUDED_SUFFIXES` schrieb `"_impl.sh"` statt `"-impl.sh"` — hätte `DOCS_HOOKS_COUNT` auf 13 statt 11 laufen lassen; im selben Codepfad wie NEW-1 gefunden und korrigiert) | concept-specifier |
-| **Freigabe** | **2026-09-26** | **User-Freigabe** (Nutzer, über `main_chat` an den `orchestrator`); formalisiert durch `documenter`. Frontmatter `status:` auf `APPROVED` gesetzt. **Freigabestand:** Concept-Review **Runde 1** (2026-09-26) `CHANGES_REQUESTED`, **5 kritische Befunde** (K1…K5) → Rev. 0.2; Re-Review **Runde 2** (2026-09-26) `CHANGES_REQUESTED` mit **0 kritischen Befunden**, `RESIDUAL_BLOCKERS: Keine`, `PLAN_READINESS: Ja` → Rev. 0.3 mit **8 behobenen** Findings (NEW-1…NEW-8) + Gegenkorrektur. **Umfang:** Freigabe der **Ausführung W0–W8**. **Zusätzlich entschieden (Nutzer, 2026-09-26):** OQ2 (`llms.txt` = **Hybrid**), OQ6 (**tracked**) und OQ8 (Regenerierung über Sync/Validator) → nach §11.2 verschoben. **Keine inhaltliche Änderung** an IC/AC/Risiken — die Freigabe ist eine Statuszeile, kein Revisions-Bump (Konvention: `docs/specs/2026-09-13-stale-role-cleanup-design.md:39`, `docs/specs/2026-09-15-reference-standards-design.md:67`). **Datumsabweichung:** Nutzer nannte 2026-09-25 (Datum der Anfrage); der Freigabevermerk trägt das **Freigabedatum 2026-09-26** | documenter |
+| **0.4** | 2026-09-26 | **Ausführungskorrektur der Branch-/PR-Strategie (offener Punkt OP-1) — drei Normativitätsstellen, keine Design-Änderung, keine inhaltliche Neuerfindung.** **OP1-1** §9.2, **W0-Zeile**: „**ein Branch pro Welle** (`chore/docs-consolidation-w<N>`)" → **ein** Wellen-Branch `feat/repository-documentation-consolidation-main` (Basis `origin/main`) mit **einem** PR gegen `main`; Wellen-Zuordnung über die **Wellenkennung im Commit-Titel**. **OP1-2** §9.2-Absatz „PR-/Branch-Kollision" vollständig neu gefasst (Ein-Branch-/Ein-PR-Regel, Commit-Titel-Konvention inkl. `… W<N> complete` und Task-ID im Commit-Body, Merge-Regel `git mv`-Wellen W4/W5/W6 zuerst, sequenzielle W1→W8, dokumentierter Bestand des überholten Vor-Branches, Rebase gegen `origin/main` vor dem PR-Merge). **OP1-3** **R16-Mitigation** (§12.2): „Ein Branch **pro Welle** …, gestapelte PRs in Reihenfolge" → Reihenfolge- und Merge-Regel statt Branch-Anzahl. **OP1-4** §15 Trace-Anker um den Rev.-0.4-Ausführungskorrektur-Anker ergänzt. **OP1-5** §16 um zwei Abgrenzungszeilen (Rev.-0.4-Grenze, Ownership-Grenze Rev. 0.4) ergänzt. **OP1-6** §17.6 als vollständiger Korrektur- und Beleg-Abschnitt angelegt. **Unverändert:** AC-01…AC-41, IC-01…IC-24, NFA-01…NFA-11, R1…R20 (R16 **nur** im Lösungsansatz), F1…F25, M-1…M-13, NG-1…NG-11, FI-1…FI-10, OQ1…OQ9, W0…W8, §9.1, §9.2-Welleninhalt und AC-Mengen, §3–§12 im Übrigen. **§13 umfasst 14 Abweichungen** (A1…A12 unverändert; **neu in Rev. 0.4: A13** Branch-Namensabweichung gegen das Design und **A14** offene Abweichung W4/W5/W6-Serialität — das Design verlangt an keiner Stelle gestapelte PRs, die **Zahl** der Branches stimmt, der **Name** nicht). **Freigabe:** Rev. 0.4 am **2026-09-26 durch den Nutzer bestätigt** (Entscheidungsweg laut Plan Rev. 0.4, K1 → `main_chat`) — Auflösung des Review-Blocks `VERDICT: BLOCKED` (F-1) in **§17.7**; die zuvor im Dokument ausgerichtete Ausnahme („Inhaltsrevision ohne erneute Freigabe") ist **entfallen**. **Keine neue ID, keine neue Welle, kein neues Risiko.** Quelle der Korrektur: `docs/plans/2026-09-25-repository-documentation-consolidation.md` (Rev. 0.3, K1/K8/K9, Global Constraints, Task W0-2) und `docs/plans/2026-09-25-docs-consolidation-wave0-freeze.md` §7.1/§7.2. **OP-1 wird in Plan und Records erst durch einen Folgeschritt formal geschlossen**; Concept-Review über Rev. 0.4 **ist erfolgt** (2026-09-26, `VERDICT: BLOCKED`, Befund **F-1**), die **Nutzer-Bestätigung** liegt vor; Auflösung und Wortlaut in **§17.7**, siehe §17.7. | concept-specifier |
+| **Freigabe** | **2026-09-26** | **User-Freigabe** (Nutzer, über `main_chat` an den `orchestrator`); formalisiert durch `documenter`. Frontmatter `status:` auf `APPROVED` gesetzt. **Freigabestand:** Concept-Review **Runde 1** (2026-09-26) `CHANGES_REQUESTED`, **5 kritische Befunde** (K1…K5) → Rev. 0.2; Re-Review **Runde 2** (2026-09-26) `CHANGES_REQUESTED` mit **0 kritischen Befunden**, `RESIDUAL_BLOCKERS: Keine`, `PLAN_READINESS: Ja` → Rev. 0.3 mit **8 behobenen** Findings (NEW-1…NEW-8) + Gegenkorrektur. **Umfang:** Freigabe der **Ausführung W0–W8**. **Zusätzlich entschieden (Nutzer, 2026-09-26):** OQ2 (`llms.txt` = **Hybrid**), OQ6 (**tracked**) und OQ8 (Regenerierung über Sync/Validator) → nach §11.2 verschoben. **Keine inhaltliche Änderung** an IC/AC/Risiken — die Freigabe ist eine Statuszeile, kein Revisions-Bump (Konvention: `docs/specs/2026-09-13-stale-role-cleanup-design.md:39`, `docs/specs/2026-09-15-reference-standards-design.md:67`). **Datumsabweichung:** Nutzer nannte 2026-09-25 (Datum der Anfrage); der Freigabevermerk trägt das **Freigabedatum 2026-09-26**. **Nach der Freigabe (rev. 0.4, 2026-09-26):** die Ausführungskorrektur der Branch-/PR-Strategie (§17.6) — **ohne** Änderung an IC/AC/Risiken; die dort zunächst im Dokument ausgerichtete Ausnahme („ohne neue Freigabe") ist **durch die nachfolgende Nutzer-Bestätigung ersetzt**, siehe nächste Zeile | documenter |
+| **Freigabe (Rev. 0.4)** | **2026-09-26** | **Nutzer-Bestätigung der Rev. 0.4** (Nutzer, über `main_chat` an den `orchestrator`; Entscheidungsweg laut Plan Rev. 0.4, K1); formalisiert durch `documenter`. **Anlass:** das Concept-Review von Rev. 0.4 endete mit `VERDICT: BLOCKED` (**F-1**) — neue normative Pflichten (verbindliche Commit-Titel-/Body-Konvention, Branch-Aufbewahrung als Scope-Aussage) waren ohne erneute User-Freigabe mit derselben Verbindlichkeitstiefe installiert worden. **Bezug der Bestätigung:** unverändert der Umfang der Ausführungsmechanik **W0–W8**; **neu bestätigt** die in Rev. 0.4 aufgenommenen Normativitätsaussagen. **Bedingung:** **A13** und die **W4/W5/W6-Serialität** (A14) sind als **offene, dokumentierte Abweichungen** registriert (§13, §17.7, §17.8). **Kein** Revisions-Bump — Rev. bleibt 0.4 | documenter |
 
 ---
 
@@ -1646,13 +1710,13 @@ kein Lückenbleiben.
 
 | Welle | Modul | Inhalt | AC | Abhängig von | Parallel mit | Rückrollpunkt |
 |---|---|---|---|---|---|---|
-| W0 | — | Design-Freeze, Contract-Liste, **ein Branch pro Welle** (`chore/docs-consolidation-w<N>`), Entscheidungs-Records zu OQ2/OQ6/OQ8 — **OQ6/OQ8 entschieden 2026-09-26** (§11.2: `docs/INDEX.md` tracked, **kein** `.gitignore`-Eintrag; Regeneration über Sync/Validator) | — | — | — | — |
+| W0 | — | Design-Freeze, Contract-Liste, **ein Wellen-Branch für das gesamte Vorhaben** (`feat/repository-documentation-consolidation-main`, Basis `origin/main`) mit **einem** PR gegen `main`; Wellen-Zuordnung über die **Wellenkennung im Commit-Titel**. **Rev. 0.4 — Ausführungskorrektur 2026-09-26 (OP-1):** ersetzt die Fassung Rev. 0.1–0.3 „**ein Branch pro Welle** (`chore/docs-consolidation-w<N>`), gestapelte PRs"; Einzelheiten und Belege in §17.6, Verbindlichkeitsformulierung im Absatz „PR-/Branch-Strategie" direkt unter dieser Tabelle — Entscheidungs-Records zu OQ2/OQ6/OQ8 — **OQ6/OQ8 entschieden 2026-09-26** (§11.2: `docs/INDEX.md` tracked, **kein** `.gitignore`-Eintrag; Regeneration über Sync/Validator) | — | — | — | — |
 | W1 | M1+M2 | C1 DocFacts, C2 DocRenderer, C3 Snippet-Bridge, `config/doc-facts-expected.yaml`; Schema-Block (M-11); **rein additiv**, kein Datei-Diff außer `llms.txt` | AC-01…AC-06, AC-23…AC-25, AC-39 | W0 | W2 (verschiedene Dateien) | revert; kein Datei-Diff |
 | W2 | M1 | Checks V1a/V1b, V3, V5, V6 (inkl. Sollwert-Vergleich), V7; **V1 startet WARNING**; V1-Fixture | AC-07…AC-11, AC-13, AC-36 | W1 (V6 braucht C1) | W3 | `docs-consolidation.checks.strict: false` |
-| W3 | M2 | `docs/INDEX.md`-Generator + C8 Scaffold-Guard + Besitzregel; volatile-Sektion; Allowlist-Basis-Pfad; **erster echter Datei-Diff**, `docs/INDEX.md` tracked | AC-12, AC-14…AC-22, AC-26, AC-27, AC-37, AC-38 | W1 | W2, W4 | `git rm docs/INDEX.md`; Scaffold-Skeleton regeneriert |
-| W4 | M3 | Architektur-Konsolidierung: `git mv` Langfassung, Root-Stub, Stale-Deklaration wandert mit (M-7) | AC-28 (Teil), AC-29 | W3 | W5, W6 | `git mv` zurück + Stub wiederherstellen |
-| W5 | M3 | Guides: `howto/`- und `docs/howto/`-Auflösung (M-5, M-6) + `derived-from`-Annotation (M-9, M-10) | AC-28 (Teil), AC-31 | W1 (C7 braucht C1) | W4, W6 | `git mv` zurück; Annotationen additiv revertierbar |
-| W6 | M3 | Spec/Plan-Legacy: `git mv` + `legacy:` additiv erweitern | AC-28 (Teil), AC-32 | W3 | W4, W5 | Config-Key additiv → Zeile entfernen |
+| W3 | M2 | `docs/INDEX.md`-Generator + C8 Scaffold-Guard + Besitzregel; volatile-Sektion; Allowlist-Basis-Pfad; **erster echter Datei-Diff**, `docs/INDEX.md` tracked | AC-12, AC-14…AC-22, AC-26, AC-27, AC-37, AC-38 | W1 | W2 (PG-2); **W4 ist Vorgänger, nicht Partner** (rev. 0.4, Folge aus A14) | `git rm docs/INDEX.md`; Scaffold-Skeleton regeneriert |
+| W4 | M3 | Architektur-Konsolidierung: `git mv` Langfassung, Root-Stub, Stale-Deklaration wandert mit (M-7) | AC-28 (Teil), AC-29 | W3 | **sequenziell** (PG-3, rev. 0.4) — **nicht** parallel | `git mv` zurück + Stub wiederherstellen |
+| W5 | M3 | Guides: `howto/`- und `docs/howto/`-Auflösung (M-5, M-6) + `derived-from`-Annotation (M-9, M-10) | AC-28 (Teil), AC-31 | W1 (C7 braucht C1), W4 (PG-3) | **sequenziell** (PG-3, rev. 0.4) — **nicht** parallel | `git mv` zurück; Annotationen additiv revertierbar |
+| W6 | M3 | Spec/Plan-Legacy: `git mv` + `legacy:` additiv erweitern | AC-28 (Teil), AC-32 | W3, W5 (PG-3) | **sequenziell** (PG-3, rev. 0.4) — **nicht** parallel | Config-Key additiv → Zeile entfernen |
 | W7 | M4 | `index.md`-Generator (C6), `log.md`-Append, `schema.md`-Update, `knowledge-indexer`-Umschreibung, **Restore-Pfad** (IC-24) | AC-33…AC-35, AC-41 | W5, W3, Rollenpflege-Branch | — (kein Parallel) | `index-mode: llm` → Generator stumm; `restore_wiki_index()` |
 | W8 | M1+M3 | `check_stale_backups` (V9), README-Totverweise (M-8), `llms.txt`-/`README.md`-Providerzahl (AC-40), `PROJECT_STRUCTURE`-Korrektur (M-12), ID-Deklaration (OQ4) | AC-30, AC-40 | W2, W3 | — | additiv |
 
@@ -1665,19 +1729,60 @@ AC-38 (1) = 14. **W0** ist Definitions-Welle ohne AC. **M3-Änderungen:** Rev. 0
 (alphabetische Reihenfolge, keine ID-Recycling); die Zuordnung AC → M-Nummer wurde
 entsprechend nachgezogen.
 
-**Ownership-disjunkte Parallelität:** W2 ‖ W3 ‖ W5 sind gleichzeitig ausführbar (Dateien:
-`scripts/lib/consistency/docs.py` / `docs/INDEX.md` + `scripts/lib/doc_*.py` /
-`docs/guides/` + `knowledge/wiki/**`). **Konflikt:** W1/W2 berühren `scripts/lib/config.py`
-bzw. `scripts/lib/consistency/*` — dieselben Dateien, an denen Track A arbeitet. W1/W2 daher
-**sequenziell nach Track A**, ein Commit pro Datei, Rebase vor jedem Merge. Zusätzlich
-**Fixture-Kollision**: die V1-Fixture `tests/fixtures/docs_v1_fixtures.md` wird erst **nach**
-dem Track-A-Merge angelegt (§2.3, R15).
+**Ownership-disjunkte Parallelität:** W2 ‖ W3 sind gleichzeitig ausführbar (Dateien:
+`scripts/lib/consistency/docs.py` / `docs/INDEX.md` + `scripts/lib/doc_*.py`). **W4/W5/W6 sind
+rev. 0.4 als `sequenziell` ausgewiesen** (PG-3, ein Agent, W4 → W5 → W6) — Grund: alle vier
+AC **AC-28, AC-29, AC-31, AC-32** verweisen per `::` auf denselben Testdatei-Anker
+`tests/test_docs_consolidation_migration.py`; `check_plan_file_overlap` würde den Parallelstart
+als Fehler melden, und jede `git mv`-Welle erzeugt R+A-Diffs auf denselben Stammpfaden
+(Plan Rev. 0.4, Wellenübersicht/PG-3 und „Warum W2 ‖ W3 parallel ist, W4/W5/W6 aber nicht").
+**Diese Angabe ist eine registrierte, offene Abweichung** — sie ist **nicht** in der Design-Quelle
+begründet (das Design führt W4/W5/W6 als paarweise parallel, `docs/specs/2026-09-25-repository-documentation-consolidation-design.md:269-271`, zusätzlich `:275` — „W2 ‖ W3 ‖ W5 sind gleichzeitig ausführbar"),
+sondern im Plan; Details, Status und Owner: **§13 A14** und **§17.8**. **Konflikt:** W1/W2
+berühren `scripts/lib/config.py` bzw. `scripts/lib/consistency/*` — dieselben Dateien, an denen
+Track A arbeitet. W1/W2 daher **sequenziell nach Track A**, ein Commit pro Datei, Rebase vor
+jedem Merge. Zusätzlich **Fixture-Kollision**: die V1-Fixture `tests/fixtures/docs_v1_fixtures.md`
+wird erst **nach** dem Track-A-Merge angelegt (§2.3, R15).
 
-**PR-/Branch-Kollision (R16, rev. 0.2):** 8 Wellen auf **einem** Branch erzeugen einen
-~65-Dateien-PR, der jeden konkurrierenden Doku-PR in Konfliktdiffs taucht. Verbindlich:
-ein Branch **pro Welle** (`chore/docs-consolidation-w<N>`, in §9.2 Spalte W0 verankert),
-gestapelte PRs in Reihenfolge W1→W8, `git mv`-Wellen (W4/W5/W6) werden **zuerst** gemergt,
-weil sie die Pfade verschieben und damit jeden folgenden Doku-PR sonst brechen.
+**PR-/Branch-Strategie** (R16, rev. 0.2; **rev. 0.4 — Ausführungskorrektur 2026-09-26, OP-1**): 8
+Wellen auf **einem** Branch erzeugen einen ~65-Dateien-PR, der jeden konkurrierenden Doku-PR in
+Konfliktdiffs taucht. Ein `git mv`-Welle-Merge macht jeden nachfolgenden Doku-PR konfligiert. Der
+**Risiko-Inhalt bleibt unverändert**; verbindlich ist nach Rev. 0.4 die **Reihenfolge- und
+Merge-Regel**, nicht die **Branch-Anzahl** — mit derselben Verbindlichkeitstiefe wie die
+aufgehobene Fassung, aber mit dem ausgeführten Sachverhalt:
+
+1. **Ein Wellen-Branch, ein PR.** Verbindlich: **ein** Feature-Branch
+   `feat/repository-documentation-consolidation-main` (Basis `origin/main`) mit **einem** PR gegen
+   `main`. **Kein** `chore/docs-consolidation-w<N>` wird angelegt; die Rev.-0.1- bis
+   Rev.-0.3-Vorgabe „ein Branch **pro Welle**, gestapelte PRs in Reihenfolge W1→W8" ist
+   **aufgehoben** (Rev. 0.4, §17.6).
+2. **Wellen-Zuordnung über die Commits.** Verbindlich: Wellenkennung im Commit-Titel
+   `docs(docs-consolidation): W<N> <Zweck>` und ein **Abschluss-Commit** je grüner Welle
+   `docs(docs-consolidation): W<N> complete`. Der `W<N>`-**Präfix ist verbindlich** für (a) den
+   Wellen-Abschluss-Commit und (b) jeden Commit-Titel, der **Wellen koordiniert** (Wellen-Übergang,
+   Reihenfolge-/Merge-Entscheidung, Wellen-Sammelstand). Für **einzelne Datei-Commits innerhalb**
+   einer Welle („ein Commit pro Datei", R3) ist der Präfix **optional**; der Titel folgt dann
+   `docs(docs-consolidation): <Zweck>` und der **Commit-Body führt zwingend die Task-ID**
+   (`Task: W<N>-<k>`). Die Wellenzuordnung ist damit dreifach garantiert: Abschluss-Commit,
+   koordinierende Titel, Task-ID im Body.
+3. **Merge-Regel.** Die `git mv`-Wellen (**W4/W5/W6**) werden **zuerst** gemergt, weil sie die
+   Pfade verschieben und damit jeden folgenden Doku-PR sonst brechen. Die Wellen laufen als
+   **sequenzielle** Commits in der Reihenfolge W1→W8; Rebase des Wellen-Branch gegen
+   `origin/main` **vor** dem PR-Merge. Damit bleibt der **R16-Intent** — kein Konflikt-Diff in
+   konkurrierende Doku-PRs — abgedeckt, ohne die ausgeführte Ein-Branch-Strategie aufzugeben.
+4. **Dokumentierter Bestand.** Der überholte Vor-Branch `feat/repository-documentation-consolidation`
+   (gemeinsames Präfix, divergente Doppelkopie der Spec-/Plan-Commits, **nicht** in `main`
+   gelandet) bleibt auf ausdrückliche Nutzer-Vorgabe („nicht löschen") **erhalten**. Ein
+   Post-Merge-Cleanup ist eine **eigene Entscheidung** und **nicht** Teil dieses Vorhabens; diese
+   Spec schreibt weder Löschung noch Aufbewahrung eines Branches vor.
+5. **Ausführungsnachweis und Belegkette.** `docs/plans/2026-09-25-repository-documentation-consolidation.md`
+   (Rev. 0.4, Global Constraints, Task **W0-2**, K1/K8/K9) und
+   `docs/plans/2026-09-25-docs-consolidation-wave0-freeze.md` §7.1 (Spec-Abweichung OP-1) und §7.2
+   (Commit-Bestand). **Design-Abweichung (rev. 0.4, A13):** das Design nennt in seiner W0-Zeile
+   zwar nur *einen* Branch, aber mit ** anderem Namen** — `chore/docs-consolidation`
+   (`docs/specs/2026-09-25-repository-documentation-consolidation-design.md:265`); gestapelte PRs
+   kommen im Design nicht vor. Der Branch-**Name** ist damit eine bewusste Abweichung (§13 A13).
+   §13 umfasst damit **14** Abweichungen (A1…A14).
 
 **Reihenfolge-Begründung:** W1 zuerst (additiv, kein Diff, größte Erkenntnis). W3 vor W4/W6,
 weil beide `git mv` sind und ein existierender kanonischer Index die neuen Pfade sofort
@@ -1779,7 +1884,7 @@ aktuellen Stand (§11.1 offen / §11.2 geschlossen).
 | **R13** | `PROJECT_STRUCTURE`-Korrektur (M-12) verändert `AGENTS.md`/`CLAUDE.md` in **jedem** Consumer (B6) | niedrig | Additiver Config-Edit; managed-block-Mechanismus (`context.py:36-38`) fängt Handpflege ab; Drift-Detection meldet; als expliziter Review-Punkt in W8 (IC-17) | `developer` + `release` |
 | **R14** | **Falsche-Fakt-Kette (Korrektheitsrisiko, nicht Churn).** `doc_facts → Renderer → V6` ist ein **geschlossener Kreis**: V6 vergleicht den Render-Output gegen `compute_doc_facts()`, also gegen dieselbe Formel, die ihn erzeugt hat. Ein **systematisch** falscher Faktor passiert **alle** Gates dieser Initiative. Real belegt: Rev. 0.1 enthielt **drei** solche Zählfehler (F19 4 statt 5, F22 6 statt 7, F14 6/7 statt 7/8) — keiner wäre von V1–V9 gefunden worden. | **hoch** | **IC-23 + AC-36:** unabhängig handgepflegte Sollwert-Datei `config/doc-facts-expected.yaml` (**elf** Werte, rev. 0.3 — die Yaml-Datei hat genau 11 Einträge; Rev. 0.2 nannte an dieser Stelle fälschlich „12"), geprüft von `load_expected_doc_facts()` / `compare_expected_doc_facts()`; V6 meldet `kind=expected-mismatch` als ERROR. **Restrisiko (bewusst akzeptiert):** jede gewollte Zahlenänderung macht den Test rot, bis die Datei im selben Commit mitgezogen wird — das ist der gewollte Review-Signalweg, kein Defekt | `developer` + `validator` |
 | **R15** | **Kollision geht über Track A hinaus.** R3 nennt nur `scripts/lib/` und `config/`. Real betroffen sind (a) **sechs** Szenario-Asserts (50/51/52/54/55/56) und (b) `config/project-config.schema.json`, das in Rev. 0.1 **nirgends** als Operation auftauchte. **Korrektur der Einordnung:** das Wurzel-Schema ist `additionalProperties: true` (`:2425`) — die 6 neuen Keys brechen die Validierung **nicht**; fehlend wären Autocomplete und der Tippfehler-Wächter, den das Repo selbst ausdrücklich nutzt (`:2058`, `:2073`). | mittel | (a) Absenz-Defaults fail-off + Besitzregel + `knowledge-engine`-Schreibverbot ⇒ alle sechs Szenarien bleiben unverändert grün (AC-38, NG-10). (b) **M-11** nimmt den Schema-Block als Operation in **W1** auf (IC-17, AC-39). (c) V1-Fixture erst nach Track-A-Merge (§2.3) | `developer` |
-| **R16** | **PR-/Branch-Kollision.** 8 Wellen, ~65 Dateien, ein Branch ⇒ ein Groß-PR, der jeden konkurrierenden Doku-PR in Konflikt-Diffs taucht. Ein `git mv`-Welle-Merge macht jeden nachfolgenden Doku-PR konfligiert. | mittel | Ein Branch **pro Welle** (`chore/docs-consolidation-w<N>`, §9.2 W0), gestapelte PRs in Reihenfolge, `git mv`-Wellen **zuerst** mergen, ein Commit pro Datei | `orchestrator` + `git` |
+| **R16** | **PR-/Branch-Kollision.** 8 Wellen, ~65 Dateien, ein Branch ⇒ ein Groß-PR, der jeden konkurrierenden Doku-PR in Konflikt-Diffs taucht. Ein `git mv`-Welle-Merge macht jeden nachfolgenden Doku-PR konfligiert. **Risiko-Inhalt unverändert.** | mittel | **Rev. 0.4 (Ausführungskorrektur 2026-09-26, OP-1):** die Branch-Anzahl ist **nicht** der Lösungsansatz — abgedeckt wird der R16-Intent über **Reihenfolge- und Merge-Regel**: (1) **ein** Wellen-Branch `feat/repository-documentation-consolidation-main` mit **einem** PR gegen `main`, kein `chore/docs-consolidation-w<N>`; (2) Wellen **sequenziell** W1→W8, Wellenzuordnung über Wellenkennung im Commit-Titel `docs(docs-consolidation): W<N> …` + Abschluss-Commit `… W<N> complete`; (3) `git mv`-Wellen (W4/W5/W6) **zuerst** mergen; (4) ein Commit pro Datei, Task-ID im Commit-Body; (5) Rebase gegen `origin/main` vor dem PR-Merge. Die aufgehobene Forderung „Branch pro Welle, gestapelte PRs" (Rev. 0.1–0.3) und die Begründung der Korrektur stehen in §9.2 (Absatz „PR-/Branch-Strategie") und §17.6 | `orchestrator` + `git` |
 | **R17** | **Downstream-Asymmetrie `docs/INDEX.md`.** In Consumer-Projekten bleibt das Scaffold-Skeleton, die V-Checks sind per Default aus. Wäre das nicht so, wäre V2 dort **dauerhaft** rot — eine Asymmetrie, die als „grüner Zustand" erscheint, obwohl nie geprüft wurde. | mittel | **Bewusste, dokumentierte Asymmetrie:** alle neun Checks sind an `docs-consolidation.enabled` gebunden (IC-05-Common-Gate), in Consumer also vollständig inaktiv. Das ist Absicht (NFA-04) und **sichtbar**: V1 meldet nichts, wo gar nicht geprüft wird. Wer Consumer absichtlich prüfen will, setzt den Key explizit. Ein „agent-meta-Eigenerkennung\"-Heuristik-Gate wird **nicht** gebaut (es würde in Fremd-Repos Doku-Claims aufstellen, die niemand gepflegt hat) | `developer` |
 | **R18** | **Auto-Commit-Interaktion.** *Analysiert und nicht zutreffend (Rev. 0.2):* die Befürchtung, generierte Doku-Dateien könnten in den Auto-Commit-Pfad geraten, ist **unbegründet**. `_sync_stage_auto_commit_allowlist` (`sync_pipeline.py:1102-1117`) liest `config` + `active_roles` über `resolve_auto_commit_config(config, active_roles, agent_meta_root)` und schreibt `.meta-config/auto-commit-allowlist.json` als **generierte** Ausgabe; der Drift-Store `.meta-config/generated-file-hashes.json` wird dort **nicht** gelesen. Auch der vom Reviewer genannte Pfad `.meta-config/auto-commit-allowlist.json` **existiert im Repo nicht** (Glob: keine Treffer) — es ist ein Sync-Output. | — | keine Mitigation nötig; die Analyse ist in IC-16 (M8-Tabelle) als Beleg verankert, damit die Frage nicht erneut aufgerollt wird | `—` |
 | **R19** | **`knowledge-indexer`-Kollision.** IC-21 fasst `agents/1-generic/knowledge-indexer.md` an — eine Datei in der von Track A / Rollenpflege berührten Zone. Ein Rebase der Rollenpflege landet sonst in einem Template-Diff. | niedrig | **Verbindliche Reihenfolge** in IC-21: W7 startet erst nach dem Rollenpflege-Merge; IC-21 ist der **letzte** Commit von W7. Kollisionsvermerk steht dort, nicht nur in einer Klammer (N2) | `orchestrator` |
@@ -1856,6 +1961,11 @@ Over-Engineering für elf stabile Zählwerte.
 | **A10** | Design nennt keinen `docs-consolidation`-Config-Block | IC-22 definiert **sechs** additive Keys mit **Fail-off**-Defaults (`enabled` = `false` bei Abwesenheit, auch in agent-meta explizit `true`) | **Korrektur der Rev.-0.1-Fassung (K5).** Rev. 0.1 setzte „Schema-Default = Default agent-meta" **und** `enabled: true` als Abwesenheits-Default — unvereinbar, weil `true` selbst ein Verhaltenswechsel bei Abwesenheit ist. Auflösende Präzedenz: `knowledge.py:127` (`ke_config.get("enabled", False)`), fail-off für Writer **und** Checks. Ohne diese Regel hätte die neue Stage 6 Szenarien gebrochen. Zusätzlich: M-11 nimmt `config/project-config.schema.json` als Operation auf (R15) |
 | **A11** | V1 gilt als ERROR ab Start | V1 startet **WARNING** in W2, wird nach W3 ERROR — wie im Design §6 W2 vorgesehen; zusätzlich `docs-consolidation.checks.strict` (IC-22) | Konsistent mit Design W2 („V1 startet als WARNING, `--validate` noch nicht blockierend"); als Config-Key operationalisiert, damit B4 für Consumer auflösbar ist |
 | **A12** | **Neu (rev. 0.2):** IC-03 las die Stale-Deklaration aus `ARCHITECTURE.md:3` (Design §5.3: „aus `ARCHITECTURE.md:3` maschinell extrahiert") | Quelle ist **`docs/architecture/00-overview-full.md`**; die Deklaration **wandert mit** der Langfassung (M-7) | Der Design-Satz und IC-18/AC-29 waren **zirkulär**: der Stub verliert nach W4 (M-2) alle eigenen Inhalte, also auch `:3` — die Quelle der Extraktion wäre weg. Beleg: `knowledge/wiki/index.md:24` beschreibt `concepts/architecture.md` als „Rohkopie von **ARCHITECTURE.full.md**", nicht von `ARCHITECTURE.md`. IC-03, IC-18 und AC-29 sind konsistent auf die Langfassung umgestellt |
+| **A13** | **Neu (rev. 0.4):** Design-W0 nennt den Branch `chore/docs-consolidation` — `docs/specs/2026-09-25-repository-documentation-consolidation-design.md:265`, Spalte „Inhalt" der Tabelle in §6 MIGRATION_ORDER | Verbindlich ist seit Rev. 0.4 der Wellen-Branch **`feat/repository-documentation-consolidation-main`** (Basis `origin/main`) mit **einem** PR gegen `main` (§9.2 W0-Zeile und Absatz „PR-/Branch-Strategie", Punkt 1) | **Nutzer-Vorgabe + Plan-Korrektur K1/K9** (Plan Rev. 0.4, Global Constraints, Task **W0-2**). Die Rev. 0.1–0.3-Fassung „ein Branch **pro Welle** (`chore/docs-consolidation-w<N>`)" war selbst schon eine **Eigenkonstruktion** ohne Design-Deckung — das Design verlangt an keiner Stelle gestapelte PRs und nennt **einen** Branch. Korrektur des Branch-**Namens** gegen die Design-Angabe; der **Umfang** (ein Branch, ein PR) stimmt mit dem Design überein. **Verifiziert am 2026-09-26:** Design-Zeile gelesen, Branch-Name wörtlich `chore/docs-consolidation`. Status: **geschlossen** (Nutzer-Bestätigung Rev. 0.4 vom 2026-09-26, §17.7) |
+| **A14** | **Neu (rev. 0.4):** Design §6 führt **W4, W5 und W6 paarweise parallel** — `docs/specs/2026-09-25-repository-documentation-consolidation-design.md:269` (W4: „W5, W6"), `:270` (W5: „W4, W6"), `:271` (W6: „W4, W5"); **zusätzlich** `:275` („Ownership-disjunkte Parallelität: W2 ‖ W3 ‖ W5 sind gleichzeitig ausführbar") — W5 ist danach auch mit **W2/W3** parallel ausgewiesen | §9.2 weist **W4 → W5 → W6 sequenziell** aus (`parallel_group` PG-3, ein Agent) | **Plan-Begründung (PG-3, Plan Rev. 0.4, „Warum W2 ‖ W3 parallel ist, W4/W5/W6 aber nicht"):** die vier AC **AC-28, AC-29, AC-31, AC-32** verweisen **alle** per `::` auf denselben Testdatei-Anker `tests/test_docs_consolidation_migration.py`; parallel ausgeführte Tasks, die dieselbe Datei anlegen oder erweitern, sind nicht ownership-disjunkt — `check_plan_file_overlap` (`scripts/lib/orchestration.py`) würde den Parallelstart als Fehler melden. Zusätzlich erzeugt jede `git mv`-Welle R+A-Diffs auf denselben Stammpfaden. **Diese Abweichung ist vorbestehend und NICHT von Rev. 0.4 erzeugt.** **Status: OFFEN** — vom Nutzer am 2026-09-26 bewusst als *offene, dokumentierte* Abweichung registriert und **hier nicht inhaltlich aufgelöst**. Owner: `orchestrator` → `main_chat`. Volltext, Auflösungsweg und Review-Pflicht: **§17.8** |
+
+**Zählung:** **14** Abweichungen — A1…A12 (rev. 0.1/0.2, unverändert) + **A13** (rev. 0.4,
+geschlossen) + **A14** (rev. 0.4, **offen**).
 
 **Übernommen ohne Änderung:** T-1…T-6, die SSoT-Zielstruktur (§1/§1.1 des Designs → §3 hier),
 C1–C8 (→ M1–M4 hier), V1–V9 (→ IC-05 hier, mit den Korrekturen A2/A3), W0–W8 (§9.2),
@@ -1901,6 +2011,16 @@ spec-id: SPEC-DOCS-CONSOLIDATION-2026-09-25
     SPEC-DOCS-INDEX-2026-09-25       (M2, W3+W4)
     SPEC-DOCS-MIGRATION-2026-09-25   (M3, W5+W6+W8)
     SPEC-KNOWLEDGE-INDEX-GEN-2026-09-25 (M4, W7)
+→ Rev. 0.4 (2026-09-26) — Ausführungskorrektur der Branch-/PR-Strategie (OP-1), §17.6:
+     Ausführung belegt in docs/plans/2026-09-25-repository-documentation-consolidation.md
+       (Rev. 0.4, Global Constraints, Task W0-2)
+    und docs/plans/2026-09-25-docs-consolidation-wave0-freeze.md §7.1/§7.2
+    Geändert: §9.2 (W0-Zeile, Absatz "PR-/Branch-Strategie"), R16-Mitigation, §15/§16/§17.6.
+     Unverändert: alle ID-Mengen, §9.1, status APPROVED.
+     §13: 14 Abweichungen — A1…A12 unverändert, A13 (Branch-Name) und A14 (W4/W5/W6 seriell,
+       offen) in Rev. 0.4 ergänzt.
+     Rev. 0.4 am 2026-09-26 durch den Nutzer bestätigt (§17.7); A14 bleibt offen (§17.8).
+     Kein neuer spec-id, keine Supersession.
 ```
 
 **Vollständigkeits-Checkliste (Coverage, keine Selbstbewertung):**
@@ -1939,17 +2059,19 @@ spec-id: SPEC-DOCS-CONSOLIDATION-2026-09-25
 | Prüfung | Ergebnis |
 |---|---|
 | **No-Placeholder** | Kein `TBD`, kein `???`, kein `FIXME`, kein leeres Feld. Offene Entscheidungen sind ausschließlich **OQ1, OQ2, OQ3, OQ4, OQ6, OQ8, OQ9** (§11.1) mit Owner, Empfehlung, Entscheidungsweg und Wellen-Blockade; **OQ5** und **OQ7** sind in §11.2 ausdrücklich als **geschlossen** mit Begründung geführt. Jede Interface-Signatur ist vollständig typisiert; jede AC nennt Datei **oder** Befehl **und** Exit-Code/Assertion. |
-| **Spec vs. Design** | T-1…T-6, C1–C8, V1–V9, W0–W8, B1–B6, §5.1–§5.4, §1/§1.1 übernommen oder **explizit** begründet abweichend. **12** Abweichungen in §13: 3 Faktualkorrekturen (A1, A5, A6), 3 Gate-Korrekturen (A2, A3, A4), 3 Ergänzungen (A7, A10, A11), 1 Sicherheits-Korrektur (A8), 1 Formatentscheidung (A9), 1 Zirkel-Auflösung (A12). Keine stille Abweichung. **Neu gegenüber Rev. 0.1:** A7 enthält die Korrektur der eigenen Fehlkorrektur F19, A10 die Fail-off-Auflösung, A12 die Stale-Quellen-Wanderung. |
+| **Spec vs. Design** | T-1…T-6, C1–C8, V1–V9, W0–W8, B1–B6, §5.1–§5.4, §1/§1.1 übernommen oder **explizit** begründet abweichend. **14** Abweichungen in §13: 3 Faktualkorrekturen (A1, A5, A6), 3 Gate-Korrekturen (A2, A3, A4), 3 Ergänzungen (A7, A10, A11), 1 Sicherheits-Korrektur (A8), 1 Formatentscheidung (A9), 1 Zirkel-Auflösung (A12), 1 Branch-Namens-Korrektur (A13, rev. 0.4), 1 **offene** Parallelitäts-Abweichung (A14, rev. 0.4, §17.8). Keine stille Abweichung. **Neu gegenüber Rev. 0.1:** A7 enthält die Korrektur der eigenen Fehlkorrektur F19, A10 die Fail-off-Auflösung, A12 die Stale-Quellen-Wanderung. **Neu in Rev. 0.4:** A13 (Design nennt `chore/docs-consolidation`, verbindlich ist `feat/repository-documentation-consolidation-main`) und A14 (W4/W5/W6 seriell statt paarweise parallel — **nicht** aufgelöst, bewusst offen). |
 | **IDs** | `spec-id: SPEC-DOCS-CONSOLIDATION-2026-09-25` im Frontmatter **und** im Trace-Anker (§15), Format `SPEC-<NAME>-<JJJJ-MM-TT>` konsistent mit `docs/REQUIREMENTS.md:4`-Nachbarn und `docs/specs/2026-09-15-reference-standards-design.md:2`. Kein `REQ-*` vergeben (FI-1, Zuständigkeit `requirements`). **AC-01…AC-41 lückenlos und je genau einmal definiert; §9.1 führt alle 41; §9.2 verteilt sie auf W1–W8, jede Welle mit ≥ 1 AC. IC-01…IC-24 lückenlos. NFA-01…NFA-11 lückenlos. R1…R20 lückenlos. F1…F25 lückenlos, F19 ausdrücklich gestrichen (kein Recycling). V1…V9 lückenlos. W0…W8 lückenlos. OQ1…OQ9, davon OQ5/OQ7 geschlossen. M-1…M-13 lückenlos.** |
 | **Querverweise** | Jeder `Datei:Zeile`-Verweis wurde am 2026-09-26 gelesen. **Neu bzw. korrigiert in Rev. 0.2:** `config/tier-presets.yaml:1, :31, :85, :115, :145` (5 Tiers); `config/dod-presets.yaml:12, :13, :30, :46, :62, :79, :96, :113` (7 Presets); `config/role-defaults.yaml:2489, :2490, :2547, :2572, :2607, :2633, :2706, :2737, :2755, :2877` (8 Pipelines, 1 disabled); `.meta-config/project.yaml:339-343` (nur `se-cascade`); `README.md:479-489` (7 Zeilen, `concept-driven-dev` fehlt), `:501`, `:688`, `:689`, `:690`, `:695`, `:696`, `:734`; `hooks/**/*.sh` (17 Dateien, 11 deploybar); `commands/1-generic/*.md` (22); `tests/scenarios/asserts/{50,51,52,54,55,56}*.sh` mit **exakten** Zeilen `:32`, `:44`, `:26-27`, `:24-25`, `:31`; `tests/scenarios/run.sh:46-52`; `tests/scenarios/configs/{51,52,54}*.project.yaml`; `tests/scenarios/registry.md:97-110`; `scripts/lib/spec_plan_scaffold.py:20-24, :27-44, :46-68`; `scripts/lib/knowledge.py:103-114, :116-129, :131-132, :153-169`; `scripts/lib/generated_file_drift.py:35-37, :44, :51-67, :82-84, :240-310, :313-351, :344-349, :354-402, :379-386, :388, :405-425, :422-424, :591-596`; `scripts/lib/consistency/placeholders.py:128-131, :135-136, :148-183, :177-182`; `scripts/lib/sync_pipeline.py:587-620, :922-945, :929, :935, :1090-1099, :1102-1117, :1139`; `scripts/lib/cli_commands.py:72, :864, :888-900, :1139`; `scripts/lib/backup.py:376+`; `scripts/lib/deactivation.py:21, :303-353`; `config/project-config.schema.json:2058, :2073, :2425`; `ARCHITECTURE.md:3, :8-20`; `knowledge/wiki/index.md:24`; `knowledge/wiki/log.md:13-17, :30`; `docs/guides/project.yaml.example` (179 Z), `howto/configs/project.yaml.example` (340 Z), `docs/howto/admin-ui-remote-access.md`. **Neu bzw. korrigiert in Rev. 0.3:** `README.md:381-390` (F22 b — Überschrift + 6 Preset-Zeilen, `concept-driven` fehlt; `config/dod-presets.yaml:96`); `ARCHITECTURE.md:3` (F4, zweite Fundstelle) gegen `VERSION:1`; `hooks/1-generic/*.sh` (**11** Dateien, davon 2 `*-impl.sh` ⇒ **9**) gegen `scripts/lib/hooks.py:95-105` und `scripts/lib/external_tools.py:217-220`; `scripts/lib/spec_plan_scaffold.py:49-51` und `:62-68` für die Abschirmungskette in AC-38; `tests/scenarios/configs/51-spec-plan-disabled.project.yaml:1-34` (kein `docs-consolidation`-Key; `spec-plan-workflow.enabled: false` `:11-12`; `knowledge-engine.enabled: false` `:7-8`; `external-system-override.enabled: true` `:20-21`); `tests/scenarios/asserts/{50:32, 51:29-32, 52:41-44, 54:26-27}` direkt gelesen. `hooks/**/*.sh` = **17** Dateien bleibt eine **Belegzahl der Befund-Zeile F3** und ist **kein** `DOCS_*`-Faktum (NEW-1). **Nicht** verifizierbar und daher als HYPOTHESIS markiert: die exakte Zahl der `docs/**/*.md` (~190, §1) und die Zahl der Knowledge-Agenten im `AGENTS.md`-Bootstrap-Block (66, OQ3, aus dem Design übernommen). |
 | **Coverage** | Jedes AC in §7 verweist auf mindestens eine IC; die Zuordnung AC → Welle → Datei → V-Check ist in §9.1 für alle **41** AC gefüllt. AC **ohne** V-Check sind in §9.1 je einzeln begründet; die Liste ist in Rev. 0.3 **vollständig** (NEW-6: Rev. 0.2 ließ AC-06, AC-22 und AC-38 weg) und umfasst **18** AC: **AC-01, AC-02, AC-03, AC-04, AC-06** (Fakten-Invarianten bzw. Key-Set, per Unit-Test in `tests/test_doc_facts.py`), **AC-18, AC-19, AC-22, AC-23, AC-24, AC-25, AC-26** (Determinismus, Drift-Store, Scaffold-Vertrag, Config-/Snippet-Bridge, per Unit-Test), **AC-34, AC-35, AC-37, AC-38, AC-39, AC-41** (Wiki-Restore, Allowlist, Szenario-Runner, Schema-Operation, Restore-Pfad). Die Begründungsklassen: Konfigurations-/Fakten-Invarianten; Determinismus-, Drift-Store-, Szenario- und Restore-Ebene — abgesichert per Unit-Test bzw. bestehendem Runner statt per Consistency-Check. |
 | **Modularisierung** | Vier Module M1–M4, jeweils mit eigener Verantwortung, Dateiliste, Wellen, Vorgänger und Rollback (§4). Die Entscheidung „eine Datei" ist in §4 begründet; OQ7 ist als **geschlossen** mit Verweis auf die Planungsentscheidung geführt (§11.2). |
 | **Review-Auflösung** | Rev. 0.2: Alle 16 Reviewer-Findings behoben (§17.1), drei Reviewer-Angaben als ungenau nachgewiesen und korrigiert (§17.2 CR-1…CR-6), drei weitere bestätigt (§17.3). **Rev. 0.3: Re-Review** (Concept-Reviewer-Re-Review vom 2026-09-26, CHANGES_REQUESTED, 0 kritisch / 2 major / 4 minor / 2 info) — **alle 8 Findings behoben** (§17.5) plus die **Gegenkorrektur** des Re-Reviewers zu §17.2 CR-1/CR-2. Der Re-Reviewer hat seinerseits **sechs** eigene Angaben (CR-1…CR-6) **zurückgezogen** und die Korrekturen aus Rev. 0.2 ausdrücklich **gestützt**; eine dieser Angaben (die Szenario-Zählung) wurde durch seine eigene Rücknahme **präzisiert**, nicht bestätigt (§17.2, CR-1). |
 | **Ownership-Grenze** | Diese Spec-Revision hat **ausschließlich** `docs/specs/2026-09-25-repository-documentation-consolidation.md` geschrieben. Kein Code, keine Config, keine `agents/`-/`knowledge/`-/`tests/fixtures/`-Änderung, kein Commit, kein Push. Der parallele Track A (`tests/fixtures/slimming-golden/`) wurde weder gelesen als Spezifikationsquelle noch verändert. |
+| **Rev. 0.4 — Abgrenzung** | Rev. 0.4 korrigiert die Branch-/PR-Normativität auf den ausgeführten Stand: §9.2 W0-Zeile, §9.2-Absatz „PR-/Branch-Strategie", R16-Mitigation sowie die Folgeverweise in §15, §16 und §17.6 (Volltext und Belege in §17.6); zusätzlich §9.2-Spalte „Parallel mit" auf den ausgeführten **sequenziellen** W4/W5/W6-Stand umgestellt und **A13**/**A14** in §13 registriert. **Unverändert:** AC-01…AC-41, IC-01…IC-24, NFA-01…NFA-11, R1…R20 (**R16 nur im Lösungsansatz**, nicht im Risiko-Inhalt und nicht in der W-Wahrscheinlichkeit „mittel"), F1…F25, M-1…M-13, NG-1…NG-11, FI-1…FI-10, OQ1…OQ9, W0…W8, §9.1, die §9.2-Welleninhalte und AC-Mengen, §3–§12 im Übrigen. **Keine** neue ID, **keine** neue Welle, **kein** neues Risiko, **keine** geänderte Architektur. **§13 umfasst 14 Abweichungen** — **A13** registriert die Branch-Namensabweichung (Design-W0 nennt `chore/docs-consolidation`, `docs/specs/2026-09-25-repository-documentation-consolidation-design.md:265`), **A14** die W4/W5/W6-Serialität und ist **offen** (§17.8). `status: APPROVED` besteht unverändert; Rev. 0.4 ist am **2026-09-26 durch den Nutzer bestätigt** (§17.7) — die zuvor im Dokument ausgerichtete Ausnahme ist entfallen. |
+| **Ownership-Grenze (Rev. 0.4)** | Die Rev. 0.4 hat **ausschließlich** `docs/specs/2026-09-25-repository-documentation-consolidation.md` geschrieben. Design und die sechs W0-Records wurden **gelesen, nicht geändert**; die sechs W0-Records bleiben unverändert und führen OP-1 weiterhin offen — der formale Abschluss von OP-1 ist ein **Folgeschritt** (§17.6/§17.7). Der **Plan** `docs/plans/2026-09-25-repository-documentation-consolidation.md` wurde im selben Durchgang **nur in Ankern und Faktenangaben** geändert (K12, Revisions-Bump 0.3 → 0.4, berichtigte Zeilenzahlen, berichtigte OP-1-Aussage im Self-Review) — **kein** Task-, Wellen-, AC-, IC-, NFA- oder Gate-Inhalt. Kein Code, keine Config, kein Commit, kein Push, kein Branch-Wechsel, kein Merge/Rebase/Force. |
 
 ---
 
-## 17. Review-Auflösung (Rev. 0.2 und Rev. 0.3)
+## 17. Review-Auflösung und Ausführungskorrekturen (Rev. 0.2, Rev. 0.3, Rev. 0.4)
 
 ### 17.1 Findings des Concept-Review — alle behoben
 
@@ -1996,6 +2118,10 @@ spec-id: SPEC-DOCS-CONSOLIDATION-2026-09-25
 | **CR-6** | Design/Rev. 0.1: Szenario `63-docs-facts-drift.md` | Nummer **63 ist vergeben** an `63-context-file-modes`. Korrekt: **64**. | `tests/scenarios/registry.md:110`; `asserts/63-context-file-modes.sh`; `configs/63-context-file-modes.project.yaml` |
 
 ### 17.3 Geprüfte und **bestätigte** Reviewer-Angaben (DEVIATION_REVIEW A1–A11)
+
+> **Geltungsbereich:** Diese Prüftabelle deckt den **Rev.-0.2-Stand** ab und umfasst die
+> §13-Abweichungen **A1…A12**. Die in **Rev. 0.4** hinzugekommenen **A13** und **A14** sind hier
+> **nicht** Gegenstand — zu A13 siehe §13/A13 und §17.6, zu A14 siehe §13/A14 und **§17.8**.
 
 | # | Urteil nach eigener Prüfung | Beleg |
 |---|---|---|
@@ -2049,3 +2175,113 @@ sechs Angaben CR-1…CR-6 **zurück**.
 | **NEW-8** AC-02-Snapshot ist `xfail` und damit nicht durchsetzbar | info | Snapshot **gestrichen**; AC-02 ist jetzt **rein formelbasiert** und durchsetzbar (**13** Formel-Assertions über eine Fixture-Konfiguration). Die Durchsetzung
  der konkreten Sollzahlen liegt **eindeutig** bei IC-23/AC-36; die Entscheidung ist im AC als „bewusste Entscheidung" begründet | `xfail` markiert einen **erwarteten** Fehlschlag: ein fehlerhafter Formel-Faktor wäre darin **invisible**; doppelte Zahlenhaltung (Test + `doc-facts-expected.yaml`) wäre ein zweiter Sollwert-Ort (R14) |
 | **Gegenkorrektur** §17.2 „3 harte Fehlschläge" | info | §17.2 sagt jetzt **0 nach Abschirmung, 3 in der naiven Variante** — mit explizitem Hinweis, dass die 3 **kein Arbeitsauftrag** sind (NG-10 verbietet jede Änderung an `tests/scenarios/`) | Absenz-Default `false` (IC-22) ⇒ alle sechs Fixtures ohne `docs-consolidation`-Key ⇒ Generator inaktiv (IC-13 Zeile 1). `asserts/50:32` und `asserts/56:31` sind reine `[ -f ]`-Existenzprüfungen; `asserts/54:26-27` und `asserts/55:24-25` erwarten den Scaffold-Inhalt `File-based index fallback` (Skeleton bleibt unangetastet, IC-15); `asserts/52:41-44` verlangt `knowledge/wiki/index.md` **und** **kein** `docs/INDEX.md` (KE autoritativ). Naive Variante ohne Abschirmung: genau 3 Zeilen wären betroffen |
+
+### 17.6 Rev. 0.4 — Ausführungskorrektur der Branch-/PR-Strategie (offener Punkt **OP-1**)
+
+**Charakter dieser Revision.** Rev. 0.4 ist **keine** Inhalts- oder Design-Erweiterung, sondern die
+Korrektur eines **Normativitätswiderspruchs**: Rev. 0.1–0.3 forderten an **drei** Stellen (OP1-1…OP1-3,
+siehe Tabelle unten) die Strategie „ein **Branch pro Welle** (`chore/docs-consolidation-w<N>`),
+gestapelte PRs" — in der W0-Zeile von §9.2, im §9.2-Absatz „PR-/Branch-Kollision" (dort wörtlich mit
+dem Präfix „**Verbindlich**") und in der Mitigation von R16 (§12.2) —,
+während die Ausführung einen Wellen-Branch mit einem PR verwendet hat. Da dieses Dokument sich zur
+**normativen Quelle** erklärt (Kopfzeile „stillschweigende Abweichungen gibt es nicht"; §2.2 „hart
+— Abweichung gilt als Spec-Verstoß"), wäre der unveränderte Stand eine Verletzung der eigenen Norm.
+Korrektur deshalb **hier**, nicht in den Records.
+
+**Betroffene Stellen (vollständig, alle geändert am 2026-09-26):**
+
+| # | Stelle | Vorher (Rev. 0.1–0.3) | Nachher (Rev. 0.4) |
+|---|---|---|---|
+| **OP1-1** | §9.2, **W0-Zeile** (Spalte „Inhalt") | „Design-Freeze, Contract-Liste, **ein Branch pro Welle** (`chore/docs-consolidation-w<N>`), Entscheidungs-Records …" | „… **ein Wellen-Branch für das gesamte Vorhaben** (`feat/repository-documentation-consolidation-main`, Basis `origin/main`) mit **einem** PR gegen `main`; Wellen-Zuordnung über die **Wellenkennung im Commit-Titel**." Ausdrücklicher Rev.-0.4-/OP-1-Vermerk mit Verweis auf den Absatz „PR-/Branch-Strategie" und auf §17.6 |
+| **OP1-2** | §9.2, Absatz „PR-/Branch-Kollision" (Rev. 0.1–0.3) | „**Verbindlich:** ein Branch **pro Welle** (`chore/docs-consolidation-w<N>`, in §9.2 Spalte W0 verankert), gestapelte PRs in Reihenfolge W1→W8, `git mv`-Wellen (W4/W5/W6) werden **zuerst** gemergt, weil …" | Neu gefasst als „**PR-/Branch-Strategie** (R16, rev. 0.2; rev. 0.4 …)" mit fünf verbindlichen Punkten: (1) Ein Branch / ein PR, `chore/docs-consolidation-w<N>` **aufgehoben**; (2) Wellen-Zuordnung über Commit-Titel `docs(docs-consolidation): W<N> <Zweck>`, Abschluss-Commit `… W<N> complete`, `W<N>`-Präfix verbindlich für Abschluss- und wellen-koordinierende Titel, **optional** für Datei-Commits (dort Task-ID `Task: W<N>-<k>` im Body), ein Commit pro Datei; (3) Merge-Regel: `git mv`-Wellen W4/W5/W6 **zuerst**, Wellen sequenziell W1→W8, Rebase gegen `origin/main` vor dem PR-Merge; (4) dokumentierter Bestand des überholten Vor-Branches, Post-Merge-Cleanup = eigene Entscheidung; (5) Ausführungsnachweis + Nicht-Design-Abweichung |
+| **OP1-3** | §12.2, **R16** (Spalte „Mitigation") | „Ein Branch **pro Welle** (`chore/docs-consolidation-w<N>`, §9.2 W0), gestapelte PRs in Reihenfolge, `git mv`-Wellen **zuerst** mergen, ein Commit pro Datei" | Rev.-0.4-Vermerk: Branch-Anzahl ist **nicht** der Lösungsansatz; fünf Teile Reihenfolge-/Merge-Regel (identisch zu OP1-2, kurz), Verweise auf §9.2 und §17.6. **Risiko-Text und Wahrscheinlichkeit „mittel" unverändert** |
+| **OP1-4** | §15, Trace-Anker | ohne Rev.-0.4-Eintrag | Rev.-0.4-Anker ergänzt (Ausführungsbelege, geänderte/unveränderte Stellen, „kein neuer `spec-id`, keine Supersession") |
+| **OP1-5** | §16, Selbstreview-Tabelle | 8 Datenzeilen (im Stand `35bb176f` gemessen) | 2 Zeilen ergänzt: „**Rev. 0.4 — Abgrenzung**" und „**Ownership-Grenze (Rev. 0.4)**" ⇒ **10** Datenzeilen; der Kopf der Tabelle trägt weiterhin den Rev.-0.3-Stand (historischer Stand, wie in §11.1/§16 für OQ2/OQ6/OQ8 bereits vermerkt) |
+| **OP1-6** | §17 | 17.1–17.5 | 17.6 als vollständiger Korrektur- und Beleg-Abschnitt (dieser Abschnitt) |
+| **OP1-7** | Kopfblock, Frontmatter, Revisions-Tabelle, Freigabevermerk | `revision: 0.3`; Revisionshistorie „endet bei Rev. 0.3"; Revisions-Tabelle ohne 0.4 | `revision: 0.4`; Rev.-0.4-Änderungsblock im Kopf; Revisionszeile **0.4** mit Begründung. **Freigabevermerk (Stand nach der Korrektur):** Rev. 0.4 ist am **2026-09-26 durch den Nutzer bestätigt** (Entscheidungsweg laut Plan Rev. 0.4, K1); die zunächst im Dokument ausgerichtete Ausnahme („Inhaltsrevision, aber **keine** erneute Freigabe") ist **entfallen** — Auflösung und Wortlaut in **§17.7**. Frontmatter: `status: APPROVED`, `approved: 2026-09-26`, `approved-scope: …`, `revision: 0.4` |
+| **OP1-8** | §13, Abweitungstabelle | A1…A12, Zählung „12 Abweichungen" | **A13** (Branch-Namensabweichung gegen Design:265) und **A14** (W4/W5/W6 seriell statt paarweise parallel, **offen**) ergänzt; Zählung auf **14** angehoben; alle Stellen, die „12 Abweichungen" nannten, nachgezogen (Kopfblock, Revisionszeile 0.4, §9.2 Punkt 5, §15, §16). **Keine** Design-Änderung — das Design bleibt unverändert |
+
+**Unverändert geblieben (ausdrücklich geprüft, kein Widerspruch):**
+
+- **§2.3** (Track A) und **R3**: „pro Welle ein Commit pro Datei; vor jedem Merge Rebase gegen den
+  Track-A-Branch" bzw. „Rebase vor jedem Merge". Beide Formulierungen sind **wortgleich aus dem
+  Design** übernommen (`docs/specs/2026-09-25-repository-documentation-consolidation-design.md:275`
+  bzw. `:368`) und **branch-anzahl-unabhängig**: unter der Ein-Branch-Strategie existiert genau
+  **ein** Merge, der Rebase geschieht davor. Keine Änderung — eine Änderung wäre eine
+  Design-Abweichung und gehörte in §13.
+- **§9.2 Spalte „Rückrollpunkt"** (je Welle): der Plan führt dieselben Punkte
+  (`docs/plans/2026-09-25-repository-documentation-consolidation.md`, Wellenübersicht) unverändert
+  und **commitweise**; die Wellen-Rückrolle wird durch die Ein-Branch-Strategie **nicht** berührt.
+- **§9.2 Spalte „Parallel mit" / „Abhängig von"** für **W4/W5/W6**: war nicht Teil von OP-1 und ist
+  in Rev. 0.4 **doch** angefasst worden — die Spalte wurde auf den ausgeführten **sequenziellen**
+  Stand umgestellt (PG-3), der Plan führt W4/W5/W6 seit Rev. 0.3 seriell. Grund der
+  **Abweichung** (Design :269-271 parallel ↔ Plan PG-3 seriell; `:275` führt W5 zusätzlich als
+  gleichzeitig ausführbar mit W2 ‖ W3): gemeinsamer Testdatei-Anker
+  AC-28/AC-29/AC-31/AC-32 und `check_plan_file_overlap`. Die Abweichung ist **vorbestehend** und
+  wurde **nicht** von Rev. 0.4 erzeugt; sie ist **nicht aufgelöst**, sondern als **A14** in §13 und
+  **offener Punkt in §17.8** registriert (Owner `orchestrator` → `main_chat`). Für W1, W2, W3, W7
+  und W8 bleiben die Spalten inhaltlich unverändert. *(Ausnahme: die **W3**-Zeile nannte zuvor „W2, W4"; da W4 nach der PG-3-Kette **Vorgänger** von W3 ist, wurde „W4" dort zu „Vorgänger, nicht Partner" präzisiert — dieselbe Korrektur, keine eigene Abweichung.)*
+- **§2.2 NG-1…NG-11, §7 (AC-01…AC-41), §8 (NFA-01…NFA-11), §9.1, §3–§8, §10, §11, §12.1/§12.3,
+  §13, §14**: keine der 41 AC, 24 IC, 11 NFA, 20 R, 25 F, 13 M, 11 NG, 10 FI, 9 OQ, 9 V, 9 Wellen
+  nennt eine Branch-, PR- oder Merge-Anforderung. Beleg: vollständige Suche nach
+  `chore/docs-consolidation`, „pro Welle", „gestapelt", „Branch pro", „Merge", „Rebase" — die
+  Fundstellen sind oben exhaustiv aufgeführt.
+
+**Verbindlichkeits-Fazit:** Nach Rev. 0.4 ist diese Spec wieder die **normative Quelle** *und*
+deckungsgleich mit der Ausführung. Der R16-Schutzziel wird weiterhin verfolgt (Merge-Regel
+`git mv`-Wellen zuerst, Reihenfolge W1→W8, ein Commit pro Datei, Sequenzierung über die
+Commit-Historie), nur über den ausgeführten statt über den überholten Mechanismus.
+
+**Offener Punkt-Status:** **OP-1 ist mit dieser Revision inhaltlich aufgelöst** (die normative
+Quelle stimmt wieder mit der Ausführung überein) und durch die **Nutzer-Bestätigung der Rev. 0.4
+vom 2026-09-26** abgesichert (§17.7). **Formal geschlossen** wird er damit **nicht** —
+Plan und die sechs W0-Records führen ihn weiterhin als offen und sind in dieser Revision
+**nicht** geändert (Files-Ownership). Zum Abschluss nachzuführen (Vorgabe, **nicht** ausgeführt):
+
+| Nachzuführen | Stelle | Was |
+|---|---|---|
+| `docs/plans/2026-09-25-docs-consolidation-wave0-freeze.md` | Kapitel 7.1 (`:289-302`), Kapitel 10 (OP-1-Tabelle `:417`, Zusammenfassung `:407`), Zeile 25 (Kopf) | OP-1 von „offen" auf „inhaltlich aufgelöst durch Spec Rev. 0.4 (2026-09-26, durch den Nutzer bestätigt — §17.7)"; die Formulierung „Korrektur der Spec (**Rev. 0.4**) **beauftragt, nicht ausgeführt** — sie erfordert ein Concept-Review" (`:417`) **entfällt**; Verweis auf §17.6/§17.7 |
+| `docs/plans/2026-09-25-docs-consolidation-track-a-gate.md` | §10, Punkt 5 (`:302`) | dasselbe |
+| `docs/plans/2026-09-25-docs-consolidation-oq6.md` | Kopfpunkt 2 (`:24`), OP-1-Hinweis (`:216`) | dasselbe |
+| `docs/plans/2026-09-25-repository-documentation-consolidation.md` | K1-Liste im Änderungsblock (`:77`), Global Constraints (`:158`), Self-Review (`:476` und offene Punkte `:1895`), Task **W0-2** (Spezifikationsabweichungs-Box) | OP-1 schließen; die Formulierung „die Korrektur der Spec (Rev. 0.4) ist **beauftragt, aber nicht ausgeführt**" entfällt; Rev.-0.4-Bezug auf `§17.6` + `§17.7` (Nutzer-Bestätigung) umstellen. **In dieser Revision bewusst nicht ausgeführt** — der Plan wurde **nur in Ankern und Faktenangaben** angefasst (K12, Revisions-Bump 0.3 → 0.4, berichtigte Zeilenzahlen, berichtigte OP-1-Aussage im Self-Review; **kein** Task-, Wellen-, AC-, IC-, NFA- oder Gate-Inhalt). Die hier genannten Plan-Zeilenanker (`:77`, `:158`, `:476`, `:1895`) sind durch den Revisions-Bump des Plans **verschoben** und bei der Umsetzung dieses Folge-Schritts neu zu bestimmen |
+| `docs/plans/2026-09-25-docs-consolidation-oq1.md` | Kopf (`:42`), Punkt 3 (`:422`) | **keine inhaltliche Änderung nötig** — die Vorrang-Regel („bei Widerspruch gilt die Spec") ist durch Rev. 0.4 wieder stimmig; nur die Datums-/Versionsangabe wäre optional nachzuziehen |
+| `docs/plans/2026-09-25-docs-consolidation-oq2.md`, `…-oq8.md` | Kopf (`:38-39` bzw. `:35`) | **keine inhaltliche Änderung nötig**, siehe vorige Zeile |
+
+Ein **Concept-Review** über Rev. 0.4 **ist als erfolgt zu führen** (2026-09-26,
+`VERDICT: BLOCKED`, Befund **F-1**); der Entscheidungsweg `main_chat` (Plan Rev. 0.4, K1) hat
+am **2026-09-26** entschieden — Auflösung und Wortlaut in **§17.7**. Der Abschluss von **OP-1**
+in Plan und Records bleibt ein **Folgeschritt** (siehe Tabelle oben).
+
+---
+
+### 17.7 Nutzerfreigabe der Rev. 0.4 (Behebung von **F-1**)
+
+| Feld | Angabe |
+|---|---|
+| **Befund** | **F-1** — Concept-Review der Rev. 0.4: `VERDICT: BLOCKED`. Rev. 0.4 führte **neue normative Pflichten** ein (verbindliche Commit-Titel-/Body-Konvention, Branch-Aufbewahrung als Scope-Aussage) und installierte sie „mit derselben Verbindlichkeitstiefe", **ohne erneute User-Freigabe**. Der Freigabevermerk richtete die Ausnahme **im Dokument selbst** aus; §15 lässt `APPROVED` nur nach Concept-Review **und** User-Freigabe zu. |
+| **Ursache** | Die Rev. 0.4 war als **Inhaltsrevision** ohne Freigabeschritt entstanden; der Autor hat die Ausnahme selbst erteilt, weil der Freigabeumfang (W0–W8) unverändert blieb. Diese Begründung trug dem Gate nicht Rechnung. |
+| **Entscheidung** | Der **Nutzer** hat **Rev. 0.4 am 2026-09-26 ausdrücklich freigegeben** — über den Entscheidungsweg laut Plan Rev. 0.4, K1 (`main_chat`), weitergeleitet an den `orchestrator` und hier durch `documenter` formalisiert. |
+| **Bezugsrahmen der Bestätigung** | **unverändert:** der Umfang der Ausführungsmechanik **W0–W8** (keine Welle, kein AC/IC/NFA/Risiko verschoben). **neu bestätigt:** die in Rev. 0.4 aufgenommenen **Normativitätsaussagen** — die verbindliche **Commit-Titel-/Body-Konvention** (§9.2 „PR-/Branch-Strategie", Punkt 2; R16-Mitigation) und die **Branch-Aufbewahrung** als Scope-Aussage (Punkt 4: „diese Spec schreibt weder Löschung noch Aufbewahrung eines Branches vor"). |
+| **Bedingung** | **A13** und die **W4/W5/W6-Serialität** (A14) sind als **offene, dokumentierte Abweichungen** zu registrieren — erledigt: A13/A14 in §13, A14 zusätzlich als offener Punkt in **§17.8**. |
+| **Ergebnis** | **F-1 aufgelöst.** Die in diesem Dokument ausgerichtete Ausnahme („Inhaltsrevision ohne erneute Freigabe") ist **entfallen** — die Freigabe liegt extern vor. `status: APPROVED` besteht unverändert, **kein** Revisions-Bump: die inhaltliche Revisionshistorie endet bei **Rev. 0.4**. Geändert wurden: Frontmatter (`approved: 2026-09-26`, `approved-scope`), Statuskopf, Revisionszeile **0.4**, Revisionszeile **„Freigabe (Rev. 0.4)"**, §16 (Zeile „Rev. 0.4 — Abgrenzung") und §17.6 (OP1-7). |
+| **Nicht betroffen** | AC-01…AC-41, IC-01…IC-24, NFA-01…NFA-11, R1…R20, F1…F25, M-1…M-13, NG-1…NG-11, FI-1…FI-10, OQ1…OQ9, W0…W8 — **keine** inhaltliche Änderung durch die Freigabe. |
+
+---
+
+### 17.8 **Offener Punkt** — W4/W5/W6-Serialität (A14)
+
+> **Status: OFFEN.** Dieser Punkt ist **bewusst nicht aufgelöst.** Er wurde vom Nutzer am
+> 2026-09-26 als *offene, dokumentierte Abweichung* registriert; die Inhaltsentscheidung ist
+> ausdrücklich der Ausführungsmessung überlassen.
+
+| Feld | Angabe |
+|---|---|
+| **Sachverhalt** | §9.2 führte **W4, W5, W6** in der Spalte „Parallel mit" als **paarweise parallel** (W4‖W5, W4‖W6, W5‖W6) — das entspricht dem Design (`docs/specs/2026-09-25-repository-documentation-consolidation-design.md:269-271`; `:275` führt W5 zusätzlich als gleichzeitig ausführbar mit W2 ‖ W3). Der Plan Rev. 0.4 führt sie **seriell**: `PG-3 (BEWUSST SERIELL, 1 Agent) W4-1 → … → W6-2` (Wellenübersicht) und in den Task-Köpfen W4-1…W6-2 (`parallel_group: PG-3 (seriell)`). **Ausgeführt wird seriell.** |
+| **Registrierung in §9.2** | Die Spalte „Parallel mit" weist für W4/W5/W6 seit Rev. 0.4 **`sequenziell` (PG-3)** aus; die Spalte „Abhängig von" führt die PG-3-Kette mit. Die Angabe bildet damit die **tatsächliche Umsetzung** ab. |
+| **Begründung des Plans** | Alle vier AC der drei Wellen — **AC-28, AC-29, AC-31, AC-32** — verweisen per `::` auf denselben Testdatei-Anker `tests/test_docs_consolidation_migration.py`. Tasks, die dieselbe Datei anlegen oder erweitern, sind **nicht ownership-disjunkt**; `check_plan_file_overlap` (`scripts/lib/orchestration.py`) würde den Parallelstart als Fehler melden. Zusätzlich erzeugt jede `git mv`-Welle R+A-Diffs auf denselben Stammpfaden. (Plan Rev. 0.4, Abschnitt „Warum W2 ‖ W3 parallel ist, W4/W5/W6 aber nicht".) |
+| **Charakter** | **Echte, vorbestehende Spec-Abweichung** (Plan gegen Spec) — **nicht** von Rev. 0.4 erzeugt und **nicht** Teil der Branch-Korrektur (OP-1). Der Concept-Reviewer hat sie als solche bestätigt. |
+| **Abweichungs-ID** | **A14** in §13 (Design ↔ Spec ↔ Plan). |
+| **Status** | **OFFEN** |
+| **Owner** | `orchestrator` → Eskalation an `main_chat` (Produkt-/Ausführungsentscheidung). |
+| **Auflösungsweg** | Eine Auflösung — also die Rückführung der §9.2-Angabe auf „parallel" **oder** eine Änderung der Ausführungsreihenfolge — erfordert eine **eigene Spec-Revision mit Concept-Review**. Der Punkt wird **nicht** nebenläufig in Plan oder Records entschieden. |
+| **Zwischendurch geltende Regel** | Bis zur Auflösung gilt die **Ausführung** (seriell, PG-3); die Abweichung ist dokumentiert und nicht stillschweigend. |
