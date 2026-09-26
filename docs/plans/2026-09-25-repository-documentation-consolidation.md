@@ -728,12 +728,12 @@ log=None) -> dict[str, str]` mit **exakt** 23 Schlüsseln; `HOOK_EXCLUDED_DIRS`,
 von `agent_meta_root` vor/nach identisch (kein Schreibzugriff).
 **Verifikation:** `python3 -m pytest tests/test_doc_facts.py::test_fact_key_set_exact -q` → **0**.
 **Steps:**
-- [ ] 1: Test zuerst schreiben (fail, ImportError).
-- [ ] 2: `doc_facts.py` mit den 23 IC-02-Schlüsseln implementieren. Die Suffix-Regel muss
+- [x] 1: Test zuerst schreiben (fail, ImportError).
+- [x] 2: `doc_facts.py` mit den 23 IC-02-Schlüsseln implementieren. Die Suffix-Regel muss
       **Bindestrich** haben (Spec NF-12: `"_impl.sh"` hätte nichts gematcht und
       `DOCS_HOOKS_COUNT` wäre 13 statt 11 gelaufen).
-- [ ] 3: Test laufen lassen (pass), Hash-Gleichheit des Baums beobachten.
-- [ ] 4: commit via `git`-Agent: `feat: add doc_facts module with exact fact key set`.
+- [x] 3: Test laufen lassen (pass), Hash-Gleichheit des Baums beobachten.
+- [x] 4: commit via `git`-Agent: `feat: add doc_facts module with exact fact key set`.
 
 ### W1-2: Skalarformeln und volatile-Markierung
 
@@ -748,11 +748,11 @@ hinterlegte Konstante geprüft (Spec NEW-8: der `xfail`-Snapshot ist entfernt; S
 ausschließlich in `config/doc-facts-expected.yaml`).
 **Verifikation:** `python3 -m pytest tests/test_doc_facts.py -q` → **0**.
 **Steps:**
-- [ ] 1: Formel-Tests schreiben (fail).
-- [ ] 2: Formeln aus IC-02 implementieren; `DOCS_AGENTS_ACTIVE_COUNT` über `compute_active_roles`
+- [x] 1: Formel-Tests schreiben (fail).
+- [x] 2: Formeln aus IC-02 implementieren; `DOCS_AGENTS_ACTIVE_COUNT` über `compute_active_roles`
       (IC-04), **nicht** `len(roles)` (F13/F21).
-- [ ] 3: Volatile-Unterdrückung implementieren; Tests grün beobachten.
-- [ ] 4: commit via `git`-Agent: `feat: implement doc fact formulas and volatile marking`.
+- [x] 3: Volatile-Unterdrückung implementieren; Tests grün beobachten.
+- [x] 4: commit via `git`-Agent: `feat: implement doc fact formulas and volatile marking`.
 
 ### W1-3: Fehlertoleranz und aktive Rollenmenge
 
@@ -768,10 +768,10 @@ im Ergebnis, weil `systems-engineering.enabled: false` (`.meta-config/project.ya
 **Verifikation:** `python3 -m pytest tests/test_doc_facts.py -q` → **0**;
 `grep -n 'systems-engineering' .meta-config/project.yaml` → **0**.
 **Steps:**
-- [ ] 1: Tests schreiben (fail).
-- [ ] 2: `compute_active_roles` = `roles:` ∩ Templates ∩ `resolve_activation_gates()` implementieren.
-- [ ] 3: Fail-soft-Pfade implementieren; Tests grün beobachten.
-- [ ] 4: commit via `git`-Agent: `feat: add fail-soft fact paths and gate-aware active roles`.
+- [x] 1: Tests schreiben (fail).
+- [x] 2: `compute_active_roles` = `roles:` ∩ Templates ∩ `resolve_activation_gates()` implementieren.
+- [x] 3: Fail-soft-Pfade implementieren; Tests grün beobachten.
+- [x] 4: commit via `git`-Agent: `feat: add fail-soft fact paths and gate-aware active roles`.
 
 ### W1-4: Staleness-Resolver
 
@@ -786,10 +786,10 @@ extrahiert und nicht mehr manuell gepflegt; Quelle ist die **Langfassung**, nich
 `ARCHITECTURE.md`-Stub (Spec A12: die Stub-Quelle verschwindet nach W4).
 **Verifikation:** `python3 -m pytest tests/test_doc_facts.py -q` → **0**.
 **Steps:**
-- [ ] 1: Tests schreiben (fail).
-- [ ] 2: Resolver implementieren (`mtime(derived-from) > derived-at` → `stale-source`).
-- [ ] 3: Tests grün beobachten.
-- [ ] 4: commit via `git`-Agent: `feat: add wiki staleness resolver`.
+- [x] 1: Tests schreiben (fail).
+- [x] 2: Resolver implementieren (`mtime(derived-from) > derived-at` → `stale-source`).
+- [x] 3: Tests grün beobachten.
+- [x] 4: commit via `git`-Agent: `feat: add wiki staleness resolver`.
 
 ### W1-5: Unabhängige Sollwert-Quelle (R14)
 
@@ -809,10 +809,24 @@ Sollwert-Parameter (keine Kopplung, kein Zirkel).
 **Verifikation:** `python3 -m pytest tests/test_doc_facts_expected.py -q` → **0**;
 `grep -c '^[A-Z_]*:' config/doc-facts-expected.yaml` → **11**.
 **Steps:**
-- [ ] 1: Tests schreiben (fail); manipulierter Sollwert als Negativ-Fixture im Test.
-- [ ] 2: `config/doc-facts-expected.yaml` anlegen (11 Keys, `verified-at`, `verified-by: human`).
-- [ ] 3: `load_/compare_` implementieren; Tests grün beobachten.
+- [x] 1: Tests schreiben (fail); manipulierter Sollwert als Negativ-Fixture im Test.
+- [x] 2: `config/doc-facts-expected.yaml` anlegen (11 Keys, `verified-at`, `verified-by: human`).
+- [x] 3: `load_/compare_` implementieren; Tests grün beobachten.
 - [ ] 4: commit via `git`-Agent: `feat: add independent expected doc facts source`.
+
+> **LEDGER-Stand 2026-09-26 — W1-5 TEILWEISE erledigt (Fortschrittsnotiz, keine
+> Änderung der Task-Semantik).** Die **Test-/Loader-/Comparator-Hälfte** ist gelandet:
+> `config/doc-facts-expected.yaml` existiert mit **elf** Einträgen plus `schema-version`,
+> `verified-at: "2026-09-26"`, `verified-by: human` (`config/doc-facts-expected.yaml:41-56`),
+> und `load_expected_doc_facts()` / `compare_expected_doc_facts()` sind implementiert
+> (`scripts/lib/doc_facts.py` — `FACT_KEYS`-gebunden, `EXPECTED_COMPARABLE_FACT_KEYS:1509`).
+> **Offen ist ausschließlich Step 4 (Commit)** zum Zeitpunkt dieses Eintrags. Die Task ist damit
+> **nicht** als Ganzes abgehakt; der Rest der W1-Welle (W1-6…W1-10) und das Wellen-Gate W1
+> (`plan:700-715`) bleiben davon unberührt. **Belegte Restpunkte** im Umfeld dieser Task: das
+> `kind`-Vokabular des Komparators ist zwischen Akzeptanz (`kind == "expected-mismatch"`,
+> `plan:807`) und `Interfaces:` (`kind ∈ {mismatch, missing-in-expected}`, `plan:799-800`)
+> gespalten — geführt als **E-12** in der konsolidierten Errata-Liste
+> („Ausführungs-Ledger und Errata", E-12).
 
 ### W1-6: Snippet-Bridge und `DOCS_`-Platzhalter-Namespace
 
@@ -833,10 +847,10 @@ W0-3).
 **Verifikation:** `python3 -m pytest tests/test_doc_facts.py -q` → **0**;
 `ls snippets/docs/*.md | wc -l` → **6**.
 **Steps:**
-- [ ] 1: Tests schreiben (fail).
-- [ ] 2: Sechs Snippets mit eigenem Frontmatter anlegen; `config.py` additiv erweitern; `^DOCS_` registrieren.
-- [ ] 3: Tests grün beobachten; `QUALITY_PIPELINES_BLOCK`-Regression gegenprüfen.
-- [ ] 4: commit via `git`-Agent: `feat: add docs snippet bridge and DOCS_ placeholder namespace`.
+- [x] 1: Tests schreiben (fail).
+- [x] 2: Sechs Snippets mit eigenem Frontmatter anlegen; `config.py` additiv erweitern; `^DOCS_` registrieren.
+- [x] 3: Tests grün beobachten; `QUALITY_PIPELINES_BLOCK`-Regression gegenprüfen.
+- [x] 4: commit via `git`-Agent: `feat: add docs snippet bridge and DOCS_ placeholder namespace`.
 
 ### W1-7: `doc_renderer.py` — Marker-API
 
@@ -853,10 +867,10 @@ Region → Rückgabe **byte-identisch** plus **genau ein** `log.warning`; erlaub
 `docs-*` ist eigener Namespace neben `agent-meta:managed-*` (keine Kollision, IC-08).
 **Verifikation:** `python3 -m pytest tests/test_doc_renderer.py -q` → **0**.
 **Steps:**
-- [ ] 1: Tests schreiben (fail).
-- [ ] 2: `DOCS_BLOCK_RE` + die drei Funktionen implementieren.
-- [ ] 3: Tests grün beobachten.
-- [ ] 4: commit via `git`-Agent: `feat: add doc renderer marker API`.
+- [x] 1: Tests schreiben (fail).
+- [x] 2: `DOCS_BLOCK_RE` + die drei Funktionen implementieren.
+- [x] 3: Tests grün beobachten.
+- [x] 4: commit via `git`-Agent: `feat: add doc renderer marker API`.
 
 ### W1-8: `doc_index.py` — Doku-Baum-Modell
 
@@ -872,11 +886,11 @@ ausgeschlossen; Frontmatter-lose Datei → Dateiname als `title`, `—` als desc
 erfundene Beschreibung; Sortierung `kind` dann `path` (NFA-02).
 **Verifikation:** `python3 -m pytest tests/test_doc_renderer.py -q` → **0**.
 **Steps:**
-- [ ] 1: Test schreiben (fail).
-- [ ] 2: `build_index_model` implementieren — **einzige** Komponente mit Doku-FS-Semantik
+- [x] 1: Test schreiben (fail).
+- [x] 2: `build_index_model` implementieren — **einzige** Komponente mit Doku-FS-Semantik
       (kein Pfadlogik-Duplikat in `doc_facts.py`).
-- [ ] 3: Determinismus beobachten.
-- [ ] 4: commit via `git`-Agent: `feat: add docs tree index model`.
+- [x] 3: Determinismus beobachten.
+- [x] 4: commit via `git`-Agent: `feat: add docs tree index model`.
 
 ### W1-9: Schema-Block `docs-consolidation` (M-11)
 
@@ -893,10 +907,10 @@ Konventions- und Autocomplete-Pflicht, **keine** Fehlerbehebung.
 **Verifikation:** `python3 -m pytest tests/test_docs_consolidation_migration.py -q` → **0**;
 `python3 -c "import json;json.load(open('config/project-config.schema.json'))"` → **0**.
 **Steps:**
-- [ ] 1: Test schreiben (fail).
-- [ ] 2: Block mit sechs Properties ergänzen.
-- [ ] 3: Test grün beobachten; Validierung mit aktiviertem Key prüfen.
-- [ ] 4: commit via `git`-Agent: `feat: declare docs-consolidation config block in schema`.
+- [x] 1: Test schreiben (fail).
+- [x] 2: Block mit sechs Properties ergänzen.
+- [x] 3: Test grün beobachten; Validierung mit aktiviertem Key prüfen.
+- [x] 4: commit via `git`-Agent: `feat: declare docs-consolidation config block in schema`.
 
 ### W1-10: Additive Config-Keys und Absenz-Default
 
@@ -912,10 +926,35 @@ in `.meta-config/project.yaml`; `enabled: true` **explizit** in agent-meta (NG-9
 **Verifikation:** `python3 -m pytest tests/test_doc_renderer.py -q` → **0**;
 `grep -n 'docs-consolidation' .meta-config/project.yaml` → **0**.
 **Steps:**
-- [ ] 1: Tests schreiben (fail).
-- [ ] 2: Fünf additive Keys anlegen.
-- [ ] 3: Tests grün beobachten; **kein** Sync-Lauf mit Schreibwirkung.
+- [x] 1: Tests schreiben (fail).
+- [ ] 2: Fünf additive Keys anlegen. **⚠️ TEILWEISE — nicht abgehakt.** Gelandet ist nur
+      `docs-consolidation.enabled: true` (separat autorisierte, eng zugeschnittene Gate-Änderung,
+      außerhalb dieser Task genehmigt). **Offen:** `index-mode`, `checks.strict`, `sources`,
+      `volatile-facts` (4 von 5 Properties).
+- [x] 3: Tests grün beobachten; **kein** Sync-Lauf mit Schreibwirkung.
 - [ ] 4: commit via `git`-Agent: `feat: add additive docs-consolidation config keys`.
+
+> **LEDGER-Stand 2026-09-26 — W1-10 TEILWEISE erledigt (Fortschrittsnotiz, keine Änderung der
+> Task-Semantik).** W1-10 ist **nicht** als Ganzes abgehakt. Stand der Landung:
+> - **Testhälfte (Steps 1 und 3):** abgeschlossen — `test_disabled_flag_is_noop` und
+>   `test_absent_block_is_noop` sind geschrieben und grün (`tests/test_doc_renderer.py`).
+> - **Produktionshälfte (Step 2):** **nur teilweise.** In `.meta-config/project.yaml` steht
+>   ausschließlich `docs-consolidation.enabled: true`. Diese Änderung wurde **nicht** als
+>   Ausführung dieser Task, sondern als **separat autorisierte, eng zugeschnittene
+>   Gate-Änderung** geliefert (Begründung: `enabled` wird von W2-7 als Common-Gate-Bedingung
+>   gebraucht, `plan:1081`).
+> - **Fehlend (4 von 5 Properties aus IC-22, `plan:904`):** `docs-consolidation.index-mode`,
+>   `docs-consolidation.checks.strict`, `docs-consolidation.sources`,
+>   `docs-consolidation.volatile-facts`. Der Schema-**Block** mit allen **sechs** Properties
+>   existiert seit W1-9 (`config/project-config.schema.json`, `plan:881-899`) und ist
+>   `additionalProperties: false` — die fehlenden vier Properties sind also **deklariert, aber
+>   nicht gesetzt**. Konsequenz: `index-mode` (IC-15) und `sources` (IC-22, OQ2-Folge aus
+>   `plan:570`) haben bis zu ihrer Lieferung keinen Wert; der Absenz-Default aus IC-22
+>   (`plan:909-911`) greift. **Owner der Restlieferung:** `developer` im Rahmen von W1-10,
+>   abhängig von W1-8 (bereits erledigt) — derzeit **blockiert** durch die offene
+>   W3-`--strict`-Gate-Frage (siehe „Blockierende Befunde", **B-1**) und durch den Umstand,
+>   dass `checks.strict` laut Akzeptanz (`plan:911`) erst in W3-4 auf `true` gesetzt werden darf.
+>   Geführt als **E-13** in der konsolidierten Errata-Liste.
 
 ---
 
@@ -959,11 +998,25 @@ Finding; die Gegenprobe `| Agents | 74 |` außerhalb jeder Region erzeugt **gena
 **Verifikation:** `python3 -m pytest tests/test_doc_facts.py -q` → **0**;
 `wc -l < tests/fixtures/docs_v1_fixtures.md` → **4**.
 **Steps:**
-- [ ] 1: Fixture (Positiv + Exempt + Gegenprobe) anlegen; Tests schreiben (fail).
-- [ ] 2: V1a (Zahl-Token ohne `\d+\.\d+` + Nomen auf derselben Zeile) und V1b (Versions-Literal)
+- [x] 1: Fixture (Positiv + Exempt + Gegenprobe) anlegen; Tests schreiben (fail).
+- [x] 2: V1a (Zahl-Token ohne `\d+\.\d+` + Nomen auf derselben Zeile) und V1b (Versions-Literal)
       implementieren. Die Rev.-0.1-Regex wird **nicht** verwendet (sie matchte keine Fundstelle).
-- [ ] 3: Suppressionen implementieren; Tests grün beobachten.
+- [x] 3: Suppressionen implementieren; Tests grün beobachten.
 - [ ] 4: commit via `git`-Agent: `feat: add V1 manual count detection with fixtures`.
+
+> **LEDGER-Stand 2026-09-26 — W2-1 TEILWEISE erledigt (Fortschrittsnotiz, keine Änderung der
+> Task-Semantik).** Die Implementierungshälfte (Steps 1–3) ist gelandet:
+> `check_no_manual_counts` mit den disjunkten Branches V1a/V1b, den Suppressionsregeln 1–4
+> (§5.1.1) und der Positiv-Fixture `tests/fixtures/docs_v1_fixtures.md` (existiert).
+> **Offen ist zum Zeitpunkt dieses Eintrags ausschließlich Step 4 (Commit)** — W2-1 ist damit
+> **nicht** als Ganzes abgehakt, und das Wellen-Gate W2 (`plan:924-940`) ist **nicht** erreicht.
+> **Zwei Review-Befunde aus der W2-1-Prüfung sind offen und blockieren den Abschluss:**
+> **B-4** (V1-Abdeckungslücke: Suppressionsregel 3 „fenced code" verdeckt `README.md:688/690/696/734`,
+> d. h. IC-05-Befunde F2, F3-Site-2 und F4 sind für V1 unsichtbar — Remediation-Owner **W3-7**,
+> **vor** der Hochstufung von V1 auf `ERROR`) und **B-5** (`scripts/lib/consistency/report.py`
+> erscheint in **keiner** `Files:`-Liste des Plans — der F1-Verlust von `line`/`branch` im
+> `--json`-Output hat derzeit keinen Owner). Beide sind im Abschnitt „Blockierende Befunde"
+> mit Evidenz verankert.
 
 ### W2-2: V3 `check_internal_links`
 
@@ -1952,4 +2005,186 @@ AC-24, AC-25, AC-26, AC-34, AC-35, AC-37, AC-38, AC-39, AC-41.
 - **Ehrliche Lücken:** V9 ohne AC; `docs/CODEBASE_OVERVIEW.md` ohne AC und NG-3; `llms.txt:5`
   Providernamen-Liste ist inhaltlich (AC-40), aber keine „manuell gepflegte Zahl“ (Spec Rev. 0.3,
   NF-9) und daher nicht Teil der 11.
+
+---
+
+## Ausführungs-Ledger — Stand 2026-09-26 (Fortschrittsabgleich W1 / W2-1)
+
+> **Was dieser Abschnitt ist — und was nicht.** Dieser Abschnitt wurde am 2026-09-26 vom
+> Dokumentations-Agenten ergänzt, weil die Checkboxen dieses Plans als **Ledger** und als
+> **menschlich lesbarer Fortschrittsausweis** dienen und ein falsches Ledger ein
+> Korrektheitsproblem für das gesamte Vorhaben ist. Er enthält **ausschließlich**:
+> (a) den Abgleich der Checkboxen gegen die tatsächlich gelandete Arbeit,
+> (b) **neu markierte** Abweichungs-/Errata-Notizen und
+> (c) eine **konsolidierte** Liste der bisher über W1- und W2-1-Reviews verstreut erhobenen
+> Befunde.
+> **Unverändert bleiben:** `status: APPROVED` (`:5`), `revision: 0.4` (`:6`), sämtliche Task-,
+> Wellen-, AC-, IC-, NFA-, R- und OQ-IDs, alle Akzeptanzkriterien, alle Verifikations-Kommandos,
+> alle Gates und der vollständige Revisions- und Änderungsnotiz-Block (Rev. 0.2–0.4, K1–K12).
+> **Keine bestehende Abweichungsnotiz wurde entfernt, ersetzt oder umformuliert.** OP-1 bleibt
+> unverändert offen und wird durch diesen Abschnitt **nicht** berührt. Dieser Abschnitt ist
+> **additive Dokumentation**, kein Bestandteil einer Plan-Revision; eine spätere Revision muss ihn
+> mitnehmen.
+>
+> **Zeilenanker in diesem Abschnitt:** Alle `plan:<Zeile>`-Verweise beziehen sich auf den
+> **Zeilenstand Rev. 0.4, also vor diesem Abgleich** (die drei LEDGER-Notizen an W1-5, W1-10 und
+> W2-1 verschieben die Zeilen danach). Das ist bewusst so markiert und folgt der Begründung von
+> **K12** (eine Zeilenzahl eines Dokumentstandes ist driftanfällig): **maßgeblich sind die
+> Abschnitts- und Task-Anker**, nicht die Zeilenzahl. Verweise auf **andere** Dateien
+> (`scripts/…`, `config/…`, `docs/specs/…`) tragen den Zeilenstand vom 2026-09-26.
+
+### L-1 Checkbox-Abgleich
+
+| Task | Checkboxen | Stand 2026-09-26 |
+|---|---|---|
+| **W1-1** | 4/4 | vollständig abgeschlossen, reviewed, committed |
+| **W1-2** | 4/4 | vollständig abgeschlossen, reviewed, committed |
+| **W1-3** | 4/4 | vollständig abgeschlossen, reviewed, committed |
+| **W1-4** | 4/4 | vollständig abgeschlossen, reviewed, committed |
+| **W1-5** | 3/4 | **teilweise** — Test-/Loader-/Comparator-Hälfte steht; nur Step 4 (Commit) offen |
+| **W1-6** | 4/4 | vollständig abgeschlossen |
+| **W1-7** | 4/4 | vollständig abgeschlossen |
+| **W1-8** | 4/4 | vollständig abgeschlossen |
+| **W1-9** | 4/4 | vollständig abgeschlossen |
+| **W1-10** | 2/4 | **teilweise** — nur `docs-consolidation.enabled: true` gelandet; 4 Properties + Commit offen |
+| **W2-1** | 3/4 | **teilweise** — Implementierung steht; nur Step 4 (Commit) offen |
+| W2-2 … W2-7 | 0/4 je Task | **nicht gestartet**, unverändert offen |
+| W0-1 … W0-7, W3-1 … W8-4 | 0/4 je Task | unverändert offen — **nicht** Gegenstand dieses Abgleichs |
+
+- **Zählung:** **vor** dem Abgleich **0 von 188** Checkboxen gesetzt (188 offen);
+  **nach** dem Abgleich **40 von 188** gesetzt (**148 offen**). Setzung: W1-1…W1-4 (16) +
+  W1-5 (3) + W1-6…W1-9 (16) + W1-10 (2) + W2-1 (3).
+- **Kein** Task wurde abgehakt, obwohl ein Step offen ist. Die drei teilweise erledigten Tasks
+  tragen zusätzlich eine **LEDGER-Stand**-Notiz direkt unter ihrer Step-Liste (W1-5, W1-10, W2-1).
+- **Nicht Gegenstand:** Die W0-Tasks sind im Repo durch die Ergebnis-Records
+  (`docs/plans/2026-09-25-docs-consolidation-oq2.md`, `-oq6.md`, `-oq8.md`, `-oq1.md`,
+  `-wave0-freeze.md`, `-track-a-gate.md`) und durch den Rev.-0.2-Block dieses Plans belegt; ihre
+  Checkboxen wurden in diesem Abgleich **bewusst nicht angefasst**, weil nur W1/W2-1 zur
+  Abstimmung beauftragt waren.
+
+### L-2 Blockierende Befunde (B-1 … B-5)
+
+> **Keine Korrektur an Spec oder Plan wurde in diesem Abschnitt vorgenommen.** B-1 und B-2 sind
+> **Korrekturbedarf an der normativen Quelle**, keine Ausführungsfehler; sie brauchen — wie der
+> bereits dokumentierte offene Punkt **OP-1** — ein **Concept-Review** und eine anschließende
+> Spec-/Plan-Revision. Sie sind hier **nicht** behoben, sondern **begrenzt und belegt** geführt.
+
+**B-1 — Das verpflichtende Gate der Welle W3 ist im Plan falsch zugeschnitten.**
+- **Sachverhalt:** Spec §10 verpflichtet `python scripts/consistency-check.py --strict` ab W3
+  **für `scripts/lib/doc_*.py` und `docs/INDEX.md`**
+  (`docs/specs/2026-09-25-repository-documentation-consolidation.md:1802-1803`). Der W3-Block des
+  Plans hat daraus ein **repo-globales** `--strict == 0` gemacht
+  (`plan:1094` — Verifikation W3: „`--strict` → **0 ab W3-7** (Pflicht ab W3, Spec §10)"), und
+  das Wellen-Gate ist daran gekoppelt (`plan:1258` Akzeptanz von W3-7).
+- **Mechanik:** `scripts/consistency-check.py:273-274` setzt Exit **1**, sobald **irgendein**
+  Finding `Severity.WARNING` trägt; `scripts/lib/consistency/report.py:75` gibt Exit **1** bei
+  Errors. Repo-globales `--strict == 0` verlangt also **null Errors und null Warnings**.
+- **Konflikt:** Die rund **19** bereits vorhandenen, warnungs-emittierenden Checks decken
+  `agents/1-generic`, `agents/2-platform` und `commands/*` ab — Pfade, die **keine** Welle W1–W8
+  anfasst. Das Wellen-Gate ist damit **nicht erreichbar**, ohne außerhalb des Plans Änderungen an
+  genau diesen Pfaden vorzunehmen.
+- **Status:** **blockierend** · **Owner:** `orchestrator` (Spec-/Plan-Korrektur mit
+  Concept-Review, Präzedenz OP-1) · **Status im Plan:** offen, dokumentiert · **Korrektur hier
+  ausdrücklich nicht ausgeführt.**
+
+**B-2 — Die Wellen-Erwartung der Welle W2 ist so nicht erfüllbar.**
+- **Sachverhalt:** Die W2-Verifikation erwartet `--strict` → **1** und verlangt, die **einzigen**
+  Findings seien `docs.no_manual_counts`-V1-**WARNING**s (`plan:927-931`).
+- **Mechanik:** (a) V1 wird erst in **W2-7** registriert (`plan:1081`), in W2-1 ist der Check
+  implementiert, aber **nicht registriert** — die W2-Erwartung beschreibt also einen Zustand, der
+  erst nach W2-7 existiert und dann von W2-1 nicht mehr verifiziert wird; (b) die drei
+  bestehenden Doku-Checks (`check_sync_cli_docs` `:9`, `check_ui_help_mappings` `:47`,
+  `check_readme_docs_index` `:100`) emittieren ausschließlich `Severity.ERROR` und **nie**
+  `WARNING`; (c) die Bestands-Baseline ist bereits **rot** gegen `--strict`.
+- **Folge:** Der beschriebene Zustand (Exit 1 **ausschließlich** wegen V1-Warnings) existiert
+  nicht — weder in W2-1 noch nach W2-7. Die Erwartung ist damit als **Wellen-Abnahmekriterium
+  unbrauchbar**.
+- **Status:** **blockierend** · **Owner:** `orchestrator` (Plan-Korrektur der W2-Verifikation) ·
+  **Korrektur hier nicht ausgeführt.**
+
+**B-3 — W1-10 ist nur zur Hälfte gelandet.** Siehe die LEDGER-Stand-Notiz an W1-10 und **E-13**.
+Von den fünf additiven `docs-consolidation.*`-Properties ist **eine** gesetzt
+(`.meta-config/project.yaml`, `docs-consolidation.enabled: true`, als **separat autorisierte,
+eng zugeschnittene Gate-Änderung** geliefert). **Offen:** `index-mode`, `checks.strict`,
+`sources`, `volatile-facts` — deklariert im Schema (W1-9), aber **ohne Wert** in der
+Projekt-Config. **Status:** **als offener Follow-up geführt, blockiert den Abschluss von W1** ·
+**Owner:** `developer` (Restlieferung W1-10), Entscheidung über den Umgang mit dem erweiterten
+Gate `orchestrator`.
+
+**B-4 — V1 hat eine Abdeckungslücke (Befund F2 aus dem W2-1-Review).**
+- **Sachverhalt:** Suppressionsregel 3 der Spec §5.1.1 („fenced code") unterdrückt
+  `README.md:688/690/696/734`. Die IC-05-Befunde **F2**, **F3-Site-2** und **F4** sind für V1
+  damit **unsichtbar** — V1 kann sie weder finden noch als grün melden.
+- **Konsequenz:** Der DoD-Punkt „11 Handzahlen = 0" (`plan:1868-1869`) und die W3-7-Akzeptanz
+  „`--strict` → 0, kein `docs.*`-Finding" (`plan:1258`) sind mit dieser Lücke **nicht** belastbar
+  beweiskräftig.
+- **Status:** **blockierend für die Hochstufung von V1 auf `ERROR`** · **Remediation-Owner:
+  W3-7**, **vor** der Umstellung von `checks.strict` in W3-4 · **Status im Plan:** offen,
+  dokumentiert · **Korrektur hier nicht ausgeführt.**
+
+**B-5 — `scripts/lib/consistency/report.py` hat keinen Task-Owner (Befund F1 aus dem W2-1-Review).**
+- **Sachverhalt:** `line` und `branch` sind **Instanzattribute** auf `Finding`, **keine**
+  Dataclass-Felder (`scripts/lib/consistency/report.py:28-41`). `print_json_report`
+  (`:78-97`) serialisiert nur `severity`, `check`, `file`, `message`, `suggestion` — der
+  `--json`-Output **verwirft** `line` und `branch`.
+- **Eigentümerlücke:** Die Deferral zeigt auf **W2-7**, aber `scripts/lib/consistency/report.py`
+  erscheint in **keiner** `Files:`-Liste **irgendeiner** Task dieses Plans (W2-7 besitzt
+  `scripts/lib/consistency/docs.py`, `scripts/consistency-check.py`,
+  `tests/test_doc_facts.py` — `plan:1064-1065`). Damit besitzt **keine** Task die Promotion, und
+  der Verlust wird **per Default dauerhaft**.
+- **Status:** **blockierend** (stillschweigender Datenverlust in einem Gate-Werkzeug) · **Owner
+  bislang: keiner** — die `Files:`-Liste einer Task (nächstliegend **W2-7**, sonst eine
+  Wellen-Gate-Korrektur) muss `report.py` ausdrücklich aufnehmen · **Korrektur hier nicht
+  ausgeführt.**
+
+### L-3 Konsolidierte Errata- und Befundliste W1 / W2-1 (E-01 … E-15)
+
+> **Zweck:** Die in den W1- und W2-1-Reviews erhobenen Befunde standen bisher über mehrere
+> Berichte verstreut. Diese Liste ist der **einzige** Sammel-Ort; die ursprünglichen
+> Berichte bleiben unverändert bestehen und werden nicht zurückgezogen. **Statusspalte:**
+> *behoben* = am Code belegt erledigt · *offener Follow-up* = aufgenommen, mit Owner, ohne
+> Gate-Wirkung · *blockierend* = verhindert ein Gate oder einen Wellen-Abschluss (siehe L-2).
+
+| ID | Befund | Evidenz | Status | Owner |
+|---|---|---|---|---|
+| **E-01** | **Fakten-Key-Erratum 23 vs. 22.** Die Task W1-1 nennt „**exakt 23 Schlüssel**" (IC-02) und „die 23 IC-02-Schlüssel"; die Implementierung führt **22** Einträge. | `plan:721`, `plan:732` vs. `scripts/lib/doc_facts.py:224-246` (`FACT_KEYS`, 22 Einträge) | *offener Follow-up* — Plan-/Spec-Korrektur beauftragt, **nicht** ausgeführt; keine Gate-Wirkung, da die Key-Set-Invariante relativ zu `FACT_KEYS` getestet wird | `orchestrator` (Plan-Korrektur) |
+| **E-02** | **R1 — doppelte Versionsdarstellung / nicht auflösbarer verschachtelter Platzhalter.** | W1-7-Review; Kreuz-Rendering-Ort `README.md:734` (`DOCS_VERSION`) und `DOCS_REPO_FACTS_BLOCK` | *offener Follow-up* — vor W3-7 zu belegen, da W3-7 die Version **einmal** rendern soll | `developer` (W3-7) |
+| **E-03** | **R2 — verwaiste `docs-end`-Markierung wird stillschweigend ignoriert.** Nur ein unbalanciertes *Start*-Marker erzeugt eine Warnung (`plan:849-852`); ein **End**-Marker ohne Start bleibt ohne Befund. | W1-7-Review; `DOCS_BLOCK_RE` / `apply_fact_blocks` in `scripts/lib/doc_renderer.py` | *offener Follow-up* — echter Fehlalarm-Freiheit vs. unbemerkter Marker-Verlust abzuwägen | `developer` (W1-7-Nachzug, sonst W3-7) |
+| **E-04** | **R3 — das Verifikations-Kommando der Task W1-5 kann `DOCS_HOOKS_1GENERIC_COUNT` nicht matchen.** `grep -c '^[A-Z_]*:'` erlaubt keine Ziffern im Schlüsselnamen; der erwartete Wert **11** ist mit diesem Kommando **nicht erreichbar** (der Dateiinhalt selbst hat 11 `DOCS_`-Einträge). | `plan:810` vs. `config/doc-facts-expected.yaml:46-56` (Schlüssel mit Ziffer) | *offener Follow-up* — Kommando oder Erwartungswert im Plan ist zu korrigieren | `orchestrator` (Plan-Korrektur) |
+| **E-05** | **R4 — `^DOCS_` schluckt Namespace-Tippfehler.** Die Registrierung ist `^DOCS_[A-Z0-9_]+$`; jeder unbekannte `DOCS_*`-Name ist damit ein gültiger dynamischer Platzhalter. Teilabdeckung: zwei bekannte Tippfehler sind in `_KNOWN_TYPOS` gelistet. | `scripts/lib/consistency/placeholders.py:136` (Registrierung), `:140-144` (`_KNOWN_TYPOS`) vs. `plan:823` | *offener Follow-up* — Restabdeckung (Whitelist statt Präfix) zu entscheiden | `developer` (W3-6/W3-7) |
+| **E-06** | **Lücke 7 vs. 6 bei den Block-Fakten.** Es gibt **sieben** `*_BLOCK`-Fakten, aber nur **sechs** Snippets: `DOCS_DOD_PRESET_BLOCK` hat **weder** Snippet **noch** Region, während `DOCS_TIER_PRESET_BLOCK` ein Snippet, aber **keine** Region hat. | `scripts/lib/doc_facts.py:240-246` (7 `*_BLOCK`) und `:1407-1408` (`BLOCK_FACT_KEYS`) vs. `snippets/docs/` (6 Dateien: `repo-facts`, `agent-roster`, `pipelines`, `hooks`, `providers`, `tier-presets`) vs. W3-7-Regionenliste `roster|pipelines|hooks|providers|version|facts` (`plan:1266`) | *offener Follow-up mit Gate-Wirkung* — vor W3-7 zu klären, sonst bleibt eine der 11 Handzahlen unersetzt | `developer` (W3-7) + `concept-architect` (Scope-Entscheid) |
+| **E-07** | **IC-04 — Wortlaut 53 vs. 58.** | W1-3/W2-4-Review; `DOCS_AGENTS_ACTIVE_COUNT`-Formel in `scripts/lib/doc_facts.py` | *offener Follow-up* — Zahlen-Aussage des Vertrags, kein Laufzeitfehler | `orchestrator` (Spec-Klarstellung) |
+| **E-08** | **AC-39 nennt „sechs Properties", die W1-10 nicht liefert.** AC-39 ist mit der W1-9-Akzeptanz (`plan:889-892`) und der W1-10-Wirkung verknüpft; tatsächlich gesetzt ist **eine** von fünf. | `plan:889`, `plan:897` vs. `.meta-config/project.yaml` (nur `docs-consolidation.enabled: true`) | *blockierend für AC-39* — identisch mit **B-3** / **E-13** | `developer` (W1-10-Restlieferung) |
+| **E-09** | **Ausschluss-Lücke 13 vs. 11.** W1-2 verlangt **13** Formel-Assertions, die unabhängige Sollwert-Quelle pinnt **11** Werte. Die Differenz ist nur teilweise ausgewiesen (volatile Fakten, Differenz-Fakten, zwei als `missing-in-expected` gemeldete Lücken) — die Zuordnung „welche der 13 Formeln sind ungepinnt" ist nicht abschließend dokumentiert. | `plan:741-748` vs. `config/doc-facts-expected.yaml:22-31` (Regel 2) und `scripts/lib/doc_facts.py:1509` (`EXPECTED_COMPARABLE_FACT_KEYS`) | *offener Follow-up* — R14-Gegenmaßnahme darf nicht stillschweigend verkürzt werden | `developer` (W2-5 / V6) + `validator` |
+| **E-10** | **IC-03 — F4/F5 sind nicht deterministisch.** Die Staleness-Auswertung über `mtime(derived-from) > derived-at` ist zeitabhängig; zwei Renderings können sich unterscheiden, ohne dass sich ein Input geändert hat. | `plan:788-792` (W1-4 Resolver) | *offener Follow-up mit NFA-Wirkung* (NFA-01 verlangt byte-Identität bei gleichem Baum) | `developer` (W1-4-Nachzug, Test in W2-3) |
+| **E-11** | **W2-`--strict`-Erwartung unerfüllbar** (identisch mit **B-2**). | `plan:927-931` vs. `plan:1081`, `scripts/lib/consistency/docs.py:9/47/100` | *blockierend* | `orchestrator` |
+| **E-12** | **Gespaltenes `kind`-Vokabular des Komparators.** `Interfaces:` nennt `kind ∈ {mismatch, missing-in-expected}`, die Akzeptanz fordert `kind == "expected-mismatch"`. | `plan:799-800` vs. `plan:806-808` | *offener Follow-up* — Vertragsbegriff muss eindeutig sein, bevor V6 darauf prüft | `developer` (W2-5) + `validator` |
+| **E-13** | **W1-10 teilweise geliefert** (identisch mit **B-3** / **E-08**). | `.meta-config/project.yaml` (nur `docs-consolidation.enabled: true`); Schema-Block vollständig seit W1-9 | *blockierend für den Abschluss von W1* | `developer` (W1-10) |
+| **E-14** | **V1-Abdeckungslücke** (identisch mit **B-4**). | Suppressionsregel 3 (§5.1.1) gegen `README.md:688/690/696/734` | *blockierend für die V1-Hochstufung auf `ERROR`* | `developer` (W3-7), vor W3-4 |
+| **E-15** | **`report.py`-Eigentümerlücke** (identisch mit **B-5**). | `scripts/lib/consistency/report.py:28-41`, `:78-97` vs. `plan:1064-1065` (W2-7 `Files:`) | *blockierend* | **derzeit keiner** — `Files:`-Liste ist zu erweitern |
+
+**Zählung L-3:** **15** Einträge — **0 × behoben**, **10 × offener Follow-up** (E-01, E-02, E-03,
+E-04, E-05, E-06, E-07, E-09, E-10, E-12), **5 × blockierend** (E-08, E-11, E-13, E-14, E-15 —
+jeweils identisch mit bzw. Verweis auf **B-2 … B-5**). Für **keinen** der genannten Befunde liegt
+am 2026-09-26 ein belegter Fix vor; „behoben" ist deshalb bewusst **nirgends** eingetragen.
+**B-1** (W3-`--strict`-Gate) ist nicht doppelt in dieser Liste geführt, sondern ausschließlich in
+L-2 — es ist ein **Gate-** und kein Codebefund.
+
+### L-4 OQ1 bleibt offen — und blockiert W5, nicht W1–W4
+
+- **OQ1** („Wiki-Topics vs. `docs/guides/`") ist **weiterhin offen**. Der Abgleich dieser
+  Ledger-Korrektur **löst OQ1 nicht auf** und darf **nicht** als Auflösung gelesen werden: W1 und
+  W2-1 sind **ohne** OQ1 gelandet, und **kein** dortiger Schritt berührt die OQ1-Scope-Grenze.
+- **Entscheidungsweg:** OQ1 wird von seinem Owner entschieden — Task **W0-7** (Produktentscheidung
+  an `main_chat` eskaliert, Record `docs/plans/2026-09-25-docs-consolidation-oq1.md`,
+  `plan:680-694`). Die Entscheidung liegt **beim Spec-Owner**, nicht bei der Ausführung und nicht
+  bei diesem Ledger-Abgleich.
+- **Abhängigkeit:** OQ1 blockiert **W5** (W5-1 … W5-3, insbesondere die Scope-Grenze von W5-3:
+  „annotiert **additiv**, migriert **nichts**", `plan:692`, `plan:1403-1423`). OQ1 blockiert
+  **nicht** W1, W2, W3 und W4.
+- **Konsequenz für die Reihenfolge:** W3 und W4 sind von OQ1 unabhängig und können — abhängig von
+  **B-1** — weiterlaufen; **vor** W5 ist die OQ1-Entscheidung abzuwarten.
+- **Verhältnis zu OP-1:** **getrennt**. OP-1 ist der formale Abschluss der Branch-Spec-Korrektur
+  und bleibt unverändert offen; OQ1 ist eine **offene Produktentscheidung**. Beide sind offen und
+  werden hier nur nebeneinander benannt, nicht verknüpft.
 
