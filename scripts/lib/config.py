@@ -1870,7 +1870,13 @@ def _build_snippet_variables(variables: dict, agent_meta_root: Path) -> None:
             PROMPT_INJECTION_DEFENSE_BLOCK (from snippets/security/) and the
             block-inlining variables OUTPUT_GUARD_BLOCK,
             BACKGROUND_PROCESS_GUARD_BLOCK and PARSE_INPUT_BLOCK (from
-            snippets/agents/, run through `_load_block_snippet`).
+            snippets/agents/, run through `_load_block_snippet`), plus the
+            DOCS_* block variables DOCS_REPO_FACTS_BLOCK,
+            DOCS_AGENT_ROSTER_BLOCK, DOCS_PIPELINES_BLOCK, DOCS_HOOKS_BLOCK,
+            DOCS_PROVIDERS_BLOCK and DOCS_TIER_PRESET_BLOCK (from snippets/docs/,
+            also run through `_load_block_snippet`; DOCS_DOD_PRESET_BLOCK has no
+            snippet per IC-11 and is left absent here — the renderer substitutes
+            the DOCS_ placeholders in their bodies).
         agent_meta_root: agent-meta source root (snippet file location).
     """
 
@@ -1925,6 +1931,33 @@ def _build_snippet_variables(variables: dict, agent_meta_root: Path) -> None:
     variables["PROMPT_INJECTION_DEFENSE_BLOCK"] = (
         _pid_path.read_text(encoding="utf-8").rstrip("\n") if _pid_path.exists() else ""
     )
+
+    # DOCS_* block snippets (SPEC IC-11, component C3). Same directory-driven
+    # registration as every other snippet group, reusing the UNCHANGED
+    # _load_block_snippet() inlining transform (frontmatter strip, CRLF -> LF,
+    # strip("\n")); a missing file yields "" (fail-soft, IC-01). Placed AFTER the
+    # snippets/security/ block so the established orchestrator/developer/security
+    # order stays untouched. The DOCS_ placeholders inside the bodies are
+    # substituted later by doc_renderer (engine E3) — never by E1/E2 (NG-11).
+    #
+    # DOCS_DOD_PRESET_BLOCK has no snippet: IC-11 enumerates six (name, stem)
+    # pairs and plan task W1-6 names the same six files. The DoD-preset fact
+    # therefore keeps the fail-soft "" here and is reported as an open gap
+    # (no snippet, no render region) for the owner decision before W3-7.
+    _docs_snippets_dir = agent_meta_root / "snippets" / "docs"
+    for _snippet_name, _var_stem in (
+        ("repo-facts", "DOCS_REPO_FACTS"),
+        ("agent-roster", "DOCS_AGENT_ROSTER"),
+        ("pipelines", "DOCS_PIPELINES"),
+        ("hooks", "DOCS_HOOKS"),
+        ("providers", "DOCS_PROVIDERS"),
+        ("tier-presets", "DOCS_TIER_PRESET"),
+    ):
+        _snippet_path = _docs_snippets_dir / f"{_snippet_name}.md"
+        _var_name = f"{_var_stem}_BLOCK"
+        variables[_var_name] = (
+            _load_block_snippet(_snippet_path) if _snippet_path.exists() else ""
+        )
 
     # Block-inlining variables (spec §3.7). `_load_block_snippet` strips the
     # frontmatter, normalizes line endings and strip("\n")-trims the result, so
