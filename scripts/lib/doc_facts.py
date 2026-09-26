@@ -7,9 +7,10 @@ is identical before and after a call (IC-01, AC-01). Every fact that cannot be
 computed yields ``""`` (fail-soft, the contract of ``_load_block_snippet``,
 ``config.py``); the generator must never abort a sync over a number.
 
-Scope of this revision (plan tasks W1-2 … W1-4): the scalar formulas of the
+Scope of this revision (plan tasks W1-2 … W1-5): the scalar formulas of the
 IC-02 table, the ``volatile`` marking, the seven ``*_BLOCK`` bodies, the
-gate-aware active-role set (IC-04) and the wiki staleness resolver (IC-03).
+gate-aware active-role set (IC-04), the wiki staleness resolver (IC-03) and
+the independent expected-value source (IC-23).
 ``FACT_KEYS`` plus ``_FACT_COMPUTERS`` is the sanctioned extension point for
 *facts*; a fact that is not registered there keeps the fail-soft default ``""``.
 
@@ -137,6 +138,39 @@ in the same breath. ``knowledge/sources/`` is immutable raw data (NG-2) and is
 never written by anything in this module — the resolver only ever reads
 ``knowledge/wiki/``.
 
+**IC-23 (W1-5) — the oracle, and the two open bookkeeping items of this task.**
+
+The circle ``doc_facts → renderer → V6`` is broken by :func:`load_expected_doc_facts`
+plus :func:`compare_expected_doc_facts` at the **end** of this module: the
+oracle is a second, hand-maintained source, and the compute path neither reads
+it nor takes it as a parameter. Two things about this task are *reported*, not
+decided here, because both belong to the plan/spec owner:
+
+* **F10 — the ``kind`` vocabulary is specified twice, differently.** The
+  *comparator*'s domain is ``{mismatch, missing-in-expected}`` in two places:
+  the IC-23 code block and plan W1-5 *Interfaces*. The same two documents give
+  ``{handedit, expected-mismatch, missing-in-expected}`` to the **V6 check**
+  (IC-23 *Vertrag* (a)/(b), plan W2-5 *Interfaces*), and the W1-5 acceptance
+  text plus AC-36's first clause name ``expected-mismatch`` for the
+  **comparator's** list. The two-domain reading is implemented here: the
+  comparator emits :data:`MISMATCH_KIND`, V6 renames it to ``expected-mismatch``
+  because it owns the third axis ``handedit`` that the comparator cannot see.
+  The acceptance text of W1-5 (and AC-36's first clause) is the place that has
+  to be corrected — the ``Finding`` claim in AC-36's second clause and all of
+  W2-5 are correct as written.
+* **F11 — the oracle's eleven do not close against the stated exclusions.**
+  15 scalar facts − ``DOCS_SCENARIO_COUNT`` (volatile) −
+  ``DOCS_AGENTS_NONSE_COUNT`` (pure difference) = 13 pinnable facts, but IC-23
+  enumerates **11**. Two are absent without a stated reason:
+  ``DOCS_AGENTS_ACTIVE_COUNT`` (computed 58 — the number W1-3 corrected from
+  53) and ``DOCS_DOCS_FILE_COUNT`` (205). The plausibly intended reason is that
+  the eleven are exactly the facts rendered as a number into ``README.md`` /
+  ``llms.txt``, which would also make ``DOCS_AGENTS_NONSE_COUNT`` a
+  *documented* exclusion; IC-23 states that only for the difference fact. The
+  eleven of IC-23 are implemented verbatim rather than padded, and
+  ``EXPECTED_COMPARABLE_FACT_KEYS`` reports both as ``missing-in-expected``
+  (WARNING), which is the honest signal until the owner rules.
+
 **Consumer obligation for W2-4 (recorded, not implemented here).**
 :class:`FactUnavailable` is a module-local exception, deliberately leaked (there
 is no ``__all__``): it signals *a source is missing or unreadable* and nothing
@@ -167,6 +201,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import NamedTuple
 
+from . import doc_index
 from .frontmatter import parse_frontmatter_file
 from .hooks import parse_hook_metadata
 from .io import load_yaml_file
@@ -233,7 +268,17 @@ half-finished transition (removed here, not yet registered) fails the suite.
 """
 
 #: Verzeichnis-Segmente, die ``DOCS_DOCS_FILE_COUNT`` nicht zählt (IC-02).
-DOCS_EXCLUDED_DIR_SEGMENTS: frozenset[str] = frozenset({"archive", "_archive"})
+#:
+#: **IC-09 / single source of truth:** the set is *not* declared here. The
+#: documentation-filesystem semantics belong to :mod:`scripts.lib.doc_index`, and
+#: this module reuses :data:`~scripts.lib.doc_index.EXCLUDED_DIR_SEGMENTS` at the
+#: one place that needs it. A second literal would be a second copy of the truth
+#: and the two would drift apart silently — the counting fact would then report a
+#: different tree than the index lists, with both sides looking individually
+#: correct. (W1-8 observed the drifted literal ``{'archive', '_archive'}``, which
+#: already omitted ``local-Inputs``; the number it produced was coincidentally
+#: right on this tree, so only the duplication was observable, not the value.)
+DOCS_EXCLUDED_DIR_SEGMENTS: frozenset[str] = doc_index.EXCLUDED_DIR_SEGMENTS
 
 #: Präfix der SE-Rollen (``se-*``), IC-02 ``DOCS_AGENTS_SE_COUNT``.
 SE_ROLE_PREFIX: str = "se-"
@@ -699,7 +744,6 @@ def _active_roles(context: FactContext) -> set[str]:
     if _agents_capable_provider(context.provider_config, context.config) is False:
         return set()
     return active
-
 
 
 def compute_active_roles(
@@ -1433,3 +1477,168 @@ def compute_doc_facts(
         if name in SCALAR_FACT_KEYS:
             scalars[name] = value
     return facts
+
+
+# --- IC-23: the independent expected-value source (plan task W1-5) -------------
+#
+# R14 / the circle ``doc_facts → renderer → V6``: V6 compares the *rendered*
+# block against ``compute_doc_facts()``, i.e. against the same formula that
+# produced it, so a systematically wrong factor passes every gate of this
+# initiative (the spec's own F19/F22/F14 were three such counting errors). The
+# only countermeasure is a second, **hand-maintained** source that the formula
+# never sees — ``config/doc-facts-expected.yaml`` (IC-23, AC-36, NFA-11).
+#
+# THE CIRCLE IS BROKEN BY CONSTRUCTION, and the construction is the contract:
+# ``compute_doc_facts()`` takes no expected-value parameter, this module's
+# compute path never mentions the oracle file, and the two sides meet *only*
+# in ``compare_expected_doc_facts()`` and in
+# ``tests/test_doc_facts_expected.py``. Nothing here writes the oracle and
+# nothing in the compute path reads it.
+
+EXPECTED_DOC_FACTS_RELPATH: str = "config/doc-facts-expected.yaml"
+"""The hand-maintained oracle of IC-23 — read by :func:`load_expected_doc_facts`
+alone, so no fact implementation can reach it (asserted by
+``test_compute_path_never_mentions_the_oracle`` and, behaviourally, by
+``test_expected_file_is_read_only_by_the_loader``)."""
+
+EXPECTED_FACTS_META_KEYS: frozenset[str] = frozenset(
+    {"schema-version", "verified-at", "verified-by"}
+)
+"""Bookkeeping keys of the oracle file. Not facts, stripped by the loader."""
+
+EXPECTED_COMPARABLE_FACT_KEYS: tuple[str, ...] = _STABLE_SCALAR_FACT_KEYS
+"""The facts an oracle entry is meaningful for: **stable** (not ``volatile``),
+**scalar** (a number, not a rendered ``*_BLOCK``) and **implemented** (not in
+:data:`PENDING_FACTS`).
+
+The narrowing is deliberate and is the spec's own exclusion list applied to
+*warnings* instead of to the file: IC-23 excludes the ``*_BLOCK`` facts ("text,
+no number") and ``DOCS_SCENARIO_COUNT`` ("volatile") from the eleven
+entries, and those facts are *permanently* unpinnable. Reporting them as
+``missing-in-expected`` would therefore produce a permanent warning for a
+decision nobody can make — the F21 failure mode (a permanent false alarm) that
+this module exists to avoid. ``DOCS_AGENTS_NONSE_COUNT`` is inside the scope
+and *is* reported as unpinned; IC-23 excludes it from the *file* because it is
+a pure difference (``SE + NONSE == TEMPLATES``, already formula-checked in
+AC-02) — a warning for it is a true statement, not noise."""
+
+MISMATCH_KIND: str = "mismatch"
+"""The comparator's kind for "both sides have a value and they differ"."""
+
+MISSING_IN_EXPECTED_KIND: str = "missing-in-expected"
+"""The comparator's kind for "computable, pinnable, and absent from the oracle".
+A **WARNING** in V6, never an error — the oracle file is allowed to grow
+(IC-23)."""
+
+
+def load_expected_doc_facts(
+    agent_meta_root: Path,
+    log: object | None = None,
+) -> dict[str, str]:
+    """Read the hand-maintained oracle ``config/doc-facts-expected.yaml``.
+
+    Fail-soft per IC-01, on the pattern of ``load_yaml_file(...,
+    on_error="default")``: a missing, unreadable, malformed or non-mapping
+    file yields ``{}`` plus **exactly one** ``log.debug`` entry — never a
+    ``SyncError``, never a fabricated number. The fail-soft contract of this
+    module is that a number can never abort a sync; the oracle is a *test
+    reference*, so degrading it to "nothing pinned" is the honest answer
+    (V6 then has nothing to compare and stays silent).
+
+    Metadata keys (``schema-version`` / ``verified-at`` / ``verified-by``) are
+    stripped; every other key is a fact. Values are coerced to ``str`` (the
+    IC-02 str contract, and a human may drop the quotes on ``11``); a
+    non-scalar value is dropped with its own ``log.debug``, and a key that is
+    not a known fact is **kept** — a typo in the oracle must stay visible
+    (``test_expected_keys_are_known_facts``) instead of being silently
+    dropped, which would reproduce the unverified-number class IC-23 exists to
+    remove.
+
+    No caching whatsoever — not even of a failure (per-call contract, like
+    ``FactContext.sources``): a second call in the same process must observe a
+    file that appeared or changed in between.
+    """
+    path = Path(agent_meta_root) / EXPECTED_DOC_FACTS_RELPATH
+    data = load_yaml_file(path, on_error="default", default=None)
+    if data is None:
+        _debug(
+            log,
+            "docs",
+            f"doc_facts: expected facts unavailable: {EXPECTED_DOC_FACTS_RELPATH}",
+        )
+        return {}
+    if not isinstance(data, dict):  # unreachable via the loader; kept as a net
+        _debug(
+            log,
+            "docs",
+            f"doc_facts: expected facts not a mapping: {EXPECTED_DOC_FACTS_RELPATH}",
+        )
+        return {}
+    result: dict[str, str] = {}
+    for raw_name, raw_value in data.items():
+        name = str(raw_name)
+        if name in EXPECTED_FACTS_META_KEYS:
+            continue
+        if isinstance(raw_value, (dict, list)):
+            _debug(log, "docs", f"doc_facts: expected fact not a scalar: {name}")
+            continue
+        result[name] = raw_value if isinstance(raw_value, str) else str(raw_value)
+    return result
+
+
+def compare_expected_doc_facts(
+    computed: Mapping[str, str],
+    expected: Mapping[str, str],
+) -> list[dict[str, str]]:
+    """Compare the computed facts against the oracle, sorted by ``fact``.
+
+    Each entry is ``{"fact", "computed", "expected", "kind"}`` with ``kind`` in
+    :data:`MISMATCH_KIND` / :data:`MISSING_IN_EXPECTED_KIND` — the two-value
+    domain of the **comparator** (IC-23 code block, plan W1-5 *Interfaces*).
+    It is deliberately *not* ``expected-mismatch``: that spelling belongs to
+    the **V6 check** (``check_docs_facts_fresh``, W2-5), which has three kinds
+    because it owns a third comparison axis the comparator does not have —
+    ``handedit`` (rendered block ≠ computed). The comparator renames
+    :data:`MISMATCH_KIND` to ``expected-mismatch`` when it builds the
+    ``Finding``. The plan's W1-5 *acceptance* text and AC-36 name
+    ``expected-mismatch`` for this list; see the module docstring — the
+    acceptance text is the place to correct, the Interfaces line wins.
+
+    Only :data:`EXPECTED_COMPARABLE_FACT_KEYS` are considered (see that
+    constant). Both kinds are computed, never inferred: ``mismatch`` requires
+    both sides to hold a value, and a fact that is absent from ``computed``
+    cannot be reported (there is no value to report). An oracle key that the
+    computed side does not know has **no** kind in this domain and is left to
+    the loader's reporting plus ``test_expected_keys_are_known_facts`` — a
+    third spelling is not invented here.
+
+    Deterministic: one pass over the sorted fact names, result sorted by
+    ``fact`` (AC-27's ordering discipline applied to findings).
+    """
+    scope = frozenset(EXPECTED_COMPARABLE_FACT_KEYS)
+    entries: list[dict[str, str]] = []
+    for fact in sorted(computed):
+        if fact not in scope:
+            continue
+        value = computed[fact]
+        if fact not in expected:
+            entries.append(
+                {
+                    "fact": fact,
+                    "computed": value,
+                    "expected": FACT_UNAVAILABLE,
+                    "kind": MISSING_IN_EXPECTED_KIND,
+                }
+            )
+            continue
+        pinned = expected[fact]
+        if pinned != value:
+            entries.append(
+                {
+                    "fact": fact,
+                    "computed": value,
+                    "expected": pinned,
+                    "kind": MISMATCH_KIND,
+                }
+            )
+    return entries
