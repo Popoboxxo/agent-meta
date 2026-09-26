@@ -1,0 +1,56 @@
+# config/doc-facts-expected.yaml — hand-maintained expected DOCS_* values.
+#
+# IC-23 / AC-36 / NFA-11 of
+# docs/specs/2026-09-25-repository-documentation-consolidation.md, plan task W1-5.
+#
+# WHY THIS FILE EXISTS (R14). The chain doc_facts -> renderer -> V6 is a closed
+# circle: V6 compares the rendered block against compute_doc_facts(), i.e.
+# against the very formula that produced it, so a systematically wrong factor
+# passes every gate of the consolidation initiative. This file is the only
+# countermeasure — a second source, maintained by a human, that the formula
+# never sees. Spec F19 (tier presets 4 instead of 5), F22 (DoD presets 6
+# instead of 7) and F14 (pipelines 6/7 instead of 7/8) were three such counting
+# errors that no V-check would have found.
+#
+# THIS IS THE ONLY PLACE IN THE REPO TREE THAT MAY HOLD A HARD-CODED DOCS_*
+# NUMBER (rev. 0.3, NEW-4/NEW-8). Do not restate a value in a test, a script or
+# a doc; assert the formula instead (AC-02) or point here.
+#
+# RULES.
+#   1. HAND-MAINTAINED, never generated. No sync, no check, no script writes
+#      this file (IC-23; NG-1 does not apply, there is no old content).
+#   2. The eleven entries below are the facts that are rendered as a *number*
+#      into README.md / llms.txt. Deliberately not pinned:
+#        - DOCS_SCENARIO_COUNT   volatile (R1: must not reach a hybrid file);
+#        - DOCS_AGENTS_NONSE_COUNT  pure difference, SE + NONSE == TEMPLATES,
+#                                already formula-checked in AC-02;
+#        - the *_BLOCK facts     rendered text, not numbers.
+#      IC-23 states only the first and third plus the difference fact; see
+#      F11 in scripts/lib/doc_facts.py for the two further gaps
+#      (DOCS_AGENTS_ACTIVE_COUNT, DOCS_DOCS_FILE_COUNT) that are reported as
+#      `missing-in-expected` (WARNING) instead of being silently pinned here.
+#   3. Every value is a quoted string (the IC-02 str contract).
+#   4. A deliberate number change makes the test red until this file is
+#      updated in the SAME commit, and bumps verified-at. That is the intended
+#      review signal, not a defect (R14 residual risk, accepted on purpose).
+#
+# Reading code: load_expected_doc_facts() / compare_expected_doc_facts() in
+# scripts/lib/doc_facts.py. The values below were derived by running
+# compute_doc_facts() on 2026-09-26, not copied from the spec.
+
+schema-version: 1
+verified-at: "2026-09-26"
+verified-by: human
+
+# IC-02 order (FACT_KEYS), not the spec's listing order.
+DOCS_VERSION: "1.2.0-beta.2"
+DOCS_AGENT_TEMPLATES_COUNT: "80"
+DOCS_AGENTS_SE_COUNT: "14"
+DOCS_PROVIDER_COUNT: "9"
+DOCS_HOOKS_COUNT: "11"
+DOCS_HOOKS_1GENERIC_COUNT: "9"
+DOCS_PIPELINES_COUNT: "8"
+DOCS_PIPELINES_ACTIVE_COUNT: "7"
+DOCS_DOD_PRESET_COUNT: "7"
+DOCS_TIER_PRESET_COUNT: "5"
+DOCS_COMMAND_COUNT: "22"
