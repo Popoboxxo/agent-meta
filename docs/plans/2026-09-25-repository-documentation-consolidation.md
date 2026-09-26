@@ -3,7 +3,7 @@ plan-id: PLAN-DOCS-CONSOLIDATION-2026-09-25
 spec-id: SPEC-DOCS-CONSOLIDATION-2026-09-25
 title: Repository-weite Doku-Konsolidierung agent-meta — Implementation Plan
 status: APPROVED
-revision: 0.1
+revision: 0.3
 pipeline_stages:
   implement: 3
 related:
@@ -46,6 +46,51 @@ related:
 > `docs/specs/2026-09-25-repository-documentation-consolidation-design.md`
 > (concept-architect, 2026-09-25, 397 Zeilen; Trace-Anker
 > `spec-id: SPEC-DOCS-CONSOLIDATION-2026-09-25`).
+>
+> **Änderungsnotiz — Rev. 0.3 (2026-09-26): Korrekturen K7–K10 aus dem Review der W0-Records.**
+> Diese Revision korrigiert ausschließlich **Verifikations-Kommandos, Erwartungswerte und
+> Formulierungen**, die das W0-Review an Plan und Records als falsch belegt hat. **Kein**
+> Task-, Wellen-, AC-, IC- oder NFA-ID wurde geändert, **keine** Entscheidung (OQ2/OQ6/OQ8),
+> **keine** Gate-Freigabe (W1/W2) und **keine** W0-Akzeptanz wurde angetastet. Betroffene
+> Stellen: Global Constraints (Commit-Konvention, Spec-Abweichung), W0-Wellenverifikation,
+> Task **W0-2**, Task **W0-4**, Self-Review. Katalog:
+>
+> - **K7** — W0-Verifikation: `git log --oneline -20 -- scripts/lib/` → **0** war unerfüllbar
+>   und sinnlos (es zählt die 20 letzten Commits des Branch, nicht eine W0-Berührung).
+>   Umgestellt auf `git log --oneline origin/main..HEAD -- scripts/lib/` → **0** — **gemessen 0**
+>   am 2026-09-26. Dieselbe Begründungslogik wie K1: abgedeckt wird ein *veralteter Prüfstand*,
+>   nicht die Existenz von Historie.
+> - **K8** — Commit-Titel-Konvention: der `W<N>`-**Präfix** ist verbindlich für den
+>   Wellen-Abschluss-Commit und für Commit-Titel, die Wellen koordinieren; für einzelne
+>   Datei-Commits **innerhalb** einer Welle ist er **optional**, dann trägt der **Body** die
+>   Task-ID. Bisherige Formulierung kollidierte mit den 47 Step-4-Commit-Messages, von denen
+>   **0** den `W`-Präfix tragen.
+> - **K9** — Branch-Prüfung: `git branch --list 'feat/repository-documentation-consolidation*'`
+>   ist ein **Präfix**-Match und liefert **2** Zeilen, nicht eine. Umgestellt auf eine
+>   Existenzprüfung mit **exaktem Namen**; der überholte Zweit-Branch wird als *dokumentierter
+>   Bestand* geführt (Nutzer-Vorgabe „nicht löschen"), nicht als Prüffehler.
+> - **K10** — W0-4: die Nachweispflicht aus **R3** umfasst `tests/fixtures/` **und**
+>   `scripts/lib/` **und** `config/`; die beiden letzten Flächen sind jetzt ausdrücklich der
+>   W0-4-Welle zugeordnet und in der Verifikation genannt.
+> - **K1 (bereits in Rev. 0.2 als Ausführungskorrektur markiert; das Review vertieft sie zum
+>   offenen Punkt)** — die Spec verlangt in §9.2 W0 und R16 weiterhin „ein Branch pro
+>   Welle". Eine Spec-Änderung (Rev. 0.4) ist **beauftragt, aber nicht ausgeführt** — sie
+>   erfordert ein Concept-Review. Der Widerspruch ist in Plan und Records sichtbar geführt
+>   (offener Punkt **OP-1**), nicht verdeckt.
+> - **K11** — ein Formfehler im Verifikationstext von W0-4 wurde behoben (unbalanciertes
+>   Backtick/Bold in `1`/`**1**`).
+
+> **Änderungsnotiz — Rev. 0.2 (2026-09-26): Ausführungskorrekturen K1–K6, keine Neuerfindung.**
+> Diese Revision korrigiert **ausschließlich Kommandos, Exit-Code-Erwartungen und die
+> Branch-Strategie** an den Stellen, an denen die Ausführung von **W0-2** und **W0-4** die
+> Plan-Vorgabe empirisch widerlegt hat. Quelle sind die beiden Ergebnis-Records der W0:
+> `docs/plans/2026-09-25-docs-consolidation-track-a-gate.md` (W0-4, §4–§5) und
+> `docs/plans/2026-09-25-docs-consolidation-wave0-freeze.md` (W0-2, Kapitel 7–8). **Kein**
+> Task-, Wellen-, AC-, IC- oder NFA-ID wurde geändert, **keine** Gate- oder Aufgaben-Semantik
+> verschoben, **keine** neue Anforderung erfunden. Betroffene Stellen: Global Constraints
+> („Ein Branch pro Welle"), W0-Wellenverifikation, Task **W0-2**, Task **W0-4**, Risiko **R16**,
+> DoD-Punkt 14, Self-Review. Die inhaltliche Gate-Aussage von W0-4 (Fixture-Verzeichnis in `main`
+> vorhanden, `docs_v1_fixtures.md` nicht vorhanden) bleibt **unverändert**.
 
 **Goal:** Die 11 nachweislich falschen Handzahlen der Einstiegs-Doku (F1–F4, F14 ×3, F22 ×2,
 `ARCHITECTURE.md:3`) durch berechnete `DOCS_*`-Fakten ersetzen, den bereits spezifizierten,
@@ -79,12 +124,58 @@ Klassifikation **XL / Architectural** (Spec:62-66).
 - **Datei-Ownership:** Jede Datei wird in genau **einer** Task geschrieben. `Files:` ist der Input
   für `check_plan_file_overlap` (`scripts/lib/orchestration.py`) und die Barrieren-Gruppen.
   **Lesen ist kein Ownership** — W2 liest `README.md`, ohne es zu besitzen.
-- **Ein Branch pro Welle** (Spec §9.2 W0, R16): `chore/docs-consolidation-w<N>`, gestapelte PRs
-  W0→W8, **ein Commit pro Datei**, Rebase gegen den Track-A-Branch vor jedem Merge.
+- **Ein Wellen-Branch statt acht Wellen-Branches (Ausführungskorrektur 2026-09-26, Quelle:
+   empirische Messung in W0-2/W0-4 — Abweichung zu Spec §9.2 W0 und R16, **begründet
+   dokumentiert** in W0-2-Record Kapitel 7, nicht stillschweigend erfüllt):** Es gilt **ein**
+   Feature-Branch `feat/repository-documentation-consolidation-main` (Basis `origin/main`) mit
+   **einem** PR. Die Wellen W0→W8 laufen als **sequenzielle Commits** auf diesem Branch; die
+   Wellen-Zuordnung trägt die **Wellenkennung im Commit-Titel** (`docs(docs-consolidation): W<N>
+   <Zweck>`) und einen **Abschluss-Commit** `docs(docs-consolidation): W<N> complete` je grüner
+   Welle. **Ein Commit pro Datei**, Rebase gegen `origin/main` vor dem Merge. Begründung:
+   (1) die Nutzer-Vorgabe (ein Branch, ein PR) hat Vorrang; (2) acht Branches erzeugen acht
+   Merge-Kernel und acht Review-Zyklen **ohne Erkenntnisgewinn**, da die Wellen ohnehin sequenziell
+   und teilweise nicht parallel ausführbar sind (Spec §9.2); (3) der **R16-Intent** wird weiterhin
+   über die Reihenfolge-Regel und die Merge-Regel „`git mv`-Wellen zuerst" abgedeckt, nicht über die
+   Branch-Anzahl. **Kein** `chore/docs-consolidation-w<N>` wird angelegt.
+  > **Spec-Abweichung (Stand 2026-09-26, offen — nicht verdeckt):** **Spec §9.2 W0 und R16
+  > verlangen weiterhin einen Branch pro Welle** (`chore/docs-consolidation-w<N>`, gestapelte
+  > PRs); **umgesetzt ist ein Branch**. Die Korrektur der Spec (Rev. 0.4) ist **beauftragt, aber
+  > nicht ausgeführt** — sie erfordert ein **Concept-Review**, das nicht erfolgt ist. Bis dahin
+  > gilt die hier umgesetzte Strategie; der Widerspruch zwischen der normativen Quelle (Spec)
+  > und der Ausführung ist dokumentiert und wird nicht verdeckt. Geführt als offener Punkt
+  > **OP-1** in W0-2-Record, Track-A-Gate-Record und Self-Review dieses Plans.
+- **Commit-Titel-Konvention — Wo-wellenzugeordnet wird (Präzisierung 2026-09-26, K8):** Der
+  `W<N>`-**Präfix** ist **verbindlich** für (a) den **Wellen-Abschluss-Commit**
+  `docs(docs-consolidation): W<N> complete` und (b) jeden Commit-Titel, der **Wellen
+  koordiniert** (z. B. Wellen-Übergang, Reihenfolge-/Merge-Entscheidung, Wellen-Sammelstand).
+  Für **einzelne Datei-Commits innerhalb** einer Welle (Plan R3, „ein Commit pro Datei") ist
+  der Präfix **optional**; der Titel folgt dann der Repo-Commit-Konvention
+  (`docs(docs-consolidation): <Zweck>`) und der **Commit-Body führt zwingend die Task-ID**
+  (`Task: W<N>-<k>`). Diese Präzisierung löst einen Kollisionsfehler der Fassung Rev. 0.2: sie
+  machte den `W<N>`-Präfix für **alle** Commits einer Welle verpflichtend, während **0 von 47**
+  der im Plan festgeschriebenen Step-4-Commit-Messages ihn tragen — die Konvention wäre ohne
+  Umschreiben dieser 47 Stellen nicht erfüllbar gewesen. **Wellenzuordnung** ist damit
+  garantiert: über den Abschluss-Commit, über die koordinierenden Titel und über die Task-ID im
+  Body jedes Datei-Commits.
+- **Bestand: zwei Branches mit gemeinsamem Präfix (dokumentiert 2026-09-26, K9):** Der
+   Präfix `feat/repository-documentation-consolidation` ist von zwei Branches belegt: dem
+   **aktiven** Wellen-Branch `feat/repository-documentation-consolidation-main` und dem
+   **überholten** Branch `feat/repository-documentation-consolidation`. Der überholte Branch
+   trägt eine divergente Doppelkopie der Spec-/Plan-Commits auf Basis eines anderen Standes; er
+   ist **nicht** in `main` gelandet. Er bleibt auf ausdrückliche **Nutzer-Vorgabe („nicht
+   löschen")** erhalten — ein Löschen wäre eine eigene Entscheidung (Post-Merge-Cleanup). Die
+   Plan-Prüfung adressiert deshalb den **exakten Branch-Namen**, nicht das Präfix.
+
 - **Track-A-Kollision (R3, R15, Spec §2.3):** W1 und W2 starten **erst** nach dem Track-A-Merge
   (`tests/fixtures/slimming-golden/`); Gate = Task W0-4. W1/W2 laufen **sequenziell zu** Track A
   und **nicht** parallel zu Änderungen an `scripts/lib/config.py` und `scripts/lib/consistency/*`.
-  Die V1-Fixture `tests/fixtures/docs_v1_fixtures.md` entsteht erst danach.
+  Die V1-Fixture `tests/fixtures/docs_v1_fixtures.md` entsteht erst danach. **Nachweisumfang
+  von R3 (drei Kollisionsflächen, präzisiert 2026-09-26):** `tests/fixtures/`
+  (`slimming-golden/`-Merge-Nachweis), `scripts/lib/` und `config/` — die beiden letzten
+  Flächen werden **gegen `origin/main`** über `git diff --name-only origin/main..HEAD --
+  scripts/lib/` bzw. `-- config/` geprüft (Soll: **leer**) und gehören **ausdrücklich zur
+  W0-4-Welle**, nicht zum ausführenden `git`-Agenten. Alle drei Flächen sind im W0-4-Record
+  belegt.
 - **Provider-Agnostik (NFA-03):** kein `if provider == "Name"` in M1–M4; kein Config-Key enthält
   einen Providernamen. Guard `tests/test_provider_agnostic_dispatch.py`.
 - **Fail-off für alle sechs Config-Keys** (IC-22): `docs-consolidation.enabled` ist bei Abwesenheit
@@ -284,14 +375,38 @@ PG-5 (1 Agent)                    W8-1 -> W8-2 -> W8-3 -> W8-4
 
 ## W0 — Definition, Entscheidungen, Freeze (kein Code)
 
-**Verifikation W0 (erwartete Exit-Codes):** `git branch --list 'chore/docs-consolidation-w*'` → **0**;
-`git log --oneline -20 -- scripts/lib/` → **0** (nur lesend). **Kein** `sync.py`-Lauf mit
+**Verifikation W0 (erwartete Exit-Codes):** `git rev-list --left-right --count origin/main...HEAD`
+→ **linke Zahl `0`** (kein Rückstand gegen `main`; die **rechte** Zahl zählt die eigenen
+Wellen-Commits des Branches und ist **unbeschränkt**) **und** der Wellen-Branch existiert unter
+**exaktem Namen** (`git rev-parse --verify --quiet
+refs/heads/feat/repository-documentation-consolidation-main` → **0**); `git log --oneline
+origin/main..HEAD -- scripts/lib/` → **0** (nur lesend: **keine** Änderung an `scripts/lib/`
+gegenüber `origin/main` — das ist die Aussage „W0 berührt `scripts/lib/` nicht"; **nicht** die
+Aussage „dieser Pfad hat nie Historie"). **Kein** `sync.py`-Lauf mit
 Schreibwirkung, kein Commit von Fremdänderungen.
+*Ausführungskorrektur 2026-09-26 (K9, Präfix-Match):* die Prüfung adressiert den **exakten
+Branch-Namen**. `git branch --list 'feat/repository-documentation-consolidation*'` ist ein
+**Präfix**-Match und liefert **gemessen 2 Zeilen** (2026-09-26) — nicht eine, wie die Fassung
+Rev. 0.2 annahm: `feat/repository-documentation-consolidation-main` (aktiv) und
+`feat/repository-documentation-consolidation` (überholt, auf Nutzer-Vorgabe erhalten). Der
+Präfix-Wert **2** ist damit **kein Prüffehler**, sondern der dokumentierte Bestand; er ist
+**zusätzlich** als Expect-Wert geführt, damit ein dritter Branch auffällt.
+*Ausführungskorrektur 2026-09-26 (K7, veralteter Prüfstand):* `git log --oneline -20 --
+scripts/lib/` → **0** war unerfüllbar und sinnlos — das Kommando zählt die letzten 20 Commits
+des Branch und **nicht** eine W0-Berührung. Umgestellt auf die Differenz gegen die Basis
+(gleiche Begründungslogik wie K1 beim Synchronitätskriterium: abgedeckt wird ein *veralteter
+Prüfstand*, nicht die Existenz von Historie).
+*Ausführungskorrektur 2026-09-26:* die
+ursprüngliche Prüfung `git branch --list 'chore/docs-consolidation-w*'` → **0** ist entfallen,
+weil **keine** Wellen-Branches angelegt werden (siehe Global Constraints und W0-2) — sie hätte
+auch bei erfüllter Strategie nichts geprüft.
 **Review W0:** `concept-reviewer` (Spec-Treue der Entscheidungs-Records) → `orchestrator`.
 **Gate bei CHANGES_REQUESTED:** W0-1/W0-3/W0-6/W0-7 kehren in die Welle zurück; W0-2/W0-4 sperren
 alle Folgewellen bis zur Auflösung.
-**Rollback W0:** `git rm docs/plans/2026-09-25-docs-consolidation-*.md`, Branches löschen; kein
-Code berührt, keine andere Welle invalidiert.
+**Rollback W0:** `git rm docs/plans/2026-09-25-docs-consolidation-*.md`; der Wellen-Branch
+`feat/repository-documentation-consolidation-main` trägt die Spec-/Plan-Commits und wird **nicht**
+gelöscht, sondern auf `origin/main` zurückgesetzt; kein Code berührt, keine andere Welle invalidiert
+(Ausführungskorrektur 2026-09-26: kein `chore/docs-consolidation-w<N>`-Branch angelegt).
 
 ### W0-1: REC-OQ6 — `docs/INDEX.md` tracked (Ergebnis-Record, entschieden 2026-09-26)
 
@@ -321,17 +436,61 @@ entscheidungsabhängiger Offenstand mehr.
 
 **Files:** Create `docs/plans/2026-09-25-docs-consolidation-wave0-freeze.md`
 **Interfaces:** Produces: eingefrorene IC-Liste IC-01…IC-24, NFA-01…NFA-11, Startwelle je
-V-Check, Branches `chore/docs-consolidation-w0`…`-w8`, Commit-Reihenfolge. Consumes: Spec §5, §8,
-§9.2, §15.
+V-Check, **ein** Wellen-Branch `feat/repository-documentation-consolidation-main` mit sequenziellen
+W-Commits, Commit-Reihenfolge. Consumes: Spec §5, §8, §9.2, §15.
 **Agent:** git · **Depends on:** — · **parallel_group:** —
 **Ziel-AK (AC):** Querschnittsanker AC-01…AC-41 (W0 trägt laut Spec §9.2 kein eigenes AC).
 **Akzeptanz:** Record listet alle 24 IC mit Zielmodul und Welle, die 9 V-Checks mit Startwelle und
-die 8 Wellen-Branches; `git branch --list 'chore/docs-consolidation-w*'` zeigt mindestens `w0`.
-**Verifikation:** `git branch --list 'chore/docs-consolidation-w*'` → **0**;
-`grep -c '^#### IC-' docs/specs/2026-09-25-repository-documentation-consolidation.md` → **24**.
+die Wellen-Zuordnung über die Commit-Titel-Konvention `docs(docs-consolidation): W<N> …` plus den
+Abschluss-Commit `docs(docs-consolidation): W<N> complete` je grüner Welle. Es wird **genau ein**
+Wellen-Branch verwendet (`feat/repository-documentation-consolidation-main`); **kein**
+`chore/docs-consolidation-w<N>` wird angelegt.
+> **Ausführungskorrektur 2026-09-26 (Quelle: empirische Messung in W0-2/W0-4) — Abweichung mit
+> Begründung, keine stille Erfüllung.** Die ursprüngliche Vorgabe „**acht** Wellen-Branches
+> `chore/docs-consolidation-w0`…`-w8` anlegen, gestapelte PRs" (Plan-W0-2 Schritt 2, Global
+> Constraints, Spec §9.2 W0, R16) ist **überholt und wurde nicht umgesetzt**: Der Nutzer hat
+> **einen** Feature-Branch und **einen** PR vorgegeben. Begründung der Anpassung: Nutzer-Vorgabe
+> hat Vorrang; acht Branches erzeugen acht Merge-Kernel ohne Erkenntnisgewinn (die Wellen sind
+> ohnehin sequenziell, W4/W5/W6 sogar seriell); der R16-Intent wird über Reihenfolge- und
+> Merge-Regel abgedeckt, nicht über die Branch-Anzahl. Die Wellen-Zuordnung bleibt über die
+> Wellenkennung im Commit-Titel, den Wellen-Abschluss-Commit und die Task-ID im Commit-Body
+> vollständig rekonstruierbar. Beleg: W0-2-Record Kapitel 7.
+> **Spec-Abweichung, offen (Stand 2026-09-26) — nicht verdeckt:** **Spec §9.2 W0 und R16
+> verlangen weiterhin einen Branch pro Welle**; umgesetzt ist **ein** Branch. Da dieser Record die
+> Spec zur **normativen Quelle** erklärt, gewinnt nach dieser eigenen Regel die Spec — der
+> eingefrorene Zustand verletzt damit die normative Quelle. Die Korrektur der Spec (Rev. 0.4) ist
+> **beauftragt, aber nicht ausgeführt**, weil sie ein **Concept-Review** erfordert. **Bis dahin
+> gilt die umgesetzte Strategie**; der Widerspruch ist dokumentiert. Fgeführt als offener Punkt
+> **OP-1** (Self-Review dieses Plans, W0-2-Record Kapitel 7/10, Track-A-Gate-Record §10).
+**Verifikation:** `git rev-list --left-right --count origin/main...HEAD` → **linke Zahl `0`**
+(kein Rückstand gegen `main`; die rechte Zahl ist unbeschränkt) **und** der Wellen-Branch
+existiert unter **exaktem Namen** (`git rev-parse --verify --quiet
+refs/heads/feat/repository-documentation-consolidation-main` → **0**); als **dokumentierter
+Präfix-Bestand** `git branch --list 'feat/repository-documentation-consolidation*'` → **2**
+(1 aktiver Wellen-Branch + 1 überholter, absichtlich erhaltener Branch; gemessen 2026-09-26 —
+siehe Global Constraints, „Bestand: zwei Branches mit gemeinsamem Präfix");
+`grep -c '^#### IC-' docs/specs/2026-09-25-repository-documentation-consolidation.md` → **24**
+(gemessen 2026-09-26; die IC stehen in §5.1–§5.5 als `####`-Überschriften: §5.1 = IC-01…06,
+§5.2 = IC-07…16, §5.3 = IC-17…18, §5.4 = IC-19…22, §5.5 = IC-23…24);
+`grep -c '^| NFA-' docs/specs/2026-09-25-repository-documentation-consolidation.md` → **11**
+(gemessen 2026-09-26). Das NFA-Muster weicht **bewusst** vom IC-Muster ab, weil die NFA in Spec §8
+als **Tabellenzeilen** und nicht als `####`-Überschriften geführt werden — `grep -c '^#### NFA-'`
+liefert **0** und wäre ein Musterfehler, kein Befund.
+*Ausführungskorrektur 2026-09-26:* die ersetzte Prüfung `git branch --list
+'chore/docs-consolidation-w*'` → **0** verlor ihren Sinn, da keine Wellen-Branches angelegt
+werden.
+*Präzisierung 2026-09-26 (K8):* „genau **1** eigener Wellen-Branch" bedeutet **einen aktiven
+Wellen-Branch unter exaktem Namen** — nicht „genau eine Zeile" eines Präfix-Matches. Die
+Fassung Rev. 0.2 war mit dem Präfix-Messwert **2** nicht erfüllbar.
 **Steps:**
 - [ ] 1: IC-/NFA-/V-/Wellen-Liste aus der Spec extrahieren und im Record spiegeln.
-- [ ] 2: Branches `chore/docs-consolidation-w0`…`-w8` anlegen (ein Branch pro Welle, R16).
+- [ ] 2: Commit-Titel-Konvention festschreiben — `W<N>`-**Präfix verbindlich** für den
+      Wellen-Abschluss-Commit `docs(docs-consolidation): W<N> complete` und für wellen-
+      koordinierende Titel; **optional** für einzelne Datei-Commits innerhalb einer Welle, dann
+      mit **Task-ID im Commit-Body** (`Task: W<N>-<k>`); **einen** Wellen-Branch
+      `feat/repository-documentation-consolidation-main` führen und die Abweichung von der
+      Vorgabe „acht Wellen-Branches" (Spec §9.2 W0, R16) **begründet** dokumentieren; **kein**
+      `chore/docs-consolidation-w<N>`-Branch anlegen.
 - [ ] 3: Commit-Reihenfolge und Merge-Regel („`git mv`-Wellen zuerst mergen“) festschreiben.
 - [ ] 4: commit via `git`-Agent: `docs: freeze docs-consolidation contracts and wave branches`.
 
@@ -369,28 +528,61 @@ berührten `scripts/lib/`-Dateien. Consumes: Spec §2.3, §9.2 (R3), Git-Histori
 **Agent:** orchestrator · **Depends on:** W0-2 · **parallel_group:** W0-PG-B
 **Ziel-AK (AC):** AC-07, AC-08 (Fixture-Kollision), AC-39 (Schema-Datei).
 **Akzeptanz:** Der Record belegt den Track-A-Merge-Status **gegen `origin/main`** — nicht gegen
-einen Feature-Branch: (a) `git ls-tree -d origin/main -- tests/fixtures/slimming-golden/` ergibt
-einen Treffer (Verzeichnis in `main` vorhanden), (b) `git ls-tree origin/main --
+einen Feature-Branch: (a) `git ls-tree -r --name-only origin/main --
+tests/fixtures/slimming-golden/` ist **nicht leer** (Verzeichnis in `main` vorhanden; Soll:
+**59** Einträge = 58 Fixtures + `README.md`), (b) `git ls-tree origin/main --
 tests/fixtures/docs_v1_fixtures.md` ist **leer**, (c) `tests/fixtures/docs_v1_fixtures.md`
 existiert auch im Arbeitsbaum nicht. **Erst dieser Nachweis gegen `origin/main`** gilt als
-Track-A-Merge; ohne ihn bleiben W1 und W2 gesperrt. Branch und `origin/main` müssen dabei
-synchron sein (`git rev-list --left-right --count origin/main...HEAD` → `0 0`), damit der
-Gate-Record nicht über einen veralteten Stand entscheidet. Inhaltlich unverändert geprüft wird
-dieselbe Aussage wie bisher: Fixture-Verzeichnis in `main` vorhanden, V1-Fixture
+Track-A-Merge; ohne ihn bleiben W1 und W2 gesperrt. Der Branch muss dabei **nicht hinter**
+`origin/main` liegen: `git rev-list --left-right --count origin/main...HEAD` → **linke Zahl `0`**
+(die **rechte** Zahl ist **unbeschränkt** — sie zählt die eigenen Spec-/Plan-Commits des Branches
+und erzeugt keinen veralteten Prüfstand); äquivalent und robuster `git merge-base --is-ancestor
+origin/main HEAD` → Exit **0** („`main` ist Vorfahr des Branches"). Beide Formen sind
+gleichbedeutend: das abgedeckte Risiko ist ein **veralteter Prüfstand**, also Commits, die auf
+`main` gelandet sind und im Branch fehlen — genau die **linke** Zahl. Inhaltlich unverändert geprüft
+wird dieselbe Aussage wie bisher: Fixture-Verzeichnis in `main` vorhanden, V1-Fixture
 `docs_v1_fixtures.md` nicht vorhanden.
 **Verifikation:** `git fetch origin` → **0**; `git ls-tree -r --name-only origin/main --
-tests/fixtures/slimming-golden/` → **nicht leer**; `git ls-tree origin/main --
-tests/fixtures/docs_v1_fixtures.md` → **leer**; `ls tests/fixtures/docs_v1_fixtures.md` → **1**
-(nicht vorhanden); `git rev-list --left-right --count origin/main...HEAD` → `0 0`.
+tests/fixtures/slimming-golden/` → **nicht leer** (**59** Einträge; zulässige Alternative:
+`git ls-tree -d origin/main -- tests/fixtures/` → enthält den Tree-Eintrag
+`tests/fixtures/slimming-golden`); `git ls-tree origin/main -- tests/fixtures/docs_v1_fixtures.md` →
+**leer**; `ls tests/fixtures/docs_v1_fixtures.md` → **2** (nicht vorhanden — GNU `ls` liefert bei
+fehlendem Operanden **2**; der Wert `1` wäre „No such file or directory" in anderen Werkzeugen und
+ist hier nicht der Fall; robust prüfbar mit `test ! -e tests/fixtures/docs_v1_fixtures.md` → **0**);
+`git rev-list --left-right --count origin/main...HEAD` → **linke Zahl `0`** (rechte Zahl
+unbeschränkt) **oder** `git merge-base --is-ancestor origin/main HEAD` → **0**.
+**Ergänzende R3-Gegenproben (Teil der W0-4-Welle, keine Freigabebedingung):**
+`git diff --name-only origin/main..HEAD -- scripts/lib/` → **leer**; `git diff --name-only
+origin/main..HEAD -- config/` → **leer** (beide gemessen **leer**, 2026-09-26). Damit sind alle
+drei von R3 genannten Kollisionsflächen belegt — `tests/fixtures/` über den `ls-tree`-Nachweis
+oben, `scripts/lib/` und `config/` über die Gegenproben.
+> **Ausführungskorrektur 2026-09-26 (Quelle: empirische Messung in W0-4, Record §3–§5).** Drei
+> Fehler in der Verifikationsformulierung, **keine** Änderung des geprüften Zustands und **keine**
+> Änderung der Gate-Aussage: (i) das Synchronitätskriterium `0 0` war ein Denkfehler und ist
+> unerfüllbar — es verlangte einen Branch **ohne eigene Commits**, obwohl der Branch seine
+> Spec-/Plan-Commits konstruktionsbedingt trägt; umgestellt auf **linke Zahl = 0**;
+> (ii) `git ls-tree -d` **mit** einem Pfadspec, der auf das Verzeichnis selbst zeigt, liefert
+> **leer** (Exit 0) — der Verzeichnis-Eintrag wird nur beim Auflisten des **Elternpfads** sichtbar;
+> (iii) `ls` auf eine fehlende Datei liefert **2**, nicht `1`. Inhaltlich bleibt: Fixture-
+> Verzeichnis in `main` vorhanden, `docs_v1_fixtures.md` nicht vorhanden; W1/W2 sind nur frei, wenn
+> der Branch **nicht hinter** `main` liegt.
+> **Präzisierung 2026-09-26 (K10) — Nachweisumfang deckt alle drei R3-Flächen ab:** R3 nennt
+> `tests/fixtures/`, `scripts/lib/` **und** `config/`. Die Fassung Rev. 0.2 belieegte nur
+> `tests/fixtures/`. **Neu und ausdrücklich Teil der W0-4-Welle** sind die beiden Gegenproben
+> `git diff --name-only origin/main..HEAD -- scripts/lib/` → **leer** und `git diff --name-only
+> origin/main..HEAD -- config/` → **leer** (beide **gemessen leer** am 2026-09-26, im
+> W0-4-Record §3 belegt). Sie sind **keine** Bedingung der Freigabe — die inhaltliche
+> Gate-Aussage bleibt die Fixture-Prüfung —, sondern schließen die Nachweislücke.
 **Ausdrücklich kein Merge-Nachweis:** `git log --oneline -20 --
 tests/fixtures/slimming-golden/` (und `git log --oneline -20 -- scripts/lib/`) führen nur die
 zuletzt von Track A berührten Dateien auf — sie sind **kein** Nachweis des Merges nach `main`.
 Der Merge-Nachweis ist ausschließlich der `git ls-tree`-Befehl gegen `origin/main` oben.
 **Steps:**
-- [ ] 1: `git fetch origin`; dann `git ls-tree -d origin/main -- tests/fixtures/slimming-golden/`
-      und `git ls-tree origin/main -- tests/fixtures/docs_v1_fixtures.md` auswerten (Nachweis
-      **gegen `origin/main`**, nicht gegen den Feature-Branch) und `git rev-list --left-right
-      --count origin/main...HEAD` → `0 0` (Stand-Synchronität) prüfen.
+- [ ] 1: `git fetch origin`; dann `git ls-tree -r --name-only origin/main --
+      tests/fixtures/slimming-golden/` (Soll: **nicht leer**, 59 Einträge) und `git ls-tree
+      origin/main -- tests/fixtures/docs_v1_fixtures.md` auswerten (Nachweis **gegen
+      `origin/main`**, nicht gegen den Feature-Branch) und `git rev-list --left-right --count
+      origin/main...HEAD` → **linke Zahl `0`** (Stand-Synchronität) prüfen.
 - [ ] 2: Track-A-Merge-Status **gegen `origin/main`** feststellen; bei offen **stoppen** und an
       `main_chat` eskalieren.
 - [ ] 3: Record mit go/no-go und Rebase-Pflicht vor jedem Merge schreiben.
@@ -1606,7 +1798,7 @@ AC-24, AC-25, AC-26, AC-34, AC-35, AC-37, AC-38, AC-39, AC-41.
 | R13 `PROJECT_STRUCTURE`-Diff (B6) | niedrig | W8-4 additiver Config-Edit, managed block + Drift-Detection, Layout-Diff muss im Review quittiert werden | **niedrig** |
 | R14 Falsche-Fakt-Kette | **hoch** | W1-5 `config/doc-facts-expected.yaml` (**elf** Werte) + `compare_expected_doc_facts`, W2-5 V6 mit `kind=expected-mismatch`; AC-02 prüft **Formeln**, nicht Zahlen | **mittel, bewusst akzeptiert** — jede gewollte Zahlenänderung macht V6 rot, bis die Datei im selben Commit mitgezogen wird (Review-Signalweg) |
 | R15 Kollision über Track A hinaus | mittel | W0-4 Fixture-Gate, W1-9 Schema-Block in W1, W2-1 Fixtures nach Track-A-Merge; Szenario-Fixtures unverändert (NG-10) | **niedrig** |
-| R16 PR-/Branch-Kollision | mittel | W0-2 ein Branch pro Welle, gestapelte PRs, `git mv`-Wellen zuerst mergen, ein Commit pro Datei | **niedrig** |
+| R16 PR-/Branch-Kollision | mittel | W0-2 **ein** Wellen-Branch mit sequenziellen W-Commits und Wellenkennung im Commit-Titel (Ausführungskorrektur 2026-09-26 statt acht Wellen-Branches, s. W0-2-Akzeptanz), `git mv`-Wellen zuerst mergen, ein Commit pro Datei | **niedrig** |
 | R17 Downstream-Asymmetrie | mittel | Absenz-Default `false` (IC-22) für Writer **und** Checks; W2-7 Common-Gate in jedem Check; W3-1 Besitzregel | **niedrig** |
 | R18 Auto-Commit-Interaktion | — | als **analysiert und nicht zutreffend** geführt (Spec:907, `sync_pipeline.py:1102-1117` liest den Drift-Store nicht); kein Plan-Task nötig | **keines** |
 | R19 `knowledge-indexer`-Kollision | mittel | W7-4 als **letzter** Commit von W7, erst nach Rollenpflege-Merge; Rollback `git checkout` | **niedrig** |
@@ -1643,8 +1835,10 @@ AC-24, AC-25, AC-26, AC-34, AC-35, AC-37, AC-38, AC-39, AC-41.
     Regressionen; `python3 scripts/sync.py --validate` → **0**; `--check` → **0**.
 13. **Traceability**: `validator`-Audit bestätigt AC-01…AC-41 → Task → Test; NFA-01…NFA-11 belegt.
 14. **Ledger**: alle Checkboxen dieses Plans gesetzt (geschrieben durch den Ledger-Writer
-    `scripts/lib/plan_ledger.py`); Merge der acht Wellen-Branches manuell bestätigt; danach
-    Verschiebung nach `docs/plans/archive/` gemäß `docs/plans/README.md:4-7`.
+     `scripts/lib/plan_ledger.py`); Merge des Wellen-Branches
+     `feat/repository-documentation-consolidation-main` manuell bestätigt (Ausführungskorrektur
+     2026-09-26: **ein** Wellen-Branch statt acht, s. W0-2-Akzeptanz); danach
+     Verschiebung nach `docs/plans/archive/` gemäß `docs/plans/README.md:4-7`.
 
 ## Self-Review (kein Platzhalter, Konsistenz gegen die Spec)
 
@@ -1682,6 +1876,19 @@ AC-24, AC-25, AC-26, AC-34, AC-35, AC-37, AC-38, AC-39, AC-41.
   3. AC-12 Implementierung in W2-6, E2E-Nachweis in W3-6 (Datei-Ownership).
   4. AC-14/15/16/27 Implementierung in W1-7, Aktivierung in W3-6 (Spec §9.1 nennt W3).
   5. W0-Tasks verweisen als **Gate-Anker** auf ACs, obwohl W0 laut Spec §9.2 kein eigenes AC trägt.
+  6. **Ein** Wellen-Branch statt acht Wellen-Branches (Nutzer-Vorgabe; Ausführungskorrektur
+     2026-09-26, Global Constraints, W0-2-Akzeptanz, R16).
+- **Offener Punkt OP-1 — Spec-Rev. 0.4 nicht ausgeführt (Stand 2026-09-26):** Die **Spec**
+  verlangt in **§9.2 W0** und **R16** weiterhin **verbindlich** „**ein Branch pro Welle**
+  (`chore/docs-consolidation-w<N>`), gestapelte PRs". Umgesetzt ist **ein** Branch
+  (`feat/repository-documentation-consolidation-main`, PR #839). Da W0-2-Record und Plan die Spec
+  zur **normativen Quelle** erklären, gilt nach dieser eigenen Regel die Spec — der
+  eingefrorene Zustand verletzt damit die normative Quelle. **Beauftragt: Korrektur der Spec auf
+  Rev. 0.4 mit Concept-Review. Ausgeführt: nein** — das Concept-Review hat nicht stattgefunden,
+  und eine Spec-Inhaltsänderung ist nicht Teil des Dokumentationsauftrags. **Bis dahin gilt die
+  umgesetzte Strategie**; der Widerspruch ist in Global Constraints, W0-2, W0-2-Record Kapitel 7
+  und §10, Track-A-Gate-Record §10 sowie OQ6-Record sichtbar dokumentiert und **nicht verdeckt**.
+  Owner des Concept-Reviews: `orchestrator`; Entscheidung über die Rev. 0.4: `main_chat`.
 - **Ehrliche Lücken:** V9 ohne AC; `docs/CODEBASE_OVERVIEW.md` ohne AC und NG-3; `llms.txt:5`
   Providernamen-Liste ist inhaltlich (AC-40), aber keine „manuell gepflegte Zahl“ (Spec Rev. 0.3,
   NF-9) und daher nicht Teil der 11.
