@@ -3,8 +3,8 @@ spec-id: SPEC-DOCS-CONSOLIDATION-2026-09-25
 title: Repository-weite Doku-Konsolidierung agent-meta — Technical Specification
 status: APPROVED
 approved: 2026-09-26
-approved-scope: Ausführung W0–W8; Rev. 0.4 (Commit-/Branch-Normativität) am 2026-09-26 durch den Nutzer bestätigt; A13 und A14 als offene, dokumentierte Abweichungen registriert; Rev. 0.5 (Gate-Präzisierung W2/W3, Finding-Ownership, V1-Sichtbarkeit vor Hochstufung) am 2026-09-26 durch den Nutzer **beauftragt** (A2A-Envelope vom 2026-09-26, Korrekturen 1–5) — **keine** Pflicht **jenseits** dieses beauftragten Umfangs; innerhalb des Umfangs werden Nachweisformen geändert (Präzisierung §17.9.4). Dritte Korrekturrunde (Concept-Review 2026-09-26, RVW2-1…RVW2-14) innerhalb **derselben** Revision, ebenfalls ohne Revisions-Bump: Nachweisformen geändert (§10, Aufzählungspunkt `--validate`; §10, `--strict`-Punkt, Unterpunkt 5; §17.9.4 (vii)–(x)); **vier Entscheidungsvorlagen E-1…E-4 sind offen und liegen beim Auftraggeber** — es wird keine Entscheidung unterstellt. Vierte Korrekturrunde (Concept-Review 2026-09-26, RVW3-1…RVW3-10) innerhalb **derselben** Revision, ebenfalls ohne Revisions-Bump: ausschließlich **Korrekturen** bestehender Sollwert-Formulierungen, Verweise und Anker — **keine** neue Pflicht, **keine** neue Task-ID, **kein** neuer Sollwert. **Rev. 0.6 (2026-09-27): zwei vom Nutzer getroffene Entscheidungen sind umgesetzt — U-1 (Modul-Split der Consistency-Checks, §4.1, Katalog K18…K21) und U-2 (AC-30 auf `README.md` + `llms.txt` verengt, die 25 toten `docs/**`-Links werden Follow-up **F-DOCS-LINKS-2026-09-27** mit Owner und Termin, Katalog K22…K24).** Rev. 0.6 ist ein **echter Revisions-Bump** (inhaltliche Pflichtänderung: AC-30-Wortlaut, Modulgrenzen), **kein** Korrekturrunden-Sammelblock. `status: APPROVED` und `approved: 2026-09-26` bleiben unverändert; die **beiden** Entscheidungen sind **bereits getroffene Nutzerentscheidungen** und werden hier **nicht** neu bewertet. Volltext **§17.10**.
-revision: 0.6
+approved-scope: Ausführung W0–W8; Rev. 0.4 (Commit-/Branch-Normativität) am 2026-09-26 durch den Nutzer bestätigt; A13 und A14 als offene, dokumentierte Abweichungen registriert; Rev. 0.5 (Gate-Präzisierung W2/W3, Finding-Ownership, V1-Sichtbarkeit vor Hochstufung) am 2026-09-26 durch den Nutzer **beauftragt** (A2A-Envelope vom 2026-09-26, Korrekturen 1–5) — **keine** Pflicht **jenseits** dieses beauftragten Umfangs; innerhalb des Umfangs werden Nachweisformen geändert (Präzisierung §17.9.4). Dritte Korrekturrunde (Concept-Review 2026-09-26, RVW2-1…RVW2-14) innerhalb **derselben** Revision, ebenfalls ohne Revisions-Bump: Nachweisformen geändert (§10, Aufzählungspunkt `--validate`; §10, `--strict`-Punkt, Unterpunkt 5; §17.9.4 (vii)–(x)); **vier Entscheidungsvorlagen E-1…E-4 sind offen und liegen beim Auftraggeber** — es wird keine Entscheidung unterstellt. Vierte Korrekturrunde (Concept-Review 2026-09-26, RVW3-1…RVW3-10) innerhalb **derselben** Revision, ebenfalls ohne Revisions-Bump: ausschließlich **Korrekturen** bestehender Sollwert-Formulierungen, Verweise und Anker — **keine** neue Pflicht, **keine** neue Task-ID, **kein** neuer Sollwert. **Rev. 0.6 (2026-09-27): zwei vom Nutzer getroffene Entscheidungen sind umgesetzt — U-1 (Modul-Split der Consistency-Checks, §4.1, Katalog K18…K21) und U-2 (AC-30 auf `README.md` + `llms.txt` verengt, die 25 toten `docs/**`-Links werden Follow-up **F-DOCS-LINKS-2026-09-27** mit Owner und Termin, Katalog K22…K24).** Rev. 0.6 ist ein **echter Revisions-Bump** (inhaltliche Pflichtänderung: AC-30-Wortlaut, Modulgrenzen), **kein** Korrekturrunden-Sammelblock. `status: APPROVED` und `approved: 2026-09-26` bleiben unverändert; die **beiden** Entscheidungen sind **bereits getroffene Nutzerentscheidungen** und werden hier **nicht** neu bewertet. Volltext **§17.10**. **Rev. 0.7 (2026-09-27): vier vom Nutzer getroffene Entscheidungen sind umgesetzt — E-5 (V4 auf den README-Index-Scope begrenzt, die 191 `docs/`-Links werden Follow-up **F-DOCS-README-INDEX-2026-09-27**; E-6 (dedizierter Task **W2-8** für die zwei roten Volltests, Position vor W2-7); E-7 (V5 wandert in das neue Modul `docs_freshness_v5.py`, §4.1); E-8 (`TASK_HEADER_RE` wird um die Wellen-/Task-Header erweitert, neuer Task **W2-9**, Ledger-Writer einsetzbar ab W2-9). Katalog **K54…K58** in **§17.11**.** Rev. 0.7 ist ein **echter Revisions-Bump** (inhaltliche Pflichtänderung: V4-Scope, Modulgrenzen, Taskmenge 48 → **50**), **kein** Korrekturrunden-Sammelblock. `status: APPROVED` und `approved: 2026-09-26` bleiben unverändert; die **vier** Entscheidungen sind **bereits getroffene, verbindliche Nutzerentscheidungen** und werden hier **nicht** neu bewertet. **Keine** AC-/IC-/R-/OQ-/V-Check-ID wurde umnummeriert oder gestrichen; **zwei** neue Task-IDs: **W2-8**, **W2-9**. **Abweichung vom Auftrag, ausdrücklich notiert:** der Auftrag nannte als Zielrevision der Spec **0.5**; die Datei trug jedoch `revision: 0.6` mit vollständigem **§17.10** (U-1/U-2). Ein Sprung auf **0.5** wäre eine **Regression** und würde den dokumentierten Rev.-0.6-Stand überschreiben — deshalb ist die Zielrevision der Spec **0.7**; der begleitende Plan steht ebenfalls auf **0.7**.
+revision: 0.7
 related:
   - docs/specs/2026-09-25-repository-documentation-consolidation-design.md
   - docs/plans/2026-09-25-repository-documentation-consolidation.md
@@ -52,6 +52,85 @@ related:
 >   **kein** V3-Finding (Backtick-Pfade in einer Tabellenzeile, keine Link-Syntax) — die
 >   Trace-Matrix-Zeile `| AC-30 | W8 | … |` ist entsprechend berichtigt (**K23**).
 >
+> > **Rev. 0.7 (2026-09-27) — Umsetzung von vier bereits getroffenen Nutzerentscheidungen:
+> > E-5 (V4-Scope), E-6 (eigener Task für zwei rote Volltests), E-7 (V5 in ein eigenes Modul),
+> > E-8 (Ledger-Writer adressiert diesen Plan).** Der Volltext steht in **§17.11**, der Katalog der
+> > Korrekturen **K54…K58** ebendort, die V4-Scope-Definition in **§17.11.2**, die Modulgrenzen in
+> > **§4.1** und die IC-05-Zeile in **IC-05**. **Dies ist ein echter Revisions-Bump** (über Rev. 0.6
+> > hinweg) und **kein** Korrekturrunden-Sammelblock: Rev. 0.7 installiert **vier inhaltliche
+> > Pflichten**, die alle **vom Nutzer entschieden** wurden und hier **nicht** neu bewertet werden.
+> > `status: APPROVED` und `approved: 2026-09-26` bleiben **unverändert**; die Ausführung W0–W8
+> > bleibt freigegeben. **Keine** Task-, Wellen-, AC-, IC-, R-, OQ- oder V-Check-ID wurde
+> > umnummeriert oder gestrichen; die **zwei** neuen Plan-Tasks sind **W2-8** (E-6) und **W2-9**
+> > (E-8) — die Taskzahl des Vorhabens steigt damit von **48** auf **50**.
+> > - **E-5 → IC-05 (V4) und §17.11.2:** V4 (`check_readme_docs_index`, Check-ID **`docs.readme_index`**)
+> >   verlangt **nicht** mehr, dass alle **205** `docs/**.md` außerhalb `archive/` in `README.md`
+> >   verlinkt sind. Der **Scope** wird auf den **README-Index-Scope** begrenzt: V4 liest die
+> >   **Dokumentations-Index-Region** von `README.md` (die `##`-Überschrift mit `Documentation Index`
+> >   bis zur nächsten `##`-Überschrift) und prüft deren **deklarierte** `docs/`-Kategorien — jede
+> >   deklarierte Kategorie muss (a) ein **existierendes** Verzeichnis sein und (b) **mindestens
+> >   einen** `docs/<kategorie>/…`-**Link** in der Region tragen. **Unverändert bleiben:** Check-ID,
+> >   Severity **ERROR** und `file` = `README.md` — und die **Signatur `(root: Path) ->
+> >   list[Finding]`, einargumentig** (**K59 / RVW-7-01, Korrekturrunde 5**: die zweigliedrige Form
+> >   `(root, config=None)` ist die Signatur der **neun neuen** V-Checks, **nicht** die des
+> >   IC-05-gepinnten Altchecks; gemessen `docs_links.py:167`, Docstring `:170-172` „the parameter
+> >   list stays `(root)`", Testpin `tests/test_doc_index.py` per `inspect.signature`).
+> >   **Die 193** nicht im README verlinkten `docs/`-**Seiten** sind **kein** V4-Finding mehr, sondern
+> >   **Follow-up `F-DOCS-README-INDEX-2026-09-27`** (Owner `developer`, Termin **2026-10-11**) —
+> >   vollständige Liste in **§17.11.3**. **K60 / RVW-7-02:** die Herleitung lautet `205 − 12 = 193`,
+> >   **nicht** `205 − 14 = 191` — die **14** in `README.md` genannten `docs/`-Pfade sind **12**
+> >   `.md` + **2** `.html` (`docs/ui/agent-graph.html`, `docs/ui/admin-ui.html`). **Der Nachweis ist
+> >   die Issue-Liste + ein once-count außerhalb V4**, **kein** `docs.readme_index`-Zählwert: V4
+> >   zählt nach E-5 **Kategorien**, nicht Seiten, und ein V4-Zählwert **beobachtet diese Menge
+> >   nicht** (ein solcher Nachweis wäre **vakuum**). **Grenze gegen V2:** V2 liest `docs/INDEX.md` und ist
+> >   **seiten**-genau (alle nicht-Archiv-`docs/**.md`); V4 liest `README.md` und ist
+> >   **kategorie**-genau (die vom handgepflegten Index deklarierten Scopes). **Grenze gegen V3:** V3
+> >   prüft, ob ein **Linkziel existiert**; V4 prüft **nie** ein Linkziel, sondern ob eine
+> >   **deklarierte Kategorie repräsentiert** ist — ein toter Link in der Index-Region ist ein
+> >   **V3**-Finding und **kein** V4-Finding (keine Doppelmeldung).
+> > - **E-6 → Plan §17.11 / Task W2-8:** die zwei roten Volltests
+> >   `tests/test_knowledge_engine.py::test_knowledge_roles_pass_schema_validation` (`:221`, Assert
+> >   **`:228`**) und
+> >   `tests/test_sharkord_service_name_migration.py::test_generated_docker_agent_has_no_leftover_platform_namespace_placeholder`
+> >   (`:34`, `--validate`-Assert **`:48`**) erhalten einen **eigenen** Task **W2-8** mit eigenem
+> >   `Files:`, eigenem Agent, eigenen AK und **Position vor W2-7**. Beide Tests hängen am
+> >   repo-globalen `--validate`-Exit-Code; dieser ist nach **§10, Aufzählungspunkt `--validate`**
+> >   **planmäßig rot** (V1/V2/V3/V6, **Korrekturrunde 5 / K67: seit Rev. 0.7 zusätzlich V4** mit
+> >   **1** ERROR — Kategorie `docs/se-cascade/`, Follow-up `F-DOCS-README-INDEX-SE-2026-09-27`;
+> >   V4 ist **bereits registriert**, `consistency-check.py:53`/`:201`) — W2-8 entkoppelt beide Tests
+> >   von dieser Fremdgröße. **Ergänzung Korrekturrunde 5 (K63 / RVW-7-05):** von den drei in
+> >   W2-8 benannten Entkopplungsmechanismen sind an W2-8s Position nur **(i)** und **(iii)**
+> >   anwendbar; **(ii)** stützt sich auf das **Common-Gate**, das erst in **W2-7** entsteht, und ist
+> >   deshalb aus W2-8s zulässiger Liste gestrichen (als spätere Option erhalten).
+> > - **E-7 → §4.1:** **V5** `check_role_generation_parity` wird aus `docs_freshness.py` in das neue
+> >   Modul **`scripts/lib/consistency/docs_freshness_v5.py`** ausgelagert. Grund: `docs_freshness.py`
+> >   ist nach W2-5 gemessen bei **592** Zeilen; V5 braucht realistisch **55–70** Zeilen und würde die
+> >   harte **< 600**-Grenze reißen. **Größenfolge:** `docs_freshness.py` **592** (V1a/V1b + V6,
+> >   **8** Zeilen Reserve) · `docs_freshness_v5.py` **≈ 55–70** (V5) — **beide < 600** ✓. Die
+> >   Zuordnung bleibt **12/12 disjunkt**, jetzt auf **5** statt 4 Module verteilt (**K56**).
+> > - **E-8 → Plan §17.11 / Task W2-9:** `TASK_HEADER_RE` (`scripts/lib/plan_identity.py:27-30`,
+> >   verwendet in `scripts/lib/plan_ledger.py:25`/`:71`/`:133`) wird um einen alternativen Zweig für
+> >   die **Wellen-/Task-Header-Form** dieses Plans (`### W2-0: …`) erweitert, und `normalize_task_id`
+> >   (`plan_identity.py:63-73`) lernt die ID-Form `W<n>-<k>`. **Positionierung:** W2-9 läuft in
+> >   **Phase 0** von W2, **vor** PG-2a ⇒ **der Ledger-Writer ist ab W2-9 einsetzbar, also für
+> >   W2-6, W2-4, W2-8 und W2-7** (die K53-Interim-Regel des manuellen Abhakens endet mit W2-9).
+> >   **Ausdrücklich festgehalten: „Ledger-Writer einsetzbar ab Task W2-9"** — **nicht** ab heute
+> >   (Stand vor W2-9 gilt die widerrufbare K53-Interim-Regel: der Orchestrator hakt von Hand ab).
+> > - **Eine Belegkorrektur mitgenommen (K58):** der Auftrag und der Korrekturrunden-4-Block nennen
+> >   `TASK_HEADER_RE` als in `scripts/lib/plan_ledger.py` liegend. **Gemessen** ist: die
+> >   **Definition** steht in `scripts/lib/plan_identity.py:27-30`, `plan_ledger.py` ist der
+> >   **Konsument** (Import `:25`, `finditer` `:71`, Tupel-Entpackung `:133`). W2-9 besitzt deshalb
+> >   **beide** Dateien, wobei `plan_ledger.py` nur geschrieben wird, falls sich der Zwei-Gruppen-
+> >   Vertrag ändert.
+> > - **Zählungen, ehrlich gemessen (Plan-Abschnitt L, Rev. 0.7):** Checkboxen **199 → 207**
+> >   (`[x]` **59** unverändert, `[ ]` **140 → 148**), Tasks **48 → 50**. Herleitung:
+> >   44 × 4 + 5 × 5 + 1 × 6 = **207**. **Keine** Zahl ist geschätzt; die Zählung ist im Plan
+> >   dokumentiert und gegengeprüft.
+> > **Bewusst nicht angefasst:** die Rev.-0.6-Blöcke (§17.10, §17.10.5), die Korrekturrunden 1–4 des
+> > Plans (K25…K53) und die dortigen Entscheidungsvorlagen-Tabellen **E-5…E-8** bleiben
+> > **wortgleich** und dokumentieren den Stand **vor** der Entscheidung; **maßgeblich** sind die
+> > **Plan-Legende**, dieser Rev.-0.7-Block und **§17.11**.
+>
 > **Legende der Kennungen (neu, Rev. 0.6, K25 — beseitigt die ID-Kollision `E-1`/`E-2`/M1;
 > Bereich korrigiert in K42, Eindeutigkeit hergestellt in K41).**
 > In Rev. 0.6 sind zwei **verschiedene** Nummernkreise entstanden, die beide `E-1`/`E-2` hießen.
@@ -67,9 +146,20 @@ related:
 > | Präfix | Bedeutung | Status | Ort |
 > |---|---|---|---|
 > | **`U-*`** (U-1, U-2) | **Nutzerentscheidung** — vom Nutzer **getroffen** und **geschlossen** | **geschlossen** | Rev. 0.6, §4.1, §17.10 |
-> | `E-*` (E-1…E-4) | **Errata-Liste / Entscheidungsvorlage** des Rev.-0.5-Ausführungs-Ledgers (Abschnitt L-3 des Plans) bzw. **offene** Entscheidungsvorlage | E-01…E-15: Errata · E-1…E-4: **offen**, unentschieden | Plan Abschnitt L-3; Spec §17.9.4 |
+> | `E-*` (E-1…E-4) | **Errata-Liste / Entscheidungsvorlage** des Rev.-0.5-Ausführungs-Ledgers (Abschnitt L-3 des Plans) bzw. **offene** Entscheidungsvorlage | E-01…E-15: Errata · E-1…E-4: **offen**, unentschieden · **E-5…E-8: ENTSCHIEDEN 2026-09-27** (Rev. 0.7, §17.11) | Plan Abschnitt L-3; Spec §17.9.4, **§17.11** |
 > | `OQ*` (OQ1…OQ10) | **offene Frage** an den Auftraggeber, mit Owner und Frist | **offen** (OQ1, OQ3, OQ4, OQ9, OQ10) | Spec §11.1 |
 > | `K-*` (K1…**K45**) | **Korrektur-Kennungen** dieses Vorhabens (kein Status, nur Auditierbarkeit) | — | Rev.-Kopfblöcke, §17 |
+>
+> >   **K-Bereich, Rev. 0.7 (K57, additiv — die Spec-Legende bleibt eingefroren).** Die Zeile oben
+> > nennt `K1…K45`; sie bleibt **unverändert**, weil die Spec-Legende seit **K42** bewusst
+> > eingefroren ist (Stand Korrekturrunde 2). **Maßgeblich** für den heutigen K-Stand ist die
+> > **Plan-Legende** (`K1…K70` — **Stand Korrekturrunde 5**; **Korrekturrunde 6 hat sie auf
+> > `K1…K75` verlängert**, §17.11.6, Muster K36/K42: diese Zeile nennt ihren damaligen Stand und
+> > bleibt **wortgleich**). **Rev. 0.7 hat den Katalog um `K54`…`K58` verlängert**
+> > (E-5-Mechanismus, E-7-Modulgrenze, E-8-Werkzeugpfad, Zählung, Faktenkorrektur) — Volltext
+> > **§17.11.1**; **Korrekturrunde 5** um `K59`…`K70` (11 Review-Findings + 5 Validator-Notizen) —
+> > Volltext **§17.11.5**; **Korrekturrunde 6** um `K71`…`K75` (1 major · 3 minor · 1 info,
+> > rein mechanisch) — Volltext **§17.11.6**.
 >
 > **Umbenennung, ausdrücklich und additiv:** Die beiden Rev.-0.6-Nutzerentscheidungen hießen in der
 > Erstfassung dieses Revisionsblocks `E-1`/`E-2` und wurden deshalb als **K25** auf **`U-1`/`U-2`**
@@ -293,6 +383,7 @@ related:
 | **0.5** | 2026-09-26 | **Gate-Präzisierung W2/W3 und Schließung zweier Eigentümerlücken (Katalog K13…K17, Volltext §17.9) — plus zweite Korrekturrunde desselben Revisionsstandes (Review `CHANGES_REQUESTED`, 15/15 Findings RVW-1…RVW-15 behoben, §17.9.4).** **Erste Runde:** **K13** W2-Gate auf die reale V1-Registrierung/Severity umgestellt (B-2/E-11) — zwei getrennte, beobachtbare Zustände (nach W2-1 / nach W2-7), gezählt über `--json` statt über den repo-globalen Exit-Code. **K14** W3-Gate auf den Spec-Scope begrenzt (B-1) — §10-Dateiscope plus **getrenntes** Doku-Gate; repo-globales `--strict == 0` als **Altbestand-Baseline** getrennt ausgewiesen. **K15** `scripts/lib/consistency/report.py` erhält **Ownership** (B-5/E-15, Task W2-7, Abnahmekriterium F1-PROMOTION). **K16** Abdeckungslücke der Suppressionsregel 3 als **benannte, terminierte** Aufgabe (B-4/E-14, W2-1 Schritt 4) mit Reihenfolgebindung an W3-4. **K17** Abschnitts-/Zählungsanker im Ledger nachgeführt (K12-Logik). **Nachmessung §17.9.1:** die Auftragsprämisse „V1 emittiert ERROR" ist **widerlegt** (V1 emittiert WARNING — `docs.py:359`, `:314-326`, `.meta-config/project.yaml:398-399` — und ist im Runner **nicht registriert**, `consistency-check.py:52-56`, gepinnt in `tests/test_doc_facts.py:2403-2422`). **Zweite Runde (RVW-1…RVW-15):** **RVW-1** Doku-Aggregat `docs-findings: 0` ist **dauerhaft** unerreichbar (V7 rot bis W5-3, V3 bis W8-2, V2 bis W3-6, V9 **nie** — 179 geduldete WARNINGs, FI-10) ⇒ **§10, `--strict`-Punkt, Unterpunkt 5 neu**: check-spezifische Kriterien mit **Termin** und **Owner** je V-Check. **RVW-2** drei weitere unerreichbare `consistency-check.py → 0`-Zeilen in W2 auf ein Zähl-Kriterium umgestellt. **RVW-3** die **fünf Wellenblock**-Zeilen W4–W8 auf die Scope-Kriterien umgestellt, Task-Zeilen unter der Geltungsregel mit ausdrücklicher Wellenabschluss-Relevanz. **RVW-4** die K16-Reihenfolgebindung als **echte Vorwärts**kante **`W2-1 → W3-4`** im DAG (die frühere Zyklus-Begründung war **falsch**). **RVW-5** Normativitätsaussage präzisiert: „keine neue normative Pflicht" war unhaltbar → „keine Pflicht **jenseits** des am **2026-09-26** beauftragten Korrekturumfangs" (Auftrag: A2A-Envelope vom 2026-09-26, Korrekturen 1–5, ausdrückliche Weisung `status: APPROVED` beizubehalten). **RVW-6** diese 0.5-Zeile + Rev.-0.5-Anker in §15 nachgezogen. **RVW-7** falscher Verweis „§12.2 R4" → **§12.1 R4** (R4 enthält keine Reihenfolgeaussage). **RVW-8** Zählherleitung im Plan-Kopf auf die L-1-Formel umgestellt. **RVW-9** Geltungsregel auf Abschnittsanker und tatsächlichen Zeilenbestand korrigiert. **RVW-10** Self-Review-Beispiel als historisch markiert. **RVW-11** W2-1 `Interfaces:` nennt die eingegrenzte Fassung der Suppressionsregeln. **RVW-12** K13-Kriterium auf **Zählwert** statt Exit-Code; alle neuen `--json`-Kommandos `sys.exit`-frei. **RVW-13** Global Constraints des Plans als historischer Rev.-0.4-Stand markiert (**OP-1 bleibt offen**). **RVW-14/15** zwei konstruktionsbedingte Aussagen als **Dokuzeilen, nicht als Prüfkriterien** geführt. **Unverändert:** AC-01…AC-41, IC-01…IC-24, NFA-01…NFA-11, R1…R20, F1…F25, M-1…M-13, NG-1…NG-11, FI-1…FI-10, OQ1…OQ9 (**OQ1 offen**), W0…W8, der normative **Pflichtumfang** von §10 Punkt 1, `status: APPROVED`, `approved: 2026-09-26`, der Ausführungsfreigabeumfang. **Keine** neue ID, **kein** Revisions-Bump innerhalb Rev. 0.5, **keine** neue Task-ID | concept-architect |
 | **0.6** | 2026-09-27 | **Umsetzung zweier bereits getroffener Nutzerentscheidungen — U-1 (Modul-Split) und U-2 (AC-30-Verengung). Volltext §17.10, Katalog K18…K24; Korrekturrunden K25…K45 (§17.10.5, Runde 1 = K25…K40, Runde 2 = K41…K45; **wahrer Endstand K45**).** **U-1:** `scripts/lib/consistency/docs.py` wird zur **Fassade** und re-exportiert alle nach außen sichtbaren Namen rückwärtskompatibel; die neun V-Checks und die drei Altchecks werden **je genau einem** von vier neuen Familienmodulen zugeordnet — `docs_links.py` (V3, V4, `check_sync_cli_docs`, `check_ui_help_mappings`), `docs_freshness.py` (V1a/V1b, V5, V6), `docs_wiki.py` (V7, V8), `docs_index.py` (V2, V9) — **jedes < 600 Zeilen** (**K18**, Modulgrenzen **§4.1** mit expliziter Abgrenzung zu den **Fach**-Modulen M1–M4, **K19**). **U-2:** **AC-30** auf **`README.md` + `llms.txt`** verengt; die **25** toten relativen internen Links unter `docs/**` werden als **Follow-up `F-DOCS-LINKS-2026-09-27`** (Owner `developer`, Termin **2026-10-11**) geführt — **kein** AC, **keine** Stillschweigung (**K22**). **Weigerungsnachweis** in §17.10.2: die Verengung trägt, weil die **2** verbleibenden Findings in `README.md:722`/`:723` liegen und der bestehende Task **W8-2** sie behebt — **kein** zusätzlicher Task nötig. **Faktenkorrekturen:** V3-Fundstellen sind `README.md:722`/`:723`, **nicht** `:721-724` (`README.md:721` `howto/` und `:724` `howto/configs/` existieren) (**K23**); `docs/REQUIREMENTS.md:21` ist **kein** V3-Finding — die Zeile nennt Backtick-Pfade in einer Tabellenzeile und V3 matcht nur Link-Syntax (`V3_INLINE_LINK_RE`, `V3_REFERENCE_DEF_RE`, `V3_HTML_HREF_RE`) — die Trace-Matrix-Zeile `| AC-30 | W8 | … |` ist auf `README.md:722-723` berichtigt; die F15-Zeile nennt `docs/REQUIREMENTS.md:21` nur noch als **manueller** Befund. **V7-Baseline 10 → 11** (`knowledge/wiki`, **11** Seiten mit `type: "Architecture"`, Baseline-Messung 2026-09-27) (**K24**). **Neu:** §4.1 (Modulgrenzen), §17.10 (Volltext, Weigerungsnachweis, Follow-up-Register, Zyklenprüfung-/Fail-closed-Klausel). **Plan-Seite:** neuer Task **W2-0** (Modul-Split, verhaltensneutral), korrigierter W2-DAG mit **echten write-set-disjunkten** Kanten, neue Testdateien `tests/test_doc_{wiki,freshness,index}.py`, korrigierte Wellen-Gate-Kommandos, Rollback-Erweiterung. **Unverändert:** AC-01…AC-29 und AC-31…AC-41, IC-01…IC-24, NFA-01…NFA-11, R1…R20, F1…F25, M-1…M-13, NG-1…NG-11, FI-1…FI-10, OQ1…OQ9 (OQ1 **offen**, OQ2/OQ6/OQ8 geschlossen), W0…W8, das System-Design, `status: APPROVED`, `approved: 2026-09-26`, kein Produktionscode | concept-architect |
 
+| **0.7** | 2026-09-27 | **Umsetzung von vier bereits getroffenen Nutzerentscheidungen — E-5, E-6, E-7, E-8. Volltext §17.11, Katalog K54…K58.** **E-5:** V4 `check_readme_docs_index` (Check-ID `docs.readme_index`) wird vom Scope „alle 205 nicht-Archiv-`docs/**.md` gegen `README.md`" auf den **README-Index-Scope** begrenzt: die Prüfung liest die `##`-Region `Documentation Index` in `README.md` und verlangt, dass jede dort **deklarierte** `docs/`-Kategorie (a) existiert und (b) mindestens **einen** `docs/<kategorie>/…`-Link in der Region trägt. **IC-05-Pin unverändert:** Check-ID, Severity ERROR, `file` = `README.md`, **Signatur einargumentig** `(root: Path) -> list[Finding]` (**K59**). **193** nicht im README verlinkte `docs/`-**Seiten** → **Follow-up `F-DOCS-README-INDEX-2026-09-27`** (Owner `developer`, Termin **2026-10-11**), **kein** Termin 0 in W0–W8 (**K55**, §17.11.2, Register §17.11.3); Herleitung `205 − 12`, Nachweis = **Issue-Liste + once-count außerhalb V4** (**K60**). **E-6:** neuer Plan-Task **W2-8** „Volltests entkoppeln" mit eigenem `Files:` (`tests/test_knowledge_engine.py`, `tests/test_sharkord_service_name_migration.py`), Agent `senior-developer`, Position **vor W2-7**; er löst die Kopplung beider Tests an den repo-globalen `--validate`-Exit-Code, der nach §10 **planmäßig rot** ist (**K56**). **E-7:** V5 wandert aus `docs_freshness.py` (gemessen **592** Zeilen nach W2-5) in das neue Modul **`scripts/lib/consistency/docs_freshness_v5.py`**; Größenfolge `592` (Reserve **8**) + **≈55–70** (V5), **beide < 600**; Zuordnung bleibt **12/12 disjunkt**, jetzt auf **5** Module (**K56**). **E-8:** `TASK_HEADER_RE` wird um die Wellen-/Task-Header-Form erweitert (Definition `scripts/lib/plan_identity.py:27-30`, Konsument `scripts/lib/plan_ledger.py:25`/`:71`/`:133`), `normalize_task_id` lernt `W<n>-<k>`; neuer Plan-Task **W2-9** in **Phase 0** von W2 ⇒ **Ledger-Writer einsetzbar ab W2-9** (die K53-Interim-Regel endet) (**K57**, **K58**). **Neu:** §17.11 (Volltext + Katalog + Register-Fortsetzung + Zyklenprüfung), §4.1 (fünftes Modul), IC-05 (V4-Zeile), §9.2 (W2-Zeile), §4 (Testdatei `tests/test_doc_freshness_v5.py`). **Zählung:** Tasks **48 → 50**, Checkboxen **199 → 207** (`[x]` **59**, `[ ]` **148**), Herleitung 44 × 4 + 5 × 5 + 1 × 6. **Unverändert:** `status: APPROVED`, `approved: 2026-09-26`, AC-01…AC-41, IC-01…IC-24, NFA-01…NFA-11, R1…R20, F1…F25, M-1…M-13, NG-1…NG-11, FI-1…FI-10, OQ1…OQ10 (OQ1, OQ10 bleiben **offen**), W0…W8, E-1…E-4 (**offen**), E-01…E-15, B-1…B-5, OP-1, keine Produktions- oder Teständerung in dieser Revision | concept-architect |
 | **Freigabe** | **2026-09-26** | **User-Freigabe** (Nutzer, über `main_chat` an den `orchestrator`); formalisiert durch `documenter`. Frontmatter `status:` auf `APPROVED` gesetzt. **Freigabestand:** Concept-Review **Runde 1** (2026-09-26) `CHANGES_REQUESTED`, **5 kritische Befunde** (K1…K5) → Rev. 0.2; Re-Review **Runde 2** (2026-09-26) `CHANGES_REQUESTED` mit **0 kritischen Befunden**, `RESIDUAL_BLOCKERS: Keine`, `PLAN_READINESS: Ja` → Rev. 0.3 mit **8 behobenen** Findings (NEW-1…NEW-8) + Gegenkorrektur. **Umfang:** Freigabe der **Ausführung W0–W8**. **Zusätzlich entschieden (Nutzer, 2026-09-26):** OQ2 (`llms.txt` = **Hybrid**), OQ6 (**tracked**) und OQ8 (Regenerierung über Sync/Validator) → nach §11.2 verschoben. **Keine inhaltliche Änderung** an IC/AC/Risiken — die Freigabe ist eine Statuszeile, kein Revisions-Bump (Konvention: `docs/specs/2026-09-13-stale-role-cleanup-design.md:39`, `docs/specs/2026-09-15-reference-standards-design.md:67`). **Datumsabweichung:** Nutzer nannte 2026-09-25 (Datum der Anfrage); der Freigabevermerk trägt das **Freigabedatum 2026-09-26**. **Nach der Freigabe (rev. 0.4, 2026-09-26):** die Ausführungskorrektur der Branch-/PR-Strategie (§17.6) — **ohne** Änderung an IC/AC/Risiken; die dort zunächst im Dokument ausgerichtete Ausnahme („ohne neue Freigabe") ist **durch die nachfolgende Nutzer-Bestätigung ersetzt**, siehe nächste Zeile | documenter |
 | **Freigabe (Rev. 0.4)** | **2026-09-26** | **Nutzer-Bestätigung der Rev. 0.4** (Nutzer, über `main_chat` an den `orchestrator`; Entscheidungsweg laut Plan Rev. 0.4, K1); formalisiert durch `documenter`. **Anlass:** das Concept-Review von Rev. 0.4 endete mit `VERDICT: BLOCKED` (**F-1**) — neue normative Pflichten (verbindliche Commit-Titel-/Body-Konvention, Branch-Aufbewahrung als Scope-Aussage) waren ohne erneute User-Freigabe mit derselben Verbindlichkeitstiefe installiert worden. **Bezug der Bestätigung:** unverändert der Umfang der Ausführungsmechanik **W0–W8**; **neu bestätigt** die in Rev. 0.4 aufgenommenen Normativitätsaussagen. **Bedingung:** **A13** und die **W4/W5/W6-Serialität** (A14) sind als **offene, dokumentierte Abweichungen** registriert (§13, §17.7, §17.8). **Kein** Revisions-Bump — Rev. bleibt 0.4 | documenter |
 | **0.5 — dritte Korrekturrunde (RVW2-1…RVW2-14)** | 2026-09-26 | Concept-Review vom 2026-09-26 über Spec + Plan Rev. 0.5: `VERDICT: CHANGES_REQUESTED`, **14 Findings** (2 Blocker, 4 Major, 7 Minor, 1 Info). **Alle 14 behandelt**, **kein Revisions-Bump**, `status: APPROVED` und `approved: 2026-09-26` unverändert. **Betroffene Stellen:** §6(b) (Präzisierung **zurückgestellt**, E-3), §10 Aufzählungspunkt `--validate` (Mechanik + **Terminierung** von `--validate`), §10, `--strict`-Punkt, Unterpunkt 5 (a: **Präsenzregel statt Registrierungszahl**; V9 **ohne Sollwert**; Verschlechterungs-Ausnahme), §10 `TEST_COMMANDS`-Punkt (Spannungslage dokumentiert, **E-4**), §11.1 OQ9 (Ergebnis-Ort präzisiert, **ohne** OQ9 zu entscheiden), IC-05 (V9-Hinweis), IC-22/M-11-Hinweis, FI-10, §17.9.3, §17.9.4 (Normativitätstabelle **(vii)–(x)**, Behandlungstabelle RVW2-1…RVW2-14, Entscheidungsvorlagen **E-1…E-4**), Revisionszeile 0.5, Frontmatter `approved-scope`. **Vier Entscheidungsvorlagen offen** (E-1 DoD-Punkt-2-Bestätigung, E-2 V9-Schwelle als Config-Key, E-3 §6(b)-`--check`-Halbsatz, E-4 `TEST_COMMANDS`-Punkt) — **keine** wurde eigenmächtig entschieden. **Unverändert:** AC-01…AC-41, IC-01…IC-24, NFA, R1…R20, F1…F25, M-1…M-13, NG-1…NG-11, FI-1…FI-10, OQ1…OQ9 (OQ1 **offen**, OQ2/OQ6/OQ8 geschlossen), W0…W8, 47 Tasks, **keine** neue Task-ID, kein Produktionscode | concept-architect |
@@ -525,9 +616,10 @@ Die **Zahl** der Tests wächst dadurch **nicht** — die V1-Tests **wandern** au
 
 | Test-Datei (neu) | Task (Plan) | Modul | Tests |
 |---|---|---|---|
-| `tests/test_doc_freshness.py` | **W2-0** (Anlage, V1-Tests wandern) → **W2-5** (V6) → **W2-4** (V5) | `docs_freshness.py` | V1a/V1b (AC-07/AC-08), V6 (AC-36), V5 (AC-11) |
+| `tests/test_doc_freshness.py` | **W2-0** (Anlage, V1-Tests wandern) → **W2-5** (V6) | `docs_freshness.py` | V1a/V1b (AC-07/AC-08), V6 (AC-36) |
+| `tests/test_doc_freshness_v5.py` (neu, **Rev. 0.7 / E-7**) | **W2-4** (V5) | `docs_freshness_v5.py` | V5 (AC-11) |
 | `tests/test_doc_wiki.py` | **W2-3** | `docs_wiki.py` | V7 (AC-10) |
-| `tests/test_doc_index.py` | **W2-6** | `docs_index.py` | V2, V4 (AC-12) |
+| `tests/test_doc_index.py` | **W2-6** | `docs_index.py` | V2 (AC-12) · V4 (README-Index-Scope, **Rev. 0.7 / E-5**) |
 
 **Summe bleibt die Vorher-Baseline:** `tests/test_doc_facts.py` + `tests/test_doc_facts_expected.py`
 = **163 passed** (Baseline-Messung 2026-09-27); nach W2-0 muss der Gesamtzähler **≥ 163** sein
@@ -564,7 +656,8 @@ Zusicherung der Trennschärfe. Die Größengrenze (< 600 Zeilen) ist **Folge**, 
 | U-1-Modul (Datei) | Frage | V-Checks | Altchecks | Fach-Modul | Erwartete Endzeilen |
 |---|---|---|---|---|---|
 | `scripts/lib/consistency/docs_links.py` (neu) | Ist jede **Referenz** auflösbar? | **V3** `check_internal_links`, **V4** `check_readme_docs_index` | `check_sync_cli_docs`, `check_ui_help_mappings` | M1 (Prüfebene) | **~330** |
-| `scripts/lib/consistency/docs_freshness.py` (neu) | Stimmt die Doku mit dem **berechneten Ist-Zustand** überein? | **V1a/V1b** `check_no_manual_counts`, **V5** `check_role_generation_parity`, **V6** `check_docs_facts_fresh` | — | M1 | **~480** |
+| `scripts/lib/consistency/docs_freshness.py` (neu) | Stimmt die Doku mit dem **berechneten Ist-Zustand** überein? | **V1a/V1b** `check_no_manual_counts`, **V6** `check_docs_facts_fresh` | — | M1 | **~480** · **Ist nach W2-5: 592** |
+| `scripts/lib/consistency/docs_freshness_v5.py` (neu, **Rev. 0.7 / E-7**) | Ist der **dokumentierte Rollenbestand** mit den **erzeugten** Rollen identisch? | **V5** `check_role_generation_parity` | — | M1 | **≈ 55–70** |
 | `scripts/lib/consistency/docs_wiki.py` (neu) | Stimmt die **abgeleitete Wissens-/Bestands-Oberfläche** mit ihren Quellen überein? | **V7** `check_wiki_staleness`, **V8** `check_spec_plan_path_convention` | — | M1 | **~200** |
 | `scripts/lib/consistency/docs_index.py` (neu) | Ist der **Doku-Bau** vollständig und geführt? | **V2** `check_docs_index_completeness`, **V9** `check_stale_backups` | — | M1 | **~180** |
 | `scripts/lib/consistency/docs.py` (**Fassade**) | Re-Export-Contract | — (re-exportiert alle) | — | M1 | **~70** |
@@ -572,7 +665,34 @@ Zusicherung der Trennschärfe. Die Größengrenze (< 600 Zeilen) ist **Folge**, 
 **Jeder V-Check V1…V9 und jeder der drei Altchecks ist genau einem Modul zugeordnet** — die
 Vollständigkeit dieser Zuordnung ist eine Eigenschaft der Tabelle: 9 V-Checks (V1 zählt als V1a/V1b
 **eines** Moduls) + 3 Altchecks = **12 Zuordnungen auf 4 Module**, ohne Doppel- und ohne
-Lückenzuordnung. **Zur Zuordnung von V5** (bewusst getroffen, weil U-1 genau vier Module vorsieht und
+Lückenzuordnung.
+
+> **Rev. 0.7 / E-7 — aus 4 Modulen werden 5; die 12/12-Disjunktheit bleibt.** `docs_freshness.py` ist
+> nach **W2-5 gemessen bei 592 Zeilen**; V5 braucht realistisch **55–70** Zeilen und würde die harte
+> **< 600**-Grenze reißen (**647–662**). V5 wird deshalb in das eigene Modul
+> `docs_freshness_v5.py` ausgelagert. **Größenfolge (verbindlich):** `docs_freshness.py` **592**
+> (V1a/V1b + V6 — **8** Zeilen Reserve, **kein** weiterer V-Check) · `docs_freshness_v5.py`
+> **≈ 55–70** (V5) — **beide < 600** ✓. **Zuordnung nach E-7:** `docs_links` = V3 + V4 + 2 Altchecks
+> (4) · `docs_freshness` = V1a/V1b + V6 (3) · `docs_freshness_v5` = V5 (1) · `docs_wiki` = V7 + V8 (2)
+> · `docs_index` = V2 + V9 (2) ⇒ **12 Zuordnungen auf 5 Module**, weiterhin disjunkt und lückenlos.
+> **Die Schnittlogik bleibt dieselbe Frage-Frage-Zuordnung:** `docs_freshness_v5` beantwortet
+> *„Stimmt der dokumentierte Rollenbestand mit dem erzeugten Rollenbestand überein?"* — dieselbe
+> Familie wie V1 (Handzahl vs. berechnete Zahl), aber **eigener Modulbestand**, weil der gemeinsame
+> Bestand die Größengrenze reißt. **Die Größengrenze ist Folge, nicht Zweck** (K18-Logik) — hier
+> ist die Folge einmalig durchgesetzt worden, weil ein Modul an der Grenze stand und die
+> Alternativen (V1-Prosa komprimieren, `_v6_finding` wiederverwenden) **Kopplung** erzeugt hätten
+> (E-7-Auswahl, Plan Rev. 0.7).
+>
+> > **Der unmittelbar folgende Absatz („Zur Zuordnung von V5") bleibt wortgleich und ist durch
+> > E-7 überholt.** Seine Aussage „ein eigenes Modul dafür wäre eine fünfte Datei und würde die
+> > U-1-Vorgabe verlassen" beschreibt den Stand **vor** E-7. **Heute gilt:** V5 liegt in
+> > `docs_freshness_v5.py` — es **ist** die fünfte Datei, und die U-1-Vorgabe wird damit
+> > **ausdrücklich erweitert**, nicht stillschweigend verlassen. **Warum die Erweiterung die
+> > richtige war:** die Alternative (gleiches Modul, 647–662 Zeilen) hätte entweder den
+> > **Abnahme-Sollwert** `< 600` gebrochen oder **Kopplung** in einen geteilten Helfer eingezogen;
+> > **beides** wäre eine stillschweigende Änderung gewesen.
+
+**Zur Zuordnung von V5** (bewusst getroffen, weil U-1 genau vier Module vorsah und
 V5 sonst nirgends hingehört): `check_role_generation_parity` vergleicht den in der Doku
 **dokumentierten** Rollenbestand mit den **tatsächlich generierten** Rollen — das ist dieselbe
 Frage wie V1 (Handzahl vs. berechnete Zahl) und V6 (generierter Block vs. berechneter Fakt). Ein
@@ -623,6 +743,15 @@ Aufrufe stehen in `run_checks()` `:199-201`. `tests/test_doc_facts.py` referenzi
 von außen referenziert; `tests/test_doc_facts_expected.py` importiert `docs` **nicht** (es bindet
 ausschließlich `scripts.lib.doc_facts`, `:58-59`). **Damit ist der Fassaden-Contract vollständig
 aus der Ist-Nutzung abgeleitet und nicht aus einer Vermutung** (K19).
+
+> **Rev. 0.7 / E-7 — der V5-Eintrag des `__all__` bleibt unverändert, nur sein Herkunftsmodul
+> ändert sich.** `"check_role_generation_parity"` (`# W2-4 (docs_freshness)`) ist **nach E-7** in
+> **`docs_freshness_v5.py`** beheimatet. **Am `__all__`-Vertrag ändert sich damit nichts**: der Name
+> wird von der Fassade **weiter** durchgereicht, nur aus einem anderen Modul importiert. **Wer den
+> V5-Eintrag schreibt, bleibt W2-7** (K46-Negativregel: W2-4 fasst `docs.py` **nicht** an) —
+> dieselbe Regel wie für V2/V6/V7. **Konsequenz für die Zwischenphase:** zwischen **W2-4** (V5
+> implementiert) und **W2-7** (`__all__`-Inkrement) ist V5 **nur modulweise** aufrufbar, nicht über
+> die Fassade; das ist der dokumentierte Normalfall des Musters und **kein** Fehlerzustand.
 
 **K28 (Rev. 0.6, Concept-Review) — `check_spec_plan_path_convention` (V8) war in der Fassung vor
 dieser Korrekturrunde nicht im `__all__`.** Das ist ein **Lückenfehler**: V8 liegt in
@@ -819,6 +948,13 @@ Vergleichsmenge muss `compute_active_roles()` sein.
 
 Bestehende drei Checks bleiben **unverändert** in Signatur und Severity
 (`check_sync_cli_docs` `:9`, `check_ui_help_mappings` `:47`, `check_readme_docs_index` `:100`).
+**Signatur der drei Altchecks, gemessen (K59 / RVW-7-01, Korrekturrunde 5 — hiermit erstmals
+festgeschrieben, statt sie aus der Form der neuen Checks abzuleiten):** **jeweils
+`(root: Path) -> list[Finding]`, einargumentig** — `check_readme_docs_index` heute
+`docs_links.py:167`, Docstring `:170-172` („the parameter list stays `(root)`"), Testpin
+`tests/test_doc_index.py` per `inspect.signature` (Parameterliste `== ["root"]`). **Die Form
+`(root, config=None)` im Folgenden gilt ausschließlich den **neun neuen** Checks** und ist **kein**
+IC-05-Pin für die drei Altchecks.
 Neu kommen neun Checks mit der Signatur `check_*(root: Path, config: dict | None = None) -> list[Finding]`
 und `check="docs.<name>"`:
 
@@ -827,7 +963,7 @@ und `check="docs.<name>"`:
 | V1 | `check_no_manual_counts` | **zwei Branches, siehe §5.1.1** — V1a Count-Branch, V1b Versions-Branch | F1, F2, F3 ×2, F4, F14 ×3, F22 | ERROR | **W2: WARNING**, nach W3: ERROR |
 | V2 | `check_docs_index_completeness` | jede getrackte `docs/**/*.md` (ohne `archive/`, `_archive/`, ohne `docs/INDEX.md` selbst) fehlt in `docs/INDEX.md` | F8, F15, F20 | ERROR | W3 |
 | V3 | `check_internal_links` | relative Markdown-Links in `docs/**`, `README.md`, `llms.txt` auf nicht existierende Ziele (ohne `#anchor`-Prüfung, ohne `http(s)://`, ohne `mailto:`) | F15 | ERROR | W2 |
-| V4 | `check_readme_docs_index` (**erweitert**) | heute `docs/api/*.md` (`:111`) → generalisiert auf den gesamten `docs/`-Baum; die bisherige Teilmenge bleibt eine echte Teilmenge der neuen Prüfung | F8, F23 | ERROR (unverändert) | W3 |
+| V4 | `check_readme_docs_index` (**umgefasst, Rev. 0.7 / E-5**) | **README-Index-Scope** (Rev. 0.7): die `##`-Region `Documentation Index` in `README.md` wird gelesen; **jede dort deklarierte `docs/`-Kategorie** muss (a) ein existierendes Verzeichnis sein und (b) **mindestens einen** `docs/<kategorie>/…`-**Link** in der Region tragen. **Nicht** gefordert: Verlinkung **aller** 205 nicht-Archiv-`docs/**.md` — das ist **V2s** Zuständigkeit (`docs/INDEX.md`). Die bisherige Teilmenge `docs/api/*.md` bleibt eine **echte** Teilmenge (alle sieben Seiten sind in `README.md:362-373` verlinkt) | F8, F23 | ERROR (unverändert) | W2 (Registrierung W2-7) |
 | V5 | `check_role_generation_parity` | `compute_active_roles()` (IC-04) ⊄ erzeugte Provider-Agent-Dateien | F13, F21 | **ERROR, sobald** `systems-engineering.enabled: true`; sonst WARNING | W2 |
 | V6 | `check_docs_facts_fresh` | (a) gerenderter `DOCS_*`-Block ≠ `compute_doc_facts()` **oder** (b) `compute_doc_facts()` ≠ Sollwert aus IC-23 | Handedit-Drift **oder** Formel-Drift | ERROR | W2 |
 | V7 | `check_wiki_staleness` | Wiki-Seite mit `derived-from` älter als die Quelle, oder `type: Architecture` ohne `derived-from` | F5, F10, F11 | WARNING | W2 |
@@ -2040,7 +2176,7 @@ behebbar (§17.10.2).
 |---|---|---|---|---|---|---|
 | W0 | — | Design-Freeze, Contract-Liste, **ein Wellen-Branch für das gesamte Vorhaben** (`feat/repository-documentation-consolidation-main`, Basis `origin/main`) mit **einem** PR gegen `main`; Wellen-Zuordnung über die **Wellenkennung im Commit-Titel**. **Rev. 0.4 — Ausführungskorrektur 2026-09-26 (OP-1):** ersetzt die Fassung Rev. 0.1–0.3 „**ein Branch pro Welle** (`chore/docs-consolidation-w<N>`), gestapelte PRs"; Einzelheiten und Belege in §17.6, Verbindlichkeitsformulierung im Absatz „PR-/Branch-Strategie" direkt unter dieser Tabelle — Entscheidungs-Records zu OQ2/OQ6/OQ8 — **OQ6/OQ8 entschieden 2026-09-26** (§11.2: `docs/INDEX.md` tracked, **kein** `.gitignore`-Eintrag; Regeneration über Sync/Validator) | — | — | — | — |
 | W1 | M1+M2 | C1 DocFacts, C2 DocRenderer, C3 Snippet-Bridge, `config/doc-facts-expected.yaml`; Schema-Block (M-11); **rein additiv**, kein Datei-Diff außer `llms.txt` | AC-01…AC-06, AC-23…AC-25, AC-39 | W0 | W2 (verschiedene Dateien) | revert; kein Datei-Diff |
-| W2 | M1 | Checks V1a/V1b, V3, V5, V6 (inkl. Sollwert-Vergleich), V7; **V1 startet WARNING**; V1-Fixture; **Rev. 0.6 (U-1/K18): Modul-Split — `consistency/docs.py` wird zur Fassade, die Prüfebene wird auf `docs_links.py` / `docs_freshness.py` / `docs_wiki.py` / `docs_index.py` aufgeteilt (Modulgrenzen §4.1), verhaltensneutral über den Task W2-0** | AC-07…AC-11, AC-13, AC-36 | W1 (V6 braucht C1) | W3 | `docs-consolidation.checks.strict: false`; zusätzlich `git rm` der vier neuen Module |
+| W2 | M1 | Checks V1a/V1b, V3, V5, V6 (inkl. Sollwert-Vergleich), V7; **V1 startet WARNING**; V1-Fixture; **Rev. 0.6 (U-1/K18): Modul-Split — `consistency/docs.py` wird zur Fassade, die Prüfebene wird auf `docs_links.py` / `docs_freshness.py` / `docs_wiki.py` / `docs_index.py` aufgeteilt (Modulgrenzen §4.1), verhaltensneutral über den Task W2-0**. **Rev. 0.7: W2 hat 10 Tasks** — zusätzlich **W2-9** (E-8, Ledger-Writer, Phase 0) und **W2-8** (E-6, Volltests entkoppeln, vor W2-7); **fünftes** Modul `docs_freshness_v5.py` (E-7, §4.1); V4 prüft nur noch den **README-Index-Scope** (E-5, IC-05) | AC-07…AC-11, AC-13, AC-36 | W1 (V6 braucht C1) | W3 | `docs-consolidation.checks.strict: false`; zusätzlich `git rm` der **fünf** neuen Module |
 | W3 | M2 | `docs/INDEX.md`-Generator + C8 Scaffold-Guard + Besitzregel; volatile-Sektion; Allowlist-Basis-Pfad; **erster echter Datei-Diff**, `docs/INDEX.md` tracked | AC-12, AC-14…AC-22, AC-26, AC-27, AC-37, AC-38 | W1 | W2 (PG-2); **W4 ist Vorgänger, nicht Partner** (rev. 0.4, Folge aus A14) | `git rm docs/INDEX.md`; Scaffold-Skeleton regeneriert |
 | W4 | M3 | Architektur-Konsolidierung: `git mv` Langfassung, Root-Stub, Stale-Deklaration wandert mit (M-7) | AC-28 (Teil), AC-29 | W3 | **sequenziell** (PG-3, rev. 0.4) — **nicht** parallel | `git mv` zurück + Stub wiederherstellen |
 | W5 | M3 | Guides: `howto/`- und `docs/howto/`-Auflösung (M-5, M-6) + `derived-from`-Annotation (M-9, M-10) | AC-28 (Teil), AC-31 | W1 (C7 braucht C1), W4 (PG-3) | **sequenziell** (PG-3, rev. 0.4) — **nicht** parallel | `git mv` zurück; Annotationen additiv revertierbar |
@@ -2122,7 +2258,11 @@ Datenverlust-Potenzial und `agents/`-Berührung ist.
 ## 10. Nicht-funktionale Akzeptanz (Pipeline-Gate)
 
 - `python3 scripts/sync.py --validate` (= `TEST_COMMAND`, `.meta-config/project.yaml:193`)
-  darf bei **V1, V2, V3, V6** nicht grün sein (ab W3; in W2 V1 noch WARNING). **Neu (M7):**
+  darf bei **V1, V2, V3, V6** nicht grün sein (ab W3; in W2 V1 noch WARNING). **Korrekturrunde 5
+  (K67 / RVW-7-09):** die Aufzählung ist um **V4** zu ergänzen — V4 ist **bereits registriert**
+  (`scripts/consistency-check.py:53`/`:201`) und hält nach E-5 **1** ERROR (Kategorie
+  `docs/se-cascade/`, Follow-up `F-DOCS-README-INDEX-SE-2026-09-27`, Termin 2026-10-11); die
+  Aufzählung war damit **unvollständig**, nicht falsch. **Neu (M7):**
   V6 meldet zusätzlich `kind=expected-mismatch` aus IC-23 — der Test wird bei einer
   unbeabsichtigten Zähländerung rot, auch wenn der Render-Output korrekt ist.
   **Mechanik, RVW2-2 (in der dritten Korrekturrunde ergänzt, belegt):** `_handle_validate` ruft
@@ -2561,7 +2701,7 @@ spec-id: SPEC-DOCS-CONSOLIDATION-2026-09-25
 |---|---|
 | **No-Placeholder** | Kein `TBD`, kein `???`, kein `FIXME`, kein leeres Feld. Offene Entscheidungen sind ausschließlich **OQ1, OQ2, OQ3, OQ4, OQ6, OQ8, OQ9** (§11.1) mit Owner, Empfehlung, Entscheidungsweg und Wellen-Blockade; **OQ5** und **OQ7** sind in §11.2 ausdrücklich als **geschlossen** mit Begründung geführt. Jede Interface-Signatur ist vollständig typisiert; jede AC nennt Datei **oder** Befehl **und** Exit-Code/Assertion. |
 | **Spec vs. Design** | T-1…T-6, C1–C8, V1–V9, W0–W8, B1–B6, §5.1–§5.4, §1/§1.1 übernommen oder **explizit** begründet abweichend. **14** Abweichungen in §13: 3 Faktualkorrekturen (A1, A5, A6), 3 Gate-Korrekturen (A2, A3, A4), 3 Ergänzungen (A7, A10, A11), 1 Sicherheits-Korrektur (A8), 1 Formatentscheidung (A9), 1 Zirkel-Auflösung (A12), 1 Branch-Namens-Korrektur (A13, rev. 0.4), 1 **offene** Parallelitäts-Abweichung (A14, rev. 0.4, §17.8). Keine stille Abweichung. **Neu gegenüber Rev. 0.1:** A7 enthält die Korrektur der eigenen Fehlkorrektur F19, A10 die Fail-off-Auflösung, A12 die Stale-Quellen-Wanderung. **Neu in Rev. 0.4:** A13 (Design nennt `chore/docs-consolidation`, verbindlich ist `feat/repository-documentation-consolidation-main`) und A14 (W4/W5/W6 seriell statt paarweise parallel — **nicht** aufgelöst, bewusst offen). |
-| **IDs** | `spec-id: SPEC-DOCS-CONSOLIDATION-2026-09-25` im Frontmatter **und** im Trace-Anker (§15), Format `SPEC-<NAME>-<JJJJ-MM-TT>` konsistent mit `docs/REQUIREMENTS.md:4`-Nachbarn und `docs/specs/2026-09-15-reference-standards-design.md:2`. Kein `REQ-*` vergeben (FI-1, Zuständigkeit `requirements`). **AC-01…AC-41 lückenlos und je genau einmal definiert; §9.1 führt alle 41; §9.2 verteilt sie auf W1–W8, jede Welle mit ≥ 1 AC. IC-01…IC-24 lückenlos. NFA-01…NFA-11 lückenlos. R1…R20 lückenlos. F1…F25 lückenlos, F19 ausdrücklich gestrichen (kein Recycling). V1…V9 lückenlos. W0…W8 lückenlos. OQ1…OQ9, davon OQ5/OQ7 geschlossen. M-1…M-13 lückenlos.** |
+| **IDs** | `spec-id: SPEC-DOCS-CONSOLIDATION-2026-09-25` im Frontmatter **und** im Trace-Anker (§15), Format `SPEC-<NAME>-<JJJJ-MM-TT>` konsistent mit `docs/REQUIREMENTS.md:4`-Nachbarn und `docs/specs/2026-09-15-reference-standards-design.md:2`. Kein `REQ-*` vergeben (FI-1, Zuständigkeit `requirements`). **AC-01…AC-41 lückenlos und je genau einmal definiert; §9.1 führt alle 41; §9.2 verteilt sie auf W1–W8, jede Welle mit ≥ 1 AC. IC-01…IC-24 lückenlos. NFA-01…NFA-11 lückenlos. R1…R20 lückenlos. F1…F25 lückenlos, F19 ausdrücklich gestrichen (kein Recycling). V1…V9 lückenlos. W0…W8 lückenlos — das heißt: alle **neun Wellen** W0…W8 sind vorhanden; es ist **keine** Aussage über Task-IDs innerhalb einer Welle (gemessen: **W0 hat 6 Tasks** — W0-1, W0-2, W0-3, W0-4, W0-6, W0-7 — und **`W0-5` existiert nicht**; Task-ID-Lückenlosheit gilt für AC/IC/NFA/R/F/V, **nicht** für W-Tasks — Präzisierung Korrekturrunde 5, `validator`-Note `n2`). OQ1…OQ9, davon OQ5/OQ7 geschlossen. M-1…M-13 lückenlos.** |
 | **Querverweise** | Jeder `Datei:Zeile`-Verweis wurde am 2026-09-26 gelesen. **Neu bzw. korrigiert in Rev. 0.2:** `config/tier-presets.yaml:1, :31, :85, :115, :145` (5 Tiers); `config/dod-presets.yaml:12, :13, :30, :46, :62, :79, :96, :113` (7 Presets); `config/role-defaults.yaml:2489, :2490, :2547, :2572, :2607, :2633, :2706, :2737, :2755, :2877` (8 Pipelines, 1 disabled); `.meta-config/project.yaml:339-343` (nur `se-cascade`); `README.md:479-489` (7 Zeilen, `concept-driven-dev` fehlt), `:501`, `:688`, `:689`, `:690`, `:695`, `:696`, `:734`; `hooks/**/*.sh` (17 Dateien, 11 deploybar); `commands/1-generic/*.md` (22); `tests/scenarios/asserts/{50,51,52,54,55,56}*.sh` mit **exakten** Zeilen `:32`, `:44`, `:26-27`, `:24-25`, `:31`; `tests/scenarios/run.sh:46-52`; `tests/scenarios/configs/{51,52,54}*.project.yaml`; `tests/scenarios/registry.md:97-110`; `scripts/lib/spec_plan_scaffold.py:20-24, :27-44, :46-68`; `scripts/lib/knowledge.py:103-114, :116-129, :131-132, :153-169`; `scripts/lib/generated_file_drift.py:35-37, :44, :51-67, :82-84, :240-310, :313-351, :344-349, :354-402, :379-386, :388, :405-425, :422-424, :591-596`; `scripts/lib/consistency/placeholders.py:128-131, :135-136, :148-183, :177-182`; `scripts/lib/sync_pipeline.py:587-620, :922-945, :929, :935, :1090-1099, :1102-1117, :1139`; `scripts/lib/cli_commands.py:72, :864, :888-900, :1139`; `scripts/lib/backup.py:376+`; `scripts/lib/deactivation.py:21, :303-353`; `config/project-config.schema.json:2058, :2073, :2425`; `ARCHITECTURE.md:3, :8-20`; `knowledge/wiki/index.md:24`; `knowledge/wiki/log.md:13-17, :30`; `docs/guides/project.yaml.example` (179 Z), `howto/configs/project.yaml.example` (340 Z), `docs/howto/admin-ui-remote-access.md`. **Neu bzw. korrigiert in Rev. 0.3:** `README.md:381-390` (F22 b — Überschrift + 6 Preset-Zeilen, `concept-driven` fehlt; `config/dod-presets.yaml:96`); `ARCHITECTURE.md:3` (F4, zweite Fundstelle) gegen `VERSION:1`; `hooks/1-generic/*.sh` (**11** Dateien, davon 2 `*-impl.sh` ⇒ **9**) gegen `scripts/lib/hooks.py:95-105` und `scripts/lib/external_tools.py:217-220`; `scripts/lib/spec_plan_scaffold.py:49-51` und `:62-68` für die Abschirmungskette in AC-38; `tests/scenarios/configs/51-spec-plan-disabled.project.yaml:1-34` (kein `docs-consolidation`-Key; `spec-plan-workflow.enabled: false` `:11-12`; `knowledge-engine.enabled: false` `:7-8`; `external-system-override.enabled: true` `:20-21`); `tests/scenarios/asserts/{50:32, 51:29-32, 52:41-44, 54:26-27}` direkt gelesen. `hooks/**/*.sh` = **17** Dateien bleibt eine **Belegzahl der Befund-Zeile F3** und ist **kein** `DOCS_*`-Faktum (NEW-1). **Nicht** verifizierbar und daher als HYPOTHESIS markiert: die exakte Zahl der `docs/**/*.md` (~190, §1) und die Zahl der Knowledge-Agenten im `AGENTS.md`-Bootstrap-Block (66, OQ3, aus dem Design übernommen). |
 | **Coverage** | Jedes AC in §7 verweist auf mindestens eine IC; die Zuordnung AC → Welle → Datei → V-Check ist in §9.1 für alle **41** AC gefüllt. AC **ohne** V-Check sind in §9.1 je einzeln begründet; die Liste ist in Rev. 0.3 **vollständig** (NEW-6: Rev. 0.2 ließ AC-06, AC-22 und AC-38 weg) und umfasst **18** AC: **AC-01, AC-02, AC-03, AC-04, AC-06** (Fakten-Invarianten bzw. Key-Set, per Unit-Test in `tests/test_doc_facts.py`), **AC-18, AC-19, AC-22, AC-23, AC-24, AC-25, AC-26** (Determinismus, Drift-Store, Scaffold-Vertrag, Config-/Snippet-Bridge, per Unit-Test), **AC-34, AC-35, AC-37, AC-38, AC-39, AC-41** (Wiki-Restore, Allowlist, Szenario-Runner, Schema-Operation, Restore-Pfad). Die Begründungsklassen: Konfigurations-/Fakten-Invarianten; Determinismus-, Drift-Store-, Szenario- und Restore-Ebene — abgesichert per Unit-Test bzw. bestehendem Runner statt per Consistency-Check. |
 | **Modularisierung** | Vier Module M1–M4, jeweils mit eigener Verantwortung, Dateiliste, Wellen, Vorgänger und Rollback (§4). Die Entscheidung „eine Datei" ist in §4 begründet; OQ7 ist als **geschlossen** mit Verweis auf die Planungsentscheidung geführt (§11.2). |
@@ -3196,5 +3336,309 @@ V-Check-ID umnummeriert.
 | **K43** | **N3 — Reststelle.** Plan:925 nannte `README.md` „W8-2 Totverweise (`:721-724`)", wodurch K30s Aussage „an allen benannten Stellen" unzutreffend war. | Auf **`:722-723`** korrigiert (`:721`/`:724` existieren) — K30s Aussage ist damit **wahr**. | Plan:925 (File Structure, „Geändert (Doku/Agent)") |
 | **K44** | **N4 — Widerspruch im selben `--validate`-Bullet + überzogene Absolutheitsaussage.** Im W8-4-Bullet standen „auch nach W8-4 rot ⇒ Deltasperre" und zwei Sätze später „spätester Termin 0 W8-4"; K27 behauptete „an keiner Stelle ein Widerspruch lesbar", obwohl acht Wiederholungen **keinen** lokalen Verweis tragen. | **Widerspruch aufgelöst:** der Nachsatz „spätester Termin 0 W8-4" ist aus dem Bullet **entfernt**; „W8-4" bleibt **nur** Termin für V2 und für die OQ10-Entscheidungsfrist. **K27s Absolutheitsaussage ehrlich gefasst** und mit den **benannten acht Stellen** dokumentiert — die kleinere Lösung wurde gewählt, weil acht zusätzliche Verweise acht Wellenblöcke sichtbar umschreiben würden, ohne Informationsgewinn. | Plan W8-4-Block (`--validate`-Zeile), Plan `W-VALIDATE-ROT` Vorrangregel |
 | **K45** | **N5 — Wiki-Seiten-Zahl ohne Historien-Markierung.** Plan:396 nannte „**10** Seiten" ohne Datum. | Als **Historie** markiert (Ist-Stand **2026-09-26**) und der aktuelle Wert **11** danebengestellt (K24). | Plan RVW-1-Absatz |
+
+### 17.11 Rev. 0.7 — E-5, E-6, E-7 und E-8 (entschieden 2026-09-27), Katalog K54…K58
+
+**Eingang und Autorisierung.** Vier **bereits getroffene Entscheidungen des Nutzers** vom
+**2026-09-27**, über `main_chat` an den `orchestrator` und hierher beauftragt. Sie sind
+**verbindlich** und werden hier **nicht** neu bewertet, **nicht** zur Entscheidung gestellt und
+**nicht** als offene Vorlage geführt:
+
+| Kennung | Entscheidung in einem Satz | Owner der Entscheidung | Datum |
+|---|---|---|---|
+| **E-5** | V4 wird vom Scope „alle 205 nicht-Archiv-`docs/**.md` gegen `README.md`" auf den **README-Index-Scope** begrenzt; die **191** daraus entstehenden Findings werden **Follow-up**. | `main_chat` (Nutzer) | 2026-09-27 |
+| **E-6** | Die zwei roten Volltests erhalten einen **eigenen Task W2-8** mit eigenem `Files:`, Agent, AK und **Position vor W2-7**. | `main_chat` (Nutzer) | 2026-09-27 |
+| **E-7** | **V5** wird in das neue Modul `scripts/lib/consistency/docs_freshness_v5.py` ausgelagert, um die harte `< 600`-Grenze zu halten. | `main_chat` (Nutzer) | 2026-09-27 |
+| **E-8** | `TASK_HEADER_RE` wird um die **Wellen-/Task-Header** erweitert; neuer Task **W2-9**; **Ledger-Writer einsetzbar ab W2-9**. | `main_chat` (Nutzer) | 2026-09-27 |
+
+**Abgrenzung zu Rev. 0.6.** Rev. 0.6 war ein **echter** Revisions-Bump (U-1/U-2). **Rev. 0.7 ist
+ebenfalls ein echter Revisions-Bump** — er ändert den **Scope eines bestehenden Checks** (V4), die
+**Modulzuordnung** (E-7) und die **Taskmenge** (48 → **50**). `status: APPROVED` und
+`approved: 2026-09-26` bleiben **unverändert**. **Keine** ID wird umnummeriert oder gestrichen;
+**zwei** Task-IDs sind neu: **W2-8**, **W2-9**. **Keine** AC, kein IC **außer** der V4-Zeile in
+IC-05, kein R, kein OQ, kein V-Check wird gestrichen; **kein** Sollwert wird gesenkt.
+
+**Wortgleich und unangetastet bleiben:** §17.10 samt §17.10.1–§17.10.5, die Rev.-0.6-Blöcke, die
+Revisionshistorie-Zeile `0.6`, die Korrekturrunden 1–4 des Plans (**K25…K53**) und deren
+Entscheidungsvorlagen-Tabellen **E-5…E-8** (dort: „offen, unentschieden"). Diese Tabellen
+dokumentieren den Stand **vor** der Entscheidung; **maßgeblich** sind die **Plan-Legende** und
+dieser Abschnitt.
+
+#### 17.11.1 Katalog K54…K58
+
+| K | Befund / Entscheidung | Behandlung | Ort |
+|---|---|---|---|
+| **K54** | **E-5 — Mechanismuswahl.** „README-Index-Scope" lässt **zwei** technisch tragfähige Lesarten zu. Auswahlkriterien waren: (a) die **193** Findings auflösen (**K60**, nicht 191), (b) V4 **nicht vakuum-trivial** machen, (c) **IC-05 nicht brechen**. | **Gewählt: kategorie-genaue Strukturvollständigkeit des README-Index** (Definition in §17.11.2). **Verworfen und begründet: Rücknahme auf den Alt-Scope `docs/api/*.md`** (Begründung dort). **IC-05-Pin unverändert** (Check-ID `docs.readme_index`, **Signatur einargumentig** `(root: Path)` — **K59**, Severity ERROR, `file` = `README.md`). Die **193** werden **kein** AC, sondern **Follow-up `F-DOCS-README-INDEX-2026-09-27`** (§17.11.3) — **kein** Termin 0 in W0–W8, **kein** stilles Absenken. | IC-05 (V4-Zeile), §17.11.2, §17.11.3, Plan Rev. 0.7 (`W2-GATE-ERRORS`, W-VALIDATE-ROT, DoD 2) |
+| **K55** | **E-5 — Grenzziehung gegen V2 und V3.** Nach der Umfangsänderung bestand die Gefahr, dass V4 mit V2 (beide `docs/`-Vollständigkeit) oder mit V3 (beide README/Link) verschmilzt und Doppelmeldungen entstehen. | **Drei disjunkte Fragen, explizit:** V2 = **Seite** fehlt in `docs/INDEX.md` (generiert, vollständig, alle nicht-Archiv-`docs/**.md`). V3 = **Linkziel** existiert nicht. V4 = **deklarierte Kategorie** des handgepflegten README-Index ist nicht repräsentiert; V4 prüft **nie** ein Linkziel. Ein toter Link in der Index-Region ist ein **V3**-Finding und **kein** V4-Finding. | §17.11.2, Plan Rev. 0.7 Task W2-6 Akzeptanz |
+| **K56** | **E-6 und E-7 — Taskmenge und Modulmenge.** Die beiden Entscheidungen erzeugen **zwei** Tasks (**W2-8**, **W2-9**) und ein **fünftes** Modul; die Zählungen 48/199 und „4 Module" wurden dadurch überholt. | **Tasks 48 → 50**, **Checkboxen 199 → 207** (`[x]` **59** unverändert, `[ ]` **140 → 148**), Herleitung **44 × 4 + 5 × 5 + 1 × 6 = 207**. **Module 4 → 5** für die Dateicheck-Logik, Zuordnung **12/12 disjunkt und lückenlos** auf **5** Module. `docs_freshness.py` = **592** Z (Reserve **8**), `docs_freshness_v5.py` = **≈ 55–70** Z — **beide < 600**. **Die alten Aussagen bleiben wortgleich** und werden **hier** berichtigt (K18-/K42-Logik: der historische Block nennt seinen damaligen Stand). | Plan Rev. 0.7 (Frontmatter, Kopf, File Structure, PG-2, Matrices, L-1), §4.1, §9.2, §4 |
+| **K57** | **E-8 — Werkzeugpfad.** `TASK_HEADER_RE` verlangt `### Task <id>`; dieser Plan schreibt `### W2-0:` ⇒ `_task_blocks()` leer ⇒ `unmatched={…}` ⇒ Exit 1. **Teilfehler (b) — „`TASK_ID_RE` erwartet zusätzlich `task-<ziffern>`" — ist in Rev. 0.7 FALSCH DIAGNOSTIZIERT und wird hiermit zurückgenommen (K66 / RVW-7-08):** `normalize_task_id("W2-0")` liefert **heute schon** `"W2-0"` (Durchreich-Zweig `return raw`, `plan_identity.py:73`, weil `TASK_ID_RE = ^task-[0-9]+$` (`:18`) nicht passt); **verhaltensgleich belegt** durch `normalize_task_id("custom") == "custom"` (`tests/test_plan_identity.py:100`) — der **`W2-0`-Pin wird in W2-9 Akzeptanz (f) neu angelegt**, **K74**). **Ein** Teilfehler, ein Werkzeug. | **Eigener Task W2-9** mit dem **einzigen** Teilfehler (a): alternativer Regex-Zweig für die Wellen-/Task-Header-Form. `normalize_task_id` / `TASK_ID_RE` bleiben **unangetastet**; eine „Reparatur" von (b) würde den Round-Trip **brechen** und ist **verboten** — (b) wird als **No-op-Pin** fortgeführt. **K62 / RVW-7-04 (additiv):** `scripts/lib/consistency/spec_plan.py` ist der **dritte** Konsument der Regex; sein hart kodiertes Dep-Token-Muster (`:570`) wird auf `W\d+-\d+` erweitert — sonst erzeugt `**W2-0**` die Phantom-ID `task-0`, `find_dependency_errors` meldet `deadlock:` und `validate_plan` bricht **vor** dem Overlap-Check ab, sodass die fail-closed-Ownership-Klausel **ganz ausfiele**. **Position Phase 0, vor PG-2a** ⇒ einsetzbar für **W2-6, W2-4, W2-8, W2-7**. Die K53-Interim-Regel (manuelles Abhaken) **endet mit W2-9** — ausdrücklich, nicht stillschweigend. | Plan Rev. 0.7 Task W2-9 (`Files:`, `Interfaces`, Akzeptanz (e)/(f)), DoD 14, Abschnitt L, DAG-Kanten 16 |
+| **K58** | **Faktenkorrektur.** Auftrag und Korrekturrunden-4-Block nennen `TASK_HEADER_RE` als in `scripts/lib/plan_ledger.py` liegend. | **Gemessen:** Definition in `scripts/lib/plan_identity.py:27-30`; `plan_ledger.py` ist **Konsument** (Import `:25`, `finditer` `:71`, Tupel-Entpackung `:133`). W2-9 besitzt deshalb **beide** Dateien — `plan_ledger.py` nur, falls sich der Zwei-Gruppen-Vertrag ändert. | Plan Rev. 0.7 Task W2-9 `Files:`; Statuskopf Rev. 0.7 |
+
+#### 17.11.2 E-5 — der gewählte Mechanismus, und die ausdrücklich verworfene Alternative
+
+**Die beiden technisch tragfähigen Lesarten von „README-Index-Scope".** Beide sind gegen den
+gemessenen Baum belegbar; sie unterscheiden sich in der **Granularität**, in der V4 die
+Vollständigkeit prüft.
+
+**Lesart A — kategorie-genaue Strukturvollständigkeit (GEWÄHLT).** V4 liest die
+`##`-Überschrift, deren Text `Documentation Index` enthält (gemessen `README.md:347`), bis zur
+nächsten `##`-Überschrift (gemessen `README.md:381`) — die **Index-Region**. Aus ihr werden die
+**deklarierten** `docs/`-Kategorien extrahiert (jeder `docs/<kategorie>/`-Pfad, der in der Region
+genannt wird; gemessen **7**: `docs/guides/`, `docs/howto/`, `docs/api/`, `docs/ui/`,
+`docs/architecture/`, `docs/plans/`, `docs/se-cascade/`). Je Kategorie gilt **zwei** Bedingungen:
+**(a) Existenz** — das Verzeichnis existiert; **(b) Repräsentation** — die Kategorie trägt
+**mindestens einen** `docs/<kategorie>/…`-**Link** (Markdown-Linkziel) **innerhalb** der Region.
+Fehlt die Überschrift ganz, liefert V4 **ein** Finding („kein Documentation-Index-Abschnitt") —
+**nicht** eine leere Liste (fail-closed statt vakuum-grün).
+
+**Die 7/6-Lesart ist entschieden, nicht offengelassen (K64 / RVW-7-06, Korrekturrunde 5).** Die
+Extraktionsregel ist „**jeder `docs/<kategorie>/`-Pfad, der in der Region genannt wird**" — **nicht**
+„jede `###`-Überschrift, die eine Kategorie nennt". Eine **überschriften**-basierte Lesart ergäbe
+**6** statt **7**, weil `docs/architecture/` **ausschließlich** im Link `README.md:371` genannt
+wird und in **keiner** `###`-Überschrift der Region steht. **Beide** Lesarten liefern denselben
+Sollwert **1** (die einzige Lücke ist `docs/se-cascade/` in beiden); die Stabilität des Sollwerts ist
+deshalb **kein** Argument gegen die Präzisierung. Die Regel steht **wortgleich** in **W2-6,
+`Interfaces`**, damit Implementierung und Spec nicht auseinanderlaufen.
+
+**Vorrangregel fail-closed vs. fail-soft (K65 / RVW-7-07, Korrekturrunde 5 — verbindlich, ersetzt
+eine gleich behandelte Doppelausnahme).** Gemessen behandelt `docs_links.py:183` die Fälle
+`README.md` fehlt **und** `docs/` fehlt **gemeinsam** (`not readme.exists() or not
+docs_dir.is_dir()` ⇒ `[]`), ohne zu sagen, welcher Fall gilt, wenn `docs/` **existiert**,
+`README.md` aber fehlt. **Reihenfolge, verbindlich:** **(1)** fehlt der **`docs/`-Verzeichnisbaum**,
+liefert V4 **`[]`** — *fail-soft*, die **einzige** Ausnahme: ein Projekt ohne `docs/`-Baum ist
+durch diese Prüfung nicht defekt, und „nicht repräsentierte Kategorie" wäre dort gegenstandslos, weil
+es weder Region noch deklarierte Kategorien gibt. **(2)** existiert `docs/`, gilt die fail-closed-
+Regel: fehlt `README.md` **oder** die `Documentation Index`-Überschrift, ist das **genau ein**
+Finding.
+
+**Lesart B — Seiten-genau innerhalb der Region (VERWORFEN).** Das *Suchgebiet* für den Linknachweis
+wird auf die Index-Region begrenzt, die *geprüfte Seitenmenge* bleibt der ganze `docs/`-Baum. Das
+ist ebenfalls baubar, scheitert aber an Kriterium (a): gemessen trägt die Region **12** `docs/`-**Seiten**
+(7 aus `docs/api/`, 2 aus `docs/guides/`, 1 aus `docs/howto/`, 1 aus `docs/architecture/`, 1
+aus `docs/plans/`), der nicht-Archiv-`docs/`-Baum hat **205** `.md`-Seiten ⇒ **205 − 12 = 193**
+Findings — Lesart B liefert damit **dieselbe** Menge wie die unveränderte Prüfung und löst den
+Blocker also **nicht** auf. **K60 / RVW-7-02 (Korrekturrunde 5):** diese Rechnung ist die
+**korrekte**; die Herleitung „**191**" in §17.11.3 war ein **Einheitenfehler** und ist hiermit
+ersetzt. Genau: die **14** in `README.md` genannten `docs/`-Pfade sind **12** `.md` + **2** `.html`
+(`docs/ui/agent-graph.html`, `docs/ui/admin-ui.html`); der **205**-Bestand ist `.md`-only, die
+`.html`-Pfade gehören **nicht** hinein. **205 − 12 = 193.**
+
+**Die dritte, ebenfalls diskutierte Lesart — Rücknahme auf den Alt-Scope `docs/api/*.md`
+(Lesart C) — ist die verworfene Alternative im Sinne des Auftrags.** Sie ist der Stand vor W2-6
+(`docs.py:111`, Spec F18) und liefert am Baum gemessen **0** Findings, weil alle **sieben**
+`docs/api/*.md` in `README.md:362-373` verlinkt sind. **Sie ist verworfen, weil sie gegen die drei
+Auswahlkriterien fällt:**
+1. **Kriterium (b) — sie ist vakuum-trivial.** Ein Check, der **0** Findings liefert, kann seine
+   eigenen Schärfe **nicht** belegen; Lesart C feuert künftig nur, wenn jemand **im Verzeichnis
+   `docs/api/`** eine Datei anlegt — einem Verzeichnis, das über W2–W8 **planmäßig** nicht wächst.
+   Unter Lesart A hat V4 **heute** einen **echten** Befund (siehe unten), die Schärfe ist damit
+   **belegt statt behauptet**.
+2. **Kriterium (c) formal, Inhalt bricht sie:** IC-05s V4-Spalte („erweitert", F8/F23) und die
+   Aussage „die bisherige Teilmenge bleibt eine **echte** Teilmenge der neuen Prüfung" werden zu
+   einem **leeren** Satz, wenn die Prüfung exakt die alte Teilmenge ist. Das ist eine
+   **Sollwert-/Vertragsauflösung** durch die Hintertür.
+3. **Fachlich:** sie lässt **genau** die **sechs** anderen deklarierten Kategorien des
+   README-Index strukturell ungeprüft — also genau die Blindstelle, unter der sich die 193
+   unbemerkt angesammelt haben. Das ist der Grund, weshalb die Verallgemeinerung ersonnen wurde.
+
+**Erwartungswert am gemessenen Baum (Lesart A).** **Genau 1 Finding**, Kategorie
+`docs/se-cascade/`: die Region trägt für diese Kategorie **keinen** Link (gemessen: `README.md:378`
+ist die Überschrift mit Backtick-Pfad, `:379` ist Prosa; der einzige `docs/se-cascade/`-Verweis
+außerhalb der Region ist `README.md:654`, ebenfalls **kein** Link). Das ist ein **echter** Befund
+der geforderten Art — eine im Index angekündigte Kategorie ohne Eintrag — und wird als
+**Follow-up `F-DOCS-README-INDEX-SE-2026-09-27`** mit Owner und Termin geführt (**§17.11.3**), **nicht**
+stillschweigend auf 0 gesetzt. **Ehrliche Grenze der Aussage:** V4 ist damit **kein** Sollwert-
+Check mit Term 0 in W0–W8; maßgeblich ist die **Deltasperre** der Regel `W-VALIDATE-ROT`
+(Plan, Spec §10 `--validate`).
+
+**Warum Lesart A V2 und V3 nicht dupliziert (K55).** V2 liest `docs/INDEX.md` und ist
+**seiten**-genau: **alle** nicht-Archiv-`docs/**.md` (ohne `docs/INDEX.md` selbst) müssen dort
+stehen — und werden das ab **W3-6**, weil `docs/INDEX.md` **100 % generiert** ist (OQ6/OQ8,
+IC-10/IC-13). V4 liest `README.md` und ist **kategorie**-genau: es fragt nichts über einzelne
+Seiten. **Die 193 sind genau die Menge, die V2 abdeckt** — sie sind deshalb **kein** Fehler des
+README, sondern eine **Eigenschaft des Formats** (die README ist ein **kuratierter** Einstieg mit
+**Auswahl**, `docs/INDEX.md` ist der **vollständige** Index). V3 prüft, ob ein **Linkziel
+existiert**; V4 prüft **nie** ein Linkziel. **Überschneidung:** keine — ein toter Link in der
+Index-Region ist ein V3-Finding und **kein** V4-Finding, und umgekehrt kann V4 rot sein, während
+V3 grün ist (fehlende Repräsentation bei existierendem Ziel).
+
+**Was E-5 ausdrücklich *nicht* leistet.** (a) `--validate → 0` wird **nicht** erreichbar — weder
+vorher noch nachher; maßgeblich ist die Deltasperre. (b) Die Vollständigkeit der `docs/`-Seiten
+**als solcher** wird **nicht** geprüft — dafür ist V2 zuständig, und es prüft sie ab W3-6 gegen
+die generierte Quelle. (c) Es entsteht **keine** neue AC; AC-12 bleibt an V2/W3-6 gebunden.
+
+#### 17.11.3 Follow-up-Register — Fortsetzung (§17.10.3 bleibt die erste Hälfte)
+
+**Regel unverändert:** ein Follow-up ist **kein** Sollwert und **kein** AC; er gilt als erledigt
+**nur** über den jeweils genannten Nachweis, ausgewertet als **Zählwert** über `--json`
+(kein Exit-Code, RVW-12). **Maßgeblich ist §17.10.3 + diese Fortsetzung.**
+
+| ID | Gegenstand | Umfang | Owner | Termin | Entscheidungsweg / Nachweis |
+|---|---|---|---|---|---|
+| **`F-DOCS-README-INDEX-2026-09-27`** | **193** nicht-Archiv-`docs/**.md`, die in `README.md` **nicht** verlinkt sind. **K60 / RVW-7-02 (Korrekturrunde 5) — Herleitung korrigiert, die frühere „**191**" war ein Einheitenfehler:** Baseline-Messung 2026-09-27: `docs/`-Baum **205** `.md`-Seiten außerhalb `archive/`/`_archive/`; `README.md` nennt **14** `docs/`-Pfade, davon **12** `.md` und **2** `.html` (`docs/ui/agent-graph.html`, `docs/ui/admin-ui.html`) ⇒ **205 − 12 = 193**. **§17.11.2 Lesart B rechnete bereits 193**; dieser Registereintrag war die einzige abweichende Stelle | Kuratierte Verlinkung der **vom Projekt als Einstieg bestimmten** Seiten in `README.md`; **kein** Inhalts-Rewrite (NG-1), **kein** Zwang, **alle 205** zu verlinken — der vollständige Index ist `docs/INDEX.md` (V2) | **`developer`** | **2026-10-11** | Folge-Issue in `Popoboxxo/agent-meta`, Titel „Docs: 193 `docs/` pages not linked in README Documentation Index (V4/E-5)"; **Anlage** als benannter Schritt (Anlage-Datum **2026-09-30**, Muster `F-ISSUE-ANLAGE` aus §17.10.3). **Nachweis — beides zusammen, messbar (K60, ersetzt den vakuumen V4-Nachweis aus Rev. 0.7):** (a) die **Issue-Liste** nennt die betroffenen Seiten **namentlich** (Eindeutigkeit, nicht nur eine Zahl); (b) der **once-count** läuft **außerhalb** des Check-Frameworks als reiner Shell-Zählaufruf: `find docs -name '*.md' -not -path '*/archive/*' -not -path '*/_archive/*' -not -name 'INDEX.md' -printf '%p\n' \| while read -r f; do grep -qF "$f" README.md \|\| echo "$f"; done \| wc -l` ⇒ Baseline **193**, Ziel **0**. **K75 (Korrekturrunde 6) — die Baseline ist zukunftssicher gefasst:** der Aufruf enthält `-not -name 'INDEX.md'`, was der **V2-Konvention** entspricht (IC-05 V2-Zeile „ohne `docs/INDEX.md` selbst"). Das ist heute **folgenlos** (`docs/INDEX.md` existiert **nicht**; Universe **205** ⇒ **193** ✓), **ab W3-6** liefert **derselbe** Aufruf aber **192** (Universe **204**, davon **12** verlinkt), während die Baseline **193** bleibt. **Deshalb gilt die Zahl als `Universe 205 − 12 verlinkt = 193` mit Bezugszeitpunkt vor W3-6**; der **Sollwert 0** ist davon **nicht** betroffen. **Ausdrücklich kein `docs.readme_index`-Zählwert:** V4 zählt nach E-5 **deklarierte Kategorien**, nicht Seiten; der Zählwert ist bei Registrierung **0** bzw. **1** und **beobachtet diese Menge nicht** — als Nachweis wäre er **vakuum** |
+| **`F-DOCS-README-INDEX-SE-2026-09-27`** | Kategorie **`docs/se-cascade/`** ist im README-Index deklariert (`README.md:378`) und trägt dort **keinen** Link | **ein** Link-Eintrag in der Index-Region, auf eine existierende Seite unter `docs/se-cascade/`; additiv, kein Rewrite | **`developer`** | **2026-10-11** | gemeinsam mit `F-DOCS-README-INDEX-2026-09-27`; **Nachweis:** Zählwert `docs.readme_index` = **0** Findings — das ist zugleich der Sollwert 0, den W2-6 für V4 führt. **Abgrenzung zu K60, ausdrücklich:** **hier** ist der `docs.readme_index`-Zählwert der **richtige** Nachweis, weil der Gegenstand eine **Kategorie** ist und genau das ist, was V4 zählt |
+
+**Warum zwei Einträge und nicht einer:** die beiden Mengen haben **verschiedene** Gegenstände
+(ein **Design**-Eintrag gegen einen **fehlenden** Eintrag) und **verschiedene** Erfüllungsbelege
+(Kuratierung gegen ein Link-Edit). Zusammenführen würde den Nachweis des einen an den des anderen
+koppeln und den jeweils eigenen Fortschritt unsichtbar machen. **Anlagestand:** beide teilen sich
+den Anlage-Schritt und das Anlage-Datum **2026-09-30**; die Abarbeitung hat Termin **2026-10-11**.
+**Ausdrücklich, weil es leicht verwechselt wird (K60):** die beiden Zeilen haben auch **zwei
+verschiedene Nachweisformen** — nur die **zweite** ist ein `docs.readme_index`-Zählwert; die
+**erste** braucht den Issue-Listen- plus Shell-Nachweis, weil ihr Gegenstand **Seiten** sind, die
+V4 nicht zählt.
+
+#### 17.11.4 Zyklenprüfung des W2-DAG nach E-6/E-7/E-8 (Plan-Seite, K57)
+
+**Kanten neu:** `W2-0 → W2-9` (Werkzeugpfad vor allen noch offenen W2-Tasks) · `W2-4 → W2-8`
+(E-6-Fix als letzter Schritt vor der Registrierung) · `W2-8 → W2-7`. **Kanten geändert:** `W2-7`
+hängt zusätzlich an **W2-8**; `W2-4 → W2-7` bleibt bestehen.
+
+**Topologische Ordnung:** `W2-1 → W2-2 → W2-0 → W2-9 → {W2-3 ‖ W2-5 ‖ W2-6} → W2-4 → W2-8 → W2-7`.
+
+**Nachweis:** (a) **keine** Kante zeigt von einer höheren auf eine niedrigere Welle; die
+Querwellenkanten (`W1-6 → W2-1`, `W0-4 → W2-1`, `W1-5 → W2-5`, `W2-1 → W3-4`, `W1-10 → W3-1`)
+bleiben unverändert **Vorwärts**kanten. (b) Innerhalb W2 zeigen alle Kanten **vorwärts** in der
+Reihenfolge oben; es existiert **keine** Kante `W2-9 → W2-0`, `W2-8 → W2-4` oder `W2-7 → W2-8`.
+(c) **PG-2a = {W2-3, W2-5, W2-6}** bleibt bei **3** Members — die Grenze von **3** gleichzeitigen
+Agents wird **nicht** überschritten, weil W2-9 **vor** und W2-4/W2-8 **nach** der Gruppe liegen.
+(d) **Write-Set-Disjunktheit** ist gewahrt: W2-9 schreibt `scripts/lib/plan_identity.py`,
+`scripts/lib/plan_ledger.py`, `tests/test_plan_identity.py`, `tests/test_plan_ledger_writer.py` —
+**keine** dieser Dateien wird von einer anderen W2-Task geschrieben; W2-8 schreibt
+`tests/test_knowledge_engine.py` und `tests/test_sharkord_service_name_migration.py` — ebenfalls
+**disjunkt** zu allen W2-Write-Sets. (e) W2-4 schreibt nach E-7 **`docs_freshness_v5.py`** (neu)
+und **`tests/test_doc_freshness_v5.py`** (neu) und **nicht mehr** `docs_freshness.py` /
+`tests/test_doc_freshness.py` — die Kante `W2-5 → W2-4` wird damit **gegenstandslos** und bleibt als
+**historische** Kante im Plan-Planungsbild sichtbar (ihre Begründung — gemeinsame Schreibmenge —
+trifft nach E-7 nicht mehr zu); die **Wirkung** ist eine **Verschärfung**, keine Lockerung: W2-4
+ist jetzt **in Phase B frei** und hängt nur noch an W2-5 (Bestand `docs_freshness.py` wird von
+niemandem mehr berührt). **Korrekturrunde 5 (K62) — (d) ist um eine Datei zu ergänzen:** W2-9
+schreibt zusätzlich **`scripts/lib/consistency/spec_plan.py`** (Dep-Token-Muster, `:570`), weil
+`_parse_plan_tasks` der **dritte** Konsument von `TASK_HEADER_RE` ist. **Write-set-disjunkt bleibt
+gewahrt:** `spec_plan.py` wird von **keiner** anderen W2-Task geschrieben (W2-7 schreibt
+`consistency-check.py`, `docs.py`, `report.py`; W2-0 schrieb `spec_plan.py` **nur lesend** für den
+Modul-Split) — die Disjunktheit wird damit **nicht** verletzt, sondern war ohne diese Ergänzung
+eine **unvollständige** Aussage.
+**Ergebnis: keine Zyklen. Der Graph ist ein DAG.**
+
+#### 17.11.5 Korrekturrunde 5 (K59…K70) — Concept-Review über Rev. 0.7: Belege, Zähleinheit, Vorrang und drei unerreichbare Mechanismen
+
+**Eingang und Autorisierung.** Concept-Review vom **2026-09-27** über Spec + Plan **Rev. 0.7**:
+`VERDICT: CHANGES_REQUESTED` — **0 kritisch, 5 major, 4 minor, 2 info** (11 Findings
+`RVW-7-01`…`RVW-7-11`); `validator`: **`PASS_WITH_NOTES`, 0 Blocker** (Notizen `n1`…`n5`).
+Diese Runde setzt **keine** neue Entscheidung des Nutzers um: E-5…E-8 bleiben, wie entschieden.
+**Kein Revisions-Bump** — `status: APPROVED`, `approved: 2026-09-26` und `revision: 0.7` bleiben
+unverändert. **Kein** Produktionscode, **keine** Tests, **keine** Runner-Änderung, **keine**
+Git-Mutation. Die Korrekturen wirken **ausschließlich auf Spec- und Plan-Text**; die dort
+beschriebenen Codeänderungen sind **Pflichten für W2-6, W2-8 und W2-9**, keine ausgeführten
+Änderungen. **Keine** Task-, AC-, IC-, R-, OQ-, V-Check- oder F-ID wurde umnummeriert oder
+gestrichen; **keine** neue Task-ID, **keine** neue offene Frage, **kein** neuer Sollwert, **keine**
+neue F-ID. §17.10 samt §17.10.1–§17.10.5, §17.11.1–§17.11.4, die Rev.-0.6-/Rev.-0.5-Blöcke und die
+Korrekturrunden 1–4 des Plans bleiben **wortgleich**, soweit sie nicht durch einen ausdrücklich als
+solchen gekennzeichneten Zusatz ergänzt wurden. **Die Spec-Legende bleibt eingefroren** auf
+`K1…K45`; **maßgeblich** ist die **Plan-Legende** (`K1…K70`).
+
+**Methodischer Vorbehalt, übernommen.** Die Read-Zeilennummern des Reviewers waren unzuverlässig;
+**alle** Belege dieser Runde stammen aus **Grep/Read im Working Tree** und wurden **vor** dem Edit
+verifiziert. **Zwei Abweichungen zwischen Review und Messung sind ausdrücklich festgehalten:**
+**(a)** der Review nennt „**sechs**" V4-Tests, seine eigenen Listen ergeben **sieben** (4 **rot** +
+3 **vakuum-grün mit falscher Semantik**); maßgeblich ist die **Messung**; **(b)** die Herleitung
+„`205 − 14 = 191`" ist ein **Einheitenfehler** — maßgeblich ist **`205 − 12 = 193`**.
+
+| K | Befund (Severity) | Behandlung | Ort |
+|---|---|---|---|
+| **K59** | **RVW-7-01 (major)** — der IC-05-Pin für V4 zitierte die Signatur `(root, config=None)`; **gemessen** ist der Pin **einargumentig** (`docs_links.py:167`, Docstring `:170-172`, Testpin `inspect.signature`) | Pin-Zitat auf `(root: Path) -> list[Finding]` korrigiert; die Form `(root, config=None)` wird **ausdrücklich** den **neun neuen** V-Checks zugeordnet. IC-05 (`:944-954` — **K72: nachgemessen**; die Angabe `:930-933` der Runde 5 war falsch und ist ein Codeblock in **IC-04**) trug **kein** Signatur-Literal — dort nur der gemessene Beleg `(root)` ergänzt | Kopf E-5, Revisionszeile `0.7`, IC-05, §17.11.1 K54, Plan (Kopf K54, W-GATE-TABLE, W2-6, W2-8) |
+| **K60** | **RVW-7-02 (major)** — (i) die Zahl **191** mischt **Einheiten** (`205 − 14`, obwohl die **14** genannten Pfade **12** `.md` + **2** `.html` sind); (ii) der Nachweis war **vakuum**, weil `docs.readme_index` nach E-5 **Kategorien** zählt und die Seitenmenge nicht beobachtet | **(i)** `191` → **`193`** (`205 − 12`) an allen normativen Stellen; Lesart B in §17.11.2 rechnete bereits 193 ⇒ der **innere Widerspruch der Spec** ist zugunsten 193 aufgelöst. **(ii)** Nachweis = **Issue-Liste (namentlich) + once-count außerhalb V4** (konkreter Shell-Zählaufruf), Baseline **193** → Ziel **0**; `docs.readme_index` ist als Nachweis **ausdrücklich für unbrauchbar** erklärt — mit der ausdrücklichen Abgrenzung, dass er für den **Kategorie**-Eintrag weiterhin der richtige Nachweis **ist**. **K75 (Korrekturrunde 6 — Bezugszeitpunkt explizit):** der Zählaufruf enthält `-not -name 'INDEX.md'` (V2-Konvention); heute ist das **folgenlos** (`docs/INDEX.md` existiert **nicht**, Universe **205** ⇒ **193**), **ab W3-6** liefert **derselbe** Aufruf **192** (Universe **204**, davon **12** verlinkt). Die Baseline ist deshalb als **`Universe 205 − 12 verlinkt = 193`, Bezugszeitpunkt vor W3-6** gefasst; der **Sollwert 0** bleibt **zeitpunktunabhängig** | Kopf E-5, Revisionszeile `0.7`, §17.11.1 K54, §17.11.2, §17.11.3, §10 `--validate` (via K67), Plan (Kopf K54, W-GATE-TABLE, W-VALIDATE-ROT, W2-6, W2-8, Coverage-Matrix, DoD, L-1, Follow-up-Register) |
+| **K61** | **RVW-7-03 (major)** — W2-6 nannte „drei V4-Tests"; im Working Tree pinnen **sieben** Tests die von E-5 **entfernte** Per-Seiten-Semantik, und **6 der 7** Fixtures schreiben `README.md` **ohne** `Documentation Index`-Überschrift ⇒ V4 feuert in diesen sechs Fixtures und W2-6 Schritt 3 ist **unerreichbar**. **K73 (Korrekturrunde 6 — Begründungsmenge präzisiert):** **R7 hat kein Fixture**, sondern liest den **echten** Baum (`tests/test_doc_index.py:394`, `REPO_ROOT` `:404-408`); er ist rot aus dem **in R7 selbst genannten** Grund (`message.split("'")[1]` auf einer Message, die nach E-5 die **Kategorie** nennt). **Die Klassifikation „alle sieben rot bzw. vakuum" bleibt korrekt** | Die **sieben** Tests werden **namentlich ersetzt, nicht angepasst** (Ersetzungstabelle mit Alt-Test → Ersatz-Test und Zustand in Plan W2-6). **Nicht-Vakuum-Nachweis** (Muster **K33**): `tests/test_doc_index.py` steht in **beide** Erfolgskriterien, und der Negativtest assertiert im selben Rumpf **auch** ein **nichtleeres** Ergebnis — sonst könnte ein Check, der nichts zurückgibt, den `== []`-Teil erfüllen | Plan W2-6 `Akzeptanz V4`, Schritte 1/3, L-1 W2-6, Kopf-Block K61 |
+| **K62** | **RVW-7-04 (major)** — `TASK_HEADER_RE` hat **drei** Konsumenten; `_parse_plan_tasks` (`spec_plan.py:557`) nutzt dieselbe Regex, hat aber hart kodierte Dep-Tokens (`:570`) und speist `check_plan_file_overlap` (`:533`) — das Instrument der **fail-closed**-Ownership-Klausel. `spec_plan.py` fehlte in W2-9s `Files:` | **Dep-Token-Muster auf `W\d+-\d+` erweitern** und `scripts/lib/consistency/spec_plan.py` in W2-9s `Files:` aufnehmen, mit Testpflicht (Akzeptanz (e): 50 Tasks, keine Phantom-Dep-ID, kein `deadlock:`/`cycle detected`) **und** ausdrücklichem Festpinnen des **erwarteten** `docs.py`-Overlap. **Alternative verworfen** (begründet in Plan W2-9): ein erreichbares, aber kaputtes Instrument ist schlechter als ein ungenutztes — `check_spec_plan_workflow` ist für **jeden** Plan aufrufbar, und `task-N` wären für **jeden** Plan mit `W<n>-<k>`-Headern Phantom-IDs. **Kettenwirkung, die den Befund trägt:** `find_dependency_errors` meldet dangling dependency **vor** dem Overlap-Check, `validate_plan` kehrt dort ab ⇒ die Ownership-Prüfung **fiele ganz aus** statt falsch zu sein | Plan W2-9 (`Files`, `Interfaces`, Akzeptanz (e), `Verifikation`, Schritte 1–3), §17.11.1 K57, §17.11.4 (d) |
+| **K63** | **RVW-7-05 (major)** — Mechanismus (ii) ist an W2-8s Position **unerreichbar** (Common-Gate entsteht erst in **W2-7**; V4 nimmt **kein** `config`; der Runner ruft die Altchecks unbedingt mit `_AGENT_META_ROOT`, `--root` leitet sie nicht um; Akzeptanz (d) schließt Produktivcode aus). (iii) nennt das Werkzeug nicht — `--json` gibt der **Runner**, nicht `sync.py --validate` | (ii) aus W2-8s zulässiger Liste **gestrichen** — als **spätere Option** mit allen drei Belegen erhalten; (i) und (iii) als **anwendbar** benannt, (iii) **mit festgeschriebenem Werkzeug** `python3 scripts/consistency-check.py --json --root <eigenes Fixture-Projekt>` und mit der Grenze, dass `--root` die Altchecks **nicht** umleitet — (iii) ist nur in der Form „nur die Dateien des Tests" zulässig | Plan W2-8 Akzeptanz (b), Kopf E-6 |
+| **K64** | **RVW-7-06 (minor)** — die Extraktionsregel stand **nur** in der Spec; überschriften-only ergäbe **6** statt **7** (`docs/architecture/` nur im Link `README.md:371`) | Regel „**jeder `docs/<kategorie>/`-Pfad, der in der Region genannt wird**" **wortgleich** in W2-6 `Interfaces` übernommen, die **7/6-Lesart ausdrücklich entschieden** und vermerkt, dass beide Lesarten den Sollwert **1** liefern — Stabilität des Sollwerts ist **kein** Gegenargument | §17.11.2, Plan W2-6 `Interfaces` |
+| **K65** | **RVW-7-07 (minor)** — fail-closed („Überschrift fehlt ⇒ 1") und fail-soft-Guard („kein `docs/` ⇒ `[]`") standen ohne **Vorrangregel** nebeneinander (`docs_links.py:183` behandelt beide Fälle **gemeinsam**) | **Vorrangregel** verbindlich: der **fail-soft-Guard zuerst** — fehlt der `docs/`-Baum, `[]` (einzige Ausnahme); bei vorhandenem `docs/` gilt **fail-closed** (fehlende `README.md` **oder** Überschrift ⇒ **1**). Zwei **neue** Tests in W2-6 | §17.11.2, Plan W2-6 `Interfaces` |
+| **K66** | **RVW-7-08 (minor)** — K57-Teilfehler (b) war **falsch diagnostiziert**: `normalize_task_id("W2-0")` liefert **heute schon** `"W2-0"` (Durchreich-Zweig `return raw`, `plan_identity.py:73`; **verhaltensgleich belegt** durch `normalize_task_id("custom") == "custom"`, `tests/test_plan_identity.py:100` — **K74**: der Anker `:96-101` der Runde 5 war falsch, dort steht `test_normalize_task_id` **ohne** `"W2-0"`; der `W2-0`-Pin wird in Akzeptanz (f) **neu** angelegt) | Gemessenes Verhalten ausgesagt, (b) **zurückgenommen**, W2-9 auf (a) beschränkt, (b) als **No-op-Pin** fortgeführt; eine „Reparatur" von (b) ist als **Round-Trip-brechend** und damit **verboten** markiert | §17.11.1 K57, Kopf E-8, Plan Kopf K57 + W2-9 |
+| **K67** | **RVW-7-09 (minor)** — V4 fehlte in den späteren `--validate`-rot-Aufzählungen, obwohl es **heute registriert** ist (1 ERROR); der heutige Arbeitsbaum-Zustand des V4-Teils von W2-6 (Generalisierung) als Ursache der zwei roten Volltests war ungedeckt | V4 in **beiden** späteren `W-VALIDATE-ROT`-Zeilen (inkl. Owner-Spalte), in **§10 `--validate`** und im Kopf ergänzt; die Aufzählung war damit **unvollständig**, nicht falsch — das ist so festgehalten | §10 `--validate`, Kopf E-6, Plan `W-VALIDATE-ROT` (4 Zeilen), L-1 W2-6 |
+| **K68** | **RVW-7-10 (info)** — Docstrings nennen weiter den Vor-E-5-Scope (`docs_links.py:8-10`, `:168-177`) | Als **Plan-Pflicht für W2-6** festgeschrieben (W2-6 ist der einzige Task, der `docs_links.py` schreibt). **Hier wird kein Code geändert** | Plan W2-6 `Akzeptanz V4` + Schritt 2 |
+| **K69** | **RVW-7-11 (info)** — Korrekturrunde 4 ohne lokalen Supersessions-Verweis | **Entscheidung: keine Änderung an Runde 4**, mit Begründung (siehe Plan, Korrekturrunde 5). Der Vorrang ist **global** regelkonform hergestellt; ein eingefügter Verweis würde die Wortgleichheit brechen, die diese Runde schützt | Plan Korrekturrunde 5, Kopf (kein Eingriff in Plan `:5626`) |
+| **K70** | **Validator-Notizen `n1`…`n5`** | Jede **einzeln** zugeordnet: `n1` bewusste Nicht-Zuordnung (Rev.-0.2-Block, wortgleich, vorbestehend), `n2` **behoben** (Präzisierung §16), `n3`/`n4` bestätigte Bewusstanten, `n5` kosmetische Nicht-Zuordnung (Legende maßgeblich). Volltext: Plan, Abschnitt „Korrekturrunde 5" | §16 (`n2`), Plan Korrekturrunde 5 |
+
+**Neu gemessene Zahlen dieser Runde (Methode offengelegt).** Neu gemessen per Grep/Read: Tasks
+**50** (W2: **10**, W0: **6** — **`W0-5` existiert nicht**), Checkboxen `[x]` **59** / `[ ]` **148** /
+gesamt **207** (**keine** Checkbox in dieser Runde gesetzt, gestrichen oder ergänzt), K-Obergrenze
+**K70**, `README.md`-Linkziele **14** = **12** `.md` + **2** `.html`, davon in der Index-Region
+**7** deklarierte Kategorien (überschriften-only **6**), V4-Sollwert **1**. **Nicht** neu gemessen und
+als **übernommene Baseline-Messung 2026-09-27** gekennzeichnet: der `docs/`-`.md`-Bestand **205** (in
+dieser Runde stand kein Shell-Werkzeug zur Verfügung). **Die Herleitung bleibt trotzdem prüfbar:**
+der Register-Nachweis ist ein **konkreter Shell-Zählaufruf** (K60), mit dem der Bestand in einer
+Zeile neu gezählt werden kann — der Zählwert hängt damit nicht an einer unüberprüfbaren Behauptung.
+
+
+#### 17.11.6 Korrekturrunde 6 (K71…K75) — zweites Concept-Review über Rev. 0.7: Write-Set-Inventare, Anker, Fixture-Begründung und Baseline-Bezugszeitpunkt
+
+**Eingang und Autorisierung.** Concept-Review vom **2026-09-27** (zweite Runde über denselben
+Revisionsstand) über Spec + Plan **Rev. 0.7**: `VERDICT: CHANGES_REQUESTED` — **0 kritisch,
+1 major, 3 minor, 1 info** (5 Findings: `NEU-1`…`NEU-4`, `INFO-1`). **Rein mechanisch, kein erneuter
+Sachentscheid:** alle 11 Findings der ersten Runde waren am Code verifiziert erledigt, beide
+Autor-Korrekturen (7 V4-Tests, **193** statt 191) waren unabhängig bestätigt. **Kein
+Revisions-Bump** — `status: APPROVED`, `approved: 2026-09-26` und `revision: 0.7` bleiben
+unverändert. **Kein** Produktionscode, **keine** Tests, **keine** Runner-Änderung, **keine**
+Git-Mutation, **keine** Löschung oder Änderung der **3 uncommitteten W2-6-Dateien**
+(`scripts/lib/consistency/docs_index.py`, `tests/test_doc_index.py`,
+`scripts/lib/consistency/docs_links.py`). **Keine** Checkbox gesetzt, gestrichen oder ergänzt.
+**Keine** Task-, AC-, IC-, R-, OQ-, V-Check- oder F-ID umnummeriert oder gestrichen; **keine**
+neue Task-ID, **keine** neue offene Frage, **kein** neuer Sollwert, **keine** neue F-ID.
+§17.10 samt §17.10.1–§17.10.5, §17.11.1–§17.11.5, die Rev.-0.6-/Rev.-0.5-Blöcke und die
+Korrekturrunden 1–5 des Plans bleiben **wortgleich**, soweit sie nicht durch einen ausdrücklich als
+solchen gekennzeichneten Zusatz ergänzt wurden. **Die Spec-Legende bleibt eingefroren** auf
+`K1…K45`; **maßgeblich** ist die **Plan-Legende** (`K1…K75`).
+
+**Methodischer Vorbehalt, in beide Richtungen.** Die `grep`-/`read`-Zeilennummern beider Reviews sind
+in diesem Projekt **nachweislich unzuverlässig**; deshalb wurde **jeder** Anker **vor** dem Edit per
+Grep am Working Tree verifiziert. **Zwei Anker-Korrekturungen der ersten Runde waren selbst falsch**
+(NEU-3) und die vom Review genannten Fundstellen wichen von den gemessenen ab (u. a.
+`tests/test_plan_index.py` → real `tests/test_plan_identity.py`; Plan `W2-9 Interfaces` → real
+**W2-6 Akzeptanz V4**). **Maßgeblich ist die Messung, nicht die Fundstellenzahl des Reviews.**
+
+| K | Befund | Behebung | Ort |
+|---|---|---|---|
+| **K71** | **NEU-1 (major)** — K62 hat `scripts/lib/consistency/spec_plan.py` korrekt in W2-9s `Files:` aufgenommen, aber **keine** der daraus abgeleiteten, im Plan als **maßgeblich** bezeichneten Stellen mitgezogen: Ownership-Matrix (W2-9: **4** `owns`-Zeilen), Matrix-Narrativ („die **vier** Werkzeug-/Testdateien", „die **sechs** neuen Dateien"), Step-Agent-Map (4 Dateien), `File Structure`, Rollback W2, **vier** Self-Review-Summenlisten. Die „Betroffene Stellen"-Liste der Runde 5 nannte **weder** Matrix **noch** Step-Agent-Map ⇒ **keine dokumentierte Ausnahme**. **Keine Kollision** (kein anderer Task führt `spec_plan.py`) | **Alle** Inventare auf den neuen Zählstand gezogen: neue Matrix-Zeile `spec_plan.py | owns (Modify, Dep-Token-Muster :570)`; Narrativ „**fünf**" bzw. „**sieben**"; Step-Agent-Map, `File Structure` (neuer Eintrag), Rollback (neue `git checkout`-Zeile) und die **vier** Summenlisten; „Betroffene Stellen" der Runde 6 nennt **alle** betroffenen Stellen. **Neu gemessen:** W2-9 = **5** `owns`-Zeilen, W2-9 + W2-8 = **7**, Rev.-0.7-Dateizeilen der Matrix = **9** — der Matrix-Kopf „**9 Dateizeilen**" war damit **richtig**, die Tabelle war die unvollständige Stelle | Plan: Ownership-Matrix (Kopf, Zeile, Narrativ ×2), Step-Agent-Map, `File Structure`, Rollback W2, „Warum W2 ‖ W3 parallel", Self-Review ×4, Kopf-Block K71, **neue** Liste der betroffenen Stellen |
+| **K72** | **NEU-3 (minor)** — drei falsche `Datei:Zeile`-Anker: IC-05 `:930-933` (real **`:944-954`**; `:930-933` ist ein Codeblock in **IC-04**), Revisionszeile `0.7` `:367` (real **`:386`**; `:383` ist die `0.5`-Zeile der Revisionstabelle und `:367` die **Leerzeile** unter „Verifikations-Legende" — die **VERIFIED**-Zeile ist `:370`), §10-`--validate` `:2235` (real **`:2257-2261`**; `:2235` steht in §9.2). **Re-Review 3 (R3-1):** der Revisionszeilen-Anker **einmal nachgemessen** = `:386` — K72 bleibt derselbe Eintrag, **keine** neue K-ID | An **allen** Fundstellen umgestellt. **Die Aussagen waren je richtig** — falsch waren nur die Anker, und genau das verletzt §16 („jeder `Datei:Zeile`-Verweis wurde gelesen") | Plan-Kopf K59, Plan-Register RVW-7-01 und RVW-7-09, §17.11.5 K59 |
+| **K73** | **NEU-4 (minor)** — „**alle** sieben Fixtures schreiben `README_RELPATH`" ist falsch: **R7 hat kein Fixture**, sondern liest den echten Baum (`tests/test_doc_index.py:394`, `REPO_ROOT` `:404-408`) | Auf „**6 der 7** Fixtures" präzisiert, **R7 gesondert** begründet (`message.split("'")[1]` auf einer Message, die nach E-5 die **Kategorie** nennt). **Die Klassifikation „alle sieben rot bzw. vakuum" bleibt korrekt** — die Begründung trug für 6 statt 7 | Plan-Kopf K61, Plan W2-6 Akzeptanz V4, §17.11.5 K61 |
+| **K74** | **NEU-2 (minor)** — der Beleg `tests/test_plan_identity.py:96-101` ist falsch: dort steht `test_normalize_task_id` mit `"3"/"TASK-3"/"task-3"/"custom"/"task-"` — **kein** `"W2-0"` | Auf den realen Anker umgestellt: „verhaltensgleich abgedeckt durch `normalize_task_id("custom") == "custom"` (`:100`, **derselbe** Durchreich-Zweig); der `W2-0`-Pin wird in **Akzeptanz (f) neu angelegt**". **Der Sachstand ist richtig** und **kein** Schutz geht verloren | §17.11.1 K57, §17.11.5 K66, Plan-Kopf K57, Plan-Kopf K66, Plan W2-9 `Interfaces`, Plan-Register RVW-7-08 |
+| **K75** | **INFO-1 (info)** — der once-count enthält `-not -name 'INDEX.md'`: heute **folgenlos** (`docs/INDEX.md` existiert nicht, Universe **205** ⇒ **193** ✓), **ab W3-6** liefert derselbe Aufruf **192** bei bleibender Baseline **193** | Baseline **zukunftssicher** gefasst als **`Universe 205 − 12 verlinkt = 193`, Bezugszeitpunkt vor W3-6**; Exclusion begründet (V2-Konvention, IC-05 V2-Zeile) und der **Sollwert 0** als **zeitpunktunabhängig** vermerkt. **Kein Baseline-Wert und kein Sollwert wurde geändert** | §17.11.3 Register, §17.11.5 K60, Plan-Kopf K60, Plan Follow-up-Register, Plan-Register RVW-7-02 |
+
+**Bewusste Nicht-Zuordnung (K71) — der historische Entscheidungs-Record bleibt wortgleich.** Die
+Spalte „Folge im Plan" des Records `E-8` nennt „Ownership-Matrix (4 Zeilen + 2 Spalten)" und vier
+Dateien in `Files:`. Der Abschnitt „Entscheidungs-Abschluss Rev. 0.7" ist **wortgleich
+festgeschrieben** und dokumentiert den **datierten** Stand vom 2026-09-27; ein Edit würde genau die
+Wortgleichheit brechen, die K36/K42 als Fehler behandelt. **Aufgelöst über die K71-Lesart-Regel:**
+jede Stelle, die W2-9s Write-Set **ohne** `spec_plan.py` nennt, meint den Stand **vor** K62.
+
+**Bewusste Nicht-Zuordnung (K72/K71) — Katalog-Obergrenzen in Fremd-Blöcken.** Der Spec-Statuskopf
+und §17.11.5 nennen als „maßgeblich" die **Plan-Legende** mit dem damaligen Stand `K1…K70`; beide
+Stellen bleiben **wortgleich** und tragen ihren **datierten** Stand. **Vorrang** (Muster K36/K42):
+**maßgeblich ist die Plan-Legende `K1…K75`**.
+
+**Neu gemessene Zahlen dieser Runde (Methode offengelegt).** Neu gemessen per Grep am Working Tree:
+Tasks **50** (W2: **10**, W0: **6** — `W0-5` existiert nicht), Checkboxen `[x]` **59** / `[ ]`
+**148** / gesamt **207** (**keine** Checkbox in dieser Runde gesetzt, gestrichen oder ergänzt; die
+Partitionsmessung `44 × 4 + 5 × 5 + 1 × 6 = 207` wurde **verifiziert** — 5er-Schritte in W2-1, W2-0,
+W2-7, W4-3, W5-2; der einzige 6er-Schritt in W8-4), K-Obergrenze **K75** (Runde 6 = K71…K75), `owns`-
+Zeilen der Matrix-Spalte **W2-9** = **5** (vorher 4), Rev.-0.7-Dateizeilen der Matrix = **9**
+(vorher 8), Fixtures der 7 V4-Tests = **6** (`tests/test_doc_index.py:280`, `:294`, `:309`, `:320`,
+`:336`, `:350`; **R7** ohne Fixture), `docs/`-Linkziele in `README.md` **14** = **12** `.md` + **2**
+`.html`. **Nicht** neu gemessen und als **übernommene Baseline-Messung 2026-09-27** gekennzeichnet:
+der `docs/`-`.md`-Bestand **205**; die Herleitung `205 − 12 = 193` bleibt über den **konkreten**
+Shell-Zählaufruf (K60) in **einer** Zeile nachprüfbar. **Keine neue F-ID** (Bestand unverändert).
+
+
+**Fail-closed-Klausel (K20, fortgeltend).** Wird eine Ownership-Zeile so geändert, dass
+`check_plan_file_overlap` für eine Parallelgruppe **zwei** Tasks mit gemeinsamer Schreibmenge
+meldet, eine Parallelgruppe **mehr als 3** gleichzeitige Agents umfassen würde, die Kantenliste
+einen **Zyklus** enthält, oder ein Task eine Datei schreiben müsste, die ein **früherer** Task
+derselben Gruppe bereits geschrieben hat, gilt: **die betroffene Task wird nicht gestartet**, der
+Plan wird **nicht** stillschweigend angepasst, und es ist ein **korrigierter Plan** mit neuer
+Ownership-Matrix **und** neuer Zyklenprüfung vorzulegen (Owner `orchestrator`, Entscheidungsweg
+`main_chat`). **Unverändert** in Kraft.
+
+
 
 
