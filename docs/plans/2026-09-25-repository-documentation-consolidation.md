@@ -2263,18 +2263,18 @@ dieser Revisionsrunde):** `docs.py` = **599** Zeilen — `check_sync_cli_docs` `
 der 600er-Grenze; **Spec §4.1 bleibt unverändert** — die Modulzuordnung wird durch diese Korrektur
 **nicht** verschoben.
 **Steps:**
-- [ ] 1: `docs_freshness.py` anlegen (V1-Block `:155-412` inkl. `Span`, `v1a_count_spans`,
+- [x] 1: `docs_freshness.py` anlegen (V1-Block `:155-412` inkl. `Span`, `v1a_count_spans`,
       `v1b_version_spans`, `v1_strict`, `_v1_finding` und der K16-Eingrenzung in
       `_v1_suppressed_lines`); `docs_links.py` anlegen (`:11-124` + `:416-599`).
-- [ ] 2: V1-Tests aus `tests/test_doc_facts.py` **verschieben** (nicht kopieren) nach
+- [x] 2: V1-Tests aus `tests/test_doc_facts.py` **verschieben** (nicht kopieren) nach
       `tests/test_doc_freshness.py`; Imports dort auf `docs_freshness` umstellen; die V3- und
       Altcheck-Tests **bleiben** in `test_doc_facts.py` und greifen weiter über die Fassade.
-- [ ] 3: `docs.py` auf Fassade reduzieren — `__all__` **wortgleich** nach Spec §4.1; `Finding` und
+- [x] 3: `docs.py` auf Fassade reduzieren — `__all__` **wortgleich** nach Spec §4.1; `Finding` und
       `Severity` aus `.report` **durchreichen** (Testreferenz `docs_lib.Severity`).
-- [ ] 4: Nachweise (a)–(f) der Akzeptanz ausführen und im Review-Protokoll festhalten; insbesondere
+- [x] 4: Nachweise (a)–(f) der Akzeptanz ausführen und im Review-Protokoll festhalten; insbesondere
       `163` als Vorher-Baseline gegen den Nachher-Zähler stellen und **jede** Differenz als
       Befund melden (kein stilles Nachziehen der Zahl).
-- [ ] 5: commit via `git`-Agent:
+- [x] 5: commit via `git`-Agent:
       `refactor: split consistency docs checks into family modules`.
 
 ### W2-3: V7 `check_wiki_staleness` — **Rev. 0.6: eigenes Modul + eigene Testdatei (PG-2a)**
@@ -2306,10 +2306,22 @@ Runner ist damit Exit **1**, nicht 0. Die Zeile bleibt als Historie sichtbar; ma
 Owner `tester`; V3 planmäßig rot, Termin **W8-2**). **Diese Task-Zeile ist für sich genommen
 kein Welle-Gate** (RVW-3).
 **Steps:**
-- [ ] 1: Test schreiben (fail).
-- [ ] 2: V7 als dünne Adapter-Schicht auf W1-4 implementieren.
-- [ ] 3: Test grün beobachten.
-- [ ] 4: commit via `git`-Agent: `feat: add V7 wiki staleness check`.
+- [x] 1: Test schreiben (fail).
+- [x] 2: V7 als dünne Adapter-Schicht auf W1-4 implementieren.
+- [x] 3: Test grün beobachten.
+- [x] 4: commit via `git`-Agent: `feat: add V7 wiki staleness check`.
+
+> **LEDGER-Stand 2026-09-27 — W2-3 VOLLSTÄNDIG erledigt (Fortschrittsnotiz, keine Änderung der
+> Task-Semantik).** Gelandet: `scripts/lib/consistency/docs_wiki.py` (**neu, 129 Z**) und
+> `tests/test_doc_wiki.py` (**neu, 391 Z**, **10** Tests) — reine Adapter-Schicht, **0** Zeilen
+> Staleness-Logik, alles über `compute_wiki_staleness` (W1-4); ruff/compileall clean.
+> **Nachweis:** V7 **nicht** registriert ⇒ Baseline `85/0/85` unverändert erhalten.
+> **Reviews:** Stufe 1 + Stufe 2 im **PG-2a**-Durchgang, **kein** offener Befund am Code.
+> **Nebenbefund (K51):** die V7-Baseline wurde von **11 auf 10** korrigiert — **K24** war eine
+> Fehlmessung (ein `type:`-Body-Kommentar in
+> `knowledge/wiki/concepts/core-principle-knowledge-engine.md:46`).
+> **Kein Wellen-Gate:** W2-3 ist **kein** Querschnitts-Task; das Wellen-Gate **W2** bleibt an
+> **W2-7** gebunden. Commit `8594e67f` (`feat: add V7 wiki staleness check`, 2 Dateien, +520).
 
 ### W2-4: V5 `check_role_generation_parity` (gate-bewusst) — **Rev. 0.6: `docs_freshness.py`, sequenziell nach W2-5**
 
@@ -2358,10 +2370,28 @@ gebrochen ist (R14).
 tests/test_doc_freshness.py -q` → **0**; `wc -l scripts/lib/consistency/docs_freshness.py` →
 **< 600**.
 **Steps:**
-- [ ] 1: Test schreiben (fail).
-- [ ] 2: V6 mit beiden Vergleichsachsen implementieren.
-- [ ] 3: Tests grün beobachten.
-- [ ] 4: commit via `git`-Agent: `feat: add V6 freshness check with expected-value axis`.
+- [x] 1: Test schreiben (fail).
+- [x] 2: V6 mit beiden Vergleichsachsen implementieren.
+- [x] 3: Tests grün beobachten.
+- [x] 4: commit via `git`-Agent: `feat: add V6 freshness check with expected-value axis`.
+
+> **LEDGER-Stand 2026-09-27 — W2-5 VOLLSTÄNDIG erledigt (Fortschrittsnotiz, keine Änderung der
+> Task-Semantik).** Gelandet: `docs_freshness.py` 317 → **592 Z** (< 600),
+> `test_doc_freshness.py` +337, `test_doc_facts_expected.py` +75/−6; 3 `kind`-Werte gemessen
+> (`handedit` ERROR, `expected-mismatch` ERROR, `missing-in-expected` WARNING — Severity-Map als
+> Datenstruktur gepinnt).
+> **AC-36-Nachweis unabhängig gemessen:** nur der Sollwert manipuliert ⇒ **genau 1**
+> `expected-mismatch` ERROR, `handedit`-Findings leer, gerenderte Doku **byte-identisch** ⇒ der
+> Kreis `doc_facts → Renderer → V6` ist gebrochen (R14). V1-Regression: **14** Testfälle
+> unverändert, der Diff berührt **null** V1-Zeilen. V6 **nicht** registriert ⇒ 0 Errors,
+> 0 Warnings beigetragen.
+> **Reviews:** `code-reviewer` (im **PG-2a**-Durchgang, keine Beanstandung an der Implementierung) ·
+> `tester` **PASS** mit **1 WARNING** + 1 INFO, beide **kein Blocker**.
+> **Offen aus dem Review (nicht W2-5, gehört W3/W4):** der Tripwire
+> `assert "agent-meta:docs-begin" not in path.read_text(...)`
+> (`tests/test_doc_facts_expected.py:287-290`) ist eine **Zustands-** statt Property-Assertion und
+> bricht aus **falschem** Grund, sobald W3/W4 die Blöcke rendert. Commit `b73e9422`
+> (`feat: add V6 freshness check with expected-value axis`, 3 Dateien, +688/−7).
 
 ### W2-6: V2 `check_docs_index_completeness` und V4-Erweiterung — **Rev. 0.6: `docs_index.py`, PG-2a**
 
@@ -4329,9 +4359,9 @@ AC-24, AC-25, AC-26, AC-34, AC-35, AC-37, AC-38, AC-39, AC-41.
 | **W1-8** | 4/4 | vollständig abgeschlossen |
 | **W1-9** | 4/4 | vollständig abgeschlossen |
 | **W1-10** | 2/4 | **teilweise** — nur `docs-consolidation.enabled: true` gelandet; 4 Properties + Commit offen |
-| **W2-1** | 3/5 | **teilweise** — Implementierung steht; offen sind Schritt 4 (**K16 / B-4**, Rule-3-Eingrenzung, in Rev. 0.5 neu) und Schritt 5 (Commit) |
-| W2-2 … W2-6 | 0/4 je Task | **nicht gestartet**, unverändert offen |
-| **W2-0** | **0/5** | **Rev. 0.6: neu, nicht gestartet.** Rev. 0.6 fügt **5** offene Checkboxen hinzu (Schritt 1 Split, 2 Test-Verschiebung, 3 Fassade, 4 Nachweise, 5 Commit) |
+| **W2-1** | 3/5 | **teilweise** — Implementierung steht; offen sind Schritt 4 (**K16 / B-4**, Rule-3-Eingrenzung, in Rev. 0.5 neu) und Schritt 5 (Commit) — **Anhang 2026-09-27 (K53-Interim-Ledger, Zeileninhalt oben bleibt Historie, s. K34-Kopfnotiz):** Ist-Stand **5/5**, alle fünf Steps tragen `[x]` (bereits in Runde 3 so festgestellt) |
+| W2-2 … W2-6 | 0/4 je Task | **nicht gestartet**, unverändert offen — **Anhang 2026-09-27 (K53-Interim-Ledger, Zeileninhalt oben bleibt Historie, s. K34-Kopfnotiz):** **W2-2** 4/4 (vorher abgehakt, unverändert), **W2-3** 4/4 (`8594e67f`) und **W2-5** 4/4 (`b73e9422`) nun abgehakt, **W2-4** und **W2-6** weiterhin **0/4** |
+| **W2-0** | **0/5** | **Rev. 0.6: neu, nicht gestartet.** Rev. 0.6 fügt **5** offene Checkboxen hinzu (Schritt 1 Split, 2 Test-Verschiebung, 3 Fassade, 4 Nachweise, 5 Commit) — **Anhang 2026-09-27 (K53-Interim-Ledger, Zeileninhalt oben bleibt Historie, s. K34-Kopfnotiz):** „nicht gestartet" ist **überholt**; Ist-Stand **5/5**, committet `b5bb0fe9`. W2-0 ist ein **Querschnitts-Task** und **kein** Wellen-Gate — das Gate W2 bleibt an **W2-7** gebunden |
 | **W2-7** | 0/5 | **nicht gestartet** — Schritt 4 ist in Rev. 0.5 **neu** (**K15 / B-5**, `report.py`-Ownership: `line`/`branch` als Dataclass-Felder); Schritt 1 trägt seit der dritten Korrekturrunde zusätzlich den **positiven** Registrierungs-Pin (**RVW2-5**, ersetzt `test_v1_is_not_wired_into_the_runner_yet`) |
 | **W4-3** | 0/5 | **nicht gestartet** — Schritt 4 ist in der dritten Korrekturrunde **neu** (**RVW2-6**: Abschluss-Sync-Lauf der Welle, trägt die V2-Spalte W4 der W-GATE-TABLE) |
 | **W5-2** | 0/5 | **nicht gestartet** — Schritt 4 ist in der dritten Korrekturrunde **neu** (**RVW2-6**: Abschluss-Sync-Lauf der Welle, trägt die V2-Spalte W5) |
@@ -4400,12 +4430,53 @@ AC-24, AC-25, AC-26, AC-34, AC-35, AC-37, AC-38, AC-39, AC-41.
   Findings). `knowledge/wiki`: **11** Seiten mit `type: "Architecture"` (**K24**, war 10).
   `docs/INDEX.md` existiert **nicht**.
 - **Kein** Task wurde abgehakt, obwohl ein Step offen ist. Die drei teilweise erledigten Tasks
-  tragen zusätzlich eine **LEDGER-Stand**-Notiz direkt unter ihrer Step-Liste (W1-5, W1-10, W2-1).
+  tragen zusätzlich eine **LEDGER-Stand**-Notiz direkt unter ihrer Step-Liste (W1-5, W1-10, W2-1);
+  seit 2026-09-27 tragen auch die **abgeschlossenen** Tasks **W2-3** und **W2-5** eine solche Notiz
+  (W2-0 nicht — der Querschnitt ist in Korrekturrunde 3 ausführlich dokumentiert).
 - **Nicht Gegenstand:** Die W0-Tasks sind im Repo durch die Ergebnis-Records
   (`docs/plans/2026-09-25-docs-consolidation-oq2.md`, `-oq6.md`, `-oq8.md`, `-oq1.md`,
   `-wave0-freeze.md`, `-track-a-gate.md`) und durch den Rev.-0.2-Block dieses Plans belegt; ihre
   Checkboxen wurden in diesem Abgleich **bewusst nicht angefasst**, weil nur W1/W2-1 zur
   Abstimmung beauftragt waren.
+
+#### K53-Interim-Ledger 2026-09-27 — Checkbox-Setzung nach der Interim-Regel aus K53
+
+> **Herkunft und Reichweite.** Die folgenden **13** Checkboxen wurden nach der **Interim-Regel aus
+> K53** gesetzt: **von Hand** durch den Orchestrator, jeweils mit **Datum, Commit-Hash und
+> Task-ID**, und **ohne** jeden Lauf von `scripts/lib/plan_ledger.py` (dieser Plan ist für das
+> Werkzeug nicht adressierbar — `TASK_HEADER_RE` verlangt `### Task <id>`, der Plan schreibt
+> `### W2-0:`; **E-8** ist offen, Owner `orchestrator` → `main_chat`, Frist **vor W2-7**). Die Regel
+> ist **widerruflich** und **kein** stiller Ersatz für den Werkzeugpfad. **Rev. 0.6 bleibt 0.6,
+> `status: APPROVED` bleibt APPROVED**, es wurde **keine** Revisionsnummer angehoben, **keine**
+> AC/IC/R/OQ/Task-/V-Check-ID umnummeriert oder gestrichen und **kein** Sollwert geändert.
+
+| Datum | Commit | Task | Ergebnis |
+|---|---|---|---|
+| 2026-09-27 | `b5bb0fe9` | **W2-0** | Verhaltensneutraler Modul-Split vollständig gelandet (`docs.py` 599 → **80** Z als Fassade, `docs_links.py` **334**, `docs_freshness.py` **317**, `test_doc_freshness.py` **384**, `test_doc_facts.py` 2867 → **2538**); Tests **163 → 163**, `consistency-check.py --json` unverändert `85/0/85`, alle Module < 600. **W2-0 ist ein Querschnitt-Task und KEIN Wellen-Gate** — das Gate W2 bleibt an **W2-7** gebunden. |
+| 2026-09-27 | `8594e67f` | **W2-3** | V7 `check_wiki_staleness` vollständig gelandet (`docs_wiki.py` **129** Z, `test_doc_wiki.py` **391** Z mit **10** Tests, reine Adapter-Schicht ohne eigene Staleness-Logik); nicht registriert, Baseline `85/0/85` erhalten. |
+| 2026-09-27 | `b73e9422` | **W2-5** | V6 `check_docs_facts_fresh` mit Sollwert-Achse vollständig gelandet (`docs_freshness.py` 317 → **592** Z < 600); AC-36-Nachweis unabhängig gemessen (Kreis `doc_facts → Renderer → V6` gebrochen, R14), V1-Regression mit **14** unveränderten Testfällen und **null** berührten V1-Zeilen. |
+
+- **Korrigierter Zähler, in dieser Pflege selbst gemessen (`grep`, Muster `^- \[x\]` / `^- \[ \]`,
+  Plan 2026-09-25):** **vorher** `^- \[x\]` = **46**, `^- \[ \]` = **153** (Partitionsmessung
+  `1:` = 36, `2:` = 37, `3:` = 36, `4:` = 38, `5:`–`9:` = 6; **keine** Nicht-Ziffer-Zeile);
+  **nachher** `^- \[x\]` = **59**, `^- \[ \]` = **140** (Partitionsmessung `1:` = 33, `2:` = 34,
+  `3:` = 33, `4:` = 35, `5:`–`9:` = 5). **Summe unverändert 199 = 46 + 153 = 59 + 140**;
+  **+13** Checkboxen gesetzt (**5** W2-0 + **4** W2-3 + **4** W2-5), **keine** gestrichen und
+  **keine** ergänzt. **Die Gesamtzahl 199 bleibt damit unverändert** — es wurde **kein** Step
+  angelegt oder entfernt, nur abgehakt.
+- **Damit überholt, ohne Umschreiben (Historie bleibt wortgleich):** die Zählhinweise in **K34**,
+  in der Korrekturrunde 3 („Abschnitt L (L-1, L-3)") und in der Korrekturrunde 4
+  („Zählung in dieser Runde selbst gemessen") nennen **46 / 153**; sie beschreiben den Stand
+  **vor** dieser K53-Setzung und bleiben darum **unverändert**. Ebenso unangetastet bleiben die
+  historischen Herleitungen **188 → 190 → 194 → 199** (Rev. 0.4/0.5/0.6, Runden 1–4), die
+  Gegenproben **40 × 4 + …**, **42 × 4 + 5 × 5 + 1 × 6** sowie die Zählstände **40 / 150 / 154**.
+  **Maßgeblich ist ab sofort dieser Block.** Stimmt ein künftiger Zähler nicht mit **59 / 140**
+  überein, ist **hier** zu korrigieren, **nicht** in der Task-Struktur.
+- **Ergebnis der Setzung:** **W2-0** 5/5 · **W2-3** 4/4 · **W2-5** 4/4. **W2-1** (5/5) und
+  **W2-2** (4/4) waren **bereits** abgehakt und wurden **nicht** angefasst. **W2-4**, **W2-6** und
+  **W2-7** bleiben **vollständig offen** (0/4, 0/4, 0/5) — **W2-6** ist blockiert (V4 macht
+  `--validate` rot: 191 Errors, 2 Volltests rot; **E-5**/**E-6** offen), **W2-4** und **W2-7** ebenfalls
+  (**E-7** bzw. **E-5**/**E-6**/**E-8**). Das Wellen-Gate **W2** ist damit **nicht** erreicht.
 
 ### L-2 Blockierende Befunde (B-1 … B-5)
 
