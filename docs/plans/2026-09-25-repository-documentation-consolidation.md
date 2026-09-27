@@ -2807,7 +2807,8 @@ Rev.-0.7-Text behauptete hier einen Teilfehler (b), den es **nicht** gibt. **Kon
 **Ebenfalls in dieser Task, ausdrücklich (K62 / RVW-7-04):** `_parse_plan_tasks`
 (`spec_plan.py:547-583`, Regex-Bindung `:55`, `finditer` `:557`) ist der **dritte** Konsument von
 `TASK_HEADER_RE` und extrahiert seine **Dep-Tokens** über das **hart kodierte** Muster
-`task-\d+|\d+` (`:570`). **Dieses Muster wird auf `W\d+-\d+` erweitert** (alternativ: Token gegen
+`task-\d+|\d+` (`:570` — **Vor-Implementierungs-Anker**; Ist-Ort nach W2-9: `_DEP_TOKEN_RE` `:68`,
+Verwendung `:581`). **Dieses Muster wird auf `W\d+-\d+` erweitert** (alternativ: Token gegen
 `_DEPENDS_RE`-Treffer und `normalize_task_id` bilden). **Warum das zwingend ist:** ohne diese
 Erweiterung liefert `**W2-3**` die Tokens `2`/`3` ⇒ `task-2`/`task-3` und `**W2-0**` ⇒ `task-0`;
 `find_dependency_errors` (`orchestration.py:207-216`) meldet daraufhin **dangling dependency**, und
@@ -2871,16 +2872,99 @@ W2-6.
 **Diese Task-Zeile ist für sich genommen kein Welle-Gate** (RVW-3): W2-9 ist ein
 **Querschnitts**-Task; das Wellen-Gate **W2** bleibt an **W2-7** gebunden.
 **Steps:**
-- [ ] 1: Tests in `tests/test_plan_identity.py` und `tests/test_plan_ledger_writer.py` schreiben
+- [x] 1: Tests in `tests/test_plan_identity.py` und `tests/test_plan_ledger_writer.py` schreiben
       (fail) — beide Header-Formen, der Nicht-Task-Ausschluss, der Round-Trip, der **No-op-Pin (f)**
       und der **Plan-Graph-Test (e)**.
-- [ ] 2: `TASK_HEADER_RE` um den Wellen-/Task-Header-Zweig erweitern; **Zwei-Gruppen-Vertrag erhalten**;
-      **Dep-Token-Muster in `scripts/lib/consistency/spec_plan.py:570` auf `W\d+-\d+` erweitern**;
+- [x] 2: `TASK_HEADER_RE` um den Wellen-/Task-Header-Zweig erweitern; **Zwei-Gruppen-Vertrag erhalten**;
+      **Dep-Token-Muster in `scripts/lib/consistency/spec_plan.py:570` (Vor-Implementierungs-Anker;
+      Ist-Ort nach W2-9: `_DEP_TOKEN_RE` `:68`, Verwendung `:581`) auf `W\d+-\d+` erweitern**;
       `normalize_task_id` / `TASK_ID_RE` **unangetastet** (K66).
-- [ ] 3: End-to-End-Nachweis (c) **und (e)** gegen diesen Plan ausführen (Baseline vorher:
+- [x] 3: End-to-End-Nachweis (c) **und (e)** gegen diesen Plan ausführen (Baseline vorher:
       `unmatched` + Exit 1; `0` Tasks im Plan-Graph) und im Task-Notiz-Format festhalten;
       **K53-Interim-Regel ausdrücklich für beendet erklären**.
-- [ ] 4: commit via `git`-Agent: `feat: accept wave task headers in the plan ledger writer`.
+- [x] 4: commit via `git`-Agent: `feat: accept wave task headers in the plan ledger writer`.
+
+> **LEDGER-Stand 2026-09-28 — W2-9 VOLLSTÄNDIG erledigt (Fortschrittsnotiz, keine Änderung der
+> Task-Semantik).** Abgehakt nach der **Interim-Regel aus K53** — W2-9 ist der **letzte** Task
+> unter dieser Regel: **4** von **4** Checkboxen von Hand gesetzt, mit **Datum (2026-09-28)**,
+> **Task-ID `W2-9`** und **Commit-Titel** `feat: accept wave task headers in the plan ledger writer`;
+> der **Hash** entsteht erst mit diesem Commit und ist deshalb **nicht** genannt (kein erfundener).
+> **Ende der K53-Interim-Regel, ausdrücklich — nicht stillschweigend:** ab dem Commit dieses Tasks
+> ist der maschinelle Ledger-Writer gegen diesen Plan einsetzbar; der erste abgehakte Task
+> **danach** ist **W2-6**. Der „jetzt noch nicht"-Zustand der Task-Interfaces entfällt damit.
+> **Gelandet:** `plan_identity.py` 86 → **116 Z** (`WAVE_ID_PATTERN` als Single Source der
+> Wellen-ID, Wellen-Gate **begrenzt**), `spec_plan.py` 596 → **607 Z** (`_DEP_TOKEN_RE` `:68`,
+> Verwendung `:581`), `test_plan_identity.py` 119 → **210 Z** (**8** Tests, +3),
+> `test_plan_ledger_writer.py` 302 → **530 Z** (**22** Tests, +6). `plan_ledger.py` **unverändert**
+> (275 Z): der Zwei-Gruppen-Vertrag ist auch durch die Fix-Runde nicht gewandert, der
+> `Files:`-Eintrag „bedingt" greift also **nicht**.
+> **Nachweis (a)–(d), (f):** (a) `test_header_regex_wave_and_task_forms` +
+> `test_header_regex_ignores_non_task_h3_headings`; (b) `test_wave_header_ledger_round_trip`
+> (`ok is True`, `unmatched == ()`) + `test_wave_header_does_not_answer_classic_task_ids`;
+> (c) `test_ledger_writer_addresses_this_plan` — **End-to-End `dry_run` gegen diesen Plan**:
+> `unmatched == ()`, `tasks_updated == ('W2-6',)`, **Exit 0**, **keine** `unmatched task ids`-Zeile,
+> Plan **byte-unverändert**; **Baseline** (alte Regex via `git show HEAD:scripts/lib/plan_identity.py`
+> nach `.tmp/` gebunden, Working Tree unberührt): `unmatched=('W2-6',)`, **Exit 1**,
+> `unmatched task ids: W2-6`, und **0** Tasks im Plan-Graph; (d) die klassischen `### Task`-Tests
+> **wortgleich** — der Test-Diff ist ein reiner Append; (f)
+> `test_normalize_task_id_leaves_wave_id_unchanged`: reine Assertion, **kein**
+> Vorher/Nachher-Vergleich, `normalize_task_id`/`TASK_ID_RE` unangetastet (K66).
+> **Akzeptanz (e) — gemessen, zwei Prämissenfehler im Rev.-0.7-Text (nicht W2-9):** erfüllt sind
+> **50** Tasks mit **50** eindeutigen IDs (keine Dubletten), `find_dependency_errors == []`,
+> **keine** `deadlock:`-/cycle-Meldung, **keine** Phantom-Dep-ID (kein `task-0`/`task-2`) und
+> **17** Overlap-Meldungen, alle `file overlap between …`. **Nicht erfüllt:** `W2-6` ⇒ Deps ist
+> `()` , nicht `{W2-0}` — Ursache: `_DEPENDS_RE` (`spec_plan.py:60`) ist zeilenverankert, der Plan
+> schreibt `**Depends on:**` **mittig** (`_DEPENDS_RE.findall(plan)` = **0**, 0 von 50 Tasks mit
+> Deps); und **keine** der 17 Meldungen nennt `scripts/lib/consistency/docs.py` — Ursache:
+> `_FILES_FIELD_RE` verlangt bei `Modify`/`Create` den **Doppelpunkt**, der Plan schreibt
+> `**Files:** Create \`…\`` **ohne** ⇒ `files_touched == ()` für alle **50**, die Overlaps entstehen
+> aus den Task-**Titeln**. Beides ist als **gemessener Zustand** mit Begründung gepinnt, **nicht**
+> wegdefiniert.
+> **Drei offene, dokumentierte Abweichungen** (Owner **Plan-Eigner** (`requirements`), Frist **vor
+> dem Merge von PR #839**; **kein** Blocker für diesen Commit): **(1)** Akzeptanz (e) ist für diesen
+> Plan **nicht erfüllbar** und braucht eine Korrektur des Rev.-0.7-Textes. **(2)** der
+> `docs.py`-`file_overlap`-Befund ist **nicht erzeugbar** — beobachtbar erst nach einer
+> `Files:`-Syntax-Korrektur bzw. einer `_FILES_FIELD_RE`-Änderung, **eigener Task**, nicht W2-9.
+> **(3)** die Verifikationszeile `ruff … → 0` ist **unerreichbar**: HEAD-Baseline **14** vorbestehende
+> Findings bei explizitem `--select I,UP,E,F,W` — **9** in `plan_ledger.py` (das laut Plan clean
+> bleiben muss) + **3** in `plan_identity.py` + **2** in `spec_plan.py` —, in HEAD und Working Tree
+> **identisch**, also **Delta W2-9 = 0** (kein einziges neues Finding). Der nackte Aufruf der
+> Verifikationszeile meldet **13**, weil ruff im Default-Select `E4,E7,E9,F` das dort zusätzlich
+> gezählte `E501` (`spec_plan.py:481`, 94 > 88) nicht führt; eine ruff-Config existiert im Repo
+> nicht, `--isolated` ändert hier also nichts.
+> **Fix-Runde Code-Review (m2–m5), jeweils gemessen:** **m2** Wellen-Gate **begrenzt** —
+> `plan_identity.py:47` verlangt nach `<W>-<k>` jetzt `(?=[ \t]*(?::|[—–-])|[ \t]*$)`; vorher
+> lieferten `### W2-0abc: X` und `### W2-0_x: X` die Task-IDs `W2-0abc`/`W2-0_x`, die
+> `normalize_task_id` unverändert durchreicht — eigenständige, nie adressierbare Phantom-IDs, also
+> genau die Klasse, die W2-9 beseitigen soll; jetzt **kein** Task. Blast-Radius: **50** Wellen-Header
+> im Repo (alle **50** in diesem Plan, sonst nirgends), **0** Verhaltensänderungen zwischen
+> begrenztem und unbeschränktem Gate; Scan-Scope **958** Markdown-Dateien über die Wurzeln `docs`,
+> `agents`, `.claude`, `.opencode`, `scripts`, `snippets`, `knowledge`, `graphify-out`, `external`
+> (ohne weitere Ausschlüsse; eigener Zählgang am selben Tag: **959** — die Differenz **1** ist eine
+> zwischenzeitlich geänderte Datei, kein Scope-Unterschied). **m3** Benennung korrigiert
+> (`plan_identity.py:40-46`, `test_plan_identity.py:127-131`): `group(1)`-Konsumenten sind
+> `_task_blocks()` (`plan_ledger.py:76`) und `parse_task_ledgers()` (`spec_plan.py:127`), der
+> **einzige** `group(2)`-Konsument ist `_parse_plan_tasks()` (`spec_plan.py:575` → `prompt` `:589`).
+> **m4** vier Fälle ergänzt: `### W2-0abc: X`, `### W2-0_x: X`, `### W 2-0: X`, `### Wave 2-0: X`
+> ⇒ **kein** Task; `### W2-0` ⇒ `group(1) == 'W2-0'`, `group(2) == ''`. **m5** Magic Numbers
+> etikettiert, **keine** Sollwert-Änderung: `len(tasks) == 50` ist der Vertrag für diesen Planstand
+> und muss von jeder Plan-Änderung mitgezogen werden; `len(errors) == 17` ist ein
+> **provisorischer Tripwire** aus der Titel-Text-Extraktion, kein semantischer Wert. **Der Tripwire
+> hat sich beim Schreiben dieser Notiz bewährt:** der erste Entwurf enthielt die Doppelpunktform
+> von `Modify`/`Create` im Fließtext, worauf `_FILES_FIELD_RE` für **W2-9** den Phantom-Write-Set
+> `('/',)` extrahierte und der Pin sofort rot wurde — der Fließtext eines Task-Blocks kann also eine
+> Write-Menge **fälschen**; die Notiz ist deshalb umformuliert, nicht der Pin. **Vakuum-Stelle an der
+> Assertion kenntlich gemacht** (`sum(... dependencies) == 0`): sie ist eine Kanone, kein Beweis —
+> der tragende Nachweis bleibt `test_wave_header_dep_tokens_yield_wave_ids_only`.
+> **Verifikation:** fokussierte Suite **58 passed**, Exit **0**; `python3 -m compileall -q
+> scripts/lib` → **0**; `ruff check --select I,UP,E,F,W` über die drei Dateien **14** Findings
+> (**9** `plan_ledger.py` / **3** `plan_identity.py` / **2** `spec_plan.py`) wie in der HEAD-Baseline,
+> **Delta 0**; Volltests als Baseline (**kein** Kriterium, `W-VALIDATE-ROT`): **2 failed, 3390
+> passed, 1 skipped, 35 errors** — die 2 roten sind die planmäßig roten W2-8/E-6-Kandidaten, die
+> 35 errors sind `tests/browser/*` ohne Socket.
+> **Reviews:** beide Stufen **`ACCEPTED_WITH_DEVIATIONS`**. Die majors aus Stufe 1 sind als
+> Abweichungen **(1)–(3)** dokumentiert und **nicht** in W2-9 behoben; die minors **m2–m5** sind
+> hier behoben. M1 (Commit-Hygiene) ist eine Anweisung an den `git`-Agenten, kein Code-Eingriff.
 
 ### W2-3: V7 `check_wiki_staleness` — **Rev. 0.6: eigenes Modul + eigene Testdatei (PG-2a)**
 

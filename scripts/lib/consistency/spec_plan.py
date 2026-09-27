@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING
 
 from .report import Finding, Severity
 from .ledger_drift import check_ledger_drift as _check_ledger_drift
-from ..plan_identity import TASK_HEADER_RE, normalize_task_id
+from ..plan_identity import TASK_HEADER_RE, WAVE_ID_PATTERN, normalize_task_id
 
 if TYPE_CHECKING:
     from ..orchestration import FanoutTask
@@ -60,6 +60,12 @@ _AGENT_FIELD_RE = re.compile(
 _DEPENDS_RE = re.compile(
     r"(?im)^[ \t]*(?:\*\*)?Depends on:(?:\*\*)?[ \t]*(.+?)[ \t]*$"
 )
+# Dep ids inside a ``Depends on:`` field. The wave form comes from the single
+# source ``plan_identity.WAVE_ID_PATTERN`` and comes first on purpose:
+# alternation is ordered, so a leading bare ``\d+`` would otherwise split
+# ``W2-0`` into the phantom ids ``task-2`` and ``task-0`` -- which
+# ``find_dependency_errors`` would report as dangling dependencies.
+_DEP_TOKEN_RE = re.compile(rf"{WAVE_ID_PATTERN}|task-\d+|\d+")
 _FILES_FIELD_RE = re.compile(r"\b(?:Modify|Create):[ \t]*`?([^\s,;`)]+)`?")
 _SPEC_FIELD_RE = re.compile(
     r"(?im)^[ \t]*(?:\*\*)?Spec:(?:\*\*)?[ \t]*(.+?)[ \t]*$"
@@ -545,12 +551,17 @@ def _check_plan_graph(
 
 
 def _parse_plan_tasks(text: str) -> list[FanoutTask]:
-    """Build one :class:`~lib.orchestration.FanoutTask` per ``### Task`` block.
+    """Build one :class:`~lib.orchestration.FanoutTask` per plan task header.
 
-    Only the graph-relevant fields are populated: ``task_id`` (normalized to
-    ``task-<number>``), ``target_agent`` (``Agent:`` field, default
-    ``developer``), ``prompt`` (task title), ``files_touched``
-    (``Modify:``/``Create:`` paths) and ``dependencies`` (``Depends on:`` ids).
+    Headers are the two forms ``TASK_HEADER_RE`` accepts: ``### Task <id>: ...``
+    and the wave form ``### <W>-<k>: ...``.
+
+    Only the graph-relevant fields are populated: ``task_id`` (normalized via
+    :func:`~lib.plan_identity.normalize_task_id`, so ``3`` becomes ``task-3``
+    while a wave id such as ``W2-0`` is passed through unchanged),
+    ``target_agent`` (``Agent:`` field, default ``developer``), ``prompt``
+    (task title), ``files_touched`` (``Modify:``/``Create:`` paths) and
+    ``dependencies`` (``Depends on:`` ids, see :data:`_DEP_TOKEN_RE`).
     """
     from ..orchestration import FanoutTask
 
@@ -567,7 +578,7 @@ def _parse_plan_tasks(text: str) -> list[FanoutTask]:
         files_touched = tuple(_FILES_FIELD_RE.findall(block))
         dependencies: list[str] = []
         for dep_match in _DEPENDS_RE.finditer(block):
-            for token in re.findall(r"task-\d+|\d+", dep_match.group(1)):
+            for token in _DEP_TOKEN_RE.findall(dep_match.group(1)):
                 dep = _normalize_task_id(token)
                 if dep not in dependencies:
                     dependencies.append(dep)
