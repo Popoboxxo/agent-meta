@@ -26,6 +26,8 @@ from pathlib import Path
 import pytest
 
 from scripts.lib.consistency import docs_freshness as docs_freshness_lib
+from scripts.lib.doc_facts import EXPECTED_COMPARABLE_FACT_KEYS
+from scripts.lib.doc_renderer import REGION_FACT_KEYS, render_doc_fact_block
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -381,4 +383,339 @@ def test_v1_is_not_wired_into_the_runner_yet():
     assert scenario_configs, "premise: the scenario configs are gone"
     for path in scenario_configs:
         assert "docs-consolidation" not in path.read_text(encoding="utf-8"), path
+
+
+# ---------------------------------------------------------------------------
+# V6 — check_docs_facts_fresh (IC-05, IC-23, AC-36, R14, plan W2-5)
+# ---------------------------------------------------------------------------
+#
+# V6 owns the two comparisons a rendered fact has to pass, and therefore the
+# three ``kind`` values of the IC-05 table: ``handedit`` (rendered region !=
+# computed facts), ``expected-mismatch`` (computed facts != the hand-maintained
+# oracle) and ``missing-in-expected`` (a pinnable fact the oracle does not
+# carry). The second axis is the only thing in the initiative that breaks the
+# closed circle ``doc_facts -> renderer -> V6`` (R14) — see the acceptance test
+# ``test_mismatch_is_reported`` in ``tests/test_doc_facts_expected.py``.
+
+#: The region the handedit axis reads. ``roster`` is one of the six allowed
+#: region names (IC-08) and no document in the repository carries a marker
+#: region today (that migration is W3/W4), so no test here can depend on the
+#: current content of a real entry document.
+V6_REGION = "roster"
+
+V6_FACT = REGION_FACT_KEYS[V6_REGION]
+
+#: One synthetic value per pinnable fact, plus the region's own block fact. The
+#: values are *derived* from the fact names, never written down: IC-23 makes
+#: ``config/doc-facts-expected.yaml`` the only place in the tree that may hold an
+#: expected number, and a fixture that restated one would reintroduce the very
+#: error class R14 exists to catch. ``<NAME>`` cannot collide with a computed
+#: value, so a comparison that fires always fires for the reason under test.
+V6_FACTS: dict[str, str] = {
+    **{name: f"<{name}>" for name in EXPECTED_COMPARABLE_FACT_KEYS},
+    V6_FACT: "<roster-block>",
+}
+
+#: The oracle that *agrees* with :data:`V6_FACTS`. Both sides are derived from
+#: the same names, so the untouched pair is silent and every test below perturbs
+#: exactly one side of it — a finding is always attributable to the perturbation.
+V6_EXPECTED: dict[str, str] = {
+    name: value for name, value in V6_FACTS.items()
+    if name in EXPECTED_COMPARABLE_FACT_KEYS
+}
+
+#: A non-empty project config. V6 only needs one to exist: the facts arrive
+#: through the patched producer, and the real formulas are somebody else's test.
+V6_CONFIG: dict = {"docs-consolidation": {"enabled": True}}
+
+
+def _v6_region_text(region: str, facts: dict[str, str], body: str | None = None) -> str:
+    """A minimal document carrying exactly one marker region.
+
+    ``body`` overrides the rendered block — that is how a *drifted* region is
+    built: the markers stay balanced and the region name stays valid, so the
+    content is the only thing that differs.
+
+    Note the missing newline after the ``docs-begin`` marker: a rendered body
+    already *starts* with the newline that closes the ``docs-begin`` line
+    (``doc_renderer.render_doc_fact_block``), so adding one here would build a
+    document the renderer would immediately rewrite.
+    """
+    rendered = render_doc_fact_block(region, facts) if body is None else body
+    return (
+        f"<!-- agent-meta:docs-begin {region} -->"
+        f"{rendered}"
+        f"<!-- agent-meta:docs-end {region} -->\n"
+    )
+
+
+def _v6_findings(monkeypatch, root: Path, facts: dict[str, str] | None = None,
+                 expected: dict[str, str] | None = None,
+                 relpaths: tuple[str, ...] = ()) -> list:
+    """Run V6 over *root* with a fixed (computed facts, oracle) pair.
+
+    ``compute_doc_facts`` and ``load_expected_doc_facts`` are the two seams V6
+    owns. The formulas are covered by ``tests/test_doc_facts.py`` and the oracle
+    loader by ``tests/test_doc_facts_expected.py``, and an isolated tree cannot
+    produce a real set of facts — so pinning both sides here is what makes V6's
+    *own* contract testable. Everything between them (the comparison, the region
+    extraction, the finding construction, the severities) is the real code.
+    """
+    monkeypatch.setattr(
+        docs_freshness_lib,
+        "compute_doc_facts",
+        lambda agent_meta_root, config, **kwargs: dict(
+            V6_FACTS if facts is None else facts
+        ),
+    )
+    monkeypatch.setattr(
+        docs_freshness_lib,
+        "load_expected_doc_facts",
+        lambda agent_meta_root, log=None: dict(
+            V6_EXPECTED if expected is None else expected
+        ),
+    )
+    monkeypatch.setattr(docs_freshness_lib, "V6_SCAN_RELPATHS", relpaths)
+    return docs_freshness_lib.check_docs_facts_fresh(root, V6_CONFIG)
+
+
+def _v6_kinds(findings: list) -> list[str]:
+    return [finding.kind for finding in findings]
+
+
+def test_v6_finds_nothing_when_both_axes_agree(monkeypatch, tmp_path):
+    """The negative control: agreeing sources and a freshly rendered region.
+
+    Every positive test below perturbs exactly one side of this state, so a
+    finding that cannot be attributed to a perturbation fails here first.
+    """
+    _v1_tree(tmp_path, "README.md", _v6_region_text(V6_REGION, V6_FACTS))
+
+    assert _v6_findings(monkeypatch, tmp_path, relpaths=("README.md",)) == []
+
+
+def test_v6_handedit_reports_a_drifted_region(monkeypatch, tmp_path):
+    """Axis (a): the rendered block differs from what the facts would render.
+
+    The message names the *first* differing body line and the finding's ``line``
+    points at it, because a drift finding that only says "differs" costs the
+    reader a diff run.
+    """
+    drifted = "\n- a roster row that no longer exists\n"
+    _v1_tree(tmp_path, "README.md", _v6_region_text(V6_REGION, V6_FACTS, drifted))
+
+    findings = _v6_findings(monkeypatch, tmp_path, relpaths=("README.md",))
+
+    assert _v6_kinds(findings) == ["handedit"]
+    finding = findings[0]
+    assert finding.severity == docs_freshness_lib.Severity.ERROR
+    assert finding.check == "docs.docs_facts_fresh"
+    assert finding.file == "README.md"
+    assert V6_REGION in finding.message
+    assert drifted.strip() in finding.message
+    lines = (tmp_path / "README.md").read_text(encoding="utf-8").splitlines()
+    assert lines[finding.line - 1] == drifted.strip(), (
+        "the reported line must be the first line that actually moved"
+    )
+
+
+def test_v6_handedit_is_silent_for_a_freshly_rendered_region(monkeypatch, tmp_path):
+    """Axis (a) really compares: byte-identical render output, no finding.
+
+    The counterpart of the test above on the *same* tree shape. Without it, a
+    check that never found a handedit at all would satisfy the positive test by
+    not running.
+    """
+    _v1_tree(tmp_path, "README.md", _v6_region_text(V6_REGION, V6_FACTS))
+
+    findings = _v6_findings(monkeypatch, tmp_path, relpaths=("README.md",))
+
+    assert _v6_kinds(findings) == []
+
+
+def test_v6_expected_mismatch_is_an_error_naming_both_values(monkeypatch, tmp_path):
+    """Axis (b): the oracle and the formula disagree — IC-23's whole point.
+
+    The rendered document is *not* part of this test, which is the point: the
+    finding is raised by the second axis alone.
+    """
+    fact = min(V6_EXPECTED)
+    manipulated = {**V6_EXPECTED, fact: f"<manipulated {fact}>"}
+
+    findings = _v6_findings(monkeypatch, tmp_path, expected=manipulated)
+
+    assert _v6_kinds(findings) == ["expected-mismatch"]
+    finding = findings[0]
+    assert finding.severity == docs_freshness_lib.Severity.ERROR
+    assert finding.file == "config/doc-facts-expected.yaml"
+    assert fact in finding.message
+    assert V6_FACTS[fact] in finding.message
+    assert manipulated[fact] in finding.message
+    # The oracle axis names a key, not a line — `line` stays unset rather than
+    # carrying a magic 0 that a console report would print as a location.
+    assert not hasattr(finding, "line")
+
+
+def test_v6_missing_in_expected_is_a_warning(monkeypatch, tmp_path):
+    """Axis (c): a pinnable fact the oracle does not carry — WARNING, not error.
+
+    IC-23 lets the file grow, so this is a warning axis and not a second error
+    axis. The document is rendered correctly here, so the finding can only come
+    from the oracle side.
+    """
+    fact = min(V6_EXPECTED)
+    trimmed = {name: value for name, value in V6_EXPECTED.items() if name != fact}
+
+    findings = _v6_findings(monkeypatch, tmp_path, expected=trimmed)
+
+    assert _v6_kinds(findings) == ["missing-in-expected"]
+    finding = findings[0]
+    assert finding.severity == docs_freshness_lib.Severity.WARNING
+    assert finding.file == "config/doc-facts-expected.yaml"
+    assert fact in finding.message
+    assert V6_FACTS[fact] in finding.message
+
+
+def test_v6_kind_domain_and_severity_are_pinned():
+    """IC-05: exactly three kinds, and only ``missing-in-expected`` is a warning.
+
+    Pinned as a data structure rather than through the check, because the two
+    facts that matter — no fourth kind, and no severity drift — must hold even
+    for a kind this file happens not to exercise yet.
+    """
+    kinds = docs_freshness_lib.V6_SEVERITY_BY_KIND
+
+    assert set(kinds) == {"handedit", "expected-mismatch", "missing-in-expected"}
+    assert kinds["handedit"] == docs_freshness_lib.Severity.ERROR
+    assert kinds["expected-mismatch"] == docs_freshness_lib.Severity.ERROR
+    assert kinds["missing-in-expected"] == docs_freshness_lib.Severity.WARNING
+    # The check renames the comparator's kind; the two vocabularies stay
+    # distinct (F10) and the shared spelling has one source of truth.
+    assert docs_freshness_lib.V6_KIND_MISSING_IN_EXPECTED == "missing-in-expected"
+    assert docs_freshness_lib.V6_KIND_EXPECTED_MISMATCH == "expected-mismatch"
+    assert docs_freshness_lib.V6_KIND_HANDEDIT == "handedit"
+
+
+def test_v6_mirrors_the_renderer_decisions(monkeypatch, tmp_path):
+    """A region the renderer would not write is a region V6 does not compare.
+
+    All-or-nothing on an unpaired begin (AC-15), first pair only on a repeated
+    region name (AC-16), unknown region names untouched (IC-08). Reporting any
+    of them would be a drift the next ``sync.py`` cannot fix — a permanent false
+    alarm, the F21 class.
+    """
+    fresh = render_doc_fact_block(V6_REGION, V6_FACTS)
+    unpaired = (
+        f"<!-- agent-meta:docs-begin {V6_REGION} -->"
+        f"{fresh}"
+        "<!-- agent-meta:docs-begin hooks -->\n"
+    )
+    duplicated = (
+        f"<!-- agent-meta:docs-begin {V6_REGION} -->"
+        f"{fresh}"
+        f"<!-- agent-meta:docs-end {V6_REGION} -->\n"
+        f"<!-- agent-meta:docs-begin {V6_REGION} -->"
+        "\n- drifted duplicate\n"
+        f"<!-- agent-meta:docs-end {V6_REGION} -->\n"
+    )
+    unknown = (
+        "<!-- agent-meta:docs-begin roster-v2 -->"
+        "\n- drifted\n"
+        "<!-- agent-meta:docs-end roster-v2 -->\n"
+    )
+
+    for body in (unpaired, duplicated, unknown):
+        root = _v1_tree(tmp_path, "README.md", body)
+        assert _v6_findings(monkeypatch, root, relpaths=("README.md",)) == [], body
+
+
+def test_v6_is_silent_without_a_project_config(monkeypatch, tmp_path):
+    """No project config → no facts → no comparison, and no false alarm.
+
+    The facts are formulas over the project config; without one they come back
+    as empty strings, and comparing empty strings against a pinned value would
+    report every fact in the repository as drifted. The control on the right
+    proves the silence is caused by the missing config and not by an inert
+    check — same document, same bytes, one config argument apart.
+    """
+    drifted = _v6_region_text(V6_REGION, V6_FACTS, "\n- drifted\n")
+    # Neither root has a .meta-config/project.yaml, so V6 has to load one itself.
+    silent = _v1_tree(tmp_path / "silent", "README.md", drifted)
+    wired = _v1_tree(tmp_path / "wired", "README.md", drifted)
+
+    assert docs_freshness_lib.check_docs_facts_fresh(silent, None) == []
+
+    monkeypatch.setattr(
+        docs_freshness_lib, "compute_doc_facts",
+        lambda agent_meta_root, config, **kwargs: dict(V6_FACTS),
+    )
+    monkeypatch.setattr(docs_freshness_lib, "V6_SCAN_RELPATHS", ("README.md",))
+    control = docs_freshness_lib.check_docs_facts_fresh(wired, V6_CONFIG)
+
+    assert _v6_kinds(control) == ["handedit"], (
+        "the control must fire — otherwise the silence above proves nothing"
+    )
+
+
+def test_v6_skips_a_region_whose_fact_could_not_be_computed(monkeypatch, tmp_path):
+    """An empty fact value is not a drift — IC-01's fail-soft, applied to V6.
+
+    ``doc_facts`` never raises on a missing source; it yields the empty string.
+    The renderer would then write the ``docs-empty`` placeholder, so comparing
+    the region against that placeholder would report a drift that no config
+    source can fix.
+    """
+    without_fact = {name: value for name, value in V6_FACTS.items() if name != V6_FACT}
+    _v1_tree(tmp_path, "README.md", _v6_region_text(V6_REGION, without_fact))
+
+    assert _v6_findings(monkeypatch, tmp_path, facts=without_fact,
+                        relpaths=("README.md",)) == []
+
+
+def test_v6_output_is_deterministic_and_axis_ordered(monkeypatch, tmp_path):
+    """Same input, same list — and the expected-value axis comes first.
+
+    The comparator already sorts by ``fact``; V6 only has to keep that order
+    when it appends the second axis, otherwise two runs would report the same
+    drift in two different orders.
+    """
+    fact = min(V6_EXPECTED)
+    expected = {**V6_EXPECTED, fact: f"<manipulated {fact}>"}
+    _v1_tree(tmp_path, "README.md", _v6_region_text(V6_REGION, V6_FACTS, "\n- drifted\n"))
+
+    first = _v6_findings(monkeypatch, tmp_path, expected=expected,
+                         relpaths=("README.md",))
+    second = _v6_findings(monkeypatch, tmp_path, expected=expected,
+                          relpaths=("README.md",))
+
+    assert [str(finding) for finding in first] == [str(finding) for finding in second]
+    assert _v6_kinds(first) == ["expected-mismatch", "handedit"]
+
+
+def test_v6_is_not_wired_into_the_runner_yet():
+    """AC-38 / K46: no caller, no facade export — W2-7 owns both.
+
+    Two properties in one test because they are one boundary: until W2-7
+    registers the check *and* exports the name, V6 cannot affect a sync, and no
+    scenario can regress from W2-5. ``docs.py`` is W2-7's write-set alone (K20),
+    so a preparatory export here would be the ownership collision K46 forbids.
+
+    The facade is checked through its ``__all__`` and its attributes, not
+    through its text: W2-0 left a bookkeeping comment in the module docstring
+    that *names* the checks which are not implemented yet, and that comment is
+    correct and stays — only the importable name is the contract.
+    """
+    from scripts.lib.consistency import docs as docs_facade
+
+    runner = (REPO_ROOT / "scripts" / "consistency-check.py").read_text(encoding="utf-8")
+
+    assert "check_docs_facts_fresh" not in runner, (
+        "W2-5 must not register the check — registration is W2-7"
+    )
+    assert "check_docs_facts_fresh" not in docs_facade.__all__, (
+        "docs.py is W2-7's write-set alone (K46)"
+    )
+    assert not hasattr(docs_facade, "check_docs_facts_fresh"), (
+        "docs.py is W2-7's write-set alone (K46)"
+    )
 

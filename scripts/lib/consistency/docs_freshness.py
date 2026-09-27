@@ -8,7 +8,9 @@ compare a hand-written number against a computed one:
 
 * **V1a/V1b** ``check_no_manual_counts`` (AC-07, AC-08) — implemented here
   (W2-1).
-* **V6** ``check_docs_facts_fresh`` — W2-5, and the reason the V1 tests live in
+* **V6** ``check_docs_facts_fresh`` (AC-36, IC-23, R14) — implemented here
+  (W2-5): the two comparisons a rendered fact has to pass, the marker region
+  and the hand-maintained oracle. It is also the reason the V1 tests live in
   ``tests/test_doc_freshness.py``.
 * **V5** ``check_role_generation_parity`` — W2-4, assigned here by Spec §4.1
   because it compares a documented inventory against the actually generated
@@ -25,8 +27,25 @@ module is reached through it. Nothing here is stdlib-external.
 from __future__ import annotations
 
 import re
+from itertools import zip_longest
 from pathlib import Path
 
+from ..doc_facts import (
+    EXPECTED_DOC_FACTS_RELPATH,
+    MISMATCH_KIND,
+    MISSING_IN_EXPECTED_KIND,
+    compare_expected_doc_facts,
+    compute_doc_facts,
+    load_expected_doc_facts,
+)
+from ..doc_renderer import (
+    DOCS_BEGIN_RE,
+    DOCS_BLOCK_RE,
+    REGION_FACT_KEYS,
+    is_valid_region,
+    render_doc_fact_block,
+)
+from ..io import load_yaml_file
 from .report import Finding, Severity
 
 # ---------------------------------------------------------------------------
@@ -315,3 +334,259 @@ def check_no_manual_counts(root: Path, config: dict | None = None) -> list[Findi
                         f"{versions[0][2]!r} on a 'version' line",
                     ))
     return findings
+
+
+# ---------------------------------------------------------------------------
+# V6 — check_docs_facts_fresh (IC-05, IC-23, AC-36, R14, plan W2-5)
+# ---------------------------------------------------------------------------
+# Two axes, three kinds. ``handedit`` (ERROR): a rendered marker region differs
+# from ``render_doc_fact_block`` on the computed facts. ``expected-mismatch``
+# (ERROR): the facts differ from ``config/doc-facts-expected.yaml`` (IC-23).
+# ``missing-in-expected`` (WARNING): a pinnable fact the oracle does not carry
+# — IC-23 lets the file grow, so that is not a defect. ``checks.strict`` is
+# deliberately **not** read: V6 is ERROR from its first wave, unlike V1.
+# ``docs/INDEX.md`` joins axis (a) with W3-3's ``render_docs_index``, which does
+# not exist yet — a stated boundary, not a placeholder.
+#
+# The second axis is the only thing in the initiative that breaks the closed
+# circle ``doc_facts -> renderer -> V6`` (R14). The first compares the render
+# output against the very formula that produced it, so a *systematically* wrong
+# factor passes every gate — the spec's F19, F22 and F14 are three real
+# counting errors no V-check would have found. The oracle is the only right-hand
+# side a human maintains and the formula never sees, so an ``expected-mismatch``
+# means: *the rendered documentation is self-consistent and the two sources
+# disagree* — either the formula is wrong, or the oracle was not carried along
+# in the same commit, which is the intended review signal (R14 residual risk)
+# and not a defect.
+
+V6_CHECK_ID = "docs.docs_facts_fresh"
+
+#: The documents the generator renders fact blocks into (spec §6 (a)) — the same
+#: three entry documents V1 scans, but its own constant so that W3's generator
+#: target list and V1's scan list move independently and a test can point one
+#: axis at a fixture alone.
+V6_SCAN_RELPATHS: tuple[str, ...] = ("README.md", "llms.txt", "ARCHITECTURE.md")
+
+#: Where the facts come from when the caller passes no project config — the
+#: canonical single-file loader path, as in ``placeholders.load_project_vars``.
+V6_PROJECT_CONFIG_RELPATH = ".meta-config/project.yaml"
+
+V6_KIND_HANDEDIT = "handedit"
+
+#: The **check's** spelling of the comparator's ``mismatch`` (F10): the two
+#: vocabularies are deliberately distinct, because the check owns a third axis.
+#: The shared spelling is not re-invented here — it is ``doc_facts``' own.
+V6_KIND_EXPECTED_MISMATCH = "expected-mismatch"
+V6_KIND_MISSING_IN_EXPECTED = MISSING_IN_EXPECTED_KIND
+
+#: The three kinds and how each is reported. Keyed by the ``kind`` constants —
+#: never by a copied literal — so the word a finding carries and the severity the
+#: runner counts cannot drift apart.
+V6_SEVERITY_BY_KIND: dict[str, Severity] = {
+    V6_KIND_HANDEDIT: Severity.ERROR,
+    V6_KIND_EXPECTED_MISMATCH: Severity.ERROR,
+    V6_KIND_MISSING_IN_EXPECTED: Severity.WARNING,
+}
+
+#: One remediation per kind, because the three axes are fixed by three different
+#: people: the renderer, the formula, and whoever maintains the oracle.
+V6_SUGGESTION: dict[str, str] = {
+    V6_KIND_HANDEDIT: (
+        "Re-render the region (`python3 scripts/sync.py`) or restore the "
+        "hand-edited text — a marker region is generated, never maintained."
+    ),
+    V6_KIND_EXPECTED_MISMATCH: (
+        "Fix the formula in `scripts/lib/doc_facts.py`, or — if the computed "
+        f"value is the right one — update `{EXPECTED_DOC_FACTS_RELPATH}` and "
+        "bump `verified-at` in the same commit (the R14 review signal)."
+    ),
+    V6_KIND_MISSING_IN_EXPECTED: (
+        f"Pin the value in `{EXPECTED_DOC_FACTS_RELPATH}`, or record next to "
+        "the other IC-23 exclusions why the fact stays unpinned."
+    ),
+}
+
+
+def _v6_project_config(root: Path, config: dict | None) -> dict:
+    """The project config the facts are computed from.
+
+    ``config`` is what the runner holds (the IC-05 signature); when it is absent
+    the check loads the canonical file itself, because a check that needed a
+    config but silently compared against an empty one would report the whole
+    repository as drifted.
+    """
+    if config:
+        return config
+    data = load_yaml_file(
+        Path(root) / V6_PROJECT_CONFIG_RELPATH, on_error="default", default=None
+    )
+    return data if isinstance(data, dict) else {}
+
+
+def _v6_computed_facts(root: Path, config: dict | None) -> dict[str, str]:
+    """The computed facts, reduced to the ones that carry a value.
+
+    A comparison needs two values. Without a project config no formula can run,
+    and with a missing source one cannot — ``doc_facts`` never raises for either
+    (IC-01), it yields the empty string. An empty value against a pinned one is
+    an absence, not a drift, and reporting it as one is the F21
+    permanent-false-alarm class; an empty result means "nothing is comparable",
+    which the caller turns into silence, not into eleven mismatches.
+    """
+    project_config = _v6_project_config(root, config)
+    if not project_config:
+        return {}
+    facts = compute_doc_facts(Path(root), project_config)
+    return {name: value for name, value in facts.items() if value}
+
+
+def _v6_first_difference(actual: str, expected: str) -> tuple[int, str, str]:
+    """``(body line, actual line, expected line)`` of the first difference.
+
+    Relative to the region body, which starts *on* the ``docs-begin`` line, so
+    the caller adds ``begin_lineno - 1``. ``(0, "", "")`` means only the
+    terminator or a trailing blank line differs. A finding that merely says
+    "differs" costs the reader a diff run.
+    """
+    for index, (left, right) in enumerate(
+        zip_longest(actual.splitlines(), expected.splitlines(), fillvalue=""),
+        start=1,
+    ):
+        if left != right:
+            return index, left, right
+    return 0, "", ""
+
+
+def _v6_rendered_regions(text: str) -> list[tuple[str, str, int]]:
+    """``(region, body, begin line)`` per region the renderer *would* write.
+
+    Mirrors the three decision rules of ``doc_renderer.apply_fact_blocks``,
+    because a region the renderer never touches cannot be repaired by
+    re-rendering: an unpaired ``docs-begin`` leaves the **whole file** alone
+    (AC-15), a repeated region name renders only its first pair (AC-16), an
+    unknown name is not rendered at all (IC-08).
+    """
+    balanced = list(DOCS_BLOCK_RE.finditer(text))
+    paired = {match.start() for match in balanced}
+    if any(match.start() not in paired for match in DOCS_BEGIN_RE.finditer(text)):
+        return []
+    regions: list[tuple[str, str, int]] = []
+    seen: set[str] = set()
+    for match in balanced:
+        region = match.group("region")
+        if region in seen or not is_valid_region(region):
+            continue
+        seen.add(region)
+        regions.append((
+            region,
+            match.group("body"),
+            text.count("\n", 0, match.start()) + 1,
+        ))
+    return regions
+
+
+def _v6_finding(kind: str, relpath: str, message: str, *,
+                lineno: int | None = None) -> Finding:
+    """The house ``Finding`` for *kind*, plus the ``kind`` attribute.
+
+    ``Finding`` (``report.py``) has no ``kind`` and no ``line`` field and that
+    module is not owned by W2-5, so both are set on the instance — the same
+    two-part contract ``_v1_finding`` uses, and the same W2-7 follow-up.
+    ``line`` is set only where the finding points into a document; the oracle
+    axis names a key, and a magic ``0`` would print as a location.
+    """
+    finding = Finding(
+        severity=V6_SEVERITY_BY_KIND[kind],
+        check=V6_CHECK_ID,
+        file=relpath,
+        message=message,
+        suggestion=V6_SUGGESTION[kind],
+    )
+    finding.kind = kind
+    if lineno is not None:
+        finding.line = lineno
+    return finding
+
+
+def _v6_handedit_findings(root: Path, facts: dict[str, str]) -> list[Finding]:
+    """Axis (a): the rendered marker regions against the computed facts.
+
+    A region whose fact is not among the computed ones is skipped: the renderer
+    would write the ``docs-empty`` placeholder for it, and comparing a real
+    region against that placeholder would report a drift no config source can
+    fix. On the scalar side the same absence is ``missing-in-expected``; here
+    silence is right — a rendered block is not a pinnable number.
+    """
+    findings: list[Finding] = []
+    for relpath in V6_SCAN_RELPATHS:
+        path = Path(root) / relpath
+        if not path.is_file():
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        for region, body, begin_lineno in _v6_rendered_regions(text):
+            if REGION_FACT_KEYS[region] not in facts:
+                continue
+            expected = render_doc_fact_block(region, facts)
+            if body == expected:
+                continue
+            index, left, right = _v6_first_difference(body, expected)
+            detail = (f"line {index}: {left!r} != {right!r}" if index
+                      else "trailing blank line or line terminator")
+            findings.append(_v6_finding(
+                V6_KIND_HANDEDIT,
+                relpath,
+                f"line {begin_lineno + index - 1}: marker region {region!r} "
+                f"differs from the block the facts render ({detail})",
+                lineno=begin_lineno + index - 1,
+            ))
+    return findings
+
+
+def _v6_expected_findings(root: Path, facts: dict[str, str]) -> list[Finding]:
+    """Axes (b) and (c): the computed facts against the hand-maintained oracle.
+
+    The loader is fail-soft (IC-01): a missing, unreadable or malformed oracle
+    yields ``{}``, and "nothing is pinned" is the honest answer — V6 then stays
+    silent. The comparator already sorts by ``fact`` and limits itself to the
+    pinnable facts, so this only maps its two kinds onto the check's three.
+    """
+    expected = load_expected_doc_facts(Path(root))
+    if not expected:
+        return []
+    findings: list[Finding] = []
+    for entry in compare_expected_doc_facts(facts, expected):
+        if entry["kind"] == MISMATCH_KIND:
+            kind = V6_KIND_EXPECTED_MISMATCH
+            message = (
+                f"{entry['fact']}: computed {entry['computed']!r} != oracle "
+                f"{entry['expected']!r} — the formula and the human-maintained "
+                "value disagree although the rendered documentation matches "
+                "the formula"
+            )
+        else:
+            kind = V6_KIND_MISSING_IN_EXPECTED
+            message = (
+                f"{entry['fact']}: computed {entry['computed']!r} is not "
+                "pinned in the oracle"
+            )
+        findings.append(_v6_finding(kind, EXPECTED_DOC_FACTS_RELPATH, message))
+    return findings
+
+
+def check_docs_facts_fresh(root: Path, config: dict | None = None) -> list[Finding]:
+    """V6: the rendered documentation and the computed facts against the oracle.
+
+    ``config`` is the project config (IC-05 signature), loaded from the repo
+    when absent. The ``docs-consolidation.enabled`` common gate and the runner
+    registration are W2-7's task; until then nothing calls this function and no
+    scenario can regress from W2-5 (AC-38). The order is fixed — expected-value
+    axis first in the comparator's ``fact`` order, then the handedit axis in scan
+    order.
+    """
+    facts = _v6_computed_facts(root, config)
+    if not facts:
+        return []
+    return _v6_expected_findings(root, facts) + _v6_handedit_findings(root, facts)

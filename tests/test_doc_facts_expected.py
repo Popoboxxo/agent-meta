@@ -43,7 +43,18 @@ them would break silently:
   decision is recorded, so a new fact cannot slip in unreviewed.
 
 W2-5 extends this file with the V6 findings; it does not change the oracle
-contract asserted here.
+contract asserted here. The V6 half of ``test_mismatch_is_reported`` is the
+acceptance criterion of that task, which is why the test name appears in both
+IC-23 and the W2-5 plan row: the first half stays the comparator entry, the
+second half is the check's ``Finding``.
+
+The imports therefore grew from ``scripts.lib.doc_facts`` alone to
+``scripts.lib.doc_renderer`` (to render a block from the computed facts) and
+``scripts.lib.consistency.docs_freshness`` (the check under test). The file
+still does **not** import the ``docs`` facade — W2-7 owns that name (K19/K46).
+Spec §4.1 states the old, narrower import set in its evidence paragraph
+("bindet ausschließlich ``scripts.lib.doc_facts``"); that sentence is about the
+*facade* list and stays correct, the W6 documentation pass owns the wording.
 """
 
 from __future__ import annotations
@@ -56,18 +67,20 @@ import pytest
 import yaml
 
 from scripts.lib import doc_facts
+from scripts.lib.consistency import docs_freshness as docs_freshness_lib
 from scripts.lib.doc_facts import (
     EXPECTED_COMPARABLE_FACT_KEYS,
     EXPECTED_DOC_FACTS_RELPATH,
     EXPECTED_FACTS_META_KEYS,
     FACT_KEYS,
-    MISSING_IN_EXPECTED_KIND,
     MISMATCH_KIND,
+    MISSING_IN_EXPECTED_KIND,
     compare_expected_doc_facts,
     compute_doc_facts,
     is_volatile,
     load_expected_doc_facts,
 )
+from scripts.lib.doc_renderer import apply_fact_blocks, render_doc_fact_block
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -200,11 +213,23 @@ def test_expected_values_match(computed, expected):
         assert DOCUMENTED_UNPINNED[fact], fact
 
 
-def test_mismatch_is_reported(computed, expected):
-    """AC-36: a manipulated value yields **exactly one** mismatch, with both values.
+def test_mismatch_is_reported(computed, expected, monkeypatch):
+    """AC-36, both halves: the comparator entry **and** the V6 finding.
 
-    The finding carries the computed value *and* the expected one, so the
-    reviewer sees which side moved without re-running anything.
+    The comparator half is IC-23's data contract: one entry, both values.
+
+    The V6 half is the acceptance criterion of plan task W2-5 and the whole
+    reason IC-23 exists. ``check_docs_facts_fresh`` is run against the **real
+    repository** with the **real** project config, so the facts it compares are
+    the ones the renderer would have written — and the *only* seam patched is
+    ``load_expected_doc_facts``, which hands the check a manipulated dict instead
+    of the committed oracle (the oracle file itself is never written). The
+    result is exactly one ERROR of kind ``expected-mismatch`` while axis (a) —
+    the handedit axis, which compares the rendered documents against those same
+    facts — stays silent. That is the proof that the circle
+    ``doc_facts -> renderer -> V6`` is broken from the outside: a systematically
+    wrong factor still renders self-consistent documentation, and only the human
+    oracle catches it (R14; spec F19, F22 and F14 were exactly that).
     """
     fact = sorted(expected)[0]
     manipulated = _manipulate(expected, fact)
@@ -219,6 +244,50 @@ def test_mismatch_is_reported(computed, expected):
     assert entry["computed"] != entry["expected"]
     # The unpinned findings are unaffected by an oracle value change.
     assert {e["fact"] for e in _unpinned(entries)} == set(DOCUMENTED_UNPINNED)
+
+    # --- the V6 half: the check, on the real tree, with a manipulated oracle ---
+    monkeypatch.setattr(
+        docs_freshness_lib, "load_expected_doc_facts", lambda root, log=None: manipulated
+    )
+    findings = docs_freshness_lib.check_docs_facts_fresh(REPO_ROOT, _project_config())
+
+    errors = [f for f in findings if f.severity == docs_freshness_lib.Severity.ERROR]
+    assert [f.kind for f in errors] == ["expected-mismatch"], [
+        (f.severity, f.kind, f.message) for f in findings
+    ]
+    finding = errors[0]
+    assert finding.check == "docs.docs_facts_fresh"
+    assert finding.file == EXPECTED_DOC_FACTS_RELPATH
+    assert fact in finding.message
+    assert entry["computed"] in finding.message
+    assert entry["expected"] in finding.message
+    # The only warnings are the documented unpinned facts — the oracle grows
+    # (IC-23), so they are a warning axis and not a second error axis.
+    assert {
+        f.message.split(":", 1)[0]
+        for f in findings
+        if f.severity == docs_freshness_lib.Severity.WARNING
+    } == set(DOCUMENTED_UNPINNED)
+    # Premise for the "obwohl": the computed facts are the ones the documents
+    # were rendered from, and a rendered block of them is byte-identical to what
+    # the renderer produces — so a *handedit* finding would be a false alarm
+    # here, and its absence is the meaningful half of the criterion. (The
+    # rendered body carries the newline that closes the ``docs-begin`` line,
+    # which is why the marker is not followed by one here.)
+    rendered = render_doc_fact_block("roster", computed)
+    document = (
+        "<!-- agent-meta:docs-begin roster -->"
+        f"{rendered}"
+        "<!-- agent-meta:docs-end roster -->\n"
+    )
+    assert apply_fact_blocks(document, computed) == document
+    # And the handedit axis really did run: it scans the same three entry
+    # documents the generator renders into, none of which carries a marker
+    # region before W3/W4.
+    for relpath in docs_freshness_lib.V6_SCAN_RELPATHS:
+        path = REPO_ROOT / relpath
+        if path.is_file():
+            assert "agent-meta:docs-begin" not in path.read_text(encoding="utf-8")
 
 
 def test_missing_in_expected_is_reported(computed, expected):
