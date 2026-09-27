@@ -1,30 +1,48 @@
 # Review rules index — database domain
+#
+# Per-rule semantics (full rationale in review-rules/ai.yaml):
+#   blocking    true -> must be resolved before merge; false -> advisory
+#   claim_type  verifiable -> falsifiable by re-reading code or re-running data
+#               judgment   -> requires expert opinion, cannot be proven
+# Source: "comment signals" taxonomy, "Looks Good to Me" ch. 6.
 version: 1
 domain: database
 rules:
   - id: DB-01
     title: Migration safety (reversible, lock-aware)
     severity_hint: high
+    blocking: true
+    claim_type: verifiable
     standard_ref:
   - id: DB-02
     title: N+1 query patterns / missing eager loading
     severity_hint: medium
+    blocking: false
+    claim_type: verifiable
     standard_ref:
   - id: DB-03
     title: Injection vectors via string-built SQL
     severity_hint: critical
+    blocking: true
+    claim_type: verifiable
     standard_ref: CWE-89
   - id: DB-04
     title: Indexing of hot query paths; lock-free concurrent builds (CREATE INDEX CONCURRENTLY) where capacity allows
     severity_hint: medium
+    blocking: false
+    claim_type: judgment
     standard_ref:
   - id: DB-05
     title: Transaction boundaries and isolation
     severity_hint: high
+    blocking: true
+    claim_type: verifiable
     standard_ref:
   - id: DB-06
     title: Schema evolution discipline (no unplanned destructive drops)
     severity_hint: high
+    blocking: true
+    claim_type: verifiable
     standard_ref:
   - id: DB-07
     title: Expand-and-contract migrations (expand → migrate → contract; no breaking single-release schema change)

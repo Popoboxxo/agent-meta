@@ -51,6 +51,10 @@ roles:
       - api-spec-v1
       - explorer-output-v1
       - concept-spec-v1
+      - eval-result-v1
+      - rag-pipeline-v1
+      - agent-observability-v1
+      - prompt-spec-v1
       output_contract: dev-result-v1
       input_schema: schemas/handoffs/task-spec.schema.json
       timeout_sec: 300
@@ -566,6 +570,13 @@ roles:
       - Agenten-Definition
       examples:
       - "Optimiere die Agenten-Definition für weniger Token."
+    handoff:
+      input_contracts:
+      - task-spec-v1
+      - eval-result-v1
+      output_contract: prompt-spec-v1
+      target_roles:
+      - developer
     short_desc: Der ultimative Experte für Prompt-Engineering
   prompt-governor:
     model: balanced
@@ -807,6 +818,7 @@ roles:
       - dependency-audit-v1
       - prompt-governance-v1
       - lifecycle-audit-v1
+      - ai-governance-assessment-v1
     short_desc: 'Projekt-Feedback standardisieren: Bugs, Features, Verbesserungen
       als GitHub I...'
   bug-feature-analyzer:
@@ -1588,6 +1600,9 @@ roles:
       examples:
       - "Definiere SLIs und SLOs für den Service."
     handoff:
+      input_contracts:
+      - agent-observability-v1
+      - eval-result-v1
       output_contract: slo-report-v1
       target_roles:
       - developer
@@ -1752,6 +1767,8 @@ roles:
       examples:
       - "Baue die ETL-Pipeline."
     handoff:
+      input_contracts:
+      - rag-pipeline-v1
       output_contract: data-pipeline-v1
       target_roles:
       - developer
@@ -2401,6 +2418,180 @@ roles:
       examples:
       - "Reviewe das UI auf Design-Token-Konformität."
 
+  llm-evaluator:
+    model: powerful
+    memory: project
+    permission_mode: plan
+    workflow_tier: optional
+    description: 'Misst die Qualität einer Modell- oder Agenten-Ausgabe gegen ein Golden Dataset:
+      Offline-Eval-Suite, LLM-as-judge mit validierten Judge-Prompts, Rubriken, Task-Success-Metriken
+      und Regressions-Gates bei Prompt-/Modellwechsel. Null-Produkt-Regel: eine fehlgeschlagene
+      Qualitätsdimension darf nicht weggemittelt werden. Grundlage: AI Model Evaluation (Nassery)
+      Kap. 10.2.3, LLM Evaluation and Alignment (Lee) Kap. 1/2. Nicht Code-Review (code-reviewer),
+      nicht Prozesskonformität (validator), nicht Security-Muster (ai-security-guardian).'
+    routing:
+      intent_keywords:
+      - LLM Evaluation
+      - Eval-Suite
+      - Golden Dataset
+      - LLM-as-judge
+      - Rubrik
+      - Regressions-Gate
+      - Prompt-Änderung bewerten
+      parallel: true
+      orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - LLM Evaluation
+      - Eval-Suite
+      - Golden Dataset
+      - LLM-as-judge
+      - Rubrik
+      - Regressions-Gate
+      examples:
+      - "Miss die Antwortqualität dieser Prompt-Änderung gegen unser Golden Dataset."
+      - "Baue eine Eval-Suite mit Rubriken und prüfe, ob der Prompt-Wechsel eine Regression bringt."
+    handoff:
+      input_contracts:
+      - task-spec-v1
+      - rag-pipeline-v1
+      - ai-governance-assessment-v1
+      - dev-result-v1
+      output_contract: eval-result-v1
+      target_roles:
+      - developer
+      - prompt-engineer
+      timeout_sec: 600
+    short_desc: Misst Modell-/Agenten-Output gegen Golden Dataset (Rubriken, LLM-as-judge, Regressions-Gates)
+  rag-engineer:
+    model: balanced
+    memory: project
+    workflow_tier: optional
+    description: 'Retrieval-Pipelines: Chunking-Strategie und Trade-offs, Embedding-Modellwahl,
+      hybride Retrieval-Suche (BM25 + Vektor), Reranking, Query-Rewriting und Retrieval-Eval-Sets
+      (recall@k, MRR, NDCG). Single responsibility — jede Stufe ist isoliert verstehbar,
+      testbar und reparierbar (Learn AI Data Engineering, Melillo, Kap. 12.1.2). Abgrenzung:
+      data-engineer deckt ETL/ELT und Lineage ab, aber ohne RAG-Bezug.'
+    routing:
+      intent_keywords:
+      - RAG
+      - Retrieval
+      - Chunking
+      - Embedding
+      - Vektordatenbank
+      - Reranking
+      - Hybrid Search
+      - recall@k
+      parallel: true
+      orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - RAG
+      - Retrieval
+      - Chunking
+      - Embedding
+      - Reranking
+      - Hybrid Search
+      examples:
+      - "Unser RAG findet die relevanten Dokumente nicht — wo liegt der Verlust?"
+      - "Wähle die Chunking-Strategie und miss recall@k auf unserem Retrieval-Eval-Set."
+    handoff:
+      input_contracts:
+      - task-spec-v1
+      - eval-result-v1
+      output_contract: rag-pipeline-v1
+      target_roles:
+      - developer
+      - data-engineer
+      timeout_sec: 600
+    short_desc: RAG/Retrieval-Pipelines (Chunking, Embeddings, hybride Suche, Reranking, Retrieval-Eval)
+  ai-governance-engineer:
+    model: powerful
+    memory: project
+    permission_mode: plan
+    workflow_tier: optional
+    description: 'Modellrisiko-Governance: Risikoklassifikation von KI-Systemen, Model-/System-Dokumentation
+      (Model Card), Bias- und Fairness-Bewertung, Mapping auf EU AI Act / NIST AI RMF / ISO 42001
+      sowie Decision Records. Leitgedanke: Governance für Unsicherheit bauen, nicht so tun,
+      als gäbe es keine (AI Governance, Bozdag/Bennati, Kap. 1.3; Decision Records Kap. 4.3.1).
+      Greift auf den vorhandenen RCM-/Control-Mapping-Ansatz zurück, statt ihn neu zu bauen —
+      IT-Kontrollen selbst bewertet control-framework-assessor.'
+    routing:
+      intent_keywords:
+      - Modellrisiko
+      - Model Card
+      - EU AI Act
+      - NIST AI RMF
+      - Risikoklassifikation KI
+      - Bias-Bewertung
+      - Decision Record
+      - KI-Governance
+      parallel: true
+      orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Modellrisiko
+      - Model Card
+      - EU AI Act
+      - NIST AI RMF
+      - Bias-Bewertung
+      - Decision Record
+      examples:
+      - "Klassifiziere das Modellrisiko unseres Bewertungs-Agenten und erstelle die Model Card."
+      - "Mappe das KI-System auf EU AI Act und NIST AI RMF und benenne das Restrisiko mit Owner."
+    handoff:
+      input_contracts:
+      - task-spec-v1
+      - eval-result-v1
+      output_contract: ai-governance-assessment-v1
+      target_roles:
+      - feedback
+      - orchestrator
+      timeout_sec: 600
+    short_desc: Modellrisiko-Governance (Risikoklassifikation, Model Card, Bias, EU AI Act/NIST RMF, Decision Records)
+  ai-observability-engineer:
+    model: balanced
+    memory: project
+    workflow_tier: optional
+    description: 'Agenten-spezifische SLIs und Telemetrie: Task Success Rate, Reasoning Quality
+      (5–10 % menschengeprüftes Sampling als leading indicator), Approval Request Rate sowie
+      Token-Kosten und Latenz pro Chain-Step mit Drift-Erkennung. Ein technisch verfügbarer
+      Agent, der ständig schlechte Entscheidungen trifft, verfehlt sein Versprechen trotz
+      erfüllter Uptime-Ziele. SLI-Definitionen nach The Ultimate AI Guide for Linux Engineers
+      (Humble) Kap. 6. Abgrenzung: sre-engineer verantwortet Infrastruktur-SLIs/SLOs.'
+    routing:
+      intent_keywords:
+      - Task Success Rate
+      - Reasoning Quality
+      - Approval Request Rate
+      - Agenten-Telemetrie
+      - Token-Kosten pro Task
+      - Drift-Erkennung
+      - Agenten-Observability
+      parallel: true
+      orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Task Success Rate
+      - Reasoning Quality
+      - Approval Request Rate
+      - Agenten-Observability
+      - Drift
+      examples:
+      - "Der Agent läuft, macht aber die falschen Entscheidungen — welche SLI zeigt das?"
+      - "Baue Reasoning-Quality-Sampling über 5–10 % der Agenten-Operationen und alarmiere auf die Leading Indicators."
+    handoff:
+      input_contracts:
+      - task-spec-v1
+      - eval-result-v1
+      output_contract: agent-observability-v1
+      target_roles:
+      - sre-engineer
+      - developer
+      timeout_sec: 600
+    short_desc: Agenten-spezifische SLIs (Task Success, Reasoning Quality, Approval Rate, Kosten/Drift)
+
+
 activation_groups:
   se:
     default: false
@@ -2432,7 +2623,6 @@ activation_groups:
       kind: roles_membership
       mode: all
       roles: ["junior-developer", "senior-developer"]
-
 outcome-caching:
   enabled: false
   ttl_seconds: 3600

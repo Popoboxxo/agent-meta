@@ -1,32 +1,52 @@
 # Review rules index — ui domain
+#
+# Per-rule semantics (full rationale in review-rules/ai.yaml):
+#   blocking    true -> must be resolved before merge; false -> advisory
+#   claim_type  verifiable -> falsifiable by re-reading code or re-running data
+#               judgment   -> requires expert opinion, cannot be proven
+# Source: "comment signals" taxonomy, "Looks Good to Me" ch. 6.
 version: 1
 domain: ui
 rules:
   - id: UI-01
     title: Design-token conformance (no hardcoded colors/spacing/fonts)
     severity_hint: medium
+    blocking: false
+    claim_type: verifiable
     standard_ref:
   - id: UI-02
     title: Layout consistency (spacing/grid/breakpoints)
     severity_hint: low
+    blocking: false
+    claim_type: judgment
     standard_ref:
   - id: UI-03
     title: Interaction states present (loading/error/empty; focus/hover/disabled variants defined)
     severity_hint: medium
+    blocking: true
+    claim_type: verifiable
     standard_ref:
   - id: UI-04
     title: i18n readiness (no hardcoded user-facing strings)
     severity_hint: medium
+    blocking: false
+    claim_type: verifiable
     standard_ref:
   - id: UI-05
     title: Surface WCAG basics (deep audits -> accessibility-specialist)
     severity_hint: high
     standard_ref: "WCAG@2.2"
+    blocking: false
+    claim_type: judgment
   - id: UI-06
     title: Consistent identification - same function maps to same label/icon (SC 3.2.4)
     severity_hint: medium
     standard_ref: "WCAG@2.2#3.2.4"
+    blocking: false
+    claim_type: judgment
   - id: UI-07
     title: Accessible semantics on interactive elements (roles/labels/landmarks/alt)
     severity_hint: high
     standard_ref: "WCAG@2.2"
+    blocking: true
+    claim_type: verifiable

@@ -1,31 +1,55 @@
 # Review rules index — backend domain
 # Fleet reviewers may ONLY cite rule_ids defined here or in their template defaults.
+#
+# Per-rule semantics (full rationale in review-rules/ai.yaml):
+#   blocking    true -> must be resolved before merge; false -> advisory
+#   claim_type  verifiable -> falsifiable by re-reading code or re-running data
+#               judgment   -> requires expert opinion, cannot be proven
+# Both derive from the "comment signals" taxonomy in "Looks Good to Me" ch. 6,
+# which replaced MoSCoW after that team found Must/Should too blurry in practice.
+#
+# The two literature-anchored AI anti-patterns proposed for this file (BE-07
+# happy-path code, BE-08 symptom fix instead of root cause) were NOT added here:
+# they are not backend-specific, so they live in review-rules/ai.yaml as AI-01/AI-02.
+# A rule_id must exist in exactly one index.
 version: 1
 domain: backend
 rules:
   - id: BE-01
     title: Silent failure hunt (swallowed exceptions, empty catches)
     severity_hint: high
+    blocking: true
+    claim_type: verifiable
     standard_ref:
   - id: BE-02
     title: API contract consistency against OpenAPI (stable shapes, versioning, breaking changes flagged)
     severity_hint: medium
     standard_ref: "OpenAPI@3.1.0"
+    blocking: false
+    claim_type: verifiable
   - id: BE-03
     title: Concurrency/async pitfalls (races, unawaited promises, shared state, missing idempotency/retry safety)
     severity_hint: high
+    blocking: true
+    claim_type: verifiable
     standard_ref:
   - id: BE-04
     title: Middleware chain order correctness
     severity_hint: medium
+    blocking: false
+    claim_type: verifiable
     standard_ref:
   - id: BE-05
     title: Input validation at system boundaries
     severity_hint: high
+    blocking: true
+    claim_type: verifiable
     standard_ref:
   - id: BE-06
     title: Observability without secret leakage
     severity_hint: medium
+    blocking: false
+    claim_type: verifiable
     standard_ref:
   - id: BE-07
     title: Golden-signal observability gaps (no latency/traffic/error/saturation metric; silent behavior invisible)

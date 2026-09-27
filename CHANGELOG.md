@@ -3,6 +3,31 @@
 ## [Unreleased]
 
 ### Added
+- **Four AI-agent roles, anchored in a 50-book literature analysis (27 Manning + 23 Humble/Packt)**:
+  - `llm-evaluator` (1.0.0) — measures model/agent output against a golden dataset: offline eval
+    suite, validated LLM-as-judge, rubrics, task-success metrics, regression gates on prompt/model
+    change. Applies the zero-product aggregation rule (Lee, *LLM Evaluation and Alignment*, ch. 2.1.4)
+    so a failed quality dimension cannot be averaged away, and classifies a task as closed- or
+    open-domain before choosing a verifier (ch. 5.1). Rubric/checklist distinction per Nassery,
+    *AI Model Evaluation*, ch. 10.2.3.
+  - `rag-engineer` (1.0.0) — retrieval pipelines: chunking trade-offs, embedding-model choice,
+    hybrid retrieval (BM25 + vector), reranking, query rewriting, retrieval eval sets
+    (recall@k/MRR/NDCG). Single-responsibility staging per Melillo, *Learn AI Data Engineering*,
+    ch. 12.1.2.
+  - `ai-governance-engineer` (1.0.0) — model-risk governance: AI risk classification, model/system
+    cards, bias assessment across segments, EU AI Act / NIST AI RMF mapping, and decision records.
+    Reuses the existing RCM and control-mapping method rather than rebuilding it. Per Bozdag/Bennati,
+    *AI Governance*, ch. 1.3 ("building governance for uncertainty, not pretending uncertainty
+    doesn't exist") and ch. 4.3.1 (decision records as the transparency artefact).
+  - `ai-observability-engineer` (1.0.0) — agent-behaviour SLIs: task success rate, reasoning quality
+    (5–10 % human-reviewed sampling, a *leading* indicator), approval request rate, plus per-task
+    token cost, latency and drift detection. SLI definitions per *The Ultimate AI Guide for Linux
+    Engineers* (Humble), ch. 6.
+  - New review-rules domain `config/review-rules/ai.yaml` with 8 rules (AI-01…AI-08), including the
+    two literature-anchored anti-patterns for AI-generated code: happy-path code (Morgan,
+    *Coding with AI*, ch. 5) and symptom-fix-instead-of-root-cause (ch. 6).
+
+
 - **Capability-gated intent-routing mandate (#264)**: `route_intent` is only mandated
   in the orchestrator's §3 when the harness registers it as a callable tool
   (`route_intent_tool` in `config/provider-capabilities.yaml`); otherwise the
@@ -38,6 +63,33 @@
   continuations this is a correction; blank lines stay blank, so no trailing whitespace is
   emitted. Single-line values and column-0 / inline placeholders are unchanged — the default
   render stays byte-identical.
+
+
+- **Review rule indexes carry `blocking` and `claim_type` per rule** (`backend`, `frontend`,
+  `database`, `security`, `ui`, plus the new `ai` domain). `blocking` marks whether a finding must
+  be resolved before merge; `claim_type` separates findings that are falsifiable from those needing
+  expert judgement. Both follow the "comment signals" taxonomy in Braganza, *"Looks Good to Me"*,
+  ch. 6 — which reports the author's team **abandoning** MoSCoW because the Must/Should boundary
+  proved too blurry, in favour of explicit needs-change / levelup / nitpick signals.
+- **DoD presets `full` and `spec-driven` activate `ai-security-review`, `prompt-governance` and
+  `lifecycle-ownership`.** These three flags were `false` in all seven presets, which meant the
+  existing AI roles could never run in a default configuration. The five lighter presets are
+  unchanged.
+- **Eight existing roles strengthened with literature-anchored rules** (each 1–2 sentences, no
+  rewrites, each with a version bump): `validator` and `se-verifier` (verifiable-vs-plausible
+  distinction and the zero-product rule for L1–Ln), `principal-developer` (context over syntax as
+  the reason this tier exists), `code-reviewer` (per-finding blocking level and claim type),
+  `prompt-engineer` (the three guardrail classes — security boundaries, behavioural limits, scope
+  restrictions — plus the counterweight that no universal prompt formula exists), `sre-engineer`
+  (hands the agent-behaviour SLI family to `ai-observability-engineer`), `data-engineer` (declares
+  the RAG/embedding gap and hands it to `rag-engineer`), `orchestrator` (single-responsibility
+  justification and review-loop governance), `api-specialist` (Swiss-Army-Knife rule and the MCP
+  N×M boundary — MCP standardises the interface contract, not the tool semantics).
+- **Registry wiring for the new roles**: `llm-evaluator`, `rag-engineer`, `ai-governance-engineer`
+  and `ai-observability-engineer` are registered in `config/role-defaults.yaml` with routing
+  keywords, timeouts and handoff contracts; `prompt-engineer` gained its first `handoff` block, and
+  `developer`, `data-engineer`, `sre-engineer`, `feedback` and `control-framework-assessor` now
+  declare the new contracts as inputs so no handoff is silent.
 
 ## [1.2.0-beta.2] - 2026-09-13
 
