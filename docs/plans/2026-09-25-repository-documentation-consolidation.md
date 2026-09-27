@@ -3,7 +3,7 @@ plan-id: PLAN-DOCS-CONSOLIDATION-2026-09-25
 spec-id: SPEC-DOCS-CONSOLIDATION-2026-09-25
 title: Repository-weite Doku-Konsolidierung agent-meta — Implementation Plan
 status: APPROVED
-revision: 0.5
+revision: 0.6
 pipeline_stages:
   implement: 3
 related:
@@ -21,8 +21,9 @@ related:
 > (`geplant | IN PROGRESS | complete`) kennt kein `Entwurf`; hier gilt die Gate-Sprache der
 > Spec. **Kein** `APPROVED` wird erfunden — es liegt eine dokumentierte User-Freigabe vor.
 >
-> **Genehmigungsumfang:** Die Freigabe umfasst die **Ausführung dieses Plans** (W0–W8, 47
-> Tasks) inklusive der im Plan mit Owner und Entscheidungsweg versehenen Entscheidungs-Points
+> **Genehmigungsumfang:** Die Freigabe umfasst die **Ausführung dieses Plans** (W0–W8, **48**
+> Tasks — **K39** (Rev. 0.6), m1: 47 → 48 durch den neuen Task **W2-0** „Modul-Split"; vorher 47)
+> inklusive der im Plan mit Owner und Entscheidungsweg versehenen Entscheidungs-Points
 > W0-1/W0-3/W0-6 (davon **OQ2/OQ6/OQ8 bereits entschieden** — Ergebnis-Records) und der noch
 > offenen Entscheidungs-Tasks W0-7/W5-1/W8-1. Die **Checkboxen sind bewusst nicht abgehakt** — das
 > Plan-Ledger bleibt offen, die Genehmigung betrifft den Plan, nicht den Fortschritt. Die
@@ -46,6 +47,215 @@ related:
 > `docs/specs/2026-09-25-repository-documentation-consolidation-design.md`
 > (concept-architect, 2026-09-25; Trace-Anker
 > `spec-id: SPEC-DOCS-CONSOLIDATION-2026-09-25`).
+>
+> **Änderungsnotiz — Rev. 0.6 (2026-09-27): K18…K24 — U-1 (Modul-Split der Consistency-Checks)
+> und U-2 (AC-30 auf `README.md` + `llms.txt` verengt), beide als bereits getroffene
+> Nutzerentscheidungen umgesetzt; W2-DAG auf echte write-set-disjunkte Kanten umgestellt.**
+> **Eingang:** die zwei **verbindlichen** Nutzerentscheidungen vom 2026-09-27 (über `main_chat` an
+> den `orchestrator`) **U-1** und **U-2** sowie die **Baseline-Messung 2026-09-27** (Übergabe vom
+> Parent, in dieser Revisionsrunde **kein** Shell-Zugriff — alle Zahlen sind als *Baseline-Messung
+> 2026-09-27, Übergabe vom Parent* markiert und **nicht** neu behauptet). **Rev. 0.5 und die
+> Rev.-0.2/0.3/0.4-Blöcke bleiben wortgleich stehen**; es wird **nichts** gelöscht. `status:
+> APPROVED` bleibt **unverändert**. **Kein** Task-, Wellen-, AC-, IC-, NFA-, R- oder OQ-ID wurde
+> umnummeriert oder gestrichen; der **einzige** neue Task ist **W2-0**; die **einzige** neue
+> offene Frage ist **OQ10** (in der Spec geführt); **kein** Produktionscode, **keine** Tests, **keine**
+> Runner-Änderung in dieser Revision. Katalog:
+>
+> - **K18 — U-1: Modulgrenzen festgelegt (verbindlich, Spec §4.1).** `scripts/lib/consistency/docs.py`
+>   (heute **599** Zeilen) wird zur **Fassade**; die Prüfebene wird nach **Familien** aufgeteilt:
+>   `docs_links.py` (V3, V4, `check_sync_cli_docs`, `check_ui_help_mappings`) · `docs_freshness.py`
+>   (V1a/V1b, **V5**, V6) · `docs_wiki.py` (V7, V8) · `docs_index.py` (V2, V9). **Jeder** V-Check V1…V9
+>   und **jeder** der drei Altchecks ist **genau einem** Modul zugeordnet — **12 Zuordnungen auf
+>   4 Module**, ohne Lücke und ohne Doppeleintrag. **Jedes Modul < 600 Zeilen.** Die
+>   Schnittlogik ist **die Frage, die ein Check stellt**; die Größengrenze ist **Folge**, nicht
+>   Zweck. **Zur Wahl von V5** (es hätte sonst kein Modul): der dokumentierte Rollenbestand gegen
+>   die generierten Rollen ist dieselbe Frage wie V1 und V6. **Zur Wahl von V8/V9** (spätere Wellen
+>   W6-2/W8-4): beide prüfen eine abgeleitete Doku-Oberfläche gegen ihren Erzeuger.
+>   **Abgrenzung gegen die Fach-Module M1–M4** (K21, Spec §4.1): *M1–M4 = was wird gebaut (Fach);
+>   U-1-Module = wo der Datei-Check-Code liegt (Datei).* Die U-1-Module liegen **vollständig in M1**;
+>   **kein** M-Modul wird umbenannt, M1–M4 behalten IDs und Bedeutung.
+> - **K19 — Fassaden-Contract rückwärtskompatibel, `__all__` exakt benannt (Spec §4.1).**
+>   `docs.py` enthält **keine** Check-Logik, nur Re-Exports, und exportiert **exakt** die in der
+>   Spec §4.1 aufgeführten Namen. **Belege statt Vermutung:** `scripts/consistency-check.py:52-56`
+>   importiert genau `check_readme_docs_index`, `check_sync_cli_docs`, `check_ui_help_mappings`
+>   (Aufrufe `run_checks()` `:199-201`); `tests/test_doc_facts.py` referenziert über
+>   `docs_lib` (`:90`) genau 29 Stellen (`check_no_manual_counts` `:2244`, `Severity` 9×,
+>   `V1_SCAN_RELPATHS` `:2457`, `v1a_count_spans`/`v1b_version_spans` `:2463-2464`, die drei
+>   Altchecks `:2533-2563`, `check_internal_links` `:2649-2853`, `V3_INERT_PREFIXES` `:2799`);
+>   `tests/test_doc_facts_expected.py` importiert `docs` **nicht** (`:58-59` bindet nur
+>   `scripts.lib.doc_facts`). **Konsequenz:** `consistency-check.py:52-56` und der bestehende
+>   **positive** Registrierungs-Pin bleiben **unangetastet** — W2-0 ändert **keinen** Import.
+> - **K20 — W2-DAG neu gezogen: aus einer strikten Kette werden echte write-set-disjunkte
+>   Parallelgruppen.** **Befund:** Rev. 0.5 ließ **alle** Tasks W2-3…W2-7 `docs.py` **und**
+>   `tests/test_doc_facts.py` schreiben (`Reihenfolge-/Abhängigkeitsmatrix`, Spalte
+>   „Datei-Ownership") — eine Kette, deren Parallelität **nur** scheinbar war. **Neu:** **(a)** neue
+>   Task **W2-0** „Modul-Split" als Welle-2-Einstieg, **verhaltensneutral** (Nachweis: `163 passed`
+>   bleibt grün, `consistency-check.py --json` unverändert, **keine** neue Registrierung);
+>   **(b)** W2-3 (V7), W2-5 (V6) und W2-6 (V2+V4) laufen **parallel** in **PG-2a** (max. 3), weil
+>   ihre Write-Sets disjunkt sind; **(c)** W2-4 (V5) folgt sequenziell, weil es dasselbe Modul
+>   (`docs_freshness.py`) und dieselbe Testdatei schreibt wie W2-5; **(d)** W2-7 (Registrierung,
+>   Common-Gate, `report.py`) bleibt der **Abschluss**. **Entscheidung — Tests werden je Modul in
+>   eigene Dateien aufgeteilt:** `tests/test_doc_wiki.py` (W2-3), `tests/test_doc_freshness.py`
+>   (W2-0 → W2-5 → W2-4), `tests/test_doc_index.py` (W2-6) — **Begründung:** Parallelität ist nur
+>   echt, wenn auch die **Test**-Write-Sets disjunkt sind; ein geteiltes `test_doc_facts.py` würde
+>   jede Parallelgruppe sofort wieder zur Kette machen.
+>   **Ehrliche Grenze, die nicht kaschiert wird:** „genau **eine** schreibende Task je Datei" ist
+>   mit **vier** Modulen (U-1) und **fünf** modul-anfassenden Tasks **nicht** gleichzeitig erfüllbar.
+>   **Verwendete Regel (Rev. 0.5-Praxis, nicht neu erfunden):** eine Datei wird pro
+>   **Parallelgruppe** von höchstens **einer** Task geschrieben; mehrere schreibende Tasks
+>   derselben Datei sind **ausschließlich sequenziell** (belegte Präzedenz: `docs.py` wird in
+>   Rev. 0.5 von W2-1…W2-7 **und** W8-4 geschrieben; die Plan-Regel steht bereits so im
+>   Self-Review, „Ownership"-Absatz). **Zyklenprüfung** und **Fail-closed-Klausel** (Spec
+>   §17.10.4, Plan-Abschnitt „Ownership-Matrix, DAG und Zyklenprüfung") sind ausformuliert:
+>   Topologische Ordnung **W2-1 → W2-2 → W2-0 → {W2-3, W2-5, W2-6} → W2-4 → W2-7** — **keine Zyklen**.
+> - **K21 — Modulgrenzen gegen Verwechslung mit M1–M4 abgesichert.** Siehe K18-Absatz und Spec
+>   §4.1. **Betroffen:** Wellenübersicht PG-2, Task **W2-0**, Ownership-Matrix, Rollback W2,
+>   `Files:`-Listen von W2-3…W2-7.
+> - **K22 — U-2: AC-30 auf `README.md` + `llms.txt` verengt; die 25 `docs/**`-Links werden
+>   Follow-up.** Die Verengung ist **nur** tragfähig, wenn die verbleibenden Findings im
+>   verbleibenden Scope liegen **und** vom bestehenden Task behebbar sind — beides ist belegt
+>   (Weigerungsnachweis Spec §17.10.2): die **2** verbleibenden Findings sind `branch=="layout"`
+>   in **`README.md:722`**/`:723` und liegen damit **im** Scope; `llms.txt` = **0**; die **25**
+>   `branch=="link"`-Findings liegen **ausschließlich** unter `docs/**` und damit **vollständig
+>   außerhalb**. **W8-2 genügt und wird nicht erweitert:** sein `Files:` enthält `README.md`, sein
+>   `V-Check:` ist **V3**, und die Behebung ist ein Umschreiben zweier Layout-Einträge — **kein**
+>   zusätzlicher Task. **Follow-up `F-DOCS-LINKS-2026-09-27`:** Owner `developer`, Termin
+>   **2026-10-11**, Nachweis = Zählwert über `--json`, **kein** Exit-Code (RVW-12). **Was die
+>   Verengung ausdrücklich nicht leistet** (und deshalb hier steht): V3 bleibt **ERROR** und meldet
+>   die 25 weiter ⇒ `docs.internal_links` geht in W0–W8 **nie** auf 0 und `--validate → 0` bleibt
+>   **dauerhaft unerreichbar**; maßgeblich ist die **Deltasperre** der Plan-Regel `W-VALIDATE-ROT`,
+>   und die Severity-Frage ist als **OQ10** (Owner `orchestrator`, Frist **vor W8-4**) in der Spec
+>   geführt. **Betroffen:** W2-GATE-ERRORS, W-GATE-TABLE (V3-Zeile), Task **W8-2**, Coverage-Matrix
+>   (AC-30), Wellenblock **W8**, `W-VALIDATE-ROT`.
+> - **K23 — zwei belegte Faktenkorrekturen an AC-30-Belegen (mitgenommen, weil K22 sie berührt).**
+>   **(a)** Die Trace-Matrix-Zeile `| AC-30 | W8 | README.md:721-724 (M-8), docs/REQUIREMENTS.md:21 | V3 |`
+>   war **doppelt veraltet**: `docs/REQUIREMENTS.md:21` (REQ-CMD-09) ist **kein** V3-Finding — die
+>   Zeile nennt `howto/commands.md`, `CLAUDE.md`, `howto/instantiate-project.md` in **Backticks**
+>   einer Tabellenzeile, V3 extrahiert aber nur **Link-Syntax** (`V3_INLINE_LINK_RE`,
+>   `V3_REFERENCE_DEF_RE`, `V3_HTML_HREF_RE`; `_v3_link_targets`) — deckt sich mit der Baseline
+>   (**0** Findings in der Datei). **(b)** `README.md:721` (`howto/`) und `:724` (`howto/configs/`)
+>   **existieren**; die beiden Layout-Findings sind **`:722`**/`:723`. **Korrigiert** in Spec
+>   (F15-N, §1.2, AC-09, AC-30, §9.1) **und** in diesem Plan (Task **W2-2**-Akzeptanz, **W8-2**,
+>   W-GATE-TABLE-Fußnote, Coverage-Matrix). **Der Pfadbefund selbst bleibt** als manueller Befund
+>   (F15-N) erhalten — er wird **nicht** gelöscht, nur **nicht** als V3-Nachweis geführt.
+> - **K24 — V7-Baseline 10 → 11 korrigiert.** Rev. 0.5 nannte **10** Wiki-Seiten mit
+>   `type: "Architecture"` (Messung 2026-09-26). Baseline-Messung 2026-09-27: **11** (11 distinkte
+>   Dateien in `knowledge/wiki`). Korrigiert an **allen** maßgeblichen Stellen dieses Plans
+> (W2-GATE-ERRORS, W-GATE-TABLE-Fußnote ³) und in der Spec (§10 `--strict`-Punkt 5); die
+> Rev.-0.5-Belegzeile bleibt als **historischer** Stand lesbar. **Kein** Sollwert, sondern eine
+>   Bestandsangabe mit unverändertem Termin **W5-3** und Owner `tester`.
+> - **Ledger-Zählungen Rev. 0.6 (mitgeführt, §L-1).** `check_internal_links()` **27** Findings =
+> **25** `link` + **2** `layout` + `llms.txt` **0**; Verteilung der 25: `docs/guides` 10 (features 5,
+>   setup 5) · `docs/concepts` 13 (davon **8** in `docs/concepts/archive/`, **5** in
+>   `docs/concepts/*.md`) · `docs/superpowers/plans/` 2 — **live** (ohne `archive/`) also **17**;
+>   Dateigrößen vorher/nachher: `docs.py` **599 → ~70** (Fassade), `docs_links.py` ~330,
+>   `docs_freshness.py` ~480, `docs_wiki.py` ~200, `docs_index.py` ~180, `report.py` **115**
+>   (unverändert), `consistency-check.py` **280** (unverändert in W2-0); **Vorher**-Testbasis
+>   `tests/test_doc_facts.py` + `tests/test_doc_facts_expected.py` = **163 passed**; Ist
+>   `docs-checks` = **0**, `docs-findings` = **0** (`consistency-check.py --json` → `total 85`,
+>   `errors 0`, `warnings 85`, enthaltene Checks `crossrefs.changelog-missing-entry` und
+>   `placeholders.unknown` — **kein** `docs.`-Check liefert Findings).
+> - **Betroffene Stellen dieses Plans (übersichtlich):** Frontmatter `revision`; dieser Block;
+>   `File Structure` (Code + Tests); Wellen-Übersicht PG-2 und Wellen-Tabelle W2; Absatz
+>   „Warum W2 ‖ W3 parallel"; Step-Agent-Map; Wellenblock **W2** (Verifikation, W2-GATE-ERRORS,
+>   Rollback); **neue** Task **W2-0**; Tasks **W2-3…W2-7**; Wellenblock **W8** und Task **W8-2**;
+>   W-GATE-TABLE (V3-, V7-Zeile); Reihenfolge-/Abhängigkeitsmatrix + **neue** Ownership-Matrix,
+>   DAG-Kantenliste und Zyklenprüfung; Coverage-Matrix (AC-30, AC-09); DoD Punkt 2; Self-Review
+>   (Ownership, Parallelgruppen); Abschnitt **L** (L-1, L-3-Zählung).
+> - **Unverändert bleiben:** AC-01…AC-29 und AC-31…AC-41, IC-01…IC-24, NFA-01…NFA-11, R1…R20,
+>   F1…F25, M-1…M-13, NG-1…NG-11, FI-1…FI-10, OQ1…OQ10 (OQ1, OQ10 bleiben **offen**), W0…W8,
+>   K1…K17, E-01…E-15, B-1…B-5, OP-1, alle Rollbacks außer W2, `status: APPROVED`.
+>
+> **Legende der Kennungen (K25 — beseitigt die ID-Kollision `E-1`/`E-2`/M1).** In Rev. 0.6 waren
+> zwei verschiedene Nummernkreise entstanden, die beide `E-1`/`E-2` hießen. Sie sind ab hier
+> **getrennt geführt**; **keine** Kennung ist doppelt belegt:
+>
+> | Präfix | Bedeutung | Status |
+> |---|---|---|
+> | **`U-*`** (U-1, U-2) | **Nutzerentscheidung** — vom Nutzer **getroffen** (2026-09-27) | **geschlossen** |
+> | `E-0*` (E-01…E-15) | **Errata** des Ausführungs-Ledgers, Abschnitt **L-3** dieses Plans | gemischt (behoben / offen / blockierend) |
+> | `E-1…E-4` (ohne führende 0) | **offene Entscheidungsvorlagen** aus Rev. 0.5 (Spec §17.9.4) | **offen, unentschieden** — z. B. ESCALATION E-2 in Task W8-4 |
+> | `OQ*` (OQ1…OQ10) | **offene Frage** an den Auftraggeber, mit Owner und Frist | **offen** (OQ1, OQ3, OQ4, OQ9, OQ10) |
+> | `K-*` (K1…K45) | **Korrektur-Kennungen** dieses Vorhabens (kein Status, nur Auditierbarkeit) | — |
+>
+> **Umbenennung, ausdrücklich und additiv:** Die beiden Rev.-0.6-Nutzerentscheidungen hießen in der
+> Erstfassung `E-1`/`E-2` und wurden als **K25** auf **`U-1`/`U-2`** umbenannt — **an allen Stellen**
+> beider Dokumente. **Achtung bei `E-1…E-4`:** die bleiben unter ihrer Kennung **unverändert** und
+> sind **keine** Nutzerentscheidungen. Insbesondere ist die **ESCALATION E-2** in Task **W8-4**
+> (V9-Altersschwelle als Config-Key oder Modulkonstante) **nicht** die Rev.-0.6-Entscheidung **U-2**.
+>
+> **Korrekturrunde Rev. 0.6, Runde 1 (Concept-Review 2026-09-27, `CHANGES_REQUESTED`, 0 kritisch ·
+> 11 major · 7 minor · 5 info; `validator`: PASS mit 3 nicht-blockierenden Notizen).** Die
+> **inhaltlichen Kernaussagen der Rev. 0.6 sind bestätigt und nicht umgestoßen**: Modulzuordnung
+> (U-1), W2-DAG, **PG-2a**, verengtes **AC-30** (U-2) und das Follow-up-Register bleiben in der
+> Sache **wortgleich**. Korrigiert wurden ausschließlich **Widersprüche und Rückstände**.
+> `status: APPROVED` unverändert; **kein** Revisions-Bump; **keine** AC/IC/R/OQ/Task-/V-Check-ID
+> umnummeriert oder gestrichen. **Katalog der Korrekturrunde 1 = K25…K40** (Tabelle unten) — dort
+> ist jede Kennung genau einmal belegt; **die Korrekturrunde 2 verlängert den Katalog um
+> K41…K45** (eigene Liste darunter), damit der **wahre Endstand K45** ist.
+>
+> | K | Review-Befund | Kurztext |
+> |---|---|---|
+> | **K25** | M1 | ID-Kollision `E-1`/`E-2` beseitigt → **`U-1`/`U-2`** + Legende |
+> | **K26** | M2 + M3 | **DoD Punkt 2** (V3 = 0 im AC-30-Scope) und **Punkt 12** (`--validate` → Deltasperre) |
+> | **K27** | M4 | `W-VALIDATE-ROT` an 4 Stellen konsistent auf „kein Termin 0" + globale Vorrangregel |
+> | **K28** | M7 | Fassaden-`__all__` um `check_spec_plan_path_convention` (V8) ergänzt |
+> | **K29** | M8 | V1-Test-Anker auf `tests/test_doc_freshness.py`; 3 Testdateien in Spec §4 |
+> | **K30** | m3 | K23 war unvollständig: Reststellen `README.md:721-723`/`:721-724` → `:722/:723` |
+> | **K31** | M11 | §4.1-Abgrenzung: `doc_facts.py` + `consistency/docs.py` (nicht `doc_renderer.py`) |
+> | **K32** | M10 | OQ10 als Zeile in „Entscheidungs-Tasks" + Querverweis in Task W8-4 |
+> | **K33** | **M6** | `W2-GATE-V1`: `tests/test_doc_freshness.py` in **beide** Erfolgskriterien (sonst vakuum-grün) |
+> | **K34** | **m6** / `validator` N-2 | Checkbox-Split **46 / 153** statt 40 / 159 |
+> | **K35** | **m5** | Self-Review-Dateiliste um `tests/test_doc_facts.py` (W2-7) ergänzt |
+> | **K36** | **M5** | W3-Block, RVW-1-Begründungstabelle: V7 **10 → 11**; V3 „**2** → W8-2 · **25** → Follow-up" |
+> | **K37** | **M9** | Fußnote **⁵** (V3-Dreiklassen) angelegt — sie war referenziert, aber undefiniert |
+> | **K38** | Runde-1-Minor (unnummeriert) | Follow-up-**Anlage** als benannter Schritt `F-ISSUE-ANLAGE` (2026-09-30) neben Abarbeitung (2026-10-11) |
+> | **K39** | m1 + m2 | Taskzahl **47 → 48**; OQ-Liste **OQ1…OQ10** |
+> | **K40** | m4 + m7 | RVW-1-Historie „10 Wiki-Seiten" markiert · `W2-1→…→W2-7` als **überholt** · Spec-`related` + Plan (`validator` N-3) |
+>
+> **Bereinigung des K-Namensraums (Runde 2, N1 — K41).** In Runde 1 war **`K26` sechsfach** belegt
+> (DoD M2, DoD M3, `W2-GATE-V1` M6, Self-Review-Liste m5, Checkbox-Split m6, `W-VALIDATE-ROT`-
+> Regelkopf) und **`K27`** doppelt (M4 **und** die m7-W2-Ketten-Markierung). **K41** vergibt die
+> freien Kennungen **K33…K40** und zieht **alle** Verweise darauf um: Plan 1708, 1709, 1711
+> (→ **K33**), 4157 und 4217 (→ **K34**), 4013 (→ **K35**), 2470 (→ **K36**; zugleich Reduktion von
+> „K24/K31" auf „K24"), 2576 (→ **K37**), 3648 (→ **K40**). **`K26` bleibt** der DoD-Korrektur
+> (M2 + M3) vorbehalten, **`K27`** der `W-VALIDATE-ROT`-Korrektur (M4). **M5 und M9** hatten in
+> Runde 1 **gar keine** K-Kennung — sie haben jetzt **K36** bzw. **K37**. **Damit ist jede
+> K-Kennung genau einmal belegt**; die Belegstelle ist die Tabelle oben.
+>
+> **Korrekturrunde Rev. 0.6, Runde 2 (Concept-Review 2026-09-27, `CHANGES_REQUESTED`, 1 major ·
+> 4 minor) — K41…K45.** Der Reviewer bestätigt ausdrücklich: Modulzuordnung **12/12 disjunkt**, DAG
+> **zyklusfrei**, PG-2a-Write-Sets **disjunkt**, **AC-30-Wortlaut unverändert**, **48** Tasks /
+> **199** Checkboxen, **W2-0-Vertrag vollständig und widerspruchsfrei**. Die Restpunkte sind
+> ausschließlich **Zitier-/Audit-Hygiene**; **keine** dieser Korrekturen berührt eine Invariante.
+> `status: APPROVED` unverändert; **kein** Revisions-Bump. Katalog:
+>
+> - **K41 — N1 (Major): K-Namensraum bereinigt.** `K26` war sechsfach, `K27` doppelt belegt; **M5**
+>   und **M9** hatten **keine** K-Kennung. Freie Kennungen **K33…K40** vergeben und **alle**
+>   Verweise umgezogen; `K24/K31` in Plan:2470 auf **`K24`** reduziert. Die Spec-Aussage
+>   „**keine** Kennung ist doppelt belegt" ist damit **wahr** und wird mit dem bereinigten ID-Satz
+>   belegt, **nicht** abgeschwächt.
+> - **K42 — N2: K-Bereiche nachgezogen.** Legende und Revisionsverweis von „K1…K31" / „K25…K31" auf
+>   den Endstand der **Runde 2** gezogen, der damals **K1…K40** / **K25…K40** war (Spec-Legende,
+>   Spec-Revisionszeile, Plan-Legende). **Nachgetragen (reine Bereichsangabe, ohne Bedeutungs-
+>   änderung von K42):** Runde 2 hat den Katalog mit **K41…K45** verlängert, der **wahre Endstand
+>   ist daher `K1…K45` / `K25…K45`**; alle drei Verweise wurden darauf nachgezogen.
+> - **K43 — N3: Reststelle `README.md:721-724`** in der M-8-Tabelle auf **`:722-723`** korrigiert —
+>   damit ist K30s Aussage „an allen benannten Stellen" **wahr**. **Fundort-Nachtrag (reine
+>   Zeilenangabe):** K43 wurde zunächst mit „Plan:914" zitiert; nach den Zeilenverschiebungen der
+>   Korrekturrunden trägt der korrigierte Text bei **Plan:934** (`File Structure` → „Geändert
+>   (Doku/Agent)"). **Hinweis zur Nachhaltigkeit:** Zeilenangaben **innerhalb** dieses Plans sind
+>   driftanfällig — maßgeblich ist der **Abschnittsanker** (`File Structure` → „Geändert
+>   (Doku/Agent)"), die Zeilennummer nur eine Lesehilfe (K12-Logik).
+> - **K44 — N4: Widerspruch im selben `--validate`-Bullet aufgelöst** (W8-4-Block) und **K27s
+>   Absolutheitsaussage ehrlich gefasst** (Begründung der gewählten Lösung dort).
+> - **K45 — N5: Wiki-Seiten-Zahl als Historie markiert** („10" = Ist-Stand 2026-09-26; maßgeblich
+>   **11**).
+>
+> **Nicht angetastet:** die **historische** Rev.-0.5-Zählzeile (Plan Rev.-0.4-Block) — sie beschreibt
+> den Stand des 2026-09-26 und bleibt als solcher stehen.
+> - **Unverändert bleiben (Kontrollliste):** Modulzuordnung **12/12 disjunkt**, W2-DAG **zyklusfrei**,
+>   PG-2a-Write-Sets disjunkt, **AC-30-Wortlaut**, **48** Tasks, **199** Checkboxen.
 >
 > **Änderungsnotiz — Rev. 0.5 (2026-09-26): K13–K17 — vier belegte Gate-/Ownership-Mängel
 > korrigiert, Ausführungs-Ledger (Abschnitt L) mitgenommen.** Eingang sind die Befunde
@@ -193,7 +403,9 @@ related:
 >   + `docs/INDEX.md`), die Exit-Code-Semantik des Runners und der DoD-Punkt 2, dessen
 >   `docs.*`-Aussage **inhaltlich unverändert** bleibt — nur ihre **Messform** wechselt.
 > - **RVW-1 (Blocker) — `W3-GATE-DOCS` (Ziel `0 docs.*`-Findings) war bei W3-7 unerreichbar.**
->   Gemessen am Working Tree: `knowledge/wiki` enthält **10** Seiten mit `type: "Architecture"`
+>   Gemessen am Working Tree (**Stand 2026-09-26 — HISTORIE, K45**): `knowledge/wiki` enthält
+>   **10** Seiten mit `type: "Architecture"` — **maßgeblich ist der Wert 11** (Baseline-Messung
+>   2026-09-27, **K24**); die 10 wird hier als historischer Messwert **nicht** fortgeschrieben
 >   und **null** `derived-from:` ⇒ V7 (`check_wiki_staleness`, WARNING) ist bis **W5-3** rot;
 >   `howto/setup/` und `howto/features/` existieren **nicht** (nur `howto/configs/`) ⇒ V3
 >   (`check_internal_links`, ERROR) ist bis **W8-2** rot; `docs/INDEX.md` existiert **nicht** ⇒
@@ -654,6 +866,22 @@ Klassifikation **XL / Architectural** (Spec: Statuskopf, Abschnitt „Klassifika
   mit Sollzahlen im Repo-Baum (R14, NFA-11).
 - Create: `docs/INDEX.md` — W3-6, 100 % generiert (§3.1), tracked (OQ6).
 - Create: `docs/architecture/INDEX.md` — W4-3, Teil-Vorschau auf denselben Baum (IC-10(d)).
+- Create: `scripts/lib/consistency/docs_links.py` — **Rev. 0.6 / U-1 (K18), Task W2-0**. Familie
+  „Referenz auflösbar": **V3** `check_internal_links`, **V4** `check_readme_docs_index` (von
+  `docs.py:102-124` übernommen) + Altchecks `check_sync_cli_docs` (`:11-46`) und
+  `check_ui_help_mappings` (`:49-98`). Prognose **~330** Zeilen, **< 600** verbindlich.
+- Create: `scripts/lib/consistency/docs_freshness.py` — **Rev. 0.6 / U-1 (K18), Task W2-0**.
+  Familie „Doku vs. berechneter Ist-Zustand": **V1a/V1b** `check_no_manual_counts` (heute
+  `docs.py:155-412`, inkl. Suppressionsregeln 1–4 und der K16-Eingrenzung) + **V6**
+  `check_docs_facts_fresh` (W2-5) + **V5** `check_role_generation_parity` (W2-4). Prognose
+  **~480** Zeilen.
+- Create: `scripts/lib/consistency/docs_wiki.py` — **Rev. 0.6 / U-1 (K18), Task W2-3** (W2-0 legt
+  es **nicht** an, weil dort noch kein Bestand liegt). Familie „abgeleitete Bestands-Oberfläche":
+  **V7** `check_wiki_staleness` (W2-3) + **V8** `check_spec_plan_path_convention` (W6-2). Prognose
+  **~200** Zeilen.
+- Create: `scripts/lib/consistency/docs_index.py` — **Rev. 0.6 / U-1 (K18), Task W2-6** (W2-0 legt
+  es **nicht** an). Familie „Doku-Bau geführt": **V2** `check_docs_index_completeness` (W2-6) +
+  **V9** `check_stale_backups` (W8-4). Prognose **~180** Zeilen.
 
 ### Neu anzulegen (Tests)
 
@@ -665,6 +893,13 @@ Klassifikation **XL / Architectural** (Spec: Statuskopf, Abschnitt „Klassifika
 - Create: `tests/test_knowledge_index_gen.py` — AC-33, AC-34, AC-35, AC-41.
 - Create: `tests/fixtures/docs_v1_fixtures.md` — V1a+V1b Positiv-Fixture (AC-07/AC-08), **erst
   nach Track-A-Merge** (Spec §2.3).
+- Create: `tests/test_doc_wiki.py` — **Rev. 0.6 / K20 (Entscheidung „Tests je Modul aufgeteilt")**,
+  Task **W2-3**: V7-Tests (AC-10, `test_v7_missing_and_stale_derived_from`). Grund: nur so ist die
+  Schreibmenge der Parallelgruppe **PG-2a** von der des W2-5/W2-6 disjunkt.
+- Create: `tests/test_doc_freshness.py` — **Rev. 0.6 / K20**, angelegt in **W2-0** (V1-Tests werden
+  aus `test_doc_facts.py` **verschoben**, nicht dupliziert), erweitert in **W2-5** (V6) und
+  **W2-4** (V5). Die drei Tasks sind **sequenziell** geordnet (Kante `W2-5 → W2-4`).
+- Create: `tests/test_doc_index.py` — **Rev. 0.6 / K20**, Task **W2-6**: V2- und V4-Tests (AC-12).
 - Create: `docs/plans/2026-09-25-docs-consolidation-oq1.md`, `-oq2.md`, `-oq4.md`, `-oq6.md`,
   `-oq8.md`, `-oq9.md`, `-wave0-freeze.md`, `-track-a-gate.md` — W0-x / W5-1 / W8-1.
 
@@ -699,7 +934,8 @@ Klassifikation **XL / Architectural** (Spec: Statuskopf, Abschnitt „Klassifika
   `.gitignore` selbst wird von **keinem** Task geschrieben oder verändert. **W3-6 legt
   `docs/INDEX.md` an und committet sie (tracked)** — W3-6 schreibt **nicht** in `.gitignore`.
   Verifiziert wird stattdessen `git check-ignore -q docs/INDEX.md` → Exit **1**.
-- Modify: `README.md` — W3-7 Marker-Regionen, W8-2 Totverweise (`:721-724`), W8-3 Providerzahl.
+- Modify: `README.md` — W3-7 Marker-Regionen, W8-2 Totverweise (`:722-723`; **K43** — ehemals `:721-724`,
+  `:721`/`:724` existieren), W8-3 Providerzahl.
 - Modify: `llms.txt` — W3-7 `:5`/`:24`, W8-3 Providerzahl.
 - Modify: `ARCHITECTURE.md` — W3-7 `:3` als Region, W4-2 Stub.
 - Modify: `knowledge/schema.md` — W7-1, Absatz „`index.md` is generated“ (`:41-42`), mit
@@ -721,7 +957,7 @@ Klassifikation **XL / Architectural** (Spec: Statuskopf, Abschnitt „Klassifika
 | M-9/M-10 | additiv | W5 | `derived-from`/`derived-at`; Architektur-Redirects |
 | M-3 | `git mv` | W6 | `docs/superpowers/specs/` → `docs/specs/archive/superpowers/` |
 | M-4 | `git mv` | W6 | `docs/superpowers/plans/` → `docs/plans/archive/superpowers/`; danach `docs/superpowers/` entfernt |
-| M-8 | Modify | W8 | `README.md:721-724` Totverweise |
+| M-8 | Modify | W8 | `README.md:722-723` Totverweise (**K30**: ehemals `:721-724`; `:721`/`:724` existieren) |
 | M-11 | Modify | W1 | Schema-Block |
 | M-12 | Modify (Config) | W8 | `PROJECT_STRUCTURE` |
 | M-13 | Modify | W6 | `legacy:` additiv |
@@ -753,14 +989,26 @@ PG-1 (3 Ketten parallel, max 3 Agents)
  |- W1-B: W1-7 -> W1-8 -> W1-10                        (doc_renderer + doc_index + Config-Keys)
  `- W1-C: W1-9                                        (Schema-Block M-11)
         v
-PG-2 (2 Ketten parallel, max 2 Agents)
- |- W2: W2-1 -> W2-2 -> W2-3 -> W2-4 -> W2-5 -> W2-6 -> W2-7   (consistency/docs.py)
+PG-2 (W2 in 2 Phasen + W3-Kette parallel, max 3 Agents)
+ |- W2 Phase 0 (sequenziell):  W2-1 -> W2-2 -> W2-0 (Modul-Split, Rev. 0.6)
+ |    W2-0 spaltet docs.py in die Fassade + docs_links.py + docs_freshness.py
+ |    und legt tests/test_doc_freshness.py an (V1-Tests wandern, nicht kopiert).
+ |    VERHALTENSNEUTRAL: 163 passed bleibt gruen, --json unveraendert, keine Registrierung.
+ |         v
+ |- W2 PG-2a (3 Tasks PARALLEL, write-set-disjunkt, Rev. 0.6 / K20):
+ |    |- W2-3 (V7)  -> docs_wiki.py      + tests/test_doc_wiki.py
+ |    |- W2-5 (V6)  -> docs_freshness.py + tests/test_doc_freshness.py + tests/test_doc_facts_expected.py
+ |    `- W2-6 (V2+V4) -> docs_index.py   + tests/test_doc_index.py
+ |         v  (W2-3 | W2-5 | W2-6, kein Zwischen-False-Start)
+ |- W2 Phase B (sequenziell):  W2-4 (V5) -> W2-7 (Registrierung, Common-Gate, report.py)
+ |    Begruendung der Serialitaet: W2-4 schreibt DASSELBE Modul (docs_freshness.py)
+ |    und DIESELBE Testdatei wie W2-5 -> Kante W2-5 -> W2-4, keine Parallelitaet.
  `- W3: W3-1 -> W3-2 -> W3-3 -> W3-4 -> W3-5 -> W3-6 -> W3-7   (Renderer/Stage/Drift/Index)
-       +-- Zusatzkante (Rev. 0.5, K16/RVW-4):  W2-1 (Schritt 4) --> W3-4
-       |   Vorwaerts-Kante ueber die Wellengrenze W2 -> W3: kein Zyklus, keine neue Task.
-       |   Folge: W3-4 startet erst nach W2-1 Schritt 4; W3-1..W3-3 und W3-5..W3-7
-       |   bleiben parallel zu W2 (Write-Sets weiterhin disjunkt).
-        v
+      +-- Zusatzkante (Rev. 0.5, K16/RVW-4):  W2-1 (Schritt 4) --> W3-4
+      |   Vorwaerts-Kante ueber die Wellengrenze W2 -> W3: kein Zyklus, keine neue Task.
+      |   Folge: W3-4 startet erst nach W2-1 Schritt 4; W3-1..W3-3 und W3-5..W3-7
+      |   bleiben parallel zu W2 (Write-Sets weiterhin disjunkt).
+       v
 PG-3 (BEWUSST SERIELL, 1 Agent)  W4-1 -> W4-2 -> W4-3 -> W5-1 -> W5-2 -> W5-3 -> W6-1 -> W6-2
         v
 PG-4 (isoliert, 1 Agent)         W7-1 -> W7-2 -> W7-3 -> W7-4 -> W7-5
@@ -772,7 +1020,7 @@ PG-5 (1 Agent)                    W8-1 -> W8-2 -> W8-3 -> W8-4
 |---|---|---|---|---|---|
 | W0 | 6 | Anker (W0 trägt laut Spec §9.2 kein eigenes AC) | — | — | Dateien löschen, kein Code berührt |
 | W1 | 10 | AC-01…AC-06, AC-23…AC-25, AC-39 | W0 | PG-1: W1-A ‖ W1-B ‖ W1-C | `docs-consolidation.enabled: false`; kein Datei-Diff |
-| W2 | 7 | AC-07…AC-11, AC-13, AC-36 | W1-A, W0-4 | PG-2: W2 ‖ W3 | `checks.strict: false` bzw. `enabled: false` |
+| W2 | **8** (Rev. 0.6: + **W2-0**) | AC-07…AC-11, AC-13, AC-36 | W1-A, W0-4 | **PG-2: W2 ‖ W3**; innerhalb W2: **PG-2a = W2-3 ‖ W2-5 ‖ W2-6** (max 3), davor und danach sequenziell | `checks.strict: false` bzw. `enabled: false`; **`git rm` der vier neuen `docs_*.py`** |
 | W3 | 7 | AC-12, AC-14…AC-22, AC-26, AC-27, AC-37, AC-38 | W1-B, W0-1, W0-6, **W2-1 (nur Schritt 4, K16 — Rev. 0.5/RVW-4)** | PG-2 | `git rm docs/INDEX.md`; Marker entfernen; `enabled: false` |
 | W4 | 3 | AC-28 (Teil), AC-29 | W3 | PG-3 seriell | `git mv` zurück + Stub `git checkout` |
 | W5 | 3 | AC-28 (Teil), AC-31 | W1, W0-7 | PG-3 seriell | `git mv` zurück; Annotationen additiv revertierbar |
@@ -782,15 +1030,43 @@ PG-5 (1 Agent)                    W8-1 -> W8-2 -> W8-3 -> W8-4
 
 ### Warum W2 ‖ W3 parallel ist, W4/W5/W6 aber nicht
 
-- **W2 ‖ W3:** Write-Sets disjunkt. W2 besitzt `scripts/lib/consistency/docs.py`,
-  `tests/test_doc_facts.py`, `tests/test_doc_facts_expected.py`, `tests/fixtures/docs_v1_fixtures.md`,
+- **W2 ‖ W3:** Write-Sets disjunkt. W2 besitzt `scripts/lib/consistency/docs_links.py`,
+  `docs_freshness.py`, `docs_wiki.py`, `docs_index.py`, `docs.py` (Fassade),
+  `tests/test_doc_wiki.py`, `tests/test_doc_freshness.py`, `tests/test_doc_index.py`,
+  `tests/test_doc_facts.py`, `tests/test_doc_facts_expected.py`,
+  `tests/fixtures/docs_v1_fixtures.md`, `scripts/lib/consistency/report.py`,
   `scripts/consistency-check.py`. W3 besitzt `scripts/lib/doc_renderer.py`, `scripts/lib/doc_index.py`,
   `scripts/lib/sync_pipeline.py`, `scripts/lib/spec_plan_scaffold.py`,
   `scripts/lib/generated_file_drift.py`, `tests/test_doc_renderer.py`,
   `tests/test_generated_file_drift_docs.py`, `docs/INDEX.md`, `README.md`, `llms.txt`,
   `ARCHITECTURE.md`, `.meta-config/project.yaml`. Überschneidung: keine (`.gitignore` bleibt
   unberührt, OQ6 entschieden). Spec §9.2
-  bestätigt diese Parallelität.
+  bestätigt diese Parallelität. **Rev. 0.6 (K20):** der W2-Teil dieser Aufzählung ist um die vier
+  neuen Module und die drei neuen Testdateien gewachsen; **W2-0** nimmt zusätzlich
+  `tests/test_doc_freshness.py` (Anlage, mit Verschiebung der V1-Tests) in seine Schreibmenge auf.
+  **Wichtig für `scripts/lib/consistency/`:** W2-0 fügt **4** Dateien hinzu — die beiden
+  bestehenden W2-Altchecks liegen weiterhin in **denselben** Dateien wie vorher; es wird **keine**
+  bestehende Datei des Runner-Importpfads umbenannt oder verschoben (§2.3-Tracking-Gate bleibt
+  gewahrt).
+- **Parallelität innerhalb von W2 (Rev. 0.6, K20 — der eigentliche Korrekturgegenstand):** die
+  Wellengrenze W2 ‖ W3 war **schon** disjunkt, die **innere** W2-Kette war es **nicht** — in
+  Rev. 0.5 schrieben W2-3…W2-7 **alle** `docs.py` **und** `tests/test_doc_facts.py`, also war jede
+  angekündigte Parallelität in W2 eine Scheinparallelität. **Neu:** W2-0 stellt den Split fertig,
+  danach sind **drei** Tasks mit **disjunkten** Write-Sets parallel (**PG-2a**: W2-3 ‖ W2-5 ‖ W2-6).
+  **Warum W2-4 und W2-7 **nicht** in PG-2a liegen:** W2-4 schreibt dasselbe Modul und dieselbe
+  Testdatei wie W2-5 (beide gehören zur Familie „Doku vs. berechneter Ist-Zustand",
+  `docs_freshness.py`); W2-7 schreibt die Fassade `docs.py`, den Runner `consistency-check.py` und
+  `report.py` — es ist der **Abschluss** und hängt an allen drei PG-2a-Tasks. Beide Fälle sind
+  **Kanten**, keine Zufälle; die Aufzählung steht im Abschnitt „Ownership-Matrix, DAG und
+  Zyklenprüfung".
+- **Tests je Modul in eigene Dateien (Rev. 0.6, K20 — ausdrückliche Entscheidung).** **JA, die Tests
+  werden aufgeteilt** auf `tests/test_doc_wiki.py`, `tests/test_doc_freshness.py`,
+  `tests/test_doc_index.py`. **Begründung in einem Satz:** Parallelität ist nur echt, wenn auch die
+  **Test**-Write-Sets disjunkt sind — ein gemeinsames `tests/test_doc_facts.py` würde jede
+  Parallelgruppe sofort wieder zur Kette machen und den Aufwand des Modul-Splits zunichtemachen.
+  **Kosten, ausdrücklich benannt:** die V1-Tests werden aus `test_doc_facts.py` **verschoben**
+  (nicht kopiert), damit die **163** Tests der Vorher-Baseline als **Summe** erhalten bleiben
+  (Nachweis in W2-0 Schritt 5) — der Umfang wächst **nicht** durch Duplikate.
 - **W4/W5/W6 seriell (bewusste Abweichung von Spec §9.2 „Parallel mit“):** die Spec bindet die
   Testdateinamen (§7-Einleitung). AC-28, AC-29, AC-31 und AC-32 verweisen **alle** per `::` auf
   `tests/test_docs_consolidation_migration.py`. Tasks, die dieselbe Datei anlegen oder erweitern,
@@ -804,7 +1080,11 @@ PG-5 (1 Agent)                    W8-1 -> W8-2 -> W8-3 -> W8-4
   Diff-Bezugsrahmen; W8s M-12 wirkt auf **alle** generierten Kontextdateien. Die Sequenzierung
   hält NFA-06 („Rollback je Welle invalidiert keine andere Welle“) aufrecht.
 - **Maximal 3 gleichzeitig laufende Agents** — unter der Grenze von 4. Eine wellen-interne
-  Barrieren-Spaltung über 4 hinaus ist damit **nicht** erforderlich.
+  Barrieren-Spaltung über 4 hinaus ist damit **nicht** erforderlich. **Rev. 0.6 (K20):** die
+  Grenze wird jetzt **innerhalb** von W2 ausgeschöpft — **PG-2a** hat genau **3** Members
+  (W2-3, W2-5, W2-6) und liegt damit **an**, aber **nicht über** der Grenze. **Warum nicht 4:**
+  W2-4 kann nicht hinzukommen (gemeinsame Schreibmenge mit W2-5) — die Grenze ist also **nicht**
+  die bindende Größe, die **Ownership-Disjunktheit** ist es.
 - **`.meta-config/project.yaml` wird von W1-10, W3-4, W6-2, W7-2/5 und W8-4 geschrieben** — alle
   liegen in **verschiedenen, sequenziell geordneten** Wellen, daher keine Parallelitätskollision.
 
@@ -814,7 +1094,7 @@ PG-5 (1 Agent)                    W8-1 -> W8-2 -> W8-3 -> W8-4
 |---|---|---|---|---|---|
 | W0-1, W0-4, W0-6, W0-7 | orchestrator | W1-1…W1-5, W1-7, W1-8 | senior-developer | W3-1…W3-4 | senior-developer |
 | W0-2 | git | W1-6, W1-9, W1-10 | developer | W3-5…W3-7 | developer |
-| W0-3 | agent-meta-manager | W2-1…W2-7 | developer | W4-1, W4-2, W5-2, W6-1 | developer |
+| W0-3 | agent-meta-manager | W0-1, W0-4, W0-6, W0-7, **W2-0** | developer | W4-1, W4-2, W5-2, W6-1 | developer |
 | W4-3, W5-3, W6-2, W8-4 | tester | W5-1 | technical-writer | W7-1, W7-5 | knowledge-curator |
 | W7-2, W7-3 | senior-developer | W7-4 | prompt-engineer | W8-1 | requirements |
 | W8-2, W8-3 | developer | | | | |
@@ -1371,10 +1651,19 @@ in `.meta-config/project.yaml`; `enabled: true` **explizit** in agent-meta (NG-9
 
 ---
 
-## W2 — Checks V1–V7 (V1 startet WARNING)
+## W2 — Checks V1–V7 (V1 startet WARNING) · **Rev. 0.6: 8 Tasks, Einfahrt über W2-0 (Modul-Split)**
 
 **Verifikation W2 (erwartete Exit-Codes):**
-- `python3 -m pytest tests/test_doc_facts.py tests/test_doc_facts_expected.py -q` → **0**
+- **Rev. 0.6 (K20) — pytest-Zeile an die aufgeteilten Testdateien angepasst:**
+  `python3 -m pytest tests/test_doc_facts.py tests/test_doc_facts_expected.py
+  tests/test_doc_freshness.py tests/test_doc_wiki.py tests/test_doc_index.py -q` → **0**.
+  **Vorher-Baseline (unverändert gültig):** `python3 -m pytest tests/test_doc_facts.py
+  tests/test_doc_facts_expected.py -q` → **163 passed** (Baseline-Messung 2026-09-27, Übergabe vom
+  Parent). **Bedeutung der Rev.-0.6-Zeile:** sie ist die **Summe** derselben Tests nach der
+  Verschiebung; die V1-Tests **wandern** nach `tests/test_doc_freshness.py`, sie werden **nicht**
+  dupliziert — die Gesamtzahl muss nach W2-0 **≥ 163** sein und **kein** Test darf verloren gehen
+  (Nachweis in **W2-0 Schritt 5**). **Die drei neuen Testdateien existieren erst ab W2-0/W2-3/W2-6**;
+  vor dem ersten W2-Lauf ist deshalb die **alte** Zeile maßgeblich.
 - ~~`python3 scripts/consistency-check.py` → **0**~~ ~~(V1 erscheint als **WARNING**)~~
   **AUFGEHOBEN durch Rev. 0.5 (K13) — der Klammer-Text war unbelegt** (V1 ist im Runner
   **nicht registriert**, `scripts/consistency-check.py:52-56`, und erscheint daher **nicht** im
@@ -1409,10 +1698,12 @@ in `.meta-config/project.yaml`; `enabled: true` **explizit** in agent-meta (NG-9
   (IC-05), und `python3 scripts/sync.py --validate` liefert genau dann **Exit 1**, wenn der
 **gesamte** Runner mindestens ein ERROR-Finding liefert (`scripts/lib/cli_commands.py:975` →
 `:171-174` → `:1056`/`:1058-1059`). **Maßgeblich ist `W-VALIDATE-ROT`** (Wellenblock
-W2 — Verifikation): planmäßig rot von **W2-7** bis einschließlich **W8-2**, spätester Termin 0
-**W8-4**, Owner `validator`; Grundlage **Spec §6(b) und der §10-Aufzählungspunkt `--validate`**, die ein Nicht-Grün-Sein
-bei V1/V2/V3/V6 **ausdrücklich sanktionieren**. **Der Sollwert wird nicht abgesenkt, sondern
-terminiert.** Die Zeile bleibt als Historie sichtbar.
+  W2 — Verifikation): planmäßig rot von **W2-7** bis einschließlich **W8-2** — **und danach weiter
+  (K27: `--validate` hat keinen Termin 0; maßgeblich ist die Deltasperre)**, Owner `validator`;
+  Grundlage **Spec §6(b) und der §10-Aufzählungspunkt `--validate`**, die ein Nicht-Grün-Sein
+  bei V1/V2/V3/V6 **ausdrücklich sanktionieren**. **Der Sollwert wird nicht abgesenkt, sondern als
+  Dokuzeile ohne Sollwert geführt und durch die Deltasperre ersetzt.** Die Zeile bleibt als
+  Historie sichtbar.
 - `bash tests/scenarios/run.sh 50 51 52 54 55 56` → **0** (6/6)
 
 **W2-GATE-V1 (neu, Rev. 0.5, K13) — das verbindliche W2-Abnahmekriterium.**
@@ -1438,8 +1729,15 @@ Roh-Exit eines Zähl-Kommandos ist unzulässig.** Wer ein CI-Signal braucht, wer
 
 | Zustand | Erwartung | Erfolgskriterium (exakt) |
 |---|---|---|
-| **nach W2-1** — V1 implementiert, **nicht** registriert | `v1-findings: 0`, leere `v1-severities`, leere `v1-files`. **Kein** Severity-Wert ist beobachtbar, weil der Runner V1 nicht aufruft; die Severity-Aussage wird in dieser Phase **ausschließlich** am Unit-Nachweis geprüft. | `python3 -m pytest tests/test_doc_facts.py -q -k v1` → **0** (deckt `test_v1_positive_fixture_yields_exactly_four_findings` mit `Severity.WARNING` und `test_v1_is_not_wired_into_the_runner_yet`) **und** das Zähl-Kommando druckt `v1-findings: 0` |
-| **nach W2-7** — V1 registriert, `checks.strict` weiterhin **nicht** gesetzt | `v1-findings:` **≥ 1** und `v1-severities:` **exakt** `['WARNING']`. Der Sprung 0 → ≥ 1 ist der Registrierungsnachweis. `v1-files` ⊆ {`README.md`, `llms.txt`, `ARCHITECTURE.md`} (`docs.py:158`) — **Dokuzeile, kein Prüfkriterium (RVW-15):** die Menge entsteht konstruktionsbedingt aus `V1_SCAN_RELPATHS`, kann also **nicht** fehlschlagen. | Zähl-Kommando druckt `v1-findings: ≥ 1` **und** `v1-severities: ['WARNING']`; zusätzlich `python3 -m pytest tests/test_doc_facts.py -q` → **0** und `bash tests/scenarios/run.sh 50 51 52 54 55 56` → **0** |
+| **nach W2-1** — V1 implementiert, **nicht** registriert | `v1-findings: 0`, leere `v1-severities`, leere `v1-files`. **Kein** Severity-Wert ist beobachtbar, weil der Runner V1 nicht aufruft; die Severity-Aussage wird in dieser Phase **ausschließlich** am Unit-Nachweis geprüft. | **vor W2-0:** `python3 -m pytest tests/test_doc_facts.py -q -k v1` → **0** (deckt `test_v1_positive_fixture_yields_exactly_four_findings` mit `Severity.WARNING` und `test_v1_is_not_wired_into_the_runner_yet`) **und** das Zähl-Kommando druckt `v1-findings: 0` · **ab W2-0 (K33):** `python3 -m pytest tests/test_doc_freshness.py tests/test_doc_facts.py -q -k v1` → **0** — die V1-Tests liegen dann in `tests/test_doc_freshness.py`; **ohne** die zweite Datei selektiert `-k v1` **nichts** und die Prüfung wäre vakuum-grün |
+| **nach W2-7** — V1 registriert, `checks.strict` weiterhin **nicht** gesetzt | `v1-findings:` **≥ 1** und `v1-severities:` **exakt** `['WARNING']`. Der Sprung 0 → ≥ 1 ist der Registrierungsnachweis. `v1-files` ⊆ {`README.md`, `llms.txt`, `ARCHITECTURE.md`} (`docs.py:158`) — **Dokuzeile, kein Prüfkriterium (RVW-15):** die Menge entsteht konstruktionsbedingt aus `V1_SCAN_RELPATHS`, kann also **nicht** fehlschlagen. | Zähl-Kommando druckt `v1-findings: ≥ 1` **und** `v1-severities: ['WARNING']`; zusätzlich `python3 -m pytest tests/test_doc_freshness.py tests/test_doc_facts.py tests/test_doc_facts_expected.py -q` → **0** (**K33**: `tests/test_doc_freshness.py` ergänzt, W2-0 verschiebt die V1-Tests dorthin) und `bash tests/scenarios/run.sh 50 51 52 54 55 56` → **0** |
+
+**K33 (Rev. 0.6, Review-Befund M6) — `W2-GATE-V1` war nicht auf die neuen Testdateien gezogen.**
+Beide Erfolgskriterien nannten **nur** `tests/test_doc_facts.py`. Ab **W2-0** liegen die V1-Tests
+aber in **`tests/test_doc_freshness.py`**: ein Aufruf `-k v1` **ohne** diese Datei selektiert
+**null** Tests und meldet Exit **0** — das Kriterium wäre **vakuum-grün** und hätte die
+Verhaltensneutralität von W2-0 **nicht** geprüft. **Beide Zeilen sind korrigiert**; die
+**Vor-W2-0-Fassung bleibt** als gültige Zeile für den Zeitraum zwischen W2-1 und W2-0 sichtbar.
 
 **Zeitliche Bindung beider Zustände (RVW2-5, ergänzt):** die Zeile „nach **W2-1**" gilt **nur bis
 W2-7** — sie stützt sich auf `test_v1_is_not_wired_into_the_runner_yet`
@@ -1464,11 +1762,11 @@ python3 scripts/consistency-check.py --json \
 |---|---|---|---|
 | `docs.no_manual_counts` (V1) | **≥ 1**, `['WARNING']` | Handzahlen werden erst in **W3-7** ersetzt | `developer` (W3-7) |
 | `docs.docs_index_completeness` (V2) | **planmäßig rot** (ERROR) | `docs/INDEX.md` existiert **nicht** — Termin **W3-6** | `senior-developer` (W3-6) |
-| `docs.internal_links` (V3) | **planmäßig rot** (ERROR) | `howto/setup/`, `howto/features/` existieren nicht — Termin **W8-2** | `developer` (W8-2) |
+| `docs.internal_links` (V3) | **planmäßig rot** (ERROR) | **Rev. 0.6, K22 — in drei Klassen aufgeteilt** (Volltext: Tabelle `W2-GATE-V3-KLASSEN`): **2** Layout-Findings `README.md:722`/`:723` ⇒ Termin **W8-2**; **25** Link-Findings unter `docs/**` ⇒ **Follow-up `F-DOCS-LINKS-2026-09-27`**, Termin **2026-10-11**, **kein** Termin 0 in W0–W8; `llms.txt` **0** | `developer` (W8-2 **und** Follow-up) |
 | `docs.readme_index` (V4) | **0** | bestehender Check, `docs/api`-Teilmenge bleibt Teilmenge; Name **belegt** (`docs.py:118`) | `developer` (W2-6) |
 | `docs.role_generation_parity` (V5) | **0** | `compute_active_roles()` schließt das deaktivierte Gate (`project.yaml:12-13`) | `developer` (W2-4) |
 | `docs.docs_facts_fresh` (V6) | **planmäßig rot** (ERROR) | generierte Blöcke existieren erst ab **W3-7** | `developer` (W3-7) |
-| `docs.wiki_staleness` (V7) | **planmäßig rot** (WARNING) | **10** Wiki-Seiten `type: "Architecture"` ohne `derived-from` (gemessen 2026-09-26) — Termin **W5-3** | `tester` (W5-3) |
+| `docs.wiki_staleness` (V7) | **planmäßig rot** (WARNING) | **11** Wiki-Seiten `type: "Architecture"` ohne `derived-from` — **K24: korrigiert von 10 auf 11** (Baseline-Messung 2026-09-27, Übergabe vom Parent; die Zahl 10 stammt aus der Messung vom 2026-09-26) — Termin **W5-3** | `tester` (W5-3) |
 
 **`docs-checks` — die Zahl ist KEIN Registrierungsnachweis (RVW2-1, Blocker; korrigiert).**
 Das Kommando oben zählt `len(collections.Counter(f["check"] for f in rows))` über die
@@ -1484,7 +1782,43 @@ aufgehoben.** Es gelten drei getrennte Aussagen:
 | **Präsenzregel** (ersetzt die Registrierungszahl) | für jeden V-Check mit Erwartungswert **≠ 0** und ≠ `n. i.` muss eine Zeile `<check> <count> <severities>` **gedruckt** werden | **je Welle, aus W-GATE-TABLE** | Eine fehlende Zeile = fehlende Registrierung **oder** fehlende Findings — beides ist ein Befund |
 | **Registrierungszahl** (Vollständigkeit V1…V9) | Anzahl **registrierter** Doku-Checks | **nicht gemessen, Messung erfolgt in Task W2-7** | **Aus dieser Quelle nicht messbar:** der Runner bietet keinen Registry-Dump (`scripts/consistency-check.py` kennt `--json`/`--strict`/`--file`/`--changed`, `:23-26`); die einzige Registrierungsstelle ist der Importblock `:52-56`, dessen Form nach W2-7 durch **keine** IC festgelegt ist. Owner `developer` (W2-7), Termin **W2-7** |
 
-**Ist-Zustand 2026-09-26 (gemessen am Working Tree, Datei:Zeile):** `docs-checks: 0` **und**
+**W2-GATE-V3-KLASSEN (neu, Rev. 0.6, K22) — die drei Klassen, in denen V3 rot ist.** V3 ist nach
+W2-7 ein **ERROR**-Check und **eine** Zählwert-Zeile ist für ihn nicht ausreichend: die Klassen
+haben **verschiedene** Termine und **verschiedene** Owner-Zuständigkeiten. Baseline-Messung
+**2026-09-27** (Übergabe vom Parent; `check_internal_links()` direkt aufgerufen, **27** Findings
+gesamt):
+
+| Klasse | `branch` | Anzahl | Wo | Zustand | Termin 0 | Owner |
+|---|---|---|---|---|---|---|
+| **README-Layout** | `layout` | **2** | `README.md:722` (`howto/setup/`), `README.md:723` (`howto/features/`) — beide in `README.md`, beide im **AC-30-Scope** (Rev. 0.6) | **rot**, im Scope des AC-30 | **W8-2** | **`developer`** (Task W8-2) |
+| **docs-Link-Fundstellen** | `link` | **25** | ausschließlich `docs/**` — `docs/guides` 10 (features 5, setup 5) · `docs/concepts` 13 (davon **8** in `docs/concepts/archive/`, **5** in `docs/concepts/*.md`) · `docs/superpowers/plans/` 2; **live** ohne `archive/` = **17** | **rot**, **außerhalb** des AC-30-Scope (U-2) | **Follow-up `F-DOCS-LINKS-2026-09-27`, Termin 2026-10-11** — **kein** Termin 0 in W0…W8 | **`developer`** |
+| **`llms.txt`** | — | **0** | `llms.txt` | **grün** | — | — |
+
+**Was daraus folgt, ausdrücklich (Ehrlichkeitsgrenze, K22):** weil V3 **ERROR** bleibt und die
+**25** `docs/**`-Findings **weiter** meldet, ist **`docs.internal_links` innerhalb W0–W8 nie `0`**
+und damit sind **`consistency-check.py → 0`** und **`sync.py --validate → 0`** **dauerhaft
+unerreichbar** (die frühere Dokuzeile „spätester Termin 0: **W8-2**" gilt nur noch für die **2**
+README-Layout-Findings). **Maßgeblich** ist ab Rev. 0.6 die **Deltasperre** der Regel
+`W-VALIDATE-ROT` (`errors` darf nicht steigen; Owner `validator`, Baseline in **W3-7**). Die
+Severity-Frage selbst ist **nicht** Gegenstand von U-1/U-2 und als **OQ10** in der Spec §11.1
+geführt (Owner `orchestrator`, Frist **vor W8-4**).
+
+**Ist-Zustand 2026-09-27 (Baseline-Messung, Übergabe vom Parent; Rev. 0.6 nachgezogen):**
+`python3 scripts/consistency-check.py --json` → `{'total': 85, 'errors': 0, 'warnings': 85}`; die
+enthaltenen Checks sind `crossrefs.changelog-missing-entry` und `placeholders.unknown` — **kein**
+`docs.`-Check liefert Findings. Also **`docs-checks: 0`** und **`docs-findings: 0`**. Begründung: V1
+ist **nicht registriert** (`scripts/consistency-check.py:52-56` importiert nur
+`check_readme_docs_index`, `check_sync_cli_docs`, `check_ui_help_mappings`; Aufrufe in `run_checks()`
+`:199-201`); der einzige heute registrierte Check mit `docs.`-Präfix ist `check_readme_docs_index`
+mit `check="docs.readme_index"` (`scripts/lib/consistency/docs.py:118`), und er liefert **0**
+Findings. **Zusätzlich, aus dem Rev.-0.6-Ledger:** `scripts/lib/consistency/docs.py` = **599**
+Zeilen, `report.py` = **115**, `consistency-check.py` = **280**, `tests/test_doc_facts.py` = **2867**,
+`tests/test_doc_facts_expected.py` = **526**; in `scripts/lib/consistency/` liegen **20** Module vor
+W2-0, **24** danach; `docs/INDEX.md` existiert **nicht**. **Konsequenz:** die Aussage „V1…V7
+implementiert" (IC-05) ist **nicht** gleichbedeutend mit „im Runner registriert"; die Registrierung
+ist ein **eigener** Nachweis (Task **W2-7**) und wird **nicht** über `docs-checks` geführt.
+
+**Historischer Ist-Zustand 2026-09-26 (gemessen am Working Tree, Datei:Zeile):** `docs-checks: 0` **und**
 `docs-findings: 0`. Begründung: V1 ist **nicht registriert**
 (`scripts/consistency-check.py:52-56` importiert nur `check_readme_docs_index`,
 `check_sync_cli_docs`, `check_ui_help_mappings`); der einzige heute registrierte Check mit
@@ -1530,36 +1864,64 @@ danach auf den Ist-Namen gezogen.
 (`:1058-1059`). **Folge:** `python3 scripts/sync.py --validate` → **0** verlangt **null
 ERROR-Findings im ganzen Repo** — nicht nur in den Doku-Checks.
 
-**Regel:** `python3 scripts/sync.py --validate` ist **planmäßig rot** von **W2-7** (dem ersten
-Lauf mit registrierten Doku-Checks) **bis einschließlich W8-2**. Verursachende Doku-Checks mit
-Termin und Owner:
+**Regel (K27, Rev. 0.6 — korrigiert):** `python3 scripts/sync.py --validate` ist **planmäßig rot**
+von **W2-7** (dem ersten Lauf mit registrierten Doku-Checks) **bis einschließlich W8-2** — und
+**danach weiter**. **K27:** V3 bleibt **ERROR** und meldet unter `docs/**` dauerhaft **25**
+Findings, die AC-30 (U-2) **nicht** behebt ⇒ **`--validate → 0` hat keinen Termin 0**; maßgeblich
+ist die **Deltasperre** (Owner `validator`, Baseline **W3-7**), offene Severity-Frage **OQ10**.
+Verursachende Doku-Checks mit Termin und Owner:
 
 | Zeitraum | Planmäßig rote Doku-ERROR-Checks | Erster Termin 0 | Owner |
 |---|---|---|---|
-| **W2-7 … W3-6** | **V2** (bis zum Sync in **W3-6**, Schritt 2), **V3**, **V6** | V6 → **W3-7**; V2 → **W3-6**; V3 → **W8-2** | `developer` (V6) · `senior-developer` (V2) · `developer` (V3) |
-| **W3-7 … W8-1** | **V3** (durchgehend bis W8-2) · **V2** ist nach W3-6 0, in **W4** und **W5** erneut rot und jeweils erst mit dem Abschluss-Sync-Lauf wieder 0 (W4-3 Schritt 4 / W5-2 Schritt 4 — Fußnote ¹ der `W-GATE-TABLE`); V6 ab W3-7 0 | **W8-2** (V3 geht auf 0; **V2** bleibt bis **W8-4 Schritt 5** rot — nächste Zeile) | `developer` (V3) · `senior-developer` (V2) |
-| **W8-2 … W8-4** | **V2** — W8-1 legt `docs/plans/…-oq4.md` an und bearbeitet `docs/REQUIREMENTS.md`; **W8-2** und **W8-3** führen **keinen** Sync, V2 bleibt dort rot. V9 ist **WARNING** und bricht `--validate` **nicht** (die Zählung `:174` filtert auf `Severity.ERROR`) | **W8-4** — V2 in **Schritt 5** (Abschluss-Sync-Lauf; **nicht** Schritt 4) | `tester` |
+| **W2-7 … W3-6** | **V2** (bis zum Sync in **W3-6**, Schritt 2), **V3**, **V6** | V6 → **W3-7**; V2 → **W3-6**; V3 → **W8-2** (nur die **2** README-Layout-Findings) | `developer` (V6) · `senior-developer` (V2) · `developer` (V3) |
+| **W3-7 … W8-1** | **V3** (durchgehend; die **2** Layout-Findings bis W8-2, die **25** `docs/**`-Findings **dauerhaft**) · **V2** ist nach W3-6 0, in **W4** und **W5** erneut rot und jeweils erst mit dem Abschluss-Sync-Lauf wieder 0 (W4-3 Schritt 4 / W5-2 Schritt 4 — Fußnote ¹ der `W-GATE-TABLE`); V6 ab W3-7 0 | **W8-2** (die 2 Layout-Findings gehen auf 0; **V2** bleibt bis **W8-4 Schritt 5** rot — nächste Zeile). **Für `--validate` insgesamt: kein Termin 0** | `developer` (V3) · `senior-developer` (V2) |
+| **W8-2 … W8-4** | **Rev. 0.6 (K22): V3 bleibt unter `docs/**` dauerhaft rot (25 ERROR-Findings, Follow-up `F-DOCS-LINKS-2026-09-27`, Termin 2026-10-11) — `--validate` ist deshalb auch nach W8-4 nicht 0.** **V2** — W8-1 legt `docs/plans/…-oq4.md` an und bearbeitet `docs/REQUIREMENTS.md`; **W8-2** und **W8-3** führen **keinen** Sync, V2 bleibt dort rot. V9 ist **WARNING** und bricht `--validate` **nicht** (die Zählung `:174` filtert auf `Severity.ERROR`) | **kein Termin 0 für `--validate`** — maßgeblich ist die **Deltasperre** (Owner `validator`, Baseline W3-7); Severity-Frage **OQ10** (Frist vor W8-4) |
 
-**Lesehinweis zur dritten Zeile (RVW3-1, vierte Korrekturrunde):** die Zeile nennt **V2**, weil V2
-der letzte planmäßig rote Doku-ERROR-Check ist. Die Regelzeile oben endet mit „bis einschließlich
-W8-2" **nicht**, weil dort alles grün wäre, sondern weil **V3** (Termin W8-2) der letzte rote Check
-des Intervalls W2-7…W8-2 ist. In **W8-3** und in **W8-4 bis Schritt 5** bleibt `--validate` deshalb
-weiterhin planmäßig rot; der erste Termin 0 für `--validate` ist damit **W8-4 Schritt 5** und steht
-unter der Bedingung von W3-BASELINE-STRICT (b) (unten). **Kein** Sollwert wurde geändert.
+**Lesehinweis zu Zeile 2 und 3 (RVW3-1, vierte Korrekturrunde; ergänzt um K27).** Die Fassung vor
+dieser Korrekturrunde nannte als „ersten Termin 0 für `--validate`" den Wert **W8-4 Schritt 5**
+und schrieb, Zeile 2 ende bei W8-2, weil dort alles grün sei. **Beides ist seit Rev. 0.6
+überholt und bleibt nur als Historie lesbar:** (a) V3 ist nach W8-2 **nur im AC-30-Scope** grün —
+unter `docs/**` meldet es **25** ERROR-Findings weiter (U-2/K22, Fußnote ⁵); (b) **V2** ist nicht
+der Grund, warum `--validate` nach W8-4 rot bliebe, sondern V3. **Maßgeblich:** `--validate` hat
+**keinen** Termin 0 (K27); es gilt die **Deltasperre**. **Kein** Sollwert wurde geändert — der
+Sollwert `→ 0` ist als **Dokuzeile ohne Sollwert** geführt, die **Deltasperre** ist die bereits
+bestehende, in Rev. 0.5 eingeführte Ersatzform.
 
 **Grundlage (spec-zitiert, nicht eigene Setzung):** Spec §6(b) und der §10-Aufzählungspunkt
 `--validate` **sanktionieren**
 ausdrücklich, dass `--validate` bei **V1, V2, V3, V6** nicht grün ist
 („darf bei **V1, V2, V3, V6** nicht grün sein (ab W3; in W2 V1 noch WARNING)"; `--validate` ist
-`TEST_COMMAND`, `.meta-config/project.yaml:193`). Der Sollwert `→ 0` wird **nicht** abgesenkt,
-sondern **terminiert**: erst **nach** W8-4, und auch dann **nur unter der Bedingung** von
-W3-BASELINE-STRICT (b): ist der repo-weite ERROR-Altbestand `> 0`, bleibt `→ 0` unerreichbar und
-maßgeblich ist die **Deltasperre** (`errors` darf nicht steigen). **Owner** der Messung und der
-Deltasperre: `validator`; **Termin** der Erstentscheidung: **W3-7** (mit der Baseline-Messung),
-**spätester Termin 0**: **W8-4**.
+`TEST_COMMAND`, `.meta-config/project.yaml:193`). **K27:** der Sollwert `→ 0` wird deshalb
+**nicht** abgesenkt, sondern als **Dokuzeile ohne Sollwert** geführt und durch die **Deltasperre**
+ersetzt — dieselbe Lesart, die bereits für den repo-globalen Altbestand und für V9 gilt. **V2** wird
+mit dem Abschluss-Sync-Lauf in **W8-4 Schritt 5** wieder 0 (das bleibt ein **Check**-Sollwert, kein
+`--validate`-Sollwert). **Owner** der Messung und der Deltasperre: `validator`; **Termin** der
+Baseline-Messung: **W3-7**. **Offen:** ob V3 für `docs/**` herabgestuft wird — **OQ10**, Owner
+`orchestrator`, Frist **vor W8-4**.
 
-**Ausdrücklich nicht von dieser Regel erfasst:**
-- `python3 scripts/sync.py --check` — der Drift-Lauf, **nicht** der Consistency-Runner
+**K27 — Globale Vorrangregel für alle Wellenblöcke (Rev. 0.6, Review-Befund M4).** Die Wellenblöcke
+**W3, W4, W5, W6, W7 und W8** wiederholen die Formel „planmäßig rot bis einschließlich **W8-2**,
+spätester Termin 0 **W8-4**" (u. a. W3-Block, W4-Block, W5-Block, W6-Block, W7-Block, W8-Block).
+**Diese Wiederholungen sind nicht einzeln umgeschrieben**, weil sie alle **derselben** Regel
+entstammen und eine gemeinsame Lesart haben. **Vorrang:** **Für `--validate` als Ganzes gilt
+„kein Termin 0"** — jede Stelle, die „spätester Termin 0 W8-4" nennt, ist als Aussage über die
+**behebbaren** Teilmenge zu lesen: **V2** (W8-4 Schritt 5) und die **2** V3-Layout-Findings
+(W8-2). **Die 25 `docs/**`-Link-Findings sind darin nicht enthalten** und haben **keinen**
+Termin 0. **Maßgeblich bleibt in jedem Wellenblock die Zeile der `W-GATE-TABLE`** (Spalte der
+jeweiligen Welle) — nicht die wiederholte Formel.
+**Grenze dieser Vorrangregel (K44, Review-Befund N4 — ehrlich gefasst):** Sie gilt **an jeder Stelle
+mit Verweis auf diese Regel oder auf `W-GATE-TABLE`**. **Acht weitere Wellenblock-Formeln**
+(Plan:2413, 2696, 2800, 2930, 3045, 3177, 3254, 4054) tragen **weder** einen lokalen K27-Verweis
+**noch** eine Umformulierung — sie sind damit **nicht je Stelle** aufgelöst, sondern **global**
+überwacht. **Warum die kleinere Lösung gewählt wurde (in einem Satz):** acht zusätzliche Verweise
+wären eine Änderung an **acht** Wellenblöcken und würden deren Rev.-0.5-Formulierung jeweils sichtbar
+überschreiben, ohne Informationsgewinn — der Aussagewert dieser Wiederholungen ist **null**, weil
+Vorrangregel und `W-GATE-TABLE` ohnehin bestimmen, was gilt.
+**Ehrliche Restaussage:** an diesen acht Stellen **kann** die alte Formulierung isoliert gelesen
+werden; **maßgeblich** ist sie **nicht**. **Der Widerspruch im selben W8-4-Bullet** ist davon
+unabhängig und **separat aufgelöst** (K44).
+
+**Ausdrücklich nicht von dieser Regel erfasst:**- `python3 scripts/sync.py --check` — der Drift-Lauf, **nicht** der Consistency-Runner
   (RVW2-13, siehe Wellenblock W3). Er wird rot, wenn generierte Dateien vom Ist abweichen, und
   sagt **nichts** über V1–V9 aus.
 - `python3 scripts/sync.py --dry-run` — führt die Consistency-Suite **nicht** aus
@@ -1601,6 +1963,36 @@ nicht spezifizierte Treffer ⇒ R4-Eskalation an `main_chat`, Startseverity blei
 **Rev. 0.5 (K15):** im W2-Rollback ist zusätzlich `scripts/lib/consistency/report.py` via
 `git checkout` zurückzusetzen — die `line`/`branch`-Felder sind additiv und ohne Codeverlust
 revertierbar.
+**Rev. 0.6 (K18/K20) — Rollback um die vier neuen Module ergänzt.** W2-0 ist **rein additiv**
+angelegt: es verschiebt Code **innerhalb** des Pakets `scripts/lib/consistency/` und legt vier
+Dateien an. Der vollständige W2-Rollback ist deshalb **zweistufig** und in dieser Reihenfolge
+auszuführen:
+
+```bash
+# Stufe 1 — W2-0 zurücksetzen (Fassade + Extraktion):
+git rm scripts/lib/consistency/docs_links.py
+git rm scripts/lib/consistency/docs_freshness.py
+git rm scripts/lib/consistency/docs_wiki.py
+git rm scripts/lib/consistency/docs_index.py
+git checkout scripts/lib/consistency/docs.py          # Fassade -> Monolith zurück
+git checkout tests/test_doc_facts.py                  # V1-Tests zurück in die alte Datei
+git rm tests/test_doc_wiki.py                         # nur falls W2-3 bereits gelandet ist
+git rm tests/test_doc_freshness.py                    # dito
+git rm tests/test_doc_index.py                        # dito
+# Stufe 2 — Konfigurations-Rollback (unveraendert):
+#   docs-consolidation.checks.strict: false; vollstaendig: enabled: false (Fail-off => V1–V7 No-op)
+git rm -f tests/fixtures/docs_v1_fixtures.md
+git checkout scripts/consistency-check.py
+git checkout scripts/lib/consistency/report.py        # Rev. 0.5, K15
+```
+
+**Reihenfolge-Begründung:** `git checkout docs.py` **vor** dem `git rm` der Nachfolger aufrufen —
+sonst existiert die Fassade einen Moment ohne ihre Importe. **Was Stufe 1 ausdrücklich nicht
+angreift:** `scripts/lib/doc_facts.py`, `doc_renderer.py`, `doc_index.py` (W1/W3) und die
+gesamte W3-Kette; die Write-Sets von W2 und W3 sind nachweislich disjunkt (Absatz „Warum W2 ‖ W3
+parallel ist"). **Konsistenz der Regel:** W2-0 verändert **keinen** Pfad des §2.3-Tracking-Gates
+(kein `.gitignore`-Eintrag, keine getrackte `docs/**/*.md`), daher ist **kein** Wellen-Invalidierungs-
+oder Tracking-Eintrag nötig.
 
 ### W2-1: V1a/V1b `check_no_manual_counts` + Positiv-Fixture
 
@@ -1734,13 +2126,14 @@ Schritt darf W3-4 `checks.strict: true` nicht setzen** (Vorbedingung, siehe Task
 relative repo-interne Pfade. Consumes: W2-1.
 **Agent:** developer · **Depends on:** W2-1 · **parallel_group:** PG-2 / W2
 **Ziel-AK (AC):** **AC-09** (IC-05) · **V-Check:** **V3**
-**Akzeptanz:** `test_v3_flags_dead_howto_links` grün: `README.md:721-723` (Links auf
-`howto/setup/`, `howto/features/`) liefert ≥ 1 `Finding(severity=ERROR,
-check="docs.internal_links", file="README.md")`. `http(s)://`, `mailto:` und `#anchor` werden
-**nicht** geprüft (R6). Die Behebung erfolgt in W8-2.
+**Akzeptanz:** `test_v3_flags_dead_howto_links` grün: `README.md:722-723` (**K30**, ehemals
+`:721-723` — `:721` `howto/` und `:724` `howto/configs/` existieren und tragen **kein** Finding;
+beide Findings tragen `branch="layout"`) auf `howto/setup/`, `howto/features/` liefert ≥ 1
+`Finding(severity=ERROR, check="docs.internal_links", file="README.md")`. `http(s)://`, `mailto:` und
+`#anchor` werden **nicht** geprüft (R6). Die Behebung erfolgt in W8-2.
 **Verifikation:** `python3 -m pytest tests/test_doc_facts.py -q` → **0**;
 ~~`python3 scripts/consistency-check.py --strict` → **1, planmäßig** (V1-WARNINGS **plus**
-V3-ERROR auf `README.md:721-723`, das erst W8-2 behebt — im Review als erwartet markieren).~~
+V3-ERROR auf `README.md:722-723`, das erst W8-2 behebt — im Review als erwartet markieren).~~
 **Ergänzung Rev. 0.5 (K13/RVW-2):** vor **W2-7** gibt es im Runner **keine** V1-Findings
 (nicht registriert), der V1-Anteil dieses Exit-Code-1 ist also **erst nach W2-7** zu erwarten.
 Die Zeile bleibt als Historie sichtbar; maßgeblich sind **W2-GATE-V1** und **W2-GATE-ERRORS**
@@ -1752,21 +2145,88 @@ Welle-Gate** (RVW-3) — sie prüft die Implementierung, nicht den Wellenabschlu
 - [x] 3: Test grün beobachten; Fehlalarm-Probe auf `http(s)://` und Anker.
 - [x] 4: commit via `git`-Agent: `feat: add V3 internal link check`.
 
-### W2-3: V7 `check_wiki_staleness`
+### W2-0: Modul-Split — `docs.py` wird zur Fassade (Rev. 0.6, U-1; **verhaltensneutral**)
 
-**Files:** Modify `scripts/lib/consistency/docs.py`, `tests/test_doc_facts.py`
+**Files:** Create `scripts/lib/consistency/docs_links.py`, `scripts/lib/consistency/docs_freshness.py`,
+`tests/test_doc_freshness.py`; Modify `scripts/lib/consistency/docs.py` (**nur** Re-Exports),
+`tests/test_doc_facts.py` (**nur** Verschiebung der V1-Tests, **keine** Löschung von Abdeckung).
+**Explizit nicht in `Files:`** — `scripts/lib/consistency/docs_wiki.py` und `docs_index.py` werden
+**nicht** von dieser Task angelegt (hier liegt noch kein Bestand); sie gehören **W2-3** bzw.
+**W2-6**.
+**Interfaces:** Produces: `docs.py` als **Fassade** mit exakt dem in **Spec §4.1** festgelegten
+`__all__`; `docs_links.py` = **V3** + **V4** + `check_sync_cli_docs` + `check_ui_help_mappings`;
+`docs_freshness.py` = **V1a/V1b** (inkl. Suppressionsregeln 1–4 in der K16-Eingrenzung) + Platz für
+**V6** (W2-5) und **V5** (W2-4); `tests/test_doc_freshness.py` mit den **verschobenen** V1-Tests.
+Consumes: **W2-1** (V1), **W2-2** (V3), W0-4 (Track-A-Merge), Spec §4.1 (Modulgrenzen, Fassaden-
+Contract), §17.10 (K18–K21). **Schreibt keine Config, keinen Runner, keine `report.py`.**
+**Agent:** developer · **Depends on:** W2-2 · **parallel_group:** — (sequenziell; **Einstieg in die
+offene W2-Arbeit**, PG-2a startet erst hiernach)
+**Ziel-AK (AC):** Querschnitt — **kein** neuer AC. Diese Task **verändert keinen** Vertrag; sie
+stellt die Voraussetzung dafür her, dass W2-3…W2-7 überhaupt parallelisierbar sind (AC-07, AC-08,
+AC-09 bleiben unverändert **inhaltlich** grün). · **V-Check:** V1a, V1b, V3, V4 + 3 Altchecks
+(umbewegt)
+**Akzeptanz — Verhaltensneutralität ist die eigentliche Abnahme (K18/K19):**
+(a) `python3 -m pytest tests/test_doc_facts.py tests/test_doc_facts_expected.py
+tests/test_doc_freshness.py -q` → **0** mit **≥ 163** Tests (Verschiebung, **kein** Verlust);
+(b) `python3 scripts/consistency-check.py --json` liefert **unverändert** `{'total': 85, 'errors': 0,
+'warnings': 85}` und **keinen** neuen `docs.`-Check; (c) **keine** neue Registrierung —
+`scripts/consistency-check.py:52-56` und die Aufrufe `:199-201` sind **byte-identisch**, der
+Nicht-Registrierungs-Pin `test_v1_is_not_wired_into_the_runner_yet`
+(`tests/test_doc_facts.py:2403-2422`) bleibt **grün** und wird erst in **W2-7** ersetzt;
+(d) `scripts/lib/consistency/docs.py` enthält **keine** `Finding(...)`-Konstruktion und **kein**
+`re.compile` mehr — nur Importe und `__all__`; (e) **Fassaden-Vollständigkeit** (K19): jeder Name
+aus Spec §4.1 `__all__` ist aus `docs` importierbar, und die **29** Referenzstellen in
+`tests/test_doc_facts.py` funktionieren **unverändert**; (f) **Modulgrenzen** (K18): jedes neue
+Modul **< 600 Zeilen** (`wc -l` je Datei, Ergebnis in die Task-Notiz).
+**Verifikation:** `python3 -m pytest tests/test_doc_facts.py tests/test_doc_facts_expected.py
+tests/test_doc_freshness.py -q` → **0**; `wc -l scripts/lib/consistency/docs*.py` → jede Zeile
+**< 600**; `git diff --name-only` → **kein** Pfad außerhalb der `Files:`-Liste (insbesondere **nicht**
+`scripts/consistency-check.py`, **nicht** `scripts/lib/consistency/report.py`).
+**Belege des Ist-Zustands (Baseline-Messung 2026-09-27, Übergabe vom Parent; kein Shell-Zugriff in
+dieser Revisionsrunde):** `docs.py` = **599** Zeilen — `check_sync_cli_docs` `:11-46`,
+`check_ui_help_mappings` `:49-98`, `check_readme_docs_index` `:102-124`, V1-Konstanten `:155-173`,
+`v1_strict` `:335-348`, `_v1_finding` `:350-369`, `check_no_manual_counts` `:371-412`, V3-Konstanten
+`:416-445`, `check_internal_links` `:555-599`; `report.py` = **115**, `consistency-check.py` = **280**,
+`tests/test_doc_facts.py` = **2867**, `tests/test_doc_facts_expected.py` = **526**; **20** Module in
+`scripts/lib/consistency/`.
+**Steps:**
+- [ ] 1: `docs_freshness.py` anlegen (V1-Block `:155-412` inkl. `Span`, `v1a_count_spans`,
+      `v1b_version_spans`, `v1_strict`, `_v1_finding` und der K16-Eingrenzung in
+      `_v1_suppressed_lines`); `docs_links.py` anlegen (`:11-124` + `:416-599`).
+- [ ] 2: V1-Tests aus `tests/test_doc_facts.py` **verschieben** (nicht kopieren) nach
+      `tests/test_doc_freshness.py`; Imports dort auf `docs_freshness` umstellen; die V3- und
+      Altcheck-Tests **bleiben** in `test_doc_facts.py` und greifen weiter über die Fassade.
+- [ ] 3: `docs.py` auf Fassade reduzieren — `__all__` **wortgleich** nach Spec §4.1; `Finding` und
+      `Severity` aus `.report` **durchreichen** (Testreferenz `docs_lib.Severity`).
+- [ ] 4: Nachweise (a)–(f) der Akzeptanz ausführen und im Review-Protokoll festhalten; insbesondere
+      `163` als Vorher-Baseline gegen den Nachher-Zähler stellen und **jede** Differenz als
+      Befund melden (kein stilles Nachziehen der Zahl).
+- [ ] 5: commit via `git`-Agent:
+      `refactor: split consistency docs checks into family modules`.
+
+### W2-3: V7 `check_wiki_staleness` — **Rev. 0.6: eigenes Modul + eigene Testdatei (PG-2a)**
+
+**Files:** Create `scripts/lib/consistency/docs_wiki.py`, `tests/test_doc_wiki.py`
+(**Rev. 0.6 / K20** — neu; in Rev. 0.5: Modify `scripts/lib/consistency/docs.py`,
+`tests/test_doc_facts.py`)
 **Interfaces:** Produces: `check_wiki_staleness(root, config=None) -> list[Finding]`, Severity
-**WARNING**. Consumes: W1-4 (`compute_wiki_staleness`).
-**Agent:** developer · **Depends on:** W2-2 · **parallel_group:** PG-2 / W2
+**WARNING**, als **dünne Adapter-Schicht auf W1-4** in `docs_wiki.py`. Consumes: W1-4
+(`compute_wiki_staleness`), **W2-0** (Modul-Familie „abgeleitete Bestands-Oberfläche"; später W6-2
+mit V8).
+**Agent:** developer · **Depends on:** **W2-0** (Rev. 0.6; vorher W2-2) · **parallel_group:**
+**PG-2a** (Rev. 0.6; parallel mit **W2-5** und **W2-6**)
 **Ziel-AK (AC):** **AC-10** (IC-05) · **V-Check:** **V7**
 **Akzeptanz:** `test_v7_missing_and_stale_derived_from` grün: `type: Architecture` **ohne**
 `derived-from` ⇒ Finding; `derived-from` mit `mtime(Quelle) > derived-at` ⇒ Finding nennt
-`stale-source`. Die Behebung (Annotation) erfolgt in W5-3.
-**Verifikation:** `python3 -m pytest tests/test_doc_facts.py -q` → **0**;
-~~`python3 scripts/consistency-check.py` → **0** (nur WARNINGs).~~
-**AUFGEHOBEN (Rev. 0.5, RVW-2) — die Klammer war sachlich falsch und die Zeile unerreichbar.**
+`stale-source`. Die Behebung (Annotation) erfolgt in W5-3. **Rev. 0.6:** der Test steht in
+`tests/test_doc_wiki.py` und der Check in `docs_wiki.py` — V7 ist damit **nicht** mehr aus der
+`docs.py`-Fassade heraus zuständig, wohl aber **über sie** aufrufbar (`__all__`).
+**Verifikation (Rev. 0.6):** `python3 -m pytest tests/test_doc_wiki.py -q` → **0**;
+`wc -l scripts/lib/consistency/docs_wiki.py` → **< 600**; ~~`python3 scripts/consistency-check.py` →
+**0** (nur WARNINGs).~~ **AUFGEHOBEN (Rev. 0.5, RVW-2) — die Klammer war sachlich falsch und die
+Zeile unerreichbar.**
 V7 ist zwar WARNING, aber W2-3 folgt auf **W2-2**: sobald V3 registriert ist, meldet
-`check_internal_links` auf `README.md:721-723` einen **ERROR** (Task **W2-2**-Akzeptanz), und
+`check_internal_links` auf `README.md:722-723` einen **ERROR** (Task **W2-2**-Akzeptanz), und
 `print_report` gibt `1 if errors else 0` (`scripts/lib/consistency/report.py:75`) — der rohe
 Runner ist damit Exit **1**, nicht 0. Die Zeile bleibt als Historie sichtbar; maßgeblich ist
 **W2-GATE-ERRORS** (Erwartungswert `docs.wiki_staleness` planmäßig rot, Termin **W5-3**,
@@ -1778,66 +2238,90 @@ kein Welle-Gate** (RVW-3).
 - [ ] 3: Test grün beobachten.
 - [ ] 4: commit via `git`-Agent: `feat: add V7 wiki staleness check`.
 
-### W2-4: V5 `check_role_generation_parity` (gate-bewusst)
+### W2-4: V5 `check_role_generation_parity` (gate-bewusst) — **Rev. 0.6: `docs_freshness.py`, sequenziell nach W2-5**
 
-**Files:** Modify `scripts/lib/consistency/docs.py`, `tests/test_doc_facts.py`
+**Files:** Modify `scripts/lib/consistency/docs_freshness.py`,
+`tests/test_doc_freshness.py` (**Rev. 0.6 / K20** — neu; in Rev. 0.5: Modify
+`scripts/lib/consistency/docs.py`, `tests/test_doc_facts.py`)
 **Interfaces:** Produces: `check_role_generation_parity(root, config=None) -> list[Finding]`;
-Severity **ERROR**, sobald `systems-engineering.enabled: true`, sonst **WARNING**. Consumes: W1-3.
-**Agent:** developer · **Depends on:** W2-3 · **parallel_group:** PG-2 / W2
+Severity **ERROR**, sobald `systems-engineering.enabled: true`, sonst **WARNING**; in
+`docs_freshness.py` (Familie „Doku vs. berechneter Ist-Zustand", Spec §4.1). Consumes: W1-3,
+**W2-5** (Rev. 0.6 — siehe Kantenbegründung).
+**Agent:** developer · **Depends on:** **W2-5** (Rev. 0.6; vorher W2-3) · **parallel_group:** —
+(**sequenziell**, Rev. 0.6; vorher PG-2/W2)
 **Ziel-AK (AC):** **AC-11** (IC-05) · **V-Check:** **V5**
 **Akzeptanz:** `test_v5_severity_depends_on_se_gate` grün; Vergleichsmenge ist
 `compute_active_roles()` (IC-04), **nicht** der `roles:`-Listeninhalt (F21-Dauerfehlalarm, NG-8).
-**Verifikation:** `python3 -m pytest tests/test_doc_facts.py -q` → **0**.
+**Verifikation (Rev. 0.6):** `python3 -m pytest tests/test_doc_freshness.py -q` → **0**;
+`wc -l scripts/lib/consistency/docs_freshness.py` → **< 600**.
+**Warum W2-4 **nicht** Teil von PG-2a ist (K20, ehrlich benannt):** W2-4 schreibt **dasselbe**
+Modul (`docs_freshness.py`) und **dieselbe** Testdatei (`tests/test_doc_freshness.py`) wie W2-5
+(V6). Ein Parallelstart wäre eine Ownership-Kollision — genau der Fehler, den die Rev. 0.6
+beseitigt. Die Kante **`W2-5 → W2-4`** ist deshalb **verbindlich**; die Reihenfolge innerhalb der
+Familie ist frei (V5 vor V6 wäre ebenso zulässig), die Kante ist es nicht.
 **Steps:**
 - [ ] 1: Test schreiben (fail).
 - [ ] 2: V5 mit Gate-Auswertung implementieren.
 - [ ] 3: Test grün beobachten; Ist-Zustand (F13) muss **WARNING** sein.
 - [ ] 4: commit via `git`-Agent: `feat: add V5 gate-aware role parity check`.
 
-### W2-5: V6 `check_docs_facts_fresh` inkl. Sollwert-Vergleich
+### W2-5: V6 `check_docs_facts_fresh` inkl. Sollwert-Vergleich — **Rev. 0.6: `docs_freshness.py`, PG-2a**
 
-**Files:** Modify `scripts/lib/consistency/docs.py`, `tests/test_doc_facts_expected.py`
+**Files:** Modify `scripts/lib/consistency/docs_freshness.py`, `tests/test_doc_freshness.py`,
+`tests/test_doc_facts_expected.py` (**Rev. 0.6 / K20** — `docs_freshness.py` und
+`tests/test_doc_freshness.py` neu; in Rev. 0.5: Modify `scripts/lib/consistency/docs.py`,
+`tests/test_doc_facts_expected.py`)
 **Interfaces:** Produces: `check_docs_facts_fresh(root, config=None) -> list[Finding]` mit
 `kind ∈ {handedit, expected-mismatch, missing-in-expected}`; `missing-in-expected` = **WARNING**,
-die anderen **ERROR**. Consumes: W1-5, W2-4.
-**Agent:** developer · **Depends on:** W2-4 · **parallel_group:** PG-2 / W2
+die anderen **ERROR**; in `docs_freshness.py`. Consumes: W1-5, **W2-0**.
+**Agent:** developer · **Depends on:** **W2-0** (Rev. 0.6; vorher W2-4) · **parallel_group:**
+**PG-2a** (Rev. 0.6; parallel mit **W2-3** und **W2-6**)
 **Ziel-AK (AC):** **AC-36** (IC-23, R14) · **V-Check:** **V6**
 **Akzeptanz:** `test_mismatch_is_reported` grün: manipulierter Sollwert ⇒ **genau ein** Finding
 `severity=ERROR, kind="expected-mismatch"` **obwohl** der gerenderte Block exakt
 `compute_doc_facts()` entspricht — der Nachweis, dass der Kreis `doc_facts → Renderer → V6`
 gebrochen ist (R14).
-**Verifikation:** `python3 -m pytest tests/test_doc_facts_expected.py -q` → **0**.
+**Verifikation (Rev. 0.6):** `python3 -m pytest tests/test_doc_facts_expected.py
+tests/test_doc_freshness.py -q` → **0**; `wc -l scripts/lib/consistency/docs_freshness.py` →
+**< 600**.
 **Steps:**
 - [ ] 1: Test schreiben (fail).
 - [ ] 2: V6 mit beiden Vergleichsachsen implementieren.
 - [ ] 3: Tests grün beobachten.
 - [ ] 4: commit via `git`-Agent: `feat: add V6 freshness check with expected-value axis`.
 
-### W2-6: V2 `check_docs_index_completeness` und V4-Erweiterung
+### W2-6: V2 `check_docs_index_completeness` und V4-Erweiterung — **Rev. 0.6: `docs_index.py`, PG-2a**
 
-**Files:** Modify `scripts/lib/consistency/docs.py`, `tests/test_doc_facts.py`
-**Interfaces:** Produces: `check_docs_index_completeness(root, config=None) -> list[Finding]`;
-`check_readme_docs_index` generalisiert von `docs/api/*.md` (`:111`) auf den gesamten `docs/`-Baum
-bei **unveränderter** Signatur und Severity. Consumes: W2-5, W1-8.
-**Agent:** developer · **Depends on:** W2-5 · **parallel_group:** PG-2 / W2
+**Files:** Create `scripts/lib/consistency/docs_index.py`, `tests/test_doc_index.py`;
+Modify `scripts/lib/consistency/docs_links.py` (**nur die V4-Generalisierung** — V4 liegt seit
+W2-0 in `docs_links.py`); (**Rev. 0.6 / K20** — neu; in Rev. 0.5: Modify
+`scripts/lib/consistency/docs.py`, `tests/test_doc_facts.py`)
+**Interfaces:** Produces: `check_docs_index_completeness(root, config=None) -> list[Finding]` in
+`docs_index.py`; `check_readme_docs_index` generalisiert von `docs/api/*.md` (`docs.py:111`,
+heute `docs_links.py`) auf den gesamten `docs/`-Baum bei **unveränderter** Signatur und Severity.
+Consumes: **W2-0**, W1-8.
+**Agent:** developer · **Depends on:** **W2-0** (Rev. 0.6; vorher W2-5) · **parallel_group:**
+**PG-2a** (Rev. 0.6; parallel mit **W2-3** und **W2-5**)
 **Ziel-AK (AC):** **AC-12** (IC-05) · **V-Check:** **V2**, **V4**
 **Akzeptanz:** `test_v2_missing_page` grün: eine getrackte `docs/**/*.md` außerhalb `archive/`, die
 in `docs/INDEX.md` fehlt ⇒ **ERROR**; `docs/INDEX.md` selbst und `archive/`-Pfade ⇒ **kein**
 Finding. Die bisherige Teilmenge `docs/api/*.md` bleibt eine echte Teilmenge der neuen Prüfung.
 **Spec-Treue:** §9.1 führt AC-12 auf W3; die **Implementierung** liegt hier (Fixture-Ebene, damit
-`scripts/lib/consistency/docs.py` nicht von zwei parallelen Ketten geschrieben wird), der
+**Rev. 0.6:** nicht `docs.py` von zwei parallelen Ketten geschrieben wird), der
 **E2E-Nachweis gegen das reale `docs/INDEX.md`** in W3-6.
-**Verifikation:** `python3 -m pytest tests/test_doc_facts.py -q` → **0**.
+**Verifikation (Rev. 0.6):** `python3 -m pytest tests/test_doc_index.py -q` → **0**;
+`wc -l scripts/lib/consistency/docs_index.py scripts/lib/consistency/docs_links.py` → je **< 600**.
 **Steps:**
 - [ ] 1: Tests schreiben (fail).
 - [ ] 2: V2 implementieren; V4 generalisieren.
 - [ ] 3: Tests grün beobachten; Szenario-Asserts 50–56 **nicht** anfassen (NG-10).
 - [ ] 4: commit via `git`-Agent: `feat: add V2 index completeness and generalize V4`.
 
-### W2-7: Registrierung, Common-Gate und Exit-Codes
+### W2-7: Registrierung, Common-Gate und Exit-Codes — **Rev. 0.6: Abschluss der Welle (K20)**
 
-**Files:** Modify `scripts/lib/consistency/docs.py`, `scripts/consistency-check.py`,
-`scripts/lib/consistency/report.py` (**neu in Rev. 0.5, K15**), `tests/test_doc_facts.py`
+**Files:** Modify `scripts/lib/consistency/docs.py` (**nur** die `__all__`-Einträge der neu
+hinzugekommenen Checks, Spec §4.1), `scripts/consistency-check.py`,
+`scripts/lib/consistency/report.py` (**Rev. 0.5, K15**), `tests/test_doc_facts.py`
 (**RVW2-5:** die Datei trägt zusätzlich den **Nicht-Registrierungs-Pin**
 `test_v1_is_not_wired_into_the_runner_yet`, `:2403-2422`, der in **Schritt 1** durch den positiven
 Registrierungs-Pin ersetzt wird — dieselbe Datei, **kein** neues File-Ownership)
@@ -1847,7 +2331,8 @@ und `Finding.branch` als **Dataclass-Felder** mit Default (Default `""`/`None`, 
 **bestehenden** Konstruktoraufrufe unverändert bleiben) und ihre Serialisierung in
 `print_json_report`. Consumes: W2-6, W1-10, W2-1 (K16-Rule-3-Eingrenzung, weil
 `_v1_finding` in `docs.py:329-347` dieselben Felder setzt).
-**Agent:** developer · **Depends on:** W2-6 · **parallel_group:** PG-2 / W2
+**Agent:** developer · **Depends on:** **W2-3, W2-4, W2-5, W2-6** (Rev. 0.6 / K20; vorher W2-6) ·
+**parallel_group:** — (**sequenziell**, Abschluss der W2)
 **Ziel-AK (AC):** **AC-13** (IC-05), **AC-24** · **V-Check:** alle
 **Akzeptanz:** `test_exit_codes_unchanged_with_new_checks` grün: 0 Errors → Exit **0**, genau 1
 Error → Exit **1**, Skriptfehler → Exit **2**; bestehende Exit-Code-Doku
@@ -1884,15 +2369,20 @@ Pin trägt; AC-38 (Szenarien 50/51/52/54/55/56 **vollständig No-op**) bleibt gr
 Szenario-Fixtures `docs-consolidation.enabled` **nicht** setzen (IC-22, Fail-off) — der positive
 Pin läuft gegen ein **eigenes** Fixture, **nicht** gegen ein Szenario. **Kein** AC und **kein**
 Sollwert wird dadurch verändert.
-**Verifikation:** `python3 -m pytest tests/test_doc_facts.py -q` → **0**;
+**Verifikation (Rev. 0.6):** `python3 -m pytest tests/test_doc_facts.py
+tests/test_doc_freshness.py tests/test_doc_wiki.py tests/test_doc_index.py
+tests/test_doc_facts_expected.py -q` → **0**;
 ~~`python3 scripts/consistency-check.py` → **0**~~
 **AUFGEHOBEN (Rev. 0.5, RVW-2) — unerreichbar.** W2-7 registriert V1–V7; V2, V3 und V6
 sind **ERROR** (IC-05), und `print_report` gibt `1 if errors else 0`
 (`scripts/lib/consistency/report.py:75`) ⇒ der rohe Runner ist ab W2-7 planmäßig Exit **1**.
-Maßgeblich ist **W2-GATE-ERRORS** (Erwartungswert je V-Check, Termin, Owner). **Dokuzeile zum
-spätesten Termin, zu dem der rohe Runner `Exit 0` liefert: W8-2** (letzter ERROR-Check ist V3) —
-Owner `developer`; das ist **kein** W2-Kriterium, sondern die Terminierung des
-Altbestands-Zustands. **Diese Task-Zeile ist für sich genommen kein Welle-Gate** (RVW-3);
+Maßgeblich ist **W2-GATE-ERRORS** (Erwartungswert je V-Check, Termin, Owner). **Rev. 0.6 (K22):
+die Dokuzeile zum spätesten Termin 0 ist zu präzisieren** — sie gilt nur noch für die **2**
+README-Layout-Findings (**W8-2**, Owner `developer`); die **25** `docs/**`-Link-Findings behebt AC-30
+**nicht** mehr (Follow-up `F-DOCS-LINKS-2026-09-27`, Termin **2026-10-11**), weshalb
+`consistency-check.py → 0` **dauerhaft unerreichbar** bleibt — maßgeblich ist die **Deltasperre**,
+Severity-Frage **OQ10**. Volltext: Tabelle `W2-GATE-V3-KLASSEN`. **Diese Task-Zeile ist für sich
+genommen kein Welle-Gate** (RVW-3);
 `bash tests/scenarios/run.sh 50 51 52 54 55 56` → **0**;
 `python3 scripts/consistency-check.py --json | python3 -c 'import json,sys;d=json.load(sys.stdin);print(sorted({k for f in d["findings"] for k in f}))'` → enthält `line` **und** `branch` (F1-PROMOTION, vacuously grün, solange `docs-consolidation.enabled: false` — dann mit dem pytest-Nachweis kombinieren).
 **Steps:**
@@ -1905,6 +2395,9 @@ Altbestands-Zustands. **Diese Task-Zeile ist für sich genommen kein Welle-Gate*
 - [ ] 2: Checks registrieren; Common-Gate als erste Bedingung in jeden Check einziehen.
       **RVW2-1:** die Registrierung ist damit der **einzige** Nachweis der Registrierungszahl —
       `docs-checks` im W-GATE zählt befundliefernde Checks und ist **kein** Registrierungsnachweis.
+      **Rev. 0.6 (K20):** die Importe in `scripts/consistency-check.py:52-56` bleiben **unverändert**
+      — registriert wird **weiter über die Fassade `docs.py`**, nicht modulweise; genau das macht den
+      Fassaden-Contract (K19) zur Voraussetzung der Registrierung.
 - [ ] 3: Tests grün beobachten; Szenario-Lauf beobachten.
 - [ ] 4: **K15 / B-5 — `line` und `branch` in `report.py` zu Dataclass-Felder mit Default
       machen, in `print_json_report` serialisieren und `_v1_finding` (`docs.py:329-347`) auf
@@ -2008,8 +2501,8 @@ gemessen 2026-09-26):**
 
 | Grund | Beleg | Behoben wann |
 |---|---|---|
-| **V7** meldet **10** Wiki-Seiten `type: "Architecture"` **ohne** `derived-from` (WARNING) | `knowledge/wiki/concepts/architecture*.md:2` u. a.; **null** `derived-from:` im Baum | **W5-3** |
-| **V3** meldet tote interne Verweise auf `howto/setup/`, `howto/features/` (ERROR) | `README.md:721-723`; im Baum existiert nur `howto/configs/project.yaml.example` | **W8-2** |
+| **V7** meldet **11** Wiki-Seiten `type: "Architecture"` **ohne** `derived-from` (WARNING) — **K36 (Rev. 0.6, Review-Befund M5): von 10 auf 11 korrigiert** (Baseline-Messung 2026-09-27; **K24** führte dieselbe Korrektur in Spec §10 `--strict`-Punkt 5 und `W2-GATE-ERRORS` ein) | `knowledge/wiki/concepts/architecture*.md:2` u. a.; **null** `derived-from:` im Baum | **W5-3** |
+| **V3** meldet **2** tote Layout-Verweise auf `howto/setup/`, `howto/features/` (**ERROR**) | `README.md:722-723` (**K30**); im Baum existiert nur `howto/configs/project.yaml.example` | **2** → **W8-2** · **25** (`docs/**`) → **Follow-up `F-DOCS-LINKS-2026-09-27`, Termin 2026-10-11** |
 | **V2** meldet jede getrackte `docs/**/*.md` ohne Eintrag (ERROR) | `docs/INDEX.md` existiert **nicht** | **W3-6** |
 | **V9** meldet den Altbestand an `*.sync-backup-*` als **WARNING** und wird ihn **nicht** abräumen | W8-4-Akzeptanz: die Altlasten bleiben **unangetastet**; FI-10 („lokale Aufräumaktion, kein Spec-Gegenstand") | **kein Termin 0** (geduldet, FI-10) — zur **Zahl** siehe Fußnote ⁴ |
 
@@ -2028,7 +2521,7 @@ Verschiebung.
 |---|---|---|---|---|---|---|---|---|---|---|
 | `docs.no_manual_counts` (V1) | ERROR ab W3-4 | ≥ 1 | **0** | 0 | 0 | 0 | 0 | 0 | **W3-7** | `developer` |
 | `docs.docs_index_completeness` (V2) | ERROR | rot | **0** | rot¹ | rot¹ | 0 | 0 | 0² | **W3-6** | `senior-developer` (W3-6) |
-| `docs.internal_links` (V3) | ERROR | rot | rot | rot | rot | rot | rot | **0** | **W8-2** | `developer` |
+| `docs.internal_links` (V3) | ERROR | rot | rot | rot | rot | rot | rot | **0** im AC-30-Scope⁵ | **W8-2** (2 Layout-Findings) · Follow-up `F-DOCS-LINKS-2026-09-27`, Termin 2026-10-11 (25 Link-Findings) | `developer` |
 | `docs.readme_index` (V4) | ERROR | 0 | 0 | 0 | 0 | 0 | 0 | 0 | — | `developer` (W2-6) |
 | `docs.role_generation_parity` (V5) | WARNING | 0 | 0 | 0 | 0 | 0 | 0 | 0 | — | `developer` (W2-4) |
 | `docs.docs_facts_fresh` (V6) | ERROR | rot | **0** | 0 | 0 | 0 | 0 | 0 | **W3-7** | `developer` (W3-7) |
@@ -2075,11 +2568,12 @@ implementierter) Check ist über das Kommando **nicht** erkennbar, weil er keine
 Diese Lücke wird durch die **Präsenzregel** nur für Checks mit Erwartungswert ≠ 0 geschlossen; für
 **V4** und **V5** (Erwartungswert 0) tragen die Unit-Tests der Tasks **W2-6** und **W2-4** sowie
 der Registrierungsnachweis in **W2-7**. Das ist als Lücke **benannt**, nicht kaschiert.
-
-³ **Redlichkeit der Erwartungswerte — was gemessen ist und was nicht.** Die **rot**-Werte der
-Tabelle sind **am Working Tree belegt** (V2: `docs/INDEX.md` fehlt; V3: `howto/setup/` und
-`howto/features/` fehlen; V7: 10 `type: "Architecture"`-Seiten ohne `derived-from`) und stehen in
-Verbindung mit einem **konkreten Termin und Owner**. Die **0**-Werte für **V4** und **V5** sind
+ ³ **Redlichkeit der Erwartungswerte — was gemessen ist und was nicht.** Die **rot**-Werte der
+   Tabelle sind **am Working Tree belegt** (V2: `docs/INDEX.md` fehlt; V3: `howto/setup/` und
+   `howto/features/` fehlen; V7: **11** `type: "Architecture"`-Seiten ohne `derived-from` —
+   **K24, Rev. 0.6: von 10 auf 11 korrigiert**, Baseline-Messung 2026-09-27, Übergabe vom Parent) und
+   stehen in Verbindung mit einem **konkreten Termin und Owner**. Die **0**-Werte für **V4** und
+   **V5** sind
 **Prognosen aus der Spezifikation**, **keine Messungen**: V4s generalisierter Umfang wird erst in
 **W2-6** implementiert, V5s Satzmenge `compute_active_roles()` schließt das deaktivierte Gate
 (`project.yaml:12-13`). **RVW2-14 — zeitgebundene Formulierung:** „nicht implementiert und
@@ -2113,6 +2607,25 @@ Umgebung falsch. **Regel (verbindlich):**
    Backups erzeugt (Drift-Store legt vor jedem Overwrite `*.sync-backup-*` an; AC-35/W7-3 verlangt
    `knowledge/wiki/index.md.sync-backup-*`).
 
+ ⁵ **V3 in den Spalten W2…W8 — AC-30-Scope und Follow-up (Rev. 0.6, U-2/K22; **K37**, Review-Befund M9:
+ diese Fußnote fehlte, obwohl sie in der V3-Zeile der Tabelle und im W8-Block referenziert
+ wurde).** V3 (`docs.internal_links`, **ERROR**, IC-05) ist nach W2-7 in **drei Klassen** rot
+ (Baseline-Messung 2026-09-27, **27** Findings gesamt):
+
+ | Klasse | `branch` | Anzahl | Wo | Termin 0 | Owner |
+ |---|---|---|---|---|---|
+ | README-Layout | `layout` | **2** | `README.md:722` (`howto/setup/`), `README.md:723` (`howto/features/`) — **im** AC-30-Scope | **W8-2** | `developer` (Task W8-2) |
+ | docs-Link-Fundstellen | `link` | **25** | ausschließlich `docs/**` — `docs/guides` 10 · `docs/concepts` 13 (**8** in `archive/`) · `docs/superpowers/plans/` 2; **live** = **17** | **kein** Termin 0 in W0–W8; **Follow-up `F-DOCS-LINKS-2026-09-27`**, Termin **2026-10-11** | `developer` |
+ | `llms.txt` | — | **0** | — | — | — |
+
+**Lesart der Spalten W2…W7:** V3 = „**rot**" bedeutet **beide** Klassen sind rot; das ist
+ planmäßig und **kein** Fehlschlag der Welle. **Lesart der Spalte W8:** „**0 im AC-30-Scope⁵**"
+ bedeutet **0** Findings mit `file` ∈ {`README.md`, `llms.txt`}; die **25** unter `docs/**` bleiben
+ **erwartet rot** und sind Follow-up, **kein** AC und **kein** Termin 0. **Folge:** V3 ist als
+ Zählwert in W0…W8 **nie 0** ⇒ `consistency-check.py → 0` und `sync.py --validate → 0` sind
+ **dauerhaft unerreichbar**; maßgeblich ist die **Deltasperre** (Owner `validator`, Baseline
+ **W3-7**), die Severity-Frage ist **OQ10** (Spec §11.1, Frist **vor W8-4**). Volltext in der
+ Tabelle `W2-GATE-V3-KLASSEN` im W2-Block.
 **Verschlechterungsregel (unabhängig von den Einzelwerten, in jeder Welle; neu gefasst, RVW2-1/RVW2-4):**
 1. **Startwelle je Check:** ein V-Check darf **erst ab seiner IC-05-Startwelle** Findings liefern
    (V1–V7 ab **W2-7**, V8 ab **W6-2**, V9 ab **W8-4**). Findings eines Checks **vor** seiner
@@ -2452,7 +2965,7 @@ mit dem verpflichtenden Klammerzuschlag `(+2 *-impl.sh helpers)`.
   Sollwert wird **nicht** abgesenkt, sondern **terminiert**.
 - ~~`python3 scripts/consistency-check.py --strict` → **0** (V3 grün)~~
   **UMGESTELLT (Rev. 0.5, RVW-3) — der Klammertext „V3 grün" war falsch.** V3 ist **ERROR**
-  und bleibt bis **W8-2** rot (`README.md:721-723` verweisen auf `howto/setup/` und
+  und bleibt bis **W8-2** rot (`README.md:722-723` (**K30**) verweisen auf `howto/setup/` und
   `howto/features/`, die **nicht** existieren; im Baum liegt nur
   `howto/configs/project.yaml.example`). **Maßgeblich ist W-GATE + W-GATE-TABLE, Spalte W4:**
   V1 0 · V4 0 · V5 0 · V6 0 · V7 rot (Termin **W5-3**, Owner `tester`) · V3 rot (Termin **W8-2**,
@@ -2724,7 +3237,9 @@ Archiv-Trennung gemäß `docs/plans/README.md`. Consumes: W5-3.
 
 ### W6-2: M-13, `legacy:`-Erweiterung und AC-28-Abschlussnachweis
 
-**Files:** Modify `.meta-config/project.yaml` (`:61-63`), `tests/test_docs_consolidation_migration.py`
+**Files:** Modify `.meta-config/project.yaml` (`:61-63`), `tests/test_docs_consolidation_migration.py`,
+**`scripts/lib/consistency/docs_wiki.py`** (**Rev. 0.6 / K18: V8 gehört zur Wiki-/Bestands-Familie**;
+vor W2-0 `docs.py`)
 **Interfaces:** Produces: `legacy:` mit **vier** Einträgen (2 alte + 2 Archivpfade);
 Deprecation-WARNING statt Fehler für die alten Pfade; `test_legacy_list_extended_additively`,
 `test_moves_are_renames`. Consumes: W6-1, W5-2, W4-1.
@@ -2735,8 +3250,9 @@ und `docs/howto/` existieren **nicht** mehr; `git log --diff-filter=R --name-onl
 ein **R**ena-**+ A**dd-Paar. `test_legacy_list_extended_additively` grün (4 Einträge).
 **Verifikation:** `python3 -m pytest tests/test_docs_consolidation_migration.py -q` → **0**;
 `grep -c 'docs/superpowers' .meta-config/project.yaml` → **2** (bleiben toleriert, B1);
-`python3 scripts/sync.py --validate` → **planmäßig rot** (`W-VALIDATE-ROT`: V3 ist ERROR und bleibt
-bis **W8-2** rot; die Deprecation-WARNING ist **irrelevant** für den Exit, weil
+`python3 scripts/sync.py --validate` → **planmäßig rot** (`W-VALIDATE-ROT`; **Rev. 0.6 (K22):**
+V3 ist ERROR und bleibt **unter `docs/**` dauerhaft** rot — Follow-up `F-DOCS-LINKS-2026-09-27`,
+Termin 2026-10-11 —; die Deprecation-WARNING ist **irrelevant** für den Exit, weil
 `_run_consistency_checks` nur `Severity.ERROR` zählt — `scripts/lib/cli_commands.py:174`).
 **Die Formulierung „Exit bleibt 0" aus der Fassung vor dieser Korrekturrunde war falsch.**
 **Steps:**
@@ -2892,7 +3408,10 @@ Termin **W8-2**, Owner `developer`);
 - `python3 scripts/sync.py --check` → **0** (Drift-Lauf, **kein** Consistency-Nachweis — RVW2-13)
 - ~~`python3 scripts/sync.py --validate` → **0**~~
   **UMGESTELLT (dritte Korrekturrunde, RVW2-2) — Termin statt Sofortwert, und die Erreichbarkeit
-  ist bedingt.** **In W8 ist V3 nach W8-2 der einzige rote Doku-ERROR-Check**; **V2** ist ab **W8-1**
+  ist bedingt; Rev. 0.6 (K22): zusätzlich dauerhaft unerreichbar.** **In W8 ist V3 nach W8-2 im
+  AC-30-Scope grün**; die **25** `docs/**`-Findings bleiben **ERROR** und halten `--validate`
+  deshalb **auch nach W8-4** rot ⇒ maßgeblich ist die **Deltasperre**, nicht `→ 0`; **V2** ist ab
+  **W8-1**
   rot (neue `docs/**/*.md`) und wird erst mit dem **Abschluss-Sync-Lauf in W8-4** (Schritt 5)
   wieder 0 — **RVW3-1: die Formulierung „nach W8-2 alle Doku-ERROR-Checks 0" war falsch** und ist
   korrigiert; W8-2 und W8-3 führen keinen Sync. V9 ist **WARNING** — `_run_consistency_checks`
@@ -2900,15 +3419,24 @@ Termin **W8-2**, Owner `developer`);
   **nicht**. **Restbedingung, die nicht gemessen ist:** `--validate` summiert **alle** ERROR-Findings
   des Repo. Ist der repo-weite Altbestand `errors > 0` (Messung in **W3-7**,
   W3-BASELINE-STRICT), bleibt `→ 0` unerreichbar und maßgeblich ist die **Deltasperre**. Owner
-  `validator`, Entscheidungspunkt **W3-7**, spätester Termin 0 **W8-4**. Grundlage **Spec §6(b) /
-  §10, Aufzählungspunkt `--validate`**. **Der Sollwert wird nicht abgesenkt.**
+   `validator`, Entscheidungspunkt **W3-7**. **K44 (Rev. 0.6, Review-Befund N4): der bisherige
+   Nachsatz „spätester Termin 0 **W8-4**" ist aus diesem Bullet entfernt** — er widersprach zwei
+   Sätze früher demselben Bullet („auch nach W8-4 rot ⇒ maßgeblich ist die Deltasperre, nicht `→ 0`").
+   **Korrigierte Fassung: `--validate` hat keinen Termin 0** (K27, Begründung: V3 bleibt **ERROR**
+   unter `docs/**`); maßgeblich ist die **Deltasperre**. „W8-4" bleibt **ausschließlich** der Termin
+   für **V2** (Check-Erwartungswert, Abschluss-Sync-Lauf Schritt 5) und der Termin der
+   **Entscheidungsfrist von OQ10** — **nicht** ein Termin 0 für `--validate`. Grundlage **Spec §6(b) /
+   §10, Aufzählungspunkt `--validate`**. **Der Sollwert wird nicht abgesenkt**, sondern als
+   Dokuzeile ohne Sollwert geführt und durch die Deltasperre ersetzt.
 - ~~`python3 scripts/consistency-check.py --strict` → **0** (V1a **und** V3 ohne Befund; V9 meldet die
   179 Altlasten als **WARNING** — lokale Aufräumaktion FI-10, kein Fehler)~~
   **UMGESTELLT (Rev. 0.5, RVW-3) — die Klammer war in sich widersprüchlich.** Sie verlangte
   gleichzeitig „V1a und V3 ohne Befund" und „V9 meldet 179 WARNINGs", verlangte mit `--strict`
   aber null **Warnings** — bei `--strict` setzt `consistency-check.py:273-274` den Exit 1
   **auch** für die V9-Warnings. **Maßgeblich ist W-GATE + W-GATE-TABLE, Spalte W8:** V1 0 ·
-  **V3 0** (W8-2 behebt `README.md:721-724` — der letzte planmäßig rote ERROR-Check, M-8) ·
+  **V3 0 im AC-30-Scope** (W8-2 behebt `README.md:722-723` — **K23: das sind die beiden
+  Layout-Findings**; die **25** `docs/**`-Link-Findings bleiben nach U-2 rot und sind
+  Follow-up `F-DOCS-LINKS-2026-09-27`, Termin **2026-10-11** — Fußnote ⁵) ·
   V4 0 · V5 0 · V6 0 · V7 0 · V8 0 · **V2 0** nach dem Abschluss-Sync-Lauf in **W8-4** (Schritt 5,
   Owner `tester`; W8-1 legt `docs/plans/…-oq4.md` an und bearbeitet `docs/REQUIREMENTS.md`) ·
   **`docs.stale_backups` (V9): geduldet, kein Sollwert** (RVW2-4) — kein Termin 0, Owner
@@ -2928,7 +3456,8 @@ Termin **W8-2**, Owner `developer`);
 **Gate bei CHANGES_REQUESTED:** der Layout-Diff in `AGENTS.md`/`CLAUDE.md` muss im Review
 **explizit quittiert** werden (B6); ohne Quittung kein Merge.
 **Rollback W8:** additiv revertierbar — `git checkout README.md llms.txt docs/REQUIREMENTS.md`,
-`git checkout .meta-config/project.yaml`, V9-Block aus `scripts/lib/consistency/docs.py` entfernen.
+`git checkout .meta-config/project.yaml`, V9-Block aus **`scripts/lib/consistency/docs_index.py`**
+entfernen (Rev. 0.6 / K18; vor W2-0 aus `docs.py`).
 Kein `git mv` betroffen ⇒ keine andere Welle invalidiert.
 
 ### W8-1: DEC-OQ4 — ID-System-Deklaration
@@ -2949,23 +3478,36 @@ Requirements-Master-ID, Einweg-Verweis“; **keine** Umbenennung (NG-6). Consume
 - [ ] 3: Szenario 53 beobachten.
 - [ ] 4: commit via `git`-Agent: `docs: declare REQ and SPEC identifier layers`.
 
-### W8-2: M-8 — Tote interne Verweise (AC-30)
+### W8-2: M-8 — Tote interne Verweise (AC-30) — **Rev. 0.6, K22: Scope `README.md` + `llms.txt` (U-2)**
 
 **Files:** Modify `README.md`, `tests/test_docs_consolidation_migration.py`
-**Interfaces:** Produces: `README.md:721-723` auf existierende Ziele umgeschrieben bzw. entfernt;
-`README.md:724` (`CLAUDE.md` als Template-Config) entfernt — die Datei existiert nicht (F15);
+**Interfaces:** Produces: `README.md:722` (`howto/setup/`) und `README.md:723` (`howto/features/`)
+auf existierende Ziele umgeschrieben bzw. entfernt — das sind **genau die zwei** verbleibenden
+V3-Fundstellen (beide `branch=="layout"`, beide in `README.md`); `llms.txt` ist bereits bei **0**;
 `test_no_dead_internal_links_after_migration`. Consumes: W4-2, W5-2, W6-1.
 **Agent:** developer · **Depends on:** W8-1 · **parallel_group:** PG-5
 **Ziel-AK (AC):** **AC-30** (IC-17, M-8) · **V-Check:** **V3**
-**Akzeptanz:** `README.md`, `llms.txt` und `docs/**` frei von Findings auf **relative interne**
-Links; V3 liefert **keine** Findings mehr (`exit 0`); keine Umbenennung von Dateien.
+**Akzeptanz (Rev. 0.6, K22 — **wesentlich geändert**):** **`README.md` und `llms.txt`** sind frei
+von Findings auf **relative interne** Links; V3 liefert **im AC-30-Scope** keine Findings mehr.
+`docs/**` ist **nicht mehr** AC-30-Scope — die **25** dortigen Link-Findings bleiben **rot** und
+sind als **Follow-up `F-DOCS-LINKS-2026-09-27`** (Owner `developer`, Termin **2026-10-11**)
+geführt. **Rev. 0.6 korrigiert außerdem zwei Belegstellen dieser Task (K23):** die Fundstellen sind
+**`README.md:722`/`:723`**, nicht `:721-723` (`:721` `howto/` und `:724` `howto/configs/` existieren);
+und `README.md:724` („`CLAUDE.md` als Template-Config", F15) ist **kein** V3-Finding — die Stelle ist
+eine Prosazeile im Verzeichnis-Fence und wird nur als **manueller** Befund mitbehoben, falls die
+Migration sie ohnehin anfasst. **Weigerungsnachweis, warum W8-2 genügt und kein zusätzlicher Task
+nötig ist:** die beiden Findings stehen **in `README.md`**, `README.md` steht in `Files:` dieser Task,
+und `V3` ist ihr `V-Check:` — Behebung = zwei Layout-Einträge umschreiben. **Zusicherung:** keine
+Umbenennung von Dateien.
 **Verifikation:** `python3 -m pytest tests/test_docs_consolidation_migration.py -q` → **0**;
 ~~`python3 scripts/consistency-check.py --strict` → **0**~~ **unter der Geltungsregel**
 (Task-Verifikation, **kein** Welle-Gate; RVW-3 — maßgeblich ist W-GATE, Spalte **W8**).
 **Steps:**
 - [ ] 1: Test schreiben (fail).
 - [ ] 2: Totverweise umschreiben/entfernen.
-- [ ] 3: V3 beobachten (Erwartungswert **0**; Zählwert über `W-GATE`, **kein** Exit-Code).
+- [ ] 3: V3 beobachten — **Erwartungswert `0` im AC-30-Scope** (`README.md`, `llms.txt`);
+      Zählwert über `W-GATE` bzw. `W2-GATE-V3-KLASSEN`, **kein** Exit-Code. **Die 25 Findings unter
+      `docs/**` bleiben erwartet rot** (K22) und sind **kein** Fehlschlag dieser Task.
 - [ ] 4: commit via `git`-Agent: `docs: fix dead internal links in README`.
 
 ### W8-3: Providerzahl generiert (AC-40)
@@ -2994,8 +3536,9 @@ Abschluss-Sync-Lauf in **W8-4, Schritt 5** (`W-VALIDATE-ROT`).
 
 ### W8-4: V9, M-12 und Abschluss
 
-**Files:** Modify `scripts/lib/consistency/docs.py`, `.meta-config/project.yaml` (`:205-221` — **nur**
-`PROJECT_STRUCTURE`, M-12), `tests/test_doc_facts.py`. **Kein** neuer `docs-consolidation`-Key —
+**Files:** Modify **`scripts/lib/consistency/docs_index.py`** (**Rev. 0.6 / K18: V9 liegt in der
+Index-Familie**; vorher `scripts/lib/consistency/docs.py`), `.meta-config/project.yaml` (`:205-221` —
+**nur** `PROJECT_STRUCTURE`, M-12), `tests/test_doc_facts.py`. **Kein** neuer `docs-consolidation`-Key —
 siehe Klammer bei `Interfaces:`.
 **Interfaces:** Produces: `check_stale_backups(root, config=None)` (**WARNING**,
 `*.sync-backup-*` älter als N Tage, Muster `.gitignore:22`); `PROJECT_STRUCTURE` um `docs/INDEX.md`,
@@ -3008,7 +3551,7 @@ siehe Klammer bei `Interfaces:`.
 wäre ein **siebter** Key, für den weder IC-22 noch M-11 (Spec IC-17, M-11: „neuer Top-Level-Block
 `docs-consolidation` mit den 6 Keys aus IC-22, `additionalProperties: false`") eine Grundlage hat,
 und würde die Projekt-Config **schema-invalid** machen. **Korrigierte Fassung:** N ist eine
-**Modulkonstante** in `scripts/lib/consistency/docs.py` — Muster `V1_SCAN_RELPATHS`,
+**Modulkonstante** in `scripts/lib/consistency/docs_index.py` (Rev. 0.6) — Muster `V1_SCAN_RELPATHS`,
 `V1_GENERATED_RELPATHS`, `V1_MAX_TOKEN_GAP` (`docs.py:158`, `:162`, `:164`), also ein im Repo
 **bereits etabliertes** Muster für schwellenartige V9-Parameter. Der **Wert** von N wird in
 W8-4 Schritt 1 festgelegt und im W8-4-Review-Protokoll als `V9-ALTERSSCHWELLE = <N>` festgehalten;
@@ -3020,6 +3563,14 @@ Modulkonstante um; fiele E-2 auf (b), wäre die Arbeit hinfällig und W1-9 nachz
 Consumes: W8-3.
 **Agent:** tester · **Depends on:** W8-3 · **parallel_group:** PG-5
 **Ziel-AK (AC):** **AC-30** (V3-Nachweis), **AC-40** · **V-Check:** **V9**
+**OQ10 — Entscheidungspunkt dieser Task (K32, Rev. 0.6; neu, s. „Entscheidungs-Tasks").** Zusätzlich
+zu **ESCALATION E-2** (V9-Altersschwelle) ist in dieser Task die offene Frage **OQ10** zu
+behandeln: **behalten die 25 V3-Findings unter `docs/**` die Severity ERROR, oder wird V3 dort
+auf WARNING herabgestuft?** Owner `orchestrator` → `main_chat`, **Frist: vor W8-4** (Spec §11.1).
+**Wirkung ohne Entscheidung:** `--validate` bleibt dauerhaft rot, maßgeblich ist die Deltasperre
+(`W-VALIDATE-ROT`, DoD Punkt 12). **Wirkung mit Entscheidung (a)** (Herabstufung): IC-05 ist in der
+nächsten Spec-Revision zu ändern — **nicht** in dieser Task (RVW3-6); **mit (b)** (ERROR bleibt):
+W8-4 ändert an der V3-Severity **nichts**, und der Doku-Endzustand bleibt planmäßig rot.
 **Spec-Lücke (ehrlich benannt, nicht kaschiert):** **V9 hat in der Spec kein AC** — §9.1 führt
 V1–V8, V9 erscheint nur in IC-05 mit Start W8. Eine AC zu erfinden wäre eine Spec-Änderung und
 unterbleibt. V9 wird in W8-4 implementiert und nachgewiesen über **W-GATE-TABLE, Zeile
@@ -3095,13 +3646,14 @@ Obergrenze nach Bestandsaufnahme.
 | W1-8 | W1 | senior-developer | W1-7 | PG-1/W1-B | AC-17 (Modell), NFA-01 | V2 | + `scripts/lib/doc_index.py` |
 | W1-10 | W1 | developer | W1-8 | PG-1/W1-B | AC-24 | alle | + `.meta-config/project.yaml` |
 | W1-9 | W1 | developer | W0-4 | PG-1/W1-C | AC-39 | — | `config/project-config.schema.json`, `tests/test_docs_consolidation_migration.py` |
-| W2-1 | W2 | developer | W1-6, W0-4 | PG-2/W2 | AC-07, AC-08 | V1a, V1b | `scripts/lib/consistency/docs.py`, `tests/fixtures/docs_v1_fixtures.md`, `tests/test_doc_facts.py` (**Rev. 0.5, K16:** zusätzlich Schritt 4 — Rule-3-Eingrenzung in `docs.py` + Sichtbarkeitstest) |
-| W2-2 | W2 | developer | W2-1 | PG-2/W2 | AC-09 | V3 | `docs.py`, `tests/test_doc_facts.py` |
-| W2-3 | W2 | developer | W2-2 | PG-2/W2 | AC-10 | V7 | dieselben 2 |
-| W2-4 | W2 | developer | W2-3 | PG-2/W2 | AC-11 | V5 | dieselben 2 |
-| W2-5 | W2 | developer | W2-4 | PG-2/W2 | AC-36 | V6 | `docs.py`, `tests/test_doc_facts_expected.py` |
-| W2-6 | W2 | developer | W2-5 | PG-2/W2 | AC-12 | V2, V4 | `docs.py`, `tests/test_doc_facts.py` |
-| W2-7 | W2 | developer | W2-6 | PG-2/W2 | AC-13, AC-24 | alle | + `scripts/consistency-check.py`, **`scripts/lib/consistency/report.py` (Rev. 0.5, K15 — B-5/E-15: `line`/`branch` als Dataclass-Felder, F1-PROMOTION)**, `tests/test_doc_facts.py` **zweimal**: Modul (bestanden) + **positiver Registrierungs-Pin in Schritt 1 (RVW2-5)** |
+| W2-1 | W2 | developer | W1-6, W0-4 | — (Gate) | AC-07, AC-08 | V1a, V1b | `scripts/lib/consistency/docs.py` (→ wandert in **W2-0** nach `docs_freshness.py`), `tests/fixtures/docs_v1_fixtures.md`, `tests/test_doc_facts.py` (**Rev. 0.5, K16:** zusätzlich Schritt 4 — Rule-3-Eingrenzung in `docs.py` + Sichtbarkeitstest) |
+| W2-2 | W2 | developer | W2-1 | — | AC-09 | V3 | `docs.py` (→ wandert in **W2-0** nach `docs_links.py`), `tests/test_doc_facts.py` |
+| **W2-0** | W2 | **developer** | **W2-2** | **— (sequenziell, Einstieg der offenen W2)** | Querschnitt (kein neuer AC) | V1a, V1b, V3, V4 + 3 Altchecks (verschoben) | **Rev. 0.6:** `scripts/lib/consistency/docs.py` (**Fassade**), **`docs_links.py`** (Create), **`docs_freshness.py`** (Create), **`tests/test_doc_freshness.py`** (Create, V1-Tests wandern), `tests/test_doc_facts.py` (nur Verschiebung). **Kein** `consistency-check.py`, **kein** `report.py`, **kein** `.meta-config/` |
+| **W2-3** | W2 | **developer** | **W2-0** | **PG-2a** (Rev. 0.6) | AC-10 | V7 | **Rev. 0.6:** **`docs_wiki.py`** (Create), **`tests/test_doc_wiki.py`** (Create) — *vorher:* `docs.py`, `tests/test_doc_facts.py` |
+| **W2-4** | W2 | **developer** | **W2-5** (Rev. 0.6; vorher W2-3) | **— (sequenziell, Rev. 0.6)** | AC-11 | V5 | **Rev. 0.6:** `docs_freshness.py`, `tests/test_doc_freshness.py` — *vorher:* `docs.py`, `tests/test_doc_facts.py` |
+| **W2-5** | W2 | **developer** | **W2-0** (Rev. 0.6; vorher W2-4) | **PG-2a** (Rev. 0.6) | AC-36 | V6 | **Rev. 0.6:** `docs_freshness.py`, `tests/test_doc_freshness.py`, `tests/test_doc_facts_expected.py` — *vorher:* `docs.py`, `tests/test_doc_facts_expected.py` |
+| **W2-6** | W2 | **developer** | **W2-0** (Rev. 0.6; vorher W2-5) | **PG-2a** (Rev. 0.6) | AC-12 | V2, V4 | **Rev. 0.6:** **`docs_index.py`** (Create), **`tests/test_doc_index.py`** (Create), `docs_links.py` (**nur** V4-Generalisierung) — *vorher:* `docs.py`, `tests/test_doc_facts.py` |
+| W2-7 | W2 | developer | **W2-3, W2-4, W2-5, W2-6** (Rev. 0.6; vorher W2-6) | — (sequenziell, Abschluss) | AC-13, AC-24 | alle | `docs.py` (**nur** `__all__`-Einträge), `scripts/consistency-check.py`, **`scripts/lib/consistency/report.py` (Rev. 0.5, K15 — B-5/E-15: `line`/`branch` als Dataclass-Felder, F1-PROMOTION)**, `tests/test_doc_facts.py` **zweimal**: Modul (bestanden) + **positiver Registrierungs-Pin in Schritt 1 (RVW2-5)** |
 | W3-1 | W3 | senior-developer | W1-10 | PG-2/W3 | AC-23, AC-26 | V6 | `scripts/lib/doc_renderer.py`, `doc_index.py`, `tests/test_doc_renderer.py` |
 | W3-2 | W3 | senior-developer | W3-1 | PG-2/W3 | AC-17, AC-18, AC-03 | V2, V6 | `doc_renderer.py`, `tests/test_doc_renderer.py` |
 | W3-3 | W3 | senior-developer | W3-2 | PG-2/W3 | AC-21 | V4 | + `scripts/lib/spec_plan_scaffold.py` |
@@ -3116,7 +3668,7 @@ Obergrenze nach Bestandsaufnahme.
 | W5-2 | W5 | developer | W5-1 | PG-3 | AC-28 (Teil) | V2, V3 | `howto/configs/…` → `docs/guides/configs/…`, `docs/howto/…` → `docs/guides/…`; **Schritt 4 (RVW2-6): Abschluss-Sync-Lauf — schreibt `docs/INDEX.md` nicht, der Generator aus W3-6 bleibt Eigentümer** |
 | W5-3 | W5 | tester | W5-2, W0-7 | PG-3 | AC-31, AC-29c | V7 | `knowledge/wiki/**/*.md`, `tests/test_docs_consolidation_migration.py` |
 | W6-1 | W6 | developer | W5-3 | PG-3 | AC-28 (Teil) | V8 | `docs/superpowers/**` → `docs/{specs,plans}/archive/superpowers/**` |
-| W6-2 | W6 | tester | W6-1 | PG-3 | AC-32, AC-28 | V8 | `.meta-config/project.yaml`, `tests/test_docs_consolidation_migration.py` |
+| W6-2 | W6 | tester | W6-1 | PG-3 | AC-32, AC-28 | V8 | `.meta-config/project.yaml`, `tests/test_docs_consolidation_migration.py`; **Rev. 0.6 (K18): V8 wandert nach `docs_wiki.py`** |
 | W7-1 | W7 | knowledge-curator | W6-2 | PG-4 (isoliert) | AC-35 | — | `knowledge/schema.md` |
 | W7-2 | W7 | senior-developer | W7-1 | PG-4 | AC-33, AC-34 | V7 | `scripts/lib/knowledge.py`, `.meta-config/project.yaml`, `tests/test_knowledge_index_gen.py` |
 | W7-3 | W7 | senior-developer | W7-2 | PG-4 | AC-35, AC-41 | — | `scripts/lib/knowledge.py`, `tests/test_knowledge_index_gen.py` |
@@ -3125,15 +3677,20 @@ Obergrenze nach Bestandsaufnahme.
 | W8-1 | W8 | requirements | W7-5 | PG-5 | AC-40 | V8 | `docs/plans/…-oq4.md`, `docs/REQUIREMENTS.md` |
 | W8-2 | W8 | developer | W8-1 | PG-5 | AC-30 | V3 | `README.md`, `tests/test_docs_consolidation_migration.py` |
 | W8-3 | W8 | developer | W8-2 | PG-5 | AC-40 | V1a, V6 | `llms.txt`, `README.md`, `tests/test_docs_consolidation_migration.py` |
-| W8-4 | W8 | tester | W8-3 | PG-5 | AC-30, AC-40 | V9 | `scripts/lib/consistency/docs.py` (**V9-ALTERSSCHWELLE als Modulkonstante, kein Config-Key — RVW2-7**), `.meta-config/project.yaml` (**nur** `PROJECT_STRUCTURE`, M-12), `tests/test_doc_facts.py`; **Schritt 5 (RVW2-6): Abschluss-Sync-Lauf — schreibt `docs/INDEX.md` nicht, der Generator aus W3-6 bleibt Eigentümer** |
+| W8-4 | W8 | tester | W8-3 | PG-5 | AC-30, AC-40 | V9 | **`scripts/lib/consistency/docs_index.py`** (Rev. 0.6 / K18: V9-ALTERSSCHWELLE als Modulkonstante, kein Config-Key — RVW2-7; vorher `docs.py`), `.meta-config/project.yaml` (**nur** `PROJECT_STRUCTURE`, M-12), `tests/test_doc_facts.py`; **Schritt 5 (RVW2-6): Abschluss-Sync-Lauf — schreibt `docs/INDEX.md` nicht, der Generator aus W3-6 bleibt Eigentümer** |
 
 **Zyklenprüfung:** Der Graph ist ein **DAG**. **Leitsatz (RVW2-9, korrigiert):** es gibt **keine
 Rückwärtskante** (keine Kante von einer höheren auf eine niedrigere Welle) und **keine
 Welle-zu-Welle-Rückkante**; zulässig sind Ketten **innerhalb** einer Welle und **Vorwärts**- oder
 **Querwellenkanten** (W3-1 hängt an W1-10, W3-4 an W2-1 — beide nachgewiesen unten). Jede
-**Querwelle**-Kante wird hier **namentlich** genannt. Die einzigen Ketten innerhalb einer Welle sind
-W0-2 → {W0-1, W0-3, W0-4, W0-6, W0-7}, W1-1→…→W1-10 (kettenintern), W2-1→…→W2-7, W3-1→…→W3-7,
-W4→W5→W6 durchgehend, W7-1→…→W7-5 und W8-1→…→W8-4. **Querwellenkanten (vollständig):**
+**Querwelle**-Kante wird hier **namentlich** genannt. Die Ketten innerhalb einer Welle sind
+W0-2 → {W0-1, W0-3, W0-4, W0-6, W0-7}, W1-1→…→W1-10 (kettenintern), W3-1→…→W3-7,
+W4→W5→W6 durchgehend, W7-1→…→W7-5 und W8-1→…→W8-4. **K40 (Rev. 0.6, Review-Befund m7): die
+Nennung „W2-1→…→W2-7" als *Kette* ist überholt** — W2 ist seit Rev. 0.6 **keine** Kette mehr,
+sondern `W2-1 → W2-2 → W2-0 → {W2-3 ‖ W2-5 ‖ W2-6} → W2-4 → W2-7` mit der Parallelgruppe
+**PG-2a**. **Maßgeblich ist der Abschnitt „Ownership-Matrix, DAG-Kantenliste und Zyklenprüfung"**
+(dort: vollständige Kantenliste, Zyklenprüfung, Fail-closed-Klausel); dieser Absatz führt die
+**übrigen** Wellen und die Querwellenkanten. **Querwellenkanten (vollständig):**
 **W1-1→W1-2…** (kettenintern, W1), **W1-5→W2-5**, **W1-6→W2-1**, **W1-8→W1-9** (alle in W1),
 **W1-10→W3-1**, **W0-4→W1-1**, **W2-1→W3-4**, **W3-6→W4-1**, **W4-3→W5-1**, **W6-2→W7-1**,
 **W7-5→W8-1**. **Alle zeigen auf eine frühere oder dieselbe Welle.** **Keine Zyklen.**
@@ -3158,6 +3715,100 @@ ist** — der Start von W3-4 ist damit **sequenziell** an W2-1 gebunden, der Res
 (W3-1…W3-3 und W3-5…W3-7) bleibt parallel zu W2. **Keine neue Task-ID**: es ist **eine**
 zusätzliche Kante auf einen **existierenden** Task.
 
+## Ownership-Matrix, DAG-Kantenliste und Zyklenprüfung (Rev. 0.6, K20)
+
+**Warum dieser Abschnitt neu ist.** Rev. 0.5 führte die Ownership nur als **eine** Spalte der
+Reihenfolge-Matrix und als Fließtext-Regel. Für die Rev. 0.6 reicht das nicht: die Parallelität in
+W2 ist nur dann belastbar, wenn **je Datei und Task** nachweisbar ist, wer schreibt und wer liest,
+und wenn die Kantenliste **explizit** aufgeschrieben ist. Beides steht hier.
+
+### 1. Ownership-Matrix W2 (Task × Datei: `owns` / `reads`)
+
+`owns` = schreibt die Datei · `reads` = liest sie (Lesen ist **kein** Ownership, Global Constraints).
+
+| Datei | W2-1 | W2-2 | **W2-0** | **W2-3** | **W2-4** | **W2-5** | **W2-6** | W2-7 |
+|---|---|---|---|---|---|---|---|---|
+| `scripts/lib/consistency/docs.py` | owns | owns | **owns** (→ Fassade) | reads | reads | reads | reads | **owns** (`__all__`) |
+| `scripts/lib/consistency/docs_links.py` | — | — | **owns** (Create) | reads | reads | reads | **owns** (V4) | reads |
+| `scripts/lib/consistency/docs_freshness.py` | — | — | **owns** (Create, V1) | reads | **owns** (V5) | **owns** (V6) | reads | reads |
+| `scripts/lib/consistency/docs_wiki.py` | — | — | — | **owns** (Create, V7) | reads | reads | reads | reads |
+| `scripts/lib/consistency/docs_index.py` | — | — | — | reads | reads | reads | **owns** (Create, V2) | reads |
+| `scripts/consistency-check.py` | reads | reads | **reads** (darf es **nicht** ändern) | reads | reads | reads | reads | **owns** |
+| `scripts/lib/consistency/report.py` | reads | reads | **reads** | reads | reads | reads | reads | **owns** (K15) |
+| `tests/test_doc_facts.py` | owns | owns | **owns** (Verschiebung) | reads | reads | reads | reads | **owns** (Pin) |
+| `tests/test_doc_freshness.py` | — | — | **owns** (Create) | reads | **owns** (V5) | **owns** (V6) | reads | reads |
+| `tests/test_doc_wiki.py` | — | — | — | **owns** (Create) | reads | reads | reads | reads |
+| `tests/test_doc_index.py` | — | — | — | reads | reads | reads | **owns** (Create) | reads |
+| `tests/test_doc_facts_expected.py` | — | — | reads | reads | reads | **owns** | reads | reads |
+| `tests/fixtures/docs_v1_fixtures.md` | owns | reads | reads | reads | reads | reads | reads | reads |
+| `tests/scenarios/**` (Asserts 50–56) | reads | reads | reads | reads | reads | reads | reads | reads |
+
+**Zellen mit zwei `owns` in derselben Parallelgruppe: keine.** Geprüfte Gruppen:
+**PG-2a = {W2-3, W2-5, W2-6}** — W2-3 schreibt `docs_wiki.py` + `test_doc_wiki.py`; W2-5 schreibt
+`docs_freshness.py` + `test_doc_freshness.py` + `test_doc_facts_expected.py`; W2-6 schreibt
+`docs_index.py` + `test_doc_index.py` + `docs_links.py`. **Mengenweise disjunkt.** W2-4 (Phase B)
+teilt sich mit W2-5 dieselben zwei Dateien, ist aber **sequenziell** — die Kante `W2-5 → W2-4` macht
+das explizit. W2-7 (Phase B) schreibt vier Dateien, die kein PG-2a-Task schreibt.
+
+**Ehrliche Grenze der Regel (K20).** „Genau **eine** schreibende Task **pro Datei im ganzen Plan**"
+ist mit **vier** Modulen (U-1) und **fünf** modul-anfassenden Tasks **nicht** erfüllbar; `docs.py`
+wird in Rev. 0.5 ohnehin von W2-1…W2-7 **und** W8-4 geschrieben. **Angewandte Regel (Rev. 0.5-
+Praxis, Self-Review-Absatz „Ownership"):** *höchstens eine schreibende Task **pro Parallelgruppe**;
+mehrere schreibende Tasks derselben Datei sind ausschließlich **sequenziell**.* `check_plan_file_overlap`
+prüft genau diese Eigenschaft.
+
+### 2. DAG-Kantenliste (vollständig, W2 + Querwellen)
+
+| # | Kante | Art | Begründung der Kante |
+|---|---|---|---|
+| 1 | `W1-6 → W2-1` | Querwelle | W2-1 braucht W1-6 (Snippet-Bridge) + W0-4 (Track-A-Merge) |
+| 2 | `W0-4 → W2-1` | Querwelle | Track-A-Kollisionsgate (R3) |
+| 3 | `W1-5 → W2-5` | Querwelle | V6 braucht `load_expected_doc_facts` aus W1-5 |
+| 4 | **`W2-2 → W2-0`** | **W2, seriell** | **Rev. 0.6:** W2-0 verschiebt den V1- und V3-Code; es kann erst laufen, wenn beide **existieren** |
+| 5 | **`W2-0 → W2-3`** | **W2, seriell → PG-2a** | **Rev. 0.6:** W2-3 legt `docs_wiki.py` an und setzt die Modul-Familie voraus |
+| 6 | **`W2-0 → W2-5`** | **W2, seriell → PG-2a** | **Rev. 0.6:** W2-5 erweitert `docs_freshness.py`, das W2-0 anlegt |
+| 7 | **`W2-0 → W2-6`** | **W2, seriell → PG-2a** | **Rev. 0.6:** W2-6 generalisiert V4 in `docs_links.py` (W2-0) und legt `docs_index.py` an |
+| 8 | **`W2-5 → W2-4`** | **W2, seriell** | **Rev. 0.6:** gemeinsame Schreibmenge `docs_freshness.py` + `test_doc_freshness.py` |
+| 9 | **`W2-3 → W2-7`** | **W2, seriell** | **Rev. 0.6:** Registrierung braucht alle implementierten Checks |
+| 10 | **`W2-4 → W2-7`** | **W2, seriell** | dito |
+| 11 | **`W2-5 → W2-7`** | **W2, seriell** | dito |
+| 12 | **`W2-6 → W2-7`** | **W2, seriell** | dito |
+| 13 | `W2-1 → W3-4` | Querwelle, **Vorwärts** | Rev. 0.5, K16/RVW-4 (unverändert) |
+| 14 | `W1-10 → W3-1` | Querwelle (unverändert) | W3-1 braucht die Config-Keys |
+| 15 | `W3-6 → W4-1`, `W4-3 → W5-1`, `W6-2 → W7-1`, `W7-5 → W8-1` | Wellenfolgen (unverändert) | §9.2 |
+
+**Parallelgruppen (max. 3):** **PG-2a = {W2-3, W2-5, W2-6}** (3 Tasks, disjunkt) · **PG-2b = {W2-4}**
+· **PG-2c = {W2-7}** · dazu unverändert **PG-2/W3** (die W3-Kette) parallel zu allen W2-Phasen.
+
+### 3. Zyklenprüfung (Rev. 0.6, neu gerechnet)
+
+**Topologische Ordnung:** `W0-2 → W0-1/W0-3/W0-4/W0-6/W0-7 → W0-4 → W1-1 → … → W1-6 → W2-1 →
+**W2-2 → W2-0 → {W2-3, W2-5, W2-6} → W2-4 → W2-7** → W3-1 → … → W3-7 → W4-1 → … → W6-2 → W7-1 →
+… → W7-5 → W8-1 → … → W8-4`.
+
+**Nachweis, vier Teile:**
+(a) **Keine Rückwärtskante** über Wellen: jede Kante zeigt von einer niedrigeren auf eine höhere
+Welle; `W2-1 → W3-4` ist eine **Vorwärts**kante (Rev. 0.5, RVW-4, unverändert).
+(b) **Innerhalb W2** zeigen alle Kanten von `W2-0` (Knoten 4) nach vorn auf `W2-3`/`W2-5`/`W2-6`
+(5–7), von `W2-5` auf `W2-4` (8) und von allen vier auf `W2-7` (9–12). **Es existiert keine Kante
+`W2-3 → W2-0`, `W2-5 → W2-0`, `W2-4 → W2-5` oder `W2-7 → W2-3`** — jede Vertauschung der Richtung
+wäre der Fehler, den RVW-4 in Rev. 0.5 aufgedeckt hat.
+(c) **Innerhalb PG-2a gibt es überhaupt keine Kanten** — die drei Tasks sind bezüglich
+Schreibmengen unabhängig; das ist der Grund, warum sie parallel laufen dürfen.
+(d) **Querwellenkanten** enden alle in W2 bzw. W3 und kehren **nicht** nach W2 zurück; die
+Präzedenzfälle W0-4 → W1-1, W1-10 → W3-1 bestehen unverändert.
+**Ergebnis: keine Zyklen. Der Graph ist ein DAG.**
+
+**Fail-closed-Klausel (K20, verbindlich).** Wird **während** W2-3…W2-7 eine Ownership-Zeile so
+geändert, dass (1) `check_plan_file_overlap` für eine Parallelgruppe **zwei** Tasks mit gemeinsamer
+Schreibmenge meldet, (2) eine Parallelgruppe **mehr als 3** gleichzeitige Agents umfassen würde,
+(3) die Kantenliste oben einen **Zyklus** enthält, oder (4) ein Task eine Datei schreiben müsste,
+die ein **früherer** Task derselben Gruppe bereits geschrieben hat, dann gilt: **die betroffene Task
+wird nicht gestartet**, der Plan wird **nicht** stillschweigend angepasst, und es ist ein
+**korrigierter Plan** mit neuer Ownership-Matrix **und** neuer Zyklenprüfung vorzulegen (Owner
+`orchestrator`, Entscheidungsweg `main_chat`, Spec §17.10.4). **Kein** Teillauf, **keine** stille
+Korrektur an der Modulzuordnung.
+
 ## Entscheidungs-Tasks
 
 | OQ | Task | Owner | Position | Folge, wenn nicht entschieden |
@@ -3168,6 +3819,7 @@ zusätzliche Kante auf einen **existierenden** Task.
 | OQ1 (offen) | W0-7 (vor Abschluss W5) | `orchestrator` → `main_chat` | W0 | W5-3 annotiert ohne Scope-Grenze; FI-4 bliebe ungebunden |
 | OQ9 (offen) | W5-1 (vor W5-2) | `technical-writer` + `documenter` | W5 | zwei SSoT-Kandidaten unter `docs/guides/` ohne Kennzeichnung (F24) |
 | OQ4 (offen) | W8-1 (vor W8-3) | `requirements` + `validator` | W8 | F16 (zwei ID-Systeme) bleibt undokumentiert |
+| **OQ10 (offen — neu, Rev. 0.6, K32)** | **W8-4** (Querverweis im Task-Text; **Frist: vor W8-4**) | `orchestrator` → `main_chat` | W8 | **V3 bleibt unter `docs/**` ERROR** ⇒ `consistency-check.py → 0` und `sync.py --validate → 0` bleiben **dauerhaft unerreichbar**; maßgeblich ist die **Deltasperre** (`errors` darf nicht steigen, Baseline W3-7). Fällt die Entscheidung für die **Herabstufung auf WARNING** (Scope-gestuft), ist **IC-05 in der nächsten Revision** zu ändern; **ohne** Entscheidung bleibt der Doku-Endzustand dauerhaft rot |
 | OQ3 | — (nach W8) | `requirements` via `main_chat` | außerhalb dieses Plans | eigene REQ (Spec §11.1 OQ3, nach W8) |
 | OQ5, OQ7 | — | — | geschlossen (Spec §11.2) | kein Task |
 
@@ -3183,8 +3835,7 @@ zusätzliche Kante auf einen **existierenden** Task.
 | AC-06 | W1-6 | W1 | — |
 | AC-07 | W2-1 (Erkennung) + W3-7 (Wirkung: kein Befund mehr) | W2/W3 | V1a, V1b |
 | AC-08 | W2-1 | W2 | V1a, V1b |
-| AC-09 | W2-2 (Fund) + W8-2 (Behebung) | W2/W8 | V3 |
-| AC-10 | W1-4 (Resolver) + W2-3 (Check) | W1/W2 | V7 |
+| AC-09 | W2-2 (Fund) + W8-2 (Behebung) | W2/W8 | V3 || AC-10 | W1-4 (Resolver) + W2-3 (Check) | W1/W2 | V7 |
 | AC-11 | W2-4 | W2 | V5 |
 | AC-12 | W2-6 (Implementierung) + W3-6 (E2E) | W2/W3 | V2 |
 | AC-13 | W2-7 | W2 | alle |
@@ -3204,7 +3855,7 @@ zusätzliche Kante auf einen **existierenden** Task.
 | AC-27 | W1-7 | W1 | V6 |
 | AC-28 | W4-1, W4-3, W5-1, W5-2, W6-1, W6-2 | W4/W5/W6 | V8 |
 | AC-29 | W1-4, W4-2, W4-3, W5-3 | W1/W4/W5 | V3, V7 |
-| AC-30 | W8-2 (+ W8-4 Nachweis) | W8 | V3 |
+| AC-30 | W8-2 (+ W8-4 Nachweis) · **Rev. 0.6 / K22: Scope auf `README.md` + `llms.txt` verengt**; die 25 `docs/**`-Fundstellen sind **kein** AC, sondern Follow-up `F-DOCS-LINKS-2026-09-27` (Owner `developer`, Termin 2026-10-11) | W8 | V3 |
 | AC-31 | W5-3 | W5 | V7 |
 | AC-32 | W6-2 | W6 | V8 |
 | AC-33 | W7-2, W7-5 | W7 | V7 |
@@ -3268,9 +3919,19 @@ AC-24, AC-25, AC-26, AC-34, AC-35, AC-37, AC-38, AC-39, AC-41.
 
 1. **Alle 41 AC** sind durch je einen beobachtbaren Test oder Kommando **tatsächlich beobachtet**
    (nicht angenommen); die Coverage-Matrix ist ohne Lücke.
-2. **Alle neun V-Checks sind implementiert; V1…V8 liefern in agent-meta je Check **0**
-   `docs.*`-Findings, `docs.stale_backups` (V9) meldet den Altbestand und ist **geduldet**
-   (FI-10).** **Neufassung in der dritten Korrekturrunde (RVW2-3)** — die Fassung davor war **in
+2. **Alle neun V-Checks sind implementiert; V1, V2, V4, V5, V6, V7 und V8 liefern in agent-meta je
+   Check **0** `docs.*`-Findings, **`docs.internal_links` (V3) liefert `0` im AC-30-Scope**
+   (`README.md` + `llms.txt`; die **25** `docs/**`-Fundstellen sind **Follow-up
+   `F-DOCS-LINKS-2026-09-27`**, Owner `developer`, Termin **2026-10-11**, **kein** Termin 0 in
+   W0–W8), `docs.stale_backups` (V9) meldet den Altbestand und ist **geduldet**
+   (FI-10).** **K26 (Rev. 0.6, Review-Befund M2) — der Erwartungswert von V3 ist korrigiert.** Die
+   Fassung vor dieser Korrekturung („V1…V8 = 0") war mit der **U-2**-Verengung von AC-30
+   unvereinbar: V3 bleibt **ERROR** (IC-05) und meldet die 25 `docs/**`-Findings **weiter**.
+   **Nur** der V3-Erwartungswert ist geändert; **V1, V2, V4, V5, V6, V7, V8** bleiben `0`
+   unverändert. **Kein** Sollwert wurde stillschweigend abgesenkt — die Aussage ist
+   **umformuliert und begründet** (K22, Spec §17.10.2), und die offene Severity-Frage ist als
+   **OQ10** geführt (Owner `orchestrator`, Frist **vor W8-4**). **Neufassung in der dritten
+   Korrekturrunde (RVW2-3)** — die Fassung davor war **in
    sich widersprüchlich**: sie behauptete „null `docs.*`-Findings" **und** legte V9 auf einen
    festen Zählwert fest; ihr Klammerzusatz „V9 wird im Doku-Scope nicht emittiert" war zudem
    **falsch** — der Doku-Scope des Gates ist `f["check"].startswith("docs.")` (W-GATE), und V9 trägt
@@ -3282,9 +3943,10 @@ AC-24, AC-25, AC-26, AC-34, AC-35, AC-37, AC-38, AC-39, AC-41.
    (RVW2-1: der Counter zählt **befundliefernde** Checks, nicht registrierte — er ist eine
    **Dokuzeile ohne Sollwert**).
    **Maßgeblich ist jetzt die Messform:** **W-GATE + W-GATE-TABLE, Spalte W8** — Erwartungswert
-   **je** V-Check, mit Termin und Owner. Am Ende des Vorhabens gilt: **V1…V8 = 0**;
-   `docs.stale_backups` (V9) = **geduldet, kein Sollwert**, Obergrenze nach der Bestandsaufnahme
-   in W8-4 Schritt 1; `docs-checks` = **Dokuzeile**; `docs-findings` = **kein** Kriterium.
+   **je** V-Check, mit Termin und Owner. Am Ende des Vorhabens gilt: **V1, V2, V4, V5, V6, V7, V8 =
+   0** und **V3 = 0 im AC-30-Scope** (K26); `docs.stale_backups` (V9) = **geduldet, kein Sollwert**,
+   Obergrenze nach der Bestandsaufnahme in W8-4 Schritt 1; `docs-checks` = **Dokuzeile**;
+   `docs-findings` = **kein** Kriterium.
    **Historisch aufgehobene Nachweisformen** (bleiben sichtbar, ersetzt wie oben): repo-globales
    `--strict → 0` (K14/RVW-1 — verlangt zusätzlich null Warnings aus den Bestandschecks über
    `agents/1-generic`, `agents/2-platform`, `commands/*`; belegt ist nur die Pfadabdeckung, die
@@ -3327,10 +3989,18 @@ AC-24, AC-25, AC-26, AC-34, AC-35, AC-37, AC-38, AC-39, AC-41.
     kein `if provider == "Name"` in M1–M4; kein Config-Key mit Providernamen.
 11. **NFA-07** eingehalten: M1, M2, M4 importieren nur Stdlib + `scripts/lib`.
 12. **DoD-Standard**: Code komplett, Konventionen und Conventional Commits eingehalten, keine
-     Regressionen; `python3 scripts/sync.py --validate` → **0** — **RVW2-2: erst nach W8-4
-     erreichbar** (Regel `W-VALIDATE-ROT`; davor planmäßig rot wegen V2/V3/V6) und **bedingt**
-     auf die in W3-7 gemessene Baseline (`errors: 0`; sonst Deltasperre);
-     `python3 scripts/sync.py --check` → **0** (Drift-Lauf, RVW2-13).
+     Regressionen; `python3 scripts/sync.py --check` → **0** (Drift-Lauf, RVW2-13).
+     **K26 (Rev. 0.6, Review-Befund M3) — `--validate → 0` ist gestrichen und durch die Deltasperre
+     ersetzt.** Die Fassung vor dieser Korrekturung („erst nach W8-4 erreichbar", Regel
+     `W-VALIDATE-ROT`) war mit **K22** unvereinbar: V3 bleibt als **ERROR** registriert und meldet
+     unter `docs/**` dauerhaft **25** Findings, die AC-30 **nicht** behebt — `→ 0` ist damit
+     **dauerhaft unerreichbar**, auch nach W8-4. **Maßgeblich ist ab Rev. 0.6 die Deltasperre:**
+     `errors` aus `consistency-check.py --json` **darf nicht steigen** gegenüber der in **W3-7**
+     gemessenen Baseline; Owner `validator`, Mess-Ort **W3-7**, Termin **W3-7**. **Der Widerspruch
+     zwischen `→ 0` und Deltasperre ist damit aufgelöst** — maßgeblich ist die Deltasperre; `→ 0`
+     ist als **Dokuzeile ohne Sollwert** geführt. **Bleibt offen und ist nicht hier entschieden:**
+     ob die V3-Severity für `docs/**` herabgestuft wird — **OQ10** (Spec §11.1, Owner
+     `orchestrator`, Frist **vor W8-4**, dort als **W8-4**-Task geführt).
 13. **Traceability**: `validator`-Audit bestätigt AC-01…AC-41 → Task → Test; NFA-01…NFA-11 belegt.
 14. **Ledger**: alle Checkboxen dieses Plans gesetzt (geschrieben durch den Ledger-Writer
      `scripts/lib/plan_ledger.py`); Merge des Wellen-Branches
@@ -3371,9 +4041,31 @@ AC-24, AC-25, AC-26, AC-34, AC-35, AC-37, AC-38, AC-39, AC-41.
   wird von W2-1…W2-7 **innerhalb** von `PG-2/W2` geteilt, was durch die serielle Kette
   W2-1 → … → W2-7 der Parallelgruppe aufgelöst ist (W2-1 Schritt 4 aus K16 und W2-7 Schritt 4
   aus K15 liegen damit **nicht** gleichzeitig).
+  **Rev. 0.6 (K20) — die Rev.-0.5-Auflösung („die serielle Kette löst es auf") ist damit gegenstandslos
+  und wird hier nicht fortgeschrieben:** W2-0 macht `docs.py` zur **Fassade**, und ab da schreibt
+  **kein** PG-2a-Task `docs.py` — die geteilte Schreibmenge ist **aufgelöst, nicht weggeregelt**.
+  Verbleibende Mehrfachschreiber sind **ausschließlich sequenziell** und je Datei benannt:
+  `docs.py` (W2-0 → W2-7), `docs_freshness.py` (W2-0 → W2-5 → W2-4),
+  `tests/test_doc_freshness.py` (W2-0 → W2-5 → W2-4), `docs_wiki.py` (W2-3 → W6-2 für V8),
+  `docs_index.py` (W2-6 → W8-4 für V9), `docs_links.py` (W2-0 → W2-6),
+  `tests/test_doc_facts.py` (W2-1 → W2-2 → W2-0 → W8-4).
+  **Vollständige Matrix:** Abschnitt „Ownership-Matrix, DAG-Kantenliste und Zyklenprüfung".
+  **K35 (Rev. 0.6, Review-Befund m5) — Dateiliste des Self-Reviews war unvollständig.** Sie nannte
+  `tests/test_doc_facts.py` nicht, obwohl **W2-7** es schreibt (positiver Registrierungs-Pin,
+  RVW2-5) — die Liste widersprach damit der Ownership-Matrix, die es als `owns` für W2-7 führt.
+  **Ergänzt:** `tests/test_doc_facts.py` (W2-1 → W2-2 → W2-0 → **W2-7** → W8-4) sowie
+  `tests/test_doc_facts_expected.py` (W2-5). **Vollständige Self-Review-Dateiliste damit:**
+  `scripts/lib/consistency/{docs.py, docs_links.py, docs_freshness.py, docs_wiki.py,
+  docs_index.py, report.py}` · `scripts/consistency-check.py` ·
+  `tests/test_doc_facts.py` · `tests/test_doc_freshness.py` · `tests/test_doc_wiki.py` ·
+  `tests/test_doc_index.py` · `tests/test_doc_facts_expected.py` · `tests/fixtures/docs_v1_fixtures.md`.
 - **Parallelgruppen:** PG-1 (3 Ketten), PG-2 (2 Ketten), PG-3 (seriell), PG-4 (isoliert),
   PG-5 (1). Maximal 3 gleichzeitig laufende Agents — **unter** der Grenze 4, daher ist keine
-  Barrieren-Spaltung über 4 hinaus nötig.
+  Barrieren-Spaltung über 4 hinaus nötig. **Rev. 0.6 (K20):** PG-2 wird **innerhalb** von W2
+  aufgeteilt in **PG-2a = {W2-3, W2-5, W2-6}** (3 Tasks, **write-set-disjunkt**), **PG-2b = {W2-4}**,
+  **PG-2c = {W2-7}**; das Limit von **3** wird damit **von innen ausgeschöpft**, nicht überschritten —
+  und die bindende Größe ist die **Ownership-Disjunktheit**, nicht die Agentenzahl (W2-4 *könnte*
+  nicht hinzukommen, weil es W2-5s Schreibmenge teilt).
 - **Track-A-Bedingung:** W1/W2 nicht parallel zu `scripts/lib/config.py`- und
   `scripts/lib/consistency/*`-Änderungen; als Gate-Task W0-4 verankert, plus Rebase-Pflicht.
 - **Exit-Codes:** pro Welle konkret genannt, inklusive der **planmäßig nicht-null** Fälle
@@ -3399,9 +4091,13 @@ AC-24, AC-25, AC-26, AC-34, AC-35, AC-37, AC-38, AC-39, AC-41.
    Zähl-Kommando wertet einen Exit-Code aus — maßgeblich ist der gedruckte Zählwert.
    **Dritte Korrekturrunde (RVW2-2, RVW2-12, RVW2-13):** (a) `python3 scripts/sync.py --validate`
    wird in **allen** Wellen über die **eine** Regel **`W-VALIDATE-ROT`** geführt — planmäßig rot
-   von **W2-7** bis einschließlich **W8-2** (Mechanik `cli_commands.py:975` → `:171-174` →
-   `:1056`/`:1058-1059`), spätester Termin 0 **W8-4**, Owner `validator`, Grundlage **Spec §6(b) /
-   §10, Aufzählungspunkt `--validate`**; die Sollwerte werden **nicht** abgesenkt, sondern **terminiert**; (b) die
+    von **W2-7** bis einschließlich **W8-2** (Mechanik `cli_commands.py:975` → `:171-174` →
+    `:1056`/`:1058-1059`), spätester Termin 0 **W8-4**, Owner `validator`, Grundlage **Spec §6(b) /
+    §10, Aufzählungspunkt `--validate`**; die Sollwerte werden **nicht** abgesenkt, sondern **terminiert**;
+    **Rev. 0.6 (K22) — der Termin 0 `W8-4` gilt für `--validate` nur noch bedingt und ist mit
+    der U-2-Verengung faktisch aufgehoben:** V3 meldet unter `docs/**` dauerhaft **25** ERROR-
+    Findings, also ist `--validate → 0` **nicht** erreichbar; maßgeblich ist die **Deltasperre**
+    (Owner `validator`, Baseline **W3-7**). Severity-Frage **OQ10**; (b) die
    Aufhebung des `--strict` ruht auf einer **ungemessenen** Prämisse und hat eine **Rückfallregel**
    in **W3-BASELINE-STRICT** erhalten — `errors: 0` **und** `warnings: 0` ⇒ `--strict → 0` ist für
    W4…W8 **wieder** maßgeblich; (c) `--check` ist der **Drift-Lauf**, nicht der
@@ -3412,8 +4108,23 @@ AC-24, AC-25, AC-26, AC-34, AC-35, AC-37, AC-38, AC-39, AC-41.
   3. AC-12 Implementierung in W2-6, E2E-Nachweis in W3-6 (Datei-Ownership).
   4. AC-14/15/16/27 Implementierung in W1-7, Aktivierung in W3-6 (Spec §9.1 nennt W3).
   5. W0-Tasks verweisen als **Gate-Anker** auf ACs, obwohl W0 laut Spec §9.2 kein eigenes AC trägt.
-  6. **Ein** Wellen-Branch statt acht Wellen-Branches (Nutzer-Vorgabe; Ausführungskorrektur
-     2026-09-26, Global Constraints, W0-2-Akzeptanz, R16).
+   6. **Ein** Wellen-Branch statt acht Wellen-Branches (Nutzer-Vorgabe; Ausführungskorrektur
+      2026-09-26, Global Constraints, W0-2-Akzeptanz, R16).
+   7. **Rev. 0.6 (U-1/K20) — Modul-Split ohne Verhaltensänderung** als **eigener** Task **W2-0**
+      statt als Nebenschritt in W2-1: nötig, weil die Parallelität in W2 sonst eine
+      Scheinparallelität bleibt (alle Tasks schrieben `docs.py` **und** `test_doc_facts.py`).
+      **W2-0 ist verhaltensneutral** und trägt **keinen** AC.
+   8. **Rev. 0.6 (U-1/K20) — Mehrfachschreiber einer Datei sind sequenziell, nicht disjunkt.**
+      „Genau **eine** schreibende Task pro Datei" ist mit vier Modulen (U-1) und fünf
+      modul-anfassenden Tasks **nicht** erfüllbar. Angewandt wird die Rev.-0.5-Regel
+      (*höchstens eine schreibende Task **pro Parallelgruppe***); `check_plan_file_overlap` prüft
+      genau das. Betroffene Dateien: `docs.py`, `docs_freshness.py`, `docs_links.py`,
+      `docs_wiki.py`, `docs_index.py`, `tests/test_doc_facts.py`,
+      `tests/test_doc_freshness.py` — alle in der Ownership-Matrix namentlich aufgeführt.
+   9. **Rev. 0.6 (U-2/K22) — AC-30 verengt** auf `README.md` + `llms.txt`; die 25 `docs/**`-Links
+      sind **Follow-up** (Owner `developer`, Termin **2026-10-11**) statt AC. **Folge:** V3 und
+      damit `consistency-check.py → 0` / `sync.py --validate → 0` sind **dauerhaft unerreichbar**;
+      maßgeblich ist die **Deltasperre**. Severity-Frage = **OQ10** (offen).
 - **Offener Punkt OP-1 — Spec-Korrektur auf Rev. 0.4 ausgeführt (Stand 2026-09-26); offen ist
   nur noch der formale Abschluss in Plan und W0-Records:** Die **Spec** verlangte im
   Rev.-0.3-Stand in **§9.2 W0** und **R16** weiterhin **verbindlich** „**ein Branch pro Welle**
@@ -3483,6 +4194,14 @@ AC-24, AC-25, AC-26, AC-34, AC-35, AC-37, AC-38, AC-39, AC-41.
 
 ### L-1 Checkbox-Abgleich
 
+> **K34 (Rev. 0.6, Review-Befund m6 / `validator` N-2) — Die Tabelle unten ist der Stand vom
+> 2026-09-26 und bleibt unverändert.** Nach Rev. 0.5 wurden **W1-1…W1-10**, **W2-1** und **W2-2**
+> **abgehakt bzw. fertiggestellt**; die Tabelle bildet diesen Fortschritt **noch nicht** ab, weil sie
+> ausdrücklich auf den 2026-09-26-Stand datiert ist. **Maßgeblich ist der Ist-Zähler
+> `^- \[x\]` = 46 / `^- \[ \]` = 153** (Übergabemessung `validator`, 2026-09-27, Summe **199** —
+> konsistent mit der Gesamtzahl, s. die Rev.-0.6-Zählung unten). **Keine** Zeile der historischen
+> Tabelle wird umgeschrieben; die Korrektur des Splits steht in der Zählung, **nicht** hier.
+
 | Task | Checkboxen | Stand 2026-09-26 |
 |---|---|---|
 | **W1-1** | 4/4 | vollständig abgeschlossen, reviewed, committed |
@@ -3497,6 +4216,7 @@ AC-24, AC-25, AC-26, AC-34, AC-35, AC-37, AC-38, AC-39, AC-41.
 | **W1-10** | 2/4 | **teilweise** — nur `docs-consolidation.enabled: true` gelandet; 4 Properties + Commit offen |
 | **W2-1** | 3/5 | **teilweise** — Implementierung steht; offen sind Schritt 4 (**K16 / B-4**, Rule-3-Eingrenzung, in Rev. 0.5 neu) und Schritt 5 (Commit) |
 | W2-2 … W2-6 | 0/4 je Task | **nicht gestartet**, unverändert offen |
+| **W2-0** | **0/5** | **Rev. 0.6: neu, nicht gestartet.** Rev. 0.6 fügt **5** offene Checkboxen hinzu (Schritt 1 Split, 2 Test-Verschiebung, 3 Fassade, 4 Nachweise, 5 Commit) |
 | **W2-7** | 0/5 | **nicht gestartet** — Schritt 4 ist in Rev. 0.5 **neu** (**K15 / B-5**, `report.py`-Ownership: `line`/`branch` als Dataclass-Felder); Schritt 1 trägt seit der dritten Korrekturrunde zusätzlich den **positiven** Registrierungs-Pin (**RVW2-5**, ersetzt `test_v1_is_not_wired_into_the_runner_yet`) |
 | **W4-3** | 0/5 | **nicht gestartet** — Schritt 4 ist in der dritten Korrekturrunde **neu** (**RVW2-6**: Abschluss-Sync-Lauf der Welle, trägt die V2-Spalte W4 der W-GATE-TABLE) |
 | **W5-2** | 0/5 | **nicht gestartet** — Schritt 4 ist in der dritten Korrekturrunde **neu** (**RVW2-6**: Abschluss-Sync-Lauf der Welle, trägt die V2-Spalte W5) |
@@ -3528,6 +4248,40 @@ AC-24, AC-25, AC-26, AC-34, AC-35, AC-37, AC-38, AC-39, AC-41.
   (W4-3, W5-2, W8-4). **Grenze der Messung:** die Zählung ist in dieser Runde **nicht gemessen**
   (kein Shell-Zugriff), sondern **hergeleitet**; Nachmessung durch `validator`, Abweichung wird
   in der Herleitung korrigiert, **nicht** in der Task-Struktur.
+- **Zählung, fortgeschrieben durch Rev. 0.6 (K20) — 5 Checkboxen hinzugekommen:** **199** Checkboxen
+  gesamt. **Herleitung der Gesamtzahl:** 42 Tasks mit je **4** Steps = 168, + W2-1 (5) + W2-7 (5) +
+  W4-3 (5) + W5-2 (5) = 188, + W8-4 (6) = 194, + **W2-0 (5)** = **199**. Gegenprobe über alle
+  **48** Tasks: 42 × 4 + 5 × 5 + 1 × 6 = **199** (W2-0, W2-1, W2-7, W4-3, W5-2 mit je 5 Steps;
+  W8-4 mit 6). **Task-Anzahl je Welle:** W2 von **7** auf **8** gestiegen; alle anderen Wellen
+  unverändert.
+  **K34 (Rev. 0.6, Review-Befund m6, `validator` N-2) — der Ist-Split ist 46 / 153, nicht 40 / 159.**
+  Die Erstfassung dieser Revision führte **40 gesetzt / 159 offen**. Das ist der **Stand vom
+  2026-09-26**; **nach Rev. 0.5 wurden W1-1…W1-10, W2-1 und W2-2 abgehakt** (+6), W1-5 und W1-10
+  wurden **fertiggestellt** (je +1 bzw. +2 = +3 Checkboxen) und **W2-1** ebenfalls (**4/5** statt
+  **3/5**, +1) ⇒ **40 + 6 + 3 + 1 = 50**? **Nein** — die Gegenrechnung ist unten eindeutig; maßgeblich
+  ist der **gemessene** Wert: **`^- \[x\]` = 46**, **`^- \[ \]` = 153**, Summe **199** (konsistent mit
+  der Gesamtzahl). **Korrigierter Split: 46 gesetzt / 153 offen.** **Die Zeilen der früheren
+  Runden (40 / 150 / 154) bleiben unverändert** — sie beschreiben den Stand des jeweiligen
+  Datums und sind **Historie**. **Grenze:** `46` ist die Übergabemessung des `validator` vom
+  2026-09-27 (Review-Begleitbefund N-2); in dieser Revisionsrunde stand **kein Shell-Zugriff** zur
+  Verfügung, die Zahl wird daher **nicht** als eigenmessung behauptet, sondern als
+  **Übergabemessung** geführt. Stimmt ein künftiger Zähler nicht überein, ist **hier** zu korrigieren,
+  **nicht** in der Task-Struktur.
+- **Rev.-0.6-Messwerte (Baseline-Messung 2026-09-27, Übergabe vom Parent — in dieser Runde nicht
+  selbst gemessen):** `check_internal_links()` → **27** Findings = **25** `link` + **2** `layout`;
+  `llms.txt` → **0**; Verteilung der 25: `docs/guides` 10, `docs/concepts` 13 (**8** davon in
+  `archive/`), `docs/superpowers/plans/` 2 → **17 live**. Dateigrößen: `docs.py` **599**
+  (→ Prognose **~70** als Fassade), `docs_links.py` **~330**, `docs_freshness.py` **~480**,
+  `docs_wiki.py` **~200**, `docs_index.py` **~180**, `report.py` **115** (unverändert),
+  `consistency-check.py` **280** (in W2-0 unverändert), `tests/test_doc_facts.py` **2867**,
+  `tests/test_doc_facts_expected.py` **526**; Module in `scripts/lib/consistency/`: **20** vor W2-0,
+  **24** danach. **Testbasis vorher:** `tests/test_doc_facts.py` + `tests/test_doc_facts_expected.py`
+  = **163 passed** — die Zahl, gegen die W2-0 Schritt 4 den Nachher-Zähler stellt.
+  **`docs-checks` Ist = 0**, **`docs-findings` Ist = 0**
+  (`consistency-check.py --json` → `{'total': 85, 'errors': 0, 'warnings': 85}`; enthaltene Checks
+  `crossrefs.changelog-missing-entry`, `placeholders.unknown` — **kein** `docs.`-Check liefert
+  Findings). `knowledge/wiki`: **11** Seiten mit `type: "Architecture"` (**K24**, war 10).
+  `docs/INDEX.md` existiert **nicht**.
 - **Kein** Task wurde abgehakt, obwohl ein Step offen ist. Die drei teilweise erledigten Tasks
   tragen zusätzlich eine **LEDGER-Stand**-Notiz direkt unter ihrer Step-Liste (W1-5, W1-10, W2-1).
 - **Nicht Gegenstand:** Die W0-Tasks sind im Repo durch die Ergebnis-Records
@@ -3587,8 +4341,10 @@ AC-24, AC-25, AC-26, AC-34, AC-35, AC-37, AC-38, AC-39, AC-41.
 - **Nachtrag Rev. 0.5 (RVW-1, 2026-09-26) — die erste Korrektur des Gates war selbst noch
   unerreichbar und ist nachgeschärft.** Das in der Statuspflege oben genannte
   **Doku-Aggregat** `docs-findings: 0` (vormals „W3-GATE-DOCS") ist als Wellen-Gate
-  **ebenfalls unerreichbar** — belegt am Working Tree: V7 rot bis **W5-3** (10 Wiki-Seiten
-  `type: "Architecture"` ohne `derived-from`), V3 rot bis **W8-2** (`README.md:721-723`), V2 rot
+  **ebenfalls unerreichbar** — belegt am Working Tree: V7 rot bis **W5-3** (~~10~~ **11** Wiki-Seiten
+  `type: "Architecture"` ohne `derived-from`; **K24** — die 10 ist der **historische** Stand vom
+  2026-09-26, maßgeblich ist die Baseline-Messung 2026-09-27 mit **11**), V3 rot bis **W8-2**
+  (`README.md:722-723`; **K30** — und unter `docs/**` **dauerhaft**, Follow-up, K22), V2 rot
   bis **W3-6** (`docs/INDEX.md` fehlt), und V9 **dauerhaft** (geduldete WARNINGs auf den
   unangetasteten Altbestand, FI-10; **RVW2-4:** „179" ist eine **Bestandsangabe**, im Working Tree
   **nicht messbar**, **kein** Sollwert).
@@ -3746,6 +4502,15 @@ Follow-up** (E-01, E-02, E-03, E-04, E-05, E-06, E-07, E-09, E-10, E-12), **5 ×
 bewusst **nirgends** eingetragen. **B-1** (W3-`--strict`-Gate) ist nicht doppelt in dieser Liste
 geführt, sondern ausschließlich in L-2 — es ist ein **Gate-** und kein Codebefund.
 
+**Zählung L-3, Rev. 0.6 (K18…K24): unverändert 18 Zeilen.** Rev. 0.6 fügt **keine** neue
+Errata-Zeile hinzu — die sieben Korrekturen K18…K24 sind **Plan-/Spec-Korrekturen**, keine
+Ausführungsbefunde, und stehen deshalb im **Rev.-0.6-Kopfblock** und in der **Ownership-Matrix**,
+nicht in dieser Liste. Die bestehenden Zeilen bleiben **wortgleich**; zwei berühren Rev. 0.6
+inhaltlich und sind **markiert statt geändert**: **E-15** (`report.py`-Eigentümerlücke) bleibt bei
+**W2-7** — W2-0 fasst `report.py` **nicht** an; **E-12** (`kind`-Vokabular des V6-Komparators) bleibt
+bei **W2-5**, das den Check nun in `docs_freshness.py` statt `docs.py` schreibt — der
+**Vertriffsbegriff** (`expected-mismatch`) ist unverändert, nur der **Ort** ändert sich.
+
 **Zählung L-3, fortgeschrieben durch Rev. 0.5 (K17):** Die 15 Zeilen bleiben **unverändert
 erhalten** (Historie); Rev. 0.5 fügt **drei** Statuspflege-Zeilen hinzu
 (**E-11 (Rev. 0.5)**, **E-14 (Rev. 0.5)**, **E-15 (Rev. 0.5)**) ⇒ **18** Zeilen in der Liste.
@@ -3756,6 +4521,17 @@ Ownership (Text), E-14 ist Code. Der ursprüngliche Satz „für keinen der gena
 ein belegter Fix vor" gilt **unverändert für den Rev.-0.4-Stand** und ist durch diese
 Fortschreibung **nicht** zurückgenommen: Rev. 0.5 liefert **Dokumentations- und
 Ownership-Korrekturen, keine Produktionsänderung**.
+
+- **Rev. 0.6 (K22) — AC-30 verengt ⇒ DoD Punkt 2 im Erwartungswert von V3 nachgezogen.** Die
+  DoD-Zeile „V1…V8 = 0" ist mit der U-2-Verengung **nicht erfüllbar**, weil V3 unter `docs/**`
+  dauerhaft **25** ERROR-Findings meldet. **Korrigiert wird ausschließlich der Erwartungswert von
+  V3:** „**V3 = 0 im AC-30-Scope** (`README.md`, `llms.txt`) · die **25** `docs/**`-Findings sind
+  **Follow-up `F-DOCS-LINKS-2026-09-27`** (Owner `developer`, Termin **2026-10-11**) und haben
+  **keinen** Termin 0 in W0–W8". **V1, V2, V4, V5, V6, V7 und V8 bleiben `0`** wie bisher; **keine**
+  andere DoD-Zeile wird angefasst. **Ausgesprochene Folge:** DoD Punkt 12
+  (`python3 scripts/sync.py --validate → 0`) ist **dauerhaft unerreichbar**; maßgeblich ist die
+  **Deltasperre** (`errors` darf nicht steigen; Owner `validator`, Baseline in **W3-7**). Die
+  Severity-Frage ist **OQ10** (Spec §11.1) und wird hier **nicht** entschieden.
 
 ### L-4 OQ1 bleibt offen — und blockiert W5, nicht W1–W4
 
