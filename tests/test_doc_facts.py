@@ -2585,12 +2585,36 @@ def test_existing_docs_checks_keep_signature_and_severity(tmp_path):
 
 V3_DEAD_LAYOUT_SITES = ((722, "howto/setup/"), (723, "howto/features/"))
 
+#: Targets V3 must never resolve. The first group is R6 proper, the second is
+#: the F2 proof: exotic schemes are inert because of the scheme *grammar*, not
+#: because someone remembered to allowlist them — every one of them would be an
+#: ERROR (and a wrong suggestion) under an allowlist. None of the targets below
+#: contains a space or a placeholder character, so the scheme rule is the only
+#: mechanism that can make them inert.
 V3_INERT_LINK_CASES = (
     ("https", "[ext](https://example.invalid/missing/page.md)"),
     ("http", "[ext](http://example.invalid/missing/page.md)"),
     ("mailto", "[mail](mailto:nobody@example.invalid)"),
     ("anchor", "[jump](#kein-solcher-anker)"),
     ("anchor-on-existing-doc", "[jump](../api/cli-reference.md#kein-solcher-anker)"),
+    ("ref-def-with-title", '[d]: https://example.invalid/x.md "Title"'),
+    ("sms", "[call](sms:+4915112345678)"),
+    ("callto", "[call](callto:+4915112345678)"),
+    ("whatsapp", "[chat](whatsapp://send?text=hi)"),
+    ("slack", "[chan](slack://channel?team=T1&id=C1)"),
+    ("matrix", "[room](matrix:r/agent-meta:matrix.org)"),
+    ("notes", "[note](notes://srv/12345)"),
+    ("git+https", "[repo](git+https://host/repo.git)"),
+    ("file", "[local](file:///tmp/page.md)"),
+    ("zoommtg", "[zoom](zoommtg://zoom.us/j/123456)"),
+    ("tg", "[tg](tg://resolve?domain=agentmeta)"),
+    ("skype", "[skype](skype:live:id)"),
+    ("obsidian", "[note](obsidian://open?vault=am)"),
+    ("steam", "[game](steam://run/440)"),
+    ("geo", "[map](geo:52.5200,13.4050)"),
+    ("bitcoin", "[pay](bitcoin:1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2)"),
+    ("magnet", "[dl](magnet:?xt=urn:btih:abcdef)"),
+    ("ssh", "[git](ssh://git@host/repo.git)"),
 )
 
 
@@ -2672,11 +2696,11 @@ def test_v3_flags_a_dead_relative_link(tmp_path):
 def test_v3_ignores_external_and_anchor_links(tmp_path, link):
     """R6: ``http(s)://``, ``mailto:`` and ``#anchor`` are not resolved.
 
-    Each case is a target that does **not** exist — or, for the last one, a
-    document that exists with an anchor in it that does not — so a check that
-    resolved them anyway would report it. The control on the same tree — a dead
-    relative link in the same file, same directory — is what stops this test
-    from passing vacuously.
+    Each case is a target that does **not** exist — or, for the two anchor
+    cases, a document that exists with an anchor in it that does not — so a
+    check that resolved them anyway would report it. The control on the same
+    tree — a dead relative link in the same file, same directory — is what
+    stops this test from passing vacuously.
     """
     root = _v1_tree(tmp_path, "README.md", f"{link}\n")
     _v1_tree(root, "docs/guides/page.md",
@@ -2729,6 +2753,64 @@ def test_v3_ignores_links_in_code_spans_and_fences(tmp_path):
 
     assert [f.message for f in findings] == [
         "line 5: link target 'missing/live.md' does not exist",
+    ], findings
+
+
+V3_REFERENCE_DEF_CASES = (
+    ("without-title", "[d]: missing/page.md"),
+    ("with-double-quoted-title", '[d]: missing/page.md "Title"'),
+    ("with-single-quoted-title", "[d]: missing/page.md 'Title'"),
+)
+
+
+@pytest.mark.parametrize(
+    ("definition",),
+    [(text,) for _case_id, text in V3_REFERENCE_DEF_CASES],
+    ids=[case_id for case_id, _text in V3_REFERENCE_DEF_CASES],
+)
+def test_v3_flags_a_dead_reference_definition(tmp_path, definition):
+    """F4: a reference definition is read **with** its optional title.
+
+    ``[d]: missing/page.md "Title"`` used to be skipped silently: the regex
+    required end-of-line after the target, so a titled definition simply did not
+    match. The control is the untitled form on the same tree — it always
+    matched, so without it a regex that stopped matching *everything* would pass.
+    """
+    root = _v1_tree(tmp_path, "docs/guides/page.md",
+                    f"{definition}\n[untitled]: missing/other.md\n")
+
+    findings = docs_lib.check_internal_links(root)
+
+    assert [(f.branch, f.line, f.message) for f in findings] == [
+        ("link", 1, "line 1: link target 'missing/page.md' does not exist"),
+        ("link", 2, "line 2: link target 'missing/other.md' does not exist"),
+    ], findings
+
+
+def test_v3_anchor_inertness_rests_on_one_mechanism(tmp_path):
+    """F6: the pure ``#anchor`` case is carried by exactly one rule.
+
+    The case used to be inert twice over — a ``"#"`` entry in the prefix
+    allowlist *and* the empty base after splitting the anchor — so it could not
+    fail for the reason it claimed. The allowlist entry is gone; what remains is
+    the empty base, and that is what this test pins, together with the fact that
+    the inertness still holds for an anchor on a document that does exist.
+    """
+    assert "#" not in docs_lib.V3_INERT_PREFIXES, (
+        "a pure anchor must be inert through the empty base alone, not through a "
+        "second prefix rule"
+    )
+    _v1_tree(tmp_path, "docs/api/cli-reference.md", "# cli\n")
+    root = _v1_tree(tmp_path, "docs/guides/page.md", (
+        "[pure](#kein-solcher-anker)\n"
+        "[on-existing](../api/cli-reference.md#kein-solcher-anker)\n"
+        "[dead](missing/page.md)\n"
+    ))
+
+    findings = docs_lib.check_internal_links(root)
+
+    assert [(f.line, f.message) for f in findings] == [
+        (3, "line 3: link target 'missing/page.md' does not exist"),
     ], findings
 
 

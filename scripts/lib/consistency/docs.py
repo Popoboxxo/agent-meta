@@ -422,15 +422,21 @@ V3_ENTRY_RELPATHS: tuple[str, ...] = ("README.md", "llms.txt")
 V3_DOCS_RELDIR = "docs"
 V3_DOC_SUFFIXES: tuple[str, ...] = (".md", ".markdown", ".txt")
 
-#: R6 — a target carrying one of these is never resolved.
-V3_INERT_PREFIXES = ("http://", "https://", "mailto:", "tel:", "ftp://",
-                     "data:", "//", "/", "#")
+#: R6 — a URI scheme (RFC 3986 §3.1) makes a target external. Deliberately a
+#: *grammar*, not an allowlist: ``sms:``, ``callto:``, ``magnet:``,
+#: ``git+https:``, ``obsidian:`` and every other scheme must stay inert, or V3
+#: turns a legitimate external reference into an ERROR (W2-2, review F2).
+V3_SCHEME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.\-]*:")
+
+#: Site-root-absolute targets are not repository-internal either. The former
+#: ``"//"`` entry is gone (F3): it never fired, ``"/"`` already covered it.
+V3_INERT_PREFIXES = ("/",)
 
 V3_INERT_CHARS = ("<", ">", "{", "}", "*", " ", "\\")
 V3_INLINE_LINK_RE = re.compile(r"\]\(\s*(?P<target>[^()\s]+)(?:\s+[^()]*)?\)")
 
 V3_REFERENCE_DEF_RE = re.compile(
-    r"^[ ]{0,3}\[[^\]]+\]:[ \t]*(?P<target>\S+)[ \t]*$")
+    r"^[ ]{0,3}\[[^\]]+\]:[ \t]*(?P<target>\S+)(?:[ \t]+[\"'][^\"']*[\"'])?[ \t]*$")
 V3_HTML_HREF_RE = re.compile(
     r"<a\b[^>]*\bhref=[\"'](?P<target>[^\"']+)[\"']", re.IGNORECASE)
 V3_FENCE_OPEN_RE = re.compile(r"^[ ]{0,3}(?P<fence>`{3,}|~{3,})")
@@ -442,10 +448,8 @@ V3_LAYOUT_ENTRY_RE = re.compile(
 def _v3_finding(severity: Severity, relpath: str, lineno: int, branch: str,
                 message: str) -> Finding:
     """Build a V3 ``Finding`` — the two instance attributes, exactly as V1 does.
-
-    ``Finding`` (``report.py``) has neither field and that module is not owned
-    by W2-2, so both are set on the instance, as V1 does. W2-7 owns the runner
-    registration and should promote them to dataclass fields.
+    ``Finding`` (``report.py``) has neither field and is not owned by W2-2, so
+    both are set on the instance; W2-7 owns the runner and should promote them.
     """
     finding = Finding(
         severity=severity, check=V3_CHECK_ID, file=relpath, message=message,
@@ -467,9 +471,8 @@ def _v3_scan_relpaths(root: Path) -> list[str]:
 
 
 def _v3_scanned_lines(text: str) -> list[tuple[int, str, int | None]]:
-    """``(lineno, line, block)`` per line; ``block`` is its fence, ``None`` in
-    prose — the split the two extractors need: a link is a claim in prose, a
-    layout entry is a claim inside a fenced block."""
+    """``(lineno, line, block)`` per line; ``block`` is its fence and ``None``
+    in prose — the split the two extractors need."""
     scanned: list[tuple[int, str, int | None]] = []
     fence: str | None = None
     block = 0
@@ -502,15 +505,15 @@ def _v3_link_targets(line: str) -> list[str]:
 def _v3_resolve(root: Path, doc: Path, target: str) -> Path | None:
     """The repository-internal path a target claims, else ``None``.
 
-    R6 draws the boundary: a scheme, a site-root-absolute path, an anchor-only
-    target, a placeholder (``{{…}}``, ``<file>``) and a target that climbs out of
-    the repository are never resolved. ``page.md#section`` drops the anchor.
+    R6: a URI scheme, a site-root-absolute or anchor-only target, a placeholder
+    and a target that climbs out of the repository are never resolved —
+    ``page.md#section`` drops its anchor, which is not checked.
     """
-    if (not target or any(target.startswith(p) for p in V3_INERT_PREFIXES)
-            or any(char in target for char in V3_INERT_CHARS)):
+    if not target or V3_SCHEME_RE.match(target):
         return None
     base = target.split("#", 1)[0].split("?", 1)[0]
-    if not base:
+    if (not base or base.startswith(V3_INERT_PREFIXES)
+            or any(char in target for char in V3_INERT_CHARS)):
         return None
     resolved = (doc.parent / base).resolve()
     try:
@@ -521,13 +524,12 @@ def _v3_resolve(root: Path, doc: Path, target: str) -> Path | None:
 
 
 def _v3_layout_entries(scanned: list[tuple[int, str, int | None]]) -> list[tuple[int, str]]:
-    """Directory entries of documented layout blocks, composed by indentation.
+    """Directory entries of layout blocks, composed by indentation.
 
-    Only a line whose entire content is ``name/`` plus an optional ``#`` comment
-    counts, which keeps prose and command lines out. A deeper entry composes onto
-    the closest shallower one — ``howto/`` then ``setup/`` becomes the claim
-    ``howto/setup/`` — and the stack resets per fence, so a block never inherits
-    the parent of an earlier one.
+    Only a line whose entire content is ``name/`` plus an optional ``#``
+    comment counts, which keeps prose out. A deeper entry composes onto the
+    closest shallower one — ``howto/`` then ``setup/`` claims ``howto/setup/``
+    — and the stack resets per fence.
     """
     entries: list[tuple[int, str]] = []
     stack: list[tuple[int, str]] = []
@@ -553,22 +555,19 @@ def _v3_layout_entries(scanned: list[tuple[int, str, int | None]]) -> list[tuple
 def check_internal_links(root: Path, config: dict | None = None) -> list[Finding]:
     """V3: documented relative repository paths that do not exist (AC-09, R6).
 
-    Two claim forms, and both are needed for AC-09: a Markdown or HTML link
-    target in the prose of any in-scope file (branch ``"link"``) and a directory
-    entry of a documented layout block (branch ``"layout"``). ``README.md``
-    carries the repository map and claims ``howto/setup/`` and
-    ``howto/features/`` at ``:721-723``; neither exists.
+    Two claim forms, both needed for AC-09: a Markdown or HTML link target in
+    the prose of any in-scope file (branch ``"link"``) and a directory entry of
+    a documented layout block (branch ``"layout"``). ``README.md`` claims
+    ``howto/setup/`` and ``howto/features/`` at ``:721-723``; neither exists.
 
-    The layout form is read **only** in the entry documents: a bare directory
-    entry inside ``docs/**`` illustrates a *consumer* project (``Zielprojekt/``,
-    ``agent-meta/`` as a submodule checkout, ``src/backend/``) and is
-    lexically indistinguishable from a claim about this repository — of 70
-    documented entries here, all 20 unverifiable ones in ``docs/**`` are
-    illustrations.
+    The layout form is read **only** in the entry documents, which carry the
+    repository map. Inside ``docs/**`` such an entry illustrates a *consumer*
+    project (``Zielprojekt/``, ``agent-meta/`` as a submodule checkout) and is
+    not distinguishable from a claim about this repository, so it is
+    deliberately not checked.
 
     ``config`` is accepted for the runner's uniform call signature; V3 reads no
-    key and has one severity (ERROR, IC-05). The common gate and the
-    registration are W2-7's — until then this is a no-op (AC-38).
+    key and has one severity (ERROR, IC-05). Gate and registration are W2-7's.
     """
     findings: list[Finding] = []
     for relpath in _v3_scan_relpaths(root):
