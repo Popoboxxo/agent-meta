@@ -533,7 +533,7 @@ related:
 > | `E-0*` (E-01…E-15) | **Errata** des Ausführungs-Ledgers, Abschnitt **L-3** dieses Plans | gemischt (behoben / offen / blockierend) |
 > | `E-1…E-8` (ohne führende 0) | **Entscheidungsvorlagen** — **E-1…E-4** aus Rev. 0.5 (Spec §17.9.4) sind **offen, unentschieden** (z. B. ESCALATION E-2 in Task W8-4); **E-5…E-8** aus Korrekturrunde 4 sind **ENTSCHIEDEN am 2026-09-27** (Nutzer, `main_chat`) — **Rev. 0.7**, Volltext im Schlussabschnitt „Entscheidungs-Abschluss Rev. 0.7" und Spec §17.11 | **E-1…E-4: offen** · **E-5…E-8: entschieden (geschlossen)** |
 > | `OQ*` (OQ1…OQ10) | **offene Frage** an den Auftraggeber, mit Owner und Frist | **offen** (OQ1, OQ3, OQ4, OQ9, OQ10) |
-> | `K-*` (K1…**K75**) | **Korrektur-Kennungen** dieses Vorhabens (kein Status, nur Auditierbarkeit) — **Herkunft dieser Zeile: Plan-Legende = Stand Rev. 0.7, Korrekturrunde 6** (Runde 3 = K46…K50, **Runde 4 = K51…K53**, **Rev. 0.7 = K54…K58**, **Korrekturrunde 5 = K59…K70**, **Korrekturrunde 6 = K71…K75**); die **Spec-Legende bleibt eingefroren** auf `K1…K45` (Spec-Statuskopf, Stand Korrekturrunde 2) | — |
+> | `K-*` (K1…**K76**) | **Korrektur-Kennungen** dieses Vorhabens (kein Status, nur Auditierbarkeit) — **Herkunft dieser Zeile: Plan-Legende = Stand Rev. 0.7, Korrekturrunde 6** (Runde 3 = K46…K50, **Runde 4 = K51…K53**, **Rev. 0.7 = K54…K58**, **Korrekturrunde 5 = K59…K70**, **Korrekturrunde 6 = K71…K75**, **additiv angehängt am 2026-09-28: K76 — Anhang „Ausführungsstand W2 Phase 0"; ausdrücklich keine Korrekturrunde und keine Plan-Revision, s. K76 und K34; K76 ist ausdrücklich die erste K-ID ohne Review-Befund und die erste Änderung einer Zeile im Rev.-0.7-Kopfblock — beide Ausnahmen sind je einmalig, s. F, K76**); die **Spec-Legende bleibt eingefroren** auf `K1…K45` (Spec-Statuskopf, Stand Korrekturrunde 2) | — |
 >
 > **Ergänzung Korrekturrunde 4 (additiv, 2026-09-27) zur Legende.** (a) Der E-Namensraum ist von
 > **`E-1…E-4` auf `E-1…E-8`** erweitert: **`E-5`** (V4-Generalisierung ohne README-Index-Owner),
@@ -1368,7 +1368,7 @@ Klassifikation **XL / Architectural** (Spec: Statuskopf, Abschnitt „Klassifika
 - Modify: `scripts/lib/consistency/spec_plan.py` — **Rev. 0.7, Task W2-9, ergänzt in Korrekturrunde 6
   (K71 / RVW-7-04-Nachbesserung)**: der **dritte** Konsument von `TASK_HEADER_RE` (Regex-Bindung
   `:55`, `_parse_plan_tasks` `:547-583`, `finditer` `:557`) extrahiert seine **Dep-Tokens** über das
-  **hart kodierte** Muster `task-\d+|\d+` (`:570`); es wird auf `W\d+-\d+` erweitert, weil sonst
+  **hart kodierte** Muster `task-\d+|\d+` (`:570`, **Vor-Implementierungs-Anker** — nach dem Commit von W2-9 `_DEP_TOKEN_RE` `:68`, Verwendung `:581`); es wird auf `W\d+-\d+` erweitert, weil sonst
   `**W2-0**` die Phantom-ID `task-0` erzeugt, `find_dependency_errors` (`orchestration.py:207-216`)
   **dangling dependency** meldet und `validate_plan` (`:287-289`) **vor**
   `check_plan_file_overlap` (`:533`) abkehrt — die fail-closed-Ownership-Klausel fiele dann **ganz
@@ -2510,7 +2510,7 @@ git checkout tests/test_knowledge_engine.py            # W2-8: Volltest-Entkoppl
 git checkout tests/test_sharkord_service_name_migration.py
 git checkout scripts/lib/plan_identity.py              # W2-9: TASK_HEADER_RE / normalize_task_id
 git checkout scripts/lib/plan_ledger.py                 # W2-9 (nur falls dort geschrieben wurde)
-git checkout scripts/lib/consistency/spec_plan.py        # W2-9 (K71): Dep-Token-Muster :570
+git checkout scripts/lib/consistency/spec_plan.py        # W2-9 (K71): Dep-Token-Muster :570 (Vor-Implementierungs-Anker; nach W2-9: _DEP_TOKEN_RE :68, Verwendung :581)
 git checkout tests/test_plan_identity.py
 git checkout tests/test_plan_ledger_writer.py
 ```
@@ -4727,7 +4727,7 @@ und wenn die Kantenliste **explizit** aufgeschrieben ist. Beides steht hier.
 | `scripts/lib/consistency/docs_index.py` | — | — | — | — | reads | reads | reads | **owns** (Create, V2) | — | reads |
 | **`scripts/lib/plan_identity.py`** (neu in W2, E-8) | — | — | — | **owns** (Modify, TASK_HEADER_RE) | — | — | — | — | — | — |
 | **`scripts/lib/plan_ledger.py`** (bedingt, E-8/K58) | — | — | — | **owns** (Modify, bedingt) | — | — | — | — | — | — |
-| **`scripts/lib/consistency/spec_plan.py`** (W2-9, K62/K71) | — | — | — | **owns** (Modify, Dep-Token-Muster `:570`) | — | — | — | — | — | — |
+| **`scripts/lib/consistency/spec_plan.py`** (W2-9, K62/K71) | — | — | — | **owns** (Modify, Dep-Token-Muster `:570` → nach W2-9 `_DEP_TOKEN_RE` `:68`) | — | — | — | — | — | — |
 | `scripts/consistency-check.py` | reads | reads | **reads** (darf es **nicht** ändern) | — | reads | reads | reads | reads | — | **owns** |
 | `scripts/lib/consistency/report.py` | reads | reads | **reads** | — | reads | reads | reads | reads | — | **owns** (K15) |
 | `tests/test_doc_facts.py` | owns | owns | **owns** (Verschiebung) | — | reads | reads | reads | reads | — | **owns** (V3-Pin `:2527-2537`, F1-/Exit-Tests) |
@@ -5586,6 +5586,302 @@ aktivieren.
 **Damit überholt, ohne Umschreiben (Historie bleibt wortgleich):** die Zählhinweise in **K34** und
 im **K53-Interim-Ledger** nennen **46 / 153** bzw. **59 / 140**; sie beschreiben den Stand **vor**
 dieser Revision. **Maßgeblich ist dieser Anhang.**
+
+#### Anhang 2026-09-28 — Ausführungsstand W2 Phase 0 (W2-9, W2-6)
+
+> **Was dieser Anhang ist — und was nicht.** Wie die beiden vorangehenden Blöcke ist er **additive
+> Statuspflege**: **keine** Plan-Revision, **keine** Korrekturrunde, **kein** Eingriff in eine als
+> wortgleich festgeschriebene Stelle. **Wortgleich bleiben:** `status: APPROVED` (`:5`),
+> `revision: 0.7` (`:6`), die **K34-Kopfnotiz**, die historische Tabelle (Stand 2026-09-26), die
+> Herleitungen **188 → 190 → 194 → 199 → 207**, der **K53-Interim-Ledger**, der **Rev.-0.7-Anhang**,
+> alle Task-/Wellen-/AC-/IC-/NFA-/R-/OQ-/V-Check-IDs, alle Akzeptanzkriterien, die Korrekturrunden
+> **1–6** und ihr Zuordnungsregister. **Keine bestehende Zeile wurde entfernt, ersetzt oder
+> umformuliert.** **Zwei ausdrücklich benannte Ausnahmen, beide rein additiv und beide
+> nachprüfbar:** (1) die **K-Legendenzeile `:536`** ist um **K76** verlängert worden (rein additiver
+> Einschub, der übrige Zeilenwortlaut unverändert); (2) an **drei** Stellen **außerhalb** dieses
+> Anhangs wurde ein **`Datei:Zeile`-Anker** durch einen Zusatz in Klammern ergänzt — **`File Structure`**
+> (Abschnitt „Geändert (Code)"), der Kommentar der Zeile `spec_plan.py` in **`Rollback W2`** und die
+> **`spec_plan.py`-Zelle der Ownership-Matrix**. **Warum genau diese drei:** es sind die einzigen
+> Fundstellen des Ankers, die **kein Task-Verbatim-Text** sind; alle drei wurden bereits in
+> Korrekturrunde 6 (**K71**) als bearbeitbare Live-Stellen geführt. **Kein** Tasktext, **keine**
+> Checkbox, **keine** ID, **kein** Sollwert und **keine** Datei außerhalb dieses Plans wurde
+> angefasst — die Begründung und die vollständige Fundstellenliste stehen in **I**.
+> Maßgeblich für den heutigen Ausführungsstand ist **dieser** Anhang (K34-Präzedenz).
+>
+> **Zwei Nummernkreise, ausdrücklich getrennt.** Die **eine** neue K-Kennung dieses Anhangs
+> (**K76**) dokumentiert eine **Ausführungs-Korrektur** (F, Datum, Grund). Alles Übrige hier ist
+> **Status** und trägt **bewusst keine** K-Kennung — dieselbe Zurückhaltung wie in den beiden
+> vorangehenden Anhängen.
+>
+> **Grenze der Messung, ausdrücklich getrennt.** (a) **Selbst gemessen** (Read/Grep/Glob im
+> Working Tree, 2026-09-28): die Checkboxenzähler je Task, die Zustände der Quell-Dateien, die
+> Zeilenanker in `scripts/…`, das **Fehlen** von `docs_freshness_v5.py` und
+> `tests/test_doc_freshness_v5.py`; **ferner, im Zuge der Review-Runde vom 2026-09-28:** die
+> **vollständige** Fundstellenerhebung des Ankers `spec_plan.py:570` über den ganzen Plan (Grep `:570`)
+> und die `Agent:`-Angaben der fünf offenen W2-Tasks. (b) **Übergabemessung** (read-only-Git-Erhebung
+> vom 2026-09-28, Parent; in diesem Anhang **nicht** selbst gemessen, weil kein Shell-Zugriff vorlag):
+> die Commit-Hashes, der `git status --porcelain`-Stand und der Dateigrößenwert **276 Z** des
+> Review-Artefakts. **Keine Zahl dieses Anhangs ist geschätzt**; jede ist entweder gemessen,
+> übernommen oder ausdrücklich als **nicht gemessen** markiert.
+
+**A. Arbeitsstand 2026-09-28 — Arbeitsbaum (Übergabemessung) und Commits.**
+
+- **Uncommittet, `M` (5):** `scripts/lib/consistency/docs_links.py`,
+  `scripts/lib/consistency/spec_plan.py`, `scripts/lib/plan_identity.py`,
+  `tests/test_plan_identity.py`, `tests/test_plan_ledger_writer.py`.
+- **Untracked (`??`, 3):** `docs/specs/2026-09-25-repository-documentation-consolidation-rereview-2.md`,
+  `scripts/lib/consistency/docs_index.py`, `tests/test_doc_index.py`.
+- **Nichts gestaged.** Committet sind **W2-0** (`b5bb0fe9`), **W2-2** (`8f290b95`), **W2-3**
+  (`8594e67f`), **W2-5** (`b73e9422`), **W2-1** (V1-Commits) sowie die Ledger-/Plan-Commits
+  `942fafe6`, `c1dda65d`, `c3ed5c9f`, `6505341c`, `1ef78386`, `c0988e18`, `4b5eaa94`;
+  `4b5eaa94` („apply E-5..E-8, add W2-8 and W2-9 (rev 0.7)") ist **docs-only** (Plan + Spec).
+
+**B. Zählstand je Task (selbst gemessen; Muster `^- \[x\] ` / `^- \[ \] `).**
+
+| Task | Checkboxen | Stand 2026-09-28 | Ausführender (`Agent:`, **selbst gemessen**) |
+|---|---|---|---|
+| **W2-9** | **0/4** | implementiert, **nicht committet**, nichts verifiziert (Phase 0) — s. C | `senior-developer` — Phase 0, **erster** Task; **Eigentümer** des Anker-Auftrags in I(d) |
+| **W2-6** | **0/4** | uncommitteter roter Zwischenstand mit **überholter** Implementierung — s. D | `developer` — E-5-Rework **in-place**; **Eigentümer** der Neuvermessung in I(b) |
+| **W2-4** | **0/4** | **nicht gestartet** — s. E | `senior-developer` — Phase B, setzt W2-5 voraus |
+| **W2-8** | **0/4** | **nicht gestartet** — s. E | `senior-developer` — Volltest-Entkopplung, unmittelbar vor W2-7 |
+| **W2-7** | **0/5** | **nicht gestartet** — s. E | `developer` — Registrierung, **Wellen-Gate W2** |
+
+- **Summen unverändert.** Dieser Anhang fügt **ausschließlich Fließtext und Tabellenzeilen** hinzu;
+  **keine** Zeile beginnt mit `- [ ]` oder `- [x]`, es wurde **keine** Checkbox gesetzt, gestrichen
+  oder ergänzt. Die Zählstände des Rev.-0.7-Anhangs (**59** gesetzt / **148** offen, Summe **207**)
+  bleiben damit **gültig** — das ist eine **Ableitung aus der Art des Eintrags**, keine neue Zählung.
+- **Damit überholt, ohne Umschreiben:** die Zeilen „W2-4 **0/4**", „W2-6 **0/4**", „W2-8 **0/4**",
+  „W2-9 **0/4**" und „W2-7 **0/5**" des Rev.-0.7-Anhangs (Stand 2026-09-27) sind **heute richtig** —
+  sie werden hier **nicht** wiederholt, weil sie sich nicht geändert haben. **Geändert hat sich nur
+  der Begründungsstand** (C und D), und genau der ist neu.
+- **Zur Anker-Disziplin der Owner-Spalte (K12).** Maßgeblich ist der **Abschnittsanker** — jeweils die
+  `Agent:`-Zeile **im Task-Block selbst** —, **nicht** eine Zeilenzahl; Zeilenzahlen dieses Plans
+  driften mit jedem Revisionsblock. **Nachgemessen** (2026-09-28, Kontrollwerte, **nicht** normativ):
+  W2-9 `senior-developer`, W2-4 `senior-developer`, W2-6 `developer`, W2-8 `senior-developer`,
+  W2-7 `developer`. **Genau diese fünf** sind die in der Reihenfolge F genannten Tasks — **kein**
+  sechster, **keine** offene Frage, **keine** Abweichung zum Plan: die `Agent:`-Angaben im Plan und
+  die Owner-Spalte hier stimmen **überein**.
+
+**C. W2-9 (Phase 0) — implementiert, aber NICHT committet.** Write-Set **exakt wie im Plan**
+(`Files:` des Task W2-9):
+
+- `scripts/lib/plan_identity.py` (**106 Z**): `WAVE_ID_PATTERN` (`:26`) und die Wellen-Header-
+  Alternative in `TASK_HEADER_RE` (`:35-47`) **mit** Zwei-Gruppen-Vertrag. `TASK_ID_RE` (`:18`) und
+  `normalize_task_id` (`:83`) sind **unangetastet** — das ist die verbindliche **K66**-Lesart
+  („W2-9 ändert ausschließlich (a); eine Reparatur von (b) ist verboten").
+- `scripts/lib/consistency/spec_plan.py` (**607 Z**): das neue `_DEP_TOKEN_RE` (`:68`), benutzt in
+  `_parse_plan_tasks` (`:581`); die Regex-Bindung `_TASK_HEADER_RE` (`:55`) steht. Das ist **K62**.
+- `tests/test_plan_identity.py`, `tests/test_plan_ledger_writer.py` (beide `M`).
+- `scripts/lib/plan_ledger.py` ist **clean** — das ist **korrekt** und **kein** fehlender Write-Set:
+  der Plan führt die Datei nur **bedingt** („Modify … **bedingt** — nur falls sich der
+  Zwei-Gruppen-Vertrag des Treffers ändert; im Normalfall **read-only**"). Ein Eingriff dort wäre
+  **nicht** durch `Files:` gedeckt.
+- **Folge für das Ledger: die K53-Interim-Regel gilt unverändert weiter.** E-8/K57 sagt wörtlich:
+  sie „gilt **unverändert bis einschließlich dem Task W2-9**"; erst „**mit dem Commit von W2-9**"
+  entfällt sie. Da nichts committet ist, entfällt sie **nicht**. Der Rev.-0.7-Anhang sagt dasselbe:
+  „der Ledger-Writer ist **heute** einsetzbar — er ist es **nicht**; erst ab W2-9". **Also: bis zum
+  Commit von W2-9 keine Checkbox von Hand setzen**; ab dem Commit von W2-9 übernimmt
+  `plan_ledger`, und **der erste mit dem Werkzeug abzuhakende Task ist W2-6** — genau die Reihenfolge
+  in F.
+
+**D. W2-6 — uncommitteter roter Zwischenstand, der eine ÜBERHOLTE Implementierung enthält. Kein
+Reparatur-, sondern ein E-5-Rework-Task.**
+
+- **Gemessen im Working Tree** (`scripts/lib/consistency/docs_links.py`, **404 Z**): `_v4_in_scope`
+  (`:122-140`), `_v4_unlinked_relpaths` (`:143-164`), `check_readme_docs_index` (`:167-198`).
+- **Was dort steht:** V4 als **Seiten**-Scan — „jede in-scope-Seite unter `docs/` muss in `README.md`
+  verlinkt sein", als **rekursiver Walk** (`rglob`, `:156-160`), `archive/`/`_archive/` ausgenommen
+  (`:140`). Das ist das Design **Rev. 0.6 / vor E-5**.
+- **Was Rev. 0.7 / E-5 verlangt** (K54, K59–K65, K68): Extraktion der **sieben** deklarierten
+  Kategorien aus der `##`-Region, deren Text `Documentation Index` enthält; **fail-soft-Guard zuerst**
+  (fehlender `docs/`-Baum ⇒ `[]`), **danach** fail-closed; **Signatur `(root)` einargumentig
+  unverändert**; Sollwert am echten Baum **genau 1** Finding (Kategorie `docs/se-cascade/`).
+- **Gemessene Abweichung:** die Vorrangregel ist **nicht** umgesetzt — `docs_links.py:183` behandelt
+  `not readme.exists() or not docs_dir.is_dir()` **gemeinsam** und liefert damit **immer** `[]`.
+- **Die K68-Docstring-Korrektur ist nicht erfolgt:** `docs_links.py:168-177` trägt weiter den
+  Vor-E-5-Wortlaut, einschließlich „Only the **scope** widened — … to the whole ``docs/`` tree"
+  (`:172-174`) und „The pre-W2 subset stays a real subset" (`:176-177`).
+- **Konsequenz, ausdrücklich:** W2-6 wird **in-place** umgesetzt — **kein** `git checkout`, **kein**
+  Löschen, **kein** Reset der drei Dateien. **Der Diff ist die Historie.** Die **sieben** namentlich
+  zu ersetzenden V4-Tests stehen in der Ersetzungstabelle **R1…R7** im Task W2-6 (`Akzeptanz V4`) und
+  werden **ersetzt, nicht angepasst** (K61). Das ist der Grund, warum W2-6 den **ersten** abzuhakenden
+  Task nach W2-9 ist: bis dahin wird das Ledger **nicht** von Hand gepflegt.
+
+**E. Nicht gestartet: W2-4, W2-8, W2-7.**
+
+- **W2-4 (0/4):** `scripts/lib/consistency/docs_freshness_v5.py` und
+  `tests/test_doc_freshness_v5.py` **existieren nicht** (Dateisuche am 2026-09-28). Die
+  Voraussetzung ist erfüllt — **W2-5** ist committet (`b73e9422`), womit der Größennachweis
+  „`docs_freshness.py` bleibt 592" beobachtbar ist. W2-4 bleibt der Grund, warum **W2-8** nicht schon
+  jetzt laufen kann (Kante **17** `W2-4 → W2-8`).
+- **W2-8 (0/4):** nicht gestartet; `tests/test_knowledge_engine.py` und
+  `tests/test_sharkord_service_name_migration.py` sind im Arbeitsbaum **nicht** als `M` geführt.
+- **W2-7 (0/5):** nicht gestartet. `Depends on: W2-3, W2-4, W2-5, W2-6, W2-8` — davon sind **alle**
+  fünf Voraussetzungen bis auf W2-4, W2-6 und W2-8 erfüllt.
+
+**F. Ausführungs-Protokoll 2026-09-28 — verbindliche Reihenfolge (K76).**
+
+> **Reihenfolge (Plan-DAG, bindend):** **`W2-9` (Phase 0) → `W2-6` → `W2-4` → `W2-8` → `W2-7`
+> (Wellen-Gate W2).**
+
+- **Die Reihenfolge ist nicht neu entschieden, sondern aus dem bestehenden DAG abgelesen.** Vier
+  Belege, alle im Plan:
+  1. **Kante 16** (`W2-0 → W2-9`) nennt die Reihenfolge der danach noch offenen Tasks **wörtlich**:
+     „W2-9 beendet die K53-Interim-Regel und muss vor **allen** noch offenen W2-Tasks laufen —
+     **W2-6, W2-4, W2-8, W2-7**".
+  2. **Topologische Ordnung** (Zyklenprüfung): `… → W2-0 → W2-9 → {W2-3, W2-5, W2-6} → W2-4 → W2-8 →
+     W2-7 → …`; von der Gruppe `{W2-3, W2-5, W2-6}` ist nach dem Ledger nur **W2-6** offen.
+  3. **Kanten 17** (`W2-4 → W2-8`) und **18** (`W2-8 → W2-7`) sowie `W2-7 Depends on: W2-3, W2-4,
+     W2-5, W2-6, W2-8` (Rev. 0.7).
+  4. **K63 / E-6** begründet W2-8s Position **unmittelbar vor W2-7**: sein Nachweis prüft „den Zustand
+     **kurz vor** der Registrierung" und belegt die Entkopplung „**vor** dem Wellenabschluss … nicht
+     erst, wenn die Welle schon rot ist".
+- **Kein Parallelismus mehr in W2 (Ableitung, keine Messung).** PG-2a = {W2-3, W2-5, W2-6} ist nach
+  dem Ledger auf **W2-6** zusammengeschrumpft; PG-2b, PG-2d, PG-2c, PG-2e sind Einzeltasks. Die
+  verbleibende W2-Arbeit ist damit **sequenziell** — die Größe **3** gleichzeitiger Agenten wird
+  nicht mehr erreicht.
+- **K76 — Ausrichtung auf den DAG, mit Datum, Grund und Folgen.** Das **A2A-Envelope vom 2026-09-28**
+  listete den separaten Testfix **nach** W2-7. Das ist **an den Plan-DAG angeglichen**: der Testfix
+  ist **W2-8** und läuft **unmittelbar vor W2-7** (Kante 18, K63). **Grund:** der Volltest-Nachweis
+  muss den Stand **kurz vor** der Registrierung prüfen, sonst belegt er einen Zwischenstand.
+  **Ausdrücklich festgehalten, weil es die Form des Eingriffs begrenzt:** es wird **keine** Plan-ID
+  umnummeriert (**W2-8** behält ID, Ort und Wortlaut im Plan), **kein** Akzeptanzkriterium geändert,
+  **keine** Checkbox gesetzt, **kein** Sollwert geändert, **keine** AC/IC/R-/OQ-/V-Check-ID neu oder
+  gestrichen, **keine** neue Task angelegt, **keine** Ownership-Zeile geändert. **K76 ersetzt keine
+  Plan-Revision** (K34-Präzedenz) — `revision: 0.7` und `status: APPROVED` bleiben unverändert, und
+  **kein Revisions-Bump ist nötig** (kein AC, kein Sollwert, keine ID, kein Widerspruch geändert).
+- **K76 — die zwei Ausnahmen, ausdrücklich benannt (in der K-Legende mitvermerkt).** K76 weicht von
+  der Praxis aller übrigen K-Kennungen **an genau zwei Punkten** ab, und **beide** sind **je einmalig**:
+  **(1)** K76 ist die **erste K-ID ohne Review-Befund** — sie entsteht aus einer Ausführungsbeobachtung
+  (DAG-Ausrichtung), nicht aus einem Finding eines Concept-Reviews; **(2)** mit K76 wurde **zum ersten
+  Mal eine Zeile im Rev.-0.7-Kopfblock** geändert (die K-Legendenzeile selbst), rein additiv. **K76
+  bleibt eine Korrektur-Kennung** im Sinne der Legende („kein Status, nur Auditierbarkeit") und **kein
+  Status-Element** — die Zählstände dieses Anhangs bleiben davon unberührt.
+
+**G. Verifikation von Ownership-Matrix (W2) und DAG-Kantenliste — read-only, nicht neu geschrieben.**
+
+- **Ownership-Matrix W2: vollständig und konsistent — keine Lücke.** Read-only nachgezählt, **ohne**
+  jede Korrektur: **9** Rev.-0.7-Dateizeilen (Kopfvermerk und Tabelle stimmen überein — die Lücke aus
+  **K71** ist damit geschlossen); **W2-9 = 5** `owns`-Zeilen; **W2-9 + W2-8 = 7**; **W2-4** `owns`
+  genau die **zwei** neuen E-7-Dateien und trägt bei `docs_freshness.py` /
+  `tests/test_doc_freshness.py` ausdrücklich „**nicht mehr** — E-7"; **W2-7** `owns` genau **fünf**
+  Dateien (**K46**-Lesart); Raster **10 Spalten** (Datei + 9 Tasks) in Kopf und **23** Datenzeilen
+  ohne Spaltenversatz. **K71 wird hier ausdrücklich nicht wiederholt, sondern nur bestätigt.**
+- **DAG-Kantenliste: vollständig — keine Lücke.** Kanten **1–15** in der Tabelle, **16/17/18**
+  additiv angehängt (Nummerierung fortgesetzt, keine bestehende Nummer geändert); die
+  Parallelgruppenliste nennt **PG-2a/2b/2c/2d/2e**; die Zyklenprüfung trägt die Rev.-0.7-Ordnung und
+  stimmt mit der Kantenliste überein.
+- **Einzige Beobachtung, kein Widerspruch:** die Zelle `scripts/lib/consistency/spec_plan.py` trug
+  einen **Vor-Implementierungs**-Anker (damals „Dep-Token-Muster **`:570`**"). **Er ist inzwischen an
+  Ort und Stelle korrigiert** (`:570` → nach W2-9 `_DEP_TOKEN_RE` `:68`); die Matrix bleibt **10** Spalten
+  breit und der Zählstand **9 / 5 / 7 / 23** ist unverändert. Vollständige Fundstellen und Auftrag:
+  **I**.
+
+**H. Das unversionierte Review-Artefakt — Eingangsgrundlage der Korrekturrunden 5 und 6.**
+
+- `docs/specs/2026-09-25-repository-documentation-consolidation-rereview-2.md` (**276 Z**, `??`,
+  **nie mitcommittet**) ist die **Eingangsgrundlage** beider Runden: **Runde 2 = Korrekturrunde 5
+  (K59…K70)**; die Findings **NEU-1…NEU-4** desselben Artefakts = **Korrekturrunde 6 (K71…K75)**,
+  jeweils über das **Re-Review 3** (R3-1, R3-2) nachgeschärft, dessen Notizen im Plan-Text stehen
+  (es existiert **kein** separates Re-Review-3-Artefakt).
+- Verdikt **`CHANGES_REQUESTED`**, 0 kritisch · **1 major** · 4 minor · 1 info. Die **1 major**
+  (NEU-1 → **K71**) ist behoben; das Verdikt selbst bleibt **unverändert** stehen, weil es den
+  damaligen Prüfstand dokumentiert.
+- **Es wird mit committet — ohne Inhaltswechsel.** Das Artefakt ist **Eingangsdokument**, kein
+  Editier-Ziel: kein Kommentar, keine Korrektur, keine Ergänzung, keine neue Verdiktzeile. Der
+  Frontmatter-Stand (`review-id: RVW-DOCS-CONSOLIDATION-R2`, `subject-revision: 0.7`, `round: 2`)
+  bleibt unangetastet. **Es wird auch kein Folgedokument erzeugt**, das es ersetzt.
+
+**I. Befund — Ankerdrift: Vollständige Fundstellen, Ist/Soll-Trennung und Auftrag mit Owner/Frist.**
+
+> **Herkunft dieses Abschnitts.** Die erste Fassung dieses Anhangs meldete denselben Befund, aber
+> **unvollständig** (drei statt fünf Live-Stellen), mit einer **vertauschten Zustandszuordnung** und
+> mit einer **unzulässigen Delegationsbegründung** (K48 in umgekehrter Bedeutung, ohne Owner/Frist).
+> Beides ist im Concept-Review `docs/concepts/concept-review-ownership-amendments-2026-09-28.md`
+> (2026-09-28, Verdikt `CHANGES_REQUESTED`, 3 major / 3 minor) beanstandet worden. Die Befunde
+> **M1**, **M2**, **M3** sowie **m1**–**m3** sind hier abgearbeitet; die Fundstellen wurden
+> **vollständig neu erhoben**, nicht aus dem Review übernommen.
+
+- **(a) `spec_plan.py:570` — vollständige Erhebung: 5 Live-Stellen, 3 geschützte Aufzeichnungen, 1
+  Fehltreffer.** **Selbst gemessen** (Grep `:570`, 2026-09-28) über den **ganzen** Plan:
+
+  | # | Stelle | Status | Behandlung |
+  |---|---|---|---|
+  | 1 | **`File Structure`** → „Geändert (Code) → `spec_plan.py`" | **Live-Inventar** (in Korrekturrunde 6 durch **K71** bearbeitet) | **hier korrigiert** — `:570` ist als **Vor-Implementierungs-Anker** gekennzeichnet, Ist-Ort `_DEP_TOKEN_RE` `:68` / Verwendung `:581` genannt |
+  | 2 | **`Rollback W2`**, Bash-Kommentar `# W2-9 (K71): Dep-Token-Muster :570` | **Live-Block** (Zeile von **K71** ergänzt) | **hier korrigiert** — gleiche Kennzeichnung; der Historic-Anker `:570` bleibt sichtbar |
+  | 3 | **Ownership-Matrix**, Zelle `spec_plan.py` | **Live-Abschnitt** (Zeile von **K71** ergänzt) | **hier korrigiert** — „Dep-Token-Muster **`:570`**" → nach W2-9 „**`_DEP_TOKEN_RE` `:68`**" |
+  | 4 | **Task W2-9 `Interfaces`** | **Task-Verbatim-Text** | **nicht** angetastet → **Auftrag** an `senior-developer`, Frist: **mit dem Commit von W2-9** (siehe unten) |
+  | 5 | **Task W2-9 `Schritt 2`** (live Anweisung: „Dep-Token-Muster in `scripts/lib/consistency/spec_plan.py:570` erweitern") | **Task-Verbatim-Text** | **nicht** angetastet → **Auftrag** an `senior-developer`, Frist: **mit dem Commit von W2-9** (siehe unten) |
+  | 6 | **K62-Katalog** im Kopf-Block der Korrekturrunde 5 | **wortgleich geschützt** | **bewusst ausgelassen** — dokumentiert den Stand der Korrekturrunde 5 |
+  | 7 | **Zuordnungsregister Korrekturrunde 5**, Zeile `RVW-7-04` | **wortgleich geschützt** (Korrekturrunden 1–5) | **bewusst ausgelassen** |
+  | 8 | **Zuordnungsregister Korrekturrunde 6**, Zeile `NEU-1` | **wortgleich geschützt** (Befundsatz) | **bewusst ausgelassen** — **Folge, ausdrücklich:** dieses Register zitiert die Matrix-Zelle **wortgleich mit `:570`**; die Korrektur oben macht das Zitat zum Stand **vor** dieser Korrektur und wird über die **K71-Lesart-Regel** aufgelöst (dieselbe Mechanik, mit der K71 den `E-8`-Record auflöst) |
+  | — | `plan:570` **innerhalb von Task W1-10** (Absenz-Default IC-22) | **Fehltreffer** | ein **Planzeilen**-Verweis (auf den OQ2-Record), **kein** `spec_plan.py`-Anker — zu Recht nicht als Fundstelle geführt |
+
+  **Nach der Korrektur dieses Anhangs: 2 Live-Stellen** (Nr. 4 und 5) sind offen, **3** sind behoben.
+  **Das Betriebsrisiko ist damit kleiner, aber nicht null:** W2-9 `Schritt 2` bleibt bis zum Commit
+  eine **live Anweisung**, die auf `:570` zeigt. Siehe den Auftrag unten.
+
+- **(b) `check_readme_docs_index` — Ist und Soll sind getrennt und dürfen nicht verwechselt werden.**
+  - **Ist (gemessen, Working Tree 2026-09-28, uncommitteter Zwischenstand):** die Funktion liegt bei
+    **`docs_links.py:167-198`**; `_v4_in_scope` `:122-140`, `_v4_unlinked_relpaths` `:143-164`,
+    fail-soft-Zeile `:183`, Docstring `:168-177`. **Diese Werte beschreiben den Zwischenstand vor dem
+    E-5-Rework** — sie sind heute korrekt und werden **nicht** zu Sollwerten erklärt.
+  - **Der Plan-Anker ist bereits heute veraltet.** `docs_links.py:121-…` (Task W2-7) stammt aus der
+    **K48**-Tabelle (Korrekturrunde 4) und ist gegenüber dem Working Tree **schon jetzt** verrutscht.
+    Es ist ein **Vor-Implementierungs-Anker**, kein Sollwert.
+  - **Soll (nach dem E-5-Rework, W2-6): nicht vorab bestimmbar.** Der Funktionsrumpf wird ersetzt
+    (K54/K59–K65/K68: Kategorie-Extraktion statt Seiten-Scan), die Docstring-Korrektur **K68** kommt
+    hinzu ⇒ die Position **nach** dem Rework lässt sich **nicht** vorab als Zeilenzahl festschreiben.
+    **Es wird deshalb ausdrücklich kein Soll-Anker gesetzt.** **Die Korrektur ist: neu messen beim
+    Commit von W2-6**, nicht auf eine vorab geratene Zeile umschreiben.
+  - **Gleiches gilt für die W2-6-eigenen Anker** (`docs_links.py:167`, Docstring `:170-172` in
+    `Interfaces`): sie sind **Ist-Messungen** des heutigen Zwischenstands und **kein** Zielwert. Auch
+    sie sind erst **nach** dem Rework neu zu messen — **beide** Anker bleiben deshalb unverändert und
+    sind **kein** Befund, weil sie als Ist zutreffend sind.
+
+- **(c) Bewertung unverändert: kein Widerspruch.** Keine ID, kein Sollwert, kein Akzeptanzkriterium und
+  keine Ownership-Entscheidung sind betroffen — es ist **Ankerdrift**, dieselbe Klasse wie
+  **K47/K48/K72**. Die betroffenen Stellen sind **nicht** als wortgleich festgeschrieben (Ausnahme:
+  die drei Befundsaufzeichnungen in der Tabelle zu (a), die **bewusst** ausgelassen bleiben).
+
+- **(d) Auftrag statt Empfehlung — die Delegation ist regelkonform belegt.** Die erste Fassung stützte
+  die Aufschiebung auf **K48**; das war **in umgekehrter Richtung falsch**: K48 ist eine
+  **In-place**-Regel („unvollständig, nicht falsch" → vollständig erfassen), **keine** Aufschiebung.
+  **K48 wird hier nicht mehr als Delegationsbegründung angeführt.** Stattdessen gilt der Mechanismus,
+  den dieser Plan für genau diesen Fall bereits etabliert hat: die **K71-Lesart-Regel** — eine Stelle
+  nennt den Stand **vor** der Änderung und wird dadurch aufgelöst, **ohne** einen wortgleichen Block
+  anzufassen. **Belege, die die Delegation tragen:**
+  1. **Owner benannt:** `senior-developer` — der Agent des Tasks **W2-9** (`Agent:`-Zeile des Tasks,
+     **selbst gemessen**). W2-9 **besitzt** `spec_plan.py` (`Files:` des Tasks; Ownership-Matrix
+     `owns`-Zelle) und **verursacht** den Anker, weil W2-9 die Datei schreibt. Ein Task kann seine
+     eigenen Anker nicht einem anderen Task überlassen.
+  2. **Frist benannt:** **mit dem Commit von W2-9**, spätestens im **LEDGER-Stand-Vermerk von W2-9**
+     (dessen Schritt 4). Eine Frist ohne benannten Task und ohne Zeitpunkt wäre unterdeterminiert.
+  3. **Exakter Änderungsauftrag** (nachträglich anführbar, additiv, am K71-Muster): in W2-9
+     `Interfaces` **und** in `Schritt 2` **je einen** Lesart-Satz ergänzen — *„der Anker `:570` ist ein
+     **Vor-Implementierungs-Anker**; nach dem Commit gilt `_DEP_TOKEN_RE`
+     (`scripts/lib/consistency/spec_plan.py:68`, Verwendung `:581`)"*. **Nur** dieser Satz, **kein**
+     Eingriff in den übrigen Tasktext, **keine** Änderung von `Files:`, Akzeptanz oder Schrittzahl.
+  4. **Warum hier nicht selbst korrigiert:** beide Stellen liegen im **Task-Verbatim-Text**. Der
+     Auftrag dieses Anhangs ist **append-only** (K34-Präzedenz) und umfasst **nicht** den Tasktext.
+     Eine eigene Einfügung dort würde genau die Wortlautgrenze verletzen, die K36/K42 als Fehler
+     behandeln — die drei Stellen oben wurden stattdessen **an Ort und Stelle** korrigiert, weil sie
+     **kein** Tasktext sind.
+
+- **(e) Keine neue K-Kennung für diese Runde — bewusst entschieden.** Die Befunde **M1/M2/M3** und
+  **m1**–**m3** sind **additive Berichtigungen dieses Anhangs**; ihr Register ist das Review-Artefakt
+  `docs/concepts/concept-review-ownership-amendments-2026-09-28.md`, in dem jedes Finding eine eigene
+  ID trägt. **K76 bleibt die höchste K-Kennung** — es wird **nichts** umnummeriert und **keine** ID
+  vergeben. **Ausdrücklich abweichend vom Muster K72** (dort vergab die Korrekturrunde eine K-ID für
+  einen Anker-Fix): hier liegt **kein** Korrekturgrund **im Plan**, sondern in **einem eigenen
+  Anhang**; eine neue K-ID im Plan-Kopf würde den Katalog des Vorhabens mit einem Befund belasten, der
+  den Plan selbst nicht betrifft. **Diese Entscheidung ist damit prüfbar und ggf. anfechtbar.**
+
+**J. Was dieser Anhang ausdrücklich nicht behauptet.** Kein Task ist abgehakt. Kein Volltestlauf
+wurde ausgeführt, kein `sync.py`, kein `pytest`, keine Git-Mutation. Die **1 major** des Reviews ist
+über **K71** im *Plan* behoben — die **Verifikation im Working Tree** steht aus. W2-9 ist
+implementiert, aber **nicht verifiziert** und **nicht committet**; W2-6 enthält eine Implementierung,
+die **ersetzt**, nicht **repariert** wird. Das Wellen-Gate **W2** ist **nicht** erreicht.
 
 ### L-2 Blockierende Befunde (B-1 … B-5)
 
