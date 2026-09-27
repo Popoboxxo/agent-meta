@@ -2212,9 +2212,13 @@ Datenverlust-Potenzial und `agents/`-Berührung ist.
       der dritten Korrekturrunde, RVW2-1/RVW2-4; Rev. 0.6: U-2/K24 nachgezogen).** Die
       Aussage „keine `docs.*`-Findings" ist als **Aggregat über alle neun Checks** **dauerhaft
       unerreichbar** und wird deshalb **nicht** als Aggregat geführt. **Stand 2026-09-27
-      (Baseline-Messung, Übergabe vom Parent):** **V7** (`check_wiki_staleness`, WARNING) meldet
-      **11** Wiki-Seiten mit `type: "Architecture"` **ohne** `derived-from` — **korrigiert von 10
-      auf 11** (K24; die Zahl 10 stammt aus der Messung vom 2026-09-26) — Termin **W5-3**;
+      (Baseline-Messung; **Rev. 0.6 / K51 berichtigt**: K24 hatte 10 auf 11 gehoben — die
+      Übergabemessung war eine **Fehlmessung**):** **V7** (`check_wiki_staleness`, WARNING) meldet
+      **10** Wiki-Seiten mit `type: "Architecture"` **ohne** `derived-from` — **über das Frontmatter
+      gemessen** (`:2` in allen 10 Dateien, sämtlich unter `knowledge/wiki/concepts/`; ein
+      `type:`-Zeilen-Scan über ganze Dateien zählte zusätzlich den **Body**-Wertelisten-Kommentar
+      `type: "Concept" # Concept | Architecture | …` in `core-principle-knowledge-engine.md:46`, dessen
+      Seite den Typ `"Concept"` trägt) — Termin **W5-3**;
       **V3** (`check_internal_links`, ERROR) meldet **drei Klassen**: **2** `branch=="layout"`
       (`README.md:722`/`:723`, `howto/setup/`, `howto/features/` — Termin **W8-2**, Owner
       `developer`), **25** `branch=="link"` (alle unter `docs/**`, **kein** Termin 0 in W0–W8 —
