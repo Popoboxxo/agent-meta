@@ -53,6 +53,15 @@ rule) is pinned at the end of this file. The ownership rule is asserted in
 an index this generator wrote stays updatable — a fail-closed rule that quietly
 froze the index after its first creation would pass the first half and break the
 second.
+
+**W3-6 adds the end-to-end counterpart** (``test_skeleton_replaced_once``, at
+the very end): the same one-time-skeleton-replacement claim, but driven over a
+**copy of this repository's real ``docs/`` tree** with the real ``DOCS_*`` facts
+and the real ``docs-consolidation`` block. The unit-level guards above prove
+the branch on a three-page fixture; the end-to-end one proves the document the
+repository would actually publish — every page linked exactly once, no
+self-reference, the volatile section last and an IC-14 footer that carries both
+the ``facts-hash`` and the generator id.
 """
 
 from __future__ import annotations
@@ -3147,4 +3156,195 @@ def test_ke_index_stays_authoritative(tmp_path: Path, monkeypatch):
     ke_notes = [line for line in log.infos if doc_renderer.KE_AUTHORITATIVE_REASON in line]
     assert len(ke_notes) == 1, log.infos
     assert doc_index.DOCS_INDEX_RELPATH in ke_notes[0], ke_notes[0]
+
+
+# ---------------------------------------------------------------------------
+# W3-6 — the end-to-end proof: the scaffold skeleton is replaced **once**
+# ---------------------------------------------------------------------------
+#
+# W3-3 left this name deliberately free ("W3-6 owns the end-to-end variant of
+# this against the real tracked ``docs/INDEX.md``"). The plan states the claim in
+# one line — the skeleton is replaced **once**
+# (``log.action("UPDATE", "docs/INDEX.md", …)`` exactly once) and a second run
+# reports ``unchanged`` with **zero** write operations — and this test is the
+# end-to-end version of it: the real ``docs/`` tree, the real ``DOCS_*`` facts
+# computed from the real checkout, the scaffold's own skeleton bytes, and the
+# real ``docs-consolidation`` block read out of ``.meta-config/project.yaml``.
+#
+# It is deliberately *not* the unit-level guard of
+# :func:`test_scaffold_skeleton_is_owned_and_replaced_under_full_mode` on a
+# three-page fixture: that one proves the branch, this one proves the branch on
+# the corpus the repository actually has — where a `## other` bucket, a missing
+# frontmatter `description` and four `archive/` directories all have to land
+# correctly for the second run to reach ``unchanged`` at all.
+
+
+def _e2e_docs_project(tmp_path: Path) -> Path:
+    """A project root holding a **copy** of this repository's real ``docs/`` tree.
+
+    A copy, not the checkout itself: the writer is contractually allowed to
+    replace ``docs/INDEX.md``, so pointing it at ``_REPO_ROOT`` would let a test
+    rewrite tracked files.  Everything else is real — the page set, the
+    frontmatter (and with it the genuine ``—`` placeholders), the ``archive/``
+    directories that must not be indexed, the sort order and therefore the
+    section layout.
+
+    ``symlinks=True`` keeps the copy faithful without following anything:
+    :func:`doc_index.build_index_model` skips symlinks by contract, so following
+    one here would put a page in the tree that the model deliberately never lists.
+    """
+    import shutil
+
+    root = tmp_path / "e2e"
+    root.mkdir()
+    shutil.copytree(
+        _REPO_ROOT / doc_index.DOCS_RELPATH,
+        root / doc_index.DOCS_RELPATH,
+        symlinks=True,
+        ignore_dangling_symlinks=True,
+    )
+    return root
+
+
+def _e2e_config() -> dict:
+    """The **live** ``docs-consolidation`` block, plus the one axis IC-13 demands.
+
+    The block is read out of ``.meta-config/project.yaml`` rather than re-spelled
+    here, so the test answers the *production* question: switch the gate off in
+    production and this fails.  ``knowledge-engine.enabled: false`` is the single
+    deliberate deviation, and it is load-bearing rather than cosmetic:
+    :func:`scripts.lib.spec_plan_scaffold.resolve_index_mode` answers
+    ``knowledge-engine`` for agent-meta's own configuration, and IC-13/IC-15 then
+    make the knowledge engine the authoritative owner of ``docs/INDEX.md`` — the
+    docs stage reports ``skipped`` and writes nothing at all (scenario 52,
+    ``asserts/52:44``, and :func:`test_ke_index_stays_authoritative`).  "The
+    generator replaces the scaffold's placeholder" is therefore a claim about
+    projects whose knowledge engine does not own the path, and the fixture has to
+    be one of them for the claim to be about anything.
+    """
+    import yaml
+
+    if not _LIVE_PROJECT_CONFIG.exists():
+        pytest.skip("no .meta-config/project.yaml in this checkout")
+    live = yaml.safe_load(_LIVE_PROJECT_CONFIG.read_text(encoding="utf-8")) or {}
+    block = live.get("docs-consolidation") or {}
+    assert block.get("enabled") is True, (
+        "the live config must switch the gate on for this test to mean anything; "
+        f"got {block!r}"
+    )
+    return {
+        "docs-consolidation": dict(block),
+        "knowledge-engine": {"enabled": False},
+    }
+
+
+def _run_sync_e2e(root: Path, config: dict) -> tuple[dict, SyncLog]:
+    """:func:`doc_renderer.sync_docs_consolidation` against the **real** source root.
+
+    The sibling :func:`_run_sync` deliberately passes a path that does not exist:
+    its subject is the write contract, not this repository's state.  The
+    end-to-end variant needs the opposite — the values that land in the
+    ``docs-facts`` block and in the IC-14 ``facts-hash`` must be the real ones, or
+    the rendered document is a fixture wearing the production API.  Read-only:
+    ``compute_doc_facts`` never writes below ``agent_meta_root`` (AC-01).
+    """
+    log = SyncLog()
+    plan = doc_renderer.sync_docs_consolidation(
+        _REPO_ROOT, root, config, {}, log, dry_run=False
+    )
+    return plan, log
+
+
+def test_skeleton_replaced_once(tmp_path: Path):
+    """IC-13/IC-15 end-to-end: the scaffold skeleton is replaced **once**.
+
+    Four claims, in the order a reviewer checks them:
+
+    1. **Once.** The first run over a real ``docs/`` tree whose ``docs/INDEX.md``
+       is the scaffold's own placeholder logs exactly one ``UPDATE`` for that
+       path, writes nothing else, and says in its note that the file it took over
+       belongs to the scaffold — not to a foreign writer.
+    2. **Owned.** The bytes that land carry :data:`DOCS_GENERATOR_ID` in the IC-14
+       footer and are not the skeleton.  This is what makes a *second* run
+       possible at all: the ownership probe is a substring search for that id, so
+       an index without it would be permanently ``skipped`` — a freeze that looks
+       exactly like a clean no-op.
+    3. **Complete and shaped.** Every real ``docs/`` page appears as a link
+       exactly once; ``docs/INDEX.md`` never lists itself; the kind sections run
+       in :data:`~scripts.lib.doc_index.KIND_ORDER`; the ``docs-facts`` block is
+       present; the ``docs-volatile`` section is **last**; and the IC-14 footer
+       closes the file with a 16-hex ``facts-hash``.  ``docs/architecture/INDEX.md``
+       is W4-3's deliverable — it must not be listed and must not be created.
+    4. **Idempotent.** The second run reports ``unchanged``, logs **no** action
+       and leaves every byte of the tree untouched.  This is what makes claim 1
+       "once" rather than "at least once".
+    """
+    rel = doc_index.DOCS_INDEX_RELPATH
+    root = _e2e_docs_project(tmp_path)
+    target = root / rel
+    target.write_text(spec_plan_scaffold._FILE_INDEX_SKELETON, encoding="utf-8")
+    assert spec_plan_scaffold.is_file_index_skeleton(
+        target.read_text(encoding="utf-8")
+    ) is True, "the fixture must really be the scaffold's placeholder"
+    # The tree as the writer will see it — before its own output exists.
+    expected = {
+        entry["path"] for entry in doc_index.build_index_model(root)["entries"]
+    }
+    expected.discard(doc_index.DOCS_INDEX_FILENAME)
+    assert expected, "the real docs tree must not be empty"
+
+    config = _e2e_config()
+
+    # (1) once.
+    plan, log = _run_sync_e2e(root, config)
+    assert plan == {"written": [rel], "unchanged": [], "skipped": []}, plan
+    assert len(log.actions) == 1, log.actions
+    assert "UPDATE" in log.actions[0] and rel in log.actions[0], log.actions
+    assert doc_renderer.SCAFFOLD_SKELETON_REASON in log.infos[0], log.infos
+    assert doc_renderer.OWNERSHIP_REASON not in log.infos[0], log.infos
+
+    document = target.read_text(encoding="utf-8")
+
+    # (2) owned.
+    assert doc_renderer.DOCS_GENERATOR_ID in _footer_of(document)
+    assert doc_renderer._carries_generator_id(document) is True
+    assert spec_plan_scaffold.is_file_index_skeleton(document) is False
+    assert spec_plan_scaffold._FILE_INDEX_SKELETON_MARKER not in document
+
+    # (3) complete and shaped.
+    links = _link_targets(document)
+    assert sorted(links) == sorted(expected), "the index does not carry the real tree"
+    assert len(links) == len(set(links)), "a page is linked twice"
+    assert doc_index.DOCS_INDEX_FILENAME not in links, "the index lists itself"
+    assert "architecture/INDEX.md" not in links, "W4-3's index must not appear in W3"
+    assert not (root / doc_index.DOCS_RELPATH / "architecture" / "INDEX.md").exists()
+
+    headings = _kind_headings(document)
+    assert headings == [kind for kind in doc_index.KIND_ORDER if kind in headings]
+    assert re.findall(r"^## (\S+)$", document, re.MULTILINE) == headings + [
+        doc_renderer.VOLATILE_SECTION_NAME
+    ], "the volatile section is not last (IC-10(e))"
+    assert document.index(doc_renderer.FACTS_BEGIN_MARKER) < document.index(
+        doc_renderer.VOLATILE_HEADING
+    )
+    assert document.index(doc_renderer.FACTS_END_MARKER) < document.index(
+        doc_renderer.VOLATILE_HEADING
+    )
+    footer = _footer_of(document)
+    assert re.search(
+        rf"^facts-hash: [0-9a-f]{{{doc_renderer.FACTS_HASH_CHARS}}}$",
+        footer,
+        re.MULTILINE,
+    ), footer
+    assert f"generator: {doc_renderer.DOCS_GENERATOR_ID}" in footer
+    assert document.rstrip().endswith(doc_renderer.FOOTER_END_MARKER), (
+        "the footer must close the file, not sit in the middle of it"
+    )
+
+    # (4) idempotent.
+    before = _tree_snapshot(root)
+    second, second_log = _run_sync_e2e(root, config)
+    assert second == {"written": [], "unchanged": [rel], "skipped": []}, second
+    assert second_log.actions == [], second_log.actions
+    assert _tree_snapshot(root) == before, "the second run changed a byte"
 
