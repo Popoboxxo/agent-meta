@@ -273,33 +273,38 @@ def v1_strict(config: dict | None) -> bool:
 
 def _v1_finding(severity: Severity, relpath: str, lineno: int, branch: str,
                 message: str) -> Finding:
-    """Build the house ``Finding`` and attach the two attributes IC-05 requires.
+    """Build the house ``Finding``; both IC-05 fields go through the constructor.
 
-    ``Finding`` (``report.py``) has no ``line`` and no ``branch`` field and that
-    module is not owned by W2-1, so the attributes are set on the instance.
-    W2-7, which owns both the runner registration and the common gate, should
-    promote them to dataclass fields so ``--json`` stops dropping them.
+    Since W2-7 (K15/B-5) ``line`` and ``branch`` are **declared** dataclass
+    fields of ``Finding`` (``report.py``) with the defaults ``None`` and ``""``,
+    and ``print_json_report`` serialises both. V1 always knows a line and a
+    branch, so it passes them as constructor arguments instead of attaching
+    them to the instance afterwards: a declared field belongs to the signature,
+    and the JSON report reads the attribute, not the call site.
     """
-    finding = Finding(
+    return Finding(
         severity=severity,
         check=V1_CHECK_ID,
         file=relpath,
         message=message,
         suggestion=V1_SUGGESTION,
+        line=lineno,
+        branch=branch,
     )
-    finding.line = lineno
-    finding.branch = branch
-    return finding
 
 
 def check_no_manual_counts(root: Path, config: dict | None = None) -> list[Finding]:
     """V1: hand-maintained counts and version literals in the entry documents.
 
-    ``config`` is the project config dict; only
-    ``docs-consolidation.checks.strict`` is read (severity). The
-    ``docs-consolidation.enabled`` common gate and the runner registration
-    belong to W2-7 — until then this function is a no-op in practice because
-    nothing calls it (AC-38).
+    ``config`` is the project config dict; only ``docs-consolidation.checks.strict``
+    is read (severity). The ``docs-consolidation.enabled`` common gate lives at the
+    **call site** — ``docs_consolidation_enabled()`` in
+    ``scripts/consistency-check.py`` wraps this function in the registry loop it
+    gates (IC-05, IC-22). Since W2-7 the check is **registered and called**: it is
+    the first entry of ``DOCS_CHECKS`` and the gated block invokes it, so it is a
+    live check. Called directly it reports regardless of the switch — the property
+    the fail-off default of IC-22/AC-38 rests on: a project that never set the key
+    runs the runner, and the runner does not call this function at all.
     """
     severity = Severity.ERROR if v1_strict(config) else Severity.WARNING
     findings: list[Finding] = []
@@ -489,11 +494,12 @@ def _v6_finding(kind: str, relpath: str, message: str, *,
                 lineno: int | None = None) -> Finding:
     """The house ``Finding`` for *kind*, plus the ``kind`` attribute.
 
-    ``Finding`` (``report.py``) has no ``kind`` and no ``line`` field and that
-    module is not owned by W2-5, so both are set on the instance — the same
-    two-part contract ``_v1_finding`` uses, and the same W2-7 follow-up.
-    ``line`` is set only where the finding points into a document; the oracle
-    axis names a key, and a magic ``0`` would print as a location.
+    ``Finding`` (``report.py``) has **no** ``kind`` field and that module is
+    not owned by W2-5, so ``kind`` — and ``line`` wherever the finding points
+    into a document — are still set on the instance. ``line`` itself has been a
+    **declared** field since W2-7 (K15/B-5) and the constructor would take it;
+    only the call form is left, here and in ``_v3_finding``. The oracle axis
+    names a key, not a line, and a magic ``0`` would print as a location.
     """
     finding = Finding(
         severity=V6_SEVERITY_BY_KIND[kind],

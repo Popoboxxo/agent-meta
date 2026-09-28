@@ -3964,25 +3964,381 @@ genommen kein Welle-Gate** (RVW-3);
 `bash tests/scenarios/run.sh 50 51 52 54 55 56` → **0**;
 `python3 scripts/consistency-check.py --json | python3 -c 'import json,sys;d=json.load(sys.stdin);print(sorted({k for f in d["findings"] for k in f}))'` → enthält `line` **und** `branch` (F1-PROMOTION, vacuously grün, solange `docs-consolidation.enabled: false` — dann mit dem pytest-Nachweis kombinieren).
 **Steps:**
-- [ ] 1: Test schreiben (fail). **RVW2-5 (verbindlich in dieser Task):** den
+- [x] 1: Test schreiben (fail). **RVW2-5 (verbindlich in dieser Task):** den
       Nicht-Registrierungs-Pin `test_v1_is_not_wired_into_the_runner_yet`
       (**`tests/test_doc_freshness.py:364-383`**, Rev. 0.6 / K47 — Datei nach dem W2-0-Verschieb;
       vor dem Split `tests/test_doc_facts.py:2403-2422`) durch den **positiven** Registrierungs-Pin
       `test_v1_is_registered_in_the_runner` ersetzen (Import in `consistency-check.py` **und**
       `docs.no_manual_counts` im `findings[]` eines Fixture-Laufs mit `enabled: true`); den
       ausgeliehen Test **nicht** löschen, sondern im Testmodul kommentieren.
-- [ ] 2: Checks registrieren; Common-Gate als erste Bedingung in jeden Check einziehen.
+- [x] 2: Checks registrieren; Common-Gate als erste Bedingung in jeden Check einziehen.
       **RVW2-1:** die Registrierung ist damit der **einzige** Nachweis der Registrierungszahl —
       `docs-checks` im W-GATE zählt befundliefernde Checks und ist **kein** Registrierungsnachweis.
       **Rev. 0.6 (K20):** die Importe in `scripts/consistency-check.py:52-56` bleiben **unverändert**
       — registriert wird **weiter über die Fassade `docs.py`**, nicht modulweise; genau das macht den
       Fassaden-Contract (K19) zur Voraussetzung der Registrierung.
-- [ ] 3: Tests grün beobachten; Szenario-Lauf beobachten.
-- [ ] 4: **K15 / B-5 — `line` und `branch` in `report.py` zu Dataclass-Felder mit Default
+- [x] 3: Tests grün beobachten; Szenario-Lauf beobachten.
+- [x] 4: **K15 / B-5 — `line` und `branch` in `report.py` zu Dataclass-Felder mit Default
       machen, in `print_json_report` serialisieren und `_v1_finding` (**`docs_freshness.py:255-273`**,
       Rev. 0.6 / K48) auf
       den Konstruktor umstellen**; F1-PROMOTION-Test schreiben (grün beobachten).
-- [ ] 5: commit via `git`-Agent: `feat: register docs checks behind fail-off common gate`.
+- [x] 5: commit via `git`-Agent: `feat: register docs checks behind fail-off common gate`.
+
+> **LEDGER-Stand 2026-09-28 — W2-7 abgehakt über den maschinellen Ledger-Writer (Fortschrittsnotiz,
+> keine Änderung der Task-Semantik).** Abgehakt **5** von **5** Checkboxen gegen diesen Plan, Task-ID
+> **`W2-7`**. Dry-Run: `tasks updated: W2-7`, `checkboxes would toggle: 5`, **Exit 0**, **keine**
+> `unmatched`-Zeile. Schreibender Lauf: `tasks updated: W2-7`, `checkboxes toggled: 5`, **Exit 0**,
+> **keine** `unmatched`-Zeile; der Plan-Diff gegen die Vorher-Kopie umfasst ausschließlich diese
+> **5** Checkboxen und diese Notiz. Plan bleibt `status: APPROVED`, `revision: 0.7`, keine ID
+> umnummeriert. **Ehrlich zu Schritt 5:** auftragsgemäß mit abgehakt, der **Commit ist nicht erfolgt** —
+> W2-7 lief als **No-Commit**-Task, der Commit ist der Schritt des `git`-Agenten.
+> **Registrierung (RVW0/Schritt 2), gemessen — `check="docs.<name>"` pro Check:** Die einzige
+> Registrierungsstelle ist die Tabelle `DOCS_CHECKS` in `scripts/consistency-check.py:105-113`, in
+> IC-05-Reihenfolge: `check_no_manual_counts` (V1) `:106`, `check_docs_index_completeness` (V2) `:107`,
+> `check_internal_links` (V3) `:108`, `_readme_docs_index` (V4) `:109`, `check_role_generation_parity`
+> (V5) `:110`, `check_docs_facts_fresh` (V6) `:111`, `check_wiki_staleness` (V7) `:112`. **7** von **7**
+> implementierten Checks registriert; **V8** (`check_spec_plan_path_convention`, W6-2) und **V9**
+> (`check_stale_backups`, W8-4) existieren noch nicht und werden von ihren Tasks an derselben Stelle
+> angehängt. Die Check-IDs stehen als Kommentar an der jeweiligen Registrierungszeile, weil die IDs den
+> Familienmodulen gehören und eine zweite Quelle im Runner nur driftfähig wäre.
+> **K20 — gemessene Lesart der Importvorgabe:** der Importblock `scripts/consistency-check.py:53-63`
+> ist **weiterhin genau ein** `from lib.consistency.docs import (...)` — die Fassade, nicht modulweise;
+> modulweise Importe (`lib.consistency.docs_links` / `docs_freshness` / `docs_freshness_v5` /
+> `docs_index` / `docs_wiki`) kommen im Runner **mit 0 Treffern** nicht vor. Gewachsen ist
+> **ausschließlich die Namensliste** innerhalb dieses einen Blocks, denn der Block *ist*
+> laut Plan (`Registrierungszahl`-Zeile, `:2295`) die Registrierungsstelle, und der positive Pin (a)
+> verlangt `check_no_manual_counts` wörtlich in diesem Block. Eine wörtlich unveränderte
+> Dreier-Namensliste bei gleichzeitig registrierten V1…V7 wäre nicht widerspruchsfrei.
+> **Die drei Zahlen, gemessen und nicht zu verwechseln (Korrektur einer früheren Notiz-Fassung, die
+> „3 → 7 Namen" schrieb):** der Importblock hat **3 → 9** Namen, die Registry `DOCS_CHECKS` **7**,
+> und die Fassade exportiert **9** `check_*`-Callables. Die Differenz **9 − 7 = 2** sind die beiden
+> vorbestehenden, **ungegateten** Altchecks `check_sync_cli_docs` und `check_ui_help_mappings`, die
+> IC-05 außerhalb der V-Familie hält (einargumentige Signatur, kein `config`): sie stehen im
+> Importblock, werden aber **nicht** über `DOCS_CHECKS` registriert. Der Fassaden-Contract
+> (K19) ist damit wirksam: die Namen stehen in `docs.py:79-85` im `__all__`
+> (`V2_CHECK_ID`, `check_docs_index_completeness`, `V5_CHECK_ID`, `check_role_generation_parity`,
+> `V6_CHECK_ID`, `check_docs_facts_fresh`, `V7_CHECK_ID`, `check_wiki_staleness`), die Importe in
+> `docs.py:37-59`. **K46 eingehalten:** nur W2-1, W2-2, W2-0 und W2-7 führen die Fassade; W2-3/W2-4/
+> W2-5/W2-6 führen sie nicht.
+> **Common-Gate (IC-05/IC-22/AC-38), Ort und Fail-off-Beleg:** `docs_consolidation_enabled()`
+> `scripts/consistency-check.py:131-149`, `load_project_config()` `:116-128`; die **erste Bedingung**
+> des gesamten registrierten V-Blocks ist `scripts/consistency-check.py:292`, der Aufruf der
+> sieben Checks `:293-294`. **Fail-off am Default, gemessen:** `docs-consolidation.enabled` ist in
+> **diesem** Repo seit W1 explizit gesetzt (`.meta-config/project.yaml:398-399`, `enabled: true`) —
+> der rohe Runner ist deshalb **nicht** no-op, und die Aussage „der Schalter ist im Repo nicht gesetzt"
+> trifft für agent-meta selbst **nicht** zu (NFA-04/IC-22: in Consumer-Projekten ist er es). Der
+> Fail-off-Nachweis ist deshalb an **Abwesenheit** geführt und in
+> `tests/test_doc_freshness.py::test_the_common_gate_is_the_first_condition_of_every_registered_check`
+> (`:463`) gepinnt: dieselbe `run_checks()`-Zeile liefert über einen Baum **ohne** Block **0**
+> `docs.`-Findings und über einen Baum, der sich **nur** durch `docs-consolidation: {enabled: true}`
+> unterscheidet, **4** (`docs.no_manual_counts`, `docs.docs_index_completeness`, `docs.internal_links`,
+> `docs.readme_index`); explizites `enabled: false` verhält sich wie Abwesenheit. Die
+> Schalter-Wahrheitstabelle (fehlender Block, leerer Block, `false`, Nicht-Boolean `"false"`,
+> Nicht-Mapping `docs-consolidation: true` ⇒ **alle** zu) ist mitgemessen; `is True` statt
+> Truthiness ist die fail-off-Seite und auf jedem schema-gültigen Input identisch zu
+> `knowledge.py:127`. **Die sechs Szenario-Fixtures `5[0-6]-*.project.yaml` setzen den Schlüssel nach
+> wie vor nicht** (gepinnt in `test_the_scenario_configs_never_set_the_common_gate`, `:511`).
+> **Exit-Code-Vertrag (AC-24), alle drei Werte gemessen — Doku `scripts/consistency-check.py:24-26`
+> unverändert gültig:** **0** (0 Errors) end-to-end als Prozess-Exit über ein Fixture mit
+> Gate zu ⇒ `summary {total 0, errors 0, warnings 0}`, Exit **0** (auch im Textbericht); **1** (genau
+> 1 Error) end-to-end über ein Gate-an-Plus-`checks.strict`-Fixture ⇒ `summary {total 1, errors 1}`,
+> Exit **1**, und der eine Error ist ein `docs.no_manual_counts`-V1a-Fund; **2** (Skriptfehler)
+> end-to-end über `--file <nicht vorhanden>` ⇒ Exit **2**. Gepinnt in
+> `tests/test_doc_facts.py::test_exit_codes_unchanged_with_new_checks` (`:2682`), zusätzlich
+> in-process an beiden Renderern (`print_report`/`print_json_report`: 0 ⇒ 0, 1 Error ⇒ 1).
+> **F1-PROMOTION (K15/B-5), Felddefinition und Serialisierung:** `Finding` in
+> `scripts/lib/consistency/report.py:31-61` — `line: int | None = None` (`:60`) und
+> `branch: str = ""` (`:61`), beide **mit Default** und hinter `suggestion`, damit jeder bestehende
+> Konstruktoraufruf einschließlich des positionellen in `python_compat.py` unverändert bleibt;
+> serialisiert in `print_json_report` (`:105-126`, Schlüssel `:116-117`). `__str__` (`:63`) ist
+> **unverändert** und zeigt weiterhin nur `message`, damit die message-only-Pins in
+> `tests/test_doc_facts.py` grün bleiben. `from __future__ import annotations` (`:3`) ist
+> hinzugekommen, weil `int | None` sonst ein Python-3.9-Importfehler wäre
+> (`check_py39_union_syntax`).
+> **Gemessener Schlüsselsatz aus dem echten Report:** `python3 scripts/consistency-check.py --json`
+> ⇒ `['branch', 'check', 'file', 'line', 'message', 'severity', 'suggestion']` — **vor** W2-7 waren es
+> `['check', 'file', 'message', 'severity', 'suggestion']`. Der F1-Nachweis als pytest
+> (`test_finding_carries_line_and_branch_through_the_json_report`, `tests/test_doc_facts.py:2622`)
+> läuft die **echte Kommandozeile** als Subprozess und liest sie mit `json.loads`; er prüft **drei**
+> Formen in einem Report: V1a (`line 1`, `branch "V1a"`), V3 (`line 3`, `branch "link"`) und V2
+> (`line None`, `branch ""`) — die letzte schließt eine bedingte Serialisierung aus.
+> **Stand nach dem Abschluss-Fix (F-A) — der Konstruktor ist jetzt der Weg, und die frühere
+> „keine Wirkung"-Aussage dieser Notiz war falsch:** `_v1_finding` in
+> `scripts/lib/consistency/docs_freshness.py:274-293` (neu, **593** Zeilen, Decke **600**) übergibt
+> `line=lineno` und `branch=branch` als **Konstruktorargumente**; der Docstring dort nennt jetzt den
+> Grund (deklarierte Felder gehören in die Signatur) statt der überholten Behauptung „`Finding` trägt
+> kein `line`-/`branch`-Feld". **Unverändert geblieben, weil nicht in der Write-Menge:** dieselbe
+> Instanzattribut-Form steht in `docs_links.py:448-460` (`_v3_finding`) und in
+> `docs_freshness.py:488-508` (`_v6_finding`, zusätzlich `kind`).
+> **Die Folge ist nicht „keine", sondern eine echte Verhaltensänderung — an der Wertoberfläche selbst
+> nicht, an `repr` und `eq` sehr wohl (gemessen):** (a) `repr(finding)` trägt jetzt `line=` und
+> `branch=`, d. h. jede Testausgabe, die ein Finding reprint, wird ausführlicher; (b) zwei Findings,
+> die sich **nur** in `line` unterscheiden, waren vorher **gleich** und sind jetzt **verschieden**.
+> Das ist die beabsichtigte Konsequenz der F1-Promotion (der Dataclass-`__eq__` vergleicht alle
+> deklarierten Felder) und kein Defekt — aber es ist eine Änderung, die ein Vergleich in einem Test
+> treffen kann. `dataclasses.fields()` enthält beide Felder jetzt **deklariert**; die
+> Instanz-``__dict__``-Belegung ist dieselbe wie beim nachträglichen Setzen.
+> **Ebenso nicht angefasst:** `kind` von V6 bleibt reines Instanzattribut und erscheint **nicht** im
+> `--json` (Begründung im Absatz weiter unten).
+> **Ist-Stand `--json` nach W2-7, nach `check` gruppiert (gemessen, 386 Findings,
+> `summary {errors 235, warnings 151}`, Prozess-Exit 1):** `docs.no_manual_counts` (V1) **52** WARNING
+> — Sollwert „≥ 1, `['WARNING']`" erfüllt, Termin **W3-7**; `docs.docs_index_completeness` (V2)
+> **207** ERROR — planmäßig rot, `docs/INDEX.md` existiert nicht, Termin **W3-6**;
+> `docs.internal_links` (V3) **27** ERROR — **2** Layout-Findings (`README.md:722`/`:723`, Termin
+> **W8-2**) + **25** unter `docs/**` (Follow-up `F-DOCS-LINKS-2026-09-27`, Termin 2026-10-11),
+> `llms.txt` **0**; `docs.readme_index` (V4) **1** ERROR — Kategorie `docs/se-cascade/`, **planmäßig
+> rot**, Follow-up `F-DOCS-README-INDEX-SE-2026-09-27`, Termin 2026-10-11; `docs.role_generation_parity`
+> (V5) **1** WARNING — das `se`-Gate ist zu, also WARNING statt ERROR (IC-05-Konvention);
+> `docs.docs_facts_fresh` (V6) **3** WARNING — die Art `missing-in-expected` ist per
+> `V6_SEVERITY_BY_KIND` WARNING, die ERROR-Arten liefern am echten Baum **0**;
+> `docs.wiki_staleness` (V7) **10** WARNING — deckungsgleich mit dem Sollwert der Planzeile.
+> **Vorher** (Baseline vor dieser Task, gleicher Lauf): **1** Error, **85** Warnings, **86** Findings,
+> davon **1** `docs.`-Finding (V4), Exit **1**; Schlüsselsatz ohne `line`/`branch`. **Abweichung
+> gemeldet:** die Planzeile „V6 planmäßig rot (ERROR)" trifft auf die **Severity-Menge** nicht zu —
+> V6 liefert am echten Baum **WARNING**; der Sollwert „rot" ist über den *Wert* erfüllt, die Severity
+> nicht. Ebenso ist V5 mit **1** Fund nicht **0** (Planzeile), weil `se-component-requirements` unter
+> dem geschlossenen `se`-Gate als **WARNING** gemeldet wird. Beide Abweichungen sind
+> `W-GATE-TABLE-ABWEICHUNG`-Kandidaten für das W2-Review-Protokoll.
+> **Ersetzung der Nicht-Registrierungs-Pins (RVW2-5, Schritt 1) — fünf Pins, nicht einer:** Der
+> planlich benannte V1-Pin `test_v1_is_not_wired_into_the_runner_yet`
+> (`tests/test_doc_freshness.py:364-377` vor der Änderung) ist durch
+> **`test_v1_is_registered_in_the_runner`** (`:406`) ersetzt; seine Historie steht als Kommentar mit
+> Abschnittsanker `:367-378` direkt darüber, der Test wird **nicht** parallel weitergeführt. Der
+> positive Pin prüft **(a)** `check_no_manual_counts` im Runner-Text **plus**
+> `from lib.consistency.docs import` **plus** `__all__`-Eintrag **plus** Eintrag in `DOCS_CHECKS`, und
+> **(b)** `docs.no_manual_counts` im `findings[]` eines **echten** `run_checks()`-Laufs über ein eigenes
+> Fixture mit `docs-consolidation.enabled: true` (Common-Gate **an**) mit `branch == "V1a"`,
+> `line == 1`, `file == "README.md"`. **Über den ersten Auftrag hinaus mitgenommen, weil die Pins sonst
+> das W2-Gate gerissen hätten:** dieselbe Ersetzung für den V6-Pin
+> `test_v6_is_not_wired_into_the_runner_yet` (`test_doc_freshness.py:695-720` vor der Änderung) ⇒
+> **`test_v6_is_registered_in_the_runner`** (`:852`) und für den V3-Pin
+> `test_v3_is_not_wired_into_the_runner_yet` (`tests/test_doc_facts.py:2527-2537` vor der Änderung) ⇒
+> **`test_v3_is_registered_in_the_runner`** (`:2598`). **Nachtrag aus dem Abschluss (2026-09-28, vom
+> Parent ausdrücklich als Write-Menge übertragen, ausschließlich zum Ersetzen der Pins):** die beiden
+> übrigen Pins sind jetzt ebenfalls durch positive Pins ersetzt, **strukturgleich** zu V3.
+> `tests/test_doc_index.py`: `test_v2_is_not_registered_in_the_runner_yet` (alt `:870-890`, drei
+> Asserts) ⇒ **`test_v2_is_registered_in_the_runner`** (neu `:909`), Historie als Kommentar mit
+> Abschnittsanker `:870-882`; Hälfte (a) `:935-949` (Runner-Text, Fassaden-Import, `__all__`,
+> `hasattr`, `DOCS_CHECKS`), Hälfte (b) `:951-957` (`run_checks()` über ein Fixture mit
+> `docs-consolidation.enabled: true`, `V2_CHECK_ID` als Literal, `file`, Severity **ERROR**).
+> `tests/test_doc_wiki.py`: `test_v7_is_not_wired_into_the_runner_yet` (alt `:379-391`, ein Assert)
+> ⇒ **`test_v7_is_registered_in_the_runner`** (neu `:415`), Historie als Kommentar mit Abschnittsanker
+> `:375-386`; Hälfte (a) `:442-454`, Hälfte (b) `:456-460` (echter `run_checks()`-Lauf, `V7_CHECK_ID`
+> als Literal, `file`, Severity **WARNING**). **Gemessener Beweis, dass ausschließlich der Pin-Block
+> verändert wurde** (Opcode-Diff gegen `git show HEAD`, nicht Zeilen-Diff): `tests/test_doc_index.py`
+> **960 → 1027** Zeilen bei **38 → 38** Tests, alle Opcode zwischen HEAD-Zeile **870** und **890**;
+> `tests/test_doc_wiki.py` **391 → 461** Zeilen bei **10 → 10** Tests, alle Opcode zwischen HEAD-Zeile
+> **374** und **391**. Der Import von `importlib.util` liegt **in** dem jeweiligen Helper, nicht im
+> Modulkopf, damit die Änderung auf den Block beschränkt bleibt. **Keine** der in W2-6 bzw. W2-3
+> implementierten Prüfungen wurde umgeschrieben — die beiden Dateien enthalten weiterhin **38** bzw.
+> **10** Tests, und die Nachbarn des Blocks (`test_v2_lives_in_docs_index_and_v4_in_docs_links`
+> `:960`, `_is_architecture_page_without_provenance` `:352`) sind byteidentisch. Fünf Pin-Historien
+> stehen jetzt als Kommentar mit Abschnittsanker im jeweiligen Modul.
+> **Fünf Einzelpins ⇒ ein struktureller Pin (F-B).** Für **V4** und **V5** gab es keinen
+> Registrierungs-Pin, und zwei neue Einzel-Pins in fremden Dateien wären der falsche Ort. Stattdessen
+> trägt `tests/test_doc_facts.py` jetzt **einen** Test
+> **`test_the_docs_registry_covers_exactly_what_the_facade_exports`** (neu `:2776`), der die
+> Vollständigkeit **strukturell** erzwingt: die Id-Menge der Registry `DOCS_CHECKS` **gleich** der
+> Id-Menge der Fassade-`check_*`-Exporte, die auf diesem Repository melden — in **beiden** Richtungen,
+> also kein exportierter Check ohne Registry-Eintrag und kein Registry-Eintrag ohne Export. Dazu vier
+> Nebenpins, jeder eine eigene Bruchform: jeder Eintrag meldet **genau eine** Id (ein toter Eintrag
+> fällt durch), die sieben Funktionen sind paarweise **verschieden** (ein kopierter Eintrag fällt
+> durch), jede Id beginnt mit `docs.` (IC-05), und das exportierte `*_CHECK_ID`-Vokabular ist
+> vollständig benutzt, mit **genau einer** Id außerhalb — die des V4-Adapters, **abgeleitet** über den
+> einzigen Export, dessen Name kein `__name__` der Registry ist, und namentlich als
+> `check_readme_docs_index` benannt. Die Differenz **9 Exporte − 7 Registry-Einträge** wird als die
+> beiden ungegateten Altchecks benannt, nicht heuristisch weggefiltert.
+> **Die Kopplung, nüchtern benannt (bewusste Entscheidung, akzeptiert, kein Refactoring).** Pin 1
+> („jeder Eintrag meldet **genau eine** Id") und die Benennung der zwei stillen Exporte
+> (`silent == {check_sync_cli_docs, check_ui_help_mappings}`) hängen daran, dass der Test gegen den
+> **echten Repository-Root** läuft und die „Clean"-Checks am **heutigen** Stand still sind. Das ist
+> eine reale Fehlalarm-Quelle in **beiden** Richtungen, und beide sind gewollt: Pin 1 ist auf einem
+> fremden, sauberen Root **rot**, weil dort **5 von 7** Einträgen nichts melden — richtig, denn ein
+> Eintrag ohne Befund ist eine stille Lücke; und `silent` behauptet, dass zwei **Altchecks** heute
+> nichts melden, was stimmt und morgen falsch sein kann. **Der konkreteste Fall:** ein späterer
+> „alle Findings beheben"-Chore, der V2/V3/V6 auf 0 bringt, macht diesen Test rot — mit einer
+> Registry-Färbung, die dann **irreführend** ist, weil die Gleichheit weiterhin hält und nur die
+> *Id-Menge* schrumpft. **Bewusst nicht abgesichert**, weil jede Absicherung denselben Chore erneut
+> bindet: der Test soll an der *Struktur* der Registry hängen, nicht an einem aktuellen
+> Finding-Stand. Wer den Chore fährt, zieht den Test mit — das ist der richtige Zeitpunkt, ihn neu zu
+> fassen.
+> **Mutantennachweis, gemessen:** ein Zeilenpaar entfernt (der Import von `check_wiki_staleness` **und**
+> sein Registry-Eintrag, damit das Modul weiter importiert) ⇒ **genau 1 failed**, und zwar an der
+> Gleichheits-Assertion mit beide Seiten im Text
+> (`registry=[…6 ids…]` gegen `exported-reporting=[…7 ids…]`, „Left contains one more item:
+> `docs.wiki_staleness`"). Die Mutation wurde **vollständig zurückgenommen** (Datei wieder **373**
+> Zeilen, `sha256` nach dem Restore geprüft, `tests/test_doc_facts.py` danach **129 passed**).
+> **Lint-Zuwächse in der eigenen Datei behoben (F-C), gemessen:** `tests/test_doc_facts.py` hatte unter
+> den Defaults **3** Befunde (**1× `I001`**, **2× `PLW1510`** — `subprocess.run` ohne `check=`) und
+> unter `--select I,UP,E,F,W` **9**. Beide `PLW1510`-Stellen prüfen **absichtlich** Exit-Codes, deshalb
+> **kein** `check=True`, sondern die Absicht explizit gemacht: `check=False` mit Begründungskommentar an
+> beiden Stellen (im F1-Test, wo der Befund das Subject ist, und im Exit-Code-Test, wo der
+> Rückgabewert das Subject ist). `I001` ist durch den mehrzeiligen `report`-Import behoben. Ergebnis
+> **`tests/test_doc_facts.py`: Defaults 3 → 0**, `--select I,UP,E,F,W` **9 → 7** (die verbleibenden
+> **7** `E501` sind vorbestehend).
+> **`ruff` über alle acht geänderten Nicht-Plan-Dateien, beide Invocations.** **Definition,
+> damit die Zahlen reproduzierbar sind:** gezählt werden die **Befunde je Datei** (die
+> `ruff check`-Treffer, ein Treffer je Regelverstoß), **einmal je Datei**; **HEAD** (Inhalt von
+> `git show HEAD:<pfad>`, über `--stdin-filename` unter demselben Pfad geprüft, damit die
+> Konfigurationsauflösung identisch ist) gegen den **Working Tree**; Summen über die **acht**
+> geänderten Nicht-Plan-Dateien. **Eigene Messung dieser Task (ruff 0.16.3, keine
+> ruff-Config im Repo):** Defaults `docs.py` **0 → 0**, `report.py` **0 → 0**,
+> `consistency-check.py` **2 → 2** (`EXE001`, `I001` — beide vorbestehend),
+> `docs_freshness.py` **0 → 0**, `test_doc_facts.py` **0 → 0**, `test_doc_freshness.py` **0 → 0**,
+> `test_doc_index.py` **0 → 0**, `test_doc_wiki.py` **0 → 0**; **Summe Defaults 2 → 2**.
+> **`--select I,UP,E,F,W`:** **2 → 1**, **1 → 1**, **23 → 24**, **1 → 1**, **8 → 7**, **5 → 3**,
+> **4 → 3**, **3 → 2**; **Summe `--select I,UP,E,F,W` 47 → 42**. **Korrektur einer früheren
+> Notiz-Fassung, die für die Defaults „5 → 2“ schrieb:** die **5** waren nie gemessen —
+> mit der oben definierten Zählung ist die HEAD-Summe **2** und die Working-Tree-Summe **2**,
+> also **2 → 2**. **Abweichung zur Review-Messung, offen benannt:** das Stufe-2-Review
+> misst die Defaults als **4 → 2**; die **2** der Zielseite stimmt mit der hier gemessenen
+> überein, die **4** der HEAD-Seite nicht — nach der oben festgelegten Definition sind es
+> **2** (`EXE001` + `I001` in `consistency-check.py`; alle sieben übrigen Dateien sind auf
+> HEAD ruff-clean in der Default-Regelmenge). **Welche Zahl gilt, ist eine Frage der
+> Zähldefinition, nicht des Codes** — beide Seiten sind in `.tmp/` nachmessbar.
+> Keine neue Fehlerklasse; der einzige Zuwachs bleibt das eine
+> `E402` im Runner für das neue `from lib.io import load_yaml_file` (gleiche Klasse wie die 14
+> vorbestehenden, die der `sys.path`-Bootstrap erzeugt).
+> **Befund aus der W2-Welle mitgenommen — `tests/test_doc_facts.py::test_existing_docs_checks_keep_signature_and_severity`
+> (`:2198`):** Der V4-Teil baute das **Vor-E-5**-Fixture (`docs/api/orphan.md` plus README **ohne**
+> `##`-Region `Documentation Index`) und war seit W2-6 grün **über den fail-closed-Pfad**
+> (`_v4_region_finding`), **nicht** über den Orphan-Pfad, den der Docstring behauptete — E-5 hat die
+> Per-Seiten-Lesart entfernt, `docs/api/orphan.md` ist kein V4-Gegenstand mehr. **Korrigiert:** das
+> Fixture ist jetzt ein **E-5-Baum** (Index-Region mit einer verlinkten Kategorie `docs/guides/` und
+> einer **deklarierten, unverlinkten** `docs/se-cascade/`), der Test **behauptet** den
+> Kategorie-Fund und prüft ihn in beide Richtungen (die Kategorie steht in der Message, die
+> verlinkte **nicht**); der **fail-closed**-Fall ist als **zweiter**, ausdrücklich benannter Block
+> mit eigener Fixture erhalten. Der Docstring nennt jetzt beide Regeln und benennt die Korrektur.
+> **Offene, gemessene Abweichung — die Verifikationszeile 2 der W2-Shell-Prüfung ist unerreichbar
+> (Owner `developer` für die Fixture-Seite, Termin offen; hier ausdrücklich **nicht** umgangen).**
+> `bash tests/scenarios/run.sh 50 51 52 54 55 56` liefert **0/6** (Exit 1) — und die **Baseline war
+> ebenfalls 0/6**, gemessen **vor** der ersten Änderung dieser Task. W2-7 hat also nicht die Rotheit
+> erzeugt, sondern die **Zahl** der Errors erhöht: **1 → 235** (Baseline: `docs.readme_index`, aus
+> W2-6/E-5; nach W2-7 zusätzlich V1 52 W, V2 207 E, V3 27 E, V5 1 W, V6 3 W, V7 10 W). **Gemessene
+> Ursache, die nicht an der Common-Gate-Semantik liegt:** `_run_consistency_checks(agent_meta_root)`
+> (`scripts/lib/cli_commands.py:150-174`, aufgerufen aus `:975`) läuft über den **agent-meta-Checkout**,
+> nicht über das Szenario-Projekt — im erhaltenen `validate.log` eines Szenario-Laufs stehen **301**
+> `docs.`-Findings aus **allen sieben** Checks, obwohl die eingespielte Fixture-`project.yaml` den
+> Schlüssel **nicht** setzt (im Temp-Verzeichnis nachgemessen). **Konsequenz, ausdrücklich
+> festgehalten:** die Plan-Akzeptanz „in allen Szenario-Fixtures sind V1–V9 **vollständig** No-op
+> (AC-38)" ist über **diesen** Shell-Aufruf **nicht messbar** — die Checks sehen die Fixture nie.
+> **Was stattdessen geprüft wird und prüfbar ist**, ist der Kern von AC-38 in
+> `tests/test_doc_freshness.py::test_the_scenario_configs_never_set_the_common_gate` (`:511`): **alle
+> 63** Fixture-Dateien `tests/scenarios/configs/*.project.yaml` wurden gemessen — **0** davon
+> enthalten den Text `docs-consolidation` (auch nicht in einem Kommentar), **0** haben einen
+> geparsten `docs-consolidation`-Block, und **0** setzen `enabled` **explizit** (also auch keiner auf
+> `false`). Der Test pinnt jetzt genau das: er läuft über **alle** Fixtures, nicht nur über `5[0-6]-*`
+> — gemessen umfasst dieses Glob **7** Dateien (50, 51, 52, **53**, 54, 55, 56), während `run.sh` nur
+> sechs davon startet. **Zusätzlich geprüft und nicht vorhanden:** **0** Treffer auf alternative
+> Schreibweisen (`docs[-_]consolidation`, `documentation[-_]consolidation`) in irgendeiner Einrückung.
+> **Konsequenz für den Plan, ohne ihn zu ändern:** die Zeile ist als **offene Abweichung** zu führen,
+> nicht als erfülltes Gate; die Korrekturbedürftigkeit (entweder `_run_consistency_checks` auf das
+> Szenario-Projekt umstellen oder die Zeile durch den direkten Test ersetzen) liegt beim Plan-Protokoll,
+> nicht bei dieser Task.
+> **Und hier ist der Befund von Gewicht dieser Welle, ohne Deckung:** weder `W-VALIDATE-ROT`
+> noch `W2-GATE-ERRORS` führen diese Szenario-Zeile, und `scripts/lib/cli_commands.py`
+> steht in **keiner** `Files:`-Liste des Plans — also **kein** Task, **kein** Termin und
+> **kein** gedeckter Owner für ihre Unerreichbarkeit.
+> **Der zweite gemeldete BLOCKER ist aufgelöst:** die beiden Nicht-Registrierungs-Pins für **V2** und
+> **V7** lagen in `tests/test_doc_index.py:870-890` und `tests/test_doc_wiki.py:379-391` und damit
+> außerhalb der ursprünglichen Schreibmenge; der Parent hat die Ownership für **genau diese zwei
+> Testdateien** übertragen, **ausschließlich** zum Ersetzen der Pins. Beide sind jetzt durch positive
+> Pins ersetzt (siehe den Absatz zur Pin-Ersetzung oben) — die Verifikationszeile 1 ist damit grün.
+> **Nicht** angefasst wurden dort: irgendeine der in W2-6 bzw. W2-3 implementierten Prüfungen, der
+> Modulkopf und alle anderen Tests beider Dateien.
+> **Zwei Sollwert-Ist-Differenzen gegen die W-GATE-Tabelle, gemessen — die Tabelle wird hier
+> ausdrücklich NICHT geändert, nur ihre Korrekturbedürftigkeit benannt:** (a) **`docs.docs_facts_fresh`
+> (V6) liefert WARNING statt ERROR.** Gemessen: **3** Findings, alle Severity **WARNING**, alle mit
+> `file == "config/doc-facts-expected.yaml"`; die Tabelle (Abschnitt „W2 — Verifikation", Zeile
+> `docs.docs_facts_fresh (V6)`) fordert „planmäßig rot (ERROR)". **Ursache:** `V6_SEVERITY_BY_KIND`
+> in `docs_freshness.py:385-389` stuft die Art `missing-in-expected` als **WARNING** und die beiden
+> ERROR-Arten (`handedit`, `expected-mismatch`) als ERROR; am echten Baum ist **nur** die
+> WARNING-Art vertreten (die ERROR-Arten liefern **0**), weil die gerenderten `DOCS_*`-Blöcke erst ab
+> **W3-7** existieren. Der *Wert* „rot" ist erfüllt, die *Severity* nicht. (b)
+> **`docs.role_generation_parity` (V5) liefert 1 statt 0.** Gemessen: **1** Finding, Severity
+> **WARNING**, `file == ".meta-config/project.yaml"`, Rolle `se-component-requirements`; die Tabelle
+> fordert **0** mit der Begründung, `compute_active_roles()` schließe das deaktivierte Gate.
+> **Ursache:** das ist gerade **nicht** der Fall — `resolve_activation_gates` liefert die Gruppe mit
+> `enabled: false`, die deklarierte Rolle bleibt also in der Differenzmenge, und `_v5_severity` stuft
+> ein **geschlossenes** Gate als WARNING (F21-Umkehrung: geschlossen = Entscheidung, nicht Defekt).
+> Beide Zeilen brauchen eine Korrektur der **Erwartungswert-Spalte** (Wert und/oder
+> Severity) durch das W2-Review-Protokoll; von dieser Task wird keine K-ID erfunden.
+> **Die Zuweisung an das W2-Review-Protokoll ist ausdrücklich OFFEN:** die Tabelle
+> `W2-GATE-ERRORS` wird von dieser Task **nicht** geändert, und Termin **und** Owner für
+> beide Zeilen sind noch nicht gesetzt. Ein Korrektur-Auftrag existiert dafür **nicht**.
+> **`kind` von V6 — Einordnung, nicht Lücke der F1-Promotion, mit Beleg:** `kind` bleibt ein reines
+> Instanzattribut und erscheint **nicht** im `--json`. Das ist **kein** Versehen der F1-Promotion:
+> (i) W2-7 Schritt 4 und die `Interfaces:` dieser Task nennen ausdrücklich **nur** `line` und `branch`;
+> (ii) **IC-05** (`spec:947-994`), der bindende IC für V1…V9, nennt weder `line`/`branch` **noch**
+> `kind`; (iii) die Spec formuliert das `kind` als **Attribut des Findings** (AC-36,
+> `spec:1954`: „V6 meldet dafür ein `Finding(severity=ERROR, check="docs.docs_facts_fresh",
+> kind="expected-mismatch")`") — verlangt aber weder ein Dataclass-Feld noch eine JSON-Serialisierung,
+> und der Finding **trägt** `kind` weiterhin auf der Instanz; (iv) die W-GATE-Kommandos der Wellen
+> lesen `check`, `severity`, `file` und nie `kind`. **Nicht behoben, mit Begründung:** ein Feld `kind`
+> in `Finding` würde in **jedem** Finding des `--json`-Reports einen neuen Schlüssel erzeugen — eine
+> **Verhaltensänderung** des Report-Schemas ohne IC und ohne Akzeptanzpunkt; der Default müsste zudem
+> frei gewählt werden (`""` neben `None`/`""` bei `line`/`branch` wäre die konsistente Wahl).
+> Empfehlung an eine Folge-Task: entweder `kind` als Feld mit Default `""` **plus** Serialisierung
+> (dann ist es eine Ausgabe-Erweiterung, die ins Review gehört) oder eine explizite
+> „V6-intern, nicht Teil des Report-Vertrags"-Festlegung in IC-05. Der Docstring in
+> `docs_freshness.py:488-496` nennt die Zwei-Teile-Form bereits vollständig.
+> **Verifikation 1–5, alle Läufe gemessen (ungefilterte Roh-Ausgabe, umgeleitet und aus der Datei
+> gelesen, weil `rtk` pytest-Fehlschläge filtert):** (1) `python3 -m pytest tests/test_doc_facts.py
+> tests/test_doc_freshness.py tests/test_doc_wiki.py tests/test_doc_index.py
+> tests/test_doc_freshness_v5.py tests/test_doc_facts_expected.py -q` ⇒ **`236 passed`, Exit 0** —
+> **beide** Verifikations-Tests sind grün, die **beiden** V2-/V7-Pins sind durch positive Pins
+> ersetzt. Zustand davor (Baseline vor der Task): **`232 passed`, Exit 0**; Zustand nach der
+> Registrierung, vor der Pin-Übernahme: **`2 failed, 234 passed`**. Volle Suite zur
+> Regressionskontrolle: `python3 -m pytest tests/ -q` ⇒ **`3420 passed, 1 skipped, 35 errors`**,
+> **0 failed**; die **35** Errors sind ausschließlich `tests/browser/*` mit
+> `pytest_socket.SocketBlockedError` (dieser Sandbox fehlt der Socket-Zugriff für den
+> `admin_server`-Fixture) und damit umgebungsbedingt, nicht durch diese Task. (2) **unreachable,
+> als offene Abweichung dokumentiert** (siehe den Absatz weiter oben): `0/6`, Exit 1, Baseline
+> ebenfalls `0/6`; W2-7 erhöht die Error-Zahl **1 → 235**, nicht die Rotheit. (3) `python3
+> scripts/consistency-check.py --json | python3 -c …` ⇒ Schlüsselsatz
+> `['branch', 'check', 'file', 'line', 'message', 'severity', 'suggestion']`, also mit **`line`** und
+> **`branch`**. (4) `python3 -m compileall -q scripts/lib` ⇒ **Exit 0**; `ruff` (0.16.3), **Defaults**:
+> `docs.py` **0 → 0**, `report.py` **0 → 0**, `consistency-check.py` **2 → 2** (`EXE001` Shebang ohne
+> Ausführbit, `I001` Importreihenfolge `frontmatter` vor `fanout_contracts`) — **beide vorbestehend**,
+> gegen `git show HEAD:<datei>` gemessen; die beiden neu übernommenen Testdateien ebenfalls **0 → 0**
+> (`test_doc_index.py`, `test_doc_wiki.py`). Mit **`--select I,UP,E,F,W`**: `docs.py` **2 → 1**
+> (E501), `report.py` **1 → 1** (E501, vorbestehend), `consistency-check.py` **23 → 24**; die Zunahme
+> ist **genau ein `E402`** für das neue `from lib.io import load_yaml_file` — dieselbe Klasse wie die
+> **14** vorbestehenden `E402`, die der `sys.path`-Bootstrap dieses Laufs erzeugt; keine neue
+> Fehlerklasse, Produktions-Gesamt **26 → 26**. `test_doc_index.py` **4 → 3** und `test_doc_wiki.py`
+> **3 → 2** (E501), also beide **verbessert**. (5) Die Rohzeile ``python3 scripts/consistency-check.py
+> → 0`` ist **aufgehoben** und wird **nicht** behauptet; der Ist-Stand steht oben nach `check`
+> gruppiert.
+> **Exit-Code-Vertrag, nach dem Pin-Umschreiben erneut end-to-end gemessen:** **0** (0 Errors, Gate zu)
+> ⇒ `{total 0, errors 0, warnings 0}`, Prozess-Exit **0** (Textbericht ebenso **0**); **1** (genau
+> 1 Error) ⇒ `{total 1, errors 1}`, Exit **1** (Textbericht **1**), und der eine Error ist ein
+> `docs.no_manual_counts`-V1a-Fund mit `line == 1`, `branch == "V1a"`; **2** (`--file` auf eine
+> nicht existierende Datei) ⇒ Exit **2**. Die Doku `scripts/consistency-check.py:24-26` ist
+> unverändert und bleibt gültig.
+> **Docstring-Korrekturen, gemessen und nur in der eigenen Schreibmenge:** in `docs.py:3-6` standen die
+> Anker ``scripts/consistency-check.py:52-56`` und ``:199-201`` — vor W2-7 korrekt, durch die
+> Registrierung **falsch geworden**. Sie zeigen jetzt ``:53-63`` (der Importblock) sowie ``:283-284``
+> (die zwei ungegateten Altchecks) und ``:292-294`` (der gegatete V1…V7-Block), jeweils am echten
+> Dateistand nachgemessen. **Bewusst nicht angefasst**, weil vorbestehend und nicht durch diese Task
+> falsch geworden: `docs.py:8-15` („two family modules") — vor W2-7 durch W2-3/W2-4/W2-6 überholt,
+> **nicht** durch W2-7.
+> **Stale Docstrings außerhalb der Schreibmenge, gemeldet und nicht geöffnet.** **Zwei** bleiben
+> übrig, nachdem `docs_freshness.py` mit dem F-A-Grant dazukam (deren Docstring ist dort jetzt
+> korrigiert): `scripts/lib/consistency/docs_wiki.py:35-40` behauptet, `Finding` trage kein `line` und
+> kein `branch`-Feld, und `scripts/lib/consistency/docs_links.py:450-452` behauptet, `Finding` habe
+> keines der beiden Felder und W2-7 müsse sie hochziehen — beides ist seit der F1-Promotion falsch.
+> **Nächster Owner:** `docs_wiki.py` → **W6-2** (der Plan führt die Datei in dessen `Files:`);
+> `docs_links.py` → **kein** Owner im Plan, die Datei wird von **keiner** Task als Write-Menge
+> geführt — das ist selbst der Befund, und er wird hier **nicht** erfunden. Termin und Owner sind vom
+> Review-Protokoll zu setzen.
+> **Überlappungs-Pin, gemessen:** `tests/test_plan_ledger_writer.py::test_validate_plan_reaches_the_expected_overlap_verdict`
+> ist **grün** — der gepflegte Pin-Literalwert `== 18` (gepflegt in `0d2e5c13`) **trifft weiterhin
+> zu**, der Assert wurde **nicht** abgeschwächt und die Zahl **nicht** angefasst. Der Tripwire
+> wurde nach dem Schreiben dieser Notiz erneut gemessen, weil die Schreibmengen des Prüfers aus den
+> im Task-Text genannten Dateinamen gebaut werden.
+> **Write-Menge-Hygiene dieser Notiz:** keine `###`-Zeile, keine Zeile mit beginnendem
+> `Depends on:`, keine Doppelpunktform der Feldnamen im Fließtext (sonst extrahiert
+> `_FILES_FIELD_RE` eine Phantom-Write-Menge); `files_touched("W2-7")` bleibt `()`.
 
 ---
 
@@ -6514,6 +6870,62 @@ wurde ausgeführt, kein `sync.py`, kein `pytest`, keine Git-Mutation. Die **1 ma
 über **K71** im *Plan* behoben — die **Verifikation im Working Tree** steht aus. W2-9 ist
 implementiert, aber **nicht verifiziert** und **nicht committet**; W2-6 enthält eine Implementierung,
 die **ersetzt**, nicht **repariert** wird. Das Wellen-Gate **W2** ist **nicht** erreicht.
+#### Anhang 2026-09-28 (b) — Ausführungsstand W2-7 (Registrierung, Common-Gate, F1-Promotion)
+
+> **Was dieser Anhang ist — und was nicht.** Wie die drei vorangehenden Blöcke ist er **additive
+> Statuspflege**: **keine** Plan-Revision, **keine** Korrekturrunde, **kein** Eingriff in eine als
+> wortgleich festgeschriebene Stelle, **keine** neue K-Kennung und **keine** umnummerierte ID.
+> **Wortgleich bleiben:** `status: APPROVED` (`:5`), `revision: 0.7` (`:6`), die **K34-Kopfnotiz**,
+> die historische Tabelle (Stand 2026-09-26), der **Rev.-0.7-Anhang** (Stand 2026-09-27), der
+> vorangehende Anhang (Stand 2026-09-28, Phase 0), die Zählherleitungen, alle Task-/Wellen-/AC-/IC-/
+> NFA-/R-/OQ-/V-Check-IDs, alle Akzeptanzkriterien und die Korrekturrunden **1–6**. **Keine bestehende
+> Zeile wurde entfernt, ersetzt oder umformuliert.** Maßgeblich für den heutigen Ausführungsstand ist
+> **dieser** Anhang (K34-Präzedenz).
+
+**A. Einordnung der drei Fundstellen, die `W2-7 | 0/5` zeigten — einzeln gemessen, zwei Fälle.**
+
+| Fundstelle | Tabelle (Kopfzeile) | Einordnung | Behandlung |
+|---|---|---|---|
+| `:6366-6384` | `### L-1 Checkbox-Abgleich`, Spalte **„Stand 2026-09-26"**, unter der **K34-Kopfnotiz** (`:6358`), die ausdrücklich sagt, die Tabelle bilde den Fortschritt **noch nicht** ab | **historisch, datiert** | **nicht** umgeschrieben |
+| `:6533-6544` | `#### Rev.-0.7-Anhang zu L-1 (2026-09-27)`, Spalte **„Stand 2026-09-27 (Rev. 0.7)"**; der Block selbst sagt `:6546` „Damit überholt, ohne Umschreiben (Historie bleibt wortgleich)" | **historisch, datiert** | **nicht** umgeschrieben |
+| `:6601-6607` | `#### Anhang 2026-09-28 — Ausführungsstand W2 Phase 0`, Spalte **„Stand 2026-09-28"** | **historisch, datiert** (siehe Begründung) | **nicht** umgeschrieben |
+
+**Begründung zur dritten Fundstelle, weil sie die einzige nahe Grenze ist.** Sie trägt das Datum des
+heutigen Tages und ist damit die **jüngste** Tabelle — aber sie ist **kein laufender Zähler**: sie ist
+ein **datierter Phasen-0-Ausführungsstand** (W2-9, W2-6), und ihre **Geschwisterzeilen sind ebenso
+überholt** (`:6605` **W2-4 `0/4` „nicht gestartet"**, `:6606` **W2-8 `0/4` „nicht gestartet"** — beide in
+zwischen erledigt). Nur die W2-7-Zeile fortzuschreiben hieße, eine Tabelle intern widersprüchlich zu
+machen und die Nachbarzeilen im Format **nicht** mitzuführen; die Vorgabe „wenn sie das Format der
+anderen laufenden Einträge behält" wäre damit verletzt. **Deshalb gilt für alle drei derselbe Fall**,
+und der Weg, den dieser Plan für einen newer-than-Stand bereits vorgesehen hat, ist ein **neuer
+datierter Anhang** — genau der über W2-1, W2-4, W2-6 und W2-8. **Befund, nicht hier behoben:** die
+Zeilen W2-3, W2-4, W2-5 und W2-8 der dritten Tabelle sind ebenfalls veraltet; sie gehören in die
+Anhänge der Tasks, die sie abschließen, und werden hier **nicht** fremd fortgeschrieben.
+
+**B. Zählstand W2-7 (selbst gemessen, 2026-09-28; Muster `^- \[x\] ` / `^- \[ \] ` im Task-Block).**
+
+| Task | Checkboxen | Stand 2026-09-28 | Ausführender (`Agent:`, **selbst gemessen**) |
+|---|---|---|---|
+| **W2-7** | **5/5** | **implementiert und verifiziert, nicht committet** (No-Commit-Task; Schritt 5 nennt nur den Commit-Titel) | `developer` — Registrierung, Common-Gate, `Finding`-Vertrag; **Eigentümer des Wellen-Gates W2** |
+
+- **Nachweis der Zählung:** `W2-7` besitzt **5** Checkboxen, alle **5** auf `- [x]` (Task-Block
+  `:3870-…`, `**Steps:**` `:3966-3985`); **0** offen. Gesamt über den Plan: **50** Tasks
+  (unverändert), Checkboxen-Summe **207** (unverändert — dieser Anhang setzt **keine** Checkbox).
+- **Was der Fortschritt inhaltlich ist:** V1…V7 über **eine** Registrierungstabelle `DOCS_CHECKS`
+  (`scripts/consistency-check.py`) registriert, alle **7** über **ein** Fail-off-Common-Gate
+  (`docs-consolidation.enabled`) geführt, `line`/`branch` als **Dataclass-Felder** mit Default in
+  `Finding` und im `--json` serialisiert, Exit-Code-Vertrag **0/1/2** unverändert.
+- **Nicht behauptet:** der rohe Runner ist **planmäßig rot** (Exit **1**), die Verifikationszeile
+  ``bash tests/scenarios/run.sh 50 51 52 54 55 56 → 0`` ist **unerreichbar**, und zwei
+  Sollwert-Ist-Differenzen gegen `W2-GATE-ERRORS` sind **offen**. Das steht vollständig in der
+  **Task-Notiz an W2-7** und wird hier **nicht** wiederholt.
+
+**C. Summen und Zähler unverändert.** Dieser Anhang fügt **ausschließlich** Fließtext und
+Tabellenzeilen hinzu; **keine** Zeile beginnt mit `- [ ]` oder `- [x]`, es wurde **keine** Checkbox
+gesetzt, gestrichen oder ergänzt, **kein** Task angelegt und **keine** ID vergeben. Taskzahl **50**,
+Checkboxen-Summe **207** und `files_touched("W2-7") == ()` bleiben damit **gültig** — Ableitung aus der
+Art des Eintrags, keine neue Zählung.
+
 
 ### L-2 Blockierende Befunde (B-1 … B-5)
 

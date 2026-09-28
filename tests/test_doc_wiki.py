@@ -372,20 +372,90 @@ def _frontmatter_keys(lines: list[str]) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# AC-38 — no runner effect before W2-7
+# AC-13 — registration in the runner (W2-7, RVW2-5)
 # ---------------------------------------------------------------------------
+#
+# History of this section: it carried ``test_v7_is_not_wired_into_the_runner_yet``
+# with the assertion ``"check_wiki_staleness" not in runner``. That pinned the
+# pre-W2-7 state — "V7 has no call site, so the scenario matrix cannot regress
+# from W2-3" — and W2-7, which registers V7, makes it red by construction. It is
+# **replaced**, not kept in parallel: keeping both would assert a contradiction.
+# The sibling replacements live in ``tests/test_doc_freshness.py`` (V1, V6),
+# ``tests/test_doc_facts.py`` (V3) and ``tests/test_doc_index.py`` (V2).
 
 
-def test_v7_is_not_wired_into_the_runner_yet():
-    """AC-38: V7 is a no-op in every scenario until W2-7 registers it.
+def _runner():
+    """The runner module, loaded the way ``lib.cli_commands`` loads it.
 
-    Same argument as the V1 and V3 pins: the common gate
-    (``docs-consolidation.enabled``) and the registration in ``run_checks()`` are
-    W2-7's task, so the scenario matrix cannot regress from W2-3. The facade
-    re-export is W2-7's too (K46), so it is deliberately **not** asserted here.
+    The filename contains a hyphen, so it cannot be imported by name. The import
+    is local so that this section stays the file's only change.
     """
-    runner = (REPO_ROOT / "scripts" / "consistency-check.py").read_text(encoding="utf-8")
-    assert "check_wiki_staleness" not in runner, (
-        "W2-3 must not register the check — registration is W2-7"
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "_consistency_runner", REPO_ROOT / "scripts" / "consistency-check.py"
     )
-    assert docs_wiki_lib.V7_CHECK_ID == V7_CHECK_ID
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _gate_open_tree(tmp_path: Path, name: str = "open") -> Path:
+    """A project root with one provenance-less Architecture page, gate **on**."""
+    root = tmp_path / name
+    _wiki_page(root / V7_WIKI_RELPATH, "concepts/agent.md",
+               {"type": WIKI_ARCHITECTURE_TYPE})
+    (root / ".meta-config").mkdir(parents=True, exist_ok=True)
+    (root / ".meta-config" / "project.yaml").write_text(
+        "docs-consolidation:\n  enabled: true\n", encoding="utf-8"
+    )
+    return root
+
+
+def test_v7_is_registered_in_the_runner(tmp_path):
+    """AC-13: V7 is exported by the facade, imported by the runner, registered.
+
+    Two halves, because on their own both are vacuous — a name can sit in an
+    import without a call, and a call can sit behind a closed gate:
+
+    (a) the import: ``check_wiki_staleness`` is reachable from
+        ``scripts/consistency-check.py`` through the **facade**
+        ``lib.consistency.docs`` only (K20), whose ``__all__`` therefore has to
+        carry the name — that is what makes the facade contract (K19) the
+        precondition of the registration — and the name has an entry in the
+        ``DOCS_CHECKS`` table, because a name in an import is not a
+        registration;
+    (b) the effect: the W2-3 fixture (one ``type: Architecture`` page without
+        ``derived-from``), a project config with ``docs-consolidation.enabled:
+        true`` and a genuine ``run_checks()`` call yield
+        ``docs.wiki_staleness`` findings.
+
+    The check id stays the literal this module quotes (:data:`V7_CHECK_ID`), and
+    the module constant is asserted equal to it, so a rename on either side
+    fails instead of agreeing on the wrong id.
+    """
+    from scripts.lib.consistency import docs as docs_facade
+
+    runner_source = (REPO_ROOT / "scripts" / "consistency-check.py").read_text(
+        encoding="utf-8"
+    )
+    assert "check_wiki_staleness" in runner_source, (
+        "the registration must be visible in the runner — the import block is "
+        "the only registration site (RVW2-1: a count over the --json report "
+        "proves nothing about registration)"
+    )
+    assert "from lib.consistency.docs import" in runner_source, (
+        "K20: registration goes through the facade, never module-wise"
+    )
+    assert "check_wiki_staleness" in docs_facade.__all__, (
+        "the facade __all__ is the contract (K19) the registration runs on"
+    )
+    assert hasattr(docs_facade, "check_wiki_staleness")
+    assert "check_wiki_staleness" in [c.__name__ for c in _runner().DOCS_CHECKS]
+
+    findings = _runner().run_checks(_gate_open_tree(tmp_path))
+
+    v7 = [f for f in findings if f.check == V7_CHECK_ID]
+    assert v7, findings
+    assert {f.file for f in v7} == {"knowledge/wiki/concepts/agent.md"}, v7
+    assert {f.severity for f in v7} == {docs_wiki_lib.Severity.WARNING}, v7

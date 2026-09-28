@@ -1,8 +1,9 @@
 """Documentation and UI cross-reference consistency checks — **facade**.
 
 Since W2-0 this module holds **no** check logic. It is the re-export contract
-that the runner (``scripts/consistency-check.py:52-56``, calls at ``:199-201``)
-and the test suite (``tests/test_doc_facts.py``) import, so the cut behind it
+that the runner (``scripts/consistency-check.py:53-63``, calls at ``:283-284``
+for the two ungated alt checks and ``:292-294`` for the gated V1…V7 block) and
+the test suite (``tests/test_doc_facts.py``) import, so the cut behind it
 stays invisible to every existing caller (K19).
 
 The checks live in two family modules, split by *the question a check asks*
@@ -34,12 +35,16 @@ from .docs_freshness import (
     V1_REGION_END,
     V1_SCAN_RELPATHS,
     V1_SUGGESTION,
+    V6_CHECK_ID,
     Span,
+    check_docs_facts_fresh,
     check_no_manual_counts,
     v1_strict,
     v1a_count_spans,
     v1b_version_spans,
 )
+from .docs_freshness_v5 import V5_CHECK_ID, check_role_generation_parity
+from .docs_index import V2_CHECK_ID, check_docs_index_completeness
 from .docs_links import (
     V3_CHECK_ID,
     V3_DOC_SUFFIXES,
@@ -52,6 +57,7 @@ from .docs_links import (
     check_sync_cli_docs,
     check_ui_help_mappings,
 )
+from .docs_wiki import V7_CHECK_ID, check_wiki_staleness
 from .report import Finding, Severity
 
 __all__ = [  # noqa: RUF022 — the order below IS the Spec §4.1 contract, not a
@@ -70,12 +76,18 @@ __all__ = [  # noqa: RUF022 — the order below IS the Spec §4.1 contract, not 
     "V3_DOCS_RELDIR", "V3_DOC_SUFFIXES", "V3_INERT_PREFIXES",
     # --- Altchecks (docs_links) ---
     "check_sync_cli_docs", "check_ui_help_mappings", "check_readme_docs_index",
-    # --- in W2-3…W2-7 nachrückend, ebenfalls durch die Fassade sichtbar (IC-05-Konvention) ---
-    # W2-0: dieser Abschnitt ist noch leer. `check_wiki_staleness` (W2-3),
-    # `check_role_generation_parity` (W2-4), `check_docs_facts_fresh` (W2-5),
-    # `check_docs_index_completeness` (W2-6), `check_spec_plan_path_convention`
-    # (W6-2) und `check_stale_backups` (W8-4) sind noch nicht implementiert —
-    # kein Stub, kein Platzhalter, keine NotImplementedError. Jede Task trägt
-    # ihren Namen hier ein, wenn sie den Check implementiert (Plan W2-7,
-    # `Files:`).
+    # --- V2 (docs_index) ---
+    "V2_CHECK_ID", "check_docs_index_completeness",
+    # --- V5 (docs_freshness_v5) ---
+    "V5_CHECK_ID", "check_role_generation_parity",
+    # --- V6 (docs_freshness) ---
+    "V6_CHECK_ID", "check_docs_facts_fresh",
+    # --- V7 (docs_wiki) ---
+    "V7_CHECK_ID", "check_wiki_staleness",
+    # --- noch offen: `check_spec_plan_path_convention` (V8, W6-2) und
+    # `check_stale_backups` (V9, W8-4) ---
+    # W2-7 hat die vier oben liegenden Checks eingetragen und registriert;
+    # W6-2 und W8-4 tragen ihren Namen hier ein, wenn sie den Check
+    # implementieren, und haengen ihn in dieselbe Registrierung in
+    # `scripts/consistency-check.py` (Plan W2-7, `Files:`).
 ]

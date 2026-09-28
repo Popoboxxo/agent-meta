@@ -74,9 +74,13 @@ from __future__ import annotations
 import copy
 import fnmatch
 import hashlib
+import importlib.util
+import json
 import os
 import re
 import shutil
+import subprocess
+import sys
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -89,6 +93,12 @@ from scripts.lib import doc_facts
 from scripts.lib import roles as roles_lib
 from scripts.lib.consistency import docs as docs_lib
 from scripts.lib.consistency import placeholders as placeholders_lib
+from scripts.lib.consistency.report import (
+    Finding,
+    Severity,
+    print_json_report,
+    print_report,
+)
 from scripts.lib.doc_facts import (
     AGENT_HELPER_PREFIX,
     AGENTS_CAPABILITY,
@@ -2191,12 +2201,23 @@ def _v1_tree(tmp_path: Path, relpath: str, body: str) -> Path:
 
 
 def test_existing_docs_checks_keep_signature_and_severity(tmp_path):
-    """W2-7's contract: the three pre-existing checks are untouched.
+    """W2-7's contract: the three pre-existing checks keep signature and severity.
 
-    IC-05 requires them to keep *signature and severity*; a rename, a new
-    required parameter or a demoted severity would silently change what
-    ``run_checks()`` collects. Both halves are pinned — the parameter list by
-    introspection, the severity by a tree that makes each one fire.
+    IC-05 requires exactly that; a rename, a new required parameter or a demoted
+    severity would silently change what ``run_checks()`` collects. The parameter
+    list is pinned by introspection, the severity by a tree that makes each check
+    fire — and, for V4, by a tree per **rule**.
+
+    **Corrected in W2-7 (finding from the W2-6 wave).** The V4 half used a
+    pre-E-5 fixture: ``docs/api/orphan.md`` plus a README with no
+    ``Documentation Index`` region. That tree is green, but through the
+    *fail-closed* branch (a ``docs/`` tree whose README cannot declare any
+    category), not through the orphan branch the fixture was built for — E-5
+    removed the per-page reading, so ``docs/api/orphan.md`` is no longer what
+    V4 looks at. The docstring claimed more than the fixture proved. Both
+    documented rules are pinned now, each through the path it actually owns:
+    the declared-but-unrepresented category (E-5) and the missing region
+    (fail-closed).
     """
     import inspect
 
@@ -2226,13 +2247,36 @@ def test_existing_docs_checks_keep_signature_and_severity(tmp_path):
         ("docs.ui_help_mappings", docs_lib.Severity.ERROR)
     ], ui
 
-    index_root = _v1_tree(tmp_path / "index", "docs/api/orphan.md", "# orphan\n")
-    _v1_tree(index_root, "README.md", "# readme\n")
+    # V4, E-5 rule: a ``docs/<category>/`` the region names, whose directory
+    # exists but which the region links no page of.
+    index_root = _v1_tree(tmp_path / "index", "docs/guides/setup.md", "# setup\n")
+    _v1_tree(index_root, "docs/se-cascade/overview.md", "# cascade\n")
+    _v1_tree(index_root, "README.md", (
+        "# readme\n"
+        "\n"
+        "## Documentation Index\n"
+        "\n"
+        "- [setup](docs/guides/setup.md)\n"
+        "- `docs/se-cascade/`\n"
+    ))
     index = docs_lib.check_readme_docs_index(index_root)
-    assert [(f.check, f.severity) for f in index] == [
-        ("docs.readme_index", docs_lib.Severity.ERROR)
+    assert [(f.check, f.severity, f.file) for f in index] == [
+        ("docs.readme_index", docs_lib.Severity.ERROR, "README.md")
     ], index
+    assert "docs/se-cascade/" in index[0].message, index[0].message
+    assert "docs/guides/" not in index[0].message, (
+        "the linked category must stay silent — otherwise the assertion above "
+        "proves nothing about which rule fired"
+    )
 
+    # V4, fail-closed rule: a ``docs/`` tree whose README has no index region.
+    closed_root = _v1_tree(tmp_path / "closed", "docs/api/orphan.md", "# orphan\n")
+    _v1_tree(closed_root, "README.md", "# readme\n")
+    closed = docs_lib.check_readme_docs_index(closed_root)
+    assert [(f.check, f.severity) for f in closed] == [
+        ("docs.readme_index", docs_lib.Severity.ERROR)
+    ], closed
+    assert "declares no" in closed[0].message, closed[0].message
 
 # --- W2-2: V3 ``check_internal_links`` (AC-09, IC-05, R6) ---------------------
 #
@@ -2524,14 +2568,326 @@ def test_v3_ignores_targets_outside_the_repository(tmp_path):
     assert [f.file for f in findings] == ["docs/page.md"], findings
 
 
-def test_v3_is_not_wired_into_the_runner_yet():
-    """AC-38: V3 is a no-op in every scenario until W2-7 registers it.
+# --- Registration in the runner (W2-7, RVW2-5) -----------------------------
+#
+# History: this section carried ``test_v3_is_not_wired_into_the_runner_yet``
+# with the assertion ``"check_internal_links" not in runner`` — the pre-W2-7
+# state, which W2-7 invalidates by registering V3. The sibling pins for V1 and
+# V6 were replaced the same way; see ``tests/test_doc_freshness.py``. The
+# fail-off half of the old pin survives in this file's scenario test below.
 
-    Same argument as the V1 pin: the common gate
-    (``docs-consolidation.enabled``) and the registration in ``run_checks()``
-    are W2-7's task, so scenarios 50-56 cannot regress from W2-2 either.
+
+def _runner():
+    """The runner module, loaded the way ``lib.cli_commands`` loads it.
+
+    The filename contains a hyphen, so it cannot be imported by name.
     """
-    runner = (REPO_ROOT / "scripts" / "consistency-check.py").read_text(encoding="utf-8")
-    assert "check_internal_links" not in runner, (
-        "W2-2 must not register the check — registration is W2-7"
+    spec = importlib.util.spec_from_file_location(
+        "_consistency_runner", REPO_ROOT / "scripts" / "consistency-check.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _gate_open_tree(tmp_path: Path, name: str = "open") -> Path:
+    """A minimal project root with a dead link and the common gate **on**."""
+    root = _v1_tree(tmp_path / name, "docs/guides/page.md", "[x](missing.md)\n")
+    (root / ".meta-config").mkdir(parents=True, exist_ok=True)
+    (root / ".meta-config" / "project.yaml").write_text(
+        "docs-consolidation:\n  enabled: true\n", encoding="utf-8"
+    )
+    return root
+
+
+def test_v3_is_registered_in_the_runner(tmp_path):
+    """AC-13: V3 is imported from the facade, registered, and reaches findings."""
+    runner_source = (REPO_ROOT / "scripts" / "consistency-check.py").read_text(
+        encoding="utf-8"
+    )
+    assert "check_internal_links" in runner_source, (
+        "the registration must be visible in the runner — the import block is "
+        "the only registration site (RVW2-1)"
+    )
+    assert "from lib.consistency.docs import" in runner_source, (
+        "K20: registration goes through the facade, never module-wise"
+    )
+    assert "check_internal_links" in docs_lib.__all__
+    assert "check_internal_links" in [c.__name__ for c in _runner().DOCS_CHECKS]
+
+    findings = _runner().run_checks(_gate_open_tree(tmp_path))
+
+    assert "docs.internal_links" in {f.check for f in findings}, findings
+    v3 = [f for f in findings if f.check == "docs.internal_links"]
+    assert [(f.branch, f.line, f.file) for f in v3] == [
+        ("link", 1, "docs/guides/page.md")
+    ], v3
+
+
+def test_finding_carries_line_and_branch_through_the_json_report(tmp_path):
+    """K15 / B-5, F1-PROMOTION: ``--json`` stops dropping the two fields.
+
+    The strongest form of the proof runs the real command line: a subprocess of
+    ``scripts/consistency-check.py --json --root <fixture>``, parsed with
+    ``json.loads``. Before the promotion ``print_json_report`` rebuilt every
+    finding from a fixed five-key dict, so ``line`` and ``branch`` were written
+    onto the instance by ``_v1_finding`` and then silently dropped — the
+    attribute existed and the report did not show it.
+
+    The fixture is built so that **three** shapes of finding are in the same
+    report, because one shape alone cannot tell the two failure modes apart:
+
+    * V1a — a real line and a real branch (``1`` / ``"V1a"``): the case the
+      promotion is about;
+    * V3 — a real line, a different branch (``"link"``): the second producer;
+    * V2 — no line and no branch at all (``None`` / ``""``), because a missing
+      index entry is a *page*, not a position. If the keys were emitted
+      conditionally, or only for checks that set them, this finding would be
+      the one that breaks.
+    """
+    root = _v1_tree(tmp_path / "json", "README.md", "| Agents | 74 |\n")
+    _v1_tree(root, "docs/guides/page.md", "# page\n\n[x](missing.md)\n")
+    (root / ".meta-config").mkdir(parents=True, exist_ok=True)
+    (root / ".meta-config" / "project.yaml").write_text(
+        "docs-consolidation:\n  enabled: true\n", encoding="utf-8"
+    )
+
+    # ``check=False`` on purpose: the exit code of this run is NOT the subject
+    # (the findings are), and a fixture that raises findings exits 1 by design.
+    # The caller asserts on the parsed report, never on ``returncode``.
+    proc = subprocess.run(
+        [sys.executable, str(REPO_ROOT / "scripts" / "consistency-check.py"),
+         "--json", "--root", str(root)],
+        capture_output=True, text=True, check=False,
+    )
+    report = json.loads(proc.stdout)
+    findings = report["findings"]
+    by_check = {check: [f for f in findings if f["check"] == check]
+                for check in {f["check"] for f in findings}}
+
+    for check in ("docs.no_manual_counts", "docs.internal_links",
+                  "docs.docs_index_completeness"):
+        assert by_check.get(check), (
+            f"premise: the fixture must produce a {check} finding, otherwise the "
+            f"key assertions below are vacuous ({sorted(by_check)})"
+        )
+
+    v1 = by_check["docs.no_manual_counts"][0]
+    assert (v1["line"], v1["branch"]) == (1, "V1a"), v1
+
+    v3 = by_check["docs.internal_links"][0]
+    assert (v3["line"], v3["branch"]) == (3, "link"), v3
+
+    v2 = by_check["docs.docs_index_completeness"][0]
+    assert (v2["line"], v2["branch"]) == (None, ""), (
+        "a page-addressed finding carries the keys with their defaults — the "
+        "keys are unconditional"
+    )
+
+    for finding in findings:
+        assert "line" in finding and "branch" in finding, finding
+
+def test_exit_codes_unchanged_with_new_checks(tmp_path):
+    """AC-24: 0 errors → 0, exactly 1 error → 1, script error → 2.
+
+    The contract is the runner's own module docstring
+    (``consistency-check.py:23-26``), unchanged by this task, implemented in
+    ``print_report`` / ``print_json_report`` (``1 if errors else 0``) plus
+    ``main``'s missing-file branch. Registering seven more checks must not move
+    a single value, so each one is measured twice: at the layer that produces
+    it (in-process) and end-to-end as a **process** exit code (subprocess), on a
+    fixture whose only findings are the ones the fixture caused.
+
+    The fixture is the delicate part. A naive ``tmp_path`` root makes
+    ``crossrefs.role-defaults-missing`` and ``fanout.capabilities-missing`` fire
+    (measured: **2** errors before any V-check says anything), which would make
+    the "0 errors → 0" case unreachable and the "1 error → 1" case
+    indistinguishable. The two minimal config files below silence exactly those
+    two checks and nothing else, so the counts are attributable.
+    """
+    error = Finding(Severity.ERROR, "docs.no_manual_counts", "README.md", "e")
+    warning = Finding(Severity.WARNING, "docs.no_manual_counts", "README.md", "w")
+
+    assert print_report([warning], REPO_ROOT, changed_only=False) == 0
+    assert print_json_report([warning]) == 0
+    assert print_report([error, warning], REPO_ROOT, changed_only=False) == 1
+    assert print_json_report([error, warning]) == 1
+
+    def _runner(*extra):
+        # ``check=False`` on purpose: this test measures the exit code itself,
+        # so a non-zero return is data, never an exception. Asserting on
+        # ``returncode`` below is the whole point of the contract.
+        return subprocess.run(
+            [sys.executable, str(REPO_ROOT / "scripts" / "consistency-check.py"),
+             *extra],
+            capture_output=True, text=True, check=False,
+        )
+
+    def _clean_tree(name: str, config: str, readme: str | None) -> Path:
+        root = tmp_path / name
+        (root / ".meta-config").mkdir(parents=True)
+        (root / ".meta-config" / "project.yaml").write_text(config, encoding="utf-8")
+        (root / "config").mkdir()
+        (root / "config" / "role-defaults.yaml").write_text("roles: {}\n",
+                                                           encoding="utf-8")
+        (root / "config" / "provider-capabilities.yaml").write_text(
+            "capabilities:\n  claude:\n    parallel_execution: false\n"
+            "    barrier_collect: false\n", encoding="utf-8")
+        if readme is not None:
+            (root / "README.md").write_text(readme, encoding="utf-8")
+        return root
+
+    # 0 errors → 0, end-to-end, and the common gate is closed on this tree.
+    quiet = _clean_tree("quiet", "systems-engineering:\n  enabled: false\n", None)
+    clean = _runner("--json", "--root", str(quiet))
+    assert json.loads(clean.stdout)["summary"]["errors"] == 0, clean.stdout
+    assert clean.returncode == 0, clean
+    assert _runner("--root", str(quiet)).returncode == 0
+
+    # exactly 1 error → 1, end-to-end, and that error is a newly registered V1.
+    loud = _clean_tree("loud", "docs-consolidation:\n  enabled: true\n"
+                              "  checks:\n    strict: true\n",
+                       "| Agents | 74 |\n")
+    ran = _runner("--json", "--root", str(loud))
+    report = json.loads(ran.stdout)
+    assert report["summary"] == {"total": 1, "errors": 1, "warnings": 0}, report
+    finding = report["findings"][0]
+    assert (finding["check"], finding["severity"]) == ("docs.no_manual_counts",
+                                                       "ERROR"), finding
+    assert (finding["line"], finding["branch"]) == (1, "V1a"), finding
+    assert ran.returncode == 1, ran
+    assert _runner("--root", str(loud)).returncode == 1
+
+    # script error → 2
+    missing = _runner("--file", str(tmp_path / "does-not-exist.md"))
+    assert missing.returncode == 2, missing
+
+
+# --- Registry completeness — structural, so it covers V4 and V5 too ---------
+#
+# Why a structural test and not a sixth and seventh single-check pin: the
+# per-check pins (V1 ``test_v1_is_registered_in_the_runner``, V2, V3, V6, V7)
+# each name one check, so a check without a pin — V4 and V5 had none — is
+# invisible. This one pins the *equality* between what the facade exports and
+# what the runner registers, so a new exported check that nobody registered, an
+# entry that was removed, or an entry duplicated all fail here.
+
+
+def test_the_docs_registry_covers_exactly_what_the_facade_exports():
+    """AC-13 as a set equality: registry ids == the reporting exported checks' ids.
+
+    Five structural pins, each of which is a way the property can break:
+
+    1. **Completeness** — every registered entry reports a check id, so an
+       entry that cannot fire would be a silent hole and is rejected here
+       instead of going unnoticed;
+    2. **Exclusivity** — the id multiset of the registry equals the id multiset
+       of the facade's exported checks *that report on this repository*. Both
+       directions at once: a registered check the facade does not hand out and
+       an exported check nobody registered both shift this equality;
+    3. **Distinctness** — seven entries, seven distinct functions, seven
+       distinct ids. A copy-pasted entry satisfies pins 1 and 2 for one id
+       twice and would hide the missing one;
+    4. **Id shape** — every id starts with ``docs.``, the IC-05 contract
+       (``check="docs.<name>"``);
+    5. **Vocabulary** — the ids the facade exports as ``*_CHECK_ID`` constants
+       are all used by a registered check, and exactly **one** registered id is
+       **not** in that vocabulary. That one is derived, not hardcoded: it is
+       the id of the exported check the registry reaches through the V4
+       adapter ``_readme_docs_index`` — the only exported check whose name is
+       not a registry ``__name__``. The W2-0 split left that alt-check out of
+       the ``__all__`` ids, and the assertion states which check it is.
+
+    **Why "the checks that report on this repository" and not simply "all
+    exported checks".** The facade exports **nine** ``check_*`` callables: the
+    seven V-checks plus the two pre-existing alt-checks ``check_sync_cli_docs``
+    and ``check_ui_help_mappings``, which IC-05 keeps **outside** the V family
+    — one-argument signatures, and no ``config`` to gate on. They are named
+    explicitly below rather than filtered by a heuristic, because "the checks
+    that happen to be silent today" would be a coincidence, not a rule: the day
+    one of them reports something, this test must fail and say so.
+
+    Each call runs over the **real** repository with the **real** project
+    config, deliberately bypassing the common gate: the subject is the registry's
+    *contents*, not whether the gate is open. Every one of the seven reports at
+    least one finding there, which is what makes pin 1 and pin 5 decidable
+    without a fixture per check.
+    """
+    import inspect
+
+    from scripts.lib.consistency import docs as docs_lib
+
+    runner = _runner()
+    repo = REPO_ROOT
+    config = runner.load_project_config(repo)
+
+    def _report_ids(func) -> set[str]:
+        """The check ids *func* reports on this repository.
+
+        IC-05 pins the three alt-checks at one argument and the nine V-checks
+        at ``(root, config=None)``; the runner solves the same shape mismatch
+        with ``_readme_docs_index``, and this helper solves it the same way.
+        """
+        if "config" in inspect.signature(func).parameters:
+            findings = func(repo, config)
+        else:
+            findings = func(repo)
+        return {finding.check for finding in findings}
+
+    registry = [_report_ids(entry) for entry in runner.DOCS_CHECKS]
+
+    assert all(len(ids) == 1 for ids in registry), (
+        "an entry that reports nothing, or more than one check id, cannot be "
+        f"pinned: {[(e.__name__, i) for e, i in zip(runner.DOCS_CHECKS, registry)]}"
+    )
+    registry_ids = [next(iter(ids)) for ids in registry]
+    assert len({id(entry) for entry in runner.DOCS_CHECKS}) == len(registry), (
+        "the registry lists the same function twice"
+    )
+    assert len(set(registry_ids)) == len(registry_ids), registry_ids
+    assert all(check.startswith("docs.") for check in registry_ids), registry_ids
+
+    exported = {
+        name: _report_ids(getattr(docs_lib, name))
+        for name in docs_lib.__all__
+        if name.startswith("check_")
+    }
+    ungated_alt_checks = {"check_sync_cli_docs", "check_ui_help_mappings"}
+    reporting = {name: ids for name, ids in exported.items() if ids}
+    silent = set(exported) - set(reporting)
+
+    assert silent == ungated_alt_checks, (
+        f"the set of exported checks that report nothing changed: {sorted(silent)} — "
+        "IC-05 keeps check_sync_cli_docs and check_ui_help_mappings outside the V "
+        "family, so a third one needs a decision, not a silent pass"
+    )
+    reporting_ids = [next(iter(ids)) for ids in reporting.values()]
+    assert sorted(reporting_ids) == sorted(registry_ids), (
+        "the registry and the facade disagree about which documentation checks "
+        f"exist: registry={sorted(registry_ids)} exported-reporting="
+        f"{sorted(reporting_ids)}"
+    )
+
+    vocabulary = {
+        getattr(docs_lib, name) for name in docs_lib.__all__
+        if name.endswith("_CHECK_ID")
+    }
+    assert vocabulary <= set(registry_ids), (
+        f"the facade exports ids no registered check reports: "
+        f"{sorted(vocabulary - set(registry_ids))}"
+    )
+    unrepresented = set(registry_ids) - vocabulary
+    assert len(unrepresented) == 1, (
+        "expected exactly one registered id outside the exported *_CHECK_ID "
+        f"vocabulary, got {sorted(unrepresented)} — if the W2-0 gap for the "
+        "README index alt-check has been closed, this assertion and the docstring "
+        "have to be updated with it"
+    )
+    adapted = [
+        name for name in reporting
+        if name not in {entry.__name__ for entry in runner.DOCS_CHECKS}
+    ]
+    assert adapted == ["check_readme_docs_index"], adapted
+    assert reporting[adapted[0]] == unrepresented, (
+        "the unrepresented id must be the one the adapted check reports"
     )

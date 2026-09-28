@@ -867,27 +867,94 @@ def test_v4_unlinked_pages_below_a_declared_category_are_not_findings(tmp_path):
     assert "ungenutzt-b.md" not in findings[0].message
 
 
-def test_v2_is_not_registered_in_the_runner_yet():
-    """Pin the pre-W2-7 state: V2 has no call site, so it cannot fire in CI yet.
+# --- Registration in the runner (W2-7, RVW2-5) -----------------------------
+#
+# History of this section: it carried ``test_v2_is_not_registered_in_the_runner_yet``
+# with the three assertions ``"check_docs_index_completeness" not in runner``,
+# ``not in docs_facade.__all__`` and ``not hasattr(docs_facade, ...)`` — the
+# pre-W2-7 state, which W2-7 invalidates by registering V2. Its own docstring
+# said so: "W2-7 **replaces** this pin with a positive one, exactly as it does
+# for ``test_v1_is_not_wired_into_the_runner_yet``". The negative pin is
+# therefore **replaced**, not deleted and not kept in parallel — keeping both
+# would assert a contradiction. The sibling replacements live in
+# ``tests/test_doc_freshness.py`` (V1, V6) and ``tests/test_doc_facts.py`` (V3).
 
-    W2-7 owns ``scripts/consistency-check.py`` and the ``docs.py`` facade
-    (K20/K46); this task writes neither. A passing test here means the wave
-    cannot have leaked a registration that its owner has not reviewed — and W2-7
-    **replaces** this pin with a positive one, exactly as it does for
-    ``test_v1_is_not_wired_into_the_runner_yet`` in ``test_doc_freshness.py``.
 
-    The facade is checked on its **export contract** (``__all__``), not on the
-    raw text: W2-0 left a comment in ``docs.py`` naming this very check as
-    "not yet implemented", and that comment is the *documentation* of the
-    pending registration, not a registration.
+def _runner():
+    """The runner module, loaded the way ``lib.cli_commands`` loads it.
+
+    The filename contains a hyphen, so it cannot be imported by name. The
+    import is local so that this section stays the file's only change.
     """
-    runner = (REPO_ROOT / "scripts" / "consistency-check.py").read_text(encoding="utf-8")
-    assert "check_docs_index_completeness" not in runner
+    import importlib.util
 
+    spec = importlib.util.spec_from_file_location(
+        "_consistency_runner", REPO_ROOT / "scripts" / "consistency-check.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _gate_open_tree(tmp_path: Path, name: str = "open") -> Path:
+    """A project root with an unindexed page and the common gate **on**."""
+    root = _tree(tmp_path / name, "docs/guides/page.md", _PAGE)
+    (root / ".meta-config").mkdir(parents=True, exist_ok=True)
+    (root / ".meta-config" / "project.yaml").write_text(
+        "docs-consolidation:\n  enabled: true\n", encoding="utf-8"
+    )
+    return root
+
+
+def test_v2_is_registered_in_the_runner(tmp_path):
+    """AC-13: V2 is exported by the facade, imported by the runner, registered.
+
+    Two halves, because on their own both are vacuous — a name can sit in an
+    import without a call, and a call can sit behind a closed gate:
+
+    (a) the import: ``check_docs_index_completeness`` is reachable from
+        ``scripts/consistency-check.py`` through the **facade**
+        ``lib.consistency.docs`` only (K20), whose ``__all__`` therefore has to
+        carry the name — that is what makes the facade contract (K19) the
+        precondition of the registration rather than a style preference — and the
+        name has an entry in the ``DOCS_CHECKS`` table, because a name in an
+        import is not a registration;
+    (b) the effect: a tree that really contains an unindexed page, a project
+        config with ``docs-consolidation.enabled: true`` and a genuine
+        ``run_checks()`` call yield ``docs.docs_index_completeness`` findings.
+
+    The check id is the literal this module already quotes at the top
+    (:data:`V2_CHECK_ID`) and is asserted unchanged, so a rename on either side
+    fails instead of agreeing on the wrong id.
+    """
     from scripts.lib.consistency import docs as docs_facade
 
-    assert "check_docs_index_completeness" not in docs_facade.__all__
-    assert not hasattr(docs_facade, "check_docs_index_completeness")
+    runner_source = (REPO_ROOT / "scripts" / "consistency-check.py").read_text(
+        encoding="utf-8"
+    )
+    assert "check_docs_index_completeness" in runner_source, (
+        "the registration must be visible in the runner — the import block is "
+        "the only registration site (RVW2-1: a count over the --json report "
+        "proves nothing about registration)"
+    )
+    assert "from lib.consistency.docs import" in runner_source, (
+        "K20: registration goes through the facade, never module-wise"
+    )
+    assert "check_docs_index_completeness" in docs_facade.__all__, (
+        "the facade __all__ is the contract (K19) the registration runs on"
+    )
+    assert hasattr(docs_facade, "check_docs_index_completeness")
+    assert "check_docs_index_completeness" in [
+        check.__name__ for check in _runner().DOCS_CHECKS
+    ]
+
+    findings = _runner().run_checks(_gate_open_tree(tmp_path))
+
+    assert V2_CHECK_ID == "docs.docs_index_completeness", V2_CHECK_ID
+    v2 = [f for f in findings if f.check == V2_CHECK_ID]
+    assert v2, findings
+    assert {f.file for f in v2} == {"docs/guides/page.md"}, v2
+    assert {f.severity for f in v2} == {docs_index_lib.Severity.ERROR}, v2
 
 
 def test_v2_lives_in_docs_index_and_v4_in_docs_links():

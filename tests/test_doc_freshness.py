@@ -21,6 +21,7 @@ copies are independent fixtures, not a contract.
 
 from __future__ import annotations
 
+import importlib.util
 from pathlib import Path
 
 import pytest
@@ -363,26 +364,197 @@ def test_v1_strict_leaves_the_finding_count_untouched(monkeypatch):
     ]
 
 
-def test_v1_is_not_wired_into_the_runner_yet():
-    """AC-38: V1 is a no-op in every scenario until W2-7 registers it.
+# --- Registration in the runner (W2-7, RVW2-5) -----------------------------
+#
+# History of this section: it carried ``test_v1_is_not_wired_into_the_runner_yet``
+# with the assertion ``"check_no_manual_counts" not in runner``. That pinned the
+# state *before* W2-7 — "V1 has no call site, so no scenario can regress from
+# W2-1" — and the task that registers V1 therefore made it red by construction.
+# RVW2-5 makes replacing it **binding**: the negative pin is not deleted and not
+# kept, it is superseded by a positive one that states the same boundary in the
+# direction that is now true. Keeping both would assert a contradiction.
+#
+# The same replacement applies to the V6 pin further down in this file, and to
+# the V3 pin in ``tests/test_doc_facts.py``.
 
-    The common gate (``docs-consolidation.enabled``) and the registration in
-    ``run_checks()`` are W2-7's task. Until then the only way V1 can affect a
-    run is a direct call, which is what this file does — and that is exactly
-    why scenarios 50-56 cannot regress from W2-1.
+
+def _runner():
+    """The runner module, loaded the way ``lib.cli_commands`` loads it.
+
+    The filename contains a hyphen, so it cannot be imported by name —
+    ``importlib.util.spec_from_file_location`` is the established route in this
+    repo (``cli_commands._run_consistency_checks``), not a test-only trick.
     """
-    runner = (REPO_ROOT / "scripts" / "consistency-check.py").read_text(encoding="utf-8")
-    assert "check_no_manual_counts" not in runner, (
-        "W2-1 must not register the check — registration is W2-7"
+    spec = importlib.util.spec_from_file_location(
+        "_consistency_runner", REPO_ROOT / "scripts" / "consistency-check.py"
     )
-    scenario_configs = sorted(
-        (REPO_ROOT / "tests" / "scenarios" / "configs").glob(
-            "5[0-6]-*.project.yaml"
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _gate_open_tree(tmp_path: Path, name: str = "open") -> Path:
+    """A minimal project root with the IC-05 sites and the common gate **on**."""
+    root = _v1_tree(tmp_path / name, "README.md", V1_COUNTER_PROBE)
+    (root / ".meta-config").mkdir(parents=True, exist_ok=True)
+    (root / ".meta-config" / "project.yaml").write_text(
+        "docs-consolidation:\n  enabled: true\n", encoding="utf-8"
+    )
+    return root
+
+
+def test_v1_is_registered_in_the_runner(tmp_path):
+    """AC-13: V1 is imported from the facade **and** reaches ``findings[]``.
+
+    Two halves, because on their own both are vacuous — a name can sit in an
+    import without a call, and a call can exist behind a closed gate:
+
+    (a) the import: ``check_no_manual_counts`` is reachable from
+        ``scripts/consistency-check.py``, and through the **facade**
+        ``lib.consistency.docs`` only (K20) — whose ``__all__`` therefore has
+        to carry the name, which is what makes the facade contract (K19) the
+        precondition of the registration rather than a style preference;
+    (b) the effect: a tree that really contains an IC-05 site, a project config
+        with ``docs-consolidation.enabled: true`` and a genuine ``run_checks()``
+        call yield ``docs.no_manual_counts`` findings.
+    """
+    from scripts.lib.consistency import docs as docs_facade
+
+    runner_source = (REPO_ROOT / "scripts" / "consistency-check.py").read_text(
+        encoding="utf-8"
+    )
+    assert "check_no_manual_counts" in runner_source, (
+        "the registration must be visible in the runner — the import block is "
+        "the only registration site (RVW2-1: a count over the --json report "
+        "proves nothing about registration)"
+    )
+    assert "from lib.consistency.docs import" in runner_source, (
+        "K20: registration goes through the facade, never module-wise"
+    )
+    assert "check_no_manual_counts" in docs_facade.__all__
+    assert "check_no_manual_counts" in [
+        check.__name__ for check in _runner().DOCS_CHECKS
+    ]
+
+    findings = _runner().run_checks(_gate_open_tree(tmp_path))
+
+    assert "docs.no_manual_counts" in {f.check for f in findings}, findings
+    v1 = [f for f in findings if f.check == "docs.no_manual_counts"]
+    assert [f.branch for f in v1] == ["V1a"], v1
+    assert [f.line for f in v1] == [1], v1
+    assert {f.file for f in v1} == {"README.md"}, v1
+
+
+def _docs_tree(tmp_path: Path, name: str, gate: str) -> Path:
+    """A project root that *can* produce V1…V4 findings — the control tree.
+
+    The README carries an IC-05 count site (V1), ``docs/guides/page.md`` is an
+    unindexed page with a dead link (V2, V3) and the README has no
+    ``Documentation Index`` region at all (V4, fail-closed). The only
+    difference between the "on" and the "off" tree is the ``gate`` string.
+    """
+    root = _v1_tree(tmp_path / name, "README.md", V1_COUNTER_PROBE)
+    _v1_tree(root, "docs/guides/page.md", "# page\n\n[x](missing.md)\n")
+    (root / ".meta-config").mkdir(parents=True, exist_ok=True)
+    (root / ".meta-config" / "project.yaml").write_text(gate, encoding="utf-8")
+    return root
+
+
+def test_the_common_gate_is_the_first_condition_of_every_registered_check(
+    tmp_path,
+):
+    """IC-05/IC-22/AC-38: with the switch absent, **every** V-check is a no-op.
+
+    Two runs over two trees that differ in exactly one byte-sequence — the
+    ``docs-consolidation`` block — and a truth table on the gate itself. The
+    control is what makes the silence mean something: the same ``run_checks``
+    over the "on" tree produces four of the seven checks' findings, so the "off"
+    run is not vacuously clean.
+
+    Absence, a non-mapping block, a non-boolean value and an explicit ``false``
+    must all read as closed (fail-off, IC-22); only the boolean ``true`` opens
+    the gate.
+    """
+    runner = _runner()
+
+    for config in ({}, None, {"docs-consolidation": {}},
+                   {"docs-consolidation": {"enabled": False}},
+                   {"docs-consolidation": {"enabled": "false"}},
+                   {"docs-consolidation": True}):
+        assert runner.docs_consolidation_enabled(config) is False, config
+
+    assert runner.docs_consolidation_enabled(
+        {"docs-consolidation": {"enabled": True}}) is True
+
+    off = _docs_tree(tmp_path, "off", "systems-engineering:\n  enabled: false\n")
+    assert runner.load_project_config(off) == {
+        "systems-engineering": {"enabled": False}}, (
+        "premise: the closed tree really has no docs-consolidation block"
+    )
+    assert [f for f in runner.run_checks(off) if f.check.startswith("docs.")] == [], (
+        "a project that never set the key collects no documentation finding"
+    )
+
+    on = _docs_tree(tmp_path, "on", "docs-consolidation:\n  enabled: true\n")
+    opened = {f.check for f in runner.run_checks(on) if f.check.startswith("docs.")}
+    assert opened == {"docs.no_manual_counts", "docs.docs_index_completeness",
+                      "docs.internal_links", "docs.readme_index"}, opened
+
+    explicit = _docs_tree(tmp_path, "explicit",
+                          "docs-consolidation:\n  enabled: false\n")
+    assert [f for f in runner.run_checks(explicit)
+            if f.check.startswith("docs.")] == [], (
+        "an explicit false is observationally identical to an absent block"
+    )
+
+
+def test_the_scenario_configs_never_set_the_common_gate():
+    """AC-38's premise, measured over **all** scenario fixtures — not a subset.
+
+    This is the half of the old V1 pin that survives the registration, and it is
+    the only **directly** measurable part of AC-38: every scenario fixture must
+    leave ``docs-consolidation`` absent, so the fail-off above keeps all seven
+    registered checks silent there.
+
+    **Why all of them, not just 50–56.** The plan's acceptance names scenarios
+    50–56, but the guarantee is a property of the *fixtures*, and the matrix has
+    grown. A fixture that opened the gate would be a documentation regression in
+    a scenario nobody is watching, so the pin covers every
+    ``*.project.yaml`` that ``tests/scenarios/run.sh`` can feed in.
+
+    Two checks per file, and the difference matters. The substring check is the
+    strict one — it also catches the key inside a comment or an example, which a
+    parser would happily ignore. The parsed check is the one that speaks the
+    runner's language: it proves the config the gate reads has no
+    ``docs-consolidation`` key at all, so "absent" and not merely "present but
+    falsy" is what is pinned. Both are asserted; the count is not hardcoded, and
+    no fixture sets ``enabled`` explicitly (``false`` included) — measured
+    **0** of **63**, which is the value this test would break on.
+
+    **What this cannot prove, stated rather than hidden.** The plan's shell line
+    ``bash tests/scenarios/run.sh 50 51 52 54 55 56 → 0`` does **not** measure
+    this: ``lib.cli_commands._run_consistency_checks(agent_meta_root)`` runs the
+    suite over the **agent-meta checkout**, so the fixture config never reaches
+    the checks. That line is therefore unreachable for a reason independent of
+    this gate — see the W2-7 plan note.
+    """
+    import yaml
+
+    configs = sorted((REPO_ROOT / "tests" / "scenarios" / "configs").glob(
+        "*.project.yaml"))
+    assert configs, "premise: the scenario configs are gone"
+
+    for path in configs:
+        text = path.read_text(encoding="utf-8")
+        assert "docs-consolidation" not in text, (
+            f"{path.name}: the common gate must stay absent — a fixture that set "
+            "it would put all seven registered checks into a scenario"
         )
-    )
-    assert scenario_configs, "premise: the scenario configs are gone"
-    for path in scenario_configs:
-        assert "docs-consolidation" not in path.read_text(encoding="utf-8"), path
+        parsed = yaml.safe_load(text) or {}
+        assert isinstance(parsed, dict), path
+        assert "docs-consolidation" not in parsed, path
+        assert "docs-consolidation" not in str(parsed).lower(), path
+
 
 
 # ---------------------------------------------------------------------------
@@ -553,7 +725,12 @@ def test_v6_expected_mismatch_is_an_error_naming_both_values(monkeypatch, tmp_pa
     assert manipulated[fact] in finding.message
     # The oracle axis names a key, not a line — `line` stays unset rather than
     # carrying a magic 0 that a console report would print as a location.
-    assert not hasattr(finding, "line")
+    # W2-7 (K15/B-5) promoted `line` from an instance attribute to a declared
+    # dataclass field with default ``None``, so "unset" is now the *value* and
+    # `hasattr` can no longer express it — the field is always there.
+    assert finding.line is None, (
+        "a key-addressed finding must not invent a line number"
+    )
 
 
 def test_v6_missing_in_expected_is_a_warning(monkeypatch, tmp_path):
@@ -692,30 +869,36 @@ def test_v6_output_is_deterministic_and_axis_ordered(monkeypatch, tmp_path):
     assert _v6_kinds(first) == ["expected-mismatch", "handedit"]
 
 
-def test_v6_is_not_wired_into_the_runner_yet():
-    """AC-38 / K46: no caller, no facade export — W2-7 owns both.
+# --- Registration in the runner (W2-7, RVW2-5) -----------------------------
+#
+# Superseded here for the same reason as the V1 pin at the top of this section:
+# ``test_v6_is_not_wired_into_the_runner_yet`` asserted that the runner does not
+# mention ``check_docs_facts_fresh`` and that the facade neither exports nor
+# carries the name — the pre-W2-7 state, which W2-7 invalidates by registering
+# V6. The positive pin below asserts the same three properties inverted, plus
+# the one that actually matters for a gate tool: the check is in the registry
+# that the common gate governs.
 
-    Two properties in one test because they are one boundary: until W2-7
-    registers the check *and* exports the name, V6 cannot affect a sync, and no
-    scenario can regress from W2-5. ``docs.py`` is W2-7's write-set alone (K20),
-    so a preparatory export here would be the ownership collision K46 forbids.
 
-    The facade is checked through its ``__all__`` and its attributes, not
-    through its text: W2-0 left a bookkeeping comment in the module docstring
-    that *names* the checks which are not implemented yet, and that comment is
-    correct and stays — only the importable name is the contract.
-    """
+def test_v6_is_registered_in_the_runner():
+    """AC-13: V6 is exported by the facade, imported by the runner, registered."""
     from scripts.lib.consistency import docs as docs_facade
 
-    runner = (REPO_ROOT / "scripts" / "consistency-check.py").read_text(encoding="utf-8")
+    runner_source = (REPO_ROOT / "scripts" / "consistency-check.py").read_text(
+        encoding="utf-8"
+    )
 
-    assert "check_docs_facts_fresh" not in runner, (
-        "W2-5 must not register the check — registration is W2-7"
+    assert "check_docs_facts_fresh" in runner_source, (
+        "W2-7 registers V6 — the import block is the only registration site"
     )
-    assert "check_docs_facts_fresh" not in docs_facade.__all__, (
-        "docs.py is W2-7's write-set alone (K46)"
+    assert "from lib.consistency.docs import" in runner_source, (
+        "K20: registration goes through the facade, never module-wise"
     )
-    assert not hasattr(docs_facade, "check_docs_facts_fresh"), (
-        "docs.py is W2-7's write-set alone (K46)"
+    assert "check_docs_facts_fresh" in docs_facade.__all__, (
+        "the facade __all__ is the contract (K19) the registration runs on"
     )
+    assert hasattr(docs_facade, "check_docs_facts_fresh")
+    assert "check_docs_facts_fresh" in [
+        check.__name__ for check in _runner().DOCS_CHECKS
+    ], "a name in an import is not a registration — it needs an entry in DOCS_CHECKS"
 
