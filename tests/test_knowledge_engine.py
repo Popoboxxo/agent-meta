@@ -15,6 +15,17 @@ from scripts.lib.knowledge import (
 _AGENT_META_ROOT = Path(__file__).resolve().parent.parent
 
 
+def _project_config_schema():
+    """Load the project-config contract (config/project-config.schema.json).
+
+    Single loader for the three tests below that read the schema: the
+    knowledge-engine property block, the phase-C property block and the
+    knowledge-role whitelist.
+    """
+    schema_path = _AGENT_META_ROOT / "config" / "project-config.schema.json"
+    return json.loads(schema_path.read_text(encoding="utf-8"))
+
+
 # ---------------------------------------------------------------------------
 # DOMAIN_CONCEPT_TYPES
 # ---------------------------------------------------------------------------
@@ -152,9 +163,7 @@ def test_build_variables_knowledge_enabled_true():
 # ---------------------------------------------------------------------------
 
 def test_schema_has_knowledge_engine_property():
-    schema_path = _AGENT_META_ROOT / "config" / "project-config.schema.json"
-    with schema_path.open(encoding="utf-8") as f:
-        schema = json.load(f)
+    schema = _project_config_schema()
     ke_schema = schema["properties"]["knowledge-engine"]
     assert ke_schema["type"] == "object"
     assert ke_schema["properties"]["enabled"]["type"] == "boolean"
@@ -219,13 +228,63 @@ def test_knowledge_indexer_has_intent_keywords():
 
 
 def test_knowledge_roles_pass_schema_validation():
-    import sys
-    import subprocess
-    result = subprocess.run(  # noqa: PLW1510
-        [sys.executable, str(_AGENT_META_ROOT / "scripts" / "sync.py"), "--dry-run", "--validate"],
-        cwd=_AGENT_META_ROOT, capture_output=True, text=True,
+    """The knowledge roles must pass project-config schema validation on their own.
+
+    W2-8 decoupling: this test used to assert the repo-global
+    ``sync.py --dry-run --validate`` exit code of the *host* repo. That exit
+    code is a foreign measure for this subject: ``_handle_validate`` runs the
+    consistency runner over ``agent_meta_root`` (``cli_commands.py:975``), so
+    the test turned red on any repo-global docs-check ERROR (e.g.
+    ``docs.readme_index`` on ``README.md``) that has nothing to do with the
+    knowledge roles. The subject is the knowledge-role config surface, so it is
+    now validated directly against ``config/project-config.schema.json`` --
+    no repo-global exit code, no documentation-check framework involved.
+
+    ``jsonschema`` is an optional dependency, so checks (1), (2) and the
+    role-discovery run *unconditionally* -- none of them needs it. Only (3)
+    and (4) call the library itself, so ``importorskip`` sits directly above
+    (3): a checkout without ``jsonschema`` loses exactly the two checks that
+    genuinely require it instead of the whole test.
+    """
+    schema = _project_config_schema()
+
+    registered = load_roles_config(_AGENT_META_ROOT)["roles"]
+    knowledge_roles = sorted(
+        name for name, spec in registered.items() if spec.get("group") == "knowledge"
     )
-    assert result.returncode == 0, result.stdout + result.stderr
+    assert knowledge_roles, "no role registered under group 'knowledge' in role-defaults.yaml"
+
+    # (1) every knowledge role is whitelisted by the schema's `roles` enum.
+    # Diagnostic pre-stage for (3): both read the same invariant, but only
+    # this one names the offending role when it breaks.
+    role_enum = schema["properties"]["roles"]["items"]["enum"]
+    rejected = [name for name in knowledge_roles if name not in role_enum]
+    assert not rejected, f"knowledge roles rejected by the project-config schema roles enum: {rejected}"
+
+    # (2) every knowledge role has a 1-generic template to be generated from
+    missing_templates = [
+        name for name in knowledge_roles
+        if not (_AGENT_META_ROOT / "agents" / "1-generic" / f"{name}.md").is_file()
+    ]
+    assert not missing_templates, f"knowledge roles without a 1-generic template: {missing_templates}"
+
+    # (3) a config that switches every knowledge role on satisfies the schema.
+    # The first use of the optional dependency: skip from here on, not above.
+    jsonschema = pytest.importorskip("jsonschema")
+    config = {
+        "project": {"name": "knowledge-schema", "prefix": "ksc", "short": "knowledge-schema"},
+        "platforms": [],
+        "roles": knowledge_roles,
+        "knowledge-engine": {
+            "enabled": True, "domain": "internal-docs", "bundle-path": "knowledge",
+        },
+    }
+    jsonschema.validate(config, schema)
+
+    # (4) non-vacuity: the identical check rejects a malformed knowledge block
+    broken = {**config, "knowledge-engine": {**config["knowledge-engine"], "enabled": "not-a-bool"}}
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(broken, schema)
 
 
 # ---------------------------------------------------------------------------
@@ -344,10 +403,7 @@ def test_knowledge_migrator_template_exists_and_has_hard_constraints():
 # ---------------------------------------------------------------------------
 
 def test_schema_knowledge_engine_has_phase_c_properties():
-    import json
-    from pathlib import Path
-    schema_path = Path(__file__).parent.parent / "config" / "project-config.schema.json"
-    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    schema = _project_config_schema()
     ke_props = schema["properties"]["knowledge-engine"]["properties"]
     for field in ("sources-dir", "wiki-dir", "schema-language", "okf", "operations", "migration", "search"):
         assert field in ke_props, f"missing knowledge-engine.{field}"

@@ -3776,14 +3776,96 @@ sein Nachweis den Zustand **kurz vor** der Registrierung prüft und die Entkoppl
 Wellenabschluss belegt ist — nicht erst, wenn die Welle schon rot ist. **Diese Task-Zeile ist für
 sich genommen kein Welle-Gate** (RVW-3): das Wellen-Gate **W2** bleibt an **W2-7** gebunden.
 **Steps:**
-- [ ] 1: Reproduktion: beide Tests laufen rot nach (die Volltest-Baseline: **genau 2** rote Tests,
+- [x] 1: Reproduktion: beide Tests laufen rot nach (die Volltest-Baseline: **genau 2** rote Tests,
       beide Stellen `:228` bzw. `:48`) und der Befund wird im Task-Notiz-Format festgehalten.
-- [ ] 2: Beide Tests entkoppeln — **ausschließlich** nach den Mechanismen **(i)/(iii)** der
+- [x] 2: Beide Tests entkoppeln — **ausschließlich** nach den Mechanismen **(i)/(iii)** der
       Akzeptanz (b) — **(ii) ist an dieser Position nicht anwendbar (K63)** und wird **nicht**
       gewählt; **kein** Eingriff in Produktivcode, `sync.py` oder Szenario-Fixtures (NG-10).
-- [ ] 3: Nachweise (a), (c), (d), (e) ausführen; insbesondere die **negative** Probe (c) und der
+- [x] 3: Nachweise (a), (c), (d), (e) ausführen; insbesondere die **negative** Probe (c) und der
       Volltest-Lauf mit **0** roten Tests; Ergebnis in den Review-Protokoll aufnehmen.
-- [ ] 4: commit via `git`-Agent: `test: decouple full-suite tests from the global validate exit code`.
+- [x] 4: commit via `git`-Agent: `test: decouple full-suite tests from the global validate exit code`.
+
+> **LEDGER-Stand 2026-09-28 — W2-8 abgehakt über den maschinellen Ledger-Writer (Fortschrittsnotiz,
+> keine Änderung der Task-Semantik).** Die K53-Interim-Regel ist mit `3d8499ca` beendet, deshalb dieser
+> Werkzeuglauf und **keine** Handsetzung. Abgehakt **4** von **4** Checkboxen gegen diesen Plan, Task-ID
+> **`W2-8`**, Schritt **4** nennt den Commit-Titel
+> `test: decouple full-suite tests from the global validate exit code`; ein Hash ist **nicht** genannt,
+> weil dieser Task **nicht** committet.
+> **Baseline, gemessen in Schritt 1 (ungefilterte Roh-Ausgabe, umgeleitet und aus der Datei gelesen —
+> `rtk` filtert pytest-Fehlschläge):** `python3 -m pytest tests/ -q` ⇒
+> **`2 failed, 3414 passed, 1 skipped, 117 warnings, 35 errors, 11 subtests passed`**, also genau
+> **zwei** rote Tests: (1) `tests/test_knowledge_engine.py::test_knowledge_roles_pass_schema_validation`
+> (Assertionsstelle damals `:228`) und (2) `tests/test_sharkord_service_name_migration.py::
+> test_generated_docker_agent_has_no_leftover_platform_namespace_placeholder` (damals `:48`). **Kern der
+> Fehlermeldung in beiden, wortgleich:** `[ERR] [docs.readme_index] documentation category
+> 'docs/se-cascade/' is declared in the README.md Documentation Index section but the section links no
+> page below it`. **Gemessene Ursache:** beide Tests prüften eine **Fremdgröße** — den repo-globalen
+> Konsistenz-Exit-Code, nicht ihren Gegenstand. `_handle_validate` ruft den Runner über
+> `agent_meta_root` (`scripts/lib/cli_commands.py:975`), und der Runner ruft
+> `check_readme_docs_index(_AGENT_META_ROOT)` **unbedingt** (`scripts/consistency-check.py:201`; `--root`
+> wirkt erst ab `:257`, die Altchecks stehen in `:196` und `:199-201`). Beim sharkord-Test gilt das
+> **trotz** `cwd=tmp_path`, weil die Altchecks den Agent-Meta-Root benutzen, nicht den Projekt-Root.
+> Die **35** `errors` sind unverändert `tests/browser/*` ohne Socket und **kein** Kriterium.
+> **Mechanismus je Test — beide (i), (ii) nicht anwendbar, (iii) gemessen und begründet verworfen:**
+> **(1) Knowledge-Test** prüft jetzt den **eigenen** Gegenstand in-process gegen
+> `config/project-config.schema.json`: jede unter `group: knowledge` registrierte Rolle muss (a) im
+> `roles.items.enum` des Schemas whitelisted sein, (b) ein `agents/1-generic/<rolle>.md` haben, und
+> (c) eine Config, die **alle** Knowledge-Rollen einschaltet, muss das Schema bestehen; als
+> **Nicht-Vakuum-Nachweis** (d) muss dieselbe Prüfung einen verbogenen `knowledge-engine.enabled`
+> ablehnen (`pytest.raises(jsonschema.ValidationError)`). **Was wegfällt:** der
+> `sync.py --dry-run --validate`-Subprozess samt `assert result.returncode == 0`. **Was hinzukommt:**
+> `import jsonschema` via `importorskip` (kein Subprozess, keine Fremdgröße).
+> **(2) sharkord-Test** prüft jetzt den **eigenen** Fixture-Scope: nach dem Sync darf **im ganzen
+> generierten Agentenbaum** `.claude/agents/*.md` **kein** `{{platform.<ns>.<key>}}`-Platzhalter
+> überleben (generalisierte, strengere Form der beiden Einzelnamen). **Was wegfällt:** der
+> `sync.py --validate`-Subprozess samt `assert validate_result.returncode == 0`. **Was hinzukommt:** die
+> Regex-Vollform plus der Baum-Scan; **erhalten bleiben** alle drei ursprünglichen Assertions
+> (`service_name` und `host_lan_ip` nicht in `docker.md`, `127.0.0.1` aufgelöst) und
+> `assert docker_agent.is_file()`. **Nicht-Vakuum beider Ersatzungen, gemessen:** der Schema-Check
+> fällt bei `enabled: "not-a-bool"` um, und eine von Hand in das generierte `docker.md`
+> eingeschleuste Zeile `sharkord/sharkord:{{platform.sharkord.image_tag}}` lässt den neuen Baum-Scan
+> anschlagen (danach wieder leer) — das Muster ist **real**, `agents/2-platform/sharkord-docker.md`
+> trägt es auf Template-Ebene an vier Stellen.
+> **(iii) wurde gemessen und verworfen, mit dem Grund:** `python3 scripts/consistency-check.py --json
+> --root <Fixture>` endet auf **Exit 1** mit **3** ERRORs — `README.md :: docs.readme_index` (Host) und
+> `config/role-defaults.yaml :: crossrefs.role-defaults-missing` sowie
+> `config/provider-capabilities.yaml :: fanout.capabilities-missing` (dem Fixture fehlen diese
+> Framework-Dateien) — und **null** Findings zu `.claude/agents/docker.md`. Ein scope-gefilterter
+> Auswertungsfilter wäre dort also ein No-op-Wächter gewesen, der 20 Sekunden Subprozess für kein
+> Signal kostet; die Grenze ist stattdessen **im Code benannt** (Kommentar am Test), inklusive der
+> Stellen `:196`/`:199-201`/`:257`.
+> **Nachweis (a):** `python3 -m pytest tests/test_knowledge_engine.py
+> tests/test_sharkord_service_name_migration.py -q` ⇒ **`46 passed`, 0 failed, Exit 0** (vorher
+> `2 failed, 44 passed`) — die **Testanzahl bleibt 46**, es wurde nichts hinzugefügt oder entfernt.
+> **Nachweis (b), am Diff belegt:** beide `assert … returncode == 0` gegen `sync.py --validate` sind
+> entfernt; im Diff steht an ihrer Stelle nur der Subprozess `sync.py` **ohne** `--validate` im
+> sharkord-Test, dessen `assert sync_result.returncode == 0` **den Fixture-Sync** betrifft und
+> erhalten bleibt. Kein `|| True`, kein `xfail`, kein `-k`-Filter, kein herabgesetzter Sollwert, kein
+> Eingriff in `scripts/sync.py`.
+> **Nachweis (c) — die negative Probe, konkret gewählt:** der Host trägt **schon jetzt** den
+> `docs.readme_index`-ERROR, deshalb genügt der Zustand allein nicht als Beweis; zusätzlich wurde ein
+> **zweiter** `docs/`-ERROR injiziert (eine zusätzliche Readme-Dokumentationskategorie
+> `docs/w28-probe/` ohne Seite darunter). Ergebnis: **2** ERRORs gleichzeitig in
+> `scripts/consistency-check.py --json` (beide `README.md :: docs.readme_index`), und der gezielte Lauf
+> der **beiden** Tests ⇒ **`2 passed`, Exit 0**. Die `README.md` wurde danach **byte-identisch**
+> zurückgeschrieben (per Byterückgabe, **ohne** Git-Operation) und der Zustand erneut gemessen.
+> **Nachweis (d):** `git diff --name-only` ⇒ **ausschließlich** `tests/test_knowledge_engine.py` und
+> `tests/test_sharkord_service_name_migration.py`, plus diese Plan-Datei als **werkzeugbedingte
+> Ausnahme** — der Ledger-Writer schreibt den Plan, das ist **kein** Produktivcode.
+> **Nachweis (e):** `python3 -m pytest tests/ -q` ⇒ **`3416 passed, 1 skipped, 119 warnings, 35 errors,
+> 11 subtests passed`**, **0 `FAILED`** (Baseline **2**), **35** `errors` wie in der Baseline und
+> **0** davon außerhalb `tests/browser/*` — Zählwert, kein Exit-Code-Kriterium (`W-VALIDATE-ROT`).
+> **Überlappungs-Pin, gemessen:** `tests/test_plan_ledger_writer.py::
+> test_validate_plan_reaches_the_expected_overlap_verdict` bleibt grün mit dem Ist-Wert **18**
+> (Literal `== 18`, `tests/test_plan_ledger_writer.py:524`, unangetastet), die Datei grün mit
+> **`22 passed`**. Der Zähler liest nur den Header-**Titel** (`spec_plan.py:589` `prompt=title`), nicht
+> den Block, deshalb verschiebt diese Notiz die Zahl nicht; `files_touched("W2-8")` bleibt `()`,
+> ebenso für **W2-4**, **W2-6** und **W2-9**, und die Task-Zahl bleibt **50** — dafür ist im Fließtext
+> bewusst **keine** Doppelpunktform der Feldwörter und **keine** zeilenbeginnende
+> `Depends on:`-Zeile verwendet (W2-9s Notiz hat diesen Tripwire bereits einmal ausgelöst).
+> **Diese Task-Zeile ist für sich genommen kein Welle-Gate** (RVW-3): das Wellen-Gate **W2** bleibt an
+> **W2-7** gebunden.
+
 
 ### W2-7: Registrierung, Common-Gate und Exit-Codes — **Rev. 0.6: Abschluss der Welle (K20); Rev. 0.7: Abschluss nach W2-8**
 
