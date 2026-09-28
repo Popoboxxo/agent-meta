@@ -2276,8 +2276,8 @@ python3 scripts/consistency-check.py --json \
 | `docs.docs_index_completeness` (V2) | **planmäßig rot** (ERROR) | `docs/INDEX.md` existiert **nicht** — Termin **W3-6** | `senior-developer` (W3-6) |
 | `docs.internal_links` (V3) | **planmäßig rot** (ERROR) | **Rev. 0.6, K22 — in drei Klassen aufgeteilt** (Volltext: Tabelle `W2-GATE-V3-KLASSEN`): **2** Layout-Findings `README.md:722`/`:723` ⇒ Termin **W8-2**; **25** Link-Findings unter `docs/**` ⇒ **Follow-up `F-DOCS-LINKS-2026-09-27`**, Termin **2026-10-11**, **kein** Termin 0 in W0–W8; `llms.txt` **0** | `developer` (W8-2 **und** Follow-up) |
 | `docs.readme_index` (V4) | **Rev. 0.7 / E-5 (K54) — der Sollwert ändert sich von 0 auf 1, mit Termin.** **Warum:** V4 prüft nach E-5 **nicht** mehr „alle 205 nicht-Archiv-`docs/**.md` sind in `README.md` verlinkt" (⇒ **193** ERROR — **K60**, nicht 191 —, `--validate` blockiert, zwei Volltests rot), sondern den **README-Index-Scope**: jede in der `##`-Region `Documentation Index` deklarierte `docs/`-Kategorie muss existieren und **mindestens einen** Link tragen. **Gemessener Ist-Stand: genau 1** Finding — Kategorie `docs/se-cascade/` (deklariert `README.md:378`, ohne Link in der Region). **Termin: Follow-up `F-DOCS-README-INDEX-SE-2026-09-27`, 2026-10-11.** **Die 193** sind **kein** V4-Finding mehr, sondern Follow-up `F-DOCS-README-INDEX-2026-09-27` (2026-10-11; Nachweis = **Issue-Liste + once-count außerhalb V4**, **kein** V4-Zählwert — **K60**). **Check-ID `docs.readme_index`, Severity ERROR, `file` = `README.md` unverändert** (IC-05-Pin; Signatur **einargumentig** `(root: Path)` — **K59**). **Wichtig:** V4 ist **bereits heute** im Runner registriert (`consistency-check.py:53`/`:201`) — die Registrierungszeile ändert sich **nicht** | `developer` (W2-6 für den Scope, Follow-ups für die Behebung) |
-| `docs.role_generation_parity` (V5) | **0** | `compute_active_roles()` schließt das deaktivierte Gate (`project.yaml:12-13`); **Rev. 0.7 / E-7:** Modul `docs_freshness_v5.py` (Task W2-4), Registrierung weiterhin **W2-7** | `developer` (W2-4) |
-| `docs.docs_facts_fresh` (V6) | **planmäßig rot** (ERROR) | generierte Blöcke existieren erst ab **W3-7** | `developer` (W3-7) |
+| `docs.role_generation_parity` (V5) | **0** | `compute_active_roles()` schließt das deaktivierte Gate (`project.yaml:12-13`); **Rev. 0.7 / E-7:** Modul `docs_freshness_v5.py` (Task W2-4), Registrierung weiterhin **W2-7** — **Nachtrag 2026-09-28, Vorschlag (Wert und Severity der Erwartungsspalte bleiben hier unverändert):** der gemessene Ist-Stand ist **1 WARNING**, nicht **0**; Ursache ist **nicht** W3-7, sondern die Gate-Logik selbst — `resolve_activation_gates` liefert die Gruppe mit `enabled: false`, die deklarierte Rolle `se-component-requirements` bleibt deshalb in der Differenzmenge, und `_v5_severity` stuft ein **geschlossenes** Gate als **WARNING** (F21-Umkehrung: geschlossen = Entscheidung, nicht Defekt). **Owner/Termin-Vorschlag, passend zur Ursache:** die Korrektur gehört zur **V5-Implementierung** bzw. zur Gate-Logik — **nicht** zu W3-7; **Termin-Vorschlag: W2-Wellenabschluss-Nachlauf, Owner-Vorschlag `developer` (Modul `docs_freshness_v5.py`, Task W2-4)** — der eingetragene Owner `developer` (W2-4) bleibt als Zeugen der Herkunft stehen, deckt die offene Abweichung aber **nicht** mehr ab, weil W2-4 **abgeschlossen** ist. **Messwerte-Beleg:** die W2-7-Notiz, Absatz „Ist-Stand `--json` nach W2-7, nach `check` gruppiert" sowie der Absatz „Zwei Sollwert-Ist-Differenzen gegen die W-GATE-Tabelle, gemessen". **Vorschlag zur Entscheidung durch den Plan-Owner, keine beschlossene Terminierung.** | `developer` (W2-4) → **Vorschlag:** `developer` (V5-Implementierung / Gate-Logik), Termin **W2-Nachlauf** |
+| `docs.docs_facts_fresh` (V6) | **planmäßig rot** (ERROR) | generierte Blöcke existieren erst ab **W3-7** — **Nachtrag 2026-09-28, Vorschlag (Erwartungswert unverändert):** der gemessene Ist-Stand ist **3 WARNING**, und **ausschließlich** der Art `missing-in-expected`; die beiden ERROR-Arten (`handedit`, `expected-mismatch`) liefern **0**, weil die gerenderten `DOCS_*`-Blöcke erst ab **W3-7** existieren (`V6_SEVERITY_BY_KIND` stuft `missing-in-expected` als WARNING). **Der *Wert* „rot" ist erfüllt, die *Severity* nicht.** **Owner/Termin-Vorschlag, passend zur Ursache:** hier liegt der eingetragene Owner `developer` (W3-7) **richtig**, denn die Blöcke entstehen in W3-7 — die Abweichung ist **derselbe** Termin, nur eine **Severity**- statt einer Wert-Frage. **Termin-Vorschlag: W3-7, Owner-Vorschlag `developer` (W3-7), unverändert**; zusätzlich **beobachtend**: das Attribut `kind` von V6 bleibt reines Instanzattribut und erscheint **nicht** im `--json` — planseitig klassifiziert, **kein** Befund. **Messwerte-Beleg:** die W2-7-Notiz, Absatz „Ist-Stand `--json` nach W2-7" sowie „Zwei Sollwert-Ist-Differenzen gegen die W-GATE-Tabelle, gemessen". **Vorschlag zur Entscheidung durch den Plan-Owner, keine beschlossene Terminierung.** | `developer` (W3-7) — **Vorschlag: unverändert `developer` (W3-7)**, Termin **W3-7** |
 | `docs.wiki_staleness` (V7) | **planmäßig rot** (WARNING) | **10** Wiki-Seiten `type: "Architecture"` ohne `derived-from` — **Rev. 0.6 / K51: von 11 auf 10 korrigiert** (K24 war eine **Fehlmessung**: ein `type:`-Zeilen-Scan über ganze Dateien zählte einen **Body**-Kommentar in `knowledge/wiki/concepts/core-principle-knowledge-engine.md:46` mit; über **Frontmatter** gemessen sind es **10**. Die Messung 2026-09-26 (10) war richtig, die Übergabemessung 2026-09-27 (11) nicht) — Termin **W5-3** | `tester` (W5-3) |
 
 **`docs-checks` — die Zahl ist KEIN Registrierungsnachweis (RVW2-1, Blocker; korrigiert).**
@@ -3872,7 +3872,40 @@ sich genommen kein Welle-Gate** (RVW-3): das Wellen-Gate **W2** bleibt an **W2-7
 **Files:** Modify `scripts/lib/consistency/docs.py` (**nur** die `__all__`-Einträge der neu
 hinzugekommenen Checks, Spec §4.1), `scripts/consistency-check.py`,
 `scripts/lib/consistency/report.py` (**Rev. 0.5, K15**), `tests/test_doc_freshness.py`,
-`tests/test_doc_facts.py`.
+`tests/test_doc_facts.py`, — **nachträgliche, protokollierte Erweiterung vom 2026-09-28**
+(keine Neuzuweisung, keine stillschweigende Nachführung; Begründung, Messung und
+Abschnittsanker im Nachtrag unmittelbar darunter) —
+`scripts/lib/consistency/docs_freshness.py`, `tests/test_doc_wiki.py`,
+`tests/test_doc_index.py`.
+**Nachtrag 2026-09-28 — die drei nachgezogenen Dateieinträge sind eine nachträgliche,
+protokollierte Erweiterung der Liste, keine Neuzuweisung und keine stillschweigende
+Nachführung einer historischen Tabelle.** **Befund (DoD-Votum, Übergabemessung vom
+2026-09-28):** der Abschluss-Commit `c5495a00` schreibt **9** Dateien — **8** Code-/Testdateien
+**plus der Plan selbst**; die `Files:`-Liste
+dieses Task-Blocks nannte bis eben **5** — die Differenz von **3** ist genau
+`scripts/lib/consistency/docs_freshness.py`, `tests/test_doc_wiki.py` und
+`tests/test_doc_index.py`. **Warum jede der drei gedeckt ist, einzeln und mit Anker:**
+(1) `scripts/lib/consistency/docs_freshness.py` ist durch **W2-7s eigenen Schritt 4** und dessen
+Akzeptanz **gefordert** — der F1-PROMOTION-Auftrag verlangt, `_v1_finding` auf den
+Konstruktor umzustellen, und `_v1_finding` ist in genau diesem Modul (Task-Block W2-7,
+Abschnitt `**Interfaces:**` sowie `**Steps:**` Schritt 4); (2) `tests/test_doc_wiki.py` trug den
+**zwingend** zu ersetzenden Nicht-Registrierungs-Pin `test_v7_is_not_wired_into_the_runner_yet`
+und (3) `tests/test_doc_index.py` den Pin `test_v2_is_not_registered_in_the_runner_yet` — beide
+sind nach RVW2-5/Schritt 1 durch einen **positiven** Registrierungs-Pin zu ersetzen statt zu
+entfernen, und die Ersetzung trägt dieser Task. **Beleg der Ersetzung:** die Task-Notiz an
+W2-7, Absatz „Ersetzung der Nicht-Registrierungs-Pins (RVW2-5, Schritt 1) — fünf Pins, nicht
+einer" (die beiden übrigen Pins dieses Auftrags sind dort als „Nachtrag aus dem Abschluss
+(2026-09-28, vom Parent ausdrücklich als Write-Menge übertragen, ausschließlich zum Ersetzen
+der Pins)" ausgewiesen). **Was ausdrücklich nicht geschieht:** **keine** Neuzuweisung einer
+fremden Task, **keine** Verschiebung der Eigentumsgrenze von W2-3 (V7) oder W2-6 (V2) — deren
+`owns` auf den Modulen bleibt unberührt, W2-7 trägt nur die **Pin-Ersetzung** in denselben
+Testdateien; **keine** Änderung an `scripts/lib/consistency/docs.py` — K46 bleibt in Kraft,
+W2-7 bleibt der alleinige Owner aller `__all__`-Inkremente. **K34:** die drei zugehörigen
+Zellen der Ownership-Matrix sind mit diesem Nachtrag nachgezogen; die dortige historische
+Aussage „W2-7 schreibt **fünf** Dateien" (Rev. 0.6 / K46) bleibt **wortgleich** stehen und
+ist nicht umgeschrieben. **Schreibform, bewusst gewählt:** die drei Einträge stehen in der
+**Doppelpunkt-freien** Form der übrigen Liste — die Doppelpunktform der beiden Feldwörter
+würde über `_FILES_FIELD_RE` eine Phantom-Write-Menge erzeugen.
 **Rev. 0.6 / K46 — Ownership-Korrektur nach W2-0 (fail-closed, der eigentliche Anlass dieser
 Runde).** W2-7 besitzt **fünf** Dateien, nicht vier: (1) `tests/test_doc_facts.py` — der
 **Nicht-Registrierungs-Pin für V3** `test_v3_is_not_wired_into_the_runner_yet` (gemessen
@@ -3961,7 +3994,43 @@ README-Layout-Findings (**W8-2**, Owner `developer`); die **25** `docs/**`-Link-
 `consistency-check.py → 0` **dauerhaft unerreichbar** bleibt — maßgeblich ist die **Deltasperre**,
 Severity-Frage **OQ10**. Volltext: Tabelle `W2-GATE-V3-KLASSEN`. **Diese Task-Zeile ist für sich
 genommen kein Welle-Gate** (RVW-3);
-`bash tests/scenarios/run.sh 50 51 52 54 55 56` → **0**;
+~~`bash tests/scenarios/run.sh 50 51 52 54 55 56` → **0**~~
+**AUFGEHOBEN (Nachtrag 2026-09-28, K13/RVW-2) — die Zeile ist unerreichbar; sie wird gestrichen,
+nicht abgesenkt.** **Gemessen:** der Aufruf liefert **0/6** (alle **6** FAIL), Exit **1**; im
+erhaltenen `validate.log` tragen alle **6** `validate=1` und `assert=skipped`. **Die Baseline war
+ebenfalls 0/6**, gemessen **vor** W2-7 — W2-7 hat also nicht die Rotheit erzeugt, sondern die Zahl
+der Errors erhöht (**1 → 235**). **Ursache, im Code belegt:** `_run_consistency_checks(agent_meta_root)`
+(`scripts/lib/cli_commands.py:975` → `:150-174`) prüft den **agent-meta-Checkout**, **nicht** das
+Szenario-Projekt — die Doku-Checks sehen die eingespielte Fixture also nie (im Temp-Verzeichnis
+nachgemessen: der Schlüssel wird von der Fixture `project.yaml` nicht gesetzt, die Findings im
+`validate.log` stammen trotzdem aus **allen sieben** Checks). **Warum keine der drei vorhandenen
+Regeln diese Zeile deckt, einzeln:** `W-VALIDATE-ROT` gilt wörtlich nur für
+`python3 scripts/sync.py --validate`; `W2-GATE-ERRORS` führt ausschließlich `docs.*`-Findings aus
+`consistency-check.py --json`, nicht den Szenario-Runner; und `scripts/lib/cli_commands.py` steht
+in **keiner** `Files:`-Liste des Plans. **Ersatzregel — was prüfbar ist und tatsächlich prüft:** der
+prüfbare Kern von **AC-38** („in allen Szenario-Fixtures sind V1–V9 **vollständig** No-op") ist der
+Test `tests/test_doc_freshness.py::test_the_scenario_configs_never_set_the_common_gate`, der über
+**alle 63** Fixture-Dateien `tests/scenarios/configs/*.project.yaml` läuft (gemessen: **0** davon
+enthalten den Text `docs-consolidation`, auch nicht in einem Kommentar, **0** haben einen geparsten
+`docs-consolidation`-Block, **0** setzen `enabled` **explizit** — also auch keiner auf `false`).
+Das ist der **ersetzende** Nachweis; die Shell-Zeile bleibt als Historie sichtbar und wird
+**nicht** als erfülltes Gate geführt. **Bleibende Lücke, ausdrücklich benannt:** der Szenario-Runner
+ist **strukturell** an den agent-meta-Zustand gekoppelt — über diesen Aufruf ist AC-38 für den
+Szenario-Lauf prinzipiell nicht messbar, und die Behebung wäre eine Umstellung von
+`_run_consistency_checks` auf das Szenario-Projekt. **Dafür existiert kein Task**, weil
+`cli_commands.py` in keiner `Files:`-Liste steht (kein Blocker für den Wellenabschluss, aber eine
+Deckungslücke). **Vorschlag zur Entscheidung durch den Plan-Owner — ausdrücklich ein Vorschlag,
+keine beschlossene Terminierung:** Folgeaufgabe **„Szenario-Runner vom agent-meta-Zustand
+entkoppeln"** (Name nach dem Muster der übrigen offenen Aufträge, **keine** neue Task-ID und
+**keine** neue K-Kennung wird hier vergeben), Owner-Vorschlag **`senior-developer`** (der Eingriff
+liegt in Produktivcode, nicht in einem Test), Termin-Vorschlag **2026-10-11** — dieselbe Frist wie
+die Nachbaraufträge `F-DOCS-LINKS-2026-09-27` und `F-DOCS-README-INDEX-SE-2026-09-27` in dieser
+Gate-Tabelle, damit die Welle nicht in zwei Terminen endet. **Terminlogik, begründet:** der Auftrag
+berührt `cli_commands.py` und damit `--validate`, dessen Sollwert ohnehin über `W-VALIDATE-ROT` und
+die Deltasperre geführt wird; er konkurriert nicht mit **W3-6** (V2/`docs/INDEX.md`) oder
+**W3-7** (Handzahlen und `DOCS_*`-Blöcke), die eigene, bereits gesetzte Ziele haben. **Der
+Plan-Owner entscheidet, ob daraus ein Task wird; ohne diese Entscheidung bleibt die Lücke
+dokumentiert offen.** Die Zeile bleibt als Historie sichtbar;
 `python3 scripts/consistency-check.py --json | python3 -c 'import json,sys;d=json.load(sys.stdin);print(sorted({k for f in d["findings"] for k in f}))'` → enthält `line` **und** `branch` (F1-PROMOTION, vacuously grün, solange `docs-consolidation.enabled: false` — dann mit dem pytest-Nachweis kombinieren).
 **Steps:**
 - [x] 1: Test schreiben (fail). **RVW2-5 (verbindlich in dieser Task):** den
@@ -5709,7 +5778,7 @@ und wenn die Kantenliste **explizit** aufgeschrieben ist. Beides steht hier.
 |---|---|---|---|---|---|---|---|---|---|---|
 | `scripts/lib/consistency/docs.py` | owns | owns | **owns** (→ Fassade) | — | reads | reads | reads | reads | — | **owns** (`__all__`) |
 | `scripts/lib/consistency/docs_links.py` | — | — | **owns** (Create) | — | reads | reads | reads | **owns** (V4-Scope, E-5) | — | reads |
-| `scripts/lib/consistency/docs_freshness.py` | — | — | **owns** (Create, V1) | — | reads | reads (**Rev. 0.7: nicht mehr — E-7**) | **owns** (V6) | reads | — | reads |
+| `scripts/lib/consistency/docs_freshness.py` | — | — | **owns** (Create, V1) | — | reads | reads (**Rev. 0.7: nicht mehr — E-7**) | **owns** (V6) | reads | — | **owns** (Rev. 0.7-Nachtrag 2026-09-28, war `reads` — Schritt 4 / `_v1_finding`) |
 | **`scripts/lib/consistency/docs_freshness_v5.py`** (neu, E-7) | — | — | — | — | — | **owns** (Create, V5) | — | — | — | reads |
 | `scripts/lib/consistency/docs_wiki.py` | — | — | — | — | **owns** (Create, V7) | reads | reads | reads | — | reads |
 | `scripts/lib/consistency/docs_index.py` | — | — | — | — | reads | reads | reads | **owns** (Create, V2) | — | reads |
@@ -5721,8 +5790,8 @@ und wenn die Kantenliste **explizit** aufgeschrieben ist. Beides steht hier.
 | `tests/test_doc_facts.py` | owns | owns | **owns** (Verschiebung) | — | reads | reads | reads | reads | — | **owns** (V3-Pin `:2527-2537`, F1-/Exit-Tests) |
 | `tests/test_doc_freshness.py` | — | — | **owns** (Create) | — | reads | reads (**Rev. 0.7: nicht mehr — E-7**) | **owns** (V6) | reads | — | **owns** (V1-Pin `:364-383`, **K46**) |
 | **`tests/test_doc_freshness_v5.py`** (neu, E-7) | — | — | — | — | — | **owns** (Create) | — | — | — | — |
-| `tests/test_doc_wiki.py` | — | — | — | — | **owns** (Create) | reads | reads | reads | — | — |
-| `tests/test_doc_index.py` | — | — | — | — | reads | reads | reads | **owns** (Create) | — | reads |
+| `tests/test_doc_wiki.py` | — | — | — | — | **owns** (Create) | reads | reads | reads | — | **owns** (Rev. 0.7-Nachtrag 2026-09-28, war `—` — V7-Pin-Ersetzung) |
+| `tests/test_doc_index.py` | — | — | — | — | reads | reads | reads | **owns** (Create) | — | **owns** (Rev. 0.7-Nachtrag 2026-09-28, war `reads` — V2-Pin-Ersetzung) |
 | **`tests/test_knowledge_engine.py`** (W2-8, E-6) | — | — | — | — | — | — | — | — | **owns** (Modify) | — |
 | **`tests/test_sharkord_service_name_migration.py`** (W2-8, E-6) | — | — | — | — | — | — | — | — | **owns** (Modify) | — |
 | **`tests/test_plan_identity.py`** (W2-9, E-8) | — | — | — | **owns** (Modify) | — | — | — | — | — | — |
@@ -5782,6 +5851,35 @@ W8-4 → `docs_index.py`). Ein `docs.py`-Write-Set in W2-3/W2-5/W2-6 wäre genau
 Ownership-Kollision, die **K20** beseitigt hat; **W2-7 ist der alleinige Owner aller
 `__all__`-Inkremente.** Eine spätere Revision, die eine dieser Listen „vollständig" macht, ist
 **fail-closed** (Fail-closed-Klausel unten).
+
+**Nachtrag 2026-09-28 — die drei W2-7-Zellen sind nachgezogen, die historischen Werte bleiben
+sichtbar (K34).** **Befund (DoD-Votum, Übergabemessung vom 2026-09-28):** der Abschluss-Commit
+`c5495a00` schreibt **9** Dateien (**8** Code-/Testdateien **plus der Plan selbst**); die
+`Files:`-Liste des Task-Blocks W2-7 nannte **5** und diese
+Matrix führte die Differenz als `reads` bzw. `—`. **Betroffene Zellen und ihr Grund, einzeln:**
+`docs_freshness.py` (`reads` → `owns`) — **gefordert durch W2-7s Schritt 4** und dessen Akzeptanz:
+`_v1_finding` liegt in genau diesem Modul; `tests/test_doc_index.py` (`reads` → `owns`) und
+`tests/test_doc_wiki.py` (`—` → `owns`) — beide trugen den **zwingend** zu ersetzenden
+Nicht-Registrierungs-Pin (V2 bzw. V7), und die Ersetzung durch positive Pins ist nach RVW2-5
+Schritt 1 Pflicht dieses Task-Blocks. **Abschnittsanker auf die begründende W2-7-Notiz:** der
+Nachtrag vom 2026-09-28 im Datei-Abschnitt des Task-Blocks W2-7 sowie der Absatz „Ersetzung der
+Nicht-Registrierungs-Pins (RVW2-5, Schritt 1) — fünf Pins, nicht einer" in derselben Notiz.
+**K34 ausdrücklich angewandt:** die Tabelle selbst trägt an den drei Stellen den **alten** Wert
+mit dem Vermerk „war `reads`" bzw. „war `—`"; **keine** Zeile wurde still umgeschrieben, und die
+datierte Aussage **Rev. 0.6 / K46** weiter oben („W2-7 schreibt **fünf** Dateien") bleibt
+**wortgleich** stehen. **Was der Nachtrag nicht tut:** er begründet die Reihenfolge der
+Nachführung, nicht den Ist-Zustand — jede der drei Dateien war bereits **vor** diesem Nachtrag
+Teil der gemessenen **8**-Dateien-Code-/Test-Write-Menge von `c5495a00` (**9** Dateien
+einschließlich des Plans); korrigiert wurde ausschließlich das
+**Plan-Inventar**, das sie als rein lesend führte. **Kollisionsprüfung, ausdrücklich:** alle drei
+Dateien werden zusätzlich von **je genau einer** W2-Task geschrieben — `docs_freshness.py` von
+**W2-5**, `tests/test_doc_index.py` von **W2-6**, `tests/test_doc_wiki.py` von **W2-3**, alle
+drei in **PG-2a**. W2-7 ist **PG-2c** und läuft **sequenziell als Letzter** (Kanten 9–12), fällt
+also unter die angewandte Regel „mehrere schreibende Tasks derselben Datei sind ausschließlich
+**sequenziell**" — **keine** Kollision in PG-2a, genau wie es für `tests/test_doc_freshness.py`
+bereits gilt. **K46 unberührt:** an `scripts/lib/consistency/docs.py` ändert sich nichts, W2-7
+bleibt der alleinige Owner aller `__all__`-Inkremente. **Keine K-Kennung vergeben** — die
+Nummernkreise bleiben getrennt, das ist Statuspflege wie in den vorangehenden Anhängen.
 
 **Ehrliche Grenze der Regel (K20).** „Genau **eine** schreibende Task **pro Datei im ganzen Plan**"
 ist mit **vier** Modulen (U-1) und **fünf** modul-anfassenden Tasks **nicht** erfüllbar; `docs.py`
@@ -6925,6 +7023,128 @@ Tabellenzeilen hinzu; **keine** Zeile beginnt mit `- [ ]` oder `- [x]`, es wurde
 gesetzt, gestrichen oder ergänzt, **kein** Task angelegt und **keine** ID vergeben. Taskzahl **50**,
 Checkboxen-Summe **207** und `files_touched("W2-7") == ()` bleiben damit **gültig** — Ableitung aus der
 Art des Eintrags, keine neue Zählung.
+
+#### Anhang 2026-09-28 (c) — Abschluss der Welle W2 (10 Tasks, Gate-Votum, offene Items)
+
+> **Was dieser Anhang ist — und was nicht.** Wie die drei vorangehenden Blöcke ist er **additive
+> Statuspflege**: **keine** Plan-Revision, **keine** Korrekturrunde, **keine** neue K-Kennung,
+> **keine** umnummerierte ID und **kein** Eingriff in eine als wortgleich festgeschriebene Stelle.
+> **Wortgleich bleiben:** `status: APPROVED` (`:5`), `revision: 0.7` (`:6`), die **K34-Kopfnotiz**,
+> die historische Tabelle (Stand 2026-09-26), der **Rev.-0.7-Anhang** (Stand 2026-09-27), der
+> Anhang vom 2026-09-28 (Phase 0) und der Anhang vom 2026-09-28 (b) (W2-7), die Zählherleitungen
+> **188 → 190 → 194 → 199 → 207**, alle Task-/Wellen-/AC-/IC-/NFA-/R-/OQ-/V-Check-IDs, alle
+> Akzeptanzkriterien und die Korrekturrunden **1–6**. **Keine bestehende Zeile wurde entfernt,
+> ersetzt oder umformuliert.** **Keine Zahl dieses Anhangs ist geschätzt:** jede ist entweder aus
+> dem Plan, aus dem DoD-Votum vom 2026-09-28 oder aus der Auftragsvorgabe **übernommen**; wo
+> keine Belegstelle existiert, steht das ausdrücklich dabei. **Maßgeblich für den heutigen
+> Ausführungsstand ist dieser Anhang** (K34-Präzedenz).
+
+**A. Zählstand W2 — alle 10 Tasks, Checkboxenzähler und Commit-Hash (übernommen, nicht gemessen).**
+
+| Task | Checkboxen | Commit-Hash | Belegstelle im Plan |
+|---|---|---|---|
+| **W2-0** | **5/5** | `b5bb0fe9` | K53-Interim-Ledger, Zeile „2026-09-27" |
+| **W2-1** | **5/5** | **kein Einzelhash im Plan belegt** — dort steht „W2-1 (V1-Commits)" | Anhang 2026-09-28 (Phase 0), Abschnitt A |
+| **W2-2** | **4/4** | `8f290b95` | Anhang 2026-09-28 (Phase 0), Abschnitt A |
+| **W2-3** | **4/4** | `8594e67f` | K53-Interim-Ledger, Zeile „2026-09-27" |
+| **W2-4** | **4/4** | **kein Hash im Plan belegt** — die Task-Notiz sagt „der Commit ist nicht erfolgt" | Task-Block W2-4, LEDGER-Stand 2026-09-28 |
+| **W2-5** | **4/4** | `b73e9422` | K53-Interim-Ledger, Zeile „2026-09-27" |
+| **W2-6** | **4/4** | **kein Hash im Plan belegt** — die Task-Notiz sagt „der Commit selbst ist nicht erfolgt" | Task-Block W2-6, LEDGER-Stand 2026-09-28 |
+| **W2-7** | **5/5** | `c5495a00` | DoD-Votum vom 2026-09-28 (schreibt **9** Dateien: **8** Code-/Testdateien **plus der Plan**) |
+| **W2-8** | **4/4** | **kein Hash im Plan belegt** — die Task-Notiz sagt „ein Hash ist **nicht** genannt, weil dieser Task **nicht** committet" | Task-Block W2-8, LEDGER-Stand 2026-09-28 |
+| **W2-9** | **4/4** | **kein Hash im Plan belegt** — die Task-Notiz sagt „der **Hash** entsteht erst mit diesem Commit und ist deshalb **nicht** genannt (kein erfundener)" | Task-Block W2-9, LEDGER-Stand 2026-09-28 |
+
+- **Summe über W2:** **43** gesetzte Checkboxen (**10** Tasks, alle Schritte auf `- [x]`).
+  **Summe über den Plan:** **50** Tasks, Checkboxen-Summe **207** — beide **unverändert**, weil
+  dieser Anhang **keine** Checkbox setzt, streicht oder ergänzt (Abschnitt C).
+- **Wo kein Hash steht, ist keiner erfunden.** Fünf der zehn Tasks haben im Plan **ausdrücklich
+  oder ersichtlich keinen** Einzelhash; das ist der dokumentierte Zustand, keine Lücke dieses
+  Anhangs.
+
+**B. Gate-Votum: `WAVE_COMPLETE_WITH_OPEN_ITEMS` — begründet, nicht gesetzt.**
+
+- **Das Votum:** W2 gilt als **abgeschlossen mit offenen Punkten**. Grundlage ist das Wellen-Gate
+  **W2-GATE-V1** in der Zeile „nach **W2-7**", das **drei** Erfolgskomponenten nennt. **Zwei von
+  drei** sind erfüllt, **eine** ist unerreichbar:
+
+| Komponente von `W2-GATE-V1` (Zeile „nach W2-7") | Ist-Stand | Erfüllt |
+|---|---|---|
+| Zähl-Kommando druckt `v1-findings:` **≥ 1** | **52** (Ist-Stand nach `check` gruppiert) | **ja** |
+| Zähl-Kommando druckt `v1-severities:` **exakt** `['WARNING']` | **exakt** `['WARNING']` | **ja** |
+| `bash tests/scenarios/run.sh 50 51 52 54 55 56` → **0** | **0/6**, Exit **1** | **nein** — Zeile aufgehoben, siehe (a) |
+
+- **Warum das ein „with open items" ist und kein „rot":** die unerreichbare Komponente ist **ein
+  Shell-Aufruf**, dessen Kopplung an den agent-meta-Zustand im Code belegt ist; sie ist seit der
+  Baseline (ebenfalls **0/6**) **nicht** durch W2-7 entstanden. Der prüfbare Kern von **AC-38** ist
+  über den Test-Pin erfüllt. **Warum es kein Blocker ist:** das Erfolgskriterium nennt die
+  `v1-findings`/`v1-severities`-Zählung **zusammen mit** dem pytest-Kriterium, und die Zählung ist
+  der **tragende** Nachweis; die Szenario-Zeile ist der **untragende** Nebenschauplatz.
+  **Warum es kein „grün" ohne Einschränkung ist:** die Zeile bleibt im Plan sichtbar, gestrichen
+  und begründet — eine Welle gilt hier nicht als abgeschlossen, wenn eine geforderte
+  Verifikationszeile nachweislich unerreichbar ist.
+- **Was das Votum ausdrücklich nicht behauptet:** `W2-GATE-ERRORS` ist **nicht** vollständig grün.
+  Zwei Zeilen dieser Tabelle tragen eine **gemessene** Abweichung vom Erwartungswert (V5, V6), und
+  der rohe Runner ist **planmäßig** rot. Das ist der vorgesehene Zustand, wird aber nicht als
+  Zielerreichung ausgegeben.
+
+**C. Summen und Zähler unverändert.** Dieser Anhang fügt **ausschließlich** Fließtext, Tabellen
+und Tabellenzellen hinzu; **keine** Zeile beginnt mit `- [ ]` oder `- [x]`, es wurde **keine**
+Checkbox gesetzt, gestrichen oder ergänzt, **kein** Task angelegt, **keine** ID vergeben und
+**keine** K-Kennung erfunden. Taskzahl **50** und Checkboxen-Summe **207** bleiben damit **gültig**
+— Ableitung aus der Art des Eintrags, keine neue Zählung.
+
+**D. Offene Items mit Owner und Termin — sieben Einträge, jeder mit Herkunft.** Aufgenommen ist
+hier **nur**, was eine **Handlung mit Owner und Termin** trägt; Beobachtungen ohne
+Handlungsauftrag stehen in Abschnitt E und werden **nicht** als offen gezählt.
+
+| # | Offenes Item | Owner | Termin |
+|---|---|---|---|
+| **(a)** | Szenario-Verifikationszeile (`bash tests/scenarios/run.sh 50 51 52 54 55 56` → **0**): aufgehoben, unerreichbar; Ersatzregel ist der Test-Pin über alle **63** Fixtures | **Vorschlag:** `senior-developer` (Produktivcode) | **Vorschlag: 2026-10-11** — Entscheidung liegt beim Plan-Owner |
+| **(b)** | `W2-GATE-ERRORS`: Termin und Owner für **V5** und **V6** nachgetragen, Erwartungswerte unverändert | **Vorschlag:** V5 → `developer` (V5-Implementierung); V6 → `developer` (W3-7) | **Vorschlag:** V5 → W2-Nachlauf; V6 → **W3-7** |
+| **(c)** | `docs_links.py` **599/600** — **1** Zeile Reserve; geplanter Folgetask **„V4 aus `docs_links.py` herauslösen"** (nimmt Bildform, 1-Zeilen-Reserve, Rest von F-5 und die F-1/F-2-Kopplung in einem Zug auf) | **Plan-Owner** (im Plan eingetragen, **kein** Task angelegt) | **im Plan nicht belegt** — die Task-Notiz nennt keinen Termin |
+| **(d)** | `docs_freshness.py` **598/600** — **2** Zeilen Reserve | Plan-Owner | **im Plan nicht belegt** — der Plan nennt an anderer Stelle **593 Z** (F1-Promotion-Notiz) bzw. **592 Z** (W2-4/W2-5); der Wert **598** stammt aus dem DoD-Votum vom 2026-09-28, die älteren Zahlen bleiben als Historie sichtbar |
+| **(e)** | Staler Docstring `docs_wiki.py:35-40` — behauptet, `Finding` trage **kein** `line`/`branch`; seit der F1-Promotion falsch | **W6-2** (der Plan führt die Datei in dessen Schreibmenge) | **im Plan nicht belegt** |
+| **(f)** | Staler Docstring `docs_links.py:450-452` — behauptet, `Finding` habe weder `line` noch `branch` und „W2-7 müsse sie hochziehen". **W2-7 hat das getan, aber nur für `docs_freshness.py`; `docs_links.py` (`_v3_finding`) blieb unangetastet**, weil `W2-7` die Datei **nicht** in seiner Schreibmenge führt | **W2-6** (`developer`) — **gemessen**: W2-6s `Files:` führt die Datei, die Ownership-Matrix gibt W2-6 `owns` (V4-Scope, E-5) und W2-0 `owns` (Create). **Einschränkung, ausdrücklich:** W2-6s Schreibmenge ist laut `Files:` auf die **V4-Umfassung** begrenzt, der Fundort `docs_links.py:450-452` liegt jedoch im **V3**-Teil (`_v3_finding`) — der **nächste Besitzer für genau diesen Eingriff ist im Plan nicht belegt** und wird hier **nicht** geraten; Termin und zuständige Task sind vom Plan-Owner zu setzen | **im Plan nicht belegt** |
+
+- **Zur Terminlogik von (a) und (b):** beide sind **Vorschläge zur Entscheidung durch den
+  Plan-Owner**, ausdrücklich **keine beschlossene Terminierung**. Für (a) folgt die Frist der
+  Nachbarzeilen dieser Gate-Tabelle (`2026-10-11`, dieselbe wie `F-DOCS-LINKS-2026-09-27` und
+  `F-DOCS-README-INDEX-SE-2026-09-27`), damit die Welle nicht in zwei Terminen endet; der Eingriff
+  liegt in `scripts/lib/cli_commands.py`, einer Datei, die in **keiner** `Files:`-Liste des Plans
+  steht — deshalb ein **Vorschlag** und kein angelegter Task. Für (b) folgt die Terminlogik der
+  Nachbarzeilen (**W3-6** für V2, **W3-7** für die generierten Blöcke, **W8-2** und **2026-10-11**
+  für V3): V5 gehört zur V5-Implementierung bzw. zur Gate-Logik und **nicht** zu W3-7, V6 gehört zu
+  W3-7, weil dort die `DOCS_*`-Blöcke erst entstehen.
+- **Was mit dem früheren Item (i) geschehen ist — ausdrücklich nicht offen.** Die **drei** in diesem
+  Anhang nachgezogenen Ownership-Zellen (`docs_freshness.py`, `tests/test_doc_index.py`,
+  `tests/test_doc_wiki.py`: von `reads`/`—` auf `owns`) sind mit dem Commit `c5495a00`
+  **erledigt**; sie stehen deshalb **nicht** in der Liste der offenen Items. Ihr Beleg ist der
+  Korrekturnachtrag in der Ownership-Matrix und der Nachtrag im `Files:`-Abschnitt des Task-Blocks
+  W2-7.
+- **Was dieser Anhang nicht tut:** er setzt **keine** Checkbox, erteilt **keinen** Auftrag, legt
+  **keinen** Task an, vergibt **keine** K-Kennung und ersetzt **keinen** Sollwert der Tabelle
+  `W2-GATE-ERRORS`. Die dortigen Zeilen V5 und V6 tragen ihre Abweichung als **Vorschlag** neben
+  dem unveränderten Erwartungswert.
+
+**E. Beobachtungen — keine offenen Aufgaben, ausdrücklich nicht in D gezählt.** Die folgenden
+zwei Punkte sind **weder** ein Defekt **noch** ein Auftrag mit Owner und Termin: sie tragen keine
+Handlung, werden deshalb **nicht** unter den offenen Items geführt und gehen **nicht** in das
+Gate-Votum aus Abschnitt B ein. Sie sind hier festgehalten, damit sie bei einem späteren Chore
+nicht verloren gehen.
+
+- **Das V6-Attribut `kind`** bleibt ein reines Instanzattribut und erscheint **nicht** im `--json`.
+  Ein Feld `kind` in `Finding` wäre eine **Ausgabe-Erweiterung** des Report-Schemas **ohne** IC
+  und **ohne** Akzeptanzpunkt; die Task-Interfaces und **IC-05** nennen ausdrücklich **nur** `line`
+  und `branch`. **Kein Defekt der F1-Promotion** — planseitig klassifiziert, kein offener Auftrag.
+  Beleg: W2-7-Notiz, Absatz „`kind` von V6 — Einordnung, nicht Lücke der F1-Promotion, mit Beleg".
+- **Der strukturelle Registry-Test** `test_the_docs_registry_covers_exactly_what_the_facade_exports`
+  hängt am **heutigen** Stillstand der „Clean"-Checks: ein späterer „alle Findings beheben"-Chore,
+  der V2/V3/V6 auf 0 bringt, macht ihn rot, mit dann **irreführender** Registry-Färbung. Das ist
+  **bewusst nicht abgesichert** — der Test soll an der *Struktur* der Registry hängen, nicht an
+  einem aktuellen Finding-Stand; jede Absicherung würde denselben Chore erneut binden. **Prognose
+  über einen künftigen Zustand, nicht gemessen** — deshalb **kein** offener Item, sondern eine
+  Beobachtung. Beleg: W2-7-Notiz, Absatz „Die Kopplung, nüchtern benannt (bewusste Entscheidung,
+  akzeptiert, kein Refactoring)".
 
 
 ### L-2 Blockierende Befunde (B-1 … B-5)
