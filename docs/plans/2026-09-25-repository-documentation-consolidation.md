@@ -4842,10 +4842,10 @@ identisch (`:23`), `_FILE_INDEX_SKELETON` (`:24`) bleibt identisch. Consumes: W3
 **Verifikation:** `python3 -m pytest tests/test_doc_renderer.py -q` → **0**;
 `bash tests/scenarios/run.sh 52 54 55 56` → **0**.
 **Steps:**
-- [ ] 1: Tests schreiben (fail).
-- [ ] 2: `is_file_index_skeleton` implementieren; Generator ruft es **vor** dem Schreiben.
-- [ ] 3: Tests grün beobachten; vier Szenarien beobachten.
-- [ ] 4: commit via `git`-Agent: `feat: guard scaffold skeleton against docs index writer`.
+- [x] 1: Tests schreiben (fail).
+- [x] 2: `is_file_index_skeleton` implementieren; Generator ruft es **vor** dem Schreiben.
+- [x] 3: Tests grün beobachten; vier Szenarien beobachten.
+- [x] 4: commit via `git`-Agent: `feat: guard scaffold skeleton against docs index writer`.
 
 ### W3-4: Stage-Reihenfolge und `checks.strict`
 

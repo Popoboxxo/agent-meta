@@ -67,7 +67,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.lib import doc_index, doc_renderer
+from scripts.lib import doc_index, doc_renderer, spec_plan_scaffold
 from scripts.lib.context import _MANAGED_BLOCK_RE, _has_duplicate_managed_block
 from scripts.lib.doc_renderer import (
     ALLOWED_REGIONS,
@@ -551,17 +551,38 @@ def test_renderer_module_is_a_write_free_leaf():
     copy of either in this module would be a second copy of the truth. The
     ``config`` prohibition is what the set exists to protect and is unchanged —
     ``doc_facts`` imports no ``config`` either, so the IC-11 bridge is intact.
+
+    **``.spec_plan_scaffold`` widens it again, at symbol granularity,** and the
+    argument is the same one: the scaffold owns the ``file-index`` placeholder
+    on this path, so the writer has to ask *that module* whether the target is
+    its skeleton (IC-15) instead of re-implementing the probe. A local copy would
+    have kept passing after a change to the F20 marker line — the exact drift the
+    allowlist exists to make visible. ``spec_plan_scaffold`` imports no
+    ``config`` either, so the prohibition and the IC-11 bridge both hold.
+
+    The second set is per **symbol**, not per module, and that is the point:
+    ``spec_plan_scaffold`` is a module that *does* write (it owns
+    ``scaffold_spec_plan_dirs``), so a module-name allowlist would wave through
+    ``from .spec_plan_scaffold import scaffold_spec_plan_dirs`` and void the
+    single-funnel invariant this test exists for. **Granularity, not the number
+    of entries, is the signal that should trigger review** on a future widening:
+    one more pure helper imported from an already-allowed module is cheap, while
+    one more *writer* reaching this module is a new disk path, however small the
+    list gets.
     """
     tree = ast.parse(_MODULE_PATH.read_text(encoding="utf-8"))
 
     imported: set[str] = set()
+    symbols: set[tuple[str, str]] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             imported.update(alias.name for alias in node.names)
         elif isinstance(node, ast.ImportFrom):
             # A TYPE_CHECKING block is not an import-time edge, but a lib import
             # would still be an unwanted dependency of a leaf module.
-            imported.add(("." * (node.level or 0)) + (node.module or ""))
+            module = ("." * (node.level or 0)) + (node.module or "")
+            imported.add(module)
+            symbols.update((module, alias.name) for alias in node.names)
     assert imported <= {
         "__future__",
         "hashlib",
@@ -573,7 +594,30 @@ def test_renderer_module_is_a_write_free_leaf():
         ".log",
         ".doc_index",
         ".doc_facts",
+        ".spec_plan_scaffold",
     }, imported
+    assert symbols <= {
+        ("__future__", "annotations"),
+        ("typing", "TYPE_CHECKING"),
+        ("typing", "Protocol"),
+        ("collections.abc", "Mapping"),
+        ("pathlib", "Path"),
+        (".io", "safe_path"),
+        (".io", "write_checked"),
+        (".log", "SyncLog"),
+        (".doc_index", "DOCS_INDEX_FILENAME"),
+        (".doc_index", "DOCS_INDEX_RELPATH"),
+        (".doc_index", "KIND_ORDER"),
+        (".doc_index", "build_index_model"),
+        (".doc_index", "has_docs_tree"),
+        (".doc_facts", "VOLATILE_FACTS"),
+        (".doc_facts", "compute_doc_facts"),
+        (".spec_plan_scaffold", "is_file_index_skeleton"),
+        (".spec_plan_scaffold", "resolve_index_mode"),
+    }, sorted(symbols)
+    # Positive pin: the guard is the scaffold's function *by name*. Without it
+    # the allowlist would stay satisfied by an unrelated symbol of that module.
+    assert (".spec_plan_scaffold", "is_file_index_skeleton") in symbols
     assert not any("config" in name.split(".")[-1] for name in imported), imported
 
     forbidden = {"open", "write_text", "write_bytes", "mkdir", "remove", "unlink", "rmtree"}
@@ -2398,3 +2442,440 @@ def test_render_docs_index_is_pure(tmp_path: Path):
     assert doc_renderer.render_docs_index(model, _facts()) == doc_renderer.render_docs_index(
         model, _facts()
     )
+
+
+# W3-3 — Scaffold-Guard und Besitzregel (IC-15, IC-13, AC-21, F20)
+# ----------------------------------------------------------------
+#
+# The scaffold writes the ``file-index`` fallback (``docs/INDEX.md``) and this
+# writer writes the same path. B2 is a **double writer**, resolved from both
+# sides: :func:`is_file_index_skeleton` recognises the skeleton by the one text
+# line F20 pins, and this writer consults it **before** the ownership probe.
+#
+# Two invariants, and only two:
+#
+# * **Order matters — the mode gate before the ownership block.** A
+#   knowledge-engine project then reports its own authoritative-mode note; the
+#   other way round, the ownership step's early returns would answer first with
+#   a foreign-writer or ``unchanged`` verdict. The order of the two checks
+#   *inside* the ownership block does not matter: they are a union of write
+#   permissions, and either order reaches the same outcome.
+#   :func:`test_scaffold_skeleton_is_owned_and_replaced_under_full_mode` pins the
+#   first by its observable consequence: a skeleton becomes an ``UPDATE``, and
+#   the note names the scaffold rather than a foreign writer.
+# * **The generator never writes a skeleton** — a property of the rendered
+#   bytes, not of a branch: the full index is not a skeleton and does not carry
+#   the F20 marker. That keeps the reverse of the ownership rule true by
+#   construction, so no code path can hand the scaffold's own file back to it.
+
+
+_KE_AUTHORITATIVE_CONFIG: dict = {
+    "docs-consolidation": {"enabled": True},
+    "knowledge-engine": {"enabled": True},
+}
+
+_SKELETON_MODE_CONFIG: dict = {
+    "docs-consolidation": {"enabled": True, "index-mode": "skeleton"},
+}
+
+#: The *other* index vocabulary: ``spec-plan-workflow.index.mode`` with its third
+#: value ``off``, next to a knowledge engine that is on. See
+#: :func:`test_index_mode_off_permits_the_full_index`.
+_INDEX_MODE_OFF_CONFIG: dict = {
+    "docs-consolidation": {"enabled": True},
+    "knowledge-engine": {"enabled": True},
+    "spec-plan-workflow": {"enabled": True, "index": {"mode": "off"}},
+}
+
+
+def _scaffold_skeleton() -> str:
+    """The scaffold's own bytes, read from the module that writes them.
+
+    Not a copy: a literal here would be a second skeleton that can drift from
+    the one the scaffold really writes, and the guard's whole job is to
+    recognise *that* file (F20).
+    """
+    return spec_plan_scaffold._FILE_INDEX_SKELETON
+
+
+def _scaffolded_root(tmp_path: Path) -> Path:
+    """A project root whose ``docs/INDEX.md`` is the real scaffold skeleton.
+
+    Built by calling ``scaffold_spec_plan_dirs`` itself rather than by writing
+    the skeleton literal. ``knowledge-engine.enabled: false`` is what makes
+    ``resolve_index_mode()`` fall through to ``file-index`` and the scaffold
+    write the fallback at all.
+    """
+    root = _docs_root(tmp_path)
+    config = {
+        "spec-plan-workflow": {"enabled": True},
+        "knowledge-engine": {"enabled": False},
+    }
+    spec_plan_scaffold.scaffold_spec_plan_dirs(
+        _REPO_ROOT, root, config, SyncLog(), dry_run=False
+    )
+    return root
+
+
+def test_scaffold_guard_recognises_only_the_skeleton():
+    """IC-15/F20: the guard is a marker probe, and it is not vacuous."""
+    assert spec_plan_scaffold._FILE_INDEX_SKELETON_MARKER == "File-based index fallback"
+    assert spec_plan_scaffold.is_file_index_skeleton(_scaffold_skeleton()) is True
+    assert spec_plan_scaffold.is_file_index_skeleton("") is False
+    assert spec_plan_scaffold.is_file_index_skeleton("# Index\n\nHand-written.\n") is False
+    # A rendered full index is not a skeleton either, or the ownership rule
+    # would become self-referential.
+    assert spec_plan_scaffold.is_file_index_skeleton(_rendered()) is False
+
+
+def test_skeleton_marker_is_line_break_tolerant():
+    """IC-15's "Zeilen-Brk ein-aus": a trailing line break is not the answer.
+
+    The guard asks a question about a *file*, not about a line, so whether the
+    content ends with a newline cannot change the verdict — and F20's "prefix
+    detection" means a maintainer's own additions under the scaffold's heading
+    keep the stamp, which is the *permissive* direction: such a file still counts
+    as the scaffold's and may be replaced. See
+    :func:`spec_plan_scaffold.is_file_index_skeleton` for the full radius.
+    """
+    skeleton = _scaffold_skeleton()
+    assert skeleton.endswith("\n")
+    assert spec_plan_scaffold.is_file_index_skeleton(skeleton) is True
+    assert spec_plan_scaffold.is_file_index_skeleton(skeleton.rstrip("\n")) is True
+
+    extended = skeleton + "\nHand-maintained additions below.\n"
+    assert spec_plan_scaffold.is_file_index_skeleton(extended) is True
+
+
+def test_skeleton_mode_preserves_scaffold(tmp_path: Path):
+    """AC-21: ``index-mode: skeleton`` leaves the scaffold skeleton untouched.
+
+    "Always untouched" is asserted as a byte-comparison of the whole tree before
+    and after, not as "the right note was logged": a writer that logs the right
+    reason and still rewrites the file passes a log-only assertion.
+    """
+    root = _scaffolded_root(tmp_path)
+    _page(root, "specs/one.md", description="First spec page.")
+    target = root / doc_index.DOCS_INDEX_RELPATH
+    before_text = target.read_text(encoding="utf-8")
+    assert spec_plan_scaffold.is_file_index_skeleton(before_text) is True
+    before = _tree_snapshot(root)
+
+    plan, log = _run_sync(root, _SKELETON_MODE_CONFIG)
+
+    assert _tree_snapshot(root) == before, "index-mode: skeleton must write nothing"
+    assert target.read_text(encoding="utf-8") == before_text
+    assert spec_plan_scaffold.is_file_index_skeleton(
+        target.read_text(encoding="utf-8")
+    ) is True
+    assert plan == {
+        "written": [],
+        "unchanged": [],
+        "skipped": [doc_index.DOCS_INDEX_RELPATH],
+    }, plan
+    assert len(log.infos) == 1, log.infos
+    assert doc_renderer.SKELETON_MODE_REASON in log.infos[0]
+    assert log.actions == []
+
+
+def test_skeleton_mode_creates_no_index_at_all(tmp_path: Path):
+    """``skeleton`` mode is the scaffold's file to have, so the writer creates none.
+
+    The mode is only meaningful if the generator stays out of the way entirely;
+    a mode that merely blocked the *replacement* would still let a first run
+    seed a full index into a project that asked for a skeleton.
+    """
+    root = _docs_root(tmp_path)
+    _page(root, "specs/one.md", description="First spec page.")
+    before = _tree_snapshot(root)
+
+    plan, log = _run_sync(root, _SKELETON_MODE_CONFIG)
+
+    assert _tree_snapshot(root) == before
+    assert not (root / doc_index.DOCS_INDEX_RELPATH).exists()
+    assert plan == {
+        "written": [],
+        "unchanged": [],
+        "skipped": [doc_index.DOCS_INDEX_RELPATH],
+    }, plan
+    assert doc_renderer.SKELETON_MODE_REASON in log.infos[0]
+    assert log.actions == []
+
+
+def test_ke_authoritative_writes_no_index(tmp_path: Path):
+    """AC-21 / IC-13 / scenario 52: the KE index is authoritative, so is nothing.
+
+    The starting state is the scaffold's own file-index skeleton, so the two
+    gates genuinely compete: the ownership probe would report it as a foreign
+    file and log ``OWNERSHIP_REASON``. The knowledge-engine reason must be the
+    one that lands, which is only reachable if the mode gate is consulted first.
+    """
+    root = _scaffolded_root(tmp_path)
+    _page(root, "specs/one.md", description="First spec page.")
+    target = root / doc_index.DOCS_INDEX_RELPATH
+    before_text = target.read_text(encoding="utf-8")
+    before = _tree_snapshot(root)
+
+    assert (
+        spec_plan_scaffold.resolve_index_mode(_KE_AUTHORITATIVE_CONFIG)[0]
+        == "knowledge-engine"
+    ), "the fixture must actually be knowledge-engine authoritative"
+
+    plan, log = _run_sync(root, _KE_AUTHORITATIVE_CONFIG)
+
+    assert _tree_snapshot(root) == before, "KE authoritative writes nothing"
+    assert target.read_text(encoding="utf-8") == before_text
+    assert plan == {
+        "written": [],
+        "unchanged": [],
+        "skipped": [doc_index.DOCS_INDEX_RELPATH],
+    }, plan
+    assert len(log.infos) == 1, log.infos
+    assert doc_renderer.KE_AUTHORITATIVE_REASON in log.infos[0]
+    assert doc_renderer.OWNERSHIP_REASON not in log.infos[0], (
+        "the wrong gate won: the ownership probe ran before the mode gate"
+    )
+    assert log.actions == []
+
+
+def test_ke_authoritative_writes_no_index_even_when_absent(tmp_path: Path):
+    """The KE gate is a mode decision, not a reaction to an existing file.
+
+    Scenario 52 asserts ``[ ! -e docs/INDEX.md ]`` on a tree where the scaffold
+    never wrote one, so the absent case needs its own unit test: a gate that
+    only fired on an existing file would pass the ownership test above and still
+    seed an index into a knowledge-engine project.
+    """
+    root = _docs_root(tmp_path)
+    _page(root, "specs/one.md", description="First spec page.")
+    before = _tree_snapshot(root)
+
+    plan, log = _run_sync(root, _KE_AUTHORITATIVE_CONFIG)
+
+    assert _tree_snapshot(root) == before
+    assert not (root / doc_index.DOCS_INDEX_RELPATH).exists()
+    assert plan == {
+        "written": [],
+        "unchanged": [],
+        "skipped": [doc_index.DOCS_INDEX_RELPATH],
+    }, plan
+    assert doc_renderer.KE_AUTHORITATIVE_REASON in log.infos[0]
+    assert log.actions == []
+
+
+def test_scaffold_skeleton_is_owned_and_replaced_under_full_mode(tmp_path: Path):
+    """IC-15: under ``index-mode: full`` the skeleton may be replaced — once.
+
+    This is the positive half of the guard and the proof of its *order*: the
+    skeleton carries no ``doc-indexer/1``, so it can only be written if
+    ``is_file_index_skeleton()`` is consulted before the ownership probe. The
+    "once" is asserted by a second run, not by a comment.
+
+    W3-6 owns the end-to-end variant of this (``test_skeleton_replaced_once``)
+    against the real tracked ``docs/INDEX.md``; this is the unit-level guard.
+    """
+    root = _scaffolded_root(tmp_path)
+    _page(root, "specs/one.md", description="First spec page.")
+    target = root / doc_index.DOCS_INDEX_RELPATH
+    assert spec_plan_scaffold.is_file_index_skeleton(
+        target.read_text(encoding="utf-8")
+    ) is True
+
+    plan, log = _run_sync(root, _ENABLED_CONFIG)
+
+    assert plan == {
+        "written": [doc_index.DOCS_INDEX_RELPATH],
+        "unchanged": [],
+        "skipped": [],
+    }, plan
+    assert len(log.actions) == 1 and "UPDATE" in log.actions[0], log.actions
+    written = target.read_text(encoding="utf-8")
+    assert doc_renderer._carries_generator_id(written) is True
+    assert spec_plan_scaffold.is_file_index_skeleton(written) is False, (
+        "the generator must never write a skeleton"
+    )
+    assert doc_renderer.SCAFFOLD_SKELETON_REASON in log.infos[0], log.infos
+    assert doc_renderer.OWNERSHIP_REASON not in log.infos[0]
+
+    before = _tree_snapshot(root)
+    second, second_log = _run_sync(root, _ENABLED_CONFIG)
+    assert second == {
+        "written": [],
+        "unchanged": [doc_index.DOCS_INDEX_RELPATH],
+        "skipped": [],
+    }, second
+    assert _tree_snapshot(root) == before
+    assert second_log.actions == []
+
+
+def test_unknown_index_mode_is_fail_closed(tmp_path: Path):
+    """A typo in ``index-mode`` writes nothing, and says which one it thought it saw.
+
+    The schema closes the enum, so this is the typo path rather than a supported
+    value. Treating an unrecognised mode as ``full`` would be fail-*open* on the
+    one switch that decides whether another module's file may be overwritten.
+    """
+    root = _scaffolded_root(tmp_path)
+    _page(root, "specs/one.md", description="First spec page.")
+    before = _tree_snapshot(root)
+    config = {"docs-consolidation": {"enabled": True, "index-mode": "ful"}}
+
+    plan, log = _run_sync(root, config)
+
+    assert _tree_snapshot(root) == before
+    assert plan["skipped"] == [doc_index.DOCS_INDEX_RELPATH], plan
+    assert doc_renderer.UNKNOWN_INDEX_MODE_REASON in log.infos[0]
+    assert log.actions == []
+
+
+def test_index_mode_off_permits_the_full_index(tmp_path: Path):
+    """``index.mode: off`` is not a blocking owner — pinned as a value, not prose.
+
+    Two vocabularies meet in :func:`doc_renderer._index_mode_block_reason`:
+    ``spec-plan-workflow.index.mode`` (``knowledge-engine``/``file-index``/
+    ``off``) and ``docs-consolidation.index-mode`` (``full``/``skeleton``).
+    ``off`` is :func:`resolve_index_mode`'s way of saying the *scaffold* writes
+    no fallback index, so it claims no file on this path: a project that switched
+    it off has no placeholder to protect, and the full index may own
+    ``docs/INDEX.md``. Observed and asserted, both halves:
+
+    * a fresh tree gets its index created, and
+    * a *leftover* skeleton is still replaced — that is the scaffold-ownership
+      step, not a mode gate.
+
+    Whether ``off`` ought to protect the second case is a spec question (IC-13
+    does not name the value), so it is pinned here: any change to it has to come
+    through this test instead of arriving unnoticed.
+    """
+    rel = doc_index.DOCS_INDEX_RELPATH
+    assert spec_plan_scaffold.resolve_index_mode(_INDEX_MODE_OFF_CONFIG)[0] == "off"
+    assert doc_renderer._index_mode_block_reason(_INDEX_MODE_OFF_CONFIG) is None
+
+    root = _docs_root(tmp_path)
+    _page(root, "specs/one.md", description="First spec page.")
+
+    plan, log = _run_sync(root, _INDEX_MODE_OFF_CONFIG)
+
+    assert (root / rel).exists(), "off does not suppress the write"
+    assert plan == {"written": [rel], "unchanged": [], "skipped": []}, plan
+    assert len(log.actions) == 1 and "CREATE" in log.actions[0], log.actions
+
+    leftover_dir = tmp_path / "leftover"
+    leftover_dir.mkdir()
+    leftover = _scaffolded_root(leftover_dir)
+    _page(leftover, "specs/one.md", description="First spec page.")
+
+    plan, log = _run_sync(leftover, _INDEX_MODE_OFF_CONFIG)
+
+    assert plan == {"written": [rel], "unchanged": [], "skipped": []}, plan
+    assert doc_renderer.SCAFFOLD_SKELETON_REASON in log.infos[0], log.infos
+
+
+def test_skeleton_guard_does_not_generalise_to_a_near_miss(tmp_path: Path):
+    """The guard is one case of the ownership rule, not a replacement for it.
+
+    A hand-written index carries neither the generator id nor the F20 marker, so
+    a guard that answered "not a skeleton" into an unconditional write would pass
+    both new tests above and destroy the file. W3-1's version of this test stays
+    in place; this one adds the *near miss* — the ``# INDEX`` heading present,
+    the marker absent — which is what a prefix check written by eye would catch.
+    """
+    root = _docs_root(tmp_path)
+    _page(root, "specs/one.md", description="First spec page.")
+    near_miss = "# INDEX\n\n> Hand-written index, kept by a maintainer.\n"
+    target = root / doc_index.DOCS_INDEX_RELPATH
+    target.write_text(near_miss, encoding="utf-8")
+    assert spec_plan_scaffold.is_file_index_skeleton(near_miss) is False
+
+    plan, log = _run_sync(root, _ENABLED_CONFIG)
+
+    assert target.read_text(encoding="utf-8") == near_miss
+    assert plan == {
+        "written": [],
+        "unchanged": [],
+        "skipped": [doc_index.DOCS_INDEX_RELPATH],
+    }, plan
+    assert doc_renderer.OWNERSHIP_REASON in log.infos[0]
+    assert log.actions == []
+
+
+def test_generator_never_writes_a_skeleton():
+    """The reverse of the ownership rule, asserted on the render itself (IC-15)."""
+    rendered = _rendered()
+    assert spec_plan_scaffold.is_file_index_skeleton(rendered) is False
+    assert spec_plan_scaffold._FILE_INDEX_SKELETON_MARKER not in rendered
+
+
+def test_writer_decision_follows_the_scaffolds_marker(tmp_path: Path, monkeypatch):
+    """Perturb the scaffold's marker and the writer's *decision* must move (F20).
+
+    Behavioural, not identity: what makes importing the scaffold's guard worth
+    having is that a change to the marker it keys on *reaches* this writer.
+    ``monkeypatch`` rewrites that one module global — the very line such a change
+    would touch — while the bytes on disk stay the scaffold's own skeleton, so
+    the verdict can only move if the writer asks the scaffold about the file. A
+    probe copied into :mod:`doc_renderer` would keep writing the file and this
+    test would fail, which is the drift it exists to catch.
+    """
+    rel = doc_index.DOCS_INDEX_RELPATH
+
+    root = _scaffolded_root(tmp_path)
+    _page(root, "specs/one.md", description="First spec page.")
+
+    before, before_log = _run_sync(root, _ENABLED_CONFIG)
+
+    assert before == {"written": [rel], "unchanged": [], "skipped": []}, before
+    assert doc_renderer.SCAFFOLD_SKELETON_REASON in before_log.infos[0], (
+        before_log.infos
+    )
+
+    # A second tree carrying byte-identical skeleton bytes, reached with the
+    # marker moved: the on-disk file is the variable-free half of the comparison.
+    moved_dir = tmp_path / "marker-moved"
+    moved_dir.mkdir()
+    moved = _scaffolded_root(moved_dir)
+    _page(moved, "specs/one.md", description="First spec page.")
+    target = moved / rel
+    assert target.read_text(encoding="utf-8") == _scaffold_skeleton()
+    monkeypatch.setattr(
+        spec_plan_scaffold, "_FILE_INDEX_SKELETON_MARKER", "no such marker here"
+    )
+
+    after, after_log = _run_sync(moved, _ENABLED_CONFIG)
+
+    assert target.read_text(encoding="utf-8") == _scaffold_skeleton(), "wrote anyway"
+    assert after == {"written": [], "unchanged": [], "skipped": [rel]}, after
+    assert doc_renderer.OWNERSHIP_REASON in after_log.infos[0], after_log.infos
+    assert after_log.actions == []
+
+
+def test_skeleton_guard_probe_is_write_free():
+    """The guard is a pure string probe inside a module that writes elsewhere.
+
+    :mod:`doc_renderer`'s inverted write-free guard cannot cover a function this
+    module now depends on but does not own, so it is pinned here by name: the
+    function takes text, returns a bool and reaches no disk. Reusing the shared
+    :func:`_called_names` predicate keeps this a third *use*, not a third copy.
+    """
+    tree = ast.parse(Path(spec_plan_scaffold.__file__).read_text(encoding="utf-8"))
+    node = next(
+        item
+        for item in tree.body
+        if isinstance(item, ast.FunctionDef) and item.name == "is_file_index_skeleton"
+    )
+    forbidden = {
+        "open",
+        "write_text",
+        "write_bytes",
+        "mkdir",
+        "unlink",
+        "rmtree",
+        "rename",
+        "replace",
+        "touch",
+        "read_text",
+        "read_bytes",
+    }
+    called = _called_names(node)
+    assert not (called & forbidden), sorted(called & forbidden)
+    assert isinstance(spec_plan_scaffold.is_file_index_skeleton(""), bool)

@@ -5,16 +5,22 @@ Two layers, one module. The **rendering** layer (:data:`DOCS_BLOCK_RE`,
 :func:`render_docs_index`) is a neutral leaf: it knows no documentation file,
 opens nothing and **writes nothing** — the caller owns the file. It is a pure
 string transformer plus the marker regexes (IC-07), so it stays importable from
-anywhere without a cycle (``scripts/lib/config.py`` consumes it in W3, and this
+anywhere without a cycle (``scripts/lib/config.py`` consumes it, and this
 module must not import ``config`` back).
 
-The **writer** layer (:func:`sync_docs_consolidation`, W3-1 / IC-13) added in
-this wave is the exception, and it is deliberately narrow: it owns the *gate*,
-the *ownership decision* and the single call into
-:func:`~scripts.lib.io.write_checked`. It never writes through a second path —
-one funnel is what keeps the idempotency check, the secret scan and ``dry_run``
-from drifting apart — and it never imports ``config``, so the IC-11 bridge stays
-possible.
+The **writer** layer (:func:`sync_docs_consolidation`, IC-13) is the exception,
+and it is deliberately narrow: it owns the *gate*, the *ownership decision* and
+the single call into :func:`~scripts.lib.io.write_checked`. It never writes
+through a second path — one funnel is what keeps the idempotency check, the
+secret scan and ``dry_run`` from drifting apart — and it never imports
+``config``, so the IC-11 bridge stays possible.
+
+The writer's second owner is the spec-plan scaffold's ``file-index`` skeleton:
+:func:`~scripts.lib.spec_plan_scaffold.is_file_index_skeleton` is consulted
+*before* the ownership probe, so a write that takes over the scaffold's
+placeholder is logged as the scaffold's file rather than as a bug. The import is
+of that function itself, never of a re-implemented probe, so a change to the
+F20 marker line cannot leave this module recognising an older skeleton.
 
 :data:`WRITER_FUNCTIONS` names the **only** module-level functions allowed to
 touch the disk. It is an allowlist of writers, not of the functions that happen
@@ -70,6 +76,7 @@ from .doc_index import (
     has_docs_tree,
 )
 from .io import safe_path, write_checked
+from .spec_plan_scaffold import is_file_index_skeleton, resolve_index_mode
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -259,6 +266,46 @@ UNREADABLE_REASON: str = "target not readable — ownership unprovable, not writ
 
 WRITER_SOURCE: str = "docs consolidation"
 """``log.action`` source of this writer (IC-13)."""
+
+FULL_INDEX_MODE: str = "full"
+SKELETON_INDEX_MODE: str = "skeleton"
+"""The two values of ``docs-consolidation.index-mode`` (W1-9 schema enum)."""
+
+DEFAULT_INDEX_MODE: str = FULL_INDEX_MODE
+"""Absence default of ``index-mode`` (IC-22) — the full index replaces the skeleton."""
+
+KE_AUTHORITATIVE_REASON: str = "knowledge-engine index is authoritative"
+"""Reason no index is written while the KE index owns the path (IC-13, scenario 52)."""
+
+SKELETON_MODE_REASON: str = (
+    "index-mode: skeleton — the scaffold skeleton is always kept (IC-15)"
+)
+"""Reason ``index-mode: skeleton`` suppresses every write (IC-13, AC-21)."""
+
+UNKNOWN_INDEX_MODE_REASON: str = (
+    "index-mode is neither 'full' nor 'skeleton' — not written (fail-closed, IC-22)"
+)
+"""Reason an unrecognised ``index-mode`` suppresses every write, fail-closed.
+
+The schema closes the enum, so this is the typo path rather than a supported
+value. It is a separate reason because claiming "the skeleton is kept" for a mode
+that means nothing would put a false statement in a sync log.
+
+The enum read here is ``docs-consolidation.index-mode`` (``full``/``skeleton``)
+and nothing else. A project also carries a *second*, unrelated index vocabulary
+— ``spec-plan-workflow.index.mode``, whose third value is ``off`` — and a value
+from that one is not a typo; :func:`_index_mode_block_reason` explains where it
+lands.
+"""
+
+SCAFFOLD_SKELETON_REASON: str = (
+    "target is the scaffold skeleton — replaced by the full index (IC-15)"
+)
+"""Reason a scaffold skeleton **is** writable, and the note that says so.
+
+Without it the one run that legitimately overwrites another module's file is
+indistinguishable in the log from a bug.
+"""
 
 DOCS_GENERATOR_ID: str = "doc-indexer/1"
 """Static generator id (IC-14) — also this writer's **ownership anchor**.
@@ -613,6 +660,57 @@ def _empty_plan() -> dict[str, list[str]]:
     return {"written": [], "unchanged": [], "skipped": []}
 
 
+def _index_mode_block_reason(config: dict) -> str | None:
+    """Why the config forbids an index write at all, or ``None`` for permission.
+
+    Two independent owners of the same path, both decided from configuration
+    alone, so neither depends on what happens to be on disk (IC-13, IC-15):
+
+    * ``resolve_index_mode() == "knowledge-engine"`` — the knowledge engine owns
+      the index. Scenario 52 asserts no ``docs/INDEX.md`` is written there, and
+      the scaffold does not write one either, so the generator has nothing to do
+      in that project.
+    * ``docs-consolidation.index-mode: skeleton`` — the scaffold skeleton is
+      always kept, so the generator writes nothing, not even on a first run into
+      an empty tree. A mode that only blocked the *replacement* would still seed
+      a full index into a project that asked for a skeleton.
+
+    An ``index-mode`` outside the schema's enum is treated as *not* ``full``:
+    fail-closed, and a reason that says so instead of guessing which mode was
+    meant.
+
+    **Two index vocabularies meet here, and only one of them is closed.**
+    ``spec-plan-workflow.index.mode`` is ``knowledge-engine`` / ``file-index`` /
+    ``off``; ``docs-consolidation.index-mode`` is ``full`` / ``skeleton``. The two
+    owners above are the complete list of what forbids a write, so ``off`` is
+    **not** one of them: it is :func:`resolve_index_mode`'s way of saying the
+    *scaffold* writes no fallback index, hence claims no file on this path — with
+    no placeholder to protect, the full index may own ``docs/INDEX.md``, and a
+    write is permitted. ``off`` also does not stop a *leftover* skeleton from
+    being replaced, since that replacement is the scaffold-ownership step, not a
+    mode gate; IC-13/IC-15 do not settle that case, so both are pinned by
+    :func:`test_index_mode_off_permits_the_full_index` rather than argued here.
+    Treating ``off`` as fail-closed would be a different contract, and a
+    behaviour change — not a docstring fix.
+
+    Args:
+        config: the loaded ``project.yaml`` mapping.
+
+    Returns:
+        The reason to log, or ``None`` when the configuration permits a write.
+    """
+    if resolve_index_mode(config)[0] == "knowledge-engine":
+        return KE_AUTHORITATIVE_REASON
+    block = config.get("docs-consolidation")
+    block = block if isinstance(block, dict) else {}
+    mode = block.get("index-mode", DEFAULT_INDEX_MODE)
+    if mode == SKELETON_INDEX_MODE:
+        return SKELETON_MODE_REASON
+    if mode != FULL_INDEX_MODE:
+        return UNKNOWN_INDEX_MODE_REASON
+    return None
+
+
 def sync_docs_consolidation(
     agent_meta_root: Path,
     project_root: Path,
@@ -638,21 +736,40 @@ def sync_docs_consolidation(
     2. **No docs tree (AC-26).** The index path goes to ``skipped`` with a
        reason. The directory is **never** created: a consumer project without
        documentation did not ask for any.
-    3. **Facts.** :func:`~scripts.lib.doc_facts.compute_doc_facts` turns
+    3. **Index mode (IC-13, IC-15).** Two configuration facts forbid a write
+       outright — a knowledge-engine project, whose KE index owns the path
+       (scenario 52), and ``index-mode: skeleton``, which keeps the scaffold
+       skeleton whatever is on disk. Both are decided from *configuration*, so
+       they cost no filesystem access and cannot be outrun by whatever the target
+       happens to contain. This step runs before the facts for the same reason
+       the two above do: no work, no cost, for a run that is going to skip.
+    4. **Facts.** :func:`~scripts.lib.doc_facts.compute_doc_facts` turns
        *agent_meta_root* into the ``DOCS_*`` mapping, which the IC-10 document
        renders. It never raises and writes nothing (AC-01), so a missing or
        half-readable checkout degrades to empty facts and the ``docs-empty``
-       placeholders rather than aborting a sync. It runs *after* the two gates
+       placeholders rather than aborting a sync. It runs *after* the gates
        above on purpose: a disabled run must not touch the source checkout at
        all, and a consumer project without docs must not pay for facts it will
        never render.
-    4. **Ownership (IC-13).** An existing target is only ever written when it is
-       byte-identical (nothing to do) or carries this generator's id. Anything
-       else belongs to another writer and is *reported*, never overwritten — a
-       hand-edited index has to survive a sync, and so does the spec-plan
-       scaffold's ``file-index`` skeleton until W3-3 teaches this function to
-       recognise it (IC-15).
-    5. **Write.** Exactly one :func:`~scripts.lib.io.write_checked` call, which
+    5. **Ownership (IC-13).** An existing target is only ever written when it is
+       byte-identical (nothing to do), is the spec-plan scaffold's ``file-index``
+       skeleton (the one file this generator is *allowed* to take over, IC-15),
+       or carries this generator's id. Anything else belongs to another writer
+       and is *reported*, never overwritten — a hand-edited index has to survive
+       a sync.
+
+       The scaffold check is consulted **before** the generator-id probe. The
+       two branches are a *union* of write permissions — a skeleton and a
+       generator-owned index are both writable, anything else is not — so either
+       order yields the same outcome; guard-first is a readability preference,
+       because it keeps the linear shape and makes the note name the real owner
+       (the scaffold) instead of a foreign writer. What *is* load-bearing is the
+       order of this step and step 3: the mode gate has to run before the
+       ownership block, or a knowledge-engine project reports ``OWNERSHIP_REASON``
+       (or plain ``unchanged``) instead of its own authoritative-mode note, and
+       the ownership step's early returns would bypass the mode decision
+       entirely.
+    6. **Write.** Exactly one :func:`~scripts.lib.io.write_checked` call, which
        is where the idempotency comparison, the secret scan and ``dry_run``
        live. Under ``dry_run`` it performs only the change detection, so the
        write candidates still surface in ``written`` (AC-23) with nothing on
@@ -690,6 +807,12 @@ def sync_docs_consolidation(
         log.note(LOG_TARGET, f"{index_rel}: {NO_DOCS_TREE_REASON}")
         return plan
 
+    mode_reason = _index_mode_block_reason(config)
+    if mode_reason is not None:
+        plan["skipped"].append(index_rel)
+        log.note(LOG_TARGET, f"{index_rel}: {mode_reason}")
+        return plan
+
     target = safe_path(project_root, index_rel)
     # The facts are computed here and not above: both gates have already
     # short-circuited, so a disabled run and a project without a docs tree never
@@ -723,7 +846,13 @@ def sync_docs_consolidation(
             plan["unchanged"].append(index_rel)
             log.note(LOG_TARGET, f"{index_rel}: {ALREADY_CURRENT_REASON}")
             return plan
-        if not _carries_generator_id(existing):
+        if is_file_index_skeleton(existing):
+            # IC-15: the spec-plan scaffold's placeholder is the one file this
+            # generator may take over, and the only one that carries no
+            # ``doc-indexer/1``. Consulted *before* the id probe on purpose --
+            # see the decision order in this function's docstring.
+            log.note(LOG_TARGET, f"{index_rel}: {SCAFFOLD_SKELETON_REASON}")
+        elif not _carries_generator_id(existing):
             plan["skipped"].append(index_rel)
             log.note(LOG_TARGET, f"{index_rel}: {OWNERSHIP_REASON}")
             return plan
