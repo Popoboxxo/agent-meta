@@ -66,6 +66,7 @@ from lib.external_tools import (
 )
 from lib.generated_file_drift import (
     backup_drifted_files,
+    base_path_for_key,
     capture_generated_file_hashes,
     is_drift_detection_enabled,
     prune_sync_backups,
@@ -606,10 +607,16 @@ def _sync_stage_generated_file_drift_scan(
         for finding in findings:
             backup_name = backup_name_by_source.get(finding["path"])
             backup_note = f" Backup written to {backup_name}." if backup_name else ""
+            # The hint must name the string that actually suppresses the
+            # finding, which is the BASE PATH and not the printed store key:
+            # is_allowlisted() fnmatches base_path_for_key(), so a copied
+            # 'README.md#docs:facts' would silently never match (IC-16 M8,
+            # AC-37). The full key stays visible above for identification.
+            allowlist_entry = base_path_for_key(finding["path"])
             log.warning(
                 f"generated-file-drift: '{finding['path']}' was manually edited "
                 f"since the last sync (provider '{finding['provider']}') -- this "
-                f"sync will overwrite it.{backup_note} Add it to "
+                f"sync will overwrite it.{backup_note} Add '{allowlist_entry}' to "
                 ".meta-config/drift-allowlist.yaml if this edit should be "
                 "preserved going forward."
             )

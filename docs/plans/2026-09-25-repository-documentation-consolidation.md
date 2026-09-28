@@ -4909,11 +4909,11 @@ entsteht; `allow-edits: ["README.md"]` unterdrückt den Marker-Body-Drift. Scan 
 werden symmetrisch ergänzt. Kein Eintritt in `_iter_managed_files` (`:240-310`).
 **Verifikation:** `python3 -m pytest tests/test_generated_file_drift_docs.py tests/test_generated_file_drift.py -q` → **0**.
 **Steps:**
-- [ ] 1: Tests schreiben (fail).
-- [ ] 2: Doku-Pfade in Scan **und** Capture ergänzen; `is_allowlisted` (`:82-84`) gegen den
+- [x] 1: Tests schreiben (fail).
+- [x] 2: Doku-Pfade in Scan **und** Capture ergänzen; `is_allowlisted` (`:82-84`) gegen den
       Basis-Pfad matchen.
-- [ ] 3: Tests grün beobachten; bestehende Drift-Tests mitlaufen lassen.
-- [ ] 4: commit via `git`-Agent: `feat: track docs files in generated file drift store`.
+- [x] 3: Tests grün beobachten; bestehende Drift-Tests mitlaufen lassen.
+- [x] 4: commit via `git`-Agent: `feat: track docs files in generated file drift store`.
 
 ### W3-6: `docs/INDEX.md` tracked, Erstgenerierung, OQ6/OQ8-Umsetzung
 
