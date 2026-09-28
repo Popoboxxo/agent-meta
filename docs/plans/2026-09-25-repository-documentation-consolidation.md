@@ -3057,11 +3057,229 @@ Grenze wird nicht aufgeweicht, indem man die Nachbarschaft aufweicht. **Beide** 
 entweder eine Kopplung in einen geteilten Helfer einziehen oder einen Sollwert (die < 600-Grenze)
 neu auslegen; **E-7** nimmt statt dessen eine **fünfte** Moduldatei.
 **Steps:**
-- [ ] 1: Test in `tests/test_doc_freshness_v5.py` schreiben (fail).
-- [ ] 2: `docs_freshness_v5.py` anlegen; V5 mit Gate-Auswertung implementieren.
-- [ ] 3: Tests grün beobachten; Ist-Zustand (F13) muss **WARNING** sein; beide `wc -l`-Belege
+- [x] 1: Test in `tests/test_doc_freshness_v5.py` schreiben (fail).
+- [x] 2: `docs_freshness_v5.py` anlegen; V5 mit Gate-Auswertung implementieren.
+- [x] 3: Tests grün beobachten; Ist-Zustand (F13) muss **WARNING** sein; beide `wc -l`-Belege
       (592 bzw. < 600) festhalten.
-- [ ] 4: commit via `git`-Agent: `feat: add V5 gate-aware role parity check in own module`.
+- [x] 4: commit via `git`-Agent: `feat: add V5 gate-aware role parity check in own module`.
+
+> **LEDGER-Stand 2026-09-28 — W2-4 VOLLSTÄNDIG umgesetzt (Fortschrittsnotiz, keine Änderung der
+> Task-Semantik).** Abgehakt über den **maschinellen Ledger-Writer** (`--update-plan-ledger` gegen
+> diesen Plan, `--task W2-4`): Dry-Run `tasks updated: W2-4`, `checkboxes would toggle: 4`,
+> **Exit 0**, **keine** `unmatched`-Zeile; schreibender Lauf `tasks updated: W2-4`,
+> `checkboxes toggled: 4`, **Exit 0**, **keine** `unmatched`-Zeile. Der Plan-Diff gegen die
+> Vorher-Kopie ist **genau diese 4 Zeilen** (alle vier in `**Steps:**` dieses Blocks, Zeilen
+> 3060–3064); Plan bleibt `status: APPROVED`, `revision: 0.7`, keine ID umnummeriert.
+> **Ehrlich zu Schritt 4:** auftragsgemäß mit abgehakt, der **Commit ist nicht erfolgt** — W2-4
+> lief als **No-Commit**-Task; der Commit ist der Schritt des `git`-Agenten.
+> **Größen, gemessen (Stand LANDUNG; Fix-Runde 1 hat sie geändert — aktuelle Werte siehe am Ende
+> dieser Notiz):** `scripts/lib/consistency/docs_freshness_v5.py` **121 Z** (**< 600** ✓),
+> `tests/test_doc_freshness_v5.py` **324 Z**, **8** Testfälle. Die Plan-Prognose „≈ 55–70 Z" ist
+> **nicht** erreicht (+51): der Rev. 0.7-Auftrag macht den Modul-Docstring zum Pflichtbestandteil
+> (IC-04-Begründung, `FactUnavailable`-Entscheidung mit V6-Muster, E-7-Verwerfungen,
+> Gate-Lesart, Registrierungs-Vorwegnahme) — **42 der 121 Z** sind dieser Docstring. Die harte
+> Grenze `< 600` ist mit **479 Z Reserve** erfüllt; **kein** Sollwert wurde abgesenkt.
+> **592-Nachweis (der eigentliche Zweck der Kante W2-5 → W2-4), gemessen:** `docs_freshness.py`
+> **592 Z vorher wie nachher**, und **byte-identisch** — `sha256` **vorher = nachher =
+> `3184e222b1b2c490cbac4ef4d5f318d57ecaf002ef89981292093c453e22b31d`**. W2-4 fasst das Modul nicht an.
+> **Vergleichsmenge, gemessen:** `compute_active_roles(REPO_ROOT, project.yaml)` ⇒ **58** gegen
+> **59** Einträge in `roles:`; Differenzmenge **genau 1** ⇒ `se-component-requirements`. Auflösung
+> über `roles.resolve_active_roles(..., require_template=True)` ⇒ **identisch** (Parität
+> nachgewiesen, der in `doc_facts`:174-185 für W2-4 festgehaltene Consumer-Obligation-Satz (b)).
+> **`FactUnavailable`, entschieden und begründet:** V5 **kann** degradieren (eine Vergleichsseite
+> fehlt ⇒ es gibt nichts zu vergleichen) und degradiert deshalb zu **Stille** — dieselbe Lesart
+> wie V6s `_v6_project_config` (`docs_freshness.py`:410) und `_v6_computed_facts` (`:426`), ein
+> fehlender Sollwert ist **Abwesenheit, kein Drift**. Der Sentinel ist `None`, **nicht** `set()`;
+> die verworfene Alternative (Ausnahme melden bzw. eine leere Menge erfinden) ist im Docstring
+> benannt: `consistency-check.py` hat **keinen** Check-`try`-Block, eine Ausnahme würde den
+> ganzen Runner abreißen, und ein Finding-Klasse „unavailable" ist in IC-05 nicht definiert.
+> **F13-Ist-Wert, gemessen an diesem Repo:** `systems-engineering.enabled: false` ⇒ genau **1**
+> Finding, Severity **WARNING** (gate `se` über `config/role-defaults.yaml::activation_groups`
+> geschlossen; Gate-Lesart über `roles.resolve_activation_gates`, **kein** hart kodierter
+> Gate-Pfad). **Beide Severity-Zweige** sind gemessen, nicht behauptet: die **ERROR**-Hälfte liest
+> eine Kopie desselben Baums mit geöffnetem Gate **und** einer `roles:`-Rolle ohne Template.
+> **Nicht-Vakuum-Nachweis, Mutanten (alle gemessen, `.tmp/w2-4/mutate.py`, **7** Mutanten — Stand
+> LANDUNG; Fix-Runde 1 hat den achten ergänzt, aktuelle Tabelle am Ende dieser Notiz):**
+> `roles:`-Liste als erzeugte Menge (**7** failed) · Severity fest ERROR (**2**) · Severity fest
+> WARNING (**1**) · dauerhaft still (**7**) · Richtung umgekehrt (**7**) · Provider-Dimension
+> ausgewertet statt übersprungen (**6**) · `FactUnavailable` zu `set()` (**1**) — die letzte ist der
+> Mutant, der aus der verlockendsten Ein-Zeilen-„Korrektur" eine erfundene Meldung **pro
+> deklarierter Rolle** macht. **Beide** Hälften des Akzeptanz-Tests
+> `test_v5_severity_depends_on_se_gate` sind damit je **einem** Mutanten zugeordnet (fest ERROR ⇒
+> 2 failed, fest WARNING ⇒ 1 failed), also **nicht** halb geprüft.
+> **Befund aus dem Mutantenlauf, benannt statt geglättet:** die erste Fassung des
+> Provider-Tests war **stumm mutierbar** — ein Mutant, der die Dimension mit einer Registry
+> ohne `agents`-Fähigkeit auswertet, blieb **grün (0 failed)**, weil ein Registry-Name, der die
+> deklarierten Provider nicht trifft, ebenfalls übersprungen wird. Der Test prüfte also nur
+> „liest die Datei nicht", nicht „überspringt die Dimension". Abhilfe **gemessen, nicht behauptet:**
+> die Prämisse ist jetzt im selben Funktionsrumpf gepinnt
+> (`compute_active_roles(root, config, collapsed) == set()` bei
+> `collapsed = {Claude, Opencode, Gemini: {capabilities: []}}`, gemessene deklarierte Provider aus
+> `.meta-config/project.yaml::ai-providers`) ⇒ derselbe Mutant jetzt **6 failed**. Ohne diese
+> Prämisse wäre „nicht registriert"/Provider-Überspringung ein **nicht** abgedeckter Akzeptanzpunkt
+> gewesen. **Registrierungs-Vorwegnahme:**
+> V5 ist **nicht** registriert — `scripts/consistency-check.py` **0** Treffer für den Namen und
+> das Modul, `docs.py::__all__` **25** Einträge ohne den Namen (der **einzige** Treffer dort ist ein
+> vorbestehender Kommentar in der leeren W2-3…W2-7-Sektion), `consistency-check.py --json` ⇒
+> **0** Findings mit `check == "docs.role_generation_parity"` (der **1** Error ist der
+> vorbestehende, terminierte W2-6-Sollwert `docs/se-cascade/`). **Bewusst kein Test** auf
+> „noch nicht registriert": ein dauerhafter Negativ-Assert wäre die Zustands-Assertion, die das
+> W2-5-Review als Mangel markiert hat — der Nachweis ist diese Messung.
+> **Write-Menge eingehalten (K46-Negativregel):** `docs_freshness.py`,
+> `tests/test_doc_freshness.py`, `docs.py`, `consistency-check.py` und die Szenario-Fixtures sind
+> **unberührt**; `docs.py` wurde nur gelesen. `git status --porcelain` zeigt **genau** drei
+> Einträge: die Plan-Datei (`M`) und die zwei neuen Dateien (`??`). Kein `xfail`, kein `-k`, kein
+> `|| true`, kein abgesenkter Sollwert, kein ausgelassener Gate-Zweig.
+> **Vorbestehender roter Test, gemessen und W2-4 nicht zugerechnet (nicht angefasst, nicht
+> geschwächt):** `tests/test_plan_ledger_writer.py::test_validate_plan_reaches_the_expected_
+> overlap_verdict` pinnt **17** Hard-Overlap-Findings und ist mit **18** rot.
+> **Korrektur der Ursachenangabe aus dem Stufe-1-Review:** die erste Fassung dieser Notiz
+> schrieb, der Zähler sei „durch Rev. 0.7s Umbenennung des W2-4-**Titels**" von 17 auf 18
+> gewandert. Das ist **sachlich falsch** und hiermit berichtigt. **Eigene Messung** über
+> `git show <commit>:docs/plans/…`, jeweils mit dem Parser des Working Tree
+> (`.tmp/w2-4r1/hist.py`):
+>
+> | Commit | Hard-Overlap-Zähler | Pin in `test_plan_ledger_writer.py` |
+> |---|---|---|
+> | `c3ed5c9f` | **14** | kein `len(errors)`-Pin |
+> | `c0988e18` | **19** | kein `len(errors)`-Pin |
+> | `4b5eaa94` | **18** | kein `len(errors)`-Pin |
+> | `3b32c156` | **18** | kein `len(errors)`-Pin |
+> | `3d8499ca` | **18** | **neu: `assert len(errors) == 17`** |
+> | `31a0db55` (HEAD) | **18** | `== 17` |
+> | Worktree | **18** | `== 17` |
+>
+> **Belegte Einordnung:** `4b5eaa94` („apply E-5..E-8, add W2-8 and W2-9 (rev 0.7)") ist
+> tatsächlich der Commit, der den W2-4-Titel auf `docs_freshness_v5.py` umbenannt hat
+> (`-… Rev. 0.6: docs_freshness.py …` / `+… Rev. 0.7 / E-7: eigenes Modul docs_freshness_v5.py …`)
+> — er hat den Zähler von **19 auf 18** gesenkt, also **weg von** 17, **nicht auf** 18. Der Pin
+> `== 17` wurde erst in **`3d8499ca`** eingeführt, wo der Ist-Wert bereits **18** war ⇒ **der
+> Test war von Geburt an rot und war nie grün**; W2-4 hat den Zähler **nicht** bewegt (18
+> vorher wie nachher).
+> **Die Reparatur gehört nicht in W2-4** (andere Schreibmenge, und der Testkommentar
+> untersagt das Schwächen des Pins): sie gehört in **W2-7** — das `docs.py`-`__all__`-Inkrement
+> dort verschiebt den Zähler **erneut** — bzw. in einen **W2-9-Nachlauf**, der den Pin gegen den
+> dann gültigen Ist-Wert neu setzt. **Einordnung als Befund, nicht als W2-4-Regression.**
+> Die inhaltlichen Pins desselben Tests sind **grün**: `files_touched == ()` für **alle** Tasks,
+> und `scripts/lib/consistency/docs.py` erscheint in **keinem** Overlap-Finding (die vom
+> W2-9-Review gefürchtete Phantom-Write-Menge ist **nicht** entstanden). Zwei weitere rote Tests
+> (`test_knowledge_engine.py::test_knowledge_roles_pass_schema_validation`,
+> `test_sharkord_service_name_migration.py::…no_leftover_platform_namespace_placeholder`) haben
+> **0** Referenzen auf `docs/plans`, `docs_freshness` oder `role_generation` und sind
+> vorbestehend; die **35** Errors stammen alle aus `tests/browser/*` (Playwright-Socket, kein
+> laufender Admin-Server) und sind umgebungsbedingt.
+
+> **LEDGER-Stand 2026-09-28 — Fix-Runde 1 (Review-Iteration 1, Stufe 1 = `ACCEPTED_WITH_DEVIATIONS`,
+> keine Blocker, alle Akzeptanzpunkte erfüllt).** Behoben sind die **drei
+> Dokumentations-Deviations** DEV-1, DEV-2 und DEV-4; **kein** Code-Refactoring, **keine**
+> Änderung an Verhalten, Severity-Regel, Vergleichsmenge oder Sollwerten. **DEV-3** (Schritt 4 als
+> abgehakt markiert, Commit offen) ist **bewusst unverändert** — Werkzeug-Granularität des
+> Ledger-Writers (Toggle pro Task, nicht pro Schritt); der Commit ist der Schritt des `git`-Agenten.
+> **DEV-1 (überzeichneter Test-Docstring), behoben durch** Variante (b) „Lese-Negativtest
+> ergänzen", **nicht** durch Abschwächen der Formulierung. **Vorher gemessen, dass die Lücke
+> real war:** ein Mutant, der `config/ai-providers.yaml` via `load_providers_config` **lädt und
+> weiterreicht**, blieb gegen den alten Testsatz **grün (Exit 0, 0 failed)** — der Review hatte
+> recht. **Ursache, selbst gemessen:** der Lösch-Test kann das nicht sehen, weil
+> `load_providers_config` fail-soft ist **und** seinen eingebauten Fallback mitbringt, der
+> `agents` deklariert (gemessen: Fallback = `Claude`, `capabilities` enthält `agents`) — auf dem
+> gesunden Baum und auf dem Baum ohne Datei ist die erzeugte Menge also **identisch**.
+> **Der einzige unterscheidende Baumzustand** ist eine Registry, die **existiert und parst**,
+> ohne `agents` zu deklarieren; genau den baut der neue Test, indem er die Datei in der Kopie
+> **umschreibt** statt sie zu löschen. **Nachher gemessen: derselbe Mutant ⇒ 1 failed**, und der
+> einzige rote Test ist der neue. **Zeilenanker NACH der Änderung**
+> (`tests/test_doc_freshness_v5.py`): `test_v5_provider_dimension_is_skipped_not_evaluated`
+> **`:279`** (Docstring jetzt: „What this test enforces, stated exactly" + Verweis auf den
+> Geschwister-Test + Warnung, die Prämisse **nicht** wegzudeduplizieren),
+> `test_v5_does_not_read_the_provider_registry` **`:326`** (**neu**), `AGENTS_CAPABILITY` im Import
+> **`:69`**. **Mutantentabelle neu (8 Mutanten, alle Zahlen gemessen,
+> `.tmp/w2-4/mutate.py`):** m1 **8** · m2 **3** · m2b **1** · m3 **8** · m4 **1** · m5 **8** ·
+> m6 **7** · **m7 (Laden + Weiterreichen der Registry) 1** — vorher **0**. Basis-Lauf **9 passed**
+> (vorher 8).
+> **DEV-2 (Zweitbegründung nur im Bericht), am Code geprüft und damit ins Modul überführt.**
+> **Bestätigt, nicht widerlegt:** `scripts/consistency-check.py` enthält genau **drei** `try`-Blöcke
+> — `get_changed_files` (`:72`, Git-Subprozess), `get_new_files_vs_main` (`:94`, dito) und `_read`
+> (`:220`, `read_text`) — und **keiner** davon umschließt einen Check-Aufruf. AST-gemessen:
+> `run_checks` (`:140`–`:216`) und `main` (`:229`–`:276`) enthalten **0** `ast.Try`-Knoten;
+> `main` ruft `run_checks` bei `:266` ungeschützt. **Verhaltensgemessen** an einer **Kopie** des
+> Runners unter `.tmp/` (die Repository-Datei blieb unberührt): ein werfender Check ⇒ **Exit 1**,
+> Traceback in stderr, **kein** JSON-Report, **0** Findings in stdout — der Verlust betrifft den
+> **gesamten** Report, nicht nur diesen Check. Die Begründung **trägt** und steht jetzt im
+> Modul-Docstring (`docs_freshness_v5.py`:30-34): Degradieren ist hier ein **Vertrag**, weil der
+> Runner dem Check keine Blast-Radius-Isolierung anbietet, in die er degradieren könnte.
+> **DEV-4 (falsche Ursachenangabe), korrigiert** — siehe die korrigierte Fassung weiter oben mit
+> der **eigen** gemessenen Zähler-Historie (`c3ed5c9f` 14 → `c0988e18` 19 → `4b5eaa94` **18** →
+> `3b32c156` 18 → `3d8499ca` 18 → `31a0db55` 18 → Worktree **18**) und der Einordnung **geboren
+> rot** in `3d8499ca`; Reparatur **nicht** in W2-4, sondern **W2-7** (das `docs.py`-Inkrement
+> verschiebt den Zähler erneut) bzw. **W2-9-Nachlauf**, und **nicht** durch Abschwächen des Pins.
+> **Verifikation, alle Läufe mit umgeleiteter Ausgabe gemessen (Stand Fix-Runde 1):** `python3 -m
+> pytest tests/test_doc_freshness_v5.py -q` ⇒ **9 passed**; `pytest
+> tests/test_doc_freshness_v5.py tests/test_doc_freshness.py -q` ⇒ **34 passed**; `pytest
+> tests/test_doc_facts.py -q` ⇒ **126 passed**; `python3 -m compileall -q scripts/lib` ⇒ **Exit 0**;
+> `docs_freshness.py` **592 Z** und sha256 **identisch** mit dem Vorzustand
+> (`3184e222b1b2c490cbac4ef4d5f318d57ecaf002ef89981292093c453e22b31d`) — **byte-identisch**;
+> `wc -l` ⇒ `docs_freshness_v5.py` **126 Z** (< 600), `tests/test_doc_freshness_v5.py` **396 Z**;
+> ruff **Defaults 0** und `--select I,UP,E,F,W` **0** über beide neuen Dateien. **V5 weiterhin
+> nicht registriert:** `consistency-check.py` **0** Treffer, `docs.__all__` **25** Einträge ohne den
+> Namen, `--json` ⇒ **0** Findings mit `check == "docs.role_generation_parity"`.
+> **Write-Menge unverändert:** nur `docs_freshness_v5.py` (Docstring-Zeile), `test_doc_freshness_v5.py`
+> (ein Test plus Docstring) und diese Plan-Notiz; `docs_freshness.py`,
+> `tests/test_doc_freshness.py`, `docs.py`, `consistency-check.py` und die Szenario-Fixtures
+> **unberührt**. Die **4** Checkboxen bleiben abgehakt, **kein** Commit, **keine** Git-Mutation.
+
+> **LEDGER-Stand 2026-09-28 — Fix-Runde 2 (Review-Iteration 2, Stufe 2 = `ACCEPTED_WITH_DEVIATIONS`,
+> Rating B+, 0 Blocker).** Zwei Findings behoben, beide Ein-Zeilen-Änderungen in W2-4s Write-Menge;
+> **kein** Verhalten im Ist-Zustand, **kein** Commit.
+> **N1 (Degradierung griff nur für `FactUnavailable`) — zuerst selbst reproduziert, dann behoben.**
+> Gemessen auf einer Baumkopie mit **unparsbarer** `config/role-defaults.yaml`
+> (`.tmp/w2-4f2/repro.py`): `compute_doc_facts` ⇒ 22 Facts, `check_docs_facts_fresh` ⇒ 1 Finding,
+> `check_role_generation_parity` ⇒ **`SyncError`, ausbrechend** — der einzige Check der Familie, der
+> den Runner abbricht (kein `try` pro Check, siehe DEV-2 oben), also genau der Ausgang, den die
+> Modul-Doku als Vermeidungsgrund für die Degradierung anführt. **Ursache gemessen:** `io.py`:78
+> (`_load_yaml_or_json`) wirft `SyncError` bei **Parse**-Fehlern, und `doc_facts` bildet laut eigener
+> Doku nur `OSError`/`ValueError` auf `FactUnavailable` ab — „any other exception type propagates
+> unchanged" (`_template_role_names`, `:608-611`); der Fail-Soft-Vertrag `:768-772` nennt eine
+> unlesbare Quelle ausdrücklich *unavailable*.
+> **Fix:** `_v5_generated_roles` fängt jetzt `(FactUnavailable, SyncError)`, Import `SyncError` aus
+> `..io`. **Nachher gemessen:** korrupte Registry ⇒ **0** Findings statt Exception, `compute_active_roles`
+> **unverändert** weiter werfend (der Dispatcher-Vertrag bleibt unangetastet — `doc_facts.py` ist W1-3s
+> Eigentum, die im Review erwähnte Dispatcher-Erweiterung ist bewusst **nicht** genommen), intakter
+> Baum ⇒ **1** Finding unverändert. **Begründung steht im Modul** (`_v5_generated_roles`-Docstring,
+> `docs_freshness_v5.py`:87-110): `SyncError` ist derselbe Fall „Quelle unlesbar", nur eine Ebene
+> tiefer gemeldet, und der breitere `except` ist auf **diesen einen** Aufruf gescoped.
+> **Pflichttest:** `test_v5_corrupt_role_registry_degrades_instead_of_escaping`
+> (`tests/test_doc_freshness_v5.py`:272) — pinnt zuerst die **Prämisse** (`pytest.raises(SyncError)`
+> an `compute_active_roles` direkt, also *warum* die Ausnahme erwartet wird), dann `== []` für V5, und
+> im selben Rumpf den nicht-leeren Ausgang auf intakter Kopie (Nicht-Vakuum). Der Geschwister-Test
+> `:247` deckt den **anderen** Zweig (Quelle **fehlt** ⇒ `FactUnavailable`) ab; erst das Paar
+> unterscheidet „degradiert" von „propagiert". Fixture-Konstante `CORRUPT_ROLE_DEFAULTS` **:96**
+> (Tab-Indentation + offene Flow-Sequenz ⇒ Parse-Fehler, nicht fehlende Datei).
+> **Mutant gemessen:** **m8** (nur `FactUnavailable` gefangen) ⇒ **1 failed**, und der einzige rote
+> Test ist der neue. **Mutantentabelle neu, 9 Mutanten, alle Zahlen gemessen:** m1 **9** · m2 **3** ·
+> m2b **1** · m3 **9** · m4 **2** · m5 **9** · m6 **8** · m7 **1** · **m8 1** — kein Mutant grün;
+> Basis-Lauf **10 passed**. **Nebenbefund, offen benannt:** das m4-Mutationsziel war nach N1 veraltet
+> (`MUTATION TARGET NOT FOUND`, also **ungemessen**, nicht grün) und wurde auf die neue
+> `except`-Zeile umgehängt — m4 ist erst jetzt wieder eine gültige Messung.
+> **N2 (Signaturreihenfolge), behoben, beide Begründungsbeine geprüft:** V5 schrieb
+> `config: None | dict = None`; jetzt `config: dict | None = None` (`docs_freshness_v5.py`:120),
+> wortgleich mit allen **5** Geschwister-Checks (`docs_freshness.py`:295 und `:579`,
+> `docs_links.py`:555, `docs_wiki.py`:91, `docs_index.py`:180). **RUF036** (=
+> `none-not-at-end-of-union`) **reproduziert:** an der Vor-Fix-Form **1 error**, an der Nach-Fix-Form
+> **All checks passed** — die Regel-Begründung des Reviews trägt also **ebenso** wie die
+> Geschwister-Konsistenz. Rein kosmetisch: der Test prüft Namen und Default, nicht die Annotation.
+> **Verifikation, alle Läufe mit umgeleiteter Ausgabe gemessen (Stand Fix-Runde 2):** `pytest
+> tests/test_doc_freshness_v5.py -q` ⇒ **10 passed**; `pytest tests/test_doc_freshness_v5.py
+> tests/test_doc_freshness.py -q` ⇒ **35 passed**; `pytest tests/test_doc_facts.py -q` ⇒ **126
+> passed**; `compileall -q scripts/lib` ⇒ **Exit 0**; ruff **Defaults 0** und
+> `--select I,UP,E,F,W` **0** über beide Dateien; `docs_freshness.py` **592 Z**, sha256
+> **identisch** (`3184e222…b31d`), **byte-identisch**; `wc -l` ⇒ `docs_freshness_v5.py` **144 Z**
+> (**< 600** ✓, +18 gegenüber Fix-Runde 1 = N1-Docstring + Import), `tests/test_doc_freshness_v5.py`
+> **442 Z**. **V5 weiterhin nicht registriert:** `consistency-check.py` **0** Treffer,
+> `docs.__all__` **25** Einträge ohne den Namen, `--json` ⇒ **0** V5-Findings. **Write-Menge:**
+> `doc_facts.py` (W1-3), `docs_freshness.py`, `docs.py`, `consistency-check.py`,
+> `test_doc_facts.py`, `test_doc_freshness.py` **unberührt**; `docs.py` und `doc_facts.py` nur
+> gelesen. **N3 und N4 bewusst nicht angefasst** und als offene Punkte an den Reviewer: **N3** die
+> Message-Formatkopplung in `_roles()` (6 von 9 Tests) und **N4** die globale Severity-Regel
+> gegenüber dem per-Rolle-Suggestion-Text (spec-konform, gehört an den Spec-Owner).
 
 ### W2-5: V6 `check_docs_facts_fresh` inkl. Sollwert-Vergleich — **Rev. 0.6: `docs_freshness.py`, PG-2a**
 
