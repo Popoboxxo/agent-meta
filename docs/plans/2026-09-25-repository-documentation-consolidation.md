@@ -4885,12 +4885,12 @@ nicht synchron sind** — das ist eine **eigene**, von V1 unabhängige Aussage.
 **Verifikation:** `python3 -m pytest tests/test_doc_renderer.py -q` → **0**;
 `grep -n 'checks.strict' .meta-config/project.yaml` → **0**.
 **Steps:**
-- [ ] 1: Test schreiben (fail).
-- [ ] 2: Stage-Funktion unmittelbar nach `scaffold_spec_plan_dirs` einhängen; `checks.strict: true`.
-- [ ] 3: Tests grün beobachten; `--validate` im Intervall als erwartet rot markieren
+- [x] 1: Test schreiben (fail).
+- [x] 2: Stage-Funktion unmittelbar nach `scaffold_spec_plan_dirs` einhängen; `checks.strict: true`.
+- [x] 3: Tests grün beobachten; `--validate` im Intervall als erwartet rot markieren
       (`W-VALIDATE-ROT`: planmäßig rot bis **W8-2**; Grundlage Spec §6(b) / §10, Aufzählungspunkt
       `--validate`).
-- [ ] 4: commit via `git`-Agent: `feat: wire docs stage after scaffold and enable strict checks`.
+- [x] 4: commit via `git`-Agent: `feat: wire docs stage after scaffold and enable strict checks`.
 
 ### W3-5: Drift-Store für Doku-Dateien
 

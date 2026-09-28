@@ -397,3 +397,5 @@ repo_containment:
     cleanup: manual
 docs-consolidation:
   enabled: true
+  checks:
+    strict: true

@@ -2879,3 +2879,272 @@ def test_skeleton_guard_probe_is_write_free():
     called = _called_names(node)
     assert not (called & forbidden), sorted(called & forbidden)
     assert isinstance(spec_plan_scaffold.is_file_index_skeleton(""), bool)
+
+
+# ——— W3-4 / AC-22 / IC-12: the wired stage and the order it has to keep ———
+
+_PIPELINE_PATH = _REPO_ROOT / "scripts" / "lib" / "sync_pipeline.py"
+_CLI_COMMANDS_PATH = _REPO_ROOT / "scripts" / "lib" / "cli_commands.py"
+
+_DOCS_STAGE = "_sync_stage_docs_consolidation"
+_SCAFFOLD_CALLEE = "scaffold_spec_plan_dirs"
+_HASH_CAPTURE_STAGE = "_sync_stage_generated_file_hash_capture"
+_ALLOWLIST_STAGE = "_sync_stage_auto_commit_allowlist"
+_DRIFT_SCAN_STAGE = "_sync_stage_generated_file_drift_scan"
+_KNOWLEDGE_STAGE = "_sync_stage_knowledge_and_isolation"
+
+
+def _pipeline_module():
+    """``lib.sync_pipeline`` under its production ``lib.*`` name.
+
+    The module imports its siblings absolutely (``from lib.x import ...``), so
+    it is importable only with ``scripts/`` on ``sys.path`` — and it has to be
+    imported under *that* name, because the object the tests below rebind is
+    the module the stage body resolves its globals in. Importing it as
+    ``scripts.lib.sync_pipeline`` instead would leave ``lib.sync_pipeline``'s
+    globals untouched and every ``monkeypatch.setattr`` would silently patch a
+    module nobody calls.
+    """
+    import sys as _sys
+
+    scripts_dir = str(_REPO_ROOT / "scripts")
+    if scripts_dir not in _sys.path:
+        _sys.path.insert(0, scripts_dir)
+    import lib.sync_pipeline as pipeline
+
+    return pipeline
+
+
+def _top_level_function_node(path: Path, name: str) -> ast.FunctionDef:
+    """The top-level ``def <name>(...)`` of *path*.
+
+    A second reader rather than a parameterised :func:`_function_node`: that
+    one is bound to ``doc_renderer``'s single module, and the pipeline module
+    and its caller are two *other* files whose defs this test has to read.
+    """
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef) and node.name == name:
+            return node
+    raise AssertionError(f"{path.name} has no function {name!r}")
+
+
+def _named_docs_root(tmp_path: Path, name: str) -> Path:
+    """``_docs_root`` for a *named* sub-project, so one test can hold two trees."""
+    (tmp_path / name).mkdir(parents=True)
+    return _docs_root(tmp_path / name)
+
+
+def _call_names_in_source_order(node: ast.AST) -> list[str]:
+    """Callee names of every ``Call`` under *node*, in source order.
+
+    Source order is the property the ordering claim is about, so the calls are
+    sorted by position rather than taken in ``ast.walk``'s breadth-first
+    order. Both a bare call and an attribute call contribute their final name;
+    a call inside a lambda or a comprehension cannot be a pipeline *stage*
+    call, so nothing is filtered out and the assertions below stay honest about
+    what they matched.
+    """
+    calls = [child for child in ast.walk(node) if isinstance(child, ast.Call)]
+    calls.sort(key=lambda call: (call.lineno, call.col_offset))
+    names: list[str] = []
+    for call in calls:
+        func = call.func
+        if isinstance(func, ast.Name):
+            names.append(func.id)
+        elif isinstance(func, ast.Attribute):
+            names.append(func.attr)
+    return names
+
+
+def _run_knowledge_stage(pipeline, root: Path, config: dict, monkeypatch) -> list[str]:
+    """Run ``_sync_stage_knowledge_and_isolation`` for real and return the call order.
+
+    Only the two collaborators that are *not* under test are stubbed: the
+    knowledge engine (it seeds a whole wiki tree and has nothing to do with this
+    ordering) and provider isolation (it runs after the docs stage and would
+    only add noise). ``scaffold_spec_plan_dirs`` and ``sync_docs_consolidation``
+    stay the production callables — they are the two writers whose order is the
+    claim — and each is wrapped by a recorder that calls through, so the
+    recorded sequence and the bytes on disk come from one and the same run.
+
+    Returns the recorded sequence, e.g. ``["knowledge", "scaffold", "docs"]``.
+    """
+    from types import SimpleNamespace
+
+    calls: list[str] = []
+
+    def _recording(name: str, real):
+        def wrapper(*args, **kwargs):
+            calls.append(name)
+            return real(*args, **kwargs)
+
+        return wrapper
+
+    monkeypatch.setattr(pipeline, "sync_knowledge_engine", lambda *a, **kw: calls.append("knowledge"))
+    monkeypatch.setattr(pipeline, "sync_provider_isolation", lambda *a, **kw: calls.append("isolation"))
+    monkeypatch.setattr(
+        pipeline,
+        _SCAFFOLD_CALLEE,
+        _recording("scaffold", spec_plan_scaffold.scaffold_spec_plan_dirs),
+    )
+    monkeypatch.setattr(
+        pipeline,
+        "sync_docs_consolidation",
+        _recording("docs", doc_renderer.sync_docs_consolidation),
+    )
+
+    args = SimpleNamespace(dry_run=False, check=False)
+    pipeline._sync_stage_knowledge_and_isolation(
+        _REPO_ROOT, root, config, [], {}, args, SyncLog()
+    )
+    return calls
+
+
+def test_stage_order_after_scaffold(tmp_path: Path, monkeypatch):
+    """AC-22/IC-12: docs stage after the scaffold, before hash capture — and it matters.
+
+    Three readings of the same order, because the order is a property of the
+    code and not of one lucky run:
+
+    1. **Source order** — inside ``_sync_stage_knowledge_and_isolation`` the
+       docs stage is called after ``scaffold_spec_plan_dirs``.
+    2. **Pipeline order** — ``_handle_sync`` calls that stage *after* the drift
+       scan and *before* hash capture, which is in turn before the auto-commit
+       allowlist. The docs stage rides inside the knowledge stage, so this half
+       is what completes IC-12's five-element chain.
+    3. **Observed order** — a real run of the stage against a real
+       ``scaffold_spec_plan_dirs``, with the docs writer wrapped by a recorder.
+
+    Half 3 also asserts *whose bytes survive*, and that is the half that makes
+    the ordering load-bearing: in ``file-index`` mode the scaffold writes the
+    ``docs/INDEX.md`` placeholder, so a docs stage running first would have its
+    full index clobbered by that placeholder (B2/R7). A recorder alone would
+    happily report ``["docs", "scaffold"]`` and still look like a passing test.
+    """
+    pipeline = _pipeline_module()
+
+    # (1) source order inside the stage that carries the docs stage.
+    stage_calls = _call_names_in_source_order(
+        _top_level_function_node(_PIPELINE_PATH, _KNOWLEDGE_STAGE)
+    )
+    assert _SCAFFOLD_CALLEE in stage_calls, stage_calls
+    assert _DOCS_STAGE in stage_calls, stage_calls
+    assert stage_calls.index(_DOCS_STAGE) > stage_calls.index(_SCAFFOLD_CALLEE), (
+        f"the docs stage must run AFTER {_SCAFFOLD_CALLEE} (IC-12); got {stage_calls}"
+    )
+
+    # (2) the pipeline chain the stage sits in.
+    handler_calls = _call_names_in_source_order(
+        _top_level_function_node(_CLI_COMMANDS_PATH, "_handle_sync")
+    )
+    for stage in (
+        _DRIFT_SCAN_STAGE,
+        _KNOWLEDGE_STAGE,
+        _HASH_CAPTURE_STAGE,
+        _ALLOWLIST_STAGE,
+    ):
+        assert stage in handler_calls, (stage, handler_calls)
+    assert handler_calls.index(_DRIFT_SCAN_STAGE) < handler_calls.index(_KNOWLEDGE_STAGE)
+    assert handler_calls.index(_KNOWLEDGE_STAGE) < handler_calls.index(_HASH_CAPTURE_STAGE)
+    assert handler_calls.index(_HASH_CAPTURE_STAGE) < handler_calls.index(_ALLOWLIST_STAGE)
+
+    # (3) observed order + the bytes it decides.
+    root = _named_docs_root(tmp_path, "file-index-mode")
+    _page(root, "specs/one.md", description="First spec page.")
+    config = {
+        "docs-consolidation": {"enabled": True},
+        "spec-plan-workflow": {"enabled": True},
+        "knowledge-engine": {"enabled": False},
+        "provider-isolation": "disabled",
+    }
+    assert spec_plan_scaffold.resolve_index_mode(config)[0] == "file-index", (
+        "the fixture must actually be in the mode where the two writers compete"
+    )
+
+    calls = _run_knowledge_stage(pipeline, root, config, monkeypatch)
+
+    assert calls == ["knowledge", "scaffold", "docs"], calls
+
+    target = root / doc_index.DOCS_INDEX_RELPATH
+    assert target.is_file(), "the docs stage produced no index at all"
+    final = target.read_text(encoding="utf-8")
+    assert spec_plan_scaffold.is_file_index_skeleton(final) is False, (
+        "the scaffold's placeholder won — the docs stage ran before it (B2)"
+    )
+    assert doc_renderer.DOCS_GENERATOR_ID in final, (
+        "the last writer was not the docs generator"
+    )
+
+    # The stage is fail-off like every other docs consumer (IC-22): with the
+    # block off it touches nothing, so an unconfigured consumer project pays
+    # nothing for the wiring.
+    off_root = _named_docs_root(tmp_path, "disabled")
+    _page(off_root, "specs/one.md", description="First spec page.")
+    off_before = _tree_snapshot(off_root)
+    assert _run_knowledge_stage(
+        pipeline, off_root, {"provider-isolation": "disabled"}, monkeypatch
+    ) == ["knowledge", "scaffold", "docs"]
+    assert _tree_snapshot(off_root) == off_before, "a disabled block wrote something"
+
+
+def test_ke_index_stays_authoritative(tmp_path: Path, monkeypatch):
+    """AC-22 (K5 correction): with KE on, the KE index keeps the path — through the stage.
+
+    Rev. 0.1 of AC-22 asserted the opposite ("the full index wins"), which
+    would have broken scenario 52: with ``knowledge-engine.enabled: true`` and
+    ``index.mode: knowledge-engine``, ``resolve_index_mode()`` does **not**
+    fall through to ``file-index``, the scaffold claims no file either, and the
+    docs stage therefore has nothing to write.
+
+    The discriminator against the sibling test that calls
+    ``sync_docs_consolidation()`` directly is the log: this one drives the
+    **wired** stage, so the ``knowledge-engine index is authoritative`` note can
+    only appear if the pipeline actually reaches the docs stage. Deleting the
+    wiring leaves an empty log and no index — the first half of this assertion
+    fails, the second half alone would not notice.
+    """
+    pipeline = _pipeline_module()
+
+    config = {
+        "docs-consolidation": {"enabled": True},
+        "knowledge-engine": {"enabled": True},
+        "spec-plan-workflow": {"enabled": True, "index": {"mode": "knowledge-engine"}},
+        "provider-isolation": "disabled",
+    }
+    assert (
+        spec_plan_scaffold.resolve_index_mode(config)[0] == "knowledge-engine"
+    ), "the fixture must actually be knowledge-engine authoritative"
+
+    root = _named_docs_root(tmp_path, "ke-authoritative")
+    _page(root, "specs/one.md", description="First spec page.")
+    log = SyncLog()
+
+    calls: list[str] = []
+    real = spec_plan_scaffold.scaffold_spec_plan_dirs
+
+    def _scaffold_then_record(*args, **kwargs):
+        calls.append("scaffold")
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(pipeline, "sync_knowledge_engine", lambda *a, **kw: calls.append("knowledge"))
+    monkeypatch.setattr(pipeline, "sync_provider_isolation", lambda *a, **kw: calls.append("isolation"))
+    monkeypatch.setattr(pipeline, _SCAFFOLD_CALLEE, _scaffold_then_record)
+    from types import SimpleNamespace
+
+    args = SimpleNamespace(dry_run=False, check=False)
+    pipeline._sync_stage_knowledge_and_isolation(
+        _REPO_ROOT, root, config, [], {}, args, log
+    )
+
+    assert calls == ["knowledge", "scaffold"], (
+        calls,
+        "the docs stage must still run; it decides not to write, not to skip itself",
+    )
+    assert not (root / doc_index.DOCS_INDEX_RELPATH).exists(), (
+        "the KE index is authoritative — no docs/INDEX.md may appear"
+    )
+    ke_notes = [line for line in log.infos if doc_renderer.KE_AUTHORITATIVE_REASON in line]
+    assert len(ke_notes) == 1, log.infos
+    assert doc_index.DOCS_INDEX_RELPATH in ke_notes[0], ke_notes[0]
+
