@@ -117,7 +117,33 @@ DOCS_RELPATH: str = "docs"
 DOCS_SUFFIX: str = ".md"
 """Only Markdown pages are indexed; other files under ``docs/`` are not pages."""
 
+DOCS_INDEX_FILENAME: str = "INDEX.md"
+DOCS_INDEX_RELPATH: str = f"{DOCS_RELPATH}/{DOCS_INDEX_FILENAME}"
+"""Project-relative location of the generated tree index.
+
+**Composed, never spelled twice.** A literal ``"docs/INDEX.md"`` in a second
+module is a second copy of the truth, and the two drift the moment the docs
+root or the index file name is renamed — this module exists precisely to be the
+single place that knows documentation-filesystem semantics (see the module
+docstring). Note that ``spec_plan_scaffold.DEFAULT_FALLBACK_INDEX`` carries the
+same default through a *configurable* key (``spec-plan-workflow.index.fallback-index``);
+the scaffold guard that reconciles the two is W3-3 (IC-15).
+"""
+
 _HEADING_PREFIX: str = "# "
+
+
+def has_docs_tree(project_root: Path) -> bool:
+    """True iff ``<project_root>/docs`` exists and is a directory.
+
+    The AC-26 predicate: a consumer project without a documentation tree is
+    **skipped, not seeded**. It therefore never creates anything — a writer that
+    decided to ``mkdir`` here would put an unasked-for directory into a project
+    that deliberately has no docs. It is the same check
+    :func:`build_index_model` degrades on, factored out so the writer and the
+    model cannot answer it differently.
+    """
+    return (Path(project_root) / DOCS_RELPATH).is_dir()
 
 
 def _normalise_description(value: object) -> str:
@@ -167,7 +193,15 @@ def _entry_for(path: Path, relpath: str) -> dict:
     """
     try:
         text = path.read_text(encoding="utf-8")
-    except OSError:
+    except (OSError, UnicodeDecodeError):
+        # An unreadable page is skipped, not fatal — the model still lists it
+        # under its file name, which is honest about the gap without inventing
+        # content. ``UnicodeDecodeError`` subclasses ``ValueError``, not
+        # ``OSError``, and is raised by the read rather than the open, so
+        # catching ``OSError`` alone lets a single latin-1 byte abort the whole
+        # sync: this helper is called on the generated ``docs/INDEX.md`` as an
+        # ordinary page, i.e. before the renderer's own hardened read of that
+        # file is ever reached.
         text = ""
     _, body = split_frontmatter(text)
     return {
@@ -234,7 +268,7 @@ def build_index_model(project_root: Path) -> dict:
     """
     docs_root = Path(project_root) / DOCS_RELPATH
     root = DOCS_RELPATH
-    if not docs_root.is_dir():
+    if not has_docs_tree(project_root):
         return {"root": root, "entries": []}
 
     entries = [

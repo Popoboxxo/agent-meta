@@ -36,11 +36,29 @@ properties of *this module* and W3 will consume it as given: the module is a
 ``config.py`` could not consume it in W3 without a cycle) and it **writes
 nothing** (no ``open``, no ``Path.write_*``, no ``os`` — a renderer that touched
 the filesystem could not be exercised against a tracked file in a dry run).
+
+**W3-1 re-scopes both guards, and says so explicitly.** The writer entry point
+``sync_docs_consolidation`` (IC-13) now lives in ``doc_renderer`` too, so:
+
+* the *rendering* half is still pinned write-free, asserted **per function**
+  rather than per module, and
+* the writer half may reach the disk only through ``write_checked`` — one
+  funnel, so idempotency, the secret scan and ``dry_run`` cannot drift apart,
+  and the import set stays ``config``-free for the same reason as before.
+
+The write contract itself (AC-23 dry run, AC-26 no-``docs``-directory, the
+``unchanged``-without-``write_checked`` idempotency and the IC-13 ownership
+rule) is pinned at the end of this file. The ownership rule is asserted in
+**both** directions: a foreign ``docs/INDEX.md`` survives byte-identical, and
+an index this generator wrote stays updatable — a fail-closed rule that quietly
+froze the index after its first creation would pass the first half and break the
+second.
 """
 
 from __future__ import annotations
 
 import ast
+import inspect
 import json
 import os
 import re
@@ -382,8 +400,39 @@ def test_region_marker_shape_and_spellings():
     assert DOCS_BLOCK_RE.search(upper) is None
 
 
+def _called_names(node: ast.AST) -> set[str]:
+    """Every called name (attribute or bare) inside the AST *node*."""
+    return {
+        child.func.attr
+        for child in ast.walk(node)
+        if isinstance(child, ast.Call) and isinstance(child.func, ast.Attribute)
+    } | {
+        child.func.id
+        for child in ast.walk(node)
+        if isinstance(child, ast.Call) and isinstance(child.func, ast.Name)
+    }
+
+
+def _function_node(name: str) -> ast.FunctionDef:
+    """The module-level ``def`` node of *name* in ``doc_renderer``."""
+    tree = ast.parse(_MODULE_PATH.read_text(encoding="utf-8"))
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef) and node.name == name:
+            return node
+    raise AssertionError(f"doc_renderer has no function {name!r}")
+
+
 def test_renderer_module_is_a_write_free_leaf():
-    """No lib import (no cycle with ``config``), no filesystem access at all."""
+    """The *rendering* API writes nothing; the module still cannot import config.
+
+    W3-1 adds one writer entry point (``sync_docs_consolidation``) to this
+    module, so the W1-7 pin is **re-scoped per function** rather than dropped.
+    The rendering half stays a pure transformer — no ``open``, no
+    ``Path.write_*`` — because a renderer that touched the filesystem could not
+    be exercised against a tracked file in a dry run. The writer half may reach
+    the disk only through ``write_checked``, so idempotency, the secret scan and
+    ``dry_run`` all stay in one funnel.
+    """
     tree = ast.parse(_MODULE_PATH.read_text(encoding="utf-8"))
 
     imported: set[str] = set()
@@ -394,19 +443,30 @@ def test_renderer_module_is_a_write_free_leaf():
             # A TYPE_CHECKING block is not an import-time edge, but a lib import
             # would still be an unwanted dependency of a leaf module.
             imported.add(("." * (node.level or 0)) + (node.module or ""))
-    assert imported <= {"__future__", "re", "typing", "collections.abc"}, imported
+    assert imported <= {
+        "__future__",
+        "re",
+        "typing",
+        "collections.abc",
+        "pathlib",
+        ".io",
+        ".log",
+        ".doc_index",
+    }, imported
+    assert not any("config" in name.split(".")[-1] for name in imported), imported
 
-    called = {
-        node.func.attr
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
-    } | {
-        node.func.id
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-    }
     forbidden = {"open", "write_text", "write_bytes", "mkdir", "remove", "unlink", "rmtree"}
-    assert not (called & forbidden), called & forbidden
+    for name in ("apply_fact_blocks", "render_doc_fact_block", "is_valid_region"):
+        called = _called_names(_function_node(name))
+        assert not (called & forbidden), (name, sorted(called & forbidden))
+
+    # The writer half may read the target, but every mutation funnels through
+    # write_checked — a second write path would be a second idempotency contract.
+    writer_forbidden = (forbidden - {"open"}) | {"rename", "replace", "touch"}
+    writer_calls = _called_names(_function_node("sync_docs_consolidation"))
+    leaked = writer_calls & writer_forbidden
+    assert not leaked, sorted(leaked)
+    assert "write_checked" in writer_calls, "every mutation must use write_checked"
 
     # Determinism of the public surface, restated as an import-time fact.
     assert re is not None and doc_renderer.__doc__
@@ -981,14 +1041,16 @@ def _tree_snapshot(root: Path) -> dict:
     }
 
 
-def _assert_consumer_surface_is_write_free(root: Path) -> None:
+def _assert_consumer_surface_is_write_free(root: Path, config: dict) -> None:
     """No docs-consolidation consumer writes anything — observed, not assumed.
 
-    Runs the whole consumer surface that exists today against a throwaway tree
-    and byte-compares the tree afterwards. The generator entry point
-    (``sync_docs_consolidation``) does not exist until W3; when it does, it has
-    to sit behind the same gate, and the structural half of this check below is
-    what keeps that claim honest until then.
+    Runs the whole consumer surface that exists today — including the W3-1
+    generator entry point, now behind the very same gate — against a throwaway
+    tree and byte-compares the tree afterwards. The behavioural half is the
+    claim; the structural half is what keeps it honest: the two *readers*
+    (``doc_facts``, ``doc_index``) must still contain no write call at all, so a
+    future edit cannot smuggle a write past a gate that only silences the
+    writer.
     """
     from scripts.lib import doc_facts  # noqa: F401 — the facts module is consumer surface too
 
@@ -1000,11 +1062,15 @@ def _assert_consumer_surface_is_write_free(root: Path) -> None:
         render_doc_fact_block(region, _FACTS)
     tracked = "<!-- agent-meta:docs-begin FACTS -->\nold\n<!-- agent-meta:docs-end FACTS -->\n"
     apply_fact_blocks(tracked, _FACTS)
+    plan = doc_renderer.sync_docs_consolidation(
+        root, root, config, {}, SyncLog(), dry_run=False
+    )
 
     after = _tree_snapshot(root)
     assert after == before, "a docs-consolidation consumer wrote to the tree: %r" % (
         sorted(set(after) ^ set(before)) or [k for k in before if after[k] != before[k]]
     )
+    assert plan == {"written": [], "unchanged": [], "skipped": []}, plan
 
     forbidden = {
         "open",
@@ -1018,17 +1084,9 @@ def _assert_consumer_surface_is_write_free(root: Path) -> None:
         "touch",
         "write_checked",
     }
-    for module in (doc_facts, doc_index, doc_renderer):
+    for module in (doc_facts, doc_index):
         tree = ast.parse(Path(module.__file__).read_text(encoding="utf-8"))
-        called = {
-            node.func.attr
-            for node in ast.walk(tree)
-            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
-        } | {
-            node.func.id
-            for node in ast.walk(tree)
-            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-        }
+        called = _called_names(tree)
         assert not (called & forbidden), (module.__name__, sorted(called & forbidden))
 
 
@@ -1080,7 +1138,7 @@ def test_disabled_flag_is_noop(tmp_path: Path):
     assert enabled_plan != _NOOP_PLAN
     assert enabled_plan["generator"]["writes"] == ["docs/INDEX.md"]
 
-    _assert_consumer_surface_is_write_free(_tree_dir(tmp_path))
+    _assert_consumer_surface_is_write_free(_tree_dir(tmp_path), loaded)
 
 
 def test_absent_block_is_noop(tmp_path: Path, monkeypatch):
@@ -1148,7 +1206,9 @@ def test_absent_block_is_noop(tmp_path: Path, monkeypatch):
     for candidate in (absent, disabled):
         jsonschema.validate(candidate, schema)
 
-    _assert_consumer_surface_is_write_free(_tree_dir(tmp_path))
+    consumer_tree = _tree_dir(tmp_path)
+    for gated in (absent, disabled):
+        _assert_consumer_surface_is_write_free(consumer_tree, gated)
 
 
 def test_live_project_config_has_no_docs_consolidation_block_yet():
@@ -1177,3 +1237,366 @@ def test_live_project_config_has_no_docs_consolidation_block_yet():
 
     assert _docs_consolidation_plan(live) == _NOOP_PLAN
     assert "docs-consolidation" not in _LIVE_PROJECT_CONFIG.read_text(encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# W3-1 — write, idempotency and dry_run contract (IC-13, AC-23, AC-26)
+# ---------------------------------------------------------------------------
+
+_ENABLED_CONFIG: dict = {"docs-consolidation": {"enabled": True}}
+
+_EMPTY_PLAN: dict = {"written": [], "unchanged": [], "skipped": []}
+
+
+def _run_sync(
+    root: Path, config: dict, *, dry_run: bool = False
+) -> tuple[dict, SyncLog]:
+    """Call the W3-1 writer and return ``(plan, log)``.
+
+    ``agent_meta_root`` is a path that does not exist and the call asserts it
+    stayed that way: this task consumes no file of the *source* checkout, and a
+    test that quietly depended on this repository's state would be a worse test
+    than one that depends on nothing.
+    """
+    sentinel = root / "no-agent-meta-root"
+    log = SyncLog()
+    plan = doc_renderer.sync_docs_consolidation(
+        sentinel, root, config, {}, log, dry_run=dry_run
+    )
+    assert not sentinel.exists(), "agent_meta_root must stay unread"
+    return plan, log
+
+
+def test_dry_run_no_writes(tmp_path: Path):
+    """AC-23: zero filesystem writes, ``written`` lists the write candidates.
+
+    The second half pins the *log*: a dry run has to report intent, not a
+    write. ``sync.py --dry-run --check`` is a CI gate, so a line tagged
+    ``[CREATE]`` in a dry-run log is a claim that a write happened while the
+    gate is supposed to be proving nothing happened.
+    """
+    root = _docs_root(tmp_path)
+    _page(root, "specs/one.md", description="First spec page.")
+    _page(root, "guides/two.md", description="Second page.")
+    wiki_log = root / "knowledge" / "wiki" / "log.md"
+    wiki_log.parent.mkdir(parents=True)
+    wiki_before = "2026-09-26 09:00 - index - pre-existing\n"
+    wiki_log.write_text(wiki_before, encoding="utf-8")
+
+    before = _tree_snapshot(root)
+    plan, log = _run_sync(root, _ENABLED_CONFIG, dry_run=True)
+
+    assert _tree_snapshot(root) == before, "dry_run must not touch the tree at all"
+    assert wiki_log.read_text(encoding="utf-8") == wiki_before
+    assert not (root / "docs" / "INDEX.md").exists(), "dry_run creates nothing"
+    assert plan == {
+        "written": [doc_index.DOCS_INDEX_RELPATH],
+        "unchanged": [],
+        "skipped": [],
+    }, plan
+
+    index_actions = [line for line in log.actions if doc_index.DOCS_INDEX_RELPATH in line]
+    assert len(index_actions) == 1, log.actions
+    # Compare the whole tag field rather than a substring. ``SyncLog.action``
+    # pads the tag to width 8, so a real write reads ``[CREATE  ]`` — a plain
+    # ``"[CREATE]" not in line`` would be vacuously true for it — and
+    # ``"WOULD-CREATE"`` *contains* ``"CREATE"``, so containment would be
+    # vacuously satisfied by a real write too. Both failure modes avoided by
+    # comparing the delimited field and normalising the padding.
+    tag_field = index_actions[0].split("]")[0] + "]"
+    assert tag_field == "[WOULD-CREATE]", index_actions
+    assert tag_field.strip("[] ") not in ("CREATE", "UPDATE"), index_actions
+
+
+def test_no_docs_dir_is_skipped_not_created(tmp_path: Path):
+    """AC-26: a consumer project without ``docs/`` is skipped, never seeded."""
+    root = tmp_path / "foreign-project"
+    root.mkdir()
+
+    for dry_run in (False, True):
+        log = SyncLog()
+        before = _tree_snapshot(root)
+        plan = doc_renderer.sync_docs_consolidation(
+            root / "no-agent-meta-root", root, _ENABLED_CONFIG, {}, log, dry_run=dry_run
+        )
+
+        assert not list(root.iterdir()), "no mkdir in a foreign project"
+        assert _tree_snapshot(root) == before
+        assert plan == {
+            "written": [],
+            "unchanged": [],
+            "skipped": [doc_index.DOCS_INDEX_RELPATH],
+        }, plan
+        assert len(log.infos) == 1, log.infos
+        assert doc_index.DOCS_INDEX_RELPATH in log.infos[0]
+        assert doc_renderer.NO_DOCS_TREE_REASON in log.infos[0]
+        assert log.actions == []
+
+
+def test_identical_content_is_unchanged_without_write_checked(
+    tmp_path: Path, monkeypatch
+):
+    """Zielinhalt == Istinhalt ⇒ ``unchanged``, and ``write_checked`` is not reached.
+
+    The second run is the only proof of idempotency that survives a refactor:
+    "the file has the right content" is also true right after a write, so the
+    spy is what distinguishes "compared and found no change" from "wrote again".
+    """
+    root = _docs_root(tmp_path)
+    _page(root, "specs/one.md", description="First spec page.")
+
+    first, first_log = _run_sync(root, _ENABLED_CONFIG)
+    assert first == {
+        "written": [doc_index.DOCS_INDEX_RELPATH],
+        "unchanged": [],
+        "skipped": [],
+    }, first
+    assert len(first_log.actions) == 1 and "CREATE" in first_log.actions[0]
+
+    seen: list[Path] = []
+    real_write_checked = doc_renderer.write_checked
+
+    def _spy(path, *args, **kwargs):
+        seen.append(Path(path))
+        return real_write_checked(path, *args, **kwargs)
+
+    monkeypatch.setattr(doc_renderer, "write_checked", _spy)
+    before = _tree_snapshot(root)
+    second, second_log = _run_sync(root, _ENABLED_CONFIG)
+
+    assert seen == [], "an unchanged target must not reach write_checked"
+    assert second == {
+        "written": [],
+        "unchanged": [doc_index.DOCS_INDEX_RELPATH],
+        "skipped": [],
+    }, second
+    assert _tree_snapshot(root) == before
+    assert second_log.actions == []
+
+
+def test_ownership_rule_never_overwrites_a_foreign_index(tmp_path: Path):
+    """IC-13: a file another writer legitimately produced is never overwritten."""
+    root = _docs_root(tmp_path)
+    _page(root, "specs/one.md", description="First spec page.")
+    foreign = "# Index\n\nHand-written index, kept by a maintainer.\n"
+    target = root / "docs" / "INDEX.md"
+    target.write_text(foreign, encoding="utf-8")
+
+    plan, log = _run_sync(root, _ENABLED_CONFIG)
+
+    assert target.read_text(encoding="utf-8") == foreign, "a foreign index must survive"
+    assert plan == {
+        "written": [],
+        "unchanged": [],
+        "skipped": [doc_index.DOCS_INDEX_RELPATH],
+    }, plan
+    assert len(log.infos) == 1, log.infos
+    assert doc_renderer.OWNERSHIP_REASON in log.infos[0]
+    assert log.actions == []
+
+
+def test_undecodable_index_is_skipped_not_raised(tmp_path: Path, monkeypatch):
+    """A non-UTF-8 target is reported, not crashed on — fail closed on decode too.
+
+    ``UnicodeDecodeError`` subclasses ``ValueError``, **not** ``OSError``, and it
+    is raised by the read rather than the open. With only ``except OSError`` on
+    the renderer's read, a single latin-1 byte in an existing ``docs/INDEX.md``
+    escaped the hardened path and aborted the whole sync — in the one place the
+    comment there promises it cannot. The outcome is the same fail-closed one as
+    a permission error: the file cannot be read, so ownership is unprovable and
+    it is reported instead of overwritten.
+
+    ``build_index_model`` is stubbed so this pins *this* read and not the
+    caller: that helper reads ``docs/INDEX.md`` as an ordinary page before this
+    function ever opens it, and it carries its own decode handling. Stubbing it
+    is the only way to reach the line under test — and the same
+    ``monkeypatch.setattr(doc_renderer, ...)`` seam the idempotency test uses.
+    """
+    root = _docs_root(tmp_path)
+    _page(root, "specs/one.md", description="First spec page.")
+    monkeypatch.setattr(
+        doc_renderer, "build_index_model", lambda _root: {"root": "docs", "entries": []}
+    )
+    target = root / "docs" / "INDEX.md"
+    # 0xE4 is 'a-umlaut' in latin-1 and an invalid UTF-8 lead byte here: it
+    # demands two continuation bytes and gets a newline.
+    undecodable = b"# Index\n\nUmlaut: \xe4\n"
+    target.write_bytes(undecodable)
+    before = _tree_snapshot(root)
+
+    plan, log = _run_sync(root, _ENABLED_CONFIG)
+
+    assert target.read_bytes() == undecodable, "an unreadable index must survive"
+    assert _tree_snapshot(root) == before
+    assert plan == {
+        "written": [],
+        "unchanged": [],
+        "skipped": [doc_index.DOCS_INDEX_RELPATH],
+    }, plan
+    assert len(log.infos) == 1, log.infos
+    assert doc_index.DOCS_INDEX_RELPATH in log.infos[0]
+    assert doc_renderer.UNREADABLE_REASON in log.infos[0]
+    # Pins the path actually taken, not just the shape: a report naming some
+    # other failure would satisfy every assertion above.
+    assert "UnicodeDecodeError" in log.infos[0], log.infos
+    assert log.actions == []
+
+
+def test_undecodable_index_does_not_abort_the_whole_sync(tmp_path: Path):
+    """End-to-end: the whole ``sync_docs_consolidation`` call survives latin-1.
+
+    The sibling test above hardens *one* read by stubbing ``build_index_model``,
+    and that stub is precisely why it went green while the sync still aborted.
+    The real helper treats ``docs/INDEX.md`` as an ordinary page and reads it
+    **first**, through ``doc_index._entry_for``; that read carried the same
+    ``except OSError``-only hole, so a ``UnicodeDecodeError`` escaped before the
+    hardened read was ever reached. The earlier fix had only moved the failure
+    one frame earlier — and a stubbed caller cannot see that, by construction.
+
+    No stub here, on purpose. The claim under test is a property of the *call
+    chain*, so replacing any link of it would exercise a program that no longer
+    exists. Both holes have to be closed for this to pass, which is the point: a
+    green suite has to mean "the sync is safe", not "one line of it is safe".
+    """
+    root = _docs_root(tmp_path)
+    _page(root, "specs/one.md", description="First spec page.")
+    target = root / "docs" / "INDEX.md"
+    undecodable = b"# Index\n\nUmlaut: \xe4\n"
+    target.write_bytes(undecodable)
+    before = _tree_snapshot(root)
+
+    plan, log = _run_sync(root, _ENABLED_CONFIG)
+
+    assert target.read_bytes() == undecodable, "an unreadable index must survive"
+    assert _tree_snapshot(root) == before, "a skipped index must not be rewritten"
+    assert plan == {
+        "written": [],
+        "unchanged": [],
+        "skipped": [doc_index.DOCS_INDEX_RELPATH],
+    }, plan
+    assert len(log.infos) == 1, log.infos
+    assert doc_index.DOCS_INDEX_RELPATH in log.infos[0]
+    assert doc_renderer.UNREADABLE_REASON in log.infos[0]
+    assert "UnicodeDecodeError" in log.infos[0], log.infos
+    assert log.actions == []
+
+
+def test_generator_owned_index_is_updated(tmp_path: Path):
+    """A file this generator wrote stays ours: a changed tree ⇒ UPDATE, not skip.
+
+    Without this the ownership rule would freeze the index after its first
+    creation — a fail-closed rule that quietly stops regenerating is worse than
+    no rule, because it looks like a successful sync.
+    """
+    root = _docs_root(tmp_path)
+    _page(root, "specs/one.md", description="First spec page.")
+    _run_sync(root, _ENABLED_CONFIG)
+    target = root / "docs" / "INDEX.md"
+    first_body = target.read_text(encoding="utf-8")
+    assert doc_renderer.DOCS_GENERATOR_ID in first_body, (
+        "the generator must sign what it writes"
+    )
+
+    _page(root, "specs/two.md", description="Second spec page.")
+    plan, log = _run_sync(root, _ENABLED_CONFIG)
+
+    assert plan == {
+        "written": [doc_index.DOCS_INDEX_RELPATH],
+        "unchanged": [],
+        "skipped": [],
+    }, plan
+    assert len(log.actions) == 1 and "UPDATE" in log.actions[0]
+    body = target.read_text(encoding="utf-8")
+    assert body != first_body
+    assert doc_renderer.DOCS_GENERATOR_ID in body
+    assert not (root / "knowledge").exists(), "a real run leaves the bundle alone"
+
+
+def test_disabled_or_absent_gate_is_a_noop(tmp_path: Path, monkeypatch):
+    """``enabled != true`` ⇒ skip log, zero writes, empty plan (IC-22 absence default).
+
+    Four shapes, one behaviour: a missing block, an empty block, an explicit
+    ``false`` carrying every sub-key that would otherwise produce work, and a
+    block that is not even a mapping. A gate that only handled the third would
+    still be fail-*open* for the two shapes every scenario fixture has.
+
+    The three filesystem entry points are replaced by tripwires, so "no write"
+    is proven as "not even a read": a byte-identical tree snapshot cannot tell
+    a read-only probe from a no-op, and a probe is exactly what an
+    "enabled"-blind writer would leave behind.
+    """
+    root = _docs_root(tmp_path)
+    _page(root, "specs/one.md", description="First spec page.")
+
+    def _unreachable(*args, **kwargs):
+        raise AssertionError("the gate must short-circuit before any filesystem access")
+
+    for name in ("has_docs_tree", "build_index_model", "write_checked"):
+        monkeypatch.setattr(doc_renderer, name, _unreachable)
+
+    for config in (
+        {},
+        {"docs-consolidation": {}},
+        {
+            "docs-consolidation": {
+                "enabled": False,
+                "index-mode": "full",
+                "checks": {"strict": True},
+                "sources": ["README.md"],
+            }
+        },
+        {"docs-consolidation": "not-a-mapping"},
+    ):
+        before = _tree_snapshot(root)
+        plan, log = _run_sync(root, config)
+
+        assert plan == _EMPTY_PLAN, config
+        assert _tree_snapshot(root) == before, config
+        assert len(log.skipped) == 1, (config, log.skipped)
+        assert doc_renderer.LOG_TARGET in log.skipped[0]
+        assert doc_renderer.DISABLED_REASON in log.skipped[0]
+
+
+def test_sync_entry_point_signature_and_result_shape(tmp_path: Path):
+    """IC-13 pins the parameter list; the result is exactly three string lists."""
+    params = list(inspect.signature(doc_renderer.sync_docs_consolidation).parameters)
+    assert params == [
+        "agent_meta_root",
+        "project_root",
+        "config",
+        "provider_config",
+        "log",
+        "dry_run",
+    ], params
+
+    root = _docs_root(tmp_path)
+    plan, _log = _run_sync(root, _ENABLED_CONFIG)
+
+    assert set(plan) == {"written", "unchanged", "skipped"}
+    for bucket in plan.values():
+        assert isinstance(bucket, list)
+        assert all(isinstance(item, str) for item in bucket)
+
+
+def test_docs_index_relpath_is_composed_not_duplicated(tmp_path: Path):
+    """The index path is derived from the docs root, so the two cannot drift."""
+    assert doc_index.DOCS_RELPATH == "docs"
+    assert doc_index.DOCS_INDEX_RELPATH == "docs/INDEX.md"
+    assert doc_index.DOCS_INDEX_RELPATH == (
+        f"{doc_index.DOCS_RELPATH}/{doc_index.DOCS_INDEX_FILENAME}"
+    )
+    assert doc_index.DOCS_INDEX_RELPATH.startswith(f"{doc_index.DOCS_RELPATH}/")
+    assert "docs/INDEX.md" not in _MODULE_PATH.read_text(encoding="utf-8"), (
+        "doc_renderer must not spell the target path itself"
+    )
+
+    with_tree = tmp_path / "with"
+    with_tree.mkdir()
+    _docs_root(with_tree)
+    without_tree = tmp_path / "without"
+    without_tree.mkdir()
+
+    assert doc_index.has_docs_tree(with_tree) is True
+    assert doc_index.has_docs_tree(without_tree) is False
+    assert not (without_tree / "docs").exists(), "the predicate creates nothing"
+

@@ -4801,10 +4801,10 @@ Schreibzugriff. Besitzregel: der Generator überschreibt **nie** eine Datei, die
 legitim geschrieben hat.
 **Verifikation:** `python3 -m pytest tests/test_doc_renderer.py -q` → **0**.
 **Steps:**
-- [ ] 1: Tests schreiben (fail).
-- [ ] 2: `sync_docs_consolidation` mit Besitzregel und `dry_run`-Pfad implementieren.
-- [ ] 3: Tests grün beobachten.
-- [ ] 4: commit via `git`-Agent: `feat: add docs consolidation writer contract`.
+- [x] 1: Tests schreiben (fail).
+- [x] 2: `sync_docs_consolidation` mit Besitzregel und `dry_run`-Pfad implementieren.
+- [x] 3: Tests grün beobachten.
+- [x] 4: commit via `git`-Agent: `feat: add docs consolidation writer contract`.
 
 ### W3-2: `docs/INDEX.md`-Volltext, Fact-Hash-Footer, Volatile-Sektion
 
