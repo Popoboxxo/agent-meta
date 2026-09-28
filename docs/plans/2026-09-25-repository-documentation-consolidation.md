@@ -2956,6 +2956,16 @@ W2-6.
 > Write-Menge **fälschen**; die Notiz ist deshalb umformuliert, nicht der Pin. **Vakuum-Stelle an der
 > Assertion kenntlich gemacht** (`sum(... dependencies) == 0`): sie ist eine Kanone, kein Beweis —
 > der tragende Nachweis bleibt `test_wave_header_dep_tokens_yield_wave_ids_only`.
+> **Faktenkorrektur zum Tripwire (nachträglich gemessen):** der oben genannte Wert **17** war
+> **nie** der Ist-Wert. Der Pin wurde in **`3d8499ca`** **geboren rot** eingeführt — gegen Plan
+> **und** Baum dieses Commits misst er **13**, gegen den heutigen Baum **18**. Dieselbe
+> Planfassung liefert je nach Baum verschiedene Zahlen, weil `check_file_overlap` die hier
+> durchweg leeren Write-Sets aus den **Task-Titeln** bildet und sie um die Import-/Doc-Referenz-
+> Kanten des Working Tree **weitet**; der Zähler hängt also an Plan- **und** Doku-Satz, nicht an
+> einer Regel dieses Repos. Der Pin wurde in dieser Task **gepflegt, nicht abgeschwächt**:
+> Ist-Wert **18**, exakt `==`, ohne `>=`/`<=`, ohne Weglassen, ohne `xfail`. **Pflegepflicht:**
+> verschiebt sich die Zahl, ist neu zu messen, die Ursache zu benennen und das Literal
+> nachzuziehen — Sichtbarkeitsgarantie, kein semantischer Vertrag.
 > **Verifikation:** fokussierte Suite **58 passed**, Exit **0**; `python3 -m compileall -q
 > scripts/lib` → **0**; `ruff check --select I,UP,E,F,W` über die drei Dateien **14** Findings
 > (**9** `plan_ledger.py` / **3** `plan_identity.py` / **2** `spec_plan.py`) wie in der HEAD-Baseline,

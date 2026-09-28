@@ -507,17 +507,28 @@ def test_validate_plan_reaches_the_expected_overlap_verdict():
     assert graph_errors == [], "plan graph must be acyclic and fully resolvable"
     assert errors, "the hard-overlap rest finding is expected for this plan"
     assert all(error.startswith("file overlap between ") for error in errors)
-    # PROVISIONAL TRIPWIRE (review m5): 17 is not a semantic constant. Every
-    # task in this plan has an empty write set (``files_touched == ()``, see the
-    # assertion below), so ``check_file_overlap`` falls back to the file names
-    # mentioned in the task *titles*. Any plan edit that adds a task, renames a
-    # header or mentions another path moves this number without changing a line
-    # of code here -- that is the intent: the pin must trip so a reviewer looks
-    # again. Do not weaken it, and do not read a change as a regression before
-    # checking whether the plan text moved.
-    assert len(errors) == 17, (
-        "the number of hard-overlap findings for this plan changed -- expected "
-        f"17, got {len(errors)}: {errors}"
+    # TRIPWIRE with a maintained pin -- MAINTENANCE DUTY: when this literal
+    # moves, do NOT relax the assert (no ``>=``, no ``<=``, no skip, no xfail,
+    # no narrowed ``-k``). Re-measure with ``check_plan_file_overlap``, name the
+    # cause, then update the literal and record it. The pin is born-red history
+    # is documented in the plan note of W2-9.
+    #
+    # WHY 18 IS NOT A SEMANTIC CONSTANT: every task in this plan has an empty
+    # write set (``files_touched == ()``, see the assertion below), because
+    # ``_FILES_FIELD_RE`` demands "Modify:"/"Create:" WITH a colon while this
+    # plan writes the field without one. ``check_file_overlap`` therefore builds
+    # its write sets from the file names mentioned in the task *titles*, widened
+    # by the import/doc-reference edges of the working tree. So the count
+    # tracks plan wording and doc-file content -- not a rule this repo defines.
+    # That is the point: the pin must trip so a reviewer looks again.
+    assert len(errors) == 18, (
+        "TRIPWIRE tripped: the hard-overlap finding count for this plan moved -- "
+        f"expected 18, got {len(errors)}. This number is derived from the plan "
+        "task titles and the working tree's import/doc-reference edges, NOT from "
+        "the write sets (every one is empty here) and NOT from a semantic "
+        "constant. Maintenance duty: re-measure, confirm what moved, then update "
+        f"this literal to {len(errors)} -- never weaken the assert. "
+        f"Findings: {errors}"
     )
 
     # The plan names scripts/lib/consistency/docs.py (W2-1/W2-2/W2-0/W2-7) as
