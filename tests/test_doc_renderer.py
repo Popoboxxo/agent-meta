@@ -422,6 +422,119 @@ def _function_node(name: str) -> ast.FunctionDef:
     raise AssertionError(f"doc_renderer has no function {name!r}")
 
 
+_FUNCTION_NODES: tuple[type[ast.AST], ...] = (ast.FunctionDef, ast.AsyncFunctionDef)
+"""Both function-def node classes — ``AsyncFunctionDef`` must be named.
+
+``ast.AsyncFunctionDef`` is a **sibling** of ``ast.FunctionDef``, not a subclass
+(verified against the stdlib grammar), so an enumeration that names only the
+sync class is not "almost complete": it is blind. An ``async def`` that calls
+``write_text`` is a writer, and before this tuple named both classes such a
+function was simply absent from the guard's input — invisible rather than
+reported, which is the one failure mode a guard must not have. Every AST
+enumeration of functions in this file goes through :func:`_functions_by_name`.
+"""
+
+
+def _functions_by_name(tree: ast.AST) -> dict[str, ast.AST]:
+    """Every function def below *tree*, keyed by name (see :data:`_FUNCTION_NODES`)."""
+    return {
+        node.name: node for node in ast.walk(tree) if isinstance(node, _FUNCTION_NODES)
+    }
+
+
+def _leaks_disk(
+    functions: dict[str, ast.AST], forbidden: set[str]
+) -> dict[str, list[str]]:
+    """Every function in *functions* that calls a *forbidden* name, with the calls.
+
+    The **shared core** of both the real guard and the W3-1 differential. It
+    deliberately applies no allowlist and no writer exemption of its own: which
+    names are *exempt* is the whole point on which the two guard shapes disagree,
+    so the caller states it and the predicate stays neutral. That is what makes
+    the differential in :func:`test_module_level_write_free_guard_is_inverted` a
+    comparison rather than a restatement — when the differential ran its own copy
+    of the comprehension, mutating the real guard's shape (dropping a name from
+    ``forbidden``, or reverting to an allowlist of write-free names) left the
+    differential green.
+    """
+    return {
+        name: sorted(_called_names(node) & forbidden)
+        for name, node in functions.items()
+        if _called_names(node) & forbidden
+    }
+
+
+def _write_free_offenders(
+    functions: dict[str, ast.AST],
+    writers: frozenset[str] | set[str],
+    forbidden: set[str],
+) -> dict[str, list[str]]:
+    """The F-A guard: :func:`_leaks_disk` minus the declared writer set."""
+    return {
+        name: calls
+        for name, calls in _leaks_disk(functions, forbidden).items()
+        if name not in writers
+    }
+
+
+
+def _fold_string(node: ast.AST) -> str | None:
+    """Constant-fold *node* to a string, or ``None`` when it is not constant.
+
+    Folding is what makes the literal probe able to see a path that is assembled
+    at import time. ``"docs" + "/" + "INDEX.md"`` is three literals, none of
+    which is the path, so a scan over ``ast.Constant`` alone reports a clean
+    module for exactly the drift the scan exists to catch — that is the second
+    half of the W3-1 finding, and this is its fix. A ``JoinedStr`` counts only
+    when every part is a constant, so a real format string is not a path.
+    """
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        left, right = _fold_string(node.left), _fold_string(node.right)
+        return None if left is None or right is None else left + right
+    if isinstance(node, ast.JoinedStr):
+        parts: list[str] = []
+        for value in node.values:
+            if not (isinstance(value, ast.Constant) and isinstance(value.value, str)):
+                return None
+            parts.append(value.value)
+        return "".join(parts)
+    return None
+
+
+def _literal_strings(tree: ast.AST) -> list[str]:
+    """Every constant-folded string in *tree* that is **code**, not prose.
+
+    A docstring is an ``ast.Constant`` like any other, so a naive literal scan
+    cannot tell "this module spells the path" from "this module explains which
+    path it produces". Only a bare ``Expr``-statement string is treated as prose
+    here; every other string constant is reported, which is the strict direction
+    to err in.
+    """
+    prose: set[int] = set()
+    for node in ast.walk(tree):
+        if not isinstance(
+            node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
+        ):
+            continue
+        for statement in node.body or ():
+            if (
+                isinstance(statement, ast.Expr)
+                and isinstance(statement.value, ast.Constant)
+                and isinstance(statement.value.value, str)
+            ):
+                prose.add(id(statement.value))
+    folded = []
+    for node in ast.walk(tree):
+        if id(node) in prose:
+            continue
+        value = _fold_string(node)
+        if value is not None:
+            folded.append(value)
+    return folded
+
+
 def test_renderer_module_is_a_write_free_leaf():
     """The *rendering* API writes nothing; the module still cannot import config.
 
@@ -432,6 +545,12 @@ def test_renderer_module_is_a_write_free_leaf():
     be exercised against a tracked file in a dry run. The writer half may reach
     the disk only through ``write_checked``, so idempotency, the secret scan and
     ``dry_run`` all stay in one funnel.
+
+    W3-2 widens the import set exactly once, for ``.doc_facts``: the IC-10
+    document needs the volatile-fact set and the fact computation, and a second
+    copy of either in this module would be a second copy of the truth. The
+    ``config`` prohibition is what the set exists to protect and is unchanged —
+    ``doc_facts`` imports no ``config`` either, so the IC-11 bridge is intact.
     """
     tree = ast.parse(_MODULE_PATH.read_text(encoding="utf-8"))
 
@@ -445,6 +564,7 @@ def test_renderer_module_is_a_write_free_leaf():
             imported.add(("." * (node.level or 0)) + (node.module or ""))
     assert imported <= {
         "__future__",
+        "hashlib",
         "re",
         "typing",
         "collections.abc",
@@ -452,6 +572,7 @@ def test_renderer_module_is_a_write_free_leaf():
         ".io",
         ".log",
         ".doc_index",
+        ".doc_facts",
     }, imported
     assert not any("config" in name.split(".")[-1] for name in imported), imported
 
@@ -1579,16 +1700,34 @@ def test_sync_entry_point_signature_and_result_shape(tmp_path: Path):
 
 
 def test_docs_index_relpath_is_composed_not_duplicated(tmp_path: Path):
-    """The index path is derived from the docs root, so the two cannot drift."""
+    """The index path is derived from the docs root, so the two cannot drift.
+
+    **The "not duplicated" half is a composed-constant pin, not a source scan.**
+    W3-1 asserted ``"docs/INDEX.md" not in _MODULE_PATH.read_text()``, which
+    fails on both counts at once: it fires on a mere *mention* in a docstring —
+    prose about the document is not a second copy of the truth, and W3-2's
+    renderer docstrings have to be able to name the file they produce — while
+    missing real drift assembled at runtime as ``"docs" + "/" + "INDEX.md"``,
+    which is precisely the kind of second copy the pin exists to catch. The
+    literal-level probe now lives in
+    :func:`test_index_path_is_not_spelled_as_a_literal`; what is pinned *here*
+    is the composition itself.
+    """
     assert doc_index.DOCS_RELPATH == "docs"
     assert doc_index.DOCS_INDEX_RELPATH == "docs/INDEX.md"
     assert doc_index.DOCS_INDEX_RELPATH == (
         f"{doc_index.DOCS_RELPATH}/{doc_index.DOCS_INDEX_FILENAME}"
     )
     assert doc_index.DOCS_INDEX_RELPATH.startswith(f"{doc_index.DOCS_RELPATH}/")
-    assert "docs/INDEX.md" not in _MODULE_PATH.read_text(encoding="utf-8"), (
-        "doc_renderer must not spell the target path itself"
-    )
+
+    # The renderer reaches the target through the constant, not through a path
+    # of its own: observed, not asserted from the source text.
+    root = _docs_root(tmp_path)
+    _page(root, "specs/one.md", description="First spec page.")
+    plan, _log = _run_sync(root, _ENABLED_CONFIG)
+    assert plan["written"] == [doc_index.DOCS_INDEX_RELPATH], plan
+    assert (root / doc_index.DOCS_INDEX_RELPATH).is_file()
+    assert not (root / "docs" / "index.md").exists(), "the spelling is case-exact"
 
     with_tree = tmp_path / "with"
     with_tree.mkdir()
@@ -1600,3 +1739,662 @@ def test_docs_index_relpath_is_composed_not_duplicated(tmp_path: Path):
     assert doc_index.has_docs_tree(without_tree) is False
     assert not (without_tree / "docs").exists(), "the predicate creates nothing"
 
+
+# ==========================================================================
+# W3-2 — the full IC-10 document: sections, facts table, volatile section,
+# IC-14 footer. The unit under test is `doc_renderer.render_docs_index`,
+# a **pure function** of `(index_model, facts)`.
+# ==========================================================================
+#
+# The contracts that are hard to restore once `docs/INDEX.md` has been written
+# and trusted:
+#
+# * **Determinism (NFA-01/AC-17).** Two renderings of one tree are byte-identical,
+#   and the bytes depend on nothing but the model and the facts — not on dict
+#   iteration order, not on mtime, not on the checkout path.
+# * **The self-exclusion stays in the renderer.** `build_index_model` is a
+#   faithful description of the tree (W1-8's published contract); the *document*
+#   decides what it lists. A model that dropped its own target would change the
+#   content the moment the file was created, and every later run would rewrite it.
+# * **The footer is a hash, not a clock (AC-18).** No timestamp, no absolute
+#   path, no username. A date here would make every sync a diff.
+# * **The hash ignores volatile facts (AC-03).** Track A adds scenarios
+#   continuously; a hash that moved with `DOCS_SCENARIO_COUNT` would rewrite the
+#   footer of every index in the repository for a change that carries no
+#   meaning. The value is still *shown*, in the `docs-volatile` section, so a
+#   scenario landing is a one-line review diff.
+# * **The generator id survives the move into the footer.** `_carries_generator_id`
+#   is a substring probe, so an id that vanished from the render output would
+#   silently freeze every index as permanently `skipped` while the sync log
+#   stays green. Hence a test of its own.
+#
+# Two carried findings from the closed W3-1 review are fixed and pinned here:
+# **F-A** inverts the write-free guard from a three-name allowlist of pure
+# functions to an explicit writer set, and **F-B** replaces a raw-source
+# substring scan with a literal-level probe. Both have their own negative
+# controls, because a guard that cannot be shown to fail is not a guard.
+
+
+def _facts(**overrides: str) -> dict:
+    """A complete, non-degenerate fact dict for the IC-10 facts/volatile split."""
+    base = {
+        "DOCS_VERSION": "1.2.0-beta.2",
+        "DOCS_AGENT_TEMPLATES_COUNT": "80",
+        "DOCS_SCENARIO_COUNT": "63",
+        "DOCS_REPO_FACTS_BLOCK": (
+            "| Fact | Value |\n| --- | --- |\n| DOCS_VERSION | 1.2.0-beta.2 |"
+        ),
+    }
+    base.update(overrides)
+    return base
+
+
+def _rendered(facts: dict | None = None) -> str:
+    """The IC-10 document for the *real* repository tree, rendered pure."""
+    return doc_renderer.render_docs_index(
+        doc_index.build_index_model(_REPO_ROOT), _facts() if facts is None else facts
+    )
+
+
+def _footer_of(text: str) -> str:
+    """The IC-14 footer block of *text* (marker to end of document)."""
+    begin = doc_renderer.FOOTER_BEGIN_MARKER
+    assert text.count(begin) == 1, "exactly one footer marker"
+    return text[text.index(begin) :]
+
+
+def _volatile_section_of(text: str) -> str:
+    """The ``docs-volatile`` region of *text*: heading up to the end marker."""
+    start = text.index(doc_renderer.VOLATILE_HEADING)
+    end = text.index(doc_renderer.VOLATILE_END_MARKER, start) + len(
+        doc_renderer.VOLATILE_END_MARKER
+    )
+    return text[start:end]
+
+
+def _link_targets(text: str) -> list[str]:
+    """Every ``- [title](path) — description`` target in *text*, in order."""
+    return re.findall(
+        r"^- \[[^\]]*\]\(([^)]+)\) — .*$", text, re.MULTILINE
+    )
+
+
+def _kind_headings(text: str) -> list[str]:
+    """The per-kind ``## <kind>`` headings, excluding IC-10's ``## volatile``."""
+    return [
+        kind
+        for kind in re.findall(r"^## (\S+)$", text, re.MULTILINE)
+        if kind != "volatile"
+    ]
+
+
+def test_render_docs_index_signature_is_the_published_one():
+    """IC-07 pins the parameter list; the result is a ``str``, not a path."""
+    params = list(inspect.signature(doc_renderer.render_docs_index).parameters)
+    assert params == ["index_model", "facts"], params
+
+    empty = doc_renderer.render_docs_index({"root": "docs", "entries": []}, _facts())
+    assert isinstance(empty, str)
+    # An empty model is still a valid document — the writer must never be handed
+    # a half-rendered string, and `sync_docs_consolidation` renders unconditionally.
+    assert empty.startswith(doc_renderer.INDEX_TITLE)
+    assert doc_renderer.FOOTER_END_MARKER in empty
+
+
+def test_index_deterministic_and_archive_excluded(tmp_path: Path):
+    """AC-17: byte-identical twice; archives out; no invented description.
+
+    The fixture carries the three ways a page can be *deficient* at once — an
+    ``archive/`` page, a page without frontmatter and a page without an ``# ``
+    heading — because a renderer that degrades gracefully on the happy path can
+    still be wrong on exactly those three.
+    """
+    root = _docs_root(tmp_path)
+    _page(root, "specs/live.md", description="A real declared description.", title="Live")
+    _page(root, "specs/archive/dead.md", description="must not be listed", title="Dead")
+    _write_page(root, "guides/bare.md", "Just prose.\n")
+    _page(root, "guides/no-heading.md", description="A declared description.")
+    _write_page(
+        root, "guides/archived.md", "---\ndescription: d\n---\n# Archived\n"
+    )
+
+    first = doc_renderer.render_docs_index(doc_index.build_index_model(root), _facts())
+    second = doc_renderer.render_docs_index(doc_index.build_index_model(root), _facts())
+
+    assert first == second, "two runs on one tree must be byte-identical"
+    assert first.encode("utf-8") == second.encode("utf-8")
+
+    links = _link_targets(first)
+    assert links == [
+        "guides/archived.md",
+        "guides/bare.md",
+        "guides/no-heading.md",
+        "specs/live.md",
+    ], links
+    assert "specs/archive/dead.md" not in links
+    assert "dead.md" not in first
+
+    # The frontmatter-less page: file name as title, placeholder description,
+    # and nothing invented out of the body text.
+    assert "- [bare](guides/bare.md) — —" in first, first
+    assert "Just prose" not in first
+    # … and a page with a description but no ``# `` heading keeps the
+    # description (its title then falls back to the file name, IC-09).
+    assert "- [Page Title](guides/no-heading.md) — A declared description." in first
+    # … and the index never lists itself, and never spells an absolute path.
+    assert doc_index.DOCS_INDEX_FILENAME not in links
+    assert str(tmp_path) not in first
+
+
+def test_footer_has_no_timestamp():
+    """AC-18: ``facts-hash`` + ``generator``, and no clock at all.
+
+    The regex is applied to the **footer block**, not the whole document: page
+    titles and descriptions are hand-written prose that may legitimately mention
+    a date, and a whole-document scan would then be a test of the corpus rather
+    than of the generator. What must be free of a date is the part the generator
+    writes.
+    """
+    footer = _footer_of(_rendered())
+
+    assert re.search(r"^facts-hash: [0-9a-f]{16}$", footer, re.MULTILINE), footer
+    assert re.search(r"^generator: .+$", footer, re.MULTILINE), footer
+
+    assert not re.search(r"\d{4}-\d{2}-\d{2}", footer), footer
+    assert not re.search(r"\d{2}:\d{2}", footer), footer
+    assert str(_REPO_ROOT) not in footer
+    assert not any(token in footer for token in ("/home/", "/Users/", "C:\\")), footer
+
+    # The marker pair is intact, and the footer is the last thing in the file.
+    assert doc_renderer.FOOTER_END_MARKER in footer
+    assert footer.rstrip().endswith(doc_renderer.FOOTER_END_MARKER), footer
+
+
+def test_facts_hash_is_sha256_over_sorted_non_volatile_facts():
+    """IC-14: the algorithm is the contract, so it is re-derived here.
+
+    Re-deriving in the test is the only version of this assertion that survives
+    a rewrite: a test that called the module's own helper would pass for any
+    helper whatsoever.
+    """
+    import hashlib
+
+    facts = _facts()
+    text = _rendered(facts)
+    found = re.search(r"^facts-hash: ([0-9a-f]{16})$", text, re.MULTILINE)
+    assert found is not None, text
+
+    stable = {
+        name: value for name, value in facts.items() if name != "DOCS_SCENARIO_COUNT"
+    }
+    expected = hashlib.sha256(
+        "\n".join(sorted(f"{name}={value}" for name, value in stable.items())).encode(
+            "utf-8"
+        )
+    ).hexdigest()[:16]
+    assert found.group(1) == expected, (found.group(1), expected)
+
+    # Exactly 16 lowercase hex characters — no more, no less.
+    assert len(found.group(1)) == doc_renderer.FACTS_HASH_CHARS == 16
+    assert found.group(1) == found.group(1).lower()
+    assert doc_renderer.compute_facts_hash(facts) == found.group(1)
+
+
+def test_facts_hash_ignores_volatile_facts_but_shows_them():
+    """AC-03: identical hash, and the differing value is in ``docs-volatile``.
+
+    This is the R1/M7 anti-churn contract. The scenario count changes whenever
+    Track A lands a scenario; if it entered the hash, every such landing would
+    rewrite the footer for no semantic reason. The value is still rendered, so
+    the review diff is one line in a section that says it is volatile.
+    """
+    first = _rendered(_facts(DOCS_SCENARIO_COUNT="63"))
+    second = _rendered(_facts(DOCS_SCENARIO_COUNT="64"))
+
+    hash_of = re.compile(r"^facts-hash: ([0-9a-f]{16})$", re.MULTILINE)
+    assert hash_of.search(first).group(1) == hash_of.search(second).group(1), (
+        "a volatile fact moved the facts-hash"
+    )
+
+    # Everything except the volatile row is byte-identical, so the diff of a
+    # new scenario is exactly one line.
+    differing = [
+        (a, b)
+        for a, b in zip(first.splitlines(), second.splitlines(), strict=True)
+        if a != b
+    ]
+    assert len(differing) == 1, differing
+    assert "63" in differing[0][0] and "64" in differing[0][1], differing
+
+    # The differing value really is in the volatile section …
+    volatile = _volatile_section_of(first)
+    assert "| DOCS_SCENARIO_COUNT | 63 |" in volatile
+    # … which is the **last** section before the footer (IC-10(e)) …
+    assert first.index(doc_renderer.VOLATILE_HEADING) < first.index(
+        doc_renderer.FOOTER_BEGIN_MARKER
+    )
+    assert not first[first.index(doc_renderer.FOOTER_BEGIN_MARKER) :].count(
+        doc_renderer.VOLATILE_HEADING
+    )
+    # … and no non-volatile fact leaks into it.
+    assert "DOCS_VERSION" not in volatile
+
+
+def test_facts_hash_ignores_fact_dict_order():
+    """AC-27 for the index: the same facts in any insertion order hash the same."""
+    facts = _facts()
+    orders = [
+        list(facts),
+        list(reversed(facts)),
+        sorted(facts, key=len, reverse=True),
+        sorted(facts),
+    ]
+    rendered = {
+        doc_renderer.render_docs_index(
+            doc_index.build_index_model(_REPO_ROOT), {key: facts[key] for key in order}
+        )
+        for order in orders
+    }
+    assert len(rendered) == 1, "fact dict order leaked into the rendered bytes"
+
+
+def test_index_lists_every_page_exactly_once():
+    """IC-10 (c): one link per page, the index itself never, archives never."""
+    text = _rendered()
+    model = doc_index.build_index_model(_REPO_ROOT)
+    expected = sorted(
+        entry["path"]
+        for entry in model["entries"]
+        if entry["path"] != doc_index.DOCS_INDEX_FILENAME
+    )
+
+    links = _link_targets(text)
+    assert sorted(links) == expected
+    assert len(links) == len(set(links)), "a page is linked twice"
+    assert doc_index.DOCS_INDEX_FILENAME not in links
+    assert not [
+        link for link in links if doc_index.EXCLUDED_DIR_SEGMENTS.intersection(link.split("/"))
+    ]
+
+    # Every section the model knows is present, in KIND_ORDER, and each link
+    # sits under the heading its own ``kind`` names.
+    headings = re.findall(r"^## (?!volatile)(\S+)$", text, re.MULTILINE)
+    assert headings == [kind for kind in doc_index.KIND_ORDER if kind in headings]
+    for kind in headings:
+        block = text.split(f"## {kind}\n", 1)[1].split("\n## ", 1)[0]
+        for link in _link_targets(block):
+            entry = next(e for e in model["entries"] if e["path"] == link)
+            assert entry["kind"] == kind, (kind, link, entry["kind"])
+
+    # A kind with no pages gets no heading at all — an empty section is noise.
+    for kind in doc_index.KIND_ORDER:
+        if kind not in {e["kind"] for e in model["entries"]}:
+            assert f"## {kind}" not in text, kind
+
+
+def test_empty_kind_gets_no_section(tmp_path: Path):
+    """Adding the first page of a kind is the only thing that may add a heading."""
+    root = _docs_root(tmp_path)
+    _page(root, "guides/one.md", description="d", title="One")
+    before = doc_renderer.render_docs_index(doc_index.build_index_model(root), _facts())
+    assert "## spikes" not in before
+    # Exactly one kind heading (`## guides`); `## volatile` is the IC-10(e)
+    # section and is counted separately.
+    assert _kind_headings(before) == ["guides"], _kind_headings(before)
+
+    _page(root, "spikes/one.md", description="d", title="Spike")
+    after = doc_renderer.render_docs_index(doc_index.build_index_model(root), _facts())
+    assert _kind_headings(after) == ["guides", "spikes"], _kind_headings(after)
+
+
+def test_rendered_index_is_deterministic_on_the_real_tree(
+    tmp_path: Path, monkeypatch
+):
+    """NFA-01 on the real corpus, including a genuinely **relative** root.
+
+    The root-spelling half used to be untestable as written: ``_REPO_ROOT`` is
+    already absolute (``Path(__file__).resolve()``), so comparing it with
+    ``_REPO_ROOT.resolve()`` compared a path with itself and the assertion could
+    not fail no matter what the renderer did. The claim is now made falsifiable
+    the only way it can be — by *actually* chdir-ing somewhere else and handing
+    ``build_index_model`` a relative path, so a root that leaked into the output
+    would show up as a differing document.
+    """
+    first = _rendered()
+    second = _rendered()
+
+    assert first == second
+    assert first.encode("utf-8") == second.encode("utf-8")
+
+    # The checkout location is not an input. Asserted twice: over the model's
+    # produced *entries* (its actual product) and then over the rendered
+    # document. The two roots are a genuinely absolute one and a genuinely
+    # relative one, and they must agree.
+    absolute_model = doc_index.build_index_model(_REPO_ROOT.resolve())
+
+    monkeypatch.chdir(tmp_path)
+    relative_root = Path(os.path.relpath(_REPO_ROOT.resolve(), os.getcwd()))
+    assert not relative_root.is_absolute(), relative_root
+    assert str(relative_root) != str(_REPO_ROOT)
+    assert relative_root.resolve() == _REPO_ROOT, "the relative root must be the real tree"
+    relative_model = doc_index.build_index_model(relative_root)
+
+    assert absolute_model["entries"], "the real corpus must be non-empty, else this is vacuous"
+    assert relative_model["entries"] == absolute_model["entries"]
+    assert relative_model["root"] == absolute_model["root"] == doc_index.DOCS_RELPATH
+
+    via_relative = doc_renderer.render_docs_index(relative_model, _facts())
+    assert via_relative == first, (
+        "the rendered document must not depend on the spelling of the root"
+    )
+
+    # … and a changed fact is: the document is a function of the facts, not a
+    # constant string with a hash bolted on.
+    changed = _rendered(_facts(DOCS_VERSION="9.9.9"))
+    assert changed != first
+    assert re.search(r"^facts-hash: ([0-9a-f]{16})$", changed, re.MULTILINE).group(
+        1
+    ) != re.search(r"^facts-hash: ([0-9a-f]{16})$", first, re.MULTILINE).group(1)
+
+
+def test_rendered_index_carries_the_generator_id(tmp_path: Path):
+    """The ownership anchor must survive the move into the IC-14 footer.
+
+    ``_carries_generator_id`` is a substring probe over the whole document, so
+    this is not cosmetic: if the id ever stopped being rendered, every later run
+    would classify its own index as a foreign file and report it as ``skipped``
+    — permanently, invisibly, with a green sync log. The negative control at the
+    end proves the probe is not vacuously true for *any* text.
+    """
+    text = _rendered()
+
+    assert doc_renderer.DOCS_GENERATOR_ID in text
+    assert doc_renderer.DOCS_GENERATOR_ID in _footer_of(text)
+    assert doc_renderer._carries_generator_id(text) is True
+    assert doc_renderer._carries_generator_id("") is False
+
+    # And the whole loop still works end to end: create, then update in place.
+    root = _docs_root(tmp_path)
+    _page(root, "specs/one.md", description="First spec page.")
+    agent_meta_root = tmp_path / "am-root"
+    config = _ENABLED_CONFIG
+    log = SyncLog()
+    plan = doc_renderer.sync_docs_consolidation(
+        agent_meta_root, root, config, {}, log, dry_run=False
+    )
+    assert plan["written"] == [doc_index.DOCS_INDEX_RELPATH], plan
+    target = root / doc_index.DOCS_INDEX_RELPATH
+    written = target.read_text(encoding="utf-8")
+    assert doc_renderer._carries_generator_id(written) is True
+
+    # The written bytes are exactly what the pure renderer produces for the same
+    # inputs — the writer has no second rendering path, so "what would be
+    # written" and "what was written" cannot diverge.
+    from scripts.lib.doc_facts import compute_doc_facts
+
+    facts = compute_doc_facts(agent_meta_root, config, provider_config={}, log=log)
+    assert written == doc_renderer.render_docs_index(
+        doc_index.build_index_model(root), facts
+    )
+
+    _page(root, "specs/two.md", description="Second spec page.")
+    plan = doc_renderer.sync_docs_consolidation(
+        agent_meta_root, root, config, {}, log, dry_run=False
+    )
+    assert plan["written"] == [doc_index.DOCS_INDEX_RELPATH], plan
+    assert doc_renderer._carries_generator_id(target.read_text(encoding="utf-8")) is True
+
+
+def test_index_survives_a_facts_dict_without_any_key():
+    """A missing fact degrades to a placeholder, it does not raise or blank out."""
+    text = doc_renderer.render_docs_index(doc_index.build_index_model(_REPO_ROOT), {})
+
+    assert text.startswith(doc_renderer.INDEX_TITLE)
+    assert doc_renderer.FOOTER_BEGIN_MARKER in text
+    assert re.search(r"^facts-hash: [0-9a-f]{16}$", text, re.MULTILINE)
+    # The empty-fact placeholder is visible in review rather than a blank row.
+    assert doc_renderer.EMPTY_MARKER_TEMPLATE.format(name="DOCS_REPO_FACTS_BLOCK") in text
+    # No unrendered placeholder leaked, and no ``None`` from a missing key.
+    assert "{{" not in text
+    assert "None" not in text
+
+
+def test_index_footer_generator_id_is_not_duplicated():
+    """The id is rendered from :data:`DOCS_GENERATOR_ID`, not from a second literal.
+
+    A second ``"doc-indexer/1"`` literal would let the footer and the ownership
+    probe drift apart: the probe looks for the constant, the footer would print
+    the copy, and bumping the constant would quietly freeze every index in the
+    repository — with a green log, because a freeze looks exactly like success.
+    The AST scan is what makes the copy visible *before* that happens; the
+    negative control proves the scan is not vacuous.
+    """
+    tree = ast.parse(_MODULE_PATH.read_text(encoding="utf-8"))
+    literals = _literal_strings(tree)
+    offenders = [
+        value
+        for value in literals
+        if doc_renderer.DOCS_GENERATOR_ID in value
+        and value != doc_renderer.DOCS_GENERATOR_ID
+    ]
+    assert offenders == [], offenders
+    assert literals.count(doc_renderer.DOCS_GENERATOR_ID) == 1, (
+        "the id must be spelled exactly once, in the constant"
+    )
+
+    injected = ast.parse(f'OTHER = "prefix {doc_renderer.DOCS_GENERATOR_ID} suffix"\n')
+    assert [
+        value
+        for value in _literal_strings(injected)
+        if doc_renderer.DOCS_GENERATOR_ID in value
+        and value != doc_renderer.DOCS_GENERATOR_ID
+    ], "the scan must see a duplicated id"
+
+
+def test_index_path_is_not_spelled_as_a_literal():
+    """F-B: the target path is derived, never spelled — at the **literal** level.
+
+    W3-1's pin scanned the raw source text, which fails twice over: it fires on
+    a mere mention in a docstring (prose about the document is not a second copy
+    of the truth, and this module's docstrings must be able to name the file they
+    produce), and it misses drift assembled at runtime as
+    ``"docs" + "/" + "INDEX.md"``. An AST probe sees only a string *literal*, so
+    the false positive is gone; the composition check in
+    :func:`test_docs_index_relpath_is_composed_not_duplicated` covers the second
+    half, and the negative control below proves the probe is not vacuous.
+
+    Docstrings are excluded explicitly, because a docstring *is* an
+    ``ast.Constant``. Leaving them in would reintroduce the very false positive
+    this test exists to remove — and it would do so silently, since the only way
+    to find out would be to try writing prose about the document.
+    """
+    tree = ast.parse(_MODULE_PATH.read_text(encoding="utf-8"))
+    literals = _literal_strings(tree)
+    offenders = [value for value in literals if "docs/INDEX" in value]
+    assert offenders == [], offenders
+
+    injected = ast.parse('RELPATH = "docs" + "/" + "INDEX.md"\n')
+    assert [
+        value for value in _literal_strings(injected) if "docs/INDEX" in value
+    ], "the probe must see a spelled path"
+
+    # … and it must NOT fire on prose: a docstring naming the file is fine.
+    prose = ast.parse('"""We generate docs/INDEX.md."""\n')
+    assert not [value for value in _literal_strings(prose) if "docs/INDEX" in value]
+
+
+def test_module_level_write_free_guard_is_inverted():
+    """F-A: every module-level function is write-free except the writer set.
+
+    W3-1's guard listed three function *names* to check write-free. Everything
+    else in the module was unchecked, and the closed review proved the hole is
+    live: a ``write_text`` injected into ``_carries_generator_id`` passed, and
+    the same injection in a future ``render_docs_index`` would have passed too —
+    which is exactly the surface W3-2 adds. The guard is therefore inverted: the
+    default is write-free and the writer is an explicit, asserted exception.
+
+    The differential at the end is **comparative, not decorative**. It runs the
+    shared predicate :func:`_leaks_disk` — the same code that judged the real
+    module above — against the W3-1 allowlist *and* against
+    :data:`doc_renderer.WRITER_FUNCTIONS`, over one injected sample containing
+    one function of each kind, so the two shapes genuinely disagree. The previous
+    version ran one predicate over two names that were in neither set: both sides
+    returned the same list by construction, which is why its "the old allowlist
+    missed it" assertion could never fail. The sample is built so that:
+
+    * ``apply_fact_blocks`` is a name the **old** allowlist listed — the old
+      guard caught it, so the inverted guard must catch it too. This is the
+      discriminating case: it is what fails if the inversion ever became
+      *weaker* than the allowlist it replaced.
+    * ``_carries_generator_id`` is a name the old allowlist never listed — the
+      F-A hole — so the old guard missed it and the inverted guard must catch it.
+    * ``render_docs_index`` writes nothing, so neither shape may flag it: the
+      negative control that keeps "flags everything" from passing as a guard.
+
+    An ``async def`` writing to disk is asserted to be *inside* the guard's input
+    rather than merely absent from it (:data:`_FUNCTION_NODES`) — the same blind
+    spot one class down.
+    """
+    forbidden = {
+        "open",
+        "write_text",
+        "write_bytes",
+        "mkdir",
+        "remove",
+        "unlink",
+        "rmtree",
+        "rename",
+        "replace",
+        "touch",
+    }
+    tree = ast.parse(_MODULE_PATH.read_text(encoding="utf-8"))
+    functions = _functions_by_name(tree)
+
+    assert doc_renderer.WRITER_FUNCTIONS <= set(functions), (
+        "the declared writer set must name real functions"
+    )
+    assert doc_renderer.WRITER_FUNCTIONS == frozenset({"sync_docs_consolidation"}), (
+        "a new writer is a deliberate, visible change — not a default"
+    )
+
+    offenders = _write_free_offenders(functions, doc_renderer.WRITER_FUNCTIONS, forbidden)
+    assert offenders == {}, offenders
+
+    # The guard's *input* must include `async def`. `ast.AsyncFunctionDef` is a
+    # sibling of `ast.FunctionDef`, not a subclass, so an enumeration naming only
+    # the sync class is blind to an async writer rather than reporting it — the
+    # invisible failure mode. The sample below therefore has to be findable AND
+    # have to be a real writer, or the assertion would pass for the wrong reason.
+    async_tree = ast.parse(
+        "async def _hidden_async_writer():\n    Path('y').write_text('z')\n"
+    )
+    async_functions = _functions_by_name(async_tree)
+    assert "_hidden_async_writer" in async_functions, (
+        "an async def must be inside the guard's input, not merely absent from it"
+    )
+    assert _write_free_offenders(async_functions, set(), forbidden) == {
+        "_hidden_async_writer": ["write_text"]
+    }
+
+    # The writer itself may read, but every mutation funnels through
+    # write_checked — one path, so idempotency and the secret scan cannot drift.
+    writer_calls = _called_names(functions["sync_docs_consolidation"])
+    assert "write_checked" in writer_calls
+    assert not (writer_calls & (forbidden - {"open"}))
+    assert "open" in writer_calls, "the writer must still be allowed to read its target"
+
+    # Negative control on the guard's own logic, and a **differential**: one
+    # injected sample, run through the shared predicate under both guard shapes.
+    injected = ast.parse(
+        # a name the old allowlist DID list -> the old guard caught it
+        "def apply_fact_blocks(text):\n"
+        "    Path('y').write_text(text)\n"
+        # a name the old allowlist never listed -> the old guard missed it
+        "def _carries_generator_id(text):\n"
+        "    return Path('y').write_text('z') or ('x' in text)\n"
+        # pure -> neither shape may flag it
+        "def render_docs_index(model, facts):\n"
+        "    return model\n"
+    )
+    injected_functions = _functions_by_name(injected)
+    injected_leaks = _leaks_disk(injected_functions, forbidden)
+    assert sorted(injected_leaks) == ["_carries_generator_id", "apply_fact_blocks"], (
+        "the shared predicate must see both writers and nothing else"
+    )
+
+    # W3-1's guard, kept as the literal it was: a hard-coded list of the function
+    # names that were checked write-free, everything else unchecked. A literal
+    # rather than an import -- the point is to pin the shape the inversion
+    # replaced, and an import would track whatever the module happens to do now.
+    old_allowlist = frozenset(
+        {"apply_fact_blocks", "render_doc_fact_block", "is_valid_region"}
+    )
+    old_caught = sorted(set(injected_leaks) & old_allowlist)
+    old_missed = sorted(set(injected_leaks) - old_allowlist)
+    new_caught = sorted(
+        _write_free_offenders(
+            injected_functions, doc_renderer.WRITER_FUNCTIONS, forbidden
+        )
+    )
+
+    assert old_caught == ["apply_fact_blocks"], (
+        "the old allowlist checked this name, so it must have caught it"
+    )
+    assert old_missed == ["_carries_generator_id"], (
+        "the old allowlist must demonstrably have missed this -- the F-A hole"
+    )
+    assert new_caught == ["_carries_generator_id", "apply_fact_blocks"], (
+        "the inverted guard must catch both what the allowlist checked and what "
+        "it never looked at"
+    )
+    assert set(old_caught) < set(new_caught), (old_caught, new_caught)
+    assert "render_docs_index" not in new_caught, (
+        "a pure function must not be reported -- otherwise the guard flags "
+        "everything and means nothing"
+    )
+
+
+def test_render_docs_index_is_pure(tmp_path: Path):
+    """The renderer half of the inverted guard, asserted on its own function.
+
+    The call-set allowlist is deliberately **not** exhaustive: a new pure helper
+    (``str.split``, ``re.sub``) is covered by default under F-A's inverted guard,
+    and pinning an exact list here would re-introduce the same brittleness one
+    level down. What must hold is that the function reaches no filesystem and no
+    clock — the properties the document's determinism rests on.
+    """
+    called = _called_names(_function_node("render_docs_index"))
+    forbidden = {
+        "open",
+        "write_text",
+        "write_bytes",
+        "mkdir",
+        "unlink",
+        "rmtree",
+        "rename",
+        "replace",
+        "touch",
+        "read_text",
+        "read_bytes",
+        "rglob",
+        "glob",
+        "iterdir",
+        "exists",
+        "stat",
+        "now",
+        "today",
+        "getmtime",
+        "getuser",
+        "expanduser",
+        "getcwd",
+    }
+    assert not (called & forbidden), sorted(called & forbidden)
+
+    # Behavioural half: rendering the same model twice, with the tree under a
+    # different path spelling, yields the same bytes — no path, no clock.
+    root = _docs_root(tmp_path)
+    _page(root, "specs/one.md", description="d", title="One")
+    model = doc_index.build_index_model(root)
+    assert doc_renderer.render_docs_index(model, _facts()) == doc_renderer.render_docs_index(
+        model, _facts()
+    )

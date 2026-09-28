@@ -4820,11 +4820,11 @@ Renderings, die sich **nur** in `DOCS_SCENARIO_COUNT` unterscheiden ⇒ **identi
 jeder `docs/**/*.md`-Pfad (ohne `archive/`, `_archive/`) genau einmal, `docs/INDEX.md` nie.
 **Verifikation:** `python3 -m pytest tests/test_doc_renderer.py -q` → **0**.
 **Steps:**
-- [ ] 1: Tests schreiben (fail).
-- [ ] 2: `render_docs_index` + Hash-Algorithmus implementieren (SHA-256 über sortierte
+- [x] 1: Tests schreiben (fail).
+- [x] 2: `render_docs_index` + Hash-Algorithmus implementieren (SHA-256 über sortierte
       **nicht-volatile** Fakten, 16 Hex-Zeichen, kein Zeitstempel, kein absoluter Pfad).
-- [ ] 3: Tests grün beobachten; Diff-Minimalität stichprobenartig prüfen.
-- [ ] 4: commit via `git`-Agent: `feat: render full docs index with stable fact hash`.
+- [x] 3: Tests grün beobachten; Diff-Minimalität stichprobenartig prüfen.
+- [x] 4: commit via `git`-Agent: `feat: render full docs index with stable fact hash`.
 
 ### W3-3: Scaffold-Guard und Besitzregel
 
