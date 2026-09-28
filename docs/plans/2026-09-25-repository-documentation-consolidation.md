@@ -3220,16 +3220,254 @@ der once-count außerhalb V4** (K60), **nicht** ein `docs.readme_index`-Zählwer
 `wc -l scripts/lib/consistency/docs_index.py scripts/lib/consistency/docs_links.py` → je **< 600**
 (gemessen im Working Tree: **211** bzw. **404**).
 **Steps:**
-- [ ] 1: Tests schreiben (fail) — V2 **und** die **sieben** namentlich zu ersetzenden V4-Tests
+- [x] 1: Tests schreiben (fail) — V2 **und** die **sieben** namentlich zu ersetzenden V4-Tests
       aus der Ersetzungstabelle (R1…R7) **sowie** die drei Erweiterungen (fail-soft, Vorrang,
       Extraktionsregel) aus dieser Akzeptanz.
-- [ ] 2: V2 implementieren; V4 auf den README-Index-Scope umstellen (E-5) inkl. Negativnachweis,
+- [x] 2: V2 implementieren; V4 auf den README-Index-Scope umstellen (E-5) inkl. Negativnachweis,
       Extraktionsregel (7/6-Lesart), Vorrangregel (fail-soft-Guard vor fail-closed-Region-Prüfung)
       und Docstring-Korrektur (K68).
-- [ ] 3: Tests grün beobachten; **Zählwert** `docs.readme_index` am echten Baum beobachten
+- [x] 3: Tests grün beobachten; **Zählwert** `docs.readme_index` am echten Baum beobachten
       (Erwartung **1**); **Nicht-Vakuum-Nachweis** aus der Akzeptanz mitlaufen lassen
       (beide Erfolgskriterien, K33/K61); Szenario-Asserts 50–56 **nicht** anfassen (NG-10).
-- [ ] 4: commit via `git`-Agent: `feat: add V2 index completeness and scope V4 to the README index`.
+- [x] 4: commit via `git`-Agent: `feat: add V2 index completeness and scope V4 to the README index`.
+
+> **LEDGER-Stand 2026-09-28 — W2-6 VOLLSTÄNDIG umgesetzt (Fortschrittsnotiz, keine Änderung der
+> Task-Semantik).** Abgehakt über den **maschinellen Ledger-Writer** (`--update-plan-ledger` gegen
+> diesen Plan, `--task W2-6`): Dry-Run `tasks updated: W2-6`, `checkboxes would toggle: 4`,
+> **Exit 0**, **keine** `unmatched`-Zeile; schreibender Lauf `tasks updated: W2-6`,
+> `checkboxes toggled: 4`, **Exit 0**, **keine** `unmatched`-Zeile. Der Plan-Diff gegen die
+> Vorher-Kopie ist **genau diese 4 Zeilen** (alle vier in `**Steps:**` dieses Blocks, Zeilen
+> 3223–3232); Plan bleibt `status: APPROVED`, `revision: 0.7`, keine ID umnummeriert.
+> **Ehrlich zur Checkbox 4:** sie ist auftragsgemäß mit abgehakt, der **Commit selbst ist nicht
+> erfolgt** — W2-6 lief als **No-Commit**-Task; der Commit ist der Schritt des `git`-Agenten.
+> **E-5-Umstellung von V4, gemessen:** `_v4_in_scope` und `_v4_unlinked_relpaths` (rekursiver
+> Walk, Substring-Test, `archive/`-Ausnahme) sind **ersetzt** durch `_v4_index_region` (`:129`),
+> `_v4_declared_categories` (`:159`), `_v4_declared_heading_categories` (`:187`),
+> `_v4_linked_categories` (`:207`), `_v4_region_finding` (`:228`) und `_v4_category_finding`
+> (`:242`); `check_readme_docs_index` sitzt jetzt bei `:265`. Die Konstanten `V4_PAGE_SUFFIX` und
+> `V4_ARCHIVE_DIRNAMES` sind entfallen (Restbestand im Modul: **0** Treffer), ersetzt durch
+> `V4_INDEX_HEADING`, `V4_CATEGORY_RE`, `V4_CATEGORY_LINK_RE`, `V4_LINK_TARGET_RE` und
+> `V4_REGION_SUGGESTION` (`:366`–`:383`).
+> **Signatur unangetastet (K59):** `inspect.signature` ⇒ `['root']`, **kein** `config`;
+> Check-ID `docs.readme_index`, Severity **ERROR** und `file == README.md` unverändert.
+> **Vorrangregel fail-soft → fail-closed (K65):** fehlt der `docs/`-Baum ⇒ `[]` **zuerst**;
+> existiert `docs/`, gilt fehlt `README.md` **oder** die `Documentation Index`-Überschrift ⇒
+> **genau ein** Finding. Gepinnt von `test_v4_absent_docs_tree_is_fail_soft` (beide Fixtures:
+> einer **mit** Index-Sektion, einer **ohne** README und **ohne** `docs/`) **und**
+> `test_v4_docs_tree_without_index_section_is_one_finding` **sowie**
+> `test_v4_readme_missing_with_docs_tree_is_one_finding`.
+> **Extraktionsregel (K64), gemessen am echten Baum:** Region `README.md:347` bis `:380`
+> (34 Zeilen; die nächste `##`-Überschrift steht bei `:381`), **7** deklarierte Kategorien
+> (`docs/guides/`, `docs/howto/`, `docs/api/`, `docs/ui/`, `docs/architecture/`, `docs/plans/`,
+> `docs/se-cascade/`), davon **6** mit Link. **Nachweis der Link-Gewinnung:** eine rein
+> überschriften-basierte Extraktion liefert **6** und **ohne** `docs/architecture/` — die Kategorie
+> steht ausschließlich im Link `README.md:371` und in **keiner** `###`-Überschrift; gepinnt in
+> `test_v4_declares_seven_categories_including_architecture_from_link_only`.
+> **Negativ- und Nicht-Vakuum-Nachweis (K33), beide Erfolgskriterien:** in **einem**
+> Funktionsrumpf — `test_v4_unlinked_pages_below_a_declared_category_are_not_findings`. Fixture A
+> mit **zwei** nicht verlinkten Seiten (`docs/guides/ungenutzt-a.md`, `docs/guides/ungenutzt-b.md`)
+> unterhalb einer deklarierten **und** verlinkten Kategorie ⇒ `== []`; Fixture B, dieselbe Regel
+> plus eine deklarierte Kategorie **ohne** Link ⇒ **nichtleer**:
+> `_categories(findings) == ["docs/se-cascade/"]`, Severity ERROR, und **weder** `ungenutzt-a.md`
+> **noch** `ungenutzt-b.md` in der Message. **Vakuum-Gegenprobe (Mutanten, gemessen):** ein
+> umgekehrter Guard lässt `test_v4_absent_docs_tree_is_fail_soft` rot (**1** failed); die
+> wiederhergestellte Per-Seiten-Regel lässt **8** Tests rot, darunter den Negativtest; ein
+> dauerhaft stiller Check lässt **9** Tests rot, darunter ebenfalls den Negativtest; die
+> Überschriften-Extraktion (6-Lesart) lässt den Extraktionstest rot (**1** failed). Jeder
+> Akzeptanzpunkt ist damit **nicht vakuum-prüfbar**. Moduldatei im Testmodul als Kommentar mit
+> Abschnittsanker erhalten (R1…R7 ⇒ Ersatztests, K61).
+> **Testmatrix (K61):** R1 `test_v4_keeps_signature_and_severity` ⇒ **getrennt** in
+> `test_v4_signature_is_one_argument_root_only` + `test_v4_declared_category_without_link_is_one_error`;
+> R2 ⇒ `test_v4_declared_category_needs_a_link`; R3 ⇒ `test_v4_declared_category_must_exist` +
+> `test_v4_declared_category_with_link_is_silent`; R4 ⇒
+> `test_v4_archived_pages_are_not_declared_categories`; R5 ⇒
+> `test_v4_reports_each_unrepresented_category_once`; R6 ⇒
+> `test_v4_finding_names_the_category_and_readme`; R7 ⇒
+> `test_real_repo_readme_index_has_exactly_one_unrepresented_category` (beziehungsbasiert: der
+> Sollwert wird aus deklarierten, verlinkten und existierenden Kategorien **abgeleitet**, nicht
+> als Ziffer festgeschrieben). Dazu **3 Erweiterungen/Vervollständigungen**
+> (`test_v4_absent_docs_tree_is_fail_soft` erweitert, zwei Vorrangtests) und **2 neue** Tests
+> (Extraktionsregel, Negativ-/Nicht-Vakuum-Nachweis). Kein Alt-Test wurde adaptiert oder
+> weichgezeichnet — kein `xfail`, kein `-k`-Filter.
+> **Abgang des 191/193-Blockers, gemessen:** die Per-Seiten-Lesart lieferte am echten Baum
+> **193** Findings (bei **207** nicht-Archiv-`docs/**/*.md`, davon **14** mit Substring-Treffer im
+> README) — das ist der als „191/193" bezeichnete Blocker. Nach E-5 liefert `docs.readme_index`
+> **genau 1** Finding: Kategorie `docs/se-cascade/`, deklariert `README.md:378`, ohne Link in der
+> Region; `file == README.md`, Severity **ERROR`, und die Message nennt die **Kategorie**, keinen
+> Seitenpfad. **Follow-up `F-DOCS-README-INDEX-SE-2026-09-27`, Termin 2026-10-11.** Die Forderung
+> nach Verlinkung aller nicht-Archiv-`docs/**.md` ist damit **abgetreten** und **V2s** Zuständigkeit
+> (`docs/INDEX.md`, 100 % generiert) — V2 meldet am echten Baum **207** unindizierte Seiten und ist
+> bis W3-6 planmäßig rot.
+> **Modulgrößen, gemessen (Stand Fix-Runde 1):** `docs_index.py` **211** Z (unverändert),
+> `docs_links.py` **404 → 550 → 599** Z, beide **< 600**; `tests/test_doc_index.py` **413 → 835** Z mit
+> **34** statt **24** Tests (die 600er-Grenze gilt nur für `scripts/lib/`). **Budget gemeldet, nicht
+> verschwiegen:** `docs_links.py` stand nach den vier Fixes zunächst bei **623** Z. Der Überschuss
+> wurde durch **Wortlautstraffung der eigenen Docstrings** abgebaut (inhaltlich vollständig: K68-
+> Umfang, K64-7/6-Begründung, D2-Gegenanforderung, D1, D3, D4, Vorrangregel alle erhalten), nicht
+> durch Weglassen — Endstand **599** Z mit **1** Zeile Reserve.
+> **Docstring-Pflicht (K68) erfüllt:** Modul- und Funktions-Docstring in `docs_links.py` nennen
+> jetzt **was** V4 prüft (deklarierte Kategorien), **was es nicht mehr** prüft (die Verlinkung aller
+> `docs/**.md`) und dass die **Signatur** `(root)` unverändert bleibt; die Vor-E-5-Formulierungen
+> („pre-W2 subset stays a real subset", „the parameter list stays `(root)`") sind entfernt.
+> **Verifikation, alle Läufe gemessen (Stand Fix-Runde 1):** `python3 -m pytest
+> tests/test_doc_index.py -q` ⇒ **34 passed, Exit 0**; `wc -l` ⇒ **211** / **599** (je < 600);
+> `python3 -m pytest tests/test_doc_facts.py -q` ⇒ **126 passed, Exit 0** (V1/V3 ohne Regression);
+> `python3 -m compileall -q scripts/lib` ⇒ **Exit 0**. **V2 weiterhin nicht registriert:**
+> `check_docs_index_completeness` kommt in `consistency-check.py` **nicht** vor, steht **nicht** in
+> `docs.__all__`, und das Attribut existiert am Facade **nicht** ⇒ **0** Findings im `--json`-Report.
+> **Pin geprüft:** `files_touched` für W2-6 ist `()` — auch nach dieser Notiz, weil im Fließtext
+> bewusst **keine** der Doppelpunktform des Datei-Feldes (die N3 aus dem W2-9-Review als Phantom-
+> Write-Menge auslöst) mit einem Pfad steht. **Erster Versuch war rot** und wird hier offen
+> benannt: der wörtliche Hinweis auf jene Form im vorigen Absatz hat das Muster selbst getriggert
+> (`files_touched` ⇒ `('/',)`) und ist deshalb umformuliert, nicht weggelassen.
+> **Szenario-Asserts 50–56 (NG-10) unangetastet**, `docs.py` (Negativregel K46) **nicht** geschrieben.
+> **Volltest-Baseline nur als Zählwert**, kein Kriterium.
+>
+> **LEDGER-Stand 2026-09-28 — Fix-Runde 1 (Review-Iteration 1, Stufe 1 = `ACCEPTED_WITH_DEVIATIONS`,
+> keine Blocker, alle 10 Akzeptanzpunkte erfüllt).** Die **E-5-Umfassung selbst bleibt unangetastet**;
+> behoben sind vier Härtungslücken, alle in `docs_links.py`, jede mit einem Test, der ohne den Fix
+> rot ist. **Zeilenanker NACH der Änderung** (`docs_links.py`, 599 Z): `_v4_index_region` `:128`,
+> `_v4_is_url_path` `:154`, `_v4_declared_categories` `:171`, `_v4_declared_heading_categories` `:195`,
+> `_v4_category_of_target` `:217` (**neu**), `_v4_is_image_target` `:231` (**neu**),
+> `_v4_linked_categories` `:250`, `_v4_region_finding` `:275`, `_v4_category_finding` `:289`,
+> `check_readme_docs_index` `:312`; Konstanten `:405`–`:433` (`V4_REFERENCE_DEF_RE` **neu** `:421`,
+> `V4_TOKEN_BOUNDARIES` **neu** `:417`, `V4_READ_ERRORS` **neu** `:425`). Entfallen: `V4_PAGE_SUFFIX`
+> (tote Konstante nach D3, 0 Restbestand).
+> **Fix-Matrix, alle Zahlen gemessen:** **D1** (Referenzdefinition galt nicht als Link ⇒ falscher
+> ERROR) — `docs_links.py:250`/`_v4_linked_categories` sammelt jetzt **beide** Markdown-Linkformen;
+> Test `test_v4_reference_definition_counts_as_a_link`; **Mutant M-D1** (RefDef-Schleife entfernt) ⇒
+> **1 failed** von 34. **D2** (keine linke Grenze ⇒ `https://x.invalid/docs/spam/a.md` deklarierte
+> Kategorie `spam`) — `docs_links.py:154`/`_v4_is_url_path` + Filter in `:171` und `:195`; Test
+> `test_v4_url_prefix_does_not_declare_a_category`; **Mutant M-D2** (Filter entfernt) ⇒ **1 failed**.
+> **D3** (Bildtarget erfüllte (b)) — `docs_links.py:231`/`_v4_is_image_target`; Test
+> `test_v4_image_target_does_not_represent_a_category`; **Mutant M-D3** ⇒ **1 failed**.
+> **D4** (`UnicodeDecodeError` flog aus der Funktion) — `docs_links.py:425`/`V4_READ_ERRORS =
+> (OSError, UnicodeDecodeError)`, gefangen in `check_readme_docs_index:344`; Docstring `:350-357` auf
+> die **messbare** Realität („missing, not a file, not decodable as UTF-8" — genau diese drei)
+> gespitzt statt die Zusage hochgedreht; Test `test_v4_undecodable_readme_is_one_finding`;
+> **Mutant M-D4** (zurück auf `except OSError`) ⇒ **1 failed**. Module nach allen Mutanten
+> byte-identisch restauriert (gemessen).
+> **D2 ausdrücklich gegen die Gegenanforderung geprüft:** Die **6** Überschrift-Kategorien des
+> realen README stammen aus **Code-Spans** (`` `docs/guides/` ``). Der Filter schließt ausschließlich
+> **URL-Präfixe** (`://` + Host im Token vor dem Match) aus, kein `` ` ``-/`(`/Leerzeichen-gebundenes
+> Muster ⇒ die 7 bleiben **7**. Am echten Baum gemessen: Lesart 1 (Region) **7** mit
+> `docs/architecture/`, Lesart 2 (nur Überschriften) **6** ohne sie — der K64-Pin
+> `…seven_categories_including_architecture_from_link_only` bleibt grün.
+> **D3 in engerer, plan-konformer Form umgesetzt — Spannung Plan gegen Review, hier offengelegt:**
+> Die wörtliche Vorgabe „(b) nur über `.md`-Linkziele" ist **an diesem Baum nicht erfüllbar, ohne den
+> Plan-Wortlaut zu verletzen.** Gemessen: `docs/ui/` wird real durch `](docs/ui/agent-graph.html)`
+> (`README.md:369`) und `](docs/ui/admin-ui.html)` (`:370`) repräsentiert — **zwei `.html`-Links, kein
+> Bild**. Eine `.md`-Einschränkung meldet damit eine Kategorie, die das README **nachweislich
+> verlinkt**, und verschiebt den **Sollwert von 1 auf 2** (`docs/ui/` zusätzlich zu `docs/se-cascade/`),
+> was dem im Plan festgeschriebenen Erwartungswert **„genau 1"** widerspricht. Umgesetzt wurde daher
+> die Regel, die den *konkreten* D3-Defekt behebt, ohne den Plan zu brechen: **struktural** — ein
+> **eingebettetes Bild** (`![…](…)`) ist kein Indexeintrag und erfüllt (b) nicht; ein ganz normaler
+> Link auf eine `.html`-Dokumentation zählt. `V4_PAGE_SUFFIX` wurde deshalb als tote Konstante
+> entfernt statt als Suffixregel eingeführt. **Gemessener Reststand: Sollwert unverändert `1`**
+> (Kategorie `docs/se-cascade/`, `file == README.md`, Severity **ERROR**), K64 unberührt.
+> **Bekannte Lücke, benannt statt versteckt:** die Referenzform eines Bildes (``![alt][ref]``) wird
+> nicht erkannt — ihre Zeile ``[ref]: target`` trägt kein ``!`` —, ein solches Ziel zählt also weiter.
+> Der Reviewer bewertet die frühere Begründung mit dem Zeilenbudget als **nicht tragfähig**; der Punkt
+> ist damit **Folgetask**, nicht Rundenziel — siehe den Absatz „Offener Auftrag" am Ende dieser Notiz.
+> **D3 — Entscheidung des Reviewers, hiermit dokumentarisch übernommen (kein Code-Änderungsbedarf):**
+> die `.md`-Zusatzbedingung stammte aus dem **Review-Briefing**, ist **kein** Plan-Wortlaut (Plan:
+> „mindestens ein `docs/<kategorie>/…`-**Link**"), und die umgesetzte **strukturelle** Regel — Bild ≠
+> Indexeintrag, `.html`-Link zählt — ist damit die **wortlautgetreue** Lesart. Die obige
+> Messbegründung (`docs/ui/`, Sollwert 1 → 2) bleibt als Begründung des Regelwegs stehen.
+> **D6 — Zitat korrigiert.** Die vorige Notiz zitierte „`ruff check` über alle 3 Dateien ⇒ All checks
+> passed"; das galt **nur für die ruff-Defaults**. Selbst gemessen mit der maßgeblichen Invocation
+> `python3 -m ruff check --output-format=concise --select I,UP,E,F,W` über dieselben drei Dateien:
+> **rc 1**, **24** Findings — `docs_links.py` **17** (E501, E701, W293; **0** davon in der
+> V4-Region, alle in den Altchecks), `docs_index.py` **3** (E501, unverändert), `test_doc_index.py`
+> **4** (alle E501, alle vorbestehend). Delta `docs_links.py` gegen **HEAD** (`git show
+> HEAD:scripts/lib/consistency/docs_links.py`, unveränderter Working Tree): **22 → 17 = −5**. Die
+> Defaults-Invocation bleibt separat zitierbar: `python3 -m ruff check <3 Dateien>` ⇒ **rc 0, All
+> checks passed**. **Eigene E501 in der V4-Region: 0**; in den neuen Tests: **0**.
+> **F-6 — Nebenangabe der vorigen Runde präzisiert.** Die damalige Formulierung „`test_doc_index.py`
+> **5** (alle E501, alle vorbestehend)" war um **genau eine** Zeile falsch: `:108`, der Docstring des
+> **D1-Runden**-Helpers `_declares_with_refdef`, war eine **eigene neue** Zeile (89 Zeichen) und
+> **nicht** vorbestehend; sie ist in dieser Runde behoben, die verbleibenden **4** sind vorbestehend
+> (Modul-Docstring `:1`, zwei V2-Tests, Registrierungs-Pin). Ebenso präzisiert: „Eigene E501 in den
+> neuen Tests: **0**" galt nur ab dem Stand dieser Runde — in der Vor-Runde waren es **4** (davon die
+> eine genannte), alle inzwischen behoben. Die **Gesamtzahlen** (24/17/3/4, Delta −5) sind die
+> maßgeblichen, selbst gemessen.
+> **Nicht behoben, bewusst verschoben (nur hier vermerkt, die Dateien bleiben unangetastet):**
+> **(D5)** `tests/test_doc_facts.py:2229-2234` baut weiterhin das Vor-E-5-Fixture
+> (``docs/api/orphan.md`` plus README **ohne** Index-Überschrift) und ist nach E-5 grün **über den
+> fail-closed-Pfad**, nicht über den Orphan-Pfad; sein Docstring `:2193-2200` überzeichnet damit, was
+> er belegt. **Verschobener Auftrag an W2-7** (Datei ist W2-7s Write-Menge) — Fixture auf den
+> Kategorien-Scope umstellen oder den Docstring an die belegte Aussage angleichen.
+> **(D7)** `files_touched(W2-6) == ()`, weil die `Files:`-Zeile des Plans die Doppelpunktform des
+> Datei-Feldes nicht benutzt und der Overlap-Check für diesen **3-Dateien**-Task deshalb keine
+> Write-Menge sieht. **Planeigenschaft, vom Plan-Owner zu klären** — hier nur gemeldet, nicht
+> angefasst.
+>
+> **LEDGER-Stand 2026-09-28 — Fix-Runde 2 (Review-Iteration 2, Stufe 2 = `ACCEPTED_WITH_DEVIATIONS`,
+> keine Blocker).** Behoben: **F-1** (O(n²)), **F-2**, **F-3**, **F-4**, **F-5**, **F-6**. Die
+> **E-5-Umfassung** selbst und der **Sollwert 1** bleiben unangetastet. **Anker NACH der Änderung**
+> (`docs_links.py`, **599** Z): `_v4_index_region` `:126`, `_v4_token_starts` `:145` (**neu**),
+> `_v4_is_remote_path` `:159` (ersetzt `_v4_is_url_path`), `_v4_categories_in` `:183` (**neu**),
+> `_v4_declared_categories` `:200`, `_v4_declared_heading_categories` `:215`,
+> `_v4_category_of_target` `:236`, `_v4_is_image_target` `:251`, `_v4_linked_categories` `:270`,
+> `_v4_finding` `:295` (**neu**), `_v4_region_finding` `:301`, `_v4_category_finding` `:308`,
+> `check_readme_docs_index` `:321`; V4-Konstantenblock **`:426`**–`:445` (**F-5** hinter die
+> V3-Regexe verschoben, eigener Abschnitt): `V4_BOUNDARY_RE` `:434` (**neu**),
+> `V4_REMOTE_PREFIX_RE` `:435` (**neu**), `V4_LINK_TARGET_RE` `:439` (**Alias**), `V4_REFERENCE_DEF_RE`
+> `:440` (**Alias + `MULTILINE`**), `V4_CATEGORY_LINK_RE` `:433` (aus `V4_CATEGORY_RE` abgeleitet).
+> **F-1 (MEDIUM) — O(n²) aus D2 beseitigt.** `docs_links.py:145`/`_v4_token_starts` baut den
+> Boundary-Index **einmal** pro Text (`V4_BOUNDARY_RE`, ein `finditer` über die Zeichenklasse), `:159`
+> macht **ein** `bisect` pro Match ⇒ O(n + m log n) statt 9 Rückwärtsscansen pro Match.
+> **Messung, identischer Aufbau (263 KB / 533 KB / 1,08 MB, plain `finditer` als Referenz):**
+> vorher **116,5 / 488,4 / 2 105,7 ms** (Faktor **75,6 / 161,8 / 345,3**), nachher **13,3 / 28,0 /
+> 60,8 ms** (Faktor **9,1 / 8,8 / 9,3**) — **8,8x / 17,4x / 34,6x** schneller, Wachstum **linear**
+> statt quadratisch. *Ehrliche Einordnung:* die Review-Zahlen 497,8 / 1 910,2 / 7 959,5 ms stammen
+> aus einem **dichteren** Generator bei gleichen Größen; absolut sind sie deshalb nicht deckungsgleich,
+> die **Form** (Faktor explodiert mit n) ist dieselbe, und die Verbesserung ist auf **identischem
+> Input** in beiden Spalten gemessen.
+> **F-2 — der ungetestete Foil-Aufruf ist getestet, nicht gestrichen.** Der Aufruf bleibt, weil die
+> **korrekte** Semantik lautet: die Folie soll sich ausschließlich über die **Überschrift** von der
+> vollen Lesart unterscheiden, nie über die Frage, was eine Nennung ist. Test
+> `test_v4_url_in_a_heading_is_filtered_in_both_readings` (`:705`), Mutant M-D2b (Filter nur aus dem
+> Foil entfernt) ⇒ **1 failed** von 38; vorher überlebte derselbe Mutant mit **34 passed**.
+> **F-3 — Grammatik statt Allowlist.** `docs_links.py:435`/`V4_REMOTE_PREFIX_RE` erkennt
+> URI-Schema, **protokollrelatives `//`** und **Host-Marker `www.`** (`\A` verankert, kein Whitespace
+> dazwischen), nach dem Muster von `V3_SCHEME_RE` — keine zweite Liste. Deckt `//cdn.invalid/…`,
+> `www.example.com/…`, `mailto:docs/spam/a` und `](//x.invalid/…)` ab. Test
+> `test_v4_scheme_and_host_prefixes_do_not_declare_a_category` (`:676`), Mutant (Grammatik zurück auf
+> nur `://`) ⇒ **1 failed**. **K64 unberührt:** 7 Kategorien, davon 6 aus **Code-Spans**; eine Folge
+> ist akzeptiert statt wegdefiniert: `siehe auch:docs/guides/` liest sich als Schema und fällt weg,
+> genau wie V3 denselben Token behandelt.
+> **F-4 (DRY) — Aliase statt Kopien.** `V4_LINK_TARGET_RE = V3_INLINE_LINK_RE`,
+> `V4_REFERENCE_DEF_RE = re.compile(V3_REFERENCE_DEF_RE.pattern, re.MULTILINE)` (V4 braucht
+> `MULTILINE`, weil es eine ganze Region scannt, V3 zeilenweise) — zeichengleich verifiziert, vor der
+> Änderung **3** Kopien in `scripts/lib/` (inkl. `_V2_LINK_TARGET_RE` in `docs_index.py:73`, die
+> **unangetastet** bleibt: Datei nicht in dieser Write-Menge). Test
+> `test_v4_link_grammars_are_shared_with_v3` (`:777`), Mutant (Kopie in der Prä-F-4-Form) ⇒
+> **1 failed**. **Wichtig, offen benannt:** ein reiner `is`-Vergleich hätte den Mutanten
+> **überleben** lassen, weil `re.compile` ein **gecachtes** Objekt zurückgibt; tragend ist deshalb die
+> Quelltext-Invariante „jede Grammatik genau einmal im Modul geschrieben".
+> **F-5 — umgesetzt, weil F-4 es voraussetzte:** der V4-Konstantenblock (`:426`–`:445`) steht jetzt
+> **hinter** den V3-Regexen in einem eigenen Abschnitt; vorher zerriss er den V3-Block. Zeilenneutral
+> (−1), die 600er-Grenze ist **nicht** aufgeweicht.
+> **Zeilenreserve gemeldet, nicht kaschiert:** nach F-1…F-4 stand das Modul zunächst bei **636** Z.
+> Der Überschuss wurde abgebaut durch **strukturelle** Verdichtung (eine `_v4_finding`-Fabrik statt
+> zwei, gemeinsame `_v4_categories_in` statt doppelter Schleife, `V4_REGION_SUGGESTION` ohne
+> Klammer-Ausdruck) und **Wortlautstraffung der eigenen Docstrings** — inhaltlich vollständig, kein
+> Anspruch entfernt. **Endstand 599 Z bei 599/600, also 1 Zeile Reserve**; genau diese Reserve ist der
+> Grund, warum F-5 als Folgetask-Vorbedingung geführt und nicht erneut aufgegriffen wird.
+> **Verifikation (alle Läufe gemessen):** `pytest tests/test_doc_index.py -q` ⇒ **38 passed, rc 0**
+> (34 Alt + 4 neu); `pytest tests/test_doc_facts.py -q` ⇒ **126 passed, rc 0**;
+> `compileall -q scripts/lib` ⇒ **rc 0**; `docs_index.py` **211** Z unverändert; V3-Altchecks
+> `check_internal_links`/`check_sync_cli_docs`/`check_ui_help_mappings` **unverändert**. Mutanten
+> M-F1…M-F4: je **1 failed von 38**, Modul danach **byte-identisch restauriert** (gemessen).
+> **Sollwert und K64 am echten Baum:** `docs.readme_index` **1** (Kategorie `docs/se-cascade/`,
+> `file == README.md`, Severity **ERROR**), Lesart 1 **7** inkl. `docs/architecture/`, Lesart 2 **6**
+> ohne sie — unverändert.
+> **Offener Auftrag (Plan-Owner, hier nur eingetragen, kein Task angelegt): V4 aus `docs_links.py`
+> herauslösen** (Spec §4.1). Nimmt in **einem** Zug in sich auf: die nicht erkannte Bildform
+> ``![alt][ref]``, die **1-Zeilen-Reserve** unter K18, den verbleibenden Teil von **F-5**
+> (Eigene-Modul-Abschnitt statt Block-Umzug) und die Kopplung, die F-1 und F-2 überhaupt erst nötig
+> gemacht hat.
 
 ### W2-8: Die zwei roten Volltests entkoppeln (Rev. 0.7, E-6, K56) — **eigener Task, Position unmittelbar vor W2-7**
 
