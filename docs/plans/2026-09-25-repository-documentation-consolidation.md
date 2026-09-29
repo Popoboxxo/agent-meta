@@ -2,7 +2,10 @@
 plan-id: PLAN-DOCS-CONSOLIDATION-2026-09-25
 spec-id: SPEC-DOCS-CONSOLIDATION-2026-09-25
 title: Repository-weite Doku-Konsolidierung agent-meta — Implementation Plan
-status: APPROVED
+status: PAUSED
+approved: 2026-09-26
+approved-scope: **Umfang W0–W8, freigegeben am 2026-09-26 durch den Nutzer über `main_chat` an den `orchestrator`. Diese historische User-Freigabe bleibt als Fakt stehen und wird durch die Pause NICHT zurückgezogen.** Der Wert `PAUSED` im Feld `status` bedeutet ausschliesslich, dass die Ausführung vor dem Index-Exception-Punkt **W3-6** angehalten ist — er hebt die Freigabe des Umfangs **nicht** auf und stellt sie **nicht** zurück. Vollständiger Record in `docs/plans/2026-09-25-repository-documentation-consolidation-pause.md`.
+paused: 2026-09-26 — **PAUSE vor W3-6; keine Implementierungsfreigabe.** Wortlaut und Beleg des Grundes stehen in `docs/plans/2026-09-25-repository-documentation-consolidation-pause.md`. **Die Plan-Revision 0.8 ist der RESUME-Schritt, nicht Teil dieser Pause** — das Feld `revision` bleibt **0.7**, es erfolgt **kein** Revisions-Bump. Ohne die User-Entscheidung über **P-1…P-5** und **E-9…E-13** und ohne Plan-Rev. 0.8 sind **W3-6** und **W4-3** **nicht** startbar.
 revision: 0.7
 pipeline_stages:
   implement: 3
@@ -21,6 +24,29 @@ related:
 > (`geplant | IN PROGRESS | complete`) kennt kein `Entwurf`; hier gilt die Gate-Sprache der
 > Spec. **Kein** `APPROVED` wird erfunden — es liegt eine dokumentierte User-Freigabe vor.
 >
+> > ⏸ **PAUSE (Pause-Datum 2026-09-26; Redaktions-/Commit-Datum des Pause-Records 2026-09-29) —
+> > der Plan steht auf `PAUSED`.** **Reichweite der Pause:** die Ausführung wird vor dem
+> > Index-Exception-Punkt **W3-6** angehalten. **Ausführungsstand:** **W2** ist mit dem
+> > Gate-Votum `WAVE_COMPLETE_WITH_OPEN_ITEMS` abgeschlossen (Anhang „Abschluss der Welle W2");
+> > **W3 bis W8 sind nicht begonnen** — W3-6 trägt vier offene Schritte, W4-3 fünf.
+> > **Benannte Abweichung zum Wellenstand:** die Auftragsvorgabe nennt W0 und W1 als
+> > abgeschlossen, das Plan-Ledger trägt für **W0 alle** Checkboxen offen und für **W1** die
+> > Tasks **W1-5** (Schritt 4) und **W1-10** (Schritte 2 und 4) offen. Beide Quellen stehen
+> > nebeneinander im Pause-Record; keiner wird hier geglättet.
+> > **Nicht startbar ohne die User-Entscheidung über `P-1…P-5` (inkl. `P-3 (e)`) und
+> > `E-9…E-13` einschließlich `E-13c` UND ohne Plan-Rev. 0.8:** **W3-6** und **W4-3** sind
+> > Einstiegspunkte und erst nach (1) User-Entscheidung, (2) Plan-Revision auf Rev. 0.8, dann
+> > (3) W3-6, dann (4) W4-3 zulässig. **Reihenfolge-Zwang**, Spec §17.12.5 (`V-D8-Uebergabe`):
+> > „P-1…P-5 ⇒ Plan-Revision ⇒ **dann** W3-6. Vor der Freigabe darf **kein** Plan-Task
+> > angefasst werden." **Plan Rev. 0.7** trägt den Rev.-0.8-Umfang **nicht** — `index-owner`,
+> > `AC-4[2-6]` und `pending-approval` sind im Plan **0** Treffer (Spec V-D8).
+> > **Vollständiger Record:**
+> > `docs/plans/2026-09-25-repository-documentation-consolidation-pause.md`.
+> > **Was die Pause NICHT tut:** keine Beta, kein Merge, kein `READY_FOR_MERGE`, keine
+> > Archivierung, keine Freigabe von P/E, **kein** Zurückziehen der User-Freigabe vom
+> > 2026-09-26 für den Umfang W0–W8, **kein** Revisions-Bump (`revision` bleibt 0.7), keine
+> > umgeschriebene Task-Checkbox, kein gelöschter AC-Zustand, keine umnummerierte ID.
+> >
 > **Genehmigungsumfang:** Die Freigabe umfasst die **Ausführung dieses Plans** (W0–W8, **50**
 > Tasks — **K39** (Rev. 0.6) m1: 47 → 48 durch den neuen Task **W2-0** „Modul-Split"; **Rev. 0.7
 > / K56: 48 → 50** durch die neuen Tasks **W2-9** „Ledger-Writer adressiert diesen Plan" (E-8) und
@@ -4917,6 +4943,23 @@ werden symmetrisch ergänzt. Kein Eintritt in `_iter_managed_files` (`:240-310`)
 
 ### W3-6: `docs/INDEX.md` tracked, Erstgenerierung, OQ6/OQ8-Umsetzung
 
+> **⏸ ENTRY-BLOCKER — W3-6 ist der Einstiegspunkt des angehaltenen Vorhabens und ist NICHT
+> startbar.** **Gate:** W3-6 darf erst angefasst werden, wenn **beide** Bedingungen erfüllt sind —
+> (a) die **User-Entscheidung** über **P-1…P-5** (inkl. **P-3 (e)** / „P-3-E") **und** über
+> **E-9…E-13** einschließlich **E-13c „Kopier-Pfad"** liegt vor, **und** (b) dieser Plan liegt als
+> **Rev. 0.8** vor und trägt den Spec-Delta **V-D8-Uebergabe** mit **PD-1…PD-10**. **Reihenfolge-Zwang**
+> (Spec §17.12.5): „P-1…P-5 ⇒ Plan-Revision ⇒ **dann** W3-6. Vor der Freigabe darf **kein**
+> Plan-Task angefasst werden." **Warum (b) zwingend ist:** die W3-6-Akzeptanz nach Spec §17.12.4
+> verlangt **T-7, T-8, T-3 (a/b) und T-5 in dieser Welle**; dieser Plan Rev. 0.7 kennt davon
+> **keins** — `Files:`, `Ziel-AK` und `Steps` dieses Task-Bereichs führen weder
+> `config/project-config.schema.json` noch `tests/test_docs_consolidation_migration.py`, weder
+> **AC-39** noch **AC-42…AC-46**, und die Config-Zeile `index-owner` kommt nicht vor. Wird W3-6
+> nach dem heutigen Stand umgesetzt, entsteht **weder** die Deklaration **noch** die
+> Schema-Property, und der KE-Vorrang-Zweig blockiert den Schreibvorgang weiter.
+> **Vollständiger Record:** `docs/plans/2026-09-25-repository-documentation-consolidation-pause.md`.
+> **Diese Notiz ist rein additiv** — sie setzt **keine** Checkbox, ändert **keinen** Sollwert,
+> vergibt **keine** ID und ersetzt **keinen** Task-Inhalt.
+>
 **Files:** Create `docs/INDEX.md`; Modify `.meta-config/project.yaml`, `README.md`,
 `tests/test_doc_renderer.py` — **kein** `.gitignore`-Eintrag (OQ6 entschieden: `tracked`)
 **Interfaces:** Produces: getrackte, 100 % generierte `docs/INDEX.md`; OQ6-Folge: `.gitignore`
@@ -5070,6 +5113,19 @@ Welle). V3 ist in W4 **planmäßig rot** (Termin **W8-2**, Owner `developer`).
 
 ### W4-3: `docs/architecture/INDEX.md` und AC-29-Nachweis
 
+> **⏸ ENTRY-BLOCKER — W4-3 ist der zweite Einstiegspunkt nach der Pause und ist NICHT startbar.**
+> **Gate:** W4-3 ist zusätzlich an Schritt 1 der Resume-Reihenfolge gebunden — **User-Entscheidung
+> über P-1…P-5 (inkl. P-3 (e)) und E-9…E-13 einschließlich E-13c** — und an **Schritt 2, die
+> Plan-Revision auf Rev. 0.8**. **Zusätzlich** ist **E-11** ausdrücklich **vor W3-6** zu entscheiden,
+> weil es genau diesen Task betrifft: E-11a (Empfehlung) verlangt, die Key-Reichweite für
+> `docs/architecture/INDEX.md` in W4-3 **zu verifizieren, nicht vorab zu entscheiden**; E-11b würde
+> eine Scope-Erweiterung **vorab** verlangen und ist ohne E-10-Entscheidung nicht zulässig.
+> **Vorbedingung aus dem Plan heraus:** die Kette **W3-6 → W4-1 → W4-2 → W4-3** (Task-Belegungstabelle,
+> Querwellenkanten) — W4-3 ist also erst nach W3-6 und der Plan-Revision bearbeitbar.
+> **Vollständiger Record:** `docs/plans/2026-09-25-repository-documentation-consolidation-pause.md`.
+> **Diese Notiz ist rein additiv** — sie setzt **keine** Checkbox, ändert **keinen** Sollwert,
+> vergibt **keine** ID und ersetzt **keinen** Task-Inhalt.
+>
 **Files:** Create `docs/architecture/INDEX.md`; Modify `tests/test_docs_consolidation_migration.py`
 **Interfaces:** Produces: Teil-Vorschau auf denselben Doku-Baum (IC-10(d));
 `test_architecture_stub_shape`, `test_stale_declaration_moved_with_longform`. Consumes: W4-2, W1-4.

@@ -3,10 +3,13 @@ spec-id: SPEC-DOCS-CONSOLIDATION-2026-09-25
 title: Repository-weite Doku-Konsolidierung agent-meta — Technical Specification
 status: APPROVED
 approved: 2026-09-26
-approved-scope: Ausführung W0–W8; Rev. 0.4 (Commit-/Branch-Normativität) am 2026-09-26 durch den Nutzer bestätigt; A13 und A14 als offene, dokumentierte Abweichungen registriert; Rev. 0.5 (Gate-Präzisierung W2/W3, Finding-Ownership, V1-Sichtbarkeit vor Hochstufung) am 2026-09-26 durch den Nutzer **beauftragt** (A2A-Envelope vom 2026-09-26, Korrekturen 1–5) — **keine** Pflicht **jenseits** dieses beauftragten Umfangs; innerhalb des Umfangs werden Nachweisformen geändert (Präzisierung §17.9.4). Dritte Korrekturrunde (Concept-Review 2026-09-26, RVW2-1…RVW2-14) innerhalb **derselben** Revision, ebenfalls ohne Revisions-Bump: Nachweisformen geändert (§10, Aufzählungspunkt `--validate`; §10, `--strict`-Punkt, Unterpunkt 5; §17.9.4 (vii)–(x)); **vier Entscheidungsvorlagen E-1…E-4 sind offen und liegen beim Auftraggeber** — es wird keine Entscheidung unterstellt. Vierte Korrekturrunde (Concept-Review 2026-09-26, RVW3-1…RVW3-10) innerhalb **derselben** Revision, ebenfalls ohne Revisions-Bump: ausschließlich **Korrekturen** bestehender Sollwert-Formulierungen, Verweise und Anker — **keine** neue Pflicht, **keine** neue Task-ID, **kein** neuer Sollwert. **Rev. 0.6 (2026-09-27): zwei vom Nutzer getroffene Entscheidungen sind umgesetzt — U-1 (Modul-Split der Consistency-Checks, §4.1, Katalog K18…K21) und U-2 (AC-30 auf `README.md` + `llms.txt` verengt, die 25 toten `docs/**`-Links werden Follow-up **F-DOCS-LINKS-2026-09-27** mit Owner und Termin, Katalog K22…K24).** Rev. 0.6 ist ein **echter Revisions-Bump** (inhaltliche Pflichtänderung: AC-30-Wortlaut, Modulgrenzen), **kein** Korrekturrunden-Sammelblock. `status: APPROVED` und `approved: 2026-09-26` bleiben unverändert; die **beiden** Entscheidungen sind **bereits getroffene Nutzerentscheidungen** und werden hier **nicht** neu bewertet. Volltext **§17.10**. **Rev. 0.7 (2026-09-27): vier vom Nutzer getroffene Entscheidungen sind umgesetzt — E-5 (V4 auf den README-Index-Scope begrenzt, die 191 `docs/`-Links werden Follow-up **F-DOCS-README-INDEX-2026-09-27**; E-6 (dedizierter Task **W2-8** für die zwei roten Volltests, Position vor W2-7); E-7 (V5 wandert in das neue Modul `docs_freshness_v5.py`, §4.1); E-8 (`TASK_HEADER_RE` wird um die Wellen-/Task-Header erweitert, neuer Task **W2-9**, Ledger-Writer einsetzbar ab W2-9). Katalog **K54…K58** in **§17.11**.** Rev. 0.7 ist ein **echter Revisions-Bump** (inhaltliche Pflichtänderung: V4-Scope, Modulgrenzen, Taskmenge 48 → **50**), **kein** Korrekturrunden-Sammelblock. `status: APPROVED` und `approved: 2026-09-26` bleiben unverändert; die **vier** Entscheidungen sind **bereits getroffene, verbindliche Nutzerentscheidungen** und werden hier **nicht** neu bewertet. **Keine** AC-/IC-/R-/OQ-/V-Check-ID wurde umnummeriert oder gestrichen; **zwei** neue Task-IDs: **W2-8**, **W2-9**. **Abweichung vom Auftrag, ausdrücklich notiert:** der Auftrag nannte als Zielrevision der Spec **0.5**; die Datei trug jedoch `revision: 0.6` mit vollständigem **§17.10** (U-1/U-2). Ein Sprung auf **0.5** wäre eine **Regression** und würde den dokumentierten Rev.-0.6-Stand überschreiben — deshalb ist die Zielrevision der Spec **0.7**; der begleitende Plan steht ebenfalls auf **0.7**.
-revision: 0.7
+approved-scope: **Rev. 0.8 (2026-09-29) — ZUR USER-FREIGABE AUSSTEHEND; der Approval-Marker `APPROVED` DECKT DIESEN UMFANG NICHT.** Die **fünf inhaltlichen Pflichtänderungen P-1…P-5** (IC-13, IC-15, IC-22-Config-Tabelle, AC-21 + AC-39, R7 — Volltext **§17.12.1**), darunter **P-3 (e)** („P-3-E"), die **fünfte Tabellenzeile** von §17.12.1 und **kein sechstes** P-Element — sie präzisiert **ausschließlich den Sollwert-Zähler in AC-39** und ändert **sonst nichts** an P-3, begründen den **neuen, noch nicht freigegebenen** Umfang `docs-consolidation.index-owner` (IC-25, IC-26, AC-42…AC-46; §17.12.3). Sie sind **vor** der Umsetzung von W3-6 mit dem Nutzer zu entscheiden. Der **bereits freigegebene** Umfang **W0–W8** und das Datum 2026-09-26 bleiben davon **unberührt**; Rev. 0.8 ist ein **echter Revisions-Bump**, **kein** Korrekturrunden-Sammelblock. **Fünf Entscheidungsvorlagen E-9…E-13** sind **offen** und liegen beim Auftraggeber (§17.12.2) — **keine** ist entschieden, **keine** wird unterstellt; **E-5…E-8** bleiben entschieden und werden **nicht** neu aufgerollt. **Keine** bestehende IC-, AC-, Task-, Wellen-, V-Check-, R-, OQ- oder F-ID wurde umnummeriert oder gestrichen; neu sind ausschließlich **IC-25, IC-26, AC-42…AC-46**; die inhaltlichen Pflichtänderungen bleiben **P-1…P-5 (inkl. P-3 (e) / „P-3-E")** — **keine** sechste P-Zeile. Ausführung W0–W8; Rev. 0.4 (Commit-/Branch-Normativität) am 2026-09-26 durch den Nutzer bestätigt; A13 und A14 als offene, dokumentierte Abweichungen registriert; Rev. 0.5 (Gate-Präzisierung W2/W3, Finding-Ownership, V1-Sichtbarkeit vor Hochstufung) am 2026-09-26 durch den Nutzer **beauftragt** (A2A-Envelope vom 2026-09-26, Korrekturen 1–5) — **keine** Pflicht **jenseits** dieses beauftragten Umfangs; innerhalb des Umfangs werden Nachweisformen geändert (Präzisierung §17.9.4). Dritte Korrekturrunde (Concept-Review 2026-09-26, RVW2-1…RVW2-14) innerhalb **derselben** Revision, ebenfalls ohne Revisions-Bump: Nachweisformen geändert (§10, Aufzählungspunkt `--validate`; §10, `--strict`-Punkt, Unterpunkt 5; §17.9.4 (vii)–(x)); **vier Entscheidungsvorlagen E-1…E-4 sind offen und liegen beim Auftraggeber** — es wird keine Entscheidung unterstellt. Vierte Korrekturrunde (Concept-Review 2026-09-26, RVW3-1…RVW3-10) innerhalb **derselben** Revision, ebenfalls ohne Revisions-Bump: ausschließlich **Korrekturen** bestehender Sollwert-Formulierungen, Verweise und Anker — **keine** neue Pflicht, **keine** neue Task-ID, **kein** neuer Sollwert. **Rev. 0.6 (2026-09-27): zwei vom Nutzer getroffene Entscheidungen sind umgesetzt — U-1 (Modul-Split der Consistency-Checks, §4.1, Katalog K18…K21) und U-2 (AC-30 auf `README.md` + `llms.txt` verengt, die 25 toten `docs/**`-Links werden Follow-up **F-DOCS-LINKS-2026-09-27** mit Owner und Termin, Katalog K22…K24).** Rev. 0.6 ist ein **echter Revisions-Bump** (inhaltliche Pflichtänderung: AC-30-Wortlaut, Modulgrenzen), **kein** Korrekturrunden-Sammelblock. `status: APPROVED` und `approved: 2026-09-26` bleiben unverändert; die **beiden** Entscheidungen sind **bereits getroffene Nutzerentscheidungen** und werden hier **nicht** neu bewertet. Volltext **§17.10**. **Rev. 0.7 (2026-09-27): vier vom Nutzer getroffene Entscheidungen sind umgesetzt — E-5 (V4 auf den README-Index-Scope begrenzt, die 191 `docs/`-Links werden Follow-up **F-DOCS-README-INDEX-2026-09-27**; E-6 (dedizierter Task **W2-8** für die zwei roten Volltests, Position vor W2-7); E-7 (V5 wandert in das neue Modul `docs_freshness_v5.py`, §4.1); E-8 (`TASK_HEADER_RE` wird um die Wellen-/Task-Header erweitert, neuer Task **W2-9**, Ledger-Writer einsetzbar ab W2-9). Katalog **K54…K58** in **§17.11**.** Rev. 0.7 ist ein **echter Revisions-Bump** (inhaltliche Pflichtänderung: V4-Scope, Modulgrenzen, Taskmenge 48 → **50**), **kein** Korrekturrunden-Sammelblock. `status: APPROVED` und `approved: 2026-09-26` bleiben unverändert; die **vier** Entscheidungen sind **bereits getroffene, verbindliche Nutzerentscheidungen** und werden hier **nicht** neu bewertet. **Keine** AC-/IC-/R-/OQ-/V-Check-ID wurde umnummeriert oder gestrichen; **zwei** neue Task-IDs: **W2-8**, **W2-9**. **Abweichung vom Auftrag, ausdrücklich notiert:** der Auftrag nannte als Zielrevision der Spec **0.5**; die Datei trug jedoch `revision: 0.6` mit vollständigem **§17.10** (U-1/U-2). Ein Sprung auf **0.5** wäre eine **Regression** und würde den dokumentierten Rev.-0.6-Stand überschreiben — deshalb ist die Zielrevision der Spec **0.7**; der begleitende Plan steht ebenfalls auf **0.7**.
+revision: 0.8
+pending-approval: Rev. 0.8 (2026-09-29) — P-1…P-5 (einschliesslich **P-3 (e)**, im Folgenden „P-3-E") offen beim Auftraggeber; E-9…E-13 offen. Der Umfang W0–W8 bleibt freigegeben (Freigabedatum 2026-09-26, unveraendert). Volltext §17.12. Korrekturrunde zu Rev. 0.8 (Concept-Review Runde 8, 2026-09-29, CHANGES_REQUESTED) behob K77…K86 (§17.12.6) ohne neue Pflicht; P-1…P-5 und E-9…E-13 bleiben unveraendert ausstehend, pending-approval: besteht fort. ZWEITE Korrekturrunde zu Rev. 0.8 (Concept-Review Runde 9, 2026-09-29, CHANGES_REQUESTED — 2 major / 7 minor / 1 info) behob RVW9-1…RVW9-9 im selben Revisionsstand, **ohne** neue Pflicht, **ohne** neue IC-/AC-/Task-/Wellen-/V-Check-ID und **ohne** Umnummerierung bestehender IDs: (a) Katalog-IDs K61…K70 ⇒ **K77…K86** (RVW9-1, dann RVW10-1; die belegte Obergrenze ist **K76** — Plan-Legende, gemessen); (b) **V-D8** als Plan-Befund registriert mit **forderlichem** Plan-Delta (**V-D8-Uebergabe**, §17.12.5) — der **Plan Rev. 0.7 selbst wird erst nach** User-Freigabe von P-1…P-5 revidiert; (c) T-4-Ordinal, E-13-Optionstabelle (Kopier-Pfad), P-3-E-Zählung, Testname, K78-Verortung, V-D1-Selbstverweis und W1-10-Reihenfolge berichtigt. P-1…P-5 (inkl. P-3-E) inhaltlich **unveraendert**, E-9…E-13 und OQ1 **offen**.
+paused: 2026-09-26 — **PAUSE. Rev. 0.8 ist ein Entwurf und KEINE Implementierungsfreigabe.** Der Grund ist, dass die Ausführung vor dem Index-Exception-Punkt angehalten wurde, weil die fünf inhaltlichen Pflichtänderungen **P-1…P-5** (§17.12.1) und die fünf Entscheidungsvorlagen **E-9…E-13 einschließlich E-13c „Kopier-Pfad"** (§17.12.2) beim Auftraggeber offen sind. Beide sind **vor** der Umsetzung von **W3-6** zu entscheiden, und der Plan Rev. 0.7 trägt den Rev.-0.8-Umfang nicht (V-D8, §17.12.5). **Vollständiger Record** in `docs/plans/2026-09-25-repository-documentation-consolidation-pause.md` (PAUSE-Record, Feld `status` = PAUSED, Feld `revision` = 0.1). **Was die Pause ausdrücklich NICHT tut** — sie zieht das Feld `approved` mit dem Datum 2026-09-26, den freigegebenen Umfang **W0–W8** oder den Hinweis, dass Rev. 0.8 selbst nicht freigegeben ist, **nicht** zurück. Sie löscht **keine** Revisions-, Korrekturrunden- oder Review-Historie, sie bumppt **keine** Revision (Rev. bleibt **0.8**), und sie vergibt, umnummeriert oder streicht **keine** ID. **Redaktions- und Commit-Datum des Pause-Records ist der 2026-09-29**; das Pause-Datum 2026-09-26 ist davon zu unterscheiden.
 related:
   - docs/specs/2026-09-25-repository-documentation-consolidation-design.md
+  - docs/specs/2026-09-25-repository-documentation-consolidation-design-agent-meta-exception.md
   - docs/plans/2026-09-25-repository-documentation-consolidation.md
   - docs/REQUIREMENTS.md
   - docs/plans/README.md
@@ -20,6 +23,27 @@ related:
 > Contracts, Datenfluss und Acceptance Criteria und enthält **keine Implementierung und
 > keinen Plan**. Der Approval-Marker wurde nach dem Review durch `concept-reviewer`
 > gesetzt (Approval-Gate, Master-Rule `spec-plan-workflow`).
+>
+> > ⏸ **PAUSE — Rev. 0.8 ist ein ENTWURF, keine Implementierungsfreigabe (Pause-Datum
+> > 2026-09-26; Redaktions-/Commit-Datum des Pause-Records 2026-09-29).** Die Ausführung ist vor
+> > dem Index-Exception-Punkt angehalten: **W3-6** (`docs/INDEX.md` tracked, Erstgenerierung)
+> > ist **nicht** startbar. **Grund:** die fünf inhaltlichen Pflichtänderungen **P-1…P-5**
+> > (inkl. **P-3 (e)** / „P-3-E", §17.12.1) und die fünf Entscheidungsvorlagen
+> > **E-9…E-13 einschließlich E-13c „Kopier-Pfad"** (§17.12.2) sind **beim Auftraggeber offen**
+> > und **vor** W3-6 zu entscheiden; der **Plan Rev. 0.7** trägt den Rev.-0.8-Umfang nicht
+> > (**V-D8**, §17.12.5, `V-D8-Uebergabe` mit **PD-1…PD-10**). **Reihenfolge-Zwang**
+> > (§17.12.5): „P-1…P-5 ⇒ Plan-Revision ⇒ **dann** W3-6. Vor der Freigabe darf
+> > **kein** Plan-Task angefasst werden." **Vollständiger Record:**
+> > `docs/plans/2026-09-25-repository-documentation-consolidation-pause.md`.
+> >
+> > **Was die Pause ausdrücklich NICHT tut** — die folgenden historischen Fakten bleiben
+> > **unverändert** stehen und werden **nicht** zurückgezogen: `approved: 2026-09-26` (Nutzer,
+> > über `main_chat` an den `orchestrator`), der **freigegebene Umfang W0–W8** sowie der
+> > Umstand, dass **Rev. 0.8 selbst nicht freigegeben** ist (`approved-scope`,
+> > `pending-approval:`). **Kein** Revisions-Bump (Rev. bleibt **0.8**), **keine** Löschung der
+> > Rev.-0.4…0.8- oder Korrekturrunden-Historie (Rev. 0.5 / RVW2, Rev. 0.6 / K18…K24,
+> > Rev. 0.7 / K54…K58, Rev. 0.8 / K77…K86, Runde 10), **keine** umnummerierte oder gestrichene
+> > ID, **kein** Produktionscode.
 >
 > **Rev. 0.4 ist am 2026-09-26 durch den Nutzer bestätigt** — über den Entscheidungsweg laut
 > Plan Rev. 0.4, K1 (`main_chat`). Das Concept-Review von Rev. 0.4 endete zuvor mit
@@ -131,6 +155,125 @@ related:
 > > **wortgleich** und dokumentieren den Stand **vor** der Entscheidung; **maßgeblich** sind die
 > > **Plan-Legende**, dieser Rev.-0.7-Block und **§17.11**.
 >
+> > **Rev. 0.8 (2026-09-29) — agent-meta-Ausnahme im KE-Vorrang-Gate (IC-25/IC-26) —
+> > ACHTUNG: `status: APPROVED` DECKT DIESEN UMFANG NICHT.** Der Volltext steht in
+> > **§17.12**, der Katalog der Korrekturen **K-1…K-5** ebendort (§17.12.1), die
+> > Entscheidungsvorlagen **E-9…E-13** in **§17.12.2**, die Nachweis- und
+> > Testakzeptanztabelle in **§17.12.4**. **Dies ist ein echter Revisions-Bump** und **kein**
+> > Korrekturrunden-Sammelblock.
+> >
+> > **Vorentscheidung des Nutzers (bereits getroffen, hier NICHT neu bewertet):** eine
+> > **explizite agent-meta-Ausnahme**, damit **W3-6** `docs/INDEX.md` schreiben kann; die
+> > **Knowledge Engine bleibt für Consumer-Projekte autoritativ**. **Ausdrücklich nicht
+> > entschieden und nicht unterstellt:** eine globale Umstellung von `index.mode` — der
+> > genehmigte Schlüssel ist ausschließlich `docs-consolidation.index-owner` (IC-25), **kein**
+> > `project.name`-/`platforms`-Vergleich und **keine** agent-meta-Erkennung über
+> > Repo-Struktur (DECISION-1, §17.12.3).
+> >
+> > **Internen Verweisen dieser Revision gilt eine bewusste Regel:** Rev. 0.8 fügt Zeilen **oberhalb**
+> > fast aller späteren Abschnitte ein. Alle von Rev. 0.8 **neu** gesetzten Verweise auf **eigene**
+> > Abschnitte sind deshalb **namenbasiert** (`IC-13`, `AC-21`, `R7`, `§17.12.1`) und **nicht**
+> > zeilenbasiert — sonst wiederholte Rev. 0.8 genau der Anker-Drift, den sie als **K-4** und
+> > **V-D1/V-D2** gerade abstellt. **Verweise auf Code, Config, Tests und Pläne bleiben
+> > `Datei:Zeile`** und sind am Working Tree gemessen.
+> >
+> > **P-1…P-5 SIND ZUR USER-FREIGABE AUSSTEHEND.** Sie sind **inhaltliche Pflichtänderungen**
+> > der APPROVED-Fassung an **fünf normativen Stellen** (IC-13, IC-15, IC-22-Tabelle,
+> > AC-21 + AC-39, R7). `status: APPROVED` und `approved: 2026-09-26` bleiben unverändert,
+> > und der **freigegebene Umfang W0–W8 bleibt vollständig freigegeben** — Rev. 0.8
+> > installiert **keine** neue Task-ID, **keine** neue Welle und **keinen** neuen V-Check; sie
+> > ändert **ausschließlich** die Bedingung, unter der das bereits verdrahtete Gate
+> > `_index_mode_block_reason()` einen Schreibvorgang verbietet. **Bis zur Freigabe von
+> > P-1…P-5 darf W3-6 die Ausnahme nicht umsetzen.**
+> >
+> > - **P-1 → IC-13** (Situationstabelle, Zeile „`resolve_index_mode` ⇒ kein Schreiben"): die
+> >   Zeile ist **absolut** formuliert und wird **bedingt**; die Verengung liegt in
+> >   `_index_mode_block_reason()` (`doc_renderer.py:702-703`). **Kein** Formulierungsfehler —
+> >   ein **neuer Vertrag**.
+> > - **P-2 → IC-15** (Skeleton-Übernahme-Absatz): IC-15 regelt nur den **Skeleton**-Fall
+> >   (`resolve_index_mode() == "file-index"`). In agent-meta entsteht der Index **ohne**
+> >   Skeleton (Neuanlage, `doc_renderer.py:829-830`). IC-15 wird dadurch **nicht falsch,
+> >   sondern unvollständig**; ergänzt wird die Neuanlage-Bedingung.
+> > - **P-3 → IC-22** (Config-Tabelle **und** ihr Fail-off-Absatz): ein **siebter** Key
+> >   (`index-owner`) kommt hinzu; „**alle sechs** Keys" wird zu „alle **sieben**". **Erweitert
+> >   gemessen (P-3 (e), §17.12.1):** **AC-39** nennt „**genau** den **sechs** Properties" — der
+> >   Schema-**Block** hat heute **fünf**
+> >   (`config/project-config.schema.json:2424-2469`), und sein **gepinnter** Test
+> >   `tests/test_docs_consolidation_migration.py::test_schema_block_present_and_closed`
+> >   (`:81`, `_EXPECTED_PROPERTIES` `:45-51`) ebenfalls **fünf**; die Zahl **sechs** ist damit
+> >   bereits heute falsch und wird durch `index-owner` nicht richtiger. Rev. 0.8 stellt sie auf
+> >   den **gemessenen** Stand.
+> > - **P-4 → AC-21** (zweiter Given/When/Then-Block): die
+> >   KE-Autorität zur **ungefähren** Vorbedingung. Mit der Ausnahme ist sie **bedingt** ⇒
+> >   **zusätzliche** AK für den Override-Pfad (**AC-42**) und für die Absenz-Semantik
+> >   (**AC-43**), sonst widerspräche der Test der Spec.
+> > - **P-5 → R7** (Mitigation-Tabelle): zwei Hebel plus Besitzregel und
+> >   `index-mode: skeleton`; ein **dritter** Hebel (`index-owner`) kommt hinzu. Das **Risiko
+> >   selbst sinkt** in agent-meta (dort gibt es nur einen Writer), die normative
+> >   Mitigation-Tabelle ändert sich.
+> >
+> > **Neu:** **IC-25** (Key, Werte, Fail-closed-Zweig, geänderte Entscheidungsfolge) und
+> > **IC-26** (Begrenztheitsvertrag) in §5.2; **eine** Zeile in der **IC-22**-Tabelle;
+> > **AC-42…AC-46** in §7 (M2); **AC-21** bedingt, **AC-39** korrigiert; **R7** um den dritten
+> > Hebel ergänzt; Revisionszeile **0.8**; §15 Trace-Anker. **Keine** bestehende IC-, AC-,
+> > Task-, Wellen-, V-Check-, R-, OQ- oder F-ID wurde umnummeriert oder gestrichen — IC-16
+> > war bereits belegt (Hash-Baseline-Vertrag `scripts/lib/generated_file_drift.py:75-91`),
+> > IC-17…IC-24 ebenfalls, deshalb beginnen die
+> > neuen ICs bei **IC-25**; die neuen ACs beginnen bei **AC-42** (AC-01…AC-41 belegt).
+> >
+> > **Korrekturen ohne Freigabebedarf (K-1…K-5, §17.12.1):** **K-1** Docstring
+> > `doc_renderer.py:669-672`; **K-2** Docstring `tests/test_doc_renderer.py:3209-3223`;
+> > **K-3** Zählkommentar `tests/test_docs_consolidation_migration.py:42-44` (K-77: der
+> > Kommentar **existiert** — die frühere Angabe „Zeile leer" war eine Fehlmessung, per Grep
+> > widerlegt); **K-4** zwei
+> > **veraltete Zeilenanker** `spec_plan_scaffold.py:62-68` → **`:115-121`** und
+> > `:40-44` → **`:80-97`** (beide **am Working Tree gemessen**); **K-5**
+> > `doc_renderer.py:685-686` („the complete list of what forbids a write") bleibt
+> > **wortwörtlich stehen** — die Liste blockierender Eigentümer bleibt **geschlossen** (zwei),
+> > weil der neue Key keinen Eigentümer **hinzufügt**, sondern nur den einen **Auslöser**
+> > stilllegt.
+> >
+> > **Korrekturrunde zu Rev. 0.8 (2026-09-29, Concept-Review Runde 8, `CHANGES_REQUESTED`:
+> > 5 major / 5 minor / 0 kritisch) — Katalog `K77…K86`, §17.12.6. `status: APPROVED` und
+> > `approved: 2026-09-26` bleiben unverändert, `pending-approval:` besteht fort.** Die Runde
+> > behob **ausschließlich Beleg- und Zuordnungsfehler** und erzeugte **keine** neue Pflicht
+> > **außerhalb des bestehenden P-3** (die einzige Sollwert-Präzisierung dieser Runde, die zweite
+> > Mengen-Pin, ist **P-3 (e) / „P-3-E"** — die fünfte Zeile der P-Tabelle, kein sechstes
+> > P-Element): **P-1…P-5 (inkl. P-3-E) bleiben zur User-Freigabe ausstehend**, **E-9…E-13 und
+> > OQ1 bleiben offen**. Vier Korrekturen sind **inhaltlich** und daher im Freigabe-Snapshot zu
+> > bestätigen: (1) **zwei** statt einer harten Sollwert-Änderung — `_EXPECTED_PROPERTIES`
+> > **und** `_IC22_ABSENCE_DEFAULTS`, beide fünf → sechs (K-78, V-D4); (2) **T-8 → T-3 → T-5
+> > liegen alle in W3-6** — die technische Unteilbarkeit ist gemessen (V-D7), E-13a in seiner
+> > bisherigen Formulation ist damit **nicht durchführbar** (K-80); (3) §12.3 (g) führt das
+> > **Restrisiko „Ausnahme wird von einem Consumer-Projekt kopiert"** — **nicht** akzeptiert,
+> > als **Ergänzung zu E-13** offen, jetzt als eigene Optionenzeile **E-13c** in §17.12.2
+> > ausgewiesen (K-81); (4) die **Trace-Matrix** führt AC-42…AC-46 jetzt
+> > mit, Zählsatz W3 14 → **19** (K-79).
+> >
+> > **Zweite Korrekturrunde zu Rev. 0.8 (2026-09-29, Concept-Review Runde 9,
+> > `CHANGES_REQUESTED`: 2 major / 7 minor / 1 info) — kein Revisions-Bump, kein ID-Zuwachs.**
+> > RVW9-1 (major): Katalog-IDs **K61…K70 ⇒ K77…K86**; die belegte Obergrenze ist **K76**
+> > (Plan-Legende, **gemessen**), **K1…K76 bleiben unberührt**, je **genau einmal** belegt. **RVW10-1 (major):** der erste Wurf **K61…K70** und die Zwischenlage **K76…K85** waren beide **dokumentübergreifend kollidierend** (`K76` ist im Plan belegt) ⇒ der Katalog steht jetzt endgültig auf **K77…K86**; **RVW10-2 (minor):** V-D1-Selbstverweis auf **`:1487-1488`** statt `:1465-1466`; **RVW10-3 (info):** zweiter Träger derselben Ordinal-Formulierung geprüft und registriert (`tests/test_doc_renderer.py:1090`, **unverändert**). RVW9-2
+> > (major): **V-D8** als Plan-Befund registriert — Plan Rev. 0.7 kennt Rev. 0.8 nicht, die
+> > W3-6-Akzeptanz nach §17.12.4 ist **vom heutigen Plan aus unerfüllbar**; der **forderliche
+> > Plan-Delta** ist in **§17.12.5 (V-D8-Uebergabe)** präzise benannt und wird **erst nach**
+> > User-Freigabe von P-1…P-5 ausgeführt — **dieser Spec-Text ändert den Plan nicht**.
+> > RVW9-3…RVW9-9 (7 minor) + 1 info: T-4-Ordinal „sixth" ⇒ **„seventh"**; **E-13c**
+> > (Kopier-Pfad) als dritte Optionenzeile in §17.12.2 und Q4-Verweis auf **§12.3** statt
+> > §17.12.3; P-3-E als **P-3 (e)** geklärt; Testname
+> > `::test_schema_declares_the_absence_defaults` (`:185-199`) statt des Wildcards
+> > `::test_fail_off_defaults_*`; K-78 auf Modus-Übersicht Zeile 8 / T-3 / Coverage umgestellt;
+> > V-D1-Selbstverweis `:1449-1450` ⇒ **`:1465-1466`**; W1-10-Step-2-Reihenfolge vor W3-6
+> > festgehalten. **Keine** P-1…P-5 wurde inhaltlich geändert, **keine** offene Vorlage
+> > entschieden, `pending-approval:` besteht fort.
+> >
+> > **E-5…E-8 werden NICHT neu aufgerollt** (Rev. 0.7, §17.11, entschieden 2026-09-27).
+> > **E-9…E-13 sind NEUE, offene Entscheidungsvorlagen** mit Optionen, Empfehlung und
+> > Auswirkung auf W3-6 / W3-7 / W4-1…W4-3 (§17.12.2). **OQ1 bleibt offen**, Owner `main_chat`
+> > (`docs/plans/2026-09-25-docs-consolidation-oq1.md:94`, Blockade **W5**, `:99`); die
+> > agent-meta-Ausnahme berührt `knowledge/wiki/**` **nicht** und hebt diese Blockade
+> > **nicht** auf.
+> >
 > **Legende der Kennungen (neu, Rev. 0.6, K25 — beseitigt die ID-Kollision `E-1`/`E-2`/M1;
 > Bereich korrigiert in K42, Eindeutigkeit hergestellt in K41).**
 > In Rev. 0.6 sind zwei **verschiedene** Nummernkreise entstanden, die beide `E-1`/`E-2` hießen.
@@ -384,7 +527,11 @@ related:
 | **0.6** | 2026-09-27 | **Umsetzung zweier bereits getroffener Nutzerentscheidungen — U-1 (Modul-Split) und U-2 (AC-30-Verengung). Volltext §17.10, Katalog K18…K24; Korrekturrunden K25…K45 (§17.10.5, Runde 1 = K25…K40, Runde 2 = K41…K45; **wahrer Endstand K45**).** **U-1:** `scripts/lib/consistency/docs.py` wird zur **Fassade** und re-exportiert alle nach außen sichtbaren Namen rückwärtskompatibel; die neun V-Checks und die drei Altchecks werden **je genau einem** von vier neuen Familienmodulen zugeordnet — `docs_links.py` (V3, V4, `check_sync_cli_docs`, `check_ui_help_mappings`), `docs_freshness.py` (V1a/V1b, V5, V6), `docs_wiki.py` (V7, V8), `docs_index.py` (V2, V9) — **jedes < 600 Zeilen** (**K18**, Modulgrenzen **§4.1** mit expliziter Abgrenzung zu den **Fach**-Modulen M1–M4, **K19**). **U-2:** **AC-30** auf **`README.md` + `llms.txt`** verengt; die **25** toten relativen internen Links unter `docs/**` werden als **Follow-up `F-DOCS-LINKS-2026-09-27`** (Owner `developer`, Termin **2026-10-11**) geführt — **kein** AC, **keine** Stillschweigung (**K22**). **Weigerungsnachweis** in §17.10.2: die Verengung trägt, weil die **2** verbleibenden Findings in `README.md:722`/`:723` liegen und der bestehende Task **W8-2** sie behebt — **kein** zusätzlicher Task nötig. **Faktenkorrekturen:** V3-Fundstellen sind `README.md:722`/`:723`, **nicht** `:721-724` (`README.md:721` `howto/` und `:724` `howto/configs/` existieren) (**K23**); `docs/REQUIREMENTS.md:21` ist **kein** V3-Finding — die Zeile nennt Backtick-Pfade in einer Tabellenzeile und V3 matcht nur Link-Syntax (`V3_INLINE_LINK_RE`, `V3_REFERENCE_DEF_RE`, `V3_HTML_HREF_RE`) — die Trace-Matrix-Zeile `| AC-30 | W8 | … |` ist auf `README.md:722-723` berichtigt; die F15-Zeile nennt `docs/REQUIREMENTS.md:21` nur noch als **manueller** Befund. **V7-Baseline 10 → 11** (`knowledge/wiki`, **11** Seiten mit `type: "Architecture"`, Baseline-Messung 2026-09-27) (**K24**). **Neu:** §4.1 (Modulgrenzen), §17.10 (Volltext, Weigerungsnachweis, Follow-up-Register, Zyklenprüfung-/Fail-closed-Klausel). **Plan-Seite:** neuer Task **W2-0** (Modul-Split, verhaltensneutral), korrigierter W2-DAG mit **echten write-set-disjunkten** Kanten, neue Testdateien `tests/test_doc_{wiki,freshness,index}.py`, korrigierte Wellen-Gate-Kommandos, Rollback-Erweiterung. **Unverändert:** AC-01…AC-29 und AC-31…AC-41, IC-01…IC-24, NFA-01…NFA-11, R1…R20, F1…F25, M-1…M-13, NG-1…NG-11, FI-1…FI-10, OQ1…OQ9 (OQ1 **offen**, OQ2/OQ6/OQ8 geschlossen), W0…W8, das System-Design, `status: APPROVED`, `approved: 2026-09-26`, kein Produktionscode | concept-architect |
 
 | **0.7** | 2026-09-27 | **Umsetzung von vier bereits getroffenen Nutzerentscheidungen — E-5, E-6, E-7, E-8. Volltext §17.11, Katalog K54…K58.** **E-5:** V4 `check_readme_docs_index` (Check-ID `docs.readme_index`) wird vom Scope „alle 205 nicht-Archiv-`docs/**.md` gegen `README.md`" auf den **README-Index-Scope** begrenzt: die Prüfung liest die `##`-Region `Documentation Index` in `README.md` und verlangt, dass jede dort **deklarierte** `docs/`-Kategorie (a) existiert und (b) mindestens **einen** `docs/<kategorie>/…`-Link in der Region trägt. **IC-05-Pin unverändert:** Check-ID, Severity ERROR, `file` = `README.md`, **Signatur einargumentig** `(root: Path) -> list[Finding]` (**K59**). **193** nicht im README verlinkte `docs/`-**Seiten** → **Follow-up `F-DOCS-README-INDEX-2026-09-27`** (Owner `developer`, Termin **2026-10-11**), **kein** Termin 0 in W0–W8 (**K55**, §17.11.2, Register §17.11.3); Herleitung `205 − 12`, Nachweis = **Issue-Liste + once-count außerhalb V4** (**K60**). **E-6:** neuer Plan-Task **W2-8** „Volltests entkoppeln" mit eigenem `Files:` (`tests/test_knowledge_engine.py`, `tests/test_sharkord_service_name_migration.py`), Agent `senior-developer`, Position **vor W2-7**; er löst die Kopplung beider Tests an den repo-globalen `--validate`-Exit-Code, der nach §10 **planmäßig rot** ist (**K56**). **E-7:** V5 wandert aus `docs_freshness.py` (gemessen **592** Zeilen nach W2-5) in das neue Modul **`scripts/lib/consistency/docs_freshness_v5.py`**; Größenfolge `592` (Reserve **8**) + **≈55–70** (V5), **beide < 600**; Zuordnung bleibt **12/12 disjunkt**, jetzt auf **5** Module (**K56**). **E-8:** `TASK_HEADER_RE` wird um die Wellen-/Task-Header-Form erweitert (Definition `scripts/lib/plan_identity.py:27-30`, Konsument `scripts/lib/plan_ledger.py:25`/`:71`/`:133`), `normalize_task_id` lernt `W<n>-<k>`; neuer Plan-Task **W2-9** in **Phase 0** von W2 ⇒ **Ledger-Writer einsetzbar ab W2-9** (die K53-Interim-Regel endet) (**K57**, **K58**). **Neu:** §17.11 (Volltext + Katalog + Register-Fortsetzung + Zyklenprüfung), §4.1 (fünftes Modul), IC-05 (V4-Zeile), §9.2 (W2-Zeile), §4 (Testdatei `tests/test_doc_freshness_v5.py`). **Zählung:** Tasks **48 → 50**, Checkboxen **199 → 207** (`[x]` **59**, `[ ]` **148**), Herleitung 44 × 4 + 5 × 5 + 1 × 6. **Unverändert:** `status: APPROVED`, `approved: 2026-09-26`, AC-01…AC-41, IC-01…IC-24, NFA-01…NFA-11, R1…R20, F1…F25, M-1…M-13, NG-1…NG-11, FI-1…FI-10, OQ1…OQ10 (OQ1, OQ10 bleiben **offen**), W0…W8, E-1…E-4 (**offen**), E-01…E-15, B-1…B-5, OP-1, keine Produktions- oder Teständerung in dieser Revision | concept-architect |
+| **0.8** | 2026-09-29 | **agent-meta-Ausnahme im KE-Vorrang-Gate — NEUER, ZUR USER-FREIGABE AUSSTEHENDER UMFANG. Volltext §17.12, Katalog K-1…K-5 (§17.12.1), Entscheidungsvorlagen E-9…E-13 (§17.12.2), DECISION-1…DECISION-4 (§17.12.3), Nachweis-/Testakzeptanz (§17.12.4).** **Auslöser (gemessen):** W3-6 scheitert an **einer** Codezeile — `scripts/lib/doc_renderer.py:702-703`; `resolve_index_mode()` löst in agent-meta `"knowledge-engine"` auf (`.meta-config/project.yaml:69` + `:77` + `:15`), der KE-Vorrang-Zweig blockiert damit jeden `docs/INDEX.md`-Schreibvorgang. `docs/INDEX.md` existiert **nicht** (Glob ohne Treffer), und V2 (`scripts/lib/consistency/docs_index.py:180-211`) meldet deshalb **jede** Seite unter `docs/` als ERROR. **Vorentscheidung des Nutzers (nicht neu bewertet):** explizite agent-meta-Ausnahme; die KE bleibt für Consumer autoritativ. **Inhaltliche Pflichtänderungen P-1…P-5 (zur Freigabe ausstehend):** IC-13 Zeile 2 bedingt, IC-15 um die Neuanlage-Bedingung ergänzt, IC-22-Tabelle siebter Key + „alle sieben Keys" (+ **P-3-E** AC-39 auf den gemessenen Property-Stand), AC-21 bedingt, R7 um einen dritten Hebel. **Neu:** IC-25 (Key `docs-consolidation.index-owner`, zweiwertiges Enum `auto` \| `docs-consolidation`, Fail-closed-Zweig **vor** der KE-Prüfung, Entscheidungsfolge als Vertrag) und IC-26 (Begrenztheitsvertrag: Wirkung ausschließlich auf `docs/INDEX.md`, `resolve_index_mode()` unberührt, Besitzregel und `is_file_index_skeleton()` unberührt, `dry_run`-Vertrag unberührt, Consumer per Konstruktion unerreichbar, kein Provider- und kein Projektname im Code); AC-42…AC-46 (Override schreibt / Absenz blockiert / unbekannter Wert fail-closed / Override hebt `skeleton` und Besitzregel **nicht** auf / `dry_run` schreibt nicht / Schema-Enum). **Korrekturen ohne Freigabebedarf K-1…K-5:** zwei Docstrings (`doc_renderer.py:669-672`, `tests/test_doc_renderer.py:3209-3223`), ein Zählkommentar (`tests/test_docs_consolidation_migration.py:42`), zwei veraltete Zeilenanker `spec_plan_scaffold.py:62-68` → **`:115-121`** und `:40-44` → **`:80-97`**; `doc_renderer.py:685-686` bleibt **wortgleich**. **Explizit nicht geändert:** `status: APPROVED`, `approved: 2026-09-26`, der freigegebene Umfang **W0–W8**, §17.10/§17.11, E-1…E-8. **Unverändert:** IC-01…IC-24, AC-01…AC-41 (bis auf AC-21/AC-39), NFA-01…NFA-11, R1…R20 (bis auf R7), F1…F25, M-1…M-13, NG-1…NG-11, FI-1…FI-10, OQ1…OQ10, V1…V9, W0…W8, Taskzahl **50** — **keine** bestehende ID umnummeriert oder gestrichen, **keine** neue Task-ID, **kein** neuer V-Check | concept-specifier |
 | **Freigabe** | **2026-09-26** | **User-Freigabe** (Nutzer, über `main_chat` an den `orchestrator`); formalisiert durch `documenter`. Frontmatter `status:` auf `APPROVED` gesetzt. **Freigabestand:** Concept-Review **Runde 1** (2026-09-26) `CHANGES_REQUESTED`, **5 kritische Befunde** (K1…K5) → Rev. 0.2; Re-Review **Runde 2** (2026-09-26) `CHANGES_REQUESTED` mit **0 kritischen Befunden**, `RESIDUAL_BLOCKERS: Keine`, `PLAN_READINESS: Ja` → Rev. 0.3 mit **8 behobenen** Findings (NEW-1…NEW-8) + Gegenkorrektur. **Umfang:** Freigabe der **Ausführung W0–W8**. **Zusätzlich entschieden (Nutzer, 2026-09-26):** OQ2 (`llms.txt` = **Hybrid**), OQ6 (**tracked**) und OQ8 (Regenerierung über Sync/Validator) → nach §11.2 verschoben. **Keine inhaltliche Änderung** an IC/AC/Risiken — die Freigabe ist eine Statuszeile, kein Revisions-Bump (Konvention: `docs/specs/2026-09-13-stale-role-cleanup-design.md:39`, `docs/specs/2026-09-15-reference-standards-design.md:67`). **Datumsabweichung:** Nutzer nannte 2026-09-25 (Datum der Anfrage); der Freigabevermerk trägt das **Freigabedatum 2026-09-26**. **Nach der Freigabe (rev. 0.4, 2026-09-26):** die Ausführungskorrektur der Branch-/PR-Strategie (§17.6) — **ohne** Änderung an IC/AC/Risiken; die dort zunächst im Dokument ausgerichtete Ausnahme („ohne neue Freigabe") ist **durch die nachfolgende Nutzer-Bestätigung ersetzt**, siehe nächste Zeile | documenter |
+| **0.8 — erste Korrekturrunde (RVW8-1…RVW8-10)** | 2026-09-29 | Concept-Review vom 2026-09-29 über Spec Rev. 0.8: `VERDICT: CHANGES_REQUESTED`, **10 Findings** (0 kritisch, 5 major, 5 minor, 0 info). **Alle 10 inhaltlich behoben**, **kein Revisions-Bump** — Rev. bleibt 0.8, `status: APPROVED` / `approved: 2026-09-26` unverändert, `pending-approval:` besteht fort. Katalog **K77…K86** (§17.12.6; **K77** war im ersten Wurf K61 — korrigiert in der zweiten Korrekturrunde, s. u.). **Betroffene Stellen:** K-3/T-4/V-D4 (Zählkommentar `:42-44` **existiert** — Fehlmessung des Read-Tools, per Grep widerlegt), T-3 **zweite** Zeile `_IC22_ABSENCE_DEFAULTS`, Trace-Matrix §9.1/§9.2 + Zählsatz (W3 14 → **19**), **V-D7** (T-8 → T-3 → T-5, alle W3-6) + E-13a zurückgenommen, §12.3 (g) auf alle vier Fragen beantwortet inkl. Kopier-Pfad (Ziffer sechs → sieben), IC-25/IC-13/§12.3 (Schema ist **best-effort**, `config.py:342`/`:388`), AC-42 (d) Anker geteilt, **V-D1** Anker-Auswahlregel + vollständiges Inventar, **V-D2** um AC-22/§13 A4 ergänzt, AC-39 Belegquelle, **V-D6** (Planlücke W3-7/`sources`). **Unverändert:** P-1…P-5 (inkl. **P-3 (e)**) zur User-Freigabe ausstehend, E-9…E-13 und OQ1 offen, Umfang W0–W8, keine Umnummerierung bestehender IDs, kein Produktionscode | concept-architect |
+| **0.8 — zweite Korrekturrunde (RVW9-1…RVW9-9)** | 2026-09-29 | Concept-Review vom 2026-09-29 über Spec Rev. 0.8 (korrigierte Fassung): `VERDICT: CHANGES_REQUESTED`, **10 Findings** (0 kritisch, **2 major**, **7 minor**, 1 info). **Alle 10 behoben**, **kein Revisions-Bump** — Rev. bleibt 0.8, `status: APPROVED` / `approved: 2026-09-26` unverändert, `pending-approval:` besteht fort. **Katalog K77…K86** — RVW9-1 hat den ersten Wurf **K61…K70** (zehnfach belegt) umnummeriert, Vorspann „ab K77; **K1…K76** bleiben unberührt", maßgebliche Obergrenze **K76** (Plan-Legende, **gemessen**) dort genannt; **RVW10-1** zieht den Katalog ein drittes Mal nach, weil die Zwischenlage **K76…K85** mit dem Plan kollidierte (`K76` dort belegt); **keine** der zehn bisherigen Bedeutungen gestrichen. **RVW9-2:** **V-D8** neu registriert — Plan Rev. 0.7 kennt Rev. 0.8 nicht (W3-6 ohne T-3/T-5/T-7/T-8/AC-42…AC-46, W1-9 abgeschlossen mit der Fehlzählung „sechs Properties", **kein** `pending-approval:` im Plan-Frontmatter), die W3-6-Akzeptanz nach §17.12.4 ist **vom heutigen Plan aus unerfüllbar**; der **forderliche Plan-Delta** ist in **§17.12.5 (V-D8-Uebergabe)** präzise benannt und wird **erst nach** User-Freigabe ausgeführt — dieser Durchgang ändert den **Plan nicht**. **RVW9-3…RVW9-9 + info:** T-4-Ordinal „sixth" ⇒ „seventh", **E-13c** (Kopier-Pfad) als dritte Optionenzeile + Q4-Verweis §17.12.3 ⇒ §12.3, **P-3 (e)** als fünfte P-Zeile geklärt, Testname `::test_schema_declares_the_absence_defaults`, K-78-Verortung, V-D1-Selbstverweis `:1449-1450` ⇒ `:1465-1466`, W1-10-Step-2-vs-T-7-Reihenfolge, §9.2-Fußnote ¹ zur AC-39-Zählkonvention. **Unverändert:** P-1…P-5 (inkl. P-3 (e)) **inhaltlich** zur User-Freigabe ausstehend, **E-9…E-13 einschließlich der neuen Optionenzeile E-13c und OQ1 offen**, Umfang W0–W8, **keine** neue IC-/AC-/Task-/Wellen-/V-Check-ID, **keine** Umnummerierung bestehender IDs, kein Produktionscode | concept-architect |
+| **0.8 — dritte Korrekturrunde (Runde 10, RVW10-1…RVW10-3)** | 2026-09-29 | **Endverifikation der zweiten Korrekturrunde** über Spec Rev. 0.8; `VERDICT: CHANGES_REQUESTED`, **3 Findings** (1 major, 1 minor, 1 info). **Alle 3 behandelt**, **kein Revisions-Bump** — Rev. bleibt 0.8, `status: APPROVED` / `approved: 2026-09-26` unverändert, `pending-approval:` besteht fort. **RVW10-1 (major):** der zweite Wurf des Korrektur-Katalogs (**K76…K85**) war **dokumentübergreifend** kollidierend — `K76` ist in der **Plan-Legende** belegt (Plan `:536`) — der Katalog steht jetzt endgültig auf **K77…K86**, und die im Vorspann genannte maßgebliche Obergrenze **K76** ist dort festgehalten. **RVW10-2 (minor):** der in der zweiten Runde eingesetzte Ersatzanker für V-D1s Selbstverweis war selbst falsch und ist auf den **gemessenen** Träger **`:1487-1488`** berichtigt. **RVW10-3 (info):** ein zweiter Träger derselben Ordinal-Formulierung geprüft und registriert (`tests/test_doc_renderer.py:1090`, **unverändert**). **Bilanz der zweiten Runde laut Runde 10:** 1 major **vollständig** behoben, 1 major **teilweise** (Restfehler → RVW10-1), 6 minor **vollständig** behoben, 1 minor **teilweise** (Restfehler → RVW10-2), 1 info behoben. **Kein technischer Blocker** — RVW10-1 und RVW10-2 sind Dokumentations-Hygiene. **Unverändert:** P-1…P-5 (inkl. **P-3 (e)**) **inhaltlich** zur User-Freigabe ausstehend, **E-9…E-13 einschließlich E-13c und OQ1 offen**, Umfang W0–W8, **keine** neue Pflicht, **keine** neue oder umnummerierte ID, kein Produktionscode. **Zusammengeführte Historie der Concept-Review-Runden zu Rev. 0.8** (drei Zeilen, **keine** ersetzt oder gestrichen): Runde 8 / K77…K86 → Runde 9 / RVW9-1…RVW9-9 → **Runde 10 / RVW10-1…RVW10-3, diese Zeile**. **Nachsatz, additiv:** nach Abschluss dieser Runde wurde das Vorhaben **pausiert** — Pause-Datum **2026-09-26**, Record `docs/plans/2026-09-25-repository-documentation-consolidation-pause.md` (`status: PAUSED`, `revision: 0.1`); Rev. 0.8 bleibt **nicht freigegeben**, `pending-approval:` besteht fort | concept-architect |
 | **Freigabe (Rev. 0.4)** | **2026-09-26** | **Nutzer-Bestätigung der Rev. 0.4** (Nutzer, über `main_chat` an den `orchestrator`; Entscheidungsweg laut Plan Rev. 0.4, K1); formalisiert durch `documenter`. **Anlass:** das Concept-Review von Rev. 0.4 endete mit `VERDICT: BLOCKED` (**F-1**) — neue normative Pflichten (verbindliche Commit-Titel-/Body-Konvention, Branch-Aufbewahrung als Scope-Aussage) waren ohne erneute User-Freigabe mit derselben Verbindlichkeitstiefe installiert worden. **Bezug der Bestätigung:** unverändert der Umfang der Ausführungsmechanik **W0–W8**; **neu bestätigt** die in Rev. 0.4 aufgenommenen Normativitätsaussagen. **Bedingung:** **A13** und die **W4/W5/W6-Serialität** (A14) sind als **offene, dokumentierte Abweichungen** registriert (§13, §17.7, §17.8). **Kein** Revisions-Bump — Rev. bleibt 0.4 | documenter |
 | **0.5 — dritte Korrekturrunde (RVW2-1…RVW2-14)** | 2026-09-26 | Concept-Review vom 2026-09-26 über Spec + Plan Rev. 0.5: `VERDICT: CHANGES_REQUESTED`, **14 Findings** (2 Blocker, 4 Major, 7 Minor, 1 Info). **Alle 14 behandelt**, **kein Revisions-Bump**, `status: APPROVED` und `approved: 2026-09-26` unverändert. **Betroffene Stellen:** §6(b) (Präzisierung **zurückgestellt**, E-3), §10 Aufzählungspunkt `--validate` (Mechanik + **Terminierung** von `--validate`), §10, `--strict`-Punkt, Unterpunkt 5 (a: **Präsenzregel statt Registrierungszahl**; V9 **ohne Sollwert**; Verschlechterungs-Ausnahme), §10 `TEST_COMMANDS`-Punkt (Spannungslage dokumentiert, **E-4**), §11.1 OQ9 (Ergebnis-Ort präzisiert, **ohne** OQ9 zu entscheiden), IC-05 (V9-Hinweis), IC-22/M-11-Hinweis, FI-10, §17.9.3, §17.9.4 (Normativitätstabelle **(vii)–(x)**, Behandlungstabelle RVW2-1…RVW2-14, Entscheidungsvorlagen **E-1…E-4**), Revisionszeile 0.5, Frontmatter `approved-scope`. **Vier Entscheidungsvorlagen offen** (E-1 DoD-Punkt-2-Bestätigung, E-2 V9-Schwelle als Config-Key, E-3 §6(b)-`--check`-Halbsatz, E-4 `TEST_COMMANDS`-Punkt) — **keine** wurde eigenmächtig entschieden. **Unverändert:** AC-01…AC-41, IC-01…IC-24, NFA, R1…R20, F1…F25, M-1…M-13, NG-1…NG-11, FI-1…FI-10, OQ1…OQ9 (OQ1 **offen**, OQ2/OQ6/OQ8 geschlossen), W0…W8, 47 Tasks, **keine** neue Task-ID, kein Produktionscode | concept-architect |
 | **0.5 — vierte Korrekturrunde (RVW3-1…RVW3-10)** | 2026-09-26 | Concept-Review vom 2026-09-26 über Spec + Plan Rev. 0.5: `VERDICT: CHANGES_REQUESTED`, **10 Findings** (0 Blocker, 6 Major, 4 Minor). **Alle 10 behandelt**, **kein Revisions-Bump** — dieselbe Korrekturrunde; `status: APPROVED`, `approved: 2026-09-26` und `revision: 0.5` unverändert. **Betroffene Stellen:** §10, Aufzählungspunkt `--validate` und `--strict`-Punkt, Unterpunkt 5 (**RVW3-6**: Obergrenze wird Plan-Protokoll, **kein** Spec-Sollwert; **RVW3-9**: benannte statt gezählte Anker), §10-Unterpunkte 5/6 (Ankerpräzisierung), FI-10 (Anker), §15-Trace-Anker, §16-Coveragezeile, §17.9.3, §17.9.4 (Normativitätstabelle (vii)/(ix)/(x), Behandlungstabelle RVW3-1…RVW3-10, Entscheidungsvorlagen **E-1…E-4** mit **Frist**-Spalte), Revisionszeile 0.5, Frontmatter `approved-scope`, Kopfblock. **Plan-Seite:** `W-VALIDATE-ROT`, Tasks W4-3/W5-2/W8-4, W3-Block, DoD Punkt 2. **Gestrichen:** die Nennung „§16 (Tabellenumfang)" in der Zeile der dritten Runde (**RVW3-10**) und der Spec-Nachtrag der V9-Obergrenze in W8-4 Schritt 4 (**RVW3-6**). **Als OFFEN gekennzeichnet, nicht ausgeführt:** die `W3-BASELINE-STRICT`-Textpflicht in W4/W5 — sie steht nicht in der Normativitätstabelle und ist vom beauftragten Korrekturumfang **nicht** gedeckt. **Unverändert:** AC-01…AC-41, IC-01…IC-24, NFA, R1…R20, F1…F25, M-1…M-13, NG-1…NG-11, FI-1…FI-10, OQ1…OQ9 (OQ1 **offen**, OQ2/OQ6/OQ8 geschlossen), W0…W8, 47 Tasks, **194 / 40 / 154** Checkboxen, **keine** neue Task-ID, **E-1…E-4 unentschieden**, OP-1 unberührt, kein Produktionscode | concept-architect |
@@ -1300,7 +1447,8 @@ def _sync_stage_docs_consolidation(
 5. `_sync_stage_auto_commit_allowlist` (`:1102`) — bleibt die letzte Stage (`:1106-1109`).
 
 Begründung: `scaffold_spec_plan_dirs` schreibt `docs/INDEX.md` **nur** im `file-index`-Modus
-(`spec_plan_scaffold.py:62-68`). Läuft der Generator davor, überschreibt der Scaffold das
+(`spec_plan_scaffold.py:115-121`; **K-4:** der frühere Anker `:62-68` ist veraltet — gemessen
+beginnt der Modus-Zweig bei `:115`, `scaffold_spec_plan_dirs` selbst bei `:100`). Läuft der Generator davor, überschreibt der Scaffold das
 Voll-Index mit dem Skeleton (B2). Das ist die stärkere Form von C8.
 
 #### IC-13 — Schreib-, Idempotenz- und `dry_run`-Vertrag
@@ -1316,7 +1464,9 @@ def sync_docs_consolidation(
 | Situation | Verhalten | Muster / Beleg |
 |---|---|---|
 | `docs-consolidation.enabled` **nicht** `true` — **auch bei kompletter Abwesenheit des Keys** | `log.skip("docs-consolidation", "disabled in project.yaml")`, **kein** Schreibzugriff, **keine** V1–V9-Ausführung | `knowledge.py:127-129` (`ke_config.get("enabled", False)`) — **Fail-off-Präzedenz** |
-| `resolve_index_mode(config)[0] == "knowledge-engine"` (KE-Index ist autoritativ) | **kein** `docs/INDEX.md` schreiben; `skipped` + `log.note("docs-consolidation", "knowledge-engine index is authoritative")` | `spec_plan_scaffold.py:40-44`; **Szenario 52** (`asserts/52:44` `[ ! -e "docs/INDEX.md" ]`) |
+| `resolve_index_mode(config)[0] == "knowledge-engine"` (KE-Index ist autoritativ) **und** `docs-consolidation.index-owner` **nicht** `docs-consolidation` (Abwesenheits-Default `auto`, IC-25) | **kein** `docs/INDEX.md` schreiben; `skipped` + `log.note("docs-consolidation", "knowledge-engine index is authoritative")` | `doc_renderer.py:702-703` (Bedingung), `:277` (`KE_AUTHORITATIVE_REASON`); **K-4:** Anker `spec_plan_scaffold.py:40-44` → **`:80-97`** (gemessen); **Szenario 52** (`asserts/52:44` `[ ! -e "docs/INDEX.md" ]`); **AC-21**, **AC-43** (pinnt die Absenz-Semantik) |
+| **`docs-consolidation.index-owner: docs-consolidation`** (agent-meta-Ausnahme, IC-25) und `index-mode` **nicht** `skeleton` | `docs/INDEX.md` wird geschrieben, **auch** bei `resolve_index_mode() == "knowledge-engine"` — die KE-Autorität gilt **nur** für Projekte **ohne** diese Deklaration; `log.note` nennt den Grund **nicht** | IC-25/IC-26; `doc_renderer.py:810-814`, `:821-824`, `:861`; **AC-42**. **Zur Freigabe ausstehend (P-1, §17.12.1)** |
+| `docs-consolidation.index-owner` **weder** `auto` **noch** `docs-consolidation` | **kein** Schreibvorgang; `skipped` + **eigener** Grund `UNKNOWN_INDEX_OWNER_REASON` (fail-closed) | IC-25 Fail-closed-Zweig (1) — **die einzige *garantierte* Absicherung**: das Schema ist Autocomplete-/Tippfehler-**Konvention**, `enum` + `additionalProperties: false` (`config/project-config.schema.json:2470`) greifen **nur**, wenn `jsonschema` installiert ist; die Schema-Validierung im Sync-Pfad ist **best-effort** (`scripts/lib/config.py:342` „**if** jsonschema is available", `:388` „jsonschema not installed or validation error — best-effort", `pass`). Fehlt das Modul, bleibt allein der Codepfad. **AC-44** |
 | `resolve_index_mode(config)[0] == "file-index"` und Ziel ist **nicht** das Scaffold-Skeleton | **kein** `docs/INDEX.md` schreiben; `skipped` + `log.note(..., "file-index fallback owned by scaffold")` | **Szenarien 54/55/56** (`asserts/54:27`, `asserts/55:25` `grep -q 'File-based index fallback'`) |
 | `resolve_index_mode(config)[0] == "file-index"` und Ziel **ist** das Scaffold-Skeleton (Präfix-Erkennung) | Voll-Index **einmalig** ersetzen | IC-15, F20, `asserts/54:26-27` |
 | Ziel existiert **nicht** (agent-meta selbst, vor W3) | Voll-Index anlegen | IC-10 |
@@ -1331,11 +1481,16 @@ def sync_docs_consolidation(
 **Besitzregel (K5-Kern, verbindlich):** Der Generator **besitzt `docs/INDEX.md` nur dann,
 wenn er sie selbst erzeugt hat** — d. h. wenn das Ziel vorher nicht existierte, **oder** wenn
 es das Scaffold-Skeleton ist. Er überschreibt **nie** eine Datei, die ein anderer Writer
-legitim geschrieben hat. Ohne diese Regel hätte die Spec (mit `enabled: true` als
-Abwesenheits-Default) in den Szenario-Fixtures — die keinen `docs-consolidation`-Key führen
-(`run.sh:46-52` kopiert `tests/scenarios/configs/*.project.yaml` unverändert nach
-`$tmp/.meta-config/project.yaml`) — den Scaffold-Skeleton mit dem Voll-Index überschrieben
-und die Szenarien 54/55/56 sowie 52 gebrochen (AC-38).
+  legitim geschrieben hat. Ohne diese Regel hätte die Spec (mit `enabled: true` als
+  Absenz-Default) in den Szenario-Fixtures — die keinen `docs-consolidation`-Key führen
+  (`run.sh:46-52` kopiert `tests/scenarios/configs/*.project.yaml` unverändert nach
+  `$tmp/.meta-config/project.yaml`) — den Scaffold-Skeleton mit dem Voll-Index überschrieben
+  und die Szenarien 54/55/56 sowie 52 gebrochen (AC-38).
+  **Die agent-meta-Ausnahme (IC-25) schwächt diese Regel nicht ab** (IC-26/3): eine fremde
+  Datei ohne Scaffold-Marker und ohne `doc-indexer/1` wird auch mit
+  `index-owner: docs-consolidation` **nicht** überschrieben (`doc_renderer.py:855-858`,
+  `OWNERSHIP_REASON` `:255-259`); gepinnt in **AC-44**. **Zur Freigabe ausstehend (P-1,
+  §17.12.1).**
 
 #### IC-14 — Fact-Hash-Footer (Diff-Stabilität)
 
@@ -1352,8 +1507,8 @@ und die Szenarien 54/55/56 sowie 52 gebrochen (AC-38).
 
 ```python
 # scripts/lib/spec_plan_scaffold.py
-DEFAULT_FALLBACK_INDEX = "docs/INDEX.md"   # :23  — bleibt identisch
-_FILE_INDEX_SKELETON = "…"                  # :24  — bleibt identisch
+DEFAULT_FALLBACK_INDEX = "docs/INDEX.md"   # :28  — bleibt identisch (K-80, RVW8-8)
+_FILE_INDEX_SKELETON = "…"                  # :29  — bleibt identisch (K-80, RVW8-8)
 _FILE_INDEX_SKELETON_MARKER = "File-based index fallback"   # NEU
 
 def is_file_index_skeleton(text: str) -> bool:
@@ -1370,6 +1525,21 @@ der Generator schreibt **nie** einen Skeleton.
 Regressionsschutz: Szenarien 54/55/56 (`registry.md:97-103`,
 `asserts/54-spec-plan-external-override.sh:26-27`, `asserts/55-spec-plan-ke-off-fallback.sh:24-25`,
 `asserts/56-spec-plan-preset-coupling.sh:31`) sowie AC-38.
+
+**Ergänzung Rev. 0.8 (P-2, §17.12.1 — IC-15 war unvollständig, nicht falsch).** Der Absatz
+regelt ausschließlich den **Skeleton**-Fall und setzt dafür
+`resolve_index_mode() == "file-index"` voraus. In agent-meta entsteht `docs/INDEX.md` jedoch
+**ohne** Skeleton, als **Neuanlage** — `resolve_index_mode()` löst dort `"knowledge-engine"` auf
+(`spec_plan_scaffold.py:80-97`; `.meta-config/project.yaml:69` + `:77` + `:15`), der Scaffold
+schreibt also **nichts** (`spec_plan_scaffold.py:116` bleibt `False`), und der Generator nimmt
+den `FileNotFoundError`-Zweig (`doc_renderer.py:829-830`, Tag `CREATE`). **Verbindlich ergänzt:**
+**Zweite Schreibbedingung** — Ziel existiert **nicht** ⇒ Voll-Index anlegen, sofern
+`docs-consolidation.enabled == true` **und** `index-mode` **nicht** `skeleton` **und**
+`index-owner` **nicht** fail-closed (IC-25). Diese Bedingung ist **unabhängig** von
+`resolve_index_mode()`; sie macht den Fall „KE-Modus **und** Ausnahme" erst **spezifizierbar**
+und ist der Grund, weshalb W3-6 in agent-meta überhaupt etwas schreiben kann. **Zur Freigabe
+ausstehend (P-2).** Gepinnt in **AC-42** (Override ⇒ `CREATE`), **AC-20** (Skeleton-Fall
+unverändert) und **AC-43** (derselbe Aufbau **ohne** den Key ⇒ `skipped`).
 
 #### IC-16 — `scripts/lib/generated_file_drift.py` :: Docs-Dateien in die Hash-Baseline
 
@@ -1412,6 +1582,169 @@ ein Key-Design-Wechsel:
 
 - `drift-allowlist.yaml` (`generated_file_drift.py:37`, `allow-edits`) gilt unverändert auch
   für Doku-Pfade — mit der Basis-Pfad-Regel oben.
+
+#### IC-25 — `docs-consolidation.index-owner`: Eigentümerdeklaration für `docs/INDEX.md` (Rev. 0.8, **P-1** — zur Freigabe ausstehend)
+
+> **Zweck dieses Vertrags.** W3-6 scheitert heute an **einer** Codezeile:
+> `doc_renderer.py:702-703` — `if resolve_index_mode(config)[0] == "knowledge-engine": return
+> KE_AUTHORITATIVE_REASON`. In agent-meta löst `resolve_index_mode()` genau diesen Wert auf
+> (`.meta-config/project.yaml:69` `index.mode: knowledge-engine`, `:77`
+> `external-system-override.enabled: false`, `:15` `knowledge-engine.enabled: true` ⇒
+> `false or not true` ⇒ **kein** Absenken auf `file-index`; `spec_plan_scaffold.py:80-97`).
+> IC-25 verengt **ausschließlich den Auslöser** dieses **einen** Gates. **Kein** dritter
+> blockierender Eigentümer, **keine** Änderung an `resolve_index_mode()`, **keine** Änderung an
+> der Besitzregel (IC-13), an `is_file_index_skeleton()` (IC-15) oder am `dry_run`-Vertrag.
+> **Der Code enthält keine agent-meta-Kenntnis** — die Ausnahme entsteht dadurch, dass **nur**
+> agent-meta den Key setzt. Beleg der Begrenztheit: DECISION-1…DECISION-4 (§17.12.3),
+> Begrenztheitsvertrag IC-26, Messbeleg AC-42…AC-46 (§7 M2).
+
+```python
+# scripts/lib/doc_renderer.py — neue Modulkonstanten neben :270-275
+
+INDEX_OWNER_AUTO: str = "auto"
+"""Abwesenheits-Default von ``index-owner`` — die Modus-Aufloesung entscheidet
+( wortwoertlich IC-13, Zeile 2 )."""
+
+INDEX_OWNER_GENERATOR: str = "docs-consolidation"
+"""Dieser Generator erklaert sich zum Eigentuemer von ``docs/INDEX.md``."""
+
+KE_OVERRIDE_REASON: str = (
+    "index-owner: docs-consolidation — the docs generator owns docs/INDEX.md in "
+    "this project"
+)
+"""Optionaler Audit-Hinweis, **kein** Pflicht-Log. **Gemessen** ist: der Aufrufer loggt
+ausschliesslich, wenn das Gate einen Grund liefert (``doc_renderer.py:810-814``); im
+erlaubten Zweig wird **nichts** geloggt. Deshalb ist diese Konstante **nicht** Teil des
+gepinnten Interface-Contracts — sie darf als Konstante existieren, **ohne** Pflicht zu sein.
+**Verbindlich** ist allein die negative Zusage: der Log nennt ``KE_AUTHORITATIVE_REASON``
+in diesem Fall **nicht** (AC-42c). Ob zusaetzlich ein Override-Hinweis geloggt wird, ist eine
+**Plan**-Entscheidung, **keine** Spec-Pflicht (V-D5, §17.12.5)."""
+
+UNKNOWN_INDEX_OWNER_REASON: str = (
+    "index-owner is neither 'auto' nor 'docs-consolidation' — not written "
+    "(fail-closed, IC-22)"
+)
+"""Grund fuer einen unbekannten Wert — eigener Grund, damit die Liste der blockierenden
+Eigentuemer **geschlossen** bleibt (``doc_renderer.py:685-686``); Muster ist
+``UNKNOWN_INDEX_MODE_REASON`` (``:285-299``): ein Wert, der nichts bedeutet, darf keinen
+wahren Satz loggen."""
+```
+
+**Geänderte Entscheidungsfolge in `_index_mode_block_reason()`** (`doc_renderer.py:663-711`) —
+**jeder** Schritt kann nur konservativer werden; die Reihenfolge **ist** der Vertrag
+(`:729-731`):
+
+> **Warum Zweig (1) die einzige *garantierte* Absicherung ist (RVW8-6, K82).** Das `enum` des
+> Schemas (`config/project-config.schema.json:2421-2470`) ist Autocomplete und
+> Tippfehler-**Konvention**. Die Schema-Validierung im Sync-Pfad ist **best-effort** und läuft
+> **nur**, wenn `jsonschema` verfügbar ist: `scripts/lib/config.py:342` („Schema validation … **if**
+> jsonschema is available"), `:372-388` („jsonschema not installed or validation error —
+> **best-effort**", `pass`). Fehlt das Modul, validiert **nichts** — `index-owner: "agent-meta"`
+> wäre dann ein gültiger Config-Wert mit unbekannter Wirkung. Der Zweig (1) ist deshalb **nicht**
+> durch „Enum zu lassen" vertretbar; er ist die Zusage, AC-44(c) pinnt ihn, und die
+> Konvention darf ihn **nicht** ersetzen.
+
+```python
+def _index_mode_block_reason(config: dict) -> str | None:
+    block = config.get("docs-consolidation")
+    block = block if isinstance(block, dict) else {}
+    owner = block.get("index-owner", INDEX_OWNER_AUTO)
+    if owner not in (INDEX_OWNER_AUTO, INDEX_OWNER_GENERATOR):
+        return UNKNOWN_INDEX_OWNER_REASON      # (1) fail-closed, VOR der KE-Pruefung
+    if (
+        owner == INDEX_OWNER_AUTO
+        and resolve_index_mode(config)[0] == "knowledge-engine"
+    ):
+        return KE_AUTHORITATIVE_REASON          # (2) unveraendert, nur bedingt
+    mode = block.get("index-mode", DEFAULT_INDEX_MODE)
+    if mode == SKELETON_INDEX_MODE:
+        return SKELETON_MODE_REASON             # (3) unveraendert
+    if mode != FULL_INDEX_MODE:
+        return UNKNOWN_INDEX_MODE_REASON        # (4) unveraendert
+    return None
+```
+
+**Warum genau diese Reihenfolge (Vertrag, nicht Geschmack):** Der Fail-closed-Zweig (1) steht
+**vor** der KE-Prüfung, damit ein Tippfehler nie als „KE ist autoritativ" fehlgedeutet wird —
+dasselbe Argument, mit dem der Bestand die KE-Prüfung vor den `index-mode`-Zweig legt
+(`:682-694`). Der Zweig (2) ist eine **Verengung** (`auto and KE`), **keine** Erweiterung:
+`index-owner: docs-consolidation` kann **keinen** Eigentümer entfernen, nur **einen** Auslöser
+stilllegen. **Verbindliche Wertetabelle** (jede Zeile ist durch **AC-42…AC-44** gepinnt):
+
+| `index-owner` | `resolve_index_mode()` | `index-mode` | Ergebnis |
+|---|---|---|---|
+| Key **fehlt** (Default `auto`) | `knowledge-engine` | beliebig | `KE_AUTHORITATIVE_REASON` — **identisch zum heutigen Verhalten** (`:702-703`) |
+| Key **fehlt** | `file-index` / `off` | `full` | `None` — **identisch zum heutigen Verhalten** |
+| Key **fehlt** | beliebig | `skeleton` | `SKELETON_MODE_REASON` — **identisch** |
+| `docs-consolidation` | `knowledge-engine` | `full` | **`None`** ⇒ Schreiben erlaubt — **die agent-meta-Ausnahme** |
+| `docs-consolidation` | `knowledge-engine` | `skeleton` | `SKELETON_MODE_REASON` — **Gegenprobe: die Ausnahme hebt (3) nicht auf** |
+| beliebiger / unbekannter Wert | beliebig | beliebig | `UNKNOWN_INDEX_OWNER_REASON`, **kein** Schreiben (fail-closed) |
+
+**Schema-Eintrag** (verbindlich, Muster `config/project-config.schema.json:2430-2438`), in
+`docs-consolidation.properties` (`:2424-2469`); `additionalProperties: false` (`:2470`) bleibt
+⇒ ein Tippfehler wie `index-owner: agent-meta` oder `index-owner: docs` ist ein
+**Schema-Fehler**, kein stiller No-op:
+
+```json
+"index-owner": {
+  "type": "string",
+  "enum": ["auto", "docs-consolidation"],
+  "default": "auto",
+  "description": "auto = the resolved index mode decides (IC-13). docs-consolidation = this project declares the docs generator the owner of docs/INDEX.md, so a knowledge-engine mode does not block the write. Fail-off: absent means auto."
+}
+```
+
+**Warum `auto` und nicht `knowledge-engine` als Default:** `auto` ist wortwoertlich das heutige
+Verhalten („die Modus-Aufloesung entscheidet") und haelt die Absenz-Semantik von IC-13 Zeile 2
+**wortgleich**; ein Default `knowledge-engine` wuerde eine Aussage treffen, die es ohne Key gar
+nicht gibt. Ein **expliziter** Wert `knowledge-engine` im Enum wird **bewusst nicht
+eingefuehrt** (DECISION-2, §17.12.3 — er wuerde einen **dritten** blockierenden Eigentuemer in die
+geschlossen dokumentierte Liste aufnehmen und `:685-686` widersprechen).
+
+#### IC-26 — Begrenztheitsvertrag der agent-meta-Ausnahme (Rev. 0.8, **P-1/P-5** — zur Freigabe ausstehend)
+
+1. **Wirkung ausschliesslich auf `docs/INDEX.md`.** `index-owner` wird an **genau einer**
+   Stelle gelesen (`_index_mode_block_reason`, `doc_renderer.py:663-711`); diese Funktion ist
+   ausschliesslich fuer den Index-Writer zustaendig (`sync_docs_consolidation` `:714`, Aufrufer
+   `sync_pipeline.py:985` → `:958`). Die Hybrid-Regionen von **W3-7** laufen ueber
+   `apply_fact_blocks()` (`doc_renderer.py:183`) und werden **nicht** beruehrt (E-10, §17.12.2).
+2. **`resolve_index_mode()` bleibt unveraendert** (`spec_plan_scaffold.py:80-97`). Folge in
+   agent-meta: der Scaffold schreibt **weiterhin kein** Skeleton (`spec_plan_scaffold.py:116`
+   bleibt `False`). Die B2-Invariante „Scaffold zuerst, Generator ersetzt das Skeleton
+   **einmalig**" (IC-12, IC-15, R7) ist damit **nicht** gebrochen, sondern fuer agent-meta
+   **sachlich gegenstandslos**: es gibt nur **einen** Writer und **einen** Erstschreibvorgang
+   (`CREATE`, `doc_renderer.py:829-830`). Sobald die Datei existiert, greift der Besitzzweig
+   ueber `_carries_generator_id()` (`:644-655`, ID `doc-indexer/1` `:310`) ⇒ der zweite Lauf
+   meldet `unchanged` (`:845-848`), **null** Aktionen. Gepinnt in **AC-20** (unveraendert),
+   **AC-42** (einmalig), **AC-45** (`dry_run`).
+3. **Besitzregel unveraendert** (IC-13): eine fremde Datei **ohne** Scaffold-Marker und **ohne**
+   Generator-ID wird auch mit `index-owner: docs-consolidation` **nicht** ueberschrieben
+   (`:855-858`, `OWNERSHIP_REASON` `:255-259`). Gepinnt in **AC-44**.
+4. **`is_file_index_skeleton()` unveraendert** (`spec_plan_scaffold.py:41-77`), einschliesslich
+   der dokumentierten **permissiven** Marker-Suchrichtung (`:52-68`) — **kein** Eingriff, **keine**
+   Verengung des Übernahmeradius.
+5. **`dry_run`-Vertrag unveraendert** (IC-13, AC-23, AC-45): genau **ein** `write_checked`
+   (`:861`), im Dry-Run nur Aenderungserkennung, Action getaggt `WOULD-CREATE`/`WOULD-UPDATE`
+   (`:867`).
+6. **Consumer unberuehrt.** **Kein** Szenario-Fixture enthaelt einen `docs-consolidation`-Key
+   (Grep ueber `tests/scenarios/configs/*.project.yaml` ⇒ **0** Treffer; IC-22-Absatz `:1553-1557`;
+   `tests/scenarios/run.sh:46-52` spielt sie 1:1 ein) ⇒ `enabled` fail-off ⇒ die Ausnahme ist
+   fuer die Szenarien **per Konstruktion unerreichbar**. Szenarien **50/51/52/54/55/56** bleiben
+   **ohne** Aenderung gruen (AC-38, NG-10).
+7. **KE-Modi der Consumer unveraendert.** `knowledge.py:185-196` liest `resolve_index_mode()`
+   unveraendert; `knowledge/wiki/index.md` bleibt Eigentum der KE (`knowledge.py:163-169`).
+8. **Kein Provider-Name, kein Projektname im Code.** Der Schluessel-Wert ist **kein** Projektname
+   (`docs-consolidation` = Feature-Name, nicht Repo-Name) und **kein** Vorkommen von
+   `platforms[0]` (`.meta-config/project.yaml:80-81` fuehrt `agent-meta` — der Key-Vergleich
+   benutzt dieses Feld **nicht**). Nachweis: Guard `tests/test_provider_agnostic_dispatch.py`
+   (bestehend) und Policy `.opencode/skills/provider-agnostic/SKILL.md:12-18` (Config-Keys statt
+   `if provider == "Name"`; gleichlautend `AGENTS.md:50`). **Keine** Repo-Struktur-Erkennung:
+   von der APPROVED-Fassung bereits entschieden (R17, Risikotabelle §12.2 — „Ein ‚agent-meta-Eigenerkennung'-
+   Heuristik-Gate wird **nicht** gebaut") und unabhaengig davon im Code der
+   `docs_consolidation_enabled`-Common-Gate (IC-05) festgehalten
+   (`scripts/consistency-check.py:144-145`).
+9. **Kein `facts-hash`-Churn.** `index-owner` fliesst **nicht** in `compute_doc_facts()` ein
+   ⇒ **kein** Churn, **kein** AC. Festgehalten, damit es nicht erneut aufgerollt wird (§17.12.2).
 
 ### 5.3 Modul M3 — Migration
 
@@ -1537,6 +1870,7 @@ nicht in einem `agents/1-generic/`-Template-Diff landet. Risiko **R19**; Rollbac
 | `docs-consolidation.checks.strict` | dito (neu) | `false` | `true` (ab W3) | V1 als ERROR vs. WARNING (B4) |
 | `docs-consolidation.sources` | dito (neu) | `[]` | `[README.md, llms.txt, ARCHITECTURE.md]` | Liste der hybrid-Dateien; leer = kein Rendering (NG-9) |
 | `docs-consolidation.volatile-facts` | dito (neu) | `[DOCS_SCENARIO_COUNT]` | dito | Fakten, die in Hybrid-Dateien unterdrückt und aus dem `facts-hash` ausgeschlossen werden (R1) |
+| **`docs-consolidation.index-owner`** (Rev. 0.8, **P-3**, **IC-25**) | dito (neu) | **`auto`** | **`docs-consolidation`** (explizit, in **W3-6**) | Deklariert den Eigentuemer des Pfads `docs/INDEX.md`. `auto` = die Modus-Aufloesung entscheidet (wortwoertlich IC-13 Zeile 2); `docs-consolidation` = **dieses** Projekt erklaert den Doku-Generator zum Eigentuemer, dann blockiert ein `knowledge-engine`-Modus das Schreiben **nicht**. Fail-off: **abwesend = `auto`**. Verengt **ausschliesslich** den KE-Vorrang-Zweig in `_index_mode_block_reason` (`doc_renderer.py:702-703`) auf `docs/INDEX.md`; **kein** Eigentuemer wird hinzugefuegt (DECISION-2). **Zur Freigabe ausstehend.** |
 | `knowledge-engine.okf.index-mode` | `.meta-config/project.yaml:18-29` (ergänzt) | `llm` | `llm` für ein Release, danach `generated` | Generator an/aus (T-6, Rollback W7) |
 
 **Selbstwiderspruch aufgelöst (K5, rev. 0.2).** Rev. 0.1 schrieb: „Alle Keys sind **additiv**;
@@ -1547,8 +1881,8 @@ unvereinbar: `true` **ist** ein Verhaltenswechsel bei Abwesenheit. Die auflösen
 `ke_config.get("enabled", False)` — „nicht explizit `true`" heißt „aus", und zwar für den
 Knowledge-Engine-Writer (`:127-129`) **und** für dessen Auto-Index-Schalter (`:132`
 `okf.get("auto-index", True)` folgt derselben Logik). Genau diese Regelung wird hier für
-`docs-consolidation.enabled` übernommen, **für alle sechs Keys** und **für Writer und Checks
-gleichermaßen**.
+`docs-consolidation.enabled` übernommen, **für alle sieben Keys** (Rev. 0.8: `index-owner`
+tritt hinzu, **P-3**) und **für Writer und Checks gleichermaßen**.
 
 **Konsequenz, die explizit benannt wird (K5):** Die Szenario-Fixtures
 `tests/scenarios/configs/*.project.yaml` werden von `tests/scenarios/run.sh:46-52`
@@ -1904,10 +2238,19 @@ noch `::test_…` und meinen dieselbe Datei.
 - **AC-21** (IC-15, IC-13) Given **dieselbe** Ausgangslage, aber `index-mode: skeleton`,
   when `sync_docs_consolidation()` läuft, then bleibt `docs/INDEX.md` byte-identisch zum
   Scaffold-Skeleton (`is_file_index_skeleton(text) is True`). Given **dieselbe** Ausgangslage,
-  aber `resolve_index_mode() == "knowledge-engine"` (KE autoritativ, Szenario 52), when
+  aber `resolve_index_mode() == "knowledge-engine"` (KE autoritativ, Szenario 52) **und**
+  `docs-consolidation.index-owner` **nicht** gesetzt (Abwesenheits-Default `auto`, IC-25), when
   `sync_docs_consolidation()` läuft, then wird **kein** `docs/INDEX.md` geschrieben, der
   Eintrag steht in `skipped`, und ein `log.note` nennt den Grund.
-  *Test `::test_skeleton_mode_preserves_scaffold` + `::test_ke_authoritative_writes_no_index`.*
+  **Bedingung Rev. 0.8 (P-4, §17.12.1 — **die KE-Autorität ist ab hier eine bedingte, keine
+  ungefähre Vorbedingung**):** dieser zweite Block gilt **nur** für Projekte **ohne** die
+  Deklaration `index-owner: docs-consolidation`. Für den deklarierenden Override gilt
+  **AC-42** (Schreiben erlaubt) und **AC-44** (der Override hebt `index-mode: skeleton` und die
+  Besitzregel **nicht** auf); für den **unveränderten** Bestand bleiben **AC-21** und **AC-38**
+  wortgleich gültig. **Zur Freigabe ausstehend.**
+  *Test `::test_skeleton_mode_preserves_scaffold` + `::test_ke_authoritative_writes_no_index` —
+  **beide unverändert**, ihre Fixtures setzen den Key nicht
+  (`tests/test_doc_renderer.py:2486-2488` bzw. `:2481-2484`).*
 - **AC-22** (IC-12) Given die Stage-Reihenfolge, when `sync.py` läuft, then ruft
   `_sync_stage_docs_consolidation` **nach** `scaffold_spec_plan_dirs` (`sync_pipeline.py:935`)
   und **vor** `_sync_stage_generated_file_hash_capture` (`:1090-1099`).
@@ -1984,11 +2327,106 @@ noch `::test_…` und meinen dieselbe Datei.
   `mkdir` ab) ⇒ IC-13, letzte Zeile („Consumer ohne `docs/`-Verzeichnis → `skipped`, **kein**
   `mkdir`"); (3) `resolve_index_mode()` löst in 51 auf **`file-index`** (KE disabled
   `configs/51-…:7-8` **oder** `external-system-override.enabled: true` `:20-21`,
-  `spec_plan_scaffold.py:40-44`) und das Ziel ist **nicht** das Scaffold-Skeleton ⇒ IC-13,
+  `spec_plan_scaffold.py:80-97`; **K-4:** der frühere Anker `:40-44` ist veraltet — gemessen
+  beginnt `resolve_index_mode` bei `:80` und endet bei `:97`) und das Ziel ist **nicht** das Scaffold-Skeleton ⇒ IC-13,
   Zeile 3 („`file-index` und Ziel ist nicht das Scaffold-Skeleton → **kein** Schreiben").
   **Kein** Assert-Skript und **keine** Fixture-Config wird geändert (NG-10). *Test
   `tests/scenarios/run.sh 50 51 52 54 55 56`
   (bestehender Runner, keine neuen Dateien).*
+
+- **AC-42** (IC-25, IC-26, IC-15 — **neu, Rev. 0.8, P-1/P-2; ZUR USER-FREIGABE AUSSTEHEND**) —
+  **Modus A (agent-meta-Ausnahme).** Given der **Live**-Block aus
+  `.meta-config/project.yaml:398-401` **plus** `index-owner: docs-consolidation`, **plus**
+  `knowledge-engine: {enabled: true}` und `spec-plan-workflow.index.mode: knowledge-engine`
+  (⇒ `resolve_index_mode(config)[0] == "knowledge-engine"`, `spec_plan_scaffold.py:80-97`), when
+  `sync_docs_consolidation(..., dry_run=False)` in einem leeren `docs/`-Baum läuft, then
+  (a) `plan == {"written": ["docs/INDEX.md"], "unchanged": [], "skipped": []}`,
+  (b) **genau eine** Action mit Tag `CREATE` (`doc_renderer.py:829-830`, `:861`),
+  (c) `KE_AUTHORITATIVE_REASON` **nicht** im Log (verbindlich **negativ**; ein zusätzlicher
+  Override-Hinweis ist **nicht** gepinnt — V-D5, §17.12.5), (d) die geschriebene Datei trägt **beide**
+  Belege — der **`docs-facts`-Block** (`doc_renderer.py:629`, `lines.extend(_facts_section(facts))`,
+  Definition `:531`) **und** die **Generator-ID** im Fact-Hash-Footer (`doc_renderer.py:635-639`,
+  `FOOTER_BEGIN_MARKER` / `facts-hash` / `generator: doc-indexer/1` / `FOOTER_END_MARKER`; die
+  Marker-Konstante selbst steht bei `:371`) — was beweist, dass `compute_doc_facts()` (`:821-824`)
+  betreten wurde und der Lauf **nicht leer** war, und (e) ein **zweiter** Lauf meldet `unchanged` mit
+  **null** Aktionen (Besitzzweig über `_carries_generator_id()`, `:644-655`, `:845-848`).
+  **Modus B (Consumer im KE-Modus — dieselbe Konfiguration, nur ohne den Key).** Given
+  **identische** Konfiguration **ohne** `index-owner`, when dieselbe Funktion läuft, then
+  `plan == {"written": [], "unchanged": [], "skipped": ["docs/INDEX.md"]}`,
+  `KE_AUTHORITATIVE_REASON` im Log, **null** Aktionen, und der `project_root`-Baum ist
+  byte-identisch vorher/nachher. **Modus A und Modus B sind ein Testpaar** und unterscheiden
+  sich in **genau einem** Config-Wert.
+  *Tests **beide neu zu erstellen** in `tests/test_doc_renderer.py`:
+  `::test_index_owner_override_writes_in_a_ke_authoritative_project` (Modus A) und
+  `::test_index_owner_absent_keeps_the_ke_authoritative_block` (Modus B). Pin-Vorbild für die
+  Fixture-Technik: `_KE_AUTHORITATIVE_CONFIG` (`:2481-2484`) und `_scaffolded_root()`
+  (`:2510-2526`); Pin-Vorbild für den Tree-Vergleich: Muster `_tree_snapshot(root)` in
+  `:2571`/`:2635`. **Neu** gegenüber dem Bestand ist hier nur, dass der **Live**-Block
+  gelesen wird (Muster `_e2e_config()`, `:3209-3238`).*
+
+- **AC-43** (IC-25, IC-13, AC-21 — **neu, Rev. 0.8, P-4; ZUR USER-FREIGABE AUSSTEHEND**) —
+  **Die Absenz-Semantik ist wortgleich zum Bestand.** Given **keinerlei** `index-owner`-Angabe
+  (Default `auto`, `INDEX_OWNER_AUTO`), when `_index_mode_block_reason(config)` auf einer
+  KE-autoritiven Konfiguration läuft, then ist das Ergebnis **zeichengleich**
+  `KE_AUTHORITATIVE_REASON` (`doc_renderer.py:277`, `:702-703`) — **kein** neuer Grund, **kein**
+  zusätzlicher Log-Eintrag, **keine** veränderte Skip-Position. **Damit ist der Nachweis für
+  beide Modi in einem Test erbracht:** der Consumer-Pfad ist unverändert (Modus B aus AC-42), und
+  **nur** die Deklaration unterscheidet die Modi.
+  *Test **neu zu erstellen**:
+  `tests/test_doc_renderer.py::test_index_owner_absent_keeps_the_ke_authoritative_block` —
+  **derselbe** Test wie der Modus-B-Test aus AC-42 (eine Behauptung, zwei Modi; **keine**
+  Doppelpflege). Zusätzlich **bestehende, unveränderte** Pins für denselben Nicht-Override-Pfad:
+  `::test_ke_authoritative_writes_no_index` (`:2614`) und
+  `::test_ke_authoritative_writes_no_index_even_when_absent` (`:2650`).*
+
+- **AC-44** (IC-25, IC-26/3, IC-15, IC-22 — **neu, Rev. 0.8, P-1; ZUR USER-FREIGABE AUSSTEHEND**) —
+  **Die Ausnahme verengt das Gate, sie weicht nichts auf.** Given
+  `index-owner: docs-consolidation` **und** `index-mode: skeleton`, when
+  `sync_docs_consolidation()` läuft, then `skipped` + `SKELETON_MODE_REASON` und der
+  Scaffold-Skeleton bleibt byte-identisch (IC-15 unberührt). Given `index-owner:
+  docs-consolidation` **und** `index-mode: full` **und** ein **fremdes** Ziel (Text **ohne**
+  Scaffold-Marker und **ohne** `doc-indexer/1`), when dieselbe Funktion läuft, then `skipped` +
+  `OWNERSHIP_REASON` (`doc_renderer.py:855-858`) und **kein** Schreibzugriff. Given
+  `index-owner: "docs"` (unbekannter Wert), when dieselbe Funktion läuft, then `skipped` +
+  `UNKNOWN_INDEX_OWNER_REASON` und **kein** Schreibzugriff — fail-closed, **vor** jeder
+  KE-Prüfung (IC-25 Zweig (1)).
+  *Tests **neu zu erstellen**:
+  `tests/test_doc_renderer.py::test_index_owner_override_does_not_relax_skeleton_or_ownership`
+  (Fälle a und b) sowie
+  `::test_unknown_index_owner_is_fail_closed` (Fall c; Muster
+  `::test_unknown_index_mode_is_fail_closed`, `:2720-2737`). Bestehende, **unveränderte** Pins
+  für dieselben Zusagen: `::test_skeleton_mode_preserves_scaffold` (`:2559`),
+  `::test_skeleton_mode_creates_no_index_at_all` (`:2590`),
+  `::test_scaffold_guard_recognises_only_the_skeleton` (`:2529`).*
+
+- **AC-45** (IC-13, IC-26/5, AC-23 — **neu, Rev. 0.8; ZUR USER-FREIGABE AUSSTEHEND**) —
+  **`dry_run` bleibt schreibfrei unter dem Override.** Given
+  `index-owner: docs-consolidation` im KE-Modus **und** `dry_run=True`, when
+  `sync_docs_consolidation()` läuft, then sind **null** Dateisystem-Schreibvorgänge erfolgt
+  (Tree-Vergleich vorher/nachher), `written` enthält **dennoch** `docs/INDEX.md`, und die Action
+  ist `WOULD-CREATE` (nicht `CREATE`) getaggt (`doc_renderer.py:867`) — ein Dry-Run-Log darf
+  nicht als Schreibprotokoll lesbar sein. **Consumer-Modus:** dieselbe Konfiguration **ohne** den
+  Key ⇒ `written` bleibt **leer**, `skipped` enthält den Pfad; ein Dry-Run kann einen Skip
+  **nicht** vortaeuschen.
+  *Test **neu zu erstellen**:
+  `tests/test_doc_renderer.py::test_index_owner_override_keeps_dry_run_free_of_writes`.
+  Bestehender, **unveränderter** Pin für den Vertrag selbst: `::test_dry_run_no_writes` (AC-23).*
+
+- **AC-46** (IC-22, IC-25, AC-39 — **neu, Rev. 0.8, P-3 / P-3 (e); ZUR USER-FREIGABE AUSSTEHEND**) —
+  **Der Schema-Wächter pinnt die zwei Werte.** Given
+  `config/project-config.schema.json`, when `docs-consolidation.properties` geparst wird, then
+  existiert `index-owner` mit `enum == ["auto", "docs-consolidation"]` und `default == "auto"`.
+  Given eine `project.yaml` mit `index-owner: "docs-consolidation"`, when die Config validiert
+  wird, then ist die Schema-Validierung grün. Given `index-owner` mit einem der Werte
+  `"knowledge-engine"`, `"agent-meta"`, `"docs"` **oder** ein nicht-stringiger Wert, when
+  validiert wird, then `jsonschema.ValidationError` — der Schreibvorgang bleibt also
+  **fail-closed**, und ein Tippfehler ist ein **Validierungsfehler**, kein stiller No-op
+  (`additionalProperties: false`, `config/project-config.schema.json:2470`).
+  *Tests **neu zu erstellen** in `tests/test_docs_consolidation_migration.py`, Muster der
+  bestehenden Enum-Tests `::test_index_mode_enum_accepts_both_modes` (`:174-176`) und
+  `::test_index_mode_enum_rejects_everything_else` (`:179-182`) ⇒
+  `::test_index_owner_enum_accepts_both_values` und
+  `::test_index_owner_enum_rejects_everything_else`.*
 
 ### M3 — Migration
 
@@ -2033,13 +2471,30 @@ noch `::test_…` und meinen dieselbe Datei.
   gelesen wird, then enthält sie **vier** Einträge (die zwei alten + die zwei neuen Archivpfade,
   Ist-Stand `:61-63` hat zwei), und ein Sync mit einer der alten Pfade erzeugt eine
   Deprecation-WARNING statt eines Fehlers. *Test `::test_legacy_list_extended_additively`.*
-- **AC-39** (IC-17, M-11, R15 — **neu**) Given `config/project-config.schema.json`, when die
-  Datei geparst wird, then existiert ein **geschlossener** Top-Level-Block
-  `docs-consolidation` (`additionalProperties: false`) mit **genau** den sechs Properties aus
-  IC-22, und **keinem** Provider-Namen als Property-Namen. Given eine `project.yaml`, die
-  `docs-consolidation.enabled: true` setzt, when die Config geladen wird, then ist die
-  Schema-Validierung grün. *Test
-  `tests/test_docs_consolidation_migration.py::test_schema_block_present_and_closed`.*
+- **AC-39** (IC-17, M-11, R15, IC-22, IC-25 — **Zählung berichtigt in Rev. 0.8, P-3 (e) / „P-3-E"; ZUR
+  USER-FREIGABE AUSSTEHEND**) Given `config/project-config.schema.json`, when die Datei geparst
+  wird, then existiert ein **geschlossener** Top-Level-Block `docs-consolidation`
+  (`additionalProperties: false`, `config/project-config.schema.json:2470`) mit **genau** den
+  Properties aus IC-22, **keinem** Provider-Namen als Property-Namen, und **keinem** Projekt- oder
+  Repo-Namen. **Property-Zahl: Rev. 0.8 setzt den gemessenen Stand.** Der Block enthält **sechs**
+  Properties — `enabled`, `index-mode`, `checks`, `sources`, `volatile-facts`
+  (Schema-Block-Ist-Stand vor Rev. 0.8, `config/project-config.schema.json:2424-2469`, **und**
+  Test-Pin `tests/test_docs_consolidation_migration.py:45-51` — **nicht** ein `.meta-config`-Stand:
+  dort trägt der Block nur `enabled` und `checks.strict`, `.meta-config/project.yaml:398-401`)
+  **plus `index-owner`** (IC-25). **Die Zahl „sechs" aus
+  der Fassung bis Rev. 0.7 war bereits damals falsch**: der Block hatte **fünf** Properties
+  (gemessen `config/project-config.schema.json:2424-2469`), und der **gepinte** Test ebenfalls
+  **fünf** (`tests/test_docs_consolidation_migration.py:45-51`, `_EXPECTED_PROPERTIES`, geprüft
+  in `::test_schema_block_present_and_closed`, `:99-103`). **Der sechste Eintrag der IC-22-Tabelle
+  ist `knowledge-engine.okf.index-mode`** und liegt in einem **anderen** Block — deshalb war
+  „genau den sechs Properties aus IC-22" eine Verwechslung von **Tabelle** und **Block**.
+  **Verbindlich:** `_EXPECTED_PROPERTIES` wird um `index-owner` erweitert (**fünf → sechs**);
+  `::test_schema_block_present_and_closed` prüft die Block-Menge, und die IC-22-Tabelle zählt
+  **sieben** Zeilen. Given eine `project.yaml`, die `docs-consolidation.enabled: true` setzt, when
+  die Config geladen wird, then ist die Schema-Validierung grün. *Test
+  `tests/test_docs_consolidation_migration.py::test_schema_block_present_and_closed`
+  (bestehend, **Sollwert-Erweiterung** `_EXPECTED_PROPERTIES` `:45-51`) +
+  `::test_index_owner_enum_accepts_both_values` (AC-46, neu).*
 - **AC-40** (IC-02, IC-22 — **neu, schließt die W8-Lücke M3**) Given W8 abgeschlossen, when
   `llms.txt` gelesen wird, then kommt die Providerzahl **nicht** mehr als handgeschriebene
   Zahl im Fließtext vor, sondern ausschließlich aus einem `agent-meta:docs-*-Block`, dessen
@@ -2114,7 +2569,7 @@ noch `::test_…` und meinen dieselbe Datei.
 | AC-05 | W1 | `scripts/lib/doc_facts.py`, `scripts/lib/roles.py:129` (gelesen) | V5 |
 | AC-06 | W1 | `scripts/lib/consistency/placeholders.py:128-131` | — |
 | AC-25 | W1 | `scripts/lib/config.py:1861-1914`, `snippets/docs/repo-facts.md` (neu) | — |
-| AC-39 | W1 | `config/project-config.schema.json` (M-11) | — |
+| AC-39 | W1, **W3-6** | `config/project-config.schema.json` (M-11; Block `:2421`, Properties `:2424-2469`, `additionalProperties: false` `:2470`) | — (Schema-Form, per Unit-Test `::test_schema_block_present_and_closed`) |
 | AC-07 | W2 | `scripts/lib/consistency/docs.py`, `tests/fixtures/docs_v1_fixtures.md` | V1a, V1b |
 | AC-08 | W2 | `scripts/lib/consistency/docs.py`, `tests/fixtures/docs_v1_fixtures.md` | V1a, V1b |
 | AC-09 | W2 | `scripts/lib/consistency/docs.py`, `README.md:721-723` | V3 |
@@ -2130,7 +2585,7 @@ noch `::test_…` und meinen dieselbe Datei.
 | AC-18 | W3 | `scripts/lib/doc_renderer.py` (IC-10/IC-14) | — (Determinismus, per Unit-Test) |
 | AC-19 | W3 | `scripts/lib/generated_file_drift.py:344-349, :379-386, :405-425` | — (Drift-Store, per Unit-Test) |
 | AC-20 | W3 | `scripts/lib/spec_plan_scaffold.py:24, :62-68`, `scripts/lib/doc_renderer.py` | V4 |
-| AC-21 | W3 | `scripts/lib/spec_plan_scaffold.py:27-44`, `.meta-config/project.yaml` (neuer Key) | V4 |
+| AC-21 | W3 | `scripts/lib/spec_plan_scaffold.py:28-30, :80-97`, `.meta-config/project.yaml` (neuer Key `index-owner`, **bedingt** — AC-21 gilt nur, wenn der Key **nicht** gesetzt ist, §7 AC-21 Modus B / P-4) | V4 |
 | AC-22 | W3 | `scripts/lib/sync_pipeline.py:922-945`, `scripts/lib/spec_plan_scaffold.py:40-44` | — |
 | AC-23 | W1 | `scripts/lib/doc_renderer.py`, `scripts/lib/knowledge.py` (später) | — |
 | AC-24 | W1 | `.meta-config/project.yaml` (neuer Key `docs-consolidation.enabled`) | — |
@@ -2148,6 +2603,11 @@ noch `::test_…` und meinen dieselbe Datei.
 | AC-34 | W7 | `scripts/lib/knowledge.py`, `knowledge/wiki/log.md:13-17` | — |
 | AC-35 | W7 | `scripts/lib/knowledge.py`, `agents/1-generic/knowledge-indexer.md`, `knowledge/schema.md:41-46` | — |
 | AC-41 | W7 | `scripts/lib/knowledge.py::restore_wiki_index` (IC-24) | — |
+| AC-42 | **W3-6** | `scripts/lib/doc_renderer.py:663-711` (IC-25 Entscheidungsfolge, Zweig (1)/(2)); `tests/test_doc_renderer.py` (**5 neue Tests**, §17.12.4 T-2) | — (Unit-Test; Paar Modus A/B, §9.1 V-Check-Spalte) |
+| AC-43 | **W3-6** | `scripts/lib/doc_renderer.py:277, :702-703`; `tests/test_doc_renderer.py` (1 neu + 2 **bestehend unverändert** `:2614`, `:2650`) | — (Unit-Test, Absenz-Semantik) |
+| AC-44 | **W3-6** | `scripts/lib/doc_renderer.py:255-259, :663-711`; `tests/test_doc_renderer.py` (2 neu; bestehend `:2529`, `:2559`, `:2590`) | — (Unit-Test; `skeleton`/Besitzregel) |
+| AC-45 | **W3-6** | `scripts/lib/doc_renderer.py:861-867` (`write_checked` / Dry-Run-Tag); `tests/test_doc_renderer.py` (1 neu; `::test_dry_run_no_writes`, AC-23, unverändert) | — (Unit-Test, `dry_run`) |
+| AC-46 | **W3-6** (T-8/T-3/T-5, Reihenfolge **V-D7**), Doku-Teil **E-13-abhängig** (offen) | `config/project-config.schema.json:2421-2470` (Property `index-owner`); `tests/test_docs_consolidation_migration.py` (T-5: 2 neue Enum-Tests; T-3 `_EXPECTED_PROPERTIES` `:45-51`; T-4 Kommentar `:42-44`) | — (Unit-Test, Schema-Form) |
 
 **V-Check-Spalte, korrigiert (M2).** Rev. 0.1 mappte sachfremde Checks: AC-19 (Marker-Body-Drift)
 → V9 `check_stale_backups` (Backup-Leichen) ist **falsch**, AC-18 (Footer-Determinismus) → V2 und
@@ -2155,6 +2615,18 @@ AC-29 (Stub-Form) → V3/V4 sind **irrelevant**. Neu: AC-19, AC-37, AC-38, AC-34
 sind Invarianten **ohne** Konsistenz-Check (Store-, Szenario- und Restore-Ebene) und werden
 per Unit-Test bzw. bestehendem Runner abgesichert — das ist die in §16 geforderte Begründung,
 kein Lückenbleiben.
+
+**Nachtrag Rev. 0.8 (K-79, RVW8-3 — schließt dieselbe Lücke für AC-42…AC-46).** AC-42…AC-46 sind
+**Gate-Ebene**-Invarianten, keine Dokumenteigenschaften: sie handeln vom *Zustand des Generators*
+(erlaubt/verweigert, fail-closed, `dry_run`) bzw. von der *Form des Schemas*. V1–V9 lesen
+`docs/**` bzw. `README.md` — **keiner** von ihnen beobachtet den Verzweig in
+`_index_mode_block_reason()`. Eine Zuordnung wäre **Scheinpräzision** (dieselbe Fehlerklasse wie
+AC-19/V9, die Rev. 0.1 zurückgenommen hat). Sie werden daher durch die in §17.12.4 benannten
+Unit-Tests mit festen Namen abgesichert (`::test_index_owner_*` in `tests/test_doc_renderer.py`;
+`::test_index_owner_enum_*` + `::test_schema_block_present_and_closed` in
+`tests/test_docs_consolidation_migration.py`). **AC-42(a)(b)(c)** sind zusätzlich durch den
+W3-6-Nachweis `python3 scripts/sync.py --dry-run` bzw. den zweiten Sync-Lauf (§17.12.4 Zeile „W3-6
+Kernlieferung") end-to-end belegt.
 
 **Entfernter Beleg der AC-30-Zeile — `docs/REQUIREMENTS.md:21` (Rev. 0.6, K23; die Zeile selbst
 bleibt bestehen, nur der Beleg ist berichtigt).** Die Trace-Matrix nannte bis Rev. 0.5
@@ -2177,19 +2649,32 @@ behebbar (§17.10.2).
 | W0 | — | Design-Freeze, Contract-Liste, **ein Wellen-Branch für das gesamte Vorhaben** (`feat/repository-documentation-consolidation-main`, Basis `origin/main`) mit **einem** PR gegen `main`; Wellen-Zuordnung über die **Wellenkennung im Commit-Titel**. **Rev. 0.4 — Ausführungskorrektur 2026-09-26 (OP-1):** ersetzt die Fassung Rev. 0.1–0.3 „**ein Branch pro Welle** (`chore/docs-consolidation-w<N>`), gestapelte PRs"; Einzelheiten und Belege in §17.6, Verbindlichkeitsformulierung im Absatz „PR-/Branch-Strategie" direkt unter dieser Tabelle — Entscheidungs-Records zu OQ2/OQ6/OQ8 — **OQ6/OQ8 entschieden 2026-09-26** (§11.2: `docs/INDEX.md` tracked, **kein** `.gitignore`-Eintrag; Regeneration über Sync/Validator) | — | — | — | — |
 | W1 | M1+M2 | C1 DocFacts, C2 DocRenderer, C3 Snippet-Bridge, `config/doc-facts-expected.yaml`; Schema-Block (M-11); **rein additiv**, kein Datei-Diff außer `llms.txt` | AC-01…AC-06, AC-23…AC-25, AC-39 | W0 | W2 (verschiedene Dateien) | revert; kein Datei-Diff |
 | W2 | M1 | Checks V1a/V1b, V3, V5, V6 (inkl. Sollwert-Vergleich), V7; **V1 startet WARNING**; V1-Fixture; **Rev. 0.6 (U-1/K18): Modul-Split — `consistency/docs.py` wird zur Fassade, die Prüfebene wird auf `docs_links.py` / `docs_freshness.py` / `docs_wiki.py` / `docs_index.py` aufgeteilt (Modulgrenzen §4.1), verhaltensneutral über den Task W2-0**. **Rev. 0.7: W2 hat 10 Tasks** — zusätzlich **W2-9** (E-8, Ledger-Writer, Phase 0) und **W2-8** (E-6, Volltests entkoppeln, vor W2-7); **fünftes** Modul `docs_freshness_v5.py` (E-7, §4.1); V4 prüft nur noch den **README-Index-Scope** (E-5, IC-05) | AC-07…AC-11, AC-13, AC-36 | W1 (V6 braucht C1) | W3 | `docs-consolidation.checks.strict: false`; zusätzlich `git rm` der **fünf** neuen Module |
-| W3 | M2 | `docs/INDEX.md`-Generator + C8 Scaffold-Guard + Besitzregel; volatile-Sektion; Allowlist-Basis-Pfad; **erster echter Datei-Diff**, `docs/INDEX.md` tracked | AC-12, AC-14…AC-22, AC-26, AC-27, AC-37, AC-38 | W1 | W2 (PG-2); **W4 ist Vorgänger, nicht Partner** (rev. 0.4, Folge aus A14) | `git rm docs/INDEX.md`; Scaffold-Skeleton regeneriert |
+| W3 | M2 | `docs/INDEX.md`-Generator + C8 Scaffold-Guard + Besitzregel; volatile-Sektion; Allowlist-Basis-Pfad; **erster echter Datei-Diff**, `docs/INDEX.md` tracked; **Rev. 0.8 (K-79): zusätzlich die agent-meta-Ausnahme** — `index-owner`-Deklaration (T-7), Gate-Zweig IC-25, 5 neue Renderer-Tests (T-2), Schema-Property `index-owner` + 2 Enum-Tests + Mengen-Pins (T-8/T-5/T-3, Reihenfolge **V-D7**) | AC-12, AC-14…AC-22, AC-26, AC-27, AC-37, AC-38, **AC-42, AC-43, AC-44, AC-45, AC-46** — **plus AC-39** über die W3-6-Halbzeile (siehe Fußnote ¹) | W1 | W2 (PG-2); **W4 ist Vorgänger, nicht Partner** (rev. 0.4, Folge aus A14) | `git rm docs/INDEX.md`; Scaffold-Skeleton regeneriert; Config-Zeile `index-owner` entfernen |
 | W4 | M3 | Architektur-Konsolidierung: `git mv` Langfassung, Root-Stub, Stale-Deklaration wandert mit (M-7) | AC-28 (Teil), AC-29 | W3 | **sequenziell** (PG-3, rev. 0.4) — **nicht** parallel | `git mv` zurück + Stub wiederherstellen |
 | W5 | M3 | Guides: `howto/`- und `docs/howto/`-Auflösung (M-5, M-6) + `derived-from`-Annotation (M-9, M-10) | AC-28 (Teil), AC-31 | W1 (C7 braucht C1), W4 (PG-3) | **sequenziell** (PG-3, rev. 0.4) — **nicht** parallel | `git mv` zurück; Annotationen additiv revertierbar |
 | W6 | M3 | Spec/Plan-Legacy: `git mv` + `legacy:` additiv erweitern | AC-28 (Teil), AC-32 | W3, W5 (PG-3) | **sequenziell** (PG-3, rev. 0.4) — **nicht** parallel | Config-Key additiv → Zeile entfernen |
 | W7 | M4 | `index.md`-Generator (C6), `log.md`-Append, `schema.md`-Update, `knowledge-indexer`-Umschreibung, **Restore-Pfad** (IC-24) | AC-33…AC-35, AC-41 | W5, W3, Rollenpflege-Branch | — (kein Parallel) | `index-mode: llm` → Generator stumm; `restore_wiki_index()` |
-| W8 | M1+M3 | `check_stale_backups` (V9), README-Totverweise (M-8), `llms.txt`-/`README.md`-Providerzahl (AC-40), `PROJECT_STRUCTURE`-Korrektur (M-12), ID-Deklaration (OQ4) | AC-30, AC-40 | W2, W3 | — | additiv |
+| W8 | M1+M3 | `check_stale_backups` (V9), README-Totverweise (M-8), `llms.txt`-/`README.md`-Providerzahl (AC-40), `PROJECT_STRUCTURE`-Korrektur (M-12), ID-Deklaration (OQ4); **Rev. 0.8 (K-79): der Doku-Anteil der `index-owner`-Deklaration, falls E-13 die Zuordnung so entscheidet — E-13 ist OFFEN; W8-4 trägt ihn nur dann. Code-, Schema- und Testanteil liegen in jedem Fall in W3-6 (V-D7)** | AC-30, AC-40 | W2, W3 | — | additiv |
 
-**Jede Welle W1–W8 ist durch mindestens ein AC abgedeckt** (W1: **10**, W2: **7**, W3: **14**,
+> **¹ Zählkonvention der W3-Zeile (RVW9-8, info) — in §9.2 sichtbar gemacht.** §9.2 zählt
+> **Halbwellen nicht**: W3-6 ist ein **Task innerhalb** der Welle W3, **keine** eigene Welle.
+> **AC-39** ist deshalb in der W3-Zeile **mit** AC-42…AC-46 zu lesen, obwohl AC-39 in §9.1 (`:2549`)
+> die Wellenangabe „W1, **W3-6**" trägt — diese Angabe bedeutet **zusätzliche Task-Welle**, nicht
+> zusätzliches AC. **W1 bleibt 10**, **W3 bleibt 19**; AC-39 wird **nicht** doppelt gezählt
+> (eine AC, **eine** Zuordnung in **einer** Wellen-AC-Spalte — Zählsatz unten).
+
+**Jede Welle W1–W8 ist durch mindestens ein AC abgedeckt** (W1: **10**, W2: **7**, W3: **19**,
 W4: 2, W5: 2, W6: 2, W7: 4, W8: 2; AC-28 zählt in W4/W5/W6 dreifach). Die Summen sind in Rev. 0.3
 **neu gezählt** (NEW-5): Rev. 0.2 nannte W1: 9 und W3: 13 — W1 war AC-39, W3 war AC-38
 (eigene AC-Spalte) nicht mitgezählt. **Nachzählung:** W1 = AC-01…AC-06 (6) + AC-23…AC-25 (3) +
 AC-39 (1) = 10; W3 = AC-12 (1) + AC-14…AC-22 (9) + AC-26 (1) + AC-27 (1) + AC-37 (1) +
-AC-38 (1) = 14. **W0** ist Definitions-Welle ohne AC. **M3-Änderungen:** Rev. 0.1Migrationen sind zu M-1…M-13 **neu** nummeriert
+AC-38 (1) = 14. **W0** ist Definitions-Welle ohne AC. **Nachzählung Rev. 0.8 (K-79, RVW8-3):**
+W3 = 14 + **AC-42, AC-43, AC-44, AC-45, AC-46** (5) = **19**; W1 bleibt **10** (AC-39 wandert
+zur Welle **W3-6** hinzu, zählt aber **nicht** doppelt — es ist **eine** AC in **einer** AC-Spalte,
+die W3-6-Angabe in §9.1 bedeutet zusätzliche Welle, nicht zusätzliches AC, **vgl. Fußnote ¹** unter
+der Tabelle); W8 bleibt **2**, weil
+der Doku-Anteil der Ausnahme **kein** eigenes AC ist, sondern denselben AC-46 trägt. **Summe
+AC:** 46 (Rev. 0.7: 41). **M3-Änderungen:** Rev. 0.1Migrationen sind zu M-1…M-13 **neu** nummeriert
 (alphabetische Reihenfolge, keine ID-Recycling); die Zuordnung AC → M-Nummer wurde
 entsprechend nachgezogen.
 
@@ -2470,6 +2955,14 @@ Wellenübersicht §9.2 nennen OQ2/OQ6/OQ8 noch als offen; das ist der **historis
 und bleibt als solcher stehen — maßgeblich für den aktuellen Status ist §11. **Ausnahme nur für
 den Rev.-0.3-Stand:** §15 (Trace-Anker) ist dagegen ein **Ist-Zustands-Anker** und führt den
 aktuellen Stand (§11.1 offen / §11.2 geschlossen).
+**Rev. 0.8 (2026-09-29):** die **OQ-Menge dieser Spec ist unverändert** — OQ1, OQ3, OQ4, OQ9,
+OQ10 bleiben **offen**, OQ2/OQ5/OQ6/OQ7/OQ8 bleiben **geschlossen**; Rev. 0.8 stellt **keine**
+OQ auf und löst **keine** auf. Neu sind **fünf Entscheidungsvorlagen E-9…E-13** (vom Typ
+Entscheidungsvorlage wie E-5…E-8, **nicht** vom Typ offene Frage wie OQ\*) mit Optionen,
+Empfehlung und Wellen-Auswirkung in **§17.12.2**; sie sind **offen**, und **keine** davon wird
+unterstellt. **Ausdrücklich ungelöst:** **OQ1** (Wiki-Topics ↔ `docs/guides/`, Owner
+`main_chat`, `docs/plans/2026-09-25-docs-consolidation-oq1.md:94`, Blockade **W5** `:99`) — die
+agent-meta-Ausnahme berührt `knowledge/wiki/**` **nicht** und hebt diese Blockade **nicht** auf.
 
 ### 11.2 Geschlossen — **nicht** mehr als offene Frage führen (N3)
 
@@ -2495,7 +2988,7 @@ aktuellen Stand (§11.1 offen / §11.2 geschlossen).
 | **R4** | **V1-Fehlalarme.** *Neu begründet:* Rev. 0.1 stützte dieses Risiko auf `README.md:688` („6 DoD presets" sei korrekt). Diese Zeile ist **Drift** (F22) — das Argument trägt nicht mehr. Das Risiko bleibt **real**, aber aus einem anderen Grund: die Nomen-Whitelist in V1a ist breit (`test(s)`, `rule(s)`, `skill(s)`), und Fließtext wie „3 tests" in einem Guide würde matchen. **Abgrenzung (RVW-7, Rev. 0.5):** R4 behandelt ausschließlich die **Fehlalarm-Ursache**. Die **Hochstufungsreihenfolge** (V1 sichtbar, bevor `checks.strict: true` auf `ERROR` hochstuft) ist **kein** Bestandteil dieses Risikos und wird hier **nicht** nachgetragen — sie ist als Ausführungs-Vorbedingung in §5.1.1 und als DAG-Kante `W2-1 → W3-4` im Plan Rev. 0.5 verankert. | mittel | V1a/V1b prüfen Marker-**Abwesenheit**, nicht die Zahl; `agent-meta:docs-exempt`-Marker (IC-05, §5.1.1); die beiden einzigen **heute** korrekten Handzahlen (`README.md:689` Tier, `README.md:695` Commands) sind **beide** exempt-fähig; Start als **WARNING**, `checks.strict: false` per Default (IC-22); **Positiv- und Negativ-Fixture** verpflichtend (AC-07/AC-08) | `developer` |
 | **R5** | Rollen-Parität (F13) | niedrig | V5 ist **gate-bewusst** (IC-04, AC-05, AC-11) und bleibt WARNING, solange `systems-engineering.enabled: false` (`project.yaml:12-13`). Ein etwaiger Fix ist ein **Config-Edit in eigener REQ** (NG-8) | `developer` |
 | **R6** | **Link-Check-Fehlalarme** auf externe URLs/Anker | mittel | V3 prüft **nur relative repo-interne Pfade**; `http(s)://`, `mailto:` und `#anchor` werden nicht geprüft; Allowlist-Pattern über den bestehenden `drift-allowlist.yaml`-Mechanismus bzw. `config`-Key (IC-05) | `developer` |
-| **R7** | **B2 Doppel-Writer** `docs/INDEX.md` (Generator vs. Scaffold) | hoch | C8 `is_file_index_skeleton()` (IC-15) **plus** verbindliche Stage-Reihenfolge Generator **nach** Scaffold (IC-12) **plus Besitzregel** (IC-13: der Generator überschreibt nur Skeletons und Neuanlagen); `index-mode: skeleton` als zweiter Hebel; Szenarien 50/51/52/54/55/56 als harte Regression (AC-20, AC-21, AC-22, **AC-38**) | `developer` |
+| **R7** | **B2 Doppel-Writer** `docs/INDEX.md` (Generator vs. Scaffold) | hoch | C8 `is_file_index_skeleton()` (IC-15) **plus** verbindliche Stage-Reihenfolge Generator **nach** Scaffold (IC-12) **plus Besitzregel** (IC-13: der Generator überschreibt nur Skeletons und Neuanlagen); `index-mode: skeleton` als zweiter Hebel; Szenarien 50/51/52/54/55/56 als harte Regression (AC-20, AC-21, AC-22, **AC-38**). **Rev. 0.8, P-5 — dritter Hebel:** `docs-consolidation.index-owner` (IC-25). Er verengt den **KE**-Vorrang-Zweig und ist damit **kein** weiterer Writer, sondern eine **Wegbedingung**: in agent-meta schreibt der Scaffold im KE-Modus **nichts** (`spec_plan_scaffold.py:116` bleibt `False`), es gibt dort also **nur einen** Writer und **einen** Erstschreibvorgang (`CREATE`, `doc_renderer.py:829-830`) — der zweite Lauf meldet `unchanged` (`:845-848`). **Das Risiko selbst sinkt in agent-meta**; unverändert bleibt es für **jedes** Projekt, das `index-owner` **nicht** setzt. **Gepinnt** in AC-42 (einmalig), AC-44 (Override hebt `skeleton` und Besitzregel **nicht** auf), AC-45 (`dry_run`), **AC-38** (Szenarien 50–56, `tests/scenarios/configs/*.project.yaml` enthalten **keinen** `docs-consolidation`-Key ⇒ per Konstruktion unerreichbar, IC-26/6). **Zur Freigabe ausstehend.** | `developer` |
 | **R8** | **B1 Downstream-Bruch** durch `docs/superpowers`-Verschiebung | mittel | `legacy:`-Liste additiv erweitert (IC-17 M-13), alte Einträge **ein Release** mit Deprecation-WARNING toleriert (AC-32); Release-Notes-Pflicht, Minor-Bump | `release` |
 | **R9** | **Scope-Creep**: ~190 `docs/*.md` (**HYPOTHESIS**, exakte Zahl erst über `DOCS_DOCS_FILE_COUNT` belegbar) + 100+ Wiki-Seiten → Migration wird zum Doku-Rewrite | mittel | Wellen sind additiv / `git mv`-only; **keine inhaltliche Neuschreibung** (NG-1); Inhaltsarbeit ist eigene REQ (u. a. OQ9); NFA-08 begrenzt den Blast Radius | `orchestrator` |
 | **R10** | `AGENTS.md`-Bootstrap-Block driftet ebenfalls | niedrig | **Bewusst außerhalb des Scopes** (NG-5), als **OQ3** geführt, nicht in den Wellen | `requirements` |
@@ -2533,6 +3026,7 @@ keine Netzwerkzugriffe, keine neuen Abhängigkeiten. Nutzerursprung: **intern**
 | d | Unvollständige Fakten rendern `docs-empty`-Marker in eine **Referenzdatei**, die von Nutzern gelesen wird | möglich — `{{DOCS_*}}` löst in `llms.txt`/`README.md` sichtbar auf |
 | e | Ein Allowlist-Eintrag unterdrückt genau die Drift-Findings, die er unterdrücken soll (Basis-Pfad vs. `#`-Key) | **ja, im Code belegt** — `fnmatch` matcht den ganzen String (`generated_file_drift.py:82-84`) |
 | f | Neue Doku-Datei blockiert `--validate` und damit den gesamten Dev-Workflow (R20/OQ8) | möglich, Owner unbekannt |
+| g | **Rev. 0.8:** ein deklarativer Eigentümer-Key (`docs-consolidation.index-owner`) wird zum zweiten Pfad, auf dem `docs/INDEX.md` geschrieben oder **nicht** geschrieben wird — und damit zu einer zweiten Stelle, an der ein Tippfehler den Index einfrieren könnte. **Zweite Ausprägung (RVW8-5):** die Deklaration wird von einem **Consumer-Projekt kopiert** (Übernahme der `project.yaml`-Zeile aus agent-meta, Beispiel-Config, Scaffold eines neuen Projekts) und hebt dort die KE-Autorität stumm auf | **ja, teilweise** — der Tippfehler-Pfad ist durch `enum` + `additionalProperties: false` (`config/project-config.schema.json:2470`) **abgedeckt**, aber die Schema-Validierung im Sync-Pfad ist **best-effort**: `scripts/lib/config.py:342` („Schema validation … **if** jsonschema is available"), `:372-388` („jsonschema not installed or validation error — **best-effort**", `pass`). Fehlt `jsonschema`, greift **kein** Enum. Die **einzige garantierte** Absicherung ist deshalb der **Code-Zweig IC-25 (1)** (`doc_renderer.py:663-711`, fail-closed vor der KE-Prüfung, gepinnt in AC-44c). **Der Kopier-Pfad ist davon unberührt** — er ist kein Tippfehler, sondern eine gültige Deklaration |
 
 **3. Was tun wir dagegen?**
 
@@ -2548,6 +3042,23 @@ keine Netzwerkzugriffe, keine neuen Abhängigkeiten. Nutzerursprung: **intern**
 - **`docs-empty`-Marker** + Fact-Hash-Footer + `dry_run`-Vertrag gegen (d) (IC-07, IC-14).
 - **Allowlist-Basis-Pfad-Regel** + AC-37 gegen (e).
 - **Workflow-Vertrag** (OQ8, R20) gegen (f).
+- **Gegen (g) — fail-closed Code-Zweig IC-25 (1)** (`doc_renderer.py:663-711`): jeder Wert, der
+  weder `auto` noch `docs-consolidation` ist, wird **vor** der KE-Prüfung in
+  `UNKNOWN_INDEX_OWNER_REASON` verweigert; `null`, `None` und jeder Fremdstring sind eingeschlossen.
+  **Das ist die einzige *garantierte* Absicherung** — sie ist **nicht** durch das Schema ersetzbar,
+  weil `enum` nur greift, wenn `jsonschema` installiert ist (`config.py:342`, `:388`, best-effort).
+  Gepinnt in **AC-44(c)**, Modus-Übersicht §17.12.4 Zeile 5. **Sichtbarkeit:** die Deklaration ist
+  eine **einezelne Zeile** in `.meta-config/project.yaml:398-401` und erscheint im Config-Diff;
+  ein absichtliches Zurücksetzen auf `auto` ist damit im Review sichtbar.
+- **Gegen (g), Kopier-Ausprägung — *noch keine* Gegenmaßnahme, bewusst offen:** ein gültiger,
+  kopierter `index-owner: docs-consolidation` ist per Konstruktion **nicht** als Tippfehler
+  erkennbar, weder per Enum noch per Code-Zweig. **Restrisiko, ausdrücklich NICHT akzeptiert und
+  NICHT entschieden** — als **E-13c „Kopier-Pfad"** geführt: die Optionenzeile in **§17.12.2**
+  benennt die beiden Entscheidungspunkte namentlich (Doku-Pflichtträger; `validate`/`--strict`-
+  Meldung, wenn `index-owner` in einem Projekt mit `knowledge-engine.enabled: true` gesetzt ist)
+  mit Optionen, Empfehlung, Owner und Termin. **RVW9-4:** dieser Bullet ist der Beleg dafür, dass
+  der Kopier-Pfad **keine** unterstellte Entscheidung ist — er ist **offen** und wird in dieser
+  Revision **nicht** entschieden.
 
 **4. Welche Konsequenzen?**
 - (a) Nutzer und alle Downstream-Submodule erhalten falsche Zahlen über `README.md` und
@@ -2557,16 +3068,31 @@ keine Netzwerkzugriffe, keine neuen Abhängigkeiten. Nutzerursprung: **intern**
   → R7, IC-12/IC-13/IC-15, AC-38.
 - (c) Datenverlust im Wiki-Index; Recovery über Sibling-Backup oder Git. **Mittel**, weil
   `knowledge/` git-getrackt ist. → R2, IC-24.
+- (d) Ein `docs-empty`-Marker erscheint in einer gelesenen Referenzdatei; die Aussage ist
+  sichtbar, nicht still — Recovery ist das Nachrechnen der Fakten. **Gering.** → IC-01 Fehlerpfade,
+  IC-07, IC-14.
 - (e) Drift wird still übersehen — das Gegenteil des Ziels, aber **leise**. **Mittel.**
   → R17-Klassifikation, AC-37.
 - (f) Frustration, Workaround über `checks.strict: false`, damit der Gain wieder verloren ist.
   **Mittel.** → R20, OQ8.
+- (g) Zwei Ausprägungen. **Tippfehler:** der Index bleibt in jedem Sync `skipped` — Recovery ist
+  das Zurücksetzen des Werts; grüner Log, eingefrorener Index, **keine** Fehlermeldung, weil
+  `skipped` der erwartete Zustand ist. **Schwer zu bemerken**, leicht zu beheben → IC-25 (1),
+  AC-44(c). **Kopierte Deklaration in einem KE-Projekt:** dasselbe eingefrorene Bild, aber ohne
+  falsche Eingabe — die KE-Autorität ist für **dieses** Projekt stillschweigend aufgehoben, während
+  die Oberfläche weiter „knowledge-engine ist autoritativ" behauptet. **Recovery:** `index-owner`
+  auf `auto` setzen bzw. die Zeile entfernen. **Schwerer**, weil kein Fehler entsteht, den man suchen
+  würde → **Restrisiko, an E-13c offen** (§12.3 Q3-Bullet; Vorlage **E-13c** in **§17.12.2** — RVW9-4: der Verweis zeigte bis dahin auf §17.12.3 DECISION-1…4, wo der Bullet **nicht** steht).
 
-**Bewertung:** Alle sechs Bedrohungen sind adressiert, aber **eine** nur unvollständig: (a)
-wird ausschließlich durch eine **Handpflege-Datei** gebrochen — ein Fehler in *dieser* Datei
+**Bewertung:** Alle **sieben** Bedrohungen (a…g) sind adressiert, aber **zwei** nur unvollständig:
+(a) wird ausschließlich durch eine **Handpflege-Datei** gebrochen — ein Fehler in *dieser* Datei
 ist wiederum ein Fehler, nur in einer anderen Quelle. Das ist eine echte, benannte
 Restgrenze (R14-Restrisiko in IC-23) und kein Versehen: eine dritte, unabhängige Quelle wäre
-Over-Engineering für elf stabile Zählwerte.
+Over-Engineering für elf stabile Zählwerte. **(g)** ist gegen den Tippfehler-Pfad hart
+(IC-25 (1), AC-44c), gegen die **kopierte** Deklaration jedoch **offen**: dort greift weder das
+`enum` (die Deklaration ist gültig) noch der fail-closed Zweig (der Wert ist bekannt). Die
+Entscheidung darüber ist **nicht** in Rev. 0.8 gefallen — sie ist als **Ergänzung zu E-13**
+registriert und liegt beim Auftraggeber.
 
 ---
 
@@ -2647,7 +3173,7 @@ spec-id: SPEC-DOCS-CONSOLIDATION-2026-09-25
      Rev. 0.4 am 2026-09-26 durch den Nutzer bestätigt (§17.7); A14 bleibt offen (§17.8).
      Kein neuer spec-id, keine Supersession.
 → Rev. 0.5 (2026-09-26) — Gate-Präzisierung W2/W3, Finding-Ownership, V1-Sichtbarkeit vor
-     Hochstufung, §17.9; zweite Korrekturrunde desselben Revisionsstandes, §17.9.4:
+  Hochstufung, §17.9; zweite Korrekturrunde desselben Revisionsstandes, §17.9.4:
       Auftrag: A2A-Envelope vom 2026-09-26 (Korrekturen 1–5; ausdrückliche Weisung,
         status APPROVED beizubehalten) · Review: concept-reviewer 2026-09-26,
         CHANGES_REQUESTED, 15 Findings RVW-1…RVW-15, alle behoben
@@ -2660,6 +3186,73 @@ spec-id: SPEC-DOCS-CONSOLIDATION-2026-09-25
         (Rev. 0.5, Abschnitte „W2 — Verifikation", „W3 — Verifikation", Kriterientabelle
         W-GATE-TABLE, Reihenfolge-/Abhängigkeitsmatrix, Abschnitt L).
       Kein neuer spec-id, keine Supersession; OQ1 bleibt offen, OP-1 bleibt offen.
+→ Rev. 0.8 (2026-09-29) — agent-meta-Ausnahme im KE-Vorrang-Gate, §17.12:
+     Eingang: docs/specs/2026-09-25-repository-documentation-consolidation-design-agent-meta-exception.md
+       (concept-architect, 2026-09-29, status: draft, DECISION-1…DECISION-4, P-1…P-5, K-1…K-5, E-9…E-13)
+     AUSLÖSER (gemessen): doc_renderer.py:702-703 · project.yaml:69/:77/:15 · spec_plan_scaffold.py:80-97
+       · docs/INDEX.md existiert nicht (Glob) · docs_index.py:180-211
+     ZUR USER-FREIGABE AUSSTEHEND: P-1…P-5 (IC-13, IC-15, IC-22-Tabelle, AC-21 + AC-39, R7) — §17.12.1;
+       darunter P-3 (e) / "P-3-E" als fünfte Zeile der P-Tabelle, kein sechstes P-Element.
+       status: APPROVED und approved: 2026-09-26 bleiben unverändert; der Umfang W0–W8 bleibt
+       freigegeben; Rev. 0.8 ist NICHT durch status: APPROVED gedeckt (Frontmatter pending-approval:).
+     OFFEN: E-9…E-13 (Entscheidungsvorlagen, §17.12.2) — keine ist entschieden.
+       E-5…E-8 bleiben entschieden (Rev. 0.7, §17.11). OQ1 bleibt offen, Blockade W5.
+     Geändert: IC-13, IC-15, IC-22; NEU IC-25, IC-26; AC-21, AC-39; NEU AC-42…AC-46; R7;
+       §12.3 Threat Model (Zeile g, Q3, Q4, Bewertung); **§9.1 (AC-42…AC-46, AC-21, AC-39)**,
+       **§9.2 (W3-, W8-Zeile, Zählsatz, Fußnote ¹)**; Revisionszeile 0.8; §17.12 (Volltext, K-1…K-5,
+       E-9…E-13, DECISION-1…DECISION-4, Nachweis-/Testakzeptanz, V-D1…V-D4, Coverage-Checkliste).
+     KORREKTURRUNDE ZU REV. 0.8 (2026-09-29, Concept-Review Runde 8, CHANGES_REQUESTED,
+       5 major / 5 minor — Katalog **K77…K86**, §17.12.6):
+       RVW8-1 K-3/T-4/V-D4 auf den belegten Stand (Kommentar :42-44 EXISTIERT — Fehlmessung
+         des Read-Tools, per Grep widerlegt); RVW8-2 _IC22_ABSENCE_DEFAULTS als ZWEITE harte
+         Sollwert-Änderung registriert ("die einzige" zurückgenommen); RVW8-3 AC-42…AC-46 in
+         §9.1/§9.2 + Zählsatz (W3 14→19); RVW8-4 V-D7 (T-8→T-3→T-5, alle W3-6) + E-13a
+         zurückgenommen; RVW8-5 §12.3 (g) auf alle vier Fragen beantwortet inkl. Kopier-Pfad,
+         Ziffer sechs→sieben, (d) ergänzt; RVW8-6 best-effort-Charakter der Schema-Validierung
+         (config.py:342/:388); RVW8-7 AC-42(d) Anker geteilt (:629 / :635-639); RVW8-8
+         Anker-Auswahlregel + vollständiges V-D1/V-D2-Inventar; RVW8-9 AC-39 Belegquelle
+          berichtigt; RVW8-10 V-D6 (Planlücke W3-7/sources) + Testname in Zeile 4.
+     ZWEITE KORREKTURRUNDE ZU REV. 0.8 (2026-09-29, Concept-Review Runde 9, CHANGES_REQUESTED,
+       2 major / 7 minor / 1 info — Katalog unverändert **K77…K86**, §17.12.6; kein Revisions-Bump):
+       RVW9-1 (major) K-Katalog **K61…K70 ⇒ K77…K86**, Vorspann auf "ab K77; K1…K76 bleiben
+         unberührt"; maßgebliche Obergrenze K76 (Plan-Legende, gemessen) dort genannt; alle ~20 Fundstellen
+         nachgezogen (Frontmatter, Kopfblock, IC-15 :1465-1466, IC-25 :1592, §9.1, §9.2, §15,
+         §17.12.1, §17.12.4, §17.12.5, §17.12.6, Trace-Matrix, Coverage).
+       RVW9-2 (major) **V-D8** registriert: Plan Rev. 0.7 kennt Rev. 0.8 nicht — W3-6 ohne T-3/T-5/
+         T-7/T-8/AC-42…AC-46, W1-9 abgeschlossen und mit der Fehlzählung "sechs Properties",
+         **kein** pending-approval: im Plan-Frontmatter; **forderlicher Plan-Delta** präzise
+         benannt in §17.12.5 (V-D8-Uebergabe an den planner) — Plan **erst nach** User-Freigabe.
+       RVW9-3 T-4-Ordinal "sixth" ⇒ "seventh" (tests/…migration.py:43), K-77 nachgezogen.
+       RVW9-4 **E-13c** (Kopier-Pfad) als dritte Optionenzeile in §17.12.2; Q4-Verweis
+         §17.12.3 ⇒ **§12.3** (:3030).
+       RVW9-5 P-3-E als **P-3 (e)** geklärt (fünfte P-Tabellenzeile, kein sechstes P-Element).
+       RVW9-6 K-78-Verortung auf Modus-Übersicht Zeile 8 / T-3 / Coverage berichtigt.
+       RVW9-7 Testname ::test_fail_off_defaults_* ⇒ **::test_schema_declares_the_absence_defaults**
+         (tests/…migration.py:185-199) in :4329, :4374, :4413.
+       RVW9-8 V-D1-Selbstverweis :1449-1450 ⇒ **:1487-1488** (**RVW10-2**: der RVW9-8-Zwischenanker :1465-1466 war IC-13-Fließtext, nicht der Anker) ⇒ RVW9-8 geschlossen; **Info-Notiz
+         ohne eigene R9-ID** (Label aus der R10-Tabelle, `rereview-10.md:59`): §9.2-W3-Fußnote ¹ macht die AC-39-Zählkonvention sichtbar. **Runde 10 vollständig: §17.12.6 :4599-4606.**
+       RVW9-9 W1-10-Step-2-vs-T-7 Reihenfolge festgehalten (§17.12.4 T-7, §17.12.5 V-D8).
+      DRITTE KORREKTURRUNDE ZU REV. 0.8 (2026-09-29, Concept-Review Runde 10, CHANGES_REQUESTED,
+        1 major / 1 minor / 1 info — Katalog unverändert **K77…K86**, §17.12.6; kein Revisions-Bump):
+        RVW10-1 (major) K-Katalog **K76…K85 ⇒ K77…K86** umnummeriert (rein additiv; **keine** der
+          zehn Bedeutungen gestrichen, **keine** K-ID unterhalb K76 angetastet); maßgebliche
+          Obergrenze auf den **gemessenen** Plan-Stand `K1…K76` korrigiert; alle Fundstellen
+          nachgezogen.
+        RVW10-2 (minor) V-D1-Selbstverweis auf den gemessenen Anker **:1487-1488** gezogen
+          (bisher `:1465-1466` — IC-13-Fließtext, nicht der Anker) ⇒ RVW9-8 geschlossen.
+        RVW10-3 (info) Registriert, **nicht** geändert: der zweite Träger derselben
+          Ordnungs-Formulierung (`tests/test_doc_renderer.py:1090-1091`) liegt außerhalb der
+          `Files:`-Liste ⇒ keine Testdatei geändert, keine neue T-ID, kein Eingriff in T-3.
+        Autoritative Aufzeichnung: **§17.12.6 :4599-4606** (R10-Tabelle) — dort ist jede
+          Fundstelle einzeln benannt und belegt; der Vollständigkeitssatz der Runde 10 gilt
+          einschließlich des in dieser Korrekturrunde nachgetragenen §15-Blocks.
+     UNVERÄNDERT durch die Korrekturrunde: P-1…P-5 bleiben ZUR USER-FREIGABE AUSSTEHEND,
+       E-9…E-13 und OQ1 bleiben OFFEN, pending-approval: besteht fort, status APPROVED und
+       approved 2026-09-26 unverändert, Umfang W0–W8 unverändert, keine Umnummerierung.
+     Unverändert: status APPROVED, approved 2026-09-26, Umfang W0–W8, §17.10/§17.11,
+       IC-01…IC-24, AC-01…AC-18 und AC-20/AC-22…AC-38/AC-40/AC-41, NFA-01…NFA-11, R1…R6/R8…R20,
+       F1…F25, M-1…M-13, NG-1…NG-11, FI-1…FI-10, OQ1…OQ10, V1…V9, Taskzahl 50.
+     Kein neuer spec-id, keine Supersession; keine bestehende ID umnummeriert oder gestrichen.
 ```
 
 **Vollständigkeits-Checkliste (Coverage, keine Selbstbewertung):**
@@ -2681,7 +3274,7 @@ spec-id: SPEC-DOCS-CONSOLIDATION-2026-09-25
 | **Restore-Pfad für den Policy-Bruch in W7** | IC-24, AC-41 | vorhanden |
 | Acceptance Criteria mit V1…V9-Verknüpfung, beobachtbar | §7 (AC-01…AC-41), §9.1 | vorhanden |
 | Nicht-funktionale Anforderungen | §8 (NFA-01…NFA-11) | vorhanden |
-| Trace-Matrix AC → Wellen → Dateien | §9.1, §9.2 | vorhanden |
+| Trace-Matrix AC → Wellen → Dateien | §9.1 (**46** AC, K-79), §9.2 (W3-Fußnote ¹) | vorhanden |
 | **Threat Model (4 Fragen)** | §12.3 | vorhanden |
 | Brücke zu offenen Entscheidungen **und** geschlossenen Punkten | §11.1 (OQ1, OQ3, OQ4, OQ9 — **offen**) / §11.2 (OQ2, OQ5, OQ6, OQ7, OQ8 — **geschlossen**; OQ2/OQ6/OQ8 per Nutzer-Entscheidung vom **2026-09-26**) | vorhanden |
 | Risiken R1…R20 mit Mitigation und Owner | §12.1, §12.2 | vorhanden |
@@ -3588,7 +4181,7 @@ neue Task-ID, **keine** neue offene Frage, **kein** neuer Sollwert, **keine** ne
 §17.10 samt §17.10.1–§17.10.5, §17.11.1–§17.11.5, die Rev.-0.6-/Rev.-0.5-Blöcke und die
 Korrekturrunden 1–5 des Plans bleiben **wortgleich**, soweit sie nicht durch einen ausdrücklich als
 solchen gekennzeichneten Zusatz ergänzt wurden. **Die Spec-Legende bleibt eingefroren** auf
-`K1…K45`; **maßgeblich** ist die **Plan-Legende** (`K1…K75`).
+`K1…K45`; **maßgeblich** ist die **Plan-Legende** (`K1…K76` — **gemessen** am Working Tree 2026-09-29: Plan `:536` „`K-*` (K1…**K76**)“, Plan `:6960` „**K76 bleibt die höchste K-Kennung**“; Plan Rev. 0.7 bleibt unverändert).
 
 **Methodischer Vorbehalt, in beide Richtungen.** Die `grep`-/`read`-Zeilennummern beider Reviews sind
 in diesem Projekt **nachweislich unzuverlässig**; deshalb wurde **jeder** Anker **vor** dem Edit per
@@ -3615,7 +4208,7 @@ jede Stelle, die W2-9s Write-Set **ohne** `spec_plan.py` nennt, meint den Stand 
 **Bewusste Nicht-Zuordnung (K72/K71) — Katalog-Obergrenzen in Fremd-Blöcken.** Der Spec-Statuskopf
 und §17.11.5 nennen als „maßgeblich" die **Plan-Legende** mit dem damaligen Stand `K1…K70`; beide
 Stellen bleiben **wortgleich** und tragen ihren **datierten** Stand. **Vorrang** (Muster K36/K42):
-**maßgeblich ist die Plan-Legende `K1…K75`**.
+**maßgeblich ist die Plan-Legende `K1…K76`** (RVW10-1: **gemessener** Stand, Plan `:536`/`:6960`; `K1…K75` war der Stand dieser Korrekturrunde).
 
 **Neu gemessene Zahlen dieser Runde (Methode offengelegt).** Neu gemessen per Grep am Working Tree:
 Tasks **50** (W2: **10**, W0: **6** — `W0-5` existiert nicht), Checkboxen `[x]` **59** / `[ ]`
@@ -3639,6 +4232,406 @@ Plan wird **nicht** stillschweigend angepasst, und es ist ein **korrigierter Pla
 Ownership-Matrix **und** neuer Zyklenprüfung vorzulegen (Owner `orchestrator`, Entscheidungsweg
 `main_chat`). **Unverändert** in Kraft.
 
+---
 
+### 17.12 Rev. 0.8 — agent-meta-Ausnahme im KE-Vorrang-Gate (2026-09-29)
 
+**Eingang.** Systemdesign **fertig vorliegend**:
+`docs/specs/2026-09-25-repository-documentation-consolidation-design-agent-meta-exception.md`
+(`status: draft`, `revision: 0.1`, concept-architect, 2026-09-29) — DECISION-1…DECISION-4,
+P-1…P-5, K-1…K-5, E-9…E-13. **Jede Kernangabe wurde am Working Tree nachgemessen**, nicht aus
+dem Entwurf übernommen; die Abweichungen zwischen Entwurf und Messung sind in
+**§17.12.5, V-D3** benannt.
 
+**Vorentscheidung des Nutzers — bereits getroffen, hier NICHT neu bewertet:** explizite
+**agent-meta-Ausnahme**, damit **W3-6** `docs/INDEX.md` schreiben kann; die **Knowledge Engine
+bleibt für Consumer-Projekte autoritativ**; **keine** globale Umstellung von `index.mode`.
+
+**Warum eine Spec-Revision und keine stille Korrekturrunde.** P-1…P-5 betreffen ausschließlich
+**normative** Stellen (IC-Vertrag, Config-Tabelle, Akzeptanzkriterium, Risikotabelle). Keine davon
+ist ein versehentlicher Fehler. Deshalb `revision: 0.8` **mit** Bump, und deshalb ist der neue
+Umfang als **noch nicht freigegeben** gekennzeichnet (§Kopf, Frontmatter `pending-approval:`,
+Revisionszeile 0.8).
+
+#### 17.12.1 Verdictschnitt — P-1…P-5 (inkl. **P-3 (e)**, inhaltliche Pflichtänderungen, **ZUR USER-FREIGABE AUSSTEHEND**) und K-1…K-5 (Korrekturen, ohne Freigabebedarf)
+
+> **Zählauflösung (RVW9-5).** Diese Tabelle trägt **fünf** P-Elemente: **P-1, P-2, P-3,
+> P-4, P-5**. **`P-3-E` ist kein sechstes P-Element**, sondern die **fünfte Tabellenzeile** — die
+> Teilstelle **(e)** von **P-3** (RVW8-2). P-3 (e) präzisiert **ausschließlich den Sollwert-Zähler
+> in AC-39** und die **Registrierung der zweiten Mengen-Pin**; am Gegenstand von P-3 (der siebten
+> Zeile der IC-22-Tabelle) ändert sie **nichts**. Deshalb bleibt es bei „**P-1…P-5**" in
+> Frontmatter `approved-scope`, §15 Trace-Anker und Ergebnisprotokoll; die Schreibweisen
+> „**P-3-E**" (P-3-Zeile, Kopfblock) und „**P-3 (e)**" (Tabellenkopf, Revisionszeilen) bezeichnen
+> **dieselbe** Zeile. **Im Freigabe-Snapshot an den Nutzer wird sie ausdrücklich mitgeführt.**
+
+| ID | Was ändert sich | Warum es **inhaltlich** ist | Blast-Radius | Ort in dieser Spec |
+|---|---|---|---|---|
+| **P-1** | Die IC-13-Tabellenzeile „`resolve_index_mode(config)[0] == "knowledge-engine"` ⇒ **kein** `docs/INDEX.md` schreiben" wird **bedingt**; zwei Zeilen kommen hinzu (Override ⇒ schreiben; unbekannter Wert ⇒ fail-closed). | Die alte Zeile ist **absolut**: bei `enabled: true` + KE-Modus ist Schreiben **immer** verboten. Die Ausnahme kehrt das für ein deklariertes Projekt um — das ist **ein neuer Vertrag**, kein Formulierungsfehler. Der Vertrag wird **nur** verengt, nie erweitert (IC-25 Wertetabelle). | 1 Code-Bedingung in 1 Funktion (`doc_renderer.py:702-703`), 1 Config-Wert in 1 Projekt. **Null** Wirkung auf Consumer (kein Fixture setzt den Key, IC-26/6). | IC-13, IC-25 |
+| **P-2** | IC-15 erhält die **zweite Schreibbedingung** „Ziel existiert **nicht** ⇒ Voll-Index anlegen", unabhängig von `resolve_index_mode()`. | IC-15 regelt **nur** den Skeleton-Fall und setzt `file-index` voraus. In agent-meta entsteht die Datei **ohne** Skeleton (Neuanlage). IC-15 wird dadurch **nicht falsch, sondern unvollständig** — die Lücke ist genau der Fall, den W3-6 braucht. | Rein **ergänzend**; der Skeleton-Pfad und alle Szenarien 54/55/56 bleiben wortgleich. | IC-15 |
+| **P-3** | IC-22-Tabelle: **siebte** Zeile `docs-consolidation.index-owner`; der Absatz „**für alle sechs** Keys" wird zu „**sieben**". | Die Tabelle **zählt** die Gate-/Rollback-Keys auf; ein fehlender Key ist in einer fail-off-Spezifikation eine **Lücke**, kein Detail. | 1 Config-Key, 1 Schema-Property, 1 Enum-Default. Consumer: **kein** neues Feld, **null** Verhaltensaenderung (IC-26/6). | IC-22 |
+| **P-3 (e)** *(= „P-3-E", **Teilstelle (e) von P-3**, **kein sechstes P-Element** — RVW9-5; Erweiterung, **selbst gemessen**)* | **AC-39** wird von „**genau** den **sechs** Properties" auf den **gemessenen** Stand umgestellt: Block = **sechs** Properties **nach** Rev. 0.8, **fünf** davor. | Die Zahl **sechs** war **schon in Rev. 0.7 falsch**: `config/project-config.schema.json:2424-2469` hat **fünf** Properties, und der **gepinte** Test `tests/test_docs_consolidation_migration.py:45-51` ebenfalls **fünf** (geprüft `:99-103`, Mengen-Assertion `:101`). Der sechste Eintrag der IC-22-**Tabelle** ist `knowledge-engine.okf.index-mode` und liegt in einem **anderen** Block — eine Verwechslung von Tabelle und Block. `index-owner` macht sie **nicht** richtiger. **Deshalb hiermit berichtigt** statt fortgeschrieben. **An P-3 selbst ändert diese Zeile nichts** — P-3 bleibt „siebte Zeile der IC-22-Tabelle". | 1 Sollwert-Zahl in **einem** AC; **zwei** Test-Pins, je **Erweiterung einer Menge** (T-3 a/b, §17.12.4); **K-78:** `_IC22_ABSENCE_DEFAULTS` (`tests/test_doc_renderer.py:1092-1098`) ist die **zweite** harte Sollwert-Änderung — ohne sie bleibt W3-6 rot | AC-39 |
+| **P-4** | AC-21s zweiter Given/When/Then-Block wird **bedingt** formuliert („`index-owner` **nicht** gesetzt"); **AC-42…AC-46** kommen hinzu. | AC-21 machte die KE-Autorität zur **ungefähren** Vorbedingung. Mit der Ausnahme ist sie **bedingt** — ohne zusätzliche AK widerspräche der Test der Spec, sobald agent-meta `index-owner` setzt. | **Rein** additional: **kein** bestehendes AC wird gestrichen oder in seinen Sollwerten gesenkt; AC-20/AC-21/AC-23/AC-24/AC-38 bleiben in ihren Sollwerten **wortgleich**. | AC-21, AC-42…AC-46 |
+| **P-5** | R7s Mitigation-Tabelle erhält einen **dritten** Hebel (`index-owner`) und den Nachweis, dass das Risiko in agent-meta **sinkt**. | Die Mitigation-Tabelle ist **normativ** (sie begründet, warum R7 beherrscht ist). Ein dritter Hebel ändert die Begründung; die Risiko-Aussage selbst bleibt in der Substanz richtig. | Risikotabelle; **kein** Sollwert, **kein** R-Id, **keine** neue Welle. | R7 |
+
+| ID | Korrektur | Art | Nachweis |
+|---|---|---|---|
+| **K-1** | Docstring `_index_mode_block_reason` (`doc_renderer.py:669-672`): „Scenario 52 asserts no `docs/INDEX.md` is written there … so the generator has nothing to do **in that project**" gilt für agent-meta ab dem Key-Set **nicht** mehr. | Reiner **Text**, **kein** Verhalten. | `doc_renderer.py:669-672` gelesen; Szenario-52-Aussage selbst bleibt **richtig** (Szenario 52 setzt den Key nicht). |
+| **K-2** | Docstring `_e2e_config()` (`tests/test_doc_renderer.py:3209-3223`) behauptet, IC-13/IC-15 machten die KE zum „authoritative owner of `docs/INDEX.md`" **für agent-metas Konfiguration**. Nach dem Key ist das für agent-meta **falsch**. | Reiner **Text**; der **Sollwert** von `test_skeleton_replaced_once` bleibt **unverändert** (Begründung §17.12.4). Die Ergänzung muss **namentlich** sagen, dass `_e2e_config()` eine **abweichende** Konfiguration benutzt (`knowledge-engine: {"enabled": False}`, `:3237`) und **warum**. | `tests/test_doc_renderer.py:3209-3223` gelesen, `:3237` gelesen, `test_skeleton_replaced_once` `:3258` gelesen. |
+| **K-3** | Zählkommentar `tests/test_docs_consolidation_migration.py:42-44` („IC-22 enumerates six rows; five of them are `docs-consolidation.*`") ⇒ **sieben / sechs**. **RVW9-3: das Ordnungswort in `:43` ist mitzuziehen** — nach der IC-22-Tabelle (sieben Zeilen, `:1845-1851`, KE-Key in `:1851`) ist `knowledge-engine.okf.index-mode` die **siebte**, nicht die sechste Zeile; Zieltext `# **seventh** (knowledge-engine.okf.index-mode) belongs to a different block and is`. | Reiner **Kommentar** — die Zahlen im **Text** der Zeilen 42-44. | **V-D4** (§17.12.5), **neu gemessen 2026-09-29 (K-77, RVW8-1):** der Kommentar **existiert**; Zeile `:42` und `:44` per Grep belegt, `:43` per Grep belegt. **Die frühere Aussage dieser Zelle („die Zeile ist leer") war eine Fehlmessung des Belegwerkzeugs, nicht des Working Tree** — das Read-Tool rendert diese drei Kommentarzeilen leer, das Grep-Tool nicht. Der Träger der **Property-Menge** bleibt `_EXPECTED_PROPERTIES` `:45-51` (als **T-3** geführt). |
+| **K-4** | **Zwei veraltete Zeilenanker:** `spec_plan_scaffold.py:62-68` → **`:115-121`**; `spec_plan_scaffold.py:40-44` → **`:80-97`**. | Reine **Anker**, **kein** Sollwert. Unabhängig von dieser Änderung — der Anker-Drift bestand bereits. | **Gemessen:** `scaffold_spec_plan_dirs` beginnt bei `spec_plan_scaffold.py:100`, der Modus-Zweig bei `:115-116` (Datei-Ende `:121`); `resolve_index_mode` beginnt bei `:80` und endet bei `:97`. Fundstellen **namenbasiert**: IC-12 (Aufrufreihenfolge, Begründungsabsatz), IC-13 (Situationstabelle), AC-38 (Zweite-Abschirmung-Liste). |
+| **K-5** | `doc_renderer.py:685-686` („The two owners above are the complete list of what forbids a write") — **BLEIBT WORTWÖRTLICH STHEN.** | Ausdrücklich als **nicht** zu ändern vermerkt, damit der Guard nicht als Widerspruch missverstanden wird. Die Liste bleibt **geschlossen bei zwei**, weil IC-25 keinen Eigentümer **hinzufügt**, sondern nur den einen **Auslöser** stilllegt (DECISION-2). | `doc_renderer.py:682-694` gelesen; die Liste am Docstring-Anfang (`:666-676`) bleibt bei zwei Eigentümern. |
+
+#### 17.12.2 Entscheidungsvorlagen E-9…E-13 (einschließlich **E-13c**) — **OFFEN, nicht entschieden**
+
+> **Nicht** entschieden. **E-5…E-8** sind ENTSCHIEDEN (Rev. 0.7, §17.11) und werden **nicht** neu
+> aufgerollt. **E-1…E-4** bleiben offen (§17.9.4) und betreffen andere Themen. Neue Vorlagen
+> beginnen daher bei **E-9**; **keine** bestehende E-ID wird umnummeriert oder verdrängt.
+> **E-13c ist eine Suboption von E-13** (keine neue E-Reihe): sie macht den Kopier-Pfad, den
+> §12.3 (g) Q3 als „Ergänzung zu E-13" führte, zu einer **benannten, entscheidbaren** Vorlage mit
+> zwei Entscheidungspunkten (RVW9-4). **E-13c ist ebenso offen wie E-13** und wird hier
+> **nicht** entschieden.
+
+**E-9 — Wert des Keys: zweiwertiges Enum oder boolescher Override?**
+
+| Option | Beschreibung | Auswirkung |
+|---|---|---|
+| **E-9a (Empfehlung)** | Enum `["auto", "docs-consolidation"]`, Default `auto` | Schema-Wächter greift; ein Tippfehler wird zum **Validierungsfehler**; self-documenting; **keine** Sollwert-Änderung |
+| E-9b | Boolean `index-override: true`, Default `false` | kürzer, aber ein **Negativname**; ein Tippfehler (`overide: true`) wäre ein stiller No-op ⇒ der Wächter verliert seinen Zweck; ein späterer dritter Wert wird ein breaking rename |
+| E-9c | Enum `["auto", "knowledge-engine", "docs-consolidation"]` | symmetrisch, fügt aber einen **dritten** blockierenden Eigentümer ein und widerspricht `doc_renderer.py:685-686` ⇒ **verworfen** (DECISION-2) |
+
+**Empfehlung: E-9a. Blockiert:** die Wertetabelle in **IC-25**, **AC-46** und den Fail-closed-Zweig.
+**Auswirkung auf die Wellen:** **W3-6** — bei E-9a **keine** Sollwert-Änderung; bei E-9b wären
+**AC-44(c)** und **AC-46** auf einen Boolean umzuschreiben (ein Test weniger). **W3-7** und
+**W4-1…W4-3** unberührt.
+
+**E-10 — Reichweite: nur `docs/INDEX.md` oder auch die W3-7-Marker-Regionen?**
+
+**Sachstand (gemessen):** `apply_fact_blocks()` (`doc_renderer.py:183`) wird vom KE-Gate
+**nicht** berührt. Ihre Gates sind `docs-consolidation.enabled` (Common-Gate,
+`scripts/consistency-check.py:138`) und `docs-consolidation.sources` (IC-22), das in
+`.meta-config/project.yaml:398-401` **fehlt** (Default `[]` ⇒ kein Rendering, NG-9).
+**W3-7 ist also durch dieses Gate nicht blockiert** — es fehlt `sources`, nicht die Ausnahme.
+
+| Option | Beschreibung | Auswirkung |
+|---|---|---|
+| **E-10a (Empfehlung)** | `index-owner` gilt **ausschließlich** für `docs/INDEX.md` | hält den Aufgaben-Scope; W3-7 bleibt eigenständig; entspricht DECISION-4 |
+| E-10b | Key = „der Doku-Generator besitzt **alle** generierten Doku-Artefakte" | erzwingt eine **Umbenennung** (der Name meint nur einen Pfad), skaliert `sources` mit und zieht W3-7 in den Scope |
+
+**Empfehlung: E-10a. Blockiert:** den Umfang von **IC-26/1** und **AC-45**.
+**Auswirkung auf die Wellen:** **W3-6** läuft mit E-10a. **W3-7** braucht in **jedem** Fall
+`docs-consolidation.sources: [README.md, llms.txt, ARCHITECTURE.md]` — das ist eine **eigene**
+Config-Zeile und **keine** Folge dieser Ausnahme. **W4-1…W4-3** unberührt.
+
+**E-11 — Reicht der Key für `docs/architecture/INDEX.md` (W4-3)?**
+
+**Sachstand (gemessen):** `docs/architecture/INDEX.md` steht in `DOCS_GENERATED_RELS`
+(`generated_file_drift.py:82`), unterliegt aber **keinem** Mode-Gate — es gibt nur **einen**
+Aufrufer von `_index_mode_block_reason`, den Index-Writer. W3-6 erzeugt die Datei ausdrücklich
+**nicht** (Plan `:4931-4932`; Test-Pin `tests/test_doc_renderer.py:3319-3320`).
+
+| Option | Beschreibung | Auswirkung |
+|---|---|---|
+| **E-11a (Empfehlung)** | Nichts ändern; in W4-3 **verifizieren**, nicht vorab entscheiden | W4-3 bleibt wie geplant |
+| E-11b | W4-3 verlangt **vorab** eine Scope-Erweiterung des Keys | nimmt E-10 faktisch vorweg ⇒ **nicht** ohne E-10-Entscheidung |
+
+**Empfehlung: E-11a. Blockiert:** nichts in W3-6; W4-3 bleibt **verifikationspflichtig**, nicht
+entscheidungspflichtig.
+
+**E-12 — Reicht eine Docstring-Korrektur, oder zwei Fixtures im AC-20-Test?**
+
+| Option | Beschreibung | Auswirkung |
+|---|---|---|
+| **E-12a (Empfehlung)** | Docstring korrigieren **und** den neuen Override-Test (AC-42 Modus A) als **zweites** Fixture danebenstellen; `_e2e_config()` **nicht** umbauen | der Test behält seine Aussage (Skeleton-Übernahme); die neue Aussage kommt **additiv** dazu; Sollwert von `test_skeleton_replaced_once` bleibt unberührt |
+| E-12b | `_e2e_config()` umbauen, sodass es **beide** Modi durchläuft | **ein** Test mit **zwei** Verhaltensweisen ⇒ schwerer zu diagnostizieren; der Skeleton-Fall verliert seinen eigenen Namen |
+| E-12c | zusätzlich ein Test an der **verdrahteten** Stage (`sync_pipeline.py:985`) | stärkerer Nachweis (Stellenwert: `test_ke_index_stays_authoritative`, `:3100`, argumentiert genau damit); Kosten: ein weiterer Test |
+
+**Empfehlung: E-12a**, mit **E-12c als möglicher Erweiterung**. **Blockiert:** den Zusatz zu K-2
+und den Testumfang von **AC-42** (ob ein Test an der verdrahteten Stage dazukommt).
+**Auswirkung auf die Wellen:** **W3-6** Testaufwand unverändert bei E-12a; **W4** unberührt.
+
+**E-13 — Dokumentationspflicht: wer trägt Schema-/Beispiel-Eintrag?**
+
+| Option | Beschreibung | Auswirkung |
+|---|---|---|
+| **E-13a (Empfehlung)** | **W3-6**: eine Zeile `index-owner` in `.meta-config/project.yaml`; **W8-4**: Schema-Abschluss und Doku | verteilt die Pflicht auf die Wellen, die ohnehin `.meta-config/project.yaml` bzw. den Schema-Stand besitzen. **K-81 / RVW8-4: in dieser Form NICHT durchführbar — als Option zurückgenommen.** T-8 (Schema-Property) ist Voraussetzung für T-3 und T-5 (V-D7); ein Schema-Abschluss in **W8-4** würde W3-6s eigenen Nachweis „erweiterte Property-Menge" unerfüllbar machen. **Korrigierte Fassung:** T-3/T-5/T-8 liegen **alle in W3-6**; **W8-4** behält — *falls* die Doku-Zuordnung so entschieden wird — **nur den Dokuanteil**. |
+| E-13b | alles in **W3-6** | W3-6 würde größer als geplant und berührte `admin-ui`-Belange (fremde Welle). **K-81: in der technischen Dimension bereits durch V-D7 entschieden** (T-3/T-5/T-8 gehören zusammen) — offen bleibt nur, ob der **Dokuanteil** zusätzlich mitwandert. |
+| **E-13c — Kopier-Pfad** *(dritte Ausprägung, in §12.3 (g) Q3 als **Ergänzung zu E-13** geführt; **erst mit dieser Korrekturrunde (RVW9-4)** als eigene Optionenzeile in §17.12.2 ausgewiesen — **nicht entschieden**, siehe Suboptionen unter der Tabelle)* | **Doku-Pflichtträger** für die **kopierte** Deklaration: wer dokumentiert, dass `index-owner: docs-consolidation` in einem KE-Projekt (`knowledge-engine.enabled: true`) die KE-Autorität aufhebt — und ob eine `validate`/`--strict`-**Meldung** dafür gefordert wird | **Sachstand (gemessen, unverändert gegenüber §12.3 (g)):** ein gültiger, kopierter `index-owner: docs-consolidation` ist per Konstruktion **nicht** als Tippfehler erkennbar — weder per Enum (der Wert ist gültig) noch per fail-closed Zweig IC-25 (1) (der Wert ist bekannt). **Restrisiko, ausdrücklich NICHT akzeptiert** (§12.3 Q3-Bullet, Q4 (g), Bewertung). **Achtung — Abgrenzung:** E-13c ist **kein** sechstes P-Element und **kein** neues AC; es ist eine **offene Entscheidungsvorlage**. |
+
+**Empfehlung: E-13a — in der korrigierten Fassung (T-3/T-5/T-8 in W3-6, Dokuanteil optional in W8-4). Blockiert:** die Zuordnung des **Dokuanteils**, **nicht** W3-6 selbst. **Die technische Wellenzuordnung von T-3/T-5/T-8 ist durch V-D7 gemessen und steht fest; sie ist keine offene Frage mehr.**
+**Auswirkung auf die Wellen:** **W3-6** +1 Config-Zeile + Schema-Property + 2 Enum-Tests + 2 Mengen-Pins; **W4-1…W4-3** unberührt; **W8-4** ggf. ein
+zusätzlicher Punkt in dessen `Files:`-Liste (**Plan**-Änderung, **keine** Spec-Änderung).
+
+**E-13c — Kopier-Pfad: Suboptionen (RVW9-4; §12.3 (g) Q3-Bullet verlangt genau diese beiden
+Entscheidungspunkte). Beide Punkte sind **offen**; **keine** ist entschieden.**
+
+| Suboption | Entscheidungspunkt | Option | Auswirkung |
+|---|---|---|---|
+| **c(1)** | **Doku-Pflichtträger** für die kopierte Deklaration | **c(1)-a (Empfehlung):** Pflicht in der **IC-25-Dokuabschnitt** dieser Spec (die Zeile `index-owner: docs-consolidation` in `.meta-config/project.yaml` wird im W3-6-Commit-Body und in der Task-`Interfaces:`-Zeile kommentiert) | **keine** neue Welle, **kein** neues AC, **keine** Code-Änderung; das Restrisiko bleibt benannt und gemessen |
+| | | c(1)-b: Pflicht als **README-Abschnitt** (Konsumenten-sichtbar) | zusätzlicher Dokuanteil in **W3-6** oder **W8-4** — E-13a (Dokuanteil) wird damit belegt; **W3-7**/**W4-1…W4-3** unberührt |
+| | | c(1)-c: **keine** Pflicht — das Restrisiko bleibt ausschließlich in Spec §12.3 benannt | **günstigster**, lässt die Oberfläche „knowledge-engine ist autoritativ" aber widersprechen; **nicht** empfohlen, weil §12.3 (g) es ausdrücklich **nicht akzeptiert** |
+| **c(2)** | `validate`/`--strict`-**Meldung**, wenn `index-owner` **und** `knowledge-engine.enabled: true` gesetzt sind | **c(2)-a (Empfehlung):** **nein** — eine Meldung wäre ein **dritter** Eigentümer-Signalpfad neben `doc_renderer.py:702-703` und dem Schema-Enum und würde DECISION-2/IC-26/1 berühren | **kein** zusätzlicher V-Check, **keine** neue Welle; W3-6 bleibt beim bisherigen Umfang + **V-D8-Plan-Delta** |
+| | | c(2)-b: **ja**, als **neuer V-Check** neben V1…V9 | **neue** Wellenzuordnung, **neuer** Plan-Task, **neue** `W-VALIDATE-ROT`-Eintragung; **größer** als Rev. 0.8 — **nur** mit ausdrücklicher Scope-Erweiterung, die in Rev. 0.8 **nicht** beauftragt ist |
+| | | c(2)-c: **ja**, aber als `WARN` statt `ERROR` | Mittelweg: Gate im `--strict`-Modus rot, im Normalmodus sichtbar; berührt §10 (Severity-Regel), **keine** neue Welle |
+
+**Empfehlung: c(1)-a + c(2)-a.** **Begrenzung (bewusst):** die Empfehlung ersetzt **keine**
+Entscheidung — sie ist die Begründung, mit der der Auftraggeber entscheidet. **Owner:** `main_chat`
+(alle übrigen offenen Vorlagen ebenso, §17.12.2-Einleitung). **Termin:** **vor** der Umsetzung von
+**W3-6** (identisch mit P-1…P-5, §17.12.1) — danach ist die kopierte Deklaration ein
+Implementierungs-, kein Entscheidungsproblem mehr.
+**Auswirkung auf die Wellen:** **W3-6** — bei c(1)-a/c(2)-a **keine** Erweiterung über den
+Rev.-0.8-Umfang hinaus; c(1)-b berührt den **Dokuanteil** (E-13a); c(2)-b/c erfordern einen
+**neuen** Plan-Task und sind **außerhalb** Rev. 0.8. **W3-7** und **W4-1…W4-3** in **allen**
+Suboptionen unberührt.
+**Sachstand, der E-13 präzisiert (gemessen):** eine Datei
+`config/agent-meta.config.example.yaml`, die als Beispielträger in Frage käme, **existiert im
+Repo nicht** (Glob ⇒ keine Treffer), und **keine** der beiden Beispiel-Configs
+(`docs/guides/project.yaml.example`, `docs/guides/configs/project.yaml.example`) enthält
+heute überhaupt einen `docs-consolidation`-Block (Grep ⇒ **0** Treffer). Die **IC-22-Tabelle**
+ist damit der **einzige** normative Ort, der die Keys dieses Blocks aufzählt — weshalb P-3
+(„siebter Key") überhaupt eine Pflicht ist.
+
+**Ausdrücklich KEINE offene Frage** (festgehalten, damit sie nicht erneut aufgerollt wird):
+
+| Thema | Feststellung |
+|---|---|
+| `facts-hash`-Churn durch den neuen Key | Der Key fließt **nicht** in `compute_doc_facts()` ein (kein Aufruf, kein Parameter) ⇒ **kein** Churn, **kein** AC (IC-26/9). |
+| **OQ1** (Wiki-Topics ↔ `docs/guides/`) | **BLEIBT OFFEN**, Owner `main_chat` (`docs/plans/2026-09-25-docs-consolidation-oq1.md:94`), Blockade **W5** (`:99`). Diese Ausnahme berührt `knowledge/wiki/**` **nicht** und hebt die Blockade **nicht** auf. **Weder OQ1 noch eine andere offene Spec-Frage wird durch Rev. 0.8 stillschweigend aufgelöst.** |
+| **OQ6**, **OQ8** | **ENTSCHIEDEN** (§11.2) — von **W3-6** umzusetzen, hier **nicht** neu bewertet. |
+| OQ2, OQ3, OQ4, OQ5, OQ7, OQ9, OQ10 | Status **unverändert** (§11.1/§11.2); Rev. 0.8 stellt **keine** davon auf. |
+
+#### 17.12.3 DECISION-1…DECISION-4 (übernommen, jede am Code belegt)
+
+| ID | Entscheidung | Verworfene Alternativen (Kurzform) | Beleg |
+|---|---|---|---|
+| **DECISION-1** | **Anbindungsachse: deklarativer Config-Key** `docs-consolidation.index-owner` (Default `auto`), gelesen von **genau einer** Funktion, in agent-meta explizit auf `docs-consolidation` gesetzt. | **B-1** Vergleich über `project.name` / `platforms` — verstößt gegen die Aufgaben-Constraint und `AGENTS.md:50`, und zählt eine Projekt**identität**, die eine Variable ist, keine Fähigkeit. **B-2** Struktur-/Marker-Erkennung („dieses Repo *ist* das Framework-Repo") — von der APPROVED-Fassung **bereits entschieden** (**R17**, Risikotabelle §12.2) und unabhängig davon im Common-Gate festgehalten (`scripts/consistency-check.py:144-145`). **C** Capabilities-Key im `knowledge-engine`-Block — würde der KE Jurisdiktion über den **Doku**-Index geben und koppelt zwei Features, die IC-13 entkoppelt hält. **D** `resolve_index_mode()`-Default umdrehen bzw. `index.mode: file-index` in agent-meta — kehrt die KE-Präzedenz um und macht den Scaffold zum Mit-Schreiber. | `AGENTS.md:50`; `.opencode/skills/provider-agnostic/SKILL.md:12-18`; **R17** (Abschnitt §12.2); `consistency-check.py:144-145`; `.meta-config/project.yaml:80-81` (`platforms: [agent-meta]` — vorhanden und **unbenutzt**); `resolve_index_mode` `spec_plan_scaffold.py:80-97`; IC-26/8 |
+| **DECISION-2** | **Kein expliziter Wert `knowledge-engine` im Enum.** Der Key kann einen Eigentümer **nicht** hinzufügen, nur den einen Auslöser stilllegen. | Wert `knowledge-engine` — **dritter** blockierender Eigentümer, widerspricht `:685-686`; zusätzlich Verhaltensaenderung für jedes `file-index`-Projekt, das den Key setzt. | `doc_renderer.py:685-686`, `:666-676`; IC-25 Wertetabelle; AC-44 |
+| **DECISION-3** | **Kein Eingriff in `resolve_index_mode()`** — die Ausnahme lebt im **Doku**-Gate, das die Funktion nur aufruft, nie in der Funktion, die auch der Scaffold liest. | Optionaler dritter Parameter `resolve_index_mode(config, *, owner_override=False)` — breitete die Ausnahme in die Scaffold-Entscheidung (`:115`) und in `knowledge.py:185` aus, also genau in die Pfade, die unverändert bleiben **müssen**; außerdem Signaturänderung eines Schnittstellenpunkts, den W1-1…W3-5 als stabil behandeln. | `spec_plan_scaffold.py:80-97`, `:115`; `knowledge.py:185`; IC-26/2 |
+| **DECISION-4** | **W3-7 wird von dieser Ausnahme ausdrücklich NICHT miterfasst.** Der Key wirkt ausschließlich auf `_index_mode_block_reason`, also auf den Index-Writer; die Hybrid-Regionen (`apply_fact_blocks`, `doc_renderer.py:183`) bleiben unberührt. | Den Key als „der Doku-Generator besitzt alle generierten Doku-Artefakte" lesen und `sources` mitskalieren — Scheinkonsistenz (der Name meint nur einen Pfad) **und** Scope-Ausweitung ohne Gate-Bedarf. | `doc_renderer.py:183`; `consistency-check.py:138`; IC-26/1; E-10 |
+
+#### 17.12.4 Nachweisformen und Testakzeptanz — **beide Modi**
+
+**Modus-Übersicht (jede Zeile nennt den Testpin, oder weist ihn als neu aus):**
+
+| # | Aussage | agent-meta-Ausnahme (Override) | Consumer im KE-Modus | Testpin | Status |
+|---|---|---|---|---|---|
+| 1 | Ein Schreibvorgang ist erlaubt | `written == ["docs/INDEX.md"]`, `CREATE`, `doc-indexer/1` **und** `docs-facts`-Block im Dokument; zweiter Lauf `unchanged`, **null** Aktionen | `skipped`, `KE_AUTHORITATIVE_REASON`, **null** Aktionen, Baum identisch | `tests/test_doc_renderer.py::test_index_owner_override_writes_in_a_ke_authoritative_project` + `::test_index_owner_absent_keeps_the_ke_authoritative_block` | **beide NEU** (AC-42) |
+| 2 | Absenz-Semantik | Default `auto` ⇒ Grund ist **zeichengleich** `KE_AUTHORITATIVE_REASON` (`:277`) | dito | `::test_index_owner_absent_keeps_the_ke_authoritative_block` (neu) + **bestehend unverändert** `::test_ke_authoritative_writes_no_index` (`:2614`), `::test_ke_authoritative_writes_no_index_even_when_absent` (`:2650`) | gemischt (AC-43) |
+| 3 | `skeleton` wird **nicht** aufgehoben | `skipped` + `SKELETON_MODE_REASON`, Skeleton byte-identisch | dito (unverändert) | **neu** `::test_index_owner_override_does_not_relax_skeleton_or_ownership`; **bestehend unverändert** `::test_skeleton_mode_preserves_scaffold` (`:2559`), `::test_skeleton_mode_creates_no_index_at_all` (`:2590`) | gemischt (AC-44 a) |
+| 4 | Besitzregel wird **nicht** aufgehoben | `skipped` + `OWNERSHIP_REASON` bei fremder Datei | dito (unverändert) | **neu** `::test_index_owner_override_does_not_relax_skeleton_or_ownership` (Fall **b**, §17.12.4 Zeile 4 nennt den Testnamen; Fall a = Zeile 3); `::test_scaffold_guard_recognises_only_the_skeleton` (`:2529`) unverändert | gemischt (AC-44 b) |
+| 5 | Unbekannter Wert ist fail-closed | `skipped` + `UNKNOWN_INDEX_OWNER_REASON`, **kein** Schreiben | dito | **neu** `::test_unknown_index_owner_is_fail_closed`; Muster `::test_unknown_index_mode_is_fail_closed` (`:2720`) | **neu** (AC-44 c) |
+| 6 | `dry_run` schreibt nicht | `written` **enthält** den Pfad, Action `WOULD-CREATE`, Baum identisch | `written` **leer**, `skipped` enthält den Pfad | **neu** `::test_index_owner_override_keeps_dry_run_free_of_writes`; `::test_dry_run_no_writes` (AC-23) unverändert | **neu** (AC-45) |
+| 7 | Schema pinnt die zwei Werte | `index-owner: docs-consolidation` **valid** | `"knowledge-engine"` / `"agent-meta"` / `"docs"` **invalid** | **neu** `::test_index_owner_enum_accepts_both_values`, `::test_index_owner_enum_rejects_everything_else`; Muster `:174-182` | **neu** (AC-46) |
+| 8 | Property-Menge des Blocks | **sechs** Properties | **sechs** Properties (der Key ist ein reines Deklarations-Key) | **bestehend, Sollwert-Erweiterung** `::test_schema_block_present_and_closed` (`:81`) ⇒ `_EXPECTED_PROPERTIES` `:45-51` **fünf → sechs** | geändert (AC-39) |
+| 9 | `off` ist **kein** blockierender Eigentümer | unverändert | unverändert | **bestehend unverändert** `::test_index_mode_off_permits_the_full_index` (`:2740`) | unverändert |
+
+**Bestehende Tests, die unverändert grün bleiben (Sollwerte unangetastet):**
+
+| Test / Assert | `file:line` | Warum unverändert |
+|---|---|---|
+| `tests/scenarios/asserts/{50:32, 51:32, 52:44, 54:26-27, 55:24-25, 56:31}` | `tests/scenarios/asserts/50-spec-plan-workflow.sh:32` · `51-spec-plan-disabled.sh:32` · `52-spec-plan-enabled.sh:44` · `54-spec-plan-external-override.sh:26-27` · `55-spec-plan-ke-off-fallback.sh:24-25` · `56-spec-plan-preset-coupling.sh:31` | **Keines** der Fixtures `tests/scenarios/configs/*.project.yaml` enthält einen `docs-consolidation`-Key (Grep ⇒ **0** Treffer; `tests/scenarios/run.sh:46-52` spielt sie 1:1 ein) ⇒ `enabled` fail-off ⇒ der Code-Pfad **nie** erreicht. **AC-38 bleibt wörtlich gültig, NG-10 gewahrt.** |
+| `::test_ke_authoritative_writes_no_index` | `tests/test_doc_renderer.py:2614` | Fixture `_KE_AUTHORITATIVE_CONFIG` (`:2481-2484`) hat **keinen** `index-owner`-Key ⇒ `auto` ⇒ Gate feuert unverändert. |
+| `::test_ke_authoritative_writes_no_index_even_when_absent` | `:2650` | dito. |
+| `::test_ke_index_stays_authoritative` | `:3100` | Fixture `:3118-3123` ohne `index-owner` ⇒ bleibt grün. |
+| `::test_index_mode_off_permits_the_full_index` | `:2740` | `off` + **kein** `index-owner` ⇒ unverändert; der Test pinnt ausdrücklich, dass `off` **kein** blockierender Eigentümer ist (DECISION-2). |
+| `::test_skeleton_mode_preserves_scaffold` · `::test_skeleton_mode_creates_no_index_at_all` | `:2559` · `:2590` | `index-mode: skeleton` wird von der Ausnahme **nicht** aufgehoben (IC-26/3, AC-44 a). |
+| `::test_skeleton_replaced_once` | `:3258` | **Sollwert bleibt unangetastet** — siehe unten. |
+| `::test_scaffold_guard_recognises_only_the_skeleton` | `:2529` | `is_file_index_skeleton()` unberührt (IC-26/4). |
+| `::test_stage_order_after_scaffold` | `:3013` | fährt die **verdrahtete** Stage; Fixture ohne `index-owner` ⇒ bleibt grün. |
+| `::test_no_property_name_is_a_provider_name` | `tests/test_docs_consolidation_migration.py:116` | Der Key-Name `index-owner` enthält **keinen** Provider-Namen (Enum `config/project-config.schema.json:24-34`); der Test liest die Property-Namen **dynamisch** und bleibt deshalb grün. |
+| `::test_schema_declares_the_absence_defaults` (Fail-off-Defaults des Blocks) | `tests/test_docs_consolidation_migration.py:185-199` (Def `:185`, Docstring `:186-192`, Asserts `:194-199`) | **K-78 (RVW8-2, belegt):** der Test liest die fünf Keys **namentlich** (`properties["enabled"]["default"]` usw.) und iteriert die Block-Property-Menge **nicht** ⇒ eine sechste Property bricht ihn **nicht**. **RVW9-7:** der frühere Wildcard-Name `::test_fail_off_defaults_*` existiert **nicht** — belegt durch den Namen `def test_schema_declares_the_absence_defaults()` bei `:185`; der Zeilenbereich beginnt **nicht** im Docstring (`:185`, nicht `:186`). |
+| `_EXPECTED_CHECKS_PROPERTIES` | `tests/test_docs_consolidation_migration.py:53`, geprüft `:112` | **K-78 (belegt):** `checks` erhält **keine** neue Property (`index-owner` liegt auf Top-Level) ⇒ Pin bleibt unberührt. |
+
+> **K78-Verortung (RVW9-6).** Die **zwei geänderten** Pins `_EXPECTED_PROPERTIES`
+> (`tests/test_docs_consolidation_migration.py:45-51`) und `_IC22_ABSENCE_DEFAULTS`
+> (`tests/test_doc_renderer.py:1092-1098`) stehen in **keiner** Zeile dieser Tabelle — sie sind
+> **keine** „unverändert grün"-Fälle. Ihre Orte sind: **Modus-Übersicht Zeile 8** (oben),
+> **T-3 (a)/(b)** (§17.12.4 Teständerungsliste) und die **Coverage-Zeile „Sollwert-Änderungen
+> vollständig registriert"** (§17.12.5). Die Tabelle trägt ausschließlich die **unveränderten**
+> Nachbarn (`_EXPECTED_CHECKS_PROPERTIES`, Fail-off-Defaults-Test).
+
+**`test_skeleton_replaced_once` — Sollwert-Stabilität als Design-Anforderung (K-2).**
+`_e2e_config()` (`:3209-3238`) kopiert den **Live**-Block inklusive des neuen Keys und setzt
+zusätzlich `knowledge-engine: {"enabled": False}` (`:3237`). Damit läuft der Test in einer
+`file-index`-Konfiguration, in der `index-owner` per Konstruktion ein **No-op** ist (der
+KE-Zweig greift ohnehin nicht). Der Test bleibt also grün, **ohne** dass sein Sollwert
+angefasst wird. **Das ist Absicht und muss im Review so verteidigt werden:** der Test beweist
+die **Skeleton-Übernahme** (AC-20), **nicht** die **Eigentümer-Deklaration**; für die zweite
+Aussage kommt der neue Test aus Zeile 1 daneben — derselbe Live-Block, aber mit
+`knowledge-engine: {enabled: true}`. **Einzige** Textänderung ist der Docstring (**K-2**).
+
+**Erforderliche Teständerungen (keine Sollwert-Absenkung, nur Erweiterung):**
+
+| # | Datei `file:line` | Änderung | Grund |
+|---|---|---|---|
+| T-1 | `tests/test_doc_renderer.py:3209-3223` | **Docstring** von `_e2e_config()` korrigieren und **ausdrücklich** benennen, dass die Fixture eine **abweichende** Konfiguration benutzt (`:3237`) und warum. | **K-2** — die Aussage ist für agent-meta nach dem Key-Set falsch. **Reiner Text.** |
+| T-2 | `tests/test_doc_renderer.py` (neu, nach `:3258`) | **5 neue Tests** (Zeilen 1–6 der Tabelle oben, ohne Zeile 7). | AC-42…AC-45. |
+| T-3 | `tests/test_docs_consolidation_migration.py:45-51`<br>**und** `tests/test_doc_renderer.py:1092-1098`<br>**Welle W3-6** (Reihenfolge T-8 → T-3 → T-5, **V-D7**) | **(a)** `_EXPECTED_PROPERTIES`: **fünf → sechs** (`+ "index-owner"`). Erforderlich, sonst bricht `::test_schema_block_present_and_closed` (`:99-103`, `:101`) mit `unexpected properties: ['index-owner']`.<br>**(b)** `_IC22_ABSENCE_DEFAULTS`: **fünf → sechs** (`+ "index-owner": "auto"` — der Wert ist der Absenz-Default aus IC-22). Erforderlich, sonst bricht `assert _schema_absence_defaults(block_schema) == _IC22_ABSENCE_DEFAULTS` (`:1371`, in `::test_absent_block_is_noop`, `:1318`), weil `_schema_absence_defaults` (`:1114-1130`) **alle** Block-Properties iteriert und deren `default` abbildet. | AC-39 / P-3 (e). **K-78 (RVW8-2):** dies sind **zwei** harte Sollwert-Änderungen in Rev. 0.8, **nicht eine** — die frühere Formulierung „die einzige echte Sollwert-Änderung" ist **zurückgenommen** (sie machte W3-6 rot, obwohl §17.12.4 genau das als Nachweis fordert). **Beide sind Erweiterungen einer Menge, keine Absenkung.** Ein Grep nach weiteren Mengen-Pins (`_EXPECTED_CHECKS_PROPERTIES` u. a.) belegt: **keine weiteren** (V-D4). **RVW9-6: die Orte von K78** sind Modus-Übersicht Zeile 8, T-3 (a)/(b) und die Coverage-Zeile — **nicht** die „bleiben grün"-Tabelle. |
+| T-4 | `tests/test_docs_consolidation_migration.py:42-44` | Zählkommentar: **Text** in Zeile `:42` von „six rows/five of them" auf „**seven rows/six** of them" **und** das Ordnungswort in Zeile `:43` von „**sixth**" auf „**seventh**" — die **Hälfte ab Zeile `:44`** bleibt **wortgleich**: `knowledge-engine.okf.index-mode` liegt weiterhin in einem anderen Block und der Verweis **„deferred to W7-2"** gilt unverändert (`:44`: „`checks.strict` is a nested key, so it is one property here"). | **K-3**. **K-77 (RVW8-1):** der Kommentar **existiert** am Working Tree (Grep-Beleg `:42`, `:43`, `:44`); die frühere Abbruchbedingung („fehlt der Kommentar, entfällt T-4") ist damit **gegenstandslos** und **ersatzlos gestrichen**. **T-4 ist verbindlich** — ein Kommentar, der nach Rev. 0.8 falsch ist (sieben Zeilen in der IC-22-Tabelle, sechs `docs-consolidation.*`-Keys), ist selbst ein Befund. **RVW9-3:** `:43` **mitziehen** — bei sieben Zeilen ist der KE-Key die **siebte**; „sechs von sieben" und „the sixth" können nicht gleichzeitig stimmen. Solltext `:43`: `# seventh (\`knowledge-engine.okf.index-mode\`) belongs to a different block and is`. |
+| T-5 | `tests/test_docs_consolidation_migration.py` (neu) — **Welle W3-6**, **nach** T-8 und T-3 (V-D7) | **2 neue Enum-Tests** (Zeile 7). | AC-46. |
+| T-6 | `scripts/lib/doc_renderer.py:669-672` | **Docstring**-Korrektur. | **K-1** — reiner Text, kein Verhalten. |
+| T-7 | `.meta-config/project.yaml:398-401` | **eine** Zeile `index-owner: docs-consolidation`. | P-3 / IC-25; **kein** Code, **kein** Test. **Reihenfolge (RVW9-9):** T-7 schreibt in **denselben** `docs-consolidation`-Block, den der **offene** Schritt 2 von Plan-**W1-10** (`docs/plans/2026-09-25-repository-documentation-consolidation.md:2115-2118`, „4 von 5 Properties": `index-mode`, `checks.strict`, `sources`, `volatile-facts`) füllen will. **Reihenfolge festgehalten: W1-10 Step 2 ist VOR W3-6 zu ziehen** (dann ist der Live-Block vor dem Delta vollständig) **oder** als Bestandteil von W3-6 zu führen; die `CAN_RUN_IN_PARALLEL`-Liste des Plans ist entsprechend zu berichtigen (Plan-Sache, Teil des V-D8-Deltas). **Zusatz-Abhängigkeit:** ein in W1-10 gesetztes `sources` aktiviert den Gate-Zweig `apply_fact_blocks` — dieselbe Abhängigkeit, die E-10 und **V-D6** als eigene Config-Zeile für W3-7 führen (`doc_renderer.py:183`, `docs-consolidation.sources` in IC-22). |
+| T-8 | `config/project-config.schema.json:2421-2470` (Block; Properties `:2424-2469`, `additionalProperties: false` `:2470`) — **Welle W3-6, zuerst** (V-D7) | **eine** Property `index-owner`. | P-3 / IC-25. **K-81:** T-8 ist Voraussetzung für T-3 und T-5. |
+
+**Nachweisformen (Kommandos, keine neuen Dateien):**
+
+| Nachweis | Kommando | Soll |
+|---|---|---|
+| W3-6 Kernlieferung | `python3 scripts/sync.py --dry-run` (einmal), danach `python3 scripts/sync.py` | 1. Lauf `CREATE docs/INDEX.md`; 2. Lauf `unchanged`, **null** Actions |
+| Drift-Baseline | `python3 scripts/sync.py --check` | **0** — sobald die Datei existiert, greift `DOCS_GENERATED_RELS` (`generated_file_drift.py:82`, Verdrahtung `:204-207`); der Docstring dort (`:201`) sagt den Fall bereits voraus: „``docs/INDEX.md`` only arrives in W3-6" |
+| Szenario-Regression | `bash tests/scenarios/run.sh 50 51 52 54 55 56` | **0** (bestehender Runner, **keine** neuen Dateien — AC-38, NG-10) |
+| V2-Nachweis | `python3 scripts/sync.py --validate` | V2 **0** (`docs_index.py:180-211`); `--validate` bleibt planmäßig **rot** über V3 (Plan `:4936-4937`) |
+| tracked (OQ6) | `git check-ignore -q docs/INDEX.md; echo $?` | **1** (Plan `:4929`, `:4935`) |
+| Schema (T-8 → T-3 → T-5, **alle in W3-6**, Reihenfolge **V-D7**) | `python3 -m pytest tests/test_docs_consolidation_migration.py -q` | gruen inkl. **2** neuer Enum-Tests und erweiterter Property-Menge (**beide** Pins: `_EXPECTED_PROPERTIES` `:45-51` **und** `_IC22_ABSENCE_DEFAULTS` `test_doc_renderer.py:1092-1098`, K-78) |
+| Einheiten | `python3 -m pytest tests/test_doc_renderer.py -q` | gruen inkl. **5** neuer Tests **und** erweitertem `_IC22_ABSENCE_DEFAULTS` (K-78) |
+
+> **Diese W3-6-Akzeptanz ist vom heutigen Plan aus unerfüllbar — V-D8 (RVW9-2, major).**
+> Die Nachweisformen dieser Tabelle verlangen T-7, T-8, T-3 (a/b) und T-5 **in W3-6**. Plan
+> Rev. 0.7 (`docs/plans/2026-09-25-repository-documentation-consolidation.md:4918-4944`) kennt
+> davon **keins**: `Files:` `:4920-4921` nennt weder `config/project-config.schema.json` noch
+> `tests/test_docs_consolidation_migration.py`; `Ziel-AK` `:4926` = **AC-20, AC-12 (E2E), AC-38**
+> — **kein** AC-42…AC-46, kein AC-39; Steps `:4938-4944` ohne T-7/T-8/T-3/T-5; Grep über den Plan:
+> `index-owner` **0** Treffer, `AC-4[2-6]` **0** Treffer, `pending-approval` **0** Treffer. Wird
+> W3-6 nach Plan umgesetzt, entsteht **weder** die Deklaration **noch** die Schema-Property ⇒ der
+> KE-Vorrang-Zweig `doc_renderer.py:702-703` blockiert weiter, `docs/INDEX.md` entsteht nicht.
+> **Der Plan wird in dieser Korrekturrunde NICHT geändert.** Der **forderliche Plan-Delta** ist in
+> **§17.12.5 (V-D8, V-D8-Uebergabe)** präzise benannt und wird **erst nach** der User-Freigabe von
+> P-1…P-5 (inkl. P-3 (e)) durch den `planner` ausgeführt.
+
+#### 17.12.5 Befunde aus der Nachmessung — was der Entwurf annahm und was der Working Tree zeigt
+
+| ID | Befund | Behandlung |
+|---|---|---|
+| **V-D1** | **Weitere veraltete Zeilenanker derselben Klasse wie K-4**, die der Entwurf **nicht** belegt und die Rev. 0.8 deshalb **nicht** angefasst hat: **(a)** IC-15 nennt `DEFAULT_FALLBACK_INDEX` bei `:23` und `_FILE_INDEX_SKELETON` bei `:24` — gemessen sind sie **`:28`** und **`:29`** (`spec_plan_scaffold.py:25-30`); **(b)** der **§15-Trace-Anker** nennt `spec_plan_scaffold.py:23` — real **`:28`**; **(c)** AC-38s zweite Abschirmung nennt `spec_plan_scaffold.py:49-51` für den „**vor** jedem `mkdir`"-Abbruch — real ist der Early-Return der deaktivierten Scaffold `spec_plan_scaffold.py:102-104` (die Funktion beginnt bei `:100`). | **Auswahlregel Rev. 0.8 (K-80, RVW8-8 — damit die Behandlung der Ankerdrift *einheitlich* ist):** Rev. 0.8 korrigiert **genau** die Anker, die in den **ohnehin von Rev. 0.8 geänderten** IC-/AC-Zeilen stehen; **alle übrigen** Fundstellen werden hier **vollständig** registriert, damit sie für die nächste Korrekturrunde nicht verloren gehen. Nach dieser Regel ist **(a)** in Rev. 0.8 zu korrigieren (IC-15 ist ein Rev.-0.8-IC, P-2) — getan, IC-15 **`:1487-1488`** ⇒ `:28`/`:29`; **(b)** und **(c)** bleiben **vorgemerkt** (Abschnitte, die Rev. 0.8 nicht anfasst). **RVW9-8: der Beleg dieser Selbstreferenz ist korrigiert** — V-D1 schrieb zuvor „IC-15 `:1449-1450`"; **RVW10-2: der von RVW9-8 gesetzte Ersatzanker `:1465-1466` war selbst falsch** und ist auf den **gemessenen** Träger gezogen** — durch K-84 (`docs/specs/2026-09-25-repository-documentation-consolidation.md:1487-1488`, `DEFAULT_FALLBACK_INDEX = "docs/INDEX.md"   # :28` und `_FILE_INDEX_SKELETON = "…"   # :29`) belegt liegt die angewandte Korrektur bei **`:1487-1488`**; `:1449-1450` trägt heute den IC-14-Überschrift-/Absatzbereich, `:1465-1466` **IC-13-Fließtext** (Szenarien 54/55/56 sowie 52, AC-38) — IC-15 beginnt bei `:1483`. **Vollständiges Inventar der übrigen Fundstellen (alle am 2026-09-29 per Grep erneut bestätigt):** `:515` (F8, `:23` → `:28`), `:528` (F20, `:24` → `:30`), `:571` (Fließtext, `:23` → `:28`), `:593` (NG-7, `:23` → `:28`), `:2187` (AC-22-Text, `:40-44` → `:80-97`), `:2255` (AC-38, `:49-51` → `:102-104`), `:2511` (AC-20, `:24, :62-68` → `:30`, `:115-121`), `:2513` (AC-22, `:40-44` → `:80-97`), `:2866` (OQ6, `:23` → `:28`), `:2968` (A4, `:62-68` → `:115-121`), `:3017` (§15, `:23` → `:28`), `:3110` (§16 Querverweise, `:20-24, :27-44, :46-68` → `:28-30, :80-97, :100-121`), `:3161` (§17.3 CR-1, `:49-51` → `:102-104`), `:3179` (A4-Nachweis, `:62-68` → `:115-121`). **Die inhaltlichen Aussagen an allen Fundstellen sind richtig — nur die Anker sind alt.** |
+| **V-D2** | **IC-12s Aufrufreihenfolge** nennt `sync_pipeline.py:922-945` / `:929` / `:935` / `:1090-1099` / `:1102` / `:1106-1109`. Gemessen: `_sync_stage_knowledge_and_isolation` **`:966`**, `sync_knowledge_engine(...)` **`:974`**, `scaffold_spec_plan_dirs(...)` **`:980`**, `_sync_stage_docs_consolidation(...)` **`:985`**, `_sync_stage_generated_file_hash_capture` **`:1139`**, `_sync_stage_auto_commit_allowlist` **`:1151`**. Die **Reihenfolge** als Aussage ist richtig; nur die Anker sind alt. **Ergänzung RVW8-8 (K-80):** dieselben veralteten Pipeline-Anker stehen **zusätzlich** in **AC-22s §9.1-Zeile** (`:2513`, `sync_pipeline.py:922-945`) und in **§13 A4** (`:2968`, `sync_pipeline.py:935`) — V-D2 registrierte bislang **nur IC-12**; damit war der Umfang der nächsten Korrekturrunde unterbestimmt. **Vollständiges Inventar:** `:2513` (AC-22) und `:2968` (A4), beide auf denselben gemessenen Stage-Ankern umzuschreiben. **Die Rev.-0.8-Texte (IC-25, IC-26/1, §17.12.4) verwenden deshalb durchgängig die gemessenen Anker.** | **Nicht** angefasst (außerhalb des Delta-Auftrags, und die *Aussagen* dort sind richtig — nur die Anker sind alt); **vorgemerkt** mit vollständigem Inventar. Der Widerspruch zwischen IC-12 und IC-25 ist damit **sichtbar** und nicht verdeckt. |
+| **V-D3** | **Zwei Belegstellen des Entwurfs sind am Working Tree nicht haltbar:** (a) die Korrektur-Klausel „neue Platzhalter dokumentiert" mit Anker `AGENTS.md:247` — in der generierten `AGENTS.md` gibt es diese Regel **nicht** (`:247` ist eine Zeile der Agent-Roster-Tabelle; die einzige placeholder-bezogene Aussage ist `AGENTS.md:39`); (b) `config/agent-meta.config.example.yaml` als Beispielträger — die Datei **existiert nicht** (Glob ⇒ keine Treffer). **Korrekte** Anker: Provider-Achse `AGENTS.md:50` **und** `.opencode/skills/provider-agnostic/SKILL.md:12-18`; Projekt-Achse `AGENTS.md:50` (Text) plus das Fehlen jeder Struktur-Heuristik in `consistency-check.py:144-145` und R17 (Abschnitt §12.2). | **K-1…K-5 wurden ausschließlich an den Stellen angewandt, an denen sie belegt sind**; die unbelegten Verweise wurden durch die **gemessenen** Anker ersetzt (§17.12.3 DECISION-1, IC-26/8). **E-13** beschreibt den Ist-Stand (kein Beispielträger vorhanden), statt eine nicht existierende Datei als Pflicht zu behaupten. |
+| **V-D4** | **Zwei notwendige Teständerungen, die der Entwurf als reine Kommentar-Korrektur führt.** (a) `tests/test_docs_consolidation_migration.py:45-51` (`_EXPECTED_PROPERTIES`) ist ein **hart gepinnter Mengen-Sollwert** und wird von `::test_schema_block_present_and_closed` (`:99-103`, `assert set(properties) == _EXPECTED_PROPERTIES`, `:101`) geprüft. Eine neue Schema-Property **bricht** diesen Test ⇒ **Sollwert-Erweiterung** (fünf ⇒ sechs). (b) `_IC22_ABSENCE_DEFAULTS` (`tests/test_doc_renderer.py:1092-1098`, hartes Fünf-Key-Dict) wird gegen `_schema_absence_defaults(block_schema)` geprüft (`:1371`, in `::test_absent_block_is_noop`, `:1318`); `_schema_absence_defaults` (`:1114-1130`) iteriert **alle** Properties des Blocks und bildet deren `default` ab ⇒ eine neue Property `index-owner` erzeugt einen **sechsten** Schlüssel ⇒ **Assertion rot**. **K-77 (RVW8-1) korrigiert zusätzlich den Träger des Kommentars:** `:42-44` **existiert** (Grep-Beleg; das Read-Tool rendert ihn leer — Fehlmessung des Werkzeugs, nicht des Working Tree). **Vollständigkeits-Greep 2026-09-29 (K-78):** die Suche nach weiteren Mengen-Pins über `_EXPECTED_PROPERTIES`, `_IC22_ABSENCE_DEFAULTS`, `_EXPECTED_CHECKS_PROPERTIES` und `_block()["properties"]` ergibt **genau zwei** zu ändernde Sollwerte. `_EXPECTED_CHECKS_PROPERTIES` (`tests/test_docs_consolidation_migration.py:53`, geprüft `:112`) bleibt **unberührt**, weil `checks` **keine** neue Property erhält; der Fail-off-Defaults-Test **`::test_schema_declares_the_absence_defaults`** (`tests/test_docs_consolidation_migration.py:185-199` — Def `:185`, Docstring `:186-192`, Asserts `:194-199`; **RVW9-7:** der frühere Wildcard-Name `::test_fail_off_defaults_*` existiert **nicht**) liest die fünf Keys **namentlich** und prüft die Menge **nicht** ⇒ bleibt grün. | (a) als **T-3**, (b) als **T-3, zweite Zeile** (§17.12.4) geführt und beide als **P-3 (e)** in §17.12.1 zur Freigabe gestellt. **Keine Absenkung** — beide sind Erweiterungen einer Menge. **RVW9-6: die Orte** von K78 sind Modus-Übersicht Zeile 8, T-3 (a)/(b) und die Coverage-Zeile „Sollwert-Änderungen vollständig registriert" — **nicht** die „bleiben grün"-Tabelle, die nur die unveränderten Nachbarn listet. |
+| **V-D5** | **`KE_OVERRIDE_REASON` ist im Entwurf nicht erreichbar.** Der Entwurf definiert die Konstante, lässt sie aber in seiner eigenen Entscheidungsfolge unbenutzt: der Zweig (2) gibt `None` zurück, und der Aufrufer loggt **ausschließlich** bei einem Grund (`doc_renderer.py:810-814`, gemessen). Ohne Eingriff in den Aufrufer bleibt die Konstante toter Code. | **Als optionale Audit-Konstante spezifiziert, nicht als Pflicht-Log** (IC-25-Docstring). **Verbindlich** ist allein die **negative** Zusage in **AC-42(c)**: `KE_AUTHORITATIVE_REASON` erscheint **nicht** im Log. Ob zusätzlich ein Override-Hinweis geloggt wird, ist eine **Plan**-Entscheidung und **keine** Spec-Pflicht — damit ist die Lücke geschlossen, ohne dem Plan eine Entscheidung abzunehmen. |
+| **V-D6** | **Planlücke bei W3-7 / `docs-consolidation.sources` (K-86, RVW8-10).** **E-10 stellt korrekt fest, dass W3-7 durch dieses Gate nicht blockiert ist**, sondern an `docs-consolidation.sources` hängt — belegt: `apply_fact_blocks` hat heute **keinen** Produktionsaufrufer (Grep über `scripts/` findet nur Docstring-Erwähnungen, `doc_renderer.py:183`); `docs-consolidation.sources` wird **nirgends** im Code gelesen; `.meta-config/project.yaml:398-401` führt den Key **nicht**. **Plan W3-7** (`:4946-4997`) trägt die nötige Config-Zeile jedoch weder in `Files:` (`:4948` nennt nur `README.md`, `llms.txt`, `ARCHITECTURE.md`) noch in den Steps (`:4991-4997`) — eine **Plan**-Lücke. | **Als Befund registriert, hier nicht behoben** — die Ergänzung ist eine **Plan**-Änderung (`Files:` + Step), **keine** Spec-Pflicht, weil **keine** inhaltliche Pflichtänderung daraus folgt. Ohne diese Registrierung wäre die Lücke in der nächsten Korrekturrunde unsichtbar geworden. **E-10 bleibt davon unberührt** (offen). |
+| **V-D7** | **T-3, T-5 und T-8 sind technisch untrennbar (K-81, RVW8-4).** Die drei Änderungen bilden **eine** Änderung: (i) **T-8** (Schema-Property `index-owner` mit `enum`/`default`) ist Voraussetzung dafür, dass `docs-consolidation.index-owner` im geschlossenen Block überhaupt zulässig ist — `config/project-config.schema.json:2470` `additionalProperties: false`; (ii) **T-3** (`_EXPECTED_PROPERTIES` **und** `_IC22_ABSENCE_DEFAULTS` fünf → sechs) bricht **ohne** T-8 `::test_schema_block_present_and_closed` (`tests/test_docs_consolidation_migration.py:99-103`) **und** die Assertion in `::test_absent_block_is_noop` (`tests/test_doc_renderer.py:1371`); (iii) **T-5** (`::test_index_owner_enum_accepts_both_values`) validiert eine Config mit `index-owner` gegen das Schema — **ohne** T-8 wirft `jsonschema` **ValidationError**, T-5 kann ohne T-8 nicht grün werden. **E-13a war in der Formulierung „W3-6: Config-Zeile; W8-4: Schema-Abschluss" damit **nicht durchführbar**:** der W3-6-Nachweis „erweiterte Property-Menge" (§17.12.4) verlangt T-8 **im selben Lauf**, in dem T-3 läuft. **Die Reihenfolge ist damit festgelegt: T-8 → T-3 → T-5, alle in derselben Welle.** **Auflösung ohne E-13-Entscheidung:** Die *technische* Unteilbarkeit (T-3/T-5/T-8 zusammen) ist eine **Messung**, keine Entscheidung und wird hier festgeschrieben. Die *offene* Frage — ob **W8-4 zusätzlich die Doku** (Schema-Kommentar/IC-22-Tabelleneintrag/Doku-Absatz) trägt — bleibt **E-13** und ist **nicht** entschieden. | **Verbindlich:** Wellenzuordnung in §9.1 (AC-39/AC-46 auf **W3-6**), E-13a in §17.12.2 als **in dieser Form zurückgenommen** markiert, Nachweiszeile §17.12.4 auf **W3-6** umgehängt. **E-13 selbst bleibt OFFEN** und wird hier **nicht** entschieden. |
+| **V-D8** | **Der Plan Rev. 0.7 kennt Rev. 0.8 nicht — die W3-6-Akzeptanz nach §17.12.4 ist unerfüllbar (RVW9-2, major).** K-81/V-D7 legt T-3/T-5/T-8 (und T-7) **ausschließlich** in W3-6 und knüpft die W3-6-Akzeptanz an „gruen inkl. 2 neuer Enum-Tests und erweiterter Property-Menge" (`:4360`/§17.12.4-Nachweiszeilen). **Gemessen am Working Tree, Plan `docs/plans/2026-09-25-repository-documentation-consolidation.md` (Rev. 0.7, `status: APPROVED`, `:5-6`):** (a) **W3-6 `Files:`** `:4920-4921` = `docs/INDEX.md`, `.meta-config/project.yaml`, `README.md`, `tests/test_doc_renderer.py` — **weder** `config/project-config.schema.json` **noch** `tests/test_docs_consolidation_migration.py`; (b) **W3-6 `Ziel-AK`** `:4926` = **AC-20, AC-12 (E2E), AC-38** — **kein** AC-42…AC-46, kein AC-39; (c) **W3-6 Steps** `:4938-4944` — keine Config-Zeile `index-owner` (T-7), keine Schema-Property (T-8), keine Pins (T-3), keine Enum-Tests (T-5), **keine Reihenfolge**; (d) **Grep** über den Plan: `index-owner` = **0** Treffer, `AC-4[2-6]` = **0** Treffer, `pending-approval` = **0** Treffer; (e) der Schema-Block und `tests/test_docs_consolidation_migration.py` sind im Plan **W1-9** zugeordnet (`:2082`, Ledger-Zeile `:5694`) — und W1-9 ist **bereits abgearbeitet** (`:2095-2098` alle `[x]`, Commit `feat: declare docs-consolidation config block in schema`), mit der Behauptung „**sechs** Properties" (`:2084` `Interfaces:`, `:2096` Step 2) — **gemessen sind fünf** (`tests/test_docs_consolidation_migration.py:46-50`, Schema `config/project-config.schema.json:2424-2469`): dieselbe Fehlzählung, die P-3 (e) in der Spec korrekt diagnostiziert, im **Plan** aber unberührt lässt; (f) **RVW9-9:** der **offene** W1-10 Step 2 (`:2115-2118`) schreibt in **denselben** `docs-consolidation`-Block wie T-7 und würde `sources` aktivieren (E-10/V-D6) — der Runde-8-Blockierpunkt „CAN_RUN_IN_PARALLEL: W1-9/W1-10-Rest" traf für den **offenen** Step 2 nicht zu. **Auswirkung, wenn W3-6 nach Plan umgesetzt wird:** es entsteht **weder** die Deklaration (T-7) **noch** die Schema-Property (T-8) ⇒ der KE-Vorrang-Zweig `doc_renderer.py:702-703` blockiert weiterhin jeden Schreibvorgang, `docs/INDEX.md` entsteht **nicht**, und die in §17.12.4 festgeschriebenen Nachweise sind **nicht erreichbar**. Zusätzlich fehlt im Plan die `pending-approval:`-Spiegelung: wer den Plan liest, sieht das Freigabe-Gate für Rev. 0.8 **nicht**. Der einzige registrierte Plan-Befund war V-D6 (`:4376`) und betrifft **W3-7** — die kleinere Lücke. | **Als Befund registriert, hier NICHT behoben (Muster V-D6).** Der Plan ist **nicht** Teil dieser Spec-Korrekturrunde und wird hier **nicht** geändert; der **forderliche Plan-Delta** ist unten (**V-D8-Uebergabe**) präzise benannt. **Ausführung erst nach User-Freigabe von P-1…P-5 (inkl. P-3 (e)) durch den `planner`.** **Keine** inhaltliche Pflichtänderung: der Sollwert steht bereits in der Spec (§17.12.4), der Plan muss ihn nur **abbilden**. **E-9…E-13 einschließlich E-13c und OQ1 bleiben davon unberührt** (offen). |
+
+#### V-D8-Uebergabe — **forderlicher Plan-Delta** (RVW9-2), auszuführen durch den `planner`, **erst nach** User-Freigabe von P-1…P-5 (inkl. **P-3 (e)**)
+
+> **Reihenfolge-Zwang:** P-1…P-5 ⇒ Plan-Revision ⇒ **dann** W3-6. Vor der Freigabe darf **kein**
+> Plan-Task angefasst werden; Rev. 0.8 ist nicht umsetzbar (`pending-approval:`, §17.12.4-Nachweis
+> verlangt T-7/T-8/T-3/T-5, der Plan kennt sie nicht). **Bezug:** Plan Rev. 0.7,
+> `status: APPROVED`, `revision: 0.7` (`:5-6`); alle Zeilenangaben dieses Abschnitts sind am
+> Working Tree per Grep/Read **gemessen** (2026-09-29).
+
+| # | Planstelle (Ist-Stand) | Forderlicher Soll | Quelle in dieser Spec |
+|---|---|---|---|
+| **PD-1** | **Frontmatter** `:1-13` — `status: APPROVED` (`:5`), `revision: 0.7` (`:6`), **kein** `pending-approval:` (Grep ⇒ **0** Treffer) | `pending-approval:`-Feld nach dem Muster der Spec (`docs/specs/2026-09-25-repository-documentation-consolidation.md:8`) mit dem Wortlaut: Rev. 0.8 — **P-1…P-5 (inkl. P-3 (e))** offen beim Auftraggeber, **E-9…E-13 (inkl. E-13c)** offen, Umfang W0–W8 freigegeben (2026-09-26, unverändert). **Bestehende** `status: APPROVED` / `approved:`-Zeilen **nicht** ändern. | §17.12.1, §17.12.2, Frontmatter `:8` |
+| **PD-2** | **W3-6 `Files:`** `:4920-4921` — nennt `docs/INDEX.md`, `.meta-config/project.yaml`, `README.md`, `tests/test_doc_renderer.py` | **zwei** Einträge ergänzen: `config/project-config.schema.json` (T-8) und `tests/test_docs_consolidation_migration.py` (T-3 (a), T-4, T-5). `tests/test_doc_renderer.py` bleibt (T-2, T-3 (b)). | §17.12.4 T-2…T-5, T-8 |
+| **PD-3** | **W3-6 `Ziel-AK`** `:4926` = **AC-20, AC-12** (E2E), **AC-38** | ergänzen um **AC-39, AC-42, AC-43, AC-44, AC-45, AC-46** (Reihenfolge in der Zeile wie in §9.1; **V-Check** bleibt **V2, V4** — die Begründung für `—` steht in §9.1 `:2596-2606`) | §9.1 (`:2549`, `:2583-2587`), §9.2 W3-Zeile (`:2629`) |
+| **PD-4** | **W3-6 `Akzeptanz`** `:4927-4932` | die **beiden** Nachweiszeilen aus §17.12.4 aufnehmen: „`python3 -m pytest tests/test_docs_consolidation_migration.py -q` → gruen inkl. **2** neuer Enum-Tests und erweiterter Property-Menge (**beide** Pins)" und „`python3 -m pytest tests/test_doc_renderer.py -q` → gruen inkl. **5** neuer Tests **und** erweitertem `_IC22_ABSENCE_DEFAULTS`" | §17.12.4 Nachweiszeilen |
+| **PD-5** | **W3-6 `Steps`** `:4938-4944` — vier Schritte, **keine** Reihenfolge-T-Angabe | die Reihenfolge **T-8 → T-3 → T-5** **explizit** als Schrittfolge bzw. als Zeile in `Interfaces:` aufnehmen; T-7 (Config-Zeile `index-owner` in `.meta-config/project.yaml:398-401`) **eigenes** benanntes Step-Feld. **Nicht** in W8-4 verschieben — V-D7 hat das gemessen und festgeschrieben | V-D7 (`:4487`), T-3/T-4/T-5/T-7/T-8 |
+| **PD-6** | **W3-6 `Verifikation`** `:4933-4937` | die **beiden** pytest-Kommandos aus **PD-4** ergänzen (die Zeile `:4936` „`--validate` ist hier planmäßig rot" bleibt **wortgleich**) | §17.12.4 |
+| **PD-7** | **W1-9 `Interfaces:`** `:2084` („**sechs** Properties aus IC-22") und **Step 2** `:2096` („Block mit sechs Properties ergänzen") — W1-9 ist `[x]`-abgeschlossen (`:2095-2098`) | **reine Textziffer-Korrektur** auf **fünf** (`tests/test_docs_consolidation_migration.py:46-50`; Schema `config/project-config.schema.json:2424-2469`), mit dem Zusatz, dass Rev. 0.8 die **sechste** Property `index-owner` in **W3-6** nachzieht (T-8). **Kein** erneutes Öffnen des Tasks, **kein** Code | P-3 (e), T-8 |
+| **PD-8** | **W1-10 Step 2** `:2115-2118` (`[ ]`, **offen**) — will `index-mode`, `checks.strict`, `sources`, `volatile-facts` in **denselben** Block wie T-7; **CAN_RUN_IN_PARALLEL**-Liste der Runde 8 stützt sich auf die Annahme, W1-10 berühre **keine** `docs-consolidation`-Zeile | Reihenfolge **festhalten**: W1-10 Step 2 **vor** W3-6 ziehen (dann ist der Live-Block vor dem Delta vollständig) **oder** als Bestandteil von **W3-6** führen; `CAN_RUN_IN_PARALLEL` entsprechend berichtigen. **Zusatz:** ein in W1-10 gesetztes `sources` aktiviert den Gate-Zweig `apply_fact_blocks` (`doc_renderer.py:183`) — die Abhängigkeit aus E-10/V-D6 | RVW9-9, T-7, V-D6, E-10 |
+| **PD-9** | **Plan-Trace-Matrix** `Ziel-AK`-Spalten: Ledger-Zeile **W1-9** `:5694` (trägt `config/project-config.schema.json`, `tests/test_docs_consolidation_migration.py`, **AC-39**), **W1-10** `:5693`, **W3-1** `:5705`; AC-Matrix **AC-39** `:6031` („W1-9") | die **neue** Zuordnung **W3-6 ← AC-39, AC-42…AC-46** in den Plan-Matrizen spiegeln, **ohne** die abgeschlossene W1-9-Zeile zu löschen (W1-9 trägt weiterhin AC-39 über den Schema-Block, W3-6 zusätzlich) | §9.1 `:2549`, §9.2 `:2629` + Fußnote ¹ |
+| **PD-10** | **Plan-E-13-Zeile** `:7349` („E-13 — W1-10 teilweise gelandet", „*blockierend für den Abschluss von W1*") | **keine** Änderung aus dieser Spec: die Plan-Zeile zu „E-13" ist die **Rev.-0.5/0.6-E-13** und **nicht** die Rev.-0.8-Vorlage **E-13/E-13c** (§17.12.2). Der `planner` muss die Namensgleichheit beim Lesen **unterscheiden**, damit die offene Vorlage nicht mit der geschlossenen verwechselt wird | §17.12.2 |
+
+**Abgrenzung des Plan-Deltas (was er ausdrücklich NICHT ist):** **keine** neue IC-/AC-/Task-/
+Wellen-/V-Check-ID, **keine** Umnummerierung, **keine** inhaltliche Spec-Entscheidung — der
+Delta **abbildet** die bereits spezifizierten T-1…T-8, AC-39 und AC-42…AC-46 auf den Plan.
+**Offen und durch den Delta ausdrücklich NICHT entschieden:** E-9, E-10, E-11, E-12, E-13,
+**E-13c** und OQ1. Insbesondere darf **PD-5** den Dokuanteil nicht nach W8-4 verschieben
+(E-13a bleibt in der korrigierten Fassung eine **Empfehlung**, E-13 bleibt **offen**) und darf
+**PD-4/PD-6** keinen `--validate`-Sollwert ändern.
+
+**Vollständigkeits-Checkliste Rev. 0.8 (Coverage, keine Selbstbewertung):**
+
+| Pflichtelement | Ort | Status |
+|---|---|---|
+| Problem / Fehlschlagstelle mit `Datei:Zeile` | §17.12.1 (P-1), IC-25 Einleitung | vorhanden |
+| Interface Contracts (neue + geänderte) | **IC-25**, **IC-26**; geändert **IC-13**, **IC-15**, **IC-22** | vorhanden |
+| Datenfluss (Wirkung auf den Pfad) | IC-25 Wertetabelle, IC-26/1–2, §17.12.4 Nachweisformen | vorhanden |
+| Acceptance Criteria für **beide** Modi | **AC-42…AC-46**; geändert **AC-21**, **AC-39** | vorhanden |
+| Testpin je AK (bestehend **oder** neu ausgewiesen) | §17.12.4 Modus-Übersicht + Teständerungsliste T-1…T-8 (**alle** Zeilen mit Testnamen) | vorhanden |
+| Provider- und Projektname **nicht** im Code | IC-26/8, DECISION-1, `AGENTS.md:50` | vorhanden |
+| Offene Fragen **nicht** entschieden | **E-9…E-13 einschließlich E-13c** (§17.12.2), OQ1 **unberührt** | vorhanden |
+| **Trace-Matrix vollständig** (jedes AC ≥ 1 Welle, jede Welle ≥ 1 AC) | §9.1 (**AC-42…AC-46** ergänzt, K63), §9.2 W3/W8, Zählsatz | vorhanden |
+| **Sollwert-Änderungen vollständig registriert** | **zwei**, beide in T-3 (K-78, V-D4) + Grep-Nachweis „keine weiteren"; Orte: Modus-Übersicht Zeile 8, T-3 (a)/(b), Coverage (RVW9-6) | vorhanden |
+| **Wellen-Reihenfolge auflösbar** | V-D7: T-8 → T-3 → T-5, **alle W3-6**; E-13a entsprechend markiert (K-80) | vorhanden |
+| **Plan führt Rev. 0.8 (V-D8)** | §17.12.4-Warnung, **V-D8** + **V-D8-Uebergabe PD-1…PD-10** (§17.12.5) | **Befund registriert**, Delta **benannt**, Ausführung **erst nach User-Freigabe** |
+| **Testnamen belegt** (kein Wildcard) | §17.12.4 `::test_schema_declares_the_absence_defaults` `tests/test_docs_consolidation_migration.py:185` (RVW9-7) | vorhanden |
+| **Threat Model zu (g) vollständig** (alle vier Fragen, inkl. Kopier-Pfad) | §12.3 Zeile g, Q3 (2 Bullets), Q4 (g **und** d), Bewertung „**sieben**" (K-81) | vorhanden |
+| Risiko-/Finding-Nachweis | R7 (P-5), **V-D1…V-D8** (§17.12.5) | vorhanden |
+| Kein `TBD`, kein `TODO`, kein unbenanntes Placeholder | gesamtes Dokument; alle neuen Aussagen mit `Datei:Zeile` oder Messbeleg | vorhanden |
+| **Korrektur-Katalog der Runde 8** | **§17.12.6, K77…K86** (10/10 Findings, je mit `file:line`-Beleg) | vorhanden |
+| **K-Eindeutigkeit belegt** (Muster K41) | Grep-Beleg 2026-09-29 über **Spec und Plan** (Repo-Wurzel; **beide** Legendenzitate: Spec-Legende **eingefroren** auf `K1…K45`, Plan-Legende `K1…K76` **maßgeblich** — Plan `:536` + `:6960`): **K1…K76** sind je **genau einmal** belegt — **K1…K45** in §17.10.5/§17.11.1, **K46…K53** in der **Plan-Legende** (Plan-Katalog Korrekturrunden 1–4, Spec-Verweise `:132`/`:3932`), **K54…K58** in §17.11.1, **K59…K70** in §17.11.5, **K71…K75** in §17.11.6, **K76** in der **Plan-Legende** (Plan `:536`, `:6808`, `:6829`, `:6839`, `:6960` — **gemessen**, Plan bleibt unverändert). **K77…K86** in §17.12.6. **Keine** Lücke, **keine** Doppelbelegung (RVW9-1 spec-intern, **RVW10-1 dokumentübergreifend** gegen den Plan nachgemessen) | vorhanden |
+| Keine Umnummerierung bestehender IDs | Kopfblock Rev. 0.8, Revisionszeile 0.8, §17.12.6 | vorhanden |
+
+#### 17.12.6 Korrektur-Katalog der Korrekturrunde zu Rev. 0.8 (K77…K86)
+
+> **Eingang:** Concept-Review Runde 8,
+> `docs/specs/2026-09-29-repository-documentation-consolidation-rereview-8.md`
+> (`review-id: RVW-DOCS-CONSOLIDATION-R8`, round 8, `CHANGES_REQUESTED`, 0 kritisch / 5 major /
+> 5 minor / 0 info). **Alle 10 Findings behoben.** **Neue Katalog-IDs ab K77; K1…K76 bleiben
+> unberührt, keine Umnummerierung, keine neue IC-/AC-/Task-/Wellen-ID.**
+> **Maßgebliche Obergrenze vor diesem Katalog: K76** — **gemessen** an der **Plan-Legende** (Plan `:536` „`K-*`
+> (K1…**K76**)“, Plan `:6960` „**K76 bleibt die höchste K-Kennung**“; **nicht** K60, **nicht** K75 — §17.11.6 endete bei K75, der Plan ist seither **additiv** um K76 gewachsen (Plan `:6808`, `:6829`, `:6839-6843`). **RVW9-1:** der erste Wurf dieses
+> Katalogs vergab **K61…K70** und überschrieb damit **zehn** bereits belegte Kennungen aus §17.11.5
+> (`:4069-4078`, Korrekturrunde 5). Der Wurf ist **rein additiv** aufgelöst: die zehn neuen
+> Einträge heißen jetzt **K77…K86**; **keine** der zehn bisherigen Bedeutungen wurde gestrichen.
+> **Verifikationsmethode (K-77):** für `tests/test_docs_consolidation_migration.py:42-44` und
+> `tests/test_doc_renderer.py:1090-1091` gilt das Read-Tool als
+> **unzuverlässig** (es rendert die belegten Kommentarzeilen leer); die Belege wurden deshalb per
+> **Grep** neu geführt.
+
+| ID | Finding | Was geändert wurde | `file:line`-Beleg (Working Tree, 2026-09-29) |
+|---|---|---|---|
+| **K77** | **RVW8-1** (major) — falsche Messung: der Zählkommentar `:42` sei leer | **Drei Stellen auf den belegten Stand korrigiert.** Der Kommentar **existiert**; die frühere Fehlmessung ist im Spec als **Fehlmessung des Belegwerkzeugs** benannt, nicht als Befund. **K-3**: Träger auf `:42-44` (vorher „die Zeile ist leer"). **T-4**: jetzt **verbindlich** (Text in `:42` „six rows/five" → „seven rows/six"; `:44` **wortgleich**, „deferred to W7-2" gilt unverändert) — die Abbruchbedingung „fehlt der Kommentar, entfällt T-4" ist **ersatzlos gestrichen**. **RVW9-3: `:43` ist mitgezogen** — „# **sixth**" → „# **seventh**" (bei sieben IC-22-Tabellenzeilen ist der KE-Key die siebte). **V-D4**: Träger auf Kommentar **plus** `_EXPECTED_PROPERTIES`, Vokabel „reine Kommentar-Korrektur" **zurückgenommen**. | Beleg Neu (Grep, 2026-09-29): `tests/test_docs_consolidation_migration.py:42` (`# IC-22 enumerates six rows; five of them are \`docs-consolidation.*\` keys, the`), `:43` (`# sixth (\`knowledge-engine.okf.index-mode\`) belongs to a different block and is`), `:44` (`# deferred to W7-2. \`checks.strict\` is a nested key, so it is one property here.`). Spec-Stellen: `docs/specs/2026-09-25-repository-documentation-consolidation.md:4257` (K-3), `:4446` (T-4), `:4484` (V-D4). |
+| **K78** | **RVW8-2** (major) — zweite, nicht registrierte harte Sollwert-Änderung `_IC22_ABSENCE_DEFAULTS` | **Registriert als zweite harte Sollwert-Änderung.** T-3 hat eine **zweite Zeile** (keine neue T-ID); die Formulierung „**die einzige echte** Sollwert-Änderung" ist **zurückgenommen**; beide Pins stehen in der **Modus-Übersicht Zeile 8**, in **T-3 (a)/(b)** und in der **Coverage-Checkliste** („Sollwert-Änderungen vollständig registriert"). **Erweiterung einer Menge, keine Absenkung.** Der von der Korrektur verlangte Grep nach weiteren Mengen-Pins ist **geführt** und im Spec protokolliert: **genau zwei** zu ändernde Sollwerte. **RVW9-6: die Verortung ist berichtigt** — die frühere Fassung nannte die „bleiben grün"-Tabelle; dort steht **keiner** der beiden geänderten Pins, sie listet die **unveränderten** Nachbarn. | Pin: `tests/test_doc_renderer.py:1092-1098` (`_IC22_ABSENCE_DEFAULTS`, hartes Fünf-Key-Dict), geprüft `:1371` (`assert _schema_absence_defaults(block_schema) == _IC22_ABSENCE_DEFAULTS`) in `::test_absent_block_is_noop` (`:1318`); `_schema_absence_defaults` `:1114-1130`, iteriert **alle** Block-Properties (`:1122`). Unberührt, **belegt**: `tests/test_docs_consolidation_migration.py:53` (`_EXPECTED_CHECKS_PROPERTIES`), geprüft `:112`; Fail-off-Defaults-Test **`::test_schema_declares_the_absence_defaults`** `:185-199` liest namentlich, prüft die Menge nicht. Spec: `:4445` (T-3), `:4401` (Modus-Übersicht Zeile 8), `:4418-4424` (bleiben-grün-Tabelle + K78-Verortungsvermerk), `:4249` (P-3 (e)). |
+| **K79** | **RVW8-3** (major) — AC-42…AC-46 fehlen in der Trace-Matrix | **Fünf Zeilen in §9.1 ergänzt** (Wellen W3-6 bzw. E-13-abhängiger Dokuanteil, betroffene Dateien mit Anker, V-Check-Spalte „—" mit Begründung), **§9.2** W3- und W8-Zeile nachgezogen, **Zählsatz** korrigiert (W3: 14 → **19**; Summe AC 41 → **46**), **AC-21** um den `index-owner`-Bezug ergänzt, **AC-39** auf „W1, **W3-6**" erweitert, **§15 „Geändert"** um §9.1/§9.2 ergänzt. Begründungsabsatz für die `—`-Spalte **neu** (V1–V9 lesen `docs/**` bzw. `README.md` und beobachten den Gate-Zweig nicht — dieselbe Fehlerklasse wie die in Rev. 0.1 zurückgenommene AC-19/V9-Zuordnung). | Spec: `:2549` (AC-39), `:2565` (AC-21), `:2583-2587` (AC-42…AC-46), `:2596-2606` (V-Check-Begründung), `:2629` (§9.2 W3), `:2634` (§9.2 W8), `:2643-2656` (Zählsatz). |
+| **K80** | **RVW8-4** (major) — Wellen-Reihenfolge von T-3/T-5/T-8 unauflösbar | **Aufgelöst, ohne E-13 zu entscheiden.** Die *technische* Unteilbarkeit ist eine **Messung** und als **V-D7** festgeschrieben: **T-8 → T-3 → T-5, alle in W3-6.** Daraus folgt zwingend, dass **E-13a in seiner bisherigen Form nicht durchführbar** ist und als Option **zurückgenommen** wurde (in der korrigierten Fassung weiterhin die Empfehlung). §9.1 (AC-39/AC-46), §9.2 (W3/W8), die Teständerungsliste (T-3/T-5/T-8) und die Nachweiszeile wurden **konsistent darauf abgestellt**. **E-13 selbst bleibt OFFEN** — offen ist nur noch der **Dokuanteil**. **RVW9-2: die Reihenfolge ist am Plan noch nicht umgesetzt** — dafür **V-D8** + **V-D8-Uebergabe PD-5** (§17.12.5). | Abhängigkeit gemessen: `config/project-config.schema.json:2470` (`additionalProperties: false`), Property-Bereich `:2424-2469`; `tests/test_docs_consolidation_migration.py:99-103` (`:101` Mengen-Assertion), `tests/test_doc_renderer.py:1371`; Enum-Testmuster `tests/test_docs_consolidation_migration.py:174-182`. Spec: `:4487` (V-D7), `:4333-4337` (E-13a/b), `:4445`/`:4447`/`:4450` (T-3/T-5/T-8), `:4461-4462` (Nachweiszeilen), `:2587` (AC-46), `:2549` (AC-39). |
+| **K81** | **RVW8-5** (major) — Threat Model Zeile (g) unvollständig | **Alle vier Fragen zu (g) beantwortet.** Frage 3: **zwei** Gegenmaßnahmen-Bullets — der fail-closed Code-Zweig IC-25 (1) als **einzige garantierte** Absicherung, und der Kopier-Pfad als **ausdrücklich nicht akzeptiertes Restrisiko**; Frage 4: **(g)**-Eintrag mit **beiden** Ausprägungen (Tippfehler ⇒ eingefrorener Index, Recovery = Wert zurücksetzen; **kopierte Deklaration** ⇒ KE-Autorität stillschweigend aufgehoben, Recovery = `auto`/Zeile entfernen, **schwerer**, weil kein Fehler entsteht); der **vorbestehend fehlende (d)-Eintrag** ergänzt, damit die Bewertung „alle sieben" trägt. Bewertungsziffer **sechs → sieben**. **„Ausnahme wird von einem Consumer-Projekt kopiert"** ist nun ausdrücklich benannt. **RVW9-4: der Kopier-Pfad ist als Optionenzeile E-13c in §17.12.2 ausgewiesen** (zwei Entscheidungspunkte, Suboptionen, Empfehlung, Owner, Termin) und der Q4-Verweis zeigt auf **§12.3** statt §17.12.3. | Spec: `:2976` (Zeile g), `:2992-3006` (Frage 3), `:3008-3030` (Frage 4), `:3032-3042` (Bewertung), `:4335-4349` (E-13c). Konsistenz: §12.3-Frage-3-Bullet verweist auf die noch offene **E-13c**, **nicht** auf eine neue Pflicht. |
+| **K82** | **RVW8-6** (minor) — §12.3 (g) überschätzt das Schema als geschlossenen Wächter | **Drei Stellen präzisiert:** IC-25 (neuer Begründungsblock vor dem Code), IC-13-Belegzeile des unbekannten Werts, §12.3 (g). Das Schema ist nun als **Autocomplete-/Tippfehler-Konvention** beschrieben, die harte Zusage ist der **Codepfad**; „Enum zu lassen" ist ausdrücklich **nicht** vertretbar. | Messung: `scripts/lib/config.py:342` („Schema validation … **if** jsonschema is available"), `:372-388` (`:388` „jsonschema not installed or validation error — **best-effort**", `pass`). Spec: `:1592-1600` (IC-25), `:1424` (IC-13), `:2976` (§12.3 g). |
+| **K83** | **RVW8-7** (minor) — AC-42 (d): Anker deckt nur die `doc-indexer/1`-Hälfte | **Beleg aufgeteilt:** der `docs-facts`-Block auf `:629` (Aufruf) mit Definition `:531`, die Generator-ID auf `:635-639` (Footer-Block) mit Marker-Konstante `:371`. | Messung: `scripts/lib/doc_renderer.py:629` (`lines.extend(_facts_section(facts))`), `:531` (`def _facts_section`), `:635-639` (Footer: `FOOTER_BEGIN_MARKER` / `facts-hash` / `generator: doc-indexer/1` / `FOOTER_END_MARKER`), `:371` (`FOOTER_BEGIN_MARKER: str = …`). Spec: `:2301-2307` (AC-42 d). |
+| **K84** | **RVW8-8** (minor) — Anker-Drift-Politik uneinheitlich, V-D1/V-D2 unvollständig | **Auswahlregel formuliert und angewendet**, Inventar **vollständig** registriert. Regel: Rev. 0.8 korrigiert genau die Anker in den **ohnehin geänderten** IC-/AC-Zeilen — angewendet auf **IC-15** (`:23`/`:24` → `:28`/`:29`); **alle übrigen 14 Fundstellen** sind mit Sollwert und Zielanker in V-D1 aufgenommen, damit sie nicht verloren gehen. **V-D2** um **AC-22** (`:2513`) und **§13 A4** (`:2968`) ergänzt. **RVW9-8: V-D1s Selbstverweis auf die angewandte Korrektur ist von `:1449-1450` auf `:1487-1488` berichtigt** (`:1449-1450` trägt den IC-14-Bereich). **RVW10-2: der Zwischenanker `:1465-1466` aus RVW9-8 war IC-13-Fließtext, nicht der Anker — auf die gemessenen `:1487-1488` gezogen (IC-15 ab `:1483`).** | Messung: `scripts/lib/spec_plan_scaffold.py:28` (`DEFAULT_FALLBACK_INDEX`), `:29` (`_FILE_INDEX_SKELETON`), `:30` (`_FILE_INDEX_SKELETON_MARKER`), `:80` (`def resolve_index_mode`), `:100` (`def scaffold_spec_plan_dirs`), `:102-104` (Early-Return), `:115-116` (Modus-Zweig), `:121` (Dateiende). Spec: `:1487-1488` (IC-15, angewendet), `:4481` (V-D1, Inventar), `:4482` (V-D2, Inventar). |
+| **K85** | **RVW8-9** (minor) — AC-39: Belegquelle falsch attribuiert | **Klammer umgestellt** von „`.meta-config`-Ist-Stand" auf **Schema-Block-Ist-Stand + Test-Pin**, mit dem ausdrücklichen Hinweis, dass der Live-Block dort **nur zwei** Keys trägt. | Messung: `config/project-config.schema.json:2424-2469` (Block-Properties), `tests/test_docs_consolidation_migration.py:45-51` (`_EXPECTED_PROPERTIES`), `.meta-config/project.yaml:398-401` (**nur** `enabled: true` + `checks.strict: true`). Spec: `:2434-2438` (AC-39, Property-Herkunft). |
+| **K86** | **RVW8-10** (minor) — Plan-Befund W3-7/`sources` nicht registriert; eine Testpin-Zeile namenlos | **V-D6 neu angelegt** (Planlücke, **nicht** inhaltliche Pflicht ⇒ **keine** Spec-Pflicht, Registrierung genügt). In §17.12.4 Zeile 4 wird der Test **namentlich** genannt inkl. Fall-Zuordnung. **RVW9-7: der Wildcard-Testname `::test_fail_off_defaults_*` in der Nachbarzeile derselben Tabelle ist durch den **realen** Namen ersetzt.** | Messung: Plan `docs/plans/2026-09-25-repository-documentation-consolidation.md:4946-4997` — `Files:` `:4948` nennt nur `README.md`, `llms.txt`, `ARCHITECTURE.md`; Steps `:4991-4997` ohne `sources`-Config-Zeile. `scripts/lib/doc_renderer.py:183` (`apply_fact_blocks`); `.meta-config/project.yaml:398-401` führt `sources` nicht. Testname (Grep): `tests/test_docs_consolidation_migration.py:185` `def test_schema_declares_the_absence_defaults() -> None:`. Spec: `:4486` (V-D6), `:4397` (§17.12.4 Zeile 4), `:4418` (bleiben-grün-Tabelle, korrekter Name). |
+
+**Ergebnis der Korrekturrunde:** 10 Findings, **10 behoben**, 0 offen aus dieser Runde. **Keine**
+inhaltliche Pflichtänderung wurde **neu** erfunden; **keine** bestehende ID wurde umnummeriert oder
+gestrichen. **P-1…P-5 (inkl. P-3 (e) / „P-3-E") bleiben ZUR USER-FREIGABE AUSSTEHEND**,
+**E-9…E-13 einschließlich der Suboption E-13c und OQ1 bleiben OFFEN**, `pending-approval:` besteht fort.
+
+**Zweite Korrekturrunde zu Rev. 0.8 (Concept-Review Runde 9, 2026-09-29, `CHANGES_REQUESTED`,
+0 kritisch / 2 major / 7 minor / 1 info) — 10/10 behoben, kein Revisions-Bump, kein ID-Zuwachs.**
+
+| Finding | Sev | Behandlung in dieser Spec | Beleg |
+|---|---|---|---|
+| **RVW9-1** | major | Katalog **K61…K70 ⇒ K77…K86**; Vorspann auf „ab **K77**; **K1…K76** bleiben unberührt" und maßgebliche Obergrenze **K76** genannt (Plan-Legende, **gemessen**); **alle** Fundstellen nachgezogen (Frontmatter `:6`/`:8`, Kopfblock, IC-15 `:1465-1466`, IC-25 `:1592`, §9.1, §9.2 W3/W8, §15 Trace-Anker + Coverage, §17.12.1, §17.12.4, §17.12.5, §17.12.6, Revisionszeilen `:510-511`). **Die zehn bisherigen Bedeutungen (§17.11.5) sind unverändert.** | Grep 2026-09-29 über **Spec und Plan** (Repo-Wurzel; Stand in der **Plan-Legende** maßgeblich — Plan `:536`): **K1…K45** §17.10.5/§17.11.1 · **K46…K53** Plan-Legende (Plan-Katalog Runde 1–4) · **K54…K58** §17.11.1 · **K59…K70** §17.11.5 · **K71…K75** §17.11.6 — je **genau einmal** belegt; **K77…K86** genau einmal in §17.12.6 — **keine** Doppelbelegung. Coverage-Zeile „K-Eindeutigkeit belegt". |
+| **RVW9-2** | major | **V-D8** als Plan-Befund registriert (Muster V-D6) + **V-D8-Uebergabe PD-1…PD-10** als forderlicher Plan-Delta (§17.12.5) + Warnung in §17.12.4. **Der Plan ist nicht geändert.** Ausführung **erst nach** User-Freigabe von P-1…P-5. | Plan gemessen: `:1-13` (Frontmatter, `revision: 0.7`, **kein** `pending-approval`), `:4920-4921` (`Files:`), `:4926` (`Ziel-AK`), `:4938-4944` (Steps), `:2080-2098` (W1-9, `[x]`, „sechs Properties" `:2084`/`:2096`), `:2115-2118` (W1-10 Step 2 `[ ]`), `:5693`/`:5694` (Ledger), `:6031` (AC-Matrix), `:7349` (Plan-E-13). Grep: `index-owner` **0**, `AC-4[2-6]` **0**, `pending-approval` **0**. |
+| **RVW9-3** | minor | T-4 zieht `:43` mit: „# **sixth**" ⇒ „# **seventh**"; `:44` bleibt wortgleich. K-3 entsprechend präzisiert. | `tests/test_docs_consolidation_migration.py:43` (Grep): `# sixth (\`knowledge-engine.okf.index-mode\`) belongs to a different block and is`; IC-22-Tabelle `:1845-1851` — **sieben** Zeilen, davon **sechs** `docs-consolidation.*`, der KE-Key in `:1851` ist die **siebte**. |
+| **RVW9-4** | minor | **E-13c „Kopier-Pfad"** als dritte Zeile der E-13-Optionentabelle + Suboptionen c(1)/c(2) mit Empfehlung, **Owner `main_chat`** und **Termin vor W3-6**; §12.3-Q3-Bullet auf E-13c umgestellt; Q4-Verweis §17.12.3 ⇒ **§12.3**. | §12.3 `:3000-3006` (Q3-Bullet), `:3030` (Q4 (g)); §17.12.2 `:4333-4335` (E-13a/b/c) + `:4339-4349` (E-13c-Suboptionen). |
+| **RVW9-5** | minor | **P-3 (e)** = fünfte Zeile der P-Tabelle, **kein** sechstes P-Element; Zählauflösung als Kasten über §17.12.1; Kopfblock `:217-219` auf „keine neue Pflicht **außerhalb des bestehenden P-3**" präzisiert; Frontmatter `approved-scope` und §15 Trace-Anker mitgeführt. | §17.12.1 Kasten + P-Tabelle; Frontmatter `:6`/`:8`; §15 Trace-Anker. |
+| **RVW9-6** | minor | K78-Verortung auf **Modus-Übersicht Zeile 8 / T-3 (a)(b) / Coverage** umgestellt; die „bleiben grün"-Tabelle trägt einen eigenen K78-Verortungsvermerk. | §17.12.4 Modus-Übersicht `:4401`, bleiben-grün-Tabelle `:4418-4424` + Verortungsvermerk `:4421-4424`, T-3 `:4445`. |
+| **RVW9-7** | minor | `::test_fail_off_defaults_*` ⇒ **`::test_schema_declares_the_absence_defaults`** in der bleiben-grün-Tabelle, in V-D4 und in K86. | `tests/test_docs_consolidation_migration.py:185` (Grep): `def test_schema_declares_the_absence_defaults() -> None:`; Docstring `:186-192`, Asserts `:194-199`. |
+| **RVW9-8** | minor | V-D1-Selbstverweis `:1449-1450` ⇒ **`:1487-1488`** (**RVW10-2**: der RVW9-8-Zwischenanker `:1465-1466` war IC-13-Fließtext, nicht der Anker). | Spec `:1487-1488` (`DEFAULT_FALLBACK_INDEX = "docs/INDEX.md"   # :28`, `_FILE_INDEX_SKELETON = "…"   # :29`) — identisch mit der Angabe in K84; `:1465-1466` = IC-13-Fließtext, IC-15 beginnt `:1483`. |
+| **RVW9-9** | minor | Reihenfolge **W1-10 Step 2 vs. T-7** in T-7 festgehalten (vor W3-6 ziehen **oder** in W3-6 führen; `sources`-Aktivierung = E-10/V-D6) und als **PD-8** in die Plan-Übergabe aufgenommen. | Plan `:2115-2118` (Step 2 `[ ]`, „4 von 5 Properties"); T-7 `.meta-config/project.yaml:398-401`; `doc_renderer.py:183`. |
+| **Info-Notiz zu §9.2 (kein eigenes R9-Finding; Label aus der R10-Tabelle, `rereview-10.md:59` — RVW9-8 selbst bleibt der minor-Befund)** | info | **§9.2** macht die AC-39-Zählkonvention sichtbar: W3-6 ist **keine** eigene Welle; Fußnote ¹ unter der §9.2-Tabelle, Zählsatz verweist darauf. | §9.2 W3-Zeile `:2629` + Fußnote ¹ `:2636-2641`; Zählsatz `:2648-2653`. |
+
+**Ergebnis der zweiten Korrekturrunde:** 10 Findings, **10 behoben**, 0 offen. **P-1…P-5 (inkl.
+P-3 (e)) inhaltlich unverändert** und weiterhin **ZUR USER-FREIGABE AUSSTEHEND**; **E-9…E-13
+einschließlich E-13c und OQ1 bleiben OFFEN**; `pending-approval:` besteht fort; `status: APPROVED`
+und `approved: 2026-09-26` bleiben unverändert; Umfang W0–W8 unverändert; **keine** neue
+IC-/AC-/Task-/Wellen-/V-Check-ID; **keine** Umnummerierung bestehender IDs.
+
+**Dritte Korrekturrunde zu Rev. 0.8 (Concept-Review Runde 10, 2026-09-29, `CHANGES_REQUESTED`,
+0 kritisch / 1 major / 1 minor / 1 info) — 3/3 behoben, kein Revisions-Bump, kein ID-Zuwachs.**
+
+| Finding | Sev | Behandlung in dieser Spec | Beleg |
+|---|---|---|---|
+| **RVW10-1** | major | **Katalog `K76…K85` ⇒ `K77…K86` umnummeriert** (rein additiv: **keine** der zehn Bedeutungen gestrichen, **keine** K-ID unterhalb K76 angetastet). **Alle** Fundstellen nachgezogen — Frontmatter `:8`; Kopfblock `:215`, `:233-234`; IC-15 `:1487-1488`; IC-25 `:1614`; §9.1 `:2596`; §9.2 `:2629`, `:2634`, `:2648`; §15 Trace-Anker `:3182`, `:3193`, `:3194`, `:3202`, `:3206`, `:3213`, `:3214` (Runde-10-Block, in dieser Korrekturrunde nachgetragen), `:3254`; §17.12.1 `:4249`, `:4257`; §17.12.2 `:4333`, `:4334`; §17.12.4 `:4418`, `:4419`, `:4421`, `:4445`, `:4446`, `:4450`, `:4461`, `:4462`; §17.12.5 `:4481`, `:4482`, `:4484`, `:4486`, `:4487`, `:4488`; Coverage `:4531`, `:4532`, `:4535`, `:4538`, `:4539`; §17.12.6 `:4542`, `:4547`, `:4549-4550`, `:4553`, `:4554`, `:4561-4581`; Revisionszeilen `:510`, `:511`; Kopfblock-Legende `:278`. **Maßgebliche Obergrenze auf den gemessenen Plan-Stand `K1…K76` korrigiert** (Spec `:4161` und §17.12.6-Vorspann `:4549-4550`); die Coverage-Zeile `:4539` nennt jetzt **beide** Legendenzitate. **Keine inhaltliche Pflicht geändert. Der Plan bleibt unverändert.** | Plan `:536` („`K-*` (K1…**K76**)“, „additiv angehängt am 2026-09-28: K76"), `:6808`, `:6829`, `:6839-6843`, `:6960` („**K76 bleibt die höchste K-Kennung** — es wird **nichts** umnummeriert und **keine** ID vergeben“). Grep 2026-09-29 über **Spec und Plan** (Repo-Wurzel), Definitionsträger je K-ID ausgezählt: **K1…K76 je genau einmal** — K13…K45 §17.10.5/§17.11.1 · K46…K53 Plan-Anlage F/G · K54…K58 §17.11.1 · K59…K70 §17.11.5 · K71…K75 §17.11.6 · **K76** Plan-Legende; **K77…K86 je genau einmal** §17.12.6 — **keine Lücke, keine Doppelbelegung**; **keine** verwaiste Referenz auf `K76…K85` oder `K61…K70`. |
+| **RVW10-2** | minor | **V-D1-Selbstverweis auf den gemessenen Anker `:1487-1488` gezogen** (bisher `:1465-1466` — selbst falsch, IC-13-Fließtext). RVW9-8 damit **geschlossen**; der RVW10-Befund als **bestätigt** vermerkt. **Keine** inhaltliche Änderung an IC-15. | Spec `:1487` `DEFAULT_FALLBACK_INDEX = "docs/INDEX.md"   # :28`, `:1488` `_FILE_INDEX_SKELETON = "…"   # :29` (IC-15 beginnt `:1483`); `:1465-1466` = IC-13-Fließtext; `:1449-1450` = IC-14-Bereich. Fundstellen: V-D1 `:4481`, K-Katalog `:4568`, Register `:4589`. |
+| **RVW10-3** | info | **Registriert, nicht geändert.** Vollständigkeits-Grep über `docs/`, `scripts/`, `tests/` nach `sixth|seventh` und `IC-22 row`: **zwei** Testträger derselben Ordnungs-Formulierung. Der erste (`tests/test_docs_consolidation_migration.py:43`) ist durch **T-4** abgedeckt und wird dort gezogen. Der zweite (`tests/test_doc_renderer.py:1090-1091`) liegt **außerhalb** der `Files:`-Liste dieses Fixes ⇒ **nur als Befund registriert, keine Testdatei geändert**, **keine** neue T-ID, **kein** Eingriff in T-3. | `tests/test_doc_renderer.py:1090-1091` (Grep 2026-09-29): `#: ``checks`` is a block whose only member is ``strict``; the sixth IC-22 row` / `#: (``knowledge-engine.okf.index-mode``) belongs to W7-2 and is out of scope.` IC-22-Tabelle Spec `:1845-1851` = **sieben** Zeilen, KE-Key in `:1851` ⇒ dieselbe Fehlerklasse wie T-4, **bleibt offen** für die nächste Korrekturrunde. Werkzeug-Fehlmessung erneut reproduziert (Read rendert beide Zonen leer, Grep liefert den Text). |
+
+**Ergebnis der dritten Korrekturrunde:** 3 Findings, **3 behoben**, 0 offen. **P-1…P-5 (inkl.
+P-3 (e)) inhaltlich unverändert** und weiterhin **ZUR USER-FREIGABE AUSSTEHEND**; **E-9…E-13
+einschließlich E-13c und OQ1 bleiben OFFEN**; `pending-approval:` besteht fort; `status:` und
+`approved: 2026-09-26` bleiben unverändert; Umfang W0–W8 unverändert; **keine** neue
+IC-/AC-/Task-/Wellen-/V-Check-ID; **keine** inhaltliche Änderung an IC-25, IC-26, IC-13,
+IC-15, IC-22, AC-42…AC-46, R7 oder §12.3 (g); **kein Produktionscode**, keine Testdatei
+geändert; **der Plan bleibt unverändert** (V-D8 bleibt beim `planner` nach Freigabe).
