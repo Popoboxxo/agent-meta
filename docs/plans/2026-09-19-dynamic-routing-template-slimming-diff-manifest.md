@@ -584,3 +584,220 @@ Klassifikation der Änderung als B2a-Fall. Die Änderung selbst ist ein Baseline
 Update-Regel (Kopf-Block dieses Abschnitts, Vertrag
 `tests/fixtures/slimming-golden/README.md:73-77`), weil keine Near-Duplikat-Variante für die
 Deltas 1–5 und keine Block-Migration vorliegt (9.2).
+
+## 10. Re-Baseline der Golden-Baseline für `dependency-auditor` (PR #825)
+
+Derselbe Verfahrensfall wie Abschnitt 8 (effort-estimator) und Abschnitt 9 (documenter), angewandt
+auf die dritte nachträglich veränderte aktive Rolle. Die CI auf PR #825
+(`feat/audit-role-disciplines-cybersecurity`, Head `4816c3e6`) schlug ausschließlich hier fehl.
+
+> **Autor:** Develop-Agent `senior-developer` (Orchestrator-Delegation); namentliche Autorschaft wird
+> hier nicht geführt — Nachweis ist der Diff-Scope in 10.5.
+> **Commit:** **noch nicht vorhanden** — die Re-Baseline wurde bewusst **nicht** committet; die
+> Aufgabengrenze verbietet Git-Mutationen (`commit`/`add`/`push`). Der Diff-Scope ist daher
+> **im Arbeitsbaum** gemessen (10.5) und wird erst mit dem Folge-Commit des `git`-Agenten zur
+> SHA. Abweichend von Abschnitt 8 wird hier deshalb **keine** Commit-SHA zitiert; eine erfundene
+> wäre eine Falschangabe.
+> **Gegenstand:** `tests/fixtures/slimming-golden/dependency-auditor.md` — 1 von **58** eingefrorenen
+> Golden-Fixtures (Aktive-Rollen-Menge, `tests/fixtures/slimming-golden/README.md:36-38`; neu
+> gemessen: `len(_golden_roles()) == _GOLDEN_ROLE_COUNT == 58`).
+> **Klassifikation:** **Baseline-Update nach Update-Regel**
+> (`tests/fixtures/slimming-golden/README.md:73-77`) — **kein B2a-/B2b-Fall**; siehe 10.2 und 10.7.
+> **Nicht Gegenstand:** `security-auditor` — siehe 10.2, Absatz „Nicht-aktive Rolle".
+
+### 10.1 Auslöser
+
+Der Inhalts-Commit `16b5adb6` (`feat(agents): cybersecurity-audit discipline for security roles`)
+führte die Vendor-/Lieferanten-Assurance-Disziplin in die Security-Rollen ein. Der Folge-Commit
+`4816c3e6` (`fix(agents): bump security role versions for audit discipline`) hob **ausschließlich die
+Versionsfelder** in zwei Templates nach (2 Dateien, +2/−2): `agents/1-generic/dependency-auditor.md`
+(`version: "1.6.0"` → `"1.7.0"`) und `agents/1-generic/security-auditor.md` (`"2.5.0"` → `"2.6.0"`).
+
+Inhaltliche Änderungen an `dependency-auditor` — **vollständig, 5 Deltas** (aus dem Diff der Fixture
+gemessen, 10.5):
+
+1. Versionsfeld `1.6.0` → `1.7.0` **sowie** das daraus abgeleitete
+   `generated-from: 1-generic/dependency-auditor.md@1.7.0`.
+2. Neuer Workflow-Schritt `5. VENDOR` im ```-Block (Assurance-Evidenz für Vendor-/Cloud-Komponenten:
+   SOC 2 Type 1 vs. Type 2, ISO/IEC 27001 Scope und Datum, PCI DSS; Nachfragen nach Zeitraum,
+   Prüfer und Verwertung der Zertifizierung; Schwachstellen-Nachverfolgung; unveränderte
+   Vendor-Defaults als Supply-Chain-Exposition).
+3. **Umnummerierung** der bestehenden Schritte `5. FINDINGS` → `6. FINDINGS` und `6. HANDOFF` →
+   `7. HANDOFF`. Das sind **keine neuen Schritte** — sie rutschen durch den eingefügten Schritt 2
+   um eine Nummer.
+4. Neuer Abschnitt `## 5. Vendor and service-provider evidence` (Einleitungssatz + 6 Aufzählungspunkte
+   inkl. FP-Guard) mit **Umnummerierung** des bestehenden Abschnitts `## 5. Findings structure` →
+   `## 6. Findings structure`.
+5. Neuer `## Provenance`-Block im `<context>` (Packt-Kurs mit Zeitmarken-Belegen) **sowie** die neue
+   Zeile `VENDOR_EVIDENCE_FINDINGS: <count>` im `<output>`-Vertrag.
+
+Wie in 8.1 und 9.1 ist der Versionssprung **orthogonal** zur Slimming-Änderung: er betrifft den Inhalt
+der Rolle, nicht die Block-Extraktion.
+
+### 10.2 Mechanismus des Fehlschlags
+
+**Wie in 9.2 ist `dependency-auditor` in `_MIGRATED_PATHS` enthalten** (neu gemessen:
+`agents/1-generic/dependency-auditor.md` in der Menge → `True`; Fundstelle
+`tests/test_template_slimming_equivalence.py:144`). Die Rolle nimmt also wie `documenter` den
+**Normalisierungs-Zweig** des Gates, nicht den Byte-Identitäts-Zweig. Damit greift
+`tests/test_template_slimming_equivalence.py:1114-1126` mit `_normalize(golden, variables)` und die
+Assertion `:1148`; die Fehlermeldung lautet folglich:
+
+```
+dependency-auditor (agents/1-generic/dependency-auditor.md): diff not attributable to declared normalizations
+```
+
+Für `dependency-auditor` sind genau **zwei** Normalisierungen deklariert (aus der Attributions-Liste
+des Fehlschlags): `OUTPUT_GUARD` → `OG-CANON` (B2a) und `PARSE_INPUT` → `PI-PASS-DEP` (B2b). Sie
+absorbieren ausschließlich die Marker-Position des Output-Guards bzw. die A2A-Parse-Zeile. Die Deltas
+1–5 aus 10.1 liegen außerhalb des Normalisierungsmodells: `_LOCATORS`
+(`tests/test_template_slimming_equivalence.py:348-353`) und `_normalize()` (`:1073-1097`) arbeiten
+ausschließlich auf den vier Block-Kinds aus `_KIND_CANONICAL_VAR`
+(`tests/test_template_slimming_equivalence.py:245-250`) und erkennen Sektionen anhand von
+Heading-/Tag-Regexen, **keine Versionsstrings, keine Schrittlisten und keine Abschnittslisten**. Eine
+erfundene `retained`-Klausel oder eine neue Variante hätte den Vertrag verletzt statt eingehalten —
+gleiche Lage wie 8.2 und 9.2, mit demselben Unterschied wie in 9.2: hier ist der
+Normalisierungs-Zweig betroffen.
+
+**Nicht-aktive Rolle `security-auditor` (ausdrücklich geprüft, kein Re-Baseline-Bedarf):**
+`security-auditor` steht zwar ebenfalls in `_MIGRATED_PATHS`
+(`tests/test_template_slimming_equivalence.py:169`), ist aber **keine aktive Rolle** dieser
+Repo-Konfiguration. Neu gemessen:
+
+- `security-auditor` steht **nicht** in der `roles:`-Whitelist `.meta-config/project.yaml`
+  (59 Einträge, Zeilen 9–67; `dependency-auditor` steht in Zeile 60, `security-auditor` kommt
+  **nicht** vor);
+- es existiert **keine** Fixture `tests/fixtures/slimming-golden/security-auditor.md`;
+- der Sync rendert **keine** `.claude/agents/security-auditor.md` — weder in Render 1 noch in
+  Render 2.
+
+Folge: das Gate iteriert über `_golden_roles()` (58 Rollen) und **`security-auditor` wird nie
+besucht**; ein Re-Baseline ist für diese Rolle weder nötig noch möglich. Der Versionssprung auf
+`2.6.0` in `agents/1-generic/security-auditor.md` hat daher **keine** Wirkung auf die
+Golden-Baseline. Die Aufgabenstellung hatte hier eine Fehlannahme (Verwechslung von
+`_MIGRATED_PATHS`-Mitgliedschaft mit Fixture-/Render-Präsenz); sie wurde vor dem Kopieren empirisch
+korrigiert, und `security-auditor` wurde **nicht** angefasst.
+
+### 10.3 Gewählte Fix-Route und Vertragsbeleg
+
+Bewusste, über den **echten Sync-Pfad** erzeugte Re-Baseline nach dem Verfahrensvertrag
+(`tests/fixtures/slimming-golden/README.md:22-41`), ausdrücklich **nicht** als „incidental
+re-render" (`:18-20`) und **nicht** als Handedit.
+
+| Option | Bewertung |
+|---|---|
+| Golden-Fixture auf 1.6.0 belassen | Nicht möglich — das Template steht auf 1.7.0, der Render ist 1.7.0 |
+| Rolle künstlich migrieren / neue B2b-Variante für die Deltas 1–5 erfinden | Vertragsbruch (10.2) |
+| `{{AGENT_META_DATE}}`-Sonderregel ausweiten | Nicht anwendbar — der Platzhalter rendert ausschließlich in `agent-meta-manager.md` (`:57-71`) |
+| `security-auditor`-Fixture „vorsorglich" anlegen | Vertragsbruch — die Rolle ist nicht aktiv und wird nicht gerendert; eine erfundene Fixture würde `_GOLDEN_ROLE_COUNT == 58` und die Nicht-Orphan-Zählung brechen (10.2, 10.6) |
+| **Bewusste Re-Baseline + Manifest-Eintrag** | **Gewählt** — genau der in R8, R9 und in der Update-Regel vorgesehene Weg |
+
+**Grenze des Fixes (bewusst eingehalten):** es wurde **ausschließlich diese eine** Fixture
+angfasst. Die beiden Sync-Läufe rendern alle 58 aktiven Rollen, aber kopiert wurde nur
+`dependency-auditor.md`; ein Bulk-Kopieren des gesamten Zielbaums hätte die 57 anderen eingefrorenen
+Fixtures verschoben und das Gate damit stillschweigend ausgehebelt. Nachweis über den
+Diff-Scope in 10.5 und über die vollständige Bestandsaufnahme in 10.6.
+
+### 10.4 Nachweis der Herkunft (keine Handpflege)
+
+- **Erzeugung über den realen Sync-Pfad**, wörtlich der Verfahrensvertrag
+  (`tests/fixtures/slimming-golden/README.md:29-31`):
+
+  ```bash
+  mkdir -p .tmp/slimming-golden-gen
+  AGENT_META_TEST_REPO="$PWD/.tmp/slimming-golden-gen" python3 scripts/sync.py --validate
+  ```
+
+  `sync --validate` rc `0` (361 Aktionen, 41 übersprungen, 2 Warnungen — vorbestehend und
+  unabhängig von dieser Änderung, identisch zu 9.4).
+- sha256 der Fixture identisch mit dem Sync-Render: Kopie per `cp` aus
+  `.tmp/slimming-golden-gen/.claude/agents/dependency-auditor.md`, danach `cmp` rc `0`, sha256
+  `b43d54e13dc23b56780ecd61af78a36a7293504c5dc57a16e162173b478b05f3` — in beiden Render-Verzeichnissen
+  und in der Fixture identisch.
+- **Determinismus-Nachweis (Zweitrender) — durchgeführt.** Wie in 8.4 und 9.4 über zwei getrennte
+  temporäre Zielverzeichnisse, anschließend der Vergleich aus
+  `tests/fixtures/slimming-golden/README.md:50`:
+
+  ```bash
+  mkdir -p .tmp/slimming-golden-gen2
+  AGENT_META_TEST_REPO="$PWD/.tmp/slimming-golden-gen2" python3 scripts/sync.py --validate
+  diff -r .tmp/slimming-golden-gen/.claude/agents .tmp/slimming-golden-gen2/.claude/agents
+  ```
+
+  Ergebnis: **`diff -r` rc `0`** — byte-identisch, null abweichende Dateien im gesamten Zielbaum.
+  Damit ist zugleich belegt, dass der Render **kein** `{{AGENT_META_DATE}}`-Drift trägt (10.6).
+- Die Fixture enthält **keinen** Absolutpfad, **keinen** Hostnamen, **keinen** Commit-SHA, **kein**
+  `{{AGENT_META_DATE}}` und **keinen** unaufgelösten Platzhalter (je `grep -c` = 0 für `{{`,
+  `/home/`, `4816c3e6`, `http://`).
+- Frontmatter konsistent: `version: 1.7.0` und `generated-from: 1-generic/dependency-auditor.md@1.7.0`
+  (`tests/fixtures/slimming-golden/dependency-auditor.md:3` und `:17`).
+
+### 10.5 Verifikation
+
+Verifikationslauf im Arbeitsbaum auf Head `4816c3e6` (Branch
+`feat/audit-role-disciplines-cybersecurity`):
+
+| Prüfung | Ergebnis |
+|---|---|
+| `pytest tests/test_template_slimming_equivalence.py -q` | **8 passed**, rc 0 — inkl. `test_golden_equivalence_and_normalization_marking`, `test_no_declared_normalization_is_dead` und der `_GOLDEN_ROLE_COUNT`-Prüfung (`:1301-1302`, `58 == 58`, unverändert) |
+| `python3 scripts/sync.py --validate` | rc `0` |
+| Vorher-Zustand desselben Laufs | **1 failed, 7 passed** — `test_golden_equivalence_and_normalization_marking` (reproduziert vor dem Fix, identisch zur CI-Meldung) |
+| `git status --short` | genau 2 Dateien: `tests/fixtures/slimming-golden/dependency-auditor.md`, `docs/plans/2026-09-19-dynamic-routing-template-slimming-diff-manifest.md` |
+| Diff-Scope der Fixture | `tests/fixtures/slimming-golden/dependency-auditor.md \| 34 +++++++++++++++` → **+29/−5** |
+
+> **Nicht durchgeführt und deshalb nicht behauptet:** ein voller `pytest tests/`-Lauf. Wie in 8.5
+> und 9.5 vermerkt, sammelt ein solcher Lauf umgebungsabhängige Admin-UI-/Django-Collection-Fehler,
+> die nichts mit dieser Änderung zu tun haben; die Aussage dieses Eintrags ist **module-genau** und
+> deckt sich mit 8.5 und 9.5.
+
+### 10.6 Bestandsaufnahme aller 58 Goldens
+
+Vollständig über alle 58 Fixtures neu gemessen (Byte-Vergleich Fixture ↔ Render, Aufteilung nach
+`_MIGRATED_PATHS`), wie in 9.6 frisch gemessen und nicht übernommen:
+
+**(a) Test-native — die Definition, die das Gate durchsetzt:**
+
+| Kategorie | Anzahl | Veränderung ggü. 9.6 |
+|---|---|---|
+| byte-identisch (unmigriert) | 11 | unverändert |
+| deklariert migriert | 47 | unverändert |
+| **echter Skew** | **0** | unverändert |
+
+**(b) Raw-Byte — ohne Normalisierung:**
+
+| Kategorie | Anzahl | Veränderung ggü. 9.6 |
+|---|---|---|
+| byte-identisch zum Render | 33 | unverändert |
+| raw-abweichend | 25 | unverändert |
+| **echter Skew** | **0** | unverändert |
+
+`dependency-auditor` stand vor der Re-Baseline in der 26er-Gruppe der raw-abweichenden Fixtures
+(alleiniger Delta-Skew: VENDOR-Schritt, Vendor-Evidenz-Abschnitt, Provenance-Block, Versionsfeld) und
+ist nach der Re-Baseline in die 33er-Gruppe der byte-identischen Render-Treffer gewechselt. Damit
+steht der Bestand **exakt** auf dem in 9.6 dokumentierten Stand zurück — ein unabhängiger Beleg
+dafür, dass durch diese Re-Baseline **keine** andere eingefrorene Fixture verschoben wurde.
+
+Die deklarierten Normalisierungen `OG-CANON` und `PI-PASS-DEP` für `dependency-auditor` bleiben als
+**lebende** Deklarationen erhalten und werden von `test_no_declared_normalization_is_dead` weiterhin
+als nicht-tot bestätigt; es war **keine** Eintragung, Entfernung oder Änderung an `_NORMALIZATIONS`
+nötig.
+
+Zusätzlich bestätigt: **keine Orphan-Fixture** und **kein Golden ohne Render-Gegenstück** (58 = 58,
+0 Orphans, Summe der Bestandsaufnahme 58). `agent-meta-manager.md` — die einzige
+`{{AGENT_META_DATE}}`-Fixture (`tests/fixtures/slimming-golden/README.md:57-71`) — ist
+**unverändert**; der `diff -r` über den gesamten Zielbaum (10.4) zeigt keinen Datumsdrift. Die
+Scratch-Verzeichnisse `.tmp/slimming-golden-gen{,2}` wurden nach der Messung entfernt.
+
+### 10.7 Status B2a
+
+B2a ist durch die Re-Baseline **wiederhergestellt**, nicht abgeschwächt: die Fixture enthält exakt
+den vom aktuellen Template erzeugten Output, die Update-Regel ist erfüllt (dieser Eintrag), und
+das Gate ist grün (10.5). Die Deltas aus 10.1 sind orthogonale Inhaltsänderungen der Rolle; an
+`_MIGRATED_PATHS`, `_NORMALIZATIONS`, `_LOCATORS` oder `_GOLDEN_ROLE_COUNT` wurde **nichts**
+angefasst — das Gate behält seine Zähne.
+
+Klarstellung zur Einordnung wie in 8.7 und 9.7: dies ist eine **Statusaussage** über B2a, keine
+Klassifikation der Änderung als B2a-Fall. Die Änderung selbst ist ein Baseline-Update nach
+Update-Regel (Kopf-Block dieses Abschnitts, Vertrag
+`tests/fixtures/slimming-golden/README.md:73-77`), weil keine Near-Duplikat-Variante für die
+Deltas 1–5 und keine Block-Migration vorliegt (10.2).
