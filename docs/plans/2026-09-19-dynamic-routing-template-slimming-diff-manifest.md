@@ -391,3 +391,196 @@ Klarstellung zur Einordnung: dies ist eine **Statusaussage** über B2a, keine Kl
 Änderung als B2a-Fall. Die Änderung selbst ist ein Baseline-Update nach Update-Regel (Kopf-Block
 dieses Abschnitts, Vertrag `tests/fixtures/slimming-golden/README.md:73-77`), weil keine
 Near-Duplikat-Variante und keine Block-Migration vorliegt (8.2).
+
+## 9. Re-Baseline der Golden-Baseline für `documenter` (PR #828)
+
+Derselbe Verfahrensfall wie Abschnitt 8, angewandt auf die zweite der beiden nachträglich
+eingefrorenen Golden-Fixtures. Die CI auf PR #828 (`feat/audit-documenter-workpapers`, Head
+`b33541c4`) schlug ausschließlich hier fehl.
+
+> **Autor:** Doku-Agent `documenter` (Orchestrator-Delegation); namentliche Autorschaft wird hier
+> nicht geführt — Nachweis ist der Diff-Scope in 9.5.
+> **Commit:** **noch nicht vorhanden** — die Re-Baseline wurde bewusst **nicht** committet; die
+> Aufgabengrenze verbietet Git-Mutationen (`commit`/`add`/`push`). Der Diff-Scope ist daher
+> **im Arbeitsbaum** gemessen (9.5) und wird erst mit dem Folge-Commit des `git`-Agenten zur
+> SHA. Abweichend von Abschnitt 8 wird hier deshalb **keine** Commit-SHA zitiert; eine erfundene
+> wäre eine Falschangabe.
+> **Gegenstand:** `tests/fixtures/slimming-golden/documenter.md` — 1 von **58** eingefrorenen
+> Golden-Fixtures (Aktive-Rollen-Menge, `tests/fixtures/slimming-golden/README.md:36-38`; neu
+> gemessen: `len(_golden_roles()) == _GOLDEN_ROLE_COUNT == 58`).
+> **Klassifikation:** **Baseline-Update nach Update-Regel**
+> (`tests/fixtures/slimming-golden/README.md:73-77`) — **kein B2a-/B2b-Fall**; siehe 9.2 und 9.7.
+
+### 9.1 Auslöser
+
+Commit `a24c1ddf` (`feat(agents): working-paper discipline for documenter (#827)`, Basis von PR
+#828) hob `agents/1-generic/documenter.md` von `version: "1.10.0"` auf `version: "1.11.0"`
+(+37/−3). Der Folge-Commit `d087d0d8` (`fix(agents): sync homeassistant documenter override to
+1.11.0`) zog den Plattform-Override `agents/2-platform/homeassistant-documenter.md` nach
+(`version: 1.2.0`, `based-on: …@1.11.0`).
+
+Inhaltliche Änderungen — **vollständig, 5 Deltas** (aus dem Render-Diff Fixture ↔ Ist-Render
+gemessen, 9.5):
+
+1. Frontmatter-`description` **umformuliert** (… „and session insights — **as artefacts that stand
+   alone and stay traceable**.").
+2. Versionsfeld `1.10.0` → `1.11.0` **sowie** das daraus abgeleitete
+   `generated-from: 1-generic/documenter.md@1.11.0`.
+3. Neuer Abschnitt `## 8. Documentation that stands alone (audit register)` (10 Aufzählungspunkte
+   plus Einleitungssatz).
+4. **Umnummerierung** des bestehenden Output-Abschnitts `## 8. Return` → `## 9. Return`. Das ist
+   **kein neuer Abschnitt** — der Abschnitt bestand bereits und rutscht durch den eingefügten
+   Abschnitt 3 um eine Nummer.
+5. Neuer `## Provenance`-Block im `<context>` (beide Packt-Kurse mit Zeitmarken-Belegen) und drei
+   zusätzliche `<constraints>`-Klauseln.
+
+Wie in 8.1 ist der Versionssprung **orthogonal** zur Slimming-Änderung: er betrifft den Inhalt der
+Rolle, nicht die Block-Extraktion.
+
+### 9.2 Mechanismus des Fehlschlags
+
+**Unterschied zu 8.2, der die Fehlschlagsursache bestimmt:** `effort-estimator` stand in
+**keiner** Registry; `documenter` steht sehr wohl in `_MIGRATED_PATHS` (neu gemessen:
+`'agents/1-generic/documenter.md' in _MIGRATED_PATHS` → `True`; Registry-Fundstelle
+`tests/test_template_slimming_equivalence.py:195` in `_PARSE_INPUT_MIGRATED`). Die Rolle nimmt also
+den **Normalisierungs-Zweig** des Gates, nicht den Byte-Identitäts-Zweig.
+
+Damit greift `tests/test_template_slimming_equivalence.py:1114-1126` mit
+`_normalize(golden, variables)` und der Assertion `:1148`, und die Fehlermeldung lautet folglich
+nicht „unexpected diff on an unmigrated role" (8.2), sondern:
+
+```
+documenter (agents/1-generic/documenter.md): diff not attributable to declared normalizations
+```
+
+Die einzige für `documenter` deklarierte Normalisierung ist `PI-BLANK`
+(Manifest-Tabelle 3.2, Fundstelle `tests/test_template_slimming_equivalence.py:675`); sie absorbiert
+ausschließlich die Leerzeile zwischen `## 1. Parse input` und dem A2A-Satz. Die Deltas 1–5 aus
+9.1 liegen außerhalb des Normalisierungsmodells: `_LOCATORS`
+(`tests/test_template_slimming_equivalence.py:348-353`) und `_normalize()` (`:1073-1097`) arbeiten
+ausschließlich auf den vier Block-Kinds aus `_KIND_CANONICAL_VAR`
+(`tests/test_template_slimming_equivalence.py:245-250`) und erkennen Sektionen anhand von
+Heading-/Tag-Regexen, **keine Versionsstrings und keine Abschnittslisten**. Eine erfundene
+`retained`-Klausel oder eine neue Variante hätte den Vertrag verletzt statt eingehalten — gleiche
+Lage wie 8.2, nur mit dem Unterschied, dass hier der Normalisierungs-Zweig betroffen ist.
+
+### 9.3 Gewählte Fix-Route und Vertragsbeleg
+
+Bewusste, über den **echten Sync-Pfad** erzeugte Re-Baseline nach dem Verfahrensvertrag
+(`tests/fixtures/slimming-golden/README.md:22-41`), ausdrücklich **nicht** als „incidental
+re-render" (`:18-20`) und **nicht** als Handedit.
+
+| Option | Bewertung |
+|---|---|
+| Golden-Fixture auf 1.10.0 belassen | Nicht möglich — das Template steht auf 1.11.0, der Render ist 1.11.0 |
+| Rolle künstlich migrieren / neue B2b-Variante für die Deltas 1–5 erfinden | Vertragsbruch (9.2) |
+| `{{AGENT_META_DATE}}`-Sonderregel ausweiten | Nicht anwendbar — der Platzhalter rendert ausschließlich in `agent-meta-manager.md` (`:57-71`) |
+| **Bewusste Re-Baseline + Manifest-Eintrag** | **Gewählt** — genau der in R8 und in der Update-Regel vorgesehene Weg |
+
+**Grenze des Fixes (bewusst eingehalten):** es wurde **ausschließlich diese eine** Fixture
+angefasst. Die beiden Sync-Läufe rendern alle 58 Rollen, aber kopiert wurde nur
+`documenter.md`; ein Bulk-Kopieren des gesamten Zielbaums hätte die 57 anderen eingefrorenen
+Fixtures verschoben und das Gate damit stillschweigend ausgehebelt. Nachweis über den
+Diff-Scope in 9.5.
+
+### 9.4 Nachweis der Herkunft (keine Handpflege)
+
+- **Erzeugung über den realen Sync-Pfad**, wörtlich der Verfahrensvertrag
+  (`tests/fixtures/slimming-golden/README.md:29-31`):
+
+  ```bash
+  mkdir -p .tmp/slimming-golden-gen
+  AGENT_META_TEST_REPO="$PWD/.tmp/slimming-golden-gen" python3 scripts/sync.py --validate
+  ```
+
+  `sync --validate` rc `0` (361 Aktionen, 41 übersprungen, 2 Warnungen — vorbestehend und
+  unabhängig von dieser Änderung).
+- sha256 der Fixture identisch mit dem Sync-Render: Kopie per `cp` aus
+  `.tmp/slimming-golden-gen/.claude/agents/documenter.md`, danach `cmp` rc `0`, sha256
+  `4d4ceb3567b23631900b0cbfa2c5243b2f6cb09a14dd27dd448ddcfc57cfe38d` — in beiden Render-Verzeichnissen
+  und in der Fixture identisch.
+- **Determinismus-Nachweis (Zweitrender) — durchgeführt.** Wie in 8.4 über zwei getrennte
+  temporäre Zielverzeichnisse, anschließend der Vergleich aus
+  `tests/fixtures/slimming-golden/README.md:50`:
+
+  ```bash
+  mkdir -p .tmp/slimming-golden-gen2
+  AGENT_META_TEST_REPO="$PWD/.tmp/slimming-golden-gen2" python3 scripts/sync.py --validate
+  diff -r .tmp/slimming-golden-gen/.claude/agents .tmp/slimming-golden-gen2/.claude/agents
+  ```
+
+  Ergebnis: **`diff -r` rc `0`** — byte-identisch, null abweichende Dateien im gesamten Zielbaum.
+  Damit ist zugleich belegt, dass der Render **kein** `{{AGENT_META_DATE}}`-Drift trägt (9.6).
+- Die Fixture enthält **keinen** Absolutpfad, **keinen** Hostnamen, **keinen** Commit-SHA, **kein**
+  `{{AGENT_META_DATE}}` und **keinen** unaufgelösten Platzhalter (je `grep -c` = 0).
+- Frontmatter konsistent: `version: 1.11.0` und `generated-from: 1-generic/documenter.md@1.11.0`
+  (`tests/fixtures/slimming-golden/documenter.md:3` und `:15`).
+
+### 9.5 Verifikation
+
+Verifikationslauf im Arbeitsbaum auf Head `b33541c4` (Branch `feat/audit-documenter-workpapers`):
+
+| Prüfung | Ergebnis |
+|---|---|
+| `pytest tests/test_template_slimming_equivalence.py -q` | **8 passed**, rc 0 — inkl. `test_golden_equivalence_and_normalization_marking`, `test_no_declared_normalization_is_dead` und der `_GOLDEN_ROLE_COUNT`-Prüfung (`:1301-1302`, `58 == 58`, unverändert) |
+| `python3 scripts/sync.py --validate` | rc `0` |
+| Vorher-Zustand desselben Laufs | **1 failed, 7 passed** — `test_golden_equivalence_and_normalization_marking` (reproduziert vor dem Fix, identisch zur CI-Meldung auf py3.9/3.11/3.12) |
+| `git status --short` | genau 2 Dateien: `tests/fixtures/slimming-golden/documenter.md`, `docs/plans/2026-09-19-dynamic-routing-template-slimming-diff-manifest.md` |
+| Diff-Scope der Fixture | `tests/fixtures/slimming-golden/documenter.md \| 43 ++++++++++++++++----` → **+38/−5** |
+
+> **Nicht durchgeführt und deshalb nicht behauptet:** ein voller `pytest tests/`-Lauf. Wie in 8.5
+> vermerkt, sammelt ein solcher Lauf umgebungsabhängige Admin-UI-/Django-Collection-Fehler, die
+> nichts mit dieser Änderung zu tun haben; die Aussage dieses Eintrags ist **module-genau** und
+> deckt sich mit 8.5.
+
+### 9.6 Bestandsaufnahme aller 58 Goldens
+
+Vollständig über alle 58 Fixtures neu gemessen (Byte-Vergleich Fixture ↔ Render, Aufteilung nach
+`_MIGRATED_PATHS`). Anders als in 8.6 wurde hier **frisch gemessen**, nicht übernommen: über das
+`render_env`-Fixture des Äquivalenz-Moduls selbst (unwrapped aufgerufen, Renderziel ein
+Wegwerf-Verzeichnis außerhalb des Repos), damit Rollen→Template-Zuordnung und Renderpfad die des
+Gates sind und keine Nachbildung.
+
+**(a) Test-native — die Definition, die das Gate durchsetzt:**
+
+| Kategorie | Anzahl | Veränderung ggü. 8.6 |
+|---|---|---|
+| byte-identisch (unmigriert) | 11 | unverändert |
+| deklariert migriert | 47 | unverändert |
+| **echter Skew** | **0** | unverändert |
+
+**(b) Raw-Byte — ohne Normalisierung:**
+
+| Kategorie | Anzahl | Veränderung ggü. 8.6 |
+|---|---|---|
+| byte-identisch zum Render | 33 | **+1** |
+| raw-abweichend | 25 | **−1** |
+| **echter Skew** | **0** | unverändert |
+
+Die Verschiebung 32 → 33 bzw. 26 → 25 ist **genau diese eine Rolle**: `documenter` ist nach der
+Re-Baseline raw-byte-identisch, weil die neue Fixture den geslimmten `PARSE_INPUT`-Block bereits
+**ohne** Leerzeile enthält und damit mit dem Ist-Render übereinstimmt. Vor der Re-Baseline stand
+`documenter` in der 26er-Gruppe (allein der `PI-BLANK`-Delta); es ist inzwischen einer der 33
+byte-identischen Render-Treffer, ohne dass eine `_NORMALIZATIONS`-Eintragung nötig war — die
+deklarierte `PI-BLANK`-Normalisierung bleibt als **lebende** Deklaration erhalten und wird von
+`test_no_declared_normalization_is_dead` weiterhin als nicht-tot bestätigt.
+
+Zusätzlich bestätigt: **keine Orphan-Fixture** und **kein Golden ohne Render-Gegenstück** (58 = 58,
+0 Orphans). `agent-meta-manager.md` — die einzige `{{AGENT_META_DATE}}`-Fixture
+(`tests/fixtures/slimming-golden/README.md:57-71`) — ist **unverändert**; der `diff -r` über den
+gesamten Zielbaum (9.4) zeigt keinen Datumsdrift. Die Scratch-Verzeichnisse
+`.tmp/slimming-golden-gen{,2}` wurden nach der Messung entfernt.
+
+### 9.7 Status B2a
+
+B2a ist durch die Re-Baseline **wiederhergestellt**, nicht abgeschwächt: die Fixture enthält exakt
+den vom aktuellen Template erzeugten Output, die Update-Regel ist erfüllt (dieser Eintrag), und
+das Gate ist grün (9.5). Die Deltas aus 9.1 sind orthogonale Inhaltsänderungen der Rolle; an
+`_MIGRATED_PATHS`, `_NORMALIZATIONS`, `_LOCATORS` oder `_GOLDEN_ROLE_COUNT` wurde **nichts**
+angefasst — das Gate behält seine Zähne.
+
+Klarstellung zur Einordnung wie in 8.7: dies ist eine **Statusaussage** über B2a, keine
+Klassifikation der Änderung als B2a-Fall. Die Änderung selbst ist ein Baseline-Update nach
+Update-Regel (Kopf-Block dieses Abschnitts, Vertrag
+`tests/fixtures/slimming-golden/README.md:73-77`), weil keine Near-Duplikat-Variante für die
+Deltas 1–5 und keine Block-Migration vorliegt (9.2).
