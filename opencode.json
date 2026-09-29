@@ -35,5 +35,13 @@
         "--mcp"
       ]
     }
+  },
+  "permission": {
+    "edit": {
+      "**": "deny"
+    },
+    "bash": {
+      "**": "deny"
+    }
   }
 }

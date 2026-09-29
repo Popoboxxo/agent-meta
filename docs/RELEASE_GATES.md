@@ -188,8 +188,16 @@ Prüft, ob generierte Artefakte (Build-Output, kompilierte Schemas, Bundles, …
 gebaut wurden, nachdem sich ihre Quelle geändert hat.
 
 **Aktivierung:** siehe [Konfiguration](#konfiguration-projectyaml--dod-preset) unten UND Datei
-`.agent-meta/generated-artifacts.yaml` im Consumer-Projekt-Root. Fehlt die Config-Datei komplett,
+`.meta-config/generated-artifacts.yaml` im Consumer-Projekt-Root. Existiert diese Datei nicht,
+wird ersatzweise `generated-artifacts.yaml` im Projekt-Root gelesen; sind beide vorhanden, gewinnt
+deterministisch `.meta-config/generated-artifacts.yaml`. Fehlt die Config-Datei komplett,
 wird das Gate unabhängig von der Enabled-Konfiguration übersprungen (rein opt-in).
+
+> **Breaking Change (Migration):** Der frühere Pfad im agent-meta-Submodul
+> (`.agent-meta/` mit Dateiname `generated-artifacts.yaml`) wird **nicht mehr gelesen**. Projekte,
+> die ihre Config dort abgelegt hatten, müssen sie nach `.meta-config/generated-artifacts.yaml`
+> (oder `generated-artifacts.yaml`) verschieben — andernfalls überspringt sich das Gate still
+> selbst (Exit 0, `[SKIP]`).
 
 **Config-Format** (stdlib-only Parser, **kein vollständiger YAML-Parser** — unterstützt nur dieses
 eingeschränkte Subset):
@@ -326,7 +334,7 @@ release-gates:
   action-pin-validation: { enabled: true }
 ```
 
-`.agent-meta/generated-artifacts.yaml`:
+`.meta-config/generated-artifacts.yaml`:
 
 ```yaml
 artifacts:
@@ -365,7 +373,7 @@ release-gates:
 ```
 
 ```yaml
-# .agent-meta/generated-artifacts.yaml
+# .meta-config/generated-artifacts.yaml
 artifacts:
   - source: src/
     generated: .next/BUILD_ID

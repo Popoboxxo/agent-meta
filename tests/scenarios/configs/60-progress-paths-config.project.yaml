@@ -1,0 +1,35 @@
+agent-meta-version: "1.1.0"
+ai-providers:
+- Claude
+# Configurable progress / checkpoint paths: the progress block moves both
+# directories away from the framework-default .meta-viz layout. The assert
+# script verifies default (no block) vs. override (this block) resolution and
+# the CheckpointStore wiring.
+dod-preset: concept-driven
+platforms: []
+rules-preset: lazy
+knowledge-engine:
+  enabled: false
+spec-plan-workflow:
+  enabled: true
+  paths:
+    specs: docs/specs
+    plans: docs/plans
+    spikes: docs/spikes
+  index:
+    mode: file-index
+    fallback-index: docs/INDEX.md
+progress:
+  dir: .run/progress
+  checkpoint-dir: .run/checkpoints
+project:
+  name: scenario-progress-paths
+  prefix: s60
+  short: scenario-progress-paths
+variables:
+  PROJECT_NAME: scenario-progress-paths
+  PROJECT_DESCRIPTION: Configurable progress/checkpoint paths (SPEC-PROGRESS-PATHS-CONFIG-2026-09-13, AC-13).
+  PROJECT_GOAL: Prove default vs. override resolution and the CheckpointStore.from_config wiring.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-progress-paths
+  GIT_MAIN_BRANCH: main

@@ -1,6 +1,8 @@
 ---
 name: se-critic
-version: 2.1.0
+version: 2.2.0
+reference_standards:
+- "IEEE 1028-2008"
 description: "Audits requirements and architecture against generic laws. Enforces role boundaries. Persists review protocols with RVW-IDs and propagates suspect marks (Issues #339 B5/B6, #334)."
 hint: Validate requirements before architecture; audit decompositions.
 tools:
@@ -63,6 +65,10 @@ Wenn ein Befund an einer REQ eine Re-Derivation des Parents erfordert:
 3. Parallel ADR-Impact prüfen: berühren die Befunde ADR-Entscheidungen → Umbau/Supersede an `se-architect` verweisen (siehe `se-cascade-adr-standard.md`).
 4. **Max. 2 automatische Re-Derivations-Iterationen**, danach User-Approval erzwingen (Kaskaden-Bomben-Schutz).
 
+## Finding & Gate Management (IEEE 1028, #772)
+- Jedes Finding trägt `severity` (`major|minor|info`), Kategorie, Disposition (`open→response→closed`) und einen Evidenz-Beleg (file:line oder Snippet). Jede Auflösung referenziert die Finding-ID.
+- **Gate-Kriterien je Ebene:** approviere eine Zerlegungsebene nur, wenn Parent-REQ, externe Interfaces und Traceability komplett/consistent/verifiable sind — kein Durchreichen einer Ebene mit offenen Major-Findings.
+
 ## JSON Output Schema
 Schema: `schemas/se-critic.schema.json`
 ```json
@@ -123,14 +129,9 @@ ARTIFACTS: <persistierte Step-/Report-Dateien (siehe Step Persistence)>
 
 </output_contract>
 
-## Anti-Recursion Guard
-Worker-Agent. Niemals Scope-Aufgaben an `orchestrator` oder andere Worker zurückdelegieren.
+{{ANTI_RECURSION_BLOCK}}
 
-<output-guard>
-## Background-Process Guard (issue #506)
-
-Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
-</output-guard>
+{{OUTPUT_GUARD_BLOCK}}
 
 {{#if AUTO_COMMIT_ENABLED}}
 {{AUTO_COMMIT_BLOCK}}

@@ -550,6 +550,17 @@ class DelegationSyntaxEngine:
         caps = self.get_capabilities(provider)
         return caps.get("file_based_agents", False)
 
+    def has_route_intent_tool(self, provider: str) -> bool:
+        """True when the harness registers ``route_intent`` as a callable tool.
+
+        Fail-safe ``False``: a missing capability entry / key means no verified
+        callable tool — the generated definition is prompt text only, so the
+        orchestrator must fall back to its static routing rules. Callability is
+        a harness property and is never inferred from the rendered definition.
+        """
+        caps = self.get_capabilities(provider)
+        return bool(caps.get("route_intent_tool", False))
+
     # ------------------------------------------------------------------
     # FANOUT/BARRIER capabilities (issue #265)
     # ------------------------------------------------------------------

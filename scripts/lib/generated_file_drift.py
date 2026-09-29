@@ -21,8 +21,10 @@ from __future__ import annotations
 
 import fnmatch
 import json
+import re
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 from .deactivation import get_active_providers
 from .io import content_hash, load_json_file, load_yaml_file, safe_path, write_atomic
@@ -114,7 +116,128 @@ def _is_sync_backup_name(name: str) -> bool:
     return fnmatch.fnmatch(name, _SYNC_BACKUP_PATTERN)
 
 
-def _iter_managed_files(agent_meta_root: Path, project_root: Path, provider: str, pc: dict) -> list[Path]:
+# The trailing ``.sync-backup-<YYYYmmdd-HHMMSS>`` suffix written by
+# backup_drifted_files() above (and its rule-index sibling). Anchored at the
+# end of the name so a nested backup-of-a-backup still strips exactly one.
+_SYNC_BACKUP_SUFFIX_RE = re.compile(r"\.sync-backup-(\d{8}-\d{6})$")
+
+
+def _sync_backup_timestamp(name: str) -> Optional[datetime]:
+    """Parse the ``YYYYmmdd-HHMMSS`` suffix of a backup *name*; None if absent
+    or unparsable (such a name is never a prune candidate -- fail-safe)."""
+    match = _SYNC_BACKUP_SUFFIX_RE.search(name)
+    if match is None:
+        return None
+    try:
+        return datetime.strptime(match.group(1), "%Y%m%d-%H%M%S")
+    except ValueError:
+        return None
+
+
+def _sync_backup_source(name: str) -> str:
+    """Source identity of a backup *name* (the name with its backup suffix removed)."""
+    return _SYNC_BACKUP_SUFFIX_RE.sub("", name)
+
+
+def prune_sync_backups(
+    target_dir: Path,
+    project_root: Path,
+    log: SyncLog,
+    dry_run: bool,
+    max_age_days: int,
+    max_per_source: int,
+) -> list[str]:
+    """Delete ``*.sync-backup-*`` siblings in *target_dir* per retention policy.
+
+    Only direct children of *target_dir* are considered, and only names that
+    match ``_is_sync_backup_name`` with a parsable ``YYYYmmdd-HHMMSS`` suffix
+    (per the ``backup_drifted_files`` convention). A backup is pruned only when
+    **both** thresholds are exceeded: its age is strictly greater than
+    *max_age_days* AND strictly more than *max_per_source* newer backups exist
+    for the same source. The most recent backup of a source therefore survives
+    unconditionally, as do non-backup names and unparsable-timestamp names.
+
+    Recommended default policy (OQ-2): ``max_per_source=3``,
+    ``max_age_days=30``; callers pass the values explicitly.
+
+    No-op in ``dry_run`` (returns ``[]``, no filesystem mutation). Fail-soft: a
+    per-file ``OSError`` is logged at debug level and iteration continues.
+    Returns the pruned project-relative posix paths.
+    """
+    if dry_run or not target_dir.is_dir():
+        return []
+
+    try:
+        entries = sorted(target_dir.iterdir())
+    except OSError as exc:
+        log.debug(
+            "sync-backup-prune",
+            f"could not list '{target_dir}': {type(exc).__name__}: {exc}",
+        )
+        return []
+
+    backups: list[tuple[Path, str, datetime]] = []
+    for path in entries:
+        if not path.is_file() or not _is_sync_backup_name(path.name):
+            continue
+        stamp = _sync_backup_timestamp(path.name)
+        if stamp is None:
+            continue
+        backups.append((path, _sync_backup_source(path.name), stamp))
+
+    now = datetime.now()
+    pruned: list[str] = []
+    for path, source, stamp in backups:
+        if (now - stamp).days <= max_age_days:
+            continue
+        newer = sum(
+            1 for _other, other_source, other_stamp in backups
+            if other_source == source and other_stamp > stamp
+        )
+        if newer <= max_per_source:
+            continue
+        try:
+            path.unlink()
+        except OSError as exc:
+            log.debug(
+                "sync-backup-prune",
+                f"could not delete '{path.name}': {type(exc).__name__}: {exc}",
+            )
+            continue
+        try:
+            pruned.append(path.relative_to(project_root).as_posix())
+        except ValueError:
+            pruned.append(str(path))
+    return pruned
+
+
+def _adapter_file_for_provider(
+    config: dict, provider: str, pc: dict
+) -> Optional[str]:
+    """Project-relative adapter path when ``per-provider`` topology is active.
+
+    An adapter file is a provider's native context file (e.g. Claude's
+    ``CLAUDE.md`` at the project root) — outside the per-provider
+    managed-index dirs walked below — so it is opted into the drift baseline
+    explicitly. Only ``per-provider`` mode opts in, keeping the default
+    ``unified`` baseline byte-identical. Purely key-driven (no provider name).
+    """
+    if not isinstance(config, dict):
+        return None
+    adapter_file = pc.get("context_adapter_file")
+    if not (isinstance(adapter_file, str) and adapter_file.strip()):
+        return None
+    from .providers import context_topology
+
+    if context_topology(config, provider) != "per-provider":
+        return None
+    return adapter_file
+
+
+def _iter_managed_files(
+    agent_meta_root: Path, project_root: Path, provider: str, pc: dict,
+    config: Optional[dict] = None,
+) -> list[Path]:
     """Absolute paths of every file this provider's writers track via a
     .agent-meta-managed index (or its -mcp/-tools sidecars), across
     agents/rules/hooks(+lib+release-gates)/commands/skills/pipeline-details.
@@ -138,6 +261,10 @@ def _iter_managed_files(agent_meta_root: Path, project_root: Path, provider: str
         dir_specs.append((pc.get("rules_dir", ".claude/rules"), ["mcp", "tools"]))
     if pc.get("has_commands", False):
         dir_specs.append((pc.get("commands_dir", ".claude/commands"), []))
+    if pc.get("has_plugins", False) and pc.get("plugin_dir"):
+        # Runtime-gate plugin artifact (SPEC-OPENCODE-RUNTIME-GATE-2026-09-13,
+        # IC-14): tracked only when the provider declares the plugin capability.
+        dir_specs.append((pc["plugin_dir"], []))
     dir_specs.append((resolve_pipeline_details_dir(pc, provider), []))
 
     for dir_rel, extra_index_names in dir_specs:
@@ -174,6 +301,12 @@ def _iter_managed_files(agent_meta_root: Path, project_root: Path, provider: str
                     if nested_candidate.is_file():
                         files.append(nested_candidate)
 
+    adapter_file = _adapter_file_for_provider(config, provider, pc)
+    if adapter_file:
+        adapter_path = project_root / adapter_file
+        if adapter_path.is_file():
+            files.append(adapter_path)
+
     return files
 
 
@@ -196,7 +329,7 @@ def scan_generated_file_drift(
     for provider, pc in provider_config.items():
         if provider not in active_providers:
             continue
-        for abs_path in _iter_managed_files(agent_meta_root, project_root, provider, pc):
+        for abs_path in _iter_managed_files(agent_meta_root, project_root, provider, pc, config):
             rel_path = abs_path.relative_to(project_root).as_posix()
             stored = stored_hashes.get(rel_path)
             if stored is None:
@@ -283,7 +416,7 @@ def capture_generated_file_hashes(
     for provider, pc in provider_config.items():
         if provider not in active_providers:
             continue
-        for abs_path in _iter_managed_files(agent_meta_root, project_root, provider, pc):
+        for abs_path in _iter_managed_files(agent_meta_root, project_root, provider, pc, config):
             rel_path = abs_path.relative_to(project_root).as_posix()
             hashes[rel_path] = content_hash(abs_path.read_text(encoding="utf-8"))
     resolved_path = project_root / PLATFORM_DEFAULTS_RESOLVED_REL

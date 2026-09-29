@@ -7,6 +7,11 @@ from pathlib import Path
 from .frontmatter import _split_frontmatter
 from .io import _load_yaml_or_json, safe_path, write_checked
 from .log import SyncLog
+from .rule_index import (
+    cleanup_stale_managed_files,
+    read_managed_index,
+    write_managed_index,
+)
 from .registry_query import (
     build_mcp_guardrails_list,
     load_mcp_registry,
@@ -54,6 +59,33 @@ def load_rules_presets(agent_meta_root: Path) -> dict:
         return {}
     presets = data.get("presets", {})
     return {k: v for k, v in presets.items() if not k.startswith("_")}
+
+
+def load_rule_gates(agent_meta_root: Path) -> dict:
+    """Load the preset-independent top-level `rule-gates` section."""
+    data, _ = _load_yaml_or_json(agent_meta_root / RULES_PRESETS_CONFIG_YAML)
+    if not data:
+        return {}
+    gates = data.get("rule-gates", {})
+    return {k: v for k, v in gates.items() if not k.startswith("_")}
+
+
+def _rule_gate_satisfied(requires: str, config: dict | None,
+                         agent_meta_root: Path) -> bool:
+    """Fail-closed evaluation of one rule-gate requirement.
+
+    Unknown requirements never activate a rule; config=None never does."""
+    if config is None:
+        return False
+    if requires == "spec-plan-workflow.enabled":
+        from .dod import resolve_spec_plan_bundle
+        return resolve_spec_plan_bundle(config, agent_meta_root)["rules-channel"]
+    if requires == "dod.root-cause-required":
+        from .dod import resolve_dod
+        return bool(
+            resolve_dod(config, agent_meta_root).get("root-cause-required", False)
+        )
+    return False
 
 
 def resolve_rules(config: dict, agent_meta_root: Path) -> dict:
@@ -124,12 +156,17 @@ def _build_always_apply_frontmatter(content: str, description: str = "") -> str:
     return "---\n" + "\n".join(fm_lines) + "\n---\n" + content
 
 
-def collect_rule_sources(agent_meta_root: Path, platforms: list[str]) -> list[tuple[Path, str]]:
+def collect_rule_sources(agent_meta_root: Path, platforms: list[str], *,
+                         config: dict | None) -> list[tuple[Path, str]]:
     """Collect rule files from 0-external, 1-generic and 2-platform layers.
 
     Returns list of (source_path, output_filename) tuples.
     Later entries override earlier ones with the same output filename —
     platform rules override generic rules of the same name.
+
+    Gated rules (config/rules-presets.yaml `rule-gates` section) are only
+    collected when their requirement is satisfied. Fail-closed: config=None
+    or an unknown requirement leaves the rule out.
     """
     seen: dict[str, Path] = {}
 
@@ -140,11 +177,19 @@ def collect_rule_sources(agent_meta_root: Path, platforms: list[str]) -> list[tu
             seen[f.name] = f
 
     # 1-generic (skip _ prefix — reserved for lazy-load knowledge files)
+    gates = load_rule_gates(agent_meta_root)
+
     generic_dir = agent_meta_root / RULES_DIR / "1-generic"
     if generic_dir.exists():
         for f in sorted(generic_dir.glob("*.md")):
-            if not f.name.startswith("_"):
-                seen[f.name] = f
+            if f.name.startswith("_"):
+                continue
+            gate = gates.get(f.stem)
+            if f.stem in gates and not _rule_gate_satisfied(
+                (gate or {}).get("requires", ""), config, agent_meta_root,
+            ):
+                continue
+            seen[f.name] = f
 
     # 2-platform (platform-prefixed, e.g. sharkord-security.md → security.md)
     # Skip _ prefix files — reserved for lazy-load knowledge files
@@ -279,7 +324,7 @@ def sync_embedded_rule_files(
     )
 
     platforms = config.get("platforms", [])
-    sources = collect_rule_sources(agent_meta_root, platforms)
+    sources = collect_rule_sources(agent_meta_root, platforms, config=config)
     if not sources:
         return
 
@@ -367,7 +412,7 @@ def sync_rules(
     )
 
     platforms = config.get("platforms", [])
-    sources = collect_rule_sources(agent_meta_root, platforms)
+    sources = collect_rule_sources(agent_meta_root, platforms, config=config)
 
     if not sources:
         return
@@ -377,12 +422,18 @@ def sync_rules(
     target_dir = project_root / (rules_dir or CLAUDE_RULES_DIR)
     managed_index_path = target_dir / ".agent-meta-managed"
 
-    previously_managed: set[str] = set()
-    if managed_index_path.exists():
-        for line in managed_index_path.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if line:
-                previously_managed.add(line)
+    # IC-01/IC-08 (R-06): route the index read through the shared helper so a
+    # corrupt/unreadable index is fail-closed (warn + treat as empty) instead of
+    # propagating and aborting the sync.
+    try:
+        previously_managed: set[str] = read_managed_index(managed_index_path)
+    except (OSError, UnicodeDecodeError) as exc:
+        log.warning(
+            f"rules: managed index '{managed_index_path}' is unreadable "
+            f"({type(exc).__name__}: {exc}) — treating as empty (fail-closed); "
+            f"non-tracked files are left untouched"
+        )
+        previously_managed = set()
 
     now_managed: set[str] = set()
 
@@ -451,19 +502,17 @@ def sync_rules(
         else:
             log.skip(rel_out, "unchanged")
 
-    # Remove stale managed rules no longer in current sources
+    # Remove stale managed rules no longer in current sources.
     # speech-mode.md is owned by sync_speech_mode (speech/ layer), not the rules/
     # hierarchy — never treat it as stale here or it gets deleted and recreated
-    # on every sync (infinite drift).
-    for stale_name in sorted(previously_managed - now_managed):
-        if stale_name == SPEECH_RULE_FILENAME:
-            continue
-        stale_path = safe_path(target_dir, stale_name)
-        if stale_path.exists():
-            log.action("DELETE", str(stale_path.relative_to(project_root)),
-                       "rule removed from agent-meta sources")
-            if not dry_run:
-                stale_path.unlink()
+    # on every sync (infinite drift); exclude it before calling the helper.
+    # IC-01/IC-08 (R-06): deletion routed through cleanup_stale_managed_files
+    # (fail-soft per file, byte-identical DELETE log line).
+    cleanup_stale_managed_files(
+        target_dir, project_root,
+        previously_managed - {SPEECH_RULE_FILENAME}, now_managed,
+        log, dry_run, "rule removed from agent-meta sources",
+    )
 
     # channel: skill stale-cleanup + shared managed-index merge in skills_dir.
     # Scoped to `all_rule_stems` (this caller's full possible name-space) so
@@ -478,8 +527,10 @@ def sync_rules(
             skills_target_dir, now_managed_skill_rules, dry_run, universe=all_rule_stems
         )
 
-    if not dry_run and now_managed:
-        managed_index_path.write_text("\n".join(sorted(now_managed)) + "\n", encoding="utf-8")
+    # OQ-4/IC-08: the managed index is written unconditionally after cleanup
+    # (including the empty set), so a removed preset/rule can no longer strand
+    # a stale index entry. write_managed_index() is a no-op only for dry_run.
+    write_managed_index(managed_index_path, now_managed, dry_run)
 
 
 def sync_speech_mode(

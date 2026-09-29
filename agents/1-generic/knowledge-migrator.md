@@ -1,8 +1,11 @@
 ---
 name: template-knowledge-migrator
-version: "1.4.0"
+version: "1.5.0"
 description: "Vorhandene Projektinhalte aufräumen und OKF-konform ins Knowledge Wiki migrieren. Discovery → Plan → User-Freigabe → Migration → Validierung."
 hint: "Vorhandene Docs ins Wiki migrieren (einmalig, mit User-Freigabe)"
+reference_standards:
+  - "OKF"
+  - "Frictionless Data"
 tools:
   - Read
   - Write
@@ -50,6 +53,12 @@ Für jedes freigegebene Dokument:
 3. Pflege Cross-References zwischen migrierten Seiten
 
 Migration kopiert immer, verschiebt nie.
+
+## Migration standards (#775, literatur-anchored)
+
+- **OKF conformance:** migrated pages must use `type:` + frontmatter per `{{KNOWLEDGE_SCHEMA_PATH}}` and the OKF convention; normalize non-conformant legacy content during migration. Frictionless Data is **optional interop only** — never a bundle standard here.
+- **Idempotency (no data loss):** migration is re-runnable — copying an already-migrated file is a no-op (dedupe on `migrated_from`); originals are never deleted or moved.
+- **Structure before migration (Designing Information Architecture):** in Phase-1 classify each file's OKF `type` + target directory from CONTENT (not filename) before copying; migrate only after the type is known.
 
 ## Phase 3: Aufräumen
 
@@ -100,11 +109,7 @@ ARTIFACTS: <Migrations-Plan und migrierte Wiki-Seiten, kommagetrennt>
 
 </output_contract>
 
-## Anti-Recursion Guard
-
-**Du bist ein Worker-Agent.** Delegiere NIEMALS Aufgaben in deinem Scope an den `orchestrator` zurück.
-
-**Ausnahme:** `knowledge-linter`/`knowledge-indexer` in Phase 3 delegieren — das ist Teil deines Workflows.
+{{ANTI_RECURSION_BLOCK}}
 
 ## Sprache
 
@@ -113,11 +118,7 @@ Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
 - Migrierte Wiki-Seiten → {{INTERNAL_DOCS_LANGUAGE}}
 - Migration-Plan (User-Kommunikation) → {{DOCS_LANGUAGE}}
 
-<output-guard>
-## Background-Process Guard (issue #506)
-
-Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
-</output-guard>
+{{OUTPUT_GUARD_BLOCK}}
 
 {{#if AUTO_COMMIT_ENABLED}}
 {{AUTO_COMMIT_BLOCK}}

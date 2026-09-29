@@ -1,6 +1,15 @@
-"""Roles config loading and model/memory/permissionMode resolution."""
+"""Roles config loading, activation resolution and model/memory/permissionMode.
+
+Canonical role-activation resolver (SPEC ``dynamic-routing-template-slimming``,
+AC A2): ``resolve_activation_gates`` reads the single default table from
+``config/role-defaults.yaml::activation_groups``; ``is_role_enabled`` maps a
+role to its activation group(s) via ``role_patterns``; ``resolve_active_roles``
+produces Layer 1 (gates + project whitelist) and Layer 2 (∩ generatable
+templates) deterministically. Provider-agnostic by construction.
+"""
 from __future__ import annotations
 
+import fnmatch
 from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
@@ -46,8 +55,12 @@ def load_roles_config(agent_meta_root: Path) -> dict:
 
     Cached per ``agent_meta_root`` (process lifetime): the file is read-only
     framework config within a sync run and every caller only reads the
-    returned dict (see #553 — this loader was re-parsed dozens of times per
-    render, dominating wall time in multi-provider integration tests).
+    returned dict (this loader was re-parsed dozens of times per render,
+    dominating wall time in multi-provider integration tests).
+
+    Returns a dict with two keys: ``roles`` (unchanged, back-compatible) and
+    ``activation_groups`` (the SPEC Block A single default table, empty when
+    absent). Existing readers of ``["roles"]`` are unaffected.
     """
     data, _ = _load_yaml_or_json(
         agent_meta_root / ROLES_CONFIG,
@@ -55,8 +68,11 @@ def load_roles_config(agent_meta_root: Path) -> dict:
         agent_meta_root / _ROLES_CONFIG_JSON,
     )
     if not data:
-        return {"roles": {}}
-    return {"roles": {k: v for k, v in data.get("roles", {}).items() if not k.startswith("_")}}
+        return {"roles": {}, "activation_groups": {}}
+    return {
+        "roles": {k: v for k, v in data.get("roles", {}).items() if not k.startswith("_")},
+        "activation_groups": data.get("activation_groups", {}) or {},
+    }
 
 
 def build_role_map(agent_meta_root: Path) -> dict[str, str]:
@@ -67,6 +83,209 @@ def build_role_map(agent_meta_root: Path) -> dict[str, str]:
     """
     roles_cfg = load_roles_config(agent_meta_root)
     return {role: role for role in roles_cfg["roles"]}
+
+
+# ---------------------------------------------------------------------------
+# Canonical activation resolver (SPEC dynamic-routing-template-slimming, A2)
+# ---------------------------------------------------------------------------
+
+def resolve_dotted(config: dict, path: str) -> object:
+    """Resolve a dotted ``a.b.c`` path inside ``config``.
+
+    Returns ``None`` when any segment is missing or an intermediate value is
+    not a mapping — callers treat that as "not configured" and fall back to
+    the group ``default``.
+    """
+    node: object = config
+    for part in path.split("."):
+        if not isinstance(node, dict) or part not in node:
+            return None
+        node = node[part]
+    return node
+
+
+def _evaluate_config_predicate(predicate: dict, config: dict, default: bool) -> bool:
+    """Evaluate a group ``config_predicate`` against the project config.
+
+    ``kind: config_flag``      → ``bool(resolve_dotted(config, path))``;
+                                 missing path → ``default``.
+    ``kind: roles_membership`` → ``any``/``all`` over
+                                 ``config.get("roles", [])``.
+    Unknown/missing kind       → ``default``.
+    """
+    kind = predicate.get("kind")
+    if kind == "config_flag":
+        value = resolve_dotted(config, str(predicate.get("path", "")))
+        return default if value is None else bool(value)
+    if kind == "roles_membership":
+        members = set(config.get("roles") or [])
+        roles = list(predicate.get("roles") or [])
+        if predicate.get("mode", "any") == "all":
+            return bool(roles) and all(role in members for role in roles)
+        return any(role in members for role in roles)
+    return default
+
+
+def resolve_activation_gates(agent_meta_root: Path, config: dict) -> dict:
+    """Resolve every activation group to its effective enable state.
+
+    Single default table: ``role-defaults.yaml::activation_groups.<group>.default``.
+    The project ``config`` beats the default (explicitly set value wins).
+    Deterministic (groups sorted by name), provider-agnostic — no provider
+    branch anywhere.
+
+    Returns ``{group_name: {"enabled": bool, "role_patterns": [str, ...]}}``.
+    ``role_patterns`` is carried alongside ``enabled`` so the root-less
+    ``is_role_enabled(role, config, gates)`` can map a role to its group
+    without reloading the config file.
+    """
+    groups_cfg = load_roles_config(agent_meta_root).get("activation_groups", {}) or {}
+    gates: dict[str, dict] = {}
+    for name in sorted(groups_cfg):
+        spec = groups_cfg[name] or {}
+        predicate = spec.get("config_predicate") or {}
+        gates[name] = {
+            "enabled": _evaluate_config_predicate(
+                predicate, config, bool(spec.get("default", False))
+            ),
+            "role_patterns": [str(p) for p in (spec.get("role_patterns") or [])],
+        }
+    return gates
+
+
+def _role_matches_patterns(role: str, patterns: list[str]) -> bool:
+    """Exact-name or glob match (``se-*``) — case-sensitive, OS-independent."""
+    return any(fnmatch.fnmatchcase(role, pattern) for pattern in patterns)
+
+
+def is_role_enabled(role: str, config: dict, gates: dict) -> bool:
+    """Return whether ``role`` passes its activation group gate(s).
+
+    ``True`` when ``role`` belongs to no group (via ``role_patterns``) or when
+    at least one of its groups is enabled; ``False`` when the role belongs to
+    group(s) and all of them are disabled. ``config`` is accepted for
+    signature stability — the effective state already lives in ``gates``
+    (``config_predicate`` beats ``default``).
+    """
+    memberships = [
+        group
+        for group in gates.values()
+        if _role_matches_patterns(role, group.get("role_patterns") or [])
+    ]
+    if not memberships:
+        return True
+    return any(group.get("enabled", False) for group in memberships)
+
+
+@lru_cache(maxsize=None)
+def _cached_template_roles(agent_meta_root: str, platforms: tuple[str, ...]) -> frozenset[str]:
+    """Cached generatable role set for a (root, platforms) pair."""
+    from .frontmatter import collect_sources, target_filename
+
+    root = Path(agent_meta_root)
+    overrides, _ = collect_sources(root, list(platforms))
+    role_map = build_role_map(root)
+    return frozenset(role for role in overrides if target_filename(role, role_map))
+
+
+def resolve_template_roles(agent_meta_root: Path, config: dict) -> set[str]:
+    """Return the generatable role set ("Layer 2 universe").
+
+    ``collect_sources(agent_meta_root, platforms)`` minus ``WRAPPER_TEMPLATES``
+    (already excluded by ``collect_sources``) minus roles without a ROLE_MAP
+    entry — matching the ``target_filename(role, role_map)`` filter of
+    ``agents.build_agent_hints``/``build_agent_table``, so routing targets and
+    hints/table stay congruent (RVW-27). ``frontmatter`` is imported lazily to
+    keep the import graph acyclic; cached per ``(agent_meta_root, platforms)``.
+    """
+    platforms = tuple(str(p) for p in (config.get("platforms") or []))
+    return set(_cached_template_roles(str(agent_meta_root), platforms))
+
+
+def _emit_warnings(warnings: set[str], warn_sink: list[str] | None) -> None:
+    """Emit deterministic (sorted, deduplicated) warnings.
+
+    With a ``warn_sink`` the list is extended in place (deduplicated against
+    already-present entries). Without one, the existing ``SyncLog`` fallback
+    writes to stderr — no warning is ever swallowed.
+    """
+    if not warnings:
+        return
+    ordered = sorted(warnings)
+    if warn_sink is not None:
+        existing = set(warn_sink)
+        warn_sink.extend(w for w in ordered if w not in existing)
+        return
+    from .log import SyncLog
+
+    log = SyncLog()
+    for message in ordered:
+        log.warn(message)
+
+
+def resolve_active_roles(
+    agent_meta_root: Path,
+    config: dict,
+    *,
+    require_template: bool = False,
+    template_roles: set[str] | None = None,
+    warn_sink: list[str] | None = None,
+) -> list[str]:
+    """Return the sorted active role set.
+
+    Layer 1: activation gates (``resolve_activation_gates``) + optional project
+    ``config["roles"]`` whitelist (AND filter). ``variables`` is deliberately
+    *not* a gate source — ``config`` is the only one (RVW-14).
+
+    ``require_template=True`` intersects with the generatable role set
+    (Layer 2). ``template_roles=None`` is resolved lazily via
+    ``resolve_template_roles`` (no ``ValueError`` in the default path, RVW-18);
+    ``agent_meta_root`` is a mandatory parameter and there is no ValueError
+    branch (RVW-28).
+
+    ``warn_sink``: optional list sink receiving deterministically sorted,
+    deduplicated warning strings:
+    - ``"active role without template: <role>"``
+    - ``"template without role-defaults entry: <role>"``
+      (``WRAPPER_TEMPLATES`` excepted)
+
+    Without a sink, the same messages go through ``SyncLog`` (stderr).
+    """
+    roles_cfg = load_roles_config(agent_meta_root)
+    all_roles = roles_cfg.get("roles", {}) or {}
+    gates = resolve_activation_gates(agent_meta_root, config)
+
+    whitelist = config.get("roles")
+    whitelist_set = set(whitelist) if whitelist is not None else None
+
+    layer1 = [
+        role
+        for role in sorted(all_roles)
+        if is_role_enabled(role, config, gates)
+        and (whitelist_set is None or role in whitelist_set)
+    ]
+
+    if not require_template:
+        return layer1
+
+    if template_roles is None:
+        universe = resolve_template_roles(agent_meta_root, config)
+    else:
+        universe = set(template_roles)
+
+    from .frontmatter import WRAPPER_TEMPLATES
+
+    warnings: set[str] = set()
+    for role in layer1:
+        if role not in universe:
+            warnings.add(f"active role without template: {role}")
+    for role in universe:
+        if role not in all_roles and role not in WRAPPER_TEMPLATES:
+            warnings.add(f"template without role-defaults entry: {role}")
+
+    _emit_warnings(warnings, warn_sink)
+
+    return [role for role in layer1 if role in universe]
 
 
 def _resolve_tier_to_model(tier_or_alias: str, provider: str, provider_config: dict) -> str:

@@ -46,6 +46,22 @@ def loaded_config():
 _AGENTS_MD_SHARERS = ("Opencode", "Gemini", "Codex", "ZCode", "KimiCode")
 
 
+def _gate_variables(config: dict, provider: str, provider_config: dict) -> dict:
+    """Mirror sync_pipeline's per-provider ``GATE_*`` injection (IC-04).
+
+    Without this, the shared-block render is exercised without any tier bundle
+    and the #794 weakest-tier defect stays invisible.
+    """
+    from lib.providers import load_provider_capabilities, runtime_gate_vars
+
+    variables = dict(config.get("variables", {}))
+    caps = load_provider_capabilities(REPO_ROOT).get(provider, {})
+    variables.update(
+        runtime_gate_vars(provider_config.get(provider, {}), caps, config)
+    )
+    return variables
+
+
 def test_shared_managed_block_identical_regardless_of_provider(loaded_config):
     """All providers sharing AGENTS.md must render byte-identical content."""
     from lib.context import _build_managed_block
@@ -70,6 +86,38 @@ def test_shared_managed_block_identical_regardless_of_provider(loaded_config):
     )
 
 
+def test_shared_managed_block_identical_with_gate_vars(loaded_config):
+    """AC-03: with the real per-sharer ``GATE_*`` vars the renders stay identical.
+
+    The test above renders without any ``GATE_*`` bundle and therefore never
+    caught the #794 double-write. This variant injects the real per-provider
+    bundle (Opencode=``permission``, Gemini=``hook``) and asserts one shared
+    render at the weakest tier (``permission``), so the second writer is a no-op.
+    """
+    from lib.context import _build_managed_block
+    from lib.log import SyncLog
+
+    config, provider_config = loaded_config
+    rendered = {
+        provider: _build_managed_block(
+            REPO_ROOT, config, _gate_variables(config, provider, provider_config),
+            SyncLog(), provider=provider, provider_config=provider_config,
+            project_root=REPO_ROOT,
+        )
+        for provider in _AGENTS_MD_SHARERS
+    }
+    baseline = rendered[_AGENTS_MD_SHARERS[0]]
+    diverged = [p for p, block in rendered.items() if block != baseline]
+    assert not diverged, (
+        f"AGENTS.md sharers {diverged} render a different managed block with real "
+        f"GATE_* vars -- the shared render must use the weakest active sharer tier "
+        f"(issue #794)"
+    )
+    assert "runtime-partially enforced" in baseline
+    assert "NICHT erzwungen" in baseline
+    assert "Keine Ausnahmen" not in baseline
+
+
 def test_repeated_sync_never_reports_pending_agents_md_change(tmp_path, loaded_config):
     """Simulates sync.py --check: sync once, then re-render each shared
     provider independently and confirm neither ever diffs from what is on disk.
@@ -80,14 +128,17 @@ def test_repeated_sync_never_reports_pending_agents_md_change(tmp_path, loaded_c
     from lib.log import SyncLog
 
     config, provider_config = loaded_config
-    variables = config.get("variables", {})
     project_root = tmp_path
     shutil.copy(REPO_ROOT / "AGENTS.md", project_root / "AGENTS.md")
 
     def sync_once(provider: str, dry_run: bool) -> SyncLog:
         log = SyncLog()
+        # Inject the real per-provider GATE_* bundle exactly as sync_pipeline
+        # does (IC-04); with the pre-#794 behaviour the two sharers would render
+        # different tiers and never converge.
         sync_context_for_provider(
-            REPO_ROOT, project_root, config, variables, log,
+            REPO_ROOT, project_root, config,
+            _gate_variables(config, provider, provider_config), log,
             dry_run=dry_run, provider=provider, provider_config=provider_config,
         )
         return log

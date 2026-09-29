@@ -154,7 +154,7 @@ def sweep_orphan_skill_channel_rules(
     cleans only within its own current universe (merge-mode, see
     ``skills._write_skills_managed_index``). A stem that disappears from ALL
     sources — e.g. a rule file deleted from ``rules/`` (issue #437:
-    python-conventions), a server removed from ``mcp-registry.yaml`` — is in
+    python-conventions), a server removed from ``config/plugin-catalog.yaml`` — is in
     nobody's universe, so the per-writer cleanups above never touch it and
     its SKILL.md stays in the always-scanned skills_dir forever: a dead,
     stale entry in every agent context. The sweep closes that gap: anything

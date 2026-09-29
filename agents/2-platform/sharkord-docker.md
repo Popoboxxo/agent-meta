@@ -129,6 +129,12 @@ volumes:
   {{EXTRA_VOLUME_DEFINITIONS}}
 ```
 
+> **Hinweis zur Einrückung:** Diese Datei hat kein `extends:`, der Body wird daher *nicht*
+> YAML-gededented. Die Platzhalter `{{%EXTRA_VOLUMES%}}`, `{{%EXTRA_ENV_VARS%}}` und
+> `{{%EXTRA_VOLUME_DEFINITIONS%}}` stehen eingerückt im Code-Fence — mehrzeilige Werte
+> übernehmen deshalb die Einrückung der Verwendungsstelle (korrekte YAML-Listeneinrückung);
+> Leerzeilen bleiben leer.
+
 ---
 
 ## Probleme & Lösungen

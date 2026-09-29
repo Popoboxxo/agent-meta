@@ -1,0 +1,28 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+dod-preset: rapid-prototyping
+platforms: []
+roles:
+- orchestrator
+- developer
+- git
+project:
+  name: scenario-stale-role-cleanup
+  prefix: s62
+  short: stale-role-cleanup
+variables:
+  PROJECT_NAME: scenario-stale-role-cleanup
+  PROJECT_DESCRIPTION: Cleanup preview classifies stale vs foreign agent files; apply removes stale backup-first.
+  PROJECT_GOAL: Verify --cleanup-preview and the apply cleanup are offline, deterministic and mutation-free.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-stale-role-cleanup
+  GIT_MAIN_BRANCH: main
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false

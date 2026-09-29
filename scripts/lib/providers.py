@@ -1,9 +1,15 @@
 """Provider configuration loading and resolution."""
 from __future__ import annotations
 
+import logging
 from pathlib import Path
+from typing import Optional
 
+from .frontmatter import REFERENCE_STANDARDS_FIELD
 from .io import _load_yaml_or_json, load_yaml_file
+from .runtime_gate import weakest_runtime_gate_tier
+
+_logger = logging.getLogger(__name__)
 
 PROVIDERS_CONFIG_YAML = "config/ai-providers.yaml"
 _PROVIDERS_CONFIG_LEGACY = "providers.config.yaml"
@@ -282,10 +288,53 @@ def resolve_context_filename(context_file: str, provider: str, pc: dict | None =
     """
     if pc is None:
         pc = _framework_provider_entry(provider)
+    adapter_file = pc.get("context_adapter_file")
+    if (
+        pc.get("context_adapter") is True
+        and isinstance(adapter_file, str)
+        and adapter_file.strip()
+    ):
+        return adapter_file
     has_dedicated = pc.get("has_dedicated_context_file", False)
     if context_file == "CLAUDE.md" and not has_dedicated:
         return "AGENTS.md"
     return context_file
+
+
+def context_topology(config: Optional[dict], provider: Optional[str] = None) -> str:
+    """Resolve ``context_file.topology`` (topology, not density).
+
+    Precedence (SPEC-CONTEXT-FILE-MODES-2026-09-13, IC-05):
+
+    1. ``context_file.provider-overrides.<provider>.topology``
+    2. ``context_file.topology``
+    3. ``"unified"``
+
+    Fail-safe: a non-mapping config/block, a non-string value or a value
+    outside the enum falls through to the next level and finally to
+    ``"unified"``. Never raises. Pass ``provider=None`` for the project-level
+    value (no provider override is consulted). Fully config-driven — no
+    provider-name literal.
+    """
+    valid = ("unified", "per-provider")
+    cfg = config if isinstance(config, dict) else {}
+    block = cfg.get("context_file")
+    if not isinstance(block, dict):
+        return "unified"
+
+    if isinstance(provider, str):
+        overrides = block.get("provider-overrides")
+        if isinstance(overrides, dict):
+            entry = overrides.get(provider)
+            if isinstance(entry, dict):
+                override = entry.get("topology")
+                if override in valid:
+                    return override
+
+    value = block.get("topology")
+    if value in valid:
+        return value
+    return "unified"
 
 
 # Hook event/payload contracts sync.py knows how to mirror hook scripts for.
@@ -303,6 +352,12 @@ def resolve_context_filename(context_file: str, provider: str, pc: dict | None =
 # a dedicated protocol value, not a claude-code-json alias. hooks/1-generic/
 # antigravity-json-adapter.sh translates between the two contracts at runtime.
 SUPPORTED_HOOK_PROTOCOLS = {"claude-code-json", "antigravity-hooks-json"}
+
+# Plugin analogue of SUPPORTED_HOOK_PROTOCOLS: only a `plugin_protocol` listed
+# here counts as a verified native plugin runtime. Phase 0 ships the machine
+# flag surface; no provider declares `has_plugins`/`plugin_protocol` yet, so
+# the plugin tier stays unreachable until the P6 verification (Phase 1).
+SUPPORTED_PLUGIN_PROTOCOLS = {"opencode-plugin-js"}
 
 
 def provider_hooks_supported(pc: dict) -> bool:
@@ -333,6 +388,138 @@ def all_providers_support_hooks(active: list, provider_config: dict) -> bool:
     )
 
 
+def provider_runtime_gate_supported(pc: Optional[dict]) -> bool:
+    """Whether a provider has a verified native plugin runtime for the gate.
+
+    Mirrors `provider_hooks_supported`: `has_plugins: true` alone only records
+    that a plugin dir/protocol could be emitted — it does NOT mean the plugin
+    runtime is verified. Only a `plugin_protocol` in
+    `SUPPORTED_PLUGIN_PROTOCOLS` counts. A non-mapping `pc` is an explicit
+    ``False`` (fail-safe), never a silent fallback.
+    """
+    if not isinstance(pc, dict):
+        return False
+    return bool(pc.get("has_plugins", False)) and pc.get("plugin_protocol") in SUPPORTED_PLUGIN_PROTOCOLS
+
+
+def provider_runtime_gate_tier(pc: Optional[dict], capabilities: Optional[dict] = None) -> str:
+    """Resolve the provider's runtime-gate tier (IC-03), fail-safe.
+
+    Precedence, first match wins:
+
+    1. ``provider_hooks_supported(pc)``                          -> ``hook``
+    2. ``provider_runtime_gate_supported(pc)``                   -> ``plugin``
+    3. ``(capabilities or {}).get("runtime_gate") == "permission"`` -> ``permission``
+    4. otherwise                                                 -> ``advisory``
+
+    The two registries are split (D-C1): the machine flags come from the
+    `ai-providers.yaml` entry (`pc`), the declared tier from the
+    `provider-capabilities.yaml` entry (`capabilities`). Only `permission` is
+    read at runtime beyond the flags; `hook`/`plugin` are derived from the
+    machine flags, so an unverified declaration can never yield a stronger
+    tier than the flags support.
+
+    This function never raises, never calls `sys.exit`, and never falls back
+    to a hook/Claude truth. `pc`/`capabilities` that are not mappings are
+    treated as ``{}``.
+    """
+    if not isinstance(pc, dict):
+        pc = {}
+    if provider_hooks_supported(pc):
+        return "hook"
+    if provider_runtime_gate_supported(pc):
+        return "plugin"
+    if isinstance(capabilities, dict) and capabilities.get("runtime_gate") == "permission":
+        return "permission"
+    return "advisory"
+
+
+def _runtime_gate_bundle(tier: str, config: Optional[dict]) -> dict:
+    """Build the ``GATE_*`` bundle for an already-resolved ``tier``.
+
+    Byte-identical to the historic ``runtime_gate_vars`` body
+    (SPEC-CONTEXT-FILE-MODES-2026-09-13, IC-02). Internal helper; the public
+    contract lives in ``runtime_gate_vars`` / ``shared_runtime_gate_vars``.
+
+    Every value is a string so the bundle merges into any ``provider_variables``
+    dict unchanged:
+
+    - ``ENFORCEMENT_TIER``     — resolved tier name
+    - ``GATE_ENFORCED``        — ``"true"`` iff tier in ``(hook, plugin)``
+    - ``GATE_PARTIAL``         — ``"true"`` iff tier ``permission``
+    - ``GATE_ADVISORY``        — ``"true"`` iff tier ``advisory``
+    - ``RUNTIME_GATE_PLUGIN_MODE`` — ``config["runtime-gate"]["plugin-mode"]``
+      validated against ``{observe, enforce}``, fail-safe ``"observe"``
+
+    Never raises: a non-mapping ``config`` is treated as ``{}``.
+    """
+    if not isinstance(config, dict):
+        config = {}
+    runtime_gate = config.get("runtime-gate", {})
+    if not isinstance(runtime_gate, dict):
+        runtime_gate = {}
+    plugin_mode = runtime_gate.get("plugin-mode", "observe")
+    if plugin_mode not in ("observe", "enforce"):
+        plugin_mode = "observe"
+    return {
+        "ENFORCEMENT_TIER": tier,
+        "GATE_ENFORCED": "true" if tier in ("hook", "plugin") else "false",
+        "GATE_PARTIAL": "true" if tier == "permission" else "false",
+        "GATE_ADVISORY": "true" if tier == "advisory" else "false",
+        "RUNTIME_GATE_PLUGIN_MODE": plugin_mode,
+    }
+
+
+def runtime_gate_vars(
+    pc: Optional[dict], capabilities: Optional[dict], config: Optional[dict]
+) -> dict:
+    """Return the per-provider rendering bundle for the resolved gate tier.
+
+    Single source of truth for the ``GATE_*`` variables consumed by the
+    rules/context renderers (IC-04). Delegates to ``_runtime_gate_bundle`` with
+    the fail-safe `provider_runtime_gate_tier`; the public contract is unchanged
+    (the five string keys documented on ``_runtime_gate_bundle``).
+    """
+    return _runtime_gate_bundle(provider_runtime_gate_tier(pc, capabilities), config)
+
+
+def shared_runtime_gate_vars(
+    shared_users: list,
+    provider_config: dict,
+    capabilities_config: Optional[dict],
+    config: Optional[dict],
+) -> dict:
+    """Return the ``GATE_*`` bundle of a shared context file.
+
+    The effective tier of a physical file shared by several providers is the
+    **weakest** tier over its active sharers (``advisory < permission < plugin <
+    hook``), so every sharer renders a byte-identical gate block
+    (SPEC-CONTEXT-FILE-MODES-2026-09-13, IC-02).
+
+    ``shared_users`` are the **active** sharers of the file; the caller filters
+    with ``resolve_providers`` — this function does not filter. Fail-safe and
+    never raises: a provider absent from ``provider_config`` is looked up as
+    ``{}``, a non-mapping entry, ``capabilities_config`` or ``config`` degrades
+    to ``{}`` (which resolves to ``advisory``). A non-iterable ``shared_users``
+    is treated as no sharers (``advisory``) instead of raising ``TypeError``
+    from the eager outer iterable of the tier generator (CR-04).
+    """
+    pcs = provider_config if isinstance(provider_config, dict) else {}
+    caps = capabilities_config if isinstance(capabilities_config, dict) else {}
+    try:
+        users = list(shared_users) if shared_users else []
+    except TypeError:
+        users = []
+    tiers = (
+        provider_runtime_gate_tier(
+            pcs.get(user, {}),
+            caps.get(user),
+        )
+        for user in users
+    )
+    return _runtime_gate_bundle(weakest_runtime_gate_tier(tiers), config)
+
+
 def resolve_provider_options(config: dict, provider: str) -> dict:
     """Return provider-specific options from config["provider-options"][provider].
 
@@ -347,3 +534,87 @@ def resolve_provider_options(config: dict, provider: str) -> dict:
         }
     """
     return config.get("provider-options", {}).get(provider, {})
+
+
+# Provider-agnostic frontmatter strip policy (SPEC-REFERENCE-STANDARDS-2026-09-15,
+# IC-03). Module constant (not an ai-providers top-level key) because
+# load_providers_config() returns `data.get("providers", data)` and would drop it.
+FRONTMATTER_STRIP_DEFAULTS: tuple[str, ...] = (REFERENCE_STANDARDS_FIELD,)
+
+# Malformed strip/keep channel values already warned about, keyed by
+# (provider, key) so a broken config warns at most once per process.
+_WARNED_MALFORMED_STRIP_KEYS: set[tuple[str, str]] = set()
+
+
+def _as_str_list(value: object, provider: str, key: str) -> list[str]:
+    """Coerce one strip/keep channel value to a list of strings (fail-safe).
+
+    ``None`` and any non-list value contribute nothing. A non-list value also
+    logs at most one WARNING per ``(provider, key)``; non-string items inside a
+    list are dropped silently (they cannot be frontmatter field names). This
+    helper never raises.
+    """
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, str)]
+    marker = (provider, key)
+    if marker not in _WARNED_MALFORMED_STRIP_KEYS:
+        _WARNED_MALFORMED_STRIP_KEYS.add(marker)
+        _logger.warning(
+            "provider '%s': '%s' must be a list of strings (got %s) — ignoring "
+            "this channel; the default frontmatter strip stays active",
+            provider,
+            key,
+            type(value).__name__,
+        )
+    return []
+
+
+def resolve_frontmatter_strip_fields(
+    provider: str,
+    config: dict,
+    provider_config: dict,
+) -> list[str]:
+    """Effective frontmatter strip set for ``provider`` (provider-agnostic).
+
+    ``strip = FRONTMATTER_STRIP_DEFAULTS ∪ project ∪ ai-providers`` and
+    ``keep = project ∪ ai-providers``; the result is the stable-ordered
+    ``strip \\ keep`` (keep wins). The two config channels are combined as a
+    union (spec F-02). Every source is optional and malformed values are
+    fail-safe (see ``_as_str_list``) — this function never raises. No provider
+    name literal is involved: the policy comes only from these config keys.
+    """
+    if not isinstance(config, dict):
+        config = {}
+    if not isinstance(provider_config, dict):
+        provider_config = {}
+
+    project_options = config.get("provider-options")
+    if not isinstance(project_options, dict):
+        project_options = {}
+    project_options = project_options.get(provider)
+    if not isinstance(project_options, dict):
+        project_options = {}
+
+    provider_entry = provider_config.get(provider)
+    if not isinstance(provider_entry, dict):
+        provider_entry = {}
+
+    strip_fields: list[str] = list(FRONTMATTER_STRIP_DEFAULTS)
+    for value, key in (
+        (project_options.get("frontmatter-strip-fields"), "frontmatter-strip-fields"),
+        (provider_entry.get("frontmatter_strip_fields"), "frontmatter_strip_fields"),
+    ):
+        for field in _as_str_list(value, provider, key):
+            if field not in strip_fields:
+                strip_fields.append(field)
+
+    keep_fields: set[str] = set()
+    for value, key in (
+        (project_options.get("frontmatter-keep-fields"), "frontmatter-keep-fields"),
+        (provider_entry.get("frontmatter_keep_fields"), "frontmatter_keep_fields"),
+    ):
+        keep_fields.update(_as_str_list(value, provider, key))
+
+    return [field for field in strip_fields if field not in keep_fields]

@@ -22,9 +22,16 @@ import re
 import time
 import uuid
 from pathlib import Path
+from typing import List, Optional
 
 from .io import _load_yaml_or_json, write_atomic
 from .json_persistence import load_json_document, save_json_document
+from .plan_identity import make_task_ref
+from .progress_paths import (
+    DEFAULT_CHECKPOINT_DIR,
+    DEFAULT_PROGRESS_DIR,
+    resolve_progress_paths,
+)
 from .providers import (
     all_providers_support_hooks,
     load_providers_config,
@@ -32,11 +39,14 @@ from .providers import (
     resolve_providers,
 )
 
-CHECKPOINT_DIR = ".meta-viz/checkpoints"
+# Deprecated compatibility aliases. The historical defaults now live in
+# ``scripts/lib/progress_paths.py`` and are no longer the source of truth for
+# path building: an explicit (or resolved) directory is injected instead.
+CHECKPOINT_DIR = DEFAULT_CHECKPOINT_DIR
 
 _RAW_OUTPUT_SUFFIX = ".txt"
 
-_PROGRESS_DIR = ".meta-viz/progress"
+_PROGRESS_DIR = DEFAULT_PROGRESS_DIR
 
 _PROGRESS_MAX_BYTES = 200_000  # ~4x the 50 KB JSON-checkpoint budget (checkpointing.md) --
                                 # rendered markdown entries run more verbose per checkpoint.
@@ -87,6 +97,34 @@ def _sanitize_component(value: str, max_len: int = 64) -> str:
     cleaned = re.sub(r"[^A-Za-z0-9._-]", "_", value)
     cleaned = cleaned.strip("._-")[:max_len].strip("._-")
     return cleaned or "unnamed"
+
+
+def validate_session_id(session_id: str) -> None:
+    """Fail-closed validation of a session id used as a path component.
+
+    ``<checkpoint-dir>/<session-id>.json`` must never escape the checkpoint
+    directory (path traversal, IC-11). Empty ids, path separators, ``..``
+    components and absolute paths are rejected with ``ValueError``; the caller
+    decides how to surface the violation (the CLI handler turns it into exit
+    ``1`` before any write, ``CheckpointStore._session_file`` re-checks it as
+    defense-in-depth).
+    """
+    if not session_id:
+        raise ValueError("checkpoint session id must not be empty")
+    if session_id in (".", "..") or ".." in session_id:
+        raise ValueError(
+            f"unsafe checkpoint session id {session_id!r}: '..' is not allowed"
+        )
+    if "/" in session_id or "\\" in session_id:
+        raise ValueError(
+            f"unsafe checkpoint session id {session_id!r}: "
+            "path separators are not allowed"
+        )
+    if Path(session_id).is_absolute():
+        raise ValueError(
+            f"unsafe checkpoint session id {session_id!r}: "
+            "absolute paths are not allowed"
+        )
 
 
 def _md_cell(value) -> str:
@@ -214,6 +252,8 @@ class Checkpoint:
         pipeline: str | None = None,
         stage: str | None = None,
         timestamp: float | None = None,
+        plan_id: Optional[str] = None,
+        task_ref: Optional[str] = None,
     ):
         self.id = str(uuid.uuid4())
         self.task_id = task_id
@@ -226,6 +266,8 @@ class Checkpoint:
         self.pipeline = pipeline
         self.stage = stage
         self.timestamp = timestamp or time.time()
+        self.plan_id = plan_id
+        self.task_ref = task_ref
 
     def to_dict(self) -> dict:
         return {
@@ -240,6 +282,8 @@ class Checkpoint:
             "pipeline": self.pipeline,
             "stage": self.stage,
             "timestamp": self.timestamp,
+            "plan_id": self.plan_id,
+            "task_ref": self.task_ref,
         }
 
     @classmethod
@@ -255,15 +299,43 @@ class Checkpoint:
             pipeline=data.get("pipeline"),
             stage=data.get("stage"),
             timestamp=data.get("timestamp"),
+            plan_id=data.get("plan_id"),
+            task_ref=data.get("task_ref")
+            or make_task_ref(data.get("plan_id"), data["task_id"]),
         )
         cp.id = data.get("id", cp.id)
         return cp
 
 
+def _iter_valid_checkpoints(checkpoints) -> list:
+    """Return valid checkpoints from a raw list; corrupt entries are skipped.
+
+    Fail-soft (MINOR-A): non-list containers, non-dict entries and entries
+    missing hard-required fields are skipped, never raised.
+    """
+    if not isinstance(checkpoints, list):
+        return []
+    valid = []
+    for raw in checkpoints:
+        if not isinstance(raw, dict):
+            continue
+        try:
+            valid.append(Checkpoint.from_dict(raw))
+        except (KeyError, TypeError, ValueError):
+            continue
+    return valid
+
+
 class CheckpointStore:
     """Persistiert und lädt Checkpoints."""
 
-    def __init__(self, project_root: Path | str | None = None, agent_meta_root: Path | str | None = None):
+    def __init__(
+        self,
+        project_root: Path | str | None = None,
+        agent_meta_root: Path | str | None = None,
+        progress_dir: Path | str | None = None,
+        checkpoint_dir: Path | str | None = None,
+    ):
         self.project_root = Path(project_root) if project_root else Path.cwd()
         # When the harness omits agent_meta_root, detect it from the project
         # root (`.agent-meta/` submodule vs. self-hosting checkout) instead of
@@ -273,17 +345,73 @@ class CheckpointStore:
             Path(agent_meta_root) if agent_meta_root
             else resolve_agent_meta_root(self.project_root)
         )
-        self.checkpoint_dir = self.project_root / CHECKPOINT_DIR
+        self.progress_dir = (
+            Path(progress_dir) if progress_dir is not None
+            else self.project_root / DEFAULT_PROGRESS_DIR
+        )
+        self.checkpoint_dir = (
+            Path(checkpoint_dir) if checkpoint_dir is not None
+            else self.project_root / DEFAULT_CHECKPOINT_DIR
+        )
+
+    @classmethod
+    def from_config(
+        cls,
+        project_root: Path | str,
+        config: Optional[dict] = None,
+        agent_meta_root: Path | str | None = None,
+    ) -> "CheckpointStore":
+        """Build a store whose directories respect the ``progress`` config.
+
+        Supersedes direct ``CheckpointStore(project_root=...)`` construction at
+        the production call sites so writes and reads observe the same resolved
+        directories (no split-brain). Without a ``progress`` block the resolved
+        paths are byte-identical to the framework defaults.
+        """
+        resolved = resolve_progress_paths(Path(project_root), config)
+        return cls(
+            project_root=project_root,
+            agent_meta_root=agent_meta_root,
+            progress_dir=resolved.progress_dir,
+            checkpoint_dir=resolved.checkpoint_dir,
+        )
 
     def _ensure_dir(self) -> None:
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
     def _session_file(self, session_id: str) -> Path:
-        return self.checkpoint_dir / f"{session_id}.json"
+        """Resolve the session JSON path, confined to the checkpoint directory.
+
+        Defense-in-depth for IC-11: the session id is validated here as well
+        (not only in the CLI handler) and the resolved path must stay under
+        ``checkpoint_dir`` — a traversal id can never create or read a file
+        outside it.
+        """
+        validate_session_id(session_id)
+        path = (self.checkpoint_dir / f"{session_id}.json").resolve()
+        root = self.checkpoint_dir.resolve()
+        try:
+            path.relative_to(root)
+        except ValueError:
+            raise ValueError(f"checkpoint path {path} escapes {root}")
+        return path
 
     def _session_raw_dir(self, session_id: str) -> Path:
-        """Directory holding the archived raw worker outputs of a session."""
-        return self.checkpoint_dir / session_id
+        """Resolve the per-session raw-output directory, confined to
+        ``checkpoint_dir`` (defense-in-depth like ``_session_file``).
+
+        Also closes a Windows drive-relative id without a separator
+        (e.g. ``C:foo``) that the id validation alone cannot catch. The path is
+        returned unresolved so callers compose it exactly as before.
+        """
+        validate_session_id(session_id)
+        path = self.checkpoint_dir / session_id
+        root = self.checkpoint_dir.resolve()
+        try:
+            path.resolve().relative_to(root)
+        except ValueError:
+            raise ValueError(f"checkpoint raw dir {path} escapes {root}")
+        return path
 
     def save_raw_output(
         self,
@@ -376,7 +504,7 @@ class CheckpointStore:
         self._write_progress_file(session_data)
 
     def _write_progress_file(self, session_data: dict) -> None:
-        """Write .meta-viz/progress/current.md -- see _render_progress_markdown
+        """Write <progress_dir>/current.md -- see _render_progress_markdown
         and _render_progress_entry. Tier A: overwrite (unchanged pre-existing
         behavior). Tier B: append the newest checkpoint only, with a rotation
         reset on the first checkpoint of a new session, and a running byte
@@ -385,7 +513,17 @@ class CheckpointStore:
         Provider-neutral path (live-progress-channel design, 2026-09-10) --
         was hardcoded to the Claude-specific .claude/progress/ before.
         """
-        progress_path = self.project_root / _PROGRESS_DIR / "current.md"
+        progress_path = self.progress_dir / "current.md"
+        # Defense-in-depth (IC-03): never write outside the resolved progress
+        # directory, e.g. when ``current.md`` is a symlink pointing elsewhere.
+        try:
+            progress_path.resolve().relative_to(self.progress_dir.resolve())
+        except ValueError:
+            _logger.warning(
+                "refusing to write progress file outside %s: %s",
+                self.progress_dir, progress_path,
+            )
+            return
         progress_path.parent.mkdir(parents=True, exist_ok=True)
         tier = _progress_tier(self.project_root, self.agent_meta_root)
         if tier == "A":
@@ -408,22 +546,43 @@ class CheckpointStore:
         return load_json_document(self._session_file(session_id), default=None)
 
     def get_last_checkpoint(self, session_id: str) -> Checkpoint | None:
-        """Get the most recent checkpoint for a session."""
+        """Get the most recent checkpoint for a session.
+
+        Fail-soft (MINOR-A): corrupt/missing sessions or entries are skipped,
+        so the most recent *valid* checkpoint is returned.
+        """
         session = self.load_session(session_id)
-        if not session or not session.get("checkpoints"):
-            return None
-        return Checkpoint.from_dict(session["checkpoints"][-1])
+        valid = _iter_valid_checkpoints(session.get("checkpoints") if session else None)
+        return valid[-1] if valid else None
 
     def get_completed_steps(self, session_id: str) -> list[Checkpoint]:
-        """Get all completed checkpoints."""
+        """Get all completed checkpoints.
+
+        Fail-soft (MINOR-A): corrupt/missing sessions or entries are skipped.
+        The drift check (``consistency/ledger_drift.py``) calls this on
+        possibly tampered sessions and must never crash ``--validate-spec-plan``.
+        """
         session = self.load_session(session_id)
-        if not session:
-            return []
-        return [
-            Checkpoint.from_dict(cp)
-            for cp in session.get("checkpoints", [])
-            if cp.get("status") == "completed"
-        ]
+        valid = _iter_valid_checkpoints(session.get("checkpoints") if session else None)
+        return [cp for cp in valid if cp.status == "completed"]
+
+    def get_checkpoint_for_task(self, session_id: str, task_ref: str) -> Optional[Checkpoint]:
+        """Return the most recent checkpoint belonging to ``task_ref``.
+
+        Matches on the stored ``task_ref``; entries written before the
+        schema extension (no ``task_ref``) are matched by reconstructing the
+        ref from their ``plan_id`` + ``task_id`` (IC-02 back-compat path).
+        Fail-soft: returns ``None`` for a missing/corrupt session, an empty
+        ``task_ref`` or no match.
+        """
+        if not task_ref:
+            return None
+        session = self.load_session(session_id)
+        checkpoints = session.get("checkpoints") if session else None
+        for checkpoint in reversed(_iter_valid_checkpoints(checkpoints)):
+            if checkpoint.task_ref == task_ref:
+                return checkpoint
+        return None
 
     def list_sessions(self) -> list[str]:
         """List all session IDs that have checkpoints."""
@@ -432,6 +591,33 @@ class CheckpointStore:
         return [
             p.stem for p in self.checkpoint_dir.glob("*.json")
         ]
+
+    def find_sessions_for_plan(self, plan_id: str) -> List[str]:
+        """Return session ids that contain a checkpoint for ``plan_id``.
+
+        Newest ``updated_at`` first; corrupt session files are skipped and
+        never raise. An empty/falsy ``plan_id`` yields an empty list.
+        """
+        if not plan_id:
+            return []
+        matches = []
+        for session_id in self.list_sessions():
+            session = self.load_session(session_id)
+            if not session:
+                continue
+            checkpoints = session.get("checkpoints")
+            if not isinstance(checkpoints, list):
+                continue
+            if any(
+                isinstance(cp, dict) and cp.get("plan_id") == plan_id
+                for cp in checkpoints
+            ):
+                updated_at = session.get("updated_at", 0)
+                if not isinstance(updated_at, (int, float)):
+                    updated_at = 0
+                matches.append((updated_at, session_id))
+        matches.sort(key=lambda item: (item[0], item[1]), reverse=True)
+        return [session_id for _, session_id in matches]
 
     def delete_session(self, session_id: str) -> bool:
         """Delete a session's checkpoint file."""

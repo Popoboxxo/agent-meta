@@ -3,7 +3,7 @@
 > Projektbeschreibung für Claude-Agenten. Diese Datei ist die **einzige Quelle**
 > für projektspezifischen Kontext — Agenten lesen sie, statt eigenen Kontext zu haben.
 >
-> Generiert von agent-meta v1.2.0 — `2026-09-12`
+> Generiert von agent-meta v1.2.0-beta.2 — `2026-09-13`
 >
 > **Längenempfehlung:** 200–500 Zeilen optimal. Über 500 Zeilen → Detailwissen in
 > `docs/ARCHITECTURE.md`, `docs/API.md` o.ä. auslagern und manuell verlinken.
@@ -45,6 +45,9 @@ docs/guides/        # Anleitungen und Beispiel-Config
 docs/ui/            # UI Assets
   architecture/     # Architektur-Diagramme (Mermaid)
   admin-ui.html     # Admin-UI Frontend
+docs/specs/         # Feature-Specs (Spec/Plan-Workflow, §5.1)
+docs/plans/         # Feature-Pläne + archive/ (docs/plans/README.md)
+docs/spikes/        # Wegwerf-Untersuchungen (explorer-Spike-Modus, F10)
 tests/              # Test-Suite (automated, manual, orchestration)
 
 ```
@@ -103,7 +106,7 @@ Kategorien für `docs/REQUIREMENTS.md`:
 
 > **AI ROUTING:** Claude -> CLAUDE.md | Opencode, Gemini -> AGENTS.md
 
-Generiert von agent-meta v1.2.0 — `2026-09-12`
+Generiert von agent-meta v1.2.0-beta.2 — `2026-09-13`
 DoD-Preset: **rapid-prototyping** | REQ-Traceability: false | Tests: false | Codebase-Overview: false | Security-Audit: false
 > **Einstiegspunkt:** Starte mit dem `orchestrator`-Agenten für alle Entwicklungsaufgaben — Ausnahmen siehe Abschnitt »Orchestrator — Universal Router«.
 

@@ -20,3 +20,6 @@ jobs:
         run: python .agent-meta/scripts/sync.py --dry-run --check
         # Exit 1 if CLAUDE.md, AGENTS.md, GEMINI.md etc. would be regenerated.
         # Run `python .agent-meta/scripts/sync.py` locally to fix.
+
+      - name: Validate spec/plan workflow artifacts (no-op when disabled)
+        run: python .agent-meta/scripts/sync.py --validate-spec-plan

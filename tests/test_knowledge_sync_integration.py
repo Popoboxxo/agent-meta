@@ -133,3 +133,16 @@ def test_invalid_domain_raises_sync_error(tmp_path):
     with pytest.raises(SyncError, match="Unknown knowledge-engine domain"):
         sync_knowledge_engine(_AGENT_META_ROOT, tmp_path, _config(domain="not-a-real-domain"), log, dry_run=False)
     assert not (tmp_path / "knowledge").exists()
+
+
+# ---------------------------------------------------------------------------
+# Task 12 — internal-docs scaffolds the plans/ and specs/ marker dirs
+# ---------------------------------------------------------------------------
+
+def test_internal_docs_scaffolds_plans_and_specs_gitkeep(tmp_path):
+    log = SyncLog()
+    sync_knowledge_engine(_AGENT_META_ROOT, tmp_path, _config(domain="internal-docs"), log, dry_run=False)
+
+    bundle = tmp_path / "knowledge"
+    assert (bundle / "wiki" / "plans" / ".gitkeep").exists()
+    assert (bundle / "wiki" / "specs" / ".gitkeep").exists()

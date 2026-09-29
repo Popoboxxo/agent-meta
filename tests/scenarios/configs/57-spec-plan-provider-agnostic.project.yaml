@@ -1,0 +1,30 @@
+agent-meta-version: "1.1.0"
+ai-providers:
+- Claude
+- Gemini
+- Opencode
+dod-preset: concept-driven
+platforms: []
+rules-preset: lazy
+knowledge-engine:
+  enabled: false
+spec-plan-workflow:
+  enabled: true
+  paths:
+    specs: docs/specs
+    plans: docs/plans
+    spikes: docs/spikes
+  index:
+    mode: file-index
+    fallback-index: docs/INDEX.md
+project:
+  name: scenario-spec-plan-provider
+  prefix: s57
+  short: scenario-spec-plan-provider
+variables:
+  PROJECT_NAME: scenario-spec-plan-provider
+  PROJECT_DESCRIPTION: Provider-agnostic delivery of the gated spec/plan rules.
+  PROJECT_GOAL: Verify every configured provider receives the gated rules with identical, provider-literal-free content.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-spec-plan-provider
+  GIT_MAIN_BRANCH: main

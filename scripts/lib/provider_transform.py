@@ -18,6 +18,7 @@ from pathlib import Path
 from .agent_toml import build_agent_toml_document
 from .frontmatter import (
     _parse_frontmatter_yaml,
+    _quiet_field_set,
     _remove_frontmatter_fields,
     _strip_frontmatter,
     _update_frontmatter_dict,
@@ -28,6 +29,7 @@ from .frontmatter import (
     load_provider_tools_config,
 )
 from .log import SyncLog
+from .providers import resolve_frontmatter_strip_fields
 
 def _validate_tools_against_whitelist(
     tools: list, provider: str, agent_meta_root: Path, log: SyncLog, role: str,
@@ -372,20 +374,13 @@ def transform_agent_content_for_provider(
     provider_config: dict,
     log: SyncLog,
 ) -> str:
-    # Opt-in per-provider frontmatter field stripping (issue #505): a
-    # provider/validation layer with a strict agent-definition schema can
-    # reject agent-meta's own bookkeeping fields (version/prompt_mode/
-    # generated-from) as unknown extra inputs. Empty by default for every
-    # shipped provider — fully backward compatible. A project opts in via
-    # the existing project-level `provider-options` block (same mechanism
-    # Continue's generate-prompts/prompt-mode already use, see
-    # providers.py::resolve_provider_options()) — no core agent-meta change
-    # needed per consumer provider quirk. `ai-providers.yaml` itself can
-    # also set `frontmatter_strip_fields` as a provider-wide default.
-    _strip_fields = (
-        config.get('provider-options', {}).get(provider, {}).get('frontmatter-strip-fields')
-        or provider_config.get(provider, {}).get('frontmatter_strip_fields', [])
-    )
+    # Provider-agnostic frontmatter strip policy (SPEC-REFERENCE-STANDARDS-2026-09-15,
+    # IC-03): the resolver unions the global defaults (`reference_standards`),
+    # the project channel (`provider-options.<P>.frontmatter-strip-fields`) and
+    # the ai-providers channel (`frontmatter_strip_fields`), then subtracts the
+    # keep channels (`frontmatter-keep-fields` / `frontmatter_keep_fields`) —
+    # keep wins. One code path for every provider, no provider-name branch.
+    _strip_fields = resolve_frontmatter_strip_fields(provider, config, provider_config)
     # Provider transform is fully data-driven (issue #629): the per-provider
     # `agent-transform:` block in config/ai-providers.yaml describes the
     # frontmatter/tool/body steps, applied by _apply_agent_transform(). This
@@ -524,6 +519,7 @@ def _transform_frontmatter_for_opencode(
     agent_meta_root: Path,
     temperature: str = "",
     strip_fields: list[str] | None = None,
+    quiet_fields: frozenset[str] | None = None,
 ) -> str:
     """Build opencode-native agent frontmatter.
 
@@ -544,6 +540,10 @@ def _transform_frontmatter_for_opencode(
     implicitly inherited from the source template's frontmatter). Their
     pre-strip values are preserved in an `agent-meta-provenance` HTML
     comment so traceability/version-bump enforcement survives the strip.
+
+    quiet_fields: stripped keys that must NOT be named in that provenance
+    comment (IC-04, mirrored from `build_frontmatter`). ``None`` applies the
+    default quiet set; a non-set value falls back to the loud path.
     """
     body = _strip_frontmatter(content)
     body = _strip_claude_specific_lines(body)
@@ -553,8 +553,17 @@ def _transform_frontmatter_for_opencode(
 
     provenance_comment = None
     if strip_fields:
-        preserved = {k: template_fm[k] for k in strip_fields if k in template_fm}
-        if generated_from and "generated-from" in strip_fields:
+        quiet = _quiet_field_set(quiet_fields)
+        preserved = {
+            k: template_fm[k]
+            for k in strip_fields
+            if k in template_fm and k not in quiet
+        }
+        if (
+            generated_from
+            and "generated-from" in strip_fields
+            and "generated-from" not in quiet
+        ):
             preserved["generated-from"] = generated_from
         if preserved:
             pairs = " ".join(f"{k}={v}" for k, v in preserved.items())

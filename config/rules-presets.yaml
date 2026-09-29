@@ -173,3 +173,50 @@ presets:
     se-cascade-review-lifecycle:
       channel: skill
       skill-description: "Use when running SE-Kaskade reviews — binding review lifecycle with protocol obligation and RVW finding IDs (Issue #339 B5)."
+    # Spec/Plan-Workflow rules: gated preset-independently via `rule-gates`
+    # below (fail-closed on `spec-plan-workflow.enabled`). channel: skill keeps
+    # only the name + description in context when the workflow is enabled.
+    spec-plan-workflow:
+      channel: skill
+      skill-description: "Use when a feature-level request needs spec→plan→execution with an approval gate — classification, spec authoring, SE boundary."
+    brainstorming-gate:
+      channel: skill
+      skill-description: "Use before any feature implementation to classify Spike/Bounded/Architectural and enforce the no-implementation-without-approval gate."
+    writing-plans:
+      channel: skill
+      skill-description: "Use when turning an approved spec into a plan — required header, file-structure map, bite-sized TDD tasks, interfaces, no-placeholder self-review."
+    plan-ledger:
+      channel: skill
+      skill-description: "Use when executing a plan task-by-task — fresh subagent per task, review, ledger/checkpoint recovery, ownership/barrier isolation (no worktree)."
+    # Recovery/root-cause rules (IC-09): gated via `rule-gates` below
+    # (session-recovery on spec-plan-workflow.enabled, root-cause-gate on
+    # dod.root-cause-required). channel: skill keeps only name + description in
+    # context while the gate is open.
+    session-recovery:
+      channel: skill
+      skill-description: "Use at session start while the spec/plan workflow is active — read-only rehydrate resume context, continue the open task, never reorder the plan."
+    root-cause-gate:
+      channel: skill
+      skill-description: "Use before every fix when the active DoD preset requires root-cause evidence — prove cause and prior attempts before changing code."
+
+# Preset-unabhaengige Gates: eine Rule wird nur ausgeliefert, wenn ihre
+# `requires`-Bedingung erfuellt ist. Fail-closed: unbekannte Bedingung oder
+# config=None => Rule bleibt draussen. Zuordnung greift in collect_rule_sources.
+rule-gates:
+  spec-plan-workflow:
+    requires: spec-plan-workflow.enabled
+  brainstorming-gate:
+    requires: spec-plan-workflow.enabled
+  writing-plans:
+    requires: spec-plan-workflow.enabled
+  plan-ledger:
+    requires: spec-plan-workflow.enabled
+  # Session-start resume context (IC-09): only meaningful while the spec/plan
+  # workflow is on. The full rule bodies are authored separately (Task 16).
+  session-recovery:
+    requires: spec-plan-workflow.enabled
+  # Root-cause gate (IC-09): a bug fix only activates the rule when the active
+  # DoD preset requests root-cause evidence (dod.root-cause-required). The full
+  # rule body is authored separately (Task 16).
+  root-cause-gate:
+    requires: dod.root-cause-required

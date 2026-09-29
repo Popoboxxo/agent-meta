@@ -160,9 +160,12 @@ damit aktuell ein Capability-Versprechen ohne Output (siehe auch den Kommentar z
 
 **Fähigkeiten (`config/provider-capabilities.yaml`):**
 - `hooks: true` — belegt durch `has_hooks: true` + `hooks_dir` in `config/ai-providers.yaml`.
-- Keine native Subagent-Dispatch-API und keine parallele Ausführung (konservativ auf `false`,
-  da Mammouths native Orchestrierungs-Oberfläche nicht dokumentiert ist) — Delegation
-  text-basiert per `@agent`-Mention, sequentiell, YAML-Text-Block-Handoff.
+- Keine verifizierte/dokumentierte native Subagent-Dispatch-API und keine verifizierte
+  parallele Ausführung (konservativ auf `false`) — Delegation text-basiert per
+  `@agent`-Mention, sequentiell, YAML-Text-Block-Handoff.
+- Modell-Effort-Level (extended thinking) sind modellabhängig: nicht jedes
+  Mammouth-Modell unterstützt Effort-Stufen — vor einer Empfehlung pro Modell
+  verifizieren.
 - MCP-Integration ist in `config/ai-providers.yaml` (noch) nicht konfiguriert (`mcp-config: {}`).
 
 **Frontmatter:** reduziert (`model`).
@@ -295,6 +298,166 @@ Rule-Content aus `config/plugin-catalog.yaml` (`kind: cli-tool`-Einträge, z.B. 
 
 ---
 
+## Kontext-Topologie: `context_file.topology` (`unified` / `per-provider`)
+
+> Trace-Anker: `SPEC-CONTEXT-FILE-MODES-2026-09-13` (Status APPROVED, 2026-09-14).
+> System-Design: `docs/specs/2026-09-13-context-file-modes-system-design.md`.
+
+### Zwei unabhängige Achsen
+
+Der `context_file`-Block trägt **zwei** Schalter, die nicht verwechselt werden dürfen:
+
+| Key | Achse | Werte | Default |
+|---|---|---|---|
+| `context_file.mode` | **Dichte** (Größe/Kompression, Issue #540) | `full` \| `compact` | `full` |
+| `context_file.topology` | **Topologie** (eine gemeinsame Datei vs. Kern + Adapter) | `unified` \| `per-provider` | `unified` |
+
+`mode` beeinflusst, **wie** der managed block gerendert wird; `topology` beeinflusst,
+**wo** er landet (eine gemeinsame Datei oder kanonischer Kern + provider-native Kanäle).
+Beide Werte sind unabhängig kombinierbar.
+
+### Default: `unified`, **nicht persistiert**
+
+- Fehlt `context_file.topology` — oder ist der Wert nicht-String, außerhalb des Enums
+  oder der `context_file`-Block kein Mapping — löst der Resolver fail-safe auf `unified` auf.
+- Der Default wird **nicht** in `project.yaml` geschrieben (`fill_defaults` persistiert ihn
+  nicht; Schema-`default` + Resolver-Fail-safe). Bestehende Projekte bleiben daher **ohne
+  Opt-in unverändert** — `unified` ist byte-identisch zum Bestand (ausgenommen die bereits
+  vorher dokumentierte Weakest-Tier-Absenkung der geteilten `AGENTS.md`).
+- `per-provider` greift ausschließlich nach explizitem Opt-in.
+
+Resolver: `scripts/lib/providers.py::context_topology(config, provider=None)` — nie werfend,
+vollständig key-/config-getrieben.
+
+### Präzedenz (deterministisch)
+
+```
+context_file.provider-overrides.<Provider>.topology   (höchste)
+        > context_file.topology
+        > "unified"                                    (Default)
+```
+
+Ein Provider-Override gewinnt nur, wenn er selbst ein gültiges Enum trägt; sonst fällt die
+Auflösung auf den Projektwert und danach auf `unified` zurück.
+
+### Opt-in
+
+```yaml
+# .meta-config/project.yaml
+context_file:
+  topology: per-provider      # explizit — ohne diesen Key bleibt es unified
+  core_file: AGENTS.md        # kanonischer Kern (Default)
+  provider-overrides:
+    Gemini:
+      topology: unified       # Einzelfall: Gemini beim Bestand belassen
+```
+
+### Was `per-provider` rendert
+
+- **Kanonischer Kern** in `context_file.core_file` (Default `AGENTS.md`): ein kanonisches
+  Render-Ziel für alle Direkt-Leser; trägt den neutralen Render-State `GATE_NEUTRAL`
+  (siehe unten) statt einer Runtime-Zusage.
+- **Provider-native dedizierte Kanäle** (Adapter-Datei oder bestehender `rules_dir`-Kanal):
+  nur für Provider, die dafür konfiguriert sind. Der Dispatch ist ausschließlich
+  key-/capability-getrieben — nie über einen Provider-Namen.
+
+### Kanal-Matrix (Stand Phase 2)
+
+| Provider | Kanal in `per-provider` | Status |
+|---|---|---|
+| Opencode, KimiCode, ZCode | **Direkt-Leser** des Kerns (`context_file.core_file`) — keine Adapter-Datei | VERIFIED-RESEARCH |
+| Claude | Adapter `CLAUDE.md` (`@AGENTS.md`-Import + managed block) | **einziger heute aktiver Adapter** (VERIFIED-RESEARCH) |
+| Gemini/Antigravity (ein Provider) | **Fallback (c):** geteilter Kern `AGENTS.md` + nativer Hook-Kanal — **keine** Adapter-Datei | Fallback (c), s. u. |
+| Codex, Copilot, Continue, Mammouth | schlafen (`context_adapter: false`) → bleiben Direkt-Leser des Kerns | HYPOTHESIS, Phase 2 (nicht scharfgeschaltet) |
+
+### Claude-Adapter (aktuell aktiv)
+
+- `config/ai-providers.yaml` setzt für Claude `context_adapter: true`,
+  `context_adapter_file: CLAUDE.md`, `context_adapter_import: "@{core}"` und
+  `context_adapter_import_supported: true`.
+- Der gerenderte Kernverweis ist die provider-native Import-Zeile `@AGENTS.md`; ist die
+  Import-Unterstützung aus oder die Syntax leer, fällt die Zeile auf einen Pointer-Satz zurück.
+- Der Claude-managed-block trägt **keinen** `GATE_*`-Text. Die verbindliche Hook-Wortwahl lebt
+  in der nativen Rules-Datei `.claude/rules/use-orchestrator.md`, die über den bestehenden
+  Rules-Seam mit dem Claude-Tier gerendert wird. Der Adapter darf also kein `GATE_ENFORCED`
+  im verwalteten `CLAUDE.md`-Block versprechen.
+
+### Gemini/Antigravity — Fallback (c)
+
+- **Verdict FINDING F-RULESLOC:** Kanal (a) `.gemini/rules` ist als
+  Antigravity-Workspace-Rules-Lokation **widerlegt** — die offizielle Doku nennt `.agents/rules`
+  (rückwärtskompatibel `.agent/rules`). Spike:
+  `docs/spikes/2026-09-14-f-rulesloc-gemini-rules-channel.md`; reproduzierbares Protokoll:
+  `tests/manual/f-rulesloc-gemini-rules-channel.md`.
+- Konsequenz: `per-provider` beansprucht den Gemini/Antigravity-Tier **nicht** über
+  `.gemini/rules`. Es gilt **Fallback (c):** geteilter Kern `AGENTS.md` + native
+  Hook-Erzwingung (Prompt-Text = Dokumentation).
+- Der Hook-Träger ist der verifizierte Antigravity-Vertrag
+  (`hook_protocol: antigravity-hooks-json`, Registrierung in `.agents/hooks.json` via
+  Übersetzungs-Adapter; siehe Hooks-Hinweis bei Gemini CLI oben). Die tatsächliche
+  Runtime-Ausführung steht weiterhin unter dem P6-Real-Repo-Test — sie wird hier bewusst
+  **nicht** als erbracht behauptet.
+- Kein Config-Bruch, kein Rollback nötig: die Kanalentscheidung ist datengetrieben.
+  **Promotion-Pfad:** Bestätigt ein späterer Real-Repo-Lauf Kanal (a), lässt sich der Tier ohne
+  neue Keys über `.gemini/rules` tragen — der Seam injiziert den Tier bereits heute. Der
+  Live-Real-Repo-Lauf des Protokolls ist noch offen (Follow-up aus Plan-Task 4).
+
+### `GATE_NEUTRAL` (Kern-Render-State)
+
+- In `per-provider` rendert der **Kern** die neutrale Variante der Gate-Regel: die Direktive
+  bleibt, **ohne** Runtime-Versprechen; `a2a-delegation-gates` verweist für die Durchsetzung
+  auf den Adapter bzw. den provider-eigenen Kanal.
+- `GATE_NEUTRAL` ist ein **Render-State**, **kein** Runtime-Tier: es steht nicht in
+  `RUNTIME_GATE_TIERS` (`scripts/lib/runtime_gate.py`); das Tier-Vokabular und die Rangfolge
+  bleiben unverändert. Der Kern behauptet damit keine Erzwingung, die er nicht leisten kann.
+
+### Adapter-Size-Guard
+
+- `context_file.max_lines` gilt auch für Adapter-Dateien. Der Size-Guard
+  (`scripts/lib/consistency/context_size.py::check_context_file_size`) zählt Adapter-Pfade
+  zusätzlich und meldet eine Überschreitung **mit dem Adapter-Pfad** getrennt vom Kern.
+- `context_file.oversize_acknowledged: true` unterdrückt die Warnung wie beim Kern. Geprüft
+  werden nur generierte (managed-markierte) Dateien; eine fehlende Adapter-Datei ist kein Finding.
+
+### Consistency-Check
+
+`scripts/lib/consistency/context_topology.py::check_context_topology_consistency` prüft die
+**Konfiguration** (nicht das gerenderte Ergebnis) und meldet ausschließlich WARNINGs:
+
+- ungültiger `context_file.topology`-Enum-Wert (Projekt oder Provider-Override),
+- adapter-fähiger Provider ohne nicht-leeren `context_adapter_file`,
+- zwei Provider mit derselben Adapter-Datei (Kollision),
+- `per-provider`-Adapter ohne Verweis auf `context_file.core_file`,
+- verwaiste Adapter-Datei in `unified` ohne managed-Index-Eintrag (verweist auf den Rollback).
+
+Registriert im Consistency-Lauf (`scripts/consistency-check.py`, u. a. über
+`sync.py --validate`). Der Check ist WARNING-only und bricht keinen Sync ab.
+
+### Admin-UI
+
+- Der bestehende `context_file`-Abschnitt ist schreibbar (`PROJECT_WRITABLE_SECTIONS`); es gibt
+  **keinen** neuen Endpoint und **keinen** neuen Top-Level-Abschnitt.
+- Die Projekt-Ansicht rendert `topology` als Dropdown (Default `unified`) und `core_file` als
+  Textfeld. Der Help-Text grenzt die Topologie-Achse ausdrücklich von der Dichte
+  (`context_file.mode: full|compact`) ab.
+- Das Help-Mapping (`check_ui_help_mappings`) kennt `context_file.topology`, sodass der
+  Consistency-Lauf dafür kein Finding meldet.
+
+### Rollback auf `unified`
+
+- Ein Wechsel `per-provider` → `unified` entfernt **index-getrackte** Adapter über
+  `rollback_context_adapters` (`scripts/lib/context.py`), **backup-first**: der Dateiinhalt
+  wird zuvor als `.sync-backup-<ts>`-Geschwister gesichert.
+- Allein der managed-Index (`.agent-meta-context-adapters-managed`) autorisiert eine Löschung —
+  fremde/user-Dateien ohne Index-Eintrag bleiben unberührt; der Index wird verworfen, sobald
+  kein Adapter mehr erwartet wird. Der Kern fällt auf die geteilte Weakest-Tier-Regel zurück.
+- **Bekannte Limitierung (dokumentiert, nicht gefixt):** Der Rollback läuft unter
+  `context_file.auto_generate`. Bei `context_file.auto_generate: false` werden Adapter beim
+  Wechsel auf `unified` **nicht** abgeräumt; ein manueller Eingriff oder ein temporäres
+  `auto_generate: true` ist nötig (S1-Contract „`auto_generate: false` wird nie übersteuert").
+
+---
+
 ## Sync-Verhalten pro Provider
 
 | Datei | Claude | Gemini | Continue | Opencode |
@@ -423,4 +586,20 @@ Details siehe [sync-concept.md](../guides/features/sync-concept.md).
   ```
 → Die gestrippten Werte gehen nicht verloren — sie landen als `<!-- agent-meta-provenance: ... -->`
   HTML-Kommentar direkt nach dem Frontmatter, damit Traceability/Version-Bump-Enforcement erhalten bleibt.
-→ Default (kein `frontmatter-strip-fields` gesetzt) ist für alle Provider unverändert — reines Opt-in.
+→ Für die **Bookkeeping-Felder** (`version`, `prompt_mode`, `generated-from`) heißt das: Default
+  (kein `frontmatter-strip-fields` gesetzt) bleibt für alle Provider unverändert — reines Opt-in.
+
+**`reference_standards` wird per Default gestrippt (SPEC-REFERENCE-STANDARDS-2026-09-15)**
+→ Das optionale Agent-Frontmatter-Feld `reference_standards` (Liste von Strings, Format
+  `<STANDARD>[@<version>][#<section>]`) wird framework-seitig **aus jedem Provider gestrippt**.
+  Der Default kommt aus einem Config-Resolver (provider-agnostisch, kein Provider-Sonderfall);
+  der Strip ist **lautlos**: das Feld erscheint weder als YAML-Key noch im
+  `agent-meta-provenance`-Kommentar.
+→ **Opt-in „keep" je Provider** (keep schlägt strip) — über den Projekt-Kanal:
+  ```yaml
+  provider-options:
+    Claude:
+      frontmatter-keep-fields: [reference_standards]
+  ```
+  oder den ai-providers-Kanal `providers.<Provider>.frontmatter_keep_fields`.
+→ Für `version`/`prompt_mode`/`generated-from` bleibt die Provenance unverändert.

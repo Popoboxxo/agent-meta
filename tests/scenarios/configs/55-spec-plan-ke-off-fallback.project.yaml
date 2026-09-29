@@ -1,0 +1,32 @@
+agent-meta-version: "1.1.0"
+ai-providers:
+- Claude
+dod-preset: concept-driven
+platforms: []
+rules-preset: lazy
+# Knowledge engine off, no external override: declared index mode
+# knowledge-engine must degrade to the file-index fallback.
+knowledge-engine:
+  enabled: false
+spec-plan-workflow:
+  enabled: true
+  paths:
+    specs: docs/specs
+    plans: docs/plans
+    spikes: docs/spikes
+  index:
+    mode: knowledge-engine
+    fallback-index: docs/INDEX.md
+  external-system-override:
+    enabled: false
+project:
+  name: scenario-spec-plan-ke-off
+  prefix: s55
+  short: scenario-spec-plan-ke-off
+variables:
+  PROJECT_NAME: scenario-spec-plan-ke-off
+  PROJECT_DESCRIPTION: file-index fallback when the knowledge engine is off.
+  PROJECT_GOAL: Verify docs/INDEX.md is written and no knowledge bundle is created when the KE is disabled.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-spec-plan-ke-off
+  GIT_MAIN_BRANCH: main

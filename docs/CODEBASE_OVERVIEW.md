@@ -1068,7 +1068,7 @@ in das `model:`-Frontmatter → die persistierte ID muss die lauffähige ID sein
 
 ### `scripts/lib/mcp.py`
 
-**Zweck:** Zentrale Verwaltung und Generierung der MCP-Server-Integrationen aus der `config/mcp-registry.yaml`.
+**Zweck:** Zentrale Verwaltung und Generierung der MCP-Server-Integrationen aus der `config/plugin-catalog.yaml`.
 
 **Hauptfunktionen:**
 - `load_mcp_registry()`: Lädt und mergt globale und projektspezifische MCP-Registries.
@@ -1163,8 +1163,8 @@ Reiner Dispatcher ohne Gate-Logik. Führt zur Laufzeit jedes `*.sh`-Script in se
 
 **1. `artifact-freshness.sh`**
 - Prüft ob generierte Artefakte nach Quelländerungen neu gebaut wurden
-- Konfiguriert via `.agent-meta/generated-artifacts.yaml` (Projekt-Konsument)
-- Quelle-mtime vs. Artefakt-mtime Vergleich (Git-Fallback)
+- Konfiguriert via `.meta-config/generated-artifacts.yaml` (Projekt-Konsument; Fallback, wenn diese Datei fehlt: `generated-artifacts.yaml` im Projekt-Root)
+- Quelle-vs-Artefakt-Vergleich über git-Commit-Timestamps; Dateisystem-mtime nur als Fallback für Pfade ohne git-Historie
 
 **2. `docker-image-scan.sh`**
 - Scannt Dockerfile Base-Images mit Trivy auf HIGH/CRITICAL-CVEs
@@ -1658,7 +1658,7 @@ Der Orchestrator ist der primäre Envelope-Produzent:
 | `agents/1-generic/feature.md` | A2A-Handoff-Integration | ✓ Phase 3 |
 | `agents/1-generic/developer.md` | A2A-Envelope-Consumer | ✓ Phase 3 |
 | `agents/1-generic/se-*.md` | Envelope-basierte Handoffs in SE-Kaskade (6 Agenten) | ✓ Phase 3 |
-| `config/mcp-registry.yaml` | `a2a-handoff` MCP-Server: `validate_handoff`, `resolve_handoff_schema`, `resolve_handoff` | ✓ Phase 4 |
+| `config/plugin-catalog.yaml` | `a2a-handoff` MCP-Server: `validate_handoff`, `resolve_handoff_schema`, `resolve_handoff` | ✓ Phase 4 |
 | `scripts/lib/viz.py` | A2A-Events in `inject_viz_prompt_block()` hinter `viz.debug`-Flag | ✓ Phase 4 |
 
 ### 11.9 Roadmap
