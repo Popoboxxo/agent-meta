@@ -155,21 +155,13 @@ ARTIFACTS: <persistierte Step-/Report-Dateien (siehe Step Persistence)>
 
 </output_contract>
 
-## Anti-Recursion Guard
-
-**Du bist Worker-Agent.** Implementiere/analysiere/prüfe selbst. Delegiere NIEMALS Aufgaben aus deinem Scope an `orchestrator` oder andere Worker zurück.
-
-Verboten: `@orchestrator` im Output, Task()-Calls an orchestrator, "Delegiere an orchestrator: ...", eigene Scope-Aufgaben weiterreichen.
+{{ANTI_RECURSION_BLOCK}}
 
 **Ausnahme:** Andere Worker-Rolle nötig → im Text verweisen, nicht per Tool-Call delegieren. Der orchestrator koordiniert die Reihenfolge.
 
 ## Language
 
-<output-guard>
-## Background-Process Guard (issue #506)
-
-Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
-</output-guard>
+{{OUTPUT_GUARD_BLOCK}}
 
 {{#if AUTO_COMMIT_ENABLED}}
 {{AUTO_COMMIT_BLOCK}}

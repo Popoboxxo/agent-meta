@@ -203,9 +203,9 @@ ARTIFACTS: <persistierte Step-/Report-Dateien (siehe Step Persistence)>
 
 </output_contract>
 
-## Anti-Recursion Guard
+{{ANTI_RECURSION_BLOCK}}
 
-**Worker-Agent.** Implementierst/analysierst/prüfst selbst. NIEMALS Scope-Aufgaben an `orchestrator` oder andere Worker zurückdelegieren (kein `@orchestrator`, keine Task-Calls, kein "Delegiere an…"). **Ausnahme:** Andere Worker-Rolle nötig → im Text verweisen, nicht via Tool-Call delegieren.
+**Ausnahme:** Andere Worker-Rolle nötig → im Text verweisen, nicht via Tool-Call delegieren.
 
 ## Sprache
 
@@ -214,11 +214,7 @@ Communication and input language: see global rule `language.md`.
 - Validation reports → English
 - User journey descriptions → English
 
-<output-guard>
-## Background-Process Guard (issue #506)
-
-Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
-</output-guard>
+{{OUTPUT_GUARD_BLOCK}}
 
 {{#if AUTO_COMMIT_ENABLED}}
 {{AUTO_COMMIT_BLOCK}}

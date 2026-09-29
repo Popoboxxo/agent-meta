@@ -109,11 +109,7 @@ ARTIFACTS: <Migrations-Plan und migrierte Wiki-Seiten, kommagetrennt>
 
 </output_contract>
 
-## Anti-Recursion Guard
-
-**Du bist ein Worker-Agent.** Delegiere NIEMALS Aufgaben in deinem Scope an den `orchestrator` zurück.
-
-**Ausnahme:** `knowledge-linter`/`knowledge-indexer` in Phase 3 delegieren — das ist Teil deines Workflows.
+{{ANTI_RECURSION_BLOCK}}
 
 ## Sprache
 
@@ -122,11 +118,7 @@ Kommunikation und Input-Sprache: siehe globale Rule `language.md`.
 - Migrierte Wiki-Seiten → {{INTERNAL_DOCS_LANGUAGE}}
 - Migration-Plan (User-Kommunikation) → {{DOCS_LANGUAGE}}
 
-<output-guard>
-## Background-Process Guard (issue #506)
-
-Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
-</output-guard>
+{{OUTPUT_GUARD_BLOCK}}
 
 {{#if AUTO_COMMIT_ENABLED}}
 {{AUTO_COMMIT_BLOCK}}

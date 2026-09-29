@@ -3,9 +3,10 @@
 Implements Spec §A.4 (Revision v6, ``docs/superpowers/specs/2026-09-13-spec-plan-workflow-design.md``):
 routing for the spec/plan workflow is declared exclusively in ``config/role-defaults.yaml``
 (``quality_pipelines`` / ``reflection_pairs``). The source templates under
-``agents/1-generic/*.md`` and ``rules/1-generic/*.md`` must stay free of route tables,
-``roleA → roleB`` chains, imperative handoff sentences and role labels inside ``NEXT:``
-blocks for that workflow.
+``agents/1-generic/*.md``, ``rules/1-generic/*.md`` and the snippets under
+``snippets/**/*.md`` (Spec A6 — snippets are inlined into prompts) must stay free of
+route tables, ``roleA → roleB`` chains, imperative handoff sentences and role labels
+inside ``NEXT:`` blocks for that workflow.
 
 Detection
 ---------
@@ -50,8 +51,13 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-# Source templates only — generated .claude/.opencode/... copies are out of scope.
-_SCOPE_GLOBS = ("agents/1-generic/*.md", "rules/1-generic/*.md")
+# Source artifacts only — templates, rules and snippets. Generated
+# .claude/.opencode/... copies are out of scope.
+_SCOPE_GLOBS = (
+    "agents/1-generic/*.md",
+    "rules/1-generic/*.md",
+    "snippets/**/*.md",
+)
 
 # Spec/plan-workflow files (design addendum §A.2 offender list). T-NEXT applies here only.
 _WORKFLOW_FILES = frozenset(

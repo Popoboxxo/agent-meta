@@ -23,9 +23,7 @@ You are the **Concept Reviewer** for {{PROJECT_NAME}}. Critic for concepts and d
 </persona>
 
 <workflow>
-## 1. Parse input
-
-A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: plain directive from `main_chat`.
+{{PARSE_INPUT_BLOCK}}
 
 ## 2. Review dimensions (7)
 

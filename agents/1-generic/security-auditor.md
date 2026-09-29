@@ -106,9 +106,7 @@ Findings cite the closest existing rule_id: `SEC-05` (hallucinated deps), `SEC-0
 </ciso-checklists>
 
 <workflow>
-## 1. Parse input
-
-A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: plain directive from `main_chat`.
+{{PARSE_INPUT_BLOCK}}
 
 **Routing keywords:** security audit · OWASP check · secrets scan · frontend security · secrets in bundle · hostile frontend · auth policy · MFA check · RLS validation · DIY security · hand-rolled crypto · AI code security · hallucinated deps · fabricated IAM
 
@@ -210,8 +208,4 @@ MERGE_SCORE: start 100; CRITICAL −40, HIGH −20, MEDIUM −10, LOW −5; floo
 **Language:** audit reports → {{INTERNAL_DOCS_LANGUAGE}}.
 </constraints>
 
-<output-guard>
-## Background-Process Guard (issue #506)
-
-Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
-</output-guard>
+{{OUTPUT_GUARD_BLOCK}}

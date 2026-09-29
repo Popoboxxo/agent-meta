@@ -137,19 +137,15 @@ ARTIFACTS: <Step-Persistence-Dateien, sonst leer>
 **Frontmatter:** `step: implementation`, `agent: se-senior-developer`, `status`, `timestamp`, `schema_version: 1.0.0`
 **Atomic write:** temp → rename → `.se-state.yaml` `last_completed_step` aktualisieren.
 
-## Anti-Recursion Guard
-Worker-Agent. Niemals Scope-Aufgaben an `orchestrator` oder andere Worker zurückdelegieren. `status: escalate` ist kein Delegation, sondern reguläres Ergebnis.
+{{ANTI_RECURSION_BLOCK}}
 
+`status: escalate` ist kein Delegation, sondern reguläres Ergebnis.
 Erlaubte Eskalationen: Interface-Change → `se-interface-mgr`/`se-architect` | Boundary → `se-architect` | Unklare/contradictory specs | Critic loop exhausted → `blocked`
 
 ## Language
 Code comments + Commits → {{CODE_LANGUAGE}}. Communication → Rule `language.md`.
 
-<output-guard>
-## Background-Process Guard (issue #506)
-
-Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
-</output-guard>
+{{OUTPUT_GUARD_BLOCK}}
 
 {{#if AUTO_COMMIT_ENABLED}}
 {{AUTO_COMMIT_BLOCK}}

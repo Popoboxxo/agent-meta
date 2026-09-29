@@ -173,6 +173,26 @@ def test_every_provider_has_explicit_runtime_gate_capability(provider):
 
 
 @pytest.mark.parametrize("provider", _registered_providers())
+def test_every_provider_has_explicit_route_intent_tool_capability(provider):
+    """Every registered provider must carry an explicit ``route_intent_tool``
+    boolean in ``config/provider-capabilities.yaml`` (same obligation as
+    ``commands``/``runtime_gate``). The runtime default is fail-safe ``false``
+    — the generated definition is prompt text, not a callable tool — so an
+    omission would leave the orchestrator mandate ungated. ``true`` may only be
+    set after a live route_intent acceptance proof."""
+    caps = _provider_capabilities().get(provider, {})
+    assert "route_intent_tool" in caps, (
+        f"Provider '{provider}' has no explicit 'route_intent_tool' entry in "
+        "config/provider-capabilities.yaml — declare the harness contract "
+        "explicitly (false until a live route_intent call is proven)."
+    )
+    assert isinstance(caps["route_intent_tool"], bool), (
+        f"Provider '{provider}'.route_intent_tool must be a boolean, got "
+        f"{caps['route_intent_tool']!r}"
+    )
+
+
+@pytest.mark.parametrize("provider", _registered_providers())
 def test_has_commands_flag_matches_capability(provider):
     has_commands = bool(_provider_configs().get(provider, {}).get("has_commands", False))
     capability = bool(_provider_capabilities().get(provider, {}).get("commands", False))
