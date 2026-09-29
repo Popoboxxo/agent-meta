@@ -377,13 +377,15 @@ def _preview_expected_filenames(
         _collect_active_skill_wrapper_filenames,
         _should_skip_role,
     )
+    from lib.roles import resolve_activation_gates
 
+    gates = resolve_activation_gates(agent_meta_root, config)
     allowed_roles = set(config["roles"]) if "roles" in config else None
     expected: set = set()
     for role, source_path in overrides.items():
         skip, filename = _should_skip_role(
             role, source_path, provider, pc, role_map, allowed_roles,
-            config, variables, project_root, target_dir, log)
+            config, variables, project_root, target_dir, log, gates=gates)
         if skip:
             continue
         expected.add(filename)

@@ -1,4 +1,4 @@
-agent-meta-version: "1.2.0-beta.2"
+agent-meta-version: 1.2.0-beta.2
 _comment: 'Szenarien-Katalog & Regressionstests fuer Framework-Aenderungen: tests/scenarios/
   (registry.md + run.sh) -- bei neuen Features/Config-Optionen dort ein Szenario ergaenzen
   (siehe rules/2-platform/agent-meta-conventions.md, Change Checklist).'
@@ -53,8 +53,6 @@ knowledge-engine:
   wiki-dir: wiki
   schema-language: auto
 spec-plan-workflow:
-  # enabled bewusst OHNE Schema-Default (Absenz-Semantik, §5.4).
-  # Fehlt der Key, greift die DoD-Preset-Kopplung. Expliziter bool gewinnt.
   enabled: true
   paths:
     specs: docs/specs
@@ -317,6 +315,8 @@ orchestrator:
   handoff:
     protocol: a2a-v1
   mode: strict
+  delegation:
+    max_depth: 10
 viz:
   enabled: false
   mode: 'off'
@@ -388,7 +388,6 @@ rules:
       block catalog (auth-flow, dependency-check, secret-scanning, ...) and enforcement
       points.
 conventions-preset: default
-# Repo-Containment ('Gefängnis-Modus'): confines agent WRITE access to the project root (plus the tmp-sink). Opt-out: enabled: false.
 repo_containment:
   enabled: true
   tmp-sink:

@@ -16,7 +16,6 @@ from pathlib import Path
 from .frontmatter import (
     AGENTS_DIR,
     _YAML_AVAILABLE,
-    _is_role_enabled,
     _merge_frontmatter,
     _parse_frontmatter_yaml,
     _strip_frontmatter,
@@ -41,6 +40,14 @@ from .rule_index import (
     write_managed_index,
 )
 from .variables import strip_inactive_conditional_blocks, substitute
+
+# Repository root of this checked-out framework — the activation-gate fallback
+# for direct `_should_skip_role()` calls that cannot pass a resolved gate map.
+# Every in-tree production caller (`sync_agents_for_provider` and the
+# cleanup/preview planner in `sync.py`) now resolves the gate map itself against
+# its own `agent_meta_root` and passes it in, so this fallback only serves
+# out-of-tree/test callers of the private helper.
+_AGENT_META_ROOT_FALLBACK = Path(__file__).resolve().parents[2]
 
 def _tools_can_spawn(tools) -> bool:
     """Return True if a frontmatter `tools` value grants sub-agent spawning.
@@ -462,6 +469,11 @@ def _build_provider_vars(
         # decides, so a hook-less provider never blanks the chat-push block in
         # a hook-capable provider's generated orchestrator.
         'PROGRESS_CHAT_PUSH_ENABLED': 'true' if provider_hooks_supported(pc) else 'false',
+        # ROUTE_INTENT_CALLABLE (issue #264 runtime follow-up): gates the §3
+        # route_intent mandate vs. its routing-rules fallback. Fail-safe false
+        # unless the harness registers route_intent as a callable tool
+        # (provider-capabilities.yaml route_intent_tool, live-proof only).
+        'ROUTE_INTENT_CALLABLE': 'true' if _ds_engine.has_route_intent_tool(provider) else 'false',
         # INTENT_ROUTING_TOOLS (issue #264): resolve the provider-mapped
         # routing-tool prerender from build_variables for THIS provider.
         # "" when the provider has no handoff_format capability or is absent
@@ -491,6 +503,7 @@ def _should_skip_role(
     project_root: Path,
     target_dir: Path,
     log: SyncLog,
+    gates: dict | None = None,
 ) -> tuple[bool, str | None]:
     """Skip-gates for one role in the per-provider agent loop.
 
@@ -499,7 +512,11 @@ def _should_skip_role(
     ``log.skip`` messages are emitted for providers declaring the
     ``verbose-sync-log`` capability (issue #735 — capability-driven, no
     provider-name branch), kept byte-identical to the historical Claude-only
-    output.
+    output. ``gates`` is the pre-resolved activation map
+    (``roles.resolve_activation_gates``) of the caller; when omitted (direct
+    out-of-tree helper calls) it is resolved against
+    ``_AGENT_META_ROOT_FALLBACK`` — the framework checkout this module was
+    loaded from, not necessarily the caller's ``agent_meta_root``.
     """
     filename = target_filename(role, role_map, ext=pc.get('agent_ext', '.md'))
     log_verbose = provider_has_capability(pc, "verbose-sync-log")
@@ -516,7 +533,11 @@ def _should_skip_role(
             log.skip(rel, f"role '{role}' not in config['roles']")
         return True, filename
 
-    if not _is_role_enabled(role, config):
+    from .roles import is_role_enabled, resolve_activation_gates
+
+    if gates is None:
+        gates = resolve_activation_gates(_AGENT_META_ROOT_FALLBACK, config)
+    if not is_role_enabled(role, config, gates):
         if log_verbose:
             rel = (str(target_dir / filename)
                    .replace(str(project_root) + '/', '')
@@ -1072,13 +1093,17 @@ def sync_agents_for_provider(agent_meta_root: Path, project_root: Path, config: 
         return
     allowed_roles = set(config['roles']) if 'roles' in config else None
 
+    from .roles import resolve_activation_gates
+
+    gates = resolve_activation_gates(agent_meta_root, config)
+
     expected_filenames: set = set()
     project_name = config.get('project', {}).get('name', 'unknown')
 
     for role, source_path in overrides.items():
         skip, filename = _should_skip_role(
             role, source_path, provider, pc, role_map, allowed_roles,
-            config, variables, project_root, target_dir, log)
+            config, variables, project_root, target_dir, log, gates=gates)
         if skip:
             continue
 

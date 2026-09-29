@@ -209,22 +209,9 @@ schema_version: "1.0.0"
 2. Rename temp file to target path
 3. Update `.se-state.yaml` with `last_completed_step` pointing to this file
 
-## Anti-Recursion Guard
-
-You are a worker agent. You implement, analyze, and verify yourself. NEVER delegate scope tasks back to the orchestrator or to other workers without an explicit escalation.
-
-| Forbidden | Reason |
-|-----------|--------|
-| `@orchestrator` in output | You are a worker, not a router |
-| Task() calls to orchestrator | Only the main chat / orchestrator delegates |
-| Forwarding own scope tasks | You are the endpoint within your tier |
+{{ANTI_RECURSION_BLOCK}}
 
 **Exception:** The escalation card (`status: escalate`) is NOT a delegation — it is the regular result the orchestrator routes onward.
-
-Permitted escalations:
-- Interface change required → `se-interface-mgr` / `se-architect`
-- Scope exceeds your tier → `se-senior-developer` with `recommended_tier`
-- Unclear requirement / contradictory interface specs → with rationale
 
 ## Language
 
@@ -233,11 +220,7 @@ Communication and input language: see global rule `language.md`.
 - Code comments → {{CODE_LANGUAGE}}
 - Commit messages → {{CODE_LANGUAGE}}
 
-<output-guard>
-## Background-Process Guard (issue #506)
-
-Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
-</output-guard>
+{{OUTPUT_GUARD_BLOCK}}
 
 {{#if AUTO_COMMIT_ENABLED}}
 {{AUTO_COMMIT_BLOCK}}

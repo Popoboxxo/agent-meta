@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from .roles import load_roles_config
+from .roles import load_roles_config, resolve_active_roles
 
 # List separators used by role descriptions. Most short_desc values already
 # enumerate capabilities as comma-separated noun phrases, so splitting on
@@ -31,46 +31,67 @@ def derive_keywords(description: str, max_keywords: int = 3, max_length: int = 1
     return ", ".join(keys[:max_keywords])[:max_length].rstrip()
 
 
-def _active_role_names(agent_meta_root: Path, config: dict, variables: dict) -> list[str]:
+def _active_role_names(
+    agent_meta_root: Path,
+    config: dict,
+    variables: dict,
+    *,
+    require_template: bool = False,
+    template_roles: set[str] | None = None,
+    warn_sink: list[str] | None = None,
+) -> list[str]:
     """Return the sorted role names that pass project activation filters.
 
-    Shared activation logic (issue #264): feature-flag gates (SE, validator,
-    knowledge engine, developer tiers) and the optional project ``roles``
-    whitelist — exactly the filter chain ``get_active_agents_data()`` applies,
-    extracted so the structured routing-rule builder sees the identical set
-    of agents as the tables.
+    Thin seam over ``roles.resolve_active_roles`` (SPEC
+    dynamic-routing-template-slimming §3.5): ``variables`` is accepted for
+    back-compatibility but is not a gate source — activation resolves from
+    ``config`` alone. The default stays Layer 1 (``require_template=False``)
+    so existing calls keep working; the internal callers request Layer 2.
     """
-    roles_cfg = load_roles_config(agent_meta_root)
-    roles = roles_cfg.get("roles", {})
-
-    roles_list = config.get("roles")
-    active_roles = set(roles_list) if roles_list is not None else None
-
-    se_enabled = variables.get("SE_ENABLED", "false") == "true"
-    validator_enabled = variables.get("VALIDATOR_ENABLED", "false") == "true"
-    knowledge_enabled = variables.get("KNOWLEDGE_ENGINE_ENABLED", "false") == "true"
-    developer_tiers = variables.get("DEVELOPER_TIERS_ENABLED", "false") == "true"
-
-    active = []
-    for role_name in sorted(roles.keys()):
-        if role_name.startswith("se-") and not se_enabled:
-            continue
-        if role_name == "validator" and not validator_enabled:
-            continue
-        if role_name.startswith("knowledge-") and not knowledge_enabled:
-            continue
-        if role_name in ("junior-developer", "senior-developer", "principal-developer") and not developer_tiers:
-            continue
-        if active_roles is not None and role_name not in active_roles:
-            continue
-        active.append(role_name)
-    return active
+    return resolve_active_roles(
+        agent_meta_root,
+        config,
+        require_template=require_template,
+        template_roles=template_roles,
+        warn_sink=warn_sink,
+    )
 
 
-def get_active_agents_data(agent_meta_root: Path, config: dict, variables: dict) -> list[dict]:
+def _has_routing_patterns(role_info: dict) -> bool:
+    """Keyword-addressable per SPEC §3.4: non-empty keywords or examples."""
+    patterns = role_info.get("routing_patterns")
+    patterns = patterns if isinstance(patterns, dict) else {}
+    return bool(patterns.get("keywords") or patterns.get("examples"))
+
+
+def _emit_warn_sink(messages: set[str], warn_sink: list[str] | None) -> None:
+    """Emit sorted, deduplicated warnings to the sink or the SyncLog fallback."""
+    if not messages:
+        return
+    ordered = sorted(messages)
+    if warn_sink is not None:
+        existing = set(warn_sink)
+        warn_sink.extend(message for message in ordered if message not in existing)
+        return
+    from .log import SyncLog
+
+    log = SyncLog()
+    for message in ordered:
+        log.warn(message)
+
+
+def get_active_agents_data(
+    agent_meta_root: Path,
+    config: dict,
+    variables: dict,
+    *,
+    template_roles: set[str] | None = None,
+    warn_sink: list[str] | None = None,
+) -> list[dict]:
     """Return a list of dictionaries with agent data.
 
-    Reads roles from config/role-defaults.yaml and respects workflow_tier and feature flags.
+    Reads roles from config/role-defaults.yaml and resolves the shared Layer-2
+    activation set (gates + whitelist intersected with generatable templates).
     Returns: list of dicts with 'name', 'short_desc' and derived 'keywords'.
     """
     roles_cfg = load_roles_config(agent_meta_root)
@@ -78,7 +99,14 @@ def get_active_agents_data(agent_meta_root: Path, config: dict, variables: dict)
 
     active_agents_data = []
 
-    for role_name in _active_role_names(agent_meta_root, config, variables):
+    for role_name in _active_role_names(
+        agent_meta_root,
+        config,
+        variables,
+        require_template=True,
+        template_roles=template_roles,
+        warn_sink=warn_sink,
+    ):
         role_info = roles[role_name]
 
         desc = role_info.get("short_desc", role_info.get("description", ""))
@@ -99,6 +127,9 @@ def get_routing_rules(
     config: dict,
     variables: dict,
     pipelines: dict | None = None,
+    *,
+    template_roles: set[str] | None = None,
+    warn_sink: list[str] | None = None,
 ) -> dict:
     """Build structured routing rules for the native intent-routing tool (issue #264).
 
@@ -122,18 +153,29 @@ def get_routing_rules(
       IS the orchestrator; the escalation gate lives in the prompt/data, not here.
 
     Returns:
-        ``{"target_agents": [...], "rules": [...], "pipelines": [...]}`` —
+        ``{"target_agents": [...], "rules": [...], "pipelines": [...],
+        "name_index": [...]}`` —
         ``target_agents`` is the sorted enum of active non-orchestrator roles;
         ``rules`` carries ``agent/tier/parallel/orchestrator_only/keywords/
         examples/output_contract/input_contracts`` per routed role (sorted by
         agent name for deterministic, idempotent output); ``pipelines`` maps
         quality pipelines with ``signal_keywords`` to ``{"route": "pipeline",
-        "pipeline": <name>, "keywords": [...]}`` entries (sorted by name).
+        "pipeline": <name>, "keywords": [...]}`` entries (sorted by name);
+        ``name_index`` carries ``agent/short_desc/tier/orchestrator_only/
+        addressability/name_only_reason`` for every target role (sorted by
+        ``agent``, including ``name_only`` roles).
     """
     roles_cfg = load_roles_config(agent_meta_root)
     roles = roles_cfg.get("roles", {})
     target_agents = [
-        name for name in _active_role_names(agent_meta_root, config, variables)
+        name for name in _active_role_names(
+            agent_meta_root,
+            config,
+            variables,
+            require_template=True,
+            template_roles=template_roles,
+            warn_sink=warn_sink,
+        )
         if name != "orchestrator"
     ]
 
@@ -169,6 +211,29 @@ def get_routing_rules(
             ],
         })
 
+    name_index = []
+    derived_warnings: set[str] = set()
+    for role_name in target_agents:
+        role_info = roles.get(role_name) or {}
+        routing = role_info.get("routing")
+        routing = routing if isinstance(routing, dict) else {}
+        addressability = routing.get("addressability")
+        if addressability not in ("keyword", "name_only", "excluded"):
+            addressability = "keyword" if _has_routing_patterns(role_info) else "name_only"
+            derived_warnings.add(
+                f"missing addressability, derived: {role_name}={addressability}"
+            )
+        name_index.append({
+            "agent": role_name,
+            "short_desc": role_info.get("short_desc", role_info.get("description", "")),
+            "tier": role_info.get("workflow_tier", "optional"),
+            "orchestrator_only": bool(routing.get("orchestrator_only", False)),
+            "addressability": addressability,
+            "name_only_reason": str(routing.get("name_only_reason") or ""),
+        })
+    name_index.sort(key=lambda entry: entry["agent"])
+    _emit_warn_sink(derived_warnings, warn_sink)
+
     pipeline_rules = []
     for pipeline_name in sorted((pipelines or {}).keys()):
         pipeline_info = pipelines[pipeline_name]  # type: ignore[index]
@@ -183,7 +248,12 @@ def get_routing_rules(
             "keywords": [str(k) for k in signal_keywords],
         })
 
-    return {"target_agents": target_agents, "rules": rules, "pipelines": pipeline_rules}
+    return {
+        "target_agents": target_agents,
+        "rules": rules,
+        "pipelines": pipeline_rules,
+        "name_index": name_index,
+    }
 
 
 def get_intent_routing_table(
@@ -191,6 +261,9 @@ def get_intent_routing_table(
     config: dict,
     variables: dict,
     pipelines: dict | None = None,
+    *,
+    template_roles: set[str] | None = None,
+    warn_sink: list[str] | None = None,
 ) -> str:
     """Generate the INTENT_ROUTING_TABLE: pipeline routing rows + a Tiers summary.
 
@@ -203,7 +276,13 @@ def get_intent_routing_table(
     """
     roles_cfg = load_roles_config(agent_meta_root)
     roles = roles_cfg.get("roles", {})
-    active_agents_data = get_active_agents_data(agent_meta_root, config, variables)
+    active_agents_data = get_active_agents_data(
+        agent_meta_root,
+        config,
+        variables,
+        template_roles=template_roles,
+        warn_sink=warn_sink,
+    )
     active_agent_names = {agent["name"] for agent in active_agents_data}
 
     required = sorted(

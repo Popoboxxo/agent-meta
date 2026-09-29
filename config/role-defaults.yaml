@@ -10,6 +10,8 @@ roles:
     handoff:
       output_contract: task-spec-v1
       handoff_routing: static
+    routing:
+      addressability: excluded
     short_desc: Einstiegspunkt für alle Entwicklungsaufgaben
   developer:
     model: balanced
@@ -17,6 +19,7 @@ roles:
     workflow_tier: required
     description: Feature-Implementierung und Bugfixes
     routing:
+      addressability: keyword
       intent_keywords:
       - Bugfix
       - Refactoring
@@ -59,6 +62,7 @@ roles:
     description: Triviale Code-Änderungen (≤2 Dateien, kein Architektur-Impact) —
       eskaliert strukturiert
     routing:
+      addressability: keyword
       intent_keywords:
       - Trivialer Fix
       - kleiner Fix
@@ -99,6 +103,8 @@ roles:
       fast nichts, kommentiert alles mit unerschütterlichem Selbstvertrauen. Read-only,
       technisch harmlos. NICHT für echte Arbeit routen.'
     routing:
+      addressability: name_only
+      name_only_reason: Easter-egg gag role with no real routing surface; reachable only via explicit name dispatch.
       parallel: true
       orchestrator_only: false
     short_desc: '[EASTER EGG / GAG] Der übereifrige Praktikant'
@@ -108,6 +114,7 @@ roles:
     workflow_tier: optional
     description: Komplexe Features, Architektur-Entscheidungen, schwierige Bugs, Cross-Cutting-Refactorings
     routing:
+      addressability: keyword
       intent_keywords:
       - Komplex
       - Architektur
@@ -152,6 +159,8 @@ roles:
       gescheitert ist. Root-Cause-Diagnose vor jeder Zeile Code. Maximale Gründlichkeit,
       maximale Kosten.
     routing:
+      addressability: name_only
+      name_only_reason: Last-resort escalation tier; reached only via explicit name dispatch from the orchestrator, never via keyword routing.
       parallel: false
       orchestrator_only: true
     handoff:
@@ -173,6 +182,7 @@ roles:
     workflow_tier: recommended
     description: Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen
     routing:
+      addressability: keyword
       intent_keywords:
       - Anforderungen
       - REQ-ID
@@ -202,6 +212,7 @@ roles:
     workflow_tier: optional
     description: Neue Ideen explorieren, Vision schärfen, Übergabe an requirements
     routing:
+      addressability: keyword
       intent_keywords:
       - Design
       - Konzept
@@ -229,6 +240,7 @@ roles:
     workflow_tier: recommended
     description: Erzeugt konkrete, geordnete Umsetzungspläne aus Konzepten/REQs/Bugs
     routing:
+      addressability: keyword
       intent_keywords:
       - Plan
       - Planung
@@ -267,6 +279,7 @@ roles:
     workflow_tier: recommended
     description: TDD, Test-Suite ausführen, Testabdeckung sichern
     routing:
+      addressability: keyword
       intent_keywords:
       - Tests
       - TDD
@@ -298,6 +311,7 @@ roles:
     description: E2E-Tests, visuelle Regression und Accessibility-Audits via Playwright
       — User-Flows statt isolierter Units
     routing:
+      addressability: keyword
       intent_keywords:
       - E2E
       - End-to-End
@@ -332,6 +346,7 @@ roles:
     description: 'Bestehende Test-Suiten ausführen (Pass/Fail-Counts, Exit-Codes,
       Stdout-Auszüge) — kein Test-Design, kein Code-Schreiben (#517)'
     routing:
+      addressability: keyword
       intent_keywords:
       - Tests ausführen
       - Test-Suite
@@ -362,6 +377,7 @@ roles:
     workflow_tier: recommended
     description: Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit
     routing:
+      addressability: keyword
       intent_keywords:
       - Validierung
       - DoD
@@ -388,6 +404,7 @@ roles:
     workflow_tier: recommended
     description: CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse pflegen
     routing:
+      addressability: keyword
       intent_keywords:
       - Dokumentation
       - README
@@ -416,6 +433,7 @@ roles:
     description: 'Sicherheits-Audit: OWASP, Secrets, Dependencies, Supply-Chain —
       statische Analyse'
     routing:
+      addressability: keyword
       intent_keywords:
       - Security
       - Audit
@@ -437,6 +455,7 @@ roles:
     description: 'Supply-Chain-Hygiene: SBOM-Analyse, Lizenz-Kompatibilität, Version-Drift
       und veraltete/verwundbare Pakete — reicht Findings über feedback ein.'
     routing:
+      addressability: keyword
       intent_keywords:
       - dependency
       - license
@@ -475,6 +494,7 @@ roles:
       — read-only, komplementär zu security-auditor (OWASP) und dependency-auditor
       (Supply-Chain).'
     routing:
+      addressability: keyword
       intent_keywords:
       - AI code security
       - vibe coding security
@@ -509,6 +529,7 @@ roles:
     description: 'Claude-Ökosystem scouten: neue Skills, Rollen, Rules und Patterns
       entdecken'
     routing:
+      addressability: keyword
       intent_keywords:
       - Scout
       - neue Skills
@@ -531,6 +552,7 @@ roles:
     description: Der ultimative Experte für Prompt-Engineering. Entwirft, prüft und
       optimiert Agentendefinitionen basierend auf Best Practices (OpenAI, Lakera).
     routing:
+      addressability: keyword
       intent_keywords:
       - Prompt
       - Prompt Engineering
@@ -555,6 +577,7 @@ roles:
       Security, Bypass Validation). Read-only auf Prompts; komplementär zu prompt-engineer
       (Design).'
     routing:
+      addressability: keyword
       intent_keywords:
       - Prompt Governance
       - Prompt Audit
@@ -586,6 +609,7 @@ roles:
     description: 'agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische
       Agenten anlegen'
     routing:
+      addressability: keyword
       intent_keywords:
       - Meta-Fragen
       - agent-meta
@@ -607,6 +631,7 @@ roles:
     workflow_tier: optional
     description: Versioning, Changelog, Build-Artifact, GitHub Release erstellen
     routing:
+      addressability: keyword
       intent_keywords:
       - Release
       - Version
@@ -627,6 +652,7 @@ roles:
     workflow_tier: required
     description: Commits, Branches, Tags, Push/Pull und alle Git-Operationen
     routing:
+      addressability: keyword
       intent_keywords:
       - Git
       - Commit
@@ -652,6 +678,7 @@ roles:
     workflow_tier: optional
     description: Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen
     routing:
+      addressability: keyword
       intent_keywords:
       - Meta-Feedback
       - Verbesserung
@@ -671,6 +698,7 @@ roles:
     description: Dev-Stack verwalten, Test-Stack starten, Binary-Management, Dockerfiles
       erstellen
     routing:
+      addressability: keyword
       intent_keywords:
       - Docker
       - Dev-Stack
@@ -693,6 +721,7 @@ roles:
     description: 'System- und Applikations-Logs analysieren: Frequency-Clustering,
       Severity-Klassifikation (RFC 5424), Root-Cause-Hypothesen, Delegation an feedback/developer/security-auditor'
     routing:
+      addressability: keyword
       intent_keywords:
       - Log
       - Logs
@@ -720,6 +749,7 @@ roles:
       Runbook-Schritte aus, liefert RCA-Report und priorisierte Hotfix-Liste unter
       Zeitdruck.'
     routing:
+      addressability: keyword
       intent_keywords:
       - incident
       - outage
@@ -758,6 +788,7 @@ roles:
     description: 'Projekt-Feedback standardisieren: Bugs, Features, Verbesserungen
       als GitHub Issues einreichen — immer vor git für Issue-Erstellung'
     routing:
+      addressability: keyword
       intent_keywords:
       - Feedback
       - Issue
@@ -785,6 +816,7 @@ roles:
     description: 'Issue-Triage: Eingehende Bug-Meldungen und Feature-Requests analysieren
       und klassifizieren (Bug, User-Error, Feature, Out-of-Scope) vor Ressourcen-Allokation'
     routing:
+      addressability: keyword
       intent_keywords:
       - Triage
       - Bug/Feature
@@ -806,6 +838,18 @@ roles:
     workflow_tier: optional
     description: Parametrische 3D-Modelle in OpenSCAD generieren, Render-Inspect-Refine
       via MCP, Druck-Optimierung
+    routing:
+      addressability: keyword
+    routing_patterns:
+      keywords:
+      - OpenSCAD
+      - 3D-Modell
+      - CAD-Modell
+      - parametrisches Modell
+      - STL-Export
+      examples:
+      - "Erstelle ein parametrisches OpenSCAD-Modell für ein Zahnrad."
+      - "Optimiere das Gehäuse für den 3D-Druck und exportiere es als STL."
     short_desc: Parametrische 3D-Modelle in OpenSCAD generieren, Render-Inspect-Refine
       via MC...
   se-requirements:
@@ -815,6 +859,7 @@ roles:
     workflow_tier: optional
     description: Nimmt Stakeholder-Bedürfnisse auf und erstellt das formale L1-Blackbox-Requirement.
     routing:
+      addressability: keyword
       intent_keywords:
       - SE Requirements
       - Stakeholder Needs
@@ -842,6 +887,7 @@ roles:
     description: Zerlegt Blackboxes in Whiteboxes nach strengen Architekturgesetzen
       (CQRS, Orthogonalität).
     routing:
+      addressability: keyword
       intent_keywords:
       - SE Architektur
       - Decomposition
@@ -871,6 +917,7 @@ roles:
     description: Prüft Architekturentscheidungen iterativ auf Vollständigkeit, Konsistenz
       und Testbarkeit.
     routing:
+      addressability: keyword
       intent_keywords:
       - SE Critic
       - Architektur Review
@@ -902,6 +949,7 @@ roles:
     workflow_tier: optional
     description: Verwaltet und validiert alle Schnittstellenverträge domänenübergreifend.
     routing:
+      addressability: keyword
       intent_keywords:
       - SE Interface
       - Schnittstellen
@@ -928,6 +976,7 @@ roles:
     description: Entscheidet deterministisch, ob der L3-Component-Leaf-Node erreicht
       wurde.
     routing:
+      addressability: keyword
       intent_keywords:
       - SE Termination
       parallel: false
@@ -955,6 +1004,7 @@ roles:
       Interfaces, ≥2 REQ-L3 (#332). Schließt die Lücke zwischen se-termination-LEAF
       und se-developer-Input.'
     routing:
+      addressability: keyword
       intent_keywords:
       - SE Component Requirements
       - Komponenten-Anforderungen
@@ -984,6 +1034,7 @@ roles:
     description: Triviale SE-Leaf-Implementierung (0-1 Interfaces, kein cross-cutting)
       — eskaliert strukturiert
     routing:
+      addressability: keyword
       intent_keywords:
       - SE trivial
       - SE Leaf
@@ -1021,6 +1072,7 @@ roles:
     parallel: true
     description: Standard SE-Leaf-Implementierung (2-4 Interfaces) mit strikter Interface-Disziplin
     routing:
+      addressability: keyword
       intent_keywords:
       - SE Implementierung
       - SE Leaf
@@ -1059,6 +1111,7 @@ roles:
     description: Komplexe SE-Leaf-Implementierung (5+ Interfaces, cross-cutting, boundary-level,
       security/performance-critical) mit Pre-Implementation Interface-Analyse
     routing:
+      addressability: keyword
       intent_keywords:
       - SE komplex
       - SE Boundary
@@ -1096,6 +1149,7 @@ roles:
     description: Entwickelt MBSE-Testmodelle und entwirft Integrationstests für den
       rechten V-Modell-Flügel.
     routing:
+      addressability: keyword
       intent_keywords:
       - SE Test
       - MBSE Tests
@@ -1118,6 +1172,7 @@ roles:
     description: Auditiert Teststrategien auf Edge-Cases, Boundary Values, Äquivalenzklassen
       und Flakiness.
     routing:
+      addressability: keyword
       intent_keywords:
       - SE Test Review
       parallel: true
@@ -1137,6 +1192,7 @@ roles:
     description: 'Multi-Level Verification (L1-Ln): Prüft integrierte Systeme gegen
       Architektur-Spezifikationen.'
     routing:
+      addressability: keyword
       intent_keywords:
       - SE Verification
       parallel: true
@@ -1155,6 +1211,7 @@ roles:
     workflow_tier: optional
     description: 'L1 System-Validierung: End-to-End User Journeys gegen Stakeholder-Bedürfnisse.'
     routing:
+      addressability: keyword
       intent_keywords:
       - SE Validation
       parallel: false
@@ -1173,6 +1230,7 @@ roles:
     description: 'V&V-Orchestrator: Bestimmt Integrationsstrategie und koordiniert
       Test-Ebenen.'
     routing:
+      addressability: keyword
       intent_keywords:
       - SE Integration
       - V&V
@@ -1194,6 +1252,7 @@ roles:
     description: 'Clean Code Gatekeeper: Blast-Radius-Analyse, SOLID/DRY Prüfung,
       Code-Qualitäts-Audit.'
     routing:
+      addressability: keyword
       intent_keywords:
       - Code Review
       - Code-Qualität
@@ -1224,6 +1283,7 @@ roles:
       Logik, Risiken, Machbarkeit und Konsistenz — gibt strukturiertes Critic-Feedback
       für Review-Loops'
     routing:
+      addressability: keyword
       intent_keywords:
       - Konzept Review
       - Design Review
@@ -1250,6 +1310,7 @@ roles:
     description: 'Erstellt technische Spezifikationen aus Anforderungen und Codebase-Kontext:
       Interface-Contracts, Datenfluss, Akzeptanzkriterien. Implementiert nicht (#370).'
     routing:
+      addressability: keyword
       intent_keywords:
       - Spezifikation
       - Konzept-Spezifikation
@@ -1284,6 +1345,7 @@ roles:
     description: 'Systemdesign für komplexe Änderungen (XL, >20 Dateien): Komponenten-Grenzen,
       Schnittstellen-Contracts, Trade-off-Analyse. Implementiert nicht (#370).'
     routing:
+      addressability: keyword
       intent_keywords:
       - Systemdesign
       - Systemarchitektur
@@ -1318,6 +1380,7 @@ roles:
     workflow_tier: optional
     description: UI-Spezifikationen, Mockups und Design-Systeme erstellen.
     routing:
+      addressability: keyword
       intent_keywords:
       - UI
       - UX
@@ -1348,6 +1411,7 @@ roles:
       (CSS/Tailwind), Farbharmonie-Systematik, Component-Variant-Contracts, Spacing-/Breakpoint-Methodik
       und Motion-Tokens.
     routing:
+      addressability: keyword
       intent_keywords:
       - Design-System
       - Design-Token
@@ -1380,6 +1444,7 @@ roles:
       und Token-/Variant-Contract (design-system-architect) — Props-Contract, State-Matrix,
       A11y-Baseline, Motion-/Responsive-Umsetzung.
     routing:
+      addressability: keyword
       intent_keywords:
       - UI-Komponente
       - React-Komponente
@@ -1411,6 +1476,7 @@ roles:
     workflow_tier: optional
     description: OpenAPI/Contract-First API Design, Schnittstellen-Spezifikationen.
     routing:
+      addressability: keyword
       intent_keywords:
       - API
       - OpenAPI
@@ -1438,6 +1504,7 @@ roles:
       und Index-Strategie — übergibt einen rückwärtskompatiblen Schema-Vertrag an
       developer.
     routing:
+      addressability: keyword
       intent_keywords:
       - database
       - schema
@@ -1474,6 +1541,7 @@ roles:
     workflow_tier: optional
     description: CI/CD, Infrastructure as Code, Kubernetes, Observability.
     routing:
+      addressability: keyword
       intent_keywords:
       - CI/CD
       - Kubernetes
@@ -1495,6 +1563,7 @@ roles:
     description: 'Proaktive Reliability-Disziplin: SLI/SLO-Definition, Error-Budgets,
       Capacity-Planning, Toil-Reduktion, Runbooks und Reliability-Reviews vor Deployment.'
     routing:
+      addressability: keyword
       intent_keywords:
       - SLO
       - SLI
@@ -1534,6 +1603,7 @@ roles:
       Lifecycle-Stage-Tracking (prototype → production → deprecated → archived) und
       Deprecation-Plan-Prüfung — read-only, Findings als Empfehlungen via feedback.'
     routing:
+      addressability: keyword
       intent_keywords:
       - App Ownership
       - orphan app
@@ -1567,6 +1637,7 @@ roles:
     description: 'Externe entwickler- und nutzergerichtete Doku: API-Referenzen, Getting-Started,
       SDK-Docs, Tutorials, CLI-Help, User-Release-Notes und UX-Microcopy.'
     routing:
+      addressability: keyword
       intent_keywords:
       - API reference
       - getting started
@@ -1600,6 +1671,7 @@ roles:
     description: 'Korrektorat: reine Fehlerkorrektur — Rechtschreibung, Grammatik, Zeichensetzung.
       Keine Stil- oder Strukturänderungen. Liefert kategorisierten Markdown-Findings-Report.'
     routing:
+      addressability: keyword
       intent_keywords:
       - Korrektorat
       - Rechtschreibung
@@ -1627,6 +1699,7 @@ roles:
     description: 'Lektorat: Stil, Satzbau, Wortwiederholungen, roter Faden und inhaltliche
       Konsistenz — aufbauend auf sauberem Korrektorat. Liefert kategorisierten Markdown-Findings-Report.'
     routing:
+      addressability: keyword
       intent_keywords:
       - Lektorat
       - Stil verbessern
@@ -1654,6 +1727,7 @@ roles:
     description: ETL/ELT-Pipelines, Schema-Migration (Datenebene), Data-Quality-Checks,
       Lineage-Analyse und Pipeline-Monitoring — übergibt eine Pipeline-Spec an developer.
     routing:
+      addressability: keyword
       intent_keywords:
       - ETL
       - ELT
@@ -1690,6 +1764,7 @@ roles:
     description: WCAG 2.1/2.2 Compliance-Audit, ARIA-Checks, Keyboard-Navigation,
       Screenreader-Guidelines, Farbkontrast, Focus-Management und Accessibility-Tree-Analyse.
     routing:
+      addressability: keyword
       intent_keywords:
       - accessibility
       - a11y
@@ -1728,6 +1803,7 @@ roles:
       Strangler Fig, inkrementelles Refactoring, Legacy-Modernisierung und Feature-Flag-getriebene
       Rewrites.'
     routing:
+      addressability: keyword
       intent_keywords:
       - refactoring
       - strangler fig
@@ -1764,6 +1840,7 @@ roles:
     description: 'Strategisches Produkt-Management: Backlog, User-Stories, Sprint-Planung,
       Priorisierung (RICE/MoSCoW), KPI-Definition und Stakeholder-Kommunikation.'
     routing:
+      addressability: keyword
       intent_keywords:
       - backlog
       - user story
@@ -1799,6 +1876,7 @@ roles:
     workflow_tier: optional
     description: Big-O Bottleneck-Identifikation und datengetriebene Performance-Optimierung.
     routing:
+      addressability: keyword
       intent_keywords:
       - Performance
       - Bottleneck
@@ -1820,6 +1898,7 @@ roles:
     description: 'Target-agnostischer Output-Router: Markdown, Confluence, Jira-Xray,
       Notion.'
     routing:
+      addressability: keyword
       intent_keywords:
       - Export
       - Routing
@@ -1842,6 +1921,7 @@ roles:
     description: Schätzt Aufwände für Entwicklungsaufgaben basierend auf Task-Typ
       und LLM-Kalibrierung
     routing:
+      addressability: keyword
       intent_keywords:
       - Aufwand
       - Schätzung
@@ -1864,6 +1944,7 @@ roles:
     description: Read-only Codebase-Recherche, Dependency- und Impact-Mapping, Datei-
       und Symbol-Suche.
     routing:
+      addressability: keyword
       intent_keywords:
       - Codebase
       - Dependencies
@@ -1897,6 +1978,7 @@ roles:
       Konfiguration (.claude), Best Practices (Formatter, Hooks, MCPs) zur optimalen
       Anpassung von agent-meta.'
     routing:
+      addressability: keyword
       intent_keywords:
       - Claude
       - Claude Code
@@ -1918,6 +2000,7 @@ roles:
       Funktionsweise, Konfiguration (.gemini), Best Practices (Formatter, Hooks, MCPs)
       zur optimalen Anpassung von agent-meta.'
     routing:
+      addressability: keyword
       intent_keywords:
       - Gemini
       - Antigravity
@@ -1939,6 +2022,7 @@ roles:
       Konfiguration (.opencode), Best Practices (Formatter, Hooks, MCPs) zur optimalen
       Anpassung von agent-meta.'
     routing:
+      addressability: keyword
       intent_keywords:
       - Opencode
       parallel: false
@@ -1958,6 +2042,7 @@ roles:
       Konfiguration (.continue), Best Practices (Formatter, Hooks, MCPs) zur optimalen
       Anpassung von agent-meta.'
     routing:
+      addressability: keyword
       intent_keywords:
       - Continue
       parallel: false
@@ -1977,6 +2062,7 @@ roles:
       Konfiguration (.github/copilot), Best Practices (Formatter, Hooks, MCPs) zur
       optimalen Anpassung von agent-meta.'
     routing:
+      addressability: keyword
       intent_keywords:
       - Copilot
       - GitHub Copilot
@@ -1998,6 +2084,7 @@ roles:
       Konfiguration (.mammouth), Best Practices (Formatter, Hooks, MCPs) zur optimalen
       Anpassung von agent-meta.'
     routing:
+      addressability: keyword
       intent_keywords:
       - Mammouth
       - Mammouth Code
@@ -2019,6 +2106,7 @@ roles:
     description: 'Strategische Knowledge-Engine-Steuerung: Schema-Evolution, Wiki-Strukturierung,
       Domänen-Anpassung, Ingest-Planung, OKF-Compliance.'
     routing:
+      addressability: keyword
       intent_keywords:
       - Knowledge
       - Wiki
@@ -2049,6 +2137,7 @@ roles:
     description: 'Sources einlesen, Key Information extrahieren, Wiki-Seiten erstellen/
       aktualisieren, Cross-References pflegen. Touch-Radius: ~10-15 Dateien/Ingest.'
     routing:
+      addressability: keyword
       intent_keywords:
       - Ingest
       - Source verarbeiten
@@ -2078,6 +2167,7 @@ roles:
     description: Fragen gegen das Knowledge Wiki beantworten. Index-First-Strategie,
       Drill-in, Synthese mit Citations. File-Back guter Antworten.
     routing:
+      addressability: keyword
       intent_keywords:
       - Wiki-Frage
       - Was wissen wir
@@ -2107,6 +2197,7 @@ roles:
     description: 'Wiki-Gesundheitscheck: Widersprüche, Orphans, veraltete Claims,
       kaputte Links, fehlende OKF-Frontmatter, Index-Staleness.'
     routing:
+      addressability: keyword
       intent_keywords:
       - Wiki-Lint
       - Wiki-Check
@@ -2136,6 +2227,7 @@ roles:
     description: Pflegt index.md (Content-Katalog, OKF §6) und log.md (Chronologisches
       Event-Log, OKF §7) im Knowledge Wiki.
     routing:
+      addressability: keyword
       intent_keywords:
       - Index aktualisieren
       - Index pflegen
@@ -2163,6 +2255,7 @@ roles:
     description: 'Kleinteilige Wiki-Pflege: Links reparieren, Tags harmonisieren,
       Frontmatter ergänzen, Typos korrigieren, Timestamps aktualisieren.'
     routing:
+      addressability: keyword
       intent_keywords:
       - Wiki-Pflege
       - Links reparieren
@@ -2194,6 +2287,7 @@ roles:
       Wiki migrieren. Discovery → Plan → User-Freigabe → Migration → Validierung.
       Schützt documenter- und requirements-eigene Dateien.
     routing:
+      addressability: keyword
       intent_keywords:
       - Migrieren
       - Aufräumen
@@ -2226,6 +2320,7 @@ roles:
     description: 'Frontend-Domain-Review: Komponenten, State, SSR/Hydration,
       Browser-APIs, Render-Performance.'
     routing:
+      addressability: keyword
       intent_keywords:
       - Frontend Review
       - Komponenten prüfen
@@ -2247,6 +2342,7 @@ roles:
     description: 'Backend-Domain-Review: API-Contracts, Silent Failures,
       Concurrency, Middleware-Ketten.'
     routing:
+      addressability: keyword
       intent_keywords:
       - Backend Review
       - API prüfen
@@ -2268,6 +2364,7 @@ roles:
     description: 'Datenbank-Domain-Review: Migration-Safety, N+1, Injection-Vektoren,
       Indexing, Transaktionen.'
     routing:
+      addressability: keyword
       intent_keywords:
       - Datenbank Review
       - Migration prüfen
@@ -2289,6 +2386,7 @@ roles:
     description: 'UI-Review: Design-Token-Conformance, Layout-Konsistenz,
       Interaction-States, i18n-Readiness.'
     routing:
+      addressability: keyword
       intent_keywords:
       - UI Review
       - Design-Token prüfen
@@ -2302,6 +2400,39 @@ roles:
       - UI-Konsistenz
       examples:
       - "Reviewe das UI auf Design-Token-Konformität."
+
+activation_groups:
+  se:
+    default: false
+    role_patterns: ["se-*"]
+    mirror_variable: SE_ENABLED
+    config_predicate:
+      kind: config_flag
+      path: systems-engineering.enabled
+  knowledge:
+    default: false
+    role_patterns: ["knowledge-*"]
+    mirror_variable: KNOWLEDGE_ENGINE_ENABLED
+    config_predicate:
+      kind: config_flag
+      path: knowledge-engine.enabled
+  validator:
+    default: false
+    role_patterns: ["validator"]
+    mirror_variable: VALIDATOR_ENABLED
+    config_predicate:
+      kind: roles_membership
+      mode: any
+      roles: ["validator"]
+  developer_tiers:
+    default: false
+    role_patterns: ["junior-developer", "senior-developer", "principal-developer"]
+    mirror_variable: DEVELOPER_TIERS_ENABLED
+    config_predicate:
+      kind: roles_membership
+      mode: all
+      roles: ["junior-developer", "senior-developer"]
+
 outcome-caching:
   enabled: false
   ttl_seconds: 3600

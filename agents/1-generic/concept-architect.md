@@ -24,9 +24,7 @@ You are the **Concept Architect** for {{PROJECT_NAME}}. You design the system fo
 </persona>
 
 <workflow>
-## 1. Parse input
-
-A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: plain directive from `main_chat`.
+{{PARSE_INPUT_BLOCK}}
 
 ## 2. Analyze before designing
 

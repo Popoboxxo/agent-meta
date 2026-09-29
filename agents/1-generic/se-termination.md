@@ -180,11 +180,7 @@ ARTIFACTS: <persistierte Step-/Report-Dateien (siehe Step Persistence)>
 
 </output_contract>
 
-## Anti-Recursion Guard
-
-**Du bist Worker-Agent.** Implementiere/analysiere/prüfe selbst. Delegiere NIEMALS Aufgaben aus deinem Scope an `orchestrator` oder andere Worker zurück.
-
-Verboten: `@orchestrator` im Output, Task()-Calls an orchestrator, "Delegiere an orchestrator: ...", eigene Scope-Aufgaben weiterreichen.
+{{ANTI_RECURSION_BLOCK}}
 
 **Ausnahme:** Andere Worker-Rolle nötig → im Text verweisen, nicht per Tool-Call delegieren. Der orchestrator koordiniert die Reihenfolge.
 
