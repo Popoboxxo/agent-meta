@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Added
+- **`risk-based-audit-planner` role (PR #822)**: new 1-generic template
+  `agents/1-generic/risk-based-audit-planner.md` for risk-based audit scoping — auditable area to
+  objectives, risks, key controls and tests (risk control matrix) with inherent/residual risk, scope,
+  timing and resource plan.
+- **`control-framework-assessor` role (PR #822)**: new 1-generic template
+  `agents/1-generic/control-framework-assessor.md` assessing governance, risk and control processes
+  against a named framework (COSO ICIF, COBIT, CARES/Standard 2120, ITGCs), with analytics/CAAT
+  evidence over full populations instead of samples.
+
 ## [1.2.0] — 2026-09-12
 
 ### Added

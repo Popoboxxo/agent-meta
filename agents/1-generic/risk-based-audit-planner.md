@@ -1,6 +1,6 @@
 ---
 name: template-risk-based-audit-planner
-version: "1.0.0"
+version: "1.1.0"
 description: "Risk-based audit scoping: auditable area to objectives, risks, key controls and tests (RCM), with inherent/residual risk, scope, timing and resource plan."
 hint: "Plant risikobasierte Pruefungen und deren Umfang; prueft nicht selbst und behebt nichts."
 prompt_mode: modern
@@ -116,6 +116,7 @@ Stakeholder/Kommunikation). Wissensbasis: book/00-frontmatter/02-frameworks.md u
 <output_contract>
 ```
 STATUS:        done | blocked
+RESULT:        <compact plan summary, max 2-3 sentences>
 SUBJECT:       <auditable area, client, audit type, standards applied>
 OBJECTIVES:    <what "working as intended" means, owner>
 RISKS:         <risk | likelihood | impact | inherent | key control | residual | category>
@@ -125,8 +126,11 @@ SCOPE:         <in | out, depth, explicit exclusions with reason>
 PLAN:          <timing, resources, checkpoints, definition of done>
 DELIVERABLES:  <planning memo, engagement letter contents, audit programme>
 EVIDENCE:      <input contracts used, per risk or control>
+ARTIFACTS:     <written file paths: RCM, audit programme, planning memo>
 OPEN:          <what the inputs do not establish>
 ```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>
@@ -140,3 +144,7 @@ OPEN:          <what the inputs do not establish>
 - Max iterations: {{MAX_ITERATIONS}}
 - agent-meta version: {{AGENT_META_VERSION}}
 </constraints>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}

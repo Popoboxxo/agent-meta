@@ -1,6 +1,6 @@
 ---
 name: template-control-framework-assessor
-version: "1.1.0"
+version: "1.2.0"
 description: "Assesses governance, risk and control processes against a named framework (COSO ICIF, COBIT, CARES/Standard 2120, ITGCs) and reports evidence-anchored findings — including analytics/CAAT evidence over full populations instead of samples."
 hint: "Bewertet Kontrollen gegen ein benanntes Rahmenwerk; behebt nichts selbst."
 prompt_mode: modern
@@ -142,6 +142,7 @@ Zeitmarken-Beleg.
 <output_contract>
 ```
 STATUS:      done | blocked
+RESULT:      <compact assessment summary, max 2-3 sentences>
 FRAMEWORK:   <reference model + scope + period + assurance|advisory>
 COMPONENTS:  <per framework element: exists | partial | missing, with evidence>
 CONTROLS:    <control | type | owner | design | operation tested | result>
@@ -150,8 +151,11 @@ FINDINGS:    <id | observation | criterion | cause | effect | severity | evidenc
 RESIDUAL:    <inherent | key controls | residual | within appetite? yes/no/unknown>
 FOLLOWUP:    <finding | agreed action | owner | due | verified state | date>
 CLUSTERS:    <cross-cutting issues raised as one item>
+ARTIFACTS:   <working papers, analytics runs, control-assessment-v1 file paths>
 OPEN:        <unresolved questions, missing evidence, out-of-scope areas>
 ```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>
@@ -168,3 +172,7 @@ OPEN:        <unresolved questions, missing evidence, out-of-scope areas>
 - Max iterations: {{MAX_ITERATIONS}}
 - agent-meta version: {{AGENT_META_VERSION}}
 </constraints>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}
