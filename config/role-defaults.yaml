@@ -2410,6 +2410,7 @@ roles:
     description: 'Risk-based audit scoping: auditable area to objectives, risks, key controls and tests
       (RCM), with inherent/residual risk, scope, timing and resource plan.'
     routing:
+      addressability: keyword
       intent_keywords:
       - risikobasierte Pruefungsplanung
       - Pruefungsuniversum
@@ -2462,6 +2463,7 @@ roles:
     description: Assesses governance, risk and control processes against a named framework (COSO ICIF, COBIT,
       CARES/Standard 2120, ITGCs) and reports evidence-anchored findings.
     routing:
+      addressability: keyword
       intent_keywords:
       - Kontrollrahmen pruefen
       - COSO
