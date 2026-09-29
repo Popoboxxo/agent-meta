@@ -10,6 +10,14 @@
   a tool call. All 9 providers ship explicit `route_intent_tool: false` (conservative;
   a live `route_intent` acceptance proof is required to flip one to `true`), so no
   runtime blocks on an unregistered tool.
+- **`risk-based-audit-planner` role (PR #822)**: new 1-generic template
+  `agents/1-generic/risk-based-audit-planner.md` for risk-based audit scoping — auditable area to
+  objectives, risks, key controls and tests (risk control matrix) with inherent/residual risk, scope,
+  timing and resource plan.
+- **`control-framework-assessor` role (PR #822)**: new 1-generic template
+  `agents/1-generic/control-framework-assessor.md` assessing governance, risk and control processes
+  against a named framework (COSO ICIF, COBIT, CARES/Standard 2120, ITGCs), with analytics/CAAT
+  evidence over full populations instead of samples.
 
 ### Changed
 - **Role activation is gate-driven for `validator` and the developer tiers (consumer-visible —

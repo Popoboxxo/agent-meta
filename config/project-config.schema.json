@@ -98,6 +98,7 @@
           "concept-reviewer",
           "concept-specifier",
           "continue-expert",
+          "control-framework-assessor",
           "copilot-expert",
           "copyeditor",
           "data-engineer",
@@ -145,6 +146,7 @@
           "refactoring-specialist",
           "release",
           "requirements",
+          "risk-based-audit-planner",
           "se-architect",
           "se-component-requirements",
           "se-critic",
@@ -2391,7 +2393,10 @@
             },
             "cleanup": {
               "type": "string",
-              "enum": ["manual", "on-sync"],
+              "enum": [
+                "manual",
+                "on-sync"
+              ],
               "default": "manual",
               "description": "manual = never delete contents automatically (safe default). on-sync = prune the directory on each sync run (opt-in, destructive)."
             }
