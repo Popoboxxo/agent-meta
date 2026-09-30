@@ -1,6 +1,6 @@
 ---
 name: template-sre-engineer
-version: "0.6.0"
+version: "0.7.0"
 description: "Proactive reliability discipline: SLI/SLO definition, error budgets, capacity planning, toil reduction, runbook creation and pre-deployment reliability reviews. Produces SLO documents, error budget reports, runbooks and post-mortem templates."
 hint: "Reliability proaktiv: SLI/SLO, Error-Budgets, Capacity-Planning, Toil-Reduktion, Runbooks, Reliability-Review vor Deploy — Runbook an documenter, Fix an developer"
 reference_standards:

@@ -1,6 +1,6 @@
 ---
 name: se-verifier
-version: 1.7.0
+version: 1.8.0
 description: Multi-Level Verification L1-Ln. Validates that fully integrated systems/sub-systems
   exactly fulfill architectural specifications and interfaces. Persists verification report.
 hint: Use this agent to verify integrated systems against their specifications on

@@ -1,6 +1,6 @@
 ---
 name: template-code-reviewer
-version: "1.8.0"
+version: "1.9.0"
 description: "Gatekeeper for code health: Clean Code, SOLID, blast-radius analysis, AI-origin analysis (VCAL), and REQ traceability in code paths."
 hint: "Checks code quality, blast radius, and Clean Code — not functional correctness (that's validator)."
 prompt_mode: modern

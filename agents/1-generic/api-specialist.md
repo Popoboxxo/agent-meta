@@ -1,6 +1,6 @@
 ---
 name: template-api-specialist
-version: "1.6.0"
+version: "1.7.0"
 description: "API design, OpenAPI specifications, contract-first development. Creates and maintains API contracts."
 hint: "Use this agent for API design, OpenAPI specifications, and contract-first development."
 reference_standards:

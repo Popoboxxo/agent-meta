@@ -1,6 +1,6 @@
 ---
 name: template-data-engineer
-version: "0.5.0"
+version: "0.6.0"
 description: "ETL/ELT pipeline design, data-layer schema migration, data quality checks, lineage analysis, pipeline monitoring and streaming/batch design. Produces pipeline specs, data quality reports, lineage diagrams and migration scripts. Distinct from database-engineer query/index work."
 hint: "Data-Pipelines: ETL/ELT, Schema-Migration (Datenebene), Data-Quality, Lineage, Pipeline-Monitoring, Streaming/Batch — übergibt Pipeline-Spec an developer"
 reference_standards:
