@@ -18,6 +18,12 @@
   `agents/1-generic/control-framework-assessor.md` assessing governance, risk and control processes
   against a named framework (COSO ICIF, COBIT, CARES/Standard 2120, ITGCs), with analytics/CAAT
   evidence over full populations instead of samples.
+- **`fraud-risk-assessor` role (PR #824)**: new 1-generic template
+  `agents/1-generic/fraud-risk-assessor.md` assessing occupational fraud risk and appraising the
+  anti-fraud program across deterrence, prevention, detection and investigation — scenarios built on
+  the Fraud Triangle/Hexagon, red-flag indicators and the reporting channel, with inherent and
+  residual exposure rated. Read-only and prospective: no investigation, no accusation, no risk
+  management.
 
 ### Changed
 - **Role activation is gate-driven for `validator` and the developer tiers (consumer-visible —
