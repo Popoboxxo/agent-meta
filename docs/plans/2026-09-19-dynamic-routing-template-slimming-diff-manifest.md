@@ -1333,3 +1333,249 @@ einmal für `control-assessment-v1` (PR #822, vor dem Merge) und einmal für
 Einträge bleiben Teil des Nachweises, weil sie zwei verschiedene, unabhängige Delta-Ursachen auf
 derselben Fixture dokumentieren. Sollte künftig ein weiterer PR erneut am `feedback`-Vertrag
 drehen, ist Abschnitt 12 der Präzedenzfall für die Reihenfolge „Merge zuerst, dann re-baselinen".
+
+## 13. Re-Baseline der Golden-Baseline für 7 Rollen (PR #840, nach dem Merge)
+
+Erster Re-Baseline-Fall, der **mehrere** Fixtures zugleich betrifft. Die Abschnitte 8–12
+deckten jeweils **eine** Fixture (`effort-estimator` #833, `documenter` #828, `dependency-auditor`
+#825, `orchestrator` #822 und #824). PR #840 verändert **neun** bestehende Rollen-Templates
+inhaltlich; davon besitzen sieben eine eingefrorene Fixture und rutschen damit alle aus der
+eingefrorenen Baseline heraus.
+
+> **Autor:** Develop-Agent `senior-developer` (Orchestrator-Delegation); namentliche Autorschaft
+> wird hier nicht geführt — Nachweis ist der Diff-Scope in 13.5.
+> **Commit:** **noch nicht vorhanden** — die Re-Baseline wurde bewusst **nicht** committet; die
+> Aufgabengrenze verbietet Git-Mutationen (`commit`/`add`/`push`). Abweichend von Abschnitt 8 wird
+> deshalb **keine** Commit-SHA zitiert; eine erfundene wäre eine Falschangabe. Messbasis ist der
+> Arbeitsbaum auf `bb27e210` (Branch `feat/ai-agent-roles-literature-2026`, Merge-Commit mit zwei
+> Eltern `27ba699b` + `01dc2ced`, in Sync mit `origin`).
+> **Gegenstand:** 7 von **58** eingefrorenen Golden-Fixtures (Aktive-Rollen-Menge,
+> `tests/fixtures/slimming-golden/README.md:36-38`; neu gemessen:
+> `len(_golden_roles()) == _GOLDEN_ROLE_COUNT == 58`).
+> **Klassifikation:** **Baseline-Update nach Update-Regel**
+> (`tests/fixtures/slimming-golden/README.md:73-77`) — **kein B2a-/B2b-Fall**; siehe 13.2 und 13.7.
+> **Nicht Gegenstand:** die vier neuen Rollen `llm-evaluator`, `rag-engineer`,
+> `ai-governance-engineer` und `ai-observability-engineer` — sie sind **keine** aktiven
+> agent-meta-Rollen (kein Eintrag in der `roles:`-Whitelist `.meta-config/project.yaml`), werden
+> nicht gerendert und besitzen keine Fixture. Ebenso nicht Gegenstand: `se-verifier` und
+> `sre-engineer` — sie wurden von PR #840 ebenfalls inhaltlich geändert, besitzen aber **keine**
+> Fixture und sind damit vom Gate nicht erfasst.
+
+### 13.1 Auslöser
+
+Der Merge-Zustand `bb27e210` enthält `01dc2ced` (`feat(agents): add fraud risk assessment role
+(#824)`) als zweiten Eltern. PR #840 (`27ba699b`) verändert die Rollen-Templates additiv — neue
+Persona-Abschnitte mit Buch-Belegen, neue Scope-Abgrenzungen, neue Routing-Verweise:
+
+| Rolle | `git diff 01dc2ced..HEAD` (Template) | Delta-Klasse | Migrationsstatus |
+|---|---|---|---|
+| `orchestrator` | +4 | Persona-Erweiterung (Decompositions-Begründung, Review-Loop-Governance) | **unmigriert** |
+| `api-specialist` | +4 | Persona-Erweiterung (Swiss-Army-Knife-Verbot, MCP-Grenze) | migriert |
+| `code-reviewer` | +9 | Persona-Erweiterung (`blocking` / `claim_type` pro Finding) | migriert |
+| `data-engineer` | +2 | Scope-Abgrenzung gegen `rag-engineer` | migriert |
+| `principal-developer` | +4 | Persona-Erweiterung (Existenz-Begründung, Anti-Pattern) | migriert |
+| `prompt-engineer` | +10 | Persona-Erweiterung (Guardrail-Klassen, keine Universalformel) | migriert |
+| `validator` | +4 | Persona-Erweiterung (verifiable ≠ plausible, Claim-Typing) | migriert |
+| `se-verifier` | +10 | zwei neue Abschnitte (Zero-Product-Regel L1–Ln, verifiable over plausible) | migriert, **ohne Fixture** |
+| `sre-engineer` | +4 | Scope-Abgrenzung gegen `ai-observability-engineer` | migriert, **ohne Fixture** |
+
+Zusätzlich wurden im selben Arbeitsbaum die **Frontmatter-Versionen** dieser neun Templates
+gemäß `conventions`-Invariante #2 minor gehoben (additive Inhaltsänderung → Minor `x.Y.0`, siehe
+13.3). Beides zusammen — Persona-Delta **und** Versionsfeld — verschiebt das gerenderte Frontmatter
+(`version:` **und** `generated-from: …@<version>`) und damit die Fixture.
+
+Der Merge lieferte für `orchestrator.md` bereits eine re-baselined Fixture (Abschnitte 11 und 12,
+mit `control-assessment-v1` bzw. `fraud-risk-assessment-v1`). Diese Re-Baseline wurde
+**darüber** gelegt; die Fixture wurde zu keinem Zeitpunkt aus `origin/main` zurückgespielt. Der
+Bestandsnachweis in 13.6 belegt, dass beide Main-Einträge erhalten geblieben sind.
+
+### 13.2 Mechanismus des Fehlschlags
+
+Das Gate `test_golden_equivalence_and_normalization_marking`
+(`tests/test_template_slimming_equivalence.py:1105-1150`) verzweigt nach der Template-Zuordnung der
+Rolle, aufgelöst über das eigene `generated-from:`-Frontmatter-Feld der Fixture gegen
+`_MIGRATED_PATHS` (`:1113-1114`):
+
+- **unmigriert** (`orchestrator`): `golden != current` ⇒ `unexpected diff on an unmigrated role`
+  (`:1116-1127`). **Byte-Identität** ist hier die vertragliche Anforderung.
+- **migriert** (die übrigen sechs): `_normalize(golden, variables)` (`:1129`) liefert den
+  normalisierten Text; `normalized != current` ⇒ `diff not attributable to declared normalizations`
+  (`:1136-1149`). Die deklarierten Normalisierungen decken **ausschließlich** die vier Block-Kinds
+  aus `_KIND_CANONICAL_VAR` ab (`ANTI_RECURSION`, `OUTPUT_GUARD`, `BACKGROUND_PROCESS_GUARD`,
+  `PARSE_INPUT`); `_LOCATORS` (`:348-353`) erkennen Sektionen über Heading-/Tag-Regexe, **keine
+  Versionsstrings und keine Persona-Absätze**.
+
+Beide Zweige sind für dieses Delta blind: das Versions- und Persona-Delta liegt außerhalb des
+Normalisierungsmodells. Eine erfundene `retained`-Klausel, eine neue B2b-Variante oder eine
+Lockerung von `_MIGRATED_PATHS` hätte den Vertrag verletzt statt eingehalten. Der Vorher-Zustand
+wurde vor dem Kopieren reproduziert und nannte **genau diese sieben** Rollen (8 Regex-Treffer, 7
+eindeutige Namen) — kein achter.
+
+### 13.3 Gewählte Fix-Route und Vertragsbeleg
+
+Bewusste, über den **echten Sync-Pfad** erzeugte Re-Baseline nach dem Verfahrensvertrag
+(`tests/fixtures/slimming-golden/README.md:22-41`), ausdrücklich **nicht** als „incidental
+re-render" (`:18-20`) und **nicht** als Handedit. Optionen:
+
+| Option | Bewertung |
+|---|---|
+| Fixtures auf dem alten Stand belassen | Nicht möglich — die Templates sind Vorgänger im Merge-Ref, der Render ist der neue Stand |
+| Rolle künstlich migrieren / B2b-Variante erfinden | Vertragsbruch (13.2) |
+| `{{AGENT_META_DATE}}`-Sonderregel ausweiten | Nicht anwendbar — der Platzhalter rendert ausschließlich in `agent-meta-manager.md` (`:57-71`) |
+| Bulk-Kopieren des gesamten `agents`-Baums in den Fixture-Ordner | **Verworfen** — würde die 51 nicht betroffenen eingefrorenen Fixtures still überschreiben und genau die Verschiebung erzeugen, die 12.6 als Fehler benennt |
+| **Bewusste Re-Baseline der 7 benannten Fixtures + Manifest-Eintrag** | **Gewählt** — genau der in R8 und in der Update-Regel vorgesehene Weg |
+
+Maßgeblich war die Reihenfolge: das Gate wurde **zuerst** laufen gelassen und seine Namensliste als
+Arbeitsauftrag übernommen; erst danach wurde kopiert. Der Byte-Vergleich gegen den Render wurde
+**nicht** als Auswahlkriterium verwendet — 24 Fixtures weichen roh vom Render ab (13.6b) und sind
+trotzdem korrekt.
+
+Ebenfalls in diesem Arbeitsbaum, aus derselben Ursache (Inhaltsänderung ohne Versionshub):
+Neun Template-Versionen minor gehoben, additiv, ohne Verhaltens- oder Variablenumbau:
+
+| Template | vorher | nachher |
+|---|---|---|
+| `agents/1-generic/api-specialist.md` | `1.6.0` | `1.7.0` |
+| `agents/1-generic/code-reviewer.md` | `1.8.0` | `1.9.0` |
+| `agents/1-generic/data-engineer.md` | `0.5.0` | `0.6.0` |
+| `agents/1-generic/orchestrator.md` | `8.2.0` | `8.3.0` |
+| `agents/1-generic/principal-developer.md` | `1.5.0` | `1.6.0` |
+| `agents/1-generic/prompt-engineer.md` | `1.10.0` | `1.11.0` |
+| `agents/1-generic/se-verifier.md` | `1.7.0` | `1.8.0` |
+| `agents/1-generic/sre-engineer.md` | `0.6.0` | `0.7.0` |
+| `agents/1-generic/validator.md` | `4.6.0` | `4.7.0` |
+
+Die vier neuen Templates (`llm-evaluator`, `rag-engineer`, `ai-governance-engineer`,
+`ai-observability-engineer`) stehen korrekt auf `1.0.0` und wurden nicht gehoben.
+
+### 13.4 Nachweis der Herkunft (keine Handpflege)
+
+- Erzeugung über den echten Sync-Pfad, Provider `Claude` (`config/ai-providers.yaml`:
+  `agents_dir: .claude/agents`), wie in `README.md:22-41` vorgeschrieben:
+  `AGENT_META_TEST_REPO="$PWD/.tmp/slimming-golden-gen" python3 scripts/sync.py --validate`
+  (rc `0`, 58 gerenderte Rollen) und ein zweiter Lauf in `.tmp/slimming-golden-gen2`.
+- **Determinismus-Nachweis (Zweitrender) — durchgeführt.** Verfahrensvertrag
+  `tests/fixtures/slimming-golden/README.md:43-55`:
+  `diff -r .tmp/slimming-golden-gen/.claude/agents .tmp/slimming-golden-gen2/.claude/agents`
+  ⇒ **rc `0`, 0 Byte Ausgabe, 58 = 58 Dateien**. Keine Abweichung, insbesondere nicht in der
+  `{{AGENT_META_DATE}}`-Zeile.
+- **Kopiert wurden ausschließlich die 7 vom Gate benannten Fixtures**, einzeln und verbatim; `cmp`
+  bestätigt für jeden der sieben Dateien Byte-Gleichheit mit **beiden** Renders. `git status`
+  weist unter `tests/fixtures/slimming-golden/` genau diese 7 als geändert aus — keine der 51
+  übrigen Fixtures wurde angefasst.
+- sha256 der sieben Fixtures im Arbeitsbaum (identisch zum jeweiligen Sync-Render):
+
+  | Fixture | sha256 |
+  |---|---|
+  | `orchestrator.md` | `5016fd71154ad3db835d06ec13ef4cf0803100f0f557d819237f4747660ab192` |
+  | `api-specialist.md` | `cbce9b31d481e8c1a825608b4968bfa58737ac35b76751d36b366376822c2350` |
+  | `code-reviewer.md` | `ff5c67079efab52347026f463a88d8ef412a98189b4f287ff658ded698bf5ea8` |
+  | `data-engineer.md` | `8d033b0aebe1f53272eaf73d19764de0c31c0bc84024d26fe9727bbf0be7c11f` |
+  | `principal-developer.md` | `c40189b4d54eff073434a9f5e2b83c436ffd6f4fa8383558979dc45cc67e799f` |
+  | `prompt-engineer.md` | `ad489a123eb0f15ee0b67f1bd78714c7f84208d79b39f5eb55a80e3b4c2e0b4d` |
+  | `validator.md` | `5b783e0da8aa6ff44bc46cb9f07da2a8aa3fd85108da136cd90213ab2c6f5168` |
+
+- Keine der 58 Fixtures enthält einen Absolutpfad, einen Hostnamen, eine 40-stellige Commit-SHA
+  oder `{{AGENT_META_DATE}}` (über das gesamte Verzeichnis geprüft).
+- Frontmatter konsistent je Fixture: `version:` **und** `generated-from: <pfad>@<version>` tragen
+  denselben Wert (`1.7.0`, `1.9.0`, `0.6.0`, `8.3.0`, `1.6.0`, `1.11.0`, `4.7.0`).
+- **Merge-Einträge erhalten:** `orchestrator.md` enthält weiterhin `fraud-risk-assessment-v1` und
+  `control-assessment-v1` (je 1 Treffer) und zusätzlich die neuen Verweise `llm-evaluator`,
+  `ai-governance-engineer`, `ai-security-guardian`. Die Fixture wurde auf dem gemergten Stand
+  **weitergeschrieben**, nicht aus `origin/main` restauriert.
+
+### 13.5 Verifikation
+
+Verifikationslauf im Arbeitsbaum auf `bb27e210` (nach dem Merge, Git-Mutationen verboten):
+
+| Prüfung | Ergebnis |
+|---|---|
+| `pytest tests/test_role_addressability_coverage.py tests/test_routing_tool_definitions.py tests/test_unified_active_set.py tests/test_template_slimming_equivalence.py -q` | **46 passed**, rc 0 |
+| `pytest tests/test_template_slimming_equivalence.py -q` | **8 passed**, rc 0 |
+| `python3 -m pytest tests/ -q --ignore=tests/browser --ignore=tests/test_knowledge_engine.py --timeout=120` | **3082 passed**, 11 Subtests, rc 0, **0 failed** |
+| `bash tests/scenarios/run.sh` | **63 von 63 Szenarien PASS**, 0 FAIL, rc 0 (`Scenarios: 63  Passed: 63  Failed: 0`) |
+| `python3 scripts/sync.py --validate` | rc `0`, **0 Errors**. Die drei `crossrefs.changelog-missing-entry`-Warnungen betreffen `snippets/agents/{background-process-guard,output-guard,parse-input}.md` — Added by `3c46920a` (PR #833), **nicht** durch PR #840; für die von diesem PR veränderten Dateien besteht keine Warnung. Der CHANGELOG-Eintrag für PR #840 liegt bereits unter `[Unreleased]` |
+| Vorher-Zustand des Gates | **1 failed** — reproduziert vor dem Fix, nannte genau diese 7 Rollen (13.2) |
+| `git status --short` | genau **19** Dateien: die 7 Fixtures (Gegenstand dieses Eintrags), 9 Template-Versionen (13.3), `config/role-defaults.yaml`, `tests/test_role_addressability_coverage.py`, dieses Manifest; `CHANGELOG.md` ist **unverändert** — **keine** Datei außerhalb des zulässigen Rahmens |
+| Diff-Scope der Fixtures | `git diff --numstat`: `api-specialist` 6/2, `code-reviewer` 11/3, `data-engineer` 4/2, `orchestrator` 20/6, `principal-developer` 6/2, `prompt-engineer` 12/2, `validator` 6/2 |
+
+Der Test-Korpus blieb unangetastet: **kein** Eingriff in `_MIGRATED_PATHS`, `_NORMALIZATIONS`,
+`_LOCATORS`, `_KIND_REGISTRY` oder `_GOLDEN_ROLE_COUNT` (58, unverändert); keine Assertion in
+`tests/test_role_addressability_coverage.py` wurde geschwächt, übersprungen oder gelockert — dort
+wurden ausschließlich die beiden Re-Baseline-Konstanten `_EXPECTED_TOTAL` (87 → 91) und
+`_EXPECTED_DISTRIBUTION` (`keyword` 84 → 88) an den real gemessenen Bestand angepasst; das
+Modul-Docstring zitiert bewusst weiterhin die eingefrorene 84er-Baseline der Spec.
+
+> **Grenze der Aussage:** die beiden Konfig-/Testdateien (`config/role-defaults.yaml`,
+> `tests/test_role_addressability_coverage.py`) sind **kein** Teil der Golden-Baseline. Sie gehören
+> zur Registrierungs-Vollständigkeit der vier neuen Rollen (`routing.addressability: keyword` als
+> erster Key unter `routing:`, `routing_patterns.keywords` byte-identisch zu
+> `routing.intent_keywords`) und sind hier nur der Vollständigkeit des Arbeitsbaum-Umfangs halber
+> genannt. Sie müssen **gemeinsam** mit den Fixtures landen, sonst regressiert
+> `test_keyword_roles_have_non_empty_patterns`.
+
+### 13.6 Bestandsaufnahme aller 58 Goldens
+
+Vollständig über alle 58 Fixtures neu gemessen (Byte-Vergleich Fixture ↔ Render aus beiden
+Sync-Läufen, Aufteilung nach `_MIGRATED_PATHS`, Template-Zuordnung je Fixture über das eigene
+`generated-from:`-Frontmatter-Feld), wie in 9.6, 10.6, 11.6 und 12.6 frisch gemessen und nicht
+übernommen:
+
+**(a) Test-native — die Definition, die das Gate durchsetzt:**
+
+| Kategorie | Anzahl | Veränderung ggü. 12.6 |
+|---|---|---|
+| byte-identisch (unmigriert) | 11 | unverändert |
+| deklariert migriert | 47 | unverändert |
+| **echter Skew** | **0** | unverändert |
+
+Die 11 unmigrierten byte-identischen Rollen sind `agent-meta-scout`, `claude-expert`,
+`continue-expert`, `copilot-expert`, `effort-estimator`, `gemini-expert`, `ideation`,
+`intern-developer`, `mammouth-expert`, `opencode-expert` und `orchestrator`. `orchestrator` ist
+darin **unverändert** enthalten: der Byte-Identitätszweig des Gates ist nach der Re-Baseline
+wieder erfüllt, die Rolle ist **nicht** und **darf nicht** migriert werden.
+
+**(b) Raw-Byte — ohne Normalisierung:**
+
+| Kategorie | vorher | nachher | Veränderung |
+|---|---|---|---|
+| byte-identisch zum Render | 27 | **34** | +7 |
+| raw-abweichend | 31 | **24** | −7 |
+
+Die 7 roh abweichenden Fixtures waren **exakt** die 7 in 13.2 genannten; alle 7 sind nach der
+Re-Baseline in die byte-identische Gruppe gewechselt. Die verbleibenden 24 Roh-Deltas sind
+**mengengleich und setzgleich** mit den 24 aus 12.6 — als Mengenvergleich vor und nach dem Kopieren
+verifiziert. Sie sind sämtlich Absatz-/Marker-Verschiebungen (`PARSE_INPUT`, `OUTPUT_GUARD`,
+`ANTI_RECURSION`) und werden von den deklarierten Normalisierungen absorbiert. Maßgeblich ist
+deshalb das Gate, nicht der Byte-Vergleich — die Re-Baseline hat **keine** andere eingefrorene
+Fixture verschoben.
+
+Zusätzlich bestätigt: **keine Orphan-Fixture** und **kein Golden ohne Render-Gegenstück** (58 = 58,
+0 Orphans in beide Richtungen). `agent-meta-manager.md` — die einzige `{{AGENT_META_DATE}}`-Fixture
+(`tests/fixtures/slimming-golden/README.md:57-71`) — ist **unverändert**; die Zeile
+`**Version info:** v1.2.0-beta.2 (2026-09-13)` ist identisch mit `HEAD`, der `diff -r` über den
+gesamten Zielbaum (13.4) zeigt keinen Datumsdrift. Die Scratch-Verzeichnisse
+`.tmp/slimming-golden-gen{,2}` wurden nach der Messung entfernt.
+
+### 13.7 Status B2a
+
+B2a ist durch die Re-Baseline **wiederhergestellt**, nicht abgeschwächt: jede der 7 Fixtures
+enthält exakt den vom aktuellen Template erzeugten Output, die Update-Regel ist erfüllt (dieser
+Eintrag), und das Gate ist grün (13.5). Die Deltas aus 13.1 sind orthogonale Inhalts- und
+Versionsänderungen der generierten Rollen; an `_MIGRATED_PATHS`, `_NORMALIZATIONS`, `_LOCATORS`,
+`_KIND_REGISTRY` oder `_GOLDEN_ROLE_COUNT` wurde **nichts** angefasst — das Gate behält seine
+Zähne.
+
+Klarstellung zur Einordnung wie in 8.7, 9.7, 10.7, 11.7 und 12.7: dies ist eine **Statusaussage**
+über B2a, keine Klassifikation der Änderung als B2a-Fall. Die Änderung selbst ist ein
+Baseline-Update nach Update-Regel (Kopf-Block dieses Abschnitts, Vertrag
+`tests/fixtures/slimming-golden/README.md:73-77`), weil für keine der sieben Rollen eine
+Near-Duplikat-Variante für das Delta aus 13.1 vorliegt (13.2).
+
+Verhältnis zu den Abschnitten 11 und 12: `orchestrator.md` ist damit **drittmal** am selben
+Gegenstand re-baselined worden — `control-assessment-v1` (PR #822, vor dem Merge),
+`fraud-risk-assessment-v1` (PR #824, nach dem Merge) und nun das Persona-/Versions-Delta aus
+PR #840. Die Abschnitte ersetzen sich **nicht**; alle drei Einträge bleiben Teil des Nachweises,
+weil sie drei unabhängige Delta-Ursachen auf derselben Fixture dokumentieren. Für die Reihenfolge
+bleibt Abschnitt 12 der Präzedenzfall („Merge zuerst, dann re-baselieren") — die vorliegende
+Re-Baseline folgt ihm.

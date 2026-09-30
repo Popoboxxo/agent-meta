@@ -15,9 +15,9 @@ presets:
     tests-required: true
     codebase-overview: true
     security-audit: false
-    ai-security-review: false
-    prompt-governance: false
-    lifecycle-ownership: false
+    ai-security-review: true
+    prompt-governance: true
+    lifecycle-ownership: true
     spec-plan-required: false
     spec-plan-traceability: false
     root-cause-required: false
@@ -81,9 +81,9 @@ presets:
     tests-required: true
     codebase-overview: false
     security-audit: false
-    ai-security-review: false
-    prompt-governance: false
-    lifecycle-ownership: false
+    ai-security-review: true
+    prompt-governance: true
+    lifecycle-ownership: true
     spec-plan-required: true
     spec-plan-traceability: true
     root-cause-required: true

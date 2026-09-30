@@ -1,0 +1,100 @@
+# Review rules index — AI / generated-code domain
+# Fleet reviewers may ONLY cite rule_ids defined here or in their template defaults.
+#
+# Rule shape is domain-neutral (same fields as backend/frontend/database/security/ui)
+# plus two fields that make a finding machine-actionable:
+#   blocking    true  -> must be resolved before merge (a "needs change" comment)
+#                false -> advisory, must not block the PR
+#   claim_type  verifiable -> falsifiable by re-reading code or re-running data
+#              judgment   -> requires expert opinion, cannot be proven
+#
+# Origin for those two fields: "Looks Good to Me" (Braganza) ch. 6, "Comment
+# signals". Note the book reports its own team ABANDONING MoSCoW, because the
+# Must/Should boundary proved too blurry in practice, and settling on three
+# explicit signals instead (needs change / levelup / nitpick) — with nitpicks
+# that "should never block a PR". The two fields above encode exactly that
+# distinction: does it block, and is the claim checkable.
+#
+# Scope note: BE-07 and BE-08 (the two rules the literature analysis proposed
+# for backend.yaml) live here instead, because they are not backend-specific —
+# they apply to any generated or agent-authored code in any domain. The AI
+# reviewer cites them from this file; no rule_id exists twice.
+version: 1
+domain: ai
+rules:
+  - id: AI-01
+    title: Happy-path code (no error, edge-case, or boundary handling)
+    severity_hint: high
+    blocking: true
+    claim_type: verifiable
+    standard_ref:
+    source: >-
+      Coding with AI (Morgan) ch. 5: "AI tools often generate happy-path code,
+      which works in ideal conditions but may need hardening for production."
+  - id: AI-02
+    title: Symptom fix instead of root cause
+    severity_hint: high
+    blocking: true
+    claim_type: judgment
+    standard_ref:
+    source: >-
+      Coding with AI (Morgan) ch. 6: "sometimes the AI will fix symptoms rather
+      than root causes." Whether the change addresses the cause is a reviewer
+      judgment, not a mechanically decidable check.
+  - id: AI-03
+    title: Unsupported claim without a source (hallucinated fact or reference)
+    severity_hint: high
+    blocking: true
+    claim_type: verifiable
+    standard_ref:
+    source: >-
+      LLM Evaluation and Alignment (Lee) ch. 5.1, "An LLM reliability quadrant":
+      check grounding against a defined source before judging factual alignment.
+  - id: AI-04
+    title: Unseparated system and user instructions (prompt-injection surface)
+    severity_hint: high
+    blocking: true
+    claim_type: verifiable
+    standard_ref: OWASP-LLM01
+    source: >-
+      Prompt guardrail classes - security boundaries, behavioral limits, scope
+      restrictions - are not separately declared in the prompt under review.
+  - id: AI-05
+    title: Non-deterministic assertion in an eval or test
+    severity_hint: medium
+    blocking: false
+    claim_type: verifiable
+    standard_ref:
+    source: >-
+      AI Model Evaluation (Nassery) ch. 10.2.3: rubrics tell you how good
+      something was, checklists tell you why.
+  - id: AI-06
+    title: Model or prompt change with no evaluation baseline
+    severity_hint: high
+    blocking: true
+    claim_type: verifiable
+    standard_ref:
+    source: >-
+      Building Reliable AI Systems (Shahani) ch. 2: failure modes such as vague
+      answers, refusals, high latency and ballooning costs arise from hidden
+      bottlenecks including prompt drift and poor fallback logic. Without a
+      recorded baseline, a quality change is indistinguishable from drift.
+  - id: AI-07
+    title: Quality dimensions averaged so a failed dimension is hidden
+    severity_hint: high
+    blocking: true
+    claim_type: verifiable
+    standard_ref:
+    source: >-
+      LLM Evaluation and Alignment (Lee) ch. 2.1.4, zero-product property of the
+      geometric mean: a single failed component must yield zero rather than be
+      averaged away.
+  - id: AI-08
+    title: Model invoked without timeout, fallback, or failure handling
+    severity_hint: high
+    blocking: true
+    claim_type: verifiable
+    standard_ref:
+    source: >-
+      Building Reliable AI Systems (Shahani) ch. 2, on fallback logic as a
+      reliability property of the deployment rather than of the prompt.
