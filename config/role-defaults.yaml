@@ -2432,6 +2432,7 @@ roles:
       Kap. 10.2.3, LLM Evaluation and Alignment (Lee) Kap. 1/2. Nicht Code-Review (code-reviewer),
       nicht Prozesskonformität (validator), nicht Security-Muster (ai-security-guardian).'
     routing:
+      addressability: keyword
       intent_keywords:
       - LLM Evaluation
       - Eval-Suite
@@ -2450,6 +2451,7 @@ roles:
       - LLM-as-judge
       - Rubrik
       - Regressions-Gate
+      - Prompt-Änderung bewerten
       examples:
       - "Miss die Antwortqualität dieser Prompt-Änderung gegen unser Golden Dataset."
       - "Baue eine Eval-Suite mit Rubriken und prüfe, ob der Prompt-Wechsel eine Regression bringt."
@@ -2475,6 +2477,7 @@ roles:
       testbar und reparierbar (Learn AI Data Engineering, Melillo, Kap. 12.1.2). Abgrenzung:
       data-engineer deckt ETL/ELT und Lineage ab, aber ohne RAG-Bezug.'
     routing:
+      addressability: keyword
       intent_keywords:
       - RAG
       - Retrieval
@@ -2492,8 +2495,10 @@ roles:
       - Retrieval
       - Chunking
       - Embedding
+      - Vektordatenbank
       - Reranking
       - Hybrid Search
+      - recall@k
       examples:
       - "Unser RAG findet die relevanten Dokumente nicht — wo liegt der Verlust?"
       - "Wähle die Chunking-Strategie und miss recall@k auf unserem Retrieval-Eval-Set."
@@ -2519,6 +2524,7 @@ roles:
       Greift auf den vorhandenen RCM-/Control-Mapping-Ansatz zurück, statt ihn neu zu bauen —
       IT-Kontrollen selbst bewertet control-framework-assessor.'
     routing:
+      addressability: keyword
       intent_keywords:
       - Modellrisiko
       - Model Card
@@ -2536,8 +2542,10 @@ roles:
       - Model Card
       - EU AI Act
       - NIST AI RMF
+      - Risikoklassifikation KI
       - Bias-Bewertung
       - Decision Record
+      - KI-Governance
       examples:
       - "Klassifiziere das Modellrisiko unseres Bewertungs-Agenten und erstelle die Model Card."
       - "Mappe das KI-System auf EU AI Act und NIST AI RMF und benenne das Restrisiko mit Owner."
@@ -2562,6 +2570,7 @@ roles:
       erfüllter Uptime-Ziele. SLI-Definitionen nach The Ultimate AI Guide for Linux Engineers
       (Humble) Kap. 6. Abgrenzung: sre-engineer verantwortet Infrastruktur-SLIs/SLOs.'
     routing:
+      addressability: keyword
       intent_keywords:
       - Task Success Rate
       - Reasoning Quality
@@ -2577,8 +2586,10 @@ roles:
       - Task Success Rate
       - Reasoning Quality
       - Approval Request Rate
+      - Agenten-Telemetrie
+      - Token-Kosten pro Task
+      - Drift-Erkennung
       - Agenten-Observability
-      - Drift
       examples:
       - "Der Agent läuft, macht aber die falschen Entscheidungen — welche SLI zeigt das?"
       - "Baue Reasoning-Quality-Sampling über 5–10 % der Agenten-Operationen und alarmiere auf die Leading Indicators."
