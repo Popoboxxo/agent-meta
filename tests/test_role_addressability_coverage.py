@@ -19,8 +19,8 @@ from pathlib import Path
 from scripts.lib.roles import load_roles_config
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-_EXPECTED_TOTAL = 86
-_EXPECTED_DISTRIBUTION = {"keyword": 83, "name_only": 2, "excluded": 1}
+_EXPECTED_TOTAL = 87
+_EXPECTED_DISTRIBUTION = {"keyword": 84, "name_only": 2, "excluded": 1}
 _VALID = {"keyword", "name_only", "excluded"}
 
 

@@ -2411,6 +2411,7 @@ roles:
     description: Assesses occupational fraud risk and appraises the anti-fraud program across deterrence,
       prevention, detection and investigation, with red-flag indicators.
     routing:
+      addressability: keyword
       intent_keywords:
       - Betrugsrisiko bewerten
       - fraud risk assessment

@@ -1,6 +1,6 @@
 ---
 name: template-fraud-risk-assessor
-version: "1.0.0"
+version: "1.1.0"
 description: "Assesses occupational fraud risk and appraises the anti-fraud program across deterrence, prevention, detection and investigation, with red-flag indicators."
 hint: "Bewertet Betrugsrisiken und Anti-Fraud-Programme; ermittelt nicht und aendert nichts."
 prompt_mode: modern
@@ -118,6 +118,7 @@ Programs). Wissensbasis: book/00-frontmatter/03-anti-patterns.md und 02-framewor
 <output_contract>
 ```
 STATUS:      done | blocked
+RESULT:      <1-2 sentences: fraud risk picture and residual exposure after this run>
 SCOPE:       <processes, roles, fraud types covered, period>
 UNIVERSE:    <exposure map: process | who could act alone | opportunity>
 SCENARIOS:   <id | scenario | triangle/hexagon legs | control that must fail>
@@ -127,7 +128,10 @@ HOTLINE:     <access, staffing, detail capture, follow-up with anonymous reporte
 FINDINGS:    <id | observation | criterion | cause | effect | severity | evidence>
 RESIDUAL:    <inherent | controls that operate | residual | within tolerance? yes/no/unknown>
 OPEN:        <unresolved questions, missing evidence, out-of-scope processes>
+ARTIFACTS:   <working papers, scenario/indicator/program tables, report file paths>
 ```
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+
 </output_contract>
 
 <constraints>
@@ -141,3 +145,7 @@ OPEN:        <unresolved questions, missing evidence, out-of-scope processes>
 - Max iterations: {{MAX_ITERATIONS}}
 - agent-meta version: {{AGENT_META_VERSION}}
 </constraints>
+
+{{#if AUTO_COMMIT_ENABLED}}
+{{AUTO_COMMIT_BLOCK}}
+{{/if}}
