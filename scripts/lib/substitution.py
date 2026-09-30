@@ -18,6 +18,10 @@ with engine-specific policies:
   * *keep*      — fallback policy for unresolved names; receives the full
                   match and the captured name and returns the text to leave
                   in place (warn-and-keep, rebuild, or pass-through).
+  * *transform* — optional post-processor for a *resolved* value; receives
+                  the match and the value and returns the emitted text.
+                  Engine 1 uses it to re-indent multi-line block values to
+                  the placeholder's line indentation; Engine 2 omits it.
 
 **Escape-safety invariant (issue #674).** Values are injected through a
 replacement *function*, so ``re.sub`` inserts the returned string literally:
@@ -40,11 +44,23 @@ Lookup = Callable[[str], "str | None"]
 KeepPolicy = Callable[[str, str], str]
 """Receives (matched_text, name); returns the text to leave in place."""
 
+Transform = Callable[[re.Match[str], str], str]
+"""Receives (match, resolved_value); returns the text to substitute.
+
+Opt-in post-processing of an already-resolved value. It exists so an engine
+that knows about *placement* (e.g. the line indentation of the placeholder)
+can repair the value before it is emitted, without this neutral module needing
+to know anything about templates. Omitted by default — the value is then
+emitted verbatim, which is the historic behavior.
+"""
+
 
 def replacement_function(
-    lookup: Lookup, keep: KeepPolicy | None = None
+    lookup: Lookup,
+    keep: KeepPolicy | None = None,
+    transform: Transform | None = None,
 ) -> Callable[[re.Match[str]], str]:
-    """Build a re.sub replacement callback from a lookup/keep policy pair.
+    """Build a re.sub replacement callback from a lookup/keep/transform policy.
 
     The callback resolves the placeholder name (match group 1) via
     ``lookup``; on ``None`` it defers to ``keep(matched, name)`` — or keeps
@@ -56,6 +72,9 @@ def replacement_function(
         lookup: Resolves a placeholder name to replacement text, or None.
         keep: Fallback for unresolved placeholders. Defaults to keeping the
             matched text unchanged.
+        transform: Optional post-processor applied to a resolved value
+            (receives the match and the value, returns the emitted text).
+            Defaults to emitting the value verbatim.
 
     Returns:
         A callback suitable as the re.sub replacement argument.
@@ -67,7 +86,9 @@ def replacement_function(
             if keep is None:
                 return match.group(0)
             return keep(match.group(0), match.group(1))
-        return value
+        if transform is None:
+            return value
+        return transform(match, value)
 
     return repl
 
@@ -77,6 +98,7 @@ def substitute_placeholders(
     pattern: "re.Pattern[str] | str",
     lookup: Lookup,
     keep: KeepPolicy | None = None,
+    transform: Transform | None = None,
 ) -> str:
     """Replace regex-matched placeholders in one escape-safe pass.
 
@@ -88,6 +110,9 @@ def substitute_placeholders(
         keep: Fallback for unresolved placeholders — receives the full
             match and the captured name, returns the text to leave in
             place. Defaults to keeping the matched text unchanged.
+        transform: Optional post-processor applied to a resolved value
+            (receives the match and the value, returns the emitted text).
+            Defaults to emitting the value verbatim.
 
     Returns:
         Text with all resolved placeholders replaced verbatim.
@@ -96,7 +121,7 @@ def substitute_placeholders(
         Any exception raised by ``lookup``/``keep`` (e.g. a strict-mode
         ``SyncError`` from Engine 1) propagates unchanged.
     """
-    return re.sub(pattern, replacement_function(lookup, keep), text)
+    return re.sub(pattern, replacement_function(lookup, keep, transform), text)
 
 
 def constant_lookup(value: object) -> Lookup:

@@ -1,6 +1,6 @@
 ---
 name: template-database-reviewer
-version: "1.2.1"
+version: "1.3.0"
 description: "Domain code review for data layers: migration safety, N+1 queries, injection vectors, indexing, transactions, schema evolution — two-pass evidence-based review with rules index."
 hint: "Database review: migrations, N+1, injection, indexing, transactions — evidence-based findings with MERGE_SCORE"
 prompt_mode: modern
@@ -31,9 +31,10 @@ No index file → built-in defaults:
 | DB-01 | Migration safety: reversible (down-path exists), lock-aware on large tables |
 | DB-02 | N+1 query patterns in ORM usage; missing eager-loading on hot paths |
 | DB-03 | Injection vectors: string-built SQL/queries (maps to CWE-89) |
-| DB-04 | Indexing: hot query paths covered; new columns in WHERE/JOIN considered |
+| DB-04 | Indexing: hot query paths covered; new columns in WHERE/JOIN considered; lock-free concurrent builds (CREATE INDEX CONCURRENTLY) where capacity allows |
 | DB-05 | Transaction boundaries: multi-write operations atomic, isolation level sane |
 | DB-06 | Schema evolution discipline: no destructive drops/rename without explicit plan note |
+| DB-07 | Expand-and-contract migrations: expand → migrate → contract, no breaking single-release schema change (#773) |
 </rules-index>
 
 <workflow>

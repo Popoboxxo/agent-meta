@@ -117,8 +117,8 @@ def _activation_from_config(config: dict) -> dict:
 # ---------------------------------------------------------------------------
 
 def load_mcp_registry(agent_meta_root: Path, config: dict | None = None, project_root: Path | None = None) -> dict:
-    """Return the mcp-server slice of the unified plugin catalog (same shape as
-    the old config/mcp-registry.yaml `mcp-servers` map)."""
+    """Return the mcp-server slice of config/plugin-catalog.yaml (same shape as
+    the legacy `mcp-servers` map)."""
     catalog = load_plugin_catalog(agent_meta_root=agent_meta_root, config=config, project_root=project_root)
     return plugins_of_kind(catalog, "mcp-server")
 

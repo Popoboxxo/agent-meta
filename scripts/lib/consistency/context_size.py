@@ -92,38 +92,65 @@ def check_context_file_size(
         pc = provider_config.get(provider)
         if not isinstance(pc, dict):
             continue
-        rel = pc.get("context_file")
-        if not rel:
+        # Core context file first, then the adapter file (IC-13): an adapter
+        # path that is also a core path (Claude: CLAUDE.md) is reported once,
+        # as the core. Missing/foreign files are never reported.
+        findings.extend(_check_one_context_path(
+            root, pc.get("context_file"), "context file", max_lines, seen_paths,
+        ))
+    for provider in active:
+        pc = provider_config.get(provider)
+        if not isinstance(pc, dict):
             continue
-        path = (root / rel).resolve()
-        if path in seen_paths or not path.is_file():
-            continue
-        seen_paths.add(path)
-
-        try:
-            content = path.read_text(encoding="utf-8")
-        except OSError:
-            continue
-        if _MANAGED_MARKER not in content:
-            continue  # hand-written file, not sync output
-
-        lines = content.splitlines()
-        if len(lines) <= max_lines:
-            continue
-
-        findings.append(Finding(
-            severity=Severity.WARNING,
-            check="context.size_guard",
-            file=rel,
-            message=(
-                f"Generated context file has {len(lines)} lines "
-                f"(limit: {max_lines}) without acknowledged oversize"
-            ),
-            suggestion=(
-                f"Reduce the file size (context_file.mode: compact, issue #540), "
-                f"raise context_file.max_lines, or set "
-                f"context_file.oversize_acknowledged: true in {_PROJECT_CONFIG}."
-            ),
+        findings.extend(_check_one_context_path(
+            root, pc.get("context_adapter_file"), "context adapter file",
+            max_lines, seen_paths,
         ))
 
     return findings
+
+
+def _check_one_context_path(
+    root: Path,
+    rel: object,
+    kind: str,
+    max_lines: int,
+    seen_paths: set,
+) -> list[Finding]:
+    """One WARNING when a generated context (or adapter) file is oversized.
+
+    Shared by the core and the adapter iteration so both count against the same
+    ``context_file.max_lines`` and the same ``seen_paths`` de-duplication.
+    """
+    if not isinstance(rel, str) or not rel.strip():
+        return []
+    path = (root / rel).resolve()
+    if path in seen_paths or not path.is_file():
+        return []
+    seen_paths.add(path)
+
+    try:
+        content = path.read_text(encoding="utf-8")
+    except OSError:
+        return []
+    if _MANAGED_MARKER not in content:
+        return []  # hand-written file, not sync output
+
+    lines = content.splitlines()
+    if len(lines) <= max_lines:
+        return []
+
+    return [Finding(
+        severity=Severity.WARNING,
+        check="context.size_guard",
+        file=rel,
+        message=(
+            f"Generated {kind} has {len(lines)} lines "
+            f"(limit: {max_lines}) without acknowledged oversize"
+        ),
+        suggestion=(
+            f"Reduce the file size (context_file.mode: compact, issue #540), "
+            f"raise context_file.max_lines, or set "
+            f"context_file.oversize_acknowledged: true in {_PROJECT_CONFIG}."
+        ),
+    )]

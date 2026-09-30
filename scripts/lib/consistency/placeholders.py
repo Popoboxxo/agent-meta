@@ -78,6 +78,12 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     "A2A_T_SIZE_LIMIT", "A2A_T_SIZE_LIMIT_TOKENS", "A2A_MAX_DEPTH",
     # Context density flag (derived from context_file.mode by build_variables, issue #540)
     "COMPACT_MODE",
+
+    "SPEC_PLAN_WORKFLOW_ENABLED", "SPEC_PLAN_SPECS_DIR", "SPEC_PLAN_PLANS_DIR",
+
+    "ENFORCEMENT_TIER", "GATE_ENFORCED", "GATE_PARTIAL", "GATE_ADVISORY",
+    "GATE_NEUTRAL",
+    "RUNTIME_GATE_PLUGIN_MODE",
     # Orchestrator snippet blocks (loaded from snippets/orchestrator/*.md by build_variables)
     "SE_MODE_BLOCK", "A2A_PROTOCOL_BLOCK", "CHECKPOINTING_BLOCK", "QUALITY_PIPELINES_BLOCK",
     "STATUS_TABLE_BLOCK", "AUTO_COMMIT_BLOCK",
@@ -109,6 +115,8 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     # agent_sync._build_provider_vars from build_variables' provider-mapped
     # prerender (issue #264)
     "INTENT_ROUTING_TOOLS",
+
+    "ROUTE_INTENT_CALLABLE",
     # Paths
     "AGENTS_DIR",
     # Release / plugin packaging

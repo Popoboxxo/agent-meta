@@ -1,0 +1,22 @@
+agent-meta-version: "1.1.0"
+ai-providers:
+- Claude
+- Gemini
+# Two hook-capable providers so both deployment targets are exercised:
+# Claude -> .claude/hooks, Gemini (Antigravity protocol) -> .agents/hooks.
+platforms: []
+project:
+  name: scenario-hook-deploy-lf
+  prefix: s61
+  short: hook-deploy-lf-newlines
+variables:
+  PROJECT_NAME: scenario-hook-deploy-lf
+  PROJECT_DESCRIPTION: Deployed hook scripts must be written with LF newlines on all platforms (#754).
+  PROJECT_GOAL: Verify every synced hook script (Claude .claude/hooks, Gemini .agents/hooks) contains no carriage return.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-hook-deploy-lf
+  GIT_MAIN_BRANCH: main
+  DOCS_LANGUAGE: Deutsch
+speech-mode: full
+tier-preset: Normal
+allow-committed-secrets: false

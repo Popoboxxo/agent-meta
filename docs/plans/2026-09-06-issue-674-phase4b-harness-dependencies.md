@@ -178,11 +178,14 @@ items — never implemented here. This boundary is stated in the #265 spike head
   `handoff_format: json`, verify the generated definition is consumable as a tool
   (schema accepted, `route_intent` call resolves to the right agent). Acceptance: one
   live session per provider in which an intent is routed via `route_intent`.
-- [ ] **Empty-§3 guard decision:** if a provider without `handoff_format` becomes
-  active while intent routing is enabled, §3 renders empty. Currently never visible —
-  every provider defines a `handoff_format` — but the behavior should be decided
-  explicitly: sync-time warning vs. documented limitation. (Remaining point from the
-  phase-4b consolidation report.)
+- [x] **Empty-§3 guard decision:** capability-gated via `route_intent_tool`
+  (issue #264 runtime follow-up). The `{{#if ROUTE_INTENT_CALLABLE}}` gate in
+  `template-orchestrator` §3 renders an explicit routing-rules fallback whenever the
+  harness does not register `route_intent` as a callable tool — the default for all 9
+  providers — instead of an empty/unanchored §3. Flipping a provider to `true`
+  requires a live acceptance proof (one session where a `route_intent` call resolves
+  to the correct agent). (Resolved; was the remaining point from the phase-4b
+  consolidation report.)
 
 ---
 
@@ -319,7 +322,7 @@ harness sub-agents from outside the harness runtime (spike §7).
 |---|---|---|
 | **#267 enforced end-to-end** (BARRIER parsing + context stripping at runtime) | **#265 backend** — a barrier that actually collects must exist first (in-harness `native-batch` turn semantics or the barrier-tool bridge); #267's parse/strip only has something to attach to once #265's collection is real | harness |
 | **#266 enforcement** (real pre-dispatch overlap check) | **harness dispatch hook** — call `check_file_overlap()` before live FANOUT/PARALLEL_GROUP dispatch (`BOUNDARY_NOTE`) | harness |
-| **#264 consumption** (`route_intent` as callable tool) | **provider function-calling** — the provider/harness must register and route the generated definition (`handoff_format` gate; `json` providers only in practice) | provider/harness |
+| **#264 consumption** (`route_intent` as callable tool) | **provider function-calling** — the provider/harness must register and route the generated definition (`handoff_format` gate; `json` providers only in practice). Runtime callability is capability-gated: `route_intent_tool: false` (all providers today) renders the §3 routing-rules fallback instead of mandating the callable | provider/harness |
 | **#506 sync-call contract** (no post-turn re-activation) | **provider turn semantics** — turn-final text must reach the synchronous caller | harness |
 | **#517 parallel footprint** (cheap parallel suite runs) | **harness parallel dispatch + host capacity** — template minimizes, cannot guarantee | harness/caller |
 

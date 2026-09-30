@@ -1,6 +1,6 @@
 ---
 name: template-frontend-reviewer
-version: "1.2.1"
+version: "1.3.0"
 description: "Domain code review for frontend code: component design, state management, SSR/hydration, browser APIs, render performance — two-pass evidence-based review with rules index."
 hint: "Frontend review: components, state, SSR/hydration, browser APIs — evidence-based findings with MERGE_SCORE"
 prompt_mode: modern
@@ -34,6 +34,7 @@ No index file → use built-in defaults, cite IDs as-is:
 | FE-04 | Browser API hygiene: listeners/timeouts cleaned up, feature-detect before use |
 | FE-05 | Render performance: unnecessary re-renders on hot paths, missing memoization |
 | FE-06 | Client bundle hygiene: no inline secrets/keys/tokens |
+| FE-07 | Premature memoization: flag unnecessary re-renders, but `memo` only on measured hot paths (#773) |
 </rules-index>
 
 <workflow>

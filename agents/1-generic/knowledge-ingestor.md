@@ -1,6 +1,6 @@
 ---
 name: template-knowledge-ingestor
-version: "1.4.0"
+version: "1.6.0"
 description: "Sources einlesen, Key Information extrahieren, Wiki-Seiten erstellen/aktualisieren, Cross-References pflegen."
 hint: "Sources verarbeiten, Wiki-Seiten schreiben, Cross-References pflegen"
 tools:
@@ -55,6 +55,22 @@ Du bist der **Knowledge Ingestor** für {{PROJECT_NAME}} — Karpathys "Ingest"-
 11. Zitiere die Source: `[Source Name](../../sources/<file>)`
 12. Delegiere an `knowledge-indexer` für `index.md` + `log.md` Update
 
+## Archiv-/Index-Route (`index.mode: knowledge-engine`)
+
+Ist `index.mode: knowledge-engine` gesetzt, übernimmst **du** die Archiv- und Index-Route
+für Specs und Pläne. Du aktualisierst `{{KNOWLEDGE_WIKI_DIR}}/index.md` (Auto-Index) bzw.
+`{{KNOWLEDGE_WIKI_DIR}}/log.md` (Auto-Log) nicht selbst, sondern **delegierst intern an
+`knowledge-indexer`**. `knowledge-indexer` wird **nie direkt vom Orchestrator** angesprochen
+— der Einstieg läuft immer über einen Knowledge-Agenten (dich).
+
+### `okf.auto-index` / `okf.auto-log`
+
+- **`true`** (Default): Der Auto-Update-Pfad ist aktiv — Index-/Log-Einträge werden nach
+  Spec-/Plan-Erstellung automatisch über diesen Rollenpfad geschrieben/aktualisiert.
+- **`false`**: **Keine** automatischen Index-/Log-Schreibzugriffe. Die Dateien werden vom
+  KE-Scaffolder weiterhin **angelegt** und **agent-driven** durch `knowledge-indexer`
+  gepflegt — `false` heißt **nicht**, dass die Dateien fehlen.
+
 ## OKF-Pflichten pro Dokument
 
 ```yaml
@@ -71,6 +87,12 @@ sources:                                           # KARPATHY EXTENSION
 ```
 
 **Touch-Radius:** 10-15 Dateien pro Ingest (Karpathy-Konvention) — überschreitest du das deutlich, informiere den `knowledge-curator`.
+
+## Extraction & provenance (#775, literatur-anchored)
+
+- **Extraction methodology (information extraction + summarization):** identify named entities + relations first, then compress progressively (key info → synthesis); keep the source→claim mapping intact at every step.
+- **Atomic notes (Zettelkasten):** one idea per page; split compound content into linked pages instead of one long page.
+- **Provenance:** every claim carries its origin (`resource:` / `sources:`); never drop it when summarizing — mark gaps as `[NEEDS INPUT]` instead of inventing content (AI for Everyday Automation).
 
 ## Code-Konventionen
 
@@ -102,11 +124,7 @@ ARTIFACTS: <erstellte/aktualisierte Wiki-Seiten, kommagetrennt>
 
 </output_contract>
 
-## Anti-Recursion Guard
-
-**Du bist ein Worker-Agent.** Delegiere NIEMALS Aufgaben in deinem Scope an den `orchestrator` zurück.
-
-**Ausnahme:** `knowledge-indexer` nach jedem Ingest delegieren — das ist Teil deines Workflows, keine Rückdelegation.
+{{ANTI_RECURSION_BLOCK}}
 
 ## Sprache
 

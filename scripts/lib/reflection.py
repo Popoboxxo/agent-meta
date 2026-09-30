@@ -72,6 +72,68 @@ def apply_project_overrides(pairs, overrides):
     return result
 
 
+def effective_reflection_pairs(agent_meta_root=None):
+    """Load framework reflection pairs with project overrides applied.
+
+    Single source for the render path (M4): the same framework + project
+    ``reflection-pairs.overrides`` merge that ``config.py`` validates against is
+    what actually drives ``loop_ref`` rendering. Without an ``agent_meta_root``
+    the module-relative framework default (repo root) is used.
+
+    The PyYAML-absent path raises ``SystemExit``; callers on the render path use
+    ``pipelines._safe_load_reflection_pairs``, which catches that and fails soft.
+    """
+    if agent_meta_root is None:
+        root = Path(os.path.dirname(__file__)).parent.parent
+    else:
+        root = Path(agent_meta_root)
+    pairs = load_reflection_pairs(str(root / "config"))
+    overrides = load_project_overrides(str(root / ".meta-config" / "project.yaml"))
+    return apply_project_overrides(pairs, overrides)
+
+
+def find_pair(pairs, pair_id):
+    """Return the reflection pair with ``pair_id``, or ``None``.
+
+    Defensive: ``None``/empty ``pair_id`` and ``None``/non-list ``pairs``
+    yield ``None`` instead of raising.
+    """
+    if not pair_id or not pairs:
+        return None
+    for pair in pairs:
+        if isinstance(pair, dict) and pair.get("id") == pair_id:
+            return pair
+    return None
+
+
+def resolve_stage_loop(stage, reflection_pairs):
+    """Resolve the effective loop config of a pipeline ``stage``.
+
+    Two mutually exclusive sources are supported (spec §Revision v6 A.3):
+
+    * ``loop: {generator, critic, max_iterations, ...}`` — legacy inline
+      definition, returned verbatim (copy) for backward compatibility.
+    * ``loop_ref: <pair-id>`` — references an entry in ``reflection_pairs``;
+      resolved to ``{generator, critic, max_iterations}``.
+
+    Fail-closed: an unknown ``loop_ref`` id yields an empty dict so callers
+    (validation/render) can report or skip it instead of silently rendering a
+    wrong loop.
+    """
+    loop_ref = stage.get("loop_ref")
+    if loop_ref:
+        pair = find_pair(reflection_pairs, loop_ref)
+        if pair is None:
+            return {}
+        return {
+            "generator": pair.get("generator"),
+            "critic": pair.get("critic"),
+            "max_iterations": pair.get("max_iterations", 3),
+        }
+    loop = stage.get("loop")
+    return dict(loop) if isinstance(loop, dict) else {}
+
+
 def validate_reflection_pairs(pairs, available_roles):
     """Validate that generator and critic roles exist."""
     errors = []

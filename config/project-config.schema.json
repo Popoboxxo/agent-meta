@@ -98,6 +98,7 @@
           "concept-reviewer",
           "concept-specifier",
           "continue-expert",
+          "control-framework-assessor",
           "copilot-expert",
           "copyeditor",
           "data-engineer",
@@ -146,6 +147,7 @@
           "refactoring-specialist",
           "release",
           "requirements",
+          "risk-based-audit-planner",
           "se-architect",
           "se-component-requirements",
           "se-critic",
@@ -579,6 +581,7 @@
         "rapid-prototyping",
         "spec-optional",
         "spec-driven",
+        "concept-driven",
         "spec-certified"
       ],
       "default": "full"
@@ -620,6 +623,21 @@
         "lifecycle-ownership": {
           "type": "boolean",
           "description": "Require a named owner and deprecation plan for every app/service (app-lifecycle-governor). Default: false.",
+          "default": false
+        },
+        "spec-plan-required": {
+          "type": "boolean",
+          "description": "Require the native spec/plan workflow for feature-level changes. Default: false (preset-coupled).",
+          "default": false
+        },
+        "spec-plan-traceability": {
+          "type": "boolean",
+          "description": "Require spec<->plan<->task<->test traceability. Default: false (preset-coupled).",
+          "default": false
+        },
+        "root-cause-required": {
+          "type": "boolean",
+          "description": "Require a documented root cause (cause + prior attempts) before any fix. Consumed by the root-cause rule gate (IC-09/G-10). Default: false (preset-coupled).",
           "default": false
         },
         "se-required": {
@@ -721,13 +739,43 @@
           "type": "object",
           "description": "Options for the Claude provider.",
           "additionalProperties": false,
-          "properties": {}
+          "properties": {
+            "frontmatter-keep-fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Frontmatter keys that must NOT be stripped for this provider, even when they appear in the global defaults or in frontmatter-strip-fields. Wins over strip. Default: empty."
+            },
+            "frontmatter-strip-fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Frontmatter keys to strip for this provider, in addition to the global defaults (reference_standards). Combined by union with ai-providers.yaml's frontmatter_strip_fields; frontmatter-keep-fields wins. Default: empty."
+            }
+          }
         },
         "Gemini": {
           "type": "object",
           "description": "Options for the Gemini provider.",
           "additionalProperties": false,
-          "properties": {}
+          "properties": {
+            "frontmatter-keep-fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Frontmatter keys that must NOT be stripped for this provider, even when they appear in the global defaults or in frontmatter-strip-fields. Wins over strip. Default: empty."
+            },
+            "frontmatter-strip-fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Frontmatter keys to strip for this provider, in addition to the global defaults (reference_standards). Combined by union with ai-providers.yaml's frontmatter_strip_fields; frontmatter-keep-fields wins. Default: empty."
+            }
+          }
         },
         "Continue": {
           "type": "object",
@@ -745,21 +793,65 @@
                 "full",
                 "slim"
               ],
-              "default": "full"
+                "default": "full"
+              },
+              "frontmatter-keep-fields": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Frontmatter keys that must NOT be stripped for this provider, even when they appear in the global defaults or in frontmatter-strip-fields. Wins over strip. Default: empty."
+              },
+              "frontmatter-strip-fields": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Frontmatter keys to strip for this provider, in addition to the global defaults (reference_standards). Combined by union with ai-providers.yaml's frontmatter_strip_fields; frontmatter-keep-fields wins. Default: empty."
+              }
             }
-          }
         },
         "Opencode": {
           "type": "object",
           "description": "Options for the Opencode provider.",
           "additionalProperties": false,
-          "properties": {}
+          "properties": {
+            "frontmatter-keep-fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Frontmatter keys that must NOT be stripped for this provider, even when they appear in the global defaults or in frontmatter-strip-fields. Wins over strip. Default: empty."
+            },
+            "frontmatter-strip-fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Frontmatter keys to strip for this provider, in addition to the global defaults (reference_standards). Combined by union with ai-providers.yaml's frontmatter_strip_fields; frontmatter-keep-fields wins. Default: empty."
+            }
+          }
         },
         "Mammouth": {
           "type": "object",
           "description": "Options for the Mammouth Code provider.",
           "additionalProperties": false,
-          "properties": {}
+          "properties": {
+            "frontmatter-keep-fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Frontmatter keys that must NOT be stripped for this provider, even when they appear in the global defaults or in frontmatter-strip-fields. Wins over strip. Default: empty."
+            },
+            "frontmatter-strip-fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Frontmatter keys to strip for this provider, in addition to the global defaults (reference_standards). Combined by union with ai-providers.yaml's frontmatter_strip_fields; frontmatter-keep-fields wins. Default: empty."
+            }
+          }
         }
       },
       "additionalProperties": true
@@ -879,6 +971,39 @@
             "compact"
           ],
           "default": "full"
+        },
+        "topology": {
+          "type": "string",
+          "description": "Context topology: one shared file ('unified') vs. a canonical core plus provider-native adapters ('per-provider'). Sibling of the density 'mode' above — NOT the same axis. Missing or invalid value always resolves to 'unified' (safe-side default: per-provider must be explicitly opted in).",
+          "enum": [
+            "unified",
+            "per-provider"
+          ],
+          "default": "unified"
+        },
+        "core_file": {
+          "type": "string",
+          "description": "Canonical shared context file (the core) used in the 'per-provider' topology. Default: AGENTS.md.",
+          "default": "AGENTS.md"
+        },
+        "provider-overrides": {
+          "type": "object",
+          "description": "Override context_file.topology per provider. Keys are provider names. Providers without an entry (or without 'topology' set) inherit the global context_file.topology.",
+          "additionalProperties": {
+            "type": "object",
+            "description": "Per-provider context topology override.",
+            "properties": {
+              "topology": {
+                "type": "string",
+                "description": "Context topology for this provider only. Same semantics as context_file.topology. When unset, inherits the global context_file.topology.",
+                "enum": [
+                  "unified",
+                  "per-provider"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
         },
         "max_lines": {
           "type": "integer",
@@ -1809,6 +1934,165 @@
       },
       "additionalProperties": false
     },
+    "spec-plan-workflow": {
+      "type": "object",
+      "description": "Native feature-level spec→plan→execution workflow (opt-in). No-op when effective_enabled=false.",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "paths": {
+          "type": "object",
+          "properties": {
+            "specs": {
+              "type": "string",
+              "default": "docs/specs"
+            },
+            "plans": {
+              "type": "string",
+              "default": "docs/plans"
+            },
+            "spikes": {
+              "type": "string",
+              "default": "docs/spikes"
+            },
+            "legacy": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            }
+          },
+          "additionalProperties": false
+        },
+        "scan": {
+          "type": "object",
+          "properties": {
+            "include": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "*.md"
+              ]
+            },
+            "changed-files-only": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          "additionalProperties": false
+        },
+        "index": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "knowledge-engine",
+                "file-index",
+                "off"
+              ],
+              "default": "knowledge-engine"
+            },
+            "fallback-index": {
+              "type": "string",
+              "default": "docs/INDEX.md"
+            }
+          },
+          "additionalProperties": false
+        },
+        "archive": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "auto",
+                "ask",
+                "off"
+              ],
+              "default": "ask"
+            },
+            "agent": {
+              "type": "string",
+              "enum": [
+                "documenter",
+                "knowledge-ingestor"
+              ],
+              "default": "documenter"
+            },
+            "trigger": {
+              "type": "string",
+              "enum": [
+                "plan-complete"
+              ],
+              "default": "plan-complete"
+            },
+            "target": {
+              "type": "string",
+              "default": "docs/plans/archive"
+            }
+          },
+          "additionalProperties": false
+        },
+        "external-system-override": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false
+            },
+            "system": {
+              "type": "string",
+              "default": ""
+            },
+            "note": {
+              "type": "string",
+              "default": ""
+            }
+          },
+          "additionalProperties": false
+        },
+        "recovery": {
+          "type": "object",
+          "description": "Session recovery / resume resolver configuration (IC-03/IC-04). Required because spec-plan-workflow is a closed object; additionalProperties:false additionally turns it into a strict typo guard.",
+          "properties": {
+            "rehydrate": {
+              "type": "boolean",
+              "description": "Enable the read-only rehydrate (resume-context) mode. Consumed via spec-plan-workflow.recovery.rehydrate."
+            },
+            "max-age-seconds": {
+              "type": "integer",
+              "description": "Age horizon for resumable sessions; negative disables the age filter."
+            },
+            "include-legacy": {
+              "type": "boolean",
+              "description": "Include legacy .meta-viz/checkpoint-<ts>.json files; only an explicit false disables it."
+            }
+          },
+          "additionalProperties": false
+        },
+        "ledger-drift": {
+          "type": "object",
+          "description": "Plan-ledger <-> checkpoint drift check (IC-07, M2). Required because spec-plan-workflow is a closed object; additionalProperties:false additionally turns it into a strict typo guard.",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Drift check is opt-out: only an explicit false disables it."
+            },
+            "severity": {
+              "type": "string",
+              "description": "Severity of emitted spec_plan_ledger_drift findings (default WARNING)."
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "viz": {
       "type": "object",
       "description": "Visualization / session tracking configuration. Controls the Viz dashboard (viz-report.py) and the MCP SSE server (viz-logger.py) that the Admin UI supervises.",
@@ -2024,6 +2308,11 @@
             },
             "additionalProperties": false
           }
+        },
+        "require-runtime-gate": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, the orchestrator-strict consistency check treats a provider that is only prompt-enforced (tier 'advisory') as an ERROR instead of a WARNING. Default: false (backwards compatible)."
         }
       },
       "additionalProperties": true
@@ -2041,6 +2330,22 @@
           "type": "boolean",
           "default": false,
           "description": "Enable AST dependency analysis during sync. Activates analysis.py scanning and prints a summary after sync completes. Default: false."
+        }
+      },
+      "additionalProperties": false
+    },
+    "runtime-gate": {
+      "type": "object",
+      "description": "Native runtime-gate plugin configuration (Phase 1). The plugin artifact is generated only for a provider with a verified plugin runtime; Phase 0 ships the schema key only (IC-16, AC-24).",
+      "properties": {
+        "plugin-mode": {
+          "type": "string",
+          "enum": [
+            "observe",
+            "enforce"
+          ],
+          "default": "observe",
+          "description": "Baked into the generated native gate plugin at sync time. 'observe' logs only; 'enforce' is unlocked only after the P6 real-repo verification (AC-21). Default: observe."
         }
       },
       "additionalProperties": false
@@ -2098,6 +2403,23 @@
             }
           },
           "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "progress": {
+      "type": "object",
+      "description": "Storage location of the progress / checkpoint store. Relative paths are resolved against the project root; the framework defaults keep the historical .meta-viz layout.",
+      "properties": {
+        "dir": {
+          "type": "string",
+          "default": ".meta-viz/progress",
+          "description": "Directory (relative to the project root) for progress files such as current.md. Framework default: .meta-viz/progress."
+        },
+        "checkpoint-dir": {
+          "type": "string",
+          "default": ".meta-viz/checkpoints",
+          "description": "Directory (relative to the project root) for per-session checkpoint files. Framework default: .meta-viz/checkpoints."
         }
       },
       "additionalProperties": false
@@ -2166,6 +2488,14 @@
             },
             "agent": {
               "type": "string"
+            },
+            "dod_flag": {
+              "type": "string",
+              "description": "Name of the resolved DoD flag that activates this stage (consumed at sync time)."
+            },
+            "payload_flag": {
+              "type": "string",
+              "description": "Name of the payload flag that activates this stage (annotated for runtime skip)."
             }
           }
         }
@@ -2199,6 +2529,16 @@
         },
         "on_error": {
           "type": "string"
+        },
+        "task-review": {
+          "type": "object",
+          "description": "Round cap for the two-stage task review (IC-08/IC-09). Declared explicitly for documentation and as a typo guard (F7).",
+          "properties": {
+            "max-rounds": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
         }
       },
       "additionalProperties": true

@@ -1,0 +1,32 @@
+agent-meta-version: "1.1.0"
+ai-providers:
+- Claude
+# rapid-prototyping sets spec-plan-required:false -> the explicit bool below is
+# the only thing that activates the workflow (precedence proof, inverse of 51).
+dod-preset: rapid-prototyping
+platforms: []
+rules-preset: lazy
+knowledge-engine:
+  enabled: true
+spec-plan-workflow:
+  enabled: true
+  paths:
+    specs: docs/specs
+    plans: docs/plans
+    spikes: docs/spikes
+  index:
+    mode: knowledge-engine
+    fallback-index: docs/INDEX.md
+  external-system-override:
+    enabled: false
+project:
+  name: scenario-spec-plan-enabled
+  prefix: s52
+  short: scenario-spec-plan-enabled
+variables:
+  PROJECT_NAME: scenario-spec-plan-enabled
+  PROJECT_DESCRIPTION: spec-plan-workflow.enabled=true with the knowledge engine active.
+  PROJECT_GOAL: Verify gated rules, scaffolding and a true spec-plan-enabled DoD flag while the KE index stays authoritative.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-spec-plan-enabled
+  GIT_MAIN_BRANCH: main

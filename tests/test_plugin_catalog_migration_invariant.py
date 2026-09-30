@@ -61,5 +61,11 @@ def test_rendered_rule_content_is_byte_identical():
 
 def test_project_atlas_seed_present_and_disabled():
     catalog = _catalog()
-    assert catalog["project-atlas"]["kind"] == "mcp-server"
-    assert catalog["project-atlas"]["enabled-by-default"] is False
+    assert catalog["projectatlas"]["kind"] == "mcp-server"
+    assert catalog["projectatlas"]["enabled-by-default"] is False
+    assert catalog["projectatlas"]["binary"] == "projectatlas"
+    assert catalog["projectatlas"]["connection"]["command"] == "projectatlas"
+    assert catalog["projectatlas"]["connection"]["args"] == []
+    assert catalog["projectatlas"]["config-generated-by"] == "projectatlas init"
+    assert "--mcp" not in catalog["projectatlas"]["connection"]["args"]
+    assert "project-atlas" not in catalog

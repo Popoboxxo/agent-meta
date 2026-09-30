@@ -462,6 +462,41 @@ def test_scan_injection_drift_flags_stray_agent_file(tmp_path):
     assert ".claude/agents/developer.md" not in paths
 
 
+def test_scan_injection_drift_ignores_sync_backup_siblings(tmp_path):
+    """`<file>.sync-backup-<ts>` siblings written by the backup-first cleanup
+    are agent-meta's own ephemeral safety copies, never foreign injections —
+    so they must not be flagged. A genuine stray artifact in the same dirs
+    still is (proves the exclusion is not a blanket ignore)."""
+    from scripts.lib.external_tools import scan_injection_drift
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write_framework_registry(agent_meta_root, {})
+
+    agents_dir = project_root / ".claude" / "agents"
+    agents_dir.mkdir(parents=True)
+    (agents_dir / "developer.md").write_text("x", encoding="utf-8")
+    (agents_dir / ".agent-meta-managed").write_text("developer.md\n", encoding="utf-8")
+    (agents_dir / "developer.md.sync-backup-20260913-155157").write_text("b", encoding="utf-8")
+    (agents_dir / "rogue-role.md").write_text("x", encoding="utf-8")
+
+    rules_dir = project_root / ".claude" / "rules"
+    rules_dir.mkdir(parents=True)
+    (rules_dir / "some-rule.md").write_text("x", encoding="utf-8")
+    (rules_dir / "some-rule.md.sync-backup-20260913-155157").write_text("b", encoding="utf-8")
+
+    provider_config = {"Claude": {
+        "skills_dir": ".claude/skills", "hooks_dir": ".claude/hooks",
+        "rules_dir": ".claude/rules", "agents_dir": ".claude/agents",
+        "has_rules": True,
+    }}
+    findings = scan_injection_drift(agent_meta_root, project_root, {}, provider_config)
+    paths = [f["path"] for f in findings["Claude"]]
+    assert ".claude/agents/developer.md.sync-backup-20260913-155157" not in paths
+    assert ".claude/rules/some-rule.md.sync-backup-20260913-155157" not in paths
+    assert ".claude/agents/rogue-role.md" in paths
+    assert ".claude/rules/some-rule.md" in paths
+
+
 def test_scan_injection_drift_excuses_providers_own_context_file_inside_rules_dir(tmp_path):
     """Continue's context_file lives INSIDE its own rules_dir (unlike every
     other provider, whose context-file equivalent lives at the project

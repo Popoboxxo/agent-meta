@@ -140,7 +140,7 @@ def generate_env_scripts(config: dict, project_root: Path, dry_run: bool = False
 
     Returns a dict with script status per file: {'.meta-config/env.ps1': 'created'|'skipped', ...}
     """
-    from .io import is_unchanged
+    from .io import is_unchanged, write_atomic
 
     envs = load_env_config(config)
 
@@ -161,7 +161,7 @@ def generate_env_scripts(config: dict, project_root: Path, dry_run: bool = False
             results[rel_path] = "skipped"
             continue
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(content, encoding="utf-8")
+        write_atomic(target, content)
         results[rel_path] = "created"
 
     return results

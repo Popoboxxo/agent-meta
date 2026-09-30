@@ -8,11 +8,11 @@ rules:
     severity_hint: high
     standard_ref:
   - id: BE-02
-    title: API contract consistency and versioning
+    title: API contract consistency against OpenAPI (stable shapes, versioning, breaking changes flagged)
     severity_hint: medium
-    standard_ref:
+    standard_ref: "OpenAPI@3.1.0"
   - id: BE-03
-    title: Concurrency/async pitfalls (races, unawaited promises)
+    title: Concurrency/async pitfalls (races, unawaited promises, shared state, missing idempotency/retry safety)
     severity_hint: high
     standard_ref:
   - id: BE-04
@@ -26,4 +26,8 @@ rules:
   - id: BE-06
     title: Observability without secret leakage
     severity_hint: medium
+    standard_ref:
+  - id: BE-07
+    title: Golden-signal observability gaps (no latency/traffic/error/saturation metric; silent behavior invisible)
+    severity_hint: high
     standard_ref:

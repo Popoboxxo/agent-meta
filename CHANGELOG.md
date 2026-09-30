@@ -2,6 +2,71 @@
 
 ## [Unreleased]
 
+### Added
+- **Capability-gated intent-routing mandate (#264)**: `route_intent` is only mandated
+  in the orchestrator's §3 when the harness registers it as a callable tool
+  (`route_intent_tool` in `config/provider-capabilities.yaml`); otherwise the
+  orchestrator derives the route from the generated routing rules and must not invent
+  a tool call. All 9 providers ship explicit `route_intent_tool: false` (conservative;
+  a live `route_intent` acceptance proof is required to flip one to `true`), so no
+  runtime blocks on an unregistered tool.
+- **`risk-based-audit-planner` role (PR #822)**: new 1-generic template
+  `agents/1-generic/risk-based-audit-planner.md` for risk-based audit scoping — auditable area to
+  objectives, risks, key controls and tests (risk control matrix) with inherent/residual risk, scope,
+  timing and resource plan.
+- **`control-framework-assessor` role (PR #822)**: new 1-generic template
+  `agents/1-generic/control-framework-assessor.md` assessing governance, risk and control processes
+  against a named framework (COSO ICIF, COBIT, CARES/Standard 2120, ITGCs), with analytics/CAAT
+  evidence over full populations instead of samples.
+
+### Changed
+- **Role activation is gate-driven for `validator` and the developer tiers (consumer-visible —
+  audit your `project.yaml` before upgrading)**: the per-role activation decision now resolves
+  from the single `activation_groups` default table in `config/role-defaults.yaml` instead of the
+  historic name-prefix heuristic. Two defaults are off unless the project opts in:
+  - `validator` is gated by `roles_membership: any [validator]`. A project whose `project.yaml`
+    has **no** `roles:` list (the key is optional in `config/project-config.schema.json`) used to
+    get a generated `validator.md` anyway — every role outside the `se-`/`knowledge-` prefixes was
+    unconditionally enabled. It is no longer generated unless `validator` is listed.
+  - `principal-developer` is now a member of the `developer_tiers` group
+    (`role_patterns: [junior-developer, senior-developer, principal-developer]`). The membership
+    change is routing-side; it also reaches the **generation** path, so a project listing
+    `principal-developer` without `junior-developer` and `senior-developer` (the `mode: all`
+    predicate) loses the generated file.
+  No project.yaml change is required for projects that already list their roles explicitly;
+  run `sync.py --validate` after upgrading to see which roles the gates drop.
+- **Multi-line `variables:` values now keep the indentation of their use site (consumer-visible
+  only if you set multi-line values)**: a multi-line value substituted at an *indented*
+  placeholder is emitted with every content line carrying the placeholder's indentation —
+  previously only the first line did. The affected production placeholders are
+  `EXTRA_VOLUMES` / `EXTRA_ENV_VARS` / `EXTRA_VOLUME_DEFINITIONS` in
+  `agents/2-platform/sharkord-docker.md` and `GH_ASSETS` in
+  `agents/2-platform/sharkord-release.md` (both files have no `extends:`, so their body is
+  not YAML-dedented before substitution). For docker-compose list items and shell line
+  continuations this is a correction; blank lines stay blank, so no trailing whitespace is
+  emitted. Single-line values and column-0 / inline placeholders are unchanged — the default
+  render stays byte-identical.
+
+## [1.2.0-beta.2] - 2026-09-13
+
+### Added
+- **Native Spec/Plan workflow**: requests are classified up front (Spike / Bounded /
+  Architectural) and routed through an explicit approval gate before implementation. Plans are
+  authored against a fixed contract, tracked in a plan-ledger, and pipelines act as the single
+  routing source. Request grouping is configurable via `config/spec-plan-groups.yaml` and
+  resolved by a bundle resolver; `sync.py --validate-spec-plan` validates the configuration.
+  Artifacts use provider-neutral paths (`docs/specs`, `docs/plans`, `docs/spikes`), and a
+  coverage matrix maps requests to the plan/spec artifacts they produce.
+- **Progress and ledger system**: sessions automatically re-hydrate and resume from the persisted
+  progress state, backed by stable cross-session plan/task identities. A machine-written plan
+  ledger with a drift check keeps plan status honest, a two-stage task review with a rounds cap
+  gates task completion, and a mandatory root-cause gate precedes every bugfix.
+- **Configurable progress and checkpoint paths**: new `progress.dir` and
+  `progress.checkpoint-dir` project keys (defaults `.meta-viz/progress` and
+  `.meta-viz/checkpoints`) let projects relocate the runtime progress store and the
+  per-session checkpoint files; relative paths resolve against the project root, and the
+  framework defaults keep the historical layout.
+
 ## [1.2.0] — 2026-09-12
 
 ### Added

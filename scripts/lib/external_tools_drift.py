@@ -19,6 +19,7 @@ from .external_tools import (
     TOOL_RULE_PREFIX,
     resolve_injection_path,
 )
+from .generated_file_drift import _is_sync_backup_name
 from .io import write_checked
 from .log import SyncLog
 from .registry_query import (
@@ -250,6 +251,12 @@ def scan_injection_drift(
                 # bookkeeping files, never a foreign injection.
                 if child.name == ".agent-meta-managed" or child.name.startswith(".agent-meta-managed-"):
                     continue
+                # `<file>.sync-backup-<ts>` siblings are agent-meta's own
+                # ephemeral safety copies (backup_drifted_files()), never a
+                # foreign injection — skipped exactly as generated_file_drift
+                # skips them in its managed-file iterators.
+                if _is_sync_backup_name(child.name):
+                    continue
                 if child.name in managed:
                     continue
                 if context_file_path is not None and child.resolve() == context_file_path:
@@ -282,6 +289,8 @@ def scan_injection_drift(
             managed = _read_managed_index(agents_dir_path)
             for child in sorted(agents_dir_path.iterdir()):
                 if child.name == ".agent-meta-managed":
+                    continue
+                if _is_sync_backup_name(child.name):
                     continue
                 if child.name in managed:
                     continue
@@ -340,6 +349,8 @@ def scan_injection_drift(
                 known_names.add("scheduled_tasks.lock")
                 for child in sorted(infra_root.iterdir()):
                     if child.name in known_names:
+                        continue
+                    if _is_sync_backup_name(child.name):
                         continue
                     if child.resolve() in permitted_root_extra:
                         continue

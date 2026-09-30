@@ -407,9 +407,10 @@ def sync_external_skills_for_provider(
         active_repos["awesome-claude-code"] = acc_cfg.get("pinned_commit", "")
         
     # Ensure all active repos are present locally
-    for repo_name, pinned_commit in active_repos.items():
-        if repo_name and repo_name in repos:
-            ensure_skill_repo(agent_meta_root, project_root, repo_name, repos[repo_name], pinned_commit, log)
+    if not dry_run:
+        for repo_name, pinned_commit in active_repos.items():
+            if repo_name and repo_name in repos:
+                ensure_skill_repo(agent_meta_root, project_root, repo_name, repos[repo_name], pinned_commit, log)
 
     wrapper_path = agent_meta_root / AGENTS_DIR / EXTERNAL_DIR / SKILL_WRAPPER
     if not wrapper_path.exists():
@@ -553,10 +554,11 @@ def sync_external_skills_for_provider(
                 active_skill_repos.add(repo)
 
     inactive_repos = all_skill_repos - active_skill_repos
-    for repo_name in inactive_repos:
-        repo_cfg = repos.get(repo_name, {})
-        local_path = repo_cfg.get("local_path", f"external/{repo_name}")
-        deinit_skill_repo(agent_meta_root, project_root, local_path, log, dry_run, is_submodule=is_project_admin)
+    if not dry_run:
+        for repo_name in inactive_repos:
+            repo_cfg = repos.get(repo_name, {})
+            local_path = repo_cfg.get("local_path", f"external/{repo_name}")
+            deinit_skill_repo(agent_meta_root, project_root, local_path, log, dry_run, is_submodule=is_project_admin)
 
     # awesome-claude-code is a reference-data repo (no skill entries), only needed by agent-meta-scout
     if "awesome-claude-code" in repos and (not acc_cfg.get("enabled", True) or "agent-meta-scout" not in roles):

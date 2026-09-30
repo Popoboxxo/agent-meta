@@ -1,0 +1,44 @@
+agent-meta-version: "1.1.0"
+ai-providers:
+- Claude
+dod-preset: concept-driven
+platforms: []
+rules-preset: lazy
+knowledge-engine:
+  enabled: false
+spec-plan-workflow:
+  enabled: true
+  paths:
+    specs: docs/specs
+    plans: docs/plans
+    spikes: docs/spikes
+    legacy:
+    - docs/superpowers/specs
+    - docs/superpowers/plans
+  scan:
+    include:
+    - '*.md'
+    changed-files-only: true
+  index:
+    mode: knowledge-engine
+    fallback-index: docs/INDEX.md
+  archive:
+    mode: ask
+    agent: documenter
+    trigger: plan-complete
+    target: docs/plans/archive
+  external-system-override:
+    enabled: true
+    system: ''
+    note: ''
+project:
+  name: scenario-spec-plan-workflow
+  prefix: s50
+  short: scenario-spec-plan
+variables:
+  PROJECT_NAME: scenario-spec-plan-workflow
+  PROJECT_DESCRIPTION: Native spec/plan workflow activation test.
+  PROJECT_GOAL: Verify scaffolding, rule gate, approval stage, file-index fallback and the disabled no-op.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-spec-plan
+  GIT_MAIN_BRANCH: main

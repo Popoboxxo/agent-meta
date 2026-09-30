@@ -1,6 +1,26 @@
 {{#if ORCH_MODE_STRICT}}
+{{#if GATE_ENFORCED}}
 # CRITICAL GATE
 MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`. Keine Ausnahmen.
+{{/if}}
+{{#if GATE_PARTIAL}}
+# CRITICAL GATE (runtime-partially enforced)
+MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`.
+Provider-native Permissions block Main-Chat-Writes; Delegations-Provenienz ist
+NICHT erzwungen (Prompt + Permission-Layer).
+{{/if}}
+{{#if GATE_ADVISORY}}
+# CRITICAL GATE (advisory)
+MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`.
+ACHTUNG: Auf diesem Provider ist der Gate rein prompt-basiert, ohne Runtime-Gate.
+{{/if}}
+{{#if GATE_NEUTRAL}}
+# CRITICAL GATE (neutral)
+MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`.
+Dieser geteilte Kontext wird von mehreren Providern gelesen; die Runtime-Erzwingung
+ist provider-spezifisch und steht im jeweiligen dedizierten Tier-Kanal (Adapter-
+bzw. Rules-Datei) — siehe `a2a-delegation-gates`.
+{{/if}}
 {{/if}}
 {{#if ORCH_MODE_ADVISORY}}
 # Orchestrator
@@ -27,6 +47,9 @@ Volle Stage-Details (Agent/Modus je Stage, Loop/Fallback/Approval-Gate) einer ge
 Plan vorhanden (`plan-*.md` oder Knowledge-Wiki Plan-Seite) -> Pipeline `feature-lifecycle` mit `payload.plan_ref`, statt neuen Lifecycle blind zu starten.
 {{/if}}
 
+{{#if SPEC_PLAN_WORKFLOW_ENABLED}}
+**Spec/Plan-Gate (Convention boundary):** Auch Nicht-Pipeline-Anfragen (Ad-hoc-Dispatch, `quick-fix`, `bugfix`) erst über die Classify-Route (`S`/`M`/`L`/`XL`) führen — kein Direkteinstieg in die Implementierung ohne freigegebene Spec/Plan (`Status: APPROVED`). Details: Master-Rule `spec-plan-workflow`.
+{{/if}}
 ## Git Delegation
 {{#unless AUTO_COMMIT_ENABLED}}
 Git Mutationen (commit, push, add etc) -> `git` Agent. Read-only (status, log) im Main Chat ok.

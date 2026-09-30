@@ -23,6 +23,9 @@ docs/guides/        # Anleitungen und Beispiel-Config
 docs/ui/            # UI Assets
   architecture/     # Architektur-Diagramme (Mermaid)
   admin-ui.html     # Admin-UI Frontend
+docs/specs/         # Feature-Specs (Spec/Plan-Workflow, §5.1)
+docs/plans/         # Feature-Pläne + archive/ (docs/plans/README.md)
+docs/spikes/        # Wegwerf-Untersuchungen (explorer-Spike-Modus, F10)
 tests/              # Test-Suite (automated, manual, orchestration)
 
 ```
@@ -79,7 +82,7 @@ Kategorien für `docs/REQUIREMENTS.md`:
  Opencode->AGENTS.md |
  Gemini->AGENTS.md
 > **ENTRY:** `orchestrator`-Agent (für alle Dev-Tasks).
-`agent-meta v1.2.0` | DoD: `rapid-prototyping` | REQ-Trace: `false`
+`agent-meta v1.2.0-beta.2` | DoD: `rapid-prototyping` | REQ-Trace: `false`
 
 
 
@@ -202,9 +205,12 @@ Harte MCP-Tool-Verbote: siehe `mcp-guardrails.md` (always-on).
 
 
 
-# CRITICAL GATE
-MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`. Keine Ausnahmen.
+# CRITICAL GATE (runtime-partially enforced)
+MAIN CHAT darf nicht selbst editieren. ALLES -> `orchestrator`.
+Provider-native Permissions block Main-Chat-Writes; Delegations-Provenienz ist
+NICHT erzwungen (Prompt + Permission-Layer).
 
+**Spec/Plan-Gate (Convention boundary):** Auch Nicht-Pipeline-Anfragen (Ad-hoc-Dispatch, `quick-fix`, `bugfix`) erst über die Classify-Route (`S`/`M`/`L`/`XL`) führen — kein Direkteinstieg in die Implementierung ohne freigegebene Spec/Plan (`Status: APPROVED`). Details: Master-Rule `spec-plan-workflow`.
 ## Git Delegation
 Git Mutationen (commit, push, add etc) -> `git` Agent. Read-only (status, log) im Main Chat ok.
 
@@ -238,6 +244,8 @@ Bei Bedarf mit `Read` laden; verfügbare Regeln via `ls` im jeweiligen Verzeichn
 | `agent-meta-scout` | Claude-Ökosystem scouten: neue Skills, Rollen, Rules |
 
 | `api-specialist` | OpenAPI/Contract-First API Design, Schnittstellen-Spezifikationen |
+
+| `app-lifecycle-governor` | App-Lifecycle-Governance: Ownership, SLA, Data-Classification |
 
 | `bug-feature-analyzer` | Issue-Triage: Eingehende Bug-Meldungen, Feature-Requests analysieren, k |
 
@@ -323,6 +331,8 @@ Bei Bedarf mit `Read` laden; verfügbare Regeln via `ls` im jeweiligen Verzeichn
 
 | `principal-developer` | Last-Resort-Eskalationsstufe |
 
+| `product-manager` | Strategisches Produkt-Management: Backlog, User-Stories, Sprint-Planung |
+
 | `prompt-engineer` | Der ultimative Experte für Prompt-Engineering |
 
 | `refactoring-specialist` | Systematische großflächige Code-Transformation mit Sicherheitsnetz: Strangler |
@@ -385,6 +395,7 @@ Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
    - `agent-meta-manager.md` → registriere als `agent-meta-manager`
    - `agent-meta-scout.md` → registriere als `agent-meta-scout`
    - `api-specialist.md` → registriere als `api-specialist`
+   - `app-lifecycle-governor.md` → registriere als `app-lifecycle-governor`
    - `bug-feature-analyzer.md` → registriere als `bug-feature-analyzer`
    - `claude-expert.md` → registriere als `claude-expert`
    - `code-reviewer.md` → registriere als `code-reviewer`
@@ -427,6 +438,7 @@ Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
    - `performance-optimizer.md` → registriere als `performance-optimizer`
    - `planner.md` → registriere als `planner`
    - `principal-developer.md` → registriere als `principal-developer`
+   - `product-manager.md` → registriere als `product-manager`
    - `prompt-engineer.md` → registriere als `prompt-engineer`
    - `refactoring-specialist.md` → registriere als `refactoring-specialist`
    - `release.md` → registriere als `release`
@@ -444,6 +456,7 @@ Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
    define_subagent(name="agent-meta-manager", ...)
    define_subagent(name="agent-meta-scout", ...)
    define_subagent(name="api-specialist", ...)
+   define_subagent(name="app-lifecycle-governor", ...)
    define_subagent(name="bug-feature-analyzer", ...)
    define_subagent(name="claude-expert", ...)
    define_subagent(name="code-reviewer", ...)
@@ -486,6 +499,7 @@ Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
    define_subagent(name="performance-optimizer", ...)
    define_subagent(name="planner", ...)
    define_subagent(name="principal-developer", ...)
+   define_subagent(name="product-manager", ...)
    define_subagent(name="prompt-engineer", ...)
    define_subagent(name="refactoring-specialist", ...)
    define_subagent(name="release", ...)

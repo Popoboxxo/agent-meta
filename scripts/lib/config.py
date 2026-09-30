@@ -28,7 +28,7 @@ from .variables import (  # re-exported for callers/tests (Issue #565)
     strip_inactive_conditional_blocks,  # noqa: F401
     substitute,  # noqa: F401
 )
-from .frontmatter import _is_role_enabled, collect_sources
+from .frontmatter import collect_sources
 from .subagent_permissions import (
     missing_tools_roles,
     render_subagent_permission_block,
@@ -47,7 +47,11 @@ from .context_templates.builder import TemplateBuilder
 from .conventions import render_convention_block, resolve_conventions
 from .platform import apply_platform_variable_cascade
 from .delegation_table import get_active_agents_data, get_intent_routing_table
-from .dod import resolve_dod, resolve_dod_preset_name
+from .dod import (
+    resolve_dod,
+    resolve_dod_preset_name,
+    resolve_spec_plan_bundle,
+)
 from .providers import (
     all_providers_support_hooks,
     load_providers_config,
@@ -64,7 +68,12 @@ from .repo_containment import (
     default_repo_containment_block,
     tmp_sink_path_error,
 )
-from .roles import build_role_map, load_roles_config
+from .roles import (
+    build_role_map,
+    is_role_enabled,
+    load_roles_config,
+    resolve_activation_gates,
+)
 
 try:
     import yaml as _yaml
@@ -639,6 +648,7 @@ def _validate_subagent_permissions(config: dict, config_path: Path) -> None:
 
     platforms = config.get("platforms", [])
     role_map = build_role_map(agent_meta_root)
+    gates = resolve_activation_gates(agent_meta_root, config)
     role_sources, _ = collect_sources(agent_meta_root, platforms)
     configured_roles = config.get("roles")
     orch_mode = _resolve_orch_mode(config.get("orchestrator", {}))
@@ -651,7 +661,7 @@ def _validate_subagent_permissions(config: dict, config_path: Path) -> None:
             continue
         if configured_roles is not None and role not in configured_roles:
             continue
-        if not _is_role_enabled(role, config):
+        if not is_role_enabled(role, config, gates):
             continue
         if role == "orchestrator" and orch_mode == "main-chat":
             continue
@@ -957,6 +967,14 @@ def fill_defaults(
         if dod_block:
             config["dod"] = dod_block
 
+    # context_file.topology (SPEC-CONTEXT-FILE-MODES-2026-09-13, IC-12) is
+    # deliberately NOT materialised into user config. Absence is the canonical
+    # unified state: the JSON-schema `default: "unified"` documents it and
+    # `providers.context_topology()` fails safe to "unified" for a missing key.
+    # Persisting the default would rewrite every existing project.yaml on the
+    # first sync (behaviour change + `--check` rc1 drift), so the safe-side
+    # default stays virtual.
+
     # Q1 (repo-containment migration, spec §9.3): materialize an explicit block
     # once for existing projects so the default-ON behavior change and its
     # opt-out are visible in .meta-config/project.yaml. Idempotent — only when
@@ -1197,9 +1215,17 @@ def _build_core_variables(
             variables["AGENT_META_REL_PATH"] = ".agent-meta/"
     else:
         variables["AGENT_META_REL_PATH"] = ".agent-meta/"
-    agent_table, unmapped = build_agent_table(config, agent_meta_root)
+    agent_table_sink: list[str] = []
+    agent_table, unmapped = build_agent_table(
+        config, agent_meta_root, warn_sink=agent_table_sink
+    )
     variables["AGENT_TABLE"] = agent_table
-    variables["AGENT_HINTS"] = build_agent_hints(config, agent_meta_root)
+    variables["AGENT_HINTS"] = build_agent_hints(
+        config, agent_meta_root, warn_sink=agent_table_sink
+    )
+    for warning in agent_table_sink:
+        if warning not in unmapped:
+            unmapped.append(warning)
 
     # User variables may be YAML scalars (true, 20) — coerce to the string form
     # templates expect ("true"/"false" for {{#if}} blocks, str() otherwise).
@@ -1321,7 +1347,13 @@ def _build_core_variables(
     return unmapped
 
 
-def _build_provider_variables(variables: dict, config: dict, agent_meta_root: Path) -> None:
+def _build_provider_variables(
+    variables: dict,
+    config: dict,
+    agent_meta_root: Path,
+    *,
+    warn_sink: list[str] | None = None,
+) -> None:
     """Populate AI-provider routing/location variables.
 
     Parameter contract:
@@ -1329,6 +1361,8 @@ def _build_provider_variables(variables: dict, config: dict, agent_meta_root: Pa
             AGENT_HINTS_CLAUDE, AGENTS_DIR and AI_PROVIDER.
         config: the loaded project.yaml dict (read-only).
         agent_meta_root: agent-meta source root (for provider config lookup).
+        warn_sink: optional list sink forwarded to `build_agent_hints()` so
+            activation warnings surface instead of being dropped.
 
     Order dependency: must run after `_build_core_variables()` — the
     AGENTS_DIR/AI_PROVIDER auto-injection below only fires when the user
@@ -1365,7 +1399,7 @@ def _build_provider_variables(variables: dict, config: dict, agent_meta_root: Pa
     # Claude Code injects agent descriptions natively into the system prompt,
     # so the table in CLAUDE.md would be a duplication — dropped for Claude only.
     variables["AGENT_HINTS_CLAUDE"] = build_agent_hints(
-        config, agent_meta_root, include_table=False
+        config, agent_meta_root, include_table=False, warn_sink=warn_sink
     )
     # AGENTS_DIR: generated agents directory of the first active provider.
     # Derived from provider config so multi-provider setups (Gemini, Opencode, …)
@@ -1563,9 +1597,13 @@ def _build_platform_variables(
     before `_build_dod_variables()`/quality-pipelines (the table only reflects
     role/orchestrator flags known at this point, matching pre-#566 behavior).
     """
-    # SYSTEMS_ENGINEERING_ENABLED
-    se_config = config.get("systems-engineering", {})
-    variables["SE_ENABLED"] = "true" if se_config.get("enabled", False) else "false"
+    gates = resolve_activation_gates(agent_meta_root, config)
+
+    def _mirror(group: str) -> str:
+        return "true" if (gates.get(group) or {}).get("enabled", False) else "false"
+
+    # SYSTEMS_ENGINEERING_ENABLED (activation mirror)
+    variables["SE_ENABLED"] = _mirror("se")
     # SE_BASE_DIR: configurable output directory for SE artifacts.
     # Read from se_output.base_dir (default: "SE").
     se_output = config.get("se_output", {})
@@ -1579,20 +1617,21 @@ def _build_platform_variables(
     # Mirrors the SE block above; consumed by the knowledge-* agent templates
     # and the intent-routing table generator (delegation_table.py).
     ke_config = config.get("knowledge-engine", {})
-    variables["KNOWLEDGE_ENGINE_ENABLED"] = "true" if ke_config.get("enabled", False) else "false"
+    variables["KNOWLEDGE_ENGINE_ENABLED"] = _mirror("knowledge")
     variables["KNOWLEDGE_DOMAIN"] = ke_config.get("domain", "research")
     variables["KNOWLEDGE_BUNDLE_PATH"] = ke_config.get("bundle-path", "knowledge")
     variables["KNOWLEDGE_SCHEMA_PATH"] = f"{variables['KNOWLEDGE_BUNDLE_PATH']}/schema.md"
     variables["KNOWLEDGE_WIKI_DIR"] = f"{variables['KNOWLEDGE_BUNDLE_PATH']}/wiki"
     variables["KNOWLEDGE_SOURCES_DIR"] = f"{variables['KNOWLEDGE_BUNDLE_PATH']}/sources"
-    # VALIDATOR_ENABLED: auto-detect from project roles list
-    variables["VALIDATOR_ENABLED"] = "true" if "validator" in config.get("roles", []) else "false"
-    # DEVELOPER_TIERS_ENABLED: 3-tier developer system (junior/developer/senior)
-    # — active only when both tier roles are enabled in the project
+    # VALIDATOR_ENABLED: activation mirror of the `validator` group (the group's
+    # own config_predicate decides the default — roles_membership by default).
+    variables["VALIDATOR_ENABLED"] = _mirror("validator")
+
     _roles = config.get("roles", [])
-    variables["DEVELOPER_TIERS_ENABLED"] = (
-        "true" if "junior-developer" in _roles and "senior-developer" in _roles else "false"
-    )
+    # DEVELOPER_TIERS_ENABLED: activation mirror of the `developer_tiers` group.
+    # One flag for the whole junior/senior/principal tier set — the group keeps
+    # them addressable as a unit instead of gating each tier separately.
+    variables["DEVELOPER_TIERS_ENABLED"] = _mirror("developer_tiers")
     # EFFORT_ESTIMATOR_ENABLED: auto-detect from project roles list
     # — orchestrator gates effort-estimator routes behind this flag to avoid dead routes
     variables["EFFORT_ESTIMATOR_ENABLED"] = "true" if "effort-estimator" in _roles else "false"
@@ -1602,9 +1641,9 @@ def _build_platform_variables(
     #   developer/senior-developer/performance-optimizer templates.
     variables["WEB_PROJECT_ENABLED"] = "true" if "e2e-tester" in _roles else "false"
     # AGENT_DELEGATION_TABLE: generate after SE_ENABLED and VALIDATOR_ENABLED are set
-    variables["active_agents"] = get_active_agents_data(agent_meta_root, config, variables)
-
-    variables["active_agents"] = get_active_agents_data(agent_meta_root, config, variables)
+    variables["active_agents"] = get_active_agents_data(
+        agent_meta_root, config, variables, warn_sink=unmapped
+    )
 
     # INTENT_ROUTING_TABLE is finalized after `effective` quality-pipelines are
     # resolved below (see QUALITY_PIPELINES_ENABLED block), so pipeline
@@ -1645,6 +1684,17 @@ def _build_dod_variables(variables: dict, config: dict, agent_meta_root: Path) -
     # DOD_*: resolve from dod-preset (base) + dod (overrides).
     # Precedence: dod (project override) > dod-preset > "full" (implicit default).
     dod_resolved = resolve_dod(config, agent_meta_root)
+
+    sp_block = config.get("spec-plan-workflow") or {}
+    sp_paths = sp_block.get("paths") or {}
+    variables["SPEC_PLAN_SPECS_DIR"] = sp_paths.get("specs", "docs/specs")
+    variables["SPEC_PLAN_PLANS_DIR"] = sp_paths.get("plans", "docs/plans")
+    variables["SPEC_PLAN_WORKFLOW_ENABLED"] = (
+        "true" if resolve_spec_plan_bundle(
+            config, agent_meta_root, dod=dod_resolved,
+        )["template-conditional"] else "false"
+    )
+
     variables["DOD_REQ_TRACEABILITY"] = "true" if dod_resolved.get("req-traceability", True) else "false"
     variables["DOD_TESTS_REQUIRED"]   = "true" if dod_resolved.get("tests-required", True) else "false"
     variables["DOD_CODEBASE_OVERVIEW"] = "true" if dod_resolved.get("codebase-overview", True) else "false"
@@ -1670,6 +1720,18 @@ def _build_dod_variables(variables: dict, config: dict, agent_meta_root: Path) -
         "Tests schreiben/aktualisieren — Pflicht vor Commit." if _dod_tests else ""
     )
     return dod_resolved
+
+
+def _select_main_reflection_pair(pairs: list[dict]) -> dict | None:
+    """Pick the reflection pair that drives the global ``MAX_ITERATIONS`` variable.
+
+    Pinned to ``dev-review-loop`` (the developer workflow's main loop) so a newly
+    added pair never silently becomes the main pair; falls back to the first pair
+    when ``dev-review-loop`` is absent. Returns ``None`` for an empty list.
+    """
+    if not pairs:
+        return None
+    return next((pair for pair in pairs if pair.get("id") == "dev-review-loop"), pairs[0])
 
 
 def _build_pipeline_variables(
@@ -1698,7 +1760,8 @@ def _build_pipeline_variables(
     """
     # REFLECTION_PAIRS_ENABLED: auto-detect from role-defaults.yaml + project overrides
     variables["REFLECTION_PAIRS_ENABLED"] = "false"
-    variables["MAX_ITERATIONS"] = "3"  # default for reflection loops
+    variables["MAX_ITERATIONS"] = "3"
+    _effective_pairs = []
     try:
         _refl_pairs = load_reflection_pairs(str(agent_meta_root / "config"))
         _refl_overrides = load_project_overrides(
@@ -1707,10 +1770,7 @@ def _build_pipeline_variables(
         _effective_pairs = apply_project_overrides(_refl_pairs, _refl_overrides)
         if _effective_pairs:
             variables["REFLECTION_PAIRS_ENABLED"] = "true"
-            _main_pair = next(
-                (p for p in _effective_pairs if p.get("id") == "dev-review-loop"),
-                _effective_pairs[0],
-            )
+            _main_pair = _select_main_reflection_pair(_effective_pairs)
             variables["MAX_ITERATIONS"] = str(_main_pair.get("max_iterations", 3))
     except Exception:  # noqa: BLE001
         # Fallback: keep existing behavior (check role-defaults.yaml directly).
@@ -1747,7 +1807,7 @@ def _build_pipeline_variables(
         roles_cfg_for_coupling = load_roles_config(agent_meta_root)
         pipeline_errors = validate_pipelines(
             effective, list(available_roles), roles_config=roles_cfg_for_coupling,
-            known_roles=set(all_roles),
+            known_roles=set(all_roles), reflection_pairs=_effective_pairs,
         )
         for err in pipeline_errors:
             unmapped.append(f"quality-pipelines: {err}")
@@ -1763,7 +1823,7 @@ def _build_pipeline_variables(
             variables["QUALITY_PIPELINES_ENABLED"] = "true"
         # Build variables for active pipelines; also set BLOCK="" for disabled
         # base pipelines so substitute() never warns about missing placeholders.
-        active_vars = build_pipeline_variables(effective, dod_resolved)
+        active_vars = build_pipeline_variables(effective, dod_resolved, _effective_pairs)
         variables.update(active_vars)
         variables["PIPELINE_MATCH_TABLE"] = generate_pipeline_match_table(effective)
         for name in pipelines:
@@ -1779,20 +1839,41 @@ def _build_pipeline_variables(
     return effective
 
 
+def _load_block_snippet(path: Path) -> str:
+    """Load a block snippet and apply the canonical inlining transform.
+
+    Transform contract (SPEC §3.7, O-D): a leading YAML frontmatter block
+    (``---`` … first ``\\n---``) is stripped, line endings are normalised to
+    ``\\n`` and the result is reduced with ``strip("\\n")``. A missing file
+    yields ``""`` (fail-soft, matching the existing snippet loaders).
+    """
+    if not path.exists():
+        return ""
+    text = path.read_text(encoding="utf-8")
+    if text.startswith("---"):
+        end = text.find("\n---", 3)
+        if end != -1:
+            text = text[end + 4:]
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    return text.strip("\n")
+
+
 def _build_snippet_variables(variables: dict, agent_meta_root: Path) -> None:
-    """Populate variable blocks loaded verbatim from snippets/ files.
+    """Populate variable blocks loaded from snippets/ files.
 
     Parameter contract:
         variables: mutated in place — receives SE_MODE_BLOCK, A2A_PROTOCOL_BLOCK,
-            CHECKPOINTING_BLOCK, QUALITY_PIPELINES_BLOCK (all from
-            snippets/orchestrator/), BROWSER_VERIFICATION_BLOCK and
+            CHECKPOINTING_BLOCK, QUALITY_PIPELINES_BLOCK, STATUS_TABLE_BLOCK (all
+            from snippets/orchestrator/), BROWSER_VERIFICATION_BLOCK and
             LANGUAGE_BEST_PRACTICES_BLOCK (from snippets/developer/, with
-            `{{LANGUAGE}}` pre-resolved against `variables["LANGUAGE"]`), and
-            PROMPT_INJECTION_DEFENSE_BLOCK (from snippets/security/).
+            `{{LANGUAGE}}` pre-resolved against `variables["LANGUAGE"]`),
+            PROMPT_INJECTION_DEFENSE_BLOCK (from snippets/security/) and the
+            block-inlining variables OUTPUT_GUARD_BLOCK,
+            BACKGROUND_PROCESS_GUARD_BLOCK and PARSE_INPUT_BLOCK (from
+            snippets/agents/, run through `_load_block_snippet`).
         agent_meta_root: agent-meta source root (snippet file location).
     """
-    # Orchestrator conditional blocks loaded from snippets (token optimization).
-    # Each block is either the real conditional section or an empty string.
+
     _snippets_dir = agent_meta_root / "snippets" / "orchestrator"
     for _snippet_name, _var_stem in (
         ("se-mode", "SE_MODE"),
@@ -1844,6 +1925,22 @@ def _build_snippet_variables(variables: dict, agent_meta_root: Path) -> None:
     variables["PROMPT_INJECTION_DEFENSE_BLOCK"] = (
         _pid_path.read_text(encoding="utf-8").rstrip("\n") if _pid_path.exists() else ""
     )
+
+    # Block-inlining variables (spec §3.7). `_load_block_snippet` strips the
+    # frontmatter, normalizes line endings and strip("\n")-trims the result, so
+    # the stored value carries no leading indentation. `substitute()` re-indents
+    # a multi-line value to the indentation of the placeholder's line, so a
+    # reference nested in a YAML literal `content: |` patch block keeps that
+    # indentation on every line instead of falling back to column 0.
+    _block_snippets_dir = agent_meta_root / "snippets" / "agents"
+    for _snippet_name, _var_stem in (
+        ("output-guard", "OUTPUT_GUARD"),
+        ("background-process-guard", "BACKGROUND_PROCESS_GUARD"),
+        ("parse-input", "PARSE_INPUT"),
+    ):
+        variables[f"{_var_stem}_BLOCK"] = _load_block_snippet(
+            _block_snippets_dir / f"{_snippet_name}.md"
+        )
 
 
 def _build_convention_variables(variables: dict, config: dict, agent_meta_root: Path) -> None:
@@ -1918,7 +2015,7 @@ def build_variables(config: dict, agent_meta_root: Path, project_root: Path | No
     """
     variables: dict = {}
     unmapped = _build_core_variables(variables, config, agent_meta_root, project_root)
-    _build_provider_variables(variables, config, agent_meta_root)
+    _build_provider_variables(variables, config, agent_meta_root, warn_sink=unmapped)
     _build_orch_variables(variables, unmapped, config, agent_meta_root)
     _build_subagent_permission_variables(variables, config)
     _build_platform_variables(variables, unmapped, config, agent_meta_root)
@@ -1927,7 +2024,7 @@ def build_variables(config: dict, agent_meta_root: Path, project_root: Path | No
     # INTENT_ROUTING_TABLE: role rows plus pipeline signal_keywords rows,
     # using the same `effective` quality-pipelines dict resolved above.
     variables["INTENT_ROUTING_TABLE"] = get_intent_routing_table(
-        agent_meta_root, config, variables, pipelines=effective
+        agent_meta_root, config, variables, pipelines=effective, warn_sink=unmapped
     )
     # INTENT_ROUTING_TOOLS (issue #264): the structured route_intent tool
     # definition, rendered once per provider via its handoff_format
@@ -1947,6 +2044,7 @@ def build_variables(config: dict, agent_meta_root: Path, project_root: Path | No
         variables,
         providers=resolve_providers(config, load_providers_config(agent_meta_root)),
         pipelines=effective,
+        warn_sink=unmapped,
     )
     _build_snippet_variables(variables, agent_meta_root)
     _build_convention_variables(variables, config, agent_meta_root)

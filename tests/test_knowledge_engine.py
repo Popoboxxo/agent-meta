@@ -82,30 +82,34 @@ from scripts.lib.frontmatter import _is_role_enabled
 
 def test_knowledge_role_enabled_when_config_true():
     config = {"knowledge-engine": {"enabled": True}}
-    assert _is_role_enabled("knowledge-curator", config) is True
+    assert _is_role_enabled("knowledge-curator", config, _AGENT_META_ROOT) is True
 
 
 def test_knowledge_role_disabled_when_config_false():
     config = {"knowledge-engine": {"enabled": False}}
-    assert _is_role_enabled("knowledge-curator", config) is False
+    assert _is_role_enabled("knowledge-curator", config, _AGENT_META_ROOT) is False
 
 
 def test_knowledge_role_disabled_when_config_missing():
-    assert _is_role_enabled("knowledge-curator", {}) is False
+    assert _is_role_enabled("knowledge-curator", {}, _AGENT_META_ROOT) is False
 
 
 def test_knowledge_role_disabled_when_block_present_but_empty():
-    assert _is_role_enabled("knowledge-curator", {"knowledge-engine": {}}) is False
+    assert _is_role_enabled(
+        "knowledge-curator", {"knowledge-engine": {}}, _AGENT_META_ROOT
+    ) is False
 
 
-def test_se_role_still_defaults_to_enabled_unaffected():
-    """Regression: existing se- behavior must not change."""
-    assert _is_role_enabled("se-architect", {}) is True
+def test_se_role_defaults_to_disabled_from_activation_group():
+    """SE follows activation_groups.se.default: false when config is absent."""
+    assert _is_role_enabled("se-architect", {}, _AGENT_META_ROOT) is False
 
 
 def test_non_prefixed_role_always_enabled():
     """Regression: roles without se-/knowledge- prefix are unaffected."""
-    assert _is_role_enabled("developer", {"knowledge-engine": {"enabled": False}}) is True
+    assert _is_role_enabled(
+        "developer", {"knowledge-engine": {"enabled": False}}, _AGENT_META_ROOT
+    ) is True
 
 
 # ---------------------------------------------------------------------------
@@ -237,7 +241,11 @@ def test_delegation_table_omits_knowledge_roles_when_disabled():
 
 def test_delegation_table_includes_knowledge_roles_when_enabled():
     variables = {"SE_ENABLED": "false", "VALIDATOR_ENABLED": "false", "KNOWLEDGE_ENGINE_ENABLED": "true"}
-    table = get_active_agents_data(_AGENT_META_ROOT, {}, variables)
+    table = get_active_agents_data(
+        _AGENT_META_ROOT,
+        {"knowledge-engine": {"enabled": True}},
+        variables,
+    )
     for role in ["knowledge-curator", "knowledge-ingestor", "knowledge-querier",
                  "knowledge-linter", "knowledge-indexer", "knowledge-gardener", "knowledge-migrator"]:
         assert role in [a['name'] for a in table]
@@ -365,7 +373,7 @@ def test_self_hosting_sync_with_knowledge_engine_enabled(tmp_path):
     dest = tmp_path / "agent-meta-copy"
     shutil.copytree(
         _AGENT_META_ROOT, dest,
-        ignore=shutil.ignore_patterns(".git", "__pycache__", "*.pyc", ".superpowers", "external"),
+        ignore=shutil.ignore_patterns(".git", "__pycache__", "*.pyc", ".superpowers", "external", ".tmp"),
     )
 
     project_yaml_path = dest / ".meta-config" / "project.yaml"
@@ -441,3 +449,66 @@ def test_admin_ui_has_view_project_knowledge_engine_function():
         assert f'{preset_name}: {{' in html or f'"{preset_name}": {{' in html
     assert 'saveProjectSection("knowledge-engine", ke, status)' in html
     assert '"project/knowledge-engine": "project_instance-knowledge_engine",' in html
+
+
+# ---------------------------------------------------------------------------
+# Task 12 — Plan/Spec concept types + okf.auto-index/auto-log semantics
+# ---------------------------------------------------------------------------
+
+import sys  # noqa: E402
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT / "scripts") not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT / "scripts"))
+
+
+def test_internal_docs_contains_plan_and_spec():
+    from lib.knowledge import DOMAIN_CONCEPT_TYPES
+    types = DOMAIN_CONCEPT_TYPES["internal-docs"]
+    assert "plan" in types
+    assert "spec" in types
+
+
+def test_gitkeep_subdirs_contain_plans_and_specs():
+    from lib.knowledge import _KNOWLEDGE_GITKEEP_SUBDIRS
+    rel = {p.as_posix() for p in _KNOWLEDGE_GITKEEP_SUBDIRS}
+    assert "wiki/plans" in rel
+    assert "wiki/specs" in rel
+
+
+def test_auto_flags_false_keep_scaffolded_files(tmp_path):
+    from lib.knowledge import sync_knowledge_engine
+    from lib.log import SyncLog
+    log = SyncLog()
+    config = {
+        "knowledge-engine": {
+            "enabled": True, "domain": "internal-docs", "bundle-path": "knowledge",
+            "okf": {"auto-index": False, "auto-log": False},
+        }
+    }
+    sync_knowledge_engine(REPO_ROOT, tmp_path, config, log, dry_run=False)
+    # Dateien bleiben nutzbar (weiterhin gescaffoldet) ...
+    assert (tmp_path / "knowledge" / "wiki" / "index.md").exists()
+    assert (tmp_path / "knowledge" / "wiki" / "log.md").exists()
+    # ... aber die automatische Pflege ist aus -> agent-driven.
+    infos = " ".join(log.infos)
+    assert "agent-driven" in infos
+
+
+def test_auto_flags_true_keep_scaffolded_files_without_agent_driven_note(tmp_path):
+    from lib.knowledge import sync_knowledge_engine
+    from lib.log import SyncLog
+    log = SyncLog()
+    config = {
+        "knowledge-engine": {
+            "enabled": True, "domain": "internal-docs", "bundle-path": "knowledge",
+            "okf": {"auto-index": True, "auto-log": True},
+        }
+    }
+    sync_knowledge_engine(REPO_ROOT, tmp_path, config, log, dry_run=False)
+    # Dateien werden auch im true-Fall gescaffoldet ...
+    assert (tmp_path / "knowledge" / "wiki" / "index.md").exists()
+    assert (tmp_path / "knowledge" / "wiki" / "log.md").exists()
+    # ... aber die agent-driven-Notiz wird nur bei auto-*: false emittiert.
+    infos = " ".join(log.infos)
+    assert "agent-driven" not in infos

@@ -6,7 +6,7 @@ import posixpath
 import re
 from pathlib import Path
 
-from .io import is_absent_gitignored_target, is_unchanged, load_json_file, safe_path, write_checked
+from .io import is_absent_gitignored_target, is_unchanged, load_json_file, safe_path, write_atomic, write_checked
 from .log import SyncLog
 from .providers import provider_hooks_supported
 
@@ -229,7 +229,7 @@ def _update_settings_hooks(
 
     if not dry_run:
         settings_path.parent.mkdir(parents=True, exist_ok=True)
-        settings_path.write_text(new_content, encoding="utf-8")
+        write_atomic(settings_path, new_content)
 
 
 def _antigravity_adapter_command(
@@ -358,7 +358,7 @@ def _update_antigravity_hooks_json(
 
     if not dry_run:
         config_path.parent.mkdir(parents=True, exist_ok=True)
-        config_path.write_text(new_content, encoding="utf-8")
+        write_atomic(config_path, new_content)
 
 
 # Registration writer per hook_protocol (issue #674 Phase 3.1). Keys are
