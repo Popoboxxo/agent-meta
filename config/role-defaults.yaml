@@ -819,6 +819,8 @@ roles:
       - prompt-governance-v1
       - lifecycle-audit-v1
       - ai-governance-assessment-v1
+      - fraud-risk-assessment-v1
+      - control-assessment-v1
     short_desc: 'Projekt-Feedback standardisieren: Bugs, Features, Verbesserungen
       als GitHub I...'
   bug-feature-analyzer:
@@ -2590,7 +2592,164 @@ roles:
       - developer
       timeout_sec: 600
     short_desc: Agenten-spezifische SLIs (Task Success, Reasoning Quality, Approval Rate, Kosten/Drift)
+  fraud-risk-assessor:
+    model: powerful
+    memory: project
+    permission_mode: plan
+    workflow_tier: optional
+    description: Assesses occupational fraud risk and appraises the anti-fraud program across deterrence,
+      prevention, detection and investigation, with red-flag indicators.
+    routing:
+      addressability: keyword
+      intent_keywords:
+      - Betrugsrisiko bewerten
+      - fraud risk assessment
+      - Betrugsdreieck
+      - Fraud Triangle
+      - Red Flags bewerten
+      - Anti-Fraud-Programm
+      - Hinweisgeber-Hotline
+      - Betrugspraevention
+      - occupational fraud
+      - Fraud Hexagon
+      parallel: true
+      orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Betrugsrisiko bewerten
+      - fraud risk assessment
+      - Betrugsdreieck
+      - Fraud Triangle
+      - Red Flags bewerten
+      - Anti-Fraud-Programm
+      - Hinweisgeber-Hotline
+      - Betrugspraevention
+      - occupational fraud
+      - Fraud Hexagon
+      examples:
+      - Bewerte das Betrugsrisiko unserer Zahlungsprozesse inklusive Szenarien und Red Flags.
+      - Pruefe, ob unser Anti-Fraud-Programm ueber Abschreckung, Praevention, Aufdeckung und Untersuchung
+        tragfaehig ist.
+      - Bewerte die Wirksamkeit unserer Hinweisgeber-Hotline und der Meldeprozesse.
+    handoff:
+      input_contracts:
+      - lifecycle-audit-v1
+      - dependency-audit-v1
+      - ai-security-audit-v1
+      - log-analysis-v1
+      - rca-report-v1
+      output_contract: fraud-risk-assessment-v1
+      target_roles:
+      - feedback
+      - orchestrator
+    short_desc: Assesses occupational fraud risk and appraises the anti-fraud program across det...
 
+  risk-based-audit-planner:
+    model: balanced
+    memory: project
+    permission_mode: plan
+    workflow_tier: optional
+    description: 'Risk-based audit scoping: auditable area to objectives, risks, key controls and tests
+      (RCM), with inherent/residual risk, scope, timing and resource plan.'
+    routing:
+      addressability: keyword
+      intent_keywords:
+      - risikobasierte Pruefungsplanung
+      - Pruefungsuniversum
+      - audit universe
+      - Auditable Area
+      - Pruefungsumfang festlegen
+      - Kontrollmatrix
+      - Pruefungsprogramm erstellen
+      - Fraud-Brainstorming
+      - Inhaerentes und Restrisiko
+      - risikobasierter Pruefungsplan
+      parallel: true
+      orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - risikobasierte Pruefungsplanung
+      - Pruefungsuniversum
+      - audit universe
+      - Auditable Area
+      - Pruefungsumfang festlegen
+      - Kontrollmatrix
+      - Pruefungsprogramm erstellen
+      - Fraud-Brainstorming
+      - Inhaerentes und Restrisiko
+      - risikobasierter Pruefungsplan
+      examples:
+      - Plane eine risikobasierte Pruefung unseres Release-Prozesses und lege Umfang, Timing und Ressourcen
+        fest.
+      - Baue aus dem Pruefungsuniversum die Kandidaten fuer dieses Quartal und begruende die Priorisierung.
+      - Erstelle die Risiko-Kontroll-Matrix fuer den Deployment-Pfad inklusive Betrugs-Brainstorming.
+    handoff:
+      input_contracts:
+      - lifecycle-audit-v1
+      - dependency-audit-v1
+      - ai-security-audit-v1
+      - slo-report-v1
+      - log-analysis-v1
+      - rca-report-v1
+      - explorer-output-v1
+      output_contract: audit-plan-v1
+      target_roles:
+      - control-framework-assessor
+    short_desc: 'Risk-based audit scoping: auditable area to objectives, risks, key controls and...'
+
+  control-framework-assessor:
+    model: powerful
+    memory: project
+    permission_mode: plan
+    workflow_tier: optional
+    description: Assesses governance, risk and control processes against a named framework (COSO ICIF, COBIT,
+      CARES/Standard 2120, ITGCs) and reports evidence-anchored findings.
+    routing:
+      addressability: keyword
+      intent_keywords:
+      - Kontrollrahmen pruefen
+      - COSO
+      - COBIT
+      - ITGC
+      - Kontrollaktivitaeten bewerten
+      - Wirksamkeit der Kontrollen
+      - Kontrollumfeld
+      - Pruefungsfeststellung
+      - Restrisiko bewerten
+      - Three Lines
+      parallel: true
+      orchestrator_only: false
+    routing_patterns:
+      keywords:
+      - Kontrollrahmen pruefen
+      - COSO
+      - COBIT
+      - ITGC
+      - Kontrollaktivitaeten bewerten
+      - Wirksamkeit der Kontrollen
+      - Kontrollumfeld
+      - Pruefungsfeststellung
+      - Restrisiko bewerten
+      - Three Lines
+      examples:
+      - Bewerte unsere Governance- und Kontrollprozesse gegen das COSO-Rahmenwerk und liefere belegte Feststellungen.
+      - Pruefe die IT general controls des Deployment-Pfads und bewerte das Restrisiko je Feststellung.
+      - Verifiziere im Follow-up, ob die vereinbarten Korrekturmassnahmen tatsaechlich wirksam sind.
+    handoff:
+      input_contracts:
+      - audit-plan-v1
+      - lifecycle-audit-v1
+      - dependency-audit-v1
+      - ai-security-audit-v1
+      - slo-report-v1
+      - log-analysis-v1
+      - review-output-v1
+      - rca-report-v1
+      output_contract: control-assessment-v1
+      target_roles:
+      - feedback
+      - orchestrator
+    short_desc: Assesses governance, risk and control processes against a named framework (COSO...
 
 activation_groups:
   se:

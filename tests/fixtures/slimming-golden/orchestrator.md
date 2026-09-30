@@ -759,7 +759,9 @@ In dieser Runtime ist **kein** natives `route_intent`-Tool registriert. Leite di
         "input_contracts": [
           "dependency-audit-v1",
           "prompt-governance-v1",
-          "lifecycle-audit-v1"
+          "lifecycle-audit-v1",
+          "fraud-risk-assessment-v1",
+          "control-assessment-v1"
         ]
       },
       {
