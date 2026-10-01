@@ -43,7 +43,7 @@ def loaded_config():
 # Every provider sharing context_file AGENTS.md (config/ai-providers.yaml).
 # Codex/ZCode/KimiCode joined the shared-context group in 2026-09 — the #638
 # union logic must cover ALL sharers, not just the two that existed then.
-_AGENTS_MD_SHARERS = ("Opencode", "Gemini", "Codex", "ZCode", "KimiCode")
+_AGENTS_MD_SHARERS = ("Opencode", "Gemini", "Codex", "ZCode", "KimiCode", "Mammouth")
 
 
 def _gate_variables(config: dict, provider: str, provider_config: dict) -> dict:

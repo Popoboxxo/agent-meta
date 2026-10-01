@@ -90,6 +90,7 @@ Resolved values (2026-10-01): PRE-2 flag-gated/default-off; PRE-3 `orchestrator`
 ## File Structure
 
 Create:
+- `config/provider-migrations.yaml` — provider-agnostic old→new path migration map (per-provider `remove` targets with an optional `requires-flag`); sole owner **Task 11**, so Task 4 keeps exclusive ownership of `config/ai-providers.yaml`.
 - `scripts/lib/artifact_validate.py` — provider-agnostic `validate_toml`, `validate_frontmatter`, `validate_json_document` returning `list[Finding]`.
 - `scripts/lib/consistency/artifact_contracts.py` — `check_artifact_contracts(agent_meta_root)` (Severity.ERROR) over generated artifacts.
 - `scripts/lib/consistency/model_contracts.py` — model-format/prefix + `model-catalog` consistency check.
@@ -308,17 +309,40 @@ discovery:
 
 ### Task 11: Path migration + idempotency / pending-write fix
 **Agent:** senior-developer
-**Files:** Modify: `scripts/lib/sync_pipeline.py`; Modify: `scripts/lib/generated_file_drift.py`; Modify: `scripts/lib/context_templates/builder.py`; Create: `tests/test_migration_paths.py`; Modify: `tests/test_context_agents_md_idempotency.py`
-**Interfaces:** Produces the ordered migration sequence (write-new -> verify -> backup-old -> remove-old), backup-first managed delete, the final-content diff, and Continue run1 substitution; Consumes Task-4 path values.
-**Acceptance:** AC-22 + AC-3a + AC-4 + AC-18: the new path exists, the old managed path is gone, each removed managed file has a byte-exact `.sync-backup-<ts>` sibling, user-authored files are never deleted, renaming the backup restores the file; after a clean scratch sync `--check` rc 0 and `sha256(run1)==sha256(run2)`; a managed-block edit is rc 1, an out-of-block edit rc 0.
+**Files:** Modify: `scripts/lib/sync_pipeline.py`; Modify: `scripts/lib/generated_file_drift.py`; Modify: `scripts/lib/context_templates/builder.py`; Create: `config/provider-migrations.yaml`; Create: `tests/test_migration_paths.py`; Modify: `tests/test_context_agents_md_idempotency.py`
+**Interfaces:** Produces the ordered migration sequence (write-new -> **verify** -> backup-old -> remove-old), backup-first managed delete, the final-content diff (wired into production, not test-only), the flag-gated `migrate_discovery_artifacts` migrator **now also running for Copilot without a flag**, and Continue run1 substitution; Consumes Task-4 path values and the `config/provider-migrations.yaml` migration map (iterated by map key; dispatch on the map + the named bool flag, never on a provider name).
+**Acceptance:** AC-22 + AC-3a + AC-4 + AC-18: the new path exists, the old managed path is gone, each removed managed file has a byte-exact `.sync-backup-<ts>` sibling, user-authored files are never deleted, renaming the backup restores the file; after a clean scratch sync `--check` rc 0 and `sha256(run1)==sha256(run2)`; a managed-block edit is rc 1, an out-of-block edit rc 0. **AC-22 default-on path (review F1):** the Copilot old→new migration runs with **no flag** (`Copilot` map entry has no `requires-flag`); the Gemini entry runs **only when `agent-discovery: true`**; a **Copilot fixture** asserts old-path-gone + byte-exact `.sync-backup-<ts>` + rollback-by-rename + user-file guard, and a discovery-off fixture proves the Gemini paths are untouched. **Review F2/F3:** the `verify` step and the final-content pending diff are wired into production (`sync_pipeline.py` / `generated_file_drift.py`).
 **Verify:** `python3 -m pytest tests/test_migration_paths.py tests/test_context_agents_md_idempotency.py -q`
 **Shared-render convergence note (added 2026-10-01):** `tests/test_agents_md_shared_context_convergence.py` and `tests/test_context_file_modes.py` carry shared-tuple expectations that omit Mammouth and must be updated here; this is a shared-render convergence concern (Mammouth now reads `AGENTS.md`) and is assigned to Task 11 (Tests/Idempotency), not to Task 4.
+**Provider-migration map (authoritative data contract — Task 11 consumes the field names; two accepted shapes):**
+```yaml
+# config/provider-migrations.yaml
+migrations:
+  Copilot:                     # default-on migration (no flag): bare-list shape
+    - remove: .github/copilot/agents
+      kind: dir
+    - remove: .github/copilot/rules
+      kind: dir
+    - remove: .github/copilot/COPILOT.md
+      kind: file
+  Gemini:                      # flag-gated shape: a mapping with `requires-flag` + `removals`
+    requires-flag: agent-discovery
+    removals:
+      - remove: .gemini/agents
+        kind: dir
+      - remove: .gemini/rules
+        kind: dir
+      - remove: .gemini/skills
+        kind: dir
+```
+The migrator normalizes both shapes: a bare list = default-on; `{requires-flag, removals: [...]}` = flag-gated. (Corrected 2026-10-01 after the Task-11 review found the earlier snippet was invalid YAML.)
+**Consumption contract:** the migrator iterates `migrations`; for each provider it runs only if (no `requires-flag`) OR (the named bool flag is truthy); every `remove` target is a managed artifact deleted backup-first (byte-exact `.sync-backup-<ts>`), user-authored files preserved, rollback by rename; dispatch on the map + flag name, never on the provider name. This preserves Task-4's exclusive ownership of `config/ai-providers.yaml` (the migration data lives in this new, Task-11-only file) while satisfying AC-22 / design §6.2.1 / spec §11.1 (Copilot default-on, Gemini discovery-gated).
 **Depends on:** 4
 **Provider-Agnostik:** migration and diff are driven by config keys; no name branch.
-- [ ] Step 1: Test schreiben (fail)
-- [ ] Step 2: implementieren
-- [ ] Step 3: Test (pass)
-- [ ] Step 4: commit — `feat: migrate artifact paths and stabilise pending writes`
+- [x] Step 1: Test schreiben (fail)
+- [x] Step 2: implementieren
+- [x] Step 3: Test (pass)
+- [x] Step 4: commit — `feat: migrate artifact paths and stabilise pending writes`
 
 ### Task 12: Provider-neutral template body references (D5)
 **Agent:** junior-developer
@@ -473,7 +497,7 @@ Each group is one `FanoutPlan(kind="parallel_group", max_parallel=2)`. Only grou
 | PG-3 | 6, 8 | `scripts/lib/provider_transform.py` + `tests/test_transform_contracts.py` vs. `scripts/lib/mcp_provider_config.py` + `tests/test_mcp_config.py` | disjoint |
 | PG-4 | 9, 10 | `config/delegation-syntax.yaml` + `scripts/lib/pipelines.py` + `templates/configs/CONTINUE.config-template.yaml` + `tests/test_pipeline_notation_config.py` vs. `scripts/lib/bootstrap.py` + `scripts/lib/context.py` + `config/provider-bootstrap.yaml` + `tests/test_bootstrap_submarkers.py` | disjoint |
 | PG-5 | 3, 12 | `scripts/lib/agent_sync.py` + `scripts/sync.py` + `tests/test_sync_validation_gate.py` vs. `agents/1-generic/agent-meta-manager.md` + `agents/1-generic/agent-meta-scout.md` + `agents/1-generic/release.md` | disjoint |
-| PG-6 | 2, 11 | `scripts/lib/consistency/artifact_contracts.py` + `scripts/lib/consistency/model_contracts.py` + `scripts/consistency-check.py` + `tests/test_consistency_checks.py` vs. `scripts/lib/sync_pipeline.py` + `scripts/lib/generated_file_drift.py` + `scripts/lib/context_templates/builder.py` + `tests/test_migration_paths.py` + `tests/test_context_agents_md_idempotency.py` | disjoint |
+| PG-6 | 2, 11 | `scripts/lib/consistency/artifact_contracts.py` + `scripts/lib/consistency/model_contracts.py` + `scripts/consistency-check.py` + `tests/test_consistency_checks.py` vs. `scripts/lib/sync_pipeline.py` + `scripts/lib/generated_file_drift.py` + `scripts/lib/context_templates/builder.py` + `config/provider-migrations.yaml` + `tests/test_migration_paths.py` + `tests/test_context_agents_md_idempotency.py` | disjoint |
 | PG-7 (stage `validate`) | 18 validator parallel with tester | verification only; no writes | disjoint |
 
 **Task 15 (release) is serial, not a parallel group:** it depends on the last behavior/scenario task (`15 -> 14`) and must run **before** regeneration so the version is final when Task 16 re-embeds it; its `Files:` set (`VERSION`, `CHANGELOG.md`, `.meta-config/project.yaml`, `README.md`) is disjoint from every other task, but it is intentionally not parallelized. Task 15 is a non-stage-target (it owns no `pipeline_stages` slot) yet it is a hard dependency of Task 16 (`16 -> 15`), so it cannot be skipped.
@@ -519,6 +543,7 @@ PY
 - **Findings-traceability re-check (2026-10-01, planning-only):** the complete finding inventory was mapped onto the existing tasks (see `## Findings Traceability (vollständig)`). At that pass, **no new task was required for any finding**; the only production-facing changes are two ownership-preserving amendments inside already-owned files — Task 4 (`config/ai-providers.yaml`, adds the G-2 Antigravity `tool-name-map` data) and Task 8 (`scripts/lib/mcp_provider_config.py`, adds the AC-7 `.continue/config.local.yaml` `name`/`version` + the CX-1 `http_headers` spelling). Both files remain single-owner, so `check_plan_file_overlap` still returns `{"safe": [all 20 finding-owning ids], "conflict": []}`, every dependency edge still points to a lower task number, and the Kahn peel still completes. All findings that are not mapped to a task are recorded there as **Deferred** or **Accepted** with rationale; forcing them into new tasks would either duplicate an existing file owner (forbidden by the global-disjointness constraint) or exceed the APPROVED spec scope. (Task 15 is *not* a finding closure and does not contradict this.)
 - **Release-task re-check (2026-10-01):** Task 15 (release + MAJOR version bump) is a release/version-bookkeeping task, not a finding closure, and it does **not** run `sync.py` or re-embed the version — regeneration (Task 16) remains the sole writer of the generated artifacts. Task 15 adds **no file overlap** with any other task (`VERSION`, `CHANGELOG.md`, `.meta-config/project.yaml`, `README.md` are owned by no other task), so `check_plan_file_overlap` = `{"safe": [all 20 ids], "conflict": []}`; its dependency edge `15 -> 14` is monotonic (14 < 15), and the edge `16 -> 15` makes Task 15 a hard (non-skippable) prerequisite of regeneration despite owning no `pipeline_stages` slot.
 - **Task-4 test-file amendment re-check (2026-10-01, later pass):** Task 4 now also modifies `tests/test_provider_hooks_config.py` (its `_INTENTIONAL_AGENTS_MD_SHARERS` constant at line 142 breaks under the Mammouth `context_file: AGENTS.md` change), alongside `config/ai-providers.yaml` and `tests/test_provider_config_contracts.py`. That path appears in **no other task's `Files:` block** (Tasks 1–3 and 5–20), so every task's `Files:` set stays globally disjoint, `check_plan_file_overlap` still returns `{"safe": [all 20 ids], "conflict": []}`, PG-1 (updated above) remains pairwise disjoint, and the graph is unchanged (no task added, no dependency edge added, no cycle; the numbering-order DAG still holds). The Task-4 discovery-sub-map shape is data in `config/ai-providers.yaml` and adds no file.
+- **Task-11 migration-map amendment re-check (2026-10-01, review F1/F2/F3 pass):** Task 11 now also creates `config/provider-migrations.yaml` — the data-driven old→new path migration map (Copilot default-on, Gemini gated by `agent-discovery`), which closes AC-22 / design §6.2.1 / spec §11.1 without touching Task-4's `config/ai-providers.yaml`. The path is brand-new and appears in **no other task's `Files:` block** (Tasks 1–10 and 12–20), so every task's `Files:` set stays globally disjoint, `check_plan_file_overlap` still returns `{"safe": [all 20 ids], "conflict": []}`, PG-6 remains pairwise disjoint (proof updated above), and the graph is unchanged (no task added, no dependency edge added, no cycle; the numbering-order DAG still holds and the Kahn peel completes). Task 4 stays the exclusive owner of `config/ai-providers.yaml`; the migration map is a separate single-owner file.
 - **Fail-closed caveat:** `check_file_overlap` also widens each task's file set from prompt-referenced paths and AST symbol-to-file resolution. Task titles in this plan are path-free, so the declared `files_touched` sets are the effective input. If a future edit adds a symbol/path to a title and replay surfaces a conflict, the affected tasks MUST be sequentialized before dispatch — never dispatched on a skipped check.
 - Outcome: **PASS** (cycles: none, overlaps: none, over-commitment: none).
 
