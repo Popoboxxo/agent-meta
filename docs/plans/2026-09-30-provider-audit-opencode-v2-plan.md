@@ -198,17 +198,30 @@ Every task: write the test first (red) -> implement -> observe green -> commit w
 
 ### Task 4: Provider registry contract data (`ai-providers.yaml`)
 **Agent:** senior-developer
-**Files:** Modify: `config/ai-providers.yaml`; Create: `tests/test_provider_config_contracts.py`
+**Files:** Modify: `config/ai-providers.yaml`; Modify: `tests/test_provider_hooks_config.py`; Create: `tests/test_provider_config_contracts.py`
+**Files rationale:** `tests/test_provider_hooks_config.py` is included because Task 4's Mammouth `context_file: AGENTS.md` change breaks `_INTENTIONAL_AGENTS_MD_SHARERS` at `tests/test_provider_hooks_config.py:142`, so that constant must be updated inside Task 4; the file is owned by no other task, so this adds no overlap.
 **Interfaces:** Produces keys `agent-discovery` (bool, `config/ai-providers.yaml` §2.1), `surface-version`, `model-format`, `model-catalog`, `agent-transform.{tools-format,tool-name-map,allowed-fields,reject-fields,frontmatter-mechanism}`, `mcp-config.format` (`opencode-json`/`opencode-json-v2`/`antigravity-mcp-json`/`kimi-json`/`codex-toml-mcp`/`continue-yaml`), `primary-role`, `model-literal`, plus the migrated path values; Consumes PRE-2/PRE-3/PRE-4/PRE-5/PRE-6.
+**Discovery sub-map shape (authoritative — Tasks 6/8/11 MUST consume):**
+```yaml
+discovery:
+  agents_dir: .agents/agents
+  rules_dir: .agents/rules
+  skills_dir: .agents/skills
+  mcp-config:
+    committed-file: .agents/mcp_config.json
+    format: antigravity-mcp-json
+```
+**Consumption contract:** path resolution (Tasks 6/11) selects `discovery.*` iff `agent-discovery: true`, else the top-level keys; MCP (Task 8) selects `discovery["mcp-config"]["format"]` iff `agent-discovery: true`, else the top-level `mcp-config.format`; dispatch on the bool + presence of `discovery`, never on the provider name.
+**Full-suite note (sequencing):** Two cross-task reds are expected after Task 4 and are **not** Task-4 defects: (a) `tests/test_mcp_config.py::test_kimicode_mcp_config_reuses_claude_settings_format` stays red until Task 8 lands (KimiCode `mcp-config.format: kimi-json` vs. the old `claude-settings` assertion); (b) `tests/test_context_compact_mode.py::test_committed_agents_md_equals_configured_mode_render` stays red until Task 16 regeneration (Mammouth now shares `AGENTS.md` and adds `.mammouth/skills` to the rendered sharer line while the committed `AGENTS.md` is stale) — this is the pre-existing 27-file drift, resolved by Task 16's `sync.py` regeneration.
 **Acceptance:** AC-21 (config side) + AC-25 (data side) + AC-8/AC-9 (values): every provider declares the new keys with correct types and defaults; Antigravity declares `agent-discovery: false` (bool, default `false`) gating the `.agents/*` discovery surface (AC-9, default-off); KimiCode `model-format: "kimi-code/{model}"` with an initial catalog; Mammouth `tools-format: map`; Opencode `surface-version: v1` default while `v2` selects `opencode-json-v2`; Copilot `agents_dir`/`context_file`/`rules_dir` and Gemini/Antigravity `agents_dir`/`rules_dir`/`skills_dir` carry the new paths; Antigravity carries a populated `agent-transform.tool-name-map` (G-2: `Read`→`view_file`, `Write`→`replace_file_content`, `Grep`→`grep_search`, `Bash`→`run_command`, per docs-part1 §2.1) so G-2 tool vocabulary is data, not code.
 **Resolved values (Amendment 2026-10-01):** PRE-2 — Antigravity discovery gated by the concrete key **`agent-discovery: false`** in `config/ai-providers.yaml` §2.1 (bool, default `false`), gates the `.agents/*` discovery surface, present and **default-off**; PRE-3 — Opencode `primary-role: orchestrator` (`mode: primary`, consumed by Task 6); PRE-4 — Copilot `agents_dir: .github/agents` + `agent_ext: .agent.md`; PRE-5 — Mammouth `context_file: AGENTS.md` and `context_adapter_file: AGENTS.md` (no `MAMMOUTH.md` target); PRE-6 — `surface-version: v1` default (v2 opt-in); OQ-3 — KimiCode `model-format: "kimi-code/{model}"` + initial `model-catalog`; OQ-6 — Antigravity `model-literal: inherit`.
 **Verify:** `python3 -m pytest tests/test_provider_config_contracts.py -q` (asserts `agent-discovery` is a bool present for Antigravity with value `false`)
 **Provider-Agnostik:** values only — no code branch.
 **Depends on:** none
-- [ ] Step 1: Test schreiben (fail)
-- [ ] Step 2: implementieren
-- [ ] Step 3: Test (pass)
-- [ ] Step 4: commit — `feat: add provider contract keys and migrated paths`
+- [x] Step 1: Test schreiben (fail)
+- [x] Step 2: implementieren
+- [x] Step 3: Test (pass)
+- [x] Step 4: commit — `feat: add provider contract keys and migrated paths`
 
 ### Task 5: Capability flags (`provider-capabilities.yaml`)
 **Agent:** developer
@@ -299,6 +312,7 @@ Every task: write the test first (red) -> implement -> observe green -> commit w
 **Interfaces:** Produces the ordered migration sequence (write-new -> verify -> backup-old -> remove-old), backup-first managed delete, the final-content diff, and Continue run1 substitution; Consumes Task-4 path values.
 **Acceptance:** AC-22 + AC-3a + AC-4 + AC-18: the new path exists, the old managed path is gone, each removed managed file has a byte-exact `.sync-backup-<ts>` sibling, user-authored files are never deleted, renaming the backup restores the file; after a clean scratch sync `--check` rc 0 and `sha256(run1)==sha256(run2)`; a managed-block edit is rc 1, an out-of-block edit rc 0.
 **Verify:** `python3 -m pytest tests/test_migration_paths.py tests/test_context_agents_md_idempotency.py -q`
+**Shared-render convergence note (added 2026-10-01):** `tests/test_agents_md_shared_context_convergence.py` and `tests/test_context_file_modes.py` carry shared-tuple expectations that omit Mammouth and must be updated here; this is a shared-render convergence concern (Mammouth now reads `AGENTS.md`) and is assigned to Task 11 (Tests/Idempotency), not to Task 4.
 **Depends on:** 4
 **Provider-Agnostik:** migration and diff are driven by config keys; no name branch.
 - [ ] Step 1: Test schreiben (fail)
@@ -454,7 +468,7 @@ Each group is one `FanoutPlan(kind="parallel_group", max_parallel=2)`. Only grou
 
 | Group | Tasks | Files (disjoint proof) | Result |
 |---|---|---|---|
-| PG-1 | 1, 4 | `scripts/lib/artifact_validate.py` + `tests/test_artifact_contracts.py` vs. `config/ai-providers.yaml` + `tests/test_provider_config_contracts.py` | disjoint |
+| PG-1 | 1, 4 | `scripts/lib/artifact_validate.py` + `tests/test_artifact_contracts.py` vs. `config/ai-providers.yaml` + `tests/test_provider_hooks_config.py` + `tests/test_provider_config_contracts.py` | disjoint |
 | PG-2 | 5, 7 | `config/provider-capabilities.yaml` + `tests/test_provider_three_file_invariant.py` vs. `scripts/lib/roles.py` + `tests/test_model_contracts.py` | disjoint |
 | PG-3 | 6, 8 | `scripts/lib/provider_transform.py` + `tests/test_transform_contracts.py` vs. `scripts/lib/mcp_provider_config.py` + `tests/test_mcp_config.py` | disjoint |
 | PG-4 | 9, 10 | `config/delegation-syntax.yaml` + `scripts/lib/pipelines.py` + `templates/configs/CONTINUE.config-template.yaml` + `tests/test_pipeline_notation_config.py` vs. `scripts/lib/bootstrap.py` + `scripts/lib/context.py` + `config/provider-bootstrap.yaml` + `tests/test_bootstrap_submarkers.py` | disjoint |
@@ -504,6 +518,7 @@ PY
 - **Release-task inserted as Task 15 (2026-10-01, re-ordered) — monotonic, disjoint:** the release/MAJOR-version-bump task now sits as **Task 15** (agent `release`, `Depends on: 14`), *before* regeneration, so the version is final when Task 16 regenerates. The five tail tasks are renumbered (regeneration 15→16, commit 16→17, validate 17→18, review-req 18→19, review-quality 19→20); Tasks 1–14 keep their numbers. Task 15 owns only `VERSION`, `CHANGELOG.md`, `.meta-config/project.yaml` and `README.md` — none of these paths appears in any other task's `Files:` block (Tasks 1–14 and 16–20), so its `Files:` set is disjoint from every other task. Every dependency edge points to a lower task number (`15 -> 14`, `16 -> 15`, `17 -> 16`, `18 -> 17`, `19 -> 18`, `20 -> 19`), so the graph is a strict DAG in numbering order, the Kahn peel completes, and `check_plan_file_overlap` returns `{"safe": [all 20 ids], "conflict": []}`. **Regeneration (Task 16) remains the sole writer of the generated artifacts**, which is why the version bump is ordered before it rather than re-embedding the version in a separate release step.
 - **Findings-traceability re-check (2026-10-01, planning-only):** the complete finding inventory was mapped onto the existing tasks (see `## Findings Traceability (vollständig)`). At that pass, **no new task was required for any finding**; the only production-facing changes are two ownership-preserving amendments inside already-owned files — Task 4 (`config/ai-providers.yaml`, adds the G-2 Antigravity `tool-name-map` data) and Task 8 (`scripts/lib/mcp_provider_config.py`, adds the AC-7 `.continue/config.local.yaml` `name`/`version` + the CX-1 `http_headers` spelling). Both files remain single-owner, so `check_plan_file_overlap` still returns `{"safe": [all 20 finding-owning ids], "conflict": []}`, every dependency edge still points to a lower task number, and the Kahn peel still completes. All findings that are not mapped to a task are recorded there as **Deferred** or **Accepted** with rationale; forcing them into new tasks would either duplicate an existing file owner (forbidden by the global-disjointness constraint) or exceed the APPROVED spec scope. (Task 15 is *not* a finding closure and does not contradict this.)
 - **Release-task re-check (2026-10-01):** Task 15 (release + MAJOR version bump) is a release/version-bookkeeping task, not a finding closure, and it does **not** run `sync.py` or re-embed the version — regeneration (Task 16) remains the sole writer of the generated artifacts. Task 15 adds **no file overlap** with any other task (`VERSION`, `CHANGELOG.md`, `.meta-config/project.yaml`, `README.md` are owned by no other task), so `check_plan_file_overlap` = `{"safe": [all 20 ids], "conflict": []}`; its dependency edge `15 -> 14` is monotonic (14 < 15), and the edge `16 -> 15` makes Task 15 a hard (non-skippable) prerequisite of regeneration despite owning no `pipeline_stages` slot.
+- **Task-4 test-file amendment re-check (2026-10-01, later pass):** Task 4 now also modifies `tests/test_provider_hooks_config.py` (its `_INTENTIONAL_AGENTS_MD_SHARERS` constant at line 142 breaks under the Mammouth `context_file: AGENTS.md` change), alongside `config/ai-providers.yaml` and `tests/test_provider_config_contracts.py`. That path appears in **no other task's `Files:` block** (Tasks 1–3 and 5–20), so every task's `Files:` set stays globally disjoint, `check_plan_file_overlap` still returns `{"safe": [all 20 ids], "conflict": []}`, PG-1 (updated above) remains pairwise disjoint, and the graph is unchanged (no task added, no dependency edge added, no cycle; the numbering-order DAG still holds). The Task-4 discovery-sub-map shape is data in `config/ai-providers.yaml` and adds no file.
 - **Fail-closed caveat:** `check_file_overlap` also widens each task's file set from prompt-referenced paths and AST symbol-to-file resolution. Task titles in this plan are path-free, so the declared `files_touched` sets are the effective input. If a future edit adds a symbol/path to a title and replay surfaces a conflict, the affected tasks MUST be sequentialized before dispatch — never dispatched on a skipped check.
 - Outcome: **PASS** (cycles: none, overlaps: none, over-commitment: none).
 
