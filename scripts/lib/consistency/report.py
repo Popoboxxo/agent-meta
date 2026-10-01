@@ -1,5 +1,7 @@
 """Finding dataclass and report formatting."""
 
+from __future__ import annotations
+
 import json
 import sys
 from dataclasses import dataclass
@@ -27,11 +29,36 @@ class Severity(str, Enum):
 
 @dataclass
 class Finding:
+    """One finding, plus the two location fields IC-05 requires.
+
+    ``line`` and ``branch`` were **instance attributes** set after construction
+    (``_v1_finding``, ``_v3_finding``, ``_v6_finding``), which made them
+    invisible to :func:`print_json_report` — the report rebuilt the dict from a
+    fixed field list, so ``--json`` silently dropped the line a finding pointed
+    at. Plan task W2-7 (K15 / B-5) promotes both to declared dataclass fields.
+
+    Two properties make the promotion safe rather than a breaking change:
+
+    * **Both have defaults** (``None`` / ``""``), so every existing constructor
+      call — including the positional one in
+      ``scripts/lib/consistency/python_compat.py`` — keeps working unchanged.
+      A finding that points at a document sets ``line``; a finding that names a
+      *key* on the oracle axis does not, and a magic ``0`` would print as a
+      location. ``branch`` is the IC-05 rule label (``V1a``, ``V1b``, ``link``,
+      ``layout``); the empty string means "this check has no sub-rules".
+    * **``__str__`` is deliberately unchanged.** The console report has no line
+      column, so the number stays in ``message``; changing it would duplicate
+      the location in the human report and break the message-only pins
+      (``tests/test_doc_facts.py``). The two views are separate on purpose.
+    """
+
     severity: Severity
     check: str       # e.g. "frontmatter.version-bump"
     file: str        # relative path
     message: str
     suggestion: str = ""
+    line: int | None = None
+    branch: str = ""
 
     def __str__(self) -> str:
         icon = _ICON.get(self.severity.value, "  ")
@@ -86,6 +113,8 @@ def print_json_report(findings: list[Finding]) -> int:
                 "file": f.file,
                 "message": f.message,
                 "suggestion": f.suggestion,
+                "line": f.line,
+                "branch": f.branch,
             }
             for f in findings
         ],

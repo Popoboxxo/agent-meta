@@ -30,6 +30,7 @@ from __future__ import annotations
 import argparse
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 # ── path setup ────────────────────────────────────────────────────────────────
@@ -50,9 +51,15 @@ from lib.consistency.crossrefs import (
     check_schema_refs,
 )
 from lib.consistency.docs import (
+    check_docs_facts_fresh,
+    check_docs_index_completeness,
+    check_internal_links,
+    check_no_manual_counts,
     check_readme_docs_index,
+    check_role_generation_parity,
     check_sync_cli_docs,
     check_ui_help_mappings,
+    check_wiki_staleness,
 )
 from lib.consistency.frontmatter import check_agent_frontmatter
 from lib.consistency.fanout_contracts import check_fanout_backend_contract
@@ -63,6 +70,103 @@ from lib.consistency.reference_standards import check_reference_standards
 from lib.consistency.repo_containment import check_repo_containment_templates
 from lib.consistency.report import Finding, Severity, print_json_report, print_report
 from lib.consistency.subagent_permissions import check_subagent_permission_templates
+from lib.io import load_yaml_file
+
+
+# --------------------------------------------------------------------------
+# Documentation checks V1…V9 — the registration (IC-05, plan task W2-7)
+# --------------------------------------------------------------------------
+# This table is the **only** place where a documentation check is registered,
+# and it is reached exclusively through the facade ``lib.consistency.docs``
+# (K20): the name must be in that module's ``__all__``, otherwise the import
+# above breaks. Registration is therefore what proves the facade contract, and
+# no count derived from the ``--json`` report can stand in for it — the report
+# counts checks that *produced findings*, not checks that *exist*.
+#
+# V8 (``check_spec_plan_path_convention``, W6-2) and V9
+# (``check_stale_backups``, W8-4) are not implemented yet; their owners append
+# the import and the entry here.
+_PROJECT_CONFIG_RELPATH = ".meta-config/project.yaml"
+
+
+def _readme_docs_index(root: Path, config: dict) -> list[Finding]:
+    """V4 adapter — IC-05/K59 pins ``check_readme_docs_index(root)`` at one argument.
+
+    The common gate hands every registered check the project config; V4 is not
+    allowed to *accept* it. Dropping it here keeps the registry on one call
+    shape instead of teaching the loop about two.
+    """
+    return check_readme_docs_index(root)
+
+
+#: The registered documentation checks, in IC-05 order. Each entry takes
+#: ``(root, config)``. **The check id is not written here** — it is owned by the
+#: family module as ``*_CHECK_ID``, and the comments below only point at that
+#: constant: re-spelling the seven ids next to the seven names would be a
+#: second, unpinned source that can only drift. The ids are read off the checks
+#: at *runtime* by ``tests/test_doc_facts.py::
+#: test_the_docs_registry_covers_exactly_what_the_facade_exports``, which derives
+#: them by calling every entry and fails when the registry and the facade's
+#: exported checks disagree.
+DOCS_CHECKS: tuple[Callable[[Path, dict], list[Finding]], ...] = (
+    check_no_manual_counts,          # V1 — id: V1_CHECK_ID (docs_freshness)
+    check_docs_index_completeness,   # V2 — id: V2_CHECK_ID (docs_index)
+    check_internal_links,            # V3 — id: V3_CHECK_ID (docs_links)
+    _readme_docs_index,              # V4 — id: V4_CHECK_ID (docs_links; the
+                                     #        facade does not re-export it)
+    check_role_generation_parity,    # V5 — id: V5_CHECK_ID (docs_freshness_v5)
+    check_docs_facts_fresh,          # V6 — id: V6_CHECK_ID (docs_freshness)
+    check_wiki_staleness,            # V7 — id: V7_CHECK_ID (docs_wiki)
+)
+
+
+def load_project_config(root: Path) -> dict:
+    """The project config every V-check reads as its ``config`` argument.
+
+    Loaded through ``lib.io.load_yaml_file`` with ``on_error="default"`` — the
+    same fail-soft loader ``placeholders.load_project_vars`` and the V5/V6
+    checks use. A missing or malformed ``project.yaml`` therefore yields ``{}``
+    rather than an exception, and ``{}`` closes the common gate below, which is
+    the same observation as "the key is absent" (IC-22).
+    """
+    data = load_yaml_file(
+        Path(root) / _PROJECT_CONFIG_RELPATH, on_error="default", default=None
+    )
+    return data if isinstance(data, dict) else {}
+
+
+def docs_consolidation_enabled(config: dict | None) -> bool:
+    """The IC-05 common gate: only ``docs-consolidation.enabled`` being true opens it.
+
+    Fail-off, the ``knowledge.py:127`` precedence IC-22 names: a missing block,
+    a non-mapping block and an explicit ``false`` are observationally identical.
+    That is what keeps scenarios 50–56 and every consumer project green (AC-38,
+    NG-10) and why there is no "does this look like agent-meta?" heuristic gate
+    beside it.
+
+    **What the gate is, precisely: a property of the call site, not of the
+    checks.** It decides whether ``run_checks()`` enters its registered block at
+    all; a check called **directly** reports regardless of the switch — measured
+    on this repository, 6 of the 7 registered checks report findings with the
+    config that closes the gate (only V5 refuses on its own, because it reads
+    the ``se`` activation gate and not this key). So "V1–V9 are a no-op without
+    the key" is true **of the runner**, which is where AC-38 and every scenario
+    exercise it, and is **not** a claim about the check functions. A future
+    caller that bypasses ``run_checks()`` inherits the calls, not the gate —
+    which is why the gate is one ``if`` at the single place all seven calls go
+    through, and why moving it into the seven functions would be seven copies
+    of one decision.
+
+    The value is compared with ``is True`` rather than tested for truth, so a
+    schema-invalid value (``"false"``, ``1``) closes the gate instead of opening
+    it. ``config/project-config.schema.json`` types the key as a boolean, so on
+    every valid input the two readings are identical; they differ only where the
+    answer is undefined, and there the direction that keeps the checks silent is
+    the one IC-22's fail-off name asks for.
+
+    """
+    block = (config or {}).get("docs-consolidation")
+    return isinstance(block, dict) and block.get("enabled") is True
 
 # ── git helpers ───────────────────────────────────────────────────────────────
 
@@ -198,7 +302,16 @@ def run_checks(
         # Phase 5: Documentation & UI Consistency
         findings.extend(check_sync_cli_docs(_AGENT_META_ROOT))
         findings.extend(check_ui_help_mappings(_AGENT_META_ROOT))
-        findings.extend(check_readme_docs_index(_AGENT_META_ROOT))
+
+        # The IC-05 common gate is the **first** condition of the whole
+        # registered V1…V7 block: with the switch absent or false not a single
+        # documentation check runs, which is the whole of AC-38. It is read from
+        # the *checked* root, not from this checkout, so `--root` and a consumer
+        # project each get their own answer.
+        project_config = load_project_config(root)
+        if docs_consolidation_enabled(project_config):
+            for docs_check in DOCS_CHECKS:
+                findings.extend(docs_check(root, project_config))
 
         # Context size guard (issue #540, C2): warn on oversized generated
         # provider context files without acknowledgment (WARNING only).

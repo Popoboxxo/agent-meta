@@ -57,6 +57,7 @@ from lib.context import (
     sync_snippets_for_provider,
 )
 from lib.deactivation import is_provider_active
+from lib.doc_renderer import sync_docs_consolidation
 from lib.dod import resolve_dod, resolve_dod_preset_name, resolve_release_gates
 from lib.external_tools import (
     generate_external_tool_artifacts,
@@ -65,6 +66,7 @@ from lib.external_tools import (
 )
 from lib.generated_file_drift import (
     backup_drifted_files,
+    base_path_for_key,
     capture_generated_file_hashes,
     is_drift_detection_enabled,
     prune_sync_backups,
@@ -605,10 +607,16 @@ def _sync_stage_generated_file_drift_scan(
         for finding in findings:
             backup_name = backup_name_by_source.get(finding["path"])
             backup_note = f" Backup written to {backup_name}." if backup_name else ""
+            # The hint must name the string that actually suppresses the
+            # finding, which is the BASE PATH and not the printed store key:
+            # is_allowlisted() fnmatches base_path_for_key(), so a copied
+            # 'README.md#docs:facts' would silently never match (IC-16 M8,
+            # AC-37). The full key stays visible above for identification.
+            allowlist_entry = base_path_for_key(finding["path"])
             log.warning(
                 f"generated-file-drift: '{finding['path']}' was manually edited "
                 f"since the last sync (provider '{finding['provider']}') -- this "
-                f"sync will overwrite it.{backup_note} Add it to "
+                f"sync will overwrite it.{backup_note} Add '{allowlist_entry}' to "
                 ".meta-config/drift-allowlist.yaml if this edit should be "
                 "preserved going forward."
             )
@@ -919,11 +927,48 @@ def _sync_stage_drift_and_plugins(
             log.debug("plugin-probe", f"skipped: {type(exc).__name__}: {exc}")  # noqa: PLE1205
 
 
+def _sync_stage_docs_consolidation(
+    agent_meta_root: Path, project_root: Path, config: dict,
+    provider_config: dict, args: argparse.Namespace, log: SyncLog,
+) -> None:
+    """Stage 9c: docs index + ``DOCS_*`` fact blocks (IC-12, AC-22).
+
+    **The call order is the contract, not the body.** This stage runs from
+    inside :func:`_sync_stage_knowledge_and_isolation`, immediately after
+    ``scaffold_spec_plan_dirs`` — and the pipeline runs that stage between
+    ``_sync_stage_generated_file_drift_scan`` (a manual edit must still be
+    visible to the scan) and ``_sync_stage_generated_file_hash_capture`` (the
+    baseline must capture the final on-disk state).
+
+    Why *after* the scaffold: in ``file-index`` mode the scaffold writes the
+    ``docs/INDEX.md`` placeholder itself, so a generator running first would
+    have its full index overwritten by that placeholder (B2/R7). The order is
+    the primary guarantee for that double-writer case; ``is_file_index_skeleton``
+    (IC-15) is the second line of defence, not a substitute for it.
+
+    Fail-off, like every other docs-consolidation consumer: with
+    ``docs-consolidation.enabled`` not exactly ``true`` this call is one
+    ``log.skip`` and no filesystem access at all (IC-22).
+
+    Reads nothing from the drift store and owns nothing the
+    ``_sync_stage_auto_commit_allowlist`` stage writes — that stage does not
+    read the store either, so R18 finds no interaction between them.
+    """
+    try:
+        sync_docs_consolidation(
+            agent_meta_root, project_root, config, provider_config, log, args.dry_run,
+        )
+    except SyncError as exc:
+        print(f"\n  !!  Docs consolidation aborted: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+
 def _sync_stage_knowledge_and_isolation(
     agent_meta_root: Path, project_root: Path, config: dict,
     providers: list, provider_config: dict, args: argparse.Namespace, log: SyncLog,
 ) -> None:
-    """Stages 8+9: knowledge-engine scaffolding + provider isolation."""
+    """Stages 8+9: knowledge-engine scaffolding + docs + provider isolation."""
+
     # Knowledge Engine — Phase A scaffolding (no-op unless knowledge-engine.enabled)
     try:
         sync_knowledge_engine(agent_meta_root, project_root, config, log, args.dry_run)
@@ -936,6 +981,10 @@ def _sync_stage_knowledge_and_isolation(
     except SyncError as exc:
         print(f"\n  !!  Spec/plan scaffolding aborted: {exc}", file=sys.stderr)
         sys.exit(1)
+
+    _sync_stage_docs_consolidation(
+        agent_meta_root, project_root, config, provider_config, args, log,
+    )
 
     # Provider isolation: hard-block cross-provider directory access
     isolation_mode = config.get("provider-isolation")

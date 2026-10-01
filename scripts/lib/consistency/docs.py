@@ -1,122 +1,93 @@
-"""Documentation and UI cross-reference consistency checks."""
+"""Documentation and UI cross-reference consistency checks — **facade**.
 
-import re
-from pathlib import Path
+Since W2-0 this module holds **no** check logic. It is the re-export contract
+that the runner (``scripts/consistency-check.py:53-63``, calls at ``:283-284``
+for the two ungated alt checks and ``:292-294`` for the gated V1…V7 block) and
+the test suite (``tests/test_doc_facts.py``) import, so the cut behind it
+stays invisible to every existing caller (K19).
 
+The checks live in two family modules, split by *the question a check asks*
+(Spec §4.1, K18):
+
+* :mod:`scripts.lib.consistency.docs_links` — "is every reference
+  resolvable?" (V3, V4, the pre-W2 alt checks)
+* :mod:`scripts.lib.consistency.docs_freshness` — "does the documentation
+  match the computed actual state?" (V1a/V1b today; V5, V6 land in W2-4/W2-5)
+
+The split is behaviour-neutral: every name below is the *same object* the
+pre-split module exported, so ``docs.<name>`` keeps resolving to the same
+function, constant and enum member it did before. ``__all__`` is the contract
+fixed in Spec §4.1. Its ``__all__`` increments have a **single** owner: plan
+**W2-7** (``Files:``) is the one task that appends the names of the checks the
+later waves implement. W2-3, W2-4, W2-5, W2-6, W6-2 and W8-4 must **not** list
+this module in their ``Files:`` — W2-3/W2-5/W2-6 run in **PG-2a**, and a
+``docs.py`` write-set there is exactly the ownership collision K20 removed.
+"""
+
+from __future__ import annotations
+
+from .docs_freshness import (
+    V1_CHECK_ID,
+    V1_EXEMPT_MARKER,
+    V1_GENERATED_RELPATHS,
+    V1_MAX_TOKEN_GAP,
+    V1_REGION_BEGIN,
+    V1_REGION_END,
+    V1_SCAN_RELPATHS,
+    V1_SUGGESTION,
+    V6_CHECK_ID,
+    Span,
+    check_docs_facts_fresh,
+    check_no_manual_counts,
+    v1_strict,
+    v1a_count_spans,
+    v1b_version_spans,
+)
+from .docs_freshness_v5 import V5_CHECK_ID, check_role_generation_parity
+from .docs_index import V2_CHECK_ID, check_docs_index_completeness
+from .docs_links import (
+    V3_CHECK_ID,
+    V3_DOC_SUFFIXES,
+    V3_DOCS_RELDIR,
+    V3_ENTRY_RELPATHS,
+    V3_INERT_PREFIXES,
+    V3_SUGGESTION,
+    check_internal_links,
+    check_readme_docs_index,
+    check_sync_cli_docs,
+    check_ui_help_mappings,
+)
+from .docs_wiki import V7_CHECK_ID, check_wiki_staleness
 from .report import Finding, Severity
 
-
-def check_sync_cli_docs(root: Path) -> list[Finding]:
-    """Check that all argparse arguments in sync.py are documented in cli-reference.md."""
-    findings = []
-    sync_py = root / "scripts" / "sync.py"
-    cli_ref = root / "docs" / "api" / "cli-reference.md"
-    
-    if not sync_py.exists() or not cli_ref.exists():
-        return findings
-
-    # Extract flags from sync.py
-    flags = set()
-    sync_content = sync_py.read_text(encoding="utf-8")
-    for line in sync_content.splitlines():
-        if "parser.add_argument(" in line:
-            # Match flags like '"--config"' or "'--init'"
-            matches = re.findall(r'["\'](--[a-zA-Z0-9-]+)["\']', line)
-            flags.update(matches)
-            
-    # Extract documented flags from cli-reference.md
-    ref_content = cli_ref.read_text(encoding="utf-8")
-    doc_flags = set()
-    for line in ref_content.splitlines():
-        matches = re.findall(r'`(--[a-zA-Z0-9-]+)[^`]*`', line)
-        doc_flags.update(matches)
-        
-    for flag in flags:
-        if flag not in doc_flags and flag not in ("--help",):
-            findings.append(Finding(
-                severity=Severity.ERROR,
-                check="docs.cli_reference",
-                file="docs/api/cli-reference.md",
-                message=f"CLI argument '{flag}' is not documented in cli-reference.md",
-                suggestion=f"Add an entry for `{flag}` in the appropriate table."
-            ))
-            
-    return findings
-
-
-def check_ui_help_mappings(root: Path) -> list[Finding]:
-    """Check that all routes in admin-ui.html routeMap have a valid help-id in admin-ui-reference.md."""
-    findings = []
-    admin_ui = root / "docs" / "ui" / "admin-ui.html"
-    help_ref = root / "docs" / "api" / "admin-ui-reference.md"
-    
-    if not admin_ui.exists() or not help_ref.exists():
-        return findings
-        
-    ui_content = admin_ui.read_text(encoding="utf-8")
-    ref_content = help_ref.read_text(encoding="utf-8")
-    
-    # Parse routeMap from admin-ui.html
-    route_map_block = re.search(r'const routeMap = \{([^}]+)\};', ui_content)
-    if not route_map_block:
-        findings.append(Finding(
-            severity=Severity.ERROR,
-            check="docs.ui_help_mappings",
-            file="docs/ui/admin-ui.html",
-            message="Could not parse 'routeMap' from admin-ui.html",
-            suggestion="Ensure routeMap is a valid JS object literal."
-        ))
-        return findings
-        
-    # Extract help IDs expected by UI
-    expected_help_ids = set()
-    for line in route_map_block.group(1).splitlines():
-        line = line.strip()
-        if not line or line.startswith("//"): continue
-        match = re.search(r'["\']([^"\']+)["\']\s*:\s*["\']([^"\']+)["\']', line)
-        if match:
-            expected_help_ids.add(match.group(2))
-            
-    # Extract available help IDs from Markdown
-    available_help_ids = set()
-    for line in ref_content.splitlines():
-        if line.startswith("<!-- help-id: "):
-            help_id = line.replace("<!-- help-id: ", "").replace(" -->", "").strip()
-            available_help_ids.add(help_id)
-            
-    for help_id in expected_help_ids:
-        if help_id not in available_help_ids:
-            findings.append(Finding(
-                severity=Severity.ERROR,
-                check="docs.ui_help_mappings",
-                file="docs/api/admin-ui-reference.md",
-                message=f"UI route expects help-id '{help_id}', but it is missing in the documentation.",
-                suggestion=f"Add `<!-- help-id: {help_id} -->` to admin-ui-reference.md."
-            ))
-            
-    return findings
-
-
-def check_readme_docs_index(root: Path) -> list[Finding]:
-    """Check that all markdown files in docs/api/ are linked in README.md."""
-    findings = []
-    readme = root / "README.md"
-    docs_api_dir = root / "docs" / "api"
-    
-    if not readme.exists() or not docs_api_dir.exists():
-        return findings
-        
-    readme_content = readme.read_text(encoding="utf-8")
-    
-    for md_file in docs_api_dir.glob("*.md"):
-        rel_path = f"docs/api/{md_file.name}"
-        if rel_path not in readme_content:
-            findings.append(Finding(
-                severity=Severity.ERROR,
-                check="docs.readme_index",
-                file="README.md",
-                message=f"File '{rel_path}' is not linked in README.md",
-                suggestion=f"Add a link to `[{md_file.stem}]({rel_path})` in the Documentation Index section."
-            ))
-            
-    return findings
+__all__ = [  # noqa: RUF022 — the order below IS the Spec §4.1 contract, not a
+    # sort order: it groups the names by the module that owns them and keeps the
+    # W2-3…W8-4 section visibly empty until those tasks land. An isort-style
+    # sort would destroy exactly that information.
+    # --- Fassaden-Durchreichung an die Tests (heute genutzt) ---
+    "Finding", "Severity",          # aus .report — Testreferenz docs_lib.Severity
+    # --- V1 (docs_freshness) ---
+    "check_no_manual_counts", "V1_CHECK_ID", "V1_SCAN_RELPATHS",
+    "V1_GENERATED_RELPATHS", "V1_MAX_TOKEN_GAP", "V1_REGION_BEGIN", "V1_REGION_END",
+    "V1_EXEMPT_MARKER", "V1_SUGGESTION", "v1a_count_spans", "v1b_version_spans", "v1_strict",
+    "Span",
+    # --- V3 (docs_links) ---
+    "check_internal_links", "V3_CHECK_ID", "V3_SUGGESTION", "V3_ENTRY_RELPATHS",
+    "V3_DOCS_RELDIR", "V3_DOC_SUFFIXES", "V3_INERT_PREFIXES",
+    # --- Altchecks (docs_links) ---
+    "check_sync_cli_docs", "check_ui_help_mappings", "check_readme_docs_index",
+    # --- V2 (docs_index) ---
+    "V2_CHECK_ID", "check_docs_index_completeness",
+    # --- V5 (docs_freshness_v5) ---
+    "V5_CHECK_ID", "check_role_generation_parity",
+    # --- V6 (docs_freshness) ---
+    "V6_CHECK_ID", "check_docs_facts_fresh",
+    # --- V7 (docs_wiki) ---
+    "V7_CHECK_ID", "check_wiki_staleness",
+    # --- noch offen: `check_spec_plan_path_convention` (V8, W6-2) und
+    # `check_stale_backups` (V9, W8-4) ---
+    # W2-7 hat die vier oben liegenden Checks eingetragen und registriert;
+    # W6-2 und W8-4 tragen ihren Namen hier ein, wenn sie den Check
+    # implementieren, und haengen ihn in dieselbe Registrierung in
+    # `scripts/consistency-check.py` (Plan W2-7, `Files:`).
+]

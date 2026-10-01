@@ -16,7 +16,23 @@ Split into three parts, mirroring context.py's context-hashes.json pattern:
 
 Spec: docs/superpowers/specs/2026-09-07-generated-file-drift-detection-design.md
 (see its "Post-implementation update (2026-09-11, #734)" note).
+
+W3-5 adds the docs-consolidation half (IC-16, AC-19, AC-37, NFA-05): the two
+fully generated index files and the marker regions of the hybrid doc files join
+the same baseline. Three properties make that safe, and all three are
+load-bearing rather than cosmetic. They are documented in full on the constants
+and helpers below (:data:`DOCS_GENERATED_RELS`, :func:`base_path_for_key`,
+:func:`_iter_docs_drift_entries`, ``backup_drifted_files``):
+
+* the doc paths are **provider-independent**, so they are handled beside
+  :data:`PLATFORM_DEFAULTS_RESOLVED_REL` and NOT inside
+  ``_iter_managed_files()``, which is provider-scoped;
+* a hybrid doc file is **prose plus generated regions**, so only the extracted
+  marker body is hashed -- under the store key ``<rel>#docs:<region>``;
+* that key is a **store key, not a path**, so it is neither backed up nor
+  silently rewritten, and the allowlist matches it by **base path**.
 """
+
 from __future__ import annotations
 
 import fnmatch
@@ -27,6 +43,12 @@ from pathlib import Path
 from typing import Optional
 
 from .deactivation import get_active_providers
+
+# Module-level on purpose: doc_renderer's rendering layer is a neutral leaf,
+# importable from anywhere (doc_renderer.py:3-9); the acyclicity guard is
+# tests/test_import_acyclicity.py. A function-local import masks a real cycle,
+# it does not prevent one.
+from .doc_renderer import DOCS_BLOCK_RE
 from .io import content_hash, load_json_file, load_yaml_file, safe_path, write_atomic
 from .log import SyncLog
 from .pipelines import resolve_pipeline_details_dir
@@ -42,6 +64,32 @@ DRIFT_ALLOWLIST_FILE = "drift-allowlist.yaml"
 # explicitly here rather than teaching _iter_managed_files a project-root-
 # level, non-per-provider file shape for a single caller.
 PLATFORM_DEFAULTS_RESOLVED_REL = ".meta-config/platform-defaults.resolved.yaml"
+
+# ---------------------------------------------------------------------------
+# W3-5 -- docs-consolidation in the hash baseline (IC-16, AC-19, AC-37, NFA-05)
+# ---------------------------------------------------------------------------
+
+#: Pseudo-provider carried by every docs finding. Docs files are not owned by
+#: a provider, so the finding needs an attribution that says exactly that --
+#: same idea as the existing ``"platform-defaults"`` literal.
+DOCS_PSEUDO_PROVIDER = "docs-consolidation"
+
+#: Fully generated docs files: hashed **whole**, because every byte of them is
+#: generator-owned. ``docs/INDEX.md`` is written in W3-6 and
+#: ``docs/architecture/INDEX.md`` in W4-3; both are listed here from the start so
+#: the baseline covers them the moment they exist, and a *missing* file simply
+#: contributes no key (absence is not drift).
+DOCS_GENERATED_RELS: tuple[str, ...] = ("docs/INDEX.md", "docs/architecture/INDEX.md")
+
+#: Hybrid docs files: hand prose **plus** generated marker regions. Only the
+#: extracted marker body is hashed, never the whole file (see the module
+#: docstring), so prose edits stay silent.
+DOCS_FACT_BLOCK_HOSTS: tuple[str, ...] = ("README.md", "llms.txt", "ARCHITECTURE.md")
+
+#: Separator between the base path and the region name in a marker-body store
+#: key: ``<rel>#docs:<region>``. A string that is deliberately **not** a path.
+DOCS_MARKER_KEY_SUFFIX = "#docs:"
+
 
 
 def _hashes_path(project_root: Path) -> Path:
@@ -79,9 +127,94 @@ def _load_allowlist_patterns(project_root: Path) -> list[str]:
     return [p for p in patterns if isinstance(p, str)] if isinstance(patterns, list) else []
 
 
+def base_path_for_key(key: str) -> str:
+    """The allowlist match target for *key*: the base path, i.e. the key up to
+    (excluding) the ``#docs:<region>`` marker suffix.
+
+    ``is_allowlisted()`` matches with ``fnmatch``, which runs against the whole
+    string -- so a pattern ``README.md`` does **not** match the store key
+    ``README.md#docs:facts``. Left unaddressed, every ``allow-edits`` entry for
+    a hybrid doc file would be silently ineffective: the entry is written
+    against the *file*, and a user has no way to know they must write
+    ``README.md#docs:*`` instead. IC-16 (M8) therefore makes base-path matching
+    mandatory, and AC-37 pins it.
+
+    A key without a marker suffix is returned unchanged, so this is a no-op for
+    every ordinary file path and for ``PLATFORM_DEFAULTS_RESOLVED_REL``.
+    """
+    marker_at = key.find(DOCS_MARKER_KEY_SUFFIX)
+    return key if marker_at == -1 else key[:marker_at]
+
+
 def is_allowlisted(rel_path: str, patterns: list[str]) -> bool:
-    """True when rel_path matches any glob pattern in patterns (fnmatch semantics)."""
-    return any(fnmatch.fnmatch(rel_path, pattern) for pattern in patterns)
+    """True when the **base path** of *rel_path* matches any glob pattern in
+    *patterns* (fnmatch semantics).
+
+    For a marker-body store key the base path is the host file without the
+    ``#docs:<region>`` suffix -- see :func:`base_path_for_key` for why the
+    suffix must not participate in the match (IC-16 M8, AC-37).
+    """
+    base_path = base_path_for_key(rel_path)
+    return any(fnmatch.fnmatch(base_path, pattern) for pattern in patterns)
+
+
+def _normalize_marker_body(body: str) -> str:
+    """The hashed form of a marker region body (IC-16).
+
+    Trailing whitespace per line and blank lines at either end are stripped, so
+    a re-indent or a stray trailing space is not reported as drift, while any
+    change to the region's actual content still is.
+    """
+    return "\n".join(line.rstrip() for line in body.splitlines()).strip()
+
+
+def _docs_marker_bodies(text: str) -> dict[str, str]:
+    """Map every ``agent-meta:docs-<region>`` body in *text* to its normalized
+    form, first occurrence of a repeated region name winning -- the same
+    "count=1" discipline ``apply_fact_blocks()`` applies when it renders.
+
+    An **unbalanced** region contributes no key: a begin marker without its end
+    marker leaves no body to hash, and the renderer's all-or-nothing rule means
+    the region is left byte-identical by the writer anyway, so a key for it
+    would report drift that no write could ever resolve.
+    """
+    bodies: dict[str, str] = {}
+    for match in DOCS_BLOCK_RE.finditer(text):
+        region = match.group("region")
+        if region in bodies:
+            continue
+        bodies[region] = _normalize_marker_body(match.group("body"))
+    return bodies
+
+
+def _iter_docs_drift_entries(project_root: Path) -> list[tuple[str, str]]:
+    """``(store_key, text_to_hash)`` for every tracked docs artifact.
+
+    The one place that enumerates the docs half of the baseline, so scan and
+    capture cannot drift apart: IC-16 requires both directions to be extended
+    symmetrically, and a second enumeration would be exactly the kind of
+    asymmetry that reports permanent drift.
+
+    Fully generated files contribute their whole content under their own path
+    key; hybrid hosts contribute one entry per marker region under
+    ``<rel>#docs:<region>``. A file that does not exist (yet) contributes
+    nothing -- ``docs/INDEX.md`` only arrives in W3-6.
+    """
+    entries: list[tuple[str, str]] = []
+    for rel in DOCS_GENERATED_RELS:
+        path = project_root / rel
+        if path.is_file():
+            entries.append((rel, path.read_text(encoding="utf-8")))
+    for rel in DOCS_FACT_BLOCK_HOSTS:
+        path = project_root / rel
+        if not path.is_file():
+            continue
+        bodies = _docs_marker_bodies(path.read_text(encoding="utf-8"))
+        entries.extend(
+            (f"{rel}{DOCS_MARKER_KEY_SUFFIX}{region}", body)
+            for region, body in sorted(bodies.items())
+        )
+    return entries
 
 
 def is_drift_detection_enabled(config: dict) -> bool:
@@ -348,6 +481,18 @@ def scan_generated_file_drift(
         if current_resolved != stored_resolved and not is_allowlisted(PLATFORM_DEFAULTS_RESOLVED_REL, allowlist):
             findings.append({"path": PLATFORM_DEFAULTS_RESOLVED_REL, "provider": "platform-defaults"})
 
+    # W3-5 -- the docs half (IC-16). Provider-independent, so it sits beside the
+    # PLATFORM_DEFAULTS_RESOLVED_REL block and NOT in _iter_managed_files().
+    for store_key, current_text in _iter_docs_drift_entries(project_root):
+        stored_docs = stored_hashes.get(store_key)
+        if stored_docs is None:
+            continue
+        if content_hash(current_text) == stored_docs:
+            continue
+        if is_allowlisted(store_key, allowlist):
+            continue
+        findings.append({"path": store_key, "provider": DOCS_PSEUDO_PROVIDER})
+
     return findings
 
 
@@ -366,6 +511,13 @@ def backup_drifted_files(
     written, but the would-be backup paths are still returned so the
     caller can surface them in its warnings. Returns the project-relative
     posix paths of the backups.
+
+    A marker-body store key (``<rel>#docs:<region>``, W3-5) is never backed
+    up: it names a region, not a file, and there is nothing to copy. The
+    region is reported by the scan and left untouched **by the store** --
+    that is NFA-05's "never rewritten" half as far as this module owns it.
+    Whether the docs writer honours a drifted region is a separate, still
+    open question (it re-renders its regions unconditionally).
     """
     if not findings:
         return []
@@ -375,6 +527,19 @@ def backup_drifted_files(
     for finding in findings:
         rel_path = finding.get("path")
         if not rel_path:
+            continue
+        # W3-5 / NFA-05 (IC-16): a marker-body store key is not a path. Without
+        # this guard the read below would merely fail soft by accident -- the
+        # hand-edited region would be reported, but a docs host that happens to
+        # carry a legal file of the same composite name would get a backup
+        # sibling. A hand-edited region must be *reported*, never materialized.
+        if DOCS_MARKER_KEY_SUFFIX in rel_path:
+            # Suppressed, not worked around: the call shape stays interchangeable
+            # with its three siblings below (same false positive as log.py:80-92).
+            log.debug(  # noqa: PLE1205 -- (target, message) is not a logging format call
+                "generated-file-drift",
+                f"'{rel_path}' is a marker-body key, not a path -- no backup written",
+            )
             continue
         target = project_root / rel_path
         try:
@@ -422,4 +587,8 @@ def capture_generated_file_hashes(
     resolved_path = project_root / PLATFORM_DEFAULTS_RESOLVED_REL
     if resolved_path.is_file():
         hashes[PLATFORM_DEFAULTS_RESOLVED_REL] = content_hash(resolved_path.read_text(encoding="utf-8"))
+    # W3-5 -- the docs half (IC-16). Same enumerator as the scan, so the two
+    # directions stay symmetric; anything less would report permanent drift.
+    for store_key, current_text in _iter_docs_drift_entries(project_root):
+        hashes[store_key] = content_hash(current_text)
     _save_hashes(project_root, hashes, dry_run)

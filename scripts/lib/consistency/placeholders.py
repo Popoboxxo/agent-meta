@@ -128,6 +128,12 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
 _DYNAMIC_PREFIXES: tuple[re.Pattern, ...] = (
     re.compile(r'^PAL_[A-Z0-9_]+$'),
     re.compile(r'^PIPELINE_[A-Z0-9_]+_(BLOCK|PROVIDER_BLOCKS)$'),
+    # SPEC IC-06: the DOCS_ fact namespace. Registered so an unresolved
+    # {{DOCS_*}} yields no placeholders.unknown finding (AC-06) — the error gate
+    # is V6 check_docs_facts_fresh, not this check. DOCS_LANGUAGE and
+    # INTERNAL_DOCS_LANGUAGE stay in _BUILTIN_VARS (R12) and are matched there
+    # first, so the prefix does not take them over.
+    re.compile(r'^DOCS_[A-Z0-9_]+$'),
 )
 
 # Known common typos: wrong_name → correct_name
