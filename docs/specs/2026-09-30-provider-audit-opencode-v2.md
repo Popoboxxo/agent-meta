@@ -1,12 +1,43 @@
 # Provider-Audit Gap Closure + Opencode v2 Support — Spec
 
-> **Status: DRAFT — PENDING APPROVAL**
+> **Status: APPROVED (2026-10-01)**
 > **Review:** docs/specs/2026-09-30-provider-audit-opencode-v2-review.md (Iteration 1 eingearbeitet)
 > **Design:** docs/specs/2026-09-30-provider-audit-opencode-v2-design.md
 > **Evidence:** docs/analysis/2026-09-30-provider-audit-runtime-consolidation.md
 > Trace anchor: `spec-id: SPEC-PROVIDER-AUDIT-OPENCODE-V2-2026-09-30` (inherited verbatim from the design; the plan MUST reference this value).
 >
-> Classification: **XL / Architectural** (design stage exists; public config contracts and multiple subsystem boundaries are affected). Final approval marker (`Status: APPROVED (date)`) is set by `concept-reviewer`, not by this document.
+> Classification: **XL / Architectural** (design stage exists; public config contracts and multiple subsystem boundaries are affected). Final approval marker `Status: APPROVED (2026-10-01)` set on 2026-10-01.
+
+---
+
+## Resolved decisions (2026-10-01)
+
+> **Approval:** The user approved this spec on **2026-10-01** and took every open decision verbatim. All OQs (OQ-1…OQ-9) and the §9 scope decision are resolved; no `DECISION-NEEDED` marker remains anywhere in this document.
+
+| ID | Binding decision (2026-10-01) | Consequence for the sync |
+|---|---|---|
+| OQ-1 | Antigravity discovery is **flag-gated, default-off** until a pclmul-capable host has really verified `agy`. | The `.agents/*` discovery contract ships behind the provider-neutral `agent-discovery` key (bool, default `false`, §2.1); the default generation keeps the current output until the flag is set. Scenario 68 / AC-9 assert the flag-gated contract, not a default-on migration. |
+| OQ-2 | Continue `.continue/agents` is a **`cn review`-only surface**, NOT a chat-agent surface; the invalid `agents:` block in `config.yaml` is removed or corrected. | The generated `.continue/agents/*.md` is not declared as auto-discovery; the `continue-yaml` writer drops/corrects the invalid `agents:` block so the config stays Zod-valid (AC-7). |
+| OQ-3 | KimiCode model IDs: **only runtime-verified `kimi-code/…` aliases** enter the `model-catalog`; bare IDs are forbidden (`model-format: "kimi-code/{model}"`). | Every emitted Kimi model carries the `kimi-code/` prefix; a bare ID outside the catalog is a fail-loud finding (AC-2, AC-12). The catalog may only be extended from `kimi provider list --json`. |
+| OQ-4 | Opencode v2 primary entry: generate **`orchestrator` as `mode: primary`** so `default_agent` can be set validly. | `ai-providers.yaml` gains `primary-role` (default `orchestrator`); the orchestrator frontmatter is emitted as `mode: primary`, all other agents as `mode: subagent`; scenario 69 / AC-5 assert `default_agent`. |
+| OQ-5 | Copilot agent extension is **`.agent.md`** (GitHub-cloud canonical) under **`.github/agents/`**. | The Copilot writer emits `*.agent.md`; stale-cleanup is scoped to `.github/agents/` (AC-8, AC-22). |
+| OQ-6 | Antigravity `model` is **`inherit`** instead of concrete tier IDs. | `ai-providers.yaml` sets the Antigravity model to `inherit`; no tier ID is emitted for Antigravity (AC-9). |
+| OQ-7 | Mammouth context uses **`AGENTS.md`**; **`MAMMOUTH.md` and its routing entry are retired**. | Mammouth `context_file` points at `AGENTS.md`; the `MAMMOUTH.md` artifact and the associated routing entry are removed. |
+| OQ-8 | Opencode v1→v2: **v2 stays opt-in in this release**; the default flip happens only with the next major (SemVer). | `surface-version` defaults to `v1`; v2 is per-project opt-in; the v2 surface is a **minor** and a future default flip is reserved for a major (§11, ADR-2). |
+| OQ-9 | Continue `roles`-enum defect in `templates/configs/CONTINUE.config-template.yaml:28` is **fixed in-scope**. | The template at `:28` is corrected so the `roles` enum no longer emits the invalid `agent` value; the fix ships with this change instead of a separate CO-2 follow-up. |
+| Scope §9 | The **27 drift files** in the repo are **regenerated in-scope** (AC-3b applies). | The change ends with a real repo-root sync that regenerates and commits the 27 files; AC-3b (`sync.py --check` rc 0 at the repo root) is binding, not moved to a follow-up PR. |
+
+---
+
+## Amendments
+
+### A1 (2026-10-01) — gap closure
+
+> Docs-only amendment to the APPROVED spec. `Status: APPROVED (2026-10-01)` is unchanged, no AC was renumbered, and no historical option was deleted. Three internal gaps are closed in place; each changed anchor is marked with `A1.1`/`A1.2`/`A1.3`.
+
+- **A1.1 — concrete discovery config key (§2.1, §4 OQ-1, §8 AC-9, §11/§11.1).** The previously unnamed OQ-1 opt-in flag is now named `agent-discovery` — a provider-neutral `bool` key defaulting to `false`. `false` keeps the provider's current discovery artifact paths byte-for-byte (Gemini/Antigravity stays `.gemini/*`); `true` enables the `.agents/*` discovery surface. Gemini/Antigravity is set to `false`. Scenario 68 / AC-9 build on this key.
+- **A1.2 — SemVer policy corrected (§11, §11.1).** The blanket "path migrations → major for the affected provider" is replaced by a per-migration, reasoned policy: Copilot's default-on path/extension/context migration is **MAJOR**; the flag-gated Antigravity `.agents/*` migration is **MINOR** (a future default flip would be major); Opencode v2 stays **MINOR** while opt-in; artifact corrections are patch/minor. Consequently this change requires a **MAJOR version bump**, and the release/version-bump step belongs to the implementation plan (the planner adds that task).
+- **A1.3 — N7 disposition recorded (§13.3).** Opencode v2's VCS/project-root requirement for discovery is **Accepted (out of generator scope)** — a runtime precondition, not a generator defect; AC-5 already scopes the v2 check to a git-rooted project. No new AC and no new task.
 
 ---
 
@@ -64,7 +95,7 @@ The provider audit proved that agent-meta generates artifacts which are broken, 
 | A v2 JSON Schema | None published (`https://v2.opencode.ai/config.json` → 301/404, F4, N8). |
 | Rewriting role templates wholesale | Only the four `.claude/...` body refs named in D5. |
 | Fixing the 85 consistency warnings and the `1.2.0-beta.2` semver regex warning | Separate finding, non-blocking (`--validate` rc=0 tolerates warnings; regression report §4/Offene Punkte 3/4). |
-| Continue `CO-2` template `roles` enum (`templates/configs/CONTINUE.config-template.yaml:28` — `roles: [chat, edit, agent]`) | Explicit follow-up ID (CO-2): the template is a user-edited starting point and is "NEVER overwritten by sync.py" (template header `:6`), so the fix belongs to the Continue naming-convention owner, not to the generator contract. The `continue-yaml` writer fixes the generated `.continue/config.yaml`/`config.local.yaml` (AC-7); the template file is tracked as a separate CO-2 follow-up (review I-13). |
+| Continue `CO-2` template `roles` enum (`templates/configs/CONTINUE.config-template.yaml:28` — `roles: [chat, edit, agent]`) | **Overridden by OQ-9 (2026-10-01): fixed in-scope in this change.** The template is a user-edited starting point and is "NEVER overwritten by sync.py" (template header `:6`), so the fix is a one-time edit of the template file shipped with this change (not a generator contract). The `continue-yaml` writer also fixes the generated `.continue/config.yaml`/`config.local.yaml` (AC-7). The earlier "separate follow-up (review I-13)" classification is superseded. |
 
 ### 1.4 Scope boundaries
 
@@ -83,6 +114,7 @@ providers:
   <Provider>:
     # NEW
     surface-version: "v1"                 # str; enum "v1"|"v2"; default "v1"
+    agent-discovery: false                # bool; default false; true enables the `.agents/*` discovery surface (see Semantics)
     model-format: "{model}"               # str; Python str.format(template, model=<resolved_id>); default "{model}"
     model-catalog:                        # list[str]; OPTIONAL; absent => check disabled (conservative, no false positives)
       - "<runtime-valid-model-id>"
@@ -106,6 +138,7 @@ Semantics:
 | Key | Semantics | Evidence |
 |---|---|---|
 | `surface-version` | Selects the generation surface where a product ships two generations. `v1` (default) keeps today's byte shape; `v2` selects `frontmatter-mechanism: opencode-native-v2` and `mcp-config.format: opencode-json-v2` (nested `mcp.servers`, §2.5 — the writer never branches on `surface-version`). | design §4.1; F4; DECISION-2; H-1 |
+| `agent-discovery` | Provider-neutral opt-in gate for the `.agents/*` discovery surface. `false` (default) keeps the provider's CURRENT discovery artifact paths byte-for-byte (Gemini/Antigravity stays `.gemini/*`); `true` makes the generator emit `.agents/agents/`, `.agents/rules/`, `.agents/skills/`, `.agents/mcp_config.json` (remote `serverUrl`, §2.5). The key name is provider-neutral; the provider-specific fact is the value. | OQ-1 (RESOLVED 2026-10-01); F6/G-7; §11.1; scenario 68/AC-9 |
 | `model-format` | Applied **exactly once** at emission to every resolved model ID. `{model}` is the only placeholder. Double application is a consistency error (`kimi-code/kimi-code/*`). | F2; H6; DECISION-5; design §8.1 |
 | `model-catalog` | Exhaustive, runtime-valid ID set. Consumed only by `scripts/lib/consistency/model_contracts.py`; an emitted ID outside the catalog is a fail-loud finding. Absent = check disabled. | DECISION-5 |
 | `tools-format: map` | Emits `tools: {<name>: true}` (object), never a YAML list. Required for Mammouth (list aborts loading, F8/N17). | F8; N17; D-note |
@@ -123,6 +156,7 @@ Concrete data values that MUST be set by this change (all values are config data
 | Codex | `mcp-config.format: codex-toml-mcp` (headers spelling `http_headers`) | CX-1 |
 | Continue | `mcp-config.format: continue-yaml` (headers spelling `requestOptions.headers`) | F7, H8, A5 |
 | Gemini/Antigravity | `mcp-config.format: antigravity-mcp-json` (remote `serverUrl`) | F6 G-7 |
+| Gemini/Antigravity | `agent-discovery: false` (default; the `.agents/*` discovery surface stays off until the flag is flipped — the concrete OQ-1 gate) | OQ-1 (RESOLVED 2026-10-01); F6 G-7 |
 | Opencode | `surface-version: v1` (default, `mcp-config.format: opencode-json`); `surface-version: v2` opt-in, which sets `mcp-config.format: opencode-json-v2` | F3, F4, DECISION-2, H-1 |
 | ZCode | `skills: true` (PAL) **and** `capabilities: [..., skills]` in `ai-providers.yaml:503-507` (`skills_dir: .zcode/skills` at `:521`) | ZC-3; M-5 |
 
@@ -314,59 +348,63 @@ Two providers writing to the same context file (`AGENTS.md` for Gemini/Opencode/
 
 ## 4. Decisions on OQ-1 … OQ-8
 
-Each entry: **Recommendation**, **Rationale**, **Alternative**. `DECISION-NEEDED` marks an explicit user/approval decision that MUST NOT be taken silently by the spec.
+Each entry: **Recommendation**, **Rationale**, **Alternative**, and the **RESOLVED (2026-10-01)** decision (see "Resolved decisions" above). `DECISION-NEEDED` marked an explicit user/approval decision that MUST NOT be taken silently by the spec; **all such markers are now resolved by the user approval of 2026-10-01** and are kept only as historical provenance. The options are retained; none deleted.
 
-### OQ-1 — Antigravity discovery: ship vs. flag-gate — **DECISION-NEEDED**
+### OQ-1 — Antigravity discovery: ship vs. flag-gate — **RESOLVED (2026-10-01): flag-gated, default-off**
 
-- **Recommendation:** Ship the discovery/path contract (`.agents/agents/`, `.agents/rules/`, `.agents/skills/`, `.agents/mcp_config.json` + `serverUrl`) as the default, because the in-binary STATIC contract is authoritative and the current `.gemini/agents/*` output is verifiably not discovered (N-fact from docs-part1 §2.1; F6). Mark Antigravity runtime acceptance HYPOTHESIS/STATIC in scenario 68 and the risk table.
-- **Rationale:** Default-on gets the path right for every consumer; a flag would ship a known-wrong default. The only unknown is `agy` execution on this CPU, not the path contract.
-- **Alternative:** Gate behind a per-provider opt-in flag until a pclmul-capable host runs `agy`. Cost: a second path remains wrong by default; benefit: zero risk of a wrong migration.
-- **Why DECISION-NEEDED:** risk appetite for shipping against a STATIC (non-executed) contract (design §1.3, §7.4).
+- **Recommendation (historical, not taken):** Ship the discovery/path contract (`.agents/agents/`, `.agents/rules/`, `.agents/skills/`, `.agents/mcp_config.json` + `serverUrl`) as the default, because the in-binary STATIC contract is authoritative and the current `.gemini/agents/*` output is verifiably not discovered (N-fact from docs-part1 §2.1; F6). Mark Antigravity runtime acceptance HYPOTHESIS/STATIC in scenario 68 and the risk table.
+- **Rationale (of the recommendation):** Default-on gets the path right for every consumer; a flag would ship a known-wrong default. The only unknown is `agy` execution on this CPU, not the path contract.
+- **Alternative (chosen):** Gate behind the provider-neutral `agent-discovery` key (bool, default `false`, §2.1) on the provider entry until a pclmul-capable host runs `agy`. Cost: a second path remains wrong by default; benefit: zero risk of a wrong migration.
+- **DECISION (2026-10-01):** **flag-gated, default-off** — the concrete gate is `agent-discovery` (default `false`; `true` enables the `.agents/*` discovery surface, §2.1); no default-on migration until `agy` is really verified on a pclmul-capable host.
 
-### OQ-2 — `.continue/agents/*.md` chat surface vs. `cn review` only
+### OQ-2 — `.continue/agents/*.md` chat surface vs. `cn review` only — **RESOLVED (2026-10-01): `cn review`-only surface**
 
 - **Recommendation:** Keep generating `.continue/agents/*.md` but **do not declare it as a chat-auto-discovery surface**; the scenario asserts only schema validity and the `cn review` read path. Add a header note in the generated file stating the auto-load is limited to `cn review` (H7/A6).
 - **Rationale:** Auto-discovery is `cn review`-only (H7 `[STATIC]`); removing the files would break the one path that does read them.
 - **Alternative:** Drop the surface entirely. Rejected: loses the `cn review` source and is a breaking artifact removal.
+- **DECISION (2026-10-01):** `cn review`-only surface; **not** a chat-agent surface; the invalid `agents:` block in `config.yaml` is removed/corrected.
 
-### OQ-3 — KimiCode `model-catalog` aliases
+### OQ-3 — KimiCode `model-catalog` aliases — **RESOLVED (2026-10-01): only runtime-verified `kimi-code/…` aliases**
 
 - **Recommendation:** Set `model-format: "kimi-code/{model}"` and an initial `model-catalog` equal to the formatted form of the current `model-tiers` values, i.e. `{kimi-code/kimi-k2.6, kimi-code/kimi-k2.7-code}`. The implementation task extends the catalog **only** from `kimi provider list --json` output; inventing aliases is prohibited.
 - **Rationale:** The runtime expects `kimi-code/<alias>` (F2/H6); the formatted tier set is a verifiable subset; the catalog check then guards the prefix class.
 - **Alternative:** Store fully-qualified IDs directly in `model-tiers`. Rejected in design DECISION-5 (leaves the bare-ID class unguarded). Vendor alias stability remains OQ-3's irreducible unknown and is documented as a data-maintenance item.
+- **DECISION (2026-10-01):** Only runtime-verified `kimi-code/…` aliases enter the `model-catalog`; bare IDs are forbidden (`model-format: "kimi-code/{model}"`).
 
-### OQ-4 — Opencode v2 entry agent (`mode: primary`) — **DECISION-NEEDED**
+### OQ-4 — Opencode v2 entry agent (`mode: primary`) — **RESOLVED (2026-10-01): `orchestrator` as `mode: primary`**
 
 - **Recommendation:** Generate one primary entry agent, using the existing registry default: mark the `orchestrator` role as `mode: primary` and set `default_agent: orchestrator`; all other agents stay `mode: subagent`. Add a `primary-role` data key (default `orchestrator`) to `ai-providers.yaml` so no name is hardcoded in code.
 - **Rationale:** v2 requires a valid default; setting `default_agent` to a subagent silently does nothing (N6, v1/v2 matrix). `orchestrator` is the documented entry point (AGENTS.md routing).
 - **Alternative:** Keep `default_agent` unset and rely on built-in `build`. Rejected: leaves the generated surface without a primary entry and does not exercise `default_agent`.
-- **Why DECISION-NEEDED:** choosing which role becomes the primary entry is a product/role decision and changes generated frontmatter semantics.
+- **DECISION (2026-10-01):** Generate `orchestrator` as `mode: primary` so `default_agent` can be set validly.
 
-### OQ-5 — Copilot extension `.md` vs `.agent.md` — **DECISION-NEEDED**
+### OQ-5 — Copilot extension `.md` vs `.agent.md` — **RESOLVED (2026-10-01): `.agent.md` under `.github/agents/`**
 
-- **Recommendation:** Emit `.md` under the corrected path `.github/agents/` (VS Code tolerant), and record the GitHub-cloud `.agent.md` requirement as a separate, opt-in convention to be decided with the naming-convention owner.
-- **Rationale:** `.md` is the tolerant subset; the path fix (P-1) is orthogonal and mandatory. `.agent.md` changes the file-name contract globally and would affect stale-cleanup.
-- **Alternative:** Emit `.agent.md` for GitHub cloud. Cost: breaks VS Code tolerance where documented.
-- **Why DECISION-NEEDED:** file-naming convention affects all Copilot consumers (task explicitly names `.agent.md`).
+- **Recommendation (historical, not taken):** Emit `.md` under the corrected path `.github/agents/` (VS Code tolerant), and record the GitHub-cloud `.agent.md` requirement as a separate, opt-in convention to be decided with the naming-convention owner.
+- **Rationale (of the recommendation):** `.md` is the tolerant subset; the path fix (P-1) is orthogonal and mandatory. `.agent.md` changes the file-name contract globally and would affect stale-cleanup.
+- **Alternative (chosen):** Emit `.agent.md` for GitHub cloud. Cost: breaks VS Code tolerance where documented.
+- **DECISION (2026-10-01):** `.agent.md` (GitHub-cloud canonical) under `.github/agents/`.
 
-### OQ-6 — Antigravity `model: inherit` vs. concrete tier IDs
+### OQ-6 — Antigravity `model: inherit` vs. concrete tier IDs — **RESOLVED (2026-10-01): `inherit`**
 
 - **Recommendation:** Set Antigravity `model: inherit` in `ai-providers.yaml` (data key `model-literal: inherit` or an empty `model-tiers` with `model: inject` → `inherit`), because the doc accepts only `inherit|flash|pro` and current IDs are non-contract (F6 G-3).
 - **Rationale:** Removes an invalid vocabulary with the smallest change; keeps tier intent for other providers untouched.
 - **Alternative:** Map tiers to `flash`/`pro`. Cost: loses per-role tiering; `inherit` is the safer default.
+- **DECISION (2026-10-01):** `inherit` instead of concrete tier IDs.
 
-### OQ-7 — Mammouth context file `AGENTS.md` vs `CONTEXT.md` — **DECISION-NEEDED**
+### OQ-7 — Mammouth context file `AGENTS.md` vs `CONTEXT.md` — **RESOLVED (2026-10-01): `AGENTS.md`; `MAMMOUTH.md` retired**
 
 - **Recommendation:** Point Mammouth `context_file` at `AGENTS.md` (shared with the other context-file providers) and stop emitting `MAMMOUTH.md`; the binary reads `AGENTS.md`/`CLAUDE.md`/`CONTEXT.md`, but `AGENTS.md` is the cross-provider canonical (F8 MM-4, A11).
 - **Rationale:** One canonical context file avoids duplicate maintenance; `MAMMOUTH.md` is proven unread.
 - **Alternative:** Emit `CONTEXT.md`. Cost: a Mammouth-only fourth context file; more drift surface.
-- **Why DECISION-NEEDED:** context-file topology/name is an explicit user convention decision (task names `CONTEXT.md` vs `AGENTS.md`).
+- **DECISION (2026-10-01):** Use `AGENTS.md`; `MAMMOUTH.md` and its routing entry are retired.
 
-### OQ-8 — v1→v2 default flip — **DECISION-NEEDED**
+### OQ-8 — v1→v2 default flip — **RESOLVED (2026-10-01): v2 stays opt-in this release**
 
 - **Recommendation:** Permanently opt-in for now: `surface-version: v1` default, `v2` per project. The SemVer path stays **minor while opt-in**; a default flip is scheduled only with a major release after v1 is deprecated.
 - **Rationale:** Existing projects run v1.18.31 (F3); a hard flip is breaking without migration (design DECISION-2, §6.1). This refines design §6.1 (which lists the v2 surface as major) by tying the major bump to the **default flip**, not to the opt-in surface.
-- **Alternative:** Flip default in a future major release. **Why DECISION-NEEDED:** product/SemVer-track decision.
+- **Alternative:** Flip default in a future major release.
+- **DECISION (2026-10-01):** v2 remains opt-in in this release; the default flip happens only with the next major (SemVer).
 
 ---
 
@@ -418,13 +456,13 @@ Each AC maps to at least one interface contract (§2) and states an observable r
 | AC-1 | Given a Codex sync, then all 58 generated `.codex/agents/*.toml` parse (`tomllib`) and Codex's own parser accepts the config. **Status: `tomllib` parse = CI-mandatory; `codex mcp list` = VERIFIED method, harness-dependent** (not a CI obligation — Codex creds absent in the audit env, F1/N1). | `python3 -c "import tomllib,pathlib; [tomllib.loads(p.read_text()) for p in pathlib.Path('<scratch>/.codex/agents').glob('*.toml')]"` (CI); real runtime: `CODEX_HOME=<scratch> codex mcp list` rc 0 (harness-dependent) | §2.1, §3.1; F1/N1/D1 |
 | AC-2 | Given a KimiCode sync, then all 58 emitted model IDs are `kimi-code/*` and resolve as runtime aliases. **Status: `grep` prefix check = CI-mandatory; `kimi acp` = VERIFIED method, harness-dependent**. | `grep -h '^model:' <scratch>/.kimi-code/agents/*.md` all match `^model: kimi-code/` (CI); real runtime: `kimi acp` → `session/set_config_option {configId:"model"}` succeeds (harness-dependent) | §2.1; F2/H6 |
 | AC-3a | Given a **scratch consumer project** after a clean real sync, then `sync.py --check` returns rc 0 (single-provider and multi-all). This measures generator correctness and is always testable, independent of the repo's own branch state. | `cd <scratch> && python3 <repo>/scripts/sync.py --check; echo $?` → `0` | §3.3, §5; F10/N14 |
-| AC-3b | Given the **agent-meta repo root** after the Regenerate-Commit, then `sync.py --check` returns rc 0 (branch hygiene). Scope-dependent: only meaningful after the in-scope regeneration of the 27 drifted files; if the scope-split (§9) is chosen, AC-3a still MUST hold and AC-3b moves to the follow-up PR. | `python3 scripts/sync.py --check; echo $?` → `0` | §3.3, §9; F10/N14; ADR-8 |
+| AC-3b | Given the **agent-meta repo root** after the Regenerate-Commit, then `sync.py --check` returns rc 0 (branch hygiene). **Binding** (scope decision 2026-10-01: the 27 drifted files are regenerated in-scope, §9); AC-3b is NOT moved to a follow-up PR. | `python3 scripts/sync.py --check; echo $?` → `0` | §3.3, §9; F10/N14; ADR-8, ADR-15 |
 | AC-4 | Given two consecutive real syncs for all 9 providers, then the second sync is byte-identical to the first (per generated file). | scenario `71-check-idempotency-all-providers` (`sha256(run1)==sha256(run2)`) | §3.3, §6; F10/N16 |
 | AC-5 | Given `surface-version: v2` in a git-rooted project, then Opencode v2 loads 58/58 agents and the config retains `mcp.servers`/`default_agent`. | real runtime: `opencode debug agents` in a git root → 58 agents; `opencode debug config` shows `mcp.servers` | §2.1, §2.5, §5; F4/N5/N7 |
 | AC-6 | Given a Mammouth sync, then every `tools:` frontmatter is an object, not a list. **Status: scenario assert = CI-mandatory; `mammouth agent list` = VERIFIED method, harness-dependent**. | scenario `66-mammouth-tools-map`; real runtime: `mammouth agent list` rc 0, no `Expected object … got [...]` (harness-dependent) | §2.1; F8/N17 |
 | AC-7 | Given a Continue sync, then `.continue/config.yaml` passes the Zod schema, `config.local.yaml` has `name`/`version`, and SSE headers use `requestOptions.headers`. | scenario `72-continue-config-validity`; `@continuedev/config-yaml` parse → 0 fatal errors | §2.1, §2.5; F7/N10–N12/H8 |
-| AC-8 | Given a Copilot sync, then artifacts exist at `.github/agents/`, `.github/instructions/`, `.github/skills/`, `.github/copilot-instructions.md`. | scenario `67-copilot-artifact-paths` | §2.5; F9/N13/P-1…P-5 |
-| AC-9 | Given a Gemini/Antigravity sync, then `.agents/agents/`, `.agents/rules/`, `.agents/skills/`, `.agents/mcp_config.json` exist and remote MCP uses `serverUrl`. | scenario `68-antigravity-discovery-paths` (STATIC/HYPOTHESIS runtime) | §2.5; F6/G-7 |
+| AC-8 | Given a Copilot sync, then artifacts exist at `.github/agents/` (as `*.agent.md`, OQ-5), `.github/instructions/`, `.github/skills/`, `.github/copilot-instructions.md`. | scenario `67-copilot-artifact-paths` | §2.5; F9/N13/P-1…P-5; ADR-12 |
+| AC-9 | Given an Antigravity sync with `agent-discovery: true`, then `.agents/agents/`, `.agents/rules/`, `.agents/skills/`, `.agents/mcp_config.json` exist and remote MCP uses `serverUrl`; with the default `agent-discovery: false` the default output is unchanged (the current `.gemini/*` paths stay byte-for-byte). Antigravity `model` is `inherit` (OQ-6). | scenario `68-antigravity-discovery-paths` (STATIC/HYPOTHESIS runtime) | §2.1, §2.5, §4; F6/G-7; ADR-11 |
 | AC-10 | Given a Gemini+ZCode project, then `AGENTS.md` carries one sub-marker per provider and both rosters survive. | scenario `70-bootstrap-marker-convergence`; `tests/test_bootstrap_submarkers.py` | §2.4, §7; F10 §6/N15/D8 |
 | AC-11 | Given any provider sync, then pipeline blocks use that provider's notation (no `task()` fallback). | scenario-level assertion + `tests/test_pipeline_notation_config.py`; missing `pipeline_notation` block → fail-loud | §2.3; D6/D7/F11 |
 | AC-12 | Given an active tier preset, then `ai-providers.yaml model-tiers` wins and `model-inherit-fallback` never emits a raw tier token. | `tests/test_model_contracts.py` | §2.1; F11 D2/D3 |
@@ -437,7 +475,7 @@ Each AC maps to at least one interface contract (§2) and states an observable r
 | AC-19 | Given the full scenario catalog, then 63 existing + scenarios 64–72 all PASS, where each new scenario 64–72 has its own `tests/scenarios/asserts/<id>.sh` (executable, cwd = temp project dir, `REPO_ROOT` as `$1`/env — convention `tests/scenarios/asserts/62-stale-role-cleanup.sh:1-13`) and a `registry.md` row in the "Katalog" table (`registry.md:44-46`). Scenario `71-check-idempotency-all-providers` MUST ship the named fixture profile **all-9-providers** (`tests/scenarios/configs/71-check-idempotency-all-providers.project.yaml`) whose `ai-providers` list contains all nine registry keys (Claude, Gemini, Opencode, Continue, Copilot, Mammouth, Codex, ZCode, KimiCode); the existing catalog does not cover all nine in one generation, so the fixture is created by this change. | `TMPDIR=<scratch> bash tests/scenarios/run.sh` (all); `bash tests/scenarios/run.sh 64 65 66 67 68 69 70 71 72` (new IDs present) | §9, §10.1 |
 | AC-20 | Given the pytest suite without the browser directory, then all tests pass. | `python3 -m pytest tests/ -q --ignore=tests/browser` | regression report §5 |
 | AC-21 | Given `mcp-config.format: opencode-json-v2` (Opencode `surface-version: v2`), then the generated `opencode.json` contains a nested `mcp.servers` object and **no** flat top-level `mcp` key; given `opencode-json` (v1), the flat `mcp` key is present and the v1 byte shape is unchanged. | `tests/test_mcp_config.py` (extended) + scenario `69-opencode-v2-surface`; JSON probe asserts `"servers" in doc["mcp"]` and `"mcp"` is not a leaf server map | §2.5, §5; F4/N5; H-1 |
-| AC-22 | Given a **bestandsprojekt** (existing consumer) that previously received Copilot/Antigravity artifacts at the old paths, then after one real sync: the new path exists, the old path is gone, every removed user-independent file has a byte-exact `.sync-backup-<ts>` sibling except where the file was not managed (user content is never deleted), and renaming the backup sibling restores the pre-migration file (rollback). | scenario `67-copilot-artifact-paths` / `68-antigravity-discovery-paths` migration asserts + `tests/test_migration_paths.py` (new) | §11; H-2; F9/N13/P-1…P-5 |
+| AC-22 | Given a **bestandsprojekt** (existing consumer) that previously received Copilot artifacts at the old paths (default-on) and, with `agent-discovery: true` (scenario 68 sets the flag), Antigravity artifacts at the old paths, then after one real sync (the Antigravity half only with `agent-discovery: true`; the default `false` leaves the Antigravity `.gemini/*` paths unchanged): the new path exists, the old path is gone, every removed user-independent file has a byte-exact `.sync-backup-<ts>` sibling except where the file was not managed (user content is never deleted), and renaming the backup sibling restores the pre-migration file (rollback). | scenario `67-copilot-artifact-paths` (default-on) / `68-antigravity-discovery-paths` (with `agent-discovery: true`) migration asserts + `tests/test_migration_paths.py` (new) | §11; H-2; F9/N13/P-1…P-5 |
 | AC-23 | Given the deprecated flat-`mcp` config (`mcp-config.format: opencode-json`) is not selected, then no `opencode.json` writer branch reads `surface-version`; the writer dispatch uses only the `mcp-config.format` value. | `tests/test_mcp_config.py` + `tests/test_provider_agnostic_dispatch.py` (no `surface-version` comparison in `scripts/lib/`) | §2.5, §2.6; AC-14 |
 | AC-24 | Given `artifact-validation: false`, then the three-file invariant fails unless `artifact-validation-reason` is set and non-empty; given `artifact-validation: true`, no reason is required. | `tests/test_provider_three_file_invariant.py` (reason gate) | §2.2; L-8 |
 | AC-25 | Given the `skills` capability, then for every provider with `skills: true` the `ai-providers.yaml` `capabilities` list contains `skills` and `skills_dir` is non-null; if either is missing the three-file invariant fails. | `tests/test_provider_three_file_invariant.py` (skills coupling) | §2.2; M-5 |
@@ -450,15 +488,15 @@ Mapping completeness: AC-1↔§2.1/§3.1, AC-2↔§2.1, AC-3a/3b/4↔§3.3/§6/�
 
 **Finding:** At branch HEAD `65a493ec`, `sync.py --check` reports `27 file(s) out of sync` (regression report §6). This is **pre-existing branch state**, not introduced by the test run (the tests mutate nothing — regression report "Arbeitsbaum-Mutationsverdikt" VERIFIED).
 
-**Recommendation (in-scope):** Resolve it **within this change**. The acceptance criterion AC-3b requires `--check` rc=0 at the repo root in a clean tree; a change that fixes generation but leaves 27 drifted files cannot satisfy AC-3b (AC-3a, the scratch-consumer check, is independent of this and always holds). The implementation plan therefore ends with a real sync in the repo root and commits the regenerated artifacts, and the 27-file delta is inspected per file (expected: config/template-driven regeneration; any file whose delta is not explained by the new contracts is escalated).
+**Decision (2026-10-01): in-scope (user approval 2026-10-01).** Resolve it **within this change**. The acceptance criterion **AC-3b is binding**: `--check` rc=0 at the repo root in a clean tree; a change that fixes generation but leaves 27 drifted files cannot satisfy AC-3b (AC-3a, the scratch-consumer check, is independent of this and always holds). The implementation plan therefore ends with a real sync in the repo root and commits the regenerated artifacts, and the 27-file delta is inspected per file (expected: config/template-driven regeneration; any file whose delta is not explained by the new contracts is escalated).
 
-**Rationale:** AC-3a (generator correctness, always testable) + AC-3b (branch hygiene, after the Regenerate-Commit) and AC-4 (run1==run2) are the core deliverables; splitting the drift into a separate PR would leave this branch failing its own AC-3b gate but must not falsify AC-3a.
+**Rationale:** AC-3a (generator correctness, always testable) + AC-3b (branch hygiene, after the Regenerate-Commit) and AC-4 (run1==run2) are the core deliverables; the user explicitly chose to keep the drift in-scope rather than split it into a separate PR.
 
-**Alternative (scope-split):** Treat the 27-file drift as a separate finding/PR and move only AC-3b to that PR; AC-3a remains mandatory in this change and must be shown green on the scratch projects. Rejected unless the approval explicitly narrows scope.
+**Alternative (rejected by the 2026-10-01 decision):** Treat the 27-file drift as a separate finding/PR and move only AC-3b to that PR; AC-3a remains mandatory in this change and must be shown green on the scratch projects. **Not chosen.**
 
 **Explicitly separate:** the 85 consistency warnings (unknown placeholders `{{PARSE_INPUT_BLOCK}}`/`{{OUTPUT_GUARD_BLOCK}}`, missing CHANGELOG entries) and the `1.2.0-beta.2` semver-regex warning are **not** fixed by this spec (non-goal §1.3; `--validate` rc=0 already). They are recorded as follow-ups.
 
-**Approval note:** the in-scope vs. scope-split choice is a PR-boundary decision that needs the approval gate (recorded as a scope decision, not an OQ).
+**Approval note:** the in-scope vs. scope-split choice was a PR-boundary decision that needed the approval gate (recorded as a scope decision, not an OQ). **Resolved 2026-10-01: in-scope.**
 
 ---
 
@@ -490,7 +528,7 @@ Each scenario gets an `asserts/<id>.sh` and a `registry.md` row (registry conven
 | `tests/test_bootstrap_submarkers.py` (new) | distinct sub-markers; cleanup keyed by registry; Gemini+ZCode both survive; legacy unscoped marker discarded → both sub-markers written (M-6 case c); user notes preserved |
 | `tests/test_context_agents_md_idempotency.py` (extend) | run1==run2 for all providers |
 | `tests/test_mcp_config.py` (extend) | `requestOptions.headers`, `http_headers`, `transport: sse`, `serverUrl`; `opencode-json-v2` → nested `mcp.servers` and absent flat `mcp`; `opencode-json` v1 byte shape unchanged |
-| `tests/test_migration_paths.py` (new) | Copilot/Antigravity old→new path migration: new path present, old path gone, managed files backed up, user files untouched, rollback from `.sync-backup-<ts>` restores (AC-22) |
+| `tests/test_migration_paths.py` (new) | Copilot old→new path migration (default-on) and Antigravity old→new path migration (only with `agent-discovery: true`; the default `false` keeps `.gemini/*`): new path present, old path gone, managed files backed up, user files untouched, rollback from `.sync-backup-<ts>` restores (AC-22) |
 | `tests/test_provider_three_file_invariant.py` (extend) | `skills` + `artifact-validation` declared; `artifact-validation-reason` non-empty when `artifact-validation: false`; `skills: true` ⇒ `ai-providers.yaml capabilities` contains `skills` and `skills_dir` non-null |
 | `tests/test_provider_agnostic_dispatch.py` (extend) | no new provider-name branch in `scripts/lib/` — `_TOUCHED_MODULES` (`:27-56`) replaced by a `scripts/lib/**/*.py` directory sweep (preferred) or extended with the new modules (AC-14) |
 
@@ -519,12 +557,14 @@ Status legend: **VERIFIED** = executed in the audit environment with observable 
 
 - **v1 stays byte-compatible**: `surface-version` defaults to `v1`; existing MCP formats, context files and the `permission:` map shape are unchanged (F3; design §4.1, DECISION-2). A v1 project is untouched by this change.
 - **v2 is opt-in** per project via `ai-providers.yaml::Opencode.surface-version: v2`; no consumer is migrated implicitly (design §6.2).
-- **SemVer path** (design §6.1, refined by OQ-8):
+- **SemVer path** (design §6.1, corrected by amendment A1.2; refines OQ-8):
   - Artifact corrections (Codex TOML, Kimi namespace, Mammouth `tools` map, Continue config) → **patch/minor**.
-  - Path migrations (Copilot `.github/copilot/agents/` → `.github/agents/`; Antigravity `.gemini/agents/` → `.agents/agents/`) → **major for the affected provider** (generated artifact locations change; `EXTRA_DONTS: no breaking changes without major version bump`).
-  - Opencode v2 surface while opt-in → **minor**; a **major** bump is reserved for a future default flip (OQ-8, DECISION-NEEDED).
+  - **Default-on path/extension/context migration (Copilot) → SemVer MAJOR for the affected provider.** The Copilot migration (`.github/copilot/agents/` → `.github/agents/`, `*.md` → `*.agent.md` per OQ-5, `COPILOT.md` → `.github/copilot-instructions.md`, `.github/copilot/rules/` → `.github/instructions/`) changes generated artifact locations and file names **with no opt-in**: an existing consumer receives the new layout on the next sync, so it is a breaking default change (`EXTRA_DONTS: no breaking changes without major version bump`).
+  - **Flag-gated migration (Antigravity `.agents/*`) → MINOR.** The `.agents/agents/`/`.agents/rules/`/`.agents/skills/` migration is gated by the provider-neutral `agent-discovery` key (default `false`, §2.1), so the default output is unchanged and nothing breaks by default; a future flip of `agent-discovery` to `true` by default would itself be a **major**. This is the explicit gate referenced by the Gemini/Antigravity migration rows in §11.1.
+  - Opencode v2 surface while opt-in → **minor**; a **major** bump is reserved for a future default flip (OQ-8, **RESOLVED 2026-10-01: v2 stays opt-in this release; default flip only with the next major**).
+- **Required bump (amendment A1.2):** because the Copilot migration is a default-on breaking change, this change requires a **MAJOR version bump** of agent-meta. The concrete release/version-bump step belongs to the implementation plan — the planner adds that task; this spec only states the required SemVer level.
 - **Migration** (design §6.2; H-2): order is always **write new path → verify → remove old path (backup-first)**. User files outside managed markers are never deleted; every managed delete is preceded by a byte-exact `.sync-backup-<YYYYmmdd-HHMMSS>` sibling (existing stale-cleanup mechanism: `scripts/lib/generated_file_drift.py:255`, `docs/specs/2026-09-13-stale-role-cleanup-design.md:155,965-977`). The per-artifact table below names the config key that changes; every key lives in `ai-providers.yaml` and is dispatched as data, never by a provider-name branch. The old bootstrap marker is discarded and rewritten provider-scoped (§7); v2 is untouched for v1 projects.
-- **Config compatibility**: new keys have defaults (`model-format`, `tools-format`, `reject-fields`, `artifact-validation`, `artifact-validation-reason`, `mcp-remote-transport`) so an unmodified consumer config keeps working; `surface-version` defaults to `v1`.
+- **Config compatibility**: new keys have defaults (`model-format`, `tools-format`, `reject-fields`, `artifact-validation`, `artifact-validation-reason`, `mcp-remote-transport`, `agent-discovery`) so an unmodified consumer config keeps working; `surface-version` defaults to `v1` and `agent-discovery` defaults to `false`.
 
 ### 11.1 Path migration table (H-2)
 
@@ -535,12 +575,14 @@ Config keys are cited with their current line in `config/ai-providers.yaml` at H
 | Agents | Copilot | `:317 agents_dir` | `.github/copilot/agents` | `.github/agents` | stale-cleanup inside the old managed dir (managed-index/marker-scoped) | `.sync-backup-<ts>` per removed file | rename `<file>.sync-backup-<ts>` → `<file>` |
 | Rules | Copilot | `:328 rules_dir` | `.github/copilot/rules` | `.github/instructions/` (`*.instructions.md`) | old rules dir emptied after new rules written | `.sync-backup-<ts>` | rename back |
 | Context | Copilot | `:319 context_file` | `.github/copilot/COPILOT.md` | `.github/copilot-instructions.md` | old file removed only when no user content outside managed markers | `.sync-backup-<ts>` | rename back |
-| Agents | Gemini/Antigravity | `:99 agents_dir` | `.gemini/agents` | `.agents/agents` | stale-cleanup inside the old managed dir | `.sync-backup-<ts>` | rename back |
-| Rules | Gemini/Antigravity | `:104 rules_dir` | `.gemini/rules` | `.agents/rules` | old rules dir emptied after new rules written | `.sync-backup-<ts>` | rename back |
-| Skills | Gemini/Antigravity | `:143 skills_dir` | `.gemini/skills` | `.agents/skills` | shared managed index in `skills_dir` | `.sync-backup-<ts>` | rename back |
+| Agents | Gemini/Antigravity | `:99 agents_dir` (gated by `agent-discovery`) | `.gemini/agents` | `.agents/agents` | stale-cleanup inside the old managed dir | `.sync-backup-<ts>` | rename back |
+| Rules | Gemini/Antigravity | `:104 rules_dir` (gated by `agent-discovery`) | `.gemini/rules` | `.agents/rules` | old rules dir emptied after new rules written | `.sync-backup-<ts>` | rename back |
+| Skills | Gemini/Antigravity | `:143 skills_dir` (gated by `agent-discovery`) | `.gemini/skills` | `.agents/skills` | shared managed index in `skills_dir` | `.sync-backup-<ts>` | rename back |
 | Bootstrap marker | Gemini+ZCode | n/a (context writer) | `<!-- agent-meta:bootstrap-begin -->` | `<!-- agent-meta:bootstrap-begin:{marker_id} -->` | legacy pair removed once, per-provider pair rewritten (§7, M-6) | context-file `.sync-backup-<ts>` | rename context-file backup back |
 
 AC-22 exercises the rows above end-to-end on a bestandsprojekt.
+
+The three Gemini/Antigravity rows are **gated by `agent-discovery: true`** (§2.1): with the default `agent-discovery: false` no `.agents/*` artifact is emitted and the current `.gemini/*` paths are kept byte-for-byte, so the migration is opt-in (see amendment A1.1 and the §11 SemVer policy above).
 
 ---
 
@@ -558,23 +600,32 @@ AC-22 exercises the rows above end-to-end on a bestandsprojekt.
 | ADR-8 | Resolve the 27-file repo drift within this change (regenerate + commit). | §9; regression report §6/AC-3b | `--check` rc 0 achievable at repo root; AC-3b split from AC-3a. |
 | ADR-9 | Path changes migrate write-new-then-remove-old, backup-first, never a silent move; a major bump ships only together with the migration table §11.1. | H-2; design §6.2; `EXTRA_DONTS` | Bestandsprojekte converge on next sync; user files preserved; rollback by renaming the `.sync-backup-<ts>` sibling. |
 | ADR-10 | Opencode v2 nesting is a distinct `mcp-config.format` value (`opencode-json-v2`), not a `surface-version` branch inside the writer. | H-1; §2.5/§2.6; design DECISION-7 | Writer dispatch stays format-only (provider-agnostic); v1 byte shape frozen; AC-21/AC-23 guard it. |
+| ADR-11 | Antigravity discovery ships **flag-gated, default-off** until `agy` is really verified on a pclmul-capable host; the `.agents/*` contract is not enabled by default. | OQ-1 (RESOLVED 2026-10-01); §4, scenario 68, AC-9 | No default-on migration against a STATIC contract; the flag must be flipped only after real runtime proof. |
+| ADR-12 | Copilot agent extension is **`.agent.md`** (GitHub-cloud canonical) under **`.github/agents/`**. | OQ-5 (RESOLVED 2026-10-01); §11.1, AC-8, AC-22 | File-name contract is `.agent.md` globally for Copilot; stale-cleanup scoped to `.github/agents/`. |
+| ADR-13 | Mammouth context is **`AGENTS.md`**; `MAMMOUTH.md` and its routing entry are retired. | OQ-7 (RESOLVED 2026-10-01); §4 | One cross-provider canonical context file; no Mammouth-only duplicate. |
+| ADR-14 | Continue `roles`-enum defect (`CONTINUE.config-template.yaml:28`) is fixed **in-scope** in this change (supersedes the CO-2 follow-up classification). | OQ-9 (RESOLVED 2026-10-01); §1.3 non-goal row, AC-7 | The template ships corrected; the generated config stays Zod-valid. |
+| ADR-15 | The 27-file repo drift is regenerated **in-scope**; AC-3b is binding. | Scope decision (RESOLVED 2026-10-01); §9, AC-3b | `--check` rc 0 achievable at the repo root; no follow-up PR for the drift. |
 
 ---
 
 ## 13. Open questions and risks
 
-### 13.1 DECISION-NEEDED (blocking the approval gate)
+### 13.1 RESOLVED (2026-10-01) — no open decisions
 
-| ID | Decision | Affected |
-|---|---|---|
-| OQ-1 | Ship Antigravity discovery default-on vs. flag-gated (STATIC contract) | §4, scenario 68, AC-9 |
-| OQ-4 | Which role becomes the Opencode v2 primary entry (`default_agent`) | §4, AC-5 |
-| OQ-5 | Copilot extension `.md` vs. `.agent.md` | §4, AC-8 |
-| OQ-7 | Mammouth context file `AGENTS.md` vs. `CONTEXT.md` | §4 |
-| OQ-8 | v1→v2 default flip timing and SemVer track | §11 |
-| Scope | 27-file repo drift in-scope vs. separate PR | §9, AC-3a/AC-3b |
+| ID | Decision | Status | Affected |
+|---|---|---|---|
+| OQ-1 | Antigravity discovery flag-gated, default-off (concrete key `agent-discovery: false`, §2.1) | **RESOLVED (2026-10-01)** | §2.1, §4, scenario 68, AC-9 |
+| OQ-2 | Continue `.continue/agents` = `cn review`-only surface; invalid `agents:` block removed/corrected | **RESOLVED (2026-10-01)** | §4, AC-7 |
+| OQ-3 | KimiCode: only runtime-verified `kimi-code/…` aliases in the catalog; bare IDs forbidden | **RESOLVED (2026-10-01)** | §4, AC-2, AC-12 |
+| OQ-4 | Opencode v2 primary entry = `orchestrator` (`mode: primary`) | **RESOLVED (2026-10-01)** | §4, AC-5 |
+| OQ-5 | Copilot extension `.agent.md` under `.github/agents/` | **RESOLVED (2026-10-01)** | §4, AC-8 |
+| OQ-6 | Antigravity `model: inherit` | **RESOLVED (2026-10-01)** | §4, AC-9 |
+| OQ-7 | Mammouth context `AGENTS.md`; `MAMMOUTH.md` retired | **RESOLVED (2026-10-01)** | §4 |
+| OQ-8 | v2 stays opt-in this release; default flip with the next major | **RESOLVED (2026-10-01)** | §11 |
+| OQ-9 | Continue `roles`-enum defect fixed in-scope | **RESOLVED (2026-10-01)** | §1.3, AC-7 |
+| Scope | 27-file repo drift regenerated in-scope (AC-3b binding) | **RESOLVED (2026-10-01)** | §9, AC-3a/AC-3b |
 
-OQ-2 (Continue `.continue/agents` surface), OQ-3 (Kimi aliases), OQ-6 (Antigravity model `inherit`) are resolved by spec recommendation above with no approval dependency; OQ-3 remains a vendor-data maintenance item.
+No `DECISION-NEEDED` marker remains; none of the options was deleted (§4 retains Recommendation/Rationale/Alternative per OQ as historical provenance).
 
 ### 13.2 Risks
 
@@ -587,8 +638,15 @@ OQ-2 (Continue `.continue/agents` surface), OQ-3 (Kimi aliases), OQ-6 (Antigravi
 | Official v1 schema used to validate v2 artifacts | false invalidity | no reliance on the official schema for v2; internal `artifact_validate` only (§5, design §4.4) |
 | Config-key naming collision with an existing key | silent override | keys added to the three-file invariant + config audit (AC-15) |
 | Antigravity/Copilot/ZCode stay STATIC | undetected runtime deviation | explicitly marked HYPOTHESIS/STATIC; real-runtime checks deferred (§10.3) |
-| Major-Bump für Pfadänderungen (Copilot/Antigravity) bricht Bestands-Consumer | Artifact paths move under a major version; release pipelines / consumers reacting to "major" are unprepared, and an un-migrated project would leave orphaned old paths | Migrations-/Rollback-Pfad §11.1 + ADR-9: write-new-then-remove-old, backup-first, user files untouched (AC-22); majors are the declared SemVer track (§11) |
+| Major-Bump für die default-on Copilot-Pfadänderung bricht Bestands-Consumer | Copilot artifact paths move under a major version **with no opt-in**; release pipelines / consumers reacting to "major" are unprepared, and an un-migrated project would leave orphaned old paths | Migrations-/Rollback-Pfad §11.1 + ADR-9: write-new-then-remove-old, backup-first, user files untouched (AC-22); majors are the declared SemVer track (§11) |
+| Flag-gated Antigravity-`.agents/*`-Migration (MINOR) | risk materialises **only with `agent-discovery: true`**; the default `false` emits no `.agents/*` artifact and keeps the `.gemini/*` paths byte-for-byte, so nothing moves and no orphaned paths arise | §11.1 rows are gated by `agent-discovery` (§11.1 line 585); the opt-in migration uses the same write-new-then-remove-old/backup-first path (AC-22); a future default flip would itself be a major (§11) |
 | Declarative `skills: true` diverges from generator reality (PAL vs. `ai-providers.yaml`) | a provider claims skills while no skills artifact is emitted (Copilot F9/N13 class) | coupling rule §2.2 / AC-25: `skills: true` requires `skills` in `capabilities` + non-null `skills_dir`; three-file invariant fails otherwise |
+
+### 13.3 Accepted (out of generator scope)
+
+| ID | Disposition | Evidence | Cross-reference |
+|---|---|---|---|
+| **N7** — Opencode v2 requires a VCS/project root for discovery: a scratch dir without a git root returned no agents; after `git init` + commit all agents loaded. | **Accepted (out of generator scope).** N7 is a **runtime precondition** of Opencode v2, not a generator defect: agent-meta cannot create or guarantee a git root in a consumer project, and the honest response is to name the precondition rather than emit a workaround artifact. AC-5 already scopes the v2 verification to a git-rooted project, so the acceptance surface stays accurate. **No new AC and no new task** are added. | `docs/analysis/2026-09-30-provider-audit-runtime-consolidation.md:71` (N7) | AC-5 (§8); §10.3 |
 
 ---
 
@@ -598,13 +656,13 @@ OQ-2 (Continue `.continue/agents` surface), OQ-3 (Kimi aliases), OQ-6 (Antigravi
 
 | Required section | Present | Notes |
 |---|---|---|
-| Status / Design / Evidence / Trace anchor | yes | `Status: DRAFT — PENDING APPROVAL`; spec-id inherited verbatim |
+| Status / Design / Evidence / Trace anchor | yes | `Status: APPROVED (2026-10-01)`; spec-id inherited verbatim; all OQs resolved (see "Resolved decisions (2026-10-01)") |
 | Problem / Goal / Non-Goals / Scope | yes | §1 |
 | Interface Contracts (file:symbol, signature, error paths) | yes | §2.1–§2.6, exact keys/signatures |
 | Data flow | yes | §3.1–§3.3 incl. `artifact_validate.py` integration |
 | Acceptance Criteria (numbered, testable) | yes | §8, AC-1…AC-25 (AC-3 split into AC-3a/AC-3b) with verification commands |
 | Open questions + risks | yes | §13 |
-| ADR log | yes | §12, ADR-1…ADR-10 |
+| ADR log | yes | §12, ADR-1…ADR-15 |
 | Test strategy delta | yes | §10 |
 | Versioning / backward compatibility | yes | §11 |
 | Self-review | yes | this section |
@@ -619,9 +677,11 @@ OQ-2 (Continue `.continue/agents` surface), OQ-3 (Kimi aliases), OQ-6 (Antigravi
 
 **Traceability:** every technical claim cites F/H/N/A/D IDs or a design section (§0, inline references). The trace anchor `spec-id: SPEC-PROVIDER-AUDIT-OPENCODE-V2-2026-09-30` is ready for the plan's `Spec:` field.
 
-**Residual uncertainty:** OQ-1/OQ-4/OQ-5/OQ-7/OQ-8 and the §9 scope decision are `DECISION-NEEDED` and block the `Status: APPROVED` marker until resolved.
+**Residual uncertainty:** none blocking. **OQ-1…OQ-9 and the §9 scope decision were all resolved by the user approval of 2026-10-01** (see "Resolved decisions (2026-10-01)"); no `DECISION-NEEDED` marker remains. The remaining uncertainties are runtime-verification items that are explicitly out of scope or STATIC/HYPOTHESIS (Antigravity `agy`, Copilot runtime, ZCode workspace auto-load — §10.3), not open spec decisions.
 
-**Review iteration 1 (2026-10-01):** all findings from `docs/specs/2026-09-30-provider-audit-opencode-v2-review.md` are incorporated: H-1 (§2.5/§2.6/AC-21/AC-23, ADR-10), H-2 (§11.1/AC-22, ADR-9, risk row), M-3 (AC-3a/3b, §9), M-4 (AC-19 + scenario-71 fixture, §10.1), M-5 (§2.2 coupling, AC-15/AC-25, risk row), M-6 (§2.4/§3.2/§7, AC-16c), L-7 (AC-14/§10.2 sweep), L-8 (reason key + AC-24), L-9 (risk row), L-10 (AC-13 fixture), I-11 (AC-1/2/6 status markers), I-12 (F4/§10.3 parse-only), I-13 (CO-2 non-goal). The five `DECISION-NEEDED` OQs remain open and unchanged.
+**Review iteration 1 (2026-10-01):** all findings from `docs/specs/2026-09-30-provider-audit-opencode-v2-review.md` are incorporated: H-1 (§2.5/§2.6/AC-21/AC-23, ADR-10), H-2 (§11.1/AC-22, ADR-9, risk row), M-3 (AC-3a/3b, §9), M-4 (AC-19 + scenario-71 fixture, §10.1), M-5 (§2.2 coupling, AC-15/AC-25, risk row), M-6 (§2.4/§3.2/§7, AC-16c), L-7 (AC-14/§10.2 sweep), L-8 (reason key + AC-24), L-9 (risk row), L-10 (AC-13 fixture), I-11 (AC-1/2/6 status markers), I-12 (F4/§10.3 parse-only), I-13 (CO-2 non-goal).
+
+**Approval (2026-10-01):** the five former `DECISION-NEEDED` OQs (OQ-1/OQ-4/OQ-5/OQ-7/OQ-8) plus OQ-2/OQ-3/OQ-6/OQ-9 and the §9 scope decision are now resolved; `Status: APPROVED (2026-10-01)` is set and the spec is released for planning. OQ-9 (Continue `roles`-enum fix) supersedes the §1.3 CO-2 follow-up classification and is now in-scope.
 
 ---
 
