@@ -178,10 +178,10 @@ Every task: write the test first (red) -> implement -> observe green -> commit w
 **Verify:** `python3 -m pytest tests/test_consistency_checks.py -q` and `python3 scripts/consistency-check.py; echo $?` -> `0`
 **Provider-Agnostik:** iteration is registry/catalog-driven; no name literals.
 **Depends on:** 1
-- [ ] Step 1: Test schreiben (fail)
-- [ ] Step 2: implementieren
-- [ ] Step 3: Test (pass)
-- [ ] Step 4: commit — `feat: register artifact and model consistency checks`
+- [x] Step 1: Test schreiben (fail)
+- [x] Step 2: implementieren
+- [x] Step 3: Test (pass)
+- [x] Step 4: commit — `feat: register artifact and model consistency checks`
 
 ### Task 3: Sync-time validation wiring + exit codes
 **Agent:** senior-developer
