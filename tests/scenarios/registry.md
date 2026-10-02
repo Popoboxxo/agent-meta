@@ -108,6 +108,15 @@ verhalten sich exakt wie bisher.
 | `61-hook-deploy-lf-newlines` | Claude, Gemini | strict (default) | Deployed Hooks sind LF-only (#754): `write_atomic` schreibt Text mit `newline="\n"`, `is_unchanged` erkennt CRLF-Drift; Assert scannt `.claude/hooks/**/*.sh` + `.agents/hooks/**/*.sh` (inkl. `antigravity-json-adapter`) auf CR |
 | `62-stale-role-cleanup` | Claude | strict (default) | Stale-Role-Cleanup (SPEC-STALE-ROLE-CLEANUP-2026-09-13, AC-10/AC-15/AC-19): `--cleanup-preview` klassifiziert ein index-getracktes `stale-role.md` als stale und ein marker-loses `foreign-notes.md` als foreign (`legacy_unmarked`) ohne jede Mutation; der Apply-Sync entfernt das stale File backup-first (`*.sync-backup-*` mit Pre-Delete-Inhalt), das foreign File überlebt byte-identisch |
 | `63-context-file-modes` | Claude, Gemini, Opencode | strict (default) | Context-File-Topologie (SPEC-CONTEXT-FILE-MODES-2026-09-13, AC-21): Default `unified` ist byte-stabil (kein Adapter-Index, kein `@AGENTS.md`, kein `GATE_NEUTRAL`; explizites `topology: unified` rendert byte-identisch); `per-provider`-Opt-in rendert den kanonischen Kern `AGENTS.md` mit neutralem Gate-State + Claude-Adapter `CLAUDE.md` (`@AGENTS.md`), Nicht-Adapter bleiben Direkt-Leser des Kerns; Rollback auf `unified` räumt den index-getrackten Adapter backup-first ab und konvergiert (`--check` rc 0) |
+| `64-codex-toml-validity` | Codex | strict (default) | all `.codex/agents/*.toml` parse + singleton in developer_instructions (AC-1) |
+| `65-kimicode-model-namespace` | KimiCode | strict (default) | all emitted model IDs are `kimi-code/*` exactly once (AC-2) |
+| `66-mammouth-tools-map` | Mammouth | strict (default) | `tools:` frontmatter is an object, never a list (AC-6) |
+| `67-copilot-artifact-paths` | Copilot | strict (default) | corrected artifact paths `.github/agents/*.agent.md` (AC-8) |
+| `68-antigravity-discovery-paths` | Gemini | strict (default) | `agent-discovery` gates the `.agents/*` surface + `serverUrl` (AC-9) |
+| `69-opencode-v2-surface` | Opencode | strict (default) | `surface-version: v2` → nested `mcp.servers`, `default_agent`, no v1-only key (AC-5/AC-21) |
+| `70-bootstrap-marker-convergence` | Gemini, ZCode | strict (default) | scoped bootstrap sub-markers + legacy discard + user notes (AC-10/AC-16) |
+| `71-check-idempotency-all-providers` | all 9 | strict (default) | all-provider tree byte-identical across syncs + `--check` rc 0 (AC-4/AC-19) |
+| `72-continue-config-validity` | Continue | strict (default) | valid `.continue/config.yaml` (roles enum, no dead agents block, name/version) (AC-7) |
 
 ## Bewusste Auslassungen
 

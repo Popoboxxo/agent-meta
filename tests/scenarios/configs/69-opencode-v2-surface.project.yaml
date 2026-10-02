@@ -1,0 +1,34 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Opencode
+dod-preset: rapid-prototyping
+platforms: []
+roles:
+- orchestrator
+- developer
+plugins:
+  playwright:
+    enabled: true
+# OQ-8/AC-5 opt-in gate. NOTE: the shipped default in config/ai-providers.yaml is
+# `surface-version: "v1"`; the key is currently registry-level data only — no
+# project.yaml key consumes it (see asserts/69-*.sh for the v2 contract check).
+surface-version: v2
+project:
+  name: scenario-opencode-v2-surface
+  prefix: s69
+  short: opencode-v2-surface
+variables:
+  PROJECT_NAME: scenario-opencode-v2-surface
+  PROJECT_DESCRIPTION: Opencode v2 nested mcp.servers, default_agent primary entry, no v1-only key.
+  PROJECT_GOAL: Verify the v2 frontmatter mechanism and opencode.json surface when surface-version is v2.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-opencode-v2-surface
+  GIT_MAIN_BRANCH: main
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false
