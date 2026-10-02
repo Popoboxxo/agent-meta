@@ -213,7 +213,7 @@ def test_provider_tier_override_beats_preset_tiers() -> None:
 _NEW_PROVIDER_MODEL_EXPECTATIONS = {
     "Codex": {"balanced": "gpt-5.3-codex-spark", "fast": "gpt-5.4"},
     "ZCode": {"balanced": "glm-5.3", "fast": "glm-5.3-flash"},
-    "KimiCode": {"balanced": "kimi-k2.7-code", "fast": "kimi-k2.6"},
+    "KimiCode": {"balanced": "kimi-code/kimi-k2.7-code", "fast": "kimi-code/kimi-k2.6"},
 }
 
 
