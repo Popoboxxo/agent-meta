@@ -45,8 +45,50 @@ def resolve_agent_meta_root(project_root: Path) -> Path:
     return project_root
 
 
+def _apply_surface_format_selection(provider_config: dict) -> dict:
+    """Resolve ``mcp-config.format`` from ``surface-version`` + ``mcp-config.surface-formats``.
+
+    Provider-agnostic and data-driven (SPEC-PROVIDER-AUDIT-OPENCODE-V2-2026-09-30,
+    Task-4 addendum / design §3.1/§3.4, DECISION-7): for every provider whose
+    ``mcp-config`` block declares a ``surface-formats`` mapping AND whose
+    ``surface-version`` value is a key of that mapping, the declared ``format``
+    is replaced with the mapped value. The writer still dispatches on the
+    resolved ``mcp-config.format`` value ONLY and never reads ``surface-version``.
+
+    Providers without the map, without an ``mcp-config`` block, or with a
+    ``surface-version`` absent from the map keep their statically declared
+    ``format`` byte-for-byte (the declared value is the fallback). The mapping
+    is looked up by value — no provider-name literal is involved. Returns the
+    same mapping object with per-entry ``mcp-config`` dicts updated in place.
+    """
+    if not isinstance(provider_config, dict):
+        return provider_config
+    for entry in provider_config.values():
+        if not isinstance(entry, dict):
+            continue
+        mcp_config = entry.get("mcp-config")
+        if not isinstance(mcp_config, dict):
+            continue
+        surface_formats = mcp_config.get("surface-formats")
+        if not isinstance(surface_formats, dict) or not surface_formats:
+            continue
+        surface_version = entry.get("surface-version")
+        if not isinstance(surface_version, str) or surface_version not in surface_formats:
+            continue
+        selected_format = surface_formats[surface_version]
+        if isinstance(selected_format, str) and selected_format:
+            mcp_config["format"] = selected_format
+    return provider_config
+
+
 def load_providers_config(agent_meta_root: Path) -> dict:
-    """Load config/ai-providers.yaml with fallback to legacy paths."""
+    """Load config/ai-providers.yaml with fallback to legacy paths.
+
+    The returned registry is normalized once so ``mcp-config.format`` already
+    reflects the ``surface-version`` selection (see
+    ``_apply_surface_format_selection``); the writer never reads
+    ``surface-version``.
+    """
     data, _ = _load_yaml_or_json(
         agent_meta_root / PROVIDERS_CONFIG_YAML,
         agent_meta_root / _PROVIDERS_CONFIG_LEGACY,
@@ -120,7 +162,7 @@ def load_providers_config(agent_meta_root: Path) -> dict:
                 },
             }
         }
-    return data.get("providers", data)
+    return _apply_surface_format_selection(data.get("providers", data))
 
 
 def load_provider_capabilities(agent_meta_root: Path) -> dict:

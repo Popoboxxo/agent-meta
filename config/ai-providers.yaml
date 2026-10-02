@@ -269,7 +269,13 @@ providers:
     mcp-config:
       committed-file: opencode.json
       secrets-file: .opencode/mcp.local.json
+      # OQ-8/AC-5: surface-version is data that SELECTS the MCP format; the
+      # writer keeps dispatching on `format` only. v1 stays the flat default,
+      # v2 selects the nested mcp.servers shape (design §3.1/§3.4, DECISION-7).
       format: opencode-json
+      surface-formats:
+        v1: opencode-json
+        v2: opencode-json-v2
     skills_dir: .opencode/skills
     snippets_dir: .opencode/snippets
     pending_tasks_file: .opencode/pending-tasks.md
