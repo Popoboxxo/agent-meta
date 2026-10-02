@@ -46,6 +46,11 @@ Resolved values (2026-10-01): PRE-2 flag-gated/default-off; PRE-3 `orchestrator`
 >
 > **Follow-up amendment (2026-10-01, later pass):** the release/version-bump gap is closed by **inserting Task 15** (`release`, MAJOR bump) *before* regeneration, depending on Task 14 — the version bump runs first so that regeneration re-embeds the new `{{AGENT_META_VERSION}}` while no task writes outside its declared `Files:` set. The five tail tasks are renumbered: old Task 15 (regeneration) → **Task 16** (depends on 15), old Task 16 (commit) → **Task 17** (depends on 16), old Task 17 (validate) → **Task 18** (depends on 17), old Task 18 (review-req) → **Task 19** (depends on 18), old Task 19 (review-quality) → **Task 20** (depends on 19). Tasks 1–14 keep their numbers. Task 15 is a non-stage-target (no `pipeline_stages` slot) but is a hard dependency of Task 16, so it cannot be skipped. `agent-discovery` is named as the concrete OQ-1 key in Task 4 / Task 14 scenario 68; N7 is recorded as Accepted (spec §13.3) with no task. See the Graph Validation and Findings-Traceability re-check bullets.
 
+> **Follow-up amendment (2026-10-02, Task 8 + Task 14 closure):** the `bash tests/scenarios/run.sh 68 69` harness is green. Owners/files and the two recorded gaps:
+> - **Task 8 (MCP writer format dispatch) — closed.** The `opencode-json-v2` MCP branch already existed; the missing wiring was the frontmatter-mechanism selection and the v1-only settings key. `config/ai-providers.yaml` adds `Opencode.agent-transform.surface-mechanisms: {v1: opencode-native, v2: opencode-native-v2}`; `scripts/lib/providers.py` resolves it in `load_providers_config` via `_apply_surface_mechanism_selection` (analogous to the existing `_apply_surface_format_selection`); `scripts/lib/context.py::apply_settings_surface_shape` drops `subagent_depth` and emits `default_agent` from `primary-role` for the resolved `opencode-json-v2` format. Dispatch stays on declared config values only — no provider-name or `surface-version` branch in a writer (AC-23), and the shipped `v1` output is byte-frozen.
+> - **Task 14 scenario 68 assert closure (`tests/scenarios/asserts/68-antigravity-discovery-paths.sh`).** The throwaway `agent-discovery` flip is now line-anchored and comment-skipping (the Gemini block's explanatory comment also contains the literal `agent-discovery: false`, so the old naive `str.replace` rewrote the comment and left the key false); the throwaway project enables one MCP server (`plugins.playwright`) so `.agents/mcp_config.json` is emitted with a non-empty server entry.
+> - **Task 14 scenario 69 assert closure.** `tests/test_opencode_v2_surface.py` (new) pins the mechanism selection and the v2 settings shape. Ledger checkboxes are deliberately untouched.
+
 ### Decision → task mapping
 
 | PRE / OQ | Decision (2026-10-01) | Ordered into |
@@ -383,10 +388,10 @@ The migrator normalizes both shapes: a bare list = default-on; `{requires-flag, 
 **Verify:** `bash tests/scenarios/run.sh 64 65 66 67 68 69 70 71 72`
 **Provider-Agnostik:** assertions key on generated artifacts, not provider names.
 **Depends on:** 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
-- [ ] Step 1: Test schreiben (fail)
-- [ ] Step 2: implementieren
-- [ ] Step 3: Test (pass)
-- [ ] Step 4: commit — `test: add provider-audit scenarios 64-72`
+- [x] Step 1: Test schreiben (fail)
+- [x] Step 2: implementieren
+- [x] Step 3: Test (pass)
+- [x] Step 4: commit — `test: add provider-audit scenarios 64-72`
 
 ### Task 15: Release + MAJOR version bump
 **Agent:** release
