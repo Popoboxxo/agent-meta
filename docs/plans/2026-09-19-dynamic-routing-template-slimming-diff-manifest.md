@@ -1579,3 +1579,93 @@ PR #840. Die Abschnitte ersetzen sich **nicht**; alle drei Einträge bleiben Tei
 weil sie drei unabhängige Delta-Ursachen auf derselben Fixture dokumentieren. Für die Reihenfolge
 bleibt Abschnitt 12 der Präzedenzfall („Merge zuerst, dann re-baselieren") — die vorliegende
 Re-Baseline folgt ihm.
+
+## 14. Re-Baseline der Golden-Baseline für 3 Rollen (Task 12 Provider-Neutralität)
+
+Erster Re-Baseline-Fall aus der **Provider-Audit-Opencode-v2**-Linie (nicht aus der
+Slimming-Migration). Task 12 („Provider-neutral template body references", Commit `f41fe4e5`)
+ersetzt fünf `.claude/`-literale Body-Referenzen durch provider-neutrale Formulierungen und hebt
+`version` + `generated-from` der drei betroffenen Templates patchweise an. Drei dieser Rollen
+besitzen eine eingefrorene Fixture und rutschen damit aus der Baseline.
+
+> **Commit:** **noch nicht vorhanden** — die Re-Baseline wurde bewusst **nicht** committet
+> (Aufgabengrenze: keine Git-Mutationen). Messbasis ist der Arbeitsbaum auf `a64412ac`
+> (Branch `feat/provider-audit-opencode-v2`).
+> **Gegenstand:** 3 von **58** eingefrorenen Golden-Fixtures.
+> **Klassifikation:** **Baseline-Update nach Update-Regel**
+> (`tests/fixtures/slimming-golden/README.md:73-77`) — **kein B2a-/B2b-Fall**; siehe 14.2/14.3.
+
+### 14.1 Auslöser
+
+Task 12 ändert drei `1-generic`-Templates inhaltlich (provider-neutrale Referenzen) und hebt
+`version` patchweise:
+
+| Rolle | Template | `version` | Delta |
+|---|---|---|---|
+| `agent-meta-manager` | `agents/1-generic/agent-meta-manager.md` | `1.22.0 → 1.22.1` | `.claude/skills/model-override-all/SKILL.md` → `{{SKILLS_DIR}}/…`; Sync-Workflow- und Handoff-Prosa provider-neutral |
+| `agent-meta-scout` | `agents/1-generic/agent-meta-scout.md` | `1.5.0 → 1.5.1` | `tools: +Glob`; `evaluate-repository`-Locator via `Glob` statt hartem `.claude/`-Pfad |
+| `release` | `agents/1-generic/release.md` | `1.12.0 → 1.12.1` | `pre-release-check.sh`-Pfad provider-neutral (`<provider-hooks-dir>`) + `Glob`-Locator |
+
+Die Versionsfelder (`version:` **und** `generated-from: …@<version>`) verschieben das gerenderte
+Frontmatter; die Body-Refs verschieben den gerenderten Body.
+
+### 14.2 Mechanismus des Fehlschlags
+
+Das Gate verzweigt (siehe 13.2): `agent-meta-scout` ist **unmigriert** ⇒ Byte-Identitätszweig
+(`unexpected diff on an unmigrated role`); `agent-meta-manager`/`release` sind migriert, aber ihr
+Delta ist **nicht** auf die vier Block-Kinds (`ANTI_RECURSION`, `OUTPUT_GUARD`,
+`BACKGROUND_PROCESS_GUARD`, `PARSE_INPUT`) zurückführbar ⇒
+`diff not attributable to declared normalizations`. `_LOCATORS` erkennt keine Versionsstrings und
+keine Inline-Body-Prosa; eine erfundene Normalisierung hätte den Vertrag gebrochen.
+
+### 14.3 Gewählte Fix-Route und Vertragsbeleg
+
+Bewusste, über den **echten Sync-Pfad** erzeugte Re-Baseline nach dem Verfahrensvertrag
+(`tests/fixtures/slimming-golden/README.md:22-41`), ausdrücklich **nicht** als Handedit und
+**nicht** als Bulk-Kopie des gesamten `agents`-Baums (vgl. 13.3). Kein Eingriff in
+`_MIGRATED_PATHS`, `_NORMALIZATIONS`, `_LOCATORS`, `_KIND_REGISTRY` oder `_GOLDEN_ROLE_COUNT`.
+
+### 14.4 Nachweis der Herkunft (keine Handpflege)
+
+- Erzeugung über den echten Sync-Pfad, Provider `Claude`:
+  `AGENT_META_TEST_REPO="$PWD/.tmp/slimming-golden-gen" python3 scripts/sync.py --validate`
+  (58 gerenderte Rollen) und ein zweiter Lauf in `.tmp/slimming-golden-gen2`.
+- **Determinismus-Nachweis (Zweitrender):**
+  `diff -r .tmp/slimming-golden-gen/.claude/agents .tmp/slimming-golden-gen2/.claude/agents`
+  ⇒ **rc `0`, 0 Byte Ausgabe, 58 = 58 Dateien**.
+- **Kopiert wurden ausschließlich die 3 vom Gate benannten Fixtures**, einzeln und verbatim; `cmp`
+  bestätigt für jede Datei Byte-Gleichheit mit **beiden** Renders. Unter
+  `tests/fixtures/slimming-golden/` weist `git status` genau diese 3 als geändert aus.
+- sha256 der drei Fixtures im Arbeitsbaum (identisch zum jeweiligen Sync-Render):
+
+  | Fixture | sha256 |
+  |---|---|
+  | `agent-meta-manager.md` | `01c47f8733310be5a2d316c2f1fa9d3e6862357e2afdfea79fa0592fab26d8b1` |
+  | `agent-meta-scout.md` | `02ef5ebcbcbf066fba3c27b6dce615c3b4483b932ba228502c0d99e882be863e` |
+  | `release.md` | `b2ac10db7a2d73ddb220fef2d1846d9c77c13bcf5ac3740e7639827e9a2ab155` |
+
+### 14.5 Verifikation
+
+| Prüfung | Ergebnis |
+|---|---|
+| `python3 -m pytest tests/test_template_slimming_equivalence.py -q` | **8 passed**, rc 0 |
+| Vorher-Zustand des Gates | **1 failed** (7 passed) — nannte genau die 3 Rollen |
+| Diff-Scope der Fixtures | `git diff --numstat`: `agent-meta-manager` 4/4, `agent-meta-scout` 7/3, `release` 7/7 |
+
+Der Test-Korpus blieb unangetastet: **kein** Eingriff in `_MIGRATED_PATHS`, `_NORMALIZATIONS`,
+`_LOCATORS`, `_KIND_REGISTRY` oder `_GOLDEN_ROLE_COUNT` (58, unverändert); keine Assertion wurde
+geschwächt, übersprungen oder gelockert — das Gate behält seine Zähne.
+
+### 14.6 Bestandsaufnahme
+
+Die 3 re-baselined Fixtures sind nach dem Kopieren byte-identisch zum Render. Die übrigen 24 roh
+abweichenden Fixtures bleiben von den deklarierten Normalisierungen absorbiert (mengen- und
+setzgleich zu 13.6b) — die Re-Baseline hat keine andere eingefrorene Fixture verschoben.
+
+### 14.7 Status B2a
+
+B2a ist durch die Re-Baseline **wiederhergestellt**, nicht abgeschwächt: jede der 3 Fixtures
+enthält exakt den vom aktuellen Template erzeugten Output, die Update-Regel ist erfüllt (dieser
+Eintrag), und das Gate ist grün (14.5). Die Deltas aus 14.1 sind orthogonale Inhalts- und
+Versionsänderungen; dies ist eine **Statusaussage** über B2a, keine Klassifikation der Änderung
+als B2a-Fall (vgl. 8.7/13.7).
