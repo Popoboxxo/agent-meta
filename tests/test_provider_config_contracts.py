@@ -189,6 +189,12 @@ def test_opencode_surface_v1_primary_role_and_format():
         "Opencode.agent-transform.allowed-fields must be populated (§4.3)"
     )
     assert all(isinstance(f, str) for f in allowed)
+    # Task-18: both surfaces emit `prompt_mode` verbatim (Opencode declares no
+    # strip-fields) and the provider preserves unknown keys in `options`, so the
+    # allow-list must include it or a v2 project fails `sync.py --validate`.
+    assert "prompt_mode" in allowed, (
+        "prompt_mode is an emitted Opencode key and must be in allowed-fields"
+    )
 
 
 def test_kimicode_model_namespace_and_catalog():

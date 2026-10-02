@@ -306,6 +306,14 @@ providers:
       - max_tokens
       - version
       - generated-from
+      # Task 18: `prompt_mode` is emitted verbatim from the template by both
+      # surfaces (Opencode declares no strip-fields). Opencode preserves
+      # unknown frontmatter keys in its `options` bucket — v1 `debug agent`
+      # collects them there and v2's agent `normalize()` explicitly promotes
+      # unknown keys into `options` "so they survive the round-trip" — so it
+      # is a legitimate emitted key, not a silent drop (runtime evidence
+      # docs/analysis/evidence/2026-09-30-runtime-opencode-v{1,2}.md).
+      - prompt_mode
       - subagent
       - hidden
       - color

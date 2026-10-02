@@ -19,6 +19,11 @@
 #      `mode: subagent`). Because `surface-version` is REGISTRY-level data (no
 #      project.yaml key consumes it), the v2 run is exercised against a throwaway
 #      framework copy in the temp dir — the real checkout is never mutated.
+#   3. V2 VALIDATE (Task-18 regression guard): `sync.py --validate` is run on the
+#      throwaway v2 project and must exit 0. The harness only runs --validate on
+#      the primary (v1) project, so a v2-only artifact-contract violation (e.g.
+#      an emitted frontmatter key missing from `agent-transform.allowed-fields`)
+#      used to stay invisible.
 # Exit 0 = all assertions hold.
 set -u
 
@@ -74,7 +79,10 @@ FW="$WORK/fw"
 PROJ="$WORK/proj"
 mkdir -p "$FW" "$PROJ/.meta-config"
 
-for d in scripts config agents templates hooks rules; do
+# Copy the framework subtrees the generator AND `--validate` read. `schemas/`
+# is required so the throwaway `--validate` run (step 3) resolves the
+# `schema_ref`s declared by templates instead of failing on missing files.
+for d in scripts config agents templates hooks rules schemas; do
     [ -e "$REPO_ROOT/$d" ] || continue
     cp -r "$REPO_ROOT/$d" "$FW/"
 done
@@ -139,6 +147,20 @@ EOF
     python3 "$FW/scripts/sync.py" > sync.log 2>&1
 ) || fail "v2 sync (surface-version: v2) failed — see $PROJ/sync.log"
 
+# 2.1 Task-18 regression guard: the v2 throwaway must pass `--validate` (rc 0).
+# The harness runs --validate on the primary v1 project only; a v2-only
+# artifact-contract violation (an emitted key absent from
+# agent-transform.allowed-fields) previously slipped through because this path
+# ran sync alone.
+(
+    cd "$PROJ" || exit 1
+    python3 "$FW/scripts/sync.py" --validate > validate.log 2>&1
+) || {
+    echo "----- v2 validate.log -----"
+    cat "$PROJ/validate.log"
+    fail "v2 --validate exited non-zero (expected 0)"
+}
+
 [ -f "$PROJ/opencode.json" ] || fail "v2 output missing: opencode.json"
 
 # 2a. Nested mcp.servers, NO flat top-level mcp server map, no v1-only key.
@@ -187,4 +209,4 @@ assert sub.get("mode") == "subagent", (
 )
 PY
 
-echo "ASSERT OK (69-opencode-v2-surface): v2 emits nested mcp.servers + default_agent + mode: primary; v1 flat byte shape frozen"
+echo "ASSERT OK (69-opencode-v2-surface): v2 emits nested mcp.servers + default_agent + mode: primary; v2 --validate rc 0; v1 flat byte shape frozen"

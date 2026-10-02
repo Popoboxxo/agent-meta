@@ -50,6 +50,7 @@ def _sample_agent_content() -> str:
         "name: template-orchestrator\n"
         'version: "0.101.0"\n'
         "description: old description\n"
+        "prompt_mode: modern\n"
         "tools:\n"
         "  - Read\n"
         "  - Bash\n"
@@ -280,6 +281,33 @@ def test_allowed_fields_violation_yields_a_finding_on_v2_surface() -> None:
     errors = _errors(findings)
     assert errors, "a key outside the narrow allow-list must yield a finding"
     assert all(f.check == "artifact-contract" for f in errors)
+
+
+def test_opencode_v2_emitted_frontmatter_passes_shipped_allow_list() -> None:
+    """Task-18 regression guard: the real Opencode v2 output must validate clean.
+
+    Both surfaces emit ``prompt_mode`` verbatim (Opencode declares no
+    ``strip-fields``), and Opencode preserves unknown frontmatter keys in its
+    ``options`` bucket rather than dropping them. The shipped
+    ``agent-transform.allowed-fields`` must therefore contain every key the
+    transform actually emits — a v2 project must pass ``--validate``.
+    """
+    config = copy.deepcopy(_PROVIDER_CONFIG)
+    transform = config["Opencode"]["agent-transform"]
+    transform["frontmatter-mechanism"] = "opencode-native-v2"
+
+    out, _ = _transform("Opencode", provider_config=config)
+    emitted = set(_frontmatter(out))
+    # Only asserted on the shipped data: this reproduces the Task-18 defect.
+    assert "prompt_mode" in emitted, "the Opencode transform emits prompt_mode"
+
+    contract = resolve_artifact_contract(config["Opencode"])
+    assert contract.allowed_fields is not None, "v2 surface enforces the allow-list"
+    violations = sorted(emitted - contract.allowed_fields)
+    assert not violations, f"emitted keys outside allowed-fields: {violations}"
+
+    findings = validate_artifact(out, contract, ".opencode/agents/orchestrator.md")
+    assert _errors(findings) == [], _errors(findings)
 
 
 def test_reject_fields_contract_is_resolved_from_config() -> None:
