@@ -31,7 +31,8 @@ from pathlib import Path
 from typing import Iterator
 
 from ..artifact_validate import (
-    validate_frontmatter,
+    resolve_artifact_contract,
+    validate_artifact,
     validate_json_document,
     validate_toml,
 )
@@ -44,11 +45,6 @@ from .report import Finding, Severity
 _JSON_FORMATS = frozenset({"opencode-json", "opencode-json-v2"})
 # TOML MCP format (Codex): the committed document must parse as TOML.
 _TOML_FORMATS = frozenset({"codex-toml-mcp"})
-# Frontmatter mechanisms emitted as TOML agent documents.
-_TOML_MECHANISMS = frozenset({"codex-toml"})
-# Every generated Markdown agent must carry these fields (all registered
-# providers emit them; see the three-file invariant).
-_REQUIRED_FIELDS = frozenset({"name", "description"})
 
 
 def _iter_artifacts(directory: Path, ext: str) -> Iterator[Path]:
@@ -73,27 +69,21 @@ def _rel(path: Path, root: Path) -> str:
         return str(path)
 
 
-def _v2_surface(cfg: dict, transform: dict) -> bool:
-    """Whether the provider's declared surface is the v2 silent-drop surface."""
-    surface = str(cfg.get("surface-version", "v1"))
-    mechanism = str(transform.get("frontmatter-mechanism", "provider-md"))
-    return surface == "v2" or mechanism.endswith("-v2")
-
-
-def _allowed_fields(cfg: dict, transform: dict) -> set[str] | None:
-    """Declared allow-list, enforced on the v2 surface only (see module doc)."""
-    allowed = transform.get("allowed-fields")
-    if not isinstance(allowed, list) or not allowed:
-        return None
-    return set(allowed) if _v2_surface(cfg, transform) else None
-
-
 def check_artifact_contracts(agent_meta_root: Path) -> list[Finding]:
     """Validate generated artifacts present in ``agent_meta_root``.
 
     Returns ``Severity.ERROR`` findings; an absent registry, an absent
     artifact directory, or a format without a declared contract yields no
     findings (conservative, no false positives).
+
+    Overlap note (quality review WARN-4): the sync-time gate
+    (``agent_sync.collect_artifact_findings``) validates the same committed
+    artifacts for a project-scoped, capability-aware fail-loud signal. This
+    check is deliberately the framework-tree, registry-wide counterpart used by
+    ``consistency-check.py``; the two cannot diverge because both resolve the
+    contract via :func:`artifact_validate.resolve_artifact_contract` and
+    validate via :func:`artifact_validate.validate_artifact` (single source of
+    truth).
     """
     findings: list[Finding] = []
     providers = load_providers_config(agent_meta_root)
@@ -103,11 +93,7 @@ def check_artifact_contracts(agent_meta_root: Path) -> list[Finding]:
     for cfg in providers.values():
         if not isinstance(cfg, dict):
             continue
-        transform = cfg.get("agent-transform")
-        transform = transform if isinstance(transform, dict) else {}
-        mechanism = str(transform.get("frontmatter-mechanism", "provider-md"))
-        reject = set(transform.get("reject-fields") or [])
-        allowed = _allowed_fields(cfg, transform)
+        contract = resolve_artifact_contract(cfg)
 
         agents_dir = cfg.get("agents_dir")
         if agents_dir:
@@ -118,16 +104,7 @@ def check_artifact_contracts(agent_meta_root: Path) -> list[Finding]:
                 if text is None:
                     continue
                 rel = _rel(path, agent_meta_root)
-                if mechanism in _TOML_MECHANISMS:
-                    findings += validate_toml(text, rel)
-                else:
-                    findings += validate_frontmatter(
-                        text,
-                        allowed_fields=allowed,
-                        required_fields=set(_REQUIRED_FIELDS),
-                        reject_fields=reject,
-                        path=rel,
-                    )
+                findings += validate_artifact(text, contract, rel)
 
         findings += _check_mcp_document(cfg, agent_meta_root)
 

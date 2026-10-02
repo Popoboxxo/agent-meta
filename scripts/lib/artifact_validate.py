@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import dataclass
 
 try:  # Python >= 3.11 ships tomllib in the stdlib.
     import tomllib
@@ -38,6 +39,68 @@ CHECK = "artifact-contract"
 
 #: Top-level keys that belong to the deprecated v1 Opencode surface only.
 _OPENCODE_V1_ONLY_KEYS = ("subagent_depth",)
+
+#: Mechanisms whose artifacts are serialized as TOML, not Markdown frontmatter.
+TOML_MECHANISMS = frozenset({"codex-toml"})
+
+#: Frontmatter keys every generated agent artifact MUST carry.
+REQUIRED_FIELDS = frozenset({"name", "description"})
+
+
+@dataclass(frozen=True)
+class ArtifactContract:
+    """Resolved, provider-agnostic format contract for one provider's artifacts.
+
+    Resolution reads only declared config **values** (``surface-version`` and
+    ``agent-transform.{frontmatter-mechanism,allowed-fields,reject-fields}``),
+    never a provider name. This is the single source of truth shared by the
+    sync-time warning (``agent_sync``) and the consistency check
+    (``consistency.artifact_contracts``) so the two cannot diverge.
+    """
+
+    mechanism: str
+    allowed_fields: set[str] | None
+    reject_fields: set[str]
+    required_fields: frozenset[str] = REQUIRED_FIELDS
+
+
+def _artifact_transform(provider_config: dict | None) -> dict:
+    """The provider's ``agent-transform`` mapping (empty when absent/malformed)."""
+    transform = (provider_config or {}).get("agent-transform")
+    return transform if isinstance(transform, dict) else {}
+
+
+def artifact_v2_surface(provider_config: dict | None) -> bool:
+    """Whether the provider declares the v2 silent-drop surface (spec §2.1/§5).
+
+    The allow-list is the v2 guard; the v1 byte shape keeps its unknown keys,
+    which the runtime normalizes internally.
+    """
+    surface = str((provider_config or {}).get("surface-version", "v1"))
+    mechanism = str(_artifact_transform(provider_config).get("frontmatter-mechanism", "provider-md"))
+    return surface == "v2" or mechanism.endswith("-v2")
+
+
+def resolve_artifact_contract(provider_config: dict | None) -> ArtifactContract:
+    """Resolve one provider's declared artifact contract from config data only.
+
+    The ``allowed-fields`` allow-list is enforced on the v2 surface only (spec
+    §2.1/§5); this is the one place that rule is applied, so the sync-time
+    warning and the consistency check cannot drift apart.
+    """
+    transform = _artifact_transform(provider_config)
+    mechanism = str(transform.get("frontmatter-mechanism", "provider-md"))
+    allowed = transform.get("allowed-fields")
+    allowed_fields = (
+        set(allowed)
+        if isinstance(allowed, list) and allowed and artifact_v2_surface(provider_config)
+        else None
+    )
+    return ArtifactContract(
+        mechanism=mechanism,
+        allowed_fields=allowed_fields,
+        reject_fields=set(transform.get("reject-fields") or []),
+    )
 
 
 def _finding(path: str, message: str, suggestion: str = "") -> Finding:
@@ -122,6 +185,25 @@ def validate_frontmatter(
         )
 
     return findings
+
+
+def validate_artifact(text: str, contract: ArtifactContract, path: str) -> list[Finding]:
+    """Validate *text* against a resolved *contract*.
+
+    Dispatch is on the declared mechanism only (:data:`TOML_MECHANISMS`), never
+    on a provider name. The caller resolves the contract once via
+    :func:`resolve_artifact_contract`; this function is the single validation
+    entry point for both the sync-time warning and the consistency check.
+    """
+    if contract.mechanism in TOML_MECHANISMS:
+        return validate_toml(text, path)
+    return validate_frontmatter(
+        text,
+        allowed_fields=contract.allowed_fields,
+        required_fields=set(contract.required_fields),
+        reject_fields=contract.reject_fields,
+        path=path,
+    )
 
 
 def validate_json_document(text: str, fmt: str, path: str) -> list[Finding]:

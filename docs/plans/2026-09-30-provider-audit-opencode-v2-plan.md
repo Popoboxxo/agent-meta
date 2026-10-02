@@ -192,10 +192,10 @@ Every task: write the test first (red) -> implement -> observe green -> commit w
 **Verify:** `cd <scratch> && python3 <repo>/scripts/sync.py --validate; echo $?` -> `1`; `python3 -m pytest tests/test_sync_validation_gate.py -q`
 **Provider-Agnostik:** findings are logged per provider from config, never from a name branch.
 **Depends on:** 1
-- [ ] Step 1: Test schreiben (fail)
-- [ ] Step 2: implementieren
-- [ ] Step 3: Test (pass)
-- [ ] Step 4: commit — `feat: surface artifact findings in sync check/validate`
+- [x] Step 1: Test schreiben (fail)
+- [x] Step 2: implementieren
+- [x] Step 3: Test (pass)
+- [x] Step 4: commit — `feat: surface artifact findings in sync check/validate`
 
 ### Task 4: Provider registry contract data (`ai-providers.yaml`)
 **Agent:** senior-developer
