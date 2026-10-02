@@ -70,6 +70,23 @@ the CHANGELOG's newest dated heading changes, `agent-meta-manager.md` legitimate
 changes in that one line; every other fixture file must stay stable. No absolute
 paths, hostnames or SHAs appear in any generated agent file.
 
+## Release-volatile meta tokens
+
+`{{AGENT_META_VERSION}}` (the *project* version from `VERSION`, not a per-role
+template version) is embedded in the bodies of `agent-meta-manager.md`,
+`agent-meta-scout.md`, `documenter.md` and `meta-feedback.md`; the date is the
+`agent-meta-manager.md` line above. A project version bump legitimately rewrites
+every embedded occurrence, so freezing those values would force a fixture
+rebaseline on every release.
+
+The B2 gate therefore treats both tokens as **release-volatile**: before the
+golden comparison, `test_template_slimming_equivalence.py` forward-ports the
+frozen `_GOLDEN_META_VERSION` / `_GOLDEN_META_DATE` values in the golden to the
+current render's values (`_port_golden_meta_tokens`). This keeps the gate
+version-agnostic without touching this fixture set. Per-role template versions
+(frontmatter `version:`, `generated-from: …@<version>`) are **not** project meta
+versions and stay frozen — they are still asserted exactly.
+
 ## Update rule
 
 Any update to this baseline requires an entry in the diff manifest
