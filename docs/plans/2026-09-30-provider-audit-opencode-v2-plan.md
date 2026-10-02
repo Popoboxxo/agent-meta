@@ -352,10 +352,10 @@ The migrator normalizes both shapes: a bare list = default-on; `{requires-flag, 
 **Verify:** `cd <scratch> && python3 <repo>/scripts/sync.py >/dev/null && ! grep -RE '\.claude/(agents|skills/model-override-all|commands/evaluate-repository|hooks/pre-release-check)' .codex .zcode .kimi-code`
 **Provider-Agnostik:** neutral wording; no provider name literal.
 **Depends on:** none
-- [ ] Step 1: Test schreiben (fail)
-- [ ] Step 2: implementieren
-- [ ] Step 3: Test (pass)
-- [ ] Step 4: commit — `docs: provider-neutral template body references`
+- [x] Step 1: Test schreiben (fail)
+- [x] Step 2: implementieren
+- [x] Step 3: Test (pass)
+- [x] Step 4: commit — `docs: provider-neutral template body references`
 
 ### Task 13: Provider-agnostic sweep guard
 **Agent:** developer

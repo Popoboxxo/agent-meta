@@ -1,6 +1,6 @@
 ---
 name: template-agent-meta-manager
-version: "1.22.0"
+version: "1.22.1"
 description: "Manage agent-meta: upgrades, sync, feedback delegation, project-specific agents, external-skill lifecycle, and creating extensions."
 hint: "Manage agent-meta: upgrade, sync, feedback, create project-specific agents"
 reference_standards:
@@ -183,7 +183,7 @@ py {{AGENT_META_REL_PATH}}scripts/sync.py --config .meta-config/project.yaml
 
 Admin-UI shortcut: *Project → Model Overrides → "Override All"* bar writes the
 key directly (with a "Zurücksetzen" button to clear it). See skill
-`.claude/skills/model-override-all/SKILL.md`.
+`{{SKILLS_DIR}}/model-override-all/SKILL.md`.
 
 ### 8b.2 Inherit Main-Chat model (`model-inherit-main-chat`)
 
@@ -415,7 +415,7 @@ sondern auch gegen realistische Consumer-Configs.
 **Project context:** {{PROJECT_CONTEXT}}
 **Goal:** {{PROJECT_GOAL}}
 
-**Sync workflow:** Mandatory order on changes → 1. test sync.py locally → 2. review .claude/agents → 3. commit → 4. (optionally) PR.
+**Sync workflow:** Mandatory order on changes → 1. test sync.py locally → 2. review the generated agents directory for the active provider → 3. commit → 4. (optionally) PR.
 
 **Version info:** v{{AGENT_META_VERSION}} ({{AGENT_META_DATE}})
 </context>
@@ -454,7 +454,7 @@ NOTES: [tradeoffs, warnings, confirmations]
 - No override when an extension is enough
 - No project-specific solution for a generic problem → feedback
 - Never sync without checking `sync.log` afterwards
-- No manual changes in `.claude/agents/`
+- No manual changes in the generated agents directory
 - Never write into the managed block of CLAUDE.md
 - **Submodule Protection:** Never edit `.agent-meta/` files directly within consumer repos.
 - **Submodule Protection:** Never modify `.gitmodules` or run `git add` on submodules automatically.

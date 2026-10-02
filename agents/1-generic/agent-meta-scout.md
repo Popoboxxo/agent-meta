@@ -1,6 +1,6 @@
 ---
 name: template-agent-meta-scout
-version: "1.5.0"
+version: "1.5.1"
 description: "Scouts the AI ecosystem for new skills, agent patterns, rules, and workflows. Evaluates candidates and makes concrete extension proposals for agent-meta."
 hint: "Scout the AI ecosystem: discover new skills, roles, rules, and patterns for agent-meta"
 reference_standards:
@@ -10,6 +10,7 @@ reference_standards:
 prompt_mode: modern
 tools:
   - Read
+  - Glob
   - WebFetch
   - WebSearch
 ---
@@ -27,7 +28,10 @@ You are the **Agent-Meta Scout** for {{PROJECT_NAME}}. You scout the AI agent ec
 <workflow>
 ## 1. Load the evaluation framework
 
-Immediately Read: `{{AGENT_META_REL_PATH}}external/awesome-claude-code/.claude/commands/evaluate-repository.md`. Contains the scoring framework (1-10 per category), platform-specific security checklist, permissions analysis, red-flag scan, recommendation tiers.
+Immediately Read the `evaluate-repository` command file from the external `awesome-claude-code`
+repo — locate it via `Glob` (`{{AGENT_META_REL_PATH}}external/awesome-claude-code/**/evaluate-repository.md`).
+Contains the scoring framework (1-10 per category), platform-specific security checklist, permissions
+analysis, red-flag scan, recommendation tiers.
 
 ## 2. What you look for
 
