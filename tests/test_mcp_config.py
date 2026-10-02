@@ -7,6 +7,7 @@ inert, silently-broken MCP integration.
 """
 
 import json
+import re
 try:
     import tomllib
 except ModuleNotFoundError:
@@ -15,10 +16,13 @@ from pathlib import Path
 
 import yaml
 
+from scripts.lib.artifact_validate import validate_json_document
 from scripts.lib.log import SyncLog
 from scripts.lib.mcp import _update_json_config, build_mcp_guardrails_list, generate_provider_configs
 from scripts.lib.mcp_provider_config import (
+    _build_connection_entry,
     _update_codex_toml_config,
+    _update_continue_yaml_config,
     _update_zcode_json_config,
     _write_provider_config,
 )
@@ -336,8 +340,10 @@ def test_codex_toml_mcp_writer_golden(tmp_path):
     assert search["url"] == "${SEARCH_URL}"
     # Bearer ${VAR} header → native bearer_token_env_var env indirection (V8).
     assert search["bearer_token_env_var"] == "SEARCH_TOKEN"
-    assert "Authorization" not in search["headers"]
-    assert search["headers"]["X-Custom"] == "${CUSTOM_VAL}"
+    # CX-1: the static header map is spelled `http_headers` in Codex, not `headers`.
+    assert "headers" not in search
+    assert "Authorization" not in search["http_headers"]
+    assert search["http_headers"]["X-Custom"] == "${CUSTOM_VAL}"
     assert "type" not in search
 
     # Idempotent: re-run on unchanged content → skip, file untouched.
@@ -417,7 +423,7 @@ def test_generate_provider_configs_codex_toml_wires_committed_file(tmp_path):
     # {{VAR}} → ${VAR} committed substitution happened before rendering.
     assert parsed["mcp_servers"]["search"]["url"] == "${SEARCH_URL}"
     assert parsed["mcp_servers"]["search"]["bearer_token_env_var"] == "SEARCH_TOKEN"
-    assert "Authorization" not in parsed["mcp_servers"]["search"].get("headers", {})
+    assert "Authorization" not in parsed["mcp_servers"]["search"].get("http_headers", {})
     assert parsed["mcp_servers"]["local-fs"]["command"] == "npx"
     assert parsed["mcp_servers"]["local-fs"]["env"] == {"API_KEY": "${API_KEY}"}
     # V8: Codex has no secrets-file — no local file may be generated.
@@ -468,17 +474,205 @@ def test_zcode_json_writer_merges_into_existing_config(tmp_path):
     assert any("unchanged" in s for s in log2.skipped)
 
 
-def test_kimicode_mcp_config_reuses_claude_settings_format():
-    # V13: Kimi Code reads the wire-identical {"mcpServers": ...} top-level
-    # key from .kimi-code/mcp.json — the claude-settings JSON branch is
-    # reused instead of a new format branch. No secrets-file (Kimi-native
-    # env indirection is a P6 detail).
+def test_kimicode_mcp_config_declares_kimi_json_format():
+    # KC-1: KimiCode has no documented `type` key — remote transport is
+    # discriminated by `transport: "sse"`, and the file key stays
+    # `mcpServers` in .kimi-code/mcp.json. The dedicated `kimi-json`
+    # format branch (instead of the former claude-settings reuse) owns
+    # that spelling. No secrets-file (Kimi-native env indirection is a
+    # P6 detail).
     repo_root = Path(__file__).resolve().parents[1]
     provider_config = load_providers_config(repo_root)
     mcp_cfg = provider_config["KimiCode"]["mcp-config"]
-    assert mcp_cfg["format"] == "claude-settings"
+    assert mcp_cfg["format"] == "kimi-json"
     assert mcp_cfg["committed-file"] == ".kimi-code/mcp.json"
     assert "secrets-file" not in mcp_cfg
+
+
+# ---------------------------------------------------------------------------
+# Task 8 — MCP writer dispatch on mcp-config.format (AC-21/AC-23/AC-7/AC-9)
+# ---------------------------------------------------------------------------
+
+
+def test_build_connection_entry_kimi_json_uses_transport_sse():
+    conn = {
+        "type": "sse",
+        "url": "{{URL}}",
+        "headers": {"Authorization": "Bearer {{TOKEN}}"},
+    }
+    entry = _build_connection_entry(conn, None, "kimi-json")
+    assert entry["transport"] == "sse"
+    assert "type" not in entry
+    assert entry["url"] == "${URL}"
+    assert entry["headers"] == {"Authorization": "Bearer ${TOKEN}"}
+
+
+def test_build_connection_entry_kimi_json_stdio_drops_type():
+    conn = {
+        "type": "stdio",
+        "command": "npx",
+        "args": ["-y", "kimi-mcp"],
+        "env": {"API_KEY": "{{API_KEY}}"},
+    }
+    entry = _build_connection_entry(conn, None, "kimi-json")
+    assert "type" not in entry
+    assert entry["command"] == "npx"
+    assert entry["args"] == ["-y", "kimi-mcp"]
+    assert entry["env"] == {"API_KEY": "${API_KEY}"}
+
+
+def test_write_provider_config_kimi_json_writes_mcp_servers(tmp_path):
+    path = tmp_path / ".kimi-code" / "mcp.json"
+    log = SyncLog()
+    entries = {"srv": {"transport": "sse", "url": "${URL}", "headers": {"X": "${Y}"}}}
+
+    _write_provider_config(path, entries, "kimi-json", log, dry_run=False, allow_secrets=True)
+
+    written = json.loads(path.read_text(encoding="utf-8"))
+    assert written["mcpServers"] == entries
+
+
+def test_build_connection_entry_antigravity_uses_server_url():
+    conn = {"type": "sse", "url": "{{URL}}", "headers": {"X": "{{Y}}"}}
+    entry = _build_connection_entry(conn, None, "antigravity-mcp-json")
+    assert entry["serverUrl"] == "${URL}"
+    assert "url" not in entry
+    assert entry["headers"] == {"X": "${Y}"}
+
+
+def test_write_provider_config_antigravity_writes_mcp_servers(tmp_path):
+    path = tmp_path / ".agents" / "mcp_config.json"
+    log = SyncLog()
+    entries = {"srv": {"type": "sse", "serverUrl": "${URL}", "headers": {"X": "${Y}"}}}
+
+    _write_provider_config(path, entries, "antigravity-mcp-json", log, dry_run=False, allow_secrets=True)
+
+    written = json.loads(path.read_text(encoding="utf-8"))
+    assert written["mcpServers"] == entries
+
+
+def test_build_connection_entry_opencode_json_v2_matches_v1_shape():
+    conn = {
+        "type": "stdio",
+        "command": "npx",
+        "args": ["-y", "srv"],
+        "env": {"API_KEY": "{{API_KEY}}"},
+    }
+    v1 = _build_connection_entry(conn, None, "opencode-json")
+    v2 = _build_connection_entry(conn, None, "opencode-json-v2")
+    assert v2 == v1
+    assert v2["type"] == "local"
+    assert v2["command"] == ["npx", "-y", "srv"]
+    assert v2["environment"] == {"API_KEY": "{env:API_KEY}"}
+
+
+def test_write_provider_config_opencode_json_v2_nests_mcp_servers(tmp_path):
+    path = tmp_path / "opencode.json"
+    log = SyncLog()
+    entries = {"srv": {"type": "remote", "enabled": True, "url": "{env:URL}"}}
+
+    _write_provider_config(path, entries, "opencode-json-v2", log, dry_run=False, allow_secrets=True)
+
+    written = json.loads(path.read_text(encoding="utf-8"))
+    assert written == {"mcp": {"servers": entries}}
+    # nested servers object, NOT a flat server map under mcp
+    assert "servers" in written["mcp"]
+    assert "srv" not in written["mcp"]
+    # the v2 validator accepts the generated shape (AC-21)
+    assert validate_json_document(
+        path.read_text(encoding="utf-8"), "opencode-json-v2", "opencode.json"
+    ) == []
+
+
+def test_write_provider_config_opencode_json_v2_replaces_flat_v1_mcp(tmp_path):
+    path = tmp_path / "opencode.json"
+    _write(path, json.dumps({"model": "m", "mcp": {"old": {"type": "remote"}}}))
+    log = SyncLog()
+    entries = {"srv": {"type": "remote", "url": "{env:URL}"}}
+
+    _write_provider_config(path, entries, "opencode-json-v2", log, dry_run=False, allow_secrets=True)
+
+    written = json.loads(path.read_text(encoding="utf-8"))
+    assert written["model"] == "m"  # unrelated top-level keys preserved
+    assert written["mcp"] == {"servers": entries}  # flat v1 map replaced
+    # a migrated document must satisfy the v2 contract — no flat key next to servers
+    assert validate_json_document(
+        path.read_text(encoding="utf-8"), "opencode-json-v2", "opencode.json"
+    ) == []
+
+
+def test_write_provider_config_opencode_json_v1_flat_byte_shape_frozen(tmp_path):
+    path = tmp_path / "opencode.json"
+    log = SyncLog()
+    entries = {"srv": {"type": "remote", "enabled": True, "url": "{env:URL}"}}
+
+    _write_provider_config(path, entries, "opencode-json", log, dry_run=False, allow_secrets=True)
+
+    written = json.loads(path.read_text(encoding="utf-8"))
+    assert written == {"mcp": entries}  # flat top-level mcp — unchanged v1 shape
+    assert "servers" not in written["mcp"]
+    # byte-exact serialization is frozen (AC-21)
+    expected = json.dumps({"mcp": entries}, indent=2, ensure_ascii=False) + "\n"
+    assert path.read_text(encoding="utf-8") == expected
+    assert validate_json_document(
+        path.read_text(encoding="utf-8"), "opencode-json", "opencode.json"
+    ) == []
+
+
+def test_build_connection_entry_continue_uses_request_options_headers():
+    conn = {
+        "type": "sse",
+        "url": "{{URL}}",
+        "headers": {"Authorization": "Bearer {{TOKEN}}"},
+    }
+    entry = _build_connection_entry(conn, None, "continue-yaml")
+    assert entry["type"] == "sse"
+    assert entry["url"] == "${URL}"
+    assert "headers" not in entry
+    assert entry["requestOptions"] == {"headers": {"Authorization": "Bearer ${TOKEN}"}}
+
+
+def test_continue_writer_local_config_gets_name_version_and_request_options(tmp_path):
+    path = tmp_path / ".continue" / "config.local.yaml"
+    log = SyncLog()
+    entries = {
+        "honcho": {
+            "type": "sse",
+            "url": "${URL}",
+            "requestOptions": {"headers": {"X": "${Y}"}},
+        }
+    }
+
+    _update_continue_yaml_config(path, entries, log, dry_run=False, allow_secrets=True)
+
+    parsed = yaml.safe_load(path.read_text(encoding="utf-8"))
+    assert parsed["name"]
+    assert parsed["version"]
+    assert parsed["mcpServers"][0]["name"] == "honcho"
+    assert parsed["mcpServers"][0]["requestOptions"]["headers"] == {"X": "${Y}"}
+
+    content = path.read_text(encoding="utf-8")
+    log2 = SyncLog()
+    _update_continue_yaml_config(path, entries, log2, dry_run=False, allow_secrets=True)
+    assert path.read_text(encoding="utf-8") == content
+    assert any("unchanged" in s for s in log2.skipped)
+
+
+def test_continue_writer_preserves_existing_name_version(tmp_path):
+    path = tmp_path / ".continue" / "config.yaml"
+    _write(path, "name: Local LLM Workspace\nversion: 1.0.0\nschema: v1\n")
+    log = SyncLog()
+    entries = {"honcho": {"type": "sse", "url": "${URL}"}}
+
+    _update_continue_yaml_config(path, entries, log, dry_run=False, allow_secrets=True)
+
+    text = path.read_text(encoding="utf-8")
+    parsed = yaml.safe_load(text)
+    assert parsed["name"] == "Local LLM Workspace"
+    assert parsed["version"] == "1.0.0"
+    # no duplicate top-level keys injected by the managed block
+    assert len(re.findall(r"^name:", text, re.MULTILINE)) == 1
+    assert len(re.findall(r"^version:", text, re.MULTILINE)) == 1
 
 
 def test_write_provider_config_claude_settings_writes_kimicode_mcp_json(tmp_path):
