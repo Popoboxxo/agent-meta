@@ -1834,6 +1834,17 @@ def _build_pipeline_variables(
                 variables[block_key] = ""
             if enabled_key not in variables:
                 variables[enabled_key] = "false"
+    except SyncError:
+        # AC-11 fail-loud. This catch is deliberately broad across the whole
+        # quality-pipelines block: *any* SyncError raised here is a fatal config
+        # error and must abort the sync (rc != 0), never be downgraded to an
+        # `unmapped` warning by the handler below. In practice that is the
+        # AC-11 case — a *declared* provider with a missing/incomplete
+        # `pipeline_notation` block, or an unreadable delegation-syntax.yaml.
+        # Providers not declared in delegation-syntax.yaml are skipped before
+        # reaching it (see pipelines.build_pipeline_variables); non-SyncError
+        # failures still downgrade to warnings below.
+        raise
     except Exception as e:  # noqa: BLE001
         unmapped.append(f"quality-pipelines: {e}")
     return effective

@@ -10,6 +10,7 @@ from pathlib import Path
 
 from .frontmatter import parse_frontmatter_text, split_frontmatter
 from .io import SyncError, load_yaml_file
+from .providers import registered_provider_names
 from .reflection import effective_reflection_pairs, find_pair, resolve_stage_loop
 
 # Module-level logger for fail-soft branches that have no SyncLog instance in
@@ -17,8 +18,111 @@ from .reflection import effective_reflection_pairs, find_pair, resolve_stage_loo
 # lost even though the error itself is deliberately non-fatal.
 _logger = logging.getLogger(__name__)
 
-KNOWN_PROVIDERS = ("Claude", "Opencode", "Gemini", "Continue", "Mammouth", "Codex", "ZCode", "KimiCode")
+# Framework root / config dir derived from this module's location — pipeline
+# notation is framework config, independent of the project's agent_meta_root
+# (the two coincide for a downstream `.agent-meta/` checkout).
+_FRAMEWORK_ROOT = Path(__file__).resolve().parent.parent.parent
+_DEFAULT_CONFIG_DIR = _FRAMEWORK_ROOT / "config"
+
+# The exact key set a provider's ``pipeline_notation`` block must declare
+# (Spec §2.3, AC-11). ``parallel_start``/``parallel_item`` are part of the set
+# because ``_generate_pipeline_block()`` reads them for ``mode: parallel_group``.
+_PIPELINE_NOTATION_KEYS = (
+    "task_fmt",
+    "mention_fmt",
+    "loop_start",
+    "loop_item",
+    "parallel_start",
+    "parallel_item",
+    "fanout_start",
+    "fanout_item",
+    "conditional_start",
+    "conditional_item",
+    "sequential_start",
+    "sequential_item",
+)
+
+# Deprecated (AC-11/F11 D7): the authoritative provider list is
+# ``providers.registered_provider_names(agent_meta_root)``. This tuple is kept
+# only as a last-resort fallback when the registry is unreadable and so the
+# long-standing public import in tests/test_pipelines.py keeps working; a
+# drift-guard test asserts it stays in parity with the live registry.
+KNOWN_PROVIDERS = (
+    "Claude", "Opencode", "Gemini", "Continue", "Mammouth",
+    "Codex", "ZCode", "KimiCode", "Copilot",
+)
 DEFAULT_MAX_DEPTH = 4
+
+
+def _registered_providers(agent_meta_root=None) -> list[str]:
+    """Return the registry-driven provider list, failing soft to the legacy tuple.
+
+    ``providers.registered_provider_names()`` unions ``provider-capabilities.yaml``
+    and ``ai-providers.yaml`` — the fix for D7 (Copilot was missing from the
+    former hardcoded ``KNOWN_PROVIDERS``).
+    """
+    root = Path(agent_meta_root) if agent_meta_root is not None else _FRAMEWORK_ROOT
+    try:
+        return registered_provider_names(root)
+    except (OSError, ValueError) as exc:
+        _logger.warning(
+            "provider registry unreadable (%s: %s); falling back to the legacy "
+            "KNOWN_PROVIDERS tuple — this may omit registered providers",
+            type(exc).__name__, exc,
+        )
+        return list(KNOWN_PROVIDERS)
+
+
+@lru_cache(maxsize=None)
+def pipeline_notation(provider: str, config_dir) -> dict:
+    """Return the ``pipeline_notation`` block for ``provider`` (Spec §2.3, AC-11).
+
+    Config-backed replacement for the former ``_PROVIDER_NOTATION`` map: reads
+    ``delegation-syntax.yaml`` from ``config_dir`` (case-insensitive provider
+    lookup) and fails loud — ``SyncError`` — when the provider, its
+    ``pipeline_notation`` block, or any required key is missing. There is no
+    silent ``opencode``/``task()`` fallback (D6/F11).
+    """
+    config_dir = Path(config_dir)
+    path = config_dir / "delegation-syntax.yaml"
+    registry = load_yaml_file(path, on_error="raise", default={})
+    syntax = registry.get("delegation_syntax", {}) if isinstance(registry, dict) else {}
+    block = syntax.get(provider)
+    if block is None:
+        for name, candidate in syntax.items():
+            if isinstance(name, str) and name.lower() == provider.lower():
+                block = candidate
+                break
+    if not isinstance(block, dict) or not isinstance(block.get("pipeline_notation"), dict):
+        raise SyncError(
+            f"delegation-syntax.yaml: provider '{provider}' has no "
+            f"'pipeline_notation' block ({path}) — every registered provider "
+            "must declare one; there is no Opencode/task() fallback (AC-11)."
+        )
+    notation = block["pipeline_notation"]
+    missing = [key for key in _PIPELINE_NOTATION_KEYS if key not in notation]
+    if missing:
+        raise SyncError(
+            f"delegation-syntax.yaml: provider '{provider}' pipeline_notation "
+            f"is incomplete ({path}) — missing: {', '.join(missing)} (AC-11)."
+        )
+    return notation
+
+
+def _pipeline_notation_declared(provider: str, config_dir) -> bool:
+    """True when ``delegation-syntax.yaml`` declares a block for ``provider``.
+
+    The per-provider detail writer uses this to skip providers the framework
+    does not declare (e.g. a synthetic probe provider) — they have no notation
+    surface. A *declared* provider whose ``pipeline_notation`` block is missing
+    or incomplete still fails loud in :func:`pipeline_notation` (AC-11).
+    """
+    path = Path(config_dir) / "delegation-syntax.yaml"
+    registry = load_yaml_file(path, on_error="raise", default={})
+    syntax = registry.get("delegation_syntax", {}) if isinstance(registry, dict) else {}
+    return any(
+        isinstance(name, str) and name.lower() == provider.lower() for name in syntax
+    )
 
 
 def _pipeline_active_for_provider(pipeline: dict, provider: str) -> bool:
@@ -251,6 +355,7 @@ def validate_pipelines(
     roles_config: dict | None = None,
     known_roles: set | None = None,
     reflection_pairs: list | None = None,
+    agent_meta_root=None,
 ) -> list[str]:
     """Validate pipelines and return a list of error messages (empty = valid).
 
@@ -276,6 +381,7 @@ def validate_pipelines(
     """
     errors = []
     orchestrator_roles = {"orchestrator"}
+    registered_providers = set(_registered_providers(agent_meta_root))
     if reflection_pairs is None:
         reflection_pairs = _safe_load_reflection_pairs()
 
@@ -299,10 +405,11 @@ def validate_pipelines(
                 )
             for key in ("include", "exclude"):
                 for p in providers_cfg.get(key, []):
-                    if p not in KNOWN_PROVIDERS:
+                    if p not in registered_providers:
                         errors.append(
                             f"Pipeline '{name}': providers.{key} entry '{p}' is not "
-                            f"a known provider ({', '.join(KNOWN_PROVIDERS)})"
+                            f"a known provider "
+                            f"({', '.join(sorted(registered_providers))})"
                         )
 
         approval_default = pipeline.get("approval_default")
@@ -632,7 +739,10 @@ def generate_pipeline_match_table(pipelines: dict) -> str:
 
 
 def build_pipeline_variables(
-    pipelines: dict, active_dod: dict, reflection_pairs: list | None = None
+    pipelines: dict,
+    active_dod: dict,
+    reflection_pairs: list | None = None,
+    agent_meta_root=None,
 ) -> dict:
     """Build Mustache variables for template substitution.
 
@@ -645,6 +755,7 @@ def build_pipeline_variables(
         - PIPELINE_<NAME>_PROVIDER_BLOCKS: dict(provider -> formatted block)
     """
     variables = {}
+    providers = _registered_providers(agent_meta_root)
     for name, pipeline in pipelines.items():
         var_name = name.upper().replace("-", "_")
         variables[f"PIPELINE_{var_name}_ENABLED"] = (
@@ -661,7 +772,15 @@ def build_pipeline_variables(
         variables[f"PIPELINE_{var_name}_BLOCK"] = ""
         # Pre-compute provider-specific blocks for later injection
         provider_blocks = {}
-        for provider in KNOWN_PROVIDERS:
+        for provider in providers:
+            if not _pipeline_notation_declared(provider, _DEFAULT_CONFIG_DIR):
+                # Not a notation provider (e.g. a synthetic/probe provider that
+                # is registered in provider-capabilities.yaml but deliberately
+                # absent from delegation-syntax.yaml) — skip it, never render.
+                # A *declared* provider whose block is missing/incomplete still
+                # fails loud in ``pipeline_notation`` (AC-11).
+                provider_blocks[provider] = ""
+                continue
             if _pipeline_active_for_provider(pipeline, provider):
                 provider_blocks[provider] = _generate_pipeline_block(
                     pipeline, provider, all_pipelines=pipelines, active_dod=active_dod,
@@ -698,12 +817,19 @@ def inject_pipeline_blocks(
     if reflection_pairs is None:
         reflection_pairs = _safe_load_reflection_pairs(agent_meta_root)
     pattern = re.compile(r"\{\{PIPELINE_([A-Z0-9_]+)_BLOCK\}\}")
+    # Undeclared providers (e.g. a synthetic probe) have no notation surface:
+    # skip, exactly like ``build_pipeline_variables``/``sync_pipeline_detail_files``.
+    # A *declared* provider with a missing/incomplete block still fails loud in
+    # ``pipeline_notation`` (AC-11) — see ``_pipeline_notation_declared``.
+    declared = _pipeline_notation_declared(provider, _DEFAULT_CONFIG_DIR)
 
     def _replacer(match):
         name = match.group(1).lower().replace("_", "-")
         pipeline = pipelines.get(name)
         if not pipeline:
             return match.group(0)
+        if not declared:
+            return ""
         if not _pipeline_active_for_provider(pipeline, provider):
             return ""
         return _generate_pipeline_block(
@@ -734,7 +860,14 @@ def generate_pipeline_detail_blocks(
     pipeline-name rows): this renders the actual stage-by-stage instructions
     `_generate_pipeline_block()` produces, headed by the pipeline name, for
     every pipeline that is enabled and active for `provider`.
+
+    Undeclared providers (e.g. a synthetic probe) are skipped — same guard as
+    ``build_pipeline_variables``/``sync_pipeline_detail_files``; a *declared*
+    provider whose ``pipeline_notation`` block is missing/incomplete still fails
+    loud in ``_generate_pipeline_block`` (AC-11).
     """
+    if not _pipeline_notation_declared(provider, _DEFAULT_CONFIG_DIR):
+        return ""
     sections = []
     for name, pipeline in pipelines.items():
         if not pipeline.get("enabled", True):
@@ -754,78 +887,9 @@ def generate_pipeline_detail_blocks(
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-_PROVIDER_NOTATION = {
-    "opencode": {
-        "task_fmt": 'task(subagent_type="{agent}", prompt="{task}")',
-        "mention_fmt": "@{agent} {task}",
-        "loop_start": "REPEAT_UNTIL Loop:",
-        "loop_item": '  - task(subagent_type="{agent}", prompt="{task}")',
-        "parallel_start": "Parallel dispatch:",
-        "parallel_item": '  - task(subagent_type="{agent}", prompt="{task}")',
-        "fanout_start": "FANOUT({count}, {agent}):",
-        "fanout_item": '  - task(subagent_type="{agent}", prompt="{task}")',
-        "conditional_start": "Conditional execution:",
-        "conditional_item": '  - Condition evaluated by {agent}: {task}',
-        "sequential_start": "",
-        "sequential_item": '{index}. task(subagent_type="{agent}", prompt="{task}")',
-    },
-    "claude": {
-        "task_fmt": 'background(agent="{agent}", prompt="{task}")',
-        "mention_fmt": "@{agent} {task}",
-        "loop_start": "REPEAT_UNTIL Loop:",
-        "loop_item": '  - background(agent="{agent}", prompt="{task}")',
-        "parallel_start": "Parallel dispatch:",
-        "parallel_item": '  - background(agent="{agent}", prompt="{task}")',
-        "fanout_start": "FANOUT({count}, {agent}):",
-        "fanout_item": '  - background(agent="{agent}", prompt="{task}")',
-        "conditional_start": "Conditional execution:",
-        "conditional_item": '  - Condition evaluated by {agent}: {task}',
-        "sequential_start": "",
-        "sequential_item": '{index}. background(agent="{agent}", prompt="{task}")',
-    },
-    "mammouth": {
-        "task_fmt": 'background(agent="{agent}", prompt="{task}")',
-        "mention_fmt": "@{agent} {task}",
-        "loop_start": "REPEAT_UNTIL Loop:",
-        "loop_item": '  - background(agent="{agent}", prompt="{task}")',
-        "parallel_start": "Parallel dispatch:",
-        "parallel_item": '  - background(agent="{agent}", prompt="{task}")',
-        "fanout_start": "FANOUT({count}, {agent}):",
-        "fanout_item": '  - background(agent="{agent}", prompt="{task}")',
-        "conditional_start": "Conditional execution:",
-        "conditional_item": '  - Condition evaluated by {agent}: {task}',
-        "sequential_start": "",
-        "sequential_item": '{index}. background(agent="{agent}", prompt="{task}")',
-    },
-    "gemini": {
-        "task_fmt": 'invoke_subagent("{agent}", "{task}")',
-        "mention_fmt": "@{agent} {task}",
-        "loop_start": "REPEAT_UNTIL Loop:",
-        "loop_item": '  - invoke_subagent("{agent}", "{task}")',
-        "parallel_start": "Parallel dispatch:",
-        "parallel_item": '  - invoke_subagent("{agent}", "{task}")',
-        "fanout_start": "FANOUT({count}, {agent}):",
-        "fanout_item": '  - invoke_subagent("{agent}", "{task}")',
-        "conditional_start": "Conditional execution:",
-        "conditional_item": '  - Condition evaluated by {agent}: {task}',
-        "sequential_start": "",
-        "sequential_item": '{index}. invoke_subagent("{agent}", "{task}")',
-    },
-    "continue": {
-        "task_fmt": "@{agent} {task}",
-        "mention_fmt": "@{agent} {task}",
-        "loop_start": "Iterative Review Loop (max {max_iterations}):",
-        "loop_item": "  - @{agent} {task}",
-        "parallel_start": "Parallel group (executed sequentially in Continue):",
-        "parallel_item": "  - @{agent} {task}",
-        "fanout_start": "FANOUT ({count}× {agent}):",
-        "fanout_item": "  - @{agent} {task}",
-        "conditional_start": "Conditional execution:",
-        "conditional_item": "  - Condition evaluated by @{agent}: {task}",
-        "sequential_start": "",
-        "sequential_item": "{index}. @{agent} {task}",
-    },
-}
+# `_PROVIDER_NOTATION` was removed (AC-11 / Spec §2.3): notation now lives in
+# config/delegation-syntax.yaml as `delegation_syntax.<Provider>.pipeline_notation`
+# and is read via `pipeline_notation()` — a missing block fails loud.
 
 
 def _execution_mode_for_pipeline(stages: list) -> str:
@@ -844,12 +908,17 @@ def _generate_pipeline_block(
     all_pipelines: dict | None = None,
     active_dod: dict | None = None,
     reflection_pairs: list | None = None,
+    config_dir=None,
     _depth: int = 0,
     _max_depth: int | None = None,
 ) -> str:
-    """Generate a provider-specific markdown block for a single pipeline."""
-    provider_key = provider.lower()
-    fmt = _PROVIDER_NOTATION.get(provider_key, _PROVIDER_NOTATION["opencode"])
+    """Generate a provider-specific markdown block for a single pipeline.
+
+    Notation is read per provider from ``delegation-syntax.yaml`` via
+    :func:`pipeline_notation` (AC-11) — a provider without a block fails loud
+    instead of falling back to the Opencode ``task()`` notation.
+    """
+    fmt = pipeline_notation(provider, config_dir or _DEFAULT_CONFIG_DIR)
     active_dod = active_dod or {}
     lines = []
     stages = pipeline.get("stages", [])
@@ -1000,6 +1069,7 @@ def _generate_pipeline_block(
                     all_pipelines=all_pipelines,
                     active_dod=active_dod,
                     reflection_pairs=reflection_pairs,
+                    config_dir=config_dir,
                     _depth=_depth + 1,
                     _max_depth=_max_depth,
                 )
@@ -1084,6 +1154,14 @@ def sync_pipeline_detail_files(
         cleanup_stale_managed_files,
         write_managed_index,
     )
+
+    # A provider the framework does not declare has no pipeline-notation
+    # surface; skipping keeps synthetic/probe providers from crashing sync
+    # while a *declared* provider with a missing block still fails loud
+    # (AC-11, see `_pipeline_notation_declared`).
+    if not _pipeline_notation_declared(provider, _DEFAULT_CONFIG_DIR):
+        log.skip(provider, "no pipeline_notation in delegation-syntax.yaml")
+        return
 
     if not dry_run:
         target_dir.mkdir(parents=True, exist_ok=True)

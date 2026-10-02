@@ -22,10 +22,12 @@ models:
 
   # Primary coder — chat, edit and agent mode
   # Tool calling supported natively → Agent Mode works
+  # (`agent` is not a valid Continue model role — Agent Mode uses the `chat`
+  #  role plus native tool calling; OQ-9)
   - name: Qwen2.5 Coder 14B (Agent)
     provider: ollama
     model: qwen2.5-coder:14b
-    roles: [chat, edit, agent]
+    roles: [chat, edit]
     defaultCompletionOptions:
       contextLength: 16384      # reduce to 8192 if OOM
 
@@ -54,7 +56,8 @@ models:
 # ──────────────────────────────────────────────────────────────
 # AGENT MODE
 # Rules are loaded from .continue/rules/ automatically.
-# Agents are in .continue/agents/ — invoke by name in Agent Mode.
+# Agents in .continue/agents/ are auto-loaded only by `cn review` (TUI);
+# Continue chat/Agent Mode does NOT auto-discover them as an agent surface (OQ-2).
 # ──────────────────────────────────────────────────────────────
 
 # ──────────────────────────────────────────────────────────────

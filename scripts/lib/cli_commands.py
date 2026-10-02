@@ -537,7 +537,13 @@ def _build_context(args, agent_meta_root: Path, log: "SyncLog"):
     harness = _resolve_and_guard_harness(args, agent_meta_root, project_root, log)
 
     config = load_config(config_path)
-    variables, pre_warnings = build_variables(config, agent_meta_root, project_root)
+    try:
+        variables, pre_warnings = build_variables(config, agent_meta_root, project_root)
+    except SyncError as exc:
+        # Fail-loud config errors (e.g. AC-11 pipeline notation) surface as a
+        # clean rc 1 for --validate/--check/sync instead of an uncaught traceback.
+        print(f"  !  {exc}", file=sys.stderr)
+        sys.exit(1)
     platforms = config.get("platforms", [])
     source_version = config.get("agent-meta-version", read_version(agent_meta_root))
 

@@ -15,6 +15,19 @@
 
 delegation_syntax:
   Claude:
+    pipeline_notation:
+      task_fmt: 'background(agent="{agent}", prompt="{task}")'
+      mention_fmt: "@{agent} {task}"
+      loop_start: "REPEAT_UNTIL Loop:"
+      loop_item: '  - background(agent="{agent}", prompt="{task}")'
+      parallel_start: "Parallel dispatch:"
+      parallel_item: '  - background(agent="{agent}", prompt="{task}")'
+      fanout_start: "FANOUT({count}, {agent}):"
+      fanout_item: '  - background(agent="{agent}", prompt="{task}")'
+      conditional_start: "Conditional execution:"
+      conditional_item: '  - Condition evaluated by {agent}: {task}'
+      sequential_start: ""
+      sequential_item: '{index}. background(agent="{agent}", prompt="{task}")'
     delegate: "Delegiere via `Agent(subagent_type=\"<ziel-agent>\", prompt=\"<vollständiger-task-text>\"). Ersetze `<ziel-agent>` mit dem Agenten-Namen (z.B. `developer`) und `<vollständiger-task-text>` mit der vollständigen Aufgabenbeschreibung."
     fanout: "FANOUT — Alle Agent()-Aufrufe in EINER Antwort absetzen, dann laufen sie parallel:\n```\nAgent(subagent_type=\"<agent_1>\", prompt=\"<task_1>\")\nAgent(subagent_type=\"<agent_2>\", prompt=\"<task_2>\")\n# Beide Calls in derselben Antwort → parallele Ausführung\n```"
     parallel_group: "PARALLEL_GROUP — Hintergrund-Tasks mit `run_in_background=True`, Vordergrund-Tasks normal:\n```\nAgent(subagent_type=\"<fg_agent>\", prompt=\"<fg_task>\")\nAgent(subagent_type=\"<bg_agent>\", prompt=\"<bg_task>\", run_in_background=True)\n# Beide Calls in derselben Antwort absetzen\n```"
@@ -38,6 +51,19 @@ delegation_syntax:
       Delegations-Tracker vermerken (issue #346).
 
   Opencode:
+    pipeline_notation:
+      task_fmt: 'task(subagent_type="{agent}", prompt="{task}")'
+      mention_fmt: "@{agent} {task}"
+      loop_start: "REPEAT_UNTIL Loop:"
+      loop_item: '  - task(subagent_type="{agent}", prompt="{task}")'
+      parallel_start: "Parallel dispatch:"
+      parallel_item: '  - task(subagent_type="{agent}", prompt="{task}")'
+      fanout_start: "FANOUT({count}, {agent}):"
+      fanout_item: '  - task(subagent_type="{agent}", prompt="{task}")'
+      conditional_start: "Conditional execution:"
+      conditional_item: '  - Condition evaluated by {agent}: {task}'
+      sequential_start: ""
+      sequential_item: '{index}. task(subagent_type="{agent}", prompt="{task}")'
     delegate: "Delegiere via `task(subagent_type=\"<ziel-agent>\", description=\"<kurzbeschreibung>\", prompt=\"<vollständiger-task-text>\"). Ersetze die Platzhalter entsprechend."
     fanout: "FANOUT — Alle task()-Calls in EINER Antwort absetzen, dann laufen sie parallel:\n```\ntask(subagent_type=\"<agent_1>\", description=\"<desc_1>\", prompt=\"<task_1>\")\ntask(subagent_type=\"<agent_2>\", description=\"<desc_2>\", prompt=\"<task_2>\")\n# Alle Calls in derselben Antwort → parallele Ausführung\n```"
     parallel_group: "PARALLEL_GROUP — Mehrere task()-Calls mit verschiedenen subagent_type in einer Antwort:\n```\ntask(subagent_type=\"<agent_fg>\", description=\"<desc>\", prompt=\"<task>\")\ntask(subagent_type=\"<agent_bg>\", description=\"<desc>\", prompt=\"<task>\")\n```"
@@ -48,6 +74,19 @@ delegation_syntax:
     handoff: *handoff-json
 
   Gemini:
+    pipeline_notation:
+      task_fmt: 'invoke_subagent("{agent}", "{task}")'
+      mention_fmt: "@{agent} {task}"
+      loop_start: "REPEAT_UNTIL Loop:"
+      loop_item: '  - invoke_subagent("{agent}", "{task}")'
+      parallel_start: "Parallel dispatch:"
+      parallel_item: '  - invoke_subagent("{agent}", "{task}")'
+      fanout_start: "FANOUT({count}, {agent}):"
+      fanout_item: '  - invoke_subagent("{agent}", "{task}")'
+      conditional_start: "Conditional execution:"
+      conditional_item: '  - Condition evaluated by {agent}: {task}'
+      sequential_start: ""
+      sequential_item: '{index}. invoke_subagent("{agent}", "{task}")'
     # Native dispatch syntax (issue #674 Phase 3.2): the Gemini/Antigravity
     # dispatch tool is `invoke_subagent` (verified runtime API — the same
     # toolcall the pipeline renderers already emit, see
@@ -69,11 +108,27 @@ delegation_syntax:
     handoff: *handoff-json
 
   Continue:
+    pipeline_notation:
+      task_fmt: "@{agent} {task}"
+      mention_fmt: "@{agent} {task}"
+      loop_start: "Iterative Review Loop (max {max_iterations}):"
+      loop_item: "  - @{agent} {task}"
+      parallel_start: "Parallel group (executed sequentially in Continue):"
+      parallel_item: "  - @{agent} {task}"
+      fanout_start: "FANOUT ({count}× {agent}):"
+      fanout_item: "  - @{agent} {task}"
+      conditional_start: "Conditional execution:"
+      conditional_item: "  - Condition evaluated by @{agent}: {task}"
+      sequential_start: ""
+      sequential_item: "{index}. @{agent} {task}"
     delegate: "@<ziel-agent> <vollständiger-task-text>"
     fanout: "Führe folgende Aufgaben nacheinander aus (Continue unterstützt keine parallele Subagent-Ausführung):\n1. @<agent_1> <task_1>\n2. @<agent_2> <task_2>"
     parallel_group: "Führe folgende Aufgaben nacheinander aus:\n1. @<agent_1> <task_1>\n2. @<agent_2> <task_2>"
     fallback: "@orchestrator <task>"
     bootstrap: "config-based"
+    # OQ-2: this target is KEPT (annotated, not removed). The generated
+    # `.continue/config.yaml` remains the config-based bootstrap surface; Task 10
+    # only removes the dead top-level `agents:` block, not this bootstrap target.
     bootstrap_sequence:
       - type: "config_update"
         target: ".continue/config.yaml"
@@ -102,6 +157,19 @@ delegation_syntax:
       Dann: @<ziel> Bearbeite diesen strukturierten Handoff.
 
   Copilot:
+    pipeline_notation:
+      task_fmt: "@{agent} {task}"
+      mention_fmt: "@{agent} {task}"
+      loop_start: "Iterative Review Loop (max {max_iterations}):"
+      loop_item: "  - @{agent} {task}"
+      parallel_start: "Parallel group (executed sequentially in Copilot):"
+      parallel_item: "  - @{agent} {task}"
+      fanout_start: "FANOUT ({count}× {agent}) — sequential in Copilot:"
+      fanout_item: "  - @{agent} {task}"
+      conditional_start: "Conditional execution:"
+      conditional_item: "  - Condition evaluated by @{agent}: {task}"
+      sequential_start: ""
+      sequential_item: "{index}. @{agent} {task}"
     delegate: "@<ziel-agent> Führe folgende Aufgabe aus: <vollständiger-task-text>"
     fanout: "Bearbeite diese Aufgaben der Reihe nach:\n1. @<agent_1> <task_1>\n2. @<agent_2> <task_2>"
     parallel_group: "Bearbeite diese Aufgaben der Reihe nach:\n1. @<agent_1> <task_1>\n2. @<agent_2> <task_2>"
@@ -117,6 +185,19 @@ delegation_syntax:
   # PAL_* placeholders resolve to working syntax instead of being silently
   # stripped. Sequential only, YAML text-block handoff (no JSON envelope).
   Mammouth:
+    pipeline_notation:
+      task_fmt: 'background(agent="{agent}", prompt="{task}")'
+      mention_fmt: "@{agent} {task}"
+      loop_start: "REPEAT_UNTIL Loop:"
+      loop_item: '  - background(agent="{agent}", prompt="{task}")'
+      parallel_start: "Parallel dispatch:"
+      parallel_item: '  - background(agent="{agent}", prompt="{task}")'
+      fanout_start: "FANOUT({count}, {agent}):"
+      fanout_item: '  - background(agent="{agent}", prompt="{task}")'
+      conditional_start: "Conditional execution:"
+      conditional_item: '  - Condition evaluated by {agent}: {task}'
+      sequential_start: ""
+      sequential_item: '{index}. background(agent="{agent}", prompt="{task}")'
     delegate: "@<ziel-agent> Führe folgende Aufgabe aus: <vollständiger-task-text>"
     fanout: "Bearbeite diese Aufgaben der Reihe nach:\n1. @<agent_1> <task_1>\n2. @<agent_2> <task_2>"
     parallel_group: "Bearbeite diese Aufgaben nacheinander:\n1. @<agent_1> <task_1>\n2. @<agent_2> <task_2>"
@@ -132,6 +213,19 @@ delegation_syntax:
   # default-on, so fan-out is multiple spawn_agent calls in one response.
   # JSON handoff (handoff_envelope_support: true).
   Codex:
+    pipeline_notation:
+      task_fmt: 'spawn_agent(agent="{agent}", task="{task}")'
+      mention_fmt: "@{agent} {task}"
+      loop_start: "REPEAT_UNTIL Loop:"
+      loop_item: '  - spawn_agent(agent="{agent}", task="{task}")'
+      parallel_start: "Parallel dispatch:"
+      parallel_item: '  - spawn_agent(agent="{agent}", task="{task}")'
+      fanout_start: "FANOUT({count}, {agent}):"
+      fanout_item: '  - spawn_agent(agent="{agent}", task="{task}")'
+      conditional_start: "Conditional execution:"
+      conditional_item: '  - Condition evaluated by {agent}: {task}'
+      sequential_start: ""
+      sequential_item: '{index}. spawn_agent(agent="{agent}", task="{task}")'
     delegate: "Delegiere via nativen `spawn_agent`-Toolcall an `<ziel-agent>` mit der Aufgabe: \"<vollständiger-task-text>\". Kontrolliere das Ergebnis via `wait_agent`."
     fanout: "FANOUT — Alle spawn_agent-Calls in EINER Antwort absetzen (multi_agent ist stable default-on):\n```\nspawn_agent(agent=\"<agent_1>\", task=\"<task_1>\")\nspawn_agent(agent=\"<agent_2>\", task=\"<task_2>\")\n```\nErgebnisse via `wait_agent` einsammeln."
     parallel_group: "PARALLEL_GROUP — Mehrere spawn_agent-Calls in einer Antwort; `wait_agent` sammelt alle Ergebnisse ein."
@@ -150,6 +244,19 @@ delegation_syntax:
   # fanout/parallel_group must instruct SEQUENTIAL processing (capability
   # gate, see header). Background offloading stays available per-task.
   ZCode:
+    pipeline_notation:
+      task_fmt: 'Agent(subagent_type="{agent}", prompt="{task}")'
+      mention_fmt: "@{agent} {task}"
+      loop_start: "REPEAT_UNTIL Loop:"
+      loop_item: '  - Agent(subagent_type="{agent}", prompt="{task}")'
+      parallel_start: "Parallel group (executed sequentially in ZCode):"
+      parallel_item: '  - Agent(subagent_type="{agent}", prompt="{task}")'
+      fanout_start: "FANOUT ({count}× {agent}) — sequential in ZCode:"
+      fanout_item: '  - Agent(subagent_type="{agent}", prompt="{task}")'
+      conditional_start: "Conditional execution:"
+      conditional_item: '  - Condition evaluated by {agent}: {task}'
+      sequential_start: ""
+      sequential_item: '{index}. Agent(subagent_type="{agent}", prompt="{task}")'
     delegate: "Delegiere via `Agent(subagent_type=\"<ziel-agent>\", prompt=\"<vollständiger-task-text>\")`. Für Hintergrund-Ausführung `run_in_background: true` setzen (Auto-Backgrounding via subagents.autoBackgroundMs, Ergebnis über /tasks)."
     fanout: "FANOUT — Bearbeite diese Aufgaben der Reihe nach (parallele Subagent-Ausführung ist für ZCode nicht verifiziert):\n1. Agent(subagent_type=\"<agent_1>\", prompt=\"<task_1>\")\n2. Agent(subagent_type=\"<agent_2>\", prompt=\"<task_2>\")"
     parallel_group: "PARALLEL_GROUP — Bearbeite diese Aufgaben der Reihe nach:\n1. Agent(subagent_type=\"<agent_1>\", prompt=\"<task_1>\")\n2. Agent(subagent_type=\"<agent_2>\", prompt=\"<task_2>\")"
@@ -164,6 +271,19 @@ delegation_syntax:
   # uniform fan-out (prompt_template + items, up to 128, aggregated report).
   # Conservative YAML text-block handoff (handoff_envelope_support: false).
   KimiCode:
+    pipeline_notation:
+      task_fmt: 'Agent(subagent_type="{agent}", prompt="{task}")'
+      mention_fmt: "@{agent} {task}"
+      loop_start: "REPEAT_UNTIL Loop:"
+      loop_item: '  - Agent(subagent_type="{agent}", prompt="{task}")'
+      parallel_start: "Parallel dispatch:"
+      parallel_item: '  - Agent(subagent_type="{agent}", prompt="{task}")'
+      fanout_start: "FANOUT({count}, {agent}) — AgentSwarm:"
+      fanout_item: '  - Agent(subagent_type="{agent}", prompt="{task}")'
+      conditional_start: "Conditional execution:"
+      conditional_item: '  - Condition evaluated by {agent}: {task}'
+      sequential_start: ""
+      sequential_item: '{index}. Agent(subagent_type="{agent}", prompt="{task}")'
     delegate: "Delegiere via `Agent(prompt=\"<vollständiger-task-text>\", description=\"<kurzbeschreibung>\", subagent_type=\"<ziel-agent>\")`."
     fanout: "FANOUT — Für gleichförmige Fan-out-Aufgaben `AgentSwarm` nutzen:\n```\nAgentSwarm(prompt_template=\"<task_template>\", items=[<item_1>, <item_2>, ...])\n```\n(bis 128 Items, aggregierter Report). Alternativ mehrere Agent-Calls in einer Antwort."
     parallel_group: "PARALLEL_GROUP — AgentSwarm mit prompt_template + items-Array für den Fan-out; einzelne abweichende Aufgaben als separate Agent-Calls in derselben Antwort."

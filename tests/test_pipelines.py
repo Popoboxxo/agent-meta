@@ -15,8 +15,13 @@ from scripts.lib.pipelines import (
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_known_providers_constant():
-    assert KNOWN_PROVIDERS == ("Claude", "Opencode", "Gemini", "Continue", "Mammouth", "Codex", "ZCode", "KimiCode")
+def test_known_providers_fallback_stays_in_parity_with_registry():
+    """D7 drift guard: the fail-soft fallback tuple must not silently omit a
+    registered provider (Copilot was missing from the original 8-tuple)."""
+    from scripts.lib.providers import registered_provider_names
+
+    assert set(KNOWN_PROVIDERS) == set(registered_provider_names(REPO_ROOT))
+    assert "Copilot" in KNOWN_PROVIDERS
 
 
 def test_pipeline_active_for_provider_no_field_means_everywhere_active():
