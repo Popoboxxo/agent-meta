@@ -56,9 +56,29 @@
 # scripts/lib/delegation_syntax.py (has_route_intent_tool) → agent_sync.py
 # (ROUTE_INTENT_CALLABLE), which gates the orchestrator §3 mandate against its
 # routing-rules fallback.
+#
+# Capability flags (SPEC-PROVIDER-AUDIT-OPENCODE-V2-2026-09-30, §2.2; AC-15 /
+# AC-24 / AC-25). Every registered provider MUST carry:
+#   skills — whether the provider receives generated skills_dir artifacts.
+#     The flag is only valid together with (a) `skills` in the
+#     ai-providers.yaml capabilities list and (b) a non-null skills_dir; the
+#     three-file invariant test enforces this coupling (AC-25, M-5).
+#   artifact-validation — whether generated artifacts pass through
+#     artifact_validate (consumed by agent_sync._artifact_validation_enabled,
+#     default true). `false` is valid ONLY with a non-empty
+#     artifact-validation-reason; the invariant test fails otherwise (AC-24).
+#   artifact-validation-reason — str|null; mandatory and non-empty iff
+#     artifact-validation is false, null otherwise.
+#   mcp-remote-transport — how the provider discriminates a remote MCP
+#     transport: url (default) | transport | type. Consumed by the MCP format
+#     writer; no provider-name branch.
 
 capabilities:
   Claude:
+    skills: true                        # skills_dir: .claude/skills (+ ai-providers capabilities)
+    artifact-validation: true
+    artifact-validation-reason: null
+    mcp-remote-transport: url
     subagent_dispatch: true
     parallel_execution: true
     file_based_agents: true
@@ -79,6 +99,10 @@ capabilities:
     description: "Vollständige Agent-Orchestrierung mit nativen Tool-Calls und Hooks."
 
   Opencode:
+    skills: true                        # skills_dir: .opencode/skills (+ ai-providers capabilities)
+    artifact-validation: true
+    artifact-validation-reason: null
+    mcp-remote-transport: url
     subagent_dispatch: true
     parallel_execution: true
     file_based_agents: true
@@ -99,6 +123,10 @@ capabilities:
     description: "Agent-Orchestrierung via task() tool, dateibasierte Agent-Registrierung."
 
   Gemini:
+    skills: true                        # skills_dir: .gemini/skills (+ ai-providers capabilities)
+    artifact-validation: true
+    artifact-validation-reason: null
+    mcp-remote-transport: url
     subagent_dispatch: true
     parallel_execution: true
     file_based_agents: false
@@ -125,6 +153,10 @@ capabilities:
       - "Hooks (issue #674 Phase 3.1): Antigravity hooks.json (.agents/hooks.json, Events PreToolUse/PostToolUse/PreInvocation/PostInvocation/Stop, camelCase-Payload, decision-JSON statt Exit-Code-2). Gespiegelt über hook_protocol antigravity-hooks-json + Übersetzungs-Adapter hooks/1-generic/antigravity-json-adapter.sh; Runtime-Ausführung = P6 real-repo-test."
 
   Continue:
+    skills: true                        # skills_dir: .continue/skills (+ ai-providers capabilities)
+    artifact-validation: true
+    artifact-validation-reason: null
+    mcp-remote-transport: url
     subagent_dispatch: false
     parallel_execution: false
     file_based_agents: false
@@ -148,6 +180,10 @@ capabilities:
       - "Keine parallele Subagent-Ausführung."
 
   Copilot:
+    skills: true                        # skills_dir: .github/copilot/skills (+ ai-providers capabilities)
+    artifact-validation: true
+    artifact-validation-reason: null
+    mcp-remote-transport: url
     subagent_dispatch: false
     parallel_execution: false
     file_based_agents: true
@@ -178,6 +214,10 @@ capabilities:
   # PostToolUse, exit-code-2-blocks) is unverified, so sync.py does not
   # actually mirror hook scripts to it (see providers.py::provider_hooks_supported).
   Mammouth:
+    skills: true                        # skills_dir: .mammouth/skills (+ ai-providers capabilities)
+    artifact-validation: true
+    artifact-validation-reason: null
+    mcp-remote-transport: url
     subagent_dispatch: false
     parallel_execution: false
     file_based_agents: true
@@ -212,6 +252,10 @@ capabilities:
   # sync.py does not mirror hook scripts (#630 pattern, see
   # providers.py::provider_hooks_supported).
   Codex:
+    skills: true                        # skills_dir: .agents/skills (+ ai-providers capabilities)
+    artifact-validation: true
+    artifact-validation-reason: null
+    mcp-remote-transport: url           # remote transport discriminated by url (+ http_headers, CX-1)
     subagent_dispatch: true
     parallel_execution: true          # multi_agent feature flag stable default-on, agents.enabled default true (V7)
     file_based_agents: true           # .codex/agents/*.toml auto-loaded as config layers, personal + project-scoped, no registration step (V7)
@@ -243,6 +287,10 @@ capabilities:
   # completely ignored by the harness (V2: config_project_hooks_ignored); the
   # yaml_text_block handoff stays conservative until json support is verified.
   ZCode:
+    skills: true                        # skills_dir: .zcode/skills (+ ai-providers capabilities) — mirrors generated skills artifacts (AC-25, M-5)
+    artifact-validation: true
+    artifact-validation-reason: null
+    mcp-remote-transport: url
     subagent_dispatch: true           # native Agent-Toolcalls (V17)
     parallel_execution: false         # backgrounding (run_in_background / autoBackgroundMs) ≠ verified parallel subagent contract
     file_based_agents: true           # REVISED per V18: user-level ~/.zcode/agents/*.md auto-load is verified; workspace-level auto-load = P6 real-repo-test; plugin route verified
@@ -274,6 +322,10 @@ capabilities:
   # config.toml [[hooks]] — no project-level hook generation surface, so no
   # mirror (#630 pattern).
   KimiCode:
+    skills: true                        # skills_dir: .kimi-code/skills (+ ai-providers capabilities) — mirrors generated skills artifacts (AC-25, M-5)
+    artifact-validation: true
+    artifact-validation-reason: null
+    mcp-remote-transport: transport     # KimiCode discriminates remote transport via `transport: "sse"` (KC-1)
     subagent_dispatch: true           # built-in coder/explore/plan + custom agents (V16)
     parallel_execution: true          # AgentSwarm fan-out with documented contract, up to 128 items (V16)
     file_based_agents: true           # Option A determined (V10): plain Markdown + YAML frontmatter, auto-discovery (project .kimi-code/agents/ > user > plugin > built-in)

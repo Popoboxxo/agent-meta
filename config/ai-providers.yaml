@@ -597,6 +597,7 @@ providers:
     capabilities:
     - agents
     - settings
+    - skills
     - mcp
     - context-managed-block
     artifact_dir: .zcode/artifacts
@@ -663,6 +664,7 @@ providers:
     has_settings: false
     capabilities:
     - agents
+    - skills
     - mcp
     - context-managed-block
     artifact_dir: .kimi-code/artifacts
