@@ -70,13 +70,15 @@ Resolved values (2026-10-01): PRE-2 flag-gated/default-off; PRE-3 `orchestrator`
 
 ### Repo facts verified read-only (path / routing placement)
 
-- **Mammouth routing entry.** The generated banner `> **AI ROUTING:** … | Mammouth -> MAMMOUTH.md | …` is produced by `scripts/lib/config.py::_build_provider_variables` (config.py:1376-1396), which groups active providers by their declared `context_file` (`config/ai-providers.yaml`). Retiring the entry is a pure data consequence of PRE-5: setting Mammouth `context_file: AGENTS.md` (Task 4) merges Mammouth into the `AGENTS.md` group, so no `Mammouth -> MAMMOUTH.md` target is emitted. **No `config.py` code change is required**, so `config.py` stays out of every `Files:` block (ownership unchanged).
+- **Mammouth routing entry.** The generated banner `> **AI ROUTING:** … | Mammouth -> MAMMOUTH.md | …` is produced by `scripts/lib/config.py::_build_provider_variables` (config.py:1376-1396), which groups active providers by their declared `context_file` (`config/ai-providers.yaml`). Retiring the entry is a pure data consequence of PRE-5: setting Mammouth `context_file: AGENTS.md` (Task 4) merges Mammouth into the `AGENTS.md` group, so no `Mammouth -> MAMMOUTH.md` target is emitted. **No `config.py` mapping code change is required**, so this routing fact needs no `config.py` entry in any `Files:` block. (The later AC-11 fail-loud closure does add `config.py` to Task 9's `Files:` — see the Task 9 fail-loud closure bullet below.)
 - **`MAMMOUTH.md`.** `config/ai-providers.yaml` currently sets `context_file: MAMMOUTH.md` (line 372) and `context_adapter_file: MAMMOUTH.md` (line 377); Task 4 repoints both to `AGENTS.md`. No root `MAMMOUTH.md` exists in this checkout; Task 16 removes any generated `MAMMOUTH.md` (and confirms `sync.py --check` rc 0) as part of the in-scope 27-file regeneration.
 - **OQ-9.** `templates/configs/CONTINUE.config-template.yaml:28` reads `roles: [chat, edit, agent]`; `agent` is outside the runtime `roles` enum (design §1.3 CO-2, F7/N11). It is declared as Continue `settings_template` at `config/ai-providers.yaml:282`.
 - **OQ-3.** `config/ai-providers.yaml` KimiCode `model-tiers` currently read `kimi-k2.6`/`kimi-k2.7-code` with empty `model-aliases` (lines 576-582); Task 4 adds the `kimi-code/{model}` `model-format` + an initial `model-catalog`, and Task 7 guarantees the prefix is applied exactly once.
 - **OQ-6.** No separate Antigravity entry exists in `config/ai-providers.yaml` (the Antigravity runtime is covered by the `Gemini` provider); Task 4 adds the `model-literal: inherit` data key and Task 6 makes the transform emit `inherit` verbatim instead of an injected tier ID.
 - Task 7 also rebaselines `tests/test_tier_presets.py` and `tests/test_provider_toml_transform.py` (stale bare KimiCode IDs; owned by no other task, disjoint).
 - Task 5 completes Task 4's ZCode/KimiCode `skills` capability data side (spec §2.1:161/§2.2:176): `config/ai-providers.yaml` gains `- skills` in both `capabilities` lists and `config/provider-capabilities.yaml` flips both `skills: false → true` (the AC-25 coupling is already satisfied by the non-null `skills_dir`). It also updates `tests/test_plugin_compact_provider_fix.py`'s now-obsolete "no lazy channel" premise — both providers now have a lazy channel via `"skills" in capabilities`. Task 4 is already committed (01b7f4c3); Task 5 completes its ZCode/KimiCode `skills` capability lines (no checkbox toggled).
+
+- **Task 9 fail-loud closure (2026-10-02):** `scripts/lib/config.py` and `scripts/lib/cli_commands.py` join Task 9's `Files:` block. The config-layer quality-pipeline handler now re-raises `SyncError` (AC-11) instead of downgrading a *declared* provider's missing/incomplete `pipeline_notation` block to an `unmapped` warning; providers absent from `delegation-syntax.yaml` stay skipped (`build_pipeline_variables`), and `cli_commands._build_context` surfaces the error as a clean rc 1 for `--validate`/`--check`/sync. `tests/test_pipeline_notation_config.py` pins the end-to-end propagation (`config._build_pipeline_variables`). The Mammouth-routing fact above ("no `config.py` change required") still holds for that routing code; this bullet records the two Task-9-owned changes in `config.py` and `cli_commands.py`. `tests/test_pipelines.py` also joins Task 9: its `KNOWN_PROVIDERS` parity guard pins D7 (the fail-soft fallback tuple stays in parity with the provider registry, Copilot included).
 
 ## Global Constraints
 
@@ -249,10 +251,10 @@ discovery:
 **Verify:** `python3 -m pytest tests/test_transform_contracts.py -q`
 **Provider-Agnostik:** every mechanism is selected by the config value; no name branch.
 **Depends on:** 1, 4
-- [ ] Step 1: Test schreiben (fail)
-- [ ] Step 2: implementieren
-- [ ] Step 3: Test (pass)
-- [ ] Step 4: commit — `feat: extend agent transform with format contracts`
+- [x] Step 1: Test schreiben (fail)
+- [x] Step 2: implementieren
+- [x] Step 3: Test (pass)
+- [x] Step 4: commit — `feat: extend agent transform with format contracts`
 
 ### Task 7: Model precedence + single format application
 **Agent:** developer
@@ -283,7 +285,7 @@ discovery:
 
 ### Task 9: Pipeline notation from config + full registry
 **Agent:** developer
-**Files:** Modify: `config/delegation-syntax.yaml`; Modify: `scripts/lib/pipelines.py`; Modify: `templates/configs/CONTINUE.config-template.yaml`; Create: `tests/test_pipeline_notation_config.py`
+**Files:** Modify: `config/delegation-syntax.yaml`; Modify: `scripts/lib/pipelines.py`; Modify: `scripts/lib/config.py`; Modify: `scripts/lib/cli_commands.py`; Modify: `templates/configs/CONTINUE.config-template.yaml`; Create: `tests/test_pipeline_notation_config.py`; Modify: `tests/test_pipelines.py`
 **Interfaces:** Produces `pipeline_notation.<Provider>` blocks and `pipeline_notation(provider, config_dir)` (config-backed, fail-loud) + registry provider list; Consumes evidence D6/D7.
 **Acceptance:** AC-11: every provider has a complete notation block consistent with its `delegate` phrasing; notation comes from `delegation-syntax.yaml`; a missing block fails loud (no `task()` default); Copilot resolves via `registered_provider_names`.
 **Resolved values (Amendment 2026-10-01):** OQ-9 — the `roles` enum at `templates/configs/CONTINUE.config-template.yaml:28` no longer contains the out-of-enum value `agent` (fix the enum; do not restructure the template); OQ-2 — keep/annotate the Continue `bootstrap_sequence.target` (`.continue/config.yaml`), whose dead `agents:` block is removed by Task 10.
@@ -291,10 +293,10 @@ discovery:
 **Verify:** `python3 -m pytest tests/test_pipeline_notation_config.py -q`
 **Provider-Agnostik:** provider list and notation are registry/config-driven.
 **Depends on:** 4
-- [ ] Step 1: Test schreiben (fail)
-- [ ] Step 2: implementieren
-- [ ] Step 3: Test (pass)
-- [ ] Step 4: commit — `feat: add config-backed pipeline notation`
+- [x] Step 1: Test schreiben (fail)
+- [x] Step 2: implementieren
+- [x] Step 3: Test (pass)
+- [x] Step 4: commit — `feat: add config-backed pipeline notation`
 
 ### Task 10: Bootstrap sub-markers + legacy migration
 **Agent:** senior-developer
@@ -305,10 +307,10 @@ discovery:
 **Verify:** `python3 -m pytest tests/test_bootstrap_submarkers.py -q`
 **Provider-Agnostik:** cleanup iterates the bootstrap registry, replacing `"Gemini" in active`.
 **Depends on:** 4
-- [ ] Step 1: Test schreiben (fail)
-- [ ] Step 2: implementieren
-- [ ] Step 3: Test (pass)
-- [ ] Step 4: commit — `fix: scope bootstrap markers per provider`
+- [x] Step 1: Test schreiben (fail)
+- [x] Step 2: implementieren
+- [x] Step 3: Test (pass)
+- [x] Step 4: commit — `fix: scope bootstrap markers per provider`
 
 ### Task 11: Path migration + idempotency / pending-write fix
 **Agent:** senior-developer
