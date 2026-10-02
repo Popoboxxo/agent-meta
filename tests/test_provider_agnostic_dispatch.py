@@ -4,13 +4,25 @@ Enforces the repo invariant that provider differences are expressed through
 capability flags / config keys, never through literal ``provider == "Name"``
 branches in ``scripts/lib/``:
 
-1. AST scan of the touched dispatch modules for equality comparisons against a
-   registered provider-name literal (comments/docstrings are ignored by design).
-2. Every registered provider carries an explicit ``commands`` boolean in
+1. A directory sweep over ``scripts/lib/**/*.py`` (replaces the former static
+   ``_TOUCHED_MODULES`` tuple, AC-14) AST-scans every module — a newly added
+   lib module is covered automatically. Flagged are provider-name dispatch
+   branches:
+     * ``provider == "Name"`` / ``!=`` against a registered provider name, and
+     * ``provider in ("Name", ...)`` / ``not in`` against an enumerated literal
+       container of registered provider names.
+   Comments/docstrings are ignored by design (the scan is AST-based).
+2. No ``surface-version`` comparison drives dispatch in ``scripts/lib/``
+   (AC-23). The one documented exception is the config-reading validator
+   ``artifact_validate.artifact_v2_surface`` (spec §2.5 / AC-13), which resolves
+   a provider's artifact contract from declared config values; it is keyed
+   explicitly below so a writer branching on ``surface-version`` is still
+   caught.
+3. Every registered provider carries an explicit ``commands`` boolean in
    ``config/provider-capabilities.yaml`` — no silent else-fallback.
-3. ``ai-providers.yaml has_commands`` agrees with the capability flag, and every
+4. ``ai-providers.yaml has_commands`` agrees with the capability flag, and every
    commands-capable provider names a target dir + format.
-4. An unsupported provider produces one explicit INFO line (not silence).
+5. An unsupported provider produces one explicit INFO line (not silence).
 """
 from __future__ import annotations
 
@@ -24,36 +36,146 @@ import yaml
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 
-_TOUCHED_MODULES = (
-    "commands",
-    "roles",
-    "rules",
-    "sync_pipeline",
-    "viz",
-    "context",
-    "providers",
-    "agent_sync",
-    "provider_transform",
-    # Stale-role-cleanup modules (SPEC-STALE-ROLE-CLEANUP-2026-09-13): the
-    # managed-index helper, the backup pruner and the skill-wrapper writer must
-    # stay provider-agnostic too (AC-20).
-    "rule_index",
-    "generated_file_drift",
-    "skills",
-    # Repo-containment ("prison mode") modules — provider dispatch goes through
-    # repo_containment.provider-overrides keyed by registry name, never a
-    # literal `provider == "Name"` branch.
-    "repo_containment",
-    "consistency/repo_containment",
-    "subagent_permissions",
-    "consistency/subagent_permissions",
-    "runtime_gate",
-    "isolation",
-    # Context-file topology consistency (SPEC-CONTEXT-FILE-MODES-2026-09-13,
-    # AC-19): adapter dispatch is key-driven, never a provider-name branch.
-    "consistency/context_topology",
-    "consistency/reference_standards",
-)
+_LIB_DIR = _REPO_ROOT / "scripts" / "lib"
+
+#: Documented exception (AC-23, spec §2.5 / AC-13): ``artifact_v2_surface`` is
+#: the validator that resolves a provider's artifact contract from the declared
+#: config values (``surface-version`` + ``frontmatter-mechanism``). Keyed by
+#: (module path, enclosing function) so it stays explicit and minimal — any
+#: other ``surface-version`` comparison, in this module or elsewhere, is still
+#: a violation.
+_SURFACE_VERSION_EXCEPTIONS = {
+    ("artifact_validate.py", "artifact_v2_surface"),
+}
+
+#: Value domain of the ``surface-version`` config key.
+_SURFACE_VERSION_VALUES = frozenset({"v1", "v2"})
+
+
+def _lib_modules() -> list[Path]:
+    """Every module under ``scripts/lib/`` (recursive), sorted by path.
+
+    The directory sweep is deliberate: a newly added lib module is covered
+    without editing this test (AC-14).
+    """
+    return sorted(_LIB_DIR.rglob("*.py"))
+
+
+def _module_name(path: Path) -> str:
+    """The module's path relative to ``scripts/lib/`` (POSIX separators)."""
+    return path.relative_to(_LIB_DIR).as_posix()
+
+
+def _parent_map(tree: ast.AST) -> dict[ast.AST, ast.AST]:
+    parents: dict[ast.AST, ast.AST] = {}
+    for parent in ast.walk(tree):
+        for child in ast.iter_child_nodes(parent):
+            parents[child] = parent
+    return parents
+
+
+def _enclosing_function(node: ast.AST, parents: dict[ast.AST, ast.AST]) -> str:
+    current = parents.get(node)
+    while current is not None:
+        if isinstance(current, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            return current.name
+        current = parents.get(current)
+    return "<module>"
+
+
+def _provider_name(value: object, names: set[str]) -> bool:
+    return isinstance(value, str) and value in names
+
+
+def _provider_equality_operands(node: ast.Compare, names: set[str]) -> list[str]:
+    """Registered provider-name literals compared with ``==``/``!=``."""
+    operands = [node.left, *node.comparators]
+    return sorted({
+        o.value
+        for o in operands
+        if isinstance(o, ast.Constant) and _provider_name(o.value, names)
+    })
+
+
+def _provider_membership_operands(node: ast.Compare, names: set[str]) -> list[str]:
+    """Registered provider names inside an enumerated literal container.
+
+    Only the ``provider in ("Name", ...)`` shape is flagged — the literal must
+    sit inside a tuple/list/set operand. A bare ``"Name" in some_dynamic_list``
+    (e.g. ``"Claude" not in active_providers``) is an active-set membership
+    check, not the dispatch anti-pattern this guard targets.
+    """
+    found: set[str] = set()
+    for operand in [node.left, *node.comparators]:
+        if not isinstance(operand, (ast.Tuple, ast.List, ast.Set)):
+            continue
+        for element in operand.elts:
+            if isinstance(element, ast.Constant) and _provider_name(element.value, names):
+                found.add(element.value)
+    return sorted(found)
+
+
+def _provider_dispatch_offenders(tree: ast.AST, module: str, names: set[str]) -> list[str]:
+    offenders: list[str] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Compare):
+            continue
+        if any(isinstance(op, (ast.Eq, ast.NotEq)) for op in node.ops):
+            consts = _provider_equality_operands(node, names)
+            if consts:
+                offenders.append(f"scripts/lib/{module}:{node.lineno}: {consts}")
+                continue
+        if any(isinstance(op, (ast.In, ast.NotIn)) for op in node.ops):
+            consts = _provider_membership_operands(node, names)
+            if consts:
+                offenders.append(f"scripts/lib/{module}:{node.lineno}: {consts}")
+    return offenders
+
+
+def _surface_version_dispatch_reason(node: ast.Compare) -> str | None:
+    """Why ``node`` is a ``surface-version`` dispatch comparison, if it is.
+
+    Two shapes are caught: a direct read of the ``"surface-version"`` config key
+    inside the comparison (e.g. ``cfg.get("surface-version") == "v2"``), and a
+    comparison against a surface-version-domain literal (``v1``/``v2``) under
+    any variable name (e.g. ``surface == "v2"`` or ``sv == "v2"``). The version
+    literals are otherwise unused in dispatch under ``scripts/lib/``, so this
+    catches a writer that branches on the surface regardless of naming.
+    """
+    if any(
+        isinstance(sub, ast.Constant) and sub.value == "surface-version"
+        for sub in ast.walk(node)
+    ):
+        return "reads 'surface-version'"
+    operands = [node.left, *node.comparators]
+    consts = {
+        o.value
+        for o in operands
+        if isinstance(o, ast.Constant) and isinstance(o.value, str)
+    }
+    if consts & _SURFACE_VERSION_VALUES:
+        return "compares a surface-version value (v1/v2)"
+    return None
+
+
+def _surface_version_dispatch_offenders(
+    tree: ast.AST, module: str, parents: dict[ast.AST, ast.AST]
+) -> list[str]:
+    offenders: list[str] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Compare):
+            continue
+        if not any(
+            isinstance(op, (ast.Eq, ast.NotEq, ast.In, ast.NotIn)) for op in node.ops
+        ):
+            continue
+        reason = _surface_version_dispatch_reason(node)
+        if reason is None:
+            continue
+        if (module, _enclosing_function(node, parents)) in _SURFACE_VERSION_EXCEPTIONS:
+            continue
+        offenders.append(f"scripts/lib/{module}:{node.lineno} ({reason})")
+    return offenders
 
 
 def _registered_providers() -> list[str]:
@@ -71,32 +193,106 @@ def _provider_configs() -> dict:
     return data.get("providers") or {}
 
 
-def test_no_literal_provider_equality_branches_in_touched_modules():
-    """No ``provider == "Claude"``-style branch may remain in the modules
-    converted by issue #735. AST-based so comments and docstrings that *mention*
-    the anti-pattern do not false-positive."""
+def test_no_provider_name_dispatch_branches_in_lib():
+    """AC-14: no ``provider == "Name"`` / ``provider in ("Name", ...)`` branch
+    may remain anywhere under ``scripts/lib/``. AST-based so comments and
+    docstrings that *mention* the anti-pattern do not false-positive."""
     names = set(_registered_providers())
+    modules = _lib_modules()
+    assert len(modules) > 1, f"scripts/lib sweep found only {len(modules)} modules"
     offenders: list[str] = []
-    for module in _TOUCHED_MODULES:
-        source = (_REPO_ROOT / "scripts" / "lib" / f"{module}.py").read_text(encoding="utf-8")
-        tree = ast.parse(source)
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Compare):
-                continue
-            if not any(isinstance(op, (ast.Eq, ast.NotEq)) for op in node.ops):
-                continue
-            consts = [
-                c.value
-                for c in [node.left, *node.comparators]
-                if isinstance(c, ast.Constant) and isinstance(c.value, str) and c.value in names
-            ]
-            if consts:
-                offenders.append(f"scripts/lib/{module}.py:{node.lineno}: {consts}")
+    for module_path in modules:
+        try:
+            tree = ast.parse(module_path.read_text(encoding="utf-8"))
+        except SyntaxError as exc:  # a module the guard cannot inspect
+            offenders.append(f"scripts/lib/{_module_name(module_path)}: unparseable: {exc}")
+            continue
+        offenders.extend(_provider_dispatch_offenders(tree, _module_name(module_path), names))
     assert not offenders, (
-        "Literal provider-name equality branch(es) reintroduced — dispatch via "
+        "Provider-name dispatch branch(es) reintroduced — dispatch via "
         "config/ai-providers.yaml capabilities (provider_has_capability) or the "
         "provider-capabilities.yaml registry instead:\n" + "\n".join(offenders)
     )
+
+
+def test_lib_sweep_covers_task_modules():
+    """AC-14: the sweep must cover the modules added by Tasks 1–11, proving the
+    glob is live (not vacuous) and no future module can bypass the guard."""
+    swept = {_module_name(path) for path in _lib_modules()}
+    expected = {
+        "artifact_validate.py",
+        "bootstrap.py",
+        "mcp_provider_config.py",
+        "pipelines.py",
+        "context.py",
+        "consistency/artifact_contracts.py",
+        "consistency/model_contracts.py",
+    }
+    assert expected <= swept, sorted(expected - swept)
+
+
+def test_no_surface_version_dispatch_in_lib():
+    """AC-23: no ``surface-version`` comparison drives dispatch in
+    ``scripts/lib/``. The writer must dispatch on the resolved
+    ``mcp-config.format`` value only (spec §2.5, design DECISION-7)."""
+    modules = _lib_modules()
+    assert len(modules) > 1, f"scripts/lib sweep found only {len(modules)} modules"
+    offenders: list[str] = []
+    for module_path in modules:
+        try:
+            tree = ast.parse(module_path.read_text(encoding="utf-8"))
+        except SyntaxError as exc:
+            offenders.append(f"scripts/lib/{_module_name(module_path)}: unparseable: {exc}")
+            continue
+        offenders.extend(
+            _surface_version_dispatch_offenders(
+                tree, _module_name(module_path), _parent_map(tree)
+            )
+        )
+    assert not offenders, (
+        "surface-version dispatch comparison(s) reintroduced — select the "
+        "declared mcp-config.format in config data and dispatch on that value "
+        "only (AC-23). Documented exception: "
+        f"{sorted(_SURFACE_VERSION_EXCEPTIONS)}:\n" + "\n".join(offenders)
+    )
+
+
+# Synthetic snippets proving the guard is live (not vacuous). They live in the
+# test module — never in ``scripts/lib/`` — so they cannot trip the sweep.
+_SYNTH_PROVIDER_EQ = "def f(provider):\n    if provider == 'Claude':\n        return 1\n"
+_SYNTH_PROVIDER_IN = "def f(provider):\n    if provider in ('Claude', 'Gemini'):\n        return 1\n"
+_SYNTH_SURFACE_BRANCH = "def write(sv):\n    if sv == 'v2':\n        return 1\n"
+_SYNTH_VALIDATOR = (
+    "def artifact_v2_surface(pc):\n"
+    "    surface = pc.get('surface-version', 'v1')\n"
+    "    return surface == 'v2'\n"
+)
+
+
+def test_guard_detects_synthetic_provider_dispatch():
+    """TDD pin: equality and enumerated-membership branches are both caught."""
+    names = set(_registered_providers())
+    assert _provider_dispatch_offenders(
+        ast.parse(_SYNTH_PROVIDER_EQ), "synthetic.py", names
+    )
+    assert _provider_dispatch_offenders(
+        ast.parse(_SYNTH_PROVIDER_IN), "synthetic.py", names
+    )
+
+
+def test_guard_detects_synthetic_surface_version_dispatch():
+    """TDD pin: a writer branching on ``surface-version`` is caught."""
+    tree = ast.parse(_SYNTH_SURFACE_BRANCH)
+    assert _surface_version_dispatch_offenders(tree, "writer.py", _parent_map(tree))
+
+
+def test_guard_exempts_only_documented_validator():
+    """The validator exception is minimal: identical code in any other module
+    (or any other function) is still reported."""
+    tree = ast.parse(_SYNTH_VALIDATOR)
+    parents = _parent_map(tree)
+    assert not _surface_version_dispatch_offenders(tree, "artifact_validate.py", parents)
+    assert _surface_version_dispatch_offenders(tree, "mcp_provider_config.py", parents)
 
 
 def test_cleanup_preview_documented():
@@ -278,10 +474,11 @@ def test_context_adapter_dispatch_is_key_driven_without_provider_literals():
     )
 
 
-def test_reference_standards_seams_are_in_touched_modules():
+def test_reference_standards_seams_are_in_lib_sweep():
     """AC-14: the reference_standards production seams are covered by the
-    provider-agnostic AST guard above — no provider-name literal may creep
+    provider-agnostic AST sweep above — no provider-name literal may creep
     into the new strip resolver call site or the consistency module."""
-    for module in ("provider_transform", "consistency/reference_standards"):
-        assert module in _TOUCHED_MODULES, module
-        assert (_REPO_ROOT / "scripts" / "lib" / f"{module}.py").exists(), module
+    swept = {_module_name(path) for path in _lib_modules()}
+    for module in ("provider_transform.py", "consistency/reference_standards.py"):
+        assert module in swept, module
+        assert (_LIB_DIR / module).exists(), module
