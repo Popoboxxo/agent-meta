@@ -7,7 +7,13 @@ from pathlib import Path
 
 from .agents import build_agent_hints, build_knowledge_engine_hints
 from .frontmatter import _strip_frontmatter
-from .io import content_hash, is_absent_gitignored_target, load_json_file, safe_path
+from .io import (
+    content_hash,
+    is_absent_gitignored_target,
+    load_json_file,
+    safe_path,
+    strip_jsonc_comments,
+)
 from .json_persistence import save_json_document
 from .log import SyncLog
 from .plugins import resolve_plugin_compact
@@ -1257,6 +1263,38 @@ def sync_context_for_provider(
     )
 
 
+def apply_settings_surface_shape(content: str, pc: dict) -> str:
+    """Apply the resolved settings-surface shape to a settings template body.
+
+    Provider-neutral dispatch on the resolved ``mcp-config.format`` value ONLY
+    (never on a provider name or ``surface-version``; the loader resolves the
+    format, the writer consumes it). For the ``opencode-json-v2`` surface the
+    v1-only top-level ``subagent_depth`` key is dropped and ``default_agent`` is
+    emitted from the ``primary-role`` data key (OQ-4/AC-5). Every other format
+    returns ``content`` byte-for-byte, so the shipped v1 surface stays frozen.
+
+    The settings template is JSONC (``//`` comments); the transform parses it
+    leniently and re-emits clean JSON. A template that cannot be parsed is
+    returned unchanged (fail-soft — the settings init still writes it).
+    """
+    mcp_config = pc.get("mcp-config") or {}
+    if mcp_config.get("format") != "opencode-json-v2":
+        return content
+    stripped = strip_jsonc_comments(content)
+    stripped = re.sub(r",\s*([}\]])", r"\1", stripped)
+    try:
+        document = json.loads(stripped)
+    except (json.JSONDecodeError, ValueError):
+        return content
+    if not isinstance(document, dict):
+        return content
+    document.pop("subagent_depth", None)
+    primary_role = pc.get("primary-role")
+    if isinstance(primary_role, str) and primary_role:
+        document["default_agent"] = primary_role
+    return json.dumps(document, indent=2, ensure_ascii=False) + "\n"
+
+
 def _init_provider_settings_json(
     project_root: Path,
     pc: dict,
@@ -1296,6 +1334,7 @@ def _init_provider_settings_json(
         source_label = "minimal fallback"
         if settings_template_rel:
             log.warning(f"{settings_template_rel} not found — using minimal fallback for {settings_file}")
+    content = apply_settings_surface_shape(content, pc)
     log.action("INIT", str(settings_path.relative_to(project_root)), source_label)
     if not dry_run:
         settings_path.parent.mkdir(parents=True, exist_ok=True)

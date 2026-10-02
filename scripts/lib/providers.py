@@ -81,12 +81,52 @@ def _apply_surface_format_selection(provider_config: dict) -> dict:
     return provider_config
 
 
+def _apply_surface_mechanism_selection(provider_config: dict) -> dict:
+    """Resolve ``agent-transform.frontmatter-mechanism`` from ``surface-version``.
+
+    Analogous to :func:`_apply_surface_format_selection` (SPEC-PROVIDER-AUDIT-
+    OPENCODE-V2-2026-09-30, §3.4/DECISION-7): for every provider whose
+    ``agent-transform`` block declares a ``surface-mechanisms`` mapping AND
+    whose ``surface-version`` value is a key of that mapping, the declared
+    ``frontmatter-mechanism`` is replaced with the mapped value. The transform
+    writer still dispatches on the resolved ``frontmatter-mechanism`` value ONLY
+    and never reads ``surface-version``.
+
+    Providers without the map, without an ``agent-transform`` block, or with a
+    ``surface-version`` absent from the map keep their statically declared
+    ``frontmatter-mechanism`` byte-for-byte (the declared value is the
+    fallback). The mapping is looked up by value — no provider-name literal is
+    involved. Returns the same mapping object with per-entry ``agent-transform``
+    dicts updated in place.
+    """
+    if not isinstance(provider_config, dict):
+        return provider_config
+    for entry in provider_config.values():
+        if not isinstance(entry, dict):
+            continue
+        transform = entry.get("agent-transform")
+        if not isinstance(transform, dict):
+            continue
+        surface_mechanisms = transform.get("surface-mechanisms")
+        if not isinstance(surface_mechanisms, dict) or not surface_mechanisms:
+            continue
+        surface_version = entry.get("surface-version")
+        if not isinstance(surface_version, str) or surface_version not in surface_mechanisms:
+            continue
+        selected_mechanism = surface_mechanisms[surface_version]
+        if isinstance(selected_mechanism, str) and selected_mechanism:
+            transform["frontmatter-mechanism"] = selected_mechanism
+    return provider_config
+
+
 def load_providers_config(agent_meta_root: Path) -> dict:
     """Load config/ai-providers.yaml with fallback to legacy paths.
 
     The returned registry is normalized once so ``mcp-config.format`` already
     reflects the ``surface-version`` selection (see
-    ``_apply_surface_format_selection``); the writer never reads
+    ``_apply_surface_format_selection``) and ``agent-transform.frontmatter-
+    mechanism`` reflects the ``surface-version`` selection (see
+    ``_apply_surface_mechanism_selection``); the writers never read
     ``surface-version``.
     """
     data, _ = _load_yaml_or_json(
@@ -162,7 +202,8 @@ def load_providers_config(agent_meta_root: Path) -> dict:
                 },
             }
         }
-    return _apply_surface_format_selection(data.get("providers", data))
+    providers = _apply_surface_format_selection(data.get("providers", data))
+    return _apply_surface_mechanism_selection(providers)
 
 
 def load_provider_capabilities(agent_meta_root: Path) -> dict:

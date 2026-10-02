@@ -284,6 +284,12 @@ providers:
       im Chat.'
     agent-transform:
       frontmatter-mechanism: opencode-native
+      # OQ-8/AC-5: surface-version is data that SELECTS the frontmatter
+      # mechanism; the transform writer keeps reading the resolved
+      # `frontmatter-mechanism` value only. v1 stays byte-frozen.
+      surface-mechanisms:
+        v1: opencode-native
+        v2: opencode-native-v2
       tools-format: keep
       tool-name-map: {}
       # §4.3: allow-list turns Opencode v2's silent frontmatter drop into a
