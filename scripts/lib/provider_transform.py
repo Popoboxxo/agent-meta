@@ -70,6 +70,57 @@ def _validate_tools_against_whitelist(
             )
     return valid
 
+_KNOWN_TIER_TOKENS = frozenset(
+    {"nano", "fast", "balanced", "powerful", "max", "ultra"}
+)
+
+
+def _resolve_role_default_fallback(
+    role: str,
+    provider: str,
+    agent_meta_root: Path,
+    provider_config: dict | None,
+) -> str:
+    """Resolve a role's ``role-defaults`` model through the provider tier table.
+
+    Inline counterpart of the ``model-inherit-fallback`` contract (D3): the
+    ``role-defaults`` catalog stores abstract tiers (``balanced`` …). Such a
+    token is looked up in the provider's ``ai-providers.yaml model-tiers`` and
+    ``role``/``apply_model_format`` is applied **exactly once** via the public
+    :func:`scripts.lib.roles.apply_model_format`. A still-unresolvable tier
+    yields ``""`` so no raw tier token can ever be emitted; a concrete model ID
+    passes through with the single ``model-format`` application.
+    """
+    from .roles import apply_model_format, load_roles_config
+
+    roles_cfg = load_roles_config(agent_meta_root)
+    raw = str((roles_cfg.get("roles", {}).get(role, {}) or {}).get("model", "") or "")
+    if not raw:
+        return ""
+    if raw in _KNOWN_TIER_TOKENS:
+        tiers = (provider_config or {}).get(provider, {}).get("model-tiers", {}) or {}
+        resolved = str(tiers.get(raw, "") or "")
+    else:
+        resolved = raw
+    if not resolved or resolved in _KNOWN_TIER_TOKENS:
+        return ""
+    return apply_model_format(resolved, provider_config, provider)
+
+
+def _apply_tool_name_map(tools: list, tool_name_map: dict | None) -> list:
+    """Translate Claude tool names to a provider vocabulary.
+
+    The mapping is data (``agent-transform.tool-name-map``): a source name not
+    present in the map passes through unchanged. Order and duplicates are
+    preserved as declared in the template. A non-dict map is ignored.
+    """
+    if not isinstance(tool_name_map, dict):
+        return list(tools)
+    return [
+        str(tool_name_map.get(t, t)) if isinstance(t, str) else t
+        for t in tools
+    ]
+
 def wrap_sections_in_xml(content: str) -> str:
     """Wrap Markdown heading sections in XML tags.
 
@@ -183,15 +234,34 @@ def _apply_agent_transform(
                                          flat model-overrides map (not just the
                                          per-provider sub-map)
       model-inherit-fallback: bool    — empty model falls back to role-defaults
-                                         unless model-inherit-main-chat is active
+                                         resolved through the provider's
+                                         model-tiers (never a raw tier token);
+                                         skipped when model-inherit-main-chat
+                                         is active
       inject-memory: bool
       inject-permission-mode: bool
       extra-fields: {key: value}      — literal frontmatter updates
+      tools-format: skip | keep | filter | remove | map
+                                       — skip: leave untouched; keep: validate
+                                         +warn only, the ORIGINAL list survives
+                                         (out-of-whitelist tokens preserved)
+                                         while tool-name-map still applies;
+                                         filter: validate + replace with the
+                                         whitelisted subset; remove: validate
+                                         then drop the field; map: emit
+                                         `{<name>: true}` object form (never a
+                                         YAML list)
+      tool-name-map: {claude: provider}
+                                       — translate Claude tool names to the
+                                         provider vocabulary; an unknown source
+                                         name passes through unchanged
+      allowed-fields: [name, ...]      — frontmatter allow-list (validated by
+                                         artifact_validate; Task-1)
+      reject-fields: [name, ...]       — frontmatter deny-list (validated by
+                                         artifact_validate; Task-1)
       tools: skip | keep | filter | remove
-                                       — skip: leave untouched (stripped via
-                                         strip-fields); keep: validate+warn only;
-                                         filter: validate + replace with subset;
-                                         remove: validate then drop the field
+                                       — legacy alias; `tools-format` wins when
+                                         both are present
       strip-fields: [name, ...]       — frontmatter keys to remove
       strip-claude-lines: bool        — strip Claude-only body lines + reassemble
       body-note: gemini-registration  — inject the Gemini registration note
@@ -199,14 +269,21 @@ def _apply_agent_transform(
       frontmatter-mechanism: opencode-native
                                        — build opencode-native frontmatter instead
                                          of the inject/strip steps above
+      frontmatter-mechanism: opencode-native-v2
+                                       — as opencode-native, plus the
+                                         `primary-role` entry emitted as
+                                         `mode: primary` (others `mode: subagent`)
       frontmatter-mechanism: codex-toml
                                        — build a Codex-native TOML agent document
                                          (name/description/model/extra-fields +
                                          the body as developer_instructions)
                                          instead of Markdown+YAML frontmatter
+
+    Provider-level keys honoured here: `model-literal` (emit the literal
+    verbatim, e.g. Antigravity `inherit`) and `primary-role` (the single
+    `mode: primary` entry for the opencode-native-v2 mechanism).
     """
     from .roles import (
-        load_roles_config,
         resolve_max_tokens,
         resolve_memory,
         resolve_model,
@@ -227,7 +304,8 @@ def _apply_agent_transform(
         log.note(rel, f'model: {model} (from {src})')
 
     # --- opencode-native frontmatter: distinct format, handled wholesale ---
-    if spec.get('frontmatter-mechanism') == 'opencode-native':
+    mechanism = spec.get('frontmatter-mechanism')
+    if mechanism in ('opencode-native', 'opencode-native-v2'):
         model = resolve_model(role, config, agent_meta_root,
                               provider=provider, provider_config=provider_config, log=log)
         if model:
@@ -251,9 +329,13 @@ def _apply_agent_transform(
                 _raw_tools, provider, agent_meta_root, log, role,
             )
             content = _update_frontmatter_dict(content, {'tools': _valid_tools})
+        mode = None
+        if mechanism == 'opencode-native-v2':
+            primary_role = (provider_config.get(provider) or {}).get('primary-role', 'orchestrator')
+            mode = 'primary' if role == primary_role else 'subagent'
         return _transform_frontmatter_for_opencode(
             content, name, description, model, steps, generated_from, agent_meta_root, temperature,
-            strip_fields=strip_fields,
+            strip_fields=strip_fields, mode=mode,
         )
 
     # --- codex-toml document: native TOML agent file, handled wholesale ---
@@ -285,15 +367,21 @@ def _apply_agent_transform(
     # --- 1. model ---
     model_mode = spec.get('model', 'skip')
     if model_mode == 'inject':
-        model = resolve_model(role, config, agent_meta_root,
-                              provider=provider, provider_config=provider_config, log=log)
-        if spec.get('model-inherit-fallback'):
+        model_literal = (provider_config.get(provider) or {}).get('model-literal')
+        if model_literal:
+            model = str(model_literal)
+        else:
+            model = resolve_model(role, config, agent_meta_root,
+                                  provider=provider, provider_config=provider_config, log=log)
+        if not model and spec.get('model-inherit-fallback'):
             inherit_active = bool((config.get('model-inherit-main-chat') or {}).get(provider))
-            if not model and not inherit_active:
-                roles_cfg = load_roles_config(agent_meta_root)
-                raw = roles_cfg["roles"].get(role, {}).get("model", "")
-                if raw:
-                    model = raw
+            if not inherit_active:
+                # Resolve the role-default through the provider's model-tiers and
+                # apply model-format exactly once. An unresolvable tier yields ""
+                # so a raw tier token is never written (AC-12/D3).
+                model = _resolve_role_default_fallback(
+                    role, provider, agent_meta_root, provider_config,
+                )
         content = inject_model_field(content, model)
         if model:
             _model_note(model)
@@ -320,7 +408,8 @@ def _apply_agent_transform(
         content = _update_frontmatter_dict(content, dict(extra_fields))
 
     # --- 5. tools ---
-    tools_mode = spec.get('tools', 'skip')
+    tools_format = spec.get('tools-format')
+    tools_mode = tools_format if tools_format is not None else spec.get('tools', 'skip')
     if tools_mode != 'skip':
         _fm = _parse_frontmatter_yaml(content)
         _tools = _fm.get('tools')
@@ -328,8 +417,24 @@ def _apply_agent_transform(
             _valid = _validate_tools_against_whitelist(
                 _tools, provider, agent_meta_root, log, role,
             )
-            if tools_mode == 'filter':
-                content = _update_frontmatter_dict(content, {'tools': _valid})
+            if tools_mode == 'keep':
+                # keep: preserve the ORIGINAL list (out-of-whitelist tokens
+                # survive) — validation above only emits warnings — while the
+                # tool-name-map is still applied to every declared token.
+                _mapped = _apply_tool_name_map(_tools, spec.get('tool-name-map'))
+                if _mapped != _tools:
+                    content = _update_frontmatter_dict(content, {'tools': _mapped})
+            elif tools_mode == 'filter':
+                # filter: the ONLY mode that replaces the list with the
+                # whitelisted subset (then translated to provider vocabulary).
+                _mapped = _apply_tool_name_map(_valid, spec.get('tool-name-map'))
+                if _mapped != _tools:
+                    content = _update_frontmatter_dict(content, {'tools': _mapped})
+            elif tools_mode == 'map':
+                _mapped = _apply_tool_name_map(_valid, spec.get('tool-name-map'))
+                content = _update_frontmatter_dict(
+                    content, {'tools': {name: True for name in _mapped}},
+                )
         if tools_mode == 'remove':
             content = _remove_frontmatter_fields(content, ['tools'])
 
@@ -520,6 +625,7 @@ def _transform_frontmatter_for_opencode(
     temperature: str = "",
     strip_fields: list[str] | None = None,
     quiet_fields: frozenset[str] | None = None,
+    mode: str | None = None,
 ) -> str:
     """Build opencode-native agent frontmatter.
 
@@ -573,7 +679,7 @@ def _transform_frontmatter_for_opencode(
     updates: dict = {
         "name": name,
         "description": description,
-        "mode": template_fm.get("mode") or "subagent",
+        "mode": mode or template_fm.get("mode") or "subagent",
     }
     if template_fm.get("version") and "version" not in strip_fields:
         updates["version"] = template_fm.get("version")
