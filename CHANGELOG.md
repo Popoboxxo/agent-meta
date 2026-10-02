@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-10-02
+
 ### Added
 - **Four AI-agent roles, anchored in a 50-book literature analysis (27 Manning + 23 Humble/Packt)**:
   - `llm-evaluator` (1.0.0) — measures model/agent output against a golden dataset: offline eval
@@ -51,6 +53,12 @@
   management.
 
 ### Changed
+- **Breaking — Copilot artifact paths migrated default-on (consumer-visible — re-run `sync.py`
+  after upgrading)**: Copilot's generated artifacts move to `.github/agents/*.agent.md`. The legacy
+  `.github/copilot/agents/` and `.github/copilot/rules/` directories and `.github/copilot/COPILOT.md`
+  are removed backup-first by the migration map (`config/provider-migrations.yaml`, no flag), so the
+  old paths disappear for consumers who do not regenerate. This default-on removal is the reason this
+  release is a MAJOR bump.
 - **Role activation is gate-driven for `validator` and the developer tiers (consumer-visible —
   audit your `project.yaml` before upgrading)**: the per-role activation decision now resolves
   from the single `activation_groups` default table in `config/role-defaults.yaml` instead of the
