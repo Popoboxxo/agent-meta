@@ -66,6 +66,7 @@ Resolved values (2026-10-01): PRE-2 flag-gated/default-off; PRE-3 `orchestrator`
 
 - **`templates/configs/CONTINUE.config-template.yaml` → Task 9.** Task 9 already owns the Continue notation surface and the `Continue` block of `config/delegation-syntax.yaml` (`bootstrap_sequence.target: .continue/config.yaml`), so the Continue config template is placed there. Added as `Modify:` in Task 9's `Files:` block; verified disjoint from Tasks 1–8 and 10–20 (no other task lists this path).
 - **OQ-2 (dead `agents:` block) → Task 10.** Both write sites are Task 10 files: `scripts/lib/bootstrap.py::_bootstrap_config_based` writes the top-level `agents:` block (bootstrap.py:191-227) and `scripts/lib/context.py:1288` emits the `# Agents : .continue/agents/  (auto-discovered by Continue)` header comment. Task 9 keeps the `bootstrap_sequence` config target and annotates it; Task 14 (scenario 72) asserts the resulting `.continue/config.yaml`.
+- **AC-12 split (2026-10-02):** the resolver half (`roles.py` precedence + `apply_model_format`) is delivered and tested by Task 7; the `model-inherit-fallback` transform half (`provider_transform.py:290-296` must route the raw value through `_resolve_tier_to_model` and emit no `model:` field when it stays a tier) is owned by Task 6, which owns that file. Precedence interpretation: the spec sentence 'a preset tiers map is a fallback' applies to the preset's GLOBAL `tiers` map; a preset's provider-specific `providers.<P>.tiers` entry remains an explicit per-provider override (pinned by a Task-7 regression test).
 
 ### Repo facts verified read-only (path / routing placement)
 
@@ -74,6 +75,8 @@ Resolved values (2026-10-01): PRE-2 flag-gated/default-off; PRE-3 `orchestrator`
 - **OQ-9.** `templates/configs/CONTINUE.config-template.yaml:28` reads `roles: [chat, edit, agent]`; `agent` is outside the runtime `roles` enum (design §1.3 CO-2, F7/N11). It is declared as Continue `settings_template` at `config/ai-providers.yaml:282`.
 - **OQ-3.** `config/ai-providers.yaml` KimiCode `model-tiers` currently read `kimi-k2.6`/`kimi-k2.7-code` with empty `model-aliases` (lines 576-582); Task 4 adds the `kimi-code/{model}` `model-format` + an initial `model-catalog`, and Task 7 guarantees the prefix is applied exactly once.
 - **OQ-6.** No separate Antigravity entry exists in `config/ai-providers.yaml` (the Antigravity runtime is covered by the `Gemini` provider); Task 4 adds the `model-literal: inherit` data key and Task 6 makes the transform emit `inherit` verbatim instead of an injected tier ID.
+- Task 7 also rebaselines `tests/test_tier_presets.py` and `tests/test_provider_toml_transform.py` (stale bare KimiCode IDs; owned by no other task, disjoint).
+- Task 5 completes Task 4's ZCode/KimiCode `skills` capability data side (spec §2.1:161/§2.2:176): `config/ai-providers.yaml` gains `- skills` in both `capabilities` lists and `config/provider-capabilities.yaml` flips both `skills: false → true` (the AC-25 coupling is already satisfied by the non-null `skills_dir`). It also updates `tests/test_plugin_compact_provider_fix.py`'s now-obsolete "no lazy channel" premise — both providers now have a lazy channel via `"skills" in capabilities`. Task 4 is already committed (01b7f4c3); Task 5 completes its ZCode/KimiCode `skills` capability lines (no checkbox toggled).
 
 ## Global Constraints
 
@@ -147,7 +150,7 @@ Modify:
 - `scripts/lib/artifact_validate.py:validate_json_document(text: str, fmt: str, path: str) -> list[Finding]` — per-format key-set assertions (`opencode-json-v2` requires `mcp.servers` and no flat `mcp`; `opencode-json` requires flat `mcp`).
 - `scripts/lib/consistency/artifact_contracts.py:check_artifact_contracts(agent_meta_root: Path) -> list[Finding]` — scans generated artifacts, Severity.ERROR.
 - `scripts/lib/consistency/model_contracts.py:check_model_contracts(agent_meta_root: Path) -> list[Finding]` — emitted model matches `model-format` and is present in `model-catalog` when configured.
-- `scripts/lib/provider_transform.py:apply_model_format(model: str, provider_config: dict) -> str` — `provider_config["model-format"].format(model=model)`, default `"{model}"`.
+- `scripts/lib/roles.py:apply_model_format(model, provider_config, provider)` — `provider_config["model-format"].format(model=model)`, default `"{model}"`.
 - `scripts/lib/roles.py:resolve_model` — `ai-providers.yaml model-tiers` wins; empty for unresolvable override-all; no raw tier token.
 - `scripts/lib/mcp_provider_config.py:_write_provider_config` — dispatch on `mcp-config.format` only; new `opencode-json-v2` branch writes nested `mcp.servers`.
 - `scripts/lib/pipelines.py:pipeline_notation(provider: str, config_dir: Path) -> dict` — reads `delegation-syntax.yaml`; a missing block is fail-loud.
@@ -226,22 +229,22 @@ discovery:
 
 ### Task 5: Capability flags (`provider-capabilities.yaml`)
 **Agent:** developer
-**Files:** Modify: `config/provider-capabilities.yaml`; Modify: `tests/test_provider_three_file_invariant.py`
+**Files:** Modify: `config/provider-capabilities.yaml`; Modify: `tests/test_provider_three_file_invariant.py`; Modify: `config/ai-providers.yaml`; Modify: `tests/test_plugin_compact_provider_fix.py`
 **Interfaces:** Produces `skills`, `artifact-validation`, `artifact-validation-reason`, `mcp-remote-transport`; Consumes Task-4 data.
 **Acceptance:** AC-15 + AC-24 + AC-25: every provider declares `skills` and `artifact-validation`; `artifact-validation: false` requires a non-empty reason; `skills: true` requires `skills` in the `ai-providers.yaml capabilities` list and a non-null `skills_dir`.
 **Verify:** `python3 -m pytest tests/test_provider_three_file_invariant.py -q`
 **Provider-Agnostik:** flags only; no name check.
 **Depends on:** 4
-- [ ] Step 1: Test schreiben (fail)
-- [ ] Step 2: implementieren
-- [ ] Step 3: Test (pass)
-- [ ] Step 4: commit — `feat: declare skills and artifact-validation capability flags`
+- [x] Step 1: Test schreiben (fail)
+- [x] Step 2: implementieren
+- [x] Step 3: Test (pass)
+- [x] Step 4: commit — `feat: declare skills and artifact-validation capability flags`
 
 ### Task 6: Transform format contracts
 **Agent:** senior-developer
 **Files:** Modify: `scripts/lib/provider_transform.py`; Create: `tests/test_transform_contracts.py`
-**Interfaces:** Produces `apply_model_format`; `tools-format: map`; `tool-name-map`; `allowed-fields`/`reject-fields`; `frontmatter-mechanism` incl. `opencode-native-v2`; Consumes Task-1 validators and Task-4 config.
-**Acceptance:** AC-6 (Mammouth `tools:` object, never a list) + AC-13 (`reject-fields` violation yields a finding).
+**Interfaces:** Consumes `roles.py:apply_model_format`; `tools-format: map`; `tool-name-map`; `allowed-fields`/`reject-fields`; `frontmatter-mechanism` incl. `opencode-native-v2`; Consumes Task-1 validators and Task-4 config.
+**Acceptance:** AC-6 (Mammouth `tools:` object, never a list) + AC-13 (`reject-fields` violation yields a finding). + D3/AC-12: the `model-inherit-fallback` at `provider_transform.py:290-296` resolves through `_resolve_tier_to_model` and never emits a raw tier token; covered in `tests/test_transform_contracts.py`.
 **Resolved values (Amendment 2026-10-01):** OQ-6 — Antigravity emits `model: inherit` verbatim (driven by `model-literal`, no injected tier ID); PRE-3 — the `opencode-native-v2` mechanism emits the primary-role entry (`orchestrator`, `mode: primary`) from the `primary-role` data key.
 **Verify:** `python3 -m pytest tests/test_transform_contracts.py -q`
 **Provider-Agnostik:** every mechanism is selected by the config value; no name branch.
@@ -253,17 +256,17 @@ discovery:
 
 ### Task 7: Model precedence + single format application
 **Agent:** developer
-**Files:** Modify: `scripts/lib/roles.py`; Create: `tests/test_model_contracts.py`
+**Files:** Modify: `scripts/lib/roles.py`; Modify: `tests/test_tier_presets.py`; Modify: `tests/test_provider_toml_transform.py`; Create: `tests/test_model_contracts.py`
 **Interfaces:** Produces `resolve_model` (ai-providers `model-tiers` wins over preset `tiers`; `model-format` applied once); Consumes Task-4 data.
-**Acceptance:** AC-12 + AC-2: an active tier preset no longer shadows `ai-providers.yaml model-tiers`; `model-inherit-fallback` never emits a raw tier token; emitted IDs carry exactly one `kimi-code/` prefix.
+**Acceptance:** AC-12 + AC-2: an active tier preset no longer shadows `ai-providers.yaml model-tiers`; emitted IDs carry exactly one `kimi-code/` prefix. (resolver half of AC-12; the transform half is Task 6).
 **Resolved values (Amendment 2026-10-01):** OQ-3 — KimiCode aliases resolve only through the `kimi-code/…` namespace; the single-prefix assertion covers `kimi-code/kimi-code/*` never leaking (Task 4 data + this task's once-only application).
 **Verify:** `python3 -m pytest tests/test_model_contracts.py -q`
 **Provider-Agnostik:** precedence is generic; no provider name.
 **Depends on:** 4
-- [ ] Step 1: Test schreiben (fail)
-- [ ] Step 2: implementieren
-- [ ] Step 3: Test (pass)
-- [ ] Step 4: commit — `fix: make provider model-tiers authoritative`
+- [x] Step 1: Test schreiben (fail)
+- [x] Step 2: implementieren
+- [x] Step 3: Test (pass)
+- [x] Step 4: commit — `fix: make provider model-tiers authoritative`
 
 ### Task 8: MCP writer format dispatch
 **Agent:** senior-developer
@@ -470,7 +473,7 @@ This table is the `parse_plan_ref` input (numeric step, agent in column 3) and t
 | 3 | Sync-time validation wiring + exit codes | `senior-developer` | 1 | AC-13, AC-3a |
 | 4 | Provider registry contract data | `senior-developer` | none | AC-15, AC-21, AC-25, AC-8, AC-9 (Amendment: `agent-discovery: false`, PRE-2…PRE-6, OQ-3, OQ-6 values) |
 | 5 | Capability flags | `developer` | 4 | AC-15, AC-24, AC-25 |
-| 6 | Transform format contracts | `senior-developer` | 1, 4 | AC-6, AC-13 |
+| 6 | Transform format contracts | `senior-developer` | 1, 4 | AC-6, AC-13, D3/AC-12 |
 | 7 | Model precedence + single format | `developer` | 4 | AC-12, AC-2 |
 | 8 | MCP writer format dispatch | `senior-developer` | 4 | AC-21, AC-23, AC-7, AC-9 |
 | 9 | Pipeline notation from config + registry | `developer` | 4 | AC-11 (Amendment: OQ-9 `CONTINUE.config-template.yaml` roles enum) |
@@ -632,7 +635,7 @@ References: Spec §11.1 (path-migration table) and Design §6.2.1 (5-step sequen
 | AC-9 | 4, 8, 11, 14 | AC-23 | 8, 13 |
 | AC-10 | 10, 14 | AC-24 | 5 |
 | AC-11 | 9 | AC-25 | 4, 5 |
-| AC-12 | 7 | ADR-6 (D5) | 12 |
+| AC-12 | 6, 7 | ADR-6 (D5) | 12 |
 | AC-13 | 1, 3, 6 | | |
 
 **Release note:** Task 15 (release + MAJOR version bump) is release bookkeeping and is not bound to an AC-1…AC-25; it is verified by the updated version markers (`grep`/read) and `git diff --stat` showing only the four version files (see the Verification table). Regeneration of the version-bearing artifacts is Task 16, verified by `sync.py --check` rc 0.
@@ -659,7 +662,7 @@ References: Spec §11.1 (path-migration table) and Design §6.2.1 (5-step sequen
 |---|---|---|---|---|---|
 | D1 | generation §2 (F1/N1/N2) | MAJOR | Task 3 | Task 3 + Task 1 + Task 14 s64; AC-1/AC-13 | singleton block moved inside the body before `codex-toml` serialization; `validate_toml` guards both files. |
 | D2 | generation §2 (F11) | MAJOR/MOD | Task 7 | `roles.py`; AC-12 | `ai-providers.yaml model-tiers` wins over preset `tiers`. |
-| D3 | generation §2 (F11) | MAJOR | Task 7 | `provider_transform.py`/`roles.py`; AC-12 | `model-inherit-fallback` resolves through the tier resolver, never a raw tier token. |
+| D3 | generation §2 (F11) | MAJOR | Task 6 / Task 7 | Task 6 (provider_transform.py) / Task 7 (roles.py); AC-12 | `model-inherit-fallback` resolves through the tier resolver, never a raw tier token. |
 | D4 | generation §2 | MINOR | Accepted | — | Continue strips unknown keys, Mammouth collects them in `options`; tolerated by both runtimes, not in spec §1.1/§2.1. Follow-up: set `inject-memory`/`inject-permission-mode` false if a harness ever rejects. |
 | D5 | generation §2 (F11) | MINOR | Task 12 | 3 templates; ADR-6 | 5 provider-neutral body refs replace `.claude/...`. |
 | D6 | generation §2 (F11) | MODERATE | Task 9 | `pipelines.py`, `delegation-syntax.yaml`; AC-11 | notation read from config; missing block fail-loud (no Opencode fallback). |
