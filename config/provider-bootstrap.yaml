@@ -1,21 +1,42 @@
 # Provider Bootstrap Registry
 # Defines how agents are registered/discovered by each provider.
 # Used by scripts/lib/bootstrap.py at sync time and at session start.
+#
+# Marker contract (spec §2.4, design §3.5):
+#   marker_id        str      scoped marker id; default = provider name. Emits
+#                             `<!-- agent-meta:bootstrap-begin:{marker_id} -->`
+#                             … `<!-- agent-meta:bootstrap-end:{marker_id} -->`.
+#   context_file     str|null explicit injection target; null -> the provider's
+#                             `context_file` from config/ai-providers.yaml.
+#   instructions_mode str     "static" (registry `instructions` text injected
+#                             verbatim — ZCode) or "generated" (per-agent roster
+#                             from agents_dir — Gemini). Only consumed by
+#                             `inject-bootstrap-instructions` providers; declared
+#                             uniformly so the registry is self-describing.
 
 bootstrap:
   Claude:
     mechanism: "file-based"
     action: "none"
+    marker_id: "Claude"
+    context_file: null
+    instructions_mode: "static"
     description: "Agenten in .claude/agents/ werden beim Kontext-Laden automatisch registriert."
 
   Opencode:
     mechanism: "file-based"
     action: "none"
+    marker_id: "Opencode"
+    context_file: null
+    instructions_mode: "static"
     description: "Agenten in .opencode/agents/ werden beim Start automatisch geladen."
 
   Gemini:
     mechanism: "api-based"
     action: "inject-bootstrap-instructions"
+    marker_id: "Gemini"
+    context_file: null
+    instructions_mode: "generated"
     template_file: "templates/bootstrap/gemini-session-bootstrap.md"
     description: |
       Gemini/Antigravity benötigt define_subagent API-Calls bei Session-Start.
@@ -29,21 +50,33 @@ bootstrap:
   Continue:
     mechanism: "config-based"
     action: "update-config"
-    description: "Agenten in .continue/config.yaml eintragen."
+    marker_id: "Continue"
+    context_file: null
+    instructions_mode: "static"
+    description: "Agenten in .continue/agents/ sind eine `cn review`-only Oberfläche — kein Chat-Auto-Discovery; kein config.yaml agents-Block (OQ-2)."
 
   Copilot:
     mechanism: "file-based"
     action: "none"
+    marker_id: "Copilot"
+    context_file: null
+    instructions_mode: "static"
     description: "Agenten in .github/copilot/agents/ werden automatisch geladen."
 
   Mammouth:
     mechanism: "file-based"
     action: "none"
+    marker_id: "Mammouth"
+    context_file: null
+    instructions_mode: "static"
     description: "Agenten in .mammouth/agents/ werden dateibasiert bereitgestellt — kein Session-Bootstrap nötig."
 
   Codex:
     mechanism: "file-based"
     action: "none"
+    marker_id: "Codex"
+    context_file: null
+    instructions_mode: "static"
     description: "Agenten in .codex/agents/*.toml werden automatisch geladen (V7, 2026-09-04: personal- + project-scoped Config-Layer, kein Registrierungs-Schritt; multi_agent stable default-on)."
 
   ZCode:
@@ -53,6 +86,8 @@ bootstrap:
     # instead of Gemini's generated per-agent roster.
     mechanism: "api-based"
     action: "inject-bootstrap-instructions"
+    marker_id: "ZCode"
+    context_file: null
     instructions_mode: "static"
     instructions: |
       ## Agent Bootstrap — Session-Start Pflicht
@@ -77,4 +112,7 @@ bootstrap:
   KimiCode:
     mechanism: "file-based"
     action: "none"
+    marker_id: "KimiCode"
+    context_file: null
+    instructions_mode: "static"
     description: "Kimi Code discoverte Custom Agents automatisch neben den Built-ins (V16, 2026-09-04: explicit > project .kimi-code/agents/ > extra dirs > user > plugin > built-in) — kein Session-Bootstrap nötig."

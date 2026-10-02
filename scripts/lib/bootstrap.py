@@ -45,6 +45,37 @@ class BootstrapEngine:
         """Return bootstrap configuration for a provider."""
         return self.bootstrap_registry.get("bootstrap", {}).get(provider, {})
 
+    def injecting_providers(self) -> list[str]:
+        """Registry-ordered providers that inject bootstrap instructions.
+
+        Single source of truth for the context-file cleanup: the caller iterates
+        this list instead of hardcoding a provider name (provider-agnostic
+        policy, spec §2.4 / design §3.5).
+        """
+        return [
+            name
+            for name, cfg in (self.bootstrap_registry.get("bootstrap") or {}).items()
+            if cfg.get("action") == "inject-bootstrap-instructions"
+        ]
+
+    def marker_id_for(self, provider: str) -> str:
+        """Scoped marker id for a provider; defaults to the provider name."""
+        return self.get_bootstrap_config(provider).get("marker_id") or provider
+
+    def resolve_context_file(self, provider: str, provider_config: dict | None = None) -> str | None:
+        """Resolve a provider's injection target.
+
+        The bootstrap registry's ``context_file`` wins when set; otherwise the
+        provider's ``ai-providers.yaml`` ``context_file`` is used. No hardcoded
+        ``.gemini/GEMINI.md`` default remains (design §3.5).
+        """
+        explicit = self.get_bootstrap_config(provider).get("context_file")
+        if explicit:
+            return explicit
+        if provider_config:
+            return (provider_config.get(provider) or {}).get("context_file")
+        return None
+
     def run_bootstrap(
         self,
         provider: str,
@@ -111,9 +142,15 @@ class BootstrapEngine:
           registry's static text is injected verbatim (trailing newlines
           stripped) — no per-agent roster generation (no agents_dir.glob).
           Used by ZCode, whose harness has no define_subagent API.
-        - default (no ``instructions_mode``, i.e. Gemini): the per-agent
-          roster is generated from ``agents_dir`` via
+        - default (``instructions_mode: generated``, i.e. Gemini): the
+          per-agent roster is generated from ``agents_dir`` via
           generate_gemini_bootstrap_instructions().
+
+        The injected block is provider-scoped (design §3.5 / DECISION-4):
+        ``<!-- agent-meta:bootstrap-begin:{marker_id} -->`` …
+        ``<!-- agent-meta:bootstrap-end:{marker_id} -->`` with ``marker_id``
+        defaulting to the provider name, so two providers sharing one context
+        file no longer overwrite each other.
         """
         if config.get("action") != "inject-bootstrap-instructions":
             return {"status": "skipped", "reason": f"unsupported action for {provider}: {config.get('action')}"}
@@ -133,7 +170,17 @@ class BootstrapEngine:
             if not instructions:
                 return {"status": "skipped", "reason": "no agents found"}
 
-        context_file = context_file or ".gemini/GEMINI.md"
+        # Registry key wins; the passed-in ai-providers.yaml value is the
+        # fallback. No hardcoded provider path remains (design §3.5).
+        context_file = config.get("context_file") or context_file
+        if not context_file:
+            return {
+                "status": "error",
+                "reason": (
+                    f"no context_file resolved for {provider} "
+                    "(provider-bootstrap.yaml and ai-providers.yaml both empty)"
+                ),
+            }
         # Path-traversal guard: context_file must resolve inside project_root.
         resolved = (project_root / context_file).resolve()
         root_resolved = project_root.resolve()
@@ -149,8 +196,9 @@ class BootstrapEngine:
             return {"status": "skipped", "reason": f"{context_file} does not exist"}
 
         existing = target_path.read_text(encoding="utf-8")
-        marker_begin = "<!-- agent-meta:bootstrap-begin -->"
-        marker_end = "<!-- agent-meta:bootstrap-end -->"
+        marker_id = config.get("marker_id") or provider
+        marker_begin = f"<!-- agent-meta:bootstrap-begin:{marker_id} -->"
+        marker_end = f"<!-- agent-meta:bootstrap-end:{marker_id} -->"
         block = f"{marker_begin}\n{instructions}\n{marker_end}"
 
         if marker_begin in existing:
@@ -179,9 +227,13 @@ class BootstrapEngine:
         config: dict[str, Any],
         project_root: Path | None,
     ) -> dict[str, Any]:
-        """Update Continue config.yaml with agent entries."""
-        agents = sorted(agents_dir.glob("*.md"))
+        """Remove the dead `.continue/config.yaml` agents block (OQ-2).
 
+        `.continue/agents/*.md` keep being generated (they are read by
+        ``cn review``); the generated config must not declare them as a chat
+        auto-discovery surface, so no `agents:` block is written anymore. A
+        block from an earlier sync is removed once, then the call is a no-op.
+        """
         if project_root is None:
             return {
                 "status": "error",
@@ -197,39 +249,37 @@ class BootstrapEngine:
 
         existing = config_path.read_text(encoding="utf-8")
 
+        # OQ-2: `.continue/agents/` is a `cn review`-only surface, never a chat
+        # auto-discovery surface. The old top-level `agents:` block was
+        # therefore dead (and Zod-invalid) — stop emitting it and remove any
+        # previously generated block on the next sync.
         marker = "# agent-meta:managed-agents-begin"
         marker_end = "# agent-meta:managed-agents-end"
-        agent_entries = "".join(f"  - name: {f.stem}\n    prompt: prompts/{f.name}\n" for f in agents)
-        managed_block = (
-            f"{marker}\n"
-            "# Auto-generated by agent-meta sync.py — do not edit manually\n"
-            f"agents:\n{agent_entries}{marker_end}"
-        )
 
         if marker in existing:
             pattern = re.compile(
                 re.escape(marker) + ".*?" + re.escape(marker_end),
                 re.DOTALL,
             )
-            # Function replacement keeps the generated block verbatim (#674).
-            new_content = pattern.sub(lambda _m: managed_block, existing, count=1)
-        else:
-            new_content = existing.rstrip("\n") + "\n\n" + managed_block + "\n"
-
-        if new_content != existing:
-            config_path.write_text(new_content, encoding="utf-8")
-            return {
-                "status": "success",
-                "provider": provider,
-                "mechanism": "config-updated",
-                "agent_count": len(agents),
-                "instructions": f"{len(agents)} Agenten in .continue/config.yaml eingetragen.",
-            }
+            new_content = pattern.sub("", existing, count=1)
+            new_content = re.sub(r"\n{3,}", "\n\n", new_content).rstrip("\n") + "\n"
+            if new_content != existing:
+                config_path.write_text(new_content, encoding="utf-8")
+                return {
+                    "status": "success",
+                    "provider": provider,
+                    "mechanism": "config-updated",
+                    "agent_count": 0,
+                    "instructions": (
+                        "removed the dead .continue/config.yaml agents block "
+                        "(.continue/agents is cn review-only, OQ-2)"
+                    ),
+                }
 
         return {
             "status": "skipped",
             "mechanism": "config-based",
-            "reason": "config.yaml already up to date",
+            "reason": "no agents block — .continue/agents is cn review-only (OQ-2)",
         }
 
     def generate_gemini_bootstrap_instructions(

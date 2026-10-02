@@ -107,8 +107,9 @@ def _split_injected_footer_tail(footer: str) -> tuple[str, str]:
     """Split a footer into (template_part, injected_tail).
 
     The injected tail is any trailing block appended below the template footer by
-    a separate step or external tool — e.g. agent-meta's own bootstrap block
-    (``<!-- agent-meta:bootstrap-begin -->``) or a third-party wrapper block. All
+    a separate step or external tool — e.g. agent-meta's own scoped bootstrap
+    block (``<!-- agent-meta:bootstrap-begin:{marker_id} -->``) or a third-party
+    wrapper block. All
     of these are delimited by HTML comments, and the context template footers are
     plain markdown with no HTML comments below the managed block, so the first
     ``<!--`` in the footer reliably marks the boundary. Returning the tail
@@ -726,9 +727,9 @@ def _sync_opencode_context(
             if not dry_run:
                 target_path.write_text(new_content, encoding="utf-8")
 
-    # Bootstrap block cleanup: remove Gemini bootstrap if Gemini is not active.
+    # Bootstrap block cleanup: registry-keyed, provider-scoped markers.
     _cleanup_bootstrap_block(target_path, config, provider_config, log, dry_run,
-                              project_root=project_root)
+                              project_root=project_root, agent_meta_root=agent_meta_root)
 
     init_opencode_personal(agent_meta_root, project_root, log, dry_run)
     _init_provider_settings_json(project_root, pc, agent_meta_root, variables, log, dry_run)
@@ -741,39 +742,79 @@ def _cleanup_bootstrap_block(
     log: SyncLog,
     dry_run: bool,
     project_root: Path | None = None,
+    agent_meta_root: Path | None = None,
 ) -> None:
-    """Remove the Gemini bootstrap block from AGENTS.md if Gemini is not active.
+    """Registry-keyed cleanup of provider-scoped bootstrap markers.
 
-    The bootstrap block (<!-- agent-meta:bootstrap-begin --> ... <!-- agent-meta:bootstrap-end -->)
-    is Gemini-specific. When Gemini is deactivated, it should not appear in AGENTS.md
-    because 1) it lists agents that won't work without Gemini, and 2) it wastes context.
+    Iterates the bootstrap registry (``inject-bootstrap-instructions``
+    providers): a provider's ``:{marker_id}`` sub-block is kept iff the
+    provider is active, otherwise removed. The legacy id-less pair
+    (``<!-- agent-meta:bootstrap-begin -->`` … ``end``) is discarded once
+    without attribution — two providers may have overwritten the same block,
+    so no author can be reconstructed (M-6, design §3.5). User notes outside
+    the managed markers are never touched.
     """
+    from .bootstrap import BootstrapEngine
     from .providers import resolve_providers
-    active = set(resolve_providers(config, provider_config))
-    gemini_active = "Gemini" in active
 
     if not target_path.exists():
         return
 
+    active = set(resolve_providers(config, provider_config))
+    root = agent_meta_root or Path(__file__).resolve().parents[2]
+    engine = BootstrapEngine(config_dir=root / "config")
+
     content = target_path.read_text(encoding="utf-8")
-    bootstrap_pattern = re.compile(
+    original = content
+
+    # 1. Legacy id-less pair: discard once (M-6). The ``\s*`` before ``-->``
+    #    never matches a scoped ``:{marker_id}`` marker.
+    legacy_pattern = re.compile(
         r"<!--\s*agent-meta:bootstrap-begin\s*-->.*?<!--\s*agent-meta:bootstrap-end\s*-->",
         re.DOTALL,
     )
-    has_bootstrap = bootstrap_pattern.search(content)
+    has_legacy = legacy_pattern.search(content) is not None
+    content = legacy_pattern.sub("", content)
 
-    if gemini_active or not has_bootstrap:
+    # 2. Provider-scoped sub-blocks: keep active, drop inactive — registry-keyed,
+    #    never a provider-name literal (provider-agnostic policy).
+    removed: list[str] = []
+    for provider in engine.injecting_providers():
+        if provider in active:
+            continue
+        marker_id = engine.marker_id_for(provider)
+        scoped_pattern = re.compile(
+            rf"<!--\s*agent-meta:bootstrap-begin:{re.escape(marker_id)}\s*-->"
+            rf".*?<!--\s*agent-meta:bootstrap-end:{re.escape(marker_id)}\s*-->",
+            re.DOTALL,
+        )
+        content, n_removed = scoped_pattern.subn("", content)
+        if n_removed:
+            removed.append(marker_id)
+
+    if content == original:
         return
 
-    new_content = bootstrap_pattern.sub("", content)
-    new_content = re.sub(r"\n{3,}", "\n\n", new_content)
-    if new_content != content:
-        rel_label = (str(target_path.relative_to(project_root))
-                     if project_root else target_path.name)
-        log.action("CLEANUP", rel_label,
-                   "removed Gemini bootstrap block (Gemini deactivated)")
-        if not dry_run:
-            target_path.write_text(new_content, encoding="utf-8")
+    # Normalise blank runs only below the managed block: bootstrap markers live
+    # in the injected footer tail, and a whole-file `\n{3,}` collapse would
+    # rewrite the managed block (breaking shared-AGENTS.md convergence, AC-05).
+    managed_end = re.search(r"<!--\s*agent-meta:managed-end\s*-->", content)
+    if managed_end:
+        head, tail = content[: managed_end.end()], content[managed_end.end():]
+        content = head + re.sub(r"\n{3,}", "\n\n", tail)
+    else:
+        content = re.sub(r"\n{3,}", "\n\n", content)
+
+    rel_label = (str(target_path.relative_to(project_root))
+                 if project_root else target_path.name)
+    details: list[str] = []
+    if has_legacy:
+        details.append("removed legacy bootstrap block")
+    if removed:
+        details.append(f"removed inactive marker(s): {', '.join(removed)}")
+    log.action("CLEANUP", rel_label, "; ".join(details) or "bootstrap markers normalised")
+    if not dry_run:
+        target_path.write_text(content, encoding="utf-8")
 
 
 def _sync_continue_context(
@@ -1285,7 +1326,7 @@ def _update_continue_config_managed_block(
     new_block = (
         f"{_CONTINUE_MANAGED_BEGIN}\n"
         f"# Managed by agent-meta v{version} — {today}\n"
-        f"# Agents : .continue/agents/  (auto-discovered by Continue)\n"
+        f"# Agents : .continue/agents/  (cn review only — NOT a chat auto-discovery surface)\n"
         f"# Rules  : .continue/rules/   (auto-discovered by Continue)\n"
         f"{_CONTINUE_MANAGED_END}"
     )
