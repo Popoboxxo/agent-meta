@@ -142,6 +142,72 @@ def test_provider_without_preset_entry_falls_back_to_registry() -> None:
 # --------------------------------------------------------------------------
 
 
+def test_project_local_preset_overrides_same_named_global_preset() -> None:
+    """A project-local preset shadows a same-named global preset.
+
+    ``Normal`` ships in ``config/tier-presets.yaml``; when a project redefines
+    ``tier-presets.Normal`` inline, the project definition must be used — the
+    global preset must not win just because the name matches.
+    """
+    global_powerful = _global_normal_preset()["tiers"]["powerful"]
+    local_powerful = "claude-sonnet-4-6"
+    assert local_powerful != global_powerful, (
+        "fixture sanity: the project-local tier and the global preset tier must "
+        f"differ (both are {local_powerful!r})"
+    )
+
+    config = {
+        "tier-presets": {
+            "Normal": {
+                "description": "project-local override",
+                "tiers": {"powerful": local_powerful},
+            }
+        }
+    }
+    resolved = _resolve("Claude", "senior-developer", config)
+    assert resolved == local_powerful, (
+        "a project-local preset must shadow the same-named global preset: "
+        f"expected {local_powerful!r}, got {resolved!r}"
+    )
+
+
+def test_project_local_preset_tiers_beat_ai_providers_model_tiers() -> None:
+    """A2 carve-out (spec amendment): a project-local preset's own ``tiers``
+    map beats the provider registry's ``model-tiers`` table, as an explicitly
+    approved EXCEPTION to AC-12's generic-preset direction.
+
+    Authority: ``docs/specs/2026-09-30-provider-audit-opencode-v2.md``
+    §Amendments A2 (project-local preset precedence carve-out); implementation
+    of record: ``roles.py::resolve_model`` ``is_project_local_preset`` branch
+    (:512-517). This direction is NOT an AC-12 conformance claim — AC-12 pins
+    the generic (global) preset case, where ``ai-providers.yaml model-tiers``
+    wins.
+
+    Mammouth has a registry ``model-tiers.powerful`` (= claude-opus-5); the
+    project-local value must not be shadowed by it.
+    """
+    registry_tier = _PROVIDER_CONFIG["Mammouth"]["model-tiers"]["powerful"]
+    local_powerful = "claude-sonnet-4-6"
+    assert local_powerful != registry_tier, (
+        "fixture sanity: the project-local tier and the registry tier must "
+        f"differ (both are {local_powerful!r})"
+    )
+
+    config = {
+        "tier-presets": {
+            "Normal": {
+                "description": "project-local override",
+                "tiers": {"powerful": local_powerful},
+            }
+        }
+    }
+    resolved = _resolve("Mammouth", "senior-developer", config)
+    assert resolved == local_powerful, (
+        "a project-local preset's tiers map must beat ai-providers.yaml "
+        f"model-tiers: expected {local_powerful!r}, got {resolved!r}"
+    )
+
+
 def test_kimicode_emits_single_prefix() -> None:
     """AC-2: every resolved KimiCode ID carries exactly one ``kimi-code/``
     prefix and the formatted ID is a declared catalog member."""
