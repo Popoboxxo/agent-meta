@@ -2,8 +2,6 @@
 
 ## [Unreleased]
 
-## [2.0.0] - 2026-10-02
-
 ### Added
 - **Four AI-agent roles, anchored in a 50-book literature analysis (27 Manning + 23 Humble/Packt)**:
   - `llm-evaluator` (1.0.0) — measures model/agent output against a golden dataset: offline eval
@@ -53,12 +51,6 @@
   management.
 
 ### Changed
-- **Breaking — Copilot artifact paths migrated default-on (consumer-visible — re-run `sync.py`
-  after upgrading)**: Copilot's generated artifacts move to `.github/agents/*.agent.md`. The legacy
-  `.github/copilot/agents/` and `.github/copilot/rules/` directories and `.github/copilot/COPILOT.md`
-  are removed backup-first by the migration map (`config/provider-migrations.yaml`, no flag), so the
-  old paths disappear for consumers who do not regenerate. This default-on removal is the reason this
-  release is a MAJOR bump.
 - **Role activation is gate-driven for `validator` and the developer tiers (consumer-visible —
   audit your `project.yaml` before upgrading)**: the per-role activation decision now resolves
   from the single `activation_groups` default table in `config/role-defaults.yaml` instead of the
@@ -112,6 +104,88 @@
   keywords, timeouts and handoff contracts; `prompt-engineer` gained its first `handoff` block, and
   `developer`, `data-engineer`, `sre-engineer`, `feedback` and `control-framework-assessor` now
   declare the new contracts as inputs so no handoff is silent.
+
+## [2.0.0] - 2026-10-02
+
+### Added
+- **Provider-agnostic artifact validation (`scripts/lib/artifact_validate.py`)** (#845):
+  `validate_toml`, `validate_frontmatter` and `validate_json_document` check every generated
+  artifact against its declared contract (`allowed-fields` / `reject-fields`, TOML parse, Opencode
+  v2 JSON nesting). The same validators feed `agent_sync._finalize_agent_content` and the two
+  consistency modules `consistency/artifact_contracts.py` and `consistency/model_contracts.py`,
+  both registered in `consistency-check.py`; a corrupted fixture yields an ERROR and a model outside
+  a configured `model-catalog` is fail-loud.
+- **`config/provider-migrations.yaml` migration map** (#845): ordered write-new → verify →
+  backup-old → remove-old path migrations with backup-first managed deletes (byte-exact
+  `.sync-backup-<ts>` sibling, rollback by rename) while user-authored files are never removed.
+  Dispatch is on the map plus the named bool flag, never on a provider name.
+- **New provider contract keys** (#845): `config/ai-providers.yaml` gains `agent-discovery`,
+  `surface-version`, `model-format`, `model-catalog`, `primary-role`, `model-literal`,
+  `agent-transform.{tools-format,tool-name-map,allowed-fields,reject-fields,frontmatter-mechanism}`
+  and `mcp-config.format` (`opencode-json`, `opencode-json-v2`, `antigravity-mcp-json`, `kimi-json`,
+  `codex-toml-mcp`, `continue-yaml`); `config/provider-capabilities.yaml` gains the `skills`,
+  `artifact-validation`, `artifact-validation-reason` and `mcp-remote-transport` flags (an
+  `artifact-validation: false` requires a non-empty reason).
+- **Opencode v2 opt-in surface** (#845): `surface-version: v2` selects `mcp-config.surface-formats`
+  → `opencode-json-v2` (nested `mcp.servers`, no flat `mcp`) and `agent-transform.surface-mechanisms`
+  → `opencode-native-v2`; the `primary-role` (`orchestrator`) is emitted as `mode: primary` with
+  `default_agent` set, all other agents as `mode: subagent`. `v1` remains the default and its output
+  is byte-frozen; the default flip is reserved for a future MAJOR.
+- **Antigravity discovery gated by `agent-discovery`** (#845): the bool flag (default `false`) gates
+  the `.agents/{agents,rules,skills}` discovery surface and `.agents/mcp_config.json`; the shipped
+  default keeps the current `.gemini/*` paths byte-for-byte. Antigravity emits `model: inherit` and
+  its MCP servers carry `serverUrl`.
+- **KimiCode model namespace** (#845): every emitted Kimi model carries the `kimi-code/{model}`
+  prefix and resolves through the `model-catalog`; a bare ID outside the catalog is a fail-loud
+  consistency finding.
+- **Mammouth reads `AGENTS.md`** (#845): `context_file`/`context_adapter_file` point at `AGENTS.md`
+  and the `MAMMOUTH.md` artifact plus its routing entry are retired.
+- **Codex TOML singleton-in-body fix** (#845): singleton blocks are emitted inside the agent body
+  before serialisation, so the previously invalid `agent-meta-manager.toml` and
+  `knowledge-curator.toml` are valid TOML; Codex MCP headers use `http_headers`.
+- **Continue config validity** (#845): the generated `.continue/config.local.yaml` carries
+  `name`/`version` (schema-valid), the invalid `roles: [..., "agent"]` enum value and the dead
+  top-level `agents:` block are removed/corrected, and MCP request headers use
+  `requestOptions.headers`.
+- **Config-backed pipeline notation** (#845): `config/delegation-syntax.yaml` is the single source
+  for provider notation, a missing block fails loud instead of falling back to the Opencode `task()`
+  default, and Copilot is added to the provider registry.
+- **Provider-audit scenarios 64–72** (#845): nine executable scenarios (Codex TOML validity,
+  KimiCode model namespace, Mammouth tools map, Copilot artifact paths, Antigravity discovery paths,
+  Opencode v2 surface, bootstrap marker convergence, all-provider `--check` idempotency, Continue
+  config validity), each with its own assert script and a scenario-registry row.
+- **Provider-agnostic sweep guard** (#845): `tests/test_provider_agnostic_dispatch.py` sweeps all of
+  `scripts/lib/**/*.py` for `if provider ==` / provider-name literals and for `surface-version`
+  comparisons in writer code.
+
+### Changed
+- **Breaking — Copilot artifact paths migrated default-on (consumer-visible — re-run `sync.py`
+  after upgrading)**: Copilot's generated artifacts move to `.github/agents/*.agent.md`. The legacy
+  `.github/copilot/agents/` and `.github/copilot/rules/` directories and `.github/copilot/COPILOT.md`
+  are removed backup-first by the migration map (`config/provider-migrations.yaml`, no flag), so the
+  old paths disappear for consumers who do not regenerate. This default-on removal is the reason this
+  release is a MAJOR bump.
+- **Sync-time validation is fail-loud (`--check`/`--validate` rc policy)** (#845): an artifact
+  contract violation makes `sync.py --validate` return rc 1 (a normal sync stays rc 0 and logs
+  `[WARN] artifact-contract:`), and the permanent `--check` false-positives plus the entry-file
+  run1→run2 drift are fixed — after a clean scratch sync `--check` is rc 0 and
+  `sha256(run1) == sha256(run2)` (a managed-block edit is rc 1, an out-of-block edit rc 0).
+- **Transform and model contracts** (#845): Mammouth `tools:` is emitted as a map (never a YAML list),
+  Antigravity tool names resolve through the data-driven `tool-name-map` (`Read`→`view_file`,
+  `Write`→`replace_file_content`, `Grep`→`grep_search`, `Bash`→`run_command`), and `resolve_model`
+  applies `model-format` exactly once with `ai-providers.yaml model-tiers` authoritative over preset
+  tiers.
+- **Bootstrap markers are scoped per provider** (#845): Gemini and ZCode each carry one scoped marker
+  pair (fixing the marker collision), the legacy unscoped pair is migrated and rebuilt per provider,
+  scoped markers of inactive providers are removed, and user notes outside the markers survive.
+- **Path migration and pending-write stabilisation** (#845): generated files move write-new → verify
+  → backup-old → remove-old with a production-wired final-content diff; Gemini discovery paths
+  migrate only when `agent-discovery` is enabled.
+- **Provider-neutral template body references** (#845): the five `.claude/`-prefixed refs in
+  `agent-meta-manager`, `agent-meta-scout` and `release` are rephrased provider-neutrally and no
+  longer appear in non-Claude generated bodies.
+- **Regenerated 27-file artifact drift** (#845): the repo is drift-free (`sync.py --check` rc 0) with
+  the new `{{AGENT_META_VERSION}}` embedded in every generated artifact.
 
 ## [1.2.0-beta.2] - 2026-09-13
 
