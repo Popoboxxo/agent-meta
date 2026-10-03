@@ -9,10 +9,15 @@ roles:
 plugins:
   playwright:
     enabled: true
-# OQ-8/AC-5 opt-in gate. NOTE: the shipped default in config/ai-providers.yaml is
-# `surface-version: "v1"`; the key is currently registry-level data only — no
-# project.yaml key consumes it (see asserts/69-*.sh for the v2 contract check).
-surface-version: v2
+# OQ-8/AC-5 opt-in gate, project channel (SPEC-ADMIN-UI-OPENCODE-SURFACE-AMENDMENT-
+# 2026-10-03, D1/D2): the consumer opts into v2 through the allow-listed
+# `provider-options.<Provider>.surface-version` key — NOT by editing the framework
+# registry. The resolver (`lib.providers.load_providers_config(root, project)`)
+# copies it onto the matching registry entry before surface resolution, so the
+# harness's own sync/--check already run the v2 tree (see asserts/69-*.sh).
+provider-options:
+  Opencode:
+    surface-version: v2
 project:
   name: scenario-opencode-v2-surface
   prefix: s69
