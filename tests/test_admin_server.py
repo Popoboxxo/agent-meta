@@ -9,6 +9,7 @@ import time and shared across test cases.
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import os
 import sys
@@ -2124,6 +2125,399 @@ class TestWriteProjectSectionContextFile(unittest.TestCase):
             handler._write_project_section()  # must not raise (HTTP 400 otherwise)
             persisted = handler.config_manager.read("project")
             self.assertEqual(persisted["context_file"], data)
+
+
+_OPENCODE_REGISTRY_FIXTURE: dict[str, Any] = {
+    "Opencode": {
+        "surface-version": "v1",
+        "mcp-config": {
+            "format": "opencode-json",
+            "surface-formats": {
+                "v1": "opencode-json",
+                "v2": "opencode-json-v2",
+            },
+        },
+        "agent-transform": {
+            "frontmatter-mechanism": "opencode-native",
+            "surface-mechanisms": {
+                "v1": "opencode-native",
+                "v2": "opencode-native-v2",
+            },
+        },
+    },
+}
+
+
+def _write_registry_file(root: Path, providers: dict) -> None:
+    """Write a minimal ``config/ai-providers.yaml`` fixture under *root*."""
+    config_dir = root / "config"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    (config_dir / "ai-providers.yaml").write_text(
+        yaml.safe_dump({"providers": providers}, sort_keys=False),
+        encoding="utf-8",
+    )
+
+
+class TestValidateSurfaceVersionsHelper(unittest.TestCase):
+    """REV-R5: module-level ``_validate_surface_versions`` contract."""
+
+    def _prov(self, version: Any, formats: Any = None) -> dict:
+        entry: dict[str, Any] = {"surface-version": version}
+        if formats is not None:
+            entry["mcp-config"] = {"surface-formats": formats}
+        return {"P": entry}
+
+    def test_value_that_is_a_surface_formats_key_is_accepted(self) -> None:
+        admin_server._validate_surface_versions(
+            self._prov("v2", {"v1": "a", "v2": "b"}))
+
+    def test_unknown_value_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            admin_server._validate_surface_versions(
+                self._prov("v3", {"v1": "a", "v2": "b"}))
+
+    def test_non_default_value_without_formats_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            admin_server._validate_surface_versions(self._prov("v2"))
+
+    def test_default_v1_without_formats_accepted(self) -> None:
+        admin_server._validate_surface_versions(self._prov("v1"))
+
+    def test_non_string_value_is_ignored(self) -> None:
+        admin_server._validate_surface_versions(
+            self._prov(2, {"v1": "a", "v2": "b"}))
+
+    def test_absent_version_is_skipped(self) -> None:
+        admin_server._validate_surface_versions({"P": {"mcp-config": {}}})
+
+    def test_allow_no_formats_opts_out(self) -> None:
+        admin_server._validate_surface_versions(
+            self._prov("v2"), allow_no_formats=True)
+
+    def test_empty_string_is_treated_as_unset_default(self) -> None:
+        # F-01 parity with lib/providers.py: "" is the explicit "unset"
+        # sentinel — accepted (no 400) ...
+        admin_server._validate_surface_versions(self._prov(""))
+        # ... and never exposed as a distinct active-surface value (it resolves
+        # like the implicit v1 default).
+        active = admin_server._compute_active_surface({
+            "P": {
+                "surface-version": "",
+                "mcp-config": {"format": "f", "surface-formats": {"v1": "f"}},
+            }
+        })
+        self.assertEqual(active["P"]["version"], "v1")
+
+
+class TestAiProvidersSurfaceValidation(unittest.TestCase):
+    """AC-A4/AC-A5: registry write handlers validate + strip reserved key."""
+
+    def _make_handler(self, root: Path, *, mode: str = "super_admin"):
+        (root / ".meta-config").mkdir(exist_ok=True)
+        handler = admin_server.AdminRequestHandler.__new__(
+            admin_server.AdminRequestHandler)
+        admin_server.AdminRequestHandler.root = root
+        admin_server.AdminRequestHandler.config_manager = (
+            admin_server.ConfigManager(root, mode=mode))
+        return handler
+
+    def test_put_invalid_value_rejected_and_file_unchanged(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            handler = self._make_handler(root)
+            _write_registry_file(root, _OPENCODE_REGISTRY_FIXTURE)
+            registry_path = root / "config" / "ai-providers.yaml"
+            before = registry_path.read_text(encoding="utf-8")
+
+            handler._read_body = lambda: {
+                "providers": {
+                    "Opencode": {
+                        "surface-version": "v3",
+                        "mcp-config": {
+                            "surface-formats": {"v1": "a", "v2": "b"}},
+                    }
+                },
+                "active-surface": {"Opencode": {"version": "v3"}},
+            }
+            handler._send_json = lambda result, status=200: None
+            with self.assertRaises(ValueError):
+                handler._route_put_config("ai-providers")
+
+            self.assertEqual(
+                registry_path.read_text(encoding="utf-8"), before)
+
+    def test_put_valid_v2_persisted_and_reserved_key_stripped(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            handler = self._make_handler(root)
+            body = {
+                "providers": {
+                    "Opencode": {
+                        "surface-version": "v2",
+                        "mcp-config": {
+                            "format": "opencode-json",
+                            "surface-formats": {
+                                "v1": "opencode-json",
+                                "v2": "opencode-json-v2",
+                            },
+                        },
+                    },
+                    # Reserved key smuggled in as a provider name: must be
+                    # stripped from the nested map too (F-02).
+                    "active-surface": {"version": "v2"},
+                },
+                "active-surface": {"Opencode": {"version": "v2"}},
+            }
+            captured: dict[str, Any] = {}
+            handler._read_body = lambda: body
+            handler._send_json = lambda result, status=200: captured.update(
+                result=result, status=status)
+            handler._route_put_config("ai-providers")
+
+            persisted = handler.config_manager.read("ai-providers")
+            self.assertEqual(
+                persisted["providers"]["Opencode"]["surface-version"], "v2")
+            self.assertNotIn("active-surface", persisted)
+            self.assertNotIn("active-surface", persisted["providers"])
+            # Shallow copies: the caller's request body (including the nested
+            # provider map) is not mutated in place.
+            self.assertIn("active-surface", body)
+            self.assertIn("active-surface", body["providers"])
+
+    def test_put_v2_without_surface_formats_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            handler = self._make_handler(root)
+            handler._read_body = lambda: {
+                "providers": {"FutureProvider": {"surface-version": "v2"}}}
+            handler._send_json = lambda result, status=200: None
+            with self.assertRaises(ValueError):
+                handler._route_put_config("ai-providers")
+
+    def _post_handler(self, root: Path, payload: Any):
+        handler = self._make_handler(root)
+        raw = json.dumps(payload).encode("utf-8")
+        handler.headers = {"Content-Length": str(len(raw))}
+        handler.rfile = io.BytesIO(raw)
+        return handler
+
+    def test_post_invalid_value_returns_400_and_file_unchanged(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            handler = self._post_handler(root, {
+                "providers": {
+                    "Opencode": {
+                        "surface-version": "v3",
+                        "mcp-config": {
+                            "surface-formats": {"v1": "a", "v2": "b"}},
+                    }
+                },
+                "active-surface": {"Opencode": {"version": "v3"}},
+            })
+            _write_registry_file(root, _OPENCODE_REGISTRY_FIXTURE)
+            registry_path = root / "config" / "ai-providers.yaml"
+            before = registry_path.read_text(encoding="utf-8")
+
+            captured: dict[str, Any] = {}
+            handler._send_json = lambda result, status=200: captured.update(
+                result=result, status=status)
+            handler._handle_post_ai_providers_update()
+
+            self.assertEqual(captured["status"], 400)
+            self.assertIn("error", captured["result"])
+            self.assertEqual(
+                registry_path.read_text(encoding="utf-8"), before)
+
+    def test_post_valid_persists_and_strips_reserved_key(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            handler = self._post_handler(root, {
+                "providers": {
+                    "Opencode": {
+                        "surface-version": "v2",
+                        "mcp-config": {
+                            "format": "opencode-json",
+                            "surface-formats": {
+                                "v1": "opencode-json",
+                                "v2": "opencode-json-v2",
+                            },
+                        },
+                    },
+                    # Reserved key smuggled in as a provider name (F-02).
+                    "active-surface": {"version": "v2"},
+                },
+                "active-surface": {"Opencode": {"version": "v2"}},
+            })
+            captured: dict[str, Any] = {}
+            handler._send_json = lambda result, status=200: captured.update(
+                result=result, status=status)
+            handler._handle_post_ai_providers_update()
+
+            self.assertTrue(captured["result"].get("success"))
+            persisted = yaml.safe_load(
+                (root / "config" / "ai-providers.yaml").read_text(
+                    encoding="utf-8"))
+            self.assertEqual(
+                persisted["providers"]["Opencode"]["surface-version"], "v2")
+            self.assertNotIn("active-surface", persisted)
+            self.assertNotIn("active-surface", persisted["providers"])
+
+
+class TestProjectProviderOptionsSurfaceValidation(unittest.TestCase):
+    """REV-R4: the project provider-options channel is validated server-side."""
+
+    def _make_handler(self, root: Path):
+        (root / ".meta-config").mkdir(exist_ok=True)
+        handler = admin_server.AdminRequestHandler.__new__(
+            admin_server.AdminRequestHandler)
+        admin_server.AdminRequestHandler.root = root
+        admin_server.AdminRequestHandler.config_manager = (
+            admin_server.ConfigManager(root, mode="project_admin"))
+        return handler
+
+    def test_project_put_invalid_value_rejected_without_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            handler = self._make_handler(root)
+            _write_registry_file(root, _OPENCODE_REGISTRY_FIXTURE)
+            handler.config_manager.write("project", {"provider-options": {}})
+
+            handler._read_body = lambda: {
+                "provider-options": {"Opencode": {"surface-version": "v3"}}}
+            handler._send_json = lambda result, status=200: None
+            with self.assertRaises(ValueError):
+                handler._route_put_config("project")
+
+            persisted = handler.config_manager.read("project")
+            self.assertEqual(persisted.get("provider-options"), {})
+
+    def test_project_put_valid_v2_persisted(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            handler = self._make_handler(root)
+            _write_registry_file(root, _OPENCODE_REGISTRY_FIXTURE)
+            handler._read_body = lambda: {
+                "provider-options": {"Opencode": {"surface-version": "v2"}}}
+            captured: dict[str, Any] = {}
+            handler._send_json = lambda result, status=200: captured.update(
+                result=result, status=status)
+            handler._route_put_config("project")
+
+            persisted = handler.config_manager.read("project")
+            self.assertEqual(
+                persisted["provider-options"]["Opencode"]["surface-version"],
+                "v2",
+            )
+
+    def test_project_section_invalid_value_rejected_without_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            handler = self._make_handler(root)
+            _write_registry_file(root, _OPENCODE_REGISTRY_FIXTURE)
+            handler._read_body = lambda: {
+                "section": "provider-options",
+                "data": {"Opencode": {"surface-version": "v3"}},
+            }
+            handler._send_json = lambda result, status=200: None
+            with self.assertRaises(ValueError):
+                handler._write_project_section()
+
+            self.assertNotIn(
+                "provider-options", handler.config_manager.read("project"))
+
+    def test_project_section_valid_v2_persisted(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            handler = self._make_handler(root)
+            _write_registry_file(root, _OPENCODE_REGISTRY_FIXTURE)
+            handler._read_body = lambda: {
+                "section": "provider-options",
+                "data": {"Opencode": {"surface-version": "v2"}},
+            }
+            captured: dict[str, Any] = {}
+            handler._send_json = lambda result, status=200: captured.update(
+                result=result, status=status)
+            handler._write_project_section()
+
+            self.assertEqual(
+                handler.config_manager.read("project")["provider-options"]
+                ["Opencode"]["surface-version"],
+                "v2",
+            )
+
+    def test_unknown_provider_non_default_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            handler = self._make_handler(root)
+            _write_registry_file(root, _OPENCODE_REGISTRY_FIXTURE)
+            handler._read_body = lambda: {
+                "provider-options": {
+                    "NoSuchProvider": {"surface-version": "v2"}}}
+            handler._send_json = lambda result, status=200: None
+            with self.assertRaises(ValueError):
+                handler._route_put_config("project")
+
+
+class TestGetAiProvidersActiveSurface(unittest.TestCase):
+    """AC-A5: GET /api/ai-providers exposes the computed read-only surface."""
+
+    def _make_handler(self, root: Path):
+        (root / ".meta-config").mkdir(exist_ok=True)
+        handler = admin_server.AdminRequestHandler.__new__(
+            admin_server.AdminRequestHandler)
+        admin_server.AdminRequestHandler.root = root
+        admin_server.AdminRequestHandler.config_manager = (
+            admin_server.ConfigManager(root, mode="project_admin"))
+        return handler
+
+    def test_get_exposes_active_surface_for_opted_in_project(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            handler = self._make_handler(root)
+            _write_registry_file(root, _OPENCODE_REGISTRY_FIXTURE)
+            handler.config_manager.write(
+                "project",
+                {"provider-options": {"Opencode": {"surface-version": "v2"}}},
+            )
+
+            captured: dict[str, Any] = {}
+            handler._send_json = lambda result, status=200: captured.update(
+                result=result, status=status)
+            handler._handle_get_ai_providers()
+
+            payload = captured["result"]
+            # The editable registry stays raw (v1); the badge shows the
+            # effective (project-resolved) surface.
+            self.assertEqual(
+                payload["providers"]["Opencode"]["surface-version"], "v1")
+            self.assertEqual(
+                payload["active-surface"]["Opencode"],
+                {
+                    "version": "v2",
+                    "format": "opencode-json-v2",
+                    "mechanism": "opencode-native-v2",
+                },
+            )
+
+    def test_get_defaults_to_v1_without_project_optin(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            handler = self._make_handler(root)
+            _write_registry_file(root, _OPENCODE_REGISTRY_FIXTURE)
+
+            captured: dict[str, Any] = {}
+            handler._send_json = lambda result, status=200: captured.update(
+                result=result, status=status)
+            handler._handle_get_ai_providers()
+
+            self.assertEqual(
+                captured["result"]["active-surface"]["Opencode"],
+                {
+                    "version": "v1",
+                    "format": "opencode-json",
+                    "mechanism": "opencode-native",
+                },
+            )
 
 
 if __name__ == "__main__":

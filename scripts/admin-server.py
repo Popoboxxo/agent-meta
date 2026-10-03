@@ -298,6 +298,118 @@ def _ensure_scripts_on_path(root: Path) -> None:
             sys.path.insert(0, str_candidate)
 
 
+#: Implicit resolvable surface versions (SPEC-ADMIN-UI-OPENCODE-SURFACE-
+#: AMENDMENT-2026-10-03, REV-R5). Mirrors ``_SURFACE_DEFAULT_VERSIONS`` in
+#: ``lib/providers.py``: a provider without an ``mcp-config.surface-formats``
+#: map can only resolve the default ``v1``; any other declared value must be
+#: rejected (no silent ``{v1, v2}`` acceptance fallback).
+#:
+#: ``""`` is the explicit "unset" sentinel: an empty string is treated exactly
+#: like the implicit ``v1`` default (the resolver ignores it — see
+#: ``lib/providers.py::_apply_surface_format_selection`` /
+#: ``_surface_version_warnings``), so it is neither rejected nor exposed as a
+#: distinct active-surface value.
+_SURFACE_DEFAULT_VERSIONS: frozenset[str] = frozenset({"", "v1"})
+
+
+def _validate_surface_versions(
+    providers: dict, *, allow_no_formats: bool = False
+) -> None:
+    """Fail-loud validator for declared ``surface-version`` values.
+
+    SPEC-ADMIN-UI-OPENCODE-SURFACE-AMENDMENT-2026-10-03 §3.2. Raises
+    :class:`ValueError` (mapped to HTTP 400 by ``do_PUT`` / ``do_POST``) when
+    any provider entry carries a string ``surface-version`` that cannot be
+    resolved:
+
+    - provider declares ``mcp-config.surface-formats``: the value MUST be a
+      key of that mapping; an unknown value is rejected.
+    - provider declares NO ``surface-formats`` map: only the implicit default
+      (``v1``) is accepted; any other value is rejected (REV-R5). Passing
+      ``allow_no_formats=True`` opts out of that rejection.
+    - a non-string ``surface-version`` (or an absent one) is ignored — the
+      resolver ignores it too, so there is nothing to resolve.
+
+    Provider-agnostic: the allowed set is read from the same data the resolver
+    reads; no provider-name literal is involved.
+    """
+    if not isinstance(providers, dict):
+        return
+    for provider, entry in providers.items():
+        if not isinstance(entry, dict):
+            continue
+        surface_version = entry.get("surface-version")
+        if not isinstance(surface_version, str):
+            continue
+        if surface_version in _SURFACE_DEFAULT_VERSIONS:
+            continue
+        mcp_config = entry.get("mcp-config")
+        surface_formats = (
+            mcp_config.get("surface-formats")
+            if isinstance(mcp_config, dict)
+            else None
+        )
+        if isinstance(surface_formats, dict) and surface_formats:
+            if surface_version not in surface_formats:
+                allowed = ", ".join(sorted(str(k) for k in surface_formats))
+                raise ValueError(
+                    f"provider '{provider}': surface-version "
+                    f"'{surface_version}' is not one of the declared "
+                    f"surface-formats ({allowed})"
+                )
+            continue
+        if allow_no_formats:
+            continue
+        raise ValueError(
+            f"provider '{provider}': surface-version '{surface_version}' is "
+            "declared without an mcp-config.surface-formats map — only the "
+            "implicit default 'v1' is resolvable"
+        )
+
+
+def _compute_active_surface(providers: dict) -> dict:
+    """Return the read-only ``active-surface`` map for the GET payload.
+
+    SPEC-ADMIN-UI-OPENCODE-SURFACE-AMENDMENT-2026-10-03 §3.2. For every
+    provider that declares an ``mcp-config.surface-formats`` map, expose the
+    resolved ``version`` (declared or implicit ``v1``), ``format``
+    (``mcp-config.format``) and ``mechanism``
+    (``agent-transform.frontmatter-mechanism``). The input is expected to be
+    the *resolved* registry (``load_providers_config``), so format/mechanism
+    already reflect the surface selection. Data-driven — no provider-name
+    literal. Never raises; malformed entries are skipped.
+    """
+    active: dict = {}
+    if not isinstance(providers, dict):
+        return active
+    for provider, entry in providers.items():
+        if not isinstance(entry, dict):
+            continue
+        mcp_config = entry.get("mcp-config")
+        surface_formats = (
+            mcp_config.get("surface-formats")
+            if isinstance(mcp_config, dict)
+            else None
+        )
+        if not isinstance(surface_formats, dict) or not surface_formats:
+            continue
+        surface_version = entry.get("surface-version")
+        if not isinstance(surface_version, str) or not surface_version:
+            surface_version = "v1"
+        transform = entry.get("agent-transform")
+        mechanism = (
+            transform.get("frontmatter-mechanism")
+            if isinstance(transform, dict)
+            else None
+        )
+        active[provider] = {
+            "version": surface_version,
+            "format": mcp_config.get("format"),
+            "mechanism": mechanism,
+        }
+    return active
+
+
 # --------------------------------------------------------------------------- #
 # Viz / MCP sub-server manager                                               #
 # --------------------------------------------------------------------------- #
@@ -3694,6 +3806,23 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         body = self._read_body()
         if body is None:
             raise ValueError("empty body")
+        if key == "ai-providers" and isinstance(body, dict):
+            # REV-R1: ``active-surface`` is a reserved, read-only key and must
+            # never be persisted — neither as a top-level sibling of
+            # ``providers`` nor as a provider name inside the registry map.
+            # Work on shallow copies so the request body is not mutated in
+            # place. Validate before any write so a rejected request leaves the
+            # file untouched.
+            body = dict(body)
+            body.pop("active-surface", None)
+            if isinstance(body.get("providers"), dict):
+                providers = dict(body["providers"])
+                providers.pop("active-surface", None)
+                body["providers"] = providers
+            else:
+                # Flat (legacy) registry: the body itself is the provider map.
+                providers = body
+            _validate_surface_versions(providers)
         # Per-project plugin overrides now flow through the plugin-catalog file
         # (config/plugin-catalog.yaml + .meta-config/plugin-catalog.yaml) rather
         # than the retired external-tools-registry project section — validate any
@@ -3710,6 +3839,10 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             # explicitly — it used to be discarded, silently dropping every
             # full-document save while still reporting success.
             self._assert_project_update_writable(body, existing)
+            if isinstance(body, dict):
+                # REV-R4: the project provider-options surface channel is
+                # validated server-side before any disk write.
+                self._validate_project_provider_options(body.get("provider-options"))
             result = self.__class__.config_manager.write(
                 "project", self._deep_merge(existing, body))
         else:
@@ -4531,13 +4664,80 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             status, body = self._handle_error(exc, "ERR_MODEL_SUGGESTIONS")
             return self._send_json(body, status=status)
 
+    def _load_providers_registry(self) -> dict:
+        """Load the raw provider registry (``config/ai-providers.yaml``).
+
+        Fail-safe: any import/load error degrades to ``{}`` so the project
+        channel's :meth:`_validate_project_provider_options` then rejects any
+        non-default value (fail-closed, REV-R5) instead of crashing.
+        """
+        try:
+            self._ensure_lib_on_path()
+            from lib.providers import load_providers_config
+            registry = load_providers_config(self._agent_meta_root())
+        except Exception:
+            return {}
+        return registry if isinstance(registry, dict) else {}
+
+    def _validate_project_provider_options(self, provider_options: Any) -> None:
+        """Validate the project channel's ``provider-options`` surface values.
+
+        REV-R4 / SPEC-ADMIN-UI-OPENCODE-SURFACE-AMENDMENT-2026-10-03 §3.2: the
+        project editor writes through this channel, so it must be validated
+        server-side, not client-side only. For every provider option entry that
+        declares ``surface-version`` the allowed set is read from that
+        provider's registry ``mcp-config.surface-formats`` via the shared
+        :func:`_validate_surface_versions` helper. A provider absent from the
+        registry has no format map and may only declare ``v1``. Raises
+        ``ValueError`` (mapped to HTTP 400) — callers invoke it *before* any
+        write.
+        """
+        if not isinstance(provider_options, dict):
+            return
+        registry = self._load_providers_registry()
+        candidates: dict = {}
+        for provider, options in provider_options.items():
+            if not isinstance(options, dict) or "surface-version" not in options:
+                continue
+            entry = registry.get(provider)
+            mcp_config = (
+                entry.get("mcp-config") if isinstance(entry, dict) else None
+            )
+            candidates[provider] = {
+                "surface-version": options.get("surface-version"),
+                "mcp-config": mcp_config if isinstance(mcp_config, dict) else {},
+            }
+        _validate_surface_versions(candidates)
+
     def _handle_get_ai_providers(self) -> None:
         try:
             path = resolve_asset(self.__class__.root, "config") / "ai-providers.yaml"
             data = {}
             if path.exists():
                 data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-            return self._send_json(data)
+            if not isinstance(data, dict):
+                data = {}
+            providers = data.get("providers", data)
+            if not isinstance(providers, dict):
+                providers = {}
+            # REV-R1/D3: the editable registry object stays raw; the resolved
+            # surface is exposed as a separate read-only sibling, computed with
+            # the effective project config so what is shown equals what sync
+            # generates.
+            project_config = self.__class__.config_manager.read("project")
+            if not isinstance(project_config, dict):
+                project_config = {}
+            active_surface: dict = {}
+            try:
+                self._ensure_lib_on_path()
+                from lib.providers import load_providers_config
+                resolved = load_providers_config(
+                    self._agent_meta_root(), project_config)
+                active_surface = _compute_active_surface(resolved)
+            except Exception:  # noqa: BLE001 - never break the editable view
+                active_surface = {}
+            return self._send_json(
+                {"providers": providers, "active-surface": active_surface})
         except Exception as exc:  # noqa: BLE001
             status, body = self._handle_error(exc, "ERR_AI_PROVIDERS")
             return self._send_json(body, status=status)
@@ -4546,6 +4746,25 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         try:
             length = int(self.headers.get("Content-Length", 0))
             data = json.loads(self.rfile.read(length).decode("utf-8")) if length > 0 else {}
+            if isinstance(data, dict):
+                # REV-R1: strip the reserved read-only ``active-surface`` key —
+                # both as a top-level sibling of ``providers`` and as a provider
+                # name inside the registry map (shallow copies — no in-place
+                # mutation) — and validate surface versions before yaml.dump; a
+                # rejected request writes nothing.
+                data = dict(data)
+                data.pop("active-surface", None)
+                if isinstance(data.get("providers"), dict):
+                    providers = dict(data["providers"])
+                    providers.pop("active-surface", None)
+                    data["providers"] = providers
+                else:
+                    # Flat (legacy) registry: the body is the provider map.
+                    providers = data
+                try:
+                    _validate_surface_versions(providers)
+                except ValueError as exc:
+                    return self._send_json({"error": str(exc)}, status=400)
             path = resolve_asset(self.__class__.root, "config") / "ai-providers.yaml"
             path.parent.mkdir(parents=True, exist_ok=True)
             with path.open("w", encoding="utf-8") as fh:
@@ -4836,6 +5055,12 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         else:
             raise ValueError("expected JSON body with 'section' and 'data', or 'key' and 'value'")
         self._assert_project_sections_writable([section])
+        if section == "provider-options":
+            # REV-R4: the Admin UI writes provider-options through this
+            # partial-section route — validate its surface values before any
+            # disk write so a bad value is rejected with HTTP 400 and leaves
+            # the persisted file untouched.
+            self._validate_project_provider_options(data)
         existing = self.__class__.config_manager.read("project")
         if not isinstance(existing, dict):
             existing = {}
