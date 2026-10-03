@@ -283,10 +283,10 @@ discovery:
 **Verify:** `python3 -m pytest tests/test_mcp_config.py -q`
 **Provider-Agnostik:** dispatch on the format string only (H-1 / ADR-10).
 **Depends on:** 4
-- [ ] Step 1: Test schreiben (fail)
-- [ ] Step 2: implementieren
-- [ ] Step 3: Test (pass)
-- [ ] Step 4: commit — `fix: dispatch mcp writers by declared format`
+- [x] Step 1: Test schreiben (fail)
+- [x] Step 2: implementieren
+- [x] Step 3: Test (pass)
+- [x] Step 4: commit — `fix: dispatch mcp writers by declared format`
 
 ### Task 9: Pipeline notation from config + full registry
 **Agent:** developer
@@ -401,10 +401,10 @@ The migrator normalizes both shapes: a bare list = default-on; `{requires-flag, 
 **Verify:** version markers updated (`grep`/read) and `git diff --stat` shows only `VERSION`, `CHANGELOG.md`, `.meta-config/project.yaml` (and `README.md` if referenced)
 **Provider-Agnostik:** version bookkeeping only — no provider name read; `{{AGENT_META_VERSION}}` substitution is provider-neutral and handled by the regeneration task (16).
 **Depends on:** 14
-- [ ] Step 1: bump `VERSION` + `.meta-config/project.yaml` (`agent-meta-version`) to the MAJOR version
-- [ ] Step 2: promote `[Unreleased]` → the new MAJOR section in `CHANGELOG.md`; update any README version reference
-- [ ] Step 3: verify version markers (`grep`/read) and confirm `git diff --stat` shows ONLY the four version files
-- [ ] Step 4: commit — `chore(release): bump major version for provider audit`
+- [x] Step 1: bump `VERSION` + `.meta-config/project.yaml` (`agent-meta-version`) to the MAJOR version
+- [x] Step 2: promote `[Unreleased]` → the new MAJOR section in `CHANGELOG.md`; update any README version reference
+- [x] Step 3: verify version markers (`grep`/read) and confirm `git diff --stat` shows ONLY the four version files
+- [x] Step 4: commit — `chore(release): bump major version for provider audit`
 
 ### Task 16: Repo regeneration (27-file drift)
 **Agent:** developer
@@ -415,10 +415,10 @@ The migrator normalizes both shapes: a bare list = default-on; `{requires-flag, 
 **Verify:** `python3 scripts/sync.py && python3 scripts/sync.py --check; echo $?` -> `0` (and the new `{{AGENT_META_VERSION}}` is embedded)
 **Provider-Agnostik:** regeneration is config/template-driven.
 **Depends on:** 15
-- [ ] Step 1: regenerate with `python3 scripts/sync.py`
-- [ ] Step 2: inspect the 27-file delta per file
-- [ ] Step 3: `--check` rc 0
-- [ ] Step 4: commit — `chore: regenerate drifted provider artifacts`
+- [x] Step 1: regenerate with `python3 scripts/sync.py`
+- [x] Step 2: inspect the 27-file delta per file
+- [x] Step 3: `--check` rc 0
+- [x] Step 4: commit — `chore: regenerate drifted provider artifacts`
 
 ### Task 17: Commit regenerated artifacts
 **Agent:** git
@@ -428,9 +428,9 @@ The migrator normalizes both shapes: a bare list = default-on; `{requires-flag, 
 **Verify:** `git status --porcelain` (empty) and `git log -1 --stat`
 **Provider-Agnostik:** not applicable (commit only).
 **Depends on:** 16
-- [ ] Step 1: stage the regenerated artifacts
-- [ ] Step 2: commit — `chore: commit regenerated provider artifacts`
-- [ ] Step 3: confirm clean tree
+- [x] Step 1: stage the regenerated artifacts
+- [x] Step 2: commit — `chore: commit regenerated provider artifacts`
+- [x] Step 3: confirm clean tree
 
 ### Task 18: Full verification gate (stage `validate`)
 **Agent:** validator
@@ -440,10 +440,10 @@ The migrator normalizes both shapes: a bare list = default-on; `{requires-flag, 
 **Verify:** `python3 scripts/sync.py --validate; python3 scripts/consistency-check.py; TMPDIR=<scratch> bash tests/scenarios/run.sh; python3 -m pytest tests/ -q --ignore=tests/browser`
 **Provider-Agnostik:** verification commands are provider-generic.
 **Depends on:** 17
-- [ ] Step 1: run `--validate` + `consistency-check.py`
-- [ ] Step 2: run the full scenario catalog
-- [ ] Step 3: run pytest without `tests/browser`
-- [ ] Step 4: record results in the ledger
+- [x] Step 1: run `--validate` + `consistency-check.py`
+- [x] Step 2: run the full scenario catalog
+- [x] Step 3: run pytest without `tests/browser`
+- [x] Step 4: record results in the ledger
 
 ### Task 19: Requirement-trace review (stage `review-req`)
 **Agent:** validator
@@ -453,9 +453,9 @@ The migrator normalizes both shapes: a bare list = default-on; `{requires-flag, 
 **Verify:** `python3 -m pytest tests/ -q --ignore=tests/browser` plus the traceability table in this plan.
 **Provider-Agnostik:** review only.
 **Depends on:** 18
-- [ ] Step 1: check AC coverage
-- [ ] Step 2: confirm harness-dependent/STATIC labels
-- [ ] Step 3: record verdict
+- [x] Step 1: check AC coverage
+- [x] Step 2: confirm harness-dependent/STATIC labels
+- [x] Step 3: record verdict
 
 ### Task 20: Quality review (stage `review-quality`)
 **Agent:** code-reviewer
@@ -465,9 +465,9 @@ The migrator normalizes both shapes: a bare list = default-on; `{requires-flag, 
 **Verify:** `python3 -m pytest tests/test_provider_agnostic_dispatch.py tests/test_mcp_config.py tests/test_artifact_contracts.py -q`
 **Provider-Agnostik:** review only.
 **Depends on:** 19
-- [ ] Step 1: review blast radius
-- [ ] Step 2: confirm fail-loud ergonomics
-- [ ] Step 3: record verdict
+- [x] Step 1: review blast radius
+- [x] Step 2: confirm fail-loud ergonomics
+- [x] Step 3: record verdict
 
 ## Step-to-Agent Map
 
@@ -557,6 +557,10 @@ PY
 - **Task-4 surface-format selection addendum (2026-10-02, AC-5 scenario-69 gap closure):** `config/ai-providers.yaml` Opencode gains a data-only `mcp-config.surface-formats` map (`v1: opencode-json`, `v2: opencode-json-v2`); the existing `format: opencode-json` stays as the v1 fallback. A generic, data-driven normalization `_apply_surface_format_selection()` in `scripts/lib/providers.py` — called by `load_providers_config()` — sets `mcp-config.format = surface-formats[surface-version]` for any provider that declares the map and whose `surface-version` is one of its keys; providers without the map (or with an unknown version) are untouched and the writer still dispatches on `mcp-config.format` only, never reading `surface-version`. It is covered by the new `tests/test_surface_version_selection.py` (10 tests). **File owners:** `config/ai-providers.yaml` stays Task 4 (extended in place); `scripts/lib/providers.py` becomes a **new single-owner** Task-4 path (it appears in no other task's `Files:` block); `tests/test_surface_version_selection.py` is a **new Task-4 file** (appears in no other task's `Files:` block). Every task's `Files:` set therefore stays globally disjoint — `check_plan_file_overlap` still returns `{"safe": [all 20 ids], "conflict": []}` and the graph is unchanged (no task added, no dependency edge added, no cycle; the numbering-order DAG still holds). `tests/test_provider_agnostic_dispatch.py` remains Task 13's file and is committed separately; it is NOT part of this addendum. Ledger checkboxes are deliberately untouched.
 - **Fail-closed caveat:** `check_file_overlap` also widens each task's file set from prompt-referenced paths and AST symbol-to-file resolution. Task titles in this plan are path-free, so the declared `files_touched` sets are the effective input. If a future edit adds a symbol/path to a title and replay surfaces a conflict, the affected tasks MUST be sequentialized before dispatch — never dispatched on a skipped check.
 - Outcome: **PASS** (cycles: none, overlaps: none, over-commitment: none).
+
+- **CORRECTION (2026-10-03, Task 19/20 review follow-up) — the "whole-graph: OK / conflict: []" claim is NOT reproduced by this section's own replay recipe.** Replaying the recipe above reports file-overlap conflicts because `check_file_overlap` widens each task's declared `files_touched` (`Modify:`/`Create:`) with paths/symbols referenced in the task body's `Interfaces:`/`Acceptance:` text and resolves those symbols back to files. The recipe therefore flags conflicts such as **task-1↔task-2** (Task 2 `Consumes artifact_validate`, which resolves to Task 1's `scripts/lib/artifact_validate.py`), **task-4↔task-5** (Task 5 `Consumes Task-4 data`, resolving to `config/ai-providers.yaml`) and **task-9↔task-10** (cross-referenced pipeline/bootstrap paths). The historical bullets above record the **declared-ownership** result (the `Files:` sets are globally disjoint); the recipe as written over-reports by also feeding body-referenced symbols into the overlap checker. The historical bullets are retained verbatim for provenance and are not deleted.
+  - **Why the plan is nevertheless safe:** the tasks were executed **SEQUENTIALLY** (never as the recipe's synthetic `parallel_group` fanouts), and file ownership was re-checked at dispatch time (one barrier per task; no two tasks wrote the same file concurrently). No concurrent writer ever touched a shared path.
+  - **Authoritative gate is green:** the repository's own plan check — `scripts/lib/consistency/spec_plan.py::_check_plan_graph`, run by `sync.py --validate` — is green. That check is the binding gate for this repo; the manual replay recipe in this section is an analytical over-report whose widening is exactly the fail-closed caveat described two bullets above.
 
 ## Barriers, Ledger, Checkpoints, Recovery
 
@@ -655,6 +659,8 @@ References: Spec §11.1 (path-migration table) and Design §6.2.1 (5-step sequen
 > **Inventory: 95 findings — 55 `Task`, 11 `Deferred`, 29 `Accepted`.** Three rows carry a split (D10, CX-2, MM-a): the primary status is `Task`, the residual (unowned fallback constant / artefact-less emission) is named in the Begründung and counted under `Deferred` semantics there.
 >
 > **No new finding-closure task is required.** Every finding that the APPROVED spec puts in scope is already owned by Task 1–20; the two genuine implementation gaps found (AC-7 `.continue/config.local.yaml` validity, G-2 Antigravity tool-name-map data) live inside files that already have a single owner and are therefore ownership-preserving amendments to Task 4 / Task 8 — inventing further finding tasks would violate the global-disjoint `Files:` rule. Findings outside the approved spec scope (or refuted at runtime) are recorded as `Deferred` / `Accepted` with rationale instead of being forced into tasks. (Task 15 is a deliberate release/version-bump task inserted by a later 2026-10-01 pass, not a finding closure.)
+
+> **Deferred (2026-10-03, Task 19/20 review follow-up) — D2 residual, tier-preset vs `ai-providers.yaml model-tiers` precedence test coverage.** The D2 precedence rule — `ai-providers.yaml model-tiers` wins over a project-local tier-preset's `tiers` — **is implemented** (Task 7, `scripts/lib/roles.py`) and **is covered** by `tests/test_tier_presets.py` (project-local preset path), but it is **not pinned by an explicit test in `tests/test_model_contracts.py`**. Recorded as **Deferred** with rationale: the project-local preset behaviour is exercised where it belongs (`tests/test_tier_presets.py`), no APPROVED AC-1…AC-25 requires a `model_contracts`-level assertion of this precedence, and adding one is a follow-up test-only change that would expand the approved spec scope; tracked here rather than forced into an existing task or a new one. (Counts as the D2 residual already covered by the inventory's "split / residual Deferred semantics" note; the per-finding status of D2 itself stays `Task`.)
 
 ### Deliberately out / Accepted register (prompt constraint)
 
