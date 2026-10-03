@@ -1962,6 +1962,15 @@ async function viewAIProviders() {
   let data;
   try { data = await api.get("/api/config/ai-providers"); }
   catch (err) { wrap.appendChild(renderError(err)); return wrap; }
+  // Read-only resolved surface map (version/format/mechanism per provider),
+  // fetched from the dedicated GET /api/ai-providers endpoint SEPARATELY so it
+  // is never merged into the editable config object. The endpoint may not
+  // expose `active-surface` yet — degrade to {} instead of failing the view.
+  const activeSurface = (await api.get("/api/ai-providers").catch(() => ({})))["active-surface"] || {};
+  // `active-surface` is a reserved read-only key (REV-R1/R3). Strip it from the
+  // editable payload defensively so a stale server response can never
+  // round-trip back into config/ai-providers.yaml on Save.
+  delete data["active-surface"];
   state.setConfig("ai-providers", data, true);
 
   const status = el("div", { class: "muted" });
@@ -1972,11 +1981,34 @@ async function viewAIProviders() {
   ]));
 
   const providers = data.providers || data || {};
+  if (providers && typeof providers === "object") delete providers["active-surface"];
   for (const [provider, conf] of Object.entries(providers)) {
     if (typeof conf !== "object" || conf === null) continue;
+    delete conf["active-surface"];
     const panel = el("details", { class: "panel" });
-    panel.appendChild(el("summary", { style: "cursor:pointer; font-weight:600;" }, [provider]));
-    const form = new SchemaFormGenerator({ type: "object", properties: inferSchema(conf) }, conf, (path, value, full) => {
+    const summary = el("summary", { style: "cursor:pointer; font-weight:600;" }, [provider]);
+    // Active-surface badge (read-only, rendered via textContent). Shown only
+    // when the server resolved a surface for this provider.
+    const surface = activeSurface[provider];
+    if (surface && typeof surface === "object") {
+      const badge = el("span", { class: "badge", style: "margin-left: var(--space-2); font-weight:normal;" });
+      badge.textContent = `surface ${surface.version || "?"} · ${surface.format || "?"} · ${surface.mechanism || "?"}`;
+      badge.title = `Active surface — version: ${surface.version || "?"}, format: ${surface.format || "?"}, mechanism: ${surface.mechanism || "?"}`;
+      summary.appendChild(badge);
+    }
+    panel.appendChild(summary);
+    // surface-version options come from THIS provider's declared
+    // mcp-config.surface-formats map; when it is absent/empty only the implicit
+    // default v1 is resolvable (REV-R5).
+    const surfaceFormats = conf["mcp-config"] && conf["mcp-config"]["surface-formats"];
+    const declaredFormats = (surfaceFormats && typeof surfaceFormats === "object")
+      ? Object.keys(surfaceFormats) : [];
+    const surfaceOptions = declaredFormats.length ? declaredFormats : ["v1"];
+    const schema = {
+      type: "object",
+      properties: inferSchema(conf, { enumFields: { "surface-version": surfaceOptions } }),
+    };
+    const form = new SchemaFormGenerator(schema, conf, (path, value, full) => {
       providers[provider] = full;
       state.state.dirty.add("ai-providers");
       status.textContent = "Unsaved changes.";
@@ -2033,14 +2065,24 @@ async function viewAIProviders() {
   return wrap;
 }
 
-function inferSchema(obj) {
+function inferSchema(obj, opts) {
   const out = {};
   if (typeof obj !== "object" || obj === null) return out;
+  // opts.enumFields maps a field name to its allowed values. When a key is
+  // listed there, emit a JSON-Schema `enum` so SchemaFormGenerator._renderField
+  // routes it to _renderEnum (a <select>) instead of a free-text input. The
+  // allowed values are always passed in by the caller (never hard-coded here);
+  // opts is forwarded through nested recursion so enumFields also reaches
+  // fields inside nested objects (REV-R7).
+  const enumFields = (opts && opts.enumFields) || {};
   for (const [k, v] of Object.entries(obj)) {
-    if (typeof v === "boolean") out[k] = { type: "boolean" };
+    if (Object.prototype.hasOwnProperty.call(enumFields, k)) {
+      out[k] = { type: "string", enum: enumFields[k] };
+    }
+    else if (typeof v === "boolean") out[k] = { type: "boolean" };
     else if (typeof v === "number") out[k] = { type: "number" };
     else if (Array.isArray(v)) out[k] = { type: "array", items: { type: typeof (v[0] || "") === "number" ? "number" : "string" } };
-    else if (typeof v === "object" && v !== null) out[k] = { type: "object", properties: inferSchema(v) };
+    else if (typeof v === "object" && v !== null) out[k] = { type: "object", properties: inferSchema(v, opts) };
     else out[k] = { type: "string" };
   }
   return out;
@@ -2506,6 +2548,11 @@ function renderOverridePanel(opts) {
 // renderDictEditor did.
 const renderDictEditor = (title, dictData, onChange, opts) => {
     const allowBool = !!(opts && opts.allowBool);
+    // Keys that a dedicated control outside this generic KV editor owns. They
+    // stay in dictData (so their live values are still what Save reads) but are
+    // not rendered as editable rows, which would otherwise offer a duplicate,
+    // conflicting input for the same key. See viewProjectProviders.
+    const excludeKeys = (opts && opts.excludeKeys) || [];
     const w = el("div", { style: "margin-top: var(--space-2);" });
     w.appendChild(el("label", {}, [title]));
     const list = el("div", { style: "display: flex; flex-direction: column; gap: var(--space-1); margin-bottom: var(--space-2);" });
@@ -2513,6 +2560,7 @@ const renderDictEditor = (title, dictData, onChange, opts) => {
     const renderRows = () => {
         list.innerHTML = "";
         Object.entries(dictData).forEach(([k, v]) => {
+            if (excludeKeys.includes(k)) return;
             const row = el("div", { style: "display: flex; gap: var(--space-1);" });
             const inpK = el("input", { class: "form-control", value: k, style: "flex: 1;", placeholder: "Key" });
             const isBool = v === true || v === false;
@@ -6503,11 +6551,19 @@ async function viewProjectGeneral() {
 async function viewProjectProviders() {
   const wrap = el("div");
   wrap.appendChild(el("h1", {}, ["Project — Providers & Platforms"]));
-  const [data, providers, platforms] = await Promise.all([
+  const [data, providers, platforms, aiProvidersResp] = await Promise.all([
     loadProject(),
     api.get("/api/providers").catch(() => []),
     api.get("/api/platforms").catch(() => []),
+    api.get("/api/ai-providers").catch(() => ({})),
   ]);
+  // Read-only registry (GET /api/ai-providers → {providers, active-surface}).
+  // Used to derive each provider's declared surface-formats keys for the
+  // project-level surface-version <select>. Never merged into the project save
+  // payload, which stays limited to provider-options.
+  const aiProvidersRegistry = (aiProvidersResp && aiProvidersResp.providers)
+    ? aiProvidersResp.providers
+    : (aiProvidersResp || {});
 
   const selProviders = new Set(Array.isArray(data["ai-providers"]) ? data["ai-providers"] : []);
   const selPlatforms = new Set(Array.isArray(data.platforms) ? data.platforms : []);
@@ -6595,7 +6651,15 @@ async function viewProjectProviders() {
     el("code", {}, ["prompt-mode"]),
     " (Continue only — emits invokable slash-commands under ",
     el("code", {}, [".continue/prompts/"]),
-    ", ", el("code", {}, ["prompt-mode: \"full\"|\"slim\""]), ").",
+    ", ", el("code", {}, ["prompt-mode: \"full\"|\"slim\""]), "); ",
+    el("code", {}, ["surface-version"]),
+    " (selects the generation surface — the options come from that provider's ",
+    el("code", {}, ["mcp-config.surface-formats"]),
+    " keys in ai-providers.yaml; when the provider declares none only the ",
+    "implicit default ", el("code", {}, ["v1"]), " is offered; unset = v1); ",
+    el("code", {}, ["agent-discovery"]),
+    " (boolean — opts into the provider's discovery surface, e.g. Antigravity ",
+    el("code", {}, [".agents/*"]), "; unset = false).",
   ]));
 
   // Determine provider names: union of providers from API + keys already in providerOptions
@@ -6625,11 +6689,59 @@ async function viewProjectProviders() {
     header.appendChild(toggleBtn);
 
     const body = el("div", { style: "padding:8px 12px; display:block;" });
+
+    // Dedicated surface-version <select> + agent-discovery checkbox. Their
+    // options come from this provider's declared mcp-config.surface-formats
+    // keys in ai-providers.yaml (fallback [v1] per REV-R5). Both write straight
+    // into provOpts, which is the live object the Save button serializes, so no
+    // extra onChange bookkeeping is needed on this page.
+    const regEntry = (aiProvidersRegistry[provName] && typeof aiProvidersRegistry[provName] === "object")
+      ? aiProvidersRegistry[provName] : {};
+    const formats = regEntry["mcp-config"] && regEntry["mcp-config"]["surface-formats"];
+    const declaredFormats = (formats && typeof formats === "object") ? Object.keys(formats) : [];
+    const surfaceOptions = declaredFormats.length ? declaredFormats : ["v1"];
+
+    const surfaceControls = el("div", { style: "display:flex; flex-direction:column; gap:var(--space-2); margin-bottom:var(--space-2);" });
+
+    const surfaceRow = el("label", { class: "flex-row", style: "gap:var(--space-2); align-items:center; font-size:12px;" });
+    surfaceRow.appendChild(el("span", { style: "min-width:130px; color:var(--text-secondary);" }, ["surface-version"]));
+    const surfaceSelect = el("select", { class: "form-control", style: "max-width:200px;" });
+    for (const opt of surfaceOptions) {
+      const o = el("option", { value: opt }, [opt]);
+      if (opt === provOpts["surface-version"]) o.selected = true;
+      surfaceSelect.appendChild(o);
+    }
+    // An already-stored value that is not among the declared formats stays
+    // visible (and fixable) instead of being silently reset on save.
+    if (typeof provOpts["surface-version"] === "string"
+        && provOpts["surface-version"] !== ""
+        && !surfaceOptions.includes(provOpts["surface-version"])) {
+      const o = el("option", { value: provOpts["surface-version"] }, [provOpts["surface-version"]]);
+      o.selected = true;
+      surfaceSelect.appendChild(o);
+    }
+    surfaceSelect.addEventListener("change", () => { provOpts["surface-version"] = surfaceSelect.value; });
+    surfaceRow.appendChild(surfaceSelect);
+    surfaceControls.appendChild(surfaceRow);
+
+    const discoveryRow = el("label", { class: "flex-row", style: "gap:var(--space-2); align-items:center; font-size:12px; cursor:pointer;" });
+    const discoveryCb = el("input", { type: "checkbox" });
+    discoveryCb.checked = provOpts["agent-discovery"] === true;
+    discoveryCb.addEventListener("change", () => { provOpts["agent-discovery"] = discoveryCb.checked; });
+    discoveryRow.appendChild(discoveryCb);
+    discoveryRow.appendChild(el("span", {}, ["agent-discovery"]));
+    surfaceControls.appendChild(discoveryRow);
+
+    body.appendChild(surfaceControls);
     // provOpts is the live object embedded in providerOptions[provName], so
     // renderDictEditor's direct mutations are already what the Save button
     // below reads -- no onChange bookkeeping needed on this page (it has no
-    // dirty-tracking status indicator at all).
-    body.appendChild(renderDictEditor("Options", provOpts, () => {}, { allowBool: true }));
+    // dirty-tracking status indicator at all). The two reserved surface keys
+    // are excluded here because the dedicated controls above own them.
+    body.appendChild(renderDictEditor("Options", provOpts, () => {}, {
+      allowBool: true,
+      excludeKeys: ["surface-version", "agent-discovery"],
+    }));
 
     // Toggle collapse
     let expanded = true;
