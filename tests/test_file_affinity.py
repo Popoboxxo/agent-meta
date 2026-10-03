@@ -127,6 +127,21 @@ def test_dict_task_with_explicit_files_field(tmp_path):
     assert result["safe"] == []
 
 
+def test_explicit_write_set_is_authoritative_over_prose(tmp_path):
+    """A non-empty explicit write set owns ONLY those files.
+
+    File paths mentioned in the task's description prose (Interfaces-style
+    "Consumes src/b.py") must not widen the write set, so they cannot
+    fabricate a conflict with the task that actually owns ``src/b.py``.
+    """
+    tasks = [
+        {"id": "A", "files": ["src/a.py"], "description": "Consumes src/b.py"},
+        {"id": "B", "files": ["src/b.py"]},
+    ]
+    result = check_file_overlap(tasks, project_root=tmp_path)
+    assert result == {"safe": ["A", "B"], "conflict": []}
+
+
 def test_mixed_input_types_keep_their_ids(tmp_path):
     subtask = SubTask(name="sub-1", agent_type="developer", description="Edit module_one.py")
     tasks = [
@@ -182,6 +197,24 @@ def test_import_graph_coupling_conflict(tmp_path):
     )
     assert result["safe"] == []
     assert result["conflict"] == [("task_1", "task_2", ["a.py", "b.py"])]
+
+
+def test_explicit_write_set_keeps_import_coupling(tmp_path):
+    """Structural (import) coupling survives an explicit write set.
+
+    Both tasks declare ``files`` explicitly, so the authoritative-write-set
+    rule skips text/symbol extraction for each — yet the import edge between
+    the two declared files must still be detected and reported as a conflict.
+    """
+    (tmp_path / "a.py").write_text("import b\n\n\ndef run_pipeline():\n    pass\n")
+    (tmp_path / "b.py").write_text("def helper_module():\n    pass\n")
+    tasks = [
+        {"id": "A", "files": ["a.py"], "description": "rewrite a"},
+        {"id": "B", "files": ["b.py"], "description": "rewrite b"},
+    ]
+    result = check_file_overlap(tasks, project_root=tmp_path)
+    assert result["safe"] == []
+    assert result["conflict"] == [("A", "B", ["a.py", "b.py"])]
 
 
 def test_doc_reference_coupling_conflict(tmp_path):

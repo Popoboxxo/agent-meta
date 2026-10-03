@@ -320,10 +320,13 @@ def check_plan_file_overlap(
 
     Single seam between plans and ``file_affinity.check_file_overlap``:
     tasks are projected to the module's dict-input shape
-    (``{"id", "task", "files"}``) so ``FanoutTask.prompt`` / prompt-referenced
-    files participate exactly like the duck-typed SubTask inputs. Returns the
-    ``#266`` result dict ``{"safe": [...], "conflict": [...]}`` verbatim.
-    Callers typically feed the result back into :func:`validate_plan`.
+    (``{"id", "task", "files"}``). A non-empty ``files_touched`` is
+    authoritative: ``FanoutTask.prompt`` / prompt-referenced files are NOT
+    scanned then. Only with an empty ``files_touched`` does the prompt/title
+    text participate exactly like the duck-typed SubTask fallback inputs.
+    Returns the ``#266`` result dict ``{"safe": [...], "conflict": [...]}``
+    verbatim. Callers typically feed the result back into
+    :func:`validate_plan`.
     """
     return check_file_overlap(_project_tasks_for_overlap(plan.tasks), project_root)
 
