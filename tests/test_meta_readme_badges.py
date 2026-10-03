@@ -60,10 +60,11 @@ def test_readme_contains_repowise_code_health_badge_and_link():
 
 def test_readme_contains_agent_meta_badge_with_tag_link():
     version = _repo_version()
+    escaped = version.replace("-", "--")
     content = _README.read_text(encoding="utf-8")
     agent_meta_badge = (
         f"[![agent-meta v{version}]"
-        f"(https://img.shields.io/badge/agent--meta-v{version}-blue.svg)]"
+        f"(https://img.shields.io/badge/agent--meta-v{escaped}-blue.svg)]"
         f"(https://github.com/Popoboxxo/agent-meta/releases/tag/v{version})"
     )
     assert "https://github.com/Popoboxxo/agent-meta/releases/tag/v" in content
@@ -75,9 +76,10 @@ def test_readme_agent_meta_badge_never_double_escapes_label():
     `badge/agent--meta-v<version>-blue.svg`, never `badge/agent----meta`
     (M1/F4/F5)."""
     version = _repo_version()
+    escaped = version.replace("-", "--")
     content = _README.read_text(encoding="utf-8")
     assert "badge/agent----meta" not in content
-    assert f"badge/agent--meta-v{version}-blue.svg" in content
+    assert f"badge/agent--meta-v{escaped}-blue.svg" in content
 
 
 def test_readme_generic_version_badge_fresh_and_no_stale_version():
@@ -85,8 +87,9 @@ def test_readme_generic_version_badge_fresh_and_no_stale_version():
     real `VERSION` (read at runtime, not hard-coded); the old stale
     pre-release value must be gone entirely (D4/Q5)."""
     version = _repo_version()
+    escaped = version.replace("-", "--")
     content = _README.read_text(encoding="utf-8")
-    assert f"version-{version}" in content
-    assert f"agent--meta-v{version}" in content
+    assert f"version-{escaped}" in content
+    assert f"agent--meta-v{escaped}" in content
     assert "0.101.0-beta.6" not in content
     assert "0.101.0--beta.6" not in content

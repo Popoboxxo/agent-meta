@@ -105,7 +105,7 @@
   `developer`, `data-engineer`, `sre-engineer`, `feedback` and `control-framework-assessor` now
   declare the new contracts as inputs so no handoff is silent.
 
-## [2.0.0] - 2026-10-02
+## [2.0.0-beta.1] - 2026-10-03
 
 ### Added
 - **Provider-agnostic artifact validation (`scripts/lib/artifact_validate.py`)** (#845):
