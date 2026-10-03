@@ -82,7 +82,7 @@ def _subst_vscode(value: str, secrets: dict | None) -> str:
 
 def _subst_for_format(fmt: str | None):
     """Placeholder substitution function for one provider-config format."""
-    if fmt == "opencode-json":
+    if fmt in ("opencode-json", "opencode-json-v2"):
         return _subst_opencode
     if fmt == "vscode-settings":
         return _subst_vscode
@@ -92,23 +92,31 @@ def _subst_for_format(fmt: str | None):
 def _build_connection_entry(conn: dict, secrets: dict | None, fmt: str | None = None) -> dict:
     """Convert a registry connection block to a provider-config dict.
 
-    fmt="opencode-json" uses opencode-specific syntax:
-      - command as array (not command + args)
-      - "environment" key (not "env")
-      - {env:VAR} interpolation (not ${VAR})
-
-    fmt="vscode-settings" uses VS Code agent-mode MCP syntax (issue #674
-    Phase 3.3):
-      - remote (sse) servers are declared with type "http" (VS Code
-        deprecates the legacy "sse" discriminator)
-      - ${env:VAR} interpolation (expanded natively by VS Code in
-        .vscode/mcp.json values)
+    The transport/header spelling is owned by the ``fmt`` value (never by a
+    provider name — AC-14/AC-23):
+      - ``opencode-json`` / ``opencode-json-v2``: command as array,
+        "environment" key, ``{env:VAR}`` interpolation; remote type ``remote``.
+      - ``vscode-settings``: remote type ``http`` (VS Code deprecates ``sse``),
+        ``${env:VAR}`` interpolation.
+      - ``antigravity-mcp-json``: remote URL uses the documented ``serverUrl``
+        key (``url``/``httpUrl`` are unsupported — F6/G-7).
+      - ``continue-yaml``: SSE auth headers live under
+        ``requestOptions.headers`` — a top-level ``headers`` key is dropped by
+        Continue's config schema (F7/H8).
+      - ``kimi-json``: KimiCode has no ``type`` discriminator; remote SSE is
+        declared as ``transport: "sse"`` and stdio is inferred from ``command``
+        (F11/KC-1).
+      - ``claude-settings`` / ``gemini-settings`` / ``zcode-json`` /
+        ``codex-toml-mcp``: generic ``type`` + ``url``/``headers`` shape.
     """
     conn_type = conn.get("type", "")
     orig_type = conn_type
 
-    is_opencode = fmt == "opencode-json"
+    is_opencode = fmt in ("opencode-json", "opencode-json-v2")
     is_vscode = fmt == "vscode-settings"
+    is_antigravity = fmt == "antigravity-mcp-json"
+    is_continue = fmt == "continue-yaml"
+    is_kimi = fmt == "kimi-json"
     subst = _subst_for_format(fmt)
 
     if is_opencode:
@@ -119,17 +127,28 @@ def _build_connection_entry(conn: dict, secrets: dict | None, fmt: str | None = 
     elif is_vscode and conn_type == "sse":
         conn_type = "http"
 
-    entry: dict = {"type": conn_type}
-
-    if is_opencode:
-        entry["enabled"] = True
+    entry: dict = {}
+    if is_kimi:
+        # KimiCode discriminates transport by field presence, not a `type`
+        # key: remote SSE requires `transport: "sse"`, stdio is inferred
+        # from the presence of `command` (F11/KC-1).
+        if orig_type == "sse":
+            entry["transport"] = "sse"
+    else:
+        entry["type"] = conn_type
+        if is_opencode:
+            entry["enabled"] = True
 
     if orig_type == "sse":
         raw_url = conn.get("url", "")
-        entry["url"] = subst(raw_url, secrets)
+        entry["serverUrl" if is_antigravity else "url"] = subst(raw_url, secrets)
         headers = conn.get("headers", {})
         if headers:
-            entry["headers"] = {k: subst(str(v), secrets) for k, v in headers.items()}
+            rendered = {k: subst(str(v), secrets) for k, v in headers.items()}
+            if is_continue:
+                entry["requestOptions"] = {"headers": rendered}
+            else:
+                entry["headers"] = rendered
 
     elif orig_type == "stdio":
         cmd = conn.get("command", "")
@@ -287,6 +306,32 @@ def _update_zcode_json_config(
                        verify_gitignored, "mcp-registry → mcp.servers")
 
 
+def _update_opencode_v2_json_config(
+    path: Path,
+    mcp_entries: dict,
+    log: SyncLog,
+    dry_run: bool,
+    allow_secrets: bool,
+    config: dict | None = None,
+    verify_gitignored: bool = False,
+) -> None:
+    """Merge mcp_entries into an opencode.json under the NESTED mcp.servers key.
+
+    Mirrors `_update_zcode_json_config` (same nested `mcp.servers` shape) but
+    replaces the whole `mcp` value instead of merging into a pre-existing
+    flat map: the v2 document contract allows only `servers` under `mcp`
+    (`artifact_validate._validate_opencode_v2`), so a flat v1 server map must
+    not survive the v1→v2 switch. Every other top-level key is preserved.
+    """
+    rel = _config_rel_label(path)
+    existing = _read_existing_json_dict(path, rel, log)
+    if existing is None:
+        return
+    existing["mcp"] = {"servers": mcp_entries}
+    _write_json_config(path, existing, rel, log, dry_run, allow_secrets, config,
+                       verify_gitignored, "mcp-registry → mcp.servers")
+
+
 def _update_continue_yaml_config(
     path: Path,
     mcp_entries: dict,
@@ -299,7 +344,11 @@ def _update_continue_yaml_config(
     """Merge mcpServers into a Continue config.yaml file.
 
     Injects a managed block so the section can be updated on subsequent syncs.
-    User model and other settings are left untouched.
+    User model and other settings are left untouched. The managed block also
+    supplies the schema-required top-level ``name``/``version`` when the
+    surrounding file does not declare them (AC-7) — needed for the generated
+    ``.continue/config.local.yaml``. SSE auth headers must already be spelled
+    ``requestOptions.headers`` (built by :func:`_build_connection_entry`).
     """
     try:
         import yaml as _yaml
@@ -312,9 +361,31 @@ def _update_continue_yaml_config(
 
     rel = str(path.name)
 
+    block_re = re.compile(
+        rf"^{re.escape(BLOCK_BEGIN)}.*?^{re.escape(BLOCK_END)}",
+        re.MULTILINE | re.DOTALL,
+    )
+
+    existing = path.read_text(encoding="utf-8") if path.exists() else ""
+
+    # Continue's config schema requires top-level `name`/`version` on every
+    # config file (AC-7). A fresh local override file (config.local.yaml) has
+    # none, so the managed block supplies them; when the surrounding user
+    # content already declares them (e.g. the committed config.yaml
+    # template), they are NOT repeated to avoid duplicate YAML keys. Only
+    # content OUTSIDE the managed block is inspected, so re-runs stay
+    # byte-identical (the injected keys live inside the block being replaced).
+    user_content = block_re.sub("", existing)
+    required_header = ""
+    if not re.search(r"^name:", user_content, re.MULTILINE):
+        required_header += "name: agent-meta\n"
+    if not re.search(r"^version:", user_content, re.MULTILINE):
+        required_header += "version: 1.0.0\n"
+
     block_content = (
         f"{BLOCK_BEGIN}\n"
         "# Generated by agent-meta — do not edit manually.\n"
+        f"{required_header}"
         "mcpServers:\n"
     )
     for server_name, entry in mcp_entries.items():
@@ -328,12 +399,7 @@ def _update_continue_yaml_config(
                 block_content += f"    {line}\n"
     block_content += BLOCK_END
 
-    if path.exists():
-        existing = path.read_text(encoding="utf-8")
-        block_re = re.compile(
-            rf"^{re.escape(BLOCK_BEGIN)}.*?^{re.escape(BLOCK_END)}",
-            re.MULTILINE | re.DOTALL,
-        )
+    if existing:
         if block_re.search(existing):
             # Function replacement keeps the generated YAML block verbatim (#674).
             new_content = block_re.sub(lambda _m: block_content, existing, count=1)
@@ -386,8 +452,9 @@ def _adapt_entry_for_codex(entry: dict) -> dict:
     by the native env-indirection key `bearer_token_env_var = "<VAR>"` (V8
     strategy: Codex has no include/import mechanism for a secrets file, so
     secrets are referenced through the environment instead). Any remaining
-    headers stay under `headers` unchanged — the exact remaining-header key
-    semantics Codex accepts are part of the P6 real-repo test (V8).
+    headers stay under ``http_headers`` — the documented Codex spelling
+    (CX-1); a plain ``headers`` table is silently ignored. The exact
+    remaining-header semantics are part of the P6 real-repo test (V8).
     """
     conn_type = entry.get("type", "")
     adapted = {k: v for k, v in entry.items() if k != "type"}
@@ -400,7 +467,9 @@ def _adapt_entry_for_codex(entry: dict) -> dict:
         del headers["Authorization"]
         adapted["bearer_token_env_var"] = match.group(1)
     if headers:
-        adapted["headers"] = headers
+        # CX-1: Codex documents the static header map as `http_headers`;
+        # a `headers` table is silently ignored by the runtime.
+        adapted["http_headers"] = headers
     return adapted
 
 
@@ -626,13 +695,26 @@ def _write_provider_config(
     config: dict | None = None,
     verify_gitignored: bool = False,
 ) -> None:
-    """Dispatch to format-specific writer."""
-    if fmt in ("claude-settings", "gemini-settings"):
+    """Dispatch to format-specific writer.
+
+    Dispatch is on the ``mcp-config.format`` string ONLY — no branch reads the
+    provider name or ``surface-version`` (H-1 / ADR-10, AC-14/AC-23). The v1
+    ``opencode-json`` branch is frozen: it keeps writing the flat top-level
+    ``mcp`` key. The v2 split lives in the ``opencode-json-v2`` value, which
+    writes the nested ``mcp.servers`` shape.
+    """
+    if fmt in ("claude-settings", "gemini-settings", "antigravity-mcp-json", "kimi-json"):
         _update_json_config(path, "mcpServers", mcp_entries, log, dry_run, allow_secrets, config=config,
                              verify_gitignored=verify_gitignored)
     elif fmt == "opencode-json":
         _update_json_config(path, "mcp", mcp_entries, log, dry_run, allow_secrets, config=config,
                              verify_gitignored=verify_gitignored)
+    elif fmt == "opencode-json-v2":
+        # v2 writes the nested `mcp.servers` key and replaces any flat v1
+        # server map left under `mcp` (the v2 contract allows no flat keys
+        # next to `servers`).
+        _update_opencode_v2_json_config(path, mcp_entries, log, dry_run, allow_secrets, config=config,
+                                        verify_gitignored=verify_gitignored)
     elif fmt == "vscode-settings":
         # VS Code agent-mode MCP (.vscode/mcp.json): top-level {"servers": ...}
         # settings shape — NOT the Claude {"mcpServers": ...} key

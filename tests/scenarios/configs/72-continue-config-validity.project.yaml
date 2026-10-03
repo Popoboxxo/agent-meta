@@ -1,0 +1,28 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Continue
+dod-preset: rapid-prototyping
+platforms: []
+roles:
+- orchestrator
+- developer
+- git
+project:
+  name: scenario-continue-config-validity
+  prefix: s72
+  short: continue-config-validity
+variables:
+  PROJECT_NAME: scenario-continue-config-validity
+  PROJECT_DESCRIPTION: Validity of the generated Continue configuration.
+  PROJECT_GOAL: Verify .continue/config.yaml carries top-level name/version, a valid roles enum without the out-of-enum 'agent' value, no dead top-level agents block, and that .continue/agents/*.md still exist.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-continue-config-validity
+  GIT_MAIN_BRANCH: main
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false

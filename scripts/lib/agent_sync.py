@@ -13,6 +13,12 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from .artifact_validate import (
+    CHECK,
+    resolve_artifact_contract,
+    validate_artifact,
+)
+from .consistency.report import Finding, Severity
 from .frontmatter import (
     AGENTS_DIR,
     _YAML_AVAILABLE,
@@ -26,7 +32,14 @@ from .frontmatter import (
 )
 from .io import is_absent_gitignored_target, safe_path, write_checked
 from .log import SyncLog
-from .providers import provider_has_capability, provider_hooks_supported
+from .providers import (
+    _surface_version_warnings,
+    load_provider_capabilities,
+    load_providers_config,
+    provider_has_capability,
+    provider_hooks_supported,
+    resolve_providers,
+)
 from .provider_transform import (
     inject_debug_block,
     transform_agent_content_for_provider,
@@ -651,6 +664,125 @@ def _apply_content_pipeline(
         content = substitute_platform(content, platform_vars, rel_source, log)
     return content
 
+def _load_artifact_capabilities(agent_meta_root: Path) -> dict:
+    """Load ``config/provider-capabilities.yaml`` once per validation pass.
+
+    Fail-soft: an unreadable registry yields ``{}`` so every provider counts as
+    validation-enabled (only an explicit ``false`` disables it, spec §2.2).
+    Callers that loop over providers or artifacts hoist this call so the file is
+    read once per sync provider / gate invocation, never once per artifact.
+    """
+    try:
+        return load_provider_capabilities(agent_meta_root) or {}
+    except Exception:  # noqa: BLE001 — optional-file semantics: default enabled
+        return {}
+
+
+def _artifact_validation_enabled(provider: str, capabilities: dict) -> bool:
+    """Whether artifact validation is enabled for *provider*.
+
+    Reads the optional ``artifact-validation`` capability flag (Task 5) from the
+    preloaded *capabilities* mapping. An absent flag or an absent provider is
+    treated as enabled; only an explicit ``false`` disables validation
+    (spec §2.2). Pure — the registry is loaded once by
+    :func:`_load_artifact_capabilities`.
+    """
+    entry = (capabilities or {}).get(provider)
+    if not isinstance(entry, dict):
+        return True
+    return entry.get("artifact-validation", True) is not False
+
+
+def _artifact_findings(content: str, pc: dict, rel_path: str) -> list:
+    """Validate one artifact's *content* against its declared contract.
+
+    Pure: the contract is resolved from *pc* and the artifact **format** is the
+    only dispatch key, through the shared ``artifact_validate`` helpers
+    (:func:`resolve_artifact_contract` / :func:`validate_artifact`) that the
+    consistency check uses too, so the sync-time warning and the check cannot
+    diverge (single source of truth).
+    """
+    return list(validate_artifact(content, resolve_artifact_contract(pc), rel_path))
+
+
+def collect_artifact_findings(
+    agent_meta_root: Path,
+    project_root: Path,
+    config: dict,
+    *,
+    log: SyncLog | None = None,
+) -> list:
+    """Validate the generated artifacts already present in *project_root*.
+
+    Read-only, registry-driven ``--check``/``--validate`` gate (spec §5): every
+    active provider's ``agents_dir`` is scanned for its declared ``agent_ext``
+    and each file is validated with :func:`_artifact_findings`. Returns a list
+    of ``(relative_path, Finding)`` pairs. Absent directories and providers with
+    validation disabled yield no findings.
+
+    A registry that cannot be loaded is **not** silently ignored: it yields one
+    ``Severity.ERROR`` finding — so the fail-loud gate exits 1 instead of
+    passing with validation disabled — and, when *log* is given, a warning.
+    """
+    findings: list = []
+    try:
+        provider_config = load_providers_config(agent_meta_root, config)
+        providers = resolve_providers(config, provider_config) if config else []
+    except Exception as exc:  # noqa: BLE001 — report, never silently pass
+        detail = (
+            f"provider registry could not be loaded ({exc}); "
+            "artifact validation skipped"
+        )
+        if log is not None:
+            log.warn(f"artifact-contract: {agent_meta_root}: {detail}")
+        findings.append((
+            _relative_posix(agent_meta_root, project_root),
+            Finding(
+                Severity.ERROR,
+                CHECK,
+                str(agent_meta_root),
+                detail,
+                "Fix config/ai-providers.yaml so the gate can run.",
+            ),
+        ))
+        return findings
+
+    capabilities = _load_artifact_capabilities(agent_meta_root)
+    for provider in providers:
+        if not _artifact_validation_enabled(provider, capabilities):
+            continue
+        pc = provider_config.get(provider) or {}
+        agents_dir = pc.get("agents_dir")
+        if not agents_dir:
+            continue
+        ext = str(pc.get("agent_ext", ".md"))
+        directory = project_root / str(agents_dir)
+        if not directory.is_dir():
+            continue
+        for path in sorted(directory.iterdir()):
+            if not path.is_file() or not path.name.endswith(ext):
+                continue
+            try:
+                text = path.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            rel = _relative_posix(path, project_root)
+            for finding in _artifact_findings(text, pc, rel):
+                findings.append((rel, finding))
+    for message in _surface_version_warnings(provider_config):
+        findings.append((
+            _relative_posix(agent_meta_root, project_root),
+            Finding(
+                Severity.WARNING,
+                CHECK,
+                str(agent_meta_root),
+                message,
+                "Declare mcp-config.surface-formats or use the default v1.",
+            ),
+        ))
+    return findings
+
+
 def _finalize_agent_content(
     content: str,
     role: str,
@@ -668,15 +800,40 @@ def _finalize_agent_content(
     variables: dict,
     debug_mode: bool,
     log: SyncLog,
+    *,
+    provider_capabilities: dict | None = None,
 ) -> str:
     """Post-pipeline finalization of one agent's content: provider transform,
     MCP tools, viz block, debug block, critical footer, path rules, XML wrap
     and the singleton constraint.
+
+    *provider_capabilities* is the preloaded ``provider-capabilities.yaml``
+    mapping. ``sync_agents_for_provider`` hoists the load once per provider and
+    passes it in; a direct caller may omit it and it is loaded once here.
     """
     name = Path(filename).stem
     layer = source_path.parts[-2]
     source_label = f'{layer}/{source_path.name}'
     generated_from = f'{source_label}@{source_version}' if source_version else source_label
+
+    # Singleton-Constraint: inject the guard block into the body BEFORE the
+    # provider serialization step. Injecting it afterwards (the pre-Task-3
+    # order) appended it outside the Codex TOML ``developer_instructions``
+    # string and produced the two invalid `.codex/agents/*.toml` files
+    # (plan Task 3 / finding D1/N1).
+    SINGLETON_CONSTRAINT_BLOCK = (
+        "\n\n## Singleton-Regel: Orchestrator-Spawn (auto-generated)\n\n"
+        "**NIEMALS** `task(subagent_type=\"orchestrator\", ...)` oder "
+        "`Agent(subagent_type=\"orchestrator\", ...)` aufrufen.\n\n"
+        "- Es existiert genau **EIN Orchestrator** pro Session — der vom `main_chat` gespawnte.\n"
+        "- Mehrere Orchestrator-Instanzen verursachen Routing-Konflikte und Session-State-Korruption.\n"
+        "- Bei unklarem Routing: Ergebnis an den Aufrufer zurückgeben, nicht weiter delegieren.\n\n"
+        "> Durchgesetzt via `rules/1-generic/a2a-delegation-gates.md` Gate #5.\n"
+    )
+    # Only agents that can actually spawn sub-agents (Agent/Task tool) need
+    # the singleton guard — injecting it into non-spawning agents is wasted context.
+    if role != "orchestrator" and not role.endswith("-iteration") and can_spawn:
+        content = content.rstrip() + SINGLETON_CONSTRAINT_BLOCK
 
     content = transform_agent_content_for_provider(
         content=content,
@@ -737,20 +894,21 @@ def _finalize_agent_content(
     if xml_cfg.get('enabled', False):
         content = wrap_sections_in_xml(content)
 
-    # Singleton-Constraint: inject guard block into all non-orchestrator agent files
-    SINGLETON_CONSTRAINT_BLOCK = (
-        "\n\n## Singleton-Regel: Orchestrator-Spawn (auto-generated)\n\n"
-        "**NIEMALS** `task(subagent_type=\"orchestrator\", ...)` oder "
-        "`Agent(subagent_type=\"orchestrator\", ...)` aufrufen.\n\n"
-        "- Es existiert genau **EIN Orchestrator** pro Session — der vom `main_chat` gespawnte.\n"
-        "- Mehrere Orchestrator-Instanzen verursachen Routing-Konflikte und Session-State-Korruption.\n"
-        "- Bei unklarem Routing: Ergebnis an den Aufrufer zurückgeben, nicht weiter delegieren.\n\n"
-        "> Durchgesetzt via `rules/1-generic/a2a-delegation-gates.md` Gate #5.\n"
-    )
-    # Only agents that can actually spawn sub-agents (Agent/Task tool) need
-    # the singleton guard — injecting it into non-spawning agents is wasted context.
-    if role != "orchestrator" and not role.endswith("-iteration") and can_spawn:
-        content = content.rstrip() + SINGLETON_CONSTRAINT_BLOCK
+    # Artifact validation (spec §5, plan Task 3): validate the finalized
+    # artifact against the provider's declared format contract before it is
+    # written. A violation is fail-soft in a normal sync (a `[WARN]
+    # artifact-contract:` line, rc 0) and fail-loud under `--check`/
+    # `--validate` via the read-only gate in sync.py. The provider's
+    # `artifact-validation: false` flag (Task 5) disables the check for that
+    # provider only; an absent flag is treated as enabled. Capabilities are
+    # preloaded once per provider by the caller; load lazily for direct callers.
+    if provider_capabilities is None:
+        provider_capabilities = _load_artifact_capabilities(agent_meta_root)
+    if _artifact_validation_enabled(provider, provider_capabilities):
+        _pc = (provider_config or {}).get(provider)
+        _rel_out = _relative_posix(target_path, project_root)
+        for _finding in _artifact_findings(content, _pc, _rel_out):
+            log.warn(f"artifact-contract: {_rel_out}: {_finding.message}")
 
     return content
 
@@ -1097,6 +1255,11 @@ def sync_agents_for_provider(agent_meta_root: Path, project_root: Path, config: 
 
     gates = resolve_activation_gates(agent_meta_root, config)
 
+    # Hoist the provider-capabilities load out of the per-role loop (quality
+    # review finding 2): the artifact-validation flag is read once per provider
+    # instead of once per generated artifact.
+    artifact_capabilities = _load_artifact_capabilities(agent_meta_root)
+
     expected_filenames: set = set()
     project_name = config.get('project', {}).get('name', 'unknown')
 
@@ -1120,7 +1283,8 @@ def sync_agents_for_provider(agent_meta_root: Path, project_root: Path, config: 
         content = _finalize_agent_content(
             content, role, filename, source_path, provider, provider_config,
             source_version, description, _can_spawn, config, agent_meta_root,
-            project_root, target_path, variables, debug_mode, log)
+            project_root, target_path, variables, debug_mode, log,
+            provider_capabilities=artifact_capabilities)
         _write_agent_file(target_path, content, source_path, agent_meta_root,
                           project_root, config, dry_run, log)
 

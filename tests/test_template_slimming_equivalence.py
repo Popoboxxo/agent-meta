@@ -30,7 +30,10 @@ What the gate checks
    per-role sync path (``_compose_role_content`` → ``_apply_content_pipeline``
    → ``_finalize_agent_content``). Roles whose template is not migrated must
    still be byte-identical to the golden. Migrated roles must match the golden
-   after applying the declared normalizations.
+   after applying the declared normalizations. Before comparing, the golden's
+   release-volatile project meta version/date tokens are ported to the current
+   render's values (``_port_golden_meta_tokens``) so version bumps do not force
+   a fixture rebaseline; per-role template versions stay frozen.
 2. **Normalization marking.** Every detected region of a declared kind is
    attributed to exactly one declared variant; the attribution
    (``role → block kind → variant id``) is printed on mismatch.
@@ -79,6 +82,21 @@ _PROVIDER = "Claude"
 #: Asserted by ``test_golden_role_set_is_pinned`` so a deleted or renamed
 #: fixture cannot silently shrink the gate's coverage.
 _GOLDEN_ROLE_COUNT = 58
+
+#: The golden corpus was frozen while the project ``VERSION`` was
+#: ``1.2.0-beta.2`` (CHANGELOG date ``2026-09-13``). The sync pipeline embeds
+#: the *project* meta version (``{{AGENT_META_VERSION}}``) and the CHANGELOG
+#: date (``{{AGENT_META_DATE}}``) into generated bodies, and both tokens are
+#: release-volatile: a version bump legitimately rewrites every embedded
+#: occurrence. The B2 gate therefore ports these two frozen tokens in the
+#: golden to the current render's values before comparing, which keeps the gate
+#: version-agnostic instead of forcing a golden rebaseline per release
+#: (cf. ``cd2e9bd3``, the Task-12 template-version rebaseline). Per-role
+#: template versions stay frozen: the frontmatter ``version:`` and
+#: ``generated-from: …@<version>`` pins are *not* project meta versions and are
+#: still asserted against the golden.
+_GOLDEN_META_VERSION = "1.2.0-beta.2"
+_GOLDEN_META_DATE = "2026-09-13"
 
 # ---------------------------------------------------------------------------
 # Shared-gate registries (extended by Tasks 13/14/15)
@@ -1102,13 +1120,43 @@ def _normalize(
 # ---------------------------------------------------------------------------
 
 
+def _port_golden_meta_tokens(text: str, variables: dict) -> str:
+    """Port the golden's release-volatile meta tokens to the current render.
+
+    The frozen golden embeds the project meta version/date resolved at freeze
+    time (``_GOLDEN_META_VERSION`` / ``_GOLDEN_META_DATE``); the current render
+    embeds the values from *variables*. Replacing only the frozen values on the
+    golden side makes the byte comparison version-agnostic without touching the
+    fixture and without masking any other version-like token (template versions
+    and ``generated-from`` pins remain exact).
+    """
+    replacements = (
+        (_GOLDEN_META_VERSION, "AGENT_META_VERSION"),
+        (_GOLDEN_META_DATE, "AGENT_META_DATE"),
+    )
+    for frozen, variable in replacements:
+        current = str(variables.get(variable, ""))
+        if not frozen or not current:
+            continue
+        # The negative lookahead avoids replacing inside a longer version token.
+        text = re.sub(
+            re.escape(frozen) + r"(?![\w.\-])",
+            lambda _match, value=current: value,
+            text,
+        )
+    return text
+
+
 def test_golden_equivalence_and_normalization_marking(render_env: RenderEnv):
     """Golden roles: unmigrated byte-identical, migrated attributed to B2b."""
     failures: list[str] = []
     b2b_marks: list[str] = []
     for role in _golden_roles():
         assert role in render_env.rendered, f"golden role not rendered: {role}"
-        golden = (_GOLDEN_DIR / f"{role}.md").read_text(encoding="utf-8")
+        golden = _port_golden_meta_tokens(
+            (_GOLDEN_DIR / f"{role}.md").read_text(encoding="utf-8"),
+            render_env.variables,
+        )
         current = render_env.rendered[role]
         template = render_env.source_paths[role]
         if template not in _MIGRATED_PATHS:

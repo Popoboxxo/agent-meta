@@ -32,7 +32,7 @@ from lib.providers import (
 from lib.runtime_gate import RUNTIME_GATE_TIER_RANK, weakest_runtime_gate_tier
 
 # The real AGENTS.md sharer set declared in config/ai-providers.yaml.
-_AGENTS_MD_SHARERS = ("Opencode", "Gemini", "Codex", "ZCode", "KimiCode")
+_AGENTS_MD_SHARERS = ("Opencode", "Gemini", "Codex", "ZCode", "KimiCode", "Mammouth")
 _ACTIVE_AGENTS_MD_SHARERS = ("Opencode", "Gemini")
 
 _GATE_KEYS = {

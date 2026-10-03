@@ -1,0 +1,49 @@
+# Provider old->new path migration map
+# (SPEC-PROVIDER-AUDIT-OPENCODE-V2-2026-09-30, Task 11; design §6.2.1, spec §11.1).
+#
+# Sole owner: Task 11. This file deliberately lives apart from
+# config/ai-providers.yaml so Task 4 keeps exclusive ownership of the provider
+# contract; the migration *data* is decoupled from the provider *definitions*.
+#
+# Schema
+# ------
+#   migrations:
+#     <provider>:
+#       requires-flag: <bool key>      # optional; migration runs only when the
+#                                      # named provider-neutral bool is exactly true
+#       removals:                      # when `requires-flag` is present
+#         - remove: <project-relative path>
+#           kind: dir | file
+#     <provider>:                      # flag-less short form (default-on)
+#       - remove: <project-relative path>
+#         kind: dir | file
+#
+# Consumption contract (scripts/lib/sync_pipeline.py::migrate_provider_paths):
+#   * iterate `migrations`; for each provider entry run only when it has no
+#     `requires-flag` OR the named bool is truthy on that provider's config;
+#   * every `remove` target is deleted backup-first (byte-exact
+#     `.sync-backup-<YYYYmmdd-HHMMSS>` sibling), user-authored files preserved
+#     (managed-marker / managed-index guard) and rollback is a plain rename of
+#     the backup sibling back onto the original name;
+#   * dispatch is on this map + the named flag, never on a provider name.
+#
+# The migration runs AFTER the new paths have been written (stage 6), so a
+# removed old path always has its new counterpart on disk first.
+
+migrations:
+  Copilot:                     # default-on migration (no flag)
+    - remove: .github/copilot/agents
+      kind: dir
+    - remove: .github/copilot/rules
+      kind: dir
+    - remove: .github/copilot/COPILOT.md
+      kind: file
+  Gemini:                      # only when agent-discovery: true
+    requires-flag: agent-discovery
+    removals:
+      - remove: .gemini/agents
+        kind: dir
+      - remove: .gemini/rules
+        kind: dir
+      - remove: .gemini/skills
+        kind: dir

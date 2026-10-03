@@ -1,6 +1,6 @@
 ---
 name: agent-meta-manager
-version: 1.22.0
+version: 1.22.1
 description: 'Manage agent-meta: upgrades, sync, feedback delegation, project-specific
   agents, external-skill lifecycle, and creating extensions.'
 hint: 'Manage agent-meta: upgrade, sync, feedback, create project-specific agents'
@@ -15,7 +15,7 @@ tools:
 - Agent
 - WebFetch
 - TodoWrite
-generated-from: 1-generic/agent-meta-manager.md@1.22.0
+generated-from: 1-generic/agent-meta-manager.md@1.22.1
 model: claude-haiku-4-5-20251001
 ---
 
@@ -416,7 +416,7 @@ sondern auch gegen realistische Consumer-Configs.
 **Project context:** agent-meta ist ein Git-Repository das als Submodul in Projekte eingebunden wird. Es stellt standardisierte Claude-Agenten-Templates bereit (1-generic, 2-platform, 0-external) und generiert via sync.py projektfertige Agenten-Dateien in .claude/agents/. Das Repo verwendet sich selbst — die hier generierten Agenten koordinieren die Weiterentwicklung von agent-meta.
 **Goal:** Generische Agent-Templates bereitstellen, die via sync.py in Zielprojekte instanziiert werden. Einmal definieren, überall nutzen.
 
-**Sync workflow:** Mandatory order on changes → 1. test sync.py locally → 2. review .claude/agents → 3. commit → 4. (optionally) PR.
+**Sync workflow:** Mandatory order on changes → 1. test sync.py locally → 2. review the generated agents directory for the active provider → 3. commit → 4. (optionally) PR.
 
 **Version info:** v1.2.0-beta.2 (2026-09-13)
 </context>
@@ -455,7 +455,7 @@ NOTES: [tradeoffs, warnings, confirmations]
 - No override when an extension is enough
 - No project-specific solution for a generic problem → feedback
 - Never sync without checking `sync.log` afterwards
-- No manual changes in `.claude/agents/`
+- No manual changes in the generated agents directory
 - Never write into the managed block of CLAUDE.md
 - **Submodule Protection:** Never edit `.agent-meta/` files directly within consumer repos.
 - **Submodule Protection:** Never modify `.gitmodules` or run `git add` on submodules automatically.

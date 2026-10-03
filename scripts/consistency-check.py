@@ -39,6 +39,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 _AGENT_META_ROOT = _SCRIPTS_DIR.parent
 
+from lib.consistency.artifact_contracts import check_artifact_contracts
 from lib.consistency.commands import check_command_frontmatter, check_duplicate_commands
 from lib.consistency.context_size import check_context_file_size
 from lib.consistency.context_topology import check_context_topology_consistency
@@ -57,12 +58,14 @@ from lib.consistency.docs import (
 from lib.consistency.frontmatter import check_agent_frontmatter
 from lib.consistency.fanout_contracts import check_fanout_backend_contract
 from lib.consistency.handoff_contracts import check_handoff_contracts
+from lib.consistency.model_contracts import check_model_contracts
 from lib.consistency.placeholders import check_placeholders, load_project_vars
 from lib.consistency.python_compat import check_fstring_backslash_hazard, check_py39_union_syntax
 from lib.consistency.reference_standards import check_reference_standards
 from lib.consistency.repo_containment import check_repo_containment_templates
 from lib.consistency.report import Finding, Severity, print_json_report, print_report
 from lib.consistency.subagent_permissions import check_subagent_permission_templates
+from lib.io import load_yaml_file
 
 # ── git helpers ───────────────────────────────────────────────────────────────
 
@@ -190,6 +193,13 @@ def run_checks(
         findings += check_schema_refs(root)
         findings += check_handoff_contracts(root)
         findings += check_fanout_backend_contract(root)
+        project_config = load_yaml_file(
+            root / ".meta-config" / "project.yaml",
+            on_error="default",
+            default={},
+        )
+        findings += check_artifact_contracts(root, project_config)
+        findings += check_model_contracts(root, project_config)
         findings += check_subagent_permission_templates(root)
         findings += check_py39_union_syntax(root)
         findings += check_fstring_backslash_hazard(root)

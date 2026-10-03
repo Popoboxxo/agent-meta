@@ -323,6 +323,29 @@ def _resolve_tier_to_model(tier_or_alias: str, provider: str, provider_config: d
     return tier_or_alias
 
 
+def apply_model_format(model: str, provider_config: dict | None, provider: str) -> str:
+    """Apply the provider's ``model-format`` template to a resolved model ID once.
+
+    Generic and provider-agnostic: the template is read from config data
+    (``provider_config[provider]["model-format"]``, default ``"{model}"``) and
+    is never selected by a provider-name branch. Application is **idempotent**:
+    when ``model`` already carries the template's literal prefix/suffix it is
+    returned unchanged, so the template can never be applied twice and a doubled
+    prefix (``kimi-code/kimi-code/*``) cannot leak. An empty model stays empty so
+    no ``model:`` field is injected.
+    """
+    if not model:
+        return model
+    entry = (provider_config or {}).get(provider) or {}
+    template = str(entry.get("model-format") or "{model}")
+    if "{model}" not in template:
+        return model
+    prefix, _, suffix = template.partition("{model}")
+    if model.startswith(prefix) and model.endswith(suffix):
+        return model
+    return f"{prefix}{model}{suffix}"
+
+
 def resolve_model(
     role: str,
     project_config: dict,
@@ -331,7 +354,37 @@ def resolve_model(
     provider_config: dict | None = None,
     log: Optional["SyncLog"] = None,
 ) -> str:
-    """Resolve the model ID for a role and provider using tier presets and registry.
+    """Resolve the model ID for a role and provider, then apply ``model-format``.
+
+    Thin wrapper around :func:`_resolve_model_raw` that enforces the emission
+    contract shared by every provider (config-driven, no provider-name branch):
+
+    * a raw tier token never leaves the resolver — it is routed through the tier
+      resolver once (`_resolve_tier_to_model`); a still-unresolvable tier yields
+      ``""`` so no ``model:`` field is injected;
+    * the provider's ``model-format`` is applied exactly once via
+      :func:`apply_model_format`.
+    """
+    resolved = _resolve_model_raw(
+        role, project_config, agent_meta_root,
+        provider=provider, provider_config=provider_config, log=log,
+    )
+    if resolved in _KNOWN_TIERS:
+        resolved = _resolve_tier_to_model(resolved, provider, provider_config or {})
+        if resolved in _KNOWN_TIERS:
+            resolved = ""
+    return apply_model_format(resolved, provider_config, provider)
+
+
+def _resolve_model_raw(
+    role: str,
+    project_config: dict,
+    agent_meta_root: Path,
+    provider: str = "Claude",
+    provider_config: dict | None = None,
+    log: Optional["SyncLog"] = None,
+) -> str:
+    """Resolve the raw (pre-``model-format``) model ID for a role and provider.
 
     Resolution order (highest to lowest):
     1. Global override: project_config["model-override-all"][provider] —
@@ -342,7 +395,10 @@ def resolve_model(
     Stages 1 and 2 are mutually exclusive per provider; validation of that
     constraint happens in scripts/lib/config.py::_validate_config(), not here.
     3. Everything else: per-role overrides, role-defaults, tier-overrides and
-       tier presets, resolved via _resolve_tier_to_model().
+       tier presets. ``ai-providers.yaml`` ``model-tiers`` is authoritative over
+       a preset's *global* ``tiers`` fallback; the active preset's own
+       provider-specific ``providers.<P>.tiers`` entry (and any project-local
+       preset) still wins as an explicit mapping.
     """
 
     tier_or_id = ""
@@ -435,7 +491,8 @@ def resolve_model(
     global_presets = load_tier_presets(agent_meta_root)
     project_presets = project_config.get("tier-presets", {}) or {}
 
-    if isinstance(project_presets, dict) and preset_name in project_presets:
+    is_project_local_preset = isinstance(project_presets, dict) and preset_name in project_presets
+    if is_project_local_preset:
         preset_data = project_presets[preset_name] or {}
         if log:
             log.debug(f"{provider}/{role}", f"Preset '{preset_name}' resolved from project-local tier-presets")
@@ -444,9 +501,26 @@ def resolve_model(
 
     # --- New format: tiers: {tier → model_id} direct ---
     if "tiers" in preset_data:
-        # Provider-specific tier within preset takes priority over global tiers
         provider_preset_tiers = (preset_data.get("providers") or {}).get(provider, {}).get("tiers") or {}
-        direct_model = provider_preset_tiers.get(base_tier) or preset_data["tiers"].get(base_tier, "")
+        registry_tiers = (provider_config or {}).get(provider, {}).get("model-tiers") or {}
+        preset_fallback_tier = preset_data["tiers"].get(base_tier, "")
+        # ai-providers.yaml model-tiers is authoritative over a preset's global
+        # tiers fallback (a global preset must not shadow the provider registry).
+        # An explicit active mapping still wins: the preset's own provider entry,
+        # or the preset's tiers when the preset is project-local. Config-driven —
+        # no provider-name branch.
+        if is_project_local_preset:
+            direct_model = (
+                provider_preset_tiers.get(base_tier)
+                or preset_fallback_tier
+                or registry_tiers.get(base_tier, "")
+            )
+        else:
+            direct_model = (
+                provider_preset_tiers.get(base_tier)
+                or registry_tiers.get(base_tier, "")
+                or preset_fallback_tier
+            )
         if direct_model:
             # provider-tier-overrides take priority over preset tiers
             pto = project_config.get("provider-tier-overrides", {})
@@ -455,9 +529,14 @@ def resolve_model(
                 if log:
                     log.debug(f"{provider}/{role}", f"Tier '{base_tier}' explicitly overriden for provider '{provider}': {resolved}")
                 return resolved
-            source = f"provider '{provider}'" if provider_preset_tiers.get(base_tier) else "global fallback"
+            if provider_preset_tiers.get(base_tier):
+                source = f"provider '{provider}' preset entry"
+            elif registry_tiers.get(base_tier) == direct_model:
+                source = "ai-providers model-tiers"
+            else:
+                source = "preset global fallback"
             if log:
-                log.debug(f"{provider}/{role}", f"Tier '{base_tier}' resolved from preset '{preset_name}' ({source}): {direct_model}")
+                log.debug(f"{provider}/{role}", f"Tier '{base_tier}' resolved from '{source}' ({preset_name}): {direct_model}")
             return direct_model
 
     # --- Old format: mapping: {tier → tier} + provider model-tiers ---

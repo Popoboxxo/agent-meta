@@ -2,6 +2,14 @@ providers:
   Claude:
     agents_dir: .claude/agents
     agent_ext: .md
+    # Provider contract (SPEC-PROVIDER-AUDIT-OPENCODE-V2-2026-09-30, Task 4):
+    # surface-version selects the generation surface (v1 default, byte-stable),
+    # agent-discovery gates the .agents/* discovery surface (default off) and
+    # model-format is applied exactly once at emission. Values only — no code
+    # branches on a provider name.
+    surface-version: "v1"
+    agent-discovery: false
+    model-format: "{model}"
     context_file: CLAUDE.md
     context_template: templates/configs/CLAUDE.project-template.md
     has_dedicated_context_file: true
@@ -95,9 +103,28 @@ providers:
       inject-memory: true
       inject-permission-mode: true
       tools: keep
+      tools-format: keep
+      tool-name-map: {}
+      reject-fields: []
   Gemini:
     agents_dir: .gemini/agents
     agent_ext: .md
+    # OQ-1/AC-9: flag-gated, default-off. With agent-discovery: false the
+    # current .gemini/* discovery paths and the gemini-settings MCP format
+    # stay byte-for-byte; true enables the .agents/* discovery surface below.
+    surface-version: "v1"
+    agent-discovery: false
+    model-format: "{model}"
+    # OQ-6: Antigravity accepts only inherit|flash|pro — no concrete tier IDs.
+    model-literal: inherit
+    # Discovery surface (Antigravity): reachable only when agent-discovery: true.
+    discovery:
+      agents_dir: .agents/agents
+      rules_dir: .agents/rules
+      skills_dir: .agents/skills
+      mcp-config:
+        committed-file: .agents/mcp_config.json
+        format: antigravity-mcp-json
     context_file: AGENTS.md
     context_template: templates/configs/AGENTS.project-template.md
     has_rules: true
@@ -169,10 +196,27 @@ providers:
       - max_output_tokens
       strip-claude-lines: true
       body-note: gemini-registration
+      tools-format: filter
+      # G-2: Antigravity subagent tool vocabulary (Claude -> provider name);
+      # an unknown source tool name passes through unchanged.
+      tool-name-map:
+        Read: view_file
+        Write: replace_file_content
+        Grep: grep_search
+        Bash: run_command
+      reject-fields: []
   Opencode:
     display-name: OpenCode
     agents_dir: .opencode/agents
     agent_ext: .md
+    # OQ-8: v2 is opt-in; v1 stays the default byte shape. surface-version: v2
+    # selects frontmatter-mechanism: opencode-native-v2 and
+    # mcp-config.format: opencode-json-v2 (consumed by Tasks 6/8, never by a
+    # provider-name branch). PRE-3/OQ-4: orchestrator is emitted as mode: primary.
+    surface-version: "v1"
+    agent-discovery: false
+    model-format: "{model}"
+    primary-role: orchestrator
     context_file: AGENTS.md
     context_template: templates/configs/AGENTS.project-template.md
     has_rules: false
@@ -225,7 +269,13 @@ providers:
     mcp-config:
       committed-file: opencode.json
       secrets-file: .opencode/mcp.local.json
+      # OQ-8/AC-5: surface-version is data that SELECTS the MCP format; the
+      # writer keeps dispatching on `format` only. v1 stays the flat default,
+      # v2 selects the nested mcp.servers shape (design §3.1/§3.4, DECISION-7).
       format: opencode-json
+      surface-formats:
+        v1: opencode-json
+        v2: opencode-json-v2
     skills_dir: .opencode/skills
     snippets_dir: .opencode/snippets
     pending_tasks_file: .opencode/pending-tasks.md
@@ -234,6 +284,40 @@ providers:
       im Chat.'
     agent-transform:
       frontmatter-mechanism: opencode-native
+      # OQ-8/AC-5: surface-version is data that SELECTS the frontmatter
+      # mechanism; the transform writer keeps reading the resolved
+      # `frontmatter-mechanism` value only. v1 stays byte-frozen.
+      surface-mechanisms:
+        v1: opencode-native
+        v2: opencode-native-v2
+      tools-format: keep
+      tool-name-map: {}
+      # §4.3: allow-list turns Opencode v2's silent frontmatter drop into a
+      # sync-time finding. Superset of the v1 and v2 emitted keys.
+      allowed-fields:
+      - name
+      - description
+      - mode
+      - model
+      - steps
+      - permission
+      - permissions
+      - temperature
+      - max_tokens
+      - version
+      - generated-from
+      # Task 18: `prompt_mode` is emitted verbatim from the template by both
+      # surfaces (Opencode declares no strip-fields). Opencode preserves
+      # unknown frontmatter keys in its `options` bucket — v1 `debug agent`
+      # collects them there and v2's agent `normalize()` explicitly promotes
+      # unknown keys into `options` "so they survive the round-trip" — so it
+      # is a legitimate emitted key, not a silent drop (runtime evidence
+      # docs/analysis/evidence/2026-09-30-runtime-opencode-v{1,2}.md).
+      - prompt_mode
+      - subagent
+      - hidden
+      - color
+      reject-fields: []
     model-tiers:
       nano: opencode-go/mimo-v2.5
       fast: opencode-go/mimo-v2.5
@@ -249,6 +333,9 @@ providers:
   Continue:
     agents_dir: .continue/agents
     agent_ext: .md
+    surface-version: "v1"
+    agent-discovery: false
+    model-format: "{model}"
     context_file: .continue/rules/project-context.md
     # Phase-2 context adapter — HYPOTHESIS, UNVERIFIED (candidate pointer file).
     # Disabled until tests/manual/phase2-adapter-hypothesis.md records a real-repo
@@ -311,12 +398,20 @@ providers:
       extra-fields:
         alwaysApply: false
       tools: remove
+      tools-format: remove
+      tool-name-map: {}
+      reject-fields: []
       strip-claude-lines: true
       body-sanitize-hr: true
   Copilot:
-    agents_dir: .github/copilot/agents
-    agent_ext: .md
-    context_file: .github/copilot/COPILOT.md
+    # PRE-4/OQ-5 + AC-8: GitHub-cloud canonical paths; agent files use the
+    # .agent.md extension under .github/agents/ (migration is default-on).
+    agents_dir: .github/agents
+    agent_ext: .agent.md
+    surface-version: "v1"
+    agent-discovery: false
+    model-format: "{model}"
+    context_file: .github/copilot-instructions.md
     # Phase-2 context adapter — HYPOTHESIS, UNVERIFIED (candidate pointer file;
     # the native path, `.github/copilot-instructions.md`, is not confirmed).
     # Disabled until tests/manual/phase2-adapter-hypothesis.md records a real-repo
@@ -325,7 +420,7 @@ providers:
     context_adapter_file: .github/copilot/COPILOT.md
     context_template: templates/configs/COPILOT.project-template.md
     has_rules: true
-    rules_dir: .github/copilot/rules
+    rules_dir: .github/instructions
     has_hooks: false
     has_commands: false
     has_settings: false
@@ -365,16 +460,24 @@ providers:
       - stop_sequences
       - max_output_tokens
       - tools
+      tools-format: skip
+      tool-name-map: {}
+      reject-fields: []
       strip-claude-lines: true
   Mammouth:
     agents_dir: .mammouth/agents
     agent_ext: .md
-    context_file: MAMMOUTH.md
+    # PRE-5/OQ-7: Mammouth reads AGENTS.md; MAMMOUTH.md and its routing entry
+    # are retired. F8/N17: tools need the object form (tools-format: map).
+    surface-version: "v1"
+    agent-discovery: false
+    model-format: "{model}"
+    context_file: AGENTS.md
     # Phase-2 context adapter — HYPOTHESIS, UNVERIFIED (candidate pointer file).
     # Disabled until tests/manual/phase2-adapter-hypothesis.md records a real-repo
     # PASS: `context_adapter: false` keeps Mammouth a direct reader of the core.
     context_adapter: false
-    context_adapter_file: MAMMOUTH.md
+    context_adapter_file: AGENTS.md
     context_template: templates/configs/AGENTS.project-template.md
     has_rules: true
     rules_dir: .mammouth/rules
@@ -395,7 +498,6 @@ providers:
     checkpoint_dir: .meta-viz
     isolation-dirs:
     - .mammouth/
-    - MAMMOUTH.md
     bash_tool_name: bash
     provider_root_dirs:
     - .mammouth/
@@ -430,10 +532,16 @@ providers:
       - top_k
       - stop_sequences
       - max_output_tokens
+      tools-format: map
+      tool-name-map: {}
+      reject-fields: []
       strip-claude-lines: true
   Codex:
     agents_dir: .codex/agents
     agent_ext: .toml
+    surface-version: "v1"
+    agent-discovery: false
+    model-format: "{model}"
     context_file: AGENTS.md
     # Phase-2 context adapter — HYPOTHESIS, UNVERIFIED (candidate `AGENTS.override.md`).
     # Disabled until tests/manual/phase2-adapter-hypothesis.md records a real-repo
@@ -489,10 +597,16 @@ providers:
       extra-fields:
         sandbox_mode: workspace-write
       tools: skip
+      tools-format: skip
+      tool-name-map: {}
+      reject-fields: []
       strip-claude-lines: true
   ZCode:
     agents_dir: .zcode/agents
     agent_ext: .md
+    surface-version: "v1"
+    agent-discovery: false
+    model-format: "{model}"
     context_file: AGENTS.md
     context_template: templates/configs/AGENTS.project-template.md
     has_rules: false
@@ -503,6 +617,7 @@ providers:
     capabilities:
     - agents
     - settings
+    - skills
     - mcp
     - context-managed-block
     artifact_dir: .zcode/artifacts
@@ -541,10 +656,26 @@ providers:
       - top_k
       - stop_sequences
       - max_output_tokens
+      tools-format: skip
+      tool-name-map: {}
+      reject-fields: []
       strip-claude-lines: true
   KimiCode:
     agents_dir: .kimi-code/agents
     agent_ext: .md
+    # F2/H6/OQ-3: only runtime-verified kimi-code/... aliases are emitted; the
+    # catalog lists the formatted model-tiers values plus the runtime aliases
+    # observed via `kimi provider list --json`. Bare IDs are forbidden.
+    surface-version: "v1"
+    agent-discovery: false
+    model-format: "kimi-code/{model}"
+    model-catalog:
+    - kimi-code/kimi-k2.6
+    - kimi-code/kimi-k2.7-code
+    - kimi-code/kimi-for-coding
+    - kimi-code/kimi-for-coding-highspeed
+    - kimi-code/k3
+    - kimi-code/k3-256k
     context_file: AGENTS.md
     context_template: templates/configs/AGENTS.project-template.md
     has_rules: false
@@ -553,6 +684,7 @@ providers:
     has_settings: false
     capabilities:
     - agents
+    - skills
     - mcp
     - context-managed-block
     artifact_dir: .kimi-code/artifacts
@@ -567,7 +699,8 @@ providers:
     - .kimi-code/pending-tasks.md
     mcp-config:
       committed-file: .kimi-code/mcp.json
-      format: claude-settings
+      # F11/KC-1: KimiCode discriminates remote transport via `transport: sse`.
+      format: kimi-json
     skills_dir: .kimi-code/skills
     snippets_dir: .kimi-code/snippets
     pending_tasks_file: .kimi-code/pending-tasks.md
@@ -583,6 +716,9 @@ providers:
     agent-transform:
       model: inject
       tools: keep
+      tools-format: keep
+      tool-name-map: {}
+      reject-fields: []
       strip-fields:
       - memory
       - temperature

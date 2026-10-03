@@ -12,6 +12,29 @@ from ..substitution import constant_lookup, substitute_placeholders
 # resolve_loops() and resolve_partials().
 _PLACEHOLDER_RE = re.compile(r"\{\{([^#>/][^}]*)\}\}")
 
+# Agent-meta managed block (HTML comment form) shared by the context writers
+# and the run-1 fixpoint convergence.
+MANAGED_BLOCK_RE = re.compile(
+    r"<!--\s*agent-meta:managed-begin\s*-->.*?<!--\s*agent-meta:managed-end\s*-->",
+    re.DOTALL,
+)
+
+
+def substitute_managed_block(text: str, managed_block: str) -> str:
+    """Replace the agent-meta managed block in *text* with *managed_block*.
+
+    Makes the FIRST sync of a scaffolded context file converge onto the
+    steady-state managed block that every later sync renders (run1 == run2
+    fixpoint, AC-4). Function replacement inserts *managed_block* verbatim, so
+    backslashes and ``$``-group references are never interpreted (issue #674).
+
+    Returns *text* unchanged when it carries no managed block; creating the
+    scaffold itself stays the caller's responsibility.
+    """
+    if not MANAGED_BLOCK_RE.search(text):
+        return text
+    return MANAGED_BLOCK_RE.sub(lambda _match: managed_block, text, count=1)
+
 
 class TemplateBuilder:
     """Handlebars-style template builder with support for partials, conditionals, loops, and variables."""

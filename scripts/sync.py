@@ -105,6 +105,35 @@ def _normalize_check_dry_run(args) -> None:
         args.dry_run = True
 
 
+def _run_artifact_gate(ctx) -> None:
+    """Read-only artifact-contract gate for ``--check`` / ``--validate``.
+
+    Validates the generated artifacts already present in the project against
+    each active provider's declared format contract (spec §5, plan Task 3).
+    ERROR findings fail loud with rc 1; a normal sync never calls this gate and
+    only emits ``[WARN] artifact-contract:`` lines. Dispatch is registry-driven
+    (``frontmatter-mechanism`` / ``surface-version`` / ``allowed-fields``
+    values), never a provider-name branch.
+    """
+    args = ctx.args
+    if not (getattr(args, "check", False) or getattr(args, "validate", False)):
+        return
+    from lib.agent_sync import collect_artifact_findings
+
+    findings = collect_artifact_findings(
+        ctx.agent_meta_root, ctx.project_root, ctx.config, log=ctx.log
+    )
+    if not findings:
+        return
+    print(
+        f"  X  artifact-contract: {len(findings)} finding(s) in generated artifacts",
+        file=sys.stderr,
+    )
+    for rel, finding in findings:
+        print(f"       {rel}: {finding.message}", file=sys.stderr)
+    sys.exit(1)
+
+
 def _build_arg_parser() -> argparse.ArgumentParser:
     """Construct the sync.py CLI argument parser (flag-based interface)."""
     parser = argparse.ArgumentParser(
@@ -539,7 +568,7 @@ def _handle_cleanup_preview(ctx: _SyncContext) -> None:
     variables = ctx.variables
 
     try:
-        provider_config = load_providers_config(agent_meta_root)
+        provider_config = load_providers_config(agent_meta_root, config)
         providers = resolve_providers(config, provider_config)
         wrapper_filenames = _collect_all_registry_wrapper_filenames(agent_meta_root)
 
@@ -663,6 +692,10 @@ def main() -> None:
         ctx = _build_context(args, agent_meta_root, log)
     if ctx is None:
         return
+
+    # Fail-loud artifact gate for the read-only CI modes (spec §5). A normal
+    # sync never reaches this branch and stays fail-soft (rc 0).
+    _run_artifact_gate(ctx)
 
     _dispatch(ctx)
     if not getattr(ctx, "read_only", False):

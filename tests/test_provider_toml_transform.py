@@ -37,7 +37,7 @@ _PROVIDER_CONFIG = load_providers_config(REPO_ROOT)
 CODEX_MODEL_BALANCED = "gpt-5.3-codex-spark"
 ZCODE_MODEL_BALANCED = "glm-5.3"
 ZCODE_MODEL_FAST = "glm-5.3-flash"
-KIMICODE_MODEL_BALANCED = "kimi-k2.7-code"
+KIMICODE_MODEL_BALANCED = "kimi-code/kimi-k2.7-code"
 
 
 def _sample_agent_content() -> str:
@@ -200,7 +200,7 @@ def test_kimicode_model_injected_and_strip_fields_applied() -> None:
     out, _ = _transform("KimiCode", "orchestrator")
     assert out.startswith("---\n")
     fm = out.split("---")[1]
-    assert "model: kimi-k2.7-code" in fm
+    assert "model: kimi-code/kimi-k2.7-code" in fm
     for field in ("memory:", "temperature:", "top_p:", "top_k:",
                   "stop_sequences:", "max_output_tokens:"):
         assert field not in fm, f"{field} must be stripped for KimiCode"

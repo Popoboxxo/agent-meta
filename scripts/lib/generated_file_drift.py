@@ -423,3 +423,308 @@ def capture_generated_file_hashes(
     if resolved_path.is_file():
         hashes[PLATFORM_DEFAULTS_RESOLVED_REL] = content_hash(resolved_path.read_text(encoding="utf-8"))
     _save_hashes(project_root, hashes, dry_run)
+
+
+# ---------------------------------------------------------------------------
+# Path migration (SPEC-PROVIDER-AUDIT-OPENCODE-V2-2026-09-30, Task 11; H-2,
+# ADR-9). Backup-first managed delete + ordered
+# write-new -> verify -> backup-old -> remove-old, plus the net-zero-aware
+# final-content diff. Every helper is provider-agnostic: it reads managed
+# markers / index entries and config path values, never a provider name.
+# ---------------------------------------------------------------------------
+
+_MANAGED_MARKERS = (
+    "agent-meta:managed-begin",
+    "agent-meta:bootstrap-begin",
+)
+
+
+def is_managed_artifact(path: Path) -> bool:
+    """True when *path* is an agent-meta-managed artifact.
+
+    Two signals, either sufficient:
+
+    A. the file content carries an agent-meta managed marker (the HTML comment
+       form or the ``# agent-meta:managed-begin`` YAML-comment form);
+    B. the file's basename is listed in a sibling ``.agent-meta-managed``
+       (or ``-mcp``/``-tools``) index.
+
+    A missing, foreign or unreadable file returns ``False`` — user content is
+    never assumed managed.
+    """
+    try:
+        content = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return False
+    if any(marker in content for marker in _MANAGED_MARKERS):
+        return True
+    if not path.parent.is_dir():
+        return False
+    return path.name in _managed_names(path.parent, "mcp", "tools")
+
+
+def write_sync_backup(target: Path, ts: Optional[str] = None) -> Optional[Path]:
+    """Write a byte-exact ``<name>.sync-backup-<ts>`` sibling of *target*.
+
+    One timestamp per call (pass *ts* to share it across a whole migration
+    batch). Returns the backup path, or ``None`` when the target cannot be
+    read or the backup cannot be written (fail-soft, mirrors
+    ``backup_drifted_files``).
+    """
+    stamp = ts or datetime.now().strftime("%Y%m%d-%H%M%S")
+    try:
+        payload = target.read_bytes()
+    except OSError:
+        return None
+    backup = target.with_name(f"{target.name}.sync-backup-{stamp}")
+    try:
+        backup.write_bytes(payload)
+    except OSError:
+        return None
+    return backup
+
+
+def _project_rel(path: Path, project_root: Path) -> str:
+    try:
+        return path.relative_to(project_root).as_posix()
+    except ValueError:
+        return str(path)
+
+
+def remove_managed_artifact(
+    target: Path,
+    project_root: Path,
+    log: SyncLog,
+    dry_run: bool = False,
+    ts: Optional[str] = None,
+    verify=None,
+) -> dict:
+    """Backup-first managed delete (H-2 / ADR-9).
+
+    A user-authored file (no managed marker / index entry) is NEVER deleted —
+    it is left in place and a WARNING is logged. A managed file is backed up
+    byte-exactly *before* it is removed, so the backup restores the exact
+    pre-delete bytes. In ``dry_run`` nothing is written: ``removed`` stays
+    ``False`` while ``would_remove`` records the intent.
+
+    ``verify`` is an optional predicate ``verify(target) -> bool``: the delete
+    is deferred when it does not return exactly ``True`` (design §6.2 step 2,
+    "verify new before removing old"). The default ``None`` keeps the historical
+    managed-marker guard as the only gate.
+    """
+    rel = _project_rel(target, project_root)
+    result = {
+        "path": rel,
+        "removed": False,
+        "would_remove": False,
+        "backup": None,
+        "reason": "absent",
+    }
+    if not target.is_file():
+        return result
+    if not is_managed_artifact(target):
+        log.warning(f"{rel}: not agent-meta managed — user-authored file left in place")
+        result["reason"] = "user-authored"
+        return result
+    if verify is not None:
+        try:
+            verdict = verify(target)
+        except Exception as exc:
+            verdict = f"{type(exc).__name__}: {exc}"
+        if verdict is not True:
+            log.warning(f"{rel}: verify deferred removal ({verdict!r}) — file left in place")
+            result["reason"] = "verify-deferred"
+            return result
+    result["would_remove"] = True
+    if dry_run:
+        result["reason"] = "managed"
+        return result
+    backup = write_sync_backup(target, ts=ts)
+    if backup is None:
+        log.warning(f"{rel}: could not write .sync-backup sibling — file left in place")
+        result["would_remove"] = False
+        result["reason"] = "backup-failed"
+        return result
+    try:
+        target.unlink()
+    except OSError as exc:
+        log.warning(f"{rel}: could not remove managed artifact: {type(exc).__name__}: {exc}")
+        result["reason"] = "remove-failed"
+        return result
+    result["removed"] = True
+    result["backup"] = _project_rel(backup, project_root)
+    result["reason"] = "managed"
+    return result
+
+
+def migrate_managed_artifact(
+    old_path: Path,
+    new_path: Path,
+    project_root: Path,
+    log: SyncLog,
+    dry_run: bool = False,
+    verify=None,
+    ts: Optional[str] = None,
+) -> dict:
+    """Ordered path migration: write-new -> verify -> backup-old -> remove-old.
+
+    Config-independent primitive used by the discovery migration driver. The
+    new artifact is written first (bytes copied from the managed old artifact
+    when the new path is still empty), then verified — ``verify(new_path)`` is
+    an optional predicate whose verdict must be exactly ``True`` to continue.
+    Only after verification succeeds is the old artifact backed up
+    byte-exactly and removed. A user-authored old artifact is left untouched
+    (data-loss guard).
+
+    Returns a result dict; ``status`` is one of ``no-old``,
+    ``user-authored``, ``read-failed``, ``write-failed``, ``verify-failed``,
+    ``backup-failed``, ``remove-failed``, ``migrated`` or ``would-migrate``.
+    """
+    old_rel = _project_rel(old_path, project_root)
+    new_rel = _project_rel(new_path, project_root)
+    result = {"old": old_rel, "new": new_rel, "status": "no-old", "backup": None}
+    if not old_path.is_file():
+        return result
+    if not is_managed_artifact(old_path):
+        log.warning(
+            f"{old_rel}: not agent-meta managed — user-authored file left in place "
+            f"(no migration to {new_rel})"
+        )
+        result["status"] = "user-authored"
+        return result
+
+    # 1. write new.
+    if not new_path.exists():
+        try:
+            payload = old_path.read_bytes()
+        except OSError as exc:
+            log.warning(f"{old_rel}: could not read for migration: {type(exc).__name__}: {exc}")
+            result["status"] = "read-failed"
+            return result
+        if not dry_run:
+            new_path.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                new_path.write_bytes(payload)
+            except OSError as exc:
+                log.warning(f"{new_rel}: could not write migrated artifact: {type(exc).__name__}: {exc}")
+                result["status"] = "write-failed"
+                return result
+
+    # 2. verify new before anything is removed.
+    if verify is not None:
+        try:
+            verdict = verify(new_path)
+        except Exception as exc:  # noqa: BLE001 - any verifier error aborts the removal
+            verdict = f"{type(exc).__name__}: {exc}"
+        if verdict is not True:
+            log.warning(f"{new_rel}: verification failed ({verdict!r}) — old artifact kept")
+            result["status"] = "verify-failed"
+            return result
+
+    # 3. backup old + 4. remove old (backup-first).
+    if dry_run:
+        result["status"] = "would-migrate"
+        return result
+    backup = write_sync_backup(old_path, ts=ts)
+    if backup is None:
+        log.warning(f"{old_rel}: could not write .sync-backup sibling — old artifact left in place")
+        result["status"] = "backup-failed"
+        return result
+    try:
+        old_path.unlink()
+    except OSError as exc:
+        log.warning(f"{old_rel}: could not remove migrated artifact: {type(exc).__name__}: {exc}")
+        result["status"] = "remove-failed"
+        result["backup"] = _project_rel(backup, project_root)
+        return result
+    result["backup"] = _project_rel(backup, project_root)
+    result["status"] = "migrated"
+    return result
+
+
+def final_content_diff(project_root: Path, final_contents: dict) -> list[str]:
+    """Project-relative paths whose FINAL content differs from the on-disk bytes.
+
+    "Final-content diff" (design §6.3): a pending-write computation must
+    reflect the end state of a sync, not its intermediate writes. A file whose
+    final content equals its current content is clean even when an intermediate
+    step would have changed it (net-zero == clean). *final_contents* maps
+    project-relative posix paths to ``str`` (utf-8) or ``bytes``.
+    """
+    changed: list[str] = []
+    for rel_path, content in final_contents.items():
+        desired = content.encode("utf-8") if isinstance(content, str) else bytes(content)
+        try:
+            current = (project_root / rel_path).read_bytes()
+        except OSError:
+            current = None
+        if current != desired:
+            changed.append(rel_path)
+    return changed
+
+
+# Optional `kind` values a migration entry may carry; anything else degrades to
+# the conservative single-file behaviour.
+_MIGRATION_KINDS = ("dir", "file")
+
+
+def _normalize_migration_entry(raw) -> Optional[dict]:
+    """One normalized ``{"remove": <rel>, "kind": <dir|file>}`` entry or None."""
+    if not isinstance(raw, dict):
+        return None
+    remove = raw.get("remove")
+    if not (isinstance(remove, str) and remove.strip()):
+        return None
+    kind = raw.get("kind", "file")
+    if kind not in _MIGRATION_KINDS:
+        kind = "file"
+    return {"remove": remove.strip(), "kind": kind}
+
+
+def _normalize_migration_spec(raw) -> Optional[dict]:
+    """Normalize one provider's map value to ``{"requires-flag", "removals"}``.
+
+    Accepts both documented shapes (data contract, config/provider-migrations.yaml):
+    a bare sequence of entries (default-on, no flag) and a mapping with an
+    optional ``requires-flag`` string plus a ``removals`` sequence. Anything
+    malformed degrades to ``None`` (fail-soft, like every optional sidecar here).
+    """
+    if isinstance(raw, list):
+        entries = [_normalize_migration_entry(item) for item in raw]
+        removals = [entry for entry in entries if entry is not None]
+        return {"requires-flag": None, "removals": removals} if removals else None
+    if not isinstance(raw, dict):
+        return None
+    flag = raw.get("requires-flag")
+    flag = flag.strip() if isinstance(flag, str) and flag.strip() else None
+    raw_removals = raw.get("removals")
+    if not isinstance(raw_removals, list):
+        return None
+    entries = [_normalize_migration_entry(item) for item in raw_removals]
+    removals = [entry for entry in entries if entry is not None]
+    if not removals:
+        return None
+    return {"requires-flag": flag, "removals": removals}
+
+
+def load_provider_migrations(config_dir: Path) -> dict[str, dict]:
+    """Read ``config/provider-migrations.yaml`` into a normalized dict.
+
+    Returns ``{provider: {"requires-flag": str|None, "removals": [...]}}``; ``{}``
+    when the file is absent or malformed (fail-soft — a project without the map
+    simply migrates nothing). Purely data-driven: the provider key is a lookup
+    key, never a branch condition.
+    """
+    data = load_yaml_file(config_dir / "provider-migrations.yaml", on_error="default", default={})
+    migrations = data.get("migrations") if isinstance(data, dict) else None
+    if not isinstance(migrations, dict):
+        return {}
+    normalized: dict[str, dict] = {}
+    for provider, raw in migrations.items():
+        if not isinstance(provider, str):
+            continue
+        spec = _normalize_migration_spec(raw)
+        if spec is not None:
+            normalized[provider] = spec
+    return normalized
+

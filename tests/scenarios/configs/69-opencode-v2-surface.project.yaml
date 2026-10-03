@@ -1,0 +1,39 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Opencode
+dod-preset: rapid-prototyping
+platforms: []
+roles:
+- orchestrator
+- developer
+plugins:
+  playwright:
+    enabled: true
+# OQ-8/AC-5 opt-in gate, project channel (SPEC-ADMIN-UI-OPENCODE-SURFACE-AMENDMENT-
+# 2026-10-03, D1/D2): the consumer opts into v2 through the allow-listed
+# `provider-options.<Provider>.surface-version` key — NOT by editing the framework
+# registry. The resolver (`lib.providers.load_providers_config(root, project)`)
+# copies it onto the matching registry entry before surface resolution, so the
+# harness's own sync/--check already run the v2 tree (see asserts/69-*.sh).
+provider-options:
+  Opencode:
+    surface-version: v2
+project:
+  name: scenario-opencode-v2-surface
+  prefix: s69
+  short: opencode-v2-surface
+variables:
+  PROJECT_NAME: scenario-opencode-v2-surface
+  PROJECT_DESCRIPTION: Opencode v2 nested mcp.servers, default_agent primary entry, no v1-only key.
+  PROJECT_GOAL: Verify the v2 frontmatter mechanism and opencode.json surface when surface-version is v2.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-opencode-v2-surface
+  GIT_MAIN_BRANCH: main
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false

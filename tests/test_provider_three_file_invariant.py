@@ -88,3 +88,159 @@ def test_issue_492_provider_registered_in_all_three_pal_configs(provider):
             "false). Add the provider to all three PAL files; Copilot is the "
             "conservative reference pattern."
         )
+
+
+# ---------------------------------------------------------------------------
+# Capability flags (SPEC-PROVIDER-AUDIT-OPENCODE-V2-2026-09-30, §2.2)
+# ---------------------------------------------------------------------------
+# AC-15: every registered provider declares `skills`, `artifact-validation`
+#        and the `mcp-remote-transport` discriminator in
+#        config/provider-capabilities.yaml.
+# AC-24: `artifact-validation: false` is valid only with a non-empty
+#        `artifact-validation-reason`.
+# AC-25: `skills: true` must mirror the ai-providers.yaml machine flags — the
+#        `capabilities` list contains `skills` and `skills_dir` is non-null.
+
+_MCP_REMOTE_TRANSPORTS = ("url", "transport", "type")
+
+
+def _capability_entries() -> dict:
+    data = _load_yaml(_REPO_ROOT / "config" / "provider-capabilities.yaml") or {}
+    return data.get("capabilities") or {}
+
+
+def _ai_provider_entries() -> dict:
+    data = _load_yaml(_REPO_ROOT / "config" / "ai-providers.yaml") or {}
+    return data.get("providers") or {}
+
+
+def _capability_flag_findings(
+    provider: str, pal_entry: dict, ai_entry: dict
+) -> list:
+    """Pure validator for one provider's §2.2 capability contract.
+
+    Returns human-readable findings; an empty list means the provider's flags
+    are consistent. Kept pure so the AC-24 reason gate stays covered even
+    though no live provider currently opts out of artifact validation."""
+    findings: list = []
+    pal_entry = pal_entry or {}
+    ai_entry = ai_entry or {}
+
+    for flag in ("skills", "artifact-validation"):
+        if flag not in pal_entry:
+            findings.append(f"{provider}: missing '{flag}' (AC-15)")
+        elif not isinstance(pal_entry[flag], bool):
+            findings.append(
+                f"{provider}: '{flag}' must be a bool, got "
+                f"{type(pal_entry[flag]).__name__} (AC-15)"
+            )
+
+    transport = pal_entry.get("mcp-remote-transport")
+    if transport not in _MCP_REMOTE_TRANSPORTS:
+        findings.append(
+            f"{provider}: 'mcp-remote-transport' must be one of "
+            f"{_MCP_REMOTE_TRANSPORTS}, got {transport!r} (§2.2)"
+        )
+
+    # AC-24 reason gate (fail-closed: `false` is only valid with a reason).
+    if pal_entry.get("artifact-validation") is False:
+        reason = pal_entry.get("artifact-validation-reason")
+        if not (isinstance(reason, str) and reason.strip()):
+            findings.append(
+                f"{provider}: 'artifact-validation: false' requires a "
+                "non-empty 'artifact-validation-reason' (AC-24)"
+            )
+
+    # AC-25 coupling to the ai-providers.yaml machine flags.
+    if pal_entry.get("skills") is True:
+        capabilities = ai_entry.get("capabilities") or []
+        if "skills" not in capabilities:
+            findings.append(
+                f"{provider}: 'skills: true' but 'skills' is absent from the "
+                "ai-providers.yaml capabilities list (AC-25)"
+            )
+        if not ai_entry.get("skills_dir"):
+            findings.append(
+                f"{provider}: 'skills: true' but ai-providers.yaml has no "
+                "'skills_dir' (AC-25)"
+            )
+    return findings
+
+
+@pytest.mark.parametrize("provider", _registered_providers())
+def test_provider_capability_flags_are_consistent(provider):
+    """[AC-15/AC-24/AC-25] Every registered provider declares the §2.2 flags
+    and keeps `skills` coupled to the ai-providers machine flags."""
+    findings = _capability_flag_findings(
+        provider,
+        _capability_entries().get(provider),
+        _ai_provider_entries().get(provider),
+    )
+    assert not findings, "\n".join(findings)
+
+
+def test_artifact_validation_false_without_reason_is_rejected():
+    """[AC-24] Synthetic gate: `false` without a reason must fail, so the
+    invariant cannot pass vacuously while no provider opts out."""
+    findings = _capability_flag_findings(
+        "Synthetic",
+        {
+            "skills": False,
+            "artifact-validation": False,
+            "mcp-remote-transport": "url",
+        },
+        {},
+    )
+    assert any("artifact-validation-reason" in f for f in findings), findings
+
+
+def test_artifact_validation_false_with_blank_reason_is_rejected():
+    """[AC-24] A whitespace-only reason does not legitimise the opt-out."""
+    findings = _capability_flag_findings(
+        "Synthetic",
+        {
+            "skills": False,
+            "artifact-validation": False,
+            "artifact-validation-reason": "   ",
+            "mcp-remote-transport": "url",
+        },
+        {},
+    )
+    assert any("artifact-validation-reason" in f for f in findings), findings
+
+
+def test_artifact_validation_false_with_reason_is_accepted():
+    """[AC-24] A non-empty reason legitimises the opt-out."""
+    findings = _capability_flag_findings(
+        "Synthetic",
+        {
+            "skills": False,
+            "artifact-validation": False,
+            "artifact-validation-reason": "provider emits non-validatable TOML",
+            "mcp-remote-transport": "url",
+        },
+        {},
+    )
+    assert findings == []
+
+
+def test_skills_true_without_ai_provider_coupling_is_rejected():
+    """[AC-25] `skills: true` without the ai-providers `skills` capability and
+    a `skills_dir` is rejected."""
+    findings = _capability_flag_findings(
+        "Synthetic",
+        {"skills": True, "artifact-validation": True, "mcp-remote-transport": "url"},
+        {"capabilities": ["agents"], "skills_dir": None},
+    )
+    assert any("capabilities list" in f for f in findings), findings
+    assert any("skills_dir" in f for f in findings), findings
+
+
+def test_skills_true_with_ai_provider_coupling_is_accepted():
+    """[AC-25] The coupling is satisfied by both machine flags together."""
+    findings = _capability_flag_findings(
+        "Synthetic",
+        {"skills": True, "artifact-validation": True, "mcp-remote-transport": "url"},
+        {"capabilities": ["agents", "skills"], "skills_dir": ".synthetic/skills"},
+    )
+    assert findings == []

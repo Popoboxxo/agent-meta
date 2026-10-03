@@ -66,8 +66,12 @@ from lib.external_tools import (
 from lib.generated_file_drift import (
     backup_drifted_files,
     capture_generated_file_hashes,
+    final_content_diff,
     is_drift_detection_enabled,
+    load_provider_migrations,
+    migrate_managed_artifact,
     prune_sync_backups,
+    remove_managed_artifact,
     scan_generated_file_drift,
 )
 from lib.gitignore import (
@@ -78,7 +82,7 @@ from lib.gitignore import (
 )
 from lib.hook_plugins import sync_hook_lib, sync_release_gates
 from lib.hooks import sync_hooks
-from lib.io import SyncError, _write_yaml, write_atomic
+from lib.io import SyncError, _write_yaml, safe_path, write_atomic
 from lib.isolation import _sync_opencode_runtime_gate, sync_provider_isolation
 from lib.knowledge import sync_knowledge_engine
 from lib.log import SyncLog
@@ -148,7 +152,7 @@ def _sync_stage_config_and_presets(
     # Reload config after auto-fill to pick up newly written defaults
     config = load_config(config_path)
 
-    provider_config = load_providers_config(agent_meta_root)
+    provider_config = load_providers_config(agent_meta_root, config)
     providers = resolve_providers(config, provider_config)
     mode = "init" if args.init else "sync"
     log.note("providers", "active: " + ", ".join(providers))
@@ -340,6 +344,346 @@ def _sync_stage_claude_base(
     return is_claude, gitignore_cfg, base_gitignore_entries, env_gitignore
 
 
+_DISCOVERY_PATH_KEYS = ("agents_dir", "rules_dir", "skills_dir")
+
+
+def verify_migrated_artifact(path: Path) -> bool:
+    """Generic "the new artifact parses/validates" predicate (design §6.2 step 2).
+
+    Provider-agnostic and format-driven: a JSON document must parse as JSON; a
+    Markdown document must parse its frontmatter when it carries one (a file
+    without frontmatter is valid). Used as the ``verify`` gate before an old
+    artifact is removed, so a failed verification keeps the old path alive.
+    """
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return False
+    if not text.strip():
+        return False
+    suffix = path.suffix.lower()
+    if suffix == ".json":
+        import json as _json
+
+        try:
+            _json.loads(text)
+        except ValueError:
+            return False
+        return True
+    if suffix in (".md", ".markdown"):
+        from .consistency.frontmatter import split_frontmatter
+
+        block, _body = split_frontmatter(text)
+        if not block:
+            return True
+        try:
+            import yaml as _yaml
+
+            _yaml.safe_load(re.sub(r"^---\n?|\n?---\s*$", "", block))
+        except Exception:
+            return False
+    return True
+
+
+def resolve_discovery_paths(provider_cfg: dict) -> dict:
+    """Overlay the provider-neutral ``discovery`` path surface onto a provider.
+
+    Path resolution selects ``discovery.<key>`` iff the provider-neutral
+    ``agent-discovery`` boolean is exactly ``True`` AND a ``discovery`` mapping
+    is present; otherwise the top-level keys win byte-for-byte. Dispatch is on
+    the bool + presence of the map — never on a provider name — so a future
+    provider that opts in converges automatically.
+
+    Returns the input mapping unchanged when the provider does not opt in
+    (identical object, no copy); otherwise a shallow copy with the overlay
+    applied. The input mapping is never mutated in either case, but callers
+    must not assume a fresh copy when the provider is not opted in.
+    """
+    if not isinstance(provider_cfg, dict) or provider_cfg.get("agent-discovery") is not True:
+        return provider_cfg
+    discovery = provider_cfg.get("discovery")
+    if not isinstance(discovery, dict):
+        return provider_cfg
+    resolved = dict(provider_cfg)
+    for key in _DISCOVERY_PATH_KEYS:
+        value = discovery.get(key)
+        if isinstance(value, str) and value:
+            resolved[key] = value
+    discovery_mcp = discovery.get("mcp-config")
+    if isinstance(discovery_mcp, dict):
+        merged = dict(provider_cfg.get("mcp-config") or {})
+        merged.update(discovery_mcp)
+        resolved["mcp-config"] = merged
+    return resolved
+
+
+def migrate_discovery_artifacts(
+    project_root: Path,
+    provider_cfg: dict,
+    log: SyncLog,
+    dry_run: bool = False,
+    ts: str | None = None,
+) -> list[dict]:
+    """Ordered migration of managed artifacts onto the discovery surface.
+
+    Config-driven (design §6.2.1 / §11.1): only a provider whose
+    provider-neutral ``agent-discovery`` bool is ``True`` with a ``discovery``
+    map is migrated. The top-level ``agents_dir``/``rules_dir``/``skills_dir``
+    are the OLD paths, the ``discovery.*`` values the NEW ones. Each managed
+    artifact is migrated through the ordered write-new -> verify -> backup-old
+    -> remove-old sequence (backup-first, byte-exact sibling); user-authored
+    files are left in place and reported. Empty old dirs are pruned afterwards.
+    Returns the per-artifact result dicts.
+    """
+    if not isinstance(provider_cfg, dict) or provider_cfg.get("agent-discovery") is not True:
+        return []
+    discovery = provider_cfg.get("discovery")
+    if not isinstance(discovery, dict):
+        return []
+    results: list[dict] = []
+    for key in _DISCOVERY_PATH_KEYS:
+        old_rel = provider_cfg.get(key)
+        new_rel = discovery.get(key)
+        if not (
+            isinstance(old_rel, str) and old_rel
+            and isinstance(new_rel, str) and new_rel
+            and old_rel != new_rel
+        ):
+            continue
+        old_dir = project_root / old_rel
+        if not old_dir.is_dir():
+            continue
+        for old_file in sorted(old_dir.rglob("*")):
+            if not old_file.is_file() or ".sync-backup-" in old_file.name:
+                continue
+            relative = old_file.relative_to(old_dir)
+            results.append(
+                migrate_managed_artifact(
+                    old_file,
+                    project_root / new_rel / relative,
+                    project_root,
+                    log,
+                    dry_run=dry_run,
+                    verify=verify_migrated_artifact,
+                    ts=ts,
+                )
+            )
+        if not dry_run and old_dir.is_dir():
+            try:
+                if not any(old_dir.iterdir()):
+                    old_dir.rmdir()
+            except OSError:
+                pass
+    return results
+
+
+def apply_discovery_migration(
+    project_root: Path,
+    provider_cfg: dict,
+    log: SyncLog,
+    dry_run: bool = False,
+    ts: str | None = None,
+) -> tuple[dict, list[dict]]:
+    """Resolve the discovery surface and migrate the old managed artifacts.
+
+    Owns the ordering (Task 11): path resolution reads the UNRESOLVED config so
+    the migration driver still sees the top-level (old) paths, while the
+    returned provider config carries the resolved (new) paths for the writers.
+    Returns ``(resolved_provider_cfg, migration_results)``; both are no-ops
+    unless the provider-neutral ``agent-discovery`` bool is ``True``.
+    """
+    resolved = resolve_discovery_paths(provider_cfg)
+    if not (isinstance(provider_cfg, dict) and provider_cfg.get("agent-discovery") is True):
+        return resolved, []
+    results = migrate_discovery_artifacts(project_root, provider_cfg, log, dry_run=dry_run, ts=ts)
+    return resolved, results
+
+
+def converge_managed_block_context(
+    project_root: Path,
+    context_file: str | None,
+    variables: dict,
+    log: SyncLog,
+    dry_run: bool = False,
+    agent_meta_root: Path | None = None,
+) -> tuple[bool, str | None]:
+    """Make the FIRST sync of a config-comment context file the run2 fixpoint.
+
+    ``_sync_continue_context`` scaffolds its context file from a rich project
+    template on run 1 and only swaps in the steady-state managed block from run
+    2 on, so run1 != run2. This pass applies the steady-state block (the exact
+    block every later sync renders) immediately, so ``sha256(run1) ==
+    sha256(run2)`` (AC-4). Only the managed block is rewritten; user content
+    outside it is preserved byte-for-byte.
+
+    Returns ``(changed, final_content)``: ``changed`` is ``True`` when the file
+    changed (or would change in ``dry_run``); ``final_content`` is the computed
+    post-cleanup content (``None`` when the file cannot be read). The caller
+    feeds ``final_content`` to ``_drop_net_zero_actions`` so the ``--check``
+    pending set reflects the final state (design §6.3, F2).
+    """
+    if not context_file:
+        return False, None
+    target = safe_path(project_root, context_file)
+    if not target.is_file():
+        return False, None
+    from .context_templates.builder import substitute_managed_block
+    from .extensions import render_managed_block
+
+    root = agent_meta_root if agent_meta_root is not None else project_root
+    steady = render_managed_block(variables, context_file, log, root)
+    existing = target.read_text(encoding="utf-8")
+    updated = substitute_managed_block(existing, steady)
+    if updated == existing:
+        return False, updated
+    if not dry_run:
+        target.write_text(updated, encoding="utf-8")
+    return True, updated
+
+
+def _drop_net_zero_actions(
+    log: SyncLog, project_root: Path, final_contents: dict,
+) -> None:
+    """Remove net-zero pending-write actions from ``log.actions`` (design §6.3).
+
+    ``--check`` counts ``log.actions`` as "would write". A file whose computed
+    FINAL (post-cleanup) content already equals its on-disk bytes is clean even
+    when an intermediate writer recorded a would-be write (net-zero == clean).
+    ``final_content_diff`` reports the genuinely changed paths; every other
+    entry is net-zero, so its action entries are dropped before the check exit
+    code is computed in ``cli_commands._run_common_tail``.
+    """
+    changed = set(final_content_diff(project_root, final_contents))
+    net_zero = [rel for rel in final_contents if rel not in changed]
+    if not net_zero:
+        return
+    markers = [
+        f"]  {rel:<50}" if len(rel) <= 50 else f"]  {rel}"
+        for rel in net_zero
+    ]
+    log.actions = [
+        action for action in log.actions
+        if not any(marker in action for marker in markers)
+    ]
+
+
+def _prune_empty_migration_dirs(dirs: set[Path]) -> None:
+    """Remove emptied old-path directories (deepest first, fail-soft)."""
+    for directory in sorted(dirs, key=lambda p: len(p.parts), reverse=True):
+        try:
+            if directory.is_dir() and not any(directory.iterdir()):
+                directory.rmdir()
+        except OSError:
+            pass
+
+
+def migrate_provider_paths(
+    project_root: Path,
+    provider: str,
+    provider_cfg: dict,
+    log: SyncLog,
+    dry_run: bool = False,
+    ts: str | None = None,
+    migrations: dict | None = None,
+    agent_meta_root: Path | None = None,
+) -> list[dict]:
+    """Map-driven old-path removal (config/provider-migrations.yaml, Task 11).
+
+    AC-22 / design §6.2.1 / spec §11.1: iterate the migration map and run a
+    provider's entry only when it has no ``requires-flag`` (default-on, e.g.
+    Copilot) OR the named provider-neutral bool is exactly ``True`` (e.g. Gemini
+    + ``agent-discovery``). Every ``remove`` target is a managed artifact
+    deleted backup-first through :func:`remove_managed_artifact` (managed-marker
+    guard + byte-exact ``.sync-backup-<ts>`` sibling); user-authored files are
+    preserved untouched, rollback is a rename of the backup back onto the
+    original name, and an emptied old directory is pruned.
+
+    Dispatch is on the map + flag name, never on a provider name. The
+    ``verify`` step of the ordered sequence (write-new -> verify -> backup-old
+    -> remove-old) is covered by :func:`migrate_discovery_artifacts`
+    (``verify_migrated_artifact``), which owns the write-new half; this
+    delete-only pass relies on the post-write ordering below plus the
+    managed-marker guard, because the map carries no new-path column to
+    validate against (explicit deferral, review F3).
+
+    Call it AFTER the per-provider writers have written the new paths (stage 6),
+    so an old path is only removed once its replacement exists.
+    """
+    if migrations is None:
+        migrations = load_provider_migrations(
+            (agent_meta_root if agent_meta_root is not None else project_root) / "config"
+        )
+    spec = migrations.get(provider)
+    if not spec:
+        return []
+    requires_flag = spec.get("requires-flag")
+    if requires_flag and provider_cfg.get(requires_flag) is not True:
+        return []
+    from datetime import datetime
+
+    removal_ts = ts or datetime.now().strftime("%Y%m%d-%H%M%S")
+    results: list[dict] = []
+    emptied_dirs: set[Path] = set()
+    for entry in spec.get("removals", []):
+        target = safe_path(project_root, entry["remove"])
+        if entry.get("kind") == "dir":
+            if not target.is_dir():
+                continue
+            for child in sorted(target.rglob("*")):
+                if not child.is_file() or ".sync-backup-" in child.name:
+                    continue
+                results.append(
+                    remove_managed_artifact(
+                        child, project_root, log, dry_run=dry_run, ts=removal_ts,
+                    )
+                )
+            emptied_dirs.add(target)
+        else:
+            if not target.is_file():
+                continue
+            results.append(
+                remove_managed_artifact(
+                    target, project_root, log, dry_run=dry_run, ts=removal_ts,
+                )
+            )
+    if not dry_run:
+        _prune_empty_migration_dirs(emptied_dirs)
+    return results
+
+
+def apply_provider_migrations(
+    project_root: Path,
+    agent_meta_root: Path,
+    provider_config: dict,
+    active_providers,
+    log: SyncLog,
+    dry_run: bool = False,
+    ts: str | None = None,
+    migrations: dict | None = None,
+) -> dict[str, list[dict]]:
+    """Iterate the migration map and run every applicable provider entry.
+
+    The map is the driver (not the provider loop): only ``migrations`` keys are
+    visited, providers absent from the config or inactive in this project are
+    skipped, and each entry's ``requires-flag`` gate is evaluated inside
+    :func:`migrate_provider_paths`. Returns ``{provider: results}``.
+    """
+    if migrations is None:
+        migrations = load_provider_migrations(agent_meta_root / "config")
+    active = set(active_providers)
+    outcome: dict[str, list[dict]] = {}
+    for provider in migrations:
+        if provider not in active:
+            continue
+        pc = provider_config.get(provider)
+        if not isinstance(pc, dict):
+            continue
+        outcome[provider] = migrate_provider_paths(
+            project_root, provider, pc, log, dry_run=dry_run, ts=ts, migrations=migrations,
+        )
+    return outcome
+
+
 def _sync_stage_contexts(
     agent_meta_root: Path, project_root: Path, config: dict,
     provider_config: dict, providers: list, variables: dict,
@@ -388,8 +732,30 @@ def _sync_stage_contexts(
         caps = load_provider_capabilities(agent_meta_root).get(provider, {})
         provider_variables = dict(provider_variables)
         provider_variables.update(runtime_gate_vars(pc, caps, config))
+        # Path migration (Task 11): resolve the discovery surface for every
+        # writer/renderer below and move the managed artifacts off the old paths
+        # (backup-first, user files untouched). Config-driven no-op unless
+        # `agent-discovery: true`; the helper owns the resolve-before-migrate
+        # ordering so the old top-level paths are still visible to the driver.
+        pc, _migration = apply_discovery_migration(project_root, pc, log, dry_run=args.dry_run)
+        provider_config[provider] = pc
         sync_context_for_provider(agent_meta_root, project_root, config, provider_variables,
                                   log, args.dry_run, provider, provider_config)
+        # Continue run1 fixpoint (AC-4): a scaffolded config-comment context file
+        # gets the steady-state managed block immediately, capability-gated —
+        # never by provider name.
+        if "context-config-comment" in (pc.get("capabilities") or []):
+            _changed, final_content = converge_managed_block_context(
+                project_root, pc.get("context_file"), provider_variables, log,
+                dry_run=args.dry_run, agent_meta_root=agent_meta_root,
+            )
+            if final_content is not None:
+                # Design §6.3 (F2): reconcile the pending set against the
+                # FINAL post-cleanup content so a net-zero context write does
+                # not make `--check` report a phantom change.
+                _drop_net_zero_actions(
+                    log, project_root, {str(pc.get("context_file")): final_content},
+                )
     return debug_mode, allow_committed_secrets, mcp_gitignore_extras
 
 
@@ -890,6 +1256,17 @@ def _sync_stage_per_provider(
                                    provider, provider_config)
         sync_external_skills_for_provider(agent_meta_root, project_root, config, variables,
                                           log, args.dry_run, provider, provider_config)
+
+    # Task 11 / AC-22: old-path migration runs AFTER every provider's writers
+    # have written the new paths. The migration MAP drives dispatch and each
+    # entry's named bool flag gates it; no provider-name branch is involved.
+    _migration_map = load_provider_migrations(agent_meta_root / "config")
+    if _migration_map:
+        apply_provider_migrations(
+            project_root, agent_meta_root, provider_config,
+            [p for p in providers if is_provider_active(config, p)],
+            log, dry_run=args.dry_run, migrations=_migration_map,
+        )
 
 
 def _sync_stage_drift_and_plugins(

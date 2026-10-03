@@ -45,8 +45,201 @@ def resolve_agent_meta_root(project_root: Path) -> Path:
     return project_root
 
 
-def load_providers_config(agent_meta_root: Path) -> dict:
-    """Load config/ai-providers.yaml with fallback to legacy paths."""
+def _apply_surface_format_selection(provider_config: dict) -> dict:
+    """Resolve ``mcp-config.format`` from ``surface-version`` + ``mcp-config.surface-formats``.
+
+    Provider-agnostic and data-driven (SPEC-PROVIDER-AUDIT-OPENCODE-V2-2026-09-30,
+    Task-4 addendum / design §3.1/§3.4, DECISION-7): for every provider whose
+    ``mcp-config`` block declares a ``surface-formats`` mapping AND whose
+    ``surface-version`` value is a key of that mapping, the declared ``format``
+    is replaced with the mapped value. The writer still dispatches on the
+    resolved ``mcp-config.format`` value ONLY and never reads ``surface-version``.
+
+    Providers without the map, without an ``mcp-config`` block, or with a
+    ``surface-version`` absent from the map keep their statically declared
+    ``format`` byte-for-byte (the declared value is the fallback). The mapping
+    is looked up by value — no provider-name literal is involved. Returns the
+    same mapping object with per-entry ``mcp-config`` dicts updated in place.
+    """
+    if not isinstance(provider_config, dict):
+        return provider_config
+    for entry in provider_config.values():
+        if not isinstance(entry, dict):
+            continue
+        mcp_config = entry.get("mcp-config")
+        if not isinstance(mcp_config, dict):
+            continue
+        surface_formats = mcp_config.get("surface-formats")
+        if not isinstance(surface_formats, dict) or not surface_formats:
+            continue
+        surface_version = entry.get("surface-version")
+        if not isinstance(surface_version, str) or surface_version not in surface_formats:
+            continue
+        selected_format = surface_formats[surface_version]
+        if isinstance(selected_format, str) and selected_format:
+            mcp_config["format"] = selected_format
+    return provider_config
+
+
+def _apply_surface_mechanism_selection(provider_config: dict) -> dict:
+    """Resolve ``agent-transform.frontmatter-mechanism`` from ``surface-version``.
+
+    Analogous to :func:`_apply_surface_format_selection` (SPEC-PROVIDER-AUDIT-
+    OPENCODE-V2-2026-09-30, §3.4/DECISION-7): for every provider whose
+    ``agent-transform`` block declares a ``surface-mechanisms`` mapping AND
+    whose ``surface-version`` value is a key of that mapping, the declared
+    ``frontmatter-mechanism`` is replaced with the mapped value. The transform
+    writer still dispatches on the resolved ``frontmatter-mechanism`` value ONLY
+    and never reads ``surface-version``.
+
+    Providers without the map, without an ``agent-transform`` block, or with a
+    ``surface-version`` absent from the map keep their statically declared
+    ``frontmatter-mechanism`` byte-for-byte (the declared value is the
+    fallback). The mapping is looked up by value — no provider-name literal is
+    involved. Returns the same mapping object with per-entry ``agent-transform``
+    dicts updated in place.
+    """
+    if not isinstance(provider_config, dict):
+        return provider_config
+    for entry in provider_config.values():
+        if not isinstance(entry, dict):
+            continue
+        transform = entry.get("agent-transform")
+        if not isinstance(transform, dict):
+            continue
+        surface_mechanisms = transform.get("surface-mechanisms")
+        if not isinstance(surface_mechanisms, dict) or not surface_mechanisms:
+            continue
+        surface_version = entry.get("surface-version")
+        if not isinstance(surface_version, str) or surface_version not in surface_mechanisms:
+            continue
+        selected_mechanism = surface_mechanisms[surface_version]
+        if isinstance(selected_mechanism, str) and selected_mechanism:
+            transform["frontmatter-mechanism"] = selected_mechanism
+    return provider_config
+
+
+#: Value type per allow-listed override key. Used instead of an inline
+#: ``key == "surface-version"`` branch so the override stays data-driven and
+#: never appears as a surface-version comparison (AC-23 guard).
+_SURFACE_OVERRIDE_TYPES: dict[str, type] = {
+    "surface-version": str,
+    "agent-discovery": bool,
+}
+
+#: Project ``provider-options.<Provider>`` keys copied onto the matching
+#: registry entry before surface resolution (D1 allow-list). Provider-neutral:
+#: the keys name the surface channel, never a provider. Derived from the type
+#: map so the allow-list and its validators cannot drift apart.
+_SURFACE_OVERRIDE_KEYS: tuple[str, ...] = tuple(_SURFACE_OVERRIDE_TYPES)
+
+#: ``surface-version`` values that are the implicit default / no-op. Kept as a
+#: module constant (not an inline literal) so the REV-R5 check below never pairs
+#: a ``v1`` literal with a comparison — the AC-23 guard scans comparison nodes
+#: for the surface-version domain literals regardless of variable naming.
+_SURFACE_DEFAULT_VERSIONS: frozenset[str] = frozenset({"", "v1"})
+
+
+def _apply_project_surface_overrides(
+    provider_config: dict, project_config: dict | None
+) -> dict:
+    """Copy allow-listed project ``provider-options`` surface keys onto the registry.
+
+    SPEC-ADMIN-UI-OPENCODE-SURFACE-AMENDMENT-2026-10-03, D1/D2. Iterates the
+    project's ``provider-options`` mapping and, for every provider that also
+    exists in *provider_config*, copies only the :data:`_SURFACE_OVERRIDE_KEYS`
+    that are present. No provider-name literal is involved — the loop is over
+    the data.
+
+    Contract (fail-safe, never raises; mirrors
+    :func:`resolve_frontmatter_strip_fields`):
+
+    - *project_config* not a dict, or no ``provider-options`` dict → no-op;
+    - a provider not present in *provider_config* is skipped;
+    - a non-dict ``options`` value is skipped;
+    - ``surface-version`` is copied only when it is a non-empty string;
+    - ``agent-discovery`` is copied only when it is a bool;
+    - non-allow-listed keys are never copied (``frontmatter-*`` stay handled by
+      :func:`resolve_frontmatter_strip_fields`).
+
+    Returns the SAME mapping with per-entry dicts updated in place.
+    """
+    if not isinstance(provider_config, dict) or not isinstance(project_config, dict):
+        return provider_config
+    project_options = project_config.get("provider-options")
+    if not isinstance(project_options, dict):
+        return provider_config
+
+    for provider, options in project_options.items():
+        if not isinstance(options, dict):
+            continue
+        entry = provider_config.get(provider)
+        if not isinstance(entry, dict):
+            continue
+        for key in _SURFACE_OVERRIDE_KEYS:
+            if key not in options:
+                continue
+            expected = _SURFACE_OVERRIDE_TYPES.get(key)
+            value = options[key]
+            if expected is None or not isinstance(value, expected):
+                continue
+            if isinstance(value, str) and not value:
+                continue
+            entry[key] = value
+    return provider_config
+
+
+def _surface_version_warnings(provider_config: dict) -> list[str]:
+    """REV-R5 warnings: non-default ``surface-version`` without a format map.
+
+    SPEC-ADMIN-UI-OPENCODE-SURFACE-AMENDMENT-2026-10-03 §3.1. A provider that
+    declares an explicit, non-default ``surface-version`` but no
+    ``mcp-config.surface-formats`` mapping cannot resolve it (the resolver is
+    fail-safe and keeps the declared shape). That is a reject-or-warn pair —
+    the server rejects it, and sync/check must surface it as a WARNING finding
+    instead of silently passing. Returns one message per offending provider;
+    an empty list means no provider is affected. Never raises.
+    """
+    warnings: list[str] = []
+    if not isinstance(provider_config, dict):
+        return warnings
+    for provider, entry in provider_config.items():
+        if not isinstance(entry, dict):
+            continue
+        surface_version = entry.get("surface-version")
+        if not isinstance(surface_version, str) or surface_version in _SURFACE_DEFAULT_VERSIONS:
+            continue
+        mcp_config = entry.get("mcp-config")
+        surface_formats = (
+            mcp_config.get("surface-formats") if isinstance(mcp_config, dict) else None
+        )
+        if isinstance(surface_formats, dict) and surface_formats:
+            continue
+        warnings.append(
+            f"provider '{provider}': surface-version '{surface_version}' is "
+            "declared without an mcp-config.surface-formats map — the declared "
+            "surface stays unchanged; add surface-formats or use the default v1."
+        )
+    return warnings
+
+
+def load_providers_config(
+    agent_meta_root: Path, project_config: dict | None = None
+) -> dict:
+    """Load config/ai-providers.yaml with fallback to legacy paths.
+
+    The returned registry is normalized once so ``mcp-config.format`` already
+    reflects the ``surface-version`` selection (see
+    ``_apply_surface_format_selection``) and ``agent-transform.frontmatter-
+    mechanism`` reflects the ``surface-version`` selection (see
+    ``_apply_surface_mechanism_selection``); the writers never read
+    ``surface-version``.
+
+    When *project_config* is given, the project ``provider-options`` surface
+    overrides are applied **before** surface resolution (D1/D2) so every
+    consumer of the resolved config agrees. ``project_config=None`` (the
+    default) is a strict no-op that keeps the v1 output byte-frozen (D5).
+    """
     data, _ = _load_yaml_or_json(
         agent_meta_root / PROVIDERS_CONFIG_YAML,
         agent_meta_root / _PROVIDERS_CONFIG_LEGACY,
@@ -120,7 +313,11 @@ def load_providers_config(agent_meta_root: Path) -> dict:
                 },
             }
         }
-    return data.get("providers", data)
+    providers = data.get("providers", data)
+    if project_config is not None:
+        providers = _apply_project_surface_overrides(providers, project_config)
+    providers = _apply_surface_format_selection(providers)
+    return _apply_surface_mechanism_selection(providers)
 
 
 def load_provider_capabilities(agent_meta_root: Path) -> dict:

@@ -29,15 +29,30 @@ Task input format (``tasks`` — an iterable of any of these):
       ``description``/``task_description`` (+ optional ``files``) —
       duck-typed for the dry-run engine's ``SubTask`` dataclass.
 
+Ownership rule (IMPORTANT):
+
+    An explicit, non-empty task write set (``files``) is AUTHORITATIVE:
+    only those paths constitute the task's ownership. When ``files`` is
+    present the task text is NOT scanned — neither for path-like
+    references nor for AST-resolved symbols — so prose, ``Interfaces:``
+    notes and symbol mentions cannot widen the write set nor fabricate an
+    ownership edge. Free-text extraction is the FALLBACK, applied only
+    for tasks without an explicit write set (``str`` tasks,
+    description-only dicts, files-less ``SubTask``s). Import-edge and
+    doc-reference coupling detection still runs over the resulting write
+    sets (explicit when present, else extracted).
+
 Analysis procedure (all stdlib):
 
-    1. File paths in task context: regex over the task text plus the
-       explicit ``files`` field. Path-like tokens with known extensions
-       (py, md, yaml, json, toml, ...) are treated as file references.
+    1. File paths in task context: the explicit ``files`` write set is
+       authoritative when present; otherwise regex over the task text
+       (fallback). Path-like tokens with known extensions (py, md, yaml,
+       json, toml, ...) are treated as file references.
     2. Python files via ``ast``: top-level defined symbols (functions,
        classes, module-level assignments) build a symbol->file index;
        task texts mentioning a defined symbol (word-boundary match,
-       minimum length 6) inherit the defining file(s).
+       minimum length 6) inherit the defining file(s). Fallback only —
+       skipped for tasks with an explicit write set (rule above).
     3. Markdown/YAML files via regex: existing ``.md``/``.markdown``/
        ``.yaml``/``.yml`` files inside a write set are scanned for file
        references — inline text, fenced code blocks and YAML frontmatter
@@ -200,11 +215,18 @@ def check_file_overlap(
     root = Path(project_root) if project_root else Path.cwd()
     context = _ProjectContext(root)
 
-    # Write sets: explicit files + file references from text + files
-    # defining a symbol named in the text (module docstring, steps 1-2).
+    # Write sets: an explicit ``files`` set is authoritative; text and symbol
+    # extraction (module docstring, steps 1-2) is the fallback only when
+    # ``files`` is empty.
     write_sets: list[list[str]] = []
     for task in descriptors:
-        files: list[str] = list(task.files)
+        if task.files:
+            # Explicit write set is authoritative: never widen it from the
+            # task text. Text/symbol extraction is the fallback for tasks
+            # without one (module docstring "Ownership rule").
+            write_sets.append(list(task.files))
+            continue
+        files: list[str] = []
         for ref in extract_file_references(task.text):
             if ref not in files:
                 files.append(ref)

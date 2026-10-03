@@ -139,7 +139,9 @@ _COLLISION_PATH_KEYS = (
     "extension_dir", "artifact_dir", "settings_file", "pending_tasks_file",
 )
 
-_INTENTIONAL_AGENTS_MD_SHARERS = ("Gemini", "Opencode", "Codex", "ZCode", "KimiCode")
+_INTENTIONAL_AGENTS_MD_SHARERS = (
+    "Gemini", "Opencode", "Mammouth", "Codex", "ZCode", "KimiCode",
+)
 
 
 def _collect_sweep_paths(providers: dict) -> dict:
