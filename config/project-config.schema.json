@@ -757,6 +757,14 @@
                 "type": "string"
               },
               "description": "Frontmatter keys to strip for this provider, in addition to the global defaults (reference_standards). Combined by union with ai-providers.yaml's frontmatter_strip_fields; frontmatter-keep-fields wins. Default: empty."
+            },
+            "surface-version": {
+              "type": "string",
+              "description": "Generation surface for this provider. Must be a key of ai-providers.yaml's mcp-config.surface-formats (Opencode: v1|v2). Default: v1 (unchanged)."
+            },
+            "agent-discovery": {
+              "type": "boolean",
+              "description": "Provider-neutral discovery-surface opt-in. Default: false."
             }
           }
         },
@@ -778,6 +786,14 @@
                 "type": "string"
               },
               "description": "Frontmatter keys to strip for this provider, in addition to the global defaults (reference_standards). Combined by union with ai-providers.yaml's frontmatter_strip_fields; frontmatter-keep-fields wins. Default: empty."
+            },
+            "surface-version": {
+              "type": "string",
+              "description": "Generation surface for this provider. Must be a key of ai-providers.yaml's mcp-config.surface-formats (Opencode: v1|v2). Default: v1 (unchanged)."
+            },
+            "agent-discovery": {
+              "type": "boolean",
+              "description": "Provider-neutral discovery-surface opt-in. Default: false."
             }
           }
         },
@@ -812,6 +828,14 @@
                   "type": "string"
                 },
                 "description": "Frontmatter keys to strip for this provider, in addition to the global defaults (reference_standards). Combined by union with ai-providers.yaml's frontmatter_strip_fields; frontmatter-keep-fields wins. Default: empty."
+              },
+              "surface-version": {
+                "type": "string",
+                "description": "Generation surface for this provider. Must be a key of ai-providers.yaml's mcp-config.surface-formats (Opencode: v1|v2). Default: v1 (unchanged)."
+              },
+              "agent-discovery": {
+                "type": "boolean",
+                "description": "Provider-neutral discovery-surface opt-in. Default: false."
               }
             }
         },
@@ -833,6 +857,14 @@
                 "type": "string"
               },
               "description": "Frontmatter keys to strip for this provider, in addition to the global defaults (reference_standards). Combined by union with ai-providers.yaml's frontmatter_strip_fields; frontmatter-keep-fields wins. Default: empty."
+            },
+            "surface-version": {
+              "type": "string",
+              "description": "Generation surface for this provider. Must be a key of ai-providers.yaml's mcp-config.surface-formats (Opencode: v1|v2). Default: v1 (unchanged)."
+            },
+            "agent-discovery": {
+              "type": "boolean",
+              "description": "Provider-neutral discovery-surface opt-in. Default: false."
             }
           }
         },
@@ -854,6 +886,14 @@
                 "type": "string"
               },
               "description": "Frontmatter keys to strip for this provider, in addition to the global defaults (reference_standards). Combined by union with ai-providers.yaml's frontmatter_strip_fields; frontmatter-keep-fields wins. Default: empty."
+            },
+            "surface-version": {
+              "type": "string",
+              "description": "Generation surface for this provider. Must be a key of ai-providers.yaml's mcp-config.surface-formats (Opencode: v1|v2). Default: v1 (unchanged)."
+            },
+            "agent-discovery": {
+              "type": "boolean",
+              "description": "Provider-neutral discovery-surface opt-in. Default: false."
             }
           }
         }

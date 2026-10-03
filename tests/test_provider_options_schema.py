@@ -26,6 +26,7 @@ _SCHEMA_PATH = _REPO_ROOT / "config" / "project-config.schema.json"
 
 _MODELLED_PROVIDERS = ("Claude", "Gemini", "Continue", "Opencode", "Mammouth")
 _NEW_KEYS = ("frontmatter-keep-fields", "frontmatter-strip-fields")
+_SURFACE_KEYS = ("surface-version", "agent-discovery")
 
 
 def _schema() -> dict:
@@ -78,6 +79,50 @@ def test_unknown_provider_option_key_still_rejected():
         with pytest.raises(jsonschema.ValidationError):
             jsonschema.validate(
                 _config(**{"provider-options": {provider: {"bogus": 1}}}),
+                _schema(),
+            )
+
+
+def test_surface_version_and_agent_discovery_modelled_for_every_modelled_provider():
+    props = _provider_options_schema()["properties"]
+    for provider in _MODELLED_PROVIDERS:
+        assert provider in props, provider
+        sub = props[provider]["properties"]
+        assert set(_SURFACE_KEYS) <= set(sub), provider
+        assert sub["surface-version"]["type"] == "string", provider
+        assert sub["agent-discovery"]["type"] == "boolean", provider
+        # No enum in the project schema: the allowed set lives in ai-providers.yaml.
+        assert "enum" not in sub["surface-version"], provider
+        assert props[provider]["additionalProperties"] is False, provider
+
+
+def test_surface_version_and_agent_discovery_accepted():
+    options = {
+        provider: {"surface-version": "v2", "agent-discovery": True}
+        for provider in _MODELLED_PROVIDERS
+    }
+    jsonschema.validate(_config(**{"provider-options": options}), _schema())
+
+
+def test_surface_version_and_agent_discovery_absence_valid():
+    options = {provider: {} for provider in _MODELLED_PROVIDERS}
+    jsonschema.validate(_config(**{"provider-options": options}), _schema())
+
+
+def test_non_string_surface_version_rejected():
+    for provider in _MODELLED_PROVIDERS:
+        with pytest.raises(jsonschema.ValidationError):
+            jsonschema.validate(
+                _config(**{"provider-options": {provider: {"surface-version": 2}}}),
+                _schema(),
+            )
+
+
+def test_non_bool_agent_discovery_rejected():
+    for provider in _MODELLED_PROVIDERS:
+        with pytest.raises(jsonschema.ValidationError):
+            jsonschema.validate(
+                _config(**{"provider-options": {provider: {"agent-discovery": "yes"}}}),
                 _schema(),
             )
 
