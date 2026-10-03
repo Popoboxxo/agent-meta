@@ -69,8 +69,16 @@ def _rel(path: Path, root: Path) -> str:
         return str(path)
 
 
-def check_artifact_contracts(agent_meta_root: Path) -> list[Finding]:
+def check_artifact_contracts(
+    agent_meta_root: Path, project_config: dict | None = None
+) -> list[Finding]:
     """Validate generated artifacts present in ``agent_meta_root``.
+
+    *project_config* is the effective project configuration
+    (``.meta-config/project.yaml``); it is threaded into
+    :func:`load_providers_config` so this registry-wide check resolves the same
+    ``mcp-config.format`` / ``frontmatter-mechanism`` surface that generation
+    emitted (D2). ``None`` keeps the historic registry-only behavior.
 
     Returns ``Severity.ERROR`` findings; an absent registry, an absent
     artifact directory, or a format without a declared contract yields no
@@ -86,7 +94,7 @@ def check_artifact_contracts(agent_meta_root: Path) -> list[Finding]:
     truth).
     """
     findings: list[Finding] = []
-    providers = load_providers_config(agent_meta_root)
+    providers = load_providers_config(agent_meta_root, project_config)
     if not isinstance(providers, dict):
         return findings
 

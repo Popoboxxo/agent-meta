@@ -33,6 +33,7 @@ from .frontmatter import (
 from .io import is_absent_gitignored_target, safe_path, write_checked
 from .log import SyncLog
 from .providers import (
+    _surface_version_warnings,
     load_provider_capabilities,
     load_providers_config,
     provider_has_capability,
@@ -725,7 +726,7 @@ def collect_artifact_findings(
     """
     findings: list = []
     try:
-        provider_config = load_providers_config(agent_meta_root)
+        provider_config = load_providers_config(agent_meta_root, config)
         providers = resolve_providers(config, provider_config) if config else []
     except Exception as exc:  # noqa: BLE001 — report, never silently pass
         detail = (
@@ -768,6 +769,17 @@ def collect_artifact_findings(
             rel = _relative_posix(path, project_root)
             for finding in _artifact_findings(text, pc, rel):
                 findings.append((rel, finding))
+    for message in _surface_version_warnings(provider_config):
+        findings.append((
+            _relative_posix(agent_meta_root, project_root),
+            Finding(
+                Severity.WARNING,
+                CHECK,
+                str(agent_meta_root),
+                message,
+                "Declare mcp-config.surface-formats or use the default v1.",
+            ),
+        ))
     return findings
 
 

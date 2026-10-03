@@ -217,7 +217,7 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
     # Override AGENT_META_REPO to point to test repo for validation context
     test_variables["PROJECT_NAME"] = test_variables.get("PROJECT_NAME", "agent-meta-test")
 
-    provider_config = load_providers_config(agent_meta_root)
+    provider_config = load_providers_config(agent_meta_root, config)
     providers = resolve_providers(config, provider_config)
     capabilities = load_provider_capabilities(agent_meta_root)
 
@@ -803,7 +803,7 @@ def _handle_deactivate_providers(ctx: _SyncContext) -> None:
     variables = ctx.variables
 
     mode = "deactivate-providers"
-    provider_config = load_providers_config(agent_meta_root)
+    provider_config = load_providers_config(agent_meta_root, config)
     targets = args.deactivate_providers if args.deactivate_providers else ["all"]
     results = deactivate_providers(
         project_root, targets, provider_config, config, log, args.dry_run
@@ -838,7 +838,7 @@ def _handle_activate_providers(ctx: _SyncContext) -> None:
     variables = ctx.variables
 
     mode = "activate-providers"
-    provider_config = load_providers_config(agent_meta_root)
+    provider_config = load_providers_config(agent_meta_root, config)
     targets = args.activate_providers if args.activate_providers else []
     results = activate_providers(
         project_root, targets, provider_config, config, log, args.dry_run

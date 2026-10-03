@@ -306,8 +306,8 @@ def test_both_checks_registered_in_run_checks(monkeypatch) -> None:
         Severity.ERROR, _ARTIFACT, "sentinel.md", "artifact sentinel"
     )
     model_sentinel = Finding(Severity.ERROR, _MODEL, "sentinel.md", "model sentinel")
-    monkeypatch.setattr(module, "check_artifact_contracts", lambda root: [artifact_sentinel])
-    monkeypatch.setattr(module, "check_model_contracts", lambda root: [model_sentinel])
+    monkeypatch.setattr(module, "check_artifact_contracts", lambda root, _project_config=None: [artifact_sentinel])
+    monkeypatch.setattr(module, "check_model_contracts", lambda root, _project_config=None: [model_sentinel])
 
     findings = module.run_checks(_REPO_ROOT)
 

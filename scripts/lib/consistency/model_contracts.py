@@ -89,10 +89,17 @@ def _extract_models(text: str, mechanism: str) -> list[str]:
     return [model] if isinstance(model, str) and model else []
 
 
-def check_model_contracts(agent_meta_root: Path) -> list[Finding]:
-    """Validate emitted model IDs against ``model-format`` / ``model-catalog``."""
+def check_model_contracts(
+    agent_meta_root: Path, project_config: dict | None = None
+) -> list[Finding]:
+    """Validate emitted model IDs against ``model-format`` / ``model-catalog``.
+
+    *project_config* is the effective project configuration; it is threaded
+    into :func:`load_providers_config` so the check resolves the same surface
+    generation emitted (D2). ``None`` keeps the historic registry-only behavior.
+    """
     findings: list[Finding] = []
-    providers = load_providers_config(agent_meta_root)
+    providers = load_providers_config(agent_meta_root, project_config)
     if not isinstance(providers, dict):
         return findings
 

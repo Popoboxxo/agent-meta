@@ -33,9 +33,15 @@ import yaml
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 
-from lib.providers import load_providers_config  # noqa: E402
+from lib.providers import (
+    _SURFACE_OVERRIDE_KEYS,
+    _apply_project_surface_overrides,
+    _surface_version_warnings,
+    load_providers_config,
+)  # noqa: E402
 
 _SURFACE_FORMATS = {"v1": "opencode-json", "v2": "opencode-json-v2"}
+_SURFACE_MECHANISMS = {"v1": "opencode-native", "v2": "opencode-native-v2"}
 
 
 def _write_config(root: Path, providers: dict) -> None:
@@ -193,3 +199,161 @@ def test_helper_is_a_single_generic_pass():
                 assert not isinstance(op, (ast.Eq, ast.NotEq)), (
                     "selection must be a mapping lookup, not an equality branch"
                 )
+
+
+# ---------------------------------------------------------------------------
+# Project-level override channel (D1/D2, AC-A1/AC-A3)
+# ---------------------------------------------------------------------------
+
+
+def _surface_provider(
+    formats: dict | None,
+    mechanisms: dict | None,
+    version: str = "v1",
+) -> dict:
+    """A provider entry declaring a surface format + mechanism selection pair."""
+    entry: dict = {
+        "surface-version": version,
+        "agent-discovery": False,
+        "mcp-config": {"format": "opencode-json"},
+        "agent-transform": {"frontmatter-mechanism": "opencode-native"},
+    }
+    if formats is not None:
+        entry["mcp-config"]["surface-formats"] = dict(formats)
+    if mechanisms is not None:
+        entry["agent-transform"]["surface-mechanisms"] = dict(mechanisms)
+    return entry
+
+
+def test_override_keys_allow_list():
+    """The copied project keys are exactly the documented allow-list."""
+    assert _SURFACE_OVERRIDE_KEYS == ("surface-version", "agent-discovery")
+
+
+def test_project_override_v2_resolves_format_and_mechanism(tmp_path):
+    """AC-A1: a project ``surface-version: v2`` selects format AND mechanism."""
+    _write_config(tmp_path, {"Opencode": _surface_provider(
+        _SURFACE_FORMATS, _SURFACE_MECHANISMS)})
+    project = {"provider-options": {"Opencode": {"surface-version": "v2"}}}
+    cfg = load_providers_config(tmp_path, project)["Opencode"]
+    assert cfg["mcp-config"]["format"] == "opencode-json-v2"
+    assert cfg["agent-transform"]["frontmatter-mechanism"] == "opencode-native-v2"
+
+
+def test_project_override_copies_agent_discovery(tmp_path):
+    """The sibling provider-neutral opt-in flag is copied through (D1)."""
+    _write_config(tmp_path, {"Opencode": _surface_provider(
+        _SURFACE_FORMATS, _SURFACE_MECHANISMS)})
+    project = {"provider-options": {"Opencode": {"agent-discovery": True}}}
+    cfg = load_providers_config(tmp_path, project)["Opencode"]
+    assert cfg["agent-discovery"] is True
+    # A non-bool discovery flag must be ignored (fail-safe).
+    bad = {"provider-options": {"Opencode": {"agent-discovery": "yes"}}}
+    assert load_providers_config(tmp_path, bad)["Opencode"].get("agent-discovery") is False
+
+
+def test_absent_override_key_leaves_registry_byte_identical(tmp_path):
+    """AC-A1/D5: an empty project override leaves the v1 defaults untouched."""
+    _write_config(tmp_path, {"Opencode": _surface_provider(
+        _SURFACE_FORMATS, _SURFACE_MECHANISMS)})
+    baseline = load_providers_config(tmp_path)
+    with_project = load_providers_config(
+        tmp_path, {"provider-options": {"Opencode": {}}}
+    )
+    assert with_project == baseline
+    assert with_project["Opencode"]["mcp-config"]["format"] == "opencode-json"
+
+
+def test_none_and_empty_project_config_are_strict_noops(tmp_path):
+    """D5: ``project_config=None``/no-block is byte-identical (v1 freeze)."""
+    _write_config(tmp_path, {"Opencode": _surface_provider(
+        _SURFACE_FORMATS, _SURFACE_MECHANISMS)})
+    baseline = load_providers_config(tmp_path)
+    assert load_providers_config(tmp_path, None) == baseline
+    assert load_providers_config(tmp_path, {}) == baseline
+
+
+def test_malformed_project_config_is_a_noop(tmp_path):
+    """Non-dict project_config / provider-options / options never raise."""
+    _write_config(tmp_path, {"Opencode": _surface_provider(
+        _SURFACE_FORMATS, _SURFACE_MECHANISMS)})
+    baseline = load_providers_config(tmp_path)
+    for bad in (
+        "not-a-dict",
+        {"provider-options": ["not-a-dict"]},
+        {"provider-options": {"Opencode": "v2"}},
+        {"provider-options": {"Opencode": None}},
+    ):
+        assert load_providers_config(tmp_path, bad) == baseline
+
+
+def test_unknown_override_value_keeps_declared_fallback(tmp_path):
+    """An unknown project value is ignored (fail-safe, no raise)."""
+    _write_config(tmp_path, {"Opencode": _surface_provider(
+        _SURFACE_FORMATS, _SURFACE_MECHANISMS)})
+    project = {"provider-options": {"Opencode": {"surface-version": "v3"}}}
+    cfg = load_providers_config(tmp_path, project)["Opencode"]
+    assert cfg["mcp-config"]["format"] == "opencode-json"
+    assert cfg["agent-transform"]["frontmatter-mechanism"] == "opencode-native"
+
+
+def test_project_override_is_provider_name_agnostic(tmp_path):
+    """A never-registered provider name proves no ``if provider ==`` branch."""
+    _write_config(tmp_path, {"FutureProvider": _surface_provider(
+        _SURFACE_FORMATS, _SURFACE_MECHANISMS)})
+    project = {"provider-options": {"FutureProvider": {"surface-version": "v2"}}}
+    cfg = load_providers_config(tmp_path, project)["FutureProvider"]
+    assert cfg["mcp-config"]["format"] == "opencode-json-v2"
+    assert cfg["agent-transform"]["frontmatter-mechanism"] == "opencode-native-v2"
+
+
+def test_override_helper_has_no_provider_name_literal():
+    """The override helper names no registered provider (data-driven only)."""
+    registered = set(load_providers_config(_REPO_ROOT).keys())
+    source = inspect.getsource(_apply_project_surface_overrides)
+    offenders = [
+        name for name in registered
+        if f'"{name}"' in source or f"'{name}'" in source
+    ]
+    assert not offenders, (
+        f"project override references provider name(s) {offenders}; "
+        "override must stay data-driven"
+    )
+
+
+def test_override_helper_ignores_unknown_provider(tmp_path):
+    """A provider-options entry absent from the registry is skipped."""
+    _write_config(tmp_path, {"Opencode": _surface_provider(
+        _SURFACE_FORMATS, _SURFACE_MECHANISMS)})
+    baseline = load_providers_config(tmp_path)
+    project = {"provider-options": {"GhostProvider": {"surface-version": "v2"}}}
+    assert load_providers_config(tmp_path, project) == baseline
+
+
+# ---------------------------------------------------------------------------
+# REV-R5: non-default surface-version without a surface-formats map
+# ---------------------------------------------------------------------------
+
+
+def test_surface_version_warning_without_formats(tmp_path):
+    """REV-R5: a non-default value without a map is a fail-loud warning, not a pass."""
+    _write_config(tmp_path, {"Opencode": _surface_provider(None, None)})
+    project = {"provider-options": {"Opencode": {"surface-version": "v2"}}}
+    cfg = load_providers_config(tmp_path, project)
+    warnings = _surface_version_warnings(cfg)
+    assert warnings, "a non-default value without surface-formats must warn"
+    assert "surface-formats" in warnings[0]
+
+
+def test_surface_version_no_warning_when_formats_declared(tmp_path):
+    """A provider that declares ``surface-formats`` resolves normally — no warning."""
+    _write_config(tmp_path, {"Opencode": _surface_provider(
+        _SURFACE_FORMATS, _SURFACE_MECHANISMS, version="v2")})
+    assert _surface_version_warnings(load_providers_config(tmp_path)) == []
+
+
+def test_surface_version_no_warning_for_default_v1(tmp_path):
+    """The implicit v1 default without a map is valid and silent."""
+    _write_config(tmp_path, {"Opencode": _surface_provider(None, None)})
+    assert _surface_version_warnings(load_providers_config(tmp_path)) == []
+

@@ -568,7 +568,7 @@ def _handle_cleanup_preview(ctx: _SyncContext) -> None:
     variables = ctx.variables
 
     try:
-        provider_config = load_providers_config(agent_meta_root)
+        provider_config = load_providers_config(agent_meta_root, config)
         providers = resolve_providers(config, provider_config)
         wrapper_filenames = _collect_all_registry_wrapper_filenames(agent_meta_root)
 

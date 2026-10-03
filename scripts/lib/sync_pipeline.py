@@ -152,7 +152,7 @@ def _sync_stage_config_and_presets(
     # Reload config after auto-fill to pick up newly written defaults
     config = load_config(config_path)
 
-    provider_config = load_providers_config(agent_meta_root)
+    provider_config = load_providers_config(agent_meta_root, config)
     providers = resolve_providers(config, provider_config)
     mode = "init" if args.init else "sync"
     log.note("providers", "active: " + ", ".join(providers))

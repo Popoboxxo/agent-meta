@@ -65,6 +65,7 @@ from lib.consistency.reference_standards import check_reference_standards
 from lib.consistency.repo_containment import check_repo_containment_templates
 from lib.consistency.report import Finding, Severity, print_json_report, print_report
 from lib.consistency.subagent_permissions import check_subagent_permission_templates
+from lib.io import load_yaml_file
 
 # ── git helpers ───────────────────────────────────────────────────────────────
 
@@ -192,8 +193,13 @@ def run_checks(
         findings += check_schema_refs(root)
         findings += check_handoff_contracts(root)
         findings += check_fanout_backend_contract(root)
-        findings += check_artifact_contracts(root)
-        findings += check_model_contracts(root)
+        project_config = load_yaml_file(
+            root / ".meta-config" / "project.yaml",
+            on_error="default",
+            default={},
+        )
+        findings += check_artifact_contracts(root, project_config)
+        findings += check_model_contracts(root, project_config)
         findings += check_subagent_permission_templates(root)
         findings += check_py39_union_syntax(root)
         findings += check_fstring_backslash_hazard(root)

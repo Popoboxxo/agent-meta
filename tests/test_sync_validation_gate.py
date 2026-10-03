@@ -158,7 +158,7 @@ def test_finalize_codex_toml_singleton_inside_developer_instructions(tmp_path: P
 
 def test_collect_artifact_findings_scans_active_providers(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(
-        agent_sync, "load_providers_config", lambda _root: _probe_pc("v2")
+        agent_sync, "load_providers_config", lambda _root, _config=None: _probe_pc("v2")
     )
     agents_dir = tmp_path / ".probe" / "agents"
     agents_dir.mkdir(parents=True)
@@ -173,13 +173,23 @@ def test_collect_artifact_findings_scans_active_providers(monkeypatch, tmp_path:
         _REPO_ROOT, tmp_path, {"ai-providers": ["Probe"]}
     )
 
-    assert [rel for rel, _finding in findings] == [".probe/agents/bad.md"]
-    assert "not in allowed-fields" in findings[0][1].message
+    errors = [rel for rel, f in findings if f.severity == Severity.ERROR]
+    assert errors == [".probe/agents/bad.md"]
+    assert "not in allowed-fields" in next(
+        f for _rel, f in findings if f.severity == Severity.ERROR
+    ).message
 
 
-def test_collect_artifact_findings_clean_tree_is_empty(monkeypatch, tmp_path: Path) -> None:
+def test_collect_artifact_findings_clean_tree_has_no_errors(monkeypatch, tmp_path: Path) -> None:
+    """A tree with no artifact errors yields exactly the expected REV-R5 warning.
+
+    The ``Probe`` fixture declares a non-default ``surface-version`` without
+    ``mcp-config.surface-formats``, so the clean tree is not entirely silent:
+    the gate must report exactly one WARNING (no ERROR), and it must not be
+    silently discarded.
+    """
     monkeypatch.setattr(
-        agent_sync, "load_providers_config", lambda _root: _probe_pc("v2")
+        agent_sync, "load_providers_config", lambda _root, _config=None: _probe_pc("v2")
     )
     agents_dir = tmp_path / ".probe" / "agents"
     agents_dir.mkdir(parents=True)
@@ -187,15 +197,20 @@ def test_collect_artifact_findings_clean_tree_is_empty(monkeypatch, tmp_path: Pa
         "---\nname: good\ndescription: probe\n---\nBody.\n", encoding="utf-8"
     )
 
-    assert agent_sync.collect_artifact_findings(
+    findings = agent_sync.collect_artifact_findings(
         _REPO_ROOT, tmp_path, {"ai-providers": ["Probe"]}
-    ) == []
+    )
+
+    assert [f.severity for _rel, f in findings] == [Severity.WARNING]
+    _rel, warning = findings[0]
+    assert warning.check == "artifact-contract"
+    assert "surface-formats" in warning.message
 
 
 def test_collect_artifact_findings_registry_failure_fails_loud(monkeypatch, tmp_path: Path) -> None:
     """A registry-load failure must not silently disable the fail-loud gate."""
 
-    def _boom(_root):
+    def _boom(_root, _config=None):
         raise RuntimeError("registry exploded")
 
     monkeypatch.setattr(agent_sync, "load_providers_config", _boom)
