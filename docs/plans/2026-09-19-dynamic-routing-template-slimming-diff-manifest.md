@@ -1812,3 +1812,82 @@ an der `TEST_COMMANDS`-Fundstelle exakt den vom aktuellen Sync-Pfad erzeugten Ou
 Update-Regel ist erfüllt (dieser Eintrag), und das Gate ist grün (15.5). Die Änderung ist eine
 orthogonale Config-Wert-Aktualisierung; dies ist eine **Statusaussage** über B2a, keine
 Klassifikation der Änderung als B2a-Fall (vgl. 8.7/14.7).
+
+## 16. Re-Baseline der Golden-Baseline für `git` (Issue #842, BOM-Commit-Guard)
+
+Derselbe Baseline-Update-Fall wie Abschnitt 14/15, ausgelöst durch eine **Template-Inhaltsänderung**
+an einer migrierten Rolle: Issue #842 dokumentiert im `git`-Template, dass die Commit-Subject an
+Byte 0 mit dem Conventional-Commit-Typ beginnen muss und niemals ein führendes UTF-8-BOM tragen darf.
+
+> **Commit:** **noch nicht vorhanden** — die Re-Baseline wurde bewusst **nicht** committet
+> (Aufgabengrenze: keine Git-Mutationen). Messbasis ist der Arbeitsbaum auf `43ca7e1d`
+> (Branch `fix/842-bom-commit-guard`).
+> **Gegenstand:** **1 von 58** eingefrorenen Golden-Fixtures:
+> `tests/fixtures/slimming-golden/git.md`
+> (`len(_golden_roles()) == _GOLDEN_ROLE_COUNT == 58`, unverändert).
+> **Klassifikation:** **Baseline-Update nach Update-Regel**
+> (`tests/fixtures/slimming-golden/README.md:90-94`) — **kein B2a-/B2b-Fall**.
+
+### 16.1 Auslöser
+
+Issue #842 ergänzt in `agents/1-generic/git.md` eine „No leading BOM"-Regel in der
+Commit-Format-Sektion und hebt die Template-`version` patchweise an:
+
+| Rolle | Template | `version` | Delta |
+|---|---|---|---|
+| `git` | `agents/1-generic/git.md` | `2.0.0 → 2.0.1` | neuer Absatz „No leading BOM (issue #842)" unter `**Commit format:**` |
+
+Das Versionsfeld (`version:` **und** `generated-from: …@<version>`) verschiebt das gerenderte
+Frontmatter; der neue Body-Absatz verschiebt den gerenderten Body.
+
+### 16.2 Mechanismus des Fehlschlags
+
+`git` steht in `_MIGRATED_PATHS`, nimmt also den Normalisierungs-Zweig des Gates
+(`tests/test_template_slimming_equivalence.py:1176-1195`). Das Delta ist **nicht** auf die vier
+Block-Kinds (`ANTI_RECURSION`, `OUTPUT_GUARD`, `BACKGROUND_PROCESS_GUARD`, `PARSE_INPUT`)
+zurückführbar ⇒ `diff not attributable to declared normalizations`. `_LOCATORS` erkennt keine
+Versionsstrings und keine Inline-Body-Prosa; eine erfundene Normalisierung wäre ein Vertragsbruch.
+
+### 16.3 Gewählte Fix-Route und Vertragsbeleg
+
+Bewusste, über den **echten Sync-Pfad** erzeugte Re-Baseline nach dem Verfahrensvertrag
+(`tests/fixtures/slimming-golden/README.md:22-41`), ausdrücklich **nicht** als Handedit. Kein
+Eingriff in `_MIGRATED_PATHS`, `_NORMALIZATIONS`, `_LOCATORS`, `_KIND_REGISTRY`, `_GOLDEN_ROLE_COUNT`
+oder `_port_golden_meta_tokens`.
+
+### 16.4 Nachweis der Herkunft (keine Handpflege)
+
+- Erzeugung über den echten Sync-Pfad, Provider `Claude`:
+
+  ```bash
+  mkdir -p .tmp/slimming-golden-gen .tmp/slimming-golden-gen2
+  AGENT_META_TEST_REPO="$PWD/.tmp/slimming-golden-gen" python3 scripts/sync.py --validate
+  AGENT_META_TEST_REPO="$PWD/.tmp/slimming-golden-gen2" python3 scripts/sync.py --validate
+  ```
+
+- **Determinismus-Nachweis (Zweitrender):**
+  `diff -r .tmp/slimming-golden-gen/.claude/agents .tmp/slimming-golden-gen2/.claude/agents`
+  ⇒ **rc `0`, 0 Byte Ausgabe**.
+- Kopiert wurde **ausschließlich die vom Gate benannte Fixture** `git.md`, einzeln und verbatim;
+  `cmp` bestätigt Byte-Gleichheit mit **beiden** Renders (`CMP1=0`, `CMP2=0`).
+- sha256 der Fixture im Arbeitsbaum:
+  `d8672e4ca5d790ef72da39ade0eb038c8a738215cfdf4d77a46a9442cebb49af`.
+
+### 16.5 Verifikation
+
+| Prüfung | Ergebnis |
+|---|---|
+| `pytest tests/test_template_slimming_equivalence.py -q` | **8 passed**, rc `0` |
+| Diff-Scope der Fixture | `git diff --numstat`: `git.md` 4/2 |
+| Konfliktmarker in der geänderten Fixture | keine |
+
+Der Test-Korpus blieb unangetastet: **kein** Eingriff in `_MIGRATED_PATHS`, `_NORMALIZATIONS`,
+`_LOCATORS`, `_KIND_REGISTRY` oder `_GOLDEN_ROLE_COUNT` (58, unverändert); keine Assertion wurde
+geschwächt, übersprungen oder gelockert.
+
+### 16.6 Status B2a
+
+B2a ist durch die Re-Baseline **wiederhergestellt**, nicht abgeschwächt: die Fixture enthält exakt
+den vom aktuellen Template erzeugten Output, die Update-Regel ist erfüllt (dieser Eintrag), und das
+Gate ist grün (16.5). Das Delta aus 16.1 ist eine orthogonale Inhalts- und Versionsänderung; dies
+ist eine **Statusaussage** über B2a, keine Klassifikation der Änderung als B2a-Fall (vgl. 8.7/14.7).

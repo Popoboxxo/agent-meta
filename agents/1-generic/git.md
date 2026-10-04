@@ -1,6 +1,6 @@
 ---
 name: template-git
-version: "2.0.0"
+version: "2.0.1"
 description: "Commits, branches, tags, push/pull and all git operations"
 hint: "Commits, branches, tags, push/pull and all git operations"
 prompt_mode: modern
@@ -123,6 +123,8 @@ Report the candidates (local + remote) to the user.
 - `chore/<topic>` — maintenance
 
 **Commit format:** `<type>(REQ-xxx): <description>`, first line ≤ 72 characters — types/REQ-ID rules: Rule `commit-conventions.md` (auto-loaded).
+
+**No leading BOM (issue #842):** the subject must start at byte 0 with the Conventional-Commit type. Never prefix a commit message with a UTF-8 BOM (`EF BB BF`, e.g. from a copied `-F` message file saved by an editor) — the guard hook rejects such a commit with exit 2. Strip the BOM before committing.
 
 **Conventional Commits (extended):** mark breaking changes with `!` after `type/scope` or a `BREAKING CHANGE:` footer (maps to MAJOR). Prefer **multiple focused commits** over one mixed commit. Optional `scope` when REQ-ID is not the target.
 
