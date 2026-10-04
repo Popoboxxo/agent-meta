@@ -945,6 +945,13 @@ def _handle_restore(ctx: _SyncContext) -> None:
     ctx.config = config
     ctx.mode = mode
 
+    if not result.get("success", False):
+        # A restore that did not actually restore anything must not exit 0:
+        # surface it as a hard error (issue #804).
+        message = result.get("error") or "; ".join(result.get("errors", [])) or "restore failed"
+        print(f"  !  restore failed: {message}", file=sys.stderr)
+        sys.exit(1)
+
 
 def _handle_list_backups(ctx: _SyncContext) -> None:
     """Handle --list-backups."""

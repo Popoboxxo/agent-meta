@@ -305,7 +305,9 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                         default=None,
                         help="Which providers to restore from --restore (default: all)")
     parser.add_argument("--force", action="store_true",
-                        help="Force overwrite when restoring (--restore)")
+                        help="Clean restore: remove the existing provider "
+                             "directory before restoring it (--restore). Without "
+                             "it, backup files are merged over the existing tree.")
     parser.add_argument("--list-backups", action="store_true",
                         help="List all available backup archives with metadata")
     parser.add_argument("--delete-backup", metavar="ARCHIVE",
