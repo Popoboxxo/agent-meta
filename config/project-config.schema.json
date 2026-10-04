@@ -15,8 +15,8 @@
     },
     "agent-meta-version": {
       "type": "string",
-      "description": "The agent-meta version this project was last synced with (e.g. '0.16.5').",
-      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+      "description": "The agent-meta version this project was last synced with, accepting SemVer pre-release and build metadata (e.g. '0.16.5', '2.0.0-beta.1', '2.0.0-rc.1+build.5').",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
     },
     "ai-provider": {
       "type": "string",
