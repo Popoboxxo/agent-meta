@@ -7,20 +7,21 @@
 # violated assertion, printed to stdout/stderr.
 #
 # Verified expectations -- derived from the framework code, not guessed:
-#   Eligibility (scripts/lib/auto_commit.py):
-#     _ELIGIBLE_TOOLS = {"Edit", "Write"}; is_role_eligible() intersects
-#     this set with the role's OWN agents/1-generic/<role>.md tools:
-#     frontmatter. Scenario-19 roles: orchestrator (Write), developer
-#     (Write+Edit), tester (Write+Edit) -> eligible; git (Bash/Read/Glob/
-#     Grep/TodoWrite) and explorer (Read/Glob/Grep/TodoWrite) -> NOT
-#     eligible. -> eligible_roles = ["developer", "orchestrator", "tester"].
+#   Authority/eligibility (scripts/lib/auto_commit.py, issue #767):
+#     is_role_eligible() is DIRECT-only: Bash AND {Edit,Write}. Scenario-19
+#     roles: developer (Bash+Write+Edit) -> direct -> eligible, tester
+#     (Bash+Write+Edit) -> direct -> eligible, orchestrator (Agent+Write,
+#     no Bash) -> delegate -> NOT eligible, git (Bash, no Edit/Write) -> none,
+#     explorer (Read/Glob/Grep, no Bash/Write) -> none.
+#     -> eligible_roles = ["developer", "tester"].
 #   Rendering (scripts/lib/auto_commit.py::render_auto_commit_block):
-#     suggest mode renders the propose-not-pause prose ("propose a
-#     ready-to-use commit message ... do NOT run `git commit` yourself,
-#     and do not stop and wait for confirmation") and deliberately does
-#     NOT render the secret-scan line: the scan runs before auto/custom
+#     suggest mode is authority-agnostic -- developer (direct), orchestrator
+#     (delegate) and any notify role render the SAME propose-only prose
+#     ("propose a ready-to-use commit message ... do NOT run `git commit`
+#     yourself, and do not stop and wait for confirmation") and deliberately
+#     do NOT render the secret-scan line: the scan runs before auto/custom
 #     commits only, and a suggest-tier agent never commits itself (the
-#     scan_line append lives only in the custom and auto branches).
+#     scan_line append lives only in the direct custom/auto branches).
 #     Deviation from the original scenario spec ("Secret-Scan-Zeile
 #     vorhanden") -- asserted here as ABSENT to pin the designed
 #     behavior; if a future change adds the scan line to suggest mode,
@@ -64,10 +65,10 @@ def check(cond: bool, msg: str) -> None:
 
 
 check(data.get("mode") == "suggest", "mode must be 'suggest'")
-check(data.get("eligible_roles") == ["developer", "orchestrator", "tester"],
-      "eligible_roles must be exactly ['developer', 'orchestrator', 'tester'] "
-      "(capability-derived; git and explorer have no Edit/Write in their own "
-      "template and must be filtered out)")
+check(data.get("eligible_roles") == ["developer", "tester"],
+      "eligible_roles must be exactly ['developer', 'tester'] "
+      "(direct-only: Bash AND Edit/Write; orchestrator is delegate-only, "
+      "git and explorer have no Edit/Write)")
 check(data.get("triggers") == [], "triggers must be empty (suggest mode has no built-in triggers)")
 check(data.get("secret_scan") is True, "secret_scan must be true (config value is recorded in the allowlist)")
 PY
@@ -108,6 +109,23 @@ for provider in .claude .gemini; do
         fail "$dev: block must NOT contain a secret-scan line in suggest mode " \
              "(scan runs before auto/custom commits only; if the framework " \
              "gained a suggest-tier scan line, update this scenario consciously)"
+    fi
+done
+
+# --- 2b. orchestrator.md (delegate) renders the SAME suggest block ------
+# suggest is authority-agnostic: no "Commit directly", no delegation step.
+for provider in .claude .gemini; do
+    orch="$provider/agents/orchestrator.md"
+    [ -f "$orch" ] || fail "generated file missing: $orch"
+    block="$(block_of "$orch")"
+    [ -n "$block" ] || fail "$orch: suggest AUTO_COMMIT_BLOCK not rendered"
+    printf '%s\n' "$block" | grep -qF "propose a ready-to-use commit message" \
+        || fail "$orch: suggest block must contain the propose-a-commit-message prose"
+    if printf '%s\n' "$block" | grep -qF "Commit directly"; then
+        fail "$orch: suggest block must NOT contain 'Commit directly'"
+    fi
+    if printf '%s\n' "$block" | grep -qi "delegate"; then
+        fail "$orch: suggest block must NOT contain a delegation instruction"
     fi
 done
 

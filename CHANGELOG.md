@@ -51,6 +51,19 @@
   management.
 
 ### Changed
+- **`auto_commit` no longer tells no-Bash roles to commit directly (consumer-visible, #767)**:
+  commit authority is now derived per role from its own 1-generic `tools:` contract into four
+  capability classes — `direct` (Bash **and** (Edit and/or Write)) commits itself, `delegate` (Edit/Write,
+  no Bash, but an `Agent`/`Task` tool) hands the commit to the `git` agent at each trigger
+  boundary, `notify` (Edit/Write, no Bash, not spawn-capable) only reports the changed files plus
+  a ready-to-use Conventional-Commits message to its caller, and `none` renders nothing. The
+  guard-hook allowlist `eligible_roles` is now **direct-only** (previously any Edit/Write role),
+  so the `orchestrator` (Write, no Bash) and the documentation/concept roles lose a "Commit
+  directly" instruction they could not carry out and no longer appear in the allowlist. The
+  configured `secret_scan` requirement is now forwarded into `delegate`/`notify` prose as well
+  (the party performing the commit runs the scan; a finding blocks it; `secret_scan: false`
+  omits it). `mode: off` still renders nothing for every role and stays byte-identical to a sync
+  without an `auto_commit` key; no template or `{{#if}}` change.
 - **Role activation is gate-driven for `validator` and the developer tiers (consumer-visible —
   audit your `project.yaml` before upgrading)**: the per-role activation decision now resolves
   from the single `activation_groups` default table in `config/role-defaults.yaml` instead of the

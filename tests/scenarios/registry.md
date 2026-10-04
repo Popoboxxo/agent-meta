@@ -62,7 +62,7 @@ verhalten sich exakt wie bisher.
 | `15-orchestrator-strict` | Claude | **strict** (explizit) | Dedizierter Orchestrator-Subagent, Pflicht |
 | `16-orchestrator-advisory` | Claude | **advisory** | Dedizierter Orchestrator-Subagent, empfohlen |
 | `17-orchestrator-main-chat` | Claude | **main-chat** | Kein Orchestrator-Subagent — Main Chat routet selbst (agent-metas eigener Modus) |
-| `18-auto-commit` | Claude, Gemini | strict (default) | Auto-commit tiers: role eligibility, AUTO_COMMIT_BLOCK rendering, allowlist generation (#694) |
+| `18-auto-commit` | Claude, Gemini, Opencode | strict (default) | Auto-commit tiers: role eligibility, direct/delegate/notify AUTO_COMMIT_BLOCK rendering (incl. root-cause Opencode), allowlist generation (#694/#767) |
 | `19-auto-commit-suggest` | Claude, Gemini | strict (default) | Auto-commit suggest tier: propose-not-pause prose, eligibility excludes git/explorer (#694) |
 | `20-auto-commit-custom` | Claude | strict (default) | Auto-commit custom tier: `custom_script` contract + sentinel prefix, no trigger prose (#694) |
 | `21-auto-commit-off-ignores-config` | Claude, Gemini, Opencode | strict (default) | Auto-commit off tier: stray config values ignored, zero block rendering, byte-identical output vs. unconfigured sync (#694) |

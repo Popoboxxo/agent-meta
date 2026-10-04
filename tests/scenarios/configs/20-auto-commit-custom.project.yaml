@@ -37,14 +37,18 @@ allow-committed-secrets: false
 # =====================================================================
 # 1. Allowlist (.meta-config/auto-commit-allowlist.json):
 #    mode "custom"; custom_script "scripts/should-commit.sh";
-#    eligible_roles ["developer", "orchestrator"] (capability-abgeleitet,
-#    git hat kein Edit/Write -> raus); secret_scan true; triggers []
+#    eligible_roles ["developer"] (direct-only, issue #767: nur Rollen mit
+#    Bash UND Edit/Write im EIGENEN 1-generic-tools:-Frontmatter; der
+#    orchestrator ist delegate-only (Agent+Write, kein Bash), git hat kein
+#    Edit/Write -> beide raus); secret_scan true; triggers []
 #    (built-in Trigger sind im custom-Modus irrelevant).
 # 2. AUTO_COMMIT_BLOCK gerendert in .claude/agents/developer.md:
 #    erwähnt `scripts/should-commit.sh` ("Commit directly whenever ...
 #    exits 0") und die Sentinel-Präfix-Anweisung
 #    (`#agent-meta:agent=<your-role-name>` vor git add/commit) sowie die
 #    Secret-Scan-Zeile (custom-Modus committet selbst -> Scan greift).
+# 2b. orchestrator.md erhält die delegate-Prosa ("delegate the commit to
+#    the `git` agent", gated am custom_script-Exit) und KEIN "Commit direkt".
 # 3. KEINE Trigger-Prosa: die Trigger-Namen (task-boundary, per-edit,
 #    context-pressure, file-count-threshold) dürfen im gerenderten Block
 #    nicht vorkommen — custom_script allein entscheidet.

@@ -50,9 +50,10 @@ allow-committed-secrets: false
 #    Allowlist darf sie maximal als aufgelöste Werte aufzeichnen
 #    (threshold 2, secret_scan false), aber es darf daraus KEIN
 #    Verhalten folgen.
-# 3. Allowlist: mode "off"; eligible_roles ist capability-derived und
-#    MODE-UNABHÄNGIG = ["developer", "orchestrator", "tester"] (jede aktive
-#    Rolle mit Edit/Write im eigenen Template); off unterdrückt nur den
+# 3. Allowlist: mode "off"; eligible_roles ist direct-only (issue #767) und
+#    MODE-UNABHÄNGIG = ["developer", "tester"] (jede aktive Rolle mit Bash
+#    UND Edit/Write im eigenen Template; der orchestrator ist delegate-only,
+#    git hat kein Edit/Write -> beide raus); off unterdrückt nur den
 #    gerenderten AUTO_COMMIT_BLOCK, nicht die Allowlist-Daten;
 #    triggers []; custom_script null.
 # 4. AUTO_COMMIT_BLOCK NIRGENDS gerendert ({{#if AUTO_COMMIT_ENABLED}}
