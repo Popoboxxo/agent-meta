@@ -261,6 +261,8 @@ def create_backup(
     label: str | None = None,
     dry_run: bool = False,
     source_version: str = "",
+    backup_dir_name: str | None = None,
+    archive_prefix: str = "agent-meta-backup",
 ) -> dict:
     """Create a timestamped backup zip of provider directories and project config.
 
@@ -278,12 +280,19 @@ def create_backup(
         label: Optional human-readable label for the backup.
         dry_run: If True, only report what would happen.
         source_version: Agent-meta version string for the manifest.
+        backup_dir_name: Optional override of the backup directory (relative to
+            the project root). Defaults to ``backup.dir`` from project.yaml.
+            Deactivation passes its own ``provider-deactivation.backup-dir`` so
+            backup and restore agree on one location (issue #805).
+        archive_prefix: Filename prefix for the archive. Defaults to
+            ``agent-meta-backup``; single-provider backups use the provider name
+            so the matching restore lookup can find them (issue #805).
 
     Returns:
         Dict with backup result including archive path and included providers.
     """
     bc = _get_backup_config(config)
-    backup_dir_name = bc["dir"]
+    backup_dir_name = backup_dir_name or bc["dir"]
     backup_dir = project_root / backup_dir_name
 
     if providers is None or not providers:
@@ -291,7 +300,7 @@ def create_backup(
     else:
         targets = [p for p in providers if p in provider_config]
 
-    archive_name = _unique_archive_name(backup_dir)
+    archive_name = _unique_archive_name(backup_dir, archive_prefix)
     zip_path = backup_dir / (archive_name + ".zip")
 
     # Build manifest
@@ -403,6 +412,7 @@ def restore_backup(
     providers: list[str] | None = None,
     force: bool = False,
     dry_run: bool = False,
+    backup_dir_name: str | None = None,
 ) -> dict:
     """Restore provider directories and optionally project config from a backup.
 
@@ -415,12 +425,15 @@ def restore_backup(
         providers: Which providers to restore (None = all in archive).
         force: If True, overwrite existing directories.
         dry_run: If True, only report what would happen.
+        backup_dir_name: Optional backup directory override (relative to the
+            project root); defaults to ``backup.dir``. Deactivation passes its
+            own backup dir so deactivate/activate agree (issue #805).
 
     Returns:
         Dict with restore results per provider and config.
     """
     bc = _get_backup_config(config)
-    backup_dir_name = bc["dir"]
+    backup_dir_name = backup_dir_name or bc["dir"]
     backup_dir = project_root / backup_dir_name
 
     # Resolve archive path
@@ -731,16 +744,22 @@ def backup_provider_dir(
     log: SyncLog,
     dry_run: bool = False,
     source_version: str = "",
+    backup_dir_name: str | None = None,
 ) -> Path | None:
     """Backup a single provider directory (used by deactivation).
 
     Delegates to create_backup for a single provider. Returns the archive path.
+    The archive is written into ``backup_dir_name`` (defaults to ``backup.dir``)
+    and prefixed with the provider name so ``restore_provider_dir`` can find it
+    again (issue #805).
     """
     result = create_backup(
         project_root, [provider], provider_config, config, log,
         label=f"deactivation:{provider}",
         dry_run=dry_run,
         source_version=source_version,
+        backup_dir_name=backup_dir_name,
+        archive_prefix=provider,
     )
     if result.get("success") and not dry_run:
         archive_path = project_root / result["archive"]
@@ -758,11 +777,14 @@ def restore_provider_dir(
     config: dict,
     log: SyncLog,
     dry_run: bool = False,
+    backup_dir_name: str | None = None,
 ) -> bool:
     """Restore a single provider from a backup archive (used by deactivation).
 
     Args:
         archive_name: The zip file name to restore from.
+        backup_dir_name: Optional backup directory override; defaults to
+            ``backup.dir``. Deactivation passes its own backup dir (issue #805).
 
     Returns:
         True if restored successfully.
@@ -771,6 +793,7 @@ def restore_provider_dir(
         project_root, archive_name, provider_config, config, log,
         providers=[provider],
         dry_run=dry_run,
+        backup_dir_name=backup_dir_name,
     )
     prov_result = result.get("provider_results", {}).get(provider, {})
     return prov_result.get("restored", False)
