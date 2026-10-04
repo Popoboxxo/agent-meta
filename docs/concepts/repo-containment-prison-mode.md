@@ -401,6 +401,49 @@ managed-Block-Logik geführt.
   verlässlichem Session-Start-Hook; Q3 entschieden: nur `manual`/`on-sync`, §10/Q3).
 - Das Verzeichnis bleibt via Gitignore ungetrackt und ist damit nicht Teil des Repo-Zustands.
 
+### 5.5 Repo-Kopien und pytest-Basetemp (Pflichtregel)
+
+`.tmp/` ist der sanktionierte Scratch-Sink — und liegt **innerhalb** der Projekt-Wurzel. Daraus
+folgt eine Pflichtregel für jede Test-Infrastruktur, die das Repo kopiert (z. B. die
+Self-Hosting-Tests in `tests/`):
+
+1. **Der pytest-Basetemp darf NIE im Arbeitsbaum liegen.** Er gehört außerhalb, z. B.
+   `--basetemp=/tmp/<user>` (oder `TMPDIR` entsprechend). Liegt er im Repo — etwa
+   `--basetemp=.tmp/pyt` — legt pytest dort `<basetemp>/pytest-of-<user>/` plus den
+   `pytest-current`-Symlink an.
+2. **Jede Repo-Kopie muss `.tmp` ausschließen** — zusätzlich zu den übrigen lokalen Bäumen
+   (`.venv/`, `graphify-out/`, `.opencode/`, `.pytest_cache/`, `node_modules/`). Wird `.tmp`
+   mitkopiert und liegt das Kopierziel selbst im Basetemp, kopiert der Klon seinen eigenen
+   Output: Der Baum wächst unbegrenzt (Vorfall 2026-09-19/20: 16 GB, 432.138 Einträge).
+3. **Symlinks nie verfolgen.** `shutil.copytree(..., symlinks=True)` — sonst folgt der Kopierer
+   dem `pytest-current`-Symlink und legt eine selbstreferenzielle Kette an.
+4. **Fail loud statt rekursieren.** Vor dem Kopieren prüfen, ob das Ziel innerhalb des
+   Quellbaums und außerhalb eines ignorierten Pfades liegt; in dem Fall abbrechen, statt zu
+   kopieren.
+5. **Sichtbar warnen, nicht hart abbrechen.** `tests/conftest.py` warnt zur
+   Collection-/Session-Start-Zeit (warning-only, kein `pytest.exit`/`pytest.fail`), wenn der
+   effektive Basetemp (`--basetemp`, sonst `TMPDIR`/`tempfile.gettempdir()`) innerhalb der
+   Repo-Wurzel liegt. Der In-Repo-Lauf bleibt damit erlaubt — er ist ein legitimer
+   Diagnose-Lauf für die Plattenplatz-Sicherheit. Der kanonische Aufruf steht in
+   `.meta-config/project.yaml` (`TEST_COMMANDS`): `python3 -m pytest tests/
+   --basetemp=/tmp/$USER/pytest-agent-meta`.
+
+Punkt 1 hat **zwei** Gründe, nicht nur den Plattenplatz: liegt der Basetemp im Arbeitsbaum,
+dann liegt auch `tmp_path` im Arbeitsbaum. Tests, die die Repo-Wurzel-Erkennung prüfen (sie
+suchen nach `.meta-config/` oder danach, ob ein Pfad innerhalb des Containment-Roots liegt),
+finden dann das **echte** Repo statt einer isolierten Fixture und schlagen fehl. Messung
+2026-09-20: 13 zusätzliche Fehlschläge (`test_repo_containment_hook`,
+`test_spec_plan_group_consistency`, `test_dod_push_check_hook`, `test_file_affinity`) — dieselben
+Tests laufen mit einem externen Basetemp fehlerfrei. Der Lauf mit In-Repo-Basetemp bleibt
+trotzdem ein legitimer **Diagnose-Lauf** für die Plattenplatz-Sicherheit; der kanonische
+Suite-Lauf nutzt einen Basetemp außerhalb des Repos.
+
+Die Regel ist eine **Convention boundary** im Sinne der zentralen Definition in
+[`../../.claude/rules/branch-guard.md`](../../.claude/rules/branch-guard.md#guard-terminologie-convention-boundary-vs-security-boundary):
+sie schützt gegen akzidentellen Missbrauch (vergessenes `--basetemp`, naive Automatisierung),
+nicht gegen einen gezielten Bypass. Punkt 4 ist zusätzlich als Defense-in-depth gedacht — er
+verhindert, dass ein fehlkonfigurierter Basetemp still die Platte füllt, statt laut abzubrechen.
+
 ---
 
 ## 6. Threat Model & bekannte Grenzen
@@ -497,6 +540,10 @@ Hook-Test folgt dem Vorbild
 
 Zusätzlich: `python scripts/consistency-check.py` muss grün bleiben (inkl.
 `check_ui_help_mappings` für die neue Route).
+
+Für Repo-Kopien in Tests gilt zusätzlich die Pflichtregel aus
+[§5.5](#55-repo-kopien-und-pytest-basetemp-pflichtregel): der pytest-Basetemp gehört außerhalb
+des Arbeitsbaums, und jede Repo-Kopie muss `.tmp` ausschließen und Symlinks unverfolgt lassen.
 
 ---
 

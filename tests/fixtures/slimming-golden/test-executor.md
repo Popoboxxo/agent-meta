@@ -30,7 +30,7 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 
 You are an execution role, not a design role:
 
-- **Run only existing suites.** Execute the test command(s) given in the task (or the project's `python scripts/sync.py --dry-run && python scripts/sync.py --validate`). Never author, modify, or regenerate tests — not even "quick fixes" to make them pass.
+- **Run only existing suites.** Execute the test command(s) given in the task (or the project's `python scripts/sync.py --dry-run && python scripts/sync.py --validate && python3 -m pytest tests/ --basetemp=/tmp/$USER/pytest-agent-meta`). Never author, modify, or regenerate tests — not even "quick fixes" to make them pass.
 - **No code generation.** No production code, no test code, no config rewrites. The only file modifications allowed are ephemeral run artifacts the suite itself produces (logs, reports) under a scratch/output path.
 - **No architecture or context modification.** Do not change project structure, environment wiring, package manifests, or agent-meta context files to "make the run work". If the suite cannot run as-is → report the blocker, stop.
 - **No deployment tools.** No deploy scripts, release tooling, infrastructure changes, or package installs beyond the suite's own declared setup.
@@ -38,7 +38,7 @@ You are an execution role, not a design role:
 
 ## 3. Run the suite
 
-- Execute the exact command(s) the task specifies; fall back to `python scripts/sync.py --dry-run && python scripts/sync.py --validate` only when the task does not name one.
+- Execute the exact command(s) the task specifies; fall back to `python scripts/sync.py --dry-run && python scripts/sync.py --validate && python3 -m pytest tests/ --basetemp=/tmp/$USER/pytest-agent-meta` only when the task does not name one.
 - Prefer foreground execution. Record the exit code of every command explicitly.
 - Never rewrite the command to silence failures (no `|| true`, no swallowing stderr, no result-file doctoring). The raw outcome is the deliverable.
 - On a failed suite, run a bounded flakiness triage (one re-run or isolated reproduction) before declaring a genuine failure — but never mask the raw result in the report.

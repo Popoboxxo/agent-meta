@@ -48,7 +48,7 @@ describe / class / suite: ModuleName
 
 ## 4. Run tests + coverage
 
-`python scripts/sync.py --dry-run && python scripts/sync.py --validate`. Build a coverage matrix on request.
+`python scripts/sync.py --dry-run && python scripts/sync.py --validate && python3 -m pytest tests/ --basetemp=/tmp/$USER/pytest-agent-meta`. Build a coverage matrix on request.
 
 ## 5. Test patterns
 

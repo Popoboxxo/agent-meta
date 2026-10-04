@@ -422,6 +422,31 @@ bash .claude/hooks/release-gates/docker-image-scan.sh
 PRE_RELEASE_GATE_ENABLED=true bash .claude/hooks/release-gates/docker-image-scan.sh
 ```
 
+## Methodik-Regel: Testläufe nie mit einem Basetemp im Arbeitsbaum
+
+Vor einem Release läuft die volle Test-Suite. Dafür gilt eine harte Methodik-Regel:
+
+- **Der pytest-Basetemp darf NIE im Arbeitsbaum liegen.** Immer außerhalb setzen, z. B.
+  `--basetemp=/tmp/<user>` (oder `TMPDIR` entsprechend), damit pytest seine
+  `pytest-of-<user>/`-Verzeichnisse nicht im Repo anlegt. Das hat zwei Gründe: Plattenplatz
+  (siehe unten) und die Tatsache, dass `tmp_path` sonst im Repo liegt — Tests, die die
+  Repo-Wurzel-Erkennung prüfen, finden dann das echte `.meta-config/` statt einer isolierten
+  Fixture (2026-09-20: 13 solche Tests schlugen nur wegen des In-Repo-Basetemps fehl).
+- **Jede Repo-Kopie muss `.tmp` ausschließen** (plus die übrigen lokalen Bäume wie `.venv/`,
+  `graphify-out/`, `.opencode/`). Sonst kopiert der Klon bei einem Basetemp im Repo seinen
+  eigenen Output und wächst unbegrenzt — Vorfall 2026-09-19/20: 16 GB, 432.138 Einträge.
+- **Symlinks unverfolgt kopieren** (`shutil.copytree(..., symlinks=True)`), sonst wird der
+  `pytest-current`-Symlink dereferenziert.
+- **Der Guard ist warning-only.** `tests/conftest.py` warnt sichtbar (pytest-Warnung), wenn der
+  effektive Basetemp im Repo liegt — er bricht den Lauf aber nie ab. Der kanonische Aufruf steht
+  in `.meta-config/project.yaml` (`TEST_COMMANDS`):
+  `python3 -m pytest tests/ --basetemp=/tmp/$USER/pytest-agent-meta`.
+
+Vollständige Regel und Begründung:
+[`concepts/repo-containment-prison-mode.md`](concepts/repo-containment-prison-mode.md) §5.5.
+Einordnung als **Convention boundary** (nicht Security boundary):
+[`.claude/rules/branch-guard.md`](../.claude/rules/branch-guard.md#guard-terminologie-convention-boundary-vs-security-boundary).
+
 ## Automatisches GitHub-Release nach Tag-Push (Issues #518/#622)
 
 Der `release`-Agent muss `gh release create` bisher als separaten, manuellen Schritt nach dem
