@@ -694,8 +694,12 @@ def _handle_only_variables(ctx: _SyncContext) -> None:
     provider_config = load_providers_config(agent_meta_root)
     providers = resolve_providers(config, provider_config)
     only_variables(project_root, variables, log, args.dry_run,
-                   providers=providers, provider_config=provider_config)
+                   providers=providers, provider_config=provider_config,
+                   config=config, agent_meta_root=agent_meta_root)
 
+    # Minimal mode: refresh context variables without running the unrelated
+    # common-tail side effects (env scripts, viz, restart banner, sync.log).
+    ctx.read_only = True
     ctx.config = config
     ctx.mode = mode
 

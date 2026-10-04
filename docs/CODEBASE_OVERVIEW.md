@@ -1522,7 +1522,7 @@ Die Dispatch-Logik verwendet die `capabilities`-Matrix aus `config/ai-providers.
 |----------|----------|-------|
 | `init_settings_json()` | `(agent_meta_root, project_root, log, dry_run, providers, provider_config, variables)` | Erstellt committed Settings-Dateien für alle aktiven Provider aus deren `settings_template` |
 | `init_settings_local_json()` | `(agent_meta_root, project_root, log, dry_run, providers, provider_config, variables)` | Erstellt lokale/persönliche Settings-Dateien aus `settings_local_template` (gitignored) |
-| `only_variables()` | `(project_root, variables, log, dry_run, providers, provider_config)` | Substituiert `{{VARIABLE}}`-Platzhalter in bestehenden Context-Dateien |
+| `only_variables()` | `(project_root, variables, log, dry_run, providers, provider_config, config=None, agent_meta_root=None)` | Rendert den statischen Teil bestehender Context-Dateien mit den aktuellen Variablen neu (Managed-Block bleibt unverändert) und substituiert offene `{{VARIABLE}}`-Platzhalter; Agenten werden nicht regeneriert (Issue #806) |
 | `ensure_gitignore_entries()` | `(project_root, log, dry_run, gitignore_entries, exact_entries)` | Stellt agent-meta Managed-Block in `.gitignore` sicher (additiv oder exakt) |
 
 **Provider-Eigenschaften (`_init_provider_settings_json()`):**
