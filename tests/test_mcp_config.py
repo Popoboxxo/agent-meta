@@ -532,6 +532,113 @@ def test_write_provider_config_kimi_json_writes_mcp_servers(tmp_path):
     assert written["mcpServers"] == entries
 
 
+def test_write_provider_config_kimi_json_warns_on_unresolved_env_ref(tmp_path):
+    """AC-8 (#843 F7): the committed KimiCode config emits inline ``${VAR}``
+    references; because KimiCode's inline expansion is unverified, each
+    affected server is flagged for manual validation.
+
+    The warning must not contribute a ``log.action`` (``--check`` counts
+    actions as "would write"), so the target file is pre-seeded identical and
+    the write is a no-op — the warning fires while the action list stays empty.
+    """
+    path = tmp_path / ".kimi-code" / "mcp.json"
+    entries = {
+        "reqogniloom": {
+            "transport": "sse",
+            "url": "${MCP_REQOGNILOOM_URL}",
+            "headers": {"Authorization": "Bearer ${MCP_REQOGNILOOM_TOKEN}"},
+        }
+    }
+    _write(path, json.dumps({"mcpServers": entries}, indent=2) + "\n")
+    log = SyncLog()
+
+    _write_provider_config(path, entries, "kimi-json", log, dry_run=True, allow_secrets=True)
+
+    joined = "\n".join(log.warnings)
+    assert "UNVERIFIED" in joined
+    assert "reqogniloom" in joined
+    assert ".kimi-code/mcp.json" in joined
+    assert "bearerTokenEnvVar" in joined
+
+    assert log.skipped
+    assert log.actions == []
+
+
+def test_write_provider_config_kimi_json_warns_on_stdio_env_value_ref(tmp_path):
+    """AC-8: the warning must also cover ``${VAR}`` references nested in a
+    stdio server's ``env`` **values** (not just ``url``/``headers``) — env
+    values are exactly where KimiCode's unverified inline expansion would be
+    relied upon, so the scan must be recursive over the entry, not keyed to
+    the remote transports only."""
+    path = tmp_path / ".kimi-code" / "mcp.json"
+    entries = {
+        "filesystem": {
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-filesystem"],
+            "env": {"API_KEY": "${API_KEY}"},
+        }
+    }
+    _write(path, json.dumps({"mcpServers": entries}, indent=2) + "\n")
+    log = SyncLog()
+
+    _write_provider_config(path, entries, "kimi-json", log, dry_run=True, allow_secrets=True)
+
+    joined = "\n".join(log.warnings)
+    assert "UNVERIFIED" in joined
+    assert "filesystem" in joined
+    assert ".kimi-code/mcp.json" in joined
+    assert log.actions == []
+
+
+def test_write_provider_config_kimi_json_non_dict_entries_do_not_crash(tmp_path):
+    """AC-8 robustness: malformed registry entries (``None`` / bare scalars)
+    must not crash the warning scan. ``json.dumps`` must stay total for any
+    value type, so a non-dict entry simply produces no ``${VAR}`` match."""
+    path = tmp_path / ".kimi-code" / "mcp.json"
+    entries = {"empty": None, "scalar": "plain", "number": 7}
+    _write(path, json.dumps({"mcpServers": entries}, indent=2) + "\n")
+    log = SyncLog()
+
+    _write_provider_config(path, entries, "kimi-json", log, dry_run=True, allow_secrets=True)
+
+    assert not any("UNVERIFIED" in w for w in log.warnings)
+    assert log.skipped
+    assert log.actions == []
+
+
+def test_write_provider_config_kimi_json_no_warn_when_env_resolved(tmp_path):
+    """AC-8: with secrets provided every ``${VAR}`` is resolved, so the
+    KimiCode manual-validation warning must not fire."""
+    conn = {
+        "type": "sse",
+        "url": "{{MCP_URL}}",
+        "headers": {"Authorization": "Bearer {{TOKEN}}"},
+    }
+    secrets = {"MCP_URL": "https://mcp.example/sse", "TOKEN": "resolved-token"}
+    entry = _build_connection_entry(conn, secrets, "kimi-json")
+    assert "${" not in json.dumps(entry)
+
+    path = tmp_path / ".kimi-code" / "mcp.json"
+    log = SyncLog()
+    _write_provider_config(
+        path, {"reqogniloom": entry}, "kimi-json", log, dry_run=True, allow_secrets=True,
+    )
+
+    assert not any("UNVERIFIED" in w for w in log.warnings)
+
+
+def test_write_provider_config_non_kimi_format_has_no_kimi_env_warning(tmp_path):
+    """AC-8: the KimiCode-specific warning is format-keyed (``kimi-json``) and
+    must not leak into other provider formats that also emit ``${VAR}``."""
+    path = tmp_path / ".vscode" / "mcp.json"
+    log = SyncLog()
+    entries = {"srv": {"type": "http", "url": "${URL}", "headers": {"X": "${Y}"}}}
+
+    _write_provider_config(path, entries, "vscode-settings", log, dry_run=True, allow_secrets=True)
+
+    assert not any("UNVERIFIED" in w for w in log.warnings)
+
+
 def test_build_connection_entry_antigravity_uses_server_url():
     conn = {"type": "sse", "url": "{{URL}}", "headers": {"X": "{{Y}}"}}
     entry = _build_connection_entry(conn, None, "antigravity-mcp-json")

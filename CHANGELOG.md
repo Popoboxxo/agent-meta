@@ -165,6 +165,15 @@
   Detection also covers ANSI-C quoting (`-m $'\uFEFF…'` / `$'\xEF\xBB\xBF…'`), combined
   short-option clusters (`-am`, `-aF`) and glued short forms (`-m<msg>`, `-am<msg>`, `-aF<file>`),
   while a normal message that merely starts with a literal `$` is not a false positive.
+- **KimiCode `mcp.json` inline env-var expansion flagged for manual validation (#843 F7 / AC-8)**:
+  the committed `.kimi-code/mcp.json` is emitted with inline `${VAR}` references and no secrets
+  file, but whether Kimi Code expands inline env vars could not be verified from the repository.
+  The `kimi-json` serialization path now emits one actionable warning per affected server (naming
+  the file and the server) stating that the inline expansion is UNVERIFIED and pointing at the
+  Kimi-native `bearerTokenEnvVar` + `env` indirection or manual validation. The warning is
+  format-keyed (never provider-name keyed), adds no `log.action` (so `--check` stays rc 0), is
+  deduplicated by `SyncLog`, and leaves the emitted JSON shape byte-identical.
+  `docs/providers/kimi-code.md` §MCP documents the resolution.
 
 ## [2.0.0-beta.1] - 2026-10-03
 
