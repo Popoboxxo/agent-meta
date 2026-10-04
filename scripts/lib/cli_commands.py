@@ -42,7 +42,7 @@ from lib.config import (
     read_version,
 )
 from lib.config_audit import apply_audit, audit_config, format_report
-from lib.context import only_variables, sync_context_for_provider
+from lib.context import only_variables
 from lib.deactivation import (
     activate_providers,
     deactivate_providers,
@@ -824,6 +824,27 @@ def _handle_deactivation_status(ctx: _SyncContext) -> None:
     ctx.mode = mode
 
 
+def _regenerate_active_providers(ctx: _SyncContext) -> None:
+    """Regenerate every active provider end-to-end after a de-/reactivation.
+
+    The deactivation/reactivation handlers used to regenerate only the
+    provider *context* files (``sync_context_for_provider``), which left the
+    generated agent, command, skill and settings artifacts missing after a
+    restore (issue #805). Running the normal sync pipeline regenerates every
+    active provider, so the resulting artifact set converges to a fresh
+    ``sync.py`` run. Deactivated providers are filtered out inside the
+    pipeline (``resolve_providers``), so they stay removed.
+    """
+    if ctx.args.dry_run:
+        return
+    from lib.config import build_variables
+
+    config = load_config(ctx.config_path)
+    ctx.config = config
+    ctx.variables, _ = build_variables(config, ctx.agent_meta_root, ctx.project_root)
+    _handle_sync(ctx)
+
+
 def _handle_deactivate_providers(ctx: _SyncContext) -> None:
     """Handle --deactivate-providers."""
     args = ctx.args
@@ -832,7 +853,6 @@ def _handle_deactivate_providers(ctx: _SyncContext) -> None:
     project_root = ctx.project_root
     config = ctx.config
     config_path = ctx.config_path
-    variables = ctx.variables
 
     mode = "deactivate-providers"
     provider_config = load_providers_config(agent_meta_root, config)
@@ -844,18 +864,12 @@ def _handle_deactivate_providers(ctx: _SyncContext) -> None:
     deactivated_list = resolve_deactivation_targets(targets, provider_config)
     update_deactivation_config(config_path, provider_config, deactivated_list,
                                 config, log, args.dry_run)
-    # Re-sync context files so AGENTS.md reflects the updated provider list.
-    if not args.dry_run:
-        config = load_config(config_path)
-        variables, _ = build_variables(config, agent_meta_root, project_root)
-        for prov in resolve_providers(config, provider_config):
-            sync_context_for_provider(agent_meta_root, project_root, config,
-                                      variables, log, args.dry_run,
-                                      prov, provider_config)
+    # Full regeneration so every active provider's artifact set converges to a
+    # fresh sync result; the deactivated provider stays removed (issue #805).
+    _regenerate_active_providers(ctx)
     import json as _json
     print(_json.dumps(results, indent=2, ensure_ascii=False))
 
-    ctx.config = config
     ctx.mode = mode
 
 
@@ -867,7 +881,6 @@ def _handle_activate_providers(ctx: _SyncContext) -> None:
     project_root = ctx.project_root
     config = ctx.config
     config_path = ctx.config_path
-    variables = ctx.variables
 
     mode = "activate-providers"
     provider_config = load_providers_config(agent_meta_root, config)
@@ -883,18 +896,13 @@ def _handle_activate_providers(ctx: _SyncContext) -> None:
     else:
         remaining = sorted(current - set(resolve_deactivation_targets(targets, provider_config)))
     update_deactivation_config(config_path, provider_config, remaining,
-                                config, log, args.dry_run)
-    if not args.dry_run:
-        config = load_config(config_path)
-        variables, _ = build_variables(config, agent_meta_root, project_root)
-        for prov in resolve_providers(config, provider_config):
-            sync_context_for_provider(agent_meta_root, project_root, config,
-                                      variables, log, args.dry_run,
-                                      prov, provider_config)
+                                config, log, args.dry_run, replace=True)
+    # Full regeneration after the restore so generated artifacts cannot
+    # silently diverge from a fresh sync result (issue #805).
+    _regenerate_active_providers(ctx)
     import json as _json
     print(_json.dumps(results, indent=2, ensure_ascii=False))
 
-    ctx.config = config
     ctx.mode = mode
 
 

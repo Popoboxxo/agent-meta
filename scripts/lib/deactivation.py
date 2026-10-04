@@ -167,16 +167,20 @@ def update_deactivation_config(
     config: dict,
     log: SyncLog,
     dry_run: bool = False,
+    replace: bool = False,
 ) -> None:
     """Write (or update) the provider-deactivation block in project.yaml.
 
-    Sets mode to 'selective' and adds the deactivated providers to the list.
-    When deactivated_providers is empty, sets enabled: false so all providers
-    are active again.
+    Sets mode to 'selective'. By default (``replace=False``) the given
+    providers are *added* to the existing deactivation list; with
+    ``replace=True`` the list is replaced by exactly ``deactivated_providers``
+    (used by reactivation, which must be able to *clear* entries — issue #805).
+    When the resulting list is empty, sets enabled: false so all providers are
+    active again.
     """
     dc = config.get("provider-deactivation", {})
     current = set(dc.get("providers", []) if isinstance(dc.get("providers"), list) else [])
-    updated = current | set(deactivated_providers)
+    updated = set(deactivated_providers) if replace else current | set(deactivated_providers)
 
     if not updated:
         # No deactivated providers → disable deactivation
@@ -214,8 +218,14 @@ def zip_provider_dir(
     """Zip a provider's root directory into a timestamped backup archive.
 
     Delegates to backup.backup_provider_dir for unified archive creation.
+    The archive is written into the deactivation backup directory (not the
+    generic ``backup.dir``) and prefixed with the provider name, so
+    ``activate_providers`` finds it again on reactivation (issue #805).
     """
-    return _backup_single(project_root, provider, provider_config, config, log, dry_run)
+    dc = _get_deactivation_config(config)
+    backup_dir_name = dc.get("backup-dir", DEFAULT_BACKUP_DIR)
+    return _backup_single(project_root, provider, provider_config, config, log,
+                          dry_run, backup_dir_name=backup_dir_name)
 
 
 def remove_provider_dir(
@@ -348,8 +358,9 @@ def activate_providers(
         latest_backup = backups[0]
         provider_result["backup_used"] = str(latest_backup.relative_to(project_root))
         provider_result["restored"] = _restore_single(
-            project_root, provider, str(latest_backup.relative_to(project_root)),
+            project_root, provider, latest_backup.name,
             provider_config, config, log, dry_run,
+            backup_dir_name=backup_dir_name,
         )
 
         results[provider] = provider_result
