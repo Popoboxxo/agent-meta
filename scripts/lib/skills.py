@@ -215,8 +215,27 @@ def _is_ahead_of_pin(repo_dir: Path, pinned_commit: str) -> bool:
     return head.returncode == 0 and head.stdout.strip() != pinned_commit
 
 
-def ensure_skill_repo(agent_meta_root: Path, project_root: Path, repo_name: str, repo_cfg: dict, pinned_commit: str, log: SyncLog) -> None:
-    """Dynamically clone or submodule add a skill repository if it doesn't exist."""
+def ensure_skill_repo(
+    agent_meta_root: Path,
+    project_root: Path,
+    repo_name: str,
+    repo_cfg: dict,
+    pinned_commit: str,
+    log: SyncLog,
+    dry_run: bool = False,
+) -> None:
+    """Dynamically clone or submodule add a skill repository if it doesn't exist.
+
+    ``dry_run`` is the missing F05 guard (issue #803): this helper mutates the
+    working tree (``git submodule add`` / ``git clone`` / ``git checkout`` on the
+    skill repo HEAD), so it must refuse to run whenever the caller is in
+    dry-run — exactly like ``write_checked``. Previously the safety depended
+    solely on the caller's ``if not dry_run:`` at the dispatch site; a caller
+    that forgot the guard (or a refactor that dropped it) silently created
+    ``.gitmodules`` and populated ``external/<repo>`` during a dry run.
+    """
+    if dry_run:
+        return
     import shutil
     repo_url = repo_cfg.get("repo", "")
     if not repo_url:
@@ -416,7 +435,8 @@ def sync_external_skills_for_provider(
     if not dry_run:
         for repo_name, pinned_commit in active_repos.items():
             if repo_name and repo_name in repos:
-                ensure_skill_repo(agent_meta_root, project_root, repo_name, repos[repo_name], pinned_commit, log)
+                ensure_skill_repo(agent_meta_root, project_root, repo_name, repos[repo_name],
+                                  pinned_commit, log, dry_run=dry_run)
 
     wrapper_path = agent_meta_root / AGENTS_DIR / EXTERNAL_DIR / SKILL_WRAPPER
     if not wrapper_path.exists():
@@ -579,7 +599,9 @@ def sync_external_skills_for_provider(
             deinit_skill_repo(agent_meta_root, project_root, local_path, log, dry_run, is_submodule=is_project_admin)
 
     # awesome-claude-code is a reference-data repo (no skill entries), only needed by agent-meta-scout
-    if "awesome-claude-code" in repos and (not acc_cfg.get("enabled", True) or "agent-meta-scout" not in roles):
+    if not dry_run and "awesome-claude-code" in repos and (
+        not acc_cfg.get("enabled", True) or "agent-meta-scout" not in roles
+    ):
         acc_local = acc_cfg.get("local_path", "external/awesome-claude-code")
         deinit_skill_repo(agent_meta_root, project_root, acc_local, log, dry_run, is_submodule=is_project_admin)
 
