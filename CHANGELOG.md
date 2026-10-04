@@ -105,6 +105,17 @@
   `developer`, `data-engineer`, `sre-engineer`, `feedback` and `control-framework-assessor` now
   declare the new contracts as inputs so no handoff is silent.
 
+### Fixed
+- **Guard hook rejects a leading UTF-8 BOM in a commit message (#842)**: the
+  `orchestrator-guard` tokenizer now emits a third word (`message` | `file` | `none`) and
+  `hooks/1-generic/orchestrator-guard-impl.sh` blocks `git commit -m`/`-F` whose subject starts
+  at byte 0 with `EF BB BF` (exit 2) — even with a `git` sentinel and before the strict-mode
+  early exit. Rejected, not stripped: the hook only sees the Bash command string. The gate is
+  scoped to `commit` and only matches a BOM at the very start of the message or message file.
+  Detection also covers ANSI-C quoting (`-m $'\uFEFF…'` / `$'\xEF\xBB\xBF…'`), combined
+  short-option clusters (`-am`, `-aF`) and glued short forms (`-m<msg>`, `-am<msg>`, `-aF<file>`),
+  while a normal message that merely starts with a literal `$` is not a false positive.
+
 ## [2.0.0-beta.1] - 2026-10-03
 
 ### Added

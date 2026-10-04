@@ -157,6 +157,11 @@ def render_auto_commit_block(resolved: dict) -> str:
         )
 
     lines.append(
+        "Ensure the commit message has no leading UTF-8 BOM — the subject "
+        "must start at byte 0 with the Conventional-Commit type (issue #842); "
+        "the guard hook rejects a BOM-prefixed commit."
+    )
+    lines.append(
         "This commit authority never extends to pushing, tagging, or "
         "branch management -- those remain exclusively the `git` role's "
         "job."

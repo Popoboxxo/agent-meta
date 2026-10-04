@@ -861,6 +861,212 @@ def test_git_sentinel_keeps_full_mutation_scope(tmp_path):
     assert result.returncode == 0, f"stderr={result.stderr}"
 
 
+# --- issue #842: reject a leading UTF-8 BOM in the commit subject ---------
+# A BOM (EF BB BF) in front of the subject breaks Conventional-Commit
+# tooling and line-based hooks: the subject must start at byte 0 with the
+# type. The gate lives between the tokenizer and the strict-mode sentinel
+# exit, so neither a `git` sentinel nor strict mode can bypass it. Only a
+# BOM at the very START of a -m/--message value or -F/--file file counts;
+# a BOM used as a zero-width space mid-subject must not false-positive.
+
+_BOM = "\ufeff"
+
+
+def test_leading_bom_via_message_flag_blocked_with_git_sentinel(tmp_path):
+    command = f"#agent-meta:agent=git\ngit commit -m '{_BOM}feat: x'"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+    assert "BOM" in result.stderr
+
+
+def test_leading_bom_blocked_before_strict_mode_sentinel(tmp_path):
+    # Issue #842: the BOM gate must fire even when the caller would otherwise
+    # take the strict-mode sentinel's `exit 0` shortcut (cwd = repo root with
+    # orchestrator.strict: true, valid `git` sentinel). If the gate were
+    # placed after that early exit this command would exit 0 instead.
+    command = f"#agent-meta:agent=git\ngit commit -m '{_BOM}feat: x'"
+    result = _run_hook({**_bash_payload(command), "cwd": _REPO_ROOT.as_posix()})
+    assert result.returncode == 2, (
+        f"BOM must be rejected before the strict-mode sentinel exit 0\n"
+        f"stdout: {result.stdout}\nstderr: {result.stderr}"
+    )
+    assert "BOM" in result.stderr
+
+
+def test_leading_bom_via_message_equals_form_blocked(tmp_path):
+    command = f"#agent-meta:agent=git\ngit commit --message='{_BOM}feat: x'"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+    assert "BOM" in result.stderr
+
+
+def test_leading_bom_not_blocked_for_non_bash_tool(tmp_path):
+    # Defense-in-depth: the gate is scoped to Bash, like every other gate.
+    payload = {
+        "tool_name": "Edit",
+        "tool_input": {"file_path": "foo.txt", "old_string": "a", "new_string": "b"},
+        "cwd": tmp_path.as_posix(),
+    }
+    result = _run_hook(payload)
+    assert result.returncode == 0, f"stderr={result.stderr}"
+
+
+def test_leading_bom_via_file_flag_blocked(tmp_path):
+    msg = tmp_path / "msg.txt"
+    msg.write_bytes(b"\xef\xbb\xbffeat: x\n")
+    command = f"#agent-meta:agent=git\ngit commit -F {msg.as_posix()}"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+    assert "BOM" in result.stderr
+
+
+def test_leading_bom_via_relative_file_flag_resolved_against_cwd(tmp_path):
+    # -F with a relative path is resolved against the payload cwd
+    # (PROJECT_ROOT), not the process cwd.
+    (tmp_path / "msg.txt").write_bytes(b"\xef\xbb\xbffeat: x\n")
+    command = "#agent-meta:agent=git\ngit commit -F msg.txt"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+    assert "BOM" in result.stderr
+
+
+def test_leading_bom_via_file_equals_form_blocked(tmp_path):
+    msg = tmp_path / "msg.txt"
+    msg.write_bytes(b"\xef\xbb\xbffeat: x\n")
+    command = f"#agent-meta:agent=git\ngit commit --file={msg.as_posix()}"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+    assert "BOM" in result.stderr
+
+
+def test_clean_message_not_blocked(tmp_path):
+    command = "#agent-meta:agent=git\ngit commit -m 'feat: x'"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 0, f"stderr={result.stderr}"
+    assert result.stderr == ""
+
+
+def test_clean_file_not_blocked(tmp_path):
+    msg = tmp_path / "msg.txt"
+    msg.write_bytes(b"feat: x\n")
+    command = f"#agent-meta:agent=git\ngit commit -F {msg.as_posix()}"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 0, f"stderr={result.stderr}"
+
+
+def test_missing_file_flag_not_bom_blocked(tmp_path):
+    # A missing -F file has no bytes to inspect -> no BOM signal; the guard
+    # must leave it to git (which will report the missing file itself).
+    missing = tmp_path / "does-not-exist.txt"
+    command = f"#agent-meta:agent=git\ngit commit -F {missing.as_posix()}"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 0, f"stderr={result.stderr}"
+
+
+def test_bom_not_at_message_start_not_blocked(tmp_path):
+    # A BOM used as a zero-width space inside the subject/body is not a
+    # leading BOM and must not false-positive.
+    command = f"#agent-meta:agent=git\ngit commit -m 'feat: mention {_BOM} here'"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 0, (
+        f"a BOM mid-message must not be rejected\nstderr: {result.stderr}"
+    )
+
+
+def test_bom_in_non_commit_subcommand_not_blocked(tmp_path):
+    # Only `commit` can carry a message/BOM; a BOM-shaped argument to another
+    # subcommand must not trip the gate.
+    command = f"#agent-meta:agent=git\ngit branch {_BOM}weird-name"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 0, f"stderr={result.stderr}"
+
+
+# --- issue #842 follow-ups: ANSI-C quoting (G1) + short-option clusters (G2)
+
+
+def test_leading_bom_via_ansi_c_unicode_escape_blocked(tmp_path):
+    # G1: `git commit -m $'\uFEFFfeat: x'` -- the shell expands ANSI-C quoting
+    # to a real BOM BEFORE git sees it, so git receives a BOM subject. shlex
+    # strips the single quotes and leaves a leading '$' + the escape text, so
+    # the raw prefix check alone missed it.
+    command = "#agent-meta:agent=git\ngit commit -m $'\\uFEFFfeat: x'"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+    assert "BOM" in result.stderr
+
+
+def test_leading_bom_via_ansi_c_hex_escape_blocked(tmp_path):
+    # G1: the byte-explicit ANSI-C spelling $'\xEF\xBB\xBF...'.
+    command = "#agent-meta:agent=git\ngit commit -m $'\\xEF\\xBB\\xBFfeat: x'"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+    assert "BOM" in result.stderr
+
+
+def test_leading_bom_via_short_option_cluster_blocked(tmp_path):
+    # G2: `git commit -am '<BOM>feat: x'` -- the message option is the last
+    # character of a combined short-option cluster, the value is the next token.
+    command = f"#agent-meta:agent=git\ngit commit -am '{_BOM}feat: x'"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+    assert "BOM" in result.stderr
+
+
+def test_leading_bom_via_short_option_cluster_ansi_c_blocked(tmp_path):
+    # G1 + G2 combined: cluster option with an ANSI-C quoted BOM value.
+    command = "#agent-meta:agent=git\ngit commit -am $'\\uFEFFfeat: x'"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+    assert "BOM" in result.stderr
+
+
+def test_leading_bom_via_glued_short_message_blocked(tmp_path):
+    # G2: value glued to the short option (`-m<msg>`).
+    command = f"#agent-meta:agent=git\ngit commit -m'{_BOM}feat: x'"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+    assert "BOM" in result.stderr
+
+
+def test_leading_bom_via_glued_cluster_message_blocked(tmp_path):
+    # G2: value glued to the cluster's trailing message option (`-am<msg>`).
+    command = f"#agent-meta:agent=git\ngit commit -am'{_BOM}feat: x'"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+    assert "BOM" in result.stderr
+
+
+def test_leading_bom_via_cluster_file_option_blocked(tmp_path):
+    # G2 for -F: `git commit -aF <file>` and glued `-aF<file>`.
+    msg = tmp_path / "msg.txt"
+    msg.write_bytes(b"\xef\xbb\xbffeat: x\n")
+    command = f"#agent-meta:agent=git\ngit commit -aF {msg.as_posix()}"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+    assert "BOM" in result.stderr
+    glued = f"#agent-meta:agent=git\ngit commit -aF{msg.as_posix()}"
+    result = _run_hook({**_bash_payload(glued), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+
+
+def test_dollar_prefixed_message_is_not_false_positive(tmp_path):
+    # Guard (G1): a normal message that merely STARTS with a literal '$' has no
+    # backslash after it, so it is not ANSI-C quoting and must be allowed.
+    for msg in ("$5 cost", "$HOME/x"):
+        command = f"#agent-meta:agent=git\ngit commit -m '{msg}'"
+        result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+        assert result.returncode == 0, (
+            f"msg={msg!r} must not be treated as a leading BOM; stderr={result.stderr}"
+        )
+
+
+def test_ansi_c_quoted_message_without_bom_is_not_false_positive(tmp_path):
+    # Guard (G1): ANSI-C quoting that does NOT start with a BOM must pass.
+    command = "#agent-meta:agent=git\ngit commit -m $'feat: x'"
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 0, f"stderr={result.stderr}"
+
+
 # --- issue #694 follow-up: bare '&' is a statement separator -------------
 # statements() used to split only on '&&'/'||'/';'/'|'/newline, so
 # "git add x & git push" was ONE statement -- and since the token loop

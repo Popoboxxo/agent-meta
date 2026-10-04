@@ -1,5 +1,5 @@
 #!/bin/bash
-# version: 1.3.0
+# version: 1.4.1
 # Real orchestrator-guard logic. NOT a standalone hook — invoked by
 # orchestrator-guard.sh (thin self-health wrapper, issue #630), which pipes
 # the PreToolUse JSON payload to this script's stdin after syntax-checking
@@ -250,22 +250,28 @@ fi
 # mutation gate (further down) applies only in non-strict mode for non-git
 # callers. Classifying once, with the same tokenizer, keeps the two gates
 # consistent and fixes the raw-regex gaps #590/#591/#602 (see header note).
-# The scan prints exactly two words: '<category> <scope>', where category is
-# 'destructive', 'mutation' or 'none' ('destructive' takes precedence when a
-# statement is both) and scope is 'broad' or 'narrow'. Scope only qualifies a
+# The scan prints exactly three words: '<category> <scope> <bom>', where
+# category is 'destructive', 'mutation' or 'none' ('destructive' takes
+# precedence when a statement is both), scope is 'broad' or 'narrow', and
+# bom is 'message' | 'file' | 'none' (issue #842: a leading UTF-8 BOM in a
+# commit message; the detector also covers ANSI-C quoting -- -m $'\uFEFF...' --
+# and combined short-option clusters/glued forms like -am/-mMSG). Scope only
+# qualifies a
 # 'mutation': 'narrow' means every git mutation found is `add` or a
 # non-amending `commit`, 'broad' means at least one other mutation is present
 # (push/rm/merge/rebase/reset/restore/tag/branch/checkout/stash, or
 # `commit --amend`, which rewrites history). The allowlist sentinel
 # (issue #694) may only pass 'narrow'. On any Python error it falls back to
-# 'none narrow' (fail-open, matching the prior gates).
+# 'none narrow none' (fail-open, matching the prior gates).
 _GIT_SCAN="none"
 _GIT_SCAN_SCOPE="narrow"
+_GIT_BOM="none"
 if [ "$TOOL_NAME" = "Bash" ]; then
   _GIT_SCAN_RAW=$(printf '%s' "$BASH_CMD" | "$_PY" -c "
-import re, shlex, sys
+import os, re, shlex, sys
 
 command = sys.stdin.read()
+root = sys.argv[1] if len(sys.argv) > 1 else '.'
 
 MUTATING = {
     'commit', 'push', 'add', 'rm', 'merge', 'rebase', 'reset', 'restore',
@@ -449,9 +455,123 @@ def is_addcommit_scope(subcmd, args):
         return False
     return True
 
+def ansi_c_decode(s):
+    # Decode a shell ANSI-C (dollar-single-quote) quoted value. shlex strips
+    # the surrounding single quotes, so the token arrives as a leading dollar
+    # sign followed by the raw escape text (backslash-u-F-E-F-F then the
+    # message, or backslash-x-E-F...). bytes(...).decode('unicode_escape')
+    # turns the backslash escapes into real characters. This source lives
+    # inside a double-quoted -c string, so it deliberately stays free of shell
+    # metacharacters (no dollar sign, backtick or brace expansion).
+    try:
+        return s.encode('latin-1', 'backslashreplace').decode('unicode_escape')
+    except Exception:
+        return s
+
+
+DOLLAR = chr(36)
+
+
+def message_starts_with_bom(msg):
+    # A leading UTF-8 BOM decodes to U+FEFF at the very start of the string
+    # (issue #842). Only the START matters -- a BOM used as a zero-width
+    # space inside the subject/body must not false-positive.
+    if not msg:
+        return False
+    if msg[0] == '\ufeff':
+        return True
+    # ANSI-C quoting bypass (issue #842, G1): an ANSI-C quoted message with a
+    # leading BOM reaches the hook as a leading dollar sign then the escape
+    # text, because shlex strips the quotes. A NORMAL message starting with a
+    # literal dollar sign must still pass, so only treat the leading dollar
+    # sign as ANSI-C when the shell would: the next character must be a
+    # backslash (an escape). A plain dollar amount has no backslash -> allowed.
+    if msg[0] == DOLLAR and len(msg) > 1 and msg[1] == '\\\\':
+        decoded = ansi_c_decode(msg[1:])
+        if decoded[:1] == '\ufeff' or decoded[:3] == '\xef\xbb\xbf':
+            return True
+    return False
+
+
+def file_starts_with_bom(path):
+    # Read the first three bytes and compare to the raw UTF-8 BOM. A BOM
+    # embedded anywhere later in the file is irrelevant (only the subject at
+    # byte 0 matters). Missing/unreadable file -> no signal (allow; git
+    # itself will report the missing file).
+    if not os.path.isabs(path):
+        path = os.path.join(root, path)
+    try:
+        with open(path, 'rb') as f:
+            return f.read(3) == b'\xef\xbb\xbf'
+    except OSError:
+        return False
+
+
+def short_cluster_value(args, tok):
+    # G2 (issue #842): a short-option cluster like '-am' or '-aF' may end in a
+    # value-taking short option. git's own grammar: 'm' takes a message (next
+    # token when it is the cluster's last char), 'F' takes a file. If the value
+    # is glued to the cluster ('-amMSG' / '-aFfile'), the remainder is the
+    # value. Return (kind, value) or (None, None) when the cluster holds no
+    # m/F. Only single-dash clusters (not '--long') are considered.
+    if not tok.startswith('-') or tok.startswith('--') or tok == '-':
+        return None, None
+    body = tok[1:]
+    for pos, ch in enumerate(body):
+        if ch == 'm':
+            rest = body[pos + 1:]
+            if rest:
+                return 'message', rest
+            if len(args) > 1:
+                return 'message', args[1]
+            return None, None
+        if ch == 'F':
+            rest = body[pos + 1:]
+            if rest:
+                return 'file', rest
+            if len(args) > 1:
+                return 'file', args[1]
+            return None, None
+    return None, None
+
+
+def commit_message_bom(args):
+    # 'message' when a -m/--message value starts with a BOM, 'file' when a
+    # -F/--file file whose first three bytes are the UTF-8 BOM, else 'none'.
+    # Recognized spellings: '-m VALUE', '--message VALUE', '--message=VALUE',
+    # '-mGLUED', and short-option clusters containing m/F ('-am VALUE',
+    # '-aFfile VALUE' -- the value is the next token only when m/F is the
+    # cluster's last character, matching git's short-option grammar; anything
+    # glued after m/F is that option's value). -m/-F may repeat; any
+    # BOM-bearing source counts.
+    for idx, tok in enumerate(args):
+        value = None
+        kind = None
+        for flag, fkind in (('-m', 'message'), ('--message', 'message'),
+                            ('-F', 'file'), ('--file', 'file')):
+            if tok == flag:
+                if idx + 1 < len(args):
+                    value, kind = args[idx + 1], fkind
+                break
+            if tok.startswith(flag + '='):
+                value, kind = tok[len(flag) + 1:], fkind
+                break
+        if value is None and (tok.startswith('-') and not tok.startswith('--')):
+            kind, value = short_cluster_value(args[idx:], tok)
+        if value is None:
+            continue
+        if kind == 'message':
+            if message_starts_with_bom(value):
+                return 'message'
+        elif file_starts_with_bom(value):
+            return 'file'
+    return 'none'
+
+
 destructive = False
 mutation = False
 mutation_scope_broad = False
+bom = 'none'
 for stmt in statements(command):
     toks = tokens_of(stmt)
     for i, tok in enumerate(toks):
@@ -464,18 +584,39 @@ for stmt in statements(command):
             mutation = True
             if not is_addcommit_scope(subcmd, args):
                 mutation_scope_broad = True
+        if subcmd == 'commit' and bom == 'none':
+            bom = commit_message_bom(args)
         break
     if destructive:
         break
 
 category = 'destructive' if destructive else ('mutation' if mutation else 'none')
 scope = 'broad' if mutation_scope_broad else 'narrow'
-print(f'{category} {scope}')
-" 2>/dev/null || echo "none narrow")
+print(f'{category} {scope} {bom}')
+" "$PROJECT_ROOT" 2>/dev/null || echo "none narrow none")
   _GIT_SCAN=$(printf '%s' "$_GIT_SCAN_RAW" | awk '{print $1}')
   _GIT_SCAN_SCOPE=$(printf '%s' "$_GIT_SCAN_RAW" | awk '{print $2}')
+  _GIT_BOM=$(printf '%s' "$_GIT_SCAN_RAW" | awk '{print $3}')
   [ -n "$_GIT_SCAN" ] || _GIT_SCAN="none"
   [ -n "$_GIT_SCAN_SCOPE" ] || _GIT_SCAN_SCOPE="narrow"
+  [ -n "$_GIT_BOM" ] || _GIT_BOM="none"
+  case "$_GIT_BOM" in
+    message|file|none) ;;
+    *) _GIT_BOM="none" ;;
+  esac
+fi
+
+# --- Leading-BOM gate: applies regardless of sentinel (issue #842) -----
+# A leading UTF-8 BOM (EF BB BF) in the commit subject breaks Conventional-
+# Commit tooling and line-based hooks. The subject must start at byte 0 with
+# the type. Placed BETWEEN the tokenizer and the strict-mode sentinel exit 0
+# below on purpose, so neither a `git`/allowlist sentinel nor strict mode can
+# bypass it. Reject (exit 2) rather than strip: the hook only sees the Bash
+# command string, and rewriting it would be error-prone.
+if [ "$TOOL_NAME" = "Bash" ] && [ "$_GIT_BOM" != "none" ]; then
+  echo "ORCHESTRATOR_GUARD: commit message starts with a UTF-8 BOM (EF BB BF); the subject must start at byte 0 with the Conventional-Commit type (issue #842)." >&2
+  echo "Detected BOM in commit $_GIT_BOM. Strip the BOM and retry." >&2
+  exit 2
 fi
 
 # --- Destructive-operation gate: applies regardless of sentinel --------
