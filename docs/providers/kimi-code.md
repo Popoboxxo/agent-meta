@@ -96,9 +96,9 @@ frontmatter opt-in. Permission inheritance from the main agent.
 
 Kimi Code reads `{"mcpServers": {...}}` from `.kimi-code/mcp.json` (user level:
 `~/.kimi-code/mcp.json`; project overrides user on name collision). agent-meta
-**reuses the wire-identical `mcpServers` JSON format** of the existing
-`claude-settings` branch (`format: claude-settings`, V13 — reuse beats a new
-format branch).
+uses its **dedicated `kimi-json` format branch**, which emits the same
+`mcpServers` wire shape as the other settings formats plus the
+`transport: "sse"` discriminator Kimi Code needs for remote SSE servers.
 
 - Transports: **stdio** (`command`/`args`/`env`/`cwd`), **HTTP** (`url`),
   **SSE** (`transport: "sse"`).
@@ -106,6 +106,16 @@ format branch).
   `startupTimeoutMs`, `toolTimeoutMs`, `enabledTools`/`disabledTools`.
 - **No separate secrets file** — Kimi-native env indirection via
   `bearerTokenEnvVar` + `env` map.
+- **Inline `${VAR}` expansion is UNVERIFIED (issue #843 F7 / AC-8)**. Because
+  there is no secrets file, the committed `.kimi-code/mcp.json` is emitted with
+  literal `${VAR}` references in `url`, `headers` and `env` values. Whether Kimi
+  Code expands inline `${VAR}` in `mcp.json` could not be verified from this
+  repository, so a sync **flags** each affected server with a warning
+  (format-keyed on `kimi-json`, never provider-name keyed). To resolve it,
+  either (a) validate the generated file manually against your Kimi Code
+  version, or (b) reference secrets through the Kimi-native `bearerTokenEnvVar`
+  + `env` indirection above. The warning adds no action, so `--check` stays
+  rc 0, and the emitted JSON shape is unchanged.
 - Kimi shows a trust prompt for project-level MCP in untrusted folders.
 
 ---

@@ -685,6 +685,50 @@ def generate_provider_configs(
         )
 
 
+_ENV_VAR_REF_RE = re.compile(r"\$\{[A-Z0-9_]+\}")
+
+
+def _warn_kimi_unresolved_env_refs(
+    path: Path,
+    mcp_entries: dict,
+    fmt: str,
+    log: SyncLog,
+) -> None:
+    """AC-8 / issue #843 F7: flag inline ``${VAR}`` env references for KimiCode.
+
+    The KimiCode (``kimi-json``) committed config emits ``${VAR}`` references
+    because it has no secrets-file indirection (see its registry
+    ``mcp-config``). Whether Kimi Code expands inline ``${VAR}`` in
+    ``mcp.json`` could not be verified from this repo, so AC-8 ("verified
+    working or flagged for manual validation") is satisfied by flagging: the
+    emitted JSON shape is left byte-identical, and this function emits one
+    explicit, actionable warning per affected server naming the file.
+
+    The check is format-keyed (``fmt == "kimi-json"``), never provider-name
+    keyed (H-1 / AC-14/AC-23). It uses ``log.warn`` only — it never calls
+    ``log.action``, so ``--check`` (which counts actions as "would write")
+    stays rc 0. A fully resolved entries map (secrets provided) contains no
+    ``${VAR}`` and therefore warns nothing; repeated calls are idempotent
+    because :meth:`SyncLog.warn` deduplicates identical messages. Nothing is
+    written or mutated.
+    """
+    if fmt != "kimi-json":
+        return
+    rel = _config_rel_label(path)
+    for server_name, entry in mcp_entries.items():
+        if not _ENV_VAR_REF_RE.search(
+            json.dumps(entry, ensure_ascii=False, default=str)
+        ):
+            continue
+        log.warn(
+            f"mcp: '{rel}' server '{server_name}' uses inline '${{VAR}}' env "
+            "references, but KimiCode's inline env-var expansion is UNVERIFIED — "
+            "validate the generated config manually, or use the Kimi-native "
+            "'bearerTokenEnvVar' + 'env' indirection instead. "
+            "See docs/providers/kimi-code.md §MCP."
+        )
+
+
 def _write_provider_config(
     path: Path,
     mcp_entries: dict,
@@ -703,6 +747,7 @@ def _write_provider_config(
     ``mcp`` key. The v2 split lives in the ``opencode-json-v2`` value, which
     writes the nested ``mcp.servers`` shape.
     """
+    _warn_kimi_unresolved_env_refs(path, mcp_entries, fmt, log)
     if fmt in ("claude-settings", "gemini-settings", "antigravity-mcp-json", "kimi-json"):
         _update_json_config(path, "mcpServers", mcp_entries, log, dry_run, allow_secrets, config=config,
                              verify_gitignored=verify_gitignored)
