@@ -38,13 +38,14 @@ allow-committed-secrets: false
 #  tests/scenarios/asserts/19-auto-commit-suggest.sh)
 # =====================================================================
 # 1. Allowlist (.meta-config/auto-commit-allowlist.json):
-#    mode "suggest"; eligible_roles ["developer", "orchestrator", "tester"]
-#    (capability-abgeleitet: nur Rollen, deren EIGENE
-#    agents/1-generic/<role>.md tools:-Frontmatter Edit oder Write
-#    deklariert — scripts/lib/auto_commit.py::_ELIGIBLE_TOOLS; git
-#    (Bash/Read/Glob/Grep/TodoWrite) und explorer (Read/Glob/Grep/
-#    TodoWrite) haben weder Edit noch Write -> fliegen raus);
-#    secret_scan true; triggers [].
+#    mode "suggest"; eligible_roles ["developer", "tester"]
+#    (direct-only, issue #767: nur Rollen mit Bash UND Edit/Write im EIGENEN
+#    agents/1-generic/<role>.md tools:-Frontmatter — developer/tester haben
+#    Bash+Write, der orchestrator (Agent+Write, kein Bash) ist delegate-only,
+#    git (Bash, kein Edit/Write) und explorer (Read/Glob/Grep/TodoWrite)
+#    fallen raus); secret_scan true; triggers [].
+# 1b. Der orchestrator (delegate) erhält in suggest-mode denselben
+#    authority-agnostischen propose-only-Block wie developer.
 # 2. AUTO_COMMIT_BLOCK gerendert in .claude/agents/developer.md und
 #    .gemini/agents/developer.md mit Propose-nicht-Pause-Prosa
 #    ("propose a ready-to-use commit message", "do NOT run `git commit`

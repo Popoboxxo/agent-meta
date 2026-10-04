@@ -35,7 +35,11 @@ def test_allowlist_written_when_auto_commit_enabled(tmp_path):
     assert allowlist_path.exists()
     data = json.loads(allowlist_path.read_text(encoding="utf-8"))
     assert data["mode"] == "auto"
+    # issue #767: eligible_roles is direct-only (Bash + Edit/Write); the
+    # orchestrator is delegate-only and must not appear.
+    assert data["eligible_roles"] == ["developer"]
     assert "developer" in data["eligible_roles"]
+    assert "orchestrator" not in data["eligible_roles"]
     assert "git" not in data["eligible_roles"]
 
 
@@ -54,7 +58,7 @@ def test_allowlist_reflects_mode_off_when_unconfigured(tmp_path):
     assert allowlist_path.exists()
     data = json.loads(allowlist_path.read_text(encoding="utf-8"))
     assert data["mode"] == "off"
-    # eligible_roles is capability data (independent of mode); 'off' still
-    # withholds actual commit authority via the guard hook's mode gate.
+    assert data["eligible_roles"] == ["developer"]
     assert "developer" in data["eligible_roles"]
+    assert "orchestrator" not in data["eligible_roles"]
     assert "git" not in data["eligible_roles"]

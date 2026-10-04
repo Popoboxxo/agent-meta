@@ -8,14 +8,14 @@
 #
 # Verified expectations -- derived from the framework code, not guessed:
 #   Allowlist (scripts/lib/auto_commit.py::resolve_auto_commit_config):
-#     eligible_roles is capability-derived and MODE-INDEPENDENT: it lists
-#     every active role whose own agents/1-generic/<role>.md tools:
-#     frontmatter contains Edit or Write (_ELIGIBLE_TOOLS). Mode "off"
+#     eligible_roles lists only active roles with DIRECT commit capability
+#     (Bash AND Edit/Write, issue #767). It is MODE-INDEPENDENT: mode "off"
 #     does NOT empty it -- off suppresses rendered behavior (empty
 #     AUTO_COMMIT_BLOCK / no commit authority), not the allowlist's data.
-#     Scenario-21 roles: orchestrator (Write), developer (Write+Edit),
-#     tester (Write+Edit) -> eligible; git (no Edit/Write) -> filtered
-#     out. -> eligible_roles = ["developer", "orchestrator", "tester"].
+#     Scenario-21 roles: developer (Bash+Write+Edit) -> direct -> eligible,
+#     tester (Bash+Write+Edit) -> direct -> eligible; orchestrator (Write,
+#     no Bash) -> delegate -> filtered out, git (Bash, no Edit/Write) ->
+#     none -> filtered out. -> eligible_roles = ["developer", "tester"].
 #     The other resolved values (file_count_threshold 2, secret_scan
 #     false from the config) are recorded but inert in off mode.
 #     scripts/lib/sync_pipeline.py::_sync_stage_auto_commit_allowlist
@@ -71,10 +71,11 @@ def check(cond: bool, msg: str) -> None:
 
 check(data.get("mode") == "off", "mode must be the string 'off' "
       "(unquoted YAML `off` parses to boolean False -- scenario config quotes it)")
-check(data.get("eligible_roles") == ["developer", "orchestrator", "tester"],
-      "eligible_roles must be ['developer', 'orchestrator', 'tester'] "
-      "(capability-derived and mode-independent: off mode suppresses the "
-      "rendered AUTO_COMMIT_BLOCK, not the allowlist's eligible_roles data)")
+check(data.get("eligible_roles") == ["developer", "tester"],
+      "eligible_roles must be ['developer', 'tester'] "
+      "(direct-only and mode-independent: off mode suppresses the rendered "
+      "AUTO_COMMIT_BLOCK, not the allowlist's eligible_roles data; the "
+      "delegate-only orchestrator is excluded)")
 check(data.get("triggers") == [], "triggers must be empty")
 check(data.get("custom_script") is None, "custom_script must be null")
 # Stray values from the config must be recorded but stay inert (nothing

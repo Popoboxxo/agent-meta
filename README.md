@@ -868,10 +868,10 @@ auto_commit:
   mode: auto
   triggers: [task-boundary, file-count-threshold]
   file_count_threshold: 5
-  secret_scan: true              # default; gates every auto/custom commit
+  secret_scan: true              # default; every auto/custom commit instruction requires the scan (direct runs it; delegate/notify hand it to the committer)
 ```
 
-**Eligibility is capability-derived, not a hand-maintained list:** any role whose own template declares `Edit` or `Write` in its `tools:` frontmatter is commit-eligible — adding those tools to a role's template is enough, no separate opt-in list to keep in sync.
+**Commit authority is capability-derived, not a hand-maintained list:** each role's own `tools:` frontmatter classifies it into one of four capability classes — `direct` (Bash **and** (Edit and/or Write)) commits itself, `delegate` (Edit/Write, no Bash, but an `Agent`/`Task` tool) hands the commit to the `git` agent at each trigger boundary, `notify` (Edit/Write, no Bash, no spawn tool) only reports the changed files plus a ready-to-use Conventional-Commits message to its caller, and `none` renders nothing. The configured `secret_scan` requirement is forwarded to every write-capable authority: `direct` runs the scan itself, `delegate` requires the party performing the commit to run it, and `notify` requires the caller/orchestrator to run it before applying the reported message (`secret_scan: false` omits the `delegate`/`notify` requirement). The guard-hook allowlist (`eligible_roles`) stays **direct-only**: only roles that can run Bash themselves ever receive hook-level commit authorization.
 
 **Enforcement is two-layered:** prompt instructions render on all 9 providers; hook authorization (`orchestrator-guard-impl.sh`) additionally checks a generated `.meta-config/auto-commit-allowlist.json` on the 4 providers with PreToolUse hook support (Claude, Gemini, Mammouth, Codex).
 

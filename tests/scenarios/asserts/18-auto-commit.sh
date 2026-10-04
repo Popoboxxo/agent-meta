@@ -7,17 +7,23 @@
 # violated assertion, printed to stdout/stderr.
 #
 # Verified expectations -- derived from the framework code, not guessed:
-#   Eligibility (scripts/lib/auto_commit.py):
-#     _ELIGIBLE_TOOLS = {"Edit", "Write"}; is_role_eligible() intersects
-#     this set with the role's OWN agents/1-generic/<role>.md tools:
-#     frontmatter. Scenario-18 roles: orchestrator (Write) -> eligible,
-#     developer (Write+Edit) -> eligible, tester (Write+Edit) -> eligible,
-#     git (Bash/Read/Glob/Grep/TodoWrite) -> NOT eligible.
-#     -> eligible_roles = ["developer", "orchestrator", "tester"].
+#   Authority/eligibility (scripts/lib/auto_commit.py, issue #767):
+#     is_role_eligible() is DIRECT-only: Bash AND {Edit,Write}. Scenario-18
+#     roles: developer (Bash+Write+Edit) -> direct -> eligible, tester
+#     (Bash+Write+Edit) -> direct -> eligible, orchestrator (Agent+Write,
+#     NO Bash) -> delegate -> NOT eligible, git (Bash/Read/Glob/Grep/
+#     TodoWrite, no Edit/Write) -> none -> NOT eligible.
+#     -> eligible_roles = ["developer", "tester"].
 #   Rendering (scripts/lib/auto_commit.py::render_auto_commit_block):
-#     auto mode renders trigger prose for the CONFIGURED triggers only,
-#     plus the secret-scan line and the sentinel-prefix line. The git.md
-#     template has no {{AUTO_COMMIT_BLOCK}} slot at all (pinned by
+#     auto mode renders per-authority prose: developer (direct) -> "Commit
+#     directly as soon as ANY ..." + secret-scan + sentinel-prefix line;
+#     orchestrator (delegate) -> "delegate the commit to the `git` agent"
+#     at each trigger boundary; documenter (notify) -> changed files + a
+#     ready-to-use message for the caller/orchestrator. delegate and notify
+#     both forward the secret-scan requirement (F1, issue #767). Asserted for
+#     Claude, Gemini AND Opencode -- the root-cause provider (orchestrator has
+#     permission.bash: deny there). The git.md template has no
+#     {{AUTO_COMMIT_BLOCK}} slot at all (pinned by
 #     tests/test_auto_commit_coverage.py::test_git_template_is_not_touched).
 set -u
 
@@ -32,11 +38,14 @@ fail() {
     exit 1
 }
 
-# --- Provider marker files (expected: Claude, Gemini) ----
+# --- Provider marker files (expected: Claude, Gemini, Opencode) ----
 [ -f "CLAUDE.md" ] || fail "root provider file missing: CLAUDE.md"
 [ -d ".claude/agents" ] || fail "agent directory missing for Claude: .claude/agents"
 [ -f "AGENTS.md" ] || fail "root provider file missing: AGENTS.md"
 [ -d ".gemini/agents" ] || fail "agent directory missing for Gemini: .gemini/agents"
+# Opencode is the ROOT-CAUSE provider for issue #767 (orchestrator has
+# permission.bash: deny there) -- its rendered agents must be asserted too.
+[ -d ".opencode/agents" ] || fail "agent directory missing for Opencode: .opencode/agents"
 
 ALLOWLIST=".meta-config/auto-commit-allowlist.json"
 [ -f "$ALLOWLIST" ] || fail "allowlist file missing: $ALLOWLIST"
@@ -58,10 +67,10 @@ def check(cond: bool, msg: str) -> None:
 
 
 check(data.get("mode") == "auto", "mode must be 'auto'")
-check(data.get("eligible_roles") == ["developer", "orchestrator", "tester"],
-      "eligible_roles must be exactly ['developer', 'orchestrator', 'tester'] "
-      "(capability-derived: only roles whose own 1-generic template declares "
-      "Edit/Write; git has neither)")
+check(data.get("eligible_roles") == ["developer", "tester"],
+      "eligible_roles must be exactly ['developer', 'tester'] "
+      "(direct-only: Bash AND Edit/Write; orchestrator has Write but no Bash, "
+      "git has Bash but no Edit/Write)")
 check(data.get("triggers") == ["task-boundary", "context-pressure"],
       "triggers must be ['task-boundary', 'context-pressure']")
 check(data.get("secret_scan") is True, "secret_scan must be true")
@@ -77,7 +86,7 @@ block_of() {
          found && /^$/ { exit }' "$1"
 }
 
-for provider in .claude .gemini; do
+for provider in .claude .gemini .opencode; do
     dev="$provider/agents/developer.md"
     [ -f "$dev" ] || fail "generated file missing: $dev"
     block="$(block_of "$dev")"
@@ -88,8 +97,47 @@ for provider in .claude .gemini; do
         || fail "$dev: rendered block does not mention trigger 'context-pressure'"
 done
 
+# --- 2b. orchestrator.md renders the DELEGATE block (issue #767) --------
+for provider in .claude .gemini .opencode; do
+    orch="$provider/agents/orchestrator.md"
+    [ -f "$orch" ] || fail "generated file missing: $orch"
+    block="$(block_of "$orch")"
+    [ -n "$block" ] || fail "$orch: delegate AUTO_COMMIT_BLOCK not rendered"
+    printf '%s\n' "$block" | grep -qF "delegate the commit to the \`git\` agent" \
+        || fail "$orch: delegate block must delegate the commit to the git agent"
+    printf '%s\n' "$block" | grep -qF "trigger boundary" \
+        || fail "$orch: delegate block must name the trigger boundary"
+    printf '%s\n' "$block" | grep -qi "secret scan" \
+        || fail "$orch: delegate block must forward the secret-scan requirement"
+    if printf '%s\n' "$block" | grep -qF "Commit directly"; then
+        fail "$orch: delegate block must NOT tell the orchestrator to commit directly"
+    fi
+done
+
+# --- 2c. documenter.md renders the NOTIFY block (issue #767) ------------
+# Notify is the third write capability: no git, hand the file list + message
+# to the caller. Asserted for every provider, incl. the root-cause Opencode.
+for provider in .claude .gemini .opencode; do
+    doc="$provider/agents/documenter.md"
+    [ -f "$doc" ] || fail "generated file missing: $doc"
+    block="$(block_of "$doc")"
+    [ -n "$block" ] || fail "$doc: notify AUTO_COMMIT_BLOCK not rendered"
+    printf '%s\n' "$block" | grep -qF "ready-to-use Conventional-Commits message" \
+        || fail "$doc: notify block must carry a ready-to-use commit message"
+    printf '%s\n' "$block" | grep -qF "caller/orchestrator" \
+        || fail "$doc: notify block must route the commit to the caller/orchestrator"
+    printf '%s\n' "$block" | grep -qi "secret scan" \
+        || fail "$doc: notify block must forward the secret-scan requirement"
+    if printf '%s\n' "$block" | grep -qF "Commit directly"; then
+        fail "$doc: notify block must NOT tell the documenter to commit directly"
+    fi
+    if printf '%s\n' "$block" | grep -qi "delegate the commit"; then
+        fail "$doc: notify block must NOT contain a delegation instruction"
+    fi
+done
+
 # --- 3. git.md must stay block-free -------------------------------------
-for provider in .claude .gemini; do
+for provider in .claude .gemini .opencode; do
     gitfile="$provider/agents/git.md"
     [ -f "$gitfile" ] || fail "generated file missing: $gitfile"
     if grep -q "Commit authority (issue #694)" "$gitfile"; then

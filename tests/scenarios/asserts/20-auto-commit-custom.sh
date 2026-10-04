@@ -7,18 +7,17 @@
 # violated assertion, printed to stdout/stderr.
 #
 # Verified expectations -- derived from the framework code, not guessed:
-#   Eligibility (scripts/lib/auto_commit.py):
-#     _ELIGIBLE_TOOLS = {"Edit", "Write"}; is_role_eligible() intersects
-#     this set with the role's OWN agents/1-generic/<role>.md tools:
-#     frontmatter. Scenario-20 roles: orchestrator (Write) -> eligible,
-#     developer (Write+Edit) -> eligible, git (Bash/Read/Glob/Grep/
-#     TodoWrite) -> NOT eligible. -> eligible_roles =
-#     ["developer", "orchestrator"].
+#   Authority/eligibility (scripts/lib/auto_commit.py, issue #767):
+#     is_role_eligible() is DIRECT-only: Bash AND {Edit,Write}. Scenario-20
+#     roles: developer (Bash+Write+Edit) -> direct -> eligible, orchestrator
+#     (Agent+Write, no Bash) -> delegate -> NOT eligible, git (Bash, no
+#     Edit/Write) -> none -> NOT eligible. -> eligible_roles = ["developer"].
 #   Rendering (scripts/lib/auto_commit.py::render_auto_commit_block):
-#     custom mode renders the custom_script contract ("Commit directly
-#     whenever `<script>` exits 0"), the secret-scan line and the
-#     sentinel-prefix line, and NO trigger prose (the built-in triggers
-#     are ignored entirely in custom mode; no trigger name may appear).
+#     custom mode renders per-authority prose. developer (direct): "Commit
+#     directly whenever `<script>` exits 0", the secret-scan line and the
+#     sentinel-prefix line, and NO trigger prose (built-in triggers are
+#     ignored entirely in custom mode). orchestrator (delegate): "delegate
+#     the commit to the `git` agent" when `<script>` exits 0.
 set -u
 
 REPO_ROOT="${1:-${REPO_ROOT:-}}"
@@ -58,9 +57,10 @@ def check(cond: bool, msg: str) -> None:
 check(data.get("mode") == "custom", "mode must be 'custom'")
 check(data.get("custom_script") == "scripts/should-commit.sh",
       "custom_script must be 'scripts/should-commit.sh'")
-check(data.get("eligible_roles") == ["developer", "orchestrator"],
-      "eligible_roles must be exactly ['developer', 'orchestrator'] "
-      "(capability-derived; git has no Edit/Write in its own template)")
+check(data.get("eligible_roles") == ["developer"],
+      "eligible_roles must be exactly ['developer'] "
+      "(direct-only: Bash AND Edit/Write; orchestrator is delegate-only, "
+      "git has no Edit/Write)")
 check(data.get("triggers") == [], "triggers must be empty (built-in triggers are ignored in custom mode)")
 check(data.get("secret_scan") is True, "secret_scan must be true")
 PY
@@ -99,6 +99,19 @@ if printf '%s\n' "$block" \
     | grep -Eq "task-boundary|per-edit|context-pressure|file-count-threshold"
 then
     fail "$dev: block must NOT contain trigger prose (custom_script alone decides)"
+fi
+
+# --- 3. orchestrator.md (delegate) gets custom delegate prose -----------
+orch=".claude/agents/orchestrator.md"
+[ -f "$orch" ] || fail "generated file missing: $orch"
+orch_block="$(block_of "$orch")"
+[ -n "$orch_block" ] || fail "$orch: delegate AUTO_COMMIT_BLOCK not rendered"
+printf '%s\n' "$orch_block" | grep -qF "scripts/should-commit.sh" \
+    || fail "$orch: delegate block must name the custom_script"
+printf '%s\n' "$orch_block" | grep -qF "delegate the commit to the \`git\` agent" \
+    || fail "$orch: delegate block must delegate the commit to the git agent"
+if printf '%s\n' "$orch_block" | grep -qF "Commit directly"; then
+    fail "$orch: delegate block must NOT tell the orchestrator to commit directly"
 fi
 
 echo "ASSERT OK (20-auto-commit-custom): allowlist shape + custom-script block verified"

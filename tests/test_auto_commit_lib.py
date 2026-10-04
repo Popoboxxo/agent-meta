@@ -1,6 +1,8 @@
-"""scripts/lib/auto_commit.py: role-eligibility derivation and allowlist
-shape (issue #694). Eligibility is capability-derived from each role's
-OWN template frontmatter tools: list -- never a hand-maintained list."""
+"""scripts/lib/auto_commit.py: role commit-authority classification,
+eligibility derivation and allowlist shape (issue #694, #767).
+
+Authority is derived from each role's OWN template frontmatter tools: list --
+never a hand-maintained list."""
 
 from __future__ import annotations
 
@@ -9,42 +11,88 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
-from lib.auto_commit import is_role_eligible, resolve_auto_commit_config  # noqa: E402
-from lib.config import load_config  # noqa: E402
+from lib.auto_commit import (
+    is_role_eligible,
+    resolve_auto_commit_config,
+    role_commit_authority,
+)
+from lib.config import load_config
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
+# --- issue #767: authority classification (AC2) -------------------------
+
+def test_direct_authority_roles():
+    for role in ("developer", "tester", "se-developer"):
+        assert role_commit_authority(role, _REPO_ROOT) == "direct", role
+
+
+def test_orchestrator_is_delegate():
+    assert role_commit_authority("orchestrator", _REPO_ROOT) == "delegate"
+
+
+def test_notify_authority_roles():
+    for role in (
+        "documenter",
+        "copyeditor",
+        "technical-writer",
+        "concept-architect",
+        "concept-specifier",
+    ):
+        assert role_commit_authority(role, _REPO_ROOT) == "notify", role
+
+
+def test_none_authority_roles():
+    for role in ("explorer", "git"):
+        assert role_commit_authority(role, _REPO_ROOT) == "none", role
+
+
+def test_authority_accepts_platform_none():
+    assert role_commit_authority("developer", _REPO_ROOT, platform=None) == "direct"
+
+
+# --- is_role_eligible is direct-only (AC1) ------------------------------
+
 def test_developer_is_eligible():
-    # agents/1-generic/developer.md tools: includes Write and Edit.
     assert is_role_eligible("developer", _REPO_ROOT) is True
 
 
+def test_tester_is_eligible():
+    assert is_role_eligible("tester", _REPO_ROOT) is True
+
+
 def test_git_is_not_eligible():
-    # agents/1-generic/git.md tools: is Bash/Read/Glob/Grep/TodoWrite only --
-    # no Edit/Write. It doesn't need this mechanism, it already has full
-    # commit authority via its own dedicated sentinel.
+    # Bash but no Edit/Write -> "none", even though it has full commit authority.
     assert is_role_eligible("git", _REPO_ROOT) is False
 
 
 def test_explorer_is_not_eligible():
-    # Read-only role -- must never become commit-eligible even if listed
-    # as an active role.
     assert is_role_eligible("explorer", _REPO_ROOT) is False
 
 
+def test_write_without_bash_is_not_eligible():
+    # Previously eligible under the coarse Edit/Write check; must no longer be.
+    for role in (
+        "orchestrator",
+        "documenter",
+        "copyeditor",
+        "technical-writer",
+        "concept-architect",
+    ):
+        assert is_role_eligible(role, _REPO_ROOT) is False, role
+
+
 def test_resolve_config_mode_off_still_computes_eligible_roles():
-    # eligible_roles is capability data (tools: contract), independent of
-    # mode; 'off' mode grants no authority via the guard hook, but the
-    # list itself must not be silently empty just because mode is 'off'.
     result = resolve_auto_commit_config(
         config={"auto_commit": {"mode": "off"}},
         active_roles=["orchestrator", "developer", "git"],
         agent_meta_root=_REPO_ROOT,
     )
     assert result["mode"] == "off"
-    assert "developer" in result["eligible_roles"]
+    assert result["eligible_roles"] == ["developer"]
     assert "git" not in result["eligible_roles"]
+    assert "orchestrator" not in result["eligible_roles"]
 
 
 def test_resolve_config_auto_mode_lists_only_eligible_active_roles():
@@ -54,9 +102,7 @@ def test_resolve_config_auto_mode_lists_only_eligible_active_roles():
         agent_meta_root=_REPO_ROOT,
     )
     assert result["mode"] == "auto"
-    assert "developer" in result["eligible_roles"]
-    assert "tester" in result["eligible_roles"]
-    assert "git" not in result["eligible_roles"]  # already has its own path
+    assert result["eligible_roles"] == ["developer", "tester"]
     assert result["triggers"] == ["task-boundary"]
 
 
@@ -70,17 +116,14 @@ def test_resolve_config_defaults_secret_scan_true():
 
 
 def test_resolve_config_suggest_mode_still_computes_eligible_roles():
-    # eligible_roles reflects capability regardless of mode; 'suggest'
-    # agents only propose a commit message and never gain hook-level
-    # commit authority -- that gate lives in the guard hook (which checks
-    # mode in ('auto', 'custom')), not in this capability list.
     result = resolve_auto_commit_config(
         config={"auto_commit": {"mode": "suggest"}},
         active_roles=["orchestrator", "developer", "git", "tester"],
         agent_meta_root=_REPO_ROOT,
     )
     assert result["mode"] == "suggest"
-    assert result["eligible_roles"] == ["developer", "orchestrator", "tester"]
+    # AC3: direct-only in every mode -- orchestrator (delegate) is excluded.
+    assert result["eligible_roles"] == ["developer", "tester"]
 
 
 def test_resolve_config_custom_mode_lists_eligible_roles():
@@ -89,7 +132,7 @@ def test_resolve_config_custom_mode_lists_eligible_roles():
         active_roles=["orchestrator", "developer", "git"],
         agent_meta_root=_REPO_ROOT,
     )
-    assert "developer" in result["eligible_roles"]
+    assert result["eligible_roles"] == ["developer"]
 
 
 def test_resolve_config_missing_auto_commit_key_defaults_to_off():
@@ -99,16 +142,11 @@ def test_resolve_config_missing_auto_commit_key_defaults_to_off():
         agent_meta_root=_REPO_ROOT,
     )
     assert result["mode"] == "off"
-    assert "developer" in result["eligible_roles"]
+    assert result["eligible_roles"] == ["developer"]
     assert "git" not in result["eligible_roles"]
 
 
 def test_load_config_normalizes_unquoted_off_bool(tmp_path):
-    # Issue #699: unquoted `mode: off` parses via YAML 1.1 as the Python
-    # bool False, not the string "off" -- every downstream consumer
-    # (AUTO_COMMIT_ENABLED, resolve_auto_commit_config, the JSON allowlist
-    # the bash guard hook trusts) must see the canonical string, or auto-commit
-    # authority silently fail-opens instead of staying off.
     config_path = tmp_path / "project.yaml"
     config_path.write_text(
         "project:\n  name: t\n  prefix: t\n  short: t\n"
@@ -123,5 +161,5 @@ def test_load_config_normalizes_unquoted_off_bool(tmp_path):
         agent_meta_root=_REPO_ROOT,
     )
     assert result["mode"] == "off"
-    assert "developer" in result["eligible_roles"]
+    assert result["eligible_roles"] == ["developer"]
     assert "git" not in result["eligible_roles"]

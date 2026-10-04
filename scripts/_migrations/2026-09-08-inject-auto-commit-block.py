@@ -17,7 +17,12 @@ from pathlib import Path
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 
-from lib.auto_commit import is_role_eligible  # noqa: E402
+from lib.auto_commit import role_commit_authority  # noqa: E402
+
+# Issue #767: "write capability" is the direct|delegate|notify write set;
+# `is_role_eligible` is now direct-only, so it no longer matches this
+# migration's "every 1-generic template with Edit/Write" contract.
+_WRITE_AUTHORITIES = ("direct", "delegate", "notify")
 
 _GENERIC_DIR = _REPO_ROOT / "agents" / "1-generic"
 _EXCLUDED = {"_reference-agent", "developer"}
@@ -50,7 +55,7 @@ def main() -> int:
         role = path.stem
         if role in _EXCLUDED:
             continue
-        if not is_role_eligible(role, _REPO_ROOT):
+        if role_commit_authority(role, _REPO_ROOT) not in _WRITE_AUTHORITIES:
             continue
         content = path.read_text(encoding="utf-8")
         if "{{AUTO_COMMIT_BLOCK}}" in content:

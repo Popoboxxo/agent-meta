@@ -1312,7 +1312,12 @@ def _build_core_variables(
     variables["AUTO_COMMIT_ENABLED"] = (
         "true" if _auto_commit_resolved["mode"] != "off" else "false"
     )
+    # Global fallback rendered at the default "direct" authority, for paths
+    # outside the per-role overlay (e.g. standalone/skill rendering). The
+    # role-aware values are resolved later in agent_sync.sync_agents_for_provider
+    # from `_AUTO_COMMIT_RESOLVED` (issue #767).
     variables["AUTO_COMMIT_BLOCK"] = render_auto_commit_block(_auto_commit_resolved)
+    variables["_AUTO_COMMIT_RESOLVED"] = _auto_commit_resolved
     # PROJECT_GOAL: fall back to the project description when not set explicitly
     if not variables.get("PROJECT_GOAL") and variables.get("PROJECT_DESCRIPTION"):
         variables["PROJECT_GOAL"] = variables["PROJECT_DESCRIPTION"]
