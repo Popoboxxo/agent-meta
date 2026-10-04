@@ -21,6 +21,7 @@ lazy imports inside function bodies preserved as-is).
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -356,38 +357,69 @@ def _run_test_plugin(agent_meta_root: Path, project_root: Path, plugin_id: str) 
     return 0 if res["status"] == "PASS" else 1
 
 
+_HUNK_HEADER_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
+
+
+def _iter_added_lines(diff_text: str):
+    """Yield ``(path, new_lineno, line)`` for every added line in a diff.
+
+    Parses ``git diff -U0`` output. ``new_lineno`` is the 1-based line number
+    in the new file and is reseeded from every ``@@ ... +c ... @@`` hunk header
+    (issue #831: the counter previously leaked across hunks, so findings in the
+    2nd+ hunk were reported with a stale line number).
+    """
+    current_path: str | None = None
+    new_lineno = 0
+    for raw in diff_text.splitlines():
+        if raw.startswith("diff --git "):
+            current_path = None
+            continue
+        if raw.startswith("+++ "):
+            target = raw[4:].strip()
+            if target in ("", "/dev/null"):
+                current_path = None
+            else:
+                current_path = target.removeprefix("b/")
+            continue
+        if raw.startswith("@@"):
+            match = _HUNK_HEADER_RE.match(raw)
+            new_lineno = int(match.group(1)) if match else 0
+            continue
+        if raw.startswith("+") and current_path is not None:
+            yield current_path, new_lineno, raw[1:]
+            new_lineno += 1
+
+
 def handle_scan_staged() -> int:
-    """issue #694: scan currently-staged file contents for secrets.
-    Returns 0 if clean, 1 if any finding -- printed to stdout with the
-    offending file path."""
+    """issue #694: scan the ADDED lines of the staged diff for secrets.
+
+    issue #831: scanning the whole index blob flagged pre-existing lines that
+    a commit merely carried along. Only lines introduced by the staged diff
+    (``+`` lines) can block a commit. Returns 0 if clean, 1 if any finding --
+    printed to stdout as ``path:line: finding``.
+
+    Non-UTF8/binary diff output is decoded with ``errors="replace"`` so a
+    non-UTF8 text file can never crash the scan (fail-open, issue #831).
+    """
     from .secrets import scan_for_secrets
 
     try:
         result = subprocess.run(
-            ["git", "diff", "--cached", "--name-only"],
-            capture_output=True, text=True, check=True,
+            ["git", "diff", "--cached", "-U0", "--no-color", "--no-ext-diff",
+             "--diff-filter=ACMR"],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            check=True,
         )
     except (subprocess.CalledProcessError, FileNotFoundError) as exc:
         print(f"Secret scan skipped -- not a git repository or git unavailable ({exc}).")
         return 0
-    staged_files = [f for f in result.stdout.splitlines() if f.strip()]
 
     any_findings = False
-    for rel_path in staged_files:
-        # `git show :<path>` reads the INDEX version -- the content that is
-        # actually about to be committed, not a working-tree copy that may
-        # have been edited (or reverted) after `git add`.
-        show = subprocess.run(["git", "show", f":{rel_path}"], capture_output=True)
-        if show.returncode != 0:
-            continue  # deleted/renamed-away files have nothing to scan
-        try:
-            content = show.stdout.decode("utf-8")
-        except UnicodeDecodeError:
-            continue  # binary -- not a text-secret risk this scanner covers
-        findings = scan_for_secrets(content)
+    for rel_path, new_lineno, added in _iter_added_lines(result.stdout):
+        findings = scan_for_secrets(added)
         if findings:
             any_findings = True
-            print(f"{rel_path}: {', '.join(findings)}")
+            print(f"{rel_path}:{new_lineno}: {', '.join(findings)}")
 
     if any_findings:
         print("Secret scan FAILED -- see findings above. Do not commit.")

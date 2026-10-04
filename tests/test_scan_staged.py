@@ -93,3 +93,85 @@ def test_scan_without_git_binary_skips_instead_of_crashing(monkeypatch):
 
     monkeypatch.setattr(cli_commands.subprocess, "run", _boom)
     assert cli_commands.handle_scan_staged() == 0
+
+
+def test_scan_staged_ignores_preexisting_flagged_line(tmp_path):
+    """issue #831: a pre-existing flagged line in the index must not block a
+    commit that only adds clean lines."""
+    _init_repo(tmp_path)
+    target = tmp_path / "settings.py"
+    target.write_text('api_key = "sk-abcdefghijklmnop1234"\n', encoding="utf-8")
+    subprocess.run(["git", "add", "settings.py"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=tmp_path, check=True)
+
+    # Stage only a clean addition; the flagged line is untouched.
+    target.write_text(
+        'api_key = "sk-abcdefghijklmnop1234"\nprint("clean")\n', encoding="utf-8",
+    )
+    subprocess.run(["git", "add", "settings.py"], cwd=tmp_path, check=True)
+
+    result = subprocess.run(
+        [sys.executable, str(_REPO_ROOT / "scripts" / "sync.py"), "--scan-staged"],
+        cwd=tmp_path, capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stdout
+
+
+def test_scan_staged_flags_newly_added_secret_line(tmp_path):
+    """issue #831: a staged diff that introduces a flagged line fails and the
+    output names the file and the new line number."""
+    _init_repo(tmp_path)
+    target = tmp_path / "settings.py"
+    target.write_text('print("clean")\n', encoding="utf-8")
+    subprocess.run(["git", "add", "settings.py"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=tmp_path, check=True)
+
+    target.write_text(
+        'print("clean")\napi_key = "sk-abcdefghijklmnop1234"\n', encoding="utf-8",
+    )
+    subprocess.run(["git", "add", "settings.py"], cwd=tmp_path, check=True)
+
+    result = subprocess.run(
+        [sys.executable, str(_REPO_ROOT / "scripts" / "sync.py"), "--scan-staged"],
+        cwd=tmp_path, capture_output=True, text=True,
+    )
+    assert result.returncode == 1, result.stdout
+    assert "settings.py:2:" in result.stdout
+
+
+def test_scan_staged_multihunk_reports_correct_new_line_number(tmp_path):
+    """issue #831: a flagged line in the second hunk must report its real new
+    line number (25), not the running counter left over from the first hunk."""
+    _init_repo(tmp_path)
+    target = tmp_path / "settings.py"
+    target.write_text("".join(f"line {i}\n" for i in range(1, 31)), encoding="utf-8")
+    subprocess.run(["git", "add", "settings.py"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=tmp_path, check=True)
+
+    lines = [f"line {i}\n" for i in range(1, 31)]
+    lines[2] = "line 3 changed\n"  # first hunk (clean)
+    lines[24] = 'api_key = "sk-abcdefghijklmnop1234"\n'  # second hunk (secret)
+    target.write_text("".join(lines), encoding="utf-8")
+    subprocess.run(["git", "add", "settings.py"], cwd=tmp_path, check=True)
+
+    result = subprocess.run(
+        [sys.executable, str(_REPO_ROOT / "scripts" / "sync.py"), "--scan-staged"],
+        cwd=tmp_path, capture_output=True, text=True,
+    )
+    assert result.returncode == 1, result.stdout
+    assert "settings.py:25:" in result.stdout
+
+
+def test_scan_staged_non_utf8_text_file_fails_open(tmp_path):
+    """issue #831 regression: a staged text file with non-UTF8 (Latin-1) bytes
+    must not crash the scan -- non-UTF8/binary must never block a commit."""
+    _init_repo(tmp_path)
+    (tmp_path / "latin1.py").write_bytes(b"# caf\xe9\nprint('hi')\n")
+    subprocess.run(["git", "add", "latin1.py"], cwd=tmp_path, check=True)
+
+    result = subprocess.run(
+        [sys.executable, str(_REPO_ROOT / "scripts" / "sync.py"), "--scan-staged"],
+        cwd=tmp_path, capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stdout
+    assert "Traceback" not in result.stderr
