@@ -106,6 +106,15 @@
   declare the new contracts as inputs so no handoff is silent.
 
 ### Fixed
+- **Codex agent TOML serialized before body injections (#862)**: `codex-toml` providers emit the
+  Markdown body as the trailing `developer_instructions = """..."""` field, but the debug-mode, viz,
+  critical-rules-footer, `pathRules` and `xml-section-wrapping` blocks were appended *after*
+  serialization — they landed outside the string and produced unparseable `.codex/agents/*.toml`.
+  `_finalize_agent_content` now detects the serialization mechanism from the provider spec
+  (`agent-transform.frontmatter-mechanism == "codex-toml"`, never the provider name) and applies
+  those body-level injections before the transform; every other provider keeps the historic order.
+  Scenario 64 now enables debug-mode plus all four options and asserts the debug marker lives inside
+  `developer_instructions`.
 - **`agent-meta-version` schema rejects SemVer pre-release/build versions (#850)**: the
   `agent-meta-version` pattern in `config/project-config.schema.json` accepted only `X.Y.Z`, so a
   repo pinned to `2.0.0-beta.1` failed its own schema and `sync.py --validate` emitted a

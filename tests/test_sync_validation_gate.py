@@ -81,6 +81,8 @@ def _probe_pc(surface: str = "v2", allowed: list | None = None) -> dict:
 
 def _finalize(content: str, provider_config: dict, provider: str, project_root: Path,
               *, filename: str = "developer.md", can_spawn: bool = True,
+              config: dict | None = None, variables: dict | None = None,
+              debug_mode: bool = False,
               log: SyncLog | None = None) -> tuple[str, SyncLog]:
     log = log or SyncLog()
     target = project_root / f".{provider.lower()}" / "agents" / filename
@@ -95,12 +97,12 @@ def _finalize(content: str, provider_config: dict, provider: str, project_root: 
         None,
         "unit probe",
         can_spawn,
-        {},
+        config or {},
         _REPO_ROOT,
         project_root,
         target,
-        {},
-        False,
+        variables or {},
+        debug_mode,
         log,
     )
     return out, log
@@ -152,6 +154,77 @@ def test_finalize_codex_toml_singleton_inside_developer_instructions(tmp_path: P
 
     doc = tomllib.loads(out)
     assert "Singleton-Regel" in doc["developer_instructions"]
+
+
+def test_finalize_codex_toml_debug_mode_inside_developer_instructions(tmp_path: Path) -> None:
+    """Issue #862: debug-mode=true must not break Codex TOML serialization.
+
+    The debug block used to be appended AFTER the TOML ``developer_instructions``
+    string, so the document no longer parsed. The marker must end up inside
+    ``developer_instructions`` and nothing may follow the closing delimiter.
+    """
+    provider_config = load_providers_config(_REPO_ROOT)
+    out, _log = _finalize(
+        "---\nname: developer\ndescription: unit probe\n---\n\nBody.\n",
+        provider_config,
+        "Codex",
+        tmp_path,
+        filename="developer.toml",
+        can_spawn=True,
+        config={"debug-mode": True},
+        debug_mode=True,
+    )
+
+    doc = tomllib.loads(out)
+    assert "<!-- agent-meta:debug-mode -->" in doc["developer_instructions"]
+    assert out.rstrip().endswith('"""')
+
+
+def test_finalize_codex_toml_all_body_injections_inside_developer_instructions(
+    tmp_path: Path,
+) -> None:
+    """Issue #862: viz + debug + footer + path rules + xml wrap stay inside."""
+    provider_config = load_providers_config(_REPO_ROOT)
+    config = {
+        "platforms": [],
+        "rules-preset": "default",
+        "debug-mode": True,
+        "viz": {"enabled": True, "mode": "full"},
+        "critical-rules-footer": {"enabled": True},
+        "pathRules": [{"path": "*.py", "rule": "dod-criteria"}],
+        "xml-section-wrapping": {"enabled": True},
+    }
+    variables = {
+        "CODE_LANGUAGE": "Englisch",
+        "COMMUNICATION_LANGUAGE": "Deutsch",
+        "USER_INPUT_LANGUAGE": "Deutsch",
+        "DOCS_LANGUAGE": "Englisch",
+        "INTERNAL_DOCS_LANGUAGE": "Deutsch",
+        "PROJECT_GOAL": "",
+        "PROJECT_LANGUAGES": "",
+        "CODE_CONVENTIONS": "",
+    }
+    out, _log = _finalize(
+        "---\nname: developer\ndescription: unit probe\n---\n\n## Body\n\nBody.\n",
+        provider_config,
+        "Codex",
+        tmp_path,
+        filename="developer.toml",
+        can_spawn=True,
+        config=config,
+        variables=variables,
+        debug_mode=True,
+    )
+
+    doc = tomllib.loads(out)
+    instructions = doc["developer_instructions"]
+    assert "<!-- agent-meta:debug-mode -->" in instructions
+    assert "Visualization Reporting" in instructions
+    assert "## Critical Rules" in instructions
+    assert "## Contextual Rules" in instructions
+    assert '<section name="' in instructions
+    assert "Singleton-Regel" in instructions
+    assert out.rstrip().endswith('"""')
 
 
 # ---------------------------------------------------------------------------

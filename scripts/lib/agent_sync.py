@@ -783,6 +783,57 @@ def collect_artifact_findings(
     return findings
 
 
+def _apply_agent_body_injections(
+    content: str,
+    *,
+    role: str,
+    name: str,
+    provider: str,
+    config: dict,
+    variables: dict,
+    log: SyncLog,
+    agent_meta_root: Path,
+    debug_mode: bool,
+) -> str:
+    """Apply the body-level injections to an agent body, in fixed order:
+
+    viz block, debug block, critical-rules footer, path rules, XML wrap.
+
+    These blocks are part of the Markdown body. Providers whose serialization
+    emits the whole body as a single trailing field (``codex-toml`` →
+    ``developer_instructions = \"\"\"...\"\"\"``) must run this BEFORE the
+    transform, otherwise the blocks land outside the serialized string and
+    the document no longer parses (issue #862). For every other provider the
+    historic order (transform first, then these injections) is preserved.
+    """
+    viz_cfg = config.get('viz', {})
+    if viz_cfg.get('enabled', False) and viz_cfg.get('mode') in ('dynamic', 'full'):
+        from .viz import inject_viz_prompt_block
+        content = inject_viz_prompt_block(content, role, provider, viz_enabled=viz_cfg.get('enabled', False), agent_meta_root=agent_meta_root,
+                                          viz_debug=viz_cfg.get("debug", False))
+
+    if debug_mode:
+        content = inject_debug_block(content, name)
+
+    footer_cfg = config.get('critical-rules-footer', {})
+    if footer_cfg.get('enabled', False):
+        content = _extract_and_append_critical_footer(
+            content, agent_meta_root, config, variables, log, provider
+        )
+
+    path_rules_cfg = config.get('pathRules', [])
+    if path_rules_cfg:
+        content = apply_path_rules(
+            content, agent_meta_root, config, variables, log, role
+        )
+
+    xml_cfg = config.get('xml-section-wrapping', {})
+    if xml_cfg.get('enabled', False):
+        content = wrap_sections_in_xml(content)
+
+    return content
+
+
 def _finalize_agent_content(
     content: str,
     role: str,
@@ -835,6 +886,28 @@ def _finalize_agent_content(
     if role != "orchestrator" and not role.endswith("-iteration") and can_spawn:
         content = content.rstrip() + SINGLETON_CONSTRAINT_BLOCK
 
+    # Serialization mechanism (keyed on the provider spec, never on the
+    # provider name): providers that emit the Markdown body as one trailing
+    # field (``codex-toml`` → ``developer_instructions = """..."""``) require
+    # the body-level injections BEFORE the transform. Appending them after the
+    # transform would land them outside the string and produce an unparseable
+    # document (issue #862).
+    transform_spec = ((provider_config or {}).get(provider) or {}).get("agent-transform") or {}
+    serialize_body_last = transform_spec.get("frontmatter-mechanism") == "codex-toml"
+
+    if serialize_body_last:
+        content = _apply_agent_body_injections(
+            content,
+            role=role,
+            name=name,
+            provider=provider,
+            config=config,
+            variables=variables,
+            log=log,
+            agent_meta_root=agent_meta_root,
+            debug_mode=debug_mode,
+        )
+
     content = transform_agent_content_for_provider(
         content=content,
         provider=provider,
@@ -850,49 +923,34 @@ def _finalize_agent_content(
         log=log,
     )
 
-    # MCP toolset: bind the servers this role opted into (issue #467).
-    # Capability-gated — `mcp__<server>__<tool>` frontmatter binding is only
-    # meaningful for providers declaring `mcp-agent-frontmatter-tools` (issue
-    # #735); other providers surface MCP tools through their own config.
-    if provider_has_capability((provider_config or {}).get(provider), "mcp-agent-frontmatter-tools"):
-        mcp_tools = resolve_mcp_tools_for_role(role, config, agent_meta_root, project_root)
-        if mcp_tools:
-            before = content
-            content = append_frontmatter_tools(content, mcp_tools)
-            if content != before:
-                servers = ', '.join(sorted({t.split('__')[1] for t in mcp_tools}))
-                log.note(str(target_path.relative_to(project_root)),
-                         f'mcp tools: +{len(mcp_tools)} from {servers}')
+    if not serialize_body_last:
+        # MCP toolset: bind the servers this role opted into (issue #467).
+        # Capability-gated — `mcp__<server>__<tool>` frontmatter binding is only
+        # meaningful for providers declaring `mcp-agent-frontmatter-tools` (issue
+        # #735); other providers surface MCP tools through their own config.
+        if provider_has_capability((provider_config or {}).get(provider), "mcp-agent-frontmatter-tools"):
+            mcp_tools = resolve_mcp_tools_for_role(role, config, agent_meta_root, project_root)
+            if mcp_tools:
+                before = content
+                content = append_frontmatter_tools(content, mcp_tools)
+                if content != before:
+                    servers = ', '.join(sorted({t.split('__')[1] for t in mcp_tools}))
+                    log.note(str(target_path.relative_to(project_root)),
+                             f'mcp tools: +{len(mcp_tools)} from {servers}')
 
-    # Visualization: inject event-logging prompt block when dynamic/full mode is enabled
-    # Applies to ALL providers — every generated agent gets the viz reporting block
-    viz_cfg = config.get('viz', {})
-    if viz_cfg.get('enabled', False) and viz_cfg.get('mode') in ('dynamic', 'full'):
-        from .viz import inject_viz_prompt_block
-        content = inject_viz_prompt_block(content, role, provider, viz_enabled=viz_cfg.get('enabled', False), agent_meta_root=agent_meta_root,
-                                          viz_debug=viz_cfg.get("debug", False))
-
-    if debug_mode:
-        content = inject_debug_block(content, name)
-
-    # Critical Rules Footer: append critical rules to end of agent files
-    footer_cfg = config.get('critical-rules-footer', {})
-    if footer_cfg.get('enabled', False):
-        content = _extract_and_append_critical_footer(
-            content, agent_meta_root, config, variables, log, provider
+        # Body-level injections run AFTER the transform for every other
+        # mechanism, preserving the historic byte order.
+        content = _apply_agent_body_injections(
+            content,
+            role=role,
+            name=name,
+            provider=provider,
+            config=config,
+            variables=variables,
+            log=log,
+            agent_meta_root=agent_meta_root,
+            debug_mode=debug_mode,
         )
-
-    # Path-based Contextual Rules: inject rules based on path patterns
-    path_rules_cfg = config.get('pathRules', [])
-    if path_rules_cfg:
-        content = apply_path_rules(
-            content, agent_meta_root, config, variables, log, role
-        )
-
-    # XML Section Wrapping: wrap Markdown ## sections in XML tags
-    xml_cfg = config.get('xml-section-wrapping', {})
-    if xml_cfg.get('enabled', False):
-        content = wrap_sections_in_xml(content)
 
     # Artifact validation (spec §5, plan Task 3): validate the finalized
     # artifact against the provider's declared format contract before it is

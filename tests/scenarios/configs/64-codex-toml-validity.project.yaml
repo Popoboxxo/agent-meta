@@ -24,5 +24,15 @@ tier-preset: Normal
 se-focus: false
 max-parallel-agents: 2
 conventions-preset: default
-debug-mode: false
+debug-mode: true
+viz:
+  enabled: true
+  mode: full
+critical-rules-footer:
+  enabled: true
+pathRules:
+- path: '*.py'
+  rule: dod-criteria
+xml-section-wrapping:
+  enabled: true
 allow-committed-secrets: false

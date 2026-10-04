@@ -4,6 +4,11 @@
 # parses with `tomllib`, and the singleton constraint text survives
 # serialization inside `developer_instructions`.)
 #
+# Issue #862: the scenario enables debug-mode + viz + critical-rules-footer +
+# pathRules + xml-section-wrapping, so it also pins that the post-serialization
+# body injections land INSIDE `developer_instructions` (a parse failure would
+# trip the tomllib check) and that the debug marker is present there.
+#
 # Contract: cwd = temp project dir (sync output); $1 and env REPO_ROOT carry the
 # agent-meta checkout path. The harness has already run dry-run + real sync +
 # --validate. Exit 0 = all assertions hold.
@@ -37,7 +42,9 @@ assert files, "no TOML files found"
 
 parse_errors = []
 singleton_files = []
+missing_debug_marker = []
 parsed = 0
+debug_marker = "<!-- agent-meta:debug-mode -->"
 
 for path in files:
     raw = path.read_text(encoding="utf-8")
@@ -53,6 +60,10 @@ for path in files:
     instructions = data["developer_instructions"]
     if "subagent_type" in instructions and "orchestrator" in instructions:
         singleton_files.append(path.name)
+    # debug-mode: true is enabled for this scenario — the marker must live
+    # inside the serialized string, not after the closing delimiter.
+    if debug_marker not in instructions:
+        missing_debug_marker.append(path.name)
 
 if parse_errors:
     for entry in parse_errors:
@@ -60,12 +71,15 @@ if parse_errors:
     raise SystemExit(1)
 
 assert parsed == len(files), f"parsed={parsed} files={len(files)}"
+if missing_debug_marker:
+    print(f"DEBUG MARKER MISSING inside developer_instructions: {missing_debug_marker}")
+    raise SystemExit(1)
 assert singleton_files, (
     "no generated TOML carried the singleton constraint inside developer_instructions"
 )
 
 print(
     f"TOML OK: {parsed}/{len(files)} files parsed; singleton constraint in "
-    f"{', '.join(sorted(singleton_files))}"
+    f"{', '.join(sorted(singleton_files))}; debug marker inside developer_instructions"
 )
 PY
