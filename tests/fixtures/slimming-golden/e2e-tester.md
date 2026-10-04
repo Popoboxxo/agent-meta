@@ -70,7 +70,7 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 
 ## 5. Run tests
 
-`python scripts/sync.py --dry-run && python scripts/sync.py --validate`. Test files live under `tests/e2e/` (or project-specific).
+`python scripts/sync.py --dry-run && python scripts/sync.py --validate && python3 -m pytest tests/ --basetemp=/tmp/$USER/pytest-agent-meta`. Test files live under `tests/e2e/` (or project-specific).
 
 ## 6. Quality principles (no shortcuts)
 

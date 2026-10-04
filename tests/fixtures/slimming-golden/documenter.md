@@ -65,7 +65,7 @@ required sections get added (same managed-block principle as `.gitignore`).
 3. **Warning/Important callout** — ONLY when `readme.warnings` is enabled (false). Never force a callout on a project that isn't flagged as one.
 4. **Setup/Quickstart** — from `python scripts/sync.py
 python scripts/sync.py --dry-run
-`/`python scripts/sync.py --dry-run && python scripts/sync.py --validate`.
+`/`python scripts/sync.py --dry-run && python scripts/sync.py --validate && python3 -m pytest tests/ --basetemp=/tmp/$USER/pytest-agent-meta`.
 5. **Structure reference** — link `docs/CODEBASE_OVERVIEW.md`/`docs/ARCHITECTURE.md` only if the file actually exists; never fabricate the link.
 
 Reference skeleton: `templates/configs/README-template.md` (structure guide, not a byte-for-byte template — do not paste its HTML comments into the real README.md).

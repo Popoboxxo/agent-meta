@@ -1669,3 +1669,146 @@ enthält exakt den vom aktuellen Template erzeugten Output, die Update-Regel ist
 Eintrag), und das Gate ist grün (14.5). Die Deltas aus 14.1 sind orthogonale Inhalts- und
 Versionsänderungen; dies ist eine **Statusaussage** über B2a, keine Klassifikation der Änderung
 als B2a-Fall (vgl. 8.7/13.7).
+
+## 15. Re-Baseline der Golden-Baseline für 4 Rollen (Issue #826, pytest-Basetemp)
+
+Derselbe Baseline-Update-Fall wie Abschnitt 14, diesmal ausgelöst **nicht** durch eine
+Template-Inhaltsänderung, sondern durch eine **Projekt-Config-Änderung**: der #826-Fix ersetzt in
+`.meta-config/project.yaml` (`TEST_COMMANDS`, Zeile 194) den bisherigen Testlauf durch den
+kanonischen pytest-Aufruf mit externem Basetemp. Diese Variable wird in vier generierte Rollen
+substituiert; deren eingefrorene Golden-Fixtures driften dadurch ausschließlich in dieser einen
+Zeile.
+
+> **Commit:** **noch nicht vorhanden** — die Re-Baseline wurde bewusst **nicht** committet
+> (Aufgabengrenze: keine Git-Mutationen). Messbasis ist der Arbeitsbaum auf Tip `ff34638f`
+> (Branch `fix/test-copytree-basetemp-recursion`, rebased auf `origin/main` `4bf62652`).
+> **Gegenstand:** **4 von 58** eingefrorenen Golden-Fixtures:
+> `tests/fixtures/slimming-golden/{documenter,e2e-tester,test-executor,tester}.md`
+> (Aktive-Rollen-Menge, `tests/fixtures/slimming-golden/README.md:36-38`;
+> `len(_golden_roles()) == _GOLDEN_ROLE_COUNT == 58`, unverändert).
+> **Klassifikation:** **Baseline-Update nach Update-Regel**
+> (`tests/fixtures/slimming-golden/README.md:90-94`) — **kein B2a-/B2b-Fall**.
+
+### 15.1 Auslöser
+
+Der Commit `ff34638f` (`chore(config): use external pytest basetemp in TEST_COMMANDS`) ändert
+`TEST_COMMANDS` in `.meta-config/project.yaml` auf:
+
+```
+python scripts/sync.py --dry-run && python scripts/sync.py --validate && python3 -m pytest tests/ --basetemp=/tmp/$USER/pytest-agent-meta
+```
+
+und behält die bisherige Kette `python scripts/sync.py --dry-run && python scripts/sync.py --validate`
+als Präfix bei. Der kanonische Aufruf ist ausdrücklich Teil des #826-Fixes
+(`docs/RELEASE_GATES.md:425-446`) und darf nicht revertiert werden. `{{TEST_COMMANDS}}` ist in
+genau vier aktiven Templates referenziert und rendert damit in vier Goldens:
+
+| Rolle | Fixture-Zeile(n) | Template-Referenz |
+|---|---|---|
+| `documenter` | `:68` | `agents/1-generic/documenter.md:65` (`{{DEV_COMMANDS}}`/`{{TEST_COMMANDS}}`) |
+| `e2e-tester` | `:73` | `agents/1-generic/e2e-tester.md:53` |
+| `test-executor` | `:33`, `:41` | `agents/1-generic/test-executor.md:29,37` |
+| `tester` | `:51` | `agents/1-generic/tester.md:48` |
+
+Es handelt sich um eine **Konfigurationswert-Drift**, nicht um eine Änderung an Templates oder an
+der Block-Extraktion; die Rollen-Templates selbst bleiben unverändert.
+
+### 15.2 Mechanismus des Fehlschlags
+
+Alle vier Rollen stehen in `_MIGRATED_PATHS`, nehmen also den Normalisierungs-Zweig des Gates
+(`tests/test_template_slimming_equivalence.py:1176-1195`). Die einzige nicht absorbierte Abweichung
+ist der `TEST_COMMANDS`-Literaltext in der jeweiligen Zeile; die Fehlermeldung nennt genau die vier
+Rollen:
+
+```
+documenter (agents/1-generic/documenter.md): diff not attributable to declared normalizations
+e2e-tester (agents/1-generic/e2e-tester.md): diff not attributable to declared normalizations
+test-executor (agents/1-generic/test-executor.md): diff not attributable to declared normalizations
+tester (agents/1-generic/tester.md): diff not attributable to declared normalizations
+```
+
+`_LOCATORS`/`_normalize` (`:348-353`, `:1073-1115`) arbeiten ausschließlich auf den vier
+Block-Kinds aus `_KIND_CANONICAL_VAR` und erkennen keine Config-Literaltexte; eine erfundene
+Normalisierung wäre ein Vertragsbruch. Zusätzlich trägt `documenter.md:60` das
+**release-volatile** Projekt-Meta-Versionstoken (Freeze-Wert `1.2.0-beta.2`), das bereits durch
+`_port_golden_meta_tokens` (`:1123-1147`) aus dem Render portiert wird — es ist **nicht** Teil der
+gemeldeten, unattribuierten Drift.
+
+### 15.3 Gewählte Fix-Route und Vertragsbeleg
+
+**Bewusste Re-Baseline nach der Update-Regel** (`README.md:90-94`): ausschließlich die vier vom Gate
+benannten Fixtures werden angepasst, **nur** an der `TEST_COMMANDS`-Fundstelle, exakt auf den Wert
+aus dem realen Sync-Render (15.4). Kein Eingriff in `_MIGRATED_PATHS`, `_NORMALIZATIONS`,
+`_LOCATORS`, `_KIND_REGISTRY`, `_GOLDEN_ROLE_COUNT` oder `_port_golden_meta_tokens`.
+
+| Option | Bewertung |
+|---|---|
+| Alten `TEST_COMMANDS`-Wert in den Fixtures belassen | Nicht möglich — rendert den neuen kanonischen Aufruf, Gate rot |
+| `TEST_COMMANDS` analog zu `{{AGENT_META_VERSION}}`/`{{AGENT_META_DATE}}` forward-porten | Nicht gewählt — das README deklariert den Forward-Port ausdrücklich für **release-volatile Meta-Tokens** (`:73-88`), nicht für beliebige Projekt-Config-Variablen; die gewählte Baseline-Aktualisierung hält die Forward-Port-Menge bewusst eng |
+| **Verbatim-Kopie der ganzen Fixtures aus dem Render** (Muster 14.4) | **Nicht gewählt** — siehe Abgrenzung unten |
+| **Gezielte Re-Baseline nur der `TEST_COMMANDS`-Fundstelle + Manifest-Eintrag** | **Gewählt** |
+
+**Abgrenzung zur Verbatim-Kopie (bewusst, nicht als Bequemlichkeit):** Eine vollständige
+Verbatim-Kopie der vier Fixtures wäre hier **schädlich**:
+
+1. Sie würde in `documenter.md:60` das **release-volatile** Projekt-Versionstoken auf den aktuellen
+   Wert (`2.0.0-beta.1`) einfrieren. Genau das soll der Forward-Port vermeiden: der eingefrorene
+   Wert `_GOLDEN_META_VERSION` wäre danach ein toter Treffer, und beim **nächsten** Release würde
+   die Fixture erneut reißen (vgl. `README.md:73-81`, „force a fixture rebaseline on every
+   release"). Alle Fixtures, die das Projekt-Meta-Versionstoken tragen (`agent-meta-manager`,
+   `agent-meta-scout`, `documenter`, `meta-feedback`), tragen weiterhin den Freeze-Wert
+   `1.2.0-beta.2`; keine der 58 enthält `2.0.0-beta.1` (neu gemessen).
+2. Sie würde in `tester`/`e2e-tester`/`test-executor` zusätzlich die **B2a-normalisierten** Regionen
+   (Leerzeile unter `## 1. Parse input`, Output-Guard-Markerposition) auf den Post-Slimming-Stand
+   ziehen. Diese Regionen werden derzeit noch von der deklarierten Normalisierung absorbiert und
+   sind damit Teil der Gate-Zähne; eine Kopie würde diese Abdeckung stillschweigend entfernen
+   („mask future regressions").
+
+Die gezielte Ersetzung ändert daher **genau eine** unattribuierte Drift pro Fixture (bei
+`test-executor` zwei identische Vorkommen) und lässt jede andere eingefrorene Zeile — inklusive
+aller B2a-/B2b-Belegregionen und der release-volatilen Meta-Tokens — unangetastet.
+
+### 15.4 Nachweis der Herkunft (keine Handpflege)
+
+- Erzeugung über den **echten Sync-Pfad**, Provider `Claude`, wörtlich der Verfahrensvertrag
+  (`README.md:29-31`):
+
+  ```bash
+  mkdir -p .tmp/golden826
+  AGENT_META_TEST_REPO="$PWD/.tmp/golden826" python3 scripts/sync.py --validate
+  ```
+
+  Ergebnis: rc `0` (58 gerenderte Rollen).
+- Der Render-Diff `diff tests/fixtures/slimming-golden/<rolle>.md .tmp/golden826/.claude/agents/<rolle>.md`
+  zeigt für die vier Rollen **nur** die `TEST_COMMANDS`-Zeile(n) plus (bei `documenter`)
+  das bereits forward-portete Projekt-Versionstoken sowie die deklarierten
+  Normalisierungsregionen. Die neue `TEST_COMMANDS`-Zeile wurde **verbatim** aus dem Render
+  übernommen, nicht aus der Config abgeschrieben.
+- Das substituierte Literal ist umgebungsunabhängig (kein absoluter Pfad, kein Hostname, keine
+  SHA); es ist exakt der in `.meta-config/project.yaml:194` definierte kanonische Aufruf
+  (`docs/RELEASE_GATES.md:441-443`).
+
+### 15.5 Verifikation
+
+| Prüfung | Ergebnis |
+|---|---|
+| Vorher: `pytest …::test_golden_equivalence_and_normalization_marking` | **1 failed**, rc `1` — nannte genau `documenter`, `e2e-tester`, `test-executor`, `tester` |
+| Nachher: dieselbe Test-Node | **1 passed**, rc `0` |
+| `pytest tests/test_template_slimming_equivalence.py -q` (ganze Datei) | **8 passed**, rc `0` |
+| `python3 scripts/sync.py --validate` | rc `0` (82 vorbestehende Konsistenz-Warnungen, unverändert) |
+| Diff-Scope `git diff --numstat` | genau 4 Fixtures: `documenter.md` 1/1, `e2e-tester.md` 1/1, `test-executor.md` 2/2, `tester.md` 1/1 |
+| Konfliktmarker in den geänderten Dateien | keine |
+
+### 15.6 Bestandsaufnahme aller 58 Goldens
+
+`git status --short` weist nach der Änderung genau die vier genannten Fixtures als geändert aus;
+die übrigen **54** Fixtures und der Gate-Korpus (`_GOLDEN_ROLE_COUNT == 58`, keine Assertion
+gelockert) bleiben unangetastet. Die Re-Baseline hat keine andere eingefrorene Fixture verschoben.
+
+### 15.7 Status B2a
+
+B2a ist durch die Re-Baseline **wiederhergestellt**, nicht abgeschwächt: die vier Fixtures enthalten
+an der `TEST_COMMANDS`-Fundstelle exakt den vom aktuellen Sync-Pfad erzeugten Output, die
+Update-Regel ist erfüllt (dieser Eintrag), und das Gate ist grün (15.5). Die Änderung ist eine
+orthogonale Config-Wert-Aktualisierung; dies ist eine **Statusaussage** über B2a, keine
+Klassifikation der Änderung als B2a-Fall (vgl. 8.7/14.7).
