@@ -19,7 +19,7 @@ from .external_tools import (
     TOOL_RULE_PREFIX,
     resolve_injection_path,
 )
-from .generated_file_drift import _is_sync_backup_name
+from .generated_file_drift import _is_sync_backup_name, is_managed_artifact
 from .io import write_checked
 from .log import SyncLog
 from .registry_query import (
@@ -157,6 +157,90 @@ _INFRA_ROOT_FALLBACK_DIRS = {
 }
 
 
+def _record_or_delegate_finding(
+    child: Path,
+    kind: str,
+    project_root: Path,
+    provider_findings: list[dict],
+) -> None:
+    """Record *child* as a finding, unless agent-meta itself fully manages it.
+
+    Recognition of agent-meta's own artifacts is delegated to the shared
+    ``is_managed_artifact`` predicate — the same managed-marker / managed-index
+    signal the generated-file-drift scanner uses. A file that carries an
+    ``agent-meta:managed-begin`` marker, or whose name is listed in a sibling
+    ``.agent-meta-managed`` (or ``-mcp``/``-tools``) index, is agent-meta's own
+    product and never a foreign injection.
+
+    Directories are excused only when the WHOLE subtree is agent-meta's own
+    (``_dir_is_fully_managed``): either the directory carries its own
+    ``.agent-meta-managed`` index, or every regular file beneath it is managed
+    (marker / index) and every nested directory is likewise fully managed. A
+    directory that merely *contains* one managed file is NOT excused — an
+    unmanaged sibling (e.g. a foreign script dropped next to a managed decoy)
+    must stay visible. This fills the gap left by the per-directory INDEX
+    lookups (which only see files registered in a *sibling* index for the four
+    scanned subdirs): the provider infra ROOT (``.claude/``, ``.gemini/``, ...)
+    and non-indexed artifacts like ``.gemini/policies`` were previously
+    invisible to recognition and were misread as foreign on the first post-sync
+    run (issue #802).
+    """
+    if child.is_dir():
+        if _dir_is_fully_managed(child):
+            return
+    elif is_managed_artifact(child):
+        return
+    provider_findings.append({
+        "path": str(child.relative_to(project_root)),
+        "kind": kind,
+        "tool": None,
+    })
+
+
+def _dir_is_fully_managed(directory: Path) -> bool:
+    """True when *directory* and its whole subtree are agent-meta-managed.
+
+    A directory carrying its own ``.agent-meta-managed`` index (e.g.
+    ``.claude/hooks/release-gates/``) is managed outright. Otherwise it is
+    managed only when every descendant regular file is managed (content marker
+    or sibling index entry) AND every nested directory is itself fully managed,
+    with at least one managed artifact present (an empty directory carries no
+    provenance and therefore reads as foreign).
+
+    agent-meta's own bookkeeping files (``.agent-meta-managed*`` indexes and
+    ``.sync-backup-<ts>`` siblings) count as managed. Any unmanaged sibling or
+    nested directory makes the WHOLE directory read as foreign, so it is
+    reported as a finding (never silently excused) — one managed decoy must not
+    hide an unmanaged neighbour. Unreadable containers fail closed (foreign).
+    """
+    if (directory / ".agent-meta-managed").is_file():
+        return True
+    try:
+        entries = sorted(directory.iterdir())
+    except OSError:
+        return False
+    saw_managed = False
+    for entry in entries:
+        name = entry.name
+        if name == ".agent-meta-managed" or name.startswith(".agent-meta-managed-"):
+            saw_managed = True
+            continue
+        if _is_sync_backup_name(name):
+            continue
+        if entry.is_dir():
+            if not _dir_is_fully_managed(entry):
+                return False
+            saw_managed = True
+        elif entry.is_file():
+            if not is_managed_artifact(entry):
+                return False
+            saw_managed = True
+        else:
+            # symlink / socket / fifo — provenance unknown, never assume managed
+            return False
+    return saw_managed
+
+
 def scan_injection_drift(
     agent_meta_root: Path,
     project_root: Path,
@@ -261,23 +345,17 @@ def scan_injection_drift(
                     continue
                 if context_file_path is not None and child.resolve() == context_file_path:
                     continue
-                # A subdirectory that carries its OWN '.agent-meta-managed'
-                # index (e.g. hooks/release-gates/, sync_release_gates() —
-                # issue #558) is a nested, self-managed sync.py output, not a
-                # foreign injection — its content is scoped by that sidecar
-                # index the same way this dir's own .agent-meta-managed
-                # scopes plain files. Deliberately generic (checks for the
-                # sentinel file, not a hardcoded dir name) so any future
-                # nested-managed hook subdirectory is covered too.
-                if child.is_dir() and (child / ".agent-meta-managed").exists():
-                    continue
+                # A subdirectory is excused only when the WHOLE subtree is
+                # agent-meta-managed (own '.agent-meta-managed' index, e.g.
+                # hooks/release-gates/ from sync_release_gates() — issue #558 —
+                # or every descendant managed). A mixed directory keeps its
+                # unmanaged siblings visible. Delegated deliberately generic to
+                # _record_or_delegate_finding (sentinel file, not a hardcoded
+                # dir name), so any future nested-managed subdirectory is
+                # covered too.
                 if child.resolve() in permitted_by_kind[kind]:
                     continue
-                provider_findings.append({
-                    "path": str(child.relative_to(project_root)),
-                    "kind": kind,
-                    "tool": None,
-                })
+                _record_or_delegate_finding(child, kind, project_root, provider_findings)
 
         # --- agents_dir: no declarable permitted-injections kind exists for
         # it (per spec — agent files are never legitimately tool-installed).
@@ -296,11 +374,7 @@ def scan_injection_drift(
                     continue
                 if child.resolve() in permitted_root_extra:
                     continue
-                provider_findings.append({
-                    "path": str(child.relative_to(project_root)),
-                    "kind": "other",
-                    "tool": None,
-                })
+                _record_or_delegate_finding(child, "other", project_root, provider_findings)
 
         # --- infra root: loose files/dirs beside the four managed subdirs ---
         # Determined from the provider's own infra root (parent of skills_dir,
@@ -354,11 +428,7 @@ def scan_injection_drift(
                         continue
                     if child.resolve() in permitted_root_extra:
                         continue
-                    provider_findings.append({
-                        "path": str(child.relative_to(project_root)),
-                        "kind": "other",
-                        "tool": None,
-                    })
+                    _record_or_delegate_finding(child, "other", project_root, provider_findings)
 
         findings_by_provider[provider] = provider_findings
 

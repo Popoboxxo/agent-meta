@@ -161,6 +161,15 @@ def _write_state(state_path: Path, value, dry_run: bool,
         data[key] = value
     else:
         data.pop(key, None)
+    # Provenance marker: recognize this companion file as agent-meta's own
+    # product (the injection-drift scanner's is_managed_artifact predicate
+    # checks file content for the canonical sentinel "agent-meta managed —
+    # do not edit manually"). Free-form key read by no
+    # code — the state readers only look up their own namespace keys — so it
+    # cannot collide with isolation-deny / runtime-gate-deny. Without it,
+    # `.claude/agent-meta-state.json` / `.opencode/agent-meta-state.json` were
+    # misread as foreign artifacts on the first post-sync scan (issue #802).
+    data.setdefault("_agent-meta", "agent-meta managed — do not edit manually")
     write_atomic(
         state_path,
         json.dumps(data, indent=2, ensure_ascii=False) + "\n",

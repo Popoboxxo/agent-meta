@@ -11,7 +11,11 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-from lib.consistency.hook_drift import check_stale_deployed_hooks
+from lib.consistency.hook_drift import (
+    _registered_hook_stems,
+    check_hook_enablement_consistency,
+    check_stale_deployed_hooks,
+)
 from lib.consistency.report import Severity
 
 _HOOK_SOURCE = """\
@@ -106,3 +110,66 @@ def test_no_findings_when_no_hook_sources_exist(tmp_path):
     findings = check_stale_deployed_hooks(project_root, agent_meta_root, _CONFIG, _PROVIDER_CONFIG)
 
     assert findings == []
+
+
+_ANTIGRAVITY_PROVIDER_CONFIG = {"Codex": {
+    "hooks_dir": ".agents/hooks",
+    "hook_protocol": "antigravity-hooks-json",
+    "hooks_config_file": ".agents/hooks.json",
+}}
+
+
+def test_registered_hook_stems_ignores_underscore_metadata_keys(tmp_path):
+    """A `_`-prefixed top-level key in hooks.json is metadata (hooks.py's
+    `_agent-meta` provenance marker), never a hook registration (F5)."""
+    project_root = tmp_path / "project"
+    cfg_dir = project_root / ".agents"
+    cfg_dir.mkdir(parents=True)
+    (cfg_dir / "hooks.json").write_text(
+        "{\n"
+        '  "_agent-meta": {"managed": "agent-meta managed — do not edit manually"},\n'
+        '  "orchestrator-guard": {"PreToolUse": []}\n'
+        "}\n",
+        encoding="utf-8",
+    )
+    pc = {"hook_protocol": "antigravity-hooks-json", "hooks_config_file": ".agents/hooks.json"}
+
+    stems = _registered_hook_stems(project_root, pc, ".agents/hooks")
+
+    assert stems == {"orchestrator-guard"}
+    assert "_agent-meta" not in stems
+
+
+def test_underscore_managed_hook_key_is_not_a_registration(tmp_path):
+    """A managed hook whose only hooks.json key is `_`-prefixed (the metadata
+    convention) must still be flagged enabled-but-not-registered — a foreign
+    `_`-prefixed key must not masquerade as its registration (F5)."""
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    source_dir = agent_meta_root / "hooks" / "1-generic"
+    source_dir.mkdir(parents=True)
+    (source_dir / "_hidden.sh").write_text(
+        "#!/bin/bash\n"
+        "# hook: _hidden\n"
+        "# version: 2.0.0\n"
+        "# event: PreToolUse\n"
+        "# enabled_by_default: true\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+    hooks_dir = project_root / ".agents" / "hooks"
+    hooks_dir.mkdir(parents=True)
+    (hooks_dir / ".agent-meta-managed").write_text("_hidden.sh\n", encoding="utf-8")
+    (hooks_dir / "_hidden.sh").write_text("#!/bin/bash\nexit 0\n", encoding="utf-8")
+    (project_root / ".agents" / "hooks.json").write_text(
+        "{\n"
+        '  "_agent-meta": {"managed": "agent-meta managed — do not edit manually"},\n'
+        '  "_hidden": {"PreToolUse": []}\n'
+        "}\n",
+        encoding="utf-8",
+    )
+
+    findings = check_hook_enablement_consistency(
+        project_root, agent_meta_root, _CONFIG, _ANTIGRAVITY_PROVIDER_CONFIG)
+
+    assert any(f.check == "hooks.enabled-but-not-registered" for f in findings), findings

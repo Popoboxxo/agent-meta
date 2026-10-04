@@ -114,6 +114,53 @@ def test_present_prompt_index_deletes_stale_and_rewrites(tmp_path: Path) -> None
     assert index.read_text(encoding="utf-8") == "developer.md\n"
 
 
+def test_unchanged_prompt_logs_no_write_action(tmp_path: Path) -> None:
+    """Issue #802: a second run over an unchanged prompt must not log a WRITE —
+    otherwise `sync.py --check` reports permanent drift (rc 1)."""
+    agent_meta_root = _make_agent_meta_root(tmp_path)
+    project_root = tmp_path / "project"
+    config = _config(("developer",))
+
+    sync_prompts_for_continue(
+        agent_meta_root, project_root, config, {}, SyncLog(),
+        dry_run=False, provider_config={},
+    )
+
+    second = SyncLog()
+    sync_prompts_for_continue(
+        agent_meta_root, project_root, config, {}, second,
+        dry_run=False, provider_config={},
+    )
+
+    assert second.actions == [], f"unchanged prompt must not log an action: {second.actions}"
+    assert any("unchanged" in s for s in second.skipped), second.skipped
+
+
+def test_changed_prompt_logs_write_action(tmp_path: Path) -> None:
+    """Issue #802: a genuine content change must still be reported as WRITE."""
+    agent_meta_root = _make_agent_meta_root(tmp_path)
+    project_root = tmp_path / "project"
+    config = _config(("developer",))
+
+    sync_prompts_for_continue(
+        agent_meta_root, project_root, config, {}, SyncLog(),
+        dry_run=False, provider_config={},
+    )
+
+    # Change the source so the generated prompt differs.
+    source = agent_meta_root / "agents" / "1-generic" / "developer.md"
+    source.write_text(
+        source.read_text(encoding="utf-8") + "\nNew body line.\n", encoding="utf-8")
+
+    second = SyncLog()
+    sync_prompts_for_continue(
+        agent_meta_root, project_root, config, {}, second,
+        dry_run=False, provider_config={},
+    )
+
+    assert any("WRITE" in a for a in second.actions), second.actions
+
+
 def test_prompt_fail_open_clause_gone() -> None:
     """AC-24: the fail-open guard is gone and the IC-01 helpers are wired in."""
     source = (REPO_ROOT / "scripts" / "lib" / "context.py").read_text(encoding="utf-8")

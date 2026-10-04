@@ -1,4 +1,7 @@
 {
+  "_agent-meta": {
+    "managed": "agent-meta managed — do not edit manually"
+  },
   "orchestrator-guard": {
     "PreToolUse": [
       {

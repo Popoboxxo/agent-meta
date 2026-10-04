@@ -13,6 +13,7 @@ from .io import (
     load_json_file,
     safe_path,
     strip_jsonc_comments,
+    write_checked,
 )
 from .json_persistence import save_json_document
 from .log import SyncLog
@@ -2232,10 +2233,16 @@ def sync_prompts_for_continue(
         final = fm + body
 
         layer = source_path.parts[-2]
-        log.action("WRITE", str(target_path.relative_to(project_root)),
-                   f"{layer}/{source_path.name} [prompt/{prompt_mode}]")
-        if not dry_run:
-            target_path.write_text(final, encoding="utf-8")
+        rel_out = str(target_path.relative_to(project_root))
+        # Route through write_checked so an unchanged prompt is a no-op
+        # (log.skip) instead of an unconditional WRITE action. Without this,
+        # `sync.py --check` reported drift forever on a converged tree
+        # (issue #802): the byte-identical content was still logged as pending.
+        if write_checked(target_path, final, log, f"{layer}/{source_path.name}",
+                         dry_run=dry_run):
+            log.action("WRITE", rel_out, f"{layer}/{source_path.name} [prompt/{prompt_mode}]")
+        else:
+            log.skip(rel_out, "unchanged")
 
     # Stale cleanup
     managed_index = prompts_dir / ".agent-meta-managed"

@@ -436,6 +436,16 @@ def capture_generated_file_hashes(
 _MANAGED_MARKERS = (
     "agent-meta:managed-begin",
     "agent-meta:bootstrap-begin",
+    # Canonical simple-annotation sentinel emitted by writers that don't use the
+    # block markers: isolation.py's Gemini TOML policy / Continue soft rule
+    # (`# agent-meta managed — do not edit manually` / HTML-comment variant),
+    # isolation state files and hooks.py's `_agent-meta` provenance key.
+    # Deliberately the FULL sentence, not the bare prefix "agent-meta managed":
+    # is_managed_artifact() also gates the destructive backup+delete / migrate
+    # path (remove_managed_artifact / migrate_managed_artifact), so a loose
+    # substring would let any user file merely *mentioning* the phrase be
+    # deleted. A narrow marker keeps the destructive guard narrow (issue #802).
+    "agent-meta managed — do not edit manually",
 )
 
 

@@ -117,6 +117,7 @@ verhalten sich exakt wie bisher.
 | `70-bootstrap-marker-convergence` | Gemini, ZCode | strict (default) | scoped bootstrap sub-markers + legacy discard + user notes (AC-10/AC-16) |
 | `71-check-idempotency-all-providers` | all 9 | strict (default) | all-provider tree byte-identical across syncs + `--check` rc 0 (AC-4/AC-19) |
 | `72-continue-config-validity` | Continue | strict (default) | valid `.continue/config.yaml` (roles enum, no dead agents block, name/version) (AC-7) |
+| `73-continue-prompts-one-sync` | Continue | strict (default) | `generate-prompts: true` converges after ONE sync: `--check` rc 0 before any second sync (issue #802) |
 
 ## Bewusste Auslassungen
 
