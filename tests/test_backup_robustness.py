@@ -108,7 +108,7 @@ def test_restore_backup_provider_restore_failure_includes_error_type_and_is_logg
         # Extraction matches on the *provider key* from the manifest
         # ("Claude"), not its directory value -- see restore_backup's
         # `matching` resolution.
-        zf.writestr("Claude/settings.json", "{}")
+        zf.writestr(".claude/settings.json", "{}")
 
     provider_config = {"Claude": {"agents_dir": ".claude/agents"}}
     log = SyncLog()

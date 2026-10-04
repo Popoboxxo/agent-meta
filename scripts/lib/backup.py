@@ -78,6 +78,22 @@ def _relative_path(path: Path, root: Path) -> str:
         return path.as_posix()
 
 
+def _member_under_directory(member: str, directory: str) -> bool:
+    """True if a zip member path lies inside *directory* (project-relative).
+
+    Archive members are stored relative to the project root (e.g.
+    ``.claude/agents/developer.md``), while the manifest records a provider's
+    *root directory* (e.g. ``.claude/``) -- never its provider key. Matching
+    members against the provider key (issue #804) found nothing and silently
+    restored an empty set.
+    """
+    member_norm = member.replace("\\", "/").lstrip("/")
+    dir_norm = directory.replace("\\", "/").strip("/")
+    if not dir_norm:
+        return False
+    return member_norm == dir_norm or member_norm.startswith(dir_norm + "/")
+
+
 def _build_manifest(
     backup_name: str,
     label: str | None,
@@ -280,9 +296,14 @@ def create_backup(
 
     # Build manifest
     extra_files: dict[str, str] = {}
-    project_yaml_path = project_root / ".meta-config" / "project.yaml"
-    if project_yaml_path.exists():
-        extra_files[".meta-config/project.yaml"] = _relative_path(project_yaml_path, project_root)
+    # Local meta-config that is part of a usable environment: the project
+    # config and, when present, the gitignored local secrets file. The
+    # secrets file lives inside the (gitignored) backup archive, and only
+    # its relative path is ever logged -- never its contents.
+    for rel_name in (".meta-config/project.yaml", ".meta-config/secrets.local.yaml"):
+        candidate = project_root / rel_name
+        if candidate.exists():
+            extra_files[rel_name] = _relative_path(candidate, project_root)
 
     manifest = _build_manifest(
         archive_name, label, targets, project_root, provider_config,
@@ -419,9 +440,11 @@ def restore_backup(
 
     # Read manifest
     manifest: dict = {}
+    archive_names: list[str] = []
     try:
         with zipfile.ZipFile(archive_path, "r") as zf:
             names = zf.namelist()
+            archive_names = names
             if MANIFEST_FILENAME in names:
                 manifest = json.loads(zf.read(MANIFEST_FILENAME).decode("utf-8"))
     except Exception as exc:  # noqa: BLE001
@@ -449,6 +472,12 @@ def restore_backup(
             # step below tries to open the same archive_path.
             log.debug("backup", f"could not infer providers from archive: {type(e).__name__}: {e}")  # noqa: PLE1205
 
+    # Provider key -> archived root directory (e.g. "Claude" -> ".claude").
+    manifest_dirs: dict[str, str] = {}
+    for pname, pinfo in (manifest.get("providers", {}) or {}).items():
+        if isinstance(pinfo, dict) and pinfo.get("directory"):
+            manifest_dirs[pname] = str(pinfo["directory"]).rstrip("/")
+
     restore_targets = providers if providers else archive_providers
     if isinstance(restore_targets, list):
         restore_targets = [p for p in restore_targets if isinstance(p, str)]
@@ -458,89 +487,107 @@ def restore_backup(
     for target in restore_targets:
         prov_result: dict = {"provider": target, "restored": False}
 
-        # Find matching provider in archive
-        matching = None
-        for ap in archive_providers:
-            if ap.rstrip("/") == target or ap == target + "/":
-                matching = ap
-                break
-        if not matching:
-            # Try by provider name from ai-providers config
-            provider_root = _get_provider_root_dir(target, provider_config)
-            if provider_root:
-                archive_name_norm = provider_root.rstrip("/")
-                for ap in archive_providers:
-                    if ap.rstrip("/") == archive_name_norm:
-                        matching = ap
-                        break
-
-        if not matching:
-            prov_result["error"] = f"provider '{target}' not found in archive"
-            result["provider_results"][target] = prov_result
-            continue
-
-        # Check if target already exists
+        # Resolve the archived directory that belongs to this provider. The
+        # manifest records it (e.g. ".claude/"); fall back to the provider
+        # config, then to the target name itself for legacy archives whose
+        # provider keys were directory names.
+        candidates: list[str] = []
+        manifest_dir = manifest_dirs.get(target)
+        if manifest_dir:
+            candidates.append(manifest_dir)
         provider_root_dir = _get_provider_root_dir(target, provider_config)
-        if not provider_root_dir:
-            prov_result["error"] = f"cannot determine root directory for '{target}'"
+        if provider_root_dir:
+            candidates.append(provider_root_dir.rstrip("/"))
+        candidates.append(target)
+
+        match_dir = next(
+            (d for d in candidates
+             if d and any(_member_under_directory(m, d) for m in archive_names)),
+            candidates[0],
+        )
+        members = [m for m in archive_names if _member_under_directory(m, match_dir)]
+
+        if not members:
+            prov_result["error"] = (
+                f"no files for provider '{target}' (directory '{match_dir}') in archive"
+            )
             result["provider_results"][target] = prov_result
             continue
 
-        target_dir = project_root / provider_root_dir
-        if target_dir.exists() and not force:
-            prov_result["error"] = f"target directory already exists: {provider_root_dir}"
-            result["provider_results"][target] = prov_result
-            continue
+        target_dir = project_root / match_dir
 
         if dry_run:
-            log.note("backup", f"DRY-RUN: would restore '{matching}' from archive")
+            log.note("backup", f"DRY-RUN: would restore '{match_dir}' from archive")
             prov_result["restored"] = True
+            prov_result["files_restored"] = len(members)
             result["provider_results"][target] = prov_result
             continue
 
-        # Extract from zip
         try:
+            # Without --force, extract over the existing tree (merge). With
+            # --force, replace it first for a clean restore.
+            if force and target_dir.exists():
+                shutil.rmtree(target_dir)
             with zipfile.ZipFile(archive_path, "r") as zf:
-                # Extract only the matching provider directory
-                for member in zf.namelist():
-                    member_parts = Path(member).parts
-                    if not member_parts:
-                        continue
-                    if member_parts[0].rstrip("/") == matching.rstrip("/"):
-                        zf.extract(member, str(target_dir.parent))
-                log.note("backup", f"restored '{matching}' for provider '{target}'")
-                prov_result["restored"] = True
-            result["provider_results"][target] = prov_result
+                for member in members:
+                    zf.extract(member, str(project_root))
+            log.note(
+                "backup",
+                f"restored '{match_dir}' for provider '{target}' ({len(members)} files)",
+            )
+            prov_result["restored"] = True
+            prov_result["files_restored"] = len(members)
         except Exception as exc:  # noqa: BLE001 -- extraction can fail in many ways (zip/OS/path)
             error = f"{type(exc).__name__}: {exc}"
-            log.warning(f"backup: failed to restore '{matching}' for provider '{target}': {error}")
+            log.warning(f"backup: failed to restore '{match_dir}' for provider '{target}': {error}")
             prov_result["error"] = error
-            result["provider_results"][target] = prov_result
+        result["provider_results"][target] = prov_result
 
-    # Restore project.yaml if requested
-    project_yaml_in_archive = ".meta-config/project.yaml" if manifest else None
-    if project_yaml_in_archive and not dry_run:
-        try:
-            target_yaml = project_root / ".meta-config" / "project.yaml"
-            with zipfile.ZipFile(archive_path, "r") as zf:
-                if project_yaml_in_archive in zf.namelist():  # noqa: SIM102
-                    if force or not target_yaml.exists():
-                        target_yaml.parent.mkdir(parents=True, exist_ok=True)
-                        with zf.open(project_yaml_in_archive) as src:
-                            target_yaml.write_bytes(src.read())
-                        result["config_restored"] = True
-                        log.note("backup", "restored project.yaml from backup")
-        except (OSError, zipfile.BadZipFile) as e:
-            # project.yaml restore is an optional add-on to the main provider
-            # restore already performed above (result["provider_results"]) —
-            # a corrupt archive or a write failure here (e.g. permission
-            # denied on .meta-config/) must not undo/fail the provider
-            # restore that already succeeded. The failure is still surfaced
-            # to the caller via result["config_restore_error"] (#583) so it
-            # is not silently swallowed.
-            error = f"{type(e).__name__}: {e}"
-            log.error("backup", f"could not restore project.yaml: {error}")
-            result["config_restore_error"] = error
+    # Restore extra meta-config files (project config + local secrets).
+    extra_entries = list(manifest.get("extra_files") or []) if manifest else []
+    if not extra_entries and manifest and ".meta-config/project.yaml" in archive_names:
+        extra_entries = [{"file": ".meta-config/project.yaml",
+                          "relative": ".meta-config/project.yaml"}]
+
+    if extra_entries and not dry_run:
+        restored_extra: list[str] = []
+        for entry in extra_entries:
+            if not isinstance(entry, dict):
+                continue
+            member = entry.get("file")
+            rel_target = entry.get("relative") or member
+            if not member or member not in archive_names:
+                continue
+            display = str(rel_target).rsplit("/", 1)[-1]
+            try:
+                target_file = project_root / rel_target
+                target_file.parent.mkdir(parents=True, exist_ok=True)
+                with zipfile.ZipFile(archive_path, "r") as zf, zf.open(member) as src:
+                    target_file.write_bytes(src.read())
+                restored_extra.append(str(rel_target))
+                if str(rel_target) == ".meta-config/project.yaml":
+                    result["config_restored"] = True
+                log.note("backup", f"restored {display} from backup")
+            except (OSError, zipfile.BadZipFile, KeyError) as e:
+                # An extra-file restore failure must not undo the provider
+                # restore that already succeeded; it is surfaced via
+                # result["config_restore_error"] (#583) and a non-zero exit.
+                error = f"{type(e).__name__}: {e}"
+                log.error("backup", f"could not restore {display}: {error}")  # noqa: PLE1205
+                result["config_restore_error"] = error
+        if restored_extra:
+            result["extra_files_restored"] = restored_extra
+
+    failures = [
+        f"{name}: {info.get('error', 'not restored')}"
+        for name, info in result["provider_results"].items()
+        if not info.get("restored")
+    ]
+    if failures:
+        result["success"] = False
+        result["errors"] = failures
+    if result.get("config_restore_error"):
+        result["success"] = False
 
     return result
 
