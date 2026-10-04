@@ -106,6 +106,12 @@
   declare the new contracts as inputs so no handoff is silent.
 
 ### Fixed
+- **`agent-meta-version` schema rejects SemVer pre-release/build versions (#850)**: the
+  `agent-meta-version` pattern in `config/project-config.schema.json` accepted only `X.Y.Z`, so a
+  repo pinned to `2.0.0-beta.1` failed its own schema and `sync.py --validate` emitted a
+  `Config validation warnings` entry. The pattern now accepts SemVer pre-release (`-beta.1`,
+  `-rc.1`) and build metadata (`+build.5`) while still rejecting `1.2`, `1.2.3.4` and `v1.2.3`.
+  `protocol_version` in `schemas/a2a-handoff.schema.json` is a separate field and is unchanged.
 - **Guard hook rejects a leading UTF-8 BOM in a commit message (#842)**: the
   `orchestrator-guard` tokenizer now emits a third word (`message` | `file` | `none`) and
   `hooks/1-generic/orchestrator-guard-impl.sh` blocks `git commit -m`/`-F` whose subject starts
