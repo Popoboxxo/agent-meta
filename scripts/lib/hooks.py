@@ -317,10 +317,20 @@ def _update_antigravity_hooks_json(
 
     # Strip stale/rewritten managed hooks (identified by top-level key = hook
     # name stem), keep every foreign (user-authored) top-level entry.
+    # Provenance marker: underscore-prefixed top-level key that never collides
+    # with a hook name (hook names are file stems like "orchestrator-guard";
+    # `_registered_hook_stems` skips underscore-prefixed keys). It lets
+    # `is_managed_artifact()` recognize the file as agent-meta's own product,
+    # so the injection-drift scanner does not misread it as a foreign artifact
+    # on the first post-sync scan (issue #802). Added before the write,
+    # updated in place.
+    hooks_json["_agent-meta"] = {"managed": "agent-meta managed — do not edit manually"}
+
     stale_names = {Path(s).stem for s in (previously_managed - now_managed)}
     rewritten_names = {e["name"] for e in active_entries}
     hooks_json = {
-        k: v for k, v in hooks_json.items() if k not in stale_names and k not in rewritten_names
+        k: v for k, v in hooks_json.items()
+        if k in ("_agent-meta",) or (k not in stale_names and k not in rewritten_names)
     }
 
     for entry_meta in active_entries:

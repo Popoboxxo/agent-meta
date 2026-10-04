@@ -7,7 +7,13 @@ import stat
 import subprocess
 from pathlib import Path
 
-from .io import _load_yaml_or_json, _normalize_enabled_config, _write_yaml, safe_path
+from .io import (
+    _load_yaml_or_json,
+    _normalize_enabled_config,
+    _write_yaml,
+    safe_path,
+    write_checked,
+)
 from .log import SyncLog
 
 EXTERNAL_SKILLS_CONFIG = "config/skills-registry.yaml"
@@ -506,39 +512,51 @@ def sync_external_skills_for_provider(
             provider_config=provider_config,
             log=log,
         )
-        log.action("WRITE", str(agent_target.relative_to(project_root)),
-                   f"0-external/{skill_name}@{commit}")
+        # Route every external-skill write through write_checked/is_unchanged
+        # so a byte-identical artifact is a no-op (log.skip) rather than an
+        # unconditional WRITE/COPY action. Without this, `sync.py --check`
+        # reported drift forever on a converged tree with an active external
+        # skill (issue #802).
+        #
+        # allow_secrets=True: external-skill content is THIRD-PARTY. The raw
+        # write_text this replaced never scanned it, so a foreign SKILL.md or
+        # additional_file containing a secret-looking line must only warn
+        # (never raise SyncError and break an otherwise-working sync) — same
+        # non-blocking semantics as the pre-write_checked path (review F3).
+        rel_agent = str(agent_target.relative_to(project_root))
+        if write_checked(agent_target, agent_content, log, f"0-external/{skill_name}",
+                         dry_run=dry_run, allow_secrets=True):
+            log.action("WRITE", rel_agent, f"0-external/{skill_name}@{commit}")
+        else:
+            log.skip(rel_agent, "unchanged")
 
-        # Copy + normalize skill files to <provider>/skills/<skill_name>/
+
         skill_target_dir = safe_path(skills_dir, skill_name)
 
-        # Entry file: copy and normalize relative paths
-        log.action("COPY", str((skill_target_dir / entry_file).relative_to(project_root)),
-                   f"{local_path}/{source_rel}/{entry_file}")
+
+        entry_content = entry_path.read_text(encoding="utf-8")
+        entry_content = normalize_skill_paths(entry_content, skill_base_path)
+        rel_entry = str((skill_target_dir / entry_file).relative_to(project_root))
+        entry_src_label = f"{local_path}/{source_rel}/{entry_file}"
+        if write_checked(skill_target_dir / entry_file, entry_content, log, entry_src_label,
+                         dry_run=dry_run, allow_secrets=True):
+            log.action("COPY", rel_entry, entry_src_label)
+        else:
+            log.skip(rel_entry, "unchanged")
+
         for af in additional:
             af_source = skill_source_dir / af
-            if af_source.exists():
-                log.action("COPY", str((skill_target_dir / af).relative_to(project_root)),
-                           f"{local_path}/{source_rel}/{af}")
-            else:
+            if not af_source.exists():
                 log.warn(f"additional_file not found: {af_source}")
-
-        if not dry_run:
-            agents_dir.mkdir(parents=True, exist_ok=True)
-            agent_target.write_text(agent_content, encoding="utf-8")
-            skill_target_dir.mkdir(parents=True, exist_ok=True)
-
-            # Normalize ./ref paths in entry file → <provider>/skills/<skill>/ref
-            entry_content = entry_path.read_text(encoding="utf-8")
-            entry_content = normalize_skill_paths(entry_content, skill_base_path)
-            (skill_target_dir / entry_file).write_text(entry_content, encoding="utf-8")
-
-            for af in additional:
-                af_source = skill_source_dir / af
-                if af_source.exists():
-                    (skill_target_dir / af).write_text(
-                        af_source.read_text(encoding="utf-8"), encoding="utf-8"
-                    )
+                continue
+            af_content = af_source.read_text(encoding="utf-8")
+            rel_af = str((skill_target_dir / af).relative_to(project_root))
+            af_src_label = f"{local_path}/{source_rel}/{af}"
+            if write_checked(skill_target_dir / af, af_content, log, af_src_label,
+                             dry_run=dry_run, allow_secrets=True):
+                log.action("COPY", rel_af, af_src_label)
+            else:
+                log.skip(rel_af, "unchanged")
 
     _write_skills_managed_index(skills_dir, now_managed, dry_run, universe=set(skills.keys()))
 

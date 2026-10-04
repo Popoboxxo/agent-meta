@@ -5,11 +5,18 @@
 # Contract: cwd = temp project dir (sync output); $1 and env REPO_ROOT carry the
 # agent-meta checkout path. The harness has already run dry-run + real sync +
 # --validate, so the tree is the run1 output. This scenario proves:
-#   1. a further sync leaves every generated artifact byte-identical
-#      (run1 == run2), and
-#   2. `sync.py --check` on the converged tree exits rc 0.
+#   1. `sync.py --check` right after that FIRST real sync exits rc 0 — one-sync
+#      convergence (issue #802: previously a second sync was required because
+#      the drift scanner and some writers were not idempotent), and
+#   2. a further sync leaves every generated artifact byte-identical
+#      (run1 == run2).
+# Order matters: `--check` MUST run before the second sync, otherwise the second
+# sync masks the one-sync-convergence bug.
 # Volatile log files written by sync itself and the harness log dir are excluded
-# from the content hash — they are diagnostics, not generated artifacts.
+# from the content hash — they are diagnostics, not generated artifacts. The
+# external-tools drift *reports* are now legitimately absent on a clean tree;
+# they are still excluded defensively (they are diagnostics, not generated
+# provider artifacts).
 # Exit 0 = all assertions hold.
 set -u
 
@@ -27,10 +34,8 @@ fail() {
 # Deterministic content hash of the generated tree (path + bytes), skipping the
 # volatile diagnostics that a run rewrites but that are not generated provider
 # artifacts: the sync/harness logs and the external-tools drift *reports*
-# (`external-tools-drift.md`, the scanner's own warning artifact; it appears on
-# the second run because the isolation state files created by the first run are
-# only then visible to the scanner). Provider agent/rule/skill/hook artifacts
-# are all covered.
+# (`external-tools-drift.md`, the scanner's own warning artifact). Provider
+# agent/rule/skill/hook artifacts are all covered.
 tree_hash() {
     find . -type f \
         -not -path './.scenario-logs/*' \
@@ -43,6 +48,15 @@ tree_hash() {
 run1_hash="$(tree_hash)"
 [ -n "$run1_hash" ] || fail "could not hash the generated tree"
 
+# Issue #802: --check must be clean after the FIRST real sync (run1), before any
+# second sync can mask non-idempotent writers/scanners.
+check_rc=0
+python3 "$REPO_ROOT/scripts/sync.py" --check > check.log 2>&1 || check_rc=$?
+[ "$check_rc" -eq 0 ] || {
+    cat check.log
+    fail "sync.py --check rc=$check_rc after ONE sync (expected one-sync convergence)"
+}
+
 run2_rc=0
 python3 "$REPO_ROOT/scripts/sync.py" > run2.log 2>&1 || run2_rc=$?
 [ "$run2_rc" -eq 0 ] || { cat run2.log; fail "second sync rc=$run2_rc"; }
@@ -51,8 +65,4 @@ run2_hash="$(tree_hash)"
 [ "$run1_hash" = "$run2_hash" ] \
     || fail "generated tree changed between sync runs ($run1_hash != $run2_hash)"
 
-check_rc=0
-python3 "$REPO_ROOT/scripts/sync.py" --check > check.log 2>&1 || check_rc=$?
-[ "$check_rc" -eq 0 ] || { cat check.log; fail "sync.py --check rc=$check_rc (expected clean tree)"; }
-
-echo "ASSERT OK (71-check-idempotency-all-providers): tree byte-identical across syncs ($run1_hash); --check rc 0"
+echo "ASSERT OK (71-check-idempotency-all-providers): --check rc 0 after ONE sync; tree byte-identical across syncs ($run1_hash)"

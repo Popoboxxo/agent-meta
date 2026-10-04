@@ -209,7 +209,9 @@ def _registered_hook_stems(
         data = read_json_lenient(project_root / config_rel)
         if not isinstance(data, dict):
             return set()
-        return {str(k) for k in data}
+        # Skip metadata keys (e.g. hooks.py's "_agent-meta" provenance marker):
+        # they are not hook names and must never count as a registration.
+        return {str(k) for k in data if not str(k).startswith("_")}
 
     settings_rel = provider_cfg.get("settings_file", ".claude/settings.json")
     settings_path = project_root / settings_rel

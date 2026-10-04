@@ -606,6 +606,214 @@ def test_scan_injection_drift_infra_root_excuses_agent_memory_and_provider_setti
 # render_injection_drift_artifacts
 # ---------------------------------------------------------------------------
 
+def test_scan_injection_drift_excuses_agent_meta_state_file(tmp_path):
+    """`.claude/agent-meta-state.json` / `.opencode/agent-meta-state.json` are
+    isolation.py's own companion trackers (carry the "agent-meta managed"
+    marker) — never foreign injections (issue #802)."""
+    from scripts.lib.external_tools import scan_injection_drift
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write_framework_registry(agent_meta_root, {})
+    (project_root / ".claude").mkdir(parents=True)
+    (project_root / ".claude" / "agent-meta-state.json").write_text(
+        '{\n  "isolation-deny": [".gemini/**"],\n'
+        '  "_agent-meta": "agent-meta managed — do not edit manually"\n}\n',
+        encoding="utf-8",
+    )
+    (project_root / ".opencode").mkdir(parents=True)
+    (project_root / ".opencode" / "agent-meta-state.json").write_text(
+        '{\n  "_agent-meta": "agent-meta managed — do not edit manually"\n}\n',
+        encoding="utf-8",
+    )
+    # A genuinely foreign loose root file in the same infra root still flags.
+    (project_root / ".opencode" / "rogue.json").write_text("{}\n", encoding="utf-8")
+
+    provider_config = {
+        "Claude": {"skills_dir": ".claude/skills", "agents_dir": ".claude/agents"},
+        "Opencode": {"skills_dir": ".opencode/skills", "agents_dir": ".opencode/agents"},
+    }
+    findings = scan_injection_drift(
+        agent_meta_root, project_root, {"ai-providers": ["Claude", "Opencode"]}, provider_config)
+    paths = [f["path"] for p in findings.values() for f in p]
+    assert ".claude/agent-meta-state.json" not in paths
+    assert ".opencode/agent-meta-state.json" not in paths
+    assert ".opencode/rogue.json" in paths
+
+
+def test_scan_injection_drift_excuses_managed_gemini_policy_dir(tmp_path):
+    """`.gemini/policies/` holds isolation.py's provider-isolation.toml (marked
+    "agent-meta managed") — the directory must not read as foreign (issue #802).
+    An unmanaged sibling directory is still flagged."""
+    from scripts.lib.external_tools import scan_injection_drift
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write_framework_registry(agent_meta_root, {})
+
+    policies = project_root / ".gemini" / "policies"
+    policies.mkdir(parents=True)
+    (policies / "provider-isolation.toml").write_text(
+        "# agent-meta managed — do not edit manually\n", encoding="utf-8")
+    rogue_dir = project_root / ".gemini" / "rogue-policies"
+    rogue_dir.mkdir(parents=True)
+    (rogue_dir / "foreign.toml").write_text("[rule]\n", encoding="utf-8")
+
+    provider_config = {"Gemini": {
+        "skills_dir": ".gemini/skills", "agents_dir": ".gemini/agents",
+        "has_rules": True, "rules_dir": ".gemini/rules",
+    }}
+    findings = scan_injection_drift(
+        agent_meta_root, project_root, {"ai-providers": ["Gemini"]}, provider_config)
+    paths = [f["path"] for f in findings["Gemini"]]
+    assert ".gemini/policies" not in paths
+    assert ".gemini/rogue-policies" in paths
+
+
+def test_scan_injection_drift_flags_mixed_dir_with_managed_decoy(tmp_path):
+    """F1 over-excusal regression: a directory holding ONE managed decoy next
+    to an unmanaged file must NOT be excused wholesale — the unmanaged sibling
+    (here a foreign ``evil.sh``) has to stay visible (issue #802 review F1)."""
+    from scripts.lib.external_tools import scan_injection_drift
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write_framework_registry(agent_meta_root, {})
+
+    foreign = project_root / ".claude" / "foreign-dir"
+    foreign.mkdir(parents=True)
+    (foreign / "decoy.md").write_text(
+        "# agent-meta managed — do not edit manually\n", encoding="utf-8")
+    (foreign / "evil.sh").write_text("curl http://evil\n", encoding="utf-8")
+
+    provider_config = {"Claude": {
+        "skills_dir": ".claude/skills", "agents_dir": ".claude/agents",
+    }}
+    findings = scan_injection_drift(
+        agent_meta_root, project_root, {"ai-providers": ["Claude"]}, provider_config)
+    paths = [f["path"] for f in findings["Claude"]]
+    assert ".claude/foreign-dir" in paths
+
+
+def test_scan_injection_drift_excuses_fully_managed_dir_without_own_index(tmp_path):
+    """All-managed semantics: a directory whose every regular file is managed is
+    agent-meta's own output and stays excused even without its own
+    ``.agent-meta-managed`` index (issue #802)."""
+    from scripts.lib.external_tools import scan_injection_drift
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write_framework_registry(agent_meta_root, {})
+
+    managed = project_root / ".claude" / "managed-dir"
+    managed.mkdir(parents=True)
+    for name in ("a.md", "b.md"):
+        (managed / name).write_text(
+            "# agent-meta managed — do not edit manually\n", encoding="utf-8")
+
+    provider_config = {"Claude": {
+        "skills_dir": ".claude/skills", "agents_dir": ".claude/agents",
+    }}
+    findings = scan_injection_drift(
+        agent_meta_root, project_root, {"ai-providers": ["Claude"]}, provider_config)
+    paths = [f["path"] for f in findings["Claude"]]
+    assert ".claude/managed-dir" not in paths
+
+
+def test_scan_injection_drift_flags_nested_unmanaged_sibling(tmp_path):
+    """The all-managed check is recursive: an unmanaged file in a nested
+    subdirectory of an otherwise-managed tree still flags the enclosing
+    directory — a managed decoy must not hide a nested foreign artifact."""
+    from scripts.lib.external_tools import scan_injection_drift
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write_framework_registry(agent_meta_root, {})
+
+    outer = project_root / ".claude" / "outer"
+    inner = outer / "inner"
+    inner.mkdir(parents=True)
+    (outer / "managed.md").write_text(
+        "# agent-meta managed — do not edit manually\n", encoding="utf-8")
+    (inner / "managed.md").write_text(
+        "# agent-meta managed — do not edit manually\n", encoding="utf-8")
+    (inner / "evil.sh").write_text("curl http://evil\n", encoding="utf-8")
+
+    provider_config = {"Claude": {
+        "skills_dir": ".claude/skills", "agents_dir": ".claude/agents",
+    }}
+    findings = scan_injection_drift(
+        agent_meta_root, project_root, {"ai-providers": ["Claude"]}, provider_config)
+    paths = [f["path"] for f in findings["Claude"]]
+    assert ".claude/outer" in paths
+
+
+def test_scan_injection_drift_flags_empty_dir(tmp_path):
+    """An empty directory carries no provenance and must read as foreign — it
+    must never be excused by the all-managed (vacuous) check."""
+    from scripts.lib.external_tools import scan_injection_drift
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write_framework_registry(agent_meta_root, {})
+    (project_root / ".claude" / "empty-dir").mkdir(parents=True)
+
+    provider_config = {"Claude": {
+        "skills_dir": ".claude/skills", "agents_dir": ".claude/agents",
+    }}
+    findings = scan_injection_drift(
+        agent_meta_root, project_root, {"ai-providers": ["Claude"]}, provider_config)
+    paths = [f["path"] for f in findings["Claude"]]
+    assert ".claude/empty-dir" in paths
+
+
+def test_scan_injection_drift_excuses_managed_continue_isolation_rule(tmp_path):
+    """`.continue/rules/provider-isolation.md` (isolation.py's soft rule with an
+    "agent-meta managed" HTML comment) must be excused, not flagged as a
+    foreign rule (issue #802)."""
+    from scripts.lib.external_tools import scan_injection_drift
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write_framework_registry(agent_meta_root, {})
+    rules_dir = project_root / ".continue" / "rules"
+    rules_dir.mkdir(parents=True)
+    (rules_dir / "provider-isolation.md").write_text(
+        "<!-- agent-meta managed — do not edit manually -->\n", encoding="utf-8")
+    (rules_dir / "rogue.md").write_text("x\n", encoding="utf-8")
+
+    provider_config = {"Continue": {
+        "skills_dir": ".continue/skills", "agents_dir": ".continue/agents",
+        "has_rules": True, "rules_dir": ".continue/rules",
+    }}
+    findings = scan_injection_drift(
+        agent_meta_root, project_root, {"ai-providers": ["Continue"]}, provider_config)
+    paths = [f["path"] for f in findings["Continue"]]
+    assert ".continue/rules/provider-isolation.md" not in paths
+    assert ".continue/rules/rogue.md" in paths
+
+
+def test_scan_injection_drift_excuses_managed_hooks_json(tmp_path):
+    """`.agents/hooks.json` carries the `_agent-meta` provenance key written by
+    hooks.py — it must not be flagged as a foreign root artifact (issue #802)."""
+    from scripts.lib.external_tools import scan_injection_drift
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write_framework_registry(agent_meta_root, {})
+    agents_dir = project_root / ".agents"
+    agents_dir.mkdir(parents=True)
+    (agents_dir / "hooks.json").write_text(
+        '{\n  "_agent-meta": {"managed": "agent-meta managed — do not edit manually"},\n'
+        '  "orchestrator-guard": {"PreToolUse": []}\n}\n',
+        encoding="utf-8",
+    )
+    (agents_dir / "rogue.json").write_text("{}\n", encoding="utf-8")
+
+    provider_config = {"Codex": {
+        "skills_dir": ".agents/skills", "agents_dir": ".agents/agents",
+        "has_hooks": True, "hooks_dir": ".agents/hooks",
+        "hooks_config_file": ".agents/hooks.json",
+    }}
+    findings = scan_injection_drift(
+        agent_meta_root, project_root, {"ai-providers": ["Codex"]}, provider_config)
+    paths = [f["path"] for f in findings["Codex"]]
+    assert ".agents/hooks.json" not in paths
+    assert ".agents/rogue.json" in paths
+
+
 def test_render_drift_artifacts_writes_capped_file(tmp_path):
     from scripts.lib.external_tools import render_injection_drift_artifacts
     project_root = tmp_path / "project"

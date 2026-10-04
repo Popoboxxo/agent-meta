@@ -106,6 +106,28 @@
   declare the new contracts as inputs so no handoff is silent.
 
 ### Fixed
+- **`sync.py --check` now converges after ONE sync on a fresh clone (#802)**: `--check` reported
+  drift (rc 1) on a freshly-synced tree until a *second* sync was run, breaking fresh clones of
+  multi-provider and Continue-`generate-prompts` projects. Three independent causes:
+  - the injection-drift scanner did not recognize several artifacts agent-meta itself had just
+    written — `.claude`/`.opencode/agent-meta-state.json`, `.gemini/policies/`,
+    `.continue/rules/provider-isolation.md` and `.agents/hooks.json` — and flagged them as foreign
+    injections. Recognition now routes through the shared `is_managed_artifact` predicate (managed
+    marker / managed-index); the isolation state files and Gemini policy carry the canonical
+    `agent-meta managed — do not edit manually` sentinel (the recognized marker is the full sentence,
+    not a loose substring, so the same predicate that gates destructive migrate/delete is not
+    widened), and `hooks.py` writes a top-level `_agent-meta` provenance key into its `hooks.json`.
+    A directory is excused only when its WHOLE subtree is agent-meta-managed — a managed decoy must
+    not hide an unmanaged sibling;
+  - `sync_prompts_for_continue` logged an unconditional `WRITE` per prompt even when the content was
+    byte-identical — now routed through `write_checked` (unchanged → `skip`);
+  - active external skills logged an unconditional `WRITE`/`COPY` — now content-compared via
+    `write_checked` (unchanged → `skip`). Third-party skill content is written with
+    `allow_secrets=True` (warn-only), preserving the non-raising behaviour of the raw `write_text` it
+    replaced.
+  A second sync is no longer required; real syncs still log `WRITE`/`COPY` when content actually
+  changes. Scenario 71 now asserts `--check` rc 0 *before* the second sync; new scenario 73 covers the
+  Continue `generate-prompts` one-sync case.
 - **Codex agent TOML serialized before body injections (#862)**: `codex-toml` providers emit the
   Markdown body as the trailing `developer_instructions = """..."""` field, but the debug-mode, viz,
   critical-rules-footer, `pathRules` and `xml-section-wrapping` blocks were appended *after*
