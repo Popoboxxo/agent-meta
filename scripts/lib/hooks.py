@@ -24,6 +24,14 @@ ANTIGRAVITY_ADAPTER_SCRIPT = "antigravity-json-adapter.sh"
 # antigravity.google/docs/hooks — issue #674 Phase 3.1).
 ANTIGRAVITY_FLAT_SHAPE_EVENTS = frozenset({"Stop", "PreInvocation", "PostInvocation"})
 
+# Hook events that are NOT native runtime events. A script declaring one is
+# invoked explicitly (by an agent or a human), never registered in a provider's
+# runtime registration artifact — writing it would create an event bucket the
+# harness never fires, so the hook would sit in settings.json and never run
+# (issue #808). See hooks/1-generic/pre-release-check.sh (`event: Manual`, run
+# by the release agent) and docs/guides/features/hooks.md.
+NON_RUNTIME_HOOK_EVENTS = frozenset({"Manual"})
+
 HOOK_TEMPLATE_SH = """\
 #!/bin/bash
 # hook: %(stem)s
@@ -490,6 +498,16 @@ def sync_hooks(
                      f"provider-specific hook ({hook_provider} only)")
             continue
 
+        # Protocol-scoped artifact: a script declaring `hook_protocol` is only
+        # meaningful where the provider registers hooks through that same
+        # contract (e.g. antigravity-json-adapter.sh for antigravity-hooks-json).
+        # Deploying it elsewhere would ship a never-executed file (issue #808).
+        declared_protocol = meta.get("hook_protocol", "")
+        if declared_protocol and declared_protocol != pc.get("hook_protocol"):
+            log.skip(str(target_path.relative_to(project_root)),
+                     f"protocol-specific script ({declared_protocol} only)")
+            continue
+
         now_managed.add(output_name)
         rel_out = str(target_path.relative_to(project_root))
         rel_source = f"hooks/{layer}/{source_path.name}"
@@ -513,6 +531,17 @@ def sync_hooks(
                 f"will fail with 'No such file or directory'."
             )
 
+        # Helper scripts (no `# hook:` header — e.g. the *-impl.sh scripts
+        # sourced by a wrapper hook, or antigravity-json-adapter.sh) are copied
+        # because a registered hook needs them, but they are never registered
+        # as standalone hooks themselves (issue #808). Reporting them as
+        # "not enabled — add hooks:{...}" was misleading: they have no
+        # registration path by design.
+        if not meta.get("hook"):
+            log.note(rel_out,
+                     "copied (helper — invoked by another hook, not registered)")
+            continue
+
         # Auto-enable viz-log when viz mode is dynamic/full
         if hook_stem == "viz-log" and viz_active:
             is_enabled = True
@@ -520,8 +549,15 @@ def sync_hooks(
             enabled_by_default = meta.get("enabled_by_default", "false").lower() == "true"
             is_enabled = project_hooks_cfg.get(hook_stem, {}).get("enabled", enabled_by_default)
 
-        if is_enabled:
-            event = meta.get("event", "PreToolUse")
+        event = meta.get("event", "PreToolUse")
+        if is_enabled and event in NON_RUNTIME_HOOK_EVENTS:
+            # `Manual` is not a native runtime event: this hook is invoked
+            # explicitly (e.g. by the release agent) and must never be written
+            # into settings.json as an event bucket the harness never fires
+            # (issue #808). The script is still deployed.
+            log.note(rel_out,
+                     f"copied (manual hook — run explicitly, not registered as '{event}')")
+        elif is_enabled:
             active_entries.append({
                 "name": hook_stem,
                 "event": event,
@@ -535,6 +571,11 @@ def sync_hooks(
             })
             log.note(str(target_path.relative_to(project_root)),
                      f"registered in settings.json (event: {event})")
+        elif event in NON_RUNTIME_HOOK_EVENTS:
+            # Not a runtime hook and not enabled: it has no settings.json
+            # registration path at all — invoked explicitly instead.
+            log.note(rel_out,
+                     f"copied (manual hook — run explicitly; not a runtime '{event}' hook)")
         else:
             log.note(str(target_path.relative_to(project_root)),
                      f"copied (not enabled) — add \"hooks\": {{\"{hook_stem}\": {{\"enabled\": true}}}} to activate")

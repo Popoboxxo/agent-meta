@@ -1,0 +1,188 @@
+"""Regression tests for issue #808 — generated Claude hooks must not be
+silently-dead code.
+
+Invariants under test:
+
+1. Every hook that is meant to run by default (``enabled_by_default: true``,
+   not overridden) is registered in the provider's registration artifact and
+   its deployed file exists.
+2. Every opt-in hook has a working registration path: enabling it via
+   ``project.yaml`` registers it.
+3. Helper scripts (no ``# hook:`` header) and non-runtime ``Manual`` hooks are
+   never registered as standalone hooks.
+4. Protocol-scoped scripts (``# hook_protocol:``) are only deployed to
+   providers speaking that protocol — e.g. ``antigravity-json-adapter.sh`` is
+   not generated for Claude.
+5. Every hook script (source and generated) is valid shell (``bash -n``).
+
+Run: python -m pytest tests/test_hook_registration_invariant.py -v
+"""
+from __future__ import annotations
+
+import json
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+_SCRIPTS_DIR = _REPO_ROOT / "scripts"
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+
+from lib.hooks import (  # noqa: E402
+    NON_RUNTIME_HOOK_EVENTS,
+    collect_hook_sources,
+    parse_hook_metadata,
+    parse_hook_settings_command,
+    sync_hooks,
+)
+from lib.log import SyncLog  # noqa: E402
+from lib.providers import load_providers_config  # noqa: E402
+
+_BASH = shutil.which("bash") or "bash"
+_CLAUDE_HOOKS_DIR = ".claude/hooks"
+
+pytestmark = pytest.mark.skipif(
+    sys.platform not in ("win32", "linux", "darwin"), reason="requires bash"
+)
+
+
+def _sync(project_root: Path, provider: str = "Claude", hooks_cfg: dict | None = None) -> SyncLog:
+    log = SyncLog()
+    config = {"platforms": [], "hooks": hooks_cfg or {}}
+    provider_config = load_providers_config(_REPO_ROOT)
+    sync_hooks(
+        _REPO_ROOT, project_root, config, log,
+        dry_run=False, provider=provider, provider_config=provider_config,
+    )
+    return log
+
+
+def _registered_stems(settings_path: Path) -> set[str]:
+    """Stems of hooks registered in a Claude settings.json artifact."""
+    data = json.loads(settings_path.read_text(encoding="utf-8"))
+    stems: set[str] = set()
+    for entries in data.get("hooks", {}).values():
+        for entry in entries:
+            for handler in entry.get("hooks", []):
+                filename = parse_hook_settings_command(
+                    str(handler.get("command", "")), _CLAUDE_HOOKS_DIR
+                )
+                if filename:
+                    stems.add(Path(filename).stem)
+    return stems
+
+
+def _default_enabled_hooks(provider: str = "Claude") -> set[str]:
+    """Source hooks that sync_hooks() is expected to register by default."""
+    expected: set[str] = set()
+    for source_path, output_name in collect_hook_sources(_REPO_ROOT, []):
+        meta = parse_hook_metadata(source_path.read_text(encoding="utf-8"))
+        if not meta.get("hook"):
+            continue  # helper
+        if meta.get("provider") and meta["provider"] != provider:
+            continue
+        if meta.get("event") in NON_RUNTIME_HOOK_EVENTS:
+            continue
+        if meta.get("enabled_by_default", "false").lower() == "true":
+            expected.add(Path(output_name).stem)
+    return expected
+
+
+def test_default_enabled_hooks_are_registered(tmp_path):
+    """Generated-hook invariant: default-enabled hooks ⊆ registered hooks."""
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+
+    _sync(project_root)
+
+    expected = _default_enabled_hooks()
+    assert expected, "sanity: agent-meta must ship at least one default-enabled hook"
+
+    registered = _registered_stems(project_root / ".claude" / "settings.json")
+    missing = expected - registered
+    assert not missing, f"default-enabled hooks are not registered: {sorted(missing)}"
+    for stem in expected:
+        assert (project_root / _CLAUDE_HOOKS_DIR / f"{stem}.sh").is_file(), (
+            f"registered default-enabled hook '{stem}' has no deployed file"
+        )
+
+
+def test_opt_in_hook_has_a_registration_path(tmp_path):
+    """A genuinely opt-in hook is not dead code: enabling it registers it."""
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+
+    _sync(project_root, hooks_cfg={"lifecycle-check": {"enabled": True}})
+
+    registered = _registered_stems(project_root / ".claude" / "settings.json")
+    assert "lifecycle-check" in registered
+    settings = json.loads(
+        (project_root / ".claude" / "settings.json").read_text(encoding="utf-8")
+    )
+    assert "PostToolUse" in settings["hooks"]
+
+
+def test_helpers_are_never_registered(tmp_path):
+    """Scripts without a `# hook:` header are helpers, not standalone hooks."""
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+
+    _sync(project_root)
+
+    registered = _registered_stems(project_root / ".claude" / "settings.json")
+    for helper in ("orchestrator-guard-impl", "repo-containment-impl", "antigravity-json-adapter"):
+        assert helper not in registered, f"helper '{helper}' was registered as a hook"
+
+
+def test_protocol_scoped_adapter_only_deployed_for_its_protocol(tmp_path):
+    """antigravity-json-adapter.sh is not dead code in a Claude project: it is
+    simply not generated there (issue #808)."""
+    claude_project = tmp_path / "claude"
+    claude_project.mkdir()
+    _sync(claude_project, provider="Claude")
+    assert not (claude_project / _CLAUDE_HOOKS_DIR / "antigravity-json-adapter.sh").exists()
+
+    gemini_project = tmp_path / "gemini"
+    gemini_project.mkdir()
+    _sync(gemini_project, provider="Gemini")
+    assert (gemini_project / ".agents" / "hooks" / "antigravity-json-adapter.sh").exists()
+
+
+def test_manual_hook_is_never_registered_even_when_enabled(tmp_path):
+    """`event: Manual` is not a native runtime event — enabling it must not
+    write a 'Manual' bucket into settings.json."""
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+
+    _sync(project_root, hooks_cfg={"pre-release-check": {"enabled": True}})
+
+    settings = json.loads(
+        (project_root / ".claude" / "settings.json").read_text(encoding="utf-8")
+    )
+    hooks = settings.get("hooks", {})
+    assert "Manual" not in hooks
+    assert "pre-release-check" not in json.dumps(hooks)
+    # The dispatcher script is still deployed for the release agent to invoke.
+    assert (project_root / _CLAUDE_HOOKS_DIR / "pre-release-check.sh").is_file()
+
+
+def test_all_hook_scripts_are_valid_shell(tmp_path):
+    """Source and generated hook scripts must all pass `bash -n`."""
+    source_scripts = sorted((_REPO_ROOT / "hooks").rglob("*.sh"))
+    assert source_scripts, "sanity: no hook sources found"
+
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    _sync(project_root)
+    generated_scripts = sorted((project_root / _CLAUDE_HOOKS_DIR).rglob("*.sh"))
+    assert generated_scripts, "sanity: no generated hook scripts found"
+
+    for script in source_scripts + generated_scripts:
+        result = subprocess.run(
+            [_BASH, "-n", str(script)], capture_output=True, text=True
+        )
+        assert result.returncode == 0, f"{script}: {result.stderr}"

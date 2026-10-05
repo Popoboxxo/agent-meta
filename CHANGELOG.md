@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+### Fixed
+- **Generated hooks are no longer shipped as silently-dead code (issue #808)**: `sync.py`
+  now distinguishes real hooks from helper scripts and from non-runtime hooks, so the
+  generated hook set and the registered hook set no longer drift:
+  - Scripts without a `# hook:` header (e.g. `orchestrator-guard-impl.sh`,
+    `repo-containment-impl.sh`) are reported as **helpers** instead of being logged as
+    "not enabled — add `hooks:{...}`". They are never registered.
+  - Protocol-scoped scripts declare `# hook_protocol:` and are only deployed to providers
+    speaking that protocol. `antigravity-json-adapter.sh` (now 1.1.0) therefore no longer
+    lands in `.claude/hooks/` for Claude projects — it is only deployed for
+    `hook_protocol: antigravity-hooks-json` (Gemini/Antigravity).
+  - Hooks with `event: Manual` (e.g. `pre-release-check.sh`) are never written into
+    `settings.json` as an event bucket the harness never fires, even if a project sets
+    `hooks: { pre-release-check: { enabled: true } }`. The dispatcher is invoked
+    explicitly by the `release` agent.
+  - The `hooks.enabled-but-not-registered` consistency check skips helpers and `Manual`
+    hooks (they have no registration path by design) and keeps flagging genuinely
+    enabled hooks that are missing their registration.
+
 ### Added
 - **Four AI-agent roles, anchored in a 50-book literature analysis (27 Manning + 23 Humble/Packt)**:
   - `llm-evaluator` (1.0.0) — measures model/agent output against a golden dataset: offline eval

@@ -1,6 +1,7 @@
 #!/bin/bash
 # antigravity-json-adapter — Antigravity <-> Claude Code hook-contract adapter
-# version: 1.0.0
+# version: 1.1.0
+# hook_protocol: antigravity-hooks-json
 # description: Translates Google Antigravity's verified hook contract (hooks.json) to the Claude Code contract hooks/1-generic/*.sh are written against (issue #674 Phase 3.1)
 #
 # NOT a hook itself — no `# hook:`/`# event:` header, so scripts/lib/hooks.py
