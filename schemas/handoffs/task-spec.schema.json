@@ -8,8 +8,9 @@
     "t": {
       "type": "string",
       "title": "Task",
-      "description": "Task-Beschreibung in Natural Language. Pflichtfeld.",
+      "description": "Task-Beschreibung in Natural Language. Pflichtfeld. Machine-enforced ceiling: max. 300 Zeichen (Framework-Default A2A_T_SIZE_LIMIT, Issue #812) — langen Kontext in ctx/con/refs auslagern, nicht in t.",
       "minLength": 1,
+      "maxLength": 300,
       "examples": ["Implementiere Login-Flow", "Fixe NullPointer in UserService.create()"]
     },
     "ctx": {

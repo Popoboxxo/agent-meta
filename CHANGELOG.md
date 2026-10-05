@@ -3,6 +3,22 @@
 ## [Unreleased]
 
 ### Fixed
+- **A2A `payload.t` length limit is now machine-enforced, not merely documented (issue #812)**:
+  the documented 300-character task-line ceiling had no schema counterpart
+  (`maxLength` was absent), so schema validation accepted arbitrarily long
+  `payload.t` values. `schemas/a2a-handoff.schema.json` now declares
+  `maxLength: 300` for `payload.t` (single envelope) and for every FANOUT batch
+  entry `payload[].t`, and the universal payload schema
+  `schemas/handoffs/task-spec.schema.json` carries the same ceiling on `t`.
+  `DelegationSyntaxEngine.validate_envelope()` enforces the limit stdlib-only
+  (works without `jsonschema`) for both payload shapes and reports a clear error
+  naming `payload.t` / `payload[<index>].t`. The ceiling derives from a single
+  source — `orchestrator.handoff.t-size-limit` (default 300) via the new
+  `resolve_a2a_t_size_limit()` / `DEFAULT_A2A_T_SIZE_LIMIT` in
+  `scripts/lib/config.py`, the same value that backs `{{A2A_T_SIZE_LIMIT}}`; a
+  consistency test locks the schema `maxLength` to that default.
+  `rules/1-generic/a2a-delegation-gates.md` now documents the limit as
+  schema-enforced instead of a degraded doc-only check.
 - **MCP connection placeholders no longer ship as raw `{{VAR}}` literals in generated
   output (issue #810)**: generated MCP rule/context artifacts (`mcp-<server>.md`,
   `<skills_dir>/mcp-<server>/SKILL.md`) rendered the plugin catalog's `connection` block

@@ -140,6 +140,63 @@ def test_envelope_schema_has_no_unimplemented_fields():
         assert definition not in schema.get("definitions", {}), f"{definition} should have been removed (unused)"
 
 
+# --- Issue #812: payload.t length is machine-enforced in the schema ---------
+
+def test_envelope_schema_payload_t_declares_max_length():
+    import json
+    schema = json.loads((REPO_ROOT / "schemas" / "a2a-handoff.schema.json").read_text(encoding="utf-8"))
+    payload = schema["properties"]["payload"]
+    assert payload["properties"]["t"]["maxLength"] == 300
+    # FANOUT batch form: every entry carries the same ceiling.
+    assert payload["items"]["properties"]["t"]["maxLength"] == 300
+
+
+def test_task_spec_schema_t_declares_max_length():
+    import json
+    schema = json.loads(
+        (REPO_ROOT / "schemas" / "handoffs" / "task-spec.schema.json").read_text(encoding="utf-8")
+    )
+    assert schema["properties"]["t"]["maxLength"] == 300
+
+
+def test_schema_max_length_matches_framework_default():
+    """The schema ceiling and the config default must not drift (single source)."""
+    import json
+    from scripts.lib.config import DEFAULT_A2A_T_SIZE_LIMIT
+    schema = json.loads((REPO_ROOT / "schemas" / "a2a-handoff.schema.json").read_text(encoding="utf-8"))
+    assert schema["properties"]["payload"]["properties"]["t"]["maxLength"] == DEFAULT_A2A_T_SIZE_LIMIT
+
+
+def test_payload_t_at_limit_is_accepted():
+    engine = DelegationSyntaxEngine()
+    envelope = _base_envelope(payload={"t": "x" * 300})
+    assert engine.validate_envelope(envelope, agent_meta_root=REPO_ROOT) == []
+
+
+def test_payload_t_over_limit_is_rejected():
+    engine = DelegationSyntaxEngine()
+    envelope = _base_envelope(payload={"t": "x" * 301})
+    errors = engine.validate_envelope(envelope, agent_meta_root=REPO_ROOT)
+    assert any("payload.t exceeds" in e and "301" in e for e in errors)
+
+
+def test_custom_t_size_limit_is_honored():
+    engine = DelegationSyntaxEngine()
+    envelope = _base_envelope(payload={"t": "x" * 50})
+    assert any(
+        "payload.t exceeds" in e
+        for e in engine.validate_envelope(envelope, agent_meta_root=REPO_ROOT, t_size_limit=40)
+    )
+    assert engine.validate_envelope(envelope, agent_meta_root=REPO_ROOT, t_size_limit=50) == []
+
+
+def test_batch_payload_entries_are_length_checked():
+    engine = DelegationSyntaxEngine()
+    envelope = _base_envelope(batch=True, payload=[{"task_id": "b1", "t": "x" * 301}])
+    errors = engine.validate_envelope(envelope, agent_meta_root=REPO_ROOT)
+    assert any("payload[0].t exceeds" in e for e in errors)
+
+
 def test_project_config_schema_handoff_only_declares_protocol():
     import json
     schema = json.loads((REPO_ROOT / "config" / "project-config.schema.json").read_text(encoding="utf-8"))
