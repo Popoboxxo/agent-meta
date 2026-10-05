@@ -2095,14 +2095,42 @@ def only_variables(
     dry_run: bool,
     providers: list[str] | None = None,
     provider_config: dict | None = None,
+    config: dict | None = None,
+    agent_meta_root: Path | None = None,
 ):
-    """Substitute {{VARIABLE}} placeholders in existing provider context files."""
+    """Re-apply the configured variables to existing provider context files.
 
+    The generated context files (CLAUDE.md, AGENTS.md, …) do not keep the
+    ``{{VARIABLE}}`` placeholders around: a full sync already substituted every
+    variable to its literal value. So substituting only *open* placeholders —
+    the historic behaviour — can never propagate a changed variable value to an
+    already-rendered file (issue #806).
+
+    The fix re-renders the **static part** (header + template footer) from the
+    provider's ``context_template`` using the current ``variables``, exactly as
+    the full-sync path does via :func:`_regenerate_static_context`, while
+
+    * the ``agent-meta:managed-begin … managed-end`` block is preserved verbatim
+      (S3 / AC-18 — refreshing the agent hints + rules table remains a full-sync
+      job), and
+    * the user-notes section is preserved (``_preserve_user_notes``).
+
+    After the static refresh, any still-open ``{{VAR}}`` outside the managed
+    block is substituted directly (back-compat with the historic behaviour and a
+    safety net when no template exists or the file has no managed block yet).
+
+    ``config`` / ``agent_meta_root`` are optional for back-compat; when either is
+    absent the static refresh is skipped and only open placeholders are
+    substituted. The provider context file is never regenerated from scratch
+    (``--init`` owns creation) and agents are never touched.
+    """
     pc = provider_config or {}
     active = providers if providers is not None else list(pc.keys())
     found_any = False
+    regenerated: set[str] = set()
     for provider in active:
-        context_file = pc[provider].get("context_file")
+        provider_pc = pc.get(provider, {})
+        context_file = provider_pc.get("context_file")
         if not context_file:
             continue
         target_path = safe_path(project_root, context_file)
@@ -2110,12 +2138,35 @@ def only_variables(
             continue
         found_any = True
         content = target_path.read_text(encoding="utf-8")
+
         if _MANAGED_BLOCK_RE.search(content):
             log.warning(
-                f"{context_file}: --only-variables substitutes placeholders only — "
-                "the agent-meta managed block is not re-rendered (S3); run a full "
-                "sync to refresh it."
+                f"{context_file}: --only-variables refreshes the static part from "
+                "the template and substitutes placeholders — the agent-meta managed "
+                "block is not re-rendered (S3); run a full sync to refresh it."
             )
+
+        # Re-render the static part once per physical file (AGENTS.md is shared
+        # by several providers — e.g. Gemini + Opencode — so a per-provider loop
+        # would process it more than once; the first template wins).
+        if config is not None and agent_meta_root is not None and context_file not in regenerated:
+            template_name = provider_pc.get("context_template")
+            template_path = agent_meta_root / template_name if template_name else None
+            # Footer semantics mirror the full-sync path: a dedicated context
+            # file (e.g. CLAUDE.md, has_dedicated_context_file) keeps its footer
+            # verbatim, while the shared AGENTS.md family rebuilds the template
+            # footer. Key-driven — no provider-name branch.
+            rebuild_footer = not provider_pc.get("has_dedicated_context_file", False)
+            _regenerate_static_context(
+                project_root, target_path, template_path, variables, log, dry_run,
+                rel_label=context_file,
+                source_label=template_name or context_file,
+                rebuild_footer=rebuild_footer,
+            )
+            regenerated.add(context_file)
+
+        # Re-read: the static refresh above may have rewritten the file.
+        content = target_path.read_text(encoding="utf-8")
         new_content = substitute(content, variables, context_file, log)
 
         if new_content == content:
