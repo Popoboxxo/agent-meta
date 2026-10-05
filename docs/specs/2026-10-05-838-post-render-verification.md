@@ -28,7 +28,7 @@ Each phase ships independently; implementation MUST NOT start before an approved
 
 **Ziel.** Close the class: one central read-only post-render verification stage validating the rendered artifacts against the resolved provider set **before** the hash baseline is captured, so drift cannot be frozen into the baseline.
 
-**Nicht-Ziele.** Not fixing instances individually (each is a fixture). #680 is the complementary **data-side** fix — an input, not a substitute. No replacement of the generated-file drift scan. No provider-name branches; no new provider; no writer instrumentation (§2.2).
+**Nicht-Ziele.** Not fixing instances individually (each is a fixture). #680 is the complementary **data-side** fix — an input, not a substitute. No replacement of the generated-file drift scan. No provider-name branches; no new provider; no writer instrumentation (§2.2). P1 does **not** resolve code-level import/module references (`import x.y`, `from a import b`) — a module path needs import resolution, not string-matching against the filesystem; out of scope, see §2.3 grammar.
 
 ## 2. Proposed Solution
 
@@ -53,10 +53,38 @@ No `RenderWriteSet`, output plan, or run-scoped write-set abstraction exists tod
 
 | ID | Predicate | Checks | Default severity |
 |----|-----------|--------|------------------|
-| P1 | path-existence | Every repo-local referenced path resolves (markdown links, backticked paths, import references). External URLs/anchors/OS paths outside the repo are out of scope. | `warn` (promote §2.4) |
+| P1 | path-existence | Repo-local paths captured by the pinned grammar (§2.3.1) resolve on disk. | `warn` (promote §2.4) |
 | P2 | directory-table | Every role listed in a generated directory table for a capable provider has a file in that provider's `agents_dir`. **Direction: listed → must exist only.** | `error` under `--validate` |
-| P3 | unresolved-placeholder | No `{{...}}` / `{{#if}}` residue survives. **Reuses** `consistency/placeholders.py::check_placeholders` (`:148`); generalizes the split diagnosis of `platform.py::warn_unresolved_platform_vars` (`:147`) from `platform_vars` to the resolved variable registry. | `warn` |
+| P3 | unresolved-placeholder | No `{{VAR}}` / `{{platform.*}}` residue survives in rendered content. **Composes** (does not duplicate, §2.3.2) existing registries/regexes from `consistency/placeholders.py` and `platform.py`. | `warn` |
 | P4 | skills | Skill references resolve against the active skill registry (#680 data-side). | `warn` until #680 |
+
+#### 2.3.1 P1 grammar (pinned — resolves the former open grammar question)
+
+Scanned over each artifact's raw rendered content (frontmatter block and fenced ```` ``` ```` code blocks stripped first, same stripping `check_placeholders` already does, `placeholders.py:156-161`, reused verbatim for consistency):
+
+- **Two source forms only:**
+  1. Markdown inline links — regex `\[[^\]]*\]\(([^)]+)\)`, capture group 1 is the candidate.
+  2. Backtick-quoted spans — regex `` `([^`\n]+)` ``, capture group 1 is the candidate.
+- **Candidate filter** (reject, no finding, if any match):
+  - URL scheme: `^[a-zA-Z][a-zA-Z0-9+.-]*://` or `^mailto:`.
+  - Anchor-only: `^#`.
+  - Contains an unresolved placeholder (`{{`) — P3's job, not P1's.
+  - No recognized extension: must match `^/?[\w][\w.\-/]*\.(md|py|yaml|yml|json|sh|txt)$` (a leading `/` is interpreted as **project-root-relative**, never an OS-absolute path).
+- **Resolution order:** candidate resolved relative to the artifact's own directory first, then relative to `project_root`; `Path.exists()` on either hit → pass. Neither resolves → `VerifyFinding(cause="missing-path")`.
+- **Explicitly out of scope** (never produce a P1 finding): Python/JS/etc. import statements (`import x.y`, `from a import b` — a module path, not a filesystem path string, see §1 Nicht-Ziele); OS-absolute paths resolving outside `project_root`; bare CLI flags/identifiers in backticks without `/` or a recognized extension (e.g. `` `--check` ``, `` `_handle_sync` ``).
+
+#### 2.3.2 P3 composition (resolves "duplicates an existing checker" — not a rewrite, not a bare delegation)
+
+`check_placeholders` (`placeholders.py:148`) only flags **unknown variable names / typos** in a pre-render **template** — a placeholder whose variable name *is* a known builtin is never flagged, even if it still appears verbatim in output. That is precisely #834's failure mode (a configured, known `{{platform.*}}` variable survives into rendered content because the render path skipped substitution) — so P3 cannot be "just call `check_placeholders` on the rendered file"; it would stay silent on exactly the bug class #834 fixtures. Conversely `warn_unresolved_platform_vars` (`platform.py:147`) already implements the right *split-diagnosis logic* (configured-but-present = `substitution-not-applied`; absent = `missing-from-config`) but is scoped only to the `{{platform.*}}` family via `_PLATFORM_VAR_RE` (`platform.py:14`).
+
+P3 is one new ~15-line function, `lib/verify.py::_check_unresolved_placeholders`, that **composes** existing building blocks rather than re-implementing or duplicating either:
+
+- Matches **both** surviving-placeholder regexes already defined elsewhere — `_PLACEHOLDER_RE` (`placeholders.py:145`, `{{[A-Z0-9_]+}}`) and `_PLATFORM_VAR_RE` (`platform.py:14`, `{{platform\.[^}]+}}`) — imported, not re-declared.
+- Builds `known = _BUILTIN_VARS | load_project_vars(agent_meta_root) | set(platform_vars.keys())` (all three imported from their existing modules) — "the resolved variable registry" generalizes `warn_unresolved_platform_vars`'s `platform_vars`-only registry to this full set.
+- Reuses `_KNOWN_TYPOS` (`placeholders.py:134`) for the typo diagnosis, unchanged.
+- Applies `warn_unresolved_platform_vars`'s split-diagnosis rule (`platform.py:172-184`), generalized from the `platform.*` family to both regex families against `known`: var in `known` → `cause="substitution-not-applied"`; var not in `known` (and not a `_DYNAMIC_PREFIXES` match, `placeholders.py:128`) → `cause="missing-from-config"`.
+
+No second source of truth is created: the known-variable set, the typo table, and both placeholder regexes are imported from their single existing definitions; only the composition (which regexes + which registry + the split rule, together, applied to *rendered* output rather than a *template*) is new.
 
 ### 2.4 Severity model + abort semantics
 
@@ -79,7 +107,9 @@ Legitimate capability-gated or feature-flag-filtered artifacts must produce **0 
 - `lib/verify.py::Artifact` — frozen dataclass: `path: Path`, `provider: str`, `kind: Literal["agent","rule","context","command","skill","hook","mcp","pipeline-details","managed-index","other"]`, `optional_for: frozenset[str] = frozenset()`. `kind` is set only by the walk (dir_spec); `managed-index` maps to P3.
 - `lib/verify.py::VerifyFinding` — frozen dataclass: `predicate` (`path-existence|directory-table|unresolved-placeholder|skills`), `severity: Literal["warn","error"]`, `artifact: Path`, `message: str`, `cause: Literal["missing-from-config","substitution-not-applied","missing-path","missing-role"]`. One cause class per predicate (P1→`missing-path`, P2→`missing-role`, P3→`missing-from-config`|`substitution-not-applied`, P4→`missing-path`).
 - `lib/verify.py::post_render_verify(verify_set, active_providers, config, project_root, log) -> tuple[VerifyFinding, ...]` — filesystem-read-only; raises `SyncError` iff a finding has `severity == "error"`.
-- `lib/verify.py::resolve_severities(config, mode: Literal["sync","validate"]) -> dict[str, Literal["off","warn","error"]]` — implements §2.4; P3 delegates to `check_placeholders`.
+- `lib/verify.py::resolve_severities(config, mode: Literal["sync","validate"]) -> dict[str, Literal["off","warn","error"]]` — implements §2.4.
+- `lib/verify.py::_check_path_existence(artifact, content, project_root) -> list[VerifyFinding]` — implements the pinned P1 grammar, §2.3.1.
+- `lib/verify.py::_check_unresolved_placeholders(content, known_vars) -> list[VerifyFinding]` — implements P3 by composing `placeholders._PLACEHOLDER_RE`, `platform._PLATFORM_VAR_RE`, `placeholders._KNOWN_TYPOS`, and `platform.warn_unresolved_platform_vars`'s split-diagnosis rule, §2.3.2. Does **not** call `check_placeholders` (wrong semantics for rendered output, see §2.3.2).
 
 ## 4. Datenfluss
 
@@ -97,6 +127,7 @@ Resolved config + active providers/presets → writer stages → post-render wal
 8. **`--check` reachability (corrected).** Reachable under `--check`/`--validate` via the read-only `_run_artifact_gate` over on-disk artifacts; a planned-render gate under forced dry-run is out of scope and documented as the #802 dependency here and in #838.
 9. **Invariant regression test.** Asserts invariants (finding presence/absence, causes, scope) — never exact rendered bytes or hashes.
 10. **Suppression.** A row whose `optional_for` contains the active provider yields zero findings; an unmarked required role with a capable provider and no file yields a finding.
+11. **P1 grammar scope.** A fixture with an import statement, an external URL, an anchor-only link, and a backtick-quoted CLI flag/identifier (no `/`, no recognized extension) each yield zero P1 findings; a fixture with a markdown link and a backtick-quoted path to a genuinely missing repo-local file each yield exactly one P1 finding with `cause="missing-path"`.
 
 ## 6. Dependencies / Relations
 
@@ -116,18 +147,18 @@ Fixture consumer layout under `tests/`; one sync run through `scripts/sync.py` p
 
 ## 9. Offene Fragen + Risiken (inkl. Threat Model)
 
-**Offene Fragen.** (a) P1 reference syntax scope (markdown links vs. backticks vs. imports; exemptions for project-local optional user files). (b) P2 coverage (only `AGENT_TABLE` or every generated directory-style table). (c) P4 promotion after #680. (d) `--dry-run`/`--check` planned set — resolved by #802, out of scope here.
+**Offene Fragen.** (a) ~~P1 reference syntax scope~~ — resolved, §2.3.1 pins the exact grammar (markdown links + backtick spans only, imports explicitly out of scope). Remaining open point: project-local optional user files (e.g. a consumer's own `docs/*.md` that intentionally references a not-yet-created path) are not separately exempted from P1 — they inherit the mode-dependent `warn` default (§2.4) until a consumer opts a predicate into `error`. (b) P2 coverage (only `AGENT_TABLE` or every generated directory-style table). (c) P4 promotion after #680. (d) `--dry-run`/`--check` planned set — resolved by #802, out of scope here.
 
 **Threat Model (4 questions).** (1) *Building:* a read-only post-render gate that reads written artifacts and can abort a sync; no network, auth, or data storage. (2) *Go wrong:* a false positive aborts a valid consumer sync (availability) and leaves a stale baseline until the next run; large/deep reference graphs slow the pass. (3) *Mitigations:* consumer-sync defaults `warn`; scope strictly to the managed-index set; bound scan depth/size; never execute/import referenced content; explicit severity overrides (`error` under `--validate` only). (4) *Consequences:* at worst broken consumer CI if a user opts into `error` with a bad predicate plus repeated drift backups; no remote-code-execution, privilege-escalation, or data-exfiltration path.
 
-**Risiken.** False positives on consumer projects with intentional external/optional references (→ P1 default `warn` until grammar pinned); duplicate diagnostics with the existing placeholder check (→ P3 reuses it, §2.3); performance on large trees (→ scoped verify set).
+**Risiken.** False positives on consumer projects with intentional external/optional references (→ P1 default `warn`, grammar pinned §2.3.1); duplicate diagnostics with the existing placeholder check (→ P3 composes, not duplicates, the existing registries/regexes, §2.3.2); performance on large trees (→ scoped verify set).
 
 ## 10. Code-Anker
 
 - `scripts/lib/cli_commands.py` — `_handle_sync` stages, stage 13 call (`:1192`); `_run_consistency_checks` (`:151`, called only `:1032` inside `_handle_validate` `:1016`).
 - `scripts/sync.py` — `_run_artifact_gate` (`:108`, runs for `--check`/`--validate`); `--check` forced dry-run (`:99-105`); dispatch fallthrough (`:657-663`).
 - `scripts/lib/generated_file_drift.py` — `_iter_managed_files` (`:237`).
-- `scripts/lib/consistency/placeholders.py` — `check_placeholders` (`:148`).
-- `scripts/lib/platform.py` — `warn_unresolved_platform_vars` split (`:147`).
+- `scripts/lib/consistency/placeholders.py` — `check_placeholders` (`:148`, why P3 does **not** call it as-is, §2.3.2); frontmatter/code-block stripping (`:156-161`, reused verbatim by P1); `_PLACEHOLDER_RE` (`:145`), `_KNOWN_TYPOS` (`:134`), `_BUILTIN_VARS` (`:11`), `load_project_vars` (`:186`) — all imported by P3, not re-declared.
+- `scripts/lib/platform.py` — `warn_unresolved_platform_vars` split-diagnosis logic (`:147`, generalized by P3, §2.3.2); `_PLATFORM_VAR_RE` (`:14`).
 - `scripts/lib/pipelines.py` — `SyncError` precedent (`:97`, `:105`).
 - `scripts/lib/crossrefs.py` — optional-tier table handling (`:133-137`).

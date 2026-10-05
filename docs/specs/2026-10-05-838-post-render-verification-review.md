@@ -222,3 +222,44 @@ before a plan can be derived. The trace anchor is valid, so a plan derived after
 the fixes can reference `SPEC-838-POST-RENDER-VERIFICATION-2026-10-05`.
 
 **STATUS: done**
+
+---
+
+## 5. Revision Log (2026-10-06, concept-specifier)
+
+Spec revised (`docs/specs/2026-10-05-838-post-render-verification.md`, `status:
+proposed` — resubmitted, not self-approved). Findings addressed:
+
+- **RVW-1** (write-set mechanism unbounded) — §2.2 pins the managed-index-derived
+  post-hoc verify set (no instrumentation, no write-set abstraction); confirmed
+  already resolved in this revision pass, no further change needed.
+- **RVW-2** (`--check` reachability factual error) — §2.1 corrected to
+  `_run_artifact_gate` (`sync.py:108-134`, verified against current code this
+  pass); confirmed already resolved, no further change needed.
+- **RVW-3** (suppression circularity vs. #835) — §2.5 defines `optional_for` as
+  authored from capability/feature config, not the materialisation resolver;
+  confirmed already resolved, no further change needed.
+- **RVW-4** (P1 grammar unresolved + fail-fast risk) — new §2.3.1 pins the exact
+  P1 grammar (markdown links + backtick spans only, candidate filter, resolution
+  order, explicit exclusions including import statements); new AC-11 makes it
+  testable; open question (a) closed. Severity/abort-desync handling in §2.4 was
+  already present and is unchanged.
+- **RVW-5** (no threat model) — §9 "Threat Model (4 questions)" was already
+  present and answers all four; confirmed, no further change needed.
+- **RVW-6** (P3 duplicates existing checker) — new §2.3.2 explains precisely why
+  `check_placeholders` cannot be called as-is (it never flags a *known* variable
+  surviving into rendered output — exactly #834's bug) and specifies the actual
+  composition: `_check_unresolved_placeholders` imports `_PLACEHOLDER_RE`,
+  `_PLATFORM_VAR_RE`, `_KNOWN_TYPOS`, `_BUILTIN_VARS`/`load_project_vars`, and
+  generalizes `warn_unresolved_platform_vars`'s split-diagnosis rule from the
+  `platform.*` family to both placeholder families. Interface contract (§3) and
+  Code-Anker (§10) updated to match.
+
+Minor findings RVW-7/8/9 were already resolved in the reviewed artifact's prior
+state (status vocabulary, P2 capability gating, enum/predicate mapping) and
+needed no further change in this pass.
+
+Size classification unchanged (phasing §0: overall L/XL across 3 phases, Phase 1
+S/M — no new files or abstractions introduced by these fixes).
+
+Ready for re-review.
