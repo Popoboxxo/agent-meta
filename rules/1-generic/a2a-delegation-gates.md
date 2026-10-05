@@ -15,8 +15,28 @@ den praktischen Fehlerfall ab:
 | Check | Status | Begründung |
 |---|---|---|
 | `delegation_depth ≤ {{A2A_MAX_DEPTH}}` | dokumentiert | Die Plattform (z.B. Claude Code) erzwingt Tiefenlimits ohnehin; eigene Prüfung ist redundant. Referenz: `docs/concepts/a2a-handoff-protocol.md` |
-| `payload.t ≤ {{A2A_T_SIZE_LIMIT}} Zeichen` | dokumentiert | Empfehlung für prägnante Task-Zeilen; der Re-Delegation-Check (Punkt 1) deckt den eigentlichen Fehlerfall (Spec-Dump) ab |
 | `max_depth` via project.yaml (`orchestrator.delegation.max_depth`) | dokumentiert | Toter Konfigurationsraum bei einem 2-Ebenen-Repo; der enforced-Pfad wurde aus `validate_envelope()` entfernt, der Doku-Verweis bleibt |
+
+## Schema-erzwungen: `payload.t ≤ {{A2A_T_SIZE_LIMIT}} Zeichen` (Issue #812)
+
+Das Task-Zeilen-Limit ist **kein** reiner Doku-Check mehr, sondern maschinell hinterlegt:
+
+- **JSON Schema:** `schemas/a2a-handoff.schema.json` deklariert `maxLength: {{A2A_T_SIZE_LIMIT}}`
+  für `payload.t` (Einzel-Envelope) und für jeden Batch-Eintrag `payload[].t`; das
+  universelle Payload-Schema `schemas/handoffs/task-spec.schema.json` trägt dasselbe Limit
+  für `t`. Jede Schema-Validierung (z.B. via `jsonschema`) weist überlange Task-Zeilen ab.
+- **Validator:** `validate_envelope()` in `scripts/lib/delegation_syntax.py` prüft die Länge
+  zusätzlich stdlib-only (ohne `jsonschema`) und meldet getrennt `payload.t` bzw.
+  `payload[<index>].t` mit einem klaren Fehler.
+- **Eine Quelle:** Das Limit stammt aus `orchestrator.handoff.t-size-limit` (Default 300),
+  aufgelöst über `resolve_a2a_t_size_limit()` in `scripts/lib/config.py` — dieselbe Quelle
+  wie der Platzhalter `{{A2A_T_SIZE_LIMIT}}`. Ein Konsistenztest bindet Schema-`maxLength`
+  und Framework-Default aneinander.
+
+> Laufzeit-Hinweis: `validate_envelope()` bleibt eine manuell aufrufbare Utility ohne
+> automatischen Dispatch-Interception-Punkt (siehe „Bekannte Grenzen"). Das Schema-Limit
+> greift überall dort, wo ein Envelope tatsächlich schema-validiert wird; der
+> Prompt-Appell bleibt für den normalen Dispatch bestehen.
 
 ## Per-Task-Tier: `payload.tier_override` (optional — Issue #346)
 

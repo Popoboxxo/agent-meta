@@ -82,13 +82,25 @@
       "description": "The domain-specific data being handed over. Must conform to the schema referenced by schema_ref. When batch is true, payload is an array of task objects — each with a task_id (local to the batch) plus domain-specific fields. source_agent and target_agent apply to ALL tasks in the batch.",
       "additionalProperties": true,
       "properties": {
+        "t": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "Short task description (IPayload.t). Machine-enforced ceiling: MUST NOT exceed 300 characters — the framework default for A2A_T_SIZE_LIMIT (issue #812). Long context belongs in ctx/con/refs, never in t."
+        },
         "tier_override": {
           "type": "string",
           "description": "Optional. Per-task tier override (issue #346): overrides the role→tier resolution (config/role-defaults.yaml → model) for exactly this dispatch. Guardrails: (1) preset bounds — the tier must exist in the active tier preset (config/tier-presets.yaml); unknown or out-of-preset tiers are rejected, falling back to the role default; (2) audit-log duty — every override attempt (applied OR rejected) must be recorded in the delegation tracker/checkpoint as 'tier_override=<tier> (applied|rejected: <reason>)'; (3) no downgrade of security-critical roles (config/role-defaults.yaml → tier-override-policy.security-critical-roles, default: security-auditor, code-reviewer). Reference implementation: resolve_tier_override() in scripts/lib/delegation_syntax.py (dormant by design — prompt-enforced via the orchestrator template and rules/1-generic/a2a-delegation-gates.md)."
         }
       },
       "items": {
-        "type": "object"
+        "type": "object",
+        "properties": {
+          "t": {
+            "type": "string",
+            "maxLength": 300,
+            "description": "Short task description for this batch entry (IPayload.t). Independent per-entry ceiling of 300 characters (issue #812)."
+          }
+        }
       }
     },
     "delegation_depth": {

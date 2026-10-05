@@ -88,6 +88,34 @@ except ImportError:
     _JSONSCHEMA_AVAILABLE = False
 
 
+#: Framework default for the ``payload.t`` (task line) length in characters.
+#: Single source of truth (issue #812): rendered as ``{{A2A_T_SIZE_LIMIT}}`` by
+#: ``_build_orch_variables`` and used by
+#: ``DelegationSyntaxEngine.validate_envelope`` as the fallback limit. Mirrored
+#: by ``maxLength`` in ``schemas/a2a-handoff.schema.json`` and
+#: ``schemas/handoffs/task-spec.schema.json`` (a test locks the values together).
+DEFAULT_A2A_T_SIZE_LIMIT = 300
+
+
+def resolve_a2a_t_size_limit(config: dict) -> int:
+    """Resolve ``orchestrator.handoff.t-size-limit`` (default 300, floor 1).
+
+    Provider-agnostic single source of truth for the ``payload.t`` ceiling:
+    both the ``{{A2A_T_SIZE_LIMIT}}`` template variable and the A2A envelope
+    validator derive from this value. Non-integer / boolean values fall back to
+    :data:`DEFAULT_A2A_T_SIZE_LIMIT` instead of leaking a wrong type.
+    """
+    orch_config = config.get("orchestrator", {}) if isinstance(config, dict) else {}
+    handoff_cfg = orch_config.get("handoff", {}) if isinstance(orch_config, dict) else {}
+    if isinstance(handoff_cfg, dict):
+        raw = handoff_cfg.get("t-size-limit", DEFAULT_A2A_T_SIZE_LIMIT)
+    else:
+        raw = DEFAULT_A2A_T_SIZE_LIMIT
+    if not isinstance(raw, int) or isinstance(raw, bool):
+        return DEFAULT_A2A_T_SIZE_LIMIT
+    return max(1, raw)
+
+
 # Top-level fields with a meaningful default value.
 # Each entry: field_name -> (default_value, description)
 # Schema-driven defaults take precedence; these are fallbacks for fields
@@ -1540,7 +1568,7 @@ def _build_orch_variables(
         variables["UNKNOWN_FALLBACK_MAIN_CHAT"] = "true" if unknown_fallback.get("main-chat", True) else "false"
         variables["UNKNOWN_FALLBACK_ASK_USER"] = "true" if unknown_fallback.get("ask-user", False) else "false"
     # A2A_T_SIZE_LIMIT / A2A_T_SIZE_LIMIT_TOKENS: hard gate for payload.t inline length.
-    t_limit = _handoff_cfg.get("t-size-limit", 300) if isinstance(_handoff_cfg, dict) else 300
+    t_limit = resolve_a2a_t_size_limit(config)
     variables["A2A_T_SIZE_LIMIT"] = str(t_limit)
     variables["A2A_T_SIZE_LIMIT_TOKENS"] = str(max(1, t_limit // 4))
     # A2A_MAX_DEPTH: configurable maximum delegation depth before HARD REJECT.

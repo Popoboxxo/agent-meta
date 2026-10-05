@@ -62,6 +62,32 @@ FANOUT_MECHANISMS: frozenset[str] = frozenset(
 _ASYNC_FANOUT_MECHANISMS: frozenset[str] = FANOUT_MECHANISMS - {"sequential-fallback"}
 
 
+def _default_t_size_limit() -> int:
+    """Return the framework default ``payload.t`` ceiling.
+
+    Imported lazily to avoid the ``config → agents → delegation_syntax`` import
+    cycle (``config`` imports ``agents``, which imports this module).
+    """
+    from .config import DEFAULT_A2A_T_SIZE_LIMIT
+
+    return DEFAULT_A2A_T_SIZE_LIMIT
+
+
+def _iter_payload_task_lines(payload: Any):
+    """Yield ``(field_path, t)`` for both IPayload shapes.
+
+    Covers the single-object form (``payload.t``) and the FANOUT batch form
+    (``payload[<index>].t`` per entry). Non-dict entries and missing ``t`` are
+    skipped — their structure is the schema validator's concern.
+    """
+    if isinstance(payload, dict):
+        yield "payload.t", payload.get("t")
+    elif isinstance(payload, list):
+        for idx, entry in enumerate(payload):
+            if isinstance(entry, dict):
+                yield f"payload[{idx}].t", entry.get("t")
+
+
 class DelegationSyntaxEngine:
     """Substitutes abstract delegation placeholders with provider-specific syntax.
 
@@ -204,6 +230,7 @@ class DelegationSyntaxEngine:
         envelope: dict[str, Any],
         schema_name: str = "a2a-handoff",
         agent_meta_root: Path | None = None,
+        t_size_limit: int | None = None,
     ) -> list[str]:
         """Validate an A2A envelope dict and return a list of error strings.
 
@@ -236,20 +263,30 @@ class DelegationSyntaxEngine:
 
         1. **Stdlib required-fields check** — always runs, no extra dependencies.
            Verifies that all fields listed in ``_A2A_REQUIRED_FIELDS`` are present,
-           rejects self-handoffs (source_agent == target_agent) and performs a
-           structural type check on ``payload.tier_override``. The full
+           rejects self-handoffs (source_agent == target_agent), performs a
+           structural type check on ``payload.tier_override`` and enforces the
+           ``payload.t`` length ceiling (``t_size_limit``, default
+           ``config.DEFAULT_A2A_T_SIZE_LIMIT``). For batch payloads every
+           ``payload[].t`` entry is checked independently. The full
            tier_override guardrails (preset bounds, security-critical downgrade
            block, audit record) live in :meth:`resolve_tier_override`.
 
         2. **Full JSON Schema validation** — runs only when ``jsonschema`` is
            importable *and* the schema file can be resolved.  Gracefully skipped
            when either condition is not met (e.g. lightweight CI environments).
+           The schema declares ``maxLength`` for ``payload.t`` (issue #812), so
+           this tier mirrors the stdlib check when available.
 
         Args:
             envelope:        The envelope dict to validate.
             schema_name:     Schema key (default ``"a2a-handoff"``).
             agent_meta_root: Repo root path used to locate the schema file.
                              Derived from ``config_dir`` when not provided.
+            t_size_limit:    Optional resolved ``payload.t`` character ceiling
+                             (the caller's ``A2A_T_SIZE_LIMIT``). Falls back to
+                             ``config.DEFAULT_A2A_T_SIZE_LIMIT`` (300) when
+                             omitted — the same constant that backs the
+                             ``{{A2A_T_SIZE_LIMIT}}`` template variable.
 
         Returns:
             A list of human-readable error strings.  Empty list means valid.
@@ -281,7 +318,17 @@ class DelegationSyntaxEngine:
                     f"got {type(tier_override).__name__}"
                 )
 
-        # Tier 2: full JSON Schema validation (optional, graceful degradation)
+
+        limit = t_size_limit if t_size_limit is not None else _default_t_size_limit()
+        for field_path, task_text in _iter_payload_task_lines(payload):
+            if isinstance(task_text, str) and len(task_text) > limit:
+                errors.append(
+                    f"{field_path} exceeds the {limit}-character limit "
+                    f"(got {len(task_text)}). Move long context to ctx/con/refs "
+                    "and keep t a single concise task line."
+                )
+
+
         schema_rel = self.get_schema_ref(schema_name)
         if schema_rel:
             if agent_meta_root is None:
