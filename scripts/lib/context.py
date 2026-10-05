@@ -218,6 +218,7 @@ def _regenerate_static_context(
     rel_label: str,
     source_label: str,
     rebuild_footer: bool = False,
+    platform_vars: dict | None = None,
 ) -> None:
     """Regenerate the static part of an existing managed context file.
 
@@ -244,6 +245,9 @@ def _regenerate_static_context(
     fallback_partials = template_path.parent.parent / "context" / "partials"
     builder = TemplateBuilder(template_path.parent, fallback_partials_dir=fallback_partials)
     rendered = builder.build(template_path.stem, variables)
+    rendered = _apply_platform_context_substitution(
+        rendered, platform_vars, source_label, log
+    )
     new_header, _tmpl_managed, new_footer = _split_context_file(rendered)
 
     existing = target_path.read_text(encoding="utf-8")
@@ -332,6 +336,37 @@ def _shared_rules_file_channel(
     return all(bool(p.get("skills_dir")) for p in pcs)
 
 
+def _apply_platform_context_substitution(
+    content: str,
+    platform_vars: dict | None,
+    source_label: str,
+    log: SyncLog,
+) -> str:
+    """Apply ``{{platform.*}}`` substitution to rendered context content (#834).
+
+    Single source of truth: delegates to :func:`platform.substitute_platform`,
+    the exact function the rule/template path already uses, so context files
+    (AGENTS.md, GEMINI.md, …) resolve the same namespace identically.
+
+    ``platform_vars is None`` means no platform context was loaded (no active
+    platform / PyYAML missing); content is returned unchanged, mirroring the
+    guard on the rule path (``rules.py`` / ``agent_sync.py``). An empty dict is
+    a real "loaded, nothing configured" state and still runs the scan so a
+    genuinely missing key is diagnosed. After substitution, any placeholder
+    whose key IS configured is reported as "substitution not applied" (the
+    #834 failure mode) instead of being silently left behind.
+    """
+    if platform_vars is None:
+        return content
+    from .platform import substitute_platform, warn_unresolved_platform_vars
+
+    content = substitute_platform(content, platform_vars, source_label, log)
+    warn_unresolved_platform_vars(
+        content, platform_vars, source_label, log, report_missing=False
+    )
+    return content
+
+
 def _ensure_context_file(
     project_root: Path,
     agent_meta_root: Path,
@@ -342,6 +377,7 @@ def _ensure_context_file(
     log: SyncLog,
     dry_run: bool,
     fallback_agent_dir: str,
+    platform_vars: dict | None = None,
 ) -> None:
     """Create a provider context file from template or minimal fallback."""
 
@@ -363,6 +399,7 @@ def _ensure_context_file(
             f"Agent files are in {fallback_agent_dir} (invoke by name).\n"
         )
         source_label = f"minimal fallback ({template_path.name if template_path else 'no template'})"
+    content = _apply_platform_context_substitution(content, platform_vars, source_label, log)
     log.action("INIT", str(target_path.relative_to(project_root)), source_label)
     if not dry_run:
         target_path.parent.mkdir(parents=True, exist_ok=True)
@@ -434,6 +471,7 @@ def _update_managed_html_block(
     provider: str = "Claude",
     pc: dict | None = None,
     adapter_line: str | None = None,
+    platform_vars: dict | None = None,
 ) -> None:
     """Update the HTML-style managed block in a context file.
 
@@ -501,6 +539,10 @@ def _update_managed_html_block(
     if adapter_line:
         new_managed = _inject_adapter_line(new_managed, adapter_line)
 
+    new_managed = _apply_platform_context_substitution(
+        new_managed, platform_vars, rel, log
+    )
+
     if not managed_pattern.search(existing):
         if not new_managed.strip():
             log.warning(
@@ -559,6 +601,7 @@ def _sync_managed_block_context(
     provider_config: dict,
     target_name: str | None = None,
     adapter_line: str | None = None,
+    platform_vars: dict | None = None,
 ) -> None:
     """Strategy for providers with a context file using HTML managed blocks.
 
@@ -611,17 +654,19 @@ def _sync_managed_block_context(
             project_root, agent_meta_root, target_path, template_path, variables, config,
             log, dry_run,
             fallback_agent_dir=pc.get("agents_dir", f".{provider.lower()}/agents"),
+            platform_vars=platform_vars,
         )
         if target_path.exists():
             _regenerate_static_context(
                 project_root, target_path, template_path, variables, log, dry_run,
                 rel_label=context_file, source_label=template_name or context_file,
                 rebuild_footer=True,
+                platform_vars=platform_vars,
             )
     if target_path.exists():
         _update_managed_html_block(
             target_path, project_root, variables, log, dry_run, agent_meta_root,
-            provider, pc, adapter_line=adapter_line,
+            provider, pc, adapter_line=adapter_line, platform_vars=platform_vars,
         )
 
     # Claude settings files are initialized by the dedicated helpers in sync.py.
@@ -639,6 +684,7 @@ def _sync_opencode_context(
     provider: str,
     provider_config: dict,
     target_name: str | None = None,
+    platform_vars: dict | None = None,
 ) -> None:
     """Strategy for Opencode: rules embedded into AGENTS.md managed block.
 
@@ -665,6 +711,9 @@ def _sync_opencode_context(
                 "<!-- agent-meta:managed-begin -->\n"
                 "<!-- agent-meta:managed-end -->\n"
             )
+        ocontent = _apply_platform_context_substitution(
+            ocontent, platform_vars, context_file, log
+        )
         log.action("INIT", context_file, template_name or "minimal fallback")
         if not dry_run:
             target_path.parent.mkdir(parents=True, exist_ok=True)
@@ -679,6 +728,7 @@ def _sync_opencode_context(
             project_root, target_path, template_path, variables, log, dry_run,
             rel_label=context_file, source_label=template_name or context_file,
             rebuild_footer=True,
+            platform_vars=platform_vars,
         )
 
     managed_pattern = re.compile(
@@ -693,6 +743,7 @@ def _sync_opencode_context(
             agent_meta_root, config, variables, log,
             provider=provider, provider_config=provider_config, project_root=project_root,
             target_name=target_name,
+            platform_vars=platform_vars,
         )
         # The "agents-managed" template ends with a trailing newline after its
         # own closing marker, but managed_pattern's match never consumes any
@@ -833,6 +884,7 @@ def _sync_continue_context(
     dry_run: bool,
     provider: str,
     provider_config: dict,
+    platform_vars: dict | None = None,
 ) -> None:
     """Strategy for Continue: project-context.md + config.yaml comment block."""
     from .extensions import render_managed_block, update_managed_block
@@ -862,6 +914,9 @@ def _sync_continue_context(
                     "Continue loads all Markdown files in this directory automatically as context.\n"
                 )
                 source_label = "minimal fallback (CONTINUE.project-template.md not found)"
+            ccontent = _apply_platform_context_substitution(
+                ccontent, platform_vars, rel_ctx, log
+            )
             log.action("INIT", rel_ctx, source_label)
             if not dry_run:
                 ctx_path.parent.mkdir(parents=True, exist_ok=True)
@@ -869,6 +924,9 @@ def _sync_continue_context(
         else:
             existing = ctx_path.read_text(encoding="utf-8")
             new_managed = render_managed_block(variables, context_file, log, agent_meta_root)
+            new_managed = _apply_platform_context_substitution(
+                new_managed, platform_vars, context_file, log
+            )
             updated = update_managed_block(existing, new_managed)
             if updated != existing:
                 log.action("UPDATE", str(ctx_path.relative_to(project_root)),
@@ -1070,6 +1128,7 @@ def _dispatch_context_strategy(
     provider_config: dict,
     target_name: str | None = None,
     adapter_line: str | None = None,
+    platform_vars: dict | None = None,
 ) -> None:
     """Capability-driven render dispatch shared by both topology modes."""
     pc = provider_config.get(provider, {})
@@ -1079,17 +1138,18 @@ def _dispatch_context_strategy(
         _sync_opencode_context(
             agent_meta_root, project_root, config, variables, log, dry_run,
             provider, provider_config, target_name=target_name,
+            platform_vars=platform_vars,
         )
     elif _has_capability(pc, "context-config-comment"):
         _sync_continue_context(
             agent_meta_root, project_root, config, variables, log, dry_run,
-            provider, provider_config,
+            provider, provider_config, platform_vars=platform_vars,
         )
     elif _has_capability(pc, "context-managed-block"):
         _sync_managed_block_context(
             agent_meta_root, project_root, config, variables, log, dry_run,
             provider, provider_config, target_name=target_name,
-            adapter_line=adapter_line,
+            adapter_line=adapter_line, platform_vars=platform_vars,
         )
 
 
@@ -1179,6 +1239,7 @@ def sync_context_adapters_for_provider(
     dry_run: bool,
     provider: str,
     provider_config: dict,
+    platform_vars: dict | None = None,
 ) -> None:
     """Write the adapter file of an adapter-capable provider (``per-provider``).
 
@@ -1204,6 +1265,7 @@ def sync_context_adapters_for_provider(
         provider, provider_config,
         target_name=adapter_file,
         adapter_line=_adapter_reference_line(config, pc),
+        platform_vars=platform_vars,
     )
     if safe_path(project_root, adapter_file).exists():
         _record_adapter_managed(project_root, adapter_file, log, dry_run)
@@ -1222,6 +1284,7 @@ def sync_context_for_provider(
     dry_run: bool,
     provider: str,
     provider_config: dict,
+    platform_vars: dict | None = None,
 ):
     """Create or update the context file for a given provider.
 
@@ -1249,18 +1312,21 @@ def sync_context_for_provider(
             sync_context_adapters_for_provider(
                 agent_meta_root, project_root, config, variables, log, dry_run,
                 provider, provider_config,
+                platform_vars=platform_vars,
             )
         else:
             _dispatch_context_strategy(
                 agent_meta_root, project_root, config, variables, log, dry_run,
                 provider, provider_config,
                 target_name=_core_context_filename(config),
+                platform_vars=platform_vars,
             )
         return
 
     _dispatch_context_strategy(
         agent_meta_root, project_root, config, variables, log, dry_run,
         provider, provider_config,
+        platform_vars=platform_vars,
     )
 
 
@@ -1512,6 +1578,7 @@ def _build_managed_block(
     provider_config: dict | None = None,
     project_root: Path | None = None,
     target_name: str | None = None,
+    platform_vars: dict | None = None,
 ) -> str:
     from .delegation_table import get_active_agents_data
     from .rules import collect_rule_sources, resolve_rules, rule_opts_lazy_channel
@@ -1815,7 +1882,11 @@ def _build_managed_block(
     )
 
     builder = TemplateBuilder(agent_meta_root / "templates" / "context")
-    return builder.build("agents-managed", local_vars)
+    rendered = builder.build("agents-managed", local_vars)
+    return _apply_platform_context_substitution(
+        rendered, platform_vars,
+        target_name or pc.get("context_file") or "context managed block", log,
+    )
 
 def init_claude_personal(
     agent_meta_root: Path,

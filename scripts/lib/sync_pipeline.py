@@ -506,6 +506,7 @@ def converge_managed_block_context(
     log: SyncLog,
     dry_run: bool = False,
     agent_meta_root: Path | None = None,
+    platform_vars: dict | None = None,
 ) -> tuple[bool, str | None]:
     """Make the FIRST sync of a config-comment context file the run2 fixpoint.
 
@@ -532,6 +533,13 @@ def converge_managed_block_context(
 
     root = agent_meta_root if agent_meta_root is not None else project_root
     steady = render_managed_block(variables, context_file, log, root)
+    if platform_vars is not None:
+        from .platform import substitute_platform, warn_unresolved_platform_vars
+
+        steady = substitute_platform(steady, platform_vars, context_file, log)
+        warn_unresolved_platform_vars(
+            steady, platform_vars, context_file, log, report_missing=False
+        )
     existing = target.read_text(encoding="utf-8")
     updated = substitute_managed_block(existing, steady)
     if updated == existing:
@@ -688,6 +696,7 @@ def _sync_stage_contexts(
     agent_meta_root: Path, project_root: Path, config: dict,
     provider_config: dict, providers: list, variables: dict,
     args: argparse.Namespace, log: SyncLog,
+    platform_vars: dict | None = None,
 ) -> tuple[bool, bool, list]:
     """Stage 4: per-provider context sync loop.
 
@@ -740,7 +749,8 @@ def _sync_stage_contexts(
         pc, _migration = apply_discovery_migration(project_root, pc, log, dry_run=args.dry_run)
         provider_config[provider] = pc
         sync_context_for_provider(agent_meta_root, project_root, config, provider_variables,
-                                  log, args.dry_run, provider, provider_config)
+                                  log, args.dry_run, provider, provider_config,
+                                  platform_vars=platform_vars)
         # Continue run1 fixpoint (AC-4): a scaffolded config-comment context file
         # gets the steady-state managed block immediately, capability-gated —
         # never by provider name.
@@ -748,6 +758,7 @@ def _sync_stage_contexts(
             _changed, final_content = converge_managed_block_context(
                 project_root, pc.get("context_file"), provider_variables, log,
                 dry_run=args.dry_run, agent_meta_root=agent_meta_root,
+                platform_vars=platform_vars,
             )
             if final_content is not None:
                 # Design §6.3 (F2): reconcile the pending set against the
