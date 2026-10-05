@@ -415,6 +415,76 @@ def test_commands_capable_provider_names_dir_and_format(provider):
     )
 
 
+def _commands_capable_providers() -> list[str]:
+    caps = _provider_capabilities()
+    return [p for p in _registered_providers() if caps.get(p, {}).get("commands") is True]
+
+
+def _commands_disabled_providers() -> list[str]:
+    caps = _provider_capabilities()
+    return [p for p in _registered_providers() if caps.get(p, {}).get("commands") is not True]
+
+
+@pytest.mark.parametrize("provider", _commands_capable_providers())
+def test_commands_capable_provider_emits_at_least_one_command(provider, tmp_path):
+    """Issue #807 (F18) capability contract: every provider that declares
+    ``commands: true`` must actually receive commands from a sync — no provider
+    may be marked capable while the generator silently emits nothing."""
+    from lib.commands import sync_commands_for_provider
+    from lib.log import SyncLog
+
+    pc = _provider_configs()[provider]
+    sync_commands_for_provider(
+        _REPO_ROOT, tmp_path, {}, SyncLog(), dry_run=False,
+        provider=provider, provider_config=_provider_configs(), variables={},
+    )
+    target_dir = tmp_path / pc["commands_dir"]
+    ext = pc.get("commands_ext", ".md")
+    emitted = [
+        f for f in target_dir.glob(f"*{ext}")
+        if not f.name.startswith(".agent-meta")
+    ]
+    assert emitted, (
+        f"Provider '{provider}' declares commands: true but sync emitted 0 "
+        f"commands into '{pc['commands_dir']}' (issue #807)."
+    )
+
+
+@pytest.mark.parametrize("provider", _commands_disabled_providers())
+def test_commands_disabled_provider_emits_nothing(provider, tmp_path):
+    """A verified ``commands: false`` decision must stay fail-quiet: sync writes
+    no command files anywhere under the project root."""
+    from lib.commands import sync_commands_for_provider
+    from lib.log import SyncLog
+
+    sync_commands_for_provider(
+        _REPO_ROOT, tmp_path, {}, SyncLog(), dry_run=False,
+        provider=provider, provider_config=_provider_configs(), variables={},
+    )
+    written = [p for p in tmp_path.rglob("*") if p.is_file()]
+    assert not written, (
+        f"Provider '{provider}' has commands: false but sync wrote {written} "
+        "— the capability gate leaked."
+    )
+
+
+def test_issue_807_verified_command_surface_decisions():
+    """Regression pin for issue #807 (F18). Copilot, Mammouth and ZCode have a
+    real project command surface (flipped to true). Codex and KimiCode have no
+    project-scoped custom-command surface and stay false as documented
+    capability decisions. Both registries must agree."""
+    caps = _provider_capabilities()
+    pc = _provider_configs()
+    for provider in ("Copilot", "Mammouth", "ZCode"):
+        assert caps[provider]["commands"] is True, provider
+        assert pc[provider]["has_commands"] is True, provider
+        assert pc[provider].get("commands_dir"), provider
+    for provider in ("Codex", "KimiCode"):
+        assert caps[provider]["commands"] is False, provider
+        assert pc[provider]["has_commands"] is False, provider
+        assert not pc[provider].get("commands_dir"), provider
+
+
 class _LogRecorder:
     def __init__(self):
         self.events = []
@@ -438,7 +508,7 @@ def test_unsupported_provider_logs_explicit_note_instead_of_silence(tmp_path):
     log = _LogRecorder()
     sync_commands_for_provider(
         _REPO_ROOT, tmp_path, {}, log, dry_run=True,
-        provider="Copilot", provider_config=_provider_configs(),
+        provider="Codex", provider_config=_provider_configs(),
     )
     notes = [e for e in log.events if e[0] == "note" and e[1] == "commands"]
     assert notes, "unsupported provider must emit an explicit commands INFO line"

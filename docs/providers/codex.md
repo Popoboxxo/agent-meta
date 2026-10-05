@@ -51,7 +51,7 @@ rules/                     ← Rules directory (project root; .rules files)
 | Config directory | `.claude/` | `.codex/` |
 | Sub-agents | `.claude/agents/*.md` | `.codex/agents/*.toml` (TOML, auto-loaded) |
 | Rules (auto-load) | `.claude/rules/` | `rules/` (project root, `.rules` files) |
-| Slash commands | `.claude/commands/*.md` | Not generated (`has_commands: false` — surface unverified) |
+| Slash commands | `.claude/commands/*.md` | Not generated — Codex custom prompts are user-global (`${CODEX_HOME}/prompts`, `/prompts:<name>`) and deprecated in favor of skills; no project-scoped prompt surface (openai/codex #9848 open). `has_commands: false` is a documented decision (issue #807) |
 | Hooks | `.claude/hooks/*.sh` + `settings.json` | Verified contract, but **deliberately not mirrored** (see Hooks) |
 | Settings | `.claude/settings.json` | **None** — everything lives in `.codex/config.toml` |
 | Skills | `.claude/skills/<name>/SKILL.md` | `.agents/skills/` (Codex reads user → repo → directory) |
@@ -243,11 +243,15 @@ Edit/Write tool; internal names `shell`/`exec_command` are **not** whitelisted).
    (`has_settings: false`).
 3. **No MCP secrets-file** — no include/import mechanism; env-var indirection is
    the documented strategy (V8).
-4. **No slash commands** — surface unverified, `has_commands: false` (P6 item).
+4. **No project-scoped slash commands** — custom prompts are user-global
+   (`${CODEX_HOME}/prompts`) and deprecated in favor of skills; project-scoped
+   `.codex/prompts/` is an open feature request, not implemented. `has_commands: false`
+   is therefore a verified capability decision (issue #807), not "unverified".
 5. **No TodoWrite mapping** — no verified todo tool in the Codex tool catalog.
 
 ## Open P6 items
 
 - MCP cross-layer merge semantics for `mcp_servers` — real-repo test (V8).
 - `rules/` `.rules` naming convention check.
-- Slash-command surface (enables `has_commands` growth).
+- Upstream project-scoped prompt support (openai/codex #9848) — would enable
+  `has_commands` growth if Codex un-deprecates custom prompts.

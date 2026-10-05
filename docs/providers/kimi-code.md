@@ -55,7 +55,7 @@ AGENTS.md                  ← Project context + managed block (shared template)
 | Config directory | `.claude/` | `.kimi-code/` |
 | Sub-agents | `.claude/agents/*.md` | `.kimi-code/agents/*.md` (auto-discovered, no bootstrap) |
 | Rules (auto-load) | `.claude/rules/` | Not configured (`has_rules: false` — unverified) |
-| Slash commands | `.claude/commands/*.md` | Not generated (`has_commands: false` — unverified) |
+| Slash commands | `.claude/commands/*.md` | Not generated — Kimi exposes slash commands as built-ins plus Active Skills (`/skill:<name>`); there is no project custom-command directory. `has_commands: false` is a documented decision (issue #807); the generated `.kimi-code/skills/` tree is the command-like surface |
 | Hooks | `.claude/hooks/*.sh` + `settings.json` | 20 events, but **user-level `config.toml` only** — not generated (see Hooks) |
 | Settings | `.claude/settings.json` | **None generated** (`has_settings: false` — `.kimi-code/local.toml` is machine-specific, see below) |
 | Skills | `.claude/skills/` | `.kimi-code/skills/` (`<name>/SKILL.md` or flat `.md`) |
@@ -212,7 +212,7 @@ ai-providers:
 | `AGENTS.md` (managed block) | Updated on every sync |
 | `AGENTS.md` (rest) | Created once, then maintained manually |
 | `.kimi-code/mcp.json` | MCP servers (reused `mcpServers` JSON format) |
-| Rules / Commands / Hooks / Settings | Not generated (all `has_*: false` — see limitations) |
+| Rules / Commands / Hooks / Settings | Not generated (all `has_*: false`; commands documented as a capability decision in #807) |
 | `.kimi-code/snippets/`, `.kimi-code/pending-tasks.md` (gitignored), `.kimi-code/3-project/` | Standard agent-meta artifacts |
 
 ---

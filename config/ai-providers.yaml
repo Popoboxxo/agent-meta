@@ -422,11 +422,20 @@ providers:
     has_rules: true
     rules_dir: .github/instructions
     has_hooks: false
-    has_commands: false
+    # Commands (issue #807): VS Code / GitHub Copilot reusable prompt files
+    # (`.github/prompts/*.prompt.md`, invoked as `/name`) are a real command
+    # surface — declaring commands: false was an UNDERCLAIM (audit finding P-6,
+    # docs/analysis/2026-09-30-provider-audit-docs-part1.md §5). No
+    # provider-name branch: commands.py only reads these keys.
+    has_commands: true
+    commands_dir: .github/prompts
+    commands_ext: .prompt.md
+    commands_format: markdown
     has_settings: false
     capabilities:
     - agents
     - rules
+    - commands
     - snippets
     - skills
     - context-managed-block
@@ -483,13 +492,22 @@ providers:
     rules_dir: .mammouth/rules
     has_hooks: true
     hooks_dir: .mammouth/hooks
-    has_commands: false
+    # Commands (issue #807): Mammouth is an OpenCode fork and owns a project
+    # command surface — `mammouth` documents "Add .md files to
+    # .mammouth/commands/ for reusable prompts" with `$ARGUMENTS`. Declaring
+    # commands: false was an UNDERCLAIM; the runtime binary string is the
+    # evidence (2026-10-05). No provider-name branch in scripts/lib/.
+    has_commands: true
+    commands_dir: .mammouth/commands
+    commands_ext: .md
+    commands_format: markdown
     has_settings: true
     settings_file: .mammouth/settings.json
     capabilities:
     - agents
     - rules
     - hooks
+    - commands
     - settings
     - snippets
     - skills
@@ -553,6 +571,14 @@ providers:
     rules_dir: rules
     has_hooks: true
     hooks_dir: .codex/hooks
+    # Commands (issue #807): Codex custom prompts (`~/.codex/prompts/*.md`,
+    # invoked as `/prompts:<name>`) are USER-GLOBAL only and deprecated in
+    # favor of skills — the official docs state they "live in your local Codex
+    # home directory ... so they're not shared through your repository".
+    # Project-scoped `.codex/prompts/` is an open feature request (openai/codex
+    # #9848), not implemented. A repo sync therefore cannot emit Codex
+    # commands; commands: false is the verified capability decision, not a
+    # silent hardcoded default.
     has_commands: false
     has_settings: false
     capabilities:
@@ -611,11 +637,21 @@ providers:
     context_template: templates/configs/AGENTS.project-template.md
     has_rules: false
     has_hooks: false
-    has_commands: false
+    # Commands (issue #807): ZCode documents a workspace command surface —
+    # "Custom commands are stored as .md files under ~/.zcode/commands
+    # (workspace-level commands live in the project directory)", invoked as
+    # `/name`, YAML frontmatter + `$ARGUMENTS` (zcode.z.ai/en/docs/commands).
+    # Declaring commands: false was an UNDERCLAIM (audit finding ZC-2). No
+    # provider-name branch in scripts/lib/.
+    has_commands: true
+    commands_dir: .zcode/commands
+    commands_ext: .md
+    commands_format: markdown
     has_settings: true
     settings_file: .zcode/config.json
     capabilities:
     - agents
+    - commands
     - settings
     - skills
     - mcp
@@ -680,6 +716,12 @@ providers:
     context_template: templates/configs/AGENTS.project-template.md
     has_rules: false
     has_hooks: false
+    # Commands (issue #807): Kimi Code CLI exposes slash commands as
+    # (a) built-ins and (b) Active Skills (`/skill:<name>`) — the docs
+    # document no project-level custom-command directory. Kimi's command-like
+    # surface is the already-synced `.kimi-code/skills/` tree, not a
+    # commands/*.md drop. commands: false is the verified capability decision
+    # (docs audit KC-2, 2026-09-30), not a silent default.
     has_commands: false
     has_settings: false
     capabilities:
