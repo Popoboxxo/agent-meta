@@ -17,6 +17,7 @@ from pathlib import Path
 
 from ..hooks import (
     CLAUDE_HOOKS_DIR,
+    NON_RUNTIME_HOOK_EVENTS,
     collect_hook_sources,
     parse_hook_metadata,
     parse_hook_settings_command,
@@ -150,6 +151,14 @@ def check_hook_enablement_consistency(
                 continue  # not managed for this project -- not our call
             meta = source_metas[source_path]
             hook_stem = Path(output_name).stem
+            # Helper scripts (no `# hook:` header) and non-runtime events
+            # (`Manual`) are never registered by sync_hooks(), so they can
+            # never be "enabled but not registered" — flagging them would be a
+            # false positive (issue #808).
+            if not meta.get("hook"):
+                continue
+            if meta.get("event") in NON_RUNTIME_HOOK_EVENTS:
+                continue
             should_be_active = project_hooks_cfg.get(hook_stem, {}).get(
                 "enabled", meta.get("enabled_by_default", "false").lower() == "true"
             )

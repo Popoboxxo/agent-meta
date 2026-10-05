@@ -69,12 +69,28 @@ Jedes Hook-Skript beginnt mit Metadaten-Kommentaren:
 
 | Feld | Werte | Bedeutung |
 |------|-------|-----------|
-| `hook` | `<name>` | Eindeutiger Bezeichner |
+| `hook` | `<name>` | Eindeutiger Bezeichner. **Fehlt dieses Feld, ist die Datei kein Hook, sondern ein Helper** (siehe unten) |
 | `version` | Semver | Versionierung (unabhängig von agent-meta) |
-| `event` | `PreToolUse`, `PostToolUse`, `Notification`, `Stop`, `SubagentStop` | Claude Code Hook-Event |
+| `event` | `PreToolUse`, `PostToolUse`, `Notification`, `Stop`, `SubagentStop` | Claude Code Hook-Event. `Manual` = kein Runtime-Event — wird explizit aufgerufen, nie in `settings.json` registriert |
 | `matcher` | `Bash`, `Read`, `Write`, … | Tool-Name-Filter (leer = alle Tools) |
 | `description` | Text | Kurzbeschreibung |
-| `enabled_by_default` | `true`/`false` | Nur Dokumentation — sync.py ignoriert dieses Feld; Opt-in via Config |
+| `provider` | Provider-Name | Optional: Skript nur für diesen Provider deployen (z.B. `Claude`) |
+| `hook_protocol` | Protokoll-Key | Optional: Skript nur deployen, wenn der Provider dasselbe `hook_protocol` spricht (z.B. `antigravity-hooks-json`) |
+| `enabled_by_default` | `true`/`false` | Default-Aktivierungszustand. `sync.py` registriert den Hook genau dann automatisch, wenn `true`; pro Projekt überschreibbar via `hooks.<name>.enabled` |
+
+**Helper-Skripte:** Dateien ohne `# hook:`-Header sind keine eigenständigen Hooks.
+Sie werden immer mitkopiert, aber **nie registriert** — sie werden von einem
+registrierten Hook aufgerufen (z.B. `orchestrator-guard-impl.sh`,
+`repo-containment-impl.sh`) oder sind protokoll-spezifisch
+(`antigravity-json-adapter.sh`, nur bei `hook_protocol: antigravity-hooks-json`
+deployt). Ein Helper ohne Registrierung ist **kein toter Code**.
+
+**`Manual`-Hooks:** `pre-release-check.sh` deklariert `event: Manual`. Es wird
+vom `release`-Agenten explizit per `Bash` aufgerufen (siehe
+`docs/RELEASE_GATES.md`) und darf **nicht** über `hooks: { pre-release-check:
+{ enabled: true } }` registriert werden — `sync.py` ignoriert eine solche
+Aktivierung bewusst, damit kein ungültiger `Manual`-Event-Bucket in
+`settings.json` landet.
 
 **Ausführbarkeits-Bit (issue #601):** von `sync.py` generierte Hook-Kopien in `<hooks_dir>/*.sh`
 haben absichtlich **kein** `+x` (`chmod 755`) — sie werden ausschließlich über
@@ -121,11 +137,29 @@ Fehlt der `hooks`-Block → kein Hook wird registriert (sicheres Default).
 
 ## Verfügbare Hooks
 
-| Hook | Event | Matcher | Beschreibung |
-|------|-------|---------|-------------|
-| `dod-push-check` | `PreToolUse` | `Bash` | Blockiert `git push` wenn Tests nicht grün sind |
-| `sync-on-config-change` | `PostToolUse` | `Write`, `Edit` | Triggert `sync.py`-Re-run wenn `.meta-config/project.yaml` geändert wird |
-| `lifecycle-check` | `PostToolUse` | `Bash` | Erkennt Git-Events (Release-Tag, Merge) und triggert Lifecycle-Tasks |
+`Default` = `enabled_by_default`-Header; ein Hook ohne Registrierung ist
+entweder opt-in (bewusst) oder ein Helper (kein `# hook:`-Header). Der
+Consistency-Check `hooks.enabled-but-not-registered` stellt sicher, dass ein
+aktivierter Hook auch tatsächlich in `settings.json` landet.
+
+| Hook | Event | Matcher | Default | Beschreibung |
+|------|-------|---------|---------|-------------|
+| `orchestrator-guard` | `PreToolUse` | alle | **on** | Erzwingt die Orchestrator-Pflicht |
+| `repo-containment` | `PreToolUse` | alle | **on** | Repo-Containment (Schreibzugriffe auf die Projektwurzel) |
+| `dod-push-check` | `PreToolUse` | `Bash` | off | Blockiert `git push` wenn Tests nicht grün sind |
+| `sync-on-config-change` | `PostToolUse` | `Write`, `Edit` | off | Triggert `sync.py`-Re-run wenn `.meta-config/project.yaml` geändert wird |
+| `lifecycle-check` | `PostToolUse` | `Bash` | off | Erkennt Git-Events (Release-Tag, Merge) und triggert Lifecycle-Tasks |
+| `auto-github-release` | `PostToolUse` | `Bash` | off | Erstellt GitHub-Releases nach einem Tag (opt-in, Seiteneffekte) |
+| `graphify-read-guard` | `PreToolUse` | `Read`, `Glob` | off | Leitet Read/Glob an die lokale `graphify`-Binary weiter (0-external) |
+| `graphify-search-guard` | `PreToolUse` | `Bash`, `Grep` | off | Leitet Bash/Grep an die lokale `graphify`-Binary weiter (0-external) |
+| `viz-log` | `PreToolUse` | alle | off* | Loggt Tool-Events für das Viz-Dashboard; *auto-on bei `viz.enabled` + `mode: dynamic/full` |
+| `pre-release-check` | `Manual` | — | off | Release-Gate-Dispatcher — wird explizit vom `release`-Agenten aufgerufen, **nie** registriert |
+
+**Helper (keine eigenständigen Hooks, werden nie registriert):**
+`orchestrator-guard-impl.sh`, `repo-containment-impl.sh`,
+`antigravity-json-adapter.sh` (nur bei `hook_protocol: antigravity-hooks-json`),
+`lib/hook_common.sh` (siehe `sync_hook_lib()`), `release-gates/*.sh`
+(Plugin-Verzeichnis des `pre-release-check`-Dispatchers).
 
 ---
 
