@@ -25,6 +25,13 @@ providers:
     has_rules: true
     has_hooks: true
     hook_protocol: claude-code-json
+    # Anchor prefix prepended to every registered hook command (issue #851):
+    # without it the generated `bash .claude/hooks/<file>.sh` is resolved
+    # relative to the process cwd, so Claude Code hooks silently miss whenever
+    # a session starts from a subdirectory. `${CLAUDE_PROJECT_DIR}` is resolved
+    # by Claude Code to the project root regardless of cwd. A provider without
+    # this key keeps emitting the (legacy) relative command unchanged.
+    hook-command-anchor: "${CLAUDE_PROJECT_DIR}"
     has_commands: true
     commands_dir: .claude/commands
     commands_ext: .md

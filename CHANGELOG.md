@@ -3,6 +3,16 @@
 ## [Unreleased]
 
 ### Fixed
+- **Claude hook commands are now anchored to `${CLAUDE_PROJECT_DIR}` instead of being cwd-relative (issue #851)**:
+  `sync.py` registered hooks as `bash .claude/hooks/<file>.sh`, which Claude Code resolves against the
+  process cwd — a session started (or a subagent spawned) from a subdirectory silently ran no hook at
+  all. The prefix is now provider-config-driven (`hook-command-anchor` in `config/ai-providers.yaml`,
+  set for Claude to `${CLAUDE_PROJECT_DIR}`) and emitted as
+  `bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/<file>.sh`. The inverse parser recognises both the anchored
+  and the legacy relative form, so already-deployed projects are clean-replaced without duplicate
+  entries; a provider without the key (e.g. Antigravity, which resolves relative to its `hooks.json`)
+  stays byte-stable (no hidden provider-name branch). Regression coverage in
+  `tests/test_hook_registration_invariant.py` and `tests/test_hook_enablement_consistency.py`.
 - **Plan-graph `file_overlap` no longer flags sequential plans or prose/`Interfaces:` paths (issue #848)**:
   two root causes. (1) `_parse_plan_tasks` ran its `Modify:`/`Create:` regex over the whole task block,
   so prose and `**Interfaces:**` paths were captured as file ownership; extraction is now scoped to the

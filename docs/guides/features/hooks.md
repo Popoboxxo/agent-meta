@@ -97,6 +97,12 @@ haben absichtlich **kein** `+x` (`chmod 755`) — sie werden ausschließlich üb
 `bash <hooks_dir>/<datei>.sh` aufgerufen (siehe `settings.json`-Eintrag unten), nie direkt
 ausgeführt. Kein `chmod +x` nötig, kein Bug.
 
+**cwd-Unabhängigkeit (issue #851):** Claude Code löst relative Kommandos gegen das Prozess-CWD auf.
+Ein aus einem Unterverzeichnis gestarteter (oder ein gespawnter Subagent-)Prozess würde den Hook
+sonst stillschweigend überspringen. Der Provider-Config-Key `hook-command-anchor` (Claude:
+`${CLAUDE_PROJECT_DIR}`) wird deshalb jedem registrierten Kommando vorangestellt. Fehlt der Key
+(z.B. Antigravity, das relativ zur `hooks.json` auflöst), bleibt die relative Form unverändert.
+
 ---
 
 ## Hook aktivieren (Projekt Opt-in)
@@ -120,7 +126,7 @@ Nach dem nächsten Sync ist der Hook in `.claude/settings.json` registriert:
     "PreToolUse": [
       {
         "matcher": "Bash",
-        "hooks": [{ "type": "command", "command": "bash .claude/hooks/dod-push-check.sh" }]
+        "hooks": [{ "type": "command", "command": "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/dod-push-check.sh" }]
       }
     ]
   }
