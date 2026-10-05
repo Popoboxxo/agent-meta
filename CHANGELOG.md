@@ -3,6 +3,17 @@
 ## [Unreleased]
 
 ### Fixed
+- **Admin-UI saves no longer silently strip YAML comments from `config/ai-providers.yaml` (issue #847)**:
+  both write paths (`ConfigManager.write` behind `PUT /api/config/ai-providers` and
+  `_handle_post_ai_providers_update`) re-serialised the heavily commented provider registry with
+  `yaml.dump`, dropping **all** `#` comments (and potentially reordering mapping keys) on every save.
+  PyYAML has no round-trip support and agent-meta is stdlib-only (`ruamel.yaml` is not allowed), so the
+  new provider-agnostic diff guard `scripts/lib/yaml_roundtrip.py` compares the on-disk text with the
+  would-be-written text and **aborts by default** (`YamlRoundTripLoss` → HTTP 400 / raised for direct
+  `ConfigManager.write` callers) instead of destroying hand-authored comments. A caller that knowingly
+  accepts the loss can opt in with the reserved body flag `"__allow_lossy__": true` (stripped before
+  persisting, so it never becomes a registry key); a lossy write then logs a warning and proceeds.
+  Regression coverage in `tests/test_ai_providers_roundtrip_847.py` (both handlers, guard unit tests).
 - **`--init`/`--fill-defaults` now enforce owner-only permissions on `project.yaml` (issue #864, security)**:
   the Admin-UI save path already chmodded `.meta-config/project.yaml` to `0600` (issue #589), but the CLI
   writers left it at `0644` under a typical `022` umask — so a plaintext `admin-ui.token` or credential key
