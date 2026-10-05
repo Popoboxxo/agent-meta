@@ -1071,10 +1071,16 @@ class ConfigManager:
             data = yaml.safe_load(fh)
         return data if data is not None else {}
 
-    def write(self, key: str, data: Any) -> dict:
+    def write(self, key: str, data: Any, *, allow_lossy: bool = False) -> dict:
         """Write a Python object back as YAML using atomic replace + backup.
-        
+
         Returns a status dict describing where the backup was stored.
+
+        ``allow_lossy`` opts out of the round-trip guard for ``ai-providers``
+        (issue #847); by default a save that would drop YAML comments or
+        reorder mapping keys is aborted with :class:`YamlRoundTripLoss`
+        (mapped to HTTP 400) so hand-authored comments are never silently
+        destroyed.
         """
         if self.mode != "super_admin" and key in SUPER_ADMIN_FILES and key not in PROJECT_FILES:
             raise SecurityError(f"Cannot write super-admin config '{key}' in project mode.")
@@ -1087,27 +1093,41 @@ class ConfigManager:
         path = self.resolve_path(key)
         path.parent.mkdir(parents=True, exist_ok=True)
 
-        backup_info: str | None = None
-        if path.exists():
-            backup_info = self._backup(path)
-            self._prune_backups(path)
-
         # Preserve block-literal (`|`) style for multi-line string values so an
         # admin-UI write round-trips them intact, matching sync.py's own YAML
         # writes (issue #717) — plain yaml.dump() folds embedded newlines away.
         from lib.io import yaml_dump_preserving_multiline
 
+        new_text = yaml_dump_preserving_multiline(
+            yaml,
+            data,
+            default_flow_style=False,
+            allow_unicode=True,
+            sort_keys=False,
+        )
+
+        # issue #847: PyYAML cannot round-trip comments. Refuse to silently
+        # strip the (heavily commented) provider registry — abort by default,
+        # warn + proceed only on explicit ``allow_lossy``.
+        if key == "ai-providers" and path.exists():
+            from lib.yaml_roundtrip import assert_roundtrip_preserved
+
+            assert_roundtrip_preserved(
+                path.read_text(encoding="utf-8"),
+                new_text,
+                context=f"config/{path.name}",
+                allow_lossy=allow_lossy,
+            )
+
+        backup_info: str | None = None
+        if path.exists():
+            backup_info = self._backup(path)
+            self._prune_backups(path)
+
         tmp_path = path.with_suffix(path.suffix + ".tmp")
         try:
             with tmp_path.open("w", encoding="utf-8") as fh:
-                yaml_dump_preserving_multiline(
-                    yaml,
-                    data,
-                    fh,
-                    default_flow_style=False,
-                    allow_unicode=True,
-                    sort_keys=False,
-                )
+                fh.write(new_text)
             os.replace(tmp_path, path)
         except Exception:
             # Never leave an orphaned .tmp behind if yaml.dump or os.replace
@@ -3806,6 +3826,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         body = self._read_body()
         if body is None:
             raise ValueError("empty body")
+        allow_lossy = False
         if key == "ai-providers" and isinstance(body, dict):
             # REV-R1: ``active-surface`` is a reserved, read-only key and must
             # never be persisted — neither as a top-level sibling of
@@ -3813,7 +3834,12 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             # Work on shallow copies so the request body is not mutated in
             # place. Validate before any write so a rejected request leaves the
             # file untouched.
+            from lib.yaml_roundtrip import ALLOW_LOSSY_KEY
+
             body = dict(body)
+            # issue #847: explicit opt-in for a lossy (comment-dropping) save.
+            # Consumed here so it is never persisted as a provider key.
+            allow_lossy = bool(body.pop(ALLOW_LOSSY_KEY, False))
             body.pop("active-surface", None)
             if isinstance(body.get("providers"), dict):
                 providers = dict(body["providers"])
@@ -3846,7 +3872,8 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
             result = self.__class__.config_manager.write(
                 "project", self._deep_merge(existing, body))
         else:
-            result = self.__class__.config_manager.write(key, body)
+            result = self.__class__.config_manager.write(
+                key, body, allow_lossy=allow_lossy)
         return self._send_json(result)
 
     def _route_put_pipelines(self) -> None:
@@ -4746,13 +4773,19 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         try:
             length = int(self.headers.get("Content-Length", 0))
             data = json.loads(self.rfile.read(length).decode("utf-8")) if length > 0 else {}
+            allow_lossy = False
             if isinstance(data, dict):
                 # REV-R1: strip the reserved read-only ``active-surface`` key —
                 # both as a top-level sibling of ``providers`` and as a provider
                 # name inside the registry map (shallow copies — no in-place
                 # mutation) — and validate surface versions before yaml.dump; a
                 # rejected request writes nothing.
+                from lib.yaml_roundtrip import ALLOW_LOSSY_KEY
+
                 data = dict(data)
+                # issue #847: explicit opt-in for a lossy (comment-dropping)
+                # save — consumed here so it is never persisted.
+                allow_lossy = bool(data.pop(ALLOW_LOSSY_KEY, False))
                 data.pop("active-surface", None)
                 if isinstance(data.get("providers"), dict):
                     providers = dict(data["providers"])
@@ -4767,8 +4800,36 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                     return self._send_json({"error": str(exc)}, status=400)
             path = resolve_asset(self.__class__.root, "config") / "ai-providers.yaml"
             path.parent.mkdir(parents=True, exist_ok=True)
+            # Preserve block-literal (``|``) style for multi-line values,
+            # matching ConfigManager.write / sync.py (issue #717).
+            from lib.io import yaml_dump_preserving_multiline
+
+            new_text = yaml_dump_preserving_multiline(
+                yaml,
+                data,
+                default_flow_style=False,
+                allow_unicode=True,
+                sort_keys=False,
+            )
+            # issue #847: refuse to silently strip YAML comments/key order
+            # (abort by default, warn + proceed on explicit ``allow_lossy``).
+            if path.exists():
+                from lib.yaml_roundtrip import (
+                    YamlRoundTripLoss,
+                    assert_roundtrip_preserved,
+                )
+
+                try:
+                    assert_roundtrip_preserved(
+                        path.read_text(encoding="utf-8"),
+                        new_text,
+                        context=f"config/{path.name}",
+                        allow_lossy=allow_lossy,
+                    )
+                except YamlRoundTripLoss as exc:
+                    return self._send_json({"error": str(exc)}, status=400)
             with path.open("w", encoding="utf-8") as fh:
-                yaml.dump(data, fh, default_flow_style=False, sort_keys=False)
+                fh.write(new_text)
             return self._send_json({"success": True})
         except Exception as exc:  # noqa: BLE001
             status, body = self._handle_error(exc, "ERR_AI_PROVIDERS_UPDATE")
