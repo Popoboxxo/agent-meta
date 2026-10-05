@@ -18,7 +18,13 @@ import yaml
 
 from scripts.lib.artifact_validate import validate_json_document
 from scripts.lib.log import SyncLog
-from scripts.lib.mcp import _update_json_config, build_mcp_guardrails_list, generate_provider_configs
+from scripts.lib.mcp import (
+    _generate_rule_content,
+    _update_json_config,
+    build_mcp_guardrails_list,
+    generate_mcp_artifacts,
+    generate_provider_configs,
+)
 from scripts.lib.mcp_provider_config import (
     _build_connection_entry,
     _update_codex_toml_config,
@@ -935,3 +941,109 @@ def test_copilot_mcp_config_wiring_in_real_registry():
     assert mcp_cfg["committed-file"] == ".vscode/mcp.json"
     assert "secrets-file" not in mcp_cfg
     assert ".vscode/" not in copilot.get("provider_root_dirs", [])
+
+
+# --- issue #810: no unresolved {{VAR}} placeholders in generated output -----
+
+_PLACEHOLDER_RE = re.compile(r"\{\{[A-Z0-9_]+\}\}")
+
+
+def _write_plugin_catalog(agent_meta_root: Path, servers: dict) -> None:
+    """Write a minimal config/plugin-catalog.yaml with the given servers."""
+    plugins = {name: {**sdef, "kind": "mcp-server"} for name, sdef in servers.items()}
+    _write(
+        agent_meta_root / "config" / "plugin-catalog.yaml",
+        yaml.dump({"plugins": plugins}),
+    )
+
+
+def test_generate_rule_content_resolves_connection_placeholders():
+    """Issue #810: registry connection placeholders must render as committed
+    env references, never as raw placeholder literals."""
+    server_def = {
+        "description": "demo",
+        "connection": {
+            "type": "sse",
+            "url": "{{MCP_DEMO_URL}}/sse",
+            "headers": {"Authorization": "Bearer {{MCP_DEMO_TOKEN}}"},
+        },
+    }
+    content = _generate_rule_content("demo", server_def)
+
+    assert not _PLACEHOLDER_RE.search(content)
+    assert "- URL: `${MCP_DEMO_URL}/sse`" in content
+
+
+def test_generate_rule_content_compact_mode_has_no_placeholders():
+    """The compact (embedded-context) variant must not leak placeholders either."""
+    server_def = {
+        "description": "demo",
+        "connection": {"type": "sse", "url": "{{MCP_DEMO_URL}}"},
+    }
+    content = _generate_rule_content("demo", server_def, compact=True)
+
+    assert not _PLACEHOLDER_RE.search(content)
+    assert "**Verbindungstyp:** `sse`" in content
+
+
+def test_sync_mcp_artifacts_emit_no_placeholder_literals(tmp_path):
+    """End-to-end: a sync of an active server whose connection uses declared
+    ``secrets:`` variables produces zero ``{{VAR}}`` literals and no warning."""
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write_plugin_catalog(agent_meta_root, {
+        "honcho": {
+            "description": "honcho",
+            "connection": {
+                "type": "sse",
+                "url": "{{MCP_HONCHO_URL}}",
+                "headers": {"Authorization": "Bearer {{MCP_HONCHO_API_KEY}}"},
+            },
+            "secrets": ["MCP_HONCHO_URL", "MCP_HONCHO_API_KEY"],
+        },
+    })
+    log = SyncLog()
+
+    generate_mcp_artifacts(
+        agent_meta_root, project_root,
+        {"mcp-servers": ["honcho"], "platforms": []},
+        {"Claude": {"has_rules": True}}, log, dry_run=False, provider="Claude",
+    )
+
+    rule = project_root / ".claude" / "rules" / "mcp-honcho.md"
+    assert rule.exists()
+    text = rule.read_text(encoding="utf-8")
+    assert not _PLACEHOLDER_RE.search(text)
+    assert "${MCP_HONCHO_URL}" in text
+    # Declared variables are expected env references — no undefined warning.
+    assert not any("MCP_HONCHO_URL" in w for w in log.warnings)
+
+
+def test_sync_mcp_artifacts_warn_on_undeclared_connection_var(tmp_path):
+    """Issue #810: a connection placeholder missing from ``secrets:`` is a
+    genuinely undefined MCP variable — sync warns and still never ships the
+    raw literal."""
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write_plugin_catalog(agent_meta_root, {
+        "orphan": {
+            "description": "orphan",
+            "connection": {"type": "sse", "url": "{{MCP_UNDEFINED_URL}}"},
+            "secrets": [],
+        },
+    })
+    log = SyncLog()
+
+    generate_mcp_artifacts(
+        agent_meta_root, project_root,
+        {"mcp-servers": ["orphan"], "platforms": []},
+        {"Claude": {"has_rules": True}}, log, dry_run=False, provider="Claude",
+    )
+
+    rule = project_root / ".claude" / "rules" / "mcp-orphan.md"
+    text = rule.read_text(encoding="utf-8")
+    assert not _PLACEHOLDER_RE.search(text)
+    assert "${MCP_UNDEFINED_URL}" in text
+    assert any(
+        "MCP_UNDEFINED_URL" in w and "secrets:" in w for w in log.warnings
+    ), log.warnings
