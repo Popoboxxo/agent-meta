@@ -136,11 +136,52 @@ def substitute_platform(
             return str(platform_vars[raw_key])
         log.warning(
             f'platform-config: placeholder {{{{{raw_key}}}}} not found in platform defaults '
-            f'or project overrides — placeholder remains in: {source_label}'
+            f'or project overrides (key missing in platform-config.yaml) — '
+            f'placeholder remains in: {source_label}'
         )
         return match.group(0)
 
     return _PLATFORM_VAR_RE.sub(replacer, text)
+
+
+def warn_unresolved_platform_vars(
+    text: str,
+    platform_vars: dict,
+    source_label: str,
+    log: 'SyncLog',
+    report_missing: bool = True,
+) -> None:
+    """Report surviving ``{{platform.*}}`` placeholders with a split diagnosis.
+
+    Issue #834 diagnosis split: a surviving placeholder has two very different
+    causes, and they must not share one message.
+
+    * The key **is** present in *platform_vars* (defaults + project overrides)
+      yet still appears in *text* — the render path never ran
+      ``substitute_platform()``. That is the "substitution not applied" bug
+      (#834).
+    * The key is **absent** from *platform_vars* — a genuine configuration gap
+      ("key missing in platform-config.yaml").
+
+    ``report_missing=False`` suppresses the second class: callers that already
+    ran :func:`substitute_platform` (which warns for missing keys itself) use
+    this to detect only the missing-call class without double-warning. The
+    loader docstring's "checked externally via warn_unresolved_platform_vars"
+    contract is served by the default ``True``.
+    """
+    for raw_key in sorted(set(_PLATFORM_VAR_RE.findall(text))):
+        if raw_key in (platform_vars or {}):
+            log.warning(
+                f'platform-config: substitution not applied — '
+                f'{{{{{raw_key}}}}} is configured but remained in: {source_label} '
+                f'(render path skipped substitute_platform(); see issue #834)'
+            )
+        elif report_missing:
+            log.warning(
+                f'platform-config: placeholder {{{{{raw_key}}}}} not found in platform '
+                f'defaults or project overrides (key missing in platform-config.yaml) — '
+                f'placeholder remains in: {source_label}'
+            )
 
 
 # Fields whose "+"-suffixed variant should be JOINED (not just overridden)

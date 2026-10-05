@@ -1151,7 +1151,7 @@ def _handle_sync(ctx: _SyncContext) -> None:
     debug_mode, allow_committed_secrets, mcp_gitignore_extras = \
         _sync_stage_contexts(ctx.agent_meta_root, ctx.project_root, config,
                              provider_config, providers, ctx.variables,
-                             ctx.args, ctx.log)
+                             ctx.args, ctx.log, platform_vars=platform_vars)
     # Stage 5: legacy-provider cleanup.
     _sync_stage_legacy_cleanup(ctx.project_root, config, provider_config,
                                providers, ctx.args, ctx.log)
