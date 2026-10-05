@@ -443,3 +443,7 @@ def _write_config(path: Path, config: dict) -> None:
     body = yaml_dump_preserving_multiline(yaml, config, allow_unicode=True,
                                           sort_keys=False, default_flow_style=False)
     path.write_text(header + body, encoding="utf-8")
+    # Issue #864: project.yaml may hold a plaintext admin token — match the
+    # Admin-UI save path and restrict it to owner-only (best-effort).
+    from .permissions import harden_admin_config_files
+    harden_admin_config_files(path)

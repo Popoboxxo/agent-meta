@@ -820,6 +820,10 @@ def sync_version_bookkeeping(
                f"agent-meta-version: {current!r} -> {actual_version!r}")
     config["agent-meta-version"] = actual_version
     config_path.write_text(new_text, encoding="utf-8")
+    # Keep the owner-only mode even if this write path runs without a prior
+    # fill_defaults() in the same process (issue #864).
+    from lib.permissions import harden_admin_config_files
+    harden_admin_config_files(config_path)
 
 
 def _sync_stage_legacy_cleanup(

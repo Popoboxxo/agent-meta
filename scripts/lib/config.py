@@ -1025,6 +1025,15 @@ def fill_defaults(
                 json.dump(config, f, indent=2, ensure_ascii=False)
                 f.write("\n")
 
+    # Enforce owner-only permissions on every non-dry run, not just when the
+    # file changed: project.yaml may carry a plaintext admin token
+    # (admin-ui.token) and must match the Admin-UI save path (issues #589,
+    # #864). A config left world-readable by an older writer is healed here on
+    # the next --init/--fill-defaults/sync. Failure is soft (see permissions).
+    if not dry_run:
+        from .permissions import harden_admin_config_files
+        harden_admin_config_files(config_path)
+
     for field_name, description in added:
         action = "AUTO-FILL" if not dry_run else "AUTO-FILL(dry)"
         # Resolve the actual value (supports "dod.req-traceability" nested lookups)
