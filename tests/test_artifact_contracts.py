@@ -26,6 +26,7 @@ sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 from lib.artifact_validate import (  # noqa: E402
     validate_frontmatter,
     validate_json_document,
+    validate_mcp_document,
     validate_toml,
 )
 from lib.consistency.report import Finding, Severity  # noqa: E402
@@ -220,11 +221,35 @@ def test_validate_json_document_v1_flat_mcp_is_clean() -> None:
     assert validate_json_document(text, "opencode-json", "opencode.json") == []
 
 
-def test_validate_json_document_v1_missing_mcp_is_error() -> None:
+def test_validate_json_document_v1_missing_mcp_is_clean() -> None:
+    # issue #849 follow-up: no MCP servers configured -> no top-level 'mcp'
+    # object is legitimate and MUST NOT produce a finding.
     text = '{"default_agent": "orchestrator"}'
+    assert validate_json_document(text, "opencode-json", "opencode.json") == []
+
+
+def test_validate_json_document_v1_empty_mcp_is_clean() -> None:
+    text = '{"mcp": {}}'
+    assert validate_json_document(text, "opencode-json", "opencode.json") == []
+
+
+def test_validate_json_document_v1_wrong_mcp_type_is_error() -> None:
+    # A populated-but-wrong-shape 'mcp' value stays fail-loud (issue #849).
+    text = '{"mcp": ["not-an-object"]}'
     errors = _errors(validate_json_document(text, "opencode-json", "opencode.json"))
     assert len(errors) == 1
     assert errors[0].check == "artifact-contract"
+    assert "mcp" in errors[0].message
+
+
+def test_validate_json_document_v2_missing_mcp_is_clean() -> None:
+    text = '{"default_agent": "orchestrator", "permission": {}}'
+    assert validate_json_document(text, "opencode-json-v2", "opencode.json") == []
+
+
+def test_validate_json_document_v2_empty_mcp_is_clean() -> None:
+    text = '{"mcp": {}}'
+    assert validate_json_document(text, "opencode-json-v2", "opencode.json") == []
 
 
 def test_validate_json_document_invalid_json_is_error() -> None:
@@ -235,3 +260,74 @@ def test_validate_json_document_invalid_json_is_error() -> None:
 def test_validate_json_document_unknown_format_is_clean() -> None:
     # Formats without a declared contract are not guessed.
     assert validate_json_document("{}", "some-other-format", "x.json") == []
+
+
+# validate_mcp_document (issue #849 — shared committed-MCP-document resolver)
+
+
+def test_validate_mcp_document_valid_v1_document_is_clean(tmp_path: Path) -> None:
+    (tmp_path / "opencode.json").write_text(
+        '{"mcp": {"foo": {"type": "local"}}}', encoding="utf-8"
+    )
+    mcp = {"committed-file": "opencode.json", "format": "opencode-json"}
+
+    assert validate_mcp_document(mcp, tmp_path) == []
+
+
+def test_validate_mcp_document_invalid_json_is_error(tmp_path: Path) -> None:
+    (tmp_path / "opencode.json").write_text("{ not valid json", encoding="utf-8")
+    mcp = {"committed-file": "opencode.json", "format": "opencode-json"}
+
+    findings = validate_mcp_document(mcp, tmp_path)
+
+    errors = _errors(findings)
+    assert len(errors) == 1
+    assert errors[0].check == "artifact-contract"
+    assert errors[0].file == "opencode.json"
+    assert "invalid JSON" in errors[0].message
+
+
+def test_validate_mcp_document_no_mcp_is_clean(tmp_path: Path) -> None:
+    # issue #849 follow-up: a generated project without MCP servers has an
+    # opencode.json that carries isolation/permission keys but no 'mcp' object.
+    (tmp_path / "opencode.json").write_text(
+        '{"subagent_depth": 3, "permission": {"edit": {"**": "deny"}}}',
+        encoding="utf-8",
+    )
+    mcp = {"committed-file": "opencode.json", "format": "opencode-json"}
+
+    assert validate_mcp_document(mcp, tmp_path) == []
+
+
+def test_validate_mcp_document_wrong_v1_shape_is_error(tmp_path: Path) -> None:
+    # A populated-but-wrong-shape 'mcp' value stays fail-loud (issue #849).
+    (tmp_path / "opencode.json").write_text('{"mcp": ["not-an-object"]}', encoding="utf-8")
+    mcp = {"committed-file": "opencode.json", "format": "opencode-json"}
+
+    errors = _errors(validate_mcp_document(mcp, tmp_path))
+    assert len(errors) == 1
+    assert "flat top-level object" in errors[0].message
+
+
+def test_validate_mcp_document_toml_format_is_validated(tmp_path: Path) -> None:
+    (tmp_path / ".codex" / "config.toml").parent.mkdir(parents=True)
+    (tmp_path / ".codex" / "config.toml").write_text("[mcp_servers.broken\n", encoding="utf-8")
+    mcp = {"committed-file": ".codex/config.toml", "format": "codex-toml-mcp"}
+
+    assert len(_errors(validate_mcp_document(mcp, tmp_path))) == 1
+
+
+def test_validate_mcp_document_absent_file_is_clean(tmp_path: Path) -> None:
+    mcp = {"committed-file": "opencode.json", "format": "opencode-json"}
+    assert validate_mcp_document(mcp, tmp_path) == []
+
+
+def test_validate_mcp_document_undeclared_format_is_clean(tmp_path: Path) -> None:
+    (tmp_path / "opencode.json").write_text("{ not valid json", encoding="utf-8")
+    mcp = {"committed-file": "opencode.json", "format": "claude-settings"}
+    assert validate_mcp_document(mcp, tmp_path) == []
+
+
+def test_validate_mcp_document_missing_config_is_clean(tmp_path: Path) -> None:
+    assert validate_mcp_document(None, tmp_path) == []
+    assert validate_mcp_document({}, tmp_path) == []
