@@ -93,6 +93,15 @@ def get_active_agents_data(
     Reads roles from config/role-defaults.yaml and resolves the shared Layer-2
     activation set (gates + whitelist intersected with generatable templates).
     Returns: list of dicts with 'name', 'short_desc' and derived 'keywords'.
+
+    Contract (issue #811 / audit check F15): the returned catalog is exactly
+    ``resolve_active_roles(..., require_template=True)``. ``config["roles"]`` is
+    a *whitelist*, not the active set: an entry that is disabled by its
+    ``activation_groups`` gate (e.g. ``se-component-requirements`` while
+    ``systems-engineering.enabled: false``) is intentionally absent from the
+    catalog. Audits must compare the catalog against the resolver output, never
+    against the raw ``roles`` list. Regression lock:
+    ``tests/test_context_catalog_active_roles.py``.
     """
     roles_cfg = load_roles_config(agent_meta_root)
     roles = roles_cfg.get("roles", {})

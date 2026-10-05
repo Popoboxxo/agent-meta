@@ -78,6 +78,26 @@ liegt in `scripts/lib/`. Ablauf (grob):
 plus projektseitigen `permission-mode-overrides` in `.meta-config/project.yaml`, Validation
 läuft über `config/project-config.schema.json`.
 
+## Agent-Katalog & aktive Rollen (Contract)
+
+Der Agent-Katalog (`## Agent Directory` im Managed Block, Vorlage
+`templates/context/partials/agents-table.md`) wird beim Sync aus
+`delegation_table.get_active_agents_data()` gerendert und ist **exakt** die
+Menge aus `roles.resolve_active_roles(..., require_template=True)` — also
+Layer 1 (Aktivierungs-Gates + Projekt-Whitelist) geschnitten mit den
+generierbaren Templates (Layer 2).
+
+Wichtig: `roles:` in `.meta-config/project.yaml` ist eine **Whitelist**, nicht
+die Menge der aktiven Rollen. Ein dort gelisteter Eintrag, dessen
+`activation_groups`-Gate deaktiviert ist, gehört **nicht** in den Katalog.
+Beispiel: `se-component-requirements` steht in der Whitelist, fehlt aber
+korrekt im Katalog, solange `systems-engineering.enabled: false` ist
+(`activation_groups.se` in `config/role-defaults.yaml`).
+
+Audits und Tests müssen den Katalog daher gegen `resolve_active_roles()`
+prüfen, nie gegen die rohe `roles:`-Liste (Audit-Check F15, Issue #811). Der
+Invariant ist in `tests/test_context_catalog_active_roles.py` festgeschrieben.
+
 ## CLAUDE.md managed block
 
 Bei jedem normalen sync aktualisiert `sync.py` automatisch den managed block in `CLAUDE.md`
