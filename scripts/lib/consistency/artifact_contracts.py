@@ -33,18 +33,10 @@ from typing import Iterator
 from ..artifact_validate import (
     resolve_artifact_contract,
     validate_artifact,
-    validate_json_document,
-    validate_toml,
+    validate_mcp_document,
 )
 from ..providers import load_providers_config
 from .report import Finding, Severity
-
-# JSON MCP formats that ``artifact_validate.validate_json_document`` knows a
-# key-shape contract for (all other formats are YAML / provider-specific and
-# are not guessed here).
-_JSON_FORMATS = frozenset({"opencode-json", "opencode-json-v2"})
-# TOML MCP format (Codex): the committed document must parse as TOML.
-_TOML_FORMATS = frozenset({"codex-toml-mcp"})
 
 
 def _iter_artifacts(directory: Path, ext: str) -> Iterator[Path]:
@@ -84,13 +76,14 @@ def check_artifact_contracts(
     artifact directory, or a format without a declared contract yields no
     findings (conservative, no false positives).
 
-    Overlap note (quality review WARN-4): the sync-time gate
-    (``agent_sync.collect_artifact_findings``) validates the same committed
+    Overlap note (quality review WARN-4, extended by issue #849): the sync-time
+    gate (``agent_sync.collect_artifact_findings``) validates the same committed
     artifacts for a project-scoped, capability-aware fail-loud signal. This
     check is deliberately the framework-tree, registry-wide counterpart used by
     ``consistency-check.py``; the two cannot diverge because both resolve the
-    contract via :func:`artifact_validate.resolve_artifact_contract` and
-    validate via :func:`artifact_validate.validate_artifact` (single source of
+    agent contract via :func:`artifact_validate.resolve_artifact_contract` /
+    :func:`artifact_validate.validate_artifact` and the committed MCP document
+    via :func:`artifact_validate.validate_mcp_document` (single source of
     truth).
     """
     findings: list[Finding] = []
@@ -114,30 +107,6 @@ def check_artifact_contracts(
                 rel = _rel(path, agent_meta_root)
                 findings += validate_artifact(text, contract, rel)
 
-        findings += _check_mcp_document(cfg, agent_meta_root)
+        findings += validate_mcp_document(cfg.get("mcp-config"), agent_meta_root)
 
     return findings
-
-
-def _check_mcp_document(cfg: dict, agent_meta_root: Path) -> list[Finding]:
-    mcp = cfg.get("mcp-config")
-    if not isinstance(mcp, dict):
-        return []
-    committed = mcp.get("committed-file")
-    fmt = mcp.get("format")
-    if not committed or not isinstance(fmt, str):
-        return []
-
-    path = agent_meta_root / str(committed)
-    if not path.is_file():
-        return []
-    text = _read(path)
-    if text is None:
-        return []
-    rel = _rel(path, agent_meta_root)
-
-    if fmt in _JSON_FORMATS:
-        return validate_json_document(text, fmt, rel)
-    if fmt in _TOML_FORMATS:
-        return validate_toml(text, rel)
-    return []

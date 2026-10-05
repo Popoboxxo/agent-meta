@@ -302,6 +302,83 @@ def test_collect_artifact_findings_registry_failure_fails_loud(monkeypatch, tmp_
     assert "could not be loaded" in finding.message
 
 
+def _probe_pc_with_mcp(
+    fmt: str = "opencode-json", committed: str = "opencode.json"
+) -> dict:
+    pc = _probe_pc("v1")
+    pc["Probe"]["mcp-config"] = {"committed-file": committed, "format": fmt}
+    return pc
+
+
+def test_collect_artifact_findings_validates_committed_mcp_document(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """Issue #849: a broken committed MCP document fails the ``--check`` gate.
+
+    The gate used to scan only ``agents_dir``; the committed MCP document was
+    validated by ``consistency-check.py`` alone, so a ``--check`` run passed on
+    an unparseable ``opencode.json``.
+    """
+    monkeypatch.setattr(
+        agent_sync,
+        "load_providers_config",
+        lambda _root, _config=None: _probe_pc_with_mcp(),
+    )
+    (tmp_path / "opencode.json").write_text("{ not valid json", encoding="utf-8")
+
+    findings = agent_sync.collect_artifact_findings(
+        _REPO_ROOT, tmp_path, {"ai-providers": ["Probe"]}
+    )
+
+    errors = [(rel, f) for rel, f in findings if f.severity == Severity.ERROR]
+    assert errors, "a broken MCP document must yield an ERROR finding"
+    rel, finding = errors[0]
+    assert rel == "opencode.json"
+    assert finding.file == "opencode.json"
+    assert finding.check == "artifact-contract"
+    assert "invalid JSON" in finding.message
+
+
+def test_collect_artifact_findings_valid_mcp_document_has_no_errors(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(
+        agent_sync,
+        "load_providers_config",
+        lambda _root, _config=None: _probe_pc_with_mcp(),
+    )
+    (tmp_path / "opencode.json").write_text('{"mcp": {"foo": {"type": "local"}}}', encoding="utf-8")
+
+    findings = agent_sync.collect_artifact_findings(
+        _REPO_ROOT, tmp_path, {"ai-providers": ["Probe"]}
+    )
+
+    assert [f for _rel, f in findings if f.severity == Severity.ERROR] == []
+
+
+def test_collect_artifact_findings_toml_mcp_document_is_validated(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """The same shared resolver covers the TOML MCP document (Codex shape)."""
+    monkeypatch.setattr(
+        agent_sync,
+        "load_providers_config",
+        lambda _root, _config=None: _probe_pc_with_mcp(
+            fmt="codex-toml-mcp", committed=".codex/config.toml"
+        ),
+    )
+    target = tmp_path / ".codex" / "config.toml"
+    target.parent.mkdir(parents=True)
+    target.write_text("[mcp_servers.broken\n", encoding="utf-8")
+
+    findings = agent_sync.collect_artifact_findings(
+        _REPO_ROOT, tmp_path, {"ai-providers": ["Probe"]}
+    )
+
+    errors = [(rel, f) for rel, f in findings if f.severity == Severity.ERROR]
+    assert errors and errors[0][1].check == "artifact-contract"
+
+
 # ---------------------------------------------------------------------------
 # Integration: real sync.py CLI against a self-hosting scratch checkout
 # ---------------------------------------------------------------------------

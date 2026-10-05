@@ -17,6 +17,7 @@ from .artifact_validate import (
     CHECK,
     resolve_artifact_contract,
     validate_artifact,
+    validate_mcp_document,
 )
 from .consistency.report import Finding, Severity
 from .frontmatter import (
@@ -738,9 +739,11 @@ def collect_artifact_findings(
 
     Read-only, registry-driven ``--check``/``--validate`` gate (spec §5): every
     active provider's ``agents_dir`` is scanned for its declared ``agent_ext``
-    and each file is validated with :func:`_artifact_findings`. Returns a list
-    of ``(relative_path, Finding)`` pairs. Absent directories and providers with
-    validation disabled yield no findings.
+    and each file is validated with :func:`_artifact_findings`; the committed MCP
+    document declared by ``mcp-config`` is validated with the shared
+    :func:`artifact_validate.validate_mcp_document` (issue #849). Returns a list
+    of ``(relative_path, Finding)`` pairs. Absent directories, absent MCP
+    documents and providers with validation disabled yield no findings.
 
     A registry that cannot be loaded is **not** silently ignored: it yields one
     ``Severity.ERROR`` finding — so the fail-loud gate exits 1 instead of
@@ -774,6 +777,8 @@ def collect_artifact_findings(
         if not _artifact_validation_enabled(provider, capabilities):
             continue
         pc = provider_config.get(provider) or {}
+        for finding in validate_mcp_document(pc.get("mcp-config"), project_root):
+            findings.append((finding.file, finding))
         agents_dir = pc.get("agents_dir")
         if not agents_dir:
             continue

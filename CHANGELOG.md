@@ -3,6 +3,17 @@
 ## [Unreleased]
 
 ### Fixed
+- **`sync --check`/`--validate` now validates the committed MCP document (issue #849)**:
+  the artifact gate (`agent_sync.collect_artifact_findings`) scanned only each
+  provider's generated agent files, so an invalid or shape-broken committed MCP
+  document (`opencode.json`/`.jsonc` flat v1 `mcp` vs. nested v2 `mcp.servers`,
+  or the Codex TOML document) passed `--check` while it was only ever caught by
+  `consistency-check.py`. The MCP-document resolution/validation is extracted
+  into a single shared helper `artifact_validate.validate_mcp_document`, called
+  by both the sync-time gate and the registry-wide consistency check (single
+  source of truth for the `resolve_artifact_contract` /
+  `validate_json_document` / `validate_toml` dispatch). Dispatch stays
+  provider-agnostic: it reads the declared `mcp-config.format` value only.
 - **A2A `payload.t` length limit is now machine-enforced, not merely documented (issue #812)**:
   the documented 300-character task-line ceiling had no schema counterpart
   (`maxLength` was absent), so schema validation accepted arbitrarily long

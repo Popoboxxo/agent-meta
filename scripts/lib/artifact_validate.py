@@ -10,6 +10,11 @@ document) — no function reads a provider name. This is the single place where 
 silent-drop / invalid-artifact class is turned into a signal (design DECISION-3,
 §4.3; spec §5).
 
+The validators are pure (text in, findings out). The one exception is
+:func:`validate_mcp_document`, the read-only resolver shared by the sync-time
+``--check``/``--validate`` gate and the consistency check so the committed MCP
+document is validated by exactly one code path (issue #849).
+
 Reuses ``scripts/lib/consistency/report.py::{Finding, Severity}``.
 """
 from __future__ import annotations
@@ -17,6 +22,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
+from pathlib import Path
 
 try:  # Python >= 3.11 ships tomllib in the stdlib.
     import tomllib
@@ -275,4 +281,53 @@ def _validate_opencode_v2(doc: dict, path: str) -> list[Finding]:
 def _validate_opencode_v1(doc: dict, path: str) -> list[Finding]:
     if not isinstance(doc.get("mcp"), dict):
         return [_finding(path, "opencode-json requires the flat top-level 'mcp' object")]
+    return []
+
+
+_MCP_JSON_FORMATS = frozenset({"opencode-json", "opencode-json-v2"})
+
+_MCP_TOML_FORMATS = frozenset({"codex-toml-mcp"})
+
+
+def validate_mcp_document(mcp_config: dict | None, root: Path) -> list[Finding]:
+    """Validate the committed MCP document declared by *mcp_config* under *root*.
+
+    The one shared resolver for the committed MCP document: the sync-time
+    ``--check``/``--validate`` gate (``agent_sync.collect_artifact_findings``)
+    and the registry-wide consistency check
+    (``consistency.artifact_contracts.check_artifact_contracts``) both call this
+    function, so the two paths cannot diverge (issue #849).
+
+    Reads the declared ``committed-file`` and dispatches on the declared
+    ``format`` value only (never a provider name):
+    :data:`_MCP_JSON_FORMATS` -> :func:`validate_json_document`;
+    :data:`_MCP_TOML_FORMATS` -> :func:`validate_toml`.
+
+    Conservative and fail-soft: a missing/empty ``mcp-config``, a missing
+    ``committed-file``, an absent or unreadable file, or an undeclared format
+    yields no findings. Malformed input never raises.
+    """
+    if not isinstance(mcp_config, dict):
+        return []
+    committed = mcp_config.get("committed-file")
+    fmt = mcp_config.get("format")
+    if not committed or not isinstance(fmt, str):
+        return []
+
+    path = root / str(committed)
+    if not path.is_file():
+        return []
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return []
+    try:
+        rel = str(path.relative_to(root)).replace("\\", "/")
+    except ValueError:
+        rel = str(path)
+
+    if fmt in _MCP_JSON_FORMATS:
+        return validate_json_document(text, fmt, rel)
+    if fmt in _MCP_TOML_FORMATS:
+        return validate_toml(text, rel)
     return []
