@@ -143,8 +143,9 @@ def test_tier_vars_reach_context_render(tmp_path, monkeypatch):
     captured: dict = {}
 
     def _context_spy(agent_meta_root, project_root, config, variables, log, dry_run,
-                     provider, provider_config):
+                     provider, provider_config, platform_vars=None):
         captured["variables"] = dict(variables)
+        captured["platform_vars"] = platform_vars
 
     monkeypatch.setattr(sync_pipeline, "sync_context_for_provider", _context_spy)
 
@@ -152,9 +153,11 @@ def test_tier_vars_reach_context_render(tmp_path, monkeypatch):
         root, project_root, {"orchestrator": {"mode": "strict"}},
         {PROVIDER: {"context_file": "CONTEXT.md"}}, [PROVIDER], {},
         argparse.Namespace(dry_run=False), SyncLog(),
+        platform_vars={"platform.probe.flag": "on"},
     )
 
     variables = captured["variables"]
+    assert captured["platform_vars"] == {"platform.probe.flag": "on"}
     assert variables["ENFORCEMENT_TIER"] == "permission"
     assert variables["GATE_PARTIAL"] == "true"
     assert variables["GATE_ENFORCED"] == "false"
