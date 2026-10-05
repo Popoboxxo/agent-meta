@@ -3,6 +3,16 @@
 ## [Unreleased]
 
 ### Fixed
+- **Plan-graph `file_overlap` no longer flags sequential plans or prose/`Interfaces:` paths (issue #848)**:
+  two root causes. (1) `_parse_plan_tasks` ran its `Modify:`/`Create:` regex over the whole task block,
+  so prose and `**Interfaces:**` paths were captured as file ownership; extraction is now scoped to the
+  `Files:` sub-block up to the next known task field header (`Interfaces:`, `Agent:`, `Depends on:`, ...;
+  bold optional, so a non-bold header still terminates but an in-block `**Note:**` does not). (2) `validate_plan` applied the
+  injected file-overlap check to every plan kind, so a sequential `Depends on:` chain sharing files
+  raised a false `spec_plan_plan_graph` ERROR; per the design contract the overlap check now fires only
+  for parallel plans (`fanout`/`parallel_group`), and the plan-graph consistency check (which models a
+  plan as `sequential`) is intentionally overlap-inert while cycle/deadlock/over-commitment stay active.
+  Regression coverage in `tests/test_spec_plan_consistency.py` and `tests/test_orchestration_contract.py`.
 - **Admin-UI saves no longer silently strip YAML comments from `config/ai-providers.yaml` (issue #847)**:
   both write paths (`ConfigManager.write` behind `PUT /api/config/ai-providers` and
   `_handle_post_ai_providers_update`) re-serialised the heavily commented provider registry with

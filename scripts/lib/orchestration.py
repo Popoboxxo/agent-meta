@@ -265,7 +265,9 @@ def validate_plan(
             receives the plan's tasks projected to ``file_affinity`` dict
             inputs and returns such a dict (or a flat ``list[str]`` of
             conflict descriptions). ``None`` skips the check — it NEVER
-            silently claims file-safety.
+            silently claims file-safety. The check is also skipped when
+            ``plan.kind == "sequential"``: its tasks run one after another, so
+            shared files are not a conflict (see check 3 below).
 
     Checks (in order):
     1. Empty plan / duplicate task_ids / deadlocks / cycles (via
@@ -275,7 +277,11 @@ def validate_plan(
        before dispatch.
     3. File overlap via the injected #266 seam; conflicts mean the plan must
        be rejected or the affected tasks sequentialized BEFORE dispatch —
-       static analysis, not an LLM guess.
+       static analysis, not an LLM guess. Only parallel plans (``fanout`` /
+       ``parallel_group``) are checked: a ``sequential`` plan runs its tasks
+       one after another, so shared files are not a conflict and the injected
+       check is skipped (design contract: file-overlap errors belong to
+       ``parallel_group`` fanout, issue #848).
     4. ``tier_override`` present without a valid abstract tier name (coarse
        check; full guardrails live in
        ``DelegationSyntaxEngine.resolve_tier_override`` — no duplicated
@@ -296,7 +302,7 @@ def validate_plan(
             "groups (FANOUT > max_parallel requires confirmation)"
         )
 
-    if file_overlap is not None:
+    if file_overlap is not None and plan.kind != "sequential":
         if callable(file_overlap):
             overlap = file_overlap(_project_tasks_for_overlap(plan.tasks))
         else:

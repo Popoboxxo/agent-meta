@@ -61,6 +61,21 @@ _DEPENDS_RE = re.compile(
     r"(?im)^[ \t]*(?:\*\*)?Depends on:(?:\*\*)?[ \t]*(.+?)[ \t]*$"
 )
 _FILES_FIELD_RE = re.compile(r"\b(?:Modify|Create):[ \t]*`?([^\s,;`)]+)`?")
+# Issue #848: the ``Files:`` sub-block is the ONLY ownership source. The block
+# runs from the ``Files:`` header (bold or plain, like the sibling parsers) up
+# to the next KNOWN task field header (``Interfaces:``, ``Agent:``,
+# ``Depends on:``, ...), also bold or plain. Prose and ``Interfaces:`` paths
+# must not count.
+_FILES_HEADER_RE = re.compile(r"(?im)^[ \t]*(?:\*\*)?Files:(?:\*\*)?[ \t]*")
+# Restrict the boundary to the task field headers actually used in
+# ``writing-plans.md`` and ``docs/plans/**`` (a ``Files:`` block is a short list
+# of ``Modify:``/``Create:`` lines). A bold/plain label outside this set — e.g.
+# an in-block ``**Note:**`` — must NOT truncate the ownership block.
+_FIELD_HEADER_RE = re.compile(
+    r"(?im)^[ \t]*(?:\*\*)?(?:Interfaces|Agent|Depends on|Steps|Acceptance|"
+    r"Verify|Provider-Agnostik|Ziel-AK|Verifikation|Akzeptanz|Kontext|Ziel)"
+    r":(?:\*\*)?[ \t]*"
+)
 _SPEC_FIELD_RE = re.compile(
     r"(?im)^[ \t]*(?:\*\*)?Spec:(?:\*\*)?[ \t]*(.+?)[ \t]*$"
 )
@@ -517,7 +532,6 @@ def _check_plan_graph(
 ) -> None:
     from ..orchestration import (
         FanoutPlan,
-        check_plan_file_overlap,
         validate_plan,
     )
 
@@ -525,23 +539,49 @@ def _check_plan_graph(
         tasks = _parse_plan_tasks(texts.get(plan, ""))
         if not tasks:
             continue
+        # A plan document is modelled as a SEQUENTIAL plan (its tasks carry
+        # ``Depends on:`` edges). Per the design contract
+        # (spec-plan-workflow-design §3.1/§7.3), file-overlap errors belong to
+        # a ``parallel_group`` fanout only — ``validate_plan`` skips the
+        # overlap check for sequential plans (issue #848). Cycle/deadlock and
+        # over-commitment checks remain active.
         fanout = FanoutPlan(
             kind="sequential",
             tasks=tuple(tasks),
             max_parallel=len(tasks),
         )
-        overlap = check_plan_file_overlap(fanout, project_root)
-        for error in validate_plan(fanout, file_overlap=overlap):
+        for error in validate_plan(fanout):
             findings.append(
                 Finding(
                     Severity.ERROR,
                     "spec_plan_plan_graph",
                     _rel(project_root, plan),
                     error,
-                    suggestion="resolve the dependency cycle/deadlock or file "
-                               "overlap before dispatching the plan",
+                    suggestion="resolve the dependency cycle/deadlock before "
+                               "dispatching the plan",
                 )
             )
+
+
+def _files_ownership(block: str) -> tuple[str, ...]:
+    """Extract ``Modify:``/``Create:`` ownership from a task's ``**Files:**`` block.
+
+    Scoped to the header-bounded sub-block (issue #848): a task's prose and
+    its ``**Interfaces:**`` paths frequently mention ``Modify:``/``Create:``
+    for illustration, but only the declared ``**Files:**`` block is real
+    ownership. Returns the paths in first-seen order, de-duplicated.
+    """
+    header = _FILES_HEADER_RE.search(block)
+    if not header:
+        return ()
+    rest = block[header.end():]
+    boundary = _FIELD_HEADER_RE.search(rest)
+    files_block = rest[: boundary.start()] if boundary else rest
+    seen: list[str] = []
+    for path in _FILES_FIELD_RE.findall(files_block):
+        if path not in seen:
+            seen.append(path)
+    return tuple(seen)
 
 
 def _parse_plan_tasks(text: str) -> list[FanoutTask]:
@@ -549,8 +589,9 @@ def _parse_plan_tasks(text: str) -> list[FanoutTask]:
 
     Only the graph-relevant fields are populated: ``task_id`` (normalized to
     ``task-<number>``), ``target_agent`` (``Agent:`` field, default
-    ``developer``), ``prompt`` (task title), ``files_touched``
-    (``Modify:``/``Create:`` paths) and ``dependencies`` (``Depends on:`` ids).
+    ``developer``), ``prompt`` (task title), ``files_touched`` (the
+    ``Modify:``/``Create:`` paths declared inside the ``**Files:**``
+    sub-block) and ``dependencies`` (``Depends on:`` ids).
     """
     from ..orchestration import FanoutTask
 
@@ -564,7 +605,7 @@ def _parse_plan_tasks(text: str) -> list[FanoutTask]:
         title = (header.group(2) or "").strip()
         agent_match = _AGENT_FIELD_RE.search(block)
         target_agent = agent_match.group(1) if agent_match else "developer"
-        files_touched = tuple(_FILES_FIELD_RE.findall(block))
+        files_touched = _files_ownership(block)
         dependencies: list[str] = []
         for dep_match in _DEPENDS_RE.finditer(block):
             for token in re.findall(r"task-\d+|\d+", dep_match.group(1)):
