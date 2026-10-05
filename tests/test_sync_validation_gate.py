@@ -356,6 +356,32 @@ def test_collect_artifact_findings_valid_mcp_document_has_no_errors(
     assert [f for _rel, f in findings if f.severity == Severity.ERROR] == []
 
 
+def test_collect_artifact_findings_mcp_document_without_mcp_is_clean(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """Issue #849 follow-up: no MCP servers configured must not fail the gate.
+
+    A generated project without MCP servers has an ``opencode.json`` carrying
+    isolation/permission keys but no top-level ``mcp`` object; that is valid and
+    must yield no ERROR (the pre-fix gate produced a false positive here).
+    """
+    monkeypatch.setattr(
+        agent_sync,
+        "load_providers_config",
+        lambda _root, _config=None: _probe_pc_with_mcp(),
+    )
+    (tmp_path / "opencode.json").write_text(
+        '{"subagent_depth": 3, "permission": {"edit": {"**": "deny"}}}',
+        encoding="utf-8",
+    )
+
+    findings = agent_sync.collect_artifact_findings(
+        _REPO_ROOT, tmp_path, {"ai-providers": ["Probe"]}
+    )
+
+    assert [f for _rel, f in findings if f.severity == Severity.ERROR] == []
+
+
 def test_collect_artifact_findings_toml_mcp_document_is_validated(
     monkeypatch, tmp_path: Path
 ) -> None:

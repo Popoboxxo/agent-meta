@@ -212,14 +212,38 @@ def validate_artifact(text: str, contract: ArtifactContract, path: str) -> list[
     )
 
 
+def _declares_mcp_content(mcp: object) -> bool:
+    """Whether a top-level ``mcp`` value actually declares MCP content.
+
+    A project with no configured MCP server legitimately emits **no** ``mcp``
+    key at all — the MCP writer returns early when the active-server list is
+    empty, while ``opencode.json`` is still emitted for isolation/permissions.
+    An absent or empty ``mcp`` object must therefore not be treated as a shape
+    violation (issue #849 follow-up: the gate produced a false positive for
+    every scenario-generated project without MCP servers).
+
+    A present value that is not an object (or a non-empty object) *does*
+    declare content and must satisfy the declared format contract.
+    """
+    if mcp is None:
+        return False
+    if isinstance(mcp, dict):
+        return bool(mcp)
+    return True
+
+
 def validate_json_document(text: str, fmt: str, path: str) -> list[Finding]:
     """Validate a JSON config document against the key shape implied by ``fmt``.
 
-    * ``opencode-json-v2`` — the document MUST carry the nested ``mcp.servers``
-      object and MUST NOT carry a flat top-level ``mcp`` server map nor a
-      v1-only key (``subagent_depth``).
-    * ``opencode-json`` — the document MUST carry the flat top-level ``mcp``
-      object (frozen v1 byte shape, AC-21).
+    Shape is only asserted when the document actually declares MCP content
+    (:func:`_declares_mcp_content`); an absent/empty ``mcp`` object is valid
+    because it means "no MCP servers configured".
+
+    * ``opencode-json-v2`` — a document that declares MCP content MUST carry the
+      nested ``mcp.servers`` object and MUST NOT carry a flat top-level ``mcp``
+      server map. A v1-only key (``subagent_depth``) is rejected regardless.
+    * ``opencode-json`` — a document that declares MCP content MUST carry the
+      flat top-level ``mcp`` object (frozen v1 byte shape, AC-21).
 
     Formats without a declared contract are not guessed (no findings).
     """
@@ -242,32 +266,37 @@ def _validate_opencode_v2(doc: dict, path: str) -> list[Finding]:
     findings: list[Finding] = []
 
     mcp = doc.get("mcp")
-    if not isinstance(mcp, dict):
-        findings.append(
-            _finding(path, "opencode-json-v2 requires the nested 'mcp.servers' object")
-        )
-    elif "servers" not in mcp:
-        findings.append(
-            _finding(
-                path,
-                "opencode-json-v2 'mcp' is a flat v1 server map; expected nested "
-                "'mcp.servers'",
-            )
-        )
-    else:
-        if not isinstance(mcp["servers"], dict):
-            findings.append(
-                _finding(path, "opencode-json-v2 'mcp.servers' must be an object")
-            )
-        # Any sibling of 'servers' is a flat-shape leak (v1 wrote servers here).
-        for field in sorted(set(mcp) - {"servers"}):
+    if _declares_mcp_content(mcp):
+        if not isinstance(mcp, dict):
             findings.append(
                 _finding(
                     path,
-                    f"opencode-json-v2 'mcp' carries flat key '{field}' next to "
+                    "opencode-json-v2 'mcp' must be an object with nested "
                     "'servers'",
                 )
             )
+        elif "servers" not in mcp:
+            findings.append(
+                _finding(
+                    path,
+                    "opencode-json-v2 'mcp' is a flat v1 server map; expected nested "
+                    "'mcp.servers'",
+                )
+            )
+        else:
+            if not isinstance(mcp["servers"], dict):
+                findings.append(
+                    _finding(path, "opencode-json-v2 'mcp.servers' must be an object")
+                )
+
+            for field in sorted(set(mcp) - {"servers"}):
+                findings.append(
+                    _finding(
+                        path,
+                        f"opencode-json-v2 'mcp' carries flat key '{field}' next to "
+                        "'servers'",
+                    )
+                )
 
     for field in _OPENCODE_V1_ONLY_KEYS:
         if field in doc:
@@ -279,8 +308,15 @@ def _validate_opencode_v2(doc: dict, path: str) -> list[Finding]:
 
 
 def _validate_opencode_v1(doc: dict, path: str) -> list[Finding]:
-    if not isinstance(doc.get("mcp"), dict):
-        return [_finding(path, "opencode-json requires the flat top-level 'mcp' object")]
+    mcp = doc.get("mcp")
+    if not _declares_mcp_content(mcp):
+        return []
+    if not isinstance(mcp, dict):
+        return [
+            _finding(
+                path, "opencode-json 'mcp' must be the flat top-level object"
+            )
+        ]
     return []
 
 
