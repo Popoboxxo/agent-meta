@@ -196,7 +196,9 @@ def test_claude_registration_path_unchanged(agent_meta_root, project_root):
         (project_root / ".claude" / "settings.json").read_text(encoding="utf-8")
     )
     entry = settings["hooks"]["PreToolUse"][0]
-    assert entry["hooks"][0]["command"] == "bash .claude/hooks/test-guard.sh"
+    assert entry["hooks"][0]["command"] == (
+        "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/test-guard.sh"
+    )
     assert not (project_root / ".agents" / "hooks.json").exists()
 
 

@@ -95,6 +95,24 @@ def test_enabled_and_registered_hook_has_no_findings(tmp_path):
     assert findings == []
 
 
+def test_anchored_registration_is_recognised_as_registered(tmp_path):
+    """Issue #851: once the cwd-independent anchored form is deployed, the
+    consistency check must still recognise the hook as registered (the parser
+    is the inverse of the anchored writer, not of the legacy form only)."""
+    agent_meta_root = tmp_path / "agent-meta"
+    project_root = tmp_path / "project"
+    _write_source(agent_meta_root, "my-guard.sh", enabled="true")
+    hooks_dir = _write_managed(project_root, ["my-guard.sh"])
+    (hooks_dir / "my-guard.sh").write_text(_HOOK_SOURCE.format(enabled="true"), encoding="utf-8")
+    _write_settings(
+        project_root, ["bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/my-guard.sh"]
+    )
+
+    findings = check_hook_enablement_consistency(project_root, agent_meta_root, _CONFIG, _PROVIDER_CONFIG)
+
+    assert findings == [], findings
+
+
 def test_disabled_by_default_hook_is_never_flagged(tmp_path):
     # This is the #714 "false reproduction" case: enabled_by_default:false and
     # no project.yaml opt-in is normal "copied but not enabled" state.

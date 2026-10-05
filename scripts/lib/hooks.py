@@ -122,21 +122,50 @@ def collect_hook_sources(
     return [(src, name) for name, src in seen.items()]
 
 
-def _hook_settings_command(output_filename: str, hooks_dir: str = CLAUDE_HOOKS_DIR) -> str:
-    """Return the shell command string registered in settings.json for a hook."""
+#: Optional cwd-independent anchor prefix (e.g. ``${CLAUDE_PROJECT_DIR}/``)
+#: accepted by `parse_hook_settings_command()` in front of the hooks dir. It
+#: matches ANY ``${VAR}`` expression so already-deployed entries from the
+#: legacy relative form AND from an anchored form are both recognised — the
+#: clean-replace in `_update_settings_hooks()` must not duplicate them during
+#: migration (issue #851).
+_COMMAND_ANCHOR_PREFIX = r"(?:\$\{[A-Za-z_][A-Za-z0-9_]*\}/)?"
+
+
+def _hook_settings_command(
+    output_filename: str,
+    hooks_dir: str = CLAUDE_HOOKS_DIR,
+    anchor: str = "",
+) -> str:
+    """Return the shell command string registered in settings.json for a hook.
+
+    ``anchor`` is a provider-config-driven prefix (e.g.
+    ``${CLAUDE_PROJECT_DIR}``) that makes the command independent of the
+    process cwd. When empty, the legacy cwd-relative form is emitted so
+    providers without the config key stay byte-stable."""
+    anchor = (anchor or "").rstrip("/")
+    if anchor:
+        return f"bash {anchor}/{hooks_dir}/{output_filename}"
     return f"bash {hooks_dir}/{output_filename}"
 
 
 def parse_hook_settings_command(command: str, hooks_dir: str = CLAUDE_HOOKS_DIR) -> str | None:
     """Inverse of `_hook_settings_command`: extract the hook filename from a
-    registered ``bash <hooks_dir>/<filename>`` command string.
+    registered ``bash [<anchor>/]<hooks_dir>/<filename>`` command string.
+
+    Recognises BOTH the anchored form (``bash ${CLAUDE_PROJECT_DIR}/...``) and
+    the legacy cwd-relative form (``bash .claude/hooks/...``), so a project
+    migrated from the legacy form keeps recognising its already-deployed
+    entries as managed (no duplicates on clean replace).
 
     Returns the filename, or None if `command` does not match the canonical
     format this module writes. Kept here next to the writer so both sides of
     the format live in one place (consumers like consistency.hook_drift must
     not re-derive the format with their own regex — a format change would
     silently desync otherwise)."""
-    m = re.match(r"^bash\s+" + re.escape(hooks_dir) + r"/(\S+)\s*$", command.strip())
+    m = re.match(
+        r"^bash\s+" + _COMMAND_ANCHOR_PREFIX + re.escape(hooks_dir) + r"/(\S+)\s*$",
+        command.strip(),
+    )
     return m.group(1) if m else None
 
 
@@ -149,6 +178,7 @@ def _update_settings_hooks(
     dry_run: bool,
     settings_path_rel: str = ".claude/settings.json",
     hooks_dir: str = CLAUDE_HOOKS_DIR,
+    hook_command_anchor: str = "",
 ) -> None:
     """Merge managed hook entries into settings.json.
 
@@ -156,8 +186,10 @@ def _update_settings_hooks(
     - Removes then re-adds entries for active hooks (clean replace)
     - Preserves all non-managed entries (user hooks, permissions, etc.)
 
-    Hooks are identified in settings.json by their command string
-    ``bash <hooks_dir>/<filename>``.
+    Hooks are identified in settings.json by their command string (anchored or
+    legacy-relative, see `parse_hook_settings_command`) — never by an exact
+    string match, so a project migrating from the legacy relative form to the
+    anchored form does not get duplicate entries.
     """
     settings_path = project_root / settings_path_rel
 
@@ -181,14 +213,19 @@ def _update_settings_hooks(
 
     hooks_section: dict = settings.get("hooks", {})
 
-    # All commands we might have ever written (to remove stale + re-add active)
-    all_managed_cmds = {_hook_settings_command(n, hooks_dir) for n in all_managed}
 
-    # Strip all managed entries from every event bucket
+    def _is_managed_entry(entry: dict) -> bool:
+        for h in entry.get("hooks", []):
+            filename = parse_hook_settings_command(h.get("command", ""), hooks_dir)
+            if filename and filename in all_managed:
+                return True
+        return False
+
+
     for event_name in list(hooks_section.keys()):
         cleaned = [
             entry for entry in hooks_section[event_name]
-            if not ({h.get("command", "") for h in entry.get("hooks", [])} & all_managed_cmds)
+            if not _is_managed_entry(entry)
         ]
         if cleaned:
             hooks_section[event_name] = cleaned
@@ -428,6 +465,7 @@ def sync_hooks(
     pc = (provider_config or {}).get(provider, {})
     hooks_dir_rel = pc.get("hooks_dir", CLAUDE_HOOKS_DIR)
     settings_file_rel = pc.get("settings_file", ".claude/settings.json")
+    hook_command_anchor = str(pc.get("hook-command-anchor", "") or "").rstrip("/")
 
     platforms = config.get("platforms", [])
     sources = collect_hook_sources(agent_meta_root, platforms)
@@ -562,7 +600,7 @@ def sync_hooks(
                 "name": hook_stem,
                 "event": event,
                 "matcher": meta.get("matcher", ""),
-                "command": _hook_settings_command(output_name, hooks_dir_rel),
+                "command": _hook_settings_command(output_name, hooks_dir_rel, hook_command_anchor),
                 # Deployed filename — the protocol-specific registration
                 # writers build their own command strings from it (the
                 # Antigravity writer routes every hook through the
@@ -611,6 +649,7 @@ def sync_hooks(
             project_root, previously_managed, now_managed, active_entries, log, dry_run,
             settings_path_rel=settings_file_rel,
             hooks_dir=hooks_dir_rel,
+            hook_command_anchor=hook_command_anchor,
         )
     else:
         registration_writer(
@@ -621,7 +660,13 @@ def sync_hooks(
     # Final verification: check all registered hook files exist on disk
     if not dry_run:
         for entry in active_entries:
-            hook_file = project_root / hooks_dir_rel / Path(entry["command"].split("/")[-1])
+            # Recognise both the anchored and the legacy relative command form
+            # so the existence check never looks up a path that includes the
+            # anchor expression (issue #851).
+            filename = parse_hook_settings_command(entry["command"], hooks_dir_rel)
+            if not filename:
+                filename = Path(entry["command"].split("/")[-1]).name
+            hook_file = project_root / hooks_dir_rel / filename
             if not hook_file.exists():
                 log.warning(
                     f"Hook '{entry['name']}' is registered in {settings_file_rel} "

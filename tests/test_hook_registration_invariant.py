@@ -186,3 +186,108 @@ def test_all_hook_scripts_are_valid_shell(tmp_path):
             [_BASH, "-n", str(script)], capture_output=True, text=True
         )
         assert result.returncode == 0, f"{script}: {result.stderr}"
+
+
+# --- issue #851: cwd-independent hook command anchoring -----------------------
+
+
+def _commands(settings: dict) -> list[str]:
+    return [
+        h["command"]
+        for entries in settings.get("hooks", {}).values()
+        for entry in entries
+        for h in entry.get("hooks", [])
+    ]
+
+
+def test_generated_claude_commands_are_anchored(tmp_path):
+    """Registered Claude hook commands are anchored to ${CLAUDE_PROJECT_DIR}
+    so they resolve regardless of the session cwd (issue #851)."""
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    _sync(project_root)
+
+    settings = json.loads(
+        (project_root / ".claude" / "settings.json").read_text(encoding="utf-8")
+    )
+    commands = _commands(settings)
+    assert commands, "sanity: at least one hook must be registered"
+    assert all(c.startswith("bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/") for c in commands), commands
+
+
+def test_parser_recognises_anchored_and_legacy_forms():
+    """Inverse parser accepts both the anchored and the legacy relative form,
+    and still rejects unrelated commands."""
+    assert parse_hook_settings_command(
+        "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/x.sh", _CLAUDE_HOOKS_DIR
+    ) == "x.sh"
+    assert parse_hook_settings_command(
+        "bash .claude/hooks/x.sh", _CLAUDE_HOOKS_DIR
+    ) == "x.sh"
+    assert parse_hook_settings_command("bash /tmp/x.sh", _CLAUDE_HOOKS_DIR) is None
+
+
+def test_legacy_relative_entry_is_clean_replaced_not_duplicated(tmp_path):
+    """Migration regression (issue #851): a settings.json carrying the legacy
+    relative command for a managed hook is recognised as managed and clean-
+    replaced by the anchored form — no duplicate entry."""
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    _sync(project_root)
+
+    settings_path = project_root / ".claude" / "settings.json"
+    settings = json.loads(settings_path.read_text(encoding="utf-8"))
+    # Simulate a project deployed before the anchor existed.
+    for entries in settings["hooks"].values():
+        for entry in entries:
+            for h in entry["hooks"]:
+                h["command"] = h["command"].replace(
+                    "bash ${CLAUDE_PROJECT_DIR}/", "bash "
+                )
+    settings_path.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
+    legacy_commands = _commands(settings)
+    assert all(c.startswith("bash .claude/hooks/") for c in legacy_commands)
+
+    _sync(project_root)
+
+    settings = json.loads(settings_path.read_text(encoding="utf-8"))
+    commands = _commands(settings)
+    assert all(c.startswith("bash ${CLAUDE_PROJECT_DIR}/") for c in commands), commands
+    assert len(commands) == len(set(commands)), f"duplicate entries: {commands}"
+    assert len(commands) == len(legacy_commands)
+
+
+def test_provider_without_anchor_key_stays_relative(tmp_path):
+    """Provider-agnostic (issue #851): a provider config without the anchor key
+    keeps the legacy relative command form — no hidden Claude branch."""
+    agent_meta_root = tmp_path / "agent-meta"
+    generic = agent_meta_root / "hooks" / "1-generic"
+    generic.mkdir(parents=True)
+    (generic / "anchor-probe.sh").write_text(
+        "#!/bin/bash\n# hook: anchor-probe\n# version: 1.0.0\n"
+        "# event: PreToolUse\n# enabled_by_default: true\nexit 0\n",
+        encoding="utf-8",
+    )
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+
+    log = SyncLog()
+    config = {"platforms": [], "hooks": {}}
+    provider_config = {
+        "TestProv": {
+            "hooks_dir": ".testprov/hooks",
+            "settings_file": ".testprov/settings.json",
+            "hook_protocol": "claude-code-json",
+            "has_hooks": True,
+        }
+    }
+    sync_hooks(
+        agent_meta_root, project_root, config, log,
+        dry_run=False, provider="TestProv", provider_config=provider_config,
+    )
+
+    settings = json.loads(
+        (project_root / ".testprov" / "settings.json").read_text(encoding="utf-8")
+    )
+    commands = _commands(settings)
+    assert commands == ["bash .testprov/hooks/anchor-probe.sh"], commands
