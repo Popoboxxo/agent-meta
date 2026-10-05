@@ -3,6 +3,15 @@
 ## [Unreleased]
 
 ### Fixed
+- **`--init`/`--fill-defaults` now enforce owner-only permissions on `project.yaml` (issue #864, security)**:
+  the Admin-UI save path already chmodded `.meta-config/project.yaml` to `0600` (issue #589), but the CLI
+  writers left it at `0644` under a typical `022` umask — so a plaintext `admin-ui.token` or credential key
+  stayed group/world-readable. `config.fill_defaults()` (the engine behind `--init`, `--fill-defaults` and
+  the per-sync auto-fill), the `--setup` wizard's `_write_config()` and the agent-meta-version write-back
+  now all harden the config via the new shared `scripts/lib/permissions.py`
+  (`harden_admin_config_files()`), mirroring the Admin-UI path (including the `.meta-config/plugin-catalog.yaml`
+  sibling when present). Hardening is best-effort/cross-platform-safe and is skipped entirely in `--dry-run`.
+  Regression coverage in `tests/test_project_yaml_permissions_864.py`.
 - **`sync --check`/`--validate` now validates the committed MCP document (issue #849)**:
   the artifact gate (`agent_sync.collect_artifact_findings`) scanned only each
   provider's generated agent files, so an invalid or shape-broken committed MCP
