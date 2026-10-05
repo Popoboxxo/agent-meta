@@ -114,6 +114,80 @@ def test_parse_plan_tasks_hyphen_header():
     assert tasks[1].prompt == "Numeric"
 
 
+def test_parse_plan_tasks_files_block_is_only_ownership_source():
+    """Issue #848: prose and ``**Interfaces:**`` paths are not ownership.
+
+    Only ``Modify:``/``Create:`` declarations inside the ``**Files:**``
+    sub-block (up to the next bold ``**<Field>:**`` header) count.
+    """
+    tasks = _parse_plan_tasks(
+        "### Task 1: alpha\n"
+        "Prose explaining Modify: scripts/shared.py and Create: b.py.\n"
+        "**Files:** Modify: a.py, Create: b.py\n"
+        "**Interfaces:** Create: scripts/shared.py\n"
+        "**Agent:** developer\n"
+        "### Task 2: beta\n"
+        "**Files:**\n"
+        "- Modify: c.py\n"
+        "**Interfaces:** Modify: scripts/shared.py\n"
+    )
+    assert [t.task_id for t in tasks] == ["task-1", "task-2"]
+    assert tasks[0].files_touched == ("a.py", "b.py")
+    assert tasks[1].files_touched == ("c.py",)
+
+
+def test_parse_plan_tasks_files_block_accepts_plain_field_headers():
+    """Issue #848 (F1): the ownership block must accept plain field headers.
+
+    Like the sibling parsers, the ``Files:``/field headers are bold-optional.
+    A plain ``Interfaces:`` line after the block is a boundary (its paths are
+    not ownership), a plain ``Files:`` header still captures ownership, and a
+    label outside the known field set (``**Note:**``) must not truncate the
+    block.
+    """
+    tasks = _parse_plan_tasks(
+        "### Task 1: alpha\n"
+        "Files: Modify: a.py\n"
+        "**Note:** a remark that must not truncate the block\n"
+        "Create: b.py\n"
+        "Interfaces: Create: scripts/shared.py\n"
+        "### Task 2: beta\n"
+        "Files: Modify: c.py, Create: d.py\n"
+    )
+    assert [t.task_id for t in tasks] == ["task-1", "task-2"]
+    # Plain ``Files:`` captured; the unknown ``**Note:**`` label did not end
+    # the block, so ``Create: b.py`` was still owned.
+    assert tasks[0].files_touched == ("a.py", "b.py")
+    # The plain ``Interfaces:`` header terminated the block before its paths.
+    assert "scripts/shared.py" not in tasks[0].files_touched
+    assert tasks[1].files_touched == ("c.py", "d.py")
+
+
+def test_plan_graph_sequential_plan_sharing_files_has_no_overlap_error(tmp_path):
+    """Issue #848: a sequential ``Depends on:`` chain may reuse files.
+
+    File-overlap errors belong to ``parallel_group`` fanout only, so the
+    plan-graph check must not flag a sequential plan.
+    """
+    plan = _plan(
+        "### Task 1: alpha\n"
+        "**Agent:** developer\n**Files:** Modify: scripts/shared.py\n"
+        "### Task 2: beta\n"
+        "**Agent:** tester\n**Files:** Modify: scripts/shared.py\n"
+        "**Depends on:** task-1\n"
+    )
+    # Guard against a vacuous pass: the plan must actually yield both tasks.
+    assert [t.task_id for t in _parse_plan_tasks(plan)] == ["task-1", "task-2"]
+    _write(tmp_path, _GOOD_SPEC, plan)
+    findings = check_spec_plan_workflow(
+        tmp_path, _ENABLED, agent_meta_root=REPO_ROOT,
+    )
+    assert not any(
+        f.check == "spec_plan_plan_graph" and f.severity == Severity.ERROR
+        for f in findings
+    ), str(findings)
+
+
 def test_parse_task_ledgers_counts_and_offsets(tmp_path):
     text = (
         "### Task 1: First\n"

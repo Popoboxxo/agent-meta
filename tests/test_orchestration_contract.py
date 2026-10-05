@@ -307,6 +307,59 @@ def test_file_overlap_none_skips_check():
     assert validate_plan(_two_task_plan(), file_overlap=None) == []
 
 
+def test_file_overlap_skipped_for_sequential_plan():
+    """Issue #848: a sequential plan runs its tasks one after another, so
+    shared files are not a conflict — the injected check is skipped.
+
+    The design contract scopes file-overlap errors to ``parallel_group``
+    fanout; a ``Depends on:`` chain must not raise a false overlap.
+    """
+    plan = FanoutPlan(
+        kind="sequential",
+        tasks=(_task("t1"), _task("t2", dependencies=("t1",))),
+    )
+    # A precomputed conflict must be ignored ...
+    assert validate_plan(plan, file_overlap=_conflict_result()) == []
+    # ... and a callable must not even be invoked.
+    called = False
+
+    def fake_overlap(projected):
+        nonlocal called
+        called = True
+        return {"safe": [], "conflict": [("t1", "t2", ["shared.py"])]}
+
+    assert validate_plan(plan, file_overlap=fake_overlap) == []
+    assert called is False
+
+
+def test_file_overlap_reported_for_parallel_group_plan():
+    """Issue #848 counterpart: a real ``parallel_group`` overlap still fires."""
+    plan = FanoutPlan(
+        kind="parallel_group",
+        tasks=(_task("t1"), _task("t2")),
+    )
+    errors = validate_plan(plan, file_overlap=_conflict_result())
+    assert len(errors) == 1
+    assert "'t1'" in errors[0] and "'t2'" in errors[0]
+
+
+def test_check_plan_file_overlap_parallel_group_real_conflict(tmp_path):
+    """Issue #848: a ``parallel_group`` with real overlapping files still raises."""
+    (tmp_path / "scripts" / "lib").mkdir(parents=True)
+    (tmp_path / "scripts" / "lib" / "shared.py").write_text("x = 1\n", encoding="utf-8")
+    plan = FanoutPlan(
+        kind="parallel_group",
+        tasks=(
+            _task("t1", files_touched=("scripts/lib/shared.py",)),
+            _task("t2", files_touched=("scripts/lib/shared.py",)),
+        ),
+    )
+    overlap = check_plan_file_overlap(plan, project_root=tmp_path)
+    assert overlap["conflict"] == [("t1", "t2", ["scripts/lib/shared.py"])]
+    errors = validate_plan(plan, file_overlap=overlap)
+    assert any("file overlap" in e for e in errors)
+
+
 def test_invalid_tier_override_rejected():
     plan = _two_task_plan(tier_override="ultra-plus")
     errors = validate_plan(plan)
