@@ -3,6 +3,15 @@
 ## [Unreleased]
 
 ### Fixed
+- **MCP connection placeholders no longer ship as raw `{{VAR}}` literals in generated
+  output (issue #810)**: generated MCP rule/context artifacts (`mcp-<server>.md`,
+  `<skills_dir>/mcp-<server>/SKILL.md`) rendered the plugin catalog's `connection` block
+  verbatim, so an active server's URL landed as e.g. `` {{MCP_HONCHO_URL}} `` instead of an
+  env reference. `_generate_rule_content()` now normalises every `{{VAR}}` to a committed
+  `${VAR}` reference via the new provider-agnostic `_render_env_references()`, and
+  `generate_mcp_artifacts()` warns when a connection references a variable that is not
+  declared under the server's `secrets:` (the genuinely "undefined MCP variable" case).
+  No secret value is ever invented. Regression coverage in `tests/test_mcp_config.py`.
 - **Destructive gate now also blocks filesystem destruction and fork bombs (issue #809)**:
   the `orchestrator-guard` destructive classifier previously only inspected
   `git <subcommand>` tokens, so a direct `rm -rf /` or `rm -rf /etc` passed through with

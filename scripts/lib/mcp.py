@@ -10,6 +10,7 @@ Public interface:
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from .io import (
@@ -109,7 +110,11 @@ def _generate_rule_content(server_name: str, server_def: dict, compact: bool = F
             "",
             "*Generiert von agent-meta aus `config/plugin-catalog.yaml` — nicht manuell bearbeiten.*",
         ]
-    return "\n".join(lines) + "\n"
+    content = "\n".join(lines) + "\n"
+    # Never ship a raw {{VAR}} literal from the registry (issue #810): the
+    # connection URL/command/args are catalog placeholders, not resolved
+    # values, so normalise them to committed ${ENV_VAR} references.
+    return _render_env_references(content)
 
 
 # ---------------------------------------------------------------------------
@@ -125,6 +130,63 @@ from .mcp_provider_config import (  # noqa: E402, F401 (re-exported for callers/
     _update_json_config,
     generate_provider_configs,
 )
+
+# {{VAR}} placeholders as used by the plugin catalog's `connection` blocks.
+_CONNECTION_PLACEHOLDER_RE = re.compile(r"\{\{([A-Z0-9_]+)\}\}")
+
+
+def _render_env_references(value: str) -> str:
+    """Render registry ``{{VAR}}`` placeholders as committed ``${VAR}`` refs.
+
+    Generated MCP rule/context content must never ship the raw registry
+    placeholder (issue #810): the value is intentionally not committed, so the
+    shell/vendor-neutral ``${VAR}`` env reference is the correct rendering.
+    Provider-agnostic by construction — it only rewrites syntax and never
+    resolves a value or branches on a provider name.
+    """
+    return _CONNECTION_PLACEHOLDER_RE.sub(
+        lambda m: "${" + m.group(1) + "}", value
+    )
+
+
+def _connection_placeholder_vars(server_def: dict) -> set[str]:
+    """Collect every ``{{VAR}}`` name referenced by a server's connection block."""
+    found: set[str] = set()
+
+    def collect(value) -> None:
+        if isinstance(value, str):
+            found.update(_CONNECTION_PLACEHOLDER_RE.findall(value))
+        elif isinstance(value, dict):
+            for item in value.values():
+                collect(item)
+        elif isinstance(value, (list, tuple)):
+            for item in value:
+                collect(item)
+
+    collect(server_def.get("connection", {}))
+    return found
+
+
+def _warn_undefined_connection_vars(server_name: str, server_def: dict, log: SyncLog) -> None:
+    """Warn about connection placeholders missing from the server's `secrets:`.
+
+    A ``{{VAR}}`` in a connection block is expected to be declared in the
+    server's ``secrets:`` list (that is what makes it appear in
+    ``secrets.local.yaml`` and become resolvable at runtime). A referenced but
+    undeclared variable is exactly the "undefined MCP variable" class from
+    issue #810: it would otherwise silently ship as an env reference nobody
+    ever gets prompted to set. Detection-only — the value is never invented;
+    the placeholder is rendered as ``${VAR}`` by
+    :func:`_render_env_references`.
+    """
+    declared = set(server_def.get("secrets", []) or [])
+    undefined = sorted(_connection_placeholder_vars(server_def) - declared)
+    for var_name in undefined:
+        log.warn(
+            f"mcp: server '{server_name}' references {{{{{var_name}}}}} in its "
+            f"connection but does not declare it under 'secrets:' — it will be "
+            f"rendered as ${{{var_name}}} but never prompted in secrets.local.yaml"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -298,6 +360,11 @@ def generate_mcp_artifacts(
     # empty now_managed set and removes every previously-generated mcp-*.md
     # rule file — deactivating the last server must not orphan its rule file.
     active_servers = resolve_active_mcp_servers(config, agent_meta_root, project_root, registry=registry)
+
+    for server_name in active_servers:
+        server_def = registry.get(server_name)
+        if server_def:
+            _warn_undefined_connection_vars(server_name, server_def, log)
 
     pc = provider_config.get(provider, {})
     rule_options = resolve_rules(config, agent_meta_root)
