@@ -1,5 +1,5 @@
 #!/bin/bash
-# version: 1.4.1
+# version: 1.5.0
 # Real orchestrator-guard logic. NOT a standalone hook — invoked by
 # orchestrator-guard.sh (thin self-health wrapper, issue #630), which pipes
 # the PreToolUse JSON payload to this script's stdin after syntax-checking
@@ -65,12 +65,15 @@ set -uo pipefail
 # no agent field) — this is mitigation, not cryptographic trust; see
 # .claude/rules/a2a-delegation-gates.md ("Bekannte Grenzen").
 #
-# Destructive-gate scope note (issues #542/#551/#590/#591/#602): the
+# Destructive-gate scope note (issues #542/#551/#590/#591/#602/#809): the
 # destructive gate now shares ONE tokenizer with the mutation gate (the
 # `parse_git` / `is_destructive` / `is_mutation` functions in the Python
 # heredoc below) instead of matching raw regexes against the whole command
-# string. It only inspects tokens of
-# real `git <subcommand>` invocations, which closes several prior gaps:
+# string. The git classification inspects tokens of real
+# `git <subcommand>` invocations; the same scan additionally covers the
+# non-git canonical catastrophes (issue #809: recursive `rm` on a dangerous
+# root such as `/`, `/etc` or HOME, and a recursive fork bomb). Together
+# these close several prior gaps:
 #   * #602: destructive keywords inside an unrelated command's quoted text
 #     argument (e.g. `gh issue create --body "git push --force ..."`,
 #     `echo "reset --hard"`) no longer match — they are not `git` tokens.
@@ -83,6 +86,12 @@ set -uo pipefail
 #     `core.pager` / `core.editor` config keys are flagged as inherently
 #     destructive (arbitrary-command execution / RCE) regardless of the
 #     subcommand.
+#   * #809: `rm -rf /`, `rm -rf /etc`, `rm -rf ~` / `rm -rf $HOME` and a
+#     recursive `rm` on any top-level system root are destructive regardless
+#     of sentinel; a recursive fork bomb (`:(){ :|:& };:`) is blocked too.
+#     Benign in-repo deletions (`rm -rf .tmp/...`) stay allowed. Still a
+#     best-effort token scan (no shell interpreter), same trade-off as the
+#     git gates below.
 # Known limitation (issue #592, deliberate — best-effort convention boundary,
 # not a security boundary; see .claude/rules/branch-guard.md#guard-terminologie
 # for the definition of both terms): command substitution and indirection
@@ -568,12 +577,146 @@ def commit_message_bom(args):
     return 'none'
 
 
-destructive = False
+# --- issue #809: non-git filesystem destruction + fork bomb -------------
+# The git classifier above only inspects 'git <subcommand>' invocations.
+# The destructive gate must also cover the canonical shell-level
+# catastrophes: recursive removal of a dangerous filesystem root and a
+# recursive fork bomb. Same best-effort token scan / convention-boundary
+# trade-off as the git gates (issue #592) -- no shell interpreter, and the
+# command is never executed.
+FS_WRAPPERS = {
+    'sudo', 'doas', 'env', 'command', 'nohup', 'time', 'nice', 'ionice',
+    'stdbuf',
+}
+# Top-level roots whose recursive removal is treated as destructive.
+# '/tmp' is deliberately absent: build/CI scratch under /tmp is routine.
+DANGEROUS_ROOTS = {
+    '/', '/etc', '/usr', '/var', '/bin', '/sbin', '/lib', '/lib64',
+    '/boot', '/dev', '/proc', '/sys', '/opt', '/root', '/home', '/srv',
+    '/mnt', '/media', '/run',
+}
+# Known scratch subtrees that stay allowed even though their first component
+# is a system root (e.g. '/var'): routine build/CI cleanup lives here.
+SCRATCH_SUBPATHS = ('/tmp/', '/var/tmp/', '/private/tmp/', '/var/folders/')
+DQUOTE = chr(34)
+SQUOTE = chr(39)
+
+
+def strip_quoted(command):
+    # Remove single/double-quoted spans so a fork-bomb-looking STRING
+    # literal (e.g. an echo argument) is not misclassified -- the same
+    # token-level scoping the git gates apply (issue #602). Best-effort:
+    # escaped quotes are not tracked (no shell parser).
+    out = []
+    quote = None
+    for c in command:
+        if quote is not None:
+            if c == quote:
+                quote = None
+            continue
+        if c == DQUOTE or c == SQUOTE:
+            quote = c
+            continue
+        out.append(c)
+    return ''.join(out)
+
+
+def is_recursive_rm(args):
+    for a in args:
+        if a == '--recursive':
+            return True
+        if a.startswith('-') and not a.startswith('--') and a != '-':
+            if 'r' in a[1:] or 'R' in a[1:]:
+                return True
+    return False
+
+
+def normalize_rm_target(target):
+    # Drop a trailing glob and trailing slashes so '/etc/*' and '/etc/'
+    # both normalize to '/etc' (bare '/' stays '/').
+    t = target.strip()
+    if t.endswith('*'):
+        t = t[:-1]
+    if t.endswith('/') and t != '/':
+        t = t.rstrip('/')
+    return t
+
+
+def is_dangerous_rm_target(target):
+    raw = target.strip()
+    # Bare current/parent dir or unqualified glob wipes the working tree.
+    # Checked on the RAW token; normalize_rm_target turns '*' into ''.
+    if raw in ('.', '..', '*'):
+        return True
+    # Known scratch subtrees stay allowed; '..' is excluded so a traversal
+    # like '/var/tmp/../etc' is not laundered into the exception.
+    if raw.startswith(SCRATCH_SUBPATHS) and '..' not in raw:
+        return False
+    t = normalize_rm_target(target)
+    if not t:
+        return False
+    if t in ('.', '..'):
+        return True
+    home = DOLLAR + 'HOME'
+    home_braced = DOLLAR + '{HOME}'
+    # HOME itself (or a glob directly under it), not a normal subdirectory.
+    if t in ('~', home, home_braced):
+        return True
+    # Absolute path: danger is the top-level component, minus scratch.
+    if t.startswith('/'):
+        if t.startswith(SCRATCH_SUBPATHS):
+            return False
+        first = '/' + t.lstrip('/').split('/', 1)[0]
+        return first in DANGEROUS_ROOTS
+    return False
+
+
+def is_fs_destructive(toks):
+    # Locate the command word, skipping wrapper prefixes and KEY=VALUE
+    # assignments (mirrors the containment classifier's approach).
+    idx, n = 0, len(toks)
+    while idx < n:
+        head = os.path.basename(toks[idx])
+        if head in FS_WRAPPERS or re.match(r'^[A-Za-z_][A-Za-z0-9_]*=', toks[idx]):
+            idx += 1
+            continue
+        break
+    if idx >= n:
+        return False
+    if os.path.basename(toks[idx]) != 'rm':
+        return False
+    args = toks[idx + 1:]
+    if not is_recursive_rm(args):
+        return False
+    return any(
+        is_dangerous_rm_target(a)
+        for a in args
+        if not (a.startswith('-') and a != '-')
+    )
+
+
+def is_fork_bomb(command):
+    # Classic ':(){ :|:& };:' and named variants like 'bomb(){ bomb|bomb& }'
+    # define a function whose body pipes the function into itself.
+    for m in re.finditer(r'([A-Za-z_:][A-Za-z0-9_:]*)\s*\(\s*\)\s*\{([^}]*)\}',
+                         command):
+        name, body = m.group(1), m.group(2)
+        if re.search(re.escape(name) + r'\s*\|\s*' + re.escape(name), body):
+            return True
+    return False
+
+
+destructive = is_fork_bomb(strip_quoted(command))
 mutation = False
 mutation_scope_broad = False
 bom = 'none'
 for stmt in statements(command):
+    if destructive:
+        break
     toks = tokens_of(stmt)
+    if is_fs_destructive(toks):
+        destructive = True
+        break
     for i, tok in enumerate(toks):
         if tok != 'git' and not tok.endswith('/git'):
             continue
@@ -621,7 +764,7 @@ fi
 
 # --- Destructive-operation gate: applies regardless of sentinel --------
 if [ "$TOOL_NAME" = "Bash" ] && [ "$_GIT_SCAN" = "destructive" ]; then
-  echo "ORCHESTRATOR_GUARD: destructive git operation requires explicit user approval (issue #516)." >&2
+  echo "ORCHESTRATOR_GUARD: destructive operation requires explicit user approval (issue #516)." >&2
   echo "Detected command: $(printf '%s' "$BASH_CMD" | head -c 200)" >&2
   echo "Ask the user to approve and run this command manually." >&2
   exit 2

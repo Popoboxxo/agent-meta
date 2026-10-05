@@ -1112,3 +1112,88 @@ def test_double_ampersand_addcommit_unchanged_by_bare_ampersand_split(tmp_path):
     command = "#agent-meta:agent=developer\ngit add -A && git commit -m 'x'"
     result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
     assert result.returncode == 0, f"stderr={result.stderr}"
+
+
+# --- issue #809: destructive gate covers filesystem destruction ----------
+# Before #809 the destructive gate only classified `git <subcommand>`
+# invocations, so `rm -rf /` and `rm -rf /etc` passed through with rc=0.
+# These tests drive the real hook subprocess in a NON-strict cwd (no
+# project.yaml) so only the destructive/mutation gates decide the exit code,
+# matching the harness the audit used.
+
+FS_DESTRUCTIVE_CASES = [
+    "rm -rf /",
+    "rm -rf /etc",
+    "rm -rf /*",
+    "rm -rf /usr",
+    "rm -rf ~",
+    "rm -rf $HOME",
+    "rm -rf ${HOME}",
+    "rm -rf .",
+    "rm -rf ..",
+    "rm -rf *",
+    "sudo rm -rf /etc",
+    "rm -r /",
+    "echo hi && rm -rf /etc",
+]
+
+
+@pytest.mark.parametrize("command", FS_DESTRUCTIVE_CASES)
+def test_fs_destruction_blocked_without_sentinel(command, tmp_path):
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, (
+        f"command={command!r} must be blocked\nstderr={result.stderr}"
+    )
+    assert "user approval" in result.stderr
+
+
+@pytest.mark.parametrize("command", [
+    "#agent-meta:agent=git\nrm -rf /etc",
+    "#agent-meta:agent=orchestrator\nrm -rf /etc",
+])
+def test_fs_destruction_blocked_even_with_sentinel(command, tmp_path):
+    # The destructive gate is capability-independent: no sentinel bypasses it.
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+    assert "user approval" in result.stderr
+
+
+FS_BENIGN_CASES = [
+    "rm -rf .tmp/build",
+    "rm -rf .tmp/foo/bar",
+    "rm -rf node_modules",
+    "rm -rf ./dist",
+    "rm -rf /tmp/my-scratch",
+    "rm -rf /var/tmp/app-cache",
+    "rm -rf ~/project/build",
+    "rm file.txt",
+]
+
+
+@pytest.mark.parametrize("command", FS_BENIGN_CASES)
+def test_benign_rm_not_blocked(command, tmp_path):
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 0, (
+        f"command={command!r} must stay allowed\nstderr={result.stderr}"
+    )
+
+
+@pytest.mark.parametrize("command", [
+    ":(){ :|:& };:",
+    "bomb(){ bomb|bomb& };bomb",
+])
+def test_fork_bomb_blocked(command, tmp_path):
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 2, f"stderr={result.stderr}"
+    assert "user approval" in result.stderr
+
+
+@pytest.mark.parametrize("command", [
+    "echo ':(){ :|:& };:'",
+    'echo "bomb(){ bomb|bomb& };bomb"',
+])
+def test_fork_bomb_text_literal_not_blocked(command, tmp_path):
+    # Same quoted-text scoping as the git gates (#602): a fork-bomb-shaped
+    # STRING argument must not trip the gate.
+    result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
+    assert result.returncode == 0, f"stderr={result.stderr}"
