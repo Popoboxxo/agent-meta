@@ -119,6 +119,18 @@
   declare the new contracts as inputs so no handoff is silent.
 
 ### Fixed
+- **Slash commands now reach Copilot, Mammouth and ZCode; Codex/KimiCode documented as no-project-surface (#807)**:
+  the F18 audit found 5/9 providers received 0 generated commands. Re-verified each against its
+  real command surface: Copilot (`.github/prompts/*.prompt.md`), Mammouth (`.mammouth/commands/*.md`,
+  its OpenCode-fork runtime documents *"Add .md files to .mammouth/commands/"*) and ZCode
+  (`.zcode/commands/*.md` workspace commands) genuinely support commands and were flipped to
+  `commands: true` + `has_commands: true` with `commands_dir`/`commands_ext`/`commands_format`
+  (fixes the prior UNDERCLAIMs P-6 / ZC-2). Codex (custom prompts are user-global
+  `${CODEX_HOME}/prompts` and deprecated; project-scoped `.codex/prompts` is an open upstream
+  request) and KimiCode (built-ins + Skills, no custom-command dir) stay `commands: false` as
+  explicit, documented capability decisions — no silent hardcoded default. New pytest contract
+  (`tests/test_provider_agnostic_dispatch.py`) asserts every `commands: true` provider emits >0
+  commands into its *declared* dir and every `commands: false` provider emits nothing.
 - **`sync.py --check` now converges after ONE sync on a fresh clone (#802)**: `--check` reported
   drift (rc 1) on a freshly-synced tree until a *second* sync was run, breaking fresh clones of
   multi-provider and Continue-`generate-prompts` projects. Three independent causes:

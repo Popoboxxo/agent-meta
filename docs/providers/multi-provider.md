@@ -118,11 +118,14 @@ alwaysApply: false        # false = explizit aufrufen; true = immer geladen
 
 ### GitHub Copilot
 
-Schlanker Provider — dateibasierte Agenten und Rules, keine Hooks/Commands/Settings.
+Schlanker Provider — dateibasierte Agenten, Rules und Prompt-Commands, keine Hooks/Settings.
 
 - `.github/copilot/agents/*.md` — generierte Agenten (werden automatisch geladen)
 - `.github/copilot/COPILOT.md` — Kontext-Datei (managed block, bei jedem sync aktualisiert)
 - `.github/copilot/rules/*.md` — Rules (`has_rules: true`)
+- `.github/prompts/*.prompt.md` — Slash-Commands (`commands: true`, issue #807): VS Code /
+  GitHub Copilot reusable prompt files, im Chat als `/name` aufrufbar; Format `markdown`,
+  Ziel-Extension `.prompt.md`. Zuvor fälschlich als `commands: false` deklariert (Audit P-6).
 - `.vscode/mcp.json` — Agent-Mode-MCP (issue #674 Phase 3.3): VS Code-eigenes
   Settings-Shape (Top-Level `{"servers": {...}}`, Format-Writer `vscode-settings`).
   Committed mit `${env:VAR}`-Platzhaltern (VS Code expandiert sie nativ) — **kein
@@ -149,14 +152,12 @@ konfiguriert — nur belegte Fähigkeiten sind aktiviert.
   `hook_protocol` spiegelt sync.py keine Hook-Skripte (#630-Muster) — Cleanup statt
   Deploy; das separate `.mammouth/settings.json` wird als Skeleton angelegt
 
-**Commands:** Mammouth setzt `has_commands: true` und listet die Capability
-`commands` — konfiguriert aber weder `commands_dir` noch `commands_ext` (anders als
-Gemini/Opencode). Der Sync-Code (`scripts/lib/commands.py::sync_commands_for_provider`)
-implementiert Zweige für Claude, Continue, Gemini und Opencode; jeder andere Provider
-endet im `else: return`. Für Mammouth wird daher **kein `.mammouth/commands/`**
-generiert — der Sync läuft still durch (kein Fehler, keine Warnung). Der Flag ist
-damit aktuell ein Capability-Versprechen ohne Output (siehe auch den Kommentar zu
-`_INFRA_ROOT_FALLBACK_DIRS` in `scripts/lib/external_tools_drift.py`).
+**Commands (issue #807):** Mammouth setzt `commands: true`, `has_commands: true` und emittiert
+generierte Commands nach `.mammouth/commands/*.md` (`commands_dir` / `commands_ext: .md` /
+`commands_format: markdown`). Mammouth ist ein OpenCode-Fork; das Runtime-Binary dokumentiert
+*"Add `.md` files to `.mammouth/commands/` for reusable prompts"* mit `$ARGUMENTS`. Zuvor stand
+`commands: false`, was die reale Command-Oberfläche untertrieb. Der Sync ist rein key-getrieben
+(`scripts/lib/commands.py::sync_commands_for_provider`) — kein Provider-Name-Branch.
 
 **Fähigkeiten (`config/provider-capabilities.yaml`):**
 - `hooks: true` — belegt durch `has_hooks: true` + `hooks_dir` in `config/ai-providers.yaml`.
@@ -471,11 +472,14 @@ Registriert im Consistency-Lauf (`scripts/consistency-check.py`, u. a. über
 | Commands | ✅ `.claude/commands/*.md` | ✅ `.gemini/commands/*.toml` | ✅ `.continue/prompts/*.md` | ✅ `.opencode/commands/*.md` |
 
 > **Copilot, Mammouth, Codex, ZCode & KimiCode** folgen demselben Grundmuster (Agenten +
-> Kontext-Datei + Rules überschrieben/aktualisiert, Skeleton einmalig). Abweichungen: Copilot
-> hat keine Hooks/Commands/Settings; Mammouth hat eine Hooks-Reservierung ohne Spiegelung
-> (#630-Muster) und ein eigenes `.mammouth/settings.json`, generiert aber keine Commands
-> (`has_commands` gesetzt, kein Sync-Zweig — siehe Mammouth-Abschnitt); Codex spiegelt keine
-> Hooks und hat kein Settings-File; ZCode und KimiCode generieren keine Rules/Commands/Hooks
+> Kontext-Datei + Rules überschrieben/aktualisiert, Skeleton einmalig). Commands (issue #807):
+> Copilot (`.github/prompts/*.prompt.md`), Mammouth (`.mammouth/commands/*.md`) und ZCode
+> (`.zcode/commands/*.md`) emittieren Commands; Codex und KimiCode nicht, weil ihnen eine
+> project-scoped Command-Oberfläche fehlt (Codex: user-global + deprecated prompts; KimiCode:
+> built-ins + Skills) — bewusste, dokumentierte Capability-Entscheidung. Weitere Abweichungen:
+> Copilot hat keine Hooks/Settings; Mammouth hat eine Hooks-Reservierung ohne Spiegelung
+> (#630-Muster) und ein eigenes `.mammouth/settings.json`; Codex spiegelt keine
+> Hooks und hat kein Settings-File; ZCode und KimiCode generieren keine Rules/Hooks
 > (siehe Provider-Abschnitte oben).
 
 ---

@@ -49,7 +49,7 @@ AGENTS.md                  ← Project context + managed block + session-start b
 | Config directory | `.claude/` | `.zcode/` |
 | Sub-agents | `.claude/agents/*.md` auto-loaded | Workspace agents are a **definition store** consumed via bootstrap (see below); user-level `~/.zcode/agents/` auto-loads |
 | Rules (auto-load) | `.claude/rules/` | Not configured (`has_rules: false` — unverified) |
-| Slash commands | `.claude/commands/*.md` | Not generated (`has_commands: false` — surface verified, no sync adapter yet) |
+| Slash commands | `.claude/commands/*.md` | Generated to `.zcode/commands/*.md` (`commands: true`, issue #807) — workspace-scope custom commands, invoked as `/name`; `.zcode`/user scope at `~/.zcode/commands` is not synced |
 | Hooks | `.claude/hooks/*.sh` + `settings.json` | **Not generated** — project-level hooks are ignored by the harness (see Hooks) |
 | Settings | `.claude/settings.json` | `.zcode/config.json` (workspace; models live in `~/.zcode/v2/config.json`) |
 | Skills | `.claude/skills/` | `.zcode/skills/` (user + workspace verified) |
@@ -198,7 +198,8 @@ ai-providers:
 | `AGENTS.md` (managed block + bootstrap block) | Updated on every sync |
 | `AGENTS.md` (rest) | Created once, then maintained manually |
 | `.zcode/config.json` | Canonical workspace settings file; MCP (`mcp.servers`) writer lands with the P3 commit — until then sync warns + skips |
-| Rules / Commands / Hooks | Not generated (`has_rules`/`has_commands`/`has_hooks` all `false`) |
+| Commands | Generated to `.zcode/commands/*.md` (`has_commands: true`, `commands_format: markdown`, issue #807) |
+| Rules / Hooks | Not generated (`has_rules`/`has_hooks` both `false`) |
 | `.zcode/snippets/`, `.zcode/pending-tasks.md` (gitignored), `.zcode/3-project/` | Standard agent-meta artifacts |
 
 ---
@@ -211,12 +212,12 @@ ai-providers:
 3. **No project-level hooks** — the harness ignores them; no mirroring possible.
 4. **No settings template / model keys** — models are UI-managed in
    `~/.zcode/v2/config.json`; per-role models ride in the agent files instead.
-5. **No commands/skills sync adapters yet** — surfaces are verified, the
-   capability list grows with P6.
+5. **Skills sync adapter** — the skills surface is verified; commands are synced
+   since issue #807, the skills capability grows with P6.
 
 ## Open P6 items
 
 - Workspace-level `.zcode/agents/` auto-load — real-repo test (V18; decides
   whether the bootstrap block stays necessary).
 - Explicit precedence `zcode.json` vs `.zcode/config.json` (V6 nice-to-have).
-- Command and skill sync adapters (`has_commands`, skills capability growth).
+- Skills sync adapter (`skills` capability growth); commands adapter landed in #807.

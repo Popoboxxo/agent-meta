@@ -48,6 +48,22 @@ commands/1-generic/doc-now.md    ← Quelldatei in agent-meta
 | **Continue** | `.continue/prompts/` | `.md` | `invokable: true` wird in Frontmatter injiziert |
 | **Gemini** | `.gemini/commands/` | `.toml` | Automatisch aus `.md` konvertiert; `$ARGUMENTS` → `{{args}}` |
 | **Opencode** | `.opencode/commands/` | `.md` | As-is, `$ARGUMENTS`-Syntax identisch zu Claude |
+| **Copilot** | `.github/prompts/` | `.prompt.md` | Prompt files (`/name` in Copilot Chat); `commands_ext: .prompt.md` |
+| **Mammouth** | `.mammouth/commands/` | `.md` | OpenCode-Fork; `$ARGUMENTS`-Syntax identisch zu Opencode |
+| **ZCode** | `.zcode/commands/` | `.md` | Workspace-Commands (`~/.zcode/commands` = User-Scope, nicht gesynct) |
+
+**Provider ohne project-scoped Command-Oberfläche (issue #807, bewusste Capability-Entscheidung):**
+
+| Provider | Entscheidung | Begründung |
+|----------|-------------|-----------|
+| **Codex** | `commands: false` | Custom prompts existieren nur user-global (`${CODEX_HOME}/prompts`, `/prompts:<name>`) und sind zugunsten von Skills deprecated; project-scoped `.codex/prompts/` ist offener Feature-Request (openai/codex #9848), nicht implementiert. Eine Repo-Sync kann daher keine Codex-Commands ausliefern. |
+| **KimiCode** | `commands: false` | Slash-Commands sind built-in oder Active Skills (`/skill:<name>`); es gibt kein projekt-lokales Custom-Command-Verzeichnis. Der Command-artige Kanal ist der bereits gesyncte `.kimi-code/skills/`-Baum. |
+
+Die Capability-Flags stehen in `config/provider-capabilities.yaml` (`commands:`),
+die Zielpfade/Formate in `config/ai-providers.yaml`
+(`commands_dir` / `commands_ext` / `commands_format`). `scripts/lib/commands.py`
+ist rein key-getrieben — keine `if provider == "Name"`-Verzweigung.
+
 
 - **Variablen-Substitution:** `{{VARIABLE}}` Platzhalter werden wie in Rules substituiert
 - **Stale-Tracking** via `.agent-meta-managed` in jedem Zielverzeichnis — veraltete Commands werden gelöscht

@@ -32,6 +32,15 @@
 # to true without confirming the provider's command directory/format in
 # config/ai-providers.yaml (commands_dir/commands_ext/commands_format).
 #
+# issue #807 (F18): the 5 providers that emitted 0 commands were re-verified.
+# Copilot (.github/prompts/*.prompt.md), Mammouth (.mammouth/commands/*.md,
+# OpenCode fork) and ZCode (.zcode/commands/*.md workspace commands) DO have a
+# project command surface and were flipped to `commands: true` (+ commands_dir/
+# ext/format). Codex (custom prompts user-global + deprecated, no project
+# scope) and KimiCode (built-ins + Skills only, no custom-command dir) stay
+# `false` as explicit, documented capability decisions — see the per-provider
+# comments. No provider-name branch was added; commands.py stays key-driven.
+#
 # runtime_gate (SPEC-OPENCODE-RUNTIME-GATE-2026-09-13, IC-01): how the
 # provider actually enforces the CRITICAL GATE ("MAIN CHAT darf nicht selbst
 # editieren"), one of hook | plugin | permission | advisory. Every registered
@@ -189,7 +198,7 @@ capabilities:
     file_based_agents: true
     text_mentions: true
     hooks: false
-    commands: false
+    commands: true                  # .github/prompts/*.prompt.md (VS Code / GitHub Copilot prompt files, `/name`) — issue #807, UNDERCLAIM P-6 fixed
     runtime_gate: advisory
     route_intent_tool: false           # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: []
@@ -223,7 +232,7 @@ capabilities:
     file_based_agents: true
     text_mentions: true
     hooks: false
-    commands: false                 # verified: no command surface upstream (ai-providers.yaml has_commands: false)
+    commands: true                  # .mammouth/commands/*.md — Mammouth (OpenCode fork) runtime binary: "Add .md files to .mammouth/commands/ for reusable prompts" (issue #807)
     runtime_gate: advisory          # hook paths configured but no verified hook_protocol (#630) — no runtime enforcement
     route_intent_tool: false        # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: []
@@ -261,7 +270,7 @@ capabilities:
     file_based_agents: true           # .codex/agents/*.toml auto-loaded as config layers, personal + project-scoped, no registration step (V7)
     text_mentions: false
     hooks: false                      # contract verified (V1) but NOT mirrored: payload deviations vs Claude Code + hash-trust review gate (#630 pattern)
-    commands: false                   # no verified command surface (ai-providers.yaml has_commands: false)
+    commands: false                   # verified decision (issue #807): Codex custom prompts are user-global (${CODEX_HOME}/prompts) + deprecated in favor of skills; no project-scoped prompt surface (openai/codex #9848 open)
     runtime_gate: advisory            # hook contract verified but not mirrored + hash-trust gate (#630) — no runtime enforcement
     route_intent_tool: false          # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: ["spawn_agent", "send_input", "resume_agent", "wait_agent", "close_agent"]   # documented dispatch surface (V7)
@@ -296,7 +305,7 @@ capabilities:
     file_based_agents: true           # REVISED per V18: user-level ~/.zcode/agents/*.md auto-load is verified; workspace-level auto-load = P6 real-repo-test; plugin route verified
     text_mentions: false
     hooks: false                      # project-level hooks are completely ignored by the harness (V2)
-    commands: false                   # no verified command surface (ai-providers.yaml has_commands: false)
+    commands: true                    # .zcode/commands/*.md workspace command surface (zcode.z.ai/en/docs/commands) — issue #807, UNDERCLAIM ZC-2 fixed
     runtime_gate: advisory            # project-level hooks ignored by the harness (V2) — no runtime enforcement
     route_intent_tool: false          # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: ["Agent", "Task"]   # V17: Agent + legacy alias Task
@@ -331,7 +340,7 @@ capabilities:
     file_based_agents: true           # Option A determined (V10): plain Markdown + YAML frontmatter, auto-discovery (project .kimi-code/agents/ > user > plugin > built-in)
     text_mentions: false
     hooks: false                      # hooks exist (20 events, V11) but only user-level ~/.kimi-code/config.toml [[hooks]] documented — no project-level hook generation (#630 pattern)
-    commands: false                   # no verified command surface (ai-providers.yaml has_commands: false)
+    commands: false                   # verified decision (issue #807): Kimi exposes slash commands as built-ins + Active Skills (/skill:<name>), no project custom-command dir; the synced .kimi-code/skills/ tree is the command surface
     runtime_gate: advisory            # hooks exist but user-level only, no project mirror (#630) — no runtime enforcement
     route_intent_tool: false          # no harness registers route_intent as a callable tool (conservative)
     native_agent_tools: ["Agent", "AgentSwarm"]   # V16: Agent (prompt/description/subagent_type/resume/run_in_background) + AgentSwarm (prompt_template + items)

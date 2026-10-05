@@ -51,7 +51,7 @@ verhalten sich exakt wie bisher.
 | `04-platform-bundle` | Claude | strict (default) | 2-platform-Layer-Override (Sharkord) |
 | `05-knowledge-engine` | Claude | strict (default) | Knowledge-Engine-Bundle-Scaffolding |
 | `06-se-cascade` | Claude | strict (default) | Systems-Engineering-Kaskade |
-| `07-new-providers` | Codex, ZCode, KimiCode | strict (default) | Neuere Provider, Lazy-Channel-Erhalt |
+| `07-new-providers` | Codex, ZCode, KimiCode | strict (default) | Neuere Provider, Lazy-Channel-Erhalt; Command-Surface-Capability (#807): ZCode emittiert `.zcode/commands/`, Codex/KimiCode nicht |
 | `08-release-automation` | Claude | strict (default) | Release-Gates + Auto-GitHub-Release-Hook |
 | `09-legacy-config` | Claude | strict (default) | Legacy `mcp-servers`/`external-tools`-Fallback |
 | `10-model-tiers` | Claude, Gemini | strict (default) | Model-Override-Präzedenz + `model-inherit-main-chat` |

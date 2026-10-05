@@ -23,4 +23,12 @@ fail() {
 [ -d ".zcode/agents" ] || fail "agent directory missing for ZCode: .zcode/agents"
 [ -d ".kimi-code/agents" ] || fail "agent directory missing for KimiCode: .kimi-code/agents"
 
+# Issue #807 (F18): command surface is capability-driven.
+# ZCode declares commands: true → generated commands land in .zcode/commands/.
+[ -d ".zcode/commands" ] || fail "ZCode command dir missing: .zcode/commands (issue #807)"
+[ -f ".zcode/commands/commit.md" ] || fail "ZCode command not emitted: .zcode/commands/commit.md"
+# Codex and KimiCode have no project-scoped command surface → nothing emitted.
+[ ! -d ".codex/prompts" ] || fail "Codex must not emit commands (no project surface, issue #807)"
+[ ! -d ".kimi-code/commands" ] || fail "KimiCode must not emit a commands dir (no command surface, issue #807)"
+
 echo "ASSERT OK (07-new-providers): all marker files present"
