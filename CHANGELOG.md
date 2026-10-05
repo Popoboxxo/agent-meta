@@ -3,6 +3,18 @@
 ## [Unreleased]
 
 ### Fixed
+- **Destructive gate now also blocks filesystem destruction and fork bombs (issue #809)**:
+  the `orchestrator-guard` destructive classifier previously only inspected
+  `git <subcommand>` tokens, so a direct `rm -rf /` or `rm -rf /etc` passed through with
+  exit 0. The shared tokenizer now also classifies non-git shell catastrophes
+  (`orchestrator-guard-impl.sh` 1.5.0):
+  - recursive `rm` on a dangerous root (`/`, a top-level system directory such as `/etc`,
+    `/usr`, `/var`, `~` / `$HOME`) is blocked with `exit 2` regardless of sentinel;
+  - a recursive fork bomb (`` :(){ :|:& };: `` and named variants) is blocked;
+  - benign in-repo deletions (`rm -rf .tmp/...`), project-relative cleanup and known
+    scratch subtrees (`/tmp/...`, `/var/tmp/...`) stay allowed;
+  - still a best-effort token scan (no shell interpreter) — documented limits in
+    `rules/1-generic/branch-guard.md` ("Bekannte Grenzen", items 5–6).
 - **Generated hooks are no longer shipped as silently-dead code (issue #808)**: `sync.py`
   now distinguishes real hooks from helper scripts and from non-runtime hooks, so the
   generated hook set and the registered hook set no longer drift:
