@@ -1147,6 +1147,53 @@ def _port_golden_meta_tokens(text: str, variables: dict) -> str:
     return text
 
 
+def _strip_auto_commit_tail(current: str, role: str, variables: dict) -> str:
+    """Remove the role's ``{{AUTO_COMMIT_BLOCK}}`` tail from a current render.
+
+    The frozen golden corpus was captured while ``auto_commit.mode`` was ``off``
+    (issue #694 post-dates the freeze), so the golden carries no trace of the
+    block. Enabling ``auto_commit`` appends a role-specific commit-authority
+    section (gated by ``{{#if AUTO_COMMIT_ENABLED}}``) as the trailing region of
+    every placeholder-bearing template. That addition is intentional, not
+    template-slimming drift, so it is removed from the current render before the
+    golden comparison.
+
+    The removed text is the exact ``{{AUTO_COMMIT_BLOCK}}`` value this gate's
+    render path substitutes (``variables["AUTO_COMMIT_BLOCK"]`` -- the global,
+    ``direct``-authority rendering; the per-role authority narrowing of the
+    production sync is applied by ``_apply_role_auto_commit_overrides``, which
+    this gate's pipeline mirror does not call, and whose per-tier prose is
+    covered by ``test_auto_commit_block_render``). Removing that one span cannot
+    mask genuine template-slimming drift: a duplicated block, an unexpected
+    separator, or a block injected where this gate does not expect it all fail
+    loudly instead of being silently absorbed.
+    """
+    block = variables.get("AUTO_COMMIT_BLOCK", "")
+    if not block or block not in current:
+        # ``mode: off`` empties the block, and templates without the placeholder
+        # render nothing -- in both cases there is nothing to strip.
+        return current
+    assert current.count(block) == 1, (
+        f"{role}: auto_commit block rendered {current.count(block)} times "
+        "(expected exactly one)"
+    )
+    # Enabling the conditional inserts the block as its own paragraph after the
+    # blank-line separator the golden freeze already carries. The block is
+    # followed by a blank line when body text follows (platform overrides append
+    # a ``## Singleton-Regel`` section) and by a single newline at EOF. Removing
+    # the block plus that one trailing separator restores the frozen golden
+    # byte-for-byte while leaving every other line (and the preceding blank-line
+    # separator, which is part of the golden) untouched.
+    span_mid = block + "\n\n"
+    span_eof = block + "\n"
+    if span_mid in current:
+        return current.replace(span_mid, "", 1)
+    assert span_eof in current, (
+        f"{role}: auto_commit block is present but not newline-terminated"
+    )
+    return current.replace(span_eof, "", 1)
+
+
 def test_golden_equivalence_and_normalization_marking(render_env: RenderEnv):
     """Golden roles: unmigrated byte-identical, migrated attributed to B2b."""
     failures: list[str] = []
@@ -1157,7 +1204,9 @@ def test_golden_equivalence_and_normalization_marking(render_env: RenderEnv):
             (_GOLDEN_DIR / f"{role}.md").read_text(encoding="utf-8"),
             render_env.variables,
         )
-        current = render_env.rendered[role]
+        current = _strip_auto_commit_tail(
+            render_env.rendered[role], role, render_env.variables
+        )
         template = render_env.source_paths[role]
         if template not in _MIGRATED_PATHS:
             if golden != current:

@@ -212,7 +212,7 @@ NICHT erzwungen (Prompt + Permission-Layer).
 
 **Spec/Plan-Gate (Convention boundary):** Auch Nicht-Pipeline-Anfragen (Ad-hoc-Dispatch, `quick-fix`, `bugfix`) erst über die Classify-Route (`S`/`M`/`L`/`XL`) führen — kein Direkteinstieg in die Implementierung ohne freigegebene Spec/Plan (`Status: APPROVED`). Details: Master-Rule `spec-plan-workflow`.
 ## Git Delegation
-Git Mutationen (commit, push, add etc) -> `git` Agent. Read-only (status, log) im Main Chat ok.
+Commit ist für die per `auto_commit`-Tier freigeschaltete Rolle erlaubt (Details im Commit-Authority-Block der jeweiligen Rolle). Push, Tag und Branch-Management bleiben ausschließlich Aufgabe des `git` Agenten. Read-only (status, log) im Main Chat ok.
 
 Native Extensions (Skills/Hooks) erlaubt, ignorieren nicht Branch-Guard/DoD.
 Skill-getriebene Sub-Agent-Loops (z.B. generische Harness-Skills wie `subagent-driven-development`) sind KEINE dritte Ausnahme von der Orchestrator-Pflicht: ein Skill darf einen bereits vom `orchestrator` gestarteten Loop ausführen, aber niemals selbst zum Einstiegspunkt für einen neuen Dev-Task werden. Einzige Ausnahmen bleiben User-Override.

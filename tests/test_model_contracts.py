@@ -243,9 +243,16 @@ def test_kimicode_prefixed_override_is_not_doubled() -> None:
 
 
 def test_default_model_format_is_a_noop() -> None:
-    """Providers with the default ``{model}`` template are byte-unchanged."""
+    """Providers with the default ``{model}`` template are byte-unchanged.
+
+    ``senior-developer`` is a role *default*, so it resolves through the active
+    preset's provider-specific Claude table (``providers.Claude.tiers.powerful``
+    wins over the ai-providers ``model-tiers`` catalog -- see the module
+    docstring). The two sources may differ; the expected value is therefore the
+    preset's provider-specific entry, i.e. the value this role actually gets.
+    """
     resolved = _resolve("Claude", "senior-developer")
-    assert resolved == _PROVIDER_CONFIG["Claude"]["model-tiers"]["powerful"]
+    assert resolved == _global_normal_preset()["providers"]["Claude"]["tiers"]["powerful"]
     assert "/" not in resolved
 
 

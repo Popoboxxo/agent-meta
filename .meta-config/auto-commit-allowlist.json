@@ -26,8 +26,11 @@
     "ui-ux-designer"
   ],
   "file_count_threshold": 5,
-  "mode": "off",
+  "mode": "auto",
   "secret_scan": true,
-  "triggers": [],
+  "triggers": [
+    "task-boundary",
+    "file-count-threshold"
+  ],
   "version": 1
 }

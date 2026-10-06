@@ -261,9 +261,16 @@ def test_shadowed_flat_overrides_warn_for_claude(
 # ---------------------------------------------------------------------------
 
 def test_regression_override_all_resolves_tier_to_model_id() -> None:
-    """Plain override-all with a tier name must resolve to the concrete model ID."""
+    """Plain override-all with a tier name must resolve to the concrete model ID.
+
+    A ``model-override-all`` tier routes through the provider's own
+    ``ai-providers.yaml`` ``model-tiers`` catalog (not the active preset's
+    provider-specific table, which only drives role defaults -- see
+    ``CLAUDE_MODEL_POWERFUL``, the Normal-preset Claude value). The two sources
+    may legitimately differ, so the expectation is read from the catalog.
+    """
     resolved = _resolve("developer", extra={"model-override-all": {"Claude": "powerful"}})
-    assert resolved == CLAUDE_MODEL_POWERFUL
+    assert resolved == _PROVIDER_CONFIG["Claude"]["model-tiers"]["powerful"]
 
 
 def test_regression_override_all_passthrough_model_id() -> None:
