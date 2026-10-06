@@ -15,19 +15,24 @@ state AND after the unification onto the shared escape-safe substitution core
 (``scripts/lib/substitution.py``): any golden value going red after the
 cutover means an existing call site's output changed — forbidden.
 
-Known, intentional engine discrepancies (issue #476; intentionally NOT
-resolved by silently picking a winner — the unified core preserves both
-behaviors via per-engine lookup/keep policies):
+Known, intentional engine discrepancies (issue #476 Phase 2 consolidation).
+Phase 1 behavior alignment (same issue) has since closed D3, D4 and D6 below
+— TemplateBuilder.resolve_variables() now mirrors substitute()'s escape
+syntax and PAL_* exemption unconditionally, and gained an opt-in
+missing-variable warning (only emitted when a ``log`` is passed to
+``TemplateBuilder.__init__`` — every pre-existing call site omits it, so
+D6's "silent keep" default is unchanged):
 
 ===  =====================================================  ==========================  ====================================
  #   Input                                                  substitute()                TemplateBuilder.resolve_variables()
 ===  =====================================================  ==========================  ====================================
 D1   ``{{ VAR }}`` (whitespace inside braces)               kept verbatim               substituted; missing -> ``{{VAR}}``
 D2   lowercase name ``{{lower_key}}``                       kept even if defined        substituted when defined
-D3   escape syntax ``{{%VAR%}}``                            rendered as ``{{VAR}}``     kept verbatim (no escape support)
-D4   ``{{PAL_*}}`` (delegation-syntax placeholders)         exempt, kept silently       substituted when defined
+D3   escape syntax ``{{%VAR%}}``                            rendered as ``{{VAR}}``     rendered as ``{{VAR}}`` (aligned)
+D4   ``{{PAL_*}}`` (delegation-syntax placeholders)         exempt, kept silently       exempt, kept silently (aligned)
 D5   variable explicitly bound to ``None``                  ``str(None)`` -> ``None``   kept as placeholder
-D6   missing variable                                       warn (strict: raise)        silent keep
+D6   missing variable                                       warn (strict: raise)        silent keep by default; warns if a
+                                                                                          ``log`` was passed to __init__
 D7   empty name ``{{ }}``                                   kept verbatim               rebuilt as ``{{}}``
 D8   newline inside braces                                  kept verbatim               substituted
 ===  =====================================================  ==========================  ====================================
@@ -106,7 +111,7 @@ PLACEHOLDER_CORPUS = [
         "e {{%NOPE%}}",
         {},
         "e {{NOPE}}",
-        "e {{%NOPE%}}",
+        "e {{NOPE}}",
     ),
     (
         "pal_missing",
@@ -145,22 +150,23 @@ PLACEHOLDER_CORPUS = [
         "a {{lower_key}} b",
         "a L b",
     ),
-    # D3: escape syntax — substitute() renders literal, builder keeps raw:
+    # D3: escape syntax — both engines render literal (aligned, issue #476
+    # Phase 1):
     (
         "escape_present",
         "e {{%WIN_PATH%}}",
         {"WIN_PATH": r"C:\x\s"},
         "e {{WIN_PATH}}",
-        "e {{%WIN_PATH%}}",
+        "e {{WIN_PATH}}",
     ),
-    # D4: PAL_* delegation placeholders — substitute() exempts them even
-    # when defined; builder has no PAL awareness:
+    # D4: PAL_* delegation placeholders — both engines exempt them even when
+    # defined (aligned, issue #476 Phase 1):
     (
         "pal_present_in_vars",
         "p {{PAL_INVOKE}}",
         {"PAL_INVOKE": "X"},
         "p {{PAL_INVOKE}}",
-        "p X",
+        "p {{PAL_INVOKE}}",
     ),
     # D5: explicit None value — key-in-dict vs get-is-not-None semantics:
     (
