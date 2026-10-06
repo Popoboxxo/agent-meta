@@ -2,15 +2,25 @@
 from __future__ import annotations
 import re
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from ..frontmatter import strip_frontmatter
 from ..substitution import constant_lookup, substitute_placeholders
+
+if TYPE_CHECKING:
+    from ..log import SyncLog
 
 # Permissive placeholder pattern: group 1 captures the name (stripped by the
 # lookup below). Excludes block markers ({{#if}}, {{/if}}, {{else}}) and
 # partials ({{> name}}) — those are handled by resolve_conditionals(),
 # resolve_loops() and resolve_partials().
 _PLACEHOLDER_RE = re.compile(r"\{\{([^#>/][^}]*)\}\}")
+
+# Escape syntax {{%VAR%}} -> literal {{VAR}} output, no substitution
+# (issue #476 Phase 1 — mirrors scripts/lib/variables.py::substitute()).
+# Permissive [^%}]+? (vs. variables.py's uppercase-only [A-Z0-9_]+) because
+# context templates may use lowercase placeholder names.
+_ESCAPE_RE = re.compile(r"\{\{%\s*([^%}]+?)\s*%\}\}")
 
 # Agent-meta managed block (HTML comment form) shared by the context writers
 # and the run-1 fixpoint convergence.
@@ -39,15 +49,25 @@ def substitute_managed_block(text: str, managed_block: str) -> str:
 class TemplateBuilder:
     """Handlebars-style template builder with support for partials, conditionals, loops, and variables."""
 
-    def __init__(self, templates_dir: Path, fallback_partials_dir: Path | None = None):
+    def __init__(
+        self,
+        templates_dir: Path,
+        fallback_partials_dir: Path | None = None,
+        log: "SyncLog | None" = None,
+    ):
         """Initialize the template builder with template and partial directories.
 
         Args:
             templates_dir: Directory containing .md template files.
             fallback_partials_dir: Optional fallback directory for partials if not found in templates_dir.
+            log: Optional SyncLog. When given, resolve_variables() warns on a
+                missing (non-PAL_*) placeholder (issue #476 Phase 1) — mirrors
+                scripts/lib/variables.py::substitute(). Omitted (default) ->
+                no warnings, matching the historic silent-keep behavior.
         """
         self.templates_dir = templates_dir
         self.fallback_partials_dir = fallback_partials_dir
+        self._log = log
 
     def resolve_partials(self, template_str: str) -> str:
         """Resolve {{> partial-name }} inclusions by loading and embedding partial files.
@@ -152,6 +172,17 @@ class TemplateBuilder:
         values are injected via function replacement, so backslashes and
         $-group references are never interpreted (issue #674).
 
+        Mirrors scripts/lib/variables.py::substitute()'s three-pass structure
+        (issue #476 Phase 1 behavior alignment):
+        1. Escaped literals ({{%VAR%}}) are stashed to sentinels so they
+           survive the substitution pass untouched.
+        2. Real {{VAR}} placeholders are substituted; PAL_* names are exempt
+           (never substituted, never warned — handled by the delegation
+           syntax engine instead); other missing names warn only if a log
+           was given to __init__ (default: silent keep, matching historic
+           behavior).
+        3. Sentinels are restored as literal {{VAR}} text.
+
         Args:
             template_str: Template string containing variable references.
             variables: Dictionary of variable names to values.
@@ -159,19 +190,46 @@ class TemplateBuilder:
         Returns:
             Template string with {{variable}} placeholders replaced or left unchanged if not found.
         """
+        # Pass 1: protect escaped literals {{%VAR%}} with a unique sentinel.
+        _SENTINEL = "\x00ESC\x00"
+        escaped: list[str] = []
+
+        def stash_escape(m: re.Match[str]) -> str:
+            escaped.append(m.group(1))
+            return f"{_SENTINEL}{len(escaped) - 1}{_SENTINEL}"
+
+        template_str = _ESCAPE_RE.sub(stash_escape, template_str)
+
+        # Pass 2: substitute real {{VAR}} placeholders. PAL_* placeholders
+        # are handled by the delegation syntax engine, not general
+        # substitution — exempt them before the variables-dict lookup.
         def lookup(name: str) -> str | None:
+            stripped = name.strip()
+            if stripped.startswith("PAL_"):
+                return None
             # Whitespace variants ({{ VAR }}) resolve on the stripped name.
-            val = variables.get(name.strip())
+            val = variables.get(stripped)
             if val is None:
                 return None
             return str(val)
 
         def keep(matched: str, name: str) -> str:
+            stripped = name.strip()
+            if stripped.startswith("PAL_"):
+                return matched
+            if self._log is not None:
+                self._log.warn(f"Variable {stripped} not in config — placeholder remains")
             # Unresolved names keep their placeholder form, rebuilt from the
             # stripped name (whitespace variants collapse to {{NAME}}).
-            return f"{{{{{name.strip()}}}}}"
+            return f"{{{{{stripped}}}}}"
 
-        return substitute_placeholders(template_str, _PLACEHOLDER_RE, lookup, keep)
+        template_str = substitute_placeholders(template_str, _PLACEHOLDER_RE, lookup, keep)
+
+        # Pass 3: restore escaped literals as {{VAR}} (no substitution happened).
+        for i, name in enumerate(escaped):
+            template_str = template_str.replace(f"{_SENTINEL}{i}{_SENTINEL}", f"{{{{{name}}}}}")
+
+        return template_str
 
     def build(self, template_name: str, variables: dict) -> str:
         """Load and render a template with the provided variables.
