@@ -1,7 +1,9 @@
 ---
 title: Bugfix-Wave — Implementierungsplan (52 Issues, 8 Cluster)
-status: DRAFT
+status: APPROVED
 date: 2026-10-06
+freigegeben_durch: Nutzer
+freigegeben_am: 2026-10-06
 repo: agent-meta
 source: .tmp/clustering-analysis.md (2026-10-06), .tmp/triage-summary.txt (Track A, Referenz/Exclusion)
 scope: Implementierungsplan für 52 bereits geclusterte, implementierungsreife Issues — Reihenfolge, Task-Zerlegung, Akzeptanzkriterien, Rollen-Tier je Issue/Issue-Gruppe
@@ -9,7 +11,7 @@ scope: Implementierungsplan für 52 bereits geclusterte, implementierungsreife I
 
 # Bugfix-Wave — Implementierungsplan
 
-> **STATUS: DRAFT** — noch nicht freigegeben. Freigabe (`Status: APPROVED`) ist Nutzer-Entscheidung, keine Selbstfreigabe durch diesen Plan.
+> **STATUS: APPROVED** — Freigegeben durch Nutzer: 2026-10-06. Implementierung kann beginnen nach Freigabe der Wave-spezifischen Specs (siehe Global Constraints, Punkt 1).
 > **Datum:** 2026-10-06 · **Quelle:** `.tmp/clustering-analysis.md` (8-Cluster-Analyse, 52 implementierungsreite Issues, heute verifiziert).
 > **Charakter:** Ausführungsplan auf Wellen-Ebene mit Task-Zerlegung je Issue/Issue-Gruppe. Dies ist **kein** Ersatz für das projekteigene Spec/Plan-Gate (`.claude/rules/use-orchestrator.md`): jede Welle/Cluster-Gruppe braucht vor Step 2 (Implementierung) ihren eigenen freigegebenen Spec (`Status: APPROVED`) — siehe Global Constraints, Punkt 1.
 
