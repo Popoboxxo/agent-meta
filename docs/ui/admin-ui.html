@@ -1985,7 +1985,7 @@ async function viewAIProviders() {
   for (const [provider, conf] of Object.entries(providers)) {
     if (typeof conf !== "object" || conf === null) continue;
     delete conf["active-surface"];
-    const panel = el("details", { class: "panel" });
+    const panel = el("details", { class: "panel", open: true });
     const summary = el("summary", { style: "cursor:pointer; font-weight:600;" }, [provider]);
     // Active-surface badge (read-only, rendered via textContent). Shown only
     // when the server resolved a surface for this provider.
