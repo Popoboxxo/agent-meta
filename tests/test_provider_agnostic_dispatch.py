@@ -6,11 +6,17 @@ branches in ``scripts/lib/``:
 
 1. A directory sweep over ``scripts/lib/**/*.py`` (replaces the former static
    ``_TOUCHED_MODULES`` tuple, AC-14) AST-scans every module — a newly added
-   lib module is covered automatically. Flagged are provider-name dispatch
-   branches:
-     * ``provider == "Name"`` / ``!=`` against a registered provider name, and
+   lib module is covered automatically. ``scripts/admin-server.py`` is swept
+   explicitly alongside it (issue #751): three real provider-literal
+   violations lived there undetected because the original sweep was scoped
+   to ``scripts/lib/**`` only. Flagged are provider-name dispatch branches:
+     * ``provider == "Name"`` / ``!=`` against a registered provider name,
      * ``provider in ("Name", ...)`` / ``not in`` against an enumerated literal
-       container of registered provider names.
+       container of registered provider names, and
+     * ``NAME = {"Provider", ...}`` / ``frozenset({"Provider", ...})`` constant
+       assignments (issue #751) — the shape that evaded the Compare-node scan
+       because the provider name never appears directly in a comparison, only
+       inside a named constant checked later via ``provider in CONSTANT``.
    Comments/docstrings are ignored by design (the scan is AST-based).
 2. No ``surface-version`` comparison drives dispatch in ``scripts/lib/``
    (AC-23). The one documented exception is the config-reading validator
@@ -115,7 +121,9 @@ def _provider_membership_operands(node: ast.Compare, names: set[str]) -> list[st
     return sorted(found)
 
 
-def _provider_dispatch_offenders(tree: ast.AST, module: str, names: set[str]) -> list[str]:
+def _provider_dispatch_offenders(
+    tree: ast.AST, module: str, names: set[str], *, prefix: str = "scripts/lib/"
+) -> list[str]:
     offenders: list[str] = []
     for node in ast.walk(tree):
         if not isinstance(node, ast.Compare):
@@ -123,12 +131,74 @@ def _provider_dispatch_offenders(tree: ast.AST, module: str, names: set[str]) ->
         if any(isinstance(op, (ast.Eq, ast.NotEq)) for op in node.ops):
             consts = _provider_equality_operands(node, names)
             if consts:
-                offenders.append(f"scripts/lib/{module}:{node.lineno}: {consts}")
+                offenders.append(f"{prefix}{module}:{node.lineno}: {consts}")
                 continue
         if any(isinstance(op, (ast.In, ast.NotIn)) for op in node.ops):
             consts = _provider_membership_operands(node, names)
             if consts:
-                offenders.append(f"scripts/lib/{module}:{node.lineno}: {consts}")
+                offenders.append(f"{prefix}{module}:{node.lineno}: {consts}")
+    offenders.extend(_provider_set_constant_offenders(tree, module, names, prefix=prefix))
+    return offenders
+
+
+def _provider_set_literal_elements(node: ast.AST, names: set[str]) -> list[str] | None:
+    """Elements of a ``set``/``frozenset`` literal, if ALL elements are
+    registered provider-name string constants — else ``None``.
+
+    Deliberately restricted to the *set* shape (``{"Claude"}`` /
+    ``frozenset({"Claude"})``/``set(["Claude"])``) — NOT bare tuple/list
+    literals. A tuple/list of provider names is routinely a legitimate
+    default-value or fallback-registry literal (e.g. ``pipelines.py``'s
+    documented ``KNOWN_PROVIDERS`` fallback tuple, ``setup.py``'s
+    ``["Claude"]`` interactive-prompt default) — not the dispatch
+    anti-pattern this check targets, which is always consumed via
+    ``provider in CONSTANT`` / ``not in CONSTANT``.
+    """
+    if isinstance(node, ast.Call):
+        func = node.func
+        if not (isinstance(func, ast.Name) and func.id in {"set", "frozenset"}):
+            return None
+        if len(node.args) != 1 or node.keywords:
+            return None
+        node = node.args[0]
+        if not isinstance(node, (ast.Set, ast.List, ast.Tuple)) or not node.elts:
+            return None
+    elif isinstance(node, ast.Set) and node.elts:
+        pass
+    else:
+        return None
+    values: list[str] = []
+    for elt in node.elts:
+        if not (isinstance(elt, ast.Constant) and _provider_name(elt.value, names)):
+            return None
+        values.append(elt.value)
+    return sorted(values)
+
+
+def _provider_set_constant_offenders(
+    tree: ast.AST, module: str, names: set[str], *, prefix: str = "scripts/lib/"
+) -> list[str]:
+    """``NAME = {"Provider", ...}`` / ``frozenset({"Provider", ...})`` constant
+    assignments (issue #751) — this shape evades the Compare-node scan above
+    because the provider-name literal never appears directly in a
+    comparison, only inside a named constant consulted later via
+    ``provider in CONSTANT``. Flags any ``Name = <literal>`` assignment
+    (module-, class- or function-scope) whose literal elements are entirely
+    registered provider names.
+    """
+    offenders: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            if not any(isinstance(t, ast.Name) for t in node.targets):
+                continue
+            value_node = node.value
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            value_node = node.value
+        else:
+            continue
+        values = _provider_set_literal_elements(value_node, names)
+        if values:
+            offenders.append(f"{prefix}{module}:{node.lineno}: {values}")
     return offenders
 
 
@@ -159,7 +229,11 @@ def _surface_version_dispatch_reason(node: ast.Compare) -> str | None:
 
 
 def _surface_version_dispatch_offenders(
-    tree: ast.AST, module: str, parents: dict[ast.AST, ast.AST]
+    tree: ast.AST,
+    module: str,
+    parents: dict[ast.AST, ast.AST],
+    *,
+    prefix: str = "scripts/lib/",
 ) -> list[str]:
     offenders: list[str] = []
     for node in ast.walk(tree):
@@ -174,8 +248,14 @@ def _surface_version_dispatch_offenders(
             continue
         if (module, _enclosing_function(node, parents)) in _SURFACE_VERSION_EXCEPTIONS:
             continue
-        offenders.append(f"scripts/lib/{module}:{node.lineno} ({reason})")
+        offenders.append(f"{prefix}{module}:{node.lineno} ({reason})")
     return offenders
+
+
+#: Display path of the explicitly-swept admin-server entrypoint (issue #751).
+_ADMIN_SERVER_PATH = _REPO_ROOT / "scripts" / "admin-server.py"
+_ADMIN_SERVER_LABEL = "admin-server.py"
+_ADMIN_SERVER_PREFIX = "scripts/"
 
 
 def _registered_providers() -> list[str]:
@@ -195,8 +275,10 @@ def _provider_configs() -> dict:
 
 def test_no_provider_name_dispatch_branches_in_lib():
     """AC-14: no ``provider == "Name"`` / ``provider in ("Name", ...)`` branch
-    may remain anywhere under ``scripts/lib/``. AST-based so comments and
-    docstrings that *mention* the anti-pattern do not false-positive."""
+    (nor a ``NAME = {"Provider", ...}`` constant, issue #751) may remain
+    anywhere under ``scripts/lib/`` or in ``scripts/admin-server.py``.
+    AST-based so comments and docstrings that *mention* the anti-pattern do
+    not false-positive."""
     names = set(_registered_providers())
     modules = _lib_modules()
     assert len(modules) > 1, f"scripts/lib sweep found only {len(modules)} modules"
@@ -208,6 +290,16 @@ def test_no_provider_name_dispatch_branches_in_lib():
             offenders.append(f"scripts/lib/{_module_name(module_path)}: unparseable: {exc}")
             continue
         offenders.extend(_provider_dispatch_offenders(tree, _module_name(module_path), names))
+    try:
+        admin_tree = ast.parse(_ADMIN_SERVER_PATH.read_text(encoding="utf-8"))
+    except SyntaxError as exc:
+        offenders.append(f"{_ADMIN_SERVER_PREFIX}{_ADMIN_SERVER_LABEL}: unparseable: {exc}")
+    else:
+        offenders.extend(
+            _provider_dispatch_offenders(
+                admin_tree, _ADMIN_SERVER_LABEL, names, prefix=_ADMIN_SERVER_PREFIX
+            )
+        )
     assert not offenders, (
         "Provider-name dispatch branch(es) reintroduced — dispatch via "
         "config/ai-providers.yaml capabilities (provider_has_capability) or the "
@@ -261,6 +353,8 @@ def test_no_surface_version_dispatch_in_lib():
 # test module — never in ``scripts/lib/`` — so they cannot trip the sweep.
 _SYNTH_PROVIDER_EQ = "def f(provider):\n    if provider == 'Claude':\n        return 1\n"
 _SYNTH_PROVIDER_IN = "def f(provider):\n    if provider in ('Claude', 'Gemini'):\n        return 1\n"
+_SYNTH_PROVIDER_SET_CONST = "PROVIDERS = {'Claude'}\n"
+_SYNTH_PROVIDER_FROZENSET_CONST = "_ALWAYS_APPLY_PROVIDERS = frozenset({'Continue'})\n"
 _SYNTH_SURFACE_BRANCH = "def write(sv):\n    if sv == 'v2':\n        return 1\n"
 _SYNTH_VALIDATOR = (
     "def artifact_v2_surface(pc):\n"
@@ -280,6 +374,21 @@ def test_guard_detects_synthetic_provider_dispatch():
     )
 
 
+def test_guard_detects_synthetic_provider_set_constant():
+    """TDD pin (issue #751): ``NAME = {"Provider", ...}`` and
+    ``NAME = frozenset({"Provider", ...})`` constant assignments are caught
+    even though no comparison ever mentions the literal directly — this is
+    the exact shape ``_ALWAYS_APPLY_PROVIDERS``/``PROVIDERS`` had before the
+    fix, and would have evaded the pre-#751 Compare-node-only scan."""
+    names = set(_registered_providers())
+    assert _provider_dispatch_offenders(
+        ast.parse(_SYNTH_PROVIDER_SET_CONST), "synthetic.py", names
+    )
+    assert _provider_dispatch_offenders(
+        ast.parse(_SYNTH_PROVIDER_FROZENSET_CONST), "synthetic.py", names
+    )
+
+
 def test_guard_detects_synthetic_surface_version_dispatch():
     """TDD pin: a writer branching on ``surface-version`` is caught."""
     tree = ast.parse(_SYNTH_SURFACE_BRANCH)
@@ -293,6 +402,40 @@ def test_guard_exempts_only_documented_validator():
     parents = _parent_map(tree)
     assert not _surface_version_dispatch_offenders(tree, "artifact_validate.py", parents)
     assert _surface_version_dispatch_offenders(tree, "mcp_provider_config.py", parents)
+
+
+def test_the_three_751_sites_resolve_via_capability_flags():
+    """Issue #751: the 3 confirmed violations each now resolve through a
+    declared ``config/ai-providers.yaml`` capability instead of a provider-
+    name literal — pinned so a regression (capability removed from the
+    config, or the literal silently reintroduced) is caught here directly,
+    not only by the generic sweep above."""
+    from lib.providers import provider_has_capability
+    from lib.rules import sync_rules  # noqa: F401 (import-only: no _ALWAYS_APPLY_PROVIDERS left)
+    from lib.skill_channel import provider_supports_skill_channel
+
+    providers_cfg = _provider_configs()
+
+    # 1. admin-server.py flat model-overrides fallback.
+    claude_pc = providers_cfg.get("Claude") or {}
+    assert provider_has_capability(claude_pc, "model-overrides-flat")
+    admin_server_src = (_REPO_ROOT / "scripts" / "admin-server.py").read_text(encoding="utf-8")
+    assert 'provider == "Claude"' not in admin_server_src
+    assert "provider_has_capability(pc, \"model-overrides-flat\")" in admin_server_src
+
+    # 2. rules.py alwaysApply dispatch (formerly _ALWAYS_APPLY_PROVIDERS).
+    continue_pc = providers_cfg.get("Continue") or {}
+    assert provider_has_capability(continue_pc, "rules-always-apply")
+    assert not provider_has_capability(claude_pc, "rules-always-apply")
+    assert "_ALWAYS_APPLY_PROVIDERS" not in (_LIB_DIR / "rules.py").read_text(encoding="utf-8")
+
+    # 3. skill_channel.py native-skill-channel dispatch (formerly PROVIDERS).
+    assert provider_has_capability(claude_pc, "native-skill-channel")
+    assert not provider_has_capability(continue_pc, "native-skill-channel")
+    assert provider_supports_skill_channel("Claude", claude_pc) is True
+    assert provider_supports_skill_channel("Continue", continue_pc) is False
+    skill_channel_src = (_LIB_DIR / "skill_channel.py").read_text(encoding="utf-8")
+    assert "PROVIDERS = " not in skill_channel_src
 
 
 def test_cleanup_preview_documented():

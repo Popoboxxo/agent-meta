@@ -63,7 +63,14 @@ def test_resolve_skill_description_falls_back_to_first_body_line():
 # ---------------------------------------------------------------------------
 
 def test_provider_supports_skill_channel_claude_with_skills_dir():
-    assert provider_supports_skill_channel("Claude", {"skills_dir": ".claude/skills"}) is True
+    pc = {"skills_dir": ".claude/skills", "capabilities": ["native-skill-channel"]}
+    assert provider_supports_skill_channel("Claude", pc) is True
+
+
+def test_provider_supports_skill_channel_false_without_capability():
+    # Claude's skills_dir alone is not enough — the capability flag (issue
+    # #751) is what the dispatch now keys on, never the provider name.
+    assert provider_supports_skill_channel("Claude", {"skills_dir": ".claude/skills"}) is False
 
 
 @pytest.mark.parametrize("provider", ["Gemini", "Copilot", "Mammouth", "Continue",
@@ -103,7 +110,7 @@ def test_sync_rules_channel_skill_writes_skill_md_not_rules_dir(tmp_path):
     _make_generic_rules(agent_meta_root)
 
     config = {"rules": {"sync-interface": {"channel": "skill", "skill-description": "Use when syncing."}}}
-    provider_config = {"Claude": {"skills_dir": ".claude/skills"}}
+    provider_config = {"Claude": {"skills_dir": ".claude/skills", "capabilities": ["native-skill-channel"]}}
 
     sync_rules(
         agent_meta_root, project_root, config, SyncLog(), dry_run=False,
@@ -133,7 +140,7 @@ def test_sync_rules_channel_skill_content_preserved_verbatim(tmp_path):
         "# Sync Interface\n\n> tagline\n\nBody.\n\n## Bekannte Grenzen\n\nEdge case text.\n",
     )
     config = {"rules": {"sync-interface": {"channel": "skill"}}}
-    provider_config = {"Claude": {"skills_dir": ".claude/skills"}}
+    provider_config = {"Claude": {"skills_dir": ".claude/skills", "capabilities": ["native-skill-channel"]}}
 
     sync_rules(
         agent_meta_root, project_root, config, SyncLog(), dry_run=False,
@@ -167,7 +174,7 @@ def test_sync_rules_channel_skill_reverts_to_rules_dir_when_disabled(tmp_path):
     agent_meta_root = tmp_path / "agent-meta"
     project_root = tmp_path / "project"
     _make_generic_rules(agent_meta_root)
-    provider_config = {"Claude": {"skills_dir": ".claude/skills"}}
+    provider_config = {"Claude": {"skills_dir": ".claude/skills", "capabilities": ["native-skill-channel"]}}
 
     sync_rules(
         agent_meta_root, project_root, {"rules": {"sync-interface": {"channel": "skill"}}},
@@ -193,7 +200,7 @@ def test_sync_rules_channel_skill_dry_run_does_not_write(tmp_path):
     agent_meta_root = tmp_path / "agent-meta"
     project_root = tmp_path / "project"
     _make_generic_rules(agent_meta_root)
-    provider_config = {"Claude": {"skills_dir": ".claude/skills"}}
+    provider_config = {"Claude": {"skills_dir": ".claude/skills", "capabilities": ["native-skill-channel"]}}
 
     sync_rules(
         agent_meta_root, project_root, {"rules": {"sync-interface": {"channel": "skill"}}},
@@ -210,7 +217,7 @@ def test_sync_rules_channel_skill_shares_index_with_external_skills(tmp_path):
     agent_meta_root = tmp_path / "agent-meta"
     project_root = tmp_path / "project"
     _make_generic_rules(agent_meta_root)
-    provider_config = {"Claude": {"skills_dir": ".claude/skills"}}
+    provider_config = {"Claude": {"skills_dir": ".claude/skills", "capabilities": ["native-skill-channel"]}}
 
     index_path = project_root / ".claude" / "skills" / ".agent-meta-managed"
     _write(index_path, "graphify\n")
