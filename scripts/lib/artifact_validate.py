@@ -38,6 +38,7 @@ except ImportError:  # pragma: no cover - optional dependency
 
 from .consistency.report import Finding, Severity
 from .frontmatter import split_frontmatter
+from .io import strip_jsonc_comments
 
 #: Finding check name. Matches the sync-log line ``artifact-contract: <message>``
 #: (spec §5) and the AC-13 ``artifact-contract`` error label.
@@ -246,9 +247,18 @@ def validate_json_document(text: str, fmt: str, path: str) -> list[Finding]:
       flat top-level ``mcp`` object (frozen v1 byte shape, AC-21).
 
     Formats without a declared contract are not guessed (no findings).
+
+    These committed settings documents are JSONC (``//`` comments, trailing
+    commas) — the runtime (OpenCode/Mammouth) reads them that way and so does
+    the rest of sync (``io.read_json_lenient``/``isolation._read_json_safe``).
+    A comment-only template (e.g. ``mammouth.json`` when no writer rewrites it
+    into comment-free JSON) is a legitimate empty config, so comments and
+    trailing commas are stripped before parsing; only genuinely broken JSON
+    still yields a finding.
     """
+    cleaned = re.sub(r",\s*([}\]])", r"\1", strip_jsonc_comments(text))
     try:
-        doc = json.loads(text)
+        doc = json.loads(cleaned)
     except json.JSONDecodeError as exc:
         return [_finding(path, f"invalid JSON: {exc}")]
 
