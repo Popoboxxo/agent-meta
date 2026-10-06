@@ -9,27 +9,6 @@
 
 > Struktur: siehe Verzeichnisstruktur im Repo (`ls`/`find`); deklarativ: `.meta-config/project.yaml` → `variables.PROJECT_STRUCTURE`.
 
-**Verzeichnisstruktur:**
-```
-agents/
-  0-external/       # Wrapper-Template für externe Skills
-  1-generic/        # Universelle Agent-Templates
-  2-platform/       # Plattform-Overrides (z.B. sharkord, homeassistant, agent-meta)
-scripts/
-  sync.py           # Agent-Generator
-  admin-server.py   # Lokaler Admin-UI-Server
-external/           # Git Submodule (externe Skill-Repos)
-docs/guides/        # Anleitungen und Beispiel-Config
-docs/ui/            # UI Assets
-  architecture/     # Architektur-Diagramme (Mermaid)
-  admin-ui.html     # Admin-UI Frontend
-docs/specs/         # Feature-Specs (Spec/Plan-Workflow, §5.1)
-docs/plans/         # Feature-Pläne + archive/ (docs/plans/README.md)
-docs/spikes/        # Wegwerf-Untersuchungen (explorer-Spike-Modus, F10)
-tests/              # Test-Suite (automated, manual, orchestration)
-
-```
-
 > Runtime & Abhängigkeiten: siehe Projekt-Manifest (`pyproject.toml` / `requirements.txt` / `package.json` / `manifest.json`).
 
 **Entry-Point:** `scripts/sync.py — Haupt-CLI für Agent-Generierung`
@@ -50,21 +29,7 @@ tests/              # Test-Suite (automated, manual, orchestration)
 - Provider-Unterschiede im Syncer-Code über Config-Keys/Capability-Flags ausdrücken, nie über `if provider == "Name"` (siehe `provider-agnostic`-Skill)
 
 
-## Build & Development
-
-```bash
-# Build
-python scripts/sync.py
-
-# Tests
-python3 scripts/sync.py --validate
-
-# Dev-Stack starten
-(kein Dev-Stack)
-
-# Nach Änderungen neu laden
-(kein Dev-Stack)
-```
+> Build: `python scripts/sync.py` · Test: `python3 scripts/sync.py --validate` · Dev: `(kein Dev-Stack)` · Reload: `(kein Dev-Stack)`
 
 ## Anforderungs-Kategorien
 
@@ -92,37 +57,7 @@ Kategorien für `docs/REQUIREMENTS.md`:
 
 Verwende Feature-Branches (`feat/`, `fix/`, `chore/`). Keine Code-Änderungen direkt auf `main` oder `master`.
 
-## Guard-Terminologie: Convention Boundary vs. Security Boundary
-
-Guards im System (Orchestrator-Guard, DoD-Push-Check, etc.) werden inkonsistent als
-"Konventions-Tool" und als "security boundary" bezeichnet — beide Aussagen sind korrekt,
-aber gegen unterschiedliche Bedrohungsmodelle:
-
-- **Convention boundary**: fail-closed gegen AKZIDENTIELLEN Missbrauch (Tippfehler,
-  vergessene Bestätigungen, naive Automatisierung). Nicht darauf ausgelegt, einen
-  gezielten Bypass-Versuch zu widerstehen (siehe Lücken unten, z.B. #592).
-- **Security boundary**: fail-closed gegen einen DELIBERATEN Umgehungsversuch.
-
-Diese Definition ist die zentrale Referenz — Hook-Header und andere Doku sollen sie
-verlinken (`.claude/rules/branch-guard.md#guard-terminologie-convention-boundary-vs-security-boundary`)
-statt sie ad hoc zu wiederholen.
-
-`orchestrator-guard.sh` ist primär eine **convention boundary** (siehe Lücken unten),
-mit einzelnen **security-boundary**-Eigenschaften für spezifische Fälle (z.B. das
-Destructive-Gate aus #516/#809, das auch bei gültigem `git`-Sentinel blockt). `dod-push-check.sh`
-ist als **security boundary** gegen fehlendes/kaputtes `python3` fail-closed (#595).
-
-## Bekannte Grenzen
-
-Die technische Durchsetzung (`orchestrator-guard.sh`) erkennt Git-Mutationen über eine tokenisierte Analyse des Bash-Befehls (gemeinsamer Tokenizer für Destructive- und Mutation-Gate, Issue #551), kein vollständiger Shell-Parser. Das Destructive-Gate deckt zusätzlich die kanonischen Shell-Katastrophen ab (Issue #809): rekursives `rm` auf einem gefährlichen Root (`/`, `~`/`$HOME`, Top-Level-Systemverzeichnisse wie `/etc`) sowie eine rekursive Fork-Bomb (`` :(){ :|:& };: ``). Benigne In-Repo-Löschungen (`rm -rf .tmp/...`) bleiben erlaubt. Bekannte Lücken:
-
-1. `eval "git commit ..."` wird nicht erkannt.
-2. Direkte Schreibzugriffe auf `.git/` werden nicht geprüft.
-3. Andere Git-Tools (`hub`, `gh repo ...`) sind nicht erfasst.
-4. Command-Substitution und Indirektion (`$(...)`, Backticks, `xargs`, `eval`) können eine Git-Mutation am Tokenizer vorbeischleusen, weil der Hook den Befehl weder ausführt noch die Shell vollständig parst (Issue #592). Ein echter Shell-Interpreter wäre unverhältnismäßig für ein Konventions-Tool. Für das FS-Destructive-Gate (#809) gilt dasselbe: nur direkte `rm`-Aufrufe (ggf. hinter `sudo`/`env`/KEY=VALUE) werden erkannt; indirekte Löschungen (`find ... -delete`, `xargs rm`, Variablen-/`$(...)`-Expansion eines Pfads, gequoteter ANSI-C-Pfad, `rm` über einen Wrapper-Alias), Pfad-Traversal (`rm -rf /var/tmp/../etc`) sowie eine als String-Literal gequotete `:(){ :|:& };:`-Definition bzw. indirekte Fork-Bombs (`eval`, base64) bleiben möglich — ein Tippfehler-/Akzident-Netz, kein Ersatz für Backups.
-
-Bewusster Trade-off, kein Bug (siehe Kommentar-Header in `.claude/hooks/orchestrator-guard.sh`) — nur relevant für Nutzer, die sich vollständig auf den Schutz statt auf die Konvention verlassen.
-
+Details (Guard-Terminologie: Convention vs. Security Boundary, bekannte technische Grenzen): `rules/1-generic/branch-guard.md`.
 
 
 # Commit-Konventionen
@@ -232,150 +167,73 @@ Bei Bedarf mit `Read` laden; verfügbare Regeln via `ls` im jeweiligen Verzeichn
 
 
 ## Agent Directory
-> ⚠️ **ACHTUNG:** Agenten (Prompts) liegen in `.gemini/agents bzw. .opencode/agents bzw. .mammouth/agents bzw. .codex/agents bzw. .zcode/agents bzw. .kimi-code/agents`.
+> Agenten (Prompts) liegen in `.gemini/agents bzw. .opencode/agents bzw. .mammouth/agents bzw. .codex/agents bzw. .zcode/agents bzw. .kimi-code/agents`.
 
 | Agent | Core Capabilities |
 |-------|-------------------|
-
 | `accessibility-specialist` | WCAG 2.1/2.2 Compliance-Audit, ARIA-Checks, Keyboard-Navigation |
-
 | `agent-meta-manager` | agent-meta verwalten: Upgrade, Sync, Feedback |
-
 | `agent-meta-scout` | Claude-Ökosystem scouten: neue Skills, Rollen, Rules |
-
 | `api-specialist` | OpenAPI/Contract-First API Design, Schnittstellen-Spezifikationen |
-
 | `app-lifecycle-governor` | App-Lifecycle-Governance: Ownership, SLA, Data-Classification |
-
 | `bug-feature-analyzer` | Issue-Triage: Eingehende Bug-Meldungen, Feature-Requests analysieren, k |
-
 | `claude-expert` | Absoluter Analyse-Experte für die Plattform Claude Code: Funktionsweise, Konf |
-
 | `code-reviewer` | Clean Code Gatekeeper: Blast-Radius-Analyse, SOLID/DRY Prüfung, Code-Qualität |
-
 | `concept-architect` | Systemdesign für komplexe Änderungen: Komponenten, Schnittstellen, Trade-offs |
-
 | `concept-reviewer` | Konzept-Critic: reviewt Design-Docs, Konzepte auf Vollständigkeit, Logik |
-
 | `concept-specifier` | Technische Spezifikationen aus Anforderungen, Codebase-Kontext — implementiert nicht |
-
 | `continue-expert` | Absoluter Analyse-Experte für die Plattform Continue: Funktionsweise, Konfigu |
-
 | `copilot-expert` | Absoluter Analyse-Experte für die Plattform GitHub Copilot: Funktionsweise, K |
-
 | `data-engineer` | ETL/ELT-Pipelines, Schema-Migration (Datenebene), Data-Quality-Checks |
-
 | `dependency-auditor` | Supply-Chain-Hygiene: SBOM-Analyse, Lizenz-Kompatibilität, Version-Drift und |
-
 | `design-system-architect` | Design-System-Schema → echte Token-Artefakte, Farbharmonie, Variant-Contracts |
-
 | `developer` | Feature-Implementierung, Bugfixes |
-
 | `devops-engineer` | CI/CD, Infrastructure as Code, Kubernetes |
-
 | `docker` | Dev-Stack verwalten, Test-Stack starten, Binary-Management |
-
 | `documenter` | CODEBASE_OVERVIEW, ARCHITECTURE, README |
-
 | `e2e-tester` | E2E-Tests, visuelle Regression, Accessibility-Audits via Playwright |
-
 | `effort-estimator` | Schätzt Aufwände für Entwicklungsaufgaben basierend auf Task-Typ, LLM-Kali |
-
 | `explorer` | Read-only Codebase-Recherche, Dependency, Impact-Mapping |
-
 | `export-manager` | Target-agnostischer Output-Router: Markdown, Confluence, Jira-Xray |
-
 | `feedback` | Projekt-Feedback standardisieren: Bugs, Features, Verbesserungen als GitHub I |
-
 | `frontend-component-engineer` | Screen-Spec + Token-Contract → produktionsreife UI-Komponenten |
-
 | `gemini-expert` | Absoluter Analyse-Experte für die Plattform Gemini (Antigravity): Funktionswe |
-
 | `git` | Commits, Branches, Tags |
-
 | `ideation` | Neue Ideen explorieren, Vision schärfen, Übergabe an requirements |
-
 | `incident-responder` | Live-Incident-Koordination: korreliert Logs, Metriken, führt Runbook-Schri |
-
 | `intern-developer` | Der übereifrige Praktikant |
-
 | `junior-developer` | Triviale Code-Änderungen (≤2 Dateien, kein Architektur-Impact) |
-
 | `knowledge-curator` | Strategische Knowledge-Engine-Steuerung: Schema-Evolution, Wiki-Strukturierun |
-
 | `knowledge-gardener` | Kleinteilige Wiki-Pflege: Links reparieren, Tags harmonisieren, Frontmatter e |
-
 | `knowledge-indexer` | Pflegt index.md (Content-Katalog, OKF §6), log.md (Chronologisches Event-L |
-
 | `knowledge-ingestor` | Sources einlesen, Key Information extrahieren, Wiki-Seiten erstellen/ aktuali |
-
 | `knowledge-linter` | Wiki-Gesundheitscheck: Widersprüche, Orphans, veraltete Claims |
-
 | `knowledge-migrator` | Vorhandene Projektinhalte aufräumen, OKF-konform ins Knowledge Wiki migrieren |
-
 | `knowledge-querier` | Fragen gegen das Knowledge Wiki beantworten |
-
 | `log-analyzer` | System, Applikations-Logs analysieren: Frequency-Clustering, Severity-Kla |
-
 | `mammouth-expert` | Absoluter Analyse-Experte für die Plattform Mammouth Code: Funktionsweise, Ko |
-
 | `meta-feedback` | Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen |
-
 | `opencode-expert` | Absoluter Analyse-Experte für die Plattform Opencode: Funktionsweise, Konfigu |
-
 | `orchestrator` | Einstiegspunkt für alle Entwicklungsaufgaben |
-
 | `performance-optimizer` | Big-O Bottleneck-Identifikation, datengetriebene Performance-Optimierung |
-
 | `planner` | Umsetzungsplanung |
-
 | `principal-developer` | Last-Resort-Eskalationsstufe |
-
 | `product-manager` | Strategisches Produkt-Management: Backlog, User-Stories, Sprint-Planung |
-
 | `prompt-engineer` | Der ultimative Experte für Prompt-Engineering |
-
 | `refactoring-specialist` | Systematische großflächige Code-Transformation mit Sicherheitsnetz: Strangler |
-
 | `release` | Versioning, Changelog, Build-Artifact |
-
 | `requirements` | Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen |
-
 | `senior-developer` | Komplexe Features, Architektur-Entscheidungen, schwierige Bugs |
-
 | `technical-writer` | Externe entwickler, nutzergerichtete Doku: API-Referenzen, Getting-Starte |
-
 | `test-executor` | Bestehende Test-Suiten ausführen — kein Test-Design, kein Code-Schreiben |
-
 | `tester` | TDD, Test-Suite ausführen, Testabdeckung sichern |
-
 | `ui-ux-designer` | UI-Spezifikationen, Mockups, Design-Systeme erstellen |
-
 | `validator` | Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit |
 
 
 ## Knowledge Engine
 
-Die Knowledge Engine ist aktiviert. Domäne: **internal-docs**.
-
-**Bundle-Pfad:** `knowledge/`
-| Pfad | Zweck |
-|------|-------|
-| `knowledge/schema.md` | Steuerungsdokument — Konventionen, Concept Types, Workflows |
-| `knowledge/sources/` | Immutable Raw Sources — LLM liest, modifiziert NIEMALS |
-| `knowledge/wiki/` | OKF Knowledge Bundle — LLM-owned, strukturiertes Wiki |
-| `knowledge/wiki/index.md` | Content-Katalog aller Wiki-Seiten (OKF §6) |
-| `knowledge/wiki/log.md` | Chronologisches Event-Log (OKF §7) |
-
-### Knowledge-Agenten
-- **Schema-Owner:** `knowledge-curator` verwaltet `knowledge/schema.md` und Concept-Type-Konventionen
-
-### Knowledge-Workflows
-- **Ingest:** Source in `knowledge/sources/` ablegen → `knowledge-ingestor` verarbeitet → Wiki aktualisiert
-- **Query:** Frage stellen → `knowledge-querier` durchsucht Index → synthetisiert Antwort
-- **Lint:** `knowledge-linter` prüft Wiki-Gesundheit (Widersprüche, Orphans, OKF-Compliance)
-- **Migration:** `knowledge-migrator` räumt vorhandene Inhalte auf und migriert ins OKF-Format
-- **Gardening:** `knowledge-gardener` pflegt Links, Tags, Typos, Timestamps
+Aktiviert (Domäne: **internal-docs**). Bundle: `knowledge/` — Index: `knowledge/wiki/index.md`, Schema/Workflows: `knowledge/schema.md`, immutable Sources: `knowledge/sources/` (LLM liest, modifiziert NIEMALS).
 
 <!-- agent-meta:managed-end -->
 
@@ -444,131 +302,8 @@ Rules:
 ## Agent Bootstrap — Session-Start Pflicht
 
 Gemini/Antigravity benötigt eine einmalige Agent-Registrierung pro Session.
-**Führe folgende Schritte zu Beginn JEDER Session aus:**
-
-1. Lies alle Agenten-Dateien aus `.gemini/agents/`:
-   - `accessibility-specialist.md` → registriere als `accessibility-specialist`
-   - `agent-meta-manager.md` → registriere als `agent-meta-manager`
-   - `agent-meta-scout.md` → registriere als `agent-meta-scout`
-   - `api-specialist.md` → registriere als `api-specialist`
-   - `app-lifecycle-governor.md` → registriere als `app-lifecycle-governor`
-   - `bug-feature-analyzer.md` → registriere als `bug-feature-analyzer`
-   - `claude-expert.md` → registriere als `claude-expert`
-   - `code-reviewer.md` → registriere als `code-reviewer`
-   - `concept-architect.md` → registriere als `concept-architect`
-   - `concept-reviewer.md` → registriere als `concept-reviewer`
-   - `concept-specifier.md` → registriere als `concept-specifier`
-   - `continue-expert.md` → registriere als `continue-expert`
-   - `copilot-expert.md` → registriere als `copilot-expert`
-   - `data-engineer.md` → registriere als `data-engineer`
-   - `dependency-auditor.md` → registriere als `dependency-auditor`
-   - `design-system-architect.md` → registriere als `design-system-architect`
-   - `developer.md` → registriere als `developer`
-   - `devops-engineer.md` → registriere als `devops-engineer`
-   - `docker.md` → registriere als `docker`
-   - `documenter.md` → registriere als `documenter`
-   - `e2e-tester.md` → registriere als `e2e-tester`
-   - `effort-estimator.md` → registriere als `effort-estimator`
-   - `explorer.md` → registriere als `explorer`
-   - `export-manager.md` → registriere als `export-manager`
-   - `feedback.md` → registriere als `feedback`
-   - `frontend-component-engineer.md` → registriere als `frontend-component-engineer`
-   - `gemini-expert.md` → registriere als `gemini-expert`
-   - `git.md` → registriere als `git`
-   - `ideation.md` → registriere als `ideation`
-   - `incident-responder.md` → registriere als `incident-responder`
-   - `intern-developer.md` → registriere als `intern-developer`
-   - `junior-developer.md` → registriere als `junior-developer`
-   - `knowledge-curator.md` → registriere als `knowledge-curator`
-   - `knowledge-gardener.md` → registriere als `knowledge-gardener`
-   - `knowledge-indexer.md` → registriere als `knowledge-indexer`
-   - `knowledge-ingestor.md` → registriere als `knowledge-ingestor`
-   - `knowledge-linter.md` → registriere als `knowledge-linter`
-   - `knowledge-migrator.md` → registriere als `knowledge-migrator`
-   - `knowledge-querier.md` → registriere als `knowledge-querier`
-   - `log-analyzer.md` → registriere als `log-analyzer`
-   - `mammouth-expert.md` → registriere als `mammouth-expert`
-   - `meta-feedback.md` → registriere als `meta-feedback`
-   - `opencode-expert.md` → registriere als `opencode-expert`
-   - `orchestrator.md` → registriere als `orchestrator`
-   - `performance-optimizer.md` → registriere als `performance-optimizer`
-   - `planner.md` → registriere als `planner`
-   - `principal-developer.md` → registriere als `principal-developer`
-   - `product-manager.md` → registriere als `product-manager`
-   - `prompt-engineer.md` → registriere als `prompt-engineer`
-   - `refactoring-specialist.md` → registriere als `refactoring-specialist`
-   - `release.md` → registriere als `release`
-   - `requirements.md` → registriere als `requirements`
-   - `senior-developer.md` → registriere als `senior-developer`
-   - `technical-writer.md` → registriere als `technical-writer`
-   - `test-executor.md` → registriere als `test-executor`
-   - `tester.md` → registriere als `tester`
-   - `ui-ux-designer.md` → registriere als `ui-ux-designer`
-   - `validator.md` → registriere als `validator`
-
-2. Registriere jeden Agenten via define_subagent API-Call:
-   ```
-   define_subagent(name="accessibility-specialist", ...)
-   define_subagent(name="agent-meta-manager", ...)
-   define_subagent(name="agent-meta-scout", ...)
-   define_subagent(name="api-specialist", ...)
-   define_subagent(name="app-lifecycle-governor", ...)
-   define_subagent(name="bug-feature-analyzer", ...)
-   define_subagent(name="claude-expert", ...)
-   define_subagent(name="code-reviewer", ...)
-   define_subagent(name="concept-architect", ...)
-   define_subagent(name="concept-reviewer", ...)
-   define_subagent(name="concept-specifier", ...)
-   define_subagent(name="continue-expert", ...)
-   define_subagent(name="copilot-expert", ...)
-   define_subagent(name="data-engineer", ...)
-   define_subagent(name="dependency-auditor", ...)
-   define_subagent(name="design-system-architect", ...)
-   define_subagent(name="developer", ...)
-   define_subagent(name="devops-engineer", ...)
-   define_subagent(name="docker", ...)
-   define_subagent(name="documenter", ...)
-   define_subagent(name="e2e-tester", ...)
-   define_subagent(name="effort-estimator", ...)
-   define_subagent(name="explorer", ...)
-   define_subagent(name="export-manager", ...)
-   define_subagent(name="feedback", ...)
-   define_subagent(name="frontend-component-engineer", ...)
-   define_subagent(name="gemini-expert", ...)
-   define_subagent(name="git", ...)
-   define_subagent(name="ideation", ...)
-   define_subagent(name="incident-responder", ...)
-   define_subagent(name="intern-developer", ...)
-   define_subagent(name="junior-developer", ...)
-   define_subagent(name="knowledge-curator", ...)
-   define_subagent(name="knowledge-gardener", ...)
-   define_subagent(name="knowledge-indexer", ...)
-   define_subagent(name="knowledge-ingestor", ...)
-   define_subagent(name="knowledge-linter", ...)
-   define_subagent(name="knowledge-migrator", ...)
-   define_subagent(name="knowledge-querier", ...)
-   define_subagent(name="log-analyzer", ...)
-   define_subagent(name="mammouth-expert", ...)
-   define_subagent(name="meta-feedback", ...)
-   define_subagent(name="opencode-expert", ...)
-   define_subagent(name="orchestrator", ...)
-   define_subagent(name="performance-optimizer", ...)
-   define_subagent(name="planner", ...)
-   define_subagent(name="principal-developer", ...)
-   define_subagent(name="product-manager", ...)
-   define_subagent(name="prompt-engineer", ...)
-   define_subagent(name="refactoring-specialist", ...)
-   define_subagent(name="release", ...)
-   define_subagent(name="requirements", ...)
-   define_subagent(name="senior-developer", ...)
-   define_subagent(name="technical-writer", ...)
-   define_subagent(name="test-executor", ...)
-   define_subagent(name="tester", ...)
-   define_subagent(name="ui-ux-designer", ...)
-   define_subagent(name="validator", ...)
-   ```
-
-3. Erst danach: Bearbeite User-Anfragen (Delegation an Orchestrator etc.)
+Lies alle `.md`-Dateien in `.gemini/agents` und registriere jeden Agenten unter seinem Dateinamen (ohne `.md`) via `define_subagent`.
+Erst danach: Bearbeite User-Anfragen (Delegation an Orchestrator etc.).
 
 > **Ohne diese Registrierung existieren die Agenten NICHT in der Runtime**
 > und der Orchestrator kann nicht delegieren.

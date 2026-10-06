@@ -1540,6 +1540,13 @@ _COMPACT_PLATFORM_RULES = {
             "`.claude/skills/admin-ui/SKILL.md`."
         ),
     },
+    "branch-guard": {
+        "keep": (),
+        "pointer": (
+            "Details (Guard-Terminologie: Convention vs. Security Boundary, "
+            "bekannte technische Grenzen): `rules/1-generic/branch-guard.md`."
+        ),
+    },
 }
 
 
