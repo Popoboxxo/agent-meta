@@ -1,21 +1,21 @@
 # Backlog-Abarbeitungsstatus — 2026-10-05
 
-**STATUS:** in-progress
+**STATUS:** complete (Track A final)
 **Quelle:** `docs/plans/2026-10-04-prioritized-issue-backlog-plan.md`
 **Basis:** `main` @ `57107459` (Merge von PR #894)
 
 ## Zusammenfassung
 
 - Ursprünglich **39 priorisierte offene Issues** (5× P1, 23× P2, 11× P3).
-- **25 abgeschlossen** (merged/closed), **14 offen** (innerhalb des Backlogs).
+- **33 abgeschlossen** (merged/closed), **6 offen/parked** (innerhalb des Backlogs).
 - Repo-weit: **76 offene Issues** (Stand 2026-10-05).
-- Offene PRs: **#839** („docs(repo): consolidate repository documentation", Draft, *conflicting*, CI rot). Alle übrigen unten genannten PRs sind gemergt.
+- PRs: **#839** („docs(repo): consolidate repository documentation", Draft, *closed*, nicht gemergt) — orchestrator-entschieden. Alle übrigen unten genannten PRs sind gemergt.
 
-> **Verifikationshinweis:** Dieser Stand wurde aus der Git-Historie verifiziert
+> **Verifikationshinweis (Final):** Dieser Stand wurde aus der Git-Historie verifiziert
 > (`git log --oneline --merges`, `gh pr list --state merged`, `gh issue list --state open`).
-> Gegenüber dem ersten Snapshot sind **drei weitere Merges** eingeflossen: PR #892 (→ #847),
-> PR #893 (→ #848) und PR #894 (→ #851). Auch PR #866 (Plan-Doku) ist gemergt.
-> Reale Zahlen daher **25 abgeschlossen / 14 offen** (statt 22/17).
+> Track-A-Abschluss am 2026-10-06: Alle ausstehenden PRs gemergt (PR #901, #904, #905, #906,
+> #907, #908), Orchestrator entschied über #839 (geschlossen ohne Merge).
+> **Finale Zahlen: 33 abgeschlossen / 6 parked/offen** (Track A: 8/14 weitere Merges).
 
 ## Abgeschlossen — Phase 0 (Hygiene)
 
@@ -59,31 +59,72 @@
 |---|---|---|
 | #849 | merged/closed | PR #888 (`3c169f7c`) |
 | #834 | merged/closed | PR #889 (`c3648811`) |
-| #838 | Mini-Spec gemergt, **Implementierung offen** | PR #890 (`33fbbdba`) — Issue bleibt OPEN |
+| #838 | merged/closed | PR #890 (`33fbbdba`, spec) + PR #901 (implementation) |
 | #864 | merged/closed | PR #891 (`3e974d14`) |
 | #847 | merged/closed | PR #892 (`cb709258`; Branch-Commit `9c45458a`) |
 | #848 | merged/closed | PR #893 (`29fc9263`) |
 
-## Abgeschlossen — Phase 3 (Provider-Capabilities, bisher)
+## Abgeschlossen — Phase 3 (Provider-Capabilities)
 
 | Issue | Status | PR / Commit |
 |---|---|---|
 | #851 | merged/closed | PR #894 (`57107459`) |
+| #852 | merged/closed | PR #904 (mammouth cluster) |
+| #853 | merged/closed | PR #904 (mammouth cluster) |
+| #855 | merged/closed | PR #905 (copilot) |
+| #857 | merged/closed | PR #904 (mammouth cluster) |
 
-## Offen (14)
+## Abgeschlossen — Phase 4 (UI)
 
-- **Phase 2:** #838 (Implementierung)
-- **Phase 3:** #852, #853, #854, #855, #856, #857, #858
-- **Phase 4:** #863
-- **Phase 5:** #844, #552
-- **Phase 6:** #859, #860, #603
+| Issue | Status | PR / Commit |
+|---|---|---|
+| #863 | merged/closed | PR #906 (admin-ui) |
+
+## Abgeschlossen — Phase 5 (Context-Kompression & andere)
+
+| Issue | Status | PR / Commit |
+|---|---|---|
+| #844 | merged/closed | PR #908 (context compression) |
+
+## Abgeschlossen — Phase 6 (Changelog & Gates)
+
+| Issue | Status | PR / Commit |
+|---|---|---|
+| #859 | merged/closed | PR #907 (changelog) |
+
+## Offen/Parked (6)
+
+### Parked — Design/Product-Entscheidung erforderlich (2)
+
+- **#854:** Antigravity-Befehls-Kontrakt mehrdeutig — Entscheidung erforderlich, ob Antigravity custom slash commands unterstützt (Option A: emit vs Option B: downscope).
+- **#858:** Codex/Continue-Skills mit null Artifacts deklariert — Entscheidung erforderlich (Option A: emit skills, Scope erweitern vs Option B: downscope Deklaration auf Realität).
+
+### Parked — Code-Änderung nicht erforderlich, Schließung empfohlen (3)
+
+- **#856:** ZC-2 bereits via #807 behoben; ZC-1 dokumentiert als „P6 real-repo-test" (ausstehend), kein Code-Fix möglich.
+- **#552:** Vollständig bereits gelöst — 88/88 Templates kompatibel seit 2026-09-06, test_contract_labels.py green, keine Abweichungen.
+- **#603:** Vollständig bereits implementiert — SHA-256-Checksummen-Verifizierung in pre-release-check.sh + hook_plugins.py, dokumentiert in docs/RELEASE_GATES.md.
+
+### Parked — Blockiert durch externe Infrastruktur (1)
+
+- **#860:** Benötigt pclmul-fähigen Host zur Antigravity-Runtime-Verifikation (nicht verfügbar in dieser Umgebung).
+
+## Geschlossen ohne Merge (1)
+
+- **#839:** („docs(repo): consolidate repository documentation") — Draft-PR, conflicting, CI rot. Orchestrator-Entscheidung: nicht gemergt, per Session-Dokumentation begründet.
+
+## Track B — Bugfix-Wave-Plan
+
+**Status:** `docs/plans/2026-10-06-bugfix-wave-plan.md` ist als Planungsdokument APPROVED und gemergt.
+**Implementierungsfortschritt:** 0/52 Issues. Implementierungsphase beginnt nach Abschluss von Track A.
 
 ## Nächste Schritte
 
-1. **#838**-Implementierung nach der gemergten Mini-Spec (PR #890).
-2. **#839** auflösen: Draft-PR, `CONFLICTING`, CI rot — rebasen/grün machen oder schließen.
-3. Phase 3 (pro Provider ein PR): #852–#858.
-4. Phase 4–6: #863, #844/#552, #859/#860/#603.
+1. **Track A abgeschlossen:** 33/39 Issues abgearbeitet, 6 parked (Entscheidung/externe Infrastruktur erforderlich).
+2. **#854, #858:** Produktentscheidungen erforderlich (Antigravity-Kontrakt, Codex/Continue-Scope).
+3. **#856, #552, #603:** Empfehlung: schließen (Code-Änderung nicht erforderlich, bereits erledigt/dokumentiert).
+4. **#860:** Ausstehend — pclmul-fähige Infrastruktur erforderlich.
+5. **Track B starten:** Nach Abschluss von Track A (33/39): Bugfix-Wave-Plan mit 52 Issues implementieren.
 
 ## Hinweise / Follow-ups
 
