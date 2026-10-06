@@ -49,6 +49,15 @@ PROJECT_SCHEMA = REPO_ROOT / "config" / "project-config.schema.json"
 # structural handle on a model cell (see _rows_with_model).
 MODEL_INPUT = 'input[list="global-model-list"]'
 
+# ``surface-version`` / ``agent-discovery`` are schema properties of every
+# provider-options block, but viewProjectProviders() never renders them as
+# generic dict-editor rows -- renderDictEditor's ``excludeKeys`` (admin-ui.html,
+# "Options" dict editor) hides them because a dedicated <select>/checkbox owns
+# them instead. A row renamed to one of these keys still writes into the same
+# provOpts object, so it vanishes from its own editor on the next renderRows()
+# -- _plan_option_edit must skip them or it hands the KV-roundtrip test a key
+# the generic editor can accept as input but never display again.
+RESERVED_PROVIDER_OPTION_KEYS = {"surface-version", "agent-discovery"}
 
 # --------------------------------------------------------------------------- #
 # Schema helpers — keep every test payload inside config/project-config.schema
@@ -86,13 +95,18 @@ def _enum_values(node):
 
 
 def _plan_option_edit(options):
-    """Pick a ``provider-options`` key the dict editor can actually render.
+    """Pick a ``provider-options`` key the generic dict editor can round-trip.
 
     ``provider-options.<Provider>`` sets ``additionalProperties: false``, so a
     made-up test key is schema-invalid. The nested dict editor only emits
     ``string`` or ``bool`` values, which narrows the usable surface to
     Continue's ``prompt-mode`` (string enum) and ``generate-prompts`` (boolean)
     — every other provider's keys are arrays, which the editor cannot produce.
+    ``surface-version``/``agent-discovery`` are schema-scalar too but must
+    stay excluded (see ``RESERVED_PROVIDER_OPTION_KEYS``): the editor renders
+    them through a dedicated select/checkbox instead of a generic row, so a
+    row renamed to one of them disappears from its own list on the next
+    render instead of round-tripping.
 
     Returns ``(provider, key, old_value, new_value)``. ``old_value`` is ``None``
     when the key is not set yet, in which case the test only adds a row;
@@ -104,6 +118,8 @@ def _plan_option_edit(options):
     for provider, sub in schema["properties"].items():
         current = options.get(provider) or {}
         for key, prop in sub.get("properties", {}).items():
+            if key in RESERVED_PROVIDER_OPTION_KEYS:
+                continue
             types = _schema_types(prop)
             if "boolean" in types:
                 allowed = [True, False]
