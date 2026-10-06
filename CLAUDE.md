@@ -31,27 +31,6 @@ Hier kannst du eigene, projektspezifische Notizen eintragen. Dieser Bereich wird
 
 > Struktur: siehe Verzeichnisstruktur im Repo (`ls`/`find`); deklarativ: `.meta-config/project.yaml` → `variables.PROJECT_STRUCTURE`.
 
-**Verzeichnisstruktur:**
-```
-agents/
-  0-external/       # Wrapper-Template für externe Skills
-  1-generic/        # Universelle Agent-Templates
-  2-platform/       # Plattform-Overrides (z.B. sharkord, homeassistant, agent-meta)
-scripts/
-  sync.py           # Agent-Generator
-  admin-server.py   # Lokaler Admin-UI-Server
-external/           # Git Submodule (externe Skill-Repos)
-docs/guides/        # Anleitungen und Beispiel-Config
-docs/ui/            # UI Assets
-  architecture/     # Architektur-Diagramme (Mermaid)
-  admin-ui.html     # Admin-UI Frontend
-docs/specs/         # Feature-Specs (Spec/Plan-Workflow, §5.1)
-docs/plans/         # Feature-Pläne + archive/ (docs/plans/README.md)
-docs/spikes/        # Wegwerf-Untersuchungen (explorer-Spike-Modus, F10)
-tests/              # Test-Suite (automated, manual, orchestration)
-
-```
-
 > Runtime & Abhängigkeiten: siehe Projekt-Manifest (`pyproject.toml` / `requirements.txt` / `package.json` / `manifest.json`).
 
 **Entry-Point:** `scripts/sync.py — Haupt-CLI für Agent-Generierung`
@@ -72,21 +51,7 @@ tests/              # Test-Suite (automated, manual, orchestration)
 - Provider-Unterschiede im Syncer-Code über Config-Keys/Capability-Flags ausdrücken, nie über `if provider == "Name"` (siehe `provider-agnostic`-Skill)
 
 
-## Build & Development
-
-```bash
-# Build
-python scripts/sync.py
-
-# Tests
-python3 scripts/sync.py --validate
-
-# Dev-Stack starten
-(kein Dev-Stack)
-
-# Nach Änderungen neu laden
-(kein Dev-Stack)
-```
+> Build: `python scripts/sync.py` · Test: `python3 scripts/sync.py --validate` · Dev: `(kein Dev-Stack)` · Reload: `(kein Dev-Stack)`
 
 ## Anforderungs-Kategorien
 

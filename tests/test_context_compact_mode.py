@@ -778,3 +778,34 @@ def test_540_compact_opencode_separates_platform_rules_via_file_channel(
         assert anchor in skill.read_text(encoding="utf-8"), (
             f"{name}: INSTRUCTION anchor lost in separate file"
         )
+
+
+def test_844_compact_branch_guard_embeds_pointer_not_overview(seeded_project):
+    # AC-4 (issue #844): branch-guard has no rules-presets.yaml opt-out, so
+    # (unlike the four pre-existing _COMPACT_PLATFORM_RULES entries) it always
+    # reaches the embed path for Opencode/Gemini — the new table entry must
+    # pointer-ize its two explanatory H2 sections while the H1 title + the
+    # two-line directive (the actual instruction) survive verbatim.
+    compact = _render_context("compact", seeded_project)
+    assert "# Branch-Guard" in compact
+    assert (
+        "Verwende Feature-Branches (`feat/`, `fix/`, `chore/`). "
+        "Keine Code-Änderungen direkt auf `main` oder `master`."
+    ) in compact
+    assert "## Guard-Terminologie" not in compact
+    assert "## Bekannte Grenzen" not in compact
+    assert "rules/1-generic/branch-guard.md" in compact
+
+
+def test_844_full_branch_guard_keeps_both_overview_sections_byte_identical(
+        seeded_project):
+    # Regression guard: full mode must never call compact_embedded_rule for
+    # branch-guard, so both OVERVIEW sections stay byte-identical to the
+    # canonical source — no knowledge loss for the full-mode render or for
+    # Claude's native rules channel (which always renders the raw source).
+    full = _render_context("full", seeded_project)
+    source = (REPO_ROOT / "rules" / "1-generic" / "branch-guard.md").read_text(
+        encoding="utf-8"
+    )
+    overview_start = source.index("## Guard-Terminologie")
+    assert source[overview_start:].strip() in full

@@ -298,8 +298,12 @@ test-repo:
   env-var: AGENT_META_TEST_REPO
 max-parallel-agents: 4
 context_file:
-  mode: full
+  mode: compact
   max_lines: 250
+  # AGENTS.md measured at 310 lines after the #844 compaction (was 575) —
+  # still above the strict 250 limit, mostly the Agent Directory table
+  # (one row per active role). Acknowledged rather than raising max_lines,
+  # which would blunt the warning for every future project (2026-10-06).
   oversize_acknowledged: true
   auto_generate: true
 orchestrator:
