@@ -19,25 +19,26 @@ from pathlib import Path
 
 from .io import safe_path, write_checked
 from .log import SyncLog
+from .providers import provider_has_capability
 
-# Providers for which channel: skill renders to <skills_dir>/<name>/SKILL.md.
-# Deliberately restricted — Gemini/Copilot/Mammouth have unclear or outdated
-# native Skill support per the provider-capability matrix; no scope expansion
-# beyond what's verified working (Claude Code Skills). Opencode is NOT
-# included despite sharing the skills_dir convention: every call site that
-# would exercise this channel (mcp.py::generate_mcp_artifacts,
+# channel: skill renders to <skills_dir>/<name>/SKILL.md only for providers
+# declaring the `native-skill-channel` capability (issue #751) — deliberately
+# restricted — Gemini/Copilot/Mammouth have unclear or outdated native Skill
+# support per the provider-capability matrix; no scope expansion beyond
+# what's verified working (Claude Code Skills). Opencode is NOT included
+# despite sharing the skills_dir convention: every call site that would
+# exercise this channel (mcp.py::generate_mcp_artifacts,
 # external_tools.py::generate_external_tool_artifacts, sync.py's sync_rules()
 # call sites) is gated behind pc.get("has_rules"), and Opencode's has_rules
 # is false (rules are embedded into AGENTS.md, no native rules dir) — so
 # including it here would be a dead, unreachable promise. Wiring channel:
 # skill to work independent of has_rules is a real, separate feature change,
 # not done here.
-PROVIDERS = {"Claude"}
 
 
 def provider_supports_skill_channel(provider: str, pc: dict) -> bool:
     """Whether channel: skill renders to <skills_dir>/<name>/SKILL.md for this provider."""
-    if provider not in PROVIDERS:
+    if not provider_has_capability(pc, "native-skill-channel"):
         return False
     return bool(pc.get("skills_dir"))
 

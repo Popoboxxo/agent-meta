@@ -4940,7 +4940,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         try:
             self._ensure_lib_on_path()
             from lib.io import _load_yaml_or_json
-            from lib.providers import resolve_providers
+            from lib.providers import provider_has_capability, resolve_providers
             from lib.roles import _KNOWN_TIERS, _resolve_tier_to_model, _upgrade_tier
 
             project_config = self.__class__.config_manager.read("project") or {}
@@ -4988,7 +4988,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                         tier_or_id = str(prov_override[role])
                         explicit = True
                     elif isinstance(overrides, dict) and role in overrides and not isinstance(overrides[role], dict):
-                        if provider == "Claude":
+                        if provider_has_capability(pc, "model-overrides-flat"):
                             tier_or_id = str(overrides[role])
                             explicit = True
 

@@ -64,8 +64,9 @@ contract changes:
       MUST be keyed by the stripped stem. The Tier-2 preset test asserts the
       effective resolution and therefore fails while the preset key is the
       inert literal from 10.2.4.
-  A4. Claude is the only channel:skill provider (skill_channel.PROVIDERS);
-      every other provider falls back to a plain rules_dir file.
+  A4. Claude is the only channel:skill provider (the "native-skill-channel"
+      capability in config/ai-providers.yaml); every other provider falls
+      back to a plain rules_dir file.
 """
 
 import re
@@ -254,6 +255,7 @@ def _synthetic_provider_config() -> dict:
             "skills_dir": ".claude/skills",
             "rules_dir": ".claude/rules",
             "has_rules": True,
+            "capabilities": ["native-skill-channel"],
         },
         "Gemini": {
             "agents_dir": ".gemini/agents",

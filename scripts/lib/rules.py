@@ -12,6 +12,7 @@ from .rule_index import (
     read_managed_index,
     write_managed_index,
 )
+from .providers import provider_has_capability
 from .registry_query import (
     build_mcp_guardrails_list,
     load_mcp_registry,
@@ -40,16 +41,6 @@ SPEECH_RULE_FILENAME = "speech-mode.md"
 SPEECH_DIR = "speech"
 
 RULES_PRESETS_CONFIG_YAML = "config/rules-presets.yaml"
-
-# Providers that support alwaysApply frontmatter.
-# Claude Code was removed (#Phase-C token-efficiency review, 2026-08-14):
-# a fresh sync.py test-lab run confirmed alwaysApply: false has zero effect
-# on Claude Code — it is a Cursor/Continue frontmatter convention Claude Code
-# silently ignores, loading '.claude/rules/*.md' in full regardless. Keeping
-# it there only added noise (and, worse, made the 'silent' preset *heavier*
-# than 'default' because of the extra frontmatter bytes with no lazy-loading
-# benefit). Continue does honor it — see _build_always_apply_frontmatter().
-_ALWAYS_APPLY_PROVIDERS = {"Continue"}
 
 
 def load_rules_presets(agent_meta_root: Path) -> dict:
@@ -488,7 +479,7 @@ def sync_rules(
         target_path = safe_path(target_dir, output_name)
 
         # Provider-aware: inject alwaysApply: false for Continue
-        if opts.get("alwaysApply") is False and provider in _ALWAYS_APPLY_PROVIDERS:
+        if opts.get("alwaysApply") is False and provider_has_capability(pc, "rules-always-apply"):
             description = resolve_skill_description(opts, source_content)
             source_content = _build_always_apply_frontmatter(source_content, description)
             log.note(str(target_path.relative_to(project_root)),
