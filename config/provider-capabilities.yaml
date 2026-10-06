@@ -193,7 +193,7 @@ capabilities:
     artifact-validation: true
     artifact-validation-reason: null
     mcp-remote-transport: url
-    subagent_dispatch: false
+    subagent_dispatch: true         # .github/agents/*.agent.md `agents:` frontmatter property — issue #855, UNDERCLAIM P-6 fixed
     parallel_execution: false
     file_based_agents: true
     text_mentions: true
@@ -201,7 +201,7 @@ capabilities:
     commands: true                  # .github/prompts/*.prompt.md (VS Code / GitHub Copilot prompt files, `/name`) — issue #807, UNDERCLAIM P-6 fixed
     runtime_gate: advisory
     route_intent_tool: false           # no harness registers route_intent as a callable tool (conservative)
-    native_agent_tools: []
+    native_agent_tools: ["agent"]    # must also be listed in `tools:` when `agents:` is non-empty — issue #855, UNDERCLAIM P-6 fixed
     structured_handoff: false
     handoff_format: "yaml_text_block"
     handoff_envelope_support: false
@@ -212,6 +212,7 @@ capabilities:
     description: "Dateibasierte Agenten (.github/copilot/agents/). @agent Text-Mentions."
     special_notes:
       - "Dateien in .github/copilot/agents/ werden automatisch geladen."
+      - "Subagent-Dispatch (#855): .github/agents/*.agent.md Frontmatter-Property `agents:` (Liste erlaubter Subagenten, ['*'] = alle, [] = keine) erfordert das `agent`-Tool zusätzlich in `tools:`; `disable-model-invocation` (default false) opted ein Agent aus dem Dispatch als Subagent aus. Kein verifizierter Parallel-/Barrier-Vertrag → fanout_mechanism bleibt sequential-fallback (siehe Nicht-Ziele in SPEC-855-COPILOT-SUBAGENT-CAPABILITY-2026-10-06)."
 
   # Conservative baseline — Mammouth is a CLI-first tool (Plan/Build modes) whose
   # native orchestration surface is undocumented. Only capabilities backed by
