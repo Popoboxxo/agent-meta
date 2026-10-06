@@ -74,9 +74,9 @@ def test_ai_providers_model_tiers_beat_active_preset() -> None:
     )
 
     resolved = _resolve("Mammouth", "senior-developer")
-    assert resolved == registry_tier, (
+    assert resolved == f"mammouth/{registry_tier}", (
         "ai-providers.yaml model-tiers must win over the preset global fallback: "
-        f"expected {registry_tier!r}, got {resolved!r}"
+        f"expected {registry_tier!r} (formatted), got {resolved!r}"
     )
 
 
@@ -131,9 +131,9 @@ def test_provider_without_preset_entry_falls_back_to_registry() -> None:
     )
 
     resolved = _resolve("Mammouth", "senior-developer")
-    assert resolved == registry_tier, (
+    assert resolved == f"mammouth/{registry_tier}", (
         "without a preset provider-specific entry the registry model-tiers must "
-        f"win: expected {registry_tier!r}, got {resolved!r}"
+        f"win: expected {registry_tier!r} (formatted), got {resolved!r}"
     )
 
 
@@ -202,9 +202,9 @@ def test_project_local_preset_tiers_beat_ai_providers_model_tiers() -> None:
         }
     }
     resolved = _resolve("Mammouth", "senior-developer", config)
-    assert resolved == local_powerful, (
+    assert resolved == f"mammouth/{local_powerful}", (
         "a project-local preset's tiers map must beat ai-providers.yaml "
-        f"model-tiers: expected {local_powerful!r}, got {resolved!r}"
+        f"model-tiers: expected {local_powerful!r} (formatted), got {resolved!r}"
     )
 
 
@@ -224,6 +224,21 @@ def test_kimicode_emits_single_prefix() -> None:
     catalog = _PROVIDER_CONFIG["KimiCode"]["model-catalog"]
     assert resolved in catalog, (
         f"{resolved!r} is not in the declared model-catalog {catalog!r}"
+    )
+
+
+def test_mammouth_emits_single_prefix() -> None:
+    """#852: every resolved Mammouth ID carries exactly one ``mammouth/``
+    prefix (idempotent model-format, no doubled prefix)."""
+    resolved = _resolve("Mammouth", "orchestrator")
+    assert resolved.startswith("mammouth/"), (
+        f"Mammouth IDs must be namespaced, got {resolved!r}"
+    )
+    assert "mammouth/mammouth/" not in resolved, (
+        f"model-format must be applied exactly once, got doubled prefix {resolved!r}"
+    )
+    assert resolved.count("mammouth/") == 1, (
+        f"exactly one prefix expected, got {resolved!r}"
     )
 
 

@@ -150,7 +150,7 @@ konfiguriert — nur belegte Fähigkeiten sind aktiviert.
 - `.mammouth/rules/*.md` — Rules (`has_rules: true`)
 - `.mammouth/hooks/` — reserviert (`has_hooks: true`): ohne verifizierten
   `hook_protocol` spiegelt sync.py keine Hook-Skripte (#630-Muster) — Cleanup statt
-  Deploy; das separate `.mammouth/settings.json` wird als Skeleton angelegt
+  Deploy; das separate `mammouth.json` wird als Skeleton angelegt
 
 **Commands (issue #807):** Mammouth setzt `commands: true`, `has_commands: true` und emittiert
 generierte Commands nach `.mammouth/commands/*.md` (`commands_dir` / `commands_ext: .md` /
@@ -478,7 +478,7 @@ Registriert im Consistency-Lauf (`scripts/consistency-check.py`, u. a. über
 > project-scoped Command-Oberfläche fehlt (Codex: user-global + deprecated prompts; KimiCode:
 > built-ins + Skills) — bewusste, dokumentierte Capability-Entscheidung. Weitere Abweichungen:
 > Copilot hat keine Hooks/Settings; Mammouth hat eine Hooks-Reservierung ohne Spiegelung
-> (#630-Muster) und ein eigenes `.mammouth/settings.json`; Codex spiegelt keine
+> (#630-Muster) und ein eigenes `mammouth.json`; Codex spiegelt keine
 > Hooks und hat kein Settings-File; ZCode und KimiCode generieren keine Rules/Hooks
 > (siehe Provider-Abschnitte oben).
 

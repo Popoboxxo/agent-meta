@@ -248,7 +248,7 @@ capabilities:
     special_notes:
       - "CLI-first Tool mit Plan- (read-only) und Build-Modus (Ausführung)."
       - "Keine native parallele Subagent-Ausführung — Delegation sequentiell/textbasiert."
-      - "Hooks-Pfade sind konfiguriert (.mammouth/hooks), aber ungespiegelt: kein verifiziertes hook_protocol (#630). MCP-Integration in ai-providers.yaml nicht konfiguriert."
+      - "Hooks-Pfade sind konfiguriert (.mammouth/hooks), aber ungespiegelt: kein verifiziertes hook_protocol (#630). MCP-Integration seit #857 konfiguriert (mcp-config.format: opencode-json, committed-file: mammouth.json)."
 
   # Codex (OpenAI Codex CLI) — orchestration surface verified against the
   # official docs (V1/V4/V7/V8, 2026-09-04); dispatch/orchestration values are

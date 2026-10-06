@@ -590,7 +590,7 @@ project by a maintainer. Treat generation for them as "should work," not "verifi
 | Gemini | Experimental | AGENTS.md | .gemini/agents/ | .gemini/rules/ | — | .gemini/commands/ | .gemini/settings.json |
 | Continue | Experimental | CONTINUE.md | .continue/agents/ | .continue/rules/ | — | .continue/prompts/ | .continue/config.yaml |
 | Copilot | Experimental | .github/copilot/COPILOT.md | .github/copilot/agents/ | .github/copilot/rules/ | — | — | .github/copilot/copilot.json |
-| Mammouth Code | Experimental | MAMMOUTH.md | .mammouth/agents/ | .mammouth/rules/ | .mammouth/hooks/ | — | .mammouth/settings.json |
+| Mammouth Code | Experimental | MAMMOUTH.md | .mammouth/agents/ | .mammouth/rules/ | .mammouth/hooks/ | — | mammouth.json |
 | Codex | Experimental | AGENTS.md | .codex/agents/ | rules/ (repo-root) | .codex/hooks/ | — | — |
 | ZCode | Experimental | AGENTS.md | .zcode/agents/ | — | — | — | .zcode/config.json |
 | KimiCode | Experimental | AGENTS.md | .kimi-code/agents/ | — | — | — | — |
