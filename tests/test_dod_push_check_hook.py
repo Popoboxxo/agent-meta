@@ -224,3 +224,19 @@ def test_hanging_test_command_is_killed_by_timeout(repo_on_feature_branch):
     result = _run_hook_with_config(repo_on_feature_branch, "git push origin feat/x", project_yaml)
     assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
     assert "TIMED OUT" in result.stderr
+
+
+def test_failing_command_blocked_even_if_piped_through_success(repo_on_feature_branch):
+    """A failing TEST_COMMAND must still block the push even if piped through
+    a filter (e.g. rtk) that itself exits 0 — regression test for #753."""
+    # A pipeline where the first part fails (exit 1) but the last part exits 0.
+    # Before the fix: pipefail not propagated, so exit code 0 is captured.
+    # After the fix: pipefail is set via "set -uo pipefail;", so exit code 1
+    # from the first command in the pipeline is captured and the push is blocked.
+    project_yaml = "variables:\n  TEST_COMMAND: \"false | cat\"\n"
+    result = _run_hook_with_config(repo_on_feature_branch, "git push origin feat/x", project_yaml)
+    assert result.returncode == 2, (
+        f"A failing command piped through something exiting 0 must still block the push "
+        f"(regression for #753)\nstdout: {result.stdout}\nstderr: {result.stderr}"
+    )
+    assert "FAILED" in result.stderr

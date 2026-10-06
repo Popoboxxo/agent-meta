@@ -1,11 +1,12 @@
 #!/bin/bash
 # hook: dod-push-check
-# version: 2.0.1
+# version: 2.0.2
 # event: PreToolUse
 # matcher: Bash
 # provider: Claude
 # description: Blocks git push on main/master (Branch-Guard) and until tests are green (DoD enforcement)
 # enabled_by_default: false
+# changelog: v2.0.2: fix pipefail propagation in TEST_CMD subshell (#753)
 
 set -uo pipefail
 
@@ -240,10 +241,11 @@ echo "DoD-Check: Running '$TEST_CMD' (timeout: ${TEST_TIMEOUT}s)..."
 _TEST_RC=0
 if command -v timeout >/dev/null 2>&1; then
   # Note: TEST_CMD executed via bash -c (no eval) — value from project.yaml
-  timeout "${TEST_TIMEOUT}s" bash -c "$TEST_CMD" 2>&1 || _TEST_RC=$?
+  # Issue #753: inject set -uo pipefail so pipeline exit codes are not masked
+  timeout "${TEST_TIMEOUT}s" bash -c "set -uo pipefail; $TEST_CMD" 2>&1 || _TEST_RC=$?
 else
   echo "DoD-Check: 'timeout' command not available on this system — running the test gate without a hard time limit." >&2
-  bash -c "$TEST_CMD" 2>&1 || _TEST_RC=$?
+  bash -c "set -uo pipefail; $TEST_CMD" 2>&1 || _TEST_RC=$?
 fi
 
 if [ "$_TEST_RC" -ne 0 ]; then
