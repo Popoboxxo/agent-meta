@@ -28,7 +28,7 @@ def test_mammouth_has_its_own_hooks_dir_and_settings_file():
     claude = providers["Claude"]
     assert mammouth.get("has_hooks") is True
     assert mammouth.get("hooks_dir") == ".mammouth/hooks"
-    assert mammouth.get("settings_file") == ".mammouth/settings.json"
+    assert mammouth.get("settings_file") == "mammouth.json"
     assert mammouth["hooks_dir"] != claude.get("hooks_dir", ".claude/hooks")
     assert mammouth["settings_file"] != claude["settings_file"]
 

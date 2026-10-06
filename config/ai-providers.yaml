@@ -487,7 +487,12 @@ providers:
     # are retired. F8/N17: tools need the object form (tools-format: map).
     surface-version: "v1"
     agent-discovery: false
-    model-format: "{model}"
+    # #852: Mammouth (OpenCode fork) resolves models at runtime as
+    # "<provider>/<model-id>" (e.g. "mammouth/claude-sonnet-5"); a bare ID
+    # is rejected. model-tiers/model-aliases below stay bare — apply_model_format()
+    # (scripts/lib/roles.py) applies this prefix exactly once at emission,
+    # the same mechanism KimiCode's "kimi-code/{model}" already uses.
+    model-format: "mammouth/{model}"
     context_file: AGENTS.md
     # Phase-2 context adapter — HYPOTHESIS, UNVERIFIED (candidate pointer file).
     # Disabled until tests/manual/phase2-adapter-hypothesis.md records a real-repo
@@ -509,7 +514,11 @@ providers:
     commands_ext: .md
     commands_format: markdown
     has_settings: true
-    settings_file: .mammouth/settings.json
+    # #853: Mammouth's native loader reads mammouth.json at the project root
+    # (OpenCode-fork convention, mirroring Opencode's own opencode.json) —
+    # never .mammouth/settings.json, which was inert (never read).
+    settings_file: mammouth.json
+    settings_template: templates/configs/MAMMOUTH.settings-template.json
     capabilities:
     - agents
     - rules
@@ -519,6 +528,7 @@ providers:
     - snippets
     - skills
     - context-managed-block
+    - mcp
     artifact_dir: .mammouth/artifacts
     checkpoint_dir: .meta-viz
     isolation-dirs:
@@ -528,7 +538,18 @@ providers:
     - .mammouth/
     gitignore_entries:
     - .mammouth/pending-tasks.md
-    mcp-config: {}
+    - .mammouth/mcp.local.json
+    # #857: real MCP surface, mirrored from Opencode's own v1 shape (flat
+    # top-level `mcp` key) — Mammouth is an explicit OpenCode fork (see
+    # comments elsewhere in this block, e.g. commands_dir/#807) and
+    # "opencode-json" is a generic format key (validate_mcp_document /
+    # scripts/lib/mcp_provider_config.py), never a provider-name branch.
+    # Same committed-file as the settings_file fix above: one JSON document
+    # carries both general settings and the "mcp" key.
+    mcp-config:
+      committed-file: mammouth.json
+      secrets-file: .mammouth/mcp.local.json
+      format: opencode-json
     skills_dir: .mammouth/skills
     snippets_dir: .mammouth/snippets
     pending_tasks_file: .mammouth/pending-tasks.md
