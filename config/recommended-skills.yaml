@@ -1,0 +1,112 @@
+# Recommended Skills Registry (issue #680)
+#
+# Curated whitelist of recommended skills/tools — DISTINCT from
+# config/skills-registry.yaml (which governs installed external skill
+# submodules via the Two-Gate approve/enable mechanism). This file is a
+# plain recommendation list, not wired into sync.py (Phase 2, deferred).
+#
+# Schema: see docs/guides/features/recommended-skills.md
+#
+# `scope` is mandatory: "provider:<name>" (vendor-specific, name must match
+# a key under providers: in config/ai-providers.yaml) or "agnostic"
+# (portable methodology/discipline, works with any AI provider).
+
+recommended-skills:
+  - name: claude-in-chrome
+    description: Browser automation for live testing (network requests, screenshots, console logs)
+    link: https://docs.claude.com/en/docs/claude-code/claude-in-chrome
+    scope: provider:claude
+    tips: Useful to verify consent-gating/tracking requests live, not just via code review
+    recommended-for:
+      - web-projects
+      - accessibility-audits
+      - ui-reviewer
+
+  - name: mcp-playwright
+    description: MCP-based browser automation for E2E flows and screenshots
+    link: https://github.com/microsoft/playwright-mcp
+    scope: agnostic
+    tips: Already wired into this repo under .claude/skills/mcp-playwright — reuse before adding a new browser tool
+    recommended-for:
+      - web-projects
+      - tester
+
+  - name: security-review
+    description: Structured security code review methodology (threat modeling, checklist-driven)
+    link: https://owasp.org/www-project-code-review-guide/
+    scope: agnostic
+    tips: Pair with a threat-model review (4-questions framing) before merging security-sensitive changes
+    recommended-for:
+      - backend-projects
+      - api-design
+      - security-reviewer
+
+  - name: frontend-design-review
+    description: UI/UX feedback and responsive layout review discipline
+    link: https://web.dev/learn/design/
+    scope: agnostic
+    recommended-for:
+      - ui-projects
+      - web-projects
+
+  - name: subagent-driven-development
+    description: Harness skill for orchestrating multi-agent dev loops on larger tasks
+    link: https://docs.claude.com/en/docs/claude-code/sub-agents
+    scope: provider:claude
+    tips: Must run inside an orchestrator-started loop per use-orchestrator.md, never as a standalone entry point
+    recommended-for:
+      - orchestrator
+      - developer
+
+  - name: provider-agnostic
+    description: Methodology for expressing provider differences via config/capability flags instead of name-branches
+    link: .claude/skills/provider-agnostic/SKILL.md
+    scope: agnostic
+    tips: Already enforced in this repo for agents/1-generic edits — see .claude/skills/provider-agnostic
+    recommended-for:
+      - developer
+      - agent-meta-core
+
+  - name: codex-cli-patterns
+    description: Prompt and workflow patterns tuned for OpenAI Codex-based coding agents
+    link: https://platform.openai.com/docs/guides/codex
+    scope: provider:codex
+    tips: "Speculative: not yet verified against this repo's Codex provider config (config/ai-providers.yaml, Codex)"
+    recommended-for:
+      - developer
+
+  - name: conventional-commits-linting
+    description: Enforce Conventional Commits format on commit messages via a pre-commit hook
+    link: https://www.conventionalcommits.org/
+    scope: agnostic
+    tips: Matches this repo's own .claude/rules/commit-conventions.md
+    recommended-for:
+      - git
+      - developer
+
+  - name: threat-model-4-questions
+    description: Lightweight 4-question threat-modeling pass (what are we building, what can go wrong, what do we do, did we do a good job)
+    link: .claude/skills/threat-model-4-questions/SKILL.md
+    scope: agnostic
+    tips: Already present in this repo as .claude/skills/threat-model-4-questions — reuse directly
+    recommended-for:
+      - security-reviewer
+      - architect
+
+  - name: tool-graphify
+    description: Generate architecture/dependency graphs from codebase structure for file/architecture questions
+    link: .claude/skills/tool-graphify/SKILL.md
+    scope: agnostic
+    tips: Already present in this repo as .claude/skills/tool-graphify
+    recommended-for:
+      - architect
+      - documenter
+
+  - name: writing-plans
+    description: Structured template/discipline for writing feature plans (docs/plans/) before implementation
+    link: .claude/skills/writing-plans/SKILL.md
+    scope: agnostic
+    tips: Already present in this repo as .claude/skills/writing-plans
+    recommended-for:
+      - requirements
+      - orchestrator
