@@ -15,7 +15,20 @@
   (incl. the ~24 h HACS sync delay). An absent `release` section or an unset `distribution` is a no-op.
   Schema in `config/project-config.schema.json`, scaffolder in `scripts/lib/release_scaffold.py`,
   coverage in `tests/test_release_scaffold.py`.
+- **Web-Plattform-Preset für SEO/Accessibility/Privacy (issue #679)**: Projekte mit
+  `platforms: [web]` erhalten jetzt drei zentral gepflegte Rule-Dateien ohne eigene
+  Recherche — `rules/2-platform/web-seo.md` → `.claude/rules/seo.md` (Local SEO, Technical
+  SEO/Core Web Vitals, Schema Markup), `rules/2-platform/web-accessibility.md` →
+  `.claude/rules/accessibility.md` (WCAG 2.2 AA inkl. Mobile-Kriterien: Target Size, Reflow,
+  Pointer Gestures) und `rules/2-platform/web-privacy.md` → `.claude/rules/privacy.md`
+  (DSGVO, Consent-first, Google Consent Mode v2, self-hosted Fonts). V1 ist bewusst
+  rules-only: kein `platform-configs/web.defaults.yaml` (generischer Best-Practice-Inhalt
+  ohne Projekt-Platzhalter) und noch kein eigenes `agents/2-platform/web-*.md` (Admin-UI-
+  Discoverability als Folge-Issue offen). Migration: `web` in `platforms:` eintragen und
+  `python scripts/sync.py` laufen lassen — bestehende manuelle `SEO/ACCESSIBILITY/PRIVACY_REQUIREMENTS`-
+  Variablen können danach entfallen. Regressions-Szenario: `tests/scenarios/configs/75-web-platform-preset`.
 
+### Fixed
 ### Fixed
 - **Claude hook commands are now anchored to `${CLAUDE_PROJECT_DIR}` instead of being cwd-relative (issue #851)**:
   `sync.py` registered hooks as `bash .claude/hooks/<file>.sh`, which Claude Code resolves against the

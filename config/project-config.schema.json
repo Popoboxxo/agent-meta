@@ -931,6 +931,13 @@
             "type": "string"
           }
         },
+        "keep": {
+          "type": "array",
+          "description": "Issue #746: project-owned paths (files or directories) under an ignored provider root that must stay version-controllable. Only effective together with ignore-provider-dirs: true. For each affected root the managed block emits a content-exclude (e.g. /.claude/*) instead of the whole-dir exclude (.claude/), then re-include negations for each keep path (e.g. !/.claude/3-project/) so Git actually honors them — a whole-dir .claude/ exclude cannot be re-included by a !-entry. Example: keep: [\".claude/3-project/\", \".gemini/rules/test-scope.md\"].",
+          "items": {
+            "type": "string"
+          }
+        },
         "exceptions": {
           "type": "array",
           "description": "List of specific paths that should bypass their category's default rule.",

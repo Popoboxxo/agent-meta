@@ -368,6 +368,7 @@ gitignore:
 | `generated` | `false` | `agents/`, `rules/`, `hooks/`, `commands/` aller aktiven Provider → gitignored |
 | `settings` | `false` | `settings.json`, `config.yaml` der Provider → gitignored |
 | `ignore-provider-dirs` | `false` | Ganze Provider-Root-Verzeichnisse (`.claude/`, `.gemini/`, …) statt der provider-internen Sub-Pfade → gitignored |
+| `keep` | `[]` | Projekteigene Pfade unter einer ignorierten Root, die versionierbar bleiben müssen (nur mit `ignore-provider-dirs: true`, issue #746) |
 
 **Hinweis:** die Kontextdatei jedes Providers (`CLAUDE.md`, `AGENTS.md`, `MAMMOUTH.md`, …) wird nie gitignored — sie enthält handgeschriebene Sektionen außerhalb des managed blocks.
 
@@ -405,6 +406,50 @@ jedem Sync exakt neu geschrieben — alte Sub-Pfad-Einträge fallen nach dem
 Einschalten beim nächsten Sync heraus. Ohne aktives Claude wird additiv
 ergänzt; dort bleiben bereits geschriebene Einträge erhalten (redundant,
 harmlos).
+
+### `gitignore.keep` — projekteigene Pfade unter einer ignorierten Root (issue #746)
+
+Mit `ignore-provider-dirs: true` wird die ganze Provider-Root (`.claude/`)
+ignoriert. Projekteigene, nicht generierte Dateien darunter (z.B. eine
+Projekt-Extension `.claude/3-project/<rolle>-ext.md` oder eine projekteigene
+Regel `.gemini/rules/test-scope.md`) werden dadurch unversionierbar — und ein
+reines `!.claude/3-project/` wirkt **nicht**, weil Git eine Datei nicht
+wieder einschließen kann, deren Elternverzeichnis ausgeschlossen ist.
+
+```yaml
+gitignore:
+  ignore-provider-dirs: true
+  keep:
+    - .claude/3-project/            # ganzes Verzeichnis behalten
+    - .gemini/rules/test-scope.md   # einzelne Datei behalten
+```
+
+Pro betroffener Root schreibt der managed block dann einen **Content-Exclude**
+(`/.claude/*`) statt des Whole-Dir-Exclude (`.claude/`) und danach
+Re-Include-Negationen für jeden keep-Pfad:
+
+```
+/.claude/*
+/.gemini/*
+/.gemini/rules/*
+!/.claude/3-project/
+!/.gemini/rules/
+!/.gemini/rules/test-scope.md
+```
+
+**Präzedenz (wichtig):** Git gilt *last-match-wins*. Der Exclude
+(`/.claude/*`) muss **vor** der Negation (`!/.claude/3-project/`) stehen —
+sonst ist die Negation ein No-op. Der managed block sortiert deshalb nicht
+alphabetisch (dort stünde `!` vor `/`), sondern schreibt erst alle
+nicht-negierten, dann alle negierten Einträge. Geschachtelte Einzeldateien
+brauchen für jedes Zwischenverzeichnis ein Re-Include + erneuten Content-Exclude,
+damit nur der keep-Pfad überlebt und Geschwister ignoriert bleiben.
+
+- `keep` wirkt **nur** mit `ignore-provider-dirs: true` (ohne Toggle ist die
+  Root nicht ignoriert, es gibt nichts wieder einzuschließen).
+- `sync.py --validate` warnt, wenn ein keep-Pfad trotzdem noch ignoriert ist
+  (z.B. weil eine Legacy-`.claude/`-Regel außerhalb des managed blocks ihn
+  überschattet) — dann die Alt-Regel entfernen und neu syncen.
 
 ---
 
