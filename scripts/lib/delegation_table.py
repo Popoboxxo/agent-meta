@@ -131,6 +131,36 @@ def get_active_agents_data(
     return active_agents_data
 
 
+def _select_examples(examples: object, language: str) -> list[str]:
+    """Select language-appropriate routing examples (issue #780, design C).
+
+    Design C keeps ``keywords`` canonical/language-neutral; language nuance
+    lives in the free-text ``examples`` layer, rendered per the project's
+    ``COMMUNICATION_LANGUAGE``.
+
+    Current data shape in ``config/role-defaults.yaml``: ``examples`` is a flat
+    list authored in the project's own language — this is a no-op passthrough
+    for that shape. Future shape: a language-tagged mapping
+    (``{"Deutsch": [...], "English": [...]}``) selected by ``language`` with a
+    deterministic fallback to the first available variant.
+
+    ponytail: passthrough-only until bilingual data exists. Authoring the
+    per-language ``examples`` content for all roles is separate, larger work
+    (#780 AC-3 / #779 IT-4); this function is just the generator plumbing.
+    """
+    if isinstance(examples, dict):
+        variant = examples.get(language)
+        if not isinstance(variant, list):
+            # Deterministic fallback: first list variant in insertion order.
+            variant = next(
+                (v for v in examples.values() if isinstance(v, list)), []
+            )
+        return [str(e) for e in variant]
+    if isinstance(examples, list):
+        return [str(e) for e in examples]
+    return []
+
+
 def get_routing_rules(
     agent_meta_root: Path,
     config: dict,
@@ -139,6 +169,7 @@ def get_routing_rules(
     *,
     template_roles: set[str] | None = None,
     warn_sink: list[str] | None = None,
+    language: str = "en",
 ) -> dict:
     """Build structured routing rules for the native intent-routing tool (issue #264).
 
@@ -160,6 +191,10 @@ def get_routing_rules(
       HARD REJECT, see orchestrator.md Singleton-Regel).
     - ``orchestrator_only`` roles keep their rule + flag: the tool's consumer
       IS the orchestrator; the escalation gate lives in the prompt/data, not here.
+    - ``language`` (design C, issue #780) selects language-tagged ``examples``
+      when a role provides a mapping; for today's flat-list examples it is a
+      no-op passthrough. ``keywords`` stay canonical/language-neutral regardless.
+      Callers thread the project's ``COMMUNICATION_LANGUAGE`` here.
 
     Returns:
         ``{"target_agents": [...], "rules": [...], "pipelines": [...],
@@ -201,8 +236,7 @@ def get_routing_rules(
             # Python consumer) keeps unmigrated roles keyword-routable.
             keywords = routing.get("intent_keywords")
         keywords = [str(k) for k in keywords] if isinstance(keywords, list) else []
-        examples = patterns.get("examples")
-        examples = [str(e) for e in examples] if isinstance(examples, list) else []
+        examples = _select_examples(patterns.get("examples"), language)
         if not keywords and not examples:
             continue
         handoff = role_info.get("handoff")

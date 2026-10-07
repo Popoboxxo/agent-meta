@@ -279,6 +279,9 @@ def build_routing_tool_definition(
         pipelines=pipelines,
         template_roles=template_roles,
         warn_sink=warn_sink,
+        # Design C (#780): render examples in the project language; keywords
+        # stay canonical/language-neutral.
+        language=variables.get("COMMUNICATION_LANGUAGE", "en"),
     )
     return {
         "tool": {
