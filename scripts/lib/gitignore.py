@@ -123,6 +123,63 @@ def filter_redundant_provider_entries(
     return [entry for entry in entries if not is_inside_provider_root(entry, roots)]
 
 
+def _keep_reinclude_entries(root: str, keep_path: str) -> list[str]:
+    """Return the gitignore patterns that re-include one `keep_path` under an
+    ignored provider `root` (issue #746).
+
+    Git cannot re-include a file whose parent directory is excluded, so a
+    whole-dir exclude (`.claude/`) makes any `!`-entry a no-op. The caller
+    emits the root as a CONTENT-exclude (`/.claude/*`) instead; this function
+    adds the re-include chain for one kept path. Each intermediate directory on
+    the way to the target is re-included and its contents re-excluded, so only
+    the kept path survives — siblings stay ignored. Example:
+
+        root=".claude/", keep_path=".claude/3-project/"
+            -> ["!/.claude/3-project/"]
+        root=".gemini/", keep_path=".gemini/rules/test-scope.md"
+            -> ["!/.gemini/rules/", "/.gemini/rules/*",
+                "!/.gemini/rules/test-scope.md"]
+
+    Final ordering (exclude-before-negate) is NOT guaranteed here — the caller's
+    managed block is sorted by ensure_gitignore_entries() into non-negated-first
+    / negated-after groups, which yields git-correct last-match-wins semantics.
+    """
+    root_dir = root.rstrip("/")
+    is_dir = keep_path.endswith("/")
+    rel = keep_path[len(root_dir) + 1:].rstrip("/")
+    if not rel:
+        return []
+    segments = rel.split("/")
+    out: list[str] = []
+    prefix = root_dir
+    for i, seg in enumerate(segments):
+        prefix = f"{prefix}/{seg}"
+        is_last = i == len(segments) - 1
+        if is_last:
+            out.append(f"!/{prefix}/" if is_dir else f"!/{prefix}")
+        else:
+            # Intermediate directory: re-include it (so git recurses), then
+            # re-exclude its direct contents so only the kept path survives.
+            out.append(f"!/{prefix}/")
+            out.append(f"/{prefix}/*")
+    return out
+
+
+def _group_keep_paths_by_root(keep_paths: list[str], roots: list[str]) -> dict[str, list[str]]:
+    """Map each provider root to the keep paths that live inside it (issue #746).
+
+    Keep paths outside every provider root are dropped (nothing to re-include —
+    they are not ignored by the toggle in the first place).
+    """
+    by_root: dict[str, list[str]] = {}
+    for kp in keep_paths:
+        for root in roots:
+            if is_inside_provider_root(kp, [root]):
+                by_root.setdefault(root, []).append(kp)
+                break
+    return by_root
+
+
 def compute_base_gitignore_entries(
     providers: list[str],
     provider_config: dict,
@@ -175,10 +232,22 @@ def compute_base_gitignore_entries(
     entries: list[str] = []
     claude_pc = provider_config.get("Claude", {})
 
+    # Keep/re-include list (issue #746): project-owned paths under an ignored
+    # provider root that must stay versionable. Only effective in toggle mode.
+    keep_by_root = _group_keep_paths_by_root(gitignore_cfg.get("keep", []), roots)
+
     # Whole provider-root directories (toggle mode only; exceptions respected —
-    # e.g. `exceptions: [".claude/"]` keeps Claude's dirs committed).
+    # e.g. `exceptions: [".claude/"]` keeps Claude's dirs committed). Roots with
+    # keep paths emit a content-exclude (`/.claude/*`) + re-include negations
+    # instead of the whole-dir exclude (`.claude/`), so Git honors the keeps.
     for root in roots:
-        if _should_ignore(root, True):
+        if not _should_ignore(root, True):
+            continue
+        if root in keep_by_root:
+            entries.append(f"/{root.rstrip('/')}/*")
+            for kp in keep_by_root[root]:
+                entries.extend(_keep_reinclude_entries(root, kp))
+        else:
             entries.append(root)
 
     # Category "local" (default true): personal/machine-local files. Repo-root
@@ -327,5 +396,39 @@ def detect_shadowed_provider_roots(
             "every generated file is untracked with no warning (`git ls-files` "
             "shows nothing). Narrow that rule, or add an exception via "
             "gitignore.exceptions in .meta-config/project.yaml."
+        )
+    return warnings
+
+
+def detect_invisible_keep_paths(
+    project_root: Path,
+    gitignore_cfg: dict,
+) -> list[str]:
+    """Return one warning per `gitignore.keep` path still ignored by git (#746).
+
+    User-facing safety net for the ordering-bug class: a keep path is only
+    useful if git actually re-includes it. For each configured keep path we
+    probe a representative path (the file itself, or a probe file inside a kept
+    directory) with `git check-ignore`; a positive match (exit 0) means the
+    re-include negation did not take effect — e.g. because a legacy whole-dir
+    rule still shadows it, or the exclude/negate ordering is wrong.
+    """
+    warnings: list[str] = []
+    keep_paths = gitignore_cfg.get("keep", [])
+    if not keep_paths or not (project_root / ".git").is_dir():
+        return warnings
+    for kp in keep_paths:
+        probe = f"{kp.rstrip('/')}/__agent_meta_keep_probe__.md" if kp.endswith("/") else kp
+        result = run_git_check_ignore(probe, str(project_root), "-v")
+        if result is None or result.returncode != 0 or not result.stdout.strip():
+            continue  # not ignored -> the keep path is honored
+        source_rule = result.stdout.strip().split("\t", 1)[0]
+        warnings.append(
+            f"gitignore-keep: project-owned keep path '{kp}' is still ignored "
+            f"by rule ({source_rule}) — the re-include negation is not taking "
+            "effect. Check for a legacy whole-dir rule shadowing it (e.g. a "
+            f"plain '{kp.split('/', 1)[0]}/' entry outside the agent-meta "
+            "managed block) and remove it, or re-run sync.py to rewrite the "
+            "managed block in the correct exclude-before-negate order."
         )
     return warnings
