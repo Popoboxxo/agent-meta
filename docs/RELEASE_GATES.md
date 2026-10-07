@@ -225,18 +225,31 @@ komplett → ebenfalls Gate-Fehler ("Artefakt nie gebaut").
 Scannt die Base-Images eines `Dockerfile` mit [Trivy](https://github.com/aquasecurity/trivy) auf
 bekannte HIGH/CRITICAL-CVEs, bevor ein Release-Image darauf aufbaut.
 
-**Voraussetzung:** siehe [Konfiguration](#konfiguration-projectyaml--dod-preset) UND ein
-`Dockerfile` existiert UND `trivy` ist im `PATH` verfügbar. Fehlt eines der beiden Letzteren →
-Gate übersprungen (Info-Log).
+**Voraussetzung:** siehe [Konfiguration](#konfiguration-projectyaml--dod-preset) UND mindestens ein
+`Dockerfile` wird gefunden (siehe Pfad-Auflösung unten) UND `trivy` ist im `PATH` verfügbar. Fehlt
+eines der beiden Letzteren → Gate übersprungen (Info-Log).
 
-**Konfigurierbarer Pfad:** Env-Var `PRE_RELEASE_DOCKERFILE_PATH` (Default: `Dockerfile`) — dies ist
-die einzige Zusatzkonfiguration, die dieses eingebaute Gate über `enabled` hinaus konsumiert;
-weitere Schlüssel im `release-gates.docker-image-scan`-Block von `project.yaml` (das Schema erlaubt
-sie, `additionalProperties: true`) werden von diesem Script derzeit ignoriert.
+**Pfad-Auflösung (Issue #745), höchste Priorität zuerst:**
 
-Extrahiert alle `FROM`-Zeilen, filtert Referenzen auf vorherige Build-Stages heraus (z. B.
-`FROM build AS test` referenziert die Stage `build`, kein pullbares Image), und ruft für jedes
-verbleibende Image `trivy image --severity HIGH,CRITICAL --exit-code 1 <image>` auf.
+1. Env-Var `PRE_RELEASE_DOCKERFILE_PATHS` — explizite Liste mehrerer Pfade, Newline- oder
+   Doppelpunkt-getrennt (z. B. `PRE_RELEASE_DOCKERFILE_PATHS="frontend/Dockerfile:backend/Dockerfile"`),
+   für Projekte mit mehreren Dockerfiles (z. B. Frontend/Backend-Monorepo).
+2. Env-Var `PRE_RELEASE_DOCKERFILE_PATH` — einzelner expliziter Pfad (bestehendes Verhalten,
+   unverändert).
+3. Root-`Dockerfile`, falls vorhanden (bestehender Default, unverändert).
+4. Auto-Discovery: jedes `Dockerfile` unterhalb des Projekt-Roots
+   (`find . -name Dockerfile`), ausgenommen `node_modules/`, `vendor/`, `.git/`, `.tmp/`.
+
+Diese Pfad-Auflösung ist die einzige Zusatzkonfiguration, die dieses eingebaute Gate über
+`enabled` hinaus konsumiert; weitere Schlüssel im `release-gates.docker-image-scan`-Block von
+`project.yaml` (das Schema erlaubt sie, `additionalProperties: true`) werden von diesem Script
+derzeit ignoriert.
+
+Für jedes aufgelöste Dockerfile: extrahiert alle `FROM`-Zeilen, filtert Referenzen auf vorherige
+Build-Stages heraus (z. B. `FROM build AS test` referenziert die Stage `build`, kein pullbares
+Image), und ruft für jedes verbleibende Image `trivy image --severity HIGH,CRITICAL --exit-code 1
+<image>` auf. Ein HIGH/CRITICAL-Fund in irgendeinem gescannten Dockerfile lässt das Gate
+insgesamt fehlschlagen (nicht-null Exit-Code).
 
 ### `action-pin-validation` — GitHub Action Pin Validation
 

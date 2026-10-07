@@ -2078,8 +2078,19 @@ def ensure_gitignore_entries(
 
     required_set = set(required)
     if exact_entries is not None:
-        # Exact mode: block must contain exactly required_set
-        new_block_entries = sorted(required_set)
+        # Exact mode: block must contain exactly required_set.
+        # ponytail: a plain sorted() is WRONG here — git uses last-match-wins, so
+        # a re-include negation (`!/.claude/3-project/`, issue #746) must appear
+        # AFTER its exclude (`/.claude/*`). But '!' (0x21) sorts before '/'
+        # (0x2F), so sorted() would emit the negation first, making it a no-op
+        # and silently breaking the kept path. Split into non-negated-first /
+        # negated-after groups (each sorted) so excludes always precede their
+        # negations. The `changed`/added/removed comparisons below stay pure set
+        # ops (order-independent) — only the written OUTPUT order changes.
+        new_block_entries = (
+            sorted(e for e in required_set if not e.startswith("!"))
+            + sorted(e for e in required_set if e.startswith("!"))
+        )
         changed = block_entries != required_set
         added = sorted(required_set - block_entries)
         removed = sorted(block_entries - required_set)
@@ -2089,7 +2100,12 @@ def ensure_gitignore_entries(
         if not missing:
             log.skip(".gitignore", "all required entries already present")
             return
-        new_block_entries = sorted(block_entries | required_set)
+        # Same exclude-before-negate ordering as the exact path (see above).
+        merged = block_entries | required_set
+        new_block_entries = (
+            sorted(e for e in merged if not e.startswith("!"))
+            + sorted(e for e in merged if e.startswith("!"))
+        )
         changed = True
         added = missing
         removed = []

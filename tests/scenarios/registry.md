@@ -118,6 +118,7 @@ verhalten sich exakt wie bisher.
 | `71-check-idempotency-all-providers` | all 9 | strict (default) | all-provider tree byte-identical across syncs + `--check` rc 0 (AC-4/AC-19) |
 | `72-continue-config-validity` | Continue | strict (default) | valid `.continue/config.yaml` (roles enum, no dead agents block, name/version) (AC-7) |
 | `73-continue-prompts-one-sync` | Continue | strict (default) | `generate-prompts: true` converges after ONE sync: `--check` rc 0 before any second sync (issue #802) |
+| `74-gitignore-keep` | Claude, Gemini | strict (default) | `ignore-provider-dirs: true` + `keep` re-includes project-owned paths — verified with REAL `git check-ignore` (ordering bug #746) |
 | `75-web-platform-preset` | Claude | strict (default) | `web`-Platform-Preset (#679): `web-{seo,accessibility,privacy}.md` rendern als plain `seo/accessibility/privacy.md`, Prefix gestrippt, keine Platzhalter |
 
 ## Bewusste Auslassungen
