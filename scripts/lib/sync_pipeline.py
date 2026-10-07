@@ -124,6 +124,7 @@ from lib.skills import (
     load_external_skills_config,
     sync_external_skills_for_provider,
 )
+from lib.release_scaffold import scaffold_release_process
 from lib.spec_plan_scaffold import scaffold_spec_plan_dirs
 from lib.viz import (
     get_gitignore_entries as viz_gitignore_entries,
@@ -1313,7 +1314,8 @@ def _sync_stage_drift_and_plugins(
 
 def _sync_stage_knowledge_and_isolation(
     agent_meta_root: Path, project_root: Path, config: dict,
-    providers: list, provider_config: dict, args: argparse.Namespace, log: SyncLog,
+    providers: list, provider_config: dict, variables: dict,
+    args: argparse.Namespace, log: SyncLog,
 ) -> None:
     """Stages 8+9: knowledge-engine scaffolding + provider isolation."""
     # Knowledge Engine — Phase A scaffolding (no-op unless knowledge-engine.enabled)
@@ -1327,6 +1329,13 @@ def _sync_stage_knowledge_and_isolation(
         scaffold_spec_plan_dirs(agent_meta_root, project_root, config, log, args.dry_run)
     except SyncError as exc:
         print(f"\n  !!  Spec/plan scaffolding aborted: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        scaffold_release_process(agent_meta_root, project_root, config, variables,
+                                 log, args.dry_run)
+    except SyncError as exc:
+        print(f"\n  !!  Release-process scaffolding aborted: {exc}", file=sys.stderr)
         sys.exit(1)
 
     # Provider isolation: hard-block cross-provider directory access

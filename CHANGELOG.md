@@ -3,6 +3,18 @@
 ## [Unreleased]
 
 ### Added
+- **Project-type-specific release-process templates (issue #452)**: a project can declare a `release`
+  section in `project.yaml` (`distribution`, `versioning`, `changelog_format`, `version_file`,
+  `version_field`). When `release.distribution` is set, the sync pipeline renders
+  `templates/docs/RELEASE_PROCESS.<distribution>.md` into `docs/RELEASE_PROCESS.md`, wrapping the
+  generated body in managed-block markers so project-specific additions below `managed-end` survive a
+  refresh (same mechanism as the extension files). Ships the HACS proof-of-concept template
+  (`templates/docs/RELEASE_PROCESS.hacs.md`) covering SemVer + `manifest.json` versioning, a
+  Conventional-Commits version-bump decision table, Keep a Changelog, the HACS version-discovery caveat
+  (GitHub Releases + `manifest.json`, not `hacs.json`), a pre-release checklist and the release workflow
+  (incl. the ~24 h HACS sync delay). An absent `release` section or an unset `distribution` is a no-op.
+  Schema in `config/project-config.schema.json`, scaffolder in `scripts/lib/release_scaffold.py`,
+  coverage in `tests/test_release_scaffold.py`.
 - **Web-Plattform-Preset für SEO/Accessibility/Privacy (issue #679)**: Projekte mit
   `platforms: [web]` erhalten jetzt drei zentral gepflegte Rule-Dateien ohne eigene
   Recherche — `rules/2-platform/web-seo.md` → `.claude/rules/seo.md` (Local SEO, Technical
@@ -16,6 +28,7 @@
   `python scripts/sync.py` laufen lassen — bestehende manuelle `SEO/ACCESSIBILITY/PRIVACY_REQUIREMENTS`-
   Variablen können danach entfallen. Regressions-Szenario: `tests/scenarios/configs/75-web-platform-preset`.
 
+### Fixed
 ### Fixed
 - **Claude hook commands are now anchored to `${CLAUDE_PROJECT_DIR}` instead of being cwd-relative (issue #851)**:
   `sync.py` registered hooks as `bash .claude/hooks/<file>.sh`, which Claude Code resolves against the
