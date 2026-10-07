@@ -1,8 +1,9 @@
 ---
-# Base template only — no `role-defaults.yaml` entry by design. Not synced
-# directly; platform-specific `*-expert` roles (e.g. agent-meta-claude-expert)
-# extend it via `based-on: "1-generic/provider-expert.md@<version>"` in
-# agents/2-platform/. No routing/intent_keywords of its own.
+# INTENTIONALLY EXCLUDED FROM ROUTING: Base template only.
+# No `role-defaults.yaml` entry by design. Used as a wrapper-base by
+# platform-specific `*-expert` roles (claude-expert, gemini-expert, etc.)
+# via `based-on: "1-generic/provider-expert.md@<version>"` in agents/2-platform/.
+# Not synced directly; no routing/intent_keywords of its own.
 name: template-provider-expert
 version: "1.5.0"
 description: "Absolute analysis expert for an AI provider: how it works, configuration, best practices for optimally adapting agent-meta."
