@@ -1175,7 +1175,7 @@ def _handle_sync(ctx: _SyncContext) -> None:
     # Stages 8+9: knowledge engine + provider isolation.
     _sync_stage_knowledge_and_isolation(ctx.agent_meta_root, ctx.project_root,
                                         config, providers, provider_config,
-                                        ctx.args, ctx.log)
+                                        ctx.variables, ctx.args, ctx.log)
     # Stage 10: pinned-commit check + unknown/unapproved-skill warnings;
     # ext_config feeds the gitignore stage.
     ext_config = _sync_stage_external_skills_check(ctx.agent_meta_root, config, ctx.log)

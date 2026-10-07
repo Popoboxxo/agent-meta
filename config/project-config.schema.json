@@ -1978,6 +1978,33 @@
       },
       "additionalProperties": false
     },
+    "release": {
+      "type": "object",
+      "description": "Project-specific release-process metadata. Drives the docs/RELEASE_PROCESS.md scaffolder (scripts/lib/release_scaffold.py). No-op when absent or when distribution is unset.",
+      "properties": {
+        "distribution": {
+          "type": "string",
+          "description": "Distribution channel. Doubles as the template suffix: 'hacs' resolves templates/docs/RELEASE_PROCESS.hacs.md. Rendered into {{DISTRIBUTION}}."
+        },
+        "versioning": {
+          "type": "string",
+          "description": "Versioning scheme (e.g. 'semver'). Rendered into {{VERSIONING}}."
+        },
+        "changelog_format": {
+          "type": "string",
+          "description": "Changelog format (e.g. 'keep-a-changelog'). Rendered into {{CHANGELOG_FORMAT}}."
+        },
+        "version_file": {
+          "type": "string",
+          "description": "Path to the file holding the authoritative version (e.g. 'custom_components/mycomponent/manifest.json'). Rendered into {{VERSION_FILE}}."
+        },
+        "version_field": {
+          "type": "string",
+          "description": "Field name within version_file holding the version (e.g. 'version'). Rendered into {{VERSION_FIELD}}."
+        }
+      },
+      "additionalProperties": true
+    },
     "spec-plan-workflow": {
       "type": "object",
       "description": "Native feature-level spec→plan→execution workflow (opt-in). No-op when effective_enabled=false.",
