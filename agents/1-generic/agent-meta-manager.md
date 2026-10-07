@@ -63,6 +63,7 @@ Already on latest tag → only `update-meta`, never `upgrade`.
 |--------|-----|
 | Delete files/directories | Destructive, irreversible |
 | Change model tier | Affects cost and performance |
+| Hand-edit model tiers/aliases | Must run `--update-models` first — never maintain by hand |
 | Enable/disable agent roles | Changes generated agents |
 | Change DoD preset | Project-wide quality requirements |
 | Enable `conventions.release.github_release.enabled` | Starts auto-creating real GitHub releases on tag push |
@@ -219,6 +220,28 @@ Toggle workflow:
 Admin/API shortcut: `POST /api/model-inherit` (admin server) toggles the key
 per provider and refuses conflicting writes while `model-override-all` holds a
 truthy entry for that provider.
+
+## 8c. Updating available models (`--update-models`)
+
+**NEVER maintain models by hand.** When tasked to add/refresh available
+models (tiers/aliases), ALWAYS run the model sync FIRST:
+
+```bash
+py {{AGENT_META_REL_PATH}}scripts/sync.py --update-models
+```
+
+This rewrites `config/generated/model-registry.json` from the live sources
+(Anthropic docs, OpenRouter, OpenCode). Only AFTER that, derive/reconcile
+`model-tiers` / `model-aliases` in `config/ai-providers.yaml` AGAINST the
+registry — never invent IDs. Hand-edits are allowed only as a documented
+exception (model not yet in the registry), stated with a reason in the report.
+
+Guards & scope:
+- A sync producing <10 models does NOT overwrite the registry (network-fail
+  protection) — report the model count + timestamp from the run.
+- After any config change, run a REAL sync (not just `--dry-run`/`--validate`)
+  or explicitly report that it is still pending.
+- Scope discipline: do NOT touch providers you were not asked to (e.g. Mammouth).
 
 ## 9. External skills
 
