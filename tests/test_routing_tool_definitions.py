@@ -223,6 +223,65 @@ def test_get_routing_rules_keyword_fallback_and_precedence(tmp_path):
     assert "patternless-role" not in agents
 
 
+def test_get_routing_rules_language_param_is_threaded(tmp_path):
+    """Design C (#780): ``language`` selects language-tagged examples; flat
+    lists stay a no-op passthrough and keywords stay language-neutral."""
+    root = tmp_path
+    (root / "config").mkdir()
+    (root / "config" / "role-defaults.yaml").write_text(
+        "roles:\n"
+        "  flat-role:\n"
+        "    model: fast\n"
+        "    workflow_tier: optional\n"
+        "    routing_patterns:\n"
+        "      keywords:\n"
+        "      - Canonical-Keyword\n"
+        "      examples:\n"
+        "      - \"Flat example.\"\n"
+        "  tagged-role:\n"
+        "    model: fast\n"
+        "    workflow_tier: optional\n"
+        "    routing_patterns:\n"
+        "      keywords:\n"
+        "      - Canonical-Keyword\n"
+        "      examples:\n"
+        "        English:\n"
+        "        - \"English example.\"\n"
+        "        Deutsch:\n"
+        "        - \"Deutsches Beispiel.\"\n",
+        encoding="utf-8",
+    )
+    variables = {k: "false" for k in _BASE_VARIABLES}
+    template_roles = {"flat-role", "tagged-role"}
+
+    def rules_for(language):
+        data = get_routing_rules(
+            root, {}, variables, template_roles=template_roles, language=language
+        )
+        return {r["agent"]: r for r in data["rules"]}
+
+    en = rules_for("English")
+    de = rules_for("Deutsch")
+    # Flat list: identical regardless of language (passthrough no-op).
+    assert en["flat-role"]["examples"] == ["Flat example."]
+    assert de["flat-role"]["examples"] == ["Flat example."]
+    # Keywords stay canonical/language-neutral in both.
+    assert en["tagged-role"]["keywords"] == ["Canonical-Keyword"]
+    assert de["tagged-role"]["keywords"] == ["Canonical-Keyword"]
+    # Language-tagged examples resolve per language.
+    assert en["tagged-role"]["examples"] == ["English example."]
+    assert de["tagged-role"]["examples"] == ["Deutsches Beispiel."]
+    # Unknown language falls back deterministically to the first variant.
+    unknown = rules_for("Klingon")
+    assert unknown["tagged-role"]["examples"] == ["English example."]
+    # Default (no language arg) does not crash and yields a flat passthrough.
+    default = get_routing_rules(
+        root, {}, variables, template_roles=template_roles
+    )
+    default_agents = {r["agent"]: r for r in default["rules"]}
+    assert default_agents["flat-role"]["examples"] == ["Flat example."]
+
+
 # ---------------------------------------------------------------------------
 # build_routing_tool_definition — neutral tool definition
 # ---------------------------------------------------------------------------
