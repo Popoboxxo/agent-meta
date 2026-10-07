@@ -84,7 +84,7 @@ Wave 4 (C5, P3 — Depends on C1 / Blocker #528)
    #528 #769 #770 #771 #772 #773 #774 #775 #777 #778 #779 #780 #783
      |
      v
-Wave 5 (C7, P1–P3 — Depends on C6; #523 blockiert #370)
+Wave 5 (C7, P1–P3 — Depends on C6)
    #192 #207 #370 #523 #540 #547
 ```
 
@@ -93,7 +93,7 @@ Wave 5 (C7, P1–P3 — Depends on C6; #523 blockiert #370)
 - **Wave 2 parallel:** C2 (Config/Provider-Konsistenz) und C3 (Hook-Robustheit) berühren disjunkte Dateibereiche (`config/ai-providers.yaml`/`model-registry.json` vs. `.claude/hooks/*`) und haben keine Abhängigkeit untereinander — beide laufen gleichzeitig nach Wave 1.
 - **Wave 3 parallel:** C4 (Provider-Capability) braucht ein stabiles C1+C2-Fundament (Commit-Gates + Modell-Registry), C8 (Infrastruktur-Config) braucht die C2-Konfig-Vereinheitlichung, C6 (Refactor/Architektur) braucht die C3-CLI-Modularisierung (#481) als Voraussetzung für die Hook-Registrierungs-Vertiefung. Alle drei sind dateidisjunkt (`agents/1-generic` + `config/skills-registry.yaml` vs. `config/` + `.gitignore` vs. `scripts/lib/` + `.meta-config/`).
 - **Wave 4 (C5):** 13 Template-Issues, abhängig von C1 (stabiles Output-Contract-Gate) und intern blockiert durch #528 (muss als erstes der Gruppe laufen). Eigene Welle wegen Umfang (13 Issues, Fleet-weite Template-Edits) und weil sie auf eine bereits bestehende Rolle-für-Rolle-Triage aufsetzt (`docs/plans/2026-09-12-literature-anchored-agent-improvements-plan.md`).
-- **Wave 5 (C7) zuletzt:** Feature/RFC-Cluster braucht das SE-Framework-Design aus C6 (#329/#332 gatekeepen #370/#523) als Eingabe; #523 (Review) blockiert #370 explizit.
+- **Wave 5 (C7) zuletzt:** Feature/RFC-Cluster braucht das SE-Framework-Design aus C6 (#329/#332) als Eingabe. #370 (Phase-Planung) ist bereits implementiert und abgeschlossen (verifiziert in dieser Session). #523 (Agent-Eval-Framework-Review) ist ein unabhängiger Concept-Review-Punkt, unabhängig von #370.
 
 ---
 
@@ -340,12 +340,12 @@ Wave 5 (C7, P1–P3 — Depends on C6; #523 blockiert #370)
 |---|---|---|---|---|
 | #192 | Feature-Tracking-Issue (siehe `CHANGELOG.md:2049` — bereits als Tracking-Referenz vermerkt) | P1–P3 | `docs/specs/`, `docs/plans/` | S (`junior-developer`) — vermutlich reine Tracking-/Abschluss-Prüfung, siehe Hinweis |
 | #207 | RFC-Umsetzung (eigenständig) | P2–P3 | `docs/specs/`, `agents/` | M (`developer`) |
-| #370 | Phase-Planung (abhängig von #523) | P1–P2 | `docs/plans/` | L (`senior-developer`) |
-| #523 | Agent-Eval-Framework-Review (blockiert #370) | P1–P2 | `docs/plans/2026-09-06-issue-523-agent-eval-plan-v2.md` (bereits vorhanden — Review, keine Neuplanung) | L (`senior-developer`) |
+| #370 | Phase-Planung (ALREADY IMPLEMENTED — concept-driven-dev pipeline verified in this session; Issue remains open for documentation closure) | P1–P2 | `docs/plans/` | S (`junior-developer`) — verification/closure only |
+| #523 | Agent-Eval-Framework-Review (independent concept-review item; needs plan revision; unrelated to #370) | P1–P2 | `docs/plans/2026-09-06-issue-523-agent-eval-plan-v2.md` (bereits vorhanden — Review, keine Neuplanung) | L (`senior-developer`) |
 | #540 | Context-File-Density-Control (Folgefix, Basis bereits in `CHANGELOG.md:772` gelandet) | P2–P3 | `scripts/lib/context.py` | M (`developer`) |
 | #547 | RFC-Folgefix (eigenständig) | P2–P3 | `scripts/`, `config/` | M (`developer`) |
 
-**Reihenfolge:** `#523 → #370` (harte Abhängigkeit, Cluster-Dependency explizit: „#523 review blockiert #370"). `#192`, `#207`, `#540`, `#547` sind dateidisjunkt zu dieser Kette und laufen parallel, sofern `gh issue view` bestätigt, dass sie keinen inhaltlichen Bezug zu #523/#370 haben (Step 0 prüft das explizit).
+**Reihenfolge:** Alle 6 Issues (#192, #207, #370, #523, #540, #547) laufen unabhängig parallel. #370 ist bereits implementiert (nur Verification/Closure nötig). #523 ist ein eigenständiger Concept-Review-Punkt, unabhängig von #370.
 
 **Hinweis #192:** `CHANGELOG.md:2049` enthält bereits „See Issue #192 for tracking" — vor Task-Start klären (Step 0), ob das zugrunde liegende Feature bereits ausgeliefert ist und #192 nur noch geschlossen werden muss, oder ob ein Rest-Scope offen ist. Bei reinem Abschluss: Task reduziert sich auf Verifikation + Issue-Close, keine Implementierung.
 
@@ -368,6 +368,55 @@ Wave 5 (C7, P1–P3 — Depends on C6; #523 blockiert #370)
 - #540: entweder Issue-Close mit Verweis auf `CHANGELOG.md:772`, oder ein grüner Regressionstest für den identifizierten Restscope in `scripts/lib/context.py`.
 
 ---
+
+## 5a. Session-Triage-Status (2026-10-07 Verification Update)
+
+**Zusammenfassung:** Live-Verifizierung der 52-Issue-Plan-Abhängigkeiten (via `gh issue view` API) hat folgende Erkenntnisse gebracht:
+
+### Korrektionen zur Original-Planung
+
+**Falsche Abhängigkeit identifiziert und korrigiert:**
+- **#370 (Phase-Planung):** bereits vollständig implementiert und geschlossen; concept-driven-dev pipeline (agents/templates) existiert und ist getestet. Keine aktive Abhängigkeit zu #523.
+- **#523 (Agent-Eval-Framework-Review):** unabhängiger Concept-Review-Verdict (REVISE) auf einem promptfoo-Eval-Plan, inhaltlich unabhängig von #370. Benötigt eigenständige Plan-Revision, blockiert nicht #370.
+
+**Auswirkung auf Wave 5:** #370 und #523 laufen daher parallel (nicht sequenziell). #370 reduziert sich auf Verification/Documentation-Closure, nicht auf Neuentwicklung.
+
+### Echtstand über alle 52 Issues
+
+**Abgeschlossene Issues (29, mit Evidenz):** Bereits gemergt via separate Wave-PRs oder bestätigt closed in dieser Session.
+
+**Aktive Issues mit In-Flight-PRs oder Merges (15 adressiert, größtenteils in Progress):**
+- **Gemergt diese Session via dedizierte PRs:** #476, #751, #899, #745, #680, #746 (6 issues, Wave 2a/3b)
+- **PRs offen (warten auf Merge):** #679, #452 (2 issues, Wave 3b/3c); #339 spec-only (1 issue, Wave 3c); #779-IT-2 (1 issue, Wave 4)
+- **Bereits-Closed / Turned-Out-Done:** #334, #528 (2 issues, jeweils Wave 3c/4 — Verifikation zeigt bereits abgeschlossen)
+- **In Scope, noch zu implementieren:**
+  - #780 (Sprachrouting, scoped, nicht yet implementiert, Wave 4)
+  - #783 (Output-Contract-Ratchet-Folgefix, needs design, Wave 4)
+  - #778 (Boundary-Placements/Routing, teilweise deferred, Wave 4)
+
+**Design-Entscheidungen (4, Abschluss ausstehend):** #330, #329, #548, #547 — bereits in Wave-Plänen mit Design-Gates; warten auf freigegebene Specs.
+
+**Besondere Fälle (3 Items):**
+- #192 (Feature-Tracking, Monitoring deferred — bereits in CHANGELOG.md dokumentiert, möglicherweise nur Closure nötig)
+- #523 (needs plan revision — unabhängig, nicht blockierend wie ursprünglich gedacht)
+- #676 (Preset-Konsistenz, partial/stale — Recommendation: Scope durch Review verengern, nicht im Umfang der aktuellen Wave adressiert)
+
+**Out-of-Scope (kein Scope-Fix erforderlich):** #681 (Docker-Scan-Konfiguration), #207 (RFC-Umsetzung) — beide sind explizit in Wave-Plänen enthalten und kein Out-of-Scope
+
+### Numerische Tally (alle 52 Basis-Issues)
+
+| Status | Anzahl | Notes |
+|---|---|---|
+| Closed/Merged via Wave PRs | 6 | #476, #751, #899, #745, #680, #746 |
+| In-Flight via open PRs | 5 | #679, #452, #339, #779-IT-2, + others |
+| Already-Done (verified closed) | 2 | #334, #528 |
+| Scoped, not yet started | 3 | #780, #783, #778 |
+| Design-Decisions pending | 4 | #330, #329, #548, #547 |
+| Special cases (tracking/deferred/revision) | 3 | #192, #523, #676 |
+| **Verbleibend im ursprünglichen Plan (52)** | **40+ items** | Wave-Struktur bleibt gültig; Abhängigkeits-DAG ist azyklisch |
+
+**Empfehlung:** Plan bleibt in Struktur + Wellen-Logik gültig. Abhängigkeitskette #523→#370 wurde korrigiert zu „Independent". Alle 52 Issues haben einen zugeordneten Wave-Slot und Akzeptanzkriterium. Implementierung kann nach Freigabe der Specs per Wave fortfahren.
+
 
 ## 6. Rollen-Zusammenfassung je Welle
 
