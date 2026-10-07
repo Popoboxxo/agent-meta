@@ -1,0 +1,38 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+- Gemini
+dod-preset: standard
+platforms: []
+roles:
+- orchestrator
+- developer
+- git
+gitignore:
+  local: true
+  generated: false
+  settings: false
+  ignore-provider-dirs: true
+  keep:
+  - .claude/3-project/
+  - .gemini/rules/test-scope.md
+project:
+  name: scenario-gitignore-keep
+  prefix: s74
+  short: scenario-gitignore-keep
+variables:
+  PROJECT_NAME: scenario-gitignore-keep
+  PROJECT_DESCRIPTION: gitignore.keep re-include mechanism test (issue #746).
+  PROJECT_GOAL: Verify ignore-provider-dirs + keep re-includes project-owned paths under an ignored provider root, honored by real git check-ignore.
+  DOCS_LANGUAGE: Deutsch
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-gitignore-keep
+  GIT_MAIN_BRANCH: main
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false
