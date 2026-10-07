@@ -1,0 +1,28 @@
+agent-meta-version: 0.101.0
+ai-providers:
+- Claude
+platforms:
+- web
+roles:
+- orchestrator
+- developer
+- git
+project:
+  name: scenario-web-platform-preset
+  prefix: s75
+  short: web-platform-preset
+variables:
+  PROJECT_NAME: scenario-web-platform-preset
+  PROJECT_DESCRIPTION: Web platform preset rule test (SEO/accessibility/privacy).
+  PROJECT_GOAL: Verify web-* platform rules render as plain seo/accessibility/privacy rule files.
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-web-platform-preset
+  GIT_MAIN_BRANCH: main
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false
