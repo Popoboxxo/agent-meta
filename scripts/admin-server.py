@@ -43,6 +43,7 @@ import hmac
 import logging
 import os
 import queue
+import re
 import stat
 import subprocess
 import sys
@@ -296,6 +297,20 @@ def _ensure_scripts_on_path(root: Path) -> None:
         str_candidate = str(candidate)
         if str_candidate not in sys.path:
             sys.path.insert(0, str_candidate)
+
+
+def _is_bare_backup_name(name: Any) -> bool:
+    """Return True if ``name`` is a bare ``*.zip`` file name (no path parts).
+
+    Trust boundary for the backup HTTP handlers (SR-D-01): ``lib.backup``
+    falls back to ``Path(archive_name)`` for CLI use, so an absolute path or
+    ``../`` traversal must never reach it from an HTTP request.
+    """
+    return (
+        isinstance(name, str)
+        and name not in (".", "..")
+        and re.fullmatch(r"[\w.-]+\.zip", name) is not None
+    )
 
 
 #: Implicit resolvable surface versions (SPEC-ADMIN-UI-OPENCODE-SURFACE-
@@ -5466,7 +5481,11 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         archive_name = body.get("archive_name")
         if not archive_name:
             return self._send_json({"error": "archive_name is required"}, status=400)
-            
+        if not _is_bare_backup_name(archive_name):
+            return self._send_json(
+                {"error": "bad_request", "detail": "invalid archive name"}, status=400
+            )
+
         providers = body.get("providers", None)
         force = body.get("force", False)
 
@@ -5493,6 +5512,10 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         root = self.__class__.root
         if not archive_name:
             return self._send_json({"error": "archive_name is required"}, status=400)
+        if not _is_bare_backup_name(archive_name):
+            return self._send_json(
+                {"error": "bad_request", "detail": "invalid archive name"}, status=400
+            )
 
         try:
             _ensure_scripts_on_path(root)
