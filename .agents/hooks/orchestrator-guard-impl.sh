@@ -1,5 +1,5 @@
 #!/bin/bash
-# version: 1.5.0
+# version: 1.6.0
 # Real orchestrator-guard logic. NOT a standalone hook — invoked by
 # orchestrator-guard.sh (thin self-health wrapper, issue #630), which pipes
 # the PreToolUse JSON payload to this script's stdin after syntax-checking
@@ -15,6 +15,11 @@ set -uo pipefail
 
 # It self-checks whether orchestrator.strict mode is enabled in project.yaml.
 # If strict mode is off, the hook exits 0 immediately and imposes no overhead.
+# Fail direction (SR-B-10): an existing but unreadable/unparseable
+# project.yaml (incl. PyYAML missing in the hook's interpreter) never
+# silently disables strict mode — a stdlib line scan decides and resolves
+# to STRICT=true on any strict indicator or doubt. Same safe-side default
+# on unreadable config as repo-containment-impl.sh's F4.
 #
 # Only mutating tools (Write, Edit, Bash) are intercepted.
 # Research tools (read, glob, grep) are never blocked.
@@ -784,8 +789,19 @@ if [ -f "$CONFIG_FILE" ]; then
   # string-literal interpolation lets python's own string-escape parsing
   # (\a, \n, ...) silently corrupt the path, making open() fail and the
   # except-branch print 'false' as if strict mode were off.
+  #
+  # Safe-side (SR-B-10, consistent with repo-containment's F4): if the
+  # config exists but can't be parsed with PyYAML (ImportError — e.g. the
+  # hook's interpreter is a different venv than sync.py's — or a YAML
+  # syntax error), it is NOT treated as "strict off". A stdlib-only line
+  # scan of the top-level `orchestrator:` block decides instead: any strict
+  # indicator (`mode: strict`, `strict: <truthy>`, also under
+  # provider-overrides) or anything the scan can't judge (flow style,
+  # anchors/aliases, unreadable file) resolves to STRICT=true. Only a scan
+  # that clearly finds no strict indicator returns false. The scan ignores
+  # `enabled: false` — over-blocking is the accepted cost of fail-closed.
   STRICT=$("$_PY" -c "
-import sys, yaml
+import sys
 
 CONFIG_FILE, PROVIDER = sys.argv[1], sys.argv[2]
 
@@ -796,7 +812,42 @@ def resolve_mode(orch, provider):
         return mode
     return orch.get('mode')
 
+FALSY = ('false', 'no', 'off', '0', '~', 'null', '')
+
+def fallback_scan():
+    # ponytail: line scan, not a YAML parser — anything it can't judge
+    # resolves strict (fail closed); shared stdlib YAML reader is B-20.
+    try:
+        with open(CONFIG_FILE, encoding='utf-8-sig') as f:
+            lines = f.read().splitlines()
+    except Exception:
+        return True
+    in_block = False
+    for raw in lines:
+        if raw.lstrip().startswith('#') or not raw.strip():
+            continue
+        line = raw.split(' #', 1)[0].rstrip()
+        stripped = line.lstrip()
+        key, _, value = stripped.partition(':')
+        key = key.strip().strip(chr(34) + chr(39))
+        value = value.strip().strip(chr(34) + chr(39))
+        if len(line) == len(stripped):  # top-level key
+            in_block = key == 'orchestrator'
+            if in_block and value:
+                return True  # inline/flow/anchored value: ambiguous
+            continue
+        if not in_block:
+            continue
+        if key == '<<' or value[:1] in ('{', '[', '&', '*', '!'):
+            return True  # merge key, flow style, anchor/alias, tag: ambiguous
+        if key == 'mode' and value.lower() == 'strict':
+            return True
+        if key == 'strict' and value.lower() not in FALSY:
+            return True
+    return False
+
 try:
+    import yaml
     with open(CONFIG_FILE) as f:
         c = yaml.safe_load(f) or {}
     orch = c.get('orchestrator', {})
@@ -808,9 +859,21 @@ try:
         strict = orch.get('strict', False)
         enabled = orch.get('enabled', True)
         print('true' if strict and enabled else 'false')
-except Exception:
-    print('false')
-" "$CONFIG_FILE" "$AGENT_META_PROVIDER" 2>/dev/null)
+except Exception as exc:
+    strict = fallback_scan()
+    verdict = ('strict indicator found or scan inconclusive, failing closed (STRICT=true)'
+               if strict else 'no strict indicator found (STRICT=false)')
+    sys.stderr.write(
+        'ORCHESTRATOR_GUARD: warning: could not read project.yaml with PyYAML ('
+        + type(exc).__name__ + '); conservative stdlib line scan: ' + verdict + '.\n'
+    )
+    print('true' if strict else 'false')
+" "$CONFIG_FILE" "$AGENT_META_PROVIDER")
+  # Any other outcome (interpreter crash, empty output) also fails closed.
+  if [ "$STRICT" != "true" ] && [ "$STRICT" != "false" ]; then
+    echo "ORCHESTRATOR_GUARD: warning: strict-mode check produced no result; failing closed (STRICT=true)." >&2
+    STRICT=true
+  fi
 
   # -z "$AGENT_ID": strict-mode main-chat blocking applies ONLY to the
   # main-thread (issue #683). A dispatched subagent's Write/Edit/Bash call
