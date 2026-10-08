@@ -301,15 +301,15 @@ def load_providers_config(
                 "model-tiers": {
                     "nano": "claude-haiku-4-5-20251001",
                     "fast": "claude-haiku-4-5-20251001",
-                    "balanced": "claude-sonnet-5",
-                    "powerful": "claude-opus-4-8",
-                    "max": "claude-fable-5",
+                    "balanced": "claude-sonnet-5-5",
+                    "powerful": "claude-opus-5-5",
+                    "max": "claude-fable-5-1",
                 },
                 "model-aliases": {
                     "haiku": "claude-haiku-4-5-20251001",
-                    "sonnet": "claude-sonnet-4-6",
-                    "opus": "claude-opus-4-8",
-                    "fable": "claude-fable-5",
+                    "sonnet": "claude-sonnet-5-5",
+                    "opus": "claude-opus-5-5",
+                    "fable": "claude-fable-5-1",
                 },
             }
         }
