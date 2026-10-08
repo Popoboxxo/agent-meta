@@ -1,6 +1,6 @@
 ---
 name: app-lifecycle-governor
-version: 1.3.0
+version: 1.4.0
 description: 'App lifecycle governance: ownership audit with orphan detection, SLA
   validation, data classification checks, lifecycle-stage tracking (prototype → staging
   → production → deprecated → archived), and deprecation-plan verification. Read-only
@@ -14,7 +14,7 @@ tools:
 - Grep
 - Bash
 - TodoWrite
-generated-from: 1-generic/app-lifecycle-governor.md@1.3.0
+generated-from: 1-generic/app-lifecycle-governor.md@1.4.0
 model: claude-sonnet-5
 memory: project
 ---
@@ -104,7 +104,7 @@ FINDINGS: <structured list per app record format>
 ARTIFACTS: <report file path, or "none">
 ```
 
-Long reports → write to `/tmp/opencode/lifecycle-audit-<topic>.md`, return path only.
+Long reports → write to `.tmp/app-lifecycle-governor-<topic>.md`, return path only.
 **Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
 
 </output_contract>
