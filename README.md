@@ -435,9 +435,9 @@ See `docs/RELEASE_GATES.md` for the full config reference.
 | **balanced** | claude-sonnet-5-5 | gemini-3.1-pro-low | qwen3.7-plus |
 | **powerful** | claude-opus-5-5 | gemini-3.1-pro-high | kimi-k2.6 |
 | **max** | claude-fable-5-1 | gemini-3.1-pro-high | kimi-k2.7-code |
-| **ultra** | claude-opus-5-5 | gemini-3.1-pro-high | kimi-k2.7-code |
+| **ultra** | claude-fable-5-1 | gemini-3.1-pro-high | kimi-k2.7-code |
 
-**ultra** is reserved exclusively for `principal-developer` (last-resort escalation after repeated senior-developer failures). Never auto-routed by keyword. Resolves to the strongest *real* model (not fictitious IDs like claude-fable-5).
+**ultra** is reserved exclusively for `principal-developer` (last-resort escalation after repeated senior-developer failures). Never auto-routed by keyword. Resolves to the strongest model listed in `config/generated/model-registry.json` (refresh via `python3 scripts/sync.py --update-models`).
 
 Continue and Copilot: no per-agent model tiers (managed centrally).
 

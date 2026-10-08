@@ -44,7 +44,7 @@ Normal:
         balanced: claude-sonnet-5-5
         powerful: claude-opus-5-5
         max: claude-opus-5-5
-        ultra: claude-opus-5-5
+        ultra: claude-fable-5-1
     Gemini:
       tiers:
         nano: gemini-3.5-flash-medium
