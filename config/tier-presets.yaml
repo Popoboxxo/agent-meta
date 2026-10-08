@@ -13,7 +13,7 @@ Cheap:
         fast: claude-haiku-4-5-20251001
         balanced: claude-haiku-4-5-20251001
         powerful: claude-haiku-4-5-20251001
-        max: claude-sonnet-4-6
+        max: claude-sonnet-5-5
     Gemini:
       tiers:
         nano: gemini-3.5-flash-medium
@@ -41,10 +41,10 @@ Normal:
       tiers:
         nano: claude-haiku-4-5-20251001
         fast: claude-haiku-4-5-20251001
-        balanced: claude-sonnet-5
-        powerful: claude-opus-4-8
-        max: claude-opus-4-8
-        ultra: claude-opus-5
+        balanced: claude-sonnet-5-5
+        powerful: claude-opus-5-5
+        max: claude-opus-5-5
+        ultra: claude-opus-5-5
     Gemini:
       tiers:
         nano: gemini-3.5-flash-medium
@@ -94,10 +94,10 @@ Advanced:
     Claude:
       tiers:
         nano: claude-haiku-4-5-20251001
-        fast: claude-sonnet-4-6
-        balanced: claude-opus-4-8
-        powerful: claude-fable-5
-        max: claude-fable-5
+        fast: claude-sonnet-5-5
+        balanced: claude-opus-5-5
+        powerful: claude-fable-5-1
+        max: claude-fable-5-1
     Gemini:
       tiers:
         nano: gemini-3.5-flash-medium
@@ -123,11 +123,11 @@ Expensive:
   providers:
     Claude:
       tiers:
-        nano: claude-sonnet-4-6
-        fast: claude-opus-4-8
-        balanced: claude-fable-5
-        powerful: claude-fable-5
-        max: claude-fable-5
+        nano: claude-sonnet-5-5
+        fast: claude-opus-5-5
+        balanced: claude-fable-5-1
+        powerful: claude-fable-5-1
+        max: claude-fable-5-1
     Gemini:
       tiers:
         nano: gemini-3.5-flash-high
@@ -153,11 +153,11 @@ Expensive as Hell:
   providers:
     Claude:
       tiers:
-        nano: claude-opus-4-8
-        fast: claude-fable-5
-        balanced: claude-fable-5
-        powerful: claude-fable-5
-        max: claude-fable-5
+        nano: claude-opus-5-5
+        fast: claude-fable-5-1
+        balanced: claude-fable-5-1
+        powerful: claude-fable-5-1
+        max: claude-fable-5-1
     Gemini:
       tiers:
         nano: gemini-3.1-pro-low
