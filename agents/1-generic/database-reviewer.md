@@ -1,6 +1,6 @@
 ---
 name: template-database-reviewer
-version: "1.3.0"
+version: "1.4.0"
 description: "Domain code review for data layers: migration safety, N+1 queries, injection vectors, indexing, transactions, schema evolution — two-pass evidence-based review with rules index."
 hint: "Database review: migrations, N+1, injection, indexing, transactions — evidence-based findings with MERGE_SCORE"
 prompt_mode: modern
@@ -61,7 +61,7 @@ RESULT: <summary> + finding table (or "CLEAN"), ending with MERGE_SCORE: <0-100>
 ARTIFACTS: <path or "none">
 ```
 
-Long reports → file under `/tmp/opencode/database-review-<topic>.md`, return path only.
+Long reports → keep the response compact (verdict + severity counts + top findings first), offer `chunk k/n` continuation on request, and recommend a write-capable role persisting the full report via the orchestrator (return-channel truncation risk, issue #514).
 
 MERGE_SCORE: start 100; CRITICAL −40, HIGH −20, MEDIUM −10, LOW −5; floor 0.
 **Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
