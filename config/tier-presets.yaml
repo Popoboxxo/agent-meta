@@ -9,10 +9,10 @@ Cheap:
   providers:
     Claude:
       tiers:
-        nano: claude-haiku-4-5-20251001
-        fast: claude-haiku-4-5-20251001
-        balanced: claude-haiku-4-5-20251001
-        powerful: claude-haiku-4-5-20251001
+        nano: claude-haiku-5-5
+        fast: claude-haiku-5-5
+        balanced: claude-haiku-5-5
+        powerful: claude-haiku-5-5
         max: claude-sonnet-5-5
     Gemini:
       tiers:
@@ -39,8 +39,8 @@ Normal:
   providers:
     Claude:
       tiers:
-        nano: claude-haiku-4-5-20251001
-        fast: claude-haiku-4-5-20251001
+        nano: claude-haiku-5-5
+        fast: claude-haiku-5-5
         balanced: claude-sonnet-5-5
         powerful: claude-opus-5-5
         max: claude-opus-5-5
@@ -93,7 +93,7 @@ Advanced:
   providers:
     Claude:
       tiers:
-        nano: claude-haiku-4-5-20251001
+        nano: claude-haiku-5-5
         fast: claude-sonnet-5-5
         balanced: claude-opus-5-5
         powerful: claude-fable-5-1
