@@ -20,6 +20,7 @@ Run: python -m pytest tests/test_dod_push_check_hook.py -v
 """
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -240,3 +241,96 @@ def test_failing_command_blocked_even_if_piped_through_success(repo_on_feature_b
         f"(regression for #753)\nstdout: {result.stdout}\nstderr: {result.stderr}"
     )
     assert "FAILED" in result.stderr
+
+
+# --- SR-B-01: tag-only detection must not leak across refs/statements -----
+#
+# The hook used to flag the WHOLE command as tag-only as soon as '--tags'
+# appeared anywhere after the first 'push' token, skipping the Branch-Guard
+# even when the same command also pushed main. With
+# AGENT_META_TEST_COMMAND=false a skipped Branch-Guard surfaces as
+# "DoD-Check FAILED" instead of the "Branch-Guard" block message.
+
+TAGS_BYPASS_ATTEMPTS = [
+    "git push origin main --tags",
+    "git push origin tag v1.0.0 main",
+    "git push origin --tags ; git push origin main",
+    "git push --tags && git push origin main",
+    # --follow-tags pushes the current branch too -- never tag-only
+    "git push --follow-tags",
+    "git push origin --follow-tags",
+    # tag-looking refspec whose destination is a branch
+    "git push origin refs/tags/v1.0.0:refs/heads/main",
+    # SR-B-01 round 2: --no-tags negates an earlier --tags (last one wins)
+    "git push origin --tags --no-tags",
+    "git push origin --tags --no-tag",
+    # space-form value option swallows the following '--tags'
+    "git push origin -o --tags",
+    "git push origin --push-option --tags",
+    # line continuation joins both lines into ONE statement with a branch ref
+    "git push --tags \\\norigin main",
+    # unresolvable 'git ... push' statement must fail closed, not be dropped
+    "git push --tags ; sudo -u git git push origin main",
+    "git push --tags ; env -u git git push origin main",
+    # --attr-source takes a separate value (issue #551 option set)
+    "git push --tags ; git --attr-source HEAD push origin main",
+    # unparseable quoting fails closed instead of falling back to str.split
+    'git push origin --tags "main',
+    # quoted ';' splits a real push into an unparseable fragment whose git
+    # token is quoted — the old str.split fallback dropped it as non-git
+    'git push --tags; g"i"t push origin main "x;y"',
+    # unknown push flags (e.g. --recurse-submodules) are never tag-only
+    "git push --recurse-submodules=on-demand origin --tags",
+]
+
+PURE_TAG_PUSHES = [
+    "git push origin --tags",
+    "git push origin tag v1.0.0",
+    "git push origin refs/tags/v1.0.0",
+    "git push origin --tags && git push origin tag v1.0.0",
+    # redirects must not be misclassified as refs (release-flow regression)
+    "git push origin --tags 2>&1",
+    "git push origin tag v1.0.0 2>&1 | tail -5",
+    "git push origin --tags >/dev/null",
+    "git push origin --tags > /dev/null 2>&1",
+    # last --tags/--no-tags occurrence wins
+    "git push origin --no-tags --tags",
+]
+
+
+def _run_hook_failing_tests(cwd: Path, command: str) -> subprocess.CompletedProcess:
+    payload = {
+        "tool_name": "Bash",
+        "tool_input": {"command": command},
+        "cwd": cwd.as_posix(),
+    }
+    env = dict(os.environ, AGENT_META_TEST_COMMAND="false", AGENT_META_TEST_TIMEOUT="5")
+    return subprocess.run(
+        [_BASH, str(_HOOK_PATH)],
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+        cwd=str(cwd),
+        env=env,
+    )
+
+
+@pytest.mark.parametrize("command", TAGS_BYPASS_ATTEMPTS)
+def test_mixed_tag_and_branch_push_hits_branch_guard(repo_on_main, command):
+    result = _run_hook_failing_tests(repo_on_main, command)
+    assert result.returncode == 2
+    assert "Branch-Guard: Push blocked" in result.stderr, (
+        f"command={command!r} must not be treated as tag-only\n"
+        f"stdout: {result.stdout}\nstderr: {result.stderr}"
+    )
+    assert "DoD-Check FAILED" not in result.stderr
+
+
+@pytest.mark.parametrize("command", PURE_TAG_PUSHES)
+def test_pure_tag_push_skips_branch_guard(repo_on_main, command):
+    result = _run_hook_failing_tests(repo_on_main, command)
+    assert "Branch-Guard" not in result.stderr, (
+        f"command={command!r} is tag-only and must skip the Branch-Guard\n"
+        f"stdout: {result.stdout}\nstderr: {result.stderr}"
+    )
+    assert "DoD-Check FAILED" in result.stderr

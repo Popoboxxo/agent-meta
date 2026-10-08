@@ -1,12 +1,12 @@
 #!/bin/bash
 # hook: dod-push-check
-# version: 2.0.2
+# version: 2.0.3
 # event: PreToolUse
 # matcher: Bash
 # provider: Claude
 # description: Blocks git push on main/master (Branch-Guard) and until tests are green (DoD enforcement)
 # enabled_by_default: false
-# changelog: v2.0.2: fix pipefail propagation in TEST_CMD subshell (#753)
+# changelog: v2.0.3: per-statement tag-only push detection with flag allowlist, --no-tags, redirects, line continuations, fail-closed parsing (SR-B-01); v2.0.2: fix pipefail propagation in TEST_CMD subshell (#753)
 
 set -uo pipefail
 
@@ -130,33 +130,161 @@ PYEOF
 # documented approach) — covers the realistic `git push <remote> <ref>` /
 # `--tags` / `tag <name>` forms; anything else (bare `git push`, `git push
 # origin`, an explicit branch ref) still falls through to the branch check.
+#
+# SR-B-01: classification is per `git push` STATEMENT (split on shell control
+# operators, same splitter as orchestrator-guard-impl.sh `statements()`), and
+# every ref of every push statement must be a tag ref. The whole command is
+# tag-only only if it has >=1 push statement and ALL of them are tag-only —
+# `git push origin main --tags` or `git push --tags && git push origin main`
+# must still hit the Branch-Guard. Any parse doubt -> "false" (fail closed).
 IS_TAG_ONLY_PUSH=$(python3 - "$COMMAND" <<'PYEOF' 2>/dev/null
-import subprocess, sys
-tokens = sys.argv[1].split()
-try:
-    rest = tokens[tokens.index("push") + 1:]
-except ValueError:
-    print("false"); sys.exit(0)
-if "--tags" in rest:
-    print("true"); sys.exit(0)
-non_flags = [t for t in rest if not t.startswith("-")]
-if len(non_flags) >= 3 and non_flags[1] == "tag":
-    print("true"); sys.exit(0)
-if len(non_flags) == 2:
-    ref = non_flags[1]
+import re, shlex, subprocess, sys
+
+# git global options that take a separate value token. KEEP IN SYNC with
+# GLOBAL_OPTS_WITH_VALUE in hooks/1-generic/orchestrator-guard-impl.sh (the
+# authoritative copy, issue #551) — duplicated only because the two hooks
+# share no Python lib. '-c'/'--config' are handled separately there.
+GLOBAL_OPTS_WITH_VALUE = {
+    "-C", "--git-dir", "--work-tree", "--namespace", "--exec-path",
+    "--super-prefix", "--config-env", "--attr-source",
+}
+GIT_OPTS_WITH_VALUE = GLOBAL_OPTS_WITH_VALUE | {"-c", "--config"}
+
+# `git push` flags allowed in a tag-only push (allowlist). Anything else —
+# --all/--branches/--mirror/--follow-tags/--recurse-submodules/--prune,
+# abbreviations, unknown flags — makes the statement NOT tag-only.
+PUSH_FLAGS_SAFE = {
+    "--dry-run", "--verbose", "--quiet", "--progress", "--no-progress",
+    "--porcelain", "--force", "--atomic", "--no-atomic", "--verify",
+    "--no-verify", "--thin", "--no-thin", "--ipv4", "--ipv6", "--delete",
+    "--set-upstream", "--force-if-includes", "--no-force-if-includes",
+    "--signed", "--no-signed", "--force-with-lease", "--no-force-with-lease",
+}
+# push long options taking a value ('--opt=v' or '--opt v'); short form: -o
+PUSH_OPTS_WITH_VALUE = {"--push-option", "--repo", "--receive-pack", "--exec"}
+PUSH_SHORT_SAFE = set("vqnfud46")
+# --tags and its unique abbreviations; the last --tags/--no-tags wins (git
+# parse-options applies flags left to right). '--t'/'--no-t' are ambiguous
+# with --thin and fall through to "unknown" (fail closed).
+TAGS_FLAGS = {"--tags", "--tag", "--ta"}
+NO_TAGS_FLAGS = {"--no-tags", "--no-tag", "--no-ta"}
+# Statement looks like a git push but cannot be resolved -> fail closed.
+UNRESOLVED = object()
+# Shell redirections incl. their target ('2>&1', '>/dev/null', '> f',
+# '&>f', '>|f'), stripped before statement splitting so '2>&1' is neither
+# split on '&' nor misread as a ref. A digit prefix counts only as a whole
+# word (bash: 'v1>log' is ref 'v1' redirected to 'log').
+REDIRECT = re.compile(
+    r"(?:(?<![^\s;&|])\d+)?&?(?:>>?|<)(?:&(?:\d+|-)|\|?\s*[^\s;&|<>()]+)")
+
+
+def ref_exists(ref):
+    return subprocess.run(["git", "rev-parse", "--verify", "--quiet", ref],
+                          capture_output=True).returncode == 0
+
+
+def is_tag_ref(ref):
+    ref = ref.lstrip("+")
+    if ":" in ref:
+        # refspec <src>:<dst> — only the destination decides what is updated
+        return ref.split(":", 1)[1].startswith("refs/tags/")
     if ref.startswith("refs/tags/"):
-        print("true"); sys.exit(0)
-    is_tag = subprocess.run(
-        ["git", "rev-parse", "--verify", "--quiet", f"refs/tags/{ref}"],
-        capture_output=True,
-    ).returncode == 0
-    is_branch = subprocess.run(
-        ["git", "rev-parse", "--verify", "--quiet", f"refs/heads/{ref}"],
-        capture_output=True,
-    ).returncode == 0
-    print("true" if (is_tag and not is_branch) else "false")
-    sys.exit(0)
-print("false")
+        return True
+    return ref_exists(f"refs/tags/{ref}") and not ref_exists(f"refs/heads/{ref}")
+
+
+def is_git(tok):
+    return tok == "git" or tok.endswith("/git")
+
+
+def push_args(toks):
+    # Return the args after 'push' for a `git [global-opts] push ...` token
+    # list, None if this statement is not a git push, or UNRESOLVED if it
+    # mentions git and push but the first git token does not resolve to
+    # 'push' (e.g. 'sudo -u git git push ...') — never silently dropped.
+    for i, tok in enumerate(toks):
+        if not is_git(tok):
+            continue
+        j = i + 1
+        while j < len(toks) and toks[j].startswith("-"):
+            j += 2 if toks[j] in GIT_OPTS_WITH_VALUE else 1
+        if j < len(toks) and toks[j] == "push":
+            return toks[j + 1:]
+        break
+    if "push" in toks and any(is_git(t) for t in toks):
+        return UNRESOLVED
+    return None
+
+
+def stmt_is_tag_only(args):
+    tags = False
+    pos = []
+    i = 0
+    while i < len(args):
+        a = args[i]
+        i += 1
+        if a == "--":
+            pos += args[i:]
+            break
+        if not a.startswith("-") or a == "-":
+            pos.append(a)
+            continue
+        name = a.split("=", 1)[0]
+        if a.startswith("--"):
+            if name in TAGS_FLAGS or name in NO_TAGS_FLAGS:
+                if "=" in a:
+                    return False
+                tags = name in TAGS_FLAGS
+            elif name in PUSH_OPTS_WITH_VALUE:
+                if "=" not in a:
+                    i += 1  # value is the next token, even if it is '--tags'
+            elif name not in PUSH_FLAGS_SAFE:
+                return False
+            continue
+        # short cluster: '-fv', '-o<val>', '-fo <val>'
+        for k, ch in enumerate(a[1:], 1):
+            if ch == "o":
+                if k == len(a) - 1:
+                    i += 1
+                break
+            if ch not in PUSH_SHORT_SAFE:
+                return False
+    refs = pos[1:]  # pos[0] is the remote
+    if tags:
+        return not refs
+    if not refs:
+        return False  # bare push / push <remote> pushes the current branch
+    k = 0
+    while k < len(refs):
+        if refs[k] == "tag":
+            if k + 1 >= len(refs):
+                return False
+            k += 2
+            continue
+        if not is_tag_ref(refs[k]):
+            return False
+        k += 1
+    return True
+
+
+def command_is_tag_only(cmd):
+    # bash drops backslash-newline before parsing: join continued lines first
+    cmd = REDIRECT.sub(" ", cmd.replace("\\\n", ""))
+    pushes = []
+    for stmt in re.split(r"&&|\|\||;|\||&|\n", cmd):
+        try:
+            toks = shlex.split(stmt)
+        except ValueError:
+            return False  # unparseable quoting: fail closed
+        args = push_args(toks)
+        if args is UNRESOLVED:
+            return False
+        if args is not None:
+            pushes.append(args)
+    return bool(pushes) and all(stmt_is_tag_only(a) for a in pushes)
+
+
+print("true" if command_is_tag_only(sys.argv[1]) else "false")
 PYEOF
 )
 
