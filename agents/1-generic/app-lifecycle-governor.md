@@ -1,6 +1,6 @@
 ---
 name: template-app-lifecycle-governor
-version: "1.3.0"
+version: "1.4.0"
 description: "App lifecycle governance: ownership audit with orphan detection, SLA validation, data classification checks, lifecycle-stage tracking (prototype → staging → production → deprecated → archived), and deprecation-plan verification. Read-only — findings are recommendations, not mandates."
 hint: "App inventory + lifecycle governance: ownership, orphan detection, SLA, data classification, deprecation plans — read-only findings"
 prompt_mode: modern
@@ -97,7 +97,7 @@ FINDINGS: <structured list per app record format>
 ARTIFACTS: <report file path, or "none">
 ```
 
-Long reports → write to `/tmp/opencode/lifecycle-audit-<topic>.md`, return path only.
+Long reports → write to `.tmp/app-lifecycle-governor-<topic>.md`, return path only.
 **Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
 
 </output_contract>
