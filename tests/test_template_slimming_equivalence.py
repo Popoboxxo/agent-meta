@@ -1147,6 +1147,25 @@ def _port_golden_meta_tokens(text: str, variables: dict) -> str:
     return text
 
 
+_MODEL_LINE = re.compile(r"^model: .*$", re.MULTILINE)
+
+
+def _port_golden_model_line(golden: str, current: str) -> str:
+    """Port the golden's frontmatter ``model:`` value to the current render.
+
+    The resolved model ID comes from ``config/ai-providers.yaml`` /
+    ``config/tier-presets.yaml`` (config-volatile, pinned by the model
+    contract tests), not from the template, so a model-generation bump must
+    not force a fixture rebaseline. Only the first ``model:`` line is ported,
+    and only when both sides carry one -- adding or dropping the field still
+    fails the gate.
+    """
+    current_match = _MODEL_LINE.search(current)
+    if not current_match or not _MODEL_LINE.search(golden):
+        return golden
+    return _MODEL_LINE.sub(lambda _m: current_match.group(0), golden, count=1)
+
+
 def _strip_auto_commit_tail(current: str, role: str, variables: dict) -> str:
     """Remove the role's ``{{AUTO_COMMIT_BLOCK}}`` tail from a current render.
 
@@ -1207,6 +1226,7 @@ def test_golden_equivalence_and_normalization_marking(render_env: RenderEnv):
         current = _strip_auto_commit_tail(
             render_env.rendered[role], role, render_env.variables
         )
+        golden = _port_golden_model_line(golden, current)
         template = render_env.source_paths[role]
         if template not in _MIGRATED_PATHS:
             if golden != current:
