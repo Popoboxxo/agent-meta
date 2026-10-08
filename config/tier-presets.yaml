@@ -23,10 +23,10 @@ Cheap:
         max: gemini-3.5-flash-high
     Opencode:
       tiers:
-        nano: opencode-go/deepseek-v4-flash
-        fast: opencode-go/deepseek-v4-flash
-        balanced: opencode-go/deepseek-v4-flash
-        powerful: opencode-go/deepseek-v4-flash
+        nano: opencode-go/deepseek-v4.1-flash
+        fast: opencode-go/deepseek-v4.1-flash
+        balanced: opencode-go/deepseek-v4.1-flash
+        powerful: opencode-go/deepseek-v4.1-flash
         max: opencode-go/qwen3.7-plus
 Normal:
   description: Das 1:1 Mapping (Status Quo).
@@ -107,7 +107,7 @@ Advanced:
         max: gemini-3.1-pro-high
     Opencode:
       tiers:
-        nano: opencode-go/deepseek-v4-flash
+        nano: opencode-go/deepseek-v4.1-flash
         fast: opencode-go/qwen3.7-plus
         balanced: opencode-go/kimi-k2.6
         powerful: opencode-go/kimi-k2.7-code
