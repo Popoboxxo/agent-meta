@@ -55,12 +55,12 @@ Normal:
         ultra: gemini-3.1-pro-high
     Opencode:
       tiers:
-        nano: opencode-go/deepseek-v4-flash
-        fast: opencode-go/deepseek-v4-flash
-        balanced: opencode-go/deepseek-v4-pro
-        powerful: opencode-go/kimi-k2.6
+        nano: opencode-go/mimo-v2.6-flash
+        fast: opencode-go/deepseek-v4.1-flash
+        balanced: opencode-go/deepseek-v4.1-flash
+        powerful: opencode-go/deepseek-v4.1-flash
         max: opencode-go/kimi-k2.7-code
-        ultra: opencode-go/kimi-k3
+        ultra: opencode-go/kimi-k2.7-code
     Codex:
       tiers:
         nano: gpt-5.4-mini
