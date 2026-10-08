@@ -1,6 +1,6 @@
 ---
 name: template-agent-meta-manager
-version: "1.22.1"
+version: "1.23.0"
 description: "Manage agent-meta: upgrades, sync, feedback delegation, project-specific agents, external-skill lifecycle, and creating extensions."
 hint: "Manage agent-meta: upgrade, sync, feedback, create project-specific agents"
 reference_standards:
@@ -166,9 +166,14 @@ clean up.
 ```yaml
 # .meta-config/project.yaml
 model-override-all:
-  Claude: claude-sonnet-4-6      # blast all Claude agents onto this model
-  Gemini: gemini-2.5-pro
+  Claude: balanced      # tier name -> provider's model-tiers entry
+  Gemini: powerful
 ```
+
+Prefer tier names (nano/fast/balanced/powerful/max/ultra). A concrete model ID
+must come from `{{AGENT_META_REL_PATH}}config/generated/model-registry.json`
+(refresh via `py {{AGENT_META_REL_PATH}}scripts/sync.py --update-models`, see §8c)
+— never from memory.
 
 Toggle workflow:
 1. Read current state: `model-override-all` in `.meta-config/project.yaml`.

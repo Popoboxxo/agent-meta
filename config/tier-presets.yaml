@@ -9,11 +9,11 @@ Cheap:
   providers:
     Claude:
       tiers:
-        nano: claude-haiku-4-5-20251001
-        fast: claude-haiku-4-5-20251001
-        balanced: claude-haiku-4-5-20251001
-        powerful: claude-haiku-4-5-20251001
-        max: claude-sonnet-4-6
+        nano: claude-haiku-5-5
+        fast: claude-haiku-5-5
+        balanced: claude-haiku-5-5
+        powerful: claude-haiku-5-5
+        max: claude-sonnet-5-5
     Gemini:
       tiers:
         nano: gemini-3.5-flash-medium
@@ -23,10 +23,10 @@ Cheap:
         max: gemini-3.5-flash-high
     Opencode:
       tiers:
-        nano: opencode-go/deepseek-v4-flash
-        fast: opencode-go/deepseek-v4-flash
-        balanced: opencode-go/deepseek-v4-flash
-        powerful: opencode-go/deepseek-v4-flash
+        nano: opencode-go/deepseek-v4.1-flash
+        fast: opencode-go/deepseek-v4.1-flash
+        balanced: opencode-go/deepseek-v4.1-flash
+        powerful: opencode-go/deepseek-v4.1-flash
         max: opencode-go/qwen3.7-plus
 Normal:
   description: Das 1:1 Mapping (Status Quo).
@@ -39,12 +39,12 @@ Normal:
   providers:
     Claude:
       tiers:
-        nano: claude-haiku-4-5-20251001
-        fast: claude-haiku-4-5-20251001
-        balanced: claude-sonnet-5
-        powerful: claude-opus-4-8
-        max: claude-opus-4-8
-        ultra: claude-opus-5
+        nano: claude-haiku-5-5
+        fast: claude-haiku-5-5
+        balanced: claude-sonnet-5-5
+        powerful: claude-opus-5-5
+        max: claude-opus-5-5
+        ultra: claude-fable-5-1
     Gemini:
       tiers:
         nano: gemini-3.5-flash-medium
@@ -55,12 +55,12 @@ Normal:
         ultra: gemini-3.1-pro-high
     Opencode:
       tiers:
-        nano: opencode-go/deepseek-v4-flash
-        fast: opencode-go/deepseek-v4-flash
-        balanced: opencode-go/deepseek-v4-pro
-        powerful: opencode-go/kimi-k2.6
+        nano: opencode-go/mimo-v2.6-flash
+        fast: opencode-go/deepseek-v4.1-flash
+        balanced: opencode-go/deepseek-v4.1-flash
+        powerful: opencode-go/deepseek-v4.1-flash
         max: opencode-go/kimi-k2.7-code
-        ultra: opencode-go/kimi-k3
+        ultra: opencode-go/kimi-k2.7-code
     Codex:
       tiers:
         nano: gpt-5.4-mini
@@ -93,11 +93,11 @@ Advanced:
   providers:
     Claude:
       tiers:
-        nano: claude-haiku-4-5-20251001
-        fast: claude-sonnet-4-6
-        balanced: claude-opus-4-8
-        powerful: claude-fable-5
-        max: claude-fable-5
+        nano: claude-haiku-5-5
+        fast: claude-sonnet-5-5
+        balanced: claude-opus-5-5
+        powerful: claude-fable-5-1
+        max: claude-fable-5-1
     Gemini:
       tiers:
         nano: gemini-3.5-flash-medium
@@ -107,7 +107,7 @@ Advanced:
         max: gemini-3.1-pro-high
     Opencode:
       tiers:
-        nano: opencode-go/deepseek-v4-flash
+        nano: opencode-go/deepseek-v4.1-flash
         fast: opencode-go/qwen3.7-plus
         balanced: opencode-go/kimi-k2.6
         powerful: opencode-go/kimi-k2.7-code
@@ -123,11 +123,11 @@ Expensive:
   providers:
     Claude:
       tiers:
-        nano: claude-sonnet-4-6
-        fast: claude-opus-4-8
-        balanced: claude-fable-5
-        powerful: claude-fable-5
-        max: claude-fable-5
+        nano: claude-sonnet-5-5
+        fast: claude-opus-5-5
+        balanced: claude-fable-5-1
+        powerful: claude-fable-5-1
+        max: claude-fable-5-1
     Gemini:
       tiers:
         nano: gemini-3.5-flash-high
@@ -153,11 +153,11 @@ Expensive as Hell:
   providers:
     Claude:
       tiers:
-        nano: claude-opus-4-8
-        fast: claude-fable-5
-        balanced: claude-fable-5
-        powerful: claude-fable-5
-        max: claude-fable-5
+        nano: claude-opus-5-5
+        fast: claude-fable-5-1
+        balanced: claude-fable-5-1
+        powerful: claude-fable-5-1
+        max: claude-fable-5-1
     Gemini:
       tiers:
         nano: gemini-3.1-pro-low

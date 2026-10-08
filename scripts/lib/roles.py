@@ -294,7 +294,7 @@ def _resolve_tier_to_model(tier_or_alias: str, provider: str, provider_config: d
     Resolution order:
     1. Tier name (nano/fast/balanced/powerful/max) → provider model-tiers table
     2. Legacy alias (haiku/sonnet/opus) → provider model-aliases table
-    3. Full model ID (e.g. claude-sonnet-4-6) → returned as-is
+    3. Full model ID (e.g. claude-sonnet-5-5) → returned as-is
     4. Empty string → returned as-is (no model field injected)
     """
     if not tier_or_alias:
