@@ -22,5 +22,8 @@ routes:
       - security-auditor
 notes: >-
   security-auditor acts as fallback on any code diff. ui-reviewer delegates deep
-  WCAG work to accessibility-specialist. Report files over ~100 lines go to
-  /tmp/opencode/ and only paths travel the return channel (issue #514).
+  WCAG work to accessibility-specialist. Long reports: the read-only reviewer
+  quartet writes no files and returns a compact summary, splitting oversized
+  output into chunks (k/n) on the return channel; writable roles write the
+  full report to .tmp/<role>-<topic>.md in the repo and return only the path
+  (issue #514).
