@@ -1147,6 +1147,42 @@ def _port_golden_meta_tokens(text: str, variables: dict) -> str:
     return text
 
 
+_MODEL_LINE = re.compile(r"^model: (.*)$", re.MULTILINE)
+
+# Fixed old->new Claude generation map for the frozen goldens' ``model:``
+# values. Deliberately NOT "copy the current line": a role silently moving to
+# another tier (e.g. powerful -> fast) must still fail this gate. Extend only
+# when a model-generation bump lands; unmapped values are compared literally.
+_GOLDEN_MODEL_MAP = {
+    "claude-haiku-4-5-20251001": "claude-haiku-5-5",
+    "claude-sonnet-5": "claude-sonnet-5-5",
+    "claude-opus-4-8": "claude-opus-5-5",
+}
+
+
+def _port_golden_model_line(golden: str) -> str:
+    """Map the golden's first ``model:`` value through ``_GOLDEN_MODEL_MAP``.
+
+    Only the first ``model:`` line is touched; adding or dropping the field
+    still fails the gate, and an unmapped value stays literal.
+    """
+    return _MODEL_LINE.sub(
+        lambda m: "model: " + _GOLDEN_MODEL_MAP.get(m.group(1), m.group(1)),
+        golden,
+        count=1,
+    )
+
+
+def test_golden_model_port_keeps_tier_drift_visible():
+    """A role moving tier (powerful -> fast) must not be masked by the port."""
+    golden = "---\nname: x\nmodel: claude-opus-4-8\n---\nbody\n"
+    ported = _port_golden_model_line(golden)
+    assert ported == golden.replace("claude-opus-4-8", "claude-opus-5-5")
+    assert ported != golden.replace("claude-opus-4-8", "claude-haiku-5-5")
+    unmapped = "---\nmodel: claude-unknown-1\n---\n"
+    assert _port_golden_model_line(unmapped) == unmapped
+
+
 def _strip_auto_commit_tail(current: str, role: str, variables: dict) -> str:
     """Remove the role's ``{{AUTO_COMMIT_BLOCK}}`` tail from a current render.
 
@@ -1207,6 +1243,7 @@ def test_golden_equivalence_and_normalization_marking(render_env: RenderEnv):
         current = _strip_auto_commit_tail(
             render_env.rendered[role], role, render_env.variables
         )
+        golden = _port_golden_model_line(golden)
         template = render_env.source_paths[role]
         if template not in _MIGRATED_PATHS:
             if golden != current:

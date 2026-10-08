@@ -15,10 +15,10 @@ from scripts.lib.roles import resolve_model
 REPO_ROOT = Path(__file__).parent.parent
 
 # Claude model-tier expectations from config/ai-providers.yaml
-CLAUDE_MODEL_POWERFUL = "claude-opus-4-8"
-CLAUDE_MODEL_FAST = "claude-haiku-4-5-20251001"
-CLAUDE_MODEL_MAX = "claude-fable-5"
-CLAUDE_MODEL_BALANCED = "claude-sonnet-5"
+CLAUDE_MODEL_POWERFUL = "claude-opus-5-5"
+CLAUDE_MODEL_FAST = "claude-haiku-5-5"
+CLAUDE_MODEL_MAX = "claude-fable-5-1"
+CLAUDE_MODEL_BALANCED = "claude-sonnet-5-5"
 
 # Provider config is loaded by resolve_model from ai-providers.yaml.
 # We must pass it to avoid hitting disk twice; load it once here.

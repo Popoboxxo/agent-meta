@@ -567,6 +567,8 @@ def test_fetch_anthropic_models_uses_curated_fallback():
     assert all(m["provider"] == "anthropic" for m in models)
     # Latest model must be present
     ids = {m["id"] for m in models}
+    assert {"claude-fable-5-1", "claude-opus-5-5", "claude-sonnet-5-5",
+            "claude-haiku-5-5"} <= ids
     assert "claude-opus-4-8" in ids
     assert "claude-fable-5" in ids
     assert "claude-haiku-4-5-20251001" in ids
@@ -678,9 +680,18 @@ def test_fetch_anthropic_models_pricing_shape(source):
 
 def test_fetch_anthropic_models_fallback_in_sync_with_docs():
     """The curated fallback must reflect the verified pricing from
-    platform.claude.com/docs/en/about-claude/models/overview (2026-06-24)."""
+    platform.claude.com/docs/en/about-claude/models/overview (2026-10-08)."""
     by_id = {m["id"]: m for m in ANTHROPIC_FALLBACK_MODELS}
-    # Current generation
+    # Current generation (2026-10-08)
+    assert by_id["claude-fable-5-1"]["input_cost_api"] == pytest.approx(10.0)
+    assert by_id["claude-fable-5-1"]["output_cost_api"] == pytest.approx(50.0)
+    assert by_id["claude-opus-5-5"]["input_cost_api"] == pytest.approx(4.0)
+    assert by_id["claude-opus-5-5"]["output_cost_api"] == pytest.approx(20.0)
+    assert by_id["claude-sonnet-5-5"]["input_cost_api"] == pytest.approx(2.0)
+    assert by_id["claude-sonnet-5-5"]["output_cost_api"] == pytest.approx(10.0)
+    assert by_id["claude-haiku-5-5"]["input_cost_api"] == pytest.approx(0.10)
+    assert by_id["claude-haiku-5-5"]["output_cost_api"] == pytest.approx(0.50)
+    # Legacy (verified 2026-06-24)
     assert by_id["claude-haiku-4-5-20251001"]["input_cost_api"] == pytest.approx(1.0)
     assert by_id["claude-haiku-4-5-20251001"]["output_cost_api"] == pytest.approx(5.0)
     assert by_id["claude-sonnet-4-6"]["input_cost_api"] == pytest.approx(3.0)

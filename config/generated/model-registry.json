@@ -28,21 +28,21 @@
       "tier": "Standard"
     },
     {
-      "id": "claude-haiku-4-5-20251001",
-      "name": "Claude Haiku 4.5",
+      "id": "claude-haiku-5-5",
+      "name": "Claude Haiku 5.5",
       "provider": "anthropic",
-      "input_cost_api": 1.0,
-      "output_cost_api": 5.0,
-      "context_length": 200000,
+      "input_cost_api": 0.1,
+      "output_cost_api": 0.5,
+      "context_length": 1000000,
       "tier": "Standard"
     },
     {
-      "id": "claude-haiku-4-5",
-      "name": "(alias) Claude Haiku 4.5",
+      "id": "anthropic/claude-haiku-5.5:batch",
+      "name": "Anthropic: Claude Haiku 5.5 (batch)",
       "provider": "anthropic",
-      "input_cost_api": 1.0,
-      "output_cost_api": 5.0,
-      "context_length": 200000,
+      "input_cost_api": 0.049999999999999996,
+      "output_cost_api": 0.25,
+      "context_length": 1000000,
       "tier": "Standard"
     },
     {
@@ -195,6 +195,15 @@
       "provider": "anthropic",
       "input_cost_api": 2.5,
       "output_cost_api": 12.5,
+      "context_length": 200000,
+      "tier": "Standard"
+    },
+    {
+      "id": "anthropic/claude-haiku-4.5",
+      "name": "Anthropic: Claude Haiku 4.5",
+      "provider": "anthropic",
+      "input_cost_api": 1.0,
+      "output_cost_api": 5.0,
       "context_length": 200000,
       "tier": "Standard"
     },
@@ -505,8 +514,8 @@
       "tier": "Standard"
     },
     {
-      "id": "opencode-go/space-bunny-free",
-      "name": "Space Bunny Free",
+      "id": "opencode-go/longcat-2.5-preview-free",
+      "name": "Longcat 2.5 Preview Free",
       "provider": "opencode-go",
       "input_cost_api": 0.0,
       "output_cost_api": 0.0,
@@ -514,8 +523,8 @@
       "tier": "Standard"
     },
     {
-      "id": "opencode-go/longcat-2.5-preview-free",
-      "name": "Longcat 2.5 Preview Free",
+      "id": "opencode-go/step-5-preview-free",
+      "name": "Step 5 Preview Free",
       "provider": "opencode-go",
       "input_cost_api": 0.0,
       "output_cost_api": 0.0,
@@ -561,6 +570,15 @@
     {
       "id": "opencode-go/hy3-preview",
       "name": "Hy3 Preview",
+      "provider": "opencode-go",
+      "input_cost_api": 0.0,
+      "output_cost_api": 0.0,
+      "context_length": null,
+      "tier": "Standard"
+    },
+    {
+      "id": "opencode-go/claude-haiku-5-5",
+      "name": "Claude Haiku 5 5",
       "provider": "opencode-go",
       "input_cost_api": 0.0,
       "output_cost_api": 0.0,
@@ -633,6 +651,15 @@
     {
       "id": "opencode-go/gpt-6-luna",
       "name": "Gpt 6 Luna",
+      "provider": "opencode-go",
+      "input_cost_api": 0.0,
+      "output_cost_api": 0.0,
+      "context_length": null,
+      "tier": "Standard"
+    },
+    {
+      "id": "opencode-go/space-bunny",
+      "name": "Space Bunny",
       "provider": "opencode-go",
       "input_cost_api": 0.0,
       "output_cost_api": 0.0,

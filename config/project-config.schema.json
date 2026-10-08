@@ -344,7 +344,7 @@
     },
     "model-override-all": {
       "type": "object",
-      "description": "Global per-provider model blast. When a provider key is set (non-empty), EVERY active agent/role of that provider resolves to this single model during sync.py — overriding all per-role, tier, preset and alias resolution. Fully reversible: remove the key (or the whole block) and the previous per-agent settings apply again automatically. Value may be a tier (nano/fast/balanced/powerful/max), a legacy alias (haiku/sonnet/opus) or a full model ID (e.g. claude-sonnet-4-6).",
+      "description": "Global per-provider model blast. When a provider key is set (non-empty), EVERY active agent/role of that provider resolves to this single model during sync.py — overriding all per-role, tier, preset and alias resolution. Fully reversible: remove the key (or the whole block) and the previous per-agent settings apply again automatically. Value may be a tier (nano/fast/balanced/powerful/max), a legacy alias (haiku/sonnet/opus) or a full model ID (e.g. claude-sonnet-5-5).",
       "additionalProperties": {
         "type": "string",
         "description": "Tier, alias or full model ID to blast onto every role of this provider."
@@ -541,7 +541,7 @@
     },
     "tier-overrides": {
       "type": "object",
-      "description": "Override the resolved tier per role. Value is a tier name (nano/fast/balanced/powerful/max/ultra) or a raw model-id string (e.g. claude-sonnet-5).",
+      "description": "Override the resolved tier per role. Value is a tier name (nano/fast/balanced/powerful/max/ultra) or a raw model-id string (e.g. claude-sonnet-5-5).",
       "additionalProperties": {
         "type": "string"
       }

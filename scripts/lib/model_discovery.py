@@ -51,7 +51,7 @@ HTTP_TIMEOUT = 20
 
 # Curated fallback for Anthropic model catalog.
 # Source: https://platform.claude.com/docs/en/about-claude/models/overview.md
-# Last verified: 2026-06-24
+# Last verified: 2026-10-08
 # Used when the live fetch fails (network error or non-markdown response).
 # The format mirrors the registry dict produced by the other fetchers
 # so ``discover_models`` can use the result transparently.
@@ -64,6 +64,44 @@ HTTP_TIMEOUT = 20
 # and expose the pre-4.6 aliases as additional entries with ``name`` prefixed
 # ``(alias)`` so they surface in the UI but are visually distinct.
 ANTHROPIC_FALLBACK_MODELS: list[dict[str, Any]] = [
+    # Current generation (2026-10-08)
+    {
+        "id": "claude-fable-5-1",
+        "name": "Claude Fable 5.1",
+        "provider": "anthropic",
+        "input_cost_api": 10.00,
+        "output_cost_api": 50.00,
+        "context_length": 1000000,
+        "tier": "Standard",
+    },
+    {
+        "id": "claude-opus-5-5",
+        "name": "Claude Opus 5.5",
+        "provider": "anthropic",
+        "input_cost_api": 4.00,
+        "output_cost_api": 20.00,
+        "context_length": 1000000,
+        "tier": "Standard",
+    },
+    {
+        "id": "claude-sonnet-5-5",
+        "name": "Claude Sonnet 5.5",
+        "provider": "anthropic",
+        "input_cost_api": 2.00,
+        "output_cost_api": 10.00,
+        "context_length": 1000000,
+        "tier": "Standard",
+    },
+    {
+        "id": "claude-haiku-5-5",
+        "name": "Claude Haiku 5.5",
+        "provider": "anthropic",
+        "input_cost_api": 0.10,
+        "output_cost_api": 0.50,
+        "context_length": 1000000,
+        "tier": "Standard",
+    },
+    # Legacy
     {
         "id": "claude-haiku-4-5-20251001",
         "name": "Claude Haiku 4.5",
