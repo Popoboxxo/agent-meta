@@ -44,6 +44,7 @@ Run: python -m pytest tests/test_orchestrator_guard_hook.py -v
 """
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -1197,3 +1198,86 @@ def test_fork_bomb_text_literal_not_blocked(command, tmp_path):
     # STRING argument must not trip the gate.
     result = _run_hook({**_bash_payload(command), "cwd": tmp_path.as_posix()})
     assert result.returncode == 0, f"stderr={result.stderr}"
+
+
+# --- SR-B-10: strict-mode detection fails closed on unreadable config ------
+# Each case builds a throwaway tmp_path project (never the real repo) so no
+# test here writes into the real .claude/hooks/.guard-audit.log.
+
+
+def _strict_project(tmp_path, project_yaml: str):
+    (tmp_path / ".meta-config").mkdir(parents=True, exist_ok=True)
+    (tmp_path / ".meta-config" / "project.yaml").write_text(project_yaml, encoding="utf-8")
+
+
+def _run_hook_in(tmp_path, payload: dict, hide_yaml: bool) -> subprocess.CompletedProcess:
+    env = dict(os.environ)
+    if hide_yaml:
+        # A fake yaml.py earlier on sys.path makes `import yaml` raise
+        # ImportError -- simulates a hook interpreter without PyYAML.
+        shadow = tmp_path / "no-yaml"
+        shadow.mkdir(exist_ok=True)
+        (shadow / "yaml.py").write_text("raise ImportError('PyYAML hidden by test')\n", encoding="utf-8")
+        env["PYTHONPATH"] = str(shadow)
+    return subprocess.run(
+        [_BASH, str(_HOOK_PATH)],
+        input=json.dumps({**payload, "cwd": tmp_path.as_posix()}),
+        capture_output=True, text=True, cwd=str(tmp_path), env=env,
+    )
+
+
+_MAIN_THREAD_WRITE = {"tool_name": "Write", "tool_input": {"file_path": "foo.txt", "content": "x"}}
+
+
+@pytest.mark.parametrize("project_yaml", [
+    "orchestrator:\n  mode: strict\n",
+    "orchestrator:\n  enabled: true\n  strict: true\n",
+    "orchestrator:\n  provider-overrides:\n    claude:\n      mode: strict\n",
+])
+def test_strict_mode_blocks_without_pyyaml(tmp_path, project_yaml):
+    _strict_project(tmp_path, project_yaml)
+    result = _run_hook_in(tmp_path, _MAIN_THREAD_WRITE, hide_yaml=True)
+    assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    assert "STRICT MODE" in result.stderr
+    assert "PyYAML" in result.stderr
+
+
+@pytest.mark.parametrize("project_yaml", [
+    "orchestrator:\n  mode: default\n",
+    "orchestrator:\n  enabled: true\n  strict: false\n",
+    "project:\n  name: x\n",
+])
+def test_non_strict_project_without_pyyaml_allows(tmp_path, project_yaml):
+    _strict_project(tmp_path, project_yaml)
+    result = _run_hook_in(tmp_path, _MAIN_THREAD_WRITE, hide_yaml=True)
+    assert result.returncode == 0, f"stdout={result.stdout!r} stderr={result.stderr!r}"
+
+
+def test_ambiguous_orchestrator_block_without_pyyaml_fails_closed(tmp_path):
+    # Flow-style mapping can't be judged by a line scan -> conservative block.
+    _strict_project(tmp_path, "orchestrator: {mode: strict}\n")
+    result = _run_hook_in(tmp_path, _MAIN_THREAD_WRITE, hide_yaml=True)
+    assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
+
+
+def test_malformed_strict_config_fails_closed(tmp_path):
+    pytest.importorskip("yaml")
+    _strict_project(tmp_path, "orchestrator:\n  mode: strict\n  bad: [unclosed\n")
+    result = _run_hook_in(tmp_path, _MAIN_THREAD_WRITE, hide_yaml=False)
+    assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    assert "STRICT MODE" in result.stderr
+
+
+def test_strict_project_with_pyyaml_still_blocks(tmp_path):
+    pytest.importorskip("yaml")
+    _strict_project(tmp_path, "orchestrator:\n  mode: strict\n")
+    result = _run_hook_in(tmp_path, _MAIN_THREAD_WRITE, hide_yaml=False)
+    assert result.returncode == 2
+    assert "PyYAML" not in result.stderr
+
+
+def test_non_strict_project_with_pyyaml_allows(tmp_path):
+    pytest.importorskip("yaml")
+    _strict_project(tmp_path, "orchestrator:\n  enabled: true\n  strict: false\n")
+    result = _run_hook_in(tmp_path, _MAIN_THREAD_WRITE, hide_yaml=False)
+    assert result.returncode == 0, f"stdout={result.stdout!r} stderr={result.stderr!r}"
