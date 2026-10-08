@@ -430,12 +430,12 @@ See `docs/RELEASE_GATES.md` for the full config reference.
 
 | Tier | Claude | Gemini | Opencode |
 |------|--------|--------|----------|
-| **nano** | claude-haiku-4-5-20251001 | gemini-3.5-flash-medium | deepseek-v4-flash |
-| **fast** | claude-haiku-4-5-20251001 | gemini-3.5-flash-high | deepseek-v4-flash |
-| **balanced** | claude-sonnet-4-6 | gemini-3.1-pro-low | qwen3.7-plus |
-| **powerful** | claude-opus-4-8 | gemini-3.1-pro-high | kimi-k2.6 |
-| **max** | claude-fable-5 | gemini-3.1-pro-high | kimi-k2.7-code |
-| **ultra** | claude-opus-4-8 | gemini-3.1-pro-high | kimi-k2.7-code |
+| **nano** | claude-haiku-5-5 | gemini-3.5-flash-medium | deepseek-v4-flash |
+| **fast** | claude-haiku-5-5 | gemini-3.5-flash-high | deepseek-v4-flash |
+| **balanced** | claude-sonnet-5-5 | gemini-3.1-pro-low | qwen3.7-plus |
+| **powerful** | claude-opus-5-5 | gemini-3.1-pro-high | kimi-k2.6 |
+| **max** | claude-fable-5-1 | gemini-3.1-pro-high | kimi-k2.7-code |
+| **ultra** | claude-opus-5-5 | gemini-3.1-pro-high | kimi-k2.7-code |
 
 **ultra** is reserved exclusively for `principal-developer` (last-resort escalation after repeated senior-developer failures). Never auto-routed by keyword. Resolves to the strongest *real* model (not fictitious IDs like claude-fable-5).
 
