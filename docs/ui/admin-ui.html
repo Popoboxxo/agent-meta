@@ -117,7 +117,9 @@ a:hover { text-decoration: underline; }
   color: var(--text-secondary);
   border-left: 3px solid transparent;
   font-size: 13px;
+  text-decoration: none;
 }
+.nav-item:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: -2px; }
 .nav-item:hover { color: var(--text-primary); background: rgba(255,255,255,0.03); }
 .nav-item.active {
   color: var(--accent-blue);
@@ -126,6 +128,10 @@ a:hover { text-decoration: underline; }
 }
 .nav-item .icon { width: 16px; opacity: 0.7; }
 .nav-item.disabled { opacity: 0.35; pointer-events: none; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
 
 #content {
   background: var(--bg-primary);
@@ -1138,7 +1144,10 @@ class Router {
       content.appendChild(renderError(err));
     }
     document.querySelectorAll(".nav-item").forEach(n => {
-      n.classList.toggle("active", n.dataset.route === hash);
+      const isActive = n.dataset.route === hash;
+      n.classList.toggle("active", isActive);
+      if (isActive) n.setAttribute("aria-current", "page");
+      else n.removeAttribute("aria-current");
     });
   }
 }
@@ -1628,14 +1637,19 @@ function buildSidebar() {
     for (const item of group.items) {
       if (item.superOnly) window.superOnlyRoutes.add(item.route);
       const isReadonly = item.superOnly && state.state.mode !== "super_admin";
-      const node = el("div", {
+      // Native link: the router is hash-based, so href="#/route" fires
+      // hashchange and is keyboard-operable without extra handlers (WCAG 2.1.1).
+      const node = el("a", {
         class: `nav-item`,
+        href: "#" + item.route,
         dataset: { route: item.route },
-        onclick: () => router.navigate(item.route),
       }, [
-        el("span", { class: "icon" }, [item.icon]),
+        el("span", { class: "icon", "aria-hidden": "true" }, [item.icon]),
         item.label,
-        isReadonly ? el("span", { style: "margin-left:auto; font-size: 0.85em; opacity: 0.5;", title: "Read-Only" }, ["🔒"]) : ""
+        isReadonly ? el("span", { style: "margin-left:auto; font-size: 0.85em; opacity: 0.5;", title: "Read-Only" }, [
+          el("span", { "aria-hidden": "true" }, ["🔒"]),
+          el("span", { class: "sr-only" }, [" (read-only)"]),
+        ]) : ""
       ]);
       nav.appendChild(node);
     }
