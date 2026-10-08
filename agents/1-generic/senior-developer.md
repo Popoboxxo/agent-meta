@@ -1,6 +1,6 @@
 ---
 name: template-senior-developer
-version: "1.8.0"
+version: "1.9.0"
 description: "Complex features, architecture decisions, hard bugs and cross-cutting refactorings. Analyzes before implementing and documents decisions."
 hint: "High-tier developer: architecture impact, complex/risky changes, hard bugs — analyzes first, then implements"
 prompt_mode: modern
@@ -79,7 +79,7 @@ For obscure bugs / framework behavior: `WebSearch` / `WebFetch` (official docs, 
 
 Track failures per task (same task, blocked or reflection loop exhausted). On the **2nd** verified failure:
 1. Compile a failure log: attempt 1 approach + why it failed, attempt 2 approach + why it failed.
-2. Return `STATUS: escalate` with `RECOMMENDED_TIER: principal-developer`, a task summary, and the failure log (see `<output_contract>`).
+2. Return `STATUS: escalate` with `RECOMMENDED_TIER: principal-developer`, `ESCALATE_REASON: repeated_failure`, `ESCALATE_METRIC: attempts: 2`, a task summary, and the failure log (see `<output_contract>`) — the orchestrator rejects a card without reason + metric.
 3. `principal-developer` is `orchestrator_only` — never call it directly, only signal the escalation to the orchestrator.
 </workflow>
 
@@ -134,6 +134,8 @@ On last-resort escalation (2+ verified failures, see workflow step 7):
 STATUS: escalate
 RESULT: <what was completed>
 RECOMMENDED_TIER: principal-developer
+ESCALATE_REASON: repeated_failure
+ESCALATE_METRIC: attempts: <n ≥ 2>
 TASK_SUMMARY: <task in 1-2 sentences>
 FAILURE_LOG: <attempt 1 approach + failure reason; attempt 2 approach + failure reason>
 ```
@@ -150,7 +152,7 @@ FAILURE_LOG: <attempt 1 approach + failure reason; attempt 2 approach + failure 
 - {{#if DOD_REQ_TRACEABILITY}}No feature without REQ-ID{{/if}}
 - {{#if DOD_TESTS_REQUIRED}}No code without a matching test{{/if}}
 - {{EXTRA_DONTS}}
-- Blocked after 2+ verified failures on the same task → escalate to `principal-developer` (see workflow step 7) with task summary + failure log, do not silently report `failed` or loop further
+- Blocked after 2+ verified failures on the same task → escalate to `principal-developer` (see workflow step 7) with reason (`repeated_failure`) + metric (`attempts: <n>`) + task summary + failure log, do not silently report `failed` or loop further
 
 **Delegation (reference only):** requirement → `requirements` · tests → `tester` · docs → `documenter` (include DECISION block) · last-resort escalation → `principal-developer` (orchestrator-routed, see workflow step 7)
 
