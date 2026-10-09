@@ -37,6 +37,9 @@ _CANONICAL_FIELDS = (
 _PLACEHOLDER = "{{ESCALATE_CARD_BLOCK}}"
 _MANDATORY_RULE = "MANDATORY (issue #346)"
 _GATE_MARKERS = re.compile(r"task summary|failure log", re.IGNORECASE)
+# Old inline card keyword — a standalone `ESCALATE` line marks a second,
+# non-canonical card body that must not survive next to the placeholder.
+_OLD_CARD_KEYWORD = re.compile(r"^ESCALATE$", re.MULTILINE)
 
 # Unrendered tier template -> the role-specific lines that must accompany the
 # canonical placeholder. The generic card schema carries no tier values, so
@@ -44,6 +47,7 @@ _GATE_MARKERS = re.compile(r"task summary|failure log", re.IGNORECASE)
 _TIER_LINES: dict[str, tuple[str, ...]] = {
     "junior-developer.md": (
         "RECOMMENDED_TIER for this tier: developer | senior-developer",
+        "FINDINGS:",
     ),
     "developer.md": (
         "RECOMMENDED_TIER for this tier: <junior-developer|developer|senior-developer>",
@@ -107,6 +111,8 @@ def test_tier_templates_reference_snippet_without_literal_card():
                 problems.append(f"{name}: role line {line!r} missing")
         if _escalate_blocks(text):
             problems.append(f"{name}: literal STATUS: escalate card still present")
+        if _OLD_CARD_KEYWORD.search(text):
+            problems.append(f"{name}: standalone ESCALATE card keyword still present")
     assert problems == [], "\n".join(problems)
 
 
@@ -139,6 +145,43 @@ def test_rendered_goldens_carry_canonical_card():
             assert field in text, f"golden {name} lacks {field}"
         assert _MANDATORY_RULE in text, f"golden {name} lacks mandatory rule"
     assert checked == 3, f"expected 3 golden-covered tiers, found {checked}"
+
+
+def _render_template(path: Path) -> str:
+    """Render one (platform) template the way the sync pipeline does."""
+    from scripts.lib.agent_sync import compose_agent
+    from scripts.lib.config import build_variables, load_config
+    from scripts.lib.frontmatter import extract_frontmatter_field
+    from scripts.lib.log import SyncLog
+    from scripts.lib.variables import strip_inactive_conditional_blocks, substitute
+
+    config = load_config(_ROOT / ".meta-config" / "project.yaml")
+    variables, _warnings = build_variables(config, _ROOT, Path("/tmp/am-escalate-render"))
+    log = SyncLog()
+    text = path.read_text(encoding="utf-8")
+    extends = extract_frontmatter_field(text, "extends")
+    if extends:
+        text = compose_agent(_ROOT / "agents" / extends, text, log)
+    rendered = substitute(text, variables, str(path), log)
+    return strip_inactive_conditional_blocks(rendered, variables)
+
+
+def test_homeassistant_override_satisfies_intake_rule():
+    """AC SR-C-07: the platform override's card carries reason AND metric."""
+    override = _ROOT / "agents" / "2-platform" / "homeassistant-developer.md"
+    source = override.read_text(encoding="utf-8")
+    assert _PLACEHOLDER in source, "override does not inline the canonical card"
+    assert "ESCALATE_REASON: <short>" not in source, "metric-less card literal remains"
+    rendered = _render_template(override)
+    card = next(
+        (b for b in re.findall(r"```\n(.*?)```", rendered, re.DOTALL)
+         if "STATUS: escalate" in b),
+        "",
+    )
+    assert "ESCALATE_REASON:" in card, "rendered override card lacks ESCALATE_REASON"
+    assert "ESCALATE_METRIC:" in card, "rendered override card lacks ESCALATE_METRIC"
+    assert _MANDATORY_RULE in rendered
+    assert "RECOMMENDED_TIER for this tier: <junior-developer|developer|senior-developer>" in rendered
 
 
 def _gate_lines_without_reason_metric(text: str) -> list[str]:
