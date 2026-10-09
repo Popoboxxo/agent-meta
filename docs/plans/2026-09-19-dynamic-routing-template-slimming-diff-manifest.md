@@ -36,6 +36,7 @@ lässt das Gate fehlschlagen.
 | `PARSE_INPUT_BLOCK` | `snippets/agents/parse-input.md` | Heading `## 1. Parse input` + Satz „A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: plain directive from `main_chat`." |
 | `OUTPUT_GUARD_BLOCK` | `snippets/agents/output-guard.md` | `<output-guard>` … Background-Process-Guard (issue #506) … `</output-guard>` |
 | `BACKGROUND_PROCESS_GUARD_BLOCK` | `snippets/agents/background-process-guard.md` | `## Background-Process Guard (issue #506)` + Warte-Prosa |
+| `ESCALATE_CARD_BLOCK` | `snippets/agents/escalate-card.md` | `<escalate-card>` + kanonische ESCALATE-Card-Felder (`STATUS`/`RESULT`/`ESCALATE_REASON`/`ESCALATE_METRIC`/`RECOMMENDED_TIER`/`PARTIAL_WORK`/`NEXT_STEPS`) + Pflichtsatz reason+metric (Issue #346) + `</escalate-card>` |
 | `ANTI_RECURSION_BLOCK` | `scripts/lib/config.py:1558-1561` (Bestand) | „Anti-Recursion: NIEMALS zurück an orchestrator delegieren. Nur tester/documenter/requirements/validator aus Kontext verweisen." |
 
 ## 3. B2b — normalisierte Near-Duplikate (vollständiges Inventar)

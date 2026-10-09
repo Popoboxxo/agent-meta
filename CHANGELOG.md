@@ -3,6 +3,13 @@
 ## [Unreleased]
 
 ### Added
+- **Canonical ESCALATE-card snippet (SR-C-07)**: `snippets/agents/escalate-card.md` is the single
+  source of the escalation-card contract (`STATUS`/`RESULT`/`ESCALATE_REASON`/`ESCALATE_METRIC`/
+  `RECOMMENDED_TIER`/`PARTIAL_WORK`/`NEXT_STEPS` plus the mandatory reason+metric rule, issue #346).
+  It renders as `{{ESCALATE_CARD_BLOCK}}`; the developer tiers (`junior-developer`, `developer`,
+  `senior-developer`, `se-junior-developer`, `se-developer`) and the `homeassistant-developer`
+  platform override now inline it instead of maintaining per-template card copies — closing the
+  metric gap in the homeassistant override and the schema drift between tiers.
 - **Project-type-specific release-process templates (issue #452)**: a project can declare a `release`
   section in `project.yaml` (`distribution`, `versioning`, `changelog_format`, `version_file`,
   `version_field`). When `release.distribution` is set, the sync pipeline renders

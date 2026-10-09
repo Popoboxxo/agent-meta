@@ -1,6 +1,6 @@
 ---
 name: developer
-version: "2.0.1"
+version: "2.1.0"
 based-on: "1-generic/developer.md@4.0.2"
 description: "Home Assistant Developer — YAML-Konfigurationen, Automatisierungen, Templates, Energy-Layer und Package-Struktur."
 hint: "Feature-Implementierung und Bugfixes für Home Assistant (YAML, Jinja2, Packages)"
@@ -158,14 +158,9 @@ patches:
 
       On escalation:
 
-      ```
-      STATUS: escalate
-      RESULT: <what was completed>
-      ESCALATE_REASON: <short>
-      RECOMMENDED_TIER: <junior-developer|developer|senior-developer>
-      PARTIAL_WORK: <what is already done>
-      NEXT_STEPS: <concrete next steps>
-      ```
+      {{ESCALATE_CARD_BLOCK}}
+
+      RECOMMENDED_TIER for this tier: <junior-developer|developer|senior-developer>
 
       Delegation:
       - New requirement? → `requirements`
