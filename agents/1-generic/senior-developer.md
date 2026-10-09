@@ -1,6 +1,6 @@
 ---
 name: template-senior-developer
-version: "1.9.0"
+version: "1.10.0"
 description: "Complex features, architecture decisions, hard bugs and cross-cutting refactorings. Analyzes before implementing and documents decisions."
 hint: "High-tier developer: architecture impact, complex/risky changes, hard bugs — analyzes first, then implements"
 prompt_mode: modern
@@ -130,15 +130,12 @@ NEXT: [Review | Tests | Commit]
 ```
 
 On last-resort escalation (2+ verified failures, see workflow step 7):
-```
-STATUS: escalate
-RESULT: <what was completed>
-RECOMMENDED_TIER: principal-developer
-ESCALATE_REASON: repeated_failure
-ESCALATE_METRIC: attempts: <n ≥ 2>
+
+{{ESCALATE_CARD_BLOCK}}
+
+RECOMMENDED_TIER for this tier: principal-developer
 TASK_SUMMARY: <task in 1-2 sentences>
-FAILURE_LOG: <attempt 1 approach + failure reason; attempt 2 approach + failure reason>
-```
+FAILURE_LOG: <attempt n approach + failure reason>
 **Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
 
 </output_contract>

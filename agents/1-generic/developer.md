@@ -1,6 +1,6 @@
 ---
 name: template-developer
-version: "4.6.0"
+version: "4.7.0"
 description: "Use when a REQ-ID or clearly scoped task needs direct feature/bugfix implementation."
 hint: "Use for feature/bugfix implementation by REQ-ID — Modern Mode, XML structure, TS contracts."
 reference_standards:
@@ -112,17 +112,9 @@ ERRORS: <empty if none>
 
 On escalation:
 
-```
-STATUS: escalate
-RESULT: <what was completed>
-ESCALATE_REASON: <categorical: blast_radius_growth | scope_violation | repeated_failure | security_risk | blocked_dependency>
-ESCALATE_METRIC: <quantifiable, e.g. affected_files > 5 | subsystems: 3 | attempts: 2>
-RECOMMENDED_TIER: <junior-developer|developer|senior-developer>
-PARTIAL_WORK: <what is already done>
-NEXT_STEPS: <concrete next steps>
-```
+{{ESCALATE_CARD_BLOCK}}
 
-`ESCALATE_REASON` (categorical) + `ESCALATE_METRIC` (quantifiable) are MANDATORY (issue #346): a card without both is invalid — the orchestrator rejects the tier change and requests structured re-submission.
+RECOMMENDED_TIER for this tier: <junior-developer|developer|senior-developer>
 
 Delegation:
 - New requirement? → `requirements`

@@ -1,6 +1,6 @@
 ---
 name: template-junior-developer
-version: "1.7.0"
+version: "1.8.0"
 description: "Fast, well-scoped code changes: 1-2 files, no architecture impact. Escalates in a structured way as soon as scope grows."
 hint: "Low-tier developer: trivial fixes, typos, small well-scoped changes — escalates on scope overrun"
 prompt_mode: modern
@@ -102,10 +102,14 @@ STATUS: done|partial|failed|escalate
 RESULT: <what changed, 1 sentence>
 ARTIFACTS: <changed files>
 COMMIT: <hash> (if created)
-ESCALATE: { reason, metric, recommended_tier, findings, partial_work } (if escalated)
 ```
 **Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
 
+On escalation:
+
+{{ESCALATE_CARD_BLOCK}}
+
+RECOMMENDED_TIER for this tier: developer | senior-developer
 </output_contract>
 
 <constraints>

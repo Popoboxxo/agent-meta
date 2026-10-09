@@ -1,6 +1,6 @@
 ---
 name: se-junior-developer
-version: 1.7.0
+version: 1.8.0
 description: Implements trivial SE leaf nodes (COTS wrappers, single-interface components). Escalates on interface complexity or scope growth. Persists implementation output.
 hint: |
   Use for trivial SE leaf nodes: single component, 0-1 interfaces, no cross-cutting concerns. Escalates if interface complexity grows.
@@ -118,18 +118,12 @@ Escalation is success, not failure. A clean escalation after 2 minutes beats a r
 
 When escalating, return `status: escalate` with:
 
-```
-ESCALATE
-leaf_id: <leaf identifier>
-req_id: <REQ-ID>
-reason: <categorical: scope_violation | blast_radius_growth | repeated_failure | blocked_dependency> — <single sentence describing the violated criterion>
-metric: <quantifiable, e.g. interfaces: 2 > 1 | subsystems: 3 | attempts: 2>
-recommended_tier: se-developer | se-senior-developer
-findings: <what you already discovered — files, root cause, context>
-partial_work: none | <what was changed and current state>
-```
+{{ESCALATE_CARD_BLOCK}}
 
-`reason` (categorical) + `metric` (quantifiable) are MANDATORY (issue #346): a card without both is invalid — the orchestrator rejects the tier change and requests structured re-submission.
+RECOMMENDED_TIER for this tier: se-developer | se-senior-developer
+LEAF_ID: <leaf identifier>
+REQ_ID: <REQ-ID>
+FINDINGS: <what you already discovered — files, root cause, context>
 
 ## Workflow
 
