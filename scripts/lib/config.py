@@ -1922,8 +1922,9 @@ def _build_snippet_variables(variables: dict, agent_meta_root: Path) -> None:
             `{{LANGUAGE}}` pre-resolved against `variables["LANGUAGE"]`),
             PROMPT_INJECTION_DEFENSE_BLOCK (from snippets/security/) and the
             block-inlining variables OUTPUT_GUARD_BLOCK,
-            BACKGROUND_PROCESS_GUARD_BLOCK and PARSE_INPUT_BLOCK (from
-            snippets/agents/, run through `_load_block_snippet`).
+            BACKGROUND_PROCESS_GUARD_BLOCK, PARSE_INPUT_BLOCK and
+            ESCALATE_CARD_BLOCK (from snippets/agents/, run through
+            `_load_block_snippet`).
         agent_meta_root: agent-meta source root (snippet file location).
     """
 
@@ -1990,6 +1991,7 @@ def _build_snippet_variables(variables: dict, agent_meta_root: Path) -> None:
         ("output-guard", "OUTPUT_GUARD"),
         ("background-process-guard", "BACKGROUND_PROCESS_GUARD"),
         ("parse-input", "PARSE_INPUT"),
+        ("escalate-card", "ESCALATE_CARD"),
     ):
         variables[f"{_var_stem}_BLOCK"] = _load_block_snippet(
             _block_snippets_dir / f"{_snippet_name}.md"
