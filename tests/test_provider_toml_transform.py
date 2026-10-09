@@ -305,4 +305,4 @@ def test_empty_catalog_still_falls_back_to_preset_global() -> None:
     resolved = resolve_model("orchestrator", {"tier-preset": "Normal"},
                              REPO_ROOT, provider="Continue",
                              provider_config=_PROVIDER_CONFIG)
-    assert resolved == "claude-sonnet-5"
+    assert resolved == "claude-sonnet-5-5"

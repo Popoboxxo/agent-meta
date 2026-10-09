@@ -138,7 +138,7 @@ def test_continue_generation_path_without_inherit_uses_role_defaults_fallback() 
     resolve_model() maps role-defaults tier 'balanced' via the Normal preset
     to a concrete ID, so the raw role-defaults fallback never triggers."""
     fm = _generate_continue_agent().split("---")[1]
-    assert "model: claude-sonnet-5" in fm, (
+    assert "model: claude-sonnet-5-5" in fm, (
         f"Without inherit the generation path must resolve as before, got: {fm!r}"
     )
 
