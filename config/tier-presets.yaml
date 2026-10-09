@@ -60,7 +60,7 @@ Normal:
         balanced: opencode-go/deepseek-v4.1-flash
         powerful: opencode-go/deepseek-v4.1-flash
         max: opencode-go/kimi-k2.7-code
-        ultra: opencode-go/kimi-k2.7-code
+        ultra: opencode-go/kimi-k3
     Codex:
       tiers:
         nano: gpt-5.4-mini

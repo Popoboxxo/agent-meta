@@ -129,7 +129,7 @@ mindmap
 | **developer** | powerful | 4.0.1 | Feature implementation and bugfixes |
 | **junior-developer** | fast | 1.2.1 | Trivial changes (1-2 files, no architecture impact) |
 | **senior-developer** | powerful | 1.2.2 | Complex features, architecture decisions, difficult bugs |
-| **principal-developer** | ultra | 1.0.1 | Last-resort escalation above senior-developer — root-cause diagnosis, systemic reasoning, no symptom fixes (most expensive call) |
+| **principal-developer** | max | 1.0.1 | Last-resort escalation above senior-developer — root-cause diagnosis, systemic reasoning, no symptom fixes (most expensive call) |
 | **intern-developer** | nano | 1.0.0 | Easter-egg/gag agent: over-eager clueless intern, read-only and harmless — not for production |
 | **requirements** | balanced | 1.4.3 | Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md |
 | **tester** | balanced | 2.1.4 | Isolated unit tests with mocks/stubs (TDD workflow) |
@@ -426,7 +426,7 @@ See `docs/RELEASE_GATES.md` for the full config reference.
 
 ## Model Tiers & Tier Presets
 
-### 5 Model Tiers
+### 6 Model Tiers
 
 | Tier | Claude | Gemini | Opencode |
 |------|--------|--------|----------|
@@ -434,10 +434,10 @@ See `docs/RELEASE_GATES.md` for the full config reference.
 | **fast** | claude-haiku-5-5 | gemini-3.5-flash-high | deepseek-v4.1-flash |
 | **balanced** | claude-sonnet-5-5 | gemini-3.1-pro-low | deepseek-v4.1-flash |
 | **powerful** | claude-opus-5-5 | gemini-3.1-pro-high | deepseek-v4.1-flash |
-| **max** | claude-fable-5-1 | gemini-3.1-pro-high | kimi-k2.7-code |
-| **ultra** | claude-fable-5-1 | gemini-3.1-pro-high | kimi-k2.7-code |
+| **max** | claude-opus-5-5 | gemini-3.1-pro-high | kimi-k2.7-code |
+| **ultra** | claude-fable-5-1 | gemini-3.1-pro-high | kimi-k3 |
 
-**ultra** is reserved exclusively for `principal-developer` (last-resort escalation after repeated senior-developer failures). Never auto-routed by keyword. Ultra resolves only where the active tier preset defines an `ultra` tier for the provider — today only the `Normal` preset does (Claude `claude-fable-5-1`, Gemini `gemini-3.1-pro-high`, Opencode `opencode-go/kimi-k2.7-code`); for every other preset/provider combination no model is pinned and the provider default applies (see `_resolve_tier_to_model` in `scripts/lib/roles.py`), which is why `principal-developer` is pinned to `max` in `config/role-defaults.yaml`.
+**ultra** is not the default tier of any role (`principal-developer` defaults to `max`); it is reached only via `tier-overrides` or an A2A `tier_override: ultra`. Never auto-routed by keyword. Ultra resolves only where the active tier preset defines an `ultra` tier for the provider — today only the `Normal` preset does (Claude `claude-fable-5-1`, Gemini `gemini-3.1-pro-high`, Opencode `opencode-go/kimi-k3`); for every other preset/provider combination no model is pinned and the provider default applies (see `_resolve_tier_to_model` in `scripts/lib/roles.py`), which is why `principal-developer` is pinned to `max` in `config/role-defaults.yaml`.
 
 Continue and Copilot: no per-agent model tiers (managed centrally).
 
