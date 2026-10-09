@@ -277,6 +277,32 @@ roles:
         ref_key: plan_ref
         stage: implement
     short_desc: Umsetzungsplanung
+  template-auditor:
+    model: fast
+    memory: ''  # Operational role, starts fresh each time to avoid context pollution.
+    workflow_tier: optional
+    description: 'Read-only Konformitäts-Audit der Agenten-Definitionen: Frontmatter-
+      und Ausgabe-Contract, Platzhalter-Integrität, hart geschriebene Delegation,
+      Override-Staleness. Reportet Findings mit file:line, editiert nie.'
+    routing:
+      addressability: name_only
+      name_only_reason: Explicit audit role — invoked only by direct name dispatch; keyword
+        routing would let a routine code task silently trigger a full framework audit.
+      parallel: false
+      orchestrator_only: true
+    routing_patterns:
+      keywords:
+      - Agenten-Audit
+      - Template-Audit
+      - Konformitätsprüfung
+      - Framework-Audit
+      examples:
+      - "Prüfe ob alle Agenten-Definitionen noch framework-konform sind."
+    handoff:
+      input_contracts:
+      - task-spec-v1
+      output_contract: audit-findings-v1
+    short_desc: 'Read-only Audit der Agenten-Definitionen — Findings statt Fixes'
   tester:
     model: fast
     memory: ''
