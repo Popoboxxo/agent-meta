@@ -357,15 +357,7 @@ auto_commit:
 model-inherit-main-chat:
   Opencode: true
   Claude: false
-model-overrides:
-  Gemini:
-    knowledge-curator: gemini-2.0-flash-lite-preview-02-05
-    knowledge-ingestor: gemini-2.0-flash-lite-preview-02-05
-    knowledge-querier: gemini-2.0-flash-lite-preview-02-05
-    knowledge-linter: gemini-2.0-flash-lite-preview-02-05
-    knowledge-indexer: gemini-2.0-flash-lite-preview-02-05
-    knowledge-gardener: gemini-2.0-flash-lite-preview-02-05
-    knowledge-migrator: gemini-2.0-flash-lite-preview-02-05
+model-overrides: {}
 reflection-pairs:
   overrides:
     dev-review-loop:
