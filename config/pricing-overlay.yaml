@@ -138,3 +138,12 @@ prices:
     opencode-go/grok-4.5:
       input: 0.0
       output: 0.0
+    opencode-go/mimo-v2.6-flash:
+      input: 0.0
+      output: 0.0
+    opencode-go/mimo-v2.6-pro:
+      input: 0.0
+      output: 0.0
+    opencode-go/deepseek-v4.1-flash:
+      input: 0.0
+      output: 0.0
