@@ -17,7 +17,7 @@ tools:
 - Grep
 - TodoWrite
 generated-from: 2-platform/agent-meta-developer.md@2.0.1
-model: claude-sonnet-5
+model: claude-sonnet-5-5
 ---
 
 > **Extension:** If `.claude/3-project/am-developer-ext.md` exists → read and apply immediately.
@@ -184,17 +184,21 @@ ERRORS: <empty if none>
 
 On escalation:
 
+<escalate-card>
+## Escalation Card (canonical contract)
 ```
 STATUS: escalate
 RESULT: <what was completed>
 ESCALATE_REASON: <categorical: blast_radius_growth | scope_violation | repeated_failure | security_risk | blocked_dependency>
 ESCALATE_METRIC: <quantifiable, e.g. affected_files > 5 | subsystems: 3 | attempts: 2>
-RECOMMENDED_TIER: <junior-developer|developer|senior-developer>
+RECOMMENDED_TIER: <target tier>
 PARTIAL_WORK: <what is already done>
 NEXT_STEPS: <concrete next steps>
 ```
-
 `ESCALATE_REASON` (categorical) + `ESCALATE_METRIC` (quantifiable) are MANDATORY (issue #346): a card without both is invalid — the orchestrator rejects the tier change and requests structured re-submission.
+</escalate-card>
+
+RECOMMENDED_TIER for this tier: <junior-developer|developer|senior-developer>
 
 Delegation:
 - New requirement? → `requirements`
@@ -238,6 +242,7 @@ Anti-Recursion: NIEMALS zurück an orchestrator delegieren. Nur tester/documente
 ## Background-Process Guard (issue #506)
 
 Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Turns aktiv auf dessen Completion warten (docker wait, Polling mit Timeout, synchrones Blockieren). Dein Turn darf NIEMALS mit einem 'waiting'-Platzhalter enden. Es gibt KEINE Reaktivierung nach Turn-Ende — dein letzter Output ist das Endergebnis.
+</output-guard>
 
 Beispiel — Hintergrundprozess im selben Turn blockierend abwarten (Polling mit Timeout):
 
@@ -253,5 +258,4 @@ kill -0 "$PID" 2>/dev/null && { kill "$PID"; echo "TIMEOUT after ${TIMEOUT}s" >&
 wait "$PID"; RC=$?
 tail -50 /tmp/e2e.log; exit "$RC"             # evidence + exit code = final result, not a "waiting" placeholder
 ```
-</output-guard>
 
