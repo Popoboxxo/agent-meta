@@ -437,7 +437,7 @@ See `docs/RELEASE_GATES.md` for the full config reference.
 | **max** | claude-fable-5-1 | gemini-3.1-pro-high | kimi-k2.7-code |
 | **ultra** | claude-fable-5-1 | gemini-3.1-pro-high | kimi-k2.7-code |
 
-**ultra** is reserved exclusively for `principal-developer` (last-resort escalation after repeated senior-developer failures). Never auto-routed by keyword. Resolves to the strongest model listed in `config/generated/model-registry.json` (refresh via `python3 scripts/sync.py --update-models`).
+**ultra** is reserved exclusively for `principal-developer` (last-resort escalation after repeated senior-developer failures). Never auto-routed by keyword. Ultra resolves only where the active tier preset defines an `ultra` tier for the provider — today only the `Normal` preset does (Claude `claude-fable-5-1`, Gemini `gemini-3.1-pro-high`, Opencode `opencode-go/kimi-k2.7-code`); for every other preset/provider combination no model is pinned and the provider default applies (see `_resolve_tier_to_model` in `scripts/lib/roles.py`), which is why `principal-developer` is pinned to `max` in `config/role-defaults.yaml`.
 
 Continue and Copilot: no per-agent model tiers (managed centrally).
 

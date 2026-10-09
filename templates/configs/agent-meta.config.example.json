@@ -40,7 +40,7 @@
     "agent-meta-manager"
   ],
 
-  "_comment_model_overrides": "Optional: Modell pro Rolle überschreiben. Gültige Werte: 'haiku', 'sonnet', 'opus' oder vollständige Modell-IDs (z.B. 'claude-opus-4-6').",
+  "_comment_model_overrides": "Optional: Modell pro Rolle überschreiben. Gültige Werte: 'haiku', 'sonnet', 'opus' oder vollständige Modell-IDs (z.B. 'claude-opus-5-5').",
   "model-overrides": {
     "git":           "haiku",
     "meta-feedback": "haiku",

@@ -15,7 +15,7 @@
   // "instructions": ["AGENTS.personal.md"],
 
   // Model override — comment out to use opencode default
-  // "model": "anthropic/claude-sonnet-4-6",
+  // "model": "anthropic/claude-sonnet-5-5",
 
   // MCP servers
   // "mcp": {}
