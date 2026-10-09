@@ -58,22 +58,71 @@ def _global_normal_preset() -> dict:
 # --------------------------------------------------------------------------
 
 
-def test_ai_providers_model_tiers_beat_active_preset() -> None:
-    """AC-12: the global Normal preset's Claude-centric ``tiers`` fallback must
+# Synthetic precedence fixture: the two precedence tests below must not depend
+# on the real tier-presets.yaml / ai-providers.yaml values (a registry-faithful
+# global fallback legitimately equals Mammouth's model-tiers).
+_SENTINEL_PRESET_FALLBACK = "sentinel-preset-global-powerful"
+_SENTINEL_REGISTRY_TIER = "sentinel-registry-powerful"
+_SENTINEL_OTHER_PROVIDER_TIER = "sentinel-opencode-preset-powerful"
+
+
+def _synthetic_precedence(monkeypatch: pytest.MonkeyPatch) -> tuple[dict, dict]:
+    """Install a synthetic global ``Normal`` preset; return
+    ``(preset, provider_config)``.
+
+    The preset has a SENTINEL global ``tiers.powerful`` fallback and a
+    provider-specific entry for a *different* provider only (Opencode), so
+    Mammouth has no preset entry. The provider config keeps Mammouth's real
+    ``model-format`` but carries a distinct SENTINEL ``model-tiers.powerful``,
+    so the values differ by construction.
+    """
+    preset = {
+        "description": "synthetic precedence fixture",
+        "tiers": {"powerful": _SENTINEL_PRESET_FALLBACK},
+        "providers": {
+            "Opencode": {"tiers": {"powerful": _SENTINEL_OTHER_PROVIDER_TIER}}
+        },
+    }
+    monkeypatch.setattr(
+        "scripts.lib.roles.load_tier_presets", lambda _root: {"Normal": preset}
+    )
+    mammouth = dict(_PROVIDER_CONFIG["Mammouth"])
+    mammouth["model-tiers"] = {"powerful": _SENTINEL_REGISTRY_TIER}
+    return preset, {"Mammouth": mammouth}
+
+
+def _resolve_synthetic(provider_config: dict) -> str:
+    """Resolve Mammouth/senior-developer (tier ``powerful``) with the synthetic
+    config as the active *global* Normal preset."""
+    return resolve_model(
+        role="senior-developer",
+        project_config={"tier-preset": "Normal"},
+        agent_meta_root=REPO_ROOT,
+        provider="Mammouth",
+        provider_config=provider_config,
+    )
+
+
+def test_ai_providers_model_tiers_beat_active_preset(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """AC-12: the global preset's Claude-centric ``tiers`` fallback must
     not shadow the provider's own ``model-tiers`` table.
 
     Mammouth has a registry catalog but no ``Normal.providers.Mammouth`` entry,
-    so before the fix the global ``tiers.powerful`` (claude-opus-4-8) leaked;
-    the registry's ``claude-opus-5`` must win.
+    so before the fix the global ``tiers.powerful`` leaked; the registry tier
+    must win. Runs on a synthetic preset/provider config
+    (``_synthetic_precedence``), independent of the real config values.
     """
-    registry_tier = _PROVIDER_CONFIG["Mammouth"]["model-tiers"]["powerful"]
-    preset_fallback = _global_normal_preset()["tiers"]["powerful"]
+    preset, provider_config = _synthetic_precedence(monkeypatch)
+    registry_tier = provider_config["Mammouth"]["model-tiers"]["powerful"]
+    preset_fallback = preset["tiers"]["powerful"]
     assert registry_tier != preset_fallback, (
         "fixture sanity: the registry tier and the preset fallback must differ "
         f"(both are {registry_tier!r})"
     )
 
-    resolved = _resolve("Mammouth", "senior-developer")
+    resolved = _resolve_synthetic(provider_config)
     assert resolved == f"mammouth/{registry_tier}", (
         "ai-providers.yaml model-tiers must win over the preset global fallback: "
         f"expected {registry_tier!r} (formatted), got {resolved!r}"
@@ -115,22 +164,25 @@ def test_preset_provider_specific_tiers_are_explicit_override() -> None:
     )
 
 
-def test_provider_without_preset_entry_falls_back_to_registry() -> None:
+def test_provider_without_preset_entry_falls_back_to_registry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """A provider that has a registry ``model-tiers`` value but NO preset
     provider-specific entry resolves from the registry, not from the preset's
-    global fallback (Mammouth, made explicit here)."""
-    preset = _global_normal_preset()
+    global fallback (Mammouth, made explicit here). Runs on a synthetic
+    preset/provider config (``_synthetic_precedence``)."""
+    preset, provider_config = _synthetic_precedence(monkeypatch)
     assert "Mammouth" not in (preset.get("providers") or {}), (
         "fixture sanity: Mammouth must have no preset provider-specific entry"
     )
-    registry_tier = _PROVIDER_CONFIG["Mammouth"]["model-tiers"]["powerful"]
+    registry_tier = provider_config["Mammouth"]["model-tiers"]["powerful"]
     preset_fallback = preset["tiers"]["powerful"]
     assert registry_tier != preset_fallback, (
         "fixture sanity: the registry tier and the preset global fallback must "
         f"differ (both are {registry_tier!r})"
     )
 
-    resolved = _resolve("Mammouth", "senior-developer")
+    resolved = _resolve_synthetic(provider_config)
     assert resolved == f"mammouth/{registry_tier}", (
         "without a preset provider-specific entry the registry model-tiers must "
         f"win: expected {registry_tier!r} (formatted), got {resolved!r}"
