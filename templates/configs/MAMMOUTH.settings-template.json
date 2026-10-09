@@ -11,7 +11,7 @@
   // "instructions": ["AGENTS.personal.md"],
 
   // Model override — comment out to use Mammouth's default
-  // "model": "mammouth/claude-sonnet-5",
+  // "model": "mammouth/claude-sonnet-5-5",
 
   // MCP servers
   // "mcp": {}

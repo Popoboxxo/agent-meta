@@ -117,7 +117,7 @@ kein memory:-Feld (Agent hat kein Gedächtnis)
 # Generiertes .claude/agents/documenter.md
 ---
 name: documenter
-model: claude-sonnet-4-6
+model: claude-sonnet-5-5
 memory: project        ← von sync.py injiziert
 version: "2.1.0"
 description: "..."

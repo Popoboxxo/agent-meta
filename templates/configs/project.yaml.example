@@ -177,9 +177,10 @@ repo_containment:
 # Modell-Tiers — provider-agnostisch (empfohlen)
 # ---------------------------------------------------------------------------
 # Tiers:  nano | fast | balanced | powerful | max
-# nano/fast  → Gemini: gemini-2.5-flash   | Claude: claude-haiku-5-5
-# balanced   → Gemini: gemini-2.5-pro     | Claude: claude-sonnet-5-5
-# powerful   → Gemini: gemini-2.5-pro     | Claude: claude-opus-5-5
+# nano      → Gemini: gemini-3.5-flash-medium | Claude: claude-haiku-5-5
+# fast      → Gemini: gemini-3.5-flash-high   | Claude: claude-haiku-5-5
+# balanced  → Gemini: gemini-3.1-pro-low      | Claude: claude-sonnet-5-5
+# powerful  → Gemini: gemini-3.1-pro-high     | Claude: claude-opus-5-5
 # max        → reserviert für Ultra-Modelle (aktuell = powerful)
 #
 # Form A — provider-spezifisch (empfohlen bei Multi-Provider):
