@@ -19,8 +19,8 @@ from pathlib import Path
 from scripts.lib.roles import load_roles_config
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-_EXPECTED_TOTAL = 91
-_EXPECTED_DISTRIBUTION = {"keyword": 88, "name_only": 2, "excluded": 1}
+_EXPECTED_TOTAL = 92
+_EXPECTED_DISTRIBUTION = {"keyword": 88, "name_only": 3, "excluded": 1}
 _VALID = {"keyword", "name_only", "excluded"}
 
 
@@ -103,7 +103,7 @@ def test_name_only_roles_have_reason():
         for name, info in roles.items()
         if (info.get("routing") or {}).get("addressability") == "name_only"
     )
-    assert name_only == ["intern-developer", "principal-developer"]
+    assert name_only == ["intern-developer", "principal-developer", "template-auditor"]
     for name in name_only:
         reason = (roles[name].get("routing") or {}).get("name_only_reason")
         assert isinstance(reason, str) and reason.strip(), (

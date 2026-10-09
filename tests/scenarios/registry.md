@@ -120,6 +120,7 @@ verhalten sich exakt wie bisher.
 | `73-continue-prompts-one-sync` | Continue | strict (default) | `generate-prompts: true` converges after ONE sync: `--check` rc 0 before any second sync (issue #802) |
 | `74-gitignore-keep` | Claude, Gemini | strict (default) | `ignore-provider-dirs: true` + `keep` re-includes project-owned paths — verified with REAL `git check-ignore` (ordering bug #746) |
 | `75-web-platform-preset` | Claude | strict (default) | `web`-Platform-Preset (#679): `web-{seo,accessibility,privacy}.md` rendern als plain `seo/accessibility/privacy.md`, Prefix gestrippt, keine Platzhalter |
+| `76-template-auditor-role` | Claude, Opencode | main-chat (default) | read-only `template-auditor` generated per provider: no `Write`/`Edit`/`Agent` tools, `edit: deny` in Opencode permission, no `model:` in source template, placeholders resolved, excluded from `route_intent` enum (name_only), output contract present |
 
 ## Bewusste Auslassungen
 

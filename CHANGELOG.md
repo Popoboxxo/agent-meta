@@ -10,6 +10,16 @@
   `senior-developer`, `se-junior-developer`, `se-developer`) and the `homeassistant-developer`
   platform override now inline it instead of maintaining per-template card copies — closing the
   metric gap in the homeassistant override and the schema drift between tiers.
+- **New read-only `template-auditor` role (1.0.0)** — extracted from `agent-meta-manager`: audits
+  agent definitions for framework conformity, compactness and correctness. Six-phase sweep
+  (inventory → gates → template checks → own delegation sweep → override integrity → report), tools
+  restricted to `Read`/`Glob`/`Grep`/`Bash`/`TodoWrite` (no `Write`/`Edit`/`Agent` — a finding is a
+  deliverable, not a fix), `addressability: name_only` + `orchestrator_only: true` so a routine task
+  cannot silently trigger a full framework audit. Report contract extends
+  STATUS/RESULT/ARTIFACTS with `FINDINGS:` and `GATES:`. Ships with scenario
+  `76-template-auditor-role` (6 assertions: per-provider generation, read-only tool set,
+  `edit: deny` in the Opencode permission block, no `model:` in the source template, resolved
+  placeholders, absence from the `route_intent` enum, output contract present).
 - **Project-type-specific release-process templates (issue #452)**: a project can declare a `release`
   section in `project.yaml` (`distribution`, `versioning`, `changelog_format`, `version_file`,
   `version_field`). When `release.distribution` is set, the sync pipeline renders
