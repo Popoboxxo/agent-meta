@@ -117,7 +117,9 @@ a:hover { text-decoration: underline; }
   color: var(--text-secondary);
   border-left: 3px solid transparent;
   font-size: 13px;
+  text-decoration: none;
 }
+.nav-item:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: -2px; }
 .nav-item:hover { color: var(--text-primary); background: rgba(255,255,255,0.03); }
 .nav-item.active {
   color: var(--accent-blue);
@@ -126,6 +128,10 @@ a:hover { text-decoration: underline; }
 }
 .nav-item .icon { width: 16px; opacity: 0.7; }
 .nav-item.disabled { opacity: 0.35; pointer-events: none; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
 
 #content {
   background: var(--bg-primary);
@@ -467,11 +473,18 @@ table.data td select { padding: 4px 8px; font-size: 12px; }
   cursor: pointer;
   position: relative;
   transition: all var(--transition);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  width: 100%;
 }
 .role-card:hover { border-color: var(--accent-blue); transform: translateY(-1px); }
+.role-card:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 2px; }
 .role-card.active { border-color: var(--accent-green); background: rgba(63,185,80,0.06); }
-.role-card .name { font-size: 13px; font-weight: 600; }
-.role-card .meta { font-size: 11px; color: var(--text-muted); margin-top: var(--space-1); }
+.role-card .name { display: block; font-size: 13px; font-weight: 600; }
+.role-card .meta { display: block; font-size: 11px; color: var(--text-muted); margin-top: var(--space-1); }
+.role-card .state { display: block; font-size: 11px; margin-top: var(--space-1); color: var(--text-secondary); }
+.role-card.active .state { color: var(--accent-green); }
 .role-card .tier-bar {
   position: absolute; top: 0; left: 0; bottom: 0;
   width: 3px; border-radius: 3px 0 0 3px;
@@ -625,11 +638,19 @@ table.data td select { padding: 4px 8px; font-size: 12px; }
   max-height: 560px;
 }
 .template-list .template-row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
   padding: 8px 12px;
   cursor: pointer;
   border-bottom: 1px solid var(--border-color);
   font-size: 13px;
 }
+.template-list .template-row:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: -2px; }
 .template-list .template-row:hover { background: rgba(255,255,255,0.04); }
 .template-list .template-row.active { background: var(--accent-blue-soft); color: var(--accent-blue); }
 .template-editor textarea {
@@ -1138,7 +1159,10 @@ class Router {
       content.appendChild(renderError(err));
     }
     document.querySelectorAll(".nav-item").forEach(n => {
-      n.classList.toggle("active", n.dataset.route === hash);
+      const isActive = n.dataset.route === hash;
+      n.classList.toggle("active", isActive);
+      if (isActive) n.setAttribute("aria-current", "page");
+      else n.removeAttribute("aria-current");
     });
   }
 }
@@ -1628,14 +1652,19 @@ function buildSidebar() {
     for (const item of group.items) {
       if (item.superOnly) window.superOnlyRoutes.add(item.route);
       const isReadonly = item.superOnly && state.state.mode !== "super_admin";
-      const node = el("div", {
+      // Native link: the router is hash-based, so href="#/route" fires
+      // hashchange and is keyboard-operable without extra handlers (WCAG 2.1.1).
+      const node = el("a", {
         class: `nav-item`,
+        href: "#" + item.route,
         dataset: { route: item.route },
-        onclick: () => router.navigate(item.route),
       }, [
-        el("span", { class: "icon" }, [item.icon]),
+        el("span", { class: "icon", "aria-hidden": "true" }, [item.icon]),
         item.label,
-        isReadonly ? el("span", { style: "margin-left:auto; font-size: 0.85em; opacity: 0.5;", title: "Read-Only" }, ["🔒"]) : ""
+        isReadonly ? el("span", { style: "margin-left:auto; font-size: 0.85em; opacity: 0.5;", title: "Read-Only" }, [
+          el("span", { "aria-hidden": "true" }, ["🔒"]),
+          el("span", { class: "sr-only" }, [" (read-only)"]),
+        ]) : ""
       ]);
       nav.appendChild(node);
     }
@@ -2099,7 +2128,7 @@ async function viewRoles() {
 
   wrap.appendChild(el("p", {}, [
     `${roles.length} roles defined in role-defaults.yaml. `,
-    "Click a card to toggle active / inactive. Shift-drag between nodes on the canvas to draw a delegation edge.",
+    "Click a card (or press Enter/Space on it) to toggle active / inactive. Shift-drag between nodes on the canvas to draw a delegation edge.",
   ]));
 
   const grid = el("div", { class: "role-grid" });
@@ -2110,14 +2139,28 @@ async function viewRoles() {
   } catch { /* project config may be absent in super_admin self-host */ }
 
   roles.forEach(role => {
-    const card = el("div", { class: `role-card ${active.has(role.name) ? "active" : ""}` });
-    card.appendChild(el("div", { class: `tier-bar ${role.tier || "optional"}` }));
-    card.appendChild(el("div", { class: "name" }, [role.name]));
+    // Native toggle button: keyboard-operable, state exposed via aria-pressed,
+    // plus a visible text indicator so state is not conveyed by colour alone.
+    // Children are <span>s because <button> only allows phrasing content.
+    const isOn = active.has(role.name);
+    const card = el("button", {
+      type: "button",
+      class: `role-card ${isOn ? "active" : ""}`,
+      "aria-pressed": String(isOn),
+    });
+    const stateNode = el("span", { class: "state" });
+    const syncState = () => {
+      const on = card.classList.contains("active");
+      card.setAttribute("aria-pressed", String(on));
+      stateNode.textContent = on ? "✓ Active" : "○ Inactive";
+    };
+    card.appendChild(el("span", { class: `tier-bar ${role.tier || "optional"}` }));
+    card.appendChild(el("span", { class: "name" }, [role.name]));
     // Description: truncated for the card, full text kept on the title attr
     // (native browser tooltip) so the user can hover for the complete line.
     const fullDesc = role.description || "";
     const shortDesc = fullDesc.length > 80 ? fullDesc.slice(0, 77) + "…" : fullDesc;
-    const descNode = el("div", {
+    const descNode = el("span", {
       class: "meta",
       style: "font-size:11px; color:var(--text-secondary); margin-top:var(--space-1); line-height:1.35;",
       title: fullDesc,
@@ -2127,15 +2170,18 @@ async function viewRoles() {
     descNode.textContent = shortDesc;
     card.appendChild(descNode);
     const promptMode = role.prompt_mode || "legacy";
-    card.appendChild(el("div", { class: "meta" }, [
+    card.appendChild(el("span", { class: "meta" }, [
       el("span", { class: `badge ${role.tier || "optional"}` }, [role.tier || "optional"]),
       " ",
       el("span", { class: `badge ${promptMode}`, title: `Prompt mode: ${promptMode}` }, [promptMode]),
       " ",
       role.model || "—",
     ]));
+    card.appendChild(stateNode);
+    syncState();
     card.addEventListener("click", () => {
       card.classList.toggle("active");
+      syncState();
       if (card.classList.contains("active")) active.add(role.name);
       else active.delete(role.name);
       toast(`${role.name} ${card.classList.contains("active") ? "activated" : "deactivated"}`, "info", 1500);
@@ -5071,7 +5117,7 @@ async function viewAgentTemplates() {
   let activeRole = null;
 
   info.templates.forEach(role => {
-    const row = el("div", { class: "template-row", onclick: async () => {
+    const row = el("button", { type: "button", class: "template-row", onclick: async () => {
       [...list.querySelectorAll(".template-row")].forEach(r => r.classList.remove("active"));
       row.classList.add("active");
       activeRole = role;
@@ -8542,8 +8588,17 @@ async function viewProjectEnvironments() {
       const isReq = cfg.required === true;
       const isSec = cfg.secret === true;
       const defDisp = isSec && cfg.default ? "••••••••" : (cfg.default || "—");
+      // Row click stays as a mouse convenience; the edit button in the first
+      // cell is the keyboard path (WCAG 2.1.1).
       const tr = el("tr", { style: "cursor:pointer;", onclick: () => openEnvModal(name) });
-      tr.appendChild(el("td", {}, [el("code", {}, [name])]));
+      const editBtn = el("button", {
+        type: "button",
+        class: "btn btn-sm",
+        "aria-label": `Edit ${name}`,
+        style: "margin-right:var(--space-2);",
+        onclick: (ev) => { ev.stopPropagation(); openEnvModal(name); },
+      }, ["✎"]);
+      tr.appendChild(el("td", {}, [editBtn, el("code", {}, [name])]));
       tr.appendChild(el("td", {}, [cfg.description || "—"]));
       tr.appendChild(el("td", { class: "mono" }, [defDisp]));
       tr.appendChild(el("td", {}, [isReq ? "✅" : "—"]));
