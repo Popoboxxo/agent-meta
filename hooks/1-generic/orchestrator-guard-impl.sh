@@ -1,5 +1,5 @@
 #!/bin/bash
-# version: 1.6.0
+# version: 1.7.0
 # Real orchestrator-guard logic. NOT a standalone hook — invoked by
 # orchestrator-guard.sh (thin self-health wrapper, issue #630), which pipes
 # the PreToolUse JSON payload to this script's stdin after syntax-checking
@@ -20,6 +20,9 @@ set -uo pipefail
 # silently disables strict mode — a stdlib line scan decides and resolves
 # to STRICT=true on any strict indicator or doubt. Same safe-side default
 # on unreadable config as repo-containment-impl.sh's F4.
+# Project root (SR-B-11, v1.7.0): resolved via $CLAUDE_PROJECT_DIR or a
+# walk-up to the nearest `.meta-config/` ancestor, so strict mode and the
+# auto-commit allowlist still apply after a `cd` into a subdirectory.
 #
 # Only mutating tools (Write, Edit, Bash) are intercepted.
 # Research tools (read, glob, grep) are never blocked.
@@ -177,10 +180,39 @@ print(m.group(1) if m else '')
 " 2>/dev/null || echo "")
 fi
 
-# Determine project root (needed by the audit log and config lookup)
-PROJECT_ROOT=$(hook_json_get "$INPUT" "cwd")
+# Determine project root (needed by the audit log, allowlist and config
+# lookup). SR-B-11: the payload cwd alone is not enough -- after the main
+# thread `cd`s into a subdirectory, `.meta-config/project.yaml` was not
+# found there and strict mode was silently off. Resolution order:
+#   1. $CLAUDE_PROJECT_DIR (harness-set) if it is an existing directory
+#      containing .meta-config/;
+#   2. otherwise the nearest ancestor of the payload cwd (inclusive)
+#      containing .meta-config/ (same walk-up as dod-push-check.sh);
+#   3. otherwise the payload cwd itself (prior behaviour).
+# PAYLOAD_CWD stays the base for cwd-relative arguments (commit -F <file>).
+PAYLOAD_CWD=$(hook_json_get "$INPUT" "cwd")
+if [ -z "$PAYLOAD_CWD" ]; then
+  PAYLOAD_CWD="$PWD"
+fi
+PROJECT_ROOT=""
+if [ -n "${CLAUDE_PROJECT_DIR:-}" ] && [ -d "$CLAUDE_PROJECT_DIR/.meta-config" ]; then
+  PROJECT_ROOT="$CLAUDE_PROJECT_DIR"
+else
+  _DIR="$PAYLOAD_CWD"
+  # Bounded walk: stops at '/' (or any fixed point of dirname, e.g. '.'
+  # for a relative cwd) and after 64 levels at most -- cannot loop.
+  for _ in {1..64}; do
+    if [ -d "$_DIR/.meta-config" ]; then
+      PROJECT_ROOT="$_DIR"
+      break
+    fi
+    _PARENT=$(dirname -- "$_DIR")
+    [ "$_PARENT" = "$_DIR" ] && break
+    _DIR="$_PARENT"
+  done
+fi
 if [ -z "$PROJECT_ROOT" ]; then
-  PROJECT_ROOT="$PWD"
+  PROJECT_ROOT="$PAYLOAD_CWD"
 fi
 
 # --- Sentinel elevation: capability-scoped + audited (issue #516) ------
@@ -741,7 +773,7 @@ for stmt in statements(command):
 category = 'destructive' if destructive else ('mutation' if mutation else 'none')
 scope = 'broad' if mutation_scope_broad else 'narrow'
 print(f'{category} {scope} {bom}')
-" "$PROJECT_ROOT" 2>/dev/null || echo "none narrow none")
+" "$PAYLOAD_CWD" 2>/dev/null || echo "none narrow none")
   _GIT_SCAN=$(printf '%s' "$_GIT_SCAN_RAW" | awk '{print $1}')
   _GIT_SCAN_SCOPE=$(printf '%s' "$_GIT_SCAN_RAW" | awk '{print $2}')
   _GIT_BOM=$(printf '%s' "$_GIT_SCAN_RAW" | awk '{print $3}')

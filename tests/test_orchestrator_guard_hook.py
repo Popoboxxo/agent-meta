@@ -1338,3 +1338,77 @@ def test_wrapper_passes_through_allow_and_block(tmp_path, impl_rc):
     assert result.returncode == impl_rc, f"stderr={result.stderr!r}"
     assert "impl crashed" not in result.stderr
 
+
+# --- SR-B-11: project root resolution (walk-up / $CLAUDE_PROJECT_DIR) --------
+
+def _strict_tree(tmp_path) -> Path:
+    proj = tmp_path / "proj"
+    sub = proj / "sub" / "dir"
+    sub.mkdir(parents=True)
+    _strict_project(proj, "orchestrator:\n  mode: strict\n")
+    return proj
+
+
+def _run_with(payload: dict, cwd: Path, extra_env=None) -> subprocess.CompletedProcess:
+    env = _clean_env()
+    env.update(extra_env or {})
+    return subprocess.run(
+        [_BASH, str(_HOOK_PATH)], input=json.dumps({**payload, "cwd": cwd.as_posix()}),
+        capture_output=True, text=True, cwd=str(cwd), env=env,
+    )
+
+
+def test_strict_mode_found_from_subdirectory(tmp_path):
+    proj = _strict_tree(tmp_path)
+    result = _run_with(_MAIN_THREAD_WRITE, proj / "sub" / "dir")
+    assert result.returncode == 2, f"stderr={result.stderr!r}"
+    assert "STRICT MODE" in result.stderr
+
+
+def test_strict_mode_found_via_claude_project_dir(tmp_path):
+    proj = _strict_tree(tmp_path)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    result = _run_with(_MAIN_THREAD_WRITE, elsewhere, {"CLAUDE_PROJECT_DIR": str(proj)})
+    assert result.returncode == 2, f"stderr={result.stderr!r}"
+
+
+@pytest.mark.parametrize("bogus", ["", "/nonexistent/sr-b-11", "<no-meta>"])
+def test_unusable_claude_project_dir_falls_back_to_walk_up(tmp_path, bogus):
+    proj = _strict_tree(tmp_path)
+    if bogus == "<no-meta>":
+        bogus = str(tmp_path)  # exists, but has no .meta-config/
+    result = _run_with(_MAIN_THREAD_WRITE, proj / "sub", {"CLAUDE_PROJECT_DIR": bogus})
+    assert result.returncode == 2, f"stderr={result.stderr!r}"
+
+
+def test_non_project_cwd_without_meta_config_stays_non_strict(tmp_path):
+    plain = tmp_path / "plain" / "a"
+    plain.mkdir(parents=True)
+    result = _run_with(_MAIN_THREAD_WRITE, plain)
+    assert result.returncode == 0, f"stderr={result.stderr!r}"
+
+
+def test_allowlist_found_from_subdirectory(tmp_path):
+    proj = tmp_path / "proj"
+    (proj / "src").mkdir(parents=True)
+    _write_allowlist(proj, "auto", ["developer"])
+    payload = _bash_payload("#agent-meta:agent=developer\ngit commit -m 'x'")
+    result = _run_with(payload, proj / "src")
+    assert result.returncode == 0, f"stderr={result.stderr!r}"
+    # Audit line lands in the project root, not in the subdirectory.
+    assert (proj / ".claude" / "hooks" / ".guard-audit.log").is_file()
+    assert not (proj / "src" / ".claude").exists()
+
+
+def test_relative_bom_file_still_resolved_against_cwd(tmp_path):
+    proj = tmp_path / "proj"
+    sub = proj / "sub"
+    sub.mkdir(parents=True)
+    (proj / ".meta-config").mkdir()
+    (sub / "msg.txt").write_bytes(b"\xef\xbb\xbffeat: x\n")
+    payload = _bash_payload("#agent-meta:agent=git\ngit commit -F msg.txt")
+    result = _run_with(payload, sub)
+    assert result.returncode == 2, f"stderr={result.stderr!r}"
+    assert "BOM" in result.stderr
+
