@@ -68,6 +68,16 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+def _clean_env() -> dict:
+    # SR-B-11: the hook prefers $CLAUDE_PROJECT_DIR over the payload cwd. A
+    # value inherited from a surrounding Claude Code session would silently
+    # retarget every tmp_path fixture at that project (and its audit log),
+    # so tests never inherit it -- tests that need it set it explicitly.
+    env = dict(os.environ)
+    env.pop("CLAUDE_PROJECT_DIR", None)
+    return env
+
+
 def _run_hook(payload: dict) -> subprocess.CompletedProcess:
     return subprocess.run(
         [_BASH, str(_HOOK_PATH)],
@@ -75,6 +85,7 @@ def _run_hook(payload: dict) -> subprocess.CompletedProcess:
         capture_output=True,
         text=True,
         cwd=str(_REPO_ROOT),
+        env=_clean_env(),
     )
 
 
@@ -734,6 +745,7 @@ def test_audit_log_rotates_when_over_cap(tmp_path):
         capture_output=True,
         text=True,
         cwd=str(_REPO_ROOT),
+        env=_clean_env(),
     )
     assert result.returncode == 0
     lines = audit_file.read_text(encoding="utf-8").splitlines()
@@ -1211,7 +1223,7 @@ def _strict_project(tmp_path, project_yaml: str):
 
 
 def _run_hook_in(tmp_path, payload: dict, hide_yaml: bool) -> subprocess.CompletedProcess:
-    env = dict(os.environ)
+    env = _clean_env()
     if hide_yaml:
         # A fake yaml.py earlier on sys.path makes `import yaml` raise
         # ImportError -- simulates a hook interpreter without PyYAML.
@@ -1281,3 +1293,232 @@ def test_non_strict_project_with_pyyaml_allows(tmp_path):
     _strict_project(tmp_path, "orchestrator:\n  enabled: true\n  strict: false\n")
     result = _run_hook_in(tmp_path, _MAIN_THREAD_WRITE, hide_yaml=False)
     assert result.returncode == 0, f"stdout={result.stdout!r} stderr={result.stderr!r}"
+
+
+# --- SR-B-08: wrapper maps impl exit status to {0, 2} -----------------------
+# Claude Code only blocks on exit 2; any other non-zero status is a
+# non-blocking error and the tool call proceeds. An impl crash (unbound
+# variable rc 1, SIGKILL 137, SIGPIPE 141) must therefore fail CLOSED.
+
+def _wrapper_with_stub_impl(tmp_path, impl_body: str) -> Path:
+    hooks_dir = tmp_path / "hooks"
+    hooks_dir.mkdir()
+    wrapper = hooks_dir / "orchestrator-guard.sh"
+    wrapper.write_text(_HOOK_PATH.read_text(encoding="utf-8"), encoding="utf-8")
+    (hooks_dir / "orchestrator-guard-impl.sh").write_text(
+        "#!/bin/bash\ncat >/dev/null\n" + impl_body + "\n", encoding="utf-8",
+    )
+    return wrapper
+
+
+@pytest.mark.parametrize("impl_body,crash_rc", [
+    ("set -u\necho \"$UNBOUND_VAR_SR_B_08\"", 1),
+    ("kill -KILL $$", 137),
+    ("kill -PIPE $$", 141),
+    ("exit 3", 3),
+])
+def test_wrapper_fails_closed_on_impl_crash(tmp_path, impl_body, crash_rc):
+    wrapper = _wrapper_with_stub_impl(tmp_path, impl_body)
+    result = subprocess.run(
+        [_BASH, str(wrapper)], input=json.dumps(_bash_payload("echo hi")),
+        capture_output=True, text=True, cwd=str(tmp_path), env=_clean_env(),
+    )
+    assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    assert f"impl crashed rc={crash_rc}" in result.stderr
+    assert "failing closed" in result.stderr
+
+
+@pytest.mark.parametrize("impl_rc", [0, 2])
+def test_wrapper_passes_through_allow_and_block(tmp_path, impl_rc):
+    wrapper = _wrapper_with_stub_impl(tmp_path, f"exit {impl_rc}")
+    result = subprocess.run(
+        [_BASH, str(wrapper)], input=json.dumps(_bash_payload("echo hi")),
+        capture_output=True, text=True, cwd=str(tmp_path), env=_clean_env(),
+    )
+    assert result.returncode == impl_rc, f"stderr={result.stderr!r}"
+    assert "impl crashed" not in result.stderr
+
+
+# --- SR-B-11: project root resolution (walk-up / $CLAUDE_PROJECT_DIR) --------
+
+def _strict_tree(tmp_path) -> Path:
+    proj = tmp_path / "proj"
+    sub = proj / "sub" / "dir"
+    sub.mkdir(parents=True)
+    _strict_project(proj, "orchestrator:\n  mode: strict\n")
+    return proj
+
+
+def _run_with(payload: dict, cwd: Path, extra_env=None) -> subprocess.CompletedProcess:
+    env = _clean_env()
+    env.update(extra_env or {})
+    return subprocess.run(
+        [_BASH, str(_HOOK_PATH)], input=json.dumps({**payload, "cwd": cwd.as_posix()}),
+        capture_output=True, text=True, cwd=str(cwd), env=env,
+    )
+
+
+def test_strict_mode_found_from_subdirectory(tmp_path):
+    proj = _strict_tree(tmp_path)
+    result = _run_with(_MAIN_THREAD_WRITE, proj / "sub" / "dir")
+    assert result.returncode == 2, f"stderr={result.stderr!r}"
+    assert "STRICT MODE" in result.stderr
+
+
+def test_strict_mode_found_via_claude_project_dir(tmp_path):
+    proj = _strict_tree(tmp_path)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    result = _run_with(_MAIN_THREAD_WRITE, elsewhere, {"CLAUDE_PROJECT_DIR": str(proj)})
+    assert result.returncode == 2, f"stderr={result.stderr!r}"
+
+
+@pytest.mark.parametrize("bogus", ["", "/nonexistent/sr-b-11", "<no-meta>"])
+def test_unusable_claude_project_dir_falls_back_to_walk_up(tmp_path, bogus):
+    proj = _strict_tree(tmp_path)
+    if bogus == "<no-meta>":
+        bogus = str(tmp_path)  # exists, but has no .meta-config/
+    result = _run_with(_MAIN_THREAD_WRITE, proj / "sub", {"CLAUDE_PROJECT_DIR": bogus})
+    assert result.returncode == 2, f"stderr={result.stderr!r}"
+
+
+def test_non_project_cwd_without_meta_config_stays_non_strict(tmp_path):
+    plain = tmp_path / "plain" / "a"
+    plain.mkdir(parents=True)
+    result = _run_with(_MAIN_THREAD_WRITE, plain)
+    assert result.returncode == 0, f"stderr={result.stderr!r}"
+
+
+def test_allowlist_found_from_subdirectory(tmp_path):
+    proj = tmp_path / "proj"
+    (proj / "src").mkdir(parents=True)
+    _write_allowlist(proj, "auto", ["developer"])
+    payload = _bash_payload("#agent-meta:agent=developer\ngit commit -m 'x'")
+    result = _run_with(payload, proj / "src")
+    assert result.returncode == 0, f"stderr={result.stderr!r}"
+    # Audit line lands in the project root, not in the subdirectory.
+    assert (proj / ".claude" / "hooks" / ".guard-audit.log").is_file()
+    assert not (proj / "src" / ".claude").exists()
+
+
+def test_relative_bom_file_still_resolved_against_cwd(tmp_path):
+    proj = tmp_path / "proj"
+    sub = proj / "sub"
+    sub.mkdir(parents=True)
+    (proj / ".meta-config").mkdir()
+    (sub / "msg.txt").write_bytes(b"\xef\xbb\xbffeat: x\n")
+    payload = _bash_payload("#agent-meta:agent=git\ngit commit -F msg.txt")
+    result = _run_with(payload, sub)
+    assert result.returncode == 2, f"stderr={result.stderr!r}"
+    assert "BOM" in result.stderr
+
+
+# --- SR-B-12: ref-loss commands are destructive (even with git sentinel) -----
+
+SR_B_12_DESTRUCTIVE = [
+    "git push origin :main",
+    "git push origin +:main",
+    "git push origin :refs/heads/x",
+    "git push --prune origin",
+    "git checkout .",
+    "git checkout -f main",
+    "git checkout --force main",
+    "git update-ref -d refs/heads/main",
+    "git update-ref --delete refs/heads/main",
+    "git reflog expire --expire=now --all",
+    "git reflog delete HEAD@{1}",
+    "git stash -q drop",
+    "git stash --quiet clear",
+    # switch is checkout's modern alias -- same force semantics.
+    "git switch -f main",
+    "git switch --discard-changes main",
+]
+
+
+@pytest.mark.parametrize("sentinel", ["", "#agent-meta:agent=git\n"])
+@pytest.mark.parametrize("command", SR_B_12_DESTRUCTIVE)
+def test_ref_loss_commands_are_destructive(tmp_path, command, sentinel):
+    result = _run_with(_bash_payload(sentinel + command), tmp_path)
+    assert result.returncode == 2, f"stderr={result.stderr!r}"
+    assert "user approval" in result.stderr
+
+
+# --- SR-B-13: history-changing subcommands are mutations ---------------------
+
+SR_B_13_MUTATIONS = [
+    "git pull",
+    "git switch main",
+    "git cherry-pick abc123",
+    "git revert HEAD",
+    "git am x.patch",
+    "git update-ref refs/heads/x HEAD",
+    "git worktree add ../wt main",
+    "git stash -q pop",
+]
+
+
+@pytest.mark.parametrize("command", SR_B_13_MUTATIONS)
+def test_new_mutations_blocked_without_sentinel(tmp_path, command):
+    result = _run_with(_bash_payload(command), tmp_path)
+    assert result.returncode == 2, f"stderr={result.stderr!r}"
+    assert "Direct git mutations" in result.stderr
+
+
+@pytest.mark.parametrize("command", SR_B_13_MUTATIONS)
+def test_new_mutations_allowed_with_git_sentinel(tmp_path, command):
+    result = _run_with(_bash_payload("#agent-meta:agent=git\n" + command), tmp_path)
+    assert result.returncode == 0, f"stderr={result.stderr!r}"
+
+
+@pytest.mark.parametrize("command", SR_B_13_MUTATIONS)
+def test_new_mutations_outside_allowlist_scope(tmp_path, command):
+    _write_allowlist(tmp_path, "auto", ["developer"])
+    result = _run_with(_bash_payload("#agent-meta:agent=developer\n" + command), tmp_path)
+    assert result.returncode == 2, f"stderr={result.stderr!r}"
+
+
+# Negative controls: must stay allowed WITHOUT any sentinel (read-only) ...
+SR_B_READ_ONLY = [
+    "git status",
+    "git log --oneline -5",
+    "git diff HEAD",
+    "git show HEAD",
+    "git branch --show-current",
+    "git remote -v",
+    "git ls-remote origin",
+    "git fetch origin",
+    "git reflog",
+    "git reflog show --all",
+    "git stash list",
+    "git worktree list",
+]
+# ... and must stay allowed WITH the git sentinel (not destructive).
+SR_B_BENIGN_WITH_SENTINEL = SR_B_READ_ONLY + [
+    "git checkout -b x",
+    "git checkout main",
+    "git checkout -- path/file.txt",
+    "git stash",
+    "git stash push -m drop",
+    "git stash pop",
+    "git push origin main:main",
+    "git push origin HEAD:main",
+    "git push --tags",
+    "git push origin :",
+    "git update-ref refs/heads/x HEAD",
+    "git pull --rebase",
+    "git switch -c feature",
+    "git stash -- drop",  # pathspec 'drop' after '--', a stash push
+    "git worktree add ../wt main",
+]
+
+
+@pytest.mark.parametrize("command", SR_B_READ_ONLY)
+def test_read_only_git_stays_allowed(tmp_path, command):
+    result = _run_with(_bash_payload(command), tmp_path)
+    assert result.returncode == 0, f"stderr={result.stderr!r}"
+
+
+@pytest.mark.parametrize("command", SR_B_BENIGN_WITH_SENTINEL)
+def test_benign_git_with_sentinel_stays_allowed(tmp_path, command):
+    result = _run_with(_bash_payload("#agent-meta:agent=git\n" + command), tmp_path)
+    assert result.returncode == 0, f"stderr={result.stderr!r}"

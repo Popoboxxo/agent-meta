@@ -1,6 +1,6 @@
 #!/bin/bash
 # hook: orchestrator-guard
-# version: 3.1.0
+# version: 3.2.0
 # event: PreToolUse
 # matcher: ""
 # description: Block non-orchestrator write/edit/bash calls when orchestrator.strict=true; also block direct git mutations in non-strict mode
@@ -17,9 +17,11 @@ set -uo pipefail
 # Why this split exists: a real incident showed that if the guard script
 # itself becomes syntactically invalid (e.g. an unresolved merge-conflict
 # marker), `bash <script>` fails with a parse error BEFORE executing a
-# single line — which exits non-zero, which the PreToolUse harness reads as
-# "block". Every subsequent tool call is then blocked, including the
-# Read/Edit calls needed to repair the very file that's broken. A single-
+# single line — which exits 2 (bash's parse-error status), which the
+# PreToolUse harness reads as "block" (any OTHER non-zero is NOT a block —
+# see the exit-status mapping below, SR-B-08). Every subsequent tool call
+# is then blocked, including the Read/Edit calls needed to repair the very
+# file that's broken. A single-
 # file script cannot self-check its own syntax when it IS the broken file —
 # the check has to live in something else that runs first (see
 # docs/plans/audit-2026-09-system-concept.md §3.2.4).
@@ -43,9 +45,25 @@ if [ ! -f "$IMPL" ]; then
   exit 2
 fi
 
+# Exit-status mapping (SR-B-08): the harness blocks ONLY on exit 2; every
+# other non-zero status is a non-blocking error and the tool call proceeds.
+# A runtime crash of impl (set -u unbound variable -> 1, signal -> 128+n,
+# SIGPIPE -> 141) must therefore not be passed through as-is -- it would
+# fail OPEN. Only a genuine 0 (allow) or 2 (block) is propagated; anything
+# else fails CLOSED. PIPESTATUS[1] is impl's own status, so a SIGPIPE on
+# printf (pipefail would surface it as the pipeline status) cannot mask it.
 if bash -n "$IMPL" 2>/dev/null; then
   printf '%s' "$INPUT" | bash "$IMPL"
-  exit $?
+  _STATUSES=("${PIPESTATUS[@]}")
+  _RC="${_STATUSES[1]:-unknown}"
+  case "$_RC" in
+    0) exit 0 ;;
+    2) exit 2 ;;
+    *)
+      echo "orchestrator-guard: impl crashed rc=$_RC, failing closed (SR-B-08)." >&2
+      exit 2
+      ;;
+  esac
 fi
 
 # --- impl script is syntactically broken: narrow self-repair carve-out ---
