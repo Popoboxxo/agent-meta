@@ -1412,3 +1412,113 @@ def test_relative_bom_file_still_resolved_against_cwd(tmp_path):
     assert result.returncode == 2, f"stderr={result.stderr!r}"
     assert "BOM" in result.stderr
 
+
+# --- SR-B-12: ref-loss commands are destructive (even with git sentinel) -----
+
+SR_B_12_DESTRUCTIVE = [
+    "git push origin :main",
+    "git push origin +:main",
+    "git push origin :refs/heads/x",
+    "git push --prune origin",
+    "git checkout .",
+    "git checkout -f main",
+    "git checkout --force main",
+    "git update-ref -d refs/heads/main",
+    "git update-ref --delete refs/heads/main",
+    "git reflog expire --expire=now --all",
+    "git reflog delete HEAD@{1}",
+    "git stash -q drop",
+    "git stash --quiet clear",
+    # switch is checkout's modern alias -- same force semantics.
+    "git switch -f main",
+    "git switch --discard-changes main",
+]
+
+
+@pytest.mark.parametrize("sentinel", ["", "#agent-meta:agent=git\n"])
+@pytest.mark.parametrize("command", SR_B_12_DESTRUCTIVE)
+def test_ref_loss_commands_are_destructive(tmp_path, command, sentinel):
+    result = _run_with(_bash_payload(sentinel + command), tmp_path)
+    assert result.returncode == 2, f"stderr={result.stderr!r}"
+    assert "user approval" in result.stderr
+
+
+# --- SR-B-13: history-changing subcommands are mutations ---------------------
+
+SR_B_13_MUTATIONS = [
+    "git pull",
+    "git switch main",
+    "git cherry-pick abc123",
+    "git revert HEAD",
+    "git am x.patch",
+    "git update-ref refs/heads/x HEAD",
+    "git worktree add ../wt main",
+    "git stash -q pop",
+]
+
+
+@pytest.mark.parametrize("command", SR_B_13_MUTATIONS)
+def test_new_mutations_blocked_without_sentinel(tmp_path, command):
+    result = _run_with(_bash_payload(command), tmp_path)
+    assert result.returncode == 2, f"stderr={result.stderr!r}"
+    assert "Direct git mutations" in result.stderr
+
+
+@pytest.mark.parametrize("command", SR_B_13_MUTATIONS)
+def test_new_mutations_allowed_with_git_sentinel(tmp_path, command):
+    result = _run_with(_bash_payload("#agent-meta:agent=git\n" + command), tmp_path)
+    assert result.returncode == 0, f"stderr={result.stderr!r}"
+
+
+@pytest.mark.parametrize("command", SR_B_13_MUTATIONS)
+def test_new_mutations_outside_allowlist_scope(tmp_path, command):
+    _write_allowlist(tmp_path, "auto", ["developer"])
+    result = _run_with(_bash_payload("#agent-meta:agent=developer\n" + command), tmp_path)
+    assert result.returncode == 2, f"stderr={result.stderr!r}"
+
+
+# Negative controls: must stay allowed WITHOUT any sentinel (read-only) ...
+SR_B_READ_ONLY = [
+    "git status",
+    "git log --oneline -5",
+    "git diff HEAD",
+    "git show HEAD",
+    "git branch --show-current",
+    "git remote -v",
+    "git ls-remote origin",
+    "git fetch origin",
+    "git reflog",
+    "git reflog show --all",
+    "git stash list",
+    "git worktree list",
+]
+# ... and must stay allowed WITH the git sentinel (not destructive).
+SR_B_BENIGN_WITH_SENTINEL = SR_B_READ_ONLY + [
+    "git checkout -b x",
+    "git checkout main",
+    "git checkout -- path/file.txt",
+    "git stash",
+    "git stash push -m drop",
+    "git stash pop",
+    "git push origin main:main",
+    "git push origin HEAD:main",
+    "git push --tags",
+    "git push origin :",
+    "git update-ref refs/heads/x HEAD",
+    "git pull --rebase",
+    "git switch -c feature",
+    "git stash -- drop",  # pathspec 'drop' after '--', a stash push
+    "git worktree add ../wt main",
+]
+
+
+@pytest.mark.parametrize("command", SR_B_READ_ONLY)
+def test_read_only_git_stays_allowed(tmp_path, command):
+    result = _run_with(_bash_payload(command), tmp_path)
+    assert result.returncode == 0, f"stderr={result.stderr!r}"
+
+
+@pytest.mark.parametrize("command", SR_B_BENIGN_WITH_SENTINEL)
+def test_benign_git_with_sentinel_stays_allowed(tmp_path, command):
+    result = _run_with(_bash_payload("#agent-meta:agent=git\n" + command), tmp_path)
+    assert result.returncode == 0, f"stderr={result.stderr!r}"

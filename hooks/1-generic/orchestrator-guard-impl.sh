@@ -63,10 +63,12 @@ set -uo pipefail
 #   * `orchestrator` sentinel exempts ONLY from strict-mode main-chat
 #     blocking (Bash) — it NEVER bypasses the git-mutation block.
 #   * `git` sentinel exempts ONLY from the git-mutation block.
-#   * Destructive operations (force push, reset --hard, clean -f, stash
-#     drop/clear, filter-branch/filter-repo, working-tree wipe) are
+#   * Destructive operations (force push, remote-ref deleting push incl.
+#     `:ref` refspecs and --prune, reset --hard, clean -f, stash drop/clear,
+#     filter-branch/filter-repo, working-tree wipe incl. `checkout .`,
+#     checkout/switch --force, update-ref -d, reflog expire/delete) are
 #     blocked EVEN with a valid `git` sentinel and require the user to
-#     approve/run them manually.
+#     approve/run them manually (ref-loss additions: SR-B-12, v1.7.0).
 #   * Every elevation attempt is appended to .claude/hooks/.guard-audit.log
 #     for post-hoc review.
 # Identity itself remains unverifiable at hook level (provider payload has
@@ -235,7 +237,8 @@ if [ "$TOOL_NAME" = "Bash" ] && [ -n "$DECLARED_AGENT" ]; then
       # IS_GIT_SENTINEL here would silently also grant the strict-mode
       # exemption to every allowlisted role. Scope: `git add` and a
       # non-amending `git commit` ONLY -- every other mutation (push, rm,
-      # merge, rebase, reset, restore, tag, branch, checkout,
+      # merge, rebase, reset, restore, tag, branch, checkout, switch, pull,
+      # cherry-pick, revert, am, update-ref, worktree,
       # stash pop|drop|clear, `commit --amend`) stays
       # blocked and must go through the `git` role, enforced via the
       # scan's narrow/broad scope word at the mutation gate below. Never
@@ -305,7 +308,8 @@ fi
 # qualifies a
 # 'mutation': 'narrow' means every git mutation found is `add` or a
 # non-amending `commit`, 'broad' means at least one other mutation is present
-# (push/rm/merge/rebase/reset/restore/tag/branch/checkout/stash, or
+# (push/rm/merge/rebase/reset/restore/tag/branch/checkout/stash, since
+# SR-B-13 also pull/switch/cherry-pick/revert/am/update-ref/worktree, or
 # `commit --amend`, which rewrites history). The allowlist sentinel
 # (issue #694) may only pass 'narrow'. On any Python error it falls back to
 # 'none narrow none' (fail-open, matching the prior gates).
@@ -322,8 +326,17 @@ root = sys.argv[1] if len(sys.argv) > 1 else '.'
 MUTATING = {
     'commit', 'push', 'add', 'rm', 'merge', 'rebase', 'reset', 'restore',
     'tag',
+    # SR-B-13: history/ref/working-tree changing subcommands that used to
+    # slip through ('switch' is checkout's modern alias).
+    'pull', 'switch', 'cherry-pick', 'revert', 'am', 'update-ref',
 }
 STASH_MUTATING = {'pop', 'drop', 'clear'}
+# Options of 'git stash' (push form) that consume a value token, so the
+# value is not misread as the stash subcommand ('git stash -m drop').
+STASH_OPTS_WITH_VALUE = {'-m', '--message', '--pathspec-from-file'}
+# 'git reflog' subcommands that delete reflog entries (SR-B-12/13); plain
+# 'git reflog' / 'git reflog show' are read-only.
+REFLOG_DESTRUCTIVE = {'expire', 'delete'}
 
 # Global git options (before the subcommand) that consume a following value
 # token; if not skipped WITH their value, the value is misread as the
@@ -414,6 +427,27 @@ def parse_git(rest):
     return rest[j], rest[j + 1:], config_keys
 
 
+def first_word(args, opts_with_value=()):
+    # First non-option token of a subcommand's args, i.e. its own
+    # sub-subcommand (SR-B-12): options may precede it ('git stash -q drop'),
+    # so 'args[0]' is not enough. Values of opts_with_value are skipped; a
+    # '--' ends option parsing and everything after it is a pathspec.
+    skip = False
+    for a in args:
+        if skip:
+            skip = False
+            continue
+        if a == '--':
+            return None
+        if a in opts_with_value:
+            skip = True
+            continue
+        if a.startswith('-'):
+            continue
+        return a
+    return None
+
+
 def has_short_flag(args, ch):
     # True if any short-flag cluster (single dash, not '--') contains 'ch',
     # e.g. has_short_flag(['-fu'], 'f') -> True. Shared by the push and clean
@@ -444,9 +478,14 @@ def is_destructive(subcmd, args, config_keys):
             return True
         # '--mirror' / '--delete' / '-d' delete remote refs -> irreversible
         # ref loss, blocked even with a git sentinel (issue #551, cf. #590).
-        if '--mirror' in args or '--delete' in args:
+        # '--prune' deletes remote refs without a local counterpart (SR-B-12).
+        if '--mirror' in args or '--delete' in args or '--prune' in args:
             return True
         if has_short_flag(args, 'd'):
+            return True
+        # Empty-source refspec ':dst' (also '+:dst') deletes the remote ref
+        # dst (SR-B-12). A bare ':' is the 'matching' refspec, not a delete.
+        if any(p.startswith(':') and len(p) > 1 for p in positionals):
             return True
         # leading '+' on a refspec forces a non-fast-forward push (issue #590);
         # a plain 'HEAD:main' (no '+') is a normal fast-forward push.
@@ -458,14 +497,26 @@ def is_destructive(subcmd, args, config_keys):
             return True
         return has_short_flag(args, 'f')
     if subcmd == 'stash':
-        return bool(args) and args[0] in ('drop', 'clear')
+        return first_word(args, STASH_OPTS_WITH_VALUE) in ('drop', 'clear')
     if subcmd in ('filter-branch', 'filter-repo'):
         return True
-    if subcmd == 'checkout':
-        if '--' in args:
-            k = args.index('--')
-            return '.' in args[k + 1:]
+    if subcmd in ('checkout', 'switch'):
+        # SR-B-12: '-f'/'--force' (and switch's '--discard-changes') throw
+        # away local changes; checkout of the '.' pathspec wipes the working
+        # tree with or without '--'. A single-path restore stays a mutation.
+        k = args.index('--') if '--' in args else len(args)
+        opts, paths = args[:k], args[k + 1:]
+        if '--force' in opts or '--discard-changes' in opts:
+            return True
+        if has_short_flag(opts, 'f'):
+            return True
+        if subcmd == 'checkout':
+            return '.' in paths or '.' in [a for a in opts if not a.startswith('-')]
         return False
+    if subcmd == 'update-ref':
+        return '-d' in args or '--delete' in args
+    if subcmd == 'reflog':
+        return first_word(args) in REFLOG_DESTRUCTIVE
     if subcmd == 'restore':
         return '.' in positionals
     return False
@@ -481,7 +532,13 @@ def is_mutation(subcmd, args):
     if subcmd == 'checkout':
         return bool(args) and not all(a.startswith('-') for a in args)
     if subcmd == 'stash':
-        return bool(args) and args[0] in STASH_MUTATING
+        return first_word(args, STASH_OPTS_WITH_VALUE) in STASH_MUTATING
+    if subcmd == 'reflog':
+        return first_word(args) in REFLOG_DESTRUCTIVE
+    if subcmd == 'worktree':
+        # Every worktree subcommand except 'list' changes worktree state.
+        w = first_word(args)
+        return w is not None and w != 'list'
     return subcmd in MUTATING
 
 
