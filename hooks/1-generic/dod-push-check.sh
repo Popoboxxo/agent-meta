@@ -1,12 +1,12 @@
 #!/bin/bash
 # hook: dod-push-check
-# version: 2.0.3
+# version: 2.1.0
 # event: PreToolUse
 # matcher: Bash
 # provider: Claude
-# description: Blocks git push on main/master (Branch-Guard) and until tests are green (DoD enforcement)
+# description: Blocks git push on/to main/master (Branch-Guard) and until tests are green (DoD enforcement)
 # enabled_by_default: false
-# changelog: v2.0.3: per-statement tag-only push detection with flag allowlist, --no-tags, redirects, line continuations, fail-closed parsing (SR-B-01); v2.0.2: fix pipefail propagation in TEST_CMD subshell (#753)
+# changelog: v2.1.0: push detection by command word incl. global options/wrappers, no false positives on quoted/echoed text (SR-B-03/04), Branch-Guard checks destination refs and blocks --all/--mirror/detached pushes (SR-B-02), no SIGPIPE fail-open on large commands (SR-B-21), scoped boundary wording (SR-B-07); v2.0.3: per-statement tag-only push detection with flag allowlist, --no-tags, redirects, line continuations, fail-closed parsing (SR-B-01); v2.0.2: fix pipefail propagation in TEST_CMD subshell (#753)
 
 set -uo pipefail
 
@@ -17,12 +17,16 @@ set -uo pipefail
 # (issue #593). stdout is used only for non-blocking progress/status text.
 
 # --- Shared helper lib + fail-closed python check (issue #595) ---------
-# This hook acts as a security boundary (Branch-Guard + DoD test gate) — see
-# .claude/rules/branch-guard.md#guard-terminologie for the convention-vs-
-# security-boundary distinction — it must not silently allow a push through
-# just because python3 went missing from PATH (which could be as simple as a
-# broken PATH, or as deliberate as an attacker trying to disable the gate).
-# Fail CLOSED instead.
+# For THIS check (dependency availability) the hook acts as a security
+# boundary — see .claude/rules/branch-guard.md#guard-terminologie for the
+# convention-vs-security-boundary distinction: it must not silently allow a
+# push through just because python3 or the helper lib went missing (which
+# could be as simple as a broken PATH, or as deliberate as an attacker trying
+# to disable the gate). Fail CLOSED instead. Otherwise (Branch-Guard command
+# classification, test gate, result cache) the hook is a convention
+# boundary: a best-effort token scan, not a shell interpreter — indirection
+# such as eval/$(...)-in-quotes/aliases (#592) or a hand-written cache file
+# can still get a push past it. Classification doubt fails closed.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if ! source "$SCRIPT_DIR/lib/hook_common.sh" 2>/dev/null; then
   echo "DoD-Check: required helper $SCRIPT_DIR/lib/hook_common.sh is missing or unreadable." >&2
@@ -49,8 +53,16 @@ COMMAND=$(hook_json_get "$INPUT" "tool_input.command")
 # Only intercept Bash tool calls
 [ "$TOOL_NAME" = "Bash" ] || exit 0
 
-# Only intercept commands that contain git push
-printf '%s' "$COMMAND" | grep -qE '(^|[;&|[:space:]])git push' || exit 0
+# Cheap pre-filter: a push needs the word 'push' somewhere (quotes/backslashes
+# between the letters tolerated, e.g. pu''sh). The precise per-statement
+# classification below decides; this only skips the python startup for the
+# common case. Here-string, NOT `printf | grep -q`: under pipefail a writer
+# killed by SIGPIPE after grep's early exit made the pipeline fail and
+# `|| exit 0` allowed large multi-line pushes through (SR-B-21).
+_Q="[\"'\\\\]*"
+# Only rc 1 (no match) skips; a grep error (rc 2) falls through (fail closed).
+grep -qE "p${_Q}u${_Q}s${_Q}h" <<<"$COMMAND"
+[ $? -eq 1 ] && exit 0
 
 # --- Resolve project config file ---
 # Config layout since agent-meta v0.26+: .meta-config/project.yaml (YAML).
@@ -136,9 +148,42 @@ PYEOF
 # every ref of every push statement must be a tag ref. The whole command is
 # tag-only only if it has >=1 push statement and ALL of them are tag-only —
 # `git push origin main --tags` or `git push --tags && git push origin main`
-# must still hit the Branch-Guard. Any parse doubt -> "false" (fail closed).
-IS_TAG_ONLY_PUSH=$(python3 - "$COMMAND" <<'PYEOF' 2>/dev/null
-import re, shlex, subprocess, sys
+# must still hit the Branch-Guard. Any parse doubt -> not tag-only.
+#
+# SR-B-03/SR-B-04: a statement is a push only if its COMMAND WORD resolves to
+# git with subcommand `push` after git's global options (`git -C . push`,
+# `/usr/bin/git push`, `(git push ...)`, `VAR=1 git push`), or if an
+# exec-capable wrapper/unknown command carries a `git [opts] push` in its args
+# (`sudo git push`, `env X=1 git push`, `timeout 60 git push` — fail closed).
+# Commands that never execute their arguments (`echo`, `grep`, `gh`, ...) are
+# not pushes even if their text contains "git push".
+#
+# SR-B-02: the Branch-Guard also checks every DESTINATION ref of each non-tag
+# push statement (`HEAD:main`, `feat:main`, `+feat:refs/heads/main`, `:main`,
+# `--delete main`, `origin/main`, `--force-with-lease=main`). Bulk/ambiguous
+# pushes (`--all`, `--branches`, `--mirror`, wildcard or `:` refspecs,
+# unknown/abbreviated push options) and refspec-less pushes from a detached
+# HEAD are blocked because the destination cannot be determined safely.
+#
+# Classifier output (one line): none | tag | push | block <reason>.
+# Anything else (python crash, empty output) blocks (fail closed). The
+# command is passed on fd 3 (here-string): argv/env cap a single string at
+# 128 KB (E2BIG) and a pipe writer can die from SIGPIPE (SR-B-21).
+
+# Resolve GIT_MAIN_BRANCH: env var > project config > default "main"
+MAIN_BRANCH="${AGENT_META_MAIN_BRANCH:-}"
+if [ -z "$MAIN_BRANCH" ] && [ -n "$CONFIG_FILE" ]; then
+  MAIN_BRANCH=$(read_config_var "$CONFIG_FILE" "GIT_MAIN_BRANCH")
+fi
+MAIN_BRANCH="${MAIN_BRANCH:-main}"
+
+# Full ref (not --abbrev-ref, which shortens to 'heads/main' when a tag of
+# the same name exists); empty = detached HEAD or not inside a repo.
+CURRENT_REF=$(git symbolic-ref -q HEAD 2>/dev/null)
+CURRENT_BRANCH="${CURRENT_REF#refs/heads/}"
+
+PUSH_CLASS=$(python3 - "$MAIN_BRANCH" "$CURRENT_BRANCH" 3<<<"$COMMAND" <<'PYEOF' 2>/dev/null
+import os, re, shlex, subprocess, sys
 
 # git global options that take a separate value token. KEEP IN SYNC with
 # GLOBAL_OPTS_WITH_VALUE in hooks/1-generic/orchestrator-guard-impl.sh (the
@@ -197,6 +242,17 @@ def is_git(tok):
     return tok == "git" or tok.endswith("/git")
 
 
+def git_subcommand(toks):
+    # toks[0] is git: skip global options (with their values) and return
+    # (subcommand or None, args after it).
+    j = 1
+    while j < len(toks) and toks[j].startswith("-"):
+        j += 2 if toks[j] in GIT_OPTS_WITH_VALUE else 1
+    if j < len(toks):
+        return toks[j], toks[j + 1:]
+    return None, []
+
+
 def push_args(toks):
     # Return the args after 'push' for a `git [global-opts] push ...` token
     # list, None if this statement is not a git push, or UNRESOLVED if it
@@ -205,11 +261,9 @@ def push_args(toks):
     for i, tok in enumerate(toks):
         if not is_git(tok):
             continue
-        j = i + 1
-        while j < len(toks) and toks[j].startswith("-"):
-            j += 2 if toks[j] in GIT_OPTS_WITH_VALUE else 1
-        if j < len(toks) and toks[j] == "push":
-            return toks[j + 1:]
+        sub, args = git_subcommand(toks[i:])
+        if sub == "push":
+            return args
         break
     if "push" in toks and any(is_git(t) for t in toks):
         return UNRESOLVED
@@ -267,39 +321,232 @@ def stmt_is_tag_only(args):
     return True
 
 
-def command_is_tag_only(cmd):
+MAIN_BRANCH, CURRENT = sys.argv[1], sys.argv[2]  # CURRENT "" = detached
+PROTECTED = {"main", "master", MAIN_BRANCH} - {""}
+
+# Shell reserved words / prefixes that precede the real command word.
+RESERVED = {"!", "{", "}", "if", "then", "elif", "else", "while", "until",
+            "do", "time", "coproc"}
+ASSIGNMENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
+# Command words that never execute their arguments: "git push" in their args
+# is text, not a push (SR-B-04). Every other non-git command word is treated
+# as a possible wrapper (sudo/env/timeout/xargs/...): fail closed.
+NON_EXEC = {"echo", "printf", "grep", "egrep", "fgrep", "rg", "ag", "ack",
+            "gh", "cat", "head", "tail", "less", "more", "wc", "ls", "man"}
+PUNCT = set("();<>|&")
+# stands in for a $(...)/<(...) group inside its parent command
+COMPUTED = "$(...)"
+
+# push long options the destination check understands; anything else
+# (incl. unique abbreviations such as '--mirr' = --mirror) is ambiguous.
+PUSH_LONG_KNOWN = (PUSH_FLAGS_SAFE | PUSH_OPTS_WITH_VALUE | TAGS_FLAGS
+                   | NO_TAGS_FLAGS | {"--follow-tags", "--no-follow-tags",
+                                      "--prune", "--no-prune",
+                                      "--recurse-submodules",
+                                      "--no-recurse-submodules"})
+PUSH_BULK = {"--all", "--branches", "--mirror"}
+_remotes = None
+
+
+def segments(stmt):
+    # Tokenize like the shell (quotes, escapes) and nest at unquoted '(' /
+    # ')', so '(git push x)', '$(git push x)' and '<(...)' expose 'git' as a
+    # command word and 'x)' does not leak into a ref. A closed group leaves
+    # COMPUTED in its parent's place ('git push origin $(...)' has a ref the
+    # hook cannot know). Returns a list of token lists.
+    lex = shlex.shlex(stmt, posix=True, punctuation_chars=True)
+    lex.whitespace_split = True
+    lex.commenters = ""
+    done, stack = [], [[]]
+    for tok in lex:  # ValueError on unbalanced quotes
+        if not set(tok) <= PUNCT:
+            stack[-1].append(tok)
+            continue
+        for ch in tok:
+            if ch == "(":
+                if stack[-1] and stack[-1][-1].endswith("$"):
+                    stack[-1][-1] = stack[-1][-1][:-1]  # '$(' / 'x=$('
+                    if not stack[-1][-1]:
+                        stack[-1].pop()
+                stack.append([])
+            elif ch == ")" and len(stack) > 1:
+                done.append(stack.pop())
+                if stack[-1]:
+                    stack[-1].append(COMPUTED)
+    return [s for s in done + stack if s]
+
+
+def segments_ok(stmt):
+    try:
+        segments(stmt)
+        return True
+    except ValueError:
+        return False
+
+
+def segment_push_args(toks):
+    # args after 'push' / None / UNRESOLVED, decided by the command word.
+    i = 0
+    while i < len(toks) and (toks[i] in RESERVED or ASSIGNMENT.match(toks[i])):
+        i += 1
+    if i >= len(toks):
+        return None
+    word = toks[i]
+    if is_git(word):
+        sub, args = git_subcommand(toks[i:])
+        return args if sub == "push" else None
+    if os.path.basename(word) in NON_EXEC:
+        return None
+    return push_args(toks[i + 1:])
+
+
+def remotes():
+    global _remotes
+    if _remotes is None:
+        out = subprocess.run(["git", "remote"], capture_output=True, text=True)
+        _remotes = set(out.stdout.split())
+    return _remotes
+
+
+def is_protected(dst):
+    if dst.startswith("refs/heads/"):
+        dst = dst[len("refs/heads/"):]
+    elif dst.startswith("refs/remotes/"):
+        dst = dst[len("refs/remotes/"):].partition("/")[2]
+    elif "/" in dst and dst.split("/", 1)[0] in remotes():
+        dst = dst.split("/", 1)[1]
+    return dst in PROTECTED
+
+
+def destination_block(args):
+    # Reason string if this (non-tag-only) push statement may update a
+    # protected branch or its destination cannot be determined; else None.
+    pos = []
+    i = 0
+    while i < len(args):
+        a = args[i]
+        i += 1
+        if a == "--":
+            pos += args[i:]
+            break
+        if not a.startswith("-") or a == "-":
+            pos.append(a)
+            continue
+        name, _, val = a.partition("=")
+        if a.startswith("--"):
+            if name in PUSH_BULK:
+                return f"'{name}' pushes many refs, destination cannot be determined"
+            if name not in PUSH_LONG_KNOWN:
+                return f"unknown push option '{name}', destination cannot be determined"
+            if name == "--force-with-lease" and val and is_protected(val.split(":", 1)[0]):
+                return f"'{a}' targets protected branch"
+            if name in PUSH_OPTS_WITH_VALUE and not val:
+                i += 1
+            continue
+        for k, ch in enumerate(a[1:], 1):
+            if ch == "o":
+                if k == len(a) - 1:
+                    i += 1
+                break
+            if ch not in PUSH_SHORT_SAFE:
+                return f"unknown push option '-{ch}', destination cannot be determined"
+    refs = pos[1:]  # pos[0] is the remote
+    if not refs:
+        if not CURRENT:
+            return "no explicit refspec on a detached HEAD (or outside a repo), destination cannot be determined"
+        return None  # pushes the current branch: checked by the caller
+    k = 0
+    while k < len(refs):
+        ref = refs[k]
+        k += 1
+        if ref == "tag":
+            k += 1  # 'tag <name>' only touches refs/tags/
+            continue
+        spec = ref.lstrip("+")
+        if "$" in spec or "`" in spec:  # incl. COMPUTED
+            return f"refspec '{ref}' is computed at run time, destination cannot be determined"
+        if "*" in spec or spec == ":":
+            return f"refspec '{ref}' pushes many refs, destination cannot be determined"
+        src, colon, dst = spec.partition(":")
+        if not colon or not dst:
+            dst = src
+        if dst in ("HEAD", "@"):
+            if not CURRENT:
+                return f"refspec '{ref}' from detached HEAD, destination cannot be determined"
+            dst = CURRENT
+        if is_protected(dst):
+            return f"destination '{dst}' of refspec '{ref}' is a protected branch"
+    return None
+
+
+def classify(cmd):
     # bash drops backslash-newline before parsing: join continued lines first
     cmd = REDIRECT.sub(" ", cmd.replace("\\\n", ""))
     pushes = []
-    for stmt in re.split(r"&&|\|\||;|\||&|\n", cmd):
-        try:
-            toks = shlex.split(stmt)
-        except ValueError:
-            return False  # unparseable quoting: fail closed
-        args = push_args(toks)
-        if args is UNRESOLVED:
-            return False
-        if args is not None:
-            pushes.append(args)
-    return bool(pushes) and all(stmt_is_tag_only(a) for a in pushes)
+    stmts = re.split(r"&&|\|\||;|\||&|\n", cmd)
+    for stmt in stmts:
+        plain = re.sub(r"[\"'\\]", "", stmt)
+        if "push" not in plain:
+            continue
+        segs = None
+        # A quote opened here and closed on a later line (multi-line -m/--body
+        # text) leaves the command word intact: re-parse with the quote
+        # closed. Still unparseable and mentions git -> fail closed.
+        for suffix in ("", '"', "'"):
+            try:
+                segs = list(segments(stmt + suffix))
+                break
+            except ValueError:
+                pass
+        if segs is None:
+            if "git" in plain:
+                return "block unparseable statement mentions git push"
+            continue
+        for toks in segs:
+            args = segment_push_args(toks)
+            if args is UNRESOLVED:
+                return "block unresolvable git push statement"
+            if args is not None:
+                pushes.append(args)
+    if not pushes:
+        return "none"
+    non_tag = [a for a in pushes if not stmt_is_tag_only(a)]
+    # B-01: any unparseable statement (a quote may hide a push) -> not tag-only
+    if not non_tag and all(segments_ok(s) for s in stmts):
+        return "tag"
+    for args in non_tag:
+        reason = destination_block(args)
+        if reason:
+            return "block " + reason
+    return "push"
 
 
-print("true" if command_is_tag_only(sys.argv[1]) else "false")
+try:
+    with os.fdopen(3, encoding="utf-8", errors="surrogateescape") as fh:
+        print(classify(fh.read()))
+except Exception as exc:  # fail closed on any classifier bug
+    print(f"block classifier error ({type(exc).__name__})")
 PYEOF
 )
 
-# --- Branch-Guard: block push on main/master ---
-CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+case "$PUSH_CLASS" in
+  none) exit 0 ;;
+  tag) IS_TAG_ONLY_PUSH=true ;;
+  push) IS_TAG_ONLY_PUSH=false ;;
+  *)
+    _REASON="${PUSH_CLASS#block }"
+    [ "${PUSH_CLASS%% *}" = "block" ] || _REASON="push classification failed (fail closed)"
+    echo "Branch-Guard: Push blocked — $_REASON." >&2
+    echo "Protected branches: $MAIN_BRANCH, main, master. Push a feature branch and open a PR instead." >&2
+    echo "" >&2
+    echo "If this is intentional (release, hotfix), disable the hook temporarily:" >&2
+    echo "  Remove dod-push-check from hooks in .meta-config/project.yaml, re-sync, push, re-enable." >&2
+    exit 2
+    ;;
+esac
 
-# Resolve GIT_MAIN_BRANCH: env var > project config > default "main"
-MAIN_BRANCH="${AGENT_META_MAIN_BRANCH:-}"
-
-if [ -z "$MAIN_BRANCH" ] && [ -n "$CONFIG_FILE" ]; then
-  MAIN_BRANCH=$(read_config_var "$CONFIG_FILE" "GIT_MAIN_BRANCH")
-fi
-MAIN_BRANCH="${MAIN_BRANCH:-main}"
-
-if [ "$IS_TAG_ONLY_PUSH" != "true" ] && { [ "$CURRENT_BRANCH" = "$MAIN_BRANCH" ] || [ "$CURRENT_BRANCH" = "master" ]; }; then
+# --- Branch-Guard: block push while on a protected branch ---
+if [ "$IS_TAG_ONLY_PUSH" != "true" ] && { [ "$CURRENT_BRANCH" = "$MAIN_BRANCH" ] || [ "$CURRENT_BRANCH" = "main" ] || [ "$CURRENT_BRANCH" = "master" ]; }; then
   echo "Branch-Guard: Push blocked — you are on '$CURRENT_BRANCH'." >&2
   echo "Create a feature branch first: git checkout -b feat/<topic>" >&2
   echo "Direct pushes to $MAIN_BRANCH are not allowed by DoD policy." >&2

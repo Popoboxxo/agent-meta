@@ -24,6 +24,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -334,3 +335,216 @@ def test_pure_tag_push_skips_branch_guard(repo_on_main, command):
         f"stdout: {result.stdout}\nstderr: {result.stderr}"
     )
     assert "DoD-Check FAILED" in result.stderr
+
+
+# --- W2-B1: push recognition by command word + destination Branch-Guard ----
+#
+# Outcomes with AGENT_META_TEST_COMMAND=false:
+#   BLOCK -> rc 2, "Branch-Guard: Push blocked" (test gate never reached)
+#   GATE  -> recognised push, Branch-Guard passed, test gate ran ("DoD-Check FAILED")
+#   NONE  -> not a push at all: rc 0, neither guard nor test gate ran
+# Nothing is ever pushed: the hook only inspects the command text.
+
+BLOCK, GATE, NONE = "block", "gate", "none"
+
+
+@pytest.fixture
+def multi_repo(tmp_path):
+    """Repo with branches main + feat/x (both on one commit), tag v1.0.0 and
+    a dummy remote 'origin' (never contacted). Starts on feat/x."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    run = lambda *args: subprocess.run(  # noqa: E731
+        ["git", *args], cwd=str(repo), capture_output=True, text=True, check=True
+    )
+    run("init", "-q")
+    run("config", "user.email", "test@example.com")
+    run("config", "user.name", "Test")
+    run("checkout", "-q", "-b", "main")
+    (repo / "f.txt").write_text("x", encoding="utf-8")
+    run("add", "f.txt")
+    run("commit", "-q", "-m", "init")
+    run("tag", "-a", "v1.0.0", "-m", "v1.0.0")
+    run("remote", "add", "origin", str(tmp_path / "does-not-exist.git"))
+    run("checkout", "-q", "-b", "feat/x")
+    return repo
+
+
+def _checkout(repo: Path, where: str) -> None:
+    args = ["checkout", "-q", "--detach"] if where == "detached" else ["checkout", "-q", where]
+    subprocess.run(["git", *args], cwd=str(repo), capture_output=True, text=True, check=True)
+
+
+def _outcome(result: subprocess.CompletedProcess) -> str:
+    if "classifier error" in result.stderr:  # fail-closed crash, not a decision
+        return f"classifier crash: {result.stderr!r}"
+    if result.returncode == 2 and "Branch-Guard: Push blocked" in result.stderr:
+        return BLOCK
+    if result.returncode == 2 and "DoD-Check FAILED" in result.stderr:
+        return GATE
+    if result.returncode == 0 and "DoD-Check" not in result.stdout + result.stderr:
+        return NONE
+    return f"unexpected rc={result.returncode} stdout={result.stdout!r} stderr={result.stderr!r}"
+
+
+def _assert_outcome(repo: Path, command: str, expected: str, env_extra=None) -> None:
+    payload = {"tool_name": "Bash", "tool_input": {"command": command}, "cwd": repo.as_posix()}
+    env = dict(os.environ, AGENT_META_TEST_COMMAND="false", AGENT_META_TEST_TIMEOUT="5")
+    env.pop("AGENT_META_MAIN_BRANCH", None)
+    env.update(env_extra or {})
+    result = subprocess.run([_BASH, str(_HOOK_PATH)], input=json.dumps(payload),
+                            capture_output=True, text=True, cwd=str(repo), env=env)
+    assert _outcome(result) == expected, f"command={command[:200]!r}: {_outcome(result)}"
+
+
+def _padding(size_kb: int) -> str:
+    line = "# " + "x" * 78 + "\n"
+    return line * (size_kb * 1024 // len(line))
+
+
+# SR-B-21: printf | grep -q under pipefail let a padded push through (SIGPIPE).
+@pytest.mark.parametrize("size_kb", [70, 300])
+def test_large_multiline_push_still_blocked(multi_repo, size_kb):
+    _checkout(multi_repo, "main")
+    _assert_outcome(multi_repo, "git push origin main\n" + _padding(size_kb), BLOCK)
+
+
+@pytest.mark.parametrize("size_kb", [70, 300])
+def test_large_multiline_push_to_main_blocked_from_feature(multi_repo, size_kb):
+    _assert_outcome(multi_repo, "git push origin HEAD:main\n" + _padding(size_kb), BLOCK)
+
+
+@pytest.mark.parametrize("size_kb", [70, 300])
+def test_large_multiline_non_push_allowed_quickly(multi_repo, size_kb):
+    _checkout(multi_repo, "main")
+    start = time.monotonic()
+    _assert_outcome(multi_repo, "git status\n" + _padding(size_kb), NONE)
+    assert time.monotonic() - start < 10
+
+
+# SR-B-03: git invoked with global options / wrappers / subshells.
+B03_FORMS = [
+    "git -C . push origin {ref}",
+    "git --no-pager push origin {ref}",
+    "git -c push.default=simple push origin {ref}",
+    "/usr/bin/git push origin {ref}",
+    "command git push origin {ref}",
+    "env VAR=1 git push origin {ref}",
+    "VAR=1 git push origin {ref}",
+    "sudo git push origin {ref}",
+    "timeout 60 git push origin {ref}",
+    "(git push origin {ref})",
+    "echo hi; (cd . && git push origin {ref})",
+    "git\tpush origin {ref}",
+    "git  push   origin {ref}",
+    "git pu''sh origin {ref}",
+]
+
+
+@pytest.mark.parametrize("form", B03_FORMS)
+def test_global_option_push_blocked_on_main(multi_repo, form):
+    _checkout(multi_repo, "main")
+    _assert_outcome(multi_repo, form.format(ref="main"), BLOCK)
+
+
+@pytest.mark.parametrize("form", B03_FORMS)
+def test_global_option_push_to_main_blocked_from_feature(multi_repo, form):
+    _assert_outcome(multi_repo, form.format(ref="main"), BLOCK)
+
+
+@pytest.mark.parametrize("form", B03_FORMS)
+def test_global_option_push_from_feature_runs_test_gate(multi_repo, form):
+    _assert_outcome(multi_repo, form.format(ref="feat/x"), GATE)
+
+
+# SR-B-04: text that merely contains "git push" is not a push.
+B04_BENIGN = [
+    'grep -rn "git push" docs/',
+    "grep -rn git push docs",
+    "echo git push",
+    'echo "git push origin main"',
+    "printf '%s\\n' git push origin main",
+    'gh pr create --title t --body "then run git push origin main later"',
+    "git stash push -m wip",
+    "docker push example/image:latest",
+]
+
+
+@pytest.mark.parametrize("command", B04_BENIGN)
+def test_benign_text_is_not_a_push_on_main(multi_repo, command):
+    _checkout(multi_repo, "main")
+    _assert_outcome(multi_repo, command, NONE)
+
+
+@pytest.mark.parametrize("command", B04_BENIGN)
+def test_benign_text_is_not_a_push_on_feature(multi_repo, command):
+    _assert_outcome(multi_repo, command, NONE)
+
+
+# SR-B-02: Branch-Guard checks destination refs, not only the current branch.
+B02_TABLE = [
+    # from a feature branch
+    ("feat/x", "git push origin HEAD:main", BLOCK),
+    ("feat/x", "git push origin feat/x:main", BLOCK),
+    ("feat/x", "git push origin +feat/x:main", BLOCK),
+    ("feat/x", "git push origin feat/x:refs/heads/main", BLOCK),
+    ("feat/x", "git push origin HEAD:master", BLOCK),
+    ("feat/x", "git push origin :main", BLOCK),
+    ("feat/x", "git push origin --delete main", BLOCK),
+    ("feat/x", "git push origin main", BLOCK),
+    ("feat/x", "git push origin refs/heads/main", BLOCK),
+    ("feat/x", "git push origin origin/main", BLOCK),
+    ("feat/x", "git push --force-with-lease=main origin HEAD:main", BLOCK),
+    ("feat/x", "git push --force-with-lease=main origin feat/x", BLOCK),
+    ("feat/x", "git push --all", BLOCK),
+    ("feat/x", "git push origin --all", BLOCK),
+    ("feat/x", "git push --mirror origin", BLOCK),
+    ("feat/x", "git push origin --branches", BLOCK),
+    ("feat/x", "git push origin 'refs/heads/*:refs/heads/*'", BLOCK),
+    ("feat/x", "git push origin :", BLOCK),
+    ("feat/x", "git push --mirr origin", BLOCK),  # unique abbreviation of --mirror
+    ("feat/x", "git push origin feat/x && git push origin HEAD:main", BLOCK),
+    ("feat/x", "echo $(git push origin main)", BLOCK),
+    ("feat/x", "git push origin >(cat) main", BLOCK),
+    # destination computed at run time cannot be checked -> fail closed
+    ("feat/x", "git push -u origin $(git branch --show-current)", BLOCK),
+    ("feat/x", 'git push origin "$BRANCH"', BLOCK),
+    ("feat/x", "git push origin feat/x", GATE),
+    ("feat/x", "git push -u origin feat/x", GATE),
+    ("feat/x", "git push --set-upstream origin feat/x", GATE),
+    ("feat/x", "git push", GATE),
+    ("feat/x", "git push origin", GATE),
+    ("feat/x", "git push origin HEAD", GATE),
+    ("feat/x", "git push --force origin feat/x", GATE),
+    ("feat/x", "git push origin feat/x:feat/y", GATE),
+    ("feat/x", "git push origin v1.0.0", GATE),
+    ("feat/x", "git push origin --tags", GATE),
+    # detached HEAD
+    ("detached", "git push", BLOCK),
+    ("detached", "git push origin", BLOCK),
+    ("detached", "git push origin HEAD", BLOCK),
+    ("detached", "git push origin HEAD:main", BLOCK),
+    ("detached", "git push origin HEAD:feat/x", GATE),
+    ("detached", "git push origin v1.0.0", GATE),
+    # on main: the current-branch rule is kept
+    ("main", "git push origin main:feat/x", BLOCK),
+    ("main", "git push origin feat/x", BLOCK),
+    ("main", "git push origin v1.0.0", GATE),
+]
+
+
+@pytest.mark.parametrize("where,command,expected", B02_TABLE)
+def test_branch_guard_destination_table(multi_repo, where, command, expected):
+    if where != "feat/x":
+        _checkout(multi_repo, where)
+    _assert_outcome(multi_repo, command, expected)
+
+
+@pytest.mark.parametrize("command,expected", [
+    ("git push origin HEAD:develop", BLOCK),
+    ("git push origin HEAD:main", BLOCK),
+    ("git push origin HEAD:master", BLOCK),
+    ("git push origin feat/x", GATE),
+])
+def test_custom_main_branch_is_protected_destination(multi_repo, command, expected):
+    _assert_outcome(multi_repo, command, expected, {"AGENT_META_MAIN_BRANCH": "develop"})
