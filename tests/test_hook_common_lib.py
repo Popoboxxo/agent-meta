@@ -96,6 +96,29 @@ def test_hook_json_get_object_value_returns_default():
     assert r.stdout.strip() == "was-object"
 
 
+@pytest.mark.parametrize("locale", ["C", "C.UTF-8", "de_DE.UTF-8"])
+@pytest.mark.parametrize("escape", ["\\ud800", "\\udcff", "\\udfff"])
+def test_hook_json_get_lone_surrogate_is_not_dropped(locale, escape):
+    """A lone surrogate made print() raise under a UTF-8 locale and the field
+    came back empty -- a present, non-empty field must never read as ""
+    (W2-B1 R2-2)."""
+    payload = '{"tool_input": {"command": "git push origin main' + escape + '"}}'
+    r = subprocess.run(
+        [_BASH, "-c", f'source "{_LIB_PATH}"\nhook_json_get "$1" tool_input.command', _BASH, payload],
+        capture_output=True, env=dict(os.environ, LC_ALL=locale))
+    assert r.stdout.startswith(b"git push origin main"), (locale, r.stdout, r.stderr)
+
+
+@pytest.mark.parametrize("locale", ["C", "de_DE.UTF-8"])
+def test_hook_json_get_invalid_utf8_input_is_not_dropped(locale):
+    script = (f'source "{_LIB_PATH}"\n'
+              'IN=$(printf \'{"tool_input": {"command": "git push \\377"}}\')\n'
+              'hook_json_get "$IN" tool_input.command\n')
+    r = subprocess.run([_BASH, "-c", script], capture_output=True,
+                       env=dict(os.environ, LC_ALL=locale))
+    assert r.stdout.startswith(b"git push "), (locale, r.stdout, r.stderr)
+
+
 # --- hook_redact_secrets (issue #596) -------------------------------------
 
 @pytest.mark.parametrize("raw,must_not_contain", [
