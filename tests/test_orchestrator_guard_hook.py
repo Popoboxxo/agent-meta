@@ -68,6 +68,16 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+def _clean_env() -> dict:
+    # SR-B-11: the hook prefers $CLAUDE_PROJECT_DIR over the payload cwd. A
+    # value inherited from a surrounding Claude Code session would silently
+    # retarget every tmp_path fixture at that project (and its audit log),
+    # so tests never inherit it -- tests that need it set it explicitly.
+    env = dict(os.environ)
+    env.pop("CLAUDE_PROJECT_DIR", None)
+    return env
+
+
 def _run_hook(payload: dict) -> subprocess.CompletedProcess:
     return subprocess.run(
         [_BASH, str(_HOOK_PATH)],
@@ -75,6 +85,7 @@ def _run_hook(payload: dict) -> subprocess.CompletedProcess:
         capture_output=True,
         text=True,
         cwd=str(_REPO_ROOT),
+        env=_clean_env(),
     )
 
 
@@ -734,6 +745,7 @@ def test_audit_log_rotates_when_over_cap(tmp_path):
         capture_output=True,
         text=True,
         cwd=str(_REPO_ROOT),
+        env=_clean_env(),
     )
     assert result.returncode == 0
     lines = audit_file.read_text(encoding="utf-8").splitlines()
@@ -1211,7 +1223,7 @@ def _strict_project(tmp_path, project_yaml: str):
 
 
 def _run_hook_in(tmp_path, payload: dict, hide_yaml: bool) -> subprocess.CompletedProcess:
-    env = dict(os.environ)
+    env = _clean_env()
     if hide_yaml:
         # A fake yaml.py earlier on sys.path makes `import yaml` raise
         # ImportError -- simulates a hook interpreter without PyYAML.
@@ -1281,3 +1293,48 @@ def test_non_strict_project_with_pyyaml_allows(tmp_path):
     _strict_project(tmp_path, "orchestrator:\n  enabled: true\n  strict: false\n")
     result = _run_hook_in(tmp_path, _MAIN_THREAD_WRITE, hide_yaml=False)
     assert result.returncode == 0, f"stdout={result.stdout!r} stderr={result.stderr!r}"
+
+
+# --- SR-B-08: wrapper maps impl exit status to {0, 2} -----------------------
+# Claude Code only blocks on exit 2; any other non-zero status is a
+# non-blocking error and the tool call proceeds. An impl crash (unbound
+# variable rc 1, SIGKILL 137, SIGPIPE 141) must therefore fail CLOSED.
+
+def _wrapper_with_stub_impl(tmp_path, impl_body: str) -> Path:
+    hooks_dir = tmp_path / "hooks"
+    hooks_dir.mkdir()
+    wrapper = hooks_dir / "orchestrator-guard.sh"
+    wrapper.write_text(_HOOK_PATH.read_text(encoding="utf-8"), encoding="utf-8")
+    (hooks_dir / "orchestrator-guard-impl.sh").write_text(
+        "#!/bin/bash\ncat >/dev/null\n" + impl_body + "\n", encoding="utf-8",
+    )
+    return wrapper
+
+
+@pytest.mark.parametrize("impl_body,crash_rc", [
+    ("set -u\necho \"$UNBOUND_VAR_SR_B_08\"", 1),
+    ("kill -KILL $$", 137),
+    ("kill -PIPE $$", 141),
+    ("exit 3", 3),
+])
+def test_wrapper_fails_closed_on_impl_crash(tmp_path, impl_body, crash_rc):
+    wrapper = _wrapper_with_stub_impl(tmp_path, impl_body)
+    result = subprocess.run(
+        [_BASH, str(wrapper)], input=json.dumps(_bash_payload("echo hi")),
+        capture_output=True, text=True, cwd=str(tmp_path), env=_clean_env(),
+    )
+    assert result.returncode == 2, f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    assert f"impl crashed rc={crash_rc}" in result.stderr
+    assert "failing closed" in result.stderr
+
+
+@pytest.mark.parametrize("impl_rc", [0, 2])
+def test_wrapper_passes_through_allow_and_block(tmp_path, impl_rc):
+    wrapper = _wrapper_with_stub_impl(tmp_path, f"exit {impl_rc}")
+    result = subprocess.run(
+        [_BASH, str(wrapper)], input=json.dumps(_bash_payload("echo hi")),
+        capture_output=True, text=True, cwd=str(tmp_path), env=_clean_env(),
+    )
+    assert result.returncode == impl_rc, f"stderr={result.stderr!r}"
+    assert "impl crashed" not in result.stderr
+
