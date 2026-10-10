@@ -548,3 +548,227 @@ def test_branch_guard_destination_table(multi_repo, where, command, expected):
 ])
 def test_custom_main_branch_is_protected_destination(multi_repo, command, expected):
     _assert_outcome(multi_repo, command, expected, {"AGENT_META_MAIN_BRANCH": "develop"})
+
+
+# --- W2-B1 round 2 ----------------------------------------------------------
+
+def _git(repo: Path, *args: str) -> None:
+    subprocess.run(["git", *args], cwd=str(repo), capture_output=True, text=True, check=True)
+
+
+# F1: git resolves a destination not starting with 'refs/' via its DWIM rules
+# (refs/%s, refs/tags/%s, refs/heads/%s, refs/remotes/%s): 'heads/main' is
+# refs/heads/main on the remote.
+F1_SPELLINGS = ["heads/main", "refs/heads/main", "remotes/origin/main",
+                "refs/remotes/origin/main", "origin/main", "heads/master"]
+F1_FORMS = [
+    "git push origin HEAD:{s}",
+    "git push origin +HEAD:{s}",
+    "git push origin feat/x:{s}",
+    "git push origin :{s}",
+    "git push origin --delete {s}",
+    "git push -d origin {s}",
+    "git push --force-with-lease={s} origin HEAD:{s}",
+    "git push --force-with-lease={s}:abc123 origin +HEAD:{s}",
+    "git push origin {s}",
+]
+F1_TABLE = [(where, form.format(s=s), BLOCK)
+            for s in F1_SPELLINGS for form in F1_FORMS
+            for where in ("feat/x", "detached", "main")]
+F1_TABLE += [
+    # a tag named 'main' / a branch merely containing 'main' stays unprotected
+    ("feat/x", "git push origin feat/x:refs/tags/main", GATE),
+    ("feat/x", "git push origin feat/x:tags/main", GATE),
+    ("feat/x", "git push origin --delete tags/main", GATE),
+    ("feat/x", "git push origin HEAD:heads/feat/y", GATE),
+    ("feat/x", "git push origin HEAD:refs/heads/feat/main", GATE),
+    ("detached", "git push origin HEAD:heads/feat/y", GATE),
+]
+
+
+@pytest.mark.parametrize("where,command,expected", F1_TABLE)
+def test_f1_dwim_destination_spellings(multi_repo, where, command, expected):
+    if where != "feat/x":
+        _checkout(multi_repo, where)
+    _assert_outcome(multi_repo, command, expected)
+
+
+# F2: a failing here-string (temp file cannot be written: /tmp full, ulimit -f)
+# must never let a push through — neither via the pre-filter nor via the
+# classifier input (empty classifier output = block).
+@pytest.mark.parametrize("trap", ["", "trap '' XFSZ; "])
+@pytest.mark.parametrize("where,first_line", [
+    ("feat/x", "git push origin main"),
+    ("feat/x", "git push origin HEAD:main"),
+    ("main", "git push"),
+])
+def test_f2_here_string_failure_fails_closed(multi_repo, trap, where, first_line):
+    if where != "feat/x":
+        _checkout(multi_repo, where)
+    command = first_line + "\n" + "\n".join(["echo " + "a" * 74] * 2000)  # ~160 KB
+    payload = {"tool_name": "Bash", "tool_input": {"command": command}}
+    env = dict(os.environ, AGENT_META_TEST_COMMAND="false", AGENT_META_TEST_TIMEOUT="5")
+    env.pop("AGENT_META_MAIN_BRANCH", None)
+    result = subprocess.run(
+        [_BASH, "-c", f'ulimit -f 64; {trap}exec "$0" "$1"', _BASH, str(_HOOK_PATH)],
+        input=json.dumps(payload), capture_output=True, text=True,
+        cwd=str(multi_repo), env=env)
+    assert result.returncode == 2, f"rc={result.returncode} stderr={result.stderr[-300:]!r}"
+    assert "Branch-Guard: Push blocked" in result.stderr
+
+
+def test_f2_one_megabyte_non_push_is_fast(multi_repo):
+    command = "git status\n" + _padding(1024)
+    start = time.monotonic()
+    _assert_outcome(multi_repo, command, NONE)
+    assert time.monotonic() - start < 5
+
+
+# QF1: a quoted separator before the refspec must not hide the destination.
+QF1_TABLE = [
+    ('git push -o "ci.variable=A;B" origin HEAD:main', BLOCK),
+    ('git push -o "x|y" origin HEAD:main', BLOCK),
+    ('git push -o "x&y" origin HEAD:main', BLOCK),
+    ('git push -o "x&&y" origin feat/x:main', BLOCK),
+    ("git push -o 'x;y' origin HEAD:main", BLOCK),
+    ('git push -o "a\nb" origin HEAD:main', BLOCK),
+    ('git -c "x.y=a;b" push origin HEAD:main', BLOCK),
+    ('sudo -u "a;b" git push origin HEAD:main', BLOCK),
+    # a statement that only parses after a quote was appended: fail closed
+    ('git push -o "x|y" origin feat/x', BLOCK),
+    # multi-line commit / PR text stays unaffected
+    ('git commit -m "fix: push check\n\nexplain the push path; and | more\n"', NONE),
+    ('gh pr create --title "push fix" --body "line one;\nline two | x\n"', NONE),
+    ('git commit -m "a; push b"', NONE),
+    ('git commit -m "a; b" && git push origin feat/x', GATE),
+]
+
+
+@pytest.mark.parametrize("command,expected", QF1_TABLE)
+def test_qf1_quoted_separator_before_refspec(multi_repo, command, expected):
+    _assert_outcome(multi_repo, command, expected)
+
+
+# QF5: man/less/more/ack can execute commands (man -P, ack --pager).
+@pytest.mark.parametrize("where", ["feat/x", "main"])
+@pytest.mark.parametrize("command", [
+    "man -P 'git push origin main' git",
+    "man --pager='git push origin main' git",
+    "man -P git-push git",
+    "MANPAGER='git push origin main' man git",
+    "ack --pager='git push origin main' x",
+    "less 'git push origin main'",
+])
+def test_qf5_exec_capable_pagers_are_not_text(multi_repo, where, command):
+    if where != "feat/x":
+        _checkout(multi_repo, where)
+    _assert_outcome(multi_repo, command, BLOCK)
+
+
+@pytest.mark.parametrize("command", ["man git-push", "man git push", "less push.log"])
+def test_qf5_reading_docs_is_not_a_push(multi_repo, command):
+    _checkout(multi_repo, "main")
+    _assert_outcome(multi_repo, command, NONE)
+
+
+# A2: tag-only detection must not spawn one git process per ref.
+def test_a2_many_tag_pushes_are_fast(multi_repo):
+    _checkout(multi_repo, "main")
+    start = time.monotonic()
+    _assert_outcome(multi_repo, "git push origin v1.0.0\n" * 5000, GATE)
+    assert time.monotonic() - start < 10
+
+
+# A5: quoting/expansion forms bash resolves to a git push.
+A5_FORMS = [
+    "git $'push' origin main",
+    'git $"push" origin main',
+    "$'git' push origin main",
+    "g$'i't push origin main",
+    "git $'\\x70ush' origin main",
+    "$'\\x67it' $'\\x70ush' origin main",
+    "git pu$'s'h origin main",
+    "git {push,} origin main",
+    "{git,} push origin main",
+    "git $(echo push) origin main",
+    "$(which git) push origin main",
+    "sudo $GIT push origin main",
+    "git-push origin main",
+    "/usr/lib/git-core/git-push origin main",
+    "sudo git-push origin main",
+]
+
+
+@pytest.mark.parametrize("where", ["feat/x", "main"])
+@pytest.mark.parametrize("command", A5_FORMS)
+def test_a5_expanded_push_forms_blocked(multi_repo, where, command):
+    if where != "feat/x":
+        _checkout(multi_repo, where)
+    _assert_outcome(multi_repo, command, BLOCK)
+
+
+@pytest.mark.parametrize("command,expected", [
+    ("git push origin {feat/x,main}", BLOCK),
+    ("git push origin ma?n", BLOCK),
+    ("git push -o $'a\\';b' origin HEAD:main", BLOCK),
+    ("git-push origin feat/x", GATE),
+])
+def test_a5_expanded_refs_from_feature(multi_repo, command, expected):
+    _assert_outcome(multi_repo, command, expected)
+
+
+# A4: another repository (-C/--git-dir/--work-tree/GIT_DIR) cannot be judged
+# by the cwd repo's HEAD.
+@pytest.mark.parametrize("command,expected", [
+    ("git -C . push", BLOCK),
+    ("git -C . push origin", BLOCK),
+    ("git -C . push origin HEAD", BLOCK),
+    ("git --git-dir=.git push", BLOCK),
+    ("git --git-dir .git push origin", BLOCK),
+    ("git --work-tree . push origin HEAD", BLOCK),
+    ("GIT_DIR=.git git push", BLOCK),
+    ("env GIT_DIR=.git git push origin HEAD", BLOCK),
+    ("git -C . push origin feat/x", GATE),
+    ("git -C . push origin HEAD:feat/x", GATE),
+])
+def test_a4_other_repository_push(multi_repo, command, expected):
+    _assert_outcome(multi_repo, command, expected)
+
+
+# A3: a refspec-less / destination-less push resolves its destination through
+# config (push.default, branch.<n>.merge, remote.<r>.push).
+A3_TABLE = [
+    ([("branch.feat/x.remote", "origin"), ("branch.feat/x.merge", "refs/heads/main")],
+     [("git push", BLOCK), ("git push origin", BLOCK), ("git push origin feat/x", GATE),
+      ("git push origin HEAD", GATE)]),
+    ([("branch.feat/x.remote", "origin"), ("branch.feat/x.merge", "refs/heads/feat/x")],
+     [("git push", GATE), ("git push origin", GATE)]),
+    ([("push.default", "matching")], [("git push", BLOCK), ("git push origin feat/x", GATE)]),
+    ([("remote.origin.push", "refs/heads/feat/x:refs/heads/main")],
+     [("git push", BLOCK), ("git push origin", BLOCK), ("git push origin feat/x", BLOCK),
+      ("git push origin HEAD", BLOCK), ("git push origin HEAD:feat/y", GATE)]),
+    ([("remote.origin.push", "refs/heads/*:refs/heads/*")],
+     [("git push", BLOCK), ("git push origin feat/x", BLOCK)]),
+    ([("remote.origin.push", "refs/heads/feat/x:refs/heads/feat/x")],
+     [("git push", GATE), ("git push origin feat/x", GATE)]),
+    ([], [("git -c push.default=upstream push", BLOCK),
+          ("git -c remote.origin.push=HEAD:main push origin feat/x", BLOCK),
+          ("git -c include.path=/x push", BLOCK),
+          ("GIT_CONFIG_PARAMETERS=x git push", BLOCK),
+          ("git -c core.quotepath=off push", GATE),
+          ("git -c core.quotepath=off push origin feat/x", GATE)]),
+]
+
+
+@pytest.mark.parametrize("config,rows", A3_TABLE)
+def test_a3_push_destination_from_config(multi_repo, config, rows):
+    for key, value in config:
+        _git(multi_repo, "config", "--add", key, value)
+    for command, expected in rows:
+        _assert_outcome(multi_repo, command, expected)
+
+
+def test_a3_tag_push_mapped_onto_main_is_not_tag_only(multi_repo):
+    _checkout(multi_repo, "main")
+    _git(multi_repo, "config", "remote.origin.push", "refs/tags/v1.0.0:refs/heads/main")
+    _assert_outcome(multi_repo, "git push origin v1.0.0", BLOCK)
