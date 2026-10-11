@@ -1,7 +1,7 @@
 ---
 title: Context-Budget-Studie — was die 9 Provider tatsächlich laden und was es kostet
 date: 2026-10-11
-status: FINAL (Evidenzbasis, keine Spezifikation)
+status: FINAL (Evidenzbasis, keine Spezifikation); Nachtrag §10 (Revision 2, 2026-10-11)
 consumed-by: SPEC-CONTEXT-PROFILES-2026-10-11 (docs/specs/2026-10-11-context-profiles-spec.md)
 related-spec: SPEC-CONTEXT-FILE-MODES-2026-09-13
 builds-on: docs/plans/issue-540-baseline.md, docs/guides/context-block-inventory.md
@@ -96,7 +96,7 @@ Keyword-Überlappung: nur 6 geteilte Keywords (`accessibility`, `a11y`, `audit`,
 
 Datenduplikat in der Quelle: `role-defaults.yaml` speichert Keywords doppelt (`routing.intent_keywords` und `routing_patterns.keywords`), identisch für 87 von 92 Rollen; festgenagelt durch `tests/test_routing_tool_definitions.py:47-64`, gelesen von `scripts/hermes_export.py:270`.
 
-Datendefekt: `template-auditor` ist `name_only`, hat aber trotzdem eine Keyword-Regel (4 Keywords, `orchestrator_only`) — Widerspruch zum §3-Text „Rollen mit addressability: name_only tragen keine Keyword-/Beispiel-Regel". `tests/scenarios/asserts/76-template-auditor-role.sh:63-76` parst das Enum per Regex und schlägt fehl, wenn `template-auditor` darin steht — der Render enthält es (Assert veraltet/widersprüchlich; wird nicht ausgeführt).
+Datendefekt: `template-auditor` ist `name_only`, hat aber trotzdem eine Keyword-Regel (4 Keywords, `orchestrator_only`) — Widerspruch zum §3-Text „Rollen mit addressability: name_only tragen keine Keyword-/Beispiel-Regel". `tests/scenarios/asserts/76-template-auditor-role.sh:63-76` parst das Enum per Regex und schlägt fehl, wenn `template-auditor` darin steht — der Render enthält es (Assert veraltet/widersprüchlich; wird nicht ausgeführt). (Nachtrag §10.1: das Assert-Skript ist ausführbar und wird von `tests/scenarios/run.sh` in CI aufgerufen; ob Assert #5 tatsächlich fehlschlägt, ist UNVERIFIED.)
 
 ### 2.3 Agent-Delegationstabelle (`AGENT_DELEGATION_TABLE`, 5,781 B)
 
@@ -132,7 +132,7 @@ Kein Runtime-Konsument parst das JSON außer dem LLM. Maschinelle Parser/Pins (T
 | `test_context_compact_mode.py:246-268` | compact-Verhalten |
 | `tests/test_template_slimming_equivalence.py:1233-1283` | Golden `tests/fixtures/slimming-golden/orchestrator.md` (87,873 B), nur Claude, 58 Rollen; Konvention: Golden zusammen mit Template-Änderungen aktualisieren |
 
-`{{#if VAR}}` wirkt nur für eine Whitelist von Variablennamen in `strip_inactive_conditional_blocks` (`config.py`); `COMPACT_MODE` ist **nicht** darin. Dieselbe Funktion läuft im nativen Rules-Pfad (`rules.py`) — eine Whitelist-Erweiterung darf native Rules nicht komprimieren (vgl. `docs/plans/issue-540-baseline.md`, Abschnitt „Mechanismus").
+`{{#if VAR}}` wirkt nur für eine Whitelist von Variablennamen in `strip_inactive_conditional_blocks` (`config.py`); `COMPACT_MODE` ist **nicht** darin. Dieselbe Funktion läuft im nativen Rules-Pfad (`rules.py`) — eine Whitelist-Erweiterung darf native Rules nicht komprimieren (vgl. `docs/plans/issue-540-baseline.md`, Abschnitt „Mechanismus"). (Nachtrag §10: die Funktion liegt in `scripts/lib/variables.py:284`, Whitelist `:298-306`.)
 
 Es gibt **keinen Role-Routing-LLM-Eval**: `tests/routing-llm-eval` + `scripts/gen_routing_llm_eval_catalog.py` / `gen_promptfoo_config.py` testen nur **Pipeline**-Routing (exakter Ein-Wort-Match).
 
@@ -406,18 +406,23 @@ Konsequenzen für das Design (Ableitung, keine Messung): (1) Routing-Signal (Key
 | U-10 | Token-Zahlen | Bytes/4-Näherung; echter Tokenizer fehlt |
 | U-11 | IFScale-/RAG-MCP-Zahlen auf unsere Modelle übertragbar | Sekundärquellen |
 | U-12 | Codex: Orchestrator als Main-Agent wählbar | nicht untersucht |
+| U-13 | Ob ein Modell zur Laufzeit tatsächlich an einen nicht existenten Agenten dispatcht (§10.2) | nur statische Analyse |
+| U-14 | Dangling-/Fan-out-Zahlen für Provider ≠ Claude, SE-/Knowledge-aktivierte Varianten, Plattformen hacs/sharkord | nicht gemessen |
+| U-15 | Read-only-Durchsetzung (Tools ohne Write/Edit) auf Kimi, ZCode, Mammouth zur Laufzeit | nur Config gelesen |
+| U-16 | Ob Szenario-76-Assert #5 zur Laufzeit fehlschlägt | kein Sync ausgeführt (würde in den agent-meta-Root schreiben) |
 
 ## 7. Reproduktion
 
 - Scratch-Projekte: `.tmp/ctx-study` (nicht versioniert); je Provider ein `project.yaml` mit 62 Rollen und dem jeweiligen Preset (`full`, `compact`, `lazy`).
 - Capture: lokaler Mock-LLM-Server, der Request-Bodies auf Platte schreibt; Runtime per Base-URL-Override darauf gerichtet. Die Spec überführt diese Skripte nach `tests/manual/context-capture/` (QG-7).
 - Größen: Byte-Zählung auf generierte Dateien bzw. Request-Bodies; Abschnittsgrößen über Überschriften-Splits.
+- Nachtrag §10: Scratch `.tmp/ctx-study/dyn/` (Projekte `p10`, `p20`, `pall`, `pha`, `pproj`, `s_repo`, `s_all`; Ausgaben `*.out`, `*.dangle.json`, `*.fan.json`; Skripte `dangle.py`, `fanout.py`); alle Syncs mit `ai-providers: [Claude]`, `dod-preset: rapid-prototyping`, `--init`, rc=0.
 
 ## 8. Rückverweise
 
 - Bestehende Kompaktierung (#540) und Klassifikation: `docs/plans/issue-540-baseline.md`, `docs/guides/context-block-inventory.md`.
 - Topologie-Achse: `SPEC-CONTEXT-FILE-MODES-2026-09-13`.
-- Ableitende Spec: `docs/specs/2026-10-11-context-profiles-spec.md` (Befunde F-01..F-18).
+- Ableitende Spec: `docs/specs/2026-10-11-context-profiles-spec.md` (Befunde F-01..F-18; Revision 2: F-19..F-33 aus §10).
 
 ## 9. Korrekturen früherer Aussagen
 
@@ -426,3 +431,129 @@ Konsequenzen für das Design (Ableitung, keine Messung): (1) Routing-Signal (Key
 | K-a | Orchestrator §12 Few-shot sei 8.5 KB inline | §12 ist ein 3-Zeilen-Pointer von 188 B auf `_wf-orchestrator-reference.md` (1,355 B); die frühere Messaussage war falsch |
 | K-b | Die Orchestrator-Datei (90.7 KB) werde in jedem Turn bezahlt | Bezahlt pro Orchestrator-Aufruf; in **jedem** Turn nur, wenn er Main-Thread-Agent ist (Claude `--agent orchestrator`, Kimi `--agent`, OpenCode/Mammouth primary) |
 | K-c | „AGENTS.md ist der Haupt-Bloat bei Claude" | falsch: CLAUDE.md ist 2.5 KB; Claude ignoriert AGENTS.md, wenn CLAUDE.md existiert; Claude-Last liegt bei Rules (17.9 KB), Roster (≈ 16.5 KB) und ggf. Orchestrator |
+| K-d | `strip_inactive_conditional_blocks` liege in `config.py` (§2.4) | liegt in `scripts/lib/variables.py:284`; Whitelist `:298-306` enthält bereits `DEVELOPER_TIERS_ENABLED`, `VALIDATOR_ENABLED`, `EFFORT_ESTIMATOR_ENABLED` und `PIPELINE_<NAME>_ENABLED` |
+| K-e | Szenario-76-Assert werde nicht ausgeführt (§2.2) | `asserts/76-template-auditor-role.sh` ist ausführbar und wird von `tests/scenarios/run.sh` in CI aufgerufen; ob Assert #5 fehlschlägt, bleibt UNVERIFIED (U-16) |
+| K-f | „Alle Rollen" = 92 Agenten | ohne `roles:` sind `validator` und die Developer-Tiers per Gate aus; vollständiger Satz = 62 Agenten (§10.2) |
+
+## 10. Nachtrag (Revision 2, 2026-10-11): Doctor-Inventar, Active-Set und Variablen-Fan-out
+
+Zweck: Evidenz für die Spec-Revision 2 (Anforderungen R1 Installations-Doctor, R2 dynamisches Routing,
+R3 project.yaml-Optimierung). Zwei read-only Analysen; keine Repo-Änderung, nur Scratch unter `.tmp/` (§7).
+
+### 10.1 Bestehende Diagnose-Werkzeuge (Abdeckung)
+
+| Werkzeug | Prüfgegenstand | Lücke für Konsumenten-Installationen |
+|---|---|---|
+| `/diagnose` (Command, LLM-only) | Dry-Run-WRITEs, VERSION, Isolation, gitignore, MCP-Rules | keine Severity-Logik, keine Tests |
+| `consistency-check.py` + `consistency/*` | Quellen im **agent-meta-Root** (`Finding`, Exit 0/1/2, `--json`) | läuft nicht gegen das Projekt |
+| `context.size_guard` | nur Zeilen (Default 250), nur Dateien mit Managed-Marker | keine Bytes/Zeichen/Provider-Caps |
+| `--audit-config [--apply]` | veraltete Rollen, fehlende Templates, Tool-Privilegien; `--apply` zeilenbasiert, kommentar-erhaltend | kein CLI-`--json` |
+| `measure_context.py` | Bytes/Zeilen/Tokens je Kontextdatei | nur `REPO_ROOT`, keine Caps, keine Tests |
+| `--validate`, `--check` | Konsistenz der Quellen, Hooks, Artefakt-Gate; ausstehende Writes | Konsistenzsuite gegen agent-meta-Root (`cli_commands.py:1029`) |
+| `generated_file_drift`, Context-Hashes, `external_tools_drift` | Drift verwalteter Dateien / Fremdartefakte | — |
+| `template-auditor` (Rolle) | Framework-**Quellen**, Kontrakt `STATUS/RESULT/ARTIFACTS/FINDINGS/GATES/NEXT` | keine Installationen |
+
+Nicht detektiert (keine Detektoren): byte-/zeichenbasierte Provider-Caps; Lazy-Skill-Pointer ohne Ziel;
+ungelesene generierte Kanäle; Copilot-Suffix; Kimi-`subagents:`; Gemini-strict-Schema; Codex `max_depth`;
+Codex-Read-only (`sandbox_mode: workspace-write` für alle, `ai-providers.yaml:668`); Verifikationsstatus von
+Capabilities nur als YAML-Kommentar; kein `sync.log`-Parser; kein Detektor für überschriebene/unbenutzte Variablen.
+Schema-Validierung der `project.yaml` nur mit optional installiertem `jsonschema`, nur als Warnung (`config.py:381-417`).
+
+Präzedenzrolle `template-auditor` (Commit 507bbb5): `name_only` **mit** `routing_patterns` (`role-defaults.yaml:288,293`)
+→ Keyword-Regel trotz name_only (`delegation_table.py:226-255`); `output_contract: audit-findings-v1` ohne Konsument;
+`instantiate-project.md` und README-Rollentabelle nicht nachgezogen; Standalone-Export erst in 1ff89be.
+Gepinnte Zahlen bei neuen Rollen: `tests/test_role_addressability_coverage.py:22-23,106` (92 Rollen; 88/3/1; name_only-Liste).
+Nächste Szenario-Nummern: 77, 78 (Assert-Skripte müssen ausführbar sein, `run.sh:75`).
+
+### 10.2 Active-Set: was der Rollenmenge folgt und was nicht
+
+Aktivmenge (`roles.py:129-288`): Allowlist ∧ Gates (`se`, `knowledge`, `validator`, `developer_tiers`) ∧ Template.
+`developer_tiers` verlangt `junior-developer` **und** `senior-developer` in `roles:`; ohne `roles:` sind `validator`
+und Tiers aus (62 statt 92 Agenten).
+
+| Folgt der Aktivmenge | Folgt ihr **nicht** |
+|---|---|
+| Enum, `routing.rules`, `name_index`, Agent-Tabelle, `AGENT_HINTS`, Agent-Dateien | §2/§2a/`pipeline-details`/`routing.pipelines`/`PIPELINE_MATCH_TABLE`; plan-driven `allowed_agents`; `input_contracts`; §4 Tier-Kette/Task-Size-Tabelle; `ANTI_RECURSION_BLOCK`; `DIRECT_DISPATCH_SECTION`; Persona-Zeile; §11-Fallback `meta-feedback`; SE-Prosa bei SE aus; Slash-Commands; Rules (`security-paved-roads`, `threat-model`); „Delegation (reference only)" in 34 Templates |
+
+Gemessen (Claude, `rapid-prototyping`):
+
+| Projekt | Rollen (Allowlist / generiert) | Orchestrator | §3 | §2a | Hängende Referenzen |
+|---|---|---:|---:|---:|---:|
+| p10 | 10 / 10 | 41,059 B | 12,020 B | 6,179 B | 117 |
+| p20 | 21 / 20 (`senior-developer` gate-gedroppt) | 49,155 B | 19,277 B | 6,179 B | 82 |
+| pall | — / 62 | 90,694 B | 56,756 B | 6,179 B | 80 |
+| pha (`homeassistant`) | 11 / 11 | 41,874 B | 12,739 B | 6,179 B | 117 |
+| pproj (+ Projektrolle) | 11 / 10 | 41,061 B | ≈ p10 | 6,179 B | ≈ p10 |
+
+- §3 ≈ 4.3 KB fix + ≈ 860 B je routbarer Rolle; Orchestrator ≈ +955 B je Rolle; §2a und `routing.pipelines` konstant.
+- p10: 117 Referenzen = Pipeline-Stage 38, Tier-Kette 25, Prosa 40, Tabellen 12, Routing-Prosa 2; ≈ 38 `background(agent="X")`;
+  häufigste fehlende Rollen `senior-developer` 17, `validator` 14; 26 von 34 `input_contracts` mit inaktivem Producer;
+  nur 1 von 7 Pipelines (`docs-update`) voll ausführbar. Heuristischer Scanner, Untergrenze.
+- Pipeline-Validierung prüft gegen `config["roles"]` bzw. alle 92 Rollen (`config.py:1852-1857`) → p20 nennt
+  `senior-developer` nicht, pall meldet 0 Pipeline-Warnungen; Agent-Renderer leitet `effective` separat ab (`agent_sync.py:666-668`).
+- `DEVELOPER_TIERS_ENABLED`, `VALIDATOR_ENABLED`, `EFFORT_ESTIMATOR_ENABLED` berechnet (`config.py:1679,1685,1688`), von keinem Template genutzt.
+- Projekt-spezifische Rollen: Sync liest nie die Konsumenten-`.claude/3-project/<role>.md` (`frontmatter.py:662-670`);
+  `PROJECT_SPECIFIC_AGENTS` hart `""` (`config.py:1712-1714`); `audit-config` meldet ERROR; Rolle fehlt überall.
+- Reflection-Overrides werden aus agent-metas eigener `.meta-config/project.yaml` geladen (`config.py:1817-1821`) →
+  p10 ohne `reflection-pairs` erhält `MAX_ITERATIONS=5` (VERIFIED, Messung).
+- Unaufgelöste Platzhalter im Output (pall): 17× `{{EXTRA_DONTS}}`, 6× `{{AGENT_META_REPO}}`, 5× `{{TEST_COMMANDS}}` u. a.
+- Agent-Tabelle: doppelter Header + Leerzeilen (bestätigt §2.3).
+
+### 10.3 Variablen-Fan-out (Sentinel-Messung, `s_repo` 58 Agenten)
+
+Jeder Textwert wurde mit Sentinels umschlossen; Injektion ist immer vollständig (keine Kürzung).
+Summe der injizierten Repo-Werte ≈ 36.1 KB je Claude-Sync (mit 1-KB-Werten für 8 Variablen ≈ 92.5 KB).
+
+| Variable | Wert | Vorkommen | Injiziert (Repo-Wert) | Injiziert (1-KB-Wert) |
+|---|---:|---:|---:|---:|
+| `PROJECT_CONTEXT` | 366 B | 56 | 20,496 B | 22,736 B |
+| `PROJECT_GOAL` | 130 B | 32 | 4,160 B | 5,248 B |
+| `EXTRA_DONTS` | 188 B | 17 | 3,196 B | 17,510 B |
+| `ARCHITECTURE` | 192 B | 13 | 2,496 B | 13,624 B |
+| `CODE_CONVENTIONS` | 345 B | 7 | 2,415 B | 7,364 B |
+| `DEV_COMMANDS` | 56 B | 10 | 560 B | 10,480 B |
+
+- Nie injiziert: `CODE_QUALITY_RULES` (505 B; von **keinem** Template genutzt → Inhalt geht still verloren),
+  `PROJECT_STRUCTURE` (nur nicht-kompakte CLAUDE.md), Docker-/sharkord-Variablen (nur `agents/2-platform/sharkord-*`),
+  `SE_MAX_CELLS`, `ORCHESTRATOR_STRICT` (nur Python).
+- Wirkungslos: `variables.ORCHESTRATOR_STRICT`/`UNKNOWN_FALLBACK_*` (überschrieben, `config.py:1493,1583-1586`),
+  `variables.SE_BASE_DIR` (`:1660`), `SE_*` gleich `role-defaults.yaml::se_variables`.
+- Duplikate: `BUILD_COMMAND` = `BUILD_COMMANDS`; `TEST_COMMAND` ≈ `TEST_COMMANDS` (`python3` vs. `python`);
+  `LANGUAGE` ≈ `PROJECT_LANGUAGES`; `ARCHITECTURE` ⊂ `PROJECT_STRUCTURE`; `PROJECT_DESCRIPTION`/`GOAL`/`CONTEXT` semantisch überlappend.
+- Extension-Dateien `<prefix>-<role>-ext.md` werden zur Laufzeit gelesen, nie injiziert (Sentinel-Test); Kosten ≈ 100 B
+  Pointer je Agent → Relokation rollen-spezifischer Inhalte ist ein großer Hebel (1 Rolle statt N).
+- `--create-ext` schreibt bei fehlenden Werten literal `{{PLATFORM}}` u. a. (`templates/managed-block.md`).
+- `--fill-defaults` dumpt die gesamte YAML neu und verliert Nutzerkommentare (`config.py:1072-1101`);
+  `yaml_roundtrip.analyze_roundtrip` (Kommentarzahl + Key-Reihenfolge) existiert, wird nur vom Admin-Server genutzt.
+
+### 10.4 Boilerplate und interne Duplikate
+
+| Block | Bytes je Kopie | Kopien (58 Agenten) | Summe |
+|---|---:|---:|---:|
+| `OUTPUT_GUARD_BLOCK` | 399 | 31 | 12,369 |
+| `BACKGROUND_PROCESS_GUARD` (inline in Quell-Templates) | 368 | 32 | 11,776 |
+| `PROMPT_INJECTION_DEFENSE_BLOCK` | 443 | 18 | 7,974 |
+| `PARSE_INPUT_BLOCK` | 129 | 30 | 3,870 |
+| `A2A_HANDOFF_BLOCK` | 348 | 11 | 3,828 |
+| `ESCALATE_CARD_BLOCK` | 652 | 3 | 1,956 |
+| `ANTI_RECURSION_BLOCK` | 127 | 9 | 1,143 |
+
+Boilerplate-Anteil an Agentenbytes: p10 6.6 KB (5.9 %), p20 16.3 KB (8.2 %), pall 50.3 KB (8.7 %).
+§2a (6.2 KB) wird durch `pipeline-details/*.md` (8.0 KB) dupliziert; jede Rolle steht im Orchestrator in Enum, Rules,
+`name_index` und Agent-Tabelle (bestätigt §2.2).
+
+### 10.5 Abgeleitete Optimierungs-Rangliste (Ableitung, keine Messung)
+
+1. Pipelines nach Stage-Verfügbarkeit gegen die gegatete Aktivmenge filtern, `allowed_agents` filtern.
+2. §4 Tier-Kette auf `DEVELOPER_TIERS_ENABLED` gaten (≈ 3.7 KB, 25 Referenzen).
+3. `input_contracts` auf aktive Producer filtern (≈ 0.7 KB in p10).
+4. Interne Orchestrator-Duplikate entfernen (Agent-Tabelle vs. `name_index`; §2a vs. `pipeline-details`).
+5. Dispatch-bezogene statische Sektionen bedingt auf die Aktivmenge.
+6. Rollenbewusste Commands und Rules.
+7. Zentrale Boilerplate-De-Dup (≈ 50 KB bei 62 Agenten; Wirkung auf Regelbefolgung UNVERIFIED).
+8. project.yaml-Fan-out-Hebel (`PROJECT_CONTEXT` ×56 u. a.; tote Variablen; Relokation in `-ext.md`).
+9. Reflection-Overrides-Quelle korrigieren.
+10. Projekt-spezifische Rollen implementieren oder Doku korrigieren.
+11. Warnungen für gate-gedroppte Allowlist-Einträge und unaufgelöste `{{VAR}}` im Output.
+
+Umsetzung und Priorisierung: Spec §4.4–§4.6, IC-17…IC-28, §11.1.
