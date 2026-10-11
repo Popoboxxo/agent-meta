@@ -106,6 +106,9 @@ def _legacy_base_entries(
     custom_entries = gitignore_cfg.get("custom_entries", [])
     if custom_entries:
         base.extend(custom_entries)
+    # IC-15 Nr. 26: tmp-sink entry is default ON even without a block.
+    if ".tmp/" not in base:
+        base.append(".tmp/")
     return base
 
 
