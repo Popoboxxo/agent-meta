@@ -390,7 +390,7 @@ def _ensure_context_file(
         content = builder.build(template_path.stem, variables)
         source_label = str(template_path.relative_to(agent_meta_root))
     else:
-        project_name = config["project"]["name"]
+        project_name = _project_name(config, variables)
         content = (
             f"# {project_name}\n\n"
             "<!-- agent-meta:managed-begin -->\n"
@@ -705,7 +705,7 @@ def _sync_opencode_context(
             builder = TemplateBuilder(template_path.parent, fallback_partials_dir=fallback_partials)
             ocontent = builder.build(template_path.stem, variables)
         else:
-            project_name = config["project"]["name"]
+            project_name = _project_name(config, variables)
             ocontent = (
                 f"# {project_name}\n\n"
                 "<!-- agent-meta:managed-begin -->\n"
@@ -1273,6 +1273,15 @@ def sync_context_adapters_for_provider(
         activation = _adapter_settings_activation(pc)
         if activation is not None:
             _write_adapter_settings_activation(project_root, activation, log, dry_run)
+
+
+def _project_name(config: dict, variables: dict) -> str:
+    """Project name from ``project.name``, else the PROJECT_NAME variable.
+
+    A config without a ``project`` block only produces a schema warning at
+    load time, so context generation must not crash on it.
+    """
+    return (config.get("project") or {}).get("name") or variables.get("PROJECT_NAME") or "project"
 
 
 def sync_context_for_provider(
@@ -2365,7 +2374,7 @@ def sync_prompts_for_continue(
         content = pal_engine.apply(content, provider)
 
         template_description = extract_frontmatter_field(content, "description") or f"Agent for {role}."
-        template_description = template_description.replace("{{PROJECT_NAME}}", config["project"]["name"])
+        template_description = template_description.replace("{{PROJECT_NAME}}", _project_name(config, variables))
 
         # Strip original frontmatter, optionally slim the body
         body = _strip_frontmatter(content)
