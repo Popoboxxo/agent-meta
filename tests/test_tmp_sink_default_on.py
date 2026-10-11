@@ -3,6 +3,7 @@
 Run: python -m pytest tests/test_tmp_sink_default_on.py -q
 """
 
+import subprocess
 import sys
 from pathlib import Path
 
@@ -45,7 +46,32 @@ def test_sink_disabled_yields_no_entry():
     assert ".tmp/" not in _entries(cfg)
 
 
-def test_entry_computation_writes_nothing(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    _entries(None)
-    assert list(tmp_path.iterdir()) == []
+def _scratch_project(tmp_path):
+    (tmp_path / ".meta-config").mkdir()
+    (tmp_path / ".meta-config" / "project.yaml").write_text(
+        'agent-meta-version: "2.0.0-beta.1"\n'
+        "ai-providers:\n- Claude\n"
+        "dod-preset: rapid-prototyping\n"
+        "variables:\n  PROJECT_NAME: scratch\n  PROJECT_PREFIX: sc\n",
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    return tmp_path
+
+
+def test_dry_run_check_writes_nothing_but_reports_entry(tmp_path):
+    project = _scratch_project(tmp_path)
+    before = sorted(p.relative_to(project) for p in project.rglob("*") if ".git" not in p.parts)
+    result = subprocess.run(
+        [sys.executable, str(_REPO_ROOT / "scripts" / "sync.py"),
+         "--config", str(project / ".meta-config" / "project.yaml"), "--dry-run", "--check"],
+        cwd=project, capture_output=True, text=True, timeout=300,
+    )
+    out = result.stdout + result.stderr
+    assert "Traceback" not in out
+    assert not (project / ".gitignore").exists()
+    after = sorted(p.relative_to(project) for p in project.rglob("*") if ".git" not in p.parts)
+    assert after == before
+    gitignore_lines = [ln for ln in out.splitlines() if ln.startswith("[UPDATE") and ".gitignore" in ln]
+    assert gitignore_lines, "dry-run did not report the managed .gitignore block"
+    assert ".tmp/" in gitignore_lines[0]
