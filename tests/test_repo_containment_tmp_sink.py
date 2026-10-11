@@ -74,7 +74,7 @@ def test_custom_relative_path_is_used(tmp_path):
 def test_managed_block_includes_tmp_sink(tmp_path):
     entries = compute_base_gitignore_entries(
         ["Claude"],
-        {"Claude": {}},
+        {"Claude": {"has_dedicated_context_file": True}},
         {},
         {"enabled": True, "tmp-sink": {"enabled": True, "path": ".tmp"}},
     )
@@ -82,14 +82,14 @@ def test_managed_block_includes_tmp_sink(tmp_path):
 
 
 def test_managed_block_has_no_entry_without_block():
-    entries = compute_base_gitignore_entries(["Claude"], {"Claude": {}}, {})
+    entries = compute_base_gitignore_entries(["Claude"], {"Claude": {"has_dedicated_context_file": True}}, {})
     assert ".tmp/" not in entries
 
 
 def test_managed_block_honors_gitignore_false():
     entries = compute_base_gitignore_entries(
         ["Claude"],
-        {"Claude": {}},
+        {"Claude": {"has_dedicated_context_file": True}},
         {},
         {
             "enabled": True,
