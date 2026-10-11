@@ -152,12 +152,14 @@ def test_local_process_partial_line_timeout(monkeypatch):
         return result
 
     # Mock the thread reader to timeout immediately
-    monkeypatch.setattr(pt.shutil, "which", lambda n: "/usr/bin/true")
+    # `cat` stays alive and reads stdin, so the handshake write cannot race a
+    # process exit (unlike `true`, which caused flaky BrokenPipe errors).
+    monkeypatch.setattr(pt.shutil, "which", lambda n: "/bin/cat")
     monkeypatch.setattr(pt, "_read_line_with_timeout", lambda stream, timeout: None)
     monkeypatch.setattr(pt, "_mcp_initialize_handshake", _mcp_with_timing)
 
     pdef = {"origin-type": "local-process",
-            "connection": {"type": "stdio", "command": "true", "args": []}}
+            "connection": {"type": "stdio", "command": "cat", "args": []}}
     res = run_plugin_test("stalled", pdef)
     assert res["status"] == "FAIL"
     # Verify call didn't hang (if mocking works, should return quickly)
@@ -288,3 +290,16 @@ def test_remote_saas_placeholder_never_reaches_http_probe(monkeypatch):
     # Case B: secret present but blank (the shipped template's default).
     res = run_plugin_test("honcho", pdef, secrets={"MCP_HONCHO_URL": ""})
     assert res["status"] == "UNAVAILABLE"
+
+
+def test_local_process_exited_before_read(monkeypatch):
+    """A process that exits at once (closed stdin) must yield a clear FAIL
+    with 'no response', not a raw '[Errno 32] Broken pipe'. Real reader."""
+    import shutil
+    true_bin = shutil.which("true") or "/bin/true"
+    monkeypatch.setattr(pt.shutil, "which", lambda n: true_bin)
+    pdef = {"origin-type": "local-process",
+            "connection": {"type": "stdio", "command": "true", "args": []}}
+    res = run_plugin_test("exited", pdef)
+    assert res["status"] == "FAIL"
+    assert "no response" in res["message"].lower()

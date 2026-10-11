@@ -46,6 +46,11 @@
   Variablen können danach entfallen. Regressions-Szenario: `tests/scenarios/configs/75-web-platform-preset`.
 
 ### Fixed
+- **Flaky `test_local_process_partial_line_timeout` / unclear plugin-test message**: the MCP
+  initialize handshake now reports a process that exits before reading the request (BrokenPipe on
+  write, or EOF on read) as FAIL "no response from MCP server (process exited ...)" instead of a raw
+  `[Errno 32] Broken pipe` / "initialize responded". The partial-line test uses `cat` (stays alive)
+  instead of `true`, and a new test covers the exited-process case explicitly.
 - **Machine-local files no longer committable without a Claude provider (SR-A-11/31)**: projects whose
   providers have no dedicated context file (Gemini, Codex, Mammouth, ZCode, KimiCode, Opencode,
   Continue, Copilot) now also ignore `sync.log`, `*.sync-backup-*`, the generated
