@@ -1420,10 +1420,20 @@ def _sync_stage_gitignore(
         )
         ensure_gitignore_entries(project_root, log, args.dry_run,
                                  exact_entries=all_gitignore_entries)
-    elif extra_provider_entries or mcp_gitignore_extras:
-        # No Claude active but other providers have gitignore entries to manage
-        ensure_gitignore_entries(project_root, log, args.dry_run,
-                                 gitignore_entries=extra_provider_entries + mcp_gitignore_extras)
+    else:
+        # No provider with a dedicated context file is active: additive path.
+        # Besides the per-provider entries, the framework-wide baseline must
+        # still be ignored (generated env scripts may hold secret defaults,
+        # sync.log / backups are machine-local, viz + skill entries) -- these
+        # used to be emitted only on the dedicated-context path.
+        framework_baseline = ["sync.log", "*.sync-backup-*"]
+        skill_gitignore_entries = _collect_skill_gitignore_entries(
+            config, ext_config, provider_config)
+        ensure_gitignore_entries(
+            project_root, log, args.dry_run,
+            gitignore_entries=_dedupe_preserving_order(
+                extra_provider_entries + framework_baseline + base_gitignore_entries
+                + skill_gitignore_entries + mcp_gitignore_extras + env_gitignore))
 
     from .gitignore import detect_invisible_keep_paths, detect_shadowed_provider_roots
     for shadow_warning in detect_shadowed_provider_roots(
@@ -1433,6 +1443,11 @@ def _sync_stage_gitignore(
         log.warning(f"[P0] {shadow_warning}")
     for keep_warning in detect_invisible_keep_paths(project_root, gitignore_cfg):
         log.warning(f"[P0] {keep_warning}")
+
+
+def _dedupe_preserving_order(entries: list[str]) -> list[str]:
+    """Drop duplicate gitignore entries, keeping the first occurrence."""
+    return list(dict.fromkeys(entries))
 
 
 def _sync_stage_config_audit(agent_meta_root: Path, config_path: Path, log: SyncLog) -> None:

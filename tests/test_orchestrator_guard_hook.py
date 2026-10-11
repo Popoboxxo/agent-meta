@@ -1522,3 +1522,22 @@ def test_read_only_git_stays_allowed(tmp_path, command):
 def test_benign_git_with_sentinel_stays_allowed(tmp_path, command):
     result = _run_with(_bash_payload("#agent-meta:agent=git\n" + command), tmp_path)
     assert result.returncode == 0, f"stderr={result.stderr!r}"
+
+
+@pytest.mark.parametrize("raw", ["not json", '{"tool_name": "Bash", ', "[1, 2"])
+def test_unparseable_payload_fails_closed(raw):
+    """SR-B-09: a non-empty payload that is not valid JSON must block (exit 2)."""
+    result = subprocess.run(
+        [_BASH, str(_HOOK_PATH)], input=raw, capture_output=True, text=True,
+        cwd=str(_REPO_ROOT), env=_clean_env(),
+    )
+    assert result.returncode == 2, result.stderr
+    assert "not valid JSON" in result.stderr
+
+
+def test_empty_payload_is_still_a_noop():
+    result = subprocess.run(
+        [_BASH, str(_HOOK_PATH)], input="", capture_output=True, text=True,
+        cwd=str(_REPO_ROOT), env=_clean_env(),
+    )
+    assert result.returncode == 0

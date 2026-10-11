@@ -46,6 +46,18 @@
   Variablen können danach entfallen. Regressions-Szenario: `tests/scenarios/configs/75-web-platform-preset`.
 
 ### Fixed
+- **Machine-local files no longer committable without a Claude provider (SR-A-11/31)**: projects whose
+  providers have no dedicated context file (Gemini, Codex, Mammouth, ZCode, KimiCode, Opencode,
+  Continue, Copilot) now also ignore `sync.log`, `*.sync-backup-*`, the generated
+  `.meta-config/env.*` scripts (may hold secret defaults), viz/skill entries and `AGENTS.personal.md`
+  (new `gitignore_entries` in `config/ai-providers.yaml`). New provider matrix test
+  `tests/test_provider_matrix_sync.py` syncs every registered provider and asserts artifact validity,
+  gitignore coverage and idempotence.
+- **`--validate` no longer reports 88 false `placeholders.unknown` warnings**: the block-inlining
+  variables `OUTPUT_GUARD_BLOCK`, `BACKGROUND_PROCESS_GUARD_BLOCK`, `PARSE_INPUT_BLOCK` and
+  `ESCALATE_CARD_BLOCK` are known built-ins.
+- **`orchestrator-guard` fails closed on an unparseable payload (SR-B-09)**: a non-empty hook payload
+  that is not valid JSON now exits 2 instead of being read as "no tool name" and allowed.
 ### Fixed
 - **Claude hook commands are now anchored to `${CLAUDE_PROJECT_DIR}` instead of being cwd-relative (issue #851)**:
   `sync.py` registered hooks as `bash .claude/hooks/<file>.sh`, which Claude Code resolves against the

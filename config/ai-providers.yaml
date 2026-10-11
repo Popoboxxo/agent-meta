@@ -173,6 +173,7 @@ providers:
     gitignore_entries:
     - .gemini/settings.local.json
     - .gemini/pending-tasks.md
+    - AGENTS.personal.md
     mcp-config:
       committed-file: .gemini/settings.json
       secrets-file: .gemini/settings.local.json
@@ -552,6 +553,7 @@ providers:
     gitignore_entries:
     - .mammouth/pending-tasks.md
     - .mammouth/mcp.local.json
+    - AGENTS.personal.md
     # #857: real MCP surface, mirrored from Opencode's own v1 shape (flat
     # top-level `mcp` key) — Mammouth is an explicit OpenCode fork (see
     # comments elsewhere in this block, e.g. commands_dir/#807) and
@@ -640,6 +642,7 @@ providers:
     - .agents/
     gitignore_entries:
     - .codex/pending-tasks.md
+    - AGENTS.personal.md
     mcp-config:
       committed-file: .codex/config.toml
       format: codex-toml-mcp
@@ -707,6 +710,7 @@ providers:
     - .zcode/
     gitignore_entries:
     - .zcode/pending-tasks.md
+    - AGENTS.personal.md
     mcp-config:
       committed-file: .zcode/config.json
       format: zcode-json
@@ -780,6 +784,7 @@ providers:
     - .kimi-code/
     gitignore_entries:
     - .kimi-code/pending-tasks.md
+    - AGENTS.personal.md
     mcp-config:
       committed-file: .kimi-code/mcp.json
       # F11/KC-1: KimiCode discriminates remote transport via `transport: sse`.

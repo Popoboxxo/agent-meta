@@ -42,7 +42,7 @@ Frühere Befunde aus `2026-09-30-provider-audit-generation.md`: D1 (ungültiges 
 | P2 | **`has_hooks: true` ohne `hook_protocol`** bei Mammouth und Codex: Hook-Dateien werden nicht registriert, das Flag suggeriert aber Hook-Support. | `config/ai-providers.yaml`, `scripts/lib/hooks.py` (Kommentar „has_hooks providers without a verified hook_protocol") | — | low (Erwartungsfehler) |
 | P3 | **Provider-Literale im Code**, die der Guard nicht sieht: z. B. `context.py` (`"Continue"` beim Prompt-Commands-Sync), `rules.py`/`roles.py` (Defaults `"Opencode"`/`"Claude"`), `gitignore.py:213` (`"Claude" not in providers`). Gesamt 35 Literal-Vorkommen in `scripts/lib`, 8 davon in `providers.py` (erlaubt, Registry-Fallback). Ein neuer Provider verhält sich dadurch anders als dokumentiert. | `grep` Provider-Namen in `scripts/lib` | SR-A-06, -12, -13, -21 | medium |
 | P4 | **`--validate` prüft nicht die echte Pipeline** (eigener Handkopie-Loop in `cli_commands.py`; bewertet teils altes `sync.log`). Provider-Fehler können dadurch grün durchgehen. | System-Review | SR-A-24, -25 | medium |
-| P5 | **`{{EXTRA_DONTS}}` / `{{PLATFORM}}` bleiben roh stehen**, wenn die Variable nicht in `project.yaml` steht (29 Dateien pro Provider in meinem Minimal-Projekt). `--fill-defaults` löst das, aber der normale Sync erzeugt weder Fehler noch Default. Das Roh-Token geht an das LLM. | Scratch-Sync, `chk.py` | neu | low–medium |
+| P5 | **`{{EXTRA_DONTS}}` / `{{PLATFORM}}` bleiben roh stehen**, wenn die Variable nicht in `project.yaml` steht (29 Dateien pro Provider in meinem Minimal-Projekt). Der Sync warnt dazu in `sync.log` (`Variable … not in config — placeholder remains`), setzt aber keinen Default; `--fill-defaults` löst es. *Korrektur (Umsetzung):* Es ist also keine stille Lücke, sondern eine Designentscheidung; M0.3 entfällt. | Scratch-Sync, `sync.log` | neu | low |
 | P6 | **88 Validate-Warnungen sind False Positives**: `{{OUTPUT_GUARD_BLOCK}}`, `{{PARSE_INPUT_BLOCK}}` u. a. sind Block-Inlining-Variablen (`context.py`), kennt der Placeholder-Check aber nicht. Echte Warnungen gehen im Rauschen unter. | `sync.py --validate` (88 WRN, alle `placeholders.unknown`) | neu | low, aber hoher Folgeschaden |
 | P7 | **Fallback ohne PyYAML**: Registry fällt still auf „nur Claude" zurück, Sync meldet Erfolg. | System-Review | SR-A-16 | low |
 | P8 | **Dateimodus**: `write_atomic` setzt 0600 und entfernt `+x` auf allen generierten Dateien (Hooks laufen nur dank `bash`-Präfix). Betrifft Teams/Container mit anderer UID. | System-Review | SR-A-15 | medium |
@@ -83,8 +83,8 @@ Leitidee: **Klassen statt Einzelbugs eliminieren.** Jede Maßnahme tötet eine g
 |---|---|---|---|
 | M0.1 | **P1 fixen**: `.gitignore`-Basisblock = Vereinigung der `gitignore_entries` aller aktiven Provider (kein Namens-Gate); `personal_file` als Registry-Key | schließt Datenleck bei 5+ Providern (SR-A-11/12/31/33) | S |
 | M0.2 | **P6 fixen**: Block-Inlining-Variablen im Placeholder-Check bekannt machen | `--validate` wieder lesbar (88 → ~0 Warnungen) | XS |
-| M0.3 | **P5**: Unbekannte/leere Projektvariablen beim Sync mit Defaults auffüllen oder als WARN melden, nie Roh-Token ausliefern | verhindert kaputte Agent-Prompts | S |
-| M0.4 | **Guards fail-closed** (SR-B-08 Wrapper reicht nur 0/2 durch, SR-B-09, SR-B-15) | stoppt stilles Abschalten der Schutzschicht | XS |
+| M0.3 | ~~P5~~ entfällt: Sync warnt bereits (siehe P5) | — | — |
+| M0.4 | **Guards fail-closed**: SR-B-08 war bereits behoben; SR-B-09 (ungültiges JSON) umgesetzt; SR-B-15 offen | stoppt stilles Abschalten der Schutzschicht | XS |
 | M0.5 | Review-Statusliste (Abschnitt 7) mit tatsächlich gemergten PRs abgleichen | Wahrheit statt „alles offen" | XS |
 
 ### Phase 1 — Struktur (1–2 Wochen)
@@ -151,3 +151,13 @@ Realistisch: **60–70 % der aktuell offenen Befunde** fallen in Phase 0/1 weg, 
 - Verhalten der Provider-Tools zur Laufzeit (nur Generierung geprüft).
 - Multi-Provider-Szenario (alle 9 gleichzeitig) und Zweitlauf-Idempotenz in dieser Analyse nicht erneut gefahren; die Audits vom 2026-09-30 nennen dort die Bootstrap-Kollision D8.
 - Admin-Server/-UI (Dimension d) wurde bewusst ausgespart.
+
+## 8. Umsetzungsstand Phase 0 (2026-10-11)
+
+| Maßnahme | Stand |
+|---|---|
+| M0.1 `.gitignore`-Leck (P1) | **umgesetzt**: Baseline-Einträge auf dem Nicht-Claude-Pfad, `AGENTS.personal.md` per Registry bei 5 Providern. Vorher 8 von 9 Provider-Tests rot, jetzt grün. |
+| M0.2 Validate-Fehlalarme (P6) | **umgesetzt**: `placeholders.unknown` 88 → 0. |
+| M0.3 | entfällt (siehe P5). |
+| M0.4 Guards | SR-B-09 **umgesetzt**; SR-B-08 war schon behoben; SR-B-15 offen. |
+| M2.1 Provider-Matrix-Test | **umgesetzt**: `tests/test_provider_matrix_sync.py`, 45 Fälle (9 Provider × 5 Invarianten). Laufzeit ca. 3 min; Teil von M3.2 (Test-Laufzeit). |
