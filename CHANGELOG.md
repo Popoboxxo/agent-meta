@@ -93,7 +93,8 @@
   the test job runs `pytest -n auto` (`pytest-xdist` in `tests/requirements.txt`), and
   `tests/test_orchestrator_guard_hook.py` runs against a throw-away copy of `project.yaml` instead of the
   real checkout, so it no longer appends test lines to `.claude/hooks/.guard-audit.log`. The new provider
-  matrix test falls back to `tomli` on Python < 3.11 (the CI matrix includes 3.9).
+  matrix test falls back to `tomli` on Python < 3.11 (the CI matrix includes 3.9). The `scenarios` job
+  timeout is 45 minutes because the scenario suite needs ~30 minutes (20 minutes cancelled it).
 - **Registry load fails loudly without PyYAML (SR-A-16)**: `load_providers_config` raises `SyncError`
   instead of silently degrading to the Claude-only fallback registry.
 - **Nested null `orchestrator.unknown-fallback` no longer crashes (SR-A-28)**.
