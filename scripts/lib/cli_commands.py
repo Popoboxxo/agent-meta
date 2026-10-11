@@ -223,6 +223,7 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
     capabilities = load_provider_capabilities(agent_meta_root)
 
     validation_errors = 0
+    errors_before = len(log.errors)
     for provider in providers:
         pc = provider_config[provider]
         caps = capabilities.get(provider, {}) if isinstance(capabilities, dict) else {}
@@ -284,21 +285,17 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
         sync_external_skills_for_provider(agent_meta_root, test_repo_path, config, test_variables,
                                           log, dry_run, provider, provider_config)
 
-    # Check sync.log for errors
-    sync_log_path = test_repo_path / "sync.log"
-    if sync_log_path.exists():
-        content = sync_log_path.read_text(encoding="utf-8")
-        error_lines = [line.strip() for line in content.splitlines()
-                       if "[ERROR]" in line or "[FAIL]" in line]
-        if error_lines:
-            log.warning(f"test-repo: Found {len(error_lines)} error(s) in sync.log:")
-            for el in error_lines:
-                log.warning(f"test-repo:   {el}")
-            validation_errors += len(error_lines)
-        else:
-            log.note("test-repo", "sync.log contains no errors")
+    # Errors recorded by THIS run (SR-A-24). The test repo's sync.log is a
+    # leftover of an earlier run: reading it made a fixed problem fail
+    # validation and, worse, a fresh error pass because nothing wrote it yet.
+    run_errors = log.errors[errors_before:]
+    if run_errors:
+        log.warning(f"test-repo: {len(run_errors)} error(s) during this validation run:")
+        for line in run_errors:
+            log.warning(f"test-repo:   {line.strip()}")
+        validation_errors += len(run_errors)
     else:
-        log.note("test-repo", "sync.log not found in test repository (first validation run)")
+        log.note("test-repo", "no errors recorded during this validation run")
 
     return validation_errors == 0
 

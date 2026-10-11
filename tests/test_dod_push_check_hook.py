@@ -934,3 +934,111 @@ def test_r2_3_normal_push_stays_fast(multi_repo):
 def test_r2_4_line_continuation_inside_push(multi_repo, command):
     _checkout(multi_repo, "main")
     _assert_outcome(multi_repo, command, BLOCK)
+
+
+# --- issues #947 / #948 / #950: false positives and xargs bypass -----------
+
+_HEREDOC_TEXT = [
+    'gh pr create --body "$(cat <<\'EOF\'\nsummary\ngit push origin main\nEOF\n)"',
+    'git commit -m "$(cat <<\'EOF\'\nfix\ngit push origin main\nEOF\n)"',
+    "cat <<EOF\ngit push origin main\nEOF",
+]
+_HEREDOC_EXECUTED = [
+    "bash <<EOF\ngit push origin main\nEOF",
+    "cat <<EOF | bash\ngit push origin main\nEOF",
+    "echo $(bash <<EOF\ngit push origin main\nEOF\n)",
+    'echo "x <<EOF"\ngit push origin main\nEOF',
+    'sh -c "$(cat <<EOF\ngit push origin main\nEOF\n)"',
+]
+
+
+@pytest.mark.parametrize("command", _HEREDOC_TEXT)
+def test_947_heredoc_text_for_text_consumer_is_not_a_push(repo_on_feature_branch, command):
+    result = _run_hook(repo_on_feature_branch, command)
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("command", _HEREDOC_EXECUTED)
+def test_947_heredoc_fed_to_a_shell_is_still_classified(repo_on_feature_branch, command):
+    result = _run_hook(repo_on_feature_branch, command)
+    assert result.returncode == 2, result.stdout
+
+
+def test_947_unterminated_heredoc_keeps_body_visible(repo_on_feature_branch):
+    result = _run_hook(repo_on_feature_branch, "cat <<EOF\ngit push origin main\n")
+    assert result.returncode == 2
+
+
+@pytest.mark.parametrize("command,expected", [
+    ("git push origin feat/x # main", 0),
+    ("git push origin feat/x #main", 0),
+    ('git push origin "#main"', 0),
+    ("git push origin main # note", 2),
+    # mid-word '#' is NOT a comment in bash: 'main' is still a second refspec
+    ("git push origin feat#x main", 2),
+])
+def test_948_comment_handling(repo_on_feature_branch, command, expected):
+    result = _run_hook(repo_on_feature_branch, command)
+    assert result.returncode == expected, (command, result.stderr)
+
+
+@pytest.mark.parametrize("command", [
+    "echo main | xargs git push origin",
+    "echo main | xargs -I{} git push origin {}",
+    "git push origin {}",
+])
+def test_950_xargs_and_placeholder_pushes_fail_closed(repo_on_feature_branch, command):
+    result = _run_hook(repo_on_feature_branch, command)
+    assert result.returncode == 2, result.stdout
+
+
+def test_950_computed_refspec_message_names_the_way_out(repo_on_feature_branch):
+    result = _run_hook(repo_on_feature_branch, "git push origin $(git branch --show-current)")
+    assert result.returncode == 2
+    assert "HEAD" in result.stderr
+
+
+# --- issue #952: cd into another repository --------------------------------
+
+@pytest.mark.parametrize("command", [
+    "cd ../other && git push",
+    "cd ../other && git push origin HEAD",
+    "pushd ../other; git push",
+    "(cd ../other && git push)",
+    "cd && git push",
+])
+def test_952_push_after_chdir_is_judged_as_foreign_repo(repo_on_feature_branch, command):
+    result = _run_hook(repo_on_feature_branch, command)
+    assert result.returncode == 2, result.stdout
+    assert "another repository" in result.stderr
+
+
+@pytest.mark.parametrize("command", [
+    "cd . && git push origin feat/x",          # no-op cd, explicit safe ref
+    "cd ../other && git push origin feat/x",   # explicit non-protected ref is safe anywhere
+    "echo abcd && git push origin feat/x",     # 'cd' inside another word
+])
+def test_952_explicit_safe_refs_and_non_cd_words_are_not_blocked(repo_on_feature_branch, command):
+    result = _run_hook(repo_on_feature_branch, command)
+    assert result.returncode == 0, result.stderr
+
+
+# --- issue #953: --recurse-submodules=on-demand pushes submodules too ------
+
+def test_953_recurse_submodules_on_demand_blocked_when_repo_has_submodules(repo_on_feature_branch):
+    (repo_on_feature_branch / ".gitmodules").write_text(
+        '[submodule "s"]\n\tpath = s\n\turl = ../s\n', encoding="utf-8")
+    for flag in ("on-demand", "only"):
+        result = _run_hook(repo_on_feature_branch, f"git push --recurse-submodules={flag} origin feat/x")
+        assert result.returncode == 2, (flag, result.stdout)
+        assert "submodule" in result.stderr
+
+
+def test_953_recurse_submodules_allowed_without_submodules_or_for_check(repo_on_feature_branch):
+    plain = _run_hook(repo_on_feature_branch, "git push --recurse-submodules=on-demand origin feat/x")
+    assert plain.returncode == 0, plain.stderr  # no .gitmodules: flag is a no-op
+    (repo_on_feature_branch / ".gitmodules").write_text("", encoding="utf-8")
+    check = _run_hook(repo_on_feature_branch, "git push --recurse-submodules=check origin feat/x")
+    assert check.returncode == 0, check.stderr  # check only verifies, never pushes
+    no_flag = _run_hook(repo_on_feature_branch, "git push origin feat/x")
+    assert no_flag.returncode == 0, no_flag.stderr

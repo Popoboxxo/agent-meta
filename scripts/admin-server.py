@@ -197,6 +197,8 @@ _DEFAULT_VIZ_SESSION_TIMEOUT = 5
 # guard still restricts binding to DEFAULT_ALLOWED_HOSTS.
 DEFAULT_ALLOWED_HOSTS: tuple[str, ...] = ("127.0.0.1", "localhost", "::1")
 LOOPBACK_HOSTS: tuple[str, ...] = ("127.0.0.1", "localhost", "::1")
+# Bind addresses that name no concrete, reachable address (#897).
+WILDCARD_HOSTS: tuple[str, ...] = ("0.0.0.0", "::", "")
 
 # Super-admin config files (only available when ``agents/1-generic/`` exists).
 SUPER_ADMIN_FILES: dict[str, str] = {
@@ -940,10 +942,19 @@ class AuthService:
         Raises :class:`SecurityError` on any mismatch.
         """
         allowed = list(allowed_hosts)
+        # A concrete bind address (``--host 172.20.5.120``) is the server's own
+        # name: its Origin is as trustworthy as its Host header (#897). A
+        # wildcard bind (0.0.0.0 / ::) names no reachable address, so browsers
+        # arriving by IP/name still need an explicit allow-list entry.
+        origin_hosts = allowed + ([bind_host] if bind_host not in WILDCARD_HOSTS else [])
         if origin is not None:
-            allowed_origins = {f"http://{h}:{bind_port}" for h in allowed}
+            allowed_origins = {f"http://{h}:{bind_port}" for h in origin_hosts}
             if origin not in allowed_origins:
-                raise SecurityError(f"origin not allowed: {origin!r}")
+                raise SecurityError(
+                    f"origin not allowed: {origin!r} -- to use the admin UI from this "
+                    "address, start the server with --allowed-hosts <host> or add it to "
+                    "admin-ui.allowed-hosts in .meta-config/project.yaml"
+                )
 
         allowed_host_values = {f"{h}:{bind_port}" for h in allowed}
         # Always allow the actual bind host (covers explicit ``--host``).
@@ -5595,6 +5606,18 @@ class AdminServer:
             )
         if not is_loopback:
             print(f"  * Token auth enabled — binding to {host}:{port}", file=sys.stderr)
+            if host in WILDCARD_HOSTS:
+                # Mutations are origin-checked: browsers reaching this server by
+                # IP or name must be allow-listed or every write fails (#897).
+                try:
+                    import socket
+                    addrs = sorted({a for a in socket.gethostbyname_ex(socket.gethostname())[2]
+                                    if not a.startswith("127.")})
+                except OSError:
+                    addrs = []
+                hint = " ".join(addrs) if addrs else "<ip-or-hostname>"
+                print(f"  * Wildcard bind: writes from other machines need "
+                      f"--allowed-hosts {hint} (or admin-ui.allowed-hosts)", file=sys.stderr)
         self.root = root.resolve()
         self.host = host
         self.port = port

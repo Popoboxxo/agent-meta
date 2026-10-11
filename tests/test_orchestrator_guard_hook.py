@@ -43,11 +43,13 @@ exit code.
 Run: python -m pytest tests/test_orchestrator_guard_hook.py -v
 """
 
+import atexit
 import json
 import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -55,6 +57,16 @@ import pytest
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _HOOK_PATH = _REPO_ROOT / "hooks" / "1-generic" / "orchestrator-guard.sh"
 _IMPL_PATH = _REPO_ROOT / "hooks" / "1-generic" / "orchestrator-guard-impl.sh"
+
+# The hook reads project.yaml and appends to <root>/.claude/hooks/.guard-audit.log
+# relative to the project it runs in. Running it against the real checkout
+# polluted that gitignored log with test lines on every local run (#945);
+# every test now runs against a throw-away copy of the real project config.
+_PROJECT_ROOT = Path(tempfile.mkdtemp(prefix="guard-test-project-"))
+(_PROJECT_ROOT / ".meta-config").mkdir()
+shutil.copy(_REPO_ROOT / ".meta-config" / "project.yaml", _PROJECT_ROOT / ".meta-config" / "project.yaml")
+(_PROJECT_ROOT / ".claude" / "hooks").mkdir(parents=True)
+atexit.register(shutil.rmtree, _PROJECT_ROOT, ignore_errors=True)
 
 # On Windows, plain ["bash", ...] can resolve to System32\bash.exe (the WSL
 # launcher) instead of Git Bash, depending on CreateProcess search order
@@ -84,7 +96,7 @@ def _run_hook(payload: dict) -> subprocess.CompletedProcess:
         input=json.dumps(payload),
         capture_output=True,
         text=True,
-        cwd=str(_REPO_ROOT),
+        cwd=str(_PROJECT_ROOT),
         env=_clean_env(),
     )
 
@@ -98,7 +110,7 @@ def _bash_payload(command: str) -> dict:
         # path separators, so a Windows-style backslash path here would
         # exercise the same bug as the dedicated backslash-cwd test below.
         # Kept as .as_posix() here since these cases aren't testing that.
-        "cwd": _REPO_ROOT.as_posix(),
+        "cwd": _PROJECT_ROOT.as_posix(),
     }
 
 
@@ -134,7 +146,7 @@ def test_strict_mode_blocks_write_for_main_thread():
     payload = {
         "tool_name": "Write",
         "tool_input": {"file_path": "foo.txt", "content": "#agent-meta:agent=git\nirrelevant"},
-        "cwd": _REPO_ROOT.as_posix(),
+        "cwd": _PROJECT_ROOT.as_posix(),
     }
     result = _run_hook(payload)
     assert result.returncode == 2
@@ -150,7 +162,7 @@ def test_strict_mode_allows_write_for_dispatched_subagent():
     payload = {
         "tool_name": "Write",
         "tool_input": {"file_path": "foo.txt", "content": "irrelevant"},
-        "cwd": _REPO_ROOT.as_posix(),
+        "cwd": _PROJECT_ROOT.as_posix(),
         "agent_id": "subagent-123",
     }
     result = _run_hook(payload)
@@ -161,7 +173,7 @@ def test_strict_mode_allows_edit_for_dispatched_subagent():
     payload = {
         "tool_name": "Edit",
         "tool_input": {"file_path": "foo.txt", "old_string": "a", "new_string": "b"},
-        "cwd": _REPO_ROOT.as_posix(),
+        "cwd": _PROJECT_ROOT.as_posix(),
         "agent_id": "subagent-123",
     }
     result = _run_hook(payload)
@@ -200,7 +212,7 @@ def test_strict_mode_survives_backslash_cwd():
     # Regression for the Windows path-interpolation bug: a cwd containing
     # backslashes must not silently disable strict-mode detection.
     payload = _bash_payload("echo test")
-    payload["cwd"] = str(_REPO_ROOT)  # native form; backslashes on Windows
+    payload["cwd"] = str(_PROJECT_ROOT)  # native form; backslashes on Windows
     result = _run_hook(payload)
     assert result.returncode == 2, (
         "strict mode should still block an undeclared command with a "
@@ -744,7 +756,7 @@ def test_audit_log_rotates_when_over_cap(tmp_path):
         input=json.dumps({**_bash_payload(command), "cwd": tmp_path.as_posix()}),
         capture_output=True,
         text=True,
-        cwd=str(_REPO_ROOT),
+        cwd=str(_PROJECT_ROOT),
         env=_clean_env(),
     )
     assert result.returncode == 0
@@ -898,7 +910,7 @@ def test_leading_bom_blocked_before_strict_mode_sentinel(tmp_path):
     # orchestrator.strict: true, valid `git` sentinel). If the gate were
     # placed after that early exit this command would exit 0 instead.
     command = f"#agent-meta:agent=git\ngit commit -m '{_BOM}feat: x'"
-    result = _run_hook({**_bash_payload(command), "cwd": _REPO_ROOT.as_posix()})
+    result = _run_hook({**_bash_payload(command), "cwd": _PROJECT_ROOT.as_posix()})
     assert result.returncode == 2, (
         f"BOM must be rejected before the strict-mode sentinel exit 0\n"
         f"stdout: {result.stdout}\nstderr: {result.stderr}"
@@ -1522,3 +1534,22 @@ def test_read_only_git_stays_allowed(tmp_path, command):
 def test_benign_git_with_sentinel_stays_allowed(tmp_path, command):
     result = _run_with(_bash_payload("#agent-meta:agent=git\n" + command), tmp_path)
     assert result.returncode == 0, f"stderr={result.stderr!r}"
+
+
+@pytest.mark.parametrize("raw", ["not json", '{"tool_name": "Bash", ', "[1, 2"])
+def test_unparseable_payload_fails_closed(raw):
+    """SR-B-09: a non-empty payload that is not valid JSON must block (exit 2)."""
+    result = subprocess.run(
+        [_BASH, str(_HOOK_PATH)], input=raw, capture_output=True, text=True,
+        cwd=str(_PROJECT_ROOT), env=_clean_env(),
+    )
+    assert result.returncode == 2, result.stderr
+    assert "not valid JSON" in result.stderr
+
+
+def test_empty_payload_is_still_a_noop():
+    result = subprocess.run(
+        [_BASH, str(_HOOK_PATH)], input="", capture_output=True, text=True,
+        cwd=str(_PROJECT_ROOT), env=_clean_env(),
+    )
+    assert result.returncode == 0

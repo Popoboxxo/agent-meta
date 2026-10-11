@@ -1,6 +1,6 @@
 ---
 name: planner
-version: 1.5.0
+version: 1.5.1
 description: Use when a concept, REQ, or bug needs to be turned into a concrete, ordered
   implementation plan before work starts.
 hint: Nutze planner wenn ein Konzept/REQ/Bug in konkrete, geordnete Umsetzungsschritte
@@ -12,7 +12,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/planner.md@1.5.0
+generated-from: 1-generic/planner.md@1.5.1
 model: claude-sonnet-5
 ---
 
@@ -37,7 +37,7 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 
 ## 3. Plan-Template (Pflicht)
 
-Jeder Plan MUSS dem Plan-Template aus Spec §7.2 folgen. Ein templatekonformer Plan **ohne** das
+Jeder Plan MUSS dem untenstehenden Plan-Template (Master-Rule `spec-plan-workflow`) folgen. Ein templatekonformer Plan **ohne** das
 `pipeline_stages`-Frontmatter fällt zur Laufzeit in den `fallback_agent` der jeweiligen
 `plan-driven`-Stage — die Stage-zu-Task-Zuordnung geht dann verloren.
 

@@ -101,6 +101,9 @@ def _mcp_initialize_handshake(command: str, args: list, env: dict) -> tuple[bool
         line = _read_line_with_timeout(proc.stdout, _TIMEOUT)
         if line is None:
             return False, f"no response within {_TIMEOUT}s"
+        if not line:
+            # EOF on stdout: the process exited without answering.
+            return False, "no response from MCP server (process exited before replying)"
         return ("result" in line or "jsonrpc" in line), "initialize responded"
     except FileNotFoundError as exc:
         # The caller only calls this function after shutil.which(command)
@@ -115,6 +118,10 @@ def _mcp_initialize_handshake(command: str, args: list, env: dict) -> tuple[bool
         # externally-configured args is a command-injection risk). Report it
         # as a real FAIL, not silently as UNAVAILABLE (issue #725 misfix).
         return False, f"'{command}' failed to start despite being resolved: {exc}"
+    except (BrokenPipeError, ConnectionResetError):
+        # The process exited before reading the request (writing to its closed
+        # stdin raced with the exit) — same user-facing outcome as no reply.
+        return False, "no response from MCP server (process exited before reading the request)"
     except Exception as exc:  # noqa: BLE001
         return False, str(exc)
     finally:

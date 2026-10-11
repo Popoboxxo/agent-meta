@@ -390,7 +390,7 @@ def _ensure_context_file(
         content = builder.build(template_path.stem, variables)
         source_label = str(template_path.relative_to(agent_meta_root))
     else:
-        project_name = config["project"]["name"]
+        project_name = _project_name(config, variables)
         content = (
             f"# {project_name}\n\n"
             "<!-- agent-meta:managed-begin -->\n"
@@ -705,7 +705,7 @@ def _sync_opencode_context(
             builder = TemplateBuilder(template_path.parent, fallback_partials_dir=fallback_partials)
             ocontent = builder.build(template_path.stem, variables)
         else:
-            project_name = config["project"]["name"]
+            project_name = _project_name(config, variables)
             ocontent = (
                 f"# {project_name}\n\n"
                 "<!-- agent-meta:managed-begin -->\n"
@@ -1273,6 +1273,15 @@ def sync_context_adapters_for_provider(
         activation = _adapter_settings_activation(pc)
         if activation is not None:
             _write_adapter_settings_activation(project_root, activation, log, dry_run)
+
+
+def _project_name(config: dict, variables: dict) -> str:
+    """Project name from ``project.name``, else the PROJECT_NAME variable.
+
+    A config without a ``project`` block only produces a schema warning at
+    load time, so context generation must not crash on it.
+    """
+    return (config.get("project") or {}).get("name") or variables.get("PROJECT_NAME") or "project"
 
 
 def sync_context_for_provider(
@@ -2284,10 +2293,16 @@ def sync_prompts_for_continue(
     log: SyncLog,
     dry_run: bool,
     provider_config: dict | None = None,
+    *,
+    provider: str,
 ):
-    """Generate .continue/prompts/<role>.md as invokable slash-commands.
+    """Generate <commands_dir>/<role>.md as invokable slash-commands.
 
-    Controlled by provider-options.Continue:
+    ``provider`` is the registry key of a provider with ``has_prompt_commands``;
+    the output directory and extension/snippet paths come from its registry
+    entry (no provider literal here, SR-A-06).
+
+    Controlled by provider-options.<provider> (today: Continue):
         generate-prompts: true          # enable (default: false)
         prompt-mode: "full" | "slim"    # full = complete agent body (default)
                                         # slim = compact role + core rules only
@@ -2307,11 +2322,11 @@ def sync_prompts_for_continue(
     from .providers import resolve_provider_options
     from .roles import build_role_map
 
-    opts = resolve_provider_options(config, "Continue")
+    opts = resolve_provider_options(config, provider)
     if not opts.get("generate-prompts", False):
         return
 
-    pc = (provider_config or {}).get("Continue", {})
+    pc = (provider_config or {}).get(provider, {})
     provider_vars = {
         'EXTENSION_DIR': pc.get('extension_dir', '.continue/3-project'),
         'SNIPPETS_DIR': pc.get('snippets_dir', '.continue/snippets'),
@@ -2326,7 +2341,7 @@ def sync_prompts_for_continue(
     overrides, _ = collect_sources(agent_meta_root, platforms)
     allowed_roles: set | None = set(config["roles"]) if "roles" in config else None
 
-    prompts_dir = project_root / ".continue" / "prompts"
+    prompts_dir = project_root / pc.get("commands_dir", ".continue/prompts")
     if not dry_run:
         prompts_dir.mkdir(parents=True, exist_ok=True)
 
@@ -2356,10 +2371,10 @@ def sync_prompts_for_continue(
         # Apply PAL delegation syntax for Continue prompts
         from .delegation_syntax import DelegationSyntaxEngine
         pal_engine = DelegationSyntaxEngine(config_dir=agent_meta_root / "config")
-        content = pal_engine.apply(content, "Continue")
+        content = pal_engine.apply(content, provider)
 
         template_description = extract_frontmatter_field(content, "description") or f"Agent for {role}."
-        template_description = template_description.replace("{{PROJECT_NAME}}", config["project"]["name"])
+        template_description = template_description.replace("{{PROJECT_NAME}}", _project_name(config, variables))
 
         # Strip original frontmatter, optionally slim the body
         body = _strip_frontmatter(content)

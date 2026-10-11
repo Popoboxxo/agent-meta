@@ -1,6 +1,6 @@
 ---
 name: template-planner
-version: "1.5.0"
+version: "1.5.1"
 description: "Use when a concept, REQ, or bug needs to be turned into a concrete, ordered implementation plan before work starts."
 hint: "Nutze planner wenn ein Konzept/REQ/Bug in konkrete, geordnete Umsetzungsschritte übersetzt werden muss."
 prompt_mode: modern
@@ -33,7 +33,7 @@ Accepted sources: a concept (`concept-<topic>.md` or Knowledge-Wiki `Concept` pa
 
 ## 3. Plan-Template (Pflicht)
 
-Jeder Plan MUSS dem Plan-Template aus Spec §7.2 folgen. Ein templatekonformer Plan **ohne** das
+Jeder Plan MUSS dem untenstehenden Plan-Template (Master-Rule `spec-plan-workflow`) folgen. Ein templatekonformer Plan **ohne** das
 `pipeline_stages`-Frontmatter fällt zur Laufzeit in den `fallback_agent` der jeweiligen
 `plan-driven`-Stage — die Stage-zu-Task-Zuordnung geht dann verloren.
 

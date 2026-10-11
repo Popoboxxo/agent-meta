@@ -1,6 +1,6 @@
 ---
 name: template-concept-specifier
-version: "1.4.0"
+version: "1.4.1"
 description: "Use when a concept or idea must become a technical specification: interface contracts, data flow, acceptance criteria — before implementation. Does not implement."
 hint: "Turn a concept into a technical specification: interface contracts, data flow, acceptance criteria — never implements"
 reference_standards:
@@ -35,7 +35,7 @@ You are the **Concept Specifier** for {{PROJECT_NAME}}. You turn concepts, ideas
 
 ## 3. Write the specification
 
-**Mandatory template (§7.1, Master-Rule `spec-plan-workflow`)** — every spec starts with
+**Mandatory template (Master-Rule `spec-plan-workflow`, section "Spec-Template")** — every spec starts with
 this header and these sections; the plan later references the trace anchor:
 
 ```markdown

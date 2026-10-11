@@ -46,6 +46,65 @@
   Variablen können danach entfallen. Regressions-Szenario: `tests/scenarios/configs/75-web-platform-preset`.
 
 ### Fixed
+- **Flaky `test_local_process_partial_line_timeout` / unclear plugin-test message**: the MCP
+  initialize handshake now reports a process that exits before reading the request (BrokenPipe on
+  write, or EOF on read) as FAIL "no response from MCP server (process exited ...)" instead of a raw
+  `[Errno 32] Broken pipe` / "initialize responded". The partial-line test uses `cat` (stays alive)
+  instead of `true`, and a new test covers the exited-process case explicitly.
+- **Machine-local files no longer committable without a Claude provider (SR-A-11/31)**: projects whose
+  providers have no dedicated context file (Gemini, Codex, Mammouth, ZCode, KimiCode, Opencode,
+  Continue, Copilot) now also ignore `sync.log`, `*.sync-backup-*`, the generated
+  `.meta-config/env.*` scripts (may hold secret defaults), viz/skill entries and `AGENTS.personal.md`
+  (new `gitignore_entries` in `config/ai-providers.yaml`). New provider matrix test
+  `tests/test_provider_matrix_sync.py` syncs every registered provider and asserts artifact validity,
+  gitignore coverage and idempotence.
+- **`--validate` no longer reports 88 false `placeholders.unknown` warnings**: the block-inlining
+  variables `OUTPUT_GUARD_BLOCK`, `BACKGROUND_PROCESS_GUARD_BLOCK`, `PARSE_INPUT_BLOCK` and
+  `ESCALATE_CARD_BLOCK` are known built-ins.
+- **`--validate` judges the current run (SR-A-24)**: `validate_test_repo` counts the errors recorded
+  by this run instead of re-reading a stale `sync.log` from the test repo (a fixed problem no longer
+  fails validation, a fresh error no longer passes).
+- **Provider literals removed from data paths (SR-A-06/12/13)**: `sync_prompts_for_continue` takes
+  `provider=` and reads its output dir from `commands_dir`; the managed `.gitignore` block is driven
+  by `has_dedicated_context_file` (union of those providers' `gitignore_entries`); the flat
+  `model-overrides` warning uses the `model-overrides-flat` capability. A new AST guard
+  (`test_no_provider_literal_usage_in_lib`) flags provider literals in `.get()`/subscripts/membership
+  tests/call arguments/new default parameters; ten legacy default-parameter sites are allowlisted and
+  may only shrink.
+- **Template fixes (#932, #933, #934, #935)**: `provider-expert`/`mammouth-expert` use their literal role
+  name in the extension path instead of the unresolvable `{{ROLE}}` (#933); `orchestrator` §10/§12 point
+  at `{{AGENT_META_REL_PATH}}agents/1-generic/_wf-orchestrator-reference.md`, which exists in the
+  submodule layout (#932); `agent-meta-manager` uses `python3` with a documented PyYAML prerequisite
+  instead of the Windows-only `py` launcher (#934); `planner`, `concept-reviewer`, `concept-specifier`,
+  `orchestrator` no longer cite the non-existent `§7.1`/`§7.2` sections (#935).
+- **`standalone/` export regenerated**: it had drifted from `agents/1-generic` and was missing the roles
+  ai-governance-engineer, ai-observability-engineer, ai-security-guardian, app-lifecycle-governor, concept-architect, concept-specifier, control-framework-assessor, fraud-risk-assessor, llm-evaluator, prompt-governor, rag-engineer, risk-based-audit-planner, se-component-requirements, test-executor.
+- **`dod-push-check` 2.1.5 (#947, #948, #950, #952, #953)**: heredoc bodies handed to a text-only consumer
+  (`cat`, `gh`, `tee`, `git commit`/`tag`/`notes`) are no longer classified as commands, so PR
+  bodies and commit messages that mention `git push origin main` stop being blocked; bodies fed to a
+  shell, interpreter, pipe or `eval` stay visible. An unquoted word-start `#` comment is cut before
+  tokenizing (`origin feat/x # main` passes; `"#main"` and mid-word `#` stay literal). `xargs`
+  carrying a `git push` and the `{}` placeholder fail closed; the computed-refspec block message names
+  the literal-branch / `HEAD` way out. A push in a command containing `cd`/`pushd`/`popd` is judged like
+  a `-C` push into another repository (refspec-less and `HEAD` pushes block), closing a bypass where the
+  other repo's `main` was checked against the cwd repo's branch. `--recurse-submodules=on-demand|only` fails
+  closed in a repository with `.gitmodules` (submodules push to their own remotes and branches).
+- **Admin UI network mode (#897)**: a concrete `--host <ip>` now authorizes its own Origin (the Host
+  check already did); a wildcard bind (`0.0.0.0`) prints the `--allowed-hosts <detected-ip>` hint at
+  startup, and the `origin not allowed` error names `--allowed-hosts` / `admin-ui.allowed-hosts`. The
+  backup overlay is closed in a `finally`, so a failed request cannot leave it hanging. A wildcard
+  bind still does not auto-trust arbitrary Host/Origin values (DNS-rebinding protection).
+- **CI robustness (#945, partial)**: every workflow job has `timeout-minutes` (was the 360-minute default),
+  the test job runs `pytest -n auto` (`pytest-xdist` in `tests/requirements.txt`), and
+  `tests/test_orchestrator_guard_hook.py` runs against a throw-away copy of `project.yaml` instead of the
+  real checkout, so it no longer appends test lines to `.claude/hooks/.guard-audit.log`. The new provider
+  matrix test falls back to `tomli` on Python < 3.11 (the CI matrix includes 3.9). The `scenarios` job
+  timeout is 45 minutes because the scenario suite needs ~30 minutes (20 minutes cancelled it).
+- **Registry load fails loudly without PyYAML (SR-A-16)**: `load_providers_config` raises `SyncError`
+  instead of silently degrading to the Claude-only fallback registry.
+- **Nested null `orchestrator.unknown-fallback` no longer crashes (SR-A-28)**.
+- **`orchestrator-guard` fails closed on an unparseable payload (SR-B-09)**: a non-empty hook payload
+  that is not valid JSON now exits 2 instead of being read as "no tool name" and allowed.
 ### Fixed
 - **Claude hook commands are now anchored to `${CLAUDE_PROJECT_DIR}` instead of being cwd-relative (issue #851)**:
   `sync.py` registered hooks as `bash .claude/hooks/<file>.sh`, which Claude Code resolves against the

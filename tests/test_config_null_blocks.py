@@ -20,7 +20,7 @@ import pytest
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 
-from lib.config import _build_core_variables, load_config  # noqa: E402
+from lib.config import _build_core_variables, _build_orch_variables, load_config  # noqa: E402
 
 # Top-level mapping blocks from config/project-config.schema.json (type: object)
 # plus framework blocks the schema does not declare (systems-engineering, ...).
@@ -117,3 +117,15 @@ def test_all_null_blocks_load_and_build_together(tmp_path: Path) -> None:
     body = "".join(f"{key}: null\n" for key in _MAPPING_BLOCKS + _SCALAR_KEYS)
     config = _load(tmp_path, body)
     _build_core_variables({}, config, _REPO_ROOT, None)
+
+
+def test_nested_null_unknown_fallback_is_unset(tmp_path: Path) -> None:
+    """SR-A-28: `orchestrator: {unknown-fallback: null}` used to raise AttributeError."""
+    # Built directly: the JSON schema rejects the nested null at load time, but
+    # build_variables is also reached with programmatic configs (admin UI, tests).
+    config = _load(tmp_path, "orchestrator: {}\n")
+    config["orchestrator"]["unknown-fallback"] = None
+    variables: dict = {}
+    _build_orch_variables(variables, [], config, _REPO_ROOT)
+    assert variables["UNKNOWN_FALLBACK_META_FEEDBACK"] == "true"
+    assert variables["UNKNOWN_FALLBACK_ASK_USER"] == "false"

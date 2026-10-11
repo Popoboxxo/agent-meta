@@ -117,6 +117,10 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     "INTENT_ROUTING_TOOLS",
 
     "ROUTE_INTENT_CALLABLE",
+    # Block-inlining variables loaded from snippets/agents/ by
+    # config._load_block_snippet_variables (resolved in every sync)
+    "OUTPUT_GUARD_BLOCK", "BACKGROUND_PROCESS_GUARD_BLOCK", "PARSE_INPUT_BLOCK",
+    "ESCALATE_CARD_BLOCK",
     # Paths
     "AGENTS_DIR",
     # Release / plugin packaging

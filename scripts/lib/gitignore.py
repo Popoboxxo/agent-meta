@@ -210,7 +210,13 @@ def compute_base_gitignore_entries(
     (the exact-managed-block path is Claude-gated) — the same guard is kept
     here so the helper mirrors the historical behavior exactly.
     """
-    if "Claude" not in providers:
+    # Capability-driven (SR-A-12): the exact-managed-block path belongs to
+    # providers that declare a dedicated context file, not to a provider name.
+    dedicated = [
+        p for p in providers
+        if provider_config.get(p, {}).get("has_dedicated_context_file", False)
+    ]
+    if not dedicated:
         return []
 
     exceptions = gitignore_cfg.get("exceptions", [])
@@ -230,7 +236,12 @@ def compute_base_gitignore_entries(
         return _should_ignore(path, category_default)
 
     entries: list[str] = []
-    claude_pc = provider_config.get("Claude", {})
+    # Union of the dedicated-context providers' local entries, order-preserving.
+    local_union: list[str] = []
+    for _dp in dedicated:
+        for _e in provider_config.get(_dp, {}).get("gitignore_entries", []):
+            if _e not in local_union:
+                local_union.append(_e)
 
     # Keep/re-include list (issue #746): project-owned paths under an ignored
     # provider root that must stay versionable. Only effective in toggle mode.
@@ -254,7 +265,7 @@ def compute_base_gitignore_entries(
     # files (CLAUDE.personal.md, sync.log, .mcp.json) survive toggle mode; only
     # provider-internal candidates are filtered as redundant.
     cat_local = gitignore_cfg.get("local", True)
-    local_candidates = claude_pc.get("gitignore_entries", _CLAUDE_LOCAL_ENTRIES_FALLBACK)
+    local_candidates = local_union or _CLAUDE_LOCAL_ENTRIES_FALLBACK
     for _p in local_candidates:
         if _keep(_p, cat_local):
             entries.append(_p)

@@ -137,6 +137,19 @@ if ! hook_have_python; then
 fi
 _PY="$(hook_python_bin)"
 
+# Fail closed on a non-empty payload that is not valid JSON (SR-B-09): the
+# field readers below return "" for unparseable input, which would read as
+# "no tool name" and let the call through. An empty payload stays a no-op
+# (non-tool events). Invalid UTF-8 bytes are tolerated (surrogateescape), as
+# in hook_json_get -- only structurally broken JSON is rejected.
+if [ -n "$INPUT" ] && ! printf '%s' "$INPUT" | "$_PY" -c \
+  'import sys, json; json.loads(sys.stdin.buffer.read().decode("utf-8", "surrogateescape"))' \
+  2>/dev/null; then
+  echo "ORCHESTRATOR_GUARD: hook payload is not valid JSON." >&2
+  echo "Failing closed (SR-B-09) -- the guard cannot evaluate a call it cannot parse." >&2
+  exit 2
+fi
+
 TOOL_NAME=$(hook_json_get "$INPUT" "tool_name")
 
 # If no tool name: startup or other events — allow through

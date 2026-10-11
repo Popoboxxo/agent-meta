@@ -102,7 +102,7 @@ def create_extension(
         print(f"  !  Unknown role '{role}'. Valid roles: {', '.join(role_map)}", file=sys.stderr)
         return
 
-    prefix = config["project"].get("prefix", "")
+    prefix = (config.get("project") or {}).get("prefix", "")
     filename = ext_target_filename(role, prefix)
     target_path = safe_path(project_root, CLAUDE_EXT_DIR, filename)
 

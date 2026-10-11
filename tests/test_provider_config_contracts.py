@@ -301,3 +301,18 @@ def test_codex_and_continue_mcp_formats():
     assert _PROVIDERS["Codex"]["agent-transform"]["frontmatter-mechanism"] == "codex-toml"
     assert _PROVIDERS["Continue"]["mcp-config"]["format"] == "continue-yaml"
     assert _PROVIDERS["Claude"]["mcp-config"]["format"] == "claude-settings"
+
+
+def test_registry_load_without_pyyaml_fails_loudly(monkeypatch):
+    """SR-A-16: no silent Claude-only fallback when PyYAML is unavailable."""
+    import sys
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    sys.path.insert(0, str(root / "scripts"))
+    import lib.providers as providers
+    from lib.io import SyncError
+
+    monkeypatch.setattr(providers, "_YAML_AVAILABLE", False)
+    with pytest.raises(SyncError, match="PyYAML is required"):
+        providers.load_providers_config(root)

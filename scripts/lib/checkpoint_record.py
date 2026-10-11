@@ -55,6 +55,7 @@ def record_checkpoint(
     plan_id: Optional[str] = None,
     status_summary: Optional[str] = None,
     next_step: Optional[str] = None,
+    agent_meta_root: Optional[Path] = None,
 ) -> int:
     """Append one checkpoint to ``session_id`` and return an exit code.
 
@@ -81,7 +82,7 @@ def record_checkpoint(
         next_step=next_step,
     )
 
-    store = CheckpointStore.from_config(project_root, config)
+    store = CheckpointStore.from_config(project_root, config, agent_meta_root=agent_meta_root)
     try:
         store.save_checkpoint(session_id, checkpoint)
     except OSError as exc:
@@ -185,6 +186,10 @@ def _handle_checkpoint(ctx) -> None:
         plan_id=plan_id,
         status_summary=getattr(args, "summary", None),
         next_step=getattr(args, "next_step", None),
+        # The running framework knows its own root; guessing it from the
+        # project root misses a framework that is not at <project>/.agent-meta
+        # and degrades to the Claude-only registry.
+        agent_meta_root=getattr(ctx, "agent_meta_root", None),
     )
 
     ref = make_task_ref(plan_id, normalize_task_id(task_id))

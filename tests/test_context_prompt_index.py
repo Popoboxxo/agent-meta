@@ -26,6 +26,9 @@ from lib.context import sync_prompts_for_continue  # noqa: E402
 from lib.log import SyncLog  # noqa: E402
 
 
+_PROVIDER_CONFIG = {"Continue": {"commands_dir": ".continue/prompts"}}
+
+
 def _make_agent_meta_root(tmp_path: Path) -> Path:
     root = tmp_path / "agent-meta"
     (root / "config").mkdir(parents=True)
@@ -68,7 +71,7 @@ def test_absent_prompt_index_adopts_nothing(tmp_path: Path) -> None:
 
     sync_prompts_for_continue(
         agent_meta_root, project_root, _config(("developer",)), {}, SyncLog(),
-        dry_run=False, provider_config={},
+        dry_run=False, provider_config=_PROVIDER_CONFIG, provider="Continue",
     )
 
     assert orphan.exists(), "fail-open delete removed an unmanaged prompt file"
@@ -87,7 +90,7 @@ def test_empty_expected_writes_zero_byte_index(tmp_path: Path) -> None:
 
     sync_prompts_for_continue(
         agent_meta_root, project_root, _config(()), {}, SyncLog(),
-        dry_run=False, provider_config={},
+        dry_run=False, provider_config=_PROVIDER_CONFIG, provider="Continue",
     )
 
     assert index.exists()
@@ -107,7 +110,7 @@ def test_present_prompt_index_deletes_stale_and_rewrites(tmp_path: Path) -> None
 
     sync_prompts_for_continue(
         agent_meta_root, project_root, _config(("developer",)), {}, SyncLog(),
-        dry_run=False, provider_config={},
+        dry_run=False, provider_config=_PROVIDER_CONFIG, provider="Continue",
     )
 
     assert not stale.exists(), "index-listed stale prompt must be deleted"
@@ -123,13 +126,13 @@ def test_unchanged_prompt_logs_no_write_action(tmp_path: Path) -> None:
 
     sync_prompts_for_continue(
         agent_meta_root, project_root, config, {}, SyncLog(),
-        dry_run=False, provider_config={},
+        dry_run=False, provider_config=_PROVIDER_CONFIG, provider="Continue",
     )
 
     second = SyncLog()
     sync_prompts_for_continue(
         agent_meta_root, project_root, config, {}, second,
-        dry_run=False, provider_config={},
+        dry_run=False, provider_config=_PROVIDER_CONFIG, provider="Continue",
     )
 
     assert second.actions == [], f"unchanged prompt must not log an action: {second.actions}"
@@ -144,7 +147,7 @@ def test_changed_prompt_logs_write_action(tmp_path: Path) -> None:
 
     sync_prompts_for_continue(
         agent_meta_root, project_root, config, {}, SyncLog(),
-        dry_run=False, provider_config={},
+        dry_run=False, provider_config=_PROVIDER_CONFIG, provider="Continue",
     )
 
     # Change the source so the generated prompt differs.
@@ -155,7 +158,7 @@ def test_changed_prompt_logs_write_action(tmp_path: Path) -> None:
     second = SyncLog()
     sync_prompts_for_continue(
         agent_meta_root, project_root, config, {}, second,
-        dry_run=False, provider_config={},
+        dry_run=False, provider_config=_PROVIDER_CONFIG, provider="Continue",
     )
 
     assert any("WRITE" in a for a in second.actions), second.actions

@@ -1,12 +1,12 @@
 #!/bin/bash
 # hook: dod-push-check
-# version: 2.1.2
+# version: 2.1.5
 # event: PreToolUse
 # matcher: Bash
 # provider: Claude
 # description: Blocks git push on/to main/master (Branch-Guard) and until tests are green (DoD enforcement)
 # enabled_by_default: false
-# changelog: v2.1.2: command-running git subcommands carrying a push blocked again (submodule foreach/bisect run git push, rebase -x/filter-branch/difftool -x/config with 'git ... push', R2-1), -c/--config-env aliases resolved or blocked, exec config (core.pager/sshCommand/editor, sequence.editor, ...) on a push or carrying one blocked, rg --pre/ack --pager blocked (R2-5), unreadable Bash command in the payload blocked instead of skipped (R2-2), linear classifier (shlex token buffer, brace/nested scans) + 20 s budget that blocks on overrun (R2-3), backslash-newline inside 'push' and 'alias' reach the classifier (R2-4); v2.1.1: DWIM destinations (heads/main, remotes/<r>/main) protected (F1), pre-filter without here-string + SIGXFSZ ignored so a failed temp file fails closed (F2), quote-aware statements and fail-closed quote repair (QF1), man/less/more/ack no longer treated as text (QF5), one for-each-ref snapshot (A2), refspec-less pushes checked against push.default/branch.<n>.merge/remote.<r>.push and -c overrides (A3), -C/--git-dir/--work-tree/GIT_DIR refspec-less or HEAD pushes blocked (A4), $'..'/$".."/{a,b}/$(..) command words and git-push resolved or blocked (A5); v2.1.0: push detection by command word incl. global options/wrappers, no false positives on quoted/echoed text (SR-B-03/04), Branch-Guard checks destination refs and blocks --all/--mirror/detached pushes (SR-B-02), no SIGPIPE fail-open on large commands (SR-B-21), scoped boundary wording (SR-B-07); v2.0.3: per-statement tag-only push detection with flag allowlist, --no-tags, redirects, line continuations, fail-closed parsing (SR-B-01); v2.0.2: fix pipefail propagation in TEST_CMD subshell (#753)
+# changelog: v2.1.5: --recurse-submodules=on-demand|only in a repo with submodules (or another repo) fails closed because the submodules push to their own remotes/branches (#953); v2.1.4: a push in a command that changes directory (cd/pushd/popd) is judged as a push into another repository (refspec-less/HEAD pushes blocked, cwd branch and config no longer assumed) (#952); v2.1.3: heredoc bodies fed to a text-only consumer (cat/gh/tee/git commit) are no longer classified as commands (#947), an unquoted word-start # comment is cut before tokenizing while quoted/mid-word # stay literal (#948), xargs carrying a git push and the {} placeholder fail closed (#950), computed-refspec block message names the HEAD / literal-branch way out (#950); v2.1.2: command-running git subcommands carrying a push blocked again (submodule foreach/bisect run git push, rebase -x/filter-branch/difftool -x/config with 'git ... push', R2-1), -c/--config-env aliases resolved or blocked, exec config (core.pager/sshCommand/editor, sequence.editor, ...) on a push or carrying one blocked, rg --pre/ack --pager blocked (R2-5), unreadable Bash command in the payload blocked instead of skipped (R2-2), linear classifier (shlex token buffer, brace/nested scans) + 20 s budget that blocks on overrun (R2-3), backslash-newline inside 'push' and 'alias' reach the classifier (R2-4); v2.1.1: DWIM destinations (heads/main, remotes/<r>/main) protected (F1), pre-filter without here-string + SIGXFSZ ignored so a failed temp file fails closed (F2), quote-aware statements and fail-closed quote repair (QF1), man/less/more/ack no longer treated as text (QF5), one for-each-ref snapshot (A2), refspec-less pushes checked against push.default/branch.<n>.merge/remote.<r>.push and -c overrides (A3), -C/--git-dir/--work-tree/GIT_DIR refspec-less or HEAD pushes blocked (A4), $'..'/$".."/{a,b}/$(..) command words and git-push resolved or blocked (A5); v2.1.0: push detection by command word incl. global options/wrappers, no false positives on quoted/echoed text (SR-B-03/04), Branch-Guard checks destination refs and blocks --all/--mirror/detached pushes (SR-B-02), no SIGPIPE fail-open on large commands (SR-B-21), scoped boundary wording (SR-B-07); v2.0.3: per-statement tag-only push detection with flag allowlist, --no-tags, redirects, line continuations, fail-closed parsing (SR-B-01); v2.0.2: fix pipefail propagation in TEST_CMD subshell (#753)
 
 set -uo pipefail
 
@@ -329,7 +329,8 @@ BRACE = re.compile(r"\{([^{}]*)\}")
 
 
 def computed(tok):
-    return "$" in tok or "`" in tok or any(
+    # '{}' is the xargs -I / find -exec placeholder: the real value is unknown
+    return "$" in tok or "`" in tok or "{}" in tok or any(
         "," in g or ".." in g for g in BRACE.findall(tok))
 
 
@@ -463,6 +464,8 @@ def push_args(toks, w):
     if g < len(toks):
         res = git_push(toks[g:], toks[:g])
         if res is not None:
+            if os.path.basename(toks[w]) == "xargs":
+                return UNRESOLVED  # refs arrive on stdin: destination unknown (#950)
             return res
     if "push" in toks[w:]:
         before = toks[w:toks.index("push", w)]
@@ -749,6 +752,17 @@ def refspec_less_block():
     return None
 
 
+def has_submodules():
+    # True when the cwd repository declares submodules (.gitmodules in its
+    # top level); unknown top level -> assume yes (fail closed).
+    try:
+        top = subprocess.run(["git", "rev-parse", "--show-toplevel"],
+                             capture_output=True, text=True, timeout=5).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return True
+    return not top or os.path.exists(os.path.join(top, ".gitmodules"))
+
+
 def destination_block(p):
     # Reason string if this (non-tag-only) push statement may update a
     # protected branch or its destination cannot be determined; else None.
@@ -773,6 +787,10 @@ def destination_block(p):
                 return f"unknown push option '{name}', destination cannot be determined"
             if name == "--force-with-lease" and val and is_protected(val.split(":", 1)[0]):
                 return f"'{a}' targets protected branch"
+            if name == "--recurse-submodules" and val in ("on-demand", "only") \
+                    and (p.foreign or has_submodules()):
+                return (f"'{a}' also pushes submodule commits to the submodules' own "
+                        "remotes and branches, destination cannot be determined")
             if name in PUSH_OPTS_WITH_VALUE and not val:
                 i += 1
             continue
@@ -804,7 +822,8 @@ def destination_block(p):
         # incl. COMPUTED, brace expansion and glob characters ('ma?n' matches
         # a file named main): the shell decides the real refspec
         if computed(spec) or "?" in spec or "[" in spec:
-            return f"refspec '{ref}' is computed at run time, destination cannot be determined"
+            return (f"refspec '{ref}' is computed at run time, destination cannot be "
+                    "determined (use a literal branch name or HEAD instead)")
         if "*" in spec or spec == ":":
             return f"refspec '{ref}' pushes many refs, destination cannot be determined"
         src, colon, dst = spec.partition(":")
@@ -848,9 +867,123 @@ def quoted_statements(cmd):
     return out
 
 
+CHDIR = re.compile(r"(?:^|[\s;&|(])(?:cd|pushd|popd)(?!\S*[\w-])(?:\s+(?!\.(?:/)?(?:\s|$|;|&|\|))|\s*$|\s*[;&|)])")
+
+# --- comment + heredoc preprocessing (#947, #948) ---------------------------
+def strip_comment(stmt):
+    # Cut an unquoted, word-start '#' comment (bash: '#' only starts a comment
+    # at the beginning of a word; 'a#b', '"#x"', '${#x}' and '$#' stay text).
+    # Only whitespace/start counts as word start: anything unusual keeps the
+    # text, which can only add blocks, never hide a push.
+    q, i, n = "", 0, len(stmt)
+    while i < n:
+        c = stmt[i]
+        if q == "'":
+            if c == "'":
+                q = ""
+        elif c == "\\":
+            i += 1
+        elif q == '"':
+            if c == '"':
+                q = ""
+        elif c in "'\"":
+            q = c
+        elif c == "#" and (i == 0 or stmt[i - 1] in " \t"):
+            return stmt[:i]
+        i += 1
+    return stmt
+
+
+HEREDOC = re.compile(r"(?<!<)<<(-?)[ \t]*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\2")
+HEREDOC_OWNERS = {"cat", "gh", "tee"}
+HEREDOC_OUTER = {"echo", "printf", "gh", "cat", "tee"}
+HEREDOC_GIT_TEXT = {"commit", "tag", "notes"}
+
+
+def _command_words(text):
+    words = re.findall(r"[^\s|&;()<>]+", text)
+    while words and (words[0] in RESERVED or ASSIGNMENT.match(words[0])):
+        words.pop(0)
+    return words
+
+
+def _text_command(words):
+    # does this command only treat stdin / its arguments as text?
+    if not words:
+        return False
+    first = os.path.basename(words[0])
+    if first == "git":
+        rest = [w for w in words[1:] if not w.startswith("-")]
+        if "-C" in words:  # -C <path>: the path is not the subcommand
+            rest = [w for w in rest if w != words[words.index("-C") + 1]]
+        return bool(rest) and rest[0] in HEREDOC_GIT_TEXT
+    return first in HEREDOC_OUTER
+
+
+def _heredoc_operator(line):
+    # The first '<<WORD' in command position (outside quotes; a double-quoted
+    # '$(' re-enters command position), or None.
+    stack = [""]
+    i, n = 0, len(line)
+    while i < n:
+        c, top = line[i], stack[-1]
+        if top == "'":
+            if c == "'":
+                stack.pop()
+        elif c == "\\":
+            i += 1
+        elif c == "$" and line[i + 1:i + 2] == "(" and top in ("", '"'):
+            stack.append("")
+            i += 1
+        elif top == "" and c == ")" and len(stack) > 1:
+            stack.pop()
+        elif top == '"':
+            if c == '"':
+                stack.pop()
+        elif c in "'\"":
+            stack.append(c)
+        elif top == "" and c == "<":
+            m = HEREDOC.match(line, i)
+            if m:
+                return m
+        i += 1
+    return None
+
+
+def strip_heredoc_bodies(cmd):
+    # Drop the body of a heredoc whose consumer only handles text: `cat`
+    # (usually inside "$(...)" for gh --body / git commit -m), gh, tee, or a
+    # text-only outer command. A body fed to a shell, interpreter, eval, xargs,
+    # a pipe or anything unknown is KEPT, since it may be executed. An
+    # unterminated heredoc keeps everything (fail closed).
+    lines = cmd.split("\n")
+    out, i = [], 0
+    while i < len(lines):
+        line = lines[i]
+        out.append(line)
+        i += 1
+        m = _heredoc_operator(line)
+        if not m or re.search(r"[|;&`]", line):
+            continue
+        pre = line[:m.start()]
+        owner_seg = pre[pre.rfind("$(") + 2:] if "$(" in pre else pre
+        owner = _command_words(owner_seg)
+        owner_ok = bool(owner) and (
+            os.path.basename(owner[0]) in HEREDOC_OWNERS or _text_command(owner))
+        if not (owner_ok and _text_command(_command_words(pre))):
+            continue
+        delim, dash = m.group(3), bool(m.group(1))
+        j = i
+        while j < len(lines) and (lines[j].lstrip("\t") if dash else lines[j]) != delim:
+            j += 1
+        if j < len(lines):
+            i = j  # skip the body; the terminator line is kept
+    return "\n".join(out)
+
+
 def classify(cmd):
     # bash drops backslash-newline before parsing: join continued lines first
-    cmd = REDIRECT.sub(" ", cmd.replace("\\\n", ""))
+    cmd = REDIRECT.sub(" ", strip_heredoc_bodies(cmd.replace("\\\n", "")))
     pushes = []
     # Fragments split on EVERY control operator (a quote may hide a push: a
     # multi-line quoted 'bash -c' body stays visible line by line) PLUS the
@@ -858,7 +991,8 @@ def classify(cmd):
     # off the refspec ('git push -o "a;b" origin HEAD:main', QF1). Both views
     # are classified; any block wins.
     stmts = list(dict.fromkeys(
-        s.strip() for s in re.split(r"&&|\|\||;|\||&|\n", cmd) + quoted_statements(cmd)))
+        strip_comment(s).strip()
+        for s in re.split(r"&&|\|\||;|\||&|\n", cmd) + quoted_statements(cmd)))
     parsed = {}  # stmt -> parses as-is (each statement is tokenized once)
     for stmt in stmts:
         plain = re.sub(r"[\"'\\$]", "", stmt)
@@ -897,6 +1031,11 @@ def classify(cmd):
             pushes.append(args)
     if not pushes:
         return "none"
+    # A cd/pushd/popd anywhere in the command may move the push into another
+    # repository whose HEAD and config the hook cannot see (#952): judge it
+    # like -C. 'cd .' is a no-op and does not count.
+    if CHDIR.search(cmd):
+        pushes = [p._replace(foreign=True) for p in pushes]
     non_tag = [p for p in pushes
                if p.foreign or p.override or not stmt_is_tag_only(p.args)]
     # B-01: any unparseable statement (a quote may hide a push) -> not tag-only;
