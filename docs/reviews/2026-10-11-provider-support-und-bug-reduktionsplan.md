@@ -161,3 +161,14 @@ Realistisch: **60–70 % der aktuell offenen Befunde** fallen in Phase 0/1 weg, 
 | M0.3 | entfällt (siehe P5). |
 | M0.4 Guards | SR-B-09 **umgesetzt**; SR-B-08 war schon behoben; SR-B-15 offen. |
 | M2.1 Provider-Matrix-Test | **umgesetzt**: `tests/test_provider_matrix_sync.py`, 45 Fälle (9 Provider × 5 Invarianten). Laufzeit ca. 3 min; Teil von M3.2 (Test-Laufzeit). |
+
+## 9. Umsetzungsstand Phase 1 (2026-10-11)
+
+| Maßnahme | Stand |
+|---|---|
+| M1.1 `--validate` | **teilweise**: Exit-Code zählt jetzt die Fehler des aktuellen Laufs (SR-A-24, 3 Tests, vorher rot). Die Handkopie der Pipeline (SR-A-25, Wiederverwendung der `_sync_stage_*`) ist **noch offen**; das ist ein eigener Refactor (M). |
+| M1.2 Provider-Literal-Guard | **umgesetzt**: neuer AST-Guard `test_no_provider_literal_usage_in_lib`. Echte Verstöße behoben: `sync_prompts_for_continue` (SR-A-06), `.gitignore`-Basisblock per Capability (SR-A-12), Flat-Override-Warnung per Capability (SR-A-13). 10 alte Default-Parameter-Stellen stehen auf einer Ratchet-Allowlist (SR-A-21 bleibt dafür offen). |
+| M1.3 Doppelte Logik | offen |
+| M1.4 Hook-Tokenizer | **entfällt**: #955 hat SR-B-01–04 bereits behoben (nachgeprüft: `--tags`, `git -C . push`, `/usr/bin/git push` blockieren, `grep … git push` nicht). |
+| M1.5 Null-Helper | **teilweise**: `unknown-fallback` (SR-A-28) behoben. Das Schema lehnt verschachtelte Nulls beim Laden ohnehin ab, erreichbar nur für programmatische Configs. |
+| M1.6 PyYAML | **umgesetzt** (SR-A-16): Registry-Load bricht laut ab. |

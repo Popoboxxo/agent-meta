@@ -307,6 +307,94 @@ def test_no_provider_name_dispatch_branches_in_lib():
     )
 
 
+#: Legacy ``provider: str = "Name"`` default parameters that predate this guard
+#: (SR-A-21). Every entry is a function whose callers all pass the provider
+#: explicitly today; the allowlist only ratchets DOWN -- never add to it, make
+#: the parameter required instead.
+_LEGACY_PROVIDER_DEFAULT_SITES = frozenset({
+    ("agent_sync.py", "_extract_and_append_critical_footer"),
+    ("context.py", "_update_managed_html_block"),
+    ("context.py", "_extract_rule_compact_from_content"),
+    ("hook_plugins.py", "sync_release_gates"),
+    ("hook_plugins.py", "sync_hook_lib"),
+    ("hooks.py", "sync_hooks"),
+    ("roles.py", "resolve_model"),
+    ("roles.py", "_resolve_model_raw"),
+    ("rules.py", "sync_embedded_rule_files"),
+    ("rules.py", "sync_rules"),
+})
+
+
+def _is_provider_literal(node: ast.AST, names: set[str]) -> bool:
+    return isinstance(node, ast.Constant) and _provider_name(node.value, names)
+
+
+def _provider_literal_usage_offenders(
+    tree: ast.AST, module: str, names: set[str], *, prefix: str = "scripts/lib/"
+) -> list[str]:
+    """Provider-name literals used as data-path selectors (SR-A-21 / SR-A-06).
+
+    Complements the ``==``/``in (..)`` guard with the shapes that slipped
+    through it: ``cfg.get("Name")`` / ``cfg["Name"]``, ``"Name" in providers``,
+    a literal passed as a call argument or keyword, and a literal default of a
+    function parameter (allowlisted legacy sites only).
+    """
+    offenders: list[str] = []
+    for node in ast.walk(tree):
+        where = f"{prefix}{module}:{getattr(node, 'lineno', 0)}"
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            defaults = [*node.args.defaults, *[d for d in node.args.kw_defaults if d]]
+            if any(_is_provider_literal(d, names) for d in defaults) and (
+                (Path(module).name, node.name) not in _LEGACY_PROVIDER_DEFAULT_SITES
+            ):
+                offenders.append(f"{where}: literal default parameter in {node.name}()")
+        elif isinstance(node, ast.Subscript) and _is_provider_literal(node.slice, names):
+            offenders.append(f"{where}: subscript with provider literal")
+        elif isinstance(node, ast.Compare):
+            if any(isinstance(op, (ast.In, ast.NotIn)) for op in node.ops) and _is_provider_literal(node.left, names):
+                offenders.append(f"{where}: provider literal membership test")
+        elif isinstance(node, ast.Call):
+            if any(_is_provider_literal(a, names) for a in node.args):
+                offenders.append(f"{where}: provider literal passed as call argument")
+            if any(_is_provider_literal(k.value, names) for k in node.keywords):
+                offenders.append(f"{where}: provider literal passed as keyword argument")
+    return offenders
+
+
+def test_no_provider_literal_usage_in_lib():
+    names = set(_registered_providers())
+    offenders: list[str] = []
+    for module_path in _lib_modules():
+        if _module_name(module_path) == "providers.py":
+            # The registry module owns the framework default provider
+            # (`default-provider`, embedded fallback registry) by design.
+            continue
+        tree = ast.parse(module_path.read_text(encoding="utf-8"))
+        offenders.extend(_provider_literal_usage_offenders(tree, _module_name(module_path), names))
+    admin = ast.parse(_ADMIN_SERVER_PATH.read_text(encoding="utf-8"))
+    offenders.extend(
+        _provider_literal_usage_offenders(admin, _ADMIN_SERVER_LABEL, names, prefix=_ADMIN_SERVER_PREFIX)
+    )
+    assert not offenders, (
+        "Provider-name literal used as a data selector -- read the registry key "
+        "(config/ai-providers.yaml) or take `provider` as a parameter:\n" + "\n".join(offenders)
+    )
+
+
+def test_literal_usage_guard_detects_synthetic_shapes():
+    names = {"Claude", "Continue"}
+    src = (
+        "def f(provider='Claude'): pass\n"
+        "x = cfg.get('Continue')\n"
+        "y = cfg['Claude']\n"
+        "ok = 'Claude' not in providers\n"
+        "g('Continue')\n"
+        "h(provider='Claude')\n"
+    )
+    found = _provider_literal_usage_offenders(ast.parse(src), "synthetic.py", names)
+    assert len(found) == 6, found
+
+
 def test_lib_sweep_covers_task_modules():
     """AC-14: the sweep must cover the modules added by Tasks 1–11, proving the
     glob is live (not vacuous) and no future module can bypass the guard."""

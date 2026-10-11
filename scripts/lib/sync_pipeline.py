@@ -1174,7 +1174,8 @@ def _sync_stage_per_provider(
         if pc.get("has_prompt_commands", False):
             sync_prompts_for_continue(agent_meta_root, project_root, config,
                                       provider_variables, log, args.dry_run,
-                                      provider_config=provider_config)
+                                      provider_config=provider_config,
+                                      provider=provider)
         if pc.get("has_rules", False):
             sync_rules(agent_meta_root, project_root, config, log, args.dry_run,
                        platform_vars=platform_vars, variables=provider_variables,

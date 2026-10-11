@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional
 
 from .frontmatter import REFERENCE_STANDARDS_FIELD
-from .io import _load_yaml_or_json, load_yaml_file
+from .io import _YAML_AVAILABLE, SyncError, _load_yaml_or_json, load_yaml_file
 from .runtime_gate import weakest_runtime_gate_tier
 
 _logger = logging.getLogger(__name__)
@@ -240,6 +240,14 @@ def load_providers_config(
     consumer of the resolved config agrees. ``project_config=None`` (the
     default) is a strict no-op that keeps the v1 output byte-frozen (D5).
     """
+    if not _YAML_AVAILABLE and (agent_meta_root / PROVIDERS_CONFIG_YAML).exists():
+        # SR-A-16: without PyYAML the registry would silently degrade to the
+        # Claude-only fallback below and the sync would "succeed" with the
+        # wrong provider set. The registry is the framework's source of truth.
+        raise SyncError(
+            f"PyYAML is required to read {PROVIDERS_CONFIG_YAML} -- "
+            "install it (pip install pyyaml) for the interpreter running sync.py."
+        )
     data, _ = _load_yaml_or_json(
         agent_meta_root / PROVIDERS_CONFIG_YAML,
         agent_meta_root / _PROVIDERS_CONFIG_LEGACY,

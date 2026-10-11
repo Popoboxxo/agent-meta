@@ -56,6 +56,19 @@
 - **`--validate` no longer reports 88 false `placeholders.unknown` warnings**: the block-inlining
   variables `OUTPUT_GUARD_BLOCK`, `BACKGROUND_PROCESS_GUARD_BLOCK`, `PARSE_INPUT_BLOCK` and
   `ESCALATE_CARD_BLOCK` are known built-ins.
+- **`--validate` judges the current run (SR-A-24)**: `validate_test_repo` counts the errors recorded
+  by this run instead of re-reading a stale `sync.log` from the test repo (a fixed problem no longer
+  fails validation, a fresh error no longer passes).
+- **Provider literals removed from data paths (SR-A-06/12/13)**: `sync_prompts_for_continue` takes
+  `provider=` and reads its output dir from `commands_dir`; the managed `.gitignore` block is driven
+  by `has_dedicated_context_file` (union of those providers' `gitignore_entries`); the flat
+  `model-overrides` warning uses the `model-overrides-flat` capability. A new AST guard
+  (`test_no_provider_literal_usage_in_lib`) flags provider literals in `.get()`/subscripts/membership
+  tests/call arguments/new default parameters; ten legacy default-parameter sites are allowlisted and
+  may only shrink.
+- **Registry load fails loudly without PyYAML (SR-A-16)**: `load_providers_config` raises `SyncError`
+  instead of silently degrading to the Claude-only fallback registry.
+- **Nested null `orchestrator.unknown-fallback` no longer crashes (SR-A-28)**.
 - **`orchestrator-guard` fails closed on an unparseable payload (SR-B-09)**: a non-empty hook payload
   that is not valid JSON now exits 2 instead of being read as "no tool name" and allowed.
 ### Fixed

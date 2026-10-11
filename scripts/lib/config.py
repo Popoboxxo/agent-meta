@@ -55,6 +55,7 @@ from .dod import (
 from .providers import (
     all_providers_support_hooks,
     load_providers_config,
+    provider_has_capability,
     registered_provider_names,
     resolve_providers,
 )
@@ -831,17 +832,23 @@ def _validate_model_inheritance(config: dict, config_path: Path) -> None:
                 "are ignored — remove them or disable inheritance.",
                 file=sys.stderr,
             )
-        # Legacy flat shape ('model-overrides.<role>: <tier>') only ever
-        # applies to Claude (see roles.py::resolve_model) — warn when dead.
+        # Legacy flat shape ('model-overrides.<role>: <tier>') applies only to
+        # providers with the 'model-overrides-flat' capability (see
+        # roles.py::resolve_model, SR-A-13) — warn when dead.
+        _pcs = load_providers_config(Path(__file__).resolve().parents[2], config)
+        flat_providers = [
+            p for p in sorted(inherit)
+            if inherit.get(p) and provider_has_capability(_pcs.get(p), "model-overrides-flat")
+        ]
         flat_roles = sorted(
             role
             for role, value in overrides.items()
-            if inherit.get("Claude") and not isinstance(value, dict)
+            if flat_providers and not isinstance(value, dict)
         )
         if flat_roles:
             print(
                 f"  !  WARNING: {config_path}: 'model-inherit-main-chat' is "
-                f"active for provider 'Claude', so the flat per-role entries "
+                f"active for provider '{', '.join(flat_providers)}', so the flat per-role entries "
                 f"under 'model-overrides' ({', '.join(flat_roles)}) "
                 "are ignored — remove them or disable inheritance.",
                 file=sys.stderr,
@@ -1565,7 +1572,9 @@ def _build_orch_variables(
     else:
         variables["FILE_AFFINITY_HINT"] = ""
     # UNKNOWN_FALLBACK: granular flags (new object format) or legacy string
-    unknown_fallback = orch_config.get("unknown-fallback", {})
+    # Nested explicit null (`unknown-fallback:` with no value) == unset (SR-A-28);
+    # _normalize_null_blocks only covers top-level keys.
+    unknown_fallback = orch_config.get("unknown-fallback") or {}
     if isinstance(unknown_fallback, str):
         # Legacy string format: backward compatibility
         variables["UNKNOWN_FALLBACK_META_FEEDBACK"] = "true" if unknown_fallback == "meta-feedback" else "false"

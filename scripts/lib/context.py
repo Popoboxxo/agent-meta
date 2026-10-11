@@ -2284,10 +2284,16 @@ def sync_prompts_for_continue(
     log: SyncLog,
     dry_run: bool,
     provider_config: dict | None = None,
+    *,
+    provider: str,
 ):
-    """Generate .continue/prompts/<role>.md as invokable slash-commands.
+    """Generate <commands_dir>/<role>.md as invokable slash-commands.
 
-    Controlled by provider-options.Continue:
+    ``provider`` is the registry key of a provider with ``has_prompt_commands``;
+    the output directory and extension/snippet paths come from its registry
+    entry (no provider literal here, SR-A-06).
+
+    Controlled by provider-options.<provider> (today: Continue):
         generate-prompts: true          # enable (default: false)
         prompt-mode: "full" | "slim"    # full = complete agent body (default)
                                         # slim = compact role + core rules only
@@ -2307,11 +2313,11 @@ def sync_prompts_for_continue(
     from .providers import resolve_provider_options
     from .roles import build_role_map
 
-    opts = resolve_provider_options(config, "Continue")
+    opts = resolve_provider_options(config, provider)
     if not opts.get("generate-prompts", False):
         return
 
-    pc = (provider_config or {}).get("Continue", {})
+    pc = (provider_config or {}).get(provider, {})
     provider_vars = {
         'EXTENSION_DIR': pc.get('extension_dir', '.continue/3-project'),
         'SNIPPETS_DIR': pc.get('snippets_dir', '.continue/snippets'),
@@ -2326,7 +2332,7 @@ def sync_prompts_for_continue(
     overrides, _ = collect_sources(agent_meta_root, platforms)
     allowed_roles: set | None = set(config["roles"]) if "roles" in config else None
 
-    prompts_dir = project_root / ".continue" / "prompts"
+    prompts_dir = project_root / pc.get("commands_dir", ".continue/prompts")
     if not dry_run:
         prompts_dir.mkdir(parents=True, exist_ok=True)
 
@@ -2356,7 +2362,7 @@ def sync_prompts_for_continue(
         # Apply PAL delegation syntax for Continue prompts
         from .delegation_syntax import DelegationSyntaxEngine
         pal_engine = DelegationSyntaxEngine(config_dir=agent_meta_root / "config")
-        content = pal_engine.apply(content, "Continue")
+        content = pal_engine.apply(content, provider)
 
         template_description = extract_frontmatter_field(content, "description") or f"Agent for {role}."
         template_description = template_description.replace("{{PROJECT_NAME}}", config["project"]["name"])
