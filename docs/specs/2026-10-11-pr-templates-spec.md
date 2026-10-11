@@ -3,7 +3,7 @@ spec-id: SPEC-PR-TEMPLATES-2026-10-11
 title: PR-Templates (generic / platform / project, mit Variablen) — Feature-Spezifikation
 status: DRAFT
 related-spec: SPEC-CONTEXT-FILE-MODES-2026-09-13
-related-issue: "(wird beim Anlegen des Feature-Requests eingetragen)"
+related-issue: "#957"
 ---
 
 # PR-Templates für agent-meta — Spec
