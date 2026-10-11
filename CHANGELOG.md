@@ -74,7 +74,7 @@
   `orchestrator` no longer cite the non-existent `§7.1`/`§7.2` sections (#935).
 - **`standalone/` export regenerated**: it had drifted from `agents/1-generic` and was missing the roles
   ai-governance-engineer, ai-observability-engineer, ai-security-guardian, app-lifecycle-governor, concept-architect, concept-specifier, control-framework-assessor, fraud-risk-assessor, llm-evaluator, prompt-governor, rag-engineer, risk-based-audit-planner, se-component-requirements, test-executor.
-- **`dod-push-check` 2.1.4 (#947, #948, #950, #952)**: heredoc bodies handed to a text-only consumer
+- **`dod-push-check` 2.1.5 (#947, #948, #950, #952, #953)**: heredoc bodies handed to a text-only consumer
   (`cat`, `gh`, `tee`, `git commit`/`tag`/`notes`) are no longer classified as commands, so PR
   bodies and commit messages that mention `git push origin main` stop being blocked; bodies fed to a
   shell, interpreter, pipe or `eval` stay visible. An unquoted word-start `#` comment is cut before
@@ -82,7 +82,8 @@
   carrying a `git push` and the `{}` placeholder fail closed; the computed-refspec block message names
   the literal-branch / `HEAD` way out. A push in a command containing `cd`/`pushd`/`popd` is judged like
   a `-C` push into another repository (refspec-less and `HEAD` pushes block), closing a bypass where the
-  other repo's `main` was checked against the cwd repo's branch.
+  other repo's `main` was checked against the cwd repo's branch. `--recurse-submodules=on-demand|only` fails
+  closed in a repository with `.gitmodules` (submodules push to their own remotes and branches).
 - **Admin UI network mode (#897)**: a concrete `--host <ip>` now authorizes its own Origin (the Host
   check already did); a wildcard bind (`0.0.0.0`) prints the `--allowed-hosts <detected-ip>` hint at
   startup, and the `origin not allowed` error names `--allowed-hosts` / `admin-ui.allowed-hosts`. The

@@ -1021,3 +1021,24 @@ def test_952_push_after_chdir_is_judged_as_foreign_repo(repo_on_feature_branch, 
 def test_952_explicit_safe_refs_and_non_cd_words_are_not_blocked(repo_on_feature_branch, command):
     result = _run_hook(repo_on_feature_branch, command)
     assert result.returncode == 0, result.stderr
+
+
+# --- issue #953: --recurse-submodules=on-demand pushes submodules too ------
+
+def test_953_recurse_submodules_on_demand_blocked_when_repo_has_submodules(repo_on_feature_branch):
+    (repo_on_feature_branch / ".gitmodules").write_text(
+        '[submodule "s"]\n\tpath = s\n\turl = ../s\n', encoding="utf-8")
+    for flag in ("on-demand", "only"):
+        result = _run_hook(repo_on_feature_branch, f"git push --recurse-submodules={flag} origin feat/x")
+        assert result.returncode == 2, (flag, result.stdout)
+        assert "submodule" in result.stderr
+
+
+def test_953_recurse_submodules_allowed_without_submodules_or_for_check(repo_on_feature_branch):
+    plain = _run_hook(repo_on_feature_branch, "git push --recurse-submodules=on-demand origin feat/x")
+    assert plain.returncode == 0, plain.stderr  # no .gitmodules: flag is a no-op
+    (repo_on_feature_branch / ".gitmodules").write_text("", encoding="utf-8")
+    check = _run_hook(repo_on_feature_branch, "git push --recurse-submodules=check origin feat/x")
+    assert check.returncode == 0, check.stderr  # check only verifies, never pushes
+    no_flag = _run_hook(repo_on_feature_branch, "git push origin feat/x")
+    assert no_flag.returncode == 0, no_flag.stderr
