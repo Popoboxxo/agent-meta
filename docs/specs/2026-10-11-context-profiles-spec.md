@@ -6,7 +6,7 @@ revision: 2
 related-spec: SPEC-CONTEXT-FILE-MODES-2026-09-13
 builds-on: SPEC-844-COMPRESS-ROOT-CONTEXT-2026-10-06, docs/plans/issue-540-baseline.md, docs/guides/context-block-inventory.md
 source-study: docs/analysis/2026-10-11-context-budget-provider-study.md
-scope-rev2: Active-Set-Filter (dynamisches Routing/Dispatch), Installations-Doctor (install-doctor), project.yaml-Optimizer (config-optimizer)
+scope-rev2: Active-Set-Filter (dynamisches Routing/Dispatch), Installations-Doctor (meta-doctor), project.yaml-Optimizer (meta-optimizer)
 ---
 
 # Context Profiles (full/compact) — Spec
@@ -27,10 +27,10 @@ scope-rev2: Active-Set-Filter (dynamisches Routing/Dispatch), Installations-Doct
 > `if provider == "Name"` (Skill `provider-agnostic`).
 >
 > **Revision 2 (Überblick):** drei Nutzeranforderungen ergänzt — **R1** Installations-Doctor
-> (Registry `config/known-issues.yaml` + Runner `sync.py --doctor` + read-only Rolle `install-doctor`),
+> (Registry `config/known-issues.yaml` + Runner `sync.py --doctor` + read-only Rolle `meta-doctor`),
 > **R2** Active-Set-Filter (ein berechneter Vertrag für alle dispatch-bezogenen Generatoren,
 > Dangling-Reference-Invariante), **R3** project.yaml-Optimizer (Runner `sync.py --optimize-config`,
-> deterministischer Applier, read-only Rolle `config-optimizer`). Neue IDs: F-19…F-33, IC-17…IC-28,
+> deterministischer Applier, read-only Rolle `meta-optimizer`). Neue IDs: F-19…F-33, IC-17…IC-28,
 > AC-37…AC-61, QG-9…QG-13, Q15…Q27, ADR-6…ADR-11, R7…R11. Bestehende IDs unverändert.
 
 ## 0. Korrekturen früherer Aussagen
@@ -85,9 +85,9 @@ scope-rev2: Active-Set-Filter (dynamisches Routing/Dispatch), Installations-Doct
    Artefakt weist an, an eine inaktive Rolle zu delegieren (Dangling-Reference-Invariante §4.4).
 7. (Rev. 2) **Installations-Doctor:** Eine versionierte Known-Issues-Registry und ein deterministischer,
    read-only Runner (`sync.py --doctor`) prüfen die instanziierte Installation auf bekannte Probleme;
-   eine read-only Rolle `install-doctor` interpretiert die Befunde und übergibt Fixes an `agent-meta-manager`.
+   eine read-only Rolle `meta-doctor` interpretiert die Befunde und übergibt Fixes an `agent-meta-manager`.
 8. (Rev. 2) **Config-Optimizer:** Ein read-only Runner (`sync.py --optimize-config`) und eine read-only
-   Rolle `config-optimizer` schlagen verlustfreie, beweisgestützte Verkleinerungen der Projekt-YAML vor
+   Rolle `meta-optimizer` schlagen verlustfreie, beweisgestützte Verkleinerungen der Projekt-YAML vor
    (Unified Diff); die Anwendung erfolgt ausschließlich über einen deterministischen Applier mit
    Roundtrip-Guard.
 
@@ -101,7 +101,7 @@ scope-rev2: Active-Set-Filter (dynamisches Routing/Dispatch), Installations-Doct
 - Keine Umformulierung von INSTRUKTION-Inhalten (Klassifikation aus `docs/guides/context-block-inventory.md` gilt).
 - Kein callable `route_intent`-Tool (bleibt `ROUTE_INTENT_CALLABLE=false`; Schema bleibt für künftige Provider erhalten, Q11).
 - (Rev. 2) Der Doctor repariert nichts und führt keinen Sync aus; er schreibt nichts außerhalb von `.tmp/`.
-- (Rev. 2) Der Doctor-Runner enthält kein LLM; LLM-Interpretation liegt ausschließlich in der Rolle `install-doctor`.
+- (Rev. 2) Der Doctor-Runner enthält kein LLM; LLM-Interpretation liegt ausschließlich in der Rolle `meta-doctor`.
 - (Rev. 2) Der Optimizer ändert keine Framework-Templates und keine `config/*.yaml` des Frameworks;
   er bearbeitet nur Projekt-Dateien (`.meta-config/project.yaml`, Extension-/Doku-Ziele bei Relokation).
 - (Rev. 2) Keine semantische Zusammenführung von Variablen ohne ausdrückliche Freigabe je Kandidat.
@@ -196,7 +196,7 @@ Aufgelöste Werte werden je Provider in `sync.log` protokolliert.
 
 **Shared-File-Regel:** Teilen sich Provider mit unterschiedlichem Profil eine Datei (AGENTS.md-Gruppe),
 gilt für diese Datei das Profil `full`, wenn mindestens ein Teiler `full` hat (sichere Seite), und
-`sync.log` meldet `context-profile.shared-file-downgrade` (WARN). Entscheidung ist Q12-abhängig.
+`sync.log` meldet `context-profile.shared-file-downgrade` (WARN). **ENTSCHIEDEN** (Q12, ADR-5): geteilte Datei → `full` + WARN (sichere Seite); verworfene Alternativen: Gate-Card als kleinster gemeinsamer Nenner, `per-provider`-Topologie.
 
 Der Active-Set-Filter (§4.4) ist **keine** Profil-Option: er gilt in `full` und `compact` gleichermaßen
 (Korrektheit, ADR-4/ADR-7).
@@ -237,7 +237,7 @@ Generatoren verboten (Guard-Test QG-13).
 | Klasse | Regel |
 |---|---|
 | Rollenlisten (Enum, Tabellen, `allowed_agents`, Anti-Recursion, Direct-Dispatch) | Schnittmenge mit `ActiveSet.roles` |
-| Pipelines | Pipeline wird gerendert, wenn alle **Pflicht**-Stage-Rollen (inkl. Reflection-Loop-Generator/-Critic) aktiv sind; inaktive `optional`-Stages und Stages mit inaktivem `dod_flag` entfallen; sonst wird die Pipeline vollständig entfernt (`PIPELINE_<NAME>_ENABLED=false`, kein §2-/§2a-Eintrag, keine `pipeline-details`-Datei, kein `routing.pipelines`-Eintrag) und als `active-set.pipeline-dropped` (INFO) protokolliert (ADR-10, Q18) |
+| Pipelines | Pipeline wird gerendert, wenn alle **Pflicht**-Stage-Rollen (inkl. Reflection-Loop-Generator/-Critic) aktiv sind; inaktive `optional`-Stages und Stages mit inaktivem `dod_flag` entfallen; sonst wird die Pipeline vollständig entfernt (`PIPELINE_<NAME>_ENABLED=false`, kein §2-/§2a-Eintrag, keine `pipeline-details`-Datei, kein `routing.pipelines`-Eintrag) und als `active-set.pipeline-dropped` (WARN) protokolliert, im Sync-Konsolenoutput sichtbar (nicht nur `sync.log`; Meldung nennt Pipeline + fehlende Rolle + Gate/Weg zur Aktivierung) (ADR-10, Q18 — entschieden) |
 | Handoff-Contracts | `input_contracts` bleiben nur, wenn eine aktive Rolle (inkl. `orchestrator`) den Contract als `output_contract` produziert |
 | Statische Prosa mit Dispatch-Anweisung | Konditional über berechnete Flags `ROLE_<UPPER_SNAKE>_ACTIVE` bzw. bestehende Gruppen-Flags (`DEVELOPER_TIERS_ENABLED`, `VALIDATOR_ENABLED`, `SE_ENABLED`) |
 | Commands | Command mit `requires_roles` wird nur generiert, wenn alle genannten Rollen aktiv sind |
@@ -261,7 +261,7 @@ Drei Schichten, klar getrennt (ADR-6):
 |---|---|---|---|
 | Wissen | `config/known-issues.yaml` (IC-21) | versionierte Registry bekannter Probleme mit Evidenz und Verifikationsstatus | — |
 | Prüfung | `scripts/lib/doctor.py` + `sync.py --doctor [--json] [--strict]` (IC-22) | deterministisch, read-only, gegen die **Projekt**-Installation | nichts (ggf. `.tmp/`) |
-| Interpretation | Rolle `install-doctor` (IC-23) | LLM, read-only; dedupliziert, priorisiert, formuliert Fixes | nichts |
+| Interpretation | Rolle `meta-doctor` (IC-23) | LLM, read-only; dedupliziert, priorisiert, formuliert Fixes | nichts |
 
 Fixes führt ausschließlich `agent-meta-manager` (Projekt-Config) bzw. ein Framework-Issue/PR aus
 (`fix-owner`). Bestehende Checks (IC-10 `context.*`, IC-19 `active-set.*`, `hooks.*`, `artifact-contract`,
@@ -272,9 +272,9 @@ Severity-Regel: `verified-state: UNVERIFIED` ⇒ effektive Severity ≤ WARNING 
 
 | Schicht | Artefakt | Art |
 |---|---|---|
-| Analyse + Beweis | `scripts/lib/config_optimizer.py` + `sync.py --optimize-config [--json]` (IC-24, IC-25) | deterministisch, read-only; Kandidaten, Fan-out-Report, Unified Diff, Beweisbericht unter `.tmp/config-optimizer/` |
+| Analyse + Beweis | `scripts/lib/meta_optimizer.py` + `sync.py --optimize-config [--json]` (IC-24, IC-25) | deterministisch, read-only; Kandidaten, Fan-out-Report, Unified Diff, Beweisbericht unter `.tmp/meta-optimizer/` |
 | Anwendung | `sync.py --apply-config-patch <proposal.json> [--accept <id>…]` (IC-24) | deterministischer Applier, zeilenbasiert, Roundtrip-Guard, Re-Beweis vor dem Schreiben |
-| Interpretation | Rolle `config-optimizer` (IC-26) | LLM, read-only; präsentiert Vorschläge, formuliert semantische Kandidaten (nicht-deterministisch, nur mit Freigabe) |
+| Interpretation | Rolle `meta-optimizer` (IC-26) | LLM, read-only; präsentiert Vorschläge, formuliert semantische Kandidaten (nicht-deterministisch, nur mit Freigabe) |
 
 Beweisstufen L0–L3 (IC-25): L0 Byte-Gleichheit aller Artefakte; L1 Placeholder-/Token-Multiset/Anker;
 L2 Relokation erreichbar; L3 semantisch (Freigabe je Kandidat). Wichtig: **L0-Kandidaten verkleinern nur
@@ -512,7 +512,7 @@ Ausgabe als JSON-Report unter `.tmp/`. Abgedeckte Runtimes zunächst: OpenCode, 
   Beschreibungen von Codex/OpenCode/Mammouth) und Directory proportional; zusätzlich OpenCode/Mammouth
   `permission.task`-Deny/hidden.
 - Rollen-Key `inherit-project-context: bool` (Default true) → Claude `omitClaudeMd`, ZCode `injectAgentsMd`.
-- Kimi: Gate-Card in Worker-Bodies via `${agents_md}` (D-1) oder Plugin-`systemPrompt`.
+- Kimi: Gate-Card in Worker-Bodies via `${agents_md}` (D-1, entschieden; Umsetzung Phase 3 nach Eval; Doctor-Known-Issue bis dahin bestehen lassen) — Plugin-`systemPrompt` nur als Alternative.
 - Admin-UI: Profil-Umschalter + Report-Ansicht. Claude `paths:`-Scoping. `permission.task`-Trimming.
 - (Rev. 2) Zentrale Boilerplate-De-Dup (IC-28-unabhängig, siehe IC-27 Abschnitt „Phase 3").
 
@@ -586,7 +586,7 @@ Version-Bumps aller berührten Templates gemäß `agent-meta-conventions.md`.
 | `active-set.dangling-mention` | INFO | Rollenname aus `known_roles \ roles` als reine Erwähnung (Backticks/Prosa); Zählung je Datei |
 | `active-set.gate-dropped` | WARN | `ActiveSet.gate_dropped` nicht leer |
 | `active-set.unknown-role` | WARN | Allowlist-Eintrag ∉ `known_roles` |
-| `active-set.pipeline-dropped` | INFO | IC-18 Nr. 2 |
+| `active-set.pipeline-dropped` | WARN (Konsole + `sync.log`) | IC-18 Nr. 2; Meldung nennt Pipeline, fehlende Pflicht-Rolle(n) und Gate/Weg zur Aktivierung (z. B. `roles:`-Allowlist ergänzen) |
 | `active-set.unresolved-placeholder` | WARN | Regex `\{\{[A-Z][A-Z0-9_]*\}\}` im generierten Output; Allowlist `config/active-set-references.yaml: placeholder_allow` (z. B. dokumentierte `{{%VAR%}}`-Escapes) |
 | `active-set.raw-roles-access` | ERROR (nur Quell-Repo) | Generator-Modul liest `config["roles"]`/`config.get("roles")` außerhalb `active_set.py`/`roles.py` (statischer Guard, QG-13) |
 
@@ -721,13 +721,13 @@ def print_doctor_json(report: DoctorReport) -> int
 - Doku: `docs/api/cli-reference.md` (sonst ERROR `docs.cli_reference`, `consistency/docs.py`).
 - Größe `doctor.py` ≤ 600 Zeilen (Konvention); Detektoren ggf. in `scripts/lib/doctor_detectors.py`.
 
-### IC-23 Rolle `install-doctor` (neu, Rev. 2)
-- Rollen-Key `install-doctor`; Datei `agents/1-generic/install-doctor.md`; Frontmatter `name: template-install-doctor`
+### IC-23 Rolle `meta-doctor` (neu, Rev. 2)
+- Rollen-Key `meta-doctor`; Datei `agents/1-generic/meta-doctor.md`; Frontmatter `name: template-meta-doctor`
   (Präfix-Konvention `agent-meta-conventions.md:15`, Präzedenz `template-template-auditor`), `version: "1.0.0"`,
   **kein** `model:`, `prompt_mode: modern`, `tools: [Read, Glob, Grep, Bash, TodoWrite]`, `description`, `hint`,
   `reference_standards`.
-- Namensbegründung (Q15): „install" benennt den Prüfgegenstand (instanziierte Installation), „doctor" die
-  etablierte Diagnose-Metapher (`--doctor`). `template-doctor` wird verworfen: der Rollen-Key würde mit dem
+- Namensbegründung (Q15): `meta-*` = Rollen, die die agent-meta-Installation selbst prüfen/optimieren (generisch in
+  `agents/1-generic`); „doctor" ist die etablierte Diagnose-Metapher (`--doctor`). `template-doctor` wird verworfen: der Rollen-Key würde mit dem
   Frontmatter-Präfix zu `template-template-doctor` und suggeriert eine Prüfung der Framework-Templates, die
   `template-auditor` bereits abdeckt.
 - Body: Extension-Pointer, `{{PROJECT_CONTEXT}}`, Workflow: (1) `sync.py --doctor --json`, (2) bei Bedarf
@@ -750,7 +750,7 @@ def print_doctor_json(report: DoctorReport) -> int
   `routing: {addressability: name_only, name_only_reason: <Text>, parallel: false, orchestrator_only: true}`,
   **kein** `routing_patterns`, `handoff: {input_contracts: [task-spec-v1], output_contract: doctor-findings-v1, target_roles: [agent-meta-manager]}`.
 
-### IC-24 Config-Optimizer-Runner `scripts/lib/config_optimizer.py` + CLI (neu, Rev. 2)
+### IC-24 Config-Optimizer-Runner `scripts/lib/meta_optimizer.py` + CLI (neu, Rev. 2)
 ```python
 CandidateKind = Literal[
     "no-effect",                 # Entfernen ist byte-gleich (umfasst: vom Builder überschrieben, gleich Default, unbenutzt in aktiven Artefakten)
@@ -794,7 +794,7 @@ def collect_candidates(project_root: Path, agent_meta_root: Path, config: dict, 
 def apply_config_patch(project_root: Path, agent_meta_root: Path, proposal: OptimizerProposal, accept_ids: Sequence[str], *, dry_run: bool) -> "ProofReport"
 ```
 - CLI Analyse: `sync.py --optimize-config [--json] [--include-semantic] [--out <dir>]`; read-only bis auf
-  `<dir>` (Default `.tmp/config-optimizer/<YYYYMMDD-HHMMSS>/` mit `proposal.json`, `proposal.diff`, `proof.json`).
+  `<dir>` (Default `.tmp/meta-optimizer/<YYYYMMDD-HHMMSS>/` mit `proposal.json`, `proposal.diff`, `proof.json`).
   Exit 0 (auch mit Kandidaten), 2 interner Fehler.
 - CLI Anwendung: `sync.py --apply-config-patch <proposal.json> [--accept <id>…] [--dry-run]`; schreibt
   `.meta-config/project.yaml` (und bei Relokation Zieldateien) **nur**, wenn IC-25 für alle angenommenen
@@ -813,9 +813,9 @@ def apply_config_patch(project_root: Path, agent_meta_root: Path, proposal: Opti
 - Diff: `difflib.unified_diff`, `n=3`, Labels `a/.meta-config/project.yaml`/`b/.meta-config/project.yaml`, LF.
   Zeilenbasiert: ein Kandidat entfernt genau die Zeilen des Keys inkl. Block-Scalar-Fortsetzungszeilen und
   direkt zugehöriger Inline-Kommentare; vorangestellte eigenständige Kommentarzeilen bleiben (Q24).
-- Fehlerpfade: `project.yaml`-Hash ≠ `project_yaml_sha256` → `config-optimizer.stale-proposal` (Exit 1, kein Schreiben);
-  Beweis fehlgeschlagen → `config-optimizer.proof-failed` (Exit 1, kein Schreiben, `proof.json` mit Gründen);
-  `--fill-defaults` in derselben Invocation → Abbruch `config-optimizer.lossy-flag` (Exit 2).
+- Fehlerpfade: `project.yaml`-Hash ≠ `project_yaml_sha256` → `meta-optimizer.stale-proposal` (Exit 1, kein Schreiben);
+  Beweis fehlgeschlagen → `meta-optimizer.proof-failed` (Exit 1, kein Schreiben, `proof.json` mit Gründen);
+  `--fill-defaults` in derselben Invocation → Abbruch `meta-optimizer.lossy-flag` (Exit 2).
 - Nur Stdlib + PyYAML; Python-3.9-kompatibel.
 
 ### IC-25 Verlustfreiheits-Beweis (neu, Rev. 2)
@@ -853,11 +853,11 @@ def prove(before_render: Path, after_render: Path, before_yaml: str, after_yaml:
 - Renders laufen über denselben Codepfad wie `--check` in Temp-Projekte unter `.tmp/`; keine Schreibzugriffe auf
   das Projekt oder den agent-meta-Root (insbesondere kein `update_roles_enum`).
 
-### IC-26 Rolle `config-optimizer` (neu, Rev. 2)
-- Rollen-Key `config-optimizer`; Datei `agents/1-generic/config-optimizer.md`; `name: template-config-optimizer`,
+### IC-26 Rolle `meta-optimizer` (neu, Rev. 2)
+- Rollen-Key `meta-optimizer`; Datei `agents/1-generic/meta-optimizer.md`; `name: template-meta-optimizer`,
   `version: "1.0.0"`, **kein** `model:`, `prompt_mode: modern`, `tools: [Read, Glob, Grep, Bash, TodoWrite]`.
-- Namensbegründung (Q15): Gegenstand ist die Projekt-Config (nicht der Kontext an sich); Suffix `-optimizer`
-  folgt `performance-optimizer`. Verworfen: `context-optimizer` (verwechselbar mit dem Profil `compact`).
+- Namensbegründung (Q15): `meta-*` = Rollen, die die agent-meta-Installation selbst prüfen/optimieren (generisch in
+  `agents/1-generic`); Gegenstand ist die Projekt-Config (nicht der Kontext an sich). Verworfen: `context-optimizer` (verwechselbar mit dem Profil `compact`).
 - Workflow: (1) `sync.py --optimize-config --json` (optional `--include-semantic`); (2) deterministische Kandidaten
   als Unified Diff zeigen, getrennt: YAML-Einsparung vs. Injektions-Einsparung; (3) semantische Kandidaten mit
   Begründung, Risiko und `NON-DETERMINISTIC`-Kennzeichnung; (4) nie selbst schreiben.
@@ -866,7 +866,7 @@ def prove(before_render: Path, after_render: Path, before_yaml: str, after_yaml:
   ```
   STATUS: done|partial|failed
   RESULT: <1-2 Sätze>
-  ARTIFACTS: .tmp/config-optimizer/<ts>/proposal.json, proposal.diff, proof.json
+  ARTIFACTS: .tmp/meta-optimizer/<ts>/proposal.json, proposal.diff, proof.json
   PROPOSALS: OPT-id | kind | deterministic | proof-level | yaml-Δbytes | injected-Δbytes(est)
   PROOF: <level_reached, byte_equal_files/files_compared, roundtrip ok/nok>
   NEXT: agent-meta-manager → sync.py --apply-config-patch <proposal.json> [--accept <ids>] (nach Nutzerfreigabe) | none
@@ -888,7 +888,7 @@ def prove(before_render: Path, after_render: Path, before_yaml: str, after_yaml:
   `PARSE_INPUT_BLOCK` als je eine Rule/ein referenziertes Snippet statt Inline-Kopie — nur, wenn Q6 (erhalten
   Subagenten Rules?) je Provider positiv beantwortet ist; sonst bleibt Inline. Opt-in, eval-gated (QG-1), Anker (QG-3).
 
-### IC-28 Neue-Rolle-Checkliste (gilt für `install-doctor` und `config-optimizer`, Rev. 2)
+### IC-28 Neue-Rolle-Checkliste (gilt für `meta-doctor` und `meta-optimizer`, Rev. 2)
 Abgeleitet aus Commit 507bbb5 (+ 1ff89be). Je Rolle vollständig, sonst kein Merge:
 
 | # | Schritt | Prüfung |
@@ -896,9 +896,9 @@ Abgeleitet aus Commit 507bbb5 (+ 1ff89be). Je Rolle vollständig, sonst kein Mer
 | 1 | Template `agents/1-generic/<role>.md`: `name: template-<role>`, `version: "1.0.0"`, **kein** `model:`, Tools nur `Read, Glob, Grep, Bash, TodoWrite`, `prompt_mode: modern`, Extension-Pointer, `{{PROJECT_CONTEXT}}`, Output-Contract, `{{PROMPT_INJECTION_DEFENSE_BLOCK}}`, `{{OUTPUT_GUARD_BLOCK}}`; alle Platzhalter in `consistency/placeholders.py` bekannt; jedes `{{#if X}}` mit Eintrag in `standalone.py` (`_CONDITIONAL_FALSE_FLAGS`/`_IDENTITY_FALLBACKS`, `:54,107-119`) | `consistency-check` grün; Szenario |
 | 2 | `config/role-defaults.yaml`-Eintrag: `routing.addressability: name_only` + `name_only_reason`, `orchestrator_only: true`, **kein** `routing_patterns`, Handoff gemäß IC-23/IC-26; `target_roles` nur mit Consumer-Contract in `agent-meta-manager` (IC-27) | `crossrefs.*`, `handoff.*` grün; neuer Test `test_name_only_roles_have_no_routing_patterns` (QG-12) |
 | 3 | Schema-Rollen-Enum (`config/project-config.schema.json`) per Sync regeneriert (`schema.py:22-40`, `update_roles_enum`) und committet | Diff enthält beide Rollen |
-| 4 | Gepinnte Tests: `tests/test_role_addressability_coverage.py` `_EXPECTED_TOTAL` 92 → **94**, Verteilung `{"keyword": 88, "name_only": 5, "excluded": 1}`, sortierte Liste `["config-optimizer", "install-doctor", "intern-developer", "principal-developer", "template-auditor"]`; `_GOLDEN_ROLE_COUNT` (`test_template_slimming_equivalence.py:84`) unverändert; `_EXPECTED_GROUPS` (`test_role_activation_schema.py:21`) nur bei neuer Aktivierungsgruppe (Q17) | pytest grün |
+| 4 | Gepinnte Tests: `tests/test_role_addressability_coverage.py` `_EXPECTED_TOTAL` 92 → **94**, Verteilung `{"keyword": 88, "name_only": 5, "excluded": 1}`, sortierte Liste `["meta-optimizer", "meta-doctor", "intern-developer", "principal-developer", "template-auditor"]`; `_GOLDEN_ROLE_COUNT` (`test_template_slimming_equivalence.py:84`) unverändert; `_EXPECTED_GROUPS` (`test_role_activation_schema.py:21`) nur bei neuer Aktivierungsgruppe (Q17) | pytest grün |
 | 5 | Standalone-Export regeneriert (`sync.py --render-standalone`), `standalone/agents/<role>.md` + `standalone/README.md` committet | `tests/test_standalone_export_in_sync.py` grün |
-| 6 | Szenarien **77** (`install-doctor`) und **78** (`config-optimizer`): Zeile in `tests/scenarios/registry.md`, `configs/7x-<role>.project.yaml`, `asserts/7x-<role>.sh` **mit `chmod +x`** (`run.sh:75` prüft `-x`); Asserts: generiert je Provider, kein Write/Edit/Agent, OpenCode `edit: deny`, kein `model:` in der Quelle, Platzhalter aufgelöst, Contract-Marker vorhanden, **keine** Keyword-Regel für die Rolle in `routing.rules` (statt Enum-Ausschluss wie Szenario-76-Assert #5) | `tests/scenarios/run.sh` grün in CI |
+| 6 | Szenarien **77** (`meta-doctor`) und **78** (`meta-optimizer`): Zeile in `tests/scenarios/registry.md`, `configs/7x-<role>.project.yaml`, `asserts/7x-<role>.sh` **mit `chmod +x`** (`run.sh:75` prüft `-x`); Asserts: generiert je Provider, kein Write/Edit/Agent, OpenCode `edit: deny`, kein `model:` in der Quelle, Platzhalter aufgelöst, Contract-Marker vorhanden, **keine** Keyword-Regel für die Rolle in `routing.rules` (statt Enum-Ausschluss wie Szenario-76-Assert #5) | `tests/scenarios/run.sh` grün in CI |
 | 7 | `CHANGELOG.md` Unreleased-Eintrag | `crossrefs.changelog-missing-entry` grün |
 | 8 | Doku: `docs/guides/setup/instantiate-project.md` (Rollenliste), README-Rollentabelle (Englisch), `docs/api/cli-reference.md` für `--doctor`, `--optimize-config`, `--apply-config-patch` | `docs.cli_reference` grün |
 | 9 | Optional Self-Hosting: Rollen in `.meta-config/project.yaml roles:` + Re-Sync (aktualisiert `generated-file-hashes.json`) | `--check` grün |
@@ -946,12 +946,12 @@ project.yaml (context-profile, provider-overrides.<P>.context-profile, context_f
 Installation (read-only):
   known-issues.yaml (IC-21) + Capabilities (IC-09) + ActiveSet
         └─► sync.py --doctor (IC-22) ── finding-ref → IC-10 / IC-19 / hooks.* ── Detektoren
-               └─► JSON-Report ─► install-doctor (IC-23) ─► doctor-findings-v1 ─► agent-meta-manager / Framework-Issue
+               └─► JSON-Report ─► meta-doctor (IC-23) ─► doctor-findings-v1 ─► agent-meta-manager / Framework-Issue
 
 Projekt-Config (Vorschlag → Beweis → Anwendung):
   project.yaml + ActiveSet ─► sync.py --optimize-config (IC-24): Sentinel-Render → Fan-out → Kandidaten → L0-Verifikation
-        └─► .tmp/config-optimizer/<ts>/{proposal.json, proposal.diff, proof.json}
-               └─► config-optimizer (IC-26) ─► config-patch-proposal-v1 ─► Nutzerfreigabe
+        └─► .tmp/meta-optimizer/<ts>/{proposal.json, proposal.diff, proof.json}
+               └─► meta-optimizer (IC-26) ─► config-patch-proposal-v1 ─► Nutzerfreigabe
                       └─► agent-meta-manager: sync.py --apply-config-patch (IC-24/IC-25: Re-Beweis + Roundtrip-Guard) ─► project.yaml
 ```
 
@@ -969,7 +969,7 @@ Projekt-Config (Vorschlag → Beweis → Anwendung):
 | QG-8 | Je Phase-1-Fix ein Test, rot vor dem Fix, grün danach | deterministisch | jede CI |
 | QG-9 (Rev. 2) | Dangling-Reference-Test `tests/test_active_set_dangling.py`: Fixture-Projekte p10-artig (10 Rollen), p20-artig (`senior-developer` ohne `junior-developer`), alle Rollen, Plattform `homeassistant`; je Provider der Matrix: null `active-set.dangling-dispatch` (ab Phase 1), `gate-dropped` gemeldet, keine unaufgelösten Platzhalter außerhalb der Allowlist | deterministisch | jede CI |
 | QG-10 (Rev. 2) | Doctor-Registry-Test `tests/test_known_issues_registry.py` (Form, eindeutige IDs, Enums, Severity-Deckel, keine Provider-Identitäts-Prädikate, nur unterstützte Detektor-Arten/Keywords, `command` nur Allowlist) + `tests/test_doctor_fixtures.py`: je Eintrag `positive/` ⇒ ≥ 1 Finding mit `check == doctor.<id>` bzw. referenzierter Check-ID, `negative/` ⇒ 0; Read-only-Test (Hash-Snapshot von Projekt- und agent-meta-Baum vor/nach `--doctor` gleich) | deterministisch | jede CI |
-| QG-11 (Rev. 2) | Optimizer-Lossless-Test `tests/test_config_optimizer.py`: (a) überschriebene/Default-gleiche/unbenutzte Variable ⇒ L0 bestanden; (b) wirksame Variable fälschlich als Kandidat injiziert ⇒ L0 schlägt fehl, Kandidat verworfen; (c) Kommentare erhalten außer auf entfernten Zeilen (exakte Zahl), Key-Reihenfolge erhalten; (d) veralteter Vorschlag ⇒ Exit 1 ohne Schreiben; (e) semantischer Kandidat ohne `--accept` ⇒ nicht angewendet; (f) Fan-out-Zahlen = unabhängige Sentinel-Zählung | deterministisch | jede CI |
+| QG-11 (Rev. 2) | Optimizer-Lossless-Test `tests/test_meta_optimizer.py`: (a) überschriebene/Default-gleiche/unbenutzte Variable ⇒ L0 bestanden; (b) wirksame Variable fälschlich als Kandidat injiziert ⇒ L0 schlägt fehl, Kandidat verworfen; (c) Kommentare erhalten außer auf entfernten Zeilen (exakte Zahl), Key-Reihenfolge erhalten; (d) veralteter Vorschlag ⇒ Exit 1 ohne Schreiben; (e) semantischer Kandidat ohne `--accept` ⇒ nicht angewendet; (f) Fan-out-Zahlen = unabhängige Sentinel-Zählung | deterministisch | jede CI |
 | QG-12 (Rev. 2) | Neue-Rolle-Konformität (IC-28): Pins in `test_role_addressability_coverage.py`, `test_name_only_roles_have_no_routing_patterns`, Szenarien 77/78, Standalone-Export | deterministisch | jede CI |
 | QG-13 (Rev. 2) | Active-Set-Single-Source: Guard-Test `tests/test_active_set_single_source.py` (statisch: kein `config["roles"]`/`config.get("roles")` in Generator-Modulen außerhalb `active_set.py`/`roles.py`; dynamisch: alle IC-18-Konsumenten erhalten dasselbe `ActiveSet`-Objekt) | deterministisch | jede CI |
 
@@ -1045,11 +1045,11 @@ Quer:
 41. **AC-41** Für `finding-ref`-Einträge stimmen Check-ID und Anzahl der Doctor-Findings mit dem direkten Aufruf der referenzierten Check-Funktion (IC-10/IC-19) auf derselben Fixture überein; `doctor.py` enthält keine eigene Implementierung dieser Checks (Import-Test).
 42. **AC-42** Auf einem Codex-Multi-Provider-Fixture mit AGENTS.md ≥ 32,768 B meldet `--doctor` `doctor.context-hard-cap-truncation` (ERROR) und endet mit Exit 1.
 43. **AC-43** `active-set.*`-Checks (IC-19) laufen als WARN: im p10-artigen Fixture meldet `active-set.dangling-dispatch` mindestens Dispatches an `senior-developer`, `validator`, `bug-feature-analyzer`, `concept-specifier`, `concept-reviewer`, `ideation`; im p20-artigen Fixture meldet `active-set.gate-dropped` `senior-developer` mit Gruppe `developer_tiers`; im Alle-Rollen-Fixture meldet `active-set.unresolved-placeholder` u. a. `{{EXTRA_DONTS}}`.
-44. **AC-44** `docs/api/cli-reference.md` dokumentiert `--doctor` (`docs.cli_reference` grün); `install-doctor` erfüllt IC-28 vollständig (QG-12 grün, Szenario 77 grün).
+44. **AC-44** `docs/api/cli-reference.md` dokumentiert `--doctor` (`docs.cli_reference` grün); `meta-doctor` erfüllt IC-28 vollständig (QG-12 grün, Szenario 77 grün).
 
 ### Rev. 2 — Phase 1 (Active-Set-Filter; ändert `full` bewusst, je Konsument eigener PR)
 45. **AC-45** Alle IC-18-Konsumenten erhalten dasselbe `ActiveSet`; QG-13 grün (kein Rohzugriff auf `config["roles"]` in Generatoren).
-46. **AC-46** Im p10-artigen Fixture werden nur Pipelines gerendert, deren Pflicht-Stage-Rollen aktiv sind — konsistent in §2, §2a, `pipeline-details/`, `routing.pipelines`, `PIPELINE_MATCH_TABLE`; jede entfernte Pipeline erscheint als `active-set.pipeline-dropped` in `sync.log`; keine veraltete `pipeline-details`-Datei bleibt nach Re-Sync bestehen.
+46. **AC-46** Im p10-artigen Fixture werden nur Pipelines gerendert, deren Pflicht-Stage-Rollen aktiv sind — konsistent in §2, §2a, `pipeline-details/`, `routing.pipelines`, `PIPELINE_MATCH_TABLE`; jede entfernte Pipeline erscheint als `active-set.pipeline-dropped` (WARN) im Sync-Konsolenoutput und in `sync.log`, die Meldung nennt Pipeline, fehlende Rolle und Gate/Weg zur Aktivierung (Test prüft Konsolenausgabe); keine veraltete `pipeline-details`-Datei bleibt nach Re-Sync bestehen.
 47. **AC-47** `allowed_agents` ⊆ `ActiveSet.roles`; jeder `input_contracts`-Eintrag in `routing.rules` hat einen aktiven Producer.
 48. **AC-48** Mit `DEVELOPER_TIERS_ENABLED=false` enthält der Orchestrator keine Referenz auf `junior-developer`, `senior-developer`, `principal-developer`; mit `true` ist §4 byte-identisch zum Stand vor der Änderung.
 49. **AC-49** Über die Fixture-Matrix (p10-, p20-, Alle-Rollen-, `homeassistant`-artig) × Provider-Matrix: null `active-set.dangling-dispatch` (Check ist ERROR); `active-set.dangling-mention` wird gezählt und liegt außerhalb `mention_allow` bei 0 für Orchestrator, Pipelines und Commands.
@@ -1059,24 +1059,24 @@ Quer:
 53. **AC-53** Projekt-spezifische Rollen (bei Q16 = implementieren): eine Rolle aus `.meta-config/agents/<role>.md` + `project-roles` erscheint als Agent-Datei, im Enum, `name_index`, in `routing.rules` (sofern `keyword`), in der Agent-Tabelle und in `PROJECT_SPECIFIC_AGENTS`; `--audit-config` meldet keinen ERROR. (Bei Q16 = dokumentieren: Doku korrigiert und Doctor-Regel `project-role-not-generated` mit Fixture grün.)
 
 ### Rev. 2 — Phase 2 (Config-Optimizer)
-54. **AC-54** `sync.py --optimize-config --json` schreibt ausschließlich unter `.tmp/config-optimizer/`; auf der selbst-gehosteten `.meta-config/project.yaml` enthält der Vorschlag mindestens `no-effect`-Kandidaten für `variables.ORCHESTRATOR_STRICT`, `variables.UNKNOWN_FALLBACK_*` und `variables.SE_BASE_DIR` sowie `CODE_QUALITY_RULES` als `dead-variable-content-loss` (nicht als Löschung).
-55. **AC-55** Anwenden aller deterministischen Kandidaten ergibt für alle aktiven Provider byte-identische generierte Artefakte (L0); ein Test mit einer absichtlich wirksamen Variable als Kandidat führt zu `config-optimizer.proof-failed` ohne Schreiben.
+54. **AC-54** `sync.py --optimize-config --json` schreibt ausschließlich unter `.tmp/meta-optimizer/`; auf der selbst-gehosteten `.meta-config/project.yaml` enthält der Vorschlag mindestens `no-effect`-Kandidaten für `variables.ORCHESTRATOR_STRICT`, `variables.UNKNOWN_FALLBACK_*` und `variables.SE_BASE_DIR` sowie `CODE_QUALITY_RULES` als `dead-variable-content-loss` (nicht als Löschung).
+55. **AC-55** Anwenden aller deterministischen Kandidaten ergibt für alle aktiven Provider byte-identische generierte Artefakte (L0); ein Test mit einer absichtlich wirksamen Variable als Kandidat führt zu `meta-optimizer.proof-failed` ohne Schreiben.
 56. **AC-56** `--apply-config-patch` erhält alle Kommentare außer denen auf entfernten Zeilen (exakte Anzahl laut Hunks) und die Reihenfolge aller verbleibenden Keys (`analyze_roundtrip`); kein `yaml.dump` der Gesamtdatei; veralteter Vorschlag (Hash-Mismatch) ⇒ Exit 1 ohne Schreiben.
 57. **AC-57** Semantische Kandidaten (`duplicate-value`, `relocate-*`, `semantic-merge`) tragen `deterministic: false`, erscheinen nur mit `--include-semantic` und werden nur mit `--accept <id>` angewendet; `relocate-*` besteht L2 (Token in Zieldatei, Pointer in jedem betroffenen Agenten).
 58. **AC-58** Der Fan-out-Report (`fan_out`) nennt je Variable Vorkommen, Dateien, injizierte Bytes je Provider; die Werte stimmen exakt mit einer unabhängigen Sentinel-Zählung auf derselben Fixture überein.
-59. **AC-59** `config-optimizer` erfüllt IC-28 vollständig (QG-12 grün, Szenario 78 grün); `agent-meta-manager` konsumiert `config-patch-proposal-v1` und `doctor-findings-v1` (kein `handoff.output-not-consumed`); `docs/api/cli-reference.md` dokumentiert `--optimize-config` und `--apply-config-patch`.
+59. **AC-59** `meta-optimizer` erfüllt IC-28 vollständig (QG-12 grün, Szenario 78 grün); `agent-meta-manager` konsumiert `config-patch-proposal-v1` und `doctor-findings-v1` (kein `handoff.output-not-consumed`); `docs/api/cli-reference.md` dokumentiert `--optimize-config` und `--apply-config-patch`.
 
 ### Rev. 2 — Phase 3 und Quer
 60. **AC-60** Boilerplate-De-Dup (IC-27, Phase 3) nur als Opt-in und nur für Provider mit positiv beantworteter Q6; Eval ≥ Baseline − 1.0 Prozentpunkt; Anker (QG-3) grün; ohne Opt-in byte-identisch (AC-35 sinngemäß).
-61. **AC-61** Neue Module (`active_set.py`, `doctor.py`, `config_optimizer.py`, Checks) enthalten keine Provider-Literale; Registry-Prädikate sind ausschließlich Capability-/Config-/Rollen-Prädikate; `test_no_provider_literal_usage_in_lib` grün.
+61. **AC-61** Neue Module (`active_set.py`, `doctor.py`, `meta_optimizer.py`, Checks) enthalten keine Provider-Literale; Registry-Prädikate sind ausschließlich Capability-/Config-/Rollen-Prädikate; `test_no_provider_literal_usage_in_lib` grün.
 
 ## 9. Phasen
 
 | Phase | Name | Inhalt | ACs | Verhaltensänderung |
 |---|---|---|---|---|
-| 0 | Messen & Absichern | Role-Routing-Eval + Baseline, Tokenizer-Messung, `--context-report`, Anker-Registry, Budgets als Obergrenzen, Dangling/Reachability als WARN, Doku-Korrekturen; **(Rev. 2)** IC-09-Keys (nur Daten), IC-17 `ActiveSet` (berechnet, noch ohne Konsumenten-Umstellung), IC-19-Checks als WARN, IC-21 Registry, IC-22 `--doctor`, IC-23 `install-doctor`, IC-28 Checkliste in Konventionen | AC-01…AC-09, AC-37…AC-44 | keine (nur neue read-only Werkzeuge, neue `sync.log`-WARNs) |
+| 0 | Messen & Absichern | Role-Routing-Eval + Baseline, Tokenizer-Messung, `--context-report`, Anker-Registry, Budgets als Obergrenzen, Dangling/Reachability als WARN, Doku-Korrekturen; **(Rev. 2)** IC-09-Keys (nur Daten), IC-17 `ActiveSet` (berechnet, noch ohne Konsumenten-Umstellung), IC-19-Checks als WARN, IC-21 Registry, IC-22 `--doctor`, IC-23 `meta-doctor`, IC-28 Checkliste in Konventionen | AC-01…AC-09, AC-37…AC-44 | keine (nur neue read-only Werkzeuge, neue `sync.log`-WARNs) |
 | 1 | Kanäle & Korrektheit | IC-15 Nr. 1–21, je eigener Issue/PR; Goldens wo nötig aktualisiert; **(Rev. 2)** IC-18 Active-Set-Konsumenten (je Konsument eigener PR, Reihenfolge = Rangliste §11.1), IC-19 `dangling-dispatch` → ERROR, IC-20 projekt-spezifische Rollen (Q16) | AC-10…AC-22, AC-45…AC-53 | Bugfixes (auch in `full`) |
-| 2 | Profil `compact` | IC-01…IC-12, C1–C7 (IC-09-Keys liegen bereits seit Phase 0 vor); **(Rev. 2)** IC-24…IC-27 Config-Optimizer + Applier + `config-optimizer`-Rolle (unabhängig vom Profil, parallel möglich) | AC-23…AC-32, AC-54…AC-59 | nur mit Opt-in (Profil) bzw. nur auf Anforderung (Optimizer) |
+| 2 | Profil `compact` | IC-01…IC-12, C1–C7 (IC-09-Keys liegen bereits seit Phase 0 vor); **(Rev. 2)** IC-24…IC-27 Config-Optimizer + Applier + `meta-optimizer`-Rolle (unabhängig vom Profil, parallel möglich) | AC-23…AC-32, AC-54…AC-59 | nur mit Opt-in (Profil) bzw. nur auf Anforderung (Optimizer) |
 | 3 | Erweiterungen | IC-16: `ultra`/Rollenprofil, Vererbungs-Flags, Kimi `${agents_md}`/Plugin-`systemPrompt`, Admin-UI, Claude `paths:`, `permission.task`; **(Rev. 2)** Boilerplate-De-Dup (IC-27), datengetriebene „Delegation (reference only)"-Listen (Q19), L2-Relokationen hoher Fan-out-Variablen | AC-33…AC-35, AC-60 | nur mit Opt-in |
 
 Reihenfolge-Regel: Phase 2 beginnt erst, wenn AC-02 (Baseline) erfüllt ist; IC-04 wird nicht gemergt, bevor AC-25 nachgewiesen ist. AC-36 und AC-61 gelten in allen Phasen.
@@ -1092,12 +1092,12 @@ Die IC-19-Check-Stufe wechselt erst auf ERROR, wenn AC-49 auf der vollständigen
 | ADR-2 Format B mit `;` | Stichprobe: B kleinstes Format (7,975 B vs. A 8,991 B, C 8,936 B) | Zeilenformat B, `;`-Trenner, Flags nur bei Nicht-Default | JSON-Parser-Tests für `compact` anpassen; Format-Risiko → QG-1 |
 | ADR-3 Alle Keywords, kuratierte Beispiele | 55 von 76 Beispielen ohne neues Signal; Tool-Use-Evidenz spricht für Beispiele | alle Keywords + erstes Beispiel + signaltragende Beispiele | deterministisch, prüfbar (QG-2) |
 | ADR-4 Bugfixes vor Profil | viele Defekte wirken auch in `full` | Phase 1 vor Phase 2, eigene PRs | `full`-Ausgabe ändert sich in Phase 1 bewusst |
-| ADR-5 Shared File fällt auf `full` | geteilte AGENTS.md, gemischte Profile | sichere Seite + WARN | Opt-in pro Provider bei geteilter Datei wirkungslos (Q12) |
+| ADR-5 Shared File fällt auf `full` | geteilte AGENTS.md, gemischte Profile | sichere Seite + WARN; **ENTSCHIEDEN** (Q12, Nutzerentscheidung Rev. 2.1); verworfen: Gate-Card als kleinster gemeinsamer Nenner, `per-provider`-Topologie | Opt-in pro Provider bei geteilter Datei wirkungslos (Q12) |
 | ADR-6 Doctor = Registry + Runner + Rolle; Checks als Bibliothek | IC-10/IC-11 planen bereits Cap-, Pointer-, Kanal-Checks; ohne Abgrenzung entstünden zwei Implementierungen | Checks sind reine Funktionen über `project_root` (IC-10/IC-19); Sync-Ende, `--doctor` und Tests rufen dieselben Funktionen; die Registry fügt nur Metadaten (Evidenz, Verifikationsstatus, Fix-Owner) und eigene Detektoren für nicht abgedeckte Klassen hinzu (`finding-ref`) | keine Doppelimplementierung; Doctor hängt zeitlich an IC-10/IC-19 (beide Phase 0) |
 | ADR-7 Ein Active-Set-Vertrag | Rollenfilter heute verteilt (allowlist, gates, template, teils roh `config["roles"]`) → Drift, stille Gate-Drops | `ActiveSet` einmal je Sync; alle Generatoren konsumieren es; Rohzugriff per Guard-Test verboten | Konsistenz; einmaliger Umbau vieler Generatoren; `full`-Ausgabe ändert sich (Phase 1) |
 | ADR-8 Optimizer schlägt vor, Applier beweist | Nutzer-YAML enthält Kommentare; `--fill-defaults` verliert sie; LLM-Edits sind unbeweisbar | Vorschlag als Unified Diff; Anwendung nur über `--apply-config-patch` mit Re-Beweis (IC-25) und Roundtrip-Guard; semantische Kandidaten nur mit Freigabe je ID | beweisbare Verlustfreiheit; zusätzlicher CLI-Befehl; `agent-meta-manager` editiert `project.yaml` dafür nicht direkt |
 | ADR-9 Neue Rollen name_only, orchestrator_only, ohne `routing_patterns` | Präzedenz `template-auditor` hat `routing_patterns` trotz name_only → Keyword-Regel, Szenario-76-Widerspruch | beide neuen Rollen ohne `routing_patterns`; Invarianten-Test für alle name_only-Rollen (wirkt nach IC-15 Nr. 14 auch für `template-auditor`) | kein versehentliches Auslösen durch Routine-Aufgaben; Aufruf nur explizit per Name |
-| ADR-10 Pipeline-Drop statt Ersatzrolle | Pipelines mit inaktiver Pflicht-Rolle sind heute nicht ausführbar, werden aber gerendert | Pipeline entfällt vollständig (+ INFO); keine implizite Ersatzrolle | keine hängenden Dispatches; Funktionsumfang sichtbar kleiner; Ersatzrollen später explizit per Daten (Q18) |
+| ADR-10 Pipeline-Drop statt Ersatzrolle | Pipelines mit inaktiver Pflicht-Rolle sind heute nicht ausführbar, werden aber gerendert | Pipeline entfällt vollständig (+ WARN, auch in der Sync-Konsole, mit fehlender Rolle und Aktivierungsweg); keine implizite Ersatzrolle | keine hängenden Dispatches; Funktionsumfang sichtbar kleiner; Ersatzrollen später explizit per Daten (`fallback_role`, Q18); **ENTSCHIEDEN** (Nutzerentscheidung, Rev. 2.1) |
 | ADR-11 Severity-Deckel für UNVERIFIED | Provider-Fakten teils nur aus Drittquellen; falsche ERRORs würden CI blockieren | `verified-state: UNVERIFIED` ⇒ ≤ WARNING; Hochstufung nur mit Evidenz-Update | weniger False-Positive-Blocker; echte Fehler ggf. zunächst nur als WARNING |
 
 ## 11. Erwartete Wirkung (ZIELE/Schätzungen, keine Messung; Tokens ≈ Bytes/4)
@@ -1156,20 +1156,20 @@ Priorisiert nach Wirkung × Korrektheitsrisiko; jede Zeile verweist auf den Spec
 | Q2 | Sprache der Tabelle (Keywords/Beispiele deutsch vs. englisch; Beispiele 96 % deutsch) | Eval-Variante mit englischem Korpus in Phase 0; Entscheidung datenbasiert |
 | Q3 | Gemini-CLI strict-Frontmatter-Schema zur Laufzeit | Lauf/Capture vor IC-15/8 |
 | Q4 | Antigravity 12,000-Zeichen-Cap und Status `define_subagent` | Runtime-Test; bis dahin UNVERIFIED, Soft-Cap nur WARN |
-| Q5 / D-1 | Brauchen Kimi-Worker Rules (sehen AGENTS.md nie)? Gate-Card via `${agents_md}`? | Phase 3, Eval + Nutzerentscheidung; `compact` macht es billig |
+| Q5 / D-1 (ENTSCHIEDEN) | Brauchen Kimi-Worker Rules (sehen AGENTS.md nie)? Gate-Card via `${agents_md}`? | **ENTSCHIEDEN (Nutzerentscheidung, Rev. 2.1):** Kimi-Worker bekommen die Gate-Card in den Worker-Bodies via `${agents_md}`; Umsetzung bleibt Phase 3 (nach Eval; `compact` hält es billig); Doctor-Known-Issue bleibt bis dahin bestehen |
 | Q6 | Erhalten Claude-Subagenten `.claude/rules`? | Capture/Doku; beeinflusst `paths:`-Scoping |
 | Q7 | Erhält ein Mammouth-Primary-Orchestrator mit unserer Datei `task`? | Capture nach IC-15/6 |
 | Q8 | Erreichbarkeitspolitik Continue-Orchestrator (nur `cn --agent`) | Nutzerentscheidung: dokumentieren vs. Prompt-Weg |
 | Q9 | `template-auditor`: Regel löschen oder §3-Text ändern | Nutzerentscheidung in IC-15/14 |
 | Q10 | OpenCode v2 `subagent_depth` | Verifikation gegen v2-Schema |
 | Q11 | Künftige Provider mit callable `route_intent` | Schema-Pfad bleibt (IC-04) |
-| Q12 | Eine Gate-Card für die geteilte Datei = kleinster gemeinsamer Nenner (beratende Runtimes) | Review; ggf. `per-provider`-Topologie |
+| Q12 (ENTSCHIEDEN) | Geteilte Datei: `full` + WARN vs. Gate-Card als kleinster gemeinsamer Nenner (beratende Runtimes) vs. `per-provider`-Topologie | **ENTSCHIEDEN (Nutzerentscheidung, Rev. 2.1):** `full` + WARN (ADR-5, sichere Seite); Gate-Card-Nenner und `per-provider`-Topologie als verworfene Alternativen dokumentiert |
 | Q13 | `lazy`-only-REFERENCE-Rules aus dem Embed löschen oder Digest behalten | Eval + Anker; Vorschlag: Digest-Satz + Pointer |
 | Q14 | Byte-Stabilität für Prompt-Caching (keine Zeitstempel in dynamischer Position) | Audit der Header (`Generiert von … — <Datum>`) in Phase 0 |
-| Q15 (Rev. 2) | Rollennamen `install-doctor` / `config-optimizer` | **Empfehlung:** annehmen (Begründung IC-23/IC-26); Frontmatter `template-install-doctor` / `template-config-optimizer` gemäß Präfix-Konvention; Nutzerentscheidung vor Phase 0 |
+| Q15 (Rev. 2, ENTSCHIEDEN) | Rollennamen `meta-doctor` / `meta-optimizer` | **ENTSCHIEDEN (Nutzerentscheidung):** Namen `meta-doctor` / `meta-optimizer`; GENERISCHE Rollen in `agents/1-generic/`, für jedes Consumer-Projekt nutzbar (nicht nur agent-meta-Selbsthosting); Frontmatter `template-meta-doctor` / `template-meta-optimizer` (Präfix `template-` nach Repo-Konvention beibehalten); Namens-Kollisionsfreiheit geprüft: Präfix `meta-` kollidiert nicht mit der bestehenden Rolle `meta-feedback` (distinkte Vollnamen) |
 | Q16 (Rev. 2) | Projekt-spezifische Rollen implementieren oder als nicht unterstützt dokumentieren; Quellpfad | **Empfehlung:** implementieren mit provider-neutralem Pfad `.meta-config/agents/<role>.md` + `project-roles:`; Legacy-Pfad lesen mit WARN (IC-20) |
 | Q17 (Rev. 2) | Aktivierungsgruppe für die neuen Rollen (z. B. `diagnostics`, Default aus) | **Empfehlung:** keine Gruppe (wie `template-auditor`; kein `_EXPECTED_GROUPS`-Churn); Mehrkosten in Projekten ohne Allowlist ≈ 2 × (≈ 266 B Roster + ≈ 260 B `name_index` + ≈ 94 B Tabelle) ≈ 1.2 KB (Schätzung); Projekte steuern über `roles:` |
-| Q18 (Rev. 2) | Pipeline mit inaktiver Pflicht-Rolle: droppen vs. Stage überspringen vs. Ersatzrolle (z. B. `senior-developer` → `developer`) | **Empfehlung:** droppen (ADR-10); optionaler Daten-Key `fallback_role` je Stage in einer späteren Revision, nur mit Eval |
+| Q18 (Rev. 2, ENTSCHIEDEN) | Pipeline mit inaktiver Pflicht-Rolle: droppen vs. Stage überspringen vs. Ersatzrolle (z. B. `senior-developer` → `developer`) | **ENTSCHIEDEN (Nutzerentscheidung, Rev. 2.1):** droppen UND Nutzer warnen — `active-set.pipeline-dropped` WARN, im Sync-Konsolenoutput sichtbar (ADR-10); `fallback_role` je Stage bleibt spätere Option, nur mit Eval |
 | Q19 (Rev. 2) | „Delegation (reference only)"-Prosa in 34 Templates | **Empfehlung:** Phase 1 nur Zeilen mit Dispatch-Anweisung konditional; Phase 3 datengetrieben (Liste in `role-defaults`, gefiltert gerendert) |
 | Q20 (Rev. 2) | Doctor in CI: nur WARN-Report oder `--strict` als Gate | **Empfehlung:** Default ohne `--strict`; `--strict` nur für Matrix-Fixtures in der agent-meta-CI |
 | Q21 (Rev. 2) | `toml-key`-Detektor unter Python 3.9 (kein `tomllib`) | **Empfehlung:** Stdlib-Subset-Parser (`[table]`, `key = int|string|bool`); nicht parsebar ⇒ INFO `doctor.detector-unavailable`; Capability-Key für „Provider nutzt TOML-Agentenkonfig" statt Provider-Name |
@@ -1226,7 +1226,8 @@ Priorisiert nach Wirkung × Korrektheitsrisiko; jede Zeile verweist auf den Spec
 | Datum | Änderung |
 |---|---|
 | 2026-10-11 | Erstentwurf (DRAFT) auf Basis der Studie `docs/analysis/2026-10-11-context-budget-provider-study.md` |
-| 2026-10-11 | Revision 2 (DRAFT): Nutzeranforderungen R1 (Installations-Doctor), R2 (Active-Set-Filter/dynamisches Routing), R3 (project.yaml-Optimizer) ergänzt — neue Befunde F-19…F-33, Konzept §4.4–§4.6, IC-17…IC-28 (u. a. `ActiveSet`, `known-issues.yaml`, `--doctor`, `install-doctor`, `--optimize-config`/`--apply-config-patch`, `config-optimizer`, Neue-Rolle-Checkliste), IC-15 Nr. 17–21, IC-09 drei Keys, QG-9…QG-13, AC-37…AC-61, ADR-6…ADR-11, Q15…Q27, R7…R11, §11 Rev.-2-Wirkung + Rangliste §11.1, Phasen §9 angepasst (IC-09-Keys nach Phase 0); Korrekturen K-d (Ort `strip_inactive_conditional_blocks`) und K-e („alle Rollen" = 62); Studie §10 (Nachtrag) ergänzt. Bestehende IDs unverändert. |
+| 2026-10-11 | Revision 2 (DRAFT): Nutzeranforderungen R1 (Installations-Doctor), R2 (Active-Set-Filter/dynamisches Routing), R3 (project.yaml-Optimizer) ergänzt — neue Befunde F-19…F-33, Konzept §4.4–§4.6, IC-17…IC-28 (u. a. `ActiveSet`, `known-issues.yaml`, `--doctor`, `meta-doctor`, `--optimize-config`/`--apply-config-patch`, `meta-optimizer`, Neue-Rolle-Checkliste), IC-15 Nr. 17–21, IC-09 drei Keys, QG-9…QG-13, AC-37…AC-61, ADR-6…ADR-11, Q15…Q27, R7…R11, §11 Rev.-2-Wirkung + Rangliste §11.1, Phasen §9 angepasst (IC-09-Keys nach Phase 0); Korrekturen K-d (Ort `strip_inactive_conditional_blocks`) und K-e („alle Rollen" = 62); Studie §10 (Nachtrag) ergänzt. Bestehende IDs unverändert. |
+| 2026-10-11 | Revision 2.1 (DRAFT): Nutzerentscheidungen Q12 (geteilte Datei → `full` + WARN), Q15 (Rollennamen `meta-doctor`/`meta-optimizer`; Wortlaut und Modulnamen `meta_optimizer.py` angepasst), Q18 (Pipeline-Drop mit WARN in der Sync-Konsole, `active-set.pipeline-dropped` INFO → WARN), D-1/Q5 (Kimi-Worker-Gate-Card via `${agents_md}`, Umsetzung Phase 3). |
 
 ## Trace-Anker
 
