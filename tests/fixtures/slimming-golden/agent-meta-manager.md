@@ -1,6 +1,6 @@
 ---
 name: agent-meta-manager
-version: 1.23.0
+version: 1.23.1
 description: 'Manage agent-meta: upgrades, sync, feedback delegation, project-specific
   agents, external-skill lifecycle, and creating extensions.'
 hint: 'Manage agent-meta: upgrade, sync, feedback, create project-specific agents'
@@ -15,7 +15,7 @@ tools:
 - Agent
 - WebFetch
 - TodoWrite
-generated-from: 1-generic/agent-meta-manager.md@1.23.0
+generated-from: 1-generic/agent-meta-manager.md@1.23.1
 model: claude-haiku-4-5-20251001
 ---
 
@@ -84,7 +84,7 @@ git add .agent-meta
 
 Order of operations (M2):
 1. `git checkout v<TARGET>` in the submodule. Afterwards the `1.2.0-beta.2` value embedded in the generated agent files is stale — it only refreshes on the next sync.
-2. **Re-sync first:** `py .agent-meta/scripts/sync.py --config .meta-config/project.yaml`. The sync writes `agent-meta-version` from the real `VERSION` back into `project.yaml` and refreshes the embedded `1.2.0-beta.2` values.
+2. **Re-sync first:** `python3 .agent-meta/scripts/sync.py --config .meta-config/project.yaml`. The sync writes `agent-meta-version` from the real `VERSION` back into `project.yaml` and refreshes the embedded `1.2.0-beta.2` values.
 3. **Then** trigger a re-render of the README badges row (documenter.md §5). The `documenter` uses the sync-embedded `1.2.0-beta.2` value, which the preceding re-sync (step 2) has just refreshed — never treat this prompt's (possibly stale) copy as the value source.
 4. Check whether `readme.badges` contains `agent-meta`: yes → re-render; no → do **not** add it automatically, only offer it (confirmation required, D2).
 
@@ -100,13 +100,15 @@ reverting, not by patching a half-upgraded tree.
 
 ## 5. Update (`update-meta` / re-sync)
 
+Invocation convention for every command in this role: `python3` (Linux/macOS; on Windows use the `py` launcher). `sync.py` requires PyYAML (`python3 -m pip install pyyaml`).
+
 ```bash
-py .agent-meta/scripts/sync.py --config .meta-config/project.yaml
+python3 .agent-meta/scripts/sync.py --config .meta-config/project.yaml
 ```
 
 Then: check `sync.log` for `[WARN]` and explain. **Mandatory after any
 `project.yaml` change:** also run
-`py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --validate`
+`python3 .agent-meta/scripts/sync.py --config .meta-config/project.yaml --validate`
 — this runs the framework's full JSON-schema validation
 (`config/project-config.schema.json`) against the entire `project.yaml`,
 catching typo'd keys, wrong types and invalid enum values that a plain sync
@@ -141,9 +143,9 @@ After a successful sync / `--validate` run:
 | Recurring main-chat workflow | `--create-command <name>` |
 
 ```bash
-py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --create-rule security-policy
-py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --create-ext <role>
-py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --create-command deploy
+python3 .agent-meta/scripts/sync.py --config .meta-config/project.yaml --create-rule security-policy
+python3 .agent-meta/scripts/sync.py --config .meta-config/project.yaml --create-ext <role>
+python3 .agent-meta/scripts/sync.py --config .meta-config/project.yaml --create-command deploy
 ```
 
 ## 8b. Model blast modes (override-all / inherit-main-chat)
@@ -173,7 +175,7 @@ model-override-all:
 
 Prefer tier names (nano/fast/balanced/powerful/max/ultra). A concrete model ID
 must come from `.agent-meta/config/generated/model-registry.json`
-(refresh via `py .agent-meta/scripts/sync.py --update-models`, see §8c)
+(refresh via `python3 .agent-meta/scripts/sync.py --update-models`, see §8c)
 — never from memory.
 
 Toggle workflow:
@@ -184,7 +186,7 @@ Toggle workflow:
 
 ```bash
 # Enable (merge, keep other providers)
-py .agent-meta/scripts/sync.py --config .meta-config/project.yaml
+python3 .agent-meta/scripts/sync.py --config .meta-config/project.yaml
 # Disable: remove the key from project.yaml, then re-sync
 ```
 
@@ -233,7 +235,7 @@ truthy entry for that provider.
 models (tiers/aliases), ALWAYS run the model sync FIRST:
 
 ```bash
-py .agent-meta/scripts/sync.py --update-models
+python3 .agent-meta/scripts/sync.py --update-models
 ```
 
 This rewrites `config/generated/model-registry.json` from the live sources
@@ -256,10 +258,10 @@ Full lifecycle: `rules/2-platform/agent-meta-sync-interface.md` (--add-skill fla
 ```bash
 # Enable
 # .meta-config/project.yaml: "external-skills": { "skill-name": { "enabled": true } }
-py .agent-meta/scripts/sync.py --config .meta-config/project.yaml
+python3 .agent-meta/scripts/sync.py --config .meta-config/project.yaml
 
 # Add
-py .agent-meta/scripts/sync.py --add-skill <url> --skill-name <n> --source <path> --role <r> --entry <file>
+python3 .agent-meta/scripts/sync.py --add-skill <url> --skill-name <n> --source <path> --role <r> --entry <file>
 
 # Submodule init
 git submodule update --init --recursive
@@ -268,8 +270,8 @@ git submodule update --init --recursive
 ## 10. Consistency check
 
 ```bash
-py .agent-meta/scripts/consistency-check.py --changed              # default, fast
-py .agent-meta/scripts/consistency-check.py --changed --json       # CI/pipelines
+python3 .agent-meta/scripts/consistency-check.py --changed              # default, fast
+python3 .agent-meta/scripts/consistency-check.py --changed --json       # CI/pipelines
 ```
 
 Checks: frontmatter (version, semver, based-on, extends, patch-anchors), cross-references, placeholders, commands.
@@ -383,7 +385,7 @@ examples above (§4-14 only spell out the keys with the most involved
 toggle-workflows — they are not the full list).
 
 ```bash
-py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --validate
+python3 .agent-meta/scripts/sync.py --config .meta-config/project.yaml --validate
 ```
 
 `--validate` (see §5) is the second half of this capability: after writing

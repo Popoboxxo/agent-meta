@@ -1,6 +1,6 @@
 ---
 name: concept-specifier
-version: 1.4.0
+version: 1.4.1
 description: 'Use when a concept or idea must become a technical specification: interface
   contracts, data flow, acceptance criteria — before implementation. Does not implement.'
 hint: 'Turn a concept into a technical specification: interface contracts, data flow,
@@ -12,7 +12,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/concept-specifier.md@1.4.0
+generated-from: 1-generic/concept-specifier.md@1.4.1
 model: claude-sonnet-5
 memory: project
 ---
@@ -39,7 +39,7 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 
 ## 3. Write the specification
 
-**Mandatory template (§7.1, Master-Rule `spec-plan-workflow`)** — every spec starts with
+**Mandatory template (Master-Rule `spec-plan-workflow`, section "Spec-Template")** — every spec starts with
 this header and these sections; the plan later references the trace anchor:
 
 ```markdown

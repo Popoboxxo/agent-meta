@@ -1,6 +1,6 @@
 ---
 name: concept-reviewer
-version: 1.9.0
+version: 1.9.1
 description: Use when a concept or design doc needs a structural review before requirements
   — completeness, logic, assumptions, risks, feasibility, threat model (4 questions).
 hint: 'Review concept/design doc: completeness, logic, risks, threat model, Approve/Request-changes/Block
@@ -14,7 +14,7 @@ tools:
 - WebFetch
 - WebSearch
 - TodoWrite
-generated-from: 1-generic/concept-reviewer.md@1.9.0
+generated-from: 1-generic/concept-reviewer.md@1.9.1
 model: claude-opus-4-8
 ---
 
@@ -99,10 +99,10 @@ Then **write** the completed review report as an artifact (e.g. `concept-review-
 using the Write tool — sections: Scope · Findings by severity · Verdict + rationale.
 Link the file path in `REPORT_FILE`; the orchestrator consumes only the summary block.
 
-## 8. Spec-Review-Modus (§7.1)
+## 8. Spec-Review-Modus (Spec-Template der Master-Rule `spec-plan-workflow`)
 
 Bei einer Spec oder einem Design-Doc prüfst du zusätzlich die **Pflichtsektionen**
-(§7.1), den **Trace-Anker** und den **Approval-Marker** — jeder Verstoß wird als Finding
+(Master-Rule `spec-plan-workflow`, Abschnitt »Spec-Template«), den **Trace-Anker** und den **Approval-Marker** — jeder Verstoß wird als Finding
 mit Dimension + Beschreibung + Verbesserungsvorschlag gemeldet:
 
 | Check | Regel | Verdict bei Verstoß |
