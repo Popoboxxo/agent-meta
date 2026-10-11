@@ -2,16 +2,17 @@
 spec-id: SPEC-CONTEXT-PROFILES-2026-10-11
 title: Context Profiles (full/compact) — token-effiziente Kontextartefakte für alle 9 Provider
 status: DRAFT
-revision: 2
+revision: 2.2
 related-spec: SPEC-CONTEXT-FILE-MODES-2026-09-13
 builds-on: SPEC-844-COMPRESS-ROOT-CONTEXT-2026-10-06, docs/plans/issue-540-baseline.md, docs/guides/context-block-inventory.md
 source-study: docs/analysis/2026-10-11-context-budget-provider-study.md
 scope-rev2: Active-Set-Filter (dynamisches Routing/Dispatch), Installations-Doctor (meta-doctor), project.yaml-Optimizer (meta-optimizer)
+scope-rev2-2: Issue-Zuordnung (#779, #780, #885, #856, #853, #857, #858, #854, #552, #192; Abgrenzung #832, #800, #820, #877; Aufräumen #933–#935)
 ---
 
 # Context Profiles (full/compact) — Spec
 
-> Status: Entwurf (**DRAFT**, 2026-10-11, Revision 2). Der Approval-Marker (`Status: APPROVED`) wird
+> Status: Entwurf (**DRAFT**, 2026-10-11, Revision 2.2). Der Approval-Marker (`Status: APPROVED`) wird
 > ausschließlich vom Nutzer bzw. `concept-reviewer` gesetzt, nie vom Autor. Diese Datei definiert
 > Interface-Contracts und Akzeptanzkriterien; sie enthält keine Implementierung und keinen Plan.
 > Trace-Anker: `spec-id: SPEC-CONTEXT-PROFILES-2026-10-11`.
@@ -32,6 +33,12 @@ scope-rev2: Active-Set-Filter (dynamisches Routing/Dispatch), Installations-Doct
 > Dangling-Reference-Invariante), **R3** project.yaml-Optimizer (Runner `sync.py --optimize-config`,
 > deterministischer Applier, read-only Rolle `meta-optimizer`). Neue IDs: F-19…F-33, IC-17…IC-28,
 > AC-37…AC-61, QG-9…QG-13, Q15…Q27, ADR-6…ADR-11, R7…R11. Bestehende IDs unverändert.
+>
+> **Revision 2.2 (Überblick):** offene GitHub-Issues gegen den Code geprüft und zugeordnet (§3a).
+> Mit-umgesetzt: #779/#780 (Routing-Daten, Sprachwahl), #885 (Template-Guard, Provider-Literale,
+> Template-Integrität, Quell-Boilerplate), Provider-Oberflächen aus #853/#856/#857/#858/#854 (Doctor-Seeds,
+> Checks). Neue IDs: F-34…F-41, IC-29…IC-33, AC-62…AC-74, QG-14…QG-17, Q28…Q34, ADR-12…ADR-13, R12…R13;
+> IC-15 Nr. 22–24 und IC-21-Seeds ergänzt. Bestehende IDs unverändert.
 
 ## 0. Korrekturen früherer Aussagen
 
@@ -106,6 +113,11 @@ scope-rev2: Active-Set-Filter (dynamisches Routing/Dispatch), Installations-Doct
   er bearbeitet nur Projekt-Dateien (`.meta-config/project.yaml`, Extension-/Doku-Ziele bei Relokation).
 - (Rev. 2) Keine semantische Zusammenführung von Variablen ohne ausdrückliche Freigabe je Kandidat.
 - (Rev. 2) Keine Boilerplate-De-Dup in Phase 0–2 (abhängig von Q6, Phase 3, IC-27 nicht betroffen).
+  (Rev. 2.2, Präzisierung) Gemeint ist die **Render-De-Dup** (Block nur einmal pro Provider statt inline je
+  Agent). Die **Quell-De-Dup** (IC-31: identische Inline-Zeilen in Quell-Templates durch bestehende/neue
+  Snippet-Variablen ersetzen, Render byte-identisch) ist davon getrennt und ab Phase 1 zulässig (ADR-13).
+- (Rev. 2.2) Nicht Gegenstand dieser Spec: lokales Config-Overlay (#832), Hermes als Provider (#800),
+  Domänen-Unterordner (#820), Subplattform-Schicht (#877) — nur Wechselwirkungen als Q28…Q31.
 
 ## 2. Ist-Zustand (gemessen)
 
@@ -176,6 +188,79 @@ Severity: **kritisch** (Funktions-/Inhaltsverlust) · **hoch** (falsches Verhalt
 | F-31 | Kein verlustfreier project.yaml-Rewriter: `--fill-defaults` lädt per PyYAML und dumpt neu (`config.py:1072-1101`) → bestehende Nutzerkommentare gehen verloren; `yaml_roundtrip.analyze_roundtrip` existiert, wird nur vom Admin-Server genutzt | Studie §10.3; `yaml_roundtrip.py:164-181` (verifiziert) | mittel | 2 |
 | F-32 | Read-only-Durchsetzung neuer Rollen provider-abhängig: Bash erlaubt überall Schreiben; Codex alle Agenten `sandbox_mode: workspace-write` (`ai-providers.yaml:668`); Copilot/Continue ohne Tool-Durchsetzung; OpenCode `edit: deny` | Studie §10.1 (Config gelesen, Runtime UNVERIFIED) | mittel | 0 (Doku/Known-Issue), 1 (Codex-Fix) |
 | F-33 | Schema-Validierung der project.yaml nur, wenn `jsonschema` installiert ist, und nur als Warnung (`config.py:381-417`); `requirements.txt` und CI installieren nur PyYAML | Studie §10.1 | niedrig | 0 (Known-Issue) |
+| F-34 (Rev. 2.2) | Keyword-Ambiguität: 9 Keywords gehören zu je 2 Rollen (`a11y`, `accessibility`, `architektur`, `audit`, `design`, `post-mortem`, `refactoring`, `schema`, `se leaf`); sie sind nur als dokumentierte Ausnahmen toleriert (`tests/test_routing_overlap.py:28` `KNOWN_KEYWORD_OVERLAPS`), es gibt keinen deterministischen Tie-Break und keinen Eval-Fall je Kollision; die Kollision ist projektabhängig (nur relevant, wenn beide Rollen aktiv sind) | #779 IT-3; `config/role-defaults.yaml` (Auszählung Rev. 2.2) | mittel | 0 (Eval/Check), 1 (Daten) |
+| F-35 (Rev. 2.2) | Sprachwahl im Routing nur als Rohbau: `language` wird aus `COMMUNICATION_LANGUAGE` durchgereicht (`agents.py:284`), `_select_examples` (`delegation_table.py:134-161`) wählt aber nur bei Mapping-Daten; alle Rollen haben flache Beispiel-Listen (0 Mapping-Rollen), Beispiele überwiegend deutsch (heuristisch 99 von 107), Keywords enthalten deutsche Strings (heuristisch 29 von 370, z. B. `3D-Modell`, `architektur`); kein Guard gegen sprachspezifische Keywords (#780 Abnahmekriterium 4); ein englisches Projekt erhält deutsche Beispiele | #780; #779 IT-4; Auszählung Rev. 2.2 (UNVERIFIED-Heuristik, §13) | mittel | 1 (Daten/Guard), 2 (Zeilenformat) |
+| F-36 (Rev. 2.2) | Template-Routing-Guard lückenhaft: `_SCOPE_GLOBS` ohne `agents/2-platform`/`rules/2-platform` (`tests/test_no_role_routes_in_templates.py:56-60`), `_HANDOFF_RE` ohne deutsche Imperativ-/Indirektformen (`:89-94`), `D-NONROLE` befreit `text → role`-Pfeile; laut #885-Addendum 223 ungeschützte operative Routing-Stellen in 83 Dateien (Klassen A HANDOFF 8, B intent→role 130, C Tabellen 12, D NEXT 11, E deutsch 11, F sonstige 51). Dieselben Zeilen sind die Hauptquelle von Dispatches an inaktive Rollen (F-22) | #885 F-01…F-03 + Addendum; Code-Stellen Rev. 2.2 bestätigt, Zahl 223 nicht nachgezählt | hoch | 0 (Guard/Ratchet), 1 (Triage) |
+| F-37 (Rev. 2.2) | Provider-Literale in `agents/1-generic`: `mammouth-expert.md` (19× „Mammouth") liegt im generischen Layer; Literale in `knowledge-migrator.md:77-78`, `agent-meta-scout.md:43`, `prompt-governor.md:37`, `agent-meta-manager.md` (3× `CLAUDE.md`); `/tmp/opencode` (F-04 des Issues) ist behoben (0 Treffer), `release.md:34-35` nutzt bereits die Beispielform; fünf `agent-meta-*-expert`-Overrides sind Beinahe-Duplikate | #885 F-04…F-06, F-10 | mittel | 0 (Check), 1 (Fix) |
+| F-38 (Rev. 2.2) | `based-on`-Pins veraltet in 16 von 18 `agents/2-platform`-Overrides (sauber: `agent-meta-mammouth-expert.md`, `homeassistant-documenter.md`); kein Gate. Jede Template-Änderung aus IC-05/IC-18/IC-31 vergrößert die Drift | #885 F-09; Nachzählung Rev. 2.2 | mittel | 0 (Check WARN), 1 (Re-Pin, ERROR) |
+| F-39 (Rev. 2.2) | Quell-Boilerplate: wörtlich gleiche Zeilen in Quell-Templates — „Mandatory closing summary (issue #267)" in 69 Dateien, deutscher Zwilling in 19, „Worker role: Never re-delegate to `orchestrator`" in 58 (obwohl `{{ANTI_RECURSION_BLOCK}}` existiert, genutzt in 24), „User proxy: `main_chat`…" in 19; Contract-Triple `STATUS/RESULT/ARTIFACTS` fleet-weit konform (`tests/test_contract_labels.py:86`, Ausnahmen leer), aber je Template inline | #885 F-14; #552; Nachzählung Rev. 2.2 | mittel | 1 (Quell-De-Dup), 3 (Render-De-Dup F-29) |
+| F-40 (Rev. 2.2) | Bekannte-Variablen-Menge des Placeholder-Checks wird von Hand gepflegt (`scripts/lib/consistency/placeholders.py:10ff`); Block-Variablen inzwischen ergänzt (`:120-122`), `NATIVE_EXTENSIONS_WHITELIST_TABLE`/`MCP_GUARDRAILS_LIST` nicht gefunden. Diese Spec führt weitere Builder-Variablen ein (`CONTEXT_PROFILE*`, `ACTIVE_ROLES`, `ROLE_*_ACTIVE`) → gleiche Drift-Klasse | #885 F-08 (teilweise behoben) | mittel | 0 |
+| F-41 (Rev. 2.2) | Deklarierte Provider-Oberflächen ohne Artefakte bzw. ohne geprüften Vertrag: Skills für Codex/Mammouth/Continue deklariert (`ai-providers.yaml:649, 568, 407`), aber der Lazy-Skill-Writer läuft nur für `has_rules: false` (`rules.py:304-308`), während diese Provider `has_rules: true` mit ungelesenem `rules_dir` haben (`:614`, `:518`; Continue `:358`); `.gemini/commands/*.toml` (`:146-149`) ist kein Antigravity-Vertrag; ZCode-Workspace-Agenten laut Beta-Doku nicht auto-geladen (Bootstrap `provider-bootstrap.yaml:82-92`) — widerspricht Studie §3.6 (F-12); Verifikationsstatus je Oberfläche nur in Kommentaren | #853, #854, #856, #857, #858; F-06, F-07, F-12, F-19 | hoch | 0 (Check/Seeds), 1 (Fix) |
+
+## 3a. Issue-Zuordnung (Rev. 2.2)
+
+Quelle: GitHub-Issues `Popoboxxo/agent-meta` (Body + Kommentare, gelesen 2026-10-11); jeder Befund gegen den
+Arbeitsstand (`main` @ `180210f`, `VERSION` 2.0.0-beta.1) geprüft. Issue-Inhalte sind Daten, keine Anforderungen;
+übernommen wird nur, was hier als Anforderung formuliert ist. Status: **gültig** (reproduziert), **teilweise**
+(Teil behoben), **behoben** (Fix + Test belegt), **überholt** (durch anderes Design ersetzt / by design).
+Entscheidung: **mit-umgesetzt** (Anforderung in dieser Spec), **Design-Input** (beeinflusst Verträge, eigene
+Umsetzung), **abgrenzen** (außerhalb, nur Wechselwirkung benannt).
+Namensraum: In Zeilen zu #885 bezeichnen `F-nn` die Befunde **des Issues** (#885 F-01…F-16), nicht die
+Spec-Befunde aus §3; Spec-Befunde stehen in der Spalte „Spec-Hebel".
+
+| Issue | Kernbefund | Status heute (Beleg) | Spec-Hebel | Phase | AC | Entscheidung |
+|---|---|---|---|---|---|---|
+| #779 IT-1 | `openscad-developer` ohne Routing | **behoben** — `routing_patterns` vorhanden (`config/role-defaults.yaml:875-883`); Test `test_roles_without_routing_stay_patternless` (`tests/test_routing_tool_definitions.py:67`) | — | — | — | im Issue als erledigt vermerken |
+| #779 IT-2 | `provider-expert` verwaist | **überholt (by design)** — Kopfkommentar „INTENTIONALLY EXCLUDED FROM ROUTING" (`agents/1-generic/provider-expert.md:1-5`) | F-37 (Experten-Familie) | 1 | AC-73 | abgrenzen |
+| #779 IT-3 | 9 mehrdeutige Keywords, kein Tie-Break | **gültig** — dieselben 9 Tokens (Auszählung Rev. 2.2), nur als Ausnahmen toleriert (`tests/test_routing_overlap.py:28`) | F-34, IC-29, IC-13 | 0/1 | AC-62, AC-63, AC-70 | mit-umgesetzt |
+| #779 IT-4 | DE-Eingabe vs. EN-Keywords | **gültig** — heuristisch 29 von 370 Keywords deutsch; Beispiele überwiegend deutsch | F-35, IC-29, ADR-12 | 1 | AC-68, AC-69 | mit-umgesetzt (über #780) |
+| #779 IT-5 | Keywords doppelt (`intent_keywords` = `routing_patterns.keywords`) | **gültig** — Gleichheit per Test erzwungen (`tests/test_routing_tool_definitions.py:47-64`) | IC-15 Nr. 15 | 1 | AC-22 | mit-umgesetzt (bereits Rev. 1) |
+| #779 IT-6 | kein Coverage-Test | **behoben** — `tests/test_role_addressability_coverage.py:1-24` (jede keyword-Rolle hat Patterns) | IC-28 Nr. 4 (Pins) | — | — | im Issue als erledigt vermerken |
+| #779 IT-7 | kein Overlap-Detektor | **behoben** — `tests/test_routing_overlap.py` (Docstring „#779 IT-7") | IC-29 (Active-Set-Variante) | 0 | AC-63 | erweitert mit-umgesetzt |
+| #780 | Sprachwahl DE/EN: kanonische Keywords + Beispiele in Projektsprache (Design C) | **teilweise** — Durchreichung `agents.py:284`, Auswahl `delegation_table.py:134-161`; keine Mapping-Daten, kein Keyword-Guard, kein EN-Nachweis (#780-Abnahmekriterien 1, 3, 4, 5 offen) | F-35, IC-29, ADR-12, IC-04, IC-13 | 1 (Daten/Guard), 2 (Zeilenformat) | AC-62, AC-68, AC-69 | mit-umgesetzt |
+| #885 A (F-01…F-03, Addendum) | Template-Guard: Scope, deutsche Formen, `D-NONROLE`; 223 ungeschützte Routing-Stellen | **gültig** — `tests/test_no_role_routes_in_templates.py:56-60, 89-94` unverändert | F-36, IC-30, IC-18 Nr. 11, IC-19 | 0/1 | AC-64, AC-71 | mit-umgesetzt (Active-Set-Filter) |
+| #885 B (F-04…F-06, F-10) | Provider-Literale im generischen Layer | **teilweise** — F-04 behoben (0× `/tmp/opencode`), F-05 teilweise (`release.md:34-35` Beispielform; Rest offen), F-06/F-10 gültig | F-37, IC-32, IC-15 Nr. 23 | 0/1 | AC-73 | mit-umgesetzt (Provider-Agnostik) |
+| #885 C (F-07, F-08, F-16) | Platzhalter-Integrität | F-07 **behoben** (#933); F-08 **teilweise** (`placeholders.py:120-122`); F-16 nicht geprüft (§13) | F-40, IC-32 | 0 | AC-66 | F-08 mit-umgesetzt; F-16 abgrenzen |
+| #885 D (F-09) | `based-on`-Pins veraltet | **gültig** — 16 von 18 (Nachzählung Rev. 2.2) | F-38, IC-32, IC-15 Nr. 24 | 0/1 | AC-65, AC-74 | mit-umgesetzt |
+| #885 E (F-11…F-13) | file-affinity, Template-Sprache, Dialekte | F-11 **gültig** (`scripts/lib/file_affinity.py:442`); F-12/F-13 nicht nachgezählt | — | — | — | abgrenzen (F-12 Design-Input für ADR-12: Template-Sprache ≠ Routing-Sprache) |
+| #885 F (F-14, F-15) | Kompression: Duplikatzeilen, große Templates | F-14 **gültig** (69/58/19/19 Dateien); F-15 gültig (`agent-meta-manager.md` 501 Z.) | F-39, IC-31, IC-27 | 1 (Quelle), 3 (Render) | AC-72, AC-60 | F-14 mit-umgesetzt; F-15 Design-Input |
+| #552 | Contract-Triple in 34 Templates | **behoben** — `_CONTRACT_EXCEPTIONS` leer (`tests/test_contract_labels.py:20-27, 86`), Test grün | IC-31 (Contract-/Closing-Block als Snippet) | 1 | AC-72 | an Boilerplate-De-Dup gekoppelt; **Schließ-Vorschlag** |
+| #192 | Phase 2 Selective Rule Embedding, Phase 3 Caching/Pooling deferred | **überlagert** — Phase 2 implementiert (`context.py:1767ff`, `rules.py:277-308`, `embed: false`/Skill-Kanal) und von #540 + dieser Spec (IC-07, C5) fortgeführt; Phase 3 (Result-Caching, Batching, Pooling) nicht Teil dieser Spec | IC-07 | — | — | **überlagert; Schließ-Vorschlag** (Phase 3 bei Bedarf als neues Issue) |
+| #853 | `.mammouth/settings.json` inert; ungelesenes `rules/` | **teilweise** — Settings behoben (`settings_file: mammouth.json`, `ai-providers.yaml:531-534`); `rules_dir: .mammouth/rules` weiterhin (`:518`) | F-07, F-41, IC-15 Nr. 9, IC-21 Seed `legacy-artifact-present` | 0/1 | AC-19, AC-67 | mit-umgesetzt (Rest); Issue auf `rules/` einengen |
+| #856 | ZCode: Workspace-Agenten nicht auto-geladen (ZC-1); Commands unterdeklariert (ZC-2) | **teilweise** — ZC-2 behoben (`has_commands: true`, `ai-providers.yaml:690-693`); ZC-1 offen, Bootstrap aktiv (`provider-bootstrap.yaml:82-92`); **Widerspruch** zu Studie §3.6/F-12 | F-41, IC-15 Nr. 7, IC-33, Q34 | 0/1 | AC-21, AC-67 | Design-Input (Q34 vor IC-15 Nr. 7) |
+| #857 | Mammouth: Skills/MCP deklariert ohne Artefakte | **teilweise** — MCP behoben (`mcp` Capability `ai-providers.yaml:545`, `mcp-config` `:564-567`); Skills gültig (Writer `rules.py:304-308` überspringt `has_rules: true`) | F-06, F-41, IC-15 Nr. 2, IC-33 | 0/1 | AC-11, AC-67 | mit-umgesetzt |
+| #858 | Codex `.agents/skills`, Continue Skills ohne Artefakte | **gültig** — Ursache wie #857 (`has_rules: true`, `ai-providers.yaml:614, 358`) | F-06, F-41, IC-15 Nr. 2, IC-33 | 0/1 | AC-11, AC-67 | mit-umgesetzt |
+| #854 | `.gemini/commands/*.toml` kein Antigravity-Vertrag | **gültig** für Antigravity (`ai-providers.yaml:146-149`); für Gemini CLI UNVERIFIED (§13) | F-41, IC-33, IC-15 Nr. 22, Q33 | 0/1 | AC-67 | Design-Input (Q33) |
+| #832 | lokales Overlay `project.yaml.local` | **gültig** — `load_config` liest eine Datei (`scripts/lib/config.py:259`) | Q28, R12 | — | — | abgrenzen |
+| #800 | Hermes als Provider | **gültig** — kein Hermes-Eintrag in `config/ai-providers.yaml` | Q29 | — | — | abgrenzen |
+| #820 | Domänen-Unterordner in `agents/1-generic` | **gültig** — nicht-rekursiv (`scripts/lib/config_audit.py:190, 319`) | Q30 | — | — | abgrenzen |
+| #877 | Subplattform-/Familien-Schicht | **gültig** — kein Mechanismus vorhanden | Q31 | — | — | abgrenzen |
+| #933 | `{{ROLE}}` in Experten-Templates | **behoben** — Commit `e432b9d`, `tests/test_template_defects_932_935.py:15-16` grün | — | — | — | **schließen** |
+| #934 | 11× `py` in `agent-meta-manager` | **behoben** — `e432b9d`, Test `:19-20` grün, `grep "^py " agents/` leer | — | — | — | **schließen** |
+| #935 | `§7.1`/`§7.2`-Verweise | **behoben** — `e432b9d`, Test `:23-24` grün | — | — | — | **schließen** |
+
+Aufräum-Empfehlung (nur Vorschlag; Schließen/Kommentieren ist Nutzer-/`git`-Aufgabe, Skill `issue-lifecycle`):
+#933, #934, #935 schließen (Fix `e432b9d` + Regressionstest belegt; #932 wird im selben Test geprüft);
+#552 schließen mit Verweis auf IC-31; #192 schließen als überlagert (Phase 3 bei Bedarf neu anlegen);
+#779 kommentieren: IT-1/IT-6/IT-7 erledigt, IT-2 by design, Rest → diese Spec; #853 auf den `rules/`-Teil
+einengen; #856 auf ZC-1 einengen; #857 auf Skills einengen; #885 kommentieren: F-04/F-07 erledigt, F-08
+teilweise, Arbeitspakete 1/2/3/4/6 → IC-30/IC-32/IC-31 dieser Spec, Paket 5 (F-11…F-13) bleibt eigenständig.
+
+Abweichungen Issue-Text ↔ Code (Stand Rev. 2.2):
+
+| Issue | Issue-Text | Code heute |
+|---|---|---|
+| #779 | 84 Rollen, 301 Keywords | 92 Rollen; 370 Keywords (aus `routing_patterns.keywords`, Fallback `intent_keywords`) |
+| #779 IT-1, IT-6, IT-7 | offen | behoben (siehe Tabelle) |
+| #885 F-09 | „15 of 18" (Kommentar), Tabelle mit 16 Zeilen | 16 von 18 veraltet; Basisversionen inzwischen höher (z. B. `provider-expert` 1.5.1, `developer` 4.7.0) |
+| #885 F-14 | 66× / 49× / 20× / 19× | 69 / 58 / 19 / 19 Dateien (Datei-, nicht Zeilenzählung) |
+| #885 F-15 | `agent-meta-manager.md` 471 Z. | 501 Z. |
+| #853 | Settings und `rules/` offen | Settings behoben, `rules/` offen |
+| #856 | ZC-1 und ZC-2 offen | ZC-2 behoben |
+| #857 | `mcp` fehlt in Capabilities | `mcp` vorhanden, Skills weiterhin leer |
+| #832 | `load_config` in `config.py:221` | `config.py:259` |
+| #192 | Phase 2 deferred | Phase 2 implementiert (Code verweist auf „#192 Phase 2") |
+| #552 | 34 Kandidaten offen | alle Klassen A–F konform, Registry leer |
 
 ## 4. Konzept
 
@@ -348,6 +433,12 @@ def select_routing_examples(rule: dict) -> list[str]
   stehen in der Agentendatei bzw. `role-defaults.yaml`"), `short_desc`, `addressability` (abgeleitet),
   `tool{}` (solange `ROUTE_INTENT_CALLABLE=false`).
 - Zeilen sortiert nach Agentenname (Byte-Stabilität).
+- (Rev. 2.2, #779/#780) `select_routing_examples` arbeitet auf der bereits sprachgewählten Beispielliste
+  (`_select_examples(examples, language)`, `delegation_table.py:134-161`, Sprache = `COMMUNICATION_LANGUAGE`,
+  IC-29); `full` (JSON/YAML) und `compact` (Zeilen) zeigen dieselbe Sprachvariante. Keywords sind kanonisch
+  und in beiden Profilen sprachunabhängig identisch (QG-2 prüft die Keyword-Menge auch über zwei Sprachen).
+  Mehrdeutige Keywords (F-34) erhalten **kein** eigenes Flag im Zeilenformat (kein Schema-Tie-Break, Q32);
+  ihre Wirkung wird über IC-13-Kollisionsfälle gemessen.
 
 ### IC-05 Orchestrator-Template `agents/1-generic/orchestrator.md`
 - §2a, §9, Agent-Tabelle in `<context>` und §3-Prosa erhalten `{{#if CONTEXT_PROFILE_COMPACT}}…{{else}}…{{/if}}`.
@@ -409,6 +500,8 @@ Neue Keys in `config/provider-capabilities.yaml` (bzw. `config/ai-providers.yaml
 | (Rev. 2) `rules_required_suffix` | string\|null | Copilot `.instructions.md` (**UNVERIFIED**) |
 | (Rev. 2) `subagent_allowlist_required` | bool | Kimi true (SOURCE-DERIVED) |
 | (Rev. 2) `read_only_enforcement` | `tools`\|`permission-map`\|`sandbox`\|`none` | OpenCode `permission-map`; Copilot/Continue `none`; Codex `none` bis IC-15 Nr. 21 (Config gelesen, Runtime UNVERIFIED) |
+| (Rev. 2.2) `surface_verified_state` | Mapping Oberfläche (`agents`\|`commands`\|`skills`\|`rules`\|`settings`\|`mcp`\|`workspace_agents_autoload`) → `verified-state`-Enum aus IC-21 | ersetzt die Kommentar-Evidenz (F-19); z. B. ZCode `workspace_agents_autoload: UNVERIFIED` (#856/Q34), Gemini `commands: UNVERIFIED` (#854/Q33) |
+| (Rev. 2.2) `legacy_artifacts` | Liste relativer Pfade | früher generierte, heute inerte Dateien, z. B. Mammouth `.mammouth/settings.json` (#853) |
 
 Datenkorrekturen (F-17): ZCode Parallelität, Kimi `agents_md_precedence`, Mammouth `subagent_dispatch`,
 Gemini `.gemini/agents` nur Antigravity, Copilot-Pfade, Claude `orchestrator_hint` `--agent`.
@@ -427,6 +520,8 @@ Code liest ausschließlich diese Keys; Guard `test_no_provider_literal_usage_in_
 | `context.unread-channel` | WARN | generiertes Verzeichnis ∉ `rules_read_channels`/Discovery des Providers (Ausnahmen in `config/context-anchors.yaml: intentional_unread`); Entfernung in Phase 1 |
 | `context.token-report` | INFO | Report-Zeile je Provider (Quelle IC-11) |
 | `context-profile.marker-in-rule` | ERROR | IC-03 |
+| (Rev. 2.2) `context.declared-surface-empty` | Phase 0 WARN, ab Phase 1 ERROR | Capability deklariert eine Oberfläche (`skills`, `commands`, `mcp`, `settings`) mit Ziel-Key (`skills_dir`, `commands_dir`, `mcp-config.committed-file`, `settings_file`), aber nach dem Sync existiert dort kein generiertes Artefakt; Ausnahmen über `config/context-anchors.yaml: intentional_empty` mit Begründung (#857, #858) |
+| (Rev. 2.2) `context.legacy-artifact-present` | WARN | Pfad aus Capability `legacy_artifacts` existiert im Projekt (inerte Altdatei, #853) |
 
 (Rev. 2) Signaturvorgabe, damit Doctor und Sync dieselben Funktionen nutzen (ADR-6): jeder Check ist eine
 reine Funktion `check_<name>(project_root: Path, active_providers: Sequence[str], capabilities: Mapping[str, Mapping], active_set: ActiveSet) -> list[Finding]`;
@@ -453,6 +548,7 @@ anchors:
     compact-only: [<string>…]
 gate_card_sections: [<rule-stem>#<heading>…]
 intentional_unread: [<path-glob>…]
+intentional_empty: [{provider_capability: <surface>, reason: <Text>}…]   # Rev. 2.2, IC-10 context.declared-surface-empty
 ```
 Pflichtanker mindestens: CRITICAL-GATE-Satz, Singleton-Regel, `STATUS`/`RESULT`/`ARTIFACTS`-Contract,
 MCP-Deny-Tokens (`delete_conclusion`, `set_config`, `browser_run_code_unsafe`, `workspace.delete`, …),
@@ -474,6 +570,15 @@ Test `tests/test_context_anchors.py` prüft je Provider × Profil.
 - Läuft manuell/CI-nightly (benötigt LLM); nicht Teil des Default-CI.
 - (Rev. 2) Zusätzliche Eval-Variante „Teilmenge": System-Prompt aus einem 10-Rollen-Projekt (p10-artig)
   vor/nach Active-Set-Filter; Metrik zusätzlich „Dispatch an inaktive Rolle" (Ziel nach Phase 1: 0).
+- (Rev. 2.2, #779 IT-3) Kollisionsfälle: für jedes Token in `KNOWN_KEYWORD_OVERLAPS`
+  (`tests/test_routing_overlap.py:28`) ≥ 2 Fälle in `catalog.manual.yaml` — ein Fall nur mit dem Token
+  (erwartet `ASK` oder die dort begründete Zielrolle) und je beteiligter Rolle ein Fall mit Zusatzkontext
+  (erwartet diese Rolle). Metrik zusätzlich „Kollisions-Accuracy" getrennt ausgewiesen. Teilmengen-Variante:
+  ist eine der beiden Rollen inaktiv, ist die aktive Rolle das erwartete Ziel.
+- (Rev. 2.2, #779 IT-4/#780) Sprachvarianten: Paraphrasen-Korpus in Deutsch **und** Englisch (je ≥ 20 Rollen);
+  zwei Render-Varianten des System-Prompts (`COMMUNICATION_LANGUAGE: Deutsch` / `English`). Metriken je
+  Kombination Eingabesprache × Render-Sprache; zusätzliche Metrik „Sprach-Delta" = Top-1(DE-Eingabe) −
+  Top-1(EN-Eingabe) je Modellklasse. Damit wird Q2 datenbasiert beantwortet (QG-14).
 
 ### IC-14 Runtime-Capture-Harness (QG-7)
 `tests/manual/context-capture/` (neu, manuell): Mock-LLM-Server + Runner-Skripte aus der Studie; Assertions je
@@ -490,7 +595,7 @@ Ausgabe als JSON-Report unter `.tmp/`. Abgedeckte Runtimes zunächst: OpenCode, 
 | 4 | Codex: `.codex/config.toml` mit `[agents] max_depth` ≥ `required_depth`; Hard-Cap-Check (32 KiB); `spawn_agent`-Parameter (`agent_type`, `message`, `items`, `fork_context`) in der Delegationssyntax | Ort der Delegationssyntax-Config UNVERIFIED | F-04, F-09 |
 | 5 | Kimi: Frontmatter `subagents:`-Allowlist, Tool-Mapping (`Agent`, `AgentSwarm`, `TodoList`), `hint` → `whenToUse` | Kimi-Agent-Transform (Ort UNVERIFIED) | F-10 |
 | 6 | Mammouth: `mode`, kleingeschriebene `permission` inkl. `task`/`todowrite`, `subagent_depth`, Capability + Delegationssyntax | `provider-capabilities.yaml:231-247` | F-11 |
-| 7 | ZCode: obsoleten Bootstrap für die CLI entfernen; Parallel-Capability korrigieren | `scripts/lib/bootstrap.py` | F-12 |
+| 7 | ZCode: obsoleten Bootstrap für die CLI entfernen; Parallel-Capability korrigieren. (Rev. 2.2) Bootstrap-Entfernung erst nach Q34 (Runtime-Capture CLI **und** Desktop), weil #856 (ZC-1, Beta-Doku: nur `~/.zcode/agents/` wird geladen) der Studie §3.6 widerspricht; bis dahin `surface_verified_state.workspace_agents_autoload: UNVERIFIED` + Doctor-Seed `surface-unverified` | `scripts/lib/bootstrap.py`; `config/provider-bootstrap.yaml:82-92` | F-12, F-41 |
 | 8 | Gemini: `context.fileName` bzw. `GEMINI.md` für Gemini CLI; strict-schema-sichere Agent-Frontmatter (erst zur Laufzeit verifizieren, Q3); kein `.gemini/rules` mehr | Settings-/Agent-Transform (Ort UNVERIFIED) | F-08, F-07 |
 | 9 | Ungelesene Verzeichnisse stoppen/verlagern: `.mammouth/rules`, Root-`rules/` für Codex, Personal-Dateien nur, wenn der Provider sie liest (`CLAUDE.local.md` statt `CLAUDE.personal.md`) | Rules-/Context-Writer | F-07 |
 | 10 | Continue: Rule-Frontmatter (`alwaysApply`, `description`); unaufgelöste Platzhalter in `project-context.md` | Continue-Rules-Writer (Ort UNVERIFIED) | F-14 |
@@ -498,13 +603,16 @@ Ausgabe als JSON-Report unter `.tmp/`. Abgedeckte Runtimes zunächst: OpenCode, 
 | 12 | Provider-Listen-Rauschen, tote Skill-Tabelle (nur existierende Skills), unaufgelöste Platzhalter, ROUTING-Banner nur für aktive Provider | Partials `header.md`, Lazy-Tabelle | F-16 |
 | 13 | `claude -a` → `claude --agent` | `ai-providers.yaml:97` | F-17 |
 | 14 | `template-auditor`: name_only ohne Keyword-Regel **oder** §3-Text anpassen (Q9); Szenario 76 korrigieren | `role-defaults.yaml`, `tests/scenarios/asserts/76-template-auditor-role.sh:63-76` | F-02 |
-| 15 | Keyword-Single-Source in `role-defaults.yaml` (`routing.intent_keywords` vs. `routing_patterns.keywords`) | `tests/test_routing_tool_definitions.py:47-64`, `scripts/hermes_export.py:270` | F-02 |
+| 15 | Keyword-Single-Source in `role-defaults.yaml` (`routing.intent_keywords` vs. `routing_patterns.keywords`). (Rev. 2.2, #779 IT-5) Red: neuer Test „kein Rollen-Eintrag enthält `routing.intent_keywords`" ist rot; Green nach Entfernen + Umstellung von `hermes_export.py` und des Fallbacks in `get_routing_rules`; der Gleichheitstest `:47-64` entfällt im selben PR | `tests/test_routing_tool_definitions.py:47-64`, `scripts/hermes_export.py:270`, `scripts/lib/delegation_table.py` (Fallback, Docstring `:186ff`) | F-02 |
 | 16 | OpenCode: `subagent_depth` auf v2 erhalten oder Tiefe anders setzen; kein `**/AGENTS.md`-Deny, wenn OpenCode aktiv | `context.py:1340-1371` (`:1367`) | F-17 |
 | 17 (Rev. 2) | Reflection-Overrides aus der **Konsumenten**-Config: `apply_project_overrides(_refl_pairs, (config.get("reflection-pairs") or {}).get("overrides", {}))` statt `load_project_overrides(agent_meta_root/...)` | `config.py:1817-1821`; `reflection.py:43-55` | F-26 |
 | 18 (Rev. 2) | Pipeline-Validierung gegen `ActiveSet.roles` statt `config["roles"]`/alle Rollen; ein einziges `effective` (Agent-Renderer `agent_sync.py:666-668` konsumiert das Ergebnis aus `config.py`, keine Neuableitung); kein Warn-False-Positive für Stages mit inaktivem `dod_flag` | `config.py:1852-1857`; `agent_sync.py:666-668`; `pipelines.py:434-435` | F-23 |
 | 19 (Rev. 2) | `--create-ext`/Managed-Block: unaufgelöste Variablen nicht literal schreiben (Zeile weglassen bzw. „nicht gesetzt") | `templates/managed-block.md`; `extensions.py:49-146` | F-27 |
 | 20 (Rev. 2) | `CODE_QUALITY_RULES`: entweder in ein Template (Code-Konventionen der Kontextdatei) einbinden **oder** im Schema als deprecated markieren + Doctor-Regel; Entscheidung Q23 | `config/project-config.schema.json`; Kontext-Template (Ort UNVERIFIED) | F-28 |
 | 21 (Rev. 2) | Codex: read-only Rollen (`tools` ohne `Write`/`Edit`) erhalten `sandbox_mode: read-only` über Capability `read_only_enforcement: sandbox` statt pauschal `workspace-write` | `ai-providers.yaml:668`; Codex-Agent-Transform (Ort UNVERIFIED) | F-32 |
+| 22 (Rev. 2.2) | Gemini-Commands je Oberfläche: Gemini CLI behält `.gemini/commands/*.toml` nur mit belegtem `surface_verified_state.commands`; Antigravity erhält Commands als Skills (`/<skill-name>`) oder keine — Entscheidung Q33. Red: `context.declared-surface-empty`/`surface-unverified` meldet die Oberfläche; Green nach Fix bzw. Herabstufung der Deklaration | `ai-providers.yaml:146-149`; Commands-Writer (`scripts/lib/commands.py`) | F-41 (#854) |
+| 23 (Rev. 2.2) | `mammouth-expert.md` in `agents/1-generic` provider-neutral machen (Mammouth-Inhalt in `agents/2-platform/agent-meta-mammouth-expert.md`, Basis `provider-expert`; Rollen-Key bleibt, AC-73); verbleibende Provider-Literale in `knowledge-migrator.md:77-78`, `agent-meta-scout.md:43`, `prompt-governor.md:37`, `agent-meta-manager.md` durch Variablen (`{{CONTEXT_FILE}}`, Provider-Verzeichnisliste aus aktiven Providern) oder `> **Example (provider-specific):**`-Blöcke ersetzen. Red: `templates.provider-literal` (IC-32) meldet ≥ 1 Treffer; Green: 0 außerhalb Allowlist | genannte Dateien; `role-defaults.yaml` (`mammouth-expert`) | F-37 (#885 F-05/F-06) |
+| 24 (Rev. 2.2) | `based-on`-Pins der 16 veralteten Overrides nachziehen (inhaltlicher Abgleich je Override, nicht nur Versionsnummer). Red: `frontmatter.based-on-stale` (IC-32) als ERROR schlägt an; Green nach Re-Pin | `agents/2-platform/*.md` | F-38 (#885 F-09) |
 
 ### IC-16 Phase-3-Erweiterungspunkte (Default aus, eval-gated)
 - Profil `ultra` / Rollenprofil: kuratierte Rollenteilmengen über die bestehende `roles:`-Allowlist; verkleinert
@@ -571,7 +679,7 @@ def active_set_variables(active: ActiveSet) -> dict[str, str]
 | 8 | Persona-Zeile, §11-Fallback `meta-feedback`, SE-Prosa | `orchestrator.md:22,26,238,255` | `ROLE_*_ACTIVE` bzw. `SE_ENABLED`; Fallback bei inaktivem `meta-feedback`: Rückfrage an den Nutzer (ASK) | 1 |
 | 9 | Slash-Commands | `commands.py:20,100-175` | neuer optionaler Frontmatter-Key `requires_roles: [<role>…]` in `commands/**`; Command nur generieren, wenn `ActiveSet.all_active(requires_roles)`; consistency-check `commands.*` akzeptiert den Key (Q26) | 1 |
 | 10 | Rules mit Rollen-Ownership (`security-paved-roads`, `threat-model`, `a2a-delegation-gates`) | `rules/1-generic/*.md` | Owner-Zeilen per `ROLE_*_ACTIVE` (im Rules-Pfad erlaubt, IC-03) | 1 |
-| 11 | „Delegation (reference only)"-Prosa (34 Templates) | `agents/1-generic/*.md` | Phase 1: nur Zeilen mit Dispatch-Anweisung konditional; reine Erwähnungen bleiben (INFO-Zählung); Phase 3: datengetrieben (Q19) | 1 / 3 |
+| 11 | „Delegation (reference only)"-Prosa (34 Templates) | `agents/1-generic/*.md` | Phase 1: nur Zeilen mit Dispatch-Anweisung konditional; reine Erwähnungen bleiben (INFO-Zählung); Phase 3: datengetrieben (Q19). (Rev. 2.2) Die Menge der betroffenen Zeilen liefert der erweiterte Template-Guard IC-30 (#885: 223 Stellen inkl. `agents/2-platform`), nicht eine eigene Heuristik | 1 / 3 |
 | 12 | Pipeline-Validierung | `config.py:1852-1857` | gegen `ActiveSet.roles` (IC-15 Nr. 18) | 1 |
 | 13 | Config-Optimizer „unbenutzt"-Analyse | IC-24 | Fan-out nur über Artefakte aktiver Rollen × aktiver Provider | 2 |
 
@@ -588,12 +696,15 @@ Version-Bumps aller berührten Templates gemäß `agent-meta-conventions.md`.
 | `active-set.unknown-role` | WARN | Allowlist-Eintrag ∉ `known_roles` |
 | `active-set.pipeline-dropped` | WARN (Konsole + `sync.log`) | IC-18 Nr. 2; Meldung nennt Pipeline, fehlende Pflicht-Rolle(n) und Gate/Weg zur Aktivierung (z. B. `roles:`-Allowlist ergänzen) |
 | `active-set.unresolved-placeholder` | WARN | Regex `\{\{[A-Z][A-Z0-9_]*\}\}` im generierten Output; Allowlist `config/active-set-references.yaml: placeholder_allow` (z. B. dokumentierte `{{%VAR%}}`-Escapes) |
+| (Rev. 2.2) `routing.keyword-overlap` | INFO | Keyword gehört zu ≥ 2 Rollen aus `ActiveSet.routable` (IC-29, #779 IT-3); Rollen außerhalb des Active Set zählen nicht |
 | `active-set.raw-roles-access` | ERROR (nur Quell-Repo) | Generator-Modul liest `config["roles"]`/`config.get("roles")` außerhalb `active_set.py`/`roles.py` (statischer Guard, QG-13) |
 
 - Signatur wie IC-10: `check_<name>(project_root, active_providers, capabilities, active_set) -> list[Finding]`.
 - Läuft am Sync-Ende (`sync.log`), im Doctor (via `finding-ref`) und in Tests auf Fixture-Projekten.
 - Neue Datei `config/active-set-references.yaml`: `placeholder_allow: [<literal>…]`, `mention_allow: [<path-glob>…]`
   (Dateien, in denen Erwähnungen inaktiver Rollen gewollt sind, z. B. Doku-Beispiele).
+  (Rev. 2.2) Zusätzlich `dispatch_phrases: {de: [<regex>…], en: [<regex>…]}` (gemeinsame Quelle für IC-19 und
+  den Template-Guard IC-30) und `provider_literal_allow: [<path-glob>…]` (IC-32).
 - Fehlerpfad: Muster-Ableitung aus `delegation-syntax.yaml` schlägt für einen aktiven Provider fehl →
   `active-set.dispatch-pattern-missing` (WARN), Check für diesen Provider übersprungen (nie still).
 
@@ -682,7 +793,12 @@ Seed-Einträge (Phase 0; `verified-state` aus Studie, nichts darüber hinaus):
 | `hooks-not-registered` | — | `finding-ref` `hooks.enabled-but-not-registered` | ERROR | VERIFIED-SOURCE |
 | `sync-pending` | — | `command` `--check`, `expect_exit: 0` | WARNING | VERIFIED-SOURCE |
 | `read-only-not-enforced` | `read_only_enforcement` eq `none` ∧ aktive Rolle ohne Write/Edit | `yaml-key` | INFO | UNVERIFIED (Runtime) |
-| `schema-validation-skipped` | — `finding-ref` `doctor.environment` | INFO | VERIFIED-SOURCE (`config.py:381-417`) |
+| `schema-validation-skipped` | — | `finding-ref` `doctor.environment` | INFO | VERIFIED-SOURCE (`config.py:381-417`) |
+| (Rev. 2.2) `declared-surface-empty` | — | `finding-ref` `context.declared-surface-empty` | WARNING | VERIFIED-SOURCE (`rules.py:304-308`; `ai-providers.yaml:407, 568, 649`; #857/#858) |
+| (Rev. 2.2) `surface-unverified` | `surface_verified_state.<s>` eq `UNVERIFIED` ∧ Oberfläche `<s>` erzeugt Artefakte | `yaml-key` auf Capability | INFO | UNVERIFIED (per Definition; #854, #856) |
+| (Rev. 2.2) `legacy-artifact-present` | `legacy_artifacts` present | `finding-ref` `context.legacy-artifact-present` | WARNING | VERIFIED-SOURCE (`ai-providers.yaml:531-534`, #853) |
+| (Rev. 2.2) `routing-examples-language-fallback` | — | `finding-ref` `routing.examples-language-fallback` (source `sync-log`) | INFO | SOURCE-DERIVED (`delegation_table.py:150-161`, #780) |
+| (Rev. 2.2) `routing-keyword-overlap-active` | — | `finding-ref` `routing.keyword-overlap` | INFO | VERIFIED-SOURCE (`tests/test_routing_overlap.py:28`, #779 IT-3) |
 
 `agent_ext` ist ein bestehender Key laut Studie §10.1 (Artefakt-Contract); exakter Key-Name UNVERIFIED (Planer prüft).
 Je Eintrag Fixtures `tests/fixtures/doctor/<id>/{positive,negative}/` (QG-10).
@@ -909,6 +1025,85 @@ Abgeleitet aus Commit 507bbb5 (+ 1ff89be). Je Rolle vollständig, sonst kein Mer
 Diese Checkliste wird zusätzlich als Abschnitt in `rules/2-platform/agent-meta-conventions.md` (bzw. Skill
 `conventions`) übernommen, damit sie für künftige Rollen gilt (F-20).
 
+### IC-29 Routing-Daten-Hygiene und Sprachwahl (Rev. 2.2; #779, #780)
+Grundsatz (ADR-12 = #780 Design C): `routing_patterns.keywords` ist **eine** kanonische, sprachneutrale
+Ankermenge; Sprachnuancen liegen ausschließlich in `routing_patterns.examples`.
+- **Datenform:** `examples` ist entweder Liste (heutige Form, gilt für jede Sprache) oder Mapping
+  `{<Sprachwert>: [<Beispiel>…]}`; Sprachwerte = zulässige Werte von `COMMUNICATION_LANGUAGE` (heute u. a.
+  `Deutsch`; exakte Enum laut Schema UNVERIFIED, Planer prüft). Auswahl über die bestehende Funktion
+  `_select_examples` (`delegation_table.py:134-161`); keine zweite Auswahl-Logik.
+- **Fallback-Sichtbarkeit:** fehlt die Projektsprache im Mapping, gilt der bestehende deterministische Fallback
+  (erste Variante) **und** `sync.log` meldet je Rolle `routing.examples-language-fallback` (INFO); heute
+  still (`:150-157`).
+- **Keyword-Guard:** neuer Test `tests/test_routing_keywords_language_neutral.py`: kein Keyword enthält
+  `[äöüßÄÖÜ]` oder Wörter einer kleinen deutschen Stoppliste; Ausnahmen nur für Eigennamen/Fachbegriffe in
+  `config/routing-language.yaml: keyword_allow` mit Begründung; Ratchet (Allowlist darf nur schrumpfen).
+  Migration: deutsche Keyword-Varianten wandern als Beispiele nach `examples.Deutsch`, englische Grundform
+  bleibt Keyword. Jede Migration einer Rolle ist eval-gated (QG-1/QG-14).
+- **Ambiguität (F-34):** kein neues Schema-Feld (Q32). Jedes Token in `KNOWN_KEYWORD_OVERLAPS` wird
+  entweder geschärft (Fix A aus #779, z. B. `audit` → `security audit` / `code review`; konkrete Schärfung
+  eval-gated) oder bleibt mit IC-13-Kollisionsfällen. Neuer Check `routing.keyword-overlap` (INFO) in
+  `scripts/lib/consistency/active_set_refs.py` (IC-19-Signatur): meldet Überlappungen nur zwischen Rollen
+  aus `ActiveSet.routable` — im Projekt ohne eine der Rollen entfällt die Kollision (Active-Set-Wechselwirkung).
+- **Single-Source:** IC-15 Nr. 15 (#779 IT-5).
+- **Coverage:** bestehend (`tests/test_role_addressability_coverage.py`); zusätzlich: jede keyword-Rolle mit
+  Mapping-`examples` hat ≥ 1 Beispiel in jeder Sprache, die im Mapping irgendeiner Rolle vorkommt (verhindert
+  den #780-Option-B-Fehler „in EN vorhanden, in DE nicht").
+- **Zeilenformat:** IC-04 (Rev.-2.2-Punkt). **Kein** Einfluss auf `tool{}`/Enum.
+
+### IC-30 Template-Routing-Guard (Rev. 2.2; #885 F-01…F-03 + Addendum)
+- `tests/test_no_role_routes_in_templates.py`: `_SCOPE_GLOBS` += `agents/2-platform/*.md`,
+  `rules/2-platform/*.md`; `_HANDOFF_RE` += `delegier\w*`, `beauftrag\w*`, `weise\s+\S+\s+an`, `übergib`,
+  `übernimm\w*|übernehm\w*`, `weiterreich\w*`, `überträg\w*` (case-insensitiv); `_ARROW_RE` adjazenz-unabhängig
+  (Zeilen, deren linke Seite auf `?`/`)` endet); `D-NONROLE` befreit `text → role` nicht mehr pauschal;
+  `D-BOUNDARY` erkennt zusätzlich `**Boundary:**`, `**Scope:**`, `**Not your job:**`.
+- Ratchet: bestehende Treffer stehen in einer Registry im Test (Datei:Klasse, ohne Zeilennummer); die Registry
+  darf nur schrumpfen. Neue Treffer schlagen fehl. Negativanker: die kanonischen Offender aus #885 (z. B.
+  `knowledge-ingestor.md` „Delegiere an `knowledge-indexer`", `developer.md` „Write tests? → `tester`").
+- Gemeinsame Mustermenge mit `active-set.dangling-dispatch` (IC-19): die Dispatch-Muster stehen einmal in
+  `config/active-set-references.yaml: dispatch_phrases` (de/en) und werden von Guard **und** Check gelesen.
+- Triage (Phase 1, #885-Policy (b)): jede Registry-Zeile wird (1) per `ROLE_*_ACTIVE` konditional
+  (IC-18 Nr. 11), (2) unter einen Allow-Marker (`**Delegation (reference only):**`, Boundary-Block) gestellt
+  oder (3) nach `role-defaults.yaml` (`handoff.target_roles`) verschoben; Policy (a) „alles in Daten" = Phase 3 (Q19).
+
+### IC-31 Quell-Boilerplate-De-Dup (Rev. 2.2; #885 F-14, #552)
+- Ziel: wörtlich wiederholte Zeilen in `agents/1-generic`/`agents/2-platform` durch Snippet-Variablen ersetzen;
+  **Render byte-identisch** (Beweis wie IC-25 L0 über die Provider-Matrix).
+- Blöcke: Worker-Rolle → bestehendes `{{ANTI_RECURSION_BLOCK}}` (heute 24 Nutzer, 58 Inline-Kopien);
+  `{{CLOSING_SUMMARY_BLOCK}}` (EN, 69 Dateien) und `{{USER_PROXY_BLOCK}}` (19) neu unter `snippets/agents/`;
+  Registrierung in `placeholders.py` über IC-32 (abgeleitete Menge).
+- EN/DE-Zwilling (19 Dateien „Pflicht-Abschluss-Summary") wird in **eigenem** PR auf die EN-Fassung
+  vereinheitlicht (ändert Render bewusst; Golden-Rebaseline mit Begründung; Anker-Check QG-3).
+- Contract-Kopplung (#552): `tests/test_contract_labels.py` prüft heute Quelltexte; nach IC-31 prüft er die
+  snippet-aufgelösten Templates (gleiche Auflösung wie `standalone.py`), damit ein in ein Snippet verschobener
+  `STATUS:/RESULT:/ARTIFACTS:`-Marker weiterhin erkannt wird (R13). Die Marker selbst bleiben pro Template
+  sichtbar im `<output_contract>` (rollenspezifische Felder); nur der generische Abschluss-Satz wandert.
+- Ratchet: neuer Test `tests/test_template_line_duplication.py` zählt Zeilen (≥ 40 Zeichen) in ≥ 5 Templates;
+  Obergrenze = Ist nach IC-31, darf nur sinken.
+- Render-De-Dup (ein Block je Provider statt je Agent) bleibt IC-27/Phase 3 (Q6).
+
+### IC-32 Template-Integritäts-Checks (Rev. 2.2; #885 F-05, F-06, F-08, F-09)
+| Check-ID | Level | Bedingung | Ort |
+|---|---|---|---|
+| `frontmatter.based-on-stale` | Phase 0 WARN, ab IC-15 Nr. 24 ERROR | `based-on: 1-generic/<role>.md@<v>` ≠ `version:` der Basis | `scripts/lib/consistency/frontmatter.py` (neben `frontmatter.based-on-missing`, `:93-97`) |
+| `placeholders.builder-known-set` | ERROR (Quell-Repo) | eine von `build_variables`, `active_set_variables` (IC-17) oder `resolve_context_profile` (IC-02) erzeugte Variable fehlt in der bekannten Menge | `scripts/lib/consistency/placeholders.py`: bekannte Menge = statische Liste ∪ zur Laufzeit abgeleitete Builder-Keys (Builder-Lauf auf Fixture-Config); kein drittes Handpflege-Register |
+| `templates.provider-literal` | Phase 0 WARN, ab IC-15 Nr. 23 ERROR | Provider-Display-Name oder Provider-Verzeichnis (abgeleitet aus `config/ai-providers.yaml`: Keys, `provider_root_dirs`, `context_file`) in `agents/1-generic/*.md` außerhalb `> **Example (provider-specific):**`-Blöcken und außerhalb `config/active-set-references.yaml: provider_literal_allow` | `scripts/lib/consistency/` (neues Modul oder bestehendes Provider-Agnostik-Modul) |
+- Daten statt Literale: die Provider-Namensliste wird aus `config/ai-providers.yaml` gelesen
+  (`test_no_provider_literal_usage_in_lib` bleibt grün).
+- `meta-doctor`/`meta-optimizer` (IC-23/IC-26) unterliegen `templates.provider-literal` ab Erstellung.
+
+### IC-33 Provider-Oberflächen-Konsistenz (Rev. 2.2; #853, #854, #856, #857, #858)
+- Neue Capability-Keys `surface_verified_state`, `legacy_artifacts` (IC-09), Checks
+  `context.declared-surface-empty`, `context.legacy-artifact-present` (IC-10), Doctor-Seeds (IC-21).
+- Ursache für #857/#858 (Skills): der Lazy-Skill-Writer (`rules.py:304-308`) schreibt nur für
+  `has_rules: false`; IC-15 Nr. 2 erweitert die Bedingung auf „Provider, deren `rules_read_channels` den
+  nativen Rules-Kanal **nicht** enthält, aber `skills`" — gekoppelt an IC-15 Nr. 9 (ungelesenes `rules_dir`
+  nicht mehr schreiben). Provider-agnostisch über Capability, kein Providername.
+- Altlasten (#853): `legacy_artifacts` werden nicht automatisch gelöscht (nicht in `.agent-meta-managed`
+  von heute garantiert, UNVERIFIED); Doctor meldet, `agent-meta-manager` räumt nach Nutzerfreigabe auf.
+- Q33/Q34 entscheiden die Commands- bzw. Workspace-Agent-Frage; bis dahin `UNVERIFIED` in
+  `surface_verified_state` und Severity-Deckel (ADR-11).
+
 ## 6. Datenfluss
 
 ```
@@ -938,7 +1133,11 @@ project.yaml (context-profile, provider-overrides.<P>.context-profile, context_f
         ▼ write_checked (byte-stabil, sortiert, keine Zeitstempel in dynamischer Position)
         │
         ▼ Consistency (IC-10, IC-19): Caps, Dangling-Pointer, Reachability, Unread, Anker (IC-12),
-        │                            Dangling-Dispatch, Unresolved-Placeholder
+        │                            Dangling-Dispatch, Unresolved-Placeholder,
+        │                            (Rev. 2.2) Declared-Surface-Empty, Legacy-Artifact, Keyword-Overlap (aktiv)
+        │
+        │  Quell-Repo (Rev. 2.2): Template-Guard IC-30, Integritäts-Checks IC-32, Quell-De-Dup-Ratchet IC-31
+        │  Routing-Daten (Rev. 2.2): role-defaults.examples[COMMUNICATION_LANGUAGE] → _select_examples (IC-29)
         │
         ▼ --context-report (IC-11) ──► CI-Budgets (QG-4)
                                   └─► Role-Routing-Eval nightly (IC-13) / Capture manuell (IC-14)
@@ -972,6 +1171,10 @@ Projekt-Config (Vorschlag → Beweis → Anwendung):
 | QG-11 (Rev. 2) | Optimizer-Lossless-Test `tests/test_meta_optimizer.py`: (a) überschriebene/Default-gleiche/unbenutzte Variable ⇒ L0 bestanden; (b) wirksame Variable fälschlich als Kandidat injiziert ⇒ L0 schlägt fehl, Kandidat verworfen; (c) Kommentare erhalten außer auf entfernten Zeilen (exakte Zahl), Key-Reihenfolge erhalten; (d) veralteter Vorschlag ⇒ Exit 1 ohne Schreiben; (e) semantischer Kandidat ohne `--accept` ⇒ nicht angewendet; (f) Fan-out-Zahlen = unabhängige Sentinel-Zählung | deterministisch | jede CI |
 | QG-12 (Rev. 2) | Neue-Rolle-Konformität (IC-28): Pins in `test_role_addressability_coverage.py`, `test_name_only_roles_have_no_routing_patterns`, Szenarien 77/78, Standalone-Export | deterministisch | jede CI |
 | QG-13 (Rev. 2) | Active-Set-Single-Source: Guard-Test `tests/test_active_set_single_source.py` (statisch: kein `config["roles"]`/`config.get("roles")` in Generator-Modulen außerhalb `active_set.py`/`roles.py`; dynamisch: alle IC-18-Konsumenten erhalten dasselbe `ActiveSet`-Objekt) | deterministisch | jede CI |
+| QG-14 (Rev. 2.2) | Routing-Sprach-/Kollisions-Eval (IC-13 Rev.-2.2-Punkte) + deterministisch: `tests/test_routing_keywords_language_neutral.py` (Ratchet), Sprachwahl-Fixture (DE/EN aus gleicher Quelle, Keyword-Mengen identisch), Mapping-Sprachabdeckung (IC-29) | LLM + deterministisch | Eval nightly; Tests jede CI |
+| QG-15 (Rev. 2.2) | Template-Routing-Guard (IC-30): erweiterter Scope/Regex, Negativanker aus #885, Ratchet-Registry nur schrumpfend; gemeinsame `dispatch_phrases` mit IC-19 (Test: Guard und Check lesen dieselbe Liste) | deterministisch | jede CI |
+| QG-16 (Rev. 2.2) | Template-Integrität (IC-32): `based-on-stale`, `builder-known-set`, `provider-literal` je mit Positiv-/Negativ-Fixture | deterministisch | jede CI |
+| QG-17 (Rev. 2.2) | Quell-De-Dup-Äquivalenz (IC-31): Render aller Agenten über die Provider-Matrix vor/nach byte-gleich (außer EN/DE-Zwillings-PR); `test_contract_labels.py` auf aufgelösten Templates grün; Duplikations-Ratchet | deterministisch | jede CI |
 
 Test-Churn (Format-Pins):
 
@@ -988,6 +1191,10 @@ Test-Churn (Format-Pins):
 | `scripts/lib/consistency/placeholders.py:111-119` | neue Built-ins (Rev. 2: `ROLE_*_ACTIVE`, `ACTIVE_ROLES`) | neue Built-ins |
 | (Rev. 2) `tests/scenarios/asserts/76-template-auditor-role.sh:63-76` | Assert #5 ersetzen (IC-15/14) | — |
 | (Rev. 2) Pipeline-bezogene Tests (`tests/test_*pipeline*.py`, exakte Liste UNVERIFIED) | Fixtures mit inaktiven Stage-Rollen ändern Erwartung (Pipeline gedroppt) | — |
+| (Rev. 2.2) `tests/test_routing_tool_definitions.py:47-64` (Gleichheit `intent_keywords`) | entfällt mit IC-15 Nr. 15 | — |
+| (Rev. 2.2) `tests/test_routing_overlap.py:28` (`KNOWN_KEYWORD_OVERLAPS`) | schrumpft je Schärfung (IC-29) | — |
+| (Rev. 2.2) `tests/test_no_role_routes_in_templates.py` | Scope/Regex erweitert, Ratchet-Registry (IC-30) | — |
+| (Rev. 2.2) `tests/test_contract_labels.py` | prüft aufgelöste Templates (IC-31) | — |
 
 ## 8. Akzeptanzkriterien
 
@@ -1070,19 +1277,40 @@ Quer:
 60. **AC-60** Boilerplate-De-Dup (IC-27, Phase 3) nur als Opt-in und nur für Provider mit positiv beantworteter Q6; Eval ≥ Baseline − 1.0 Prozentpunkt; Anker (QG-3) grün; ohne Opt-in byte-identisch (AC-35 sinngemäß).
 61. **AC-61** Neue Module (`active_set.py`, `doctor.py`, `meta_optimizer.py`, Checks) enthalten keine Provider-Literale; Registry-Prädikate sind ausschließlich Capability-/Config-/Rollen-Prädikate; `test_no_provider_literal_usage_in_lib` grün.
 
+### Rev. 2.2 — Phase 0 (Issue-Zuordnung; Checks/Eval, keine Render-Änderung)
+62. **AC-62** Der Eval-Korpus (IC-13) enthält für jedes Token aus `KNOWN_KEYWORD_OVERLAPS` ≥ 2 Kollisionsfälle mit erwarteter Ausgabe sowie DE- und EN-Paraphrasen für je ≥ 20 Rollen; die Baseline (AC-02) weist Kollisions-Accuracy und Sprach-Delta je Modellklasse aus (#779 IT-3/IT-4, #780).
+63. **AC-63** `routing.keyword-overlap` (INFO) meldet im Alle-Rollen-Fixture alle 9 Overlap-Tokens und im p10-artigen Fixture nur Tokens, deren beide Rollen aktiv sind; Doctor-Seed `routing-keyword-overlap-active` liefert dieselbe Anzahl (AC-41 sinngemäß).
+64. **AC-64** `tests/test_no_role_routes_in_templates.py` scannt `agents/2-platform` und `rules/2-platform`, erkennt die deutschen Formen aus IC-30 und enthält die #885-Negativanker; der Test ist mit Ratchet-Registry grün, und eine neu eingefügte Zeile „Delegiere an `tester`" in einem Fixture-Template lässt ihn fehlschlagen (#885 F-01…F-03).
+65. **AC-65** `frontmatter.based-on-stale` (WARN) meldet jede Abweichung zwischen Pin und Basisversion; die Anzahl wird gegen die Basisdateien berechnet (kein gepinnter Zahlenwert) (#885 F-09).
+66. **AC-66** `placeholders.builder-known-set`: jede von `build_variables`, `active_set_variables` und `resolve_context_profile` erzeugte Variable ist bekannt; eine neu im Builder eingeführte, nicht registrierte Variable lässt den Test fehlschlagen; `consistency-check --json` meldet keine `placeholders.*`-Warnung für Builder-Variablen (#885 F-08).
+67. **AC-67** `context.declared-surface-empty` meldet (WARN) auf dem Provider-Matrix-Fixture mindestens die fehlenden Skills für Codex, Mammouth und Continue; `context.legacy-artifact-present` meldet ein Fixture mit `.mammouth/settings.json`; die Seeds `declared-surface-empty`, `surface-unverified`, `legacy-artifact-present`, `routing-examples-language-fallback`, `routing-keyword-overlap-active` erfüllen AC-37/AC-38 (#853, #854, #856, #857, #858).
+
+### Rev. 2.2 — Phase 1 (Daten, Guard-Triage, Quell-De-Dup, Provider-Literale)
+68. **AC-68** `tests/test_routing_keywords_language_neutral.py` ist grün; die Allowlist `keyword_allow` enthält nur begründete Eigennamen/Fachbegriffe und ist gegenüber dem Phase-0-Stand nicht gewachsen; jede Keyword-Migration einer Rolle besteht QG-1 (≥ Baseline − 1.0 Prozentpunkt) (#779 IT-4; #780-Abnahmekriterien 4, 5).
+69. **AC-69** Aus derselben `role-defaults.yaml` erzeugt ein Fixture mit `COMMUNICATION_LANGUAGE: Deutsch` deutsche und eines mit `English` englische Beispiele (in `full`-JSON und, ab Phase 2, im Zeilenformat); die Keyword-Mengen beider Renders sind identisch; eine Rolle ohne Variante der Projektsprache erzeugt `routing.examples-language-fallback` (INFO) (#780-Abnahmekriterien 1–3).
+70. **AC-70** Jedes der 9 Overlap-Tokens ist entweder geschärft (aus mindestens einer Rolle entfernt, `KNOWN_KEYWORD_OVERLAPS`-Eintrag gelöscht) oder durch AC-62-Fälle abgedeckt; jede Schärfung besteht QG-1 und verschlechtert die Kollisions-Accuracy nicht (#779 IT-3).
+71. **AC-71** Die IC-30-Ratchet-Registry ist für die #885-Klassen A (HANDOFF), D (NEXT) und E (deutsch) leer; Klasse B/C/F-Zeilen sind konditional (`ROLE_*_ACTIVE`), unter Allow-Marker oder in `role-defaults.yaml`; AC-49 bleibt grün.
+72. **AC-72** Nach IC-31 kommen Worker-Rollen-, Closing-Summary- und User-Proxy-Zeile in Quell-Templates nicht mehr inline vor (Ratchet-Test); der Render aller Agenten ist über die Provider-Matrix byte-gleich zum Stand davor (außer dem EN/DE-Zwillings-PR mit Golden-Rebaseline); `test_contract_labels.py` ist auf aufgelösten Templates grün (#885 F-14, #552).
+73. **AC-73** `agents/1-generic/mammouth-expert.md` enthält keine Provider-Literale mehr außerhalb der Allowlist (Inhalt auf `provider-expert` + Plattform-Override zurückgeführt); der Rollen-Key `mammouth-expert` und die Pins aus IC-28 Nr. 4 bleiben unverändert (ob `resolve_active_roles(require_template=True)` ein `1-generic`-Template verlangt: UNVERIFIED, Planer prüft); `templates.provider-literal` ist ERROR und meldet 0 Treffer außerhalb der Allowlist; Mammouth-Projekte erhalten weiterhin einen Mammouth-Experten (Szenario/Fixture) (#885 F-05/F-06).
+74. **AC-74** Alle `based-on`-Pins entsprechen der Basisversion; `frontmatter.based-on-stale` ist ERROR (#885 F-09).
+
 ## 9. Phasen
 
 | Phase | Name | Inhalt | ACs | Verhaltensänderung |
 |---|---|---|---|---|
-| 0 | Messen & Absichern | Role-Routing-Eval + Baseline, Tokenizer-Messung, `--context-report`, Anker-Registry, Budgets als Obergrenzen, Dangling/Reachability als WARN, Doku-Korrekturen; **(Rev. 2)** IC-09-Keys (nur Daten), IC-17 `ActiveSet` (berechnet, noch ohne Konsumenten-Umstellung), IC-19-Checks als WARN, IC-21 Registry, IC-22 `--doctor`, IC-23 `meta-doctor`, IC-28 Checkliste in Konventionen | AC-01…AC-09, AC-37…AC-44 | keine (nur neue read-only Werkzeuge, neue `sync.log`-WARNs) |
-| 1 | Kanäle & Korrektheit | IC-15 Nr. 1–21, je eigener Issue/PR; Goldens wo nötig aktualisiert; **(Rev. 2)** IC-18 Active-Set-Konsumenten (je Konsument eigener PR, Reihenfolge = Rangliste §11.1), IC-19 `dangling-dispatch` → ERROR, IC-20 projekt-spezifische Rollen (Q16) | AC-10…AC-22, AC-45…AC-53 | Bugfixes (auch in `full`) |
-| 2 | Profil `compact` | IC-01…IC-12, C1–C7 (IC-09-Keys liegen bereits seit Phase 0 vor); **(Rev. 2)** IC-24…IC-27 Config-Optimizer + Applier + `meta-optimizer`-Rolle (unabhängig vom Profil, parallel möglich) | AC-23…AC-32, AC-54…AC-59 | nur mit Opt-in (Profil) bzw. nur auf Anforderung (Optimizer) |
+| 0 | Messen & Absichern | Role-Routing-Eval + Baseline, Tokenizer-Messung, `--context-report`, Anker-Registry, Budgets als Obergrenzen, Dangling/Reachability als WARN, Doku-Korrekturen; **(Rev. 2)** IC-09-Keys (nur Daten), IC-17 `ActiveSet` (berechnet, noch ohne Konsumenten-Umstellung), IC-19-Checks als WARN, IC-21 Registry, IC-22 `--doctor`, IC-23 `meta-doctor`, IC-28 Checkliste in Konventionen; **(Rev. 2.2)** IC-13-Korpus um Kollisions-/Sprachfälle, IC-29 Check `routing.keyword-overlap` + Keyword-Guard als Ratchet, IC-30 Guard-Erweiterung mit Ratchet, IC-32 Checks als WARN (`builder-known-set` als ERROR im Quell-Repo), IC-33 Keys/Checks/Seeds | AC-01…AC-09, AC-37…AC-44, AC-62…AC-67 | keine (nur neue read-only Werkzeuge, neue `sync.log`-WARNs, Test-Ratchets) |
+| 1 | Kanäle & Korrektheit | IC-15 Nr. 1–24, je eigener Issue/PR; Goldens wo nötig aktualisiert; **(Rev. 2)** IC-18 Active-Set-Konsumenten (je Konsument eigener PR, Reihenfolge = Rangliste §11.1), IC-19 `dangling-dispatch` → ERROR, IC-20 projekt-spezifische Rollen (Q16); **(Rev. 2.2)** IC-29 Daten (Single-Source, Sprach-Mapping, Schärfung, eval-gated), IC-30 Triage, IC-31 Quell-De-Dup, IC-32 → ERROR nach IC-15 Nr. 23/24 | AC-10…AC-22, AC-45…AC-53, AC-68…AC-74 | Bugfixes (auch in `full`); IC-31 render-neutral außer EN/DE-PR |
+| 2 | Profil `compact` | IC-01…IC-12, C1–C7 (IC-09-Keys liegen bereits seit Phase 0 vor); **(Rev. 2)** IC-24…IC-27 Config-Optimizer + Applier + `meta-optimizer`-Rolle (unabhängig vom Profil, parallel möglich); **(Rev. 2.2)** IC-04 mit sprachgewählten Beispielen (AC-69 Zeilenformat-Teil) | AC-23…AC-32, AC-54…AC-59 | nur mit Opt-in (Profil) bzw. nur auf Anforderung (Optimizer) |
 | 3 | Erweiterungen | IC-16: `ultra`/Rollenprofil, Vererbungs-Flags, Kimi `${agents_md}`/Plugin-`systemPrompt`, Admin-UI, Claude `paths:`, `permission.task`; **(Rev. 2)** Boilerplate-De-Dup (IC-27), datengetriebene „Delegation (reference only)"-Listen (Q19), L2-Relokationen hoher Fan-out-Variablen | AC-33…AC-35, AC-60 | nur mit Opt-in |
 
 Reihenfolge-Regel: Phase 2 beginnt erst, wenn AC-02 (Baseline) erfüllt ist; IC-04 wird nicht gemergt, bevor AC-25 nachgewiesen ist. AC-36 und AC-61 gelten in allen Phasen.
 (Rev. 2) Zusatzregeln: IC-18 Nr. 2 (Pipelines) wird vor IC-04 gemergt, damit das Zeilenformat bereits auf der
 gefilterten Pipeline-Menge basiert. Der Config-Optimizer (Phase 2) setzt IC-17 (Phase 0) voraus, nicht das Profil.
 Die IC-19-Check-Stufe wechselt erst auf ERROR, wenn AC-49 auf der vollständigen Fixture-Matrix grün ist.
+(Rev. 2.2) Zusatzregeln: Keyword-Migration und -Schärfung (IC-29) erst nach AC-62 (Baseline mit Kollisions-
+und Sprachfällen). IC-30-Triage läuft vor bzw. mit IC-18 Nr. 11 (gleiche Zeilenmenge). IC-31 vor IC-05/IC-18-
+Template-Änderungen mergen, damit Konditionale nicht in 58 Inline-Kopien gepflegt werden; IC-32
+`based-on-stale` (WARN) muss vor dem ersten Template-PR aktiv sein. IC-15 Nr. 7 (ZCode-Bootstrap) erst nach Q34.
 
 ## 10. ADRs (Kurzform)
 
@@ -1099,6 +1327,8 @@ Die IC-19-Check-Stufe wechselt erst auf ERROR, wenn AC-49 auf der vollständigen
 | ADR-9 Neue Rollen name_only, orchestrator_only, ohne `routing_patterns` | Präzedenz `template-auditor` hat `routing_patterns` trotz name_only → Keyword-Regel, Szenario-76-Widerspruch | beide neuen Rollen ohne `routing_patterns`; Invarianten-Test für alle name_only-Rollen (wirkt nach IC-15 Nr. 14 auch für `template-auditor`) | kein versehentliches Auslösen durch Routine-Aufgaben; Aufruf nur explizit per Name |
 | ADR-10 Pipeline-Drop statt Ersatzrolle | Pipelines mit inaktiver Pflicht-Rolle sind heute nicht ausführbar, werden aber gerendert | Pipeline entfällt vollständig (+ WARN, auch in der Sync-Konsole, mit fehlender Rolle und Aktivierungsweg); keine implizite Ersatzrolle | keine hängenden Dispatches; Funktionsumfang sichtbar kleiner; Ersatzrollen später explizit per Daten (`fallback_role`, Q18); **ENTSCHIEDEN** (Nutzerentscheidung, Rev. 2.1) |
 | ADR-11 Severity-Deckel für UNVERIFIED | Provider-Fakten teils nur aus Drittquellen; falsche ERRORs würden CI blockieren | `verified-state: UNVERIFIED` ⇒ ≤ WARNING; Hochstufung nur mit Evidenz-Update | weniger False-Positive-Blocker; echte Fehler ggf. zunächst nur als WARNING |
+| ADR-12 (Rev. 2.2) Sprachwahl im Routing = #780 Design C | Projekte unterschiedlicher Sprache; Option B (zwei Keyword-Sätze) verdoppelt Pflege und Coverage-Lücken; Generator-Rohbau existiert (`delegation_table.py:134-161`, `agents.py:284`) | kanonische sprachneutrale Keywords; `examples` je `COMMUNICATION_LANGUAGE` als Mapping; sichtbarer Fallback; Keyword-Guard als Ratchet; Template-Sprache (#885 F-12) ist davon getrennt | eine Coverage-Quelle; Datenmigration eval-gated; englische Projekte erhalten erst nach Datenpflege englische Beispiele |
+| ADR-13 (Rev. 2.2) Quell-De-Dup getrennt von Render-De-Dup | #885 F-14 (Pflegelast in Quellen) vs. F-29 (Tokens im Render); Render-De-Dup hängt an Q6 | Quell-De-Dup über Snippet-Variablen mit L0-Beweis ab Phase 1; Render-De-Dup bleibt Phase 3 | Template-Änderungen (IC-05, IC-18) treffen eine Stelle statt 58; keine Token-Einsparung durch IC-31 allein |
 
 ## 11. Erwartete Wirkung (ZIELE/Schätzungen, keine Messung; Tokens ≈ Bytes/4)
 
@@ -1147,13 +1377,17 @@ Priorisiert nach Wirkung × Korrektheitsrisiko; jede Zeile verweist auf den Spec
 | 9 | Reflection-Overrides-Quelle fixen | Korrektheit (`MAX_ITERATIONS`) | IC-15 Nr. 17 | 1 |
 | 10 | Projekt-spezifische Rollen implementieren oder Doku korrigieren | Funktion (heute nicht nutzbar) | IC-20, Q16 | 1 |
 | 11 | Warnung bei gate-gedroppten Allowlist-Einträgen und übrig gebliebenen `{{VAR}}` | Sichtbarkeit | IC-17, IC-19 | 0 |
+| 12 (Rev. 2.2) | Template-Guard erweitern und 223 Routing-Stellen triagieren | Korrektheit; Voraussetzung für 0 Dangling-Dispatch in Worker-Agenten | IC-30, IC-18 Nr. 11 | 0/1 |
+| 13 (Rev. 2.2) | Quell-De-Dup (Worker-Rolle, Closing-Summary, User-Proxy) | Pflege: eine Stelle statt bis zu 69; keine Token-Wirkung | IC-31, ADR-13 | 1 |
+| 14 (Rev. 2.2) | Sprachgewählte Beispiele + kanonische Keywords | Routing-Qualität in Nicht-DE-Projekten (UNVERIFIED bis QG-14) | IC-29, ADR-12 | 1/2 |
+| 15 (Rev. 2.2) | Skills-Kanal für Codex/Mammouth/Continue (statt ungelesener `rules_dir`) | behebt hängende Pointer und leere Oberflächen | IC-33, IC-15 Nr. 2/9 | 1 |
 
 ## 12. Offene Fragen und Risiken
 
 | # | Frage | Auflösung |
 |---|---|---|
 | Q1 | Routing-Qualität des Zeilenformats auf kleinen Modellen | QG-1/AC-25 |
-| Q2 | Sprache der Tabelle (Keywords/Beispiele deutsch vs. englisch; Beispiele 96 % deutsch) | Eval-Variante mit englischem Korpus in Phase 0; Entscheidung datenbasiert |
+| Q2 | Sprache der Tabelle (Keywords/Beispiele deutsch vs. englisch; Beispiele 96 % deutsch) | Eval-Variante mit englischem Korpus in Phase 0; Entscheidung datenbasiert. (Rev. 2.2) Mechanismus festgelegt (ADR-12, #780 Design C); offen bleibt nur die Datenfrage, beantwortet durch QG-14 |
 | Q3 | Gemini-CLI strict-Frontmatter-Schema zur Laufzeit | Lauf/Capture vor IC-15/8 |
 | Q4 | Antigravity 12,000-Zeichen-Cap und Status `define_subagent` | Runtime-Test; bis dahin UNVERIFIED, Soft-Cap nur WARN |
 | Q5 / D-1 (ENTSCHIEDEN) | Brauchen Kimi-Worker Rules (sehen AGENTS.md nie)? Gate-Card via `${agents_md}`? | **ENTSCHIEDEN (Nutzerentscheidung, Rev. 2.1):** Kimi-Worker bekommen die Gate-Card in den Worker-Bodies via `${agents_md}`; Umsetzung bleibt Phase 3 (nach Eval; `compact` hält es billig); Doctor-Known-Issue bleibt bis dahin bestehen |
@@ -1172,13 +1406,20 @@ Priorisiert nach Wirkung × Korrektheitsrisiko; jede Zeile verweist auf den Spec
 | Q18 (Rev. 2, ENTSCHIEDEN) | Pipeline mit inaktiver Pflicht-Rolle: droppen vs. Stage überspringen vs. Ersatzrolle (z. B. `senior-developer` → `developer`) | **ENTSCHIEDEN (Nutzerentscheidung, Rev. 2.1):** droppen UND Nutzer warnen — `active-set.pipeline-dropped` WARN, im Sync-Konsolenoutput sichtbar (ADR-10); `fallback_role` je Stage bleibt spätere Option, nur mit Eval |
 | Q19 (Rev. 2) | „Delegation (reference only)"-Prosa in 34 Templates | **Empfehlung:** Phase 1 nur Zeilen mit Dispatch-Anweisung konditional; Phase 3 datengetrieben (Liste in `role-defaults`, gefiltert gerendert) |
 | Q20 (Rev. 2) | Doctor in CI: nur WARN-Report oder `--strict` als Gate | **Empfehlung:** Default ohne `--strict`; `--strict` nur für Matrix-Fixtures in der agent-meta-CI |
-| Q21 (Rev. 2) | `toml-key`-Detektor unter Python 3.9 (kein `tomllib`) | **Empfehlung:** Stdlib-Subset-Parser (`[table]`, `key = int|string|bool`); nicht parsebar ⇒ INFO `doctor.detector-unavailable`; Capability-Key für „Provider nutzt TOML-Agentenkonfig" statt Provider-Name |
+| Q21 (Rev. 2) | `toml-key`-Detektor unter Python 3.9 (kein `tomllib`) | **Empfehlung:** Stdlib-Subset-Parser (`[table]`, `key = int\|string\|bool`); nicht parsebar ⇒ INFO `doctor.detector-unavailable`; Capability-Key für „Provider nutzt TOML-Agentenkonfig" statt Provider-Name |
 | Q22 (Rev. 2) | `json-schema`-Detektor ohne `jsonschema` | **Empfehlung:** Subset-Validator (IC-21-Tabelle); kein neues Dependency |
 | Q23 (Rev. 2) | `CODE_QUALITY_RULES`: in Template einbinden oder deprecaten | **Empfehlung:** in die Code-Konventionen der Kontextdatei einbinden (Inhalt war vom Nutzer gewollt); bis dahin Doctor-WARN |
 | Q24 (Rev. 2) | Kommentar-Zuordnung beim zeilenbasierten Entfernen (eigenständige Kommentarzeilen direkt über einem entfernten Key) | **Empfehlung:** erhalten (konservativ); Nutzer kann sie per semantischem Kandidaten entfernen |
 | Q25 (Rev. 2) | `PROJECT_CONTEXT`-Pointer-Hebel automatisch im Profil `compact`? | **Empfehlung:** nein; nur Optimizer-Vorschlag (L2) mit Freigabe + Eval, weil Projektkontext in jedem Agenten Routing-/Qualitätsrelevanz haben kann |
 | Q26 (Rev. 2) | Frontmatter-Key `requires_roles` für Commands (Name; Akzeptanz durch `commands.*`-Checks) | **Empfehlung:** `requires_roles` (Liste, optional); `consistency/commands`-Check um den Key erweitern |
 | Q27 (Rev. 2) | Read-only-Durchsetzung neuer Rollen auf Providern ohne Tool-/Sandbox-Durchsetzung | **Empfehlung:** Prompt-Ebene + Known-Issue `read-only-not-enforced` (INFO); Codex-Fix IC-15 Nr. 21 |
+| Q28 (Rev. 2.2, #832) | Lokales Overlay `.meta-config/project.yaml.local` (Deep-Merge, Listen ersetzen): Wechselwirkung mit Active-Set, Doctor, Optimizer | **Empfehlung:** nicht in dieser Spec umsetzen (eigenes Issue). Verträge so halten, dass es später passt: (1) `compute_active_set` (IC-17) und Pipeline-Validierung laufen auf der **gemergten** Config (wie #832 FR-5); `sync.log` nennt die Overlay-Keys (nur Namen); (2) Doctor meldet ein vorhandenes Overlay als INFO und wertet Prädikate `config:` auf der gemergten Config aus; (3) Optimizer: zwei Quellen ⇒ `OptimizerProposal.project_yaml_sha256` wird zu einem Hash über beide Dateien, jeder Kandidat trägt die Quelldatei; ein Kandidat für einen Key, den das Overlay überschreibt, entfällt mit Grund `overlay-shadowed`; Phase-2-Applier schreibt nur `project.yaml`; (4) Eval/CI mit `--no-local-config` (#832 FR-4), sonst ist die Baseline nicht reproduzierbar (R12) |
+| Q29 (Rev. 2.2, #800) | Hermes als Provider/Exportziel | **Empfehlung:** abgrenzen. Falls umgesetzt: Hermes-Eintrag erhält die IC-09-Keys (`rules_read_channels`, `roster_in_harness`, Caps, `surface_verified_state`); `hermes_export.py` konsumiert `ActiveSet` (IC-17) statt eigener Rollenliste, damit keine Handoffs an inaktive Rollen exportiert werden; Fail-closed bei fehlendem PyYAML entspricht dem Doctor-Muster (`schema-validation-skipped`); IC-15 Nr. 15 (Keyword-Single-Source) betrifft `hermes_export.py:270` unmittelbar |
+| Q30 (Rev. 2.2, #820) | Domänen-Unterordner unter `agents/1-generic` | **Empfehlung:** abgrenzen. Wechselwirkung: `ActiveSet.missing_template` (IC-17) macht heute unsichtbare verschachtelte Templates als WARN sichtbar; bei Umsetzung konsumiert `compute_active_set` den dort vorgeschlagenen einzigen Discovery-Helper (keine weitere `glob("*.md")`-Variante); `templates.provider-literal` und IC-30 müssen dann rekursiv scannen |
+| Q31 (Rev. 2.2, #877) | Subplattform-/Familien-Schicht | **Empfehlung:** abgrenzen. Wechselwirkung: `ActiveSet.sources` erhält dann den Wert `family`; Familien-Rules unterliegen Reachability (§4.3), Anker (IC-12) und `rules_read_channels` wie Plattform-Rules; Provenienz-Marker dürfen die Byte-Stabilität nicht brechen (Q14) |
+| Q32 (Rev. 2.2, #779 IT-3 Fix B) | Schema-Feld für Priorität/Tie-Break bei mehrdeutigen Keywords | **Empfehlung:** nein (Fix A + Kollisions-Eval); nur wenn QG-14 eine Kollisions-Accuracy unter der Baseline-Schwelle zeigt, die Schärfung nicht behebt, wird ein Feld in einer späteren Revision eingeführt |
+| Q33 (Rev. 2.2, #854) | Commands-Vertrag Gemini CLI vs. Antigravity (`.gemini/commands/*.toml`) | **Empfehlung:** Verifikation je Oberfläche (`surface_verified_state.commands`); Gemini CLI: TOML-Commands beibehalten, sofern belegt; Antigravity: Commands als Skills abbilden oder Deklaration entfernen (IC-15 Nr. 22); bis dahin INFO-Seed `surface-unverified` |
+| Q34 (Rev. 2.2, #856) | ZCode: werden Workspace-Agenten (`.zcode/agents/`) auto-geladen? Beta-Doku (#856) vs. Studie §3.6 (CLI lädt automatisch) | **Empfehlung:** Runtime-Capture (IC-14) für ZCode CLI und Desktop vor IC-15 Nr. 7; Ergebnis in `surface_verified_state.workspace_agents_autoload`; Bootstrap nur für Oberflächen ohne Autoload behalten |
 
 | # | Risiko | Gegenmaßnahme |
 |---|---|---|
@@ -1193,6 +1434,8 @@ Priorisiert nach Wirkung × Korrektheitsrisiko; jede Zeile verweist auf den Spec
 | R9 (Rev. 2) | Optimizer-Renderkosten (viele Renders über alle Provider) | ein Sentinel-Render + eine gemeinsame L0-Verifikation; Bisektion nur bei Abweichung |
 | R10 (Rev. 2) | Umgehung des Appliers durch direkte LLM-Edits an `project.yaml` | Vertrag in `agent-meta-manager` (IC-27); Doctor-Regel möglich (Hash-Vergleich gegen letzten angewendeten Vorschlag, spätere Revision) |
 | R11 (Rev. 2) | Über-Filterung entfernt nützliche Hinweise (z. B. „Rolle X existiert, ist aber nicht aktiv") | Erwähnungen bleiben (INFO); nur Dispatch-Anweisungen werden entfernt |
+| R12 (Rev. 2.2) | Zwei Config-Quellen (#832 `project.yaml` + `.local`) machen Active-Set, Doctor-Prädikate, Optimizer-Hash und Eval-Baseline nicht reproduzierbar | Q28: gemergte Config als einzige Eingabe, Quelldatei je Optimizer-Kandidat, `overlay-shadowed`, `--no-local-config` in CI/Eval |
+| R13 (Rev. 2.2) | Quell-De-Dup (IC-31) bricht Tests, die Quelltexte scannen (`test_contract_labels.py`, `test_no_role_routes_in_templates.py`, Szenario-Asserts) | Tests auf snippet-aufgelöste Templates umstellen (gleiche Auflösung wie `standalone.py`); QG-17 |
 
 ## 13. Nicht verifiziert
 
@@ -1220,6 +1463,17 @@ Priorisiert nach Wirkung × Korrektheitsrisiko; jede Zeile verweist auf den Spec
 | (Rev. 2) SE-/Knowledge-aktivierte Varianten des Active-Set-Experiments; Plattformen hacs/sharkord | nicht untersucht |
 | (Rev. 2) Wirkung der Boilerplate-De-Dup auf Regelbefolgung | UNVERIFIED (Eval nötig, Q6) |
 | (Rev. 2) Ziele §11 (Rev.-2-Tabelle) | Schätzung |
+| (Rev. 2.2) Sprachanteile Keywords (29 von 370 deutsch) und Beispiele (99 von 107 deutsch) | Heuristik (Umlaute + Stoppwörter), nicht manuell klassifiziert |
+| (Rev. 2.2) #885-Zahl 223 ungeschützte Routing-Stellen und Klassenaufteilung | aus dem Issue übernommen, nicht nachgezählt; nur die Guard-Code-Stellen sind bestätigt |
+| (Rev. 2.2) Duplikat-Zählungen F-39 (69/58/19/19) | Dateizählung per exaktem String; Varianten mit abweichendem Wortlaut nicht erfasst |
+| (Rev. 2.2) #885 F-08-Rest: ob `NATIVE_EXTENSIONS_WHITELIST_TABLE`/`MCP_GUARDRAILS_LIST` noch Placeholder-Warnungen erzeugen | UNVERIFIED (kein `consistency-check`-Lauf); #885 F-16 (CHANGELOG) nicht geprüft |
+| (Rev. 2.2) #885 F-12/F-13 (Template-Sprache, Dialekte) aktueller Stand | nicht nachgezählt |
+| (Rev. 2.2) Gemini CLI liest `.gemini/commands/*.toml`; Antigravity ignoriert sie | UNVERIFIED (nur Issue #854 bzw. Provider-Doku-Aussage, keine Runtime) |
+| (Rev. 2.2) ZCode Workspace-Agent-Autoload (CLI/Desktop) | UNVERIFIED; widersprüchliche Quellen (#856 vs. Studie §3.6) |
+| (Rev. 2.2) Ob der Sync inerte Altdateien (`.mammouth/settings.json`) über `.agent-meta-managed` selbst entfernt | UNVERIFIED |
+| (Rev. 2.2) Exakte Enum-Werte von `COMMUNICATION_LANGUAGE` im Schema | UNVERIFIED (Planer prüft) |
+| (Rev. 2.2) Ob `resolve_active_roles(require_template=True)` für `mammouth-expert` ein `1-generic`-Template verlangt | UNVERIFIED |
+| (Rev. 2.2) Wirkung sprachgewählter Beispiele auf Routing-Qualität | UNVERIFIED bis QG-14 |
 
 ## 14. Revisionen
 
@@ -1228,6 +1482,7 @@ Priorisiert nach Wirkung × Korrektheitsrisiko; jede Zeile verweist auf den Spec
 | 2026-10-11 | Erstentwurf (DRAFT) auf Basis der Studie `docs/analysis/2026-10-11-context-budget-provider-study.md` |
 | 2026-10-11 | Revision 2 (DRAFT): Nutzeranforderungen R1 (Installations-Doctor), R2 (Active-Set-Filter/dynamisches Routing), R3 (project.yaml-Optimizer) ergänzt — neue Befunde F-19…F-33, Konzept §4.4–§4.6, IC-17…IC-28 (u. a. `ActiveSet`, `known-issues.yaml`, `--doctor`, `meta-doctor`, `--optimize-config`/`--apply-config-patch`, `meta-optimizer`, Neue-Rolle-Checkliste), IC-15 Nr. 17–21, IC-09 drei Keys, QG-9…QG-13, AC-37…AC-61, ADR-6…ADR-11, Q15…Q27, R7…R11, §11 Rev.-2-Wirkung + Rangliste §11.1, Phasen §9 angepasst (IC-09-Keys nach Phase 0); Korrekturen K-d (Ort `strip_inactive_conditional_blocks`) und K-e („alle Rollen" = 62); Studie §10 (Nachtrag) ergänzt. Bestehende IDs unverändert. |
 | 2026-10-11 | Revision 2.1 (DRAFT): Nutzerentscheidungen Q12 (geteilte Datei → `full` + WARN), Q15 (Rollennamen `meta-doctor`/`meta-optimizer`; Wortlaut und Modulnamen `meta_optimizer.py` angepasst), Q18 (Pipeline-Drop mit WARN in der Sync-Konsole, `active-set.pipeline-dropped` INFO → WARN), D-1/Q5 (Kimi-Worker-Gate-Card via `${agents_md}`, Umsetzung Phase 3). |
+| 2026-10-11 | Revision 2.2 (DRAFT): GitHub-Issues gegen den Code geprüft und eingearbeitet — neuer §3a Issue-Zuordnung (Status mit Beleg, Spec-Hebel, Phase, AC, Entscheidung; Abweichungen Issue-Text ↔ Code; Aufräum-Empfehlung #933–#935, #552, #192). Neue Befunde F-34…F-41; neue IC-29 (Routing-Daten/Sprachwahl, #779/#780), IC-30 (Template-Guard, #885 A), IC-31 (Quell-De-Dup, #885 F-14/#552), IC-32 (Template-Integrität, #885 F-05/F-06/F-08/F-09), IC-33 (Provider-Oberflächen, #853/#854/#856/#857/#858); Ergänzungen IC-04, IC-09 (2 Keys), IC-10 (2 Checks), IC-13, IC-15 (Nr. 7 und 15 präzisiert, Nr. 22–24 neu), IC-18 Nr. 11, IC-21 (5 Seeds); QG-14…QG-17; AC-62…AC-74; ADR-12…ADR-13; Q28…Q34 (#832, #800, #820, #877, Tie-Break, Gemini-Commands, ZCode-Autoload); R12…R13; §1.3 Präzisierung Quell- vs. Render-De-Dup; §9, §11.1, §13 aktualisiert; Tabellenformat zweier Zeilen korrigiert (IC-21 `schema-validation-skipped`, Q21). Entscheidungen Q12, Q15, Q18, D-1 unverändert. Bestehende IDs unverändert. |
 
 ## Trace-Anker
 
