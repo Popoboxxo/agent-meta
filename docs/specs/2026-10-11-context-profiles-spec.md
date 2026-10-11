@@ -1,7 +1,7 @@
 ---
 spec-id: SPEC-CONTEXT-PROFILES-2026-10-11
 title: Context Profiles (full/compact) — token-effiziente Kontextartefakte für alle 9 Provider
-status: DRAFT
+status: APPROVED
 revision: 3.4
 review: docs/reviews/2026-10-11-context-profiles-spec-review.md (Rev. 2.2, REVISE; eingearbeitet in Rev. 3)
 review-2: docs/reviews/2026-10-11-context-profiles-spec-review-2.md (Rev. 3, REVISE; eingearbeitet in Rev. 3.1)
@@ -19,7 +19,7 @@ scope-rev3-4: Review-3-Einarbeitung (W-1…W-5, H-1…H-3) + Nutzerentscheidunge
 
 # Context Profiles (full/compact) — Spec
 
-> Status: Entwurf (**DRAFT**, 2026-10-11, Revision 3.4). Der Approval-Marker (`Status: APPROVED`) wird
+> Status: APPROVED (Nutzerfreigabe 2026-10-11, Revision 3.4, nach drei Reviews: docs/reviews/2026-10-11-context-profiles-spec-review*.md). Der Approval-Marker (`Status: APPROVED`) wird
 > ausschließlich vom Nutzer bzw. `concept-reviewer` gesetzt, nie vom Autor. Diese Datei definiert
 > Interface-Contracts und Akzeptanzkriterien; sie enthält keine Implementierung und keinen Plan.
 > Trace-Anker: `spec-id: SPEC-CONTEXT-PROFILES-2026-10-11`.
@@ -2721,6 +2721,7 @@ Priorisiert nach Wirkung × Korrektheitsrisiko; jede Zeile verweist auf den Spec
 | 2026-10-11 | Rev. 3.2: Q9 entschieden (angleichen, Nutzerentscheidung). `template-auditor`: `routing_patterns` entfernen (`role-defaults.yaml:293-294`, `addressability: name_only` `:288`); Szenario-76-Assert #5 auf „keine Keyword-Regel in `routing.rules`“ umstellen. |
 | 2026-10-11 | Revision 3.3 (DRAFT): Nutzerentscheidungen eingearbeitet, Fakten vorher am Code geprüft (`repo_containment.py`, `gitignore.py`, `config.py`, `sync_pipeline.py`). **Q36/Q37** wie empfohlen bestätigt; **Q35** bestätigt (kein Fallback, `tmp-sink.disabled`) plus Vorgaben: tmp-sink **Default AN** auch ohne Block (Codeänderung `gitignore.py:329-330` nötig → IC-15 Nr. 26, F-46, AC-92), Sink **im Repo** auf Linux und Windows (Pfadregeln IC-34; Lücken `repo_containment.py:205-229, 171, 187, 428` → F-45, IC-15 Nr. 27, AC-93), **alle Arbeitsverzeichnisse** im Sink (`resolve_work_dir`; korrigiert: `--context-report`, Temp-Projekt der Beweis-Renders, Applier-Temp-Datei; AC-94), Seed `tmp-sink-outside-repo-or-system-temp` (AC-96). **Q38** (Doctor-Rechte): `meta-doctor`/`--doctor` sind **nicht strikt read-only**, schreiben nur in den tmp-sink; nur `meta-optimizer` strikt read-only; alle „Doctor read-only"-Stellen angepasst (Überblick, §1, §4, IC-22, IC-23, AC-39, §4.7, Datenfluss), `--deactivation-status` bleibt gestrichen wegen Messverfälschung (ADR-19). Neue IDs: F-45…F-46, IC-15 Nr. 26…27, AC-92…AC-96, QG-20, ADR-19…ADR-20, R22. Abweichungen: Der Optimizer-**Runner** schreibt weiterhin Vorschläge in den Sink (nur die **Rolle** ist strikt read-only); die Applier-Temp-Datei liegt im Sink (Cross-Device-Abbruch statt Systemtemp-Fallback); `scratch\out` wird kanonisiert statt abgelehnt. |
 | 2026-10-11 | Revision 3.4 (DRAFT): Drittes Review `docs/reviews/2026-10-11-context-profiles-spec-review-3.md` (APPROVE_WITH_CHANGES; W-1…W-5, H-1…H-3) eingearbeitet, jede Korrektur am Code geprüft. **W-1** (Nutzer): IC-15 Nr. 27 um Hook-Spiegel (`repo-containment-impl.sh:183-185, 225-246`, Version 1.0.0 → 1.1.0, Drift-Check) und `progress_paths.py:86ff` erweitert, gemeinsamer Testkorpus (AC-97, Q39). **W-2**: `getattr(pathmod, "isjunction", None)` + Reparse-Point-Fallback, `raising=False`, „3.13“ gestrichen (F-47, Q40, §13). **W-3**: Seed-Zeile in IC-21 (`finding-ref` `doctor.tmp-sink-location`), Prüfung in `tmp_sink_location_error`, AC-94-Grep-Scope vs. AC-96 geklärt. **W-4**: Schreibziele `doctor/` + `context-report/` im konfigurierten Sink, AC-39/AC-95/QG-10 gegen den aufgelösten Sink, Verhalten bei deaktiviertem Sink für `--context-report`, `command`-Detektoren, `--doctor --out` (IC-22, AC-98, Q41). **W-5**: harter Fehler + Migrationshinweis (`config.py:568`, AC-99, ADR-21, R23, Q42), AC-01-Ausnahme (iv)/(v), §9-Zeilen mit IC-15 Nr. 26/27 und AC-92…AC-99, „keine Verhaltensänderung“ präzisiert. **H-1**: „read-only“-Restformulierungen bei Werkzeugen (§9 Phase 0, QG-10, IC-23-Allowlist ersetzt), `--out` in IC-22-Signatur. **H-2**: Zeilenangaben `:46→:48`, `:177→:179`, `:187→:186`, `repo_containment.py:14-18→:34-37`. **H-3**: Szenario 76 einheitlich `:62-77`. Abweichung zum Review: Hook-Validierung liegt tatsächlich in `:225-246` (Regex `:183-185`), nicht `:183-224`. Neue IDs: F-47, AC-97…AC-99, Q39…Q42, ADR-21, R23. |
+| 2026-10-11 | Freigabe (APPROVED) durch den Nutzer für Revision 3.4; nächste Stufe: Plan (writing-plans). |
 
 ## Trace-Anker
 
