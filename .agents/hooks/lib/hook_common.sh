@@ -1,7 +1,8 @@
 #!/bin/bash
 # lib: hook_common
-# version: 1.0.0
+# version: 1.0.1
 # description: Shared helper functions sourced by other hook scripts (issue #601 dedup)
+# changelog: v1.0.1: hook_json_get no longer returns "" for a present field whose value holds a lone surrogate or whose payload holds invalid UTF-8 (W2-B1 R2-2)
 #
 # NOT a hook itself — no `event`/`matcher` header, sync.py never registers it
 # in settings.json. Deployed verbatim to <hooks_dir>/lib/hook_common.sh
@@ -64,14 +65,30 @@ hook_json_get() {
     printf '%s' "$default"
     return 0
   fi
+  # Bytes in, bytes out (W2-B1 R2-2): invalid UTF-8 in the payload and a
+  # lone surrogate escape ("\ud800") in a value used to make the decode or
+  # print() raise under a strict UTF-8 locale, so a present field came back
+  # as "" (a guard then saw no command at all). Undecodable input bytes are
+  # passed through as-is (surrogateescape), lone surrogates are written as
+  # their raw 3-byte encoding (surrogatepass) -- never dropped.
   printf '%s' "$json" | "$py" -c "
 import json, sys
 
 path, default = sys.argv[1], sys.argv[2]
+
+
+def emit(text):
+    try:
+        data = text.encode('utf-8', 'surrogateescape')
+    except UnicodeEncodeError:
+        data = text.encode('utf-8', 'surrogatepass')
+    sys.stdout.buffer.write(data + b'\n')
+
+
 try:
-    d = json.load(sys.stdin)
+    d = json.loads(sys.stdin.buffer.read().decode('utf-8', 'surrogateescape'))
 except Exception:
-    print(default)
+    emit(default)
     sys.exit(0)
 
 cur = d
@@ -83,9 +100,9 @@ for key in path.split('.'):
         break
 
 if cur is None or isinstance(cur, (dict, list)):
-    print(default)
+    emit(default)
 else:
-    print(cur)
+    emit(str(cur))
 " "$path" "$default" 2>/dev/null || printf '%s' "$default"
 }
 
