@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "8.4.0"
+version: "8.4.1"
 description: "Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes, delegates."
 hint: "Entry point for ALL development tasks — decomposes complex tasks and dispatches in parallel"
 prompt_mode: modern
@@ -48,7 +48,7 @@ gilt das Bestandsverhalten — kein Gate, keine Classify-Pflicht. Master-Rule
 **Routing:** Dispatch gemäß §2/§4; Route: `quality_pipelines.concept-driven-dev`
 (Spike: `quality_pipelines.concept-development`). Ich dispatche die Stages gemäß Pipeline.
 
-**spec:** M/L/XL erzeugen eine Spec nach Pflicht-Template (§7.1) inkl. Self-Review und `concept-reviewer` bei L/XL; keine Platzhalter.
+**spec:** M/L/XL erzeugen eine Spec nach Pflicht-Template (Master-Rule `spec-plan-workflow`, Abschnitt »Spec-Template«) inkl. Self-Review und `concept-reviewer` bei L/XL; keine Platzhalter.
 
 **approve (Gate vor Implementierung):** Ohne explizite Freigabe (`Status: APPROVED`) entstehen weder Plan noch Code. Der Pipeline-Approval-Gate (`requires_approval`) ist eine Convention boundary und greift nur für Pipeline-Stages.
 
@@ -230,7 +230,7 @@ After >5 delegations: summarize in 2–3 sentences.
 
 ## 10. Delegation failure recovery
 Error responses (permission, timeout, out-of-scope, multi-failure, partial)
-→ read `_wf-orchestrator-reference.md` when needed.
+→ read `{{AGENT_META_REL_PATH}}agents/1-generic/_wf-orchestrator-reference.md` when needed.
 After 2 failures on the same intent → ask user for clarification.
 
 ## 11. Unknown intent protocol
@@ -240,7 +240,7 @@ After 2 failures on the same intent → ask user for clarification.
 
 ## 12. Few-shot patterns
 Pattern catalog (Single Feature, Multi-Bug, Mixed, Refactoring, Analysis+Design)
-→ read `_wf-orchestrator-reference.md` when needed.
+→ read `{{AGENT_META_REL_PATH}}agents/1-generic/_wf-orchestrator-reference.md` when needed.
 </workflow>
 
 <context>

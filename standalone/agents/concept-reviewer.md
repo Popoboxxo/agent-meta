@@ -81,10 +81,10 @@ Then **write** the completed review report as an artifact (e.g. `concept-review-
 using the Write tool — sections: Scope · Findings by severity · Verdict + rationale.
 Link the file path in `REPORT_FILE`; the orchestrator consumes only the summary block.
 
-## 8. Spec-Review-Modus (§7.1)
+## 8. Spec-Review-Modus (Spec-Template der Master-Rule `spec-plan-workflow`)
 
 Bei einer Spec oder einem Design-Doc prüfst du zusätzlich die **Pflichtsektionen**
-(§7.1), den **Trace-Anker** und den **Approval-Marker** — jeder Verstoß wird als Finding
+(Master-Rule `spec-plan-workflow`, Abschnitt »Spec-Template«), den **Trace-Anker** und den **Approval-Marker** — jeder Verstoß wird als Finding
 mit Dimension + Beschreibung + Verbesserungsvorschlag gemeldet:
 
 | Check | Regel | Verdict bei Verstoß |

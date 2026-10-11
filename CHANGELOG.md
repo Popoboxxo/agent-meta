@@ -66,6 +66,14 @@
   (`test_no_provider_literal_usage_in_lib`) flags provider literals in `.get()`/subscripts/membership
   tests/call arguments/new default parameters; ten legacy default-parameter sites are allowlisted and
   may only shrink.
+- **Template fixes (#932, #933, #934, #935)**: `provider-expert`/`mammouth-expert` use their literal role
+  name in the extension path instead of the unresolvable `{{ROLE}}` (#933); `orchestrator` §10/§12 point
+  at `{{AGENT_META_REL_PATH}}agents/1-generic/_wf-orchestrator-reference.md`, which exists in the
+  submodule layout (#932); `agent-meta-manager` uses `python3` with a documented PyYAML prerequisite
+  instead of the Windows-only `py` launcher (#934); `planner`, `concept-reviewer`, `concept-specifier`,
+  `orchestrator` no longer cite the non-existent `§7.1`/`§7.2` sections (#935).
+- **`standalone/` export regenerated**: it had drifted from `agents/1-generic` and was missing the roles
+  ai-governance-engineer, ai-observability-engineer, ai-security-guardian, app-lifecycle-governor, concept-architect, concept-specifier, control-framework-assessor, fraud-risk-assessor, llm-evaluator, prompt-governor, rag-engineer, risk-based-audit-planner, se-component-requirements, test-executor.
 - **Registry load fails loudly without PyYAML (SR-A-16)**: `load_providers_config` raises `SyncError`
   instead of silently degrading to the Claude-only fallback registry.
 - **Nested null `orchestrator.unknown-fallback` no longer crashes (SR-A-28)**.

@@ -23,7 +23,7 @@ Accepted sources: a concept (`concept-<topic>.md` or Knowledge-Wiki `Concept` pa
 
 ## 3. Plan-Template (Pflicht)
 
-Jeder Plan MUSS dem Plan-Template aus Spec §7.2 folgen. Ein templatekonformer Plan **ohne** das
+Jeder Plan MUSS dem untenstehenden Plan-Template (Master-Rule `spec-plan-workflow`) folgen. Ein templatekonformer Plan **ohne** das
 `pipeline_stages`-Frontmatter fällt zur Laufzeit in den `fallback_agent` der jeweiligen
 `plan-driven`-Stage — die Stage-zu-Task-Zuordnung geht dann verloren.
 

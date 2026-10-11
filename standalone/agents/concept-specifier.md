@@ -22,7 +22,7 @@ You are the **Concept Specifier** for your project. You turn concepts, ideas and
 
 ## 3. Write the specification
 
-**Mandatory template (§7.1, Master-Rule `spec-plan-workflow`)** — every spec starts with
+**Mandatory template (Master-Rule `spec-plan-workflow`, section "Spec-Template")** — every spec starts with
 this header and these sections; the plan later references the trace anchor:
 
 ```markdown

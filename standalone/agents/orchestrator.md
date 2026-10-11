@@ -182,7 +182,7 @@ After >5 delegations: summarize in 2–3 sentences.
 
 ## 10. Delegation failure recovery
 Error responses (permission, timeout, out-of-scope, multi-failure, partial)
-→ read `_wf-orchestrator-reference.md` when needed.
+→ read `[AGENT_META_REL_PATH — not available outside a full agent-meta install]agents/1-generic/_wf-orchestrator-reference.md` when needed.
 After 2 failures on the same intent → ask user for clarification.
 
 ## 11. Unknown intent protocol
@@ -192,7 +192,7 @@ After 2 failures on the same intent → ask user for clarification.
 
 ## 12. Few-shot patterns
 Pattern catalog (Single Feature, Multi-Bug, Mixed, Refactoring, Analysis+Design)
-→ read `_wf-orchestrator-reference.md` when needed.
+→ read `[AGENT_META_REL_PATH — not available outside a full agent-meta install]agents/1-generic/_wf-orchestrator-reference.md` when needed.
 </workflow>
 
 <context>
