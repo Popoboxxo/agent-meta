@@ -2522,3 +2522,28 @@ class TestGetAiProvidersActiveSurface(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestCheckOriginBindHost(unittest.TestCase):
+    """#897: a concrete bind address authorizes its own Origin; a wildcard does not."""
+
+    def _check(self, *, origin, host, bind_host):
+        admin_server.AuthService.check_origin(
+            origin=origin, host=host, allowed_hosts=admin_server.DEFAULT_ALLOWED_HOSTS,
+            bind_host=bind_host, bind_port=7420,
+        )
+
+    def test_concrete_bind_host_origin_is_allowed(self) -> None:
+        self._check(origin="http://172.20.5.120:7420", host="172.20.5.120:7420",
+                    bind_host="172.20.5.120")
+
+    def test_wildcard_bind_does_not_authorize_arbitrary_origin(self) -> None:
+        with self.assertRaises(admin_server.SecurityError) as ctx:
+            self._check(origin="http://172.20.5.120:7420", host="172.20.5.120:7420",
+                        bind_host="0.0.0.0")
+        self.assertIn("--allowed-hosts", str(ctx.exception))
+
+    def test_foreign_origin_still_rejected_on_concrete_bind(self) -> None:
+        with self.assertRaises(admin_server.SecurityError):
+            self._check(origin="http://evil.example:7420", host="172.20.5.120:7420",
+                        bind_host="172.20.5.120")

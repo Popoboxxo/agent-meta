@@ -83,6 +83,11 @@
   the literal-branch / `HEAD` way out. A push in a command containing `cd`/`pushd`/`popd` is judged like
   a `-C` push into another repository (refspec-less and `HEAD` pushes block), closing a bypass where the
   other repo's `main` was checked against the cwd repo's branch.
+- **Admin UI network mode (#897)**: a concrete `--host <ip>` now authorizes its own Origin (the Host
+  check already did); a wildcard bind (`0.0.0.0`) prints the `--allowed-hosts <detected-ip>` hint at
+  startup, and the `origin not allowed` error names `--allowed-hosts` / `admin-ui.allowed-hosts`. The
+  backup overlay is closed in a `finally`, so a failed request cannot leave it hanging. A wildcard
+  bind still does not auto-trust arbitrary Host/Origin values (DNS-rebinding protection).
 - **Registry load fails loudly without PyYAML (SR-A-16)**: `load_providers_config` raises `SyncError`
   instead of silently degrading to the Claude-only fallback registry.
 - **Nested null `orchestrator.unknown-fallback` no longer crashes (SR-A-28)**.

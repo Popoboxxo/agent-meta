@@ -8385,9 +8385,15 @@ async function viewBackups() {
       status.textContent = "Creating backup…";
       try {
         await api.post("/api/backups/create", { label });
-      } catch(e) { alert("Error: " + e); }
-      hideModal();
-      load();
+      } catch(e) {
+        status.textContent = "Backup failed.";
+        alert("Error: " + e);
+      } finally {
+        // Always close the "in progress" overlay, even if the error dialog
+        // itself throws (#897).
+        hideModal();
+        load();
+      }
     }}, ["Create Backup"])
   ]);
   wrap.appendChild(controls);
