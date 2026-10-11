@@ -95,7 +95,7 @@ Fundstellen beziehen sich auf HEAD `4750487e`. Tests: `tests/test_dod_push_check
 | ID | Schweregrad | Befund / Reproduktion | Status | Fix-Fundstelle / Commit | Verif. |
 |---|---|---|---|---|---|
 | R1Q-1 | Mittel | Gequoteter Separator vor dem Refspec versteckt das Ziel: Payload `git push -o "ci.variable=A;B" origin HEAD:main` lief nur in den Test-Gate statt Block. | fixed | QF1: Statements quote-aware + Legacy-Sicht, BLOCK gewinnt; `test_qf1_quoted_separator_before_refspec` (`QF1_TABLE`); `ba53c796` (v2.1.1) | V |
-| R1Q-2 | Mittel (Verfügbarkeit) | Heredoc/mehrzeiliger Text (PR-Body, Commit-Message) mit einer Zeile, die mit `git push … main` beginnt, blockiert hart; Meldung lautet „Push blocked", obwohl der Befehl `gh`/`commit` ist. | offen | Issue #943 (W2-B2b, Scope-Punkt j); Workaround `--body-file` / `-F` | — |
+| R1Q-2 | Mittel (Verfügbarkeit) | Heredoc/mehrzeiliger Text (PR-Body, Commit-Message) mit einer Zeile, die mit `git push … main` beginnt, blockiert hart; Meldung lautet „Push blocked", obwohl der Befehl `gh`/`commit` ist. | offen | Issue #947; Workaround `--body-file` / `-F` | — |
 | R1Q-3 | Niedrig | Kommentar `# main` nach einem Push zählt als Refspec, da `lex.commenters = ""` (`dod-push-check.sh` Z. 605, unverändert). | offen | — | — |
 | R1Q-4 | Niedrig (Wartbarkeit) | Flag-/Short-Cluster-Walk (~25 Zeilen) doppelt in `stmt_is_tag_only` und `destination_block`. | offen | — | — |
 | R1Q-5 | Mittel | `man`, `less`, `more`, `ack`, `gh` in `NON_EXEC`, obwohl sie Befehle ausführen können (`man -P`, `LESSOPEN`, `ack --pager`). | fixed | QF5: man/less/more/ack aus `NON_EXEC` entfernt, man-Sonderregel, `gh`-`!alias`-Grenze dokumentiert (Header Z. 534–541); `test_qf5_exec_capable_pagers_are_not_text`, `test_qf5_reading_docs_is_not_a_push`; `ba53c796` | V |
@@ -111,7 +111,7 @@ Fundstellen beziehen sich auf HEAD `4750487e`. Tests: `tests/test_dod_push_check
 |---|---|---|---|---|---|
 | R1S-1 | **Blocker** | DWIM-Ziel-Bypass über `heads/main`: Payloads `feature:heads/main`, `+feature:heads/main`, `:heads/main`, `--delete heads/main`, `-d origin heads/main` nach dem Subcommand `push`; per `--dry-run` gegen Bare-Repo bestätigt, dass git sie auf `refs/heads/main` auflöst. | fixed | F1: Normalisierung in `is_protected` (heads/…, remotes/<r>/…, refs/…); `tags/main` bleibt ungeschützt; `test_f1_dwim_destination_spellings` (`F1_TABLE`, 6 Schreibweisen × 9 Formen × 3 Zustände + Negativfälle); `ba53c796` | V |
 | R1S-2 | **Blocker** | Pre-Filter fail-open: `grep … <<<"$COMMAND"; [ $? -eq 1 ] && exit 0` — kann die Here-String-Tempdatei nicht angelegt werden (> Pipe-Größe bei `ulimit -f 64`, volles `/tmp`), liefert grep rc 1 ⇒ exit 0. Reproduziert mit ~160-KB-Befehl. | fixed | F2: Pre-Filter als reines Bash `[[ =~ ]]` (Z. 105–109), `trap '' XFSZ` (Z. 61), leere Klassifizierer-Ausgabe blockt; `test_f2_here_string_failure_fails_closed` (mit/ohne XFSZ-Trap, `ulimit -f 64`), `test_f2_one_megabyte_non_push_is_fast`; `ba53c796` | V |
-| R1S-3 | Mittel (Verfügbarkeit) | Mehrzeiliger Text blockiert hart — identisch mit R1Q-2. | offen | Issue #943 (W2-B2b) | — |
+| R1S-3 | Mittel (Verfügbarkeit) | Mehrzeiliger Text blockiert hart — identisch mit R1Q-2. | offen | Issue #947 | — |
 | R1S-4 | Mittel (DoS) | Ein `git rev-parse` pro Ref: 10 000 Refs ≈ 22 s. | fixed | A2: ein `for-each-ref`-Snapshot (Z. 284–289); `test_a2_many_tag_pushes_are_fast` (5000 Tag-Pushes < 10 s); `ba53c796` | V |
 | R1S-5 | Mittel | Refspec-loser Push wird über Config umgeleitet (`push.default=upstream` + `branch.<n>.merge=refs/heads/main`, `remote.<r>.push`); ausnutzbar nur mit Nicht-Default-Config. | fixed | A3: Config-Auswertung inkl. `-c`/`GIT_CONFIG*`-Overrides (Header Z. 211–214); `test_a3_push_destination_from_config`, `test_a3_tag_push_mapped_onto_main_is_not_tag_only`; `ba53c796` | V |
 | R1S-6 | Mittel | `git -C other` / `--git-dir` ohne Refspec bzw. mit `HEAD` wird gegen das cwd-Repo beurteilt. | fixed | A4: Block (Header Z. 209–211); `test_a4_other_repository_push`; `ba53c796` | V |
@@ -153,14 +153,16 @@ Bleibt offen (dokumentierte Grenze, Header Z. 30–38):
 
 | ID | Kurzbeschreibung | Issue |
 |---|---|---|
-| R1Q-2 / R1S-3 | Heredoc/mehrzeiliger Text blockiert hart, irreführende Meldung | #943 (W2-B2b, Scope-Punkt j) — Zuordnung laut Orchestrator, hier nicht gegen den Issue-Text geprüft |
-| R1Q-3 | `# main`-Kommentar als Refspec (`lex.commenters = ""`) | wird nach PR-Erstellung ergänzt (Kandidat für #943) |
-| R1Q-4 | doppelter Flag-/Short-Cluster-Walk | wird nach PR-Erstellung ergänzt |
-| R1Q-6 | `xargs`-Push nur Gate, `{}`-Platzhalter, `HEAD`-Hinweis in der Meldung | wird nach PR-Erstellung ergänzt |
-| R1Q-8 (Rest) | Testlücken: Main-Branch aus `project.yaml`, Tag/Branch gleichen Namens, `-C other`, `_run_hook`-Env | wird nach PR-Erstellung ergänzt |
-| R1Q-9 (Rest) | `cd other && …` gegen cwd-Repo beurteilt | wird nach PR-Erstellung ergänzt |
-| R1S-10 | `--recurse-submodules=on-demand` ohne Submodul-Zielprüfung | wird nach PR-Erstellung ergänzt |
-| R2S-7 | nicht geprüfte Re-Review-Punkte | wird nach PR-Erstellung ergänzt |
+| R1Q-2 / R1S-3 | Heredoc/mehrzeiliger Text blockiert hart, irreführende Meldung | #947 (dod-push-check-Heredoc-Fehlalarm; #943 ist die Restlücken-Sammlung von orchestrator-guard, W2-B2b) |
+| R1Q-3 | `# main`-Kommentar als Refspec (`lex.commenters = ""`) | #948 |
+| R1Q-4 | doppelter Flag-/Short-Cluster-Walk | #949 |
+| R1Q-6 | `xargs`-Push nur Gate, `{}`-Platzhalter, `HEAD`-Hinweis in der Meldung | #950 |
+| R1Q-8 (Rest) | Testlücken: Main-Branch aus `project.yaml`, Tag/Branch gleichen Namens, `-C other`, `_run_hook`-Env | #951 |
+| R1Q-9 (Rest) | `cd other && …` gegen cwd-Repo beurteilt | #952 |
+| R1S-10 | `--recurse-submodules=on-demand` ohne Submodul-Zielprüfung | #953 |
+| R2S-7 | nicht geprüfte Re-Review-Punkte | #954 |
+
+Cluster-Bezug (verwandte Issues, nicht dieser Befund): #943 (orchestrator-guard Restlücken), #944 (repo-containment), #945 (Test-Isolation / CI-Timeouts), #946 (Zweifelsfall-Branches und Stashes).
 
 ---
 
