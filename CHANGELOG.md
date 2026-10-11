@@ -74,6 +74,13 @@
   `orchestrator` no longer cite the non-existent `§7.1`/`§7.2` sections (#935).
 - **`standalone/` export regenerated**: it had drifted from `agents/1-generic` and was missing the roles
   ai-governance-engineer, ai-observability-engineer, ai-security-guardian, app-lifecycle-governor, concept-architect, concept-specifier, control-framework-assessor, fraud-risk-assessor, llm-evaluator, prompt-governor, rag-engineer, risk-based-audit-planner, se-component-requirements, test-executor.
+- **`dod-push-check` 2.1.3 (#947, #948, #950)**: heredoc bodies handed to a text-only consumer
+  (`cat`, `gh`, `tee`, `git commit`/`tag`/`notes`) are no longer classified as commands, so PR
+  bodies and commit messages that mention `git push origin main` stop being blocked; bodies fed to a
+  shell, interpreter, pipe or `eval` stay visible. An unquoted word-start `#` comment is cut before
+  tokenizing (`origin feat/x # main` passes; `"#main"` and mid-word `#` stay literal). `xargs`
+  carrying a `git push` and the `{}` placeholder fail closed; the computed-refspec block message names
+  the literal-branch / `HEAD` way out.
 - **Registry load fails loudly without PyYAML (SR-A-16)**: `load_providers_config` raises `SyncError`
   instead of silently degrading to the Claude-only fallback registry.
 - **Nested null `orchestrator.unknown-fallback` no longer crashes (SR-A-28)**.

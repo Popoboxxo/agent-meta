@@ -934,3 +934,65 @@ def test_r2_3_normal_push_stays_fast(multi_repo):
 def test_r2_4_line_continuation_inside_push(multi_repo, command):
     _checkout(multi_repo, "main")
     _assert_outcome(multi_repo, command, BLOCK)
+
+
+# --- issues #947 / #948 / #950: false positives and xargs bypass -----------
+
+_HEREDOC_TEXT = [
+    'gh pr create --body "$(cat <<\'EOF\'\nsummary\ngit push origin main\nEOF\n)"',
+    'git commit -m "$(cat <<\'EOF\'\nfix\ngit push origin main\nEOF\n)"',
+    "cat <<EOF\ngit push origin main\nEOF",
+]
+_HEREDOC_EXECUTED = [
+    "bash <<EOF\ngit push origin main\nEOF",
+    "cat <<EOF | bash\ngit push origin main\nEOF",
+    "echo $(bash <<EOF\ngit push origin main\nEOF\n)",
+    'echo "x <<EOF"\ngit push origin main\nEOF',
+    'sh -c "$(cat <<EOF\ngit push origin main\nEOF\n)"',
+]
+
+
+@pytest.mark.parametrize("command", _HEREDOC_TEXT)
+def test_947_heredoc_text_for_text_consumer_is_not_a_push(repo_on_feature_branch, command):
+    result = _run_hook(repo_on_feature_branch, command)
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("command", _HEREDOC_EXECUTED)
+def test_947_heredoc_fed_to_a_shell_is_still_classified(repo_on_feature_branch, command):
+    result = _run_hook(repo_on_feature_branch, command)
+    assert result.returncode == 2, result.stdout
+
+
+def test_947_unterminated_heredoc_keeps_body_visible(repo_on_feature_branch):
+    result = _run_hook(repo_on_feature_branch, "cat <<EOF\ngit push origin main\n")
+    assert result.returncode == 2
+
+
+@pytest.mark.parametrize("command,expected", [
+    ("git push origin feat/x # main", 0),
+    ("git push origin feat/x #main", 0),
+    ('git push origin "#main"', 0),
+    ("git push origin main # note", 2),
+    # mid-word '#' is NOT a comment in bash: 'main' is still a second refspec
+    ("git push origin feat#x main", 2),
+])
+def test_948_comment_handling(repo_on_feature_branch, command, expected):
+    result = _run_hook(repo_on_feature_branch, command)
+    assert result.returncode == expected, (command, result.stderr)
+
+
+@pytest.mark.parametrize("command", [
+    "echo main | xargs git push origin",
+    "echo main | xargs -I{} git push origin {}",
+    "git push origin {}",
+])
+def test_950_xargs_and_placeholder_pushes_fail_closed(repo_on_feature_branch, command):
+    result = _run_hook(repo_on_feature_branch, command)
+    assert result.returncode == 2, result.stdout
+
+
+def test_950_computed_refspec_message_names_the_way_out(repo_on_feature_branch):
+    result = _run_hook(repo_on_feature_branch, "git push origin $(git branch --show-current)")
+    assert result.returncode == 2
+    assert "HEAD" in result.stderr
