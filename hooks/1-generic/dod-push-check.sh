@@ -1,12 +1,12 @@
 #!/bin/bash
 # hook: dod-push-check
-# version: 2.1.1
+# version: 2.1.2
 # event: PreToolUse
 # matcher: Bash
 # provider: Claude
 # description: Blocks git push on/to main/master (Branch-Guard) and until tests are green (DoD enforcement)
 # enabled_by_default: false
-# changelog: v2.1.1: DWIM destinations (heads/main, remotes/<r>/main) protected (F1), pre-filter without here-string + SIGXFSZ ignored so a failed temp file fails closed (F2), quote-aware statements and fail-closed quote repair (QF1), man/less/more/ack no longer treated as text (QF5), one for-each-ref snapshot (A2), refspec-less pushes checked against push.default/branch.<n>.merge/remote.<r>.push and -c overrides (A3), -C/--git-dir/--work-tree/GIT_DIR refspec-less or HEAD pushes blocked (A4), $'..'/$".."/{a,b}/$(..) command words and git-push resolved or blocked (A5); v2.1.0: push detection by command word incl. global options/wrappers, no false positives on quoted/echoed text (SR-B-03/04), Branch-Guard checks destination refs and blocks --all/--mirror/detached pushes (SR-B-02), no SIGPIPE fail-open on large commands (SR-B-21), scoped boundary wording (SR-B-07); v2.0.3: per-statement tag-only push detection with flag allowlist, --no-tags, redirects, line continuations, fail-closed parsing (SR-B-01); v2.0.2: fix pipefail propagation in TEST_CMD subshell (#753)
+# changelog: v2.1.2: command-running git subcommands carrying a push blocked again (submodule foreach/bisect run git push, rebase -x/filter-branch/difftool -x/config with 'git ... push', R2-1), -c/--config-env aliases resolved or blocked, exec config (core.pager/sshCommand/editor, sequence.editor, ...) on a push or carrying one blocked, rg --pre/ack --pager blocked (R2-5), unreadable Bash command in the payload blocked instead of skipped (R2-2), linear classifier (shlex token buffer, brace/nested scans) + 20 s budget that blocks on overrun (R2-3), backslash-newline inside 'push' and 'alias' reach the classifier (R2-4); v2.1.1: DWIM destinations (heads/main, remotes/<r>/main) protected (F1), pre-filter without here-string + SIGXFSZ ignored so a failed temp file fails closed (F2), quote-aware statements and fail-closed quote repair (QF1), man/less/more/ack no longer treated as text (QF5), one for-each-ref snapshot (A2), refspec-less pushes checked against push.default/branch.<n>.merge/remote.<r>.push and -c overrides (A3), -C/--git-dir/--work-tree/GIT_DIR refspec-less or HEAD pushes blocked (A4), $'..'/$".."/{a,b}/$(..) command words and git-push resolved or blocked (A5); v2.1.0: push detection by command word incl. global options/wrappers, no false positives on quoted/echoed text (SR-B-03/04), Branch-Guard checks destination refs and blocks --all/--mirror/detached pushes (SR-B-02), no SIGPIPE fail-open on large commands (SR-B-21), scoped boundary wording (SR-B-07); v2.0.3: per-statement tag-only push detection with flag allowlist, --no-tags, redirects, line continuations, fail-closed parsing (SR-B-01); v2.0.2: fix pipefail propagation in TEST_CMD subshell (#753)
 
 set -uo pipefail
 
@@ -27,6 +27,15 @@ set -uo pipefail
 # boundary: a best-effort token scan, not a shell interpreter — indirection
 # such as eval/$(...)-in-quotes/aliases (#592) or a hand-written cache file
 # can still get a push past it. Classification doubt fails closed.
+# Known alias/config limits (R2-5): only aliases and exec config declared ON
+# THE SAME command line are seen. An alias or core.pager/sshCommand/editor
+# set in a config file (repo, global, GIT_CONFIG_GLOBAL=<file>,
+# include.path) or exported in an earlier statement/call (`git config
+# alias.p push` in one call — blocked only if its value names git+push —
+# then `git p origin main` in the next) is invisible: the pre-filter never
+# sees 'push'. Likewise a script run by `rebase -x`, `bisect run`,
+# `submodule foreach`, hooks or a filter whose text does not contain
+# 'git ... push' (e.g. `git rebase -x ./deploy.sh`).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if ! source "$SCRIPT_DIR/lib/hook_common.sh" 2>/dev/null; then
   echo "DoD-Check: required helper $SCRIPT_DIR/lib/hook_common.sh is missing or unreadable." >&2
@@ -55,17 +64,46 @@ INPUT=$(cat)
 TOOL_NAME=$(hook_json_get "$INPUT" "tool_name")
 COMMAND=$(hook_json_get "$INPUT" "tool_input.command")
 
-# Only intercept Bash tool calls
-[ "$TOOL_NAME" = "Bash" ] || exit 0
+# R2-2: an empty COMMAND must mean "no command", never "could not extract
+# it" (unparseable payload, non-string command, a helper failure): a Bash
+# (or unidentifiable) call whose payload holds a non-empty command that did
+# not reach us is blocked. An empty command of a non-Bash tool stays allowed.
+if [ -z "$COMMAND" ] && { [ -z "$TOOL_NAME" ] || [ "$TOOL_NAME" = "Bash" ]; }; then
+  _PAYLOAD_STATE=$(printf '%s' "$INPUT" | python3 -c '
+import json, sys
+try:
+    d = json.loads(sys.stdin.buffer.read().decode("utf-8", "surrogateescape"))
+except Exception:
+    d = None
+ti = d.get("tool_input") if isinstance(d, dict) else None
+cmd = ti.get("command") if isinstance(ti, dict) else None
+tool = d.get("tool_name") if isinstance(d, dict) else None
+if not isinstance(d, dict) or (cmd not in (None, "") and tool in (None, "", "Bash")):
+    print("unreadable")
+else:
+    print("empty")
+' 2>/dev/null)
+  if [ "$_PAYLOAD_STATE" != "empty" ]; then
+    echo "Branch-Guard: Push blocked — the Bash command could not be read from the hook payload (fail closed)." >&2
+    echo "Re-issue the command; if it contains unusual bytes (lone surrogates, invalid UTF-8), remove them." >&2
+    exit 2
+  fi
+fi
+
+# Only intercept Bash tool calls (and calls whose tool is unidentifiable)
+[ "$TOOL_NAME" = "Bash" ] || [ -z "$TOOL_NAME" ] || exit 0
 
 # Cheap pre-filter: a push needs the word 'push' somewhere (quotes/backslashes/
-# '$' between the letters tolerated, e.g. pu''sh, pu$'s'h) or ANSI-C quoting
-# ($'\x70ush' can spell anything). The precise per-statement classification
-# below decides; this only skips the python startup for the common case.
-# Pure bash: no fork, no pipe (SIGPIPE under pipefail, SR-B-21) and no
-# here-string temp file (a failed redirection returned rc 1 = "no match").
-_Q="[\"'\\\\\$]*"
-_PUSH_RE="p${_Q}u${_Q}s${_Q}h|[\$]'"
+# '$' and backslash-newline between the letters tolerated, e.g. pu''sh,
+# pu$'s'h, pu\<newline>sh) or ANSI-C quoting ($'\x70ush' can spell
+# anything) or a git alias declared on the command line ('-c alias.p=push p',
+# '--config-env=alias.p=VAR p', any case). The precise per-statement
+# classification below decides; this only skips the python startup for the
+# common case. Pure bash: no fork, no pipe (SIGPIPE under pipefail,
+# SR-B-21) and no here-string temp file (a failed redirection returned rc 1
+# = "no match").
+_Q="[\"'\\\\\$"$'\n'"]*"
+_PUSH_RE="p${_Q}u${_Q}s${_Q}h|[\$]'|[Aa]${_Q}[Ll]${_Q}[Ii]${_Q}[Aa]${_Q}[Ss]"
 # Only rc 1 (no match) skips; a regex error (rc 2) falls through (fail closed).
 [[ $COMMAND =~ $_PUSH_RE ]]
 [ $? -eq 1 ] && exit 0
@@ -192,7 +230,13 @@ MAIN_BRANCH="${MAIN_BRANCH:-main}"
 CURRENT_REF=$(git symbolic-ref -q HEAD 2>/dev/null)
 CURRENT_BRANCH="${CURRENT_REF#refs/heads/}"
 
-PUSH_CLASS=$(python3 - "$MAIN_BRANCH" "$CURRENT_BRANCH" 3<<<"$COMMAND" <<'PYEOF' 2>/dev/null
+# R2-3: hard time budget. The classifier is linear (~1.5 s per MB), but a
+# hook that runs into the harness timeout is a non-blocking error (= allow):
+# past CLASSIFY_BUDGET seconds it is killed, its output is empty -> block.
+CLASSIFY_BUDGET=20
+_BUDGET=()
+command -v timeout >/dev/null 2>&1 && _BUDGET=(timeout -k 2 "$CLASSIFY_BUDGET")
+PUSH_CLASS=$(${_BUDGET[@]+"${_BUDGET[@]}"} python3 - "$MAIN_BRANCH" "$CURRENT_BRANCH" 3<<<"$COMMAND" <<'PYEOF' 2>/dev/null
 import collections, os, re, shlex, subprocess, sys
 
 # git global options that take a separate value token. KEEP IN SYNC with
@@ -279,49 +323,132 @@ ENV_OVERRIDE = ("GIT_CONFIG",)
 # overrides that can remap an explicit destination-less ref
 MAP_KEYS = ("remote.", "include", "git_config")
 # a word the shell expands at run time: $'..', $"..", $VAR, `..`, $(...), {a,b}
-BRACE = re.compile(r"\{[^{}]*(?:,|\.\.)[^{}]*\}")
+# (brace groups found first, then checked: a single regex with a ',' between
+# two [^{}]* runs backtracks quadratically on '{,,,,...', R2-3)
+BRACE = re.compile(r"\{([^{}]*)\}")
 
 
 def computed(tok):
-    return "$" in tok or "`" in tok or bool(BRACE.search(tok))
+    return "$" in tok or "`" in tok or any(
+        "," in g or ".." in g for g in BRACE.findall(tok))
+
+
+# a command string inside one argument ('man -P "git push ..."', 'bash -c ...'):
+# 'git' followed (anywhere later) by the word 'push'. Two linear searches
+# instead of r"git\b.*\bpush\b" (quadratic on many 'git' words, R2-3).
+GIT_WORD = re.compile(r"git\b")
+PUSH_WORD = re.compile(r"\bpush\b")
+
+
+def nested(tok):
+    m = GIT_WORD.search(tok)
+    return bool(m and PUSH_WORD.search(tok, m.end()))
+
+
+# R2-1/R2-5: config whose value git runs as a command. Set on the command
+# line of a push it can run anything around it -> fail closed.
+EXEC_KEYS = ("core.pager", "pager.", "core.sshcommand", "core.editor",
+             "sequence.editor", "core.askpass", "core.fsmonitor",
+             "core.hookspath", "diff.external", "gpg.", "credential.",
+             "uploadpack.", "include")
+# Subcommands whose arguments are text (messages, patterns, paths) and never
+# a command line; every other subcommand (rebase -x, bisect run, submodule
+# foreach, filter-branch, difftool -x, config, fetch --upload-pack, ...) is
+# treated as able to run one: a 'git ... push' string in its args blocks.
+TEXT_SUBCOMMANDS = {"commit", "tag", "notes", "stash", "merge", "log", "show",
+                    "shortlog", "status", "add", "rm", "mv", "branch",
+                    "switch", "checkout", "restore", "reset", "describe",
+                    "blame", "diff", "rev-parse", "reflog", "revert",
+                    "cherry-pick", "format-patch"}
+ALIAS_DEPTH = 16
 
 
 def git_subcommand(toks):
     # toks[0] is git: skip global options (with their values) and return
-    # (subcommand or None, args after it, foreign, override).
+    # (subcommand or None, args after it, foreign, override, config) where
+    # config lists every (key lower-case, value) set by -c/--config-env
+    # (value None: taken from the environment, unknown).
     j = 1
-    foreign, override = False, ()
+    foreign, override, config = False, (), []
     while j < len(toks) and toks[j].startswith("-"):
         opt = toks[j]
         name, _, val = opt.partition("=")
         if opt in GIT_OPTS_WITH_VALUE:
             val = toks[j + 1] if j + 1 < len(toks) else ""
         foreign |= name in REPO_OPTS
-        if name in CONFIG_OPTS and val.lower().startswith(CONFIG_KEYS):
-            override += (val.lower(),)
+        if name in CONFIG_OPTS:
+            if val.lower().startswith(CONFIG_KEYS):
+                override += (val.lower(),)
+            key, _, value = val.partition("=")
+            config.append((key.lower(), None if name == "--config-env" else value))
         j += 2 if opt in GIT_OPTS_WITH_VALUE else 1
     if j < len(toks):
-        return toks[j], toks[j + 1:], foreign, override
-    return None, [], foreign, override
+        return toks[j], toks[j + 1:], foreign, override, config
+    return None, [], foreign, override, config
+
+
+def runs_push(sub, args):
+    # R2-1: a subcommand other than push that runs a command line from its
+    # args ('submodule foreach git push ...', 'bisect run git push ...').
+    # The unquoted scan (a git word followed by push) applies to every
+    # subcommand; the quoted one ('rebase -x "git push ..."') not to text
+    # subcommands, so 'git commit -m "... git push ..."' stays a commit.
+    g = next((k for k, t in enumerate(args) if is_git(t)), None)
+    if g is not None and any(PUSH_WORD.search(t) for t in args[g + 1:]):
+        return True  # also 'foreach git -c alias.p=push p'
+    if sub in TEXT_SUBCOMMANDS:
+        return False
+    if "push" in args and any(computed(t) for t in args[:args.index("push")]):
+        return True
+    return any(nested(t) for t in args)
 
 
 def git_push(toks, prefix):
     # toks[0] is git or git-push, prefix = the tokens before it (assignments,
     # wrapper words). Push, None (other subcommand) or UNRESOLVED (computed
-    # subcommand such as git $'push' / git {push,} / git $(echo push)).
+    # subcommand such as git $'push' / git {push,} / git $(echo push), a
+    # command-running subcommand or config that carries a push, an alias
+    # that cannot be resolved).
     if os.path.basename(toks[0]) == "git-push":
-        sub, args, foreign, override = "push", toks[1:], False, ()
+        sub, args, foreign, override, config = "push", toks[1:], False, (), []
     else:
-        sub, args, foreign, override = git_subcommand(toks)
+        sub, args, foreign, override, config = git_subcommand(toks)
+    env_config = [t for t in prefix if t.startswith(ENV_OVERRIDE)]
+    if any("alias" in t.lower() or "push" in t or nested(t) for t in env_config):
+        return UNRESOLVED  # GIT_CONFIG_KEY_0=alias.p GIT_CONFIG_VALUE_0=push ...
+    # aliases declared on this command line ('-c alias.p=push p ...') are
+    # expanded like git does: the value's words replace the alias word.
+    for _ in range(ALIAS_DEPTH):
+        if any(value is not None and nested(value) for _, value in config):
+            return UNRESOLVED  # -c core.pager='git push ...', -c alias.x='!git push'
+        if any(key.startswith("alias.") and value is None for key, value in config):
+            return UNRESOLVED  # --config-env=alias.<n>=VAR: value unknown
+        aliases = {key[len("alias."):]: value for key, value in config
+                   if key.startswith("alias.")}
+        if sub is None or sub.lower() not in aliases:
+            break
+        value = aliases[sub.lower()]
+        if value.startswith("!"):
+            # a shell alias runs anything; one that mentions push -> block
+            return UNRESOLVED if "push" in re.sub(r"[\"'\\$]", "", value) else None
+        try:
+            words = shlex.split(value)
+        except ValueError:
+            return UNRESOLVED
+        sub, more, f2, o2, c2 = git_subcommand([toks[0]] + words)
+        args = more + args
+        foreign, override, config = foreign or f2, override + o2, config + c2
+    else:
+        return UNRESOLVED  # alias loop
     if sub != "push":
-        return UNRESOLVED if sub is not None and computed(sub) else None
+        if sub is not None and (computed(sub) or runs_push(sub, args)):
+            return UNRESOLVED
+        return None
+    if any(key.startswith(EXEC_KEYS) for key, _ in config):
+        return UNRESOLVED  # git -c core.sshCommand=... push
     foreign |= any(t.startswith(ENV_FOREIGN) for t in prefix)
-    override += tuple(t.lower() for t in prefix if t.startswith(ENV_OVERRIDE))
+    override += tuple(t.lower() for t in env_config)
     return Push(args, foreign, override)
-
-
-# a command string inside one argument ('man -P "git push ..."', 'bash -c ...')
-NESTED = re.compile(r"git\b.*\bpush\b", re.S)
 
 
 def push_args(toks, w):
@@ -341,7 +468,7 @@ def push_args(toks, w):
         before = toks[w:toks.index("push", w)]
         if g < len(toks) or any(computed(t) for t in before):
             return UNRESOLVED
-    if any(NESTED.search(t) for t in toks[w + 1:g]):
+    if any(nested(t) for t in toks[w + 1:g]):
         return UNRESOLVED
     return None
 
@@ -410,7 +537,8 @@ ASSIGNMENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
 # man are NOT here (man -P '<cmd>', less with LESSOPEN, ack --pager run
 # commands). Known limit: a user-defined `gh` alias with a '!' shell
 # expansion (gh alias set --shell) can run a push; gh stays here because
-# `gh pr create --body "..."` text must not count as a push.
+# `gh pr create --body "..."` text must not count as a push. rg runs a
+# command only with --pre (checked before this set, like ack --pager).
 NON_EXEC = {"echo", "printf", "grep", "egrep", "fgrep", "rg", "ag",
             "gh", "cat", "head", "tail", "wc", "ls"}
 PUNCT = set("();<>|&")
@@ -428,13 +556,51 @@ PUSH_BULK = {"--all", "--branches", "--mirror"}
 _remotes = None
 
 
+class _Buf:
+    # Token buffer for _Lexer: shlex grows its token with 'self.token +=
+    # char' on an attribute, which CPython cannot do in place — one long
+    # word cost O(n^2) (1 MB: ~30 s, a hook timeout is not a block, R2-3).
+    # Appending to a list keeps shlex's own state machine (no second
+    # tokenizer that could disagree with it) at linear cost.
+    __slots__ = ("parts", "size")
+
+    def __init__(self, text):
+        self.parts, self.size = [text], len(text)
+
+    def __iadd__(self, text):
+        self.parts.append(text)
+        self.size += len(text)
+        return self
+
+    def __bool__(self):
+        return self.size > 0
+
+    def __str__(self):
+        return "".join(self.parts)
+
+    def __eq__(self, other):
+        return str(self) == other
+
+    __hash__ = None
+
+
+class _Lexer(shlex.shlex):
+    # 'token += c' stores the same _Buf back; 'token = c' starts a new one
+    token = property(lambda self: self._buf, lambda self, v: setattr(
+        self, "_buf", v if isinstance(v, _Buf) else _Buf(v)))
+
+    def read_token(self):
+        tok = super().read_token()
+        return str(tok) if isinstance(tok, _Buf) else tok
+
+
 def segments(stmt):
     # Tokenize like the shell (quotes, escapes) and nest at unquoted '(' /
     # ')', so '(git push x)', '$(git push x)' and '<(...)' expose 'git' as a
     # command word and 'x)' does not leak into a ref. A closed group leaves
     # COMPUTED in its parent's place ('git push origin $(...)' has a ref the
     # hook cannot know). Returns a list of token lists.
-    lex = shlex.shlex(stmt, posix=True, punctuation_chars=True)
+    lex = _Lexer(stmt, posix=True, punctuation_chars=True)
     lex.whitespace_split = True
     lex.commenters = ""
     # kinds: per open group how its value lands in the parent — "" plain
@@ -485,6 +651,9 @@ def segment_push_args(toks):
     word = toks[i]
     if is_git(word):
         return git_push(toks[i:], toks[:i])
+    if os.path.basename(word) in ("rg", "ack", "ack-grep") and any(
+            t.startswith(("--pre", "--pager")) for t in toks[i + 1:]):
+        return UNRESOLVED  # rg --pre / ack --pager run a command per file
     if os.path.basename(word) in NON_EXEC:
         return None
     if os.path.basename(word) == "man":
@@ -690,9 +859,11 @@ def classify(cmd):
     # are classified; any block wins.
     stmts = list(dict.fromkeys(
         s.strip() for s in re.split(r"&&|\|\||;|\||&|\n", cmd) + quoted_statements(cmd)))
+    parsed = {}  # stmt -> parses as-is (each statement is tokenized once)
     for stmt in stmts:
         plain = re.sub(r"[\"'\\$]", "", stmt)
-        if "push" not in plain and "$'" not in stmt:
+        # 'alias': '-c alias.p=push p', '--config-env=alias.p=VAR p' (R2-5)
+        if "push" not in plain and "$'" not in stmt and "alias" not in plain.lower():
             continue
         segs = None
         # A quote opened here and closed on a later line (multi-line -m/--body
@@ -704,6 +875,7 @@ def classify(cmd):
                 break
             except ValueError:
                 pass
+        parsed[stmt] = segs is not None and not suffix
         if segs is None:
             if "git" in plain:
                 return "block unparseable statement mentions git push"
@@ -729,7 +901,8 @@ def classify(cmd):
                if p.foreign or p.override or not stmt_is_tag_only(p.args)]
     # B-01: any unparseable statement (a quote may hide a push) -> not tag-only;
     # A3: a remote.<r>.push mapping may land a tag ref on a branch
-    if not non_tag and all(segments_ok(s) for s in stmts) and not push_config_block():
+    if not non_tag and all(parsed[s] if s in parsed else segments_ok(s) for s in stmts) \
+            and not push_config_block():
         return "tag"
     for p in pushes if push_config_block() else non_tag:
         reason = destination_block(p)
@@ -745,6 +918,7 @@ except Exception as exc:  # fail closed on any classifier bug
     print(f"block classifier error ({type(exc).__name__})")
 PYEOF
 )
+_CLASS_RC=$?
 
 case "$PUSH_CLASS" in
   none) exit 0 ;;
@@ -753,6 +927,7 @@ case "$PUSH_CLASS" in
   *)
     _REASON="${PUSH_CLASS#block }"
     [ "${PUSH_CLASS%% *}" = "block" ] || _REASON="push classification failed (fail closed)"
+    [ "$_CLASS_RC" -eq 124 ] && _REASON="push classification exceeded ${CLASSIFY_BUDGET}s (fail closed)"
     echo "Branch-Guard: Push blocked — $_REASON." >&2
     echo "Protected branches: $MAIN_BRANCH, main, master. Push a feature branch and open a PR instead." >&2
     echo "" >&2

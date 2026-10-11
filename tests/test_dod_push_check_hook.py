@@ -772,3 +772,165 @@ def test_a3_tag_push_mapped_onto_main_is_not_tag_only(multi_repo):
     _checkout(multi_repo, "main")
     _git(multi_repo, "config", "remote.origin.push", "refs/tags/v1.0.0:refs/heads/main")
     _assert_outcome(multi_repo, "git push origin v1.0.0", BLOCK)
+
+
+# R2-1: git subcommands/config that run another command must not hide a push
+# (`git submodule foreach git push ...` was blocked by v2.0.3).
+R2_1_BLOCKED = [
+    "git submodule foreach git push origin main",
+    "git submodule foreach --recursive git push origin HEAD:main",
+    "git bisect run git push origin main",
+    "git submodule foreach 'git push origin main'",
+    "git rebase --exec 'git push origin main' HEAD~0",
+    "git rebase -x 'git push origin main' HEAD",
+    "git filter-branch --tree-filter 'git push origin main' HEAD",
+    "git difftool -x 'git push origin main' HEAD",
+    "git -c core.pager='git push origin main' log -1",
+    "git -c core.sshCommand='sh -c \"git push origin main\"' fetch",
+    "git -c core.editor='git push origin main' commit",
+    "git -c sequence.editor='git push origin main' rebase -i HEAD",
+    "git config alias.x '!git push origin main'",
+    "git -c alias.p='!git push origin main' p",
+    "git -c alias.x='!sh -c \"git push origin main\"' x",
+    "git -c alias.p=push p origin main",
+    "git -c ALIAS.p=push P origin HEAD:main",
+    "git -c alias.p=push -c alias.q=p q origin main",
+    "git --config-env=alias.p=PV p origin main",
+    "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.p GIT_CONFIG_VALUE_0=push git p origin main",
+    "git -c core.sshCommand=ssh push origin feat/x",
+    "git -c core.pager=cat push origin feat/x",
+    "rg --pre 'git push origin main' x",
+    "rg --pre=x push",
+    "ack --pager=x push",
+]
+
+
+@pytest.mark.parametrize("where", ["feat/x", "main", "detached"])
+@pytest.mark.parametrize("command", R2_1_BLOCKED)
+def test_r2_1_command_running_subcommands_blocked(multi_repo, where, command):
+    if where != "feat/x":
+        _checkout(multi_repo, where)
+    _assert_outcome(multi_repo, command, BLOCK)
+
+
+@pytest.mark.parametrize("command,expected", [
+    ("git -c alias.p=push p origin feat/x", GATE),
+    ("git -c alias.p=push p origin HEAD:main", BLOCK),
+    ('git commit -m "then git push origin main"', NONE),
+    ('git tag -a v2 -m "git push origin main"', NONE),
+    ('git log --grep "git push"', NONE),
+    ("git stash push -m wip", NONE),
+    ('rg "git push" docs', NONE),
+    ("rg -n push scripts", NONE),
+    ("git submodule foreach git status && git push origin feat/x", GATE),
+])
+def test_r2_1_resolved_aliases_and_text(multi_repo, command, expected):
+    _assert_outcome(multi_repo, command, expected)
+
+
+# R2-2: a payload the JSON helper cannot hand over must not open the gate.
+def _run_payload(repo: Path, payload: bytes, env_extra=None) -> subprocess.CompletedProcess:
+    env = dict(os.environ, AGENT_META_TEST_COMMAND="false", AGENT_META_TEST_TIMEOUT="5")
+    env.pop("AGENT_META_MAIN_BRANCH", None)
+    env.update(env_extra or {})
+    return subprocess.run([_BASH, str(_HOOK_PATH)], input=payload, capture_output=True,
+                          cwd=str(repo), env=env)
+
+
+def _bash_payload(command: str) -> bytes:
+    return json.dumps({"tool_name": "Bash", "tool_input": {"command": command}}).encode()
+
+
+@pytest.mark.parametrize("locale", ["C", "C.UTF-8", "de_DE.UTF-8"])
+@pytest.mark.parametrize("command", [
+    "git push origin main\ud800",
+    "git push origin main\udcff",
+    "echo \udcff; git push origin main",
+    "git push origin main # \udfff",
+])
+def test_r2_2_lone_surrogate_does_not_skip_guard(multi_repo, locale, command):
+    _checkout(multi_repo, "main")
+    result = _run_payload(multi_repo, _bash_payload(command), {"LC_ALL": locale, "LANG": locale})
+    assert result.returncode == 2, (locale, command, result.stderr[-300:])
+
+
+@pytest.mark.parametrize("payload", [
+    b'{"tool_name": "Bash", "tool_input": {"command": "git push origin main \xff\xfe"}}',
+    b'{"tool_name": "Bash", "tool_input": {"command": "git push origin main\\u0000"}}',
+    b'{"tool_name": "Bash", "tool_input": {"command": ["git", "push", "origin", "main"]}}',
+    b'{"tool_name": "Bash", "tool_input": {"command": "git push origin main"',
+    b'not json at all: git push origin main',
+])
+def test_r2_2_unextractable_bash_command_blocked(multi_repo, payload):
+    _checkout(multi_repo, "main")
+    for locale in ("C", "de_DE.UTF-8"):
+        result = _run_payload(multi_repo, payload, {"LC_ALL": locale, "LANG": locale})
+        assert result.returncode == 2, (locale, payload, result.stderr[-300:])
+
+
+@pytest.mark.parametrize("payload", [
+    b'{"tool_name": "Read", "tool_input": {"file_path": "x"}}',
+    b'{"tool_name": "Write", "tool_input": {"file_path": "x", "content": "git push"}}',
+    b'{"tool_name": "Bash", "tool_input": {"command": ""}}',
+])
+def test_r2_2_empty_command_for_non_bash_or_empty_bash_allowed(multi_repo, payload):
+    _checkout(multi_repo, "main")
+    result = _run_payload(multi_repo, payload)
+    assert result.returncode == 0, (payload, result.stderr[-300:])
+
+
+# R2-3: classifier time must stay linear; a hook timeout would fail open.
+@pytest.mark.parametrize("command", [
+    "git push origin main " + "a" * (1 << 20),
+    "$" * (1 << 20) + " git push origin main",
+    "\\" * (1 << 20) + " git push origin main",
+    "git push origin main " + "a" * (2 << 20),
+    "$" * (2 << 20) + "push origin main",
+    "git push origin '{" + "," * (1 << 20) + "' main",
+    "git rebase -x '" + "git " * (1 << 18) + "' HEAD; git push origin main",
+], ids=["ident-1M", "dollar-1M", "backslash-1M", "ident-2M", "dollar-2M", "commas-1M",
+        "git-words-1M"])
+def test_r2_3_huge_push_commands_block_in_time(multi_repo, command):
+    start = time.monotonic()
+    _assert_outcome(multi_repo, command, BLOCK)
+    assert time.monotonic() - start < 25
+
+
+@pytest.mark.parametrize("command,expected", [
+    ("git push origin feat/x\n" * 10000, GATE),
+    ("echo " + "$(" * 50000 + "\ngit push origin main", BLOCK),
+    ("git push origin main " + "a" * (300 << 10), BLOCK),
+], ids=["10k-pushes", "50k-nested", "ident-300K"])
+def test_r2_3_many_statements_and_nesting_fast(multi_repo, command, expected):
+    start = time.monotonic()
+    _assert_outcome(multi_repo, command, expected)
+    assert time.monotonic() - start < 10
+
+
+def test_r2_3_classifier_over_budget_blocks(multi_repo, tmp_path):
+    # `timeout` killing the classifier (rc 124, no output) must block.
+    stub = tmp_path / "stub"
+    stub.mkdir()
+    (stub / "timeout").write_text("#!/bin/sh\nexit 124\n", encoding="utf-8")
+    (stub / "timeout").chmod(0o755)
+    payload = _bash_payload("git push origin feat/x")
+    result = _run_payload(multi_repo, payload,
+                          {"PATH": f"{stub}{os.pathsep}{os.environ['PATH']}"})
+    assert result.returncode == 2
+    assert b"exceeded 20s" in result.stderr
+
+
+def test_r2_3_normal_push_stays_fast(multi_repo):
+    start = time.monotonic()
+    _assert_outcome(multi_repo, "git push origin HEAD:main", BLOCK)
+    assert time.monotonic() - start < 2
+
+
+# R2-4: backslash-newline inside the word 'push' (bash joins the lines).
+@pytest.mark.parametrize("command", [
+    "git pu\\\nsh origin main",
+    "git p\\\nu\\\ns\\\nh origin main",
+])
+def test_r2_4_line_continuation_inside_push(multi_repo, command):
+    _checkout(multi_repo, "main")
+    _assert_outcome(multi_repo, command, BLOCK)
