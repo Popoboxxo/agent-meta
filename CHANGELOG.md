@@ -88,6 +88,11 @@
   startup, and the `origin not allowed` error names `--allowed-hosts` / `admin-ui.allowed-hosts`. The
   backup overlay is closed in a `finally`, so a failed request cannot leave it hanging. A wildcard
   bind still does not auto-trust arbitrary Host/Origin values (DNS-rebinding protection).
+- **CI robustness (#945, partial)**: every workflow job has `timeout-minutes` (was the 360-minute default),
+  the test job runs `pytest -n auto` (`pytest-xdist` in `tests/requirements.txt`), and
+  `tests/test_orchestrator_guard_hook.py` runs against a throw-away copy of `project.yaml` instead of the
+  real checkout, so it no longer appends test lines to `.claude/hooks/.guard-audit.log`. The new provider
+  matrix test falls back to `tomli` on Python < 3.11 (the CI matrix includes 3.9).
 - **Registry load fails loudly without PyYAML (SR-A-16)**: `load_providers_config` raises `SyncError`
   instead of silently degrading to the Claude-only fallback registry.
 - **Nested null `orchestrator.unknown-fallback` no longer crashes (SR-A-28)**.

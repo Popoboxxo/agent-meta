@@ -21,11 +21,15 @@ Run: python -m pytest tests/test_provider_matrix_sync.py -v
 import re
 import subprocess
 import sys
-import tomllib
 from pathlib import Path
 
 import pytest
 import yaml
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python < 3.11
+    import tomli as tomllib
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _SYNC = _REPO_ROOT / "scripts" / "sync.py"

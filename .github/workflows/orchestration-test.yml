@@ -27,6 +27,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -45,7 +46,7 @@ jobs:
         run: pip install -r tests/requirements.txt
 
       - name: Run orchestration & runtime tests
-        run: python -m pytest tests/ -q
+        run: python -m pytest tests/ -q -n auto
 
       - name: Validate agent templates
         run: python scripts/sync.py --validate
