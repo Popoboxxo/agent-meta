@@ -9,7 +9,9 @@ produced on the pre-feature ``main`` state.
 Differences are only tolerated for paths matching ``AC01_EXCEPTIONS`` (the
 AC-01 exception list (i)-(v) of SPEC-CONTEXT-PROFILES-2026-10-11, kept as data).
 
-Regenerate the manifest (only for a justified rebaseline):
+Regenerate the manifest (only for a justified rebaseline; ``--write`` is only
+allowed on a clean, unmodified ``main`` state, rebaseline only with a documented
+reason, Spec AC-01):
     python tests/test_ac01_render_identity.py --write
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
@@ -23,7 +25,7 @@ import sys
 import tempfile
 from datetime import date
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Sequence
 
 import pytest
 import yaml
@@ -37,8 +39,9 @@ _PROVIDERS = sorted(
 
 # AC-01 exception list (i)-(v) as data: regexes over "<provider>/<relpath>".
 # (i)/(ii) new meta-doctor / meta-optimizer role artifacts and their roster rows,
-# (iv) IC-15 Nr. 26 root .gitignore entry of the tmp-sink (None path).
-# (iii) golden rebaselines and (v) hard errors produce no render diff.
+# (iv)/(v) produce no render diff in a regular sync, so there is no pattern (Spec AC-01 iv/v);
+# (ii)/(iii) (meta-doctor roster rows in existing files, golden rebaseline) are done
+# via rebaseline in package 0e, not via a path pattern.
 # Empty entries would hide drift, so every pattern must stay role/entry specific.
 AC01_EXCEPTIONS = frozenset({
     r".*/meta-doctor\.[a-z]+$",
@@ -73,11 +76,15 @@ def _make_project(root: Path, provider: str) -> Path:
     return project
 
 
-def _hash_file(path: Path, root: Path) -> str:
-    data = path.read_bytes()
-    # Normalize run-specific values: scratch root path and today's date stamp.
-    for needle, repl in ((str(root).encode(), b"<ROOT>"), (date.today().isoformat().encode(), b"<DATE>")):
-        data = data.replace(needle, repl)
+def _hash_file(path: Path, root: Path, dates: Sequence[str]) -> str:
+    data = path.read_bytes().replace(b"\r\n", b"\n")
+    # Normalize run-specific values: scratch root path (native, posix, JSON-escaped)
+    # and the date stamp(s) captured once per run (before/after the sync).
+    root_variants = {str(root), root.as_posix(), str(root).replace("\\", "\\\\")}
+    for needle in sorted(root_variants, key=len, reverse=True):
+        data = data.replace(needle.encode(), b"<ROOT>")
+    for d in dates:
+        data = data.replace(d.encode(), b"<DATE>")
     return hashlib.sha256(data).hexdigest()
 
 
@@ -88,6 +95,8 @@ def render_matrix_hashes(fixture_root: Path) -> Dict[str, str]:
     """
     fixture_root = Path(fixture_root)
     hashes: Dict[str, str] = {}
+    date_before = date.today().isoformat()
+    projects: List[tuple] = []
     for provider in _PROVIDERS:
         project = _make_project(fixture_root, provider)
         for f in sorted(project.rglob("*")):
@@ -96,7 +105,11 @@ def render_matrix_hashes(fixture_root: Path) -> Dict[str, str]:
             rel = f.relative_to(fixture_root).as_posix()
             if _SKIP_RE.search(rel):
                 continue
-            hashes[rel] = _hash_file(f, fixture_root)
+            projects.append((rel, f))
+    # Date captured once before and once after all syncs; both are normalized.
+    dates = {date_before, date.today().isoformat()}
+    for rel, f in projects:
+        hashes[rel] = _hash_file(f, fixture_root, sorted(dates))
     return hashes
 
 
@@ -137,7 +150,7 @@ def test_ac01_detects_drift(rendered):
     try:
         target.write_bytes(original + b"\n<!-- drift -->\n")
         mutated = dict(current)
-        mutated[victim] = _hash_file(target, root)
+        mutated[victim] = _hash_file(target, root, [date.today().isoformat()])
         assert diff_against_manifest(mutated, baseline) == [f"changed: {victim}"]
     finally:
         target.write_bytes(original)
