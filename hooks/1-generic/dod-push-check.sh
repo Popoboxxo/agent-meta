@@ -1,12 +1,12 @@
 #!/bin/bash
 # hook: dod-push-check
-# version: 2.1.3
+# version: 2.1.4
 # event: PreToolUse
 # matcher: Bash
 # provider: Claude
 # description: Blocks git push on/to main/master (Branch-Guard) and until tests are green (DoD enforcement)
 # enabled_by_default: false
-# changelog: v2.1.3: heredoc bodies fed to a text-only consumer (cat/gh/tee/git commit) are no longer classified as commands (#947), an unquoted word-start # comment is cut before tokenizing while quoted/mid-word # stay literal (#948), xargs carrying a git push and the {} placeholder fail closed (#950), computed-refspec block message names the HEAD / literal-branch way out (#950); v2.1.2: command-running git subcommands carrying a push blocked again (submodule foreach/bisect run git push, rebase -x/filter-branch/difftool -x/config with 'git ... push', R2-1), -c/--config-env aliases resolved or blocked, exec config (core.pager/sshCommand/editor, sequence.editor, ...) on a push or carrying one blocked, rg --pre/ack --pager blocked (R2-5), unreadable Bash command in the payload blocked instead of skipped (R2-2), linear classifier (shlex token buffer, brace/nested scans) + 20 s budget that blocks on overrun (R2-3), backslash-newline inside 'push' and 'alias' reach the classifier (R2-4); v2.1.1: DWIM destinations (heads/main, remotes/<r>/main) protected (F1), pre-filter without here-string + SIGXFSZ ignored so a failed temp file fails closed (F2), quote-aware statements and fail-closed quote repair (QF1), man/less/more/ack no longer treated as text (QF5), one for-each-ref snapshot (A2), refspec-less pushes checked against push.default/branch.<n>.merge/remote.<r>.push and -c overrides (A3), -C/--git-dir/--work-tree/GIT_DIR refspec-less or HEAD pushes blocked (A4), $'..'/$".."/{a,b}/$(..) command words and git-push resolved or blocked (A5); v2.1.0: push detection by command word incl. global options/wrappers, no false positives on quoted/echoed text (SR-B-03/04), Branch-Guard checks destination refs and blocks --all/--mirror/detached pushes (SR-B-02), no SIGPIPE fail-open on large commands (SR-B-21), scoped boundary wording (SR-B-07); v2.0.3: per-statement tag-only push detection with flag allowlist, --no-tags, redirects, line continuations, fail-closed parsing (SR-B-01); v2.0.2: fix pipefail propagation in TEST_CMD subshell (#753)
+# changelog: v2.1.4: a push in a command that changes directory (cd/pushd/popd) is judged as a push into another repository (refspec-less/HEAD pushes blocked, cwd branch and config no longer assumed) (#952); v2.1.3: heredoc bodies fed to a text-only consumer (cat/gh/tee/git commit) are no longer classified as commands (#947), an unquoted word-start # comment is cut before tokenizing while quoted/mid-word # stay literal (#948), xargs carrying a git push and the {} placeholder fail closed (#950), computed-refspec block message names the HEAD / literal-branch way out (#950); v2.1.2: command-running git subcommands carrying a push blocked again (submodule foreach/bisect run git push, rebase -x/filter-branch/difftool -x/config with 'git ... push', R2-1), -c/--config-env aliases resolved or blocked, exec config (core.pager/sshCommand/editor, sequence.editor, ...) on a push or carrying one blocked, rg --pre/ack --pager blocked (R2-5), unreadable Bash command in the payload blocked instead of skipped (R2-2), linear classifier (shlex token buffer, brace/nested scans) + 20 s budget that blocks on overrun (R2-3), backslash-newline inside 'push' and 'alias' reach the classifier (R2-4); v2.1.1: DWIM destinations (heads/main, remotes/<r>/main) protected (F1), pre-filter without here-string + SIGXFSZ ignored so a failed temp file fails closed (F2), quote-aware statements and fail-closed quote repair (QF1), man/less/more/ack no longer treated as text (QF5), one for-each-ref snapshot (A2), refspec-less pushes checked against push.default/branch.<n>.merge/remote.<r>.push and -c overrides (A3), -C/--git-dir/--work-tree/GIT_DIR refspec-less or HEAD pushes blocked (A4), $'..'/$".."/{a,b}/$(..) command words and git-push resolved or blocked (A5); v2.1.0: push detection by command word incl. global options/wrappers, no false positives on quoted/echoed text (SR-B-03/04), Branch-Guard checks destination refs and blocks --all/--mirror/detached pushes (SR-B-02), no SIGPIPE fail-open on large commands (SR-B-21), scoped boundary wording (SR-B-07); v2.0.3: per-statement tag-only push detection with flag allowlist, --no-tags, redirects, line continuations, fail-closed parsing (SR-B-01); v2.0.2: fix pipefail propagation in TEST_CMD subshell (#753)
 
 set -uo pipefail
 
@@ -852,6 +852,8 @@ def quoted_statements(cmd):
     return out
 
 
+CHDIR = re.compile(r"(?:^|[\s;&|(])(?:cd|pushd|popd)(?!\S*[\w-])(?:\s+(?!\.(?:/)?(?:\s|$|;|&|\|))|\s*$|\s*[;&|)])")
+
 # --- comment + heredoc preprocessing (#947, #948) ---------------------------
 def strip_comment(stmt):
     # Cut an unquoted, word-start '#' comment (bash: '#' only starts a comment
@@ -1014,6 +1016,11 @@ def classify(cmd):
             pushes.append(args)
     if not pushes:
         return "none"
+    # A cd/pushd/popd anywhere in the command may move the push into another
+    # repository whose HEAD and config the hook cannot see (#952): judge it
+    # like -C. 'cd .' is a no-op and does not count.
+    if CHDIR.search(cmd):
+        pushes = [p._replace(foreign=True) for p in pushes]
     non_tag = [p for p in pushes
                if p.foreign or p.override or not stmt_is_tag_only(p.args)]
     # B-01: any unparseable statement (a quote may hide a push) -> not tag-only;

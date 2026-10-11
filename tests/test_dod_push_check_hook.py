@@ -996,3 +996,28 @@ def test_950_computed_refspec_message_names_the_way_out(repo_on_feature_branch):
     result = _run_hook(repo_on_feature_branch, "git push origin $(git branch --show-current)")
     assert result.returncode == 2
     assert "HEAD" in result.stderr
+
+
+# --- issue #952: cd into another repository --------------------------------
+
+@pytest.mark.parametrize("command", [
+    "cd ../other && git push",
+    "cd ../other && git push origin HEAD",
+    "pushd ../other; git push",
+    "(cd ../other && git push)",
+    "cd && git push",
+])
+def test_952_push_after_chdir_is_judged_as_foreign_repo(repo_on_feature_branch, command):
+    result = _run_hook(repo_on_feature_branch, command)
+    assert result.returncode == 2, result.stdout
+    assert "another repository" in result.stderr
+
+
+@pytest.mark.parametrize("command", [
+    "cd . && git push origin feat/x",          # no-op cd, explicit safe ref
+    "cd ../other && git push origin feat/x",   # explicit non-protected ref is safe anywhere
+    "echo abcd && git push origin feat/x",     # 'cd' inside another word
+])
+def test_952_explicit_safe_refs_and_non_cd_words_are_not_blocked(repo_on_feature_branch, command):
+    result = _run_hook(repo_on_feature_branch, command)
+    assert result.returncode == 0, result.stderr
