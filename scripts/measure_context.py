@@ -19,6 +19,15 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from lib.context_report import (  # noqa: E402 -- shared measurement function (IC-11)
+    count_text_stats,
+    measure_artifacts,
+    merge_provider_mappings,
+    render_table as render_artifact_table,
+)
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 PROVIDERS_CONFIG = "config/ai-providers.yaml"
@@ -79,11 +88,12 @@ def measure_file(path: Path) -> dict[str, object]:
         display_path = str(path.resolve().relative_to(REPO_ROOT))
     except ValueError:
         display_path = str(path)
+    stats = count_text_stats(content)
     return {
         "path": display_path,
-        "lines": len(content.decode(encoding="utf-8", errors="replace").splitlines()),
-        "bytes": len(content),
-        "tokens_approx": len(content) // BYTES_PER_TOKEN,
+        "lines": stats["lines"],
+        "bytes": stats["bytes"],
+        "tokens_approx": stats["tokens_est"],
     }
 
 
@@ -205,11 +215,43 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="optional additional file to measure (missing defaults are skipped)",
     )
     parser.add_argument(
+        "--project",
+        default=None,
+        help="measure the rendered artifacts of a project per provider "
+        "(same function as sync.py --context-report)",
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
         help="emit machine-readable JSON instead of a table",
     )
     return parser.parse_args(argv)
+
+
+def run_project_report(project: Path, as_json: bool) -> int:
+    """Report per-provider artifact sizes of *project* via ``measure_artifacts``."""
+    from lib.config import load_config
+    from lib.providers import (
+        load_provider_capabilities,
+        load_providers_config,
+        resolve_providers,
+    )
+
+    config_path = project / ".meta-config" / "project.yaml"
+    if not config_path.is_file():
+        print(f"error: no project config at {config_path}", file=sys.stderr)
+        return 1
+    config = load_config(config_path)
+    provider_config = load_providers_config(REPO_ROOT, config)
+    providers = resolve_providers(config, provider_config)
+    mappings = merge_provider_mappings(
+        provider_config, load_provider_capabilities(REPO_ROOT))
+    report = measure_artifacts(project, providers, mappings)
+    if not report:
+        print("error: no provider context files found", file=sys.stderr)
+        return 1
+    print(json.dumps(report, indent=2) if as_json else render_artifact_table(report))
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -223,6 +265,8 @@ def main(argv: list[str] | None = None) -> int:
         the extra target does not exist.
     """
     args = parse_args(argv)
+    if args.project is not None:
+        return run_project_report(Path(args.project), args.json)
     try:
         measurements = collect_measurements(REPO_ROOT, args.target)
     except FileNotFoundError as exc:
