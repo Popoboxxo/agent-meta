@@ -113,10 +113,10 @@ capabilities:
     context_soft_cap_lines: 200
     roster_in_harness: true
     agents_md_visible_to_subagents: false
-    rules_read_channels: [native-rules-dir, path-scoped]
+    rules_read_channels: [native-rules-dir, path-scoped]  # path-scoped: capability only, generated from Phase 3
     skills_discovery_dirs: [".claude/skills"]
     main_agent_selectable: true
-    agents_md_precedence: concatenate
+    agents_md_precedence: concatenate  # irrelevant; AGENTS.md ignored
     required_depth: 2
     strips_html_comments: true
     rules_required_suffix: null
@@ -158,7 +158,7 @@ capabilities:
     fanout_mechanism: native-batch
     barrier_collect: true
     # --- IC-09 context budget / channel keys (SPEC-CONTEXT-PROFILES-2026-10-11, Task 0a.5): pure data, not yet consumed by the render.
-    # Source: docs/analysis/2026-10-11-context-budget-provider-study.md. agents_md_precedence=nearest is UNVERIFIED (not in study).
+    # Source: docs/analysis/2026-10-11-context-budget-provider-study.md. agents_md_precedence=nearest is UNVERIFIED (not in study). Keys marked UNVERIFIED here (not covered by surface_verified_state.context_file).
     context_hard_cap_bytes: null
     context_soft_cap_bytes: null
     context_soft_cap_chars: null
@@ -210,7 +210,7 @@ capabilities:
     fanout_mechanism: native-batch
     barrier_collect: true
     # --- IC-09 context budget / channel keys (SPEC-CONTEXT-PROFILES-2026-10-11, Task 0a.5): pure data, not yet consumed by the render.
-    # Source: docs/analysis/2026-10-11-context-budget-provider-study.md. soft_cap_chars 12000 = Antigravity per-rule-file cap, UNVERIFIED (third-party, study 3.7); read_only_enforcement=tools UNVERIFIED.
+    # Source: docs/analysis/2026-10-11-context-budget-provider-study.md. soft_cap_chars 12000 = Antigravity per-rule-file cap, UNVERIFIED (third-party, study 3.7); read_only_enforcement=tools UNVERIFIED. Keys marked UNVERIFIED here (not covered by surface_verified_state.context_file).
     context_hard_cap_bytes: null
     context_soft_cap_bytes: null
     context_soft_cap_chars: 12000
@@ -267,7 +267,7 @@ capabilities:
     fanout_mechanism: sequential-fallback
     barrier_collect: false
     # --- IC-09 context budget / channel keys (SPEC-CONTEXT-PROFILES-2026-10-11, Task 0a.5): pure data, not yet consumed by the render.
-    # Source: docs/analysis/2026-10-11-context-budget-provider-study.md. main_agent_selectable=true only via `cn --agent` (study 3.8); agents_md_precedence=nearest UNVERIFIED (no AGENTS.md reader).
+    # Source: docs/analysis/2026-10-11-context-budget-provider-study.md. main_agent_selectable=true only via `cn --agent` (study 3.8); agents_md_precedence=nearest UNVERIFIED (no AGENTS.md reader). Keys marked UNVERIFIED here (not covered by surface_verified_state.context_file).
     context_hard_cap_bytes: null
     context_soft_cap_bytes: null
     context_soft_cap_chars: null
@@ -385,7 +385,7 @@ capabilities:
     fanout_mechanism: sequential-fallback
     barrier_collect: false
     # --- IC-09 context budget / channel keys (SPEC-CONTEXT-PROFILES-2026-10-11, Task 0a.5): pure data, not yet consumed by the render.
-    # Source: docs/analysis/2026-10-11-context-budget-provider-study.md. OpenCode fork: agents_md_visible_to_subagents, agents_md_precedence, read_only_enforcement inherited from OpenCode, UNVERIFIED for the fork; .mammouth/rules is inert (study 3.4) so not a channel.
+    # Source: docs/analysis/2026-10-11-context-budget-provider-study.md. OpenCode fork: agents_md_visible_to_subagents, agents_md_precedence, read_only_enforcement inherited from OpenCode, UNVERIFIED for the fork; .mammouth/rules is inert (study 3.4) so not a channel. Keys marked UNVERIFIED here (not covered by surface_verified_state.context_file).
     context_hard_cap_bytes: null
     context_soft_cap_bytes: null
     context_soft_cap_chars: null
@@ -516,7 +516,7 @@ capabilities:
     barrier_collect: false
     bootstrap_required: true          # workspace-level .zcode/agents/ consumption via bootstrap injection (Gemini posture, plan §5.8)
     # --- IC-09 context budget / channel keys (SPEC-CONTEXT-PROFILES-2026-10-11, Task 0a.5): pure data, not yet consumed by the render.
-    # Source: docs/analysis/2026-10-11-context-budget-provider-study.md. hard cap 100 KiB per file (VERIFIED-SOURCE); workspace_agents_autoload UNVERIFIED (#856/Q34); read_only_enforcement=none UNVERIFIED.
+    # Source: docs/analysis/2026-10-11-context-budget-provider-study.md. hard cap 100 KiB per file (VERIFIED-SOURCE); workspace_agents_autoload UNVERIFIED (#856/Q34); read_only_enforcement=none UNVERIFIED. Keys marked UNVERIFIED here (not covered by surface_verified_state.context_file).
     context_hard_cap_bytes: 102400
     context_soft_cap_bytes: null
     context_soft_cap_chars: null
@@ -578,7 +578,7 @@ capabilities:
     fanout_mechanism: swarm
     barrier_collect: true
     # --- IC-09 context budget / channel keys (SPEC-CONTEXT-PROFILES-2026-10-11, Task 0a.5): pure data, not yet consumed by the render.
-    # Source: docs/analysis/2026-10-11-context-budget-provider-study.md. soft cap = AGENTS_MD_RECOMMENDED_MAX_BYTES warning, no truncation (VERIFIED-SOURCE); subagent_allowlist_required SOURCE-DERIVED.
+    # Source: docs/analysis/2026-10-11-context-budget-provider-study.md. soft cap = AGENTS_MD_RECOMMENDED_MAX_BYTES warning, no truncation (VERIFIED-SOURCE); subagent_allowlist_required SOURCE-DERIVED. agents_md_precedence=concatenate supersedes the stale special_notes line ("nearest-wins"); correction in Phase 1 (F-17), special_notes left unchanged.
     context_hard_cap_bytes: null
     context_soft_cap_bytes: 32768
     context_soft_cap_chars: null

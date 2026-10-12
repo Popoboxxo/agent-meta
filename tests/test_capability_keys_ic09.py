@@ -48,8 +48,30 @@ def _is_int(v):
     return isinstance(v, int) and not isinstance(v, bool)
 
 
+_EXPECTED_PROVIDERS = {
+    "Claude", "Gemini", "Opencode", "Continue", "Copilot", "Mammouth",
+    "Codex", "ZCode", "KimiCode",
+}
+# empty is intentional: generated instruction files are never read there (F-17)
+_EMPTY_CHANNELS_OK = ("Copilot", "Gemini")
+
+
 def test_providers_present():
-    assert len(_PROVIDERS) >= 9
+    assert len(_PROVIDERS) == 9
+    assert set(_PROVIDERS) == _EXPECTED_PROVIDERS
+
+
+@pytest.mark.parametrize("provider", _PROVIDERS)
+def test_depth_and_skill_dirs(provider):
+    c = _CAPS[provider]
+    assert c["required_depth"] >= 2  # spec IC-09: orchestrator -> worker
+    assert c["skills_discovery_dirs"], "skills_discovery_dirs must not be empty"
+
+
+@pytest.mark.parametrize("provider", _EMPTY_CHANNELS_OK)
+def test_empty_rules_read_channels_allowed(provider):
+    # empty is intentional: rules_read_channels: [] is valid, not a missing key
+    assert _CAPS[provider]["rules_read_channels"] == []
 
 
 @pytest.mark.parametrize("provider", _PROVIDERS)
