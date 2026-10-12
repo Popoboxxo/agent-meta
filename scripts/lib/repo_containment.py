@@ -558,6 +558,108 @@ def resolve_effective_repo_containment(
     )
 
 
+class TmpSinkError(Exception):
+    """Output-path resolution failure carrying a stable error code (IC-34).
+
+    ``code`` is ``tmp-sink.disabled``, ``tmp-sink.invalid-path``,
+    ``tmp-sink.invalid-segment`` or ``out-outside-tmp-sink``; for the
+    disabled/out codes a *tool* prefix yields ``<tool>.<code>``. Callers map
+    it to Exit 2.
+    """
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(f"{code}: {message}")
+        self.code = code
+        self.message = message
+
+
+def _sink_error_code(code: str, tool: str) -> str:
+    return f"{tool}.{code}" if tool else code
+
+
+def _active_sink_dir(project_root: Path, config: Optional[dict], tool: str) -> Path:
+    """Return the realpath-resolved sink dir or raise :class:`TmpSinkError`."""
+    effective = resolve_effective_repo_containment(config)
+    if not effective.tmp_sink_enabled:
+        raise TmpSinkError(
+            _sink_error_code("tmp-sink.disabled", tool),
+            "tmp-sink is disabled; no output location available "
+            "(opt in with repo_containment.tmp-sink.enabled: true)",
+        )
+    bad = [f for f in effective.findings if f.code == "repo-containment.tmp-sink-path"]
+    if bad:  # resolver fell back to the default; never silently redirect output
+        raise TmpSinkError("tmp-sink.invalid-path", bad[0].message)
+    error = tmp_sink_path_error(effective.tmp_sink_path, project_root)
+    sink = _resolve_sink_dir(project_root, effective) if error is None else None
+    if sink is None:
+        raise TmpSinkError(
+            "tmp-sink.invalid-path",
+            f"repo_containment.tmp-sink.path {effective.tmp_sink_path!r}: "
+            f"{error or 'not resolvable'}",
+        )
+    return sink
+
+
+def _checked_segment(value: str, what: str) -> str:
+    """Validate a relative sub-path (*subdir*) or single segment (*run_id*)."""
+    error = tmp_sink_path_error(value)
+    if error is None and what == "run_id" and ("/" in value or "\\" in value):
+        error = "must be a single path segment"
+    if error is not None:
+        raise TmpSinkError("tmp-sink.invalid-segment", f"{what} {value!r}: {error}")
+    return canonical_tmp_sink_path(value)
+
+
+def resolve_output_dir(
+    project_root: Path, config: Optional[dict], subdir: str, *, tool: str = ""
+) -> Path:
+    """Return ``<tmp-sink>/<subdir>`` (not created) for tool output (IC-34).
+
+    Raises :class:`TmpSinkError` when the sink is disabled or unsafe; there is
+    no fallback location (Q35). Never consults the system temp directory.
+    """
+    sink = _active_sink_dir(Path(project_root), config, tool)
+    return sink.joinpath(*_checked_segment(subdir, "subdir").split("/"))
+
+
+def resolve_work_dir(
+    project_root: Path,
+    config: Optional[dict],
+    subdir: str,
+    run_id: str,
+    *,
+    tool: str = "",
+) -> Path:
+    """Return ``<tmp-sink>/<subdir>/<run_id>/work`` (not created), IC-34."""
+    base = resolve_output_dir(project_root, config, subdir, tool=tool)
+    return base / _checked_segment(run_id, "run_id") / "work"
+
+
+def resolve_out_path(
+    project_root: Path, config: Optional[dict], out: str, *, tool: str = ""
+) -> Path:
+    """Validate an explicit ``--out`` against the sink via ``realpath`` (IC-34).
+
+    Relative paths are taken relative to *project_root*. Anything resolving
+    outside the sink (``..``, symlinks, absolute paths) raises
+    ``<tool>.out-outside-tmp-sink``.
+    """
+    sink = _active_sink_dir(Path(project_root), config, tool)
+    root = os.path.abspath(os.fspath(project_root))
+    target = os.path.realpath(os.path.join(root, os.fspath(out)))
+    base = os.path.normcase(os.fspath(sink))
+    try:
+        inside = os.path.commonpath([base, os.path.normcase(target)]) == base
+    except ValueError:
+        inside = False
+    if not inside or os.path.normcase(target) == base:
+        raise TmpSinkError(
+            _sink_error_code("out-outside-tmp-sink", tool),
+            f"--out {os.fspath(out)!r} must lie inside the tmp-sink {os.fspath(sink)!r}",
+        )
+    return Path(target)
+
+
 def ensure_tmp_sink(
     project_root: str | os.PathLike[str],
     effective: ResolvedRepoContainment,

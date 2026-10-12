@@ -1511,6 +1511,9 @@ def _build_orch_variables(
     # (context.py::_build_context_vars, rules.py::_merged_rule_vars) re-resolve
     # with provider=... and overwrite these, so a provider override wins.
     variables.update(repo_containment_variables(config))
+    # TMP_SINK_PATH (IC-34): configured tmp-sink path for role templates; same
+    # resolution as REPO_CONTAINMENT_TMP_PATH. Provided only, not yet rendered.
+    variables["TMP_SINK_PATH"] = variables["REPO_CONTAINMENT_TMP_PATH"]
     # A2A_PROTOCOL_ENABLED: structured agent-to-agent handoff envelope.
     # Active when orchestrator.handoff.protocol is set (default "a2a-v1").
     # Disable via handoff.protocol: none/false to drop the ~90-line A2A section.
