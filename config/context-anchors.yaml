@@ -1,0 +1,58 @@
+# Anchor registry (IC-12, SPEC-CONTEXT-PROFILES-2026-10-11).
+# Literal substrings that must stay findable in the rendered artifacts of every
+# provider, independent of the context profile. Checked by
+# tests/test_context_anchors.py (QG-3).
+#
+# anchors.<artifact-kind>.all-profiles : required in profile `full` and `compact`
+# anchors.<artifact-kind>.compact-only : additionally required in profile `compact`
+# Kinds: entry-file | claude-md | orchestrator | rules-native | gate-card
+#
+# Provider-independent: a rule anchor must be found in the provider's native
+# rules directory or, if the provider has none, inlined in its entry file.
+anchors:
+  entry-file:
+    all-profiles: []
+    compact-only: []
+  claude-md:
+    all-profiles:
+      - "## Projekt"
+      - "## Agenten-Konfiguration"
+    compact-only: []
+  orchestrator:
+    all-profiles:
+      - "Singleton-Regel"
+      - "STATUS: done"
+      - "RESULT:"
+      - "ARTIFACTS:"
+    compact-only: []
+  rules-native:
+    all-profiles:
+      - "# CRITICAL GATE"
+      - "MAIN CHAT darf nicht selbst editieren"
+      - "Anti-Recursion: Worker dürfen nicht an `orchestrator` zurück delegieren."
+      - "# MCP Hard Prohibitions"
+      - "# Branch-Guard"
+      - "Keine Code-Änderungen direkt auf `main` oder `master`"
+      - "# Sprachregeln"
+      - "# Commit-Konventionen"
+      - "Verwende Conventional Commits (feat, fix, chore)."
+    compact-only: []
+  gate-card:
+    all-profiles: []
+    compact-only: []
+
+# Sections the compact gate-card extracts from source rules (IC-06):
+# <rule-stem>#<heading>
+gate_card_sections:
+  - "use-orchestrator#CRITICAL GATE"
+  - "use-orchestrator#Git Delegation"
+  - "branch-guard#Branch-Guard"
+  - "mcp-guardrails#MCP Hard Prohibitions"
+
+# Paths (globs) that are deliberately never read by a provider (IC-10 unread check).
+intentional_unread: []
+
+# Declared surfaces that are deliberately empty (IC-10 context.declared-surface-empty):
+# - provider_capability: <surface>
+#   reason: <text>
+intentional_empty: []
