@@ -562,9 +562,8 @@ class TmpSinkError(Exception):
     """Output-path resolution failure carrying a stable error code (IC-34).
 
     ``code`` is ``tmp-sink.disabled``, ``tmp-sink.invalid-path``,
-    ``tmp-sink.invalid-segment`` or ``out-outside-tmp-sink``; for the
-    disabled/out codes a *tool* prefix yields ``<tool>.<code>``. Callers map
-    it to Exit 2.
+    ``tmp-sink.invalid-segment`` or ``out-outside-tmp-sink``; when a *tool* is
+    given every code is prefixed ``<tool>.<code>``. Callers map it to Exit 2.
     """
 
     def __init__(self, code: str, message: str) -> None:
@@ -588,26 +587,55 @@ def _active_sink_dir(project_root: Path, config: Optional[dict], tool: str) -> P
         )
     bad = [f for f in effective.findings if f.code == "repo-containment.tmp-sink-path"]
     if bad:  # resolver fell back to the default; never silently redirect output
-        raise TmpSinkError("tmp-sink.invalid-path", bad[0].message)
+        raise TmpSinkError(
+            _sink_error_code("tmp-sink.invalid-path", tool), bad[0].message
+        )
     error = tmp_sink_path_error(effective.tmp_sink_path, project_root)
     sink = _resolve_sink_dir(project_root, effective) if error is None else None
     if sink is None:
         raise TmpSinkError(
-            "tmp-sink.invalid-path",
+            _sink_error_code("tmp-sink.invalid-path", tool),
             f"repo_containment.tmp-sink.path {effective.tmp_sink_path!r}: "
             f"{error or 'not resolvable'}",
         )
     return sink
 
 
-def _checked_segment(value: str, what: str) -> str:
+def _checked_segment(value: str, what: str, tool: str = "") -> str:
     """Validate a relative sub-path (*subdir*) or single segment (*run_id*)."""
     error = tmp_sink_path_error(value)
     if error is None and what == "run_id" and ("/" in value or "\\" in value):
         error = "must be a single path segment"
     if error is not None:
-        raise TmpSinkError("tmp-sink.invalid-segment", f"{what} {value!r}: {error}")
+        raise TmpSinkError(
+            _sink_error_code("tmp-sink.invalid-segment", tool),
+            f"{what} {value!r}: {error}",
+        )
     return canonical_tmp_sink_path(value)
+
+
+def _ensure_inside_sink(sink: Path, joined: Path, what: str, tool: str) -> None:
+    """Reject *joined* if its longest existing prefix resolves outside *sink*.
+
+    Catches a symlink/junction planted inside the sink (a subdir that points
+    to a location outside it) before the caller creates or writes anything
+    below it. Non-existing tail segments cannot escape yet.
+    """
+    probe = joined
+    while probe != sink and not os.path.lexists(probe) and probe != probe.parent:
+        probe = probe.parent
+    real = os.path.normcase(os.path.realpath(probe))
+    base = os.path.normcase(os.fspath(sink))
+    try:
+        inside = os.path.commonpath([base, real]) == base
+    except ValueError:  # different drives (Windows) or mixed absolute/relative
+        inside = False
+    if not inside:
+        raise TmpSinkError(
+            _sink_error_code("tmp-sink.invalid-segment", tool),
+            f"{what} resolves outside the tmp-sink {os.fspath(sink)!r} "
+            "(symlink or junction escape)",
+        )
 
 
 def resolve_output_dir(
@@ -619,7 +647,9 @@ def resolve_output_dir(
     no fallback location (Q35). Never consults the system temp directory.
     """
     sink = _active_sink_dir(Path(project_root), config, tool)
-    return sink.joinpath(*_checked_segment(subdir, "subdir").split("/"))
+    joined = sink.joinpath(*_checked_segment(subdir, "subdir", tool).split("/"))
+    _ensure_inside_sink(sink, joined, "subdir", tool)
+    return joined
 
 
 def resolve_work_dir(
@@ -632,7 +662,10 @@ def resolve_work_dir(
 ) -> Path:
     """Return ``<tmp-sink>/<subdir>/<run_id>/work`` (not created), IC-34."""
     base = resolve_output_dir(project_root, config, subdir, tool=tool)
-    return base / _checked_segment(run_id, "run_id") / "work"
+    work = base / _checked_segment(run_id, "run_id", tool) / "work"
+    sink = _active_sink_dir(Path(project_root), config, tool)
+    _ensure_inside_sink(sink, work, "run_id", tool)
+    return work
 
 
 def resolve_out_path(
@@ -643,6 +676,14 @@ def resolve_out_path(
     Relative paths are taken relative to *project_root*. Anything resolving
     outside the sink (``..``, symlinks, absolute paths) raises
     ``<tool>.out-outside-tmp-sink``.
+
+    Caveats: the check is a point-in-time ``realpath`` test (TOCTOU) -- a
+    symlink swapped in afterwards defeats it, so callers should open the file
+    with ``O_NOFOLLOW``/``O_EXCL`` or re-check immediately before writing.
+    Comparison uses ``os.path.normcase``, which only folds case on Windows;
+    on case-insensitive filesystems elsewhere (macOS default) differently
+    cased spellings of the sink are not folded. Windows junction/drive cases
+    are only simulated in tests (UNVERIFIED).
     """
     sink = _active_sink_dir(Path(project_root), config, tool)
     root = os.path.abspath(os.fspath(project_root))

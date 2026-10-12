@@ -111,3 +111,51 @@ def test_tmp_sink_path_variable(tmp_path):
     assert variables["TMP_SINK_PATH"] == "scratch/out"
     variables, _ = build_variables({}, REPO_ROOT, tmp_path)
     assert variables["TMP_SINK_PATH"] == ".tmp"
+
+
+def test_symlink_subdir_escape_rejected(tmp_path):
+    (tmp_path / "scratch" / "out").mkdir(parents=True)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (tmp_path / "scratch" / "out" / "doctor").symlink_to(outside)
+    with pytest.raises(rc.TmpSinkError) as exc:
+        rc.resolve_output_dir(tmp_path, _cfg(), "doctor")
+    assert exc.value.code == "tmp-sink.invalid-segment"
+    with pytest.raises(rc.TmpSinkError) as exc:
+        rc.resolve_work_dir(tmp_path, _cfg(), "doctor", "r1")
+    assert exc.value.code == "tmp-sink.invalid-segment"
+    with pytest.raises(rc.TmpSinkError) as exc:
+        rc.resolve_output_dir(tmp_path, _cfg(), "doctor/deeper", tool="doctor")
+    assert exc.value.code == "doctor.tmp-sink.invalid-segment"
+
+
+def test_symlink_inside_sink_still_allowed(tmp_path):
+    (tmp_path / "scratch" / "out" / "real").mkdir(parents=True)
+    (tmp_path / "scratch" / "out" / "alias").symlink_to(tmp_path / "scratch" / "out" / "real")
+    got = rc.resolve_output_dir(tmp_path, _cfg(), "alias")
+    assert got == Path(os.path.realpath(tmp_path / "scratch/out")) / "alias"
+
+
+def test_symlinked_run_id_escape_rejected(tmp_path):
+    base = tmp_path / "scratch" / "out" / "doctor"
+    base.mkdir(parents=True)
+    (tmp_path / "outside").mkdir()
+    (base / "r1").symlink_to(tmp_path / "outside")
+    with pytest.raises(rc.TmpSinkError) as exc:
+        rc.resolve_work_dir(tmp_path, _cfg(), "doctor", "r1")
+    assert exc.value.code == "tmp-sink.invalid-segment"
+
+
+def test_out_equal_to_sink_rejected(tmp_path):
+    with pytest.raises(rc.TmpSinkError) as exc:
+        rc.resolve_out_path(tmp_path, _cfg(), "scratch/out", tool="doctor")
+    assert exc.value.code == "doctor.out-outside-tmp-sink"
+
+
+def test_invalid_path_and_segment_carry_tool_prefix(tmp_path):
+    with pytest.raises(rc.TmpSinkError) as exc:
+        rc.resolve_output_dir(tmp_path, _cfg("../escape"), "doctor", tool="doctor")
+    assert exc.value.code == "doctor.tmp-sink.invalid-path"
+    with pytest.raises(rc.TmpSinkError) as exc:
+        rc.resolve_output_dir(tmp_path, _cfg(), "..", tool="doctor")
+    assert exc.value.code == "doctor.tmp-sink.invalid-segment"
