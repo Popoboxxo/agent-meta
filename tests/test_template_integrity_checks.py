@@ -88,3 +88,47 @@ def test_builder_known_set_unsupplied_template_placeholder_is_error(tmp_path):
     assert [f.file for f in findings if "NOT_A_BUILDER_VAR" in f.message] == [
         "agents/1-generic/a.md"]
     assert not any("'{{PREFIX}}'" in f.message for f in findings)
+
+
+# --- templates.provider-literal (IC-32) ---
+
+from lib.consistency.provider_literals import check_provider_literal  # noqa: E402
+
+
+def _mk_literal_repo(tmp_path: Path, body: str, allow=()) -> Path:
+    (tmp_path / "config").mkdir()
+    (tmp_path / "agents" / "1-generic").mkdir(parents=True)
+    (tmp_path / "config" / "ai-providers.yaml").write_text(
+        "providers:\n  Acme:\n    context_file: ACME.md\n"
+        "    provider_root_dirs:\n    - .acme/\n", encoding="utf-8")
+    allow_yaml = "".join(f"  - '{a}'\n" for a in allow)
+    (tmp_path / "config" / "active-set-references.yaml").write_text(
+        "provider_literal_allow:\n" + (allow_yaml or "  []\n"), encoding="utf-8")
+    (tmp_path / "agents" / "1-generic" / "a.md").write_text(body, encoding="utf-8")
+    return tmp_path
+
+
+def test_provider_literal_outside_example_is_warning(tmp_path):
+    root = _mk_literal_repo(tmp_path, "Read .acme/rules and ACME.md.\n")
+    findings = check_provider_literal(root)
+    assert len(findings) == 1
+    assert findings[0].check == "templates.provider-literal"
+    assert findings[0].severity is Severity.WARNING
+    assert ".acme/" in findings[0].message and "ACME.md" in findings[0].message
+
+
+def test_provider_literal_inside_example_block_is_ignored(tmp_path):
+    body = ("> **Example (provider-specific):**\n> Use .acme/ and Acme.\n\n"
+            "Plain text.\n")
+    assert check_provider_literal(_mk_literal_repo(tmp_path, body)) == []
+
+
+def test_provider_literal_after_example_block_is_flagged(tmp_path):
+    body = "> **Example (provider-specific):**\n> .acme/\n\nBack to Acme.\n"
+    findings = check_provider_literal(_mk_literal_repo(tmp_path, body))
+    assert len(findings) == 1 and "line 4" in findings[0].message
+
+
+def test_provider_literal_allowlisted_file_is_ignored(tmp_path):
+    root = _mk_literal_repo(tmp_path, "Acme here.\n", allow=["agents/1-generic/a.md"])
+    assert check_provider_literal(root) == []
