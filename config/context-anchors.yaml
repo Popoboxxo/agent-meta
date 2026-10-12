@@ -1,0 +1,67 @@
+# Anchor registry (IC-12, SPEC-CONTEXT-PROFILES-2026-10-11).
+# Literal substrings that must stay findable in the rendered artifacts of every
+# provider, independent of the context profile. Checked by
+# tests/test_context_anchors.py (QG-3).
+#
+# anchors.<artifact-kind>.all-profiles : required in profile `full` and `compact`
+# anchors.<artifact-kind>.compact-only : additionally required in profile `compact`
+# Kinds: entry-file | claude-md | orchestrator | rules-native | gate-card
+#
+# Provider-independent: a rule anchor must be found in the provider's native
+# rules directory or, if the provider has none, inlined in its entry file.
+#
+# Notes:
+# - Anchors are literal wording, not semantic: a deliberate text change (e.g.
+#   "Verwende Conventional Commits (feat, fix, chore).", the Anti-Recursion
+#   sentence) breaks the test on purpose and must be re-anchored consciously.
+# - MCP deny-token anchors (`delete_conclusion`, `set_config`,
+#   `browser_run_code_unsafe`, `workspace.delete`) are deliberately absent until
+#   an MCP-active fixture exists (before profile `compact`, AC-24/QG-3). Today
+#   the registry only protects the heading `# MCP Hard Prohibitions`.
+anchors:
+  entry-file:
+    all-profiles: []
+    compact-only: []  # empty until Phase 2
+  claude-md:
+    all-profiles:
+      - "## Projekt\n\n**Name:**"
+      - "## Agenten-Konfiguration\n\n<!-- agent-meta:managed-begin -->"
+    compact-only: []  # empty until Phase 2
+  orchestrator:
+    all-profiles:
+      - "Singleton-Regel"
+      - "STATUS: done"
+      - "RESULT: <"
+      - "ARTIFACTS:"
+    compact-only: []  # empty until Phase 2
+  rules-native:
+    all-profiles:
+      - "# CRITICAL GATE"
+      - "MAIN CHAT darf nicht selbst editieren"
+      - "Anti-Recursion: Worker dürfen nicht an `orchestrator` zurück delegieren."
+      - "# MCP Hard Prohibitions"
+      - "# Branch-Guard"
+      - "Keine Code-Änderungen direkt auf `main` oder `master`"
+      - "# Sprachregeln"
+      - "# Commit-Konventionen"
+      - "Verwende Conventional Commits (feat, fix, chore)."
+    compact-only: []
+  gate-card:
+    all-profiles: []  # empty until Phase 2
+    compact-only: []  # empty until Phase 2
+
+# Sections the compact gate-card extracts from source rules (IC-06):
+# <rule-stem>#<heading>
+gate_card_sections:
+  - "use-orchestrator#CRITICAL GATE"
+  - "use-orchestrator#Git Delegation"
+  - "branch-guard#Branch-Guard"
+  - "mcp-guardrails#MCP Hard Prohibitions"
+
+# Paths (globs) that are deliberately never read by a provider (IC-10 unread check).
+intentional_unread: []
+
+# Declared surfaces that are deliberately empty (IC-10 context.declared-surface-empty):
+# - provider_capability: <surface>
+#   reason: <text>
+intentional_empty: []

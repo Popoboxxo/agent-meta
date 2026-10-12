@@ -60,6 +60,7 @@ from lib.cli_commands import (
     _handle_activate_providers,
     _handle_audit_config,
     _handle_backup,
+    _handle_context_report,
     _handle_create_command,
     _handle_create_ext,
     _handle_create_hook,
@@ -152,6 +153,17 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                              "one JSON object on stdout; writes nothing (no index write, "
                              "no unlink, no backup, no clone/submodule). Exit code 0 even "
                              "for a non-empty stale set, 1 only on internal failure.")
+    parser.add_argument("--context-report", action="store_true",
+                        help="Measure the rendered context artifacts (entry file, rules, "
+                             "orchestrator, harness roster) per active provider. Renders into "
+                             "a work dir under <tmp-sink>/context-report/ and writes only "
+                             "there. Exit 1 on context.over-hard-cap, 2 when the tmp-sink "
+                             "is disabled (tmp-sink.disabled).")
+    parser.add_argument("--json", action="store_true",
+                        help="With --context-report: emit the report as JSON")
+    parser.add_argument("--profile", choices=("full", "compact", "both"), default="full",
+                        help="With --context-report: context profile to report "
+                             "(compact is reserved for Phase 2)")
     parser.add_argument("--create-ext", metavar="ROLE",
                         help="Create extension file for ROLE (or 'all'). "
                              "Does not overwrite existing files.")
@@ -176,7 +188,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dry-run", action="store_true",
                         help="Show what would be done without writing files")
     parser.add_argument("--check", action="store_true",
-                        help="CI mode (use with --dry-run): exit 1 if any file would be "
+                        help="CI mode (forces dry-run): exit 1 if any file would be "
                              "written/changed, exit 0 if everything is up to date. "
                              "Use to fail CI when provider context files are out of sync.")
     parser.add_argument("--validate", action="store_true",
@@ -630,6 +642,7 @@ _MODE_HANDLERS = [
     (lambda a: a.audit_config, _handle_audit_config),
     (lambda a: a.only_variables, _handle_only_variables),
     (lambda a: a.cleanup_preview, _handle_cleanup_preview),
+    (lambda a: a.context_report, _handle_context_report),
     (lambda a: a.create_ext, _handle_create_ext),
     (lambda a: a.update_ext, _handle_update_ext),
     (lambda a: a.create_rule, _handle_create_rule),
@@ -680,7 +693,7 @@ def main() -> None:
     agent_meta_root = find_agent_meta_root(script_path)
     log = SyncLog()
 
-    if getattr(args, "cleanup_preview", False):
+    if getattr(args, "cleanup_preview", False) or getattr(args, "context_report", False):
         # IC-06: the preview must emit exactly one JSON object on stdout and
         # write nothing. Context building is shared CLI plumbing that can print
         # (auto-detect banner) and, when self-hosting, touch the schema enum —

@@ -215,7 +215,7 @@ Markdown-first Provider mit Auto-Discovery — kein Session-Bootstrap nötig
 
 - `.kimi-code/agents/*.md` — generierte Agenten (Default-Transform-Pfad: `model: inject`
   + Strip-Set; Auto-Discovery `explicit > project > extra dirs > user > plugin > built-in`)
-- `AGENTS.md` — Kontext-Datei (managed block, nearest-wins-Subdirs wie Codex)
+- `AGENTS.md` — Kontext-Datei (managed block, konkatenierte Subdir-Dateien wie Codex)
 - `.kimi-code/mcp.json` — MCP (`mcpServers`-JSON, wire-identisch zum `claude-settings`-Branch
   wiederverwendet; Secrets via `bearerTokenEnvVar`/`env`-Indirektion)
 - `.kimi-code/skills/` — Skills (`<name>/SKILL.md` oder flat `.md`)

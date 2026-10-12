@@ -51,7 +51,7 @@ AGENTS.md                  ← Project context + managed block (shared template)
 
 | Feature | Claude Code | Kimi Code |
 |---------|------------|-----------|
-| Context file | `CLAUDE.md` | `AGENTS.md` (nearest-wins subdirs, like Codex; global `~/.kimi-code/AGENTS.md`; `/init` generates it) |
+| Context file | `CLAUDE.md` | `AGENTS.md` (concatenated: global + each directory Git-root → cwd; closer files do not replace farther ones; global `~/.kimi-code/AGENTS.md`; `/init` generates it) |
 | Config directory | `.claude/` | `.kimi-code/` |
 | Sub-agents | `.claude/agents/*.md` | `.kimi-code/agents/*.md` (auto-discovered, no bootstrap) |
 | Rules (auto-load) | `.claude/rules/` | Not configured (`has_rules: false` — unverified) |

@@ -2,6 +2,10 @@
 
 > Stand: agent-meta v0.27.x | Quelle: [google-gemini/gemini-cli](https://github.com/google-gemini/gemini-cli)
 
+> **Veraltet (teilweise):** Modellstand, `.gemini/hooks` und Kontextdatei-Angaben sind laut Studie
+> `docs/analysis/2026-10-11-context-budget-provider-study.md` §3.7 nicht mehr belegt. Korrigiert
+> sind nur Sub-Agenten, Rules und `context.fileName`; der Rest ist **UNVERIFIED**.
+
 ---
 
 ## Was ist Gemini CLI?
@@ -12,7 +16,7 @@ führt Shell-Kommandos aus, hat eingebaute Tools (Suche, Webfetch, Datei-Ops).
 
 Kostenlos nutzbar: 60 Requests/min, 1.000/Tag mit Google-Account.
 
-Default-Modell: **Gemini 2.5 Pro** (1M Token Context).
+Default-Modell laut Konfiguration: **Gemini 2.5 Pro** (1M Token Context) — Modellstand **UNVERIFIED/veraltet** (Studie §3.7 nennt das Dokument veraltet).
 Weitere Modell-IDs: `gemini-2.5-pro`, `gemini-2.0-flash`.
 
 ---
@@ -60,11 +64,17 @@ Unterstützt `@./path/file.md` für Modularisierung.
 
 ## Sub-Agenten in Gemini CLI
 
-Gemini CLI hat kein natives Sub-Agenten-System wie Claude Codes `.claude/agents/`.
-Die Community diskutiert dies (Issue #1471), aber es ist kein offizielles Feature.
+`.gemini/agents/*.md` sind native Subagenten der Gemini CLI. Der Loader validiert das
+Frontmatter mit einem `.strict()`-Schema (erlaubt: `kind`, `name`, `description`,
+`display_name`, `tools`, `mcp_servers`, `model`, `temperature`, `max_turns`,
+`timeout_mins`; Tools werden validiert). Quelle: Studie
+`docs/analysis/2026-10-11-context-budget-provider-study.md` §3.7 (SOURCE-DERIVED,
+nicht ausgeführt).
 
-**agent-meta generiert trotzdem `.gemini/agents/*.md`** — der Markdown-Body ist
-identisch mit Claude, aber das Frontmatter ist reduziert:
+**Offener Defekt:** unsere generierten Agenten enthalten Zusatz-Keys (`version`, `hint`,
+`prompt_mode`, `generated-from`) und Claude-/Antigravity-Toolnamen — nach dem
+`.strict()`-Schema würden sie abgelehnt. Das Beispiel unten zeigt den aktuell
+generierten (reduzierten) Stand, nicht ein verifiziert ladbares Format:
 
 ```yaml
 ---
@@ -83,10 +93,16 @@ Entfernt im Vergleich zu Claude: `memory`, `permissionMode`.
 
 ## Rules
 
-Gemini CLI unterstützt `.gemini/rules/` für Rule-Dateien. agent-meta generiert:
+`.gemini/rules/` wird von **keinem** Harness gelesen (weder Gemini CLI noch Antigravity;
+siehe `docs/spikes/2026-09-14-f-rulesloc-gemini-rules-channel.md` und Studie §3.7).
+agent-meta generiert dennoch:
 
-- Rule-Dateien in `.gemini/rules/`
+- Rule-Dateien in `.gemini/rules/` (inert, 17,880 B)
 - `has_rules: true` in `config/ai-providers.yaml`
+
+**Kontextdatei:** Gemini CLI lädt standardmäßig `GEMINI.md`. Ohne `context.fileName` in
+`.gemini/settings.json` wird `AGENTS.md` ignoriert — unsere generierte `settings.json`
+setzt den Key aktuell nicht, die CLI erhält daher keinen Projektkontext (Studie §3.7).
 
 **Workaround:** Wichtige Regeln als eigene `@./`-Referenzen in GEMINI.md einbinden:
 
@@ -190,14 +206,14 @@ model-overrides:
 | `.gemini/settings.json` | ❌ Einmalig angelegt (Skeleton) |
 | `.gemini/commands/*.toml` | ✅ Aus `commands/` transformiert, stale gelöscht |
 | `.gemini/hooks/*.sh` | ✅ Kopiert, stale gelöscht |
-| Rules | ✅ Generiert in `.gemini/rules/`, stale gelöscht |
+| Rules | ⚠️ Generiert in `.gemini/rules/`, stale gelöscht — von keinem Harness gelesen |
 
 ---
 
 ## Bekannte Einschränkungen
 
-1. **Rules werden wie bei Claude generiert** — `.gemini/rules/` wird von sync.py befüllt
+1. **Rules inert** — `.gemini/rules/` wird von sync.py befüllt, aber von keinem Harness gelesen
 2. **Kein persistentes Agenten-Gedächtnis** — `memory:`-Feld wird entfernt
 3. **Kein permissionMode** — Berechtigungen über Google-Account gesteuert
-4. **Sub-Agenten inoffiziell** — Gemini kennt `.gemini/agents/` nicht nativ; die Dateien sind für zukünftige Kompatibilität vorbereitet
+4. **Sub-Agenten strikt validiert** — `.gemini/agents/` ist nativ, das Schema ist `.strict()`; unsere Zusatz-Keys/Toolnamen sind ein offener Defekt (Studie §3.7)
 5. **TOML-Commands** — andere Syntax als Claude/Continue; `$ARGUMENTS` heißt `{{args}}`
