@@ -67,6 +67,7 @@ from .reflection import (
 from .repo_containment import (
     TMP_SINK_CLEANUP_MODES,
     default_repo_containment_block,
+    tmp_sink_location_error,
     tmp_sink_path_error,
 )
 from .roles import (
@@ -566,9 +567,13 @@ def _validate_repo_containment(config: dict, config_path: Path) -> None:
     if path is not None:
         project_root = config_path.parent.parent
         error = tmp_sink_path_error(path, project_root)
+        if not error and isinstance(path, str):
+            error = tmp_sink_location_error(path, project_root)
         if error:
             _fail(
-                f"invalid 'repo_containment.tmp-sink.path' {path!r}: {error}."
+                f"invalid 'repo_containment.tmp-sink.path' {path!r}: {error}. "
+                "Migration: change tmp-sink.path to a relative path inside "
+                "the repo, e.g. '.tmp' (default) or 'scratch/out'."
             )
 
 
