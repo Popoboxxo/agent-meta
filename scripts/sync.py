@@ -188,7 +188,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dry-run", action="store_true",
                         help="Show what would be done without writing files")
     parser.add_argument("--check", action="store_true",
-                        help="CI mode (use with --dry-run): exit 1 if any file would be "
+                        help="CI mode (forces dry-run): exit 1 if any file would be "
                              "written/changed, exit 0 if everything is up to date. "
                              "Use to fail CI when provider context files are out of sync.")
     parser.add_argument("--validate", action="store_true",

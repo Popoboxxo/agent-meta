@@ -3,6 +3,18 @@
 ## [Unreleased]
 
 ### Added
+- **Context measurement and budgets (#964)**: new IC-09 capability keys in
+  `config/provider-capabilities.yaml`, the `python3 scripts/sync.py --context-report [--json]` mode
+  (`scripts/lib/context_report.py`, `measure_artifacts`; output only in the tmp-sink), the anchor
+  registry `config/context-anchors.yaml` and per-provider context budget ceilings
+  (`tests/test_context_budgets.py`). Measurement doc with bytes per artifact and approximated tokens:
+  `docs/analysis/2026-10-11-context-tokenizer-measurement.md` (tokenizer ratios UNVERIFIED until
+  `tests/manual/measure_tokens.py` runs with a real tokenizer).
+- **Provider docs corrected (#964)**: `docs/providers/codex.md` (root `rules/`/`.rules` are not loaded;
+  `.rules` = Starlark exec policy; AGENTS.md is concatenated, not nearest-wins),
+  `docs/providers/kimi-code.md` (concatenation instead of nearest-wins) and
+  `docs/providers/gemini-cli.md` (native `.strict()` subagent schema, `.gemini/rules` read by no
+  harness, `context.fileName` needed for AGENTS.md). Guarded by `tests/test_context_docs_corrections.py`.
 - **Canonical ESCALATE-card snippet (SR-C-07)**: `snippets/agents/escalate-card.md` is the single
   source of the escalation-card contract (`STATUS`/`RESULT`/`ESCALATE_REASON`/`ESCALATE_METRIC`/
   `RECOMMENDED_TIER`/`PARTIAL_WORK`/`NEXT_STEPS` plus the mandatory reason+metric rule, issue #346).
@@ -46,6 +58,8 @@
   Variablen können danach entfallen. Regressions-Szenario: `tests/scenarios/configs/75-web-platform-preset`.
 
 ### Fixed
+- **`--check` help text (#964)**: `--help` now says `--check` forces dry-run (matches
+  `_normalize_check_dry_run`) instead of "use with --dry-run".
 - **repo-containment hook and progress paths mirror the tmp-sink rules (#963)**:
   `repo-containment-impl.sh` (`# version: 1.0.0` -> `1.1.0`, drift warning via `check_stale_deployed_hooks`)
   and `progress_path_error` now apply the same path rules and canonical form as `tmp_sink_path_error`
