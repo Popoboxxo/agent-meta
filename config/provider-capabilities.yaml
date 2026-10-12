@@ -105,6 +105,34 @@ capabilities:
     # continues (turn semantics) — native-batch, barrier by construction.
     fanout_mechanism: native-batch
     barrier_collect: true
+    # --- IC-09 context budget / channel keys (SPEC-CONTEXT-PROFILES-2026-10-11, Task 0a.5): pure data, not yet consumed by the render.
+    # Source: docs/analysis/2026-10-11-context-budget-provider-study.md. CLAUDE.md hierarchy is concatenated; AGENTS.md is ignored when CLAUDE.md exists (study 3.1), so agents_md_visible_to_subagents=false.
+    context_hard_cap_bytes: null
+    context_soft_cap_bytes: null
+    context_soft_cap_chars: null
+    context_soft_cap_lines: 200
+    roster_in_harness: true
+    agents_md_visible_to_subagents: false
+    rules_read_channels: [native-rules-dir, path-scoped]
+    skills_discovery_dirs: [".claude/skills"]
+    main_agent_selectable: true
+    agents_md_precedence: concatenate
+    required_depth: 2
+    strips_html_comments: true
+    rules_required_suffix: null
+    subagent_allowlist_required: false
+    read_only_enforcement: tools
+    surface_verified_state:
+      agents: DOCUMENTED
+      commands: UNVERIFIED
+      skills: DOCUMENTED
+      rules: DOCUMENTED
+      settings: UNVERIFIED
+      mcp: UNVERIFIED
+      workspace_agents_autoload: UNVERIFIED
+      context_file: DOCUMENTED
+    legacy_artifacts: []
+    agent_config_format: markdown
     description: "Vollständige Agent-Orchestrierung mit nativen Tool-Calls und Hooks."
 
   Opencode:
@@ -129,6 +157,34 @@ capabilities:
     # documented in the Opencode parallel_pattern (delegation-syntax.yaml).
     fanout_mechanism: native-batch
     barrier_collect: true
+    # --- IC-09 context budget / channel keys (SPEC-CONTEXT-PROFILES-2026-10-11, Task 0a.5): pure data, not yet consumed by the render.
+    # Source: docs/analysis/2026-10-11-context-budget-provider-study.md. agents_md_precedence=nearest is UNVERIFIED (not in study).
+    context_hard_cap_bytes: null
+    context_soft_cap_bytes: null
+    context_soft_cap_chars: null
+    context_soft_cap_lines: null
+    roster_in_harness: true
+    agents_md_visible_to_subagents: true
+    rules_read_channels: [embedded]
+    skills_discovery_dirs: [".opencode/skills"]
+    main_agent_selectable: true
+    agents_md_precedence: nearest
+    required_depth: 2
+    strips_html_comments: false
+    rules_required_suffix: null
+    subagent_allowlist_required: false
+    read_only_enforcement: permission-map
+    surface_verified_state:
+      agents: VERIFIED-RUNTIME
+      commands: UNVERIFIED
+      skills: UNVERIFIED
+      rules: UNVERIFIED
+      settings: UNVERIFIED
+      mcp: UNVERIFIED
+      workspace_agents_autoload: UNVERIFIED
+      context_file: VERIFIED-RUNTIME
+    legacy_artifacts: []
+    agent_config_format: markdown
     description: "Agent-Orchestrierung via task() tool, dateibasierte Agent-Registrierung."
 
   Gemini:
@@ -153,6 +209,34 @@ capabilities:
     # Gemini parallel_pattern) — native-batch turn semantics.
     fanout_mechanism: native-batch
     barrier_collect: true
+    # --- IC-09 context budget / channel keys (SPEC-CONTEXT-PROFILES-2026-10-11, Task 0a.5): pure data, not yet consumed by the render.
+    # Source: docs/analysis/2026-10-11-context-budget-provider-study.md. soft_cap_chars 12000 = Antigravity per-rule-file cap, UNVERIFIED (third-party, study 3.7); read_only_enforcement=tools UNVERIFIED.
+    context_hard_cap_bytes: null
+    context_soft_cap_bytes: null
+    context_soft_cap_chars: 12000
+    context_soft_cap_lines: null
+    roster_in_harness: false
+    agents_md_visible_to_subagents: false
+    rules_read_channels: []
+    skills_discovery_dirs: [".gemini/skills"]
+    main_agent_selectable: false
+    agents_md_precedence: concatenate
+    required_depth: 2
+    strips_html_comments: false
+    rules_required_suffix: null
+    subagent_allowlist_required: false
+    read_only_enforcement: tools
+    surface_verified_state:
+      agents: VERIFIED-SOURCE
+      commands: UNVERIFIED
+      skills: UNVERIFIED
+      rules: VERIFIED-SOURCE
+      settings: UNVERIFIED
+      mcp: UNVERIFIED
+      workspace_agents_autoload: UNVERIFIED
+      context_file: DOCUMENTED
+    legacy_artifacts: []
+    agent_config_format: markdown
     description: "API-basierte Agent-Registrierung, ephemere Runtime."
     bootstrap_required: true
     special_notes:
@@ -182,6 +266,34 @@ capabilities:
     # conservative sequential fallback (parallel_execution: false).
     fanout_mechanism: sequential-fallback
     barrier_collect: false
+    # --- IC-09 context budget / channel keys (SPEC-CONTEXT-PROFILES-2026-10-11, Task 0a.5): pure data, not yet consumed by the render.
+    # Source: docs/analysis/2026-10-11-context-budget-provider-study.md. main_agent_selectable=true only via `cn --agent` (study 3.8); agents_md_precedence=nearest UNVERIFIED (no AGENTS.md reader).
+    context_hard_cap_bytes: null
+    context_soft_cap_bytes: null
+    context_soft_cap_chars: null
+    context_soft_cap_lines: null
+    roster_in_harness: false
+    agents_md_visible_to_subagents: false
+    rules_read_channels: [native-rules-dir]
+    skills_discovery_dirs: [".continue/skills"]
+    main_agent_selectable: true
+    agents_md_precedence: nearest
+    required_depth: 2
+    strips_html_comments: false
+    rules_required_suffix: null
+    subagent_allowlist_required: false
+    read_only_enforcement: none
+    surface_verified_state:
+      agents: VERIFIED-SOURCE
+      commands: UNVERIFIED
+      skills: VERIFIED-SOURCE
+      rules: VERIFIED-SOURCE
+      settings: UNVERIFIED
+      mcp: UNVERIFIED
+      workspace_agents_autoload: UNVERIFIED
+      context_file: VERIFIED-SOURCE
+    legacy_artifacts: []
+    agent_config_format: markdown
     description: "Text-basierte Agent-Mentions (@agent). Keine native Subagent-API."
     special_notes:
       - "@agent Text-Mentions als Subagent-Dispatch."
@@ -209,6 +321,34 @@ capabilities:
     # conservative sequential fallback (parallel_execution: false).
     fanout_mechanism: sequential-fallback
     barrier_collect: false
+    # --- IC-09 context budget / channel keys (SPEC-CONTEXT-PROFILES-2026-10-11, Task 0a.5): pure data, not yet consumed by the render.
+    # Source: docs/analysis/2026-10-11-context-budget-provider-study.md. Copilot values from audit citations (docs gated): rules_required_suffix and skills dirs UNVERIFIED; soft_cap_chars 4000 = code-review limit per instruction file; rules_read_channels=[] because generated .github/instructions/*.md are never read (F-17/Phase 1 fixes data).
+    context_hard_cap_bytes: null
+    context_soft_cap_bytes: null
+    context_soft_cap_chars: 4000
+    context_soft_cap_lines: null
+    roster_in_harness: false
+    agents_md_visible_to_subagents: false
+    rules_read_channels: []
+    skills_discovery_dirs: [".github/skills", ".claude/skills", ".agents/skills"]
+    main_agent_selectable: false
+    agents_md_precedence: nearest
+    required_depth: 2
+    strips_html_comments: false
+    rules_required_suffix: ".instructions.md"
+    subagent_allowlist_required: false
+    read_only_enforcement: none
+    surface_verified_state:
+      agents: UNVERIFIED
+      commands: UNVERIFIED
+      skills: UNVERIFIED
+      rules: UNVERIFIED
+      settings: UNVERIFIED
+      mcp: UNVERIFIED
+      workspace_agents_autoload: UNVERIFIED
+      context_file: UNVERIFIED
+    legacy_artifacts: []
+    agent_config_format: markdown
     description: "Dateibasierte Agenten (.github/copilot/agents/). @agent Text-Mentions."
     special_notes:
       - "Dateien in .github/copilot/agents/ werden automatisch geladen."
@@ -244,6 +384,34 @@ capabilities:
     # — conservative sequential fallback (parallel_execution: false).
     fanout_mechanism: sequential-fallback
     barrier_collect: false
+    # --- IC-09 context budget / channel keys (SPEC-CONTEXT-PROFILES-2026-10-11, Task 0a.5): pure data, not yet consumed by the render.
+    # Source: docs/analysis/2026-10-11-context-budget-provider-study.md. OpenCode fork: agents_md_visible_to_subagents, agents_md_precedence, read_only_enforcement inherited from OpenCode, UNVERIFIED for the fork; .mammouth/rules is inert (study 3.4) so not a channel.
+    context_hard_cap_bytes: null
+    context_soft_cap_bytes: null
+    context_soft_cap_chars: null
+    context_soft_cap_lines: null
+    roster_in_harness: true
+    agents_md_visible_to_subagents: true
+    rules_read_channels: [embedded]
+    skills_discovery_dirs: [".mammouth/skills"]
+    main_agent_selectable: false
+    agents_md_precedence: nearest
+    required_depth: 2
+    strips_html_comments: false
+    rules_required_suffix: null
+    subagent_allowlist_required: false
+    read_only_enforcement: permission-map
+    surface_verified_state:
+      agents: VERIFIED-RUNTIME
+      commands: UNVERIFIED
+      skills: UNVERIFIED
+      rules: VERIFIED-RUNTIME
+      settings: UNVERIFIED
+      mcp: UNVERIFIED
+      workspace_agents_autoload: UNVERIFIED
+      context_file: VERIFIED-RUNTIME
+    legacy_artifacts: [".mammouth/settings.json"]
+    agent_config_format: markdown
     description: "Dateibasierte Agenten (.mammouth/agents/), CLI-first mit Plan/Build-Modi. Text-basierte Delegation, keine native Subagent-API."
     special_notes:
       - "CLI-first Tool mit Plan- (read-only) und Build-Modus (Ausführung)."
@@ -284,6 +452,34 @@ capabilities:
     # turn semantics).
     fanout_mechanism: tool-mediated
     barrier_collect: true
+    # --- IC-09 context budget / channel keys (SPEC-CONTEXT-PROFILES-2026-10-11, Task 0a.5): pure data, not yet consumed by the render.
+    # Source: docs/analysis/2026-10-11-context-budget-provider-study.md. main_agent_selectable=false: UNVERIFIED (study 4.1); hard cap = project_doc_max_bytes, silent truncation (VERIFIED-RUNTIME).
+    context_hard_cap_bytes: 32768
+    context_soft_cap_bytes: null
+    context_soft_cap_chars: null
+    context_soft_cap_lines: null
+    roster_in_harness: true
+    agents_md_visible_to_subagents: true
+    rules_read_channels: [embedded, skills]
+    skills_discovery_dirs: [".agents/skills"]
+    main_agent_selectable: false
+    agents_md_precedence: concatenate
+    required_depth: 2
+    strips_html_comments: false
+    rules_required_suffix: null
+    subagent_allowlist_required: false
+    read_only_enforcement: none
+    surface_verified_state:
+      agents: UNVERIFIED
+      commands: UNVERIFIED
+      skills: VERIFIED-RUNTIME
+      rules: VERIFIED-RUNTIME
+      settings: UNVERIFIED
+      mcp: UNVERIFIED
+      workspace_agents_autoload: UNVERIFIED
+      context_file: VERIFIED-RUNTIME
+    legacy_artifacts: []
+    agent_config_format: toml
     description: "Dateibasierte TOML-Agenten (.codex/agents/*.toml) mit nativem spawn_agent-Dispatch und stable-default-on multi_agent-Fanout."
     special_notes:
       - "Agenten sind TOML-Dateien mit name/description/sandbox_mode/model/developer_instructions (Pflichtfeld: developer_instructions, V7)."
@@ -319,6 +515,34 @@ capabilities:
     fanout_mechanism: sequential-fallback
     barrier_collect: false
     bootstrap_required: true          # workspace-level .zcode/agents/ consumption via bootstrap injection (Gemini posture, plan §5.8)
+    # --- IC-09 context budget / channel keys (SPEC-CONTEXT-PROFILES-2026-10-11, Task 0a.5): pure data, not yet consumed by the render.
+    # Source: docs/analysis/2026-10-11-context-budget-provider-study.md. hard cap 100 KiB per file (VERIFIED-SOURCE); workspace_agents_autoload UNVERIFIED (#856/Q34); read_only_enforcement=none UNVERIFIED.
+    context_hard_cap_bytes: 102400
+    context_soft_cap_bytes: null
+    context_soft_cap_chars: null
+    context_soft_cap_lines: null
+    roster_in_harness: true
+    agents_md_visible_to_subagents: true
+    rules_read_channels: [embedded]
+    skills_discovery_dirs: [".zcode/skills"]
+    main_agent_selectable: false
+    agents_md_precedence: nearest
+    required_depth: 2
+    strips_html_comments: false
+    rules_required_suffix: null
+    subagent_allowlist_required: false
+    read_only_enforcement: none
+    surface_verified_state:
+      agents: VERIFIED-SOURCE
+      commands: UNVERIFIED
+      skills: UNVERIFIED
+      rules: UNVERIFIED
+      settings: UNVERIFIED
+      mcp: UNVERIFIED
+      workspace_agents_autoload: UNVERIFIED
+      context_file: VERIFIED-SOURCE
+    legacy_artifacts: []
+    agent_config_format: markdown
     description: "Agent-Orchestrierung via Agent-Toolcall (Legacy-Alias Task), dateibasierte Agent-Definitionen mit Bootstrap-Injection ins Workspace-AGENTS.md."
     special_notes:
       - "AGENTS.md: nur user-global + Workspace-Level — kein Child-Dir-Merging, kein @import."
@@ -353,6 +577,34 @@ capabilities:
     # single return value IS the barrier (swarm semantics).
     fanout_mechanism: swarm
     barrier_collect: true
+    # --- IC-09 context budget / channel keys (SPEC-CONTEXT-PROFILES-2026-10-11, Task 0a.5): pure data, not yet consumed by the render.
+    # Source: docs/analysis/2026-10-11-context-budget-provider-study.md. soft cap = AGENTS_MD_RECOMMENDED_MAX_BYTES warning, no truncation (VERIFIED-SOURCE); subagent_allowlist_required SOURCE-DERIVED.
+    context_hard_cap_bytes: null
+    context_soft_cap_bytes: 32768
+    context_soft_cap_chars: null
+    context_soft_cap_lines: null
+    roster_in_harness: true
+    agents_md_visible_to_subagents: false
+    rules_read_channels: [embedded]
+    skills_discovery_dirs: [".kimi-code/skills"]
+    main_agent_selectable: true
+    agents_md_precedence: concatenate
+    required_depth: 2
+    strips_html_comments: false
+    rules_required_suffix: null
+    subagent_allowlist_required: true
+    read_only_enforcement: tools
+    surface_verified_state:
+      agents: VERIFIED-SOURCE
+      commands: UNVERIFIED
+      skills: UNVERIFIED
+      rules: UNVERIFIED
+      settings: UNVERIFIED
+      mcp: UNVERIFIED
+      workspace_agents_autoload: UNVERIFIED
+      context_file: VERIFIED-SOURCE
+    legacy_artifacts: []
+    agent_config_format: markdown
     description: "Custom Agents als Markdown+YAML-Frontmatter mit Auto-Discovery; Dispatch via Agent und AgentSwarm-Fanout (bis 128 Items)."
     special_notes:
       - "AGENTS.md: Projekt-Root + Subdirs auto-geladen (nearest-wins, wie Codex); global ~/.kimi-code/AGENTS.md."
