@@ -5,19 +5,19 @@
 #   hand-off to a role. Read by tests/test_no_role_routes_in_templates.py (IC-30) and
 #   later by the active-set.dangling-dispatch check (IC-19). The guard allows an
 #   optional "an"/"zu"/"to" and article between phrase and role token.
+#   ``delegier\w*`` already covers "delegiert an".
 # provider_literal_allow: path globs where provider-specific literals are intended (IC-32).
 dispatch_phrases:
   en:
     - 'hand[ -]?off to'
     - 'hand back to'
-    - 'route to'
+    - '\broute to'
   de:
-    - 'delegiert an'
     - 'dispatch(?:e)? an'
     - 'weiter(?:leiten)? an'
     - 'delegier\w*'
     - 'beauftrag\w*'
-    - 'weise\s+\S+\s+an'
+    - '\bweise\s+\S+\s+an'
     - 'übergib'
     - 'übernimm\w*'
     - 'übernehm\w*'
