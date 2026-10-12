@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from lib.consistency.frontmatter import check_based_on_stale  # noqa: E402
+from lib.frontmatter import split_frontmatter  # noqa: E402
 from lib.consistency import placeholders as _ph  # noqa: E402
 from lib.consistency.report import Severity  # noqa: E402
 
@@ -18,8 +19,8 @@ _PIN = re.compile(r'^based-on:\s*["\']?([^@"\']+)@([^"\'\s]+)', re.M)
 
 
 def _version(path: Path) -> str:
-    text = path.read_text(encoding="utf-8")
-    return str(yaml.safe_load(text.split("---")[1]).get("version"))
+    block, _body = split_frontmatter(path.read_text(encoding="utf-8"))
+    return str(yaml.safe_load(block.strip().strip("-")).get("version"))
 
 
 def _expected_stale(root: Path) -> set:
@@ -61,6 +62,20 @@ def test_based_on_stale_fixture_outdated_pin(tmp_path):
 
 def test_based_on_stale_fixture_current_pin(tmp_path):
     assert check_based_on_stale(_mk(tmp_path, "1-generic/dev.md@2.0.0")) == []
+
+
+def test_based_on_stale_pin_without_at_is_skipped(tmp_path):
+    assert check_based_on_stale(_mk(tmp_path, "1-generic/dev.md")) == []
+
+
+def test_based_on_stale_missing_base_is_skipped(tmp_path):
+    assert check_based_on_stale(_mk(tmp_path, "1-generic/gone.md@1.0.0")) == []
+
+
+def test_based_on_stale_compares_versions_as_exact_strings(tmp_path):
+    """Documented boundary: ``1.0`` vs ``1.0.0`` is reported (no semver normalization)."""
+    root = _mk(tmp_path, "1-generic/dev.md@2.0")
+    assert len(check_based_on_stale(root)) == 1
 
 
 def test_builder_known_set_real_repo_clean():

@@ -114,8 +114,11 @@ def check_based_on_stale(agent_meta_root: Path) -> list[Finding]:
     """WARN when a ``based-on`` pin in agents/2-platform lags its base file.
 
     The pin ``1-generic/<role>.md@<version>`` is compared with the current
-    ``version:`` of the referenced base file. Unparseable pins and missing
-    base files are skipped (reported by other checks).
+    ``version:`` of the referenced base file. Silently skipped (reported by
+    other checks): pins without ``@`` / unparseable pins, missing or unreadable
+    base files, and base files without a ``version:``. Versions are compared as
+    exact strings, so ``1.0`` vs ``1.0.0`` counts as stale (no semver
+    normalization; pins are expected to copy the base ``version:`` verbatim).
     """
     findings: list[Finding] = []
     platform_dir = agent_meta_root / "agents" / "2-platform"
