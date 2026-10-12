@@ -81,9 +81,10 @@ def test_managed_block_includes_tmp_sink(tmp_path):
     assert ".tmp/" in entries
 
 
-def test_managed_block_has_no_entry_without_block():
+def test_managed_block_has_default_entry_without_block():
+    # IC-15 Nr. 26: tmp-sink default ON even without a repo_containment block.
     entries = compute_base_gitignore_entries(["Claude"], {"Claude": {"has_dedicated_context_file": True}}, {})
-    assert ".tmp/" not in entries
+    assert ".tmp/" in entries
 
 
 def test_managed_block_honors_gitignore_false():

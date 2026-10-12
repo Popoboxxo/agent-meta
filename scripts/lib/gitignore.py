@@ -28,7 +28,10 @@ from pathlib import Path
 
 from .io import run_git_check_ignore
 from .providers import resolve_providers
-from .repo_containment import resolve_effective_repo_containment
+from .repo_containment import (
+    default_repo_containment_block,
+    resolve_effective_repo_containment,
+)
 
 # Category fallback for Claude's gitignore_entries when the provider config
 # carries none (mirrors the historical inline default in sync.py).
@@ -320,14 +323,13 @@ def compute_base_gitignore_entries(
 def _tmp_sink_gitignore_entry(repo_containment_cfg: dict | None) -> str | None:
     """Return the tmp-sink managed-block entry, or None when not applicable.
 
-    Additive on top of the Claude-gated managed block: only an explicitly
-    present ``repo_containment`` mapping (materialized by sync.py, spec §9.3)
-    with an enabled sink and ``tmp-sink.gitignore: true`` yields an entry. A
-    missing/non-mapping block adds nothing, so the historical entry set is
-    preserved for projects that never materialized the block.
+    Additive on top of the Claude-gated managed block. Default ON (IC-15
+    Nr. 26): a missing/non-mapping ``repo_containment`` block falls back to
+    ``default_repo_containment_block()`` (sink ``.tmp/``). An explicit mapping
+    yields an entry only with an enabled sink and ``tmp-sink.gitignore: true``.
     """
     if not isinstance(repo_containment_cfg, dict):
-        return None
+        repo_containment_cfg = default_repo_containment_block()
     effective = resolve_effective_repo_containment(
         {"repo_containment": repo_containment_cfg}, None
     )
