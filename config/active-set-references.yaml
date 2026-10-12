@@ -1,0 +1,27 @@
+# Shared data for the active-set reference checks and the template routing guard
+# (spec SPEC-CONTEXT-PROFILES-2026-10-11, IC-19 / IC-30 / IC-32).
+#
+# dispatch_phrases: regex fragments (case-insensitive) that introduce an imperative
+#   hand-off to a role. Read by tests/test_no_role_routes_in_templates.py (IC-30) and
+#   later by the active-set.dangling-dispatch check (IC-19). The guard allows an
+#   optional "an"/"zu"/"to" and article between phrase and role token.
+# provider_literal_allow: path globs where provider-specific literals are intended (IC-32).
+dispatch_phrases:
+  en:
+    - 'hand[ -]?off to'
+    - 'hand back to'
+    - 'route to'
+  de:
+    - 'delegiert an'
+    - 'dispatch(?:e)? an'
+    - 'weiter(?:leiten)? an'
+    - 'delegier\w*'
+    - 'beauftrag\w*'
+    - 'weise\s+\S+\s+an'
+    - 'übergib'
+    - 'übernimm\w*'
+    - 'übernehm\w*'
+    - 'weiterreich\w*'
+    - 'überträg\w*'
+provider_literal_allow:
+  - 'agents/2-platform/agent-meta-*-expert.md'
