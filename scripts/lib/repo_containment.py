@@ -224,7 +224,12 @@ def _is_link_or_junction(path: str, pathmod: Any = os.path) -> bool:
 
 
 def _lexical_error(path: str) -> Optional[str]:
-    """Host-independent rules; returns an error string or None."""
+    """Host-independent rules; returns an error string or None.
+
+    Documented limits (no code fix): Windows 8.3 short names (e.g. ``GIT~1``
+    for ``.git``) are not expanded lexically and therefore not matched against
+    the protected prefixes.
+    """
     if _WINDOWS_DRIVE_RE.match(path):
         return "must be relative to the project root (drive-letter paths are not allowed)"
     if path[:1] in ("/", "\\"):
@@ -260,7 +265,13 @@ def _lexical_error(path: str) -> Optional[str]:
 def _resolution_error(
     normalized: str, project_root: "str | os.PathLike[str]", pathmod: Any
 ) -> Optional[str]:
-    """Realpath/link checks of *normalized* below *project_root*."""
+    """Realpath/link checks of *normalized* below *project_root*.
+
+    Documented limits (no code fix): a link *inside* the project root that
+    points at another in-root location such as ``.git`` is accepted, because
+    the resolved target still lies within the root and this check does not
+    re-apply the protected-prefix list to the resolved target.
+    """
     root = pathmod.abspath(os.fspath(project_root))
     root_real = pathmod.realpath(root)
     key = pathmod.normcase
@@ -561,6 +572,10 @@ def ensure_tmp_sink(
 
     The path is re-validated defensively: a manually constructed
     :class:`ResolvedRepoContainment` with an escaping path provisions nothing.
+
+    The re-validation after ``makedirs`` is *detecting only*: the directory
+    has already been created at that point and nothing is removed or rolled
+    back; the caller merely receives ``None`` instead of the path.
     """
     sink_dir = _resolve_sink_dir(project_root, effective)
     if sink_dir is None:
