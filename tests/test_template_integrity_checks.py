@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from lib.consistency.frontmatter import check_based_on_stale  # noqa: E402
+from lib.consistency import placeholders as _ph  # noqa: E402
 from lib.consistency.report import Severity  # noqa: E402
 
 _PIN = re.compile(r'^based-on:\s*["\']?([^@"\']+)@([^"\'\s]+)', re.M)
@@ -60,3 +61,30 @@ def test_based_on_stale_fixture_outdated_pin(tmp_path):
 
 def test_based_on_stale_fixture_current_pin(tmp_path):
     assert check_based_on_stale(_mk(tmp_path, "1-generic/dev.md@2.0.0")) == []
+
+
+def test_builder_known_set_real_repo_clean():
+    assert _ph.check_builder_known_set(ROOT) == []
+
+
+def test_builder_known_set_unregistered_builder_var_is_error(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        _ph, "BUILDERS",
+        list(_ph.BUILDERS) + [lambda cfg, root, proj: {"BRAND_NEW_VAR": "x"}],
+        raising=False)
+    findings = _ph.check_builder_known_set(tmp_path)
+    hits = [f for f in findings if "BRAND_NEW_VAR" in f.message]
+    assert len(hits) == 1
+    assert hits[0].severity is Severity.ERROR
+    assert hits[0].check == "placeholders.builder-known-set"
+
+
+def test_builder_known_set_unsupplied_template_placeholder_is_error(tmp_path):
+    (tmp_path / "agents" / "1-generic").mkdir(parents=True)
+    (tmp_path / "agents" / "1-generic" / "a.md").write_text(
+        "---\nname: a\n---\nUse {{NOT_A_BUILDER_VAR}} and {{PREFIX}}.\n",
+        encoding="utf-8")
+    findings = _ph.check_builder_known_set(tmp_path)
+    assert [f.file for f in findings if "NOT_A_BUILDER_VAR" in f.message] == [
+        "agents/1-generic/a.md"]
+    assert not any("'{{PREFIX}}'" in f.message for f in findings)

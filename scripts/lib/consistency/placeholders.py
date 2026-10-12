@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import Callable, Optional
 
 from .report import Finding, Severity
 from ..io import load_yaml_file
@@ -203,3 +204,94 @@ def _rel(path: Path, root: Path) -> str:
         return str(path.relative_to(root)).replace("\\", "/")
     except ValueError:
         return str(path)
+
+
+# --- IC-32 placeholders.builder-known-set (AC-66) -------------------------
+# A builder maps (config, agent_meta_root, project_root) -> {VAR: value}.
+# Extension point: 0b.1 appends ``active_set_variables``, Phase 2 appends
+# ``resolve_context_profile``; the derived set follows this list automatically.
+Builder = Callable[[dict, Path, Optional[Path]], dict]
+
+
+def _build_variables_builder(config: dict, agent_meta_root: Path,
+                             project_root: Optional[Path] = None) -> dict:
+    from ..config import build_variables
+    return build_variables(config, agent_meta_root, project_root)[0]
+
+
+BUILDERS: list[Builder] = [_build_variables_builder]
+
+# Builder variables resolved per pipeline name (config-dependent family).
+_BUILDER_FAMILIES: tuple[re.Pattern, ...] = (
+    re.compile(r'^PIPELINE_[A-Z0-9_]+_(ENABLED|DESCRIPTION|STAGES)$'),
+)
+
+# Ratchet (shrink only): builder variables that predate this check and are not
+# in _BUILTIN_VARS. New builder variables must be registered, not added here.
+_UNREGISTERED_BUILDER_RATCHET: frozenset[str] = frozenset({
+    "AGENT_HINTS_CLAUDE", "AGENT_LOCATIONS", "DEVELOPER_SNIPPETS_PATH_SET",
+    "DEV_STACK_START_SET", "EFFORT_ESTIMATOR_ENABLED", "KNOWLEDGE_BUNDLE_PATH",
+    "KNOWLEDGE_ENGINE_ENABLED", "KNOWLEDGE_SCHEMA_PATH", "KNOWLEDGE_SOURCES_DIR",
+    "KNOWLEDGE_WIKI_DIR", "NATIVE_EXTENSIONS_ENABLED",
+    "NATIVE_EXTENSIONS_WHITELIST_ACTIVE", "NATIVE_EXTENSIONS_WHITELIST_TABLE",
+    "ORCH_MODE_ADVISORY", "ORCH_MODE_DISABLED", "ORCH_MODE_MAIN_CHAT",
+    "ORCH_MODE_STRICT", "PROGRESS_CHAT_PUSH_ENABLED", "PROVIDER_ROUTING",
+    "TESTER_SNIPPETS_PATH_SET", "TMP_SINK_PATH", "WEB_PROJECT_ENABLED",
+    "_AUTO_COMMIT_RESOLVED", "_INTENT_ROUTING_TOOL_DEFS", "active_agents",
+})
+
+# Ratchet: template placeholders neither builder-derived nor registered,
+# found when the check was introduced (wrapper variables are filled by the
+# skills layer; the others are unresolved in the source repo).
+_UNKNOWN_TEMPLATE_RATCHET: frozenset[str] = frozenset({
+    "SKILL_ROLE", "SKILL_DESCRIPTION", "SKILL_NAME", "SKILL_COMMIT",
+    "SKILL_NAME_DISPLAY", "SKILL_ADDITIONAL_FILES_SECTION",
+    "TECH_STACK", "AGENT_RULES", "EXTERNAL_DOCS_LANGUAGE", "MCP_GUARDRAILS_LIST",
+})
+
+
+def derive_builder_vars(agent_meta_root: Path) -> set[str]:
+    """Run all BUILDERS on an empty config and return the produced keys."""
+    keys: set[str] = set()
+    for builder in BUILDERS:
+        keys |= set(builder({}, agent_meta_root, None))
+    return keys
+
+
+def _is_family(var: str) -> bool:
+    return (any(p.match(var) for p in _DYNAMIC_PREFIXES)
+            or any(p.match(var) for p in _BUILDER_FAMILIES))
+
+
+def check_builder_known_set(agent_meta_root: Path) -> list[Finding]:
+    """ERROR for builder variables missing from the registered set and for
+    template placeholders not supplied by any builder (source repo only)."""
+    findings: list[Finding] = []
+    check = "placeholders.builder-known-set"
+    derived = derive_builder_vars(agent_meta_root)
+    registered = (_BUILTIN_VARS | _UNREGISTERED_BUILDER_RATCHET
+                  | load_project_vars(agent_meta_root))
+    for var in sorted(derived):
+        if var in registered or _is_family(var):
+            continue
+        findings.append(Finding(
+            Severity.ERROR, check, "scripts/lib/consistency/placeholders.py",
+            f"Builder variable '{var}' is not in the known placeholder set.",
+            "Add it to _BUILTIN_VARS (and the CLAUDE.md variables table).",
+        ))
+    known = derived | registered
+    for pattern in ("agents/*/*.md", "rules/*/*.md"):
+        for path in sorted(agent_meta_root.glob(pattern)):
+            body = path.read_text(encoding="utf-8")
+            body = re.sub(r'```.*?```', '', body, flags=re.DOTALL)
+            body = re.sub(r'`[^`\n]+`', '', body)
+            for var in sorted(set(_PLACEHOLDER_RE.findall(body))):
+                if (var in known or var in _UNKNOWN_TEMPLATE_RATCHET
+                        or var in _KNOWN_TYPOS or _is_family(var)):
+                    continue
+                findings.append(Finding(
+                    Severity.ERROR, check, _rel(path, agent_meta_root),
+                    f"Placeholder '{{{{{var}}}}}' is not supplied by any variable builder.",
+                    "Provide it from a builder in BUILDERS or fix the name.",
+                ))
+    return findings
