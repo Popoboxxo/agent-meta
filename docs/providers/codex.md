@@ -102,8 +102,8 @@ multiple `spawn_agent` calls in one response.
 
 Codex follows the `AGENTS.md` standard with **concatenation semantics** (root → cwd, V3):
 
-- Files are concatenated root → cwd, **closer files appear later** — a subdirectory
-  `AGENTS.md` effectively overrides the root file.
+- Files are concatenated root → cwd, **closer files appear later** (higher precedence in
+  practice) — a subdirectory `AGENTS.md` does not replace the root file, it is appended.
 - **Max 1 file per directory** (`AGENTS.override.md` > `AGENTS.md`; empty files skipped).
 - `project_doc_max_bytes` = **32 KiB combined over the whole chain** — silent
   truncation risk for large managed blocks.

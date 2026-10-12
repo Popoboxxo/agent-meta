@@ -5,6 +5,7 @@ Not part of the automated suite. The optional tokenizer (``tiktoken``) is NOT a
 framework dependency (Stdlib + PyYAML only in ``scripts/lib``); it is imported
 here lazily. Without it the script prints a notice and exits 0 -- the byte
 column of the measurement doc then stays "approximated (bytes // 4), UNVERIFIED".
+With ``--strict`` a missing tokenizer is an error instead: exit code 3.
 
 Usage (from the repo root)::
 
@@ -31,7 +32,10 @@ def _load_encoder():
         import tiktoken  # type: ignore
     except ImportError:
         return None
-    enc = tiktoken.get_encoding("cl100k_base")
+    try:
+        enc = tiktoken.get_encoding("cl100k_base")
+    except Exception:  # vocabulary download blocked (offline / proxy): treat as unavailable
+        return None
     return lambda text: len(enc.encode(text))
 
 
@@ -46,20 +50,23 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("report", nargs="?", help="JSON from --context-report --json")
     parser.add_argument("--files", nargs="+", help="files to tokenize directly")
+    parser.add_argument("--strict", action="store_true",
+                        help="exit 3 instead of 0 when no tokenizer is available")
     args = parser.parse_args(argv)
 
     count = _load_encoder()
+    missing_rc = 3 if args.strict else 0
     if args.report:
         _print_report(json.loads(Path(args.report).read_text(encoding="utf-8")))
     if not args.files:
         if count is None:
             print("NOTICE: no tokenizer available (pip install tiktoken to measure real "
                   "ratios); byte-based estimates above are UNVERIFIED.")
-        return 0
+        return missing_rc if count is None else 0
     if count is None:
         print("NOTICE: no tokenizer available (pip install tiktoken); cannot tokenize "
               "files. Ratios stay UNVERIFIED.")
-        return 0
+        return missing_rc
     print("file | bytes | tokens | bytes/token")
     for name in args.files:
         data = Path(name).read_bytes()
