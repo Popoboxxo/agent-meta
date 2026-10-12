@@ -157,6 +157,7 @@ capabilities:
     # documented in the Opencode parallel_pattern (delegation-syntax.yaml).
     fanout_mechanism: native-batch
     barrier_collect: true
+    description: "Agent-Orchestrierung via task() tool, dateibasierte Agent-Registrierung."
     # --- IC-09 context budget / channel keys (SPEC-CONTEXT-PROFILES-2026-10-11, Task 0a.5): pure data, not yet consumed by the render.
     # Source: docs/analysis/2026-10-11-context-budget-provider-study.md. agents_md_precedence=nearest is UNVERIFIED (not in study). Keys marked UNVERIFIED here (not covered by surface_verified_state.context_file).
     context_hard_cap_bytes: null
@@ -185,7 +186,6 @@ capabilities:
       context_file: VERIFIED-RUNTIME
     legacy_artifacts: []
     agent_config_format: markdown
-    description: "Agent-Orchestrierung via task() tool, dateibasierte Agent-Registrierung."
 
   Gemini:
     skills: true                        # skills_dir: .gemini/skills (+ ai-providers capabilities)
