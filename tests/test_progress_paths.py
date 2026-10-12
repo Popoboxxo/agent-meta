@@ -271,3 +271,21 @@ def test_no_provider_literals_and_py39_syntax():
             and node.value in names
         })
         assert literals == [], "provider literal(s) in progress_paths: {0}".format(literals)
+
+
+@pytest.mark.parametrize(
+    "value", ["\\\\server\\share\\x", "CON", ".GIT/x", ".Codex/out", "a:b", "x.", "a<b"]
+)
+def test_hardened_rules_reject_unsafe_progress_dir(tmp_path, value):
+    resolved = resolve_progress_paths(tmp_path, {"progress": {"dir": value}})
+
+    assert resolved.progress_rel == DEFAULT_PROGRESS_DIR
+    assert resolved.progress_source == SOURCE_SAFE_FALLBACK
+    assert len(resolved.findings) == 1
+
+
+def test_backslash_progress_dir_is_canonicalized(tmp_path):
+    resolved = resolve_progress_paths(tmp_path, {"progress": {"dir": "run\\progress"}})
+
+    assert resolved.progress_rel == "run/progress"
+    assert resolved.progress_dir == tmp_path / "run" / "progress"

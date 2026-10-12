@@ -1,5 +1,5 @@
 #!/bin/bash
-# version: 1.0.0
+# version: 1.1.0
 # Real repo-containment ("prison mode") logic. NOT a standalone hook —
 # invoked by repo-containment.sh (thin self-health wrapper, issue #630), which
 # pipes the PreToolUse JSON payload to this script's stdin after syntax-
@@ -35,8 +35,19 @@
 # yaml.safe_load on .meta-config/project.yaml, passing the path as argv so
 # backslash-bearing Windows paths are never string-interpolated) and mirror
 # the resolver's precedence and safe-side rules inline. The tmp-sink path is
-# re-validated (relative, non-empty, no drive-letter prefix, no '..' segments,
-# not the repo root itself) before it widens the allow-list.
+# re-validated before it widens the allow-list with the SAME rule set as
+# scripts/lib/repo_containment.py::tmp_sink_path_error (IC-15 Nr. 27 a/b, hook
+# mirror f; parity enforced by tests/test_tmp_sink_path_parity.py over the
+# shared corpus tests/fixtures/tmp-sink-path-corpus.json): relative only (no
+# absolute/UNC/drive paths), no '..' segment, no reserved Windows device
+# names, no trailing dot/space, ':' or <>"|?* / control characters, no
+# protected directory (case-insensitive), not the repo root itself. The
+# accepted path is used in its canonical form (backslash -> slash before
+# normpath). An invalid path keeps falling back to '.tmp' (never aborts at
+# runtime); only the decision and canonical form must match Python. The
+# protected provider directories are embedded below (config/ai-providers.yaml
+# is not deployed); the parity test fails when they drift from
+# provider_root_dirs.
 #
 # Provider identity: `AGENT_META_PROVIDER` is substituted per provider by
 # sync.py's per-provider copy step (scripts/lib/hooks.py:470,
@@ -175,19 +186,76 @@ CONFIG_FILE="$REPO_ROOT/.meta-config/project.yaml"
 read_effective_containment() {
   "$_PY" - "$1" "$2" <<'PYEOF'
 import os
+import posixpath
 import re
 import sys
 
 CONFIG_FILE, PROVIDER = sys.argv[1], sys.argv[2]
 
-# Mirrors scripts/lib/repo_containment.py::tmp_sink_path_error.
+# Mirrors scripts/lib/repo_containment.py::tmp_sink_path_error (lexical rules).
 _WINDOWS_DRIVE_RE = re.compile(r"^[A-Za-z]:")
+_RESERVED = frozenset(
+    ["CON", "PRN", "AUX", "NUL"]
+    + ["COM%d" % i for i in range(1, 10)]
+    + ["LPT%d" % i for i in range(1, 10)]
+)
+_FORBIDDEN_CHARS = frozenset('<>"|?*')
+# Lower-cased protected segment prefixes (framework dirs + provider_root_dirs).
+_PROTECTED = (
+    (".git",), (".claude",), (".meta-config",), (".agents",), (".codex",),
+    (".continue",), (".gemini",), (".github", "copilot"), (".kimi-code",),
+    (".mammouth",), (".opencode",), (".zcode",),
+)
 
 
-def emit(enabled, sink_enabled, sink_path):
+def canonical_path(path):
+    """Backslash -> slash BEFORE normpath, always POSIX-style."""
+    return posixpath.normpath(path.replace("\\", "/"))
+
+
+def path_error(path):
+    """Return an error string for an unsafe sink path, else None."""
+    if not isinstance(path, str) or not path.strip():
+        return "empty or not a string"
+    if _WINDOWS_DRIVE_RE.match(path):
+        return "drive-letter path"
+    if path[:1] in ("/", "\\"):
+        return "absolute or UNC path"
+    if any(ord(ch) < 32 for ch in path):
+        return "control character"
+    if path in (".", ".."):
+        return "root or parent"
+    segments = path.replace("\\", "/").split("/")
+    if any(segment == ".." for segment in segments):
+        return "'..' segment"
+    for segment in segments:
+        if segment in ("", "."):
+            continue
+        if ":" in segment:
+            return "':' in segment"
+        if any(ch in _FORBIDDEN_CHARS for ch in segment):
+            return "forbidden character"
+        if segment[-1] in (".", " "):
+            return "trailing dot or space"
+        if segment.split(".", 1)[0].rstrip(" ").upper() in _RESERVED:
+            return "reserved Windows name"
+    normalized = canonical_path(path)
+    if normalized in ("", ".", "..") or normalized.startswith("../"):
+        return "escapes the root"
+    lowered = tuple(seg.lower() for seg in normalized.split("/"))
+    for prefix in _PROTECTED:
+        if lowered[: len(prefix)] == prefix:
+            return "protected directory"
+    return None
+
+
+def emit(enabled, sink_enabled, sink_path, rejected=False):
+    # SINK_REJECTED is observed only by tests/test_tmp_sink_path_parity.py
+    # (AC-97); the shell consumer deliberately ignores it (silent fallback).
     print("ENABLED=%d" % (1 if enabled else 0))
     print("SINK_ENABLED=%d" % (1 if sink_enabled else 0))
     print("SINK_PATH=%s" % sink_path)
+    print("SINK_REJECTED=%d" % (1 if rejected else 0))
 
 
 try:
@@ -222,28 +290,11 @@ try:
         sink_enabled = True
 
     path = sink.get("path", ".tmp")
-    valid = (
-        isinstance(path, str)
-        and bool(path.strip())
-        and not os.path.isabs(path)
-        and not _WINDOWS_DRIVE_RE.match(path)
-        and path not in (".", "..")
-    )
-    if valid:
-        segments = path.replace("\\", "/").split("/")
-        valid = not any(segment == ".." for segment in segments)
-    if valid:
-        # A path whose normalized form is the root itself (".", "./.", "") or
-        # escapes it is refused, mirroring the sync validator. The commonpath
-        # re-check in the hook would otherwise treat the repo root as the sink.
-        normalized = os.path.normpath(path)
-        valid = normalized not in ("", ".", "..") and not normalized.startswith(
-            ".." + os.sep
-        )
-    if not valid:
-        path = ".tmp"
+    # Same decision and canonical form as Python; invalid => safe fallback.
+    rejected = path_error(path) is not None
+    path = ".tmp" if rejected else canonical_path(path)
 
-    emit(enabled, sink_enabled, path)
+    emit(enabled, sink_enabled, path, rejected)
 except Exception:
     # F4 safe-side: missing/unreadable/unparseable config never opens silently.
     emit(True, True, ".tmp")

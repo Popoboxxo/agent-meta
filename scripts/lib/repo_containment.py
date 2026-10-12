@@ -20,11 +20,14 @@ anywhere in this module (provider-agnostic policy).
 from __future__ import annotations
 
 import os
+import posixpath
 import re
 import shutil
+import stat
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Optional
 
 # ---------------------------------------------------------------------------
 # Framework defaults (spec §2.1) — single source of truth shared by the
@@ -46,6 +49,27 @@ TMP_SINK_GITIGNORE_CONTENT = "*\n!.gitignore\n"
 # does not catch it on POSIX, so reject it explicitly here to keep the rule
 # identical across platforms (mirrors the Admin-UI client-side validation).
 _WINDOWS_DRIVE_RE = re.compile(r"^[A-Za-z]:")
+
+# Windows-only path hazards, rejected on every host so a sink path means the
+# same directory everywhere (IC-15 Nr. 27 a, F-45).
+_WINDOWS_RESERVED_NAMES = frozenset(
+    ["CON", "PRN", "AUX", "NUL"]
+    + [f"COM{i}" for i in range(1, 10)]
+    + [f"LPT{i}" for i in range(1, 10)]
+)
+_FORBIDDEN_SEGMENT_CHARS = frozenset('<>"|?*')
+
+# Protected top-level names (compared case-insensitively) as sink or sink
+# prefix. Provider directories come from ``provider_root_dirs`` in
+# ``config/ai-providers.yaml`` (data-driven, no provider literals here); the
+# static entries are the framework-owned directories plus a fallback.
+_PROTECTED_STATIC = (".git", ".claude", ".meta-config")
+_PROVIDERS_YAML = Path(__file__).resolve().parents[2] / "config" / "ai-providers.yaml"
+_protected_cache: Optional[tuple] = None
+
+# Test seam: called between resolving the sink dir and creating it
+# (ensure_tmp_sink TOCTOU test, AC-93). Always ``None`` in production.
+_TOCTOU_TEST_HOOK: Optional[Callable[[], None]] = None
 
 #: Which precedence level produced the effective master switch.
 SOURCE_PROVIDER_OVERRIDE = "provider-override"
@@ -139,93 +163,221 @@ class TmpSinkGitignoreOutcome:
     dry_run: bool = False
 
 
-def _resolve_sink_dir(
-    project_root: str | os.PathLike[str],
-    effective: ResolvedRepoContainment,
-) -> Path | None:
-    """Resolve (and defensively re-validate) the sink directory, else None.
-
-    Shared by :func:`ensure_tmp_sink`, :func:`cleanup_tmp_sink` and
-    :func:`ensure_tmp_sink_gitignore`. Returns ``None`` when the sink is
-    disabled, when the configured path would escape ``project_root`` (after
-    symlink resolution) or when the sink directory **is itself a symlink**.
-
-    Security note (spec §5.4): the naive ``normpath``/``commonpath`` check does
-    not resolve symlinks. A ``.tmp`` symlink pointing outside the root would
-    make ``ensure_tmp_sink_gitignore`` write and -- far worse -- make
-    ``cleanup_tmp_sink`` with ``cleanup: on-sync`` DELETE outside the project.
-    Both sides are therefore resolved with :func:`os.path.realpath`, containment
-    is re-checked on the real paths, and a symlinked sink is refused outright.
-    """
-    if not isinstance(effective, ResolvedRepoContainment):
-        return None
-    if not effective.tmp_sink_enabled:
-        return None
-
-    root = os.fspath(project_root)
-    root_real = os.path.realpath(root)
-    target = os.path.normpath(os.path.join(root, effective.tmp_sink_path))
-
-    # A sink that is itself a symlink is never trustworthy: the link target can
-    # change at any time between the containment check and the write/delete.
-    if os.path.islink(target):
-        return None
-
-    target_real = os.path.realpath(target)
-    # A sink path that canonicalizes to the project root itself (``.``,
-    # ``./.``, ``""``, ...) is refused: ``commonpath`` would otherwise accept
-    # it, and a manually constructed ResolvedRepoContainment would let
-    # cleanup_tmp_sink("on-sync") delete top-level project entries (spec §5.4).
-    if target_real == root_real:
-        return None
+def _protected_prefixes() -> tuple:
+    """Lower-cased segment tuples that must not be a sink or sink prefix."""
+    global _protected_cache
+    if _protected_cache is not None:
+        return _protected_cache
+    entries = set(_PROTECTED_STATIC)
     try:
-        if os.path.commonpath([root_real, target_real]) != root_real:
-            return None
-    except ValueError:
-        return None
-    return Path(target)
+        import yaml  # PyYAML is a permitted dependency
+
+        data = yaml.safe_load(_PROVIDERS_YAML.read_text(encoding="utf-8")) or {}
+        providers = data.get("providers", data) if isinstance(data, dict) else {}
+        for cfg in providers.values() if isinstance(providers, dict) else ():
+            dirs = cfg.get("provider_root_dirs") if isinstance(cfg, dict) else None
+            for entry in dirs or ():
+                if isinstance(entry, str):
+                    entries.add(entry)
+    except Exception:  # noqa: BLE001 - registry unreadable => static list only
+        pass
+    prefixes = set()
+    for entry in entries:
+        segs = tuple(
+            seg.lower() for seg in entry.replace("\\", "/").split("/") if seg not in ("", ".")
+        )
+        if segs:
+            prefixes.add(segs)
+    _protected_cache = tuple(sorted(prefixes))
+    return _protected_cache
 
 
-def tmp_sink_path_error(
-    path: Any,
-    project_root: str | os.PathLike[str] | None = None,
-) -> str | None:
-    """Return an error string when *path* is not a safe scratch path, else None.
+def canonical_tmp_sink_path(path: str) -> str:
+    """Return the host-independent canonical form of a sink path.
 
-    Rules (spec §4.3): non-empty string, relative, not ``.``/``..`` and
-    without a ``..`` segment; after ``os.path.normpath`` it must not escape
-    ``project_root`` (checked when *project_root* is provided). Shared by the
-    non-exiting resolver and the hard sync-time validator so both enforce the
-    exact same rule set.
+    A backslash becomes ``/`` *before* ``normpath`` (IC-15 Nr. 27 b) and the
+    normalization is always POSIX-style, so ``scratch\\out`` is the same
+    directory on Linux and Windows.
     """
-    if not isinstance(path, str):
-        return f"expected a string, got {type(path).__name__}"
-    if not path.strip():
-        return "must not be empty"
-    if os.path.isabs(path):
-        return "must be relative to the project root (absolute paths are not allowed)"
+    return posixpath.normpath(path.replace("\\", "/"))
+
+
+def _is_link_or_junction(path: str, pathmod: Any = os.path) -> bool:
+    """True for a symlink, a junction or (Windows) any reparse point."""
+    try:
+        if pathmod.islink(path):
+            return True
+    except (OSError, ValueError):
+        return True
+    isjunction = getattr(pathmod, "isjunction", None)  # absent before Python 3.12
+    if isjunction is not None:
+        try:
+            return bool(isjunction(path))
+        except (OSError, ValueError):
+            return True
+    reparse = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+    try:
+        attrs = getattr(os.stat(path, follow_symlinks=False), "st_file_attributes", None)
+    except (OSError, ValueError):
+        return False  # nonexistent component: nothing to follow
+    return bool(attrs is not None and attrs & reparse)
+
+
+def _lexical_error(path: str) -> Optional[str]:
+    """Host-independent rules; returns an error string or None.
+
+    Documented limits (no code fix): Windows 8.3 short names (e.g. ``GIT~1``
+    for ``.git``) are not expanded lexically and therefore not matched against
+    the protected prefixes.
+    """
     if _WINDOWS_DRIVE_RE.match(path):
         return "must be relative to the project root (drive-letter paths are not allowed)"
+    if path[:1] in ("/", "\\"):
+        return "must be relative to the project root (absolute and UNC paths are not allowed)"
+    if any(ord(ch) < 32 for ch in path):
+        return "must not contain control characters"
     if path in (".", ".."):
         return f"must not be {path!r}"
     segments = path.replace("\\", "/").split("/")
     if any(segment == ".." for segment in segments):
         return "must not contain '..' segments"
-    normalized = os.path.normpath(path)
-    if normalized in ("", ".", "..") or normalized.startswith(".." + os.sep):
+    for segment in segments:
+        if segment in ("", "."):
+            continue
+        if ":" in segment:
+            return "must not contain ':' (NTFS data streams, drive prefixes)"
+        if any(ch in _FORBIDDEN_SEGMENT_CHARS for ch in segment):
+            return "must not contain any of the characters <>\"|?*"
+        if segment[-1] in (".", " "):
+            return "segments must not end with a dot or a space"
+        if segment.split(".", 1)[0].rstrip(" ").upper() in _WINDOWS_RESERVED_NAMES:
+            return "must not use a reserved Windows device name"
+    normalized = canonical_tmp_sink_path(path)
+    if normalized in ("", ".", "..") or normalized.startswith("../"):
         return "must not escape the project root"
-    if project_root is not None:
-        # ``project_root`` itself may be relative (e.g. ``"."`` when validating
-        # a config that lives right here). ``os.path.commonpath`` returns ``""``
-        # for two relative paths and would falsely report an escape, so resolve
-        # BOTH sides against the current working directory first.
-        root = os.path.abspath(os.fspath(project_root))
-        target = os.path.abspath(os.path.join(root, normalized))
+    lowered = tuple(seg.lower() for seg in normalized.split("/"))
+    for prefix in _protected_prefixes():
+        if lowered[: len(prefix)] == prefix:
+            return "must not be a protected directory (.git, .claude, .meta-config, provider directories)"
+    return None
+
+
+def _resolution_error(
+    normalized: str, project_root: "str | os.PathLike[str]", pathmod: Any
+) -> Optional[str]:
+    """Realpath/link checks of *normalized* below *project_root*.
+
+    Documented limits (no code fix): a link *inside* the project root that
+    points at another in-root location such as ``.git`` is accepted, because
+    the resolved target still lies within the root and this check does not
+    re-apply the protected-prefix list to the resolved target.
+    """
+    root = pathmod.abspath(os.fspath(project_root))
+    root_real = pathmod.realpath(root)
+    key = pathmod.normcase
+
+    def inside(candidate: str) -> bool:
         try:
-            if os.path.commonpath([root, target]) != root:
-                return "must not escape the project root"
+            return key(pathmod.commonpath([root_real, candidate])) == key(root_real)
+        except ValueError:  # e.g. different drives
+            return False
+
+    parts = normalized.split("/")
+    current = root
+    for index, part in enumerate(parts):
+        current = pathmod.join(current, part)
+        if not _is_link_or_junction(current, pathmod):
+            continue
+        if index == len(parts) - 1:
+            return "must not be a symlink, junction or reparse point"
+        if not inside(pathmod.realpath(current)):
+            return "must not escape the project root (link in path)"
+
+    target_real = pathmod.realpath(pathmod.join(root, *parts))
+    if key(target_real) == key(root_real):
+        return "must not resolve to the project root"
+    if not inside(target_real):
+        return "must not escape the project root"
+    return None
+
+
+def _resolve_sink_dir(
+    project_root: "str | os.PathLike[str]",
+    effective: ResolvedRepoContainment,
+    *,
+    pathmod: Any = os.path,
+) -> Optional[Path]:
+    """Resolve (and defensively re-validate) the sink directory, else None.
+
+    Shared by :func:`ensure_tmp_sink`, :func:`cleanup_tmp_sink` and
+    :func:`ensure_tmp_sink_gitignore`. Returns ``None`` when the sink is
+    disabled, when the path breaks any :func:`tmp_sink_path_error` rule
+    (lexical, link/junction on the way, realpath escape) and otherwise the
+    **realpath-resolved** directory, so callers never act on a path that can be
+    swapped for a link afterwards (spec §5.4, IC-15 Nr. 27 b/d).
+    """
+    if not isinstance(effective, ResolvedRepoContainment):
+        return None
+    if not effective.tmp_sink_enabled:
+        return None
+    if tmp_sink_path_error(effective.tmp_sink_path, project_root, pathmod=pathmod):
+        return None
+    root = pathmod.abspath(os.fspath(project_root))
+    parts = canonical_tmp_sink_path(effective.tmp_sink_path).split("/")
+    return Path(pathmod.realpath(pathmod.join(root, *parts)))
+
+
+def tmp_sink_path_error(
+    path: Any,
+    project_root: "str | os.PathLike[str] | None" = None,
+    *,
+    pathmod: Any = os.path,
+) -> Optional[str]:
+    """Return an error string when *path* is not a safe scratch path, else None.
+
+    Rules (spec §4.3, IC-34, IC-15 Nr. 27): non-empty string, relative (no
+    ``/x``, backslash-leading, UNC, ``\\\\?\\``, drive letters), no ``..``
+    segment, no reserved Windows device names, trailing dot/space, ``:``,
+    ``<>"|?*`` or control characters, no protected directory (``.git``,
+    ``.claude``, ``.meta-config``, provider directories; case-insensitive).
+    When *project_root* is given the path is additionally resolved with
+    ``pathmod.realpath``: no link/junction/reparse point on the way that
+    escapes the root, no link as last component, no escape, not the root.
+    ``pathmod`` (default ``os.path``) lets tests simulate ``ntpath``.
+    """
+    if not isinstance(path, str):
+        return f"expected a string, got {type(path).__name__}"
+    if not path.strip():
+        return "must not be empty"
+    error = _lexical_error(path)
+    if error:
+        return error
+    if project_root is not None:
+        return _resolution_error(canonical_tmp_sink_path(path), project_root, pathmod)
+    return None
+
+
+def tmp_sink_location_error(path: str, project_root: Path) -> Optional[str]:
+    """Return an error when the sink resolves outside the repo or in system temp.
+
+    Only place that consults :func:`tempfile.gettempdir` in the sink context.
+    A sink under the system temp dir is reported only when the project root
+    itself is *not* under it (otherwise every temp-based checkout would fail).
+    """
+    root_real = os.path.realpath(os.fspath(project_root))
+    target_real = os.path.realpath(os.path.join(root_real, path))
+
+    def under(base: str, candidate: str) -> bool:
+        try:
+            return os.path.commonpath([base, candidate]) == base
         except ValueError:
-            return "must not escape the project root"
+            return False
+
+    temp_real = os.path.realpath(tempfile.gettempdir())
+    if under(temp_real, target_real) and not under(temp_real, root_real):
+        return "resolves into the system temp directory"
+    if not under(root_real, target_real):
+        return "resolves outside the project root"
     return None
 
 
@@ -420,12 +572,24 @@ def ensure_tmp_sink(
 
     The path is re-validated defensively: a manually constructed
     :class:`ResolvedRepoContainment` with an escaping path provisions nothing.
+
+    The re-validation after ``makedirs`` is *detecting only*: the directory
+    has already been created at that point and nothing is removed or rolled
+    back; the caller merely receives ``None`` instead of the path.
     """
     sink_dir = _resolve_sink_dir(project_root, effective)
     if sink_dir is None:
         return None
+    if _TOCTOU_TEST_HOOK is not None:
+        _TOCTOU_TEST_HOOK()
+    # Re-validate right before creating: the path may have turned into a link.
+    if _resolve_sink_dir(project_root, effective) != sink_dir:
+        return None
     if not dry_run:
         os.makedirs(sink_dir, exist_ok=True)
+        # ... and once more afterwards (a swap during makedirs).
+        if _resolve_sink_dir(project_root, effective) != sink_dir:
+            return None
     return sink_dir
 
 

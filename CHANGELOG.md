@@ -46,6 +46,18 @@
   Variablen können danach entfallen. Regressions-Szenario: `tests/scenarios/configs/75-web-platform-preset`.
 
 ### Fixed
+- **repo-containment hook and progress paths mirror the tmp-sink rules (#963)**:
+  `repo-containment-impl.sh` (`# version: 1.0.0` -> `1.1.0`, drift warning via `check_stale_deployed_hooks`)
+  and `progress_path_error` now apply the same path rules and canonical form as `tmp_sink_path_error`
+  (UNC, reserved Windows names, protected provider directories, backslash canonicalization); an unsafe
+  sink path still falls back to `.tmp` in the hook. One shared corpus
+  (`tests/fixtures/tmp-sink-path-corpus.json`) is checked against all three implementations.
+- **tmp-sink path guard hardened (#963)**: the protected-path list for `repo_containment.tmp-sink.path`
+  now covers all provider directories (e.g. `.agents/out` is rejected). Unsafe paths (drive letters,
+  UNC, root escape, reserved Windows names) in existing configurations now abort the sync hard.
+  Migration: change `tmp-sink.path` to a relative path inside the repo, e.g. `.tmp` or `scratch/out`.
+  Known limits: Windows 8.3 short names (`GIT~1`) and an intermediate in-root symlink pointing at `.git`
+  are not detected.
 - **Flaky `test_local_process_partial_line_timeout` / unclear plugin-test message**: the MCP
   initialize handshake now reports a process that exits before reading the request (BrokenPipe on
   write, or EOF on read) as FAIL "no response from MCP server (process exited ...)" instead of a raw
