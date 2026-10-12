@@ -3,6 +3,7 @@
 Run: python -m pytest tests/test_tmp_sink_migration_error.py -v
 """
 
+import ast
 import os
 import subprocess
 import sys
@@ -90,10 +91,21 @@ def test_sync_renders_nothing_on_unsafe_path(tmp_path):
 
 
 def test_matrix_fixtures_are_free_of_tmp_sink_paths():
-    ac01 = (_REPO_ROOT / "tests" / "test_ac01_render_identity.py").read_text(
-        encoding="utf-8"
-    )
-    assert "tmp-sink" not in ac01.split("def _make_project", 1)[1].split("def _hash_file", 1)[0]
+    ac01_path = _REPO_ROOT / "tests" / "test_ac01_render_identity.py"
+    source = ac01_path.read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    funcs = [
+        n for n in ast.walk(tree)
+        if isinstance(n, ast.FunctionDef) and n.name == "_make_project"
+    ]
+    if not funcs:
+        pytest.fail(
+            f"fixture anchor '_make_project' not found in {ac01_path.name}; "
+            "it was renamed or removed - update this test to the new fixture builder"
+        )
+    segment = ast.get_source_segment(source, funcs[0]) or ""
+    assert segment, f"could not extract source of _make_project from {ac01_path.name}"
+    assert "tmp-sink" not in segment
     base = _REPO_ROOT / "tests" / "fixtures" / "ac01-baseline"
     for f in base.rglob("*.y*ml"):
         assert "tmp-sink" not in f.read_text(encoding="utf-8", errors="replace")
