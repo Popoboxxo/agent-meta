@@ -107,6 +107,48 @@ def check_agent_frontmatter(path: Path, content: str, agent_meta_root: Path,
     return findings
 
 
+_BASED_ON_RE = re.compile(r'^(?P<path>[^@\s]+)@(?P<version>\S+)$')
+
+
+def check_based_on_stale(agent_meta_root: Path) -> list[Finding]:
+    """WARN when a ``based-on`` pin in agents/2-platform lags its base file.
+
+    The pin ``1-generic/<role>.md@<version>`` is compared with the current
+    ``version:`` of the referenced base file. Unparseable pins and missing
+    base files are skipped (reported by other checks).
+    """
+    findings: list[Finding] = []
+    platform_dir = agent_meta_root / "agents" / "2-platform"
+    if not platform_dir.is_dir():
+        return findings
+    for path in sorted(platform_dir.glob("*.md")):
+        try:
+            fm = _parse_frontmatter(path.read_text(encoding="utf-8"))
+        except OSError:
+            continue
+        pin = str((fm or {}).get("based-on") or "").strip()
+        m = _BASED_ON_RE.match(pin)
+        if not m:
+            continue
+        base_path = agent_meta_root / "agents" / m.group("path")
+        try:
+            base_fm = _parse_frontmatter(base_path.read_text(encoding="utf-8"))
+        except OSError:
+            continue
+        base_version = str((base_fm or {}).get("version") or "").strip()
+        pinned = m.group("version")
+        if base_version and base_version != pinned:
+            findings.append(Finding(
+                Severity.WARNING, "frontmatter.based-on-stale",
+                _rel(path, agent_meta_root),
+                f"based-on pin '{pinned}' is stale; base {m.group('path')} "
+                f"is at '{base_version}'.",
+                "Review the override against the base and set: "
+                f"based-on: \"{m.group('path')}@{base_version}\"",
+            ))
+    return findings
+
+
 def _check_extends(extends: str, rel: str, agent_meta_root: Path) -> list[Finding]:
     findings = []
     base_path = agent_meta_root / "agents" / extends
