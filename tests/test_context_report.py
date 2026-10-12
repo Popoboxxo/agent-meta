@@ -71,7 +71,7 @@ def test_over_hard_cap_finding(tmp_path):
 def test_module_has_no_systemtemp_or_dot_tmp_literal():
     """AC-75/AC-94 grep guard over the new module."""
     text = MODULE.read_text(encoding="utf-8")
-    assert not re.search(r"tempfile|gettempdir|mkdtemp|/tmp|%TEMP%|\.tmp\b", text)
+    assert not re.search(r"tempfile|gettempdir|/tmp|%TEMP%|TMPDIR|mkdtemp|\.tmp\b", text)
 
 
 def _project(root: Path, sink_enabled: bool = True) -> Path:
@@ -166,3 +166,61 @@ def test_cli_disabled_sink_exits_2_and_writes_nothing(tmp_path):
 def test_cli_reference_documents_context_report():
     text = (REPO_ROOT / "docs" / "api" / "cli-reference.md").read_text(encoding="utf-8")
     assert "--context-report" in text
+
+
+def _run_report(tmp_path, before_run=None, **kw):
+    cfg = _project(tmp_path)
+    if before_run is not None:
+        before_run()
+    args = dict(
+        project_root=tmp_path, agent_meta_root=REPO_ROOT, config_path=cfg,
+        config={"repo_containment": {"tmp-sink": {"enabled": True, "path": "scratch/out"}}},
+        providers=["Claude"], mappings={"Claude": {"context_file": "CLAUDE.md"}},
+        as_json=True)
+    args.update(kw)
+    return cr.run_context_report(**args)
+
+
+def test_render_failure_exits_2_with_own_code(tmp_path, monkeypatch, capsys):
+    def boom(*_a, **_k):
+        raise FileNotFoundError("git")
+
+    code = _run_report(tmp_path, lambda: monkeypatch.setattr(subprocess, "run", boom))
+    assert code == 2
+    assert "context-report.render-failed" in capsys.readouterr().err
+
+
+def test_old_work_dirs_survive_failed_render(tmp_path, monkeypatch):
+    old = tmp_path / "scratch" / "out" / "context-report" / "old-run" / "work"
+    old.mkdir(parents=True)
+    def boom(*_a, **_k):
+        raise OSError("x")
+
+    assert _run_report(tmp_path, lambda: monkeypatch.setattr(subprocess, "run", boom)) == 2
+    assert old.is_dir()
+
+
+def test_empty_report_warns_but_exits_0(tmp_path, capsys):
+    assert _run_report(tmp_path, mappings={"Claude": {}}) == 0
+    assert "empty report" in capsys.readouterr().err
+
+
+def test_profile_both_note_names_requested_profile(tmp_path, capsys):
+    assert _run_report(tmp_path, profile="both") == 0
+    err = capsys.readouterr().err
+    assert "'both'" in err and "'compact'" not in err
+
+
+def test_rules_skipped_without_rules_dir(tmp_path):
+    _write(tmp_path / ".claude/rules/a.md", "rule\n")
+    caps = {"Claude": {"has_rules": True}}
+    assert "rules" not in cr.measure_artifacts(tmp_path, ["Claude"], caps).get("Claude", {})
+    merged = cr.merge_provider_mappings({"providers": {"Claude": {"has_rules": True}}}, {})
+    assert merged["Claude"]["rules_dir"] == ".claude/rules"
+    assert "rules" in cr.measure_artifacts(tmp_path, ["Claude"], merged)["Claude"]
+
+
+def test_cli_reference_documents_exit_codes_and_limitation():
+    text = (REPO_ROOT / "docs" / "api" / "cli-reference.md").read_text(encoding="utf-8")
+    assert "context-report.render-failed" in text
+    assert "3-project" in text

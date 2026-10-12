@@ -1013,8 +1013,9 @@ def _handle_prune_backups(ctx: _SyncContext) -> None:
 def _handle_context_report(ctx: _SyncContext) -> None:
     """Handle ``--context-report`` (IC-11): render into the tmp-sink, measure, exit.
 
-    Exit 0 on success, 1 on ``context.over-hard-cap`` or render failure, 2 when
-    the tmp-sink is disabled or unsafe (``tmp-sink.disabled``).
+    Exit 0 on success, 1 only on ``context.over-hard-cap``, 2 when the tmp-sink
+    is disabled or unsafe (``tmp-sink.disabled``) or the render fails
+    (``context-report.render-failed``).
     """
     from lib.context_report import merge_provider_mappings, run_context_report
     from lib.providers import (

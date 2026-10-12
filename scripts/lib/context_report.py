@@ -10,6 +10,15 @@ configured tmp-sink (``resolve_work_dir``, IC-34), measures the rendered
 artifacts and writes the report into the sink subdir ``context-report``.
 It never writes into the project proper and never touches the system temp
 directory.
+
+Limitation: the project is rendered by ``sync.py --init`` on a copy of
+``project.yaml`` only. Project-local files outside ``.meta-config``
+(``.claude/3-project/*-ext.md``, project-owned rules and hooks, the "Eigene
+Notizen" section of CLAUDE.md) are absent from the render, so the measurement
+can underestimate the real always-loaded footprint.
+
+Exit codes: 0 ok, 1 only for ``context.over-hard-cap``, 2 for tmp-sink errors
+and for render failures (``context-report.render-failed``).
 """
 from __future__ import annotations
 
@@ -22,17 +31,20 @@ from datetime import datetime
 from pathlib import Path
 from typing import Mapping, Optional, Sequence
 
+from lib.rules import CLAUDE_RULES_DIR
 from lib.repo_containment import (
     TmpSinkError,
     resolve_output_dir,
     resolve_work_dir,
+    work_dir_env,
 )
 
 REPORT_SUBDIR = "context-report"
 BYTES_PER_TOKEN = 4
-DEFAULT_RULES_DIR = ".claude/rules"
 DEFAULT_AGENT_EXT = ".md"
 ORCHESTRATOR_STEM = "orchestrator"
+GIT_INIT_TIMEOUT_S = 60
+RENDER_FAILED_CODE = "context-report.render-failed"
 
 # (capability key, cap_kind) in precedence order: a hard cap wins over a soft
 # cap, bytes win over chars over lines.
@@ -107,7 +119,8 @@ def measure_artifacts(
     ``capabilities[provider]`` is the provider's merged mapping: the cap /
     channel keys of ``config/provider-capabilities.yaml`` (IC-09) plus the
     path keys of ``config/ai-providers.yaml`` (``context_file``, ``agents_dir``,
-    ``agent_ext``, ``rules_dir``, ``has_rules``). Artifacts that do not exist
+    ``agent_ext``, ``rules_dir``, ``has_rules``); without ``rules_dir`` rules are skipped
+    (``merge_provider_mappings`` supplies it). Artifacts that do not exist
     are omitted.
 
     Returns ``{provider: {artifact: {bytes, lines, tokens_est, cap, cap_kind}}}``
@@ -129,8 +142,9 @@ def measure_artifacts(
             artifacts["entry-file"] = _entry(entry, cap, kind)
             always.append(entry)
 
-        if caps.get("has_rules"):
-            rules = _stat_dir(root / (caps.get("rules_dir") or DEFAULT_RULES_DIR))
+        rules_dir = caps.get("rules_dir")
+        if caps.get("has_rules") and rules_dir:
+            rules = _stat_dir(root / rules_dir)
             if rules is not None:
                 artifacts["rules"] = _entry(rules)
                 always.append(rules)
@@ -174,6 +188,9 @@ def merge_provider_mappings(provider_config: Mapping, capabilities: Mapping) -> 
             continue
         combined = dict(entry)
         combined.update(capabilities.get(name) or {})
+        if combined.get("has_rules") and not combined.get("rules_dir"):
+            # Same fallback sync_rules() applies to rules_dir-less providers.
+            combined["rules_dir"] = CLAUDE_RULES_DIR
         merged[name] = combined
     return merged
 
@@ -216,12 +233,10 @@ def render_into_work_dir(agent_meta_root: Path, config_path: Path, work_dir: Pat
     cfg_dir.mkdir(exist_ok=True)
     target_cfg = cfg_dir / "project.yaml"
     shutil.copyfile(config_path, target_cfg)
-    env = dict(os.environ)
-    for key in ("TMPDIR", "TEMP", "TMP"):
-        env[key] = str(work_dir)
+    env = work_dir_env(work_dir)
     sync_script = Path(agent_meta_root) / "scripts" / "sync.py"
     subprocess.run(["git", "init", "-q"], cwd=str(work_dir), check=False,
-                   capture_output=True, env=env)
+                   capture_output=True, env=env, timeout=GIT_INIT_TIMEOUT_S)
     result = subprocess.run(
         [sys.executable, str(sync_script), "--config", str(target_cfg), "--init"],
         cwd=str(work_dir), env=env, capture_output=True, text=True, timeout=600,
@@ -242,7 +257,7 @@ def run_context_report(
     as_json: bool = False,
     profile: str = "full",
 ) -> int:
-    """Render, measure and report; returns the process exit code (0/1/2)."""
+    """Render, measure and report; returns the process exit code (0, 1 over-hard-cap, 2 error)."""
     run_id = "{}-{}".format(datetime.now().strftime("%Y%m%d-%H%M%S"), os.getpid())
     try:
         output_dir = resolve_output_dir(project_root, config, REPORT_SUBDIR)
@@ -251,15 +266,18 @@ def run_context_report(
         print("error: {}: {}".format(exc.code, exc.message), file=sys.stderr)
         return 2
     if profile != "full":
-        print("note: profile 'compact' is not implemented yet (Phase 2); "
-              "reporting 'full' only", file=sys.stderr)
-    _prune_old_work_dirs(output_dir, run_id)
+        print("note: profile '{}' is not implemented yet (Phase 2); "
+              "reporting 'full' only".format(profile), file=sys.stderr)
     try:
         render_into_work_dir(agent_meta_root, config_path, work_dir)
     except (RuntimeError, OSError, subprocess.SubprocessError) as exc:
-        print("error: context-report: {}".format(exc), file=sys.stderr)
-        return 1
+        print("error: {}: {}".format(RENDER_FAILED_CODE, exc), file=sys.stderr)
+        return 2
+    _prune_old_work_dirs(output_dir, run_id)
     report = measure_artifacts(work_dir, list(providers), mappings)
+    if not report:
+        print("warning: context-report: no artifacts measured "
+              "(empty report); check providers and path mappings", file=sys.stderr)
     payload = json.dumps(report, indent=2, ensure_ascii=False)
     report_dir = output_dir / run_id
     report_dir.mkdir(parents=True, exist_ok=True)

@@ -736,6 +736,18 @@ def ensure_tmp_sink(
     return sink_dir
 
 
+def work_dir_env(work_dir: Path, base: Optional[dict] = None) -> dict:
+    """Return an environment whose temp-dir variables point at *work_dir*.
+
+    Subprocesses started with it create temporary files below the tmp-sink
+    work directory instead of the system temp directory (IC-34).
+    """
+    env = dict(os.environ if base is None else base)
+    for key in ("TMPDIR", "TEMP", "TMP"):
+        env[key] = str(work_dir)
+    return env
+
+
 def _remove_entry(path: Path) -> None:
     """Delete one filesystem entry (file, symlink or directory tree)."""
     if path.is_symlink() or path.is_file():
