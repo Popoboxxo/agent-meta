@@ -10,6 +10,13 @@ date stamp, so sizes vary by a few bytes between runs. The ceiling is
 Ist + max(``TOLERANCE_MIN_BYTES``, ``TOLERANCE_RATIO`` * Ist), i.e. small
 enough to catch real growth, large enough to be path-length independent.
 
+The tolerance max(256 B, 2 %) is our interpretation of QG-4/AC-07, which does
+not fix a number: it absorbs date and scratch-path jitter. For large artifacts
+2 % is wide (e.g. ~11 KB on a 577 KB roster), so the ceiling is a guard against
+growth, not an exact pin. To bound that, the tolerance is additionally capped at
+``TOLERANCE_MAX_BYTES`` (4 KB). The tolerance could be made precise by a spec
+revision of QG-4/AC-07.
+
 Run: python3 -m pytest tests/test_context_budgets.py -q
 """
 
@@ -31,9 +38,12 @@ from tests.test_ac01_render_identity import _make_project  # noqa: E402
 
 TOLERANCE_MIN_BYTES = 256
 TOLERANCE_RATIO = 0.02
+TOLERANCE_MAX_BYTES = 4096
 
 # Ist-values in bytes (data table). Matches Spec section 2 (Claude orchestrator
-# 90,691 B, CLAUDE.md ~2.5 KB, rules 17.9-18.3 KB, AGENTS.md 25.6 KB / Gemini 33 KB).
+# 90,691 B, CLAUDE.md ~2.5 KB, Claude rules 17.9-18.3 KB, AGENTS.md 25.6 KB / Gemini 33 KB).
+# Known, unexplained deviation: Continue rules measure 19,004 B vs. 18,591 B in the
+# spec; the Ist-value below pins the measurement, the delta is not yet clarified.
 _IST_FULL: Dict[str, Dict[str, int]] = {
     "Claude": {"entry-file": 2511, "rules": 18297, "orchestrator": 90691,
                "harness-roster": 577570, "always-loaded": 598378},
@@ -57,7 +67,7 @@ _IST_FULL: Dict[str, Dict[str, int]] = {
 
 
 def _ceiling(ist: int) -> int:
-    return ist + max(TOLERANCE_MIN_BYTES, int(ist * TOLERANCE_RATIO))
+    return ist + min(TOLERANCE_MAX_BYTES, max(TOLERANCE_MIN_BYTES, int(ist * TOLERANCE_RATIO)))
 
 
 FULL_BUDGET_CEILINGS: Dict[str, Dict[str, int]] = {
