@@ -360,3 +360,26 @@ def test_broken_impl_allows_edit_of_wrapper_itself(tmp_path):
     }
     result = _run_isolated(hook, payload, tmp_path)
     assert result.returncode == 0, f"stdout={result.stdout!r} stderr={result.stderr!r}"
+
+
+@pytest.mark.parametrize(
+    "yaml_path",
+    ['"\\\\\\\\server\\\\share\\\\x"', '"CON"', '".GIT"', '".Codex/out"', '"a:b"', '"x."'],
+)
+def test_unsafe_sink_path_falls_back_to_default(tmp_path, yaml_path):
+    """IC-15 Nr. 27 f: the hook mirrors the hardened rules (UNC, reserved, protected)."""
+    root = _project(
+        tmp_path,
+        'repo_containment:\n  enabled: true\n  tmp-sink:\n    enabled: true\n'
+        f'    path: {yaml_path}\n',
+    )
+    assert f"under {root}/.tmp" in _outside_block_stderr(root)
+
+
+def test_sink_path_backslash_is_canonicalized(tmp_path):
+    root = _project(
+        tmp_path,
+        'repo_containment:\n  enabled: true\n  tmp-sink:\n    enabled: true\n'
+        '    path: "scratch\\\\out"\n',
+    )
+    assert f"under {root}/scratch/out" in _outside_block_stderr(root)

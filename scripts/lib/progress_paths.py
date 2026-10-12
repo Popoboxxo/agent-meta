@@ -13,8 +13,9 @@ override, findings instead of exceptions, traversal-validated paths): every
 invalid value falls back to the framework default and emits at most one
 ``warning`` finding -- the resolver never raises and never exits.
 
-This is a *leaf* module: it imports only the standard library plus the
-repo-local config loader (:mod:`lib.io`). It must never import
+This is a *leaf* module: it imports only the standard library, the repo-local
+config loader (:mod:`lib.io`) and the shared path rules of
+:mod:`lib.repo_containment` (which itself imports nothing from ``lib``). It must never import
 ``lib.checkpoint`` (the store imports this module), so no import cycle exists.
 Provider-scoped behaviour does not exist here: the vestigial provider key
 ``checkpoint_dir`` is never consulted, and the code contains no provider
@@ -23,12 +24,12 @@ literal and no ``if provider == ...`` branch.
 from __future__ import annotations
 
 import os
-import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Any, Optional, Tuple
 
 from .io import SyncError, _load_yaml_or_json
+from .repo_containment import canonical_tmp_sink_path, tmp_sink_path_error
 
 DEFAULT_PROGRESS_DIR = ".meta-viz/progress"
 DEFAULT_CHECKPOINT_DIR = ".meta-viz/checkpoints"
@@ -40,8 +41,6 @@ SOURCE_SAFE_FALLBACK = "safe-fallback"
 _PROGRESS_BLOCK = "progress"
 _DIR_KEY = "dir"
 _CHECKPOINT_DIR_KEY = "checkpoint-dir"
-
-_WINDOWS_DRIVE_RE = re.compile(r"^[A-Za-z]:")
 
 _UNSET = object()
 
@@ -86,48 +85,20 @@ class ResolvedProgressPaths:
 def progress_path_error(
     path: object,
     project_root: Optional[Path] = None,
+    *,
+    pathmod: Any = os.path,
 ) -> Optional[str]:
     """Return an error string when *path* is not a safe relative path, else None.
 
-    Same guarantee class as ``repo_containment.tmp_sink_path_error`` -- the
-    validator and the resolver share exactly one rule set:
-
-    1. must be a string;
-    2. must not be empty or whitespace-only;
-    3. must be relative (no absolute path, no drive-letter path);
-    4. must not be ``.``/``..`` and must not contain a ``..`` segment;
-    5. after ``os.path.normpath`` it must not be empty, ``.``, ``..`` or start
-       with ``..<sep>``;
-    6. when *project_root* is given, the resolved target must stay under it
-       (``os.path.commonpath``; a ``ValueError`` is a violation).
-
-    ``None`` means valid; any other return value is the violation message.
+    Delegates to ``repo_containment.tmp_sink_path_error`` so the validator, the
+    resolver, the tmp-sink and the hook mirror share exactly one rule set
+    (IC-15 Nr. 27 f, AC-97): relative only (no absolute, UNC, drive-letter),
+    no ``..`` segment, no reserved Windows names, no trailing dot/space, ``:``
+    or ``<>"|?*``/control characters, no protected directory (case-insensitive),
+    and -- when *project_root* is given -- no link/junction escape. ``None``
+    means valid; any other return value is the violation message.
     """
-    if not isinstance(path, str):
-        return f"expected a string, got {type(path).__name__}"
-    if not path.strip():
-        return "must not be empty"
-    if os.path.isabs(path):
-        return "must be relative to the project root (absolute paths are not allowed)"
-    if _WINDOWS_DRIVE_RE.match(path):
-        return "must be relative to the project root (drive-letter paths are not allowed)"
-    if path in (".", ".."):
-        return f"must not be {path!r}"
-    segments = path.replace("\\", "/").split("/")
-    if any(segment == ".." for segment in segments):
-        return "must not contain '..' segments"
-    normalized = os.path.normpath(path)
-    if normalized in ("", ".", "..") or normalized.startswith(".." + os.sep):
-        return "must not escape the project root"
-    if project_root is not None:
-        root = os.path.abspath(os.fspath(project_root))
-        target = os.path.abspath(os.path.join(root, normalized))
-        try:
-            if os.path.commonpath([root, target]) != root:
-                return "must not escape the project root"
-        except ValueError:
-            return "must not escape the project root"
-    return None
+    return tmp_sink_path_error(path, project_root, pathmod=pathmod)
 
 
 def _load_config_best_effort(root: Path) -> dict:
@@ -201,9 +172,9 @@ def _resolve_value(
 
 def _absolute_and_rel(root: Path, rel: str) -> Tuple[Path, str]:
     """Return ``(absolute_path, posix_relative_path)`` for a project-relative value."""
-    normalized = os.path.normpath(rel.replace("\\", "/"))
-    absolute = Path(os.path.abspath(os.path.join(str(root), normalized)))
-    return absolute, Path(normalized).as_posix()
+    normalized = canonical_tmp_sink_path(rel)
+    absolute = Path(os.path.abspath(os.path.join(str(root), *normalized.split("/"))))
+    return absolute, normalized
 
 
 def resolve_progress_paths(
