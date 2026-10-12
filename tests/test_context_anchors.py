@@ -94,8 +94,6 @@ def test_full_render_contains_all_anchors(rendered, provider):
             haystack = corpora[kind]
             if kind == "rules-native" and not haystack.strip():
                 haystack = fallback
-            elif kind == "rules-native":
-                haystack = haystack + "\n" + fallback
             if kind == "claude-md" and not corpora["claude-md"].strip():
                 continue  # provider has no CLAUDE.md
             if anchor not in haystack:

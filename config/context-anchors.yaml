@@ -9,22 +9,31 @@
 #
 # Provider-independent: a rule anchor must be found in the provider's native
 # rules directory or, if the provider has none, inlined in its entry file.
+#
+# Notes:
+# - Anchors are literal wording, not semantic: a deliberate text change (e.g.
+#   "Verwende Conventional Commits (feat, fix, chore).", the Anti-Recursion
+#   sentence) breaks the test on purpose and must be re-anchored consciously.
+# - MCP deny-token anchors (`delete_conclusion`, `set_config`,
+#   `browser_run_code_unsafe`, `workspace.delete`) are deliberately absent until
+#   an MCP-active fixture exists (before profile `compact`, AC-24/QG-3). Today
+#   the registry only protects the heading `# MCP Hard Prohibitions`.
 anchors:
   entry-file:
     all-profiles: []
-    compact-only: []
+    compact-only: []  # empty until Phase 2
   claude-md:
     all-profiles:
-      - "## Projekt"
-      - "## Agenten-Konfiguration"
-    compact-only: []
+      - "## Projekt\n\n**Name:**"
+      - "## Agenten-Konfiguration\n\n<!-- agent-meta:managed-begin -->"
+    compact-only: []  # empty until Phase 2
   orchestrator:
     all-profiles:
       - "Singleton-Regel"
       - "STATUS: done"
-      - "RESULT:"
+      - "RESULT: <"
       - "ARTIFACTS:"
-    compact-only: []
+    compact-only: []  # empty until Phase 2
   rules-native:
     all-profiles:
       - "# CRITICAL GATE"
@@ -38,8 +47,8 @@ anchors:
       - "Verwende Conventional Commits (feat, fix, chore)."
     compact-only: []
   gate-card:
-    all-profiles: []
-    compact-only: []
+    all-profiles: []  # empty until Phase 2
+    compact-only: []  # empty until Phase 2
 
 # Sections the compact gate-card extracts from source rules (IC-06):
 # <rule-stem>#<heading>
