@@ -11,6 +11,7 @@ Run: python -m pytest tests/test_tmp_sink_path_parity.py -q
 
 from __future__ import annotations
 
+import ast
 import json
 import ntpath
 import posixpath
@@ -94,6 +95,39 @@ def test_progress_path_error_resolves_links(tmp_path):
         pytest.skip("symlinks unavailable")
     assert progress_path_error("lnk/x", root)
     assert progress_path_error("ok/x", root) is None
+
+
+def _hook_protected_prefixes() -> set:
+    match = re.search(r"^_PROTECTED = (\(.*?\n\))$", _hook_python_block(), re.DOTALL | re.M)
+    assert match, "_PROTECTED tuple not found in hook python block"
+    return {tuple(seg.lower() for seg in entry) for entry in ast.literal_eval(match.group(1))}
+
+
+def _expected_protected_prefixes() -> set:
+    """Fallback list plus provider_root_dirs, derived independently of the hook."""
+    import yaml
+
+    entries = {".git", ".claude", ".meta-config"}
+    data = yaml.safe_load((REPO_ROOT / "config" / "ai-providers.yaml").read_text(encoding="utf-8"))
+    providers = data.get("providers", data)
+    for cfg in providers.values():
+        entries.update(e for e in (cfg.get("provider_root_dirs") or ()) if isinstance(e, str))
+    return {
+        tuple(seg.lower() for seg in e.replace("\\", "/").split("/") if seg not in ("", "."))
+        for e in entries
+    }
+
+
+def test_hook_protected_list_equals_python_and_registry():
+    hook = _hook_protected_prefixes()
+    python = {tuple(p) for p in rc._protected_prefixes()}
+    expected = _expected_protected_prefixes()
+    for name, actual in (("python", python), ("hook", hook)):
+        assert actual == expected, (
+            f"{name} protected list differs from fallback + provider_root_dirs: "
+            f"missing in {name}={sorted(expected - actual)}, "
+            f"extra in {name}={sorted(actual - expected)}"
+        )
 
 
 def test_hook_protects_every_python_protected_prefix(tmp_path):

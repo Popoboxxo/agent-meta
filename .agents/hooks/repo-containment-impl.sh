@@ -250,6 +250,8 @@ def path_error(path):
 
 
 def emit(enabled, sink_enabled, sink_path, rejected=False):
+    # SINK_REJECTED is observed only by tests/test_tmp_sink_path_parity.py
+    # (AC-97); the shell consumer deliberately ignores it (silent fallback).
     print("ENABLED=%d" % (1 if enabled else 0))
     print("SINK_ENABLED=%d" % (1 if sink_enabled else 0))
     print("SINK_PATH=%s" % sink_path)
