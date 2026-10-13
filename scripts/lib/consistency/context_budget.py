@@ -204,13 +204,15 @@ def check_over_hard_cap(
     active_providers: Sequence[str],
     capabilities: Mapping[str, Mapping],
     active_set,
+    report: Optional[Mapping] = None,
 ) -> list:
     """``context.over-hard-cap``: entry file >= ``context_hard_cap_bytes`` (WARN in Phase 0; spec: ERROR)."""
     from ..context_report import measure_artifacts
 
     root = Path(project_root)
     findings = []
-    report = measure_artifacts(root, active_providers, capabilities)
+    if report is None:  # sync-end passes one shared measurement
+        report = measure_artifacts(root, active_providers, capabilities)
     for provider in active_providers:
         stat = (report.get(provider) or {}).get("entry-file")
         if not stat or stat.get("cap_kind") != "hard-bytes":
@@ -229,13 +231,15 @@ def check_over_soft_cap(
     active_providers: Sequence[str],
     capabilities: Mapping[str, Mapping],
     active_set,
+    report: Optional[Mapping] = None,
 ) -> list:
     """``context.over-soft-cap``: entry file above ``context_soft_cap_{bytes,chars,lines}`` (WARN)."""
     from ..context_report import measure_artifacts
 
     root = Path(project_root)
     findings = []
-    report = measure_artifacts(root, active_providers, capabilities)
+    if report is None:  # sync-end passes one shared measurement
+        report = measure_artifacts(root, active_providers, capabilities)
     for provider in active_providers:
         stat = (report.get(provider) or {}).get("entry-file")
         if not stat:

@@ -240,6 +240,7 @@ def build_routing_tool_definition(
     *,
     template_roles: set[str] | None = None,
     warn_sink: list[str] | None = None,
+    info_sink: list[str] | None = None,
 ) -> dict:
     """Build the provider-neutral intent-routing tool definition (issue #264).
 
@@ -282,6 +283,7 @@ def build_routing_tool_definition(
         # Design C (#780): render examples in the project language; keywords
         # stay canonical/language-neutral.
         language=variables.get("COMMUNICATION_LANGUAGE", "en"),
+        info_sink=info_sink,
     )
     return {
         "tool": {
@@ -373,6 +375,7 @@ def build_routing_tool_definitions_for_providers(
     *,
     template_roles: set[str] | None = None,
     warn_sink: list[str] | None = None,
+    info_sink: list[str] | None = None,
 ) -> dict[str, str]:
     """Render the routing tool definition once per provider, in its format.
 
@@ -404,6 +407,7 @@ def build_routing_tool_definitions_for_providers(
         pipelines=pipelines,
         template_roles=template_roles,
         warn_sink=warn_sink,
+        info_sink=info_sink,
     )
     rendered: dict[str, str] = {}
     for provider in providers:

@@ -2110,6 +2110,7 @@ def build_variables(config: dict, agent_meta_root: Path, project_root: Path | No
     # Active providers only: resolve_providers applies the project's
     # ai-providers list and deactivation filter, matching the per-provider
     # sync loop's provider set.
+    routing_info: list[str] = []
     variables["_INTENT_ROUTING_TOOL_DEFS"] = build_routing_tool_definitions_for_providers(
         agent_meta_root,
         config,
@@ -2117,7 +2118,11 @@ def build_variables(config: dict, agent_meta_root: Path, project_root: Path | No
         providers=resolve_providers(config, load_providers_config(agent_meta_root)),
         pipelines=effective,
         warn_sink=unmapped,
+        info_sink=routing_info,
     )
+    # IC-29: INFO lines (e.g. routing.examples-language-fallback) collected during
+    # the build; drained into sync.log by _sync_stage_context_checks (no render effect).
+    variables["_ROUTING_INFO"] = routing_info
     _build_snippet_variables(variables, agent_meta_root)
     _build_convention_variables(variables, config, agent_meta_root)
     apply_platform_variable_cascade(variables, config, config.get("platforms", []), agent_meta_root)

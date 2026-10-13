@@ -78,6 +78,7 @@ from lib.sync_pipeline import (
     _sync_stage_contexts,
     _sync_stage_drift_and_plugins,
     _sync_stage_external_skills_check,
+    _sync_stage_context_checks,
     _sync_stage_generated_file_drift_scan,
     _sync_stage_generated_file_hash_capture,
     _sync_stage_gitignore,
@@ -1234,6 +1235,11 @@ def _handle_sync(ctx: _SyncContext) -> None:
     # this file's own write isn't captured into that hash baseline.
     _sync_stage_auto_commit_allowlist(ctx.agent_meta_root, ctx.project_root,
                                       config, ctx.args, ctx.log)
+    # Stage 14b: context/active-set checks (IC-10/19/29) -- report-only (WARN/INFO
+    # in sync.log), fail-soft, no exit-code or render effect.
+    _sync_stage_context_checks(
+        ctx.agent_meta_root, ctx.project_root, config, ctx.active_set, ctx.log,
+        info_messages=(ctx.variables or {}).get("_ROUTING_INFO"))
     # Stage 15: version bookkeeping (#720) -- write the actually-deployed
     # agent-meta version back into project.yaml so it never silently drifts
     # behind a submodule upgrade.

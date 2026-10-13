@@ -1534,3 +1534,65 @@ def _sync_stage_auto_commit_allowlist(agent_meta_root, project_root, config, arg
     if getattr(args, "dry_run", False):
         return
     write_atomic(allowlist_path, json.dumps(resolved, indent=2, sort_keys=True) + "\n")
+
+
+def _log_context_finding(log: SyncLog, finding) -> None:
+    """Route one consistency Finding into sync.log: INFO -> note, else WARN."""
+    text = f"{finding.check}: {finding.file}: {finding.message}"
+    if getattr(finding.severity, "value", finding.severity) == "INFO":
+        log.note(finding.check, f"{finding.file}: {finding.message}")
+    else:
+        log.warn(text)
+
+
+def _sync_stage_context_checks(
+    agent_meta_root: Path, project_root: Path, config: dict, active_set,
+    log: SyncLog, *, info_messages: list[str] | None = None,
+) -> None:
+    """Sync-end context/active-set checks (IC-10, IC-19, IC-29; AC-08, AC-43).
+
+    Report-only: findings go to sync.log as WARN (INFO for info-level checks),
+    never change the exit code or any render. Read-only on the project, so it
+    is safe in dry-run. Every check is fail-soft -- an exception is logged as
+    a WARN and the sync continues. ``info_messages`` are INFO lines collected
+    during variable building (``routing.examples-language-fallback``).
+    """
+    for message in info_messages or ():
+        log.note("routing.examples-language-fallback", message)
+    try:
+        from lib.consistency import active_set_refs, context_budget
+        from lib.context_report import measure_artifacts, merge_provider_mappings
+
+        provider_config = load_providers_config(agent_meta_root, config)
+        providers = resolve_providers(config, provider_config)
+        capabilities = merge_provider_mappings(
+            provider_config, load_provider_capabilities(agent_meta_root))
+        report = None
+        try:  # measure once, shared by hard/soft cap checks
+            report = measure_artifacts(project_root, providers, capabilities)
+        except Exception as exc:  # noqa: BLE001 - fail-soft
+            log.warn(f"context.checks: measure_artifacts failed: {exc}")
+        checks = [
+            (context_budget, "check_over_hard_cap", {"report": report}),
+            (context_budget, "check_over_soft_cap", {"report": report}),
+            (context_budget, "check_dangling_pointer", {}),
+            (context_budget, "check_rule_unreachable", {}),
+            (context_budget, "check_unread_channel", {}),
+            (context_budget, "check_marker_in_rule", {}),
+            (active_set_refs, "check_dangling_dispatch", {}),
+            (active_set_refs, "check_dangling_mention", {}),
+            (active_set_refs, "check_unresolved_placeholder", {}),
+            (active_set_refs, "check_keyword_overlap", {}),
+        ]
+    except Exception as exc:  # noqa: BLE001 - fail-soft
+        log.warn(f"context.checks: setup failed: {exc}")
+        return
+    for module, name, extra in checks:
+        if report is None and "report" in extra:
+            continue
+        try:
+            check = getattr(module, name)
+            for finding in check(project_root, providers, capabilities, active_set, **extra):
+                _log_context_finding(log, finding)
+        except Exception as exc:  # noqa: BLE001 - fail-soft, never abort the sync
+            log.warn(f"{name}: check failed: {exc}")
