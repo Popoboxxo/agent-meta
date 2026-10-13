@@ -105,6 +105,36 @@ def test_builder_known_set_unsupplied_template_placeholder_is_error(tmp_path):
     assert not any("'{{PREFIX}}'" in f.message for f in findings)
 
 
+def test_tmp_sink_path_is_registered_not_ratcheted():
+    assert "TMP_SINK_PATH" in _ph._BUILTIN_VARS
+    assert "TMP_SINK_PATH" not in _ph._UNREGISTERED_BUILDER_RATCHET
+
+
+def test_builder_internals_are_filtered_from_derived_vars():
+    derived = _ph.derive_builder_vars(ROOT)
+    assert not {v for v in derived if v.startswith("_")}
+    assert "active_agents" not in derived
+    for internal in ("_AUTO_COMMIT_RESOLVED", "_INTENT_ROUTING_TOOL_DEFS", "active_agents"):
+        assert internal not in _ph._UNREGISTERED_BUILDER_RATCHET
+
+
+def test_skill_wrapper_and_mcp_guardrails_are_families_not_ratchet():
+    for var in ("SKILL_NAME", "SKILL_ROLE", "SKILL_ADDITIONAL_FILES_SECTION",
+                "MCP_GUARDRAILS_LIST"):
+        assert _ph._is_family(var), var
+        assert var not in _ph._UNKNOWN_TEMPLATE_RATCHET
+    assert not _ph._is_family("TECH_STACK")
+
+
+def test_builder_known_set_scans_snippets_too(tmp_path):
+    (tmp_path / "snippets" / "x").mkdir(parents=True)
+    (tmp_path / "snippets" / "x" / "s.md").write_text(
+        "Use {{NOT_A_BUILDER_VAR}} here.\n", encoding="utf-8")
+    findings = _ph.check_builder_known_set(tmp_path)
+    assert [f.file for f in findings if "NOT_A_BUILDER_VAR" in f.message] == [
+        "snippets/x/s.md"]
+
+
 # --- templates.provider-literal (IC-32) ---
 
 from lib.consistency.provider_literals import check_provider_literal  # noqa: E402
