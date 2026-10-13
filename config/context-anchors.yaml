@@ -59,6 +59,7 @@ gate_card_sections:
   - "mcp-guardrails#MCP Hard Prohibitions"
 
 # Paths (globs) that are deliberately never read by a provider (IC-10 unread check).
+# Entry form: a glob string, or {glob: <pattern>, reason: <text>} (preferred).
 intentional_unread: []
 
 # Declared surfaces that are deliberately empty (IC-10 context.declared-surface-empty):

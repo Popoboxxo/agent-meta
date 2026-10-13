@@ -13,9 +13,16 @@ expressed through those keys (``context_file``, ``rules_dir``, ``skills_dir``,
 ``rules_read_channels``, ``skills_discovery_dirs``, ``context_*_cap_*``) --
 never through provider names.
 
-Phase 0 contract: every finding is a WARNING and never changes an exit code.
-The spec target level (ERROR from Phase 1 / for the hard cap and the marker
-check) is named in the docstrings so the later promotion is a one-line change.
+Severity is centralised: ``SPEC_SEVERITY`` holds the level the spec prescribes
+per check, ``PHASE0_SEVERITY`` the level actually emitted today (everything
+WARNING, no exit-code change). ``_warn`` reads ``PHASE0_SEVERITY``; promoting a
+check to its spec level (e.g. ``over-hard-cap`` and ``marker-in-rule`` from
+Phase 1) is a one-line change in that table.
+
+Not part of this module (task 0b.2): ``context.token-report`` (0a report),
+``context.declared-surface-empty`` (IC-33) and ``context.legacy-artifact-present``.
+Known gap, Phase 1: the Copilot soft cap is per instruction file; it is only
+checked here against the entry file.
 
 ``active_set`` is part of the shared signature; none of the checks here
 depends on the role set (rules and skills are not roles), so it is unused.
@@ -38,6 +45,17 @@ CHANNEL_PATH_SCOPED = "path-scoped"
 CHANNEL_SKILLS = "skills"
 _FILE_CHANNELS = (CHANNEL_NATIVE, CHANNEL_PATH_SCOPED)
 
+# Level the spec prescribes (IC-10) vs. the level emitted in Phase 0.
+SPEC_SEVERITY = {
+    "context.over-hard-cap": Severity.ERROR,
+    "context.over-soft-cap": Severity.WARNING,
+    "context.dangling-pointer": Severity.ERROR,   # WARN in Phase 0, ERROR from Phase 1
+    "context.rule-unreachable": Severity.ERROR,   # WARN in Phase 0, ERROR from Phase 1
+    "context.unread-channel": Severity.WARNING,
+    "context-profile.marker-in-rule": Severity.ERROR,
+}
+PHASE0_SEVERITY = {check: Severity.WARNING for check in SPEC_SEVERITY}
+
 COMPACT_MARKER = "CONTEXT_PROFILE_COMPACT"
 # Row of a lazy-skill table: "| skill-name | description |" below a "| Skill |" header.
 _TABLE_HEADER_RE = re.compile(r"^\|\s*Skill\s*\|", re.IGNORECASE)
@@ -52,7 +70,7 @@ _FRONTMATTER_RE = re.compile(r"\A---\r?\n.*?\r?\n---\r?\n", re.DOTALL)
 # ---------------------------------------------------------------------------
 
 def _warn(check: str, file: str, message: str, suggestion: str = "") -> Finding:
-    return Finding(Severity.WARNING, check, file, message, suggestion)
+    return Finding(PHASE0_SEVERITY[check], check, file, message, suggestion)
 
 
 def _read_text(path: Path) -> Optional[str]:
@@ -74,7 +92,13 @@ def _load_anchor_list(key: str) -> list:
 
 
 def _intentional_unread() -> list:
-    return [g for g in _load_anchor_list("intentional_unread") if isinstance(g, str)]
+    """Globs of ``intentional_unread``; entries are ``str`` or ``{glob, reason}``."""
+    globs = []
+    for entry in _load_anchor_list("intentional_unread"):
+        glob = entry.get("glob") if isinstance(entry, dict) else entry
+        if isinstance(glob, str) and glob:
+            globs.append(glob)
+    return globs
 
 
 def _rel(path: Path, project_root: Path) -> str:
@@ -112,6 +136,10 @@ def _has_any_skill(project_root: Path, directory: str) -> bool:
     return base.is_dir() and any((child / "SKILL.md").is_file() for child in base.iterdir())
 
 
+def _normalize_heading(line: str) -> str:
+    return line.strip().lstrip("#").strip()
+
+
 def _first_heading(text: str) -> str:
     """First markdown heading line of a rule body (frontmatter stripped), else first line."""
     body = _FRONTMATTER_RE.sub("", text, count=1)
@@ -124,6 +152,12 @@ def _first_heading(text: str) -> str:
             return stripped
         first_non_empty = first_non_empty or stripped
     return first_non_empty
+
+
+def _body_probe(text: str) -> str:
+    """Second non-empty body line (frontmatter stripped); ``""`` for one-line rules."""
+    lines = [ln.strip() for ln in _FRONTMATTER_RE.sub("", text, count=1).splitlines() if ln.strip()]
+    return lines[1] if len(lines) > 1 else ""
 
 
 def _pointer_artifacts(project_root: Path, caps: Mapping) -> list:
@@ -185,8 +219,7 @@ def check_over_hard_cap(
             caps = capabilities.get(provider) or {}
             findings.append(_warn(
                 "context.over-hard-cap", str(caps.get("context_file", "")),
-                f"{provider}: entry file is {stat['bytes']} bytes, hard cap is {stat['cap']} bytes "
-                "(content beyond the cap is not loaded by the provider)",
+                f"{provider}: entry file ({stat['bytes']} bytes) exceeds hard cap ({stat['cap']} bytes)",
                 "shrink the entry file (profile compact, move content into lazy skills)"))
     return findings
 
@@ -316,15 +349,21 @@ def check_rule_unreachable(
             continue
         context_file = caps.get("context_file")
         entry_text = (_read_text(root / context_file) or "") if context_file else ""
-        entry_lines = set(entry_text.splitlines())
+        entry_lines = {_normalize_heading(line) for line in entry_text.splitlines() if line.strip()}
         skill_dirs = _skill_dirs(caps) if CHANNEL_SKILLS in channels else []
-        for rule in _rule_files(root, caps):
-            text = _read_text(rule)
+        texts = {rule: _read_text(rule) for rule in _rule_files(root, caps)}
+        headings = {rule: _normalize_heading(_first_heading(t)) for rule, t in texts.items() if t is not None}
+        for rule, text in texts.items():
             if text is None:
                 continue
-            heading = _first_heading(text)
+            heading = headings[rule]
             if heading and heading in entry_lines:
-                continue
+                # Rules sharing a heading must not mask each other: only then also
+                # require the second body line (embedded text may be re-substituted,
+                # so unique headings are trusted on their own).
+                shared = list(headings.values()).count(heading) > 1
+                if not shared or _body_probe(text) in entry_text:
+                    continue
             if any((root / d / rule.stem / "SKILL.md").is_file() for d in skill_dirs):
                 continue
             findings.append(_warn(

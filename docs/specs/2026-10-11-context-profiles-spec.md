@@ -1093,7 +1093,7 @@ Seed-Einträge (Phase 0; `verified-state` aus Studie, nichts darüber hinaus):
 
 | id | Prädikat (Kurz) | Detektor | Severity | verified-state |
 |---|---|---|---|---|
-| `context-hard-cap-truncation` | `context_hard_cap_bytes` present | `file-size` bytes `>` `limit_key` | ERROR | VERIFIED-RUNTIME (Codex, Studie §3.2) |
+| `context-hard-cap-truncation` | `context_hard_cap_bytes` present | `file-size` bytes `≥` `limit_key` | ERROR | VERIFIED-RUNTIME (Codex, Studie §3.2) |
 | `context-soft-cap-bytes` | `context_soft_cap_bytes` present | `file-size` bytes | WARNING | VERIFIED-SOURCE (Kimi, Studie §3.5) |
 | `instruction-soft-cap-chars` | `context_soft_cap_chars` present | `file-size` chars | WARNING | UNVERIFIED (Copilot 4,000; Antigravity 12,000) |
 | `context-soft-cap-lines` | `context_soft_cap_lines` present | `file-size` lines | WARNING | DOCUMENTED (Claude 200) |

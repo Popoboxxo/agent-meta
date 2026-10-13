@@ -22,6 +22,7 @@ Run: python3 -m pytest tests/test_context_budget_checks.py -q
 """
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 import sys
@@ -40,7 +41,10 @@ from lib.consistency.report import Severity  # noqa: E402
 from lib.providers import load_provider_capabilities, load_providers_config  # noqa: E402
 from tests.test_ac01_render_identity import _make_project, _run_sync  # noqa: E402
 
-BROKEN_SKILL_PROVIDERS = ["Codex", "Mammouth", "Gemini", "Continue"]
+# Runtime: the default-preset matrix renders only Gemini, Claude and Codex (each synced
+# project costs ~10 s). Mammouth/Continue share the same empty-skills-dir defect
+# (measured in the docstring above) but are not re-rendered here.
+DEFAULT_MATRIX = ["Gemini", "Claude", "Codex"]
 LAZY_TABLE_SKILLS = 15
 GEMINI_LOST_LAZY_RULES = {
     "a2a-delegation-gates", "issue-lifecycle", "lifecycle-tasks",
@@ -74,7 +78,7 @@ def mappings():
 @pytest.fixture(scope="module")
 def default_projects(tmp_path_factory):
     root = tmp_path_factory.mktemp("budget-default")
-    return {p: _make_project(root, p) for p in BROKEN_SKILL_PROVIDERS + ["Claude"]}
+    return {p: _make_project(root, p) for p in DEFAULT_MATRIX}
 
 
 @pytest.fixture(scope="module")
@@ -100,7 +104,7 @@ ALL_CHECKS = [
 
 # --- AC-08: known defects on real synced projects ---------------------------
 
-@pytest.mark.parametrize("provider", BROKEN_SKILL_PROVIDERS)
+@pytest.mark.parametrize("provider", ["Gemini", "Codex"])
 def test_ac08_missing_skills_are_reported(default_projects, mappings, provider):
     findings = _run(cb.check_dangling_pointer, default_projects[provider], provider, mappings)
     skills = [f for f in findings if "lazy table names skill" in f.message]
@@ -153,10 +157,18 @@ def test_dangling_pointer_clears_once_skills_exist(default_projects, mappings, t
 
 
 def test_checks_never_raise_error_severity(default_projects, mappings):
+    assert set(cb.PHASE0_SEVERITY) == set(cb.SPEC_SEVERITY)
+    assert all(level is Severity.WARNING for level in cb.PHASE0_SEVERITY.values())
     for check in ALL_CHECKS:
         for provider, project in default_projects.items():
             for finding in _run(check, project, provider, mappings):
                 assert finding.severity in (Severity.WARNING, Severity.INFO)
+
+
+def test_severity_comes_from_central_table(monkeypatch):
+    monkeypatch.setitem(cb.PHASE0_SEVERITY, "context.over-hard-cap", Severity.ERROR)
+    assert cb._warn("context.over-hard-cap", "f", "m").severity is Severity.ERROR
+    assert cb.SPEC_SEVERITY["context-profile.marker-in-rule"] is Severity.ERROR
 
 
 # --- synthetic projects: rule of each check --------------------------------
@@ -229,4 +241,27 @@ def test_rule_reachable_via_skills_channel(tmp_path):
 def test_module_has_no_provider_literal_and_stays_small():
     source = (REPO_ROOT / "scripts" / "lib" / "consistency" / "context_budget.py").read_text(encoding="utf-8")
     assert len(source.splitlines()) <= 600
-    assert "provider ==" not in source
+    assert not re.search(r"\bprovider\w*\s*(==|!=|in)\s*[\(\[\"']", source)
+    registered = yaml.safe_load((REPO_ROOT / "config" / "ai-providers.yaml").read_text(encoding="utf-8"))["providers"]
+    for name in registered:
+        assert not re.search(r"[\"']%s[\"']" % re.escape(name), source), name
+
+
+def test_first_heading_edge_cases():
+    assert cb._first_heading("---\nname: x\n---\n\n# Title\nbody\n") == "# Title"
+    assert cb._first_heading("plain first line\nsecond\n") == "plain first line"
+    assert cb._first_heading("") == ""
+    assert cb._normalize_heading("## Title ") == "Title"
+
+
+def test_duplicate_heading_does_not_mask_unembedded_rule(tmp_path):
+    _write(tmp_path / "ENTRY.md", "# Shared\nbody of rule a\n")
+    _write(tmp_path / "rules" / "a.md", "# Shared\nbody of rule a\n")
+    _write(tmp_path / "rules" / "b.md", "# Shared\nbody of rule b\n")
+    findings = cb.check_rule_unreachable(tmp_path, ["P"], _caps(rules_read_channels=[]), None)
+    assert [Path(f.file).stem for f in findings] == ["b"]
+
+
+def test_intentional_unread_accepts_dict_entries(monkeypatch):
+    monkeypatch.setattr(cb, "_load_anchor_list", lambda key: [{"glob": "a/*", "reason": "r"}, "b", {"x": 1}])
+    assert cb._intentional_unread() == ["a/*", "b"]
