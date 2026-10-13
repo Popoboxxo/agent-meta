@@ -30,6 +30,21 @@ Deviation spec vs. real state (documented, not hidden):
 * The legit-reader list is whole-module; ``delegation_table.py``, ``pipelines.py``
   and ``provider_transform.py`` currently have no ``config`` receiver hit and are
   kept as forward-compat exemptions per IC-18.
+* Scope (widened): ``scripts/sync.py`` and ``scripts/lib/**/*.py`` (incl.
+  ``consistency/``). Receivers: ``config``, ``cfg``, ``project_config``,
+  ``project_cfg`` and attributes ``*.config``. Detected forms: ``x["roles"]``,
+  ``x.get/pop/setdefault("roles")`` and ``"roles" in x`` / ``not in``.
+  Registry receivers (``roles_cfg``, ``role_defaults``, ``data``, ``roles_config``)
+  stay excluded.
+* Deliberately NOT scanned: ``scripts/admin-server.py`` (``project_config.get``,
+  admin UI, no generator) and ``hermes_export.py`` (export tooling).
+* New hits vs. spec: ``config.py:1862`` (``"roles" in config``, same function as
+  :1863, no new key). ``consistency/active_set_refs.py:212`` (``cfg.get("roles")``
+  in ``check_unknown_role``) is a LEGIT reader: it only validates the raw
+  allowlist against the registry (like ``config_audit.py``), no activation use.
+* Known limits: alias assignment (``r = config; r["roles"]``) is not followed;
+  keys are ``module::Class.method`` of the innermost function (nested functions
+  of the same name inside one method share a key).
 """
 
 from __future__ import annotations
@@ -41,7 +56,7 @@ from typing import Dict, FrozenSet, List, Set
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 # Generator modules in scope: scripts/sync.py and scripts/lib/*.py.
-SCAN_GLOBS = ("scripts/sync.py", "scripts/lib/*.py")
+SCAN_GLOBS = ("scripts/sync.py", "scripts/lib/**/*.py")
 
 # Legit readers (IC-18 "Legitime Leser"): module path -> reason.
 LEGIT_READERS: Dict[str, str] = {
@@ -49,9 +64,10 @@ LEGIT_READERS: Dict[str, str] = {
     "scripts/lib/roles.py": "gate/allowlist resolution (resolve_active_roles) is the sanctioned reader",
     "scripts/lib/config_audit.py": "validates the raw list against the registry, no activation consumption",
     "scripts/lib/runtime_gate.py": "reads the role registry role-defaults.yaml::roles, not the allowlist",
-    "scripts/lib/delegation_table.py": "reads the role registry (role-defaults.yaml::roles), not the allowlist",
-    "scripts/lib/pipelines.py": "reads the role registry (role-defaults.yaml::roles), not the allowlist",
-    "scripts/lib/provider_transform.py": "reads the role registry (role-defaults.yaml::roles), not the allowlist",
+    "scripts/lib/consistency/active_set_refs.py": "check_unknown_role only validates the raw allowlist against the registry (like config_audit), no activation consumption",
+    "scripts/lib/delegation_table.py": "Forward-Compat: reads the role registry (role-defaults.yaml::roles), not the allowlist",
+    "scripts/lib/pipelines.py": "Forward-Compat: reads the role registry (role-defaults.yaml::roles), not the allowlist",
+    "scripts/lib/provider_transform.py": "Forward-Compat: reads the role registry (role-defaults.yaml::roles), not the allowlist",
 }
 
 # Start registry (F-42, IC-18 no. 14-18). Format: "<module>::<function>".
@@ -74,34 +90,48 @@ def _is_roles_const(node: ast.AST) -> bool:
     return isinstance(node, ast.Constant) and node.value == "roles"
 
 
+CONFIG_NAMES = frozenset({"config", "cfg", "project_config", "project_cfg"})
+MUTATORS = frozenset({"get", "pop", "setdefault"})
+
+
 def _is_config(node: ast.AST) -> bool:
-    # Only the project config dict; registry dicts (role_defaults, roles_config) are other receivers.
-    return isinstance(node, ast.Name) and node.id == "config"
+    # Project config dict only; registry dicts (role_defaults, roles_cfg, ...) are other receivers.
+    if isinstance(node, ast.Name):
+        return node.id in CONFIG_NAMES
+    return isinstance(node, ast.Attribute) and node.attr == "config"
 
 
 def scan_source(source: str, rel: str) -> Set[str]:
-    """Return ``module::function`` keys of raw ``["roles"]`` / ``.get("roles")`` access."""
+    """Return ``module::Class.func`` keys of raw access to the ``roles`` allowlist."""
     tree = ast.parse(source)
     hits: Set[str] = set()
 
-    def visit(node: ast.AST, func: str) -> None:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            func = node.name
-        is_sub = isinstance(node, ast.Subscript) and _is_config(node.value) and _is_roles_const(
-            node.slice.value if isinstance(node.slice, ast.Index) else node.slice  # py3.8 compat
-        )
-        is_get = (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Attribute)
-            and node.func.attr == "get"
-            and _is_config(node.func.value)
-            and node.args
-            and _is_roles_const(node.args[0])
-        )
-        if is_sub or is_get:
-            hits.add(f"{rel}::{func}")
+    def visit(node: ast.AST, scope: str) -> None:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            scope = node.name if scope == "<module>" else f"{scope}.{node.name}"
+        hit = False
+        if isinstance(node, ast.Subscript):
+            key = node.slice.value if isinstance(node.slice, ast.Index) else node.slice  # py3.8 compat
+            hit = _is_config(node.value) and _is_roles_const(key)
+        elif isinstance(node, ast.Call):
+            f = node.func
+            hit = (
+                isinstance(f, ast.Attribute)
+                and f.attr in MUTATORS
+                and _is_config(f.value)
+                and bool(node.args)
+                and _is_roles_const(node.args[0])
+            )
+        elif isinstance(node, ast.Compare):
+            hit = (
+                _is_roles_const(node.left)
+                and any(isinstance(op, (ast.In, ast.NotIn)) for op in node.ops)
+                and any(_is_config(c) for c in node.comparators)
+            )
+        if hit:
+            hits.add(f"{rel}::{scope}")
         for child in ast.iter_child_nodes(node):
-            visit(child, func)
+            visit(child, scope)
 
     visit(tree, "<module>")
     return hits
@@ -175,4 +205,24 @@ def test_legit_readers_exist_and_have_reason():
     # [REQ-QG-13] exemption list must not rot: files exist (or are known forward-compat) with reason
     for rel, reason in LEGIT_READERS.items():
         assert reason.strip(), rel
+        assert (REPO_ROOT / rel).is_file(), f"LEGIT_READERS entry without file: {rel}"
     assert not (set(LEGIT_READERS) & {k.split("::")[0] for k in RAW_ROLES_RATCHET})
+
+
+def test_scanner_flags_in_pop_setdefault_and_cfg_receivers(tmp_path):
+    # [REQ-QG-13] membership test, pop/setdefault, cfg/self.config receivers and nested dirs are covered
+    sub = tmp_path / "scripts" / "lib" / "consistency"
+    sub.mkdir(parents=True)
+    (sub / "mod.py").write_text(
+        "class K:\n"
+        "    def a(self, config):\n        return 'roles' in config\n"
+        "    def b(self, cfg):\n        return cfg.pop('roles')\n"
+        "    def c(self):\n        return self.config.setdefault('roles', [])\n"
+        "    def d(self, role_defaults):\n        return role_defaults.get('roles')\n",
+        encoding="utf-8",
+    )
+    assert scan_repo(tmp_path) == {
+        "scripts/lib/consistency/mod.py::K.a",
+        "scripts/lib/consistency/mod.py::K.b",
+        "scripts/lib/consistency/mod.py::K.c",
+    }
