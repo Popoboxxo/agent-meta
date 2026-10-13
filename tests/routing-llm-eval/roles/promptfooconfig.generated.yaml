@@ -584,102 +584,6 @@ tests:
       properties:
         target:
           const: planner
-- description: rk-template-auditor-01 [template-auditor]
-  vars:
-    role: orchestrator
-    prompt: 'Bitte übernimm: Agenten-Audit.'
-  assert:
-  - type: contains-json
-    value:
-      type: object
-      required:
-      - target
-      - tier_escalation
-      properties:
-        target:
-          const: template-auditor
-        tier_escalation:
-          const: true
-- description: rk-template-auditor-02 [template-auditor]
-  vars:
-    role: orchestrator
-    prompt: 'Bitte übernimm: Template-Audit.'
-  assert:
-  - type: contains-json
-    value:
-      type: object
-      required:
-      - target
-      - tier_escalation
-      properties:
-        target:
-          const: template-auditor
-        tier_escalation:
-          const: true
-- description: rk-template-auditor-03 [template-auditor]
-  vars:
-    role: orchestrator
-    prompt: 'Bitte übernimm: Konformitätsprüfung.'
-  assert:
-  - type: contains-json
-    value:
-      type: object
-      required:
-      - target
-      - tier_escalation
-      properties:
-        target:
-          const: template-auditor
-        tier_escalation:
-          const: true
-- description: rk-template-auditor-04 [template-auditor]
-  vars:
-    role: orchestrator
-    prompt: 'Bitte übernimm: Framework-Audit.'
-  assert:
-  - type: contains-json
-    value:
-      type: object
-      required:
-      - target
-      - tier_escalation
-      properties:
-        target:
-          const: template-auditor
-        tier_escalation:
-          const: true
-- description: rk-template-auditor-en [template-auditor]
-  vars:
-    role: orchestrator
-    prompt: 'Please handle this: Agenten-Audit.'
-  assert:
-  - type: contains-json
-    value:
-      type: object
-      required:
-      - target
-      - tier_escalation
-      properties:
-        target:
-          const: template-auditor
-        tier_escalation:
-          const: true
-- description: rx-template-auditor-01 [template-auditor]
-  vars:
-    role: orchestrator
-    prompt: Prüfe ob alle Agenten-Definitionen noch framework-konform sind.
-  assert:
-  - type: contains-json
-    value:
-      type: object
-      required:
-      - target
-      - tier_escalation
-      properties:
-        target:
-          const: template-auditor
-        tier_escalation:
-          const: true
 - description: rn-template-auditor-de [template-auditor]
   vars:
     role: orchestrator
@@ -8579,6 +8483,126 @@ tests:
   vars:
     role: orchestrator
     prompt: Ask intern-developer to take this one.
+  assert:
+  - type: contains-json
+    value:
+      type: object
+      required:
+      - target
+      properties:
+        target:
+          const: intern-developer
+- description: m-ask-audit-en [orchestrator]
+  vars:
+    role: orchestrator
+    prompt: Run an audit.
+  assert:
+  - type: contains-json
+    value:
+      type: object
+      required:
+      - target
+      properties:
+        target:
+          const: ASK
+- description: m-ask-design-de [orchestrator]
+  vars:
+    role: orchestrator
+    prompt: Ich brauche ein Design für das Dashboard.
+  assert:
+  - type: contains-json
+    value:
+      type: object
+      required:
+      - target
+      properties:
+        target:
+          const: ASK
+- description: m-coll-audit-sec-de [security-auditor]
+  vars:
+    role: orchestrator
+    prompt: Audit unserer Secret-Verwaltung und der Abhängigkeits-CVEs.
+  assert:
+  - type: contains-json
+    value:
+      type: object
+      required:
+      - target
+      properties:
+        target:
+          const: security-auditor
+- description: m-coll-audit-review-en [code-reviewer]
+  vars:
+    role: orchestrator
+    prompt: Audit the diff in the PR for style and maintainability.
+  assert:
+  - type: contains-json
+    value:
+      type: object
+      required:
+      - target
+      properties:
+        target:
+          const: code-reviewer
+- description: m-coll-design-ui-en [ui-ux-designer]
+  vars:
+    role: orchestrator
+    prompt: Design of the buttons and colours on the login screen.
+  assert:
+  - type: contains-json
+    value:
+      type: object
+      required:
+      - target
+      properties:
+        target:
+          const: ui-ux-designer
+- description: m-coll-schema-db-de [database-engineer]
+  vars:
+    role: orchestrator
+    prompt: Ändere das Schema der Nutzertabelle und ergänze eine Migration.
+  assert:
+  - type: contains-json
+    value:
+      type: object
+      required:
+      - target
+      properties:
+        target:
+          const: database-engineer
+- description: m-pipe-bugfix-en [orchestrator]
+  vars:
+    role: orchestrator
+    prompt: Login throws a 500 after the update, please fix.
+  assert:
+  - type: contains-json
+    value:
+      type: object
+      required:
+      - target
+      properties:
+        target:
+          const: pipeline:bugfix
+- description: m-nameonly-principal-en [principal-developer]
+  vars:
+    role: orchestrator
+    prompt: 'principal-developer, take over: the senior-developer failed three times.'
+  assert:
+  - type: contains-json
+    value:
+      type: object
+      required:
+      - target
+      - tier_escalation
+      properties:
+        target:
+          const: principal-developer
+        tier_escalation:
+          const: true
+- description: m-nameonly-intern-de [intern-developer]
+  vars:
+    role: orchestrator
+    prompt: Bitte intern-developer, nimm diese Aufgabe.
   assert:
   - type: contains-json
     value:

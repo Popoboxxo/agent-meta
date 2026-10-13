@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -84,6 +85,8 @@ def _overlap_index(roles: dict) -> dict:
     """normalized keyword -> sorted owner roles, only for tokens owned by >1 role."""
     owners: dict = defaultdict(set)
     for name, info in roles.items():
+        if (info.get("routing") or {}).get("addressability") in ("excluded", "name_only"):
+            continue  # not keyword-routable: never an overlap owner
         for kw in _patterns(info)[0]:
             owners[_norm(kw)].add(name)
     return {t: sorted(r) for t, r in sorted(owners.items()) if len(r) > 1}
@@ -105,6 +108,14 @@ def generate_catalog(agent_meta_root: Path) -> dict:
         addressability = (info.get("routing") or {}).get("addressability")
         if addressability == "excluded":
             continue
+        if addressability == "name_only":
+            # Direct addressing only: no keyword/example positives (Q9).
+            add(f"rn-{name}-de", name, "name_only", "de",
+                f"Rufe den Agenten {name} auf und starte direkt.", name,
+                pair_id=f"rn-{name}")
+            add(f"rn-{name}-en", name, "name_only", "en",
+                f"Run the {name} agent directly.", name, pair_id=f"rn-{name}")
+            continue
         keywords, examples = _patterns(info)
 
         n_kw = 0
@@ -117,17 +128,11 @@ def generate_catalog(agent_meta_root: Path) -> dict:
             add(f"rk-{name}-{n_kw:02d}", name, "keyword", "de",
                 f"Bitte übernimm: {kw}.", name, source_keyword=kw)
         if first_plain is not None:
-            add(f"rk-{name}-en", name, "keyword", "en",
+            add(f"rk-{name}-en", name, "keyword", "mixed",
                 f"Please handle this: {first_plain}.", name, source_keyword=first_plain)
         for n_ex, example in enumerate(examples, start=1):
             add(f"rx-{name}-{n_ex:02d}", name, "example", "de", example, name,
                 source_example=example)
-
-        if addressability == "name_only":
-            add(f"rn-{name}-de", name, "name_only", "de",
-                f"Rufe den Agenten {name} auf und starte direkt.", name)
-            add(f"rn-{name}-en", name, "name_only", "en",
-                f"Run the {name} agent directly.", name)
 
     # Collision cases: one DE + one EN case per owner role of every overlap token,
     # disambiguated by the owner's own example, plus a bare-token ASK case.
@@ -140,7 +145,7 @@ def generate_catalog(agent_meta_root: Path) -> dict:
             add(f"rc-{slug}-{owner}-de", owner, "collision", "de",
                 f"{base} Stichwort: {kw}.", owner,
                 source_keyword=kw, overlap_token=token)
-            add(f"rc-{slug}-{owner}-en", owner, "collision", "en",
+            add(f"rc-{slug}-{owner}-en", owner, "collision", "mixed",
                 f"Request: {base} Keyword: {kw}.", owner,
                 source_keyword=kw, overlap_token=token)
         add(f"rc-{slug}-ask", "orchestrator", "ambiguous", "de",
@@ -155,9 +160,38 @@ def render_catalog(catalog: dict) -> str:
     return CATALOG_HEADER + body
 
 
-def catalog_hash(path: Path) -> str:
-    """sha256 over the bytes of the (generated) catalog file."""
-    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+def language_pairs(catalog) -> list:
+    """Pair DE/EN cases by ``pair_id`` -> [(de_case, en_case)].
+
+    Only genuine DE/EN pairs (same intent, same target) are valid for the
+    language-delta metric; ``mixed`` cases (English frame around canonical DE
+    keywords, no EN data in role-defaults, IC-29) never take part.
+    """
+    cases = catalog["cases"] if isinstance(catalog, dict) else catalog
+    groups: dict = defaultdict(dict)
+    for case in cases:
+        if "pair_id" in case:
+            groups[case["pair_id"]][case["lang"]] = case
+    return [(g["de"], g["en"]) for _, g in sorted(groups.items()) if {"de", "en"} <= set(g)]
+
+
+def corpus_hash_of(generated: list, manual: list) -> str:
+    """sha256 over the evaluated set: generated + manual, sorted by id, canonical JSON."""
+    union = sorted(list(generated) + list(manual), key=lambda c: c["id"])
+    blob = json.dumps(union, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+
+def _load_cases(path: Path) -> list:
+    if not path.exists():
+        return []
+    return (yaml.safe_load(path.read_text(encoding="utf-8")) or {}).get("cases", [])
+
+
+def corpus_hash(out_dir: Path) -> str:
+    """Corpus hash (IC-13) of the committed catalogs in ``out_dir``."""
+    out_dir = Path(out_dir)
+    return corpus_hash_of(_load_cases(out_dir / GENERATED_NAME), _load_cases(out_dir / MANUAL_NAME))
 
 
 def _assertion(expected: dict) -> list:
@@ -213,7 +247,7 @@ def main(argv: list = None) -> int:
                         help="Directory holding the roles catalogs.")
     parser.add_argument("--check", action="store_true", help="Exit 1 if files are stale.")
     parser.add_argument("--print-hash", action="store_true",
-                        help="Print sha256 of the generated catalog and exit.")
+                        help="Print corpus sha256 (generated + manual cases) and exit.")
     args = parser.parse_args(argv)
     out_dir = Path(args.out_dir)
     # The manual catalog is an input: when writing to a foreign dir, read the repo copy.
@@ -221,7 +255,8 @@ def main(argv: list = None) -> int:
     outputs = render_outputs(_REPO_ROOT, manual_src)
 
     if args.print_hash:
-        print(hashlib.sha256(outputs[GENERATED_NAME].encode("utf-8")).hexdigest())
+        print(corpus_hash_of(generate_catalog(_REPO_ROOT)["cases"],
+                             _load_cases(manual_src / MANUAL_NAME)))
         return 0
     if args.check:
         stale = [n for n, c in outputs.items()

@@ -6,7 +6,6 @@ curated extras live in ``tests/routing-llm-eval/roles/catalog.manual.yaml``.
 """
 from __future__ import annotations
 
-import hashlib
 import importlib.util
 import subprocess
 import sys
@@ -68,7 +67,7 @@ def test_ac03_case_schema_target_and_tier_escalation(all_cases):
         assert set(exp) == {"target", "tier_escalation"}, case["id"]
         assert isinstance(exp["target"], str) and exp["target"], case["id"]
         assert isinstance(exp["tier_escalation"], bool), case["id"]
-        assert case["lang"] in {"de", "en"}, case["id"]
+        assert case["lang"] in {"de", "en", "mixed"}, case["id"]
         assert case["task"].strip(), case["id"]
 
 
@@ -78,6 +77,8 @@ def test_ac62_every_keyword_and_example_is_covered(roles, all_cases):
     ex_cov = {(c["role"], c["source_example"]) for c in all_cases if "source_example" in c}
     missing = []
     for name, info in roles.items():
+        if (info.get("routing") or {}).get("addressability") in ("name_only", "excluded"):
+            continue  # name_only roles are addressed by name only (Q9)
         patterns = info.get("routing_patterns") or {}
         missing += [(name, "kw", k) for k in patterns.get("keywords") or [] if (name, k) not in kw_cov]
         missing += [(name, "ex", e) for e in patterns.get("examples") or [] if (name, e) not in ex_cov]
@@ -89,19 +90,43 @@ def test_ac62_at_least_20_roles_have_de_and_en_paraphrases(all_cases):
     langs = defaultdict(set)
     for case in all_cases:
         if case["category"] == "paraphrase":
-            langs[case["role"]].add(case["lang"])
-    both = sorted(r for r, ls in langs.items() if ls == {"de", "en"})
+            langs[case["role"]].add(case["lang"])  # mixed never counts as en
+    both = sorted(r for r, ls in langs.items() if {"de", "en"} <= ls)
     assert len(both) >= 20, both
 
 
+def test_ac62_language_pairs_share_target_and_are_balanced(all_cases):
+    """[AC-62] language delta only on pair_id pairs: same target, DE == EN count."""
+    pairs = gen.language_pairs({"cases": all_cases})
+    assert len(pairs) >= 20
+    for de, en in pairs:
+        assert de["pair_id"] == en["pair_id"]
+        assert de["expected"] == en["expected"], de["pair_id"]
+        assert (de["lang"], en["lang"]) == ("de", "en")
+    manual_paired = [c for c in all_cases if c["id"].startswith("m-")]
+    assert Counter(c["lang"] for c in manual_paired) == {"de": len(manual_paired) // 2, "en": len(manual_paired) // 2}
+    # every pair_id has exactly one DE and one EN case
+    by_pair = Counter(c["pair_id"] for c in all_cases if "pair_id" in c)
+    assert set(by_pair.values()) == {2}
+
+
+def test_ac62_mixed_cases_have_no_pair_id(all_cases):
+    """[AC-62] English-framed DE-keyword cases are 'mixed' and never paired."""
+    mixed = [c for c in all_cases if c["lang"] == "mixed"]
+    assert mixed
+    assert not [c["id"] for c in mixed if "pair_id" in c]
+
+
 def test_ac62_all_pattern_roles_have_de_and_en_cases(roles, all_cases):
-    """[AC-62] every role with routing patterns has DE and EN cases."""
+    """[AC-62] every keyword-routable pattern role has DE and EN-framed (en/mixed) cases."""
     langs = defaultdict(set)
     for case in all_cases:
         langs[case["role"]].add(case["lang"])
     gaps = [
         n for n, i in roles.items()
-        if (i.get("routing_patterns") or {}).get("keywords") and langs[n] != {"de", "en"}
+        if (i.get("routing_patterns") or {}).get("keywords")
+        and (i.get("routing") or {}).get("addressability") == "keyword"
+        and not ("de" in langs[n] and langs[n] & {"en", "mixed"})
     ]
     assert not gaps, gaps
 
@@ -133,6 +158,9 @@ def test_ac62_name_only_roles_have_direct_addressing_cases(roles, all_cases):
         mine = [c for c in all_cases if c["category"] == "name_only" and c["expected"]["target"] == name]
         assert {c["lang"] for c in mine} == {"de", "en"}, name
         assert all(name in c["task"] for c in mine), name
+        positives = [c["id"] for c in all_cases
+                     if c["role"] == name and ("source_keyword" in c or "source_example" in c)]
+        assert not positives, positives  # direct addressing only (Q9)
 
 
 def test_ac62_excluded_roles_are_never_targets(roles, all_cases):
@@ -200,12 +228,29 @@ def test_ac62_manual_catalog_is_merged_unchanged_into_promptfoo():
     assert len(config["tests"]) == len(generated) + len(manual)
 
 
-def test_ac62_corpus_hash_is_sha256_of_generated_file(capsys):
-    """[AC-62] --print-hash prints sha256 of catalog.generated.yaml."""
-    expected = hashlib.sha256(GENERATED.read_bytes()).hexdigest()
-    assert gen.catalog_hash(GENERATED) == expected
+def test_ac62_corpus_hash_covers_generated_and_manual(capsys, tmp_path):
+    """[AC-62] corpus hash = sha256 over generated+manual; manual change alters it."""
+    expected = gen.corpus_hash(ROLES_DIR)
+    assert len(expected) == 64
     assert gen.main(["--print-hash"]) == 0
     assert capsys.readouterr().out.strip() == expected
+    copy = tmp_path / "roles"
+    copy.mkdir()
+    for name in ("catalog.generated.yaml", "catalog.manual.yaml"):
+        (copy / name).write_bytes((ROLES_DIR / name).read_bytes())
+    assert gen.corpus_hash(copy) == expected
+    manual = (copy / "catalog.manual.yaml")
+    manual.write_text(manual.read_text(encoding="utf-8").replace("Make it better.", "Improve it."),
+                      encoding="utf-8")
+    assert gen.corpus_hash(copy) != expected
+
+
+def test_ac62_excluded_and_name_only_roles_own_no_overlap_token(roles):
+    """[AC-62] excluded/name_only roles are never overlap owners."""
+    owners = set().union(*gen._overlap_index(roles).values())
+    skipped = {n for n, i in roles.items()
+               if (i.get("routing") or {}).get("addressability") in ("excluded", "name_only")}
+    assert not owners & skipped
 
 
 def test_ac62_generated_header_marks_file_as_generated():
