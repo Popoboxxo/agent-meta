@@ -112,6 +112,17 @@ def _normalize_check_dry_run(args) -> None:
         args.dry_run = True
 
 
+def _validate_doctor_flags(parser, args) -> None:
+    """--strict / --provider / --out belong to --doctor; reject them elsewhere."""
+    if getattr(args, "doctor", False):
+        return
+    stray = [flag for flag, used in (
+        ("--strict", args.strict), ("--provider", args.provider is not None),
+        ("--out", args.out is not None)) if used]
+    if stray:
+        parser.error(f"{', '.join(stray)} can only be used together with --doctor")
+
+
 def _run_artifact_gate(ctx) -> None:
     """Read-only artifact-contract gate for ``--check`` / ``--validate``.
 
@@ -143,8 +154,11 @@ def _run_artifact_gate(ctx) -> None:
 
 def _build_arg_parser() -> argparse.ArgumentParser:
     """Construct the sync.py CLI argument parser (flag-based interface)."""
+    # allow_abbrev=False: the bytecode guard above and the --doctor flag
+    # validation match the exact flag spelling, so `--doc` must not resolve to it.
     parser = argparse.ArgumentParser(
-        description="Sync agent-meta agents into a project."
+        description="Sync agent-meta agents into a project.",
+        allow_abbrev=False,
     )
     parser.add_argument("--config", required=False, default=None,
                         help="Path to project.yaml (default: auto-detect .meta-config/project.yaml "
@@ -709,6 +723,7 @@ def main() -> None:
     """Parse CLI args and drive the sync: early modes, dispatch, common tail."""
     parser = _build_arg_parser()
     args = parser.parse_args()
+    _validate_doctor_flags(parser, args)
     _normalize_check_dry_run(args)
     # Start every run with a fresh gitignore probe cache (#752): a long-lived
     # process must not reuse an ignore decision from a previous run.

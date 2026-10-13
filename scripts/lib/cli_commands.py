@@ -1166,21 +1166,27 @@ def _handle_doctor(ctx: _SyncContext) -> None:
                             providers=getattr(args, "provider", None))
         if strict:
             report = _doctor_apply_strict(report)
-        if out:
-            payload = json.dumps(report_to_dict(report), indent=2,
-                                 ensure_ascii=False, sort_keys=True) + "\n"
-            _write_doctor_out(ctx, out, payload)
     except TmpSinkError as exc:
         print(f"error: {exc.code}: {exc.message}", file=sys.stderr)
         sys.exit(2)
     except Exception as exc:  # noqa: BLE001 -- any internal failure -> exit 2 (IC-22)
         print(f"error: doctor.internal-error: {type(exc).__name__}", file=sys.stderr)
         sys.exit(2)
+    write_failed = False
+    if out:  # a failed write must not hide the report: print it, then exit 2
+        payload = json.dumps(report_to_dict(report), indent=2,
+                             ensure_ascii=False, sort_keys=True) + "\n"
+        try:
+            _write_doctor_out(ctx, out, payload)
+        except (TmpSinkError, OSError) as exc:
+            code = getattr(exc, "code", "doctor.out-write-failed")
+            print(f"error: {code}: {type(exc).__name__}", file=sys.stderr)
+            write_failed = True
     if getattr(args, "json", False):
         print_doctor_json(report)
     else:
         _print_doctor_text(report)
-    sys.exit(_doctor_exit_code(report, strict))
+    sys.exit(2 if write_failed else _doctor_exit_code(report, strict))
 
 
 def _handle_validate(ctx: _SyncContext) -> None:

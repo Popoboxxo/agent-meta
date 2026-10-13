@@ -60,6 +60,7 @@ class Hit:
     bindings: dict = field(default_factory=dict)
     severity: Optional[Severity] = None   # raw severity of a referenced check
     ref_check: str = ""
+    provider: str = ""   # provider of a per-provider referenced check (else env.provider)
 
 
 class DetectorUnavailable(Exception):
@@ -472,9 +473,22 @@ def detect_finding_ref(det: dict, env: Env, tgt: dict) -> list:
     for check, file, message, severity, bindings in rows:
         if pattern and not pattern.search(message):
             continue
-        hits.append(Hit(file, quoted=clip(message), bindings=bindings,
-                        severity=severity, ref_check=check))
+        hits.append(Hit(file, quoted=clip(message), bindings=bindings, severity=severity,
+                        ref_check=check, provider=_message_provider(det, message, env)))
     return hits
+
+
+def _message_provider(det: dict, message: str, env: Env) -> str:
+    """Provider named by the ``"<provider>: ..."`` prefix of a context-budget message.
+
+    Only a name from the active provider set is accepted (never free text), so
+    ``--provider`` filtering and the per-provider ``provider`` field work for
+    provider-independent ``finding-ref`` entries.
+    """
+    if det["source"] != "context-budget":
+        return ""
+    name = message.split(": ", 1)[0]
+    return name if name in env.providers else ""
 
 
 # ---------------------------------------------------- variable-unreferenced

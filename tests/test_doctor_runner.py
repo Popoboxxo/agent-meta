@@ -427,11 +427,11 @@ def test_yaml_key_project_config_block_missing(tmp_path, monkeypatch):
 
 def test_yaml_key_capability_wildcard_with_surface_filter(tmp_path, monkeypatch):
     ids = real("surface-unverified")
-    monkeypatch.delattr(context_budget, "surface_target_key", raising=False)
+    monkeypatch.setattr(context_budget, "surface_target_key", lambda s: None)
     report = run(tmp_path, monkeypatch, ids)                    # no mapping => no finding
-    assert report.findings == () and ("surface-unverified", "detector-unavailable") in report.skipped
+    assert report.findings == ()
     monkeypatch.setattr(context_budget, "surface_target_key",
-                        lambda s: {"commands": "commands_dir"}.get(s), raising=False)
+                        lambda s: {"commands": "commands_dir"}.get(s))
     (hit,) = run(tmp_path, monkeypatch, ids).findings
     assert hit.message == "Surface commands is UNVERIFIED for this provider; its generated artifacts may be ignored."
     assert hit.severity is Severity.INFO and hit.provider == "Claude"

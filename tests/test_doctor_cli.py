@@ -409,3 +409,58 @@ def test_doctor_modules_do_not_branch_on_provider_identity():
     block = text[start:text.index("def _handle_validate(")]
     for name in ("Claude", "Codex", "Gemini", "OpenCode"):
         assert f'== "{name}"' not in block and f"== '{name}'" not in block
+
+
+# ------------------------------------------------- review follow-ups (flags, binding)
+
+def test_abbreviated_doctor_flag_is_rejected(monkeypatch, capsys, project):
+    """allow_abbrev=False: ``--doc`` must not run the doctor (nor skip the bytecode guard)."""
+    monkeypatch.chdir(project)
+    monkeypatch.setattr(sys, "argv", ["sync.py", "--doc"])
+    with pytest.raises(SystemExit) as exc:
+        sync.main()
+    assert exc.value.code == 2
+    assert "unrecognized arguments" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("flags", [["--strict"], ["--provider", "Claude"], ["--out", "x.json"]])
+def test_doctor_only_flags_require_doctor(monkeypatch, capsys, project, flags):
+    config = project / ".meta-config" / "project.yaml"
+    monkeypatch.chdir(project)
+    monkeypatch.setattr(sys, "argv", ["sync.py", "--config", str(config), "--check", *flags])
+    with pytest.raises(SystemExit) as exc:
+        sync.main()
+    assert exc.value.code == 2
+    err = capsys.readouterr().err
+    assert flags[0] in err and "only be used together with --doctor" in err
+
+
+def test_failed_out_write_still_prints_report_and_exits_two(
+        monkeypatch, capsys, project, fake_command):
+    from lib import cli_commands
+
+    def broken(ctx, out, payload):
+        raise OSError("disk full")
+    monkeypatch.setattr(cli_commands, "_write_doctor_out", broken)
+    code, out, err = _main(monkeypatch, capsys, project, "--json", "--out", f"{_SINK}/doctor/r.json")
+    assert code == 2
+    assert "doctor.out-write-failed" in err
+    assert json.loads(out)["summary"]["registry_version"] == 1
+
+
+def test_declared_surface_empty_is_bound_to_provider_and_filterable(
+        monkeypatch, capsys, tmp_path, fake_command):
+    root = tmp_path / "multi"
+    _make_project(root, providers="[Claude, Codex]")
+
+    def surface(*args):
+        code, out, _ = _main(monkeypatch, capsys, root, "--json", *args)
+        assert code == 0
+        return [f for f in json.loads(out)["findings"] if f["issue_id"] == "declared-surface-empty"]
+
+    both = surface()
+    assert both and all(f["provider"] for f in both)
+    assert "Claude" in {f["provider"] for f in both}
+    only = surface("--provider", "Claude")
+    assert only and {f["provider"] for f in only} == {"Claude"}
+    assert all(f["provider"] != "Claude" for f in surface("--provider", "Codex"))

@@ -30,7 +30,7 @@ from .doctor_detectors import (
 from .doctor_formats import QUOTED_MAX, clip
 from .doctor_predicates import (
     Env, base_bindings, evaluate_predicates, fixed_in_reached, needs_provider,
-    passes_deferred, render, resolve_verified_state, surface_mapper,
+    passes_deferred, render, resolve_verified_state,
 )
 from .doctor_registry import load_validation_context, validate_entry
 from .providers import load_provider_capabilities, load_providers_config
@@ -154,7 +154,7 @@ def _build_finding(entry: dict, env: Env, hit: Hit, bindings: dict) -> DoctorFin
         effective, "doctor." + entry["id"], file,
         render(entry.get("message") or entry["title"], values),
         render(entry["fix-hint"], values),
-        issue_id=entry["id"], provider=env.provider, verified_state=state,
+        issue_id=entry["id"], provider=hit.provider or env.provider, verified_state=state,
         evidence=f"{ev['kind']}: {ev['ref']} ({ev['date']})",
         fix_owner=entry["fix-owner"], severity_registry=registry.value,
         quoted=clip(hit.quoted, QUOTED_MAX), ref_check=hit.ref_check)
@@ -190,10 +190,6 @@ def _run_entry(entry: dict, base: Env, findings: list, skipped: set) -> None:
     envs = ([_provider_env(base, p) for p in base.providers]
             if needs_provider(entry) else [base])
     applied = False
-    if (any("surface_has_target" in p for p in entry.get("applies_to") or [])
-            and surface_mapper() is None):
-        skipped.add((entry["id"], SKIP_UNAVAILABLE))   # mapping producer lands in 0d.4
-        return
     for env in envs:
         combos, deferred = evaluate_predicates(entry.get("applies_to"), env)
         for combo in combos:

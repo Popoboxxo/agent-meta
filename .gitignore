@@ -73,3 +73,8 @@ node_modules/
 
 # ProjectAtlas local repository-intelligence index (per-machine, not shared)
 .projectatlas/
+
+# doctor seed fixtures contain provider dirs and logs that are ignored elsewhere
+!tests/fixtures/doctor/**
+tests/fixtures/doctor/**/*.pyc
+tests/fixtures/doctor/**/__pycache__/

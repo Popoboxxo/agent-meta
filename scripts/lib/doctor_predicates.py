@@ -196,10 +196,10 @@ def evaluate_predicates(preds: list, env: Env) -> tuple:
 
 
 def surface_mapper():
-    """``surface_target_key`` of context_budget (lands with Task 0d.4), else None."""
-    from .consistency import context_budget
+    """``surface_target_key`` of context_budget (surface -> ai-providers target key)."""
+    from .consistency.context_budget import surface_target_key
 
-    return getattr(context_budget, "surface_target_key", None)
+    return surface_target_key
 
 
 def passes_deferred(deferred: list, bindings: dict) -> bool:
@@ -208,7 +208,7 @@ def passes_deferred(deferred: list, bindings: dict) -> bool:
         return True
     mapper = surface_mapper()
     key = bindings.get("key")
-    return bool(mapper and key and mapper(key))
+    return bool(key and mapper(key))
 
 
 def needs_provider(entry: dict) -> bool:
