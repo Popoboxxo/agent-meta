@@ -1,0 +1,3 @@
+ai-providers: [Claude]
+variables:
+  TEAM_MOTTO: Ship early and often
