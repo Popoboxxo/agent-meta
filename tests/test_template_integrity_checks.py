@@ -177,3 +177,35 @@ def test_provider_literal_after_example_block_is_flagged(tmp_path):
 def test_provider_literal_allowlisted_file_is_ignored(tmp_path):
     root = _mk_literal_repo(tmp_path, "Acme here.\n", allow=["agents/1-generic/a.md"])
     assert check_provider_literal(root) == []
+
+
+def test_provider_literal_substring_in_longer_word_is_not_flagged(tmp_path):
+    root = _mk_literal_repo(tmp_path, "Acmeology and xACME.md and my.acme/ ok.\n")
+    assert check_provider_literal(root) == []
+
+
+def test_provider_literal_blank_line_ends_example_block(tmp_path):
+    body = "> **Example (provider-specific):**\n> .acme/\n\n> Acme again\n"
+    findings = check_provider_literal(_mk_literal_repo(tmp_path, body))
+    assert len(findings) == 1 and "line 4" in findings[0].message
+
+
+def test_provider_literal_indented_marker_is_not_recognized(tmp_path):
+    body = "  > **Example (provider-specific):**\n  > Acme\n"
+    findings = check_provider_literal(_mk_literal_repo(tmp_path, body))
+    assert len(findings) == 1 and "line 2" in findings[0].message
+
+
+def test_provider_literal_scope_is_agents_generic_top_level_only(tmp_path):
+    root = _mk_literal_repo(tmp_path, "clean\n")
+    (root / "rules" / "1-generic").mkdir(parents=True)
+    (root / "rules" / "1-generic" / "r.md").write_text("Acme\n", encoding="utf-8")
+    (root / "agents" / "1-generic" / "sub").mkdir()
+    (root / "agents" / "1-generic" / "sub" / "n.md").write_text("Acme\n", encoding="utf-8")
+    assert check_provider_literal(root) == []
+
+
+def test_provider_literal_real_repo_smoke_only_warnings():
+    findings = check_provider_literal(ROOT)
+    assert all(f.severity is Severity.WARNING for f in findings)
+    assert all(f.file.startswith("agents/1-generic/") for f in findings)

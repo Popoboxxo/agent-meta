@@ -24,4 +24,13 @@ dispatch_phrases:
     - 'weiterreich\w*'
     - 'überträg\w*'
 provider_literal_allow:
+  # Provider experts document one provider by design.
   - 'agents/2-platform/agent-meta-*-expert.md'
+  - 'agents/1-generic/mammouth-expert.md'
+  # False positive: the English word "Continue" matches a provider name (case-sensitive).
+  - 'agents/1-generic/se-termination.md'
+  # Book title mentioning a provider name, not a provider dependency.
+  - 'agents/1-generic/prompt-engineer.md'
+  # Not allowed on purpose: agents/1-generic/agent-meta-manager.md (generator/
+  # framework documentation) - hits stay visible as warnings.
+  # rules/1-generic/* is out of scope until Q30 (not scanned).

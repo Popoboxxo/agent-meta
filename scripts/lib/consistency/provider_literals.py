@@ -1,10 +1,17 @@
 """Provider-literal check for generic templates (IC-30 / IC-32).
 
-Generic templates (``agents/1-generic``, ``rules/1-generic``) must stay
-provider-agnostic. The literal set is derived from ``config/ai-providers.yaml``
-(provider keys, ``provider_root_dirs``, ``context_file``); nothing is hardcoded.
-Literals are tolerated inside ``> **Example (provider-specific):**`` blockquotes
-and in files matching ``provider_literal_allow`` (config/active-set-references.yaml).
+Generic templates (``agents/1-generic/*.md``, not recursive; ``rules/1-generic``
+joins the scope with Q30) must stay provider-agnostic. The literal set is
+derived from ``config/ai-providers.yaml`` (provider keys, ``provider_root_dirs``,
+``context_file``); nothing is hardcoded. Matching is case-sensitive with word
+boundaries (a literal inside a longer word is not a hit).
+
+Tolerated: files matching ``provider_literal_allow``
+(config/active-set-references.yaml) and example blocks. An example block starts
+at a line beginning with ``> **Example (provider-specific):**`` (the marker is
+recognized only at column 0, without leading spaces) and ends at the first line
+that does not start with ``>`` (after optional leading whitespace) - a blank
+line therefore ends the block.
 """
 from __future__ import annotations
 
@@ -17,7 +24,7 @@ from ..io import load_yaml_file
 
 CHECK_ID = "templates.provider-literal"
 EXAMPLE_MARKER = "> **Example (provider-specific):**"
-_SCAN_DIRS = ("agents/1-generic", "rules/1-generic")
+_SCAN_GLOBS = ("agents/1-generic/*.md",)
 
 
 def _literals(root: Path) -> list:
@@ -57,11 +64,8 @@ def check_provider_literal(agent_meta_root: Path) -> list:
         return []
     compiled = [(lit, _compile(lit)) for lit in literals]
     findings = []
-    for sub in _SCAN_DIRS:
-        base = root / sub
-        if not base.is_dir():
-            continue
-        for path in sorted(base.rglob("*.md")):
+    for pattern in _SCAN_GLOBS:
+        for path in sorted(root.glob(pattern)):
             rel = path.relative_to(root).as_posix()
             if _allowed(rel, allow):
                 continue
