@@ -1,0 +1,73 @@
+# Hand-written additions to the role-routing eval corpus (IC-13). Never rewritten
+# by scripts/gen_role_routing_eval_catalog.py; merged unchanged into
+# promptfooconfig.generated.yaml. Every case needs a short `reason`.
+# Schema: expected {target: <role> | pipeline:<name> | ASK, tier_escalation: bool}.
+# ID prefix m- is reserved for this file. No role-defaults keyword is reused
+# verbatim here, so these cases test generalisation (paraphrase), not lookup.
+cases:
+  # --- paraphrases (DE + EN) for >= 20 roles ---
+  - {id: m-developer-de, role: developer, category: paraphrase, lang: de, task: "Baue die neue Exportfunktion in den Service ein.", expected: {target: developer, tier_escalation: false}, reason: "paraphrase of implementation work"}
+  - {id: m-developer-en, role: developer, category: paraphrase, lang: en, task: "Add the new export function to the service.", expected: {target: developer, tier_escalation: false}, reason: "paraphrase of implementation work"}
+  - {id: m-junior-developer-de, role: junior-developer, category: paraphrase, lang: de, task: "Korrigiere den Tippfehler in der Fehlermeldung von utils.py.", expected: {target: junior-developer, tier_escalation: false}, reason: "single-file trivial edit"}
+  - {id: m-junior-developer-en, role: junior-developer, category: paraphrase, lang: en, task: "Fix the typo in the error message in utils.py.", expected: {target: junior-developer, tier_escalation: false}, reason: "single-file trivial edit"}
+  - {id: m-senior-developer-de, role: senior-developer, category: paraphrase, lang: de, task: "Entwirf die modulübergreifende Cache-Invalidierung und setze sie um.", expected: {target: senior-developer, tier_escalation: false}, reason: "cross-module design plus implementation"}
+  - {id: m-senior-developer-en, role: senior-developer, category: paraphrase, lang: en, task: "Design and implement cache invalidation across modules.", expected: {target: senior-developer, tier_escalation: false}, reason: "cross-module design plus implementation"}
+  - {id: m-code-reviewer-de, role: code-reviewer, category: paraphrase, lang: de, task: "Schau dir meinen Pull Request auf Lesbarkeit und Fehler an.", expected: {target: code-reviewer, tier_escalation: false}, reason: "review without literal keyword"}
+  - {id: m-code-reviewer-en, role: code-reviewer, category: paraphrase, lang: en, task: "Look over my pull request for readability and bugs.", expected: {target: code-reviewer, tier_escalation: false}, reason: "review without literal keyword"}
+  - {id: m-security-auditor-de, role: security-auditor, category: paraphrase, lang: de, task: "Gibt es Schwachstellen oder geleakte Zugangsdaten im Repo?", expected: {target: security-auditor, tier_escalation: false}, reason: "security intent in plain words"}
+  - {id: m-security-auditor-en, role: security-auditor, category: paraphrase, lang: en, task: "Are there vulnerabilities or leaked credentials in the repo?", expected: {target: security-auditor, tier_escalation: false}, reason: "security intent in plain words"}
+  - {id: m-tester-de, role: tester, category: paraphrase, lang: de, task: "Schreibe zuerst fehlschlagende Unit-Tests für die Preisberechnung.", expected: {target: tester, tier_escalation: false}, reason: "test-first intent"}
+  - {id: m-tester-en, role: tester, category: paraphrase, lang: en, task: "Write failing unit tests for the price calculation first.", expected: {target: tester, tier_escalation: false}, reason: "test-first intent"}
+  - {id: m-e2e-tester-de, role: e2e-tester, category: paraphrase, lang: de, task: "Klicke den Bestellprozess im echten Browser komplett durch.", expected: {target: e2e-tester, tier_escalation: false}, reason: "browser flow without E2E keyword"}
+  - {id: m-e2e-tester-en, role: e2e-tester, category: paraphrase, lang: en, task: "Click through the whole checkout flow in a real browser.", expected: {target: e2e-tester, tier_escalation: false}, reason: "browser flow without E2E keyword"}
+  - {id: m-accessibility-specialist-de, role: accessibility-specialist, category: paraphrase, lang: de, task: "Ist das Formular für Screenreader-Nutzer und per Tastatur bedienbar?", expected: {target: accessibility-specialist, tier_escalation: false}, reason: "a11y intent in plain words"}
+  - {id: m-accessibility-specialist-en, role: accessibility-specialist, category: paraphrase, lang: en, task: "Can keyboard-only and blind users operate this form?", expected: {target: accessibility-specialist, tier_escalation: false}, reason: "a11y intent in plain words"}
+  - {id: m-ui-ux-designer-de, role: ui-ux-designer, category: paraphrase, lang: de, task: "Skizziere den Bildschirmaufbau der Einstellungsseite.", expected: {target: ui-ux-designer, tier_escalation: false}, reason: "screen layout sketch"}
+  - {id: m-ui-ux-designer-en, role: ui-ux-designer, category: paraphrase, lang: en, task: "Sketch the screen layout of the settings page.", expected: {target: ui-ux-designer, tier_escalation: false}, reason: "screen layout sketch"}
+  - {id: m-database-engineer-de, role: database-engineer, category: paraphrase, lang: de, task: "Die Abfrage auf der Bestelltabelle dauert 8 Sekunden, mach sie schneller.", expected: {target: database-engineer, tier_escalation: false}, reason: "query tuning in plain words"}
+  - {id: m-database-engineer-en, role: database-engineer, category: paraphrase, lang: en, task: "The orders table query takes 8 seconds, speed it up.", expected: {target: database-engineer, tier_escalation: false}, reason: "query tuning in plain words"}
+  - {id: m-sre-engineer-de, role: sre-engineer, category: paraphrase, lang: de, task: "Lege Verfügbarkeitsziele fest und messe sie für die API.", expected: {target: sre-engineer, tier_escalation: false}, reason: "availability targets"}
+  - {id: m-sre-engineer-en, role: sre-engineer, category: paraphrase, lang: en, task: "Set availability targets and measure them for the API.", expected: {target: sre-engineer, tier_escalation: false}, reason: "availability targets"}
+  - {id: m-incident-responder-de, role: incident-responder, category: paraphrase, lang: de, task: "Der Zahlungsdienst ist seit 10 Minuten komplett ausgefallen, Kunden melden Fehler.", expected: {target: incident-responder, tier_escalation: false}, reason: "live production failure"}
+  - {id: m-incident-responder-en, role: incident-responder, category: paraphrase, lang: en, task: "The payment service has been completely down for 10 minutes and customers are reporting errors.", expected: {target: incident-responder, tier_escalation: false}, reason: "live production failure"}
+  - {id: m-refactoring-specialist-de, role: refactoring-specialist, category: paraphrase, lang: de, task: "Ersetze schrittweise das alte Abrechnungsmodul durch die neue Architektur.", expected: {target: refactoring-specialist, tier_escalation: false}, reason: "incremental replacement"}
+  - {id: m-refactoring-specialist-en, role: refactoring-specialist, category: paraphrase, lang: en, task: "Incrementally replace the old billing module with the new architecture.", expected: {target: refactoring-specialist, tier_escalation: false}, reason: "incremental replacement"}
+  - {id: m-documenter-de, role: documenter, category: paraphrase, lang: de, task: "Beschreibe die neuen CLI-Optionen für Nutzer.", expected: {target: documenter, tier_escalation: false}, reason: "user-facing docs without keyword"}
+  - {id: m-documenter-en, role: documenter, category: paraphrase, lang: en, task: "Describe the new CLI options for users.", expected: {target: documenter, tier_escalation: false}, reason: "user-facing docs without keyword"}
+  - {id: m-git-de, role: git, category: paraphrase, lang: de, task: "Lade meine lokalen Änderungen auf den Remote und eröffne einen Merge Request.", expected: {target: git, tier_escalation: false}, reason: "VCS operation in plain words"}
+  - {id: m-git-en, role: git, category: paraphrase, lang: en, task: "Upload my local changes to the remote and open a merge request.", expected: {target: git, tier_escalation: false}, reason: "VCS operation in plain words"}
+  - {id: m-requirements-de, role: requirements, category: paraphrase, lang: de, task: "Halte fest, dass Nutzer ihr Passwort zurücksetzen können müssen.", expected: {target: requirements, tier_escalation: false}, reason: "capture a requirement"}
+  - {id: m-requirements-en, role: requirements, category: paraphrase, lang: en, task: "Record that users must be able to reset their password.", expected: {target: requirements, tier_escalation: false}, reason: "capture a requirement"}
+  - {id: m-ideation-de, role: ideation, category: paraphrase, lang: de, task: "Lass uns brainstormen, wie ein Plugin-System aussehen könnte.", expected: {target: ideation, tier_escalation: false}, reason: "brainstorming"}
+  - {id: m-ideation-en, role: ideation, category: paraphrase, lang: en, task: "Let's brainstorm what a plugin system could look like.", expected: {target: ideation, tier_escalation: false}, reason: "brainstorming"}
+  - {id: m-knowledge-curator-de, role: knowledge-curator, category: paraphrase, lang: de, task: "Passe die Seitentypen unserer Wissensbasis an.", expected: {target: knowledge-curator, tier_escalation: false}, reason: "knowledge base conventions"}
+  - {id: m-knowledge-curator-en, role: knowledge-curator, category: paraphrase, lang: en, task: "Adjust the page types of our knowledge base.", expected: {target: knowledge-curator, tier_escalation: false}, reason: "knowledge base conventions"}
+  - {id: m-se-developer-de, role: se-developer, category: paraphrase, lang: de, task: "Setze die Komponente aus dem Systems-Engineering-Plan um, sie hat drei Schnittstellen.", expected: {target: se-developer, tier_escalation: false}, reason: "SE component, mid difficulty"}
+  - {id: m-se-developer-en, role: se-developer, category: paraphrase, lang: en, task: "Build the component from the systems engineering plan, it has three interfaces.", expected: {target: se-developer, tier_escalation: false}, reason: "SE component, mid difficulty"}
+  - {id: m-devops-engineer-de, role: devops-engineer, category: paraphrase, lang: de, task: "Richte die Build-Pipeline ein, die bei jedem Merge ausliefert.", expected: {target: devops-engineer, tier_escalation: false}, reason: "CI/CD intent"}
+  - {id: m-devops-engineer-en, role: devops-engineer, category: paraphrase, lang: en, task: "Set up the build pipeline that deploys on every merge.", expected: {target: devops-engineer, tier_escalation: false}, reason: "CI/CD intent"}
+  - {id: m-data-engineer-de, role: data-engineer, category: paraphrase, lang: de, task: "Baue den nächtlichen Datenimport aus den Kassensystemen ins Warehouse.", expected: {target: data-engineer, tier_escalation: false}, reason: "ETL intent"}
+  - {id: m-data-engineer-en, role: data-engineer, category: paraphrase, lang: en, task: "Build the nightly data import from the POS systems into the warehouse.", expected: {target: data-engineer, tier_escalation: false}, reason: "ETL intent"}
+
+  # --- ambiguity: must ask back ---
+  - {id: m-ask-vague-de, role: orchestrator, category: ambiguous, lang: de, task: "Mach das mal besser.", expected: {target: ASK, tier_escalation: false}, reason: "no object, no intent"}
+  - {id: m-ask-vague-en, role: orchestrator, category: ambiguous, lang: en, task: "Make it better.", expected: {target: ASK, tier_escalation: false}, reason: "no object, no intent"}
+  - {id: m-ask-audit-de, role: orchestrator, category: ambiguous, lang: de, task: "Führe ein Audit durch.", expected: {target: ASK, tier_escalation: false}, reason: "audit overlap: code-reviewer vs security-auditor", overlap_token: audit}
+  - {id: m-ask-design-en, role: orchestrator, category: ambiguous, lang: en, task: "I need a design for the dashboard.", expected: {target: ASK, tier_escalation: false}, reason: "design overlap: ideation vs ui-ux-designer", overlap_token: design}
+
+  # --- collision disambiguation with explicit context ---
+  - {id: m-coll-audit-sec-en, role: security-auditor, category: collision, lang: en, task: "Run an audit of our secrets handling and dependency CVEs.", expected: {target: security-auditor, tier_escalation: false}, reason: "audit with security context", overlap_token: audit}
+  - {id: m-coll-audit-review-de, role: code-reviewer, category: collision, lang: de, task: "Audit des Diffs im PR auf Stil und Wartbarkeit.", expected: {target: code-reviewer, tier_escalation: false}, reason: "audit with code-style context", overlap_token: audit}
+  - {id: m-coll-design-ui-de, role: ui-ux-designer, category: collision, lang: de, task: "Design der Buttons und Farben im Login-Screen.", expected: {target: ui-ux-designer, tier_escalation: false}, reason: "design with visual context", overlap_token: design}
+  - {id: m-coll-schema-db-en, role: database-engineer, category: collision, lang: en, task: "Change the schema of the users table and add a migration.", expected: {target: database-engineer, tier_escalation: false}, reason: "schema with SQL context", overlap_token: schema}
+
+  # --- negatives: orchestrator handles it, no role dispatch ---
+  - {id: m-neg-smalltalk-de, role: orchestrator, category: negative, lang: de, task: "Danke, das war's für heute.", expected: {target: ASK, tier_escalation: false}, reason: "no task; must not dispatch a role"}
+  - {id: m-neg-smalltalk-en, role: orchestrator, category: negative, lang: en, task: "Thanks, that's all for today.", expected: {target: ASK, tier_escalation: false}, reason: "no task; must not dispatch a role"}
+
+  # --- pipelines ---
+  - {id: m-pipe-bugfix-de, role: orchestrator, category: pipeline, lang: de, task: "Der Login wirft nach dem Update einen 500er, bitte beheben.", expected: {target: "pipeline:bugfix", tier_escalation: false}, reason: "defect report maps to bugfix pipeline"}
+
+  # --- name-only extra: explicit address beyond the generated template ---
+  - {id: m-nameonly-principal-de, role: principal-developer, category: name_only, lang: de, task: "principal-developer, übernimm: der senior-developer ist dreimal gescheitert.", expected: {target: principal-developer, tier_escalation: true}, reason: "explicit escalation by name, orch-only"}
+  - {id: m-nameonly-intern-en, role: intern-developer, category: name_only, lang: en, task: "Ask intern-developer to take this one.", expected: {target: intern-developer, tier_escalation: false}, reason: "explicit address of easter-egg role"}
