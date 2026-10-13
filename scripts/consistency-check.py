@@ -55,7 +55,7 @@ from lib.consistency.docs import (
     check_sync_cli_docs,
     check_ui_help_mappings,
 )
-from lib.consistency.frontmatter import check_agent_frontmatter
+from lib.consistency.frontmatter import check_agent_frontmatter, check_based_on_stale
 from lib.consistency.fanout_contracts import check_fanout_backend_contract
 from lib.consistency.handoff_contracts import check_handoff_contracts
 from lib.consistency.model_contracts import check_model_contracts
@@ -204,6 +204,7 @@ def run_checks(
         findings += check_py39_union_syntax(root)
         findings += check_fstring_backslash_hazard(root)
         findings += check_repo_containment_templates(_AGENT_META_ROOT)
+        findings += check_based_on_stale(root)  # WARNING only (#885 F-09)
 
         # Phase 5: Documentation & UI Consistency
         findings.extend(check_sync_cli_docs(_AGENT_META_ROOT))

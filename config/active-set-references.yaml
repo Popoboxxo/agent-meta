@@ -1,0 +1,36 @@
+# Shared data for the active-set reference checks and the template routing guard
+# (spec SPEC-CONTEXT-PROFILES-2026-10-11, IC-19 / IC-30 / IC-32).
+#
+# dispatch_phrases: regex fragments (case-insensitive) that introduce an imperative
+#   hand-off to a role. Read by tests/test_no_role_routes_in_templates.py (IC-30) and
+#   later by the active-set.dangling-dispatch check (IC-19). The guard allows an
+#   optional "an"/"zu"/"to" and article between phrase and role token.
+#   ``delegier\w*`` already covers "delegiert an".
+# provider_literal_allow: path globs where provider-specific literals are intended (IC-32).
+dispatch_phrases:
+  en:
+    - 'hand[ -]?off to'
+    - 'hand back to'
+    - '\broute to'
+  de:
+    - 'dispatch(?:e)? an'
+    - 'weiter(?:leiten)? an'
+    - 'delegier\w*'
+    - 'beauftrag\w*'
+    - '\bweise\s+\S+\s+an'
+    - 'übergib'
+    - 'übernimm\w*'
+    - 'übernehm\w*'
+    - 'weiterreich\w*'
+    - 'überträg\w*'
+provider_literal_allow:
+  # Provider experts document one provider by design.
+  - 'agents/2-platform/agent-meta-*-expert.md'
+  - 'agents/1-generic/mammouth-expert.md'
+  # False positive: the English word "Continue" matches a provider name (case-sensitive).
+  - 'agents/1-generic/se-termination.md'
+  # Book title mentioning a provider name, not a provider dependency.
+  - 'agents/1-generic/prompt-engineer.md'
+  # Not allowed on purpose: agents/1-generic/agent-meta-manager.md (generator/
+  # framework documentation) - hits stay visible as warnings.
+  # rules/1-generic/* is out of scope until Q30 (not scanned).

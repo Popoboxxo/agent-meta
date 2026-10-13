@@ -10,21 +10,26 @@ inside ``NEXT:`` blocks for that workflow.
 
 Detection
 ---------
-* ``T-ROUTE-COL``  — table header containing a ``Route`` column. Scans the whole scope.
-* ``T-ROLE-ARROW`` — ``roleA → roleB`` where BOTH tokens resolve to the dynamic
-  role list. Backticks are optional on each side; a construct whose tokens do not
-  both resolve to roles is exempted via ``D-NONROLE``. Scans the whole scope.
-* ``T-HANDOFF``    — ``hand off to | hand back to | delegiert an | route to |
-  dispatch(e) an | weiter(leiten) an`` followed by a role token, optionally
-  preceded by a German article (``den|dem|einen|der|die|das``) or ``the``.
-  Backticks optional. Scans the whole scope.
-* ``T-NEXT``       — ``NEXT: [ ... role ... ]``. Restricted to the spec/plan-workflow
-  files listed in the design addendum §A.2 offender list.
+All classes scan the whole scope (every file below), not only the workflow files.
+
+* ``T-ROUTE-COL``  — table header containing a ``Route`` column.
+* ``T-ROLE-ARROW`` — (a) ``roleA → roleB`` where BOTH tokens resolve to the dynamic
+  role list (backticks optional); (b) ``text? → `role` `` / ``text) → `role` ``;
+  (c) list lines ``- text → `role` `` (class B, no ``?``/``)`` needed). A construct
+  whose target is not a role is exempted via ``D-NONROLE``.
+* ``T-HANDOFF``    — any phrase from ``dispatch_phrases.en|de`` in
+  ``config/active-set-references.yaml`` (e.g. ``hand off to``, ``route to``,
+  ``delegier*``, ``beauftrag*``, ``übergib``, ``übernimm*``, ``weise X an``)
+  followed by a role token, optionally preceded by ``an|zu|to`` and an article
+  (``den|dem|einen|der|die|das|the``). Backticks optional.
+* ``T-NEXT``       — ``NEXT: [ ... role ... ]`` (AC-71 class D, every scope file).
 
 Allowed documentation forms (``D-*``)
 -------------------------------------
 * ``D-BOUNDARY``      — lines inside a ``<context>`` block that carries a
-  ``Role and boundary`` heading, or lines starting with ``**Not your job:**``.
+  ``Role and boundary`` heading, lines starting with ``**Not your job:**``, and
+  list items under a boundary label (``Not this role``, ``Out of scope``,
+  ``What you do NOT do``, ``Boundaries``, ``Delegation (reference only)``).
 * ``D-REFERENCE``     — lines starting with ``**Delegation (reference only):**``.
 * ``D-PIPELINE``      — the detected construct itself names a pipeline/pair id
   (``quality_pipelines.*`` / ``reflection_pairs.*``) instead of a bare role. This
@@ -57,9 +62,12 @@ _SCOPE_GLOBS = (
     "agents/1-generic/*.md",
     "rules/1-generic/*.md",
     "snippets/**/*.md",
+    "agents/2-platform/*.md",
+    "rules/2-platform/*.md",
 )
 
-# Spec/plan-workflow files (design addendum §A.2 offender list). T-NEXT applies here only.
+# Spec/plan-workflow files (design addendum §A.2 offender list). Kept for the
+# ``workflow_file`` flag of ``classify_line``; T-NEXT itself applies to every scope file.
 _WORKFLOW_FILES = frozenset(
     {
         "rules/1-generic/spec-plan-workflow.md",
@@ -86,12 +94,47 @@ _ARROW_RE = re.compile(
     r"(?<![A-Za-z0-9_-])`?([A-Za-z0-9_-]+)`?\s*(?:→|->)\s*"
     r"`?([A-Za-z0-9_-]+)`?(?![A-Za-z0-9_-])"
 )
-_HANDOFF_RE = re.compile(
-    r"(?i)(?:hand[ -]?off to|hand back to|delegiert an|route to|"
-    r"dispatch(?:e)? an|weiter(?:leiten)? an)"
-    r"\s+(?:the\s+|der\s+|die\s+|das\s+|den\s+|dem\s+|einen\s+)?"
-    r"`?([A-Za-z0-9_.-]+)`?"
+_ARROW_TEXT_RE = re.compile(
+    # "Write tests? -> `tester`": the left side is prose (ends with ``?``/``)``),
+    # so the adjacent-token pattern above cannot see it (IC-30, #885 class B).
+    r"[?)]`?\s*(?:→|->)\s*`?([A-Za-z0-9_-]+)`?(?![A-Za-z0-9_-])"
 )
+_ARROW_LIST_RE = re.compile(r"(?:→|->)\s*`([A-Za-z0-9_-]+)`(?![A-Za-z0-9_-])")
+_LIST_ITEM_RE = re.compile(r"^\s*(?:[-*]|\d+\.)\s")
+# Header lines that open a boundary list (items below are role boundaries, not routes).
+_BOUNDARY_LABEL_RE = re.compile(
+    r"not this role|out of scope|do(?:es)? not (?:do|cover|check)|\bnot your job\b"
+    r"|boundaries|reference only",
+    re.IGNORECASE,
+)
+_DISPATCH_PHRASES_FILE = Path("config") / "active-set-references.yaml"
+_HANDOFF_RE_CACHE: dict[Path, "re.Pattern[str]"] = {}
+
+
+def load_dispatch_phrases(repo_root: Path = REPO_ROOT) -> list[str]:
+    """``dispatch_phrases.de`` + ``.en`` from config (shared with IC-19; never hardcoded)."""
+    data = _load_yaml(repo_root / _DISPATCH_PHRASES_FILE)
+    phrases = data.get("dispatch_phrases") or {}
+    return list(phrases.get("en") or []) + list(phrases.get("de") or [])
+
+
+def build_handoff_re(phrases: list[str]) -> "re.Pattern[str]":
+    alternation = "|".join(f"(?:{phrase})" for phrase in phrases)
+    return re.compile(
+        rf"(?i)(?:{alternation})"
+        r"\s+(?:(?:an|zu|to)\s+)?"
+        r"(?:the\s+|der\s+|die\s+|das\s+|den\s+|dem\s+|einen\s+)?"
+        r"`?([A-Za-z0-9_.-]+)`?"
+    )
+
+
+def handoff_re(repo_root: Path = REPO_ROOT) -> "re.Pattern[str]":
+    if repo_root not in _HANDOFF_RE_CACHE:
+        _HANDOFF_RE_CACHE[repo_root] = build_handoff_re(load_dispatch_phrases(repo_root))
+    return _HANDOFF_RE_CACHE[repo_root]
+
+
+
 _NEXT_RE = re.compile(r"^\s*NEXT:\s*\[([^\]]*)\]")
 
 # Narrow, role-scoped replacement for the former line-wide D-ESCALATION rule:
@@ -108,11 +151,61 @@ _ORCHESTRATOR_FILE = "agents/1-generic/orchestrator.md"
 
 _REFERENCE_PREFIX = "**Delegation (reference only):**"
 _NOT_YOUR_JOB_PREFIX = "**Not your job:**"
+_BOUNDARY_PREFIXES = (_NOT_YOUR_JOB_PREFIX, "**Boundary:**", "**Scope:**")
 _FORBIDDEN_REFERENCE_TOKENS = ("background(", "invoke_subagent", "task(subagent_type")
 
 _CONTEXT_OPEN = "<context>"
 _CONTEXT_CLOSE = "</context>"
 _BOUNDARY_HEADING_RE = re.compile(r"^##\s+Role and boundary\s*$")
+
+
+# Ratchet registry (IC-30, #885): existing uncovered constructs as "file:class" (no line
+# numbers). May only shrink; every Phase-1 triage PR removes its entries. New hits fail.
+# T-NEXT entries (AC-71 class D, #885 F-03) and list-arrow T-ROLE-ARROW entries (class B,
+# outside boundary sections) were added when both detections became repo-wide.
+ROUTE_RATCHET: frozenset[str] = frozenset(
+    {
+        "agents/1-generic/accessibility-specialist.md:T-NEXT",
+        "agents/1-generic/ai-governance-engineer.md:T-NEXT",
+        "agents/1-generic/ai-observability-engineer.md:T-NEXT",
+        "agents/1-generic/code-reviewer.md:T-NEXT",
+        "agents/1-generic/concept-architect.md:T-ROLE-ARROW",
+        "agents/1-generic/concept-reviewer.md:T-ROLE-ARROW",
+        "agents/1-generic/concept-specifier.md:T-ROLE-ARROW",
+        "agents/1-generic/copyeditor.md:T-NEXT",
+        "agents/1-generic/data-engineer.md:T-NEXT",
+        "agents/1-generic/database-engineer.md:T-NEXT",
+        "agents/1-generic/dependency-auditor.md:T-NEXT",
+        "agents/1-generic/design-system-architect.md:T-ROLE-ARROW",
+        "agents/1-generic/developer.md:T-ROLE-ARROW",
+        "agents/1-generic/documenter.md:T-HANDOFF",
+        "agents/1-generic/feedback.md:T-ROLE-ARROW",
+        "agents/1-generic/frontend-component-engineer.md:T-ROLE-ARROW",
+        "agents/1-generic/incident-responder.md:T-NEXT",
+        "agents/1-generic/incident-responder.md:T-ROLE-ARROW",
+        "agents/1-generic/knowledge-curator.md:T-HANDOFF",
+        "agents/1-generic/knowledge-ingestor.md:T-HANDOFF",
+        "agents/1-generic/knowledge-querier.md:T-HANDOFF",
+        "agents/1-generic/llm-evaluator.md:T-NEXT",
+        "agents/1-generic/meta-feedback.md:T-ROLE-ARROW",
+        "agents/1-generic/product-manager.md:T-NEXT",
+        "agents/1-generic/proofreader.md:T-NEXT",
+        "agents/1-generic/rag-engineer.md:T-NEXT",
+        "agents/1-generic/refactoring-specialist.md:T-NEXT",
+        "agents/1-generic/requirements.md:T-NEXT",
+        "agents/1-generic/se-integration-and-test-manager.md:T-ROLE-ARROW",
+        "agents/1-generic/se-requirements.md:T-ROLE-ARROW",
+        "agents/1-generic/se-validator.md:T-ROLE-ARROW",
+        "agents/1-generic/sre-engineer.md:T-NEXT",
+        "agents/1-generic/technical-writer.md:T-NEXT",
+        "agents/1-generic/test-executor.md:T-NEXT",
+        "agents/1-generic/validator.md:T-NEXT",
+        "agents/2-platform/homeassistant-developer.md:T-ROLE-ARROW",
+        "rules/1-generic/a2a-delegation-gates.md:T-ROLE-ARROW",
+        "rules/1-generic/use-orchestrator.md:T-ROLE-ARROW",
+        "rules/2-platform/gemini-orchestrator-first.md:T-HANDOFF",
+    }
+)
 
 
 @dataclass
@@ -175,6 +268,10 @@ def load_pipeline_ids(repo_root: Path = REPO_ROOT) -> set[str]:
     return pipelines | pairs
 
 
+# Module-level default (REPO_ROOT config), kept for the public ``_HANDOFF_RE`` interface.
+_HANDOFF_RE = handoff_re(REPO_ROOT)
+
+
 def iter_scope_files(repo_root: Path = REPO_ROOT) -> list[Path]:
     files: list[Path] = []
     for pattern in _SCOPE_GLOBS:
@@ -206,6 +303,33 @@ def boundary_lines(text: str) -> set[int]:
     return allowed
 
 
+def boundary_section_lines(text: str) -> set[int]:
+    """1-based numbers of list items directly under a boundary label line.
+
+    A label line (``**What you do NOT do:**``, ``## Out of scope`` ...) opens a
+    section; it ends at the first non-list text line or heading after the items.
+    """
+    allowed: set[int] = set()
+    active = False
+    seen_item = False
+    for number, line in enumerate(text.splitlines(), start=1):
+        stripped = line.strip()
+        if _BOUNDARY_LABEL_RE.search(stripped) and not _LIST_ITEM_RE.match(line):
+            active, seen_item = True, False
+            continue
+        if not active:
+            continue
+        if _LIST_ITEM_RE.match(line):
+            allowed.add(number)
+            seen_item = True
+        elif not stripped:
+            if seen_item:
+                active = False
+        elif stripped.startswith("#") or (seen_item and not line.startswith((" ", "\t"))):
+            active = False
+    return allowed
+
+
 def _pipeline_target(token: str, pipeline_ids: set[str]) -> bool:
     """Case-insensitive membership check for a pipeline/pair id token."""
     return token in pipeline_ids or token.lower() in {p.lower() for p in pipeline_ids}
@@ -219,6 +343,7 @@ def classify_line(
     is_boundary: bool,
     workflow_file: bool,
     is_orchestrator: bool = False,
+    handoff_pattern: "re.Pattern[str] | None" = None,
 ) -> list[tuple[str, list[str]]]:
     """Return ``[(kind, allowed_reasons), ...]`` for one line.
 
@@ -230,7 +355,7 @@ def classify_line(
     constructs: list[tuple[str, list[str]]] = []
 
     reasons: list[str] = []
-    if is_boundary or line.lstrip().startswith(_NOT_YOUR_JOB_PREFIX):
+    if is_boundary or line.lstrip().startswith(_BOUNDARY_PREFIXES):
         reasons.append("D-BOUNDARY")
     if line.lstrip().startswith(_REFERENCE_PREFIX):
         reasons.append("D-REFERENCE")
@@ -248,8 +373,20 @@ def classify_line(
             arrow_reasons.append("D-NONROLE")
         constructs.append(("T-ROLE-ARROW", arrow_reasons))
 
-    match = _HANDOFF_RE.search(line)
-    if match:
+    text_targets = _ARROW_TEXT_RE.findall(line)
+    if _LIST_ITEM_RE.match(line):
+        text_targets += _ARROW_LIST_RE.findall(line)
+    for target in text_targets:
+        # ``text -> role``: only exempt when the right side is not a role (D-NONROLE).
+        text_reasons = list(reasons)
+        if _pipeline_target(target, pipeline_ids):
+            text_reasons.append("D-PIPELINE")
+        if target not in roles:
+            text_reasons.append("D-NONROLE")
+        constructs.append(("T-ROLE-ARROW", text_reasons))
+
+    pattern = handoff_pattern or _HANDOFF_RE
+    for match in pattern.finditer(line):
         target = match.group(1).lower()
         handoff_reasons = list(reasons)
         is_pipeline_target = _pipeline_target(target, pipeline_ids)
@@ -260,13 +397,14 @@ def classify_line(
         if target in roles or is_pipeline_target:
             constructs.append(("T-HANDOFF", handoff_reasons))
 
-    if workflow_file:
-        next_match = _NEXT_RE.search(line)
-        if next_match and any(
-            re.search(rf"(?i)(?<![\w-]){re.escape(role)}(?![\w-])", next_match.group(1))
-            for role in roles
-        ):
-            constructs.append(("T-NEXT", list(reasons)))
+    # T-NEXT applies to every scope file (AC-71 class D); ``workflow_file`` is
+    # retained only for call-site compatibility.
+    next_match = _NEXT_RE.search(line)
+    if next_match and any(
+        re.search(rf"(?i)(?<![\w-]){re.escape(role)}(?![\w-])", next_match.group(1))
+        for role in roles
+    ):
+        constructs.append(("T-NEXT", list(reasons)))
 
     return constructs
 
@@ -274,11 +412,12 @@ def classify_line(
 def find_findings(repo_root: Path = REPO_ROOT) -> list[Finding]:
     roles = load_roles(repo_root)
     pipeline_ids = load_pipeline_ids(repo_root)
+    handoff_pattern = handoff_re(repo_root)
     findings: list[Finding] = []
     for path in iter_scope_files(repo_root):
         rel = path.relative_to(repo_root).as_posix()
         text = path.read_text(encoding="utf-8")
-        boundary = boundary_lines(text)
+        boundary = boundary_lines(text) | boundary_section_lines(text)
         is_workflow = rel in _WORKFLOW_FILES
         is_orchestrator = rel == _ORCHESTRATOR_FILE
         for number, line in enumerate(text.splitlines(), start=1):
@@ -289,6 +428,7 @@ def find_findings(repo_root: Path = REPO_ROOT) -> list[Finding]:
                 is_boundary=number in boundary,
                 workflow_file=is_workflow,
                 is_orchestrator=is_orchestrator,
+                handoff_pattern=handoff_pattern,
             ):
                 if not reasons:
                     findings.append(Finding(rel, number, kind, line))
@@ -305,11 +445,95 @@ def _reference_lines(repo_root: Path = REPO_ROOT) -> list[tuple[str, int, str]]:
     return lines
 
 
+def _key(finding: Finding) -> str:
+    return f"{finding.path}:{finding.kind}"
+
+
+def new_findings(repo_root: Path = REPO_ROOT, ratchet: frozenset = ROUTE_RATCHET) -> list[Finding]:
+    """Findings not covered by the ratchet registry."""
+    return [f for f in find_findings(repo_root) if _key(f) not in ratchet]
+
+
+def stale_ratchet_entries(
+    repo_root: Path = REPO_ROOT, ratchet: frozenset = ROUTE_RATCHET
+) -> list[str]:
+    """Registry entries without a current hit (must be removed: ratchet only shrinks)."""
+    current = {_key(f) for f in find_findings(repo_root)}
+    return sorted(ratchet - current)
+
+
 def test_no_uncovered_role_routes_in_templates():
-    findings = find_findings()
+    findings = new_findings()
     assert findings == [], "Uncovered routing constructs:\n" + "\n".join(
         str(f) for f in findings
     )
+
+
+def test_route_ratchet_only_shrinks():
+    stale = stale_ratchet_entries()
+    assert stale == [], (
+        "ROUTE_RATCHET entries without a hit - remove them (ratchet may only shrink):\n"
+        + "\n".join(stale)
+    )
+
+
+def _fixture_repo(tmp_path: Path, template_body: str, rel: str = "agents/2-platform/x.md") -> Path:
+    (tmp_path / "config").mkdir()
+    for name in ("role-defaults.yaml", "active-set-references.yaml"):
+        (tmp_path / "config" / name).write_text(
+            (REPO_ROOT / "config" / name).read_text(encoding="utf-8"), encoding="utf-8"
+        )
+    target = tmp_path / rel
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(template_body, encoding="utf-8")
+    return tmp_path
+
+
+def test_new_german_imperative_in_fixture_template_fails_guard(tmp_path):
+    root = _fixture_repo(tmp_path, "# X\n\nDelegiere an `tester`, wenn fertig.\n")
+    hits = new_findings(root)
+    assert [(h.kind, h.line) for h in hits] == [("T-HANDOFF", 3)]
+
+
+def test_fixture_in_platform_rules_scope_is_scanned(tmp_path):
+    root = _fixture_repo(
+        tmp_path, "Bitte beauftrage den `developer` mit dem Fix.\n", "rules/2-platform/r.md"
+    )
+    assert [h.kind for h in new_findings(root)] == ["T-HANDOFF"]
+
+
+def test_new_hit_in_ratcheted_file_other_class_still_fails(tmp_path):
+    root = _fixture_repo(tmp_path, "Delegiere an `tester`.\n", "agents/1-generic/developer.md")
+    assert new_findings(root, ratchet=frozenset({"agents/1-generic/developer.md:T-ROLE-ARROW"}))
+    assert not new_findings(root, ratchet=frozenset({"agents/1-generic/developer.md:T-HANDOFF"}))
+
+
+def test_guard_and_config_share_dispatch_phrases():
+    phrases = load_dispatch_phrases()
+    assert phrases, "dispatch_phrases.de/en must be configured"
+    data = _load_yaml(REPO_ROOT / "config" / "active-set-references.yaml")
+    assert set(data["dispatch_phrases"]) == {"de", "en"}
+    assert "provider_literal_allow" in data
+
+
+def test_885_negative_anchors_are_flagged():
+    roles = load_roles()
+    pipeline_ids = load_pipeline_ids()
+    for line in (
+        "Delegiere an `knowledge-indexer`.",
+        "Delegiere an `tester`.",
+        "- Write tests? → `tester`",
+        "Übergib an den `developer`.",
+        "Leite das weiter: übernimm `validator`.",
+    ):
+        constructs = classify_line(
+            line,
+            roles=roles | {"knowledge-indexer"},
+            pipeline_ids=pipeline_ids,
+            is_boundary=False,
+            workflow_file=False,
+        )
+        assert any(reasons == [] for _, reasons in constructs), f"not flagged: {line!r}"
 
 
 def test_delegation_reference_lines_have_no_dispatch_semantics():
@@ -323,7 +547,7 @@ def test_delegation_reference_lines_have_no_dispatch_semantics():
 
 
 def test_next_role_labels_absent_in_spec_plan_workflow_scope():
-    findings = [f for f in find_findings() if f.kind == "T-NEXT"]
+    findings = [f for f in new_findings() if f.kind == "T-NEXT"]
     assert findings == [], "Role labels in NEXT: for spec/plan workflow:\n" + "\n".join(
         str(f) for f in findings
     )
@@ -454,3 +678,56 @@ def test_d_escalation_requires_principal_developer_target():
     assert any(reasons == [] for _, reasons in constructs), (
         "escalation keyword with a non-escalation role must be flagged"
     )
+
+
+def test_custom_dispatch_phrase_from_config_is_detected(tmp_path):
+    """The guard must derive its phrases from the config file, not a hardcoded list."""
+    body = "Please zzhandoff the `tester` now.\n"
+    control = tmp_path / "control"
+    control.mkdir()
+    assert new_findings(_fixture_repo(control, body)) == [], "unconfigured phrase must not hit"
+    configured = tmp_path / "configured"
+    configured.mkdir()
+    root = _fixture_repo(configured, body)
+    cfg = root / "config" / "active-set-references.yaml"
+    cfg.write_text(
+        cfg.read_text(encoding="utf-8").replace("  en:\n", "  en:\n    - 'zzhandoff'\n", 1),
+        encoding="utf-8",
+    )
+    assert [h.kind for h in new_findings(root)] == ["T-HANDOFF"]
+
+
+def test_next_block_with_role_is_flagged_in_every_scope_file(tmp_path):
+    """AC-71 class D: ``NEXT: [... role ...]`` is no longer limited to workflow files."""
+    root = _fixture_repo(tmp_path, "# X\n\nNEXT: [Review | tester]\n")
+    assert [(h.kind, h.line) for h in new_findings(root)] == [("T-NEXT", 3)]
+
+
+def test_next_block_without_role_is_allowed(tmp_path):
+    root = _fixture_repo(tmp_path, "# X\n\nNEXT: [Review | Tests | Commit]\n")
+    assert new_findings(root) == []
+
+
+def test_list_arrow_route_without_question_mark_is_flagged(tmp_path):
+    """#885 class B: ``- text -> `role` `` needs no ``?``/``)`` on the left side."""
+    root = _fixture_repo(tmp_path, "# X\n\n- Update the docs → `documenter`\n")
+    assert [(h.kind, h.line) for h in new_findings(root)] == [("T-ROLE-ARROW", 3)]
+
+
+def test_list_arrow_to_non_role_is_allowed(tmp_path):
+    root = _fixture_repo(tmp_path, "# X\n\n- retry → fallback → `failed` when exhausted\n")
+    assert new_findings(root) == []
+
+
+def test_list_arrow_under_out_of_scope_label_is_allowed(tmp_path):
+    body = (
+        "# X\n\n**What you do NOT do:**\n- Code quality → `code-reviewer`\n"
+        "- Tests → `tester`\n\nOther text.\n\n- Docs → `documenter`\n"
+    )
+    root = _fixture_repo(tmp_path, body)
+    assert [(h.kind, h.line) for h in new_findings(root)] == [("T-ROLE-ARROW", 9)]
+
+
+def test_section_label_variants_open_boundary_sections():
+    text = "Not this role:\n- a → `tester`\n\n## Out of scope\n\n- b → `tester`\n"
+    assert boundary_section_lines(text) == {2, 6}
