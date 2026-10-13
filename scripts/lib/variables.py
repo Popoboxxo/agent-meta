@@ -304,6 +304,8 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
     conditional_vars.update({k for k in variables if k.startswith("REPO_CONTAINMENT_")})
     conditional_vars.update({k for k in variables if k.startswith("SUBAGENT_PERMISSIONS_")})
     conditional_vars.update({k for k in variables if k.endswith("_SET")})
+    # IC-03 / IC-17: per-role activity flags (ROLE_<UPPER_SNAKE>_ACTIVE)
+    conditional_vars.update({k for k in variables if k.startswith("ROLE_") and k.endswith("_ACTIVE")})
 
     if not conditional_vars:
         return text

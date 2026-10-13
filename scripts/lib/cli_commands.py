@@ -330,6 +330,9 @@ class _SyncContext:
         self.viz_cfg = viz_cfg
         self.harness = harness
         self.mode: str | None = None
+        # IC-17: computed once per sync by _build_context; no consumer reads
+        # it yet (consumer migration is IC-18, later phase).
+        self.active_set = None
         # Report-only modes (e.g. --audit-config) set this so main() skips the
         # common tail, which writes env.* scripts and sync.log (issue #738).
         self.read_only = False
@@ -589,13 +592,23 @@ def _build_context(args, agent_meta_root: Path, log: "SyncLog"):
     for w in pre_warnings:
         log.warn(w)
 
-    return _SyncContext(
+    ctx = _SyncContext(
         args=args, log=log, agent_meta_root=agent_meta_root,
         project_root=project_root, config=config, config_path=config_path,
         variables=variables, platforms=platforms,
         source_version=source_version, viz_cfg=viz_cfg,
         harness=harness,
     )
+    # IC-17: single ActiveSet per sync; unknown-role / gate-dropped warnings
+    # go to the sync log. Informational only -- does not alter any render.
+    from lib.active_set import compute_active_set
+    active_warnings: list = []
+    ctx.active_set = compute_active_set(
+        config, agent_meta_root, project_root, warn_sink=active_warnings)
+    for w in active_warnings:
+        if w.startswith("active-set."):
+            log.warn(w)
+    return ctx
 
 
 def _resolve_and_guard_harness(args, agent_meta_root: Path, project_root: Path,
