@@ -79,7 +79,8 @@ def put(root, rel, text="", *, binary=None):
     if binary is not None:
         path.write_bytes(binary)
     else:
-        path.write_text(text, encoding="utf-8", newline="")
+        with open(path, "w", encoding="utf-8", newline="") as fh:
+            fh.write(text)
     return path
 
 
