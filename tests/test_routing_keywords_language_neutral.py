@@ -4,6 +4,10 @@ No keyword may contain umlauts (a, o, u with diaeresis, sharp s) or a word from 
 it is listed in ``config/routing-language.yaml: keyword_allow`` with a reason.
 The allowlist may only shrink (ratchet): stale entries and growth beyond the
 Phase-0 baseline fail.
+
+"Migrationsschuld" (migration debt) is a deliberate, accepted reason for an
+allowlist entry. PHASE0_ALLOW_MAX must be lowered together with every
+shrinkage of ``keyword_allow`` so the ratchet stays tight.
 """
 import re
 import sys

@@ -51,9 +51,10 @@ def test_p10_reports_only_pairs_with_all_roles_active():
                       if len(roles & active.routable) >= 2)
     assert _tokens(findings) == expected
     assert len(expected) < 9
-    for f in findings:  # no inactive role may appear in the message
-        assert not any(r in f.message for r in active.known_roles - active.roles
-                       if r in KNOWN_KEYWORD_OVERLAPS[f.message.split("'")[1]])
+    for f in findings:  # message role set must stay within the routable roles
+        listed = f.message.split("routable roles:", 1)[1]
+        roles = {r.strip() for r in listed.split(",")}
+        assert roles <= active.routable, f.message
 
 
 def test_overlap_check_is_deterministic():
@@ -96,3 +97,12 @@ def test_get_routing_rules_threads_info_sink(monkeypatch):
     rules = get_routing_rules(_ROOT, {}, {}, language="English", info_sink=sink)
     assert any("routing.examples-language-fallback" in m and "developer" in m for m in sink)
     assert [r for r in rules["rules"] if r["agent"] == "developer"][0]["examples"] == ["a"]
+
+
+def test_fallback_log_skips_empty_role_and_language_alias():
+    examples = {"Deutsch": ["a"], "English": ["b"]}
+    sink: list = []
+    assert _select_examples(examples, "Francais", info_sink=sink) == ["a"]  # no role
+    assert sink == []
+    _select_examples(examples, "en", role="r1", info_sink=sink)  # alias of English
+    assert sink == []

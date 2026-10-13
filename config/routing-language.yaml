@@ -3,6 +3,9 @@
 # keyword_allow: German keywords tolerated by tests/test_routing_keywords_language_neutral.py.
 #   Phase-0 baseline (ratchet): the list may only shrink. Each German variant moves
 #   to examples.Deutsch in Phase 1 (eval-gated) and its entry is deleted then.
+#   "Migrationsschuld" (migration debt) is deliberately accepted as a reason.
+#   PHASE0_ALLOW_MAX in tests/test_routing_keywords_language_neutral.py must be
+#   lowered with every shrinkage of this list.
 keyword_allow:
   - keyword: "API prüfen"
     reason: "Phase-0 baseline: German keyword awaiting migration to examples.Deutsch (IC-29)"

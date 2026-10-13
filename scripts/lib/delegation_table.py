@@ -131,6 +131,20 @@ def get_active_agents_data(
     return active_agents_data
 
 
+_LANGUAGE_ALIASES = {"en": "english", "de": "deutsch"}
+
+
+def _has_language_variant(examples: dict, language: str) -> bool:
+    """True if ``examples`` has a list under ``language`` or its alias (log decision only)."""
+
+    def norm(value: object) -> str:
+        text = str(value).strip().casefold()
+        return _LANGUAGE_ALIASES.get(text, text)
+
+    wanted = norm(language)
+    return any(isinstance(v, list) and norm(k) == wanted for k, v in examples.items())
+
+
 def _note_examples_fallback(role: str, language: str, info_sink: list[str] | None) -> None:
     """Record the INFO ``routing.examples-language-fallback`` (log only, no render effect)."""
     message = (
@@ -176,7 +190,10 @@ def _select_examples(
     if isinstance(examples, dict):
         variant = examples.get(language)
         if not isinstance(variant, list):
-            _note_examples_fallback(role, language, info_sink)
+            # Log only a genuine miss: needs a role and no variant under the
+            # language's alias either ("en" vs mapping key "English").
+            if role and not _has_language_variant(examples, language):
+                _note_examples_fallback(role, language, info_sink)
             # Deterministic fallback: first list variant in insertion order.
             variant = next(
                 (v for v in examples.values() if isinstance(v, list)), []
