@@ -38,6 +38,7 @@ CHECK_GATE_DROPPED = "active-set.gate-dropped"
 CHECK_UNKNOWN_ROLE = "active-set.unknown-role"
 CHECK_UNRESOLVED = "active-set.unresolved-placeholder"
 CHECK_PATTERN_MISSING = "active-set.dispatch-pattern-missing"
+CHECK_KEYWORD_OVERLAP = "routing.keyword-overlap"
 CHECK_INVALID_PHRASE = "active-set.invalid-dispatch-phrase"
 
 _AGENT_META_ROOT = Path(__file__).resolve().parents[3]
@@ -278,3 +279,21 @@ def check_unresolved_placeholder(project_root: Path, active_providers: Sequence[
                     f"unresolved placeholder {ph} ({n}x)",
                     "Set the variable in project.yaml or add it to placeholder_allow"))
     return _dedupe(findings)
+
+
+def check_keyword_overlap(project_root: Path, active_providers: Sequence[str],
+                          capabilities: Mapping[str, Mapping], active_set) -> list:
+    """IC-29 (INFO): keywords shared by >= 2 roles of ``ActiveSet.routable``."""
+    from ..roles import load_roles_config
+
+    roles = load_roles_config(_AGENT_META_ROOT).get("roles") or {}
+    owners: dict = {}
+    for role in sorted(frozenset(active_set.routable)):
+        patterns = (roles.get(role) or {}).get("routing_patterns") or {}
+        for kw in patterns.get("keywords") or []:
+            owners.setdefault(str(kw).strip().casefold(), set()).add(role)
+    return [Finding(
+        Severity.INFO, CHECK_KEYWORD_OVERLAP, "config/role-defaults.yaml",
+        f"keyword '{tok}' is shared by routable roles: {', '.join(sorted(rs))}",
+        "Sharpen the keyword or keep it covered by collision eval cases")
+        for tok, rs in sorted(owners.items()) if len(rs) >= 2]
