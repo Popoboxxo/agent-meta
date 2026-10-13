@@ -19,8 +19,7 @@ WARNING, no exit-code change). ``_warn`` reads ``PHASE0_SEVERITY``; promoting a
 check to its spec level (e.g. ``over-hard-cap`` and ``marker-in-rule`` from
 Phase 1) is a one-line change in that table.
 
-Not part of this module (task 0b.2): ``context.token-report`` (0a report),
-``context.declared-surface-empty`` (IC-33) and ``context.legacy-artifact-present``.
+Not part of this module: ``context.token-report`` (0a report).
 Known gap, Phase 1: the Copilot soft cap is per instruction file; it is only
 checked here against the entry file.
 
@@ -53,6 +52,8 @@ SPEC_SEVERITY = {
     "context.rule-unreachable": Severity.ERROR,   # WARN in Phase 0, ERROR from Phase 1
     "context.unread-channel": Severity.WARNING,
     "context-profile.marker-in-rule": Severity.ERROR,
+    "context.declared-surface-empty": Severity.ERROR,   # WARN in Phase 0, ERROR from Phase 1
+    "context.legacy-artifact-present": Severity.WARNING,
 }
 PHASE0_SEVERITY = {check: Severity.WARNING for check in SPEC_SEVERITY}
 
@@ -465,4 +466,107 @@ def check_marker_in_rule(
                 f"rule file contains the profile marker {COMPACT_MARKER} "
                 "(native rules must be identical in every context profile)",
                 "move profile-conditional content out of rules (IC-03)"))
+    return findings
+
+
+# ---------------------------------------------------------------------------
+# context.declared-surface-empty / context.legacy-artifact-present (IC-33)
+# ---------------------------------------------------------------------------
+
+# surface -> target key (dotted path into the merged provider mapping). Single
+# source for the doctor predicate ``surface_has_target``; surfaces without an
+# entry (agents, rules, context_file, workspace_agents_autoload) never produce
+# a declared-surface-empty finding.
+_SURFACE_TARGET_KEYS = {
+    "skills": "skills_dir",
+    "commands": "commands_dir",
+    "mcp": "mcp-config.committed-file",
+    "settings": "settings_file",
+}
+
+
+def surface_target_key(surface: str) -> Optional[str]:
+    """Return the ai-providers target key of a surface, ``None`` if it has none."""
+    return _SURFACE_TARGET_KEYS.get(surface)
+
+
+def _target_path(caps: Mapping, key: str) -> Optional[str]:
+    """Resolve a dotted target key in *caps*; ``None`` unless it is a non-empty string."""
+    node = caps
+    for part in key.split("."):
+        node = node.get(part) if isinstance(node, Mapping) else None
+    return node if isinstance(node, str) and node else None
+
+
+def _surface_has_artifact(project_root: Path, surface: str, rel: str) -> bool:
+    if surface == "skills":
+        return _has_any_skill(project_root, rel)
+    if surface == "commands":
+        return _non_empty_dir(project_root / rel)
+    return (project_root / rel).is_file()
+
+
+def _intentional_empty() -> set:
+    """Surfaces of ``intentional_empty`` ``{provider_capability, reason}``; a reason is mandatory."""
+    surfaces = set()
+    for entry in _load_anchor_list("intentional_empty"):
+        if not isinstance(entry, dict):
+            continue
+        surface, reason = entry.get("provider_capability"), entry.get("reason")
+        if isinstance(surface, str) and surface and isinstance(reason, str) and reason.strip():
+            surfaces.add(surface)
+    return surfaces
+
+
+def check_declared_surface_empty(
+    project_root: Path,
+    active_providers: Sequence[str],
+    capabilities: Mapping[str, Mapping],
+    active_set,
+) -> list:
+    """``context.declared-surface-empty``: declared surface without generated artifact (WARN; spec: ERROR from Phase 1).
+
+    A provider declares a surface when its mapping carries the surface's target
+    key (``skills_dir``, ``commands_dir``, ``mcp-config.committed-file``,
+    ``settings_file``). Skills count as generated when ``<dir>/*/SKILL.md``
+    exists, commands when the directory is non-empty, mcp/settings when the
+    file exists. ``config/context-anchors.yaml: intentional_empty`` exempts a
+    surface (``provider_capability: <surface>``, ``reason`` mandatory).
+    """
+    root = Path(project_root)
+    exempt = _intentional_empty()
+    findings = []
+    for provider in active_providers:
+        caps = capabilities.get(provider) or {}
+        for surface, key in _SURFACE_TARGET_KEYS.items():
+            rel = _target_path(caps, key)
+            if rel is None or surface in exempt or _surface_has_artifact(root, surface, rel):
+                continue
+            findings.append(_warn(
+                "context.declared-surface-empty", rel,
+                f"{provider}: surface '{surface}' is declared ({key}: {rel}) but nothing is generated there",
+                "generate the surface, drop it from the provider capabilities or add it to "
+                "intentional_empty with a reason"))
+    return findings
+
+
+def check_legacy_artifact_present(
+    project_root: Path,
+    active_providers: Sequence[str],
+    capabilities: Mapping[str, Mapping],
+    active_set,
+) -> list:
+    """``context.legacy-artifact-present``: a path of ``legacy_artifacts`` exists in the project (WARN).
+
+    Inert leftovers of earlier generator versions (e.g. #853); never deleted automatically.
+    """
+    root = Path(project_root)
+    findings = []
+    for provider in active_providers:
+        for rel in (capabilities.get(provider) or {}).get("legacy_artifacts") or []:
+            if isinstance(rel, str) and rel and (root / rel).exists():
+                findings.append(_warn(
+                    "context.legacy-artifact-present", rel,
+                    f"{provider}: legacy artifact '{rel}' is still present and is no longer read",
+                    "delete the file (it is not removed automatically)"))
     return findings

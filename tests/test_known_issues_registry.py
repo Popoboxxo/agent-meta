@@ -30,11 +30,8 @@ from lib.doctor_registry import (  # noqa: E402
 
 _REGISTRY_PATH = _ROOT / "config" / "known-issues.yaml"
 
-# finding-ref check ids whose producer does not exist yet. Remove each id from
-# this set when the producer lands (0d.4: IC-10 checks). The reverse test turns
-# a stale entry red. The runner-owned doctor.* ids (doctor.environment,
-# doctor.tmp-sink-location) are defined as literals in scripts/lib/doctor_detectors.py.
-_PENDING_0D4 = {"context.declared-surface-empty", "context.legacy-artifact-present"}
+# The runner-owned doctor.* ids (doctor.environment, doctor.tmp-sink-location)
+# are defined as literals in scripts/lib/doctor_detectors.py.
 
 
 # Mandatory seeds: IC-21 table + Rev. 2.2 + Rev. 3/3.1/3.4 additions.
@@ -257,23 +254,11 @@ def _lib_source():
 
 
 def test_finding_ref_checks_exist(registry):
-    """Every finding-ref check id is produced somewhere (literal in
-    scripts/lib) or is explicitly pending / runner-owned."""
+    """Every finding-ref check id is produced somewhere (literal in scripts/lib)."""
     sources = _lib_source()
     for eid, det in _finding_refs(registry):
         check = det["check"]
-        if check in _PENDING_0D4:
-            continue
         assert any(f'"{check}"' in text for text in sources.values()), (eid, check)
-
-
-def test_pending_finding_ref_ids_are_not_in_code(registry):
-    sources = _lib_source()
-    referenced = {d["check"] for _, d in _finding_refs(registry)}
-    assert _PENDING_0D4 <= referenced
-    for check in _PENDING_0D4:
-        assert not any(f'"{check}"' in text for text in sources.values()), (
-            f"{check} now exists in code - remove it from the pending set")
 
 
 def test_sync_log_check_literal_in_delegation_table(registry):

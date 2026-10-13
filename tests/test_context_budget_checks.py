@@ -265,3 +265,87 @@ def test_duplicate_heading_does_not_mask_unembedded_rule(tmp_path):
 def test_intentional_unread_accepts_dict_entries(monkeypatch):
     monkeypatch.setattr(cb, "_load_anchor_list", lambda key: [{"glob": "a/*", "reason": "r"}, "b", {"x": 1}])
     assert cb._intentional_unread() == ["a/*", "b"]
+
+
+# --- IC-33: declared-surface-empty / legacy-artifact-present (AC-67) --------
+
+def _empty_surface_caps(**overrides) -> dict:
+    return _caps(skills_dir="sk", commands_dir="cmd", settings_file="set.json",
+                 **{"mcp-config": {"committed-file": "mcp.json"}}, **overrides)
+
+
+def test_surface_target_key_mapping():
+    assert cb.surface_target_key("skills") == "skills_dir"
+    assert cb.surface_target_key("commands") == "commands_dir"
+    assert cb.surface_target_key("mcp") == "mcp-config.committed-file"
+    assert cb.surface_target_key("settings") == "settings_file"
+    for surface in ("agents", "rules", "context_file", "workspace_agents_autoload", ""):
+        assert cb.surface_target_key(surface) is None
+
+
+def test_declared_surface_empty_reports_all_four_surfaces(tmp_path):
+    findings = cb.check_declared_surface_empty(tmp_path, ["P"], _empty_surface_caps(), None)
+    assert {f.file for f in findings} == {"sk", "cmd", "set.json", "mcp.json"}
+    assert {f.check for f in findings} == {"context.declared-surface-empty"}
+    assert all(f.severity is Severity.WARNING and f.message.startswith("P: ") for f in findings)
+    assert cb.SPEC_SEVERITY["context.declared-surface-empty"] is Severity.ERROR
+
+
+def test_declared_surface_empty_clears_with_artifacts(tmp_path):
+    _write(tmp_path / "sk" / "x" / "SKILL.md", "# x\n")
+    _write(tmp_path / "cmd" / "c.md", "# c\n")
+    _write(tmp_path / "set.json", "{}")
+    _write(tmp_path / "mcp.json", "{}")
+    assert cb.check_declared_surface_empty(tmp_path, ["P"], _empty_surface_caps(), None) == []
+
+
+def test_declared_surface_empty_negative_cases(tmp_path):
+    (tmp_path / "sk").mkdir()  # directory without SKILL.md still counts as empty
+    (tmp_path / "cmd").mkdir()
+    caps = _caps(skills_dir="sk", commands_dir="cmd")
+    assert {f.file for f in cb.check_declared_surface_empty(tmp_path, ["P"], caps, None)} == {"sk", "cmd"}
+    # no target key declared -> nothing declared; inactive provider -> not checked
+    assert cb.check_declared_surface_empty(tmp_path, ["P"], _caps(skills_dir=None, commands_dir=""), None) == []
+    assert cb.check_declared_surface_empty(tmp_path, [], caps, None) == []
+
+
+def test_declared_surface_empty_intentional_empty_suppresses(tmp_path, monkeypatch):
+    entries = [{"provider_capability": "skills", "reason": "r"},
+               {"provider_capability": "commands", "reason": ""},  # reason is mandatory
+               {"provider_capability": "mcp"}, "settings"]
+    monkeypatch.setattr(cb, "_load_anchor_list",
+                        lambda key: entries if key == "intentional_empty" else [])
+    findings = cb.check_declared_surface_empty(tmp_path, ["P"], _empty_surface_caps(), None)
+    assert {f.file for f in findings} == {"cmd", "set.json", "mcp.json"}
+
+
+def test_legacy_artifact_present(tmp_path):
+    caps = _caps(legacy_artifacts=[".old/settings.json", "gone.txt"])
+    assert cb.check_legacy_artifact_present(tmp_path, ["P"], caps, None) == []
+    _write(tmp_path / ".old" / "settings.json", "{}")
+    (finding,) = cb.check_legacy_artifact_present(tmp_path, ["P"], caps, None)
+    assert finding.check == "context.legacy-artifact-present"
+    assert finding.file == ".old/settings.json" and finding.severity is Severity.WARNING
+    assert cb.SPEC_SEVERITY["context.legacy-artifact-present"] is Severity.WARNING
+    assert cb.check_legacy_artifact_present(tmp_path, [], caps, None) == []
+    assert cb.check_legacy_artifact_present(tmp_path, ["P"], _caps(), None) == []
+
+
+def test_legacy_artifact_real_mammouth_capability(tmp_path, mappings):
+    _write(tmp_path / ".mammouth" / "settings.json", "{}")
+    findings = cb.check_legacy_artifact_present(tmp_path, ["Mammouth"], mappings, None)
+    assert [f.file for f in findings] == [".mammouth/settings.json"]
+
+
+@pytest.mark.parametrize("provider", ["Codex", "Mammouth", "Continue"])
+def test_ac67_matrix_reports_missing_skills(provider, mappings, tmp_path):
+    # AC-67: declared but empty skills directories of Codex/Mammouth/Continue
+    # (no skills are generated for them, see the module docstring)
+    findings = cb.check_declared_surface_empty(tmp_path, [provider], mappings, None)
+    assert mappings[provider]["skills_dir"] in {f.file for f in findings}
+
+
+def test_ac67_matrix_codex_real_sync(default_projects, mappings):
+    findings = _run(cb.check_declared_surface_empty, default_projects["Codex"], "Codex", mappings)
+    assert ".agents/skills" in {f.file for f in findings}
+    assert _run(cb.check_legacy_artifact_present, default_projects["Codex"], "Codex", mappings) == []

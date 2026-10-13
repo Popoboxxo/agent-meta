@@ -861,10 +861,9 @@ def test_binding_values_are_sanitised(tmp_path, monkeypatch):
 
 
 def test_every_non_pending_finding_ref_seed_resolves():
-    pending = {"context.declared-surface-empty", "context.legacy-artifact-present"}
     for e in _REGISTRY["issues"]:
         d = e["detector"]
-        if d.get("kind") != "finding-ref" or d["check"] in pending:
+        if d.get("kind") != "finding-ref":
             continue
         if d["source"] in ("context-budget", "active-set"):
             assert doctor_detectors.resolve_check_function(d["source"], d["check"]), e["id"]
