@@ -284,6 +284,19 @@ Rolle: senior-developer · Issue: #967 · PR: 0d · Depends: 0b · AC: AC-37, AC
 - [ ] Step 3: Test (pass): `python3 -m pytest tests/test_known_issues_registry.py -q`
 - [ ] Step 4: commit `feat: add known-issues registry with phase-0 seeds`
 
+#### Umsetzungs-Nachzüge Phase 0d (zur Spec-Aufnahme)
+Die freigegebene Spec bleibt unverändert; die Umsetzung von Task 0d.1 hat folgende Präzisierungen ergeben, die bei der nächsten Spec-Revision in IC-21 aufzunehmen sind (Validator: `scripts/lib/doctor_registry.py`, Registry-Header: `config/known-issues.yaml`).
+1. **Capability-Prädikate auch auf ai-providers.yaml-Keys:** `agent_ext` und `agent-transform.allowed-fields` liegen in `config/ai-providers.yaml`; Capability-Keys lösen gegen die Vereinigung von `provider-capabilities.yaml` und den Provider-Vertragskeys auf.
+2. **Bindungen:** zulässig sind `{role}`, `{key}`, `{provider}`, `{tmp_sink}`, `{agents_dir}`, `{extension_dir}`, `{agent_ext}`; `{reason}` und `{length}` nur in `message` (`{length}` = Zeichenanzahl des Variablenwerts, AC-77; nie der Wert). Bindungsreihenfolge: Wildcard-Prädikate/-Detektoren zuerst (binden `{key}`), danach `surface_has_target` als Filter je `{key}`; Mapping-Quelle `surface_target_key(surface)` in `context_budget.py` (entsteht in 0d.4).
+3. **`regex`-Felder:** zusätzlich `path`, `path_template`, `default` (Ersatz bei fehlendem Config-Wert), `line_anchored`, `optional_suffix`. Der Runner setzt `re.MULTILINE` und liest Text unnormalisiert; Zeilenende-Muster müssen CRLF tolerieren (`[ \t\r]*$`).
+4. **`path-exists`-Felder:** `exclude_glob`, `bind` (bindet den Glob-Stamm; `bind` erfordert `then`), `then` (je gebundenem Wert). `require_suffix_key`-Polarität: Treffer sind Dateien des Globs, deren Name den Suffix aus dem Capability-Key **nicht** trägt.
+5. **`yaml-key`:** `subject: capability` liest die Capability-Matrix statt einer Projektdatei; neues Prädikat `surface_has_target: "{key}"` (muss exakt die `{key}`-Bindung sein).
+6. **Wert-Dispatch in `verified-state-by-capability`:** `{<capability-key>: {<capability-wert>: <state>}}` (z. B. `context_soft_cap_chars: {4000: DOCUMENTED, 12000: UNVERIFIED}`); fehlt der Wert im Mapping, gilt das Top-Level-`verified-state` als Fallback. Test: Dispatch-Schlüssel entsprechen den tatsächlichen Capability-Werten.
+7. **Config-Prädikat `default`:** `{config: <pfad>, op: ne, value: false, default: true}`; fehlender Pfad gilt als `default`.
+8. **`finding-ref`:** `source: sync-log` verweist auf ein Check-Literal im Sync-Log-Producer (`delegation_table.py`); `source: doctor` erfordert eine `doctor.*`-Check-ID (Runner-eigen: `doctor.environment`, `doctor.tmp-sink-location`). Check-IDs ohne Producer (`context.declared-surface-empty`, `context.legacy-artifact-present`) stehen in `_PENDING_0D4` im Registry-Test und werden in 0d.4 entfernt.
+9. **Dedupe:** `variable-unreferenced` (Key `*`) überspringt Variablen mit eigenem Seed (aktuell `CODE_QUALITY_RULES` → `dead-variable-code-quality-rules`).
+10. **`schema_from_key`-Ableitung und Deckel-Lint:** das JSON-Schema wird aus dem Capability-Wert abgeleitet (Feldliste ⇒ `properties` + `additionalProperties: false`); ein Eintrag mit `verified-state: UNVERIFIED` darf nicht Severity `ERROR` deklarieren (ADR-11-Deckel, Validator-Lint). Evidenz-`date` ist ein gequoteter String.
+
 ### Task 0d.2: Doctor-Runner und Detektoren implementieren (IC-22)
 Rolle: senior-developer · Issue: #967 · PR: 0d · Depends: 0d.1 · AC: AC-40, AC-41, AC-78, AC-96 · Falle: `finding-ref` importiert IC-10/IC-19-Funktionen; Sink-Prüfung nur über `tmp_sink_path_error`/`tmp_sink_location_error`; `doctor.py` ≤ 600 Zeilen.
 **Files:** Create `scripts/lib/doctor.py`, `scripts/lib/doctor_detectors.py`; Test Create `tests/test_doctor_runner.py`
