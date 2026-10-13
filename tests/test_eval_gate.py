@@ -21,7 +21,7 @@ REPORT = {
 
 
 def _est():
-    return eg.estimate_cost(10, ["m1"], 3, REPORT)
+    return eg.estimate_cost(10, ["m1"], 3, REPORT, today="2026-10-13")
 
 
 class _Mock:
@@ -36,9 +36,9 @@ class _Mock:
 def test_estimate_values_and_determinism():
     e = _est()
     assert e["calls"] == 30
-    assert e["input_tokens"] == 30000
+    assert e["input_tokens"] == 30 * (1000 + 150)
     assert e["output_tokens"] == 6000
-    assert e["cost_usd"] == round((30000 * 3 + 6000 * 15) / 1e6, 6)
+    assert e["cost_usd"] == round((30 * 1150 * 3 + 6000 * 15) / 1e6, 6)
     assert not e["unverified"]
     assert e == _est()
 
@@ -48,9 +48,35 @@ def test_estimate_without_prices_is_unverified():
     assert e["cost_usd"] is None and e["unverified"]
 
 
+def test_estimate_adds_orchestrator_and_takes_max_provider():
+    rep = {
+        "a": {"always-loaded": {"tokens_est": 100}, "orchestrator": {"tokens_est": 50}},
+        "b": {"always-loaded": {"tokens_est": 120}},
+    }
+    e = eg.estimate_cost(1, ["x"], 1, rep, task_tokens_per_case=10)
+    assert e["input_tokens"] == 160
+
+
+def test_estimate_zero_or_missing_tokens_unverified():
+    for rep in ({"tokens_est": 0}, {}, {"a": {"always-loaded": {}}}):
+        rep = dict(rep, pricing=REPORT["pricing"])
+        e = eg.estimate_cost(1, ["m1"], 1, rep, today="2026-10-13")
+        assert e["unverified"] and e["cost_usd"] is None
+
+
+def test_estimate_price_date_staleness():
+    def un(d, **kw):
+        rep = dict(REPORT, pricing=dict(REPORT["pricing"], _date=d))
+        return eg.estimate_cost(1, ["m1"], 1, rep, today="2026-10-13", **kw)["unverified"]
+    assert not un("2026-10-13") and not un("2026-07-15")
+    assert un("2026-07-14")  # 91 days
+    assert not un("2026-07-14", max_age_days=100)
+    assert un("garbage") and un("2027-01-01")  # invalid / future
+
+
 def test_no_approval_zero_calls_and_prints_estimate():
     mock, out = _Mock(), []
-    r = eg.run_with_approval(_est(), None, [mock, mock], Path("unused.json"), emit=out.append)
+    r = eg.run_with_approval(_est(), None, [mock, mock], Path("unused.json"), out.append)
     assert mock.calls == 0
     assert r["status"] == eg.AWAITING_APPROVAL
     assert out and "30 calls" in out[0] and "USD" in out[0]
@@ -59,7 +85,7 @@ def test_no_approval_zero_calls_and_prints_estimate():
 def test_rejection_writes_skip_file(tmp_path):
     mock = _Mock()
     p = tmp_path / "runs" / "2026-10-13-x.json"
-    r = eg.run_with_approval(_est(), "no", [mock], p, reason="too expensive", today="2026-10-13")
+    r = eg.run_with_approval(_est(), "no", [mock], p, lambda t: None, "too expensive", today="2026-10-13")
     assert mock.calls == 0 and r["status"] == eg.SKIPPED_BY_USER
     rec = json.loads(p.read_text(encoding="utf-8"))
     assert rec["status"] == "SKIPPED-BY-USER"
@@ -70,23 +96,60 @@ def test_rejection_writes_skip_file(tmp_path):
 
 def test_approval_runs_callbacks(tmp_path):
     mock = _Mock()
-    r = eg.run_with_approval(_est(), " YES ", [mock, mock], tmp_path / "s.json")
+    r = eg.run_with_approval(_est(), " YES ", [mock, mock], tmp_path / "s.json", lambda t: None)
     assert mock.calls == 2 and r["status"] == eg.APPROVED
     assert not (tmp_path / "s.json").exists()
 
 
 def test_request_approval_tokens():
-    assert eg.request_approval({}, "yes") and eg.request_approval({}, "Ja")
+    assert eg.request_approval({}, "yes") and eg.request_approval({}, " Ja ")
     assert not eg.request_approval({}, None)
-    assert not eg.request_approval({}, "") and not eg.request_approval({}, "maybe")
+    for bad in ("", "  ", "maybe", "y", "j", "yes please"):
+        assert not eg.request_approval({}, bad)
+
+
+def test_blank_input_is_awaiting_without_skip_record(tmp_path):
+    mock, p = _Mock(), tmp_path / "s.json"
+    for blank in ("", "   "):
+        r = eg.run_with_approval(_est(), blank, [mock], p, lambda t: None)
+        assert r["status"] == eg.AWAITING_APPROVAL
+    assert mock.calls == 0 and not p.exists()
+
+
+def test_y_is_rejection(tmp_path):
+    mock, p = _Mock(), tmp_path / "s.json"
+    r = eg.run_with_approval(_est(), "y", [mock], p, lambda t: None)
+    assert r["status"] == eg.SKIPPED_BY_USER and mock.calls == 0 and p.exists()
+
+
+def test_approval_bound_to_estimate_hash(tmp_path):
+    mock, p = _Mock(), tmp_path / "s.json"
+    good = eg.estimate_hash(_est())
+    r = eg.run_with_approval(_est(), "yes", [mock], p, lambda t: None, approved_estimate_hash="bad")
+    assert r["status"] == eg.AWAITING_APPROVAL and mock.calls == 0
+    r = eg.run_with_approval(_est(), "yes", [mock], p, lambda t: None, approved_estimate_hash=good)
+    assert r["status"] == eg.APPROVED and mock.calls == 1
+
+
+def test_skip_record_path():
+    p = eg.skip_record_path(Path("/r"), "2026-10-13", "qg1")
+    assert p == Path("/r/tests/routing-llm-eval/roles/runs/2026-10-13-qg1.json")
 
 
 def _baseline(metric="top1_accuracy", runs=(90.0, 90.0, 90.0), classes=("a", "b")):
-    return {"model_classes": {c: {metric: list(runs)} for c in classes}}
+    return {
+        "corpus_hash": "h",
+        "model_ids": {c: c + "-1" for c in classes},
+        "model_classes": {c: {metric: list(runs)} for c in classes},
+    }
 
 
 def _cand(value, metric="top1_accuracy", classes=("a", "b")):
-    return {"model_classes": {c: {metric: value} for c in classes}}
+    return {
+        "corpus_hash": "h",
+        "model_ids": {c: c + "-1" for c in classes},
+        "model_classes": {c: {metric: value} for c in classes},
+    }
 
 
 def test_thin_baseline_not_evidenced():
@@ -100,12 +163,54 @@ def test_skipped_candidate_not_evidenced():
 
 
 def test_missing_candidate_and_corpus_mismatch():
-    assert eg.evaluate_gate(_baseline(), {"model_classes": {"a": {"top1_accuracy": 90}}}) == eg.NOT_EVIDENCED
+    c = _cand(90)
+    del c["model_classes"]["b"]
+    assert eg.evaluate_gate(_baseline(), c) == eg.NOT_EVIDENCED
     b = _baseline()
     b["corpus_hash"] = "x"
     c = _cand(90)
     c["corpus_hash"] = "y"
     assert eg.evaluate_gate(b, c) == eg.NOT_EVIDENCED
+
+
+def test_missing_corpus_hash_either_side():
+    assert eg.evaluate_gate(_baseline(), _cand(99)) == eg.PASSED
+    for side in ("b", "c"):
+        b, c = _baseline(), _cand(99)
+        del (b if side == "b" else c)["corpus_hash"]
+        assert eg.evaluate_gate(b, c) == eg.NOT_EVIDENCED
+    b, c = _baseline(), _cand(99)
+    del b["corpus_hash"], c["corpus_hash"]
+    assert eg.evaluate_gate(b, c) == eg.NOT_EVIDENCED
+
+
+def test_model_ids_mismatch_or_missing():
+    c = _cand(99)
+    c["model_ids"]["a"] = "a-2"
+    assert eg.evaluate_gate(_baseline(), c) == eg.NOT_EVIDENCED
+    c = _cand(99)
+    del c["model_ids"]
+    assert eg.evaluate_gate(_baseline(), c) == eg.NOT_EVIDENCED
+
+
+def test_invalid_values_not_evidenced_no_exception():
+    nan = float("nan")
+    for bad in (None, nan, 101, -1, True, "x"):
+        assert eg.evaluate_gate(_baseline(), _cand(bad)) == eg.NOT_EVIDENCED
+    assert eg.evaluate_gate(_baseline(runs=(90, nan, 90)), _cand(90)) == eg.NOT_EVIDENCED
+    assert eg.evaluate_gate(_baseline(runs=(90, None, 90)), _cand(90)) == eg.NOT_EVIDENCED
+    assert eg.evaluate_gate(_baseline(runs=(90, 90, 150)), _cand(90)) == eg.NOT_EVIDENCED
+
+
+def test_failed_dominates_not_evidenced():
+    c = {
+        "corpus_hash": "h",
+        "model_ids": _cand(1)["model_ids"],
+        "model_classes": {"a": {"top1_accuracy": 10}, "b": {"top1_accuracy": None}},
+    }
+    assert eg.evaluate_gate(_baseline(), c) == eg.FAILED
+    c["model_classes"]["a"]["top1_accuracy"] = 95
+    assert eg.evaluate_gate(_baseline(), c) == eg.NOT_EVIDENCED
 
 
 def test_higher_better_directions():
@@ -149,7 +254,8 @@ def test_k_boundaries():
 
 def test_one_failing_class_fails_and_determinism():
     b = _baseline()
-    c = {"model_classes": {"a": {"top1_accuracy": 95}, "b": {"top1_accuracy": 70}}}
+    c = _cand(95)
+    c["model_classes"]["b"]["top1_accuracy"] = 70
     assert eg.evaluate_gate(b, c) == eg.FAILED
     assert eg.evaluate_gate(b, c) == eg.evaluate_gate(b, c)
 
