@@ -45,6 +45,11 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
+# --doctor must not touch the installation, not even with bytecode caches
+# (IC-22 write boundary): decide before the first lib import.
+if "--doctor" in sys.argv[1:]:
+    sys.dont_write_bytecode = True
+
 # Add scripts/ directory to sys.path so lib/ is importable regardless of cwd
 _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
@@ -68,6 +73,7 @@ from lib.cli_commands import (
     _handle_deactivate_providers,
     _handle_deactivation_status,
     _handle_delete_backup,
+    _handle_doctor,
     _handle_fill_defaults,
     _handle_list_backups,
     _handle_only_variables,
@@ -159,8 +165,26 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                              "a work dir under <tmp-sink>/context-report/ and writes only "
                              "there. Exit 1 on context.over-hard-cap, 2 when the tmp-sink "
                              "is disabled (tmp-sink.disabled).")
+    parser.add_argument("--doctor", action="store_true",
+                        help="Diagnose the installation against the known-issues registry "
+                             "(config/known-issues.yaml). Writes nothing into the project or "
+                             "agent-meta; only --out writes one JSON report into "
+                             "<tmp-sink>/doctor/. Exit 0 without ERROR, 1 with ERROR (or "
+                             "WARNING with --strict), 2 on runtime error, with --strict on "
+                             "doctor.registry-invalid, or when --out is rejected "
+                             "(doctor.out-outside-tmp-sink, doctor.tmp-sink.disabled). "
+                             "The sync-pending check runs 'sync.py --check --dry-run' "
+                             "(about 25 s).")
+    parser.add_argument("--strict", action="store_true",
+                        help="With --doctor: WARNING findings exit 1, an invalid registry "
+                             "entry (doctor.registry-invalid) is an ERROR and exits 2")
+    parser.add_argument("--provider", nargs="+", action="extend", metavar="P", default=None,
+                        help="With --doctor: only check these active providers")
+    parser.add_argument("--out", metavar="FILE", default=None,
+                        help="With --doctor: also write the JSON report to FILE, which must "
+                             "lie inside <tmp-sink>/doctor/ (e.g. .tmp/doctor/<ts>.json)")
     parser.add_argument("--json", action="store_true",
-                        help="With --context-report: emit the report as JSON")
+                        help="With --context-report or --doctor: emit the report as JSON")
     parser.add_argument("--profile", choices=("full", "compact", "both"), default="full",
                         help="With --context-report: context profile to report "
                              "(compact is reserved for Phase 2)")
@@ -643,6 +667,7 @@ _MODE_HANDLERS = [
     (lambda a: a.only_variables, _handle_only_variables),
     (lambda a: a.cleanup_preview, _handle_cleanup_preview),
     (lambda a: a.context_report, _handle_context_report),
+    (lambda a: a.doctor, _handle_doctor),
     (lambda a: a.create_ext, _handle_create_ext),
     (lambda a: a.update_ext, _handle_update_ext),
     (lambda a: a.create_rule, _handle_create_rule),
@@ -665,6 +690,10 @@ _MODE_HANDLERS = [
     (lambda a: a.checkpoint, _handle_checkpoint),
     (lambda a: a.update_plan_ledger is not None, handle_update_plan_ledger),
 ]
+
+
+# Modes that run _build_context with dry_run forced on and stdout on stderr.
+_STDOUT_CLEAN_MODES = ("cleanup_preview", "context_report", "doctor")
 
 
 def _dispatch(ctx: _SyncContext) -> None:
@@ -693,11 +722,12 @@ def main() -> None:
     agent_meta_root = find_agent_meta_root(script_path)
     log = SyncLog()
 
-    if getattr(args, "cleanup_preview", False) or getattr(args, "context_report", False):
-        # IC-06: the preview must emit exactly one JSON object on stdout and
-        # write nothing. Context building is shared CLI plumbing that can print
-        # (auto-detect banner) and, when self-hosting, touch the schema enum —
-        # so run it with dry_run forced on and stdout redirected to stderr.
+    if any(getattr(args, flag, False) for flag in _STDOUT_CLEAN_MODES):
+        # IC-06 / IC-22: the preview/report must emit exactly one JSON object on
+        # stdout and write nothing outside its own sink. Context building is
+        # shared CLI plumbing that can print (auto-detect banner) and, when
+        # self-hosting, touch the schema enum — so run it with dry_run forced on
+        # and stdout redirected to stderr.
         saved_dry_run = args.dry_run
         args.dry_run = True
         with contextlib.redirect_stdout(sys.stderr):
