@@ -9,6 +9,18 @@ provider, nothing hardcoded) plus the shared ``dispatch_phrases`` of
 ``config/active-set-references.yaml``. When no pattern can be derived for a
 provider the check reports ``active-set.dispatch-pattern-missing`` and skips
 that provider - never silently.
+
+Heuristic decisions (spec IC-19 names only pipeline formats, dispatch phrases and
+dispatch-table rows):
+- No generic arrow rule (``-> role``): arrows also appear in boundary lists
+  ("Boundary: ... -> role") and fallback flows, which are references, not
+  dispatches; those stay ``dangling-mention`` (INFO).
+- Table rows count as dispatch only for roles in cells whose column header names
+  a routing target (route/agent/role/target/tier/...); prose cells ("When",
+  "Notes") of the same row are mentions.
+- Pipeline formats with extra slots in the head (``FANOUT({count}, {agent})``)
+  are matched with a wildcard for that slot; ``conditional_*`` formats name the
+  evaluating agent, not a dispatch target, and are excluded.
 """
 from __future__ import annotations
 
@@ -32,6 +44,11 @@ _PROJECT_CFG = ".meta-config/project.yaml"
 _PLACEHOLDER_RE = re.compile(r"\{\{[A-Z][A-Z0-9_]*\}\}")
 _ARTICLE = r"(?:(?:an|zu|to)\s+)?(?:(?:den|dem|einen|der|die|das|the)\s+)?"
 _FMT_TOKEN_RE = re.compile(r"\{agent\}|\{task\}|\{\w+\}")
+_SLOT_RE = re.compile(r"\{\w+\}")
+_DISPATCH_HEADER_RE = re.compile(
+    r"route|routing|agents?\b|roles?\b|rolle|target|ziel|delegat|dispatch|tier|assign",
+    re.IGNORECASE)
+_NON_DISPATCH_KEYS = ("conditional",)
 
 
 # --- config / file helpers -------------------------------------------------
@@ -50,8 +67,9 @@ def _dispatch_formats(root: Path, provider: str) -> list:
     data = load_yaml_file(Path(root) / "config" / "delegation-syntax.yaml") or {}
     entry = ((data.get("delegation_syntax") or {}).get(provider)) or {}
     notation = entry.get("pipeline_notation") or {}
-    return sorted({v for v in notation.values()
-                   if isinstance(v, str) and "{agent}" in v})
+    return sorted({v for k, v in notation.items()
+                   if isinstance(v, str) and "{agent}" in v
+                   and not str(k).startswith(_NON_DISPATCH_KEYS)})
 
 
 def _scan_files(project_root: Path, provider: str) -> list:
@@ -87,12 +105,16 @@ def _role_alt(roles) -> str:
 def _fmt_pattern(fmt: str, alt: str) -> Optional[re.Pattern]:
     head, _, tail = fmt.partition("{agent}")
     head = head.strip()
-    if len(head) < 2:
+    if not head:
         return None
+    # Extra slots in the head ({count}, {index}) match any non-space run.
+    head_rx = r"\s*".join(
+        r"[^\s,]+" if _SLOT_RE.fullmatch(part) else re.escape(part)
+        for part in re.split(r"(\{\w+\})", head.replace(" ", "")) if part)
     suffix = _FMT_TOKEN_RE.split(tail, maxsplit=1)[0].strip()
     # Without a literal suffix the role token must end at a word boundary.
     end = re.escape(suffix) if suffix else r"(?![\w-])"
-    return re.compile(re.escape(head) + "(?P<r>" + alt + ")" + end)
+    return re.compile(r"(?<![\w.])" + head_rx + r"\s*(?P<r>" + alt + ")" + end)
 
 
 def _phrase_patterns(alt: str) -> list:
@@ -106,8 +128,6 @@ def _phrase_patterns(alt: str) -> list:
                     + r")(?![\w-])", re.IGNORECASE))
             except re.error:
                 continue
-    # Arrow routes ("... -> `role`") are imperative hand-offs as well.
-    out.append(re.compile(r"(?:\u2192|->)\s*[`@\"']?(?P<r>" + alt + r")(?![\w-])"))
     return out
 
 
@@ -131,12 +151,23 @@ def _line_hits(lines: list, dispatch_pats: list, dangling: frozenset) -> list:
     token = re.compile(r"(?<![\w-])(?P<r>" + alt + r")(?![\w-])")
     row_token = re.compile(r"`(?P<r>" + alt + r")`")
     result = []
+    dispatch_cols: set = set()
+    in_table = False
     for lineno, line in enumerate(lines, 1):
         dispatch = set()
         for pat in dispatch_pats:
             dispatch |= {m.group("r") for m in pat.finditer(line)}
         if line.lstrip().startswith("|"):
-            dispatch |= {m.group("r") for m in row_token.finditer(line)}
+            cells = line.strip().strip("|").split("|")
+            if not in_table:  # first row of a table = header
+                dispatch_cols = {i for i, c in enumerate(cells)
+                                 if _DISPATCH_HEADER_RE.search(c)}
+                in_table = True
+            else:
+                for i in dispatch_cols & set(range(len(cells))):
+                    dispatch |= {m.group("r") for m in row_token.finditer(cells[i])}
+        else:
+            in_table = False
         mentions = {m.group("r") for m in token.finditer(line)} - dispatch
         if dispatch or mentions:
             result.append((lineno, dispatch, mentions))

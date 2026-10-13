@@ -27,6 +27,9 @@ dispatch_phrases:
     - 'übernehm\w*'
     - 'weiterreich\w*'
     - 'überträg\w*'
+# Both lists start empty on purpose: first population comes from measurement. The
+# unresolved placeholders found in the p10 fixture (12) are real unset variables
+# of a bare fixture project, not documented escapes, so they are not allowlisted.
 placeholder_allow: []
 mention_allow: []
 provider_literal_allow:

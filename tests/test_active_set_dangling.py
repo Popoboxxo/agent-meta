@@ -102,3 +102,81 @@ def test_missing_dispatch_pattern_is_reported_not_silent(synced, monkeypatch):
 def test_module_has_no_provider_branch_or_print():
     src = (_ROOT / "scripts" / "lib" / "consistency" / "active_set_refs.py").read_text(encoding="utf-8")
     assert "provider ==" not in src and "print(" not in src
+
+
+# --- heuristics, allowlists, negatives -------------------------------------
+
+def _scratch(tmp_path, body, name="x.md"):
+    agents = tmp_path / ".claude" / "agents"
+    agents.mkdir(parents=True)
+    (agents / name).write_text(body, encoding="utf-8")
+    return tmp_path
+
+
+def _dangling_roles_of(findings):
+    return sorted({f.message.split("'")[1] for f in findings})
+
+
+def test_dispatch_to_active_role_is_not_a_finding(synced, tmp_path):
+    _, active = synced("p10")
+    proj = _scratch(tmp_path, 'background(agent="developer", prompt="x")\n'
+                              "| Tier | When |\n|---|---|\n| `developer` | std |\n")
+    assert asr.check_dangling_dispatch(proj, _PROVIDERS, {}, active) == []
+    assert asr.check_dangling_mention(proj, _PROVIDERS, {}, active) == []
+
+
+def test_arrow_and_conditional_are_not_dispatch(synced, tmp_path):
+    _, active = synced("p10")
+    proj = _scratch(tmp_path, "Boundary: DoD check -> `validator`\n"
+                              "Condition evaluated by validator: ok\n")
+    assert asr.check_dangling_dispatch(proj, _PROVIDERS, {}, active) == []
+    assert _dangling_roles_of(asr.check_dangling_mention(proj, _PROVIDERS, {}, active)) == ["validator"]
+
+
+def test_table_heuristic_positive_only_dispatch_columns(synced, tmp_path):
+    _, active = synced("p10")
+    proj = _scratch(tmp_path, "| Tier | When |\n|---|---|\n"
+                              "| `senior-developer` | after `validator` fails |\n")
+    found = asr.check_dangling_dispatch(proj, _PROVIDERS, {}, active)
+    assert _dangling_roles_of(found) == ["senior-developer"]
+
+
+def test_table_heuristic_boundary_no_dispatch_header(synced, tmp_path):
+    _, active = synced("p10")
+    proj = _scratch(tmp_path, "| Name | Notes |\n|---|---|\n| `senior-developer` | x |\n")
+    assert asr.check_dangling_dispatch(proj, _PROVIDERS, {}, active) == []
+    assert _dangling_roles_of(asr.check_dangling_mention(proj, _PROVIDERS, {}, active)) == ["senior-developer"]
+
+
+def test_fanout_head_slots_are_matched(synced, tmp_path):
+    _, active = synced("p10")
+    proj = _scratch(tmp_path, 'FANOUT(3, validator):\n  - background(agent="ideation", prompt="x")\n')
+    found = asr.check_dangling_dispatch(proj, _PROVIDERS, {}, active)
+    assert _dangling_roles_of(found) == ["ideation", "validator"]
+
+
+def test_placeholder_allow_suppresses(synced, tmp_path, monkeypatch):
+    _, active = synced("p10")
+    proj = _scratch(tmp_path, "{{FOO_BAR}} and {{BAZ}}\n")
+    monkeypatch.setattr(asr, "_refs", lambda: {"placeholder_allow": ["{{FOO_BAR}}"]})
+    found = asr.check_unresolved_placeholder(proj, _PROVIDERS, {}, active)
+    assert [("{{BAZ}}" in f.message) for f in found] == [True]
+
+
+def test_mention_allow_suppresses(synced, tmp_path, monkeypatch):
+    _, active = synced("p10")
+    proj = _scratch(tmp_path, "see `validator`\n")
+    assert asr.check_dangling_mention(proj, _PROVIDERS, {}, active)
+    monkeypatch.setattr(asr, "_refs", lambda: {"mention_allow": [".claude/agents/x.md"]})
+    assert asr.check_dangling_mention(proj, _PROVIDERS, {}, active) == []
+
+
+_SYNTAX = yaml.safe_load((_ROOT / "config" / "delegation-syntax.yaml").read_text(encoding="utf-8"))
+_ALL_PROVIDERS = sorted(_SYNTAX["delegation_syntax"])
+
+
+@pytest.mark.parametrize("provider", _ALL_PROVIDERS)
+def test_every_provider_derives_a_dispatch_pattern(provider):
+    fmts = asr._dispatch_formats(_ROOT, provider)
+    pats = [asr._fmt_pattern(f, "validator") for f in fmts]
+    assert fmts and all(pats), f"{provider}: formats {fmts}"
