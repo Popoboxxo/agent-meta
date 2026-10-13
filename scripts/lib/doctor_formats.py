@@ -57,9 +57,9 @@ def _split_top(text: str, sep: str) -> list:
             quote = "" if ch == quote else quote
         elif ch in "\"'":
             quote = ch
-        elif ch == "[":
+        elif ch in "[{":
             depth += 1
-        elif ch == "]":
+        elif ch in "]}":
             depth -= 1
         elif ch == sep and depth == 0:
             parts.append("".join(cur))
@@ -79,7 +79,7 @@ def _split_key(text: str) -> list:
         elif len(part) >= 2 and part[0] == part[-1] and part[0] in "\"'":
             keys.append(part[1:-1])
         else:
-            raise TomlUnsupported(f"unsupported key {part!r}")
+            raise TomlUnsupported("unsupported key syntax")
     return keys
 
 
@@ -87,13 +87,22 @@ def _parse_value(text: str):
     text = text.strip()
     if text in ("true", "false"):
         return text == "true"
-    if text.startswith(('"""', "'''")) or text.startswith("{"):
-        raise TomlUnsupported("multi-line strings and inline tables are unsupported")
+    if text.startswith(('"""', "'''")):
+        raise TomlUnsupported("multi-line strings are unsupported")
+    if text.startswith("{") and text.endswith("}"):
+        table: dict = {}
+        for item in [p for p in _split_top(text[1:-1], ",") if p.strip()]:
+            key, sep, value = item.partition("=")
+            if not sep:
+                raise TomlUnsupported("expected key = value in inline table")
+            keys = _split_key(key)
+            _descend(table, keys[:-1])[keys[-1]] = _parse_value(value)
+        return table
     if text.startswith('"') and text.endswith('"') and len(text) >= 2:
         try:
             return json.loads(text)
         except ValueError as exc:
-            raise TomlUnsupported(str(exc)) from exc
+            raise TomlUnsupported("invalid string value") from exc
     if text.startswith("'") and text.endswith("'") and len(text) >= 2:
         return text[1:-1]
     if text.startswith("[") and text.endswith("]"):
@@ -105,7 +114,7 @@ def _parse_value(text: str):
     try:
         return float(text)
     except ValueError as exc:
-        raise TomlUnsupported(f"unsupported value {text!r}") from exc
+        raise TomlUnsupported("unsupported value syntax") from exc
 
 
 def _descend(root: dict, keys: list) -> dict:
@@ -113,31 +122,68 @@ def _descend(root: dict, keys: list) -> dict:
     for key in keys:
         node = node.setdefault(key, {})
         if not isinstance(node, dict):
-            raise TomlUnsupported(f"key {key!r} redefined")
+            raise TomlUnsupported("key redefined")
     return node
 
 
+def _depth(text: str) -> int:
+    depth, quote = 0, ""
+    for ch in text:
+        if quote:
+            quote = "" if ch == quote else quote
+        elif ch in "\"'":
+            quote = ch
+        elif ch in "[{":
+            depth += 1
+        elif ch in "]}":
+            depth -= 1
+    return depth
+
+
 def parse_toml_subset(text: str) -> dict:
-    """Parse tables, dotted keys and scalar / one-line array values only."""
+    """Parse tables, dotted keys, scalars, arrays and inline tables.
+
+    Arrays of tables and multi-line strings are outside the subset.
+    """
     root: dict = {}
     current = root
-    for raw in text.splitlines():
+    lines = iter(text.splitlines())
+    for raw in lines:
         line = _strip_comment(raw).strip()
         if not line:
             continue
         if line.startswith("[["):
             raise TomlUnsupported("arrays of tables are unsupported")
         if line.startswith("["):
-            if not line.endswith("]"):
-                raise TomlUnsupported("multi-line arrays are unsupported")
-            current = _descend(root, _split_key(line[1:-1]))
+            current = _descend(root, _split_key(line[1:-1] if line.endswith("]") else ""))
             continue
         key, sep, value = line.partition("=")
         if not sep:
             raise TomlUnsupported("expected key = value")
+        while _depth(value) > 0:   # multi-line array / inline table
+            nxt = next(lines, None)
+            if nxt is None:
+                raise TomlUnsupported("unterminated value")
+            value += " " + _strip_comment(nxt).strip()
         keys = _split_key(key)
         _descend(current, keys[:-1])[keys[-1]] = _parse_value(value)
     return root
+
+
+def parse_toml(text: str) -> dict:
+    """``tomllib`` when available (3.11+), else the subset parser.
+
+    Both paths raise :class:`TomlUnsupported` with a fixed, content-free
+    message (artifact text must never reach finding text).
+    """
+    try:
+        import tomllib
+    except ImportError:
+        return parse_toml_subset(text)
+    try:
+        return tomllib.loads(text)
+    except (tomllib.TOMLDecodeError, ValueError) as exc:
+        raise TomlUnsupported("invalid TOML") from exc
 
 
 # ------------------------------------------------------------ JSON-schema subset

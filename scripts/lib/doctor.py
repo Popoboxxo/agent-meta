@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import Sequence
 
 import yaml
 
@@ -30,7 +30,7 @@ from .doctor_detectors import (
 from .doctor_formats import QUOTED_MAX, clip
 from .doctor_predicates import (
     Env, base_bindings, evaluate_predicates, fixed_in_reached, needs_provider,
-    passes_deferred, render, resolve_verified_state,
+    passes_deferred, render, resolve_verified_state, surface_mapper,
 )
 from .doctor_registry import load_validation_context, validate_entry
 from .providers import load_provider_capabilities, load_providers_config
@@ -40,6 +40,7 @@ REGISTRY_REL = "config/known-issues.yaml"
 REGISTRY_VERSION = 1
 CHECK_REGISTRY_INVALID = "doctor.registry-invalid"
 CHECK_DETECTOR_UNAVAILABLE = "doctor.detector-unavailable"
+CHECK_PROVIDER_FILTER = "doctor.provider-filter"
 SKIP_FIXED_IN = "fixed-in"
 SKIP_PREDICATE = "predicate"
 SKIP_UNAVAILABLE = "detector-unavailable"
@@ -63,8 +64,9 @@ class DoctorFinding(Finding):
 
 @dataclass(frozen=True)
 class DoctorReport:
-    findings: tuple
-    skipped: tuple                # (issue_id, reason: fixed-in|predicate|detector-unavailable|registry-invalid)
+    findings: tuple[DoctorFinding, ...]
+    # (issue_id, reason: fixed-in|predicate|detector-unavailable|registry-invalid)
+    skipped: tuple[tuple[str, str], ...]
     registry_version: int
     agent_meta_version: str
 
@@ -89,7 +91,7 @@ def _invalid_finding(issue_id: str, error: str) -> DoctorFinding:
         clip(error, 200), Severity.WARNING, Severity.ERROR)
 
 
-def load_known_issues(agent_meta_root: Path) -> tuple:
+def load_known_issues(agent_meta_root: Path) -> tuple[list[dict], list[DoctorFinding]]:
     """Load and validate the registry; fail-soft, never raises.
 
     Only ``<agent_meta_root>/config/known-issues.yaml`` is read: no project
@@ -142,7 +144,8 @@ def _effective_severity(entry: dict, hit: Hit, state: str) -> tuple:
 def _build_finding(entry: dict, env: Env, hit: Hit, bindings: dict) -> DoctorFinding:
     state = resolve_verified_state(entry, env)
     registry, effective = _effective_severity(entry, hit, state)
-    values = {**env.bindings, **bindings}
+    # binding values may stem from artifact names: strip control chars, cap length
+    values = {k: clip(v) for k, v in {**env.bindings, **bindings}.items()}
     file = hit.file or render(entry["target"].get("path"), values)
     if hit.line:
         file = f"{file}:{hit.line}"
@@ -166,6 +169,17 @@ def _unavailable_finding(entry: dict, env: Env, reason: str) -> DoctorFinding:
         evidence="source: scripts/lib/doctor_detectors.py", severity_registry="INFO")
 
 
+def _filter_finding(name: str, known: bool) -> DoctorFinding:
+    why = "is not active in this project" if known else "is not a registered provider"
+    return DoctorFinding(
+        Severity.INFO, CHECK_PROVIDER_FILTER, "",
+        "A requested provider was ignored by the provider filter",
+        f"Provider {clip(name, 40)!r} {why}; only active providers are checked.",
+        provider=clip(name, 40), verified_state="VERIFIED-SOURCE",
+        fix_owner="project-config", evidence="source: scripts/lib/doctor.py",
+        severity_registry="INFO")
+
+
 def _provider_env(base: Env, provider: str) -> Env:
     caps = base.caps_map.get(provider) or {}
     return replace(base, provider=provider, providers=(provider,), caps=caps,
@@ -176,6 +190,10 @@ def _run_entry(entry: dict, base: Env, findings: list, skipped: set) -> None:
     envs = ([_provider_env(base, p) for p in base.providers]
             if needs_provider(entry) else [base])
     applied = False
+    if (any("surface_has_target" in p for p in entry.get("applies_to") or [])
+            and surface_mapper() is None):
+        skipped.add((entry["id"], SKIP_UNAVAILABLE))   # mapping producer lands in 0d.4
+        return
     for env in envs:
         combos, deferred = evaluate_predicates(entry.get("applies_to"), env)
         for combo in combos:
@@ -211,12 +229,13 @@ def _dedupe(findings: list) -> list:
 
 
 def run_doctor(project_root: Path, agent_meta_root: Path, config: dict, *,
-               providers: Optional[Sequence[str]] = None) -> DoctorReport:
+               providers: Sequence[str] | None = None) -> DoctorReport:
     """Evaluate the registry against the project installation (read-only).
 
     Order (spec IC-22): sync.log snapshot, static / ``finding-ref`` detectors,
-    then ``command`` detectors. ``providers`` replaces the active-provider set
-    (registered providers only); ``None`` means the active providers of *config*.
+    then ``command`` detectors. ``providers`` is intersected with the active
+    providers of *config* (``None`` = all active providers); a requested name that
+    is unknown or not active is ignored and reported as INFO ``doctor.provider-filter``.
     """
     project_root, agent_meta_root = Path(project_root), Path(agent_meta_root)
     config = config if isinstance(config, dict) else {}
@@ -225,10 +244,12 @@ def run_doctor(project_root: Path, agent_meta_root: Path, config: dict, *,
     version = _agent_meta_version(agent_meta_root)
 
     provider_config = load_providers_config(agent_meta_root, config)
-    if providers is None:
-        names = get_active_providers(config, provider_config)
-    else:
-        names = [p for p in providers if p in provider_config]
+    names = get_active_providers(config, provider_config)
+    if providers is not None:
+        for name in sorted(set(providers) - set(names)):
+            known = name in provider_config
+            findings.append(_filter_finding(name, known))
+        names = [p for p in names if p in set(providers)]
     caps_map = merge_provider_mappings(
         provider_config, load_provider_capabilities(agent_meta_root))
     effective = resolve_effective_repo_containment(config)

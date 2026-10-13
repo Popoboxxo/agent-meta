@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import fnmatch
 import importlib
+import os
 import re
 import subprocess
 import sys
@@ -23,12 +24,13 @@ import yaml
 
 from .consistency.report import Severity
 from .doctor_formats import (
-    TomlUnsupported, clip, parse_toml_subset, schema_from_capability_value,
+    TomlUnsupported, clip, parse_toml, schema_from_capability_value,
     validate_schema_subset,
 )
 from .doctor_predicates import (
     MISSING, Env, compare, expected_value, get_path, is_present, iter_paths, render,
 )
+from .doctor_registry import COMMAND_ALLOWLIST, FORBIDDEN_ARGV
 from .frontmatter import parse_frontmatter_text, split_frontmatter
 from .repo_containment import (
     DEFAULT_TMP_SINK_PATH, tmp_sink_location_error, tmp_sink_path_error,
@@ -42,7 +44,7 @@ CHECK_TMP_SINK = "doctor.tmp-sink-location"
 DEFAULT_COMMAND_TIMEOUT_S = 60
 _DIR_ARTIFACTS = ("rules_dir", "agents_dir", "skills_dir", "commands_dir")
 _TEMPLATE_ROOTS = ("agents", "rules", "templates", "snippets", "commands")
-_LOG_LINE = re.compile(r"^\[(?:INFO|WARN)\]\s+([A-Za-z0-9_.*-]+):?(?:\s|$)")
+_LOG_LINE = re.compile(r"^\[(INFO|WARN)\]\s+([A-Za-z0-9_.*-]+):?(?:\s|$)")
 # check source -> module holding the IC-10 / IC-19 check functions
 _CHECK_MODULES = {
     "context-budget": ".consistency.context_budget",
@@ -309,14 +311,17 @@ def detect_yaml_key(det: dict, env: Env, tgt: dict) -> list:
 def detect_toml_key(det: dict, env: Env, tgt: dict) -> list:
     expected = expected_value(det, env)
     hits = []
-    for path in target_files(tgt, env):
+    files = target_files(tgt, env)
+    if not files:
+        raise DetectorUnavailable("target file is missing", notify=False)
+    for path in files:
         text = _read(path)
         if text is None:
             continue
         try:
-            doc = parse_toml_subset(text)
+            doc = parse_toml(text)
         except TomlUnsupported as exc:
-            raise DetectorUnavailable(f"TOML subset parser: {exc}") from exc
+            raise DetectorUnavailable(f"TOML parser: {exc}") from exc
         value = get_path(doc, det["key"])
         # Interpretation: a missing key under "lt" counts as below the limit.
         if (value is MISSING and det["op"] == "lt") or compare(det["op"], value, expected):
@@ -348,6 +353,8 @@ def detect_json_schema(det: dict, env: Env, tgt: dict) -> list:
 
 def detect_command(det: dict, env: Env, tgt: dict) -> list:
     argv = list(det["argv"])
+    if tuple(argv) not in COMMAND_ALLOWLIST or FORBIDDEN_ARGV & set(argv):
+        raise DetectorUnavailable("argv is not on the command allowlist")
     if "--context-report" in argv and not env.sink_enabled:
         raise DetectorUnavailable(
             "writing command needs repo_containment.tmp-sink.enabled: true")
@@ -356,8 +363,10 @@ def detect_command(det: dict, env: Env, tgt: dict) -> list:
     try:
         proc = subprocess.run(
             cmd, cwd=str(env.project_root), shell=False, stdin=subprocess.DEVNULL,
-            capture_output=True, text=True, timeout=det.get("timeout_s", DEFAULT_COMMAND_TIMEOUT_S))
-    except (OSError, subprocess.SubprocessError) as exc:
+            capture_output=True, encoding="utf-8", errors="replace",
+            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+            timeout=det.get("timeout_s", DEFAULT_COMMAND_TIMEOUT_S))
+    except (OSError, ValueError, subprocess.SubprocessError) as exc:
         raise DetectorUnavailable(f"command could not run: {type(exc).__name__}") from exc
     if proc.returncode == det["expect_exit"]:
         return []
@@ -374,7 +383,8 @@ def _sync_log_entries(env: Env) -> list:
         for line in text.splitlines():
             match = _LOG_LINE.match(line)
             if match:
-                entries.append((match.group(1), line[match.end(1):].strip(" :()")))
+                severity = Severity.WARNING if match.group(1) == "WARN" else Severity.INFO
+                entries.append((match.group(2), line[match.end(2):].strip(" :()"), severity))
         env.shared["sync_log"] = entries
     return env.shared["sync_log"]
 
@@ -433,8 +443,8 @@ def _raw_findings(det: dict, env: Env) -> list:
             raise DetectorUnavailable("unknown runner-owned check")
         return [(h.ref_check, h.file, h.quoted, h.severity, h.bindings) for h in fn(env)]
     if source == "sync-log":
-        return [(c, SYNC_LOG_REL, msg, Severity.INFO, {})
-                for c, msg in _sync_log_entries(env) if fnmatch.fnmatch(c, check)]
+        return [(c, SYNC_LOG_REL, msg, sev, {})
+                for c, msg, sev in _sync_log_entries(env) if fnmatch.fnmatch(c, check)]
     if source == "hooks":
         from .consistency import hook_drift
 

@@ -195,13 +195,18 @@ def evaluate_predicates(preds: list, env: Env) -> tuple:
     return combos, deferred
 
 
+def surface_mapper():
+    """``surface_target_key`` of context_budget (lands with Task 0d.4), else None."""
+    from .consistency import context_budget
+
+    return getattr(context_budget, "surface_target_key", None)
+
+
 def passes_deferred(deferred: list, bindings: dict) -> bool:
     """``surface_has_target: "{key}"`` filter (mapping source: context_budget)."""
     if not deferred:
         return True
-    from .consistency import context_budget  # lazy: mapping lands with Task 0d.4
-
-    mapper = getattr(context_budget, "surface_target_key", None)
+    mapper = surface_mapper()
     key = bindings.get("key")
     return bool(mapper and key and mapper(key))
 
