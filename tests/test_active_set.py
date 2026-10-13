@@ -96,9 +96,36 @@ def test_ha_platform_roles_are_platform_sourced():
     active, _ = _compute("ha")
     assert isinstance(active, ActiveSet)
     assert active.has("orchestrator")
+    assert active.sources["developer"] == "platform"
 
 
 def test_has_and_all_active():
     active, _ = _compute("p10")
     assert active.all_active(["orchestrator", "developer"])
     assert not active.all_active(["orchestrator", "validator"])
+
+
+def test_routable_excludes_orchestrator_in_main_chat_mode():
+    active, _ = _compute("p10", {"orchestrator": {"mode": "main-chat"}})
+    assert "orchestrator" not in active.routable
+    assert "developer" in active.routable
+
+
+def test_missing_template_has_real_content():
+    for name in ("pall", "ha"):
+        active, _ = _compute(name)
+        assert active.missing_template, name
+        assert not set(active.missing_template) & active.roles
+
+
+def test_missing_template_warnings_are_not_active_set_prefixed():
+    active, sink = _compute("pall")
+    assert any(w.startswith("active role without template:") for w in sink)
+    assert not any(w.startswith("active-set.") for w in sink)
+
+
+def test_gate_reason_config_flag_variant():
+    active, _ = _compute("p10", {"roles": ["orchestrator", "se-architect"]})
+    drop = [d for d in active.gate_dropped if d.role == "se-architect"]
+    assert drop and drop[0].group == "se"
+    assert drop[0].reason == "requires systems-engineering.enabled to be enabled"

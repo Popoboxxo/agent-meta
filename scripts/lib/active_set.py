@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Mapping, Optional
 
+from .variables import _resolve_orch_mode
 from .roles import (
     _emit_warnings,
     is_role_enabled,
@@ -117,9 +118,13 @@ def compute_active_set(
         for role in sorted(known)
     }
 
+    # Main-chat skip: in orchestrator.mode "main-chat" the orchestrator is not
+    # a dispatch target (same rule as config.py strict-permission scan).
+    main_chat = _resolve_orch_mode(config.get("orchestrator") or {}) == "main-chat"
     routable = frozenset(
         role for role in active
         if ((role_defs.get(role) or {}).get("routing") or {}).get("addressability") != "excluded"
+        and not (main_chat and role == "orchestrator")
     )
 
     producers: dict = {}
