@@ -110,6 +110,9 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     "se_persistence_schema_dir",
     # Generated tables (injected by build_variables)
     "AGENT_DELEGATION_TABLE", "PROJECT_SPECIFIC_AGENTS",
+    # Active-set contract (IC-17, active_set_variables); ROLE_*_ACTIVE is a
+    # dynamic family (see _DYNAMIC_PREFIXES)
+    "ACTIVE_ROLES",
     "PIPELINE_MATCH_TABLE", "INTENT_ROUTING_TABLE", "PIPELINE_DETAIL_BLOCKS",
     "PIPELINE_DETAILS_DIR",
     # Structured intent-routing tool definition, resolved per provider in
@@ -139,6 +142,7 @@ _DYNAMIC_PREFIXES: tuple[re.Pattern, ...] = (
     re.compile(r'^PAL_[A-Z0-9_]+$'),
     re.compile(r'^SKILL_[A-Z0-9_]+$'),
     re.compile(r'^MCP_GUARDRAILS_LIST$'),
+    re.compile(r'^ROLE_[A-Z0-9_]+_ACTIVE$'),
     re.compile(r'^PIPELINE_[A-Z0-9_]+_(BLOCK|PROVIDER_BLOCKS)$'),
 )
 
@@ -226,7 +230,15 @@ def _build_variables_builder(config: dict, agent_meta_root: Path,
     return build_variables(config, agent_meta_root, project_root)[0]
 
 
-BUILDERS: list[Builder] = [_build_variables_builder]
+def active_set_variables_builder(config: dict, agent_meta_root: Path,
+                                 project_root: Optional[Path] = None) -> dict:
+    """Wrap IC-17 ``active_set_variables`` in the builder signature."""
+    from ..active_set import active_set_variables, compute_active_set
+    return active_set_variables(compute_active_set(
+        config, agent_meta_root, project_root or agent_meta_root, warn_sink=[]))
+
+
+BUILDERS: list[Builder] = [_build_variables_builder, active_set_variables_builder]
 
 # Builder variables resolved per pipeline name (config-dependent family).
 # Boundary: any PIPELINE_<NAME>_(ENABLED|DESCRIPTION|STAGES) matches, whether

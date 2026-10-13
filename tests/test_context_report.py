@@ -64,7 +64,10 @@ def test_over_hard_cap_finding(tmp_path):
     report = cr.measure_artifacts(tmp_path, ["Alpha"], _CAPS)
     findings = cr.find_over_hard_cap(report)
     assert len(findings) == 1 and "context.over-hard-cap" in findings[0]
+    # boundary is inclusive: exactly at the cap already counts (IC-10)
     _write(tmp_path / "ENTRY.md", "x" * 100)
+    assert len(cr.find_over_hard_cap(cr.measure_artifacts(tmp_path, ["Alpha"], _CAPS))) == 1
+    _write(tmp_path / "ENTRY.md", "x" * 99)
     assert cr.find_over_hard_cap(cr.measure_artifacts(tmp_path, ["Alpha"], _CAPS)) == []
 
 

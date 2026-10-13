@@ -1,0 +1,6 @@
+# homeassistant platform; variables.EXTRA_DONTS intentionally unset.
+agent-meta-version: "2.0.0-beta.1"
+ai-providers:
+- Claude
+platforms:
+- homeassistant

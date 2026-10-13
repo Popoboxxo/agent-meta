@@ -1,0 +1,26 @@
+# 20 roles incl. senior-developer WITHOUT junior-developer: the developer_tiers
+# gate (requires all of junior+senior) drops senior-developer (AC-43).
+agent-meta-version: "2.0.0-beta.1"
+ai-providers:
+- Claude
+roles:
+- orchestrator
+- developer
+- senior-developer
+- tester
+- documenter
+- git
+- requirements
+- planner
+- code-reviewer
+- explorer
+- release
+- security-auditor
+- devops-engineer
+- docker
+- log-analyzer
+- technical-writer
+- performance-optimizer
+- refactoring-specialist
+- api-specialist
+- database-engineer

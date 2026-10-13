@@ -169,13 +169,17 @@ def measure_artifacts(
 
 
 def find_over_hard_cap(report: Mapping[str, Mapping]) -> list:
-    """Return ``context.over-hard-cap`` findings as message strings."""
+    """Return ``context.over-hard-cap`` findings as message strings.
+
+    Boundary is inclusive (``bytes >= cap``, IC-06/IC-10): an artifact exactly
+    at the hard cap is already truncated by the reader.
+    """
     findings = []
     for provider, artifacts in report.items():
         for artifact, stat in artifacts.items():
-            if stat.get("cap_kind") == "hard-bytes" and stat["bytes"] > stat["cap"]:
+            if stat.get("cap_kind") == "hard-bytes" and stat["bytes"] >= stat["cap"]:
                 findings.append(
-                    "context.over-hard-cap: {}/{} {} > {} bytes".format(
+                    "context.over-hard-cap: {}/{} {} >= {} bytes".format(
                         provider, artifact, stat["bytes"], stat["cap"]))
     return findings
 

@@ -131,7 +131,42 @@ def get_active_agents_data(
     return active_agents_data
 
 
-def _select_examples(examples: object, language: str) -> list[str]:
+_LANGUAGE_ALIASES = {"en": "english", "de": "deutsch"}
+
+
+def _has_language_variant(examples: dict, language: str) -> bool:
+    """True if ``examples`` has a list under ``language`` or its alias (log decision only)."""
+
+    def norm(value: object) -> str:
+        text = str(value).strip().casefold()
+        return _LANGUAGE_ALIASES.get(text, text)
+
+    wanted = norm(language)
+    return any(isinstance(v, list) and norm(k) == wanted for k, v in examples.items())
+
+
+def _note_examples_fallback(role: str, language: str, info_sink: list[str] | None) -> None:
+    """Record the INFO ``routing.examples-language-fallback`` (log only, no render effect)."""
+    message = (
+        f"routing.examples-language-fallback: role '{role}' has no examples for "
+        f"language '{language}'; using first variant"
+    )
+    if info_sink is not None:
+        if message not in info_sink:
+            info_sink.append(message)
+        return
+    from .log import SyncLog
+
+    SyncLog().note("routing.examples-language-fallback", message)
+
+
+def _select_examples(
+    examples: object,
+    language: str,
+    *,
+    role: str = "",
+    info_sink: list[str] | None = None,
+) -> list[str]:
     """Select language-appropriate routing examples (issue #780, design C).
 
     Design C keeps ``keywords`` canonical/language-neutral; language nuance
@@ -144,6 +179,10 @@ def _select_examples(examples: object, language: str) -> list[str]:
     (``{"Deutsch": [...], "English": [...]}``) selected by ``language`` with a
     deterministic fallback to the first available variant.
 
+    Fallback visibility (IC-29, log only): when a mapping lacks ``language``,
+    one ``routing.examples-language-fallback`` INFO message per role is added to
+    ``info_sink`` (or the ``SyncLog`` fallback). The selected result is unchanged.
+
     ponytail: passthrough-only until bilingual data exists. Authoring the
     per-language ``examples`` content for all roles is separate, larger work
     (#780 AC-3 / #779 IT-4); this function is just the generator plumbing.
@@ -151,6 +190,10 @@ def _select_examples(examples: object, language: str) -> list[str]:
     if isinstance(examples, dict):
         variant = examples.get(language)
         if not isinstance(variant, list):
+            # Log only a genuine miss: needs a role and no variant under the
+            # language's alias either ("en" vs mapping key "English").
+            if role and not _has_language_variant(examples, language):
+                _note_examples_fallback(role, language, info_sink)
             # Deterministic fallback: first list variant in insertion order.
             variant = next(
                 (v for v in examples.values() if isinstance(v, list)), []
@@ -170,6 +213,7 @@ def get_routing_rules(
     template_roles: set[str] | None = None,
     warn_sink: list[str] | None = None,
     language: str = "en",
+    info_sink: list[str] | None = None,
 ) -> dict:
     """Build structured routing rules for the native intent-routing tool (issue #264).
 
@@ -236,7 +280,9 @@ def get_routing_rules(
             # Python consumer) keeps unmigrated roles keyword-routable.
             keywords = routing.get("intent_keywords")
         keywords = [str(k) for k in keywords] if isinstance(keywords, list) else []
-        examples = _select_examples(patterns.get("examples"), language)
+        examples = _select_examples(
+            patterns.get("examples"), language, role=role_name, info_sink=info_sink
+        )
         if not keywords and not examples:
             continue
         handoff = role_info.get("handoff")

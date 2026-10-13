@@ -26,6 +26,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from lib.active_set import compute_active_set
 from lib.backup import (
     create_backup,
     delete_backup,
@@ -77,6 +78,7 @@ from lib.sync_pipeline import (
     _sync_stage_contexts,
     _sync_stage_drift_and_plugins,
     _sync_stage_external_skills_check,
+    _sync_stage_context_checks,
     _sync_stage_generated_file_drift_scan,
     _sync_stage_generated_file_hash_capture,
     _sync_stage_gitignore,
@@ -330,6 +332,9 @@ class _SyncContext:
         self.viz_cfg = viz_cfg
         self.harness = harness
         self.mode: str | None = None
+        # IC-17: computed once per sync by _build_context; no consumer reads
+        # it yet (consumer migration is IC-18, later phase).
+        self.active_set = None
         # Report-only modes (e.g. --audit-config) set this so main() skips the
         # common tail, which writes env.* scripts and sync.log (issue #738).
         self.read_only = False
@@ -589,13 +594,24 @@ def _build_context(args, agent_meta_root: Path, log: "SyncLog"):
     for w in pre_warnings:
         log.warn(w)
 
-    return _SyncContext(
+    ctx = _SyncContext(
         args=args, log=log, agent_meta_root=agent_meta_root,
         project_root=project_root, config=config, config_path=config_path,
         variables=variables, platforms=platforms,
         source_version=source_version, viz_cfg=viz_cfg,
         harness=harness,
     )
+    # IC-17: single ActiveSet per sync; unknown-role / gate-dropped warnings
+    # go to the sync log. Informational only -- does not alter any render.
+    active_warnings: list = []
+    ctx.active_set = compute_active_set(
+        config, agent_meta_root, project_root, warn_sink=active_warnings)
+    # Only active-set.* diagnostics are logged here: the resolver's other
+    # warnings (missing templates) are already reported by existing paths.
+    for w in active_warnings:
+        if w.startswith("active-set."):
+            log.warn(w)
+    return ctx
 
 
 def _resolve_and_guard_harness(args, agent_meta_root: Path, project_root: Path,
@@ -1219,6 +1235,11 @@ def _handle_sync(ctx: _SyncContext) -> None:
     # this file's own write isn't captured into that hash baseline.
     _sync_stage_auto_commit_allowlist(ctx.agent_meta_root, ctx.project_root,
                                       config, ctx.args, ctx.log)
+    # Stage 14b: context/active-set checks (IC-10/19/29) -- report-only (WARN/INFO
+    # in sync.log), fail-soft, no exit-code or render effect.
+    _sync_stage_context_checks(
+        ctx.agent_meta_root, ctx.project_root, config, ctx.active_set, ctx.log,
+        info_messages=(ctx.variables or {}).get("_ROUTING_INFO"))
     # Stage 15: version bookkeeping (#720) -- write the actually-deployed
     # agent-meta version back into project.yaml so it never silently drifts
     # behind a submodule upgrade.
