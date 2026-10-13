@@ -38,6 +38,7 @@ CHECK_GATE_DROPPED = "active-set.gate-dropped"
 CHECK_UNKNOWN_ROLE = "active-set.unknown-role"
 CHECK_UNRESOLVED = "active-set.unresolved-placeholder"
 CHECK_PATTERN_MISSING = "active-set.dispatch-pattern-missing"
+CHECK_INVALID_PHRASE = "active-set.invalid-dispatch-phrase"
 
 _AGENT_META_ROOT = Path(__file__).resolve().parents[3]
 _PROJECT_CFG = ".meta-config/project.yaml"
@@ -117,18 +118,19 @@ def _fmt_pattern(fmt: str, alt: str) -> Optional[re.Pattern]:
     return re.compile(r"(?<![\w.])" + head_rx + r"\s*(?P<r>" + alt + ")" + end)
 
 
-def _phrase_patterns(alt: str) -> list:
+def _phrase_patterns(alt: str) -> tuple:
+    """Return ``(patterns, invalid)``; ``invalid`` lists ``(phrase, error)`` pairs."""
     phrases = _refs().get("dispatch_phrases") or {}
-    out = []
+    out, invalid = [], []
     for lang in ("en", "de"):
         for phrase in phrases.get(lang) or []:
             try:
                 out.append(re.compile(
                     "(?:" + phrase + r")\s*" + _ARTICLE + r"[`@\"']?(?P<r>" + alt
                     + r")(?![\w-])", re.IGNORECASE))
-            except re.error:
-                continue
-    return out
+            except re.error as exc:
+                invalid.append((str(phrase), str(exc)))
+    return out, invalid
 
 
 def _dangling_roles(active_set) -> frozenset:
@@ -192,7 +194,14 @@ def _collect(project_root, providers, active_set, kind: str) -> list:
                 "active-set dispatch/mention checks skipped for it",
                 "Add pipeline_notation task_fmt/mention_fmt with an {agent} slot"))
             continue
-        pats += _phrase_patterns(alt)
+        phrase_pats, invalid = _phrase_patterns(alt)
+        pats += phrase_pats
+        if kind == "dispatch":
+            findings += [Finding(
+                Severity.WARNING, CHECK_INVALID_PHRASE, "config/active-set-references.yaml",
+                f"invalid dispatch_phrases regex {phrase!r}: {err}",
+                "Fix the regex; the phrase is ignored by the dispatch check")
+                for phrase, err in invalid]
         for path in _scan_files(project_root, provider):
             rel = _rel(path, project_root)
             if kind == "mention" and any(fnmatch.fnmatch(rel, g) for g in mention_allow):

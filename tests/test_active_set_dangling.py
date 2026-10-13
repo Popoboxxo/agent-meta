@@ -53,6 +53,14 @@ def test_p10_dangling_dispatch_covers_ac43_roles(synced):
     text = " ".join(f.message for f in findings)
     for role in _AC43_ROLES:
         assert f"'{role}'" in text, role
+    # Pin the exact (file, role) set so heuristic drift is visible.
+    pairs = {(f.file.rsplit("/", 1)[-1], f.message.split("'")[1]) for f in findings}
+    assert pairs == {("documenter.md", "knowledge-ingestor")} | {
+        ("orchestrator.md", r) for r in (
+            "bug-feature-analyzer", "concept-architect", "concept-reviewer",
+            "concept-specifier", "ideation", "junior-developer",
+            "principal-developer", "senior-developer", "validator")}
+    assert len(findings) == 10
 
 
 def test_p10_dangling_mention_is_info(synced):
@@ -60,6 +68,11 @@ def test_p10_dangling_mention_is_info(synced):
     findings = asr.check_dangling_mention(project, _PROVIDERS, {}, active)
     assert findings and all(f.severity == Severity.INFO for f in findings)
     assert all(f.check == "active-set.dangling-mention" for f in findings)
+    pairs = {(f.file.rsplit("/", 1)[-1], f.message.split("'")[1]) for f in findings}
+    # Prose references (boundary lists, "Delegation (reference only)") are mentions.
+    assert {("code-reviewer.md", "validator"), ("release.md", "validator"),
+            ("developer.md", "validator"), ("tester.md", "se-validator")} <= pairs
+    assert all("(" in f.message and "x," in f.message for f in findings)  # count + first line
 
 
 def test_p20_gate_dropped_reports_senior_developer(synced):
@@ -180,3 +193,38 @@ def test_every_provider_derives_a_dispatch_pattern(provider):
     fmts = asr._dispatch_formats(_ROOT, provider)
     pats = [asr._fmt_pattern(f, "validator") for f in fmts]
     assert fmts and all(pats), f"{provider}: formats {fmts}"
+
+
+def test_non_dispatch_keys_conditional_item_is_unit_excluded(monkeypatch):
+    monkeypatch.setattr(asr, "load_yaml_file", lambda path: {"delegation_syntax": {"P": {
+        "pipeline_notation": {
+            "task_fmt": "run({agent})",
+            "conditional_item": "  - Condition evaluated by {agent}: {task}"}}}})
+    assert asr._dispatch_formats(_ROOT, "P") == ["run({agent})"]
+    pat = asr._fmt_pattern("run({agent})", "validator")
+    assert pat.search("run(validator)")
+    assert asr._NON_DISPATCH_KEYS == ("conditional",)
+
+
+def test_conditional_line_yields_no_dispatch(synced, tmp_path):
+    _, active = synced("p10")
+    proj = _scratch(tmp_path, "  - Condition evaluated by validator: x\n")
+    assert asr.check_dangling_dispatch(proj, _PROVIDERS, {}, active) == []
+
+
+def test_phrase_patterns_positive():
+    pats, invalid = asr._phrase_patterns("validator")
+    assert invalid == []
+    assert any(p.search("delegiere an validator") for p in pats)
+    assert any(p.search("Hand off to the `validator`") for p in pats)
+    assert not any(p.search("validator is nice") for p in pats)
+
+
+def test_invalid_phrase_regex_is_surfaced(synced, tmp_path, monkeypatch):
+    _, active = synced("p10")
+    monkeypatch.setattr(asr, "_refs", lambda: {"dispatch_phrases": {"en": ["bad(", "route to"]}})
+    proj = _scratch(tmp_path, "route to validator\n")
+    found = asr.check_dangling_dispatch(proj, _PROVIDERS, {}, active)
+    checks = sorted(f.check for f in found)
+    assert checks == ["active-set.dangling-dispatch", "active-set.invalid-dispatch-phrase"]
+    assert all(f.severity == Severity.WARNING for f in found)
