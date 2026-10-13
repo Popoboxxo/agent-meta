@@ -26,6 +26,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from lib.active_set import compute_active_set
 from lib.backup import (
     create_backup,
     delete_backup,
@@ -601,10 +602,11 @@ def _build_context(args, agent_meta_root: Path, log: "SyncLog"):
     )
     # IC-17: single ActiveSet per sync; unknown-role / gate-dropped warnings
     # go to the sync log. Informational only -- does not alter any render.
-    from lib.active_set import compute_active_set
     active_warnings: list = []
     ctx.active_set = compute_active_set(
         config, agent_meta_root, project_root, warn_sink=active_warnings)
+    # Only active-set.* diagnostics are logged here: the resolver's other
+    # warnings (missing templates) are already reported by existing paths.
     for w in active_warnings:
         if w.startswith("active-set."):
             log.warn(w)

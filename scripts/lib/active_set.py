@@ -91,6 +91,18 @@ def compute_active_set(
     """Compute the ActiveSet once per sync (``project_root`` reserved for Q16)."""
     from .frontmatter import PLATFORM_DIR, collect_sources
 
+    # Input hardening: the allowlist is only honoured as a list of str; the
+    # orchestrator block only as a dict. Work on a shallow copy so the
+    # caller's config is never mutated.
+    config = dict(config)
+    if config.get("roles") is not None:
+        raw = config["roles"]
+        config["roles"] = (
+            list(raw) if isinstance(raw, list) and all(isinstance(r, str) for r in raw) else []
+        )
+    if not isinstance(config.get("orchestrator"), dict):
+        config["orchestrator"] = {}
+
     roles_cfg = load_roles_config(agent_meta_root)
     role_defs = roles_cfg.get("roles", {}) or {}
     known = frozenset(role_defs)
@@ -112,6 +124,8 @@ def compute_active_set(
     _emit_warnings(warnings, warn_sink)
 
     overrides, _ = collect_sources(agent_meta_root, list(config.get("platforms") or []))
+    # "framework" is the default classification (also for roles whose template
+    # is missing); "project" is reserved for deferred project-specific roles (Q16).
     sources = {
         role: "platform" if role in overrides and overrides[role].parent.name == PLATFORM_DIR
         else "framework"
@@ -120,7 +134,7 @@ def compute_active_set(
 
     # Main-chat skip: in orchestrator.mode "main-chat" the orchestrator is not
     # a dispatch target (same rule as config.py strict-permission scan).
-    main_chat = _resolve_orch_mode(config.get("orchestrator") or {}) == "main-chat"
+    main_chat = _resolve_orch_mode(config["orchestrator"]) == "main-chat"
     routable = frozenset(
         role for role in active
         if ((role_defs.get(role) or {}).get("routing") or {}).get("addressability") != "excluded"
@@ -147,10 +161,8 @@ def compute_active_set(
 
 def active_set_variables(active: ActiveSet) -> dict:
     """Template variables derived from the ActiveSet (all values are strings)."""
-    variables = {
-        "ACTIVE_ROLES": ",".join(sorted(active.roles)),
-        "PROJECT_SPECIFIC_AGENTS": "",
-    }
+    # PROJECT_SPECIFIC_AGENTS stays owned by config.build_variables.
+    variables = {"ACTIVE_ROLES": ",".join(sorted(active.roles))}
     for role in sorted(active.known_roles):
         key = "ROLE_%s_ACTIVE" % role.upper().replace("-", "_")
         variables[key] = "true" if role in active.roles else "false"

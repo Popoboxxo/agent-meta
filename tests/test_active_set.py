@@ -64,6 +64,11 @@ def test_sets_are_sorted_and_deterministic():
     listed = variables["ACTIVE_ROLES"].split(",")
     assert listed == sorted(listed)
     assert active_set_variables(_compute("p20")[0]) == variables
+    base = yaml.safe_load((_FIX / "p20" / ".meta-config" / "project.yaml").read_text(encoding="utf-8"))
+    reversed_roles = compute_active_set(
+        {**base, "roles": list(reversed(base["roles"]))}, _ROOT, _FIX / "p20")
+    assert reversed_roles == active
+    assert active_set_variables(reversed_roles) == variables
 
 
 def test_role_active_variables_cover_all_known_roles():
@@ -74,7 +79,7 @@ def test_role_active_variables_cover_all_known_roles():
         assert variables[key] == ("true" if role in active.roles else "false")
     assert variables["ROLE_ORCHESTRATOR_ACTIVE"] == "true"
     assert variables["ROLE_SENIOR_DEVELOPER_ACTIVE"] == "false"
-    assert variables["PROJECT_SPECIFIC_AGENTS"] == ""
+    assert "PROJECT_SPECIFIC_AGENTS" not in variables
 
 
 def test_routable_excludes_orchestrator_and_sources_framework():
@@ -129,3 +134,26 @@ def test_gate_reason_config_flag_variant():
     drop = [d for d in active.gate_dropped if d.role == "se-architect"]
     assert drop and drop[0].group == "se"
     assert drop[0].reason == "requires systems-engineering.enabled to be enabled"
+
+
+@pytest.mark.parametrize("bad_roles", ["developer", ["developer", {"x": 1}], 5])
+def test_malformed_roles_do_not_raise_or_warn_per_character(bad_roles):
+    active, sink = _compute("p10", {"roles": bad_roles})
+    assert active.roles == frozenset()
+    assert not any("active-set.unknown-role" in w for w in sink)
+
+
+def test_non_dict_orchestrator_is_coerced():
+    active, _ = _compute("p10", {"orchestrator": "main-chat"})
+    assert "orchestrator" in active.roles
+
+
+def test_build_context_sets_active_set():
+    import sync
+    from lib import cli_commands
+    from lib.log import SyncLog
+    args = sync._build_arg_parser().parse_args(
+        ["--config", str(_FIX / "p10" / ".meta-config" / "project.yaml")])
+    args.dry_run = True
+    ctx = cli_commands._build_context(args, _ROOT, SyncLog())
+    assert isinstance(ctx.active_set, ActiveSet)
