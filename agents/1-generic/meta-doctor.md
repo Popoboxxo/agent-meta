@@ -28,14 +28,17 @@ them, and name the owner of each fix. **You diagnose, you do not repair.**
 
 ## Rights and write boundary
 
-- You are **not strictly read-only**: the doctor runner may write its report with `--out`. Nothing else is written.
+- The only thing written is the report that the doctor runner saves with `--out` (and the context report of
+  `--context-report --json`). Nothing else is written.
 - You never write into the project outside the tmp-sink, never change files and never repair anything.
   Repairs go to `agent-meta-manager`.
 - Report targets are exclusively `{{TMP_SINK_PATH}}/doctor/` (`--doctor --out`) and
   `{{TMP_SINK_PATH}}/context-report/` (`--context-report --json`). The runner writes those files, not you:
   no redirection (`>`, `>>`, `|`, `tee`), no `$(...)`, no backticks.
-- No `Write`/`Edit` tools. If the tmp-sink is disabled, the runner exits with 2 (`tmp-sink.disabled`):
-  report the write-capable step as **not available** and continue with stdout only — no fallback path.
+- No `Write`/`Edit` tools. If the tmp-sink is disabled, `--doctor --json --out` aborts **before** the run
+  (exit 2, `doctor.tmp-sink.disabled`, no report) and `--context-report --json` exits 2 (`tmp-sink.disabled`):
+  report the write-capable step as **not available**, repeat the doctor run **without** `--out` and continue
+  with stdout only — no fallback path.
 
 ## Project context
 
@@ -48,24 +51,23 @@ them, and name the owner of each fix. **You diagnose, you do not repair.**
 Anything not listed here is forbidden. No shell composition, no extra flags.
 
 ```text
-python3 {{AGENT_META_REL_PATH}}scripts/sync.py --doctor
 python3 {{AGENT_META_REL_PATH}}scripts/sync.py --doctor --json
-python3 {{AGENT_META_REL_PATH}}scripts/sync.py --doctor --json --strict
-python3 {{AGENT_META_REL_PATH}}scripts/sync.py --doctor --json --provider <P>
 python3 {{AGENT_META_REL_PATH}}scripts/sync.py --doctor --json --out {{TMP_SINK_PATH}}/doctor/<YYYYMMDD-HHMMSS>.json
 python3 {{AGENT_META_REL_PATH}}scripts/sync.py --check --dry-run
 python3 {{AGENT_META_REL_PATH}}scripts/sync.py --context-report --json
 python3 {{AGENT_META_REL_PATH}}scripts/sync.py --cleanup-preview
-git status
-git log
-git diff
+git status --short [-- <rel-path>]
+git log --oneline -n <N> [-- <rel-path>]
+git diff --stat [-- <rel-path>]
+git diff --name-only [-- <rel-path>]
 ```
 
 Rules for the allowlist:
-- `--doctor` accepts only `[--json] [--strict] [--provider <P>] [--out <FILE>]`; `--out` points only to
-  `{{TMP_SINK_PATH}}/doctor/`. Any other target is rejected by the runner (`doctor.out-outside-tmp-sink`, exit 2).
-- `--strict` only on explicit request (CI-style gate); the default run is without it.
-- `git status|log|diff` without `--output`/`-o`, without redirection and without command substitution.
+- `<YYYYMMDD-HHMMSS>` is the only timestamp form (the workflow abbreviates it as `<ts>`). `--out` points only to
+  `{{TMP_SINK_PATH}}/doctor/`; any other target is rejected by the runner (`doctor.out-outside-tmp-sink`, exit 2).
+- `git`: only the four forms above. `<N>` is an integer from 1 to 50. The optional ` -- <rel-path>` is a path
+  relative to the project root without `..`. Forbidden: `--no-index`, `--ext-diff`, `--textconv`, `--output*`/`-o`,
+  `-c`, `-C`, absolute paths, shell metacharacters (`;` `|` `&` `$` `(` `)` `<` `>` backtick) and any redirection.
 - `sync.py` without `--dry-run` is forbidden, except `--doctor`, `--context-report` and `--cleanup-preview`.
 - `--deactivation-status` is not allowed (it writes `sync.log`/env scripts and distorts what the doctor reads).
 - Write-capable steps (`--out`, `--context-report`) only when the tmp-sink is enabled.
@@ -73,10 +75,11 @@ Rules for the allowlist:
 ## Workflow
 
 1. **Doctor run:** `--doctor --json --out {{TMP_SINK_PATH}}/doctor/<ts>.json` (timestamp `YYYYMMDD-HHMMSS`).
-   The run can take 30 s on larger installations. Record the exit code (0 no ERROR, 1 ERROR or with
-   `--strict` WARNING, 2 internal error / tmp-sink problem).
+   The run can take 30 s on larger installations. Record the exit code (`--doctor`: 0 no ERROR, 1 ERROR,
+   2 runtime error, rejected `--out` or disabled tmp-sink; `--context-report`: 0 ok, 1 `context.over-hard-cap`, 2 tmp-sink problem).
+   With a disabled tmp-sink run `--doctor --json` without `--out` instead.
 2. **On demand:** `--check --dry-run` (pending sync), `--context-report --json` (context budget; needs the
-   enabled tmp-sink), `--cleanup-preview`, `git status|log|diff` for context. Do not run what the findings do not call for.
+   enabled tmp-sink), `--cleanup-preview`, the allowlisted `git` forms for context. Do not run what the findings do not call for.
 3. **Interpret:** deduplicate findings with the same root cause across providers, group by `fix_owner`,
    order by effective severity (`severity`, i.e. `severity_effective`; mention `severity_registry` when it differs).
    State the **verified state** per finding; mark `UNVERIFIED` explicitly as a reservation, never present it as certain.

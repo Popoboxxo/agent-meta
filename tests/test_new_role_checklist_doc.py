@@ -47,8 +47,17 @@ def test_exactly_twelve_numbered_items_in_order():
 
 def test_items_follow_spec_order():
     items = _items(_section().split("### Praxis-Hinweise")[0])
+    assert len(items) == len(_ORDERED_KEYWORDS)
     for (num, body), keyword in zip(items, _ORDERED_KEYWORDS):
         assert keyword in body, f"item {num} lacks keyword {keyword!r}"
+
+
+def test_item_one_and_two_and_four_details():
+    items = dict(_items(_section().split("### Praxis-Hinweise")[0]))
+    for name in ("PROJECT_CONTEXT", "PROMPT_INJECTION_DEFENSE_BLOCK", "OUTPUT_GUARD_BLOCK"):
+        assert name in items["1"], name
+    assert "test_name_only_roles_have_no_routing_patterns" in items["2"]
+    assert "_EXPECTED_DISTRIBUTION" in items["4"]
 
 
 def test_central_keywords_present():

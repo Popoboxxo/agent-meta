@@ -121,7 +121,7 @@ verhalten sich exakt wie bisher.
 | `74-gitignore-keep` | Claude, Gemini | strict (default) | `ignore-provider-dirs: true` + `keep` re-includes project-owned paths — verified with REAL `git check-ignore` (ordering bug #746) |
 | `75-web-platform-preset` | Claude | strict (default) | `web`-Platform-Preset (#679): `web-{seo,accessibility,privacy}.md` rendern als plain `seo/accessibility/privacy.md`, Prefix gestrippt, keine Platzhalter |
 | `76-template-auditor-role` | Claude, Opencode | main-chat (default) | read-only `template-auditor` generated per provider: no `Write`/`Edit`/`Agent` tools, `edit: deny` in Opencode permission, no `model:` in source template, placeholders resolved, excluded from `route_intent` enum (name_only), output contract present |
-| `77-meta-doctor-role` | Claude, Opencode | main-chat (default) | read-only `meta-doctor` generated per provider (IC-23/IC-28): no `Write`/`Edit`/`Agent` tools, `edit: deny` in Opencode permission, no `model:` in source template, placeholders resolved, no keyword rule in routing rules (name_only, still in `target_agents`/`name_index`), `doctor-findings-v1` output contract present |
+| `77-meta-doctor-role` | Claude, Opencode | main-chat (default) | `meta-doctor` generated per provider (IC-23/IC-28): no `Write`/`Edit` tools, `edit: deny` in Opencode permission, no `model:` in source template, placeholders resolved, no keyword rule in routing rules (name_only, still in `target_agents`/`name_index`), `doctor-findings-v1` output contract present, no `.tmp` literal, no "strictly read-only" wording, exact bash allowlist lines |
 
 ## Bewusste Auslassungen
 

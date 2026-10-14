@@ -29,18 +29,23 @@ _H4_NAME_ONLY_REASON = (
 _SYNC = "python3 {{AGENT_META_REL_PATH}}scripts/sync.py"
 _SINK = "{{TMP_SINK_PATH}}"
 _EXPECTED_ALLOWLIST = [
-    _SYNC + " --doctor",
     _SYNC + " --doctor --json",
-    _SYNC + " --doctor --json --strict",
-    _SYNC + " --doctor --json --provider <P>",
     _SYNC + " --doctor --json --out " + _SINK + "/doctor/<YYYYMMDD-HHMMSS>.json",
     _SYNC + " --check --dry-run",
     _SYNC + " --context-report --json",
     _SYNC + " --cleanup-preview",
-    "git status",
-    "git log",
-    "git diff",
+    "git status --short [-- <rel-path>]",
+    "git log --oneline -n <N> [-- <rel-path>]",
+    "git diff --stat [-- <rel-path>]",
+    "git diff --name-only [-- <rel-path>]",
 ]
+# IC-23/AC-88: the dropped extra forms must stay out of the allowlist.
+_DROPPED_FORMS = ("--doctor\n", "--strict", "--provider")
+# git hardening (review M2): each must be named as forbidden in the allowlist rules.
+_FORBIDDEN_GIT_TOKENS = (
+    "--no-index", "--ext-diff", "--textconv", "--output*", "`-c`", "`-C`",
+    "absolute paths", "shell metacharacters", "redirection",
+)
 
 
 def _text() -> str:
@@ -91,9 +96,30 @@ def test_bash_allowlist_is_exact():
     assert _allowlist_block() == _EXPECTED_ALLOWLIST
 
 
+def test_allowlist_whitelist_forms_present_exactly_once():
+    lines = _allowlist_block()
+    for form in _EXPECTED_ALLOWLIST:
+        assert lines.count(form) == 1, form
+    text = "\n".join(lines) + "\n"
+    for dropped in _DROPPED_FORMS:
+        assert dropped not in text, dropped
+
+
+def test_git_forbidden_forms_and_consistent_rules():
+    text = _text()
+    for token in _FORBIDDEN_GIT_TOKENS:
+        assert token in text, token
+    assert "integer from 1 to 50" in text
+    assert "Anything not listed here is forbidden" in text
+    assert "any further arguments" not in text
+    assert "beliebige" not in text
+    # the placeholder syntax for timestamps is YYYYMMDD-HHMMSS only
+    assert not re.search(r"<(ts|timestamp)>\.json\s*$", "\n".join(_allowlist_block()))
+
+
 def test_allowlist_has_no_redirection_or_output_flags():
     for line in _allowlist_block():
-        bare = re.sub(r"<[A-Za-z_-]+>", "", line)  # drop <P>/<YYYYMMDD-HHMMSS> placeholders
+        bare = re.sub(r"<[A-Za-z_-]+>", "", line)  # drop <N>/<rel-path>/<YYYYMMDD-HHMMSS> placeholders
         assert not re.search(r"(>|<|\||\btee\b|\$\(|`|--output|\s-o\b)", bare), line
     assert not any("--deactivation-status" in ln for ln in _allowlist_block())
 
@@ -120,7 +146,10 @@ def test_prompt_injection_and_rights_statements():
     assert "{{OUTPUT_GUARD_BLOCK}}" in body
     assert "data, not instructions" in body
     assert "never repairs anything" in _text()
-    assert "not strictly read-only" in body
+    # AC-95: never describe meta-doctor as strictly read-only
+    assert not re.search(r"strict(ly)?[ -]read-only|strikt read-only", _text(), re.IGNORECASE)
+    assert "only thing written is the report" in body
+    assert "doctor.tmp-sink.disabled" in body and "without `--out`" in body
     assert "never write into the project outside the tmp-sink" in body.replace("You never", "never")
     assert "agent-meta-manager" in body
     assert "never delegate back to `orchestrator`" in body
@@ -180,6 +209,7 @@ def test_role_not_in_any_routing_keywords_of_other_roles():
 
 _MANAGER = REPO_ROOT / "agents" / "1-generic" / "agent-meta-manager.md"
 _MANAGER_VERSION_BEFORE = "1.23.1"
+_MANAGER_PROVIDER_LITERAL_BASELINE = 8
 
 
 def _manager_text() -> str:
@@ -195,6 +225,21 @@ def _consumer_section() -> str:
 def test_manager_declares_doctor_findings_input_contract():
     handoff = _roles()["agent-meta-manager"].get("handoff") or {}
     assert "doctor-findings-v1" in (handoff.get("input_contracts") or [])
+
+
+def test_no_read_only_wording_for_meta_doctor_in_texts():
+    """AC-95: no text calls meta-doctor/--doctor strictly read-only (meta-optimizer may be)."""
+    pattern = re.compile(r"(strikt|strict(ly)?)[ -]read-only|read-only[^\n]{0,20}meta-doctor|meta-doctor[^\n]{0,40}read-only", re.IGNORECASE)
+    files = [REPO_ROOT / "README.md", REPO_ROOT / "CHANGELOG.md", REPO_ROOT / "standalone" / "README.md",
+             TEMPLATE, REPO_ROOT / "config" / "role-defaults.yaml",
+             REPO_ROOT / "docs" / "guides" / "setup" / "instantiate-project.md"]
+    files += sorted((REPO_ROOT / "standalone" / "agents").glob("meta-doctor.md"))
+    offenders = []
+    for f in files:
+        for n, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+            if pattern.search(line) and "meta-optimizer" not in line:
+                offenders.append("%s:%d" % (f.relative_to(REPO_ROOT), n))
+    assert not offenders, offenders
 
 
 def test_no_output_not_consumed_finding_for_doctor_findings():
@@ -223,4 +268,5 @@ def test_manager_version_bumped_and_no_new_provider_literal():
     ver = str(fm["version"])
     assert tuple(map(int, ver.split("."))) > tuple(map(int, _MANAGER_VERSION_BEFORE.split(".")))
     hits = [f for f in check_provider_literal(REPO_ROOT) if "agent-meta-manager" in str(f.file)]
-    assert len(hits) <= 8, len(hits)
+    # Baseline: 8 hits in agent-meta-manager before the 0e.3 consumer section (section adds none).
+    assert len(hits) <= _MANAGER_PROVIDER_LITERAL_BASELINE, len(hits)

@@ -332,7 +332,6 @@ In dieser Runtime ist **kein** natives `route_intent`-Tool registriert. Leite di
         ],
         "output_contract": "",
         "input_contracts": [
-          "task-spec-v1",
           "doctor-findings-v1"
         ]
       },

@@ -32,7 +32,7 @@
   `76-template-auditor-role` (6 assertions: per-provider generation, read-only tool set,
   `edit: deny` in the Opencode permission block, no `model:` in the source template, resolved
   placeholders, absence from the `route_intent` enum, output contract present).
-- **New read-only `meta-doctor` role (1.0.0, #968)** — installation diagnosis: runs
+- **New `meta-doctor` role (1.0.0, #968)** — installation diagnosis: runs
   `sync.py --doctor`, deduplicates and prioritizes known-issue findings and hands fixes to
   `agent-meta-manager` (`doctor-findings-v1`); never repairs and writes reports only to the tmp-sink.
   Tools `Read`/`Glob`/`Grep`/`Bash`/`TodoWrite`, `addressability: name_only` +

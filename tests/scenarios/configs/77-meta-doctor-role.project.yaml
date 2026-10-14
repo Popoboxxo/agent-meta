@@ -13,6 +13,10 @@ roles:
 - code-reviewer
 - tester
 - meta-doctor
+repo_containment:
+  tmp-sink:
+    enabled: true
+    path: scratch/out
 project:
   name: scenario-meta-doctor
   prefix: s77

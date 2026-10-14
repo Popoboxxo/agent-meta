@@ -1,18 +1,20 @@
 #!/bin/bash
 # Scenario assert for 77-meta-doctor-role
-# (IC-23/IC-28, Task 0e.2: read-only meta-doctor installation-diagnosis role).
+# (IC-23/IC-28, Task 0e.2: meta-doctor installation-diagnosis role).
 #
 # Contract: cwd = temp project dir (sync output); $1 and env REPO_ROOT carry the
 # agent-meta checkout path. The harness has already run dry-run + real sync +
 # --validate. This scenario proves the generated `meta-doctor`:
 #   1. is generated at all for every active provider,
-#   2. is READ-ONLY — no `Write`/`Edit`/`Agent` in its tools frontmatter, and
+#   2. has no `Write`/`Edit`/`Agent` in its tools frontmatter, and
 #      `edit: deny` in the Opencode permission block,
 #   3. has no `model:` field in its SOURCE template (models come from
 #      tier-presets/role-defaults, never from the template),
 #   4. resolves all placeholders except escaped doc examples,
 #   5. has NO keyword rule in routing rules (addressability: name_only; it stays
 #      name-dispatchable via target_agents/name_index),
+#   7. contains no `.tmp` literal (configured sink `scratch/out` is rendered instead),
+#      no "strict(ly) read-only" wording, and the exact bash allowlist lines.
 #   6. still carries the mandatory STATUS/RESULT/ARTIFACTS output contract and the
 #      `doctor-findings-v1` contract marker.
 # Exit 0 = all assertions hold.
@@ -34,16 +36,16 @@ for prov in .claude .opencode; do
     [ -f "$prov/agents/meta-doctor.md" ] || fail "meta-doctor.md missing for $prov"
 done
 
-# 2. read-only tool set in the Claude frontmatter.
+# 2. tool set without Write/Edit/Agent in the Claude frontmatter.
 CLAUDE_TOOLS="$(sed -n '/^---$/,/^---$/p' .claude/agents/meta-doctor.md | sed -n '/^tools:/,/^[a-z]/p')"
 for forbidden in Write Edit Agent; do
     if printf '%s\n' "$CLAUDE_TOOLS" | grep -qE "^[-[:space:]]*${forbidden}\$"; then
-        fail "read-only role declares forbidden tool '${forbidden}' in Claude frontmatter"
+        fail "meta-doctor declares forbidden tool '${forbidden}' in Claude frontmatter"
     fi
 done
 # Opencode must deny edits explicitly.
 grep -q 'edit: deny' .opencode/agents/meta-doctor.md \
-    || fail "Opencode permission block does not deny edit (read-only role)"
+    || fail "Opencode permission block does not deny edit (no Write/Edit tools)"
 
 # 3. source template declares no model: field (model resolution stays in config).
 SOURCE="$REPO_ROOT/agents/1-generic/meta-doctor.md"
@@ -83,4 +85,32 @@ for marker in 'STATUS:' 'RESULT:' 'ARTIFACTS:' 'doctor-findings-v1'; do
         || fail "output contract marker '$marker' missing"
 done
 
-echo "ASSERT OK (77-meta-doctor-role): generated, read-only, no model field, placeholders resolved, name_only routing (no keyword rule), output contract present"
+# 7. AC-88/AC-95: sink path rendered from the configured sink (scratch/out), no `.tmp`
+#    literal, no "strict(ly) read-only" wording, exact allowlist lines.
+for prov in .claude .opencode; do
+    f="$prov/agents/meta-doctor.md"
+    if grep -qE '(^|[^A-Za-z0-9_])\.tmp([^A-Za-z0-9_]|$)' "$f"; then
+        fail "$f contains a literal .tmp (sink must come from {{TMP_SINK_PATH}})"
+    fi
+    grep -q 'scratch/out/doctor/' "$f" || fail "$f does not render the configured sink scratch/out/doctor/"
+    if grep -qiE 'strict(ly)?[ -]read-only|strikt read-only' "$f"; then
+        fail "$f calls meta-doctor strictly read-only (AC-95)"
+    fi
+    for line in \
+        'python3 .agent-meta/scripts/sync.py --doctor --json' \
+        'python3 .agent-meta/scripts/sync.py --doctor --json --out scratch/out/doctor/<YYYYMMDD-HHMMSS>.json' \
+        'python3 .agent-meta/scripts/sync.py --check --dry-run' \
+        'python3 .agent-meta/scripts/sync.py --context-report --json' \
+        'python3 .agent-meta/scripts/sync.py --cleanup-preview' \
+        'git status --short [-- <rel-path>]' \
+        'git log --oneline -n <N> [-- <rel-path>]' \
+        'git diff --stat [-- <rel-path>]' \
+        'git diff --name-only [-- <rel-path>]'; do
+        grep -qxF "$line" "$f" || fail "$f: allowlist line missing: $line"
+    done
+    for dropped in '--strict' '--provider <P>'; do
+        if grep -qF -- "$dropped" "$f"; then fail "$f: dropped allowlist form present: $dropped"; fi
+    done
+done
+
+echo "ASSERT OK (77-meta-doctor-role): generated, no Write/Edit tools, no model field, placeholders resolved, name_only routing (no keyword rule), output contract present, no .tmp literal, no strict-read-only wording, exact allowlist"
