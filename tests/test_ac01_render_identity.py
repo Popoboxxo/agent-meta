@@ -23,6 +23,11 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
 - Review of package 0e (fix commit): meta-doctor allowlist reduced to the exact IC-23/AC-88 forms, wording
   without "read-only", manager ``input_contracts`` reduced to ``doctor-findings-v1`` (no ``task-spec-v1``).
   Affects only the meta-doctor artifacts, the orchestrator routing data and managed-file hashes.
+- Task 1.05 (IC-18 no. 18, user decision): meta-doctor (new in 0e, unreleased): the NEXT
+  conditional ``ROLE_META_FEEDBACK_ACTIVE`` is true in the default (meta-feedback is in the
+  ActiveSet) now that ``active_set_variables`` reaches ``build_variables``. Only the
+  meta-doctor artifacts of all providers and the dependent generated-file-hashes change; the
+  exception regex now also covers two-suffix names (``meta-doctor.agent.md``).
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
@@ -54,7 +59,7 @@ _PROVIDERS = sorted(
 # via rebaseline in package 0e, not via a path pattern.
 # Empty entries would hide drift, so every pattern must stay role/entry specific.
 AC01_EXCEPTIONS = frozenset({
-    r".*/meta-doctor\.[a-z]+$",
+    r".*/meta-doctor(\.[a-z]+)+$",
     r".*/meta-optimizer\.[a-z]+$",
     r".*/standalone/agents/meta-doctor\.md$",
 })

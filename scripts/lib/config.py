@@ -28,7 +28,7 @@ from .variables import (  # re-exported for callers/tests (Issue #565)
     strip_inactive_conditional_blocks,  # noqa: F401
     substitute,  # noqa: F401
 )
-from .active_set import ActiveSet, compute_active_set
+from .active_set import ActiveSet, active_set_variables, compute_active_set
 from .frontmatter import collect_sources
 from .subagent_permissions import (
     missing_tools_roles,
@@ -2117,11 +2117,8 @@ def build_variables(
     active_set = _resolve_active_set(active_set, config, agent_meta_root, project_root)
     variables: dict = {}
     unmapped = _build_core_variables(variables, config, agent_meta_root, project_root)
-    # NOT applied: variables.update(active_set_variables(active_set)). Making
-    # ROLE_<ROLE>_ACTIVE effective flips `{{#if ROLE_META_FEEDBACK_ACTIVE}}` in
-    # meta-doctor.md for every default project (default render + generated-file
-    # hashes change, AC-01 breaks without rebaseline). Blocked pending a spec
-    # decision; see tests/test_variable_builder_active_set.py.
+    # IC-17/IC-18: ACTIVE_ROLES and ROLE_<ROLE>_ACTIVE come from the ActiveSet.
+    variables.update(active_set_variables(active_set))
     _build_provider_variables(variables, config, agent_meta_root, warn_sink=unmapped)
     _build_orch_variables(variables, unmapped, config, agent_meta_root)
     _build_subagent_permission_variables(variables, config)

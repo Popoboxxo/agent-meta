@@ -16,8 +16,6 @@ import dataclasses
 import sys
 from pathlib import Path
 
-import pytest
-
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT / "scripts"))
@@ -55,12 +53,6 @@ def test_effort_estimator_true_when_in_active_set():
     assert variables["EFFORT_ESTIMATOR_ENABLED"] == "true"
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="IC-18 no. 18 (ROLE_*_ACTIVE / ACTIVE_ROLES in build_variables) BLOCKED: making them "
-    "effective changes the default meta-doctor render (`{{#if ROLE_META_FEEDBACK_ACTIVE}}`) and "
-    "generated-file-hashes, breaking AC-01 (no rebaseline allowed). Needs a spec decision.",
-)
 def test_build_variables_exposes_active_set_variables_p20():
     config = _fixture_config("p20")
     variables, _ = build_variables(config, _REPO_ROOT, _REPO_ROOT)
