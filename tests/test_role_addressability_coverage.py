@@ -1,8 +1,8 @@
-"""Addressability coverage over the real 84-role config.
+"""Addressability coverage over the real role config (pinned role count below).
 
 SPEC ``dynamic-routing-template-slimming`` AC A1/A5 (Task 4, #779 IT-6):
 every role declares ``routing.addressability`` ∈ {keyword, name_only, excluded};
-the distribution is exactly ``81 keyword / 2 name_only / 1 excluded``;
+the distribution is pinned (``_EXPECTED_DISTRIBUTION``);
 ``excluded`` is exactly ``orchestrator``; every keyword role has non-empty
 ``routing_patterns.keywords`` or ``.examples``; every name_only role has a
 non-empty ``name_only_reason``.
@@ -19,8 +19,12 @@ from pathlib import Path
 from scripts.lib.roles import load_roles_config
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-_EXPECTED_TOTAL = 92
-_EXPECTED_DISTRIBUTION = {"keyword": 88, "name_only": 3, "excluded": 1}
+_EXPECTED_TOTAL = 93
+_EXPECTED_DISTRIBUTION = {"keyword": 88, "name_only": 4, "excluded": 1}
+# Ratchet exceptions for test_name_only_roles_have_no_routing_patterns (IC-28 Nr. 2):
+# name_only roles that still carry routing_patterns. Task 1.35 (Q9) removes the
+# patterns of template-auditor and must then empty this set.
+_NAME_ONLY_PATTERN_EXCEPTIONS = frozenset({"template-auditor"})
 _VALID = {"keyword", "name_only", "excluded"}
 
 
@@ -103,12 +107,31 @@ def test_name_only_roles_have_reason():
         for name, info in roles.items()
         if (info.get("routing") or {}).get("addressability") == "name_only"
     )
-    assert name_only == ["intern-developer", "principal-developer", "template-auditor"]
+    assert name_only == [
+        "intern-developer", "meta-doctor", "principal-developer", "template-auditor",
+    ]
     for name in name_only:
         reason = (roles[name].get("routing") or {}).get("name_only_reason")
         assert isinstance(reason, str) and reason.strip(), (
             f"{name}: name_only_reason missing/empty"
         )
+
+
+def test_name_only_roles_have_no_routing_patterns():
+    """IC-28 Nr. 2: name_only roles carry no routing_patterns/intent_keywords."""
+    roles = _roles()
+    offenders = []
+    for name, info in roles.items():
+        routing = info.get("routing") or {}
+        if routing.get("addressability") != "name_only":
+            continue
+        patterns = info.get("routing_patterns") or {}
+        if patterns.get("keywords") or patterns.get("examples") or routing.get("intent_keywords"):
+            offenders.append(name)
+    assert sorted(offenders) == sorted(_NAME_ONLY_PATTERN_EXCEPTIONS), (
+        f"name_only roles with routing patterns drifted: {sorted(offenders)} "
+        f"(allowed ratchet exceptions: {sorted(_NAME_ONLY_PATTERN_EXCEPTIONS)})"
+    )
 
 
 def test_openscad_developer_is_keyword_routed_with_real_patterns():

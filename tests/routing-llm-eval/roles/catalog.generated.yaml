@@ -408,6 +408,24 @@ cases:
   expected:
     target: template-auditor
     tier_escalation: true
+- id: rn-meta-doctor-de
+  role: meta-doctor
+  category: name_only
+  lang: de
+  task: Rufe den Agenten meta-doctor auf und starte direkt.
+  pair_id: rn-meta-doctor
+  expected:
+    target: meta-doctor
+    tier_escalation: true
+- id: rn-meta-doctor-en
+  role: meta-doctor
+  category: name_only
+  lang: en
+  task: Run the meta-doctor agent directly.
+  pair_id: rn-meta-doctor
+  expected:
+    target: meta-doctor
+    tier_escalation: true
 - id: rk-tester-01
   role: tester
   category: keyword

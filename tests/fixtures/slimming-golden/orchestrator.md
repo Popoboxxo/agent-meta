@@ -331,7 +331,10 @@ In dieser Runtime ist **kein** natives `route_intent`-Tool registriert. Leite di
           "Upgrade agent-meta im Projekt und sync neu."
         ],
         "output_contract": "",
-        "input_contracts": []
+        "input_contracts": [
+          "task-spec-v1",
+          "doctor-findings-v1"
+        ]
       },
       {
         "agent": "agent-meta-scout",

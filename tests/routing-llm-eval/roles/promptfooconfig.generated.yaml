@@ -616,6 +616,38 @@ tests:
           const: template-auditor
         tier_escalation:
           const: true
+- description: rn-meta-doctor-de [meta-doctor]
+  vars:
+    role: orchestrator
+    prompt: Rufe den Agenten meta-doctor auf und starte direkt.
+  assert:
+  - type: contains-json
+    value:
+      type: object
+      required:
+      - target
+      - tier_escalation
+      properties:
+        target:
+          const: meta-doctor
+        tier_escalation:
+          const: true
+- description: rn-meta-doctor-en [meta-doctor]
+  vars:
+    role: orchestrator
+    prompt: Run the meta-doctor agent directly.
+  assert:
+  - type: contains-json
+    value:
+      type: object
+      required:
+      - target
+      - tier_escalation
+      properties:
+        target:
+          const: meta-doctor
+        tier_escalation:
+          const: true
 - description: rk-tester-01 [tester]
   vars:
     role: orchestrator

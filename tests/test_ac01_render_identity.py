@@ -14,6 +14,13 @@ allowed on a clean, unmodified ``main`` state, rebaseline only with a documented
 reason, Spec AC-01):
     python tests/test_ac01_render_identity.py --write
 
+Rebaseline log (manifest is plain JSON, so reasons are kept here):
+- Task 0e.2 (IC-28, AC-01 exception list ii/iii): new role ``meta-doctor`` (all provider
+  artifacts, roster/enum/name_index rows in orchestrator, AGENTS.md, copilot-instructions,
+  managed-file lists and generated-file-hashes) plus the ``agent-meta-manager`` 1.24.0
+  ``doctor-findings-v1`` consumer section and ``handoff.input_contracts`` row in the
+  orchestrator routing data. No other render changes.
+
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
 
