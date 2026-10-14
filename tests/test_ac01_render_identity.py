@@ -53,6 +53,11 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   ``role-defaults.yaml: anti_recursion.reference_roles`` that are in the ActiveSet; the default drops
   ``/validator`` (gate off). Changed: orchestrator, developer per provider and generated-file-hashes
   (3 x 9 = 27 of 1075 entries). No template version bump (template source unchanged).
+- Task 1.16 (IC-18 no. 8): orchestrator persona/section 11 follow ``ROLE_META_FEEDBACK_ACTIVE`` and the
+  AI review roles, SE-mode prose needs ``SE_ENABLED`` (off in the default), ``se-critic`` and
+  ``effort-estimator`` only when active, and the static prose names only rendered pipelines (the default
+  drops ``concept-driven-dev``/``feature-lifecycle`` mentions, closing the PR C interim). Changed:
+  orchestrator per provider + generated-file-hashes (2 x 9 = 18 of 1075 entries).
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

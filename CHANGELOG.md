@@ -58,8 +58,8 @@
   Caution: `roles:` is an allowlist - if your project has no `roles:` key yet, adding one turns it into an
   allowlist and restricts it to the listed roles, so list ALL roles you want to keep. In the default project the
   3 WARNs per sync disappear only by activating those roles.
-  Known interim: until Task 1.16 the static orchestrator prose (task-size routing "M-XL: first
-  concept-driven-dev", "complex feature -> feature-lifecycle") still names dropped pipelines in default projects.
+  The static orchestrator prose (task-size routing, "complex feature -> feature-lifecycle", plan-driven gate
+  example) names a pipeline only while it is rendered (Task 1.16, see below).
   Scenarios 50, 51 and 52 got an explicit `roles:` list so `concept-driven-dev` stays.
 - **`routing.rules[].input_contracts` only with an active producer (IC-18 Nr. 4, AC-47 part)**: projects with
   a `roles:` subset no longer list input contracts that no active role produces (`task-spec-v1` stays, the
@@ -93,6 +93,16 @@
   conditionals against the ActiveSet, so the orchestrator and the `use-orchestrator` rule only offer direct
   dispatch to active roles (e.g. no `agent-meta-manager`/`feedback` rows in a 10-role project). Default render
   unchanged (all four row roles active, AC-01 green without rebaseline).
+- **Orchestrator persona, section 11 fallback and SE prose follow the ActiveSet (IC-18 Nr. 8, AC-49 part, PR D)**:
+  the fallback list and section 11 name `meta-feedback` only when it is active - otherwise the fallback is ASK
+  (question to the user via `main_chat`); the AI review routing names `ai-security-guardian`, `llm-evaluator` and
+  `ai-governance-engineer` only when all three are active (otherwise a role-neutral sentence); `effort-estimator`
+  and `se-critic` only when active; the SE-mode prose only with `SE_ENABLED` (off in the default, so the two SE
+  lines disappear there). The static prose now names `concept-driven-dev`, `concept-development` and
+  `feature-lifecycle` only while the pipeline is rendered (`PIPELINE_<NAME>_ENABLED`); this closes the PR C
+  interim where default projects still read "M-XL: first concept-driven-dev" / "complex feature ->
+  feature-lifecycle". AC-01 rebaselined (18 of 1075: orchestrator per provider + hashes), orchestrator golden
+  rebaselined (SE prose, `se-critic`, AI review sentence: inactive in the self-hosting config).
 
 ### Changed
 - **`ACTIVE_ROLES` / `ROLE_<ROLE>_ACTIVE` available in templates**: `build_variables` injects
