@@ -24,6 +24,7 @@
   committed `standalone/agents/` export (19 files). Ratchet ceilings lowered to 16 lines / 164 occurrences.
 
 ### Fixed
+- CI: raise `scenarios` job timeout from 45 to 60 minutes (the scenario suite regularly needs 42–45+ minutes).
 - **Active-set consumers (IC-18 Nr. 14-18, PR A)**: the raw `roles` allowlist is no longer the only source
   for role-dependent generators; the per-sync `ActiveSet` (gates applied) is used.
   - Continue role prompts follow the ActiveSet: gate-dropped roles and, without a `roles:` key,
