@@ -69,6 +69,19 @@
   (`target_agents`/`name_index`). Scenario 76 assert #5 now checks "no keyword rule in `routing.rules`";
   the ratchet exception list in `tests/test_role_addressability_coverage.py` is empty. AC-01 rebaselined
   for the per-provider orchestrator artifacts only (routing data shrank), context budget `_IST_FULL` updated.
+- **Developer tier chain gated on `DEVELOPER_TIERS_ENABLED` (IC-18 Nr. 5, AC-48, PR D), also in the default**:
+  with the `developer_tiers` gate off (the default) the orchestrator no longer names `junior-developer`,
+  `senior-developer` or `principal-developer`: section 4 routes every implementation task to `developer`,
+  the task-size table shows `developer` in the tier column, the `orchestrator_only` route points to the
+  ESCALATE-Card intake. Concept agents in the task-size table follow `ROLE_CONCEPT_*_ACTIVE`. `developer`
+  (`RECOMMENDED_TIER` line) and `planner` (step mapping, delegation pattern) are gated the same way. With the
+  gate on, section 4 is byte-identical to before (pinned in
+  `tests/fixtures/developer-tiers/orchestrator-section4-tiers-on.md`). Minor bumps: `orchestrator` 8.5.0,
+  `developer` 4.8.0, `planner` 1.6.0. AC-01 rebaselined (36 of 1075 hashes: orchestrator, developer, planner
+  per provider + `generated-file-hashes.json`), orchestrator budget -762 B per provider. Standalone export:
+  `ROLE_*_ACTIVE`, `DEVELOPER_TIERS_ENABLED` and `PIPELINE_*_ENABLED` are set to `true` (all roles exported),
+  which also fixes the leaked double branch in `standalone/agents/meta-doctor.md`
+  ("meta-feedbackuser: framework issue").
 
 ### Changed
 - **`ACTIVE_ROLES` / `ROLE_<ROLE>_ACTIVE` available in templates**: `build_variables` injects

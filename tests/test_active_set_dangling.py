@@ -52,19 +52,16 @@ def test_p10_dangling_dispatch_covers_ac43_roles(synced):
     assert all(f.check == "active-set.dangling-dispatch" for f in findings)
     text = " ".join(f.message for f in findings)
     # IC-18 no. 2 (pipeline drop): bug-feature-analyzer, ideation and validator were
-    # dispatched only from pipeline blocks that are no longer rendered on p10, so they
-    # leave the dangling set; the remaining AC-43 roles stay covered.
-    for role in ("senior-developer", "concept-specifier", "concept-reviewer"):
-        assert f"'{role}'" in text, role
-    for role in ("validator", "bug-feature-analyzer", "ideation"):
+    # dispatched only from pipeline blocks that are no longer rendered on p10.
+    # IC-18 no. 5 (tier chain): the orchestrator section 4 / task-size table is gated
+    # on DEVELOPER_TIERS_ENABLED and ROLE_CONCEPT_*_ACTIVE, so senior-developer and
+    # the concept roles leave the dangling set as well.
+    for role in _AC43_ROLES:
         assert f"'{role}'" not in text, role
     # Pin the exact (file, role) set so heuristic drift is visible.
     pairs = {(f.file.rsplit("/", 1)[-1], f.message.split("'")[1]) for f in findings}
-    assert pairs == {("documenter.md", "knowledge-ingestor")} | {
-        ("orchestrator.md", r) for r in (
-            "concept-architect", "concept-reviewer", "concept-specifier",
-            "junior-developer", "principal-developer", "senior-developer")}
-    assert len(findings) == 7
+    assert pairs == {("documenter.md", "knowledge-ingestor")}
+    assert len(findings) == 1
 
 
 def test_p10_dangling_mention_is_info(synced):

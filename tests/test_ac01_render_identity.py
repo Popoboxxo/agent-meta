@@ -44,6 +44,11 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   the 3 ``pipeline-details/*.md`` files plus the ``.agent-meta-managed`` index per provider, and the matching
   ``generated-file-hashes.json`` (27 + 9 + 9 + 9 = 54 of 1102 entries; 1075 remain, 27 files vanished). No other
   hash changed.
+- Task 1.13 (IC-18 no. 5, AC-48: the default has ``developer_tiers`` off): orchestrator section 3/4 and the
+  task-size table name ``developer`` instead of the junior/senior/principal chain, developer's
+  ``RECOMMENDED_TIER`` line and the planner step mapping drop ``senior-developer``; minor version bumps
+  (orchestrator 8.5.0, developer 4.8.0, planner 1.6.0). Changed: orchestrator, developer, planner per provider
+  and generated-file-hashes (4 x 9 = 36 of 1075 entries).
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
