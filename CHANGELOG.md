@@ -103,6 +103,14 @@
   interim where default projects still read "M-XL: first concept-driven-dev" / "complex feature ->
   feature-lifecycle". AC-01 rebaselined (18 of 1075: orchestrator per provider + hashes), orchestrator golden
   rebaselined (SE prose, `se-critic`, AI review sentence: inactive in the self-hosting config).
+- **Commands with `requires_roles` only for active roles (IC-18 Nr. 9, AC-50, PR D)**: new optional command
+  frontmatter key `requires_roles: [<role>...]`; a command is generated only when all listed roles are in the
+  ActiveSet, otherwise it is skipped and a previously generated copy is removed by the managed-file cleanup.
+  The key is a generator directive and is stripped from the rendered command (default render byte-identical).
+  Set on `doc-now` (`documenter`), `feedback`/`report-bug` (`feedback`), `analyze-logs` (`log-analyzer`) and
+  `upgrade-meta` (`agent-meta-manager`). Command bodies now resolve `{{#if ROLE_*_ACTIVE}}` conditionals;
+  `add-provider` delegates to `meta-feedback` only when it is active (otherwise the user files the issue).
+  New consistency check `commands.requires-roles-invalid` (ERROR: not a list or unknown role).
 
 ### Changed
 - **`ACTIVE_ROLES` / `ROLE_<ROLE>_ACTIVE` available in templates**: `build_variables` injects

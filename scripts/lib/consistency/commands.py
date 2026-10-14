@@ -48,6 +48,10 @@ def check_command_frontmatter(path: Path, content: str, agent_meta_root: Path) -
             "Use: allowed-tools: [\"Bash\", \"Read\"]",
         ))
 
+    # requires_roles (IC-18 no. 9, Q26): optional generator directive; when
+    # present it must be a list of roles defined in config/role-defaults.yaml.
+    findings.extend(_check_requires_roles(fm, rel, agent_meta_root))
+
     # argument-hint: recommended
     if "argument-hint" not in fm:
         findings.append(Finding(
@@ -99,6 +103,30 @@ def check_duplicate_commands(agent_meta_root: Path) -> list[Finding]:
             ))
 
     return findings
+
+
+def _check_requires_roles(fm: dict, rel: str, agent_meta_root: Path) -> list[Finding]:
+    """``commands.requires-roles-invalid`` for a malformed or unknown ``requires_roles``."""
+    if "requires_roles" not in fm:
+        return []
+    value = fm.get("requires_roles")
+    if not isinstance(value, list) or not all(isinstance(r, str) for r in value):
+        return [Finding(
+            Severity.ERROR, "commands.requires-roles-invalid", rel,
+            f"'requires_roles' must be a list of role names, got {value!r}",
+            "Use: requires_roles: [documenter]",
+        )]
+    from ..roles import load_roles_config
+
+    known = set((load_roles_config(agent_meta_root).get("roles") or {}).keys())
+    unknown = sorted(set(value) - known)
+    if not unknown:
+        return []
+    return [Finding(
+        Severity.ERROR, "commands.requires-roles-invalid", rel,
+        f"'requires_roles' names roles not defined in config/role-defaults.yaml: {unknown}",
+        "Fix the role names or remove them from requires_roles.",
+    )]
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────

@@ -16,6 +16,43 @@ from .rule_index import (
 COMMANDS_DIR = "commands"
 CLAUDE_COMMANDS_DIR = ".claude/commands"
 
+# IC-18 no. 9: generator directive in a command source's frontmatter. Never
+# rendered into the provider command (it is not a provider frontmatter key).
+REQUIRES_ROLES_KEY = "requires_roles"
+_REQUIRES_ROLES_LINE_RE = re.compile(r"^requires_roles:[^\n]*\n", re.MULTILINE)
+
+
+def command_required_roles(content: str) -> list[str]:
+    """Roles a command source requires (``requires_roles``), ``[]`` when absent.
+
+    Raises ``SyncError`` for a present but malformed value (not a list of
+    strings), so a typo never silently generates or drops a command.
+    """
+    import yaml
+
+    fm_block, _ = _split_frontmatter(content)
+    if not fm_block:
+        return []
+    try:
+        data = yaml.safe_load(fm_block[3:-4]) or {}
+    except yaml.YAMLError as exc:
+        raise SyncError(f"commands: unreadable frontmatter ({exc})") from exc
+    if not isinstance(data, dict) or REQUIRES_ROLES_KEY not in data:
+        return []
+    value = data[REQUIRES_ROLES_KEY]
+    if not isinstance(value, list) or not all(isinstance(r, str) for r in value):
+        raise SyncError(
+            f"commands: '{REQUIRES_ROLES_KEY}' must be a list of role names, got {value!r}")
+    return list(value)
+
+
+def _strip_requires_roles(content: str) -> str:
+    """Remove the ``requires_roles`` frontmatter line from a command source."""
+    fm_block, body = _split_frontmatter(content)
+    if not fm_block or REQUIRES_ROLES_KEY not in fm_block:
+        return content
+    return _REQUIRES_ROLES_LINE_RE.sub("", fm_block, count=1) + body
+
 
 def collect_command_sources(agent_meta_root: Path, platforms: list[str]) -> list[tuple[Path, str]]:
     """Collect command files from 0-external, 1-generic and 2-platform layers.
@@ -106,6 +143,7 @@ def sync_commands_for_provider(
     provider: str,
     provider_config: dict | None = None,
     variables: dict | None = None,
+    active_set=None,
 ):
     """Copy command files to the provider-specific target directory.
 
@@ -122,10 +160,19 @@ def sync_commands_for_provider(
     silent ``return``; a provider that declares support without a
     ``commands_dir`` fails loudly.
 
-    Variables substitution: {{VAR}} placeholders are substituted like rules.
+    Variables substitution: {{VAR}} placeholders are substituted like rules,
+    then ``{{#if ROLE_*_ACTIVE}}`` conditionals are resolved.
     Stale-tracking via the managed index in the target directory.
+
+    IC-18 no. 9 (AC-50): a source with ``requires_roles`` is only generated when
+    ``active_set.all_active(requires_roles)``; otherwise it is not managed this
+    run, so a previously generated copy is removed by the managed-file cleanup.
+    ``active_set`` is the per-sync ActiveSet (computed from ``config`` when
+    omitted, for standalone callers).
     """
+    from .active_set import compute_active_set
     from .config import substitute
+    from .variables import strip_inactive_conditional_blocks
     from .providers import load_provider_capabilities, provider_commands_supported
 
     pc = (provider_config or {}).get(provider, {})
@@ -140,6 +187,8 @@ def sync_commands_for_provider(
 
     platforms = config.get("platforms", [])
     sources = collect_command_sources(agent_meta_root, platforms)
+    if active_set is None:
+        active_set = compute_active_set(config, agent_meta_root, project_root, warn_sink=[])
 
     commands_dir_rel = pc.get("commands_dir")
     if not commands_dir_rel:
@@ -185,8 +234,17 @@ def sync_commands_for_provider(
         layer = source_path.parts[-2]
         rel_source = f"commands/{layer}/{source_path.name}"
 
+        required = command_required_roles(content)
+        if not active_set.all_active(required):
+            missing = ", ".join(r for r in required if not active_set.has(r))
+            log.skip(str(target_path.relative_to(project_root)),
+                     f"requires inactive role(s): {missing}")
+            continue
+        content = _strip_requires_roles(content)
+
         if variables is not None:
             content = substitute(content, variables, rel_source, log)
+            content = strip_inactive_conditional_blocks(content, variables)
 
         if commands_format == "continue":
             content = _add_frontmatter_field(content, "invokable", "true")

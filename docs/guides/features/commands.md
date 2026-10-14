@@ -90,6 +90,9 @@ Command body here. Use $ARGUMENTS to receive optional user input.
 | `description` | Ja | Kurzbeschreibung im Command-Picker |
 | `allowed-tools` | Nein | Werkzeuge die dieser Command nutzen darf |
 | `argument-hint` | Nein | Platzhalter-Hinweis für Argumente |
+| `requires_roles` | Nein | Liste von Rollen (`requires_roles: [documenter]`). Der Command wird nur generiert, wenn alle genannten Rollen im Active Set sind (IC-18 Nr. 9); sonst entfällt er und eine früher generierte Kopie wird als Managed-File entfernt. Der Key ist eine Generator-Direktive und erscheint nicht im generierten Command. |
+
+Command-Bodies dürfen `{{#if ROLE_<ROLLE>_ACTIVE}}…{{else}}…{{/if}}` nutzen (z. B. `add-provider`: Delegation an `meta-feedback` nur, wenn die Rolle aktiv ist).
 
 ### Continue
 
@@ -147,6 +150,7 @@ analyze-logs.md
 ```
 
 - Commands die in dieser Liste stehen aber nicht mehr in den Quellen existieren → werden gelöscht
+- Commands, deren `requires_roles` nicht vollständig aktiv sind → werden nicht generiert bzw. gelöscht
 - Commands die **nicht** in dieser Liste stehen (projekt-eigen) → werden nie angefasst
 
 ---
@@ -160,6 +164,7 @@ analyze-logs.md
 description: Delegate to documenter agent to update CODEBASE_OVERVIEW.md immediately
 allowed-tools: ["Agent"]
 argument-hint: "[area or file to focus on]"
+requires_roles: [documenter]
 ---
 
 Delegate to the `documenter` agent with this task:

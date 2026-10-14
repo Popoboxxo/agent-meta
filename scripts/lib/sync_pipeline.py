@@ -1274,7 +1274,7 @@ def _sync_stage_per_provider(
             sync_commands_for_provider(agent_meta_root, project_root, config, log,
                                        args.dry_run, provider,
                                        provider_config=provider_config,
-                                       variables=variables)
+                                       variables=variables, active_set=active_set)
         # Sync snippets and external skills per provider
         sync_snippets_for_provider(agent_meta_root, project_root, config, log, args.dry_run,
                                    provider, provider_config)
