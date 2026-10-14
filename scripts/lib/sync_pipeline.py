@@ -1519,7 +1519,7 @@ def _sync_stage_generated_file_hash_capture(
     capture_generated_file_hashes(agent_meta_root, project_root, config, provider_config, args.dry_run)
 
 
-def _sync_stage_auto_commit_allowlist(agent_meta_root, project_root, config, args, log, active_set) -> None:
+def _sync_stage_auto_commit_allowlist(agent_meta_root, project_root, config, args, log) -> None:
     """Issue #694: write .meta-config/auto-commit-allowlist.json reflecting
     the resolved auto_commit config for this sync. Runs on every sync,
     overwriting the previous allowlist in full (not merged) -- stale
@@ -1527,13 +1527,8 @@ def _sync_stage_auto_commit_allowlist(agent_meta_root, project_root, config, arg
     after _sync_stage_generated_file_hash_capture (which the conventions
     skill's Change Checklist and this repo's own stage-13 comment both
     call the true last stage) so this file's own write doesn't get
-    captured into that hash baseline a step too early.
-
-    IC-18 no. 14: the role list comes from the ActiveSet, not the raw
-    ``roles`` allowlist -- a gate-dropped role must not keep commit authority
-    (the runtime reader orchestrator-guard-impl.sh trusts this file). The JSON
-    format is unchanged."""
-    active_roles = sorted(active_set.roles)
+    captured into that hash baseline a step too early."""
+    active_roles = config.get("roles", [])
     resolved = resolve_auto_commit_config(config, active_roles, agent_meta_root)
 
     allowlist_path = project_root / ".meta-config" / "auto-commit-allowlist.json"

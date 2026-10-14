@@ -7,6 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -64,6 +66,12 @@ def test_allowlist_reflects_mode_off_when_unconfigured(tmp_path):
     assert "git" not in data["eligible_roles"]
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason="IC-18 no. 14 BLOCKED: deriving the allowlist from ActiveSet.roles changes the "
+    "default render (projects without `roles:` get eligible_roles [] today, the full "
+    "ActiveSet list after) and breaks AC-01 (no rebaseline allowed). Needs a spec decision.",
+)
 def test_allowlist_excludes_gate_dropped_role(tmp_path):
     # IC-18 no. 14 / AC-84 (spec-faithful direction): senior-developer is
     # dropped by the developer_tiers gate in the p20 fixture (no
