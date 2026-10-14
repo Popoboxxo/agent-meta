@@ -1539,7 +1539,13 @@ def _build_orch_variables(
     _dd_enabled = orch_config.get("direct-dispatch-enabled", True)
     if _dd_enabled:
         _dd_template = agent_meta_root / "templates" / "direct-dispatch-section.md"
-        variables["DIRECT_DISPATCH_SECTION"] = _dd_template.read_text(encoding="utf-8") if _dd_template.exists() else ""
+        # IC-18 no. 7: each row sits under {{#if ROLE_<ROLE>_ACTIVE}}; resolve
+        # against the ActiveSet here so the value is final for every consumer.
+        variables["DIRECT_DISPATCH_SECTION"] = (
+            strip_inactive_conditional_blocks(
+                _dd_template.read_text(encoding="utf-8"), active_set_variables(active_set))
+            if _dd_template.exists() else ""
+        )
     else:
         variables["DIRECT_DISPATCH_SECTION"] = ""
     # ORCHESTRATOR_OUTCOME_CACHING: auto-inject from outcome-caching block in project.yaml

@@ -88,6 +88,11 @@
   `config.py`. Default (validator gate off): "Nur tester/documenter/requirements aus Kontext verweisen."
   Without any active reference role only the first sentence remains. `load_roles_config` exposes
   `anti_recursion`. AC-01 rebaselined (27 of 1075: orchestrator, developer per provider + hashes).
+- **`DIRECT_DISPATCH_SECTION` rows only for active roles (IC-18 Nr. 7, PR D)**: every row of
+  `templates/direct-dispatch-section.md` sits under `{{#if ROLE_<ROLE>_ACTIVE}}`; the builder resolves the
+  conditionals against the ActiveSet, so the orchestrator and the `use-orchestrator` rule only offer direct
+  dispatch to active roles (e.g. no `agent-meta-manager`/`feedback` rows in a 10-role project). Default render
+  unchanged (all four row roles active, AC-01 green without rebaseline).
 
 ### Changed
 - **`ACTIVE_ROLES` / `ROLE_<ROLE>_ACTIVE` available in templates**: `build_variables` injects
