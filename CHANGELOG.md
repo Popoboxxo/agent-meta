@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Fixed
+- CI: raise `scenarios` job timeout from 45 to 60 minutes (the scenario suite regularly needs 42–45+ minutes).
 - **`template-auditor` without keyword routing (Q9, IC-15 Nr. 14)**: removed `routing_patterns` from the
   name_only role `template-auditor` in `config/role-defaults.yaml`; it stays dispatchable by name only
   (`target_agents`/`name_index`). Scenario 76 assert #5 now checks "no keyword rule in `routing.rules`";
