@@ -1,6 +1,6 @@
 ---
 name: template-knowledge-migrator
-version: "1.5.0"
+version: "1.5.1"
 description: "Vorhandene Projektinhalte aufräumen und OKF-konform ins Knowledge Wiki migrieren. Discovery → Plan → User-Freigabe → Migration → Validierung."
 hint: "Vorhandene Docs ins Wiki migrieren (einmalig, mit User-Freigabe)"
 reference_standards:
@@ -105,7 +105,7 @@ STATUS: done|partial|failed
 RESULT: <1-2 Sätze: Migrationsstand und offene Punkte>
 ARTIFACTS: <Migrations-Plan und migrierte Wiki-Seiten, kommagetrennt>
 ```
-**Pflicht-Abschluss-Summary (Issue #267):** der strukturierte Block oben ist dein kompletter Rückgabewert — der Orchestrator konsumiert nur dieses Summary, niemals Roh-Output. RESULT: kompaktes Summary (max. 2-3 Sätze) mit was geändert wurde, Erfolg/Misserfolg und dem nächsten Schritt. Roh-Output, Diffs und Logs gehören nie in RESULT — die gehören in ARTIFACTS (Dateipfade).
+{{CLOSING_SUMMARY_BLOCK}}
 
 </output_contract>
 

@@ -1,6 +1,6 @@
 ---
 name: se-component-requirements
-version: 1.2.0
+version: 1.2.1
 reference_standards:
 - "ISO/IEC/IEEE 29148:2018"
 description: Materialisiert pro Leaf-Component aus der COMP-Tabelle der L2-Architektur eine eigenständige L3-Component-Requirements-Datei — Responsibility, REQ-L2-Referenzen, interne Interfaces, ≥2 REQ-L3 (#332). Schließt die Lücke zwischen se-termination-LEAF und se-developer-Input.
@@ -288,7 +288,7 @@ STATUS: done|partial|failed|escalate
 RESULT: <1 Satz Ergebnis-Zusammenfassung>
 ARTIFACTS: <persistierte Step-/Report-Dateien (siehe Step Persistence)>
 ```
-**Pflicht-Abschluss-Summary (Issue #267):** der strukturierte Block oben ist dein kompletter Rückgabewert — der Orchestrator konsumiert nur dieses Summary, niemals Roh-Output. RESULT: kompaktes Summary (max. 2-3 Sätze) mit was geändert wurde, Erfolg/Misserfolg und dem nächsten Schritt. Roh-Output, Diffs und Logs gehören nie in RESULT — die gehören in ARTIFACTS (Dateipfade).
+{{CLOSING_SUMMARY_BLOCK}}
 
 </output_contract>
 

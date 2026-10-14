@@ -30,10 +30,10 @@ _SCAN_GLOBS = (
 _MIN_LINE_LENGTH = 40
 _MIN_FILES = 5
 
-# Ratchet ceilings (actual state after IC-31 / Task 1.06, measured by
+# Ratchet ceilings (actual state after IC-31 / Tasks 1.06 + 1.07, measured by
 # ``_duplicate_lines()``). Lower them when duplicates disappear; never raise.
-MAX_DUPLICATE_LINES = 17        # distinct lines present in >= 5 files
-MAX_DUPLICATE_OCCURRENCES = 183  # sum of files over those lines
+MAX_DUPLICATE_LINES = 16        # distinct lines present in >= 5 files
+MAX_DUPLICATE_OCCURRENCES = 164  # sum of files over those lines
 
 # Snippets whose body must no longer occur inline in a source template.
 _DEDUPED_SNIPPETS = ("worker-role", "closing-summary", "user-proxy")
@@ -75,6 +75,16 @@ def test_boilerplate_snippets_not_inline():
         "boilerplate line is inline again -- use the {{..._BLOCK}} placeholder: "
         + "; ".join(offenders)
     )
+
+
+def test_no_german_closing_summary_twin():
+    """Task 1.07: the DE twin of the closing summary is unified on the EN block."""
+    offenders = [
+        path.relative_to(_REPO_ROOT).as_posix()
+        for path in _source_files()
+        if "Pflicht-Abschluss-Summary" in path.read_text(encoding="utf-8")
+    ]
+    assert not offenders, f"German closing-summary twin is back in: {offenders}"
 
 
 def test_deduped_snippets_are_referenced():

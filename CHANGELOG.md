@@ -6,7 +6,7 @@
 - **Source boilerplate de-duplicated render-neutrally (IC-31, AC-72)**: the verbatim worker-role line
   (49 occurrences), the "Mandatory closing summary" line (67) and the "User proxy" line (20) in
   `agents/1-generic` / `agents/2-platform` are replaced by the new snippet blocks `{{WORKER_ROLE_BLOCK}}`,
-  `{{CLOSING_SUMMARY_BLOCK}}` and `{{USER_PROXY_BLOCK}}` (`snippets/agents/`, registered in
+  `{{CLOSING_SUMMARY_BLOCK}}` and `{{USER_PROXY_BLOCK}}` (`snippets/agents/worker-role.md`, `closing-summary.md`, `user-proxy.md`; registered in
   `consistency/placeholders.py`, resolved in `standalone.py`). The rendered output of all providers and the
   standalone export is byte-identical (AC-01 harness green, no rebaseline, no version bumps because the
   frontmatter `version` is part of the render). Template source: `agents/1-generic` 708376 -> 681588 bytes
@@ -15,6 +15,13 @@
   new ratchet `tests/test_template_line_duplication.py`. `tests/test_contract_labels.py` now checks the
   snippet-resolved templates (`scripts.lib.standalone.resolve_block_snippets`, #552). The existing
   `{{ANTI_RECURSION_BLOCK}}` (German text) is not reused: it would change the render of the worker-role line.
+- **EN/DE closing-summary twin unified on EN (IC-31, AC-72 exception)**: the German "Pflicht-Abschluss-Summary"
+  line in 19 templates (`mammouth-expert`, `knowledge-*` x7, `se-*` x11; patch version bump each, override
+  `agent-meta-mammouth-expert` re-pinned) now uses `{{CLOSING_SUMMARY_BLOCK}}` - the rendered text of these
+  agents switches from German to English (deliberate render change). Rebaselined: AC-01 `hashes.json`
+  (18 of 1102 hashes: the `mammouth-expert` artifacts of all providers + managed-file hashes; the other 18
+  roles are not part of the provider matrix), 8 slimming goldens (`knowledge-*`, `mammouth-expert`), and the
+  committed `standalone/agents/` export (19 files). Ratchet ceilings lowered to 16 lines / 164 occurrences.
 
 ### Fixed
 - **`template-auditor` without keyword routing (Q9, IC-15 Nr. 14)**: removed `routing_patterns` from the
