@@ -136,6 +136,7 @@
           "llm-evaluator",
           "log-analyzer",
           "mammouth-expert",
+          "meta-doctor",
           "meta-feedback",
           "opencode-expert",
           "openscad-developer",

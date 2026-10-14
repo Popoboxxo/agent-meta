@@ -139,7 +139,7 @@ mindmap
 | **documenter** | fast | 1.7.0 | Maintains CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md, conclusions |
 | **git** | fast | 1.4.0 | All git operations: commits, branches, merges, tags, push/pull |
 
-### Workflow & Framework (9 agents)
+### Workflow & Framework (10 agents)
 
 | Agent | Tier | Version | Description |
 |-------|------|---------|-------------|
@@ -149,6 +149,7 @@ mindmap
 | **feedback** | fast | 1.2.3 | Standardizes bug reports and feature requests as GitHub issues |
 | **agent-meta-manager** | balanced | 1.19.0 | Manage agent-meta: upgrades, sync, feedback, project-specific agents |
 | **agent-meta-scout** | balanced | 1.1.3 | Scout AI ecosystem: new skills, roles, rules, patterns |
+| **meta-doctor** | fast | 1.0.0 | Installation diagnosis (`sync.py --doctor`; reports only to the tmp-sink): prioritizes known-issue findings, hands fixes to agent-meta-manager; name-only addressable |
 | **meta-feedback** | fast | 2.1.3 | Improvement proposals for agent-meta as GitHub issues |
 | **prompt-engineer** | balanced | 1.3.1 | Expert for prompt engineering, AI security, agent design |
 | **concept-reviewer** | balanced | 1.0.3 | Reviews design docs for completeness, logic, risks, feasibility |

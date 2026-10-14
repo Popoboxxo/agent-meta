@@ -32,6 +32,16 @@
   `76-template-auditor-role` (6 assertions: per-provider generation, read-only tool set,
   `edit: deny` in the Opencode permission block, no `model:` in the source template, resolved
   placeholders, absence from the `route_intent` enum, output contract present).
+- **New `meta-doctor` role (1.0.0, #968)** — installation diagnosis: runs
+  `sync.py --doctor`, deduplicates and prioritizes known-issue findings and hands fixes to
+  `agent-meta-manager` (`doctor-findings-v1`); never repairs and writes reports only to the tmp-sink.
+  Tools `Read`/`Glob`/`Grep`/`Bash`/`TodoWrite`, `addressability: name_only` +
+  `orchestrator_only: true`, no `routing_patterns`. `agent-meta-manager` 1.24.0 consumes
+  `doctor-findings-v1` (section 10b). Registered per the new-role checklist (IC-28): schema role enum,
+  standalone export, pins in `tests/test_role_addressability_coverage.py` (93 roles, name_only 4,
+  new `test_name_only_roles_have_no_routing_patterns` with a ratchet exception for `template-auditor`),
+  routing-eval corpus regenerated, scenario `77-meta-doctor-role`. Golden and AC-01 baseline were
+  rebaselined (new role artifacts and the manager consumer section only).
 - **Project-type-specific release-process templates (issue #452)**: a project can declare a `release`
   section in `project.yaml` (`distribution`, `versioning`, `changelog_format`, `version_file`,
   `version_field`). When `release.distribution` is set, the sync pipeline renders
