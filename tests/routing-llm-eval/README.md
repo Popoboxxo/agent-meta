@@ -29,6 +29,18 @@ Beide Provider-Wrapper nehmen `--agent <role>` (default: `orchestrator`)
 und beenden sich mit **exit 2 bei unbekannter/fehlender Rollen-Datei**
 (finding W6).
 
+### Prompt-Quelle, Modell und Baseline (IC-13, IC-36)
+
+- **System-Prompt:** immer die **gerenderte** Agent-Datei des aktiven Profils
+  (`.claude/agents/<role>.md`, Frontmatter entfernt; Opencode: `.opencode/agents/<role>.md`).
+  Für `orchestrator` ist das die gerenderte Orchestrator-Datei, nicht `.claude/rules/use-orchestrator.md`.
+  Fehlt die Datei: exit 2 — zuerst `python3 scripts/sync.py` ausführen.
+- **Modellklasse:** `CLAUDE_ROUTING_EVAL_MODEL` (Default `haiku`) bzw.
+  `OPENCODE_ROUTING_EVAL_MODEL` (Default `opencode-go/deepseek-v4-flash`).
+- **Baseline (Task 0f.3):** braucht mindestens 2 Modellklassen und mindestens 3 Läufe
+  je Modell und läuft nur nach ausdrücklicher Nutzerfreigabe der Kostenschätzung (IC-36).
+  Ohne Freigabe wird ein Skip-Record geschrieben.
+
 ## Single Source of Truth
 
 **Handgepflegt (nur diese beiden):**

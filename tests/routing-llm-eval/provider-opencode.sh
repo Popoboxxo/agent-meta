@@ -57,7 +57,7 @@ done
 
 SRC_AGENT="$REPO_ROOT/.opencode/agents/${ROLE}.md"
 if [[ ! -f "$SRC_AGENT" ]]; then
-  echo "provider-opencode: unknown or missing role file: $SRC_AGENT" >&2
+  echo "provider-opencode: unknown or missing role file: $SRC_AGENT (run 'python3 scripts/sync.py' first to render the agents)" >&2
   exit 2
 fi
 

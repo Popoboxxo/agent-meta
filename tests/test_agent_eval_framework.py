@@ -9,6 +9,7 @@ Covers:
 """
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -51,6 +52,33 @@ def test_claude_wrapper_strips_frontmatter_for_non_orchestrator():
     script = (EVAL_DIR / "provider-claude.sh").read_text(encoding="utf-8")
     assert "frontmatter" in script.lower()
     assert "/^---[[:space:]]*$/" in script, "frontmatter-stripping awk missing"
+
+
+def test_claude_wrapper_orchestrator_uses_rendered_agent_file(tmp_path):
+    """IC-13: the orchestrator prompt is the rendered, frontmatter-stripped
+    .claude/agents/orchestrator.md (not the use-orchestrator.md stub). A PATH
+    stub for `claude` echoes the system-prompt file; no LLM call happens."""
+    rendered = _REPO_ROOT / ".claude" / "agents" / "orchestrator.md"
+    if not rendered.is_file():
+        pytest.skip("rendered orchestrator missing (run sync.py)")
+    stub = tmp_path / "claude"
+    stub.write_text(
+        '#!/bin/bash\nwhile [[ $# -gt 0 ]]; do\n'
+        '  if [[ "$1" == "--system-prompt-file" ]]; then cat "$2"; exit 0; fi\n'
+        '  shift\ndone\nexit 3\n',
+        encoding="utf-8",
+    )
+    stub.chmod(0o755)
+    env = dict(os.environ, PATH=f"{tmp_path}{os.pathsep}{os.environ['PATH']}")
+    result = subprocess.run(
+        ["bash", str(EVAL_DIR / "provider-claude.sh"), "--agent", "orchestrator", "p"],
+        capture_output=True, text=True, env=env, timeout=60,
+    )
+    assert result.returncode == 0, result.stderr
+    text = rendered.read_text(encoding="utf-8")
+    body = text.split("\n---\n", 1)[1] if text.startswith("---") else text
+    assert body.strip() in result.stdout
+    assert not result.stdout.startswith("---")
 
 
 # --- catalogs --------------------------------------------------------------

@@ -3,11 +3,10 @@
 # agent-meta GENERATED artifact as system prompt.
 #
 # v2 (issue #535, findings #523):
-#   * --agent <role> : orchestrator keeps its legacy source
-#                      (.claude/rules/use-orchestrator.md, no frontmatter),
-#                      every other role uses .claude/agents/<role>.md WITH
-#                      frontmatter stripped (finding H3: frontmatter would be
-#                      injected as prompt garbage via --system-prompt-file).
+#   * --agent <role> : every role (orchestrator included, see v4) uses
+#                      .claude/agents/<role>.md WITH frontmatter stripped
+#                      (finding H3: frontmatter would be injected as prompt
+#                      garbage via --system-prompt-file).
 #                      Missing/unknown role => exit 2 (finding W6).
 #   * Structured sidecar identical to provider-opencode.sh v2 (finding B1):
 #     claude -p does not stream structured events, so tool_events stays empty
@@ -61,21 +60,20 @@ if [[ "$EVAL_ISOLATION" == "repo-readonly" ]]; then
   (cd "$REPO_ROOT" && git ls-files -z | tar --null -T - -cf -) | tar -xf - -C "$RUN_DIR"
 fi
 
-SYSTEM_FILE=""
-if [[ "$ROLE" == "orchestrator" ]]; then
-  SYSTEM_FILE="$REPO_ROOT/.claude/rules/use-orchestrator.md"
-else
-  SRC_AGENT="$REPO_ROOT/.claude/agents/${ROLE}.md"
-  if [[ ! -f "$SRC_AGENT" ]]; then
-    echo "provider-claude: unknown or missing role file: $SRC_AGENT" >&2
-    exit 2
-  fi
-  SYSTEM_FILE="$RUN_DIR/system-prompt.md"
-  # Strip YAML frontmatter (H3): everything from the first '---' line up to
-  # the second '---' line, inclusive. If no frontmatter present, copy as-is.
-  awk 'BEGIN{fm=0; done=0} NR==1 && /^---[[:space:]]*$/{fm=1; next} fm && /^---[[:space:]]*$/{fm=0; done=1; next} done||!fm{print}' \
-    "$SRC_AGENT" > "$SYSTEM_FILE"
+# v4 (IC-13, Task 1.35 follow-up): every role -- including the orchestrator --
+# uses the RENDERED .claude/agents/<role>.md of the active profile with
+# frontmatter stripped. The former orchestrator source
+# (.claude/rules/use-orchestrator.md) was only a stub, not the routing prompt.
+SRC_AGENT="$REPO_ROOT/.claude/agents/${ROLE}.md"
+if [[ ! -f "$SRC_AGENT" ]]; then
+  echo "provider-claude: unknown or missing role file: $SRC_AGENT (run 'python3 scripts/sync.py' first to render the agents)" >&2
+  exit 2
 fi
+SYSTEM_FILE="$RUN_DIR/system-prompt.md"
+# Strip YAML frontmatter (H3): everything from the first '---' line up to
+# the second '---' line, inclusive. If no frontmatter present, copy as-is.
+awk 'BEGIN{fm=0; done=0} NR==1 && /^---[[:space:]]*$/{fm=1; next} fm && /^---[[:space:]]*$/{fm=0; done=1; next} done||!fm{print}' \
+  "$SRC_AGENT" > "$SYSTEM_FILE"
 
 OUTPUT_TEXT="$(
   cd "$RUN_DIR"
