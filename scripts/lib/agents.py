@@ -19,6 +19,7 @@ from .frontmatter import (
 )
 
 if TYPE_CHECKING:
+    from .active_set import ActiveSet
     from .delegation_syntax import DelegationSyntaxEngine
 
 try:
@@ -48,6 +49,32 @@ _ROUTING_TOOL_DESCRIPTION = (
 # render_routing_tool_definition() + config change — never a provider-name
 # branch (provider-agnostic policy).
 _TOOL_FORMAT_KEYS = frozenset({"json", "yaml_text_block"})
+
+
+def _resolve_role_set(
+    agent_meta_root: Path,
+    config: dict,
+    active_set: "ActiveSet | None",
+    template_roles: set[str] | None,
+    warn_sink: list[str] | None,
+) -> set[str]:
+    """Active (Layer-2) role set: the shared ActiveSet when given, else resolved locally.
+
+    ``ActiveSet.roles`` equals ``resolve_active_roles(require_template=True)``
+    (IC-17); the sync pipeline passes its single per-sync object so no
+    generator recomputes the set (QG-13 dynamic).
+    """
+    if active_set is not None:
+        return set(active_set.roles)
+    from .roles import resolve_active_roles
+
+    return set(resolve_active_roles(
+        agent_meta_root,
+        config,
+        require_template=True,
+        template_roles=template_roles,
+        warn_sink=warn_sink,
+    ))
 
 
 def build_knowledge_engine_hints(config: dict, compact: bool = False) -> str:
@@ -108,6 +135,7 @@ def build_agent_hints(
     *,
     template_roles: set[str] | None = None,
     warn_sink: list[str] | None = None,
+    active_set: "ActiveSet | None" = None,
 ) -> str:
     """Generate agent usage hints for {{AGENT_HINTS}}.
 
@@ -120,19 +148,14 @@ def build_agent_hints(
               agent descriptions natively — the table would be a ~1.5 KB duplication.
 
     The active set is the shared Layer-2 resolution (gates + whitelist ∩
-    generatable templates), identical to the routing targets.
+    generatable templates), identical to the routing targets. ``active_set``
+    (IC-17) is the per-sync ActiveSet shared by all generators; when given it
+    replaces the local resolution (``template_roles``/``warn_sink`` then unused).
     """
-    from .roles import resolve_active_roles
-
     platforms = config.get("platforms", [])
     overrides, _ = collect_sources(agent_meta_root, platforms)
-    active_roles = set(resolve_active_roles(
-        agent_meta_root,
-        config,
-        require_template=True,
-        template_roles=template_roles,
-        warn_sink=warn_sink,
-    ))
+    active_roles = _resolve_role_set(
+        agent_meta_root, config, active_set, template_roles, warn_sink)
 
     lines = []
     # Determine if main-chat mode is active (no orchestrator subagent in this mode)
@@ -185,6 +208,7 @@ def build_agent_table(
     *,
     template_roles: set[str] | None = None,
     warn_sink: list[str] | None = None,
+    active_set: "ActiveSet | None" = None,
 ) -> tuple[str, list[str]]:
     """Generate markdown table for {{AGENT_TABLE}}. Returns (table, unmapped_warnings).
 
@@ -192,18 +216,13 @@ def build_agent_table(
     generatable templates); templates without a ROLE_MAP entry are reported in
     the returned ``unmapped`` list.
     """
-    from .roles import build_role_map, resolve_active_roles
+    from .roles import build_role_map
 
     platforms = config.get("platforms", [])
     overrides, _ = collect_sources(agent_meta_root, platforms)
     role_map = build_role_map(agent_meta_root)
-    active_roles = set(resolve_active_roles(
-        agent_meta_root,
-        config,
-        require_template=True,
-        template_roles=template_roles,
-        warn_sink=warn_sink,
-    ))
+    active_roles = _resolve_role_set(
+        agent_meta_root, config, active_set, template_roles, warn_sink)
 
     rows = []
     unmapped = []
@@ -241,6 +260,7 @@ def build_routing_tool_definition(
     template_roles: set[str] | None = None,
     warn_sink: list[str] | None = None,
     info_sink: list[str] | None = None,
+    active_set: "ActiveSet | None" = None,
 ) -> dict:
     """Build the provider-neutral intent-routing tool definition (issue #264).
 
@@ -280,6 +300,7 @@ def build_routing_tool_definition(
         pipelines=pipelines,
         template_roles=template_roles,
         warn_sink=warn_sink,
+        active_set=active_set,
         # Design C (#780): render examples in the project language; keywords
         # stay canonical/language-neutral.
         language=variables.get("COMMUNICATION_LANGUAGE", "en"),
@@ -376,6 +397,7 @@ def build_routing_tool_definitions_for_providers(
     template_roles: set[str] | None = None,
     warn_sink: list[str] | None = None,
     info_sink: list[str] | None = None,
+    active_set: "ActiveSet | None" = None,
 ) -> dict[str, str]:
     """Render the routing tool definition once per provider, in its format.
 
@@ -408,6 +430,7 @@ def build_routing_tool_definitions_for_providers(
         template_roles=template_roles,
         warn_sink=warn_sink,
         info_sink=info_sink,
+        active_set=active_set,
     )
     rendered: dict[str, str] = {}
     for provider in providers:

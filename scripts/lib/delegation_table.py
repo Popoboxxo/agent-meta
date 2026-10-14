@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .roles import load_roles_config, resolve_active_roles
+
+if TYPE_CHECKING:
+    from .active_set import ActiveSet
 
 # List separators used by role descriptions. Most short_desc values already
 # enumerate capabilities as comma-separated noun phrases, so splitting on
@@ -39,8 +43,13 @@ def _active_role_names(
     require_template: bool = False,
     template_roles: set[str] | None = None,
     warn_sink: list[str] | None = None,
+    active_set: ActiveSet | None = None,
 ) -> list[str]:
     """Return the sorted role names that pass project activation filters.
+
+    With ``active_set`` (IC-17, the per-sync object shared by all generators)
+    the set is read from it instead of being resolved again; ``require_template``
+    is then implied (``ActiveSet.roles`` is the Layer-2 set).
 
     Thin seam over ``roles.resolve_active_roles`` (SPEC
     dynamic-routing-template-slimming §3.5): ``variables`` is accepted for
@@ -48,6 +57,8 @@ def _active_role_names(
     ``config`` alone. The default stays Layer 1 (``require_template=False``)
     so existing calls keep working; the internal callers request Layer 2.
     """
+    if active_set is not None:
+        return sorted(active_set.roles)
     return resolve_active_roles(
         agent_meta_root,
         config,
@@ -87,6 +98,7 @@ def get_active_agents_data(
     *,
     template_roles: set[str] | None = None,
     warn_sink: list[str] | None = None,
+    active_set: ActiveSet | None = None,
 ) -> list[dict]:
     """Return a list of dictionaries with agent data.
 
@@ -115,6 +127,7 @@ def get_active_agents_data(
         require_template=True,
         template_roles=template_roles,
         warn_sink=warn_sink,
+        active_set=active_set,
     ):
         role_info = roles[role_name]
 
@@ -214,6 +227,7 @@ def get_routing_rules(
     warn_sink: list[str] | None = None,
     language: str = "en",
     info_sink: list[str] | None = None,
+    active_set: ActiveSet | None = None,
 ) -> dict:
     """Build structured routing rules for the native intent-routing tool (issue #264).
 
@@ -263,6 +277,7 @@ def get_routing_rules(
             require_template=True,
             template_roles=template_roles,
             warn_sink=warn_sink,
+            active_set=active_set,
         )
         if name != "orchestrator"
     ]
@@ -353,6 +368,7 @@ def get_intent_routing_table(
     *,
     template_roles: set[str] | None = None,
     warn_sink: list[str] | None = None,
+    active_set: ActiveSet | None = None,
 ) -> str:
     """Generate the INTENT_ROUTING_TABLE: pipeline routing rows + a Tiers summary.
 
@@ -371,6 +387,7 @@ def get_intent_routing_table(
         variables,
         template_roles=template_roles,
         warn_sink=warn_sink,
+        active_set=active_set,
     )
     active_agent_names = {agent["name"] for agent in active_agents_data}
 

@@ -598,6 +598,13 @@ def _build_context(args, agent_meta_root: Path, log: "SyncLog"):
     # Warn if actual git tag of agent-meta submodule doesn't match configured version
     read_git_version(agent_meta_root)
 
+    # Resolver diagnostics that the generators used to emit themselves (missing
+    # template / template without role-defaults entry) now come from the single
+    # ActiveSet computation above; keep them in the pre-warnings.
+    for w in active_warnings:
+        if not w.startswith("active-set.") and w not in pre_warnings:
+            pre_warnings.append(w)
+
     for w in pre_warnings:
         log.warn(w)
 

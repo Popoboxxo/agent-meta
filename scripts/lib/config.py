@@ -1220,7 +1220,8 @@ def _load_se_variable_defaults(agent_meta_root: Path, warnings: list[str] | None
 
 
 def _build_core_variables(
-    variables: dict, config: dict, agent_meta_root: Path, project_root: Path | None
+    variables: dict, config: dict, agent_meta_root: Path, project_root: Path | None,
+    active_set: ActiveSet | None = None,
 ) -> list[str]:
     """Populate project-identity, agent-table, user-config and REQ/context variables.
 
@@ -1233,6 +1234,8 @@ def _build_core_variables(
         config: the loaded project.yaml dict (read-only).
         agent_meta_root: agent-meta source root (for AGENT_TABLE/version lookups).
         project_root: consuming project's root, or None when self-hosting.
+        active_set: the per-sync ActiveSet (IC-17) feeding AGENT_TABLE/AGENT_HINTS;
+            None = resolved locally (standalone callers).
 
     Returns:
         The `unmapped` warnings list created by `build_agent_table()` — the
@@ -1267,11 +1270,11 @@ def _build_core_variables(
         variables["AGENT_META_REL_PATH"] = ".agent-meta/"
     agent_table_sink: list[str] = []
     agent_table, unmapped = build_agent_table(
-        config, agent_meta_root, warn_sink=agent_table_sink
+        config, agent_meta_root, warn_sink=agent_table_sink, active_set=active_set
     )
     variables["AGENT_TABLE"] = agent_table
     variables["AGENT_HINTS"] = build_agent_hints(
-        config, agent_meta_root, warn_sink=agent_table_sink
+        config, agent_meta_root, warn_sink=agent_table_sink, active_set=active_set
     )
     for warning in agent_table_sink:
         if warning not in unmapped:
@@ -1408,6 +1411,7 @@ def _build_provider_variables(
     agent_meta_root: Path,
     *,
     warn_sink: list[str] | None = None,
+    active_set: ActiveSet | None = None,
 ) -> None:
     """Populate AI-provider routing/location variables.
 
@@ -1454,7 +1458,8 @@ def _build_provider_variables(
     # Claude Code injects agent descriptions natively into the system prompt,
     # so the table in CLAUDE.md would be a duplication — dropped for Claude only.
     variables["AGENT_HINTS_CLAUDE"] = build_agent_hints(
-        config, agent_meta_root, include_table=False, warn_sink=warn_sink
+        config, agent_meta_root, include_table=False, warn_sink=warn_sink,
+        active_set=active_set,
     )
     # AGENTS_DIR: generated agents directory of the first active provider.
     # Derived from provider config so multi-provider setups (Gemini, Opencode, …)
@@ -1728,7 +1733,7 @@ def _build_platform_variables(
     )
     # AGENT_DELEGATION_TABLE: generate after SE_ENABLED and VALIDATOR_ENABLED are set
     variables["active_agents"] = get_active_agents_data(
-        agent_meta_root, config, variables, warn_sink=unmapped
+        agent_meta_root, config, variables, warn_sink=unmapped, active_set=active_set
     )
 
     # INTENT_ROUTING_TABLE is finalized after `effective` quality-pipelines are
@@ -2135,10 +2140,12 @@ def build_variables(
     # IC-17/IC-18: one ActiveSet per build; the sync pipeline passes its own.
     active_set = _resolve_active_set(active_set, config, agent_meta_root, project_root)
     variables: dict = {}
-    unmapped = _build_core_variables(variables, config, agent_meta_root, project_root)
+    unmapped = _build_core_variables(
+        variables, config, agent_meta_root, project_root, active_set=active_set)
     # IC-17/IC-18: ACTIVE_ROLES and ROLE_<ROLE>_ACTIVE come from the ActiveSet.
     variables.update(active_set_variables(active_set))
-    _build_provider_variables(variables, config, agent_meta_root, warn_sink=unmapped)
+    _build_provider_variables(
+        variables, config, agent_meta_root, warn_sink=unmapped, active_set=active_set)
     _build_orch_variables(variables, unmapped, config, agent_meta_root)
     _build_subagent_permission_variables(variables, config)
     _build_platform_variables(variables, unmapped, config, agent_meta_root, active_set)
@@ -2147,7 +2154,8 @@ def build_variables(
     # INTENT_ROUTING_TABLE: role rows plus pipeline signal_keywords rows,
     # using the same `effective` quality-pipelines dict resolved above.
     variables["INTENT_ROUTING_TABLE"] = get_intent_routing_table(
-        agent_meta_root, config, variables, pipelines=effective, warn_sink=unmapped
+        agent_meta_root, config, variables, pipelines=effective, warn_sink=unmapped,
+        active_set=active_set,
     )
     # INTENT_ROUTING_TOOLS (issue #264): the structured route_intent tool
     # definition, rendered once per provider via its handoff_format
@@ -2170,6 +2178,7 @@ def build_variables(
         pipelines=effective,
         warn_sink=unmapped,
         info_sink=routing_info,
+        active_set=active_set,
     )
     # IC-29: INFO lines (e.g. routing.examples-language-fallback) collected during
     # the build; drained into sync.log by _sync_stage_context_checks (no render effect).
