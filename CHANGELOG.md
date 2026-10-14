@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Changed
+- **Source boilerplate de-duplicated render-neutrally (IC-31, AC-72)**: the verbatim worker-role line
+  (49 occurrences), the "Mandatory closing summary" line (67) and the "User proxy" line (20) in
+  `agents/1-generic` / `agents/2-platform` are replaced by the new snippet blocks `{{WORKER_ROLE_BLOCK}}`,
+  `{{CLOSING_SUMMARY_BLOCK}}` and `{{USER_PROXY_BLOCK}}` (`snippets/agents/`, registered in
+  `consistency/placeholders.py`, resolved in `standalone.py`). The rendered output of all providers and the
+  standalone export is byte-identical (AC-01 harness green, no rebaseline, no version bumps because the
+  frontmatter `version` is part of the render). Template source: `agents/1-generic` 708376 -> 681588 bytes
+  (-26788), `agents/2-platform` 81703 -> 81383 bytes (-320); line count unchanged (1:1 line swap);
+  duplicated source lines (>= 40 chars in >= 5 files) 20 distinct / 319 occurrences -> 17 / 183, guarded by the
+  new ratchet `tests/test_template_line_duplication.py`. `tests/test_contract_labels.py` now checks the
+  snippet-resolved templates (`scripts.lib.standalone.resolve_block_snippets`, #552). The existing
+  `{{ANTI_RECURSION_BLOCK}}` (German text) is not reused: it would change the render of the worker-role line.
+
 ### Fixed
 - **`template-auditor` without keyword routing (Q9, IC-15 Nr. 14)**: removed `routing_patterns` from the
   name_only role `template-auditor` in `config/role-defaults.yaml`; it stays dispatchable by name only

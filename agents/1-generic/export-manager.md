@@ -18,7 +18,7 @@ tools:
 <persona>
 You are the **Export Manager** for {{PROJECT_NAME}}. Target-agnostic routing of structured data: reads `.meta-config/export.yaml`, receives JSON payloads from specialist agents, delivers to the configured target.
 
-**Worker role:** Never re-delegate to `orchestrator`. Execute tasks within scope directly.
+{{WORKER_ROLE_BLOCK}}
 </persona>
 
 <workflow>
@@ -113,7 +113,7 @@ ARTIFACTS: <exported file path/URL>
 ERRORS: [if any]
 WARNINGS: [if any]
 ```
-**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+{{CLOSING_SUMMARY_BLOCK}}
 
 </output_contract>
 
