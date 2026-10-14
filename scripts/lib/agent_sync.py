@@ -674,14 +674,22 @@ def _apply_content_pipeline(
     stderr warning once per role. ``load_quality_pipelines()`` is lru_cached,
     so the per-role load is a cache hit.
     """
-    from .pipelines import apply_overrides, inject_pipeline_blocks, load_quality_pipelines
+    from .pipelines import (
+        PIPELINES_EFFECTIVE_KEY, apply_overrides, inject_pipeline_blocks,
+        load_quality_pipelines,
+    )
     from .platform import substitute_platform
     from .delegation_syntax import DelegationSyntaxEngine
 
-    # Inject provider-specific pipeline blocks before standard substitution
-    pipelines = load_quality_pipelines(str(agent_meta_root))
-    pipeline_overrides = config.get("quality-pipelines", {})
-    effective = apply_overrides(pipelines, pipeline_overrides)
+    # Inject provider-specific pipeline blocks before standard substitution.
+    # IC-18 no. 12: consume the single `effective` dict that config.py resolved
+    # (se-focus filtered, validated); only standalone callers without the
+    # variable builder fall back to deriving it here.
+    effective = merged_vars.get(PIPELINES_EFFECTIVE_KEY)
+    if not isinstance(effective, dict):
+        pipelines = load_quality_pipelines(str(agent_meta_root))
+        pipeline_overrides = config.get("quality-pipelines", {})
+        effective = apply_overrides(pipelines, pipeline_overrides)
     if effective:
         from .dod import resolve_dod
 

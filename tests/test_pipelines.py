@@ -1430,3 +1430,94 @@ def test_quick_fix_root_cause_is_conditional():
     assert root_cause["agent"] == "bug-feature-analyzer"
     assert root_cause["mode"] == "conditional"
     assert root_cause["condition"] == {"dod_flag": "root-cause-required"}
+
+
+# --- IC-18 no. 12 / IC-15 no. 18: validation against ActiveSet.roles (AC-52) ---
+
+_ACTIVE_SET_FIXTURES = REPO_ROOT / "tests" / "fixtures" / "active-set"
+
+
+def _fixture_pipeline_warnings(tmp_path, fixture):
+    """Run build_variables for an active-set fixture, return the quality-pipelines warnings."""
+    import shutil
+
+    from scripts.lib.config import build_variables, load_config
+
+    (tmp_path / ".meta-config").mkdir()
+    dest = tmp_path / ".meta-config" / "project.yaml"
+    shutil.copyfile(_ACTIVE_SET_FIXTURES / fixture / ".meta-config" / "project.yaml", dest)
+    with dest.open("a", encoding="utf-8") as fh:
+        fh.write("project:\n  name: t\n  prefix: t\n")
+    config = load_config(dest)
+    _, warnings = build_variables(config, REPO_ROOT, tmp_path)
+    return [w for w in warnings if w.startswith("quality-pipelines:")]
+
+
+def test_p20_pipeline_warning_names_gate_dropped_senior_developer(tmp_path):
+    # AC-52: the p20 fixture lists senior-developer in `roles:` but the
+    # developer_tiers gate drops it -- the old raw allowlist check stayed silent.
+    warnings = _fixture_pipeline_warnings(tmp_path, "p20")
+    assert any("senior-developer" in w for w in warnings), warnings
+
+
+def test_pall_default_reports_gate_dropped_roles_referenced_by_pipelines(tmp_path):
+    # F-23: without a `roles:` key the validator used ALL roles (0 warnings).
+    warnings = _fixture_pipeline_warnings(tmp_path, "pall")
+    joined = "\n".join(warnings)
+    assert "validator" in joined and "senior-developer" in joined, warnings
+
+
+def test_p10_inactive_dod_flag_stage_does_not_warn(tmp_path):
+    # AC-52: quick-fix/root-cause is conditional on root-cause-required (off in the
+    # default DoD preset) and not rendered -> no warning for bug-feature-analyzer
+    # there, although p10 lacks that role. Other stages (bugfix) still warn.
+    warnings = _fixture_pipeline_warnings(tmp_path, "p10")
+    quick_fix = [w for w in warnings if "Pipeline 'quick-fix'" in w]
+    assert quick_fix == [], quick_fix
+    assert any("Pipeline 'bugfix'" in w and "bug-feature-analyzer" in w for w in warnings)
+
+
+def _conditional_pipeline():
+    return {
+        "p": {
+            "stages": [
+                {"id": "a", "agent": "git", "mode": "sequential", "task": "x"},
+                {"id": "b", "agent": "ghost", "mode": "conditional", "task": "y",
+                 "condition": {"dod_flag": "some-flag"}},
+            ]
+        }
+    }
+
+
+def test_validate_pipelines_skips_stage_with_inactive_dod_flag():
+    assert validate_pipelines(_conditional_pipeline(), ["git"], active_dod={"some-flag": False}) == []
+
+
+def test_validate_pipelines_still_checks_stage_with_active_dod_flag():
+    errors = validate_pipelines(_conditional_pipeline(), ["git"], active_dod={"some-flag": True})
+    assert any("ghost" in e for e in errors)
+    # Without DoD information every stage is validated (unchanged behavior).
+    assert any("ghost" in e for e in validate_pipelines(_conditional_pipeline(), ["git"]))
+
+
+def test_agent_renderer_consumes_the_variable_builders_effective_pipelines(tmp_path):
+    # IC-18 no. 12: no re-derivation in the renderer -- the dict from the
+    # variable builder (config.py) decides which pipeline blocks are injected.
+    from scripts.lib.agent_sync import _apply_content_pipeline
+    from scripts.lib.log import SyncLog
+    from scripts.lib.pipelines import PIPELINES_EFFECTIVE_KEY
+
+    only_custom = {
+        "custom-pipe": {
+            "description": "custom",
+            "stages": [{"id": "s1", "agent": "git", "task": "UNIQUE-TASK-MARKER", "mode": "sequential"}],
+        }
+    }
+    config = {}
+    content = _apply_content_pipeline(
+        "A {{PIPELINE_CUSTOM_PIPE_BLOCK}} B {{PIPELINE_FEATURE_LIFECYCLE_BLOCK}}",
+        config, "Claude", {PIPELINES_EFFECTIVE_KEY: only_custom}, "src.md", None, REPO_ROOT, SyncLog(),
+    )
+    assert "UNIQUE-TASK-MARKER" in content
+    # feature-lifecycle is not in the builder's dict -> its placeholder stays untouched.
+    assert "Feature-Branch anlegen" not in content

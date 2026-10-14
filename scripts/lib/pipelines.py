@@ -53,6 +53,10 @@ KNOWN_PROVIDERS = (
 )
 DEFAULT_MAX_DEPTH = 4
 
+# Non-string private variable carrying the one `effective` quality-pipelines dict
+# from the variable builder (config.py) to the agent renderer (IC-18 no. 12).
+PIPELINES_EFFECTIVE_KEY = "_PIPELINES_EFFECTIVE"
+
 
 def _registered_providers(agent_meta_root=None) -> list[str]:
     """Return the registry-driven provider list, failing soft to the legacy tuple.
@@ -349,6 +353,18 @@ def _validate_task_review_rounds(pipelines: dict, reflection_pairs: list) -> lis
     return errors
 
 
+def _stage_dod_flag_inactive(stage: dict, active_dod: dict) -> bool:
+    """True for a ``conditional`` stage whose ``dod_flag`` is off (not rendered).
+
+    Same rule as ``_generate_pipeline_block`` (flag missing in ``active_dod`` =
+    active), so validation and rendering cannot disagree.
+    """
+    if stage.get("mode") != "conditional":
+        return False
+    cond = stage.get("condition", {})
+    return "dod_flag" in cond and not active_dod.get(cond["dod_flag"], True)
+
+
 def validate_pipelines(
     pipelines: dict,
     available_roles: list,
@@ -356,6 +372,7 @@ def validate_pipelines(
     known_roles: set | None = None,
     reflection_pairs: list | None = None,
     agent_meta_root=None,
+    active_dod: dict | None = None,
 ) -> list[str]:
     """Validate pipelines and return a list of error messages (empty = valid).
 
@@ -378,6 +395,10 @@ def validate_pipelines(
       (issue
     reflection_pairs: optional pre-resolved `reflection_pairs` list for
       `loop_ref` resolution; defaults to the framework role-defaults.
+    active_dod: optional resolved DoD flags (IC-15 no. 18). A ``conditional``
+      stage whose ``condition.dod_flag`` is inactive is not rendered, so its
+      roles are not validated (no false positive, e.g. ``quick-fix``/``root-cause``
+      with ``root-cause-required`` off). ``None`` validates every stage.
     """
     errors = []
     orchestrator_roles = {"orchestrator"}
@@ -428,6 +449,9 @@ def validate_pipelines(
                     f"Pipeline '{name}': stage '{stage.get('id')}' requires_approval "
                     f"must be a boolean, got {type(requires_approval).__name__}"
                 )
+
+            if active_dod is not None and _stage_dod_flag_inactive(stage, active_dod):
+                continue
 
             agent = stage.get("agent")
             if agent and agent not in available_roles:
@@ -940,7 +964,7 @@ def _generate_pipeline_block(
         mode = stage.get("mode", "sequential")
         if mode == "conditional":
             cond = stage.get("condition", {})
-            if "dod_flag" in cond and not active_dod.get(cond["dod_flag"], True):
+            if _stage_dod_flag_inactive(stage, active_dod):
                 continue
         agent = stage.get("agent", "")
         task = stage.get("task", "")

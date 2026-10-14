@@ -38,6 +38,13 @@
   - Convention blocks and the strict subagent-permission scan always use the ActiveSet. Without a
     `roles:` key this was "all roles with a source" before, now the ActiveSet.
   - `EFFORT_ESTIMATOR_ENABLED` follows `ActiveSet.has("effort-estimator")`.
+- **Active-set consumers (IC-18 Nr. 1, 12; IC-15 Nr. 18, PR C)**: agent table/hints, active-agents data,
+  routing rules/tool definitions, intent table and the per-provider agent loop receive the one per-sync
+  `ActiveSet` instead of re-resolving the role set (render unchanged, `tests/test_active_set_consumers_identity.py`).
+  Quality-pipeline validation runs against `ActiveSet.roles` (gate-dropped roles such as `senior-developer`
+  without `junior-developer`, or `validator` without its gate, are now reported in the default as well),
+  stages with an inactive `dod_flag` no longer warn, and the agent renderer consumes the single `effective`
+  pipelines dict of the variable builder (se-focus filtered) instead of deriving its own.
 - **`template-auditor` without keyword routing (Q9, IC-15 Nr. 14)**: removed `routing_patterns` from the
   name_only role `template-auditor` in `config/role-defaults.yaml`; it stays dispatchable by name only
   (`target_agents`/`name_index`). Scenario 76 assert #5 now checks "no keyword rule in `routing.rules`";

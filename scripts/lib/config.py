@@ -36,6 +36,7 @@ from .subagent_permissions import (
     resolve_effective_subagent_permission_mode,
 )
 from .pipelines import (
+    PIPELINES_EFFECTIVE_KEY,
     apply_overrides,
     build_pipeline_variables,
     generate_pipeline_match_table,
@@ -1826,7 +1827,8 @@ def _select_main_reflection_pair(pairs: list[dict]) -> dict | None:
 
 
 def _build_pipeline_variables(
-    variables: dict, unmapped: list[str], config: dict, agent_meta_root: Path, dod_resolved: dict
+    variables: dict, unmapped: list[str], config: dict, agent_meta_root: Path, dod_resolved: dict,
+    active_set: ActiveSet | None = None,
 ) -> dict:
     """Populate reflection-loop and quality-pipeline variables.
 
@@ -1843,6 +1845,9 @@ def _build_pipeline_variables(
         dod_resolved: the dict returned by `_build_dod_variables()` — reused
             here so `build_pipeline_variables()` sees the same resolved DoD
             preset without re-resolving it.
+        active_set: the per-sync ActiveSet (IC-17); pipeline agent references are
+            validated against ``ActiveSet.roles`` (IC-18 no. 12, IC-15 no. 18).
+            None = resolved locally (standalone callers).
 
     Returns:
         The `effective` quality-pipelines dict (post-override, post-validation,
@@ -1889,16 +1894,18 @@ def _build_pipeline_variables(
         if not se_focus:
             effective = {k: v for k, v in effective.items()
                          if not k.startswith("se-")}
-        # Validate pipeline agent references against available roles
+        # Validate pipeline agent references against the ActiveSet (IC-18 no. 12):
+        # a gate-dropped role (e.g. senior-developer without junior-developer)
+        # is not available, and stages whose dod_flag is inactive are not
+        # validated (they are not rendered either).
         all_roles = list(build_role_map(agent_meta_root).keys())
-        if "roles" in config:
-            available_roles = set(config["roles"])
-        else:
-            available_roles = set(all_roles)
+        available_roles = set(
+            _resolve_active_set(active_set, config, agent_meta_root).roles)
         roles_cfg_for_coupling = load_roles_config(agent_meta_root)
         pipeline_errors = validate_pipelines(
             effective, list(available_roles), roles_config=roles_cfg_for_coupling,
             known_roles=set(all_roles), reflection_pairs=_effective_pairs,
+            active_dod=dod_resolved,
         )
         for err in pipeline_errors:
             unmapped.append(f"quality-pipelines: {err}")
@@ -2150,7 +2157,11 @@ def build_variables(
     _build_subagent_permission_variables(variables, config)
     _build_platform_variables(variables, unmapped, config, agent_meta_root, active_set)
     dod_resolved = _build_dod_variables(variables, config, agent_meta_root)
-    effective = _build_pipeline_variables(variables, unmapped, config, agent_meta_root, dod_resolved)
+    effective = _build_pipeline_variables(
+        variables, unmapped, config, agent_meta_root, dod_resolved, active_set)
+    # IC-18 no. 12: the one `effective` pipelines dict; the agent renderer
+    # (agent_sync._apply_content_pipeline) consumes it instead of re-deriving.
+    variables[PIPELINES_EFFECTIVE_KEY] = effective
     # INTENT_ROUTING_TABLE: role rows plus pipeline signal_keywords rows,
     # using the same `effective` quality-pipelines dict resolved above.
     variables["INTENT_ROUTING_TABLE"] = get_intent_routing_table(

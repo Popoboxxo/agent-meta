@@ -184,7 +184,9 @@ def test_config_build_pipeline_variables_propagates_missing_block(monkeypatch):
     unmapped: list[str] = []
     with pytest.raises(SyncError, match="pipeline_notation"):
         config_mod._build_pipeline_variables(variables, unmapped, {}, REPO_ROOT, {})
-    assert unmapped == [], (
+    # Pipeline validation warnings against the ActiveSet (IC-18 no. 12) may be
+    # present; the SyncError itself must never be recorded as one of them.
+    assert not any("pipeline_notation" in w for w in unmapped), (
         "the SyncError must propagate, not be recorded as a warning: "
         f"{unmapped}"
     )
