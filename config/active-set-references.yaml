@@ -31,7 +31,10 @@ dispatch_phrases:
 # unresolved placeholders found in the p10 fixture (12) are real unset variables
 # of a bare fixture project, not documented escapes, so they are not allowlisted.
 placeholder_allow: []
-mention_allow: []
+mention_allow:
+  # add-project-role: the argument-hint names an example role to ADD, i.e. one that is
+  # usually not active yet ("e.g. security-auditor"); intended mention (AC-49).
+  - '*add-project-role.*'
 provider_literal_allow:
   # Provider experts document one provider by design.
   - 'agents/2-platform/agent-meta-*-expert.md'

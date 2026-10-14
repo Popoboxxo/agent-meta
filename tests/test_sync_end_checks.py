@@ -54,11 +54,28 @@ def p10_synced(tmp_path_factory):
     return project, result
 
 
-def test_p10_sync_logs_dangling_dispatch_as_warn_exit_zero(p10_synced):
+def test_p10_sync_exit_zero_without_dangling_dispatch(p10_synced):
+    # Task 1.20 (AC-49): p10 renders no dispatch to an inactive role any more.
     project, result = p10_synced
     assert result.returncode == 0, result.stdout[-1000:] + result.stderr[-1000:]
-    lines = (project / "sync.log").read_text(encoding="utf-8").splitlines()
-    assert any(ln.startswith("[WARN]") and "active-set.dangling-dispatch" in ln for ln in lines)
+    text = (project / "sync.log").read_text(encoding="utf-8")
+    assert "active-set.dangling-dispatch" not in text
+
+
+def test_dangling_dispatch_is_logged_as_error_report_only(p10_synced):
+    # ERROR level (Task 1.20) is still report-only: it lands in sync.log's error
+    # list, never in the warnings and never changes the exit code.
+    project, _ = p10_synced
+    agent = project / ".claude" / "agents" / "developer.md"
+    original = agent.read_text(encoding="utf-8")
+    try:
+        agent.write_text(original + "\nDelegiere an `validator`.\n", encoding="utf-8")
+        log = SyncLog()
+        _stage(project, log)
+    finally:
+        agent.write_text(original, encoding="utf-8")
+    assert any("active-set.dangling-dispatch" in e and "validator" in e for e in log.errors)
+    assert not any("active-set.dangling-dispatch" in w for w in log.warnings)
 
 
 def test_info_findings_are_logged_as_info_not_warn(p10_synced, monkeypatch):

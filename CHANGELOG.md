@@ -130,6 +130,16 @@
   provider + hashes), 24 slimming goldens rebaselined (version lines; in the self-hosting config also the
   inactive `se-*`/`security-auditor` rows and arrows). Inline conditionals at a line end use
   `{{else}}{{/if}}` because a false simple `{{#if}}` there also swallows the newline.
+- **`active-set.dangling-dispatch` is ERROR (IC-19, AC-49, Task 1.20, PR D)**: the check now also scans the
+  generated rules (`rules_dir`, or the default rules dir for providers with `has_rules`), commands
+  (`commands_dir`) and `pipeline-details` files besides agents and the context file. Findings are still
+  report-only at sync end (sync.log error list/summary, exit code unchanged). Over the fixture matrix
+  (p10/p20/pall/ha) x all registered providers there are zero dangling dispatches and zero dangling mentions in
+  orchestrator, pipeline-details and commands (`tests/test_active_set_dangling.py`). `mention_allow` lists
+  `*add-project-role.*` (its argument-hint names an example role to add); `add-project-role` names
+  `/meta-feedback` only when the role is active. Not done: the `RAW_ROLES_RATCHET` (QG-13/AC-84) keeps its
+  three intersection sites (auto-commit allowlist, scout skill, `WEB_PROJECT_ENABLED`) - emptying it changes
+  default behaviour (see the PR report).
 
 ### Changed
 - **`ACTIVE_ROLES` / `ROLE_<ROLE>_ACTIVE` available in templates**: `build_variables` injects

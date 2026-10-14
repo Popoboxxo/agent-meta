@@ -96,6 +96,17 @@ def test_unknown_role_in_allowlist(synced, tmp_path):
     assert asr.check_unknown_role(project, _PROVIDERS, {}, active) == []
 
 
+def test_dangling_dispatch_is_error_level(synced, tmp_path):
+    # Task 1.20 (AC-49): the check is ERROR from phase 1 on; mentions stay INFO.
+    _, active = synced("p10")
+    proj = _scratch(tmp_path, "Delegiere an `validator`.\nsee `validator`\n")
+    found = asr.check_dangling_dispatch(proj, _PROVIDERS, {}, active)
+    assert [(f.check, f.severity) for f in found] == [
+        ("active-set.dangling-dispatch", Severity.ERROR)]
+    assert all(f.severity == Severity.INFO
+               for f in asr.check_dangling_mention(proj, _PROVIDERS, {}, active))
+
+
 def test_missing_dispatch_pattern_is_reported_not_silent(synced, monkeypatch):
     project, active = synced("p10")
     monkeypatch.setattr(asr, "_dispatch_formats", lambda root, provider: [])
@@ -218,6 +229,62 @@ def test_invalid_phrase_regex_is_surfaced(synced, tmp_path, monkeypatch):
     monkeypatch.setattr(asr, "_refs", lambda: {"dispatch_phrases": {"en": ["bad(", "route to"]}})
     proj = _scratch(tmp_path, "route to validator\n")
     found = asr.check_dangling_dispatch(proj, _PROVIDERS, {}, active)
-    checks = sorted(f.check for f in found)
-    assert checks == ["active-set.dangling-dispatch", "active-set.invalid-dispatch-phrase"]
-    assert all(f.severity == Severity.WARNING for f in found)
+    assert sorted((f.check, f.severity.value) for f in found) == [
+        ("active-set.dangling-dispatch", Severity.ERROR.value),
+        ("active-set.invalid-dispatch-phrase", Severity.WARNING.value)]
+
+
+# --- Task 1.20 (AC-49): scan scope and fixture matrix x provider matrix --------
+
+@pytest.mark.parametrize("rel", [
+    ".claude/commands/x.md", ".claude/rules/x.md", ".claude/pipeline-details/x.md"])
+def test_commands_rules_and_pipeline_details_are_scanned(synced, tmp_path, rel):
+    _, active = synced("p10")
+    target = tmp_path / rel
+    target.parent.mkdir(parents=True)
+    target.write_text("Delegiere an `validator`.\n", encoding="utf-8")
+    found = asr.check_dangling_dispatch(tmp_path, _PROVIDERS, {}, active)
+    assert [(f.file, f.severity) for f in found] == [(rel, Severity.ERROR)]
+
+
+_MATRIX_PROVIDERS = sorted(yaml.safe_load(
+    (_ROOT / "config" / "ai-providers.yaml").read_text(encoding="utf-8"))["providers"])
+# AC-49: mentions outside mention_allow must be 0 for these generated artifacts.
+_MENTION_ZERO_PARTS = ("orchestrator", "pipeline-details", "commands", "prompts")
+
+
+@pytest.fixture(scope="module")
+def matrix(tmp_path_factory):
+    """Each AC-49 fixture synced once with every registered provider."""
+    out = {}
+    for name in ("p10", "p20", "pall", "ha"):
+        project = tmp_path_factory.mktemp("matrix-" + name) / name
+        (project / ".meta-config").mkdir(parents=True)
+        config = yaml.safe_load(
+            (_FIX / name / ".meta-config" / "project.yaml").read_text(encoding="utf-8"))
+        config["ai-providers"] = list(_MATRIX_PROVIDERS)
+        (project / ".meta-config" / "project.yaml").write_text(
+            yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+        subprocess.run(["git", "init", "-q"], cwd=project, check=True)
+        res = subprocess.run(
+            [sys.executable, str(_ROOT / "scripts" / "sync.py"), "--config",
+             str(project / ".meta-config" / "project.yaml"), "--init"],
+            cwd=project, capture_output=True, text=True, timeout=900)
+        assert res.returncode == 0, res.stdout[-1500:] + res.stderr[-1500:]
+        out[name] = (project, compute_active_set(config, _ROOT, project))
+    return out
+
+
+@pytest.mark.parametrize("name", ["p10", "p20", "pall", "ha"])
+def test_ac49_no_dangling_dispatch_over_provider_matrix(matrix, name):
+    project, active = matrix[name]
+    found = asr.check_dangling_dispatch(project, _MATRIX_PROVIDERS, {}, active)
+    assert found == [], "\n".join(f"{f.file}: {f.message}" for f in found)
+
+
+@pytest.mark.parametrize("name", ["p10", "p20", "pall", "ha"])
+def test_ac49_no_dangling_mention_in_orchestrator_pipelines_commands(matrix, name):
+    project, active = matrix[name]
+    found = [f for f in asr.check_dangling_mention(project, _MATRIX_PROVIDERS, {}, active)
+             if any(part in f.file for part in _MENTION_ZERO_PARTS)]
+    assert found == [], "\n".join(f"{f.file}: {f.message}" for f in found)
