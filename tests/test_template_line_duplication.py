@@ -96,6 +96,7 @@ def test_deduped_snippets_are_referenced():
 
 
 def test_line_duplication_ratchet():
+    assert len(_source_files()) > 50, "scan globs matched too few files (vacuous ratchet)"
     duplicates = _duplicate_lines()
     occurrences = sum(len(files) for files in duplicates.values())
     worst = sorted(duplicates.items(), key=lambda item: -len(item[1]))[:5]

@@ -1928,6 +1928,19 @@ def _load_block_snippet(path: Path) -> str:
     return text.strip("\n")
 
 
+# snippets/agents/<name>.md -> <STEM>_BLOCK variable. Single source for the sync
+# pipeline (below), standalone.py and resolve_block_snippets().
+AGENT_BLOCK_SNIPPETS: tuple[tuple[str, str], ...] = (
+    ("output-guard", "OUTPUT_GUARD"),
+    ("background-process-guard", "BACKGROUND_PROCESS_GUARD"),
+    ("parse-input", "PARSE_INPUT"),
+    ("escalate-card", "ESCALATE_CARD"),
+    ("closing-summary", "CLOSING_SUMMARY"),
+    ("user-proxy", "USER_PROXY"),
+    ("worker-role", "WORKER_ROLE"),
+)
+
+
 def _build_snippet_variables(variables: dict, agent_meta_root: Path) -> None:
     """Populate variable blocks loaded from snippets/ files.
 
@@ -2005,15 +2018,9 @@ def _build_snippet_variables(variables: dict, agent_meta_root: Path) -> None:
     # reference nested in a YAML literal `content: |` patch block keeps that
     # indentation on every line instead of falling back to column 0.
     _block_snippets_dir = agent_meta_root / "snippets" / "agents"
-    for _snippet_name, _var_stem in (
-        ("output-guard", "OUTPUT_GUARD"),
-        ("background-process-guard", "BACKGROUND_PROCESS_GUARD"),
-        ("parse-input", "PARSE_INPUT"),
-        ("escalate-card", "ESCALATE_CARD"),
-        ("closing-summary", "CLOSING_SUMMARY"),
-        ("user-proxy", "USER_PROXY"),
-        ("worker-role", "WORKER_ROLE"),
-    ):
+    # ANTI_RECURSION_BLOCK (DE, datengetrieben, Task 1.14) vs WORKER_ROLE_BLOCK
+    # (EN, statisch): bewusst getrennt (AC-72 byte-identisch).
+    for _snippet_name, _var_stem in AGENT_BLOCK_SNIPPETS:
         variables[f"{_var_stem}_BLOCK"] = _load_block_snippet(
             _block_snippets_dir / f"{_snippet_name}.md"
         )

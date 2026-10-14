@@ -15,11 +15,12 @@ rather than invented facts.
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 from pathlib import Path
 
 from .frontmatter import _YAML_AVAILABLE, _parse_frontmatter_yaml, is_deprecated_template
 from .config import (
-    _build_snippet_variables,
+    AGENT_BLOCK_SNIPPETS,
     _load_block_snippet,
     _orch_mode_flags,
     _resolve_agent_meta_date,
@@ -182,31 +183,43 @@ _EMPTY_BULLET_RE = re.compile(r"^- *\n", re.MULTILINE)
 _EXCESS_BLANK_LINES_RE = re.compile(r"\n{3,}")
 
 
-# IC-31 block snippets that standalone resolves to their real text.
-_STANDALONE_BLOCK_SNIPPETS: tuple[tuple[str, str], ...] = (
-    ("closing-summary", "CLOSING_SUMMARY_BLOCK"),
-    ("user-proxy", "USER_PROXY_BLOCK"),
-    ("worker-role", "WORKER_ROLE_BLOCK"),
+# IC-31 block snippets that standalone resolves to their real text; the
+# name -> variable mapping comes from config.AGENT_BLOCK_SNIPPETS.
+_STANDALONE_BLOCK_NAMES = frozenset({"closing-summary", "user-proxy", "worker-role"})
+_STANDALONE_BLOCK_SNIPPETS: tuple[tuple[str, str], ...] = tuple(
+    (name, f"{stem}_BLOCK")
+    for name, stem in AGENT_BLOCK_SNIPPETS
+    if name in _STANDALONE_BLOCK_NAMES
 )
+
+
+@lru_cache(maxsize=8)
+def _block_vars_cached(agent_meta_root: Path, fingerprint: tuple) -> dict:
+    """Block variables for one root; ``fingerprint`` (mtimes) invalidates edits."""
+    return {
+        f"{stem}_BLOCK": _load_block_snippet(
+            agent_meta_root / "snippets" / "agents" / f"{name}.md"
+        )
+        for name, stem in AGENT_BLOCK_SNIPPETS
+    }
 
 
 def resolve_block_snippets(text: str, agent_meta_root: Path) -> str:
     """Inline every ``snippets/agents/*.md`` ``{{<NAME>_BLOCK}}`` reference.
 
-    Same resolution as the sync pipeline (``_build_snippet_variables`` +
-    ``substitute``); all other placeholders stay untouched. Lets tests and
-    tools inspect a template with its block snippets resolved (IC-31, #552).
+    Same resolution as the sync pipeline (``AGENT_BLOCK_SNIPPETS`` +
+    ``_load_block_snippet`` + ``substitute``); all other placeholders stay
+    untouched. Lets tests and tools inspect a template with its block snippets
+    resolved (IC-31, #552). Block variables are cached per root and
+    invalidated by snippet file mtimes.
     """
-    all_vars: dict = {}
-    _build_snippet_variables(all_vars, agent_meta_root)
-    block_vars = {
-        key: all_vars[key]
-        for key in (
-            f"{p.stem.upper().replace('-', '_')}_BLOCK"
-            for p in sorted((agent_meta_root / "snippets" / "agents").glob("*.md"))
-        )
-        if key in all_vars
-    }
+    snippets_dir = agent_meta_root / "snippets" / "agents"
+    fingerprint = tuple(
+        (snippets_dir / f"{name}.md").stat().st_mtime_ns
+        if (snippets_dir / f"{name}.md").exists() else None
+        for name, _stem in AGENT_BLOCK_SNIPPETS
+    )
+    block_vars = _block_vars_cached(agent_meta_root, fingerprint)
     return substitute(text, block_vars, "block-snippet resolution", None)
 
 
