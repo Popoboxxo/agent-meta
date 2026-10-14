@@ -254,3 +254,43 @@ def test_default_project_drops_pipelines_with_gate_off_roles(tmp_path):
     for name in ("concept-driven-dev", "feature-lifecycle", "refactor"):
         assert any("active-set.pipeline-dropped" in l and f"'{name}'" in l for l in console.splitlines())
     assert not (tmp_path / ".claude" / "pipeline-details" / "refactor.md").exists()
+
+
+# --- Activation advice of the WARN (default project and allowlist case) -------------
+
+def test_drop_warning_advice_in_default_project_names_gate_and_allowlist_caveat(tmp_path):
+    from scripts.lib.pipelines import PipelineDrop, format_pipeline_drop
+
+    _, active = _active(tmp_path, "pall")  # no roles key: gate_dropped is empty
+    assert active.gate_dropped == ()
+    validator = format_pipeline_drop(PipelineDrop("p", ("validator",), ("s",)), active, REPO_ROOT)
+    assert "gate `validator` is off by default" in validator
+    assert "listing `validator` in `roles:`" in validator
+    assert "allowlist" in validator and "list ALL roles you want to keep" in validator
+    for role in ("senior-developer", "junior-developer"):
+        tiers = format_pipeline_drop(PipelineDrop("p", (role,), ("s",)), active, REPO_ROOT)
+        assert "gate `developer_tiers`" in tiers
+        assert "BOTH `junior-developer` AND `senior-developer`" in tiers
+        assert "list ALL roles you want to keep" in tiers
+
+
+def test_drop_warning_advice_in_allowlist_case(tmp_path):
+    from scripts.lib.pipelines import PipelineDrop, format_pipeline_drop
+
+    _, active = _active(tmp_path, "p10")
+    ideation = format_pipeline_drop(PipelineDrop("p", ("ideation",), ("s",)), active, REPO_ROOT)
+    assert "list it in `roles:`" in ideation and "allowlist" in ideation
+    # p20: senior-developer is listed but its gate needs junior-developer as well.
+    (tmp_path / "x").mkdir()
+    _, p20 = _active(tmp_path / "x", "p20")
+    senior = format_pipeline_drop(PipelineDrop("p", ("senior-developer",), ("s",)), p20, REPO_ROOT)
+    assert "BOTH `junior-developer` AND `senior-developer`" in senior
+
+
+def test_allowed_agents_without_fallback_agent_stage_stays_unchanged(tmp_path):
+    _, active = _active(tmp_path, "p10")
+    stage_pipeline = {"impl": {"stages": [
+        {"id": "implement", "agent": "developer", "mode": "plan-driven", "task": "x",
+         "plan-driven": {"allowed_agents": ["junior-developer", "senior-developer"]}}]}}
+    kept, _ = filter_pipelines_by_active_set(stage_pipeline, active, {})
+    assert kept["impl"] is stage_pipeline["impl"]  # no empty list ("no restriction") leak

@@ -50,9 +50,16 @@
   are no longer rendered in projects where those roles are inactive - the default project (gates
   `validator`/`developer_tiers` off) included. They disappear from the match table, section 2a, the
   `pipeline-details/*.md` files (stale files are removed on re-sync), `routing.pipelines` and the intent table;
-  sync prints and logs `active-set.pipeline-dropped` (WARN) naming the pipeline, the missing role and how to
-  enable it. Plan-driven `allowed_agents` of rendered pipelines contain only active roles. Default orchestrator
-  artifact: -3.8 to -4.5 KB per provider. To keep a pipeline, add its roles to `roles:` (and enable their gate).
+  sync prints and logs `active-set.pipeline-dropped` (WARN) naming the pipeline, the missing role and its
+  activation gate. Plan-driven `allowed_agents` of rendered pipelines contain only active roles (a stage without
+  `fallback_agent` is left unchanged). Default orchestrator artifact: -3.8 to -4.5 KB per provider.
+  How to keep a pipeline: list its roles in `roles:` (`validator`; `junior-developer` AND `senior-developer`).
+  Caution: `roles:` is an allowlist - if your project has no `roles:` key yet, adding one turns it into an
+  allowlist and restricts it to the listed roles, so list ALL roles you want to keep. In the default project the
+  3 WARNs per sync disappear only by activating those roles.
+  Known interim: until Task 1.16 the static orchestrator prose (task-size routing "M-XL: first
+  concept-driven-dev", "complex feature -> feature-lifecycle") still names dropped pipelines in default projects.
+  Scenarios 50, 51 and 52 got an explicit `roles:` list so `concept-driven-dev` stays.
 - **`routing.rules[].input_contracts` only with an active producer (IC-18 Nr. 4, AC-47 part)**: projects with
   a `roles:` subset no longer list input contracts that no active role produces (`task-spec-v1` stays, the
   orchestrator produces it). Default render unchanged (every default input contract has an active producer).

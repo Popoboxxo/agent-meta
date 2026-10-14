@@ -9,6 +9,11 @@ instead of recomputing the role set.
 The sync is run in-process (``sync.main``) with spies on the compute function
 and on every generator entry point; the spies delegate to the real code, so the
 sync itself runs unchanged.
+
+Known gap (accepted residual risk, follow-up): ``context.py`` (``build_agent_hints`` ~644/646,
+``get_active_agents_data`` ~1717) still calls ``resolve_active_roles`` itself instead of
+receiving the shared object; it does not call ``compute_active_set``, so the count above
+holds, and the drift risk is low (same resolver).
 """
 from __future__ import annotations
 

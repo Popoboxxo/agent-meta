@@ -1928,7 +1928,7 @@ def _build_pipeline_variables(
             reflection_pairs=_effective_pairs,
         )
         for _drop in _drops:
-            unmapped.append(format_pipeline_drop(_drop, _active))
+            unmapped.append(format_pipeline_drop(_drop, _active, agent_meta_root))
         if effective:
             variables["QUALITY_PIPELINES_ENABLED"] = "true"
         # Build variables for active pipelines; also set BLOCK="" for disabled
