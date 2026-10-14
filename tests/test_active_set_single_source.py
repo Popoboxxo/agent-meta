@@ -9,7 +9,12 @@ intersection sites (``_sync_stage_auto_commit_allowlist``,
 ``sync_external_skills_for_provider``, ``_build_platform_variables``: the raw
 condition stays the upper bound, ``ActiveSet`` intersects it) plus
 ``_build_pipeline_variables`` and ``agent_sync.sync_agents_for_provider``
-(later PRs). The line numbers and the deviation list below describe the
+(later PRs). Task 1.08 (PR C) removed ``sync_agents_for_provider`` (it now takes
+the shared ``ActiveSet``, computed locally only for standalone callers); Task 1.09
+removed ``_build_pipeline_variables`` (pipeline validation uses ``ActiveSet.roles``).
+Remaining after PR C: 3 intersection sites (see ``RAW_ROLES_RATCHET``) -- AC-84
+(empty registry) is not reached; each is kept because dropping the raw condition
+would change the default render or the no-allowlist behaviour. The line numbers and the deviation list below describe the
 initial registry and are historical.
 
 Ratchet semantics (same style as ``ROUTE_RATCHET`` in
@@ -84,8 +89,6 @@ RAW_ROLES_RATCHET: FrozenSet[str] = frozenset(
         "scripts/lib/skills.py::sync_external_skills_for_provider",  # IC-18 no. 17: raw condition stays, ActiveSet intersects it (default render); raw read remains
         "scripts/lib/sync_pipeline.py::_sync_stage_auto_commit_allowlist",  # IC-18 no. 14: raw allowlist stays the upper bound (default render), ActiveSet intersects it; raw read remains until the spec drops the no-allowlist case
         "scripts/lib/config.py::_build_platform_variables",  # IC-18 no. 18 (:1689): WEB_PROJECT_ENABLED keeps the raw condition, ActiveSet intersects it (default render); raw read remains
-        "scripts/lib/config.py::_build_pipeline_variables",  # not in spec F-42 (:1863 available_roles) - see docstring
-        "scripts/lib/agent_sync.py::sync_agents_for_provider",  # not in spec F-42 (:1337)
     }
 )
 

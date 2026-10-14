@@ -12,6 +12,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .artifact_validate import (
     CHECK,
@@ -54,6 +55,9 @@ from .rule_index import (
     write_managed_index,
 )
 from .variables import strip_inactive_conditional_blocks, substitute
+
+if TYPE_CHECKING:
+    from .active_set import ActiveSet
 
 # Repository root of this checked-out framework — the activation-gate fallback
 # for direct `_should_skip_role()` calls that cannot pass a resolved gate map.
@@ -540,8 +544,14 @@ def _should_skip_role(
     target_dir: Path,
     log: SyncLog,
     gates: dict | None = None,
+    active_set: ActiveSet | None = None,
 ) -> tuple[bool, str | None]:
     """Skip-gates for one role in the per-provider agent loop.
+
+    ``active_set`` (IC-17/IC-18 no. 1) is the per-sync ActiveSet shared with
+    every other generator: when given it replaces the ``allowed_roles``
+    allowlist test (the gate check then runs first so the gate skip messages
+    stay intact, followed by the ActiveSet membership check).
 
     Returns ``(skip, filename)``; ``filename`` is the provider-specific
     target filename (``None`` for roles outside ROLE_MAP). The verbose
@@ -561,13 +571,16 @@ def _should_skip_role(
             log.skip(str(source_path.name), 'role not in ROLE_MAP')
         return True, filename
 
-    if allowed_roles is not None and role not in allowed_roles:
+    def _skip_not_in_roles() -> tuple[bool, str | None]:
         if log_verbose:
             rel = (str(target_dir / filename)
                    .replace(str(project_root) + '/', '')
                    .replace(str(project_root) + chr(92), ""))
             log.skip(rel, f"role '{role}' not in config['roles']")
         return True, filename
+
+    if active_set is None and allowed_roles is not None and role not in allowed_roles:
+        return _skip_not_in_roles()
 
     from .roles import is_role_enabled, resolve_activation_gates
 
@@ -583,6 +596,9 @@ def _should_skip_role(
             else:
                 log.skip(rel, "systems-engineering is disabled")
         return True, filename
+
+    if active_set is not None and not active_set.has(role):
+        return _skip_not_in_roles()
 
     # Skip orchestrator agent file in main-chat mode — no orchestrator subagent
     # is spawned; the main chat acts as router + worker. Not added to
@@ -658,14 +674,22 @@ def _apply_content_pipeline(
     stderr warning once per role. ``load_quality_pipelines()`` is lru_cached,
     so the per-role load is a cache hit.
     """
-    from .pipelines import apply_overrides, inject_pipeline_blocks, load_quality_pipelines
+    from .pipelines import (
+        PIPELINES_EFFECTIVE_KEY, apply_overrides, inject_pipeline_blocks,
+        load_quality_pipelines,
+    )
     from .platform import substitute_platform
     from .delegation_syntax import DelegationSyntaxEngine
 
-    # Inject provider-specific pipeline blocks before standard substitution
-    pipelines = load_quality_pipelines(str(agent_meta_root))
-    pipeline_overrides = config.get("quality-pipelines", {})
-    effective = apply_overrides(pipelines, pipeline_overrides)
+    # Inject provider-specific pipeline blocks before standard substitution.
+    # IC-18 no. 12: consume the single `effective` dict that config.py resolved
+    # (se-focus filtered, validated); only standalone callers without the
+    # variable builder fall back to deriving it here.
+    effective = merged_vars.get(PIPELINES_EFFECTIVE_KEY)
+    if not isinstance(effective, dict):
+        pipelines = load_quality_pipelines(str(agent_meta_root))
+        pipeline_overrides = config.get("quality-pipelines", {})
+        effective = apply_overrides(pipelines, pipeline_overrides)
     if effective:
         from .dod import resolve_dod
 
@@ -1323,8 +1347,12 @@ def _run_provider_bootstrap(
 def sync_agents_for_provider(agent_meta_root: Path, project_root: Path, config: dict,
                              variables: dict, log: SyncLog, dry_run: bool, provider: str,
                              provider_config: dict, platform_vars: dict | None = None,
-                             debug_mode: bool = False):
+                             debug_mode: bool = False,
+                             active_set: ActiveSet | None = None):
     """Generate agent files for a specific provider.
+
+    ``active_set`` is the per-sync ActiveSet (IC-17) shared with all other
+    generators; standalone callers that pass none get one computed locally.
 
     Claude:    .claude/agents/<role>.md   — full frontmatter, all fields
     Gemini:    .gemini/agents/<role>.md   — frontmatter without permissionMode/memory
@@ -1334,7 +1362,10 @@ def sync_agents_for_provider(agent_meta_root: Path, project_root: Path, config: 
         provider, provider_config, agent_meta_root, project_root, config, dry_run, log)
     if pc is None:
         return
-    allowed_roles = set(config['roles']) if 'roles' in config else None
+    if active_set is None:
+        from .active_set import compute_active_set
+
+        active_set = compute_active_set(config, agent_meta_root, project_root, warn_sink=[])
 
     from .roles import resolve_activation_gates
 
@@ -1350,8 +1381,9 @@ def sync_agents_for_provider(agent_meta_root: Path, project_root: Path, config: 
 
     for role, source_path in overrides.items():
         skip, filename = _should_skip_role(
-            role, source_path, provider, pc, role_map, allowed_roles,
-            config, variables, project_root, target_dir, log, gates=gates)
+            role, source_path, provider, pc, role_map, None,
+            config, variables, project_root, target_dir, log, gates=gates,
+            active_set=active_set)
         if skip:
             continue
 

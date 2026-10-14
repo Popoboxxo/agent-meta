@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .roles import load_roles_config, resolve_active_roles
+
+if TYPE_CHECKING:
+    from .active_set import ActiveSet
 
 # List separators used by role descriptions. Most short_desc values already
 # enumerate capabilities as comma-separated noun phrases, so splitting on
@@ -39,8 +43,13 @@ def _active_role_names(
     require_template: bool = False,
     template_roles: set[str] | None = None,
     warn_sink: list[str] | None = None,
+    active_set: ActiveSet | None = None,
 ) -> list[str]:
     """Return the sorted role names that pass project activation filters.
+
+    With ``active_set`` (IC-17, the per-sync object shared by all generators)
+    the set is read from it instead of being resolved again; ``require_template``
+    is then implied (``ActiveSet.roles`` is the Layer-2 set).
 
     Thin seam over ``roles.resolve_active_roles`` (SPEC
     dynamic-routing-template-slimming §3.5): ``variables`` is accepted for
@@ -48,6 +57,8 @@ def _active_role_names(
     ``config`` alone. The default stays Layer 1 (``require_template=False``)
     so existing calls keep working; the internal callers request Layer 2.
     """
+    if active_set is not None:
+        return sorted(active_set.roles)
     return resolve_active_roles(
         agent_meta_root,
         config,
@@ -87,6 +98,7 @@ def get_active_agents_data(
     *,
     template_roles: set[str] | None = None,
     warn_sink: list[str] | None = None,
+    active_set: ActiveSet | None = None,
 ) -> list[dict]:
     """Return a list of dictionaries with agent data.
 
@@ -115,6 +127,7 @@ def get_active_agents_data(
         require_template=True,
         template_roles=template_roles,
         warn_sink=warn_sink,
+        active_set=active_set,
     ):
         role_info = roles[role_name]
 
@@ -204,6 +217,21 @@ def _select_examples(
     return []
 
 
+def _produced_contracts(roles: dict, active_names: list[str]) -> set[str]:
+    """Contracts produced as ``output_contract`` by at least one active role.
+
+    Local equivalent of ``ActiveSet.producers`` for callers without a shared
+    ActiveSet (same data: ``handoff.output_contract`` of the active roles).
+    """
+    produced: set[str] = set()
+    for name in active_names:
+        handoff = (roles.get(name) or {}).get("handoff")
+        contract = handoff.get("output_contract") if isinstance(handoff, dict) else None
+        if contract:
+            produced.add(str(contract))
+    return produced
+
+
 def get_routing_rules(
     agent_meta_root: Path,
     config: dict,
@@ -214,6 +242,7 @@ def get_routing_rules(
     warn_sink: list[str] | None = None,
     language: str = "en",
     info_sink: list[str] | None = None,
+    active_set: ActiveSet | None = None,
 ) -> dict:
     """Build structured routing rules for the native intent-routing tool (issue #264).
 
@@ -245,7 +274,8 @@ def get_routing_rules(
         "name_index": [...]}`` —
         ``target_agents`` is the sorted enum of active non-orchestrator roles;
         ``rules`` carries ``agent/tier/parallel/orchestrator_only/keywords/
-        examples/output_contract/input_contracts`` per routed role (sorted by
+        examples/output_contract/input_contracts`` per routed role
+        (``input_contracts`` reduced to contracts with an active producer) (sorted by
         agent name for deterministic, idempotent output); ``pipelines`` maps
         quality pipelines with ``signal_keywords`` to ``{"route": "pipeline",
         "pipeline": <name>, "keywords": [...]}`` entries (sorted by name);
@@ -255,17 +285,23 @@ def get_routing_rules(
     """
     roles_cfg = load_roles_config(agent_meta_root)
     roles = roles_cfg.get("roles", {})
-    target_agents = [
-        name for name in _active_role_names(
-            agent_meta_root,
-            config,
-            variables,
-            require_template=True,
-            template_roles=template_roles,
-            warn_sink=warn_sink,
-        )
-        if name != "orchestrator"
-    ]
+    active_names = _active_role_names(
+        agent_meta_root,
+        config,
+        variables,
+        require_template=True,
+        template_roles=template_roles,
+        warn_sink=warn_sink,
+        active_set=active_set,
+    )
+    target_agents = [name for name in active_names if name != "orchestrator"]
+    # IC-18 no. 4: an input contract stays only if an active role (the
+    # orchestrator included) produces it as its output_contract.
+    produced = (
+        {contract for contract, who in active_set.producers.items() if who}
+        if active_set is not None
+        else _produced_contracts(roles, active_names)
+    )
 
     rules = []
     for role_name in target_agents:
@@ -296,7 +332,8 @@ def get_routing_rules(
             "examples": examples,
             "output_contract": str(handoff.get("output_contract") or ""),
             "input_contracts": [
-                str(c) for c in (handoff.get("input_contracts") or []) if str(c).strip()
+                str(c) for c in (handoff.get("input_contracts") or [])
+                if str(c).strip() and str(c) in produced
             ],
         })
 
@@ -353,6 +390,7 @@ def get_intent_routing_table(
     *,
     template_roles: set[str] | None = None,
     warn_sink: list[str] | None = None,
+    active_set: ActiveSet | None = None,
 ) -> str:
     """Generate the INTENT_ROUTING_TABLE: pipeline routing rows + a Tiers summary.
 
@@ -371,6 +409,7 @@ def get_intent_routing_table(
         variables,
         template_roles=template_roles,
         warn_sink=warn_sink,
+        active_set=active_set,
     )
     active_agent_names = {agent["name"] for agent in active_agents_data}
 

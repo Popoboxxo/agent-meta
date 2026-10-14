@@ -3,6 +3,22 @@ ai-providers:
 - Claude
 dod-preset: concept-driven
 platforms: []
+# Explicit roles so the concept-driven-dev pipeline keeps all its required stage roles
+# (the validator gate is off by default and the pipeline would be dropped, IC-18 no. 2).
+roles:
+- orchestrator
+- developer
+- tester
+- documenter
+- git
+- requirements
+- planner
+- code-reviewer
+- explorer
+- ideation
+- concept-specifier
+- concept-reviewer
+- validator
 rules-preset: lazy
 knowledge-engine:
   enabled: false

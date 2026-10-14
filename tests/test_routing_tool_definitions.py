@@ -568,3 +568,69 @@ def test_orchestrator_section3_renders_mandate_with_route_intent_tool(monkeypatc
     assert "ROUTE_INTENT_CALLABLE" not in rendered
     assert "{{else}}" not in rendered
 
+
+
+# --- IC-18 no. 4 / AC-47 (part): input_contracts need an active producer ------------
+
+_P10_ROLES = [
+    "orchestrator", "developer", "tester", "documenter", "git", "requirements",
+    "planner", "code-reviewer", "explorer", "release",
+]
+
+
+def _rules_by_agent(rules_data):
+    return {rule["agent"]: rule for rule in rules_data["rules"]}
+
+
+def _p10_rules(use_shared_active_set):
+    from scripts.lib.active_set import compute_active_set
+
+    config = {"roles": list(_P10_ROLES)}
+    active = None
+    if use_shared_active_set:
+        root = _AGENT_META_ROOT.resolve()
+        active = compute_active_set(config, root, root, warn_sink=[])
+    return get_routing_rules(
+        _AGENT_META_ROOT, config, dict(_BASE_VARIABLES), active_set=active
+    )
+
+
+@pytest.mark.parametrize("use_shared_active_set", [False, True])
+def test_p10_input_contracts_all_have_an_active_producer(use_shared_active_set):
+    from scripts.lib.active_set import compute_active_set
+
+    root = _AGENT_META_ROOT.resolve()
+    active = compute_active_set({"roles": list(_P10_ROLES)}, root, root, warn_sink=[])
+    rules = _rules_by_agent(_p10_rules(use_shared_active_set))
+    registry = load_roles_config(_AGENT_META_ROOT)["roles"]
+    removed = 0
+    for agent, rule in rules.items():
+        declared = (registry[agent].get("handoff") or {}).get("input_contracts") or []
+        for contract in rule["input_contracts"]:
+            assert active.producers.get(contract), (agent, contract)
+        removed += len(declared) - len(rule["input_contracts"])
+    # p10 lacks e.g. the producers of a11y-audit-v1 / db-schema-v1 -> something was filtered.
+    assert removed > 0
+    assert "a11y-audit-v1" not in rules["developer"]["input_contracts"]
+
+
+@pytest.mark.parametrize("use_shared_active_set", [False, True])
+def test_task_spec_contract_stays_because_the_orchestrator_produces_it(use_shared_active_set):
+    rules = _rules_by_agent(_p10_rules(use_shared_active_set))
+    registry = load_roles_config(_AGENT_META_ROOT)["roles"]
+    holders = [
+        agent for agent, rule in rules.items()
+        if "task-spec-v1" in ((registry[agent].get("handoff") or {}).get("input_contracts") or [])
+    ]
+    assert holders, "fixture assumption: some routed role consumes task-spec-v1"
+    for agent in holders:
+        assert "task-spec-v1" in rules[agent]["input_contracts"]
+
+
+def test_default_input_contracts_are_unchanged():
+    # Default (no roles key): every declared input contract has an active producer.
+    rules = get_routing_rules(_AGENT_META_ROOT, {}, dict(_BASE_VARIABLES))
+    registry = load_roles_config(_AGENT_META_ROOT)["roles"]
+    for rule in rules["rules"]:
+        declared = (registry[rule["agent"]].get("handoff") or {}).get("input_contracts") or []
+        assert rule["input_contracts"] == [str(c) for c in declared if str(c).strip()]

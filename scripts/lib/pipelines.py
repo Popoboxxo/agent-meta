@@ -5,13 +5,18 @@ import json
 import logging
 import os
 import re
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
+from typing import TYPE_CHECKING, Mapping
 
 from .frontmatter import parse_frontmatter_text, split_frontmatter
 from .io import SyncError, load_yaml_file
 from .providers import registered_provider_names
 from .reflection import effective_reflection_pairs, find_pair, resolve_stage_loop
+
+if TYPE_CHECKING:
+    from .active_set import ActiveSet
 
 # Module-level logger for fail-soft branches that have no SyncLog instance in
 # scope (Issue #568) — DEBUG-level only, so troubleshooting information isn't
@@ -52,6 +57,10 @@ KNOWN_PROVIDERS = (
     "Codex", "ZCode", "KimiCode", "Copilot",
 )
 DEFAULT_MAX_DEPTH = 4
+
+# Non-string private variable carrying the one `effective` quality-pipelines dict
+# from the variable builder (config.py) to the agent renderer (IC-18 no. 12).
+PIPELINES_EFFECTIVE_KEY = "_PIPELINES_EFFECTIVE"
 
 
 def _registered_providers(agent_meta_root=None) -> list[str]:
@@ -349,6 +358,18 @@ def _validate_task_review_rounds(pipelines: dict, reflection_pairs: list) -> lis
     return errors
 
 
+def _stage_dod_flag_inactive(stage: dict, active_dod: dict) -> bool:
+    """True for a ``conditional`` stage whose ``dod_flag`` is off (not rendered).
+
+    Same rule as ``_generate_pipeline_block`` (flag missing in ``active_dod`` =
+    active), so validation and rendering cannot disagree.
+    """
+    if stage.get("mode") != "conditional":
+        return False
+    cond = stage.get("condition", {})
+    return "dod_flag" in cond and not active_dod.get(cond["dod_flag"], True)
+
+
 def validate_pipelines(
     pipelines: dict,
     available_roles: list,
@@ -356,6 +377,7 @@ def validate_pipelines(
     known_roles: set | None = None,
     reflection_pairs: list | None = None,
     agent_meta_root=None,
+    active_dod: dict | None = None,
 ) -> list[str]:
     """Validate pipelines and return a list of error messages (empty = valid).
 
@@ -378,6 +400,10 @@ def validate_pipelines(
       (issue
     reflection_pairs: optional pre-resolved `reflection_pairs` list for
       `loop_ref` resolution; defaults to the framework role-defaults.
+    active_dod: optional resolved DoD flags (IC-15 no. 18). A ``conditional``
+      stage whose ``condition.dod_flag`` is inactive is not rendered, so its
+      roles are not validated (no false positive, e.g. ``quick-fix``/``root-cause``
+      with ``root-cause-required`` off). ``None`` validates every stage.
     """
     errors = []
     orchestrator_roles = {"orchestrator"}
@@ -428,6 +454,9 @@ def validate_pipelines(
                     f"Pipeline '{name}': stage '{stage.get('id')}' requires_approval "
                     f"must be a boolean, got {type(requires_approval).__name__}"
                 )
+
+            if active_dod is not None and _stage_dod_flag_inactive(stage, active_dod):
+                continue
 
             agent = stage.get("agent")
             if agent and agent not in available_roles:
@@ -726,6 +755,211 @@ def validate_plan_ref(
     return errors
 
 
+# ---------------------------------------------------------------------------
+# Active-set filter (IC-18 no. 2, Spec §4.4)
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class PipelineDrop:
+    """A pipeline removed because a required stage role is not in the ActiveSet."""
+
+    pipeline: str
+    missing_roles: tuple
+    dropped_stages: tuple
+
+
+def _stage_roles(stage: dict, reflection_pairs: list) -> set:
+    """Roles a stage needs when it is rendered (agent, group members, loop pair, fallback)."""
+    roles = set()
+    if stage.get("agent"):
+        roles.add(stage["agent"])
+    for item in stage.get("parallel_group") or []:
+        if isinstance(item, dict) and item.get("agent"):
+            roles.add(item["agent"])
+    if stage.get("mode") == "loop":
+        loop = resolve_stage_loop(stage, reflection_pairs) or {}
+        roles.update(r for r in (loop.get("generator"), loop.get("critic")) if r)
+    if stage.get("mode") == "plan-driven":
+        fallback = (stage.get("plan-driven") or {}).get("fallback_agent")
+        if fallback:
+            roles.add(fallback)
+    return roles
+
+
+def _intersect_allowed_agents(stage: dict, roles) -> dict:
+    """Plan-driven ``allowed_agents`` restricted to the active roles (IC-18 no. 3).
+
+    Returns the very same ``stage`` object when nothing changes, else a copy
+    (inputs are shared/cached and must not be mutated). If the intersection
+    would be empty, the restriction falls back to ``[fallback_agent]`` instead of
+    an empty list -- the renderer reads an empty list as "no restriction". Without a
+    ``fallback_agent`` the stage is left unchanged.
+    """
+    if stage.get("mode") != "plan-driven":
+        return stage
+    plan = stage.get("plan-driven") or {}
+    fallback = plan.get("fallback_agent")
+    if not fallback:
+        return stage  # never produce an empty list (= "no restriction") without a fallback
+    allowed = plan.get("allowed_agents") or []
+    narrowed = [agent for agent in allowed if agent in roles]
+    if len(narrowed) == len(allowed):
+        return stage
+    return {**stage, "plan-driven": {**plan, "allowed_agents": narrowed or [fallback]}}
+
+
+def _dod_flag_off(stage: dict, active_dod: Mapping | None, variables: Mapping) -> bool:
+    """Inactive ``dod_flag`` of a conditional stage (same rule as the renderer).
+
+    ``active_dod`` (resolved DoD) wins; without it the ``DOD_<FLAG>`` variable
+    is consulted, and an unknown flag counts as active (renderer default).
+    """
+    if active_dod is not None:
+        return _stage_dod_flag_inactive(stage, active_dod)  # one rule set
+    if stage.get("mode") != "conditional":
+        return False
+    flag = (stage.get("condition") or {}).get("dod_flag")
+    if not flag:
+        return False
+    return variables.get("DOD_" + flag.upper().replace("-", "_")) == "false"
+
+
+def filter_pipelines_by_active_set(
+    effective: dict,
+    active: "ActiveSet",
+    variables: Mapping[str, str],
+    *,
+    active_dod: Mapping | None = None,
+    reflection_pairs: list | None = None,
+) -> tuple:
+    """Drop pipelines whose required stage roles are not in ``active.roles``.
+
+    Rule (Spec §4.4): a pipeline stays when every **required** stage role is
+    active, including the reflection-loop generator/critic and ``parallel_group``
+    members. Not required are stages with an inactive ``dod_flag`` and stages
+    marked ``optional`` (an optional stage with an inactive role is removed from
+    the surviving pipeline). Plan-driven ``allowed_agents`` of surviving pipelines
+    are intersected with ``active.roles`` (IC-18 no. 3, AC-47). A ``run_pipeline`` reference to a dropped pipeline
+    drops the referencing pipeline too. Disabled pipelines pass through untouched
+    (they are not rendered anyway).
+
+    Pure: ``effective`` (and its shared nested stage dicts) is never mutated.
+    Returns ``(surviving pipelines in input order, drops sorted by pipeline)``.
+    """
+    if reflection_pairs is None:
+        reflection_pairs = _safe_load_reflection_pairs()
+    roles = active.roles
+    result: dict = {}
+    drops: dict = {}
+
+    for name, pipeline in effective.items():
+        stages = pipeline.get("stages", []) if isinstance(pipeline, dict) else None
+        if not isinstance(stages, list) or not pipeline.get("enabled", True):
+            result[name] = pipeline
+            continue
+        missing: set = set()
+        bad_stages: list = []
+        kept: list = []
+        modified = False
+        for stage in stages:
+            if not isinstance(stage, dict) or _dod_flag_off(stage, active_dod, variables):
+                kept.append(stage)
+                continue
+            stage_missing = {r for r in _stage_roles(stage, reflection_pairs) if r not in roles}
+            if stage_missing and stage.get("optional"):
+                continue  # inactive optional stage: removed, pipeline survives
+            if stage_missing:
+                missing |= stage_missing
+                bad_stages.append(str(stage.get("id", "")))
+            narrowed = _intersect_allowed_agents(stage, roles)
+            if narrowed is not stage:
+                modified = True
+            kept.append(narrowed)
+        if missing:
+            drops[name] = PipelineDrop(name, tuple(sorted(missing)), tuple(bad_stages))
+        elif modified or len(kept) != len(stages):
+            result[name] = {**pipeline, "stages": kept}
+        else:
+            result[name] = pipeline
+
+    # Transitive: a pipeline referencing a dropped pipeline via run_pipeline.
+    changed = True
+    while changed:
+        changed = False
+        for name in list(result):
+            pipeline = result[name]
+            stages = pipeline.get("stages", []) if isinstance(pipeline, dict) else []
+            if not isinstance(stages, list) or not pipeline.get("enabled", True):
+                continue
+            via = [
+                (st, drops[st["run_pipeline"]]) for st in stages
+                if isinstance(st, dict) and st.get("mode") == "run_pipeline"
+                and st.get("run_pipeline") in drops
+                and not _dod_flag_off(st, active_dod, variables)
+            ]
+            if via:
+                missing = sorted({r for _, d in via for r in d.missing_roles})
+                drops[name] = PipelineDrop(
+                    name, tuple(missing), tuple(str(st.get("id", "")) for st, _ in via))
+                del result[name]
+                changed = True
+
+    return result, [drops[n] for n in sorted(drops)]
+
+
+_ALLOWLIST_NOTE = (
+    "NOTE: `roles:` is an allowlist - if your project has no `roles:` key yet, adding "
+    "one restricts it to the listed roles, so list ALL roles you want to keep, not only this one"
+)
+
+
+def _role_gate_advice(role: str, groups: Mapping) -> str:
+    """Activation advice for one missing role, resolved from the gate groups (no allowlist needed)."""
+    from .roles import _role_matches_patterns
+
+    for group, spec in sorted(groups.items()):
+        spec = spec or {}
+        if not _role_matches_patterns(role, [str(p) for p in spec.get("role_patterns") or []]):
+            continue
+        predicate = spec.get("config_predicate") or {}
+        kind = predicate.get("kind")
+        if kind == "roles_membership":
+            members = [str(r) for r in predicate.get("roles") or []]
+            listed = ", ".join(f"`{m}`" for m in members)
+            if predicate.get("mode", "any") == "all" and len(members) > 1:
+                need = f"needs BOTH {' AND '.join(f'`{m}`' for m in members)}" if len(members) == 2 else f"needs ALL of {listed}"
+                return (f"'{role}': gate `{group}` is off by default and {need} in `roles:`. "
+                        + _ALLOWLIST_NOTE)
+            return (f"'{role}': gate `{group}` is off by default. Enable it by listing {listed} "
+                    f"in `roles:` - " + _ALLOWLIST_NOTE)
+        if kind == "config_flag":
+            return (f"'{role}': gate `{group}` is off by default. Enable it with "
+                    f"`{predicate.get('path', '')}: true` in .meta-config/project.yaml")
+        return f"'{role}': activation group `{group}` is disabled by default"
+    return f"'{role}': list it in `roles:` (the allowlist excludes it). " + _ALLOWLIST_NOTE
+
+
+def format_pipeline_drop(drop: PipelineDrop, active: "ActiveSet", agent_meta_root=None) -> str:
+    """WARN text ``active-set.pipeline-dropped`` (pipeline, missing roles, way to enable).
+
+    The gate group of each missing role is resolved from ``role-defaults.yaml``
+    (``activation_groups`` + ``role_patterns``), independent of any allowlist, so the
+    advice is correct in the default project as well. Without ``agent_meta_root``
+    the framework root of this module is used.
+    """
+    from .roles import load_roles_config
+
+    root = Path(agent_meta_root) if agent_meta_root is not None else _FRAMEWORK_ROOT
+    groups = load_roles_config(root).get("activation_groups", {}) or {}
+    ways = [_role_gate_advice(role, groups) for role in drop.missing_roles]
+    stages = ", ".join(drop.dropped_stages)
+    return (
+        f"active-set.pipeline-dropped: pipeline '{drop.pipeline}' is not rendered - "
+        f"required role(s) {', '.join(repr(r) for r in drop.missing_roles)} "
+        f"not active (stage(s): {stages}). To enable: " + "; ".join(ways)
+    )
+
+
 def generate_pipeline_match_table(pipelines: dict) -> str:
     """Generate Pipeline Match Check table from quality_pipelines config."""
     lines = ["| Signal | Pipeline |", "|--------|----------|"]
@@ -940,7 +1174,7 @@ def _generate_pipeline_block(
         mode = stage.get("mode", "sequential")
         if mode == "conditional":
             cond = stage.get("condition", {})
-            if "dod_flag" in cond and not active_dod.get(cond["dod_flag"], True):
+            if _stage_dod_flag_inactive(stage, active_dod):
                 continue
         agent = stage.get("agent", "")
         task = stage.get("task", "")

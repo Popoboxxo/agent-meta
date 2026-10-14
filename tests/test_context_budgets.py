@@ -47,16 +47,17 @@ TOLERANCE_MAX_BYTES = 4096
 # Re-pinned again after the review fixes (meta-doctor allowlist text, manager input_contracts without task-spec-v1).
 # Known, unexplained deviation: Continue rules measure 19,004 B vs. 18,591 B in the
 # spec; the Ist-value below pins the measurement, the delta is not yet clarified.
+# Re-pinned for the default pipeline drop (IC-18 no. 2, Task 1.10): orchestrator -3.8..-4.5 KB per provider.
 _IST_FULL: Dict[str, Dict[str, int]] = {
-    "Claude": {"entry-file": 2511, "rules": 18297, "orchestrator": 90750, "harness-roster": 587189, "always-loaded": 607997},
-    "Codex": {"entry-file": 25652, "rules": 18380, "orchestrator": 90170, "harness-roster": 581136, "always-loaded": 625168},
-    "Continue": {"entry-file": 617, "rules": 19004, "orchestrator": 74747, "always-loaded": 19621},
-    "Copilot": {"entry-file": 9334, "rules": 18405, "orchestrator": 74627, "always-loaded": 27739},
-    "Gemini": {"entry-file": 33221, "rules": 18297, "orchestrator": 90612, "always-loaded": 51518},
-    "KimiCode": {"entry-file": 25652, "orchestrator": 75870, "harness-roster": 572080, "always-loaded": 597732},
-    "Mammouth": {"entry-file": 25652, "rules": 18387, "orchestrator": 75584, "harness-roster": 574331, "always-loaded": 618370},
-    "Opencode": {"entry-file": 25716, "orchestrator": 90478, "harness-roster": 583713, "always-loaded": 609429},
-    "ZCode": {"entry-file": 26566, "orchestrator": 75905, "harness-roster": 570936, "always-loaded": 597502},
+    "Claude": {"entry-file": 2511, "rules": 18297, "orchestrator": 86226, "harness-roster": 582624, "always-loaded": 603432},
+    "Codex": {"entry-file": 25652, "rules": 18380, "orchestrator": 85666, "harness-roster": 576591, "always-loaded": 620623},
+    "Continue": {"entry-file": 617, "rules": 19004, "orchestrator": 70950, "always-loaded": 19621},
+    "Copilot": {"entry-file": 9334, "rules": 18405, "orchestrator": 70832, "always-loaded": 27739},
+    "Gemini": {"entry-file": 33221, "rules": 18297, "orchestrator": 86248, "always-loaded": 51518},
+    "KimiCode": {"entry-file": 25652, "orchestrator": 71547, "harness-roster": 567716, "always-loaded": 593368},
+    "Mammouth": {"entry-file": 25652, "rules": 18387, "orchestrator": 71321, "harness-roster": 570027, "always-loaded": 614066},
+    "Opencode": {"entry-file": 25716, "orchestrator": 85914, "harness-roster": 579108, "always-loaded": 604824},
+    "ZCode": {"entry-file": 26566, "orchestrator": 71522, "harness-roster": 566512, "always-loaded": 593078},
 }
 
 

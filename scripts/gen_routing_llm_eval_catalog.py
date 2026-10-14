@@ -49,7 +49,13 @@ except ImportError:
     )
     sys.exit(1)
 
-from scripts.lib.pipelines import apply_overrides, load_quality_pipelines
+from scripts.lib.active_set import compute_active_set
+from scripts.lib.dod import resolve_dod
+from scripts.lib.pipelines import (
+    apply_overrides,
+    filter_pipelines_by_active_set,
+    load_quality_pipelines,
+)
 
 DEFAULT_OUT_PATH = _REPO_ROOT / "tests" / "routing-llm-eval" / "catalog.generated.yaml"
 DEFAULT_PROJECT_CONFIG = _REPO_ROOT / ".meta-config" / "project.yaml"
@@ -100,6 +106,13 @@ def filter_effective_pipelines(agent_meta_root: Path, project_config: dict) -> d
         name: pl for name, pl in effective.items()
         if isinstance(pl.get("stages", []), list)
     }
+
+    # IC-18 no. 2: pipelines whose required roles are inactive are not rendered,
+    # so they must not be routing-eval targets either.
+    active = compute_active_set(
+        project_config, agent_meta_root, agent_meta_root, warn_sink=[])
+    effective, _drops = filter_pipelines_by_active_set(
+        effective, active, {}, active_dod=resolve_dod(project_config, agent_meta_root))
 
     return {
         name: pl for name, pl in effective.items() if pl.get("signal_keywords")
