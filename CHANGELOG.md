@@ -82,6 +82,12 @@
   `ROLE_*_ACTIVE`, `DEVELOPER_TIERS_ENABLED` and `PIPELINE_*_ENABLED` are set to `true` (all roles exported),
   which also fixes the leaked double branch in `standalone/agents/meta-doctor.md`
   ("meta-feedbackuser: framework issue").
+- **`ANTI_RECURSION_BLOCK` from data ∩ ActiveSet (IC-18 Nr. 6, PR D)**: the roles a worker may point to
+  come from the new `role-defaults.yaml` key `anti_recursion.reference_roles`
+  (`tester`, `documenter`, `requirements`, `validator`), intersected with the ActiveSet; no role literal in
+  `config.py`. Default (validator gate off): "Nur tester/documenter/requirements aus Kontext verweisen."
+  Without any active reference role only the first sentence remains. `load_roles_config` exposes
+  `anti_recursion`. AC-01 rebaselined (27 of 1075: orchestrator, developer per provider + hashes).
 
 ### Changed
 - **`ACTIVE_ROLES` / `ROLE_<ROLE>_ACTIVE` available in templates**: `build_variables` injects

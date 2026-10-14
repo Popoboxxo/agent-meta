@@ -49,6 +49,10 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   ``RECOMMENDED_TIER`` line and the planner step mapping drop ``senior-developer``; minor version bumps
   (orchestrator 8.5.0, developer 4.8.0, planner 1.6.0). Changed: orchestrator, developer, planner per provider
   and generated-file-hashes (4 x 9 = 36 of 1075 entries).
+- Task 1.14 (IC-18 no. 6): ``ANTI_RECURSION_BLOCK`` names only reference roles of
+  ``role-defaults.yaml: anti_recursion.reference_roles`` that are in the ActiveSet; the default drops
+  ``/validator`` (gate off). Changed: orchestrator, developer per provider and generated-file-hashes
+  (3 x 9 = 27 of 1075 entries). No template version bump (template source unchanged).
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

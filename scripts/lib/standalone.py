@@ -233,17 +233,17 @@ def _standalone_active_set_flags(agent_meta_root: Path) -> dict:
     ``{{#if}}...{{else}}`` (orphaned-marker cleanup).
     """
     from .active_set import active_set_variables
+    from .pipelines import load_quality_pipelines
     from .roles import load_roles_config
 
-    roles_cfg = load_roles_config(agent_meta_root)
-    known = frozenset((roles_cfg.get("roles") or {}).keys())
+    known = frozenset((load_roles_config(agent_meta_root).get("roles") or {}).keys())
     flags = {
         key: value
         for key, value in active_set_variables(_AllActive(known)).items()
         if key.startswith("ROLE_")
     }
     flags["DEVELOPER_TIERS_ENABLED"] = "true"
-    for name in (roles_cfg.get("quality_pipelines") or {}):
+    for name in load_quality_pipelines(str(agent_meta_root)):
         flags["PIPELINE_%s_ENABLED" % str(name).upper().replace("-", "_")] = "true"
     return flags
 
