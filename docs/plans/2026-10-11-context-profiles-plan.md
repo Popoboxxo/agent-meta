@@ -365,6 +365,15 @@ Rolle: tester · Issue: #969 · PR: 0f · Depends: 0a.10 · parallel_group: 0f-g
 - [ ] Step 3: Test (pass): `python3 -m pytest tests/test_role_routing_eval_catalog.py -q`
 - [ ] Step 4: commit `feat: add role routing eval catalog generator and corpus`
 
+**Umsetzungs-Nachzüge 0f** (aus Review zu 0f.1; Spec bleibt unverändert, Spec-Nachzug offen):
+- Kollisionsfälle (IC-29-Overlap-Tokens) liegen in `catalog.generated.yaml`, nicht in `catalog.manual.yaml` (Abweichung von IC-13; Spec-Nachzug).
+- McNemar zurückgestellt (IC-36/Q37); bis dahin gilt das τ-Modell mit ≥ 3 Baseline-Läufen.
+- Freigabewort `yes`/`ja` und Preis-Maximalalter der Kostenschätzung gemäß IC-36 in `eval_gate` (0f.2) umsetzen.
+- Korpus-Hash = sha256 über die kanonische Vereinigung von `catalog.generated.yaml` und `catalog.manual.yaml` (nach `id` sortiert, kanonisches JSON); Ausgabe via `python3 scripts/gen_role_routing_eval_catalog.py --print-hash`, in Python `corpus_hash(out_dir)`.
+- Sprach-Delta nur auf `pair_id`-Paaren (`language_pairs(catalog)`: gleiche Zielrolle, je ein `de`- und `en`-Fall). Englisch gerahmte DE-Keyword-Fälle sind `lang: mixed` und zählen nicht als `en`; EN-Daten in `role-defaults` fehlen bis IC-29.
+- `name_only`-Rollen erhalten nur Direktadressierungs-Fälle, keine Keyword-/Beispiel-Positivfälle; Q9 (template-auditor ohne `routing_patterns`) muss VOR dem Baseline-Lauf umgesetzt sein, der Hash ändert sich dadurch erneut.
+- Voraussetzung für 0f.3 (vor der Freigabeanfrage klären): `tests/routing-llm-eval/provider-claude.sh` nutzt `.claude/rules/use-orchestrator.md` (Stub) und ein festes Modell `haiku`. Zu klären: System-Prompt-Quelle (gerenderte Orchestrator-Datei des jeweiligen Profils), Profil-/Modell-Parametrisierung der Provider und ≥ 2 Modellklassen.
+
 ### Task 0f.2: Toleranzmodell und Freigabe-Wrapper implementieren (IC-36)
 Rolle: developer · Issue: #969 · PR: 0f · Depends: — · parallel_group: 0f-g1 · AC: AC-86 (Freigabe)
 **Files:** Create `scripts/lib/eval_gate.py`; Test Create `tests/test_eval_gate.py`
