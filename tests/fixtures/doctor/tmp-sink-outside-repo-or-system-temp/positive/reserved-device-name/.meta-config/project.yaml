@@ -1,0 +1,8 @@
+ai-providers: [Claude]
+repo_containment:
+  enabled: true
+  tmp-sink:
+    enabled: true
+    path: CON
+    gitignore: true
+    cleanup: false

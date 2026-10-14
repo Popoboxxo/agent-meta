@@ -1579,6 +1579,8 @@ def _sync_stage_context_checks(
             (context_budget, "check_rule_unreachable", {}),
             (context_budget, "check_unread_channel", {}),
             (context_budget, "check_marker_in_rule", {}),
+            (context_budget, "check_declared_surface_empty", {}),
+            (context_budget, "check_legacy_artifact_present", {}),
             (active_set_refs, "check_dangling_dispatch", {}),
             (active_set_refs, "check_dangling_mention", {}),
             (active_set_refs, "check_unresolved_placeholder", {}),

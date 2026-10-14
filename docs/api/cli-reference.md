@@ -11,6 +11,7 @@ The `sync.py` script is the central entry point of the agent-meta framework. It 
 | `--only-variables` | Substitutes variables (`{{VARIABLE}}`) in the existing configuration without generating new agents. |
 | `--cleanup-preview` | Planning-only, side-effect-free JSON preview of the stale agent files a sync would remove (dry-run gate). Emits exactly one JSON object on stdout and writes nothing (no index write, no unlink, no backup, no clone/submodule). Exit 0 even for a non-empty stale set, 1 only on internal failure. |
 | `--context-report [--json] [--profile full\|compact\|both]` | Measures the rendered context artifacts (entry file, rules, orchestrator, harness roster, always-loaded set) per active provider: bytes, lines, estimated tokens (bytes / 4) and the capability caps (IC-09). Renders the project into a work directory below the tmp-sink subdirectory `context-report/` and writes only there (the report is also stored as `report.json`); nothing is written into the project and the system temp directory is never used. Exit 0; exit 1 only on `context.over-hard-cap`; exit 2 with `tmp-sink.disabled` when `repo_containment.tmp-sink.enabled` is `false`, and exit 2 with `context-report.render-failed` when the render fails (including missing `git`); an empty report prints a warning to stderr and exits 0. Limitation: the project is rendered with `sync.py --init` on a copy of `project.yaml` only, so project-local files outside `.meta-config` (`.claude/3-project/*-ext.md`, project-owned rules and hooks, the "Eigene Notizen" section of CLAUDE.md) are missing and the measurement can underestimate the real always-loaded footprint. `--json` emits `{provider: {artifact: {bytes, lines, tokens_est, cap, cap_kind}}}`; `--profile compact` is reserved for Phase 2 (currently reports `full`). Shares `measure_artifacts` (`scripts/lib/context_report.py`) with `scripts/measure_context.py --project <path>`. |
+| `--doctor` | Diagnoses the installation against the known-issues registry (`config/known-issues.yaml`, the only registry source; a project-level registry is ignored). Deterministic, no LLM. Writes nothing into the project or into agent-meta; the only write target is one JSON report via `--out` inside `<tmp-sink>/doctor/`. Flags and exit codes: see the section "`--doctor` installation diagnosis" below. |
 | `--dry-run` | Simulates the sync process without writing any files to disk. |
 | `--check` | Exits with code 1 if context files (`CLAUDE.md`, `AGENTS.md`) are out of sync, otherwise 0. (Crucial for CI/CD). |
 | `--validate` | Performs a full sync into a test repository. Results are in `sync.log`. |
@@ -73,6 +74,41 @@ Exit code 0 even when the stale set is non-empty; exit code 1 only on an interna
 - `fingerprint` — stable `sha256:…` hash over the canonical stale set (sorted by
   provider/path/reason/tracked/adopted). Pass it to `POST /api/roles/cleanup/apply` so
   the server can reject a stale preview.
+
+### `--doctor` installation diagnosis
+
+`sync.py --doctor [--json] [--strict] [--provider P ...] [--out FILE]` evaluates the registry
+entries per active provider (predicates, detectors, severity cap) and reports the findings sorted by
+severity, issue id, provider and file. It is not strictly read-only: its write boundary is the
+resolved tmp-sink (IC-34), nothing else.
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Prints exactly one deterministic JSON object on stdout (`findings[]`, `summary` with `total`, `errors`, `warnings`, `infos`, `registry_version`, `agent_meta_version`, `skipped[]`, `severity[]`). Banners and diagnostics go to stderr. Without it a text report is printed. |
+| `--strict` | CI mode: a WARNING finding also exits 1, and an invalid registry entry (`doctor.registry-invalid`, reported as WARNING otherwise) becomes an ERROR and exits 2. Intended for the agent-meta CI on matrix fixtures. |
+| `--provider P ...` | Restricts the run to the named providers. Unknown or inactive names are ignored and reported as INFO `doctor.provider-filter`. |
+| `--out FILE` | Also writes the JSON report to `FILE`. `FILE` must lie inside `<tmp-sink>/doctor/` of the configured sink (e.g. `.tmp/doctor/<YYYYMMDD-HHMMSS>.json`); the check compares `realpath`s, so `..` and symlink escapes are rejected. Without `--out` nothing is written. |
+
+Exit codes:
+
+| Exit | Meaning |
+|------|---------|
+| 0 | No finding with effective severity ERROR (INFO and WARNING findings do not fail the run without `--strict`). |
+| 1 | At least one effective ERROR finding, or at least one WARNING finding with `--strict`. |
+| 2 | Runtime error (`doctor.internal-error`), `--strict` with `doctor.registry-invalid`, `--out` outside `<tmp-sink>/doctor/` (`doctor.out-outside-tmp-sink`), or `--out` with `repo_containment.tmp-sink.enabled: false` (`doctor.tmp-sink.disabled`, takes precedence). The target is checked before the run starts, so a rejected `--out` costs no runtime. |
+
+Behavior with a disabled tmp-sink: `--doctor` without `--out` runs normally (stdout/JSON complete); `command`
+detectors that would write below the sink are skipped (`detector-unavailable`), stdout-only commands
+(`--check --dry-run`) still run, and the `tmp-sink-outside-repo-or-system-temp` seed is skipped.
+
+Write boundary: like `--cleanup-preview`, `--doctor` forces dry-run and redirects stdout to stderr
+before the context is built (no schema-enum update when self-hosting), then marks the run read-only
+so the common tail writes neither `sync.log` nor env scripts. Bytecode caches are not written either.
+
+Runtime: the `sync-pending` seed runs `sync.py --check --dry-run` as a subprocess (timeout 60 s per
+`command` detector). Expect about 25-30 s on the agent-meta repository itself and about 7 s on a small
+project; all other detectors are file reads and take well under a second. Run it deliberately, not in a
+tight loop.
 
 ## Session Resume & Checkpointing
 

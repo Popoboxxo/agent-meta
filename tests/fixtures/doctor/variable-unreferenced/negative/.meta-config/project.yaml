@@ -1,0 +1,3 @@
+ai-providers: [Claude]
+variables:
+  PROJECT_NAME: demo

@@ -1053,6 +1053,142 @@ def _handle_context_report(ctx: _SyncContext) -> None:
     sys.exit(code)
 
 
+_DOCTOR_SUBDIR = "doctor"
+
+
+def _resolve_doctor_out(ctx: _SyncContext, out: str):
+    """Validate ``--doctor --out`` against ``<tmp-sink>/doctor/`` (IC-22, IC-34).
+
+    Sink resolution and the ``realpath`` comparison stay in ``repo_containment``
+    (``resolve_out_path`` / ``resolve_output_dir``); the doctor write boundary is
+    the ``doctor/`` subdirectory of the resolved sink. Raises ``TmpSinkError``
+    with ``doctor.tmp-sink.disabled`` (takes precedence) or
+    ``doctor.out-outside-tmp-sink``.
+    """
+    from lib.repo_containment import (
+        TmpSinkError, resolve_out_path, resolve_output_dir,
+    )
+
+    target = resolve_out_path(ctx.project_root, ctx.config, out, tool="doctor")
+    base = os.path.normcase(os.fspath(
+        resolve_output_dir(ctx.project_root, ctx.config, _DOCTOR_SUBDIR, tool="doctor")))
+    real = os.path.normcase(os.fspath(target))
+    try:
+        inside = os.path.commonpath([base, real]) == base and real != base
+    except ValueError:  # different drives (Windows)
+        inside = False
+    if not inside:
+        raise TmpSinkError(
+            "doctor.out-outside-tmp-sink",
+            f"--out {out!r} must lie inside <tmp-sink>/{_DOCTOR_SUBDIR}/")
+    return target
+
+
+def _write_doctor_out(ctx: _SyncContext, out: str, payload: str) -> None:
+    """Write the JSON report to the validated ``--out`` file (the only doctor write)."""
+    target = _resolve_doctor_out(ctx, out)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target = _resolve_doctor_out(ctx, out)  # re-check after mkdir (symlink swap)
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(target, flags, 0o644)
+    with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(payload)
+
+
+def _doctor_exit_code(report, strict: bool) -> int:
+    """Exit-code matrix (IC-22): 2 strict registry-invalid, 1 ERROR (or strict WARNING), else 0."""
+    from lib.consistency.report import Severity
+    from lib.doctor import CHECK_REGISTRY_INVALID
+
+    if strict and any(f.check == CHECK_REGISTRY_INVALID for f in report.findings):
+        return 2
+    if any(f.severity is Severity.ERROR for f in report.findings):
+        return 1
+    if strict and any(f.severity is Severity.WARNING for f in report.findings):
+        return 1
+    return 0
+
+
+def _doctor_apply_strict(report):
+    """--strict: ``doctor.registry-invalid`` is an ERROR (its registry severity)."""
+    from dataclasses import replace
+    from lib.consistency.report import Severity
+    from lib.doctor import CHECK_REGISTRY_INVALID
+
+    findings = tuple(
+        replace(f, severity=Severity.ERROR) if f.check == CHECK_REGISTRY_INVALID else f
+        for f in report.findings)
+    return replace(report, findings=findings)
+
+
+def _print_doctor_text(report) -> None:
+    """Human-readable doctor report on stdout."""
+    counts: dict = {}
+    for finding in report.findings:
+        counts[finding.severity.value] = counts.get(finding.severity.value, 0) + 1
+    print("Doctor: {} finding(s) | errors {} | warnings {} | infos {} | "
+          "registry v{} | agent-meta {} | skipped {}".format(
+              len(report.findings), counts.get("ERROR", 0), counts.get("WARNING", 0),
+              counts.get("INFO", 0), report.registry_version, report.agent_meta_version,
+              len(report.skipped)))
+    for f in report.findings:
+        scope = f" [{f.provider}]" if f.provider else ""
+        where = f" {f.file}" if f.file else ""
+        print(f"  {f.severity.value:<7} {f.check}{scope}{where}")
+        print(f"          {f.message}")
+        if f.suggestion:
+            print(f"          fix: {f.suggestion}")
+
+
+def _handle_doctor(ctx: _SyncContext) -> None:
+    """Handle ``--doctor`` (IC-22): diagnose, print, optionally write one report, exit.
+
+    ``main()`` has already forced dry-run and moved stdout to stderr around
+    ``_build_context``; this handler sets ``read_only`` so the common tail writes
+    neither ``sync.log`` nor env scripts. The only write is ``--out`` inside
+    ``<tmp-sink>/doctor/``. Exit 0/1 per findings, 2 on runtime error, rejected
+    ``--out`` or (``--strict``) ``doctor.registry-invalid``.
+    """
+    import json
+
+    from lib.doctor import print_doctor_json, report_to_dict, run_doctor
+    from lib.repo_containment import TmpSinkError
+
+    ctx.read_only = True
+    ctx.mode = "doctor"
+    args = ctx.args
+    out = getattr(args, "out", None)
+    strict = bool(getattr(args, "strict", False))
+    try:
+        if out:  # fail before the (slow) run when the target is not allowed
+            _resolve_doctor_out(ctx, out)
+        report = run_doctor(ctx.project_root, ctx.agent_meta_root, ctx.config,
+                            providers=getattr(args, "provider", None))
+        if strict:
+            report = _doctor_apply_strict(report)
+    except TmpSinkError as exc:
+        print(f"error: {exc.code}: {exc.message}", file=sys.stderr)
+        sys.exit(2)
+    except Exception as exc:  # noqa: BLE001 -- any internal failure -> exit 2 (IC-22)
+        print(f"error: doctor.internal-error: {type(exc).__name__}", file=sys.stderr)
+        sys.exit(2)
+    write_failed = False
+    if out:  # a failed write must not hide the report: print it, then exit 2
+        payload = json.dumps(report_to_dict(report), indent=2,
+                             ensure_ascii=False, sort_keys=True) + "\n"
+        try:
+            _write_doctor_out(ctx, out, payload)
+        except (TmpSinkError, OSError) as exc:
+            code = getattr(exc, "code", "doctor.out-write-failed")
+            print(f"error: {code}: {type(exc).__name__}", file=sys.stderr)
+            write_failed = True
+    if getattr(args, "json", False):
+        print_doctor_json(report)
+    else:
+        _print_doctor_text(report)
+    sys.exit(2 if write_failed else _doctor_exit_code(report, strict))
+
+
 def _handle_validate(ctx: _SyncContext) -> None:
     """Handle --validate (may sys.exit; falls through on full success)."""
     args = ctx.args

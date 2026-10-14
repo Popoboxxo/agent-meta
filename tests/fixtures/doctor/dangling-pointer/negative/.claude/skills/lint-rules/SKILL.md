@@ -1,0 +1,4 @@
+---
+name: lint-rules
+---
+Rules.

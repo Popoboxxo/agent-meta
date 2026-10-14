@@ -1,0 +1,3 @@
+ai-providers: [Claude]
+variables:
+  CODE_QUALITY_RULES: Prefer small functions

@@ -1,0 +1,545 @@
+# Known-Issues Registry (SPEC-CONTEXT-PROFILES-2026-10-11, IC-21, Task 0d.1).
+# Versioned catalogue of known provider/config problems with evidence and
+# verification state. Consumed by the doctor runner (`sync.py --doctor`, IC-22,
+# Task 0d.2). Contract tests: tests/test_known_issues_registry.py.
+#
+# Source binding (AC-78): the registry is read ONLY from
+# <agent_meta_root>/config/known-issues.yaml. No project override, no search path.
+#
+# Schema
+# ------
+#   registry-version: 1
+#   issues:
+#     - id: <kebab-case, unique, stable>      # Finding.check = "doctor.<id>"
+#       title: <one line>
+#       message: <optional template; bindings only, never artifact text>
+#       applies_to:                           # AND-combined; empty = always
+#         - {capability: <key-path>, op: present|absent|eq|ne|truthy|falsy|in|gt|lt, value|value_key: <x>}
+#         - {config: <project.yaml dotted path>, op: <same>, value: <x>, default: <x>}
+#         - {active_role: <role>, op: truthy|falsy}
+#         - {active_role_where: {tools_without|tools_with: [<tool>...]}}
+#         - {surface_has_target: "{key}"}     # surface {key} maps to a target key
+#       target:
+#         artifact: context_file|rules_dir|agents_dir|skills_dir|commands_dir|
+#                   hooks_config_file|project_config|sync_log|<ai-providers dotted key>
+#         role: <optional, may use bindings>
+#         path: <optional, project-relative>
+#       detector:                             # exactly one of: a detector | any_of
+#         kind: file-size|regex|path-exists|yaml-key|toml-key|json-schema|
+#               command|finding-ref|variable-unreferenced
+#       severity: ERROR|WARNING|INFO
+#       verified-state: VERIFIED-RUNTIME|VERIFIED-SOURCE|SOURCE-DERIVED|DOCUMENTED|UNVERIFIED
+#       verified-state-by-capability:         # optional, per-provider resolution
+#         derive: surface_verified_state.<surface>
+#         # or  <capability-key>: <state>
+#         # or  <capability-key>: {<capability-value>: <state>}
+#       evidence: {kind: runtime|source|docs|third-party, ref: <url|path:line>, date: YYYY-MM-DD}
+#       fix-hint: <one sentence; never applied automatically>
+#       fix-owner: agent-meta-manager|framework-issue|project-config
+#       introduced-in: <agent-meta version|null>
+#       fixed-in: <agent-meta version|null>   # runner skips when VERSION >= fixed-in
+#
+# Evaluation order and runner rules (contract for the doctor runner, 0d.2)
+# ------------------------------------------------------------------------
+#   * Regex are compiled with re.MULTILINE; text is read unnormalised, so
+#     patterns that anchor on line ends must tolerate CRLF (`[ \t\r]*$`).
+#   * Binding order: (1) wildcard predicates / detectors (`*` in a key path)
+#     iterate first and bind {key}; (2) `surface_has_target: "{key}"` is then
+#     applied as a FILTER per bound {key}. Its mapping source is
+#     `surface_target_key(surface)` in scripts/lib/consistency/context_budget.py
+#     (surface -> ai-providers target key; introduced with the
+#     `context.declared-surface-empty` check in Task 0d.4; surfaces without a
+#     target key never produce a finding).
+#   * Dedupe: `variable-unreferenced` with key "*" skips every variable that
+#     has its own dedicated seed (currently CODE_QUALITY_RULES ->
+#     `dead-variable-code-quality-rules`), so one variable yields one finding.
+#   * `verified-state-by-capability` value dispatch (`{<value>: <state>}`): if
+#     the provider's value has no entry, the top-level `verified-state` is used.
+#   * `schema_from_key` derives the JSON schema from the capability value
+#     (a list of allowed field names becomes `additionalProperties: false`
+#     over `properties` with those names).
+#
+# Semantics
+# ---------
+#   * A detector reports a hit ("Treffer") when the condition it states holds;
+#     a top-level detector yields a finding on a hit. `any_of` yields a finding
+#     only when NO sub-detector hits (sub-detectors state the healthy condition).
+#   * `present` = key exists and is neither null nor empty; `absent` is its
+#     negation. Predicates reference capability keys (provider-capabilities.yaml
+#     IC-09, or ai-providers.yaml provider contract keys such as agent_ext) and
+#     config keys only. Predicates on provider identity (name, display name as
+#     value) are forbidden - behaviour differences are expressed by capability keys.
+#   * `value_key`: comparison value is read from the capability of the provider
+#     under test. `pattern_from_config`: regex = re.escape(<config value>), with
+#     optional `default` (used when the config value is missing; otherwise the
+#     entry is skipped), `line_anchored` and `optional_suffix`.
+#   * Wildcard `*` in a key path iterates map keys and binds {key}.
+#     `active_role_where` binds {role} (one finding per bound role).
+#     Bindable names in templates: {role}, {key}, {provider}, {tmp_sink},
+#     {agents_dir}, {extension_dir}, {agent_ext}; {reason} and {length} in `message`
+#     only ({reason}: runner-owned `source: doctor` findings; {length}: character
+#     count of the unreferenced variable value, never the value itself). Unbound names are an error.
+#   * `verified-state-by-capability` resolves the verified-state per provider;
+#     top-level `verified-state` is the conservative fallback. UNVERIFIED caps
+#     the effective severity at WARNING (ADR-11).
+#   * `command` runs without a shell; the runner ALWAYS appends --dry-run. argv
+#     must be one of: [--check], [--context-report, --json], [--cleanup-preview]
+#     and never contains --dry-run or --deactivation-status (AC-85).
+#   * yaml-key with `subject: capability` reads the capability matrix instead of
+#     a project file. path-exists with `require_suffix_key` hits on files of the
+#     glob whose name lacks the suffix stored under that capability key;
+#     `bind` binds the glob stem, `then` is evaluated per bound value.
+#   * `message` and `fix-hint` are templates; artifact content never appears in
+#     them (only as file[:line] / `quoted`, max 120 chars).
+
+registry-version: 1
+
+issues:
+  # ---- context budget (IC-11 measurement) ----------------------------------
+  - id: context-hard-cap-truncation
+    title: Context file exceeds the provider hard cap and is silently truncated
+    applies_to:
+      - {capability: context_hard_cap_bytes, op: present}
+    target: {artifact: context_file}
+    detector: {kind: file-size, unit: bytes, op: ">=", limit_key: context_hard_cap_bytes}
+    severity: ERROR
+    verified-state: VERIFIED-SOURCE
+    verified-state-by-capability:
+      derive: surface_verified_state.context_file
+    evidence: {kind: runtime, ref: "docs/analysis/2026-10-11-context-budget-provider-study.md section 3.2", date: '2026-10-11'}
+    fix-hint: Shorten the context file below the cap or move detail into rules/skills.
+    fix-owner: project-config
+    introduced-in: 2.0.0-beta.1
+    fixed-in: null
+
+  - id: context-soft-cap-bytes
+    title: Context file exceeds the provider recommended byte size
+    applies_to:
+      - {capability: context_soft_cap_bytes, op: present}
+    target: {artifact: context_file}
+    detector: {kind: file-size, unit: bytes, op: ">", limit_key: context_soft_cap_bytes}
+    severity: WARNING
+    verified-state: VERIFIED-SOURCE
+    evidence: {kind: source, ref: "docs/analysis/2026-10-11-context-budget-provider-study.md section 3.5", date: '2026-10-11'}
+    fix-hint: Shorten the context file below the recommended size.
+    fix-owner: project-config
+    introduced-in: 2.0.0-beta.1
+    fixed-in: null
+
+  - id: instruction-soft-cap-chars
+    title: Instruction file exceeds the provider character limit
+    applies_to:
+      - {capability: context_soft_cap_chars, op: present}
+    target: {artifact: rules_dir}
+    detector: {kind: file-size, unit: chars, op: ">", limit_key: context_soft_cap_chars}
+    severity: WARNING
+    verified-state: UNVERIFIED
+    verified-state-by-capability:
+      context_soft_cap_chars: {4000: DOCUMENTED, 12000: UNVERIFIED}
+    evidence: {kind: third-party, ref: "docs/analysis/2026-10-11-context-budget-provider-study.md section 3.7", date: '2026-10-11'}
+    fix-hint: Split the instruction file into smaller files below the limit.
+    fix-owner: project-config
+    introduced-in: 2.0.0-beta.1
+    fixed-in: null
+
+  - id: context-soft-cap-lines
+    title: Context file exceeds the provider recommended line count
+    applies_to:
+      - {capability: context_soft_cap_lines, op: present}
+    target: {artifact: context_file}
+    detector: {kind: file-size, unit: lines, op: ">", limit_key: context_soft_cap_lines}
+    severity: WARNING
+    verified-state: DOCUMENTED
+    evidence: {kind: docs, ref: "docs/analysis/2026-10-11-context-budget-provider-study.md section 3.1", date: '2026-10-11'}
+    fix-hint: Shorten the context file below the recommended line count.
+    fix-owner: project-config
+    introduced-in: 2.0.0-beta.1
+    fixed-in: null
+
+  - id: dangling-pointer
+    title: Context file points to a file that does not exist
+    applies_to: []
+    target: {artifact: context_file}
+    detector: {kind: finding-ref, check: context.dangling-pointer, source: context-budget}
+    severity: ERROR
+    verified-state: VERIFIED-RUNTIME
+    evidence: {kind: runtime, ref: "docs/analysis/2026-10-11-context-budget-provider-study.md section 4.4", date: '2026-10-11'}
+    fix-hint: Fix or remove the pointer, or generate the referenced file.
+    fix-owner: agent-meta-manager
+    introduced-in: 2.0.0-beta.1
+    fixed-in: null
+
+  - id: rule-unreachable
+    title: Rule file is not reachable through any channel the provider reads
+    applies_to: []
+    target: {artifact: rules_dir}
+    detector: {kind: finding-ref, check: context.rule-unreachable, source: context-budget}
+    severity: ERROR
+    verified-state: VERIFIED-RUNTIME
+    evidence: {kind: runtime, ref: "docs/analysis/2026-10-11-context-budget-provider-study.md section 4.3", date: '2026-10-11'}
+    fix-hint: Embed the rule into the context file or route it through a channel the provider reads.
+    fix-owner: agent-meta-manager
+    introduced-in: 2.0.0-beta.1
+    fixed-in: null
+
+  - id: unread-channel
+    title: Generated content uses a channel the provider does not read
+    applies_to: []
+    target: {artifact: rules_dir}
+    detector: {kind: finding-ref, check: context.unread-channel, source: context-budget}
+    severity: WARNING
+    verified-state: SOURCE-DERIVED
+    verified-state-by-capability:
+      derive: surface_verified_state.rules
+    evidence: {kind: source, ref: "docs/analysis/2026-10-11-context-budget-provider-study.md section 4.3", date: '2026-10-11'}
+    fix-hint: Move the content to a channel listed in rules_read_channels of the provider.
+    fix-owner: agent-meta-manager
+    introduced-in: 2.0.0-beta.1
+    fixed-in: null
+
+  # ---- provider artifact contract ------------------------------------------
+  - id: rules-file-wrong-suffix
+    title: Rule file lacks the suffix the provider requires
+    applies_to:
+      - {capability: rules_required_suffix, op: present}
+    target: {artifact: rules_dir}
+    detector: {kind: path-exists, glob: "*", expect: present, require_suffix_key: rules_required_suffix}
+    severity: WARNING
+    verified-state: UNVERIFIED
+    evidence: {kind: third-party, ref: "docs/analysis/2026-10-11-context-budget-provider-study.md section 3.6", date: '2026-10-11'}
+    fix-hint: Rename the rule files to carry the required suffix.
+    fix-owner: agent-meta-manager
+    introduced-in: 2.0.0-beta.1
+    fixed-in: null
+
+  - id: orchestrator-missing-subagent-allowlist
+    title: Orchestrator lacks the subagent allowlist the provider requires
+    applies_to:
+      - {capability: subagent_allowlist_required, op: eq, value: true}
+      - {active_role: orchestrator, op: truthy}
+    target: {artifact: agents_dir, role: orchestrator}
+    detector: {kind: yaml-key, key: subagents, frontmatter: true, op: absent}
+    severity: ERROR
+    verified-state: SOURCE-DERIVED
+    evidence: {kind: source, ref: "docs/analysis/2026-10-11-context-budget-provider-study.md section 3.5", date: '2026-10-11'}
+    fix-hint: Declare the dispatchable roles in the orchestrator frontmatter.
+    fix-owner: agent-meta-manager
+    introduced-in: 2.0.0-beta.1
+    fixed-in: null
+
+  - id: agent-name-suffix
+    title: Agent frontmatter name carries a file extension suffix
+    applies_to:
+      - {capability: agent_ext, op: present}
+    target: {artifact: agents_dir}
+    detector: {kind: regex, pattern: '^name:[ \t]*[\w-]+\.[A-Za-z]+[ \t]*$', expect: match, scope: frontmatter}
+    severity: WARNING
+    verified-state: VERIFIED-SOURCE
+    evidence: {kind: source, ref: scripts/lib/agent_sync.py:892, date: '2026-10-11'}
+    fix-hint: Strip the file extension from the frontmatter name.
+    fix-owner: agent-meta-manager
+    introduced-in: 2.0.0-beta.1
+    fixed-in: null
+
+  - id: agent-frontmatter-strict-schema
+    title: Agent frontmatter violates the provider strict field schema
+    applies_to:
+      - {capability: agent-transform.allowed-fields, op: present}
+    target: {artifact: agents_dir}
+    detector: {kind: json-schema, schema_from_key: agent-transform.allowed-fields}
+    severity: WARNING
+    verified-state: SOURCE-DERIVED
+    evidence: {kind: source, ref: config/ai-providers.yaml:308, date: '2026-10-11'}
+    fix-hint: Remove frontmatter fields the provider schema does not allow.
+    fix-owner: agent-meta-manager
+    introduced-in: 2.0.0-beta.1
+    fixed-in: null
+
+  - id: dispatch-depth-missing
+    title: Subagent dispatch depth is below the required depth in the TOML agent config
+    applies_to:
+      - {capability: agent_config_format, op: eq, value: toml}
+      - {capability: required_depth, op: present}
+    target: {artifact: mcp-config.committed-file}
+    detector: {kind: toml-key, key: agents.max_depth, op: lt, value_key: required_depth}
+    severity: ERROR
+    verified-state: VERIFIED-RUNTIME
+    evidence: {kind: runtime, ref: "docs/analysis/2026-10-11-context-budget-provider-study.md section 3.2", date: '2026-10-11'}
+    fix-hint: Set agents.max_depth in the provider config to at least the required depth.
+    fix-owner: project-config
+    introduced-in: 2.0.0-beta.1
+    fixed-in: null
+
+  # ---- active-set references (IC-17 / IC-19) -------------------------------
+  - id: dangling-role-dispatch
+    title: A dispatch references a role that is not active
+    applies_to: []
+    target: {artifact: agents_dir}
+    detector: {kind: finding-ref, check: active-set.dangling-dispatch, source: active-set}
+    severity: ERROR
+    verified-state: VERIFIED-SOURCE
+    evidence: {kind: source, ref: "docs/analysis/2026-10-11-context-budget-provider-study.md section 10.2", date: '2026-10-11'}
+    fix-hint: Activate the referenced role or remove the dispatch reference.
+    fix-owner: agent-meta-manager
+    introduced-in: 2.0.0-beta.1
+    fixed-in: null
+
+  - id: gate-dropped-allowlist-role
+    title: A gate dropped a role that the allowlist still references
+    applies_to: []
+    target: {artifact: agents_dir}
+    detector: {kind: finding-ref, check: active-set.gate-dropped, source: active-set}
+    severity: WARNING
+    verified-state: VERIFIED-SOURCE
+    evidence: {kind: source, ref: scripts/lib/consistency/active_set_refs.py:37, date: '2026-10-11'}
+    fix-hint: Align the gate configuration with the role allowlist.
+    fix-owner: agent-meta-manager
+    introduced-in: 2.0.0-beta.1
+    fixed-in: null
+
+  - id: unresolved-placeholder-in-output
+    title: Generated output still contains an unresolved placeholder
+    applies_to: []
+    target: {artifact: agents_dir}
+    detector: {kind: finding-ref, check: active-set.unresolved-placeholder, source: active-set}
+    severity: WARNING
+    verified-state: VERIFIED-SOURCE
+    evidence: {kind: source, ref: scripts/lib/consistency/active_set_refs.py:39, date: '2026-10-11'}
+    fix-hint: Define the variable in project.yaml or remove the placeholder from the template.
+    fix-owner: agent-meta-manager
+    introduced-in: 2.0.0-beta.1
+    fixed-in: null
+
+  # ---- variables / roles ---------------------------------------------------
+  - id: dead-variable-code-quality-rules
+    title: CODE_QUALITY_RULES is set but no template renders it
+    applies_to:
+      - {config: variables.CODE_QUALITY_RULES, op: present}
+    target: {artifact: project_config}
+    detector: {kind: variable-unreferenced, key: CODE_QUALITY_RULES, universe: all-roles-all-providers}
+    severity: WARNING
+    verified-state: VERIFIED-SOURCE
+    evidence: {kind: source, ref: "docs/analysis/2026-10-11-context-budget-provider-study.md section 10.3", date: '2026-10-11'}
+    fix-hint: Include the variable in a template via a framework issue, or remove it after approval.
+    fix-owner: framework-issue
+    introduced-in: 2.0.0-beta.1
+    fixed-in: null
+
+  - id: project-role-not-generated
+    title: Project-specific role file is not generated into the agents directory
+    message: "Project role {role} has an extension file but no generated agent."
+    applies_to: []
+    target: {artifact: agents_dir, role: "{role}"}
+    detector:
+      kind: path-exists
+      glob: "{extension_dir}/*.md"
+      exclude_glob: "*-ext.md"
+      bind: role
+      expect: present
+      then: {kind: path-exists, path_template: "{agents_dir}/{role}{agent_ext}", expect: absent}
+    severity: WARNING
+    verified-state: VERIFIED-SOURCE
+    evidence: {kind: source, ref: docs/specs/2026-10-11-context-profiles-spec.md#ic-20, date: '2026-10-11'}
+    fix-hint: Project roles are not generated yet; track the Q16 project-roles issue (#958).
+    fix-owner: framework-issue
+    introduced-in: 2.0.0-beta.1
+    fixed-in: null
+
+  - id: variable-unreferenced
+    title: A configured variable is referenced by no template
+    message: "Variable `variables.{key}` is used by no template (value length {length}); its content is silently lost (no rendering, no removal by the doctor)."
+    applies_to: []
+    target: {artifact: project_config}
+    detector: {kind: variable-unreferenced, key: "*", universe: all-roles-all-providers}
+    severity: WARNING
+    verified-state: VERIFIED-SOURCE
+    evidence: {kind: source, ref: "docs/analysis/2026-10-11-context-budget-provider-study.md section 10.3", date: '2026-10-11'}
+    fix-hint: Include the variable via a framework issue, or remove it through an approved optimizer proposal.
+    fix-owner: project-config
+    introduced-in: 2.0.0-beta.1
+    fixed-in: null
+
+  # ---- hooks / sync --------------------------------------------------------
+  - id: hooks-not-registered
+    title: Hooks are enabled but not registered in the provider hook config
+    applies_to: []
+    target: {artifact: hooks_config_file}
+    detector: {kind: finding-ref, check: hooks.enabled-but-not-registered, source: hooks}
+    severity: ERROR
+    verified-state: VERIFIED-SOURCE
+    evidence: {kind: source, ref: scripts/lib/consistency/hook_drift.py:184, date: '2026-10-11'}
+    fix-hint: Run the sync to register the enabled hooks.
+    fix-owner: agent-meta-manager
+    introduced-in: 2.0.0-beta.1
+    fixed-in: null
+
+  - id: sync-pending
+    title: Generated artifacts are out of date with the sources
+    applies_to: []
+    target: {artifact: project_config}
+    detector: {kind: command, argv: ["--check"], expect_exit: 0, timeout_s: 60}
+    severity: WARNING
+    verified-state: VERIFIED-SOURCE
+    evidence: {kind: source, ref: scripts/sync.py, date: '2026-10-11'}
+    fix-hint: Run python scripts/sync.py to regenerate the artifacts.
+    fix-owner: agent-meta-manager
+    introduced-in: 2.0.0-beta.1
+    fixed-in: null
+
+  # ---- capability-driven ---------------------------------------------------
+  - id: read-only-not-enforced
+    title: Read-only role is not enforced by the provider runtime
+    message: "Role {role} has no Write/Edit tools but the provider does not enforce read-only."
+    applies_to:
+      - {capability: read_only_enforcement, op: eq, value: none}
+      - {active_role_where: {tools_without: [Write, Edit]}}
+    target: {artifact: agents_dir, role: "{role}"}
+    detector: {kind: yaml-key, key: tools, frontmatter: true, op: present}
+    severity: INFO
+    verified-state: UNVERIFIED
+    evidence: {kind: third-party, ref: "docs/analysis/2026-10-11-context-budget-provider-study.md section 4.1", date: '2026-10-11'}
+    fix-hint: Treat the role as advisory read-only; do not rely on the tool list for enforcement.
+    fix-owner: framework-issue
+    introduced-in: 2.0.0-beta.1
+    fixed-in: null
+
+  - id: schema-validation-skipped
+    title: Config schema validation was skipped in this environment
+    applies_to: []
+    target: {artifact: project_config}
+    detector: {kind: finding-ref, check: doctor.environment, source: doctor}
+    severity: INFO
+    verified-state: VERIFIED-SOURCE
+    evidence: {kind: source, ref: scripts/lib/config.py:381-417, date: '2026-10-11'}
+    fix-hint: Install the optional schema validator to validate project.yaml.
+    fix-owner: project-config
+    introduced-in: 2.0.0-beta.1
+    fixed-in: null
+
+  - id: declared-surface-empty
+    title: A provider declares a surface for which no artifacts are generated
+    applies_to: []
+    target: {artifact: skills_dir}
+    detector: {kind: finding-ref, check: context.declared-surface-empty, source: context-budget}
+    severity: WARNING
+    verified-state: VERIFIED-SOURCE
+    evidence: {kind: source, ref: "scripts/lib/rules.py:304-308 (#857, #858)", date: '2026-10-11'}
+    fix-hint: Generate the declared surface or drop it from the provider capabilities.
+    fix-owner: framework-issue
+    introduced-in: 2.0.0-beta.1
+    fixed-in: null
+
+  - id: surface-unverified
+    title: A generated provider surface is unverified
+    message: "Surface {key} is UNVERIFIED for this provider; its generated artifacts may be ignored."
+    applies_to:
+      - {surface_has_target: "{key}"}
+    target: {artifact: project_config}
+    detector: {kind: yaml-key, subject: capability, key: surface_verified_state.*, op: eq, value: UNVERIFIED}
+    severity: INFO
+    verified-state: UNVERIFIED
+    evidence: {kind: third-party, ref: "docs/specs/2026-10-11-context-profiles-spec.md (#854, #856)", date: '2026-10-11'}
+    fix-hint: Verify the surface at runtime and update surface_verified_state.
+    fix-owner: framework-issue
+    introduced-in: 2.0.0-beta.1
+    fixed-in: null
+
+  - id: legacy-artifact-present
+    title: A legacy artifact of the provider is still present
+    applies_to:
+      - {capability: legacy_artifacts, op: present}
+    target: {artifact: project_config}
+    detector: {kind: finding-ref, check: context.legacy-artifact-present, source: context-budget}
+    severity: WARNING
+    verified-state: VERIFIED-SOURCE
+    evidence: {kind: source, ref: "config/ai-providers.yaml:531-534 (#853)", date: '2026-10-11'}
+    fix-hint: Remove the legacy artifact after checking that nothing reads it.
+    fix-owner: project-config
+    introduced-in: 2.0.0-beta.1
+    fixed-in: null
+
+  # ---- routing -------------------------------------------------------------
+  - id: routing-examples-language-fallback
+    title: Routing examples fell back to another language
+    applies_to: []
+    target: {artifact: sync_log}
+    detector: {kind: finding-ref, check: routing.examples-language-fallback, source: sync-log}
+    severity: INFO
+    verified-state: SOURCE-DERIVED
+    evidence: {kind: source, ref: "scripts/lib/delegation_table.py:150-161 (#780)", date: '2026-10-11'}
+    fix-hint: Provide routing examples for the configured language.
+    fix-owner: framework-issue
+    introduced-in: 2.0.0-beta.1
+    fixed-in: null
+
+  - id: routing-keyword-overlap-active
+    title: Routing keywords overlap between active roles
+    applies_to: []
+    target: {artifact: agents_dir}
+    detector: {kind: finding-ref, check: routing.keyword-overlap, source: active-set}
+    severity: INFO
+    verified-state: VERIFIED-SOURCE
+    evidence: {kind: source, ref: "tests/test_routing_overlap.py:28 (#779)", date: '2026-10-11'}
+    fix-hint: Disambiguate the overlapping routing keywords of the active roles.
+    fix-owner: framework-issue
+    introduced-in: 2.0.0-beta.1
+    fixed-in: null
+
+  # ---- repo containment / tmp-sink -----------------------------------------
+  - id: tmp-sink-not-gitignored
+    title: The tmp-sink directory is not ignored by git
+    applies_to:
+      - {config: repo_containment.tmp-sink.enabled, op: ne, value: false, default: true}
+    target: {artifact: project_config, path: .gitignore}
+    detector:
+      any_of:
+        - kind: regex
+          path: .gitignore
+          pattern_from_config: repo_containment.tmp-sink.path
+          default: .tmp
+          literal: true
+          line_anchored: true
+          optional_suffix: "/"
+          expect: match
+        - kind: regex
+          path_template: "{tmp_sink}/.gitignore"
+          pattern: '\A(?s:(?=.*^\*[ \t\r]*$)(?=.*^!\.gitignore[ \t\r]*$))'
+          expect: match
+          scope: all
+    severity: WARNING
+    verified-state: VERIFIED-SOURCE
+    evidence: {kind: source, ref: "scripts/lib/repo_containment.py:43, :476-510", date: '2026-10-11'}
+    fix-hint: Add the tmp-sink path to .gitignore or let the next sync write the sink .gitignore.
+    fix-owner: project-config
+    introduced-in: 2.0.0-beta.1
+    fixed-in: null
+
+  - id: repo-containment-block-missing
+    title: The repo_containment block is missing from project.yaml
+    message: "The repo_containment block is missing; defaults apply and the next sync materialises it."
+    applies_to:
+      - {config: repo_containment, op: absent}
+    target: {artifact: project_config}
+    detector: {kind: yaml-key, key: repo_containment, op: absent}
+    severity: INFO
+    verified-state: VERIFIED-SOURCE
+    evidence: {kind: source, ref: scripts/lib/config.py:1016-1023, date: '2026-10-11'}
+    fix-hint: Run the sync once; it writes the repo_containment block with defaults.
+    fix-owner: project-config
+    introduced-in: 2.0.0-beta.1
+    fixed-in: null
+
+  - id: tmp-sink-outside-repo-or-system-temp
+    title: The tmp-sink path violates the sink location rules
+    message: "repo_containment.tmp-sink.path violates the sink rules: {reason}"
+    applies_to:
+      - {config: repo_containment.tmp-sink.enabled, op: ne, value: false, default: true}
+    target: {artifact: project_config}
+    detector: {kind: finding-ref, check: doctor.tmp-sink-location, source: doctor}
+    severity: ERROR
+    verified-state: VERIFIED-SOURCE
+    evidence: {kind: source, ref: "scripts/lib/repo_containment.py (tmp_sink_path_error, tmp_sink_location_error)", date: '2026-10-11'}
+    fix-hint: Choose a relative path inside the repository, for example .tmp or scratch/out.
+    fix-owner: project-config
+    introduced-in: 2.0.0-beta.1
+    fixed-in: null
