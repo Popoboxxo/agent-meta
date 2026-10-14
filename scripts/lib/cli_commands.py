@@ -1370,7 +1370,7 @@ def _handle_sync(ctx: _SyncContext) -> None:
     # Stage 14: auto-commit allowlist (#694) -- must run after stage 13 so
     # this file's own write isn't captured into that hash baseline.
     _sync_stage_auto_commit_allowlist(ctx.agent_meta_root, ctx.project_root,
-                                      config, ctx.args, ctx.log)
+                                      config, ctx.args, ctx.log, ctx.active_set)
     # Stage 14b: context/active-set checks (IC-10/19/29) -- report-only (WARN/INFO
     # in sync.log), fail-soft, no exit-code or render effect.
     _sync_stage_context_checks(

@@ -73,7 +73,6 @@ LEGIT_READERS: Dict[str, str] = {
 # Start registry (F-42, IC-18 no. 14-18). Format: "<module>::<function>".
 RAW_ROLES_RATCHET: FrozenSet[str] = frozenset(
     {
-        "scripts/lib/sync_pipeline.py::_sync_stage_auto_commit_allowlist",  # IC-18 no. 14 (:1530)
         "scripts/lib/context.py::sync_prompts_for_continue",  # IC-18 no. 15 (:2342)
         "scripts/sync.py::_preview_expected_filenames",  # IC-18 no. 16 (:426)
         "scripts/lib/skills.py::sync_external_skills_for_provider",  # IC-18 no. 17 (:424)
