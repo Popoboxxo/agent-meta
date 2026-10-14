@@ -290,14 +290,6 @@ roles:
         routing would let a routine code task silently trigger a full framework audit.
       parallel: false
       orchestrator_only: true
-    routing_patterns:
-      keywords:
-      - Agenten-Audit
-      - Template-Audit
-      - Konformitätsprüfung
-      - Framework-Audit
-      examples:
-      - "Prüfe ob alle Agenten-Definitionen noch framework-konform sind."
     handoff:
       input_contracts:
       - task-spec-v1

@@ -21,8 +21,6 @@ keyword_allow:
     reason: "Phase-0 baseline: German keyword awaiting migration to examples.Deutsch (IC-29)"
   - keyword: "Komponenten prüfen"
     reason: "Phase-0 baseline: German keyword awaiting migration to examples.Deutsch (IC-29)"
-  - keyword: "Konformitätsprüfung"
-    reason: "Phase-0 baseline: German keyword awaiting migration to examples.Deutsch (IC-29)"
   - keyword: "Migration prüfen"
     reason: "Phase-0 baseline: German keyword awaiting migration to examples.Deutsch (IC-29)"
   - keyword: "Prompt-Änderung bewerten"

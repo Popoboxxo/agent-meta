@@ -22,9 +22,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 _EXPECTED_TOTAL = 93
 _EXPECTED_DISTRIBUTION = {"keyword": 88, "name_only": 4, "excluded": 1}
 # Ratchet exceptions for test_name_only_roles_have_no_routing_patterns (IC-28 Nr. 2):
-# name_only roles that still carry routing_patterns. Task 1.35 (Q9) removes the
-# patterns of template-auditor and must then empty this set.
-_NAME_ONLY_PATTERN_EXCEPTIONS = frozenset({"template-auditor"})
+# name_only roles that still carry routing_patterns. Empty since Task 1.35 (Q9);
+# new entries are not allowed.
+_NAME_ONLY_PATTERN_EXCEPTIONS = frozenset()
 _VALID = {"keyword", "name_only", "excluded"}
 
 

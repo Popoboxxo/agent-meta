@@ -11,8 +11,8 @@
 #   3. has no `model:` field in its SOURCE template (models come from
 #      tier-presets/role-defaults, never from the template),
 #   4. resolves all placeholders except escaped doc examples,
-#   5. is NOT name-addressable via keyword routing in the generated
-#      route_intent tool definition (addressability: name_only),
+#   5. has NO keyword rule in routing rules (addressability: name_only; it stays
+#      name-dispatchable via target_agents/name_index),
 #   6. still carries the mandatory STATUS/RESULT/ARTIFACTS output contract.
 # Exit 0 = all assertions hold.
 set -u
@@ -59,22 +59,22 @@ for prov in .claude .opencode; do
     fi
 done
 
-# 5. addressability name_only: the role must NOT appear in the generated
-#    route_intent target_agent enum (that enum lists keyword-addressable roles).
-if grep -q '"target_agent"' .claude/agents/orchestrator.md 2>/dev/null; then
-    if python3 - <<'PY'
-import re, sys, pathlib
-t = pathlib.Path(".claude/agents/orchestrator.md").read_text(encoding="utf-8")
-m = re.search(r'"enum":\s*\[(.*?)\]', t, re.S)
-if not m:
-    sys.exit(0)  # no routing tool block (no-routing-tool provider) — nothing to assert
-enum = re.findall(r'"([a-z0-9-]+)"', m.group(1))
-sys.exit(1 if "template-auditor" in enum else 0)
+# 5. addressability name_only: no keyword rule for the role in routing.rules
+#    (IC-15 Nr. 14); it must still be name-dispatchable (target_agents + name_index).
+REPO_ROOT="$REPO_ROOT" python3 - <<'PY' || fail "template-auditor routing is not name_only (keyword rule present or name entry missing)"
+import os, sys
+sys.path.insert(0, os.environ["REPO_ROOT"])
+from pathlib import Path
+from scripts.lib.delegation_table import get_routing_rules
+
+rules = get_routing_rules(Path(os.environ["REPO_ROOT"]), {}, {})
+if any(r.get("agent") == "template-auditor" for r in rules["rules"]):
+    sys.exit(1)
+if "template-auditor" not in rules["target_agents"]:
+    sys.exit(1)
+entry = [n for n in rules["name_index"] if n.get("agent") == "template-auditor"]
+sys.exit(0 if entry and entry[0].get("addressability") == "name_only" else 1)
 PY
-    then
-        fail "template-auditor appears in the route_intent target_agent enum (addressability must be name_only)"
-    fi
-fi
 
 # 6. mandatory output contract markers present.
 for marker in 'STATUS:' 'RESULT:' 'ARTIFACTS:'; do
