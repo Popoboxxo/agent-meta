@@ -26,6 +26,11 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
 - Task 1.35 (Q9, IC-15 Nr. 14): ``template-auditor`` loses its ``routing_patterns`` (name_only role
   without keyword rule). Rebaselined only the per-provider orchestrator artifact (its keyword
   routing data / intent rows) and the matching managed-file hashes; no other artifact changed.
+- Task 1.05 (IC-18 no. 18, user decision): meta-doctor (new in 0e, unreleased): the NEXT
+  conditional ``ROLE_META_FEEDBACK_ACTIVE`` is true in the default (meta-feedback is in the
+  ActiveSet) now that ``active_set_variables`` reaches ``build_variables``. Only the
+  meta-doctor artifacts of all providers and the dependent generated-file-hashes change; the
+  exception regex now also covers two-suffix names (``meta-doctor.agent.md``).
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
@@ -57,7 +62,7 @@ _PROVIDERS = sorted(
 # via rebaseline in package 0e, not via a path pattern.
 # Empty entries would hide drift, so every pattern must stay role/entry specific.
 AC01_EXCEPTIONS = frozenset({
-    r".*/meta-doctor\.[a-z]+$",
+    r".*/meta-doctor\.(md|toml|agent\.md)$",
     r".*/meta-optimizer\.[a-z]+$",
     r".*/standalone/agents/meta-doctor\.md$",
 })

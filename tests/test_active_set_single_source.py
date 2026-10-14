@@ -4,6 +4,14 @@ Spec ``docs/specs/2026-10-11-context-profiles-spec.md`` (QG-13, IC-18, F-42, AC-
 the ungated allowlist ``config["roles"]`` must not be consumed directly; consumers
 derive the active role set from ``ActiveSet``. Rule id: ``active-set.raw-roles-access``.
 
+State after PR A (IC-18 no. 14-18): 5 ratchet entries remain -- three
+intersection sites (``_sync_stage_auto_commit_allowlist``,
+``sync_external_skills_for_provider``, ``_build_platform_variables``: the raw
+condition stays the upper bound, ``ActiveSet`` intersects it) plus
+``_build_pipeline_variables`` and ``agent_sync.sync_agents_for_provider``
+(later PRs). The line numbers and the deviation list below describe the
+initial registry and are historical.
+
 Ratchet semantics (same style as ``ROUTE_RATCHET`` in
 ``tests/test_no_role_routes_in_templates.py``):
 
@@ -73,14 +81,10 @@ LEGIT_READERS: Dict[str, str] = {
 # Start registry (F-42, IC-18 no. 14-18). Format: "<module>::<function>".
 RAW_ROLES_RATCHET: FrozenSet[str] = frozenset(
     {
-        "scripts/lib/sync_pipeline.py::_sync_stage_auto_commit_allowlist",  # IC-18 no. 14 (:1530)
-        "scripts/lib/context.py::sync_prompts_for_continue",  # IC-18 no. 15 (:2342)
-        "scripts/sync.py::_preview_expected_filenames",  # IC-18 no. 16 (:426)
-        "scripts/lib/skills.py::sync_external_skills_for_provider",  # IC-18 no. 17 (:424)
-        "scripts/lib/config.py::_build_platform_variables",  # IC-18 no. 18 (:1689, effort estimator)
-        "scripts/lib/config.py::_build_convention_variables",  # IC-18 no. 18 (:2044)
+        "scripts/lib/skills.py::sync_external_skills_for_provider",  # IC-18 no. 17: raw condition stays, ActiveSet intersects it (default render); raw read remains
+        "scripts/lib/sync_pipeline.py::_sync_stage_auto_commit_allowlist",  # IC-18 no. 14: raw allowlist stays the upper bound (default render), ActiveSet intersects it; raw read remains until the spec drops the no-allowlist case
+        "scripts/lib/config.py::_build_platform_variables",  # IC-18 no. 18 (:1689): WEB_PROJECT_ENABLED keeps the raw condition, ActiveSet intersects it (default render); raw read remains
         "scripts/lib/config.py::_build_pipeline_variables",  # not in spec F-42 (:1863 available_roles) - see docstring
-        "scripts/lib/config.py::_validate_subagent_permissions",  # IC-18 no. 18 "active-role list" (spec :682, real :687)
         "scripts/lib/agent_sync.py::sync_agents_for_provider",  # not in spec F-42 (:1337)
     }
 )

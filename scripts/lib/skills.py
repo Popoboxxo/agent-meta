@@ -383,8 +383,13 @@ def sync_external_skills_for_provider(
     dry_run: bool,
     provider: str,
     provider_config: dict,
+    active_set=None,
 ):
     """Generate provider-specific wrapper agents for approved + project-enabled skills.
+
+    ``active_set`` (IC-17): the awesome-claude-code scout condition is the raw
+    allowlist check AND ``ActiveSet.has("agent-meta-scout")`` (intersection, so
+    a gate-dropped scout never pulls the repo in). Computed here when omitted.
 
     Two-gate check per skill:
     1. approved: true in external-skills.config.yaml  (meta-maintainer quality gate)
@@ -422,12 +427,16 @@ def sync_external_skills_for_provider(
     # agent-meta-scout implicitly requires awesome-claude-code (unless disabled via enabled: false)
     # Project can override: external-skills.awesome-claude-code.enabled: false
     roles = config.get("roles", [])
+    if active_set is None:
+        from .active_set import compute_active_set
+        active_set = compute_active_set(config, agent_meta_root, project_root, warn_sink=[])
+    scout_active = "agent-meta-scout" in roles and active_set.has("agent-meta-scout")
     acc_cfg = repos.get("awesome-claude-code", {})
     acc_project_override = project_skills.get("awesome-claude-code", {})
     if (
         acc_cfg.get("enabled", True)
         and acc_project_override.get("enabled", True)
-        and "agent-meta-scout" in roles
+        and scout_active
     ):
         active_repos["awesome-claude-code"] = acc_cfg.get("pinned_commit", "")
         
@@ -600,7 +609,7 @@ def sync_external_skills_for_provider(
 
     # awesome-claude-code is a reference-data repo (no skill entries), only needed by agent-meta-scout
     if not dry_run and "awesome-claude-code" in repos and (
-        not acc_cfg.get("enabled", True) or "agent-meta-scout" not in roles
+        not acc_cfg.get("enabled", True) or not scout_active
     ):
         acc_local = acc_cfg.get("local_path", "external/awesome-claude-code")
         deinit_skill_repo(agent_meta_root, project_root, acc_local, log, dry_run, is_submodule=is_project_admin)

@@ -132,6 +132,7 @@ def _run_per_provider(
     sync_pipeline._sync_stage_per_provider(
         root, project_root, config, provider_config, [PROVIDER], {},
         None, False, False, [], argparse.Namespace(dry_run=False), SyncLog(),
+        None,  # active_set: consumers (prompts/skills) are stubbed above
     )
     return captured, writer_calls, project_root
 
