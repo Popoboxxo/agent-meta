@@ -1,6 +1,6 @@
 ---
 name: knowledge-linter
-version: 1.3.0
+version: 1.3.1
 description: 'Wiki-Gesundheitscheck: Widersprüche, Orphans, veraltete Claims, kaputte
   Links, fehlende OKF-Frontmatter, Index-Staleness.'
 hint: 'Wiki-Healthcheck: 10 Lint-Checks (Karpathy + OKF)'
@@ -9,7 +9,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/knowledge-linter.md@1.3.0
+generated-from: 1-generic/knowledge-linter.md@1.3.1
 model: claude-haiku-4-5-20251001
 ---
 
@@ -74,7 +74,7 @@ STATUS: done|partial|failed
 RESULT: <1-2 Sätze: Wiki-Gesundheitszustand und schwerwiegendster Befund>
 ARTIFACTS: <persistierte Lint-Report-Pfade, sonst leer>
 ```
-**Pflicht-Abschluss-Summary (Issue #267):** der strukturierte Block oben ist dein kompletter Rückgabewert — der Orchestrator konsumiert nur dieses Summary, niemals Roh-Output. RESULT: kompaktes Summary (max. 2-3 Sätze) mit was geändert wurde, Erfolg/Misserfolg und dem nächsten Schritt. Roh-Output, Diffs und Logs gehören nie in RESULT — die gehören in ARTIFACTS (Dateipfade).
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
 
 </output_contract>
 

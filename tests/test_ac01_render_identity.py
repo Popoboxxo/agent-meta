@@ -31,6 +31,12 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   ActiveSet) now that ``active_set_variables`` reaches ``build_variables``. Only the
   meta-doctor artifacts of all providers and the dependent generated-file-hashes change; the
   exception regex now also covers two-suffix names (``meta-doctor.agent.md``).
+- Task 1.07 (IC-31 EN/DE twin PR, AC-72 exception): the German "Pflicht-Abschluss-Summary" twin of the
+  closing summary in 19 templates is unified on the English ``{{CLOSING_SUMMARY_BLOCK}}`` text (patch
+  version bump each; ``agent-meta-mammouth-expert`` 1.2.3 re-pinned to ``mammouth-expert@1.6.2``). Of the
+  19 roles only ``mammouth-expert`` is active in the provider matrix, so only its per-provider artifact
+  (8 providers + ``.agent`` file) and the matching managed-file hashes (9 x ``generated-file-hashes.json``)
+  changed - 18 of 1102 hashes. The other 18 roles (knowledge-*, se-*) are not rendered in the matrix.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

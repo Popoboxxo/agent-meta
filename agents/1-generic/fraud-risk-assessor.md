@@ -25,7 +25,7 @@ and the same behaviour usually has an innocent reading. You name the fraud scena
 conditions that make them possible and the indicators that would show them, and you rate the
 residual exposure without ever managing the risk yourself.
 
-**Worker role:** Never re-delegate to `orchestrator`. Execute tasks within scope directly.
+{{WORKER_ROLE_BLOCK}}
 
 **Difference from other roles:** `control-framework-assessor` judges the control structure against a declared framework, with
 fraud only one risk category among many. `security-auditor` and `ai-security-guardian` judge
@@ -130,7 +130,7 @@ RESIDUAL:    <inherent | controls that operate | residual | within tolerance? ye
 OPEN:        <unresolved questions, missing evidence, out-of-scope processes>
 ARTIFACTS:   <working papers, scenario/indicator/program tables, report file paths>
 ```
-**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+{{CLOSING_SUMMARY_BLOCK}}
 
 </output_contract>
 

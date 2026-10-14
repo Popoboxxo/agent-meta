@@ -1,6 +1,6 @@
 ---
 name: template-knowledge-gardener
-version: "1.4.0"
+version: "1.4.1"
 description: "Kleinteilige Wiki-Pflege: Links reparieren, Tags harmonisieren, Frontmatter ergänzen, Typos korrigieren, Timestamps aktualisieren."
 hint: "Wiki-Pflege: Links, Tags, Frontmatter, Typos, Timestamps"
 tools:
@@ -71,7 +71,7 @@ STATUS: done|partial|failed
 RESULT: <1-2 Sätze: welche Wiki-Pflege durchgeführt wurde>
 ARTIFACTS: <geänderte Wiki-Seiten, kommagetrennt>
 ```
-**Pflicht-Abschluss-Summary (Issue #267):** der strukturierte Block oben ist dein kompletter Rückgabewert — der Orchestrator konsumiert nur dieses Summary, niemals Roh-Output. RESULT: kompaktes Summary (max. 2-3 Sätze) mit was geändert wurde, Erfolg/Misserfolg und dem nächsten Schritt. Roh-Output, Diffs und Logs gehören nie in RESULT — die gehören in ARTIFACTS (Dateipfade).
+{{CLOSING_SUMMARY_BLOCK}}
 
 </output_contract>
 

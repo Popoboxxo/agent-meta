@@ -30,6 +30,8 @@ per issue #528 (no required frontmatter fields, not worker roles).
 import re
 from pathlib import Path
 
+from scripts.lib.standalone import resolve_block_snippets
+
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 AGENTS_1_GENERIC = _REPO_ROOT / "agents" / "1-generic"
 
@@ -94,7 +96,14 @@ _CONTRACT_EXCEPTIONS: dict[str, str] = {
 
 
 def _template_text(name: str) -> str:
-    return (AGENTS_1_GENERIC / name).read_text(encoding="utf-8")
+    """Template text with ``snippets/agents`` block placeholders resolved.
+
+    IC-31 (#552): a protocol marker moved into a snippet must still be
+    detected, so the contract rules run on the snippet-resolved template
+    (same resolution as the sync pipeline / standalone render).
+    """
+    raw = (AGENTS_1_GENERIC / name).read_text(encoding="utf-8")
+    return resolve_block_snippets(raw, _REPO_ROOT)
 
 
 def _has_contract_section(text: str) -> bool:
@@ -109,11 +118,17 @@ def _missing_markers(text: str) -> list[str]:
 
 def _contract_scope() -> dict[str, str]:
     """All templates with a contract section -> their content."""
-    return {
-        p.name: p.read_text(encoding="utf-8")
-        for p in sorted(AGENTS_1_GENERIC.glob("*.md"))
-        if _has_contract_section(p.read_text(encoding="utf-8"))
-    }
+    resolved = {p.name: _template_text(p.name) for p in sorted(AGENTS_1_GENERIC.glob("*.md"))}
+    return {name: text for name, text in resolved.items() if _has_contract_section(text)}
+
+
+def test_block_snippet_markers_are_visible_after_resolution():
+    """R13/#552: markers living only in a snippet are found on resolved text."""
+    raw = (AGENTS_1_GENERIC / "developer.md").read_text(encoding="utf-8")
+    assert "{{ESCALATE_CARD_BLOCK}}" in raw
+    resolved = _template_text("developer.md")
+    assert "{{ESCALATE_CARD_BLOCK}}" not in resolved
+    assert "ESCALATE_REASON:" in resolved and "ESCALATE_REASON:" not in raw
 
 
 # --- issue #541 regression ------------------------------------------------

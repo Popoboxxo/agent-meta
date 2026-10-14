@@ -47,7 +47,7 @@ patches:
 
       **NICHT anfassen:** `addons/mkdocs/help.md` und `assets/` — diese nie überschreiben.
 
-      **Worker role:** Never re-delegate to `orchestrator`. Execute tasks within scope directly.
+      {{WORKER_ROLE_BLOCK}}
       </persona>
   - op: replace
     anchor: "<workflow>"
@@ -254,7 +254,7 @@ patches:
 
       **Delegation (reference only):** code changes → `developer` · missing tests → `tester` · unclear requirement → `requirements` · validation → `validator`
 
-      **User proxy:** `main_chat`. Confirmations carry user authority.
+      {{USER_PROXY_BLOCK}}
 
       **Language:** README → {{DOCS_LANGUAGE}} · internal docs → {{INTERNAL_DOCS_LANGUAGE}}.
       </constraints>

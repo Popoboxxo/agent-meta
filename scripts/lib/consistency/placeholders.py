@@ -124,7 +124,8 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     # Block-inlining variables loaded from snippets/agents/ by
     # config._load_block_snippet_variables (resolved in every sync)
     "OUTPUT_GUARD_BLOCK", "BACKGROUND_PROCESS_GUARD_BLOCK", "PARSE_INPUT_BLOCK",
-    "ESCALATE_CARD_BLOCK",
+    "ESCALATE_CARD_BLOCK", "CLOSING_SUMMARY_BLOCK", "USER_PROXY_BLOCK",
+    "WORKER_ROLE_BLOCK",
     # Paths
     "AGENTS_DIR",
     # Release / plugin packaging
