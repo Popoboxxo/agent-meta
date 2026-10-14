@@ -1,6 +1,6 @@
 ---
 name: concept-architect
-version: 1.4.0
+version: 1.4.1
 description: 'Use when a complex change (XL, >20 files) or cross-cutting change —
   public interfaces/contracts, data model/schema, more than one subsystem boundary
   — needs a system design before implementation: components, interfaces, trade-off
@@ -14,7 +14,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/concept-architect.md@1.4.0
+generated-from: 1-generic/concept-architect.md@1.4.1
 model: claude-opus-4-8
 memory: project
 ---

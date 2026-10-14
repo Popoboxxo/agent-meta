@@ -44,6 +44,12 @@ Allowed documentation forms (``D-*``)
   ``principal-developer`` *and* whose line names the escalation policy
   (``escalat``/``last-resort``/``eskalation``). This replaces the former
   line-wide exemption so other role routes on such lines stay covered.
+* ``D-CONDITIONAL``   — IC-30 triage option (1) / IC-18 no. 11: the construct's
+  target role is rendered only while that role is active, i.e. the target token
+  sits inside the positive branch of ``{{#if ROLE_<TARGET>_ACTIVE}}`` — either a
+  block conditional (marker lines of their own) or an inline segment on the
+  same line (up to the next ``{{else}}``/``{{/if}}``/``{{#if``). A different
+  role's flag never covers a target; an ``{{else}}`` branch is not covered.
 
 PyYAML is used when importable; a stdlib-only regex fallback extracts the role list.
 """
@@ -154,58 +160,22 @@ _NOT_YOUR_JOB_PREFIX = "**Not your job:**"
 _BOUNDARY_PREFIXES = (_NOT_YOUR_JOB_PREFIX, "**Boundary:**", "**Scope:**")
 _FORBIDDEN_REFERENCE_TOKENS = ("background(", "invoke_subagent", "task(subagent_type")
 
+_INLINE_ROLE_IF_RE = re.compile(r"\{\{#if ROLE_([A-Z0-9_]+)_ACTIVE\}\}")
+_INLINE_SEGMENT_END_RE = re.compile(r"\{\{else\}\}|\{\{/if\}\}|\{\{#if ")
+_BLOCK_IF_RE = re.compile(r"^\s*\{\{#if (\w+)\}\}\s*$")
+_BLOCK_ELSE_RE = re.compile(r"^\s*\{\{else\}\}\s*$")
+_BLOCK_ENDIF_RE = re.compile(r"^\s*\{\{/if\}\}\s*$")
+
 _CONTEXT_OPEN = "<context>"
 _CONTEXT_CLOSE = "</context>"
 _BOUNDARY_HEADING_RE = re.compile(r"^##\s+Role and boundary\s*$")
 
 
 # Ratchet registry (IC-30, #885): existing uncovered constructs as "file:class" (no line
-# numbers). May only shrink; every Phase-1 triage PR removes its entries. New hits fail.
-# T-NEXT entries (AC-71 class D, #885 F-03) and list-arrow T-ROLE-ARROW entries (class B,
-# outside boundary sections) were added when both detections became repo-wide.
-ROUTE_RATCHET: frozenset[str] = frozenset(
-    {
-        "agents/1-generic/accessibility-specialist.md:T-NEXT",
-        "agents/1-generic/ai-governance-engineer.md:T-NEXT",
-        "agents/1-generic/ai-observability-engineer.md:T-NEXT",
-        "agents/1-generic/code-reviewer.md:T-NEXT",
-        "agents/1-generic/concept-architect.md:T-ROLE-ARROW",
-        "agents/1-generic/concept-reviewer.md:T-ROLE-ARROW",
-        "agents/1-generic/concept-specifier.md:T-ROLE-ARROW",
-        "agents/1-generic/copyeditor.md:T-NEXT",
-        "agents/1-generic/data-engineer.md:T-NEXT",
-        "agents/1-generic/database-engineer.md:T-NEXT",
-        "agents/1-generic/dependency-auditor.md:T-NEXT",
-        "agents/1-generic/design-system-architect.md:T-ROLE-ARROW",
-        "agents/1-generic/developer.md:T-ROLE-ARROW",
-        "agents/1-generic/documenter.md:T-HANDOFF",
-        "agents/1-generic/feedback.md:T-ROLE-ARROW",
-        "agents/1-generic/frontend-component-engineer.md:T-ROLE-ARROW",
-        "agents/1-generic/incident-responder.md:T-NEXT",
-        "agents/1-generic/incident-responder.md:T-ROLE-ARROW",
-        "agents/1-generic/knowledge-curator.md:T-HANDOFF",
-        "agents/1-generic/knowledge-ingestor.md:T-HANDOFF",
-        "agents/1-generic/knowledge-querier.md:T-HANDOFF",
-        "agents/1-generic/llm-evaluator.md:T-NEXT",
-        "agents/1-generic/meta-feedback.md:T-ROLE-ARROW",
-        "agents/1-generic/product-manager.md:T-NEXT",
-        "agents/1-generic/proofreader.md:T-NEXT",
-        "agents/1-generic/rag-engineer.md:T-NEXT",
-        "agents/1-generic/refactoring-specialist.md:T-NEXT",
-        "agents/1-generic/requirements.md:T-NEXT",
-        "agents/1-generic/se-integration-and-test-manager.md:T-ROLE-ARROW",
-        "agents/1-generic/se-requirements.md:T-ROLE-ARROW",
-        "agents/1-generic/se-validator.md:T-ROLE-ARROW",
-        "agents/1-generic/sre-engineer.md:T-NEXT",
-        "agents/1-generic/technical-writer.md:T-NEXT",
-        "agents/1-generic/test-executor.md:T-NEXT",
-        "agents/1-generic/validator.md:T-NEXT",
-        "agents/2-platform/homeassistant-developer.md:T-ROLE-ARROW",
-        "rules/1-generic/a2a-delegation-gates.md:T-ROLE-ARROW",
-        "rules/1-generic/use-orchestrator.md:T-ROLE-ARROW",
-        "rules/2-platform/gemini-orchestrator-first.md:T-HANDOFF",
-    }
-)
+# numbers). May only shrink; new hits fail. Emptied by the Phase-1 triage (Task 1.19,
+# AC-71): every former entry is now conditional on its target role (D-CONDITIONAL),
+# so classes A/D/E and the B/C/F lines no longer need a registry entry.
+ROUTE_RATCHET: frozenset[str] = frozenset()
 
 
 @dataclass
@@ -330,6 +300,47 @@ def boundary_section_lines(text: str) -> set[int]:
     return allowed
 
 
+def _flag_role(flag: str) -> str | None:
+    """``ROLE_SENIOR_DEVELOPER_ACTIVE`` -> ``senior-developer`` (else ``None``)."""
+    if flag.startswith("ROLE_") and flag.endswith("_ACTIVE"):
+        return flag[len("ROLE_"):-len("_ACTIVE")].lower().replace("_", "-")
+    return None
+
+
+def conditional_block_roles(text: str) -> dict[int, frozenset[str]]:
+    """1-based line -> roles whose block ``{{#if ROLE_*_ACTIVE}}`` (positive branch) encloses it."""
+    stack: list[tuple[str | None, bool]] = []
+    covered: dict[int, frozenset[str]] = {}
+    for number, line in enumerate(text.splitlines(), start=1):
+        opened = _BLOCK_IF_RE.match(line)
+        if opened:
+            stack.append((_flag_role(opened.group(1)), True))
+            continue
+        if _BLOCK_ELSE_RE.match(line):
+            if stack:
+                role, _positive = stack[-1]
+                stack[-1] = (role, False)
+            continue
+        if _BLOCK_ENDIF_RE.match(line):
+            if stack:
+                stack.pop()
+            continue
+        roles = frozenset(role for role, positive in stack if role and positive)
+        if roles:
+            covered[number] = roles
+    return covered
+
+
+def inline_conditional_spans(line: str) -> list[tuple[int, int, str]]:
+    """``(start, end, role)`` spans of inline ``{{#if ROLE_*_ACTIVE}}`` positive branches."""
+    spans = []
+    for match in _INLINE_ROLE_IF_RE.finditer(line):
+        end_match = _INLINE_SEGMENT_END_RE.search(line, match.end())
+        end = end_match.start() if end_match else len(line)
+        spans.append((match.end(), end, match.group(1).lower().replace("_", "-")))
+    return spans
+
+
 def _pipeline_target(token: str, pipeline_ids: set[str]) -> bool:
     """Case-insensitive membership check for a pipeline/pair id token."""
     return token in pipeline_ids or token.lower() in {p.lower() for p in pipeline_ids}
@@ -344,15 +355,24 @@ def classify_line(
     workflow_file: bool,
     is_orchestrator: bool = False,
     handoff_pattern: "re.Pattern[str] | None" = None,
+    block_roles: frozenset = frozenset(),
 ) -> list[tuple[str, list[str]]]:
     """Return ``[(kind, allowed_reasons), ...]`` for one line.
 
     An entry with an empty ``reasons`` list is an uncovered routing construct.
     ``D-PIPELINE`` is construct-scoped: it is attached only when the detected
     construct's own token(s) name a pipeline/pair id — never because the line
-    happens to mention ``quality_pipelines.`` somewhere.
+    happens to mention ``quality_pipelines.`` somewhere. ``D-CONDITIONAL`` is
+    construct-scoped as well: only the target token's own ``ROLE_*_ACTIVE``
+    gate (``block_roles`` of the enclosing block conditionals, or an inline
+    segment on this line) covers it.
     """
     constructs: list[tuple[str, list[str]]] = []
+    spans = inline_conditional_spans(line)
+
+    def conditional(role: str, pos: int) -> bool:
+        return role in block_roles or any(
+            start <= pos < end and span_role == role for start, end, span_role in spans)
 
     reasons: list[str] = []
     if is_boundary or line.lstrip().startswith(_BOUNDARY_PREFIXES):
@@ -365,24 +385,30 @@ def classify_line(
     if _ROUTE_COL_RE.search(line):
         constructs.append(("T-ROUTE-COL", list(reasons)))
 
-    for first, second in _ARROW_RE.findall(line):
+    for arrow in _ARROW_RE.finditer(line):
+        first, second = arrow.group(1), arrow.group(2)
         arrow_reasons = list(reasons)
         if _pipeline_target(first, pipeline_ids) or _pipeline_target(second, pipeline_ids):
             arrow_reasons.append("D-PIPELINE")
         if not (first in roles and second in roles):
             arrow_reasons.append("D-NONROLE")
+        if conditional(second, arrow.start(2)):
+            arrow_reasons.append("D-CONDITIONAL")
         constructs.append(("T-ROLE-ARROW", arrow_reasons))
 
-    text_targets = _ARROW_TEXT_RE.findall(line)
+    text_targets = list(_ARROW_TEXT_RE.finditer(line))
     if _LIST_ITEM_RE.match(line):
-        text_targets += _ARROW_LIST_RE.findall(line)
-    for target in text_targets:
+        text_targets += list(_ARROW_LIST_RE.finditer(line))
+    for text_match in text_targets:
+        target = text_match.group(1)
         # ``text -> role``: only exempt when the right side is not a role (D-NONROLE).
         text_reasons = list(reasons)
         if _pipeline_target(target, pipeline_ids):
             text_reasons.append("D-PIPELINE")
         if target not in roles:
             text_reasons.append("D-NONROLE")
+        if conditional(target, text_match.start(1)):
+            text_reasons.append("D-CONDITIONAL")
         constructs.append(("T-ROLE-ARROW", text_reasons))
 
     pattern = handoff_pattern or _HANDOFF_RE
@@ -394,17 +420,26 @@ def classify_line(
             handoff_reasons.append("D-PIPELINE")
         if target in _ESCALATION_TARGETS and _ESCALATION_RE.search(line):
             handoff_reasons.append("D-ESCALATION")
+        if conditional(target, match.start(1)):
+            handoff_reasons.append("D-CONDITIONAL")
         if target in roles or is_pipeline_target:
             constructs.append(("T-HANDOFF", handoff_reasons))
 
     # T-NEXT applies to every scope file (AC-71 class D); ``workflow_file`` is
     # retained only for call-site compatibility.
     next_match = _NEXT_RE.search(line)
-    if next_match and any(
-        re.search(rf"(?i)(?<![\w-]){re.escape(role)}(?![\w-])", next_match.group(1))
-        for role in roles
-    ):
-        constructs.append(("T-NEXT", list(reasons)))
+    if next_match:
+        hits = [
+            (role, next_match.start(1) + hit.start())
+            for role in roles
+            for hit in re.finditer(
+                rf"(?i)(?<![\w-]){re.escape(role)}(?![\w-])", next_match.group(1))
+        ]
+        if hits:
+            next_reasons = list(reasons)
+            if all(conditional(role, pos) for role, pos in hits):
+                next_reasons.append("D-CONDITIONAL")
+            constructs.append(("T-NEXT", next_reasons))
 
     return constructs
 
@@ -418,6 +453,7 @@ def find_findings(repo_root: Path = REPO_ROOT) -> list[Finding]:
         rel = path.relative_to(repo_root).as_posix()
         text = path.read_text(encoding="utf-8")
         boundary = boundary_lines(text) | boundary_section_lines(text)
+        block_roles = conditional_block_roles(text)
         is_workflow = rel in _WORKFLOW_FILES
         is_orchestrator = rel == _ORCHESTRATOR_FILE
         for number, line in enumerate(text.splitlines(), start=1):
@@ -429,6 +465,7 @@ def find_findings(repo_root: Path = REPO_ROOT) -> list[Finding]:
                 workflow_file=is_workflow,
                 is_orchestrator=is_orchestrator,
                 handoff_pattern=handoff_pattern,
+                block_roles=block_roles.get(number, frozenset()),
             ):
                 if not reasons:
                     findings.append(Finding(rel, number, kind, line))
@@ -478,7 +515,7 @@ def test_route_ratchet_only_shrinks():
 
 
 def _fixture_repo(tmp_path: Path, template_body: str, rel: str = "agents/2-platform/x.md") -> Path:
-    (tmp_path / "config").mkdir()
+    (tmp_path / "config").mkdir(parents=True)
     for name in ("role-defaults.yaml", "active-set-references.yaml"):
         (tmp_path / "config" / name).write_text(
             (REPO_ROOT / "config" / name).read_text(encoding="utf-8"), encoding="utf-8"
@@ -731,3 +768,47 @@ def test_list_arrow_under_out_of_scope_label_is_allowed(tmp_path):
 def test_section_label_variants_open_boundary_sections():
     text = "Not this role:\n- a → `tester`\n\n## Out of scope\n\n- b → `tester`\n"
     assert boundary_section_lines(text) == {2, 6}
+
+
+# --- IC-30 triage (Task 1.19, AC-71): D-CONDITIONAL and the emptied ratchet --------
+
+
+def test_route_ratchet_is_empty_after_triage():
+    """AC-71: classes A (HANDOFF), D (NEXT), E (German) are empty; B/C/F lines are
+    conditional, under an allow marker or in data -- so no registry entry remains."""
+    assert ROUTE_RATCHET == frozenset()
+
+
+def test_block_conditional_on_target_role_is_allowed(tmp_path):
+    body = "# X\n\n{{#if ROLE_TESTER_ACTIVE}}\n- Write tests? → `tester`\n{{/if}}\n"
+    assert new_findings(_fixture_repo(tmp_path, body)) == []
+
+
+def test_inline_conditional_on_target_role_is_allowed(tmp_path):
+    body = "# X\n\n- Write tests?{{#if ROLE_TESTER_ACTIVE}} → `tester`{{else}}{{/if}}\n"
+    assert new_findings(_fixture_repo(tmp_path, body)) == []
+
+
+def test_conditional_on_other_role_does_not_cover(tmp_path):
+    body = "# X\n\n{{#if ROLE_DOCUMENTER_ACTIVE}}\nDelegiere an `tester`.\n{{/if}}\n"
+    assert [(h.kind, h.line) for h in new_findings(_fixture_repo(tmp_path, body))] == [
+        ("T-HANDOFF", 4)]
+
+
+def test_else_branch_is_not_covered(tmp_path):
+    body = ("# X\n\n{{#if ROLE_TESTER_ACTIVE}}\nok\n{{else}}\nDelegiere an `tester`.\n{{/if}}\n")
+    assert [(h.kind, h.line) for h in new_findings(_fixture_repo(tmp_path, body))] == [
+        ("T-HANDOFF", 6)]
+
+
+def test_inline_segment_ends_at_else(tmp_path):
+    body = "# X\n\n- Tests?{{#if ROLE_TESTER_ACTIVE}} ok{{else}} → `tester`{{/if}}\n"
+    assert [h.kind for h in new_findings(_fixture_repo(tmp_path, body))] == ["T-ROLE-ARROW"]
+
+
+def test_next_block_needs_every_role_conditional(tmp_path):
+    covered = ("# X\n\nNEXT: [Review{{#if ROLE_DEVELOPER_ACTIVE}} | Developer fix{{/if}}"
+               "{{#if ROLE_DOCUMENTER_ACTIVE}} | Documenter{{/if}}]\n")
+    assert new_findings(_fixture_repo(tmp_path / "a", covered)) == []
+    partial = "# X\n\nNEXT: [Review{{#if ROLE_DEVELOPER_ACTIVE}} | Developer fix{{/if}} | Documenter]\n"
+    assert [h.kind for h in new_findings(_fixture_repo(tmp_path / "b", partial))] == ["T-NEXT"]

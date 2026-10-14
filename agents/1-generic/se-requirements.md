@@ -1,6 +1,6 @@
 ---
 name: se-requirements
-version: 2.2.1
+version: 2.2.2
 reference_standards:
 - "ISO/IEC/IEEE 29148:2018"
 - "ISO/IEC/IEEE 15288:2023"
@@ -102,7 +102,7 @@ You are L1-SH. Architecture decisions gehören `se-architect`.
 ### `arch_impact` Flag
 Bei architektur-relevantem Need: Problem formulieren, nicht Lösung. `arch_trigger` ist Problem-Statement.
 - `arch_impact: false` (default)
-- `arch_impact: true` → `se-architect` muss bearbeiten
+- `arch_impact: true`{{#if ROLE_SE_ARCHITECT_ACTIVE}} → `se-architect` muss bearbeiten{{else}} → Architektur-Klärung über den Orchestrator{{/if}}
 - `acceptance_criteria` → messbar, Architektur wird dagegen validiert
 
 ### Scope Classification

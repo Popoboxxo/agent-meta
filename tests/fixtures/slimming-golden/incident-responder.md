@@ -1,6 +1,6 @@
 ---
 name: incident-responder
-version: 1.5.0
+version: 1.5.1
 description: 'Live incident coordination: ingests logs and metrics, executes runbook
   steps, drives root-cause analysis (5-Whys, Fishbone), classifies severity (P0/P1/P2)
   and produces an RCA report plus a prioritized hotfix list under time pressure.'
@@ -15,7 +15,7 @@ tools:
 - WebSearch
 - WebFetch
 - TodoWrite
-generated-from: 1-generic/incident-responder.md@1.5.0
+generated-from: 1-generic/incident-responder.md@1.5.1
 model: claude-sonnet-5
 memory: project
 ---

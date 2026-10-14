@@ -1,6 +1,6 @@
 ---
 name: template-validator
-version: "4.7.0"
+version: "4.7.1"
 description: "Formal process gatekeeper: DoD checkboxes, REQ-ID presence, commit conventions. Does NOT judge code quality — that's code-reviewer."
 hint: "Internal quality checker: DoD checklist, traceability audit. Invoked by the orchestrator after implementation. Not for direct user questions or setup help."
 prompt_mode: modern
@@ -120,7 +120,7 @@ TRACEABILITY: <REQ→Code→Test matrix or 'N/A'>
 BLOCKERS: [list of merge-blocking issues]
 NOTES: [optional, helpful for implementer]
 ARTIFACTS: <persisted validation report path, empty if returned inline>
-NEXT: [Release for merge | Back to developer | To validator]
+NEXT: [{{#if ROLE_RELEASE_ACTIVE}}Release for merge{{else}}Approve for merge{{/if}}{{#if ROLE_DEVELOPER_ACTIVE}} | Back to developer{{/if}}{{#if ROLE_VALIDATOR_ACTIVE}} | To validator{{/if}}]
 ```
 {{CLOSING_SUMMARY_BLOCK}}
 

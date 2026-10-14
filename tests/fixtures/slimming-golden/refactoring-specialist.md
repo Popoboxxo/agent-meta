@@ -1,6 +1,6 @@
 ---
 name: refactoring-specialist
-version: 0.5.0
+version: 0.5.1
 description: 'Systematic large-scale code transformation with safety nets: Strangler
   Fig pattern, incremental refactoring, code smell detection, legacy modernization
   and feature-flag-driven rewrites with backwards-compatibility guarantees. Produces
@@ -16,7 +16,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/refactoring-specialist.md@0.5.0
+generated-from: 1-generic/refactoring-specialist.md@0.5.1
 model: claude-sonnet-5
 memory: project
 ---

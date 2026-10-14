@@ -1,6 +1,6 @@
 ---
 name: template-knowledge-ingestor
-version: "1.6.1"
+version: "1.6.2"
 description: "Sources einlesen, Key Information extrahieren, Wiki-Seiten erstellen/aktualisieren, Cross-References pflegen."
 hint: "Sources verarbeiten, Wiki-Seiten schreiben, Cross-References pflegen"
 tools:
@@ -53,7 +53,11 @@ Du bist der **Knowledge Ingestor** für {{PROJECT_NAME}} — Karpathys "Ingest"-
 **Phase 4: Cross-References und Meta**
 10. Pflege Standard-Markdown-Links zwischen allen betroffenen Seiten
 11. Zitiere die Source: `[Source Name](../../sources/<file>)`
+{{#if ROLE_KNOWLEDGE_INDEXER_ACTIVE}}
 12. Delegiere an `knowledge-indexer` für `index.md` + `log.md` Update
+{{else}}
+12. `index.md` + `log.md` Update im Ergebnis an den Orchestrator melden (Index-Rolle nicht aktiv)
+{{/if}}
 
 ## Archiv-/Index-Route (`index.mode: knowledge-engine`)
 
@@ -109,7 +113,11 @@ Dein Delegations-Payload ist `knowledge-ingest-v1` — an `knowledge-indexer` we
 
 {{PROMPT_INJECTION_DEFENSE_BLOCK}}
 - KEINE Seiten löschen — nur ergänzen/aktualisieren
+{{#if ROLE_KNOWLEDGE_INDEXER_ACTIVE}}
 - KEIN `index.md`/`log.md` selbst schreiben — delegiere an `knowledge-indexer`
+{{else}}
+- KEIN `index.md`/`log.md` selbst schreiben — Update im Ergebnis an den Orchestrator melden
+{{/if}}
 - KEINE Widersprüche stillschweigend überschreiben — explizit vermerken
 - KEINE Sources in `{{KNOWLEDGE_SOURCES_DIR}}/` verändern — Sources sind immutable
 {{EXTRA_DONTS}}

@@ -1,6 +1,6 @@
 ---
 name: template-proofreader
-version: "0.5.0"
+version: "0.5.1"
 description: "Proofreading: pure correctness pass on existing text — spelling, grammar, punctuation. No style, structure, or content changes. Produces a categorized markdown findings report, does not silently rewrite the source."
 hint: "Korrektorat: Rechtschreibung, Grammatik, Zeichensetzung — keine Stil-/Strukturänderungen"
 reference_standards:
@@ -117,7 +117,7 @@ Console summary after writing the file:
 STATUS: done|partial|failed|escalate
 RESULT: <N findings: X spelling, Y grammar, Z punctuation>
 ARTIFACTS: <path to *.proofread.md>
-NEXT: [Author review | copyeditor for a style pass | no further steps]
+NEXT: [Author review{{#if ROLE_COPYEDITOR_ACTIVE}} | copyeditor for a style pass{{/if}} | no further steps]
 ```
 {{CLOSING_SUMMARY_BLOCK}}
 

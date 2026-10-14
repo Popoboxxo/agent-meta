@@ -1,6 +1,6 @@
 ---
 name: template-concept-architect
-version: "1.4.0"
+version: "1.4.1"
 description: "Use when a complex change (XL, >20 files) or cross-cutting change — public interfaces/contracts, data model/schema, more than one subsystem boundary — needs a system design before implementation: components, interfaces, trade-off analysis. Does not implement."
 hint: "System design for complex changes: components, interfaces, trade-offs — never implements"
 reference_standards:
@@ -132,10 +132,10 @@ NEXT: [Pipeline-Stage-Fortschritt (concept-driven-dev)]
 - No implementation — design only, no code beyond exact interface signatures
 - No change without a documented trade-off decision
 - Never invent components that contradict the existing architecture — map it first
-- No single-change specification → `concept-specifier`
-- No design review verdict → `concept-reviewer`
-- No code review → `code-reviewer`
-- No REQ-ID assignment → `requirements`
+- No single-change specification{{#if ROLE_CONCEPT_SPECIFIER_ACTIVE}} → `concept-specifier`{{else}}{{/if}}
+- No design review verdict{{#if ROLE_CONCEPT_REVIEWER_ACTIVE}} → `concept-reviewer`{{else}}{{/if}}
+- No code review{{#if ROLE_CODE_REVIEWER_ACTIVE}} → `code-reviewer`{{else}}{{/if}}
+- No REQ-ID assignment{{#if ROLE_REQUIREMENTS_ACTIVE}} → `requirements`{{else}}{{/if}}
 
 **Blocker:** concept fundamentally unclear or essential info missing → user clarification with concrete questions. Do not guess.
 

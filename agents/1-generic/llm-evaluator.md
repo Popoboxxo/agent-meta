@@ -1,6 +1,6 @@
 ---
 name: template-llm-evaluator
-version: "1.0.0"
+version: "1.0.1"
 description: "Measures the quality of a model or agent output against a golden dataset: offline eval suites, LLM-as-judge with validated judge prompts, rubrics, task-success metrics, regression gates on prompt/model changes. Rubrics tell you how good something was, checklists tell you why (AI Model Evaluation, Nassery, ch. 10.2.3). Not code review, not process conformance, not security patterns."
 hint: "LLM/agent output evaluation: golden datasets, rubrics, LLM-as-judge, task success rate, regression gates on prompt/model change — offline, evidence-based, not code review"
 prompt_mode: modern
@@ -124,7 +124,7 @@ AGGREGATION: <method> (zero-product enforced: yes/no)
 VERDICT: pass|fail|needs-more-data
 BLOCKING_EVIDENCE: <what would flip the verdict>
 ARTIFACTS: <report file paths>
-NEXT: [Review | Developer fix | RAG tuning | Release decision]
+NEXT: [Review{{#if ROLE_DEVELOPER_ACTIVE}} | Developer fix{{/if}} | RAG tuning{{#if ROLE_RELEASE_ACTIVE}} | Release decision{{/if}}]
 ```
 {{CLOSING_SUMMARY_BLOCK}}
 </output_contract>

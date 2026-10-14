@@ -1,6 +1,6 @@
 ---
 name: concept-reviewer
-version: 1.9.1
+version: 1.9.2
 description: Use when a concept or design doc needs a structural review before requirements
   — completeness, logic, assumptions, risks, feasibility, threat model (4 questions).
 hint: 'Review concept/design doc: completeness, logic, risks, threat model, Approve/Request-changes/Block
@@ -14,7 +14,7 @@ tools:
 - WebFetch
 - WebSearch
 - TodoWrite
-generated-from: 1-generic/concept-reviewer.md@1.9.1
+generated-from: 1-generic/concept-reviewer.md@1.9.2
 model: claude-opus-4-8
 ---
 
@@ -171,7 +171,7 @@ NEXT: [Pipeline-Stage-Fortschritt (concept-driven-dev)]
 - Write only the review report — never edit the reviewed concept itself
 - Never write or propose code
 - No code review → `code-reviewer`
-- No engineering review → `se-critic`
+- No engineering review
 - No implementation details
 - No vague findings — always dimension + description + suggestion
 - Blocking requires evidence of a completeness/logic gap or an unexplained design choice — "spec incomplete" is a valid, cited Block; personal preference is not (Design Docs at Google; Joel Spolsky)

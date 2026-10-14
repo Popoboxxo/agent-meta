@@ -58,6 +58,12 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   ``effort-estimator`` only when active, and the static prose names only rendered pipelines (the default
   drops ``concept-driven-dev``/``feature-lifecycle`` mentions, closing the PR C interim). Changed:
   orchestrator per provider + generated-file-hashes (2 x 9 = 18 of 1075 entries).
+- Task 1.19 (IC-18 no. 11 / IC-30 triage, AC-71): dispatch/NEXT lines in worker templates are gated on
+  their target role (``ROLE_*_ACTIVE``); patch bumps of the triaged templates. In the default only the
+  inactive targets disappear (documenter KE route, bug-feature-analyzer ``se-critic``/``se-interface-mgr``
+  rows, concept-reviewer ``se-critic`` and developer ``validator`` arrows); the rest is the version bump.
+  Changed: 29 agent artifacts per provider (accessibility-specialist ... test-executor, see CHANGELOG) +
+  generated-file-hashes (30 x 9 = 270 of 1075 entries).
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

@@ -1,6 +1,6 @@
 ---
 name: validator
-version: 4.7.0
+version: 4.7.1
 description: 'Formal process gatekeeper: DoD checkboxes, REQ-ID presence, commit conventions.
   Does NOT judge code quality — that''s code-reviewer.'
 hint: 'Internal quality checker: DoD checklist, traceability audit. Invoked by the
@@ -12,7 +12,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/validator.md@4.7.0
+generated-from: 1-generic/validator.md@4.7.1
 model: claude-sonnet-5
 memory: project
 permissionMode: plan

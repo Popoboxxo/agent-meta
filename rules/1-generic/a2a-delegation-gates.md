@@ -3,7 +3,7 @@
 ## Enforced Gates (aktiv prüfen — HARD REJECT)
 
 1. **No Self-Handoff / No Re-Delegation:** Ein `payload`, der mit "Du bist..." beginnt, ist ein Re-Delegations-/Spec-Dump-Versuch → HARD REJECT.
-2. **Orchestrator-Singleton:** NUR `main_chat` darf den `orchestrator` spawnen. Worker → `orchestrator` → HARD REJECT (siehe `singleton-orchestrator-architecture.md`).
+2. **Orchestrator-Singleton:** NUR `main_chat` darf den `orchestrator` spawnen. Worker{{#if ROLE_ORCHESTRATOR_ACTIVE}} → `orchestrator`{{/if}} → HARD REJECT (siehe `singleton-orchestrator-architecture.md`).
 3. **Execution-Trace-Isolation:** Worker-Output muss strukturiert sein (STATUS, RESULT, ARTIFACTS). Keine rohen Logs propagieren.
 
 ## Degradierte Checks (Doku-Pflicht, kein Gate — Issue #346)

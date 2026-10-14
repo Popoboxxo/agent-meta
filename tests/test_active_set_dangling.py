@@ -48,20 +48,12 @@ def synced(tmp_path_factory):
 def test_p10_dangling_dispatch_covers_ac43_roles(synced):
     project, active = synced("p10")
     findings = asr.check_dangling_dispatch(project, _PROVIDERS, {}, active)
-    assert findings and all(f.severity == Severity.WARNING for f in findings)
-    assert all(f.check == "active-set.dangling-dispatch" for f in findings)
-    text = " ".join(f.message for f in findings)
-    # IC-18 no. 2 (pipeline drop): bug-feature-analyzer, ideation and validator were
-    # dispatched only from pipeline blocks that are no longer rendered on p10.
-    # IC-18 no. 5 (tier chain): the orchestrator section 4 / task-size table is gated
-    # on DEVELOPER_TIERS_ENABLED and ROLE_CONCEPT_*_ACTIVE, so senior-developer and
-    # the concept roles leave the dangling set as well.
-    for role in _AC43_ROLES:
-        assert f"'{role}'" not in text, role
-    # Pin the exact (file, role) set so heuristic drift is visible.
-    pairs = {(f.file.rsplit("/", 1)[-1], f.message.split("'")[1]) for f in findings}
-    assert pairs == {("documenter.md", "knowledge-ingestor")}
-    assert len(findings) == 1
+    # IC-18 no. 2 (pipeline drop) removed the pipeline dispatches of bug-feature-analyzer,
+    # ideation and validator; IC-18 no. 5 (tier chain) the senior-developer and concept
+    # dispatches; IC-18 no. 11 / IC-30 triage (Task 1.19) the documenter route to
+    # knowledge-ingestor. The AC-43 roles are still inactive on p10 -- nothing dispatches them.
+    assert set(_AC43_ROLES) <= set(active.known_roles) - set(active.roles)
+    assert findings == []
 
 
 def test_p10_dangling_mention_is_info(synced):

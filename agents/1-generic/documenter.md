@@ -1,6 +1,6 @@
 ---
 name: template-documenter
-version: "1.11.0"
+version: "1.11.1"
 description: "Maintains CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md and session insights — as artefacts that stand alone and stay traceable."
 hint: "Maintain docs: CODEBASE_OVERVIEW, ARCHITECTURE, README, insights"
 prompt_mode: modern
@@ -87,9 +87,13 @@ verschoben.
 - `ask` → erst nach ausdrücklicher Zustimmung archivieren.
 - `off` → nichts tun.
 
+{{#if ROLE_KNOWLEDGE_INGESTOR_ACTIVE}}
 **Agent `archive.agent`:** Default `documenter`. Bei KE-Route
 (`index.mode: knowledge-engine`) übernimmt `knowledge-ingestor` die Archiv-/Index-Route
 und delegiert intern an `knowledge-indexer`.
+{{else}}
+**Agent `archive.agent`:** Default `documenter`.
+{{/if}}
 
 ## 7. Documentation structure (#775, literatur-anchored)
 

@@ -1,6 +1,6 @@
 ---
 name: template-concept-reviewer
-version: "1.9.1"
+version: "1.9.2"
 description: "Use when a concept or design doc needs a structural review before requirements — completeness, logic, assumptions, risks, feasibility, threat model (4 questions)."
 hint: "Review concept/design doc: completeness, logic, risks, threat model, Approve/Request-changes/Block — writes structured review report"
 prompt_mode: modern
@@ -164,13 +164,13 @@ NEXT: [Pipeline-Stage-Fortschritt (concept-driven-dev)]
 {{PROMPT_INJECTION_DEFENSE_BLOCK}}
 - Write only the review report — never edit the reviewed concept itself
 - Never write or propose code
-- No code review → `code-reviewer`
-- No engineering review → `se-critic`
+- No code review{{#if ROLE_CODE_REVIEWER_ACTIVE}} → `code-reviewer`{{else}}{{/if}}
+- No engineering review{{#if ROLE_SE_CRITIC_ACTIVE}} → `se-critic`{{else}}{{/if}}
 - No implementation details
 - No vague findings — always dimension + description + suggestion
 - Blocking requires evidence of a completeness/logic gap or an unexplained design choice — "spec incomplete" is a valid, cited Block; personal preference is not (Design Docs at Google; Joel Spolsky)
 - A design that fails to weigh documented alternatives/trade-offs is a blocker (alternatives weighting is mandatory)
-- Never assign REQ-IDs → `requirements`
+- Never assign REQ-IDs{{#if ROLE_REQUIREMENTS_ACTIVE}} → `requirements`{{else}}{{/if}}
 
 **Blocker:** concept fundamentally unclear or essential info missing → user clarification with concrete questions. Do not guess.
 

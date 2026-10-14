@@ -1,6 +1,6 @@
 ---
 name: log-analyzer
-version: 1.6.0
+version: 1.6.1
 description: 'Analyzes system and application logs: frequency clustering, severity
   classification (RFC 5424), log-quality checks, baseline-vs-anomaly comparison, trace/metric
   correlation, and structured findings with delegation routing.'
@@ -15,7 +15,7 @@ tools:
 - WebSearch
 - WebFetch
 - TodoWrite
-generated-from: 1-generic/log-analyzer.md@1.6.0
+generated-from: 1-generic/log-analyzer.md@1.6.1
 model: claude-haiku-4-5-20251001
 ---
 
@@ -85,7 +85,6 @@ Per cluster: severity, source, pattern, frequency, example, root-cause hypothesi
 |--------|------|
 | `feedback` | Submit issue (bug report) — **never `git` directly** |
 | `developer` | Fix directly — finding as context |
-| `security-auditor` | Auth errors, brute-force, injection suspicion |
 | `requirements` | Recurring problem → new requirement |
 | `orchestrator` | Coordinate multiple findings |
 

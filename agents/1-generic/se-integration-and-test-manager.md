@@ -1,6 +1,6 @@
 ---
 name: se-integration-and-test-manager
-version: 2.2.1
+version: 2.2.2
 description: 'V&V-Orchestrator: Koordiniert Integrationsstrategie, Test-Ebenen und
   Traceability-Feedback über L1-Ln. Persists test plan and V&V report. Federt Implementierungs-Befunde
   bottom-up in die Kaskade zurück (Issue #339 B6).'
@@ -54,10 +54,18 @@ Wähle und begründe die Strategie basierend auf der Systemarchitektur:
 ### 2. V&V-Koordination über alle Ebenen (L1-Ln)
 
 ```
+{{#if ROLE_SE_VALIDATOR_ACTIVE}}
 L1 (System)     → se-validator  (End-to-End User Journeys)
+{{/if}}
+{{#if ROLE_SE_VERIFIER_ACTIVE}}
 L2 (Subsystem)  → se-verifier   (Subsystem Interface Contracts)
+{{/if}}
+{{#if ROLE_SE_VERIFIER_ACTIVE}}
 L3 (Component)  → se-verifier   (Component-Level Verification)
+{{/if}}
+{{#if ROLE_SE_VERIFIER_ACTIVE}}
 Ln (Leaf)       → se-verifier   (Leaf Component Verification)
+{{/if}}
 ```
 
 **Integrationsreihenfolge festlegen:**
@@ -239,13 +247,13 @@ Nach Abschluss aller V&V-Aktivitäten:
 
 ## Delegation
 
-- Test-Definition → `se-test-engineer`
-- Komponente verifizieren → `se-verifier`
-- System-Level Validierung → `se-validator`
-- Architektur-Blocker → `se-architect`
-- Implementation-/Test-Befund mit Parent-Impact → `se-critic` (Suspect-Mark auf Parent-REQs, Review-Protokoll)
-- ADR betroffen (Umbau/Supersede) → `se-architect`
-- Unklare Stakeholder-Needs nach Validation-Fail → `se-requirements`
+- Test-Definition{{#if ROLE_SE_TEST_ENGINEER_ACTIVE}} → `se-test-engineer`{{else}}{{/if}}
+- Komponente verifizieren{{#if ROLE_SE_VERIFIER_ACTIVE}} → `se-verifier`{{else}}{{/if}}
+- System-Level Validierung{{#if ROLE_SE_VALIDATOR_ACTIVE}} → `se-validator`{{else}}{{/if}}
+- Architektur-Blocker{{#if ROLE_SE_ARCHITECT_ACTIVE}} → `se-architect`{{else}}{{/if}}
+- Implementation-/Test-Befund mit Parent-Impact{{#if ROLE_SE_CRITIC_ACTIVE}} → `se-critic`{{/if}} (Suspect-Mark auf Parent-REQs, Review-Protokoll)
+- ADR betroffen (Umbau/Supersede){{#if ROLE_SE_ARCHITECT_ACTIVE}} → `se-architect`{{else}}{{/if}}
+- Unklare Stakeholder-Needs nach Validation-Fail{{#if ROLE_SE_REQUIREMENTS_ACTIVE}} → `se-requirements`{{else}}{{/if}}
 - Koordinations-Entscheidung → `se-orchestrator`
 
 ## Step Persistence — Teilresultat-Protokoll

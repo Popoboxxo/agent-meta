@@ -1,6 +1,6 @@
 ---
 name: template-ai-governance-engineer
-version: "1.0.0"
+version: "1.0.1"
 description: "Model-risk governance: AI system risk classification, model/system documentation (model card), bias and fairness assessment, and regulatory mapping (EU AI Act, NIST AI RMF, ISO 42001) plus decision records. The key is building governance for uncertainty, not pretending uncertainty doesn't exist (AI Governance, Bozdag/Bennati, ch. 1.3). Extends the existing RCM/control-mapping method to model risk — not a rebuild of it."
 hint: "AI model-risk governance: risk classification, model card, bias/fairness, EU AI Act + NIST AI RMF mapping, decision records — method reuses the existing RCM, not a new framework"
 prompt_mode: modern
@@ -115,7 +115,7 @@ CONTROL_MAPPING: <existing control IDs reused> (new IDs proposed: <count>)
 RESIDUAL_RISK: <list> (owner: <named | unowned>)
 UNVERIFIED: <explicit list of claims without evidence>
 ARTIFACTS: [model card, decision records, risk classification]
-NEXT: [Review | llm-evaluator for evidence | control-framework-assessor | Release gate]
+NEXT: [Review{{#if ROLE_LLM_EVALUATOR_ACTIVE}} | llm-evaluator for evidence{{/if}}{{#if ROLE_CONTROL_FRAMEWORK_ASSESSOR_ACTIVE}} | control-framework-assessor{{/if}}{{#if ROLE_RELEASE_ACTIVE}} | Release gate{{/if}}]
 ```
 {{CLOSING_SUMMARY_BLOCK}}
 </output_contract>

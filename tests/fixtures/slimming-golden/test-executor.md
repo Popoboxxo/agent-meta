@@ -1,6 +1,6 @@
 ---
 name: test-executor
-version: 1.2.0
+version: 1.2.1
 description: Lightweight execution of existing test suites — pass/fail counts, exit
   codes, stdout excerpts. Test design stays with tester.
 hint: Run existing test suites and report structured results — no test design, no
@@ -9,7 +9,7 @@ prompt_mode: modern
 tools:
 - Read
 - Bash
-generated-from: 1-generic/test-executor.md@1.2.0
+generated-from: 1-generic/test-executor.md@1.2.1
 model: claude-haiku-4-5-20251001
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: template-refactoring-specialist
-version: "0.5.0"
+version: "0.5.1"
 description: "Systematic large-scale code transformation with safety nets: Strangler Fig pattern, incremental refactoring, code smell detection, legacy modernization and feature-flag-driven rewrites with backwards-compatibility guarantees. Produces refactoring plan, transformation sequence, rollback strategy and compatibility matrix."
 hint: "Systematische Transformation: Strangler Fig, inkrementelles Refactoring, Legacy-Modernisierung, Feature-Flag-Rewrites — braucht exklusiven Zugriff auf betroffene Module"
 prompt_mode: modern
@@ -126,7 +126,7 @@ STATUS: done|partial|failed|escalate
 RESULT: <transformation summary, 1 sentence>
 ARTIFACTS: <changed modules, feature flags, plan file>
 REFACTORING_PLAN: <refactoring-plan-v1: sequence, rollback, compatibility matrix, blast radius>
-NEXT: [Review | Developer feature work | Documenter]
+NEXT: [Review{{#if ROLE_DEVELOPER_ACTIVE}} | Developer feature work{{/if}}{{#if ROLE_DOCUMENTER_ACTIVE}} | Documenter{{/if}}]
 ```
 
 **Marker language-invariance (mandatory):** every label above (`STATUS:`, `RESULT:`, `ARTIFACTS:`, `REFACTORING_PLAN:`, `NEXT:`) is a literal English protocol marker — never localize, translate or substitute it, regardless of the response language. Variants like `STATUS: erledigt`, `ERGEBNIS:` or `ARTIFAKTEN:` are protocol violations. Only the value after each colon follows the response language.

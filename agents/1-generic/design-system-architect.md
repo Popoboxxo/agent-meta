@@ -1,6 +1,6 @@
 ---
 name: template-design-system-architect
-version: "0.6.0"
+version: "0.6.1"
 description: "Translates a UI design-system schema into real, project-bound design-token artifacts (CSS custom properties / Tailwind config) plus the underlying systematics: color-harmony rules, a design-time contrast gate, spacing/breakpoint methodology, component-variant contracts, and motion tokens."
 hint: "Design-System-Schema → echte Token-Artefakte: Primitive/Semantic/Component-Ebenen, Farbharmonie + Kontrast-Gate (Design-time, kein WCAG-Audit), Spacing/Breakpoint-Methodik, Variant-Contracts, Motion-Tokens."
 reference_standards:
@@ -104,9 +104,9 @@ ARTIFACTS: [files created]
 ```
 
 Delegation:
-- Component implementation → `frontend-component-engineer`
+- Component implementation{{#if ROLE_FRONTEND_COMPONENT_ENGINEER_ACTIVE}} → `frontend-component-engineer`{{else}}{{/if}}
 - Contrast-gate failure → back to `ui-ux-designer` (schema change), never a unilateral color swap
-- Binding WCAG verdict on rendered components → `accessibility-specialist`
+- Binding WCAG verdict on rendered components{{#if ROLE_ACCESSIBILITY_SPECIALIST_ACTIVE}} → `accessibility-specialist`{{else}}{{/if}}
 {{CLOSING_SUMMARY_BLOCK}}
 
 </output_contract>

@@ -1,6 +1,6 @@
 ---
 name: se-validator
-version: 1.7.1
+version: 1.7.2
 description: 'L1 System-Validierung: End-to-End User Journeys gegen Stakeholder-Bedürfnisse
   abgleichen. ''Did we build the right system?'' Persists validation report.'
 hint: Validiert das System auf L1-Ebene durch User-Journey-Simulation — ignoriert
@@ -165,10 +165,10 @@ Return your final output **only** as a JSON object matching the following schema
 
 ## Delegation
 
-- Internal component verification → `se-verifier`
-- Architecture redesign for blocked journeys → `se-architect`
-- Unclear/missing stakeholder needs → `se-requirements`
-- Cross-level validation coordination → `se-integration-and-test-manager`
+- Internal component verification{{#if ROLE_SE_VERIFIER_ACTIVE}} → `se-verifier`{{else}}{{/if}}
+- Architecture redesign for blocked journeys{{#if ROLE_SE_ARCHITECT_ACTIVE}} → `se-architect`{{else}}{{/if}}
+- Unclear/missing stakeholder needs{{#if ROLE_SE_REQUIREMENTS_ACTIVE}} → `se-requirements`{{else}}{{/if}}
+- Cross-level validation coordination{{#if ROLE_SE_INTEGRATION_AND_TEST_MANAGER_ACTIVE}} → `se-integration-and-test-manager`{{else}}{{/if}}
 
 ## Step Persistence — Teilresultat-Protokoll
 

@@ -51,16 +51,17 @@ TOLERANCE_MAX_BYTES = 4096
 # Re-pinned for the tier-chain gate (IC-18 no. 5, Task 1.13): default orchestrator -762 B per provider.
 # Re-pinned for the data-driven anti-recursion block (IC-18 no. 6, Task 1.14): default drops /validator (-10 B).
 # Re-pinned for the orchestrator prose gating (IC-18 no. 8, Task 1.16): SE prose off by default, dropped pipelines no longer named.
+# Re-pinned for the IC-30 triage (IC-18 no. 11, Task 1.19): documenter KE route and bug-feature-analyzer SE rows drop in the default (harness-roster -263 B).
 _IST_FULL: Dict[str, Dict[str, int]] = {
-    "Claude": {"entry-file": 2511, "rules": 18297, "orchestrator": 85147, "harness-roster": 581537, "always-loaded": 602345},
-    "Codex": {"entry-file": 25652, "rules": 18380, "orchestrator": 84587, "harness-roster": 575504, "always-loaded": 619536},
+    "Claude": {"entry-file": 2511, "rules": 18297, "orchestrator": 85147, "harness-roster": 581274, "always-loaded": 602082},
+    "Codex": {"entry-file": 25652, "rules": 18380, "orchestrator": 84587, "harness-roster": 575241, "always-loaded": 619273},
     "Continue": {"entry-file": 617, "rules": 19004, "orchestrator": 69871, "always-loaded": 19621},
     "Copilot": {"entry-file": 9334, "rules": 18405, "orchestrator": 69753, "always-loaded": 27739},
     "Gemini": {"entry-file": 33221, "rules": 18297, "orchestrator": 85169, "always-loaded": 51518},
-    "KimiCode": {"entry-file": 25652, "orchestrator": 70468, "harness-roster": 566629, "always-loaded": 592281},
-    "Mammouth": {"entry-file": 25652, "rules": 18387, "orchestrator": 70242, "harness-roster": 568940, "always-loaded": 612979},
-    "Opencode": {"entry-file": 25716, "orchestrator": 84835, "harness-roster": 578021, "always-loaded": 603737},
-    "ZCode": {"entry-file": 26566, "orchestrator": 70443, "harness-roster": 565425, "always-loaded": 591991},
+    "KimiCode": {"entry-file": 25652, "orchestrator": 70468, "harness-roster": 566366, "always-loaded": 592018},
+    "Mammouth": {"entry-file": 25652, "rules": 18387, "orchestrator": 70242, "harness-roster": 568677, "always-loaded": 612716},
+    "Opencode": {"entry-file": 25716, "orchestrator": 84835, "harness-roster": 577758, "always-loaded": 603474},
+    "ZCode": {"entry-file": 26566, "orchestrator": 70443, "harness-roster": 565162, "always-loaded": 591728},
 }
 
 

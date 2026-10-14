@@ -116,6 +116,20 @@
   `a2a-delegation-gates` (default security-critical roles) name an owner role only when it is active; the
   block catalog itself stays complete ("*(keine aktive Eigentümer-Rolle)*" without an active owner). Default
   render unchanged (all owners active, AC-01 green without rebaseline).
+- **IC-30 triage: worker dispatch lines follow the ActiveSet (IC-18 Nr. 11, AC-71, PR D)**: every line of the
+  template routing-guard registry (#885 classes A/D/E: `T-HANDOFF`, `T-NEXT`, German handoffs; B/C/F:
+  `T-ROLE-ARROW`) is now conditional on its target role - `NEXT:` items, `→ \`role\`` delegation/boundary
+  arrows, German `Delegiere an`/`übernimmt` lines (knowledge-*), the documenter KE route, the
+  bug-feature-analyzer consultation table, the log-analyzer delegation table and the rules
+  `a2a-delegation-gates`, `use-orchestrator`, `gemini-orchestrator-first`. The guard
+  (`tests/test_no_role_routes_in_templates.py`) gains the construct-scoped allow rule `D-CONDITIONAL` (target
+  token inside the positive branch of its own `{{#if ROLE_<TARGET>_ACTIVE}}`, block or inline); the ratchet
+  registry `ROUTE_RATCHET` is empty. Default render: only inactive targets disappear (documenter KE route,
+  `se-critic`/`se-interface-mgr` rows, `se-critic`/`validator` arrows) plus patch bumps of 36 templates
+  (35 in `agents/1-generic`, `homeassistant-developer`; `developer` keeps its 4.8.0 from this PR). AC-01 rebaselined (270 of 1075: 29 agents per
+  provider + hashes), 24 slimming goldens rebaselined (version lines; in the self-hosting config also the
+  inactive `se-*`/`security-auditor` rows and arrows). Inline conditionals at a line end use
+  `{{else}}{{/if}}` because a false simple `{{#if}}` there also swallows the newline.
 
 ### Changed
 - **`ACTIVE_ROLES` / `ROLE_<ROLE>_ACTIVE` available in templates**: `build_variables` injects

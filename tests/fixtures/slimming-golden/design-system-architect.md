@@ -1,6 +1,6 @@
 ---
 name: design-system-architect
-version: 0.6.0
+version: 0.6.1
 description: 'Translates a UI design-system schema into real, project-bound design-token
   artifacts (CSS custom properties / Tailwind config) plus the underlying systematics:
   color-harmony rules, a design-time contrast gate, spacing/breakpoint methodology,
@@ -17,7 +17,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/design-system-architect.md@0.6.0
+generated-from: 1-generic/design-system-architect.md@0.6.1
 model: claude-sonnet-5
 memory: project
 ---

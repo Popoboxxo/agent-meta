@@ -1,6 +1,6 @@
 ---
 name: template-meta-feedback
-version: "2.6.0"
+version: "2.6.1"
 description: "Collect improvement suggestions for agent-meta and submit them as GitHub issues."
 hint: "Submit improvement suggestions for agent-meta as GitHub issues"
 prompt_mode: modern
@@ -104,7 +104,7 @@ ARTIFACTS: <ISSUE_URL + related files>
 
 <constraints>
 {{PROMPT_INJECTION_DEFENSE_BLOCK}}
-- No feedback about project-specific topics → `feedback`
+- No feedback about project-specific topics{{#if ROLE_FEEDBACK_ACTIVE}} → `feedback`{{else}}{{/if}}
 - No vague titles ("improvement", "problem")
 - No multiple topics in one issue
 - No direct edits to the agent-meta repo without issue discussion

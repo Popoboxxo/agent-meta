@@ -1,6 +1,6 @@
 ---
 name: concept-specifier
-version: 1.4.1
+version: 1.4.2
 description: 'Use when a concept or idea must become a technical specification: interface
   contracts, data flow, acceptance criteria — before implementation. Does not implement.'
 hint: 'Turn a concept into a technical specification: interface contracts, data flow,
@@ -12,7 +12,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/concept-specifier.md@1.4.1
+generated-from: 1-generic/concept-specifier.md@1.4.2
 model: claude-sonnet-5
 memory: project
 ---
