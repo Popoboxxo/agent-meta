@@ -1344,7 +1344,8 @@ def _handle_sync(ctx: _SyncContext) -> None:
     _sync_stage_per_provider(ctx.agent_meta_root, ctx.project_root, config,
                              provider_config, providers, ctx.variables,
                              platform_vars, debug_mode, allow_committed_secrets,
-                             mcp_gitignore_extras, ctx.args, ctx.log)
+                             mcp_gitignore_extras, ctx.args, ctx.log,
+                             ctx.active_set)
     # Stage 7: injection-drift governance + plugin probe.
     _sync_stage_drift_and_plugins(ctx.agent_meta_root, ctx.project_root, config,
                                   provider_config, ctx.args, ctx.log)

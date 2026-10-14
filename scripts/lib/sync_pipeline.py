@@ -1068,6 +1068,7 @@ def _sync_stage_per_provider(
     provider_config: dict, providers: list, variables: dict,
     platform_vars: dict | None, debug_mode: bool, allow_committed_secrets: bool,
     mcp_gitignore_extras: list, args: argparse.Namespace, log: SyncLog,
+    active_set,
 ) -> None:
     """Stage 6: per-provider main loop (pipeline details, agents, Continue
     prompts, rules, MCP, external tools, hooks, commands, snippets,
@@ -1175,7 +1176,7 @@ def _sync_stage_per_provider(
             sync_prompts_for_continue(agent_meta_root, project_root, config,
                                       provider_variables, log, args.dry_run,
                                       provider_config=provider_config,
-                                      provider=provider)
+                                      provider=provider, active_set=active_set)
         if pc.get("has_rules", False):
             sync_rules(agent_meta_root, project_root, config, log, args.dry_run,
                        platform_vars=platform_vars, variables=provider_variables,
