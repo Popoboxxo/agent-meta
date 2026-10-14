@@ -786,6 +786,26 @@ def _stage_roles(stage: dict, reflection_pairs: list) -> set:
     return roles
 
 
+def _intersect_allowed_agents(stage: dict, roles) -> dict:
+    """Plan-driven ``allowed_agents`` restricted to the active roles (IC-18 no. 3).
+
+    Returns the very same ``stage`` object when nothing changes, else a copy
+    (inputs are shared/cached and must not be mutated). If the intersection
+    would be empty, the restriction falls back to ``[fallback_agent]`` instead of
+    an empty list -- the renderer reads an empty list as "no restriction".
+    """
+    if stage.get("mode") != "plan-driven":
+        return stage
+    plan = stage.get("plan-driven") or {}
+    allowed = plan.get("allowed_agents") or []
+    narrowed = [agent for agent in allowed if agent in roles]
+    if len(narrowed) == len(allowed):
+        return stage
+    if not narrowed and plan.get("fallback_agent"):
+        narrowed = [plan["fallback_agent"]]
+    return {**stage, "plan-driven": {**plan, "allowed_agents": narrowed}}
+
+
 def _dod_flag_off(stage: dict, active_dod: Mapping | None, variables: Mapping) -> bool:
     """Inactive ``dod_flag`` of a conditional stage (same rule as the renderer).
 
@@ -816,7 +836,8 @@ def filter_pipelines_by_active_set(
     active, including the reflection-loop generator/critic and ``parallel_group``
     members. Not required are stages with an inactive ``dod_flag`` and stages
     marked ``optional`` (an optional stage with an inactive role is removed from
-    the surviving pipeline). A ``run_pipeline`` reference to a dropped pipeline
+    the surviving pipeline). Plan-driven ``allowed_agents`` of surviving pipelines
+    are intersected with ``active.roles`` (IC-18 no. 3, AC-47). A ``run_pipeline`` reference to a dropped pipeline
     drops the referencing pipeline too. Disabled pipelines pass through untouched
     (they are not rendered anyway).
 
@@ -837,6 +858,7 @@ def filter_pipelines_by_active_set(
         missing: set = set()
         bad_stages: list = []
         kept: list = []
+        modified = False
         for stage in stages:
             if not isinstance(stage, dict) or _dod_flag_off(stage, active_dod, variables):
                 kept.append(stage)
@@ -847,10 +869,13 @@ def filter_pipelines_by_active_set(
             if stage_missing:
                 missing |= stage_missing
                 bad_stages.append(str(stage.get("id", "")))
-            kept.append(stage)
+            narrowed = _intersect_allowed_agents(stage, roles)
+            if narrowed is not stage:
+                modified = True
+            kept.append(narrowed)
         if missing:
             drops[name] = PipelineDrop(name, tuple(sorted(missing)), tuple(bad_stages))
-        elif len(kept) != len(stages):
+        elif modified or len(kept) != len(stages):
             result[name] = {**pipeline, "stages": kept}
         else:
             result[name] = pipeline

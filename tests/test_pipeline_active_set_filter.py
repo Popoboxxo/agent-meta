@@ -129,3 +129,52 @@ def test_disabled_pipeline_passes_through_without_drop(tmp_path):
         {"id": "s", "agent": "ideation", "mode": "sequential", "task": "x"}]}}
     kept, drops = filter_pipelines_by_active_set(pipelines, active, {})
     assert kept == pipelines and drops == []
+
+
+# --- IC-18 no. 3 / AC-47 (part): allowed_agents ⊆ ActiveSet.roles -----------------
+
+def _plan_driven(allowed, fallback="developer"):
+    return {"stages": [
+        {"id": "implement", "agent": "developer", "mode": "plan-driven", "task": "x",
+         "plan-driven": {"fallback_agent": fallback, "allowed_agents": allowed}},
+    ]}
+
+
+def test_p10_allowed_agents_only_contain_active_roles(tmp_path):
+    _, active = _active(tmp_path, "p10")
+    allowed = ["junior-developer", "developer", "senior-developer", "frontend-component-engineer"]
+    pipelines = {"impl": _plan_driven(allowed)}
+    original = copy.deepcopy(pipelines)
+    kept, drops = filter_pipelines_by_active_set(pipelines, active, {})
+    assert drops == []
+    result = kept["impl"]["stages"][0]["plan-driven"]["allowed_agents"]
+    assert result == ["developer"]
+    assert set(result) <= active.roles
+    assert pipelines == original  # shared input untouched
+
+
+def test_allowed_agents_unchanged_object_when_all_active(tmp_path):
+    _, active = _active(tmp_path, "p10")
+    pipelines = {"impl": _plan_driven(["developer", "tester"])}
+    kept, _ = filter_pipelines_by_active_set(pipelines, active, {})
+    assert kept["impl"] is pipelines["impl"]
+
+
+def test_allowed_agents_never_become_an_empty_restriction(tmp_path):
+    # The renderer reads [] as "no restriction" -> fall back to the fallback agent.
+    _, active = _active(tmp_path, "p10")
+    pipelines = {"impl": _plan_driven(["junior-developer", "senior-developer"])}
+    kept, _ = filter_pipelines_by_active_set(pipelines, active, {})
+    assert kept["impl"]["stages"][0]["plan-driven"]["allowed_agents"] == ["developer"]
+
+
+def test_real_feature_lifecycle_allowed_agents_on_p10_with_validator_active(tmp_path):
+    # feature-lifecycle is dropped on p10 (validator); with validator active the
+    # real pipeline survives and its allowed_agents shrink to the active roles.
+    import dataclasses
+
+    config, active = _active(tmp_path, "p10")
+    widened = dataclasses.replace(active, roles=active.roles | {"validator"})
+    kept, _ = _filter(config, widened)
+    stage = next(s for s in kept["feature-lifecycle"]["stages"] if s["id"] == "implement")
+    assert stage["plan-driven"]["allowed_agents"] == ["developer"]
