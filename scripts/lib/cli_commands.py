@@ -571,8 +571,15 @@ def _build_context(args, agent_meta_root: Path, log: "SyncLog"):
     harness = _resolve_and_guard_harness(args, agent_meta_root, project_root, log)
 
     config = load_config(config_path)
+    # IC-17: single ActiveSet per sync, shared with the variable builder (IC-18
+    # no. 18) and every other consumer via ctx.active_set. Unknown-role /
+    # gate-dropped diagnostics go to the sync log below.
+    active_warnings: list = []
+    active_set = compute_active_set(
+        config, agent_meta_root, project_root, warn_sink=active_warnings)
     try:
-        variables, pre_warnings = build_variables(config, agent_meta_root, project_root)
+        variables, pre_warnings = build_variables(
+            config, agent_meta_root, project_root, active_set=active_set)
     except SyncError as exc:
         # Fail-loud config errors (e.g. AC-11 pipeline notation) surface as a
         # clean rc 1 for --validate/--check/sync instead of an uncaught traceback.
@@ -601,11 +608,7 @@ def _build_context(args, agent_meta_root: Path, log: "SyncLog"):
         source_version=source_version, viz_cfg=viz_cfg,
         harness=harness,
     )
-    # IC-17: single ActiveSet per sync; unknown-role / gate-dropped warnings
-    # go to the sync log. Informational only -- does not alter any render.
-    active_warnings: list = []
-    ctx.active_set = compute_active_set(
-        config, agent_meta_root, project_root, warn_sink=active_warnings)
+    ctx.active_set = active_set
     # Only active-set.* diagnostics are logged here: the resolver's other
     # warnings (missing templates) are already reported by existing paths.
     for w in active_warnings:
@@ -858,7 +861,11 @@ def _regenerate_active_providers(ctx: _SyncContext) -> None:
 
     config = load_config(ctx.config_path)
     ctx.config = config
-    ctx.variables, _ = build_variables(config, ctx.agent_meta_root, ctx.project_root)
+    # Config was reloaded from disk: recompute so ctx.active_set matches it.
+    ctx.active_set = compute_active_set(
+        config, ctx.agent_meta_root, ctx.project_root, warn_sink=[])
+    ctx.variables, _ = build_variables(
+        config, ctx.agent_meta_root, ctx.project_root, active_set=ctx.active_set)
     _handle_sync(ctx)
 
 

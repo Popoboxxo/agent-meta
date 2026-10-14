@@ -75,10 +75,8 @@ RAW_ROLES_RATCHET: FrozenSet[str] = frozenset(
     {
         "scripts/lib/skills.py::sync_external_skills_for_provider",  # IC-18 no. 17 (:424) - BLOCKED: default-render change, see test_scout_skill_active_set
         "scripts/lib/sync_pipeline.py::_sync_stage_auto_commit_allowlist",  # IC-18 no. 14 (:1530) - BLOCKED: default-render change, see test_auto_commit_allowlist_pipeline
-        "scripts/lib/config.py::_build_platform_variables",  # IC-18 no. 18 (:1689, effort estimator)
-        "scripts/lib/config.py::_build_convention_variables",  # IC-18 no. 18 (:2044)
+        "scripts/lib/config.py::_build_platform_variables",  # IC-18 no. 18 (:1689) - only WEB_PROJECT_ENABLED left, BLOCKED: default-render change
         "scripts/lib/config.py::_build_pipeline_variables",  # not in spec F-42 (:1863 available_roles) - see docstring
-        "scripts/lib/config.py::_validate_subagent_permissions",  # IC-18 no. 18 "active-role list" (spec :682, real :687)
         "scripts/lib/agent_sync.py::sync_agents_for_provider",  # not in spec F-42 (:1337)
     }
 )

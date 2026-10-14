@@ -28,6 +28,7 @@ from .variables import (  # re-exported for callers/tests (Issue #565)
     strip_inactive_conditional_blocks,  # noqa: F401
     substitute,  # noqa: F401
 )
+from .active_set import ActiveSet, compute_active_set
 from .frontmatter import collect_sources
 from .subagent_permissions import (
     missing_tools_roles,
@@ -72,7 +73,6 @@ from .repo_containment import (
 )
 from .roles import (
     build_role_map,
-    is_role_enabled,
     load_roles_config,
     resolve_activation_gates,
 )
@@ -682,9 +682,9 @@ def _validate_subagent_permissions(config: dict, config_path: Path) -> None:
 
     platforms = config.get("platforms", [])
     role_map = build_role_map(agent_meta_root)
-    gates = resolve_activation_gates(agent_meta_root, config)
     role_sources, _ = collect_sources(agent_meta_root, platforms)
-    configured_roles = config.get("roles")
+    active_set = compute_active_set(
+        config, agent_meta_root, config_path.parent.parent, warn_sink=[])
     orch_mode = _resolve_orch_mode(config.get("orchestrator", {}))
 
     active_roles: list[str] = []
@@ -693,9 +693,7 @@ def _validate_subagent_permissions(config: dict, config_path: Path) -> None:
         # scope (a role without a resolved source file is never written).
         if role not in role_sources:
             continue
-        if configured_roles is not None and role not in configured_roles:
-            continue
-        if not is_role_enabled(role, config, gates):
+        if not active_set.has(role):
             continue
         if role == "orchestrator" and orch_mode == "main-chat":
             continue
@@ -1634,8 +1632,25 @@ def _build_subagent_permission_variables(variables: dict, config: dict) -> None:
     variables["SUBAGENT_PERMISSIONS_BLOCK"] = render_subagent_permission_block(mode)
 
 
+def _resolve_active_set(
+    active_set: ActiveSet | None, config: dict, agent_meta_root: Path,
+    project_root: Path | None = None,
+) -> ActiveSet:
+    """Return the per-sync ActiveSet, computing it only for standalone callers.
+
+    The sync pipeline computes the ActiveSet once and passes it in (IC-17);
+    direct callers (tests, tooling) get a locally computed one. Warnings are
+    swallowed here -- the pipeline logs them from its own computation.
+    """
+    if active_set is not None:
+        return active_set
+    return compute_active_set(
+        config, agent_meta_root, project_root or agent_meta_root, warn_sink=[])
+
+
 def _build_platform_variables(
-    variables: dict, unmapped: list[str], config: dict, agent_meta_root: Path
+    variables: dict, unmapped: list[str], config: dict, agent_meta_root: Path,
+    active_set: ActiveSet | None = None,
 ) -> None:
     """Populate SE/Knowledge-Engine/role-toggle variables and the delegation table.
 
@@ -1686,14 +1701,19 @@ def _build_platform_variables(
     # own config_predicate decides the default — roles_membership by default).
     variables["VALIDATOR_ENABLED"] = _mirror("validator")
 
+    active_set = _resolve_active_set(active_set, config, agent_meta_root)
+    # WEB_PROJECT_ENABLED below still reads the raw allowlist: switching it to
+    # the ActiveSet turns the web blocks on for every default project (e2e-tester
+    # is active without a `roles:` key) and changes the default render (AC-01).
+    # Tracked in RAW_ROLES_RATCHET (IC-18 no. 18, blocked).
     _roles = config.get("roles", [])
     # DEVELOPER_TIERS_ENABLED: activation mirror of the `developer_tiers` group.
     # One flag for the whole junior/senior/principal tier set — the group keeps
     # them addressable as a unit instead of gating each tier separately.
     variables["DEVELOPER_TIERS_ENABLED"] = _mirror("developer_tiers")
-    # EFFORT_ESTIMATOR_ENABLED: auto-detect from project roles list
-    # — orchestrator gates effort-estimator routes behind this flag to avoid dead routes
-    variables["EFFORT_ESTIMATOR_ENABLED"] = "true" if "effort-estimator" in _roles else "false"
+    # EFFORT_ESTIMATOR_ENABLED: derived from the ActiveSet (IC-18 no. 18) --
+    # orchestrator gates effort-estimator routes behind this flag to avoid dead routes
+    variables["EFFORT_ESTIMATOR_ENABLED"] = "true" if active_set.has("effort-estimator") else "false"
     # WEB_PROJECT_ENABLED: auto-detect web-oriented projects from the roles list.
     # — derived purely from role activation (e2e-tester present), no separate
     #   config flag. Gates browser-verification and web-vitals blocks in the
@@ -2015,7 +2035,10 @@ def _build_snippet_variables(variables: dict, agent_meta_root: Path) -> None:
         )
 
 
-def _build_convention_variables(variables: dict, config: dict, agent_meta_root: Path) -> None:
+def _build_convention_variables(
+    variables: dict, config: dict, agent_meta_root: Path,
+    active_set: ActiveSet | None = None,
+) -> None:
     """Populate release/issue convention-block variables.
 
     Parameter contract:
@@ -2041,8 +2064,7 @@ def _build_convention_variables(variables: dict, config: dict, agent_meta_root: 
     inline comment at its assignment for why.
     """
     _conv_log = SyncLog()
-    _roles_list = config.get("roles")
-    _active_roles = set(_roles_list) if _roles_list is not None else None
+    _active_roles = set(_resolve_active_set(active_set, config, agent_meta_root).roles)
     try:
         _resolved_conventions = resolve_conventions(config, agent_meta_root)
     except ValueError as _conv_exc:
@@ -2071,8 +2093,13 @@ def _build_convention_variables(variables: dict, config: dict, agent_meta_root: 
             variables.update(_blocks)
 
 
-def build_variables(config: dict, agent_meta_root: Path, project_root: Path | None = None) -> tuple[dict, list[str]]:
+def build_variables(
+    config: dict, agent_meta_root: Path, project_root: Path | None = None,
+    active_set: ActiveSet | None = None,
+) -> tuple[dict, list[str]]:
     """Returns (variables_dict, pre_warnings).
+
+    ``active_set`` is the per-sync ActiveSet (computed here when omitted).
 
     project_root is the consuming project's root (where .meta-config/ lives).
     It differs from agent_meta_root whenever agent-meta is embedded as a
@@ -2085,12 +2112,19 @@ def build_variables(config: dict, agent_meta_root: Path, project_root: Path | No
     `_build_*_variables()` sub-function (see their docstrings for the exact
     parameter/mutation contract and any inter-group ordering constraints).
     """
+    # IC-17/IC-18: one ActiveSet per build; the sync pipeline passes its own.
+    active_set = _resolve_active_set(active_set, config, agent_meta_root, project_root)
     variables: dict = {}
     unmapped = _build_core_variables(variables, config, agent_meta_root, project_root)
+    # NOT applied: variables.update(active_set_variables(active_set)). Making
+    # ROLE_<ROLE>_ACTIVE effective flips `{{#if ROLE_META_FEEDBACK_ACTIVE}}` in
+    # meta-doctor.md for every default project (default render + generated-file
+    # hashes change, AC-01 breaks without rebaseline). Blocked pending a spec
+    # decision; see tests/test_variable_builder_active_set.py.
     _build_provider_variables(variables, config, agent_meta_root, warn_sink=unmapped)
     _build_orch_variables(variables, unmapped, config, agent_meta_root)
     _build_subagent_permission_variables(variables, config)
-    _build_platform_variables(variables, unmapped, config, agent_meta_root)
+    _build_platform_variables(variables, unmapped, config, agent_meta_root, active_set)
     dod_resolved = _build_dod_variables(variables, config, agent_meta_root)
     effective = _build_pipeline_variables(variables, unmapped, config, agent_meta_root, dod_resolved)
     # INTENT_ROUTING_TABLE: role rows plus pipeline signal_keywords rows,
@@ -2124,7 +2158,7 @@ def build_variables(config: dict, agent_meta_root: Path, project_root: Path | No
     # the build; drained into sync.log by _sync_stage_context_checks (no render effect).
     variables["_ROUTING_INFO"] = routing_info
     _build_snippet_variables(variables, agent_meta_root)
-    _build_convention_variables(variables, config, agent_meta_root)
+    _build_convention_variables(variables, config, agent_meta_root, active_set)
     apply_platform_variable_cascade(variables, config, config.get("platforms", []), agent_meta_root)
 
     return variables, unmapped
