@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Fixed
+- **`template-auditor` without keyword routing (Q9, IC-15 Nr. 14)**: removed `routing_patterns` from the
+  name_only role `template-auditor` in `config/role-defaults.yaml`; it stays dispatchable by name only
+  (`target_agents`/`name_index`). Scenario 76 assert #5 now checks "no keyword rule in `routing.rules`";
+  the ratchet exception list in `tests/test_role_addressability_coverage.py` is empty. AC-01 rebaselined
+  for the per-provider orchestrator artifacts only (routing data shrank), context budget `_IST_FULL` updated.
+
 ### Added
 - **Context measurement and budgets (#964)**: new IC-09 capability keys in
   `config/provider-capabilities.yaml`, the `python3 scripts/sync.py --context-report [--json]` mode

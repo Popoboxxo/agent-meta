@@ -48,15 +48,15 @@ TOLERANCE_MAX_BYTES = 4096
 # Known, unexplained deviation: Continue rules measure 19,004 B vs. 18,591 B in the
 # spec; the Ist-value below pins the measurement, the delta is not yet clarified.
 _IST_FULL: Dict[str, Dict[str, int]] = {
-    "Claude": {"entry-file": 2511, "rules": 18297, "orchestrator": 91267, "harness-roster": 587706, "always-loaded": 608514},
-    "Codex": {"entry-file": 25652, "rules": 18380, "orchestrator": 90687, "harness-roster": 581653, "always-loaded": 625685},
-    "Continue": {"entry-file": 617, "rules": 19004, "orchestrator": 75111, "always-loaded": 19621},
-    "Copilot": {"entry-file": 9334, "rules": 18405, "orchestrator": 74991, "always-loaded": 27739},
-    "Gemini": {"entry-file": 33221, "rules": 18297, "orchestrator": 91129, "always-loaded": 51518},
-    "KimiCode": {"entry-file": 25652, "orchestrator": 76234, "harness-roster": 572444, "always-loaded": 598096},
-    "Mammouth": {"entry-file": 25652, "rules": 18387, "orchestrator": 75948, "harness-roster": 574695, "always-loaded": 618734},
-    "Opencode": {"entry-file": 25716, "orchestrator": 90995, "harness-roster": 584230, "always-loaded": 609946},
-    "ZCode": {"entry-file": 26566, "orchestrator": 76269, "harness-roster": 571300, "always-loaded": 597866},
+    "Claude": {"entry-file": 2511, "rules": 18297, "orchestrator": 90750, "harness-roster": 587189, "always-loaded": 607997},
+    "Codex": {"entry-file": 25652, "rules": 18380, "orchestrator": 90170, "harness-roster": 581136, "always-loaded": 625168},
+    "Continue": {"entry-file": 617, "rules": 19004, "orchestrator": 74747, "always-loaded": 19621},
+    "Copilot": {"entry-file": 9334, "rules": 18405, "orchestrator": 74627, "always-loaded": 27739},
+    "Gemini": {"entry-file": 33221, "rules": 18297, "orchestrator": 90612, "always-loaded": 51518},
+    "KimiCode": {"entry-file": 25652, "orchestrator": 75870, "harness-roster": 572080, "always-loaded": 597732},
+    "Mammouth": {"entry-file": 25652, "rules": 18387, "orchestrator": 75584, "harness-roster": 574331, "always-loaded": 618370},
+    "Opencode": {"entry-file": 25716, "orchestrator": 90478, "harness-roster": 583713, "always-loaded": 609429},
+    "ZCode": {"entry-file": 26566, "orchestrator": 75905, "harness-roster": 570936, "always-loaded": 597502},
 }
 
 
