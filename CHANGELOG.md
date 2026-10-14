@@ -3,11 +3,31 @@
 ## [Unreleased]
 
 ### Fixed
+- **Active-set consumers (IC-18 Nr. 14-18, PR A)**: the raw `roles` allowlist is no longer the only source
+  for role-dependent generators; the per-sync `ActiveSet` (gates applied) is used.
+  - Continue role prompts follow the ActiveSet: gate-dropped roles and, without a `roles:` key,
+    `knowledge-*`/`se-*` no longer get a prompt (only projects with opt-in
+    `provider-options.Continue.generate-prompts`).
+  - Auto-commit allowlist (`.meta-config/auto-commit-allowlist.json`): `eligible_roles` is the raw list
+    intersected with the ActiveSet, so gate-dropped roles lose their commit authority (format and default
+    without `roles:` unchanged).
+  - `--cleanup-preview` treats gate-dropped roles as stale (expected files = `ActiveSet.roles`).
+  - Scout skill (`awesome-claude-code`) and `WEB_PROJECT_ENABLED` additionally require the role in the
+    ActiveSet (intersection; default render unchanged).
+  - Convention blocks and the strict subagent-permission scan always use the ActiveSet. Without a
+    `roles:` key this was "all roles with a source" before, now the ActiveSet.
+  - `EFFORT_ESTIMATOR_ENABLED` follows `ActiveSet.has("effort-estimator")`.
 - **`template-auditor` without keyword routing (Q9, IC-15 Nr. 14)**: removed `routing_patterns` from the
   name_only role `template-auditor` in `config/role-defaults.yaml`; it stays dispatchable by name only
   (`target_agents`/`name_index`). Scenario 76 assert #5 now checks "no keyword rule in `routing.rules`";
   the ratchet exception list in `tests/test_role_addressability_coverage.py` is empty. AC-01 rebaselined
   for the per-provider orchestrator artifacts only (routing data shrank), context budget `_IST_FULL` updated.
+
+### Changed
+- **`ACTIVE_ROLES` / `ROLE_<ROLE>_ACTIVE` available in templates**: `build_variables` injects
+  `active_set_variables`. The `meta-doctor` NEXT line now names `meta-feedback` in the default
+  (`ROLE_META_FEEDBACK_ACTIVE`); AC-01 rebaselined for the meta-doctor artifacts and their
+  `generated-file-hashes` only.
 
 ### Added
 - **Context measurement and budgets (#964)**: new IC-09 capability keys in

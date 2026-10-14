@@ -62,7 +62,7 @@ _PROVIDERS = sorted(
 # via rebaseline in package 0e, not via a path pattern.
 # Empty entries would hide drift, so every pattern must stay role/entry specific.
 AC01_EXCEPTIONS = frozenset({
-    r".*/meta-doctor(\.[a-z]+)+$",
+    r".*/meta-doctor\.(md|toml|agent\.md)$",
     r".*/meta-optimizer\.[a-z]+$",
     r".*/standalone/agents/meta-doctor\.md$",
 })

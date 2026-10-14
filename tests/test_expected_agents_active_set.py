@@ -3,6 +3,10 @@
 ``sync._preview_expected_filenames`` (the expected-file set behind
 ``--cleanup-preview`` stale detection) must filter by ``ActiveSet.roles``
 instead of the raw ``config["roles"]`` allowlist.
+
+Only ``test_expected_files_follow_given_active_set`` fails on the old code; the
+two p20 tests pass before and after because ``_should_skip_role`` already applies
+the activation gates (they document the contract).
 """
 from __future__ import annotations
 

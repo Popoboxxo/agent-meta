@@ -683,6 +683,9 @@ def _validate_subagent_permissions(config: dict, config_path: Path) -> None:
     platforms = config.get("platforms", [])
     role_map = build_role_map(agent_meta_root)
     role_sources, _ = collect_sources(agent_meta_root, platforms)
+    # Semantics change (IC-18 no. 18): without a `roles:` key this scan used
+    # "all roles with a source"; it now uses the ActiveSet. load_config has no
+    # sync context, so the ActiveSet is computed locally (strict mode only).
     active_set = compute_active_set(
         config, agent_meta_root, config_path.parent.parent, warn_sink=[])
     orch_mode = _resolve_orch_mode(config.get("orchestrator", {}))
@@ -1638,6 +1641,9 @@ def _resolve_active_set(
 ) -> ActiveSet:
     """Return the per-sync ActiveSet, computing it only for standalone callers.
 
+    ``_validate_subagent_permissions`` runs inside ``load_config`` (before any
+    sync context exists) and computes its own ActiveSet in strict mode only.
+
     The sync pipeline computes the ActiveSet once and passes it in (IC-17);
     direct callers (tests, tooling) get a locally computed one. Warnings are
     swallowed here -- the pipeline logs them from its own computation.
@@ -2065,6 +2071,8 @@ def _build_convention_variables(
     inline comment at its assignment for why.
     """
     _conv_log = SyncLog()
+    # Semantics change (IC-18 no. 18): `applies_to_roles` gating used the raw
+    # allowlist (None = all roles without `roles:`); it now uses the ActiveSet.
     _active_roles = set(_resolve_active_set(active_set, config, agent_meta_root).roles)
     try:
         _resolved_conventions = resolve_conventions(config, agent_meta_root)

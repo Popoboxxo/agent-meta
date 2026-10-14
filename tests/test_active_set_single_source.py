@@ -4,6 +4,14 @@ Spec ``docs/specs/2026-10-11-context-profiles-spec.md`` (QG-13, IC-18, F-42, AC-
 the ungated allowlist ``config["roles"]`` must not be consumed directly; consumers
 derive the active role set from ``ActiveSet``. Rule id: ``active-set.raw-roles-access``.
 
+State after PR A (IC-18 no. 14-18): 5 ratchet entries remain -- three
+intersection sites (``_sync_stage_auto_commit_allowlist``,
+``sync_external_skills_for_provider``, ``_build_platform_variables``: the raw
+condition stays the upper bound, ``ActiveSet`` intersects it) plus
+``_build_pipeline_variables`` and ``agent_sync.sync_agents_for_provider``
+(later PRs). The line numbers and the deviation list below describe the
+initial registry and are historical.
+
 Ratchet semantics (same style as ``ROUTE_RATCHET`` in
 ``tests/test_no_role_routes_in_templates.py``):
 
