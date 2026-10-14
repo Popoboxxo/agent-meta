@@ -58,6 +58,7 @@ from lib.hooks import create_hook
 from lib.io import SyncError
 from lib.log import SyncLog
 from lib.pipelines import (
+    PIPELINES_EFFECTIVE_KEY,
     apply_overrides,
     load_quality_pipelines,
     resolve_pipeline_details_dir,
@@ -237,10 +238,12 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
 
         pipeline_details_dir = resolve_pipeline_details_dir(pc, provider)
         test_variables["PIPELINE_DETAILS_DIR"] = pipeline_details_dir
-        pipelines_for_details = apply_overrides(
-            load_quality_pipelines(str(agent_meta_root)), config.get("quality-pipelines", {})
-        )
-        if pipelines_for_details:
+        pipelines_for_details = test_variables.get(PIPELINES_EFFECTIVE_KEY)
+        if not isinstance(pipelines_for_details, dict):
+            pipelines_for_details = apply_overrides(
+                load_quality_pipelines(str(agent_meta_root)), config.get("quality-pipelines", {})
+            )
+        if pipelines_for_details or PIPELINES_EFFECTIVE_KEY in test_variables:
             sync_pipeline_detail_files(
                 pipelines_for_details, provider, test_repo_path / pipeline_details_dir,
                 test_repo_path, resolve_dod(config, agent_meta_root), log, dry_run,

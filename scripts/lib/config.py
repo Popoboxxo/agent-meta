@@ -38,6 +38,8 @@ from .subagent_permissions import (
 from .pipelines import (
     PIPELINES_EFFECTIVE_KEY,
     apply_overrides,
+    filter_pipelines_by_active_set,
+    format_pipeline_drop,
     build_pipeline_variables,
     generate_pipeline_match_table,
     load_quality_pipelines,
@@ -1917,6 +1919,16 @@ def _build_pipeline_variables(
             name: pl for name, pl in effective.items()
             if isinstance(pl.get("stages", []), list)
         }
+        # IC-18 no. 2 / ADR-10: drop pipelines whose required stage roles are not
+        # in the ActiveSet (also narrows plan-driven allowed_agents) and warn --
+        # the warning reaches the console and sync.log via the pre-warnings.
+        _active = _resolve_active_set(active_set, config, agent_meta_root)
+        effective, _drops = filter_pipelines_by_active_set(
+            effective, _active, variables, active_dod=dod_resolved,
+            reflection_pairs=_effective_pairs,
+        )
+        for _drop in _drops:
+            unmapped.append(format_pipeline_drop(_drop, _active))
         if effective:
             variables["QUALITY_PIPELINES_ENABLED"] = "true"
         # Build variables for active pipelines; also set BLOCK="" for disabled

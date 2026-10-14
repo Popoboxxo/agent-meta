@@ -178,3 +178,79 @@ def test_real_feature_lifecycle_allowed_agents_on_p10_with_validator_active(tmp_
     kept, _ = _filter(config, widened)
     stage = next(s for s in kept["feature-lifecycle"]["stages"] if s["id"] == "implement")
     assert stage["plan-driven"]["allowed_agents"] == ["developer"]
+
+
+# --- Wiring (AC-46): renderers, WARN output, stale pipeline-details cleanup --------
+
+import subprocess
+import sys
+
+_SYNC = REPO_ROOT / "scripts" / "sync.py"
+
+
+def _sync_project(root: Path, roles) -> "subprocess.CompletedProcess":
+    (root / ".meta-config").mkdir(exist_ok=True)
+    lines = ['agent-meta-version: "2.0.0-beta.1"', "ai-providers:", "- Claude"]
+    if roles is not None:
+        lines += ["roles:"] + [f"- {r}" for r in roles]
+    lines += ["project:", "  name: t", "  prefix: t"]
+    (root / ".meta-config" / "project.yaml").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    if not (root / ".git").exists():
+        subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+    result = subprocess.run(
+        [sys.executable, str(_SYNC), "--config", str(root / ".meta-config" / "project.yaml")],
+        cwd=root, capture_output=True, text=True, timeout=300,
+    )
+    assert result.returncode == 0, result.stdout[-1500:] + result.stderr[-1500:]
+    return result
+
+
+def _p10_roles():
+    import yaml
+
+    return yaml.safe_load(
+        (_FIXTURES / "p10" / ".meta-config" / "project.yaml").read_text(encoding="utf-8"))["roles"]
+
+
+def test_p10_sync_warns_on_console_and_in_sync_log_and_renders_no_dropped_pipeline(tmp_path):
+    result = _sync_project(tmp_path, _p10_roles())
+    console = result.stdout + result.stderr
+    for name, role in (("feature-lifecycle", "validator"), ("refactor", "senior-developer"),
+                       ("bugfix", "bug-feature-analyzer")):
+        line = next(
+            (l for l in console.splitlines()
+             if "active-set.pipeline-dropped" in l and f"'{name}'" in l), None)
+        assert line is not None, f"no console WARN for {name}"
+        assert f"'{role}'" in line and "roles:" in line  # missing role + way to enable
+    logs = list(tmp_path.rglob("sync.log"))
+    assert logs and "active-set.pipeline-dropped" in logs[0].read_text(encoding="utf-8")
+
+    orchestrator = (tmp_path / ".claude" / "agents" / "orchestrator.md").read_text(encoding="utf-8")
+    for name in ("feature-lifecycle", "refactor", "bugfix", "concept-driven-dev", "concept-development"):
+        # Match-table row and §2a heading (static prose may still mention a name).
+        assert f"| `{name}` |" not in orchestrator, name
+        assert f"### `{name}`" not in orchestrator, name
+        assert f'"pipeline": "{name}"' not in orchestrator, name  # routing.pipelines
+    assert "| `quick-fix` |" in orchestrator and "| `docs-update` |" in orchestrator
+    details = tmp_path / ".claude" / "pipeline-details"
+    assert sorted(f.name for f in details.glob("*.md")) == ["docs-update.md", "quick-fix.md"]
+
+
+def test_resync_removes_stale_pipeline_details_of_dropped_pipelines(tmp_path):
+    full = _p10_roles() + ["senior-developer", "junior-developer", "validator"]
+    _sync_project(tmp_path, full)
+    details = tmp_path / ".claude" / "pipeline-details"
+    assert (details / "refactor.md").exists() and (details / "feature-lifecycle.md").exists()
+    _sync_project(tmp_path, _p10_roles())
+    assert not (details / "refactor.md").exists()
+    assert not (details / "feature-lifecycle.md").exists()
+    assert "refactor.md" not in (details / ".agent-meta-managed").read_text(encoding="utf-8")
+
+
+def test_default_project_drops_pipelines_with_gate_off_roles(tmp_path):
+    # ADR-10: applies in the default too (validator / developer_tiers gates off).
+    result = _sync_project(tmp_path, None)
+    console = result.stdout + result.stderr
+    for name in ("concept-driven-dev", "feature-lifecycle", "refactor"):
+        assert any("active-set.pipeline-dropped" in l and f"'{name}'" in l for l in console.splitlines())
+    assert not (tmp_path / ".claude" / "pipeline-details" / "refactor.md").exists()

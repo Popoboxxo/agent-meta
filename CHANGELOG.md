@@ -45,6 +45,14 @@
   without `junior-developer`, or `validator` without its gate, are now reported in the default as well),
   stages with an inactive `dod_flag` no longer warn, and the agent renderer consumes the single `effective`
   pipelines dict of the variable builder (se-focus filtered) instead of deriving its own.
+- **Pipelines with an inactive required role are dropped (IC-18 Nr. 2/3, AC-46, ADR-10), also in the default**:
+  `concept-driven-dev`, `feature-lifecycle` (both need `validator`) and `refactor` (needs `senior-developer`)
+  are no longer rendered in projects where those roles are inactive - the default project (gates
+  `validator`/`developer_tiers` off) included. They disappear from the match table, section 2a, the
+  `pipeline-details/*.md` files (stale files are removed on re-sync), `routing.pipelines` and the intent table;
+  sync prints and logs `active-set.pipeline-dropped` (WARN) naming the pipeline, the missing role and how to
+  enable it. Plan-driven `allowed_agents` of rendered pipelines contain only active roles. Default orchestrator
+  artifact: -3.8 to -4.5 KB per provider. To keep a pipeline, add its roles to `roles:` (and enable their gate).
 - **`routing.rules[].input_contracts` only with an active producer (IC-18 Nr. 4, AC-47 part)**: projects with
   a `roles:` subset no longer list input contracts that no active role produces (`task-spec-v1` stays, the
   orchestrator produces it). Default render unchanged (every default input contract has an active producer).

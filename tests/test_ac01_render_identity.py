@@ -37,6 +37,13 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   19 roles only ``mammouth-expert`` is active in the provider matrix, so only its per-provider artifact
   (8 providers + ``.agent`` file) and the matching managed-file hashes (9 x ``generated-file-hashes.json``)
   changed - 18 of 1102 hashes. The other 18 roles (knowledge-*, se-*) are not rendered in the matrix.
+- Task 1.10 (IC-18 no. 2, user decision ADR-10/Q18: the pipeline drop applies in the DEFAULT too): in the
+  default project the ``validator`` and ``developer_tiers`` gates are off, so ``concept-driven-dev`` and
+  ``feature-lifecycle`` (``validator``) and ``refactor`` (``senior-developer``) are no longer rendered. Changed
+  only: the per-provider orchestrator artifact (9; match table, section 2a detail blocks, ``routing.pipelines``),
+  the 3 ``pipeline-details/*.md`` files plus the ``.agent-meta-managed`` index per provider, and the matching
+  ``generated-file-hashes.json`` (27 + 9 + 9 + 9 = 54 of 1102 entries; 1075 remain, 27 files vanished). No other
+  hash changed.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

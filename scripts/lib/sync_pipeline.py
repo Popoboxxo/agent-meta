@@ -89,6 +89,7 @@ from lib.log import SyncLog
 from lib.subagent_permissions import resolve_subagent_permission_provider_vars
 from lib.mcp import generate_mcp_artifacts, sync_secrets_template
 from lib.pipelines import (
+    PIPELINES_EFFECTIVE_KEY,
     apply_overrides,
     load_quality_pipelines,
     resolve_pipeline_details_dir,
@@ -1159,10 +1160,15 @@ def _sync_stage_per_provider(
         # (sync_context_for_provider / _build_managed_block).
         pipeline_details_dir = resolve_pipeline_details_dir(pc, provider)
         provider_variables["PIPELINE_DETAILS_DIR"] = pipeline_details_dir
-        pipelines_for_details = apply_overrides(
-            load_quality_pipelines(str(agent_meta_root)), config.get("quality-pipelines", {})
-        )
-        if pipelines_for_details:
+        # IC-18 no. 2: the variable builder's filtered `effective` (dropped
+        # pipelines get no detail file; stale ones are removed by the managed-file
+        # cleanup, which must also run when nothing is left).
+        pipelines_for_details = variables.get(PIPELINES_EFFECTIVE_KEY)
+        if not isinstance(pipelines_for_details, dict):
+            pipelines_for_details = apply_overrides(
+                load_quality_pipelines(str(agent_meta_root)), config.get("quality-pipelines", {})
+            )
+        if pipelines_for_details or PIPELINES_EFFECTIVE_KEY in variables:
             sync_pipeline_detail_files(
                 pipelines_for_details, provider, project_root / pipeline_details_dir,
                 project_root, resolve_dod(config, agent_meta_root), log, args.dry_run,

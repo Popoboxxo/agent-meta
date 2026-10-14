@@ -538,6 +538,14 @@ Rolle: senior-developer · Issue: aus 1.00 · Depends: 1.09 · AC: AC-46 · Fall
 - [ ] Step 3: Test (pass): `python3 -m pytest tests/test_pipeline_active_set_filter.py tests/test_template_slimming_equivalence.py -q`
 - [ ] Step 4: commit `feat: drop pipelines whose required roles are inactive`
 
+#### Umsetzungs-Nachzüge 1.10/1.11 (zur Spec-Aufnahme)
+Die freigegebene Spec bleibt unverändert; die folgenden Abweichungen/Entscheidungen sind umgesetzt.
+1. **Default-Drop (Nutzerentscheidung, ADR-10/Q18, AC-23-Phase-1-Rebaseline):** der Pipeline-Drop gilt auch im Default (kein `roles:`-Key). Der Default hat 63 aktive Rollen; die Gates `validator` und `developer_tiers` sind aus, also fehlen `validator`, `junior-developer`, `senior-developer`. Folge: `concept-driven-dev` und `feature-lifecycle` (`validator`) sowie `refactor` (`senior-developer`) werden im Default nicht mehr gerendert; stattdessen WARN `active-set.pipeline-dropped` mit Aktivierungsweg. Rebaseline: AC-01 `hashes.json` (nur Orchestrator-Artefakte, `pipeline-details`, `generated-file-hashes.json`), Context-Budget-Pins; der Orchestrator-Golden war bereits in 1.12 als Teilmenge rebaselined.
+2. **dod_flag (AC-52):** der Plan-Test-Wortlaut „Stage mit inaktivem `dod_flag` warnt“ ist falsch; laut Spec AC-52 warnt sie NICHT. Umgesetzt in 1.09 (`validate_pipelines(active_dod=...)`, geteilte Regel `_stage_dod_flag_inactive`).
+3. **Zusatzparameter:** `filter_pipelines_by_active_set(effective, active, variables, *, active_dod=None, reflection_pairs=None)`. `active_dod` ist nötig, weil `root-cause-required`/`spec-plan-enabled` keine `DOD_*`-Variable haben; `reflection_pairs` löst `loop_ref` (Generator/Critic) mit Projekt-Overrides auf. Zusätzlich `format_pipeline_drop(drop, active)` für den WARN-Text. Ein leerer `allowed_agents`-Schnitt fällt auf `[fallback_agent]` zurück (der Renderer liest `[]` als „keine Restriktion“).
+4. **Verdrahtung:** das gefilterte `effective` entsteht einmal in `config._build_pipeline_variables` (`PIPELINES_EFFECTIVE_KEY`); Agent-Renderer, `pipeline-details` (`sync_pipeline.py`, Test-Repo-Pfad in `cli_commands.py`), `PIPELINE_MATCH_TABLE`, `INTENT_ROUTING_TABLE` und `routing.pipelines` konsumieren es; `gen_routing_llm_eval_catalog.py` filtert mit demselben Aufruf. Veraltete `pipeline-details`-Dateien entfernt die bestehende Managed-File-Cleanup (der Aufruf läuft auch bei leerem `effective`).
+5. **Szenarien:** 51/52 (`concept-driven-dev`-Detaildatei) bekamen eine explizite `roles:`-Liste inkl. `validator`.
+
 ### Task 1.11: `allowed_agents` mit ActiveSet schneiden (IC-18 Nr. 3)
 Rolle: developer · Issue: aus 1.00 · Depends: 1.10 · AC: AC-47 (Teil)
 **Files:** Modify `scripts/lib/pipelines.py`; Test Modify `tests/test_pipeline_active_set_filter.py`
