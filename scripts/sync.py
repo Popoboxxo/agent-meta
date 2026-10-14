@@ -446,8 +446,12 @@ def _preview_expected_filenames(
     project_root: Path,
     agent_meta_root: Path,
     log: SyncLog,
+    active_set,
 ) -> set:
     """Filenames the provider's agent sync would (re)write this run.
+
+    IC-18 no. 16: the role filter is ``ActiveSet.roles`` (single source), not
+    the raw ``config["roles"]`` allowlist.
 
     Mirrors the planning half of ``sync_agents_for_provider`` without composing
     or writing any content: the skip-gates decide membership, the IC-03
@@ -461,7 +465,7 @@ def _preview_expected_filenames(
     from lib.roles import resolve_activation_gates
 
     gates = resolve_activation_gates(agent_meta_root, config)
-    allowed_roles = set(config["roles"]) if "roles" in config else None
+    allowed_roles = set(active_set.roles)
     expected: set = set()
     for role, source_path in overrides.items():
         skip, filename = _should_skip_role(
@@ -634,7 +638,7 @@ def _handle_cleanup_preview(ctx: _SyncContext) -> None:
                 continue
             expected = _preview_expected_filenames(
                 config, variables, provider, pc, role_map, overrides,
-                target_dir, project_root, agent_meta_root, log)
+                target_dir, project_root, agent_meta_root, log, ctx.active_set)
             stale = plan_agent_cleanup(
                 target_dir, expected, provider, wrapper_filenames, pc, project_root)
             stale_entries.extend(stale)

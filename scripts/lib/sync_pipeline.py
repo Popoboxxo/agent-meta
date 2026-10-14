@@ -1068,6 +1068,7 @@ def _sync_stage_per_provider(
     provider_config: dict, providers: list, variables: dict,
     platform_vars: dict | None, debug_mode: bool, allow_committed_secrets: bool,
     mcp_gitignore_extras: list, args: argparse.Namespace, log: SyncLog,
+    active_set,
 ) -> None:
     """Stage 6: per-provider main loop (pipeline details, agents, Continue
     prompts, rules, MCP, external tools, hooks, commands, snippets,
@@ -1175,7 +1176,7 @@ def _sync_stage_per_provider(
             sync_prompts_for_continue(agent_meta_root, project_root, config,
                                       provider_variables, log, args.dry_run,
                                       provider_config=provider_config,
-                                      provider=provider)
+                                      provider=provider, active_set=active_set)
         if pc.get("has_rules", False):
             sync_rules(agent_meta_root, project_root, config, log, args.dry_run,
                        platform_vars=platform_vars, variables=provider_variables,
@@ -1272,7 +1273,8 @@ def _sync_stage_per_provider(
         sync_snippets_for_provider(agent_meta_root, project_root, config, log, args.dry_run,
                                    provider, provider_config)
         sync_external_skills_for_provider(agent_meta_root, project_root, config, variables,
-                                          log, args.dry_run, provider, provider_config)
+                                          log, args.dry_run, provider, provider_config,
+                                          active_set=active_set)
 
     # Task 11 / AC-22: old-path migration runs AFTER every provider's writers
     # have written the new paths. The migration MAP drives dispatch and each
@@ -1518,7 +1520,7 @@ def _sync_stage_generated_file_hash_capture(
     capture_generated_file_hashes(agent_meta_root, project_root, config, provider_config, args.dry_run)
 
 
-def _sync_stage_auto_commit_allowlist(agent_meta_root, project_root, config, args, log) -> None:
+def _sync_stage_auto_commit_allowlist(agent_meta_root, project_root, config, args, log, active_set) -> None:
     """Issue #694: write .meta-config/auto-commit-allowlist.json reflecting
     the resolved auto_commit config for this sync. Runs on every sync,
     overwriting the previous allowlist in full (not merged) -- stale
@@ -1526,9 +1528,16 @@ def _sync_stage_auto_commit_allowlist(agent_meta_root, project_root, config, arg
     after _sync_stage_generated_file_hash_capture (which the conventions
     skill's Change Checklist and this repo's own stage-13 comment both
     call the true last stage) so this file's own write doesn't get
-    captured into that hash baseline a step too early."""
+    captured into that hash baseline a step too early.
+
+    IC-18 no. 14: the explicit project allowlist stays the upper bound (no
+    ``roles:`` key keeps the empty list, default render unchanged) and the
+    ActiveSet intersects it, so a gate-dropped role loses commit authority."""
     active_roles = config.get("roles", [])
     resolved = resolve_auto_commit_config(config, active_roles, agent_meta_root)
+    resolved["eligible_roles"] = [
+        role for role in resolved["eligible_roles"] if active_set.has(role)
+    ]
 
     allowlist_path = project_root / ".meta-config" / "auto-commit-allowlist.json"
     if getattr(args, "dry_run", False):

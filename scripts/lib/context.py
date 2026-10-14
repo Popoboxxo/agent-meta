@@ -2295,8 +2295,12 @@ def sync_prompts_for_continue(
     provider_config: dict | None = None,
     *,
     provider: str,
+    active_set,
 ):
     """Generate <commands_dir>/<role>.md as invokable slash-commands.
+
+    IC-18 no. 15: prompts are generated only for ``active_set.roles`` (gates
+    and the roles allowlist already applied), never from the raw allowlist.
 
     ``provider`` is the registry key of a provider with ``has_prompt_commands``;
     the output directory and extension/snippet paths come from its registry
@@ -2339,7 +2343,7 @@ def sync_prompts_for_continue(
     prompt_mode = opts.get("prompt-mode", "full")
     platforms = config.get("platforms", [])
     overrides, _ = collect_sources(agent_meta_root, platforms)
-    allowed_roles: set | None = set(config["roles"]) if "roles" in config else None
+    allowed_roles = active_set.roles
 
     prompts_dir = project_root / pc.get("commands_dir", ".continue/prompts")
     if not dry_run:
@@ -2351,7 +2355,7 @@ def sync_prompts_for_continue(
         filename = target_filename(role, role_map)
         if not filename:
             continue
-        if allowed_roles is not None and role not in allowed_roles:
+        if role not in allowed_roles:
             continue
 
         expected.add(filename)
