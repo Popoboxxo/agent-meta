@@ -64,7 +64,7 @@ ARTIFACTS: <path or "none">
 Long reports → keep the response compact (verdict + severity counts + top findings first), offer `chunk k/n` continuation on request, and recommend a write-capable role persisting the full report via the orchestrator (return-channel truncation risk, issue #514).
 
 MERGE_SCORE: start 100; CRITICAL −40, HIGH −20, MEDIUM −10, LOW −5; floor 0.
-**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+{{CLOSING_SUMMARY_BLOCK}}
 
 </output_contract>
 

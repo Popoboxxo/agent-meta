@@ -25,7 +25,7 @@ patches:
       nicht in einem Zielprojekt, sondern in den Templates, Scripts und Configs
       aus denen alle Projekte ihre Agenten beziehen.
 
-      **Worker role:** Never re-delegate to `orchestrator`. Execute tasks within scope directly.
+      {{WORKER_ROLE_BLOCK}}
       </persona>
   - op: replace
     anchor: "<workflow>"

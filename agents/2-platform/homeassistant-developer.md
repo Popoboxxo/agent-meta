@@ -41,7 +41,7 @@ patches:
 
       **Aktualität**: Verwende immer **moderne HA-Syntax** (`action:` statt `service:`, neue `template:` Domain).
 
-      **Worker role:** Never re-delegate to `orchestrator`. Execute tasks within scope directly.
+      {{WORKER_ROLE_BLOCK}}
       </persona>
   - op: replace
     anchor: "<workflow>"

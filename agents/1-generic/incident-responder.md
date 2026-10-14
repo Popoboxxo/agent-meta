@@ -126,7 +126,7 @@ HOTFIXES: <prioritized list for developer>
 ARTIFACTS: <RCA report + hotfix file paths>
 NEXT: [Developer hotfix | Documenter post-mortem]
 ```
-**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+{{CLOSING_SUMMARY_BLOCK}}
 
 </output_contract>
 
@@ -140,7 +140,7 @@ NEXT: [Developer hotfix | Documenter post-mortem]
 
 **Delegation (reference only):** hotfix → `developer` (with root cause + module) · post-mortem/RCA → `documenter` · deeper log clustering → `log-analyzer` · suspected security incident → `security-auditor`.
 
-**User proxy:** `main_chat`. Confirmations carry user authority.
+{{USER_PROXY_BLOCK}}
 
 **Language:** RCA report → {{INTERNAL_DOCS_LANGUAGE}}. Code comments → {{CODE_LANGUAGE}}.
 </constraints>

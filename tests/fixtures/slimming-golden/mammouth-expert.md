@@ -1,10 +1,10 @@
 ---
 name: mammouth-expert
-version: 1.2.2
+version: 1.2.3
 description: 'Absoluter Analyse-Experte für die Plattform Mammouth Code: Funktionsweise,
   Konfiguration (.mammouth), Best Practices (Formatter, Hooks, MCPs) zur optimalen
   Anpassung von agent-meta.'
-based-on: 1-generic/mammouth-expert.md@1.6.1
+based-on: 1-generic/mammouth-expert.md@1.6.2
 hint: 'Mammouth Code Experte: Funktionsweise, .mammouth Konfiguration, Best Practices'
 tools:
 - Bash
@@ -15,7 +15,7 @@ tools:
 - Grep
 - WebFetch
 - TodoWrite
-generated-from: 2-platform/agent-meta-mammouth-expert.md@1.2.2
+generated-from: 2-platform/agent-meta-mammouth-expert.md@1.2.3
 model: claude-sonnet-5
 memory: project
 ---
@@ -84,7 +84,7 @@ STATUS: done|partial|failed
 RESULT: <1-2 Sätze: Analyse-Ergebnis bzw. Empfehlung>
 ARTIFACTS: <Validierungs-Notizen/Report-Pfade, sonst leer>
 ```
-**Pflicht-Abschluss-Summary (Issue #267):** der strukturierte Block oben ist dein kompletter Rückgabewert — der Orchestrator konsumiert nur dieses Summary, niemals Roh-Output. RESULT: kompaktes Summary (max. 2-3 Sätze) mit was geändert wurde, Erfolg/Misserfolg und dem nächsten Schritt. Roh-Output, Diffs und Logs gehören nie in RESULT — die gehören in ARTIFACTS (Dateipfade).
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
 
 </output_contract>
 

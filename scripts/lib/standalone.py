@@ -15,10 +15,13 @@ rather than invented facts.
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 from pathlib import Path
 
 from .frontmatter import _YAML_AVAILABLE, _parse_frontmatter_yaml, is_deprecated_template
 from .config import (
+    AGENT_BLOCK_SNIPPETS,
+    _load_block_snippet,
     _orch_mode_flags,
     _resolve_agent_meta_date,
     _resolve_orch_mode,
@@ -180,11 +183,59 @@ _EMPTY_BULLET_RE = re.compile(r"^- *\n", re.MULTILINE)
 _EXCESS_BLANK_LINES_RE = re.compile(r"\n{3,}")
 
 
+# IC-31 block snippets that standalone resolves to their real text; the
+# name -> variable mapping comes from config.AGENT_BLOCK_SNIPPETS.
+_STANDALONE_BLOCK_NAMES = frozenset({"closing-summary", "user-proxy", "worker-role"})
+_STANDALONE_BLOCK_SNIPPETS: tuple[tuple[str, str], ...] = tuple(
+    (name, f"{stem}_BLOCK")
+    for name, stem in AGENT_BLOCK_SNIPPETS
+    if name in _STANDALONE_BLOCK_NAMES
+)
+
+
+@lru_cache(maxsize=8)
+def _block_vars_cached(agent_meta_root: Path, fingerprint: tuple) -> dict:
+    """Block variables for one root; ``fingerprint`` (mtimes) invalidates edits."""
+    return {
+        f"{stem}_BLOCK": _load_block_snippet(
+            agent_meta_root / "snippets" / "agents" / f"{name}.md"
+        )
+        for name, stem in AGENT_BLOCK_SNIPPETS
+    }
+
+
+def resolve_block_snippets(text: str, agent_meta_root: Path) -> str:
+    """Inline every ``snippets/agents/*.md`` ``{{<NAME>_BLOCK}}`` reference.
+
+    Same resolution as the sync pipeline (``AGENT_BLOCK_SNIPPETS`` +
+    ``_load_block_snippet`` + ``substitute``); all other placeholders stay
+    untouched. Lets tests and tools inspect a template with its block snippets
+    resolved (IC-31, #552). Block variables are cached per root and
+    invalidated by snippet file mtimes.
+    """
+    snippets_dir = agent_meta_root / "snippets" / "agents"
+    fingerprint = tuple(
+        (snippets_dir / f"{name}.md").stat().st_mtime_ns
+        if (snippets_dir / f"{name}.md").exists() else None
+        for name, _stem in AGENT_BLOCK_SNIPPETS
+    )
+    block_vars = _block_vars_cached(agent_meta_root, fingerprint)
+    return substitute(text, block_vars, "block-snippet resolution", None)
+
+
 def _standalone_variables(agent_meta_root: Path) -> dict:
     variables: dict = {}
     variables.update(_IDENTITY_FALLBACKS)
     variables.update(_ORCHESTRATION_FALLBACKS)
     variables.update(_CONDITIONAL_FALSE_FLAGS)
+    # Render-neutral source de-dup blocks (IC-31): plain English boilerplate
+    # that read identically inline before the snippet extraction, so they
+    # resolve to their real text standalone (unlike the other *_BLOCK
+    # variables, which have no standalone fallback).
+    for _snippet_name, _var_name in _STANDALONE_BLOCK_SNIPPETS:
+        variables[_var_name] = _load_block_snippet(
+            agent_meta_root / "snippets" / "agents" / f"{_snippet_name}.md"
+        )
     variables["AGENT_META_VERSION"] = read_version(agent_meta_root)
     variables["AGENT_META_DATE"] = _resolve_agent_meta_date(agent_meta_root)
     # Convention blocks: render the 'default' preset so a standalone release/git

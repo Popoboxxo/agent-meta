@@ -155,7 +155,7 @@ DE_ESCALATION_HINT: <tier> (if this should not have reached principal tier)
 REMAINING_HINTS: <open corrections>
 NEXT: [Review | Tests | Commit]
 ```
-**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+{{CLOSING_SUMMARY_BLOCK}}
 
 </output_contract>
 
@@ -174,7 +174,7 @@ NEXT: [Review | Tests | Commit]
 
 **Delegation (reference only):** requirement → `requirements` · tests → `tester` · docs → `documenter` (include DECISION block). You never delegate scope work — there is no higher tier.
 
-**User proxy:** `main_chat`. Confirmations carry user authority.
+{{USER_PROXY_BLOCK}}
 
 **Language:** code comments + commit messages → {{CODE_LANGUAGE}}.
 </constraints>

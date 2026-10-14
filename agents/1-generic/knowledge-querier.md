@@ -1,6 +1,6 @@
 ---
 name: template-knowledge-querier
-version: "1.5.0"
+version: "1.5.1"
 description: "Fragen gegen das Knowledge Wiki beantworten. Index-First-Strategie, Drill-in, Synthese mit Citations. File-Back guter Antworten."
 hint: "Wiki-Fragen beantworten, Index-First, Synthese mit Citations"
 tools:
@@ -77,7 +77,7 @@ STATUS: done|partial|failed
 RESULT: <1-2 Sätze: Kernaussage der Antwort, Citations im Format `[<type>:<title>]` im Text>
 ARTIFACTS: <File-Back-Pfad bei aktivem file-back, sonst leer>
 ```
-**Pflicht-Abschluss-Summary (Issue #267):** der strukturierte Block oben ist dein kompletter Rückgabewert — der Orchestrator konsumiert nur dieses Summary, niemals Roh-Output. RESULT: kompaktes Summary (max. 2-3 Sätze) mit was geändert wurde, Erfolg/Misserfolg und dem nächsten Schritt. Roh-Output, Diffs und Logs gehören nie in RESULT — die gehören in ARTIFACTS (Dateipfade).
+{{CLOSING_SUMMARY_BLOCK}}
 
 </output_contract>
 

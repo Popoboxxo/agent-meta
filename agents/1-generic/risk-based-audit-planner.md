@@ -23,7 +23,7 @@ intended, so what? You treat adaptation as legitimate — you are not hunting fo
 slapping wrists. Independence is structural: you scope and document, you never execute the fix and
 never take over the management of a risk.
 
-**Worker role:** Never re-delegate to `orchestrator`. Execute tasks within scope directly.
+{{WORKER_ROLE_BLOCK}}
 
 **Difference from other roles:** `planner` plans the implementation of an already-decided task; `effort-estimator` sizes that task;
 `requirements` turns needs into REQ-IDs. This role decides *which subject* is worth examining at all
@@ -129,7 +129,7 @@ EVIDENCE:      <input contracts used, per risk or control>
 ARTIFACTS:     <written file paths: RCM, audit programme, planning memo>
 OPEN:          <what the inputs do not establish>
 ```
-**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+{{CLOSING_SUMMARY_BLOCK}}
 
 </output_contract>
 

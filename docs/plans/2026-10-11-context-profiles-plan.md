@@ -494,6 +494,14 @@ Rolle: senior-developer · Issue: aus 1.00 · Depends: 0e · AC: AC-72 · Falle:
 - [ ] Step 3: Test (pass): `python3 -m pytest tests/test_template_line_duplication.py tests/test_contract_labels.py tests/test_ac01_render_identity.py -q`
 - [ ] Step 4: commit `chore: replace repeated template boilerplate with snippets`
 
+#### Umsetzungs-Nachzüge 1.06/1.07 (zur Spec-Aufnahme)
+Die freigegebene Spec bleibt unverändert; die folgenden Abweichungen sind umgesetzt und bei einer Spec-Revision zu übernehmen.
+1. **Worker-Rolle (IC-31/Task 1.06):** neuer `{{WORKER_ROLE_BLOCK}}` (`snippets/agents/worker-role.md`, EN, statisch) statt `{{ANTI_RECURSION_BLOCK}}`. Grund: `ANTI_RECURSION_BLOCK` rendert deutschen, datengetriebenen Text; ein Ersatz der englischen Inline-Zeile würde den Render ändern (AC-72 verlangt byte-identisch). Beide Blöcke sind bewusst getrennt. Interfaces-Zeile 1.06 ergänzt: Produces `{{CLOSING_SUMMARY_BLOCK}}`, `{{USER_PROXY_BLOCK}}`, `{{WORKER_ROLE_BLOCK}}` (statt Nutzung `{{ANTI_RECURSION_BLOCK}}`).
+2. **Zahlen (gemessen):** Worker-Role 49 identische Zeilen (nicht 24 Nutzer/58 Kopien; 8 weitere Varianten sind nicht identisch); Closing-Summary 67 (3 abweichende Varianten bleiben inline); User-Proxy 20 identische Zeilen (nicht 19).
+3. **Version-Bumps (Step 2):** Ausnahme — render-neutrale Quell-Refactors erfolgen ohne Bump, weil das Frontmatter-`version:` im Render steht (ein Bump bräche AC-72/AC-01 byte-identisch). Vorschlag für Konventions-Skill, Hard Invariant 2 (Skill-Datei nicht geändert): „Bump on every content change — except purely source-level, render-neutral refactors (AC-01 harness green, rendered output byte-identical), because the frontmatter `version` is part of the render; record these in the CHANGELOG instead." Task 1.07 (Render-Änderung) bumpt dagegen (Patch).
+4. **Task 1.07 Dateiliste:** `tests/fixtures/slimming-golden/orchestrator.md` blieb unverändert; tatsächlich rebaselined wurden 8 Goldens (`knowledge-*` ×7, `mammouth-expert`), außerdem AC-01 `hashes.json` (18 von 1102) und `standalone/agents/` (19 Dateien).
+5. **Registrierung (IC-32):** die neuen `*_BLOCK` sind bisher manuell in `_BUILTIN_VARS` (`consistency/placeholders.py`) eingetragen; die Zuordnung Snippet→Variable liegt einmalig in `config.AGENT_BLOCK_SNIPPETS`. IC-32 soll die Menge später daraus ableiten. Präzedenz für render-neutrales Snippet-Dedup ohne Bump: Commit 5034004 (SR-C-07, escalate-card).
+
 ### Task 1.07: EN/DE-Zwilling auf EN vereinheitlichen (IC-31)
 Rolle: prompt-engineer · Issue: aus 1.00 · Depends: 1.06 · AC: AC-72 (Ausnahme), AC-06
 **Files:** Modify die 19 Templates mit „Pflicht-Abschluss-Summary" unter `agents/`, `tests/fixtures/slimming-golden/orchestrator.md`; Test Modify `tests/test_template_line_duplication.py`

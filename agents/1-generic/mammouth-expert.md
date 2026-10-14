@@ -1,6 +1,6 @@
 ---
 name: template-mammouth-expert
-version: "1.6.1"
+version: "1.6.2"
 description: "Absoluter Analyse-Experte für die Plattform Mammouth Code: Funktionsweise, Konfiguration (.mammouth), Best Practices (Formatter, Hooks, MCPs) zur optimalen Anpassung von agent-meta."
 hint: "Mammouth Code Experte: Funktionsweise, .mammouth Konfiguration, Best Practices"
 reference_standards:
@@ -81,7 +81,7 @@ STATUS: done|partial|failed
 RESULT: <1-2 Sätze: Analyse-Ergebnis bzw. Empfehlung>
 ARTIFACTS: <Validierungs-Notizen/Report-Pfade, sonst leer>
 ```
-**Pflicht-Abschluss-Summary (Issue #267):** der strukturierte Block oben ist dein kompletter Rückgabewert — der Orchestrator konsumiert nur dieses Summary, niemals Roh-Output. RESULT: kompaktes Summary (max. 2-3 Sätze) mit was geändert wurde, Erfolg/Misserfolg und dem nächsten Schritt. Roh-Output, Diffs und Logs gehören nie in RESULT — die gehören in ARTIFACTS (Dateipfade).
+{{CLOSING_SUMMARY_BLOCK}}
 
 </output_contract>
 

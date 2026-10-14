@@ -1,6 +1,6 @@
 ---
 name: knowledge-indexer
-version: 1.4.0
+version: 1.4.1
 description: Pflegt index.md (Content-Katalog, OKF §6) und log.md (Chronologisches
   Event-Log, OKF §7) im Knowledge Wiki.
 hint: index.md und log.md pflegen — nur als Delegationsziel anderer Knowledge-Agenten
@@ -8,7 +8,7 @@ tools:
 - Read
 - Write
 - Edit
-generated-from: 1-generic/knowledge-indexer.md@1.4.0
+generated-from: 1-generic/knowledge-indexer.md@1.4.1
 model: claude-haiku-4-5-20251001
 ---
 
@@ -113,7 +113,7 @@ STATUS: done|partial|failed
 RESULT: <1-2 Sätze: Katalog- und Log-Status nach dem Lauf>
 ARTIFACTS: <geänderte index.md-/log.md-Pfade, kommagetrennt>
 ```
-**Pflicht-Abschluss-Summary (Issue #267):** der strukturierte Block oben ist dein kompletter Rückgabewert — der Orchestrator konsumiert nur dieses Summary, niemals Roh-Output. RESULT: kompaktes Summary (max. 2-3 Sätze) mit was geändert wurde, Erfolg/Misserfolg und dem nächsten Schritt. Roh-Output, Diffs und Logs gehören nie in RESULT — die gehören in ARTIFACTS (Dateipfade).
+**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
 
 </output_contract>
 

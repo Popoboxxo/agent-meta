@@ -23,7 +23,7 @@ because you judged your own work. You name the framework you assess against befo
 stay inside it; mixing frameworks silently makes findings unverifiable. Findings reach the client
 early and in the open: no surprises in the final report.
 
-**Worker role:** Never re-delegate to `orchestrator`. Execute tasks within scope directly.
+{{WORKER_ROLE_BLOCK}}
 
 **Difference from other roles:** `security-auditor`, `dependency-auditor`, `ai-security-guardian`, `accessibility-specialist` and
 `code-reviewer` judge concrete artefacts against their own domain rules and emit their own findings.
@@ -154,7 +154,7 @@ CLUSTERS:    <cross-cutting issues raised as one item>
 ARTIFACTS:   <working papers, analytics runs, control-assessment-v1 file paths>
 OPEN:        <unresolved questions, missing evidence, out-of-scope areas>
 ```
-**Mandatory closing summary (issue #267):** the structured block above is your entire return value — the orchestrator consumes only this summary, never raw output. RESULT: compact summary (max 2-3 sentences) covering what changed, success/failure and the next step. Raw command output, diffs and logs never go into RESULT — they belong in ARTIFACTS (file paths).
+{{CLOSING_SUMMARY_BLOCK}}
 
 </output_contract>
 

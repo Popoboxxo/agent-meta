@@ -2,13 +2,54 @@
 
 ## [Unreleased]
 
+### Changed
+- **Source boilerplate de-duplicated render-neutrally (IC-31, AC-72)**: the verbatim worker-role line
+  (49 occurrences), the "Mandatory closing summary" line (67) and the "User proxy" line (20) in
+  `agents/1-generic` / `agents/2-platform` are replaced by the new snippet blocks `{{WORKER_ROLE_BLOCK}}`,
+  `{{CLOSING_SUMMARY_BLOCK}}` and `{{USER_PROXY_BLOCK}}` (`snippets/agents/worker-role.md`, `closing-summary.md`, `user-proxy.md`; registered in
+  `consistency/placeholders.py`, resolved in `standalone.py`). The rendered output of all providers and the
+  standalone export is byte-identical (AC-01 harness green, no rebaseline, no version bumps because the
+  frontmatter `version` is part of the render). Template source: `agents/1-generic` 708376 -> 681588 bytes
+  (-26788), `agents/2-platform` 81703 -> 81383 bytes (-320); line count unchanged (1:1 line swap);
+  duplicated source lines (>= 40 chars in >= 5 files) 20 distinct / 319 occurrences -> 17 / 183, guarded by the
+  new ratchet `tests/test_template_line_duplication.py`. `tests/test_contract_labels.py` now checks the
+  snippet-resolved templates (`scripts.lib.standalone.resolve_block_snippets`, #552). The existing
+  `{{ANTI_RECURSION_BLOCK}}` (German text) is not reused: it would change the render of the worker-role line.
+- **EN/DE closing-summary twin unified on EN (IC-31, AC-72 exception)**: the German "Pflicht-Abschluss-Summary"
+  line in 19 templates (`mammouth-expert`, `knowledge-*` x7, `se-*` x11; patch version bump each, override
+  `agent-meta-mammouth-expert` re-pinned) now uses `{{CLOSING_SUMMARY_BLOCK}}` - the rendered text of these
+  agents switches from German to English (deliberate render change). Rebaselined: AC-01 `hashes.json`
+  (18 of 1102 hashes: the `mammouth-expert` artifacts of all providers + managed-file hashes; the other 18
+  roles are not part of the provider matrix), 8 slimming goldens (`knowledge-*`, `mammouth-expert`), and the
+  committed `standalone/agents/` export (19 files). Ratchet ceilings lowered to 16 lines / 164 occurrences.
+
 ### Fixed
 - CI: raise `scenarios` job timeout from 45 to 60 minutes (the scenario suite regularly needs 42–45+ minutes).
+- **Active-set consumers (IC-18 Nr. 14-18, PR A)**: the raw `roles` allowlist is no longer the only source
+  for role-dependent generators; the per-sync `ActiveSet` (gates applied) is used.
+  - Continue role prompts follow the ActiveSet: gate-dropped roles and, without a `roles:` key,
+    `knowledge-*`/`se-*` no longer get a prompt (only projects with opt-in
+    `provider-options.Continue.generate-prompts`).
+  - Auto-commit allowlist (`.meta-config/auto-commit-allowlist.json`): `eligible_roles` is the raw list
+    intersected with the ActiveSet, so gate-dropped roles lose their commit authority (format and default
+    without `roles:` unchanged).
+  - `--cleanup-preview` treats gate-dropped roles as stale (expected files = `ActiveSet.roles`).
+  - Scout skill (`awesome-claude-code`) and `WEB_PROJECT_ENABLED` additionally require the role in the
+    ActiveSet (intersection; default render unchanged).
+  - Convention blocks and the strict subagent-permission scan always use the ActiveSet. Without a
+    `roles:` key this was "all roles with a source" before, now the ActiveSet.
+  - `EFFORT_ESTIMATOR_ENABLED` follows `ActiveSet.has("effort-estimator")`.
 - **`template-auditor` without keyword routing (Q9, IC-15 Nr. 14)**: removed `routing_patterns` from the
   name_only role `template-auditor` in `config/role-defaults.yaml`; it stays dispatchable by name only
   (`target_agents`/`name_index`). Scenario 76 assert #5 now checks "no keyword rule in `routing.rules`";
   the ratchet exception list in `tests/test_role_addressability_coverage.py` is empty. AC-01 rebaselined
   for the per-provider orchestrator artifacts only (routing data shrank), context budget `_IST_FULL` updated.
+
+### Changed
+- **`ACTIVE_ROLES` / `ROLE_<ROLE>_ACTIVE` available in templates**: `build_variables` injects
+  `active_set_variables`. The `meta-doctor` NEXT line now names `meta-feedback` in the default
+  (`ROLE_META_FEEDBACK_ACTIVE`); AC-01 rebaselined for the meta-doctor artifacts and their
+  `generated-file-hashes` only.
 
 ### Added
 - **Context measurement and budgets (#964)**: new IC-09 capability keys in
