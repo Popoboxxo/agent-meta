@@ -111,6 +111,11 @@
   `upgrade-meta` (`agent-meta-manager`). Command bodies now resolve `{{#if ROLE_*_ACTIVE}}` conditionals;
   `add-provider` delegates to `meta-feedback` only when it is active (otherwise the user files the issue).
   New consistency check `commands.requires-roles-invalid` (ERROR: not a list or unknown role).
+- **Rule owner lines follow the ActiveSet (IC-18 Nr. 10, PR D)**: `security-paved-roads` (owner column and the
+  review-finding sentence), `threat-model-4-questions` (`concept-reviewer` / `orchestrator` lines) and
+  `a2a-delegation-gates` (default security-critical roles) name an owner role only when it is active; the
+  block catalog itself stays complete ("*(keine aktive Eigentümer-Rolle)*" without an active owner). Default
+  render unchanged (all owners active, AC-01 green without rebaseline).
 
 ### Changed
 - **`ACTIVE_ROLES` / `ROLE_<ROLE>_ACTIVE` available in templates**: `build_variables` injects
