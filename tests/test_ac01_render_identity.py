@@ -23,6 +23,9 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
 - Review of package 0e (fix commit): meta-doctor allowlist reduced to the exact IC-23/AC-88 forms, wording
   without "read-only", manager ``input_contracts`` reduced to ``doctor-findings-v1`` (no ``task-spec-v1``).
   Affects only the meta-doctor artifacts, the orchestrator routing data and managed-file hashes.
+- Task 1.35 (Q9, IC-15 Nr. 14): ``template-auditor`` loses its ``routing_patterns`` (name_only role
+  without keyword rule). Rebaselined only the per-provider orchestrator artifact (its keyword
+  routing data / intent rows) and the matching managed-file hashes; no other artifact changed.
 - Task 1.05 (IC-18 no. 18, user decision): meta-doctor (new in 0e, unreleased): the NEXT
   conditional ``ROLE_META_FEEDBACK_ACTIVE`` is true in the default (meta-feedback is in the
   ActiveSet) now that ``active_set_variables`` reaches ``build_variables``. Only the
