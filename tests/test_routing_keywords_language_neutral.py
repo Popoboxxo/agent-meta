@@ -20,7 +20,7 @@ sys.path.insert(0, str(_ROOT))
 
 from scripts.lib.roles import load_roles_config  # noqa: E402
 
-PHASE0_ALLOW_MAX = 18  # may only decrease (AC-68)
+PHASE0_ALLOW_MAX = 17  # exact current count; may only decrease (AC-68)
 _UMLAUT_RE = re.compile("[äöüßÄÖÜ]")
 _STOPLIST = frozenset({
     "und", "oder", "der", "die", "das", "mit", "für", "fuer", "nicht", "bitte",
@@ -75,4 +75,5 @@ def test_allowlist_entries_have_reason_and_are_not_stale():
 
 
 def test_allowlist_only_shrinks():
-    assert len(_config()["keyword_allow"]) <= PHASE0_ALLOW_MAX
+    # Equality: the bound must be lowered together with every shrinkage.
+    assert len(_config()["keyword_allow"]) == PHASE0_ALLOW_MAX
