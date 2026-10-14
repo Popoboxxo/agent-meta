@@ -303,6 +303,27 @@ roles:
       - task-spec-v1
       output_contract: audit-findings-v1
     short_desc: 'Read-only Audit der Agenten-Definitionen — Findings statt Fixes'
+  meta-doctor:
+    model: fast
+    memory: ''  # Operational role, starts fresh each time to avoid context pollution.
+    workflow_tier: optional
+    description: 'Installation doctor: runs `sync.py --doctor`, deduplicates and prioritizes
+      known-issue findings of this agent-meta installation, and hands fixes to agent-meta-manager
+      — never repairs anything and writes reports only to the configured tmp-sink.'
+    routing:
+      addressability: name_only
+      name_only_reason: Diagnostic meta role; invoked explicitly by name (e.g. 'run
+        meta-doctor'), never by routine task keywords, to avoid accidental diagnostic
+        runs.
+      parallel: false
+      orchestrator_only: true
+    handoff:
+      input_contracts:
+      - task-spec-v1
+      output_contract: doctor-findings-v1
+      target_roles:
+      - agent-meta-manager
+    short_desc: 'Diagnoses the agent-meta installation (reports only to the tmp-sink)'
   tester:
     model: fast
     memory: ''
