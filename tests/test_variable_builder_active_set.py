@@ -84,3 +84,19 @@ def test_convention_blocks_follow_active_set():
     _build_convention_variables(without_git, config, _REPO_ROOT, reduced)
     assert with_git.get("GIT_ISSUE_NAMING_BLOCK")
     assert not without_git.get("GIT_ISSUE_NAMING_BLOCK")
+
+
+def test_web_project_flag_intersects_allowlist_and_active_set():
+    config = {"roles": ["orchestrator", "developer", "e2e-tester"]}
+    active = compute_active_set(config, _REPO_ROOT, _REPO_ROOT, warn_sink=[])
+    listed: dict = {}
+    _build_platform_variables(listed, [], config, _REPO_ROOT, active)
+    assert listed["WEB_PROJECT_ENABLED"] == "true"
+    reduced = dataclasses.replace(active, roles=active.roles - {"e2e-tester"})
+    dropped: dict = {}
+    _build_platform_variables(dropped, [], config, _REPO_ROOT, reduced)
+    assert dropped["WEB_PROJECT_ENABLED"] == "false"
+    # Default (no allowlist): unchanged "false" even though e2e-tester is active.
+    default: dict = {}
+    _build_platform_variables(default, [], {}, _REPO_ROOT)
+    assert default["WEB_PROJECT_ENABLED"] == "false"

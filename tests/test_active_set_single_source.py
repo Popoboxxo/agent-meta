@@ -73,9 +73,9 @@ LEGIT_READERS: Dict[str, str] = {
 # Start registry (F-42, IC-18 no. 14-18). Format: "<module>::<function>".
 RAW_ROLES_RATCHET: FrozenSet[str] = frozenset(
     {
-        "scripts/lib/skills.py::sync_external_skills_for_provider",  # IC-18 no. 17 (:424) - BLOCKED: default-render change, see test_scout_skill_active_set
-        "scripts/lib/sync_pipeline.py::_sync_stage_auto_commit_allowlist",  # IC-18 no. 14 (:1530) - BLOCKED: default-render change, see test_auto_commit_allowlist_pipeline
-        "scripts/lib/config.py::_build_platform_variables",  # IC-18 no. 18 (:1689) - only WEB_PROJECT_ENABLED left, BLOCKED: default-render change
+        "scripts/lib/skills.py::sync_external_skills_for_provider",  # IC-18 no. 17: raw condition stays, ActiveSet intersects it (default render); raw read remains
+        "scripts/lib/sync_pipeline.py::_sync_stage_auto_commit_allowlist",  # IC-18 no. 14: raw allowlist stays the upper bound (default render), ActiveSet intersects it; raw read remains until the spec drops the no-allowlist case
+        "scripts/lib/config.py::_build_platform_variables",  # IC-18 no. 18 (:1689): WEB_PROJECT_ENABLED keeps the raw condition, ActiveSet intersects it (default render); raw read remains
         "scripts/lib/config.py::_build_pipeline_variables",  # not in spec F-42 (:1863 available_roles) - see docstring
         "scripts/lib/agent_sync.py::sync_agents_for_provider",  # not in spec F-42 (:1337)
     }

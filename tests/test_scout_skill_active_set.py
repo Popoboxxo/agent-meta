@@ -20,13 +20,6 @@ from lib import skills as skills_mod  # noqa: E402
 from lib.active_set import ActiveSet  # noqa: E402
 from lib.log import SyncLog  # noqa: E402
 
-pytestmark = pytest.mark.xfail(
-    strict=True,
-    reason="IC-18 no. 17 BLOCKED: switching to ActiveSet.has('agent-meta-scout') makes the "
-    "default project (no `roles:` key, scout active) clone awesome-claude-code "
-    "(+513 files, .gitmodules) and breaks AC-01 (no rebaseline allowed). Needs a spec decision.",
-)
-
 _PROVIDER_CONFIG = {"Claude": {"agents_dir": ".claude/agents", "skills_dir": ".claude/skills"}}
 
 
@@ -55,13 +48,15 @@ def _ensured_repos(monkeypatch, tmp_path: Path, config: dict, active_set: Active
 
 @pytest.mark.parametrize("allowlist", [None, ["agent-meta-scout"]])
 def test_scout_not_in_active_set_does_not_enable_skill(monkeypatch, tmp_path, allowlist):
-    # A raw allowlist naming the scout (or none at all) is irrelevant: the
-    # gate-dropped / inactive scout must not pull in awesome-claude-code.
+    # No allowlist (default render stays unchanged) or a gate-dropped scout
+    # named in the allowlist must not pull in awesome-claude-code.
     config = {} if allowlist is None else {"roles": allowlist}
     assert "awesome-claude-code" not in _ensured_repos(
         monkeypatch, tmp_path, config, _active("developer"))
 
 
 def test_scout_in_active_set_enables_skill(monkeypatch, tmp_path):
-    repos = _ensured_repos(monkeypatch, tmp_path, {}, _active("developer", "agent-meta-scout"))
+    repos = _ensured_repos(
+        monkeypatch, tmp_path, {"roles": ["agent-meta-scout"]},
+        _active("developer", "agent-meta-scout"))
     assert "awesome-claude-code" in repos
