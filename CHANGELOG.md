@@ -45,6 +45,9 @@
   without `junior-developer`, or `validator` without its gate, are now reported in the default as well),
   stages with an inactive `dod_flag` no longer warn, and the agent renderer consumes the single `effective`
   pipelines dict of the variable builder (se-focus filtered) instead of deriving its own.
+- **`routing.rules[].input_contracts` only with an active producer (IC-18 Nr. 4, AC-47 part)**: projects with
+  a `roles:` subset no longer list input contracts that no active role produces (`task-spec-v1` stays, the
+  orchestrator produces it). Default render unchanged (every default input contract has an active producer).
 - **`template-auditor` without keyword routing (Q9, IC-15 Nr. 14)**: removed `routing_patterns` from the
   name_only role `template-auditor` in `config/role-defaults.yaml`; it stays dispatchable by name only
   (`target_agents`/`name_index`). Scenario 76 assert #5 now checks "no keyword rule in `routing.rules`";

@@ -45,6 +45,16 @@ What the gate checks
    the rendered template carries the canonical block text and the mandatory
    markers.
 
+Golden rebaseline log (the frozen set is edited only with a documented reason):
+
+* Task 1.12 (IC-18 no. 4, AC-47 part): ``orchestrator.md`` -- the golden case renders
+  the repository's own ``.meta-config/project.yaml`` (a ``roles:`` SUBSET, 58 roles),
+  so ``routing.rules[].input_contracts`` now keeps only contracts with an active
+  producer (e.g. ``doctor-findings-v1``, ``db-schema-v1``, ``slo-report-v1`` and
+  ``rag-pipeline-v1`` entries disappear where no active role produces them). Only
+  ``input_contracts`` lines of the embedded routing JSON changed (12 hunks); the
+  default (all roles) render is unchanged (AC-01 hashes untouched).
+
 The gate is network-free, writes nothing into the repository (the render target
 is a pytest ``tmp_path``) and renders the corpus once per module (~5s).
 """

@@ -331,9 +331,7 @@ In dieser Runtime ist **kein** natives `route_intent`-Tool registriert. Leite di
           "Upgrade agent-meta im Projekt und sync neu."
         ],
         "output_contract": "",
-        "input_contracts": [
-          "doctor-findings-v1"
-        ]
+        "input_contracts": []
       },
       {
         "agent": "agent-meta-scout",
@@ -549,9 +547,7 @@ In dieser Runtime ist **kein** natives `route_intent`-Tool registriert. Leite di
           "Baue die ETL-Pipeline."
         ],
         "output_contract": "data-pipeline-v1",
-        "input_contracts": [
-          "rag-pipeline-v1"
-        ]
+        "input_contracts": []
       },
       {
         "agent": "dependency-auditor",
@@ -613,9 +609,7 @@ In dieser Runtime ist **kein** natives `route_intent`-Tool registriert. Leite di
           "task-spec-v1",
           "review-output-v1",
           "e2e-result-v1",
-          "db-schema-v1",
           "rca-report-v1",
-          "slo-report-v1",
           "data-pipeline-v1",
           "a11y-audit-v1",
           "refactoring-plan-v1",
@@ -623,9 +617,6 @@ In dieser Runtime ist **kein** natives `route_intent`-Tool registriert. Leite di
           "api-spec-v1",
           "explorer-output-v1",
           "concept-spec-v1",
-          "eval-result-v1",
-          "rag-pipeline-v1",
-          "agent-observability-v1",
           "prompt-spec-v1"
         ]
       },
@@ -677,7 +668,6 @@ In dieser Runtime ist **kein** natives `route_intent`-Tool registriert. Leite di
         ],
         "output_contract": "",
         "input_contracts": [
-          "slo-report-v1",
           "refactoring-plan-v1"
         ]
       },
@@ -770,11 +760,7 @@ In dieser Runtime ist **kein** natives `route_intent`-Tool registriert. Leite di
         "output_contract": "",
         "input_contracts": [
           "dependency-audit-v1",
-          "prompt-governance-v1",
-          "lifecycle-audit-v1",
-          "ai-governance-assessment-v1",
-          "fraud-risk-assessment-v1",
-          "control-assessment-v1"
+          "lifecycle-audit-v1"
         ]
       },
       {
@@ -890,9 +876,7 @@ In dieser Runtime ist **kein** natives `route_intent`-Tool registriert. Leite di
           "task-spec-v1",
           "review-output-v1",
           "e2e-result-v1",
-          "db-schema-v1",
           "rca-report-v1",
-          "slo-report-v1",
           "data-pipeline-v1",
           "a11y-audit-v1",
           "refactoring-plan-v1",
@@ -1171,8 +1155,7 @@ In dieser Runtime ist **kein** natives `route_intent`-Tool registriert. Leite di
         ],
         "output_contract": "prompt-spec-v1",
         "input_contracts": [
-          "task-spec-v1",
-          "eval-result-v1"
+          "task-spec-v1"
         ]
       },
       {
@@ -1253,9 +1236,7 @@ In dieser Runtime ist **kein** natives `route_intent`-Tool registriert. Leite di
           "task-spec-v1",
           "review-output-v1",
           "e2e-result-v1",
-          "db-schema-v1",
           "rca-report-v1",
-          "slo-report-v1",
           "data-pipeline-v1",
           "a11y-audit-v1",
           "refactoring-plan-v1",

@@ -217,6 +217,21 @@ def _select_examples(
     return []
 
 
+def _produced_contracts(roles: dict, active_names: list[str]) -> set[str]:
+    """Contracts produced as ``output_contract`` by at least one active role.
+
+    Local equivalent of ``ActiveSet.producers`` for callers without a shared
+    ActiveSet (same data: ``handoff.output_contract`` of the active roles).
+    """
+    produced: set[str] = set()
+    for name in active_names:
+        handoff = (roles.get(name) or {}).get("handoff")
+        contract = handoff.get("output_contract") if isinstance(handoff, dict) else None
+        if contract:
+            produced.add(str(contract))
+    return produced
+
+
 def get_routing_rules(
     agent_meta_root: Path,
     config: dict,
@@ -259,7 +274,8 @@ def get_routing_rules(
         "name_index": [...]}`` —
         ``target_agents`` is the sorted enum of active non-orchestrator roles;
         ``rules`` carries ``agent/tier/parallel/orchestrator_only/keywords/
-        examples/output_contract/input_contracts`` per routed role (sorted by
+        examples/output_contract/input_contracts`` per routed role
+        (``input_contracts`` reduced to contracts with an active producer) (sorted by
         agent name for deterministic, idempotent output); ``pipelines`` maps
         quality pipelines with ``signal_keywords`` to ``{"route": "pipeline",
         "pipeline": <name>, "keywords": [...]}`` entries (sorted by name);
@@ -269,18 +285,23 @@ def get_routing_rules(
     """
     roles_cfg = load_roles_config(agent_meta_root)
     roles = roles_cfg.get("roles", {})
-    target_agents = [
-        name for name in _active_role_names(
-            agent_meta_root,
-            config,
-            variables,
-            require_template=True,
-            template_roles=template_roles,
-            warn_sink=warn_sink,
-            active_set=active_set,
-        )
-        if name != "orchestrator"
-    ]
+    active_names = _active_role_names(
+        agent_meta_root,
+        config,
+        variables,
+        require_template=True,
+        template_roles=template_roles,
+        warn_sink=warn_sink,
+        active_set=active_set,
+    )
+    target_agents = [name for name in active_names if name != "orchestrator"]
+    # IC-18 no. 4: an input contract stays only if an active role (the
+    # orchestrator included) produces it as its output_contract.
+    produced = (
+        {contract for contract, who in active_set.producers.items() if who}
+        if active_set is not None
+        else _produced_contracts(roles, active_names)
+    )
 
     rules = []
     for role_name in target_agents:
@@ -311,7 +332,8 @@ def get_routing_rules(
             "examples": examples,
             "output_contract": str(handoff.get("output_contract") or ""),
             "input_contracts": [
-                str(c) for c in (handoff.get("input_contracts") or []) if str(c).strip()
+                str(c) for c in (handoff.get("input_contracts") or [])
+                if str(c).strip() and str(c) in produced
             ],
         })
 
