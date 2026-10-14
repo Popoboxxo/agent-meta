@@ -174,3 +174,53 @@ def test_role_not_in_any_routing_keywords_of_other_roles():
             continue
         blob = repr((info.get("routing") or {}).get("intent_keywords")) + repr(info.get("routing_patterns"))
         assert "meta-doctor" not in blob, name
+
+
+# --- Task 0e.3 (IC-23, AC-44): agent-meta-manager consumes doctor-findings-v1 ---
+
+_MANAGER = REPO_ROOT / "agents" / "1-generic" / "agent-meta-manager.md"
+_MANAGER_VERSION_BEFORE = "1.23.1"
+
+
+def _manager_text() -> str:
+    return _MANAGER.read_text(encoding="utf-8")
+
+
+def _consumer_section() -> str:
+    m = re.search(r"\n## [^\n]*doctor-findings-v1[^\n]*\n(.*?)(?=\n## |\Z)", _manager_text(), re.DOTALL)
+    assert m, "consumer section for doctor-findings-v1 missing in agent-meta-manager"
+    return m.group(1)
+
+
+def test_manager_declares_doctor_findings_input_contract():
+    handoff = _roles()["agent-meta-manager"].get("handoff") or {}
+    assert "doctor-findings-v1" in (handoff.get("input_contracts") or [])
+
+
+def test_no_output_not_consumed_finding_for_doctor_findings():
+    from scripts.lib.consistency.handoff_contracts import check_handoff_contracts  # type: ignore
+    findings = check_handoff_contracts(REPO_ROOT)
+    bad = [f for f in findings if f.check == "handoff.output-not-consumed" and "doctor-findings-v1" in f.message]
+    assert not bad, bad
+
+
+def test_manager_consumer_section_contract():
+    sec = _consumer_section()
+    low = sec.lower()
+    assert "untrusted" in low
+    for field in ("`quoted`", "`evidence`", "`message`"):
+        assert field in sec
+    assert "severity_registry" in sec and "severity_effective" in sec
+    assert "doctor.registry-invalid" in sec
+    assert "never" in low and "instruction" in low
+    assert "approval" in low
+    assert len(sec.strip().splitlines()) <= 16
+
+
+def test_manager_version_bumped_and_no_new_provider_literal():
+    from scripts.lib.consistency.provider_literals import check_provider_literal  # type: ignore
+    fm = parse_frontmatter_file(_MANAGER)
+    ver = str(fm["version"])
+    assert tuple(map(int, ver.split("."))) > tuple(map(int, _MANAGER_VERSION_BEFORE.split(".")))
+    hits = [f for f in check_provider_literal(REPO_ROOT) if "agent-meta-manager" in str(f.file)]
+    assert len(hits) <= 8, len(hits)

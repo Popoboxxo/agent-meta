@@ -681,6 +681,10 @@ roles:
       - Agenten verwalten
       examples:
       - "Upgrade agent-meta im Projekt und sync neu."
+    handoff:
+      input_contracts:
+      - task-spec-v1
+      - doctor-findings-v1
     short_desc: 'agent-meta verwalten: Upgrade, Sync, Feedback, projektspezifische
       Agenten anl...'
   release:
