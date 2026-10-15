@@ -90,7 +90,7 @@ Pflicht: Code komplett, Konventionen & Conv. Commits eingehalten, keine Regressi
 # MCP Hard Prohibitions
 
 > Kurzfassung der harten Tool-Verbote aktiver MCP-Server. Vollständige Tool-Listen und
-> Hinweise: pro Provider in `.gemini/skills bzw. .opencode/skills bzw. .mammouth/skills bzw. .agents/skills bzw. .zcode/skills bzw. .kimi-code/skills` — jeweils `mcp-<server>/SKILL.md` (`use-lazy-rules.md`).
+> Hinweise: pro Provider in `.gemini/skills bzw. .opencode/skills` — jeweils `mcp-<server>/SKILL.md` (`use-lazy-rules.md`).
 
 - **honcho:** `delete_conclusion`, `set_config` — absolut verboten.
 - **playwright:** `browser_run_code_unsafe`, `browser_evaluate`, `browser_file_upload`, `browser_handle_dialog` — absolut verboten.
@@ -116,7 +116,7 @@ Durchsetzung: PreToolUse-Hook = **Convention boundary** (keine Security Boundary
 
 # Lazy-Loaded Rules
 
-> Nicht immer geladen — bei Bedarf per `Read` öffnen: `.gemini/skills bzw. .opencode/skills bzw. .mammouth/skills bzw. .agents/skills bzw. .zcode/skills bzw. .kimi-code/skills/<skill>/SKILL.md` (jeweils).
+> Nicht immer geladen — bei Bedarf per `Read` öffnen: `.gemini/skills bzw. .opencode/skills/<skill>/SKILL.md` (jeweils).
 
 | Skill | Wann |
 |---|---|
@@ -162,12 +162,12 @@ Anti-Recursion: Worker dürfen nicht an `orchestrator` zurück delegieren.
 ## Übrige Regeln (Lazy-Load)
 
 Nicht-Kern-Regeln werden NICHT in diesen Block eingebettet (Progressive Disclosure, #192):
-sie liegen pro Provider als separate Dateien in .gemini/skills bzw. .opencode/skills bzw. .mammouth/skills bzw. .agents/skills bzw. .zcode/skills bzw. .kimi-code/skills — jeweils `<rule-name>/SKILL.md`.
+sie liegen pro Provider als separate Dateien in .gemini/skills bzw. .opencode/skills — jeweils `<rule-name>/SKILL.md`.
 Bei Bedarf mit `Read` laden; verfügbare Regeln via `ls` im jeweiligen Verzeichnis.
 
 
 ## Agent Directory
-> Agenten (Prompts) liegen in `.gemini/agents bzw. .opencode/agents bzw. .mammouth/agents bzw. .codex/agents bzw. .zcode/agents bzw. .kimi-code/agents`.
+> Agenten (Prompts) liegen in `.gemini/agents bzw. .opencode/agents`.
 
 | Agent | Core Capabilities |
 |-------|-------------------|
