@@ -124,15 +124,27 @@ def test_embedded_rule_files_written_for_weak_provider(env, tmp_path):
     assert (tmp_path / ".zcode" / "skills" / "sync-interface" / "SKILL.md").exists()
 
 
-def test_embedded_rule_files_noop_for_has_rules_provider(env, tmp_path):
-    # Gemini has_rules: true — its files come from sync_rules(); this channel
-    # must not double-write.
+def test_embedded_rule_files_noop_for_native_rules_provider(env, tmp_path):
+    # Claude reads its native rules dir: its files come from sync_rules();
+    # this channel must not double-write.
+    env["sync_files"](
+        REPO_ROOT, tmp_path, env["config"], env["log"], dry_run=False,
+        variables=env["variables"], provider="Claude",
+        provider_config=env["provider_config"],
+    )
+    assert not (tmp_path / ".claude" / "skills").exists()
+
+
+def test_embedded_rule_files_written_for_unread_rules_dir_provider(env, tmp_path):
+    # IC-15 Nr. 2: Gemini writes a rules dir it never reads (has_rules: true,
+    # rules_read_channels without a native channel) -- the lazy rules must
+    # land in its skills channel, otherwise they are lost (F-06).
     env["sync_files"](
         REPO_ROOT, tmp_path, env["config"], env["log"], dry_run=False,
         variables=env["variables"], provider="Gemini",
         provider_config=env["provider_config"],
     )
-    assert not (tmp_path / ".gemini" / "skills").exists()
+    assert (tmp_path / ".gemini" / "skills" / "submodule-protection" / "SKILL.md").exists()
 
 
 def test_shared_block_identical_with_and_without_embed_false(env):
@@ -221,9 +233,10 @@ def test_tool_artifacts_written_for_opencode(env, tmp_path):
     assert "graphify" in skill.read_text(encoding="utf-8").lower()
 
 
-def test_mcp_artifacts_unchanged_for_has_rules_provider(env, tmp_path):
-    # Gemini (has_rules:true): rule files still land in its rules_dir — the
-    # #192 channel must not double-write into .gemini/skills.
+def test_mcp_artifacts_for_unread_rules_dir_provider(env, tmp_path):
+    # Gemini (has_rules:true, rules dir unread): rule files still land in its
+    # rules_dir, and the lazy per-server sections additionally reach its
+    # skills channel (IC-15 Nr. 2) -- the managed block points there.
     from lib.mcp import generate_mcp_artifacts
 
     pc = env["provider_config"]["Gemini"]
@@ -232,7 +245,7 @@ def test_mcp_artifacts_unchanged_for_has_rules_provider(env, tmp_path):
         dry_run=False, provider="Gemini", rules_dir=pc.get("rules_dir"),
     )
     assert (tmp_path / ".gemini" / "rules" / "mcp-honcho.md").exists()
-    assert not (tmp_path / ".gemini" / "skills" / "mcp-honcho").exists()
+    assert (tmp_path / ".gemini" / "skills" / "mcp-honcho" / "SKILL.md").exists()
 
 
 # ---------------------------------------------------------------------------

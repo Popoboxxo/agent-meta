@@ -295,14 +295,21 @@ def sync_embedded_rule_files(
     content stays reachable while the always-on context shrinks (progressive
     disclosure, issues #192 + #540).
 
-    Provider-agnostic: gated purely on config keys (has_rules / skills_dir),
-    never on provider names. Providers with ``has_rules: true`` receive their
-    rule files via sync_rules() — this function is a no-op for them, and a
-    no-op when no skills_dir is configured (the managed block then embeds the
+    Provider-agnostic: gated purely on the read-channel data (IC-15 Nr. 2 /
+    IC-33, ``lib/rule_channels.lazy_skill_channel``): the provider reads no
+    native rules directory but reads skills. ``has_rules`` alone no longer
+    decides -- a provider that writes an unread rules directory (e.g. a
+    ``rules_dir`` outside its read channels) still receives its lazy rules
+    here. A no-op for native-rules providers (sync_rules() covers them) and
+    for providers without a skills channel (the managed block then embeds the
     rules as fallback, no content loss).
     """
+    from .providers import load_provider_capabilities
+    from .rule_channels import lazy_skill_channel, merged_caps
+
     pc = (provider_config or {}).get(provider, {})
-    if pc.get("has_rules", False):
+    caps = merged_caps(provider, provider_config or {}, load_provider_capabilities(agent_meta_root))
+    if not lazy_skill_channel(caps):
         return
     skills_dir_rel = pc.get("skills_dir")
     if not skills_dir_rel:

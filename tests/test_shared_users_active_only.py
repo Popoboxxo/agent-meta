@@ -21,7 +21,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from tests.active_set_render import default_config, synced_project
+from tests.active_set_render import default_config, preset_config, synced_project
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 _PROVIDERS = yaml.safe_load(
@@ -62,7 +62,7 @@ def test_catalog_has_a_shared_group_with_both_rule_kinds():
 
 @pytest.mark.parametrize("provider", [_WITH_RULES, _WITHOUT_RULES])
 def test_single_provider_block_names_no_inactive_sharer_path(tmp_path_factory, provider):
-    project = synced_project(tmp_path_factory, default_config(), [provider])
+    project = synced_project(tmp_path_factory, preset_config(provider))
     block = _managed_block(project)
     own = _path_values(provider)
     foreign = set().union(*(_path_values(p) for p in SHARERS if p != provider)) - own

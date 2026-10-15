@@ -155,7 +155,20 @@
   (`rules_read_channels`, spec §4.3) of every active sharer instead of `has_rules` - a written but unread
   rules directory never replaces the embedded rules (new helper `scripts/lib/rule_channels.py`). Default
   render: AGENTS.md of the six AGENTS.md providers changes (AC-01 rebaselined, 6 of 1075 hashes); a project
-  with all sharers active is unchanged.
+  with all sharers active is unchanged. The committed self-hosting AGENTS.md was regenerated accordingly.
+- **Lazy rules reach every provider with a skills channel (IC-15 Nr. 2, IC-33, F-06, #857, #858, PR E)**:
+  rules routed out of the always-on context (`embed: false` / `channel: skill`, rules presets `lazy` and
+  `silent`) are now written as `<skills_dir>/<rule>/SKILL.md` for every provider that reads no native rules
+  directory but reads skills - decided by `rules_read_channels`, no longer by `has_rules`. Before, providers
+  that write an unread rules directory (Codex `rules/`, Mammouth `.mammouth/rules`, Gemini `.gemini/rules`)
+  got a lazy-load pointer without any skill behind it, and Gemini under `rules-preset: lazy` lost 8 rules
+  completely. Same gating for the lazy MCP/external-tool sections. Data: `rules_read_channels` gains
+  `skills` for Opencode, Mammouth, ZCode, KimiCode (`[embedded, skills]`), Gemini and Copilot (`[skills]`,
+  their rules dirs stay unread until IC-15 Nr. 8/3) and Continue (`[native-rules-dir, skills]`); Continue
+  declares `native-skill-channel`, so `channel: skill` rules land in `.continue/skills` instead of
+  `.continue/rules`; Copilot's `skills_dir` is `.github/skills` (was the never-read `.github/copilot/skills`,
+  now listed in `legacy_artifacts`). Default preset: only Copilot's rendered skills path changes (AC-01
+  rebaselined, 4 of 1075 hashes).
 
 ### Changed
 - **`ACTIVE_ROLES` / `ROLE_<ROLE>_ACTIVE` available in templates**: `build_variables` injects

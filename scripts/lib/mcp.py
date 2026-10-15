@@ -381,10 +381,15 @@ def generate_mcp_artifacts(
     # the shared managed block no longer embeds (embed: false / channel:
     # skill in rules-presets.yaml) as separate SKILL.md files — the same
     # progressive-disclosure channel sync_embedded_rule_files() uses for
-    # rules/ sources. Gated purely on config keys (has_rules / skills_dir),
-    # no provider-name branches.
+    # rules/ sources. Gated on the read-channel data (IC-15 Nr. 2:
+    # lib/rule_channels.lazy_skill_channel -- no native rules channel, but a
+    # skills channel), no provider-name branches.
+    from .providers import load_provider_capabilities
+    from .rule_channels import lazy_skill_channel, merged_caps
+
     embedded_rules_channel_dir: Path | None = None
-    if not pc.get("has_rules") and skills_dir_rel:
+    _caps = merged_caps(provider, provider_config, load_provider_capabilities(agent_meta_root))
+    if lazy_skill_channel(_caps) and skills_dir_rel:
         embedded_rules_channel_dir = project_root / skills_dir_rel
         if not dry_run:
             embedded_rules_channel_dir.mkdir(parents=True, exist_ok=True)

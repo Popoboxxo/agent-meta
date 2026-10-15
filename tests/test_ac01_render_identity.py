@@ -68,6 +68,10 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   Single-provider projects no longer join the path fields of all six catalog sharers with "bzw."
   (agents dir, pending-tasks file, skills dir) and the header banner no longer names inactive sharers.
   Changed: AGENTS.md of the six AGENTS.md providers (6 of 1075 entries). No other hash changed.
+- Task 1.22 (IC-15 no. 2, AC-14 path part): Copilot's ``skills_dir`` moves from the never-read
+  ``.github/copilot/skills`` to ``.github/skills``. In the default preset no rule is lazy, so only the
+  rendered ``SKILLS_DIR`` path changes: Copilot ``agent-meta-manager``, ``mcp-guardrails``,
+  ``use-lazy-rules`` and its ``generated-file-hashes.json`` (4 of 1075 entries).
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

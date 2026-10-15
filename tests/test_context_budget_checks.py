@@ -11,12 +11,13 @@ Two layers:
     generated for Codex/Mammouth/Gemini/Continue (their skills directories are
     empty) -> 15 ``context.dangling-pointer`` rows each (AC-08 requires >= 10)
     plus one for the "Uebrige Regeln (Lazy-Load)" pointer when it is rendered.
-  - preset ``lazy``: Gemini embeds only 11 of its 19 rules in AGENTS.md, has no
+  - preset ``lazy``: Gemini embeds only 11 of its 19 rules in AGENTS.md, had no
     rules read channel (``rules_read_channels: []``) and no lazy skills, so
-    exactly 8 rules are lost -> 8 ``context.rule-unreachable`` (AC-08 "die 8
+    exactly 8 rules were lost -> 8 ``context.rule-unreachable`` (AC-08 "die 8
     verlorenen Gemini-lazy-Rules"). The lost set is a2a-delegation-gates,
     issue-lifecycle, lifecycle-tasks, the three se-cascade-* rules,
-    session-conclusion and submodule-protection.
+    session-conclusion and submodule-protection. Fixed by IC-15 Nr. 2 (skills
+    channel); the AC-08 tests reproduce the defect by removing the skills.
 
 Run: python3 -m pytest tests/test_context_budget_checks.py -q
 """
@@ -115,14 +116,29 @@ def test_ac08_missing_skills_are_reported(default_projects, mappings, provider):
     assert {f.file for f in skills}  # each finding names the artifact carrying the pointer
 
 
-def test_ac08_lazy_pointer_without_any_skill_is_reported(lazy_projects, mappings):
-    # the "Uebrige Regeln (Lazy-Load)" pointer is only rendered with rules-preset lazy
-    findings = _run(cb.check_dangling_pointer, lazy_projects["Gemini"], "Gemini", mappings)
+def _without_skills(project: Path, tmp_path: Path, mappings) -> Path:
+    """Copy of a synced Gemini project with its skills dir removed (pre-IC-15 Nr. 2 state)."""
+    copy = tmp_path / "gemini-no-skills"
+    shutil.copytree(project, copy)
+    shutil.rmtree(copy / mappings["Gemini"]["skills_dir"], ignore_errors=True)
+    return copy
+
+
+def test_ac08_lazy_pointer_without_any_skill_is_reported(lazy_projects, mappings, tmp_path):
+    # the "Uebrige Regeln (Lazy-Load)" pointer is only rendered with rules-preset lazy.
+    # IC-15 Nr. 2 writes the lazy skills now; the defect is reproduced by removing them.
+    assert not [f for f in _run(cb.check_dangling_pointer, lazy_projects["Gemini"], "Gemini", mappings)
+                if "lazy-load pointer" in f.message]
+    project = _without_skills(lazy_projects["Gemini"], tmp_path, mappings)
+    findings = _run(cb.check_dangling_pointer, project, "Gemini", mappings)
     assert any("lazy-load pointer promises rule skills" in f.message for f in findings)
 
 
-def test_ac08_gemini_lazy_preset_loses_eight_rules(lazy_projects, mappings):
-    findings = _run(cb.check_rule_unreachable, lazy_projects["Gemini"], "Gemini", mappings)
+def test_ac08_gemini_lazy_preset_loses_eight_rules(lazy_projects, mappings, tmp_path):
+    # Fixed by IC-15 Nr. 2: the 8 lazy rules reach Gemini as skills.
+    assert _run(cb.check_rule_unreachable, lazy_projects["Gemini"], "Gemini", mappings) == []
+    project = _without_skills(lazy_projects["Gemini"], tmp_path, mappings)
+    findings = _run(cb.check_rule_unreachable, project, "Gemini", mappings)
     assert {Path(f.file).stem for f in findings} == GEMINI_LOST_LAZY_RULES
     assert len(findings) == 8
     assert all(f.check == "context.rule-unreachable" and f.severity is Severity.WARNING

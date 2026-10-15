@@ -1190,14 +1190,15 @@ def _sync_stage_per_provider(
                        provider_config=provider_config)
             sync_speech_mode(agent_meta_root, project_root, config, log, args.dry_run,
                              rules_dir=pc.get("rules_dir"))
-        elif pc.get("skills_dir") and pc.get("context_file"):
-            # Issue #192 Phase 2 (selective rule embedding): providers without
-            # a native rules_dir but with a skills_dir receive the rules the
-            # managed block does NOT embed (embed: false / channel: skill) as
-            # separate <skills_dir>/<rule>/SKILL.md files, so the shared
+        if pc.get("skills_dir") and pc.get("context_file"):
+            # Issue #192 Phase 2 (selective rule embedding): providers that
+            # read no native rules directory but read skills receive the rules
+            # the managed block does NOT embed (embed: false / channel: skill)
+            # as separate <skills_dir>/<rule>/SKILL.md files, so the shared
             # context file can point at them instead of embedding the bodies
-            # (progressive disclosure). Pure config-key gating — no provider
-            # names. No-op when neither flag is set (block embeds as fallback).
+            # (progressive disclosure). IC-15 Nr. 2: also for providers that
+            # write an unread rules_dir (has_rules) -- the function gates on
+            # rules_read_channels itself. No provider names.
             sync_embedded_rule_files(agent_meta_root, project_root, config, log,
                                      args.dry_run, variables=provider_variables,
                                      provider=provider, provider_config=provider_config)

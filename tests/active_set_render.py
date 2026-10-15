@@ -91,6 +91,33 @@ def synced_project(tmp_path_factory, config: dict, providers: Optional[list] = N
     return _SYNC_CACHE[key]
 
 
+def synced_projects(tmp_path_factory, configs: dict, providers: Optional[list] = None,
+                    workers: int = 4) -> dict:
+    """Cached, parallel ``synced_project`` for ``{name: config}``; returns ``{name: project}``.
+
+    Configs already in the session cache are reused; the missing ones are synced
+    concurrently (``sync_configs_parallel``) and added to the cache.
+    """
+    keys = {name: yaml.safe_dump([config, providers], sort_keys=True)
+            for name, config in configs.items()}
+    missing = {name: configs[name] for name, key in keys.items() if key not in _SYNC_CACHE}
+    if missing:
+        done = sync_configs_parallel(tmp_path_factory.mktemp("as-sync-par"), missing,
+                                     providers, workers=workers)
+        for name, project in done.items():
+            _SYNC_CACHE.setdefault(keys[name], project)
+    return {name: _SYNC_CACHE[key] for name, key in keys.items()}
+
+
+def preset_config(provider: str, preset: str = "default") -> dict:
+    """AC-01 default project for one provider, optionally with a ``rules-preset``."""
+    config = default_config()
+    config["ai-providers"] = [provider]
+    if preset != "default":
+        config["rules-preset"] = preset
+    return config
+
+
 def default_config() -> dict:
     """The AC-01 provider-matrix default project (no ``roles:`` key)."""
     return {

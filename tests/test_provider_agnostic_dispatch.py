@@ -518,10 +518,15 @@ def test_the_three_751_sites_resolve_via_capability_flags():
     assert "_ALWAYS_APPLY_PROVIDERS" not in (_LIB_DIR / "rules.py").read_text(encoding="utf-8")
 
     # 3. skill_channel.py native-skill-channel dispatch (formerly PROVIDERS).
+    # IC-15 Nr. 2: Continue declares the native skill channel too (.continue/skills);
+    # a provider without the capability (Opencode) never gets it.
+    opencode_pc = providers_cfg.get("Opencode") or {}
     assert provider_has_capability(claude_pc, "native-skill-channel")
-    assert not provider_has_capability(continue_pc, "native-skill-channel")
+    assert provider_has_capability(continue_pc, "native-skill-channel")
+    assert not provider_has_capability(opencode_pc, "native-skill-channel")
     assert provider_supports_skill_channel("Claude", claude_pc) is True
-    assert provider_supports_skill_channel("Continue", continue_pc) is False
+    assert provider_supports_skill_channel("Continue", continue_pc) is True
+    assert provider_supports_skill_channel("Opencode", opencode_pc) is False
     skill_channel_src = (_LIB_DIR / "skill_channel.py").read_text(encoding="utf-8")
     assert "PROVIDERS = " not in skill_channel_src
 

@@ -314,28 +314,6 @@ def _has_capability(pc: dict, capability: str) -> bool:
     return capability in pc.get("capabilities", [])
 
 
-def _shared_rules_file_channel(
-    pc: dict, provider_config: dict | None, shared_users: list[str]
-) -> bool:
-    """True when every provider sharing this context_file can load rules from
-    separate files (progressive-disclosure file channel, issue #192 Phase 2).
-
-    Expressed purely via config keys: a provider participates when a
-    ``skills_dir`` is configured — the channel that receives non-embedded
-    rules as ``<skills_dir>/<rule-stem>/SKILL.md`` (rendered on demand via
-    Read). Deliberately NOT keyed on provider names (provider-agnostic
-    policy): a future provider joining the shared file converges
-    automatically. When any sharer lacks the channel, the caller embeds the
-    rule instead of dropping it — a rules-preset opt-out must never delete
-    content a provider cannot load from anywhere else.
-    """
-    if provider_config and shared_users:
-        pcs = [provider_config.get(p, {}) for p in shared_users]
-    else:
-        pcs = [pc]
-    return all(bool(p.get("skills_dir")) for p in pcs)
-
-
 def _apply_platform_context_substitution(
     content: str,
     platform_vars: dict | None,
@@ -1602,7 +1580,7 @@ def _build_managed_block(
     # build_knowledge_engine_hints is imported at module top level — the
     # lazy import was vestigial (agents does not import context; Issue #478
     # cleanup, guarded by tests/test_import_acyclicity.py).
-    from .rule_channels import provider_channel_caps, reads_native_rules
+    from .rule_channels import provider_channel_caps, reads_native_rules, reads_rule_skills
 
     pc = (provider_config or {}).get(provider, {})
 
@@ -1633,9 +1611,9 @@ def _build_managed_block(
     # written but unread rules_dir must never replace the embedded rules.
     if provider_config:
         _sharer_caps = provider_channel_caps(agent_meta_root, provider_config, shared_users)
-        has_native_rules = all(reads_native_rules(c) for c in _sharer_caps.values())
     else:
-        has_native_rules = reads_native_rules(pc)
+        _sharer_caps = {provider: pc}
+    has_native_rules = all(reads_native_rules(c) for c in _sharer_caps.values())
 
     def _shared(dir_key: str, default_fmt: str) -> str:
         """Join a per-provider path field across all shared_users, deduped.
@@ -1772,14 +1750,14 @@ def _build_managed_block(
 
         # Issue #192 Phase 2 (selective rule embedding): a rule flagged
         # `embed: false` (or routed to `channel: skill`) leaves the managed
-        # block when the whole shared-file group can load rules from separate
-        # files (every sharer has a skills_dir — see
-        # _shared_rules_file_channel). The block then renders a pointer to
+        # block when every active sharer reads rules as skills
+        # (`rules_read_channels` contains `skills`, IC-15 Nr. 2 / IC-33, see
+        # lib/rule_channels.py). The block then renders a pointer to
         # <SKILLS_DIR>/<rule-stem>/SKILL.md instead of the rule body;
-        # sync_rules()/sync_embedded_rule_files() write those files. Without
-        # the file channel the rule EMBEDS (never drops): a preset opt-out
-        # must not delete content for a provider with no way to load it.
-        rules_file_channel = _shared_rules_file_channel(pc, provider_config, shared_users)
+        # sync_embedded_rule_files() writes those files. Without the skills
+        # channel the rule EMBEDS (never drops): a preset opt-out must not
+        # delete content for a provider with no way to load it (spec §4.3).
+        rules_file_channel = all(reads_rule_skills(c) for c in _sharer_caps.values())
 
         for src_path, output_name in rule_sources:
             # Key options by the OUTPUT stem ("admin-ui"), not the raw source
