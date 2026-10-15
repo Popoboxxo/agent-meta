@@ -1888,29 +1888,50 @@ def _build_managed_block(
         target_name or pc.get("context_file") or "context managed block", log,
     )
 
+# IC-15 Nr. 9 (F-07): Claude Code loads CLAUDE.local.md next to CLAUDE.md
+# (docs: "Local instructions"); CLAUDE.personal.md was never read.
+CLAUDE_LOCAL_FILE = "CLAUDE.local.md"
+CLAUDE_PERSONAL_LEGACY_FILE = "CLAUDE.personal.md"
+
+
 def init_claude_personal(
     agent_meta_root: Path,
     project_root: Path,
     log: SyncLog,
     dry_run: bool,
 ):
-    """Copy CLAUDE.personal-template.md to CLAUDE.personal.md if not present yet."""
+    """Create the personal Claude context file ``CLAUDE.local.md`` once.
+
+    Copies ``CLAUDE.personal-template.md`` to ``CLAUDE.local.md`` -- the file
+    Claude Code actually loads (IC-15 Nr. 9). A legacy ``CLAUDE.personal.md``
+    holds the user's own notes and is never touched; while it exists no
+    ``CLAUDE.local.md`` is created and the sync warns to rename it (the legacy
+    file was never loaded by Claude Code).
+    """
     template_path = agent_meta_root / "templates" / "configs" / "CLAUDE.personal-template.md"
-    target_path = project_root / "CLAUDE.personal.md"
+    target_path = project_root / CLAUDE_LOCAL_FILE
+    legacy_path = project_root / CLAUDE_PERSONAL_LEGACY_FILE
 
     if target_path.exists():
-        log.skip("CLAUDE.personal.md", "already exists")
+        log.skip(CLAUDE_LOCAL_FILE, "already exists")
+        return
+    if legacy_path.exists():
+        log.warning(
+            f"{CLAUDE_PERSONAL_LEGACY_FILE} is not loaded by Claude Code — rename it to "
+            f"{CLAUDE_LOCAL_FILE} to keep your personal notes in context (IC-15 Nr. 9); "
+            f"{CLAUDE_LOCAL_FILE} is not created while the legacy file exists"
+        )
         return
     if is_absent_gitignored_target(target_path, dry_run):
-        log.skip("CLAUDE.personal.md", "absent (target root gitignored)")
+        log.skip(CLAUDE_LOCAL_FILE, "absent (target root gitignored)")
         return
 
     if not template_path.exists():
-        log.warning("CLAUDE.personal-template.md not found — skipping CLAUDE.personal.md creation")
+        log.warning(f"CLAUDE.personal-template.md not found — skipping {CLAUDE_LOCAL_FILE} creation")
         return
 
     content = template_path.read_text(encoding="utf-8")
-    log.action("INIT", "CLAUDE.personal.md", "templates/configs/CLAUDE.personal-template.md")
+    log.action("INIT", CLAUDE_LOCAL_FILE, "templates/configs/CLAUDE.personal-template.md")
     if not dry_run:
         target_path.write_text(content, encoding="utf-8")
 

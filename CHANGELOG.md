@@ -169,6 +169,17 @@
   `.continue/rules`; Copilot's `skills_dir` is `.github/skills` (was the never-read `.github/copilot/skills`,
   now listed in `legacy_artifacts`). Default preset: only Copilot's rendered skills path changes (AC-01
   rebaselined, 4 of 1075 hashes).
+- **No more generated directories the provider never reads (IC-15 Nr. 9, F-07, AC-19, #853, PR E)**: Codex
+  (project-root `rules/`) and Mammouth (`.mammouth/rules/`) get `has_rules: false` - their rules were
+  already embedded in AGENTS.md, the directories were dead files (study 3.2/3.4). A directory written by an
+  earlier version is removed on the next sync through its managed indexes only (`.agent-meta-managed`,
+  `-mcp`, `-tools`; new data key `retired_rules_dirs`); files you put there yourself stay, the directory
+  is removed only when empty. Claude: the personal file is now `CLAUDE.local.md` (loaded by Claude Code,
+  gitignored) instead of the never-loaded `CLAUDE.personal.md`. An existing `CLAUDE.personal.md` is left
+  untouched; while it exists no `CLAUDE.local.md` is created and the sync warns to rename it. Still unread
+  and reported by `context.unread-channel`: `.gemini/rules` (IC-15 Nr. 8) and `.github/instructions`
+  (IC-15 Nr. 3). AC-01 rebaselined (49 entries: rules-dir files removed, `CLAUDE.local.md`, Claude
+  `.gitignore`, 2 x `generated-file-hashes.json`).
 
 ### Changed
 - **`ACTIVE_ROLES` / `ROLE_<ROLE>_ACTIVE` available in templates**: `build_variables` injects

@@ -302,6 +302,7 @@ def load_providers_config(
                     ".claude/settings.local.json",
                     ".claude/agent-memory-local/",
                     ".claude/pending-tasks.md",
+                    "CLAUDE.local.md",
                     "CLAUDE.personal.md",
                     "sync.log",
                     ".mcp.json",

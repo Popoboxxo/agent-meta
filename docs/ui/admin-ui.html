@@ -8773,7 +8773,7 @@ async function viewProjectGitignore() {
     
     // Local files per provider
     if (prov === "Claude") {
-        knownLocal.push(`${pfx}/settings.local.json`, `${pfx}/agent-memory-local/`, "CLAUDE.personal.md");
+        knownLocal.push(`${pfx}/settings.local.json`, `${pfx}/agent-memory-local/`, "CLAUDE.local.md", "CLAUDE.personal.md");
     } else if (prov === "Gemini") {
         knownLocal.push("GEMINI.personal.md");
     } else if (prov === "Opencode") {
@@ -8868,7 +8868,7 @@ async function viewProjectGitignore() {
     };
   };
 
-  const localSection = renderCategory("Local Files", ".claude/settings.local.json, CLAUDE.personal.md, memory-local folders.", defLocal, currentLocal, knownLocal);
+  const localSection = renderCategory("Local Files", ".claude/settings.local.json, CLAUDE.local.md, CLAUDE.personal.md, memory-local folders.", defLocal, currentLocal, knownLocal);
   const genSection = renderCategory("Generated Framework", "Provider folders (.claude/agents, .gemini/rules, etc.).", defGenerated, currentGenerated, knownGenerated);
   const setSection = renderCategory("Settings & Configs", "opencode.json, settings.json, config.yaml, etc.", defSettings, currentSettings, knownSettings);
 
@@ -8993,11 +8993,11 @@ async function viewGitignoreDefaults() {
   const defSettings = false;
   
   // We mock a standard set of paths for the default view
-  const knownLocal = [".claude/settings.local.json", ".claude/agent-memory-local/", "CLAUDE.personal.md", "sync.log"];
+  const knownLocal = [".claude/settings.local.json", ".claude/agent-memory-local/", "CLAUDE.local.md", "CLAUDE.personal.md", "sync.log"];
   const knownGenerated = [".claude/agents/", ".claude/rules/", ".claude/hooks/", ".claude/commands/"];
   const knownSettings = [".claude/settings.json"];
 
-  wrap.appendChild(renderReadonlyCategory("Local Files", ".claude/settings.local.json, CLAUDE.personal.md, memory-local folders.", defLocal, knownLocal));
+  wrap.appendChild(renderReadonlyCategory("Local Files", ".claude/settings.local.json, CLAUDE.local.md, CLAUDE.personal.md, memory-local folders.", defLocal, knownLocal));
   wrap.appendChild(renderReadonlyCategory("Generated Framework", "Provider folders (.claude/agents, .gemini/rules, etc.).", defGenerated, knownGenerated));
   wrap.appendChild(renderReadonlyCategory("Settings & Configs", "opencode.json, settings.json, config.yaml, etc.", defSettings, knownSettings));
 

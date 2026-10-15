@@ -72,6 +72,12 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   ``.github/copilot/skills`` to ``.github/skills``. In the default preset no rule is lazy, so only the
   rendered ``SKILLS_DIR`` path changes: Copilot ``agent-meta-manager``, ``mcp-guardrails``,
   ``use-lazy-rules`` and its ``generated-file-hashes.json`` (4 of 1075 entries).
+- Task 1.23 (IC-15 no. 9, AC-19): Codex and Mammouth no longer write their unread rules directories
+  (project-root ``rules/``, ``.mammouth/rules/``; rules stay embedded in AGENTS.md); Claude gets
+  ``CLAUDE.local.md`` (read by Claude Code) instead of ``CLAUDE.personal.md``. Removed: 2 x 22 rules-dir
+  files (19 rules + 3 managed indexes) and ``Claude/CLAUDE.personal.md``; added ``Claude/CLAUDE.local.md``;
+  changed: Claude ``.gitignore`` (``CLAUDE.local.md`` entry) and the Codex/Mammouth
+  ``generated-file-hashes.json`` (49 entries; 1075 -> 1031). AGENTS.md is unchanged.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

@@ -38,7 +38,7 @@ _PROVIDERS = sorted(
 )
 # Files the sync creates that are machine-local and must never be committable.
 _LOCAL_FILE_RE = re.compile(
-    r"(\.personal\.md$|(^|/)sync\.log$|(^|/)env\.(sh|ps1|unset\.sh|unset\.ps1)$|\.sync-backup-)"
+    r"(\.personal\.md$|(^|/)CLAUDE\.local\.md$|(^|/)sync\.log$|(^|/)env\.(sh|ps1|unset\.sh|unset\.ps1)$|\.sync-backup-)"
 )
 
 

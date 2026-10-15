@@ -82,6 +82,7 @@ providers:
     - .claude/agent-memory-local/
     - .claude/pending-tasks.md
     - .claude/progress/
+    - CLAUDE.local.md
     - CLAUDE.personal.md
     - sync.log
     - '*.sync-backup-*'
@@ -519,8 +520,13 @@ providers:
     context_adapter: false
     context_adapter_file: AGENTS.md
     context_template: templates/configs/AGENTS.project-template.md
-    has_rules: true
-    rules_dir: .mammouth/rules
+    # IC-15 Nr. 9 (F-07, #853): .mammouth/rules is never read (study 3.4,
+    # VERIFIED-RUNTIME) -- rules are embedded in AGENTS.md, lazy rules go to
+    # .mammouth/skills. The formerly generated directory is cleaned up through
+    # its managed indexes (foreign files stay).
+    has_rules: false
+    retired_rules_dirs:
+    - .mammouth/rules
     has_hooks: true
     hooks_dir: .mammouth/hooks
     # Commands (issue #807): Mammouth is an OpenCode fork and owns a project
@@ -540,7 +546,6 @@ providers:
     settings_template: templates/configs/MAMMOUTH.settings-template.json
     capabilities:
     - agents
-    - rules
     - hooks
     - commands
     - settings
@@ -615,8 +620,13 @@ providers:
     context_adapter: false
     context_adapter_file: AGENTS.override.md
     context_template: templates/configs/AGENTS.project-template.md
-    has_rules: true
-    rules_dir: rules
+    # IC-15 Nr. 9 (F-07): Codex never reads a project-root rules/ directory
+    # (study 3.2, VERIFIED-RUNTIME) -- rules are embedded in AGENTS.md, lazy
+    # rules go to .agents/skills. The formerly generated rules/ is cleaned up
+    # through its managed indexes (foreign files stay).
+    has_rules: false
+    retired_rules_dirs:
+    - rules
     has_hooks: true
     hooks_dir: .codex/hooks
     # Commands (issue #807): Codex custom prompts (`~/.codex/prompts/*.md`,
@@ -631,7 +641,6 @@ providers:
     has_settings: false
     capabilities:
     - agents
-    - rules
     - hooks
     - snippets
     - skills

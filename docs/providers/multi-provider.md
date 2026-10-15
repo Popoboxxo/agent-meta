@@ -147,7 +147,9 @@ konfiguriert — nur belegte Fähigkeiten sind aktiviert.
 - `.mammouth/agents/*.md` — generierte Agenten (dateibasiert, kein Session-Bootstrap nötig)
 - `MAMMOUTH.md` — Kontext-Datei (managed block, bei jedem sync aktualisiert; nutzt das
   gemeinsame `AGENTS.project-template.md`)
-- `.mammouth/rules/*.md` — Rules (`has_rules: true`)
+- Rules: eingebettet in `AGENTS.md`, Lazy-Rules als `.mammouth/skills/<rule>/SKILL.md`
+  (`has_rules: false`; das frühere `.mammouth/rules/` wurde nie gelesen und wird beim Sync
+  über seine Managed-Indizes entfernt, IC-15 Nr. 9)
 - `.mammouth/hooks/` — reserviert (`has_hooks: true`): ohne verifizierten
   `hook_protocol` spiegelt sync.py keine Hook-Skripte (#630-Muster) — Cleanup statt
   Deploy; das separate `mammouth.json` wird als Skeleton angelegt
@@ -255,8 +257,8 @@ Nur bekannte Provider werden verarbeitet. Unbekannte Werte werden stillschweigen
 
 **Hinweis:** Rules werden für alle Provider mit `has_rules: true` generiert (Claude →
 `.claude/rules/`, Gemini → `.gemini/rules/`, Continue → `.continue/rules/`, Copilot →
-`.github/copilot/rules/`, Mammouth → `.mammouth/rules/`, Codex → `rules/`; Opencode bettet
-Rules in `AGENTS.md` ein). Hooks werden für Provider mit `has_hooks: true` UND verifiziertem
+`.github/copilot/rules/`; Opencode, Mammouth, Codex, ZCode und Kimi Code betten
+Rules in `AGENTS.md` ein, Lazy-Rules landen als Skills im jeweiligen `skills_dir`). Hooks werden für Provider mit `has_hooks: true` UND verifiziertem
 `hook_protocol` gespiegelt (Claude → settings.json-Registrierung; Gemini →
 `antigravity-hooks-json`, Registrierung in `.agents/hooks.json` via Übersetzungs-Adapter) —
 Codex reserviert lediglich `.codex/hooks/`, spiegelt aber keine Hooks (kein `hook_protocol`,
@@ -507,8 +509,6 @@ in `<agents_dir>/`, für Rules in `<rules_dir>/`:
 - `.gemini/rules/.agent-meta-managed`
 - `.continue/rules/.agent-meta-managed`
 - `.github/copilot/rules/.agent-meta-managed`
-- `.mammouth/rules/.agent-meta-managed`
-- `rules/.agent-meta-managed` (Codex — Projekt-Root)
 
 Generierte MCP-/Tool-Rules nutzen eigene Sidecar-Indizes im selben Rules-Verzeichnis
 (`.agent-meta-managed-mcp` bzw. `.agent-meta-managed-tools`).
@@ -542,6 +542,7 @@ Dokumentation: https://docs.continue.dev
 
 ```
 # agent-meta (Claude)
+CLAUDE.local.md
 CLAUDE.personal.md
 .claude/settings.local.json
 
