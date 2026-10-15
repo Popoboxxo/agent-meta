@@ -1602,25 +1602,40 @@ def _build_managed_block(
     # build_knowledge_engine_hints is imported at module top level — the
     # lazy import was vestigial (agents does not import context; Issue #478
     # cleanup, guarded by tests/test_import_acyclicity.py).
-    pc = (provider_config or {}).get(provider, {})
-    has_native_rules = pc.get("has_rules", False)
+    from .rule_channels import provider_channel_caps, reads_native_rules
 
-    # Providers that render into the *same physical* context_file (currently
-    # only Opencode + Gemini, both sharing AGENTS.md). Every value below that
-    # is derived from a single provider's config (pc) must instead be derived
-    # from the union of shared_users -- otherwise the rendered managed block
-    # differs depending on which shared provider happens to sync last, and
-    # each sync overwrites the other's version forever (issue #638: infinite
-    # oscillation, permanent false "out of sync" on --check).
+    pc = (provider_config or {}).get(provider, {})
+
+    # Providers that render into the *same physical* context_file (the
+    # AGENTS.md group). Every value below that is derived from a single
+    # provider's config (pc) must instead be derived from the union of
+    # shared_users -- otherwise the rendered managed block differs depending
+    # on which shared provider happens to sync last, and each sync overwrites
+    # the other's version forever (issue #638: infinite oscillation, permanent
+    # false "out of sync" on --check).
+    # IC-15 Nr. 1 (F-05): only the sharers this project ACTIVATES count. A
+    # catalog-wide set listed the directories of providers the project never
+    # uses and let an inactive sharer veto the lazy channel. The rendering
+    # provider itself always belongs to the set.
     shared_users = [provider]
     shared_name = target_name or pc.get("context_file")
     if provider_config and shared_name:
+        from .providers import resolve_providers
+
+        _active = set(resolve_providers(config, provider_config))
         shared_users = [
             p for p, cfg in provider_config.items()
-            if cfg.get("context_file") == shared_name
-        ]
-        if not all(provider_config[p].get("has_rules", False) for p in shared_users):
-            has_native_rules = False
+            if cfg.get("context_file") == shared_name and (p in _active or p == provider)
+        ] or [provider]
+
+    # Native rules (pointer instead of embedding) only when EVERY sharer reads
+    # its generated rules directory (rules_read_channels, spec §4.3) -- a
+    # written but unread rules_dir must never replace the embedded rules.
+    if provider_config:
+        _sharer_caps = provider_channel_caps(agent_meta_root, provider_config, shared_users)
+        has_native_rules = all(reads_native_rules(c) for c in _sharer_caps.values())
+    else:
+        has_native_rules = reads_native_rules(pc)
 
     def _shared(dir_key: str, default_fmt: str) -> str:
         """Join a per-provider path field across all shared_users, deduped.
@@ -1733,20 +1748,11 @@ def _build_managed_block(
         # Native rule artifacts (.claude/rules/*, skills) stay full — they are
         # lazy-loaded and not part of the always-on context footprint.
         _global_compact = local_vars.get("COMPACT_MODE") == "true"
-        # shared_users is catalog-wide (every provider that declares this
-        # context_file anywhere in config/ai-providers.yaml, active or not --
-        # see _shares_context_with_embedded_rules), so it always contains
-        # ZCode/KimiCode for an AGENTS.md-based provider even when this
-        # project never activates them. Only a provider actually selected in
-        # this project's config can ever render (and thus lose content into)
-        # this physical file, so the lazy-channel check is scoped to the
-        # subset of shared_users this project actually activates.
+        # shared_users holds only the active sharers (IC-15 Nr. 1), so the
+        # plugin compact decision is scoped to providers that can actually
+        # render (and thus lose content into) this physical file.
         if provider_config:
-            from .providers import resolve_providers
-            _active_providers = set(resolve_providers(config, provider_config))
-            _compact_pcs = [
-                provider_config[p] for p in shared_users if p in _active_providers
-            ] or [pc]
+            _compact_pcs = [provider_config[p] for p in shared_users] or [pc]
         else:
             _compact_pcs = [pc]
         _compact = resolve_plugin_compact(_global_compact, _compact_pcs)

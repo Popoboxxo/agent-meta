@@ -64,6 +64,10 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   rows, concept-reviewer ``se-critic`` and developer ``validator`` arrows); the rest is the version bump.
   Changed: 29 agent artifacts per provider (accessibility-specialist ... test-executor, see CHANGELOG) +
   generated-file-hashes (30 x 9 = 270 of 1075 entries).
+- Task 1.21 (IC-15 no. 1, F-05): the shared AGENTS.md block is derived from the ACTIVE sharers only.
+  Single-provider projects no longer join the path fields of all six catalog sharers with "bzw."
+  (agents dir, pending-tasks file, skills dir) and the header banner no longer names inactive sharers.
+  Changed: AGENTS.md of the six AGENTS.md providers (6 of 1075 entries). No other hash changed.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

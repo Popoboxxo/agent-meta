@@ -66,10 +66,10 @@ def test_embed_false_rule_leaves_block_when_group_has_file_channel(env):
 
 
 def test_embed_false_rule_embeds_without_file_channel(env):
-    # Simulate a weak sharer: ZCode without skills_dir → the whole AGENTS.md
-    # group loses the file channel → the rule must EMBED, never drop.
+    # Simulate a weak ACTIVE sharer: Gemini without skills_dir → the whole
+    # AGENTS.md group loses the file channel → the rule must EMBED, never drop.
     provider_config = {k: dict(v) for k, v in env["provider_config"].items()}
-    provider_config["ZCode"] = {**provider_config["ZCode"], "skills_dir": None}
+    provider_config["Gemini"] = {**provider_config["Gemini"], "skills_dir": None}
     config = _no_worktree_override(env)
     block = env["build_block"](
         REPO_ROOT, config, env["variables"], env["log"],
@@ -78,6 +78,20 @@ def test_embed_false_rule_embeds_without_file_channel(env):
     )
     assert "# No Worktree Isolation" in block  # fallback: embedded, not lost
     assert "## Übrige Regeln (Lazy-Load)" not in block
+
+
+def test_inactive_weak_sharer_does_not_veto_file_channel(env):
+    # IC-15 Nr. 1: ZCode is not active in this project, so its missing
+    # skills_dir must not force the active group back to embedding.
+    provider_config = {k: dict(v) for k, v in env["provider_config"].items()}
+    provider_config["ZCode"] = {**provider_config["ZCode"], "skills_dir": None}
+    block = env["build_block"](
+        REPO_ROOT, _no_worktree_override(env), env["variables"], env["log"],
+        provider="Opencode", provider_config=provider_config,
+        project_root=REPO_ROOT,
+    )
+    assert "# No Worktree Isolation" not in block
+    assert "## Übrige Regeln (Lazy-Load)" in block
 
 
 def test_embedded_rule_files_written_for_opencode(env, tmp_path):
@@ -122,9 +136,11 @@ def test_embedded_rule_files_noop_for_has_rules_provider(env, tmp_path):
 
 
 def test_shared_block_identical_with_and_without_embed_false(env):
-    # Issue #638 convergence must hold under the new flags: every sharer of
-    # AGENTS.md renders byte-identical managed blocks.
+    # Issue #638 convergence must hold under the new flags: every ACTIVE sharer
+    # of AGENTS.md renders byte-identical managed blocks (IC-15 Nr. 1: the
+    # block is derived from the active sharers, so all five are activated).
     config = _no_worktree_override(env)
+    config["ai-providers"] = ["Claude", "Opencode", "Gemini", "Codex", "ZCode", "KimiCode"]
     blocks = {
         provider: env["build_block"](
             REPO_ROOT, config, env["variables"], env["log"],
@@ -161,10 +177,10 @@ def test_mcp_and_tool_sections_leave_block_on_file_channel(env):
 
 
 def test_mcp_and_tool_sections_embed_without_file_channel(env):
-    # A sharer without skills_dir removes the group file channel → the
+    # An active sharer without skills_dir removes the group file channel → the
     # MCP/tool sections EMBED again (fallback, never content loss).
     provider_config = {k: dict(v) for k, v in env["provider_config"].items()}
-    provider_config["ZCode"] = {**provider_config["ZCode"], "skills_dir": None}
+    provider_config["Gemini"] = {**provider_config["Gemini"], "skills_dir": None}
     block = env["build_block"](
         REPO_ROOT, env["config"], env["variables"], env["log"],
         provider="Opencode", provider_config=provider_config,

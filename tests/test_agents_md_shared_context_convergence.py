@@ -46,6 +46,26 @@ def loaded_config():
 _AGENTS_MD_SHARERS = ("Opencode", "Gemini", "Codex", "ZCode", "KimiCode", "Mammouth")
 
 
+def _all_sharers_active(config: dict) -> dict:
+    """The repo config with every AGENTS.md sharer active.
+
+    IC-15 Nr. 1: the shared block is derived from the ACTIVE sharers only, and
+    only an active provider ever renders the file -- so the identity invariant
+    is asserted over a project that activates the whole group.
+    """
+    config = dict(config)
+    config["ai-providers"] = list(dict.fromkeys(
+        list(config.get("ai-providers") or []) + list(_AGENTS_MD_SHARERS)))
+    return config
+
+
+def _active_sharers(config: dict, provider_config: dict) -> list:
+    from lib.providers import resolve_providers
+
+    active = set(resolve_providers(config, provider_config))
+    return [p for p in _AGENTS_MD_SHARERS if p in active]
+
+
 def _gate_variables(config: dict, provider: str, provider_config: dict) -> dict:
     """Mirror sync_pipeline's per-provider ``GATE_*`` injection (IC-04).
 
@@ -68,6 +88,7 @@ def test_shared_managed_block_identical_regardless_of_provider(loaded_config):
     from lib.log import SyncLog
 
     config, provider_config = loaded_config
+    config = _all_sharers_active(config)
     variables = config.get("variables", {})
 
     rendered = {
@@ -98,15 +119,17 @@ def test_shared_managed_block_identical_with_gate_vars(loaded_config):
     from lib.log import SyncLog
 
     config, provider_config = loaded_config
+    sharers = _active_sharers(config, provider_config)
+    assert len(sharers) > 1, sharers
     rendered = {
         provider: _build_managed_block(
             REPO_ROOT, config, _gate_variables(config, provider, provider_config),
             SyncLog(), provider=provider, provider_config=provider_config,
             project_root=REPO_ROOT,
         )
-        for provider in _AGENTS_MD_SHARERS
+        for provider in sharers
     }
-    baseline = rendered[_AGENTS_MD_SHARERS[0]]
+    baseline = rendered[sharers[0]]
     diverged = [p for p, block in rendered.items() if block != baseline]
     assert not diverged, (
         f"AGENTS.md sharers {diverged} render a different managed block with real "
@@ -128,6 +151,7 @@ def test_repeated_sync_never_reports_pending_agents_md_change(tmp_path, loaded_c
     from lib.log import SyncLog
 
     config, provider_config = loaded_config
+    config = _all_sharers_active(config)
     project_root = tmp_path
     shutil.copy(REPO_ROOT / "AGENTS.md", project_root / "AGENTS.md")
 

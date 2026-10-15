@@ -174,11 +174,13 @@ def test_shared_managed_block_identical_with_gate_vars(loaded_config):
     """AC-03: with the real per-sharer GATE_* vars the renders are identical.
 
     The render must carry the permission (GATE_PARTIAL) variant — not the hook
-    (GATE_ENFORCED) variant — for the shared AGENTS.md group.
+    (GATE_ENFORCED) variant — for the shared AGENTS.md group. Only the active
+    sharers render the file (IC-15 Nr. 1: the shared block is derived from the
+    active sharers, an inactive provider never writes it).
     """
     config, provider_config, capabilities = loaded_config
     renders = {}
-    for provider in _AGENTS_MD_SHARERS:
+    for provider in _ACTIVE_AGENTS_MD_SHARERS:
         pc = provider_config.get(provider, {})
         variables = _per_provider_vars(config, pc, capabilities.get(provider, {}))
         renders[provider] = _build_managed_block(
@@ -191,11 +193,11 @@ def test_shared_managed_block_identical_with_gate_vars(loaded_config):
             project_root=_REPO_ROOT,
         )
 
-    baseline = renders[_AGENTS_MD_SHARERS[0]]
+    baseline = renders[_ACTIVE_AGENTS_MD_SHARERS[0]]
     diverged = [p for p, block in renders.items() if block != baseline]
     assert not diverged, (
         f"AGENTS.md sharers {diverged} render a different managed block than "
-        f"{_AGENTS_MD_SHARERS[0]} even with real GATE_* vars injected"
+        f"{_ACTIVE_AGENTS_MD_SHARERS[0]} even with real GATE_* vars injected"
     )
     assert "runtime-partially enforced" in baseline
     assert "NICHT erzwungen" in baseline

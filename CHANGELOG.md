@@ -146,6 +146,16 @@
   The `D-CONDITIONAL` guard rule applies only to files with well-formed conditional markers (repo-wide balance
   test). `requires_roles` accepts flow and block style, only that entry is parsed (non-YAML frontmatter of
   external commands no longer aborts the sync), and the consistency check reuses the generator's parser.
+- **Shared context file derived from the active providers only (IC-15 Nr. 1, F-05, PR E)**: the AGENTS.md
+  managed block used to join the path fields of every catalog provider that writes AGENTS.md
+  (`.gemini/agents bzw. .opencode/agents bzw. ...`), also in single-provider projects, and let an inactive
+  sharer without a skills directory veto the lazy-rule channel. Now only the providers the project activates
+  count: a single-provider AGENTS.md names only its own agents dir, pending-tasks file and skills dir.
+  Whether rules are embedded or replaced by the "native rules" pointer now follows the read channels
+  (`rules_read_channels`, spec §4.3) of every active sharer instead of `has_rules` - a written but unread
+  rules directory never replaces the embedded rules (new helper `scripts/lib/rule_channels.py`). Default
+  render: AGENTS.md of the six AGENTS.md providers changes (AC-01 rebaselined, 6 of 1075 hashes); a project
+  with all sharers active is unchanged.
 
 ### Changed
 - **`ACTIVE_ROLES` / `ROLE_<ROLE>_ACTIVE` available in templates**: `build_variables` injects
