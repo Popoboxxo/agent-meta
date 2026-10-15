@@ -217,7 +217,10 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
     from lib.runtime_gate import sync_runtime_gate_plugins
     from lib.skills import sync_external_skills_for_provider
 
-    test_variables, _pre_warnings = build_variables(config, agent_meta_root, test_repo_path)
+    # IC-17/IC-18: one ActiveSet for the test-repo sync, shared by every consumer.
+    active_set = compute_active_set(config, agent_meta_root, test_repo_path, warn_sink=[])
+    test_variables, _pre_warnings = build_variables(
+        config, agent_meta_root, test_repo_path, active_set=active_set)
     # Override AGENT_META_REPO to point to test repo for validation context
     test_variables["PROJECT_NAME"] = test_variables.get("PROJECT_NAME", "agent-meta-test")
 
@@ -250,7 +253,8 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
             )
 
         sync_agents_for_provider(agent_meta_root, test_repo_path, config, test_variables,
-                                 log, dry_run, provider, provider_config)
+                                 log, dry_run, provider, provider_config,
+                                 active_set=active_set)
         sync_context_for_provider(agent_meta_root, test_repo_path, config, test_variables,
                                   log, dry_run, provider, provider_config)
         if pc["has_rules"]:
@@ -284,11 +288,12 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
         if pc.get("has_commands", False):
             sync_commands_for_provider(agent_meta_root, test_repo_path, config, log,
                                        dry_run, provider, provider_config=provider_config,
-                                       variables=test_variables)
+                                       variables=test_variables, active_set=active_set)
         sync_snippets_for_provider(agent_meta_root, test_repo_path, config, log, dry_run,
                                    provider, provider_config)
         sync_external_skills_for_provider(agent_meta_root, test_repo_path, config, test_variables,
-                                          log, dry_run, provider, provider_config)
+                                          log, dry_run, provider, provider_config,
+                                          active_set=active_set)
 
     # Errors recorded by THIS run (SR-A-24). The test repo's sync.log is a
     # leftover of an earlier run: reading it made a fixed problem fail
@@ -1389,8 +1394,9 @@ def _handle_sync(ctx: _SyncContext) -> None:
     # this file's own write isn't captured into that hash baseline.
     _sync_stage_auto_commit_allowlist(ctx.agent_meta_root, ctx.project_root,
                                       config, ctx.args, ctx.log, ctx.active_set)
-    # Stage 14b: context/active-set checks (IC-10/19/29) -- report-only (WARN/INFO
-    # in sync.log), fail-soft, no exit-code or render effect.
+    # Stage 14b: context/active-set checks (IC-10/19/29) -- report-only (WARN/INFO,
+    # ERROR for active-set.dangling-dispatch, in sync.log), fail-soft, no exit-code
+    # or render effect.
     _sync_stage_context_checks(
         ctx.agent_meta_root, ctx.project_root, config, ctx.active_set, ctx.log,
         info_messages=(ctx.variables or {}).get("_ROUTING_INFO"))

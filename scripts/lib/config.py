@@ -43,6 +43,7 @@ from .pipelines import (
     build_pipeline_variables,
     generate_pipeline_match_table,
     load_quality_pipelines,
+    pipeline_var_stem,
     validate_pipelines,
 )
 from .analysis import FileAffinityAnalyzer, analyze_project
@@ -1960,7 +1961,7 @@ def _build_pipeline_variables(
         variables.update(active_vars)
         variables["PIPELINE_MATCH_TABLE"] = generate_pipeline_match_table(effective)
         for name in pipelines:
-            var_name = name.upper().replace("-", "_")
+            var_name = pipeline_var_stem(name)
             block_key = f"PIPELINE_{var_name}_BLOCK"
             enabled_key = f"PIPELINE_{var_name}_ENABLED"
             if block_key not in variables:
@@ -2188,7 +2189,7 @@ def build_variables(
     variables.update(active_set_variables(active_set))
     _build_provider_variables(
         variables, config, agent_meta_root, warn_sink=unmapped, active_set=active_set)
-    _build_orch_variables(variables, unmapped, config, agent_meta_root, active_set)
+    _build_orch_variables(variables, unmapped, config, agent_meta_root, active_set=active_set)
     _build_subagent_permission_variables(variables, config)
     _build_platform_variables(variables, unmapped, config, agent_meta_root, active_set)
     dod_resolved = _build_dod_variables(variables, config, agent_meta_root)

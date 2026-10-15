@@ -36,7 +36,11 @@ from typing import Mapping, Optional, Sequence
 from .report import Finding, Severity
 from ..io import load_yaml_file
 from ..pipelines import resolve_pipeline_details_dir
+from ..rule_index import read_managed_index
 from ..rules import CLAUDE_RULES_DIR
+
+# Default managed-file index name of rules/commands directories (rule_index).
+MANAGED_INDEX = ".agent-meta-managed"
 
 CHECK_DANGLING_DISPATCH = "active-set.dangling-dispatch"
 CHECK_DANGLING_MENTION = "active-set.dangling-mention"
@@ -81,16 +85,36 @@ def _dispatch_formats(root: Path, provider: str) -> list:
 
 
 def _scan_dirs(cfg: dict, provider: str) -> list:
-    """Generated directories of ``provider`` (config keys only, no provider names)."""
-    dirs = [cfg.get("agents_dir")]
+    """``(dir, managed_index)`` of ``provider``'s generated directories (config keys only).
+
+    ``managed_index`` names the sync's managed-file index in that directory;
+    when it exists only the listed files are scanned, so unmanaged user files
+    (own commands/rules) never produce findings. ``None`` = scan every file.
+    """
+    dirs = [(cfg.get("agents_dir"), None)]
     # Providers with native rules but without rules_dir write the default rules dir
     # (same fallback as rules.sync_rules).
-    dirs.append(cfg.get("rules_dir") or (CLAUDE_RULES_DIR if cfg.get("has_rules") else None))
+    rules_dir = cfg.get("rules_dir") or (CLAUDE_RULES_DIR if cfg.get("has_rules") else None)
+    dirs.append((rules_dir, MANAGED_INDEX))
     if cfg.get("has_commands"):
-        dirs.append(cfg.get("commands_dir"))
+        dirs.append((cfg.get("commands_dir"), cfg.get("commands_managed_index", MANAGED_INDEX)))
     if isinstance(cfg.get("agents_dir"), str):
-        dirs.append(resolve_pipeline_details_dir(cfg, provider))
-    return [d for d in dirs if isinstance(d, str)]
+        dirs.append((resolve_pipeline_details_dir(cfg, provider), None))
+    return [(d, idx) for d, idx in dirs if isinstance(d, str)]
+
+
+def _managed_names(root: Path, index: str):
+    """Union of the sync's managed indexes in ``root`` (``index`` plus the
+    ``.agent-meta-managed*`` siblings written by MCP/external-tool rules);
+    ``None`` when ``root`` has no index at all."""
+    indexes = {root / index} | set(root.glob(MANAGED_INDEX + "*"))
+    present = [p for p in sorted(indexes) if p.is_file()]
+    if not present:
+        return None
+    names: set = set()
+    for path in present:
+        names |= read_managed_index(path)
+    return names
 
 
 def _scan_files(project_root: Path, provider: str) -> list:
@@ -99,12 +123,21 @@ def _scan_files(project_root: Path, provider: str) -> list:
     suffixes = {Path("x" + str(ext)).suffix
                 for ext in (".md", cfg.get("agent_ext") or ".md", cfg.get("commands_ext") or ".md")}
     files: list = []
-    for base in _scan_dirs(cfg, provider):
-        if (project_root / base).is_dir():
-            files += [p for p in sorted((project_root / base).rglob("*"))
-                      if p.is_file() and p.suffix in suffixes and p not in files]
+    seen: set = set()
+    for base, index in _scan_dirs(cfg, provider):
+        root = project_root / base
+        if not root.is_dir():
+            continue
+        managed = _managed_names(root, index) if index else None
+        for p in sorted(root.rglob("*")):
+            if not p.is_file() or p.suffix not in suffixes or p in seen:
+                continue
+            if managed is not None and p.relative_to(root).as_posix() not in managed:
+                continue
+            seen.add(p)
+            files.append(p)
     ctx = cfg.get("context_file")
-    if isinstance(ctx, str) and (project_root / ctx).is_file() and project_root / ctx not in files:
+    if isinstance(ctx, str) and (project_root / ctx).is_file() and project_root / ctx not in seen:
         files.append(project_root / ctx)
     return files
 

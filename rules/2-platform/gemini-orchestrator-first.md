@@ -1,7 +1,7 @@
 ---
 name: gemini-orchestrator-first
 platform: gemini
-version: 1.0.0
+version: 1.0.1
 ---
 # Orchestrator-First — Gemini Platform
 

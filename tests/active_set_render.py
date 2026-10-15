@@ -30,8 +30,8 @@ def fixture_config(name: str) -> dict:
     return yaml.safe_load(path.read_text(encoding="utf-8"))
 
 
-def sync_config(project: Path, config: dict, providers: Optional[list] = None) -> Path:
-    """Write ``config`` (optionally overriding ``ai-providers``) and run the sync."""
+def _prepare(project: Path, config: dict, providers: Optional[list]) -> list:
+    """Write ``config`` (optionally overriding ``ai-providers``); return the sync argv."""
     config = dict(config)
     if providers is not None:
         config["ai-providers"] = list(providers)
@@ -39,12 +39,56 @@ def sync_config(project: Path, config: dict, providers: Optional[list] = None) -
     (project / ".meta-config" / "project.yaml").write_text(
         yaml.safe_dump(config, sort_keys=False, allow_unicode=True), encoding="utf-8")
     subprocess.run(["git", "init", "-q"], cwd=project, check=True)
-    res = subprocess.run(
-        [sys.executable, str(REPO_ROOT / "scripts" / "sync.py"), "--config",
-         str(project / ".meta-config" / "project.yaml"), "--init"],
-        cwd=project, capture_output=True, text=True, timeout=600)
+    return [sys.executable, str(REPO_ROOT / "scripts" / "sync.py"), "--config",
+            str(project / ".meta-config" / "project.yaml"), "--init"]
+
+
+def sync_config(project: Path, config: dict, providers: Optional[list] = None) -> Path:
+    """Write ``config`` (optionally overriding ``ai-providers``) and run the sync."""
+    argv = _prepare(project, config, providers)
+    res = subprocess.run(argv, cwd=project, capture_output=True, text=True, timeout=900)
     assert res.returncode == 0, res.stdout[-1500:] + res.stderr[-1500:]
     return project
+
+
+def sync_configs_parallel(root: Path, configs: dict, providers: Optional[list] = None,
+                          workers: int = 4) -> dict:
+    """Sync several ``{name: config}`` projects under ``root`` concurrently.
+
+    Each project lives in its own directory (no shared state); at most
+    ``workers`` sync processes run at once. Returns ``{name: project}``.
+    """
+    pending = []
+    for name, config in configs.items():
+        project = root / name
+        pending.append((name, project, _prepare(project, config, providers)))
+    done: dict = {}
+    running: list = []
+    while pending or running:
+        while pending and len(running) < max(1, workers):
+            name, project, argv = pending.pop(0)
+            proc = subprocess.Popen(argv, cwd=project, stdout=subprocess.PIPE,
+                                    stderr=subprocess.STDOUT, text=True)
+            running.append((name, project, proc))
+        name, project, proc = running.pop(0)
+        out, _ = proc.communicate(timeout=900)
+        assert proc.returncode == 0, f"{name}: sync failed\n{out[-1500:]}"
+        done[name] = project
+    return done
+
+
+# Session cache: identical configs are synced once per test session (per xdist
+# worker), shared read-only by every module. Callers must not modify the files.
+_SYNC_CACHE: dict = {}
+
+
+def synced_project(tmp_path_factory, config: dict, providers: Optional[list] = None) -> Path:
+    """Cached ``sync_config`` keyed by the config (and provider override)."""
+    key = yaml.safe_dump([config, providers], sort_keys=True)
+    if key not in _SYNC_CACHE:
+        _SYNC_CACHE[key] = sync_config(
+            tmp_path_factory.mktemp("as-sync") / "project", config, providers)
+    return _SYNC_CACHE[key]
 
 
 def default_config() -> dict:

@@ -50,7 +50,7 @@ def check_command_frontmatter(path: Path, content: str, agent_meta_root: Path) -
 
     # requires_roles (IC-18 no. 9, Q26): optional generator directive; when
     # present it must be a list of roles defined in config/role-defaults.yaml.
-    findings.extend(_check_requires_roles(fm, rel, agent_meta_root))
+    findings.extend(_check_requires_roles(content, rel, agent_meta_root))
 
     # argument-hint: recommended
     if "argument-hint" not in fm:
@@ -105,19 +105,23 @@ def check_duplicate_commands(agent_meta_root: Path) -> list[Finding]:
     return findings
 
 
-def _check_requires_roles(fm: dict, rel: str, agent_meta_root: Path) -> list[Finding]:
-    """``commands.requires-roles-invalid`` for a malformed or unknown ``requires_roles``."""
-    if "requires_roles" not in fm:
-        return []
-    value = fm.get("requires_roles")
-    if not isinstance(value, list) or not all(isinstance(r, str) for r in value):
-        return [Finding(
-            Severity.ERROR, "commands.requires-roles-invalid", rel,
-            f"'requires_roles' must be a list of role names, got {value!r}",
-            "Use: requires_roles: [documenter]",
-        )]
+def _check_requires_roles(content: str, rel: str, agent_meta_root: Path) -> list[Finding]:
+    """``commands.requires-roles-invalid`` for a malformed or unknown ``requires_roles``.
+
+    Parses with the generator's own ``command_required_roles`` so check and sync
+    agree on flow/block style and on what is malformed.
+    """
+    from ..commands import command_required_roles
+    from ..io import SyncError
     from ..roles import load_roles_config
 
+    try:
+        value = command_required_roles(content)
+    except SyncError as exc:
+        return [Finding(
+            Severity.ERROR, "commands.requires-roles-invalid", rel, str(exc),
+            "Use: requires_roles: [documenter]",
+        )]
     known = set((load_roles_config(agent_meta_root).get("roles") or {}).keys())
     unknown = sorted(set(value) - known)
     if not unknown:

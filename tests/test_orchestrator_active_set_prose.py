@@ -16,7 +16,7 @@ from tests.active_set_render import (
     default_config,
     fixture_config,
     section,
-    sync_config,
+    synced_project,
     tiers_on_config,
 )
 
@@ -26,11 +26,10 @@ _DROPPED_DEFAULT_PIPELINES = ("concept-driven-dev", "feature-lifecycle")
 
 @pytest.fixture(scope="module")
 def projects(tmp_path_factory):
-    root = tmp_path_factory.mktemp("prose")
     return {
-        "p10": sync_config(root / "p10", fixture_config("p10")),
-        "default": sync_config(root / "default", default_config()),
-        "all": sync_config(root / "all", tiers_on_config()),
+        "p10": synced_project(tmp_path_factory, fixture_config("p10")),
+        "default": synced_project(tmp_path_factory, default_config()),
+        "all": synced_project(tmp_path_factory, tiers_on_config()),
     }
 
 

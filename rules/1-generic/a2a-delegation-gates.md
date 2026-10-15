@@ -46,7 +46,7 @@ Rolle→Tier-Auflösung (`role-defaults.yaml` → `model`) nur für genau diesen
 **Guardrails (Referenz-Implementierung: `resolve_tier_override()` in `scripts/lib/delegation_syntax.py`):**
 
 1. **Preset-Bounds:** Der Tier-Name muss im aktiven tier-preset existieren (`config/tier-presets.yaml` — globales `tiers:` plus `providers.<provider>.tiers` wenn Provider-Kontext vorliegt). Unbekannter Tier oder Tier außerhalb des Presets → Override wird verworfen, Fallback auf Rollen-Default.
-2. **Kein Downgrade sicherheitskritischer Rollen:** Rollen aus `tier-override-policy.security-critical-roles` (`config/role-defaults.yaml`; Default: {{#if ROLE_SECURITY_AUDITOR_ACTIVE}}`security-auditor`{{#if ROLE_CODE_REVIEWER_ACTIVE}}, {{/if}}{{/if}}{{#if ROLE_CODE_REVIEWER_ACTIVE}}`code-reviewer`{{/if}}) können per Override nur gleich- oder höhergestuft werden.
+2. **Kein Downgrade sicherheitskritischer Rollen:** Rollen aus `tier-override-policy.security-critical-roles` (`config/role-defaults.yaml`; Default: {{#if ROLE_SECURITY_AUDITOR_ACTIVE}}`security-auditor`{{#if ROLE_CODE_REVIEWER_ACTIVE}}, `code-reviewer`{{/if}}{{else}}{{#if ROLE_CODE_REVIEWER_ACTIVE}}`code-reviewer`{{else}}keine aktive Rolle{{/if}}{{/if}}) können per Override nur gleich- oder höhergestuft werden.
 3. **Audit-Log-Pflicht:** Jeder Override-Versuch — angenommen ODER abgelehnt — wird im Delegations-Tracker/Checkpoint protokolliert: `tier_override=<tier> (applied|rejected: <reason>)`.
 
 {{#if SUBAGENT_PERMISSIONS_STRICT}}

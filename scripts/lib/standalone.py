@@ -232,28 +232,17 @@ def _standalone_active_set_flags(agent_meta_root: Path) -> dict:
     keys ``strip_inactive_conditional_blocks`` would keep BOTH branches of an
     ``{{#if}}...{{else}}`` (orphaned-marker cleanup).
     """
-    from .active_set import active_set_variables
-    from .pipelines import load_quality_pipelines
+    from .pipelines import load_quality_pipelines, pipeline_var_stem
     from .roles import load_roles_config
 
-    known = frozenset((load_roles_config(agent_meta_root).get("roles") or {}).keys())
     flags = {
-        key: value
-        for key, value in active_set_variables(_AllActive(known)).items()
-        if key.startswith("ROLE_")
+        "ROLE_%s_ACTIVE" % role.upper().replace("-", "_"): "true"
+        for role in (load_roles_config(agent_meta_root).get("roles") or {})
     }
     flags["DEVELOPER_TIERS_ENABLED"] = "true"
     for name in load_quality_pipelines(str(agent_meta_root)):
-        flags["PIPELINE_%s_ENABLED" % str(name).upper().replace("-", "_")] = "true"
+        flags["PIPELINE_%s_ENABLED" % pipeline_var_stem(name)] = "true"
     return flags
-
-
-class _AllActive:
-    """Minimal ActiveSet stand-in: every known role is active (standalone)."""
-
-    def __init__(self, known: frozenset) -> None:
-        self.roles = known
-        self.known_roles = known
 
 
 def _standalone_variables(agent_meta_root: Path) -> dict:

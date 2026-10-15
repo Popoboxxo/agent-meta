@@ -1,5 +1,4 @@
 """IC-19 active-set reference checks (Task 0b.3, AC-43)."""
-import subprocess
 import sys
 from pathlib import Path
 
@@ -12,6 +11,7 @@ sys.path.insert(0, str(_ROOT / "scripts"))
 from lib.active_set import compute_active_set  # noqa: E402
 from lib.consistency import active_set_refs as asr  # noqa: E402
 from lib.consistency.report import Severity  # noqa: E402
+from tests.active_set_render import sync_configs_parallel, synced_project  # noqa: E402
 
 _FIX = Path(__file__).resolve().parent / "fixtures" / "active-set"
 _AC43_ROLES = ("senior-developer", "validator", "bug-feature-analyzer",
@@ -21,26 +21,12 @@ _PROVIDERS = ["Claude"]
 
 @pytest.fixture(scope="module")
 def synced(tmp_path_factory):
-    """Sync a fixture into a scratch project once per fixture name."""
-    cache = {}
-
+    """A fixture project synced once per session (shared, read-only)."""
     def _get(name):
-        if name in cache:
-            return cache[name]
-        project = tmp_path_factory.mktemp(name) / name
-        (project / ".meta-config").mkdir(parents=True)
-        cfg_text = (_FIX / name / ".meta-config" / "project.yaml").read_text(encoding="utf-8")
-        (project / ".meta-config" / "project.yaml").write_text(cfg_text, encoding="utf-8")
-        subprocess.run(["git", "init", "-q"], cwd=project, check=True)
-        res = subprocess.run(
-            [sys.executable, str(_ROOT / "scripts" / "sync.py"), "--config",
-             str(project / ".meta-config" / "project.yaml"), "--init"],
-            cwd=project, capture_output=True, text=True, timeout=300)
-        assert res.returncode == 0, res.stdout[-1500:] + res.stderr[-1500:]
-        config = yaml.safe_load(cfg_text)
-        active = compute_active_set(config, _ROOT, project)
-        cache[name] = (project, active)
-        return cache[name]
+        config = yaml.safe_load(
+            (_FIX / name / ".meta-config" / "project.yaml").read_text(encoding="utf-8"))
+        project = synced_project(tmp_path_factory, config)
+        return project, compute_active_set(config, _ROOT, project)
 
     return _get
 
@@ -255,24 +241,15 @@ _MENTION_ZERO_PARTS = ("orchestrator", "pipeline-details", "commands", "prompts"
 
 @pytest.fixture(scope="module")
 def matrix(tmp_path_factory):
-    """Each AC-49 fixture synced once with every registered provider."""
-    out = {}
-    for name in ("p10", "p20", "pall", "ha"):
-        project = tmp_path_factory.mktemp("matrix-" + name) / name
-        (project / ".meta-config").mkdir(parents=True)
-        config = yaml.safe_load(
-            (_FIX / name / ".meta-config" / "project.yaml").read_text(encoding="utf-8"))
-        config["ai-providers"] = list(_MATRIX_PROVIDERS)
-        (project / ".meta-config" / "project.yaml").write_text(
-            yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
-        subprocess.run(["git", "init", "-q"], cwd=project, check=True)
-        res = subprocess.run(
-            [sys.executable, str(_ROOT / "scripts" / "sync.py"), "--config",
-             str(project / ".meta-config" / "project.yaml"), "--init"],
-            cwd=project, capture_output=True, text=True, timeout=900)
-        assert res.returncode == 0, res.stdout[-1500:] + res.stderr[-1500:]
-        out[name] = (project, compute_active_set(config, _ROOT, project))
-    return out
+    """Each AC-49 fixture synced once with every registered provider (concurrently)."""
+    names = ("p10", "p20", "pall", "ha")
+    configs = {name: yaml.safe_load(
+        (_FIX / name / ".meta-config" / "project.yaml").read_text(encoding="utf-8"))
+        for name in names}
+    projects = sync_configs_parallel(
+        tmp_path_factory.mktemp("matrix"), configs, providers=_MATRIX_PROVIDERS)
+    return {name: (projects[name], compute_active_set(configs[name], _ROOT, projects[name]))
+            for name in names}
 
 
 @pytest.mark.parametrize("name", ["p10", "p20", "pall", "ha"])
@@ -288,3 +265,16 @@ def test_ac49_no_dangling_mention_in_orchestrator_pipelines_commands(matrix, nam
     found = [f for f in asr.check_dangling_mention(project, _MATRIX_PROVIDERS, {}, active)
              if any(part in f.file for part in _MENTION_ZERO_PARTS)]
     assert found == [], "\n".join(f"{f.file}: {f.message}" for f in found)
+
+
+def test_unmanaged_user_command_is_not_scanned(synced, tmp_path):
+    # Review fix: with a managed index present only sync-managed files are scanned,
+    # so a user's own command can never make --doctor fail.
+    _, active = synced("p10")
+    commands = tmp_path / ".claude" / "commands"
+    commands.mkdir(parents=True)
+    (commands / "mine.md").write_text("Delegiere an `validator`.\n", encoding="utf-8")
+    (commands / "managed.md").write_text("Delegiere an `validator`.\n", encoding="utf-8")
+    (commands / ".agent-meta-managed").write_text("managed.md\n", encoding="utf-8")
+    found = asr.check_dangling_dispatch(tmp_path, _PROVIDERS, {}, active)
+    assert [f.file for f in found] == [".claude/commands/managed.md"]

@@ -18,7 +18,7 @@ from tests.active_set_render import (
     REPO_ROOT,
     default_config,
     fixture_config,
-    sync_config,
+    synced_project,
     tiers_on_config,
 )
 
@@ -31,11 +31,10 @@ _TOKEN = re.compile(r"(?<![\w-])(" + "|".join(re.escape(r) for r in _KNOWN) + r"
 
 @pytest.fixture(scope="module")
 def projects(tmp_path_factory):
-    root = tmp_path_factory.mktemp("rules-owner")
     out = {}
     for name, config in (("p10", fixture_config("p10")), ("default", default_config()),
                          ("all", tiers_on_config())):
-        out[name] = (sync_config(root / name, config), config)
+        out[name] = (synced_project(tmp_path_factory, config), config)
     return out
 
 
@@ -59,14 +58,30 @@ def test_p10_paved_roads_keep_the_block_catalog(projects):
     assert "{{" not in text
 
 
+_PINNED = REPO_ROOT / "tests" / "fixtures" / "active-set-prose" / "rules-all-active"
+
+
 @pytest.mark.parametrize("name", ["default", "all"])
 @pytest.mark.parametrize("stem", _RULES)
 def test_rules_unchanged_when_owners_active(projects, name, stem):
-    # Every owner role is active in the default and the all-roles project.
+    # Every owner role is active in the default and the all-roles project, so the
+    # render equals the pre-change render (pinned from main 8f2ecb2, default project).
     text = _rule(projects[name][0], stem)
-    source = (REPO_ROOT / "rules" / "1-generic" / f"{stem}.md").read_text(encoding="utf-8")
-    for line in source.splitlines():
-        if "{{" in line:
-            continue
-        if _TOKEN.search(line):
-            assert line in text, (stem, line)
+    assert text == (_PINNED / f"{stem}.md").read_text(encoding="utf-8")
+    assert "keine aktive Eigentümer-Rolle" not in text
+
+
+@pytest.mark.parametrize("sa,cr,expected", [
+    ("true", "true", "Default: `security-auditor`, `code-reviewer`)"),
+    ("true", "false", "Default: `security-auditor`)"),
+    ("false", "true", "Default: `code-reviewer`)"),
+    ("false", "false", "Default: keine aktive Rolle)"),
+])
+def test_a2a_default_roles_render_for_every_combination(sa, cr, expected):
+    from scripts.lib.variables import strip_inactive_conditional_blocks
+
+    source = (REPO_ROOT / "rules" / "1-generic" / "a2a-delegation-gates.md").read_text(encoding="utf-8")
+    line = next(ln for ln in source.splitlines() if "security-critical-roles" in ln and "Default:" in ln)
+    rendered = strip_inactive_conditional_blocks(
+        line, {"ROLE_SECURITY_AUDITOR_ACTIVE": sa, "ROLE_CODE_REVIEWER_ACTIVE": cr})
+    assert expected in rendered

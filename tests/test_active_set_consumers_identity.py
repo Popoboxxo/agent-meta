@@ -35,6 +35,7 @@ import lib.agents as agents_mod  # noqa: E402
 import lib.cli_commands as cli_commands_mod  # noqa: E402
 import lib.config as config_mod  # noqa: E402
 import lib.delegation_table as delegation_mod  # noqa: E402
+import lib.sync_pipeline as sync_pipeline_mod  # noqa: E402
 
 _FIXTURES = _REPO_ROOT / "tests" / "fixtures" / "active-set"
 
@@ -47,6 +48,10 @@ _GENERATORS = (
     (agents_mod, "build_agent_table"),
     (agents_mod, "build_routing_tool_definitions_for_providers"),
     (agent_sync_mod, "_should_skip_role"),
+    # PR D (IC-18 no. 6/7/9): ANTI_RECURSION_BLOCK / DIRECT_DISPATCH_SECTION builder
+    # and the command writer.
+    (config_mod, "_build_orch_variables"),
+    (sync_pipeline_mod, "sync_commands_for_provider"),
 )
 # config.py binds some generators by name at import time.
 _CONFIG_BOUND = (

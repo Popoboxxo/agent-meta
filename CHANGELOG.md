@@ -140,6 +140,12 @@
   `/meta-feedback` only when the role is active. Not done: the `RAW_ROLES_RATCHET` (QG-13/AC-84) keeps its
   three intersection sites (auto-commit allowlist, scout skill, `WEB_PROJECT_ENABLED`) - emptying it changes
   default behaviour (see the PR report).
+  `--doctor` consequence: the seed `dangling-role-dispatch` now yields an effective ERROR, so a dangling
+  dispatch makes `--doctor` exit 1. To keep user files out, rules/commands directories are scanned only for files
+  listed in the sync's managed indexes (`.agent-meta-managed*`); unmanaged project commands/rules are ignored.
+  The `D-CONDITIONAL` guard rule applies only to files with well-formed conditional markers (repo-wide balance
+  test). `requires_roles` accepts flow and block style, only that entry is parsed (non-YAML frontmatter of
+  external commands no longer aborts the sync), and the consistency check reuses the generator's parser.
 
 ### Changed
 - **`ACTIVE_ROLES` / `ROLE_<ROLE>_ACTIVE` available in templates**: `build_variables` injects

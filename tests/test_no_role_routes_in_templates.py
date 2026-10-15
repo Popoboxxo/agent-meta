@@ -50,6 +50,10 @@ Allowed documentation forms (``D-*``)
   block conditional (marker lines of their own) or an inline segment on the
   same line (up to the next ``{{else}}``/``{{/if}}``/``{{#if``). A different
   role's flag never covers a target; an ``{{else}}`` branch is not covered.
+  Granted only in files whose conditional markers are well-formed
+  (``marker_problems``): balanced, block markers on their own lines closed by
+  block markers, inline markers opened and closed on the same line. Mixed or
+  unbalanced markers would let the stack/segment logic misread a branch.
 
 PyYAML is used when importable; a stdlib-only regex fallback extracts the role list.
 """
@@ -307,6 +311,42 @@ def _flag_role(flag: str) -> str | None:
     return None
 
 
+_MARKER_RE = re.compile(r"\{\{(#if|#unless) (\w+)\}\}|\{\{(else)\}\}|\{\{/(if|unless)\}\}")
+
+
+def marker_problems(text: str) -> list[tuple[int, str]]:
+    """``(line, problem)`` for unbalanced or mixed block/inline conditional markers.
+
+    A marker alone on its line is a block marker, any other is inline. A block
+    open must be continued/closed by block markers; an inline open must be
+    continued/closed on the same line; the marker kinds must match; nothing may
+    stay open at the end of the file.
+    """
+    stack: list[tuple[str, str, int]] = []
+    problems: list[tuple[int, str]] = []
+    for number, line in enumerate(text.splitlines(), start=1):
+        markers = list(_MARKER_RE.finditer(line))
+        form = "block" if len(markers) == 1 and line.strip() == markers[0].group(0) else "inline"
+        for marker in markers:
+            if marker.group(1):
+                stack.append((marker.group(1)[1:], form, number))
+                continue
+            top = stack[-1] if stack else None
+            same = top is not None and top[1] == form and (form == "block" or top[2] == number)
+            if marker.group(3):
+                if not (same and top[0] == "if"):
+                    problems.append((number, "else-mismatch"))
+                continue
+            if top is None:
+                problems.append((number, "close-without-open"))
+                continue
+            stack.pop()
+            if not same or top[0] != marker.group(4):
+                problems.append((number, "close-mismatch"))
+    problems += [(number, "unclosed") for _, _, number in stack]
+    return problems
+
+
 def conditional_block_roles(text: str) -> dict[int, frozenset[str]]:
     """1-based line -> roles whose block ``{{#if ROLE_*_ACTIVE}}`` (positive branch) encloses it."""
     stack: list[tuple[str | None, bool]] = []
@@ -356,6 +396,7 @@ def classify_line(
     is_orchestrator: bool = False,
     handoff_pattern: "re.Pattern[str] | None" = None,
     block_roles: frozenset = frozenset(),
+    allow_conditional: bool = True,
 ) -> list[tuple[str, list[str]]]:
     """Return ``[(kind, allowed_reasons), ...]`` for one line.
 
@@ -371,6 +412,8 @@ def classify_line(
     spans = inline_conditional_spans(line)
 
     def conditional(role: str, pos: int) -> bool:
+        if not allow_conditional:
+            return False
         return role in block_roles or any(
             start <= pos < end and span_role == role for start, end, span_role in spans)
 
@@ -453,7 +496,8 @@ def find_findings(repo_root: Path = REPO_ROOT) -> list[Finding]:
         rel = path.relative_to(repo_root).as_posix()
         text = path.read_text(encoding="utf-8")
         boundary = boundary_lines(text) | boundary_section_lines(text)
-        block_roles = conditional_block_roles(text)
+        wellformed = not marker_problems(text)
+        block_roles = conditional_block_roles(text) if wellformed else {}
         is_workflow = rel in _WORKFLOW_FILES
         is_orchestrator = rel == _ORCHESTRATOR_FILE
         for number, line in enumerate(text.splitlines(), start=1):
@@ -466,6 +510,7 @@ def find_findings(repo_root: Path = REPO_ROOT) -> list[Finding]:
                 is_orchestrator=is_orchestrator,
                 handoff_pattern=handoff_pattern,
                 block_roles=block_roles.get(number, frozenset()),
+                allow_conditional=wellformed,
             ):
                 if not reasons:
                     findings.append(Finding(rel, number, kind, line))
@@ -812,3 +857,48 @@ def test_next_block_needs_every_role_conditional(tmp_path):
     assert new_findings(_fixture_repo(tmp_path / "a", covered)) == []
     partial = "# X\n\nNEXT: [Review{{#if ROLE_DEVELOPER_ACTIVE}} | Developer fix{{/if}} | Documenter]\n"
     assert [h.kind for h in new_findings(_fixture_repo(tmp_path / "b", partial))] == ["T-NEXT"]
+
+
+# --- review fixes: D-CONDITIONAL bypasses and marker balance ------------------
+
+
+def test_bypass_block_open_closed_inline_is_not_covered(tmp_path):
+    # (a) a block open closed by an inline {{/if}} at the end of a content line
+    body = ("# X\n\n{{#if ROLE_TESTER_ACTIVE}}\nok{{/if}}\nDelegiere an `tester`.\n")
+    assert [h.kind for h in new_findings(_fixture_repo(tmp_path, body))] == ["T-HANDOFF"]
+
+
+def test_bypass_inline_else_inside_block_is_not_covered(tmp_path):
+    # (b) an inline {{else}} inside a block conditional
+    body = ("# X\n\n{{#if ROLE_TESTER_ACTIVE}}\nok {{else}} Delegiere an `tester`.\n{{/if}}\n")
+    assert [h.kind for h in new_findings(_fixture_repo(tmp_path, body))] == ["T-HANDOFF"]
+
+
+def test_bypass_unclosed_inline_open_is_not_covered(tmp_path):
+    # (c) an inline {{#if ROLE_X_ACTIVE}} without {{/if}}
+    body = "# X\n\n- Tests?{{#if ROLE_TESTER_ACTIVE}} → `tester`\n"
+    assert [h.kind for h in new_findings(_fixture_repo(tmp_path, body))] == ["T-ROLE-ARROW"]
+
+
+def test_marker_problems_detects_each_bypass():
+    assert marker_problems("{{#if A}}\nx{{/if}}\n")
+    assert marker_problems("{{#if A}}\nx {{else}} y\n{{/if}}\n")
+    assert marker_problems("x {{#if A}} y\n")
+    assert marker_problems("{{#if A}}\nx\n{{else}}\ny\n{{/if}}\nz {{#if B}}w{{else}}{{/if}}\n") == []
+
+
+# templates/context/ is rendered by the context engine with handlebars-style
+# multi-line inline markers ({{#each}}); it is not an agent/rule source.
+_BALANCE_GLOBS = ("agents/**/*.md", "rules/**/*.md", "commands/**/*.md", "snippets/**/*.md",
+                  "templates/*.md", "templates/bootstrap/*.md", "templates/configs/*.md",
+                  "templates/docs/*.md")
+
+
+def test_repo_conditional_markers_are_well_formed():
+    bad = {}
+    for pattern in _BALANCE_GLOBS:
+        for path in sorted(REPO_ROOT.glob(pattern)):
+            problems = marker_problems(path.read_text(encoding="utf-8"))
+            if problems:
+                bad[path.relative_to(REPO_ROOT).as_posix()] = problems[:3]
+    assert bad == {}, bad

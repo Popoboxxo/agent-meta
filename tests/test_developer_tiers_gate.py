@@ -75,7 +75,7 @@ from tests.active_set_render import (  # noqa: E402
     default_config,
     fixture_config,
     section,
-    sync_config,
+    synced_project,
     tiers_on_config,
 )
 
@@ -87,11 +87,10 @@ _SECTION4_FIXTURE = (
 
 @pytest.fixture(scope="module")
 def tier_projects(tmp_path_factory):
-    root = tmp_path_factory.mktemp("tiers")
     return {
-        "off-default": sync_config(root / "off-default", default_config()),
-        "off-p10": sync_config(root / "off-p10", fixture_config("p10")),
-        "on": sync_config(root / "on", tiers_on_config()),
+        "off-default": synced_project(tmp_path_factory, default_config()),
+        "off-p10": synced_project(tmp_path_factory, fixture_config("p10")),
+        "on": synced_project(tmp_path_factory, tiers_on_config()),
     }
 
 

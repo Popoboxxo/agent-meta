@@ -78,6 +78,21 @@ def test_dangling_dispatch_is_logged_as_error_report_only(p10_synced):
     assert not any("active-set.dangling-dispatch" in w for w in log.warnings)
 
 
+def test_error_finding_keeps_real_sync_exit_code_zero(tmp_path, monkeypatch):
+    # A real (in-process) sync with an injected ERROR-level dangling dispatch:
+    # the finding lands in sync.log as [ERROR], the exit code stays 0.
+    from lib.consistency.report import Finding, Severity
+
+    monkeypatch.setattr(active_set_refs, "check_dangling_dispatch", lambda *a, **k: [
+        Finding(Severity.ERROR, "active-set.dangling-dispatch", ".claude/agents/x.md",
+                "dispatch to inactive role 'validator' (1x, first line 1)")])
+    project = _project(tmp_path)
+    assert _sync_in_process(project, monkeypatch) == 0
+    text = (project / "sync.log").read_text(encoding="utf-8")
+    assert any(ln.startswith("[ERROR]") and "active-set.dangling-dispatch" in ln
+               for ln in text.splitlines())
+
+
 def test_info_findings_are_logged_as_info_not_warn(p10_synced, monkeypatch):
     from lib.consistency.report import Finding, Severity
 

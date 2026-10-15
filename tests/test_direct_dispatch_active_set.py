@@ -59,3 +59,12 @@ def test_every_row_is_gated_on_its_role():
         flag = "ROLE_%s_ACTIVE" % match.group(1).upper().replace("-", "_")
         assert lines[i - 1] == "{{#if %s}}" % flag, line
         assert lines[i + 1] == "{{/if}}", line
+
+
+def test_template_uses_only_role_conditionals():
+    # config._build_orch_variables resolves the section with ROLE_*_ACTIVE flags
+    # only; any other marker would keep both branches (orphan cleanup).
+    template = (REPO_ROOT / "templates" / "direct-dispatch-section.md").read_text(encoding="utf-8")
+    flags = re.findall(r"\{\{#(?:if|unless) (\w+)\}\}", template)
+    assert flags and all(re.fullmatch(r"ROLE_[A-Z0-9_]+_ACTIVE", f) for f in flags), flags
+    assert "{{else}}" not in template and "{{#unless" not in template
