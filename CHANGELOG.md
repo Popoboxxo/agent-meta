@@ -190,6 +190,14 @@
   `context.dangling-pointer` findings over 9 providers x presets `default`/`lazy`. Default render: AC-01
   rebaselined (18 entries: 6 x AGENTS.md, 4 x `use-lazy-rules.md` removed plus their managed indexes and
   `generated-file-hashes.json`); the committed self-hosting AGENTS.md was regenerated (banner).
+- **`context.dangling-pointer` is ERROR (Task 1.24, AC-11, PR E)**: over 9 providers x rules presets
+  (`default`, `minimal`, `silent`, `lazy`) no generated artifact names a missing skill any more, so the check
+  emits its spec level (`EMITTED_SEVERITY` / `PHASE1_PROMOTED` in `consistency/context_budget.py`). Sync end
+  stays report-only (sync.log error list, exit code unchanged); `--doctor` exits 1 on a dangling pointer
+  (seed `dangling-pointer` is ERROR). Not promoted yet: `context.rule-unreachable` (Copilot's
+  `.github/instructions` rules stay unread until IC-15 Nr. 3) and `context.declared-surface-empty` (surfaces
+  that are empty by design, e.g. skills without lazy rules or MCP config without servers) - see the plan's
+  "Umsetzungs-Nachzüge 1.21–1.24, 1.33".
 
 ### Changed
 - **`ACTIVE_ROLES` / `ROLE_<ROLE>_ACTIVE` available in templates**: `build_variables` injects

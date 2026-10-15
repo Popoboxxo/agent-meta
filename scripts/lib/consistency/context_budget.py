@@ -14,10 +14,13 @@ expressed through those keys (``context_file``, ``rules_dir``, ``skills_dir``,
 never through provider names.
 
 Severity is centralised: ``SPEC_SEVERITY`` holds the level the spec prescribes
-per check, ``PHASE0_SEVERITY`` the level actually emitted today (everything
-WARNING, no exit-code change). ``_warn`` reads ``PHASE0_SEVERITY``; promoting a
-check to its spec level (e.g. ``over-hard-cap`` and ``marker-in-rule`` from
-Phase 1) is a one-line change in that table.
+per check, ``PHASE0_SEVERITY`` the Phase-0 level (everything WARNING) and
+``EMITTED_SEVERITY`` the level actually emitted: Phase 0 plus the checks in
+``PHASE1_PROMOTED`` at their spec level (Task 1.24: ``context.dangling-pointer``
+is ERROR). ``_warn`` reads ``EMITTED_SEVERITY``; promoting a further check is a
+one-line change in ``PHASE1_PROMOTED``. Sync end stays report-only (ERROR lands
+in the sync.log error list, exit code unchanged); ``--doctor`` exits 1 on an
+effective ERROR.
 
 Not part of this module: ``context.token-report`` (0a report).
 Known gap, Phase 1: the Copilot soft cap is per instruction file; it is only
@@ -56,6 +59,16 @@ SPEC_SEVERITY = {
     "context.legacy-artifact-present": Severity.WARNING,
 }
 PHASE0_SEVERITY = {check: Severity.WARNING for check in SPEC_SEVERITY}
+# Phase 1 (Task 1.24): checks promoted to their spec level once the matrix
+# 9 providers x rules presets reports zero findings (AC-11). rule-unreachable
+# (AC-12) waits for IC-15 Nr. 3 (Copilot instructions are still unread);
+# declared-surface-empty waits for a "content expected" rule (surfaces that are
+# empty by design: skills without lazy rules, MCP without servers).
+PHASE1_PROMOTED = frozenset({"context.dangling-pointer"})
+EMITTED_SEVERITY = {
+    check: (SPEC_SEVERITY[check] if check in PHASE1_PROMOTED else level)
+    for check, level in PHASE0_SEVERITY.items()
+}
 
 COMPACT_MARKER = "CONTEXT_PROFILE_COMPACT"
 # Row of a lazy-skill table: "| skill-name | description |" below a "| Skill |" header.
@@ -71,7 +84,7 @@ _FRONTMATTER_RE = re.compile(r"\A---\r?\n.*?\r?\n---\r?\n", re.DOTALL)
 # ---------------------------------------------------------------------------
 
 def _warn(check: str, file: str, message: str, suggestion: str = "") -> Finding:
-    return Finding(PHASE0_SEVERITY[check], check, file, message, suggestion)
+    return Finding(EMITTED_SEVERITY[check], check, file, message, suggestion)
 
 
 def _read_text(path: Path) -> Optional[str]:
@@ -280,7 +293,7 @@ def check_dangling_pointer(
     capabilities: Mapping[str, Mapping],
     active_set,
 ) -> list:
-    """``context.dangling-pointer``: a skill named in a generated artifact does not exist (WARN; spec: ERROR from Phase 1).
+    """``context.dangling-pointer``: a skill named in a generated artifact does not exist (ERROR since Task 1.24).
 
     Two pointer kinds, both resolved against the provider's skill directories
     (``skills_dir`` + ``skills_discovery_dirs``):

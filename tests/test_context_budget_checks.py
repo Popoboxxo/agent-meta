@@ -130,7 +130,7 @@ def test_ac08_missing_skills_are_reported(default_projects, mappings, provider, 
     assert len(skills) >= 10
     assert len(skills) == LAZY_TABLE_SKILLS
     assert {f.check for f in findings} == {"context.dangling-pointer"}
-    assert all(f.severity is Severity.WARNING for f in findings)
+    assert all(f.severity is Severity.ERROR for f in findings)  # Task 1.24: promoted
     assert {f.file for f in skills}  # each finding names the artifact carrying the pointer
 
 
@@ -189,17 +189,22 @@ def test_dangling_pointer_clears_once_skills_exist(default_projects, mappings, t
     assert _run(cb.check_dangling_pointer, project, "Gemini", mappings) == []
 
 
-def test_checks_never_raise_error_severity(default_projects, mappings):
-    assert set(cb.PHASE0_SEVERITY) == set(cb.SPEC_SEVERITY)
+def test_only_promoted_checks_emit_error(default_projects, mappings):
+    assert set(cb.PHASE0_SEVERITY) == set(cb.SPEC_SEVERITY) == set(cb.EMITTED_SEVERITY)
     assert all(level is Severity.WARNING for level in cb.PHASE0_SEVERITY.values())
+    assert cb.PHASE1_PROMOTED == {"context.dangling-pointer"}
+    for check, level in cb.EMITTED_SEVERITY.items():
+        expected = cb.SPEC_SEVERITY[check] if check in cb.PHASE1_PROMOTED else Severity.WARNING
+        assert level is expected, check
+    # a synced default project triggers none of the promoted (ERROR) checks
     for check in ALL_CHECKS:
         for provider, project in default_projects.items():
             for finding in _run(check, project, provider, mappings):
-                assert finding.severity in (Severity.WARNING, Severity.INFO)
+                assert finding.severity in (Severity.WARNING, Severity.INFO), finding
 
 
 def test_severity_comes_from_central_table(monkeypatch):
-    monkeypatch.setitem(cb.PHASE0_SEVERITY, "context.over-hard-cap", Severity.ERROR)
+    monkeypatch.setitem(cb.EMITTED_SEVERITY, "context.over-hard-cap", Severity.ERROR)
     assert cb._warn("context.over-hard-cap", "f", "m").severity is Severity.ERROR
     assert cb.SPEC_SEVERITY["context-profile.marker-in-rule"] is Severity.ERROR
 
