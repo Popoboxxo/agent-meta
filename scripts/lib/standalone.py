@@ -223,6 +223,28 @@ def resolve_block_snippets(text: str, agent_meta_root: Path) -> str:
     return substitute(text, block_vars, "block-snippet resolution", None)
 
 
+def _standalone_active_set_flags(agent_meta_root: Path) -> dict:
+    """Active-set conditionals (IC-18 no. 5-11) for the standalone export.
+
+    The standalone export ships every role, so every role counts as active
+    (``ROLE_<ROLE>_ACTIVE`` = ``"true"``), the developer tier chain is complete
+    (``DEVELOPER_TIERS_ENABLED``) and every pipeline is named. Without these
+    keys ``strip_inactive_conditional_blocks`` would keep BOTH branches of an
+    ``{{#if}}...{{else}}`` (orphaned-marker cleanup).
+    """
+    from .pipelines import load_quality_pipelines, pipeline_var_stem
+    from .roles import load_roles_config
+
+    flags = {
+        "ROLE_%s_ACTIVE" % role.upper().replace("-", "_"): "true"
+        for role in (load_roles_config(agent_meta_root).get("roles") or {})
+    }
+    flags["DEVELOPER_TIERS_ENABLED"] = "true"
+    for name in load_quality_pipelines(str(agent_meta_root)):
+        flags["PIPELINE_%s_ENABLED" % pipeline_var_stem(name)] = "true"
+    return flags
+
+
 def _standalone_variables(agent_meta_root: Path) -> dict:
     variables: dict = {}
     variables.update(_IDENTITY_FALLBACKS)
@@ -236,6 +258,7 @@ def _standalone_variables(agent_meta_root: Path) -> dict:
         variables[_var_name] = _load_block_snippet(
             agent_meta_root / "snippets" / "agents" / f"{_snippet_name}.md"
         )
+    variables.update(_standalone_active_set_flags(agent_meta_root))
     variables["AGENT_META_VERSION"] = read_version(agent_meta_root)
     variables["AGENT_META_DATE"] = _resolve_agent_meta_date(agent_meta_root)
     # Convention blocks: render the 'default' preset so a standalone release/git

@@ -63,6 +63,11 @@ DEFAULT_MAX_DEPTH = 4
 PIPELINES_EFFECTIVE_KEY = "_PIPELINES_EFFECTIVE"
 
 
+def pipeline_var_stem(name: str) -> str:
+    """``concept-driven-dev`` -> ``CONCEPT_DRIVEN_DEV`` (stem of ``PIPELINE_<STEM>_*``)."""
+    return str(name).upper().replace("-", "_")
+
+
 def _registered_providers(agent_meta_root=None) -> list[str]:
     """Return the registry-driven provider list, failing soft to the legacy tuple.
 
@@ -991,7 +996,7 @@ def build_pipeline_variables(
     variables = {}
     providers = _registered_providers(agent_meta_root)
     for name, pipeline in pipelines.items():
-        var_name = name.upper().replace("-", "_")
+        var_name = pipeline_var_stem(name)
         variables[f"PIPELINE_{var_name}_ENABLED"] = (
             "true" if pipeline.get("enabled", True) else "false"
         )

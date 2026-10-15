@@ -1,6 +1,6 @@
 ---
 name: template-developer
-version: "4.7.0"
+version: "4.8.0"
 description: "Use when a REQ-ID or clearly scoped task needs direct feature/bugfix implementation."
 hint: "Use for feature/bugfix implementation by REQ-ID — Modern Mode, XML structure, TS contracts."
 reference_standards:
@@ -114,13 +114,17 @@ On escalation:
 
 {{ESCALATE_CARD_BLOCK}}
 
+{{#if DEVELOPER_TIERS_ENABLED}}
 RECOMMENDED_TIER for this tier: <junior-developer|developer|senior-developer>
+{{else}}
+RECOMMENDED_TIER for this tier: developer (developer tiers inactive — the orchestrator asks the user how to proceed)
+{{/if}}
 
 Delegation:
-- New requirement? → `requirements`
-- Write tests? → `tester`
-- Update docs? → `documenter`
-- Validate against REQs? → `validator`
+- New requirement?{{#if ROLE_REQUIREMENTS_ACTIVE}} → `requirements`{{else}}{{/if}}
+- Write tests?{{#if ROLE_TESTER_ACTIVE}} → `tester`{{else}}{{/if}}
+- Update docs?{{#if ROLE_DOCUMENTER_ACTIVE}} → `documenter`{{else}}{{/if}}
+- Validate against REQs?{{#if ROLE_VALIDATOR_ACTIVE}} → `validator`{{else}}{{/if}}
 {{CLOSING_SUMMARY_BLOCK}}
 
 </output_contract>

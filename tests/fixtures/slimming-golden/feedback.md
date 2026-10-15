@@ -1,6 +1,6 @@
 ---
 name: feedback
-version: 1.8.0
+version: 1.8.1
 description: Standardizes bug reports, feature requests, and improvement suggestions
   for the deployed project — categorized, prepared, and submitted directly as a GitHub
   issue.
@@ -13,7 +13,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/feedback.md@1.8.0
+generated-from: 1-generic/feedback.md@1.8.1
 model: claude-haiku-4-5-20251001
 ---
 

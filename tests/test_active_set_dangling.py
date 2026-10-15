@@ -1,5 +1,4 @@
 """IC-19 active-set reference checks (Task 0b.3, AC-43)."""
-import subprocess
 import sys
 from pathlib import Path
 
@@ -12,6 +11,7 @@ sys.path.insert(0, str(_ROOT / "scripts"))
 from lib.active_set import compute_active_set  # noqa: E402
 from lib.consistency import active_set_refs as asr  # noqa: E402
 from lib.consistency.report import Severity  # noqa: E402
+from tests.active_set_render import sync_configs_parallel, synced_project  # noqa: E402
 
 _FIX = Path(__file__).resolve().parent / "fixtures" / "active-set"
 _AC43_ROLES = ("senior-developer", "validator", "bug-feature-analyzer",
@@ -21,26 +21,12 @@ _PROVIDERS = ["Claude"]
 
 @pytest.fixture(scope="module")
 def synced(tmp_path_factory):
-    """Sync a fixture into a scratch project once per fixture name."""
-    cache = {}
-
+    """A fixture project synced once per session (shared, read-only)."""
     def _get(name):
-        if name in cache:
-            return cache[name]
-        project = tmp_path_factory.mktemp(name) / name
-        (project / ".meta-config").mkdir(parents=True)
-        cfg_text = (_FIX / name / ".meta-config" / "project.yaml").read_text(encoding="utf-8")
-        (project / ".meta-config" / "project.yaml").write_text(cfg_text, encoding="utf-8")
-        subprocess.run(["git", "init", "-q"], cwd=project, check=True)
-        res = subprocess.run(
-            [sys.executable, str(_ROOT / "scripts" / "sync.py"), "--config",
-             str(project / ".meta-config" / "project.yaml"), "--init"],
-            cwd=project, capture_output=True, text=True, timeout=300)
-        assert res.returncode == 0, res.stdout[-1500:] + res.stderr[-1500:]
-        config = yaml.safe_load(cfg_text)
-        active = compute_active_set(config, _ROOT, project)
-        cache[name] = (project, active)
-        return cache[name]
+        config = yaml.safe_load(
+            (_FIX / name / ".meta-config" / "project.yaml").read_text(encoding="utf-8"))
+        project = synced_project(tmp_path_factory, config)
+        return project, compute_active_set(config, _ROOT, project)
 
     return _get
 
@@ -48,23 +34,12 @@ def synced(tmp_path_factory):
 def test_p10_dangling_dispatch_covers_ac43_roles(synced):
     project, active = synced("p10")
     findings = asr.check_dangling_dispatch(project, _PROVIDERS, {}, active)
-    assert findings and all(f.severity == Severity.WARNING for f in findings)
-    assert all(f.check == "active-set.dangling-dispatch" for f in findings)
-    text = " ".join(f.message for f in findings)
-    # IC-18 no. 2 (pipeline drop): bug-feature-analyzer, ideation and validator were
-    # dispatched only from pipeline blocks that are no longer rendered on p10, so they
-    # leave the dangling set; the remaining AC-43 roles stay covered.
-    for role in ("senior-developer", "concept-specifier", "concept-reviewer"):
-        assert f"'{role}'" in text, role
-    for role in ("validator", "bug-feature-analyzer", "ideation"):
-        assert f"'{role}'" not in text, role
-    # Pin the exact (file, role) set so heuristic drift is visible.
-    pairs = {(f.file.rsplit("/", 1)[-1], f.message.split("'")[1]) for f in findings}
-    assert pairs == {("documenter.md", "knowledge-ingestor")} | {
-        ("orchestrator.md", r) for r in (
-            "concept-architect", "concept-reviewer", "concept-specifier",
-            "junior-developer", "principal-developer", "senior-developer")}
-    assert len(findings) == 7
+    # IC-18 no. 2 (pipeline drop) removed the pipeline dispatches of bug-feature-analyzer,
+    # ideation and validator; IC-18 no. 5 (tier chain) the senior-developer and concept
+    # dispatches; IC-18 no. 11 / IC-30 triage (Task 1.19) the documenter route to
+    # knowledge-ingestor. The AC-43 roles are still inactive on p10 -- nothing dispatches them.
+    assert set(_AC43_ROLES) <= set(active.known_roles) - set(active.roles)
+    assert findings == []
 
 
 def test_p10_dangling_mention_is_info(synced):
@@ -105,6 +80,17 @@ def test_unknown_role_in_allowlist(synced, tmp_path):
     assert [f.check for f in findings] == ["active-set.unknown-role"]
     assert "no-such-role" in findings[0].message
     assert asr.check_unknown_role(project, _PROVIDERS, {}, active) == []
+
+
+def test_dangling_dispatch_is_error_level(synced, tmp_path):
+    # Task 1.20 (AC-49): the check is ERROR from phase 1 on; mentions stay INFO.
+    _, active = synced("p10")
+    proj = _scratch(tmp_path, "Delegiere an `validator`.\nsee `validator`\n")
+    found = asr.check_dangling_dispatch(proj, _PROVIDERS, {}, active)
+    assert [(f.check, f.severity) for f in found] == [
+        ("active-set.dangling-dispatch", Severity.ERROR)]
+    assert all(f.severity == Severity.INFO
+               for f in asr.check_dangling_mention(proj, _PROVIDERS, {}, active))
 
 
 def test_missing_dispatch_pattern_is_reported_not_silent(synced, monkeypatch):
@@ -229,6 +215,66 @@ def test_invalid_phrase_regex_is_surfaced(synced, tmp_path, monkeypatch):
     monkeypatch.setattr(asr, "_refs", lambda: {"dispatch_phrases": {"en": ["bad(", "route to"]}})
     proj = _scratch(tmp_path, "route to validator\n")
     found = asr.check_dangling_dispatch(proj, _PROVIDERS, {}, active)
-    checks = sorted(f.check for f in found)
-    assert checks == ["active-set.dangling-dispatch", "active-set.invalid-dispatch-phrase"]
-    assert all(f.severity == Severity.WARNING for f in found)
+    assert sorted((f.check, f.severity.value) for f in found) == [
+        ("active-set.dangling-dispatch", Severity.ERROR.value),
+        ("active-set.invalid-dispatch-phrase", Severity.WARNING.value)]
+
+
+# --- Task 1.20 (AC-49): scan scope and fixture matrix x provider matrix --------
+
+@pytest.mark.parametrize("rel", [
+    ".claude/commands/x.md", ".claude/rules/x.md", ".claude/pipeline-details/x.md"])
+def test_commands_rules_and_pipeline_details_are_scanned(synced, tmp_path, rel):
+    _, active = synced("p10")
+    target = tmp_path / rel
+    target.parent.mkdir(parents=True)
+    target.write_text("Delegiere an `validator`.\n", encoding="utf-8")
+    found = asr.check_dangling_dispatch(tmp_path, _PROVIDERS, {}, active)
+    assert [(f.file, f.severity) for f in found] == [(rel, Severity.ERROR)]
+
+
+_MATRIX_PROVIDERS = sorted(yaml.safe_load(
+    (_ROOT / "config" / "ai-providers.yaml").read_text(encoding="utf-8"))["providers"])
+# AC-49: mentions outside mention_allow must be 0 for these generated artifacts.
+_MENTION_ZERO_PARTS = ("orchestrator", "pipeline-details", "commands", "prompts")
+
+
+@pytest.fixture(scope="module")
+def matrix(tmp_path_factory):
+    """Each AC-49 fixture synced once with every registered provider (concurrently)."""
+    names = ("p10", "p20", "pall", "ha")
+    configs = {name: yaml.safe_load(
+        (_FIX / name / ".meta-config" / "project.yaml").read_text(encoding="utf-8"))
+        for name in names}
+    projects = sync_configs_parallel(
+        tmp_path_factory.mktemp("matrix"), configs, providers=_MATRIX_PROVIDERS)
+    return {name: (projects[name], compute_active_set(configs[name], _ROOT, projects[name]))
+            for name in names}
+
+
+@pytest.mark.parametrize("name", ["p10", "p20", "pall", "ha"])
+def test_ac49_no_dangling_dispatch_over_provider_matrix(matrix, name):
+    project, active = matrix[name]
+    found = asr.check_dangling_dispatch(project, _MATRIX_PROVIDERS, {}, active)
+    assert found == [], "\n".join(f"{f.file}: {f.message}" for f in found)
+
+
+@pytest.mark.parametrize("name", ["p10", "p20", "pall", "ha"])
+def test_ac49_no_dangling_mention_in_orchestrator_pipelines_commands(matrix, name):
+    project, active = matrix[name]
+    found = [f for f in asr.check_dangling_mention(project, _MATRIX_PROVIDERS, {}, active)
+             if any(part in f.file for part in _MENTION_ZERO_PARTS)]
+    assert found == [], "\n".join(f"{f.file}: {f.message}" for f in found)
+
+
+def test_unmanaged_user_command_is_not_scanned(synced, tmp_path):
+    # Review fix: with a managed index present only sync-managed files are scanned,
+    # so a user's own command can never make --doctor fail.
+    _, active = synced("p10")
+    commands = tmp_path / ".claude" / "commands"
+    commands.mkdir(parents=True)
+    (commands / "mine.md").write_text("Delegiere an `validator`.\n", encoding="utf-8")
+    (commands / "managed.md").write_text("Delegiere an `validator`.\n", encoding="utf-8")
+    (commands / ".agent-meta-managed").write_text("managed.md\n", encoding="utf-8")
+    found = asr.check_dangling_dispatch(tmp_path, _PROVIDERS, {}, active)
+    assert [f.file for f in found] == [".claude/commands/managed.md"]

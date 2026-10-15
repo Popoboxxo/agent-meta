@@ -1,6 +1,6 @@
 ---
 name: knowledge-curator
-version: 1.4.1
+version: 1.4.2
 description: 'Strategische Knowledge-Engine-Steuerung: Schema-Evolution, Wiki-Strukturierung,
   Domänen-Anpassung, Ingest-Planung, OKF-Compliance-Sicherung.'
 hint: Wiki-Strategie, Schema-Evolution, OKF-Compliance
@@ -9,7 +9,7 @@ tools:
 - Write
 - Agent
 - TodoWrite
-generated-from: 1-generic/knowledge-curator.md@1.4.1
+generated-from: 1-generic/knowledge-curator.md@1.4.2
 model: claude-sonnet-5
 memory: project
 ---

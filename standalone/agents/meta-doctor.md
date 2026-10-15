@@ -107,7 +107,7 @@ ARTIFACTS: <paths, e.g. [TMP_SINK_PATH — not available outside a full agent-me
 FINDINGS: D-nn | ERROR|WARNING|INFO | <issue_id|check> | <file[:line]> | <provider|all> | <verified-state>
           Finding: … / Evidence: … / Fix: … (fix-owner)
 GATES: doctor=<exit>, check=<exit|skipped>
-NEXT: agent-meta-manager (project-config) | meta-feedbackuser: framework issue (framework-issue) | none
+NEXT: agent-meta-manager (project-config) | meta-feedback (framework-issue) | none
 ```
 
 **Mandatory closing summary (issue #267):** the structured block above is your entire return value — the

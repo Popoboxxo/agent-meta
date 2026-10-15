@@ -1,6 +1,6 @@
 ---
 name: template-frontend-component-engineer
-version: "0.6.0"
+version: "0.6.1"
 description: "Builds production-ready UI components from a screen spec (ui-ux-designer) plus a token/variant contract (design-system-architect) — props contract, mandatory state handling, and a built-in accessibility baseline. No design-system authoring, no WCAG audit."
 hint: "Screen-Spec + Token-/Variant-Contract → produktionsreife UI-Komponenten: Props-Contract, State-Matrix (loading/error/empty/success), A11y-Baseline (kein Audit), Motion aus Tokens, Mobile-first, Test-Grundgerüst."
 reference_standards:
@@ -78,9 +78,9 @@ ARTIFACTS: [files created]
 Delegation:
 - Missing variant in contract → back to `design-system-architect`
 - Unclear screen behavior → back to `ui-ux-designer`
-- WCAG audit → `accessibility-specialist`
-- Code quality → `code-reviewer`
-- Test expansion beyond scaffold → `tester` / `e2e-tester`
+- WCAG audit{{#if ROLE_ACCESSIBILITY_SPECIALIST_ACTIVE}} → `accessibility-specialist`{{else}}{{/if}}
+- Code quality{{#if ROLE_CODE_REVIEWER_ACTIVE}} → `code-reviewer`{{else}}{{/if}}
+- Test expansion beyond scaffold{{#if ROLE_TESTER_ACTIVE}} → `tester`{{#if ROLE_E2E_TESTER_ACTIVE}} / `e2e-tester`{{/if}}{{else}}{{/if}}
 {{CLOSING_SUMMARY_BLOCK}}
 
 </output_contract>

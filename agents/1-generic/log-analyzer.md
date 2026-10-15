@@ -1,6 +1,6 @@
 ---
 name: template-log-analyzer
-version: "1.6.0"
+version: "1.6.1"
 description: "Analyzes system and application logs: frequency clustering, severity classification (RFC 5424), log-quality checks, baseline-vs-anomaly comparison, trace/metric correlation, and structured findings with delegation routing."
 hint: "Log analysis: cluster errors, classify severity (RFC 5424), delegate findings as issues or tasks"
 reference_standards:
@@ -80,11 +80,21 @@ Per cluster: severity, source, pattern, frequency, example, root-cause hypothesi
 
 | Target | When |
 |--------|------|
+{{#if ROLE_FEEDBACK_ACTIVE}}
 | `feedback` | Submit issue (bug report) — **never `git` directly** |
+{{/if}}
+{{#if ROLE_DEVELOPER_ACTIVE}}
 | `developer` | Fix directly — finding as context |
+{{/if}}
+{{#if ROLE_SECURITY_AUDITOR_ACTIVE}}
 | `security-auditor` | Auth errors, brute-force, injection suspicion |
+{{/if}}
+{{#if ROLE_REQUIREMENTS_ACTIVE}}
 | `requirements` | Recurring problem → new requirement |
+{{/if}}
+{{#if ROLE_ORCHESTRATOR_ACTIVE}}
 | `orchestrator` | Coordinate multiple findings |
+{{/if}}
 
 ## 9. Online research (only `--deep`)
 

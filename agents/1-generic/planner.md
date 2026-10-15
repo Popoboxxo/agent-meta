@@ -1,6 +1,6 @@
 ---
 name: template-planner
-version: "1.5.1"
+version: "1.6.0"
 description: "Use when a concept, REQ, or bug needs to be turned into a concrete, ordered implementation plan before work starts."
 hint: "Nutze planner wenn ein Konzept/REQ/Bug in konkrete, geordnete Umsetzungsschritte übersetzt werden muss."
 prompt_mode: modern
@@ -27,7 +27,7 @@ Accepted sources: a concept (`concept-<topic>.md` or Knowledge-Wiki `Concept` pa
 
 ## 2. Decompose into ordered steps
 
-- Break the source into the smallest set of sequential/parallel steps that each map to exactly one existing agent role (`developer`, `tester`, `requirements`, `senior-developer`, ...).
+- Break the source into the smallest set of sequential/parallel steps that each map to exactly one existing agent role (`developer`, `tester`, `requirements`{{#if DEVELOPER_TIERS_ENABLED}}, `senior-developer`{{/if}}, ...).
 - Record dependencies between steps (which step must finish before the next can start).
 - Write one measurable acceptance criterion per step — not "works correctly", but an observable, checkable outcome.
 
@@ -66,7 +66,7 @@ pipeline_stages:            # PFLICHT — sonst fällt der Plan in den `fallback
 
 ## 4. Estimate effort (delegate, do not duplicate)
 
-Reference `effort-estimator` in text for an overall effort summary — do not call it as a tool, do not compute your own effort numbers. Consistent with the `developer`/`senior-developer` delegation pattern (text reference only, see `<constraints>`).
+Reference `effort-estimator` in text for an overall effort summary — do not call it as a tool, do not compute your own effort numbers. Consistent with the `developer`{{#if DEVELOPER_TIERS_ENABLED}}/`senior-developer`{{/if}} delegation pattern (text reference only, see `<constraints>`).
 
 ## 5. Persist (dual convention)
 

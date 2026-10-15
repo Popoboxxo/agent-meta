@@ -2850,6 +2850,16 @@ tier-override-policy:
   security-critical-roles:
   - security-auditor
   - code-reviewer
+# Anti-recursion block (IC-18 no. 6): roles a worker may point to from its
+# context instead of re-delegating. ANTI_RECURSION_BLOCK renders this list
+# intersected with the per-sync ActiveSet (order kept); scripts/lib/config.py
+# holds no role literal.
+anti_recursion:
+  reference_roles:
+  - tester
+  - documenter
+  - requirements
+  - validator
 reflection_pairs:
 - id: dev-review-loop
   generator: developer

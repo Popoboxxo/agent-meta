@@ -58,8 +58,8 @@
   Caution: `roles:` is an allowlist - if your project has no `roles:` key yet, adding one turns it into an
   allowlist and restricts it to the listed roles, so list ALL roles you want to keep. In the default project the
   3 WARNs per sync disappear only by activating those roles.
-  Known interim: until Task 1.16 the static orchestrator prose (task-size routing "M-XL: first
-  concept-driven-dev", "complex feature -> feature-lifecycle") still names dropped pipelines in default projects.
+  The static orchestrator prose (task-size routing, "complex feature -> feature-lifecycle", plan-driven gate
+  example) names a pipeline only while it is rendered (Task 1.16, see below).
   Scenarios 50, 51 and 52 got an explicit `roles:` list so `concept-driven-dev` stays.
 - **`routing.rules[].input_contracts` only with an active producer (IC-18 Nr. 4, AC-47 part)**: projects with
   a `roles:` subset no longer list input contracts that no active role produces (`task-spec-v1` stays, the
@@ -69,6 +69,83 @@
   (`target_agents`/`name_index`). Scenario 76 assert #5 now checks "no keyword rule in `routing.rules`";
   the ratchet exception list in `tests/test_role_addressability_coverage.py` is empty. AC-01 rebaselined
   for the per-provider orchestrator artifacts only (routing data shrank), context budget `_IST_FULL` updated.
+- **Developer tier chain gated on `DEVELOPER_TIERS_ENABLED` (IC-18 Nr. 5, AC-48, PR D), also in the default**:
+  with the `developer_tiers` gate off (the default) the orchestrator no longer names `junior-developer`,
+  `senior-developer` or `principal-developer`: section 4 routes every implementation task to `developer`,
+  the task-size table shows `developer` in the tier column, the `orchestrator_only` route points to the
+  ESCALATE-Card intake. Concept agents in the task-size table follow `ROLE_CONCEPT_*_ACTIVE`. `developer`
+  (`RECOMMENDED_TIER` line) and `planner` (step mapping, delegation pattern) are gated the same way. With the
+  gate on, section 4 is byte-identical to before (pinned in
+  `tests/fixtures/developer-tiers/orchestrator-section4-tiers-on.md`). Minor bumps: `orchestrator` 8.5.0,
+  `developer` 4.8.0, `planner` 1.6.0. AC-01 rebaselined (36 of 1075 hashes: orchestrator, developer, planner
+  per provider + `generated-file-hashes.json`), orchestrator budget -762 B per provider. Standalone export:
+  `ROLE_*_ACTIVE`, `DEVELOPER_TIERS_ENABLED` and `PIPELINE_*_ENABLED` are set to `true` (all roles exported),
+  which also fixes the leaked double branch in `standalone/agents/meta-doctor.md`
+  ("meta-feedbackuser: framework issue").
+- **`ANTI_RECURSION_BLOCK` from data ∩ ActiveSet (IC-18 Nr. 6, PR D)**: the roles a worker may point to
+  come from the new `role-defaults.yaml` key `anti_recursion.reference_roles`
+  (`tester`, `documenter`, `requirements`, `validator`), intersected with the ActiveSet; no role literal in
+  `config.py`. Default (validator gate off): "Nur tester/documenter/requirements aus Kontext verweisen."
+  Without any active reference role only the first sentence remains. `load_roles_config` exposes
+  `anti_recursion`. AC-01 rebaselined (27 of 1075: orchestrator, developer per provider + hashes).
+- **`DIRECT_DISPATCH_SECTION` rows only for active roles (IC-18 Nr. 7, PR D)**: every row of
+  `templates/direct-dispatch-section.md` sits under `{{#if ROLE_<ROLE>_ACTIVE}}`; the builder resolves the
+  conditionals against the ActiveSet, so the orchestrator and the `use-orchestrator` rule only offer direct
+  dispatch to active roles (e.g. no `agent-meta-manager`/`feedback` rows in a 10-role project). Default render
+  unchanged (all four row roles active, AC-01 green without rebaseline).
+- **Orchestrator persona, section 11 fallback and SE prose follow the ActiveSet (IC-18 Nr. 8, AC-49 part, PR D)**:
+  the fallback list and section 11 name `meta-feedback` only when it is active - otherwise the fallback is ASK
+  (question to the user via `main_chat`); the AI review routing names `ai-security-guardian`, `llm-evaluator` and
+  `ai-governance-engineer` only when all three are active (otherwise a role-neutral sentence); `effort-estimator`
+  and `se-critic` only when active; the SE-mode prose only with `SE_ENABLED` (off in the default, so the two SE
+  lines disappear there). The static prose now names `concept-driven-dev`, `concept-development` and
+  `feature-lifecycle` only while the pipeline is rendered (`PIPELINE_<NAME>_ENABLED`); this closes the PR C
+  interim where default projects still read "M-XL: first concept-driven-dev" / "complex feature ->
+  feature-lifecycle". AC-01 rebaselined (18 of 1075: orchestrator per provider + hashes), orchestrator golden
+  rebaselined (SE prose, `se-critic`, AI review sentence: inactive in the self-hosting config).
+- **Commands with `requires_roles` only for active roles (IC-18 Nr. 9, AC-50, PR D)**: new optional command
+  frontmatter key `requires_roles: [<role>...]`; a command is generated only when all listed roles are in the
+  ActiveSet, otherwise it is skipped and a previously generated copy is removed by the managed-file cleanup.
+  The key is a generator directive and is stripped from the rendered command (default render byte-identical).
+  Set on `doc-now` (`documenter`), `feedback`/`report-bug` (`feedback`), `analyze-logs` (`log-analyzer`) and
+  `upgrade-meta` (`agent-meta-manager`). Command bodies now resolve `{{#if ROLE_*_ACTIVE}}` conditionals;
+  `add-provider` delegates to `meta-feedback` only when it is active (otherwise the user files the issue).
+  New consistency check `commands.requires-roles-invalid` (ERROR: not a list or unknown role).
+- **Rule owner lines follow the ActiveSet (IC-18 Nr. 10, PR D)**: `security-paved-roads` (owner column and the
+  review-finding sentence), `threat-model-4-questions` (`concept-reviewer` / `orchestrator` lines) and
+  `a2a-delegation-gates` (default security-critical roles) name an owner role only when it is active; the
+  block catalog itself stays complete ("*(keine aktive Eigentümer-Rolle)*" without an active owner). Default
+  render unchanged (all owners active, AC-01 green without rebaseline).
+- **IC-30 triage: worker dispatch lines follow the ActiveSet (IC-18 Nr. 11, AC-71, PR D)**: every line of the
+  template routing-guard registry (#885 classes A/D/E: `T-HANDOFF`, `T-NEXT`, German handoffs; B/C/F:
+  `T-ROLE-ARROW`) is now conditional on its target role - `NEXT:` items, `→ \`role\`` delegation/boundary
+  arrows, German `Delegiere an`/`übernimmt` lines (knowledge-*), the documenter KE route, the
+  bug-feature-analyzer consultation table, the log-analyzer delegation table and the rules
+  `a2a-delegation-gates`, `use-orchestrator`, `gemini-orchestrator-first`. The guard
+  (`tests/test_no_role_routes_in_templates.py`) gains the construct-scoped allow rule `D-CONDITIONAL` (target
+  token inside the positive branch of its own `{{#if ROLE_<TARGET>_ACTIVE}}`, block or inline); the ratchet
+  registry `ROUTE_RATCHET` is empty. Default render: only inactive targets disappear (documenter KE route,
+  `se-critic`/`se-interface-mgr` rows, `se-critic`/`validator` arrows) plus patch bumps of 36 templates
+  (35 in `agents/1-generic`, `homeassistant-developer`; `developer` keeps its 4.8.0 from this PR). `homeassistant-documenter` 1.2.1 re-pinned to `documenter@1.11.1`. AC-01 rebaselined (270 of 1075: 29 agents per
+  provider + hashes), 24 slimming goldens rebaselined (version lines; in the self-hosting config also the
+  inactive `se-*`/`security-auditor` rows and arrows). Inline conditionals at a line end use
+  `{{else}}{{/if}}` because a false simple `{{#if}}` there also swallows the newline.
+- **`active-set.dangling-dispatch` is ERROR (IC-19, AC-49, Task 1.20, PR D)**: the check now also scans the
+  generated rules (`rules_dir`, or the default rules dir for providers with `has_rules`), commands
+  (`commands_dir`) and `pipeline-details` files besides agents and the context file. Findings are still
+  report-only at sync end (sync.log error list/summary, exit code unchanged). Over the fixture matrix
+  (p10/p20/pall/ha) x all registered providers there are zero dangling dispatches and zero dangling mentions in
+  orchestrator, pipeline-details and commands (`tests/test_active_set_dangling.py`). `mention_allow` lists
+  `*add-project-role.*` (its argument-hint names an example role to add); `add-project-role` names
+  `/meta-feedback` only when the role is active. Not done: the `RAW_ROLES_RATCHET` (QG-13/AC-84) keeps its
+  three intersection sites (auto-commit allowlist, scout skill, `WEB_PROJECT_ENABLED`) - emptying it changes
+  default behaviour (see the PR report).
+  `--doctor` consequence: the seed `dangling-role-dispatch` now yields an effective ERROR, so a dangling
+  dispatch makes `--doctor` exit 1. To keep user files out, rules/commands directories are scanned only for files
+  listed in the sync's managed indexes (`.agent-meta-managed*`); unmanaged project commands/rules are ignored.
+  The `D-CONDITIONAL` guard rule applies only to files with well-formed conditional markers (repo-wide balance
+  test). `requires_roles` accepts flow and block style, only that entry is parsed (non-YAML frontmatter of
+  external commands no longer aborts the sync), and the consistency check reuses the generator's parser.
 
 ### Changed
 - **`ACTIVE_ROLES` / `ROLE_<ROLE>_ACTIVE` available in templates**: `build_variables` injects

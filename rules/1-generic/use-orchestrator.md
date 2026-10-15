@@ -52,7 +52,7 @@ Plan vorhanden (`plan-*.md` oder Knowledge-Wiki Plan-Seite) -> Pipeline `feature
 {{/if}}
 ## Git Delegation
 {{#unless AUTO_COMMIT_ENABLED}}
-Git Mutationen (commit, push, add etc) -> `git` Agent. Read-only (status, log) im Main Chat ok.
+Git Mutationen (commit, push, add etc){{#if ROLE_GIT_ACTIVE}} -> `git` Agent{{else}} nur über den Orchestrator{{/if}}. Read-only (status, log) im Main Chat ok.
 {{/unless}}
 {{#if AUTO_COMMIT_ENABLED}}
 Commit ist für die per `auto_commit`-Tier freigeschaltete Rolle erlaubt (Details im Commit-Authority-Block der jeweiligen Rolle). Push, Tag und Branch-Management bleiben ausschließlich Aufgabe des `git` Agenten. Read-only (status, log) im Main Chat ok.

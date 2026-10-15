@@ -1,6 +1,6 @@
 ---
 name: dependency-auditor
-version: 1.7.0
+version: 1.7.1
 description: 'Supply-chain hygiene: SBOM analysis, license compatibility (MIT/Apache/GPL
   matrix), version drift, outdated and deprecated packages. Categorizes dependency
   findings by risk and files them via the feedback agent — not application security.'
@@ -14,7 +14,7 @@ tools:
 - Bash
 - WebFetch
 - TodoWrite
-generated-from: 1-generic/dependency-auditor.md@1.7.0
+generated-from: 1-generic/dependency-auditor.md@1.7.1
 model: claude-sonnet-5
 ---
 

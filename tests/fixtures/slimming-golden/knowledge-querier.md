@@ -1,6 +1,6 @@
 ---
 name: knowledge-querier
-version: 1.5.1
+version: 1.5.2
 description: Fragen gegen das Knowledge Wiki beantworten. Index-First-Strategie, Drill-in,
   Synthese mit Citations. File-Back guter Antworten.
 hint: Wiki-Fragen beantworten, Index-First, Synthese mit Citations
@@ -9,7 +9,7 @@ tools:
 - Write
 - Glob
 - Grep
-generated-from: 1-generic/knowledge-querier.md@1.5.1
+generated-from: 1-generic/knowledge-querier.md@1.5.2
 model: claude-haiku-4-5-20251001
 ---
 

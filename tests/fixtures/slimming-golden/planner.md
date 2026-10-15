@@ -1,6 +1,6 @@
 ---
 name: planner
-version: 1.5.1
+version: 1.6.0
 description: Use when a concept, REQ, or bug needs to be turned into a concrete, ordered
   implementation plan before work starts.
 hint: Nutze planner wenn ein Konzept/REQ/Bug in konkrete, geordnete Umsetzungsschritte
@@ -12,7 +12,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/planner.md@1.5.1
+generated-from: 1-generic/planner.md@1.6.0
 model: claude-sonnet-5
 ---
 

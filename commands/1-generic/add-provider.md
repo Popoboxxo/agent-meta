@@ -39,7 +39,11 @@ The requested provider is not yet in the agent-meta registry. Before filing the 
 - Does it have a known permission/deny mechanism for file access?
 - What model IDs does it use?
 
+{{#if ROLE_META_FEEDBACK_ACTIVE}}
 Then delegate to the `meta-feedback` agent with this task:
+{{else}}
+Then ask the user to file this GitHub issue in the agent-meta repository (no framework-feedback agent is active in this project):
+{{/if}}
 
 File a GitHub issue titled: "feat: add [ProviderName] as a supported AI provider"
 

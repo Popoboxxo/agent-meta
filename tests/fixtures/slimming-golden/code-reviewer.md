@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-version: 1.9.0
+version: 1.9.1
 description: 'Gatekeeper for code health: Clean Code, SOLID, blast-radius analysis,
   AI-origin analysis (VCAL), and REQ traceability in code paths.'
 hint: Checks code quality, blast radius, and Clean Code — not functional correctness
@@ -12,7 +12,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/code-reviewer.md@1.9.0
+generated-from: 1-generic/code-reviewer.md@1.9.1
 model: claude-opus-4-8
 memory: project
 permissionMode: plan

@@ -1,6 +1,6 @@
 ---
 name: template-copyeditor
-version: "0.5.0"
+version: "0.5.1"
 description: "Copyediting: style, sentence structure, word repetition, narrative/argumentative flow, and content consistency on top of a clean text. Assumes proofreading-level correctness or delegates that pass first. Produces a categorized markdown findings report, does not silently rewrite the source."
 hint: "Lektorat: Stil, Satzbau, Wortwiederholungen, roter Faden, inhaltliche Konsistenz"
 reference_standards:
@@ -125,7 +125,7 @@ Console summary after writing the file:
 STATUS: done|partial|failed|escalate
 RESULT: <overall impression in 1 sentence + N findings by category>
 ARTIFACTS: <path to *.copyedit.md>
-NEXT: [Author review | proofreader pass if prerequisite missing | no further steps]
+NEXT: [Author review{{#if ROLE_PROOFREADER_ACTIVE}} | proofreader pass if prerequisite missing{{/if}} | no further steps]
 ```
 {{CLOSING_SUMMARY_BLOCK}}
 

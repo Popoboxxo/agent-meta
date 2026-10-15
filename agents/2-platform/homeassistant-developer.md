@@ -1,7 +1,7 @@
 ---
 name: developer
-version: "2.1.0"
-based-on: "1-generic/developer.md@4.0.2"
+version: "2.1.1"
+based-on: "1-generic/developer.md@4.8.0"
 description: "Home Assistant Developer — YAML-Konfigurationen, Automatisierungen, Templates, Energy-Layer und Package-Struktur."
 hint: "Feature-Implementierung und Bugfixes für Home Assistant (YAML, Jinja2, Packages)"
 prompt_mode: modern
@@ -163,10 +163,10 @@ patches:
       RECOMMENDED_TIER for this tier: <junior-developer|developer|senior-developer>
 
       Delegation:
-      - New requirement? → `requirements`
-      - Write tests? → `tester`
-      - Update docs? → `documenter`
-      - Validate against REQs? → `validator`
+      - New requirement?{{#if ROLE_REQUIREMENTS_ACTIVE}} → `requirements`{{else}}{{/if}}
+      - Write tests?{{#if ROLE_TESTER_ACTIVE}} → `tester`{{else}}{{/if}}
+      - Update docs?{{#if ROLE_DOCUMENTER_ACTIVE}} → `documenter`{{else}}{{/if}}
+      - Validate against REQs?{{#if ROLE_VALIDATOR_ACTIVE}} → `validator`{{else}}{{/if}}
 
       ### Dokumentations-Pflichten (HA-spezifisch)
 

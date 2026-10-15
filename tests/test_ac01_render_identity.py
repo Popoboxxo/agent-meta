@@ -44,6 +44,26 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   the 3 ``pipeline-details/*.md`` files plus the ``.agent-meta-managed`` index per provider, and the matching
   ``generated-file-hashes.json`` (27 + 9 + 9 + 9 = 54 of 1102 entries; 1075 remain, 27 files vanished). No other
   hash changed.
+- Task 1.13 (IC-18 no. 5, AC-48: the default has ``developer_tiers`` off): orchestrator section 3/4 and the
+  task-size table name ``developer`` instead of the junior/senior/principal chain, developer's
+  ``RECOMMENDED_TIER`` line and the planner step mapping drop ``senior-developer``; minor version bumps
+  (orchestrator 8.5.0, developer 4.8.0, planner 1.6.0). Changed: orchestrator, developer, planner per provider
+  and generated-file-hashes (4 x 9 = 36 of 1075 entries).
+- Task 1.14 (IC-18 no. 6): ``ANTI_RECURSION_BLOCK`` names only reference roles of
+  ``role-defaults.yaml: anti_recursion.reference_roles`` that are in the ActiveSet; the default drops
+  ``/validator`` (gate off). Changed: orchestrator, developer per provider and generated-file-hashes
+  (3 x 9 = 27 of 1075 entries). No template version bump (template source unchanged).
+- Task 1.16 (IC-18 no. 8): orchestrator persona/section 11 follow ``ROLE_META_FEEDBACK_ACTIVE`` and the
+  AI review roles, SE-mode prose needs ``SE_ENABLED`` (off in the default), ``se-critic`` and
+  ``effort-estimator`` only when active, and the static prose names only rendered pipelines (the default
+  drops ``concept-driven-dev``/``feature-lifecycle`` mentions, closing the PR C interim). Changed:
+  orchestrator per provider + generated-file-hashes (2 x 9 = 18 of 1075 entries).
+- Task 1.19 (IC-18 no. 11 / IC-30 triage, AC-71): dispatch/NEXT lines in worker templates are gated on
+  their target role (``ROLE_*_ACTIVE``); patch bumps of the triaged templates. In the default only the
+  inactive targets disappear (documenter KE route, bug-feature-analyzer ``se-critic``/``se-interface-mgr``
+  rows, concept-reviewer ``se-critic`` and developer ``validator`` arrows); the rest is the version bump.
+  Changed: 29 agent artifacts per provider (accessibility-specialist ... test-executor, see CHANGELOG) +
+  generated-file-hashes (30 x 9 = 270 of 1075 entries).
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

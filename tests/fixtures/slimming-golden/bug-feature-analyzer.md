@@ -1,6 +1,6 @@
 ---
 name: bug-feature-analyzer
-version: 1.5.0
+version: 1.5.1
 description: 'Analyzes and classifies incoming bug reports and feature requests before
   resource allocation. Distinguishes: real bug, user error, valid feature, out-of-scope.'
 hint: 'Issue triage: classify bug vs. user-error vs. feature vs. out-of-scope — before
@@ -12,7 +12,7 @@ tools:
 - Grep
 - Bash
 - TodoWrite
-generated-from: 1-generic/bug-feature-analyzer.md@1.5.0
+generated-from: 1-generic/bug-feature-analyzer.md@1.5.1
 model: claude-haiku-4-5-20251001
 ---
 
@@ -52,9 +52,7 @@ At most **one** escalation per issue. Still unclear afterwards → `UNCLEAR` to 
 | Situation | Consulted agent |
 |-----------|-----------------|
 | Scope unclear | `requirements` |
-| Architectural doubts | `se-critic` |
 | Technical feasibility | `ideation` |
-| Interfaces affected | `se-interface-mgr` |
 
 ## 6. Decision matrix
 

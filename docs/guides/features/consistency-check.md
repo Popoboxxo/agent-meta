@@ -153,6 +153,7 @@ Alle bekannten Built-in-Variablen: `scripts/lib/consistency/placeholders.py` →
 | `commands.allowed-tools-not-list` | ERROR | `allowed-tools` ist String statt Array |
 | `commands.argument-hint-missing` | INFO | Kein `argument-hint:` Feld |
 | `commands.arguments-not-used` | WARNING | `argument-hint` deutet auf Argumente, `$ARGUMENTS` aber nicht im Body |
+| `commands.requires-roles-invalid` | ERROR | `requires_roles` ist keine Liste von Rollennamen oder nennt Rollen, die nicht in `config/role-defaults.yaml` stehen |
 | `commands.duplicate-in-layer` | WARNING | Zwei Command-Dateien gleichen Namens in derselben Schicht |
 
 ---

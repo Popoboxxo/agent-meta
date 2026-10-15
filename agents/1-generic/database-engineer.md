@@ -1,6 +1,6 @@
 ---
 name: template-database-engineer
-version: "1.4.0"
+version: "1.4.1"
 description: "Relational schema design, database migrations, query optimization and index strategy. Produces backwards-compatible migration scripts with rollback paths and hands a schema contract to the developer."
 hint: "Database design: schema, migrations (Alembic/Flyway style), query optimization, index strategy — hands a schema contract to developer"
 reference_standards:
@@ -122,7 +122,7 @@ STATUS: done|partial|failed|escalate
 RESULT: <schema/migration summary, 1 sentence>
 ARTIFACTS: <migration + schema files>
 SCHEMA_CONTRACT: <db-schema-v1: tables, constraints, indexes, rollback path>
-NEXT: [Review | Developer implementation | Tests]
+NEXT: [Review{{#if ROLE_DEVELOPER_ACTIVE}} | Developer implementation{{/if}} | Tests]
 ```
 {{CLOSING_SUMMARY_BLOCK}}
 

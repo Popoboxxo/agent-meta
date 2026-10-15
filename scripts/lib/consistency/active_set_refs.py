@@ -2,7 +2,11 @@
 
 Pure functions over a synced ``project_root``; all share the IC-10 signature
 ``(project_root, active_providers, capabilities, active_set) -> list[Finding]``.
-Phase 0: WARN/INFO only.
+Phase 1 (Task 1.20, AC-49): ``active-set.dangling-dispatch`` is ERROR; the other
+checks stay WARN/INFO. The scan covers per provider the agents, the rules
+(``rules_dir``, or the default rules dir for providers with ``has_rules`` but
+no ``rules_dir``), the commands (``commands_dir``), the pipeline-details files
+and the context file.
 
 Dispatch patterns are derived from ``config/delegation-syntax.yaml`` (per active
 provider, nothing hardcoded) plus the shared ``dispatch_phrases`` of
@@ -31,6 +35,12 @@ from typing import Mapping, Optional, Sequence
 
 from .report import Finding, Severity
 from ..io import load_yaml_file
+from ..pipelines import resolve_pipeline_details_dir
+from ..rule_index import read_managed_index
+from ..rules import CLAUDE_RULES_DIR
+
+# Default managed-file index name of rules/commands directories (rule_index).
+MANAGED_INDEX = ".agent-meta-managed"
 
 CHECK_DANGLING_DISPATCH = "active-set.dangling-dispatch"
 CHECK_DANGLING_MENTION = "active-set.dangling-mention"
@@ -74,17 +84,60 @@ def _dispatch_formats(root: Path, provider: str) -> list:
                    and not str(k).startswith(_NON_DISPATCH_KEYS)})
 
 
+def _scan_dirs(cfg: dict, provider: str) -> list:
+    """``(dir, managed_index)`` of ``provider``'s generated directories (config keys only).
+
+    ``managed_index`` names the sync's managed-file index in that directory;
+    when it exists only the listed files are scanned, so unmanaged user files
+    (own commands/rules) never produce findings. ``None`` = scan every file.
+    """
+    dirs = [(cfg.get("agents_dir"), None)]
+    # Providers with native rules but without rules_dir write the default rules dir
+    # (same fallback as rules.sync_rules).
+    rules_dir = cfg.get("rules_dir") or (CLAUDE_RULES_DIR if cfg.get("has_rules") else None)
+    dirs.append((rules_dir, MANAGED_INDEX))
+    if cfg.get("has_commands"):
+        dirs.append((cfg.get("commands_dir"), cfg.get("commands_managed_index", MANAGED_INDEX)))
+    if isinstance(cfg.get("agents_dir"), str):
+        dirs.append((resolve_pipeline_details_dir(cfg, provider), None))
+    return [(d, idx) for d, idx in dirs if isinstance(d, str)]
+
+
+def _managed_names(root: Path, index: str):
+    """Union of the sync's managed indexes in ``root`` (``index`` plus the
+    ``.agent-meta-managed*`` siblings written by MCP/external-tool rules);
+    ``None`` when ``root`` has no index at all."""
+    indexes = {root / index} | set(root.glob(MANAGED_INDEX + "*"))
+    present = [p for p in sorted(indexes) if p.is_file()]
+    if not present:
+        return None
+    names: set = set()
+    for path in present:
+        names |= read_managed_index(path)
+    return names
+
+
 def _scan_files(project_root: Path, provider: str) -> list:
     cfg = _provider_cfg(provider)
-    ext = str(cfg.get("agent_ext") or ".md")
-    files = []
-    for key in ("agents_dir", "rules_dir"):
-        base = cfg.get(key)
-        if isinstance(base, str) and (project_root / base).is_dir():
-            files += [p for p in sorted((project_root / base).rglob("*"))
-                      if p.is_file() and p.suffix in {".md", ext}]
+    # Final suffix only: a compound extension (".agent.md") ends in ".md".
+    suffixes = {Path("x" + str(ext)).suffix
+                for ext in (".md", cfg.get("agent_ext") or ".md", cfg.get("commands_ext") or ".md")}
+    files: list = []
+    seen: set = set()
+    for base, index in _scan_dirs(cfg, provider):
+        root = project_root / base
+        if not root.is_dir():
+            continue
+        managed = _managed_names(root, index) if index else None
+        for p in sorted(root.rglob("*")):
+            if not p.is_file() or p.suffix not in suffixes or p in seen:
+                continue
+            if managed is not None and p.relative_to(root).as_posix() not in managed:
+                continue
+            seen.add(p)
+            files.append(p)
     ctx = cfg.get("context_file")
-    if isinstance(ctx, str) and (project_root / ctx).is_file():
+    if isinstance(ctx, str) and (project_root / ctx).is_file() and project_root / ctx not in seen:
         files.append(project_root / ctx)
     return files
 
@@ -214,7 +267,7 @@ def _collect(project_root, providers, active_set, kind: str) -> list:
             for role, linenos in sorted(per_role.items()):
                 if kind == "dispatch":
                     findings.append(Finding(
-                        Severity.WARNING, CHECK_DANGLING_DISPATCH, rel,
+                        Severity.ERROR, CHECK_DANGLING_DISPATCH, rel,
                         f"dispatch to inactive role '{role}' ({len(linenos)}x, "
                         f"first line {linenos[0]})",
                         "Activate the role or filter the route for this active set"))

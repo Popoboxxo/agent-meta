@@ -1,6 +1,6 @@
 ---
 name: template-test-executor
-version: "1.2.0"
+version: "1.2.1"
 description: "Lightweight execution of existing test suites — pass/fail counts, exit codes, stdout excerpts. Test design stays with tester."
 hint: "Run existing test suites and report structured results — no test design, no code changes"
 prompt_mode: modern
@@ -100,7 +100,7 @@ SKIPPED: [count]
 EXIT_CODE: [per command]
 STDOUT_EXCERPTS: <failure summaries / stack traces, trimmed to the relevant parts>
 ARTIFACTS: <log/report paths produced by the run>
-NEXT: [recommended follow-up, e.g. failures → developer]
+NEXT: [recommended follow-up{{#if ROLE_DEVELOPER_ACTIVE}}, e.g. failures → developer{{/if}}]
 ```
 
 STATUS/RESULT/ARTIFACTS are mandatory on every completion — even on green runs. On failure, STDOUT_EXCERPTS must carry the actionable failure output.

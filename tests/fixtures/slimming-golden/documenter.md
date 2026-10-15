@@ -1,6 +1,6 @@
 ---
 name: documenter
-version: 1.11.0
+version: 1.11.1
 description: Maintains CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md and session
   insights — as artefacts that stand alone and stay traceable.
 hint: 'Maintain docs: CODEBASE_OVERVIEW, ARCHITECTURE, README, insights'
@@ -12,7 +12,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/documenter.md@1.11.0
+generated-from: 1-generic/documenter.md@1.11.1
 model: claude-haiku-4-5-20251001
 memory: project
 ---

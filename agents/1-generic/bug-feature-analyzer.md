@@ -1,6 +1,6 @@
 ---
 name: template-bug-feature-analyzer
-version: "1.5.0"
+version: "1.5.1"
 description: "Analyzes and classifies incoming bug reports and feature requests before resource allocation. Distinguishes: real bug, user error, valid feature, out-of-scope."
 hint: "Issue triage: classify bug vs. user-error vs. feature vs. out-of-scope — before developer/feature-lifecycle delegation"
 prompt_mode: modern
@@ -47,10 +47,18 @@ At most **one** escalation per issue. Still unclear afterwards → `UNCLEAR` to 
 
 | Situation | Consulted agent |
 |-----------|-----------------|
+{{#if ROLE_REQUIREMENTS_ACTIVE}}
 | Scope unclear | `requirements` |
+{{/if}}
+{{#if ROLE_SE_CRITIC_ACTIVE}}
 | Architectural doubts | `se-critic` |
+{{/if}}
+{{#if ROLE_IDEATION_ACTIVE}}
 | Technical feasibility | `ideation` |
+{{/if}}
+{{#if ROLE_SE_INTERFACE_MGR_ACTIVE}}
 | Interfaces affected | `se-interface-mgr` |
+{{/if}}
 
 ## 6. Decision matrix
 

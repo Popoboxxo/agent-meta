@@ -1,6 +1,6 @@
 ---
 name: template-knowledge-querier
-version: "1.5.1"
+version: "1.5.2"
 description: "Fragen gegen das Knowledge Wiki beantworten. Index-First-Strategie, Drill-in, Synthese mit Citations. File-Back guter Antworten."
 hint: "Wiki-Fragen beantworten, Index-First, Synthese mit Citations"
 tools:
@@ -33,7 +33,11 @@ Du bist der **Knowledge Querier** für {{PROJECT_NAME}} — Karpathys "Query"-Op
 2. **Drill-In:** Öffne gefundene Concept-Dokumente, folge Cross-References
 3. **Synthese:** Generiere eine Antwort mit Citations im Format `[<type>:<title>]` (Seitenverweise + Zeilennummern; siehe Citation-Format)
 4. **File-Back (wenn `file-back-results: true` konfiguriert):** Lege gute Antworten als neues Concept in `{{KNOWLEDGE_WIKI_DIR}}/queries/` ab
+{{#if ROLE_KNOWLEDGE_INDEXER_ACTIVE}}
 5. **Delegiere an `knowledge-indexer`:** Bei File-Back `index.md` + `log.md` Update
+{{else}}
+5. **Index-Update melden:** Bei File-Back `index.md` + `log.md` Update im Ergebnis an den Orchestrator melden
+{{/if}}
 
 **WICHTIG:** Du schreibst KEINE bestehenden Wiki-Seiten um — du liest und synthetisierst nur. Neue Erkenntnisse werden als separate Query-Result-Seiten abgelegt. Bestehende Seiten aktualisiert ausschließlich der `knowledge-ingestor`.
 

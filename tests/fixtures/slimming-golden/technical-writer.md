@@ -1,6 +1,6 @@
 ---
 name: technical-writer
-version: 0.4.0
+version: 0.4.1
 description: 'External developer- and user-facing documentation: API references, getting-started
   guides, SDK docs, tutorials, CLI help pages, user-facing release notes and UX microcopy.
   Distinct from internal team docs owned by documenter.'
@@ -14,7 +14,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/technical-writer.md@0.4.0
+generated-from: 1-generic/technical-writer.md@0.4.1
 model: claude-haiku-4-5-20251001
 memory: project
 ---

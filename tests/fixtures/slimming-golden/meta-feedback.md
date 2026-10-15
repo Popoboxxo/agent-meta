@@ -1,6 +1,6 @@
 ---
 name: meta-feedback
-version: 2.6.0
+version: 2.6.1
 description: Collect improvement suggestions for agent-meta and submit them as GitHub
   issues.
 hint: Submit improvement suggestions for agent-meta as GitHub issues
@@ -10,7 +10,7 @@ tools:
 - Read
 - WebFetch
 - TodoWrite
-generated-from: 1-generic/meta-feedback.md@2.6.0
+generated-from: 1-generic/meta-feedback.md@2.6.1
 model: claude-haiku-4-5-20251001
 ---
 

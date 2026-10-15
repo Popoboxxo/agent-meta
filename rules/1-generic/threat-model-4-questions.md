@@ -10,7 +10,11 @@ CISO Lovable):
 
 ## Anwendung
 
+{{#if ROLE_CONCEPT_REVIEWER_ACTIVE}}
 - `concept-reviewer` prüft die 4 Fragen in Design-Docs (Threat-Model-Checkliste).
+{{/if}}
+{{#if ROLE_ORCHESTRATOR_ACTIVE}}
 - `orchestrator` stellt die 4 Fragen vor Feature-Releases.
+{{/if}}
 - **Interne Apps:** vereinfacht — 1–2 Fragen reichen.
 - **Customer-facing Apps:** vollständig — alle 4 Fragen plus dokumentiertes Threat Model.

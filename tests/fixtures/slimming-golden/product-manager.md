@@ -1,6 +1,6 @@
 ---
 name: product-manager
-version: 0.4.0
+version: 0.4.1
 description: 'Strategic, business-oriented backlog and roadmap ownership: user stories,
   sprint planning, prioritization frameworks (RICE, MoSCoW), KPI/metrics definition
   and stakeholder communication. Distinct from requirements'' technical REQ-ID traceability.'
@@ -14,7 +14,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/product-manager.md@0.4.0
+generated-from: 1-generic/product-manager.md@0.4.1
 model: claude-sonnet-5
 memory: project
 ---

@@ -43,6 +43,7 @@ from .pipelines import (
     build_pipeline_variables,
     generate_pipeline_match_table,
     load_quality_pipelines,
+    pipeline_var_stem,
     validate_pipelines,
 )
 from .analysis import FileAffinityAnalyzer, analyze_project
@@ -1485,7 +1486,8 @@ def _build_provider_variables(
 
 
 def _build_orch_variables(
-    variables: dict, unmapped: list[str], config: dict, agent_meta_root: Path
+    variables: dict, unmapped: list[str], config: dict, agent_meta_root: Path,
+    active_set: ActiveSet | None = None,
 ) -> None:
     """Populate orchestrator/A2A/native-extensions/analysis flag variables.
 
@@ -1501,7 +1503,10 @@ def _build_orch_variables(
         config: the loaded project.yaml dict (read-only).
         agent_meta_root: agent-meta source root (for the direct-dispatch
             template and the analysis module).
+        active_set: the per-sync ActiveSet (computed when omitted); filters
+            ANTI_RECURSION_BLOCK and DIRECT_DISPATCH_SECTION (IC-18 no. 6/7).
     """
+    active_set = _resolve_active_set(active_set, config, agent_meta_root)
     orch_config = config.get("orchestrator", {})
     variables["ORCHESTRATOR_ENABLED"] = "true" if orch_config.get("enabled", True) else "false"
     variables["ORCHESTRATOR_STRICT"] = "true" if orch_config.get("strict", True) else "false"
@@ -1535,7 +1540,13 @@ def _build_orch_variables(
     _dd_enabled = orch_config.get("direct-dispatch-enabled", True)
     if _dd_enabled:
         _dd_template = agent_meta_root / "templates" / "direct-dispatch-section.md"
-        variables["DIRECT_DISPATCH_SECTION"] = _dd_template.read_text(encoding="utf-8") if _dd_template.exists() else ""
+        # IC-18 no. 7: each row sits under {{#if ROLE_<ROLE>_ACTIVE}}; resolve
+        # against the ActiveSet here so the value is final for every consumer.
+        variables["DIRECT_DISPATCH_SECTION"] = (
+            strip_inactive_conditional_blocks(
+                _dd_template.read_text(encoding="utf-8"), active_set_variables(active_set))
+            if _dd_template.exists() else ""
+        )
     else:
         variables["DIRECT_DISPATCH_SECTION"] = ""
     # ORCHESTRATOR_OUTCOME_CACHING: auto-inject from outcome-caching block in project.yaml
@@ -1623,10 +1634,23 @@ def _build_orch_variables(
         f"payload.t ≤ {variables.get('A2A_T_SIZE_LIMIT', '300')} Zeichen."
         if variables.get("A2A_PROTOCOL_ENABLED") == "true" else ""
     )
-    variables["ANTI_RECURSION_BLOCK"] = (
-        "Anti-Recursion: NIEMALS zurück an orchestrator delegieren. "
-        "Nur tester/documenter/requirements/validator aus Kontext verweisen."
-    )
+    variables["ANTI_RECURSION_BLOCK"] = _anti_recursion_block(agent_meta_root, active_set)
+
+
+def _anti_recursion_block(agent_meta_root: Path, active_set: ActiveSet) -> str:
+    """ANTI_RECURSION_BLOCK (IC-18 no. 6): reference roles from data ∩ ActiveSet.
+
+    The candidate list is ``role-defaults.yaml: anti_recursion.reference_roles``
+    (order kept); only roles in ``active_set.roles`` are named. Without any
+    active reference role the second sentence is dropped.
+    """
+    raw = (load_roles_config(agent_meta_root).get("anti_recursion") or {}).get("reference_roles")
+    candidates = [str(r) for r in raw] if isinstance(raw, list) else []
+    named = [role for role in candidates if active_set.has(role)]
+    block = "Anti-Recursion: NIEMALS zurück an orchestrator delegieren."
+    if named:
+        block += " Nur " + "/".join(named) + " aus Kontext verweisen."
+    return block
 
 
 def _build_subagent_permission_variables(variables: dict, config: dict) -> None:
@@ -1937,7 +1961,7 @@ def _build_pipeline_variables(
         variables.update(active_vars)
         variables["PIPELINE_MATCH_TABLE"] = generate_pipeline_match_table(effective)
         for name in pipelines:
-            var_name = name.upper().replace("-", "_")
+            var_name = pipeline_var_stem(name)
             block_key = f"PIPELINE_{var_name}_BLOCK"
             enabled_key = f"PIPELINE_{var_name}_ENABLED"
             if block_key not in variables:
@@ -2165,7 +2189,7 @@ def build_variables(
     variables.update(active_set_variables(active_set))
     _build_provider_variables(
         variables, config, agent_meta_root, warn_sink=unmapped, active_set=active_set)
-    _build_orch_variables(variables, unmapped, config, agent_meta_root)
+    _build_orch_variables(variables, unmapped, config, agent_meta_root, active_set=active_set)
     _build_subagent_permission_variables(variables, config)
     _build_platform_variables(variables, unmapped, config, agent_meta_root, active_set)
     dod_resolved = _build_dod_variables(variables, config, agent_meta_root)

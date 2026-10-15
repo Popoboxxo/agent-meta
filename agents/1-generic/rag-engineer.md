@@ -1,6 +1,6 @@
 ---
 name: template-rag-engineer
-version: "1.0.0"
+version: "1.0.1"
 description: "Retrieval-augmented generation pipelines: chunking strategy and trade-offs, embedding model choice, hybrid retrieval (BM25 + vector), reranking, query rewriting, and retrieval eval sets (recall@k, MRR, NDCG). Single responsibility — each agent is small enough to understand, test, and fix in isolation (Learn AI Data Engineering, Melillo, ch. 12.1.2). Complements data-engineer (ETL/ELT pipelines), which has no RAG scope."
 hint: "RAG pipelines: chunking, embeddings, hybrid retrieval, reranking, query rewriting, recall@k/MRR/NDCG — index and retrieval quality, not ETL"
 prompt_mode: modern
@@ -119,7 +119,7 @@ EVAL:
   failing_stage: <chunk|embed|retrieve|rerank> (<evidence>)
 CONTEXT_BUDGET: <dropped/kept ratio> (<risk>)
 ARTIFACTS: <pipeline spec, eval report file paths>
-NEXT: [RAG tuning | llm-evaluator for answer quality | Developer fix]
+NEXT: [RAG tuning{{#if ROLE_LLM_EVALUATOR_ACTIVE}} | llm-evaluator for answer quality{{/if}}{{#if ROLE_DEVELOPER_ACTIVE}} | Developer fix{{/if}}]
 ```
 {{CLOSING_SUMMARY_BLOCK}}
 </output_contract>

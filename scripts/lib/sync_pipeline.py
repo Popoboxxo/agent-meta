@@ -1274,7 +1274,7 @@ def _sync_stage_per_provider(
             sync_commands_for_provider(agent_meta_root, project_root, config, log,
                                        args.dry_run, provider,
                                        provider_config=provider_config,
-                                       variables=variables)
+                                       variables=variables, active_set=active_set)
         # Sync snippets and external skills per provider
         sync_snippets_for_provider(agent_meta_root, project_root, config, log, args.dry_run,
                                    provider, provider_config)
@@ -1552,10 +1552,17 @@ def _sync_stage_auto_commit_allowlist(agent_meta_root, project_root, config, arg
 
 
 def _log_context_finding(log: SyncLog, finding) -> None:
-    """Route one consistency Finding into sync.log: INFO -> note, else WARN."""
+    """Route one consistency Finding into sync.log: INFO -> note, ERROR -> error, else WARN.
+
+    ERROR (e.g. ``active-set.dangling-dispatch`` from phase 1) is still report-only:
+    it lands in the sync.log error list and summary, the exit code is unchanged.
+    """
     text = f"{finding.check}: {finding.file}: {finding.message}"
-    if getattr(finding.severity, "value", finding.severity) == "INFO":
+    level = getattr(finding.severity, "value", finding.severity)
+    if level == "INFO":
         log.note(finding.check, f"{finding.file}: {finding.message}")
+    elif level == "ERROR":
+        log.error(finding.file, f"{finding.check}: {finding.message}")
     else:
         log.warn(text)
 
@@ -1566,7 +1573,8 @@ def _sync_stage_context_checks(
 ) -> None:
     """Sync-end context/active-set checks (IC-10, IC-19, IC-29; AC-08, AC-43).
 
-    Report-only: findings go to sync.log as WARN (INFO for info-level checks),
+    Report-only: findings go to sync.log as WARN (INFO for info-level checks,
+    ERROR for error-level checks such as ``active-set.dangling-dispatch``),
     never change the exit code or any render. Read-only on the project, so it
     is safe in dry-run. Every check is fail-soft -- an exception is logged as
     a WARN and the sync continues. ``info_messages`` are INFO lines collected

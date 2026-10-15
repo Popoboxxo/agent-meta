@@ -1,6 +1,6 @@
 ---
 name: template-requirements
-version: "1.9.0"
+version: "1.9.1"
 description: "Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md and check traceability."
 hint: "Capture requirements, assign REQ-IDs, maintain REQUIREMENTS.md"
 prompt_mode: modern
@@ -90,7 +90,7 @@ NEW_REQS: [REQ-001, REQ-002, ...] (if assigned)
 UPDATED: [changes to existing REQs]
 TRACEABILITY_MATRIX: [if created]
 ARTIFACTS: <REQUIREMENTS.md + traceability matrix paths>
-NEXT: [recommended step: planner, developer, feature, ...]
+NEXT: [recommended step: {{#if ROLE_PLANNER_ACTIVE}}planner, {{/if}}{{#if ROLE_DEVELOPER_ACTIVE}}developer, {{/if}}feature, ...]
 ```
 {{CLOSING_SUMMARY_BLOCK}}
 

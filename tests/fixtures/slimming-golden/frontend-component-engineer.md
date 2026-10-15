@@ -1,6 +1,6 @@
 ---
 name: frontend-component-engineer
-version: 0.6.0
+version: 0.6.1
 description: Builds production-ready UI components from a screen spec (ui-ux-designer)
   plus a token/variant contract (design-system-architect) — props contract, mandatory
   state handling, and a built-in accessibility baseline. No design-system authoring,
@@ -17,7 +17,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/frontend-component-engineer.md@0.6.0
+generated-from: 1-generic/frontend-component-engineer.md@0.6.1
 model: claude-sonnet-5
 memory: project
 ---

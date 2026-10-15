@@ -1,6 +1,6 @@
 ---
 name: knowledge-ingestor
-version: 1.6.1
+version: 1.6.2
 description: Sources einlesen, Key Information extrahieren, Wiki-Seiten erstellen/aktualisieren,
   Cross-References pflegen.
 hint: Sources verarbeiten, Wiki-Seiten schreiben, Cross-References pflegen
@@ -10,7 +10,7 @@ tools:
 - Edit
 - Glob
 - Grep
-generated-from: 1-generic/knowledge-ingestor.md@1.6.1
+generated-from: 1-generic/knowledge-ingestor.md@1.6.2
 model: claude-sonnet-5
 ---
 

@@ -58,8 +58,9 @@ def load_roles_config(agent_meta_root: Path) -> dict:
     returned dict (this loader was re-parsed dozens of times per render,
     dominating wall time in multi-provider integration tests).
 
-    Returns a dict with two keys: ``roles`` (unchanged, back-compatible) and
+    Returns a dict with the keys ``roles`` (unchanged, back-compatible),
     ``activation_groups`` (the SPEC Block A single default table, empty when
+    absent) and ``anti_recursion`` (IC-18 no. 6 reference roles, empty when
     absent). Existing readers of ``["roles"]`` are unaffected.
     """
     data, _ = _load_yaml_or_json(
@@ -68,10 +69,11 @@ def load_roles_config(agent_meta_root: Path) -> dict:
         agent_meta_root / _ROLES_CONFIG_JSON,
     )
     if not data:
-        return {"roles": {}, "activation_groups": {}}
+        return {"roles": {}, "activation_groups": {}, "anti_recursion": {}}
     return {
         "roles": {k: v for k, v in data.get("roles", {}).items() if not k.startswith("_")},
         "activation_groups": data.get("activation_groups", {}) or {},
+        "anti_recursion": data.get("anti_recursion", {}) or {},
     }
 
 

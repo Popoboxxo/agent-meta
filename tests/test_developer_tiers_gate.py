@@ -64,3 +64,79 @@ def test_developer_tiers_active_includes_principal_developer_as_name_only():
 def test_developer_tiers_inactive_excludes_principal_developer():
     """Default (inactive) group: principal is absent from targets and name_index."""
     _assert_developer_tiers_state({}, enabled=False)
+
+
+# --- IC-18 no. 5 / AC-48: tier chain in the rendered prose -------------------
+
+import pytest  # noqa: E402
+
+from tests.active_set_render import (  # noqa: E402
+    REPO_ROOT,
+    default_config,
+    fixture_config,
+    section,
+    synced_project,
+    tiers_on_config,
+)
+
+_TIER_ROLES = ("junior-developer", "senior-developer", "principal-developer")
+_SECTION4_FIXTURE = (
+    REPO_ROOT / "tests" / "fixtures" / "developer-tiers" / "orchestrator-section4-tiers-on.md"
+)
+
+
+@pytest.fixture(scope="module")
+def tier_projects(tmp_path_factory):
+    return {
+        "off-default": synced_project(tmp_path_factory, default_config()),
+        "off-p10": synced_project(tmp_path_factory, fixture_config("p10")),
+        "on": synced_project(tmp_path_factory, tiers_on_config()),
+    }
+
+
+def _agent(project, role: str) -> str:
+    return (project / ".claude" / "agents" / f"{role}.md").read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("name", ["off-default", "off-p10"])
+def test_tiers_off_orchestrator_names_no_tier_role(tier_projects, name):
+    text = _agent(tier_projects[name], "orchestrator")
+    leaked = [role for role in _TIER_ROLES if role in text]
+    assert leaked == [], f"{name}: orchestrator references inactive tiers {leaked}"
+
+
+@pytest.mark.parametrize("name", ["off-default", "off-p10"])
+def test_tiers_off_developer_names_no_tier_role(tier_projects, name):
+    text = _agent(tier_projects[name], "developer")
+    leaked = [tier for tier in _TIER_ROLES if tier in text]
+    assert leaked == [], f"{name}/developer: references inactive tiers {leaked}"
+
+
+@pytest.mark.parametrize("name", ["off-default", "off-p10"])
+def test_tiers_off_planner_maps_steps_without_tier_roles(tier_projects, name):
+    text = _agent(tier_projects[name], "planner")
+    # Step mapping and the delegation pattern are gated; the output-guard example
+    # ("e.g., `senior-developer`") is a pinned mention (OG-PASS-PLANNER golden).
+    assert "(`developer`, `tester`, `requirements`, ...)" in text
+    assert "Consistent with the `developer` delegation pattern" in text
+    lines = [line for line in text.splitlines() if "senior-developer" in line]
+    assert lines == ["  write-out to a write-capable role (e.g., `senior-developer`) via the"]
+
+
+def test_tiers_off_section4_routes_to_developer(tier_projects):
+    text = section(_agent(tier_projects["off-default"], "orchestrator"),
+                   "## 4. Developer tier selection", "## 5. ")
+    assert "`developer`" in text
+    assert "ESCALATE-Card intake" in text
+
+
+def test_tiers_on_section4_is_byte_identical_to_pre_change(tier_projects):
+    text = section(_agent(tier_projects["on"], "orchestrator"),
+                   "## 4. Developer tier selection", "## 5. ")
+    assert text == _SECTION4_FIXTURE.read_text(encoding="utf-8")
+
+
+def test_p10_orchestrator_names_no_inactive_concept_role(tier_projects):
+    text = _agent(tier_projects["off-p10"], "orchestrator")
+    for role in ("concept-specifier", "concept-reviewer", "concept-architect"):
+        assert f"`{role}`" not in text, role

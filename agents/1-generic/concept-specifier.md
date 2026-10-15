@@ -1,6 +1,6 @@
 ---
 name: template-concept-specifier
-version: "1.4.1"
+version: "1.4.2"
 description: "Use when a concept or idea must become a technical specification: interface contracts, data flow, acceptance criteria — before implementation. Does not implement."
 hint: "Turn a concept into a technical specification: interface contracts, data flow, acceptance criteria — never implements"
 reference_standards:
@@ -126,10 +126,10 @@ NEXT: [Pipeline-Stage-Fortschritt (concept-driven-dev)]
 - No implementation — specification only, no code beyond exact interface signatures
 - Never invent interfaces that contradict the codebase — verify first
 - No vague acceptance criteria — every criterion testable
-- No system design for XL changes → `concept-architect`
-- No spec review verdict → `concept-reviewer`
-- No REQ-ID assignment → `requirements`
-- No code review → `code-reviewer`
+- No system design for XL changes{{#if ROLE_CONCEPT_ARCHITECT_ACTIVE}} → `concept-architect`{{else}}{{/if}}
+- No spec review verdict{{#if ROLE_CONCEPT_REVIEWER_ACTIVE}} → `concept-reviewer`{{else}}{{/if}}
+- No REQ-ID assignment{{#if ROLE_REQUIREMENTS_ACTIVE}} → `requirements`{{else}}{{/if}}
+- No code review{{#if ROLE_CODE_REVIEWER_ACTIVE}} → `code-reviewer`{{else}}{{/if}}
 
 **Blocker:** concept fundamentally unclear or essential info missing → user clarification with concrete questions. Do not guess.
 
