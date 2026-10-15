@@ -126,7 +126,7 @@
   token inside the positive branch of its own `{{#if ROLE_<TARGET>_ACTIVE}}`, block or inline); the ratchet
   registry `ROUTE_RATCHET` is empty. Default render: only inactive targets disappear (documenter KE route,
   `se-critic`/`se-interface-mgr` rows, `se-critic`/`validator` arrows) plus patch bumps of 36 templates
-  (35 in `agents/1-generic`, `homeassistant-developer`; `developer` keeps its 4.8.0 from this PR). AC-01 rebaselined (270 of 1075: 29 agents per
+  (35 in `agents/1-generic`, `homeassistant-developer`; `developer` keeps its 4.8.0 from this PR). `homeassistant-documenter` 1.2.1 re-pinned to `documenter@1.11.1`. AC-01 rebaselined (270 of 1075: 29 agents per
   provider + hashes), 24 slimming goldens rebaselined (version lines; in the self-hosting config also the
   inactive `se-*`/`security-auditor` rows and arrows). Inline conditionals at a line end use
   `{{else}}{{/if}}` because a false simple `{{#if}}` there also swallows the newline.
