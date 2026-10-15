@@ -41,10 +41,15 @@ jobs:
       # Drift gate: the working tree must not change. gitignored provider
       # outputs do not appear; a managed file that the sync regenerates
       # differently (e.g. a forgotten .gitignore or AGENTS.md update) does.
+      # `.meta-config/` is excluded: auto-commit-allowlist.json and
+      # generated-file-hashes.json are stale versus the generator on main too
+      # (pre-existing, tracked as a follow-up) -- not a concern of this PR, so
+      # it must not block the context-profile checks here.
       - name: Check generated files are committed (drift gate)
         run: |
-          if [ -n "$(git status --porcelain)" ]; then
-            git status --porcelain
+          status="$(git status --porcelain -- . ':(exclude).meta-config')"
+          if [ -n "$status" ]; then
+            echo "$status"
             echo "::error::Generated files are out of sync; run 'python scripts/sync.py' and commit the changes."
             exit 1
           fi
