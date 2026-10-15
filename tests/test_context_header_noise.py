@@ -86,3 +86,14 @@ def test_empty_lazy_table_is_not_rendered(projects, provider):
         text = artifact.read_text(encoding="utf-8")
         assert not cb._lazy_table_skills(text), f"{provider}: {artifact.name} lists lazy skills"
         assert "# Lazy-Loaded Rules" not in text, f"{provider}: {artifact.name}"
+
+
+def test_filter_skill_tables_unit():
+    from lib.rules import filter_skill_tables, has_skill_table
+
+    text = "# T\n\n| Skill | Wann |\n|---|---|\n| a | x |\n| b | y |\n\nfooter\n"
+    assert has_skill_table(text) and not has_skill_table("# T\n| Agent | x |\n")
+    assert filter_skill_tables("# no table\n", set()) == "# no table\n"
+    assert filter_skill_tables(text, {"b"}) == "# T\n\n| Skill | Wann |\n|---|---|\n| b | y |\n\nfooter\n"
+    assert filter_skill_tables(text, {"a", "b"}) == text
+    assert filter_skill_tables(text, set()) is None
