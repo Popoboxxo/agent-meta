@@ -32,7 +32,7 @@ from lib.active_set import compute_active_set  # noqa: E402
 from lib.consistency import context_budget as cb  # noqa: E402
 from lib.providers import load_provider_capabilities, load_providers_config  # noqa: E402
 from lib.rule_channels import lazy_skill_channel, reads_native_rules  # noqa: E402
-from lib.rules import collect_rule_sources, resolve_rules, rule_opts_lazy_channel  # noqa: E402
+from lib.rules import collect_rule_sources, provider_opts_skip, resolve_rules, rule_opts_lazy_channel  # noqa: E402
 from lib.skill_channel import provider_supports_skill_channel  # noqa: E402
 from tests.active_set_render import preset_config, synced_projects  # noqa: E402
 
@@ -55,7 +55,7 @@ def _lazy_stems(config: dict, provider: str) -> set:
     for _src, output_name in collect_rule_sources(REPO_ROOT, config.get("platforms", []), config=config):
         stem = Path(output_name).stem
         opts = options.get(stem, {})
-        if opts.get(provider.lower()) in ("skip", False):
+        if provider_opts_skip(opts, provider):
             continue
         if rule_opts_lazy_channel(opts):
             stems.add((stem, opts.get("channel") == "skill"))

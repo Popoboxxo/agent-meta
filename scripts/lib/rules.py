@@ -295,7 +295,10 @@ def filter_skill_tables(content: str, available: set) -> str | None:
     Returns the content unchanged when it has no ``| Skill |`` table, the
     filtered content when at least one row survives, and ``None`` when the
     content carries skill tables but none of their rows names an existing
-    skill -- the rule is then pure noise and is not rendered.
+    skill -- the rule is then pure noise and is not rendered. The whole rule
+    is dropped then -- non-table prose included; that is deliberate: a rule
+    whose table names no existing skill carries no content once the table is
+    empty.
     """
     out: list = []
     in_table = had_table = False
@@ -417,6 +420,10 @@ def sync_embedded_rule_files(
     caps = merged_caps(provider, provider_config or {}, load_provider_capabilities(agent_meta_root))
     if not lazy_skill_channel(caps):
         return
+    # Read from the provider entry (``pc``), not the merged caps the channel
+    # helper sees: shipped providers define ``skills_dir`` in ai-providers.yaml,
+    # but a consumer project may declare it in provider-capabilities.yaml only --
+    # the guard then keeps a None target path out.
     skills_dir_rel = pc.get("skills_dir")
     if not skills_dir_rel:
         return
