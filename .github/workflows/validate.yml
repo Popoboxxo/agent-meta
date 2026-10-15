@@ -32,15 +32,22 @@ jobs:
           python-version: '3.11'
       - name: Install dependencies
         run: pip install pyyaml
-      - name: Validate sync output
-        run: python scripts/sync.py --validate
-      # Drift gate (#739). Read-only: --check forces --dry-run. Note that on
-      # agent-meta self-hosting the generated provider dirs are gitignored, so
-      # a fresh CI checkout additionally reports [INIT] actions for files that
-      # are absent by design (issue #739, defect 4); the gate becomes fully
-      # green once that defect is fixed.
+      # Drift gate (#739) first: read-only, --check forces --dry-run and thus
+      # compares the committed output against what the generator would write.
+      # On agent-meta self-hosting the generated provider dirs are gitignored,
+      # so a fresh CI checkout additionally reports [INIT] actions for files
+      # that are absent by design (issue #739, defect 4); the gate becomes
+      # fully green once that defect is fixed.
       - name: Check generated files are in sync (drift gate)
         run: python3 scripts/sync.py --check
+      # The reachability checks (context.dangling-pointer, ERROR since task
+      # 1.24) resolve lazy-skill pointers against the generated provider
+      # directories, which are gitignored on self-hosting -- a fresh checkout
+      # has no skills. Generate the output before validating it.
+      - name: Generate sync output
+        run: python scripts/sync.py
+      - name: Validate sync output
+        run: python scripts/sync.py --validate
       - name: Lint agent frontmatter
         run: |
           python3 -c "
