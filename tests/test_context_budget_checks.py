@@ -7,10 +7,12 @@ Two layers:
   reported as WARNINGs. The numbers below were measured against the real state
   (``sync.py --init`` of a single-provider project, 2026-10-13):
 
-  - preset ``default``: ``use-lazy-rules`` lists 15 skills, none of them is
+  - preset ``default``: ``use-lazy-rules`` listed 15 skills, none of them is
     generated for Codex/Mammouth/Gemini/Continue (their skills directories are
     empty) -> 15 ``context.dangling-pointer`` rows each (AC-08 requires >= 10)
     plus one for the "Uebrige Regeln (Lazy-Load)" pointer when it is rendered.
+    Fixed by IC-15 Nr. 12 (the table lists only existing skills); the AC-08
+    tests reproduce the defect by appending the unfiltered source table.
   - preset ``lazy``: Gemini embeds only 11 of its 19 rules in AGENTS.md, had no
     rules read channel (``rules_read_channels: []``) and no lazy skills, so
     exactly 8 rules were lost -> 8 ``context.rule-unreachable`` (AC-08 "die 8
@@ -105,9 +107,25 @@ ALL_CHECKS = [
 
 # --- AC-08: known defects on real synced projects ---------------------------
 
+def _with_source_lazy_table(project: Path, tmp_path: Path, provider: str, mappings) -> Path:
+    """Copy of a synced project whose entry file carries the unfiltered source lazy table.
+
+    IC-15 Nr. 12 renders only existing skills (the default preset has none, so the
+    table is gone); the AC-08 defect is reproduced by appending the source table.
+    """
+    copy = tmp_path / f"{provider}-source-table"
+    shutil.copytree(project, copy)
+    table = (REPO_ROOT / "rules" / "1-generic" / "use-lazy-rules.md").read_text(encoding="utf-8")
+    entry = copy / mappings[provider]["context_file"]
+    entry.write_text(entry.read_text(encoding="utf-8") + "\n" + table, encoding="utf-8")
+    return copy
+
+
 @pytest.mark.parametrize("provider", ["Gemini", "Codex"])
-def test_ac08_missing_skills_are_reported(default_projects, mappings, provider):
-    findings = _run(cb.check_dangling_pointer, default_projects[provider], provider, mappings)
+def test_ac08_missing_skills_are_reported(default_projects, mappings, provider, tmp_path):
+    assert _run(cb.check_dangling_pointer, default_projects[provider], provider, mappings) == []
+    project = _with_source_lazy_table(default_projects[provider], tmp_path, provider, mappings)
+    findings = _run(cb.check_dangling_pointer, project, provider, mappings)
     skills = [f for f in findings if "lazy table names skill" in f.message]
     assert len(skills) >= 10
     assert len(skills) == LAZY_TABLE_SKILLS
@@ -160,13 +178,12 @@ def test_unread_channel_flags_gemini_rules_dir_not_claude(default_projects, mapp
 
 
 def test_dangling_pointer_clears_once_skills_exist(default_projects, mappings, tmp_path):
-    project = tmp_path / "gemini"
-    shutil.copytree(default_projects["Gemini"], project)
-    table = (project / ".gemini" / "rules" / "use-lazy-rules.md").read_text(encoding="utf-8")
+    project = _with_source_lazy_table(default_projects["Gemini"], tmp_path, "Gemini", mappings)
+    table = (project / mappings["Gemini"]["context_file"]).read_text(encoding="utf-8")
     skills = cb._lazy_table_skills(table)
     assert len(skills) == LAZY_TABLE_SKILLS
     for skill in skills:
-        target = project / ".gemini" / "skills" / skill
+        target = project / mappings["Gemini"]["skills_dir"] / skill
         target.mkdir(parents=True)
         (target / "SKILL.md").write_text("# skill\n", encoding="utf-8")
     assert _run(cb.check_dangling_pointer, project, "Gemini", mappings) == []

@@ -180,6 +180,16 @@
   and reported by `context.unread-channel`: `.gemini/rules` (IC-15 Nr. 8) and `.github/instructions`
   (IC-15 Nr. 3). AC-01 rebaselined (49 entries: rules-dir files removed, `CLAUDE.local.md`, Claude
   `.gitignore`, 2 x `generated-file-hashes.json`).
+- **Context files without provider noise (IC-15 Nr. 12, F-16, PR E)**: the AGENTS.md header banner is built
+  from the active providers grouped by context file (`> **AI ROUTING:** Codex -> AGENTS.md`, same helper
+  `providers.build_provider_routing` as the project templates' `PROVIDER_ROUTING`) instead of the hard-wired
+  `Opencode->AGENTS.md | Gemini->AGENTS.md` lines. Lazy-skill tables (`| Skill | Wann |`, rule
+  `use-lazy-rules`) list only skills the sync actually writes for the provider (for a shared AGENTS.md: for
+  every active sharer); a table without any existing skill is not rendered, so default-preset projects no
+  longer get the rule naming 15 agent-meta-internal skills (`sync-interface`, `admin-ui`, ...). Zero
+  `context.dangling-pointer` findings over 9 providers x presets `default`/`lazy`. Default render: AC-01
+  rebaselined (18 entries: 6 x AGENTS.md, 4 x `use-lazy-rules.md` removed plus their managed indexes and
+  `generated-file-hashes.json`); the committed self-hosting AGENTS.md was regenerated (banner).
 
 ### Changed
 - **`ACTIVE_ROLES` / `ROLE_<ROLE>_ACTIVE` available in templates**: `build_variables` injects

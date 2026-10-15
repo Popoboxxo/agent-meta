@@ -1575,7 +1575,14 @@ def _build_managed_block(
     platform_vars: dict | None = None,
 ) -> str:
     from .delegation_table import get_active_agents_data
-    from .rules import collect_rule_sources, resolve_rules, rule_opts_lazy_channel
+    from .rules import (
+        collect_rule_sources,
+        filter_skill_tables,
+        has_skill_table,
+        lazy_skill_stems,
+        resolve_rules,
+        rule_opts_lazy_channel,
+    )
 
     # build_knowledge_engine_hints is imported at module top level — the
     # lazy import was vestigial (agents does not import context; Issue #478
@@ -1635,6 +1642,14 @@ def _build_managed_block(
 
     local_vars = dict(variables)
     local_vars["AGENTS_DIR"] = _shared("agents_dir", ".{}/agents")
+    # IC-15 Nr. 12 (F-16): the header banner lists the ACTIVE providers by
+    # context file (same data as the project templates' PROVIDER_ROUTING),
+    # never a hard-wired provider list.
+    if provider_config:
+        from .providers import build_provider_routing, resolve_providers
+
+        local_vars["PROVIDER_ROUTING"] = build_provider_routing(
+            resolve_providers(config, provider_config), provider_config)
 
     # Shared-file gate tier (SPEC-CONTEXT-FILE-MODES-2026-09-13, IC-03): a
     # physical context_file shared by more than one ACTIVE provider must render
@@ -1758,6 +1773,7 @@ def _build_managed_block(
         # channel the rule EMBEDS (never drops): a preset opt-out must not
         # delete content for a provider with no way to load it (spec §4.3).
         rules_file_channel = all(reads_rule_skills(c) for c in _sharer_caps.values())
+        _available_cache: set | None = None
 
         for src_path, output_name in rule_sources:
             # Key options by the OUTPUT stem ("admin-ui"), not the raw source
@@ -1799,6 +1815,18 @@ def _build_managed_block(
                 # `_compact` below -- this is agent-meta's own always-on rule
                 # density, not the plugin lazy-channel-loss bug (#638-adjacent).
                 rule_content = compact_embedded_rule(Path(output_name).stem, rule_content)
+            # IC-15 Nr. 12: a lazy-skill table lists only skills that exist for
+            # EVERY active sharer; a table without any such skill is not embedded.
+            if has_skill_table(rule_content):
+                if _available_cache is None:
+                    _available_cache = set.intersection(*[
+                        lazy_skill_stems(agent_meta_root, project_root, config, p, c)
+                        for p, c in _sharer_caps.items()
+                    ])
+                filtered = filter_skill_tables(rule_content, _available_cache)
+                if filtered is None:
+                    continue
+                rule_content = filtered
             embedded_rules.append({"content": rule_content})
         
         try:

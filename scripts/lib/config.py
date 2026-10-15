@@ -7,7 +7,6 @@ import os
 import re
 import subprocess
 import sys
-from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -59,6 +58,7 @@ from .dod import (
 )
 from .providers import (
     all_providers_support_hooks,
+    build_provider_routing,
     load_providers_config,
     provider_has_capability,
     registered_provider_names,
@@ -1436,27 +1436,20 @@ def _build_provider_variables(
     provider_config = load_providers_config(agent_meta_root)
     providers = resolve_providers(config, provider_config)
 
-    routing_groups = defaultdict(list)
     agent_locations = []
 
     for p in providers:
         if p in provider_config:
             pc = provider_config[p]
             cfile = pc.get("context_file")
-            if cfile:
-                routing_groups[cfile].append(p)
-
             # Collect agent locations for AGENTS.md
             agents_dir = pc.get("agents_dir")
             if agents_dir and cfile == "AGENTS.md":
                 display_name = pc.get("display-name", p)
                 agent_locations.append(f"- **{display_name}:** Agent files in `{agents_dir}/`. Invoke by name.")
 
-    routing_hints = []
-    for cfile, p_list in routing_groups.items():
-        routing_hints.append(f"{', '.join(p_list)} -> {cfile}")
-
-    variables["PROVIDER_ROUTING"] = "> **AI ROUTING:** " + " | ".join(routing_hints) if routing_hints else ""
+    variables["PROVIDER_ROUTING"] = build_provider_routing(
+        [p for p in providers if p in provider_config], provider_config)
     variables["AGENT_LOCATIONS"] = "\n".join(agent_locations) if agent_locations else "Agent files in provider-specific directories."
     # AGENT_HINTS_CLAUDE: entry-point hint without the per-agent table.
     # Claude Code injects agent descriptions natively into the system prompt,

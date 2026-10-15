@@ -78,6 +78,12 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   files (19 rules + 3 managed indexes) and ``Claude/CLAUDE.personal.md``; added ``Claude/CLAUDE.local.md``;
   changed: Claude ``.gitignore`` (``CLAUDE.local.md`` entry) and the Codex/Mammouth
   ``generated-file-hashes.json`` (49 entries; 1075 -> 1031). AGENTS.md is unchanged.
+- Task 1.33 (IC-15 no. 12, F-16): the AGENTS.md header banner lists the active providers by context file
+  (``> **AI ROUTING:** Codex -> AGENTS.md``) instead of the hard-wired ``Opencode->AGENTS.md | Gemini->
+  AGENTS.md``; lazy-skill tables list only skills the sync writes for the provider - the default preset has
+  none, so ``use-lazy-rules`` is no longer rendered. Changed: 6 x AGENTS.md (banner, embedded table gone),
+  removed 4 x ``use-lazy-rules.md`` (Claude, Continue, Gemini, Copilot rules dirs), changed their 4
+  ``.agent-meta-managed`` indexes and 4 ``generated-file-hashes.json`` (18 entries; 1031 -> 1027).
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

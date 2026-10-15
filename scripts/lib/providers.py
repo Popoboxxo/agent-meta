@@ -383,6 +383,23 @@ def registered_provider_names(agent_meta_root: Path) -> list[str]:
     return sorted(names)
 
 
+def build_provider_routing(providers: list, provider_config: dict) -> str:
+    """Routing banner ``> **AI ROUTING:** A, B -> AGENTS.md | C -> C.md`` of *providers*.
+
+    Groups the given (active) providers by their ``context_file`` in order of
+    first appearance; empty string when none has a context file. Shared by the
+    project-template variable ``PROVIDER_ROUTING`` and the AGENTS.md managed
+    block header (IC-15 Nr. 12: only active providers, no hard-wired names).
+    """
+    groups: dict = {}
+    for p in providers:
+        cfile = (provider_config.get(p) or {}).get("context_file")
+        if cfile:
+            groups.setdefault(cfile, []).append(p)
+    hints = [f"{', '.join(names)} -> {cfile}" for cfile, names in groups.items()]
+    return "> **AI ROUTING:** " + " | ".join(hints) if hints else ""
+
+
 def resolve_providers(config: dict, provider_config: dict, filter_deactivated: bool = True) -> list:
     """Resolve active AI providers from config.
 
