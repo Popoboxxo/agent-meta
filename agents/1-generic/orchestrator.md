@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "8.5.0"
+version: "8.5.1"
 description: "Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes, delegates."
 hint: "Entry point for ALL development tasks — decomposes complex tasks and dispatches in parallel"
 prompt_mode: modern
@@ -295,8 +295,6 @@ Pattern catalog (Single Feature, Multi-Bug, Mixed, Refactoring, Analysis+Design)
 
 **Agent table:**
 <!-- agent-meta:managed-begin -->
-| Agent | Responsibility | Tier | Parallel |
-|-------|----------------|------|----------|
 {{AGENT_DELEGATION_TABLE}}
 Parallel: max {{MAX_PARALLEL_AGENTS}}. Not parallel: tester↔developer, code-reviewer→git, requirements→tester.
 <!-- agent-meta:managed-end -->

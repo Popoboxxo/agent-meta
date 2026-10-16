@@ -1,6 +1,6 @@
 ---
 name: orchestrator
-version: 8.5.0
+version: 8.5.1
 description: 'Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes,
   delegates.'
 hint: Entry point for ALL development tasks — decomposes complex tasks and dispatches
@@ -11,7 +11,7 @@ tools:
 - Agent
 - Read
 - Write
-generated-from: 1-generic/orchestrator.md@8.5.0
+generated-from: 1-generic/orchestrator.md@8.5.1
 model: claude-sonnet-5
 permissionMode: plan
 ---
@@ -2110,8 +2110,6 @@ Pattern catalog (Single Feature, Multi-Bug, Mixed, Refactoring, Analysis+Design)
 
 **Agent table:**
 <!-- agent-meta:managed-begin -->
-| Agent | Responsibility | Tier | Parallel |
-|-------|----------------|------|----------|
 | Agent | Core Capabilities |
 |-------|-------------------|
 | `accessibility-specialist` | WCAG 2.1/2.2 Compliance-Audit, ARIA-Checks, Keyboard-Navigation |

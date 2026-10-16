@@ -24,6 +24,15 @@
   committed `standalone/agents/` export (19 files). Ratchet ceilings lowered to 16 lines / 164 occurrences.
 
 ### Fixed
+- **Agent delegation table rendered as one valid table (IC-15 Nr. 11, AC-20, F-15)**: the
+  `agents-table` partial no longer emits blank lines between rows (the full-mode layout was an
+  invalid Markdown table with 66-68 blank lines) and the orchestrator no longer repeats a second
+  `| Agent | Responsibility | Tier | Parallel |` header above the partial's
+  `| Agent | Core Capabilities |` header (whose Tier/Parallel columns were never filled). The
+  partial is dense in both context modes, so `context_file.mode` no longer changes the table.
+  `orchestrator` 8.5.0 -> 8.5.1, partial 2.0.0 -> 2.1.0. AC-01 rebaselined (24 of 1007 hashes: the
+  orchestrator artifact of all 9 providers, the 6 `AGENTS.md` Agent-Directory rows, and the 9
+  `generated-file-hashes.json`) plus the orchestrator slimming golden and the `standalone/` export.
 - **Mammouth subagent dispatch enabled (IC-15 Nr. 6, F-11)**: a Mammouth sync now emits the same
   OpenCode-native agent surface as Opencode — a lowercase `permission` map including `task`/`todowrite`
   and a set `mode` — instead of the previously inert Claude-cased `tools:` object (study 3.4:

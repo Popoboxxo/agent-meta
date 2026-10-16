@@ -125,6 +125,13 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   lines. Changed: 19 ``Continue/.continue/rules/*.md`` plus
   ``project-context.md`` and the Continue ``.meta-config/generated-file-hashes.json``
   (20 of 1007 entries; Continue-only, 0 non-Continue drift).
+- Task 1.32 (IC-15 Nr. 11, AC-20 / F-15): the Agent Directory / ``AGENT_DELEGATION_TABLE``
+  is now one valid Markdown table - the ``agents-table`` partial no longer emits blank
+  lines between rows (full mode) and the orchestrator no longer repeats a second header
+  above the partial-provided ``| Agent | Core Capabilities |`` header (orchestrator
+  8.5.0 -> 8.5.1). Changed: the orchestrator artifact of all 9 providers, the 6
+  ``AGENTS.md`` files (Agent Directory rows lose the blank-line separation) and the 9
+  ``generated-file-hashes.json`` (24 of 1007 entries). No other artifact changed.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

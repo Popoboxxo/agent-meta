@@ -1,10 +1,8 @@
 ---
 name: "Agent Table"
-version: 2.0.0
+version: 2.1.0
 ---
 | Agent | Core Capabilities |
 |-------|-------------------|
-{{#if COMPACT_MODE}}{{#each active_agents}}| `{{name}}` | {{keywords}} |
-{{/each}}{{else}}{{#each active_agents}}
-| `{{name}}` | {{keywords}} |
-{{/each}}{{/if}}
+{{#each active_agents}}| `{{name}}` | {{keywords}} |
+{{/each}}

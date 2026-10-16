@@ -209,8 +209,6 @@ SE mode: optional
 
 **Agent table:**
 <!-- agent-meta:managed-begin -->
-| Agent | Responsibility | Tier | Parallel |
-|-------|----------------|------|----------|
 [AGENT_DELEGATION_TABLE — not available outside a full agent-meta install]
 Parallel: max [MAX_PARALLEL_AGENTS — not available outside a full agent-meta install]. Not parallel: tester↔developer, code-reviewer→git, requirements→tester.
 <!-- agent-meta:managed-end -->
