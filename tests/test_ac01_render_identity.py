@@ -101,6 +101,12 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   ``tools:`` object, plus a ``subagent_depth`` from the ``required_depth`` capability (``inject-subagent-depth``).
   Changed: all 62 ``Mammouth/.mammouth/agents/*.md`` and the Mammouth
   ``.meta-config/generated-file-hashes.json`` (63 of 1028 hashes). No other provider's render changed.
+- Task 1.28 (IC-15 Nr. 8, F-08/F-07): Gemini no longer writes its unread ``.gemini/rules`` directory
+  (rules stay embedded in AGENTS.md) and ``.gemini/settings.json`` gains ``context.fileName=AGENTS.md``
+  so Gemini CLI actually reads the shared core. Removed: the 21 ``Gemini/.gemini/rules`` files
+  (18 rules + 3 managed indexes); changed: ``Gemini/.gemini/settings.json`` and the Gemini
+  ``.meta-config/generated-file-hashes.json`` (23 of 1028 entries; 1028 -> 1007). AGENTS.md and no
+  other provider's render changed.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

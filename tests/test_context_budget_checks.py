@@ -14,12 +14,12 @@ Two layers:
     Fixed by IC-15 Nr. 12 (the table lists only existing skills); the AC-08
     tests reproduce the defect by appending the unfiltered source table.
   - preset ``lazy``: Gemini embeds only 11 of its 19 rules in AGENTS.md, had no
-    rules read channel (``rules_read_channels: []``) and no lazy skills, so
-    exactly 8 rules were lost -> 8 ``context.rule-unreachable`` (AC-08 "die 8
-    verlorenen Gemini-lazy-Rules"). The lost set is a2a-delegation-gates,
-    issue-lifecycle, lifecycle-tasks, the three se-cascade-* rules,
-    session-conclusion and submodule-protection. Fixed by IC-15 Nr. 2 (skills
-    channel); the AC-08 tests reproduce the defect by removing the skills.
+    rules read channel and no lazy skills, so exactly 8 rules were lost
+    (a2a-delegation-gates, issue-lifecycle, lifecycle-tasks, the three
+    se-cascade-* rules, session-conclusion, submodule-protection). Fixed by
+    IC-15 Nr. 2 (skills channel) and IC-15 Nr. 8 (the unread ``.gemini/rules``
+    dir is retired); the AC-08 tests reproduce the defect shape by removing the
+    skills and, where the rules dir no longer exists, synthetically.
 
 Run: python3 -m pytest tests/test_context_budget_checks.py -q
 """
@@ -49,11 +49,6 @@ from tests.test_ac01_render_identity import _make_project, _run_sync  # noqa: E4
 # (measured in the docstring above) but are not re-rendered here.
 DEFAULT_MATRIX = ["Gemini", "Claude", "Codex"]
 LAZY_TABLE_SKILLS = 15
-GEMINI_LOST_LAZY_RULES = {
-    "a2a-delegation-gates", "issue-lifecycle", "lifecycle-tasks",
-    "se-cascade-adr-standard", "se-cascade-artifact-taxonomy",
-    "se-cascade-review-lifecycle", "session-conclusion", "submodule-protection",
-}
 
 
 def _make_lazy_project(root: Path, provider: str) -> Path:
@@ -152,13 +147,22 @@ def test_ac08_lazy_pointer_without_any_skill_is_reported(lazy_projects, mappings
     assert any("lazy-load pointer promises rule skills" in f.message for f in findings)
 
 
-def test_ac08_gemini_lazy_preset_loses_eight_rules(lazy_projects, mappings, tmp_path):
-    # Fixed by IC-15 Nr. 2: the 8 lazy rules reach Gemini as skills.
-    assert _run(cb.check_rule_unreachable, lazy_projects["Gemini"], "Gemini", mappings) == []
-    project = _without_skills(lazy_projects["Gemini"], tmp_path, mappings)
-    findings = _run(cb.check_rule_unreachable, project, "Gemini", mappings)
-    assert {Path(f.file).stem for f in findings} == GEMINI_LOST_LAZY_RULES
-    assert len(findings) == 8
+def test_ac08_unread_rules_dir_without_skills_is_reported(tmp_path):
+    """AC-08: a generated-but-unread rules dir whose rules are neither embedded
+    nor reachable through skills is flagged.
+
+    IC-15 Nr. 8 retired Gemini's own ``.gemini/rules`` dir (the former 8-rule
+    loss shape is now structurally impossible), so the defect is reconstructed
+    synthetically; ``test_ac08_default_preset_gemini_has_no_unreachable_rule``
+    pins the fixed Gemini state and ``test_rule_reachable_via_skills_channel``
+    covers the reachable case.
+    """
+    _write(tmp_path / "AGENTS.md", "# Entry\n")
+    _write(tmp_path / "rules" / "lost-rule.md", "# Lost Rule\n\nbody\n")
+    caps = _caps(context_file="AGENTS.md", rules_dir="rules",
+                 rules_read_channels=["skills"], skills_dir="skills")
+    findings = cb.check_rule_unreachable(tmp_path, ["P"], caps, None)
+    assert {Path(f.file).stem for f in findings} == {"lost-rule"}
     assert all(f.check == "context.rule-unreachable" and f.severity is Severity.WARNING
                for f in findings)
 
@@ -171,9 +175,9 @@ def test_ac08_claude_native_rules_dir_is_reachable(lazy_projects, mappings):
     assert _run(cb.check_rule_unreachable, lazy_projects["Claude"], "Claude", mappings) == []
 
 
-def test_unread_channel_flags_gemini_rules_dir_not_claude(default_projects, mappings):
-    gemini = _run(cb.check_unread_channel, default_projects["Gemini"], "Gemini", mappings)
-    assert [f.file for f in gemini] == [".gemini/rules"]
+def test_unread_channel_clears_for_gemini_rules_dir(default_projects, mappings):
+    """IC-15 Nr. 8: Gemini no longer writes the unread ``.gemini/rules`` dir."""
+    assert _run(cb.check_unread_channel, default_projects["Gemini"], "Gemini", mappings) == []
     assert _run(cb.check_unread_channel, default_projects["Claude"], "Claude", mappings) == []
 
 

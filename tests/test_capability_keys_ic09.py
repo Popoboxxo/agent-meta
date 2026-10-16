@@ -53,8 +53,11 @@ _EXPECTED_PROVIDERS = {
     "Codex", "ZCode", "KimiCode",
 }
 # no native rules channel: generated instruction files are never read there (F-17);
-# lazy rules reach them as skills since IC-15 Nr. 2 (formerly rules_read_channels: [])
-_UNREAD_RULES_DIR_SKILLS_ONLY = ("Copilot", "Gemini")
+# lazy rules reach them as skills since IC-15 Nr. 2 (formerly rules_read_channels: []).
+# Gemini left this set with IC-15 Nr. 8 (rules embedded in AGENTS.md, read via
+# context.fileName -> rules_read_channels gains "embedded"); Copilot stays until
+# IC-15 Nr. 3.
+_UNREAD_RULES_DIR_SKILLS_ONLY = ("Copilot",)
 
 
 def test_providers_present():

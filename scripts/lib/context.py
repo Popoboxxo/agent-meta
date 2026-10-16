@@ -1253,47 +1253,56 @@ def _dispatch_context_strategy(
 
 
 def _adapter_settings_activation(pc: dict) -> dict | None:
-    """Resolve the provider-native settings activation for an adapter file.
+    """Resolve the provider-native settings key that names a context file.
 
-    Capability/``settings_file``-gated (AC-26, F-10):
+    Two key-driven opt-ins share this resolver:
 
-    * ``context_adapter_settings`` absent/``False`` (the default) → ``None``: no
-      settings write; the adapter file is the provider's default context file.
-    * ``context_adapter_settings: true`` additionally requires a native
-      ``settings_file`` and the provider-native key name in
-      ``context_adapter_settings_key`` (worked example: ``context.fileName`` in
-      ``.gemini/settings.json``); a missing piece degrades to ``None`` instead of
-      guessing (never writes an unspecified key).
+    * **Adapter activation** (``context_adapter_settings: true``): the native
+      ``context_adapter_file`` is only read once a provider-native settings key
+      names it (``context_adapter_settings_key``; worked example
+      ``context.fileName`` in ``.gemini/settings.json``).
+    * **Core filename settings** (``context_filename_settings_key``): a direct
+      reader of the shared core (Gemini CLI reads ``GEMINI.md`` by default)
+      gets its native settings key set to the resolved ``context_file`` so the
+      runtime actually reads the generated core file (IC-15 Nr. 8 / AC-18).
 
-    Purely key-driven — no provider-name literal in any branch.
+    Both require a native ``settings_file`` and a non-blank provider-native
+    dotted key; a missing piece degrades to ``None`` instead of guessing
+    (never writes an unspecified key). Purely key-driven — no provider-name
+    literal in any branch.
     """
-    if pc.get("context_adapter_settings") is not True:
-        return None
     settings_file = pc.get("settings_file")
-    settings_key = pc.get("context_adapter_settings_key")
-    adapter_file = pc.get("context_adapter_file")
     if not (isinstance(settings_file, str) and settings_file.strip()):
         return None
+    if pc.get("context_adapter_settings") is True:
+        settings_key = pc.get("context_adapter_settings_key")
+        target_file = pc.get("context_adapter_file")
+    else:
+        settings_key = pc.get("context_filename_settings_key")
+        target_file = pc.get("context_file")
     if not (isinstance(settings_key, str) and settings_key.strip()):
         return None
-    if not (isinstance(adapter_file, str) and adapter_file.strip()):
+    if not (isinstance(target_file, str) and target_file.strip()):
         return None
     return {
         "settings_file": settings_file,
         "settings_key": settings_key.strip(),
-        "adapter_file": adapter_file,
+        "adapter_file": target_file,
     }
 
 
 def _write_adapter_settings_activation(
     project_root: Path, activation: dict, log: SyncLog, dry_run: bool
 ) -> None:
-    """Merge the provider-native settings key that activates an adapter file.
+    """Merge the provider-native settings key that names a context file.
 
     Only reached through ``_adapter_settings_activation`` (an explicit provider
-    opt-in). The dotted native key is set on the existing settings document,
-    preserving sibling keys. A missing or non-mapping settings file is a
-    ``log.warning`` — never a silent no-op and never a create-and-guess.
+    opt-in, adapter file or core filename). The dotted native key is set on the
+    existing settings document, preserving sibling keys. A missing or
+    non-mapping settings file is a ``log.warning`` — never a silent no-op and
+    never a create-and-guess. Idempotent: once the key already names the file,
+    the settings document is left untouched (no write, no action), so a second
+    sync stays net-zero (AC-28).
     """
     settings_file = activation["settings_file"]
     settings_key = activation["settings_key"]
@@ -1301,13 +1310,13 @@ def _write_adapter_settings_activation(
     settings_path = safe_path(project_root, settings_file)
     if not settings_path.exists():
         log.warning(
-            f"context_adapter_settings for '{adapter_file}' requires '{settings_file}' "
+            f"context settings for '{adapter_file}' requires '{settings_file}' "
             "— settings file missing, activation skipped"
         )
         return
     document = load_json_file(settings_path, on_error="warn", default=None, log=log)
     if not isinstance(document, dict):
-        log.warning(f"{settings_file}: not a JSON object — adapter activation skipped")
+        log.warning(f"{settings_file}: not a JSON object — context settings skipped")
         return
     cursor = document
     parts = [part for part in settings_key.split(".") if part]
@@ -1320,12 +1329,15 @@ def _write_adapter_settings_activation(
             branch = {}
             cursor[part] = branch
         cursor = branch
+    if cursor.get(parts[-1]) == adapter_file:
+        log.skip(settings_file, f"{settings_key} already set")
+        return
     cursor[parts[-1]] = adapter_file
     if not dry_run:
         save_json_document(settings_path, document)
     log.action(
         "UPDATE", settings_file,
-        f"context adapter activation: {settings_key}={adapter_file}",
+        f"native context settings: {settings_key}={adapter_file}",
     )
 
 
@@ -1374,6 +1386,26 @@ def sync_context_adapters_for_provider(
             _write_adapter_settings_activation(project_root, activation, log, dry_run)
 
 
+def _apply_context_filename_settings(
+    project_root: Path, pc: dict, log: SyncLog, dry_run: bool
+) -> None:
+    """Write the provider-native context-filename key for a direct core reader.
+
+    AC-18 / IC-15 Nr. 8: Gemini CLI reads ``GEMINI.md`` by default, so the
+    generated core (``AGENTS.md``) is only read once the native settings key
+    names it (``context.fileName``). Key-driven via
+    ``_adapter_settings_activation`` (``context_filename_settings_key``); the
+    write is skipped when the named file does not exist, so a provider whose
+    context render was skipped never gets a dangling settings pointer.
+    """
+    activation = _adapter_settings_activation(pc)
+    if activation is None:
+        return
+    if not safe_path(project_root, activation["adapter_file"]).exists():
+        return
+    _write_adapter_settings_activation(project_root, activation, log, dry_run)
+
+
 def _project_name(config: dict, variables: dict) -> str:
     """Project name from ``project.name``, else the PROJECT_NAME variable.
 
@@ -1417,25 +1449,27 @@ def sync_context_for_provider(
 
     if context_topology(config, provider) == "per-provider":
         if pc.get("context_adapter") is True:
+            # The adapter write owns its own provider-native settings activation.
             sync_context_adapters_for_provider(
                 agent_meta_root, project_root, config, variables, log, dry_run,
                 provider, provider_config,
                 platform_vars=platform_vars,
             )
-        else:
-            _dispatch_context_strategy(
-                agent_meta_root, project_root, config, variables, log, dry_run,
-                provider, provider_config,
-                target_name=_core_context_filename(config),
-                platform_vars=platform_vars,
-            )
-        return
+            return
+        _dispatch_context_strategy(
+            agent_meta_root, project_root, config, variables, log, dry_run,
+            provider, provider_config,
+            target_name=_core_context_filename(config),
+            platform_vars=platform_vars,
+        )
+    else:
+        _dispatch_context_strategy(
+            agent_meta_root, project_root, config, variables, log, dry_run,
+            provider, provider_config,
+            platform_vars=platform_vars,
+        )
 
-    _dispatch_context_strategy(
-        agent_meta_root, project_root, config, variables, log, dry_run,
-        provider, provider_config,
-        platform_vars=platform_vars,
-    )
+    _apply_context_filename_settings(project_root, pc, log, dry_run)
 
 
 def apply_settings_surface_shape(content: str, pc: dict) -> str:

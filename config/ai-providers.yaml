@@ -138,8 +138,17 @@ providers:
         format: antigravity-mcp-json
     context_file: AGENTS.md
     context_template: templates/configs/AGENTS.project-template.md
-    has_rules: true
-    rules_dir: .gemini/rules
+    # IC-15 Nr. 8 (F-08/F-07, #975): Gemini CLI reads GEMINI.md by default, so
+    # the shared core AGENTS.md is only read when the native settings key
+    # `context.fileName` names it. `context_filename_settings_key` (below) makes
+    # _adapter_settings_activation write that key -- data-driven, no provider
+    # name branch. Rules stay embedded in AGENTS.md; the unread `.gemini/rules`
+    # directory is no longer written and a directory from an earlier version is
+    # cleaned up through its managed index (foreign files stay).
+    has_rules: false
+    retired_rules_dirs:
+    - .gemini/rules
+    context_filename_settings_key: context.fileName
     has_hooks: true
     hook_protocol: antigravity-hooks-json
     hooks_dir: .agents/hooks

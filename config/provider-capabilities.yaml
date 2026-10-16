@@ -217,7 +217,7 @@ capabilities:
     context_soft_cap_lines: null
     roster_in_harness: false
     agents_md_visible_to_subagents: false
-    rules_read_channels: [skills]  # IC-15 Nr. 2: .gemini/skills discovered (study 3.7); AGENTS.md read via context.fileName is IC-15 Nr. 8
+    rules_read_channels: [embedded, skills]  # IC-15 Nr. 8: rules embedded in AGENTS.md (read via context.fileName, see ai-providers.yaml context_filename_settings_key); IC-15 Nr. 2: .gemini/skills discovered (study 3.7)
     skills_discovery_dirs: [".gemini/skills"]
     main_agent_selectable: false
     agents_md_precedence: concatenate

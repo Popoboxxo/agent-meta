@@ -243,11 +243,15 @@ def test_copilot_migrated_paths():
 
 def test_gemini_antigravity_default_paths_unchanged():
     """OQ-1/AC-9: with ``agent-discovery: false`` the current ``.gemini/*``
-    discovery artifact paths stay byte-for-byte."""
+    discovery artifact paths stay byte-for-byte (IC-15 Nr. 8 note: the unread
+    ``.gemini/rules`` directory was dropped from the render)."""
     cfg = _PROVIDERS["Gemini"]
     assert cfg["agent-discovery"] is False
     assert cfg["agents_dir"] == ".gemini/agents"
-    assert cfg["rules_dir"] == ".gemini/rules"
+    # IC-15 Nr. 8: rules are embedded in AGENTS.md and read via context.fileName;
+    # the unread rules directory is retired (Legacy-Aufräumung über die Indizes).
+    assert "rules_dir" not in cfg
+    assert cfg["retired_rules_dirs"] == [".gemini/rules"]
     assert cfg["skills_dir"] == ".gemini/skills"
 
 
