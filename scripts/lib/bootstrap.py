@@ -87,6 +87,7 @@ class BootstrapEngine:
         context_file: str | None = None,
         compact: bool = False,
         agents_label: str | None = None,
+        hard_cap_guard: Any = None,
     ) -> dict[str, Any]:
         """Execute provider-specific bootstrap actions.
 
@@ -108,6 +109,7 @@ class BootstrapEngine:
                 provider, agents_dir, config, project_root,
                 dry_run=dry_run, log=log, context_file=context_file,
                 compact=compact, agents_label=agents_label,
+                hard_cap_guard=hard_cap_guard,
             )
         elif mechanism == "config-based":
             return self._bootstrap_config_based(provider, agents_dir, config, project_root)
@@ -126,6 +128,7 @@ class BootstrapEngine:
         context_file: str | None = None,
         compact: bool = False,
         agents_label: str | None = None,
+        hard_cap_guard: Any = None,
     ) -> dict[str, Any]:
         """Inject session-start bootstrap instructions into the provider's
         context file (e.g. GEMINI.md or the provider's AGENTS.md) for
@@ -213,6 +216,8 @@ class BootstrapEngine:
                 log.skip(str(target_path.relative_to(project_root)), "bootstrap instructions unchanged")
             return {"status": "skipped", "mechanism": "api-based", "reason": "bootstrap instructions unchanged"}
 
+        if hard_cap_guard is not None:
+            hard_cap_guard(target_path, new_content)
         if log:
             log.action("UPDATE", str(target_path.relative_to(project_root)), "bootstrap instructions")
         if not dry_run:

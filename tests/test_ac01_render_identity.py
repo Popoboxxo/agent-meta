@@ -84,6 +84,12 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   none, so ``use-lazy-rules`` is no longer rendered. Changed: 6 x AGENTS.md (banner, embedded table gone),
   removed 4 x ``use-lazy-rules.md`` (Claude, Continue, Gemini, Copilot rules dirs), changed their 4
   ``.agent-meta-managed`` indexes and 4 ``generated-file-hashes.json`` (18 entries; 1031 -> 1027).
+- Task 1.25 (IC-15 no. 4, F-04/F-09): Codex gets a ``.codex/config.toml`` with a managed
+  ``[agents] max_depth`` table (new artifact) and its ``spawn_agent`` delegation syntax uses the real
+  ``agent_type``/``message`` parameters instead of ``agent``/``task`` (config/delegation-syntax.yaml).
+  Changed: ``Codex/.codex/config.toml`` (added), ``Codex/.codex/agents/orchestrator.toml``, the 4
+  ``Codex/.codex/pipeline-details/*.md`` and ``Codex/.meta-config/generated-file-hashes.json``
+  (7 of 1028 entries). No other provider's render changed.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

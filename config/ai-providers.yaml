@@ -658,6 +658,9 @@ providers:
     - .codex/pending-tasks.md
     - AGENTS.personal.md
     mcp-config:
+      # Same committed file is the IC-15 Nr. 4 dispatch target: the sync writes
+      # a managed [agents] max_depth table here (scripts/lib/dispatch_depth.py),
+      # gated on the capability keys agent_config_format: toml + required_depth.
       committed-file: .codex/config.toml
       format: codex-toml-mcp
     skills_dir: .agents/skills

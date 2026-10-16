@@ -1319,6 +1319,8 @@ def _run_provider_bootstrap(
     agent_meta_root: Path,
     dry_run: bool,
     log: SyncLog,
+    config: dict | None = None,
+    provider_config: dict | None = None,
 ) -> None:
     """Provider Bootstrap: session-start agent registration for providers whose
     config/provider-bootstrap.yaml entry demands it (Gemini: inject generated
@@ -1330,6 +1332,15 @@ def _run_provider_bootstrap(
     """
     from .bootstrap import BootstrapEngine
 
+    guard = None
+    if config is not None and provider_config is not None:
+        def guard(target_path: Path, content: str) -> None:
+            from .context import enforce_context_hard_cap
+            enforce_context_hard_cap(
+                agent_meta_root, project_root, config, provider_config,
+                target_path, content,
+            )
+
     bootstrap_engine = BootstrapEngine(config_dir=agent_meta_root / "config")
     bootstrap_cfg = bootstrap_engine.get_bootstrap_config(provider)
     if bootstrap_cfg and bootstrap_cfg.get("action") != "none":
@@ -1339,6 +1350,7 @@ def _run_provider_bootstrap(
             context_file=pc.get("context_file"),
             compact=variables.get("COMPACT_MODE") == "true",
             agents_label=pc.get("agents_dir", f".{provider.lower()}/agents"),
+            hard_cap_guard=guard,
         )
         if bootstrap_cfg.get("action") == "update-config" and result.get("status") == "success":
             rel_target = str(target_dir.relative_to(project_root))
@@ -1417,4 +1429,7 @@ def sync_agents_for_provider(agent_meta_root: Path, project_root: Path, config: 
                           pc, project_root, dry_run, log)
 
 
-    _run_provider_bootstrap(provider, pc, target_dir, project_root, variables, agent_meta_root, dry_run, log)
+    _run_provider_bootstrap(
+        provider, pc, target_dir, project_root, variables, agent_meta_root,
+        dry_run, log, config=config, provider_config=provider_config,
+    )

@@ -24,6 +24,16 @@
   committed `standalone/agents/` export (19 files). Ratchet ceilings lowered to 16 lines / 164 occurrences.
 
 ### Fixed
+- **Codex dispatch depth, hard cap and `spawn_agent` syntax (IC-15 Nr. 4, F-04/F-09)**: a Codex sync now
+  writes `.codex/config.toml` with a managed `[agents] max_depth` (gated on the capability keys
+  `agent_config_format: toml` + `required_depth`, `scripts/lib/dispatch_depth.py`), so a spawned
+  orchestrator child keeps its multi-agent tools. The rendered `spawn_agent` delegation uses the real
+  `agent_type`/`message` parameters (`items`/`fork_context` documented) instead of `agent`/`task`. A
+  generated context file at or above a reader's `context_hard_cap_bytes` (Codex 32 KiB, e.g. the
+  6-provider `AGENTS.md` after the managed block and the bootstrap injection) now aborts the sync with
+  `context.over-hard-cap` instead of writing it silently. AC-01 rebaselined (7 of 1028 hashes: the new
+  `.codex/config.toml`, the Codex orchestrator and 4 pipeline-details files, plus the Codex
+  generated-file-hashes).
 - CI: raise `scenarios` job timeout from 45 to 60 minutes (the scenario suite regularly needs 42–45+ minutes).
 - **Active-set consumers (IC-18 Nr. 14-18, PR A)**: the raw `roles` allowlist is no longer the only source
   for role-dependent generators; the per-sync `ActiveSet` (gates applied) is used.

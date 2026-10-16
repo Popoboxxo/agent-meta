@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 
 from .agents import build_agent_hints, build_knowledge_engine_hints
 from .frontmatter import _strip_frontmatter
 from .io import (
+    SyncError,
     content_hash,
     is_absent_gitignored_target,
     load_json_file,
@@ -439,6 +441,101 @@ def _inject_adapter_line(managed_block: str, adapter_line: str) -> str:
     return managed_block.replace(marker, f"{marker}\n{line}", 1)
 
 
+def _context_hard_cap_readers(
+    project_root: Path, config: dict, provider_config: dict, target_path: Path
+) -> list:
+    """Active providers whose ``context_file`` resolves to *target_path*."""
+    from .providers import resolve_providers
+
+    readers = []
+    for name in resolve_providers(config, provider_config):
+        context_file = (provider_config.get(name) or {}).get("context_file")
+        if not context_file:
+            continue
+        try:
+            candidate = safe_path(project_root, context_file)
+        except SyncError:
+            continue
+        if candidate == target_path:
+            readers.append(name)
+    return readers
+
+
+def enforce_context_hard_cap(
+    agent_meta_root: Path,
+    project_root: Path,
+    config: dict,
+    provider_config: dict,
+    target_path: Path,
+    content: str,
+) -> None:
+    """Raise ``context.over-hard-cap`` before writing a reader-truncated file.
+
+    Every active provider that reads this physical file is a reader (IC-10); a
+    file at or above the smallest reader ``context_hard_cap_bytes`` is silently
+    truncated at runtime, so the sync aborts instead of writing it. The
+    decision reuses ``context_budget.check_over_hard_cap`` with an in-memory
+    (pre-write) report, keeping a single source of truth.
+    """
+    from .consistency import context_budget
+    from .context_report import merge_provider_mappings
+    from .providers import load_provider_capabilities
+
+    readers = _context_hard_cap_readers(
+        project_root, config, provider_config, target_path
+    )
+    if not readers:
+        return
+    merged = merge_provider_mappings(
+        provider_config, load_provider_capabilities(agent_meta_root)
+    )
+    # ``Path.write_text`` translates "\n" to ``os.linesep`` on write (newline=None),
+    # so measure the artifact exactly as it lands on disk (CRLF on Windows).
+    written = content.replace("\r\n", "\n").replace("\n", os.linesep)
+    data = written.encode("utf-8")
+    report = {}
+    for name in readers:
+        cap = (merged.get(name) or {}).get("context_hard_cap_bytes")
+        if not (isinstance(cap, int) and not isinstance(cap, bool)):
+            cap = None
+        report[name] = {
+            "entry-file": {
+                "bytes": len(data),
+                "lines": len(content.splitlines()),
+                "tokens_est": len(data) // 4,
+                "cap": cap,
+                "cap_kind": "hard-bytes" if cap is not None else None,
+            }
+        }
+    findings = context_budget.check_over_hard_cap(
+        project_root, readers, merged, None, report=report
+    )
+    if findings:
+        rel = target_path.relative_to(project_root).as_posix()
+        raise SyncError(
+            f"context.over-hard-cap: {rel} — {findings[0].message}; "
+            "refusing to write a context file a reader truncates"
+        )
+
+
+def _write_dispatch_depth(
+    agent_meta_root: Path,
+    project_root: Path,
+    provider: str,
+    provider_config: dict,
+    log: SyncLog,
+    dry_run: bool,
+) -> None:
+    """Write the capability-gated ``[agents] max_depth`` config for a provider."""
+    from .dispatch_depth import write_dispatch_depth_config
+    from .providers import load_provider_capabilities
+
+    pc = provider_config.get(provider) or {}
+    capabilities = load_provider_capabilities(agent_meta_root).get(provider, {})
+    for rel in write_dispatch_depth_config(project_root, pc, capabilities, dry_run):
+        log.action("WRITE", rel, "[agents] max_depth >= required depth")
+
+
 def _update_managed_html_block(
     target_path: Path,
     project_root: Path,
@@ -450,6 +547,8 @@ def _update_managed_html_block(
     pc: dict | None = None,
     adapter_line: str | None = None,
     platform_vars: dict | None = None,
+    config: dict | None = None,
+    provider_config: dict | None = None,
 ) -> None:
     """Update the HTML-style managed block in a context file.
 
@@ -532,6 +631,11 @@ def _update_managed_html_block(
             )
             return
         new_content = _insert_managed_block_above_foreign_content(existing, new_managed)
+        if config is not None and provider_config is not None:
+            enforce_context_hard_cap(
+                agent_meta_root, project_root, config, provider_config,
+                target_path, new_content,
+            )
         log.action(
             "INIT", rel,
             "managed block inserted — file existed without an agent-meta "
@@ -545,6 +649,11 @@ def _update_managed_html_block(
     # must be inserted verbatim (#674 escape-safety).
     new_content = managed_pattern.sub(lambda _m: new_managed, existing, count=1)
     if new_content != existing:
+        if config is not None and provider_config is not None:
+            enforce_context_hard_cap(
+                agent_meta_root, project_root, config, provider_config,
+                target_path, new_content,
+            )
         log.action("UPDATE", rel, "managed block")
         if not dry_run:
             target_path.write_text(new_content, encoding="utf-8")
@@ -645,6 +754,7 @@ def _sync_managed_block_context(
         _update_managed_html_block(
             target_path, project_root, variables, log, dry_run, agent_meta_root,
             provider, pc, adapter_line=adapter_line, platform_vars=platform_vars,
+            config=config, provider_config=provider_config,
         )
 
     # Claude settings files are initialized by the dedicated helpers in sync.py.
@@ -735,6 +845,10 @@ def _sync_opencode_context(
             # Function replacement keeps the rendered block verbatim (#674).
             new_content = managed_pattern.sub(lambda _m: new_managed, existing, count=1)
             if new_content != existing:
+                enforce_context_hard_cap(
+                    agent_meta_root, project_root, config, provider_config,
+                    target_path, new_content,
+                )
                 log.action("UPDATE", context_file, "managed block (agent hints + rules)")
                 if not dry_run:
                     target_path.write_text(new_content, encoding="utf-8")
@@ -755,6 +869,10 @@ def _sync_opencode_context(
             # above the foreign content instead of leaving it uninitialized
             # forever or discarding what is already there.
             new_content = _insert_managed_block_above_foreign_content(existing, new_managed)
+            enforce_context_hard_cap(
+                agent_meta_root, project_root, config, provider_config,
+                target_path, new_content,
+            )
             log.action(
                 "INIT", context_file,
                 "managed block inserted — file existed without an agent-meta "
@@ -1110,6 +1228,9 @@ def _dispatch_context_strategy(
 ) -> None:
     """Capability-driven render dispatch shared by both topology modes."""
     pc = provider_config.get(provider, {})
+    _write_dispatch_depth(
+        agent_meta_root, project_root, provider, provider_config, log, dry_run
+    )
     if _has_capability(pc, "context-embedded-rules") or _shares_context_with_embedded_rules(
         provider, pc, provider_config
     ):
