@@ -107,6 +107,14 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   (18 rules + 3 managed indexes); changed: ``Gemini/.gemini/settings.json`` and the Gemini
   ``.meta-config/generated-file-hashes.json`` (23 of 1028 entries; 1028 -> 1007). AGENTS.md and no
   other provider's render changed.
+- Task 1.29 (IC-15 Nr. 3, AC-14 / F-13): Copilot rule files gain the mandatory ``.instructions.md``
+  suffix plus ``applyTo``/``description`` frontmatter, and every Copilot agent frontmatter ``name:``
+  drops the leaked extension (``orchestrator.agent`` -> ``orchestrator``). Changed/reassigned: 18
+  ``Copilot/.github/instructions/*.md`` removed + 18 ``*.instructions.md`` added, all 63
+  ``Copilot/.github/agents/*.agent.md`` names, the ``.github/instructions/.agent-meta-managed`` index
+  and the Copilot ``.meta-config/generated-file-hashes.json`` (101 of 1007 entries; Copilot-only,
+  0 non-Copilot drift; ``meta-doctor.agent.md`` is covered by the existing AC-01 exception). No other
+  provider's render changed.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

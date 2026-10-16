@@ -455,6 +455,12 @@ providers:
     context_template: templates/configs/COPILOT.project-template.md
     has_rules: true
     rules_dir: .github/instructions
+    # IC-15 Nr. 3 / AC-14 (F-13): GitHub Copilot reads path-scoped instruction
+    # files (`.github/instructions/<name>.instructions.md`, suffix from the
+    # `rules_required_suffix` capability). The syncer reads this key generically
+    # (no provider-name branch) and emits it as `applyTo:` frontmatter; `"**"`
+    # = repository-wide.
+    rules_apply_to: "**"
     has_hooks: false
     # Commands (issue #807): VS Code / GitHub Copilot reusable prompt files
     # (`.github/prompts/*.prompt.md`, invoked as `/name`) are a real command

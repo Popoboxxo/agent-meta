@@ -885,6 +885,24 @@ def _apply_agent_body_injections(
     return content
 
 
+def _agent_name_from_filename(filename: str, provider_config: dict | None,
+                              provider: str) -> str:
+    """The agent's logical name: *filename* with the provider's ``agent_ext``
+    stripped.
+
+    ``Path(filename).stem`` only removes the last suffix, so a two-part
+    extension would leak the extension into the frontmatter ``name:``
+    (Copilot ``orchestrator.agent.md`` -> ``orchestrator.agent`` instead of
+    ``orchestrator``; F-13, IC-15 Nr. 3 / AC-14). Read from ``agent_ext`` — no
+    provider-name branch. Falls back to ``Path.stem`` when the filename does
+    not carry the declared extension.
+    """
+    agent_ext = ((provider_config or {}).get(provider) or {}).get("agent_ext") or ".md"
+    if filename.endswith(agent_ext):
+        return filename[: -len(agent_ext)]
+    return Path(filename).stem
+
+
 def _finalize_agent_content(
     content: str,
     role: str,
@@ -914,7 +932,7 @@ def _finalize_agent_content(
     mapping. ``sync_agents_for_provider`` hoists the load once per provider and
     passes it in; a direct caller may omit it and it is loaded once here.
     """
-    name = Path(filename).stem
+    name = _agent_name_from_filename(filename, provider_config, provider)
     layer = source_path.parts[-2]
     source_label = f'{layer}/{source_path.name}'
     generated_from = f'{source_label}@{source_version}' if source_version else source_label

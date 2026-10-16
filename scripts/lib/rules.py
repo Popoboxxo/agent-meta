@@ -149,6 +149,31 @@ def _build_always_apply_frontmatter(content: str, description: str = "") -> str:
         fm_lines.append(f"description: {_yaml_quote(description)}")
     return "---\n" + "\n".join(fm_lines) + "\n---\n" + content
 
+def _build_rule_frontmatter(content: str, keys: dict[str, str]) -> str:
+    """Prepend (or inject into an existing block) YAML frontmatter keys a
+    provider requires for its native rule-file format.
+
+    IC-15 Nr. 3 / AC-14: Copilot path-scoped instruction files
+    (``.github/instructions/<name>.instructions.md``) are only read with
+    ``applyTo``/``description`` frontmatter. ``keys`` holds already-rendered
+    ``key: <yaml-scalar>`` values supplied by the caller; a key already present
+    in the source frontmatter is never overwritten.
+    """
+    if content.startswith("---"):
+        fm_block, body = _split_frontmatter(content)
+        if not fm_block:
+            return content
+        inner = fm_block[3:-4]
+        addition = "".join(
+            f"\n{key}: {value}" for key, value in keys.items() if key not in inner
+        )
+        if addition:
+            return "---" + inner + addition + "\n---" + body
+        return content
+    if not keys:
+        return content
+    return "---\n" + "\n".join(f"{k}: {v}" for k, v in keys.items()) + "\n---\n" + content
+
 
 def collect_rule_sources(agent_meta_root: Path, platforms: list[str], *,
                          config: dict | None) -> list[tuple[Path, str]]:
@@ -530,6 +555,20 @@ def sync_rules(
 
     rule_options = resolve_rules(config, agent_meta_root)
 
+    # IC-15 Nr. 3 / AC-14 (F-13): a provider whose native rule files require a
+    # mandatory suffix (Copilot `.instructions.md`) and path-scoped frontmatter
+    # declares this through data — `rules_required_suffix` (capability matrix)
+    # and `rules_apply_to` (provider config); no provider-name branch.
+    from .providers import load_provider_capabilities
+    from .rule_channels import merged_caps
+
+    caps = merged_caps(provider, provider_config or {provider: pc},
+                       load_provider_capabilities(agent_meta_root))
+    rules_required_suffix = caps.get("rules_required_suffix")
+    if not (isinstance(rules_required_suffix, str) and rules_required_suffix):
+        rules_required_suffix = None
+    rules_apply_to = pc.get("rules_apply_to")
+
     target_dir = project_root / (rules_dir or CLAUDE_RULES_DIR)
     managed_index_path = target_dir / ".agent-meta-managed"
 
@@ -578,10 +617,16 @@ def sync_rules(
         rule_stem = Path(output_name).stem
         opts = rule_options.get(rule_stem, {})
 
+        # Native rule files may require a mandatory suffix that replaces the
+        # default `.md` (Copilot `.instructions.md`, IC-15 Nr. 3 / AC-14).
+        target_name = output_name
+        if rules_required_suffix and output_name.endswith(".md"):
+            target_name = output_name[: -len(".md")] + rules_required_suffix
+
         # Provider-aware: skip rule entirely when the rule opts out for this
         # provider (`<provider-lowercase>: skip` in rules-presets.yaml), issue #735.
         if provider_opts_skip(opts, provider):
-            log.skip(str((target_dir / output_name).relative_to(project_root)),
+            log.skip(str((target_dir / target_name).relative_to(project_root)),
                      f"rules-preset: {provider.lower()}: skip for '{rule_stem}'")
             continue
 
@@ -602,7 +647,7 @@ def sync_rules(
         if has_skill_table(source_content):
             filtered = filter_skill_tables(source_content, _available_skills())
             if filtered is None:
-                log.skip(str((target_dir / output_name).relative_to(project_root)),
+                log.skip(str((target_dir / target_name).relative_to(project_root)),
                          "lazy-skill table names no existing skill for this provider")
                 continue
             source_content = filtered
@@ -620,7 +665,7 @@ def sync_rules(
             )
             continue
 
-        target_path = safe_path(target_dir, output_name)
+        target_path = safe_path(target_dir, target_name)
 
         # Provider-aware: inject alwaysApply: false for Continue
         if opts.get("alwaysApply") is False and provider_has_capability(pc, "rules-always-apply"):
@@ -629,8 +674,19 @@ def sync_rules(
             log.note(str(target_path.relative_to(project_root)),
                      f"alwaysApply: false (rules-preset: '{config.get('rules-preset', 'default')}')")
 
+        # IC-15 Nr. 3 / AC-14: native rule-file frontmatter a provider requires
+        # to read the file (Copilot `.instructions.md`: applyTo + description).
+        if rules_required_suffix:
+            required_keys: dict[str, str] = {}
+            if isinstance(rules_apply_to, str) and rules_apply_to:
+                required_keys["applyTo"] = _yaml_quote(rules_apply_to)
+            description = resolve_skill_description(opts, source_content)
+            if description:
+                required_keys["description"] = _yaml_quote(description)
+            source_content = _build_rule_frontmatter(source_content, required_keys)
+
         rel_out = str(target_path.relative_to(project_root))
-        now_managed.add(output_name)
+        now_managed.add(target_name)
 
         if write_checked(target_path, source_content, log, rel_source, dry_run=dry_run):
             log.action("COPY", rel_out, src_label)
