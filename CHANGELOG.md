@@ -24,6 +24,14 @@
   committed `standalone/agents/` export (19 files). Ratchet ceilings lowered to 16 lines / 164 occurrences.
 
 ### Fixed
+- **Mammouth subagent dispatch enabled (IC-15 Nr. 6, F-11)**: a Mammouth sync now emits the same
+  OpenCode-native agent surface as Opencode — a lowercase `permission` map including `task`/`todowrite`
+  and a set `mode` — instead of the previously inert Claude-cased `tools:` object (study 3.4:
+  "Claude-Tool-Keys werden zu inerten Permission-Keys"), plus a `subagent_depth` derived from the
+  capability `required_depth` via the data key `inject-subagent-depth` (no provider literal). The
+  capability `subagent_dispatch` is corrected to `true` (the native `task` tool is verified at runtime).
+  AC-01 rebaselined (63 of 1028 hashes: the 62 `.mammouth/agents/*.md` and the Mammouth
+  generated-file-hashes). Runtime capture is UNVERIFIED (no Mammouth runtime available here).
 - **Kimi orchestrator frontmatter corrected (IC-15 Nr. 5, F-10)**: a Kimi sync now emits the
   `subagents:` allow-list of the active delegatable roles (from the per-sync `ActiveSet`) on the
   orchestrator, maps `TodoWrite` -> `TodoList`, adds the `AgentSwarm` fan-out tool (capability

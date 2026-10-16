@@ -592,10 +592,22 @@ providers:
       opus: claude-opus-5-5
       fable: claude-fable-5-1
     agent-transform:
+      # F-11/IC-15 Nr. 6: Mammouth is an OpenCode fork. Its agent frontmatter
+      # uses the same native surface as Opencode — a lowercase `permission` map
+      # (incl. `task`/`todowrite`) and a set `mode` — instead of the previously
+      # inert Claude-cased `tools:` object (study 3.4: "Claude-Tool-Keys werden
+      # zu inerten Permission-Keys"). The OpenCode-native mechanism also never
+      # emits a `tools:` list (a list aborts the whole agent directory, AC-6).
+      frontmatter-mechanism: opencode-native
       model: inject
       model-note-flat: true
-      inject-permission-mode: true
-      tools: keep
+      # Emit `subagent_depth` from the capability `required_depth` (study 3.4:
+      # no depth emitted -> default 1) so a spawned orchestrator keeps its
+      # dispatch tools; gated on this data key, never a provider-name branch.
+      inject-subagent-depth: true
+      tools: skip
+      tools-format: skip
+      tool-name-map: {}
       strip-fields:
       - memory
       - temperature
@@ -603,8 +615,6 @@ providers:
       - top_k
       - stop_sequences
       - max_output_tokens
-      tools-format: map
-      tool-name-map: {}
       reject-fields: []
       strip-claude-lines: true
   Codex:

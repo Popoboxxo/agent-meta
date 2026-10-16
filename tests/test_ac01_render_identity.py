@@ -95,6 +95,12 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   allow-list (``ActiveSet.routable``) plus the ``native_agent_tools`` fan-out tool ``AgentSwarm``.
   Changed: all 62 ``KimiCode/.kimi-code/agents/*.md`` and the KimiCode
   ``.meta-config/generated-file-hashes.json`` (63 of 1028 hashes). No other provider's render changed.
+- Task 1.27 (IC-15 no. 6, F-11): the Mammouth ``agent-transform`` switches to ``frontmatter-mechanism:
+  opencode-native`` (Mammouth is an OpenCode fork), so every Mammouth agent emits a lowercase
+  ``permission`` map (incl. ``task``/``todowrite``) and a set ``mode`` instead of the inert Claude-cased
+  ``tools:`` object, plus a ``subagent_depth`` from the ``required_depth`` capability (``inject-subagent-depth``).
+  Changed: all 62 ``Mammouth/.mammouth/agents/*.md`` and the Mammouth
+  ``.meta-config/generated-file-hashes.json`` (63 of 1028 hashes). No other provider's render changed.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

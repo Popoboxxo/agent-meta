@@ -193,11 +193,13 @@ def test_resolver_malformed_values_fail_safe_and_warn_once(caplog):
 # --- Task 5: provider-matrix regression pins -------------------------------
 
 def test_mechanism_partition_matches_the_documented_8_9_matrix():
-    """AC-01/AC-02 context (F-01): exactly two providers use a
-    `frontmatter-mechanism`; the other seven patch the frontmatter. The
-    mechanism comes from config, not from a provider-name branch."""
-    assert len(_MECHANISM_PROVIDERS) == 2, _MECHANISM_PROVIDERS
-    assert len(_NO_MECHANISM_PROVIDERS) == 7, _NO_MECHANISM_PROVIDERS
+    """AC-01/AC-02 context (F-01): three providers use a
+    `frontmatter-mechanism` (Opencode and — as an OpenCode fork — Mammouth share
+    `opencode-native`, Codex uses `codex-toml`; Mammouth joined in IC-15 Nr. 6);
+    the other six patch the frontmatter. The mechanism comes from config, not
+    from a provider-name branch."""
+    assert len(_MECHANISM_PROVIDERS) == 3, _MECHANISM_PROVIDERS
+    assert len(_NO_MECHANISM_PROVIDERS) == 6, _NO_MECHANISM_PROVIDERS
     assert set(_MECHANISM_BY_PROVIDER.values()) - {None} == {"opencode-native", "codex-toml"}
 
 

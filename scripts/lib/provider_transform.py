@@ -259,6 +259,10 @@ def _apply_agent_transform(
                                          is active
       inject-memory: bool
       inject-permission-mode: bool
+      inject-subagent-depth: bool     — for the opencode-native mechanism, emit
+                                        `subagent_depth: <required_depth>` (the
+                                        capability value) so a spawned
+                                        orchestrator keeps its dispatch tools
       extra-fields: {key: value}      — literal frontmatter updates
       tools-format: skip | keep | filter | remove | map
                                        — skip: leave untouched; keep: validate
@@ -321,6 +325,10 @@ def _apply_agent_transform(
         resolve_temperature,
     )
     rel = str(target_path.relative_to(project_root))
+    # Capability entry for this provider (config/provider-capabilities.yaml),
+    # read once here. The data-driven dispatch steps below consume it — never a
+    # provider-name branch.
+    _caps = (provider_capabilities or {}).get(provider) or {}
 
     def _model_note(model: str) -> None:
         po = config.get('model-overrides', {})
@@ -362,9 +370,20 @@ def _apply_agent_transform(
         if mechanism == 'opencode-native-v2':
             primary_role = (provider_config.get(provider) or {}).get('primary-role', 'orchestrator')
             mode = 'primary' if role == primary_role else 'subagent'
+        # Data-driven dispatch depth (spec key `inject-subagent-depth`): emit the
+        # capability `required_depth` as the frontmatter `subagent_depth` so a
+        # spawned orchestrator keeps its dispatch tools (study 3.4: no depth
+        # emitted -> default 1). Gated on the spec key + a positive capability
+        # value — never a provider-name branch; providers without the key (e.g.
+        # Opencode) stay byte-identical.
+        subagent_depth = None
+        if spec.get('inject-subagent-depth'):
+            _depth = _caps.get('required_depth')
+            if isinstance(_depth, int) and not isinstance(_depth, bool) and _depth >= 1:
+                subagent_depth = _depth
         return _transform_frontmatter_for_opencode(
             content, name, description, model, steps, generated_from, agent_meta_root, temperature,
-            strip_fields=strip_fields, mode=mode,
+            strip_fields=strip_fields, mode=mode, subagent_depth=subagent_depth,
         )
 
     # --- codex-toml document: native TOML agent file, handled wholesale ---
@@ -456,7 +475,6 @@ def _apply_agent_transform(
     # come from the shared ActiveSet (never re-resolved here); the native
     # dispatch tools come from the `native_agent_tools` capability. Both are
     # gated on the spec key + capability — no provider-name branch.
-    _caps = (provider_capabilities or {}).get(provider) or {}
     _primary_role = (provider_config.get(provider) or {}).get('primary-role', 'orchestrator')
     _dispatch_source = spec.get('subagents-allowlist')
     _emit_dispatch = (
@@ -697,6 +715,7 @@ def _transform_frontmatter_for_opencode(
     strip_fields: list[str] | None = None,
     quiet_fields: frozenset[str] | None = None,
     mode: str | None = None,
+    subagent_depth: int | None = None,
 ) -> str:
     """Build opencode-native agent frontmatter.
 
@@ -752,6 +771,8 @@ def _transform_frontmatter_for_opencode(
         "description": description,
         "mode": mode or template_fm.get("mode") or "subagent",
     }
+    if isinstance(subagent_depth, int) and not isinstance(subagent_depth, bool) and subagent_depth >= 1:
+        updates["subagent_depth"] = subagent_depth
     if template_fm.get("version") and "version" not in strip_fields:
         updates["version"] = template_fm.get("version")
     if generated_from and "generated-from" not in strip_fields:

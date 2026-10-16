@@ -212,10 +212,17 @@ def test_kimicode_model_namespace_and_catalog():
     assert cfg["mcp-config"]["format"] == "kimi-json"
 
 
-def test_mammouth_tools_format_is_map():
-    """F8/N17/AC-6: Mammouth needs the object form ``tools: {name: true}``."""
+def test_mammouth_uses_opencode_native_permission_surface():
+    """F-11/IC-15 Nr. 6: Mammouth (OpenCode fork) now emits the native lowercase
+    ``permission`` map (incl. ``task``/``todowrite``) instead of the previously
+    inert Claude-cased ``tools:`` object (study 3.4). AC-6's real guard — never
+    emit a ``tools:`` *list* (a list aborts the whole agent directory) — still
+    holds: the mechanism emits no ``tools`` field at all. The map object form
+    itself stays covered by
+    ``test_transform_contracts.py::test_tools_format_map_is_data_driven_not_mammouth_specific``."""
     cfg = _PROVIDERS["Mammouth"]
-    assert cfg["agent-transform"]["tools-format"] == "map"
+    assert cfg["agent-transform"]["frontmatter-mechanism"] == "opencode-native"
+    assert cfg["agent-transform"].get("tools-format") == "skip"
 
 
 def test_mammouth_context_file_migrated_to_agents_md():

@@ -111,15 +111,23 @@ def _errors(findings: list) -> list:
 # ---------------------------------------------------------------------------
 
 
-def test_mammouth_tools_are_a_yaml_object_not_a_list() -> None:
-    """AC-6: a Mammouth ``tools:`` list aborts loading the whole directory, so
-    ``tools-format: map`` must emit ``{<name>: true}``."""
-    out, _ = _transform("Mammouth")
-    tools = _frontmatter(out)["tools"]
+def test_mammouth_permission_surface_emits_no_tools_list() -> None:
+    """F-11/IC-15 Nr. 6: Mammouth (OpenCode fork) now emits the native lowercase
+    ``permission`` map instead of the previously inert, Claude-cased ``tools:``
+    object (study 3.4: "Claude-Tool-Keys werden zu inerten Permission-Keys").
 
-    assert isinstance(tools, dict), f"tools must be an object, got {type(tools)!r}"
-    assert tools == {"Read": True, "Bash": True, "Grep": True, "Write": True}
-    assert not isinstance(tools, list)
+    AC-6's real guard — never emit a ``tools:`` *list* (a list aborts the whole
+    agent directory) — still holds: the opencode-native mechanism emits no
+    ``tools`` field at all. The data-driven ``tools-format: map`` object form
+    stays covered by ``test_tools_format_map_is_data_driven_not_mammouth_specific``."""
+    out, _ = _transform("Mammouth")
+    fm = _frontmatter(out)
+
+    assert "tools" not in fm, "the inert Claude-cased tools object must be gone"
+    perms = fm["permission"]
+    assert isinstance(perms, dict), f"permission must be an object, got {type(perms)!r}"
+    assert all(k == k.lower() for k in perms), perms
+    assert "Read" not in perms
 
 
 def test_tools_format_map_is_data_driven_not_mammouth_specific() -> None:

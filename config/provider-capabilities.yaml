@@ -368,7 +368,7 @@ capabilities:
     artifact-validation: true
     artifact-validation-reason: null
     mcp-remote-transport: url
-    subagent_dispatch: false
+    subagent_dispatch: true         # F-11/IC-15 Nr. 6: native `task` tool verified at runtime (study 3.4 — the build agent dispatched the orchestrator); the generated Claude-cased `tools:` keys were inert
     parallel_execution: false
     file_based_agents: true
     text_mentions: true
@@ -412,10 +412,10 @@ capabilities:
       context_file: VERIFIED-RUNTIME
     legacy_artifacts: [".mammouth/settings.json"]
     agent_config_format: markdown
-    description: "Dateibasierte Agenten (.mammouth/agents/), CLI-first mit Plan/Build-Modi. Text-basierte Delegation, keine native Subagent-API."
+    description: "Dateibasierte Agenten (.mammouth/agents/), CLI-first mit Plan/Build-Modi. Nativer `task`-Dispatch (OpenCode-Fork), keine verifizierte parallele Subagent-Ausführung."
     special_notes:
       - "CLI-first Tool mit Plan- (read-only) und Build-Modus (Ausführung)."
-      - "Keine native parallele Subagent-Ausführung — Delegation sequentiell/textbasiert."
+      - "Nativer `task`-Dispatch vorhanden (study 3.4); keine verifizierte parallele/Barrier-Subagent-Ausführung — fanout bleibt sequential-fallback."
       - "Hooks-Pfade sind konfiguriert (.mammouth/hooks), aber ungespiegelt: kein verifiziertes hook_protocol (#630). MCP-Integration seit #857 konfiguriert (mcp-config.format: opencode-json, committed-file: mammouth.json)."
 
   # Codex (OpenAI Codex CLI) — orchestration surface verified against the
