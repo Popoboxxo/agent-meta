@@ -20,11 +20,6 @@ roles:
     description: Feature-Implementierung und Bugfixes
     routing:
       addressability: keyword
-      intent_keywords:
-      - Bugfix
-      - Refactoring
-      - Implementierung
-      - Code schreiben
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -67,10 +62,6 @@ roles:
       eskaliert strukturiert
     routing:
       addressability: keyword
-      intent_keywords:
-      - Trivialer Fix
-      - kleiner Fix
-      - ≤2 Dateien
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -119,11 +110,6 @@ roles:
     description: Komplexe Features, Architektur-Entscheidungen, schwierige Bugs, Cross-Cutting-Refactorings
     routing:
       addressability: keyword
-      intent_keywords:
-      - Komplex
-      - Architektur
-      - schwieriger Bug
-      - Cross-Cutting
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -187,10 +173,6 @@ roles:
     description: Anforderungen aufnehmen, REQ-IDs vergeben, REQUIREMENTS.md pflegen
     routing:
       addressability: keyword
-      intent_keywords:
-      - Anforderungen
-      - REQ-ID
-      - Requirements
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -217,11 +199,6 @@ roles:
     description: Neue Ideen explorieren, Vision schärfen, Übergabe an requirements
     routing:
       addressability: keyword
-      intent_keywords:
-      - Design
-      - Konzept
-      - Architektur
-      - Idee
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -245,16 +222,6 @@ roles:
     description: Erzeugt konkrete, geordnete Umsetzungspläne aus Konzepten/REQs/Bugs
     routing:
       addressability: keyword
-      intent_keywords:
-      - Plan
-      - Planung
-      - Schritte
-      - Umsetzungsplan
-      - "wie setzen wir das um"
-      - plane
-      - Plan erstellen
-      - Umsetzungsplan erstellen
-      - Implementierungsplan
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -323,10 +290,6 @@ roles:
     description: TDD, Test-Suite ausführen, Testabdeckung sichern
     routing:
       addressability: keyword
-      intent_keywords:
-      - Tests
-      - TDD
-      - Testabdeckung
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -355,13 +318,6 @@ roles:
       — User-Flows statt isolierter Units
     routing:
       addressability: keyword
-      intent_keywords:
-      - E2E
-      - End-to-End
-      - Browser-Test
-      - visuelle Regression
-      - Accessibility
-      - a11y
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -390,12 +346,6 @@ roles:
       Stdout-Auszüge) — kein Test-Design, kein Code-Schreiben (#517)'
     routing:
       addressability: keyword
-      intent_keywords:
-      - Tests ausführen
-      - Test-Suite
-      - Re-Run
-      - Fix-Verify
-      - CI-Verify
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -421,10 +371,6 @@ roles:
     description: Code gegen REQs prüfen, DoD-Checkliste, Traceability-Audit
     routing:
       addressability: keyword
-      intent_keywords:
-      - Validierung
-      - DoD
-      - Traceability
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -448,11 +394,6 @@ roles:
     description: CODEBASE_OVERVIEW, ARCHITECTURE, README, Erkenntnisse pflegen
     routing:
       addressability: keyword
-      intent_keywords:
-      - Dokumentation
-      - README
-      - Docs
-      - Doku
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -477,10 +418,6 @@ roles:
       statische Analyse'
     routing:
       addressability: keyword
-      intent_keywords:
-      - Security
-      - Audit
-      - OWASP
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -499,14 +436,6 @@ roles:
       und veraltete/verwundbare Pakete — reicht Findings über feedback ein.'
     routing:
       addressability: keyword
-      intent_keywords:
-      - dependency
-      - license
-      - SBOM
-      - package audit
-      - vulnerability
-      - outdated
-      - supply chain
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -538,15 +467,6 @@ roles:
       (Supply-Chain).'
     routing:
       addressability: keyword
-      intent_keywords:
-      - AI code security
-      - vibe coding security
-      - halluzinierte Dependencies
-      - fake packages
-      - fabricated IAM
-      - insecure defaults
-      - brittle logic
-      - phantom endpoints
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -573,10 +493,6 @@ roles:
       entdecken'
     routing:
       addressability: keyword
-      intent_keywords:
-      - Scout
-      - neue Skills
-      - Ökosystem
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -596,10 +512,6 @@ roles:
       optimiert Agentendefinitionen basierend auf Best Practices (OpenAI, Lakera).
     routing:
       addressability: keyword
-      intent_keywords:
-      - Prompt
-      - Prompt Engineering
-      - Agenten-Definition
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -628,13 +540,6 @@ roles:
       (Design).'
     routing:
       addressability: keyword
-      intent_keywords:
-      - Prompt Governance
-      - Prompt Audit
-      - PromptBOM
-      - Prompt Provenance
-      - banned prompt pattern
-      - Prompt Safety
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -660,10 +565,6 @@ roles:
       Agenten anlegen'
     routing:
       addressability: keyword
-      intent_keywords:
-      - Meta-Fragen
-      - agent-meta
-      - Agenten verwalten
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -685,10 +586,6 @@ roles:
     description: Versioning, Changelog, Build-Artifact, GitHub Release erstellen
     routing:
       addressability: keyword
-      intent_keywords:
-      - Release
-      - Version
-      - Changelog
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -706,12 +603,6 @@ roles:
     description: Commits, Branches, Tags, Push/Pull und alle Git-Operationen
     routing:
       addressability: keyword
-      intent_keywords:
-      - Git
-      - Commit
-      - Branch
-      - Push
-      - Pull
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -732,9 +623,6 @@ roles:
     description: Verbesserungsvorschläge für agent-meta als GitHub Issues einreichen
     routing:
       addressability: keyword
-      intent_keywords:
-      - Meta-Feedback
-      - Verbesserung
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -752,10 +640,6 @@ roles:
       erstellen
     routing:
       addressability: keyword
-      intent_keywords:
-      - Docker
-      - Dev-Stack
-      - Container
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -775,10 +659,6 @@ roles:
       Severity-Klassifikation (RFC 5424), Root-Cause-Hypothesen, Delegation an feedback/developer/security-auditor'
     routing:
       addressability: keyword
-      intent_keywords:
-      - Log
-      - Logs
-      - Fehleranalyse
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -803,15 +683,6 @@ roles:
       Zeitdruck.'
     routing:
       addressability: keyword
-      intent_keywords:
-      - incident
-      - outage
-      - RCA
-      - root cause
-      - post-mortem
-      - hotfix
-      - P0
-      - P1
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -842,10 +713,6 @@ roles:
       als GitHub Issues einreichen — immer vor git für Issue-Erstellung'
     routing:
       addressability: keyword
-      intent_keywords:
-      - Feedback
-      - Issue
-      - Bug melden
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -873,10 +740,6 @@ roles:
       und klassifizieren (Bug, User-Error, Feature, Out-of-Scope) vor Ressourcen-Allokation'
     routing:
       addressability: keyword
-      intent_keywords:
-      - Triage
-      - Bug/Feature
-      - klassifizieren
       parallel: true
       orchestrator_only: true
     routing_patterns:
@@ -916,9 +779,6 @@ roles:
     description: Nimmt Stakeholder-Bedürfnisse auf und erstellt das formale L1-Blackbox-Requirement.
     routing:
       addressability: keyword
-      intent_keywords:
-      - SE Requirements
-      - Stakeholder Needs
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -944,9 +804,6 @@ roles:
       (CQRS, Orthogonalität).
     routing:
       addressability: keyword
-      intent_keywords:
-      - SE Architektur
-      - Decomposition
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -974,9 +831,6 @@ roles:
       und Testbarkeit.
     routing:
       addressability: keyword
-      intent_keywords:
-      - SE Critic
-      - Architektur Review
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -1006,9 +860,6 @@ roles:
     description: Verwaltet und validiert alle Schnittstellenverträge domänenübergreifend.
     routing:
       addressability: keyword
-      intent_keywords:
-      - SE Interface
-      - Schnittstellen
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -1033,8 +884,6 @@ roles:
       wurde.
     routing:
       addressability: keyword
-      intent_keywords:
-      - SE Termination
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -1061,9 +910,6 @@ roles:
       und se-developer-Input.'
     routing:
       addressability: keyword
-      intent_keywords:
-      - SE Component Requirements
-      - Komponenten-Anforderungen
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -1091,9 +937,6 @@ roles:
       — eskaliert strukturiert
     routing:
       addressability: keyword
-      intent_keywords:
-      - SE trivial
-      - SE Leaf
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -1129,9 +972,6 @@ roles:
     description: Standard SE-Leaf-Implementierung (2-4 Interfaces) mit strikter Interface-Disziplin
     routing:
       addressability: keyword
-      intent_keywords:
-      - SE Implementierung
-      - SE Leaf
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -1168,9 +1008,6 @@ roles:
       security/performance-critical) mit Pre-Implementation Interface-Analyse
     routing:
       addressability: keyword
-      intent_keywords:
-      - SE komplex
-      - SE Boundary
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -1206,9 +1043,6 @@ roles:
       rechten V-Modell-Flügel.
     routing:
       addressability: keyword
-      intent_keywords:
-      - SE Test
-      - MBSE Tests
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -1229,8 +1063,6 @@ roles:
       und Flakiness.
     routing:
       addressability: keyword
-      intent_keywords:
-      - SE Test Review
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -1249,8 +1081,6 @@ roles:
       Architektur-Spezifikationen.'
     routing:
       addressability: keyword
-      intent_keywords:
-      - SE Verification
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -1268,8 +1098,6 @@ roles:
     description: 'L1 System-Validierung: End-to-End User Journeys gegen Stakeholder-Bedürfnisse.'
     routing:
       addressability: keyword
-      intent_keywords:
-      - SE Validation
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -1287,9 +1115,6 @@ roles:
       Test-Ebenen.'
     routing:
       addressability: keyword
-      intent_keywords:
-      - SE Integration
-      - V&V
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -1309,10 +1134,6 @@ roles:
       Code-Qualitäts-Audit.'
     routing:
       addressability: keyword
-      intent_keywords:
-      - Code Review
-      - Code-Qualität
-      - Audit
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -1340,9 +1161,6 @@ roles:
       für Review-Loops'
     routing:
       addressability: keyword
-      intent_keywords:
-      - Konzept Review
-      - Design Review
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -1367,10 +1185,6 @@ roles:
       Interface-Contracts, Datenfluss, Akzeptanzkriterien. Implementiert nicht (#370).'
     routing:
       addressability: keyword
-      intent_keywords:
-      - Spezifikation
-      - Konzept-Spezifikation
-      - Interface-Contracts
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -1402,11 +1216,6 @@ roles:
       Schnittstellen-Contracts, Trade-off-Analyse. Implementiert nicht (#370).'
     routing:
       addressability: keyword
-      intent_keywords:
-      - Systemdesign
-      - Systemarchitektur
-      - Komponenten-Design
-      - Trade-off
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -1437,11 +1246,6 @@ roles:
     description: UI-Spezifikationen, Mockups und Design-Systeme erstellen.
     routing:
       addressability: keyword
-      intent_keywords:
-      - UI
-      - UX
-      - Mockup
-      - Design
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -1468,12 +1272,6 @@ roles:
       und Motion-Tokens.
     routing:
       addressability: keyword
-      intent_keywords:
-      - Design-System
-      - Design-Token
-      - Design-Tokens
-      - Farbschema
-      - Variant-Contract
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -1501,11 +1299,6 @@ roles:
       A11y-Baseline, Motion-/Responsive-Umsetzung.
     routing:
       addressability: keyword
-      intent_keywords:
-      - UI-Komponente
-      - React-Komponente
-      - Frontend-Komponente
-      - Komponente bauen
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -1533,10 +1326,6 @@ roles:
     description: OpenAPI/Contract-First API Design, Schnittstellen-Spezifikationen.
     routing:
       addressability: keyword
-      intent_keywords:
-      - API
-      - OpenAPI
-      - Contract-First
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -1561,14 +1350,6 @@ roles:
       developer.
     routing:
       addressability: keyword
-      intent_keywords:
-      - database
-      - schema
-      - migration
-      - query optimization
-      - index
-      - SQL
-      - db-design
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -1598,10 +1379,6 @@ roles:
     description: CI/CD, Infrastructure as Code, Kubernetes, Observability.
     routing:
       addressability: keyword
-      intent_keywords:
-      - CI/CD
-      - Kubernetes
-      - Infrastruktur
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -1620,15 +1397,6 @@ roles:
       Capacity-Planning, Toil-Reduktion, Runbooks und Reliability-Reviews vor Deployment.'
     routing:
       addressability: keyword
-      intent_keywords:
-      - SLO
-      - SLI
-      - error budget
-      - reliability
-      - runbook
-      - capacity planning
-      - toil
-      - post-mortem
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -1663,14 +1431,6 @@ roles:
       Deprecation-Plan-Prüfung — read-only, Findings als Empfehlungen via feedback.'
     routing:
       addressability: keyword
-      intent_keywords:
-      - App Ownership
-      - orphan app
-      - Lifecycle Management
-      - Deprecation Plan
-      - SLA Validation
-      - Data Classification
-      - App Inventory
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -1697,15 +1457,6 @@ roles:
       SDK-Docs, Tutorials, CLI-Help, User-Release-Notes und UX-Microcopy.'
     routing:
       addressability: keyword
-      intent_keywords:
-      - API reference
-      - getting started
-      - tutorial
-      - SDK docs
-      - release notes
-      - quickstart
-      - user guide
-      - microcopy
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -1731,13 +1482,6 @@ roles:
       Keine Stil- oder Strukturänderungen. Liefert kategorisierten Markdown-Findings-Report.'
     routing:
       addressability: keyword
-      intent_keywords:
-      - Korrektorat
-      - Rechtschreibung
-      - Grammatik prüfen
-      - Zeichensetzung
-      - proofreading
-      - Tippfehler
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -1759,13 +1503,6 @@ roles:
       Konsistenz — aufbauend auf sauberem Korrektorat. Liefert kategorisierten Markdown-Findings-Report.'
     routing:
       addressability: keyword
-      intent_keywords:
-      - Lektorat
-      - Stil verbessern
-      - Satzbau
-      - Wortwiederholungen
-      - roter Faden
-      - copyediting
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -1787,15 +1524,6 @@ roles:
       Lineage-Analyse und Pipeline-Monitoring — übergibt eine Pipeline-Spec an developer.
     routing:
       addressability: keyword
-      intent_keywords:
-      - ETL
-      - ELT
-      - data pipeline
-      - data quality
-      - lineage
-      - streaming
-      - batch
-      - schema registry
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -1826,15 +1554,6 @@ roles:
       Screenreader-Guidelines, Farbkontrast, Focus-Management und Accessibility-Tree-Analyse.
     routing:
       addressability: keyword
-      intent_keywords:
-      - accessibility
-      - a11y
-      - WCAG
-      - ARIA
-      - screen reader
-      - keyboard navigation
-      - color contrast
-      - focus management
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -1865,13 +1584,6 @@ roles:
       Rewrites.'
     routing:
       addressability: keyword
-      intent_keywords:
-      - refactoring
-      - strangler fig
-      - legacy modernization
-      - code smell
-      - systematic transformation
-      - framework upgrade
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -1902,15 +1614,6 @@ roles:
       Priorisierung (RICE/MoSCoW), KPI-Definition und Stakeholder-Kommunikation.'
     routing:
       addressability: keyword
-      intent_keywords:
-      - backlog
-      - user story
-      - sprint planning
-      - prioritization
-      - RICE
-      - MoSCoW
-      - roadmap
-      - KPI
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -1938,10 +1641,6 @@ roles:
     description: Big-O Bottleneck-Identifikation und datengetriebene Performance-Optimierung.
     routing:
       addressability: keyword
-      intent_keywords:
-      - Performance
-      - Bottleneck
-      - Optimierung
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -1960,10 +1659,6 @@ roles:
       Notion.'
     routing:
       addressability: keyword
-      intent_keywords:
-      - Export
-      - Routing
-      - Target
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -1983,10 +1678,6 @@ roles:
       und LLM-Kalibrierung
     routing:
       addressability: keyword
-      intent_keywords:
-      - Aufwand
-      - Schätzung
-      - Kosten
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -2006,11 +1697,6 @@ roles:
       und Symbol-Suche.
     routing:
       addressability: keyword
-      intent_keywords:
-      - Codebase
-      - Dependencies
-      - Impact
-      - Recherche
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -2040,9 +1726,6 @@ roles:
       Anpassung von agent-meta.'
     routing:
       addressability: keyword
-      intent_keywords:
-      - Claude
-      - Claude Code
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -2062,9 +1745,6 @@ roles:
       zur optimalen Anpassung von agent-meta.'
     routing:
       addressability: keyword
-      intent_keywords:
-      - Gemini
-      - Antigravity
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -2084,8 +1764,6 @@ roles:
       Anpassung von agent-meta.'
     routing:
       addressability: keyword
-      intent_keywords:
-      - Opencode
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -2104,8 +1782,6 @@ roles:
       Anpassung von agent-meta.'
     routing:
       addressability: keyword
-      intent_keywords:
-      - Continue
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -2124,9 +1800,6 @@ roles:
       optimalen Anpassung von agent-meta.'
     routing:
       addressability: keyword
-      intent_keywords:
-      - Copilot
-      - GitHub Copilot
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -2146,9 +1819,6 @@ roles:
       Anpassung von agent-meta.'
     routing:
       addressability: keyword
-      intent_keywords:
-      - Mammouth
-      - Mammouth Code
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -2168,12 +1838,6 @@ roles:
       Domänen-Anpassung, Ingest-Planung, OKF-Compliance.'
     routing:
       addressability: keyword
-      intent_keywords:
-      - Knowledge
-      - Wiki
-      - Wissen
-      - Schema
-      - Knowledge-Engine
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -2199,10 +1863,6 @@ roles:
       aktualisieren, Cross-References pflegen. Touch-Radius: ~10-15 Dateien/Ingest.'
     routing:
       addressability: keyword
-      intent_keywords:
-      - Ingest
-      - Source verarbeiten
-      - einlesen
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -2229,11 +1889,6 @@ roles:
       Drill-in, Synthese mit Citations. File-Back guter Antworten.
     routing:
       addressability: keyword
-      intent_keywords:
-      - Wiki-Frage
-      - Was wissen wir
-      - Knowledge Query
-      - Recherche im Wiki
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -2259,11 +1914,6 @@ roles:
       kaputte Links, fehlende OKF-Frontmatter, Index-Staleness.'
     routing:
       addressability: keyword
-      intent_keywords:
-      - Wiki-Lint
-      - Wiki-Check
-      - Knowledge Lint
-      - Wiki-Gesundheit
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -2289,10 +1939,6 @@ roles:
       Event-Log, OKF §7) im Knowledge Wiki.
     routing:
       addressability: keyword
-      intent_keywords:
-      - Index aktualisieren
-      - Index pflegen
-      - log pflegen
       parallel: true
       orchestrator_only: true
     routing_patterns:
@@ -2317,11 +1963,6 @@ roles:
       Frontmatter ergänzen, Typos korrigieren, Timestamps aktualisieren.'
     routing:
       addressability: keyword
-      intent_keywords:
-      - Wiki-Pflege
-      - Links reparieren
-      - Tags aufräumen
-      - Wiki aufräumen
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -2349,12 +1990,6 @@ roles:
       Schützt documenter- und requirements-eigene Dateien.
     routing:
       addressability: keyword
-      intent_keywords:
-      - Migrieren
-      - Aufräumen
-      - Wiki-Migration
-      - Docs migrieren
-      - Vorhandene Docs ins Wiki
       parallel: false
       orchestrator_only: false
     routing_patterns:
@@ -2382,10 +2017,6 @@ roles:
       Browser-APIs, Render-Performance.'
     routing:
       addressability: keyword
-      intent_keywords:
-      - Frontend Review
-      - Komponenten prüfen
-      - React/Vue prüfen
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -2404,10 +2035,6 @@ roles:
       Concurrency, Middleware-Ketten.'
     routing:
       addressability: keyword
-      intent_keywords:
-      - Backend Review
-      - API prüfen
-      - Silent Failures
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -2426,10 +2053,6 @@ roles:
       Indexing, Transaktionen.'
     routing:
       addressability: keyword
-      intent_keywords:
-      - Datenbank Review
-      - Migration prüfen
-      - SQL Review
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -2448,10 +2071,6 @@ roles:
       Interaction-States, i18n-Readiness.'
     routing:
       addressability: keyword
-      intent_keywords:
-      - UI Review
-      - Design-Token prüfen
-      - UI-Konsistenz
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -2475,14 +2094,6 @@ roles:
       nicht Prozesskonformität (validator), nicht Security-Muster (ai-security-guardian).'
     routing:
       addressability: keyword
-      intent_keywords:
-      - LLM Evaluation
-      - Eval-Suite
-      - Golden Dataset
-      - LLM-as-judge
-      - Rubrik
-      - Regressions-Gate
-      - Prompt-Änderung bewerten
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -2520,15 +2131,6 @@ roles:
       data-engineer deckt ETL/ELT und Lineage ab, aber ohne RAG-Bezug.'
     routing:
       addressability: keyword
-      intent_keywords:
-      - RAG
-      - Retrieval
-      - Chunking
-      - Embedding
-      - Vektordatenbank
-      - Reranking
-      - Hybrid Search
-      - recall@k
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -2567,15 +2169,6 @@ roles:
       IT-Kontrollen selbst bewertet control-framework-assessor.'
     routing:
       addressability: keyword
-      intent_keywords:
-      - Modellrisiko
-      - Model Card
-      - EU AI Act
-      - NIST AI RMF
-      - Risikoklassifikation KI
-      - Bias-Bewertung
-      - Decision Record
-      - KI-Governance
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -2613,14 +2206,6 @@ roles:
       (Humble) Kap. 6. Abgrenzung: sre-engineer verantwortet Infrastruktur-SLIs/SLOs.'
     routing:
       addressability: keyword
-      intent_keywords:
-      - Task Success Rate
-      - Reasoning Quality
-      - Approval Request Rate
-      - Agenten-Telemetrie
-      - Token-Kosten pro Task
-      - Drift-Erkennung
-      - Agenten-Observability
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -2654,17 +2239,6 @@ roles:
       prevention, detection and investigation, with red-flag indicators.
     routing:
       addressability: keyword
-      intent_keywords:
-      - Betrugsrisiko bewerten
-      - fraud risk assessment
-      - Betrugsdreieck
-      - Fraud Triangle
-      - Red Flags bewerten
-      - Anti-Fraud-Programm
-      - Hinweisgeber-Hotline
-      - Betrugspraevention
-      - occupational fraud
-      - Fraud Hexagon
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -2706,17 +2280,6 @@ roles:
       (RCM), with inherent/residual risk, scope, timing and resource plan.'
     routing:
       addressability: keyword
-      intent_keywords:
-      - risikobasierte Pruefungsplanung
-      - Pruefungsuniversum
-      - audit universe
-      - Auditable Area
-      - Pruefungsumfang festlegen
-      - Kontrollmatrix
-      - Pruefungsprogramm erstellen
-      - Fraud-Brainstorming
-      - Inhaerentes und Restrisiko
-      - risikobasierter Pruefungsplan
       parallel: true
       orchestrator_only: false
     routing_patterns:
@@ -2759,17 +2322,6 @@ roles:
       CARES/Standard 2120, ITGCs) and reports evidence-anchored findings.
     routing:
       addressability: keyword
-      intent_keywords:
-      - Kontrollrahmen pruefen
-      - COSO
-      - COBIT
-      - ITGC
-      - Kontrollaktivitaeten bewerten
-      - Wirksamkeit der Kontrollen
-      - Kontrollumfeld
-      - Pruefungsfeststellung
-      - Restrisiko bewerten
-      - Three Lines
       parallel: true
       orchestrator_only: false
     routing_patterns:

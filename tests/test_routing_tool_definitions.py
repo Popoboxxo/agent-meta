@@ -44,24 +44,17 @@ _BASE_VARIABLES: dict = {
 # Config data integrity (guards the routing_patterns migration itself)
 # ---------------------------------------------------------------------------
 
-def test_role_defaults_routing_patterns_match_intent_keywords():
-    """Every role with legacy intent_keywords carries equivalent routing_patterns."""
+def test_role_defaults_keep_keywords_in_a_single_source():
+    """IC-15 Nr. 15: keywords live only in ``routing_patterns.keywords``."""
     roles = load_roles_config(_AGENT_META_ROOT)["roles"]
-    migrated = 0
-    for role, info in roles.items():
-        legacy = (info.get("routing") or {}).get("intent_keywords")
-        if not isinstance(legacy, list) or not legacy:
-            continue
-        patterns = info.get("routing_patterns")
-        assert isinstance(patterns, dict), f"{role}: routing_patterns missing"
-        assert patterns.get("keywords") == legacy, (
-            f"{role}: routing_patterns.keywords drifted from routing.intent_keywords"
-        )
-        assert isinstance(patterns.get("examples"), list) and patterns["examples"], (
-            f"{role}: routing_patterns.examples missing"
-        )
-        migrated += 1
-    assert migrated >= 50, "unexpectedly few routed roles — config migration lost?"
+    offenders = sorted(
+        role for role, info in roles.items()
+        if "intent_keywords" in (info.get("routing") or {})
+    )
+    assert offenders == [], (
+        "routing.intent_keywords must not exist - single source is "
+        f"routing_patterns.keywords; offenders: {offenders}"
+    )
 
 
 def test_roles_without_routing_stay_patternless():
@@ -183,8 +176,8 @@ def test_get_routing_rules_pipeline_routes():
     assert get_routing_rules(_AGENT_META_ROOT, {}, dict(_BASE_VARIABLES))["pipelines"] == []
 
 
-def test_get_routing_rules_keyword_fallback_and_precedence(tmp_path):
-    """routing_patterns.keywords wins; legacy intent_keywords is the fallback."""
+def test_get_routing_rules_ignores_legacy_intent_keywords(tmp_path):
+    """IC-15 Nr. 15: only routing_patterns.keywords route; legacy is ignored."""
     root = tmp_path
     (root / "config").mkdir()
     (root / "config" / "role-defaults.yaml").write_text(
@@ -215,10 +208,10 @@ def test_get_routing_rules_keyword_fallback_and_precedence(tmp_path):
     template_roles = {"legacy-role", "explicit-role", "patternless-role"}
     rules = get_routing_rules(root, {}, variables, template_roles=template_roles)
     agents = {r["agent"]: r for r in rules["rules"]}
-    assert agents["legacy-role"]["keywords"] == ["Legacy-Keyword"]
-    assert agents["legacy-role"]["examples"] == []
+    assert "legacy-role" not in agents, "legacy intent_keywords must not route"
     assert agents["explicit-role"]["keywords"] == ["Explicit-Keyword"]
     assert agents["explicit-role"]["examples"]
+    assert "legacy-role" in rules["target_agents"]
     assert "patternless-role" in rules["target_agents"]
     assert "patternless-role" not in agents
 

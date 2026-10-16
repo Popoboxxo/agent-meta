@@ -289,12 +289,12 @@ def test_role_defaults_has_seven_knowledge_roles():
         assert "conditional" not in roles[name]
 
 
-def test_knowledge_indexer_has_intent_keywords():
+def test_knowledge_indexer_has_routing_keywords():
     roles_cfg = load_roles_config(_AGENT_META_ROOT)
-    routing = roles_cfg["roles"]["knowledge-indexer"]["routing"]
-    assert "intent_keywords" in routing
-    assert "Index aktualisieren" in routing["intent_keywords"]
-    assert routing["orchestrator_only"] is True
+    indexer = roles_cfg["roles"]["knowledge-indexer"]
+    keywords = indexer["routing_patterns"]["keywords"]
+    assert "Index aktualisieren" in keywords
+    assert indexer["routing"]["orchestrator_only"] is True
 
 
 def test_knowledge_roles_pass_schema_validation():
