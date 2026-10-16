@@ -444,11 +444,27 @@ def _inject_adapter_line(managed_block: str, adapter_line: str) -> str:
 def _context_hard_cap_readers(
     project_root: Path, config: dict, provider_config: dict, target_path: Path
 ) -> list:
-    """Active providers whose ``context_file`` resolves to *target_path*."""
+    """Active providers whose ``context_file`` resolves to *target_path*.
+
+    Read-only reader discovery: only providers registered in
+    ``provider_config`` and marked active by the project config can be readers.
+    A name in ``ai-providers`` absent from the registry (synthetic, test or
+    custom provider) has no resolvable reader entry and must not trip
+    ``resolve_providers``' strict catalog validation (issue #732) — that check
+    belongs to config-load time (``config._validate_providers``). Degrading to
+    "no measurable reader" keeps the write path alive without weakening the cap
+    for real, registered providers.
+    """
     from .providers import resolve_providers
 
+    try:
+        active = resolve_providers(config, provider_config)
+    except ValueError:
+        # Unknown provider name for this registry — no reader to measure here.
+        return []
+
     readers = []
-    for name in resolve_providers(config, provider_config):
+    for name in active:
         context_file = (provider_config.get(name) or {}).get("context_file")
         if not context_file:
             continue

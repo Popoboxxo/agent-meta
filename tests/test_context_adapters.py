@@ -40,10 +40,12 @@ sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 from lib.config import load_config
 from lib.context import (
     _adapter_reference_line,
+    enforce_context_hard_cap,
     rollback_context_adapters,
     sync_context_adapters_for_provider,
     sync_context_for_provider,
 )
+from lib.io import SyncError
 from lib.log import SyncLog
 from lib.providers import (
     load_provider_capabilities,
@@ -291,6 +293,39 @@ def test_empty_import_falls_back_to_pointer(tmp_path, loaded_config):
         {"context_file": {"core_file": "AGENTS.md"}},
         _adapter_pc(context_adapter_import_supported=False),
     ) == "Read `AGENTS.md` for the shared project context."
+
+
+def test_hard_cap_readers_tolerate_non_catalog_provider(tmp_path):
+    """Regression (Task 1.25): the hard-cap reader discovery must not crash on
+    a synthetic/custom provider absent from the registry.
+
+    The project config names a real catalog provider while the injected
+    ``provider_config`` only knows a synthetic one. ``resolve_providers``'
+    strict catalog validation (issue #732) is a config-load concern and must
+    not be re-raised by this read-only per-file cap check.
+    """
+    config = {"ai-providers": ["Claude"]}
+    pc = _adapter_pc()
+    target = (tmp_path / pc["context_adapter_file"]).resolve()
+
+    # Must not raise: the unknown 'Claude' entry has no registered reader.
+    enforce_context_hard_cap(
+        _REPO_ROOT, tmp_path, config, {"SyntheticAdapter": pc},
+        target, "x" * 100_000,
+    )
+
+
+def test_hard_cap_still_aborts_for_registered_synthetic_reader(tmp_path):
+    """The tolerance fix must not lower the protection: a registered active
+    provider over its hard cap still aborts with ``context.over-hard-cap``."""
+    pc = {"context_file": "AGENTS.md", "context_hard_cap_bytes": 16}
+    target = (tmp_path / "AGENTS.md").resolve()
+
+    with pytest.raises(SyncError, match="context.over-hard-cap"):
+        enforce_context_hard_cap(
+            _REPO_ROOT, tmp_path, {"ai-providers": ["SyntheticAdapter"]},
+            {"SyntheticAdapter": pc}, target, "x" * 1000,
+        )
 
 
 def test_claude_managed_block_has_no_gate_vars(tmp_path, loaded_config):
