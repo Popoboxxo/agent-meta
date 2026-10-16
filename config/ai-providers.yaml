@@ -96,7 +96,7 @@ providers:
     pending_tasks_file: .claude/pending-tasks.md
     extension_dir: .claude/3-project
     orchestrator_hint: "- **In Claude Code (CLI):** Startet den `orchestrator`-Agenten\
-      \ mit `claude -a orchestrator` oder w\xE4hlt ihn aus."
+      \ mit `claude --agent orchestrator` oder w\xE4hlt ihn aus."
     model-tiers:
       nano: claude-haiku-5-5
       fast: claude-haiku-5-5
