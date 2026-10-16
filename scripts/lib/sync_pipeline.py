@@ -50,6 +50,7 @@ from lib.context import (
     init_claude_personal,
     init_settings_json,
     init_settings_local_json,
+    omit_unresolved_placeholder_lines,
     rollback_context_adapters,
     sync_claude_md_static,
     sync_context_for_provider,
@@ -542,6 +543,9 @@ def converge_managed_block_context(
         warn_unresolved_platform_vars(
             steady, platform_vars, context_file, log, report_missing=False
         )
+    # IC-15 Nr. 10 (F-14): the steady block feeds the Continue context file;
+    # omit lines whose project variable is unset (study 3.8) so run1 == run2.
+    steady = omit_unresolved_placeholder_lines(steady)
     existing = target.read_text(encoding="utf-8")
     updated = substitute_managed_block(existing, steady)
     if updated == existing:

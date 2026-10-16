@@ -115,6 +115,16 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   and the Copilot ``.meta-config/generated-file-hashes.json`` (101 of 1007 entries; Copilot-only,
   0 non-Copilot drift; ``meta-doctor.agent.md`` is covered by the existing AC-01 exception). No other
   provider's render changed.
+- Task 1.31 (IC-15 Nr. 10, AC-10 / F-14): Continue rule files gain
+  ``alwaysApply: false`` + ``description`` frontmatter (driven by the
+  ``rules-always-apply`` capability; before, the frontmatter was only emitted
+  when the rules-preset opted in, so the default preset shipped 18,591 B of
+  rules always active - 28 % of the local template window, study §3.8) and
+  ``.continue/rules/project-context.md`` no longer ships unresolved
+  ``{{PLATFORM}}``/``{{BUILD_COMMAND}}``/``{{RUNTIME}}``/``{{TEST_COMMAND}}``
+  lines. Changed: 19 ``Continue/.continue/rules/*.md`` plus
+  ``project-context.md`` and the Continue ``.meta-config/generated-file-hashes.json``
+  (20 of 1007 entries; Continue-only, 0 non-Continue drift).
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

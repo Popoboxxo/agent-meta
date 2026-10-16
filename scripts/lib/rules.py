@@ -667,12 +667,21 @@ def sync_rules(
 
         target_path = safe_path(target_dir, target_name)
 
-        # Provider-aware: inject alwaysApply: false for Continue
-        if opts.get("alwaysApply") is False and provider_has_capability(pc, "rules-always-apply"):
+        # IC-15 Nr. 10 / AC-10 (F-14): a provider that declares the
+        # `rules-always-apply` capability (only Continue honours the flag)
+        # reads its native rule files in full unless they opt out — study
+        # §3.8 measured 18,591 B always active (28 % of the local template
+        # window). Capability-driven (no provider literal): every rule file
+        # written to such a rules_dir gets `alwaysApply: false` + a
+        # `description` so the runtime lazy-loads it (model-decision) instead
+        # of pushing the whole set into every request. An explicit
+        # `alwaysApply: true` preset override still forces always-on.
+        if (provider_has_capability(pc, "rules-always-apply")
+                and opts.get("alwaysApply") is not True):
             description = resolve_skill_description(opts, source_content)
             source_content = _build_always_apply_frontmatter(source_content, description)
             log.note(str(target_path.relative_to(project_root)),
-                     f"alwaysApply: false (rules-preset: '{config.get('rules-preset', 'default')}')")
+                     "alwaysApply: false + description (rules-always-apply capability)")
 
         # IC-15 Nr. 3 / AC-14: native rule-file frontmatter a provider requires
         # to read the file (Copilot `.instructions.md`: applyTo + description).

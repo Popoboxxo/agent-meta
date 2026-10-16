@@ -987,6 +987,28 @@ def _cleanup_bootstrap_block(
         target_path.write_text(content, encoding="utf-8")
 
 
+# IC-15 Nr. 10 / AC-10 (F-14): the Continue context file must never ship an
+# unresolved `{{UPPER_SNAKE}}` placeholder (study 3.8 measured `{{PLATFORM}}` /
+# `{{BUILD_COMMAND}}` in `.continue/rules/project-context.md`). Same policy as
+# IC-15 Nr. 19 for `--create-ext`: a line whose project variable is unset is
+# omitted instead of written literally. A line without placeholders survives
+# byte-for-byte, so a fully configured project renders unchanged.
+_UNRESOLVED_PLACEHOLDER_RE = re.compile(r"\{\{[A-Z][A-Z0-9_]*\}\}")
+
+
+def omit_unresolved_placeholder_lines(text: str) -> str:
+    """Drop whole lines still carrying an unresolved ``{{VAR}}`` placeholder.
+
+    Provider-agnostic helper (no provider literal); consumed by the Continue
+    context writer and the run1-convergence pass so both agree on the exact
+    emitted bytes (AC-4 fixpoint).
+    """
+    return "".join(
+        line for line in text.splitlines(keepends=True)
+        if not _UNRESOLVED_PLACEHOLDER_RE.search(line)
+    )
+
+
 def _sync_continue_context(
     agent_meta_root: Path,
     project_root: Path,
@@ -1029,6 +1051,8 @@ def _sync_continue_context(
             ccontent = _apply_platform_context_substitution(
                 ccontent, platform_vars, rel_ctx, log
             )
+            # IC-15 Nr. 10 (F-14): never scaffold unresolved placeholders.
+            ccontent = omit_unresolved_placeholder_lines(ccontent)
             log.action("INIT", rel_ctx, source_label)
             if not dry_run:
                 ctx_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1039,6 +1063,8 @@ def _sync_continue_context(
             new_managed = _apply_platform_context_substitution(
                 new_managed, platform_vars, context_file, log
             )
+            # IC-15 Nr. 10 (F-14): omit lines with unset project variables.
+            new_managed = omit_unresolved_placeholder_lines(new_managed)
             updated = update_managed_block(existing, new_managed)
             if updated != existing:
                 log.action("UPDATE", str(ctx_path.relative_to(project_root)),

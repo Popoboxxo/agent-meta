@@ -58,8 +58,16 @@ TOLERANCE_MAX_BYTES = 4096
 _IST_FULL: Dict[str, Dict[str, int]] = {
     "Claude": {"entry-file": 2511, "rules": 17268, "orchestrator": 85147, "harness-roster": 581274, "always-loaded": 601053},
     "Codex": {"entry-file": 24143, "orchestrator": 84587, "harness-roster": 575241, "always-loaded": 599384},
-    "Continue": {"entry-file": 617, "rules": 17973, "orchestrator": 69871, "always-loaded": 18590},
-    "Copilot": {"entry-file": 9334, "rules": 17360, "orchestrator": 69753, "always-loaded": 26694},
+    # Continue: rule files gained `alwaysApply: false` + `description` frontmatter
+    # (Task 1.31, IC-15 Nr. 10 / F-14) and `.continue/rules/project-context.md`
+    # dropped its unresolved-placeholder lines; the disk-byte metric counts the
+    # frontmatter, so `rules`/`always-loaded` grow while the runtime always-on set
+    # shrinks (the reader lazy-loads `alwaysApply: false` files).
+    "Continue": {"entry-file": 374, "rules": 20174, "orchestrator": 69871, "always-loaded": 20548},
+    # Copilot: `.github/instructions/*.instructions.md` gained the required suffix
+    # plus `applyTo`/`description` frontmatter and the agent `name:` fix
+    # (Task 1.29, IC-15 Nr. 3 / F-13) — pin refreshed to the measured Ist.
+    "Copilot": {"entry-file": 9425, "rules": 19954, "orchestrator": 69747, "always-loaded": 29379},
     "Gemini": {"entry-file": 31715, "rules": 17268, "orchestrator": 85169, "always-loaded": 48983},
     "KimiCode": {"entry-file": 24157, "orchestrator": 70468, "harness-roster": 566366, "always-loaded": 590523},
     "Mammouth": {"entry-file": 24154, "orchestrator": 70242, "harness-roster": 568677, "always-loaded": 592831},
