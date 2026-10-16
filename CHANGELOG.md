@@ -24,6 +24,13 @@
   committed `standalone/agents/` export (19 files). Ratchet ceilings lowered to 16 lines / 164 occurrences.
 
 ### Fixed
+- **Kimi orchestrator frontmatter corrected (IC-15 Nr. 5, F-10)**: a Kimi sync now emits the
+  `subagents:` allow-list of the active delegatable roles (from the per-sync `ActiveSet`) on the
+  orchestrator, maps `TodoWrite` -> `TodoList`, adds the `AgentSwarm` fan-out tool (capability
+  `native_agent_tools`) and renames `hint` -> `whenToUse` on every agent. All data-driven through the
+  KimiCode `agent-transform` block plus `subagent_allowlist_required` — no provider literal. AC-01
+  rebaselined (63 of 1028 hashes: the 62 `.kimi-code/agents/*.md` and the KimiCode generated-file-hashes).
+  Runtime capture is UNVERIFIED (no Kimi runtime available in this environment).
 - **Codex dispatch depth, hard cap and `spawn_agent` syntax (IC-15 Nr. 4, F-04/F-09)**: a Codex sync now
   writes `.codex/config.toml` with a managed `[agents] max_depth` (gated on the capability keys
   `agent_config_format: toml` + `required_depth`, `scripts/lib/dispatch_depth.py`), so a spawned

@@ -904,6 +904,7 @@ def _finalize_agent_content(
     log: SyncLog,
     *,
     provider_capabilities: dict | None = None,
+    active_set=None,
 ) -> str:
     """Post-pipeline finalization of one agent's content: provider transform,
     MCP tools, viz block, debug block, critical footer, path rules, XML wrap
@@ -972,6 +973,8 @@ def _finalize_agent_content(
         target_path=target_path,
         provider_config=provider_config,
         log=log,
+        active_set=active_set,
+        provider_capabilities=provider_capabilities,
     )
 
     if not serialize_body_last:
@@ -1414,7 +1417,8 @@ def sync_agents_for_provider(agent_meta_root: Path, project_root: Path, config: 
             content, role, filename, source_path, provider, provider_config,
             source_version, description, _can_spawn, config, agent_meta_root,
             project_root, target_path, variables, debug_mode, log,
-            provider_capabilities=artifact_capabilities)
+            provider_capabilities=artifact_capabilities,
+            active_set=active_set)
         _write_agent_file(target_path, content, source_path, agent_meta_root,
                           project_root, config, dry_run, log)
 

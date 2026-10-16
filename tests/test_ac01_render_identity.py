@@ -90,6 +90,11 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   Changed: ``Codex/.codex/config.toml`` (added), ``Codex/.codex/agents/orchestrator.toml``, the 4
   ``Codex/.codex/pipeline-details/*.md`` and ``Codex/.meta-config/generated-file-hashes.json``
   (7 of 1028 entries). No other provider's render changed.
+- Task 1.26 (IC-15 no. 5, F-10): the KimiCode ``agent-transform`` maps ``TodoWrite``->``TodoList`` and
+  renames ``hint``->``whenToUse`` on every Kimi agent, and the orchestrator gains the Kimi ``subagents:``
+  allow-list (``ActiveSet.routable``) plus the ``native_agent_tools`` fan-out tool ``AgentSwarm``.
+  Changed: all 62 ``KimiCode/.kimi-code/agents/*.md`` and the KimiCode
+  ``.meta-config/generated-file-hashes.json`` (63 of 1028 hashes). No other provider's render changed.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

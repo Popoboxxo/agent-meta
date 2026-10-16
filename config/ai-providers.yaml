@@ -822,7 +822,14 @@ providers:
       model: inject
       tools: keep
       tools-format: keep
-      tool-name-map: {}
+      # F-10/IC-15 Nr. 5: KimiCode reads `whenToUse` (not `hint`), the native
+      # todo tool is `TodoList` (not `TodoWrite`) and the dispatcher needs an
+      # explicit `subagents:` allow-list plus the AgentSwarm fan-out tool.
+      tool-name-map:
+        TodoWrite: TodoList
+      rename-fields:
+        hint: whenToUse
+      subagents-allowlist: routable
       reject-fields: []
       strip-fields:
       - memory
