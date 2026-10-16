@@ -354,7 +354,7 @@ def test_personal_files_skip_absent_gitignored_in_dry_run(tmp_path):
     """context.init_claude_personal/init_opencode_personal must not action the
     absent gitignored personal files in dry-run mode, but write on a real run."""
     _init_repo(tmp_path)
-    (tmp_path / ".gitignore").write_text("CLAUDE.personal.md\nAGENTS.personal.md\n", encoding="utf-8")
+    (tmp_path / ".gitignore").write_text("CLAUDE.local.md\nAGENTS.personal.md\n", encoding="utf-8")
     am_root = tmp_path / "amroot"
     templates = am_root / "templates" / "configs"
     templates.mkdir(parents=True)
@@ -368,7 +368,7 @@ def test_personal_files_skip_absent_gitignored_in_dry_run(tmp_path):
 
     init_claude_personal(am_root, tmp_path, log, dry_run=False)
     init_opencode_personal(am_root, tmp_path, log, dry_run=False)
-    assert (tmp_path / "CLAUDE.personal.md").exists()
+    assert (tmp_path / "CLAUDE.local.md").exists()  # IC-15 Nr. 9: the file Claude Code reads
     assert (tmp_path / "AGENTS.personal.md").exists()
 
 

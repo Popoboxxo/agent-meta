@@ -66,10 +66,10 @@ def test_embed_false_rule_leaves_block_when_group_has_file_channel(env):
 
 
 def test_embed_false_rule_embeds_without_file_channel(env):
-    # Simulate a weak sharer: ZCode without skills_dir → the whole AGENTS.md
-    # group loses the file channel → the rule must EMBED, never drop.
+    # Simulate a weak ACTIVE sharer: Gemini without skills_dir → the whole
+    # AGENTS.md group loses the file channel → the rule must EMBED, never drop.
     provider_config = {k: dict(v) for k, v in env["provider_config"].items()}
-    provider_config["ZCode"] = {**provider_config["ZCode"], "skills_dir": None}
+    provider_config["Gemini"] = {**provider_config["Gemini"], "skills_dir": None}
     config = _no_worktree_override(env)
     block = env["build_block"](
         REPO_ROOT, config, env["variables"], env["log"],
@@ -78,6 +78,20 @@ def test_embed_false_rule_embeds_without_file_channel(env):
     )
     assert "# No Worktree Isolation" in block  # fallback: embedded, not lost
     assert "## Übrige Regeln (Lazy-Load)" not in block
+
+
+def test_inactive_weak_sharer_does_not_veto_file_channel(env):
+    # IC-15 Nr. 1: ZCode is not active in this project, so its missing
+    # skills_dir must not force the active group back to embedding.
+    provider_config = {k: dict(v) for k, v in env["provider_config"].items()}
+    provider_config["ZCode"] = {**provider_config["ZCode"], "skills_dir": None}
+    block = env["build_block"](
+        REPO_ROOT, _no_worktree_override(env), env["variables"], env["log"],
+        provider="Opencode", provider_config=provider_config,
+        project_root=REPO_ROOT,
+    )
+    assert "# No Worktree Isolation" not in block
+    assert "## Übrige Regeln (Lazy-Load)" in block
 
 
 def test_embedded_rule_files_written_for_opencode(env, tmp_path):
@@ -110,21 +124,35 @@ def test_embedded_rule_files_written_for_weak_provider(env, tmp_path):
     assert (tmp_path / ".zcode" / "skills" / "sync-interface" / "SKILL.md").exists()
 
 
-def test_embedded_rule_files_noop_for_has_rules_provider(env, tmp_path):
-    # Gemini has_rules: true — its files come from sync_rules(); this channel
-    # must not double-write.
+def test_embedded_rule_files_noop_for_native_rules_provider(env, tmp_path):
+    # Claude reads its native rules dir: its files come from sync_rules();
+    # this channel must not double-write.
+    env["sync_files"](
+        REPO_ROOT, tmp_path, env["config"], env["log"], dry_run=False,
+        variables=env["variables"], provider="Claude",
+        provider_config=env["provider_config"],
+    )
+    assert not (tmp_path / ".claude" / "skills").exists()
+
+
+def test_embedded_rule_files_written_for_unread_rules_dir_provider(env, tmp_path):
+    # IC-15 Nr. 2: Gemini writes a rules dir it never reads (has_rules: true,
+    # rules_read_channels without a native channel) -- the lazy rules must
+    # land in its skills channel, otherwise they are lost (F-06).
     env["sync_files"](
         REPO_ROOT, tmp_path, env["config"], env["log"], dry_run=False,
         variables=env["variables"], provider="Gemini",
         provider_config=env["provider_config"],
     )
-    assert not (tmp_path / ".gemini" / "skills").exists()
+    assert (tmp_path / ".gemini" / "skills" / "submodule-protection" / "SKILL.md").exists()
 
 
 def test_shared_block_identical_with_and_without_embed_false(env):
-    # Issue #638 convergence must hold under the new flags: every sharer of
-    # AGENTS.md renders byte-identical managed blocks.
+    # Issue #638 convergence must hold under the new flags: every ACTIVE sharer
+    # of AGENTS.md renders byte-identical managed blocks (IC-15 Nr. 1: the
+    # block is derived from the active sharers, so all five are activated).
     config = _no_worktree_override(env)
+    config["ai-providers"] = ["Claude", "Opencode", "Gemini", "Codex", "ZCode", "KimiCode"]
     blocks = {
         provider: env["build_block"](
             REPO_ROOT, config, env["variables"], env["log"],
@@ -161,10 +189,10 @@ def test_mcp_and_tool_sections_leave_block_on_file_channel(env):
 
 
 def test_mcp_and_tool_sections_embed_without_file_channel(env):
-    # A sharer without skills_dir removes the group file channel → the
+    # An active sharer without skills_dir removes the group file channel → the
     # MCP/tool sections EMBED again (fallback, never content loss).
     provider_config = {k: dict(v) for k, v in env["provider_config"].items()}
-    provider_config["ZCode"] = {**provider_config["ZCode"], "skills_dir": None}
+    provider_config["Gemini"] = {**provider_config["Gemini"], "skills_dir": None}
     block = env["build_block"](
         REPO_ROOT, env["config"], env["variables"], env["log"],
         provider="Opencode", provider_config=provider_config,
@@ -205,9 +233,10 @@ def test_tool_artifacts_written_for_opencode(env, tmp_path):
     assert "graphify" in skill.read_text(encoding="utf-8").lower()
 
 
-def test_mcp_artifacts_unchanged_for_has_rules_provider(env, tmp_path):
-    # Gemini (has_rules:true): rule files still land in its rules_dir — the
-    # #192 channel must not double-write into .gemini/skills.
+def test_mcp_artifacts_for_unread_rules_dir_provider(env, tmp_path):
+    # Gemini (has_rules:true, rules dir unread): rule files still land in its
+    # rules_dir, and the lazy per-server sections additionally reach its
+    # skills channel (IC-15 Nr. 2) -- the managed block points there.
     from lib.mcp import generate_mcp_artifacts
 
     pc = env["provider_config"]["Gemini"]
@@ -216,7 +245,7 @@ def test_mcp_artifacts_unchanged_for_has_rules_provider(env, tmp_path):
         dry_run=False, provider="Gemini", rules_dir=pc.get("rules_dir"),
     )
     assert (tmp_path / ".gemini" / "rules" / "mcp-honcho.md").exists()
-    assert not (tmp_path / ".gemini" / "skills" / "mcp-honcho").exists()
+    assert (tmp_path / ".gemini" / "skills" / "mcp-honcho" / "SKILL.md").exists()
 
 
 # ---------------------------------------------------------------------------

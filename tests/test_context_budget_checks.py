@@ -7,16 +7,19 @@ Two layers:
   reported as WARNINGs. The numbers below were measured against the real state
   (``sync.py --init`` of a single-provider project, 2026-10-13):
 
-  - preset ``default``: ``use-lazy-rules`` lists 15 skills, none of them is
+  - preset ``default``: ``use-lazy-rules`` listed 15 skills, none of them is
     generated for Codex/Mammouth/Gemini/Continue (their skills directories are
     empty) -> 15 ``context.dangling-pointer`` rows each (AC-08 requires >= 10)
     plus one for the "Uebrige Regeln (Lazy-Load)" pointer when it is rendered.
-  - preset ``lazy``: Gemini embeds only 11 of its 19 rules in AGENTS.md, has no
+    Fixed by IC-15 Nr. 12 (the table lists only existing skills); the AC-08
+    tests reproduce the defect by appending the unfiltered source table.
+  - preset ``lazy``: Gemini embeds only 11 of its 19 rules in AGENTS.md, had no
     rules read channel (``rules_read_channels: []``) and no lazy skills, so
-    exactly 8 rules are lost -> 8 ``context.rule-unreachable`` (AC-08 "die 8
+    exactly 8 rules were lost -> 8 ``context.rule-unreachable`` (AC-08 "die 8
     verlorenen Gemini-lazy-Rules"). The lost set is a2a-delegation-gates,
     issue-lifecycle, lifecycle-tasks, the three se-cascade-* rules,
-    session-conclusion and submodule-protection.
+    session-conclusion and submodule-protection. Fixed by IC-15 Nr. 2 (skills
+    channel); the AC-08 tests reproduce the defect by removing the skills.
 
 Run: python3 -m pytest tests/test_context_budget_checks.py -q
 """
@@ -104,25 +107,56 @@ ALL_CHECKS = [
 
 # --- AC-08: known defects on real synced projects ---------------------------
 
+def _with_source_lazy_table(project: Path, tmp_path: Path, provider: str, mappings) -> Path:
+    """Copy of a synced project whose entry file carries the unfiltered source lazy table.
+
+    IC-15 Nr. 12 renders only existing skills (the default preset has none, so the
+    table is gone); the AC-08 defect is reproduced by appending the source table.
+    """
+    copy = tmp_path / f"{provider}-source-table"
+    shutil.copytree(project, copy)
+    table = (REPO_ROOT / "rules" / "1-generic" / "use-lazy-rules.md").read_text(encoding="utf-8")
+    entry = copy / mappings[provider]["context_file"]
+    entry.write_text(entry.read_text(encoding="utf-8") + "\n" + table, encoding="utf-8")
+    return copy
+
+
 @pytest.mark.parametrize("provider", ["Gemini", "Codex"])
-def test_ac08_missing_skills_are_reported(default_projects, mappings, provider):
-    findings = _run(cb.check_dangling_pointer, default_projects[provider], provider, mappings)
+def test_ac08_missing_skills_are_reported(default_projects, mappings, provider, tmp_path):
+    assert _run(cb.check_dangling_pointer, default_projects[provider], provider, mappings) == []
+    project = _with_source_lazy_table(default_projects[provider], tmp_path, provider, mappings)
+    findings = _run(cb.check_dangling_pointer, project, provider, mappings)
     skills = [f for f in findings if "lazy table names skill" in f.message]
     assert len(skills) >= 10
     assert len(skills) == LAZY_TABLE_SKILLS
     assert {f.check for f in findings} == {"context.dangling-pointer"}
-    assert all(f.severity is Severity.WARNING for f in findings)
+    assert all(f.severity is Severity.ERROR for f in findings)  # Task 1.24: promoted
     assert {f.file for f in skills}  # each finding names the artifact carrying the pointer
 
 
-def test_ac08_lazy_pointer_without_any_skill_is_reported(lazy_projects, mappings):
-    # the "Uebrige Regeln (Lazy-Load)" pointer is only rendered with rules-preset lazy
-    findings = _run(cb.check_dangling_pointer, lazy_projects["Gemini"], "Gemini", mappings)
+def _without_skills(project: Path, tmp_path: Path, mappings) -> Path:
+    """Copy of a synced Gemini project with its skills dir removed (pre-IC-15 Nr. 2 state)."""
+    copy = tmp_path / "gemini-no-skills"
+    shutil.copytree(project, copy)
+    shutil.rmtree(copy / mappings["Gemini"]["skills_dir"], ignore_errors=True)
+    return copy
+
+
+def test_ac08_lazy_pointer_without_any_skill_is_reported(lazy_projects, mappings, tmp_path):
+    # the "Uebrige Regeln (Lazy-Load)" pointer is only rendered with rules-preset lazy.
+    # IC-15 Nr. 2 writes the lazy skills now; the defect is reproduced by removing them.
+    assert not [f for f in _run(cb.check_dangling_pointer, lazy_projects["Gemini"], "Gemini", mappings)
+                if "lazy-load pointer" in f.message]
+    project = _without_skills(lazy_projects["Gemini"], tmp_path, mappings)
+    findings = _run(cb.check_dangling_pointer, project, "Gemini", mappings)
     assert any("lazy-load pointer promises rule skills" in f.message for f in findings)
 
 
-def test_ac08_gemini_lazy_preset_loses_eight_rules(lazy_projects, mappings):
-    findings = _run(cb.check_rule_unreachable, lazy_projects["Gemini"], "Gemini", mappings)
+def test_ac08_gemini_lazy_preset_loses_eight_rules(lazy_projects, mappings, tmp_path):
+    # Fixed by IC-15 Nr. 2: the 8 lazy rules reach Gemini as skills.
+    assert _run(cb.check_rule_unreachable, lazy_projects["Gemini"], "Gemini", mappings) == []
+    project = _without_skills(lazy_projects["Gemini"], tmp_path, mappings)
+    findings = _run(cb.check_rule_unreachable, project, "Gemini", mappings)
     assert {Path(f.file).stem for f in findings} == GEMINI_LOST_LAZY_RULES
     assert len(findings) == 8
     assert all(f.check == "context.rule-unreachable" and f.severity is Severity.WARNING
@@ -144,29 +178,33 @@ def test_unread_channel_flags_gemini_rules_dir_not_claude(default_projects, mapp
 
 
 def test_dangling_pointer_clears_once_skills_exist(default_projects, mappings, tmp_path):
-    project = tmp_path / "gemini"
-    shutil.copytree(default_projects["Gemini"], project)
-    table = (project / ".gemini" / "rules" / "use-lazy-rules.md").read_text(encoding="utf-8")
+    project = _with_source_lazy_table(default_projects["Gemini"], tmp_path, "Gemini", mappings)
+    table = (project / mappings["Gemini"]["context_file"]).read_text(encoding="utf-8")
     skills = cb._lazy_table_skills(table)
     assert len(skills) == LAZY_TABLE_SKILLS
     for skill in skills:
-        target = project / ".gemini" / "skills" / skill
+        target = project / mappings["Gemini"]["skills_dir"] / skill
         target.mkdir(parents=True)
         (target / "SKILL.md").write_text("# skill\n", encoding="utf-8")
     assert _run(cb.check_dangling_pointer, project, "Gemini", mappings) == []
 
 
-def test_checks_never_raise_error_severity(default_projects, mappings):
-    assert set(cb.PHASE0_SEVERITY) == set(cb.SPEC_SEVERITY)
+def test_only_promoted_checks_emit_error(default_projects, mappings):
+    assert set(cb.PHASE0_SEVERITY) == set(cb.SPEC_SEVERITY) == set(cb.EMITTED_SEVERITY)
     assert all(level is Severity.WARNING for level in cb.PHASE0_SEVERITY.values())
+    assert cb.PHASE1_PROMOTED == {"context.dangling-pointer"}
+    for check, level in cb.EMITTED_SEVERITY.items():
+        expected = cb.SPEC_SEVERITY[check] if check in cb.PHASE1_PROMOTED else Severity.WARNING
+        assert level is expected, check
+    # a synced default project triggers none of the promoted (ERROR) checks
     for check in ALL_CHECKS:
         for provider, project in default_projects.items():
             for finding in _run(check, project, provider, mappings):
-                assert finding.severity in (Severity.WARNING, Severity.INFO)
+                assert finding.severity in (Severity.WARNING, Severity.INFO), finding
 
 
 def test_severity_comes_from_central_table(monkeypatch):
-    monkeypatch.setitem(cb.PHASE0_SEVERITY, "context.over-hard-cap", Severity.ERROR)
+    monkeypatch.setitem(cb.EMITTED_SEVERITY, "context.over-hard-cap", Severity.ERROR)
     assert cb._warn("context.over-hard-cap", "f", "m").severity is Severity.ERROR
     assert cb.SPEC_SEVERITY["context-profile.marker-in-rule"] is Severity.ERROR
 

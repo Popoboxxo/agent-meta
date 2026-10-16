@@ -190,3 +190,51 @@ def write_managed_index(index_path: Path, now_managed: set[str], dry_run: bool) 
     index_path.parent.mkdir(parents=True, exist_ok=True)
     content = "\n".join(sorted(now_managed))
     index_path.write_text(f"{content}\n" if content else "", encoding="utf-8")
+
+
+def cleanup_retired_managed_dir(
+    project_root: Path,
+    retired_rel: str,
+    index_names: tuple,
+    log: SyncLog,
+    dry_run: bool,
+    reason: str,
+) -> None:
+    """Remove a directory agent-meta no longer writes (IC-15 Nr. 9).
+
+    Only files listed in one of the directory's managed indexes
+    (``index_names``) are deleted, then the indexes themselves. Files the
+    project put there on its own are never touched; the directory is removed
+    only once it is empty. Fail-soft: an unreadable index or an undeletable
+    file is logged as a warning and never aborts the sync.
+    """
+    target_dir = safe_path(project_root, retired_rel)
+    if not target_dir.is_dir():
+        return
+    for index_name in index_names:
+        index_path = target_dir / index_name
+        if not index_path.is_file():
+            continue
+        try:
+            managed = read_managed_index(index_path)
+        except (OSError, UnicodeDecodeError) as exc:
+            log.warning(
+                f"retired dir '{retired_rel}': index '{index_name}' unreadable "
+                f"({type(exc).__name__}: {exc}) — directory left in place"
+            )
+            continue
+        cleanup_stale_managed_files(target_dir, project_root, managed, set(), log, dry_run, reason)
+        log.action("DELETE", _relative_posix(index_path, project_root), reason)
+        if not dry_run:
+            try:
+                index_path.unlink()
+            except OSError as exc:
+                log.warning(f"retired dir '{retired_rel}': could not delete '{index_name}': {exc}")
+    if dry_run:
+        return
+    try:
+        if not any(target_dir.iterdir()):
+            target_dir.rmdir()
+            log.action("DELETE", _relative_posix(target_dir, project_root), reason)
+    except OSError as exc:
+        log.warning(f"retired dir '{retired_rel}': could not remove directory: {exc}")

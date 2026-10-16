@@ -193,7 +193,7 @@ py .agent-meta/scripts/sync.py --config .meta-config/project.yaml --init
 
 Das erzeugt (bei aktivem `"Claude"` Provider):
 - `CLAUDE.md` — Projekt-Kontext für den AI-Assistenten
-- `CLAUDE.personal.md` — Persönliche Präferenzen (gitignored)
+- `CLAUDE.local.md` — Persönliche Präferenzen (gitignored, von Claude Code geladen)
 - `.claude/settings.json` — Team-Permissions Skeleton
 - `.claude/settings.local.json` — Persönliche Permissions (gitignored)
 - `.claude/agents/*.md` — Alle generierten Agenten

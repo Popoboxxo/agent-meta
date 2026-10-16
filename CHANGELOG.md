@@ -146,6 +146,58 @@
   The `D-CONDITIONAL` guard rule applies only to files with well-formed conditional markers (repo-wide balance
   test). `requires_roles` accepts flow and block style, only that entry is parsed (non-YAML frontmatter of
   external commands no longer aborts the sync), and the consistency check reuses the generator's parser.
+- **Shared context file derived from the active providers only (IC-15 Nr. 1, F-05, PR E)**: the AGENTS.md
+  managed block used to join the path fields of every catalog provider that writes AGENTS.md
+  (`.gemini/agents bzw. .opencode/agents bzw. ...`), also in single-provider projects, and let an inactive
+  sharer without a skills directory veto the lazy-rule channel. Now only the providers the project activates
+  count: a single-provider AGENTS.md names only its own agents dir, pending-tasks file and skills dir.
+  Whether rules are embedded or replaced by the "native rules" pointer now follows the read channels
+  (`rules_read_channels`, spec §4.3) of every active sharer instead of `has_rules` - a written but unread
+  rules directory never replaces the embedded rules (new helper `scripts/lib/rule_channels.py`). Default
+  render: AGENTS.md of the six AGENTS.md providers changes (AC-01 rebaselined, 6 of 1075 hashes); a project
+  with all sharers active is unchanged. The committed self-hosting AGENTS.md was regenerated accordingly.
+- **Lazy rules reach every provider with a skills channel (IC-15 Nr. 2, IC-33, F-06, #857, #858, PR E)**:
+  rules routed out of the always-on context (`embed: false` / `channel: skill`, rules presets `lazy` and
+  `silent`) are now written as `<skills_dir>/<rule>/SKILL.md` for every provider that reads no native rules
+  directory but reads skills - decided by `rules_read_channels`, no longer by `has_rules`. Before, providers
+  that write an unread rules directory (Codex `rules/`, Mammouth `.mammouth/rules`, Gemini `.gemini/rules`)
+  got a lazy-load pointer without any skill behind it, and Gemini under `rules-preset: lazy` lost 8 rules
+  completely. Same gating for the lazy MCP/external-tool sections. Data: `rules_read_channels` gains
+  `skills` for Opencode, Mammouth, ZCode, KimiCode (`[embedded, skills]`), Gemini and Copilot (`[skills]`,
+  their rules dirs stay unread until IC-15 Nr. 8/3) and Continue (`[native-rules-dir, skills]`); Continue
+  declares `native-skill-channel`, so `channel: skill` rules land in `.continue/skills` instead of
+  `.continue/rules`; Copilot's `skills_dir` is `.github/skills` (was the never-read `.github/copilot/skills`,
+  now listed in `legacy_artifacts`). Default preset: only Copilot's rendered skills path changes (AC-01
+  rebaselined, 4 of 1075 hashes).
+- **No more generated directories the provider never reads (IC-15 Nr. 9, F-07, AC-19, #853, PR E)**: Codex
+  (project-root `rules/`) and Mammouth (`.mammouth/rules/`) get `has_rules: false` - their rules were
+  already embedded in AGENTS.md, the directories were dead files (study 3.2/3.4). A directory written by an
+  earlier version is removed on the next sync through its managed indexes only (`.agent-meta-managed`,
+  `-mcp`, `-tools`; new data key `retired_rules_dirs`); files you put there yourself stay, the directory
+  is removed only when empty. Claude: the personal file is now `CLAUDE.local.md` (loaded by Claude Code,
+  gitignored) instead of the never-loaded `CLAUDE.personal.md`. An existing `CLAUDE.personal.md` is left
+  untouched; while it exists no `CLAUDE.local.md` is created and the sync warns to rename it. Still unread
+  and reported by `context.unread-channel`: `.gemini/rules` (IC-15 Nr. 8) and `.github/instructions`
+  (IC-15 Nr. 3). AC-01 rebaselined (49 entries: rules-dir files removed, `CLAUDE.local.md`, Claude
+  `.gitignore`, 2 x `generated-file-hashes.json`).
+- **Context files without provider noise (IC-15 Nr. 12, F-16, PR E)**: the AGENTS.md header banner is built
+  from the active providers grouped by context file (`> **AI ROUTING:** Codex -> AGENTS.md`, same helper
+  `providers.build_provider_routing` as the project templates' `PROVIDER_ROUTING`) instead of the hard-wired
+  `Opencode->AGENTS.md | Gemini->AGENTS.md` lines. Lazy-skill tables (`| Skill | Wann |`, rule
+  `use-lazy-rules`) list only skills the sync actually writes for the provider (for a shared AGENTS.md: for
+  every active sharer); a table without any existing skill is not rendered, so default-preset projects no
+  longer get the rule naming 15 agent-meta-internal skills (`sync-interface`, `admin-ui`, ...). Zero
+  `context.dangling-pointer` findings over 9 providers x presets `default`/`lazy`. Default render: AC-01
+  rebaselined (18 entries: 6 x AGENTS.md, 4 x `use-lazy-rules.md` removed plus their managed indexes and
+  `generated-file-hashes.json`); the committed self-hosting AGENTS.md was regenerated (banner).
+- **`context.dangling-pointer` is ERROR (Task 1.24, AC-11, PR E)**: over 9 providers x rules presets
+  (`default`, `minimal`, `silent`, `lazy`) no generated artifact names a missing skill any more, so the check
+  emits its spec level (`EMITTED_SEVERITY` / `PHASE1_PROMOTED` in `consistency/context_budget.py`). Sync end
+  stays report-only (sync.log error list, exit code unchanged); `--doctor` exits 1 on a dangling pointer
+  (seed `dangling-pointer` is ERROR). Not promoted yet: `context.rule-unreachable` (Copilot's
+  `.github/instructions` rules stay unread until IC-15 Nr. 3) and `context.declared-surface-empty` (surfaces
+  that are empty by design, e.g. skills without lazy rules or MCP config without servers) - see the plan's
+  "Umsetzungs-Nachzüge 1.21–1.24, 1.33".
 
 ### Changed
 - **`ACTIVE_ROLES` / `ROLE_<ROLE>_ACTIVE` available in templates**: `build_variables` injects

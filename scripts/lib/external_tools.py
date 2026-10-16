@@ -269,14 +269,19 @@ def generate_external_tool_artifacts(
     # native rules_dir but with a skills_dir receive the tool sections the
     # shared managed block no longer embeds (embed: false / channel: skill in
     # rules-presets.yaml) as separate SKILL.md files — same channel as mcp.py
-    # and rules.py::sync_embedded_rule_files(). Config-key gating only.
+    # and rules.py::sync_embedded_rule_files(). Gated on the read-channel data
+    # (IC-15 Nr. 2: lib/rule_channels.lazy_skill_channel), no provider names.
+    from .providers import load_provider_capabilities
+    from .rule_channels import lazy_skill_channel, merged_caps
+
     embedded_rules_channel_dir: Path | None = None
-    if not pc.get("has_rules"):
-        if not skills_dir_rel:
-            # No rules_dir and no skills_dir: nothing can be rendered — the
-            # managed block embeds these sections as fallback (content-loss
-            # protection), so there is no file work here at all.
-            return
+    if not pc.get("has_rules") and not skills_dir_rel:
+        # No rules_dir and no skills_dir: nothing can be rendered — the
+        # managed block embeds these sections as fallback (content-loss
+        # protection), so there is no file work here at all.
+        return
+    _caps = merged_caps(provider, provider_config, load_provider_capabilities(agent_meta_root))
+    if lazy_skill_channel(_caps) and skills_dir_rel:
         embedded_rules_channel_dir = project_root / skills_dir_rel
         if not dry_run:
             embedded_rules_channel_dir.mkdir(parents=True, exist_ok=True)

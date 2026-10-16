@@ -1064,6 +1064,38 @@ def _skill_channel_universe(
     return universe
 
 
+def _cleanup_retired_rules_dirs(
+    project_root: Path, config: dict, provider_config: dict, providers: list,
+    pc: dict, log: SyncLog, dry_run: bool,
+) -> None:
+    """Remove rules directories a provider no longer writes (IC-15 Nr. 9, F-07).
+
+    Data-driven via ``retired_rules_dirs`` in config/ai-providers.yaml. Only
+    managed-index entries are deleted (rules, MCP and tool indexes); a path an
+    active provider still uses as its ``rules_dir`` is never touched.
+    """
+    from lib.external_tools import TOOLS_MANAGED_INDEX_FILENAME
+    from lib.mcp import MCP_MANAGED_INDEX_FILENAME
+    from lib.rule_index import cleanup_retired_managed_dir
+
+    retired = [d for d in (pc.get("retired_rules_dirs") or []) if isinstance(d, str) and d]
+    if not retired:
+        return
+    in_use = {
+        provider_config[p].get("rules_dir") for p in providers
+        if p in provider_config and provider_config[p].get("has_rules")
+        and is_provider_active(config, p)
+    }
+    for rel in retired:
+        if rel in in_use:
+            continue
+        cleanup_retired_managed_dir(
+            project_root, rel,
+            (".agent-meta-managed", MCP_MANAGED_INDEX_FILENAME, TOOLS_MANAGED_INDEX_FILENAME),
+            log, dry_run, "rules dir is not read by the provider (IC-15 Nr. 9)",
+        )
+
+
 def _sync_stage_per_provider(
     agent_meta_root: Path, project_root: Path, config: dict,
     provider_config: dict, providers: list, variables: dict,
@@ -1190,14 +1222,17 @@ def _sync_stage_per_provider(
                        provider_config=provider_config)
             sync_speech_mode(agent_meta_root, project_root, config, log, args.dry_run,
                              rules_dir=pc.get("rules_dir"))
-        elif pc.get("skills_dir") and pc.get("context_file"):
-            # Issue #192 Phase 2 (selective rule embedding): providers without
-            # a native rules_dir but with a skills_dir receive the rules the
-            # managed block does NOT embed (embed: false / channel: skill) as
-            # separate <skills_dir>/<rule>/SKILL.md files, so the shared
+        _cleanup_retired_rules_dirs(project_root, config, provider_config, providers,
+                                    pc, log, args.dry_run)
+        if pc.get("skills_dir") and pc.get("context_file"):
+            # Issue #192 Phase 2 (selective rule embedding): providers that
+            # read no native rules directory but read skills receive the rules
+            # the managed block does NOT embed (embed: false / channel: skill)
+            # as separate <skills_dir>/<rule>/SKILL.md files, so the shared
             # context file can point at them instead of embedding the bodies
-            # (progressive disclosure). Pure config-key gating — no provider
-            # names. No-op when neither flag is set (block embeds as fallback).
+            # (progressive disclosure). IC-15 Nr. 2: also for providers that
+            # write an unread rules_dir (has_rules) -- the function gates on
+            # rules_read_channels itself. No provider names.
             sync_embedded_rule_files(agent_meta_root, project_root, config, log,
                                      args.dry_run, variables=provider_variables,
                                      provider=provider, provider_config=provider_config)

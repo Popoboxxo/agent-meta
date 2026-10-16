@@ -64,6 +64,26 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   rows, concept-reviewer ``se-critic`` and developer ``validator`` arrows); the rest is the version bump.
   Changed: 29 agent artifacts per provider (accessibility-specialist ... test-executor, see CHANGELOG) +
   generated-file-hashes (30 x 9 = 270 of 1075 entries).
+- Task 1.21 (IC-15 no. 1, F-05): the shared AGENTS.md block is derived from the ACTIVE sharers only.
+  Single-provider projects no longer join the path fields of all six catalog sharers with "bzw."
+  (agents dir, pending-tasks file, skills dir) and the header banner no longer names inactive sharers.
+  Changed: AGENTS.md of the six AGENTS.md providers (6 of 1075 entries). No other hash changed.
+- Task 1.22 (IC-15 no. 2, AC-14 path part): Copilot's ``skills_dir`` moves from the never-read
+  ``.github/copilot/skills`` to ``.github/skills``. In the default preset no rule is lazy, so only the
+  rendered ``SKILLS_DIR`` path changes: Copilot ``agent-meta-manager``, ``mcp-guardrails``,
+  ``use-lazy-rules`` and its ``generated-file-hashes.json`` (4 of 1075 entries).
+- Task 1.23 (IC-15 no. 9, AC-19): Codex and Mammouth no longer write their unread rules directories
+  (project-root ``rules/``, ``.mammouth/rules/``; rules stay embedded in AGENTS.md); Claude gets
+  ``CLAUDE.local.md`` (read by Claude Code) instead of ``CLAUDE.personal.md``. Removed: 2 x 22 rules-dir
+  files (19 rules + 3 managed indexes) and ``Claude/CLAUDE.personal.md``; added ``Claude/CLAUDE.local.md``;
+  changed: Claude ``.gitignore`` (``CLAUDE.local.md`` entry) and the Codex/Mammouth
+  ``generated-file-hashes.json`` (49 entries; 1075 -> 1031). AGENTS.md is unchanged.
+- Task 1.33 (IC-15 no. 12, F-16): the AGENTS.md header banner lists the active providers by context file
+  (``> **AI ROUTING:** Codex -> AGENTS.md``) instead of the hard-wired ``Opencode->AGENTS.md | Gemini->
+  AGENTS.md``; lazy-skill tables list only skills the sync writes for the provider - the default preset has
+  none, so ``use-lazy-rules`` is no longer rendered. Changed: 6 x AGENTS.md (banner, embedded table gone),
+  removed 4 x ``use-lazy-rules.md`` (Claude, Continue, Gemini, Copilot rules dirs), changed their 4
+  ``.agent-meta-managed`` indexes and 4 ``generated-file-hashes.json`` (18 entries; 1031 -> 1027).
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

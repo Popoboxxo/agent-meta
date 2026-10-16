@@ -123,9 +123,10 @@ Codex does **not** load a project-root `rules/*.md` directory. `.rules` files ar
 Starlark exec-policy files (command allow/deny), not context rules. Measured
 (study `docs/analysis/2026-10-11-context-budget-provider-study.md` §3.2): the
 generated root `rules/*.md` + `.rules` (18,380 B) are dead files for Codex.
-agent-meta still configures `has_rules: true` + `rules_dir: rules`; whether to stop
-generating them is tracked outside this document. Rule content reaches Codex only
-through `AGENTS.md`.
+Since IC-15 Nr. 9 agent-meta configures `has_rules: false` (no `rules_dir`): rules are
+embedded in `AGENTS.md`, lazy rules are written as `.agents/skills/<rule>/SKILL.md`
+(IC-15 Nr. 2). A root `rules/` written by an earlier version is removed on sync through
+its managed indexes (`retired_rules_dirs`); files you added there yourself stay.
 
 ---
 

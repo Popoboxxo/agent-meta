@@ -38,6 +38,7 @@ from .repo_containment import (
 _CLAUDE_LOCAL_ENTRIES_FALLBACK: list[str] = [
     ".claude/settings.local.json",
     ".claude/agent-memory-local/",
+    "CLAUDE.local.md",
     "CLAUDE.personal.md",
     "sync.log",
 ]

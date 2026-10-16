@@ -23,7 +23,12 @@ from .providers import provider_has_capability
 
 # channel: skill renders to <skills_dir>/<name>/SKILL.md only for providers
 # declaring the `native-skill-channel` capability (issue #751) — deliberately
-# restricted — Gemini/Copilot/Mammouth have unclear or outdated native Skill
+# restricted to native-rules providers with a verified skills surface (Claude;
+# Continue since IC-15 Nr. 2, `.continue/skills`). Providers WITHOUT a read
+# native rules dir get their lazy rules through the separate embedded-rules
+# skills channel (rules.sync_embedded_rule_files, gated on
+# rules_read_channels via lib/rule_channels.py). Historic note: restricted
+# because Gemini/Copilot/Mammouth have unclear or outdated native Skill
 # support per the provider-capability matrix; no scope expansion beyond
 # what's verified working (Claude Code Skills). Opencode is NOT included
 # despite sharing the skills_dir convention: every call site that would

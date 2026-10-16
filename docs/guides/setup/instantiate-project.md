@@ -145,7 +145,7 @@ py .agent-meta/scripts/sync.py --config .meta-config/project.yaml
 
 Das Script erzeugt beim ersten Aufruf (bei aktivem `"Claude"` in `ai-providers`):
 - `CLAUDE.md` — aus Template, wenn noch nicht vorhanden
-- `CLAUDE.personal.md` — persönliche Präferenzen-Template (gitignored, einmalig)
+- `CLAUDE.local.md` — persönliche Präferenzen-Template (gitignored, einmalig; von Claude Code geladen)
 - `.claude/settings.json` — Team-Permissions Skeleton (einmalig, Hooks werden bei jedem sync gemergt)
 - `.claude/settings.local.json` — persönliches Skeleton (gitignored, einmalig)
 - `.gitignore` — fehlende Einträge werden ergänzt (bei jedem Sync)
@@ -182,8 +182,9 @@ git add CLAUDE.md .claude/settings.json .claude/agents/ .gitignore .meta-config/
 git commit -m "chore: initialize agent-meta agents"
 ```
 
-> `CLAUDE.personal.md` und `.claude/settings.local.json` sind gitignored — nie committen.
-> Jeder Entwickler im Team erhält `CLAUDE.personal.md` beim ersten `sync` automatisch.
+> `CLAUDE.local.md` und `.claude/settings.local.json` sind gitignored — nie committen.
+> Jeder Entwickler im Team erhält `CLAUDE.local.md` beim ersten `sync` automatisch (eine ältere
+> `CLAUDE.personal.md` wurde nie geladen — in `CLAUDE.local.md` umbenennen).
 
 ---
 
@@ -512,11 +513,11 @@ Vollständige Anleitung: `agent-meta-manager` → Abschnitt "CLAUDE.md Review & 
 - [ ] `sync.log` ohne Warnungen
 - [ ] `CLAUDE.md` vorhanden mit managed block
 - [ ] `CLAUDE.md` ohne offene `{{...}}` Platzhalter
-- [ ] `CLAUDE.personal.md` vorhanden (gitignored, persönlich befüllen)
+- [ ] `CLAUDE.local.md` vorhanden (gitignored, persönlich befüllen)
 - [ ] `.claude/settings.json` vorhanden und committed
 - [ ] `.claude/settings.local.json` vorhanden (gitignored)
 - [ ] `.claude/rules/` vorhanden mit `issue-lifecycle.md`
-- [ ] `.gitignore` enthält `CLAUDE.personal.md`, `.claude/settings.local.json`, `sync.log`
+- [ ] `.gitignore` enthält `CLAUDE.local.md`, `.claude/settings.local.json`, `sync.log`
 - [ ] `.claude/agents/orchestrator.md` vorhanden
 - [ ] `.claude/agents/developer.md` vorhanden
 - [ ] `.claude/agents/tester.md` vorhanden

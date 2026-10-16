@@ -1,6 +1,7 @@
 """Rules layer: collect, sync, speech-mode, create."""
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -15,7 +16,9 @@ from .rule_index import (
 from .providers import provider_has_capability
 from .registry_query import (
     build_mcp_guardrails_list,
+    load_external_tools_registry,
     load_mcp_registry,
+    resolve_active_external_tools,
     resolve_active_mcp_servers,
 )
 from .variables import (
@@ -274,6 +277,112 @@ def rule_opts_lazy_channel(opts: dict) -> bool:
     return opts.get("embed") is False or opts.get("channel") == "skill"
 
 
+# Lazy-skill table rows ("| skill-name | when |" below a "| Skill |" header),
+# same grammar as consistency/context_budget.py::_lazy_table_skills.
+_SKILL_TABLE_HEADER_RE = re.compile(r"^\|\s*Skill\s*\|", re.IGNORECASE)
+_SKILL_TABLE_ROW_RE = re.compile(r"^\|\s*([A-Za-z0-9][A-Za-z0-9_.-]*)\s*\|")
+_SKILL_TABLE_SEPARATOR_RE = re.compile(r"^\|[\s:|-]+\|?\s*$")
+
+
+def has_skill_table(content: str) -> bool:
+    """True when *content* has a lazy-skill table (``| Skill | ... |`` header line)."""
+    return any(_SKILL_TABLE_HEADER_RE.match(line) for line in content.splitlines())
+
+
+def filter_skill_tables(content: str, available: set) -> str | None:
+    """Keep only rows of lazy-skill tables whose skill is in *available* (IC-15 Nr. 12).
+
+    Returns the content unchanged when it has no ``| Skill |`` table, the
+    filtered content when at least one row survives, and ``None`` when the
+    content carries skill tables but none of their rows names an existing
+    skill -- the rule is then pure noise and is not rendered. The whole rule
+    is dropped then -- non-table prose included; that is deliberate: a rule
+    whose table names no existing skill carries no content once the table is
+    empty.
+    """
+    out: list = []
+    in_table = had_table = False
+    kept_rows = 0
+    for line in content.splitlines(keepends=True):
+        if _SKILL_TABLE_HEADER_RE.match(line):
+            in_table = had_table = True
+            out.append(line)
+            continue
+        if in_table:
+            if _SKILL_TABLE_SEPARATOR_RE.match(line):
+                out.append(line)
+                continue
+            row = _SKILL_TABLE_ROW_RE.match(line)
+            if row:
+                if row.group(1) in available:
+                    kept_rows += 1
+                    out.append(line)
+                continue
+            in_table = False
+        out.append(line)
+    if not had_table:
+        return content
+    return "".join(out) if kept_rows else None
+
+
+def lazy_skill_stems(
+    agent_meta_root: Path,
+    project_root: Path | None,
+    config: dict,
+    provider: str,
+    caps: dict,
+) -> set[str]:
+    """Rule/MCP/tool stems this sync writes as ``<skills_dir>/<stem>/SKILL.md`` for *provider*.
+
+    Mirrors the routing decisions of the writers (sync_rules,
+    sync_embedded_rule_files, mcp.generate_mcp_artifacts,
+    external_tools.generate_external_tool_artifacts) on the read-channel data
+    (*caps* = merged provider mapping, lib/rule_channels.py): native-rules
+    providers with the native skill channel route ``channel: skill``; providers
+    with the lazy skills channel route ``embed: false`` / ``channel: skill``.
+    """
+    from .external_tools import TOOL_RULE_PREFIX
+    from .mcp import MCP_RULE_PREFIX
+    from .rule_channels import lazy_skill_channel, reads_native_rules
+
+    if not caps.get("skills_dir"):
+        return set()
+    if reads_native_rules(caps):
+        if not provider_supports_skill_channel(provider, caps):
+            return set()
+
+        def routed(opts: dict) -> bool:
+            return opts.get("channel") == "skill"
+    elif lazy_skill_channel(caps):
+        routed = rule_opts_lazy_channel
+    else:
+        return set()
+
+    options = resolve_rules(config, agent_meta_root)
+    stems: set[str] = set()
+    for _src, output_name in collect_rule_sources(
+            agent_meta_root, config.get("platforms", []), config=config):
+        stem = Path(output_name).stem
+        opts = options.get(stem, {})
+        if not provider_opts_skip(opts, provider) and routed(opts):
+            stems.add(stem)
+    registry = load_mcp_registry(agent_meta_root, config, project_root)
+    if registry:
+        for server in resolve_active_mcp_servers(config, agent_meta_root, project_root, registry=registry):
+            stem = f"{MCP_RULE_PREFIX}{server}"
+            opts = options.get(stem, {})
+            if server in registry and not provider_opts_skip(opts, provider) and routed(opts):
+                stems.add(stem)
+    tools = load_external_tools_registry(agent_meta_root, config, project_root)
+    if tools:
+        for tool in resolve_active_external_tools(config, agent_meta_root, project_root, registry=tools):
+            tool_def = tools.get(tool) or {}
+            stem = f"{TOOL_RULE_PREFIX}{tool}"
+            if tool_def and provider not in tool_def.get("provider-skip", []) and routed(options.get(stem, {})):
+                stems.add(stem)
+    return stems
+
+
 def sync_embedded_rule_files(
     agent_meta_root: Path,
     project_root: Path,
@@ -295,15 +404,26 @@ def sync_embedded_rule_files(
     content stays reachable while the always-on context shrinks (progressive
     disclosure, issues #192 + #540).
 
-    Provider-agnostic: gated purely on config keys (has_rules / skills_dir),
-    never on provider names. Providers with ``has_rules: true`` receive their
-    rule files via sync_rules() — this function is a no-op for them, and a
-    no-op when no skills_dir is configured (the managed block then embeds the
+    Provider-agnostic: gated purely on the read-channel data (IC-15 Nr. 2 /
+    IC-33, ``lib/rule_channels.lazy_skill_channel``): the provider reads no
+    native rules directory but reads skills. ``has_rules`` alone no longer
+    decides -- a provider that writes an unread rules directory (e.g. a
+    ``rules_dir`` outside its read channels) still receives its lazy rules
+    here. A no-op for native-rules providers (sync_rules() covers them) and
+    for providers without a skills channel (the managed block then embeds the
     rules as fallback, no content loss).
     """
+    from .providers import load_provider_capabilities
+    from .rule_channels import lazy_skill_channel, merged_caps
+
     pc = (provider_config or {}).get(provider, {})
-    if pc.get("has_rules", False):
+    caps = merged_caps(provider, provider_config or {}, load_provider_capabilities(agent_meta_root))
+    if not lazy_skill_channel(caps):
         return
+    # Read from the provider entry (``pc``), not the merged caps the channel
+    # helper sees: shipped providers define ``skills_dir`` in ai-providers.yaml,
+    # but a consumer project may declare it in provider-capabilities.yaml only --
+    # the guard then keeps a None target path out.
     skills_dir_rel = pc.get("skills_dir")
     if not skills_dir_rel:
         return
@@ -440,6 +560,19 @@ def sync_rules(
     skills_dir_rel = pc.get("skills_dir")
     skills_target_dir = (project_root / skills_dir_rel) if (skills_dir_rel and supports_skill_channel) else None
     now_managed_skill_rules: set[str] = set()
+    _available_cache: list = []
+
+    def _available_skills() -> set:
+        """Lazy-skill stems of this provider (computed once, only when a table needs it)."""
+        if not _available_cache:
+            from .providers import load_provider_capabilities
+            from .rule_channels import merged_caps
+
+            caps = merged_caps(provider, provider_config or {provider: pc},
+                               load_provider_capabilities(agent_meta_root))
+            _available_cache.append(
+                lazy_skill_stems(agent_meta_root, project_root, config, provider, caps))
+        return _available_cache[0]
 
     for source_path, output_name in sources:
         rule_stem = Path(output_name).stem
@@ -462,6 +595,17 @@ def sync_rules(
 
         if platform_vars is not None:
             source_content = substitute_platform(source_content, platform_vars, rel_source, log)
+
+        # IC-15 Nr. 12: lazy-skill tables list only skills this sync writes for
+        # the provider; a table without any existing skill drops the rule
+        # (stale cleanup below removes a previously written copy).
+        if has_skill_table(source_content):
+            filtered = filter_skill_tables(source_content, _available_skills())
+            if filtered is None:
+                log.skip(str((target_dir / output_name).relative_to(project_root)),
+                         "lazy-skill table names no existing skill for this provider")
+                continue
+            source_content = filtered
 
         # channel: skill — render into skills_dir instead of rules_dir, for
         # providers with real Skill lazy-loading support. Deliberately NOT

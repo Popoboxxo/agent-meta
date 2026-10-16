@@ -58,7 +58,7 @@ agent-meta/
                                └─ handgeschriebener Rest (nie überschrieben)
   src/backend/CLAUDE.md      ← optional: ordnerspezifischer Kontext (nie von sync.py berührt)
   src/frontend/CLAUDE.md     ← optional: ordnerspezifischer Kontext (nie von sync.py berührt)
-  CLAUDE.personal.md         ← persönliche Präferenzen (gitignored, nie committen)
+  CLAUDE.local.md            ← persönliche Präferenzen (gitignored, nie committen; von Claude Code geladen)
   .claude/                   ← Claude Code (immer wenn "Claude" in ai-providers)
     settings.json            ← Team-Permissions (committed ins Repo)
     settings.local.json      ← persönliche Permissions (gitignored, nie committen)
@@ -100,11 +100,11 @@ agent-meta/
 | Datei | Committed? | Angelegt von | Zweck |
 |-------|------------|--------------|-------|
 | `CLAUDE.md` | Ja | sync.py (einmalig) | Projektregeln für alle |
-| `CLAUDE.personal.md` | Nein (gitignored) | sync.py (einmalig) | Persönliche Präferenzen |
+| `CLAUDE.local.md` | Nein (gitignored) | sync.py (einmalig) | Persönliche Präferenzen |
 | `.claude/settings.json` | Ja | sync.py (einmalig Skeleton + Hooks-Merge) | Team-Permissions + Hooks |
 | `.claude/settings.local.json` | Nein (gitignored) | sync.py (einmalig) | Persönliche Permissions |
 
-`CLAUDE.personal.md` wird einmalig aus `howto/CLAUDE.personal-template.md` kopiert und danach nie wieder von sync.py angefasst. Jeder Entwickler füllt sie für sich aus.
+`CLAUDE.local.md` wird einmalig aus `templates/configs/CLAUDE.personal-template.md` kopiert und danach nie wieder von sync.py angefasst. Jeder Entwickler füllt sie für sich aus. Claude Code lädt sie zusammen mit `CLAUDE.md`. Eine ältere `CLAUDE.personal.md` wurde von Claude Code nie geladen: sync.py lässt sie unverändert, legt dann keine `CLAUDE.local.md` an und warnt — bitte in `CLAUDE.local.md` umbenennen (IC-15 Nr. 9).
 
 ---
 
@@ -248,7 +248,7 @@ py .agent-meta/scripts/sync.py --add-skill <repo-url> --skill-name <name> --sour
 | `.continue/rules/project-context.md` managed block | **Immer aktualisieren** | Jeder Sync (wenn "Continue" aktiv) |
 | `.gitignore` | **Fehlende Einträge ergänzen** | Jeder Sync |
 | `CLAUDE.md` | **Einmalig anlegen** aus Template | Einmalig, wenn nicht vorhanden |
-| `CLAUDE.personal.md` | **Einmalig anlegen** aus Template | Einmalig, wenn nicht vorhanden |
+| `CLAUDE.local.md` | **Einmalig anlegen** aus Template | Einmalig, wenn weder sie noch eine alte `CLAUDE.personal.md` vorhanden ist |
 | `.claude/settings.json` (Skeleton) | **Einmalig anlegen** | Einmalig, wenn nicht vorhanden |
 | `.claude/settings.local.json` | **Einmalig anlegen** (Skeleton, gitignored) | Einmalig, wenn nicht vorhanden |
 | `.gemini/GEMINI.md` | **Einmalig anlegen** aus Template | Einmalig, wenn nicht vorhanden |
@@ -260,7 +260,7 @@ py .agent-meta/scripts/sync.py --add-skill <repo-url> --skill-name <name> --sour
 | `.meta-config/context-hashes.json` | **Aktualisieren** mit Hashes der generierten Static Header | Jeder Sync |
 | `sync.log` | Überschreiben | Jeder Lauf |
 
-> Einmalige Aktionen für Claude (CLAUDE.md, settings.json, CLAUDE.personal.md) sind nur aktiv wenn `"Claude"` in `ai-providers` steht.
+> Einmalige Aktionen für Claude (CLAUDE.md, settings.json, CLAUDE.local.md) sind nur aktiv wenn `"Claude"` in `ai-providers` steht.
 > Für Gemini und Continue: Kontext-Datei + Settings werden beim ersten sync ohne `--init` angelegt.
 
 ### CLAUDE.md managed block
@@ -356,7 +356,7 @@ sync.py verwaltet einen managed block in `.gitignore`. Das Verhalten ist per `pr
 
 ```yaml
 gitignore:
-  local: true       # Standard: persönliche Dateien sind gitignored (settings.local.json, CLAUDE.personal.md)
+  local: true       # Standard: persönliche Dateien sind gitignored (settings.local.json, CLAUDE.local.md, CLAUDE.personal.md)
   generated: false  # Standard: generierte Dateien sind committed (agents/, rules/, hooks/)
   settings: false   # Standard: Settings-Dateien sind committed (settings.json, GEMINI.md)
   ignore-provider-dirs: false  # ganze Provider-Verzeichnisse statt Sub-Pfaden gitignoren (issue #557)
@@ -364,7 +364,7 @@ gitignore:
 
 | Flag | Standard | `true` bedeutet |
 |------|----------|-----------------|
-| `local` | `true` | `.claude/settings.local.json`, `CLAUDE.personal.md`, `sync.log` → gitignored |
+| `local` | `true` | `.claude/settings.local.json`, `CLAUDE.local.md`, `CLAUDE.personal.md`, `sync.log` → gitignored |
 | `generated` | `false` | `agents/`, `rules/`, `hooks/`, `commands/` aller aktiven Provider → gitignored |
 | `settings` | `false` | `settings.json`, `config.yaml` der Provider → gitignored |
 | `ignore-provider-dirs` | `false` | Ganze Provider-Root-Verzeichnisse (`.claude/`, `.gemini/`, …) statt der provider-internen Sub-Pfade → gitignored |
@@ -390,7 +390,7 @@ der provider-internen Sub-Path-Allowlist:
 - Redundante Sub-Pfade **innerhalb** einer ignorierten Wurzel (z.B.
   `.claude/settings.local.json`, `.gemini/pending-tasks.md`, `.claude/agents/`)
   werden aus der Berechnung herausgefiltert.
-- Repo-Root-Dateien bleiben unverändert: `sync.log`, `CLAUDE.personal.md`,
+- Repo-Root-Dateien bleiben unverändert: `sync.log`, `CLAUDE.local.md`, `CLAUDE.personal.md`,
   `AGENTS.personal.md`, `.mcp.json`, `opencode.json` folgen weiterhin ihren
   Kategorien (`local`/`settings`); Top-Level-Context-Files (`CLAUDE.md`,
   `AGENTS.md`, `MAMMOUTH.md`) werden nie pauschal ignoriert.

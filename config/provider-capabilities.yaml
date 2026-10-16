@@ -166,7 +166,7 @@ capabilities:
     context_soft_cap_lines: null
     roster_in_harness: true
     agents_md_visible_to_subagents: true
-    rules_read_channels: [embedded]
+    rules_read_channels: [embedded, skills]  # IC-15 Nr. 2: lazy rules as <skills_dir>/<rule>/SKILL.md (study 3.3)
     skills_discovery_dirs: [".opencode/skills"]
     main_agent_selectable: true
     agents_md_precedence: nearest
@@ -217,7 +217,7 @@ capabilities:
     context_soft_cap_lines: null
     roster_in_harness: false
     agents_md_visible_to_subagents: false
-    rules_read_channels: []
+    rules_read_channels: [skills]  # IC-15 Nr. 2: .gemini/skills discovered (study 3.7); AGENTS.md read via context.fileName is IC-15 Nr. 8
     skills_discovery_dirs: [".gemini/skills"]
     main_agent_selectable: false
     agents_md_precedence: concatenate
@@ -274,7 +274,7 @@ capabilities:
     context_soft_cap_lines: null
     roster_in_harness: false
     agents_md_visible_to_subagents: false
-    rules_read_channels: [native-rules-dir]
+    rules_read_channels: [native-rules-dir, skills]  # skills: .continue/skills is a real runtime surface (study 3.8, H9)
     skills_discovery_dirs: [".continue/skills"]
     main_agent_selectable: true
     agents_md_precedence: nearest
@@ -301,7 +301,7 @@ capabilities:
       - "Keine parallele Subagent-Ausführung."
 
   Copilot:
-    skills: true                        # skills_dir: .github/copilot/skills (+ ai-providers capabilities)
+    skills: true                        # skills_dir: .github/skills (+ ai-providers capabilities)
     artifact-validation: true
     artifact-validation-reason: null
     mcp-remote-transport: url
@@ -322,14 +322,14 @@ capabilities:
     fanout_mechanism: sequential-fallback
     barrier_collect: false
     # --- IC-09 context budget / channel keys (SPEC-CONTEXT-PROFILES-2026-10-11, Task 0a.5): pure data, not yet consumed by the render.
-    # Source: docs/analysis/2026-10-11-context-budget-provider-study.md. Copilot values from audit citations (docs gated): rules_required_suffix and skills dirs UNVERIFIED; soft_cap_chars 4000 = code-review limit per instruction file; rules_read_channels=[] because generated .github/instructions/*.md are never read (F-17/Phase 1 fixes data).
+    # Source: docs/analysis/2026-10-11-context-budget-provider-study.md. Copilot values from audit citations (docs gated): rules_required_suffix and skills dirs UNVERIFIED; soft_cap_chars 4000 = code-review limit per instruction file; rules_read_channels has no native channel because generated .github/instructions/*.md are never read (F-17/Phase 1 fixes data); skills via .github/skills (IC-15 Nr. 2).
     context_hard_cap_bytes: null
     context_soft_cap_bytes: null
     context_soft_cap_chars: 4000
     context_soft_cap_lines: null
     roster_in_harness: false
     agents_md_visible_to_subagents: false
-    rules_read_channels: []
+    rules_read_channels: [skills]  # IC-15 Nr. 2: .github/skills (UNVERIFIED); .github/instructions/*.md stays unread until IC-15 Nr. 3
     skills_discovery_dirs: [".github/skills", ".claude/skills", ".agents/skills"]
     main_agent_selectable: false
     agents_md_precedence: nearest
@@ -347,7 +347,7 @@ capabilities:
       mcp: UNVERIFIED
       workspace_agents_autoload: UNVERIFIED
       context_file: UNVERIFIED
-    legacy_artifacts: []
+    legacy_artifacts: [".github/copilot/skills"]  # pre-IC-15 Nr. 2 skills dir, never read
     agent_config_format: markdown
     description: "Dateibasierte Agenten (.github/copilot/agents/). @agent Text-Mentions."
     special_notes:
@@ -392,7 +392,7 @@ capabilities:
     context_soft_cap_lines: null
     roster_in_harness: true
     agents_md_visible_to_subagents: true
-    rules_read_channels: [embedded]
+    rules_read_channels: [embedded, skills]  # IC-15 Nr. 2: .mammouth/skills discovered (study 3.4, VERIFIED-RUNTIME)
     skills_discovery_dirs: [".mammouth/skills"]
     main_agent_selectable: false
     agents_md_precedence: nearest
@@ -523,7 +523,7 @@ capabilities:
     context_soft_cap_lines: null
     roster_in_harness: true
     agents_md_visible_to_subagents: true
-    rules_read_channels: [embedded]
+    rules_read_channels: [embedded, skills]  # IC-15 Nr. 2: .zcode/skills (study 3.6)
     skills_discovery_dirs: [".zcode/skills"]
     main_agent_selectable: false
     agents_md_precedence: nearest
@@ -585,7 +585,7 @@ capabilities:
     context_soft_cap_lines: null
     roster_in_harness: true
     agents_md_visible_to_subagents: false
-    rules_read_channels: [embedded]
+    rules_read_channels: [embedded, skills]  # IC-15 Nr. 2: .kimi-code/skills (study 3.5)
     skills_discovery_dirs: [".kimi-code/skills"]
     main_agent_selectable: true
     agents_md_precedence: concatenate

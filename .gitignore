@@ -37,6 +37,7 @@ graphify-out/
 .opencode/settings.local.json
 .tmp/
 AGENTS.personal.md
+CLAUDE.local.md
 CLAUDE.personal.md
 sync.log
 # --- end agent-meta managed ---

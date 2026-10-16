@@ -314,28 +314,6 @@ def _has_capability(pc: dict, capability: str) -> bool:
     return capability in pc.get("capabilities", [])
 
 
-def _shared_rules_file_channel(
-    pc: dict, provider_config: dict | None, shared_users: list[str]
-) -> bool:
-    """True when every provider sharing this context_file can load rules from
-    separate files (progressive-disclosure file channel, issue #192 Phase 2).
-
-    Expressed purely via config keys: a provider participates when a
-    ``skills_dir`` is configured — the channel that receives non-embedded
-    rules as ``<skills_dir>/<rule-stem>/SKILL.md`` (rendered on demand via
-    Read). Deliberately NOT keyed on provider names (provider-agnostic
-    policy): a future provider joining the shared file converges
-    automatically. When any sharer lacks the channel, the caller embeds the
-    rule instead of dropping it — a rules-preset opt-out must never delete
-    content a provider cannot load from anywhere else.
-    """
-    if provider_config and shared_users:
-        pcs = [provider_config.get(p, {}) for p in shared_users]
-    else:
-        pcs = [pc]
-    return all(bool(p.get("skills_dir")) for p in pcs)
-
-
 def _apply_platform_context_substitution(
     content: str,
     platform_vars: dict | None,
@@ -1597,30 +1575,52 @@ def _build_managed_block(
     platform_vars: dict | None = None,
 ) -> str:
     from .delegation_table import get_active_agents_data
-    from .rules import collect_rule_sources, resolve_rules, rule_opts_lazy_channel
+    from .rules import (
+        collect_rule_sources,
+        filter_skill_tables,
+        has_skill_table,
+        lazy_skill_stems,
+        resolve_rules,
+        rule_opts_lazy_channel,
+    )
 
     # build_knowledge_engine_hints is imported at module top level — the
     # lazy import was vestigial (agents does not import context; Issue #478
     # cleanup, guarded by tests/test_import_acyclicity.py).
-    pc = (provider_config or {}).get(provider, {})
-    has_native_rules = pc.get("has_rules", False)
+    from .rule_channels import provider_channel_caps, reads_native_rules, reads_rule_skills
 
-    # Providers that render into the *same physical* context_file (currently
-    # only Opencode + Gemini, both sharing AGENTS.md). Every value below that
-    # is derived from a single provider's config (pc) must instead be derived
-    # from the union of shared_users -- otherwise the rendered managed block
-    # differs depending on which shared provider happens to sync last, and
-    # each sync overwrites the other's version forever (issue #638: infinite
-    # oscillation, permanent false "out of sync" on --check).
+    pc = (provider_config or {}).get(provider, {})
+
+    # Providers that render into the *same physical* context_file (the
+    # AGENTS.md group). Every value below that is derived from a single
+    # provider's config (pc) must instead be derived from the union of
+    # shared_users -- otherwise the rendered managed block differs depending
+    # on which shared provider happens to sync last, and each sync overwrites
+    # the other's version forever (issue #638: infinite oscillation, permanent
+    # false "out of sync" on --check).
+    # IC-15 Nr. 1 (F-05): only the sharers this project ACTIVATES count. A
+    # catalog-wide set listed the directories of providers the project never
+    # uses and let an inactive sharer veto the lazy channel. The rendering
+    # provider itself always belongs to the set.
     shared_users = [provider]
     shared_name = target_name or pc.get("context_file")
     if provider_config and shared_name:
+        from .providers import resolve_providers
+
+        _active = set(resolve_providers(config, provider_config))
         shared_users = [
             p for p, cfg in provider_config.items()
-            if cfg.get("context_file") == shared_name
-        ]
-        if not all(provider_config[p].get("has_rules", False) for p in shared_users):
-            has_native_rules = False
+            if cfg.get("context_file") == shared_name and (p in _active or p == provider)
+        ] or [provider]
+
+    # Native rules (pointer instead of embedding) only when EVERY sharer reads
+    # its generated rules directory (rules_read_channels, spec §4.3) -- a
+    # written but unread rules_dir must never replace the embedded rules.
+    if provider_config:
+        _sharer_caps = provider_channel_caps(agent_meta_root, provider_config, shared_users)
+    else:
+        _sharer_caps = {provider: pc}
+    has_native_rules = all(reads_native_rules(c) for c in _sharer_caps.values())
 
     def _shared(dir_key: str, default_fmt: str) -> str:
         """Join a per-provider path field across all shared_users, deduped.
@@ -1642,6 +1642,14 @@ def _build_managed_block(
 
     local_vars = dict(variables)
     local_vars["AGENTS_DIR"] = _shared("agents_dir", ".{}/agents")
+    # IC-15 Nr. 12 (F-16): the header banner lists the ACTIVE providers by
+    # context file (same data as the project templates' PROVIDER_ROUTING),
+    # never a hard-wired provider list.
+    if provider_config:
+        from .providers import build_provider_routing, resolve_providers
+
+        local_vars["PROVIDER_ROUTING"] = build_provider_routing(
+            resolve_providers(config, provider_config), provider_config)
 
     # Shared-file gate tier (SPEC-CONTEXT-FILE-MODES-2026-09-13, IC-03): a
     # physical context_file shared by more than one ACTIVE provider must render
@@ -1733,20 +1741,11 @@ def _build_managed_block(
         # Native rule artifacts (.claude/rules/*, skills) stay full — they are
         # lazy-loaded and not part of the always-on context footprint.
         _global_compact = local_vars.get("COMPACT_MODE") == "true"
-        # shared_users is catalog-wide (every provider that declares this
-        # context_file anywhere in config/ai-providers.yaml, active or not --
-        # see _shares_context_with_embedded_rules), so it always contains
-        # ZCode/KimiCode for an AGENTS.md-based provider even when this
-        # project never activates them. Only a provider actually selected in
-        # this project's config can ever render (and thus lose content into)
-        # this physical file, so the lazy-channel check is scoped to the
-        # subset of shared_users this project actually activates.
+        # shared_users holds only the active sharers (IC-15 Nr. 1), so the
+        # plugin compact decision is scoped to providers that can actually
+        # render (and thus lose content into) this physical file.
         if provider_config:
-            from .providers import resolve_providers
-            _active_providers = set(resolve_providers(config, provider_config))
-            _compact_pcs = [
-                provider_config[p] for p in shared_users if p in _active_providers
-            ] or [pc]
+            _compact_pcs = [provider_config[p] for p in shared_users] or [pc]
         else:
             _compact_pcs = [pc]
         _compact = resolve_plugin_compact(_global_compact, _compact_pcs)
@@ -1766,14 +1765,15 @@ def _build_managed_block(
 
         # Issue #192 Phase 2 (selective rule embedding): a rule flagged
         # `embed: false` (or routed to `channel: skill`) leaves the managed
-        # block when the whole shared-file group can load rules from separate
-        # files (every sharer has a skills_dir — see
-        # _shared_rules_file_channel). The block then renders a pointer to
+        # block when every active sharer reads rules as skills
+        # (`rules_read_channels` contains `skills`, IC-15 Nr. 2 / IC-33, see
+        # lib/rule_channels.py). The block then renders a pointer to
         # <SKILLS_DIR>/<rule-stem>/SKILL.md instead of the rule body;
-        # sync_rules()/sync_embedded_rule_files() write those files. Without
-        # the file channel the rule EMBEDS (never drops): a preset opt-out
-        # must not delete content for a provider with no way to load it.
-        rules_file_channel = _shared_rules_file_channel(pc, provider_config, shared_users)
+        # sync_embedded_rule_files() writes those files. Without the skills
+        # channel the rule EMBEDS (never drops): a preset opt-out must not
+        # delete content for a provider with no way to load it (spec §4.3).
+        rules_file_channel = all(reads_rule_skills(c) for c in _sharer_caps.values())
+        _available_cache: set | None = None
 
         for src_path, output_name in rule_sources:
             # Key options by the OUTPUT stem ("admin-ui"), not the raw source
@@ -1815,6 +1815,18 @@ def _build_managed_block(
                 # `_compact` below -- this is agent-meta's own always-on rule
                 # density, not the plugin lazy-channel-loss bug (#638-adjacent).
                 rule_content = compact_embedded_rule(Path(output_name).stem, rule_content)
+            # IC-15 Nr. 12: a lazy-skill table lists only skills that exist for
+            # EVERY active sharer; a table without any such skill is not embedded.
+            if has_skill_table(rule_content):
+                if _available_cache is None:
+                    _available_cache = set.intersection(*[
+                        lazy_skill_stems(agent_meta_root, project_root, config, p, c)
+                        for p, c in _sharer_caps.items()
+                    ])
+                filtered = filter_skill_tables(rule_content, _available_cache)
+                if filtered is None:
+                    continue
+                rule_content = filtered
             embedded_rules.append({"content": rule_content})
         
         try:
@@ -1904,29 +1916,50 @@ def _build_managed_block(
         target_name or pc.get("context_file") or "context managed block", log,
     )
 
+# IC-15 Nr. 9 (F-07): Claude Code loads CLAUDE.local.md next to CLAUDE.md
+# (docs: "Local instructions"); CLAUDE.personal.md was never read.
+CLAUDE_LOCAL_FILE = "CLAUDE.local.md"
+CLAUDE_PERSONAL_LEGACY_FILE = "CLAUDE.personal.md"
+
+
 def init_claude_personal(
     agent_meta_root: Path,
     project_root: Path,
     log: SyncLog,
     dry_run: bool,
 ):
-    """Copy CLAUDE.personal-template.md to CLAUDE.personal.md if not present yet."""
+    """Create the personal Claude context file ``CLAUDE.local.md`` once.
+
+    Copies ``CLAUDE.personal-template.md`` to ``CLAUDE.local.md`` -- the file
+    Claude Code actually loads (IC-15 Nr. 9). A legacy ``CLAUDE.personal.md``
+    holds the user's own notes and is never touched; while it exists no
+    ``CLAUDE.local.md`` is created and the sync warns to rename it (the legacy
+    file was never loaded by Claude Code).
+    """
     template_path = agent_meta_root / "templates" / "configs" / "CLAUDE.personal-template.md"
-    target_path = project_root / "CLAUDE.personal.md"
+    target_path = project_root / CLAUDE_LOCAL_FILE
+    legacy_path = project_root / CLAUDE_PERSONAL_LEGACY_FILE
 
     if target_path.exists():
-        log.skip("CLAUDE.personal.md", "already exists")
+        log.skip(CLAUDE_LOCAL_FILE, "already exists")
+        return
+    if legacy_path.exists():
+        log.warning(
+            f"{CLAUDE_PERSONAL_LEGACY_FILE} is not loaded by Claude Code — rename it to "
+            f"{CLAUDE_LOCAL_FILE} to keep your personal notes in context (IC-15 Nr. 9); "
+            f"{CLAUDE_LOCAL_FILE} is not created while the legacy file exists"
+        )
         return
     if is_absent_gitignored_target(target_path, dry_run):
-        log.skip("CLAUDE.personal.md", "absent (target root gitignored)")
+        log.skip(CLAUDE_LOCAL_FILE, "absent (target root gitignored)")
         return
 
     if not template_path.exists():
-        log.warning("CLAUDE.personal-template.md not found — skipping CLAUDE.personal.md creation")
+        log.warning(f"CLAUDE.personal-template.md not found — skipping {CLAUDE_LOCAL_FILE} creation")
         return
 
     content = template_path.read_text(encoding="utf-8")
-    log.action("INIT", "CLAUDE.personal.md", "templates/configs/CLAUDE.personal-template.md")
+    log.action("INIT", CLAUDE_LOCAL_FILE, "templates/configs/CLAUDE.personal-template.md")
     if not dry_run:
         target_path.write_text(content, encoding="utf-8")
 

@@ -219,15 +219,16 @@ def test_toggle_on_copilot_ignores_only_copilot_subdir_not_github():
 
 
 def test_toggle_on_codex_roots_include_agents_dir_but_never_rules():
-    """Codex: `.codex/` plus repo-root `.agents/` (skills_dir). `rules/`
-    (rules_dir at repo root) must NEVER become a provider root."""
+    """Codex: `.codex/` plus repo-root `.agents/` (skills_dir). The repo-root
+    `rules/` must NEVER become a provider root -- and since IC-15 Nr. 9 Codex
+    no longer writes it at all (rules embedded in AGENTS.md)."""
     provider_config = _load_provider_config()
     roots = collect_provider_roots(["Codex"], provider_config)
     assert roots == [".codex/", ".agents/"]
     entries = compute_base_gitignore_entries(
         ["Claude", "Codex"], provider_config, _toggle_on_cfg(generated=True)
     )
-    assert "rules/" in entries  # untouched: category-driven, not provider-root
+    assert "rules/" not in entries  # no generated rules dir (IC-15 Nr. 9), never a provider root
 
 
 def test_toggle_on_does_not_affect_repo_root_local_files():

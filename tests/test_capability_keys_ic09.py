@@ -52,8 +52,9 @@ _EXPECTED_PROVIDERS = {
     "Claude", "Gemini", "Opencode", "Continue", "Copilot", "Mammouth",
     "Codex", "ZCode", "KimiCode",
 }
-# empty is intentional: generated instruction files are never read there (F-17)
-_EMPTY_CHANNELS_OK = ("Copilot", "Gemini")
+# no native rules channel: generated instruction files are never read there (F-17);
+# lazy rules reach them as skills since IC-15 Nr. 2 (formerly rules_read_channels: [])
+_UNREAD_RULES_DIR_SKILLS_ONLY = ("Copilot", "Gemini")
 
 
 def test_providers_present():
@@ -68,10 +69,11 @@ def test_depth_and_skill_dirs(provider):
     assert c["skills_discovery_dirs"], "skills_discovery_dirs must not be empty"
 
 
-@pytest.mark.parametrize("provider", _EMPTY_CHANNELS_OK)
-def test_empty_rules_read_channels_allowed(provider):
-    # empty is intentional: rules_read_channels: [] is valid, not a missing key
-    assert _CAPS[provider]["rules_read_channels"] == []
+@pytest.mark.parametrize("provider", _UNREAD_RULES_DIR_SKILLS_ONLY)
+def test_unread_rules_dir_has_only_the_skills_channel(provider):
+    # IC-15 Nr. 2: no native rules channel (the generated rules dir is unread),
+    # but the skills channel carries the lazy rules
+    assert _CAPS[provider]["rules_read_channels"] == ["skills"]
 
 
 @pytest.mark.parametrize("provider", _PROVIDERS)
