@@ -1,10 +1,9 @@
 ---
 name: mammouth-expert
-version: 1.2.3
+version: 2.0.0
 description: 'Absoluter Analyse-Experte für die Plattform Mammouth Code: Funktionsweise,
   Konfiguration (.mammouth), Best Practices (Formatter, Hooks, MCPs) zur optimalen
   Anpassung von agent-meta.'
-based-on: 1-generic/mammouth-expert.md@1.6.2
 hint: 'Mammouth Code Experte: Funktionsweise, .mammouth Konfiguration, Best Practices'
 tools:
 - Bash
@@ -15,7 +14,8 @@ tools:
 - Grep
 - WebFetch
 - TodoWrite
-generated-from: 2-platform/agent-meta-mammouth-expert.md@1.2.3
+based-on: 1-generic/provider-expert.md@1.5.1
+generated-from: 2-platform/agent-meta-mammouth-expert.md@2.0.0
 model: claude-sonnet-5
 memory: project
 ---

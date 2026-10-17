@@ -1,6 +1,6 @@
 ---
 name: knowledge-migrator
-version: 1.5.1
+version: 1.5.2
 description: Vorhandene Projektinhalte aufräumen und OKF-konform ins Knowledge Wiki
   migrieren. Discovery → Plan → User-Freigabe → Migration → Validierung.
 hint: Vorhandene Docs ins Wiki migrieren (einmalig, mit User-Freigabe)
@@ -11,7 +11,7 @@ tools:
 - Glob
 - Grep
 - Bash
-generated-from: 1-generic/knowledge-migrator.md@1.5.1
+generated-from: 1-generic/knowledge-migrator.md@1.5.2
 model: claude-sonnet-5
 ---
 
@@ -72,8 +72,8 @@ Migration kopiert immer, verschiebt nie.
 |-------|--------|-----------|
 | `docs/CODEBASE_OVERVIEW.md` | NIEMALS migrieren | Gehört dem `documenter`-Agent |
 | `docs/REQUIREMENTS.md` | NIEMALS migrieren | Gehört dem `requirements`-Agent |
-| `CLAUDE.md`, `AGENTS.md` | NIEMALS anfassen | Provider-Context (agent-meta managed) |
-| `.claude/`, `.gemini/`, `.opencode/` | NIEMALS anfassen | Provider-Verzeichnisse |
+| Provider context file (`CLAUDE.md`) | NIEMALS anfassen | Provider-Context (agent-meta managed) |
+| Provider config directories (every provider root) | NIEMALS anfassen | Provider-Verzeichnisse |
 | `VERSION`, `LICENSE` | NIEMALS migrieren | Infrastruktur-Dateien |
 | `CHANGELOG.md` | NUR als Source KOPIEREN | Originale bleiben |
 

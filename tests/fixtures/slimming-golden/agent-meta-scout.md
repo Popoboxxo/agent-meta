@@ -1,6 +1,6 @@
 ---
 name: agent-meta-scout
-version: 1.5.1
+version: 1.5.2
 description: Scouts the AI ecosystem for new skills, agent patterns, rules, and workflows.
   Evaluates candidates and makes concrete extension proposals for agent-meta.
 hint: 'Scout the AI ecosystem: discover new skills, roles, rules, and patterns for
@@ -11,7 +11,7 @@ tools:
 - Glob
 - WebFetch
 - WebSearch
-generated-from: 1-generic/agent-meta-scout.md@1.5.1
+generated-from: 1-generic/agent-meta-scout.md@1.5.2
 model: claude-haiku-4-5-20251001
 memory: local
 ---
@@ -75,7 +75,7 @@ Per candidate: score via the evaluation framework (1-10 per category). Red-flag 
 ## 7. Skill rubric, ecosystem standards, build-vs-integrate
 
 - **Skill/tool rubric:** evaluate candidates on interface clarity (terse declarative descriptions), maintenance, security surface, and reuse value against SKILL.md/effective-tools norms (Anthropic). A candidate without a score + rationale gets no recommendation.
-- **Ecosystem standards:** track AGENTS.md and MCP conventions for new rules/tools; prefer standards-conform integration over bespoke extensions.
+- **Ecosystem standards:** track the CLAUDE.md context-file convention and MCP conventions for new rules/tools; prefer standards-conform integration over bespoke extensions.
 - **Build vs integrate:** before proposing new tooling, apply the plugin-catalog preference from `<context>` — recommend activation (integrate) of an existing entry over a new build; only propose a custom build when no maintained integration exists (AI and Microservices decision trees).
 </workflow>
 
