@@ -167,6 +167,16 @@ def test_dangling_pointer_is_error():
     assert cb._warn("context.dangling-pointer", "f", "m").severity is Severity.ERROR
 
 
+def test_rule_unreachable_is_error():
+    # AC-12: the 9x4 matrix reports zero findings (see the test below), so the
+    # check now emits its spec level (ERROR) instead of the Phase-0 WARNING.
+    cb, _compute, _maps = _context_checks()
+    from lib.consistency.report import Severity
+
+    assert cb.EMITTED_SEVERITY["context.rule-unreachable"] is Severity.ERROR
+    assert cb._warn("context.rule-unreachable", "f", "m").severity is Severity.ERROR
+
+
 @pytest.mark.parametrize("preset", _RULES_PRESETS)
 @pytest.mark.parametrize("provider", _PROVIDERS)
 def test_no_dangling_pointer_and_no_unreachable_rule(preset_matrix, preset, provider):

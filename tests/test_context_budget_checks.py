@@ -163,8 +163,8 @@ def test_ac08_unread_rules_dir_without_skills_is_reported(tmp_path):
                  rules_read_channels=["skills"], skills_dir="skills")
     findings = cb.check_rule_unreachable(tmp_path, ["P"], caps, None)
     assert {Path(f.file).stem for f in findings} == {"lost-rule"}
-    assert all(f.check == "context.rule-unreachable" and f.severity is Severity.WARNING
-               for f in findings)
+    assert all(f.check == "context.rule-unreachable" and f.severity is Severity.ERROR
+               for f in findings)  # AC-12: promoted to its spec level (Task 1.24 follow-up)
 
 
 def test_ac08_default_preset_gemini_has_no_unreachable_rule(default_projects, mappings):
@@ -196,7 +196,7 @@ def test_dangling_pointer_clears_once_skills_exist(default_projects, mappings, t
 def test_only_promoted_checks_emit_error(default_projects, mappings):
     assert set(cb.PHASE0_SEVERITY) == set(cb.SPEC_SEVERITY) == set(cb.EMITTED_SEVERITY)
     assert all(level is Severity.WARNING for level in cb.PHASE0_SEVERITY.values())
-    assert cb.PHASE1_PROMOTED == {"context.dangling-pointer"}
+    assert cb.PHASE1_PROMOTED == {"context.dangling-pointer", "context.rule-unreachable"}
     for check, level in cb.EMITTED_SEVERITY.items():
         expected = cb.SPEC_SEVERITY[check] if check in cb.PHASE1_PROMOTED else Severity.WARNING
         assert level is expected, check

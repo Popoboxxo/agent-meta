@@ -16,8 +16,9 @@ never through provider names.
 Severity is centralised: ``SPEC_SEVERITY`` holds the level the spec prescribes
 per check, ``PHASE0_SEVERITY`` the Phase-0 level (everything WARNING) and
 ``EMITTED_SEVERITY`` the level actually emitted: Phase 0 plus the checks in
-``PHASE1_PROMOTED`` at their spec level (Task 1.24: ``context.dangling-pointer``
-is ERROR). ``_warn`` reads ``EMITTED_SEVERITY``; promoting a further check is a
+``PHASE1_PROMOTED`` at their spec level (Task 1.24 and its follow-up:
+``context.dangling-pointer`` and ``context.rule-unreachable`` are ERROR).
+``_warn`` reads ``EMITTED_SEVERITY``; promoting a further check is a
 one-line change in ``PHASE1_PROMOTED``. Sync end stays report-only (ERROR lands
 in the sync.log error list, exit code unchanged); ``--doctor`` exits 1 on an
 effective ERROR.
@@ -62,13 +63,13 @@ SPEC_SEVERITY = {
 PHASE0_SEVERITY = {check: Severity.WARNING for check in SPEC_SEVERITY}
 # Phase 1 (Task 1.24): checks promoted to their spec level once the matrix
 # 9 providers x rules presets reports zero findings (AC-11). rule-unreachable
-# (AC-12) waits for the 9x4 matrix to report zero findings (Copilot still
-# reports all 18 .github/instructions rules as unreachable in every preset).
-# declared-surface-empty keeps its WARN: it is gated by ``content_expected``
-# (surfaces that are empty by design -- skills without lazy rules, MCP without
-# active servers -- are not reported), so there is no false-positive class left
-# that would require a global exemption.
-PHASE1_PROMOTED = frozenset({"context.dangling-pointer"})
+# (AC-12) was promoted in the 1.24 follow-up: after Copilot declares its
+# path-scoped .github/instructions channel (Task 1.29), the 9x4 matrix reports
+# zero findings. declared-surface-empty keeps its WARN: it is gated by
+# ``content_expected`` (surfaces that are empty by design -- skills without
+# lazy rules, MCP without active servers -- are not reported), so there is no
+# false-positive class left that would require a global exemption.
+PHASE1_PROMOTED = frozenset({"context.dangling-pointer", "context.rule-unreachable"})
 EMITTED_SEVERITY = {
     check: (SPEC_SEVERITY[check] if check in PHASE1_PROMOTED else level)
     for check, level in PHASE0_SEVERITY.items()
@@ -351,7 +352,7 @@ def check_rule_unreachable(
     capabilities: Mapping[str, Mapping],
     active_set,
 ) -> list:
-    """``context.rule-unreachable``: reachability invariant (spec 4.3) violated (WARN; spec: ERROR from Phase 1).
+    """``context.rule-unreachable``: reachability invariant (spec 4.3) violated (ERROR since Task 1.24 follow-up; AC-12).
 
     A generated rule file is reachable for a provider when one of these holds:
 
