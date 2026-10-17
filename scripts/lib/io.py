@@ -217,6 +217,42 @@ def load_yaml_file(
     return data
 
 
+# Stat-validated cache of parsed framework YAML files. Framework config
+# (config/*.yaml) is read on hot per-artifact paths — the context hard-cap
+# guard, the delegation-syntax engine, pipeline notation and reflection
+# overrides — where re-parsing dominated sync wall-clock on slow interpreters
+# (a multi-provider sync breached its 300 s test limit on Python 3.9).
+# Keyed on the file path and invalidated whenever (mtime_ns, size) changes, so
+# the steady-state sync parses each file once while any in-process edit (unit
+# tests, admin-server) is still observed.
+_YAML_CACHE: dict = {}
+
+
+def load_yaml_cached(path: Path, *, on_error: str = "raise", default=None):
+    """Like `load_yaml_file`, but memoized until the file's stat changes.
+
+    Same ``on_error`` / missing-file contract as `load_yaml_file`. A missing
+    file is never cached (so a file created later in the same process is still
+    picked up). Callers must treat the returned mapping as read-only: every
+    call with an unchanged file returns the same object.
+    """
+    p = Path(path)
+    try:
+        st = p.stat()
+        sig = (st.st_mtime_ns, st.st_size)
+    except OSError:
+        sig = None
+    if sig is None:
+        return load_yaml_file(p, on_error=on_error, default=default)
+    key = (str(p), on_error)
+    cached = _YAML_CACHE.get(key)
+    if cached is not None and cached[0] == sig:
+        return cached[1]
+    value = load_yaml_file(p, on_error=on_error, default=default)
+    _YAML_CACHE[key] = (sig, value)
+    return value
+
+
 def load_json_file(
     path: Path,
     *,

@@ -6,7 +6,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from .frontmatter import _YAML_AVAILABLE
-from .io import load_yaml_file
+from .io import load_yaml_cached, load_yaml_file
 
 
 def _require_yaml() -> None:
@@ -57,7 +57,7 @@ def load_project_overrides(project_config=None):
         project_config = os.path.join(os.path.dirname(__file__), '..', '..', '.meta-config', 'project.yaml')
     if not os.path.exists(project_config):
         return {}
-    config = load_yaml_file(Path(project_config), on_error="raise", default={})
+    config = load_yaml_cached(Path(project_config), on_error="raise", default={})
     return (config.get('reflection-pairs') or {}).get('overrides', {})
 
 

@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Mapping
 
 from .frontmatter import parse_frontmatter_text, split_frontmatter
-from .io import SyncError, load_yaml_file
+from .io import SyncError, load_yaml_cached, load_yaml_file
 from .providers import registered_provider_names
 from .reflection import effective_reflection_pairs, find_pair, resolve_stage_loop
 
@@ -132,7 +132,7 @@ def _pipeline_notation_declared(provider: str, config_dir) -> bool:
     or incomplete still fails loud in :func:`pipeline_notation` (AC-11).
     """
     path = Path(config_dir) / "delegation-syntax.yaml"
-    registry = load_yaml_file(path, on_error="raise", default={})
+    registry = load_yaml_cached(path, on_error="raise", default={})
     syntax = registry.get("delegation_syntax", {}) if isinstance(registry, dict) else {}
     return any(
         isinstance(name, str) and name.lower() == provider.lower() for name in syntax

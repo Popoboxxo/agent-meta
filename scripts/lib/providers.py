@@ -6,7 +6,12 @@ from pathlib import Path
 from typing import Optional
 
 from .frontmatter import REFERENCE_STANDARDS_FIELD
-from .io import _YAML_AVAILABLE, SyncError, _load_yaml_or_json, load_yaml_file
+from .io import (
+    _YAML_AVAILABLE,
+    SyncError,
+    _load_yaml_or_json,
+    load_yaml_cached,
+)
 from .runtime_gate import weakest_runtime_gate_tier
 
 _logger = logging.getLogger(__name__)
@@ -334,8 +339,13 @@ def load_provider_capabilities(agent_meta_root: Path) -> dict:
 
     Framework config; a missing or malformed file yields ``{}`` (optional-file
     semantics — callers fall back to ai-providers.yaml).
+
+    Stat-cached (`load_yaml_cached`): the context hard-cap guard and the
+    delegation engine otherwise re-parse this file hundreds of times per sync,
+    which dominated sync wall-clock on slow interpreters (multi-provider sync
+    breached its 300 s test limit on Python 3.9).
     """
-    data = load_yaml_file(
+    data = load_yaml_cached(
         agent_meta_root / PROVIDER_CAPABILITIES_YAML,
         on_error="default",
         default={},
