@@ -112,6 +112,32 @@ def _dedicated_provider() -> str:
     return next(p for p in _PROVIDERS if _MAPPINGS[p].get("has_dedicated_context_file"))
 
 
+def _uses_agents_personal_writer(provider: str) -> bool:
+    """True for providers routed through the shared embedded-rules AGENTS.md writer."""
+    caps = _MAPPINGS[provider]
+    if "context-embedded-rules" in (caps.get("capabilities") or []):
+        return True
+    return any(
+        p != provider
+        and c.get("context_file") == caps.get("context_file")
+        and "context-embedded-rules" in (c.get("capabilities") or [])
+        for p, c in _MAPPINGS.items()
+    )
+
+
+@pytest.mark.parametrize("provider", _PROVIDERS)
+def test_agents_personal_file_only_for_reading_providers(projects, provider):
+    """The AGENTS.personal.md writer runs only for providers whose harness reads it."""
+    if not _uses_agents_personal_writer(provider):
+        pytest.skip("provider does not use the shared AGENTS.md personal writer")
+    caps = _MAPPINGS[provider]
+    target = projects[provider] / "AGENTS.personal.md"
+    if caps.get("personal_agents_file", True):
+        assert target.is_file(), f"{provider}: reads AGENTS.personal.md but none was created"
+    else:
+        assert not target.exists(), f"{provider}: AGENTS.personal.md written although the harness ignores it"
+
+
 def test_claude_local_md_replaces_unread_personal_file(projects):
     project = projects[_dedicated_provider()]
     assert (project / "CLAUDE.local.md").is_file()

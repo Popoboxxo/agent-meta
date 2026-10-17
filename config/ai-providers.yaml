@@ -138,6 +138,9 @@ providers:
         format: antigravity-mcp-json
     context_file: AGENTS.md
     context_template: templates/configs/AGENTS.project-template.md
+    # IC-15 Nr. 9 / F-07 (#971): Gemini does not read AGENTS.personal.md, so the
+    # sync must not create it. Data-driven key; readers use true (default).
+    personal_agents_file: false
     # IC-15 Nr. 8 (F-08/F-07, #975): Gemini CLI reads GEMINI.md by default, so
     # the shared core AGENTS.md is only read when the native settings key
     # `context.fileName` names it. `context_filename_settings_key` (below) makes
@@ -240,6 +243,8 @@ providers:
     primary-role: orchestrator
     context_file: AGENTS.md
     context_template: templates/configs/AGENTS.project-template.md
+    # Opencode reads the generated AGENTS.personal.md (instructions field).
+    personal_agents_file: true
     has_rules: false
     has_hooks: false
     has_commands: true
@@ -535,6 +540,8 @@ providers:
     context_adapter: false
     context_adapter_file: AGENTS.md
     context_template: templates/configs/AGENTS.project-template.md
+    # Opencode fork: reads the generated AGENTS.personal.md (instructions field).
+    personal_agents_file: true
     # IC-15 Nr. 9 (F-07, #853): .mammouth/rules is never read (study 3.4,
     # VERIFIED-RUNTIME) -- rules are embedded in AGENTS.md, lazy rules go to
     # .mammouth/skills. The formerly generated directory is cleaned up through
@@ -645,6 +652,8 @@ providers:
     context_adapter: false
     context_adapter_file: AGENTS.override.md
     context_template: templates/configs/AGENTS.project-template.md
+    # IC-15 Nr. 9 / F-07 (#971): Codex does not read AGENTS.personal.md.
+    personal_agents_file: false
     # IC-15 Nr. 9 (F-07): Codex never reads a project-root rules/ directory
     # (study 3.2, VERIFIED-RUNTIME) -- rules are embedded in AGENTS.md, lazy
     # rules go to .agents/skills. The formerly generated rules/ is cleaned up
@@ -728,6 +737,8 @@ providers:
     model-format: "{model}"
     context_file: AGENTS.md
     context_template: templates/configs/AGENTS.project-template.md
+    # IC-15 Nr. 9 / F-07 (#971): ZCode does not read AGENTS.personal.md.
+    personal_agents_file: false
     has_rules: false
     has_hooks: false
     # Commands (issue #807): ZCode documents a workspace command surface —
@@ -808,6 +819,8 @@ providers:
     - kimi-code/k3-256k
     context_file: AGENTS.md
     context_template: templates/configs/AGENTS.project-template.md
+    # IC-15 Nr. 9 / F-07 (#971): KimiCode does not read AGENTS.personal.md.
+    personal_agents_file: false
     has_rules: false
     has_hooks: false
     # Commands (issue #807): Kimi Code CLI exposes slash commands as

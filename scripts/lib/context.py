@@ -903,7 +903,10 @@ def _sync_opencode_context(
     _cleanup_bootstrap_block(target_path, config, provider_config, log, dry_run,
                               project_root=project_root, agent_meta_root=agent_meta_root)
 
-    init_opencode_personal(agent_meta_root, project_root, log, dry_run)
+    # IC-15 Nr. 9 / F-07: only harnesses that read AGENTS.personal.md get the
+    # file (data key, no provider-name branch).
+    if pc.get("personal_agents_file", True):
+        init_opencode_personal(agent_meta_root, project_root, log, dry_run)
     _init_provider_settings_json(
         project_root, pc, agent_meta_root, variables, log, dry_run, provider=provider
     )
@@ -2198,8 +2201,9 @@ def init_opencode_personal(
 ):
     """Copy AGENTS.personal-template.md to AGENTS.personal.md if not present yet.
 
-    Analogous to CLAUDE.personal.md — gitignored, never committed, loaded via
-    the `instructions` field in opencode.json.
+    Gitignored, never committed, loaded via the `instructions` field in
+    opencode.json. Callers gate on the provider key ``personal_agents_file``
+    (IC-15 Nr. 9): harnesses that do not read the file never get it.
     """
     template_path = agent_meta_root / "templates" / "configs" / "AGENTS.personal-template.md"
     target_path = project_root / "AGENTS.personal.md"

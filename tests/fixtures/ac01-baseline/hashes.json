@@ -229,7 +229,6 @@
  "Codex/.meta-config/project.yaml": "8494c791eacff9b88f66561176702cd136a27d57a6854a85f8248e1b48e5c2da",
  "Codex/.tmp/.gitignore": "240a3e0d37d2e86b614063f5347eb02d4f99ca6c254de6b82871ff8d95532a7d",
  "Codex/AGENTS.md": "7e0df36f3643167592b2da7b6aaa835dbc22f5ccaec62b133d76e65d46bf10eb",
- "Codex/AGENTS.personal.md": "99ee523953c92b642a1912db2a684fd7ab4df5e7e6780e5e878b5f9dcda28779",
  "Continue/.continue/agents/.agent-meta-managed": "94152a3e5e9477b227304cb06d8852b0c8e5ac455cf618e2fbff94a50fad1c8e",
  "Continue/.continue/agents/accessibility-specialist.md": "5efc99cec3fe5dd5fa49994e7d94db859ef2c993cbaf224326e4d53e9666d7ae",
  "Continue/.continue/agents/agent-meta-manager.md": "1d35709744be67498f212cc02d454e7682f02cb61383c6d24e6b7ff370b2599b",
@@ -604,7 +603,6 @@
  "Gemini/.meta-config/project.yaml": "74e0fa96a07355a9acdaabc6780aae664c5fbf12201428d29725066c0c20d710",
  "Gemini/.tmp/.gitignore": "240a3e0d37d2e86b614063f5347eb02d4f99ca6c254de6b82871ff8d95532a7d",
  "Gemini/AGENTS.md": "5986dc300779ca3d5425cbc232b855e6107429ee388f8c4802da408e1f69ad81",
- "Gemini/AGENTS.personal.md": "99ee523953c92b642a1912db2a684fd7ab4df5e7e6780e5e878b5f9dcda28779",
  "KimiCode/.gitignore": "5a3be84bb406c01156b7d3d0c24977a4afd7bf527ff6b53a318426213cd75301",
  "KimiCode/.kimi-code/agents/.agent-meta-managed": "94152a3e5e9477b227304cb06d8852b0c8e5ac455cf618e2fbff94a50fad1c8e",
  "KimiCode/.kimi-code/agents/accessibility-specialist.md": "962ffb3b4f0e739be35149ec492a9cba48caf1117344b372b004c33ad340cfe8",
@@ -686,7 +684,6 @@
  "KimiCode/.meta-config/project.yaml": "52112b61ed23ab24973d47daa4e8d20f90f73d91918f958e12d95972785b17ac",
  "KimiCode/.tmp/.gitignore": "240a3e0d37d2e86b614063f5347eb02d4f99ca6c254de6b82871ff8d95532a7d",
  "KimiCode/AGENTS.md": "e8e4e804a9da3c1a837dd91b463cfb5918c57be72456ef95af124bd62050d932",
- "KimiCode/AGENTS.personal.md": "99ee523953c92b642a1912db2a684fd7ab4df5e7e6780e5e878b5f9dcda28779",
  "Mammouth/.gitignore": "eb4bcef6dd64a9f46ea2cb28a12fa364ac2874f89d950ae94cfbd929b361b0c1",
  "Mammouth/.mammouth/agents/.agent-meta-managed": "94152a3e5e9477b227304cb06d8852b0c8e5ac455cf618e2fbff94a50fad1c8e",
  "Mammouth/.mammouth/agents/accessibility-specialist.md": "f3ada1d61a02ba3f50e375885df9c15c2cb4d7d378cf601d1b2c1f3543c8b1ce",
@@ -1004,6 +1001,5 @@
  "ZCode/.zcode/pipeline-details/concept-development.md": "06680d749babbf4cb98423cbabe8308e8e24762332e0e2b37290f7d9c9f71f97",
  "ZCode/.zcode/pipeline-details/docs-update.md": "30e8b497239dd8d607f2d0d85ec3cf5452754b1440d322d558e93e3a47ac2d75",
  "ZCode/.zcode/pipeline-details/quick-fix.md": "6f8e57877ea5d1b30d65247bc840d426c2207420516e3eecf3eaeb3b779ea203",
- "ZCode/AGENTS.md": "aa5da33f29c320b09b0e662a41a97424b15190991b04d5171f17f5adfe7014d3",
- "ZCode/AGENTS.personal.md": "99ee523953c92b642a1912db2a684fd7ab4df5e7e6780e5e878b5f9dcda28779"
+ "ZCode/AGENTS.md": "aa5da33f29c320b09b0e662a41a97424b15190991b04d5171f17f5adfe7014d3"
 }
