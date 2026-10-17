@@ -427,6 +427,14 @@ Rolle: test-executor · Issue: #969 · PR: 0f · Depends: 0f.1, 0f.2 · AC: AC-0
 - [ ] Step 3: Test (pass): `python3 -m pytest tests/test_eval_baseline_schema.py -q`
 - [ ] Step 4: commit `chore: record full-profile role routing baseline` (PR-Text: `Closes #969`)
 
+**Status 2026-10-17: SKIPPED-BY-USER.** Der Lauf (Deepseek-only, 659 Fälle × 3 Wiederholungen = 1977 Calls; Kostenschätzung 0.0000 USD laut Overlay, UNVERIFIED ohne datierte Quelle) wurde auf Nutzerentscheidung abgebrochen (~12 h Laufzeit); eine Baseline wird nicht belegt. Skip-Record: `tests/routing-llm-eval/roles/runs/2026-10-17-qg1-deepseek.json`.
+
+Konsequenzen:
+- AC-02/AC-62 bleiben nicht belegt (nur 1 statt ≥ 2 Modellklassen).
+- 1.46/1.47 bleiben nur SKIPPED-fähig; ihr Depends „0f.3 (AC-62 belegt)“ bleibt offen.
+- `compact` (Phase 2) bleibt unverifiziertes Opt-in ohne Verifikationsanspruch (AC-86 Profil-Teil).
+- Implementiert und in PR #998 enthalten: Runner (`scripts/run_role_routing_eval.py`), Baseline-/Skip-Record-Schema, Output-Contract.
+
 ## Phase 1
 
 Reihenfolge: 1.00 → 1.01 (#970, erster IC-18-PR) → IC-18 Nr. 15–18 (1.02–1.05) → IC-31 (1.06/1.07, vor allen Template-PRs) → IC-18 Nr. 1–12 (1.08–1.19; Nr. 2 vor IC-04) → 1.20. IC-15-Fixes (1.21–1.44) und IC-29 (1.45–1.47) laufen ab 1.01 je eigenem Branch; bei gemeinsamen Dateien gilt die `Depends`-Kette.

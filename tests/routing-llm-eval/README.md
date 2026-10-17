@@ -36,7 +36,9 @@ und beenden sich mit **exit 2 bei unbekannter/fehlender Rollen-Datei**
   Für `orchestrator` ist das die gerenderte Orchestrator-Datei, nicht `.claude/rules/use-orchestrator.md`.
   Fehlt die Datei: exit 2 — zuerst `python3 scripts/sync.py` ausführen.
 - **Modellklasse:** `CLAUDE_ROUTING_EVAL_MODEL` (Default `haiku`) bzw.
-  `OPENCODE_ROUTING_EVAL_MODEL` (Default `opencode-go/deepseek-v4-flash`).
+  `OPENCODE_ROUTING_EVAL_MODEL` (Default `opencode-go/deepseek-v4.1-flash`).
+  Modell-IDs sind provider-seitig zu verifizieren; `deepseek-v4-flash` existiert
+  nicht und ist keine gültige Modell-ID.
 - **Baseline (Task 0f.3):** braucht mindestens 2 Modellklassen und mindestens 3 Läufe
   je Modell und läuft nur nach ausdrücklicher Nutzerfreigabe der Kostenschätzung (IC-36).
   Ohne Freigabe wird ein Skip-Record geschrieben.
@@ -56,13 +58,13 @@ und beenden sich mit **exit 2 bei unbekannter/fehlender Rollen-Datei**
 # Kostenlose Vorschau (kein LLM-Call, kein Netz):
 python3 scripts/run_role_routing_eval.py --estimate-only \
   --provider opencode \
-  --model-class deepseek=opencode/opencode-go/deepseek-v4-flash \
+  --model-class deepseek=opencode/opencode-go/deepseek-v4.1-flash \
   --date 2026-10-17
 
 # Bezahlter Deepseek-only-Lauf (3 Läufe, nur nach Freigabe; niemals automatisch):
 python3 scripts/run_role_routing_eval.py \
   --provider opencode \
-  --model-class deepseek=opencode/opencode-go/deepseek-v4-flash \
+  --model-class deepseek=opencode/opencode-go/deepseek-v4.1-flash \
   --repeat 3 --approval yes --date 2026-10-17
 ```
 

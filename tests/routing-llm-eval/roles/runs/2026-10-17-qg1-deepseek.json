@@ -1,0 +1,21 @@
+{
+  "date": "2026-10-17",
+  "estimate": {
+    "calls": 1977,
+    "cases": 659,
+    "cost_usd": 0.0,
+    "input_tokens": 325038570,
+    "models": [
+      "opencode-go/deepseek-v4.1-flash"
+    ],
+    "output_tokens": 395400,
+    "price_assumption": {
+      "date": null,
+      "source": "config/pricing-overlay.yaml"
+    },
+    "runs": 3,
+    "unverified": true
+  },
+  "reason": "Nutzerentscheidung 2026-10-17 — Lauf abgebrochen (~12 h Laufzeit), Baseline wird nicht belegt (AC-02 verlangt ≥2 Modellklassen; es wäre nur 1 Klasse).",
+  "status": "SKIPPED-BY-USER"
+}

@@ -826,8 +826,8 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         metavar="NAME=PROVIDER/MODEL",
         help=(
-            "model class, e.g. deepseek=opencode/opencode-go/deepseek-v4-flash; "
-            "repeat for multiple classes"
+            "model class, e.g. deepseek=opencode/opencode-go/deepseek-v4.1-flash "
+            "(model IDs must be verified provider-side); repeat for multiple classes"
         ),
     )
     parser.add_argument(
