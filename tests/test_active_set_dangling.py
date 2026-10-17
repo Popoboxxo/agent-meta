@@ -244,9 +244,11 @@ _CAPS = yaml.safe_load(
 # which grows that shared context past the strictest cap; its sync then aborts
 # by design with ``context.over-hard-cap`` (Task 1.25; asserted in
 # ``tests/test_dispatch_depth_and_hard_cap.py``). Such fixtures are synced over
-# the remaining providers only; the shared context is still scanned, once,
-# through the uncapped ``AGENTS.md`` readers, so no reference coverage is lost
-# beyond what the allowlisted fixtures already exercise per provider.
+# the uncapped providers only, so the hard-cap providers contribute no
+# artifacts for them: their reference coverage comes solely from the
+# allowlisted fixtures (p10/p20), not from pall/ha. The shared ``AGENTS.md``
+# the all-roles fixtures do produce is still scanned once through the uncapped
+# readers, so that content is covered — but not per hard-cap provider.
 _SHARED_CONTEXT_HARD_CAP = {
     p for p in _MATRIX_PROVIDERS
     if _PROVIDER_CFG[p].get("context_file") == "AGENTS.md"

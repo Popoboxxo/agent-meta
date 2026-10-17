@@ -119,6 +119,7 @@ def test_spec_example_values():
     assert _CAPS["Copilot"]["rules_required_suffix"] == ".instructions.md"
     assert _CAPS["Codex"]["agent_config_format"] == "toml"
     assert _CAPS["Codex"]["rules_read_channels"] == ["embedded", "skills"]
+    assert _CAPS["Copilot"]["rules_read_channels"] == ["path-scoped", "skills"]
     assert _CAPS["Codex"]["surface_verified_state"]["context_file"] == "VERIFIED-RUNTIME"
     assert _CAPS["ZCode"]["surface_verified_state"]["context_file"] == "VERIFIED-SOURCE"
     assert _CAPS["ZCode"]["surface_verified_state"]["workspace_agents_autoload"] == "UNVERIFIED"
