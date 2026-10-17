@@ -113,12 +113,15 @@ def test_unverified_cap_is_evaluated_per_provider(tmp_path, monkeypatch):
         "per-provider-cap",
         {"kind": "file-size", "unit": "chars", "op": ">", "limit_key": "context_soft_cap_chars"},
         applies_to=[{"capability": "context_soft_cap_chars", "op": "present"}],
-        target={"artifact": "rules_dir"}, severity="ERROR", state="UNVERIFIED",
+        target={"artifact": "context_file"}, severity="ERROR", state="UNVERIFIED",
         validated=False,
         **{"verified-state-by-capability": {"context_soft_cap_chars": {4000: "DOCUMENTED",
                                                                        12000: "UNVERIFIED"}}})
-    put(tmp_path, ".github/instructions/big.instructions.md", "x" * 13000)
-    put(tmp_path, ".gemini/rules/big.md", "x" * 13000)
+    # IC-15 Nr. 8 retired Gemini's `.gemini/rules` dir, so `rules_dir` is no
+    # longer a target both providers share. `context_file` is; the per-provider
+    # cap (Copilot 4000, Gemini 12000) still exercises the UNVERIFIED cap.
+    put(tmp_path, ".github/copilot-instructions.md", "x" * 13000)
+    put(tmp_path, "AGENTS.md", "x" * 13000)
     report = run(tmp_path, monkeypatch, [e], providers=("Copilot", "Gemini"))
     states = {f.provider: (f.verified_state, f.severity) for f in report.findings}
     assert states["Copilot"] == ("DOCUMENTED", Severity.ERROR)
