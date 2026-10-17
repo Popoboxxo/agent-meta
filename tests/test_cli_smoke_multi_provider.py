@@ -31,6 +31,13 @@ def project(tmp_path_factory):
         'agent-meta-version: "2.0.0-beta.1"\n'
         "ai-providers: [" + ", ".join(_PROVIDERS) + "]\n"
         "dod-preset: rapid-prototyping\n"
+        # Codex silently truncates its AGENTS.md reader at 32 KiB (context hard
+        # cap, Task 1.25). The all-provider *full* render is intentionally over
+        # that cap (AC-13), so `--init` would abort with `context.over-hard-cap`
+        # and mask every CLI mode this matrix exercises. Compact mode — the
+        # supported way to fit a large context — keeps the same provider set
+        # while staying well below the cap.
+        "context_file:\n  mode: compact\n"
         "variables:\n  PROJECT_NAME: smoke\n  PROJECT_PREFIX: sm\n",
         encoding="utf-8",
     )
