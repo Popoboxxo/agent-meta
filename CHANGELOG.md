@@ -3,6 +3,19 @@
 ## [Unreleased]
 
 ### Changed
+- **Routing keywords come from a single source (IC-30)**: the orchestrator/rule routing keywords
+  are read from one registry instead of being duplicated across templates and `role-defaults.yaml`,
+  so a keyword rendered for dispatch can no longer drift out of sync with the source of truth.
+- **Reflection overrides come from the consumer config (IC-15 Nr. 17, AC-51)**: `config.py` reads
+  `reflection-pairs.overrides` from the CONSUMER `project.yaml` handed to `build_variables`, via the
+  now dict-aware `reflection.load_project_overrides(config)` — instead of re-implementing the lookup
+  inline. This keeps agent-meta's own tracked `MAX_ITERATIONS` from leaking into projects without a
+  `reflection-pairs` block.
+- **Adapter runtime captures remain UNVERIFIED (AC-15/AC-16/AC-17)**: the per-provider core/adapter
+  render (native import syntax `@AGENTS.md`, pointer fallback, byte-identical idempotence) is asserted
+  hermetically only — no Claude adapter runtime was captured here. The same holds for the runtime
+  surfaces asserted in this phase (Task 1.25 Codex config/hard cap, IC-15 Nr. 5/6 Kimi/Mammouth
+  dispatch): their evidence is UNVERIFIED without a live runtime of those harnesses.
 - **Source boilerplate de-duplicated render-neutrally (IC-31, AC-72)**: the verbatim worker-role line
   (49 occurrences), the "Mandatory closing summary" line (67) and the "User proxy" line (20) in
   `agents/1-generic` / `agents/2-platform` are replaced by the new snippet blocks `{{WORKER_ROLE_BLOCK}}`,
@@ -24,6 +37,45 @@
   committed `standalone/agents/` export (19 files). Ratchet ceilings lowered to 16 lines / 164 occurrences.
 
 ### Fixed
+- **Copilot reads its generated instruction files (IC-15 Nr. 3, F-17)**: Copilot's capability
+  `rules_read_channels` is now `[path-scoped, skills]` (was `[skills]`) — the sync-generated
+  `.github/instructions/<name>.instructions.md` files are read once they carry the required
+  `applyTo`/`description` frontmatter. `rules._build_rule_frontmatter` detects an already-present key
+  with a YAML-key-precise `^key:` match instead of a substring test, so a value or a longer key
+  (`xapplyTo`) can no longer make a required key look present. The generated agent name is derived
+  provider-agnostically from the artifact filename, not a provider literal. Runtime capture is
+  UNVERIFIED (no Copilot runtime available here). Pinned by a positive `rules_read_channels` value in
+  `tests/test_capability_keys_ic09.py`.
+- **Continue rules get provider-native frontmatter; unresolved placeholders are never written
+  (IC-15 Nr. 10, F-14)**: a generated Continue rule file carries the `alwaysApply`/`description`
+  frontmatter Continue expects, and `context.omit_unresolved_placeholder_lines` drops any line whose
+  project variable is unset instead of writing a literal `{{VAR}}`. Every discarded line is now
+  recorded at debug level (F13) so an omitted directive stays diagnosable. A fully configured project
+  renders byte-identically.
+- **`--create-ext` / `--update-ext` never ship unresolved placeholders (IC-15 Nr. 19, F-14)**:
+  `extensions.render_managed_block` routes its rendered block through the shared
+  `context.omit_unresolved_placeholder_lines`, so a created/updated extension file contains no
+  literal `{{VAR}}` for an unset project variable.
+- **Gemini context surface is key-driven (IC-15 Nr. 8, F-07/F-16)**: the Gemini provider entry
+  declares `context_filename_settings_key: context.fileName` so AGENTS.md is actually loaded, lists
+  `retired_rules_dirs` for the never-read `.gemini/rules` (removed on re-sync through its managed
+  indexes only) and gates the personal agent file on the `personal_agents_file` data key — a harness
+  that does not read `AGENTS.personal.md` no longer gets it. No provider literal.
+- **Read-only roles map to a read-only sandbox (IC-15, F-07)**: a role declaring the read-only
+  enforcement capability now emits the provider's read-only sandbox/permission mode instead of the
+  default writable surface. Capability-key driven — no provider literal.
+- **`--deactivation-status` is read-only (Task 1.25 review)**: the mode reports deactivation state
+  without mutating any context/settings file (no writes, no side effects).
+- **`declared-surface-empty` only fires when content was expected (Task 1.24 review)**: the check is
+  gated on the new `content_expected` predicate, so a surface that is empty by design (skills without
+  lazy rules, MCP config without servers) no longer warns.
+- **`context.rule-unreachable` is ERROR (Phase 1)**: with Copilot's `.github/instructions` files now
+  read, no generated rule channel is unreachable any more, so the check emits its ERROR severity
+  (report-only at sync end, `--doctor` exits 1).
+- **Phase-1 consistency promotions (PR F)**: `templates.provider-literal` (a provider name literal
+  left in a generic template) and `frontmatter.based-on-stale` (a platform override whose `based-on`
+  version no longer matches its source) are now ERROR-level; the affected platform overrides were
+  re-pinned to their current source versions so the default tree is clean.
 - **Agent delegation table rendered as one valid table (IC-15 Nr. 11, AC-20, F-15)**: the
   `agents-table` partial no longer emits blank lines between rows (the full-mode layout was an
   invalid Markdown table with 66-68 blank lines) and the orchestrator no longer repeats a second
@@ -57,7 +109,8 @@
   6-provider `AGENTS.md` after the managed block and the bootstrap injection) now aborts the sync with
   `context.over-hard-cap` instead of writing it silently. AC-01 rebaselined (7 of 1028 hashes: the new
   `.codex/config.toml`, the Codex orchestrator and 4 pipeline-details files, plus the Codex
-  generated-file-hashes).
+  generated-file-hashes). Runtime capture is UNVERIFIED (no Codex runtime available here) — the
+  `[agents] max_depth` and the 32 KiB hard-cap abort are asserted hermetically only.
 - CI: raise `scenarios` job timeout from 45 to 60 minutes (the scenario suite regularly needs 42–45+ minutes).
 - **Active-set consumers (IC-18 Nr. 14-18, PR A)**: the raw `roles` allowlist is no longer the only source
   for role-dependent generators; the per-sync `ActiveSet` (gates applied) is used.
@@ -228,10 +281,10 @@
   (`default`, `minimal`, `silent`, `lazy`) no generated artifact names a missing skill any more, so the check
   emits its spec level (`EMITTED_SEVERITY` / `PHASE1_PROMOTED` in `consistency/context_budget.py`). Sync end
   stays report-only (sync.log error list, exit code unchanged); `--doctor` exits 1 on a dangling pointer
-  (seed `dangling-pointer` is ERROR). Not promoted yet: `context.rule-unreachable` (Copilot's
-  `.github/instructions` rules stay unread until IC-15 Nr. 3) and `context.declared-surface-empty` (surfaces
-  that are empty by design, e.g. skills without lazy rules or MCP config without servers) - see the plan's
-  "Umsetzungs-Nachzüge 1.21–1.24, 1.33".
+  (seed `dangling-pointer` is ERROR). Phase-1 follow-ups (PR F): `context.rule-unreachable` is now ERROR —
+  with Copilot's `.github/instructions` files read (IC-15 Nr. 3) no generated rule channel is unreachable
+  any more — and `context.declared-surface-empty` is gated on the `content_expected` predicate so a surface
+  that is empty by design (e.g. skills without lazy rules) no longer warns.
 
 ### Changed
 - **`ACTIVE_ROLES` / `ROLE_<ROLE>_ACTIVE` available in templates**: `build_variables` injects
