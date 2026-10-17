@@ -147,15 +147,26 @@ def get_active_agents_data(
 _LANGUAGE_ALIASES = {"en": "english", "de": "deutsch"}
 
 
-def _has_language_variant(examples: dict, language: str) -> bool:
-    """True if ``examples`` has a list under ``language`` or its alias (log decision only)."""
+def _normalize_language(value: object) -> str:
+    """Normalize a language label: strip, casefold, resolve the ``en``/``de`` aliases."""
+    text = str(value).strip().casefold()
+    return _LANGUAGE_ALIASES.get(text, text)
 
-    def norm(value: object) -> str:
-        text = str(value).strip().casefold()
-        return _LANGUAGE_ALIASES.get(text, text)
 
-    wanted = norm(language)
-    return any(isinstance(v, list) and norm(k) == wanted for k, v in examples.items())
+def _find_language_variant(examples: dict, language: str) -> list | None:
+    """Return the example list for ``language`` (exact key first, then normalized match).
+
+    Single lookup shared by the selection and the fallback-log decision
+    (``_select_examples``) — no second matching logic.
+    """
+    exact = examples.get(language)
+    if isinstance(exact, list):
+        return exact
+    wanted = _normalize_language(language)
+    for key, value in examples.items():
+        if isinstance(value, list) and _normalize_language(key) == wanted:
+            return value
+    return None
 
 
 def _note_examples_fallback(role: str, language: str, info_sink: list[str] | None) -> None:
@@ -186,11 +197,12 @@ def _select_examples(
     lives in the free-text ``examples`` layer, rendered per the project's
     ``COMMUNICATION_LANGUAGE``.
 
-    Current data shape in ``config/role-defaults.yaml``: ``examples`` is a flat
-    list authored in the project's own language — this is a no-op passthrough
-    for that shape. Future shape: a language-tagged mapping
-    (``{"Deutsch": [...], "English": [...]}``) selected by ``language`` with a
-    deterministic fallback to the first available variant.
+    Data shapes: a flat list is the language-neutral form and passes through
+    unchanged; a language-tagged mapping (``{"Deutsch": [...], "English":
+    [...]}``) is resolved by ``language`` — exact key first, then a
+    case-insensitive match that also resolves the ``en``/``de`` aliases (same
+    normalization as the fallback log). A miss falls back deterministically to
+    the first available list variant.
 
     Fallback visibility (IC-29, log only): when a mapping lacks ``language``,
     one ``routing.examples-language-fallback`` INFO message per role is added to
@@ -201,11 +213,11 @@ def _select_examples(
     (#780 AC-3 / #779 IT-4); this function is just the generator plumbing.
     """
     if isinstance(examples, dict):
-        variant = examples.get(language)
-        if not isinstance(variant, list):
+        variant = _find_language_variant(examples, language)
+        if variant is None:
             # Log only a genuine miss: needs a role and no variant under the
-            # language's alias either ("en" vs mapping key "English").
-            if role and not _has_language_variant(examples, language):
+            # language's alias either ("fr" vs mapping keys "Deutsch"/"English").
+            if role:
                 _note_examples_fallback(role, language, info_sink)
             # Deterministic fallback: first list variant in insertion order.
             variant = next(
@@ -262,9 +274,10 @@ def get_routing_rules(
     - ``orchestrator_only`` roles keep their rule + flag: the tool's consumer
       IS the orchestrator; the escalation gate lives in the prompt/data, not here.
     - ``language`` (design C, issue #780) selects language-tagged ``examples``
-      when a role provides a mapping; for today's flat-list examples it is a
-      no-op passthrough. ``keywords`` stay canonical/language-neutral regardless.
-      Callers thread the project's ``COMMUNICATION_LANGUAGE`` here.
+      when a role provides a mapping; matching is case-insensitive and resolves
+      the ``en``/``de`` aliases (see ``_select_examples``). Flat-list examples
+      are a no-op passthrough. ``keywords`` stay canonical/language-neutral
+      regardless. Callers thread the project's ``COMMUNICATION_LANGUAGE`` here.
 
     Returns:
         ``{"target_agents": [...], "rules": [...], "pipelines": [...],
