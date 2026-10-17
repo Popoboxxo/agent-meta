@@ -1579,10 +1579,12 @@ def _sync_stage_auto_commit_allowlist(agent_meta_root, project_root, config, arg
     call the true last stage) so this file's own write doesn't get
     captured into that hash baseline a step too early.
 
-    IC-18 no. 14: the explicit project allowlist stays the upper bound (no
-    ``roles:`` key keeps the empty list, default render unchanged) and the
-    ActiveSet intersects it, so a gate-dropped role loses commit authority."""
-    active_roles = config.get("roles", [])
+    IC-18 no. 14 / IC-17 addendum (D1): the explicit project allowlist stays the
+    upper bound (no ``roles:`` key keeps the empty list, default render
+    unchanged) and the ActiveSet intersects it, so a gate-dropped role loses
+    commit authority. The allowlist comes from the sanctioned
+    ``ActiveSet.raw_roles`` (``None`` == no ``roles:`` key -> empty list)."""
+    active_roles = sorted(active_set.raw_roles) if active_set.raw_roles is not None else []
     resolved = resolve_auto_commit_config(config, active_roles, agent_meta_root)
     resolved["eligible_roles"] = [
         role for role in resolved["eligible_roles"] if active_set.has(role)

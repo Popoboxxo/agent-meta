@@ -1733,10 +1733,10 @@ def _build_platform_variables(
     variables["VALIDATOR_ENABLED"] = _mirror("validator")
 
     active_set = _resolve_active_set(active_set, config, agent_meta_root)
-    # WEB_PROJECT_ENABLED: the raw allowlist stays the condition (default render
-    # unchanged: e2e-tester is active by default but not 'listed') and the
-    # ActiveSet intersects it, so a gate-dropped e2e-tester never enables it.
-    _roles = config.get("roles", [])
+    # WEB_PROJECT_ENABLED: the sanctioned raw allowlist (``ActiveSet.raw_roles``,
+    # IC-17 addendum/D1) stays the condition (default render unchanged:
+    # e2e-tester is active by default but not 'listed') and the ActiveSet
+    # intersects it, so a gate-dropped e2e-tester never enables it.
     # DEVELOPER_TIERS_ENABLED: activation mirror of the `developer_tiers` group.
     # One flag for the whole junior/senior/principal tier set — the group keeps
     # them addressable as a unit instead of gating each tier separately.
@@ -1749,7 +1749,8 @@ def _build_platform_variables(
     #   config flag. Gates browser-verification and web-vitals blocks in the
     #   developer/senior-developer/performance-optimizer templates.
     variables["WEB_PROJECT_ENABLED"] = (
-        "true" if "e2e-tester" in _roles and active_set.has("e2e-tester") else "false"
+        "true" if active_set.raw_roles and "e2e-tester" in active_set.raw_roles
+        and active_set.has("e2e-tester") else "false"
     )
     # AGENT_DELEGATION_TABLE: generate after SE_ENABLED and VALIDATOR_ENABLED are set
     variables["active_agents"] = get_active_agents_data(

@@ -49,6 +49,59 @@ def test_pall_has_no_allowlist_and_no_gate_drops():
     assert active.roles <= active.known_roles
 
 
+def test_raw_roles_is_none_without_allowlist_key():
+    # IC-17 addendum / D1: no `roles:` key -> None (no allowlist supplied).
+    active, _ = _compute("pall")
+    assert active.raw_roles is None
+
+
+def test_raw_roles_null_is_none_like_missing_key():
+    # `roles: null` is not an allowlist either: same None sentinel as no key.
+    active, _ = _compute("pall", {"roles": None})
+    assert active.raw_roles is None
+
+
+def test_missing_roles_key_keeps_auto_commit_allowlist_default_empty(tmp_path):
+    # No `roles:` key -> raw_roles None -> the pipeline passes [] (unchanged
+    # default), even when an auto_commit block is present.
+    from types import SimpleNamespace
+
+    from lib.log import SyncLog
+    from lib.sync_pipeline import _sync_stage_auto_commit_allowlist
+
+    config = yaml.safe_load(
+        (_FIX / "pall" / ".meta-config" / "project.yaml").read_text(encoding="utf-8"))
+    config["auto_commit"] = {"mode": "auto", "triggers": ["task-boundary"]}
+    active = compute_active_set(config, _ROOT, tmp_path)
+    _sync_stage_auto_commit_allowlist(
+        _ROOT, tmp_path, config, SimpleNamespace(dry_run=False), SyncLog(), active)
+    data = yaml.safe_load(
+        (tmp_path / ".meta-config" / "auto-commit-allowlist.json").read_text(encoding="utf-8"))
+    assert data["eligible_roles"] == []
+
+
+def test_raw_roles_is_the_normalised_allowlist():
+    # IC-17 addendum / D1: key present -> frozenset mirror of the allowlist.
+    active, _ = _compute("p10")
+    base = yaml.safe_load(
+        (_FIX / "p10" / ".meta-config" / "project.yaml").read_text(encoding="utf-8"))
+    assert isinstance(active.raw_roles, frozenset)
+    assert active.raw_roles == frozenset(base["roles"])
+
+
+def test_raw_roles_empty_allowlist_is_not_none():
+    # None != empty set: an explicit empty `roles:` list keeps the empty set.
+    active, _ = _compute("p10", {"roles": []})
+    assert active.raw_roles == frozenset()
+    assert active.raw_roles is not None
+
+
+def test_raw_roles_malformed_allowlist_normalises_like_activation():
+    # Same normalisation as the activation path: malformed values -> empty set.
+    active, _ = _compute("p10", {"roles": "developer"})
+    assert active.raw_roles == frozenset()
+
+
 def test_unknown_role_warns():
     active, sink = _compute("p10", {"roles": ["orchestrator", "developer", "no-such-role"]})
     assert any("active-set.unknown-role" in w and "no-such-role" in w for w in sink)

@@ -51,11 +51,13 @@ def _make_agent_meta_root(tmp_path: Path) -> Path:
 
 
 def _active(config: dict) -> ActiveSet:
-    """Minimal ActiveSet whose roles mirror the config allowlist (no gates here)."""
-    roles = frozenset(config.get("roles") or ())
+    """Minimal ActiveSet whose roles and raw allowlist mirror the config (no gates)."""
+    raw = config.get("roles")
+    roles = frozenset(raw or ())
     return ActiveSet(
         roles=roles, routable=roles, known_roles=roles, sources={}, gates={},
         gate_dropped=(), missing_template=(), producers={},
+        raw_roles=frozenset(raw) if raw is not None else None,
     )
 
 

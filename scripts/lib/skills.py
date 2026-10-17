@@ -387,9 +387,11 @@ def sync_external_skills_for_provider(
 ):
     """Generate provider-specific wrapper agents for approved + project-enabled skills.
 
-    ``active_set`` (IC-17): the awesome-claude-code scout condition is the raw
-    allowlist check AND ``ActiveSet.has("agent-meta-scout")`` (intersection, so
-    a gate-dropped scout never pulls the repo in). Computed here when omitted.
+    ``active_set`` (IC-17): the awesome-claude-code scout condition is the
+    sanctioned ``ActiveSet.raw_roles`` allowlist AND
+    ``ActiveSet.has("agent-meta-scout")`` (intersection, so a gate-dropped scout
+    never pulls the repo in; no ``roles:`` key -> ``raw_roles is None`` ->
+    condition false). Computed here when omitted.
 
     Two-gate check per skill:
     1. approved: true in external-skills.config.yaml  (meta-maintainer quality gate)
@@ -426,11 +428,11 @@ def sync_external_skills_for_provider(
             
     # agent-meta-scout implicitly requires awesome-claude-code (unless disabled via enabled: false)
     # Project can override: external-skills.awesome-claude-code.enabled: false
-    roles = config.get("roles", [])
     if active_set is None:
         from .active_set import compute_active_set
         active_set = compute_active_set(config, agent_meta_root, project_root, warn_sink=[])
-    scout_active = "agent-meta-scout" in roles and active_set.has("agent-meta-scout")
+    listed_roles = active_set.raw_roles or ()
+    scout_active = "agent-meta-scout" in listed_roles and active_set.has("agent-meta-scout")
     acc_cfg = repos.get("awesome-claude-code", {})
     acc_project_override = project_skills.get("awesome-claude-code", {})
     if (
