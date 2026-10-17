@@ -53,6 +53,7 @@ def _sample_agent_content() -> str:
         "  - Bash\n"
         "  - Agent\n"
         "  - TodoWrite\n"
+        "  - Write\n"
         "memory: project\n"
         "temperature: 0.3\n"
         "---\n"

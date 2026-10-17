@@ -138,6 +138,44 @@ def _apply_tool_name_map(tools: list, tool_name_map: dict | None) -> list:
         for t in tools
     ]
 
+def _role_read_only(template_fm: dict) -> bool:
+    """Whether a role declares no write capability in its template tools.
+
+    Mirrors the doctor ``active_role_where: {tools_without: [Write, Edit]}``
+    predicate (scripts/lib/doctor_predicates.py): a role is read-only when its
+    template tool list contains neither ``Write`` nor ``Edit``; an empty or
+    missing list also counts as read-only. A comma-separated tool string is
+    accepted for parity with the doctor reader.
+    """
+    tools = (template_fm or {}).get('tools')
+    if isinstance(tools, str):
+        tools = [t.strip() for t in tools.split(',') if t.strip()]
+    if tools is None:
+        return True
+    if not isinstance(tools, list):
+        return False
+    return not any(t in ('Write', 'Edit') for t in tools if isinstance(t, str))
+
+def _effective_extra_fields(spec: dict, caps: dict, template_fm: dict) -> dict:
+    """Resolve a transform's literal ``extra-fields`` for a role.
+
+    A provider that enforces read-only access through a sandbox field declares
+    the capability ``read_only_enforcement: sandbox`` (config/
+    provider-capabilities.yaml) and the override map ``read-only-extra-fields``
+    in its ``agent-transform`` spec. The override is merged over ``extra-fields``
+    for a read-only role (see :func:`_role_read_only`); every other role keeps
+    the default. Pure data — no provider-name branch.
+    """
+    fields = dict(spec.get('extra-fields') or {})
+    read_only_fields = spec.get('read-only-extra-fields')
+    if (
+        caps.get('read_only_enforcement') == 'sandbox'
+        and isinstance(read_only_fields, dict)
+        and _role_read_only(template_fm)
+    ):
+        fields.update(read_only_fields)
+    return fields
+
 def wrap_sections_in_xml(content: str) -> str:
     """Wrap Markdown heading sections in XML tags.
 
@@ -404,7 +442,11 @@ def _apply_agent_transform(
         body = _strip_frontmatter(content)
         if spec.get('strip-claude-lines'):
             body = _strip_claude_specific_lines(body)
-        extra_fields = dict(spec.get('extra-fields') or {})
+        # IC-15 Nr. 21: a provider whose capability is
+        # `read_only_enforcement: sandbox` maps read-only roles (template tools
+        # without Write/Edit) to the read-only sandbox value declared under
+        # `read-only-extra-fields` — a plain data lookup, never a provider name.
+        extra_fields = _effective_extra_fields(spec, _caps, _fm)
         return build_agent_toml_document(
             name=name, description=description, model=model or "",
             extra_fields=extra_fields, body=body,
@@ -451,9 +493,15 @@ def _apply_agent_transform(
             log.note(rel, f'permissionMode: {permission_mode} (from {src})')
 
     # --- 4. literal frontmatter updates ---
-    extra_fields = spec.get('extra-fields')
-    if extra_fields:
-        content = _update_frontmatter_dict(content, dict(extra_fields))
+    if spec.get('extra-fields') or spec.get('read-only-extra-fields'):
+        # The read-only override (IC-15 Nr. 21) is resolved from the capability
+        # `read_only_enforcement: sandbox` + the `read-only-extra-fields` map;
+        # see _effective_extra_fields.
+        extra_fields = _effective_extra_fields(
+            spec, _caps, _parse_frontmatter_yaml(content),
+        )
+        if extra_fields:
+            content = _update_frontmatter_dict(content, extra_fields)
 
     # --- 4b. frontmatter key renames (data: rename-fields) ---
     rename_fields = spec.get('rename-fields')

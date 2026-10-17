@@ -468,7 +468,11 @@ capabilities:
     strips_html_comments: false
     rules_required_suffix: null
     subagent_allowlist_required: false
-    read_only_enforcement: none
+    # IC-15 Nr. 21 (F-32): Codex enforces read-only through a per-agent sandbox
+    # field. Roles without Write/Edit are emitted with `sandbox_mode: read-only`
+    # (see ai-providers.yaml Codex `agent-transform.read-only-extra-fields`)
+    # instead of the pauschale `workspace-write`. Runtime UNVERIFIED.
+    read_only_enforcement: sandbox
     surface_verified_state:
       agents: UNVERIFIED
       commands: UNVERIFIED

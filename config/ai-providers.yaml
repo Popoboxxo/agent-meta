@@ -708,6 +708,13 @@ providers:
       model: inject
       extra-fields:
         sandbox_mode: workspace-write
+      # IC-15 Nr. 21 (F-32): a role whose template tool list carries neither
+      # Write nor Edit is read-only. Together with the capability
+      # `read_only_enforcement: sandbox` this override map turns the pauschale
+      # `workspace-write` into `read-only` for exactly those roles. Pure data —
+      # provider_transform reads the keys, never a provider name.
+      read-only-extra-fields:
+        sandbox_mode: read-only
       tools: skip
       tools-format: skip
       tool-name-map: {}

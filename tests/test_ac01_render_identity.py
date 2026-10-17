@@ -138,6 +138,13 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   ``fraud-risk-assessor``, ``risk-based-audit-planner``) render the framework value ``3``
   instead of agent-meta's leaked override ``5``. Changed: those 3 artifacts per provider
   (9 providers) plus the 9 ``generated-file-hashes.json`` (36 of 1007 entries; 0 unrelated drift).
+- Task 1.40 (IC-15 Nr. 21, AC-10 / F-32): a provider declaring
+  ``read_only_enforcement: sandbox`` (Codex) plus the ``read-only-extra-fields`` override
+  map now emits ``sandbox_mode: read-only`` for roles whose template tool list carries
+  neither ``Write`` nor ``Edit`` (previously the pauschale ``workspace-write``). Changed: the
+  21 read-only ``Codex/.codex/agents/*.toml`` roles plus the Codex
+  ``.meta-config/generated-file-hashes.json`` (22 of 1007 entries; Codex-only, 0 non-Codex
+  drift; ``meta-doctor.toml`` is covered by the existing AC-01 exception).
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
