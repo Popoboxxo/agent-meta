@@ -20,6 +20,7 @@ import re
 from pathlib import Path
 
 from . import providers
+from .providers import load_provider_capabilities
 from .consistency.orchestrator_strict import _resolve_effective_strict
 from .io import read_json_lenient, safe_path, write_atomic, write_checked
 from .log import SyncLog
@@ -56,21 +57,58 @@ _CONTINUE_ISOLATION_FILE = ".continue/rules/provider-isolation.md"
 # Public entry point
 # ---------------------------------------------------------------------------
 
+def _provider_reads_dir(
+    provider: str,
+    provider_pc: dict,
+    capabilities: dict,
+    directory: str,
+) -> bool:
+    """Whether *provider* actively reads *directory* as its own context file.
+
+    Provider-agnostic (IC-15 Nr. 16 / F-17): a foreign isolation-dir that is
+    the target provider's declared ``context_file`` must not be denied when the
+    ``agents_md_visible_to_subagents`` capability marks the provider as an
+    active reader of that shared core (e.g. an ``AGENTS.md`` reader in a
+    multi-provider project). Keyed on declared data only — never a provider-name
+    literal.
+    """
+    context_file = provider_pc.get("context_file")
+    if not (isinstance(context_file, str) and context_file == directory):
+        return False
+    caps = capabilities.get(provider) if isinstance(capabilities, dict) else None
+    return isinstance(caps, dict) and caps.get("agents_md_visible_to_subagents") is True
+
+
 def sync_provider_isolation(
     project_root: Path,
     providers: list[str],
     provider_config: dict,
     log: SyncLog,
     dry_run: bool,
+    agent_meta_root: Path | None = None,
 ) -> None:
     """Generate provider isolation blocks for all active providers.
 
     Does nothing when fewer than 2 providers are active (no cross-provider
     isolation needed).
+
+    A foreign isolation-dir that the target provider reads as its own context
+    file (capability ``agents_md_visible_to_subagents`` true) is skipped, so a
+    shared core such as ``AGENTS.md`` is never denied to an active reader
+    (IC-15 Nr. 16). ``agent_meta_root`` locates the capability registry; when it
+    is omitted no capability data is available and every foreign dir is kept
+    (fail-safe, byte-compatible with the previous behaviour).
     """
     if len(providers) < 2:
         log.skip("provider-isolation", f"only {len(providers)} provider active — skipping")
         return
+
+    capabilities: dict = {}
+    if agent_meta_root is not None:
+        try:
+            capabilities = load_provider_capabilities(agent_meta_root) or {}
+        except Exception:
+            capabilities = {}
 
     log.note("provider-isolation", f"generating isolation for: {', '.join(providers)}")
 
@@ -78,6 +116,7 @@ def sync_provider_isolation(
         # foreign_dirs = isolation-dirs of all OTHER active providers.
         # dir_owner tracks which provider each dir belongs to (used for
         # human-readable deny messages instead of guessing from the path).
+        provider_pc = provider_config.get(provider, {})
         foreign_dirs: list[str] = []
         dir_owner: dict[str, str] = {}
         for other in providers:
@@ -85,9 +124,12 @@ def sync_provider_isolation(
                 continue
             other_pc = provider_config.get(other, {})
             for d in other_pc.get("isolation-dirs", []):
-                if d not in foreign_dirs:
-                    foreign_dirs.append(d)
-                    dir_owner[d] = other
+                if d in foreign_dirs:
+                    continue
+                if _provider_reads_dir(provider, provider_pc, capabilities, d):
+                    continue
+                foreign_dirs.append(d)
+                dir_owner[d] = other
 
         if not foreign_dirs:
             log.skip(f"provider-isolation/{provider}", "no foreign dirs found")

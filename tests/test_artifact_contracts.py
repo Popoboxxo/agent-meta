@@ -209,11 +209,10 @@ def test_validate_json_document_v2_flat_mcp_is_error() -> None:
     assert errors
 
 
-def test_validate_json_document_v2_rejects_v1_only_key() -> None:
+def test_validate_json_document_v2_accepts_subagent_depth() -> None:
+    # IC-15 Nr. 16: subagent_depth is retained on the v2 surface, not v1-only.
     text = '{"mcp": {"servers": {}}, "subagent_depth": 2}'
-    errors = _errors(validate_json_document(text, "opencode-json-v2", "opencode.json"))
-    assert len(errors) == 1
-    assert "subagent_depth" in errors[0].message
+    assert validate_json_document(text, "opencode-json-v2", "opencode.json") == []
 
 
 def test_validate_json_document_v1_flat_mcp_is_clean() -> None:

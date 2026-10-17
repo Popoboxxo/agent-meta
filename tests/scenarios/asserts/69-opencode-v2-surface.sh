@@ -23,8 +23,9 @@
 #      `mcp` server map, v1-only `subagent_depth` retained).
 #   2. V2 PROJECT CHANNEL: the PRIMARY project (synced by the harness from the
 #      fixture above) must emit the v2 shape/mechanism — nested `mcp.servers`, no
-#      flat top-level server map, no v1-only `subagent_depth`, a `default_agent`
-#      key, and v2 frontmatter (`orchestrator` mode: primary, others subagent).
+#      flat top-level server map, the retained `subagent_depth` (>= 2, IC-15
+#      Nr. 16), a `default_agent` key, and v2 frontmatter (`orchestrator` mode:
+#      primary, others subagent).
 #   3. V2 `--check` rc 0 on the consistent v2 tree; a v1 tree under the v2 project
 #      yields a non-zero `--check` (no silent divergence).
 # Exit 0 = all assertions hold.
@@ -158,7 +159,7 @@ assert opts.get("surface-version") == "v2", (
 )
 PY
 
-# 2b. Nested mcp.servers, NO flat top-level mcp server map, no v1-only key.
+# 2b. Nested mcp.servers, NO flat top-level mcp server map, retained depth.
 python3 - opencode.json <<'PY' || fail "v2 opencode.json key-shape contract violated"
 import json
 import sys
@@ -169,7 +170,9 @@ assert "servers" in mcp, "v2 'mcp' must be nested with a 'servers' object"
 assert isinstance(mcp["servers"], dict), "'mcp.servers' must be an object"
 flat = sorted(set(mcp) - {"servers"})
 assert not flat, f"v2 'mcp' carries flat v1 server key(s): {flat}"
-assert "subagent_depth" not in doc, "v2 must not carry the v1-only key 'subagent_depth'"
+assert doc.get("subagent_depth", 0) >= 2, (
+    "v2 must retain the orchestrator subagent_depth (IC-15 Nr. 16)"
+)
 PY
 
 # 2c. default_agent key + a primary-role entry (orchestrator, mode: primary).

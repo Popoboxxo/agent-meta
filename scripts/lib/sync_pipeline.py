@@ -1389,7 +1389,10 @@ def _sync_stage_knowledge_and_isolation(
     # Provider isolation: hard-block cross-provider directory access
     isolation_mode = config.get("provider-isolation")
     if isolation_mode != "disabled":
-        sync_provider_isolation(project_root, providers, provider_config, log, args.dry_run)
+        sync_provider_isolation(
+            project_root, providers, provider_config, log, args.dry_run,
+            agent_meta_root=agent_meta_root,
+        )
     else:
         log.skip("provider-isolation", "disabled in project.yaml")
 

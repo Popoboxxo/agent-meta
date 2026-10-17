@@ -775,7 +775,9 @@ def _sync_managed_block_context(
 
     # Claude settings files are initialized by the dedicated helpers in sync.py.
     if not has_dedicated:
-        _init_provider_settings_json(project_root, pc, agent_meta_root, variables, log, dry_run)
+        _init_provider_settings_json(
+            project_root, pc, agent_meta_root, variables, log, dry_run, provider=provider
+        )
 
 
 def _sync_opencode_context(
@@ -902,7 +904,9 @@ def _sync_opencode_context(
                               project_root=project_root, agent_meta_root=agent_meta_root)
 
     init_opencode_personal(agent_meta_root, project_root, log, dry_run)
-    _init_provider_settings_json(project_root, pc, agent_meta_root, variables, log, dry_run)
+    _init_provider_settings_json(
+        project_root, pc, agent_meta_root, variables, log, dry_run, provider=provider
+    )
 
 
 def _cleanup_bootstrap_block(
@@ -1514,15 +1518,28 @@ def sync_context_for_provider(
     _apply_context_filename_settings(project_root, pc, log, dry_run)
 
 
-def apply_settings_surface_shape(content: str, pc: dict) -> str:
+def _required_depth(capabilities: dict | None) -> int | None:
+    """``required_depth`` as a positive int (bool rejected), else ``None``."""
+    depth = (capabilities or {}).get("required_depth")
+    if isinstance(depth, int) and not isinstance(depth, bool) and depth >= 1:
+        return depth
+    return None
+
+
+def apply_settings_surface_shape(
+    content: str, pc: dict, capabilities: dict | None = None
+) -> str:
     """Apply the resolved settings-surface shape to a settings template body.
 
     Provider-neutral dispatch on the resolved ``mcp-config.format`` value ONLY
     (never on a provider name or ``surface-version``; the loader resolves the
     format, the writer consumes it). For the ``opencode-json-v2`` surface the
-    v1-only top-level ``subagent_depth`` key is dropped and ``default_agent`` is
-    emitted from the ``primary-role`` data key (OQ-4/AC-5). Every other format
-    returns ``content`` byte-for-byte, so the shipped v1 surface stays frozen.
+    top-level ``subagent_depth`` key is RETAINED — sourced from the
+    ``required_depth`` capability when available (IC-15 Nr. 16: the v2 surface
+    must not drop the orchestrator depth; the shipped template value is kept
+    otherwise) — and ``default_agent`` is emitted from the ``primary-role``
+    data key (OQ-4/AC-5). Every other format returns ``content`` byte-for-byte,
+    so the shipped v1 surface stays frozen.
 
     The settings template is JSONC (``//`` comments); the transform parses it
     leniently and re-emits clean JSON. A template that cannot be parsed is
@@ -1539,7 +1556,9 @@ def apply_settings_surface_shape(content: str, pc: dict) -> str:
         return content
     if not isinstance(document, dict):
         return content
-    document.pop("subagent_depth", None)
+    depth = _required_depth(capabilities)
+    if depth is not None:
+        document["subagent_depth"] = depth
     primary_role = pc.get("primary-role")
     if isinstance(primary_role, str) and primary_role:
         document["default_agent"] = primary_role
@@ -1553,6 +1572,7 @@ def _init_provider_settings_json(
     variables: dict,
     log: SyncLog,
     dry_run: bool,
+    provider: str | None = None,
 ) -> None:
     """Create provider settings skeleton once if it does not exist yet."""
 
@@ -1585,7 +1605,16 @@ def _init_provider_settings_json(
         source_label = "minimal fallback"
         if settings_template_rel:
             log.warning(f"{settings_template_rel} not found — using minimal fallback for {settings_file}")
-    content = apply_settings_surface_shape(content, pc)
+    capabilities = None
+    if provider:
+        try:
+            from . import providers as _providers
+            capabilities = (
+                _providers.load_provider_capabilities(agent_meta_root) or {}
+            ).get(provider)
+        except Exception:
+            capabilities = None
+    content = apply_settings_surface_shape(content, pc, capabilities)
     log.action("INIT", str(settings_path.relative_to(project_root)), source_label)
     if not dry_run:
         settings_path.parent.mkdir(parents=True, exist_ok=True)
@@ -2217,6 +2246,7 @@ def init_settings_json(
             variables or {},
             log,
             dry_run,
+            provider=provider,
         )
 
 
