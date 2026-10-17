@@ -132,6 +132,12 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   8.5.0 -> 8.5.1). Changed: the orchestrator artifact of all 9 providers, the 6
   ``AGENTS.md`` files (Agent Directory rows lose the blank-line separation) and the 9
   ``generated-file-hashes.json`` (24 of 1007 entries). No other artifact changed.
+- Task 1.38 (IC-15 Nr. 17, AC-51): the reflection overrides now come from the CONSUMER
+  config instead of agent-meta's own tracked ``.meta-config/project.yaml``, so the three
+  active ``{{MAX_ITERATIONS}}`` roles (``control-framework-assessor``,
+  ``fraud-risk-assessor``, ``risk-based-audit-planner``) render the framework value ``3``
+  instead of agent-meta's leaked override ``5``. Changed: those 3 artifacts per provider
+  (9 providers) plus the 9 ``generated-file-hashes.json`` (36 of 1007 entries; 0 unrelated drift).
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
