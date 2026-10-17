@@ -136,8 +136,12 @@ def test_ac07_inflated_artifact_exceeds_ceiling(measured):
     caps = mappings[provider]
     target = projects[provider] / caps["agents_dir"] / ("orchestrator" + (caps.get("agent_ext") or ".md"))
     original = target.read_bytes()
+    # Inflate against the PINNED ceiling, not `_ceiling(len(original))`: after the
+    # phase-1 slimming the artifact is smaller than its pinned Ist, so its own
+    # tolerance ceiling sits below the pin and would not trip the check.
+    limit = FULL_BUDGET_CEILINGS[provider]["orchestrator"]
     try:
-        target.write_bytes(original + b"x" * (_ceiling(len(original)) - len(original) + 1))
+        target.write_bytes(original + b"x" * (limit - len(original) + 1))
         violations = check_ceilings(_measure(projects, mappings), FULL_BUDGET_CEILINGS)
     finally:
         target.write_bytes(original)
