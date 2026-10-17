@@ -1,6 +1,6 @@
 ---
 name: template-agent-meta-manager
-version: "1.24.0"
+version: "1.24.1"
 description: "Manage agent-meta: upgrades, sync, feedback delegation, project-specific agents, external-skill lifecycle, and creating extensions."
 hint: "Manage agent-meta: upgrade, sync, feedback, create project-specific agents"
 reference_standards:
@@ -165,12 +165,13 @@ model, overriding per-role/tier/preset resolution. Remove the key (or the whole
 block) and the previous per-agent settings resume automatically — nothing else to
 clean up.
 
-```yaml
-# .meta-config/project.yaml
-model-override-all:
-  Claude: balanced      # tier name -> provider's model-tiers entry
-  Gemini: powerful
-```
+> **Example (provider-specific):**
+> ```yaml
+> # .meta-config/project.yaml
+> model-override-all:
+>   Claude: balanced      # tier name -> provider's model-tiers entry
+>   Gemini: powerful
+> ```
 
 Prefer tier names (nano/fast/balanced/powerful/max/ultra). A concrete model ID
 must come from `{{AGENT_META_REL_PATH}}config/generated/model-registry.json`
@@ -204,12 +205,13 @@ When a provider is set to `true`, `sync.py` omits the generated agent's
 `model:` field entirely — the agent then inherits the main-chat model at
 runtime. `false` counts as unset (normal per-role/tier resolution applies).
 
-```yaml
-# .meta-config/project.yaml
-model-inherit-main-chat:
-  Claude: true      # all Claude agents inherit the main-chat model
-  Gemini: false     # unset — normal per-role resolution applies
-```
+> **Example (provider-specific):**
+> ```yaml
+> # .meta-config/project.yaml
+> model-inherit-main-chat:
+>   Claude: true      # all Claude agents inherit the main-chat model
+>   Gemini: false     # unset — normal per-role resolution applies
+> ```
 
 Toggle workflow:
 1. Read current state: `model-inherit-main-chat` in `.meta-config/project.yaml`.
@@ -248,7 +250,7 @@ Guards & scope:
   protection) — report the model count + timestamp from the run.
 - After any config change, run a REAL sync (not just `--dry-run`/`--validate`)
   or explicitly report that it is still pending.
-- Scope discipline: do NOT touch providers you were not asked to (e.g. Mammouth).
+- Scope discipline: do NOT touch providers you were not asked to (e.g. a provider outside the task scope).
 
 ## 9. External skills
 
@@ -292,11 +294,11 @@ Input: `sync.py --doctor --json` report or a `meta-doctor` hand-off (role, if pr
 - Exit code: `0` no ERROR, `1` ERROR (WARNING with `--strict`), `2` runtime error / `--out` rejected / `doctor.registry-invalid` under `--strict`. `doctor.registry-invalid` (skipped registry entry): report it, repair nothing.
 - Repair only by §3/§8 rules and only after approval, as for any other change; propose one fix per finding (`suggestion`, `fix_owner`). Missing or unknown fields: ask, do not invent.
 
-## 11. Improve CLAUDE.md
+## 11. Improve {{CONTEXT_FILE}}
 
 Immediate rule: error observed → write an imperative rule → insert outside the managed block.
 
-**Length check:** `wc -l CLAUDE.md` — ≤300 optimal, 301-500 acceptable, >500 warn → offload detail knowledge.
+**Length check:** `wc -l {{CONTEXT_FILE}}` — ≤300 optimal, 301-500 acceptable, >500 warn → offload detail knowledge.
 
 ## 12. Template migration (e.g. classic → modern port)
 
@@ -493,7 +495,7 @@ NOTES: [tradeoffs, warnings, confirmations]
 - No project-specific solution for a generic problem → feedback
 - Never sync without checking `sync.log` afterwards
 - No manual changes in the generated agents directory
-- Never write into the managed block of CLAUDE.md
+- Never write into the managed block of {{CONTEXT_FILE}}
 - **Submodule Protection:** Never edit `.agent-meta/` files directly within consumer repos.
 - **Submodule Protection:** Never modify `.gitmodules` or run `git add` on submodules automatically.
 - **Submodule Protection:** Never scaffold source code in consumer projects (manage only `.meta-config/project.yaml` and managed blocks).

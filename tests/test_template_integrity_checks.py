@@ -153,12 +153,12 @@ def _mk_literal_repo(tmp_path: Path, body: str, allow=()) -> Path:
     return tmp_path
 
 
-def test_provider_literal_outside_example_is_warning(tmp_path):
+def test_provider_literal_outside_example_is_error(tmp_path):
     root = _mk_literal_repo(tmp_path, "Read .acme/rules and ACME.md.\n")
     findings = check_provider_literal(root)
     assert len(findings) == 1
     assert findings[0].check == "templates.provider-literal"
-    assert findings[0].severity is Severity.WARNING
+    assert findings[0].severity is Severity.ERROR
     assert ".acme/" in findings[0].message and "ACME.md" in findings[0].message
 
 
@@ -205,7 +205,6 @@ def test_provider_literal_scope_is_agents_generic_top_level_only(tmp_path):
     assert check_provider_literal(root) == []
 
 
-def test_provider_literal_real_repo_smoke_only_warnings():
-    findings = check_provider_literal(ROOT)
-    assert all(f.severity is Severity.WARNING for f in findings)
-    assert all(f.file.startswith("agents/1-generic/") for f in findings)
+def test_provider_literal_real_repo_clean():
+    """AC-73: the source repo has 0 provider literals outside the allowlist."""
+    assert check_provider_literal(ROOT) == []

@@ -15,7 +15,7 @@
 | `_wf-issue.md` | GitHub Issue bearbeiten (L workflow) | `rules/1-generic/issue-lifecycle.md` |
 | `_wf-git-ops.md` | Git extended workflows, platform hints | Agent template: `git.md` |
 | `_wf-feedback.md` | Feedback an agent-meta | Agent template: `meta-feedback.md` |
-| `_wf-claude-review.md` | CLAUDE.md review & improvement | `rules/2-platform/agent-meta-conventions.md` |
+| `_wf-claude-review.md` | Context-file review & improvement | `rules/2-platform/agent-meta-conventions.md` |
 
 ## Why This Change?
 

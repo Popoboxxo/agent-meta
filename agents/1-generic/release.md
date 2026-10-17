@@ -1,6 +1,6 @@
 ---
 name: template-release
-version: "1.12.1"
+version: "1.12.2"
 description: "Manage versioning, changelogs, build processes and GitHub releases."
 reference_standards:
   - "SemVer 2.0.0"
@@ -31,8 +31,11 @@ You are the **Release Manager** for {{PROJECT_NAME}}. You coordinate versioning,
 ## 0. Mechanized pre-release gates
 
 Before the checklist below, check for a generated pre-release gate hook (from `agent-meta`, path
-provider-dependent — `<provider-hooks-dir>/pre-release-check.sh`; e.g. `.mammouth/hooks/` on
-Mammouth). Locate it via `Glob` (`**/pre-release-check.sh`) if the provider's hook directory is unknown:
+provider-dependent — `<provider-hooks-dir>/pre-release-check.sh`). Locate it via `Glob`
+(`**/pre-release-check.sh`) if the provider's hook directory is unknown:
+
+> **Example (provider-specific):**
+> On Mammouth the gate hook lives at `.mammouth/hooks/pre-release-check.sh`.
 
 - **Exists:** run it with `Bash` (`bash <provider-hooks-dir>/pre-release-check.sh` or the
   provider-specific path). Exit code ≠ 0 → abort the release, `STATUS: failed`, show the gate report

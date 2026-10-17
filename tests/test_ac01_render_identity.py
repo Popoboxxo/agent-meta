@@ -145,6 +145,16 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   21 read-only ``Codex/.codex/agents/*.toml`` roles plus the Codex
   ``.meta-config/generated-file-hashes.json`` (22 of 1007 entries; Codex-only, 0 non-Codex
   drift; ``meta-doctor.toml`` is covered by the existing AC-01 exception).
+- Task 1.42 (IC-15 Nr. 23, AC-73): provider literals are removed from the generic
+  templates. ``agent-meta-manager``/``agent-meta-scout``/``prompt-governor`` use the
+  ``{{CONTEXT_FILE}}`` placeholder, ``agent-meta-manager``/``release`` wrap their
+  provider-specific snippets in ``> **Example (provider-specific):**`` blocks, and
+  ``mammouth-expert`` is split into a provider-neutral ``1-generic`` base plus a
+  standalone ``2-platform/agent-meta-mammouth-expert.md`` (based on
+  ``provider-expert``, both 2.0.0). Changed: 5 agent artifacts per provider (9
+  providers = 45), 9 ``generated-file-hashes.json`` and 1
+  ``Copilot/.github/copilot-instructions.md`` — 55 of 1007 hashes; 0 added/removed.
+  ``knowledge-migrator`` is not rendered in the matrix. No other artifact changed.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

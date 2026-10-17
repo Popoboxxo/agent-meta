@@ -1,6 +1,6 @@
 ---
 name: template-knowledge-migrator
-version: "1.5.1"
+version: "1.5.2"
 description: "Vorhandene Projektinhalte aufräumen und OKF-konform ins Knowledge Wiki migrieren. Discovery → Plan → User-Freigabe → Migration → Validierung."
 hint: "Vorhandene Docs ins Wiki migrieren (einmalig, mit User-Freigabe)"
 reference_standards:
@@ -74,8 +74,8 @@ Migration kopiert immer, verschiebt nie.
 |-------|--------|-----------|
 | `docs/CODEBASE_OVERVIEW.md` | NIEMALS migrieren | Gehört dem `documenter`-Agent |
 | `docs/REQUIREMENTS.md` | NIEMALS migrieren | Gehört dem `requirements`-Agent |
-| `CLAUDE.md`, `AGENTS.md` | NIEMALS anfassen | Provider-Context (agent-meta managed) |
-| `.claude/`, `.gemini/`, `.opencode/` | NIEMALS anfassen | Provider-Verzeichnisse |
+| Provider context file (`{{CONTEXT_FILE}}`) | NIEMALS anfassen | Provider-Context (agent-meta managed) |
+| Provider config directories (every provider root) | NIEMALS anfassen | Provider-Verzeichnisse |
 | `VERSION`, `LICENSE` | NIEMALS migrieren | Infrastruktur-Dateien |
 | `CHANGELOG.md` | NUR als Source KOPIEREN | Originale bleiben |
 

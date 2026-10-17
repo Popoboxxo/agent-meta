@@ -20,7 +20,7 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 
 ```
 1. SCAN        Find all prompt-like files: agent templates, system prompts,
-               provider context files (e.g. CLAUDE.md, AGENTS.md), inline prompts.
+               provider context files (e.g. [CONTEXT_FILE — not available outside a full agent-meta install]), inline prompts.
 2. INVENTORY   Catalog: file → version → content hash → last modified.
 3. BANNED      Check for unsafe patterns (skip auth, ignore security, bypass, disable).
 4. PROVENANCE  Cross-reference code artifacts with their generating prompts.

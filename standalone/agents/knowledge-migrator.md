@@ -53,8 +53,8 @@ Migration kopiert immer, verschiebt nie.
 |-------|--------|-----------|
 | `docs/CODEBASE_OVERVIEW.md` | NIEMALS migrieren | Gehört dem `documenter`-Agent |
 | `docs/REQUIREMENTS.md` | NIEMALS migrieren | Gehört dem `requirements`-Agent |
-| `CLAUDE.md`, `AGENTS.md` | NIEMALS anfassen | Provider-Context (agent-meta managed) |
-| `.claude/`, `.gemini/`, `.opencode/` | NIEMALS anfassen | Provider-Verzeichnisse |
+| Provider context file (`[CONTEXT_FILE — not available outside a full agent-meta install]`) | NIEMALS anfassen | Provider-Context (agent-meta managed) |
+| Provider config directories (every provider root) | NIEMALS anfassen | Provider-Verzeichnisse |
 | `VERSION`, `LICENSE` | NIEMALS migrieren | Infrastruktur-Dateien |
 | `CHANGELOG.md` | NUR als Source KOPIEREN | Originale bleiben |
 
