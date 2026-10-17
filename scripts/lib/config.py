@@ -66,6 +66,7 @@ from .providers import (
 )
 from .reflection import (
     apply_project_overrides,
+    load_project_overrides,
     load_reflection_pairs,
 )
 from .repo_containment import (
@@ -1881,7 +1882,7 @@ def _build_pipeline_variables(
         # IC-15 Nr. 17 / AC-51: overrides come from the CONSUMER config handed
         # to build_variables — not agent-meta's own tracked project.yaml, whose
         # MAX_ITERATIONS=5 leaked into projects without `reflection-pairs`.
-        _refl_overrides = (config.get("reflection-pairs") or {}).get("overrides", {})
+        _refl_overrides = load_project_overrides(config)
         _effective_pairs = apply_project_overrides(_refl_pairs, _refl_overrides)
         if _effective_pairs:
             variables["REFLECTION_PAIRS_ENABLED"] = "true"

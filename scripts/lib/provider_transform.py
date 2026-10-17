@@ -16,6 +16,7 @@ import re
 from pathlib import Path
 
 from .agent_toml import build_agent_toml_document
+from .dispatch_depth import required_depth_int
 from .frontmatter import (
     _parse_frontmatter_yaml,
     _quiet_field_set,
@@ -416,9 +417,7 @@ def _apply_agent_transform(
         # Opencode) stay byte-identical.
         subagent_depth = None
         if spec.get('inject-subagent-depth'):
-            _depth = _caps.get('required_depth')
-            if isinstance(_depth, int) and not isinstance(_depth, bool) and _depth >= 1:
-                subagent_depth = _depth
+            subagent_depth = required_depth_int(_caps)
         return _transform_frontmatter_for_opencode(
             content, name, description, model, steps, generated_from, agent_meta_root, temperature,
             strip_fields=strip_fields, mode=mode, subagent_depth=subagent_depth,

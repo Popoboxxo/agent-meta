@@ -27,9 +27,14 @@ _BLOCK_RE = re.compile(
 )
 
 
-def _required_depth(capabilities: Mapping):
-    """``required_depth`` as a positive int, else ``None`` (bool is rejected)."""
-    depth = capabilities.get("required_depth")
+def required_depth_int(capabilities: Mapping | None = None):
+    """``required_depth`` as a positive int, else ``None`` (bool is rejected).
+
+    Single source for the capability -> dispatch-depth coercion (F4): consumed
+    by ``dispatch_depth``, ``context`` and ``provider_transform`` so the
+    bool-rejection / ``>= 1`` rule lives in exactly one place.
+    """
+    depth = (capabilities or {}).get("required_depth")
     if isinstance(depth, int) and not isinstance(depth, bool) and depth >= 1:
         return depth
     return None
@@ -48,7 +53,7 @@ def dispatch_depth_supported(pc: Mapping, capabilities: Mapping) -> bool:
     """True when the capability data requests a TOML ``[agents]`` depth write."""
     return (
         capabilities.get("agent_config_format") == "toml"
-        and _required_depth(capabilities) is not None
+        and required_depth_int(capabilities) is not None
         and _config_file(pc) is not None
     )
 
@@ -85,7 +90,7 @@ def write_dispatch_depth_config(
     if not dispatch_depth_supported(pc, capabilities):
         return []
     rel = _config_file(pc)
-    depth = _required_depth(capabilities)
+    depth = required_depth_int(capabilities)
     path = safe_path(project_root, rel)
     block = _render_block(depth)
     if path.exists():

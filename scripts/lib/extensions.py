@@ -82,7 +82,8 @@ def _render_extension_managed_block(
     from .context import omit_unresolved_placeholder_lines
 
     return omit_unresolved_placeholder_lines(
-        render_managed_block(variables, source_label, log, agent_meta_root)
+        render_managed_block(variables, source_label, log, agent_meta_root),
+        log, source_label,
     )
 
 

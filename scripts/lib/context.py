@@ -32,6 +32,7 @@ from .variables import (
     strip_inactive_conditional_blocks,
     substitute,
 )
+from .dispatch_depth import required_depth_int
 from .context_templates.builder import TemplateBuilder
 
 SNIPPETS_DIR = "snippets"
@@ -1058,17 +1059,26 @@ def _cleanup_bootstrap_block(
 _UNRESOLVED_PLACEHOLDER_RE = re.compile(r"\{\{[A-Z][A-Z0-9_]*\}\}")
 
 
-def omit_unresolved_placeholder_lines(text: str) -> str:
+def omit_unresolved_placeholder_lines(
+    text: str, log: SyncLog | None = None, label: str = ""
+) -> str:
     """Drop whole lines still carrying an unresolved ``{{VAR}}`` placeholder.
 
     Provider-agnostic helper (no provider literal); consumed by the Continue
     context writer and the run1-convergence pass so both agree on the exact
-    emitted bytes (AC-4 fixpoint).
+    emitted bytes (AC-4 fixpoint). Every discarded line is recorded at debug
+    level (F13) so a silently dropped directive stays diagnosable instead of
+    vanishing without a trace.
     """
-    return "".join(
-        line for line in text.splitlines(keepends=True)
-        if not _UNRESOLVED_PLACEHOLDER_RE.search(line)
-    )
+    kept: list[str] = []
+    for line in text.splitlines(keepends=True):
+        if _UNRESOLVED_PLACEHOLDER_RE.search(line):
+            if log is not None:
+                log.debug(label or "context",
+                          f"omitted unresolved placeholder line: {line.strip()}")
+        else:
+            kept.append(line)
+    return "".join(kept)
 
 
 def _sync_continue_context(
@@ -1114,7 +1124,7 @@ def _sync_continue_context(
                 ccontent, platform_vars, rel_ctx, log
             )
             # IC-15 Nr. 10 (F-14): never scaffold unresolved placeholders.
-            ccontent = omit_unresolved_placeholder_lines(ccontent)
+            ccontent = omit_unresolved_placeholder_lines(ccontent, log, rel_ctx)
             log.action("INIT", rel_ctx, source_label)
             if not dry_run:
                 ctx_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1126,7 +1136,7 @@ def _sync_continue_context(
                 new_managed, platform_vars, context_file, log
             )
             # IC-15 Nr. 10 (F-14): omit lines with unset project variables.
-            new_managed = omit_unresolved_placeholder_lines(new_managed)
+            new_managed = omit_unresolved_placeholder_lines(new_managed, log, context_file)
             updated = update_managed_block(existing, new_managed)
             if updated != existing:
                 log.action("UPDATE", str(ctx_path.relative_to(project_root)),
@@ -1576,14 +1586,6 @@ def sync_context_for_provider(
     _apply_context_filename_settings(project_root, pc, log, dry_run)
 
 
-def _required_depth(capabilities: dict | None) -> int | None:
-    """``required_depth`` as a positive int (bool rejected), else ``None``."""
-    depth = (capabilities or {}).get("required_depth")
-    if isinstance(depth, int) and not isinstance(depth, bool) and depth >= 1:
-        return depth
-    return None
-
-
 def apply_settings_surface_shape(
     content: str, pc: dict, capabilities: dict | None = None
 ) -> str:
@@ -1614,7 +1616,7 @@ def apply_settings_surface_shape(
         return content
     if not isinstance(document, dict):
         return content
-    depth = _required_depth(capabilities)
+    depth = required_depth_int(capabilities)
     if depth is not None:
         document["subagent_depth"] = depth
     primary_role = pc.get("primary-role")

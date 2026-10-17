@@ -149,6 +149,16 @@ def _build_always_apply_frontmatter(content: str, description: str = "") -> str:
         fm_lines.append(f"description: {_yaml_quote(description)}")
     return "---\n" + "\n".join(fm_lines) + "\n---\n" + content
 
+def _frontmatter_declares_key(inner: str, key: str) -> bool:
+    """True when the raw frontmatter body *inner* declares top-level *key*.
+
+    Exact ``key:`` match at a line start (YAML-key-precise, F6) — the previous
+    ``key not in inner`` substring test treated a value or a longer key
+    (``xapplyTo``) as present and skipped a required key (IC-15 Nr. 3 / AC-14).
+    """
+    return re.search(rf"^{re.escape(key)}\s*:", inner, re.MULTILINE) is not None
+
+
 def _build_rule_frontmatter(content: str, keys: dict[str, str]) -> str:
     """Prepend (or inject into an existing block) YAML frontmatter keys a
     provider requires for its native rule-file format.
@@ -165,7 +175,8 @@ def _build_rule_frontmatter(content: str, keys: dict[str, str]) -> str:
             return content
         inner = fm_block[3:-4]
         addition = "".join(
-            f"\n{key}: {value}" for key, value in keys.items() if key not in inner
+            f"\n{key}: {value}" for key, value in keys.items()
+            if not _frontmatter_declares_key(inner, key)
         )
         if addition:
             return "---" + inner + addition + "\n---" + body

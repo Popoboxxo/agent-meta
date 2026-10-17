@@ -546,7 +546,7 @@ def converge_managed_block_context(
         )
     # IC-15 Nr. 10 (F-14): the steady block feeds the Continue context file;
     # omit lines whose project variable is unset (study 3.8) so run1 == run2.
-    steady = omit_unresolved_placeholder_lines(steady)
+    steady = omit_unresolved_placeholder_lines(steady, log, context_file)
     existing = target.read_text(encoding="utf-8")
     updated = substitute_managed_block(existing, steady)
     if updated == existing:
