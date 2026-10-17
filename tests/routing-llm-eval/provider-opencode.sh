@@ -101,7 +101,7 @@ if [[ -n "$CONTRACT_FILE" ]]; then
   { printf '\n\n'; cat "$CONTRACT_FILE"; } >> "$RUN_DIR/.opencode/agents/${ROLE}.md"
 fi
 
-MODEL="${OPENCODE_ROUTING_EVAL_MODEL:-opencode-go/deepseek-v4-flash}"
+MODEL="${OPENCODE_ROUTING_EVAL_MODEL:-opencode-go/deepseek-v4.1-flash}"
 
 # `opencode run` spawns a detached `opencode serve` background process that
 # does NOT exit when the run completes. Kill only PIDs that appeared during
