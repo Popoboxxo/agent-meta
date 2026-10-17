@@ -204,7 +204,7 @@ def run_checks(
         findings += check_py39_union_syntax(root)
         findings += check_fstring_backslash_hazard(root)
         findings += check_repo_containment_templates(_AGENT_META_ROOT)
-        findings += check_based_on_stale(root)  # WARNING only (#885 F-09)
+        findings += check_based_on_stale(root)  # ERROR since IC-15 Nr. 24 (#885 F-09)
 
         # Phase 5: Documentation & UI Consistency
         findings.extend(check_sync_cli_docs(_AGENT_META_ROOT))

@@ -1,4 +1,4 @@
-"""Template integrity checks: stale ``based-on`` pins (AC-65, IC-32)."""
+"""Template integrity checks: stale ``based-on`` pins (AC-65, AC-74, IC-32)."""
 from __future__ import annotations
 
 import re
@@ -38,7 +38,7 @@ def _expected_stale(root: Path) -> set:
 def test_based_on_stale_matches_computed_deviations():
     findings = check_based_on_stale(ROOT)
     assert {Path(f.file).name for f in findings} == _expected_stale(ROOT)
-    assert all(f.severity is Severity.WARNING for f in findings)
+    assert all(f.severity is Severity.ERROR for f in findings)
     assert all(f.check == "frontmatter.based-on-stale" for f in findings)
 
 
@@ -57,7 +57,7 @@ def test_based_on_stale_fixture_outdated_pin(tmp_path):
     findings = check_based_on_stale(_mk(tmp_path, "1-generic/dev.md@1.0.0"))
     assert len(findings) == 1
     assert findings[0].check == "frontmatter.based-on-stale"
-    assert findings[0].severity is Severity.WARNING
+    assert findings[0].severity is Severity.ERROR
 
 
 def test_based_on_stale_fixture_current_pin(tmp_path):

@@ -12,7 +12,7 @@ tools:
   - Grep
   - WebFetch
   - TodoWrite
-based-on: "1-generic/provider-expert.md@1.0.0"
+based-on: "1-generic/provider-expert.md@1.5.1"
 ---
 
 # Role: GitHub Copilot Expert

@@ -1,7 +1,7 @@
 ---
 name: sharkord-docker
 version: "1.2.3"
-based-on: "1-generic/docker.md@1.0.0"
+based-on: "1-generic/docker.md@1.9.0"
 description: "Sharkord-spezifischer Docker-Agent. Plugin-Mount, Access-Token, Mediasoup-Ports, SYS_NICE, Port-Register."
 hint: "Sharkord Dev-Stack: Plugin-Mount, Access-Token, Mediasoup-Ports, Compose"
 tools:

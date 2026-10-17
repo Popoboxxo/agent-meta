@@ -111,7 +111,7 @@ _BASED_ON_RE = re.compile(r'^(?P<path>[^@\s]+)@(?P<version>\S+)$')
 
 
 def check_based_on_stale(agent_meta_root: Path) -> list[Finding]:
-    """WARN when a ``based-on`` pin in agents/2-platform lags its base file.
+    """ERROR when a ``based-on`` pin in agents/2-platform lags its base file.
 
     The pin ``1-generic/<role>.md@<version>`` is compared with the current
     ``version:`` of the referenced base file. Silently skipped (reported by
@@ -142,7 +142,7 @@ def check_based_on_stale(agent_meta_root: Path) -> list[Finding]:
         pinned = m.group("version")
         if base_version and base_version != pinned:
             findings.append(Finding(
-                Severity.WARNING, "frontmatter.based-on-stale",
+                Severity.ERROR, "frontmatter.based-on-stale",
                 _rel(path, agent_meta_root),
                 f"based-on pin '{pinned}' is stale; base {m.group('path')} "
                 f"is at '{base_version}'.",

@@ -1,7 +1,7 @@
 ---
 name: sharkord-release
 version: "1.3.2"
-based-on: "1-generic/release.md@1.3.0"
+based-on: "1-generic/release.md@1.12.2"
 description: "Sharkord-Plattform Release-Agent. Baut auf template-release auf. Konsolidiert alle Erfahrungen aus sharkord-vid-with-friends und sharkord-hero-introducer: Versionierung, Bun-Build, Artifact-Packaging, GitHub Release via gh CLI, Required Binaries, Windows PATH-Fix."
 hint: "Sharkord Plugin Release: Bun-Build, ZIP/TAR, GitHub Release via gh CLI"
 tools:
