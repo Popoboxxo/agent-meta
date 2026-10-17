@@ -37,6 +37,7 @@ from pathlib import Path
 from typing import Mapping, Optional, Sequence
 
 from .report import Finding, Severity
+from .surface_content import content_expected
 
 _ANCHORS_YAML = "config/context-anchors.yaml"
 # scripts/lib/consistency/context_budget.py -> framework root (repo or .agent-meta)
@@ -61,9 +62,12 @@ SPEC_SEVERITY = {
 PHASE0_SEVERITY = {check: Severity.WARNING for check in SPEC_SEVERITY}
 # Phase 1 (Task 1.24): checks promoted to their spec level once the matrix
 # 9 providers x rules presets reports zero findings (AC-11). rule-unreachable
-# (AC-12) waits for IC-15 Nr. 3 (Copilot instructions are still unread);
-# declared-surface-empty waits for a "content expected" rule (surfaces that are
-# empty by design: skills without lazy rules, MCP without servers).
+# (AC-12) waits for the 9x4 matrix to report zero findings (Copilot still
+# reports all 18 .github/instructions rules as unreachable in every preset).
+# declared-surface-empty keeps its WARN: it is gated by ``content_expected``
+# (surfaces that are empty by design -- skills without lazy rules, MCP without
+# active servers -- are not reported), so there is no false-positive class left
+# that would require a global exemption.
 PHASE1_PROMOTED = frozenset({"context.dangling-pointer"})
 EMITTED_SEVERITY = {
     check: (SPEC_SEVERITY[check] if check in PHASE1_PROMOTED else level)
@@ -543,8 +547,13 @@ def check_declared_surface_empty(
     key (``skills_dir``, ``commands_dir``, ``mcp-config.committed-file``,
     ``settings_file``). Skills count as generated when ``<dir>/*/SKILL.md``
     exists, commands when the directory is non-empty, mcp/settings when the
-    file exists. ``config/context-anchors.yaml: intentional_empty`` exempts a
-    surface (``provider_capability: <surface>``, ``reason`` mandatory).
+    file exists.
+
+    Only surfaces whose content is expected are reported (``content_expected``):
+    an empty skills directory without lazy-rule/skill demand and an MCP config
+    without active servers are empty by design, not defects.
+    ``config/context-anchors.yaml: intentional_empty`` remains an additional
+    exemption (``provider_capability: <surface>``, ``reason`` mandatory).
     """
     root = Path(project_root)
     exempt = _intentional_empty()
@@ -553,7 +562,9 @@ def check_declared_surface_empty(
         caps = capabilities.get(provider) or {}
         for surface, key in _SURFACE_TARGET_KEYS.items():
             rel = _target_path(caps, key)
-            if rel is None or surface in exempt or _surface_has_artifact(root, surface, rel):
+            if (rel is None or surface in exempt
+                    or not content_expected(root, provider, caps, surface)
+                    or _surface_has_artifact(root, surface, rel)):
                 continue
             findings.append(_warn(
                 "context.declared-surface-empty", rel,

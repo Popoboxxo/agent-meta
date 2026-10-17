@@ -222,8 +222,10 @@ def _caps(**overrides) -> dict:
 
 
 def _write(path: Path, text: str) -> None:
+    # newline="\n" keeps byte counts OS-independent (no CRLF translation).
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
+    with path.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write(text)
 
 
 def test_hard_cap_boundary(tmp_path):
@@ -313,6 +315,7 @@ def test_intentional_unread_accepts_dict_entries(monkeypatch):
 
 def _empty_surface_caps(**overrides) -> dict:
     return _caps(skills_dir="sk", commands_dir="cmd", settings_file="set.json",
+                 rules_read_channels=["embedded", "skills"],
                  **{"mcp-config": {"committed-file": "mcp.json"}}, **overrides)
 
 
@@ -325,12 +328,28 @@ def test_surface_target_key_mapping():
         assert cb.surface_target_key(surface) is None
 
 
-def test_declared_surface_empty_reports_all_four_surfaces(tmp_path):
+def test_declared_surface_empty_skips_surfaces_without_content_demand(tmp_path):
+    # commands/settings are always written when declared; skills need lazy rules,
+    # mcp needs an active server (content_expected).
     findings = cb.check_declared_surface_empty(tmp_path, ["P"], _empty_surface_caps(), None)
-    assert {f.file for f in findings} == {"sk", "cmd", "set.json", "mcp.json"}
+    assert {f.file for f in findings} == {"cmd", "set.json"}
     assert {f.check for f in findings} == {"context.declared-surface-empty"}
     assert all(f.severity is Severity.WARNING and f.message.startswith("P: ") for f in findings)
     assert cb.SPEC_SEVERITY["context.declared-surface-empty"] is Severity.ERROR
+
+
+def test_declared_surface_empty_reports_skills_when_lazy_rules_expected(tmp_path):
+    _write(tmp_path / ".meta-config" / "project.yaml", "rules-preset: lazy\n")
+    findings = cb.check_declared_surface_empty(tmp_path, ["P"], _empty_surface_caps(), None)
+    assert "sk" in {f.file for f in findings}
+
+
+def test_declared_surface_empty_reports_mcp_only_with_active_server(tmp_path):
+    assert "mcp.json" not in {
+        f.file for f in cb.check_declared_surface_empty(tmp_path, ["P"], _empty_surface_caps(), None)}
+    _write(tmp_path / ".meta-config" / "project.yaml", "mcp-servers:\n- honcho\n")
+    assert "mcp.json" in {
+        f.file for f in cb.check_declared_surface_empty(tmp_path, ["P"], _empty_surface_caps(), None)}
 
 
 def test_declared_surface_empty_clears_with_artifacts(tmp_path):
@@ -345,7 +364,8 @@ def test_declared_surface_empty_negative_cases(tmp_path):
     (tmp_path / "sk").mkdir()  # directory without SKILL.md still counts as empty
     (tmp_path / "cmd").mkdir()
     caps = _caps(skills_dir="sk", commands_dir="cmd")
-    assert {f.file for f in cb.check_declared_surface_empty(tmp_path, ["P"], caps, None)} == {"sk", "cmd"}
+    # commands are always expected when declared; skills only with lazy-rule demand
+    assert {f.file for f in cb.check_declared_surface_empty(tmp_path, ["P"], caps, None)} == {"cmd"}
     # no target key declared -> nothing declared; inactive provider -> not checked
     assert cb.check_declared_surface_empty(tmp_path, ["P"], _caps(skills_dir=None, commands_dir=""), None) == []
     assert cb.check_declared_surface_empty(tmp_path, [], caps, None) == []
@@ -358,7 +378,7 @@ def test_declared_surface_empty_intentional_empty_suppresses(tmp_path, monkeypat
     monkeypatch.setattr(cb, "_load_anchor_list",
                         lambda key: entries if key == "intentional_empty" else [])
     findings = cb.check_declared_surface_empty(tmp_path, ["P"], _empty_surface_caps(), None)
-    assert {f.file for f in findings} == {"cmd", "set.json", "mcp.json"}
+    assert {f.file for f in findings} == {"cmd", "set.json"}
 
 
 def test_legacy_artifact_present(tmp_path):
@@ -381,13 +401,16 @@ def test_legacy_artifact_real_mammouth_capability(tmp_path, mappings):
 
 @pytest.mark.parametrize("provider", ["Codex", "Mammouth", "Continue"])
 def test_ac67_matrix_reports_missing_skills(provider, mappings, tmp_path):
-    # AC-67: declared but empty skills directories of Codex/Mammouth/Continue
-    # (no skills are generated for them, see the module docstring)
+    # AC-67: declared but empty skills directories of Codex/Mammouth/Continue,
+    # now gated on content_expected -- the lazy preset makes rule skills expected.
+    _write(tmp_path / ".meta-config" / "project.yaml", "rules-preset: lazy\n")
     findings = cb.check_declared_surface_empty(tmp_path, [provider], mappings, None)
     assert mappings[provider]["skills_dir"] in {f.file for f in findings}
 
 
-def test_ac67_matrix_codex_real_sync(default_projects, mappings):
+def test_ac67_matrix_codex_real_sync_has_no_false_positive(default_projects, mappings):
+    # default preset: no lazy-rule skills expected, so an empty .agents/skills is
+    # not reported (content_expected) even though Codex declares the surface.
     findings = _run(cb.check_declared_surface_empty, default_projects["Codex"], "Codex", mappings)
-    assert ".agents/skills" in {f.file for f in findings}
+    assert findings == []
     assert _run(cb.check_legacy_artifact_present, default_projects["Codex"], "Codex", mappings) == []
