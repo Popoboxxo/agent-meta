@@ -8,6 +8,18 @@ dropped (``gate_dropped``) and unknown allowlist entries.
 ``"project"`` is a reserved ``sources`` value only (project-specific roles are
 deferred, Q16); ``known_roles`` equals the ``role-defaults`` roles for now.
 All collections are sorted/frozen so serialization is byte-stable.
+
+``raw_roles`` (IC-17 addendum, decision D1) is the sanctioned read model for the
+ungated ``config["roles"]`` allowlist: ``None`` when no ``roles:`` key was
+supplied, else the normalised ``frozenset`` mirror of the allowlist (same input
+hardening as the activation path: a non-list/invalid value normalises to the
+empty set, exactly like ``_detect_gate_drops``/``resolve_active_roles`` see it).
+The distinction ``None`` vs. ``frozenset()`` is behaviour-relevant and must be
+kept: ``None`` means "no allowlist at all" (default render keeps every
+gate-enabled role), an empty set means "the listed allowlist is empty". The
+field is the documented source and upper bound for intersection consumers; they
+must not read ``config["roles"]`` themselves (QG-13
+``active-set.raw-roles-access``).
 """
 from __future__ import annotations
 
@@ -43,6 +55,12 @@ class ActiveSet:
     gate_dropped: tuple                   # tuple[GateDrop, ...], sorted
     missing_template: tuple               # tuple[str, ...], sorted
     producers: Mapping[str, frozenset]    # output_contract id -> active roles
+    # Sanctioned view of the raw, ungated ``config["roles"]`` allowlist
+    # (IC-17 addendum/D1; QG-13 source for intersection consumers). ``None`` =
+    # no ``roles:`` key was supplied; ``frozenset()`` = key present but the
+    # normalised allowlist is empty. ``None`` and the empty set are NOT
+    # interchangeable (see the module docstring).
+    raw_roles: Optional[frozenset]
 
     def has(self, role: str) -> bool:
         return role in self.roles
@@ -100,6 +118,7 @@ def compute_active_set(
         config["roles"] = (
             list(raw) if isinstance(raw, list) and all(isinstance(r, str) for r in raw) else []
         )
+    raw_roles = frozenset(config["roles"]) if config.get("roles") is not None else None
     if not isinstance(config.get("orchestrator"), dict):
         config["orchestrator"] = {}
 
@@ -156,6 +175,7 @@ def compute_active_set(
         gate_dropped=tuple(drops),
         missing_template=missing_template,
         producers={k: frozenset(v) for k, v in sorted(producers.items())},
+        raw_roles=raw_roles,
     )
 
 

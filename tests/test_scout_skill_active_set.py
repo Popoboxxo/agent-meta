@@ -2,8 +2,8 @@
 
 ``sync_external_skills_for_provider`` implicitly activates the
 ``awesome-claude-code`` repo only when the ``agent-meta-scout`` role is
-active -- decided by ``ActiveSet.has("agent-meta-scout")``, not by the raw
-``roles`` allowlist.
+active -- decided by the sanctioned ``ActiveSet.raw_roles`` allowlist
+(IC-17 addendum, D1) intersected with ``ActiveSet.has("agent-meta-scout")``.
 """
 from __future__ import annotations
 
@@ -23,11 +23,11 @@ from lib.log import SyncLog  # noqa: E402
 _PROVIDER_CONFIG = {"Claude": {"agents_dir": ".claude/agents", "skills_dir": ".claude/skills"}}
 
 
-def _active(*roles: str) -> ActiveSet:
+def _active(*roles: str, raw_roles=None) -> ActiveSet:
     frozen = frozenset(roles)
     return ActiveSet(
         roles=frozen, routable=frozen, known_roles=frozen, sources={}, gates={},
-        gate_dropped=(), missing_template=(), producers={},
+        gate_dropped=(), missing_template=(), producers={}, raw_roles=raw_roles,
     )
 
 
@@ -51,12 +51,14 @@ def test_scout_not_in_active_set_does_not_enable_skill(monkeypatch, tmp_path, al
     # No allowlist (default render stays unchanged) or a gate-dropped scout
     # named in the allowlist must not pull in awesome-claude-code.
     config = {} if allowlist is None else {"roles": allowlist}
+    raw = frozenset(allowlist) if allowlist is not None else None
     assert "awesome-claude-code" not in _ensured_repos(
-        monkeypatch, tmp_path, config, _active("developer"))
+        monkeypatch, tmp_path, config, _active("developer", raw_roles=raw))
 
 
 def test_scout_in_active_set_enables_skill(monkeypatch, tmp_path):
     repos = _ensured_repos(
         monkeypatch, tmp_path, {"roles": ["agent-meta-scout"]},
-        _active("developer", "agent-meta-scout"))
+        _active("developer", "agent-meta-scout",
+                raw_roles=frozenset({"agent-meta-scout"})))
     assert "awesome-claude-code" in repos

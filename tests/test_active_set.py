@@ -49,6 +49,34 @@ def test_pall_has_no_allowlist_and_no_gate_drops():
     assert active.roles <= active.known_roles
 
 
+def test_raw_roles_is_none_without_allowlist_key():
+    # IC-17 addendum / D1: no `roles:` key -> None (no allowlist supplied).
+    active, _ = _compute("pall")
+    assert active.raw_roles is None
+
+
+def test_raw_roles_is_the_normalised_allowlist():
+    # IC-17 addendum / D1: key present -> frozenset mirror of the allowlist.
+    active, _ = _compute("p10")
+    base = yaml.safe_load(
+        (_FIX / "p10" / ".meta-config" / "project.yaml").read_text(encoding="utf-8"))
+    assert isinstance(active.raw_roles, frozenset)
+    assert active.raw_roles == frozenset(base["roles"])
+
+
+def test_raw_roles_empty_allowlist_is_not_none():
+    # None != empty set: an explicit empty `roles:` list keeps the empty set.
+    active, _ = _compute("p10", {"roles": []})
+    assert active.raw_roles == frozenset()
+    assert active.raw_roles is not None
+
+
+def test_raw_roles_malformed_allowlist_normalises_like_activation():
+    # Same normalisation as the activation path: malformed values -> empty set.
+    active, _ = _compute("p10", {"roles": "developer"})
+    assert active.raw_roles == frozenset()
+
+
 def test_unknown_role_warns():
     active, sink = _compute("p10", {"roles": ["orchestrator", "developer", "no-such-role"]})
     assert any("active-set.unknown-role" in w and "no-such-role" in w for w in sink)

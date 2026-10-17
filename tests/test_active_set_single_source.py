@@ -4,26 +4,30 @@ Spec ``docs/specs/2026-10-11-context-profiles-spec.md`` (QG-13, IC-18, F-42, AC-
 the ungated allowlist ``config["roles"]`` must not be consumed directly; consumers
 derive the active role set from ``ActiveSet``. Rule id: ``active-set.raw-roles-access``.
 
-State after PR A (IC-18 no. 14-18): 5 ratchet entries remain -- three
-intersection sites (``_sync_stage_auto_commit_allowlist``,
-``sync_external_skills_for_provider``, ``_build_platform_variables``: the raw
-condition stays the upper bound, ``ActiveSet`` intersects it) plus
-``_build_pipeline_variables`` and ``agent_sync.sync_agents_for_provider``
-(later PRs). Task 1.08 (PR C) removed ``sync_agents_for_provider`` (it now takes
-the shared ``ActiveSet``, computed locally only for standalone callers); Task 1.09
-removed ``_build_pipeline_variables`` (pipeline validation uses ``ActiveSet.roles``).
-Remaining after PR C: 3 intersection sites (see ``RAW_ROLES_RATCHET``) -- AC-84
-(empty registry) is not reached; each is kept because dropping the raw condition
-would change the default render or the no-allowlist behaviour. The line numbers and the deviation list below describe the
-initial registry and are historical.
+History: PR A (IC-18 no. 14-18) left 5 ratchet entries -- three intersection
+sites (``_sync_stage_auto_commit_allowlist``, ``sync_external_skills_for_provider``,
+``_build_platform_variables``: the raw condition stays the upper bound,
+``ActiveSet`` intersects it) plus ``_build_pipeline_variables`` and
+``agent_sync.sync_agents_for_provider`` (later PRs). Task 1.08 (PR C) removed
+``sync_agents_for_provider`` (it now takes the shared ``ActiveSet``, computed
+locally only for standalone callers); Task 1.09 removed
+``_build_pipeline_variables`` (pipeline validation uses ``ActiveSet.roles``).
+
+PR G (IC-17 addendum, decision D1, AC-84): the raw allowlist became the
+sanctioned, documented ``ActiveSet.raw_roles`` field (``None`` without a
+``roles:`` key, the normalised frozenset otherwise), so the three remaining
+intersection sites no longer read ``config["roles"]`` either and
+``RAW_ROLES_RATCHET`` is empty -- AC-84 (empty registry at the end of phase 1)
+is reached; the ratchet may only stay empty or shrink. The line numbers and the
+deviation list below describe the initial registry and are historical.
 
 Ratchet semantics (same style as ``ROUTE_RATCHET`` in
 ``tests/test_no_role_routes_in_templates.py``):
 
 * ``RAW_ROLES_RATCHET`` = today's hits (``module::function``). A hit that is not
   registered fails (new access); a registered entry without a hit fails (stale,
-  the ratchet may only shrink). Each IC-18 PR removes its entries; AC-84 requires
-  an empty registry at the end of phase 1.
+  the ratchet may only shrink). Each IC-18 PR removed its entries; PR G emptied
+  the registry (AC-84).
 * ``LEGIT_READERS`` = modules that read the allowlist/registry legitimately,
   each with a reason. They are skipped entirely.
 
@@ -84,13 +88,9 @@ LEGIT_READERS: Dict[str, str] = {
 }
 
 # Start registry (F-42, IC-18 no. 14-18). Format: "<module>::<function>".
-RAW_ROLES_RATCHET: FrozenSet[str] = frozenset(
-    {
-        "scripts/lib/skills.py::sync_external_skills_for_provider",  # IC-18 no. 17: raw condition stays, ActiveSet intersects it (default render); raw read remains
-        "scripts/lib/sync_pipeline.py::_sync_stage_auto_commit_allowlist",  # IC-18 no. 14: raw allowlist stays the upper bound (default render), ActiveSet intersects it; raw read remains until the spec drops the no-allowlist case
-        "scripts/lib/config.py::_build_platform_variables",  # IC-18 no. 18 (:1689): WEB_PROJECT_ENABLED keeps the raw condition, ActiveSet intersects it (default render); raw read remains
-    }
-)
+# Emptied by PR G (IC-17 addendum, decision D1, AC-84): the three remaining
+# intersection sites now read the sanctioned ``ActiveSet.raw_roles`` field.
+RAW_ROLES_RATCHET: FrozenSet[str] = frozenset()
 
 
 def _is_roles_const(node: ast.AST) -> bool:
