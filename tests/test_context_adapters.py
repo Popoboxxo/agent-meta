@@ -296,23 +296,25 @@ def test_empty_import_falls_back_to_pointer(tmp_path, loaded_config):
 
 
 def test_hard_cap_readers_tolerate_non_catalog_provider(tmp_path):
-    """Regression (Task 1.25): the hard-cap reader discovery must not crash on
-    a synthetic/custom provider absent from the registry.
+    """Regression (Task 1.25 / B2): a non-catalog provider name in
+    ``ai-providers`` must not disable the cap for the registered readers.
 
-    The project config names a real catalog provider while the injected
-    ``provider_config`` only knows a synthetic one. ``resolve_providers``'
-    strict catalog validation (issue #732) is a config-load concern and must
-    not be re-raised by this read-only per-file cap check.
+    The config mixes one registered reader (over its cap) with an unknown,
+    synthetic name. ``resolve_providers``' strict catalog validation (issue
+    #732) is a config-load concern; the read-only per-file cap check filters
+    the unknown name out and still measures the registered reader — so the
+    over-cap write aborts instead of silently degrading to "no measurable
+    reader" (which would disable the cap for every reader).
     """
-    config = {"ai-providers": ["Claude"]}
-    pc = _adapter_pc()
-    target = (tmp_path / pc["context_adapter_file"]).resolve()
+    pc = {"context_file": "AGENTS.md", "context_hard_cap_bytes": 16}
+    target = (tmp_path / "AGENTS.md").resolve()
 
-    # Must not raise: the unknown 'Claude' entry has no registered reader.
-    enforce_context_hard_cap(
-        _REPO_ROOT, tmp_path, config, {"SyntheticAdapter": pc},
-        target, "x" * 100_000,
-    )
+    with pytest.raises(SyncError, match="context.over-hard-cap"):
+        enforce_context_hard_cap(
+            _REPO_ROOT, tmp_path,
+            {"ai-providers": ["SyntheticAdapter", "NoSuchProvider"]},
+            {"SyntheticAdapter": pc}, target, "x" * 1000,
+        )
 
 
 def test_hard_cap_still_aborts_for_registered_synthetic_reader(tmp_path):

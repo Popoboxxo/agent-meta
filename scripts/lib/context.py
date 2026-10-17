@@ -461,19 +461,15 @@ def _context_hard_cap_readers(
     Read-only reader discovery: only providers registered in
     ``provider_config`` and marked active by the project config can be readers.
     A name in ``ai-providers`` absent from the registry (synthetic, test or
-    custom provider) has no resolvable reader entry and must not trip
-    ``resolve_providers``' strict catalog validation (issue #732) — that check
-    belongs to config-load time (``config._validate_providers``). Degrading to
-    "no measurable reader" keeps the write path alive without weakening the cap
-    for real, registered providers.
+    custom provider) is *filtered out* rather than aborting the discovery —
+    ``resolve_providers``' strict catalog validation (issue #732) belongs to
+    config-load time (``config._validate_providers``), and dropping the whole
+    set would silently disable the cap for every real, registered reader. The
+    remaining registered readers are still measured.
     """
     from .providers import resolve_providers
 
-    try:
-        active = resolve_providers(config, provider_config)
-    except ValueError:
-        # Unknown provider name for this registry — no reader to measure here.
-        return []
+    active = resolve_providers(config, provider_config, tolerate_unknown=True)
 
     readers = []
     for name in active:
