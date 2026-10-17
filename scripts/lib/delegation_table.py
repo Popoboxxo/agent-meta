@@ -216,7 +216,7 @@ def _select_examples(
         variant = _find_language_variant(examples, language)
         if variant is None:
             # Log only a genuine miss: needs a role and no variant under the
-            # language's alias either ("en" vs mapping key "English").
+            # language's alias either ("fr" vs mapping keys "Deutsch"/"English").
             if role:
                 _note_examples_fallback(role, language, info_sink)
             # Deterministic fallback: first list variant in insertion order.

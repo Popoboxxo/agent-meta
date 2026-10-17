@@ -908,6 +908,7 @@ Rolle: developer · Issue: aus 1.00 · Depends: 0b · AC: AC-69 (`full`-Teil) ·
 Rolle: developer · Issue: aus 1.00 · Depends: 1.45, 0f.3 (AC-62 belegt) · AC: AC-68 · Falle: ein Eval-Lauf je PR nach Freigabe; `SKIPPED-BY-USER` ⇒ nicht mergen.
 **Files:** Modify `config/role-defaults.yaml`, `config/routing-language.yaml`; Test Modify `tests/test_routing_keywords_language_neutral.py`
 **Interfaces:** Produces DE-Varianten unter `examples.Deutsch`, schrumpfende `keyword_allow`; Consumes `eval_gate.evaluate_gate`
+**Voraussetzung (Follow-up aus 1.45-Review F-2):** `scripts/gen_role_routing_eval_catalog.py` muss vor 1.46 mapping-fähig gemacht werden (`examples` als Mapping lesen); Sprach-Keys (`Deutsch`/`English`/…) dürfen nicht als Korpus-Tasks/Kollisionsbasis landen.
 - [ ] Step 1: Test schreiben (fail): Ratchet-Grenze für `keyword_allow` senken
 - [ ] Step 2: implementieren (Batch-Eval protokollieren)
 - [ ] Step 3: Test (pass): `python3 -m pytest tests/test_routing_keywords_language_neutral.py -q`

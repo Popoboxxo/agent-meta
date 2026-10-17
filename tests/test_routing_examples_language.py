@@ -77,7 +77,6 @@ def _rules_by_agent(root: Path, language: str, info_sink: list | None = None) ->
         template_roles=_TEMPLATE_ROLES,
         info_sink=info_sink,
     )
-    render_routing_tool_definition(definition, "json")
     return {rule["agent"]: rule for rule in definition["routing"]["rules"]}
 
 
@@ -89,6 +88,20 @@ def test_de_and_en_renders_show_language_matching_examples(tmp_path):
     assert en["mapped-role"]["examples"] == ["English example."]
     assert de["flat-role"]["examples"] == ["Flat example."]
     assert en["flat-role"]["examples"] == ["Flat example."]
+
+
+def test_rendered_json_carries_language_matching_examples(tmp_path):
+    root = _fixture_root(tmp_path)
+    definition = build_routing_tool_definition(
+        root,
+        {},
+        {"COMMUNICATION_LANGUAGE": "Deutsch"},
+        template_roles=_TEMPLATE_ROLES,
+    )
+    rendered = render_routing_tool_definition(definition, "json")
+    assert '"Deutsches Beispiel."' in rendered
+    assert '"English example."' not in rendered
+    assert '"Flat example."' in rendered
 
 
 def test_keyword_sets_are_identical_across_language_renders(tmp_path):

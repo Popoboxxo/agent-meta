@@ -40,6 +40,9 @@ def _mapping_language_gaps(roles: dict) -> dict[str, list[str]]:
     Collects every language a list-variant mapping of the config carries
     (normalized, so ``en``/``English`` count as the same language) and reports,
     per role with mapping ``examples``, which of them have no example there.
+    An empty list is a missing variant, not coverage: the language key still
+    marks the language as used, so the gap is reported (IC-29: ≥ 1 example
+    per language).
     """
     mappings = {}
     for name, info in roles.items():
@@ -55,10 +58,12 @@ def _mapping_language_gaps(roles: dict) -> dict[str, list[str]]:
 
     gaps: dict[str, list[str]] = {}
     for name, mapping in mappings.items():
+        # IC-29 requires ≥ 1 example per language: an empty list is a gap,
+        # never coverage (the language key still counts as "used" above).
         present = {
             _normalize_language(key)
             for key, value in mapping.items()
-            if isinstance(value, list)
+            if isinstance(value, list) and value
         }
         missing = sorted(
             label for norm, label in all_languages.items() if norm not in present
@@ -164,6 +169,15 @@ def test_mapping_examples_cover_every_language_used_in_any_mapping():
         },
     }
     assert _mapping_language_gaps(synthetic) == {"incomplete": ["Deutsch"]}
+
+    empty_variant = {
+        "empty-lang": {
+            "routing_patterns": {
+                "examples": {"Deutsch": [], "English": ["e"]},
+            }
+        },
+    }
+    assert _mapping_language_gaps(empty_variant) == {"empty-lang": ["Deutsch"]}
 
 
 def test_name_only_roles_have_reason():
