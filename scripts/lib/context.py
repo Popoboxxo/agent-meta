@@ -221,6 +221,10 @@ def _regenerate_static_context(
     source_label: str,
     rebuild_footer: bool = False,
     platform_vars: dict | None = None,
+    *,
+    config: dict | None = None,
+    provider_config: dict | None = None,
+    agent_meta_root: Path | None = None,
 ) -> None:
     """Regenerate the static part of an existing managed context file.
 
@@ -302,8 +306,11 @@ def _regenerate_static_context(
 
     new_content = new_header + existing_managed + target_footer
     log.action("UPDATE", rel_label, "static part regenerated from template")
-    if not dry_run:
-        target_path.write_text(new_content, encoding="utf-8")
+    _write_reader_context(
+        target_path, new_content,
+        agent_meta_root=agent_meta_root, project_root=project_root,
+        config=config, provider_config=provider_config, dry_run=dry_run,
+    )
     _record_static_hash(project_root, rel_label, norm_new, dry_run)
 GITIGNORE_BLOCK_BEGIN = "# --- agent-meta managed (do not edit) ---"
 GITIGNORE_BLOCK_END   = "# --- end agent-meta managed ---"
@@ -358,6 +365,7 @@ def _ensure_context_file(
     dry_run: bool,
     fallback_agent_dir: str,
     platform_vars: dict | None = None,
+    provider_config: dict | None = None,
 ) -> None:
     """Create a provider context file from template or minimal fallback."""
 
@@ -383,7 +391,11 @@ def _ensure_context_file(
     log.action("INIT", str(target_path.relative_to(project_root)), source_label)
     if not dry_run:
         target_path.parent.mkdir(parents=True, exist_ok=True)
-        target_path.write_text(content, encoding="utf-8")
+    _write_reader_context(
+        target_path, content,
+        agent_meta_root=agent_meta_root, project_root=project_root,
+        config=config, provider_config=provider_config, dry_run=dry_run,
+    )
 
 
 def _core_context_filename(config: dict) -> str:
@@ -532,6 +544,41 @@ def enforce_context_hard_cap(
             f"context.over-hard-cap: {rel} — {findings[0].message}; "
             "refusing to write a context file a reader truncates"
         )
+
+
+def _write_reader_context(
+    target_path: Path,
+    content: str,
+    *,
+    agent_meta_root: Path | None,
+    project_root: Path,
+    config: dict | None,
+    provider_config: dict | None,
+    dry_run: bool,
+) -> None:
+    """The single write chokepoint for reader-measured context files (IC-10).
+
+    Every physical context file read by one or more active providers must be
+    measured against each reader's ``context_hard_cap_bytes`` before it lands on
+    disk: a file at or above the smallest reader cap is silently truncated by
+    the runtime, so the sync aborts instead of writing it
+    (:func:`enforce_context_hard_cap`). Routing every such write through this one
+    helper keeps the guard from being bypassed by a newly added write path.
+    When the reader set cannot be resolved (``config`` / ``provider_config`` /
+    ``agent_meta_root`` absent on auxiliary back-compat paths) the write
+    proceeds unchanged — exactly as before this guard existed.
+    """
+    if (
+        config is not None
+        and provider_config is not None
+        and agent_meta_root is not None
+    ):
+        enforce_context_hard_cap(
+            agent_meta_root, project_root, config, provider_config,
+            target_path, content,
+        )
+    if not dry_run:
+        target_path.write_text(content, encoding="utf-8")
 
 
 def _write_dispatch_depth(
@@ -758,6 +805,7 @@ def _sync_managed_block_context(
             log, dry_run,
             fallback_agent_dir=pc.get("agents_dir", f".{provider.lower()}/agents"),
             platform_vars=platform_vars,
+            provider_config=provider_config,
         )
         if target_path.exists():
             _regenerate_static_context(
@@ -765,6 +813,8 @@ def _sync_managed_block_context(
                 rel_label=context_file, source_label=template_name or context_file,
                 rebuild_footer=True,
                 platform_vars=platform_vars,
+                config=config, provider_config=provider_config,
+                agent_meta_root=agent_meta_root,
             )
     if target_path.exists():
         _update_managed_html_block(
@@ -823,7 +873,11 @@ def _sync_opencode_context(
         log.action("INIT", context_file, template_name or "minimal fallback")
         if not dry_run:
             target_path.parent.mkdir(parents=True, exist_ok=True)
-            target_path.write_text(ocontent, encoding="utf-8")
+        _write_reader_context(
+            target_path, ocontent,
+            agent_meta_root=agent_meta_root, project_root=project_root,
+            config=config, provider_config=provider_config, dry_run=dry_run,
+        )
 
     # Refresh the static header AND footer from the template on every sync so the
     # dynamic `## Agents` provider list never freezes at INIT (same header+footer
@@ -835,6 +889,8 @@ def _sync_opencode_context(
             rel_label=context_file, source_label=template_name or context_file,
             rebuild_footer=True,
             platform_vars=platform_vars,
+            config=config, provider_config=provider_config,
+            agent_meta_root=agent_meta_root,
         )
 
     managed_pattern = re.compile(
@@ -990,8 +1046,11 @@ def _cleanup_bootstrap_block(
     if removed:
         details.append(f"removed inactive marker(s): {', '.join(removed)}")
     log.action("CLEANUP", rel_label, "; ".join(details) or "bootstrap markers normalised")
-    if not dry_run:
-        target_path.write_text(content, encoding="utf-8")
+    _write_reader_context(
+        target_path, content,
+        agent_meta_root=agent_meta_root, project_root=project_root,
+        config=config, provider_config=provider_config, dry_run=dry_run,
+    )
 
 
 # IC-15 Nr. 10 / AC-10 (F-14): the Continue context file must never ship an
@@ -2416,6 +2475,7 @@ def sync_claude_md_static(
     variables: dict,
     log: SyncLog,
     dry_run: bool,
+    provider_config: dict | None = None,
 ):
     """Create or regenerate the STATIC part of CLAUDE.md (above the managed block).
 
@@ -2442,8 +2502,11 @@ def sync_claude_md_static(
         rendered = builder.build(template_path.stem, variables)
         new_header, _managed, _footer = _split_context_file(rendered)
         log.action("INIT", rel, "templates/configs/CLAUDE.project-template.md")
-        if not dry_run:
-            target_path.write_text(rendered, encoding="utf-8")
+        _write_reader_context(
+            target_path, rendered,
+            agent_meta_root=agent_meta_root, project_root=project_root,
+            config=config, provider_config=provider_config, dry_run=dry_run,
+        )
         _record_static_hash(
             project_root, rel, _normalize_static_sig(_strip_user_notes(new_header)), dry_run
         )
@@ -2452,6 +2515,8 @@ def sync_claude_md_static(
     _regenerate_static_context(
         project_root, target_path, template_path, variables, log, dry_run,
         rel_label=rel, source_label="CLAUDE.project-template.md",
+        config=config, provider_config=provider_config,
+        agent_meta_root=agent_meta_root,
     )
 
 
@@ -2529,6 +2594,8 @@ def only_variables(
                 rel_label=context_file,
                 source_label=template_name or context_file,
                 rebuild_footer=rebuild_footer,
+                config=config, provider_config=provider_config,
+                agent_meta_root=agent_meta_root,
             )
             regenerated.add(context_file)
 
@@ -2540,8 +2607,11 @@ def only_variables(
             log.skip(context_file, "no open placeholders")
         else:
             log.action("WRITE", context_file, "variables from config")
-            if not dry_run:
-                target_path.write_text(new_content, encoding="utf-8")
+            _write_reader_context(
+                target_path, new_content,
+                agent_meta_root=agent_meta_root, project_root=project_root,
+                config=config, provider_config=provider_config, dry_run=dry_run,
+            )
 
     if not found_any:
         print("  !  No provider context file found — use --init to create one")

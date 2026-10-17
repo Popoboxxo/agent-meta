@@ -326,7 +326,8 @@ def _sync_stage_claude_base(
     )
     if is_claude:
         if _context_auto_generate(config):
-            sync_claude_md_static(agent_meta_root, project_root, config, variables, log, args.dry_run)
+            sync_claude_md_static(agent_meta_root, project_root, config, variables, log, args.dry_run,
+                                  provider_config=provider_config)
         else:
             log.note("CLAUDE.md", "context_file.auto_generate: false — static header left untouched")
             log.warning(

@@ -19,8 +19,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SYNC = REPO_ROOT / "scripts" / "sync.py"
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 CODEX_HARD_CAP_BYTES = 32768
 AGENTS_MD_PROVIDERS = ["Gemini", "Opencode", "Mammouth", "Codex", "ZCode", "KimiCode"]
@@ -55,6 +58,40 @@ def _run(project: Path, *extra: str) -> subprocess.CompletedProcess:
          str(project / ".meta-config" / "project.yaml"), *extra],
         cwd=project, capture_output=True, text=True, timeout=600,
     )
+
+
+def test_static_context_regeneration_over_cap_aborts(tmp_path):
+    """B1 (red-first): ``_regenerate_static_context`` writes a reader-measured
+    context file (the static header + preserved managed block) and must honour
+    the reader hard cap. Previously only the managed-block write path was
+    guarded, so an over-cap static regeneration slipped through unguarded.
+    """
+    from lib.context import _regenerate_static_context
+    from lib.io import SyncError
+    from lib.log import SyncLog
+
+    template_dir = tmp_path / "templates" / "context"
+    template_dir.mkdir(parents=True)
+    template = template_dir / "AGENTS.md"
+    template.write_text(
+        "# Title\n\n" + "x" * 40_000 + "\n\n"
+        "<!-- agent-meta:managed-begin -->\n<!-- agent-meta:managed-end -->\n",
+        encoding="utf-8",
+    )
+    target = tmp_path / "AGENTS.md"
+    target.write_text(
+        "# old\n\n<!-- agent-meta:managed-begin -->\n<!-- agent-meta:managed-end -->\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SyncError, match="context.over-hard-cap"):
+        _regenerate_static_context(
+            tmp_path, target, template, {}, SyncLog(), dry_run=False,
+            rel_label="AGENTS.md", source_label="AGENTS.md",
+            config={"ai-providers": ["Codex"]},
+            provider_config={"Codex": {"context_file": "AGENTS.md"}},
+            agent_meta_root=REPO_ROOT,
+        )
 
 
 def test_codex_config_toml_gets_agents_max_depth(tmp_path):
