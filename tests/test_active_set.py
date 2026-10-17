@@ -55,6 +55,31 @@ def test_raw_roles_is_none_without_allowlist_key():
     assert active.raw_roles is None
 
 
+def test_raw_roles_null_is_none_like_missing_key():
+    # `roles: null` is not an allowlist either: same None sentinel as no key.
+    active, _ = _compute("pall", {"roles": None})
+    assert active.raw_roles is None
+
+
+def test_missing_roles_key_keeps_auto_commit_allowlist_default_empty(tmp_path):
+    # No `roles:` key -> raw_roles None -> the pipeline passes [] (unchanged
+    # default), even when an auto_commit block is present.
+    from types import SimpleNamespace
+
+    from lib.log import SyncLog
+    from lib.sync_pipeline import _sync_stage_auto_commit_allowlist
+
+    config = yaml.safe_load(
+        (_FIX / "pall" / ".meta-config" / "project.yaml").read_text(encoding="utf-8"))
+    config["auto_commit"] = {"mode": "auto", "triggers": ["task-boundary"]}
+    active = compute_active_set(config, _ROOT, tmp_path)
+    _sync_stage_auto_commit_allowlist(
+        _ROOT, tmp_path, config, SimpleNamespace(dry_run=False), SyncLog(), active)
+    data = yaml.safe_load(
+        (tmp_path / ".meta-config" / "auto-commit-allowlist.json").read_text(encoding="utf-8"))
+    assert data["eligible_roles"] == []
+
+
 def test_raw_roles_is_the_normalised_allowlist():
     # IC-17 addendum / D1: key present -> frozenset mirror of the allowlist.
     active, _ = _compute("p10")

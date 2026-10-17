@@ -11,9 +11,10 @@ All collections are sorted/frozen so serialization is byte-stable.
 
 ``raw_roles`` (IC-17 addendum, decision D1) is the sanctioned read model for the
 ungated ``config["roles"]`` allowlist: ``None`` when no ``roles:`` key was
-supplied, else the normalised ``frozenset`` mirror of the allowlist (same input
-hardening as the activation path: a non-list/invalid value normalises to the
-empty set, exactly like ``_detect_gate_drops``/``resolve_active_roles`` see it).
+supplied or the key holds ``null`` (``roles: null``), else the normalised
+``frozenset`` mirror of the allowlist (same input hardening as the activation
+path: a non-list/invalid value normalises to the empty set, exactly like
+``_detect_gate_drops``/``resolve_active_roles`` see it).
 The distinction ``None`` vs. ``frozenset()`` is behaviour-relevant and must be
 kept: ``None`` means "no allowlist at all" (default render keeps every
 gate-enabled role), an empty set means "the listed allowlist is empty". The
