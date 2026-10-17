@@ -711,7 +711,8 @@ _MODE_HANDLERS = [
 
 
 # Modes that run _build_context with dry_run forced on and stdout on stderr.
-_STDOUT_CLEAN_MODES = ("cleanup_preview", "context_report", "doctor")
+_STDOUT_CLEAN_MODES = ("cleanup_preview", "context_report", "deactivation_status",
+                       "doctor")
 
 
 def _dispatch(ctx: _SyncContext) -> None:

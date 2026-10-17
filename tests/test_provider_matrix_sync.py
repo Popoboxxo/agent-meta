@@ -135,9 +135,6 @@ def test_second_run_is_idempotent(synced):
 # --- Task 1.24 (AC-11, AC-12): reachability over 9 providers x rules presets ----------
 
 _RULES_PRESETS = ("default", "minimal", "silent", "lazy")
-# Rules dirs still unread before their own fix lands (IC-15 Nr. 3, Task 1.29): their
-# non-embedded rules stay `context.rule-unreachable` (WARN) until then.
-_PENDING_UNREACHABLE_DIRS = {".github/instructions": "IC-15 Nr. 3 (Task 1.29)"}
 
 
 @pytest.fixture(scope="module")
@@ -170,6 +167,16 @@ def test_dangling_pointer_is_error():
     assert cb._warn("context.dangling-pointer", "f", "m").severity is Severity.ERROR
 
 
+def test_rule_unreachable_is_error():
+    # AC-12: the 9x4 matrix reports zero findings (see the test below), so the
+    # check now emits its spec level (ERROR) instead of the Phase-0 WARNING.
+    cb, _compute, _maps = _context_checks()
+    from lib.consistency.report import Severity
+
+    assert cb.EMITTED_SEVERITY["context.rule-unreachable"] is Severity.ERROR
+    assert cb._warn("context.rule-unreachable", "f", "m").severity is Severity.ERROR
+
+
 @pytest.mark.parametrize("preset", _RULES_PRESETS)
 @pytest.mark.parametrize("provider", _PROVIDERS)
 def test_no_dangling_pointer_and_no_unreachable_rule(preset_matrix, preset, provider):
@@ -178,6 +185,5 @@ def test_no_dangling_pointer_and_no_unreachable_rule(preset_matrix, preset, prov
     active = compute_active_set(config, _REPO_ROOT, project)
     dangling = cb.check_dangling_pointer(project, [provider], mappings, active)
     assert not dangling, [f"{f.file}: {f.message}" for f in dangling][:5]
-    unreachable = [f.file for f in cb.check_rule_unreachable(project, [provider], mappings, active)
-                   if str(Path(f.file).parent) not in _PENDING_UNREACHABLE_DIRS]
+    unreachable = [f.file for f in cb.check_rule_unreachable(project, [provider], mappings, active)]
     assert not unreachable, f"{provider}/{preset}: unreachable rules {unreachable}"

@@ -56,6 +56,26 @@ STUBBED = {
                                  "importlib.util.find_spec is stubbed per case",
     "surface-unverified": "every shipped provider has UNVERIFIED surfaces with a target key, "
                           "so the negative needs a capability matrix with verified surfaces",
+    "rule-unreachable": "IC-15 Nr. 8 retired the unread rules dirs, so no shipped provider "
+                        "writes a rules dir it does not read any more; the positive case "
+                        "reconstructs the retired Gemini `.gemini/rules` shape via "
+                        "STUB_CAPABILITIES",
+    "unread-channel": "same retirement as `rule-unreachable`; the positive case reconstructs "
+                      "the retired Gemini `.gemini/rules` shape via STUB_CAPABILITIES",
+}
+
+# Per-seed provider-capability stubs for fixtures whose defect no longer exists in a
+# shipped provider (IC-15 Nr. 8: Gemini/Mammouth/Codex retired their unread rules
+# dirs). The checks stay as they are; only the fixture's provider shape is restored
+# so a positive case still produces a finding and a negative case still exercises the
+# reachable/clean path.
+STUB_CAPABILITIES = {
+    "rule-unreachable": {
+        "Gemini": {"has_rules": True, "rules_dir": ".gemini/rules"},
+    },
+    "unread-channel": {
+        "Gemini": {"has_rules": True, "rules_dir": ".gemini/rules"},
+    },
 }
 
 # finding-ref seeds: referenced check id that a positive must carry in `ref_check`.
@@ -157,6 +177,8 @@ def _run_case(project, seed, kind, providers=None):
             for entry in caps.values():
                 entry["surface_verified_state"] = {
                     k: "DOCUMENTED" for k in entry.get("surface_verified_state", {})}
+        for provider, overrides in STUB_CAPABILITIES.get(seed, {}).items():
+            caps.setdefault(provider, {}).update(overrides)
         return caps
 
     with pytest.MonkeyPatch.context() as mp:

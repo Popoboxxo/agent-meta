@@ -1892,3 +1892,38 @@ B2a ist durch die Re-Baseline **wiederhergestellt**, nicht abgeschwächt: die Fi
 den vom aktuellen Template erzeugten Output, die Update-Regel ist erfüllt (dieser Eintrag), und das
 Gate ist grün (16.5). Das Delta aus 16.1 ist eine orthogonale Inhalts- und Versionsänderung; dies
 ist eine **Statusaussage** über B2a, keine Klassifikation der Änderung als B2a-Fall (vgl. 8.7/14.7).
+
+## 17. Nachträgliche Rebaseline — Phase 1 (PR F, Provider-Channel-Fixes)
+
+> **Anlass:** Fixtures werden ausschließlich mit dokumentierter Begründung angepasst (Update-Regel,
+> `tests/fixtures/slimming-golden/README.md`). PR F (`da1ee3ff` Provider-Literal-Verschiebung,
+> `b3b3f406` Re-Pin veralteter `based-on`-Versionen, zugehörige Template-Versionsbumps) hat den
+> Render **außerhalb** der B2b-Normalisierung geändert.
+
+**Geändert (11 Fixtures):** `agent-meta-scout`, `claude-expert`, `continue-expert`,
+`copilot-expert`, `gemini-expert`, `mammouth-expert`, `opencode-expert` (unmigriert) sowie
+`agent-meta-manager`, `developer`, `knowledge-migrator`, `release` (migriert; Drift außerhalb der
+deklarierten Normalisierungsregionen).
+
+**Ursachen je Kategorie:**
+
+| Kategorie | Commit/Quelle | Fixtures |
+|---|---|---|
+| Provider-Literal-Verschiebung aus generischen Templates | `da1ee3ff` | `agent-meta-scout` (AGENTS.md → CLAUDE.md-Konvention), `agent-meta-manager` (YAML-Beispiele als provider-spezifisches Blockquote), `release` (Hook-Verzeichnis-Beispiel als Blockquote), `knowledge-migrator` (Tabellenzellen generalisiert) |
+| Re-Pin veralteter `based-on`-Versionen | `b3b3f406` | `claude-expert`, `continue-expert`, `copilot-expert`, `gemini-expert`, `opencode-expert`, `developer` (2-platform), `mammouth-expert` (Konsolidierung auf `provider-expert`) |
+| Template-Versionsbump | jeweiliges PR-F-Commit | `agent-meta-manager` 1.24.0→1.24.1, `agent-meta-scout` 1.5.1→1.5.2, `knowledge-migrator` 1.5.1→1.5.2, `release` 1.12.1→1.12.2, `mammouth-expert` 1.2.3→2.0.0 |
+
+**B2b-Inventar unverändert:** Die Inline-Normalisierungsregionen der migrierten Fixtures bleiben
+verbatim erhalten (`knowledge-migrator` AR-K6). `_MIGRATED_PATHS`, `_NORMALIZATIONS`, `_LOCATORS`,
+`_KIND_REGISTRY` und `_GOLDEN_ROLE_COUNT` (58) sind unangetastet; die Regenerierung erzeugt die 25
+bereits byte-identischen Fixtures exakt.
+
+**Windows-Fix (kein Normalisierungsverlust):** `render_env` speichert `source_paths` über
+`.as_posix()`, sodass die Migriert-Erkennung plattformunabhängig gegen `_MIGRATED_PATHS` greift.
+Ohne den Fix meldete Windows alle 31 abweichenden Fixtures als „unmigrated"; davon sind 20 regulär
+durch die deklarierte Normalisierung abgedeckt (A2A-Zeile / `</output-guard>`-Position /
+Anti-Recursion-Block) und bleiben unverändert.
+
+**Verifikation:** `pytest tests/test_template_slimming_equivalence.py -q` → **9 passed**, rc `0`;
+`pytest tests/test_ac01_render_identity.py -q` → **3 passed**; `scripts/sync.py --validate` rc `0`
+(nur vorbestehende Warnungen).

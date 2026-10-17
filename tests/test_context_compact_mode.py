@@ -136,21 +136,23 @@ _SAMPLE_AGENTS = [
 ]
 
 
-def test_agents_table_full_render_keeps_legacy_layout_byte_for_byte():
-    # Legacy layout: blank line between rows. #540 Fix 1 unified the
-    # DESCRIPTION column to 1-3 keywords in BOTH modes (derive_keywords);
-    # the layout difference (blank-line separation vs dense rows) remains.
-    legacy = ("| Agent | Core Capabilities |\n"
-              "|-------|-------------------|\n"
-              "\n| `alpha` | Erstes Tool, zweites Feature, drittes Ding |\n"
-              "\n| `beta` | Zweites Agent |\n\n")
+def test_agents_table_full_render_is_dense_without_blank_lines():
+    # #540 Fix 1 unified the DESCRIPTION column to 1-3 keywords in BOTH
+    # modes (derive_keywords); AC-20 (IC-15 Nr. 11) additionally removes
+    # the old blank-line separation, so full mode now matches the dense
+    # compact layout (single header, no blank lines).
+    expected = ("| Agent | Core Capabilities |\n"
+                "|-------|-------------------|\n"
+                "| `alpha` | Erstes Tool, zweites Feature, drittes Ding |\n"
+                "| `beta` | Zweites Agent |\n\n")
     builder = TemplateBuilder(REPO_ROOT / "templates" / "context")
     body = _agents_table_body()
     rendered = builder.resolve_conditionals(
         builder.resolve_loops(body, {"active_agents": _SAMPLE_AGENTS}),
         {"COMPACT_MODE": "false"},
     )
-    assert rendered == legacy
+    assert rendered == expected
+    assert "\n\n|" not in rendered  # no blank line inside the table (AC-20)
     assert "kurz" not in rendered  # full description must not leak (Fix 1)
 
 
@@ -252,22 +254,21 @@ def test_agent_delegation_table_resolves_conditionals_both_modes():
 
     config = load_config(REPO_ROOT / ".meta-config" / "project.yaml")
 
-    # Force full explicitly: the repo's own project.yaml now ships
-    # context_file.mode=compact, so the derived config would otherwise render
-    # the dense table on the "full" leg too.
+    # Both modes now render the same dense table (AC-20); this guards that
+    # the conditional/loop markers are fully resolved on either leg.
     full_config = dict(config)
     full_config["context_file"] = {"mode": "full"}
     variables, _ = build_variables(full_config, REPO_ROOT)
     full_table = variables["AGENT_DELEGATION_TABLE"]
     assert "{{#if" not in full_table and "{{else}}" not in full_table
-    assert "\n\n| `" in full_table  # legacy blank-line-separated layout
+    assert "\n\n| `" not in full_table  # dense keyword rows (AC-20)
 
     compact_config = dict(config)
     compact_config["context_file"] = {"mode": "compact"}
     compact_vars, _ = build_variables(compact_config, REPO_ROOT)
     compact_table = compact_vars["AGENT_DELEGATION_TABLE"]
     assert "{{#if" not in compact_table and "{{else}}" not in compact_table
-    assert "\n\n| `" not in compact_table  # dense keyword rows
+    assert "\n\n| `" not in compact_table  # dense keyword rows (AC-20)
     assert "| `orchestrator` | Einstiegspunkt für alle Entwicklungsaufgaben |" in compact_table
 
 
@@ -696,13 +697,19 @@ def test_540_compact_native_rules_providers_keep_platform_rules_full(provider, t
     if scripts_dir not in sys.path:
         sys.path.insert(0, scripts_dir)
     from lib.log import SyncLog
-    from lib.providers import load_providers_config
+    from lib.providers import load_provider_capabilities, load_providers_config
+    from lib.rule_channels import merged_caps
     from lib.rules import sync_rules
 
     provider_config = load_providers_config(REPO_ROOT)
     config, variables = _compact_variables()
     pc = provider_config[provider]
     rules_dir = pc.get("rules_dir", ".claude/rules")
+    # Task 1.29 (IC-15 Nr. 3): a provider may require a rule-file suffix
+    # (Copilot writes `.github/instructions/<name>.instructions.md`). Honour the
+    # resolved capability so the native artifact is found, not assumed `.md`.
+    caps = merged_caps(provider, provider_config, load_provider_capabilities(REPO_ROOT))
+    rule_suffix = caps.get("rules_required_suffix") or ".md"
 
     sync_rules(
         REPO_ROOT, tmp_path, config, SyncLog(), dry_run=False, variables=variables,
@@ -711,7 +718,7 @@ def test_540_compact_native_rules_providers_keep_platform_rules_full(provider, t
 
     for name, full_marker in _PLATFORM_RULE_FULL_MARKERS.items():
         skill = tmp_path / pc["skills_dir"] / name / "SKILL.md"
-        rule = tmp_path / rules_dir / f"{name}.md"
+        rule = tmp_path / rules_dir / f"{name}{rule_suffix}"
         path = skill if skill.exists() else rule
         assert path.exists(), f"{provider}: {name} not rendered natively"
         text = path.read_text(encoding="utf-8")

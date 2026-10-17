@@ -52,9 +52,11 @@ _EXPECTED_PROVIDERS = {
     "Claude", "Gemini", "Opencode", "Continue", "Copilot", "Mammouth",
     "Codex", "ZCode", "KimiCode",
 }
-# no native rules channel: generated instruction files are never read there (F-17);
-# lazy rules reach them as skills since IC-15 Nr. 2 (formerly rules_read_channels: [])
-_UNREAD_RULES_DIR_SKILLS_ONLY = ("Copilot", "Gemini")
+# Every provider with a written rules directory now declares a file read channel
+# (native-rules-dir / path-scoped): Gemini with IC-15 Nr. 8 (embedded via
+# context.fileName), Copilot with IC-15 Nr. 3 (Task 1.29: .github/instructions
+# path-scoped). The former "skills-only" set (F-17) is empty, so no provider is
+# pinned here anymore.
 
 
 def test_providers_present():
@@ -67,13 +69,6 @@ def test_depth_and_skill_dirs(provider):
     c = _CAPS[provider]
     assert c["required_depth"] >= 2  # spec IC-09: orchestrator -> worker
     assert c["skills_discovery_dirs"], "skills_discovery_dirs must not be empty"
-
-
-@pytest.mark.parametrize("provider", _UNREAD_RULES_DIR_SKILLS_ONLY)
-def test_unread_rules_dir_has_only_the_skills_channel(provider):
-    # IC-15 Nr. 2: no native rules channel (the generated rules dir is unread),
-    # but the skills channel carries the lazy rules
-    assert _CAPS[provider]["rules_read_channels"] == ["skills"]
 
 
 @pytest.mark.parametrize("provider", _PROVIDERS)
@@ -124,6 +119,7 @@ def test_spec_example_values():
     assert _CAPS["Copilot"]["rules_required_suffix"] == ".instructions.md"
     assert _CAPS["Codex"]["agent_config_format"] == "toml"
     assert _CAPS["Codex"]["rules_read_channels"] == ["embedded", "skills"]
+    assert _CAPS["Copilot"]["rules_read_channels"] == ["path-scoped", "skills"]
     assert _CAPS["Codex"]["surface_verified_state"]["context_file"] == "VERIFIED-RUNTIME"
     assert _CAPS["ZCode"]["surface_verified_state"]["context_file"] == "VERIFIED-SOURCE"
     assert _CAPS["ZCode"]["surface_verified_state"]["workspace_agents_autoload"] == "UNVERIFIED"

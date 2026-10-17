@@ -26,8 +26,10 @@ def _load_managed_block_template(agent_meta_root: Path) -> str:
         "<!-- This block is automatically updated by sync.py on --update-ext. -->\n"
         "<!-- Project-specific additions belong in the section BELOW this marker. -->\n"
         "\n"
-        "**Projekt:** {{PROJECT_NAME}} | **Plattform:** {{PLATFORM}} | **Runtime:** {{RUNTIME}}\n"
-        "**Build:** `{{BUILD_COMMAND}}` | **Test:** `{{TEST_COMMAND}}`\n"
+        "**Projekt:** {{PROJECT_NAME}} | **Plattform:** {{PLATFORM}}\n"
+        "**Runtime:** {{RUNTIME}}\n"
+        "**Build:** `{{BUILD_COMMAND}}`\n"
+        "**Test:** `{{TEST_COMMAND}}`\n"
         "<!-- agent-meta:managed-end -->"
     )
 
@@ -63,6 +65,26 @@ def render_managed_block(
 
     content = substitute(template, variables, source_label, log)
     return content
+
+
+def _render_extension_managed_block(
+    variables: dict,
+    source_label: str,
+    log: SyncLog,
+    agent_meta_root: Path | None = None,
+) -> str:
+    """Render the managed block for an extension and drop unresolved lines.
+
+    IC-15 Nr. 19: an extension (``--create-ext``/``--update-ext``) must never
+    contain a literal ``{{VAR}}``; a line whose variable is not set is omitted
+    entirely (the shared ``context.omit_unresolved_placeholder_lines`` rule).
+    """
+    from .context import omit_unresolved_placeholder_lines
+
+    return omit_unresolved_placeholder_lines(
+        render_managed_block(variables, source_label, log, agent_meta_root),
+        log, source_label,
+    )
 
 
 def update_managed_block(existing: str, new_managed: str) -> str:
@@ -110,7 +132,9 @@ def create_extension(
         log.skip(str(target_path.relative_to(project_root)), "extension already exists — use --update-ext to update")
         return
 
-    managed = render_managed_block(variables, f"--create-ext {role}", log, agent_meta_root)
+    managed = _render_extension_managed_block(
+        variables, f"--create-ext {role}", log, agent_meta_root
+    )
     project_stub = _load_project_stub_template(agent_meta_root)
     content = managed + project_stub
 
@@ -135,7 +159,9 @@ def update_extensions(
 
     for ext_file in sorted(ext_dir.glob(f"*{EXT_SUFFIX}.md")):
         existing = ext_file.read_text(encoding="utf-8")
-        new_managed = render_managed_block(variables, str(ext_file.name), log, agent_meta_root)
+        new_managed = _render_extension_managed_block(
+            variables, str(ext_file.name), log, agent_meta_root
+        )
         new_content = update_managed_block(existing, new_managed)
 
         if new_content == existing:

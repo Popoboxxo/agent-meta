@@ -54,6 +54,24 @@ Golden rebaseline log (the frozen set is edited only with a documented reason):
   ``rag-pipeline-v1`` entries disappear where no active role produces them). Only
   ``input_contracts`` lines of the embedded routing JSON changed (12 hunks); the
   default (all roles) render is unchanged (AC-01 hashes untouched).
+* Phase 1 (PR F, provider-channel fixes): eleven goldens rebaselined (checkout
+  history: ``da1ee3ff`` provider-literal relocation, ``b3b3f406`` re-pinned
+  ``based-on`` versions, plus per-role template version bumps).
+  * Seven unmigrated roles drifted outside the normalization set:
+    ``agent-meta-scout``, ``claude-expert``, ``continue-expert``,
+    ``copilot-expert``, ``gemini-expert``, ``mammouth-expert``,
+    ``opencode-expert``.
+  * Four migrated roles drifted outside their declared normalization regions:
+    ``agent-meta-manager``, ``developer``, ``knowledge-migrator``,
+    ``release``. Their inline normalization regions are preserved verbatim, so
+    the B2b attribution keeps running for them.
+  * This rebaseline also repairs the migrated-role detection on Windows:
+    ``render_env`` now stores ``source_path.relative_to(_REPO_ROOT).as_posix()``
+    so ``source_paths`` matches the forward-slash ``_MIGRATED_PATHS`` registry.
+    Previously every migrated role was classified unmigrated on Windows and the
+    20 normalization-covered roles (A2A-line / ``</output-guard>`` position /
+    Anti-Recursion block) were reported as spurious byte diffs; those goldens
+    are unchanged. AC-01 hashes untouched.
 
 The gate is network-free, writes nothing into the repository (the render target
 is a pytest ``tmp_path``) and renders the corpus once per module (~5s).
@@ -1055,7 +1073,11 @@ def render_env(tmp_path_factory: pytest.TempPathFactory) -> RenderEnv:
             target_path, variables, False, log,
         )
         rendered[role] = content
-        source_paths[role] = str(source_path.relative_to(_REPO_ROOT))
+        # ``.as_posix()`` keeps the registry comparison platform-independent:
+        # ``_MIGRATED_PATHS`` is written with forward slashes, while a bare
+        # ``str(WindowsPath)`` yields backslashes and would classify every
+        # migrated role as unmigrated on Windows.
+        source_paths[role] = source_path.relative_to(_REPO_ROOT).as_posix()
     return RenderEnv(variables=variables, rendered=rendered, source_paths=source_paths)
 
 

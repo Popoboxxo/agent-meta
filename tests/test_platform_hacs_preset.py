@@ -804,7 +804,7 @@ class TestTier3TempProjectSync:
         sync_rules(
             _REPO_ROOT, project_root, config, SyncLog(), dry_run=False,
             platform_vars=platform_vars, variables=variables,
-            rules_dir=provider_config["Gemini"].get("rules_dir"), provider="Gemini",
+            rules_dir=".gemini/rules", provider="Gemini",
             provider_config=provider_config,
         )
         gemini_rule = project_root / ".gemini" / "rules" / "integration-development.md"

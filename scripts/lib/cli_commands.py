@@ -844,12 +844,21 @@ def _handle_viz_cleanup(ctx: _SyncContext) -> None:
 
 
 def _handle_deactivation_status(ctx: _SyncContext) -> None:
-    """Handle --deactivation-status."""
+    """Handle --deactivation-status (read-only, AC-85 / IC-15 Nr. 25).
+
+    ``--deactivation-status`` only reports; it must not write ``sync.log`` or
+    the env scripts (``sync.log`` is a doctor input -- writing it would corrupt
+    the measurement). Like ``--cleanup-preview``, the mode forces dry-run and
+    redirects ``_build_context``'s stdout in ``sync.py`` (``_STDOUT_CLEAN_MODES``);
+    setting ``ctx.read_only`` here skips the common tail that would write those
+    files.
+    """
     agent_meta_root = ctx.agent_meta_root
     project_root = ctx.project_root
     config = ctx.config
 
     mode = "deactivation-status"
+    ctx.read_only = True
     provider_config = load_providers_config(agent_meta_root)
     status = get_deactivation_status(project_root, config, provider_config)
     import json as _json

@@ -6,7 +6,12 @@ from pathlib import Path
 from typing import Optional
 
 from .frontmatter import REFERENCE_STANDARDS_FIELD
-from .io import _YAML_AVAILABLE, SyncError, _load_yaml_or_json, load_yaml_file
+from .io import (
+    _YAML_AVAILABLE,
+    SyncError,
+    _load_yaml_or_json,
+    load_yaml_cached,
+)
 from .runtime_gate import weakest_runtime_gate_tier
 
 _logger = logging.getLogger(__name__)
@@ -334,8 +339,13 @@ def load_provider_capabilities(agent_meta_root: Path) -> dict:
 
     Framework config; a missing or malformed file yields ``{}`` (optional-file
     semantics — callers fall back to ai-providers.yaml).
+
+    Stat-cached (`load_yaml_cached`): the context hard-cap guard and the
+    delegation engine otherwise re-parse this file hundreds of times per sync,
+    which dominated sync wall-clock on slow interpreters (multi-provider sync
+    breached its 300 s test limit on Python 3.9).
     """
-    data = load_yaml_file(
+    data = load_yaml_cached(
         agent_meta_root / PROVIDER_CAPABILITIES_YAML,
         on_error="default",
         default={},
@@ -400,7 +410,8 @@ def build_provider_routing(providers: list, provider_config: dict) -> str:
     return "> **AI ROUTING:** " + " | ".join(hints) if hints else ""
 
 
-def resolve_providers(config: dict, provider_config: dict, filter_deactivated: bool = True) -> list:
+def resolve_providers(config: dict, provider_config: dict, filter_deactivated: bool = True,
+                      tolerate_unknown: bool = False) -> list:
     """Resolve active AI providers from config.
 
     Supports:
@@ -413,6 +424,12 @@ def resolve_providers(config: dict, provider_config: dict, filter_deactivated: b
 
     When filter_deactivated is True (default), providers marked as deactivated in
     provider-deactivation config are excluded.
+
+    ``tolerate_unknown`` (default False) drops unknown names instead of raising
+    (#732). A strict catalog check belongs to config-load time
+    (``config._validate_providers``); read-only per-file callers — the context
+    hard-cap reader discovery — must not lose the registered readers because a
+    synthetic/custom name is exotic, so they pass True.
     """
     registered = set(provider_config)
 
@@ -421,6 +438,8 @@ def resolve_providers(config: dict, provider_config: dict, filter_deactivated: b
         # then fell back to Claude. Fail loud instead of producing a silent
         # Claude run (load_config._validate_providers catches this earlier for
         # the normal sync path; this guards direct resolve_providers() callers).
+        if tolerate_unknown:
+            return
         raise ValueError(
             f"Unknown provider {value!r} in '{field}' — registered providers: "
             f"{', '.join(sorted(registered)) or '(none)'}. "
@@ -434,24 +453,33 @@ def resolve_providers(config: dict, provider_config: dict, filter_deactivated: b
             for item in raw:
                 if not isinstance(item, str) or item not in registered:
                     _reject(item, "ai-providers")
-            providers = list(raw)
+                    if tolerate_unknown:
+                        continue
+                providers.append(item)
         elif isinstance(raw, str):
             if raw not in registered:
                 _reject(raw, "ai-providers")
-            providers = [raw]
+                if tolerate_unknown:
+                    providers = []
+            else:
+                providers = [raw]
 
     if not providers and "ai-provider" in config:
         p = config["ai-provider"]
         if isinstance(p, str):
             if p not in registered:
                 _reject(p, "ai-provider")
-            providers = [p]
+                if tolerate_unknown:
+                    providers = []
+            else:
+                providers = [p]
 
     if not providers:
         default_provider = config.get("default-provider", "Claude")
         if default_provider not in registered:
             _reject(default_provider, "default-provider")
-        providers = [default_provider]
+        if default_provider in registered:
+            providers = [default_provider]
 
     if filter_deactivated:
         dc = config.get("provider-deactivation", {})

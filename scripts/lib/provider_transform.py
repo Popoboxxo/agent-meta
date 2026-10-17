@@ -16,6 +16,7 @@ import re
 from pathlib import Path
 
 from .agent_toml import build_agent_toml_document
+from .dispatch_depth import required_depth_int
 from .frontmatter import (
     _parse_frontmatter_yaml,
     _quiet_field_set,
@@ -107,6 +108,23 @@ def _resolve_role_default_fallback(
     return apply_model_format(resolved, provider_config, provider)
 
 
+def _with_native_tools(tools: list, native: list | None) -> list:
+    """Append a provider's declared native dispatch tools to a tool list.
+
+    ``native`` is the ``native_agent_tools`` capability (e.g. Kimi
+    ``[Agent, AgentSwarm]``). Order is preserved and duplicates are dropped; a
+    non-list value is ignored. Used only for the dispatcher role (see the
+    ``subagents-allowlist`` spec key in :func:`_apply_agent_transform`).
+    """
+    if not isinstance(native, list):
+        return list(tools)
+    out = list(tools)
+    for t in native:
+        if isinstance(t, str) and t not in out:
+            out.append(t)
+    return out
+
+
 def _apply_tool_name_map(tools: list, tool_name_map: dict | None) -> list:
     """Translate Claude tool names to a provider vocabulary.
 
@@ -120,6 +138,44 @@ def _apply_tool_name_map(tools: list, tool_name_map: dict | None) -> list:
         str(tool_name_map.get(t, t)) if isinstance(t, str) else t
         for t in tools
     ]
+
+def _role_read_only(template_fm: dict) -> bool:
+    """Whether a role declares no write capability in its template tools.
+
+    Mirrors the doctor ``active_role_where: {tools_without: [Write, Edit]}``
+    predicate (scripts/lib/doctor_predicates.py): a role is read-only when its
+    template tool list contains neither ``Write`` nor ``Edit``; an empty or
+    missing list also counts as read-only. A comma-separated tool string is
+    accepted for parity with the doctor reader.
+    """
+    tools = (template_fm or {}).get('tools')
+    if isinstance(tools, str):
+        tools = [t.strip() for t in tools.split(',') if t.strip()]
+    if tools is None:
+        return True
+    if not isinstance(tools, list):
+        return False
+    return not any(t in ('Write', 'Edit') for t in tools if isinstance(t, str))
+
+def _effective_extra_fields(spec: dict, caps: dict, template_fm: dict) -> dict:
+    """Resolve a transform's literal ``extra-fields`` for a role.
+
+    A provider that enforces read-only access through a sandbox field declares
+    the capability ``read_only_enforcement: sandbox`` (config/
+    provider-capabilities.yaml) and the override map ``read-only-extra-fields``
+    in its ``agent-transform`` spec. The override is merged over ``extra-fields``
+    for a read-only role (see :func:`_role_read_only`); every other role keeps
+    the default. Pure data — no provider-name branch.
+    """
+    fields = dict(spec.get('extra-fields') or {})
+    read_only_fields = spec.get('read-only-extra-fields')
+    if (
+        caps.get('read_only_enforcement') == 'sandbox'
+        and isinstance(read_only_fields, dict)
+        and _role_read_only(template_fm)
+    ):
+        fields.update(read_only_fields)
+    return fields
 
 def wrap_sections_in_xml(content: str) -> str:
     """Wrap Markdown heading sections in XML tags.
@@ -220,6 +276,8 @@ def _apply_agent_transform(
     provider_config: dict,
     log: SyncLog,
     strip_fields: list,
+    active_set=None,
+    provider_capabilities: dict | None = None,
 ) -> str:
     """Apply a data-driven per-provider agent transform (issue #629).
 
@@ -240,6 +298,10 @@ def _apply_agent_transform(
                                          is active
       inject-memory: bool
       inject-permission-mode: bool
+      inject-subagent-depth: bool     — for the opencode-native mechanism, emit
+                                        `subagent_depth: <required_depth>` (the
+                                        capability value) so a spawned
+                                        orchestrator keeps its dispatch tools
       extra-fields: {key: value}      — literal frontmatter updates
       tools-format: skip | keep | filter | remove | map
                                        — skip: leave untouched; keep: validate
@@ -255,6 +317,16 @@ def _apply_agent_transform(
                                        — translate Claude tool names to the
                                          provider vocabulary; an unknown source
                                          name passes through unchanged
+      rename-fields: {old: new}        — rename frontmatter keys (e.g. Kimi
+                                         `hint` → `whenToUse`)
+      subagents-allowlist: routable|roles
+                                       — emit a `subagents:` allow-list of the
+                                         active delegatable roles (from the shared
+                                         ActiveSet) on the provider's primary
+                                         role, and inject the provider's
+                                         `native_agent_tools` capability; gated
+                                         on the capability
+                                         `subagent_allowlist_required`
       allowed-fields: [name, ...]      — frontmatter allow-list (validated by
                                          artifact_validate; Task-1)
       reject-fields: [name, ...]       — frontmatter deny-list (validated by
@@ -292,6 +364,10 @@ def _apply_agent_transform(
         resolve_temperature,
     )
     rel = str(target_path.relative_to(project_root))
+    # Capability entry for this provider (config/provider-capabilities.yaml),
+    # read once here. The data-driven dispatch steps below consume it — never a
+    # provider-name branch.
+    _caps = (provider_capabilities or {}).get(provider) or {}
 
     def _model_note(model: str) -> None:
         po = config.get('model-overrides', {})
@@ -333,9 +409,18 @@ def _apply_agent_transform(
         if mechanism == 'opencode-native-v2':
             primary_role = (provider_config.get(provider) or {}).get('primary-role', 'orchestrator')
             mode = 'primary' if role == primary_role else 'subagent'
+        # Data-driven dispatch depth (spec key `inject-subagent-depth`): emit the
+        # capability `required_depth` as the frontmatter `subagent_depth` so a
+        # spawned orchestrator keeps its dispatch tools (study 3.4: no depth
+        # emitted -> default 1). Gated on the spec key + a positive capability
+        # value — never a provider-name branch; providers without the key (e.g.
+        # Opencode) stay byte-identical.
+        subagent_depth = None
+        if spec.get('inject-subagent-depth'):
+            subagent_depth = required_depth_int(_caps)
         return _transform_frontmatter_for_opencode(
             content, name, description, model, steps, generated_from, agent_meta_root, temperature,
-            strip_fields=strip_fields, mode=mode,
+            strip_fields=strip_fields, mode=mode, subagent_depth=subagent_depth,
         )
 
     # --- codex-toml document: native TOML agent file, handled wholesale ---
@@ -356,7 +441,11 @@ def _apply_agent_transform(
         body = _strip_frontmatter(content)
         if spec.get('strip-claude-lines'):
             body = _strip_claude_specific_lines(body)
-        extra_fields = dict(spec.get('extra-fields') or {})
+        # IC-15 Nr. 21: a provider whose capability is
+        # `read_only_enforcement: sandbox` maps read-only roles (template tools
+        # without Write/Edit) to the read-only sandbox value declared under
+        # `read-only-extra-fields` — a plain data lookup, never a provider name.
+        extra_fields = _effective_extra_fields(spec, _caps, _fm)
         return build_agent_toml_document(
             name=name, description=description, model=model or "",
             extra_fields=extra_fields, body=body,
@@ -403,9 +492,48 @@ def _apply_agent_transform(
             log.note(rel, f'permissionMode: {permission_mode} (from {src})')
 
     # --- 4. literal frontmatter updates ---
-    extra_fields = spec.get('extra-fields')
-    if extra_fields:
-        content = _update_frontmatter_dict(content, dict(extra_fields))
+    if spec.get('extra-fields') or spec.get('read-only-extra-fields'):
+        # The read-only override (IC-15 Nr. 21) is resolved from the capability
+        # `read_only_enforcement: sandbox` + the `read-only-extra-fields` map;
+        # see _effective_extra_fields.
+        extra_fields = _effective_extra_fields(
+            spec, _caps, _parse_frontmatter_yaml(content),
+        )
+        if extra_fields:
+            content = _update_frontmatter_dict(content, extra_fields)
+
+    # --- 4b. frontmatter key renames (data: rename-fields) ---
+    rename_fields = spec.get('rename-fields')
+    if isinstance(rename_fields, dict) and rename_fields:
+        _fm = _parse_frontmatter_yaml(content)
+        _ren_updates: dict = {}
+        _ren_removes: list = []
+        for _old, _new in rename_fields.items():
+            if _old in _fm:
+                _ren_updates[str(_new)] = _fm[_old]
+                _ren_removes.append(str(_old))
+        if _ren_updates:
+            content = _update_frontmatter_dict(content, _ren_updates, removes=_ren_removes)
+
+    # --- 4c. subagent allowlist (data: subagents-allowlist) ---
+    # A provider that requires an explicit `subagents:` allow-list on its
+    # dispatcher (capability `subagent_allowlist_required`, e.g. Kimi) declares
+    # the source (`routable` / `roles`) in its agent-transform spec. The roles
+    # come from the shared ActiveSet (never re-resolved here); the native
+    # dispatch tools come from the `native_agent_tools` capability. Both are
+    # gated on the spec key + capability — no provider-name branch.
+    _primary_role = (provider_config.get(provider) or {}).get('primary-role', 'orchestrator')
+    _dispatch_source = spec.get('subagents-allowlist')
+    _emit_dispatch = (
+        bool(_dispatch_source)
+        and role == _primary_role
+        and active_set is not None
+        and _caps.get('subagent_allowlist_required') is True
+    )
+    if _emit_dispatch:
+        _pool = active_set.routable if str(_dispatch_source) == 'routable' else active_set.roles
+        content = _update_frontmatter_dict(
+            content, {'subagents': sorted(set(_pool) - {role})})
 
     # --- 5. tools ---
     tools_format = spec.get('tools-format')
@@ -422,12 +550,16 @@ def _apply_agent_transform(
                 # survive) — validation above only emits warnings — while the
                 # tool-name-map is still applied to every declared token.
                 _mapped = _apply_tool_name_map(_tools, spec.get('tool-name-map'))
+                if _emit_dispatch:
+                    _mapped = _with_native_tools(_mapped, _caps.get('native_agent_tools'))
                 if _mapped != _tools:
                     content = _update_frontmatter_dict(content, {'tools': _mapped})
             elif tools_mode == 'filter':
                 # filter: the ONLY mode that replaces the list with the
                 # whitelisted subset (then translated to provider vocabulary).
                 _mapped = _apply_tool_name_map(_valid, spec.get('tool-name-map'))
+                if _emit_dispatch:
+                    _mapped = _with_native_tools(_mapped, _caps.get('native_agent_tools'))
                 if _mapped != _tools:
                     content = _update_frontmatter_dict(content, {'tools': _mapped})
             elif tools_mode == 'map':
@@ -478,6 +610,8 @@ def transform_agent_content_for_provider(
     target_path: Path,
     provider_config: dict,
     log: SyncLog,
+    active_set=None,
+    provider_capabilities: dict | None = None,
 ) -> str:
     # Provider-agnostic frontmatter strip policy (SPEC-REFERENCE-STANDARDS-2026-09-15,
     # IC-03): the resolver unions the global defaults (`reference_standards`),
@@ -507,6 +641,8 @@ def transform_agent_content_for_provider(
             content, _transform_spec, provider, role, name, description, generated_from,
             config, agent_meta_root, project_root, target_path, provider_config, log,
             _strip_fields,
+            active_set=active_set,
+            provider_capabilities=provider_capabilities,
         )
 
     return content
@@ -626,6 +762,7 @@ def _transform_frontmatter_for_opencode(
     strip_fields: list[str] | None = None,
     quiet_fields: frozenset[str] | None = None,
     mode: str | None = None,
+    subagent_depth: int | None = None,
 ) -> str:
     """Build opencode-native agent frontmatter.
 
@@ -681,6 +818,8 @@ def _transform_frontmatter_for_opencode(
         "description": description,
         "mode": mode or template_fm.get("mode") or "subagent",
     }
+    if isinstance(subagent_depth, int) and not isinstance(subagent_depth, bool) and subagent_depth >= 1:
+        updates["subagent_depth"] = subagent_depth
     if template_fm.get("version") and "version" not in strip_fields:
         updates["version"] = template_fm.get("version")
     if generated_from and "generated-from" not in strip_fields:

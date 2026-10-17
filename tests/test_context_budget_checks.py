@@ -14,12 +14,12 @@ Two layers:
     Fixed by IC-15 Nr. 12 (the table lists only existing skills); the AC-08
     tests reproduce the defect by appending the unfiltered source table.
   - preset ``lazy``: Gemini embeds only 11 of its 19 rules in AGENTS.md, had no
-    rules read channel (``rules_read_channels: []``) and no lazy skills, so
-    exactly 8 rules were lost -> 8 ``context.rule-unreachable`` (AC-08 "die 8
-    verlorenen Gemini-lazy-Rules"). The lost set is a2a-delegation-gates,
-    issue-lifecycle, lifecycle-tasks, the three se-cascade-* rules,
-    session-conclusion and submodule-protection. Fixed by IC-15 Nr. 2 (skills
-    channel); the AC-08 tests reproduce the defect by removing the skills.
+    rules read channel and no lazy skills, so exactly 8 rules were lost
+    (a2a-delegation-gates, issue-lifecycle, lifecycle-tasks, the three
+    se-cascade-* rules, session-conclusion, submodule-protection). Fixed by
+    IC-15 Nr. 2 (skills channel) and IC-15 Nr. 8 (the unread ``.gemini/rules``
+    dir is retired); the AC-08 tests reproduce the defect shape by removing the
+    skills and, where the rules dir no longer exists, synthetically.
 
 Run: python3 -m pytest tests/test_context_budget_checks.py -q
 """
@@ -49,11 +49,6 @@ from tests.test_ac01_render_identity import _make_project, _run_sync  # noqa: E4
 # (measured in the docstring above) but are not re-rendered here.
 DEFAULT_MATRIX = ["Gemini", "Claude", "Codex"]
 LAZY_TABLE_SKILLS = 15
-GEMINI_LOST_LAZY_RULES = {
-    "a2a-delegation-gates", "issue-lifecycle", "lifecycle-tasks",
-    "se-cascade-adr-standard", "se-cascade-artifact-taxonomy",
-    "se-cascade-review-lifecycle", "session-conclusion", "submodule-protection",
-}
 
 
 def _make_lazy_project(root: Path, provider: str) -> Path:
@@ -152,15 +147,24 @@ def test_ac08_lazy_pointer_without_any_skill_is_reported(lazy_projects, mappings
     assert any("lazy-load pointer promises rule skills" in f.message for f in findings)
 
 
-def test_ac08_gemini_lazy_preset_loses_eight_rules(lazy_projects, mappings, tmp_path):
-    # Fixed by IC-15 Nr. 2: the 8 lazy rules reach Gemini as skills.
-    assert _run(cb.check_rule_unreachable, lazy_projects["Gemini"], "Gemini", mappings) == []
-    project = _without_skills(lazy_projects["Gemini"], tmp_path, mappings)
-    findings = _run(cb.check_rule_unreachable, project, "Gemini", mappings)
-    assert {Path(f.file).stem for f in findings} == GEMINI_LOST_LAZY_RULES
-    assert len(findings) == 8
-    assert all(f.check == "context.rule-unreachable" and f.severity is Severity.WARNING
-               for f in findings)
+def test_ac08_unread_rules_dir_without_skills_is_reported(tmp_path):
+    """AC-08: a generated-but-unread rules dir whose rules are neither embedded
+    nor reachable through skills is flagged.
+
+    IC-15 Nr. 8 retired Gemini's own ``.gemini/rules`` dir (the former 8-rule
+    loss shape is now structurally impossible), so the defect is reconstructed
+    synthetically; ``test_ac08_default_preset_gemini_has_no_unreachable_rule``
+    pins the fixed Gemini state and ``test_rule_reachable_via_skills_channel``
+    covers the reachable case.
+    """
+    _write(tmp_path / "AGENTS.md", "# Entry\n")
+    _write(tmp_path / "rules" / "lost-rule.md", "# Lost Rule\n\nbody\n")
+    caps = _caps(context_file="AGENTS.md", rules_dir="rules",
+                 rules_read_channels=["skills"], skills_dir="skills")
+    findings = cb.check_rule_unreachable(tmp_path, ["P"], caps, None)
+    assert {Path(f.file).stem for f in findings} == {"lost-rule"}
+    assert all(f.check == "context.rule-unreachable" and f.severity is Severity.ERROR
+               for f in findings)  # AC-12: promoted to its spec level (Task 1.24 follow-up)
 
 
 def test_ac08_default_preset_gemini_has_no_unreachable_rule(default_projects, mappings):
@@ -171,9 +175,9 @@ def test_ac08_claude_native_rules_dir_is_reachable(lazy_projects, mappings):
     assert _run(cb.check_rule_unreachable, lazy_projects["Claude"], "Claude", mappings) == []
 
 
-def test_unread_channel_flags_gemini_rules_dir_not_claude(default_projects, mappings):
-    gemini = _run(cb.check_unread_channel, default_projects["Gemini"], "Gemini", mappings)
-    assert [f.file for f in gemini] == [".gemini/rules"]
+def test_unread_channel_clears_for_gemini_rules_dir(default_projects, mappings):
+    """IC-15 Nr. 8: Gemini no longer writes the unread ``.gemini/rules`` dir."""
+    assert _run(cb.check_unread_channel, default_projects["Gemini"], "Gemini", mappings) == []
     assert _run(cb.check_unread_channel, default_projects["Claude"], "Claude", mappings) == []
 
 
@@ -192,7 +196,7 @@ def test_dangling_pointer_clears_once_skills_exist(default_projects, mappings, t
 def test_only_promoted_checks_emit_error(default_projects, mappings):
     assert set(cb.PHASE0_SEVERITY) == set(cb.SPEC_SEVERITY) == set(cb.EMITTED_SEVERITY)
     assert all(level is Severity.WARNING for level in cb.PHASE0_SEVERITY.values())
-    assert cb.PHASE1_PROMOTED == {"context.dangling-pointer"}
+    assert cb.PHASE1_PROMOTED == {"context.dangling-pointer", "context.rule-unreachable"}
     for check, level in cb.EMITTED_SEVERITY.items():
         expected = cb.SPEC_SEVERITY[check] if check in cb.PHASE1_PROMOTED else Severity.WARNING
         assert level is expected, check
@@ -218,8 +222,10 @@ def _caps(**overrides) -> dict:
 
 
 def _write(path: Path, text: str) -> None:
+    # newline="\n" keeps byte counts OS-independent (no CRLF translation).
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
+    with path.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write(text)
 
 
 def test_hard_cap_boundary(tmp_path):
@@ -309,6 +315,7 @@ def test_intentional_unread_accepts_dict_entries(monkeypatch):
 
 def _empty_surface_caps(**overrides) -> dict:
     return _caps(skills_dir="sk", commands_dir="cmd", settings_file="set.json",
+                 rules_read_channels=["embedded", "skills"],
                  **{"mcp-config": {"committed-file": "mcp.json"}}, **overrides)
 
 
@@ -321,12 +328,28 @@ def test_surface_target_key_mapping():
         assert cb.surface_target_key(surface) is None
 
 
-def test_declared_surface_empty_reports_all_four_surfaces(tmp_path):
+def test_declared_surface_empty_skips_surfaces_without_content_demand(tmp_path):
+    # commands/settings are always written when declared; skills need lazy rules,
+    # mcp needs an active server (content_expected).
     findings = cb.check_declared_surface_empty(tmp_path, ["P"], _empty_surface_caps(), None)
-    assert {f.file for f in findings} == {"sk", "cmd", "set.json", "mcp.json"}
+    assert {f.file for f in findings} == {"cmd", "set.json"}
     assert {f.check for f in findings} == {"context.declared-surface-empty"}
     assert all(f.severity is Severity.WARNING and f.message.startswith("P: ") for f in findings)
     assert cb.SPEC_SEVERITY["context.declared-surface-empty"] is Severity.ERROR
+
+
+def test_declared_surface_empty_reports_skills_when_lazy_rules_expected(tmp_path):
+    _write(tmp_path / ".meta-config" / "project.yaml", "rules-preset: lazy\n")
+    findings = cb.check_declared_surface_empty(tmp_path, ["P"], _empty_surface_caps(), None)
+    assert "sk" in {f.file for f in findings}
+
+
+def test_declared_surface_empty_reports_mcp_only_with_active_server(tmp_path):
+    assert "mcp.json" not in {
+        f.file for f in cb.check_declared_surface_empty(tmp_path, ["P"], _empty_surface_caps(), None)}
+    _write(tmp_path / ".meta-config" / "project.yaml", "mcp-servers:\n- honcho\n")
+    assert "mcp.json" in {
+        f.file for f in cb.check_declared_surface_empty(tmp_path, ["P"], _empty_surface_caps(), None)}
 
 
 def test_declared_surface_empty_clears_with_artifacts(tmp_path):
@@ -341,7 +364,8 @@ def test_declared_surface_empty_negative_cases(tmp_path):
     (tmp_path / "sk").mkdir()  # directory without SKILL.md still counts as empty
     (tmp_path / "cmd").mkdir()
     caps = _caps(skills_dir="sk", commands_dir="cmd")
-    assert {f.file for f in cb.check_declared_surface_empty(tmp_path, ["P"], caps, None)} == {"sk", "cmd"}
+    # commands are always expected when declared; skills only with lazy-rule demand
+    assert {f.file for f in cb.check_declared_surface_empty(tmp_path, ["P"], caps, None)} == {"cmd"}
     # no target key declared -> nothing declared; inactive provider -> not checked
     assert cb.check_declared_surface_empty(tmp_path, ["P"], _caps(skills_dir=None, commands_dir=""), None) == []
     assert cb.check_declared_surface_empty(tmp_path, [], caps, None) == []
@@ -354,7 +378,7 @@ def test_declared_surface_empty_intentional_empty_suppresses(tmp_path, monkeypat
     monkeypatch.setattr(cb, "_load_anchor_list",
                         lambda key: entries if key == "intentional_empty" else [])
     findings = cb.check_declared_surface_empty(tmp_path, ["P"], _empty_surface_caps(), None)
-    assert {f.file for f in findings} == {"cmd", "set.json", "mcp.json"}
+    assert {f.file for f in findings} == {"cmd", "set.json"}
 
 
 def test_legacy_artifact_present(tmp_path):
@@ -377,13 +401,16 @@ def test_legacy_artifact_real_mammouth_capability(tmp_path, mappings):
 
 @pytest.mark.parametrize("provider", ["Codex", "Mammouth", "Continue"])
 def test_ac67_matrix_reports_missing_skills(provider, mappings, tmp_path):
-    # AC-67: declared but empty skills directories of Codex/Mammouth/Continue
-    # (no skills are generated for them, see the module docstring)
+    # AC-67: declared but empty skills directories of Codex/Mammouth/Continue,
+    # now gated on content_expected -- the lazy preset makes rule skills expected.
+    _write(tmp_path / ".meta-config" / "project.yaml", "rules-preset: lazy\n")
     findings = cb.check_declared_surface_empty(tmp_path, [provider], mappings, None)
     assert mappings[provider]["skills_dir"] in {f.file for f in findings}
 
 
-def test_ac67_matrix_codex_real_sync(default_projects, mappings):
+def test_ac67_matrix_codex_real_sync_has_no_false_positive(default_projects, mappings):
+    # default preset: no lazy-rule skills expected, so an empty .agents/skills is
+    # not reported (content_expected) even though Codex declares the surface.
     findings = _run(cb.check_declared_surface_empty, default_projects["Codex"], "Codex", mappings)
-    assert ".agents/skills" in {f.file for f in findings}
+    assert findings == []
     assert _run(cb.check_legacy_artifact_present, default_projects["Codex"], "Codex", mappings) == []

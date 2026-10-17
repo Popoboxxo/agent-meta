@@ -8,7 +8,8 @@
 # paths and that the legacy `.github/copilot/agents` layout is gone:
 #   1. agent files are `.github/agents/<role>.agent.md` (not `.md`, not the
 #      legacy `.github/copilot/agents` dir),
-#   2. rules live under `.github/instructions/`,
+#   2. rules live under `.github/instructions/` with the provider-required
+#      `.instructions.md` suffix (Task 1.29, IC-15 Nr. 3),
 #   3. the context file is `.github/copilot-instructions.md`.
 # Exit 0 = all assertions hold.
 set -u
@@ -42,8 +43,8 @@ fi
 
 # 3. Rules land under .github/instructions/.
 [ -d ".github/instructions" ] || fail "instructions dir missing: .github/instructions"
-[ -f ".github/instructions/branch-guard.md" ] \
-    || fail "missing instruction file: .github/instructions/branch-guard.md"
+[ -f ".github/instructions/branch-guard.instructions.md" ] \
+    || fail "missing instruction file: .github/instructions/branch-guard.instructions.md"
 
 # 4. Native context file path.
 [ -f ".github/copilot-instructions.md" ] \

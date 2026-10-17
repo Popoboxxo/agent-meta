@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 
 from .agents import build_agent_hints, build_knowledge_engine_hints
 from .frontmatter import _strip_frontmatter
 from .io import (
+    SyncError,
     content_hash,
     is_absent_gitignored_target,
     load_json_file,
@@ -30,6 +32,7 @@ from .variables import (
     strip_inactive_conditional_blocks,
     substitute,
 )
+from .dispatch_depth import required_depth_int
 from .context_templates.builder import TemplateBuilder
 
 SNIPPETS_DIR = "snippets"
@@ -219,6 +222,10 @@ def _regenerate_static_context(
     source_label: str,
     rebuild_footer: bool = False,
     platform_vars: dict | None = None,
+    *,
+    config: dict | None = None,
+    provider_config: dict | None = None,
+    agent_meta_root: Path | None = None,
 ) -> None:
     """Regenerate the static part of an existing managed context file.
 
@@ -300,8 +307,11 @@ def _regenerate_static_context(
 
     new_content = new_header + existing_managed + target_footer
     log.action("UPDATE", rel_label, "static part regenerated from template")
-    if not dry_run:
-        target_path.write_text(new_content, encoding="utf-8")
+    _write_reader_context(
+        target_path, new_content,
+        agent_meta_root=agent_meta_root, project_root=project_root,
+        config=config, provider_config=provider_config, dry_run=dry_run,
+    )
     _record_static_hash(project_root, rel_label, norm_new, dry_run)
 GITIGNORE_BLOCK_BEGIN = "# --- agent-meta managed (do not edit) ---"
 GITIGNORE_BLOCK_END   = "# --- end agent-meta managed ---"
@@ -356,6 +366,7 @@ def _ensure_context_file(
     dry_run: bool,
     fallback_agent_dir: str,
     platform_vars: dict | None = None,
+    provider_config: dict | None = None,
 ) -> None:
     """Create a provider context file from template or minimal fallback."""
 
@@ -381,7 +392,11 @@ def _ensure_context_file(
     log.action("INIT", str(target_path.relative_to(project_root)), source_label)
     if not dry_run:
         target_path.parent.mkdir(parents=True, exist_ok=True)
-        target_path.write_text(content, encoding="utf-8")
+    _write_reader_context(
+        target_path, content,
+        agent_meta_root=agent_meta_root, project_root=project_root,
+        config=config, provider_config=provider_config, dry_run=dry_run,
+    )
 
 
 def _core_context_filename(config: dict) -> str:
@@ -439,6 +454,148 @@ def _inject_adapter_line(managed_block: str, adapter_line: str) -> str:
     return managed_block.replace(marker, f"{marker}\n{line}", 1)
 
 
+def _context_hard_cap_readers(
+    project_root: Path, config: dict, provider_config: dict, target_path: Path
+) -> list:
+    """Active providers whose ``context_file`` resolves to *target_path*.
+
+    Read-only reader discovery: only providers registered in
+    ``provider_config`` and marked active by the project config can be readers.
+    A name in ``ai-providers`` absent from the registry (synthetic, test or
+    custom provider) is *filtered out* rather than aborting the discovery —
+    ``resolve_providers``' strict catalog validation (issue #732) belongs to
+    config-load time (``config._validate_providers``), and dropping the whole
+    set would silently disable the cap for every real, registered reader. The
+    remaining registered readers are still measured.
+    """
+    from .providers import resolve_providers
+
+    active = resolve_providers(config, provider_config, tolerate_unknown=True)
+
+    readers = []
+    for name in active:
+        context_file = (provider_config.get(name) or {}).get("context_file")
+        if not context_file:
+            continue
+        try:
+            candidate = safe_path(project_root, context_file)
+        except SyncError:
+            continue
+        if candidate == target_path:
+            readers.append(name)
+    return readers
+
+
+def enforce_context_hard_cap(
+    agent_meta_root: Path,
+    project_root: Path,
+    config: dict,
+    provider_config: dict,
+    target_path: Path,
+    content: str,
+) -> None:
+    """Raise ``context.over-hard-cap`` before writing a reader-truncated file.
+
+    Every active provider that reads this physical file is a reader (IC-10); a
+    file at or above the smallest reader ``context_hard_cap_bytes`` is silently
+    truncated at runtime, so the sync aborts instead of writing it. The
+    decision reuses ``context_budget.check_over_hard_cap`` with an in-memory
+    (pre-write) report, keeping a single source of truth.
+    """
+    from .consistency import context_budget
+    from .context_report import merge_provider_mappings
+    from .providers import load_provider_capabilities
+
+    readers = _context_hard_cap_readers(
+        project_root, config, provider_config, target_path
+    )
+    if not readers:
+        return
+    merged = merge_provider_mappings(
+        provider_config, load_provider_capabilities(agent_meta_root)
+    )
+    # ``Path.write_text`` translates "\n" to ``os.linesep`` on write (newline=None),
+    # so measure the artifact exactly as it lands on disk (CRLF on Windows).
+    written = content.replace("\r\n", "\n").replace("\n", os.linesep)
+    data = written.encode("utf-8")
+    report = {}
+    for name in readers:
+        cap = (merged.get(name) or {}).get("context_hard_cap_bytes")
+        if not (isinstance(cap, int) and not isinstance(cap, bool)):
+            cap = None
+        report[name] = {
+            "entry-file": {
+                "bytes": len(data),
+                "lines": len(content.splitlines()),
+                "tokens_est": len(data) // 4,
+                "cap": cap,
+                "cap_kind": "hard-bytes" if cap is not None else None,
+            }
+        }
+    findings = context_budget.check_over_hard_cap(
+        project_root, readers, merged, None, report=report
+    )
+    if findings:
+        rel = target_path.relative_to(project_root).as_posix()
+        raise SyncError(
+            f"context.over-hard-cap: {rel} — {findings[0].message}; "
+            "refusing to write a context file a reader truncates"
+        )
+
+
+def _write_reader_context(
+    target_path: Path,
+    content: str,
+    *,
+    agent_meta_root: Path | None,
+    project_root: Path,
+    config: dict | None,
+    provider_config: dict | None,
+    dry_run: bool,
+) -> None:
+    """The single write chokepoint for reader-measured context files (IC-10).
+
+    Every physical context file read by one or more active providers must be
+    measured against each reader's ``context_hard_cap_bytes`` before it lands on
+    disk: a file at or above the smallest reader cap is silently truncated by
+    the runtime, so the sync aborts instead of writing it
+    (:func:`enforce_context_hard_cap`). Routing every such write through this one
+    helper keeps the guard from being bypassed by a newly added write path.
+    When the reader set cannot be resolved (``config`` / ``provider_config`` /
+    ``agent_meta_root`` absent on auxiliary back-compat paths) the write
+    proceeds unchanged — exactly as before this guard existed.
+    """
+    if (
+        config is not None
+        and provider_config is not None
+        and agent_meta_root is not None
+    ):
+        enforce_context_hard_cap(
+            agent_meta_root, project_root, config, provider_config,
+            target_path, content,
+        )
+    if not dry_run:
+        target_path.write_text(content, encoding="utf-8")
+
+
+def _write_dispatch_depth(
+    agent_meta_root: Path,
+    project_root: Path,
+    provider: str,
+    provider_config: dict,
+    log: SyncLog,
+    dry_run: bool,
+) -> None:
+    """Write the capability-gated ``[agents] max_depth`` config for a provider."""
+    from .dispatch_depth import write_dispatch_depth_config
+    from .providers import load_provider_capabilities
+
+    pc = provider_config.get(provider) or {}
+    capabilities = load_provider_capabilities(agent_meta_root).get(provider, {})
+    for rel in write_dispatch_depth_config(project_root, pc, capabilities, dry_run):
+        log.action("WRITE", rel, "[agents] max_depth >= required depth")
+
+
 def _update_managed_html_block(
     target_path: Path,
     project_root: Path,
@@ -450,6 +607,8 @@ def _update_managed_html_block(
     pc: dict | None = None,
     adapter_line: str | None = None,
     platform_vars: dict | None = None,
+    config: dict | None = None,
+    provider_config: dict | None = None,
 ) -> None:
     """Update the HTML-style managed block in a context file.
 
@@ -532,6 +691,11 @@ def _update_managed_html_block(
             )
             return
         new_content = _insert_managed_block_above_foreign_content(existing, new_managed)
+        if config is not None and provider_config is not None:
+            enforce_context_hard_cap(
+                agent_meta_root, project_root, config, provider_config,
+                target_path, new_content,
+            )
         log.action(
             "INIT", rel,
             "managed block inserted — file existed without an agent-meta "
@@ -545,6 +709,11 @@ def _update_managed_html_block(
     # must be inserted verbatim (#674 escape-safety).
     new_content = managed_pattern.sub(lambda _m: new_managed, existing, count=1)
     if new_content != existing:
+        if config is not None and provider_config is not None:
+            enforce_context_hard_cap(
+                agent_meta_root, project_root, config, provider_config,
+                target_path, new_content,
+            )
         log.action("UPDATE", rel, "managed block")
         if not dry_run:
             target_path.write_text(new_content, encoding="utf-8")
@@ -633,6 +802,7 @@ def _sync_managed_block_context(
             log, dry_run,
             fallback_agent_dir=pc.get("agents_dir", f".{provider.lower()}/agents"),
             platform_vars=platform_vars,
+            provider_config=provider_config,
         )
         if target_path.exists():
             _regenerate_static_context(
@@ -640,16 +810,21 @@ def _sync_managed_block_context(
                 rel_label=context_file, source_label=template_name or context_file,
                 rebuild_footer=True,
                 platform_vars=platform_vars,
+                config=config, provider_config=provider_config,
+                agent_meta_root=agent_meta_root,
             )
     if target_path.exists():
         _update_managed_html_block(
             target_path, project_root, variables, log, dry_run, agent_meta_root,
             provider, pc, adapter_line=adapter_line, platform_vars=platform_vars,
+            config=config, provider_config=provider_config,
         )
 
     # Claude settings files are initialized by the dedicated helpers in sync.py.
     if not has_dedicated:
-        _init_provider_settings_json(project_root, pc, agent_meta_root, variables, log, dry_run)
+        _init_provider_settings_json(
+            project_root, pc, agent_meta_root, variables, log, dry_run, provider=provider
+        )
 
 
 def _sync_opencode_context(
@@ -695,7 +870,11 @@ def _sync_opencode_context(
         log.action("INIT", context_file, template_name or "minimal fallback")
         if not dry_run:
             target_path.parent.mkdir(parents=True, exist_ok=True)
-            target_path.write_text(ocontent, encoding="utf-8")
+        _write_reader_context(
+            target_path, ocontent,
+            agent_meta_root=agent_meta_root, project_root=project_root,
+            config=config, provider_config=provider_config, dry_run=dry_run,
+        )
 
     # Refresh the static header AND footer from the template on every sync so the
     # dynamic `## Agents` provider list never freezes at INIT (same header+footer
@@ -707,6 +886,8 @@ def _sync_opencode_context(
             rel_label=context_file, source_label=template_name or context_file,
             rebuild_footer=True,
             platform_vars=platform_vars,
+            config=config, provider_config=provider_config,
+            agent_meta_root=agent_meta_root,
         )
 
     managed_pattern = re.compile(
@@ -735,6 +916,10 @@ def _sync_opencode_context(
             # Function replacement keeps the rendered block verbatim (#674).
             new_content = managed_pattern.sub(lambda _m: new_managed, existing, count=1)
             if new_content != existing:
+                enforce_context_hard_cap(
+                    agent_meta_root, project_root, config, provider_config,
+                    target_path, new_content,
+                )
                 log.action("UPDATE", context_file, "managed block (agent hints + rules)")
                 if not dry_run:
                     target_path.write_text(new_content, encoding="utf-8")
@@ -755,6 +940,10 @@ def _sync_opencode_context(
             # above the foreign content instead of leaving it uninitialized
             # forever or discarding what is already there.
             new_content = _insert_managed_block_above_foreign_content(existing, new_managed)
+            enforce_context_hard_cap(
+                agent_meta_root, project_root, config, provider_config,
+                target_path, new_content,
+            )
             log.action(
                 "INIT", context_file,
                 "managed block inserted — file existed without an agent-meta "
@@ -767,8 +956,13 @@ def _sync_opencode_context(
     _cleanup_bootstrap_block(target_path, config, provider_config, log, dry_run,
                               project_root=project_root, agent_meta_root=agent_meta_root)
 
-    init_opencode_personal(agent_meta_root, project_root, log, dry_run)
-    _init_provider_settings_json(project_root, pc, agent_meta_root, variables, log, dry_run)
+    # IC-15 Nr. 9 / F-07: only harnesses that read AGENTS.personal.md get the
+    # file (data key, no provider-name branch).
+    if pc.get("personal_agents_file", True):
+        init_opencode_personal(agent_meta_root, project_root, log, dry_run)
+    _init_provider_settings_json(
+        project_root, pc, agent_meta_root, variables, log, dry_run, provider=provider
+    )
 
 
 def _cleanup_bootstrap_block(
@@ -849,8 +1043,42 @@ def _cleanup_bootstrap_block(
     if removed:
         details.append(f"removed inactive marker(s): {', '.join(removed)}")
     log.action("CLEANUP", rel_label, "; ".join(details) or "bootstrap markers normalised")
-    if not dry_run:
-        target_path.write_text(content, encoding="utf-8")
+    _write_reader_context(
+        target_path, content,
+        agent_meta_root=agent_meta_root, project_root=project_root,
+        config=config, provider_config=provider_config, dry_run=dry_run,
+    )
+
+
+# IC-15 Nr. 10 / AC-10 (F-14): the Continue context file must never ship an
+# unresolved `{{UPPER_SNAKE}}` placeholder (study 3.8 measured `{{PLATFORM}}` /
+# `{{BUILD_COMMAND}}` in `.continue/rules/project-context.md`). Same policy as
+# IC-15 Nr. 19 for `--create-ext`: a line whose project variable is unset is
+# omitted instead of written literally. A line without placeholders survives
+# byte-for-byte, so a fully configured project renders unchanged.
+_UNRESOLVED_PLACEHOLDER_RE = re.compile(r"\{\{[A-Z][A-Z0-9_]*\}\}")
+
+
+def omit_unresolved_placeholder_lines(
+    text: str, log: SyncLog | None = None, label: str = ""
+) -> str:
+    """Drop whole lines still carrying an unresolved ``{{VAR}}`` placeholder.
+
+    Provider-agnostic helper (no provider literal); consumed by the Continue
+    context writer and the run1-convergence pass so both agree on the exact
+    emitted bytes (AC-4 fixpoint). Every discarded line is recorded at debug
+    level (F13) so a silently dropped directive stays diagnosable instead of
+    vanishing without a trace.
+    """
+    kept: list[str] = []
+    for line in text.splitlines(keepends=True):
+        if _UNRESOLVED_PLACEHOLDER_RE.search(line):
+            if log is not None:
+                log.debug(label or "context",
+                          f"omitted unresolved placeholder line: {line.strip()}")
+        else:
+            kept.append(line)
+    return "".join(kept)
 
 
 def _sync_continue_context(
@@ -895,6 +1123,8 @@ def _sync_continue_context(
             ccontent = _apply_platform_context_substitution(
                 ccontent, platform_vars, rel_ctx, log
             )
+            # IC-15 Nr. 10 (F-14): never scaffold unresolved placeholders.
+            ccontent = omit_unresolved_placeholder_lines(ccontent, log, rel_ctx)
             log.action("INIT", rel_ctx, source_label)
             if not dry_run:
                 ctx_path.parent.mkdir(parents=True, exist_ok=True)
@@ -905,6 +1135,8 @@ def _sync_continue_context(
             new_managed = _apply_platform_context_substitution(
                 new_managed, platform_vars, context_file, log
             )
+            # IC-15 Nr. 10 (F-14): omit lines with unset project variables.
+            new_managed = omit_unresolved_placeholder_lines(new_managed, log, context_file)
             updated = update_managed_block(existing, new_managed)
             if updated != existing:
                 log.action("UPDATE", str(ctx_path.relative_to(project_root)),
@@ -1110,6 +1342,9 @@ def _dispatch_context_strategy(
 ) -> None:
     """Capability-driven render dispatch shared by both topology modes."""
     pc = provider_config.get(provider, {})
+    _write_dispatch_depth(
+        agent_meta_root, project_root, provider, provider_config, log, dry_run
+    )
     if _has_capability(pc, "context-embedded-rules") or _shares_context_with_embedded_rules(
         provider, pc, provider_config
     ):
@@ -1132,47 +1367,56 @@ def _dispatch_context_strategy(
 
 
 def _adapter_settings_activation(pc: dict) -> dict | None:
-    """Resolve the provider-native settings activation for an adapter file.
+    """Resolve the provider-native settings key that names a context file.
 
-    Capability/``settings_file``-gated (AC-26, F-10):
+    Two key-driven opt-ins share this resolver:
 
-    * ``context_adapter_settings`` absent/``False`` (the default) → ``None``: no
-      settings write; the adapter file is the provider's default context file.
-    * ``context_adapter_settings: true`` additionally requires a native
-      ``settings_file`` and the provider-native key name in
-      ``context_adapter_settings_key`` (worked example: ``context.fileName`` in
-      ``.gemini/settings.json``); a missing piece degrades to ``None`` instead of
-      guessing (never writes an unspecified key).
+    * **Adapter activation** (``context_adapter_settings: true``): the native
+      ``context_adapter_file`` is only read once a provider-native settings key
+      names it (``context_adapter_settings_key``; worked example
+      ``context.fileName`` in ``.gemini/settings.json``).
+    * **Core filename settings** (``context_filename_settings_key``): a direct
+      reader of the shared core (Gemini CLI reads ``GEMINI.md`` by default)
+      gets its native settings key set to the resolved ``context_file`` so the
+      runtime actually reads the generated core file (IC-15 Nr. 8 / AC-18).
 
-    Purely key-driven — no provider-name literal in any branch.
+    Both require a native ``settings_file`` and a non-blank provider-native
+    dotted key; a missing piece degrades to ``None`` instead of guessing
+    (never writes an unspecified key). Purely key-driven — no provider-name
+    literal in any branch.
     """
-    if pc.get("context_adapter_settings") is not True:
-        return None
     settings_file = pc.get("settings_file")
-    settings_key = pc.get("context_adapter_settings_key")
-    adapter_file = pc.get("context_adapter_file")
     if not (isinstance(settings_file, str) and settings_file.strip()):
         return None
+    if pc.get("context_adapter_settings") is True:
+        settings_key = pc.get("context_adapter_settings_key")
+        target_file = pc.get("context_adapter_file")
+    else:
+        settings_key = pc.get("context_filename_settings_key")
+        target_file = pc.get("context_file")
     if not (isinstance(settings_key, str) and settings_key.strip()):
         return None
-    if not (isinstance(adapter_file, str) and adapter_file.strip()):
+    if not (isinstance(target_file, str) and target_file.strip()):
         return None
     return {
         "settings_file": settings_file,
         "settings_key": settings_key.strip(),
-        "adapter_file": adapter_file,
+        "adapter_file": target_file,
     }
 
 
 def _write_adapter_settings_activation(
     project_root: Path, activation: dict, log: SyncLog, dry_run: bool
 ) -> None:
-    """Merge the provider-native settings key that activates an adapter file.
+    """Merge the provider-native settings key that names a context file.
 
     Only reached through ``_adapter_settings_activation`` (an explicit provider
-    opt-in). The dotted native key is set on the existing settings document,
-    preserving sibling keys. A missing or non-mapping settings file is a
-    ``log.warning`` — never a silent no-op and never a create-and-guess.
+    opt-in, adapter file or core filename). The dotted native key is set on the
+    existing settings document, preserving sibling keys. A missing or
+    non-mapping settings file is a ``log.warning`` — never a silent no-op and
+    never a create-and-guess. Idempotent: once the key already names the file,
+    the settings document is left untouched (no write, no action), so a second
+    sync stays net-zero (AC-28).
     """
     settings_file = activation["settings_file"]
     settings_key = activation["settings_key"]
@@ -1180,13 +1424,13 @@ def _write_adapter_settings_activation(
     settings_path = safe_path(project_root, settings_file)
     if not settings_path.exists():
         log.warning(
-            f"context_adapter_settings for '{adapter_file}' requires '{settings_file}' "
+            f"context settings for '{adapter_file}' requires '{settings_file}' "
             "— settings file missing, activation skipped"
         )
         return
     document = load_json_file(settings_path, on_error="warn", default=None, log=log)
     if not isinstance(document, dict):
-        log.warning(f"{settings_file}: not a JSON object — adapter activation skipped")
+        log.warning(f"{settings_file}: not a JSON object — context settings skipped")
         return
     cursor = document
     parts = [part for part in settings_key.split(".") if part]
@@ -1199,12 +1443,15 @@ def _write_adapter_settings_activation(
             branch = {}
             cursor[part] = branch
         cursor = branch
+    if cursor.get(parts[-1]) == adapter_file:
+        log.skip(settings_file, f"{settings_key} already set")
+        return
     cursor[parts[-1]] = adapter_file
     if not dry_run:
         save_json_document(settings_path, document)
     log.action(
         "UPDATE", settings_file,
-        f"context adapter activation: {settings_key}={adapter_file}",
+        f"native context settings: {settings_key}={adapter_file}",
     )
 
 
@@ -1253,6 +1500,26 @@ def sync_context_adapters_for_provider(
             _write_adapter_settings_activation(project_root, activation, log, dry_run)
 
 
+def _apply_context_filename_settings(
+    project_root: Path, pc: dict, log: SyncLog, dry_run: bool
+) -> None:
+    """Write the provider-native context-filename key for a direct core reader.
+
+    AC-18 / IC-15 Nr. 8: Gemini CLI reads ``GEMINI.md`` by default, so the
+    generated core (``AGENTS.md``) is only read once the native settings key
+    names it (``context.fileName``). Key-driven via
+    ``_adapter_settings_activation`` (``context_filename_settings_key``); the
+    write is skipped when the named file does not exist, so a provider whose
+    context render was skipped never gets a dangling settings pointer.
+    """
+    activation = _adapter_settings_activation(pc)
+    if activation is None:
+        return
+    if not safe_path(project_root, activation["adapter_file"]).exists():
+        return
+    _write_adapter_settings_activation(project_root, activation, log, dry_run)
+
+
 def _project_name(config: dict, variables: dict) -> str:
     """Project name from ``project.name``, else the PROJECT_NAME variable.
 
@@ -1296,36 +1563,43 @@ def sync_context_for_provider(
 
     if context_topology(config, provider) == "per-provider":
         if pc.get("context_adapter") is True:
+            # The adapter write owns its own provider-native settings activation.
             sync_context_adapters_for_provider(
                 agent_meta_root, project_root, config, variables, log, dry_run,
                 provider, provider_config,
                 platform_vars=platform_vars,
             )
-        else:
-            _dispatch_context_strategy(
-                agent_meta_root, project_root, config, variables, log, dry_run,
-                provider, provider_config,
-                target_name=_core_context_filename(config),
-                platform_vars=platform_vars,
-            )
-        return
+            return
+        _dispatch_context_strategy(
+            agent_meta_root, project_root, config, variables, log, dry_run,
+            provider, provider_config,
+            target_name=_core_context_filename(config),
+            platform_vars=platform_vars,
+        )
+    else:
+        _dispatch_context_strategy(
+            agent_meta_root, project_root, config, variables, log, dry_run,
+            provider, provider_config,
+            platform_vars=platform_vars,
+        )
 
-    _dispatch_context_strategy(
-        agent_meta_root, project_root, config, variables, log, dry_run,
-        provider, provider_config,
-        platform_vars=platform_vars,
-    )
+    _apply_context_filename_settings(project_root, pc, log, dry_run)
 
 
-def apply_settings_surface_shape(content: str, pc: dict) -> str:
+def apply_settings_surface_shape(
+    content: str, pc: dict, capabilities: dict | None = None
+) -> str:
     """Apply the resolved settings-surface shape to a settings template body.
 
     Provider-neutral dispatch on the resolved ``mcp-config.format`` value ONLY
     (never on a provider name or ``surface-version``; the loader resolves the
     format, the writer consumes it). For the ``opencode-json-v2`` surface the
-    v1-only top-level ``subagent_depth`` key is dropped and ``default_agent`` is
-    emitted from the ``primary-role`` data key (OQ-4/AC-5). Every other format
-    returns ``content`` byte-for-byte, so the shipped v1 surface stays frozen.
+    top-level ``subagent_depth`` key is RETAINED — sourced from the
+    ``required_depth`` capability when available (IC-15 Nr. 16: the v2 surface
+    must not drop the orchestrator depth; the shipped template value is kept
+    otherwise) — and ``default_agent`` is emitted from the ``primary-role``
+    data key (OQ-4/AC-5). Every other format returns ``content`` byte-for-byte,
+    so the shipped v1 surface stays frozen.
 
     The settings template is JSONC (``//`` comments); the transform parses it
     leniently and re-emits clean JSON. A template that cannot be parsed is
@@ -1342,7 +1616,9 @@ def apply_settings_surface_shape(content: str, pc: dict) -> str:
         return content
     if not isinstance(document, dict):
         return content
-    document.pop("subagent_depth", None)
+    depth = required_depth_int(capabilities)
+    if depth is not None:
+        document["subagent_depth"] = depth
     primary_role = pc.get("primary-role")
     if isinstance(primary_role, str) and primary_role:
         document["default_agent"] = primary_role
@@ -1356,6 +1632,7 @@ def _init_provider_settings_json(
     variables: dict,
     log: SyncLog,
     dry_run: bool,
+    provider: str | None = None,
 ) -> None:
     """Create provider settings skeleton once if it does not exist yet."""
 
@@ -1388,7 +1665,16 @@ def _init_provider_settings_json(
         source_label = "minimal fallback"
         if settings_template_rel:
             log.warning(f"{settings_template_rel} not found — using minimal fallback for {settings_file}")
-    content = apply_settings_surface_shape(content, pc)
+    capabilities = None
+    if provider:
+        try:
+            from . import providers as _providers
+            capabilities = (
+                _providers.load_provider_capabilities(agent_meta_root) or {}
+            ).get(provider)
+        except Exception:
+            capabilities = None
+    content = apply_settings_surface_shape(content, pc, capabilities)
     log.action("INIT", str(settings_path.relative_to(project_root)), source_label)
     if not dry_run:
         settings_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1972,8 +2258,9 @@ def init_opencode_personal(
 ):
     """Copy AGENTS.personal-template.md to AGENTS.personal.md if not present yet.
 
-    Analogous to CLAUDE.personal.md — gitignored, never committed, loaded via
-    the `instructions` field in opencode.json.
+    Gitignored, never committed, loaded via the `instructions` field in
+    opencode.json. Callers gate on the provider key ``personal_agents_file``
+    (IC-15 Nr. 9): harnesses that do not read the file never get it.
     """
     template_path = agent_meta_root / "templates" / "configs" / "AGENTS.personal-template.md"
     target_path = project_root / "AGENTS.personal.md"
@@ -2020,6 +2307,7 @@ def init_settings_json(
             variables or {},
             log,
             dry_run,
+            provider=provider,
         )
 
 
@@ -2185,6 +2473,7 @@ def sync_claude_md_static(
     variables: dict,
     log: SyncLog,
     dry_run: bool,
+    provider_config: dict | None = None,
 ):
     """Create or regenerate the STATIC part of CLAUDE.md (above the managed block).
 
@@ -2211,8 +2500,11 @@ def sync_claude_md_static(
         rendered = builder.build(template_path.stem, variables)
         new_header, _managed, _footer = _split_context_file(rendered)
         log.action("INIT", rel, "templates/configs/CLAUDE.project-template.md")
-        if not dry_run:
-            target_path.write_text(rendered, encoding="utf-8")
+        _write_reader_context(
+            target_path, rendered,
+            agent_meta_root=agent_meta_root, project_root=project_root,
+            config=config, provider_config=provider_config, dry_run=dry_run,
+        )
         _record_static_hash(
             project_root, rel, _normalize_static_sig(_strip_user_notes(new_header)), dry_run
         )
@@ -2221,6 +2513,8 @@ def sync_claude_md_static(
     _regenerate_static_context(
         project_root, target_path, template_path, variables, log, dry_run,
         rel_label=rel, source_label="CLAUDE.project-template.md",
+        config=config, provider_config=provider_config,
+        agent_meta_root=agent_meta_root,
     )
 
 
@@ -2298,6 +2592,8 @@ def only_variables(
                 rel_label=context_file,
                 source_label=template_name or context_file,
                 rebuild_footer=rebuild_footer,
+                config=config, provider_config=provider_config,
+                agent_meta_root=agent_meta_root,
             )
             regenerated.add(context_file)
 
@@ -2309,8 +2605,11 @@ def only_variables(
             log.skip(context_file, "no open placeholders")
         else:
             log.action("WRITE", context_file, "variables from config")
-            if not dry_run:
-                target_path.write_text(new_content, encoding="utf-8")
+            _write_reader_context(
+                target_path, new_content,
+                agent_meta_root=agent_meta_root, project_root=project_root,
+                config=config, provider_config=provider_config, dry_run=dry_run,
+            )
 
     if not found_any:
         print("  !  No provider context file found — use --init to create one")

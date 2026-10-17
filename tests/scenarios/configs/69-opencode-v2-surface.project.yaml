@@ -24,7 +24,7 @@ project:
   short: opencode-v2-surface
 variables:
   PROJECT_NAME: scenario-opencode-v2-surface
-  PROJECT_DESCRIPTION: Opencode v2 nested mcp.servers, default_agent primary entry, no v1-only key.
+  PROJECT_DESCRIPTION: Opencode v2 nested mcp.servers, default_agent primary entry, retained subagent_depth.
   PROJECT_GOAL: Verify the v2 frontmatter mechanism and opencode.json surface when surface-version is v2.
   GIT_PLATFORM: GitHub
   GIT_REMOTE_URL: https://github.com/example/scenario-opencode-v2-surface

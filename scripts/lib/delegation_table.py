@@ -254,9 +254,6 @@ def get_routing_rules(
 
     Resolution rules:
 
-    - ``keywords`` falls back to the legacy ``routing.intent_keywords`` list
-      when ``routing_patterns.keywords`` is absent — keeps hand-written
-      fixtures and not-yet-migrated roles routable without duplication.
     - Roles without any patterns produce no rule (they are not keyword-routable)
       but still appear in ``target_agents`` — the tool's enum covers name-based
       dispatch too, mirroring the current prose table.
@@ -311,10 +308,6 @@ def get_routing_rules(
         routing = role_info.get("routing")
         routing = routing if isinstance(routing, dict) else {}
         keywords = patterns.get("keywords")
-        if not isinstance(keywords, list):
-            # Documented fallback: legacy routing.intent_keywords (no other
-            # Python consumer) keeps unmigrated roles keyword-routable.
-            keywords = routing.get("intent_keywords")
         keywords = [str(k) for k in keywords] if isinstance(keywords, list) else []
         examples = _select_examples(
             patterns.get("examples"), language, role=role_name, info_sink=info_sink

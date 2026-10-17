@@ -1,5 +1,7 @@
+import re
 from pathlib import Path
 
+from scripts.lib.config import build_variables, load_config
 from scripts.lib.delegation_table import get_intent_routing_table
 
 
@@ -78,4 +80,38 @@ def test_intent_routing_table_includes_tiers_summary_line():
     assert "**Tiers**" in table
     assert "recommended:" in table
     assert "required:" in table
-    assert "`developer`" in table  # developer is a 'required' tier role
+    assert "`developer`" in table
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+_ORCHESTRATOR_TEMPLATE = REPO_ROOT / "agents" / "1-generic" / "orchestrator.md"
+_SEPARATOR_RE = re.compile(r"^\s*\|(?:\s*:?-{2,}:?\s*\|)+\s*$")
+
+
+def _rendered_delegation_table(mode: str) -> str:
+    config = {**load_config(REPO_ROOT / ".meta-config" / "project.yaml"),
+              "context_file": {"mode": mode}}
+    variables, _ = build_variables(config, REPO_ROOT)
+    return variables["AGENT_DELEGATION_TABLE"]
+
+
+def _header_count(text: str) -> int:
+    return sum(1 for line in text.splitlines() if _SEPARATOR_RE.match(line))
+
+
+def test_delegation_table_is_one_dense_table_in_both_modes():
+    for mode in ("full", "compact"):
+        table = _rendered_delegation_table(mode)
+        assert _header_count(table) == 1, f"{mode}: expected exactly one header row"
+        assert "\n\n" not in table, f"{mode}: blank line inside the delegation table"
+
+
+def test_orchestrator_agent_table_renders_a_single_header():
+    src = _ORCHESTRATOR_TEMPLATE.read_text(encoding="utf-8")
+    block = src.split("**Agent table:**", 1)[1].split(
+        "<!-- agent-meta:managed-end -->", 1)[0]
+    for mode in ("full", "compact"):
+        rendered = block.replace(
+            "{{AGENT_DELEGATION_TABLE}}", _rendered_delegation_table(mode))
+        assert _header_count(rendered) == 1, f"{mode}: duplicate table header"
+        assert "\n\n| `" not in rendered, f"{mode}: blank line between delegation rows"  # developer is a 'required' tier role

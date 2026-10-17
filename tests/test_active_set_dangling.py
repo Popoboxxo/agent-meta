@@ -233,21 +233,50 @@ def test_commands_rules_and_pipeline_details_are_scanned(synced, tmp_path, rel):
     assert [(f.file, f.severity) for f in found] == [(rel, Severity.ERROR)]
 
 
-_MATRIX_PROVIDERS = sorted(yaml.safe_load(
-    (_ROOT / "config" / "ai-providers.yaml").read_text(encoding="utf-8"))["providers"])
+_PROVIDER_CFG = yaml.safe_load(
+    (_ROOT / "config" / "ai-providers.yaml").read_text(encoding="utf-8"))["providers"]
+_MATRIX_PROVIDERS = sorted(_PROVIDER_CFG)
+_CAPS = yaml.safe_load(
+    (_ROOT / "config" / "provider-capabilities.yaml").read_text(encoding="utf-8"))["capabilities"]
+
+# Readers that truncate the shared ``AGENTS.md`` through a hard cap (AC-13).
+# A fixture without a ``roles:`` allowlist renders every gate-enabled role,
+# which grows that shared context past the strictest cap; its sync then aborts
+# by design with ``context.over-hard-cap`` (Task 1.25; asserted in
+# ``tests/test_dispatch_depth_and_hard_cap.py``). Such fixtures are synced over
+# the uncapped providers only, so the hard-cap providers contribute no
+# artifacts for them: their reference coverage comes solely from the
+# allowlisted fixtures (p10/p20), not from pall/ha. The shared ``AGENTS.md``
+# the all-roles fixtures do produce is still scanned once through the uncapped
+# readers, so that content is covered — but not per hard-cap provider.
+_SHARED_CONTEXT_HARD_CAP = {
+    p for p in _MATRIX_PROVIDERS
+    if _PROVIDER_CFG[p].get("context_file") == "AGENTS.md"
+    and _CAPS.get(p, {}).get("context_hard_cap_bytes")}
+_UNCAPPED_PROVIDERS = [p for p in _MATRIX_PROVIDERS if p not in _SHARED_CONTEXT_HARD_CAP]
+
 # AC-49: mentions outside mention_allow must be 0 for these generated artifacts.
 _MENTION_ZERO_PARTS = ("orchestrator", "pipeline-details", "commands", "prompts")
 
 
 @pytest.fixture(scope="module")
 def matrix(tmp_path_factory):
-    """Each AC-49 fixture synced once with every registered provider (concurrently)."""
+    """Each AC-49 fixture synced once with every registered provider (concurrently).
+
+    All-roles fixtures (no ``roles:`` key: ``pall``, ``ha``) exceed a
+    shared-context hard cap, so they are synced over ``_UNCAPPED_PROVIDERS``
+    instead (see ``_SHARED_CONTEXT_HARD_CAP``); the allowlisted fixtures keep
+    the full matrix.
+    """
     names = ("p10", "p20", "pall", "ha")
     configs = {name: yaml.safe_load(
         (_FIX / name / ".meta-config" / "project.yaml").read_text(encoding="utf-8"))
         for name in names}
-    projects = sync_configs_parallel(
-        tmp_path_factory.mktemp("matrix"), configs, providers=_MATRIX_PROVIDERS)
+    root = tmp_path_factory.mktemp("matrix")
+    allowlisted = {name: cfg for name, cfg in configs.items() if "roles" in cfg}
+    all_roles = {name: cfg for name, cfg in configs.items() if "roles" not in cfg}
+    projects = sync_configs_parallel(root, allowlisted, providers=_MATRIX_PROVIDERS)
+    projects.update(sync_configs_parallel(root, all_roles, providers=_UNCAPPED_PROVIDERS))
     return {name: (projects[name], compute_active_set(configs[name], _ROOT, projects[name]))
             for name in names}
 

@@ -239,10 +239,15 @@ def test_mcp_artifacts_for_unread_rules_dir_provider(env, tmp_path):
     # skills channel (IC-15 Nr. 2) -- the managed block points there.
     from lib.mcp import generate_mcp_artifacts
 
-    pc = env["provider_config"]["Gemini"]
+    # IC-15 Nr. 8 retired Gemini's real .gemini/rules directory; reconstruct the
+    # unread-rules-dir shape so the dual write (rules dir + skills) stays covered.
+    provider_config = {k: dict(v) for k, v in env["provider_config"].items()}
+    provider_config["Gemini"] = {
+        **provider_config["Gemini"], "has_rules": True, "rules_dir": ".gemini/rules",
+    }
     generate_mcp_artifacts(
-        REPO_ROOT, tmp_path, env["config"], env["provider_config"], env["log"],
-        dry_run=False, provider="Gemini", rules_dir=pc.get("rules_dir"),
+        REPO_ROOT, tmp_path, env["config"], provider_config, env["log"],
+        dry_run=False, provider="Gemini", rules_dir=".gemini/rules",
     )
     assert (tmp_path / ".gemini" / "rules" / "mcp-honcho.md").exists()
     assert (tmp_path / ".gemini" / "skills" / "mcp-honcho" / "SKILL.md").exists()

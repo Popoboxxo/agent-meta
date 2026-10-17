@@ -14,7 +14,7 @@ tools:
 - Grep
 - WebFetch
 - TodoWrite
-based-on: 1-generic/provider-expert.md@1.0.0
+based-on: 1-generic/provider-expert.md@1.5.1
 generated-from: 2-platform/agent-meta-gemini-expert.md@1.0.0
 model: claude-sonnet-5
 memory: project

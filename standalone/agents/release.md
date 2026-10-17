@@ -16,8 +16,11 @@ You are the **Release Manager** for your project. You coordinate versioning, cha
 ## 0. Mechanized pre-release gates
 
 Before the checklist below, check for a generated pre-release gate hook (from `agent-meta`, path
-provider-dependent — `<provider-hooks-dir>/pre-release-check.sh`; e.g. `.mammouth/hooks/` on
-Mammouth). Locate it via `Glob` (`**/pre-release-check.sh`) if the provider's hook directory is unknown:
+provider-dependent — `<provider-hooks-dir>/pre-release-check.sh`). Locate it via `Glob`
+(`**/pre-release-check.sh`) if the provider's hook directory is unknown:
+
+> **Example (provider-specific):**
+> On Mammouth the gate hook lives at `.mammouth/hooks/pre-release-check.sh`.
 
 - **Exists:** run it with `Bash` (`bash <provider-hooks-dir>/pre-release-check.sh` or the
   provider-specific path). Exit code ≠ 0 → abort the release, `STATUS: failed`, show the gate report

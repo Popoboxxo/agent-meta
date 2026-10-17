@@ -50,6 +50,7 @@ from lib.context import (
     init_claude_personal,
     init_settings_json,
     init_settings_local_json,
+    omit_unresolved_placeholder_lines,
     rollback_context_adapters,
     sync_claude_md_static,
     sync_context_for_provider,
@@ -325,7 +326,8 @@ def _sync_stage_claude_base(
     )
     if is_claude:
         if _context_auto_generate(config):
-            sync_claude_md_static(agent_meta_root, project_root, config, variables, log, args.dry_run)
+            sync_claude_md_static(agent_meta_root, project_root, config, variables, log, args.dry_run,
+                                  provider_config=provider_config)
         else:
             log.note("CLAUDE.md", "context_file.auto_generate: false — static header left untouched")
             log.warning(
@@ -542,6 +544,9 @@ def converge_managed_block_context(
         warn_unresolved_platform_vars(
             steady, platform_vars, context_file, log, report_missing=False
         )
+    # IC-15 Nr. 10 (F-14): the steady block feeds the Continue context file;
+    # omit lines whose project variable is unset (study 3.8) so run1 == run2.
+    steady = omit_unresolved_placeholder_lines(steady, log, context_file)
     existing = target.read_text(encoding="utf-8")
     updated = substitute_managed_block(existing, steady)
     if updated == existing:
@@ -1385,7 +1390,10 @@ def _sync_stage_knowledge_and_isolation(
     # Provider isolation: hard-block cross-provider directory access
     isolation_mode = config.get("provider-isolation")
     if isolation_mode != "disabled":
-        sync_provider_isolation(project_root, providers, provider_config, log, args.dry_run)
+        sync_provider_isolation(
+            project_root, providers, provider_config, log, args.dry_run,
+            agent_meta_root=agent_meta_root,
+        )
     else:
         log.skip("provider-isolation", "disabled in project.yaml")
 

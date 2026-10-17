@@ -1,6 +1,6 @@
 ---
 name: agent-meta-manager
-version: 1.24.0
+version: 1.24.1
 description: 'Manage agent-meta: upgrades, sync, feedback delegation, project-specific
   agents, external-skill lifecycle, and creating extensions.'
 hint: 'Manage agent-meta: upgrade, sync, feedback, create project-specific agents'
@@ -15,7 +15,7 @@ tools:
 - Agent
 - WebFetch
 - TodoWrite
-generated-from: 1-generic/agent-meta-manager.md@1.24.0
+generated-from: 1-generic/agent-meta-manager.md@1.24.1
 model: claude-haiku-4-5-20251001
 ---
 
@@ -166,12 +166,13 @@ model, overriding per-role/tier/preset resolution. Remove the key (or the whole
 block) and the previous per-agent settings resume automatically — nothing else to
 clean up.
 
-```yaml
-# .meta-config/project.yaml
-model-override-all:
-  Claude: balanced      # tier name -> provider's model-tiers entry
-  Gemini: powerful
-```
+> **Example (provider-specific):**
+> ```yaml
+> # .meta-config/project.yaml
+> model-override-all:
+>   Claude: balanced      # tier name -> provider's model-tiers entry
+>   Gemini: powerful
+> ```
 
 Prefer tier names (nano/fast/balanced/powerful/max/ultra). A concrete model ID
 must come from `.agent-meta/config/generated/model-registry.json`
@@ -205,12 +206,13 @@ When a provider is set to `true`, `sync.py` omits the generated agent's
 `model:` field entirely — the agent then inherits the main-chat model at
 runtime. `false` counts as unset (normal per-role/tier resolution applies).
 
-```yaml
-# .meta-config/project.yaml
-model-inherit-main-chat:
-  Claude: true      # all Claude agents inherit the main-chat model
-  Gemini: false     # unset — normal per-role resolution applies
-```
+> **Example (provider-specific):**
+> ```yaml
+> # .meta-config/project.yaml
+> model-inherit-main-chat:
+>   Claude: true      # all Claude agents inherit the main-chat model
+>   Gemini: false     # unset — normal per-role resolution applies
+> ```
 
 Toggle workflow:
 1. Read current state: `model-inherit-main-chat` in `.meta-config/project.yaml`.
@@ -249,7 +251,7 @@ Guards & scope:
   protection) — report the model count + timestamp from the run.
 - After any config change, run a REAL sync (not just `--dry-run`/`--validate`)
   or explicitly report that it is still pending.
-- Scope discipline: do NOT touch providers you were not asked to (e.g. Mammouth).
+- Scope discipline: do NOT touch providers you were not asked to (e.g. a provider outside the task scope).
 
 ## 9. External skills
 

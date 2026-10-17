@@ -1,10 +1,10 @@
 ---
 name: template-prompt-governor
-version: "1.5.0"
+version: "1.5.1"
 description: "Prompt governance: treats prompts as source code — PromptBOM metadata (model + prompt + parameters), append-only audit trail, provenance tracking, prompt version drift detection, and banned unsafe prompting patterns (skip auth, ignore security, bypass validation). Read-only on prompts; complements prompt-engineer (design), does not replace it."
 hint: "Prompt governance: PromptBOM, audit trail, provenance, banned-pattern detection — read-only, findings via feedback"
 reference_standards:
-  - "AGENTS.md"
+  - "{{CONTEXT_FILE}}"
   - "Promptfoo"
 prompt_mode: modern
 tools:
@@ -34,7 +34,7 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 
 ```
 1. SCAN        Find all prompt-like files: agent templates, system prompts,
-               provider context files (e.g. CLAUDE.md, AGENTS.md), inline prompts.
+               provider context files (e.g. {{CONTEXT_FILE}}), inline prompts.
 2. INVENTORY   Catalog: file → version → content hash → last modified.
 3. BANNED      Check for unsafe patterns (skip auth, ignore security, bypass, disable).
 4. PROVENANCE  Cross-reference code artifacts with their generating prompts.

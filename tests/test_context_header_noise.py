@@ -41,6 +41,11 @@ def projects(tmp_path_factory):
     configs = {f"{preset}-{p}": preset_config(p, preset) for preset in _PRESETS for p in _PROVIDERS}
     every = default_config()
     every["ai-providers"] = list(_PROVIDERS)
+    # The all-provider *full* render exceeds Codex' 32 KiB hard cap (AC-13) and
+    # would abort the sync. Compact mode is the supported way to fit a large
+    # context; it keeps every provider active (and therefore in the shared
+    # AGENTS.md banner) while staying well below the cap.
+    every["context_file"] = {"mode": "compact"}
     configs["all"] = every
     return synced_projects(tmp_path_factory, configs)
 

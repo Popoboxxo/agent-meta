@@ -1,7 +1,7 @@
 ---
 name: tester
 version: "1.0.2"
-based-on: "1-generic/tester.md@2.1.4"
+based-on: "1-generic/tester.md@2.7.0"
 description: "HACS Integration Tester — pytest ohne HA-Paket (Fake-Package), Logik zuerst, dann E2E auf Dev-Instanz."
 hint: "Schreibt HA-freie Unit-Tests (Fake-Package) und E2E-Tests für HACS-Integrationen"
 prompt_mode: modern

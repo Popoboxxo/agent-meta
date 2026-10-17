@@ -451,7 +451,10 @@ def test_failed_out_write_still_prints_report_and_exits_two(
 def test_declared_surface_empty_is_bound_to_provider_and_filterable(
         monkeypatch, capsys, tmp_path, fake_command):
     root = tmp_path / "multi"
-    _make_project(root, providers="[Claude, Codex]")
+    config = _make_project(root, providers="[Claude, Codex]")
+    # content_expected: the lazy preset makes missing rule skills reportable for both.
+    config.write_text(config.read_text(encoding="utf-8") + "rules-preset: lazy\n",
+                      encoding="utf-8")
 
     def surface(*args):
         code, out, _ = _main(monkeypatch, capsys, root, "--json", *args)

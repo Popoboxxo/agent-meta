@@ -1,7 +1,10 @@
 #!/bin/bash
 # Scenario assert for 66-mammouth-tools-map
-# (Spec §8 AC-6, spec §10.1 row 66: the `tools:` frontmatter is an object /
-# YAML mapping, never a list.)
+# (Spec §8 AC-6, spec §10.1 row 66 — as amended by IC-15 Nr. 6 / Task 1.27:
+# Mammouth is an OpenCode fork and now uses the opencode-native mechanism — a
+# lowercase `permission` YAML mapping plus a set `mode` — instead of the
+# formerly inert Claude-cased `tools:` object. The AC-6 invariant is preserved:
+# the mechanism must never emit a `tools:` list.)
 #
 # Contract: cwd = temp project dir (sync output); $1 and env REPO_ROOT carry the
 # agent-meta checkout path. The harness has already run dry-run + real sync +
@@ -55,22 +58,36 @@ for path in files:
     except Exception as exc:  # noqa: BLE001 - report every parse failure verbatim
         errors.append(f"{path}: frontmatter parse error: {type(exc).__name__}: {exc}")
         continue
-    if not isinstance(data, dict) or "tools" not in data:
-        errors.append(f"{path}: no 'tools' key in frontmatter")
+    if not isinstance(data, dict):
+        errors.append(f"{path}: frontmatter is not a mapping")
         continue
-    tools = data["tools"]
-    checked += 1
+    # opencode-native mechanism (Task 1.27): `permission` map + `mode`.
+    # AC-6 invariant: a `tools:` LIST would abort the whole directory — forbid it.
+    tools = data.get("tools")
     if isinstance(tools, list):
-        errors.append(f"{path}: 'tools' is a list, expected a YAML mapping")
-    elif not isinstance(tools, dict):
-        errors.append(f"{path}: 'tools' is {type(tools).__name__}, expected a YAML mapping")
-    elif not tools:
-        errors.append(f"{path}: 'tools' mapping is empty")
+        errors.append(
+            f"{path}: 'tools' is a list, expected no tools list (opencode-native)"
+        )
+        continue
+    mode = data.get("mode")
+    if mode not in ("subagent", "primary"):
+        errors.append(f"{path}: 'mode' is {mode!r}, expected 'subagent' or 'primary'")
+    permission = data.get("permission")
+    checked += 1
+    if not isinstance(permission, dict):
+        errors.append(
+            f"{path}: 'permission' is {type(permission).__name__}, expected a YAML mapping"
+        )
+    elif not permission:
+        errors.append(f"{path}: 'permission' mapping is empty")
 
 if errors:
     for entry in errors:
         print(f"TOOLS MAP ERROR: {entry}")
     raise SystemExit(1)
 
-print(f"TOOLS OK: {checked}/{len(files)} file(s) carry a non-empty 'tools' mapping")
+print(
+    f"PERMISSION OK: {checked}/{len(files)} file(s) carry a set mode "
+    "and a non-empty 'permission' mapping (no 'tools' list)"
+)
 PY

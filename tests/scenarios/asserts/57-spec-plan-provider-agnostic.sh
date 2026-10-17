@@ -24,7 +24,7 @@ for rule in spec-plan-workflow brainstorming-gate writing-plans plan-ledger; do
         || fail "Claude gated rule '$rule' missing"
     [ -f ".opencode/skills/$rule/SKILL.md" ] \
         || fail "Opencode gated rule '$rule' missing"
-    [ -f ".gemini/rules/$rule.md" ] \
+    [ -f ".gemini/skills/$rule/SKILL.md" ] \
         || fail "Gemini gated rule '$rule' missing"
 done
 
@@ -61,7 +61,7 @@ problems = []
 for rule in RULES:
     claude = body(root / ".claude" / "skills" / rule / "SKILL.md")
     opencode = body(root / ".opencode" / "skills" / rule / "SKILL.md")
-    gemini = body(root / ".gemini" / "rules" / f"{rule}.md")
+    gemini = body(root / ".gemini" / "skills" / rule / "SKILL.md")
     if not (claude == opencode == gemini):
         problems.append(f"{rule}: delivered bodies differ across providers")
     for name in PROVIDERS:

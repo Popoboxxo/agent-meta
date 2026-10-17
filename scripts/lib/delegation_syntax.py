@@ -16,7 +16,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from .io import load_yaml_file
+from .io import load_yaml_cached
 from .roles import _TIER_SEQUENCE
 
 # Known A2A schemas shipped with agent-meta (relative to repo root).
@@ -152,7 +152,7 @@ class DelegationSyntaxEngine:
             # Canonical single-file loader (Issue #479), fail-soft: absent or
             # malformed registry yields {} — same as the former hand-rolled
             # loader (FileNotFoundError/yaml.YAMLError → {}).
-            self._syntax_registry = load_yaml_file(
+            self._syntax_registry = load_yaml_cached(
                 self.config_dir / "delegation-syntax.yaml",
                 on_error="default",
                 default={},
@@ -162,7 +162,7 @@ class DelegationSyntaxEngine:
     @property
     def capabilities_registry(self) -> dict[str, Any]:
         if self._capabilities_registry is None:
-            self._capabilities_registry = load_yaml_file(
+            self._capabilities_registry = load_yaml_cached(
                 self.config_dir / "provider-capabilities.yaml",
                 on_error="default",
                 default={},
@@ -185,7 +185,7 @@ class DelegationSyntaxEngine:
         config, absent or malformed content yields an empty registry.
         """
         if self._tier_presets is None:
-            self._tier_presets = load_yaml_file(
+            self._tier_presets = load_yaml_cached(
                 self.config_dir / "tier-presets.yaml",
                 on_error="default",
                 default={},
@@ -201,7 +201,7 @@ class DelegationSyntaxEngine:
         is a top-level sibling of ``roles``.
         """
         if self._role_defaults is None:
-            self._role_defaults = load_yaml_file(
+            self._role_defaults = load_yaml_cached(
                 self.config_dir / "role-defaults.yaml",
                 on_error="default",
                 default={},

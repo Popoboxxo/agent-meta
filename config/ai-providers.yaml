@@ -96,7 +96,7 @@ providers:
     pending_tasks_file: .claude/pending-tasks.md
     extension_dir: .claude/3-project
     orchestrator_hint: "- **In Claude Code (CLI):** Startet den `orchestrator`-Agenten\
-      \ mit `claude -a orchestrator` oder w\xE4hlt ihn aus."
+      \ mit `claude --agent orchestrator` oder w\xE4hlt ihn aus."
     model-tiers:
       nano: claude-haiku-5-5
       fast: claude-haiku-5-5
@@ -138,8 +138,20 @@ providers:
         format: antigravity-mcp-json
     context_file: AGENTS.md
     context_template: templates/configs/AGENTS.project-template.md
-    has_rules: true
-    rules_dir: .gemini/rules
+    # IC-15 Nr. 9 / F-07 (#971): Gemini does not read AGENTS.personal.md, so the
+    # sync must not create it. Data-driven key; readers use true (default).
+    personal_agents_file: false
+    # IC-15 Nr. 8 (F-08/F-07, #975): Gemini CLI reads GEMINI.md by default, so
+    # the shared core AGENTS.md is only read when the native settings key
+    # `context.fileName` names it. `context_filename_settings_key` (below) makes
+    # _adapter_settings_activation write that key -- data-driven, no provider
+    # name branch. Rules stay embedded in AGENTS.md; the unread `.gemini/rules`
+    # directory is no longer written and a directory from an earlier version is
+    # cleaned up through its managed index (foreign files stay).
+    has_rules: false
+    retired_rules_dirs:
+    - .gemini/rules
+    context_filename_settings_key: context.fileName
     has_hooks: true
     hook_protocol: antigravity-hooks-json
     hooks_dir: .agents/hooks
@@ -231,6 +243,8 @@ providers:
     primary-role: orchestrator
     context_file: AGENTS.md
     context_template: templates/configs/AGENTS.project-template.md
+    # Opencode reads the generated AGENTS.personal.md (instructions field).
+    personal_agents_file: true
     has_rules: false
     has_hooks: false
     has_commands: true
@@ -446,6 +460,12 @@ providers:
     context_template: templates/configs/COPILOT.project-template.md
     has_rules: true
     rules_dir: .github/instructions
+    # IC-15 Nr. 3 / AC-14 (F-13): GitHub Copilot reads path-scoped instruction
+    # files (`.github/instructions/<name>.instructions.md`, suffix from the
+    # `rules_required_suffix` capability). The syncer reads this key generically
+    # (no provider-name branch) and emits it as `applyTo:` frontmatter; `"**"`
+    # = repository-wide.
+    rules_apply_to: "**"
     has_hooks: false
     # Commands (issue #807): VS Code / GitHub Copilot reusable prompt files
     # (`.github/prompts/*.prompt.md`, invoked as `/name`) are a real command
@@ -520,6 +540,8 @@ providers:
     context_adapter: false
     context_adapter_file: AGENTS.md
     context_template: templates/configs/AGENTS.project-template.md
+    # Opencode fork: reads the generated AGENTS.personal.md (instructions field).
+    personal_agents_file: true
     # IC-15 Nr. 9 (F-07, #853): .mammouth/rules is never read (study 3.4,
     # VERIFIED-RUNTIME) -- rules are embedded in AGENTS.md, lazy rules go to
     # .mammouth/skills. The formerly generated directory is cleaned up through
@@ -592,10 +614,22 @@ providers:
       opus: claude-opus-5-5
       fable: claude-fable-5-1
     agent-transform:
+      # F-11/IC-15 Nr. 6: Mammouth is an OpenCode fork. Its agent frontmatter
+      # uses the same native surface as Opencode — a lowercase `permission` map
+      # (incl. `task`/`todowrite`) and a set `mode` — instead of the previously
+      # inert Claude-cased `tools:` object (study 3.4: "Claude-Tool-Keys werden
+      # zu inerten Permission-Keys"). The OpenCode-native mechanism also never
+      # emits a `tools:` list (a list aborts the whole agent directory, AC-6).
+      frontmatter-mechanism: opencode-native
       model: inject
       model-note-flat: true
-      inject-permission-mode: true
-      tools: keep
+      # Emit `subagent_depth` from the capability `required_depth` (study 3.4:
+      # no depth emitted -> default 1) so a spawned orchestrator keeps its
+      # dispatch tools; gated on this data key, never a provider-name branch.
+      inject-subagent-depth: true
+      tools: skip
+      tools-format: skip
+      tool-name-map: {}
       strip-fields:
       - memory
       - temperature
@@ -603,8 +637,6 @@ providers:
       - top_k
       - stop_sequences
       - max_output_tokens
-      tools-format: map
-      tool-name-map: {}
       reject-fields: []
       strip-claude-lines: true
   Codex:
@@ -620,6 +652,8 @@ providers:
     context_adapter: false
     context_adapter_file: AGENTS.override.md
     context_template: templates/configs/AGENTS.project-template.md
+    # IC-15 Nr. 9 / F-07 (#971): Codex does not read AGENTS.personal.md.
+    personal_agents_file: false
     # IC-15 Nr. 9 (F-07): Codex never reads a project-root rules/ directory
     # (study 3.2, VERIFIED-RUNTIME) -- rules are embedded in AGENTS.md, lazy
     # rules go to .agents/skills. The formerly generated rules/ is cleaned up
@@ -658,6 +692,9 @@ providers:
     - .codex/pending-tasks.md
     - AGENTS.personal.md
     mcp-config:
+      # Same committed file is the IC-15 Nr. 4 dispatch target: the sync writes
+      # a managed [agents] max_depth table here (scripts/lib/dispatch_depth.py),
+      # gated on the capability keys agent_config_format: toml + required_depth.
       committed-file: .codex/config.toml
       format: codex-toml-mcp
     skills_dir: .agents/skills
@@ -680,6 +717,13 @@ providers:
       model: inject
       extra-fields:
         sandbox_mode: workspace-write
+      # IC-15 Nr. 21 (F-32): a role whose template tool list carries neither
+      # Write nor Edit is read-only. Together with the capability
+      # `read_only_enforcement: sandbox` this override map turns the pauschale
+      # `workspace-write` into `read-only` for exactly those roles. Pure data —
+      # provider_transform reads the keys, never a provider name.
+      read-only-extra-fields:
+        sandbox_mode: read-only
       tools: skip
       tools-format: skip
       tool-name-map: {}
@@ -693,6 +737,8 @@ providers:
     model-format: "{model}"
     context_file: AGENTS.md
     context_template: templates/configs/AGENTS.project-template.md
+    # IC-15 Nr. 9 / F-07 (#971): ZCode does not read AGENTS.personal.md.
+    personal_agents_file: false
     has_rules: false
     has_hooks: false
     # Commands (issue #807): ZCode documents a workspace command surface —
@@ -773,6 +819,8 @@ providers:
     - kimi-code/k3-256k
     context_file: AGENTS.md
     context_template: templates/configs/AGENTS.project-template.md
+    # IC-15 Nr. 9 / F-07 (#971): KimiCode does not read AGENTS.personal.md.
+    personal_agents_file: false
     has_rules: false
     has_hooks: false
     # Commands (issue #807): Kimi Code CLI exposes slash commands as
@@ -819,7 +867,14 @@ providers:
       model: inject
       tools: keep
       tools-format: keep
-      tool-name-map: {}
+      # F-10/IC-15 Nr. 5: KimiCode reads `whenToUse` (not `hint`), the native
+      # todo tool is `TodoList` (not `TodoWrite`) and the dispatcher needs an
+      # explicit `subagents:` allow-list plus the AgentSwarm fan-out tool.
+      tool-name-map:
+        TodoWrite: TodoList
+      rename-fields:
+        hint: whenToUse
+      subagents-allowlist: routable
       reject-fields: []
       strip-fields:
       - memory

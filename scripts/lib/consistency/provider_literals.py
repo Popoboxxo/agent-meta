@@ -6,7 +6,9 @@ derived from ``config/ai-providers.yaml`` (provider keys, ``provider_root_dirs``
 ``context_file``); nothing is hardcoded. Matching is case-sensitive with word
 boundaries (a literal inside a longer word is not a hit).
 
-Tolerated: files matching ``provider_literal_allow``
+Severity: ERROR since IC-15 Nr. 23 / AC-73 — a provider literal outside the
+tolerated scope fails the check (Phase 0 shipped it as WARNING to measure the
+baseline first). Tolerated: files matching ``provider_literal_allow``
 (config/active-set-references.yaml) and example blocks. An example block starts
 at a line beginning with ``> **Example (provider-specific):**`` (the marker is
 recognized only at column 0, without leading spaces) and ends at the first line
@@ -81,7 +83,7 @@ def check_provider_literal(agent_meta_root: Path) -> list:
                 hits = [lit for lit, rx in compiled if rx.search(line)]
                 if hits:
                     findings.append(Finding(
-                        Severity.WARNING, CHECK_ID, rel,
+                        Severity.ERROR, CHECK_ID, rel,
                         f"line {lineno}: provider literal(s) {', '.join(hits)}"
                         " in generic template",
                         "Use a placeholder or move into a "

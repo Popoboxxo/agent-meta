@@ -41,8 +41,18 @@ def _shared_group() -> tuple:
 
 CONTEXT_FILE, SHARERS = _shared_group()
 # One sharer with and one without a native rules dir, plus the pair of both.
-_WITH_RULES = next(p for p in SHARERS if _PROVIDERS[p].get("has_rules"))
-_WITHOUT_RULES = next(p for p in SHARERS if not _PROVIDERS[p].get("has_rules"))
+def _embeds_rules(provider: str) -> bool:
+    """True for a sharer that writes its rules into the shared context file.
+
+    IC-15 Nr. 8 sets ``has_rules: false`` for every AGENTS.md sharer (the retired
+    rules dirs were never read), so ``context-embedded-rules`` is the rules-channel
+    discriminator left inside the shared group.
+    """
+    return "context-embedded-rules" in (_PROVIDERS[provider].get("capabilities") or [])
+
+
+_WITH_RULES = next(p for p in SHARERS if _embeds_rules(p))
+_WITHOUT_RULES = next(p for p in SHARERS if not _embeds_rules(p))
 
 
 def _managed_block(project: Path) -> str:

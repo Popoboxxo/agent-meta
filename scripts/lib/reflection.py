@@ -6,7 +6,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from .frontmatter import _YAML_AVAILABLE
-from .io import load_yaml_file
+from .io import load_yaml_cached, load_yaml_file
 
 
 def _require_yaml() -> None:
@@ -43,16 +43,22 @@ def load_reflection_pairs(config_dir=None):
 def load_project_overrides(project_config=None):
     """Load project-specific overrides from project.yaml.
 
-    Same loader upgrade as `load_reflection_pairs` (Issue #479): malformed
-    YAML raises SyncError instead of a raw YAMLError.
+    ``project_config`` is either the path to a ``project.yaml`` (default: the
+    repo-local ``.meta-config/project.yaml``) or an already-loaded config dict
+    (F7: ``config.py`` reads the CONSUMER config handed to ``build_variables``,
+    never agent-meta's own tracked file). Same loader upgrade as
+    `load_reflection_pairs` (Issue #479): malformed YAML raises SyncError
+    instead of a raw YAMLError.
     """
+    if isinstance(project_config, dict):
+        return (project_config.get('reflection-pairs') or {}).get('overrides', {})
     _require_yaml()
     if project_config is None:
         project_config = os.path.join(os.path.dirname(__file__), '..', '..', '.meta-config', 'project.yaml')
     if not os.path.exists(project_config):
         return {}
-    config = load_yaml_file(Path(project_config), on_error="raise", default={})
-    return config.get('reflection-pairs', {}).get('overrides', {})
+    config = load_yaml_cached(Path(project_config), on_error="raise", default={})
+    return (config.get('reflection-pairs') or {}).get('overrides', {})
 
 
 def apply_project_overrides(pairs, overrides):

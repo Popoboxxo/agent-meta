@@ -214,26 +214,26 @@ delegation_syntax:
   # JSON handoff (handoff_envelope_support: true).
   Codex:
     pipeline_notation:
-      task_fmt: 'spawn_agent(agent="{agent}", task="{task}")'
+      task_fmt: 'spawn_agent(agent_type="{agent}", message="{task}")'
       mention_fmt: "@{agent} {task}"
       loop_start: "REPEAT_UNTIL Loop:"
-      loop_item: '  - spawn_agent(agent="{agent}", task="{task}")'
+      loop_item: '  - spawn_agent(agent_type="{agent}", message="{task}")'
       parallel_start: "Parallel dispatch:"
-      parallel_item: '  - spawn_agent(agent="{agent}", task="{task}")'
+      parallel_item: '  - spawn_agent(agent_type="{agent}", message="{task}")'
       fanout_start: "FANOUT({count}, {agent}):"
-      fanout_item: '  - spawn_agent(agent="{agent}", task="{task}")'
+      fanout_item: '  - spawn_agent(agent_type="{agent}", message="{task}")'
       conditional_start: "Conditional execution:"
       conditional_item: '  - Condition evaluated by {agent}: {task}'
       sequential_start: ""
-      sequential_item: '{index}. spawn_agent(agent="{agent}", task="{task}")'
-    delegate: "Delegiere via nativen `spawn_agent`-Toolcall an `<ziel-agent>` mit der Aufgabe: \"<vollständiger-task-text>\". Kontrolliere das Ergebnis via `wait_agent`."
-    fanout: "FANOUT — Alle spawn_agent-Calls in EINER Antwort absetzen (multi_agent ist stable default-on):\n```\nspawn_agent(agent=\"<agent_1>\", task=\"<task_1>\")\nspawn_agent(agent=\"<agent_2>\", task=\"<task_2>\")\n```\nErgebnisse via `wait_agent` einsammeln."
-    parallel_group: "PARALLEL_GROUP — Mehrere spawn_agent-Calls in einer Antwort; `wait_agent` sammelt alle Ergebnisse ein."
+      sequential_item: '{index}. spawn_agent(agent_type="{agent}", message="{task}")'
+    delegate: "Delegiere via nativen `spawn_agent`-Toolcall: `spawn_agent(agent_type=\"<ziel-agent>\", message=\"<vollständiger-task-text>\")`. Optionale Parameter: `items` (Batch-Aufträge) und `fork_context` (Kontext-Vererbung). Kontrolliere das Ergebnis via `wait_agent`."
+    fanout: "FANOUT — Alle spawn_agent-Calls in EINER Antwort absetzen (multi_agent ist stable default-on):\n```\nspawn_agent(agent_type=\"<agent_1>\", message=\"<task_1>\")\nspawn_agent(agent_type=\"<agent_2>\", message=\"<task_2>\")\n```\nErgebnisse via `wait_agent` einsammeln."
+    parallel_group: "PARALLEL_GROUP — Mehrere spawn_agent-Calls in einer Antwort (`fork_context` steuert die Kontext-Vererbung); `wait_agent` sammelt alle Ergebnisse ein."
     fallback: "Bearbeite: <task>"
     bootstrap: "file-based"
     tool_preamble: "false"
     auto_parallel: false
-    parallel_pattern: "**Parallel-Pattern (konkret):**\n```\nspawn_agent(agent=\"developer\", task=\"Fix A\")\nspawn_agent(agent=\"tester\", task=\"Tests für B\")\nwait_agent(...)  # Ergebnisse einsammeln\n```\n"
+    parallel_pattern: "**Parallel-Pattern (konkret):**\n```\nspawn_agent(agent_type=\"developer\", message=\"Fix A\")\nspawn_agent(agent_type=\"tester\", message=\"Tests für B\")\nwait_agent(...)  # Ergebnisse einsammeln\n```\n"
     handoff: *handoff-json
 
   # ZCode (V17, 2026-09-04): dispatch tool is Agent (legacy alias Task);

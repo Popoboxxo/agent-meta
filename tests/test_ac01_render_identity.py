@@ -84,6 +84,77 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   none, so ``use-lazy-rules`` is no longer rendered. Changed: 6 x AGENTS.md (banner, embedded table gone),
   removed 4 x ``use-lazy-rules.md`` (Claude, Continue, Gemini, Copilot rules dirs), changed their 4
   ``.agent-meta-managed`` indexes and 4 ``generated-file-hashes.json`` (18 entries; 1031 -> 1027).
+- Task 1.25 (IC-15 no. 4, F-04/F-09): Codex gets a ``.codex/config.toml`` with a managed
+  ``[agents] max_depth`` table (new artifact) and its ``spawn_agent`` delegation syntax uses the real
+  ``agent_type``/``message`` parameters instead of ``agent``/``task`` (config/delegation-syntax.yaml).
+  Changed: ``Codex/.codex/config.toml`` (added), ``Codex/.codex/agents/orchestrator.toml``, the 4
+  ``Codex/.codex/pipeline-details/*.md`` and ``Codex/.meta-config/generated-file-hashes.json``
+  (7 of 1028 entries). No other provider's render changed.
+- Task 1.26 (IC-15 no. 5, F-10): the KimiCode ``agent-transform`` maps ``TodoWrite``->``TodoList`` and
+  renames ``hint``->``whenToUse`` on every Kimi agent, and the orchestrator gains the Kimi ``subagents:``
+  allow-list (``ActiveSet.routable``) plus the ``native_agent_tools`` fan-out tool ``AgentSwarm``.
+  Changed: all 62 ``KimiCode/.kimi-code/agents/*.md`` and the KimiCode
+  ``.meta-config/generated-file-hashes.json`` (63 of 1028 hashes). No other provider's render changed.
+- Task 1.27 (IC-15 no. 6, F-11): the Mammouth ``agent-transform`` switches to ``frontmatter-mechanism:
+  opencode-native`` (Mammouth is an OpenCode fork), so every Mammouth agent emits a lowercase
+  ``permission`` map (incl. ``task``/``todowrite``) and a set ``mode`` instead of the inert Claude-cased
+  ``tools:`` object, plus a ``subagent_depth`` from the ``required_depth`` capability (``inject-subagent-depth``).
+  Changed: all 62 ``Mammouth/.mammouth/agents/*.md`` and the Mammouth
+  ``.meta-config/generated-file-hashes.json`` (63 of 1028 hashes). No other provider's render changed.
+- Task 1.28 (IC-15 Nr. 8, F-08/F-07): Gemini no longer writes its unread ``.gemini/rules`` directory
+  (rules stay embedded in AGENTS.md) and ``.gemini/settings.json`` gains ``context.fileName=AGENTS.md``
+  so Gemini CLI actually reads the shared core. Removed: the 21 ``Gemini/.gemini/rules`` files
+  (18 rules + 3 managed indexes); changed: ``Gemini/.gemini/settings.json`` and the Gemini
+  ``.meta-config/generated-file-hashes.json`` (23 of 1028 entries; 1028 -> 1007). AGENTS.md and no
+  other provider's render changed.
+- Task 1.29 (IC-15 Nr. 3, AC-14 / F-13): Copilot rule files gain the mandatory ``.instructions.md``
+  suffix plus ``applyTo``/``description`` frontmatter, and every Copilot agent frontmatter ``name:``
+  drops the leaked extension (``orchestrator.agent`` -> ``orchestrator``). Changed/reassigned: 18
+  ``Copilot/.github/instructions/*.md`` removed + 18 ``*.instructions.md`` added, all 63
+  ``Copilot/.github/agents/*.agent.md`` names, the ``.github/instructions/.agent-meta-managed`` index
+  and the Copilot ``.meta-config/generated-file-hashes.json`` (101 of 1007 entries; Copilot-only,
+  0 non-Copilot drift; ``meta-doctor.agent.md`` is covered by the existing AC-01 exception). No other
+  provider's render changed.
+- Task 1.31 (IC-15 Nr. 10, AC-10 / F-14): Continue rule files gain
+  ``alwaysApply: false`` + ``description`` frontmatter (driven by the
+  ``rules-always-apply`` capability; before, the frontmatter was only emitted
+  when the rules-preset opted in, so the default preset shipped 18,591 B of
+  rules always active - 28 % of the local template window, study §3.8) and
+  ``.continue/rules/project-context.md`` no longer ships unresolved
+  ``{{PLATFORM}}``/``{{BUILD_COMMAND}}``/``{{RUNTIME}}``/``{{TEST_COMMAND}}``
+  lines. Changed: 19 ``Continue/.continue/rules/*.md`` plus
+  ``project-context.md`` and the Continue ``.meta-config/generated-file-hashes.json``
+  (20 of 1007 entries; Continue-only, 0 non-Continue drift).
+- Task 1.32 (IC-15 Nr. 11, AC-20 / F-15): the Agent Directory / ``AGENT_DELEGATION_TABLE``
+  is now one valid Markdown table - the ``agents-table`` partial no longer emits blank
+  lines between rows (full mode) and the orchestrator no longer repeats a second header
+  above the partial-provided ``| Agent | Core Capabilities |`` header (orchestrator
+  8.5.0 -> 8.5.1). Changed: the orchestrator artifact of all 9 providers, the 6
+  ``AGENTS.md`` files (Agent Directory rows lose the blank-line separation) and the 9
+  ``generated-file-hashes.json`` (24 of 1007 entries). No other artifact changed.
+- Task 1.38 (IC-15 Nr. 17, AC-51): the reflection overrides now come from the CONSUMER
+  config instead of agent-meta's own tracked ``.meta-config/project.yaml``, so the three
+  active ``{{MAX_ITERATIONS}}`` roles (``control-framework-assessor``,
+  ``fraud-risk-assessor``, ``risk-based-audit-planner``) render the framework value ``3``
+  instead of agent-meta's leaked override ``5``. Changed: those 3 artifacts per provider
+  (9 providers) plus the 9 ``generated-file-hashes.json`` (36 of 1007 entries; 0 unrelated drift).
+- Task 1.40 (IC-15 Nr. 21, AC-10 / F-32): a provider declaring
+  ``read_only_enforcement: sandbox`` (Codex) plus the ``read-only-extra-fields`` override
+  map now emits ``sandbox_mode: read-only`` for roles whose template tool list carries
+  neither ``Write`` nor ``Edit`` (previously the pauschale ``workspace-write``). Changed: the
+  21 read-only ``Codex/.codex/agents/*.toml`` roles plus the Codex
+  ``.meta-config/generated-file-hashes.json`` (22 of 1007 entries; Codex-only, 0 non-Codex
+  drift; ``meta-doctor.toml`` is covered by the existing AC-01 exception).
+- Task 1.42 (IC-15 Nr. 23, AC-73): provider literals are removed from the generic
+  templates. ``agent-meta-manager``/``agent-meta-scout``/``prompt-governor`` use the
+  ``{{CONTEXT_FILE}}`` placeholder, ``agent-meta-manager``/``release`` wrap their
+  provider-specific snippets in ``> **Example (provider-specific):**`` blocks, and
+  ``mammouth-expert`` is split into a provider-neutral ``1-generic`` base plus a
+  standalone ``2-platform/agent-meta-mammouth-expert.md`` (based on
+  ``provider-expert``, both 2.0.0). Changed: 5 agent artifacts per provider (9
+  providers = 45), 9 ``generated-file-hashes.json`` and 1
+  ``Copilot/.github/copilot-instructions.md`` — 55 of 1007 hashes; 0 added/removed.
+  ``knowledge-migrator`` is not rendered in the matrix. No other artifact changed.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

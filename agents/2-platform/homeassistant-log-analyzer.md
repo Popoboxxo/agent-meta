@@ -1,7 +1,7 @@
 ---
 name: log-analyzer
 version: "1.1.0"
-based-on: "1-generic/log-analyzer.md@1.1.1"
+based-on: "1-generic/log-analyzer.md@1.6.1"
 description: "Home Assistant Log-Analyzer — spezialisiert auf home-assistant.log, Komponenten-Fehler, Integrations-Probleme, Templates und Zigbee/MQTT-Diagnose."
 hint: "HA-Log-Analyse: Integrations-Fehler, Template-Errors, Zigbee/MQTT-Diagnose, Severity-Klassifikation"
 prompt_mode: modern

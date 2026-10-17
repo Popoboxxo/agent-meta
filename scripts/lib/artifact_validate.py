@@ -44,10 +44,9 @@ from .io import strip_jsonc_comments
 #: (spec §5) and the AC-13 ``artifact-contract`` error label.
 CHECK = "artifact-contract"
 
-#: Top-level keys that belong to the deprecated v1 Opencode surface only.
-_OPENCODE_V1_ONLY_KEYS = ("subagent_depth",)
-
 #: Mechanisms whose artifacts are serialized as TOML, not Markdown frontmatter.
+#: (The former v1-only ``subagent_depth`` guard was removed: the v2 surface
+#: retains the orchestrator depth — IC-15 Nr. 16.)
 TOML_MECHANISMS = frozenset({"codex-toml"})
 
 #: Frontmatter keys every generated agent artifact MUST carry.
@@ -242,7 +241,8 @@ def validate_json_document(text: str, fmt: str, path: str) -> list[Finding]:
 
     * ``opencode-json-v2`` — a document that declares MCP content MUST carry the
       nested ``mcp.servers`` object and MUST NOT carry a flat top-level ``mcp``
-      server map. A v1-only key (``subagent_depth``) is rejected regardless.
+      server map. (``subagent_depth`` is no longer a v1-only key: the v2 surface
+      retains the orchestrator depth — IC-15 Nr. 16.)
     * ``opencode-json`` — a document that declares MCP content MUST carry the
       flat top-level ``mcp`` object (frozen v1 byte shape, AC-21).
 
@@ -307,12 +307,6 @@ def _validate_opencode_v2(doc: dict, path: str) -> list[Finding]:
                         "'servers'",
                     )
                 )
-
-    for field in _OPENCODE_V1_ONLY_KEYS:
-        if field in doc:
-            findings.append(
-                _finding(path, f"opencode-json-v2 must not carry v1-only key '{field}'")
-            )
 
     return findings
 

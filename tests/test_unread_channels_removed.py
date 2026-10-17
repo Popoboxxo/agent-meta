@@ -36,10 +36,9 @@ _PROVIDERS = sorted(load_providers_config(REPO_ROOT, {}))
 _MAPPINGS = cr.merge_provider_mappings(
     load_providers_config(REPO_ROOT, {}), load_provider_capabilities(REPO_ROOT))
 # Unread directories with a planned fix of their own (not part of IC-15 Nr. 9).
-_PENDING = {
-    ".gemini/rules": "IC-15 Nr. 8 (Task 1.28: Gemini context.fileName, no .gemini/rules)",
-    ".github/instructions": "IC-15 Nr. 3 (Task 1.29: .instructions.md suffix + applyTo)",
-}
+# Empty since IC-15 Nr. 3 (Task 1.29) declared .github/instructions as a
+# path-scoped read channel: no generated rules directory is unread anymore.
+_PENDING: dict = {}
 
 
 @pytest.fixture(scope="module")
@@ -111,6 +110,32 @@ def test_legacy_rules_dir_cleanup_keeps_foreign_files(projects, tmp_path):
 
 def _dedicated_provider() -> str:
     return next(p for p in _PROVIDERS if _MAPPINGS[p].get("has_dedicated_context_file"))
+
+
+def _uses_agents_personal_writer(provider: str) -> bool:
+    """True for providers routed through the shared embedded-rules AGENTS.md writer."""
+    caps = _MAPPINGS[provider]
+    if "context-embedded-rules" in (caps.get("capabilities") or []):
+        return True
+    return any(
+        p != provider
+        and c.get("context_file") == caps.get("context_file")
+        and "context-embedded-rules" in (c.get("capabilities") or [])
+        for p, c in _MAPPINGS.items()
+    )
+
+
+@pytest.mark.parametrize("provider", _PROVIDERS)
+def test_agents_personal_file_only_for_reading_providers(projects, provider):
+    """The AGENTS.personal.md writer runs only for providers whose harness reads it."""
+    if not _uses_agents_personal_writer(provider):
+        pytest.skip("provider does not use the shared AGENTS.md personal writer")
+    caps = _MAPPINGS[provider]
+    target = projects[provider] / "AGENTS.personal.md"
+    if caps.get("personal_agents_file", True):
+        assert target.is_file(), f"{provider}: reads AGENTS.personal.md but none was created"
+    else:
+        assert not target.exists(), f"{provider}: AGENTS.personal.md written although the harness ignores it"
 
 
 def test_claude_local_md_replaces_unread_personal_file(projects):

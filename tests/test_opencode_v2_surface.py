@@ -14,9 +14,11 @@ SPEC-PROVIDER-AUDIT-OPENCODE-V2-2026-09-30, §4.1 / AC-5 / AC-21 / AC-23
 Both selections happen once, generically, in ``load_providers_config``; the
 writers consume the resolved value only and never read ``surface-version``.
 
-The v2 settings surface (``opencode.json``) additionally drops the v1-only
-``subagent_depth`` key and emits ``default_agent`` from the ``primary-role``
-data key. ``apply_settings_surface_shape`` dispatches on the resolved
+The v2 settings surface (``opencode.json``) additionally retains the
+``subagent_depth`` key (sourced from the ``required_depth`` capability when
+available — IC-15 Nr. 16: the v2 surface must not drop the orchestrator depth)
+and emits ``default_agent`` from the ``primary-role`` data key.
+``apply_settings_surface_shape`` dispatches on the resolved
 ``mcp-config.format`` value only; every non-v2 format is returned
 byte-for-byte so the shipped v1 surface stays frozen.
 
@@ -168,11 +170,20 @@ def _pc_v2() -> dict:
     }
 
 
-def test_v2_settings_drops_subagent_depth_and_emits_default_agent():
+def test_v2_settings_keep_subagent_depth_and_emit_default_agent():
     out = apply_settings_surface_shape(_SETTINGS_TEMPLATE, _pc_v2())
     doc = json.loads(out)
-    assert "subagent_depth" not in doc
+    assert doc["subagent_depth"] == 3, (
+        "the v2 surface must retain the shipped subagent_depth (IC-15 Nr. 16)"
+    )
     assert doc["default_agent"] == "orchestrator"
+
+
+def test_v2_settings_subagent_depth_comes_from_required_depth():
+    doc = json.loads(
+        apply_settings_surface_shape(_SETTINGS_TEMPLATE, _pc_v2(), {"required_depth": 2})
+    )
+    assert doc["subagent_depth"] == 2
 
 
 def test_v2_settings_default_agent_comes_from_primary_role():
@@ -186,7 +197,7 @@ def test_v2_settings_without_primary_role_emits_no_default_agent():
     pc = _pc_v2()
     pc.pop("primary-role")
     doc = json.loads(apply_settings_surface_shape(_SETTINGS_TEMPLATE, pc))
-    assert "subagent_depth" not in doc
+    assert doc["subagent_depth"] == 3
     assert "default_agent" not in doc
 
 

@@ -101,7 +101,7 @@ verhalten sich exakt wie bisher.
 | `54-spec-plan-external-override` | Claude | strict (default) | `external-system-override.enabled:true` + KE aktiv: alle KE-Schreibpfade übersprungen (kein `knowledge/`), `docs/INDEX.md`-Fallback geschrieben |
 | `55-spec-plan-ke-off-fallback` | Claude | strict (default) | KE deaktiviert (`enabled:false`, kein Override): `index.mode:knowledge-engine` degradiert zum file-index-Fallback, kein `knowledge/`-Bundle |
 | `56-spec-plan-preset-coupling` | Claude | strict (default) | Absenz-Semantik: ohne expliziten Block aktiviert `dod-preset:concept-driven` (spec-plan-required) den Workflow, `rapid-prototyping` bleibt No-op |
-| `57-spec-plan-provider-agnostic` | Claude, Gemini, Opencode | strict (default) | Gated Rules je Provider (Claude/Opencode Skill-Channel, Gemini Rules-Channel), identischer Body ohne Provider-Literale in Output und Rule-Quelle |
+| `57-spec-plan-provider-agnostic` | Claude, Gemini, Opencode | strict (default) | Gated Rules je Provider (Claude/Opencode/Gemini Skill-Channel; IC-15 Nr. 8: Gemini's unread Rules-Channel ist retired), identischer Body ohne Provider-Literale in Output und Rule-Quelle |
 | `58-spec-plan-spike` | Claude | strict (default) | Spike-Route in der gated Master-Rule; read-only `explorer`-Spike-Modus (allgemeine Rollen-Capability, nicht am Master-Switch gegated — prüft nur den enabled-Pfad) mit SPIKE-CODE-Marker/Spike-Doc-Pfad, Plan-/Spec-Templates sichtbar |
 | `59-progress-ledger` | Claude | strict (default) | Progress-/Ledger-Verdrahtung (SPEC-PROGRESS-LEDGER-2026-09-13, AC-28): `execute_plan`-Checkpoint + Ledger-Close-out, `--update-plan-ledger`-Writer, `spec_plan_ledger_drift`-WARNING für einen synthetischen Mismatch und `--rehydrate`-`next_task_ref` |
 | `60-progress-paths-config` | Claude | strict (default) | Konfigurierbare Progress-/Checkpoint-Pfade (SPEC-PROGRESS-PATHS-CONFIG-2026-09-13, AC-13): `progress.dir`/`progress.checkpoint-dir`-Override im `progress`-Block, Default-`.meta-viz`-Layout ohne Block, `CheckpointStore.from_config`-Wiring |
@@ -113,7 +113,7 @@ verhalten sich exakt wie bisher.
 | `66-mammouth-tools-map` | Mammouth | strict (default) | `tools:` frontmatter is an object, never a list (AC-6) |
 | `67-copilot-artifact-paths` | Copilot | strict (default) | corrected artifact paths `.github/agents/*.agent.md` (AC-8) |
 | `68-antigravity-discovery-paths` | Gemini | strict (default) | `agent-discovery` gates the `.agents/*` surface + `serverUrl` (AC-9) |
-| `69-opencode-v2-surface` | Opencode | strict (default) | `surface-version: v2` → nested `mcp.servers`, `default_agent`, no v1-only key (AC-5/AC-21) |
+| `69-opencode-v2-surface` | Opencode | strict (default) | `surface-version: v2` → nested `mcp.servers`, `default_agent`, retained `subagent_depth` (IC-15 Nr. 16) (AC-5/AC-21) |
 | `70-bootstrap-marker-convergence` | Gemini, ZCode | strict (default) | scoped bootstrap sub-markers + legacy discard + user notes (AC-10/AC-16) |
 | `71-check-idempotency-all-providers` | all 9 | strict (default) | all-provider tree byte-identical across syncs + `--check` rc 0 (AC-4/AC-19) |
 | `72-continue-config-validity` | Continue | strict (default) | valid `.continue/config.yaml` (roles enum, no dead agents block, name/version) (AC-7) |

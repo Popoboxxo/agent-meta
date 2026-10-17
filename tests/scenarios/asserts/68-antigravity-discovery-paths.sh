@@ -12,8 +12,10 @@
 #      (`.agents/agents|rules|skills` + `.agents/mcp_config.json`,
 #      `antigravity-mcp-json`) is declared as data.
 #   2. OPT-IN SURFACE: with `agent-discovery: true` the generator emits the
-#      `.agents/agents`, `.agents/rules`, `.agents/skills` directories and
-#      `.agents/mcp_config.json`, whose remote entries use `serverUrl`.
+#      `.agents/agents` and `.agents/skills` directories and
+#      `.agents/mcp_config.json`, whose remote entries use `serverUrl`. Gemini's
+#      rules stay embedded in AGENTS.md (has_rules: false, Task 1.28), so
+#      `.agents/rules` is intentionally absent.
 #      Because the flag is REGISTRY-level data (no project.yaml key consumes
 #      it), the opt-in run is exercised against a throwaway framework copy in
 #      the temp dir — the real checkout is never mutated.
@@ -107,7 +109,7 @@ if n != 1:
 open(p, "w", encoding="utf-8").write(head + tail)
 PY
 
-cat > "$PROJ/.meta-config/project.yaml" <<EOF
+cat > "$PROJ/.meta-config/project.yaml" <<'EOF'
 agent-meta-version: 0.101.0
 ai-providers:
 - Gemini
@@ -151,7 +153,11 @@ EOF
 ) || fail "opt-in sync (agent-discovery: true) failed — see $PROJ/sync.log"
 
 [ -d "$PROJ/.agents/agents" ] || fail "opt-in surface missing: .agents/agents"
-[ -d "$PROJ/.agents/rules" ] || fail "opt-in surface missing: .agents/rules"
+# IC-15 Nr. 8 (Task 1.28): Gemini has_rules=false — its rules stay embedded in
+# AGENTS.md and the (still-declared) discovery `rules_dir` is never written, so
+# the opt-in surface must NOT contain `.agents/rules`.
+[ ! -e "$PROJ/.agents/rules" ] \
+    || fail "unexpected .agents/rules — Gemini rules stay embedded (has_rules: false)"
 [ -d "$PROJ/.agents/skills" ] || fail "opt-in surface missing: .agents/skills"
 [ -f "$PROJ/.agents/mcp_config.json" ] || fail "opt-in surface missing: .agents/mcp_config.json"
 

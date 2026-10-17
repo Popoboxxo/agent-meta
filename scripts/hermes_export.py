@@ -262,12 +262,12 @@ def collect_role_meta(
     if not isinstance(entry, dict):
         entry = {}
     handoff = entry.get("handoff") or {}
-    routing = entry.get("routing") or {}
+    patterns = entry.get("routing_patterns") or {}
     tier, warning = resolve_abstract_tier(str(entry.get("model", "") or ""))
     meta = {
         "tier": tier,
         "description": _role_description(role, entry, agent_meta_root),
-        "keywords": [str(k) for k in (routing.get("intent_keywords") or [])],
+        "keywords": [str(k) for k in (patterns.get("keywords") or [])],
         "output_contract": handoff.get("output_contract"),
         "input_contracts": [str(c) for c in (handoff.get("input_contracts") or [])],
         "input_schema": handoff.get("input_schema"),
