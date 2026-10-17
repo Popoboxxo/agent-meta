@@ -5,7 +5,8 @@ every role declares ``routing.addressability`` ∈ {keyword, name_only, excluded
 the distribution is pinned (``_EXPECTED_DISTRIBUTION``);
 ``excluded`` is exactly ``orchestrator``; every keyword role has non-empty
 ``routing_patterns.keywords`` or ``.examples``; every name_only role has a
-non-empty ``name_only_reason``.
+non-empty ``name_only_reason``. IC-29 coverage: every role with language-mapping
+``examples`` offers ≥ 1 example per language any mapping of the config uses.
 
 The derivation helper is intentionally defined *in the test only* (the
 production resolver belongs to a later task): it mirrors the spec rule
@@ -16,6 +17,7 @@ from __future__ import annotations
 from collections import Counter
 from pathlib import Path
 
+from scripts.lib.delegation_table import _normalize_language
 from scripts.lib.roles import load_roles_config
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -30,6 +32,40 @@ _VALID = {"keyword", "name_only", "excluded"}
 
 def _roles() -> dict:
     return load_roles_config(REPO_ROOT)["roles"]
+
+
+def _mapping_language_gaps(roles: dict) -> dict[str, list[str]]:
+    """IC-29 coverage (test-local mirror): role -> mapping languages it lacks.
+
+    Collects every language a list-variant mapping of the config carries
+    (normalized, so ``en``/``English`` count as the same language) and reports,
+    per role with mapping ``examples``, which of them have no example there.
+    """
+    mappings = {}
+    for name, info in roles.items():
+        examples = (info.get("routing_patterns") or {}).get("examples")
+        if isinstance(examples, dict):
+            mappings[name] = examples
+
+    all_languages: dict[str, str] = {}
+    for mapping in mappings.values():
+        for key, value in mapping.items():
+            if isinstance(value, list):
+                all_languages.setdefault(_normalize_language(key), key)
+
+    gaps: dict[str, list[str]] = {}
+    for name, mapping in mappings.items():
+        present = {
+            _normalize_language(key)
+            for key, value in mapping.items()
+            if isinstance(value, list)
+        }
+        missing = sorted(
+            label for norm, label in all_languages.items() if norm not in present
+        )
+        if missing:
+            gaps[name] = missing
+    return gaps
 
 
 def derive_addressability(role_name: str, info: dict) -> str:
@@ -98,6 +134,36 @@ def test_keyword_roles_have_non_empty_patterns():
         if not (patterns.get("keywords") or patterns.get("examples")):
             patternless.append(name)
     assert not patternless, f"keyword roles without patterns: {patternless}"
+
+
+def test_mapping_examples_cover_every_language_used_in_any_mapping():
+    """IC-29 mapping coverage: a role with mapping ``examples`` must offer at
+    least one example per language any mapping of the config uses (prevents the
+    #780 Option-B error "present in EN, missing in DE").
+
+    Vacuous until task 1.46 adds mapping data to ``role-defaults.yaml``; the
+    red-ability of the guard is pinned with a synthetic incomplete mapping.
+    """
+    assert _mapping_language_gaps(_roles()) == {}
+
+    synthetic = {
+        "complete": {
+            "routing_patterns": {
+                "examples": {"Deutsch": ["d"], "English": ["e"]},
+            }
+        },
+        "incomplete": {
+            "routing_patterns": {
+                "examples": {"English": ["e"]},
+            }
+        },
+        "flat-list": {
+            "routing_patterns": {
+                "examples": ["neutral for every language"],
+            }
+        },
+    }
+    assert _mapping_language_gaps(synthetic) == {"incomplete": ["Deutsch"]}
 
 
 def test_name_only_roles_have_reason():
