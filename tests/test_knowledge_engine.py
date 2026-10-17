@@ -407,9 +407,14 @@ def test_knowledge_migrator_template_exists_and_has_hard_constraints():
     assert path.exists()
     content = path.read_text(encoding="utf-8")
     assert content.startswith("---\nname: template-knowledge-migrator")
+    # Task 1.42 (IC-15 Nr. 23): the hard-constraint table no longer names provider
+    # literals (AC-73), so the protected-file references are asserted in their
+    # provider-agnostic form that renders to the active provider's paths:
+    # {{CONTEXT_FILE}} covers CLAUDE.md / AGENTS.md, and the provider config dirs
+    # are referenced generically.
     for protected in [
         "docs/CODEBASE_OVERVIEW.md", "docs/REQUIREMENTS.md",
-        "CLAUDE.md", "AGENTS.md", ".claude/", ".gemini/", ".opencode/",
+        "{{CONTEXT_FILE}}", "Provider config directories",
         "VERSION", "LICENSE", "CHANGELOG.md",
     ]:
         assert protected in content, f"missing protected-file reference: {protected}"

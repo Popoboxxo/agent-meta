@@ -697,13 +697,19 @@ def test_540_compact_native_rules_providers_keep_platform_rules_full(provider, t
     if scripts_dir not in sys.path:
         sys.path.insert(0, scripts_dir)
     from lib.log import SyncLog
-    from lib.providers import load_providers_config
+    from lib.providers import load_provider_capabilities, load_providers_config
+    from lib.rule_channels import merged_caps
     from lib.rules import sync_rules
 
     provider_config = load_providers_config(REPO_ROOT)
     config, variables = _compact_variables()
     pc = provider_config[provider]
     rules_dir = pc.get("rules_dir", ".claude/rules")
+    # Task 1.29 (IC-15 Nr. 3): a provider may require a rule-file suffix
+    # (Copilot writes `.github/instructions/<name>.instructions.md`). Honour the
+    # resolved capability so the native artifact is found, not assumed `.md`.
+    caps = merged_caps(provider, provider_config, load_provider_capabilities(REPO_ROOT))
+    rule_suffix = caps.get("rules_required_suffix") or ".md"
 
     sync_rules(
         REPO_ROOT, tmp_path, config, SyncLog(), dry_run=False, variables=variables,
@@ -712,7 +718,7 @@ def test_540_compact_native_rules_providers_keep_platform_rules_full(provider, t
 
     for name, full_marker in _PLATFORM_RULE_FULL_MARKERS.items():
         skill = tmp_path / pc["skills_dir"] / name / "SKILL.md"
-        rule = tmp_path / rules_dir / f"{name}.md"
+        rule = tmp_path / rules_dir / f"{name}{rule_suffix}"
         path = skill if skill.exists() else rule
         assert path.exists(), f"{provider}: {name} not rendered natively"
         text = path.read_text(encoding="utf-8")
