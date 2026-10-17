@@ -89,6 +89,18 @@ if ! grep -q '^mode: primary$' "$RUN_DIR/.opencode/agents/${ROLE}.md"; then
   exit 2
 fi
 
+# IC-13 output contract: the routing eval asserts on a JSON object. Only the
+# eval runner (and a promptfoo run with the same env var) opts in, so the
+# behavioral catalogs keep their normal prose answers.
+CONTRACT_FILE="${EVAL_OUTPUT_CONTRACT:-}"
+if [[ -n "$CONTRACT_FILE" ]]; then
+  if [[ ! -f "$CONTRACT_FILE" ]]; then
+    echo "provider-opencode: EVAL_OUTPUT_CONTRACT file not found: $CONTRACT_FILE" >&2
+    exit 2
+  fi
+  { printf '\n\n'; cat "$CONTRACT_FILE"; } >> "$RUN_DIR/.opencode/agents/${ROLE}.md"
+fi
+
 MODEL="${OPENCODE_ROUTING_EVAL_MODEL:-opencode-go/deepseek-v4-flash}"
 
 # `opencode run` spawns a detached `opencode serve` background process that

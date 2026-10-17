@@ -4,3 +4,13 @@
 # template source and to the self-hosted deployment of this repo.
 hooks/**/*.sh text eol=lf
 .agents/hooks/**/*.sh text eol=lf
+
+# The routing eval catalogs under tests/routing-llm-eval/ are byte-compared
+# against a fresh generator run (drift test, AC-62). Force LF so a Windows
+# checkout with core.autocrlf=true still matches the generator's LF output.
+tests/routing-llm-eval/*.yaml text eol=lf
+tests/routing-llm-eval/**/*.yaml text eol=lf
+
+# The eval provider wrappers are POSIX shell scripts executed by the runner;
+# a CRLF produces "\r: command not found" (same rationale as hooks/**).
+tests/routing-llm-eval/*.sh text eol=lf

@@ -40,6 +40,40 @@ und beenden sich mit **exit 2 bei unbekannter/fehlender Rollen-Datei**
 - **Baseline (Task 0f.3):** braucht mindestens 2 Modellklassen und mindestens 3 Läufe
   je Modell und läuft nur nach ausdrücklicher Nutzerfreigabe der Kostenschätzung (IC-36).
   Ohne Freigabe wird ein Skip-Record geschrieben.
+- **Ausgabe-Contract:** `output-contract.md` wird vom Runner über
+  `EVAL_OUTPUT_CONTRACT=<pfad>` gesetzt und von beiden Provider-Wrappern an den
+  System-Prompt gehängt. Nur so erfüllt das Modell die promptfoo-Asserts
+  (`contains-json` auf `{target[, tier_escalation]}`); ohne die Env-Variable
+  bleiben die behavioralen Kataloge beim normalen Prosa-Antwortverhalten.
+- **Runner:** `scripts/run_role_routing_eval.py` lädt den Korpus, schätzt die
+  Kosten aus `measure_artifacts`, zeigt sie an und startet erst nach `yes`/`ja`
+  (IC-36). `--estimate-only` ist immer offline. Modellklassen sind explizit
+  (`--model-class NAME=PROVIDER/MODEL`, wiederholbar); eine einzelne Klasse ist
+  erlaubt, wird aber im Baseline-Metadatenfeld `evidence.status` als
+  `not-evidenced` ausgewiesen (AC-02 verlangt ≥ 2 Klassen).
+
+```bash
+# Kostenlose Vorschau (kein LLM-Call, kein Netz):
+python3 scripts/run_role_routing_eval.py --estimate-only \
+  --provider opencode \
+  --model-class deepseek=opencode/opencode-go/deepseek-v4-flash \
+  --date 2026-10-17
+
+# Bezahlter Deepseek-only-Lauf (3 Läufe, nur nach Freigabe; niemals automatisch):
+python3 scripts/run_role_routing_eval.py \
+  --provider opencode \
+  --model-class deepseek=opencode/opencode-go/deepseek-v4-flash \
+  --repeat 3 --approval yes --date 2026-10-17
+```
+
+Ergebnis: `roles/baseline/<date>-<model>-<profile>.json`; eine Ablehnung schreibt
+`roles/runs/<date>-qg1-<model>.json` mit `status: SKIPPED-BY-USER`, Kostenschätzung
+und Begründung. Promptfoo kann denselben Contract nutzen:
+
+```bash
+EVAL_OUTPUT_CONTRACT=tests/routing-llm-eval/output-contract.md \
+  npx promptfoo eval -c tests/routing-llm-eval/roles/promptfooconfig.generated.yaml
+```
 
 ## Single Source of Truth
 
