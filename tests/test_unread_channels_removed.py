@@ -36,9 +36,9 @@ _PROVIDERS = sorted(load_providers_config(REPO_ROOT, {}))
 _MAPPINGS = cr.merge_provider_mappings(
     load_providers_config(REPO_ROOT, {}), load_provider_capabilities(REPO_ROOT))
 # Unread directories with a planned fix of their own (not part of IC-15 Nr. 9).
-_PENDING = {
-    ".github/instructions": "IC-15 Nr. 3 (Task 1.29: .instructions.md suffix + applyTo)",
-}
+# Empty since IC-15 Nr. 3 (Task 1.29) declared .github/instructions as a
+# path-scoped read channel: no generated rules directory is unread anymore.
+_PENDING: dict = {}
 
 
 @pytest.fixture(scope="module")

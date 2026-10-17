@@ -322,14 +322,14 @@ capabilities:
     fanout_mechanism: sequential-fallback
     barrier_collect: false
     # --- IC-09 context budget / channel keys (SPEC-CONTEXT-PROFILES-2026-10-11, Task 0a.5): pure data, not yet consumed by the render.
-    # Source: docs/analysis/2026-10-11-context-budget-provider-study.md. Copilot values from audit citations (docs gated): rules_required_suffix and skills dirs UNVERIFIED; soft_cap_chars 4000 = code-review limit per instruction file; rules_read_channels has no native channel because generated .github/instructions/*.md are never read (F-17/Phase 1 fixes data); skills via .github/skills (IC-15 Nr. 2).
+    # Source: docs/analysis/2026-10-11-context-budget-provider-study.md. Copilot values from audit citations (docs gated): rules_required_suffix and skills dirs UNVERIFIED; soft_cap_chars 4000 = code-review limit per instruction file; rules_read_channels declares path-scoped since IC-15 Nr. 3 (Task 1.29) writes generated .github/instructions/*.instructions.md with applyTo/description frontmatter that Copilot reads; skills via .github/skills (IC-15 Nr. 2).
     context_hard_cap_bytes: null
     context_soft_cap_bytes: null
     context_soft_cap_chars: 4000
     context_soft_cap_lines: null
     roster_in_harness: false
     agents_md_visible_to_subagents: false
-    rules_read_channels: [skills]  # IC-15 Nr. 2: .github/skills (UNVERIFIED); .github/instructions/*.md stays unread until IC-15 Nr. 3
+    rules_read_channels: [path-scoped, skills]  # IC-15 Nr. 3 (Task 1.29): .github/instructions/*.instructions.md are read path-scoped (applyTo frontmatter); IC-15 Nr. 2: .github/skills
     skills_discovery_dirs: [".github/skills", ".claude/skills", ".agents/skills"]
     main_agent_selectable: false
     agents_md_precedence: nearest

@@ -52,12 +52,11 @@ _EXPECTED_PROVIDERS = {
     "Claude", "Gemini", "Opencode", "Continue", "Copilot", "Mammouth",
     "Codex", "ZCode", "KimiCode",
 }
-# no native rules channel: generated instruction files are never read there (F-17);
-# lazy rules reach them as skills since IC-15 Nr. 2 (formerly rules_read_channels: []).
-# Gemini left this set with IC-15 Nr. 8 (rules embedded in AGENTS.md, read via
-# context.fileName -> rules_read_channels gains "embedded"); Copilot stays until
-# IC-15 Nr. 3.
-_UNREAD_RULES_DIR_SKILLS_ONLY = ("Copilot",)
+# Every provider with a written rules directory now declares a file read channel
+# (native-rules-dir / path-scoped): Gemini with IC-15 Nr. 8 (embedded via
+# context.fileName), Copilot with IC-15 Nr. 3 (Task 1.29: .github/instructions
+# path-scoped). The former "skills-only" set (F-17) is empty, so no provider is
+# pinned here anymore.
 
 
 def test_providers_present():
@@ -70,13 +69,6 @@ def test_depth_and_skill_dirs(provider):
     c = _CAPS[provider]
     assert c["required_depth"] >= 2  # spec IC-09: orchestrator -> worker
     assert c["skills_discovery_dirs"], "skills_discovery_dirs must not be empty"
-
-
-@pytest.mark.parametrize("provider", _UNREAD_RULES_DIR_SKILLS_ONLY)
-def test_unread_rules_dir_has_only_the_skills_channel(provider):
-    # IC-15 Nr. 2: no native rules channel (the generated rules dir is unread),
-    # but the skills channel carries the lazy rules
-    assert _CAPS[provider]["rules_read_channels"] == ["skills"]
 
 
 @pytest.mark.parametrize("provider", _PROVIDERS)
