@@ -22,6 +22,7 @@ from pathlib import Path
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _CLI_REFERENCE = _REPO_ROOT / "docs" / "api" / "cli-reference.md"
 _CHANGELOG = _REPO_ROOT / "CHANGELOG.md"
+_README = _REPO_ROOT / "README.md"
 
 
 def _normalized(text: str) -> str:
@@ -227,3 +228,142 @@ def test_changelog_documents_the_compact_render_package():
         "The 2b entry must name `compact` and the REFERENCE sections delivered "
         "through the skills channel."
     )
+
+
+# --- 2c.4: the published `compact` profile (cli-reference, README, CHANGELOG) ---
+
+
+def _readme_text() -> str:
+    return _README.read_text(encoding="utf-8")
+
+
+def _readme_profile_section() -> str:
+    """The level-2 README section whose heading names the context profile."""
+    text = _readme_text()
+    heading = re.search(r"(?m)^## .*[Cc]ontext [Pp]rofiles?.*$", text)
+    assert heading, (
+        "README.md must carry a level-2 'Context Profiles' section (2c.4): the "
+        "opt-in profile and its unverified status need an English home."
+    )
+    rest = text[heading.end():]
+    next_heading = re.search(r"(?m)^## ", rest)
+    return rest[: next_heading.start()] if next_heading else rest
+
+
+def _changelog_bullet(marker: str) -> str:
+    """The [Unreleased] bullet (plus its continuation lines) containing *marker*."""
+    lines = _unreleased_section().splitlines()
+    index = next((i for i, line in enumerate(lines) if marker in line), None)
+    assert index is not None, (
+        f"CHANGELOG.md [Unreleased] must carry a bullet naming '{marker}' (2c.4)."
+    )
+    block = [lines[index]]
+    for line in lines[index + 1:]:
+        if line.startswith("- ") or line.startswith("### "):
+            break
+        block.append(line)
+    return "\n".join(block)
+
+
+def test_cli_reference_lifts_profile_out_of_reserved_status():
+    lowered = _normalized(_cli_reference_text())
+    assert "reserved for phase 2" not in lowered, (
+        "docs/api/cli-reference.md must drop the stale 'reserved for Phase 2' "
+        "wording for `--profile compact|both` (2c.4): the flag really renders "
+        "the profile."
+    )
+    assert "work directory" in lowered, (
+        "cli-reference must state that `--profile compact|both` renders into a "
+        "work directory below the tmp-sink."
+    )
+    assert "delta" in lowered, (
+        "cli-reference must state that `--profile both` reports the full/compact "
+        "delta."
+    )
+    assert "never modified" in lowered, (
+        "cli-reference must state that the project config on disk is never "
+        "modified (the injected key lands in the work-dir copy only)."
+    )
+
+
+def test_cli_reference_labels_ac26_targets_as_estimates():
+    section = _context_profile_section()
+    lowered = _normalized(section)
+    assert "estimate" in lowered, (
+        "The context-profile section must label the AC-26 size targets as "
+        "ESTIMATES (Spec section 11), not measurements."
+    )
+    assert "not measurements" in lowered, (
+        "The section must state explicitly that the targets are estimates, not "
+        "measurements."
+    )
+    assert "--context-report" in section, (
+        "The section must point at `--context-report` as the source of the "
+        "measured values."
+    )
+    assert "ceiling" in lowered, (
+        "The section must state that the measured values are pinned as "
+        "regression ceilings."
+    )
+    assert "not claim" in lowered or "no claim" in lowered, (
+        "The section must state that it does not claim the targets are met."
+    )
+
+
+def test_readme_documents_opt_in_unverified_with_reason_and_estimate():
+    lowered = _normalized(_readme_profile_section())
+    assert "opt-in" in lowered, (
+        "The README profile section must name the opt-in character of "
+        "`context-profile: compact`."
+    )
+    assert "unverified" in lowered, (
+        "The README profile section must state the unverified status (IC-36 "
+        "no. 3 / AC-86)."
+    )
+    assert "ac-02" in lowered and "baseline" in lowered, (
+        "The README section must give the reason: the `full` baseline (AC-02) "
+        "was skipped by the user (0f.3)."
+    )
+    assert "2f" in lowered, (
+        "The README section must name the planned proof (package 2f)."
+    )
+    assert "estimate" in lowered and "ac-26" in lowered, (
+        "The README section must label the AC-26 targets as estimates."
+    )
+
+
+def test_readme_never_claims_verification():
+    lowered = _normalized(_readme_profile_section())
+    without_unverified = lowered.replace("unverified", "")
+    for claim in ("verified", "validated", "recommended"):
+        assert claim not in without_unverified, (
+            f"README.md must not claim `{claim}` for `compact` (IC-36 no. 3): "
+            "the profile stays opt-in and unverified."
+        )
+
+
+def test_changelog_documents_the_compact_anchors_report_package():
+    lowered = _normalized(_unreleased_section())
+    assert "package 2c" in lowered, (
+        "CHANGELOG.md [Unreleased] must record package 2c (anchor registry, "
+        "budgets/report, provider matrix)."
+    )
+    assert "anchor" in lowered and "provider matrix" in lowered, (
+        "The 2c entry must name the anchor registry and the provider matrix."
+    )
+    assert "estimate" in lowered, (
+        "The 2c entry must label the AC-26 targets as estimates (Spec section "
+        "11)."
+    )
+
+
+def test_changelog_2c_entry_keeps_compact_opt_in_and_unverified():
+    lowered = _normalized(_changelog_bullet("package 2c"))
+    assert "opt-in" in lowered and "unverified" in lowered, (
+        "The 2c entry must keep `compact` opt-in and unverified (IC-36)."
+    )
+    without_unverified = lowered.replace("unverified", "")
+    for claim in ("verified", "validated", "recommended"):
+        assert claim not in without_unverified, (
+            f"The 2c entry must not claim `{claim}` (IC-36 no. 3)."
+        )

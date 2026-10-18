@@ -26,6 +26,22 @@
   **opt-in and unverified**: the deterministic parts (AC-24) are asserted hermetically, the
   role-routing proof (AC-25) is planned in package 2f, a `compact` sync logs INFO
   `context-profile.unverified` (AC-86), and no default flips to `compact`.
+- **`compact` anchors, budgets report and provider matrix (package 2c, UNVERIFIED)**: the anchor
+  registry `config/context-anchors.yaml` declares the `all-profiles`/`compact-only` surfaces per
+  provider × profile × artifact kind (IC-12/QG-3), and `sync.py --context-report
+  --profile full|compact|both` renders the opt-in profile into a work directory below the tmp-sink
+  (via `resolve_work_dir`, IC-34) — injecting `context-profile: compact` into the work-dir *copy*
+  of `project.yaml` only, never the project config — and reports the `full` ↔ `compact` delta. Every
+  `compact`/`both` report carries the machine-readable `targets_note`: the AC-26 size targets are
+  ESTIMATES (Spec section 11), not measurements; the measured `compact` sizes are pinned as
+  regression ceilings (`COMPACT_BUDGET_CEILINGS`) while `COMPACT_BUDGET_TARGETS` records the AC-26
+  targets as data (test pins plus the capability config keys `Codex.context_hard_cap_bytes: 32768`
+  and `Copilot.context_soft_cap_chars: 4000`). The provider matrix (QG-6) covers 9 providers ×
+  2 profiles and `sync.py --check` stays green after a `compact` sync (idempotent, QG-2 anchors and
+  pointers intact). The profile stays **opt-in and unverified** (IC-36): the role-routing proof
+  (AC-25) is planned in package 2f, a `compact` sync logs INFO `context-profile.unverified`, and no
+  default flips to `compact`. The measured sizes currently miss several AC-26 targets (documented
+  deviation, to be resolved by a later spec revision per AC-26).
 
 ### Changed
 - **Routing keywords come from a single source (IC-30)**: the orchestrator/rule routing keywords

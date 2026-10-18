@@ -10,7 +10,7 @@ The `sync.py` script is the central entry point of the agent-meta framework. It 
 | `--init` | Generates the provider-specific configuration (e.g., `CLAUDE.md`) from templates if they do not already exist. |
 | `--only-variables` | Substitutes variables (`{{VARIABLE}}`) in the existing configuration without generating new agents. |
 | `--cleanup-preview` | Planning-only, side-effect-free JSON preview of the stale agent files a sync would remove (dry-run gate). Emits exactly one JSON object on stdout and writes nothing (no index write, no unlink, no backup, no clone/submodule). Exit 0 even for a non-empty stale set, 1 only on internal failure. |
-| `--context-report [--json] [--profile full\|compact\|both]` | Measures the rendered context artifacts (entry file, rules, orchestrator, harness roster, always-loaded set) per active provider: bytes, lines, estimated tokens (bytes / 4) and the capability caps (IC-09). Renders the project into a work directory below the tmp-sink subdirectory `context-report/` and writes only there (the report is also stored as `report.json`); nothing is written into the project and the system temp directory is never used. Exit 0; exit 1 only on `context.over-hard-cap`; exit 2 with `tmp-sink.disabled` when `repo_containment.tmp-sink.enabled` is `false`, and exit 2 with `context-report.render-failed` when the render fails (including missing `git`); an empty report prints a warning to stderr and exits 0. Limitation: the project is rendered with `sync.py --init` on a copy of `project.yaml` only, so project-local files outside `.meta-config` (`.claude/3-project/*-ext.md`, project-owned rules and hooks, the "Eigene Notizen" section of CLAUDE.md) are missing and the measurement can underestimate the real always-loaded footprint. `--json` emits `{provider: {artifact: {bytes, lines, tokens_est, cap, cap_kind}}}`; `--profile compact` is reserved for Phase 2 (currently reports `full`). Shares `measure_artifacts` (`scripts/lib/context_report.py`) with `scripts/measure_context.py --project <path>`. |
+| `--context-report [--json] [--profile full\|compact\|both]` | Measures the rendered context artifacts (entry file, rules, orchestrator, harness roster, always-loaded set) per active provider: bytes, lines, estimated tokens (bytes / 4) and the capability caps (IC-09). Renders the project into a work directory below the tmp-sink subdirectory `context-report/` and writes only there (the report is also stored as `report.json`); nothing is written into the project and the system temp directory is never used. Exit 0; exit 1 only on `context.over-hard-cap`; exit 2 with `tmp-sink.disabled` when `repo_containment.tmp-sink.enabled` is `false`, and exit 2 with `context-report.render-failed` when the render fails (including missing `git`); an empty report prints a warning to stderr and exits 0. Limitation: the project is rendered with `sync.py --init` on a copy of `project.yaml` only, so project-local files outside `.meta-config` (`.claude/3-project/*-ext.md`, project-owned rules and hooks, the "Eigene Notizen" section of CLAUDE.md) are missing and the measurement can underestimate the real always-loaded footprint. `--json` emits `{provider: {artifact: {bytes, lines, tokens_est, cap, cap_kind}}}`. `--profile compact` really renders the opt-in `compact` profile into a work directory below the tmp-sink subdirectory `context-report/` (via `resolve_work_dir`, IC-34), injecting `context-profile: compact` into the work-dir *copy* of `project.yaml` only — the project config on disk is never modified; `--profile both` renders `full` and `compact` and reports the `full` ↔ `compact` delta (`profiles`, `full`, `compact`, `delta`). `compact` is opt-in and unverified (IC-36): every `compact`/`both` report carries the machine-readable `targets_note` (the AC-26 size targets are ESTIMATES, Spec section 11, not measurements) and prints the same note to stderr. Shares `measure_artifacts` (`scripts/lib/context_report.py`) with `scripts/measure_context.py --project <path>`. |
 | `--doctor` | Diagnoses the installation against the known-issues registry (`config/known-issues.yaml`, the only registry source; a project-level registry is ignored). Deterministic, no LLM. Writes nothing into the project or into agent-meta; the only write target is one JSON report via `--out` inside `<tmp-sink>/doctor/`. Flags and exit codes: see the section "`--doctor` installation diagnosis" below. |
 | `--dry-run` | Simulates the sync process without writing any files to disk. |
 | `--check` | Exits with code 1 if context files (`CLAUDE.md`, `AGENTS.md`) are out of sync, otherwise 0. (Crucial for CI/CD). |
@@ -130,8 +130,23 @@ soon as one sharer resolves to `full` (safe side, ADR-5), and a requested `compa
 downgraded with a single WARN `context-profile.shared-file-downgrade` per file, naming the
 requesting providers.
 
-The profile is a pure switch — the documentation makes no claim beyond "opt-in, unverified";
-see `--context-report --profile compact|both` for measuring the rendered artifacts.
+`--context-report --profile compact|both` (IC-11) renders the profile into a work directory below
+the tmp-sink and reports the `full` ↔ `compact` delta; `--profile compact` injects
+`context-profile: compact` into the work-dir *copy* of `project.yaml` only — the project config on
+disk is never modified. The profile is a pure switch: the documentation makes no claim beyond
+"opt-in, unverified" and does not put the requested profile into the project configuration.
+
+### AC-26 size targets are ESTIMATES
+
+The `compact` size targets of AC-26 (Claude orchestrator ≤ 32 KB; AGENTS.md single provider ≤ 8 KB;
+AGENTS.md multi provider ≤ 12 KB and < 32,768 B; Gemini AGENTS.md ≤ 9 KB; Continue always-on rules
+≤ 2 KB; Copilot instruction file ≤ 4,000 chars) are **ESTIMATES** (Spec section 11), not
+measurements. They are recorded as data: test pins plus the capability config keys
+`Codex.context_hard_cap_bytes: 32768` and `Copilot.context_soft_cap_chars: 4000`, surfaced by the
+report as the artifact's `cap`/`cap_kind`. The measured values are reported by `--context-report`
+and pinned as regression ceilings (`COMPACT_BUDGET_CEILINGS` in `tests/test_context_budgets.py`).
+This documentation does **not claim** the targets are met — several are currently missed (a
+documented deviation, to be resolved by a later spec revision per AC-26; out of scope here).
 
 ## Session Resume & Checkpointing
 

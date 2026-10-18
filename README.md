@@ -119,6 +119,23 @@ mindmap
       External Skills
 ```
 
+## Context Profiles (`context-profile`) — opt-in, unverified
+
+`context-profile: full|compact` (default `full`) is a top-level `project.yaml` key that switches the
+context-density profile; a per-provider scope is available via
+`provider-overrides.<Provider>.context-profile`. `compact` ships **opt-in and unverified**: the
+role-routing eval that would evidence AC-25 has not run because its `full` baseline (AC-02) was
+skipped by the user (0f.3, `SKIPPED-BY-USER`), and the planned proof lives in package 2f (a separate
+user approval with a cost estimate comes first). Until then a sync with `context-profile: compact`
+writes the INFO `context-profile.unverified` per compact provider to `sync.log`, and this README
+makes no verification claim beyond "opt-in, unverified". No default changes: a missing key or `full`
+keeps every render byte-identical (AC-35).
+
+The `compact` size targets of AC-26 are **ESTIMATES** (spec section 11), not measurements. The
+measured values are reported by `sync.py --context-report --profile compact|both` and pinned as
+regression ceilings in the test suite. See [`docs/api/cli-reference.md`](docs/api/cli-reference.md)
+for the flags and the resolution precedence.
+
 ## Agent Roster — 74 Generic Agents
 
 ### Core Development (12 agents)
