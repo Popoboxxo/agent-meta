@@ -1897,6 +1897,84 @@ class TestWriteProjectSectionPlugins(unittest.TestCase):
                     handler._write_project_section()
 
 
+class TestContextProfileWriteGuard(unittest.TestCase):
+    """IC-01 (2a review fix): the Admin UI must reject out-of-enum
+    ``context-profile`` writes with ValueError (HTTP 400) *before* any disk
+    write — both on the partial-section route and on the full-document
+    GET-then-PUT round trip used by the project editor."""
+
+    def _make_handler(self, root: Path):
+        (root / ".meta-config").mkdir(exist_ok=True)
+        handler = admin_server.AdminRequestHandler.__new__(admin_server.AdminRequestHandler)
+        admin_server.AdminRequestHandler.root = root
+        admin_server.AdminRequestHandler.config_manager = admin_server.ConfigManager(
+            root, mode="project_admin")
+        handler._send_json = lambda result: None
+        return handler
+
+    def test_invalid_partial_section_rejected_without_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            handler = self._make_handler(Path(tmp))
+            handler.config_manager.write("project", {"context-profile": "compact"})
+            handler._read_body = lambda: {"section": "context-profile", "data": "ultra"}
+            with self.assertRaises(ValueError) as ctx:
+                handler._write_project_section()
+            self.assertIn("context-profile.invalid", str(ctx.exception))
+            self.assertIn("full, compact", str(ctx.exception))
+            persisted = handler.config_manager.read("project")
+            self.assertEqual(persisted["context-profile"], "compact")
+
+    def test_valid_partial_section_round_trips(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            handler = self._make_handler(Path(tmp))
+            handler._read_body = lambda: {"section": "context-profile", "data": "compact"}
+            handler._write_project_section()  # must not raise
+            persisted = handler.config_manager.read("project")
+            self.assertEqual(persisted["context-profile"], "compact")
+
+    def test_null_partial_section_counts_as_unset(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            handler = self._make_handler(Path(tmp))
+            handler._read_body = lambda: {"section": "context-profile", "data": None}
+            handler._write_project_section()  # must not raise
+
+    def test_full_document_put_rejects_invalid_value(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            handler = self._make_handler(Path(tmp))
+            handler.config_manager.write("project", {"context-profile": "full"})
+            handler._read_body = lambda: {"context-profile": "ultra"}
+            with self.assertRaises(ValueError) as ctx:
+                handler._route_put_config("project")
+            self.assertIn("context-profile.invalid", str(ctx.exception))
+            persisted = handler.config_manager.read("project")
+            self.assertEqual(persisted["context-profile"], "full")
+
+    def test_full_document_put_accepts_valid_value(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            handler = self._make_handler(Path(tmp))
+            handler._read_body = lambda: {"context-profile": "compact"}
+            handler._route_put_config("project")  # must not raise
+            persisted = handler.config_manager.read("project")
+            self.assertEqual(persisted["context-profile"], "compact")
+
+    def test_guard_rejects_invalid_provider_override(self) -> None:
+        # provider-overrides is read-only through the current PUT whitelist
+        # (changed values 400 via _assert_project_update_writable), so the
+        # guard is exercised directly to keep it honest for future whitelist
+        # changes and the internal fixed-section writers.
+        with tempfile.TemporaryDirectory() as tmp:
+            handler = self._make_handler(Path(tmp))
+            with self.assertRaises(ValueError) as ctx:
+                handler._guard_context_profile_write(
+                    "provider-overrides", {"Opencode": {"context-profile": "ultra"}})
+            self.assertIn("provider-overrides.Opencode.context-profile",
+                          str(ctx.exception))
+            # Valid overrides and unrelated sections pass through.
+            handler._guard_context_profile_write(
+                "provider-overrides", {"Opencode": {"context-profile": "compact"}})
+            handler._guard_context_profile_write("hooks", {"any": "thing"})
+
+
 class TestPluginCatalogInjectionValidation(unittest.TestCase):
     """I2/I3: per-project plugin overrides now flow through the plugin-catalog
     file (project-plugin-catalog). A schema-invalid permitted-injections entry
