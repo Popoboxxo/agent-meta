@@ -75,6 +75,18 @@ SYSTEM_FILE="$RUN_DIR/system-prompt.md"
 awk 'BEGIN{fm=0; done=0} NR==1 && /^---[[:space:]]*$/{fm=1; next} fm && /^---[[:space:]]*$/{fm=0; done=1; next} done||!fm{print}' \
   "$SRC_AGENT" > "$SYSTEM_FILE"
 
+# IC-13 output contract: the routing eval asserts on a JSON object. Only the
+# eval runner (and a promptfoo run with the same env var) opts in, so the
+# behavioral catalogs keep their normal prose answers.
+CONTRACT_FILE="${EVAL_OUTPUT_CONTRACT:-}"
+if [[ -n "$CONTRACT_FILE" ]]; then
+  if [[ ! -f "$CONTRACT_FILE" ]]; then
+    echo "provider-claude: EVAL_OUTPUT_CONTRACT file not found: $CONTRACT_FILE" >&2
+    exit 2
+  fi
+  { printf '\n\n'; cat "$CONTRACT_FILE"; } >> "$SYSTEM_FILE"
+fi
+
 OUTPUT_TEXT="$(
   cd "$RUN_DIR"
   claude -p \
