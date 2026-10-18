@@ -17,7 +17,7 @@ version: 2.0.0
 {{/if}}
 {{/if}}{{/if}}
 {{> agents-location }}
-{{#if CONTEXT_PROFILE_COMPACT}}{{> agents-list-compact }}
-{{else}}{{> agents-table }}{{/if}}
+{{#if CONTEXT_PROFILE_COMPACT}}{{#if EMIT_AGENT_ROSTER}}{{> agents-list-compact }}
+{{/if}}{{else}}{{> agents-table }}{{/if}}
 {{> knowledge-engine-hints }}
 <!-- agent-meta:managed-end -->

@@ -163,6 +163,13 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   (``orchestrator.md``/``.toml``/``.agent.md``) plus the 9
   ``generated-file-hashes.json`` (18 of 1003 hashes; 0 added/removed). No other
   artifact changed.
+- C2/C3/IC-05 roster gating (SPEC-CONTEXT-PROFILES-2026-10-11): the compact agent roster in
+  both emitters (orchestrator ``<context>`` names line and the shared-file ``agents-list-compact``)
+  is gated on the per-provider ``roster_in_harness`` capability (IC-09). The orchestrator template
+  is bumped 8.6.0 -> 8.7.0; the ``{{else}}`` (full) branch is unchanged, so without the
+  ``context-profile`` opt-in every render only differs by that version bump. Changed: the 9
+  per-provider orchestrator artifacts (``orchestrator.md``/``.toml``/``.agent.md``) plus the 9
+  ``generated-file-hashes.json`` (18 hashes; 0 added/removed). No other artifact changed.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

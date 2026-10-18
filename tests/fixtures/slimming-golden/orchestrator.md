@@ -1,6 +1,6 @@
 ---
 name: orchestrator
-version: 8.6.0
+version: 8.7.0
 description: 'Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes,
   delegates.'
 hint: Entry point for ALL development tasks — decomposes complex tasks and dispatches
@@ -11,7 +11,7 @@ tools:
 - Agent
 - Read
 - Write
-generated-from: 1-generic/orchestrator.md@8.6.0
+generated-from: 1-generic/orchestrator.md@8.7.0
 model: claude-sonnet-5
 permissionMode: plan
 ---

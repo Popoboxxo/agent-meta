@@ -9,6 +9,11 @@ Spec ``docs/specs/2026-10-11-context-profiles-spec.md``:
   section ``compact`` removes (§2a, §9-Begründung, Contracts, ``short_desc``) stays
   reachable through an existing pointer: **the path exists and the section is
   present there** (asserted strictly below, per provider).
+* **C2/C3/IC-05 roster gating** — the compact agent roster (orchestrator
+  ``<context>`` names line, ``AGENTS.md`` ``agents-list-compact``) is present iff
+  the provider (or, for the shared file, at least one ACTIVE sharer) has
+  ``roster_in_harness: false``. A ``roster_in_harness: true`` provider has the
+  roster in its harness, so ``short_desc`` is not rendered and not required.
 * **AC-27 / QG-6** — the provider matrix runs 9 providers × 2 profiles plus
   multi-provider combinations (shared-file downgrade, AC-30).
 * **AC-28** — ``sync.py --check`` is green after a ``compact`` sync and a second
@@ -80,6 +85,16 @@ _MANAGED_TARGET = yaml.safe_load(
     (_REPO_ROOT / "templates" / "context" / "agents-managed.md").read_text(encoding="utf-8")
     .split("---", 2)[1]
 )["target_file"]
+
+# C2/C3/IC-05: the compact agent roster is gated on the per-provider
+# ``roster_in_harness`` capability (IC-09 key; read, never hardcoded).
+_CAPABILITIES = yaml.safe_load(
+    (_REPO_ROOT / "config" / "provider-capabilities.yaml").read_text(encoding="utf-8")
+)["capabilities"]
+_ROSTER_IN_HARNESS = {
+    provider: bool(_CAPABILITIES[provider]["roster_in_harness"]) for provider in _PROVIDERS
+}
+_AGENTS_MD_GROUP = _CONTEXT_FILE_GROUPS[_MANAGED_TARGET]
 
 _COMPACT_LINE_RE = re.compile(r"^(?P<agent>[a-z0-9][a-z0-9-]*)\|(?P<flags>[^|]*)\|(?P<keywords>[^|]*)\|(?P<examples>.*)$")
 _PIPELINE_LINE_RE = re.compile(r"^pipeline:(?P<pipeline>[^|]+)\|(?P<keywords>.*)$")
@@ -469,46 +484,70 @@ def test_reachability_contracts_destination(matrix, provider):
 
 @pytest.mark.parametrize("provider", _PROVIDERS)
 def test_reachability_short_desc_destination(matrix, provider):
-    """``short_desc`` → carried by the artifact that keeps the role→description map.
+    """``short_desc`` → the roster the compact profile still emits, or the harness.
 
-    QG-2 clause ``short_desc`` (path exists AND the section is present there),
-    asserted per destination class:
+    QG-2 clause ``short_desc`` (the role→description map stays reachable), now
+    asserted **strictly** per provider against the C2/C3/IC-05 gating: the
+    compact agent roster is OMITTED when the provider's ``roster_in_harness``
+    capability is true (the harness owns the roster, ``short_desc`` is simply not
+    required), and kept when it is false.
 
-    * AGENTS.md-group: the ``## Agent Directory`` section of the file named by
-      ``templates/context/agents-managed.md`` — asserted **strictly**: every
-      ``name_index`` role has a ``- `\\`<role>\\``: `` bullet and its
-      ``short_desc`` string is present (measured 62/62).
-    * all other providers: only the name-channel form is asserted (a catalog
-      file exists per role), because the compact render currently carries **no**
-      ``short_desc`` destination for them.
+    * orchestrator ``<context>``: the comma-separated names line
+      (``**Agent table (names only):** …``) is present iff
+      ``roster_in_harness=false``.
+    * ``AGENTS.md`` (shared file): the ``- `\\`<role>\\``: <short_desc>`` list is
+      emitted iff at least one ACTIVE sharer has ``roster_in_harness=false`` (the
+      single-provider matrix reduces to the provider's own flag); otherwise the
+      section stays without a roster.
+    * other providers: only the name-channel form is asserted (a catalog file
+      exists per role), independently of the (possibly omitted) roster.
 
-    That second class is **Claude, Continue and Copilot**: the compact §3 line
-    block has no ``short_desc`` field, and none of these three renders the
-    ``agents-list-compact`` partial in any profile (``0/62`` / ``1/62`` measured).
-    This is the known-open 2b ``roster_in_harness`` gating finding (C2:
-    "Agent-Tabelle in ``<context>`` entfällt bei ``roster_in_harness: true``,
-    sonst Namensliste"), out of Task 18's scope — reported as an open deviation,
-    deliberately not skipped, xfailed or weakened.
+    The routing vocabulary (roles, keywords, flags, name-only reasons) stays
+    reachable from compact §3 regardless of the omitted table (QG-2), re-asserted
+    here from the ``name_index`` independently of the roster.
     """
+    roster = _ROSTER_IN_HARNESS[provider]
     context_file = _PROVIDER_TABLE[provider]["context_file"]
     definition = _routing(matrix[(provider, "full")], provider)
     name_index = definition["routing"]["name_index"]
     assert name_index, "%s: empty name_index" % provider
+
+    # QG-2: the routable role vocabulary is reachable from compact §3 alone — the
+    # omitted roster table takes no role/keyword knowledge with it.
+    rules, _pipelines, _line = _parse_routing_lines(
+        _rendered_routing(matrix[(provider, "compact")], provider))
+    assert set(rules) & {entry["agent"] for entry in name_index}, (
+        "%s: compact §3 lost the routable role vocabulary" % provider)
+
+    orch_text = _orchestrator_file(
+        matrix[(provider, "compact")], provider).read_text(encoding="utf-8")
+    names_line = re.search(r"^\*\*Agent table \(names only\):\*\* (.*)$", orch_text, re.M)
+    if roster:
+        assert names_line is None, (
+            "%s: roster_in_harness=true must omit the compact names-only line" % provider)
+    else:
+        assert names_line is not None, (
+            "%s: roster_in_harness=false must keep the compact names-only line" % provider)
+        assert names_line.group(1).strip(), "%s: empty names-only line" % provider
 
     ctx_text = (matrix[(provider, "compact")] / context_file).read_text(encoding="utf-8")
     if context_file == _MANAGED_TARGET:
         section = _section(ctx_text, "## Agent Directory")
         assert section, "%s: compact context file has no Agent Directory section" % provider
         listed = dict(re.findall(r"^- `([^`]+)`: (.+)$", section, re.M))
-        assert listed, "%s: compact Agent Directory carries no agent list" % provider
-        for entry in name_index:
-            assert entry["agent"] in listed, (
-                "%s: %s missing from the compact agent list" % (provider, entry["agent"]))
-            short_desc = entry["short_desc"].strip()
-            if short_desc:
-                assert short_desc in ctx_text, (
-                    "%s: short_desc of %s not present in the compact context file"
-                    % (provider, entry["agent"]))
+        if roster:
+            assert not listed, (
+                "%s: roster_in_harness=true must omit the shared-file agent list" % provider)
+        else:
+            assert listed, "%s: roster_in_harness=false must emit the agent list" % provider
+            for entry in name_index:
+                assert entry["agent"] in listed, (
+                    "%s: %s missing from the compact agent list" % (provider, entry["agent"]))
+                short_desc = entry["short_desc"].strip()
+                if short_desc:
+                    assert short_desc in listed[entry["agent"]], (
+                        "%s: short_desc of %s not present in the compact agent list"
+                        % (provider, entry["agent"]))
     else:
         agents_dir = matrix[(provider, "compact")] / _PROVIDER_TABLE[provider]["agents_dir"]
         for entry in name_index:
@@ -549,6 +588,21 @@ def test_shared_file_compact_when_every_sharer_is_compact(multi_provider):
     assert re.search(r"^- `[a-z0-9-]+`: ", text, re.M), (
         "all-compact sharers must render the compact one-line agent list")
     assert "| Agent | Core Capabilities |" not in text
+
+
+def test_shared_file_omits_roster_when_all_active_sharers_are_in_harness(tmp_path):
+    """C2/C3 (IC-06): the shared compact roster drops when every ACTIVE sharer
+    keeps the roster in its harness (``roster_in_harness: true``), while the
+    ``## Agent Directory`` location pointer stays."""
+    sharers = [p for p in _AGENTS_MD_GROUP if _ROSTER_IN_HARNESS[p]][:2]
+    assert len(sharers) == 2, "need two roster_in_harness=true AGENTS.md sharers"
+    config = _config(sharers, profile="compact")
+    project, _result = _sync_fresh(tmp_path / "all-in-harness", config)
+
+    text = (project / _SHARED_CONTEXT_FILE).read_text(encoding="utf-8")
+    assert not re.search(r"^- `[a-z0-9-]+`: ", text, re.M), (
+        "all roster_in_harness=true sharers must omit the shared compact roster")
+    assert "## Agent Directory" in text, "the agent location pointer must stay"
 
 
 def test_provider_override_scopes_compact_to_one_provider(tmp_path):

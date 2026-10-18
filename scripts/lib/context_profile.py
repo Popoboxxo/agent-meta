@@ -147,6 +147,27 @@ def resolve_shared_file_profile(
     return "compact" if seen else "full"
 
 
+def resolve_shared_emit_roster(roster_by_provider: Mapping[str, bool]) -> bool:
+    """Whether a *shared* context file must emit the compact agent roster.
+
+    C2/C3/IC-06 (SPEC-CONTEXT-PROFILES-2026-10-11): one physical file is shared
+    by providers with mixed ``roster_in_harness`` flags and is rendered once, so
+    the roster decision must be the same for every sharer. Safe side (mirroring
+    :func:`resolve_shared_file_profile`): emit the roster as soon as ONE sharer
+    has ``roster_in_harness`` false — that reader depends on the generated list.
+
+    Returns:
+        ``True`` iff at least one sharer has ``roster_in_harness`` false; ``False``
+        when every sharer keeps the roster in its harness. An empty mapping is the
+        safe side too: nothing proves the roster is harness-provided, so the list
+        stays (``True``).
+    """
+    for roster_in_harness in roster_by_provider.values():
+        if not roster_in_harness:
+            return True
+    return not roster_by_provider
+
+
 def _variables_for(profile: ProfileValue) -> Dict[str, str]:
     return {
         "CONTEXT_PROFILE": profile,

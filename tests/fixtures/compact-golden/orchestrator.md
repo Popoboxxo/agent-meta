@@ -1,6 +1,6 @@
 ---
 name: orchestrator
-version: 8.6.0
+version: 8.7.0
 description: 'Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes,
   delegates.'
 hint: Entry point for ALL development tasks — decomposes complex tasks and dispatches
@@ -11,7 +11,7 @@ tools:
 - Agent
 - Read
 - Write
-generated-from: 1-generic/orchestrator.md@8.6.0
+generated-from: 1-generic/orchestrator.md@8.7.0
 model: claude-sonnet-5-5
 permissionMode: plan
 ---
@@ -392,7 +392,7 @@ Pattern catalog (Single Feature, Multi-Bug, Mixed, Refactoring, Analysis+Design)
 
 **Model tier:** nano (trivial) | fast (Git/Meta) | balanced (default) | powerful (architecture/security) | max (only with justification)
 
-**Agent table (names only):** accessibility-specialist,agent-meta-manager,agent-meta-scout,api-specialist,app-lifecycle-governor,bug-feature-analyzer,claude-expert,code-reviewer,concept-architect,concept-reviewer,concept-specifier,continue-expert,copilot-expert,data-engineer,dependency-auditor,design-system-architect,developer,devops-engineer,docker,documenter,e2e-tester,effort-estimator,explorer,export-manager,feedback,frontend-component-engineer,gemini-expert,git,ideation,incident-responder,intern-developer,junior-developer,knowledge-curator,knowledge-gardener,knowledge-indexer,knowledge-ingestor,knowledge-linter,knowledge-migrator,knowledge-querier,log-analyzer,mammouth-expert,meta-feedback,opencode-expert,orchestrator,performance-optimizer,planner,principal-developer,product-manager,prompt-engineer,refactoring-specialist,release,requirements,senior-developer,technical-writer,test-executor,tester,ui-ux-designer,validator
+
 
 
 

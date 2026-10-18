@@ -2319,9 +2319,10 @@ def _build_managed_block(
     # by sync_pipeline (IC-04). Only the GATE_* family is neutralised -- the
     # remaining rendered provider-scoped inputs (ORCH_MODE_*, REPO_CONTAINMENT_*)
     # stay per-provider by design (determinism scope AC-25 / R7).
+    from .providers import load_provider_capabilities
+
     if provider_config:
         from .providers import (
-            load_provider_capabilities,
             resolve_providers,
             shared_runtime_gate_vars,
         )
@@ -2354,6 +2355,7 @@ def _build_managed_block(
         context_profile_variables,
         resolve_context_profile,
         resolve_shared_file_profile,
+        resolve_shared_emit_roster,
     )
 
     local_vars.update(context_profile_variables(config, provider, shared_users))
@@ -2370,6 +2372,32 @@ def _build_managed_block(
                     f"'{shared_name}' renders profile 'full'; 'compact' requested "
                     "by: " + ", ".join(_compact)
                 )
+
+    # IC-09 / C2-C3 (SPEC-CONTEXT-PROFILES-2026-10-11): the compact agent roster
+    # in this physical file is gated on the sharers' ``roster_in_harness``
+    # capability. The file renders once for every active sharer, so the decision
+    # is resolved over ``shared_users`` with the safe-side rule (emit as soon as
+    # one sharer lacks the harness roster; C2/C3 "entfällt, wenn alle Teiler
+    # roster_in_harness: true haben"). Read from config/provider-capabilities.yaml
+    # — no provider-name branch.
+    #
+    # ``EMIT_AGENT_ROSTER`` is the *emit* predicate in this context file ("true"
+    # keeps the roster list, "false" omits it — the harness owns the roster). It is
+    # deliberately NOT the orchestrator's ``ROSTER_IN_HARNESS`` capability literal:
+    # that one has the inverted meaning ("true" means omit) and is consumed only by
+    # the agent template (orchestrator.md, ``_PROVIDER_ROSTER_VARS``).
+    _roster_caps = load_provider_capabilities(agent_meta_root)
+    _roster_users = shared_users if provider_config else [provider]
+    local_vars["EMIT_AGENT_ROSTER"] = (
+        "true"
+        if resolve_shared_emit_roster(
+            {
+                user: (_roster_caps.get(user) or {}).get("roster_in_harness") is True
+                for user in _roster_users
+            }
+        )
+        else "false"
+    )
 
     from .providers import context_topology
 

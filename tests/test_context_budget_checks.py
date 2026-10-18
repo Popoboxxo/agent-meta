@@ -270,6 +270,17 @@ def test_marker_in_rule_source_and_generated(tmp_path):
     assert cb.COMPACT_MARKER in findings[0].message
 
 
+def test_marker_in_rule_flags_the_roster_gate(tmp_path):
+    """F3: ``ROSTER_IN_HARNESS`` in a rule is flagged like the profile marker."""
+    _write(tmp_path / "rules" / "a.md", "# A\n{{#unless ROSTER_IN_HARNESS}}x\n")
+    _write(tmp_path / "rules" / "b.md", "# B\nclean\n")
+    findings = cb.check_marker_in_rule(tmp_path, ["P"], _caps(), None)
+    assert [f.file for f in findings] == ["rules/a.md"]
+    assert findings[0].check == "context-profile.marker-in-rule"
+    assert findings[0].severity is Severity.ERROR
+    assert "ROSTER_IN_HARNESS" in findings[0].message
+
+
 def test_unread_channel_skills_dir_and_exemption(tmp_path, monkeypatch):
     _write(tmp_path / "rules" / "a.md", "# A\n")
     _write(tmp_path / "sk" / "x" / "SKILL.md", "# x\n")

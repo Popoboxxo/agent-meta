@@ -13,6 +13,16 @@ wrapped in ``{{#if CONTEXT_PROFILE_COMPACT}}…{{else}}…{{/if}}``:
 ``compact`` is opt-in and unverified (IC-36): nothing here claims that the
 profile is verified, validated or recommended. QG-5 freezes the ``compact``
 render as ``tests/fixtures/compact-golden/orchestrator.md``.
+
+Golden rebaseline log (the frozen ``compact`` fixture is edited only with a
+documented reason):
+
+* C2/C3/IC-05 roster gating (SPEC-CONTEXT-PROFILES-2026-10-11): the compact
+  agent roster is now gated on the per-provider ``roster_in_harness`` capability.
+  Claude's capability is ``true`` (roster lives in the harness), so the compact
+  render legitimately drops ``**Agent table (names only):** <names>`` — the
+  compact golden is rebaselined to that gated render. The ``{{else}}`` (full)
+  branch is unchanged, so the slimming golden only moves with the version bump.
 """
 from __future__ import annotations
 
@@ -31,7 +41,7 @@ from scripts.lib.agent_sync import (
 )
 from scripts.lib.config import build_variables, load_config
 from scripts.lib.log import SyncLog
-from scripts.lib.providers import load_providers_config
+from scripts.lib.providers import load_provider_capabilities, load_providers_config
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _TEMPLATE = _REPO_ROOT / "agents" / "1-generic" / "orchestrator.md"
@@ -48,6 +58,7 @@ _INLINE_STAGE_DETAIL_MARKERS = (
     "Full stage-by-stage instructions per pipeline",
 )
 _TABLE_HEADER = "| Agent | Core Capabilities |"
+_NAMES_LINE = "**Agent table (names only):**"
 
 _MODEL_MAP = {
     "claude-haiku-4-5-20251001": "claude-haiku-5-5",
@@ -55,6 +66,16 @@ _MODEL_MAP = {
     "claude-opus-4-8": "claude-opus-5-5",
 }
 _MODEL_LINE = re.compile(r"^model: (.*)$", re.MULTILINE)
+
+
+def _roster_in_harness(provider: str) -> bool:
+    """Whether ``provider`` keeps the agent roster in its harness (IC-09 key).
+
+    Read from ``config/provider-capabilities.yaml`` (never hardcoded), so the
+    assertion tracks the capability instead of a provider name.
+    """
+    caps = load_provider_capabilities(_REPO_ROOT)
+    return (caps.get(provider) or {}).get("roster_in_harness") is True
 
 
 def _normalize(text: str, variables: dict) -> str:
@@ -181,3 +202,35 @@ def test_compact_render_matches_compact_golden(rendered):
     golden = _COMPACT_GOLDEN.read_text(encoding="utf-8")
     current = _normalize(rendered["compact"], rendered["compact_vars"])
     assert golden == current, _diff(golden, current, "orchestrator(compact)")
+    assert _NAMES_LINE not in golden, (
+        "the frozen compact golden must reflect the roster_in_harness gating "
+        "(no names-only line for a roster-in-harness provider)"
+    )
+
+
+def test_compact_omits_roster_when_provider_keeps_it_in_harness(rendered):
+    """C2/C3/IC-05: a ``roster_in_harness: true`` provider renders NO roster.
+
+    Claude keeps the agent roster in its harness (``roster_in_harness: true``),
+    so the compact ``<context>`` drops the names-only line entirely; the full
+    render is untouched and keeps the delegation table.
+    """
+    assert _roster_in_harness(_PROVIDER) is True, (
+        f"{_PROVIDER} is expected to declare roster_in_harness: true"
+    )
+
+    compact = rendered["compact"]
+    assert _NAMES_LINE not in compact, (
+        "roster_in_harness=true must omit the compact names-only roster"
+    )
+    assert "{{ACTIVE_ROLES}}" not in compact, "the roster placeholder must be resolved"
+    assert "{{#unless ROSTER_IN_HARNESS}}" not in compact, (
+        "the gating marker must be resolved"
+    )
+    assert "{{ROSTER_IN_HARNESS}}" not in compact, (
+        "the bare roster marker must not leak into the render"
+    )
+
+    full = rendered["full"]
+    assert _NAMES_LINE not in full
+    assert _TABLE_HEADER in full, "the full render must keep the agent table"

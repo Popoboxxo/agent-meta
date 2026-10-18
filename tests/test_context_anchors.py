@@ -25,6 +25,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import test_ac01_render_identity as matrix  # noqa: E402
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_REPO_ROOT / "scripts"))
+
+from lib.context_profile import resolve_shared_emit_roster  # noqa: E402
+from lib.providers import load_provider_capabilities  # noqa: E402
+
 _REGISTRY = _REPO_ROOT / "config" / "context-anchors.yaml"
 _MCP_ACTIVE_FIXTURE = (
     _REPO_ROOT / "tests" / "fixtures" / "mcp-active" / ".meta-config" / "project.yaml"
@@ -77,6 +82,19 @@ _MANAGED_BLOCK_RE = re.compile(
 
 def _load_registry() -> dict:
     return yaml.safe_load(_REGISTRY.read_text(encoding="utf-8"))
+
+
+def _roster_emitted(provider: str) -> bool:
+    """Whether the compact entry-file roster is emitted for ``provider``.
+
+    C2/C3/IC-06: the compact agent roster is gated on ``roster_in_harness``
+    (IC-09); the anchor harness syncs one provider per project, so the shared-file
+    safe-side rule reduces to the provider's own flag (via the production
+    resolver, never a provider name).
+    """
+    caps = load_provider_capabilities(_REPO_ROOT)
+    flag = (caps.get(provider) or {}).get("roster_in_harness") is True
+    return resolve_shared_emit_roster({provider: flag})
 
 
 def _read_all(project: Path, names: List[str]) -> str:
@@ -237,14 +255,28 @@ def test_compact_render_keeps_all_profile_anchors(compact_rendered, provider):
 
 @pytest.mark.parametrize("provider", matrix._PROVIDERS)
 def test_compact_render_contains_compact_only_anchors(compact_rendered, provider):
-    """The compact-only anchors hold wherever the profile renders that surface."""
+    """The compact-only anchors hold wherever the profile renders that surface.
+
+    The ``entry-file`` compact-only anchors ARE the compact agent roster
+    (``- `\\`<role>\\``:``). C2/C3/IC-06 gates that roster on ``roster_in_harness``:
+    a provider whose harness owns the roster omits the list, so the anchors must
+    be absent (the safe-side rule is the production resolver, not a literal).
+    """
     reg = _load_registry()["anchors"]
     corpora = compact_rendered[provider][1]
+    emit_roster = _roster_emitted(provider)
     missing = []
     for kind in _KINDS:
         haystack = corpora[kind]
         if not haystack.strip():
-            continue  # this provider renders no compact surface for the kind
+            continue
+        if kind == "entry-file" and not emit_roster:
+            present = [a for a in reg[kind]["compact-only"] if a in haystack]
+            assert not present, (
+                f"{provider}: roster_in_harness=true must omit the entry-file "
+                f"roster anchors, found: {present}"
+            )
+            continue
         for anchor in reg[kind]["compact-only"]:
             if anchor not in haystack:
                 missing.append(f"{kind}: {anchor!r}")

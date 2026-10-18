@@ -124,3 +124,40 @@ def test_override_compact_with_sole_active_sharer_keeps_compact(loaded_config, c
     assert local_vars["CONTEXT_PROFILE_COMPACT"] == "true"
     assert not [w for w in log.warnings
                 if "context-profile.shared-file-downgrade" in w]
+
+
+# -- shared-file roster gate (C2/C3/IC-06) ----------------------------------
+
+
+def test_shared_file_emits_roster_when_a_sharer_lacks_harness_roster(loaded_config, captured):
+    """Mixed sharers (here Gemini has ``roster_in_harness: false``) ⇒ the shared
+    file keeps the compact roster (safe side)."""
+    config, provider_config = loaded_config
+    config = _config(config)
+
+    log = SyncLog()
+    local_vars = _render(config, provider_config, "Codex", captured, log)
+
+    assert local_vars["EMIT_AGENT_ROSTER"] == "true"
+
+
+def test_shared_file_omits_roster_when_all_active_sharers_keep_it(loaded_config, captured):
+    """Every active sharer with ``roster_in_harness: true`` ⇒ the shared file
+    drops the roster."""
+    config, provider_config = loaded_config
+    config = _config(config, active=["Opencode", "Codex"])
+
+    log = SyncLog()
+    local_vars = _render(config, provider_config, "Opencode", captured, log)
+
+    assert local_vars["EMIT_AGENT_ROSTER"] == "false"
+
+
+def test_shared_file_roster_follows_the_sole_provider_flag(loaded_config, captured):
+    """Single active sharer: the shared value is the provider's own capability."""
+    config, provider_config = loaded_config
+    config = _config(config, active=["Gemini"])
+
+    log = SyncLog()
+    gemini = _render(config, provider_config, "Gemini", captured, log)
+    assert gemini["EMIT_AGENT_ROSTER"] == "true"

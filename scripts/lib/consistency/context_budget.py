@@ -79,6 +79,11 @@ EMITTED_SEVERITY = {
 }
 
 COMPACT_MARKER = "CONTEXT_PROFILE_COMPACT"
+#: Render-side markers that must never appear in a native rule source (IC-03 /
+#: IC-09): the profile AND roster gates belong to agents/context templates
+#: (variables.py force-adds both for the render path), so a stray marker in a
+#: rule would be silently resolved instead of flagged.
+RULE_FORBIDDEN_MARKERS = (COMPACT_MARKER, "ROSTER_IN_HARNESS")
 # Row of a lazy-skill table: "| skill-name | description |" below a "| Skill |" header.
 _TABLE_HEADER_RE = re.compile(r"^\|\s*Skill\s*\|", re.IGNORECASE)
 _TABLE_ROW_RE = re.compile(r"^\|\s*([A-Za-z0-9][A-Za-z0-9_.-]*)\s*\|")
@@ -463,11 +468,12 @@ def check_marker_in_rule(
     capabilities: Mapping[str, Mapping],
     active_set,
 ) -> list:
-    """``context-profile.marker-in-rule``: ``CONTEXT_PROFILE_COMPACT`` in a rule file (IC-03; ERROR since 2a.4).
+    """``context-profile.marker-in-rule``: a render marker in a rule file (IC-03; ERROR since 2a.4).
 
     Scans rule sources (``<project_root>/rules/**/*.md``) and the generated
     rule directories of the active providers. Native rules must stay
-    byte-identical across context profiles, so the marker is not allowed there.
+    byte-identical across context profiles, so neither ``CONTEXT_PROFILE_COMPACT``
+    nor ``ROSTER_IN_HARNESS`` is allowed there (``RULE_FORBIDDEN_MARKERS``).
     """
     root = Path(project_root)
     candidates: dict = {}
@@ -481,10 +487,13 @@ def check_marker_in_rule(
     findings = []
     for path in sorted(candidates):
         text = _read_text(path)
-        if text is not None and COMPACT_MARKER in text:
+        if text is None:
+            continue
+        marker = next((m for m in RULE_FORBIDDEN_MARKERS if m in text), None)
+        if marker is not None:
             findings.append(_warn(
                 "context-profile.marker-in-rule", _rel(path, root),
-                f"rule file contains the profile marker {COMPACT_MARKER} "
+                f"rule file contains the render marker {marker} "
                 "(native rules must be identical in every context profile)",
                 "move profile-conditional content out of rules (IC-03)"))
     return findings

@@ -23,6 +23,7 @@ from lib.context_profile import (
     context_profile_variables,
     resolve_context_profile,
     resolve_shared_file_profile,
+    resolve_shared_emit_roster,
 )
 
 
@@ -156,6 +157,23 @@ def test_shared_file_empty_is_full():
     assert resolve_shared_file_profile([]) == "full"
 
 
+# -- shared roster gate (C2/C3/IC-06, pure resolver) ------------------------
+
+
+def test_shared_roster_emitted_when_any_sharer_lacks_harness_roster():
+    assert resolve_shared_emit_roster({"A": True, "B": False}) is True
+
+
+def test_shared_roster_omitted_when_every_sharer_keeps_it_in_harness():
+    assert resolve_shared_emit_roster({"A": True, "B": True}) is False
+
+
+def test_shared_roster_empty_is_the_safe_side():
+    # Empty ⇒ emit the roster (nothing to compress; mirrors the shared-profile
+    # safe-side default of ``full``).
+    assert resolve_shared_emit_roster({}) is True
+
+
 # --- provider variables -------------------------------------------------
 
 
@@ -259,6 +277,33 @@ def test_flag_is_whitelisted_in_rules_path():
     ) == "ACD"
     # Absent flag must read as inactive (opt-in safe default).
     assert strip_inactive_conditional_blocks(text, {}) == "ACD"
+
+
+def test_roster_flag_is_whitelisted_in_rules_path():
+    """The nested roster gate must resolve (never leak) in the agent path."""
+    from lib.variables import strip_inactive_conditional_blocks
+
+    text = "A{{#if ROSTER_IN_HARNESS}}B{{else}}C{{/if}}D"
+    assert strip_inactive_conditional_blocks(text, {"ROSTER_IN_HARNESS": "true"}) == "ABD"
+    assert strip_inactive_conditional_blocks(text, {"ROSTER_IN_HARNESS": "false"}) == "ACD"
+    # Only an explicit "true" omits the roster (default-off conditional).
+    assert strip_inactive_conditional_blocks(text, {}) == "ACD"
+
+
+def test_provider_injection_exposes_roster_in_harness_capability():
+    """``ROSTER_IN_HARNESS`` is exposed per provider via the same seam as the
+    profile variables, read from ``config/provider-capabilities.yaml``."""
+    config = _config()
+    config["ai-providers"] = ["Claude", "Gemini"]
+    variables, _unmapped = _build_variables(config)
+    roster = variables["_PROVIDER_ROSTER_VARS"]
+    assert roster["Claude"] == {"ROSTER_IN_HARNESS": "true"}
+    assert roster["Gemini"] == {"ROSTER_IN_HARNESS": "false"}
+
+    claude = _build_provider_vars("Claude", variables, config)
+    gemini = _build_provider_vars("Gemini", variables, config)
+    assert claude["ROSTER_IN_HARNESS"] == "true"
+    assert gemini["ROSTER_IN_HARNESS"] == "false"
 
 
 def test_log_line_names_resolved_values_and_source():

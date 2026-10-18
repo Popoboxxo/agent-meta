@@ -528,6 +528,11 @@ def _build_provider_vars(
     provider_vars.update(
         (variables.get('_PROVIDER_CONTEXT_PROFILE_VARS') or {}).get(provider, {})
     )
+    # IC-09 / C2: the per-provider ``roster_in_harness`` capability travels the
+    # same seam; it gates the compact agent table in the orchestrator template.
+    provider_vars.update(
+        (variables.get('_PROVIDER_ROSTER_VARS') or {}).get(provider, {})
+    )
     if config is not None:
         # Feature A (M2): flags and SUBAGENT_PERMISSIONS_BLOCK travel together
         # from one resolver, so the orchestrator block can never diverge from

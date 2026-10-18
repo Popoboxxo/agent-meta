@@ -64,6 +64,7 @@ from .dod import (
 from .providers import (
     all_providers_support_hooks,
     build_provider_routing,
+    load_provider_capabilities,
     load_providers_config,
     provider_has_capability,
     registered_provider_names,
@@ -2262,6 +2263,23 @@ def build_variables(
         # IC-01: out-of-enum provider-overrides.<P>.context-profile values for
         # active providers abort as SyncError (clean rc 1, no traceback).
         raise SyncError(f"context-profile.invalid: {exc}") from exc
+
+    # IC-09 / C2 (SPEC-CONTEXT-PROFILES-2026-10-11): the per-provider
+    # ``roster_in_harness`` capability drives the compact agent-table gate. It
+    # travels through the SAME provider-variable seam as the context-profile
+    # values (merged in agent_sync._build_provider_vars) so context_profile.py
+    # stays pure data and no render path branches on a provider name.
+    _roster_caps = load_provider_capabilities(agent_meta_root)
+    variables["_PROVIDER_ROSTER_VARS"] = {
+        provider: {
+            "ROSTER_IN_HARNESS": (
+                "true"
+                if (_roster_caps.get(provider) or {}).get("roster_in_harness") is True
+                else "false"
+            )
+        }
+        for provider in _profile_providers
+    }
 
     _build_snippet_variables(variables, agent_meta_root)
     _build_convention_variables(variables, config, agent_meta_root, active_set)

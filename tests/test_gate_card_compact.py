@@ -185,8 +185,36 @@ def test_missing_gate_card_section_raises(
         build_gate_card(_REPO_ROOT, config, variables, SyncLog())
 
 
-def test_compact_entry_swaps_rules_and_table_for_gate_card_and_list(rendered):
-    """``compact`` renders the gate card + a blank-line-free one-line agent list."""
+_AGENT_LIST_LINE_RE = re.compile(r"^- `[a-z0-9-]+`: ")
+
+
+def _agents_md_roster_emitted(provider_config, capabilities, config) -> bool:
+    """Whether the shared entry file renders the compact roster (capability-driven).
+
+    Mirrors ``_build_managed_block`` exactly: the physical ``AGENTS.md`` renders
+    once for every ACTIVE sharer, so the production safe-side resolver decides over
+    the sharers' ``roster_in_harness`` flags. Depends only on
+    ``config/provider-capabilities.yaml`` and the group membership — never a
+    provider literal (keeps the test correct if the group changes, F6).
+    """
+    from lib.context import _shared_context_users
+    from lib.context_profile import resolve_shared_emit_roster
+
+    target = provider_config[_PROVIDER]["context_file"]
+    sharers = _shared_context_users(
+        _PROVIDER, provider_config, config, target_name=target
+    )
+    flags = {
+        p: (capabilities.get(p) or {}).get("roster_in_harness") is True
+        for p in sharers
+    }
+    return resolve_shared_emit_roster(flags)
+
+
+def test_compact_entry_swaps_rules_and_table_for_gate_card_and_list(
+    rendered, loaded_config, provider_config, capabilities
+):
+    """``compact`` renders the gate card + a capability-gated one-line agent list."""
     compact = rendered["compact"]
     for marker in _GATE_CARD_MARKERS:
         assert marker in compact, f"compact entry lost {marker!r}"
@@ -194,12 +222,20 @@ def test_compact_entry_swaps_rules_and_table_for_gate_card_and_list(rendered):
     assert "## Agent Directory" in compact
 
     lines = compact.splitlines()
-    start = next(i for i, line in enumerate(lines) if line.startswith("- `"))
-    end = start
-    while end + 1 < len(lines) and lines[end + 1].startswith("- `"):
-        end += 1
-    assert end - start + 1 >= 2, "compact agent list has fewer than two agents"
-    assert "" not in lines[start:end + 1], "compact agent list contains blank lines"
+    roster_lines = [line for line in lines if _AGENT_LIST_LINE_RE.match(line)]
+    if _agents_md_roster_emitted(provider_config, capabilities, loaded_config):
+        assert roster_lines, "compact profile must emit the one-line agent list"
+        assert len(roster_lines) >= 2, "compact agent list has fewer than two agents"
+        start = lines.index(roster_lines[0])
+        end = start
+        while end + 1 < len(lines) and _AGENT_LIST_LINE_RE.match(lines[end + 1]):
+            end += 1
+        assert "" not in lines[start:end + 1], "compact agent list contains blank lines"
+    else:
+        assert not roster_lines, (
+            "every ACTIVE AGENTS.md sharer keeps its roster in the harness "
+            "(roster_in_harness=true) — the shared compact list must be omitted"
+        )
 
 
 def test_full_and_no_key_render_byte_identical(rendered):

@@ -21,6 +21,10 @@
 # - The compact-only surfaces live in the shared AGENTS.md managed block (gate
 #   card + one-line agent list, IC-06) and in the Claude maintainer notes (IC-08);
 #   `rules-native` has no compact-only addition, so its list stays empty.
+# - `entry-file.compact-only` pins the compact AGENT ROSTER bullets. C2/C3/IC-06
+#   gates that roster on the reader's `roster_in_harness` capability: a provider
+#   whose harness owns the roster renders NO list, so test_context_anchors.py
+#   asserts these anchors present iff the roster is emitted (capability-driven).
 anchors:
   entry-file:
     all-profiles: []

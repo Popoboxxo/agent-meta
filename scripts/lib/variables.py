@@ -44,6 +44,7 @@ _VALID_SUBAGENT_PERMISSION_MODES: frozenset[str] = frozenset({"strict", "warn", 
 _FALSE_DEFAULT_CONDITIONALS: frozenset[str] = frozenset({
     "GATE_NEUTRAL",
     "CONTEXT_PROFILE_COMPACT",
+    "ROSTER_IN_HARNESS",
 })
 
 # Only these are safe as {{#if}} conditionals: strip_inactive_conditional_blocks
@@ -310,6 +311,10 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
     # conditionals in agents/context templates resolve; source rules/ must
     # never use it (context-profile.marker-in-rule, ERROR).
     conditional_vars.update({"CONTEXT_PROFILE_COMPACT"})
+    # IC-09 / C2: the per-provider ``roster_in_harness`` capability gates the
+    # compact agent table (orchestrator template). Default-off: only an explicit
+    # "true" omits the roster, so an unwired render keeps the names list.
+    conditional_vars.update({"ROSTER_IN_HARNESS"})
     conditional_vars.update({k for k in variables if k.startswith("ORCH_MODE_")})
     conditional_vars.update({k for k in variables if k.startswith("REPO_CONTAINMENT_")})
     conditional_vars.update({k for k in variables if k.startswith("SUBAGENT_PERMISSIONS_")})
