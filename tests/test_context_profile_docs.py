@@ -1,0 +1,141 @@
+"""Docs guardrail for the opt-in context profile (2a.7, AC-29 and AC-86).
+
+``context-profile: compact`` ships as an *opt-in, unverified* feature: the
+role-routing eval that would evidence AC-25 (2f.2) has not run because its
+``full`` baseline (AC-02) was skipped by the user (0f.3, ``SKIPPED-BY-USER``);
+the deterministic parts are asserted hermetically, the verification claim is
+planned for package 2f. The documentation must name that status *with* the
+reason (missing baseline/AC-02, proof planned in 2f), tie it to the
+``context-profile.unverified`` INFO and never claim verification, validation
+or a recommendation (IC-36 no. 3).
+
+These tests are intentionally source assertions, mirroring
+``tests/test_runtime_gate_docs.py``: docs that over-promise are a defect, so
+the wording is pinned here.
+
+Run: python -m pytest tests/test_context_profile_docs.py -v
+"""
+
+import re
+from pathlib import Path
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_CLI_REFERENCE = _REPO_ROOT / "docs" / "api" / "cli-reference.md"
+_CHANGELOG = _REPO_ROOT / "CHANGELOG.md"
+
+
+def _normalized(text: str) -> str:
+    """Lower-case + collapse whitespace so phrases split across wrapped lines
+    still match."""
+    return " ".join(text.split()).lower()
+
+
+def _cli_reference_text() -> str:
+    return _CLI_REFERENCE.read_text(encoding="utf-8")
+
+
+def _context_profile_section() -> str:
+    """The level-2 cli-reference section whose heading names ``context-profile``."""
+    text = _cli_reference_text()
+    heading = re.search(r"(?m)^## .*context-profile.*$", text)
+    assert heading, (
+        "docs/api/cli-reference.md must carry a level-2 'context-profile' "
+        "section (2a.7): the opt-in profile and its unverified status need a "
+        "documented home."
+    )
+    rest = text[heading.end():]
+    next_heading = re.search(r"(?m)^## ", rest)
+    return rest[: next_heading.start()] if next_heading else rest
+
+
+def _unreleased_section() -> str:
+    text = _CHANGELOG.read_text(encoding="utf-8")
+    start = text.find("## [Unreleased]")
+    assert start != -1, "CHANGELOG.md must keep an [Unreleased] section."
+    rest = text[start:]
+    next_release = re.search(r"(?m)^## \[", rest[1:])
+    return rest if not next_release else rest[: next_release.start() + 1]
+
+
+def test_cli_reference_documents_opt_in_unverified_with_reason():
+    lowered = _normalized(_context_profile_section())
+    assert "opt-in" in lowered, (
+        "The context-profile section must name the opt-in character of "
+        "`context-profile: compact`."
+    )
+    assert "unverified" in lowered, (
+        "The context-profile section must state the unverified status "
+        "(IC-36 no. 3 / AC-86)."
+    )
+    assert "ac-02" in lowered and "baseline" in lowered, (
+        "The section must give the reason: the `full` baseline (AC-02) was "
+        "skipped by the user (0f.3)."
+    )
+    assert "2f" in lowered, (
+        "The section must name the planned proof (package 2f) so the status "
+        "stays traceable."
+    )
+
+
+def test_cli_reference_documents_keys_and_precedence():
+    section = _context_profile_section()
+    lowered = _normalized(section)
+    assert "context-profile" in lowered, (
+        "The section must document the top-level `context-profile` key."
+    )
+    assert "provider-overrides" in lowered, (
+        "The section must document the per-provider override "
+        "`provider-overrides.<Provider>.context-profile`."
+    )
+    assert "full" in lowered and "compact" in lowered, (
+        "The section must name both profile values (`full`, `compact`)."
+    )
+    assert "precedence" in lowered, (
+        "The section must document the resolution precedence."
+    )
+    assert "context_file.mode" in section, (
+        "The section must name the explicit `context_file.mode` sub-setting as "
+        "the highest-precedence input."
+    )
+
+
+def test_cli_reference_names_the_gate_messages():
+    section = _context_profile_section()
+    assert "context-profile.unverified" in section, (
+        "The section must name the INFO `context-profile.unverified` that a "
+        "`compact` sync writes to sync.log."
+    )
+    assert "context-profile.shared-file-downgrade" in section, (
+        "The section must name the WARN `context-profile.shared-file-downgrade` "
+        "of the shared-file downgrade (ADR-5)."
+    )
+
+
+def test_cli_reference_never_claims_verification():
+    lowered = _normalized(_context_profile_section())
+    without_unverified = lowered.replace("unverified", "")
+    assert "verified" not in without_unverified, (
+        "The context-profile section must not claim 'verified' "
+        "(IC-36 no. 3): `compact` stays unverified until 2f.3."
+    )
+    assert "validated" not in without_unverified, (
+        "The context-profile section must not claim 'validated'."
+    )
+    assert "recommended" not in without_unverified, (
+        "The context-profile section must not recommend `compact`."
+    )
+
+
+def test_changelog_unreleased_documents_the_opt_in_profile():
+    lowered = _normalized(_unreleased_section())
+    assert "context-profile" in lowered, (
+        "CHANGELOG.md [Unreleased] must document the opt-in context profile "
+        "(2a.7)."
+    )
+    assert "unverified" in lowered, (
+        "The CHANGELOG entry must carry the unverified status (AC-86)."
+    )
+    assert "ac-25" in lowered or "2f" in lowered, (
+        "The CHANGELOG entry must reference the planned AC-25 proof (package "
+        "2f)."
+    )

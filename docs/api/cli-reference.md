@@ -110,6 +110,29 @@ Runtime: the `sync-pending` seed runs `sync.py --check --dry-run` as a subproces
 project; all other detectors are file reads and take well under a second. Run it deliberately, not in a
 tight loop.
 
+## Context Profiles (`context-profile`) — opt-in, unverified
+
+`context-profile: full|compact` (default `full`) is a top-level `project.yaml` key that
+bundles the context-density measures of the profile axis; a per-provider scope is available
+via `provider-overrides.<Provider>.context-profile`. Resolution precedence per single
+setting: explicit sub-setting (`context_file.mode`) > `provider-overrides.<Provider>.context-profile`
+> `context-profile` > default. `compact` implies `context_file.mode: compact` only while the
+mode is not explicitly set.
+
+`compact` ships **opt-in and unverified**: the role-routing eval that would evidence AC-25
+has not run because its `full` baseline (AC-02) was skipped by the user (0f.3,
+`SKIPPED-BY-USER`). While no passing `compact` evaluation exists, a sync with
+`context-profile: compact` writes the INFO `context-profile.unverified` per compact provider
+to `sync.log`; the proof is planned in package 2f (separate user approval with a cost
+estimate first). No default changes: a missing key or `full` leaves every render
+byte-identical (AC-35). A context file shared by several active providers renders `full` as
+soon as one sharer resolves to `full` (safe side, ADR-5), and a requested `compact` is
+downgraded with a single WARN `context-profile.shared-file-downgrade` per file, naming the
+requesting providers.
+
+The profile is a pure switch — the documentation makes no claim beyond "opt-in, unverified";
+see `--context-report --profile compact|both` for measuring the rendered artifacts.
+
 ## Session Resume & Checkpointing
 
 | Flag | Description |

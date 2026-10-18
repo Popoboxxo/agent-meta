@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Added
+- **Opt-in context profiles (`context-profile`, UNVERIFIED)**: `context-profile: full|compact` —
+  default `full` — plus a per-provider `provider-overrides.<Provider>.context-profile` resolve the
+  effective profile per provider (precedence: explicit `context_file.mode` > provider override >
+  global key > default; `compact` implies `context_file.mode: compact` only while the mode is
+  unset) and inject `CONTEXT_PROFILE`/`CONTEXT_PROFILE_COMPACT` into the renders. The switch is
+  **opt-in and unverified**: the role-routing eval that would evidence AC-25 has not run (its
+  `full` baseline, AC-02, was skipped by the user — 0f.3, `SKIPPED-BY-USER`; the proof is planned
+  in package 2f). A sync with `compact` therefore logs INFO `context-profile.unverified` per
+  compact provider; a context file shared by several active providers renders `full` and a
+  requested `compact` is downgraded with one WARN `context-profile.shared-file-downgrade` per
+  file (ADR-5). No default flips to `compact`: a missing key or `full` keeps every render
+  byte-identical (AC-35).
+
 ### Changed
 - **Routing keywords come from a single source (IC-30)**: the orchestrator/rule routing keywords
   are read from one registry instead of being duplicated across templates and `role-defaults.yaml`,
