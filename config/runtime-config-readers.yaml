@@ -1,0 +1,62 @@
+# Runtime config reader registry (IC-35, SPEC-CONTEXT-PROFILES-2026-10-11).
+#
+# Source of truth for which `.meta-config/project.yaml` keys are consumed at
+# *runtime* (outside the sync render path). Consumers: IC-24 (mark
+# `runtime-reader`) and the doctor detector `variable-unreferenced` (a
+# registered runtime reader counts as usage).
+#
+# Source is only `agent_meta_root` (like IC-21). `release-gates.*` is NOT an
+# entry: those values are baked in at sync time (hook_common.sh:214-217) and
+# are already covered by L0. `auto_commit` is NOT an entry either: its runtime
+# artifact `.meta-config/auto-commit-allowlist.json` is a generated artifact.
+#
+# `reader`  = repo-relative source path under `agent_meta_root`.
+# `evidence`= generated-runtime path + line (audit anchor, mapped to `reader`).
+registry-version: 1
+readers:
+  - key: repo_containment
+    reader: hooks/1-generic/repo-containment-impl.sh
+    evidence: ".claude/hooks/repo-containment-impl.sh:267"
+    effect: "Schreib-Containment der Agenten"
+  - key: orchestrator
+    reader: hooks/1-generic/orchestrator-guard-impl.sh
+    evidence: ".claude/hooks/orchestrator-guard-impl.sh:881"
+    effect: "Strict-Mode/Guard"
+  - key: variables.TEST_COMMAND
+    reader: hooks/1-generic/dod-push-check.sh
+    evidence: ".claude/hooks/dod-push-check.sh:1095"
+    effect: "DoD-Test-Gate vor Push"
+  - key: variables.TEST_TIMEOUT
+    reader: hooks/1-generic/dod-push-check.sh
+    evidence: ".claude/hooks/dod-push-check.sh:1142"
+    effect: "Test-Timeout"
+  - key: variables.GIT_MAIN_BRANCH
+    reader: hooks/1-generic/dod-push-check.sh
+    evidence: ".claude/hooks/dod-push-check.sh:224"
+    effect: "Hauptzweig-Erkennung"
+  - key: admin-ui
+    reader: scripts/admin-server.py
+    evidence: "scripts/admin-server.py:515"
+    effect: "Bind-Host, Token/Token-Datei, Allowed-Hosts, Port der Admin-UI"
+  - key: viz
+    reader: scripts/admin-server.py
+    evidence: "scripts/admin-server.py:472"
+    effect: "Viz-/MCP-Server-Ports, Event-Log, Retention"
+  - key: lifecycle-triggers
+    reader: scripts/lifecycle_check.py
+    evidence: "scripts/lifecycle_check.py:196"
+    effect: "Pending-Tasks bei Lifecycle-Events"
+# Credential mark (IC-35 Rev. 3.1) - data source for IC-24.
+# A path is a credential iff one of its SEGMENTS matches `name_patterns`
+# (case-insensitive; whole segment or segment suffix after `-`/`_`), OR it
+# falls under `keys` (prefix match for subkeys), OR its string value is
+# reported by `secrets.scan_for_secrets`. The pattern is segment-exact so
+# `max-tokens-overrides` does NOT match. Credential keys take precedence over
+# runtime-reader.
+credentials:
+  name_patterns:
+    - '(^|[-_])(token|secret|password|passwd|api[-_]?key|credentials?|private[-_]?key)$'
+  keys:
+    - {key: admin-ui.token, evidence: "scripts/lib/permissions.py:3-4"}
+    - {key: admin-ui.token-file, evidence: "scripts/admin-server.py:496"}
+  value_scan: secrets

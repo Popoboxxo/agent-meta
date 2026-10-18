@@ -37,6 +37,7 @@ from .repo_containment import (
 )
 
 PROJECT_CONFIG_REL = ".meta-config/project.yaml"
+RUNTIME_READERS_REL = "config/runtime-config-readers.yaml"
 SYNC_LOG_REL = "sync.log"
 CAPABILITY_FILE_REL = "config/provider-capabilities.yaml"
 CHECK_ENVIRONMENT = "doctor.environment"
@@ -505,12 +506,50 @@ def _framework_template_text(env: Env) -> str:
     return env.shared["templates"]
 
 
+def _runtime_reader_keys(env: Env) -> set:
+    """Reader keys from the IC-35 runtime registry (cached on ``env.shared``).
+
+    Fail-soft like the other detectors: a missing/unreadable/malformed registry
+    yields an empty set, so the doctor behaves as before and never crashes. Only
+    ``agent_meta_root`` is read (source of truth, same as IC-21).
+    """
+    if "runtime_reader_keys" not in env.shared:
+        keys: set = set()
+        path = Path(env.agent_meta_root) / RUNTIME_READERS_REL
+        try:
+            data = yaml.safe_load(path.read_text(encoding="utf-8"))
+            for entry in (data or {}).get("readers", []) or []:
+                key = entry.get("key") if isinstance(entry, dict) else None
+                if isinstance(key, str) and key:
+                    keys.add(key)
+        except Exception:
+            keys = set()
+        env.shared["runtime_reader_keys"] = keys
+    return env.shared["runtime_reader_keys"]
+
+
+def _runtime_reader_covers(reader_keys: set, key: str) -> bool:
+    """True when a registry reader key covers ``key`` (dotted; prefix for subkeys).
+
+    Both the bare ``<KEY>`` and the ``variables.<KEY>`` form are accepted, so a
+    project-config top-level key like ``admin-ui`` counts as consumed just as a
+    ``variables.X`` reader covers the variable ``X``.
+    """
+    for reader_key in reader_keys:
+        if reader_key in (key, "variables." + key):
+            return True
+        if reader_key.startswith(key + ".") or reader_key.startswith("variables." + key + "."):
+            return True
+    return False
+
+
 def detect_variable_unreferenced(det: dict, env: Env, tgt: dict) -> list:
     variables = env.config.get("variables")
     if not isinstance(variables, dict):
         return []
     keys = sorted(variables, key=str) if det["key"] == "*" else [det["key"]]
     own_seeds = env.shared.get("own_variable_seeds", set())
+    reader_keys = _runtime_reader_keys(env)
     text = _framework_template_text(env)
     hits = []
     for key in keys:
@@ -518,7 +557,7 @@ def detect_variable_unreferenced(det: dict, env: Env, tgt: dict) -> list:
         if value is None or (det["key"] == "*" and key in own_seeds):
             continue
         used = re.search(r"\{\{[^}]*\b" + re.escape(str(key)) + r"\b[^}]*\}\}", text)
-        if not used:
+        if not used and not _runtime_reader_covers(reader_keys, str(key)):
             hits.append(Hit(PROJECT_CONFIG_REL,
                             bindings={"key": str(key), "length": len(str(value))}))
     return hits
