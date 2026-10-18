@@ -1060,6 +1060,12 @@ def _handle_prune_backups(ctx: _SyncContext) -> None:
 def _handle_context_report(ctx: _SyncContext) -> None:
     """Handle ``--context-report`` (IC-11): render into the tmp-sink, measure, exit.
 
+    ``--profile full|compact|both`` selects what is measured: ``full`` keeps the
+    Phase-1 render, ``compact`` renders the opt-in profile (the ``context-profile``
+    key is injected into the work-dir config copy only, never the project config)
+    and ``both`` reports the ``full`` vs ``compact`` delta. ``compact`` is opt-in
+    and unverified (IC-36); the AC-26 size targets are estimates (Spec section 11).
+
     Exit 0 on success, 1 only on ``context.over-hard-cap``, 2 when the tmp-sink
     is disabled or unsafe (``tmp-sink.disabled``) or the render fails
     (``context-report.render-failed``).

@@ -5,6 +5,7 @@ Run: python -m pytest tests/test_context_report.py -q
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import subprocess
@@ -208,10 +209,59 @@ def test_empty_report_warns_but_exits_0(tmp_path, capsys):
     assert "empty report" in capsys.readouterr().err
 
 
-def test_profile_both_note_names_requested_profile(tmp_path, capsys):
-    assert _run_report(tmp_path, profile="both") == 0
+def test_profile_compact_renders_compact_artifacts(tmp_path):
+    """``--profile compact`` renders the compact profile (IC-11, AC-26 measurement basis)."""
+    cfg = _project(tmp_path)
+    full = json.loads(_run(tmp_path, cfg, "--context-report", "--profile", "full", "--json").stdout)
+    compact = json.loads(
+        _run(tmp_path, cfg, "--context-report", "--profile", "compact", "--json").stdout)
+    assert compact["Claude"]["orchestrator"]["bytes"] < full["Claude"]["orchestrator"]["bytes"]
+    # the injection lives in the rendered work-dir copy of the config
+    work_cfgs = list((tmp_path / "scratch" / "out" / "context-report").glob(
+        "*/work/.meta-config/project.yaml"))
+    assert len(work_cfgs) == 1
+    assert "context-profile: compact" in work_cfgs[0].read_text(encoding="utf-8")
+
+
+def test_profile_compact_leaves_project_config_unchanged(tmp_path):
+    """The real project config stays byte-identical under ``--profile compact``."""
+    cfg = _project(tmp_path)
+    before = _snapshot(tmp_path, "scratch/out")
+    config_hash = hashlib.sha256(cfg.read_bytes()).hexdigest()
+    result = _run(tmp_path, cfg, "--context-report", "--profile", "compact")
+    assert result.returncode == 0, result.stdout[-800:] + result.stderr[-800:]
+    assert hashlib.sha256(cfg.read_bytes()).hexdigest() == config_hash
+    assert _snapshot(tmp_path, "scratch/out") == before
+
+
+def test_profile_both_reports_full_vs_compact_delta(tmp_path):
+    cfg = _project(tmp_path)
+    result = _run(tmp_path, cfg, "--context-report", "--profile", "both", "--json")
+    assert result.returncode == 0, result.stdout[-1500:] + result.stderr[-1500:]
+    payload = json.loads(result.stdout)
+    assert {"full", "compact", "delta", "targets_note"} <= set(payload)
+    row = payload["delta"]["Claude"]["orchestrator"]
+    assert row["full"] == payload["full"]["Claude"]["orchestrator"]["bytes"]
+    assert row["compact"] == payload["compact"]["Claude"]["orchestrator"]["bytes"]
+    assert row["delta_bytes"] == row["compact"] - row["full"]
+    assert "ESTIMATE" in payload["targets_note"].upper()
+
+
+def test_profile_compact_json_carries_estimate_label(tmp_path):
+    """The estimate label is machine-readable in the compact payload, not only stderr."""
+    cfg = _project(tmp_path)
+    result = _run(tmp_path, cfg, "--context-report", "--profile", "compact", "--json")
+    assert result.returncode == 0, result.stdout[-800:] + result.stderr[-800:]
+    payload = json.loads(result.stdout)
+    assert "ESTIMATE" in payload["targets_note"].upper()
+    assert "does not verify the compact profile" in payload["targets_note"]
+    assert payload["Claude"]["entry-file"]["bytes"] > 0  # provider entries still present
+
+
+def test_profile_note_labels_targets_as_estimates(tmp_path, capsys):
+    assert _run_report(tmp_path, profile="compact") == 0
     err = capsys.readouterr().err
-    assert "'both'" in err and "'compact'" not in err
+    assert "ESTIMATE" in err.upper() and "AC-26" in err and "Spec" in err
 
 
 def test_rules_skipped_without_rules_dir(tmp_path):
