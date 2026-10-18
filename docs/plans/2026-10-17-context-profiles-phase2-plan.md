@@ -3,6 +3,8 @@
 > Status: APPROVED
 >
 > **Freigabevermerk:** Nutzerfreigabe 2026-10-18 (Auftrag ‚Phase 2 komplett umsetzen‘); Entscheidungen zu den offenen Fragen siehe `## Offene Nutzerfragen` unten.
+>
+> **Fortschritt (2026-10-18):** 2a.1–2a.8, 2b.1–2b.6, 2c.1–2c.4 umgesetzt und committet (siehe docs/plans/2026-10-18-context-profiles-phase2-status.md); offen: 2d.1–2d.7, 2e.1–2e.6, 2f.1–2f.3 (2f gated).
 
 **Goal:** Phase 2 der Spec vollständig umsetzen — Profil `compact` (IC-01…IC-12, C1–C7) sowie Config-Optimizer, Applier und Rolle `meta-optimizer` (IC-24…IC-28, IC-35) — ausschließlich als Opt-in ohne Default-Änderung; die nachweisabhängigen Verifikationsschritte (AC-02/AC-25) sind als eigene Gate-Tasks (Paket 2f) ausgewiesen und heute nicht startbar.
 **Architecture:** Neue Auflösungsschicht `context_profile.py` über der bestehenden `COMPACT_MODE`-Ableitung (`config.py:1394-1407`); Profil-Konditionale nur in Resolution/Templates, der Active-Set-Filter (IC-17/IC-18) bleibt orthogonal; Per-Provider-Profile über einen Provider-Injection-Seam analog `_INTENT_ROUTING_TOOL_DEFS`/`shared_runtime_gate_vars`; Optimizer als reines Stdlib-Modul mit Sentinel-Render im tmp-sink, Remove-only-Applier und Laufzeit-Leser-Registry als Daten.
@@ -112,6 +114,7 @@ pipeline_stages:
 ### Task 1: 2.00 — Skip-Record des Baseline-Laufs 0f.3 versionieren
 **Agent:** tester · **Issue:** #977 · **PR:** 2.00 · **AC:** AC-02 (Zustand), AC-62 (Baseline-Teil), AC-86 (Skip-Datei) · **Gate:** —
 **Depends on:** —
+> **Hinweis (2026-10-18):** Ein `SKIPPED-BY-USER`-Record existiert bereits unter `tests/routing-llm-eval/roles/runs/2026-10-17-qg1-deepseek.json`; `tests/test_eval_baseline_schema.py` ist grün. Die Task-Steps bleiben bewusst **ungetickt** (Dateiname weicht vom Plan-Soll `2026-10-17-baseline-full.json` ab) — Vorbedingung faktisch erfüllt, siehe Statusdoku §3.
 **Falle:** `SKIPPED-BY-USER` ist die belegte Faktenlage von 2026-10-17 — Record per `eval_gate.write_skip_record` erzeugen, nicht per Hand schreiben; `estimate_cost`-Bezugsgrößen fixieren und im Record festhalten: `cases` = Fallzahl aus `tests/routing-llm-eval/roles/catalog.generated.yaml`, `models` = ≥ 2 namentlich benannte Modellklassen, `runs` = 3 je Metrik, Preisquelle/-datum über `max_age_days` ausgewiesen.
 **Files:**
 - Create: `tests/routing-llm-eval/roles/runs/2026-10-17-baseline-full.json`
@@ -255,10 +258,10 @@ pipeline_stages:
 - Create: `tests/test_routing_lines_compact.py`
 - Modify: `tests/test_routing_tool_definitions.py`
 **Interfaces:** Produces `render_routing_lines(rules: list[dict], pipelines: list[dict], name_only: list[dict]) -> str`, `select_routing_examples(rule: dict) -> list[str]`, `compact`-Zweig in `render_routing_tool_definition`/`build_routing_tool_definitions_for_providers`, Zeilenform `<agent>|<flags>|<kw1>;<kw2>|<example>[/<example>]`, Pipeline-Zeile `pipeline:<name>|<signal_keywords>`, Name-only-Zeile `name-only: <agent> (<reason>); …`; Consumes `get_routing_rules`, `_select_examples(examples, language)`
-- [ ] Step 1: Test schreiben (fail): Zeilen sortiert; Flags `req`/`rec`/`orch-only`/`name-only` nur bei Nicht-Default; leere Flags ⇒ `||`; alle Keywords enthalten; Beispiele sprachgewählt (DE-Fixture/EN-Fixture, identische Keyword-Menge); `;` im Keyword ⇒ `SyncError`; `full`-Pfad byte-identisch
-- [ ] Step 2: implementieren
-- [ ] Step 3: Test (pass): `python3 -m pytest tests/test_routing_lines_compact.py tests/test_routing_tool_definitions.py tests/test_ac01_render_identity.py -q`
-- [ ] Step 4: commit `feat: render compact routing lines for opt-in profile`
+- [x] Step 1: Test schreiben (fail): Zeilen sortiert; Flags `req`/`rec`/`orch-only`/`name-only` nur bei Nicht-Default; leere Flags ⇒ `||`; alle Keywords enthalten; Beispiele sprachgewählt (DE-Fixture/EN-Fixture, identische Keyword-Menge); `;` im Keyword ⇒ `SyncError`; `full`-Pfad byte-identisch
+- [x] Step 2: implementieren
+- [x] Step 3: Test (pass): `python3 -m pytest tests/test_routing_lines_compact.py tests/test_routing_tool_definitions.py tests/test_ac01_render_identity.py -q`
+- [x] Step 4: commit `feat: render compact routing lines for opt-in profile`
 
 ### Task 11: 2b.2 — Orchestrator-§2a/§9/Agent-Tabelle per Profil-Konditional verdichten
 **Agent:** prompt-engineer · **Issue:** #977 · **PR:** 2b · **parallel_group:** 2b-g1 · **AC:** AC-24 (C1/C2-Teil), AC-23 (IC-05-Template-Teil) · **Gate:** —
@@ -273,10 +276,10 @@ pipeline_stages:
 - Create: `tests/test_orchestrator_compact_sections.py`
 - Create: `tests/fixtures/compact-golden/orchestrator.md`
 **Interfaces:** Produces Profil-Konditionale in §2a (Pointer auf `{{PIPELINE_DETAILS_DIR}}/<pipeline>.md`), §9 (Schwellen verbatim, Prosa → Pointer `_wf-orchestrator-reference.md`), Agent-Tabelle (entfällt bei `roster_in_harness: true`, sonst Namensliste); Standalone-Flag `CONTEXT_PROFILE_COMPACT`; `compact`-Golden (QG-5); Consumes `CONTEXT_PROFILE_COMPACT`
-- [ ] Step 1: Test schreiben (fail): `full`-Render byte-identisch (Golden), `compact`-Render ohne Tabellen-Overhead, Anker (Singleton/Contract) vorhanden, `compact`-Golden fehlt
-- [ ] Step 2: implementieren (Version-Bump; Standalone-Flag; Rebaseline mit Begründung + Log-Eintrag; compact-Golden erzeugen)
-- [ ] Step 3: Test (pass): `python3 -m pytest tests/test_orchestrator_compact_sections.py tests/test_template_slimming_equivalence.py tests/test_ac01_render_identity.py tests/test_standalone_export_in_sync.py -q`
-- [ ] Step 4: commit `feat: compact orchestrator sections behind context profile`
+- [x] Step 1: Test schreiben (fail): `full`-Render byte-identisch (Golden), `compact`-Render ohne Tabellen-Overhead, Anker (Singleton/Contract) vorhanden, `compact`-Golden fehlt
+- [x] Step 2: implementieren (Version-Bump; Standalone-Flag; Rebaseline mit Begründung + Log-Eintrag; compact-Golden erzeugen)
+- [x] Step 3: Test (pass): `python3 -m pytest tests/test_orchestrator_compact_sections.py tests/test_template_slimming_equivalence.py tests/test_ac01_render_identity.py tests/test_standalone_export_in_sync.py -q`
+- [x] Step 4: commit `feat: compact orchestrator sections behind context profile`
 
 ### Task 12: 2b.3 — Gate-Card und kompakte Agentenliste im Entry-File bereitstellen
 **Agent:** senior-developer · **Issue:** #977 · **PR:** 2b · **AC:** AC-24 (C3-Teil), AC-26 (Entry-File-Ziele) · **Gate:** —
@@ -291,10 +294,10 @@ pipeline_stages:
 - Create: `tests/test_gate_card_compact.py`
 - Create: `tests/fixtures/compact-golden/agents-managed.md`
 **Interfaces:** Produces Verdichtungszweig `CONTEXT_PROFILE_COMPACT` in `agents-managed.md` (`gate-card`/`agents-list-compact` statt `rules-embedded`/`agents-table`), `build_gate_card(...) -> str`, Hard-Cap-Guard; `compact`-Golden (QG-5); Consumes `config/context-anchors.yaml`, `_build_managed_block`, `get_active_agents_data`
-- [ ] Step 1: Test schreiben (fail): Gate-Card enthält CRITICAL GATE, Git Delegation, Branch-Guard-Kern, Commit-Konventionen, Sprachregeln, Singleton, MCP-Deny-Header; fehlende Sektion ⇒ `SyncError`; Agentenliste ohne Leerzeilen; `full` byte-identisch; `compact`-Golden fehlt
-- [ ] Step 2: implementieren
-- [ ] Step 3: Test (pass): `python3 -m pytest tests/test_gate_card_compact.py tests/test_provider_matrix_sync.py -q`
-- [ ] Step 4: commit `feat: add compact gate card and agent list to entry files`
+- [x] Step 1: Test schreiben (fail): Gate-Card enthält CRITICAL GATE, Git Delegation, Branch-Guard-Kern, Commit-Konventionen, Sprachregeln, Singleton, MCP-Deny-Header; fehlende Sektion ⇒ `SyncError`; Agentenliste ohne Leerzeilen; `full` byte-identisch; `compact`-Golden fehlt
+- [x] Step 2: implementieren
+- [x] Step 3: Test (pass): `python3 -m pytest tests/test_gate_card_compact.py tests/test_provider_matrix_sync.py -q`
+- [x] Step 4: commit `feat: add compact gate card and agent list to entry files`
 
 ### Task 13: 2b.4 — REFERENCE-Anteile generischer Rules in den Skills-Kanal verlagern
 **Agent:** senior-developer · **Issue:** #977 · **PR:** 2b · **AC:** AC-24 (C5-Teil), AC-32 (IC-07-Klausel) · **Gate:** —
@@ -304,10 +307,10 @@ pipeline_stages:
 - Modify: `scripts/lib/context.py`
 - Create: `tests/test_compact_rule_channels.py`
 **Interfaces:** Produces erweiterte `_COMPACT_PLATFORM_RULES`-Tabelle, Reachability-Fallback-WARN, Nutzung von `rule_channels.reads_rule_skills`/`lazy_skill_channel`; Consumes `collect_rule_sources`, `resolve_rules`, `lazy_skill_stems`, `docs/guides/context-block-inventory.md`
-- [ ] Step 1: Test schreiben (fail): Fixture-Provider mit Skills-Kanal ⇒ REFERENCE-Teile als `<skills_dir>/<rule>/SKILL.md`, INSTRUKTION-Kerne embedded; Provider ohne Kanal ⇒ Volltext + keine Datei; `context.rule-unreachable` bleibt 0
-- [ ] Step 2: implementieren
-- [ ] Step 3: Test (pass): `python3 -m pytest tests/test_compact_rule_channels.py tests/test_lazy_skills_channel.py tests/test_context_budget_checks.py -q`
-- [ ] Step 4: commit `feat: lazy-load reference rule sections in compact profile`
+- [x] Step 1: Test schreiben (fail): Fixture-Provider mit Skills-Kanal ⇒ REFERENCE-Teile als `<skills_dir>/<rule>/SKILL.md`, INSTRUKTION-Kerne embedded; Provider ohne Kanal ⇒ Volltext + keine Datei; `context.rule-unreachable` bleibt 0
+- [x] Step 2: implementieren
+- [x] Step 3: Test (pass): `python3 -m pytest tests/test_compact_rule_channels.py tests/test_lazy_skills_channel.py tests/test_context_budget_checks.py -q`
+- [x] Step 4: commit `feat: lazy-load reference rule sections in compact profile`
 
 ### Task 14: 2b.5 — CLAUDE.md-Notizen im `compact`-Profil als HTML-Kommentare rendern
 **Agent:** developer · **Issue:** #977 · **PR:** 2b · **AC:** AC-24 (C6-Teil) · **Gate:** —
@@ -318,10 +321,10 @@ pipeline_stages:
 - Modify: `scripts/lib/context.py`
 - Modify: `tests/test_gate_card_compact.py`
 **Interfaces:** Produces Notiz-Block als `<!-- … -->` im `compact`-Zweig der Claude-Datei; Consumes `merged_caps(provider, …)`, `strips_html_comments`
-- [ ] Step 1: Test schreiben (fail): Claude-Fixture `compact` ⇒ Notizen als Kommentar; geteilte Datei oder Fremd-Provider ⇒ unverändert sichtbar/aus
-- [ ] Step 2: implementieren
-- [ ] Step 3: Test (pass): `python3 -m pytest tests/test_gate_card_compact.py tests/test_context_docs_corrections.py -q`
-- [ ] Step 4: commit `feat: render claude notes as html comments in compact profile`
+- [x] Step 1: Test schreiben (fail): Claude-Fixture `compact` ⇒ Notizen als Kommentar; geteilte Datei oder Fremd-Provider ⇒ unverändert sichtbar/aus
+- [x] Step 2: implementieren
+- [x] Step 3: Test (pass): `python3 -m pytest tests/test_gate_card_compact.py tests/test_context_docs_corrections.py -q`
+- [x] Step 4: commit `feat: render claude notes as html comments in compact profile`
 
 ### Task 15: 2b.6 — CHANGELOG und Klassifikations-Doku für Paket 2b pflegen
 **Agent:** documenter · **Issue:** #977 · **PR:** 2b · **AC:** AC-24 (Doku), AC-86 (Unverified-Hinweis) · **Gate:** —
@@ -332,10 +335,10 @@ pipeline_stages:
 - Modify: `docs/guides/context-block-inventory.md`
 - Modify: `tests/test_context_profile_docs.py`
 **Interfaces:** Produces Klassifikationseinträge (REFERENCE-Anteile der vier Regeln, INSTRUKTION-Kerne) + CHANGELOG; Consumes 2b.4
-- [ ] Step 1: Test schreiben (fail): Klassifikationstabelle ohne die REFERENCE-Anteile der vier Regeln ⇒ rot
-- [ ] Step 2: implementieren
-- [ ] Step 3: Test (pass): `python3 -m pytest tests/test_context_profile_docs.py -q && python3 scripts/consistency-check.py`
-- [ ] Step 4: commit `docs: record compact render classification`
+- [x] Step 1: Test schreiben (fail): Klassifikationstabelle ohne die REFERENCE-Anteile der vier Regeln ⇒ rot
+- [x] Step 2: implementieren
+- [x] Step 3: Test (pass): `python3 -m pytest tests/test_context_profile_docs.py -q && python3 scripts/consistency-check.py`
+- [x] Step 4: commit `docs: record compact render classification`
 
 ## Paket 2c — Budgets, Anker und Report für `compact` (IC-09…IC-12)
 
@@ -348,10 +351,10 @@ pipeline_stages:
 - Modify: `tests/test_context_anchors.py`
 - Create: `tests/fixtures/mcp-active/.meta-config/project.yaml`
 **Interfaces:** Produces `compact-only`-Ankerlisten + Testlauf je Provider × Profil; Consumes `measure_artifacts`-Renders der Matrix
-- [ ] Step 1: Test schreiben (fail): `compact`-Renders ohne Gate-Card-Anker ⇒ rot
-- [ ] Step 2: implementieren (Ankerlisten aus 2b.3/2b.4/2b.5)
-- [ ] Step 3: Test (pass): `python3 -m pytest tests/test_context_anchors.py -q`
-- [ ] Step 4: commit `chore: pin compact profile anchors in the registry`
+- [x] Step 1: Test schreiben (fail): `compact`-Renders ohne Gate-Card-Anker ⇒ rot
+- [x] Step 2: implementieren (Ankerlisten aus 2b.3/2b.4/2b.5)
+- [x] Step 3: Test (pass): `python3 -m pytest tests/test_context_anchors.py -q`
+- [x] Step 4: commit `chore: pin compact profile anchors in the registry`
 
 ### Task 17: 2c.2 — `--context-report --profile compact|both` real rendern und Ziele pinnen
 **Agent:** senior-developer · **Issue:** #977 · **PR:** 2c · **parallel_group:** 2c-g1 · **AC:** AC-26, AC-11 (Δ) · **Gate:** —
@@ -363,10 +366,10 @@ pipeline_stages:
 - Modify: `tests/test_context_report.py`
 - Modify: `tests/test_context_budgets.py`
 **Interfaces:** Produces `--profile compact|both` mit echtem `compact`-Render, Report-Δ `full` vs. `compact`, Zielwerte als Daten (`tests/test_context_budgets.py`, Caps als Config-Keys); Consumes `resolve_context_profile`, `resolve_work_dir`, `measure_artifacts`
-- [ ] Step 1: Test schreiben (fail): `--profile compact` misst `compact`-Artefakte (Claude-Orchestrator ≤ 32 KB, AGENTS.md Einzel ≤ 8 KB, Multi ≤ 12 KB und < 32,768 B, Gemini ≤ 9 KB, Continue ≤ 2 KB, Copilot ≤ 4,000 Zeichen); künstliche Vergrößerung ⇒ rot; Projekt-Config unverändert (Hash-Snapshot)
-- [ ] Step 2: implementieren
-- [ ] Step 3: Test (pass): `python3 -m pytest tests/test_context_report.py tests/test_context_budgets.py -q`
-- [ ] Step 4: commit `feat: report and pin compact profile budgets`
+- [x] Step 1: Test schreiben (fail): `--profile compact` misst `compact`-Artefakte (Claude-Orchestrator ≤ 32 KB, AGENTS.md Einzel ≤ 8 KB, Multi ≤ 12 KB und < 32,768 B, Gemini ≤ 9 KB, Continue ≤ 2 KB, Copilot ≤ 4,000 Zeichen); künstliche Vergrößerung ⇒ rot; Projekt-Config unverändert (Hash-Snapshot)
+- [x] Step 2: implementieren
+- [x] Step 3: Test (pass): `python3 -m pytest tests/test_context_report.py tests/test_context_budgets.py -q`
+- [x] Step 4: commit `feat: report and pin compact profile budgets`
 
 ### Task 18: 2c.3 — Provider-Matrix 9×2, Idempotenz und `compact`-Checks absichern
 **Agent:** tester · **Issue:** #977 · **PR:** 2c · **AC:** AC-24 (QG-2), AC-27, AC-28 · **Gate:** —
@@ -378,11 +381,11 @@ pipeline_stages:
 - Modify: `tests/test_provider_matrix_sync.py`
 - Modify: `tests/test_context_budget_checks.py`
 **Interfaces:** Produces Matrix-Lauf 9 Provider × 2 Profile + Shared-File-Kombinationen, Informationserhaltungs-Prüfung nach QG-2-Vollset, Idempotenz-Check; Consumes 2b/2c.1/2c.2-Artefakte
-- [ ] Step 1: Test schreiben (fail): `compact`-Matrix ohne Vollständigkeit ⇒ rot (fehlende Kombination/Idempotenzverletzung/QG-2-Mengendifferenz)
-- [ ] Step 2: implementieren (Fixtures/Wiederholungssync)
-- [ ] Step 3: Test (pass): `python3 -m pytest tests/test_compact_matrix.py tests/test_provider_matrix_sync.py tests/test_context_budget_checks.py -q`
-- [ ] Step 4: commit `test: cover compact profile across the provider matrix`
-- [ ] Step 5: Nachweis `sync.py --check` nach `compact`-Sync (Ausgabe im PR protokollieren)
+- [x] Step 1: Test schreiben (fail): `compact`-Matrix ohne Vollständigkeit ⇒ rot (fehlende Kombination/Idempotenzverletzung/QG-2-Mengendifferenz)
+- [x] Step 2: implementieren (Fixtures/Wiederholungssync)
+- [x] Step 3: Test (pass): `python3 -m pytest tests/test_compact_matrix.py tests/test_provider_matrix_sync.py tests/test_context_budget_checks.py -q`
+- [x] Step 4: commit `test: cover compact profile across the provider matrix`
+- [x] Step 5: Nachweis `sync.py --check` nach `compact`-Sync (Ausgabe im PR protokollieren)
 
 ### Task 19: 2c.4 — Doku und CHANGELOG für das `compact`-Profil veröffentlichen
 **Agent:** documenter · **Issue:** #977 · **PR:** 2c · **AC:** AC-26 (Doku), AC-86 · **Gate:** —
@@ -394,10 +397,10 @@ pipeline_stages:
 - Modify: `CHANGELOG.md`
 - Modify: `tests/test_context_profile_docs.py`
 **Interfaces:** Produces Doku „Profil `compact` (Opt-in, unverifiziert)“ mit Zielwerten und Unverified-Hinweis; Consumes 2c.1–2c.3
-- [ ] Step 1: Test schreiben (fail): cli-reference sagt noch „reserved for Phase 2“; README ohne Profil-Abschnitt
-- [ ] Step 2: implementieren
-- [ ] Step 3: Test (pass): `python3 -m pytest tests/test_context_profile_docs.py tests/test_context_report.py -q && python3 scripts/consistency-check.py`
-- [ ] Step 4: commit `docs: publish opt-in compact profile`
+- [x] Step 1: Test schreiben (fail): cli-reference sagt noch „reserved for Phase 2“; README ohne Profil-Abschnitt
+- [x] Step 2: implementieren
+- [x] Step 3: Test (pass): `python3 -m pytest tests/test_context_profile_docs.py tests/test_context_report.py -q && python3 scripts/consistency-check.py`
+- [x] Step 4: commit `docs: publish opt-in compact profile`
 
 ## Paket 2d — Config-Optimizer, Applier, Laufzeit-Leser (IC-24, IC-25, IC-35)
 
