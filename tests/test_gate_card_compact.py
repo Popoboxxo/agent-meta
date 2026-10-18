@@ -30,7 +30,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 
 from lib.config import build_variables, load_config
-from lib.context import _build_managed_block, build_gate_card
+from lib.context import _build_managed_block, _update_managed_html_block, build_gate_card
 from lib.io import SyncError
 from lib.log import SyncLog
 from lib.mcp import (
@@ -246,3 +246,99 @@ def test_compact_entry_over_hard_cap_raises(
             _REPO_ROOT, config, variables, SyncLog(), provider=_PROVIDER,
             provider_config=provider_config, project_root=tmp_path,
         )
+
+
+_NOTES_COMMENT_RE = re.compile(
+    r"<!--\s*\nGeneriert von agent-meta v.*?-->", re.DOTALL
+)
+
+
+def _entry_file_block(
+    provider, profile, project_root, loaded_config, provider_config, capabilities
+):
+    """Render the provider's HTML managed block through the real writer (IC-08).
+
+    ``_update_managed_html_block`` is the single seam that renders
+    ``templates/context/claude-managed.md``; the returned text is the managed
+    block exactly as it lands in the target file.
+    """
+    config = dict(loaded_config)
+    if profile is not None:
+        config["context-profile"] = profile
+    variables = _variables(
+        provider, provider_config, capabilities, project_root, config
+    )
+    pc = provider_config[provider]
+    target = project_root / pc["context_file"]
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(
+        "<!-- agent-meta:managed-begin -->\n<!-- agent-meta:managed-end -->\n",
+        encoding="utf-8",
+    )
+    _update_managed_html_block(
+        target, project_root, variables, SyncLog(), dry_run=False,
+        agent_meta_root=_REPO_ROOT, provider=provider, pc=pc,
+        config=config, provider_config=provider_config,
+    )
+    match = _MANAGED_BLOCK_RE.search(target.read_text(encoding="utf-8"))
+    assert match, f"{provider}: no managed block written"
+    return match.group(0)
+
+
+def test_full_claude_entry_stays_byte_identical(
+    tmp_path, loaded_config, provider_config, capabilities
+):
+    """No opt-in keeps the Claude entry block byte-identical (AC-23, IC-08)."""
+    rendered = _entry_file_block(
+        "Claude", None, tmp_path, loaded_config, provider_config, capabilities
+    )
+    committed = (_REPO_ROOT / "CLAUDE.md").read_text(encoding="utf-8")
+    match = _MANAGED_BLOCK_RE.search(committed)
+    assert match, "committed CLAUDE.md has no managed block"
+    assert rendered.rstrip("\n") == match.group(0).rstrip("\n"), _diff(
+        match.group(0).rstrip("\n"), rendered.rstrip("\n"), "claude-managed(full)"
+    )
+
+
+def test_compact_claude_notes_become_html_comment(
+    tmp_path, loaded_config, provider_config, capabilities
+):
+    """IC-08 (C6): the Claude entry file hides its notes in an HTML comment."""
+    block = _entry_file_block(
+        "Claude", "compact", tmp_path, loaded_config, provider_config, capabilities
+    )
+    assert _NOTES_COMMENT_RE.search(block), (
+        "compact Claude notes are not a block HTML comment:\n" + block
+    )
+
+
+def test_compact_foreign_provider_keeps_notes_visible(
+    tmp_path, loaded_config, provider_config, capabilities
+):
+    """IC-08: a reader without ``strips_html_comments`` keeps them visible."""
+    block = _entry_file_block(
+        "Copilot", "compact", tmp_path, loaded_config, provider_config, capabilities
+    )
+    assert "Generiert von agent-meta v" in block
+    assert _NOTES_COMMENT_RE.search(block) is None, (
+        "foreign provider hid its maintainer notes in an HTML comment:\n" + block
+    )
+
+
+def test_compact_shared_entry_file_keeps_notes_visible(
+    tmp_path, loaded_config, provider_config, capabilities
+):
+    """IC-08: a shared context file (more than one reader) keeps them visible."""
+    config = {**loaded_config, "context-profile": "compact"}
+    config["ai-providers"] = ["Claude", "Copilot"]
+    shared = {
+        **provider_config,
+        "Copilot": {**provider_config["Copilot"], "context_file": "CLAUDE.md"},
+    }
+    block = _entry_file_block(
+        "Claude", "compact", tmp_path, config, shared, capabilities
+    )
+    assert "Generiert von agent-meta v" in block
+    assert _NOTES_COMMENT_RE.search(block) is None, (
+        "shared context file hid its maintainer notes in an HTML comment:\n" + block
+    )

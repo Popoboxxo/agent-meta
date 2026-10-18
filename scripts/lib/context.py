@@ -596,6 +596,45 @@ def _write_dispatch_depth(
         log.action("WRITE", rel, "[agents] max_depth >= required depth")
 
 
+def _managed_notes_as_html_comment(
+    agent_meta_root: Path,
+    config: dict | None,
+    provider: str,
+    provider_config: dict | None,
+) -> bool:
+    """Whether the managed-block maintainer notes may become an HTML comment.
+
+    IC-08 (C6): only a context file whose *sole* reader strips HTML comments
+    before injection (capability ``strips_html_comments``) may hide its
+    maintainer/provenance notes in a ``<!-- … -->`` block; a shared file (more
+    than one reader) never does. Capability-driven via ``merged_caps`` — no
+    provider-name branch. Without the ``compact`` opt-in every render keeps the
+    notes visible, so the output stays byte-identical (AC-23).
+    """
+    from .context_profile import context_profile_variables
+    from .providers import load_provider_capabilities
+    from .rule_channels import merged_caps
+
+    config = config or {}
+    shared_users = _shared_context_users(
+        provider, provider_config, config, tolerate_unknown=True
+    )
+    if len(shared_users) != 1:
+        return False
+    compact = (
+        context_profile_variables(config, provider, shared_users).get(
+            "CONTEXT_PROFILE_COMPACT"
+        )
+        == "true"
+    )
+    if not compact:
+        return False
+    caps = merged_caps(
+        provider, provider_config or {}, load_provider_capabilities(agent_meta_root)
+    )
+    return bool(caps.get("strips_html_comments"))
+
+
 def _update_managed_html_block(
     target_path: Path,
     project_root: Path,
@@ -641,6 +680,16 @@ def _update_managed_html_block(
     _has_dedicated = (pc or {}).get("has_dedicated_context_file", False)
     if _has_dedicated and "AGENT_HINTS_CLAUDE" in variables:
         render_vars = {**variables, "AGENT_HINTS": variables["AGENT_HINTS_CLAUDE"]}
+    render_vars = {
+        **render_vars,
+        "CONTEXT_MANAGED_NOTES_AS_COMMENT": (
+            "true"
+            if _managed_notes_as_html_comment(
+                agent_meta_root, config, provider, provider_config
+            )
+            else "false"
+        ),
+    }
 
     builder = TemplateBuilder(agent_meta_root / "templates" / "context")
     try:
@@ -2066,6 +2115,7 @@ def _shared_context_users(
     provider_config: dict | None,
     config: dict,
     target_name: str | None = None,
+    tolerate_unknown: bool = False,
 ) -> list[str]:
     """Providers that render into the *same physical* context_file as *provider*.
 
@@ -2074,6 +2124,11 @@ def _shared_context_users(
     and let an inactive sharer veto the lazy channel. The rendering provider
     itself always belongs to the set. A non-shared context file yields
     ``[provider]``.
+
+    ``tolerate_unknown`` forwards to :func:`resolve_providers` so callers that
+    pass a synthetic ``provider_config`` (for which the project's ``ai-providers``
+    names are unknown) get the conservative "not shared" answer instead of a
+    raised ``ValueError``; the default keeps the strict historical behavior.
     """
     pc = (provider_config or {}).get(provider, {})
     shared_name = target_name or pc.get("context_file")
@@ -2081,7 +2136,9 @@ def _shared_context_users(
         return [provider]
     from .providers import resolve_providers
 
-    active = set(resolve_providers(config, provider_config))
+    active = set(
+        resolve_providers(config, provider_config, tolerate_unknown=tolerate_unknown)
+    )
     return [
         p for p, cfg in provider_config.items()
         if cfg.get("context_file") == shared_name and (p in active or p == provider)
