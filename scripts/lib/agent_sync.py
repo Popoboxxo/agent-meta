@@ -522,6 +522,12 @@ def _build_provider_vars(
         # never as a crashed sync.
         'INTENT_ROUTING_TOOLS': (variables.get('_INTENT_ROUTING_TOOL_DEFS') or {}).get(provider, ''),
     }
+    # IC-02/IC-03 (AC-30): per-provider context-profile values resolved in
+    # build_variables; the core CONTEXT_PROFILE/CONTEXT_PROFILE_COMPACT values
+    # are only the full/false fallback.
+    provider_vars.update(
+        (variables.get('_PROVIDER_CONTEXT_PROFILE_VARS') or {}).get(provider, {})
+    )
     if config is not None:
         # Feature A (M2): flags and SUBAGENT_PERMISSIONS_BLOCK travel together
         # from one resolver, so the orchestrator block can never diverge from

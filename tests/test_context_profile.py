@@ -18,6 +18,7 @@ sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 
 from lib.context_profile import (
     ResolvedContextProfile,
+    context_profile_log_lines,
     context_profile_provider_variables,
     context_profile_variables,
     resolve_context_profile,
@@ -195,3 +196,76 @@ def test_shared_wrapper_keeps_compact_when_all_sharers_compact():
         "CONTEXT_PROFILE": "compact",
         "CONTEXT_PROFILE_COMPACT": "true",
     }
+
+
+# --- build_variables / provider injection (Task 2a.3) -------------------
+
+
+def _build_variables(config):
+    from lib.config import build_variables
+
+    return build_variables(config, _REPO_ROOT, _REPO_ROOT)
+
+
+def _build_provider_vars(provider, variables, config):
+    from lib.agent_sync import _build_provider_vars
+
+    from lib.providers import load_providers_config
+
+    pcs = load_providers_config(_REPO_ROOT)
+    return _build_provider_vars(pcs[provider], provider, variables, _REPO_ROOT, config)
+
+
+def test_core_variables_default_to_full_and_false():
+    variables, _unmapped = _build_variables(_config())
+    assert variables["COMPACT_MODE"] == "false"
+    assert variables["CONTEXT_PROFILE"] == "full"
+    assert variables["CONTEXT_PROFILE_COMPACT"] == "false"
+
+
+def test_core_variables_compact_profile_sets_flag():
+    variables, _unmapped = _build_variables(_config(**{"context-profile": "compact"}))
+    assert variables["COMPACT_MODE"] == "true"
+    assert variables["CONTEXT_PROFILE"] == "compact"
+    assert variables["CONTEXT_PROFILE_COMPACT"] == "true"
+
+
+def test_provider_injection_affects_only_override_provider():
+    config = _config(
+        **{"provider-overrides": {"Opencode": {"context-profile": "compact"}}}
+    )
+    variables, _unmapped = _build_variables(config)
+    assert variables["_PROVIDER_CONTEXT_PROFILE_VARS"]["Opencode"] == {
+        "CONTEXT_PROFILE": "compact",
+        "CONTEXT_PROFILE_COMPACT": "true",
+    }
+    opencode = _build_provider_vars("Opencode", variables, config)
+    claude = _build_provider_vars("Claude", variables, config)
+    assert opencode["CONTEXT_PROFILE"] == "compact"
+    assert opencode["CONTEXT_PROFILE_COMPACT"] == "true"
+    assert claude["CONTEXT_PROFILE"] == "full"
+    assert claude["CONTEXT_PROFILE_COMPACT"] == "false"
+
+
+def test_flag_is_whitelisted_in_rules_path():
+    from lib.variables import strip_inactive_conditional_blocks
+
+    text = "A{{#if CONTEXT_PROFILE_COMPACT}}B{{else}}C{{/if}}D"
+    assert strip_inactive_conditional_blocks(
+        text, {"CONTEXT_PROFILE_COMPACT": "true"}
+    ) == "ABD"
+    assert strip_inactive_conditional_blocks(
+        text, {"CONTEXT_PROFILE_COMPACT": "false"}
+    ) == "ACD"
+    # Absent flag must read as inactive (opt-in safe default).
+    assert strip_inactive_conditional_blocks(text, {}) == "ACD"
+
+
+def test_log_line_names_resolved_values_and_source():
+    config = _config(**{"context-profile": "compact", "context_file": {"mode": "full"}})
+    lines = context_profile_log_lines(config, ["Claude"])
+    assert lines == [
+        "context-profile: Claude profile=compact mode=full preset=default "
+        "(sources: context_file_mode=explicit, profile=profile, "
+        "rules_preset=default)"
+    ]

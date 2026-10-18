@@ -38,7 +38,13 @@ _VALID_SUBAGENT_PERMISSION_MODES: frozenset[str] = frozenset({"strict", "warn", 
 #: only active when the canonical core is rendered in ``per-provider``
 #: topology (SPEC-CONTEXT-FILE-MODES-2026-09-13, AC-23) and must never leak
 #: into the shared/``unified`` or provider-native rules render by omission.
-_FALSE_DEFAULT_CONDITIONALS: frozenset[str] = frozenset({"GATE_NEUTRAL"})
+# Context-profile flag (IC-03): opt-in, so an absent value must read as
+# inactive — otherwise a bare {{#if CONTEXT_PROFILE_COMPACT}} would leak into
+# the render path everywhere the provider injection is not applied.
+_FALSE_DEFAULT_CONDITIONALS: frozenset[str] = frozenset({
+    "GATE_NEUTRAL",
+    "CONTEXT_PROFILE_COMPACT",
+})
 
 # Only these are safe as {{#if}} conditionals: strip_inactive_conditional_blocks
 # treats every value except the literal "false" as active, so a mode STRING
@@ -300,6 +306,10 @@ def strip_inactive_conditional_blocks(text: str, variables: dict) -> str:
     conditional_vars.update({k for k in variables if k in ("ORCHESTRATOR_ENABLED", "ORCHESTRATOR_STRICT", "DIRECT_DISPATCH_ENABLED", "UNKNOWN_FALLBACK_ASK_USER", "UNKNOWN_FALLBACK_META_FEEDBACK", "UNKNOWN_FALLBACK_MAIN_CHAT", "A2A_PROTOCOL_ENABLED", "ORCHESTRATOR_OUTCOME_CACHING", "CHECKPOINTING_ENABLED", "NATIVE_EXTENSIONS_ENABLED", "NATIVE_EXTENSIONS_WHITELIST_ACTIVE", "ANALYSIS_ENABLED", "FILE_BASED_AGENTS", "AUTO_COMMIT_ENABLED", "PROGRESS_CHAT_PUSH_ENABLED", "SPEC_PLAN_WORKFLOW_ENABLED", "ROUTE_INTENT_CALLABLE")})
     # IC-05: mutually-exclusive runtime-gate tiers are strippable conditionals.
     conditional_vars.update({"GATE_ENFORCED", "GATE_PARTIAL", "GATE_ADVISORY", "GATE_NEUTRAL"})
+    # IC-03: the opt-in context-profile flag. Whitelisted so profile
+    # conditionals in agents/context templates resolve; source rules/ must
+    # never use it (context-profile.marker-in-rule, ERROR).
+    conditional_vars.update({"CONTEXT_PROFILE_COMPACT"})
     conditional_vars.update({k for k in variables if k.startswith("ORCH_MODE_")})
     conditional_vars.update({k for k in variables if k.startswith("REPO_CONTAINMENT_")})
     conditional_vars.update({k for k in variables if k.startswith("SUBAGENT_PERMISSIONS_")})

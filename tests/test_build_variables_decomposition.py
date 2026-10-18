@@ -66,6 +66,23 @@ def test_build_core_variables_compact_mode_default_false():
     assert variables["COMPACT_MODE"] == "false"
 
 
+def test_build_core_variables_context_profile_defaults():
+    variables = {}
+    _build_core_variables(variables, _base_config(), AGENT_META_ROOT, None)
+    assert variables["CONTEXT_PROFILE"] == "full"
+    assert variables["CONTEXT_PROFILE_COMPACT"] == "false"
+
+
+def test_build_core_variables_context_profile_compact():
+    config = _base_config()
+    config["context-profile"] = "compact"
+    variables = {}
+    _build_core_variables(variables, config, AGENT_META_ROOT, None)
+    assert variables["COMPACT_MODE"] == "true"
+    assert variables["CONTEXT_PROFILE"] == "compact"
+    assert variables["CONTEXT_PROFILE_COMPACT"] == "true"
+
+
 # --- _build_provider_variables -----------------------------------------------
 
 def test_build_provider_variables_sets_agents_dir_and_ai_provider():

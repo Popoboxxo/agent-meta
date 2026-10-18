@@ -22,7 +22,7 @@ effect (the provider-injection seam lives in ``config.py`` / ``agent_sync.py``).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Iterable, Literal, Mapping
+from typing import Dict, Iterable, List, Literal, Mapping
 
 ProfileValue = Literal["full", "compact"]
 SourceValue = Literal["explicit", "provider-override", "profile", "default"]
@@ -158,6 +158,27 @@ def context_profile_provider_variables(config: dict, provider: str) -> Dict[str,
     """Return ``CONTEXT_PROFILE``/``CONTEXT_PROFILE_COMPACT`` for ``provider``."""
     resolved = resolve_context_profile(config, provider)
     return _variables_for(resolved.profile)
+
+
+def context_profile_log_lines(config: dict, providers: Iterable[str]) -> List[str]:
+    """One INFO summary line per provider (AC-29).
+
+    Format: ``context-profile: <P> profile=<…> mode=<…> preset=<…>
+    (sources: <setting>=<source>, …)``. The provenance makes ``source=explicit``
+    (``context_file.mode``) visible in ``sync.log``.
+    """
+    lines: List[str] = []
+    for provider in providers:
+        resolved = resolve_context_profile(config, provider)
+        sources = ", ".join(
+            f"{key}={resolved.sources[key]}" for key in sorted(resolved.sources)
+        )
+        lines.append(
+            f"context-profile: {provider} profile={resolved.profile} "
+            f"mode={resolved.context_file_mode} preset={resolved.rules_preset} "
+            f"(sources: {sources})"
+        )
+    return lines
 
 
 def context_profile_variables(

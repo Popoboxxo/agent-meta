@@ -79,6 +79,8 @@ _BUILTIN_VARS: frozenset[str] = frozenset({
     "A2A_T_SIZE_LIMIT", "A2A_T_SIZE_LIMIT_TOKENS", "A2A_MAX_DEPTH",
     # Context density flag (derived from context_file.mode by build_variables, issue #540)
     "COMPACT_MODE",
+    # Context-profile axis (IC-02/IC-03): resolved per provider, opt-in.
+    "CONTEXT_PROFILE", "CONTEXT_PROFILE_COMPACT",
 
     "SPEC_PLAN_WORKFLOW_ENABLED", "SPEC_PLAN_SPECS_DIR", "SPEC_PLAN_PLANS_DIR",
 

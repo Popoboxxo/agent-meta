@@ -15,6 +15,11 @@ from .agents import (
     build_agent_table,
     build_routing_tool_definitions_for_providers,
 )
+from .context_profile import (
+    context_profile_log_lines,
+    context_profile_provider_variables,
+    resolve_context_profile,
+)
 from .io import SyncError, _load_yaml_or_json, _write_yaml, load_yaml_file
 from .log import SyncLog
 from .variables import (  # re-exported for callers/tests (Issue #565)
@@ -1401,11 +1406,24 @@ def _build_core_variables(
     # project.yaml (context_file.mode is the canonical source). Consumed by
     # generated context templates via {{#if COMPACT_MODE}}, resolved against
     # the variables dict by TemplateBuilder.resolve_conditionals().
-    _context_file_cfg = config.get("context_file", {})
-    _context_mode = (
-        _context_file_cfg.get("mode") if isinstance(_context_file_cfg, dict) else None
+    # COMPACT_MODE / CONTEXT_PROFILE (issue #540 + IC-02): derived from the
+    # resolved context profile. The core builder is provider-agnostic, so the
+    # global resolution (empty provider => no provider-override) is the
+    # fallback here; the per-provider values are injected by
+    # agent_sync._build_provider_vars via variables["_PROVIDER_CONTEXT_PROFILE_VARS"]
+    # (AC-30). Placed AFTER the user-variables loop so this derived value always
+    # wins over a stale variables.COMPACT_MODE / variables.CONTEXT_PROFILE entry
+    # in project.yaml (context_file.mode / context-profile are the canonical
+    # sources). With no opt-in key every value is the full/false fallback, so
+    # renders stay byte-identical to the Phase-1 goldens (AC-01/AC-23).
+    _global_profile = resolve_context_profile(config, "")
+    variables["COMPACT_MODE"] = (
+        "true" if _global_profile.context_file_mode == "compact" else "false"
     )
-    variables["COMPACT_MODE"] = "true" if _context_mode == "compact" else "false"
+    variables["CONTEXT_PROFILE"] = _global_profile.profile
+    variables["CONTEXT_PROFILE_COMPACT"] = (
+        "true" if _global_profile.profile == "compact" else "false"
+    )
     return unmapped
 
 
@@ -2225,6 +2243,21 @@ def build_variables(
     # IC-29: INFO lines (e.g. routing.examples-language-fallback) collected during
     # the build; drained into sync.log by _sync_stage_context_checks (no render effect).
     variables["_ROUTING_INFO"] = routing_info
+
+    # IC-02/IC-03 (AC-30): per-provider context-profile values, resolved once
+    # and merged into each provider's variable set in
+    # agent_sync._build_provider_vars (the only place the synced provider name
+    # is known). The INFO summary lines (AC-29) ride the _ROUTING_INFO-style
+    # drain.
+    _profile_providers = resolve_providers(
+        config, load_providers_config(agent_meta_root))
+    variables["_PROVIDER_CONTEXT_PROFILE_VARS"] = {
+        provider: context_profile_provider_variables(config, provider)
+        for provider in _profile_providers
+    }
+    variables["_CONTEXT_PROFILE_INFO"] = context_profile_log_lines(
+        config, _profile_providers)
+
     _build_snippet_variables(variables, agent_meta_root)
     _build_convention_variables(variables, config, agent_meta_root, active_set)
     apply_platform_variable_cascade(variables, config, config.get("platforms", []), agent_meta_root)
