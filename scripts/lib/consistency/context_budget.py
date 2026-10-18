@@ -16,8 +16,8 @@ never through provider names.
 Severity is centralised: ``SPEC_SEVERITY`` holds the level the spec prescribes
 per check, ``PHASE0_SEVERITY`` the Phase-0 level (everything WARNING) and
 ``EMITTED_SEVERITY`` the level actually emitted: Phase 0 plus the checks in
-``PHASE1_PROMOTED`` at their spec level (Task 1.24 and its follow-up:
-``context.dangling-pointer`` and ``context.rule-unreachable`` are ERROR).
+``PHASE1_PROMOTED`` at their spec level: ``context.dangling-pointer`` and
+``context.rule-unreachable`` (Task 1.24) plus ``context-profile.marker-in-rule``.
 ``_warn`` reads ``EMITTED_SEVERITY``; promoting a further check is a
 one-line change in ``PHASE1_PROMOTED``. Sync end stays report-only (ERROR lands
 in the sync.log error list, exit code unchanged); ``--doctor`` exits 1 on an
@@ -69,7 +69,10 @@ PHASE0_SEVERITY = {check: Severity.WARNING for check in SPEC_SEVERITY}
 # ``content_expected`` (surfaces that are empty by design -- skills without
 # lazy rules, MCP without active servers -- are not reported), so there is no
 # false-positive class left that would require a global exemption.
-PHASE1_PROMOTED = frozenset({"context.dangling-pointer", "context.rule-unreachable"})
+PHASE1_PROMOTED = frozenset({
+    "context.dangling-pointer", "context.rule-unreachable",
+    "context-profile.marker-in-rule",
+})
 EMITTED_SEVERITY = {
     check: (SPEC_SEVERITY[check] if check in PHASE1_PROMOTED else level)
     for check, level in PHASE0_SEVERITY.items()
@@ -460,7 +463,7 @@ def check_marker_in_rule(
     capabilities: Mapping[str, Mapping],
     active_set,
 ) -> list:
-    """``context-profile.marker-in-rule``: ``CONTEXT_PROFILE_COMPACT`` in a rule file (IC-03; WARN in Phase 0, spec: ERROR).
+    """``context-profile.marker-in-rule``: ``CONTEXT_PROFILE_COMPACT`` in a rule file (IC-03; ERROR since 2a.4).
 
     Scans rule sources (``<project_root>/rules/**/*.md``) and the generated
     rule directories of the active providers. Native rules must stay

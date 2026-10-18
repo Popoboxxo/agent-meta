@@ -196,7 +196,10 @@ def test_dangling_pointer_clears_once_skills_exist(default_projects, mappings, t
 def test_only_promoted_checks_emit_error(default_projects, mappings):
     assert set(cb.PHASE0_SEVERITY) == set(cb.SPEC_SEVERITY) == set(cb.EMITTED_SEVERITY)
     assert all(level is Severity.WARNING for level in cb.PHASE0_SEVERITY.values())
-    assert cb.PHASE1_PROMOTED == {"context.dangling-pointer", "context.rule-unreachable"}
+    assert cb.PHASE1_PROMOTED == {
+        "context.dangling-pointer", "context.rule-unreachable",
+        "context-profile.marker-in-rule",
+    }
     for check, level in cb.EMITTED_SEVERITY.items():
         expected = cb.SPEC_SEVERITY[check] if check in cb.PHASE1_PROMOTED else Severity.WARNING
         assert level is expected, check
@@ -204,7 +207,9 @@ def test_only_promoted_checks_emit_error(default_projects, mappings):
     for check in ALL_CHECKS:
         for provider, project in default_projects.items():
             for finding in _run(check, project, provider, mappings):
-                assert finding.severity in (Severity.WARNING, Severity.INFO), finding
+                assert finding.severity is cb.EMITTED_SEVERITY[finding.check], finding
+    for provider, project in default_projects.items():
+        assert _run(cb.check_marker_in_rule, project, provider, mappings) == []
 
 
 def test_severity_comes_from_central_table(monkeypatch):
@@ -261,6 +266,8 @@ def test_marker_in_rule_source_and_generated(tmp_path):
     findings = cb.check_marker_in_rule(tmp_path, ["P"], _caps(), None)
     assert [f.file for f in findings] == ["rules/a.md"]
     assert findings[0].check == "context-profile.marker-in-rule"
+    assert findings[0].severity is Severity.ERROR
+    assert cb.COMPACT_MARKER in findings[0].message
 
 
 def test_unread_channel_skills_dir_and_exemption(tmp_path, monkeypatch):
