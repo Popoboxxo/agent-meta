@@ -1397,15 +1397,6 @@ def _build_core_variables(
     variables.setdefault("DEV_COMMANDS", "")
     # MAX_PARALLEL_AGENTS: auto-inject from top-level config field (default: 2)
     variables["MAX_PARALLEL_AGENTS"] = str(config.get("max-parallel-agents", 2))
-    # COMPACT_MODE: boolean flag derived from context_file.mode (issue #540, C1).
-    # True ONLY when context_file.mode == "compact"; a missing key, an invalid
-    # value or a non-mapping context_file block all fall back to full mode —
-    # safe-side default: context compression must be explicitly opted in.
-    # Deliberately placed AFTER the user-variables loop above so this derived
-    # value always wins over any stale variables.COMPACT_MODE entry in
-    # project.yaml (context_file.mode is the canonical source). Consumed by
-    # generated context templates via {{#if COMPACT_MODE}}, resolved against
-    # the variables dict by TemplateBuilder.resolve_conditionals().
     # COMPACT_MODE / CONTEXT_PROFILE (issue #540 + IC-02): derived from the
     # resolved context profile. The core builder is provider-agnostic, so the
     # global resolution (empty provider => no provider-override) is the
@@ -1414,8 +1405,11 @@ def _build_core_variables(
     # (AC-30). Placed AFTER the user-variables loop so this derived value always
     # wins over a stale variables.COMPACT_MODE / variables.CONTEXT_PROFILE entry
     # in project.yaml (context_file.mode / context-profile are the canonical
-    # sources). With no opt-in key every value is the full/false fallback, so
-    # renders stay byte-identical to the Phase-1 goldens (AC-01/AC-23).
+    # sources). Consumed by generated context templates via {{#if COMPACT_MODE}}
+    # / {{CONTEXT_PROFILE}}, resolved against the variables dict by
+    # TemplateBuilder.resolve_conditionals(). With no opt-in key every value is
+    # the full/false fallback, so renders stay byte-identical to the Phase-1
+    # goldens (AC-01/AC-23).
     try:
         _global_profile = resolve_context_profile(config, "")
     except ValueError as exc:

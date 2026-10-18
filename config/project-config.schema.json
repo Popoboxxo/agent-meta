@@ -2513,7 +2513,7 @@
         "properties": {
           "context-profile": {
             "type": "string",
-            "description": "Context-profile override for this provider only. Same enum as the global 'context-profile'. Missing or invalid value inherits the global value (IC-01).",
+            "description": "Context-profile override for this provider only. Same enum as the global 'context-profile'. A missing value (or an explicit null) inherits the global value; any other out-of-enum value is a config error (the sync aborts as 'context-profile.invalid', IC-01).",
             "enum": [
               "full",
               "compact"
