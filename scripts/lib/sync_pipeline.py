@@ -1635,6 +1635,16 @@ def _sync_stage_context_checks(
         providers = resolve_providers(config, provider_config)
         capabilities = merge_provider_mappings(
             provider_config, load_provider_capabilities(agent_meta_root))
+        # IC-36/AC-86: INFO context-profile.unverified per compact provider while
+        # the compact eval has no passing result (rides the _ROUTING_INFO drain).
+        from lib.context_profile import resolve_context_profile
+        from lib.context_profile_gate import context_profile_info_lines
+
+        resolved_profiles = [
+            resolve_context_profile(config, provider) for provider in providers
+        ]
+        for line in context_profile_info_lines(resolved_profiles, agent_meta_root):
+            log.note("context-profile.unverified", line)
         report = None
         try:  # measure once, shared by hard/soft cap checks
             report = measure_artifacts(project_root, providers, capabilities)
