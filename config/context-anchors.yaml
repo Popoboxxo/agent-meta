@@ -15,25 +15,33 @@
 #   "Verwende Conventional Commits (feat, fix, chore).", the Anti-Recursion
 #   sentence) breaks the test on purpose and must be re-anchored consciously.
 # - MCP deny-token anchors (`delete_conclusion`, `set_config`,
-#   `browser_run_code_unsafe`, `workspace.delete`) are deliberately absent until
-#   an MCP-active fixture exists (before profile `compact`, AC-24/QG-3). Today
-#   the registry only protects the heading `# MCP Hard Prohibitions`.
+#   `browser_run_code_unsafe`, `workspace.delete`) are pinned under
+#   `gate-card.compact-only`; they are only rendered when an MCP server is
+#   active, so the compact render uses tests/fixtures/mcp-active (AC-24/QG-3).
+# - The compact-only surfaces live in the shared AGENTS.md managed block (gate
+#   card + one-line agent list, IC-06) and in the Claude maintainer notes (IC-08);
+#   `rules-native` has no compact-only addition, so its list stays empty.
 anchors:
   entry-file:
     all-profiles: []
-    compact-only: []  # empty until Phase 2
+    compact-only:
+      - "- `orchestrator`:"
+      - "- `developer`:"
   claude-md:
     all-profiles:
       - "## Projekt\n\n**Name:**"
       - "## Agenten-Konfiguration\n\n<!-- agent-meta:managed-begin -->"
-    compact-only: []  # empty until Phase 2
+    compact-only:
+      - "<!--\nGeneriert von agent-meta v"
   orchestrator:
     all-profiles:
       - "Singleton-Regel"
       - "STATUS: done"
       - "RESULT: <"
       - "ARTIFACTS:"
-    compact-only: []  # empty until Phase 2
+    compact-only:
+      - "_wf-orchestrator-reference.md"
+      - "<pipeline>.md"
   rules-native:
     all-profiles:
       - "# CRITICAL GATE"
@@ -47,8 +55,23 @@ anchors:
       - "Verwende Conventional Commits (feat, fix, chore)."
     compact-only: []
   gate-card:
-    all-profiles: []  # empty until Phase 2
-    compact-only: []  # empty until Phase 2
+    all-profiles: []
+    compact-only:
+      - "# CRITICAL GATE"
+      - "MAIN CHAT darf nicht selbst editieren"
+      - "## Git Delegation"
+      - "Anti-Recursion: Worker dürfen nicht an `orchestrator` zurück delegieren."
+      - "# Branch-Guard"
+      - "Keine Code-Änderungen direkt auf `main` oder `master`"
+      - "# Commit-Konventionen"
+      - "Verwende Conventional Commits (feat, fix, chore)."
+      - "# Sprachregeln"
+      - "## Enforced Gates (aktiv prüfen — HARD REJECT)"
+      - "Orchestrator-Singleton:"
+      - "# MCP Hard Prohibitions"
+      - "`delete_conclusion`, `set_config`"
+      - "`browser_run_code_unsafe`"
+      - "`workspace.delete`"
 
 # Sections the compact gate-card extracts from source rules (IC-06):
 # <rule-stem>#<heading>

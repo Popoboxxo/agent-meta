@@ -1,0 +1,13 @@
+# First MCP-active fixture (AC-24/QG-3): enables MCP servers whose blocked tools
+# carry the deny tokens the compact gate card must keep visible (`delete_conclusion`,
+# `set_config`, `browser_run_code_unsafe`, `workspace.delete`). Used by
+# tests/test_context_anchors.py for the `compact` provider matrix.
+agent-meta-version: "2.0.0-beta.1"
+ai-providers:
+  - Claude
+dod-preset: rapid-prototyping
+context-profile: compact
+plugins: [honcho, reqogniloom, playwright]
+variables:
+  PROJECT_NAME: mcp-active
+  PROJECT_PREFIX: mcp
