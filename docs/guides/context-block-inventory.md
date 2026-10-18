@@ -130,6 +130,29 @@ Die „Bekannte Grenzen"-Subsektionen (z.B. A2A Z100–107, Branch-Guard Z110–
 Begründungs-Prosa zu den Regeln → bei Kompromittierung kürzbar, Kernregel muss als
 Anchor erhalten bleiben.
 
+#### 4a-i. IC-07-Klassifikation: REFERENCE-Anteile im Skills-Kanal (Paket 2b)
+
+> **Zweck:** dokumentiert die Sektionsklassifikation der vier generischen Rules, deren
+> REFERENCE-Anteil im `compact`-Profil den Managed Block verlässt. **Trace:**
+> `SPEC-CONTEXT-PROFILES-2026-10-11` IC-07 (AC-24 C5, AC-32). **Datenquelle:** die vier
+> Rule-Dateien unter `rules/1-generic/` und die Tabelle `_COMPACT_PLATFORM_RULES`
+> (`scripts/lib/context.py`), Writer `sync_compact_reference_skills`. **Stand:** 2026-10-18.
+>
+> **Wirkung:** nur bei Opt-in `context-profile: compact` **und** wenn jeder Teiler der
+> Kontextdatei Rules über einen gelesenen Skills-Kanal bezieht, werden die
+> REFERENCE-Anteile als `<skills_dir>/<rule>/SKILL.md` geschrieben (Phase-1-Writer).
+> Ohne diesen Kanal bleibt der Volltext embedded (Invariante §4.3). Das Profil bleibt
+> **Opt-in, unverifiziert**: ohne Opt-in ist der Render byte-identisch, und der Sync
+> schreibt die INFO `context-profile.unverified` (AC-86, IC-36 Nr. 3) — keine Doku
+> behauptet eine Verifikation.
+
+| Rule-Datei | INSTRUKTION-Kern (embedded) | REFERENCE-Anteil (Skills-Kanal) |
+|---|---|---|
+| a2a-delegation-gates.md | Titel, „Enforced Gates", „Per-Task-Tier", „Subagent Permission Policy" | „Degradierte Checks", Schema-`payload.t`-Limit, „Runtime-Enforcement-Tier", „Bekannte Grenzen" → `<skills_dir>/a2a-delegation-gates/SKILL.md` |
+| branch-guard.md | Titel + Branch-Pflicht (Preamble) | „Guard-Terminologie", „Bekannte Grenzen" → `<skills_dir>/branch-guard/SKILL.md` |
+| submodule-protection.md | gesamter Regelkörper (keine H2-Sektion) | kein REFERENCE-Anteil — nichts wird verlagert, der Volltext bleibt embedded |
+| security-paved-roads.md | Titel + „Enforcement" | „Block-Katalog" → `<skills_dir>/security-paved-roads/SKILL.md` |
+
 #### 4b. Platform-Rules (`rules/2-platform/agent-meta-*.md`) — Z240–397, ~158 Zeilen
 
 | Rule-Datei | Bereich | Kategorie | Begründung |

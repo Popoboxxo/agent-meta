@@ -139,3 +139,91 @@ def test_changelog_unreleased_documents_the_opt_in_profile():
         "The CHANGELOG entry must reference the planned AC-25 proof (package "
         "2f)."
     )
+
+
+_INVENTORY = _REPO_ROOT / "docs" / "guides" / "context-block-inventory.md"
+
+# The four generic rules whose REFERENCE portion leaves the managed block for
+# the skills channel in the `compact` opt-in (IC-07; 2b.4 implements, 2b.6
+# documents).
+_IC07_REFERENCE_RULES = (
+    "a2a-delegation-gates",
+    "branch-guard",
+    "submodule-protection",
+    "security-paved-roads",
+)
+# Of those, the ones with a removable REFERENCE portion written as
+# ``<skills_dir>/<rule>/SKILL.md``; ``submodule-protection`` has no H2 section,
+# so its whole body stays embedded and no skill is written (2b.4).
+_IC07_SKILLS_CHANNEL_RULES = (
+    "a2a-delegation-gates",
+    "branch-guard",
+    "security-paved-roads",
+)
+
+
+def _inventory_text() -> str:
+    return _INVENTORY.read_text(encoding="utf-8")
+
+
+def _ic07_classification_section() -> str:
+    """The inventory section that classifies the IC-07 REFERENCE rules."""
+    text = _inventory_text()
+    heading = re.search(r"(?m)^#{2,4} .*IC-07.*$", text)
+    assert heading, (
+        "docs/guides/context-block-inventory.md must carry an IC-07 "
+        "classification section (2b.6): the REFERENCE parts moved to the skills "
+        "channel need a documented home."
+    )
+    rest = text[heading.end():]
+    next_heading = re.search(r"(?m)^#{2,4} ", rest)
+    return rest[: next_heading.start()] if next_heading else rest
+
+
+def test_inventory_classifies_the_ic07_reference_rules():
+    section = _normalized(_ic07_classification_section())
+    for rule in _IC07_REFERENCE_RULES:
+        assert rule in section, (
+            f"docs/guides/context-block-inventory.md must classify the "
+            f"REFERENCE rule `{rule}` (IC-07, 2b.6)."
+        )
+    assert "instruktion" in section and "embedded" in section, (
+        "The IC-07 table must state that the INSTRUCTION cores stay embedded."
+    )
+    assert "reference" in section, (
+        "The IC-07 table must classify the removable REFERENCE parts."
+    )
+    for rule in _IC07_SKILLS_CHANNEL_RULES:
+        assert f"{rule}/skill.md" in section, (
+            f"The IC-07 table must route the REFERENCE part of `{rule}` to the "
+            f"skills channel (`<skills_dir>/{rule}/SKILL.md`)."
+        )
+
+
+def test_inventory_keeps_compact_opt_in_and_unverified():
+    lowered = _normalized(_ic07_classification_section())
+    assert "opt-in" in lowered, (
+        "The IC-07 section must keep `compact` opt-in (IC-36 no. 3)."
+    )
+    assert "unverified" in lowered or "unverifiziert" in lowered, (
+        "The IC-07 section must carry the unverified status (AC-86)."
+    )
+    unwrapped = lowered.replace("unverified", "").replace("unverifiziert", "")
+    for claim in ("verified", "validated", "recommended",
+                  "verifiziert", "validiert", "empfohlen"):
+        assert claim not in unwrapped, (
+            f"The IC-07 section must not claim `{claim}` (IC-36 no. 3): "
+            "`compact` stays opt-in and unverified."
+        )
+
+
+def test_changelog_documents_the_compact_render_package():
+    lowered = _normalized(_unreleased_section())
+    assert "package 2b" in lowered, (
+        "CHANGELOG.md [Unreleased] must record package 2b (the compact render "
+        "densification)."
+    )
+    assert "compact" in lowered and "skills" in lowered, (
+        "The 2b entry must name `compact` and the REFERENCE sections delivered "
+        "through the skills channel."
+    )

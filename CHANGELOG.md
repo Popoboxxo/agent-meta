@@ -15,6 +15,17 @@
   requested `compact` is downgraded with one WARN `context-profile.shared-file-downgrade` per
   file (ADR-5). No default flips to `compact`: a missing key or `full` keeps every render
   byte-identical (AC-35).
+- **`compact` render densification (IC-04…IC-08, package 2b, UNVERIFIED)**: with
+  `context-profile: compact` the renders carry the compact routing lines (IC-04; a keyword with
+  `;` or `|` raises a `SyncError`), compacted orchestrator sections (IC-05), a compact gate card
+  plus name-only agent list in the entry file (IC-06), the REFERENCE sections of the four generic
+  rules (`a2a-delegation-gates`, `branch-guard`, `submodule-protection`, `security-paved-roads`,
+  IC-07) moved to the skills channel as `<skills_dir>/<rule>/SKILL.md` — without that channel the
+  full text stays embedded (invariant §4.3) — and CLAUDE.md notes as HTML comments (IC-08). The
+  classification is recorded in `docs/guides/context-block-inventory.md`. The profile stays
+  **opt-in and unverified**: the deterministic parts (AC-24) are asserted hermetically, the
+  role-routing proof (AC-25) is planned in package 2f, a `compact` sync logs INFO
+  `context-profile.unverified` (AC-86), and no default flips to `compact`.
 
 ### Changed
 - **Routing keywords come from a single source (IC-30)**: the orchestrator/rule routing keywords
