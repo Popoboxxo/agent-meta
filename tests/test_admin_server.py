@@ -2127,6 +2127,31 @@ class TestWriteProjectSectionContextFile(unittest.TestCase):
             self.assertEqual(persisted["context_file"], data)
 
 
+class TestWriteProjectSectionContextProfile(unittest.TestCase):
+    """AC-86 (SPEC-CONTEXT-PROFILES-2026-10-11): the opt-in ``context-profile``
+    section (``full``/``compact``, default ``full``) is writable through the
+    guarded partial-update route — an HTTP 400 here would break the Admin UI
+    Save button, which PUTs exactly this section; no new endpoint."""
+
+    def _make_handler(self, root: Path):
+        (root / ".meta-config").mkdir(exist_ok=True)
+        handler = admin_server.AdminRequestHandler.__new__(admin_server.AdminRequestHandler)
+        admin_server.AdminRequestHandler.root = root
+        admin_server.AdminRequestHandler.config_manager = admin_server.ConfigManager(
+            root, mode="project_admin")
+        handler._send_json = lambda result: None
+        return handler
+
+    def test_context_profile_section_write_accepted(self) -> None:
+        self.assertIn("context-profile", admin_server.PROJECT_WRITABLE_SECTIONS)
+        with tempfile.TemporaryDirectory() as tmp:
+            handler = self._make_handler(Path(tmp))
+            handler._read_body = lambda: {"section": "context-profile", "data": "compact"}
+            handler._write_project_section()  # must not raise (HTTP 400 otherwise)
+            persisted = handler.config_manager.read("project")
+            self.assertEqual(persisted["context-profile"], "compact")
+
+
 _OPENCODE_REGISTRY_FIXTURE: dict[str, Any] = {
     "Opencode": {
         "surface-version": "v1",
