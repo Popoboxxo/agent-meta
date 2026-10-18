@@ -1583,6 +1583,12 @@ def sync_context_for_provider(
             platform_vars=platform_vars,
         )
 
+    # IC-07 (Task 2b.4): the compact profile's rule REFERENCE sections reach
+    # providers with a skills channel as <skills_dir>/<rule>/SKILL.md.
+    sync_compact_reference_skills(
+        agent_meta_root, project_root, config, variables, log, dry_run,
+        provider, provider_config,
+    )
     _apply_context_filename_settings(project_root, pc, log, dry_run)
 
 
@@ -1819,33 +1825,110 @@ _COMPACT_PLATFORM_RULES = {
             "Details (Guard-Terminologie: Convention vs. Security Boundary, "
             "bekannte technische Grenzen): `rules/1-generic/branch-guard.md`."
         ),
+        "reference_skill": True,
+    },
+    # IC-07 (Task 2b.4): generic rules with a REFERENCE portion next to their
+    # INSTRUCTION core, classified after docs/guides/context-block-inventory.md
+    # (INSTRUCTION stays embedded, the "Bekannte Grenzen"/detail prose is
+    # reference). `reference_skill` marks the rules whose removed sections are
+    # written as `<skills_dir>/<rule>/SKILL.md` for every sharer with a skills
+    # read channel (sync_compact_reference_skills); without that channel the
+    # full text stays embedded (invariant §4.3). `profile_only` keeps these
+    # entries out of the #540 COMPACT_MODE render: they are opt-in
+    # (`context-profile: compact`) only, so every render without that key stays
+    # byte-identical and no pointer promises a skill nobody wrote.
+    "a2a-delegation-gates": {
+        "keep": (
+            "## Enforced Gates (aktiv prüfen — HARD REJECT)",
+            "## Per-Task-Tier: `payload.tier_override` (optional — Issue #346)",
+            "## Subagent Permission Policy (strict)",
+            "## Subagent Permission Policy (warn)",
+        ),
+        "pointer": (
+            "Details (Degradierte Checks, Schema-erzwungenes `payload.t`-Limit, "
+            "Runtime-Enforcement-Tier, Bekannte Grenzen): "
+            "`<skills_dir>/a2a-delegation-gates/SKILL.md`."
+        ),
+        "reference_skill": True,
+        "profile_only": True,
+    },
+    "submodule-protection": {
+        # No H2 section: the whole rule body is the INSTRUCTION core, so there
+        # is no reference portion to move (entry kept for the IC-07
+        # classification and any future reference section).
+        "keep": (),
+        "pointer": (
+            "Details (Submodul-Lifecycle, `.gitmodules`-Schutz): "
+            "`<skills_dir>/submodule-protection/SKILL.md`."
+        ),
+        "reference_skill": True,
+        "profile_only": True,
+    },
+    "security-paved-roads": {
+        "keep": ("## Enforcement",),
+        "pointer": (
+            "Details (Block-Katalog mit Abdeckung und Eigentümer-Rollen): "
+            "`<skills_dir>/security-paved-roads/SKILL.md`."
+        ),
+        "reference_skill": True,
+        "profile_only": True,
     },
 }
 
 
-def compact_embedded_rule(output_stem: str, content: str) -> str:
-    """Collapse OVERVIEW sections of a known platform rule to a pointer (compact mode).
+def _split_compact_rule(output_stem: str, content: str) -> tuple[str, str]:
+    """Split a classified rule into ``(INSTRUCTION core, REFERENCE text)``.
+
+    The classification comes from ``_COMPACT_PLATFORM_RULES``: the preamble
+    (rule title plus its leading directive) and every H2 section named in
+    ``keep`` are the INSTRUCTION core, every other line the REFERENCE portion
+    (IC-07). Both parts together still carry every line of *content* — the
+    split only decides which part is embedded and which one the skills channel
+    has to deliver.
+    """
+    keep_set = set(_COMPACT_PLATFORM_RULES[output_stem]["keep"])
+    core: list[str] = []
+    reference: list[str] = []
+    keep_current = True  # preamble before the first H2 is always instruction/title
+    for line in content.splitlines():
+        if line.startswith("## "):
+            keep_current = line.strip() in keep_set
+        (core if keep_current else reference).append(line)
+    return "\n".join(core).rstrip(), "\n".join(reference).strip()
+
+
+def compact_embedded_rule(output_stem: str, content: str, *,
+                          profile_compact: bool = False,
+                          skills_channel: bool = True) -> str:
+    """Collapse the REFERENCE sections of a known rule to a pointer (compact mode).
 
     The preamble (content before the first ``## `` heading, including the rule's
     ``# `` title) and every H2 section named in the rule's ``keep`` list survive
     verbatim — these are the INSTRUCTION parts that must stay identical in both
     modes (issue #540 non-goal: density only, no semantic change). All other H2
     sections are dropped and replaced by a single pointer line to the full
-    reference. Rules not in the table pass through unchanged, so full mode (which
-    never calls this) and every other embedded rule are unaffected.
+    reference. Rules not in the table — and rules without a removable section —
+    pass through unchanged, so full mode (which never calls this) and every
+    other embedded rule are unaffected.
+
+    ``profile_compact`` marks the ``context-profile: compact`` render of a rule
+    whose ``reference_skill`` sections leave the block: those sections are only
+    removable when at least one read channel delivers them, which the caller
+    reports as ``skills_channel``. Without it the full text stays embedded
+    (invariant §4.3 — never drop content a provider cannot load). Entries
+    flagged ``profile_only`` are not compacted at all without the profile
+    opt-in, so the #540 render keeps its bytes.
     """
     spec = _COMPACT_PLATFORM_RULES.get(output_stem)
     if not spec:
         return content
-    keep_set = set(spec["keep"])
-    kept: list[str] = []
-    keep_current = True  # preamble before the first H2 is always instruction/title
-    for line in content.splitlines():
-        if line.startswith("## "):
-            keep_current = line.strip() in keep_set
-        if keep_current:
-            kept.append(line)
-    body = "\n".join(kept).rstrip()
+    if spec.get("profile_only") and not profile_compact:
+        return content
+    body, reference = _split_compact_rule(output_stem, content)
+    if not reference:
+        return content
+    if profile_compact and spec.get("reference_skill") and not skills_channel:
+        return content
     return f"{body}\n\n{spec['pointer']}"
 
 
@@ -1978,6 +2061,119 @@ def _enforce_compact_hard_cap(
     )
 
 
+def _shared_context_users(
+    provider: str,
+    provider_config: dict | None,
+    config: dict,
+    target_name: str | None = None,
+) -> list[str]:
+    """Providers that render into the *same physical* context_file as *provider*.
+
+    IC-15 Nr. 1 (F-05): only the sharers the project ACTIVATES count. A
+    catalog-wide set listed the directories of providers the project never uses
+    and let an inactive sharer veto the lazy channel. The rendering provider
+    itself always belongs to the set. A non-shared context file yields
+    ``[provider]``.
+    """
+    pc = (provider_config or {}).get(provider, {})
+    shared_name = target_name or pc.get("context_file")
+    if not (provider_config and shared_name):
+        return [provider]
+    from .providers import resolve_providers
+
+    active = set(resolve_providers(config, provider_config))
+    return [
+        p for p, cfg in provider_config.items()
+        if cfg.get("context_file") == shared_name and (p in active or p == provider)
+    ] or [provider]
+
+
+def sync_compact_reference_skills(
+    agent_meta_root: Path,
+    project_root: Path,
+    config: dict,
+    variables: dict,
+    log: SyncLog,
+    dry_run: bool,
+    provider: str,
+    provider_config: dict | None = None,
+) -> None:
+    """Write the REFERENCE sections of compact-profile rules as skills (IC-07).
+
+    A rule with a REFERENCE portion keeps only its INSTRUCTION core embedded
+    (``compact_embedded_rule``); the removed sections stay reachable because
+    they are written as ``<skills_dir>/<rule>/SKILL.md`` — the Phase-1 writer
+    (:func:`lib.skill_channel.write_skill_channel_rule`) is reused, so the
+    artifact has the same format as every other generated skill.
+
+    The stem is deliberately NOT registered in the lazy skills index: that
+    index's ``universe`` is the set of all rule stems, so the Phase-1 writer's
+    stale cleanup (``rules.sync_embedded_rule_files``) would delete the
+    reference skill of an embedded rule in the same sync — it owns only the
+    rules routed to the channel by ``embed: false`` / ``channel: skill``.
+
+    Only reached with the ``compact`` opt-in and only for a context file whose
+    sharers all read rules as skills (``lazy_skill_channel``): without that
+    channel the render keeps the full text embedded (invariant §4.3) and this
+    writer writes nothing. Rules the Phase-1 writer already owns
+    (``lazy_skill_stems``: ``embed: false`` / ``channel: skill``) are skipped so
+    no stem is written twice; a rule without a removable reference section
+    writes nothing.
+    """
+    from .context_profile import context_profile_variables
+    from .rule_channels import lazy_skill_channel, provider_channel_caps
+    from .rules import (
+        collect_rule_sources,
+        lazy_skill_stems,
+        provider_opts_skip,
+        resolve_rules,
+    )
+    from .skill_channel import write_skill_channel_rule
+
+    pc = (provider_config or {}).get(provider, {})
+    skills_dir_rel = pc.get("skills_dir")
+    if not skills_dir_rel:
+        return
+    shared_users = _shared_context_users(provider, provider_config, config)
+    if context_profile_variables(config, provider, shared_users)[
+        "CONTEXT_PROFILE_COMPACT"
+    ] != "true":
+        return
+    sharer_caps = provider_channel_caps(agent_meta_root, provider_config or {}, shared_users)
+    if not all(lazy_skill_channel(caps) for caps in sharer_caps.values()):
+        return
+
+    rule_options = resolve_rules(config, agent_meta_root)
+    already_written = lazy_skill_stems(
+        agent_meta_root, project_root, config, provider, sharer_caps[provider]
+    )
+    skills_target_dir = project_root / skills_dir_rel
+    for source_path, output_name in collect_rule_sources(
+        agent_meta_root, config.get("platforms", []), config=config
+    ):
+        rule_stem = Path(output_name).stem
+        if not _COMPACT_PLATFORM_RULES.get(rule_stem, {}).get("reference_skill"):
+            continue
+        if rule_stem in already_written:
+            continue
+        opts = rule_options.get(rule_stem, {})
+        if all(provider_opts_skip(opts, user) for user in shared_users):
+            continue
+        layer = source_path.parts[-2]
+        rel_source = f"rules/{layer}/{source_path.name}"
+        content = substitute(
+            source_path.read_text(encoding="utf-8"), variables, rel_source, log
+        )
+        content = strip_inactive_conditional_blocks(content, variables)
+        _core, reference = _split_compact_rule(rule_stem, content)
+        if not reference:
+            continue
+        write_skill_channel_rule(
+            rule_stem, reference, opts, skills_target_dir, project_root, log,
+            dry_run, rel_source,
+        )
+
+
 def _build_managed_block(
     agent_meta_root: Path,
     config: dict,
@@ -2013,20 +2209,10 @@ def _build_managed_block(
     # on which shared provider happens to sync last, and each sync overwrites
     # the other's version forever (issue #638: infinite oscillation, permanent
     # false "out of sync" on --check).
-    # IC-15 Nr. 1 (F-05): only the sharers this project ACTIVATES count. A
-    # catalog-wide set listed the directories of providers the project never
-    # uses and let an inactive sharer veto the lazy channel. The rendering
-    # provider itself always belongs to the set.
-    shared_users = [provider]
+    shared_users = _shared_context_users(
+        provider, provider_config, config, target_name=target_name
+    )
     shared_name = target_name or pc.get("context_file")
-    if provider_config and shared_name:
-        from .providers import resolve_providers
-
-        _active = set(resolve_providers(config, provider_config))
-        shared_users = [
-            p for p, cfg in provider_config.items()
-            if cfg.get("context_file") == shared_name and (p in _active or p == provider)
-        ] or [provider]
 
     # Native rules (pointer instead of embedding) only when EVERY sharer reads
     # its generated rules directory (rules_read_channels, spec §4.3) -- a
@@ -2185,6 +2371,11 @@ def _build_managed_block(
         # Native rule artifacts (.claude/rules/*, skills) stay full — they are
         # lazy-loaded and not part of the always-on context footprint.
         _global_compact = local_vars.get("COMPACT_MODE") == "true"
+        # IC-07 (Task 2b.4): the profile render moves the REFERENCE sections of
+        # the classified rules into the skills channel, so their removability
+        # is bound to that channel (below). Effective, shared-file-downgraded
+        # value (see context_profile_variables above).
+        _profile_compact = local_vars.get("CONTEXT_PROFILE_COMPACT") == "true"
         # shared_users holds only the active sharers (IC-15 Nr. 1), so the
         # plugin compact decision is scoped to providers that can actually
         # render (and thus lose content into) this physical file.
@@ -2258,7 +2449,24 @@ def _build_managed_block(
                 # Deliberately on the global flag, not the provider-aware
                 # `_compact` below -- this is agent-meta's own always-on rule
                 # density, not the plugin lazy-channel-loss bug (#638-adjacent).
-                rule_content = compact_embedded_rule(Path(output_name).stem, rule_content)
+                if _profile_compact and not rules_file_channel:
+                    spec = _COMPACT_PLATFORM_RULES.get(rule_stem, {})
+                    if spec.get("reference_skill") and _split_compact_rule(
+                        rule_stem, rule_content
+                    )[1]:
+                        # IC-07 (Task 2b.4): a REFERENCE portion that no read
+                        # channel can deliver stays embedded in full instead of
+                        # pointing at a skill nobody writes (invariant §4.3).
+                        log.warn(
+                            "context.rule-reference-fallback: rule "
+                            f"'{rule_stem}' keeps its full text embedded — no read "
+                            "skills channel for its REFERENCE sections (spec 4.3)"
+                        )
+                rule_content = compact_embedded_rule(
+                    Path(output_name).stem, rule_content,
+                    profile_compact=_profile_compact,
+                    skills_channel=rules_file_channel,
+                )
             # IC-15 Nr. 12: a lazy-skill table lists only skills that exist for
             # EVERY active sharer; a table without any such skill is not embedded.
             if has_skill_table(rule_content):
