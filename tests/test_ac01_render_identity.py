@@ -155,6 +155,14 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   providers = 45), 9 ``generated-file-hashes.json`` and 1
   ``Copilot/.github/copilot-instructions.md`` — 55 of 1007 hashes; 0 added/removed.
   ``knowledge-migrator`` is not rendered in the matrix. No other artifact changed.
+- Task 11 (2b.2, IC-05, AC-23): the orchestrator template §2a, §9 and the ``<context>``
+  agent table are wrapped in ``{{#if CONTEXT_PROFILE_COMPACT}}…{{else}}…{{/if}}`` (minor
+  bump 8.5.1 -> 8.6.0). The ``{{else}}`` branch is the unchanged text, so without the
+  ``context-profile`` opt-in every render only differs by the version bump in the
+  orchestrator artifact. Changed: the 9 per-provider orchestrator artifacts
+  (``orchestrator.md``/``.toml``/``.agent.md``) plus the 9
+  ``generated-file-hashes.json`` (18 of 1003 hashes; 0 added/removed). No other
+  artifact changed.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

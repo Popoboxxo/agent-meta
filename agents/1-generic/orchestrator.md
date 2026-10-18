@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "8.5.1"
+version: "8.6.0"
 description: "Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes, delegates."
 hint: "Entry point for ALL development tasks — decomposes complex tasks and dispatches in parallel"
 prompt_mode: modern
@@ -81,9 +81,13 @@ Signal → confirmation (NO auto-run) → pipeline or ad-hoc. Do not suggest dis
 
 ## 2a. Pipeline stage detail
 
+{{#if CONTEXT_PROFILE_COMPACT}}
+Per-pipeline stage detail (agent, mode, loop/fanout/plan-driven/approval-gate specifics) → read `{{PIPELINE_DETAILS_DIR}}/<pipeline>.md` before dispatching a matched pipeline's stages.
+{{else}}
 Full stage-by-stage instructions per pipeline (agent, mode, loop/fanout/plan-driven/approval-gate specifics) — consult before dispatching a matched pipeline's stages:
 
 {{PIPELINE_DETAIL_BLOCKS}}
+{{/if}}
 
 **Plan-driven gate:** Wenn die gematchte Pipeline `plan-driven`-Stages enthält
 {{#if PIPELINE_FEATURE_LIFECYCLE_ENABLED}}(z.B. `feature-lifecycle` → Stage `implement`), {{/if}}und KEIN Plan existiert:
@@ -248,11 +252,19 @@ Artifact pattern for output >200 lines: subagent writes to an artifact directory
 REPEAT_UNTIL(gen, critic, max). Supersession: `history[]` holds IDs only.
 
 ## 9. Context guard & checkpointing
+{{#if CONTEXT_PROFILE_COMPACT}}
+After >5 delegations: summarize in 2–3 sentences.
+
+{{CHECKPOINTING_BLOCK}}
+
+**Summarization-as-a-Contract (issue #267):** rationale, checkpoint format and harness enforcement → read `{{AGENT_META_REL_PATH}}agents/1-generic/_wf-orchestrator-reference.md` when needed.
+{{else}}
 After >5 delegations: summarize in 2–3 sentences.
 
 {{CHECKPOINTING_BLOCK}}
 
 **Summarization-as-a-Contract (issue #267):** Each worker returns ONLY its compact summary — the STATUS/RESULT/ARTIFACTS block. Raw output (logs, diffs, verbose tool output) is archived under `.meta-viz/checkpoints/<session-id>/` via `CheckpointStore.save_raw_output` and comes back as a `checkpoint_ref` pointer. Never re-request raw output into the context to "double-check" — read the referenced file only when details are actually needed. Enforced harness-side by `scripts/lib/orchestration.py` (issue #265): barrier entries carry `summary` + `checkpoint_ref` only; raw output is never re-rendered into the orchestrator context.
+{{/if}}
 
 ## 10. Delegation failure recovery
 Error responses (permission, timeout, out-of-scope, multi-failure, partial)
@@ -293,11 +305,15 @@ Pattern catalog (Single Feature, Multi-Bug, Mixed, Refactoring, Analysis+Design)
 
 **Model tier:** nano (trivial) | fast (Git/Meta) | balanced (default) | powerful (architecture/security) | max (only with justification)
 
+{{#if CONTEXT_PROFILE_COMPACT}}
+**Agent table (names only):** {{ACTIVE_ROLES}}
+{{else}}
 **Agent table:**
 <!-- agent-meta:managed-begin -->
 {{AGENT_DELEGATION_TABLE}}
 Parallel: max {{MAX_PARALLEL_AGENTS}}. Not parallel: tester↔developer, code-reviewer→git, requirements→tester.
 <!-- agent-meta:managed-end -->
+{{/if}}
 
 {{PROJECT_SPECIFIC_AGENTS}}
 
