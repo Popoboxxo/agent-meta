@@ -2503,6 +2503,33 @@
         }
       },
       "additionalProperties": false
+    },
+    "provider-overrides": {
+      "type": "object",
+      "description": "Top-level per-provider overrides (SPEC-CONTEXT-PROFILES-2026-10-11, IC-01). Keys are provider names; currently only 'context-profile' is supported per provider. Providers without an entry (or without 'context-profile' set) inherit the global 'context-profile'. Resolution: explicit sub-setting > provider override > global profile > default.",
+      "additionalProperties": {
+        "type": "object",
+        "description": "Per-provider context-profile override.",
+        "properties": {
+          "context-profile": {
+            "type": "string",
+            "description": "Context-profile override for this provider only. Same enum as the global 'context-profile'. Missing or invalid value inherits the global value (IC-01).",
+            "enum": [
+              "full",
+              "compact"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "context-profile": {
+      "type": "string",
+      "description": "Opt-in context-density profile (SPEC-CONTEXT-PROFILES-2026-10-11, IC-01). 'full' = byte-identical Phase-1 render (safe-side default). 'compact' = instruction-preserving compressed output, opt-in and unverified. The missing key always resolves to 'full'; the default is virtual and never persisted by fill_defaults (safe-side default: compression must be explicitly opted in).",
+      "enum": [
+        "full",
+        "compact"
+      ]
     }
   },
   "required": [

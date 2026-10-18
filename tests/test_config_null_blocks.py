@@ -52,6 +52,7 @@ _MAPPING_BLOCKS = [
     "gitignore",
     "drift-detection",
     "context_file",
+    "provider-overrides",
     "lifecycle-triggers",
     "mcp-registry",
     "plugin-catalog",

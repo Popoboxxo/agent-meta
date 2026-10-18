@@ -301,3 +301,12 @@ variables:
 #     whitelist: []          # empty = no filter. Non-empty = allow-only:
 #                            # only listed Skills/Plugins may run, everything else is blocked
 #                            # regardless of `enabled`. Example: ["superpowers", "code-simplifier"]
+
+# Context-Profil (Opt-in, unverifiziert; SPEC-CONTEXT-PROFILES-2026-10-11, IC-01).
+# "full" (Default, Render byte-identisch) oder "compact" (Verdichtung, nur mit Opt-in).
+# context-profile: compact
+#
+# Profil je Provider (überschreibt den globalen Wert nur für diesen Provider):
+# provider-overrides:
+#   Opencode:
+#     context-profile: compact
