@@ -1408,7 +1408,8 @@ def _handle_sync(ctx: _SyncContext) -> None:
     # or render effect.
     _sync_stage_context_checks(
         ctx.agent_meta_root, ctx.project_root, config, ctx.active_set, ctx.log,
-        info_messages=(ctx.variables or {}).get("_ROUTING_INFO"))
+        info_messages=(ctx.variables or {}).get("_ROUTING_INFO"),
+        profile_info_messages=(ctx.variables or {}).get("_CONTEXT_PROFILE_INFO"))
     # Stage 15: version bookkeeping (#720) -- write the actually-deployed
     # agent-meta version back into project.yaml so it never silently drifts
     # behind a submodule upgrade.
