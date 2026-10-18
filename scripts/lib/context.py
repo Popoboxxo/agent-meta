@@ -1970,6 +1970,35 @@ def _build_managed_block(
         for p in shared_users:
             local_vars[f"PLATFORM_{p.upper()}"] = True
 
+    # IC-02/AC-30 (2a.6): one context profile per physical context file. A file
+    # shared by several ACTIVE providers renders 'full' as soon as one sharer
+    # resolves to 'full' (ADR-5); a requested 'compact' is downgraded with a
+    # single WARN per file. resolve_shared_file_profile decides over ALL active
+    # sharers, so provider-overrides.<P>=compact only survives while P is the
+    # sole active sharer. The wrapper also covers the single-provider case
+    # (shared_users == [provider]), where its result equals the per-provider
+    # value injected by agent_sync._build_provider_vars.
+    from .context_profile import (
+        context_profile_variables,
+        resolve_context_profile,
+        resolve_shared_file_profile,
+    )
+
+    local_vars.update(context_profile_variables(config, provider, shared_users))
+    _profile_users = sorted(set(shared_users) | {provider})
+    if len(_profile_users) > 1:
+        _profiles = [resolve_context_profile(config, p) for p in _profile_users]
+        if resolve_shared_file_profile(_profiles) == "full":
+            _compact = sorted(p.provider for p in _profiles if p.profile == "compact")
+            if _compact:
+                # Identical for every rendering sharer -> log.warn dedups it to
+                # exactly one message per physical file.
+                log.warn(
+                    "context-profile.shared-file-downgrade: shared context file "
+                    f"'{shared_name}' renders profile 'full'; 'compact' requested "
+                    "by: " + ", ".join(_compact)
+                )
+
     from .providers import context_topology
 
     # ``per-provider``: the canonical core is read by several providers, so it
