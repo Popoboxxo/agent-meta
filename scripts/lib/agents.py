@@ -17,6 +17,7 @@ from .frontmatter import (
     extract_frontmatter_field,
     target_filename,
 )
+from .io import SyncError
 
 if TYPE_CHECKING:
     from .active_set import ActiveSet
@@ -344,6 +345,151 @@ def build_routing_tool_definition(
     }
 
 
+# ---------------------------------------------------------------------------
+# Compact routing lines (IC-04, SPEC-CONTEXT-PROFILES-2026-10-11)
+# ---------------------------------------------------------------------------
+#
+# Active ONLY under ``context-profile: compact`` AND ROUTE_INTENT_CALLABLE=false;
+# otherwise the json / yaml_text_block render stays byte-identical (AC-01/AC-35).
+# Provider selection is config/capability driven (resolved context profile +
+# ``route_intent_tool`` capability) — never a provider-name branch.
+#
+# Deliberate deviation (C2 precedence, plan Task 2b.1): there is NO compact
+# branch for ``PIPELINE_MATCH_TABLE`` — the §2 pipeline table stays verbatim
+# under ``compact``. The IC-04 "single-source" clause is revisable only after the
+# 2f eval, so it is intentionally not implemented here.
+
+# Field separators the line grammar reserves: keywords use ";", fields use "|".
+_ROUTING_LINE_FIELD_SEPARATORS = (";", "|")
+
+
+def select_routing_examples(rule: dict) -> list[str]:
+    """IC-04: the first example plus every later example without an own keyword.
+
+    The examples arrive already language-selected (``get_routing_rules`` →
+    ``_select_examples``, project language); keywords stay canonical. An example
+    that repeats one of the role's own keywords (case-insensitive substring)
+    adds no routing signal beyond the keyword and is dropped.
+    """
+    examples = [str(example) for example in (rule.get("examples") or [])]
+    if not examples:
+        return []
+    keywords = [str(k).casefold() for k in (rule.get("keywords") or []) if str(k)]
+    selected = [examples[0]]
+    for example in examples[1:]:
+        folded = example.casefold()
+        if not any(keyword in folded for keyword in keywords):
+            selected.append(example)
+    return selected
+
+
+def _routing_line_flags(rule: dict, name_only_agents: set[str]) -> str:
+    """Flags only when non-default, fixed order: ``req``, ``rec``, ``orch-only``,
+    ``name-only``; empty renders as the empty field (``||``)."""
+    flags = []
+    tier = rule.get("tier", "optional")
+    if tier == "required":
+        flags.append("req")
+    elif tier == "recommended":
+        flags.append("rec")
+    if rule.get("orchestrator_only"):
+        flags.append("orch-only")
+    if rule.get("agent") in name_only_agents or rule.get("addressability") == "name_only":
+        flags.append("name-only")
+    return ",".join(flags)
+
+
+def _routing_name_only_entries(name_index: list[dict]) -> list[dict]:
+    """The ``name_only`` roles of a routing name index (agent + reason)."""
+    return [
+        {"agent": entry.get("agent", ""), "reason": entry.get("name_only_reason", "")}
+        for entry in name_index
+        if entry.get("addressability") == "name_only"
+    ]
+
+
+def _guard_routing_keyword(target: str, keyword: str) -> None:
+    """Fail closed on a keyword the compact line format cannot represent."""
+    for separator in _ROUTING_LINE_FIELD_SEPARATORS:
+        if separator in keyword:
+            raise SyncError(
+                f"compact routing line: {target} keyword {keyword!r} contains "
+                "a line separator (';' or '|')"
+            )
+
+
+def render_routing_lines(
+    rules: list[dict], pipelines: list[dict], name_only: list[dict]
+) -> str:
+    """Render the IC-04 compact routing line block (opt-in ``compact`` profile).
+
+    Line forms, deterministic and sorted by name (byte-stability):
+
+    - ``<agent>|<flags>|<kw1>;<kw2>|<example>[/<example>]`` per keyword rule,
+    - ``pipeline:<name>|<signal_keywords>`` per pipeline route,
+    - one ``name-only: <agent> (<reason>); …`` line for the name-only roles.
+
+    Returns "" when there is nothing to render.
+
+    Raises:
+        SyncError: when a keyword contains ``;`` or ``|`` (the message names the
+            role / pipeline and the offending keyword — AC-31).
+    """
+    name_only_agents = {str(entry.get("agent", "")) for entry in name_only}
+    lines: list[str] = []
+    for rule in sorted(rules, key=lambda entry: str(entry.get("agent", ""))):
+        agent = str(rule.get("agent", ""))
+        keywords = [str(keyword) for keyword in (rule.get("keywords") or [])]
+        for keyword in keywords:
+            _guard_routing_keyword(f"role '{agent}'", keyword)
+        lines.append(
+            "|".join([
+                agent,
+                _routing_line_flags(rule, name_only_agents),
+                ";".join(keywords),
+                "/".join(select_routing_examples(rule)),
+            ])
+        )
+    for pipeline in sorted(pipelines, key=lambda entry: str(entry.get("pipeline", ""))):
+        name = str(pipeline.get("pipeline", ""))
+        keywords = [str(keyword) for keyword in (pipeline.get("keywords") or [])]
+        for keyword in keywords:
+            _guard_routing_keyword(f"pipeline '{name}'", keyword)
+        lines.append(f"pipeline:{name}|{';'.join(keywords)}")
+    if name_only:
+        entries = sorted(
+            (
+                str(entry.get("agent", "")),
+                str(entry.get("reason") or entry.get("name_only_reason") or ""),
+            )
+            for entry in name_only
+        )
+        lines.append(
+            "name-only: " + "; ".join(f"{agent} ({reason})" for agent, reason in entries)
+        )
+    return "\n".join(lines) + "\n" if lines else ""
+
+
+def _render_compact_routing(
+    config: dict, provider: str, engine: "DelegationSyntaxEngine"
+) -> bool:
+    """IC-04 activation gate: compact profile AND no callable ``route_intent``.
+
+    Both facts are config/capability driven. An out-of-enum ``context-profile``
+    is reported as SyncError ``context-profile.invalid`` by the IC-01 validation
+    in ``build_variables``; here it degrades to the full render so the routing
+    render never raises earlier than that gate.
+    """
+    if engine.has_route_intent_tool(provider):
+        return False
+    from .context_profile import resolve_context_profile
+
+    try:
+        return resolve_context_profile(config, provider).profile == "compact"
+    except ValueError:
+        return False
+
+
 def render_routing_tool_definition(definition: dict, tool_format: str) -> str:
     """Serialize a routing tool definition in a provider's native format.
 
@@ -433,10 +579,20 @@ def build_routing_tool_definitions_for_providers(
         active_set=active_set,
     )
     rendered: dict[str, str] = {}
+    name_only = _routing_name_only_entries(definition["routing"]["name_index"])
     for provider in providers:
         caps = engine.get_capabilities(provider)
         tool_format = str(caps.get("handoff_format") or "")
-        rendered[provider] = (
-            render_routing_tool_definition(definition, tool_format) if tool_format else ""
-        )
+        if not tool_format:
+            rendered[provider] = ""
+        elif _render_compact_routing(config, provider, engine):
+            # IC-04: the compact line block replaces the json/yaml_text_block
+            # render only under the active opt-in AND the non-callable fallback.
+            rendered[provider] = render_routing_lines(
+                definition["routing"]["rules"],
+                definition["routing"]["pipelines"],
+                name_only,
+            )
+        else:
+            rendered[provider] = render_routing_tool_definition(definition, tool_format)
     return rendered
