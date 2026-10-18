@@ -27,7 +27,7 @@ from typing import Dict, Iterable, List, Literal, Mapping
 ProfileValue = Literal["full", "compact"]
 SourceValue = Literal["explicit", "provider-override", "profile", "default"]
 
-_VALID_PROFILES = ("full", "compact")
+VALID_PROFILES = ("full", "compact")
 _VALID_MODES = ("full", "compact")
 
 
@@ -55,10 +55,10 @@ class ResolvedContextProfile:
 
 
 def _validate_profile(value: object, where: str) -> ProfileValue:
-    if value not in _VALID_PROFILES:
+    if value not in VALID_PROFILES:
         raise ValueError(
             f"invalid {where}: {value!r} (expected one of: "
-            f"{', '.join(_VALID_PROFILES)})"
+            f"{', '.join(VALID_PROFILES)})"
         )
     return value  # type: ignore[return-value]
 

@@ -1249,6 +1249,19 @@ def _handle_validate(ctx: _SyncContext) -> None:
     for _stale in _stale_overrides:
         log.warning(f"config-audit [P1] stale-override: {_stale.message}")
 
+    # Invalid context-profile values (IC-01): the sync path aborts active
+    # providers as `context-profile.invalid` before this handler runs, so this
+    # surfacing covers the remaining case -- out-of-enum values in
+    # provider-overrides for providers the sync never resolves. Hard error,
+    # like the other consistency checks.
+    _invalid_profiles = _validate_audit_report.by_category("context-profile.invalid")
+    for _invalid_profile in _invalid_profiles:
+        log.warning(
+            f"config-audit [ERROR] context-profile.invalid: "
+            f"{_invalid_profile.message}")
+    if _invalid_profiles:
+        consistency_errors += len(_invalid_profiles)
+
     # Unpaired closing tags (issue #567): a copy-paste artifact like a
     # trailing `</output>` with no `<output>` anywhere in the file ships
     # broken structural markup into every synced project. Treated as a hard

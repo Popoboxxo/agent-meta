@@ -15,6 +15,7 @@ Covers IC-01:
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -148,3 +149,79 @@ def test_context_profile_enum_is_not_persisted_by_default(tmp_path: Path):
     fill_defaults(tmp_path / "project.yaml", _REPO_ROOT, SyncLog(), dry_run=False)
     reloaded = yaml.safe_load((tmp_path / "project.yaml").read_text(encoding="utf-8"))
     assert "context-profile" not in reloaded
+
+
+# --- IC-01 error path (2a review fix): context-profile.invalid --------------
+
+_P10_FIXTURE = _REPO_ROOT / "tests" / "fixtures" / "active-set" / "p10"
+_SYNC_PY = _REPO_ROOT / "scripts" / "sync.py"
+
+
+def _cli_project(tmp_path: Path, extra: str = "") -> Path:
+    """p10 fixture copy as a throwaway sync project with *extra* appended."""
+    project = tmp_path / "p10"
+    (project / ".meta-config").mkdir(parents=True)
+    (project / ".meta-config" / "project.yaml").write_text(
+        (_P10_FIXTURE / ".meta-config" / "project.yaml").read_text(encoding="utf-8")
+        + extra,
+        encoding="utf-8")
+    subprocess.run(["git", "init", "-q"], cwd=project, check=True)
+    return project
+
+
+def _run_cli(project: Path, mode: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [sys.executable, str(_SYNC_PY),
+         "--config", str(project / ".meta-config" / "project.yaml"), mode],
+        cwd=project, capture_output=True, text=True, timeout=300)
+
+
+def test_cli_validate_reports_invalid_profile_without_traceback(tmp_path: Path):
+    project = _cli_project(tmp_path, "context-profile: ultra\n")
+    proc = _run_cli(project, "--validate")
+    out = proc.stdout + proc.stderr
+    assert proc.returncode != 0
+    assert "context-profile.invalid" in out
+    assert "full, compact" in out
+    assert "Traceback" not in out
+
+
+def test_cli_sync_aborts_cleanly_on_invalid_profile(tmp_path: Path):
+    project = _cli_project(tmp_path, "context-profile: ultra\n")
+    proc = _run_cli(project, "--init")
+    out = proc.stdout + proc.stderr
+    assert proc.returncode != 0
+    assert "context-profile.invalid" in out
+    assert "full, compact" in out
+    assert "Traceback" not in out
+
+
+def test_cli_validate_flags_invalid_override_for_inactive_provider(tmp_path: Path):
+    # The sync path only resolves active providers, so an out-of-enum
+    # override for an inactive provider must surface via the config audit.
+    project = _cli_project(
+        tmp_path,
+        "provider-overrides:\n  Opencode:\n    context-profile: ultra\n")
+    proc = _run_cli(project, "--validate")
+    out = proc.stdout + proc.stderr
+    assert proc.returncode != 0
+    assert "context-profile.invalid" in out
+    assert "provider-overrides.Opencode" in out
+    assert "Traceback" not in out
+
+
+def test_audit_config_flags_invalid_profile_values(tmp_path: Path):
+    from lib.config_audit import audit_config
+
+    project = _cli_project(
+        tmp_path,
+        "context-profile: ultra\n"
+        "provider-overrides:\n  Opencode:\n    context-profile: turbo\n")
+    report = audit_config(_REPO_ROOT, project / ".meta-config" / "project.yaml")
+    issues = report.by_category("context-profile.invalid")
+    assert len(issues) == 2
+    assert {i.severity for i in issues} == {"error"}
+    messages = "\n".join(i.message for i in issues)
+    assert "'ultra'" in messages and "'turbo'" in messages
+    assert "provider-overrides.Opencode.context-profile" in messages
+    assert "full, compact" in messages

@@ -1416,7 +1416,13 @@ def _build_core_variables(
     # in project.yaml (context_file.mode / context-profile are the canonical
     # sources). With no opt-in key every value is the full/false fallback, so
     # renders stay byte-identical to the Phase-1 goldens (AC-01/AC-23).
-    _global_profile = resolve_context_profile(config, "")
+    try:
+        _global_profile = resolve_context_profile(config, "")
+    except ValueError as exc:
+        # IC-01: an out-of-enum context-profile is a hard config error. Wrapped
+        # as SyncError so _build_context aborts with a clean rc 1
+        # (context-profile.invalid) instead of a raw traceback.
+        raise SyncError(f"context-profile.invalid: {exc}") from exc
     variables["COMPACT_MODE"] = (
         "true" if _global_profile.context_file_mode == "compact" else "false"
     )
@@ -2251,12 +2257,17 @@ def build_variables(
     # drain.
     _profile_providers = resolve_providers(
         config, load_providers_config(agent_meta_root))
-    variables["_PROVIDER_CONTEXT_PROFILE_VARS"] = {
-        provider: context_profile_provider_variables(config, provider)
-        for provider in _profile_providers
-    }
-    variables["_CONTEXT_PROFILE_INFO"] = context_profile_log_lines(
-        config, _profile_providers)
+    try:
+        variables["_PROVIDER_CONTEXT_PROFILE_VARS"] = {
+            provider: context_profile_provider_variables(config, provider)
+            for provider in _profile_providers
+        }
+        variables["_CONTEXT_PROFILE_INFO"] = context_profile_log_lines(
+            config, _profile_providers)
+    except ValueError as exc:
+        # IC-01: out-of-enum provider-overrides.<P>.context-profile values for
+        # active providers abort as SyncError (clean rc 1, no traceback).
+        raise SyncError(f"context-profile.invalid: {exc}") from exc
 
     _build_snippet_variables(variables, agent_meta_root)
     _build_convention_variables(variables, config, agent_meta_root, active_set)
