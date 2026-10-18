@@ -1849,6 +1849,135 @@ def compact_embedded_rule(output_stem: str, content: str) -> str:
     return f"{body}\n\n{spec['pointer']}"
 
 
+_GATE_CARD_HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
+
+
+def _load_gate_card_sections(agent_meta_root: Path) -> list[str]:
+    """Section specs (``<rule-stem>#<heading>``) the compact gate-card extracts.
+
+    Source of truth (IC-12): ``config/context-anchors.yaml::gate_card_sections``.
+    An absent or empty list is a configuration error, not an empty gate card.
+    """
+    from .io import load_yaml_file
+
+    registry = load_yaml_file(
+        agent_meta_root / "config" / "context-anchors.yaml",
+        on_error="raise", default={},
+    ) or {}
+    sections = registry.get("gate_card_sections")
+    if not isinstance(sections, list) or not sections:
+        raise SyncError(
+            "context.gate-card: 'gate_card_sections' missing or empty in "
+            "config/context-anchors.yaml"
+        )
+    return [str(section) for section in sections]
+
+
+def _extract_rule_section(rule_text: str, heading: str) -> str | None:
+    """Return the ``#<heading>`` section of *rule_text* (heading line included).
+
+    The section runs from the matching heading line to the next markdown heading
+    (any level) or the end of the rule. *heading* matches a heading whose text is
+    equal or starts with ``<heading> `` so a conditioned suffix
+    (``# CRITICAL GATE (runtime-partially enforced)``) is still found. Returns
+    ``None`` when no heading matches.
+    """
+    lines = rule_text.splitlines()
+    start = None
+    for index, line in enumerate(lines):
+        match = _GATE_CARD_HEADING_RE.match(line)
+        if not match:
+            continue
+        text = match.group(2).strip()
+        if text == heading or text.startswith(f"{heading} "):
+            start = index
+            break
+    if start is None:
+        return None
+    end = len(lines)
+    for index in range(start + 1, len(lines)):
+        if _GATE_CARD_HEADING_RE.match(lines[index]):
+            end = index
+            break
+    return "\n".join(lines[start:end]).strip()
+
+
+def build_gate_card(
+    agent_meta_root: Path,
+    config: dict,
+    variables: dict,
+    log: SyncLog,
+) -> str:
+    """Render the compact gate card: rule sections extracted verbatim (IC-06).
+
+    The section names come from ``config/context-anchors.yaml::gate_card_sections``;
+    every section is read from its source rule and substituted like the embedded
+    rules are, so the card is never a hand-maintained copy. A section whose rule
+    or heading is missing aborts the sync with ``SyncError`` instead of shipping
+    a partial gate card.
+    """
+    from .rules import collect_rule_sources
+
+    sources = {
+        Path(output_name).stem: source_path
+        for source_path, output_name in collect_rule_sources(
+            agent_meta_root, config.get("platforms", []), config=config
+        )
+    }
+    sections: list[str] = []
+    for spec in _load_gate_card_sections(agent_meta_root):
+        stem, _sep, heading = spec.partition("#")
+        source_path = sources.get(stem)
+        if source_path is None:
+            raise SyncError(
+                f"context.gate-card: rule '{stem}' for section '{spec}' "
+                "(gate_card_sections) not found"
+            )
+        layer = source_path.parts[-2]
+        rel_source = f"rules/{layer}/{source_path.name}"
+        content = substitute(
+            source_path.read_text(encoding="utf-8"), variables, rel_source, log
+        )
+        content = strip_inactive_conditional_blocks(content, variables)
+        section = _extract_rule_section(content, heading)
+        if section is None:
+            raise SyncError(
+                f"context.gate-card: section '{heading}' missing in {rel_source} "
+                "(gate_card_sections)"
+            )
+        sections.append(section)
+    return "\n\n".join(sections) + "\n"
+
+
+def _enforce_compact_hard_cap(
+    agent_meta_root: Path,
+    config: dict,
+    provider_config: dict | None,
+    project_root: Path | None,
+    pc: dict,
+    target_name: str | None,
+    block: str,
+) -> None:
+    """Abort a compact render whose entry file would reach a reader hard cap.
+
+    Reuses the write-path guard on the rendered managed block so an over-cap
+    ``compact`` entry file never lands on disk (IC-06 ``context.over-hard-cap``,
+    "never silently write"). A no-op when the reader set or target is unknown.
+    """
+    if project_root is None or not provider_config:
+        return
+    name = target_name or pc.get("context_file")
+    if not name:
+        return
+    try:
+        target_path = safe_path(project_root, name)
+    except SyncError:
+        return
+    enforce_context_hard_cap(
+        agent_meta_root, project_root, config, provider_config, target_path, block
+    )
+
+
 def _build_managed_block(
     agent_meta_root: Path,
     config: dict,
@@ -2224,8 +2353,32 @@ def _build_managed_block(
         config, compact=local_vars.get("COMPACT_MODE") == "true"
     )
 
+    if local_vars.get("CONTEXT_PROFILE_COMPACT") == "true":
+        if "MCP_GUARDRAILS_LIST" not in local_vars:
+            from .mcp import (
+                build_mcp_guardrails_list,
+                load_mcp_registry,
+                resolve_active_mcp_servers,
+            )
+
+            _mcp_registry = load_mcp_registry(agent_meta_root, config, project_root)
+            local_vars["MCP_GUARDRAILS_LIST"] = build_mcp_guardrails_list(
+                _mcp_registry,
+                resolve_active_mcp_servers(
+                    config, agent_meta_root, project_root, registry=_mcp_registry
+                ),
+            )
+        local_vars["GATE_CARD"] = build_gate_card(
+            agent_meta_root, config, local_vars, log
+        )
+
     builder = TemplateBuilder(agent_meta_root / "templates" / "context")
     rendered = builder.build("agents-managed", local_vars)
+    if local_vars.get("CONTEXT_PROFILE_COMPACT") == "true":
+        _enforce_compact_hard_cap(
+            agent_meta_root, config, provider_config, project_root, pc,
+            target_name, rendered,
+        )
     return _apply_platform_context_substitution(
         rendered, platform_vars,
         target_name or pc.get("context_file") or "context managed block", log,

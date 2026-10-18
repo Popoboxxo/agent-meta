@@ -56,6 +56,9 @@ gate_card_sections:
   - "use-orchestrator#CRITICAL GATE"
   - "use-orchestrator#Git Delegation"
   - "branch-guard#Branch-Guard"
+  - "commit-conventions#Commit-Konventionen"
+  - "language#Sprachregeln"
+  - "a2a-delegation-gates#Enforced Gates"
   - "mcp-guardrails#MCP Hard Prohibitions"
 
 # Paths (globs) that are deliberately never read by a provider (IC-10 unread check).
