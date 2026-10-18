@@ -1,6 +1,8 @@
 # Context Profiles — Phase 2 Implementation Plan (Profil `compact`, Config-Optimizer)
 
-> Status: geplant
+> Status: APPROVED
+>
+> **Freigabevermerk:** Nutzerfreigabe 2026-10-18 (Auftrag ‚Phase 2 komplett umsetzen‘); Entscheidungen zu den offenen Fragen siehe `## Offene Nutzerfragen` unten.
 
 **Goal:** Phase 2 der Spec vollständig umsetzen — Profil `compact` (IC-01…IC-12, C1–C7) sowie Config-Optimizer, Applier und Rolle `meta-optimizer` (IC-24…IC-28, IC-35) — ausschließlich als Opt-in ohne Default-Änderung; die nachweisabhängigen Verifikationsschritte (AC-02/AC-25) sind als eigene Gate-Tasks (Paket 2f) ausgewiesen und heute nicht startbar.
 **Architecture:** Neue Auflösungsschicht `context_profile.py` über der bestehenden `COMPACT_MODE`-Ableitung (`config.py:1394-1407`); Profil-Konditionale nur in Resolution/Templates, der Active-Set-Filter (IC-17/IC-18) bleibt orthogonal; Per-Provider-Profile über einen Provider-Injection-Seam analog `_INTENT_ROUTING_TOOL_DEFS`/`shared_runtime_gate_vars`; Optimizer als reines Stdlib-Modul mit Sentinel-Render im tmp-sink, Remove-only-Applier und Laufzeit-Leser-Registry als Daten.
@@ -699,7 +701,12 @@ Ergebnis (geprüft gegen Spec §8, §9, §9.1, IC-01…IC-12, IC-24…IC-28, IC-
 ## Offene Nutzerfragen
 
 1. **IC-04-Merge (2b.1):** Plan-Default ist der Opt-in-Merge hinter `context-profile: compact` mit `context-profile.unverified`-Hinweis (Rev.-3-Regel). Konservative Alternative: 2b.1 fertigstellen, aber erst nach belegtem AC-25 (2f.2) mergen; 2b.2–2c laufen dann als Stacked-PR-Kette auf dem 2b.1-Branch (Rebase nach jedem Basis-Merge, s. Ausführungsmodell „Konservative Variante“). Auflösung der Reihenfolge: der 2f.2-Lauf und die 2c.3-Matrix rendern gegen den **Kandidaten-Build des Branch-Stack-Heads** (Branch-Stand statt Merge) — damit weder zirkulär noch blockierend für 2a/2d/2e. Welche Variante gilt?
+   **Entscheidung (2026-10-18):** 2b.1 wird als **Opt-in** gemergt (nicht „as verified“); der Verifikationsanspruch („as verified“) entsteht erst nach 2f.3. Die konservative Stacked-PR-Variante wird verworfen; 2b.2–2c laufen regulär nach Paket-Merge-Reihenfolge.
 2. **AC-02/AC-25-Nachweis:** Soll ein späterer Baseline-Versuch (2f.1) mit ≥ 2 Modellklassen und ≥ 3 Läufen je Metrik plus Reproduktionslauf (AC-02) eingeplant werden (mit Kostenschätzung und separater Nutzerfreigabe)? Falls ja: Zielmodellklassen und grober Zeitpunkt (z. B. nach Paket 2c)?
+   **Entscheidung (2026-10-18):** Ein späterer Baseline-Versuch mit **≥ 2 Modellklassen** bleibt als Gate 2f.1 vorgesehen, wird aber heute **nicht** gestartet (Status: SKIPPED); er braucht eine eigene, separate Nutzerfreigabe inkl. vorab angezeigter Kostenschätzung.
 3. **Paket-Issues:** Alle Tasks referenzieren Tracking #977. Sollen je Paket eigene Issues (#977-Ableger, Muster Phase 1: #963…#970) angelegt werden, oder bleibt #977 das alleinige Issue?
+   **Entscheidung (2026-10-18):** Keine separaten Paket-Issues; **#977 bleibt das Dach**. Ableger-Issues werden nur auf ausdrücklichen Zuruf angelegt.
 4. **Selbst-Hosting (IC-28 Nr. 9):** Soll `meta-optimizer` (und nachträglich `meta-doctor`) in `.meta-config/project.yaml roles:` aufgenommen werden (optionaler Checklistenpunkt, ändert `generated-file-hashes.json`), oder bleibt self-hosting unverändert?
+   **Entscheidung (2026-10-18):** `meta-optimizer` wird **nicht** in das Self-Hosting-`roles:` aufgenommen (nur für Fixtures/Tests); self-hosting bleibt unverändert.
 5. **Unverified-Doku-Tonalität:** Der Plan hält `compact` strikt neutral („Opt-in, unverifiziert“). Soll README/`cli-reference` zusätzlich den Grund (fehlende Baseline/AC-02) nennen und den geplanten Nachweis (2f) referenzieren, oder nur den Status ohne Begründung?
+   **Entscheidung (2026-10-18):** README/`cli-reference` nennen den Status **mit Begründung** (fehlende Baseline/AC-02, geplanter Nachweis in Paket 2f); keine Verifikationsbehauptung (IC-36 Nr. 3).
