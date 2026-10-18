@@ -34,7 +34,7 @@
 
 | Spur | Inhalt | Tasks | Bedingung |
 |---|---|---|---|
-| **A — unverifikations-sicher (jetzt ausliefern)** | Profil-Auflösung/Schema/Konditionale, Render-Verdichtung, Budgets/Anker/Report, Optimizer + Rolle — alles Opt-in bzw. read-only; Defaults unangetastet; `context-profile.unverified`-INFO aktiv | 2.00, 2a.1–2a.7, 2b.1–2b.6, 2c.1–2c.4, 2d.1–2d.7, 2e.1–2e.6 | kein AC-02 nötig; keine Verifikationsbehauptung; kein Default-Wechsel |
+| **A — unverifikations-sicher (jetzt ausliefern)** | Profil-Auflösung/Schema/Konditionale, Render-Verdichtung, Budgets/Anker/Report, Optimizer + Rolle — alles Opt-in bzw. read-only; Defaults unangetastet; `context-profile.unverified`-INFO aktiv | 2.00, 2a.1–2a.8, 2b.1–2b.6, 2c.1–2c.4, 2d.1–2d.7, 2e.1–2e.6 | kein AC-02 nötig; keine Verifikationsbehauptung; kein Default-Wechsel |
 | **B — nachweisabhängig (heute nicht startbar)** | Baseline-Nachversuch (AC-02), `compact`-Eval (AC-25), Verifikations-Abschluss (INFO-Absenz, Doku-Claim, AC-26-Claim) | 2f.1 (Gate: Nutzerfreigabe, Kostenschätzung zuerst), 2f.2 (Gate: AC-02 belegt), 2f.3 (Gate: AC-25 belegt) | Start erst nach erfülltem Gate; Tasks ändern Spur-A-Code nur in der Evidenz-Auswertung und in Doku-Claims |
 
 **Regeln für Spur A:**
@@ -45,13 +45,13 @@
 
 ## Ausführungsmodell
 
-- DAG (Spur A): `2.00 → (2a.1 ↔ 2a.2 = 2a-g1) → 2a.3 → (2a.4 ∥ 2a.5 ∥ 2a.6 = 2a-g2) → 2a.7`; `2a.3 → (2b.1 ∥ 2b.2 = 2b-g1) → 2b.3 → 2b.4 → 2b.5 → 2b.6`; `2b.3…2b.5 → (2c.1 ∥ 2c.2 = 2c-g1) → 2c.3 → 2c.4`; `2d.1 → 2d.2 → 2d.3 → 2d.4 → 2d.5 → 2d.6 → 2d.7` (eigenes Modul; Ausführung unabhängig vom Eval möglich, **Merge erst nach 2c** — geteilte Dateien siehe Merge-Reihenfolge); `(2d.2, 2d.3) → 2e.1 → (2e.2; 2e.3 → 2e.4 → 2e.5) → 2e.6`. Maßgebliche Kantenliste ist das maschinenlesbare `**Depends on:**` je Task; die Paket-Koordinaten (2a.1 … 2f.3) stehen in den Task-Titeln.
+- DAG (Spur A): `2.00 → (2a.1 ↔ 2a.2 = 2a-g1) → 2a.3 → (2a.4 ∥ 2a.5 ∥ 2a.6 = 2a-g2) → 2a.7 → 2a.8 (Zusatz, hängt an 2a.2)`; `2a.3 → (2b.1 ∥ 2b.2 = 2b-g1) → 2b.3 → 2b.4 → 2b.5 → 2b.6`; `2b.3…2b.5 → (2c.1 ∥ 2c.2 = 2c-g1) → 2c.3 → 2c.4`; `2d.1 → 2d.2 → 2d.3 → 2d.4 → 2d.5 → 2d.6 → 2d.7` (eigenes Modul; Ausführung unabhängig vom Eval möglich, **Merge erst nach 2c** — geteilte Dateien siehe Merge-Reihenfolge); `(2d.2, 2d.3) → 2e.1 → (2e.2; 2e.3 → 2e.4 → 2e.5) → 2e.6`. Maßgebliche Kantenliste ist das maschinenlesbare `**Depends on:**` je Task; die Paket-Koordinaten (2a.1 … 2f.3) stehen in den Task-Titeln.
 - DAG (Spur B): `2f.1 → 2f.2 → 2f.3`; 2f.2 setzt die gemergten Pakete 2a–2c voraus **oder** rendert in der konservativen Variante aus dem Head des 2b.1-Branch-Stacks inkl. 2b.2–2c (der Eval braucht echte `compact`-Artefakte).
 - **Eval-Unabhängigkeit:** 2d/2e hängen nur an 0a-III (IC-34, #981) und 0b (IC-17, #984) — beide gemergt — und dürfen unabhängig vom Eval beginnen (Spec §9, Rev.-3-Zusatzregel); sie teilen jedoch Dateien mit 2b/2c (s. u.) und werden deshalb sequenziell gemergt.
 - **2b-Voraussetzung:** Task 1.10 (IC-18 Nr. 2, Pipelines-Filter) ist mit #992 gemergt; das Zeilenformat basiert damit auf der gefilterten Pipeline-Menge.
 - Parallelität nur innerhalb eines `parallel_group` mit disjunkter Ownership laut `Files:` (maschinenlesbar über die `Files:`-Blöcke; Prüfung `check_plan_file_overlap`, `scripts/lib/orchestration.py:320`, auf dem `FanoutPlan` dieses Plans; `validate_plan` meldet Zyklen/Overlaps); Tasks ohne Gruppe laufen sequenziell.
 - **Merge-/Ausführungsreihenfolge (paketübergreifende Überschneidungen dokumentiert, Muster Phase-1-Plan):** *Innerhalb der Pakete:* 2a vor 2b (Variablen/Konditionale); 2d vor 2e (CLI + Proposal-Format existieren); 2e.2 vor 2e.3–2e.5 (Rollen-Registrierung, `role-defaults`-Eintrag); 2e.4 vor 2e.5 (gemeinsame Rebaseline-Dateien `tests/fixtures/slimming-golden/`, `tests/fixtures/ac01-baseline/hashes.json`). *Paketübergreifend* wird sequenziell gemergt: **2a → 2b → 2c → 2d → 2e** (kein Paket startet vor dem Merge seines Vorgängers, sofern eine der folgenden Überschneidungen existiert; Ausnahme ist allein die konservative Variante, in der 2b.1 bis nach 2f.2 offenbleibt und 2b.2–2c als gestackte Kette darauf laufen — Start-Reihenfolge unverändert, Merge von 2b.1 zuletzt). *Bekannte Überschneidungen:* `CHANGELOG.md` (2a.7, 2b.6, 2c.4, 2d.2, 2d.3, 2e.6 — je Paket sequenziell), `docs/api/cli-reference.md` (2a.7, 2c.4, 2d.2, 2d.3, 2e.6), `scripts/lib/cli_commands.py` (2c.2, 2d.2, 2d.3), `tests/test_context_profile_docs.py` (2a.7, 2b.6, 2c.4), `scripts/lib/agent_sync.py` (2a.3/2b.1), `scripts/lib/context.py` (2a.6/2b.3/2b.4/2b.5 — über `Depends on:` bereits sequenziell), `README.md` (2c.4/2e.2/2e.6/2f.3), `config/project-config.schema.json` (2a.2/2e.2), `tests/test_context_budget_checks.py` (2a.4/2c.3), `scripts/lib/context_profile_gate.py` + `tests/test_context_profile_gate.py` (2a.5/2f.3), `tests/test_eval_baseline_schema.py` (2.00/2f.1/2f.2), Rebaseline-Dateien `tests/fixtures/ac01-baseline/hashes.json` + `tests/test_ac01_render_identity.py` (2b.2/2e.2/2e.4/2e.5), `agents/1-generic/orchestrator.md` + `tests/fixtures/slimming-golden/orchestrator.md` (2b.2/2e.2/2e.5), `agents/1-generic/agent-meta-manager.md` + `tests/fixtures/slimming-golden/agent-meta-manager.md` (2e.2/2e.4).
-- **Konservative Variante (offene Nutzerfrage 1: 2b.1-Hold-back, Stacked-PR-Kette):** 2b.1 wird auf `feat/977-2b1-…` fertiggestellt, der PR bleibt bis nach belegtem AC-25 offen. 2b.2–2b.6 und 2c.1–2c.4 bauen als **gestackte Branches** auf dem jeweiligen Vorgänger-Head auf (jeder PR nennt seinen Basis-Branch; nach jedem Basis-Merge wird die Kette per Rebase auf den neuen Basis-Head gezogen) und laufen nicht gegen `main`. 2f.2 rendert den **Kandidaten-Build des Stack-Heads** (Branch-Stand statt Merge — keine Zirkularität); die 2c.3-Matrix und der `--check`-Nachweis (Task 17, Step 5) laufen ebenfalls gegen diesen Kandidaten-Build. Merge erst nach bestandenem 2f.2 in Kettenreihenfolge (2b.1 zuerst); scheitert 2f.2, bleibt 2b.1 ungemergt und die Kette wird nicht freigegeben. 2a, 2d und 2e sind nicht Teil der Kette; ihre Ausführung bleibt unabhängig, der Merge folgt weiterhin der Paketreihenfolge (2a → 2b → 2c → 2d → 2e).
+- **Konservative Variante (offene Nutzerfrage 1: 2b.1-Hold-back, Stacked-PR-Kette):** 2b.1 wird auf `feat/977-2b1-…` fertiggestellt, der PR bleibt bis nach belegtem AC-25 offen. 2b.2–2b.6 und 2c.1–2c.4 bauen als **gestackte Branches** auf dem jeweiligen Vorgänger-Head auf (jeder PR nennt seinen Basis-Branch; nach jedem Basis-Merge wird die Kette per Rebase auf den neuen Basis-Head gezogen) und laufen nicht gegen `main`. 2f.2 rendert den **Kandidaten-Build des Stack-Heads** (Branch-Stand statt Merge — keine Zirkularität); die 2c.3-Matrix und der `--check`-Nachweis (Task 18, Step 5) laufen ebenfalls gegen diesen Kandidaten-Build. Merge erst nach bestandenem 2f.2 in Kettenreihenfolge (2b.1 zuerst); scheitert 2f.2, bleibt 2b.1 ungemergt und die Kette wird nicht freigegeben. 2a, 2d und 2e sind nicht Teil der Kette; ihre Ausführung bleibt unabhängig, der Merge folgt weiterhin der Paketreihenfolge (2a → 2b → 2c → 2d → 2e).
 - Ausführung nach Skill `plan-ledger`: frischer Subagent je Task, zweistufiges Review (req → quality), Ledger = Checkboxen dieser Datei, **kein** `isolation: "worktree"`.
 - Issue-Spalte referenziert das Tracking-Issue #977; die Ableitung eigener Paket-Issues ist offene Nutzerfrage 3.
 
@@ -133,10 +133,10 @@ pipeline_stages:
 - Create: `scripts/lib/context_profile.py`
 - Create: `tests/test_context_profile.py`
 **Interfaces:** Produces `ResolvedContextProfile(provider, profile, context_file_mode, rules_preset, sources)`, `resolve_context_profile(config: dict, provider: str) -> ResolvedContextProfile`, `resolve_shared_file_profile(profiles: Iterable[ResolvedContextProfile]) -> Literal["full", "compact"]` (mindestens ein Teiler `full` ⇒ `full`), `context_profile_provider_variables(config: dict, provider: str) -> dict[str, str]` (`CONTEXT_PROFILE`/`CONTEXT_PROFILE_COMPACT` für die Provider-Injection in 2a.3), `context_profile_variables(config: dict, provider: str, shared_users: Iterable[str]) -> dict[str, str]` (Shared-File-Wrapper: wendet `resolve_shared_file_profile` über `shared_users ∪ {provider}` an und delegiert an `context_profile_provider_variables`; Managed-Block-Injection in 2a.6); Consumes `config.get("context-profile")`, `config.get("provider-overrides")`, `config.get("context_file", {}).get("mode")`, `config.get("rules-preset", "default")`
-- [ ] Step 1: Test schreiben (fail): Präzedenzmatrix (explizit/override/global/default), `compact`⇒`mode=compact`, explizites `mode: full` gewinnt (`sources["context_file_mode"]=="explicit"`), Shared-File-Regel, unbekannter Wert ⇒ `ValueError`
-- [ ] Step 2: implementieren
-- [ ] Step 3: Test (pass): `python3 -m pytest tests/test_context_profile.py -q`
-- [ ] Step 4: commit `feat: add context profile resolution with precedence`
+- [x] Step 1: Test schreiben (fail): Präzedenzmatrix (explizit/override/global/default), `compact`⇒`mode=compact`, explizites `mode: full` gewinnt (`sources["context_file_mode"]=="explicit"`), Shared-File-Regel, unbekannter Wert ⇒ `ValueError`
+- [x] Step 2: implementieren
+- [x] Step 3: Test (pass): `python3 -m pytest tests/test_context_profile.py -q`
+- [x] Step 4: commit `feat: add context profile resolution with precedence`
 
 ### Task 3: 2a.2 — Schema und Validierungsfehler für `context-profile` ergänzen
 **Agent:** developer · **Issue:** #977 · **PR:** 2a · **parallel_group:** 2a-g1 · **AC:** AC-01 (kein Render), AC-30 (Schema-Teil) · **Gate:** —
@@ -148,10 +148,10 @@ pipeline_stages:
 - Modify: `tests/test_config_null_blocks.py`
 - Create: `tests/test_context_profile_schema.py`
 **Interfaces:** Produces Schema-Keys `context-profile` (enum `full|compact`) und `provider-overrides.<P>.context-profile`, Fehlerpfad `context-profile.invalid`; Consumes IC-01, `scripts/lib/config_audit*.py`
-- [ ] Step 1: Test schreiben (fail): ungültiger Wert ⇒ Validierungsfehler mit erlaubten Werten; `provider-overrides: null` wird wie ein fehlender Block behandelt; gültiger Eintrag kollidiert nicht mit den bestehenden verschachtelten `provider-overrides`-Blöcken
-- [ ] Step 2: implementieren (inkl. Beispiel im Schema-Example und `_MAPPING_BLOCKS`-Eintrag)
-- [ ] Step 3: Test (pass): `python3 -m pytest tests/test_context_profile_schema.py tests/test_config_null_blocks.py -q`
-- [ ] Step 4: commit `feat: add context-profile schema keys and validation error`
+- [x] Step 1: Test schreiben (fail): ungültiger Wert ⇒ Validierungsfehler mit erlaubten Werten; `provider-overrides: null` wird wie ein fehlender Block behandelt; gültiger Eintrag kollidiert nicht mit den bestehenden verschachtelten `provider-overrides`-Blöcken
+- [x] Step 2: implementieren (inkl. Beispiel im Schema-Example und `_MAPPING_BLOCKS`-Eintrag)
+- [x] Step 3: Test (pass): `python3 -m pytest tests/test_context_profile_schema.py tests/test_config_null_blocks.py -q`
+- [x] Step 4: commit `feat: add context-profile schema keys and validation error`
 
 ### Task 4: 2a.3 — `CONTEXT_PROFILE`/`COMPACT_MODE` an die Auflösung hängen und loggen
 **Agent:** senior-developer · **Issue:** #977 · **PR:** 2a · **AC:** AC-23 (byte-stabil ohne Key), AC-29 (Log `source=explicit`), AC-30 (Provider-Injection) · **Gate:** —
@@ -165,10 +165,10 @@ pipeline_stages:
 - Modify: `tests/test_context_profile.py`
 - Modify: `tests/test_build_variables_decomposition.py`
 **Interfaces:** Produces Variablen `CONTEXT_PROFILE` (`full|compact`) und `CONTEXT_PROFILE_COMPACT` (`true|false`) als provider-injizierte Werte (`_PROVIDER_CONTEXT_PROFILE_VARS` → `_build_provider_vars`) mit Core-Fallback `full`/`false`; Whitelist-Eintrag `CONTEXT_PROFILE_COMPACT` in `strip_inactive_conditional_blocks` (`variables.py:283ff`); Consumes `resolve_context_profile`, `ResolvedContextProfile.sources`
-- [ ] Step 1: Test schreiben (fail): ohne Key bleiben alle Phase-1-Renders des Profil-Pfads unverändert (`COMPACT_MODE=false`, `CONTEXT_PROFILE=full`); `context-profile: compact` ⇒ `CONTEXT_PROFILE_COMPACT=true`; explizites `context_file.mode: full` ⇒ `source=explicit`; `provider-overrides.<P>.context-profile: compact` ⇒ nur P rendert `compact`, alle übrigen Provider `full`/`false` (AC-30 „wirkt nur auf P“); Whitelist erkennt das Flag im Rules-Pfad
-- [ ] Step 2: implementieren (Core-Fallback + Provider-Prerender + Merge in `_build_provider_vars`)
-- [ ] Step 3: Test (pass): `python3 -m pytest tests/test_context_profile.py tests/test_ac01_render_identity.py tests/test_build_variables_decomposition.py -q`
-- [ ] Step 4: commit `feat: derive context profile variables from resolved profile`
+- [x] Step 1: Test schreiben (fail): ohne Key bleiben alle Phase-1-Renders des Profil-Pfads unverändert (`COMPACT_MODE=false`, `CONTEXT_PROFILE=full`); `context-profile: compact` ⇒ `CONTEXT_PROFILE_COMPACT=true`; explizites `context_file.mode: full` ⇒ `source=explicit`; `provider-overrides.<P>.context-profile: compact` ⇒ nur P rendert `compact`, alle übrigen Provider `full`/`false` (AC-30 „wirkt nur auf P“); Whitelist erkennt das Flag im Rules-Pfad
+- [x] Step 2: implementieren (Core-Fallback + Provider-Prerender + Merge in `_build_provider_vars`)
+- [x] Step 3: Test (pass): `python3 -m pytest tests/test_context_profile.py tests/test_ac01_render_identity.py tests/test_build_variables_decomposition.py -q`
+- [x] Step 4: commit `feat: derive context profile variables from resolved profile`
 
 ### Task 5: 2a.4 — `context-profile.marker-in-rule` auf Spec-Severity ERROR promovieren
 **Agent:** developer · **Issue:** #977 · **PR:** 2a · **parallel_group:** 2a-g2 · **AC:** AC-32 · **Gate:** —
@@ -178,10 +178,10 @@ pipeline_stages:
 - Modify: `scripts/lib/consistency/context_budget.py`
 - Modify: `tests/test_context_budget_checks.py`
 **Interfaces:** Produces `PHASE1_PROMOTED` inkl. `context-profile.marker-in-rule` (effektive Severity ERROR via `SPEC_SEVERITY`/`EMITTED_SEVERITY`); Consumes bestehendes `check_marker_in_rule(project_root: Path, active_providers: Sequence[str], capabilities: Mapping[str, Mapping], active_set) -> list[Finding]`, Quell-Rules `rules/1-generic/*.md`, `rules/2-platform/*.md`
-- [ ] Step 1: Test schreiben (fail): bestehender Fixture-Test wird von WARN- auf ERROR-Erwartung umgestellt (Fixture-Rule mit Marker ⇒ ERROR mit Datei/Hinweis); reale Regelmenge ohne Marker ⇒ 0 Befunde
-- [ ] Step 2: implementieren (Promotion in `PHASE1_PROMOTED`)
-- [ ] Step 3: Test (pass): `python3 -m pytest tests/test_context_budget_checks.py -q && python3 scripts/consistency-check.py`
-- [ ] Step 4: commit `feat: promote context-profile marker check to error`
+- [x] Step 1: Test schreiben (fail): bestehender Fixture-Test wird von WARN- auf ERROR-Erwartung umgestellt (Fixture-Rule mit Marker ⇒ ERROR mit Datei/Hinweis); reale Regelmenge ohne Marker ⇒ 0 Befunde
+- [x] Step 2: implementieren (Promotion in `PHASE1_PROMOTED`)
+- [x] Step 3: Test (pass): `python3 -m pytest tests/test_context_budget_checks.py -q && python3 scripts/consistency-check.py`
+- [x] Step 4: commit `feat: promote context-profile marker check to error`
 
 ### Task 6: 2a.5 — INFO `context-profile.unverified` bei fehlendem AC-25-Beleg ausgeben
 **Agent:** developer · **Issue:** #977 · **PR:** 2a · **parallel_group:** 2a-g2 · **AC:** AC-86 (Profil-Teil) · **Gate:** —
@@ -192,10 +192,10 @@ pipeline_stages:
 - Modify: `scripts/lib/sync_pipeline.py`
 - Create: `tests/test_context_profile_gate.py`
 **Interfaces:** Produces `scripts/lib/context_profile_gate.py` mit `context_profile_gate_state(agent_meta_root: Path) -> Literal["evidenced", "not-evidenced"]`, `context_profile_info_lines(resolved: Sequence[ResolvedContextProfile], agent_meta_root: Path) -> list[str]` (INFO `context-profile.unverified` je Provider mit Profil `compact` ohne Beleg); Consumes `eval_gate.evaluate_gate`, `eval_gate.SKIP_RECORD_DIR`, Muster `variables["_ROUTING_INFO"]` → `_sync_stage_context_checks`
-- [ ] Step 1: Test schreiben (fail): Meta-Repo ohne Baseline (heutiger Zustand) + Fixture mit `compact` ⇒ INFO-Zeile in `sync.log`; Fixture mit gültiger Baseline-/Beleg-Datei ⇒ keine INFO; Default ohne Key ⇒ keine INFO
-- [ ] Step 2: implementieren (Drain in `sync_pipeline.py`)
-- [ ] Step 3: Test (pass): `python3 -m pytest tests/test_context_profile_gate.py tests/test_sync_end_checks.py -q`
-- [ ] Step 4: commit `feat: log unverified context profile gate state`
+- [x] Step 1: Test schreiben (fail): Meta-Repo ohne Baseline (heutiger Zustand) + Fixture mit `compact` ⇒ INFO-Zeile in `sync.log`; Fixture mit gültiger Baseline-/Beleg-Datei ⇒ keine INFO; Default ohne Key ⇒ keine INFO
+- [x] Step 2: implementieren (Drain in `sync_pipeline.py`)
+- [x] Step 3: Test (pass): `python3 -m pytest tests/test_context_profile_gate.py tests/test_sync_end_checks.py -q`
+- [x] Step 4: commit `feat: log unverified context profile gate state`
 
 ### Task 7: 2a.6 — Shared-File-Downgrade als WARN melden und Datei `full` rendern
 **Agent:** senior-developer · **Issue:** #977 · **PR:** 2a · **parallel_group:** 2a-g2 · **AC:** AC-30 · **Gate:** —
@@ -206,10 +206,10 @@ pipeline_stages:
 - Modify: `scripts/lib/context_profile.py`
 - Create: `tests/test_context_profile_shared_file.py`
 **Interfaces:** Produces WARN `context-profile.shared-file-downgrade`, Managed-Block-Injection (`CONTEXT_PROFILE`/`CONTEXT_PROFILE_COMPACT` in `local_vars` je Provider via `context_profile_variables(config, provider, shared_users)` — Shared-File-Wrapper um 2a.1s `context_profile_provider_variables`, Shared-File-Regel über alle aktiven Sharer); Consumes `resolve_context_profile`, `resolve_shared_file_profile`, `context_profile_variables`, `provider_channel_caps`
-- [ ] Step 1: Test schreiben (fail): Fixture mit geteilter Datei, ein Provider `compact`, einer `full` ⇒ Render `full`, genau eine WARN mit Datei und Providern; `provider-overrides.<P>: compact` auf geteilter Datei ⇒ Downgrade auf `full` + WARN (AC-30)
-- [ ] Step 2: implementieren
-- [ ] Step 3: Test (pass): `python3 -m pytest tests/test_context_profile_shared_file.py tests/test_provider_matrix_sync.py -q`
-- [ ] Step 4: commit `feat: downgrade shared context files to full profile with warning`
+- [x] Step 1: Test schreiben (fail): Fixture mit geteilter Datei, ein Provider `compact`, einer `full` ⇒ Render `full`, genau eine WARN mit Datei und Providern; `provider-overrides.<P>: compact` auf geteilter Datei ⇒ Downgrade auf `full` + WARN (AC-30)
+- [x] Step 2: implementieren
+- [x] Step 3: Test (pass): `python3 -m pytest tests/test_context_profile_shared_file.py tests/test_provider_matrix_sync.py -q`
+- [x] Step 4: commit `feat: downgrade shared context files to full profile with warning`
 
 ### Task 8: 2a.7 — Doku und CHANGELOG für Paket 2a aktualisieren
 **Agent:** documenter · **Issue:** #977 · **PR:** 2a · **AC:** AC-29 (Doku), AC-86 (Unverified-Hinweis) · **Gate:** —
@@ -220,14 +220,30 @@ pipeline_stages:
 - Modify: `CHANGELOG.md`
 - Create: `tests/test_context_profile_docs.py`
 **Interfaces:** Produces Doku-Abschnitt „`context-profile` (Opt-in, unverifiziert)“, CHANGELOG-Unreleased-Eintrag; Consumes 2a.1–2a.6
-- [ ] Step 1: Test schreiben (fail): Doku-Abschnitt und CHANGELOG-Eintrag fehlen
-- [ ] Step 2: implementieren
-- [ ] Step 3: Test (pass): `python3 -m pytest tests/test_context_profile_docs.py -q && python3 scripts/consistency-check.py`
-- [ ] Step 4: commit `docs: document opt-in context profile resolution`
+- [x] Step 1: Test schreiben (fail): Doku-Abschnitt und CHANGELOG-Eintrag fehlen
+- [x] Step 2: implementieren
+- [x] Step 3: Test (pass): `python3 -m pytest tests/test_context_profile_docs.py -q && python3 scripts/consistency-check.py`
+- [x] Step 4: commit `docs: document opt-in context profile resolution`
+
+### Task 9: 2a.8 — `context-profile` in der Admin-UI exponieren
+- [x] Zusatz (2026-10-18): 2a.8 — Admin-UI-Exposition (Nutzerauftrag; #730-Fehlerklasse vermeiden)
+**Agent:** developer · **Issue:** #977 · **PR:** 2a · **AC:** AC-86 (Profil) · **Gate:** —
+**Depends on:** 3
+**Falle:** `context-profile` ist ein Top-Level-Key (`full`/`compact`), kein Objekt wie `context_file`; die UI schreibt ihn als eigene Sektion `["context-profile", contextProfile]` über den vorhandenen PUT-Route — kein neuer Endpoint, keine neue Route; Default `full` bei fehlendem/fremdem Wert (AC-35); Help-Text nennt Opt-in/UNVERIFIED bis AC-25 und AC-35, keine Verifikationsbehauptung; Whitelist `PROJECT_WRITABLE_SECTIONS` (bei `context_file`) ergänzen, sonst HTTP 400 beim Speichern.
+**Files:**
+- Modify: `scripts/admin-server.py`
+- Modify: `docs/ui/admin-ui.html`
+- Create: `tests/test_context_profile_admin.py`
+- Modify: `tests/test_admin_server.py`
+**Interfaces:** Produces Admin-UI-Dropdown „Context profile“ (`full`/`compact`, Default `full`) und writable Sektion `context-profile`; Consumes `context-profile`-Key (2a.2), `provider-overrides.<P>.context-profile`, Muster `context_file`-Panel und Topology-Admin-Test
+- [x] Step 1: Test schreiben (fail): statische UI-Asserts (Default-Zeile, Dropdown, Save-Payload, Help-Marker) + `"context-profile" in PROJECT_WRITABLE_SECTIONS` und PUT-Akzeptanz
+- [x] Step 2: implementieren
+- [x] Step 3: Test (pass): `python3 -m pytest tests/test_context_profile_admin.py tests/test_admin_ui_git_section.py tests/test_context_topology_admin.py -q`
+- [x] Step 4: commit `feat: expose the context profile switch in the admin ui`
 
 ## Paket 2b — Routing-Zeilenformat und Render-Verdichtung (IC-04…IC-08, C1–C7)
 
-### Task 9: 2b.1 — Routing-Zeilenformat für `compact` implementieren
+### Task 10: 2b.1 — Routing-Zeilenformat für `compact` implementieren
 **Agent:** senior-developer · **Issue:** #977 · **PR:** 2b · **parallel_group:** 2b-g1 · **AC:** AC-31, AC-69 (Zeilenformat-Teil), AC-27 (Teil) · **Gate:** — (Opt-in-Merge; „as verified“ erst 2f.3 — offene Nutzerfrage 1)
 **Depends on:** 4
 **Voraussetzung:** Task 1.10 der Phase 1 (IC-18 Nr. 2, Pipelines-Filter) ist mit #992 gemergt — nicht Teil dieses Plans.
@@ -244,7 +260,7 @@ pipeline_stages:
 - [ ] Step 3: Test (pass): `python3 -m pytest tests/test_routing_lines_compact.py tests/test_routing_tool_definitions.py tests/test_ac01_render_identity.py -q`
 - [ ] Step 4: commit `feat: render compact routing lines for opt-in profile`
 
-### Task 10: 2b.2 — Orchestrator-§2a/§9/Agent-Tabelle per Profil-Konditional verdichten
+### Task 11: 2b.2 — Orchestrator-§2a/§9/Agent-Tabelle per Profil-Konditional verdichten
 **Agent:** prompt-engineer · **Issue:** #977 · **PR:** 2b · **parallel_group:** 2b-g1 · **AC:** AC-24 (C1/C2-Teil), AC-23 (IC-05-Template-Teil) · **Gate:** —
 **Depends on:** 4
 **Falle:** `{{else}}`-Zweig ist der unveränderte heutige Text (byte-stabil in `full`); Active-Set-Konditionale (IC-18 Nr. 4–8) gelten in beiden Zweigen unabhängig; §1/§2/§4/§5/§6/§7/§11 verbatim; Version-Bump (Minor) + `based-on`-Prüfung der Plattform-Varianten; **Standalone-Export:** `CONTEXT_PROFILE_COMPACT: "false"` in `standalone._CONDITIONAL_FALSE_FLAGS` (`standalone.py:121`) ergänzen, sonst leakt das Konditional in den Standalone-Render; **Rebaseline Pflicht (A-F-1):** der Minor-Bump ändert den gerenderten Orchestrator (Frontmatter-Version im Golden) ⇒ `tests/fixtures/slimming-golden/orchestrator.md` + `tests/fixtures/ac01-baseline/hashes.json` neu einfrieren **und** Rebaseline-Log in `tests/test_ac01_render_identity.py` ergänzen (Begründung im PR); **QG-5:** neues `compact`-Golden.
@@ -262,9 +278,9 @@ pipeline_stages:
 - [ ] Step 3: Test (pass): `python3 -m pytest tests/test_orchestrator_compact_sections.py tests/test_template_slimming_equivalence.py tests/test_ac01_render_identity.py tests/test_standalone_export_in_sync.py -q`
 - [ ] Step 4: commit `feat: compact orchestrator sections behind context profile`
 
-### Task 11: 2b.3 — Gate-Card und kompakte Agentenliste im Entry-File bereitstellen
+### Task 12: 2b.3 — Gate-Card und kompakte Agentenliste im Entry-File bereitstellen
 **Agent:** senior-developer · **Issue:** #977 · **PR:** 2b · **AC:** AC-24 (C3-Teil), AC-26 (Entry-File-Ziele) · **Gate:** —
-**Depends on:** 9, 10, 7
+**Depends on:** 10, 11, 7
 **Voraussetzung:** In der konservativen Variante (offene Nutzerfrage 1) bleibt 2b.1 ungemergt — 2b.3 baut dann als gestackter Branch auf dem 2b.1-Branch-Stand auf (Rebase-Kette, s. Ausführungsmodell „Konservative Variante“; kein Ausführungsblocker).
 **Falle:** Gate-Texte werden per Section-Extraktion aus den Quell-Rules geholt (keine Kopie); Quellen `config/context-anchors.yaml::gate_card_sections`; fehlende Sektion ⇒ `SyncError`; Pointer nur auf existierende Pfade (IC-10 `context.dangling-pointer`); Entry-File ≥ `context_hard_cap_bytes` ⇒ `SyncError` `context.over-hard-cap` (nie still schreiben); **QG-5:** neues `compact`-Golden für das Entry-File.
 **Files:**
@@ -280,9 +296,9 @@ pipeline_stages:
 - [ ] Step 3: Test (pass): `python3 -m pytest tests/test_gate_card_compact.py tests/test_provider_matrix_sync.py -q`
 - [ ] Step 4: commit `feat: add compact gate card and agent list to entry files`
 
-### Task 12: 2b.4 — REFERENCE-Anteile generischer Rules in den Skills-Kanal verlagern
+### Task 13: 2b.4 — REFERENCE-Anteile generischer Rules in den Skills-Kanal verlagern
 **Agent:** senior-developer · **Issue:** #977 · **PR:** 2b · **AC:** AC-24 (C5-Teil), AC-32 (IC-07-Klausel) · **Gate:** —
-**Depends on:** 11
+**Depends on:** 12
 **Falle:** Klassifikation erweitert `_COMPACT_PLATFORM_RULES` (`context.py:1784`) um `a2a-delegation-gates`, `branch-guard`, `submodule-protection`, `security-paved-roads` nach `docs/guides/context-block-inventory.md`; INSTRUKTION-Kerne bleiben embedded; ohne Skills-Kanal bleibt der Volltext embedded (Invariante §4.3); `lazy` nur, wenn für jeden Teiler über einen gelesenen Kanal erreichbar, sonst embed + WARN; keine zweite Schreiblogik — bestehender Phase-1-Skill-Writer.
 **Files:**
 - Modify: `scripts/lib/context.py`
@@ -293,9 +309,9 @@ pipeline_stages:
 - [ ] Step 3: Test (pass): `python3 -m pytest tests/test_compact_rule_channels.py tests/test_lazy_skills_channel.py tests/test_context_budget_checks.py -q`
 - [ ] Step 4: commit `feat: lazy-load reference rule sections in compact profile`
 
-### Task 13: 2b.5 — CLAUDE.md-Notizen im `compact`-Profil als HTML-Kommentare rendern
+### Task 14: 2b.5 — CLAUDE.md-Notizen im `compact`-Profil als HTML-Kommentare rendern
 **Agent:** developer · **Issue:** #977 · **PR:** 2b · **AC:** AC-24 (C6-Teil) · **Gate:** —
-**Depends on:** 12
+**Depends on:** 13
 **Falle:** nur für Dateien, deren alleiniger Leser Capability `strips_html_comments: true` hat (Claude); nie in geteilten Dateien; `full` byte-identisch.
 **Files:**
 - Modify: `templates/context/claude-managed.md`
@@ -307,9 +323,9 @@ pipeline_stages:
 - [ ] Step 3: Test (pass): `python3 -m pytest tests/test_gate_card_compact.py tests/test_context_docs_corrections.py -q`
 - [ ] Step 4: commit `feat: render claude notes as html comments in compact profile`
 
-### Task 14: 2b.6 — CHANGELOG und Klassifikations-Doku für Paket 2b pflegen
+### Task 15: 2b.6 — CHANGELOG und Klassifikations-Doku für Paket 2b pflegen
 **Agent:** documenter · **Issue:** #977 · **PR:** 2b · **AC:** AC-24 (Doku), AC-86 (Unverified-Hinweis) · **Gate:** —
-**Depends on:** 9, 10, 11, 12, 13
+**Depends on:** 10, 11, 12, 13, 14
 **Falle:** `compact` bleibt „Opt-in, unverifiziert“; Klassifikationstabelle in `docs/guides/context-block-inventory.md` muss die vier neuen REFERENCE-Regeln führen.
 **Files:**
 - Modify: `CHANGELOG.md`
@@ -323,9 +339,9 @@ pipeline_stages:
 
 ## Paket 2c — Budgets, Anker und Report für `compact` (IC-09…IC-12)
 
-### Task 15: 2c.1 — Pflicht-Anker für `compact` in der Anker-Registry hinterlegen
+### Task 16: 2c.1 — Pflicht-Anker für `compact` in der Anker-Registry hinterlegen
 **Agent:** tester · **Issue:** #977 · **PR:** 2c · **parallel_group:** 2c-g1 · **AC:** AC-24 (QG-3), AC-06 (compact-Teil) · **Gate:** —
-**Depends on:** 11, 13
+**Depends on:** 12, 14
 **Falle:** `compact-only`-Listen je Artefakt-Kind füllen (Gate-Card-Anker inkl. MCP-Deny-Tokens, erstmals MCP-active Fixture); Anker sind wörtlich, Änderungen brechen den Test bewusst.
 **Files:**
 - Modify: `config/context-anchors.yaml`
@@ -337,9 +353,9 @@ pipeline_stages:
 - [ ] Step 3: Test (pass): `python3 -m pytest tests/test_context_anchors.py -q`
 - [ ] Step 4: commit `chore: pin compact profile anchors in the registry`
 
-### Task 16: 2c.2 — `--context-report --profile compact|both` real rendern und Ziele pinnen
+### Task 17: 2c.2 — `--context-report --profile compact|both` real rendern und Ziele pinnen
 **Agent:** senior-developer · **Issue:** #977 · **PR:** 2c · **parallel_group:** 2c-g1 · **AC:** AC-26, AC-11 (Δ) · **Gate:** —
-**Depends on:** 13
+**Depends on:** 14
 **Falle:** kein stdout-only-Modus; Rendern in ein Arbeitsverzeichnis via `resolve_work_dir`; `--profile compact` injiziert `context-profile: compact` in die Temp-Kopie, nicht in die Projekt-Config; Zielwerte **nicht** als Lib-Konstante in `context_report.py` führen, sondern als Test-/Config-Daten: QG-4-Pins in `tests/test_context_budgets.py` plus Caps als Config-Keys (C7); Ziele als Schätzwerte markieren (Spec §11), nie still anpassen.
 **Files:**
 - Modify: `scripts/lib/context_report.py`
@@ -352,9 +368,9 @@ pipeline_stages:
 - [ ] Step 3: Test (pass): `python3 -m pytest tests/test_context_report.py tests/test_context_budgets.py -q`
 - [ ] Step 4: commit `feat: report and pin compact profile budgets`
 
-### Task 17: 2c.3 — Provider-Matrix 9×2, Idempotenz und `compact`-Checks absichern
+### Task 18: 2c.3 — Provider-Matrix 9×2, Idempotenz und `compact`-Checks absichern
 **Agent:** tester · **Issue:** #977 · **PR:** 2c · **AC:** AC-24 (QG-2), AC-27, AC-28 · **Gate:** —
-**Depends on:** 15, 16, 12
+**Depends on:** 16, 17, 13
 **Voraussetzung:** In der konservativen Variante (2b.1-Hold-back, offene Nutzerfrage 1) laufen Matrix und `--check`-Nachweis gegen den Kandidaten-Build des 2b.1-Branch-Stacks (s. Ausführungsmodell); `Depends on:` bleibt unverändert.
 **Falle:** Multi-Provider-Kombinationen mit Shared-File-Downgrade einschließen; `--check` ist nach `compact`-Sync grün (zweimaliger Sync byte-identisch); `context.dangling-pointer`/`context.rule-unreachable` laufen für `compact` auf ihrer Phase-1-Stufe (ERROR) — Fixtures müssen matrixweit 0 Befunde liefern; **QG-2-Vollset explizit:** Mengengleichheit `full` ↔ `compact` für Rollen, Keywords, Pipeline-Signal-Keywords, Flags (`required`/`recommended`/`orchestrator_only`), Name-only-Liste + Gründe; die IC-04-Beispielregel ist verifiziert; jeder in `compact` entfernte Abschnitt (§2a, §9-Begründung, Contracts, `short_desc`) ist über einen existierenden Pointer erreichbar (Pfad existiert, Abschnitt dort vorhanden).
 **Files:**
@@ -368,9 +384,9 @@ pipeline_stages:
 - [ ] Step 4: commit `test: cover compact profile across the provider matrix`
 - [ ] Step 5: Nachweis `sync.py --check` nach `compact`-Sync (Ausgabe im PR protokollieren)
 
-### Task 18: 2c.4 — Doku und CHANGELOG für das `compact`-Profil veröffentlichen
+### Task 19: 2c.4 — Doku und CHANGELOG für das `compact`-Profil veröffentlichen
 **Agent:** documenter · **Issue:** #977 · **PR:** 2c · **AC:** AC-26 (Doku), AC-86 · **Gate:** —
-**Depends on:** 17
+**Depends on:** 18
 **Falle:** Ziele als Schätzungen kennzeichnen; keine Aussage zu AC-25; `--profile compact|both` in `docs/api/cli-reference.md` von „reserved for Phase 2“ auf den realen Stand heben.
 **Files:**
 - Modify: `docs/api/cli-reference.md`
@@ -385,7 +401,7 @@ pipeline_stages:
 
 ## Paket 2d — Config-Optimizer, Applier, Laufzeit-Leser (IC-24, IC-25, IC-35)
 
-### Task 19: 2d.1 — Laufzeit-Leser-Registry mit Credential-Markierung anlegen
+### Task 20: 2d.1 — Laufzeit-Leser-Registry mit Credential-Markierung anlegen
 **Agent:** developer · **Issue:** #977 · **PR:** 2d · **AC:** AC-81 (Registry-Teil), AC-89 (Credential-Muster) · **Gate:** —
 **Depends on:** —
 **Voraussetzung:** 0a-III (IC-34, #981) und 0b (IC-17, #984) sind gemergt — nicht Teil dieses Plans.
@@ -401,9 +417,9 @@ pipeline_stages:
 - [ ] Step 3: Test (pass): `python3 -m pytest tests/test_runtime_config_readers.py tests/test_doctor_fixtures.py -q`
 - [ ] Step 4: commit `feat: add runtime config reader registry with credentials`
 
-### Task 20: 2d.2 — Optimizer-Runner mit Kandidaten, Fan-out und L0-Beweis bereitstellen
+### Task 21: 2d.2 — Optimizer-Runner mit Kandidaten, Fan-out und L0-Beweis bereitstellen
 **Agent:** senior-developer · **Issue:** #977 · **PR:** 2d · **AC:** AC-54, AC-55 (Beweis-Teil inkl. L0-Vergleichsmenge), AC-57 (Hinweis-Klassifikation, `--include-semantic`), AC-58, AC-75/AC-94/AC-98 (Optimizer-Teil), AC-89 (Runner-Teil), AC-91 (Proposal-Felder) · **Gate:** —
-**Depends on:** 19
+**Depends on:** 20
 **Falle:** Sentinel-Render in `<tmp-sink>/meta-optimizer/<ts>/work/` via `resolve_work_dir` (nie Systemtemp); Konditional-Variablen nicht umschließen (`occurrences: null`, `conditional: true`); Credential-Pfade ohne Kandidat/Hinweis/FanOutEntry/Wert in `rationale`; Universe-Prüfung für `no-effect` (`variables.*` nur ohne Template-Referenz oder builder-überschrieben); `--fill-defaults` in derselben Invocation ⇒ `meta-optimizer.lossy-flag` (Exit 2); Sink deaktiviert ⇒ `tmp-sink.disabled` (Exit 2); Projekt-/Framework-Hash-Snapshot belegt „schreibt nur in den Sink“; **L0-Vergleichsmenge (AC-55 Rev. 3):** `.meta-config/auto-commit-allowlist.json` liegt heute **nicht** in der Vergleichsmenge (`generated_file_drift.py` walkt nur Provider-Verzeichnisse; `_sync_stage_auto_commit_allowlist` schreibt bewusst **nach** der Hash-Capture, `sync_pipeline.py:1571-1579`) ⇒ in die L0-Vergleichsmenge von `prove(...)` aufnehmen und testen; **semantische Arten** (`duplicate-value`, `relocate-*`, `semantic-merge`) erscheinen nur mit `--include-semantic` (AC-57). **Weitere `.meta-config/*.json` (§13, „Planer prüft“):** `generated-file-hashes.json` und `context-hashes.json` werden wie `.meta-config/auto-commit-allowlist.json` in die L0-Vergleichsmenge **aufgenommen** (beide sind render-abgeleitete Sidecars; ein wirkungsfreier Kandidat darf sie nicht ändern) und in `proof.json` als Vergleichsdateien gelistet.
 **Files:**
 - Create: `scripts/lib/meta_optimizer.py`
@@ -420,9 +436,9 @@ pipeline_stages:
 - [ ] Step 3: Test (pass): `python3 -m pytest tests/test_meta_optimizer_runner.py tests/test_meta_optimizer_fanout.py -q && python3 scripts/consistency-check.py`
 - [ ] Step 4: commit `feat: add config optimizer runner with fan-out and proof`
 
-### Task 21: 2d.3 — Applier mit Vorschau, Neuberechnung und Remove-only einführen
+### Task 22: 2d.3 — Applier mit Vorschau, Neuberechnung und Remove-only einführen
 **Agent:** senior-developer · **Issue:** #977 · **PR:** 2d · **AC:** AC-55 (Anwendung), AC-56, AC-80, AC-90 (Applier-Teil), AC-91 (Anwendbarkeit: `version-mismatch`, `rejected: not-applicable`), AC-57 (`rejected: not-applicable`), AC-75/AC-94 (Applier-Teil), AC-89 (Redaktion/Mode) · **Gate:** —
-**Depends on:** 20
+**Depends on:** 21
 **Falle:** `--accept` Pflicht; ohne `--preview` und ohne `--dry-run` ⇒ Exit 2; Neuberechnung + Remove-only (`after_yaml` Zeilen-Teilfolge) + Hunk-Abgleich (redigierte Formen); TOCTOU-Recheck vor `os.replace`; Temp-Datei `<sink>/meta-optimizer/<ts>/project.yaml.new`, cross-device ⇒ Exit 1 `meta-optimizer.cross-device`; `project.yaml.bak` nur mit redigierten Credential-Werten, `applied.json.approval_source` ausschließlich `relayed`, `backup_redacted_keys` nur Namen; Hinweis-ID in `--accept` ⇒ `rejected: not-applicable`; `--accept-runtime` für `confirm-runtime`; alle Sink-Dateien `0600`; **`version-mismatch` (AC-91):** weicht `proposal.json.agent_meta_version` von der laufenden Framework-Version ab ⇒ Exit 1, nichts wird geschrieben.
 **Files:**
 - Modify: `scripts/lib/meta_optimizer.py`
@@ -437,9 +453,9 @@ pipeline_stages:
 - [ ] Step 3: Test (pass): `python3 -m pytest tests/test_meta_optimizer_applier.py tests/test_meta_optimizer_runner.py -q`
 - [ ] Step 4: commit `feat: add remove-only config patch applier with preview binding`
 
-### Task 22: 2d.4 — `fill_defaults`-Wechselwirkung als `info-only` abbilden
+### Task 23: 2d.4 — `fill_defaults`-Wechselwirkung als `info-only` abbilden
 **Agent:** developer · **Issue:** #977 · **PR:** 2d · **AC:** AC-82 · **Gate:** —
-**Depends on:** 21
+**Depends on:** 22
 **Falle:** `refill_keys` aus **denselben** Funktionen berechnen, die `fill_defaults` nutzt (`config_field_defaults()`, Schema-Top-Level-Defaults, Sonderblöcke `repo_containment`/`project.short`/`dod`), keine Kopie; für diese Keys nie ein Entfernungs-Hunk, nur `info-only` mit Mark `refilled-by-defaults` und Pflichttext; `structural-simplify` erzeugt nie einen Hunk.
 **Files:**
 - Modify: `scripts/lib/meta_optimizer.py`
@@ -450,9 +466,9 @@ pipeline_stages:
 - [ ] Step 3: Test (pass): `python3 -m pytest tests/test_meta_optimizer_refill.py -q`
 - [ ] Step 4: commit `feat: mark refilled defaults as non-removable hints`
 
-### Task 23: 2d.5 — `inactive-scope`-Kandidaten mit Reaktivierungs-Warnung ausweisen
+### Task 24: 2d.5 — `inactive-scope`-Kandidaten mit Reaktivierungs-Warnung ausweisen
 **Agent:** developer · **Issue:** #977 · **PR:** 2d · **AC:** AC-83 · **Gate:** —
-**Depends on:** 22
+**Depends on:** 23
 **Falle:** Abgrenzung zu `no-effect`: nur im aktuellen Active Set wirkungslos ⇒ `inactive-scope` (nicht `no-effect`), `deterministic: false`, Mark `reactivation-loss-warning` mit Pflichttext „Bei späterer Reaktivierung …“; Fixture p10-artig (`tests/fixtures/active-set/p10`); nach Anwendung + Re-Sync mit aktivierter Rolle erscheint `active-set.unresolved-placeholder` bzw. der Framework-Default, wie in der Warnung angekündigt.
 **Files:**
 - Modify: `scripts/lib/meta_optimizer.py`
@@ -463,9 +479,9 @@ pipeline_stages:
 - [ ] Step 3: Test (pass): `python3 -m pytest tests/test_meta_optimizer_inactive_scope.py -q`
 - [ ] Step 4: commit `feat: classify inactive-scope candidates with reactivation warning`
 
-### Task 24: 2d.6 — Laufzeit-Leser als `confirm-runtime` markieren
+### Task 25: 2d.6 — Laufzeit-Leser als `confirm-runtime` markieren
 **Agent:** developer · **Issue:** #977 · **PR:** 2d · **AC:** AC-81 · **Gate:** —
-**Depends on:** 23
+**Depends on:** 24
 **Falle:** Mark `runtime-reader` + `approval_level: confirm-runtime` + Pflichttext mit Leser-Namen aus der Registry; ohne `--accept-runtime` ⇒ `rejected: needs-runtime-confirmation`; Credential-Keys haben Vorrang und erscheinen nicht; kein Ausschluss (Nutzerentscheidung), nur Markierung.
 **Files:**
 - Modify: `scripts/lib/meta_optimizer.py`
@@ -476,9 +492,9 @@ pipeline_stages:
 - [ ] Step 3: Test (pass): `python3 -m pytest tests/test_meta_optimizer_marks.py tests/test_runtime_config_readers.py -q`
 - [ ] Step 4: commit `feat: require runtime confirmation for runtime-reader keys`
 
-### Task 25: 2d.7 — Credential-Ausschluss und Sink-Härtung end-to-end absichern
+### Task 26: 2d.7 — Credential-Ausschluss und Sink-Härtung end-to-end absichern
 **Agent:** tester · **Issue:** #977 · **PR:** 2d · **AC:** AC-89 · **Gate:** —
-**Depends on:** 21, 24
+**Depends on:** 22, 25
 **Falle:** Fixture mit `admin-ui.token` (Testwert ≥ 20 Zeichen), `admin-ui.token-file`, `variables.API_TOKEN` und einem `scan_for_secrets`-Treffer; Testwert darf in **keiner** Datei unter `<tmp-sink>/meta-optimizer/` als Byte-Folge vorkommen; Redaktionsmarker im Diff-Kontext; Modus `0600` (POSIX, sonst Skip); `max-tokens-overrides` Negativfall.
 **Files:**
 - Create: `tests/test_meta_optimizer_credentials.py`
@@ -491,9 +507,9 @@ pipeline_stages:
 
 ## Paket 2e — Rolle `meta-optimizer` und Freigabe-Workflow (IC-26, IC-27, IC-28)
 
-### Task 26: 2e.1 — Rolle `meta-optimizer` als read-only Proposal-Rolle anlegen
+### Task 27: 2e.1 — Rolle `meta-optimizer` als read-only Proposal-Rolle anlegen
 **Agent:** prompt-engineer · **Issue:** #977 · **PR:** 2e · **AC:** AC-79, AC-59 (Rollen-Teil), AC-91 (Berichts-Teil) · **Gate:** —
-**Depends on:** 20, 21
+**Depends on:** 21, 22
 **Falle:** `tools: [Read, Glob, Grep, TodoWrite]` — kein Bash/Write/Edit/Agent; Output-Contract mit `ARTIFACTS: none`; `warnings` wörtlich, Hinweise als „nicht anwendbar — manuelle Nutzeränderung bzw. Framework-Issue“; keine Credential-Werte zitieren; `name_only` ohne `routing_patterns`; H-4-Texte (`description`, `short_desc`, `name_only_reason`) ausformuliert; ausführender Schritt liegt bei `agent-meta-manager` (IC-27); **Standalone-Check (A-F-2):** Quelle auf Konditionale prüfen — enthält sie `{{#if …}}`, fehlende Einträge in `standalone._CONDITIONAL_FALSE_FLAGS` ergänzen (sonst keine Änderung; Ergebnis im PR notieren).
 **Files:**
 - Create: `agents/1-generic/meta-optimizer.md`
@@ -505,9 +521,9 @@ pipeline_stages:
 - [ ] Step 3: Test (pass): `python3 -m pytest tests/test_meta_optimizer_role.py -q && python3 scripts/consistency-check.py`
 - [ ] Step 4: commit `feat: add read-only meta-optimizer proposal role`
 
-### Task 27: 2e.2 — `meta-optimizer` nach IC-28 registrieren und Goldens rebaselinen
+### Task 28: 2e.2 — `meta-optimizer` nach IC-28 registrieren und Goldens rebaselinen
 **Agent:** developer · **Issue:** #977 · **PR:** 2e · **AC:** AC-23 (Ausnahmeliste (i)–(iii)), AC-59 (Registrierung) · **Gate:** —
-**Depends on:** 26
+**Depends on:** 27
 **Falle:** `_EXPECTED_TOTAL` 93 → 94, Verteilung `{"keyword": 88, "name_only": 5, "excluded": 1}`, sortierte Liste in `test_name_only_roles_have_reason` (`intern-developer`, `meta-doctor`, `meta-optimizer`, `principal-developer`, `template-auditor`); `_GOLDEN_ROLE_COUNT` bleibt 58; `_EXPECTED_GROUPS` unverändert (`tests/test_role_activation_schema.py`; Q17: keine Gruppe); Golden-/`hashes.json`-Rebaseline mit Begründung; AC-01/AC-23-Ausnahmeliste rollenspezifisch erweitern (**nie pauschal**); **`AC01_EXCEPTIONS`-Pattern:** `.*/meta-optimizer\.[a-z]+$` fasst `meta-optimizer.agent.md` nicht (Punkt im Suffix) ⇒ auf `.*/meta-optimizer\.(md|toml|agent\.md)$` erweitern (Muster `meta-doctor`).
 **Files:**
 - Modify: `config/project-config.schema.json`
@@ -530,9 +546,9 @@ pipeline_stages:
 - [ ] Step 3: Test (pass): `python3 -m pytest tests/test_role_addressability_coverage.py tests/test_standalone_export_in_sync.py tests/test_ac01_render_identity.py -q && bash tests/scenarios/run.sh 78-meta-optimizer-role`
 - [ ] Step 4: commit `chore: register meta-optimizer role across schema and goldens`
 
-### Task 28: 2e.3 — Contract `config-patch-proposal-v1` verdrahten
+### Task 29: 2e.3 — Contract `config-patch-proposal-v1` verdrahten
 **Agent:** prompt-engineer · **Issue:** #977 · **PR:** 2e · **AC:** AC-59 (Consumer) · **Gate:** —
-**Depends on:** 26
+**Depends on:** 27
 **Falle:** `agent-meta-manager` muss den Contract in `handoff.input_contracts` führen, sonst `handoff.output-not-consumed`; `config-patch-proposal-v1` bleibt Phase-2-Contract (nicht 0e); Schema-Ablage nach bestehendem Muster unter `schemas/handoffs/`.
 **Files:**
 - Modify: `config/role-defaults.yaml`
@@ -544,9 +560,9 @@ pipeline_stages:
 - [ ] Step 3: Test (pass): `python3 scripts/consistency-check.py && python3 -m pytest tests/test_meta_optimizer_role.py -q`
 - [ ] Step 4: commit `feat: wire config-patch-proposal contract into the manager`
 
-### Task 29: 2e.4 — `agent-meta-manager`-Workflow um Analyse, Vorschau und Anwendung ergänzen
+### Task 30: 2e.4 — `agent-meta-manager`-Workflow um Analyse, Vorschau und Anwendung ergänzen
 **Agent:** prompt-engineer · **Issue:** #977 · **PR:** 2e · **AC:** AC-59, AC-90 (Manager-Schritte), AC-91 (Manager-Teil) · **Gate:** —
-**Depends on:** 28
+**Depends on:** 29
 **Falle:** drei Schritte (1) `sync.py --optimize-config --json --out {{TMP_SINK_PATH}}/meta-optimizer/<ts>/` ausführen und Pfad zurückgeben, (2) Vorschau `--dry-run` erzeugen, (3) Anwendung nur `--preview <preview.json>` nach wörtlich weitergeleiteter Nutzerantwort; `project.yaml` nie per `Edit`; kein `--fill-defaults`; Version-Bump + Golden-Rebaseline.
 **Files:**
 - Modify: `agents/1-generic/agent-meta-manager.md`
@@ -560,9 +576,9 @@ pipeline_stages:
 - [ ] Step 3: Test (pass): `python3 scripts/consistency-check.py && python3 -m pytest tests/test_meta_optimizer_role.py tests/test_ac01_render_identity.py -q`
 - [ ] Step 4: commit `feat: add optimizer apply workflow to agent-meta-manager`
 
-### Task 30: 2e.5 — Orchestrator zur Vorschau-Pflicht verpflichten
+### Task 31: 2e.5 — Orchestrator zur Vorschau-Pflicht verpflichten
 **Agent:** prompt-engineer · **Issue:** #977 · **PR:** 2e · **AC:** AC-90 (Orchestrator-Teil), AC-23 (IC-27-Template-Teil) · **Gate:** —
-**Depends on:** 29
+**Depends on:** 30
 **Falle:** `preview.json` muss dem Nutzer über `main_chat` gezeigt werden, bevor eine Anwendung veranlasst wird; keine Ergänzung von IDs, die nicht wörtlich in der weitergeleiteten Nutzerantwort stehen; kein Bash für Orchestrator/`meta-optimizer`; Version-Bump + Rebaseline (`tests/fixtures/slimming-golden/orchestrator.md`, `tests/fixtures/ac01-baseline/hashes.json`, Rebaseline-Log in `tests/test_ac01_render_identity.py`).
 **Files:**
 - Modify: `agents/1-generic/orchestrator.md`
@@ -576,9 +592,9 @@ pipeline_stages:
 - [ ] Step 3: Test (pass): `python3 -m pytest tests/test_meta_optimizer_role.py tests/test_orchestrator_compact_sections.py tests/test_ac01_render_identity.py -q`
 - [ ] Step 4: commit `feat: require optimizer preview approval in orchestrator`
 
-### Task 31: 2e.6 — Szenario-78-Asserts, CLI-Doku und Konventions-Praxis abschließen
+### Task 32: 2e.6 — Szenario-78-Asserts, CLI-Doku und Konventions-Praxis abschließen
 **Agent:** documenter · **Issue:** #977 · **PR:** 2e · **AC:** AC-59 (Doku/Szenario), AC-79/AC-91 (Asserts) · **Gate:** —
-**Depends on:** 27, 30
+**Depends on:** 28, 31
 **Falle:** Asserts prüfen je Provider generiert, kein Bash/Write/Edit/Agent, OpenCode `edit: deny`, kein `model:` in der Quelle, Platzhalter aufgelöst, keine Keyword-Regel in `routing.rules`, jede `warnings`-Zeile wörtlich, `ARTIFACTS: none`; `docs/api/cli-reference.md` dokumentiert beide Optimizer-Flags inkl. Exit-Codes; Praxis-Hinweise in `agent-meta-conventions.md` ergänzen.
 **Files:**
 - Modify: `tests/scenarios/asserts/78-meta-optimizer-role.sh` (chmod +x)
@@ -599,7 +615,7 @@ pipeline_stages:
 
 > **Start nur nach Gate:** Diese Tasks werden ohne erfülltes Gate nicht begonnen (keine Vorbereitung von Läufen „auf Vorrat“). Vor jedem Lauf: Kostenschätzung anzeigen (`eval_gate.format_estimate`), ausdrückliche Nutzerfreigabe einholen; Ablehnung ⇒ `SKIPPED-BY-USER`-Record (Muster Task 2.00) und Gate bleibt „nicht belegt“.
 
-### Task 32: 2f.1 — Role-Routing-Baseline (`full`) mit ≥ 2 Modellklassen nachversuchen
+### Task 33: 2f.1 — Role-Routing-Baseline (`full`) mit ≥ 2 Modellklassen nachversuchen
 **Agent:** test-executor · **Issue:** #977 · **PR:** 2f-I · **AC:** AC-02 (inkl. Reproduktionslauf), AC-62 (Baseline-Teil) · **Gate:** Nutzerfreigabe (Kostenschätzung zuerst)
 **Depends on:** —
 **Falle:** ≥ 2 Modellklassen × ≥ 3 Läufe je Metrik, σ je Metrik, Korpus-Hash, Modell-IDs und Parameter in der Baseline-Datei; **AC-02 umfasst den Reproduktionslauf:** ein zweiter Lauf mit identischer Config reproduziert jede Metrik innerhalb der dokumentierten Streuung (σ) — als `repro`-Abschnitt der Baseline-Datei nachweisen (gleiche Config, Modell-IDs, Parameter); Abbruch ohne Freigabe ⇒ `SKIPPED-BY-USER` (neuer Record, Task 2.00 aktualisieren).
@@ -612,9 +628,9 @@ pipeline_stages:
 - [ ] Step 3: Test (pass): `python3 -m pytest tests/test_eval_baseline_schema.py tests/test_eval_gate.py -q`
 - [ ] Step 4: commit `chore: record full profile routing baseline`
 
-### Task 33: 2f.2 — `compact`-Eval gegen die Baseline fahren (AC-25)
+### Task 34: 2f.2 — `compact`-Eval gegen die Baseline fahren (AC-25)
 **Agent:** test-executor · **Issue:** #977 · **PR:** 2f-II · **AC:** AC-25 · **Gate:** AC-02 belegt (2f.1) **und** 2a–2c gemergt **oder** konservative Variante: Kandidaten-Build aus dem 2b.1-Branch (offene Nutzerfrage 1 — der Eval rendert echte `compact`-Artefakte; kein Zirkularitätsproblem)
-**Depends on:** 32
+**Depends on:** 33
 **Falle:** je Metrik Richtung und Toleranz aus IC-36 (`τ = max(1 pp, k·σ)`, k = 2), gepaarte Fälle nach Möglichkeit; Batch je PR; Ergebnisdateien versioniert; Verschlechterung ⇒ Gate „nicht bestanden“, keine Merge-Freigabe für „as verified“.
 **Files:**
 - Create: `tests/routing-llm-eval/roles/baseline/<date>-<model>-compact.json` (bzw. Ergebnisdateien)
@@ -625,9 +641,9 @@ pipeline_stages:
 - [ ] Step 3: Test (pass): `python3 -m pytest tests/test_eval_gate.py tests/test_eval_baseline_schema.py -q`
 - [ ] Step 4: commit `chore: evaluate compact profile routing against baseline`
 
-### Task 34: 2f.3 — Verifikationsanspruch und INFO-Absenz nach belegtem AC-25 herstellen
+### Task 35: 2f.3 — Verifikationsanspruch und INFO-Absenz nach belegtem AC-25 herstellen
 **Agent:** senior-developer · **Issue:** #977 · **PR:** 2f-III · **AC:** AC-25 (Abschluss), AC-86 (Profil-Teil), AC-26 (Claim) · **Gate:** AC-25 belegt (2f.2)
-**Depends on:** 33
+**Depends on:** 34
 **Falle:** nur bei belegtem AC-25 verschwindet die INFO `context-profile.unverified`; kein Default wechselt auf `compact` (Test bleibt bestehen); Doku/CHANGELOG dürfen erst jetzt Verifikation nennen; `compact` bleibt Opt-in.
 **Files:**
 - Modify: `scripts/lib/context_profile_gate.py` (Evidenz-Auswertung)
@@ -647,8 +663,8 @@ pipeline_stages:
 Ergebnis (geprüft gegen Spec §8, §9, §9.1, IC-01…IC-12, IC-24…IC-28, IC-34…IC-36):
 
 - Jeder Task hat genau eine Rolle (`**Agent:**`), benannte Tests, ein nicht-leeres `Files:`- und `Interfaces:`-Feld (Produces/Consumes mit Datei + Symbol); keine unerledigten Arbeitsmarker, keine leeren Felder. Konsumierte, bereits vorhandene ICs ohne eigenen Task: IC-09 (Capability-Keys), IC-10 (Check-Signatur/Checks in `consistency/context_budget.py`/`active_set_refs.py`), IC-12 (Anker-Registry), IC-17 (ActiveSet), IC-18 Nr. 2 (Pipeline-Filter, #992) — Phase-2-Tasks konsumieren sie nur.
-- **Maschinenlesbarkeit (B-F-01-Nachweis, am 2026-10-18 gegen diese Datei ausgeführt):** `spec_plan._parse_plan_tasks` ⇒ **34 Tasks, 34 mit `Files:`-Ownership, 31 mit `Depends on:`-Kanten** (ohne Vorbedingung: Task 1/2.00, 19/2d.1, 32/2f.1); `validate_plan(FanoutPlan(kind="sequential", max_parallel=34))` ⇒ **0 Fehler** (keine Deadlocks/Zyklen/Over-Commitment); `check_plan_file_overlap` ⇒ `{"safe": 2, "conflict": 187}` — die 187 Meldungen sind Import-/Doku-Kopplungen über sequenzielle Kanten (bekanntes #266-Verhalten; `_check_plan_graph` prüft File-Overlap für sequenzielle Pläne bewusst nicht, #848), **innerhalb der vier `parallel_group`s: 0 Konflikte** (2a-g1: safe=2, 2a-g2 inkl. 2a.6: safe=3, 2b-g1: safe=2, 2c-g1: safe=2; je `conflict=0` — pairwise disjunkt laut deklariertem `Files:`).
-- Jeder AC der Phase 2 hat ≥ 1 Task (Tabelle unten; am 2026-10-18 aus den `**AC:**`-Feldern der Task-Header regeneriert, inkl. 2a.7/AC-29, 2a.2/AC-01, 2d.3/AC-57 und der AC-91/AC-98-Angleichung); AC-02/AC-25 sind explizit als Gate-Tasks (2f) ausgewiesen und heute nicht startbar.
+- **Maschinenlesbarkeit (B-F-01-Nachweis, am 2026-10-18 gegen diese Datei ausgeführt):** `spec_plan._parse_plan_tasks` ⇒ **35 Tasks, 35 mit `Files:`-Ownership, 32 mit `Depends on:`-Kanten** (ohne Vorbedingung: Task 1/2.00, 20/2d.1, 33/2f.1); `validate_plan(FanoutPlan(kind="sequential", max_parallel=35))` ⇒ **0 Fehler** (keine Deadlocks/Zyklen/Over-Commitment); `check_plan_file_overlap` ⇒ `{"safe": 2, "conflict": 195}` — die 195 Meldungen sind Import-/Doku-Kopplungen über sequenzielle Kanten (bekanntes #266-Verhalten; `_check_plan_graph` prüft File-Overlap für sequenzielle Pläne bewusst nicht, #848), **innerhalb der vier `parallel_group`s: 0 Konflikte** (2a-g1: safe=2, 2a-g2 inkl. 2a.6: safe=3, 2b-g1: safe=2, 2c-g1: safe=2; je `conflict=0` — pairwise disjunkt laut deklariertem `Files:`).
+- Jeder AC der Phase 2 hat ≥ 1 Task (Tabelle unten; am 2026-10-18 aus den `**AC:**`-Feldern der Task-Header regeneriert, inkl. 2a.7/AC-29, 2a.8/AC-86, 2a.2/AC-01, 2d.3/AC-57 und der AC-91/AC-98-Angleichung); AC-02/AC-25 sind explizit als Gate-Tasks (2f) ausgewiesen und heute nicht startbar.
 - Gate-Spuren: Spur A (ohne AC-02 auslieferbar, Opt-in, kein Verifikationsanspruch) = 2.00, 2a.\*, 2b.\*, 2c.\*, 2d.\*, 2e.\*; Spur B (belegtes AC-02/AC-25 nötig) = 2f.1–2f.3. Der `context-profile.unverified`-INFO (2a.5) ist Teil von Spur A und verschwindet erst in 2f.3; IC-04 (2b.1) wird als Opt-in gemergt, nicht „as verified“ (offene Nutzerfrage 1; konservative Variante nutzt den Kandidaten-Build des 2b.1-Branch-Stacks in 2f.2 und 2c.3).
 - Byte-Stabilität: kein Task der Spur A ändert den Default-/`full`-Render ohne Rebaseline-Eintrag in der AC-23-Ausnahmeliste (2b.2/2e.2/2e.4/2e.5 mit Minor-Bump, Golden + `hashes.json` + Rebaseline-Log); `compact` ist überall hinter `CONTEXT_PROFILE_COMPACT` bzw. den Key `context-profile` gegated.
 - Parallel-Gruppen ownership-disjunkt (Prüfung `check_plan_file_overlap`, `scripts/lib/orchestration.py:320`, auf diesem Plan): 2a-g1 (2a.1 `context_profile.py`/`test_context_profile.py` ↔ 2a.2 Schema/Example/`test_context_profile_schema.py`), 2a-g2 (2a.4 `context_budget.py`/`test_context_budget_checks.py` ∥ 2a.5 `context_profile_gate.py`/`sync_pipeline.py`/`test_context_profile_gate.py` ∥ 2a.6 `context.py`/`context_profile.py`/`test_context_profile_shared_file.py`), 2b-g1 (2b.1 `agents.py`/`delegation_table.py`/`agent_sync.py` ↔ 2b.2 `orchestrator.md`/`standalone.py`/`test_orchestrator_compact_sections.py`), 2c-g1 (2c.1 `context-anchors.yaml`/`test_context_anchors.py` ↔ 2c.2 `context_report.py`/`cli_commands.py`/`test_context_budget*`) — keine Datei doppelt.
@@ -688,7 +704,7 @@ Ergebnis (geprüft gegen Spec §8, §9, §9.1, IC-01…IC-12, IC-24…IC-28, IC-
 | AC-81 | 2d.1, 2d.6 | `tests/test_runtime_config_readers.py`, `tests/test_meta_optimizer_marks.py` |
 | AC-82 | 2d.4 | `tests/test_meta_optimizer_refill.py` |
 | AC-83 | 2d.5 | `tests/test_meta_optimizer_inactive_scope.py` |
-| AC-86 (Profil) | 2.00, 2a.5, 2a.7, 2b.6, 2c.4, 2f.3 | `tests/test_context_profile_gate.py`, `tests/test_context_profile_docs.py` |
+| AC-86 (Profil) | 2.00, 2a.5, 2a.7, 2a.8, 2b.6, 2c.4, 2f.3 | `tests/test_context_profile_gate.py`, `tests/test_context_profile_docs.py`, `tests/test_context_profile_admin.py` |
 | AC-89 | 2d.1, 2d.2, 2d.3, 2d.7 | `tests/test_runtime_config_readers.py`, `tests/test_meta_optimizer_runner.py`, `tests/test_meta_optimizer_applier.py`, `tests/test_meta_optimizer_credentials.py` |
 | AC-90 | 2d.3, 2e.4, 2e.5 | `tests/test_meta_optimizer_applier.py`, `tests/test_meta_optimizer_role.py`, Szenario 78 |
 | AC-91 (inkl. `version-mismatch`/`rejected: not-applicable`: 2d.3) | 2d.2, 2d.3, 2e.1, 2e.4, 2e.6 | `tests/test_meta_optimizer_runner.py`, `tests/test_meta_optimizer_applier.py`, `tests/test_meta_optimizer_role.py`, Szenario 78 |
