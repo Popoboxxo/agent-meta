@@ -212,6 +212,7 @@ Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 | `.claude/agents/agent-meta-manager.md` | `1-generic/agent-meta-manager.md` |
 | `.claude/agents/agent-meta-scout.md` | `1-generic/agent-meta-scout.md` |
 | `.claude/agents/meta-doctor.md` | `1-generic/meta-doctor.md` (optional, Installationsdiagnose, nur per Name ansprechbar) |
+| `.claude/agents/meta-optimizer.md` | `1-generic/meta-optimizer.md` (optional, read-only Config-Optimizer: bewertet `--optimize-config`-Proposals und liefert Varianten — nur Proposal, nur per Name ansprechbar) |
 | `.claude/agents/prompt-engineer.md` | `1-generic/prompt-engineer.md` |
 | `.claude/agents/log-analyzer.md` | `1-generic/log-analyzer.md` (oder `2-platform/homeassistant-log-analyzer.md`) |
 | `.claude/agents/feedback.md` | `1-generic/feedback.md` |
@@ -530,6 +531,7 @@ Vollständige Anleitung: `agent-meta-manager` → Abschnitt "CLAUDE.md Review & 
 - [ ] `.claude/agents/agent-meta-manager.md` vorhanden
 - [ ] `.claude/agents/agent-meta-scout.md` vorhanden
 - [ ] `.claude/agents/meta-doctor.md` vorhanden (optional, nur wenn Rolle `meta-doctor` aktiviert)
+- [ ] `.claude/agents/meta-optimizer.md` vorhanden (optional, nur wenn Rolle `meta-optimizer` aktiviert; read-only Proposal-Rolle, name-only)
 - [ ] `.claude/agents/prompt-engineer.md` vorhanden
 - [ ] `.claude/agents/log-analyzer.md` vorhanden
 - [ ] `.claude/agents/feedback.md` vorhanden

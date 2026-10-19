@@ -72,6 +72,12 @@ Golden rebaseline log (the frozen set is edited only with a documented reason):
     20 normalization-covered roles (A2A-line / ``</output-guard>`` position /
     Anti-Recursion block) were reported as spurious byte diffs; those goldens
     are unchanged. AC-01 hashes untouched.
+* Task 28 (2e.2, IC-28/AC-59): new role ``meta-optimizer`` registered. **No
+  golden rebaseline required**: the role is not in this repository's
+  ``.meta-config/project.yaml`` ``roles:`` whitelist, so the real-sync render
+  (``AGENT_META_TEST_REPO=… sync.py --validate``) contains no ``meta-optimizer``
+  roster/name_index/routing row and ``orchestrator.md``/``agent-meta-manager.md``
+  stay byte-identical (0 golden files changed). ``_GOLDEN_ROLE_COUNT`` stays 58.
 
 The gate is network-free, writes nothing into the repository (the render target
 is a pytest ``tmp_path``) and renders the corpus once per module (~5s).

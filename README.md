@@ -156,7 +156,7 @@ for the flags and the resolution precedence.
 | **documenter** | fast | 1.7.0 | Maintains CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md, conclusions |
 | **git** | fast | 1.4.0 | All git operations: commits, branches, merges, tags, push/pull |
 
-### Workflow & Framework (10 agents)
+### Workflow & Framework (11 agents)
 
 | Agent | Tier | Version | Description |
 |-------|------|---------|-------------|
@@ -168,6 +168,7 @@ for the flags and the resolution precedence.
 | **agent-meta-scout** | balanced | 1.1.3 | Scout AI ecosystem: new skills, roles, rules, patterns |
 | **meta-doctor** | fast | 1.0.0 | Installation diagnosis (`sync.py --doctor`; reports only to the tmp-sink): prioritizes known-issue findings, hands fixes to agent-meta-manager; name-only addressable |
 | **meta-feedback** | fast | 2.1.3 | Improvement proposals for agent-meta as GitHub issues |
+| **meta-optimizer** | balanced | 1.0.0 | Read-only config optimizer: evaluates `sync.py --optimize-config` proposals and presents token-compact, evidence-backed variants — proposal only, name-only addressable |
 | **prompt-engineer** | balanced | 1.3.1 | Expert for prompt engineering, AI security, agent design |
 | **concept-reviewer** | balanced | 1.0.3 | Reviews design docs for completeness, logic, risks, feasibility |
 
@@ -698,7 +699,7 @@ Dynamic model registry updated via `sync.py --update-models`:
 ```
 agents/
   0-external/                # External skill wrappers (dynamically cloned)
-  1-generic/                 # Universal provider-agnostic templates (60 + 13 SE agents)
+  1-generic/                 # Universal provider-agnostic templates (61 + 13 SE agents)
   2-platform/                # Platform-specific overrides (full-replacement or composition)
 config/
   role-defaults.yaml         # Agent defaults, routing, handoff contracts

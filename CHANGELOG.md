@@ -88,6 +88,15 @@
   same invocation (`meta-optimizer.lossy-flag`). No system temp use
   (AC-94) and no render scratch survives (the applier's recomputation owns and removes its scratch,
   review N2).
+- **`meta-optimizer` role registered (IC-28/AC-23/AC-59)**: the read-only config-optimizer role
+  introduced in package 2e.1 is now registered across the framework: `meta-optimizer` is in the
+  auto-generated `roles` enum of `config/project-config.schema.json`, in the pinned
+  addressability distribution (94 roles: 88 keyword, 5 name-only, 1 excluded) with its
+  `name_only` reason, in the AC-01 baseline hashes (9 per-provider artifacts plus the
+  orchestrator/`AGENTS.md`/copilot-instructions/managed-list/hash rows), in the standalone export
+  (`standalone/agents/meta-optimizer.md`) and in scenario `78-meta-optimizer-role`. The AC-01
+  exception regex now also covers the Copilot two-suffix form `meta-optimizer.agent.md`. No
+  default render behavior changes for existing roles.
 
 ### Changed
 - **Routing keywords come from a single source (IC-30)**: the orchestrator/rule routing keywords

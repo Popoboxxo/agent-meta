@@ -170,6 +170,11 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   ``context-profile`` opt-in every render only differs by that version bump. Changed: the 9
   per-provider orchestrator artifacts (``orchestrator.md``/``.toml``/``.agent.md``) plus the 9
   ``generated-file-hashes.json`` (18 hashes; 0 added/removed). No other artifact changed.
+- Task 28 (2e.2, IC-28/AC-23/AC-59): new role ``meta-optimizer`` registration: per-provider role
+  artifacts, roster/name_index/enum rows in the orchestrator, AGENTS.md/context-file rows,
+  managed-file lists and ``generated-file-hashes.json``. The exception regex is extended to
+  ``.*/meta-optimizer\\.(md|toml|agent\\.md)$`` so the Copilot two-suffix form
+  (``meta-optimizer.agent.md``) is covered. No other render changed.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
@@ -202,7 +207,7 @@ _PROVIDERS = sorted(
 # Empty entries would hide drift, so every pattern must stay role/entry specific.
 AC01_EXCEPTIONS = frozenset({
     r".*/meta-doctor\.(md|toml|agent\.md)$",
-    r".*/meta-optimizer\.[a-z]+$",
+    r".*/meta-optimizer\.(md|toml|agent\.md)$",
     r".*/standalone/agents/meta-doctor\.md$",
 })
 
@@ -316,6 +321,18 @@ def test_ac01_detects_drift(rendered):
 def test_ac01_exception_list_allows_meta_doctor_artifacts():
     baseline = {"codex/.codex/agents/developer.toml": "a"}
     current = dict(baseline, **{"codex/.codex/agents/meta-doctor.toml": "b"})
+    assert diff_against_manifest(current, baseline) == []
+
+
+def test_ac01_exception_list_allows_meta_optimizer_artifacts():
+    baseline = {"codex/.codex/agents/developer.toml": "a"}
+    current = dict(baseline, **{
+        "Claude/.claude/agents/meta-optimizer.md": "b",
+        "Codex/.codex/agents/meta-optimizer.toml": "c",
+        # Copilot uses the two-suffix form; the old `[a-z]+$` pattern misses
+        # it because of the dot in `.agent.md`.
+        "Copilot/.github/agents/meta-optimizer.agent.md": "d",
+    })
     assert diff_against_manifest(current, baseline) == []
 
 
