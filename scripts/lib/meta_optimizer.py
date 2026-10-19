@@ -71,6 +71,7 @@ from lib.active_set import compute_active_set
 from lib.config import (
     _CASCADE_MANAGED_PRESET_KEYS,
     _load_schema_defaults,
+    _VARIABLE_FALLBACKS,
     build_variables,
     config_field_defaults,
     read_version,
@@ -141,9 +142,9 @@ _RUNTIME_READER_WARNING = (
     "proven for the render, not for the reader."
 )
 _REACTIVATION_WARNING = (
-    "If the role/provider that renders this key is activated later, the value is no "
-    "longer available; the placeholder then stays unresolved or falls back to the "
-    "framework default."
+    "Bei späterer Reaktivierung der Rolle/des Providers steht dieser Wert nicht "
+    "mehr zur Verfügung; der Platzhalter bleibt dann unaufgelöst bzw. fällt auf "
+    "den Framework-Default zurück."
 )
 _REFILL_WARNING = (
     "Entfernen wäre wirkungslos: der nächste Sync (sync_pipeline.py:152) "
@@ -437,6 +438,85 @@ def _framework_references(agent_meta_root: Path) -> tuple:
             for match in _CONDITIONAL_REFERENCE_RE.finditer(text):
                 conditionals.add(match.group(1))
     return frozenset(names), frozenset(conditionals)
+
+
+def _template_role_references(agent_meta_root: Path, config: Mapping) -> dict:
+    """Map a variable name to the roles whose resolved template references it.
+
+    Uses the same source resolution as the sync (``collect_sources`` with the
+    project's ``platforms:``), so the mapping also covers platform overrides.
+    The returned values are deterministically sorted role tuples; this is the
+    role context AC-83 needs to name the inactive role(s).
+    """
+    from lib.frontmatter import collect_sources
+
+    platforms = [str(platform) for platform in (config.get("platforms") or [])]
+    try:
+        overrides, _ = collect_sources(Path(agent_meta_root), platforms)
+    except OSError:  # pragma: no cover - unreadable template tree
+        return {}
+    references: dict = {}
+    for role, path in overrides.items():
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:  # pragma: no cover - unreadable template
+            continue
+        for match in _REFERENCE_RE.finditer(text):
+            name = match.group(1) or match.group(2)
+            references.setdefault(name, set()).add(role)
+    return {name: tuple(sorted(roles)) for name, roles in references.items()}
+
+
+def _active_roles_for_scope(agent_meta_root: Path, config: Mapping, active) -> frozenset:
+    """The template-backed active role set from the ActiveSet (or a fallback).
+
+    The ActiveSet is computed once per sync and is authoritative; the
+    ``resolve_active_roles`` fallback keeps direct callers honest that pass no
+    set.
+    """
+    roles = getattr(active, "roles", None)
+    if roles is not None:
+        return frozenset(roles)
+    from lib.roles import resolve_active_roles
+
+    return frozenset(resolve_active_roles(
+        Path(agent_meta_root), dict(config), require_template=True, warn_sink=[]))
+
+
+def _inactive_reference_roles(name: str, references: Mapping,
+                              active_roles: Sequence[str],
+                              known_roles: Sequence[str] = ()) -> tuple:
+    """Roles that reference *name* in a template but are not active right now."""
+    active = set(active_roles)
+    known = set(known_roles)
+    inactive = [
+        role for role in references.get(name, ())
+        if role not in active and (not known or role in known)
+    ]
+    return tuple(sorted(inactive))
+
+
+def _reactivation_warning(roles: Sequence[str] = (),
+                          *, has_fallback: bool = False) -> str:
+    """Mandatory German reactivation warning (AC-83, spec lines 1415-1417).
+
+    Starts with "Bei späterer Reaktivierung ..." (plan Task 24), names the
+    inactive role(s) when known and announces either the framework default
+    (``_VARIABLE_FALLBACKS``) or the unresolved placeholder.
+    """
+    roles = tuple(sorted({str(role) for role in roles}))
+    if roles:
+        label = "der Rolle" if len(roles) == 1 else "der Rollen"
+        subject = "{} {}".format(label, ", ".join("'{}'".format(role) for role in roles))
+    else:
+        subject = "der Rolle/des Providers"
+    if has_fallback:
+        tail = "der Platzhalter fällt dann auf den Framework-Default zurück."
+    else:
+        tail = ("der Platzhalter bleibt dann unaufgelöst bzw. fällt auf den "
+                "Framework-Default zurück.")
+    return ("Bei späterer Reaktivierung {} steht dieser Wert nicht mehr zur "
+            "Verfügung; {}".format(subject, tail))
 
 
 def _is_conditional(name: str, resolved: Mapping,
@@ -821,7 +901,8 @@ def refill_keys(agent_meta_root: Path, config: Mapping) -> set:
 
 def _removable_candidate(config_text: str, path: str, kind: str, *, rationale: str,
                          runtime_reader: bool, credential_lines: Mapping,
-                         warnings: Tuple[str, ...] = ()) -> Candidate:
+                         warnings: Tuple[str, ...] = (),
+                         reactivation_warning: Optional[str] = None) -> Candidate:
     new_text, removed = _remove_keys(config_text, [path])
     removed_lines = removed.get(path, [])
     hunks = _redact_hunks(_diff_hunks(config_text, new_text), credential_lines) if removed_lines else ()
@@ -832,7 +913,8 @@ def _removable_candidate(config_text: str, path: str, kind: str, *, rationale: s
     if runtime_reader:
         all_warnings = all_warnings + (_RUNTIME_READER_WARNING,)
     if kind == "inactive-scope":
-        all_warnings = all_warnings + (_REACTIVATION_WARNING,)
+        all_warnings = all_warnings + (
+            reactivation_warning or _REACTIVATION_WARNING,)
     return Candidate(
         id="OPT-{}:{}".format(kind, path),
         kind=kind,
@@ -980,6 +1062,9 @@ def _classify_candidates(project_root: Path, agent_meta_root: Path, config: Mapp
     static_refs, static_conditionals = _framework_references(agent_meta_root)
     builder_owned = _builder_owned_names(sorted(raw_vars), config, agent_meta_root,
                                          project_root, active)
+    role_references = _template_role_references(agent_meta_root, config)
+    active_roles = _active_roles_for_scope(agent_meta_root, config, active)
+    known_roles = tuple(getattr(active, "known_roles", ()) or ())
     credential_line_map = _credential_source_lines(config_text, sorted(credentials), config)
 
     wrap_names = sentinel_wrapped_names(
@@ -1030,11 +1115,17 @@ def _classify_candidates(project_root: Path, agent_meta_root: Path, config: Mapp
                 rationale="Removal is byte-identical for every active artifact (L0).",
                 runtime_reader=runtime_reader, credential_lines=credential_line_map))
         else:
+            inactive_roles = _inactive_reference_roles(
+                name, role_references, active_roles, known_roles)
+            warning = _reactivation_warning(
+                inactive_roles, has_fallback=name in _VARIABLE_FALLBACKS)
             candidates.append(_removable_candidate(
                 config_text, path, "inactive-scope",
                 rationale=("Only ineffective for the current active set; a template "
-                           "reference exists."),
-                runtime_reader=runtime_reader, credential_lines=credential_line_map))
+                           "reference exists for inactive role(s): {}.".format(
+                               ", ".join(inactive_roles) or "<unknown>")),
+                runtime_reader=runtime_reader, credential_lines=credential_line_map,
+                reactivation_warning=warning))
 
     if include_semantic:
         candidates.extend(_duplicate_hints(raw_vars, counts, sorted(credentials)))
