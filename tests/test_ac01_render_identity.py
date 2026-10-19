@@ -175,6 +175,10 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   managed-file lists and ``generated-file-hashes.json``. The exception regex is extended to
   ``.*/meta-optimizer\\.(md|toml|agent\\.md)$`` so the Copilot two-suffix form
   (``meta-optimizer.agent.md``) is covered. No other render changed.
+- Task 29 (2e.3, IC-27/AC-59): ``agent-meta-manager`` gains ``handoff.input_contracts +=
+  config-patch-proposal-v1`` -> one additional ``input_contracts`` routing row in the orchestrator
+  routing data. Changed: the 9 per-provider orchestrator artifacts plus the 9
+  ``generated-file-hashes.json`` (18 of 1012 hashes; 0 added/removed). No other render changed.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

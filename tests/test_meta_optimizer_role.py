@@ -8,6 +8,7 @@ addressability, the IC-26 output-contract markers, the mandatory
 """
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -207,3 +208,99 @@ def test_no_provider_literals_in_template():
         "copilot", "anthropic",
     ):
         assert literal not in low, literal
+
+
+# --- Task 29 / 2e.3 (IC-27, AC-59 Consumer): agent-meta-manager consumes config-patch-proposal-v1 ---
+
+
+def test_manager_declares_config_patch_proposal_input_contract():
+    handoff = _roles()["agent-meta-manager"].get("handoff") or {}
+    assert "config-patch-proposal-v1" in (handoff.get("input_contracts") or [])
+
+
+def test_no_output_not_consumed_finding_for_config_patch_proposal():
+    from scripts.lib.consistency.handoff_contracts import check_handoff_contracts  # type: ignore
+    findings = check_handoff_contracts(REPO_ROOT)
+    bad = [f for f in findings if f.check == "handoff.output-not-consumed" and "config-patch-proposal-v1" in f.message]
+    assert not bad, bad
+
+
+def test_config_patch_proposal_schema_exists_and_pins_the_contract():
+    schema_path = REPO_ROOT / "schemas" / "handoffs" / "config-patch-proposal.schema.json"
+    assert schema_path.is_file(), schema_path
+    data = json.loads(schema_path.read_text(encoding="utf-8"))
+
+    assert data["$schema"] == "http://json-schema.org/draft-07/schema#"
+    assert data["type"] == "object"
+    assert "config-patch-proposal-v1" in data["title"]
+    assert "config-patch-proposal-v1" in data["description"]
+
+    # Top-level contract markers: STATUS / RESULT / PROPOSALS / PROOF / NEXT.
+    assert set(data["required"]) == {"st", "rs", "pr", "pf", "nx"}
+    assert data["properties"]["st"]["enum"] == ["done", "partial", "failed"]
+    assert data["properties"]["ar"]["maxItems"] == 0
+
+    # The two sub-objects are reachable without resolving a $ref.
+    proposal = data["definitions"]["proposal"]
+    proof = data["definitions"]["proof"]
+    assert proposal["type"] == "object"
+    assert proof["type"] == "object"
+
+    assert set(proposal["required"]) == {
+        "id", "kind", "sc", "dt", "ap", "al", "pl", "mk", "wn", "yb", "ib", "vr", "ra",
+    }
+    assert proposal["properties"]["kind"]["enum"] == [
+        "no-effect",
+        "dead-variable-content-loss",
+        "duplicate-value",
+        "relocate-to-ext",
+        "relocate-to-doc",
+        "semantic-merge",
+        "inactive-scope",
+        "structural-simplify",
+        "info-only",
+    ]
+    assert proposal["properties"]["sc"]["enum"] == [
+        "variables",
+        "roles",
+        "providers",
+        "auto_commit",
+        "hooks",
+        "repo_containment",
+        "orchestrator",
+        "structural-other",
+    ]
+    assert proposal["properties"]["al"]["enum"] == ["confirm", "confirm-runtime"]
+    assert proposal["properties"]["pl"]["enum"] == ["none", "L0", "L1", "L2", "L3"]
+    assert proposal["properties"]["mk"]["items"]["enum"] == [
+        "runtime-reader",
+        "refilled-by-defaults",
+        "inactive-scope",
+        "reactivation-loss-warning",
+    ]
+    assert proposal["properties"]["id"]["pattern"] == "^OPT-[a-z-]+:.+$"
+    assert proposal["properties"]["dt"]["type"] == "boolean"
+    assert proposal["properties"]["ap"]["type"] == "boolean"
+
+    assert set(proof["required"]) == {"lvl", "beq", "cmp", "rto", "snt"}
+    assert proof["properties"]["lvl"]["enum"] == ["none", "L0", "L1", "L2", "L3"]
+    assert proof["properties"]["rto"]["enum"] == ["ok", "nok"]
+    assert proof["properties"]["beq"]["minimum"] == 0
+    assert proof["properties"]["cmp"]["minimum"] == 0
+
+
+def test_config_patch_proposal_stays_a_phase_2_contract():
+    roles = _roles()
+    producers = [
+        name
+        for name, info in roles.items()
+        if (info.get("handoff") or {}).get("output_contract") == "config-patch-proposal-v1"
+    ]
+    assert producers == ["meta-optimizer"]
+    # Phase 0 / 0e roles must neither produce nor consume the phase-2 contract.
+    for phase0_role in ("meta-doctor", "template-auditor"):
+        info = roles.get(phase0_role) or {}
+        handoff = info.get("handoff") or {}
+        assert handoff.get("output_contract") != "config-patch-proposal-v1", phase0_role
+        assert "config-patch-proposal-v1" not in (handoff.get("input_contracts") or []), phase0_role
+

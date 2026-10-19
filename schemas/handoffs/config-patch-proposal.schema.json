@@ -1,0 +1,218 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ConfigPatchProposal — config-patch-proposal-v1 Payload Schema",
+  "description": "Payload-Schema des Contracts `config-patch-proposal-v1` (IC-26/IC-27, Paket 2e): der read-only Vorschlagsbericht der Rolle `meta-optimizer` an `agent-meta-manager`. Strukturierte Entsprechung des Text-Output-Contracts STATUS/RESULT/ARTIFACTS/PROPOSALS/PROOF/NEXT. Kurze Feldnamen (2-3 Zeichen) für Token-Effizienz, ausführliche title/description für Lesbarkeit. Phase-2-Contract — nicht in die Phase-0-Kontrakte verschieben.",
+  "type": "object",
+  "required": ["st", "rs", "pr", "pf", "nx"],
+  "properties": {
+    "st": {
+      "type": "string",
+      "title": "Status",
+      "description": "Ausführungsstatus der Rolle: done (alle Kandidaten bewertet), partial (nur ein Teil bewertbar) oder failed (Eingabe nicht lesbar bzw. unvollständig). Entspricht der STATUS-Zeile des Output-Contracts.",
+      "enum": ["done", "partial", "failed"]
+    },
+    "rs": {
+      "type": "string",
+      "title": "Result",
+      "description": "Ergebnis in 1-2 Sätzen: was der Optimizer vorgeschlagen hat. Entspricht der RESULT-Zeile des Output-Contracts.",
+      "minLength": 1
+    },
+    "ar": {
+      "type": "array",
+      "title": "Artifacts",
+      "description": "Die Rolle schreibt nichts: ARTIFACTS ist immer leer. Die gelesene Eingabe (proposal.json) steht in `ip`.",
+      "maxItems": 0,
+      "items": {
+        "type": "string"
+      }
+    },
+    "ip": {
+      "type": "string",
+      "title": "Input Path",
+      "description": "Gelesene Eingabe (proposal.json) des Optimizer-Laufs. Der Pfad zeigt auf den Sink, nicht auf das Projekt-Repository."
+    },
+    "pr": {
+      "type": "array",
+      "title": "Proposals",
+      "description": "Liste der bewerteten Kandidaten. Nur Kandidaten mit `applicable: true` (`ap`) gehören in die Freigabeliste; Hinweis-Kandidaten (`ap: false`) tragen die Kennzeichnung 'nicht anwendbar — manuelle Nutzeränderung bzw. Framework-Issue' und behalten ihre ID nur zur Referenz.",
+      "items": {
+        "$ref": "#/definitions/proposal"
+      }
+    },
+    "pf": {
+      "title": "Proof",
+      "description": "Beweisblock des Laufs. L0 beweist nur die Byte-Gleichheit der generierten Artefakte im aktiven Set — kein Beweis für inaktive Rollen oder Provider.",
+      "$ref": "#/definitions/proof"
+    },
+    "nx": {
+      "type": "string",
+      "title": "Next",
+      "description": "Nächster Schritt. Der Vorschlag selbst ist keine Freigabe: erst die ausdrückliche Nutzerantwort mit den IDs, danach die Vorschau (`--dry-run`) und erst dann die Anwendung (`--preview`) — beides durch `agent-meta-manager`.",
+      "minLength": 1
+    }
+  },
+  "definitions": {
+    "proposal": {
+      "type": "object",
+      "title": "Proposal",
+      "description": "Ein bewerteter Optimizer-Kandidat. Entspricht einer Zeile der PROPOSALS-Sektion des Output-Contracts.",
+      "required": [
+        "id",
+        "kind",
+        "sc",
+        "dt",
+        "ap",
+        "al",
+        "pl",
+        "mk",
+        "wn",
+        "yb",
+        "ib",
+        "vr",
+        "ra"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "title": "OPT-ID",
+          "description": "Eindeutige Kennung des Kandidaten im Format `OPT-<kind>:<yaml_path>`, z. B. `OPT-no-effect:variables.PROJECT_GOAL`. Nur anwendbare Kandidaten tragen eine Freigabe-relevante ID.",
+          "pattern": "^OPT-[a-z-]+:.+$"
+        },
+        "kind": {
+          "type": "string",
+          "title": "Kind",
+          "description": "Art des Kandidaten (CandidateKind). `structural-simplify`, `relocate-*` und `semantic-merge` sind reine Hinweise und werden nie angewendet.",
+          "enum": [
+            "no-effect",
+            "dead-variable-content-loss",
+            "duplicate-value",
+            "relocate-to-ext",
+            "relocate-to-doc",
+            "semantic-merge",
+            "inactive-scope",
+            "structural-simplify",
+            "info-only"
+          ]
+        },
+        "sc": {
+          "type": "string",
+          "title": "Scope",
+          "description": "Betroffener Konfigurationsbereich des Kandidaten (Scope).",
+          "enum": [
+            "variables",
+            "roles",
+            "providers",
+            "auto_commit",
+            "hooks",
+            "repo_containment",
+            "orchestrator",
+            "structural-other"
+          ]
+        },
+        "dt": {
+          "type": "boolean",
+          "title": "Deterministic",
+          "description": "true, wenn die Änderung deterministisch ist (nur bei `no-effect` ohne Marks). Eigene Zusatzvorschläge der Rolle sind immer `false` (NON-DETERMINISTIC)."
+        },
+        "ap": {
+          "type": "boolean",
+          "title": "Applicable",
+          "description": "true = Kandidat steht in der Freigabeliste; false = Hinweis 'nicht anwendbar — manuelle Nutzeränderung bzw. Framework-Issue'."
+        },
+        "al": {
+          "type": "string",
+          "title": "Approval Level",
+          "description": "Erforderliche Freigabestufe. `confirm-runtime` verlangt eine gesonderte, ausdrückliche Nutzerbestätigung (Runtime-Keys).",
+          "enum": ["confirm", "confirm-runtime"]
+        },
+        "pl": {
+          "type": "string",
+          "title": "Proof Level",
+          "description": "Für den Kandidaten erforderlicher Beweisgrad (proof_level_required): none, L0 (Byte-Gleichheit der generierten Artefakte im aktiven Set) bis L3.",
+          "enum": ["none", "L0", "L1", "L2", "L3"]
+        },
+        "mk": {
+          "type": "array",
+          "title": "Marks",
+          "description": "Markierungen des Kandidaten (Mark). `runtime-reader` erzwingt `confirm-runtime`, `inactive-scope` die Reaktivierungs-Warnung, `reactivation-loss-warning` den Hinweis, dass der Wert bei späterer Reaktivierung nicht mehr zur Verfügung steht.",
+          "items": {
+            "type": "string",
+            "enum": [
+              "runtime-reader",
+              "refilled-by-defaults",
+              "inactive-scope",
+              "reactivation-loss-warning"
+            ]
+          }
+        },
+        "wn": {
+          "type": "array",
+          "title": "Warnings",
+          "description": "Pflichttexte des Kandidaten. Sie werden wörtlich aus Candidate.warnings übernommen und niemals paraphrasiert; `agent-meta-manager` zeigt sie vor der Anwendung erneut an.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "yb": {
+          "type": "integer",
+          "title": "YAML-Δbytes",
+          "description": "Eingesparte Bytes in der YAML-Konfiguration (yaml_bytes_saved).",
+          "minimum": 0
+        },
+        "ib": {
+          "type": "integer",
+          "title": "Injected-Δbytes",
+          "description": "Geschätzte eingesparte injizierte Bytes (injected_bytes_saved_est).",
+          "minimum": 0
+        },
+        "vr": {
+          "type": "string",
+          "title": "Variante",
+          "description": "Token-kompakte Variante des Kandidaten — der konkrete Vorschlagstext für die Konfiguration."
+        },
+        "ra": {
+          "type": "string",
+          "title": "Rationale",
+          "description": "Begründung des Vorschlags: warum die Änderung sicher ist und welchen Nutzen sie bringt."
+        }
+      }
+    },
+    "proof": {
+      "type": "object",
+      "title": "Proof",
+      "description": "Beweisblock des Optimizer-Laufs. Entspricht der PROOF-Zeile des Output-Contracts.",
+      "required": ["lvl", "beq", "cmp", "rto", "snt"],
+      "properties": {
+        "lvl": {
+          "type": "string",
+          "title": "Level Reached",
+          "description": "Erreichter Beweisgrad. L0 beweist ausschließlich die Byte-Gleichheit der generierten Artefakte im aktiven Set.",
+          "enum": ["none", "L0", "L1", "L2", "L3"]
+        },
+        "beq": {
+          "type": "integer",
+          "title": "Byte-Equal Files",
+          "description": "Anzahl der byte-gleichen Dateien (byte_equal_files).",
+          "minimum": 0
+        },
+        "cmp": {
+          "type": "integer",
+          "title": "Files Compared",
+          "description": "Anzahl der verglichenen Dateien (files_compared).",
+          "minimum": 0
+        },
+        "rto": {
+          "type": "string",
+          "title": "Roundtrip",
+          "description": "Ergebnis des Roundtrip-Checks: ok oder nok.",
+          "enum": ["ok", "nok"]
+        },
+        "snt": {
+          "type": "string",
+          "title": "Scope Note",
+          "description": "Geltungsbereich des Beweises. L0 beweist nur Byte-Gleichheit der generierten Artefakte im aktiven Set — inaktive Rollen und Provider sind nicht abgedeckt."
+        }
+      }
+    }
+  }
+}
