@@ -1,6 +1,7 @@
 # Fixture: two keys sharing one value (duplicate-value hint, AC-57).
-# No unused/dead variables so "without --include-semantic there is no
-# non-deterministic candidate" can be asserted literally.
+# No unused/dead variables so the only non-deterministic candidates without
+# --include-semantic are the AC-81 runtime-reader info-only hints
+# (e.g. repo_containment), never a semantic kind.
 agent-meta-version: "2.0.0-beta.1"
 ai-providers:
 - Claude

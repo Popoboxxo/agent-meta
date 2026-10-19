@@ -60,7 +60,7 @@ import shutil
 import subprocess
 import sys
 from collections import Counter
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Literal, Mapping, Optional, Sequence, Tuple
@@ -138,6 +138,10 @@ SCOPE_NOTE = (
     "after a later role/provider activation.",
 )
 _RUNTIME_READER_WARNING = (
+    "Wird zur Laufzeit von {readers} gelesen; der Beweis (IC-25) deckt dieses "
+    "Verhalten nicht ab."
+)
+_RUNTIME_READER_FALLBACK_WARNING = (
     "A runtime reader consumes this key outside the render; removing it is only "
     "proven for the render, not for the reader."
 )
@@ -153,6 +157,9 @@ _REFILL_WARNING = (
 )
 _REDACTION_MARKER = "<redacted credential, {} bytes>"
 _REGISTRY_RELPATH = "config/runtime-config-readers.yaml"
+#: Framework root derived from this module (``scripts/lib/meta_optimizer.py``);
+#: the fallback registry source for direct helper callers (Task 25 / AC-81).
+_FRAMEWORK_ROOT = Path(__file__).resolve().parents[2]
 
 #: Applier error codes (IC-24 "Applier"/"Vorschau und Anwendung", Rev. 3.1).
 STALE_PROPOSAL_CODE = "meta-optimizer.stale-proposal"
@@ -393,6 +400,131 @@ def _runtime_reader_keys(agent_meta_root: Path) -> tuple:
     return tuple(
         str(entry.get("key")) for entry in (registry.get("readers") or [])
         if isinstance(entry, Mapping) and entry.get("key")
+    )
+
+
+def _runtime_reader_map(agent_meta_root: Path) -> dict:
+    """Map every runtime key to its distinct reader source path(s) (IC-35).
+
+    ``readers[].key`` is a config path (``repo_containment``,
+    ``variables.TEST_COMMAND``), ``readers[].reader`` the repo-relative source
+    that consumes it at runtime. Readers are sorted and de-duplicated so the
+    mandatory warning is deterministic.
+    """
+    registry = _load_registry(Path(agent_meta_root))
+    readers: dict = {}
+    for entry in (registry.get("readers") or []):
+        if not isinstance(entry, Mapping):
+            continue
+        key, reader = entry.get("key"), entry.get("reader")
+        if not key or not reader:
+            continue
+        readers.setdefault(str(key), set()).add(str(reader))
+    return {key: tuple(sorted(names)) for key, names in readers.items()}
+
+
+def _runtime_reader_names(path: str, reader_map: Mapping) -> tuple:
+    """Distinct, sorted reader names whose registry key covers *path*."""
+    return tuple(sorted({
+        name
+        for key, names in reader_map.items()
+        if _matches_any(path, (str(key),))
+        for name in names
+    }))
+
+
+def _runtime_reader_warning(readers: Sequence[str]) -> str:
+    """Mandatory German runtime-reader text (AC-81, spec lines 1427-1430)."""
+    names = sorted({str(reader) for reader in readers if str(reader)})
+    if not names:
+        # Direct helper callers without a resolvable reader keep a stable text;
+        # production candidates always carry registry-derived names.
+        return _RUNTIME_READER_FALLBACK_WARNING
+    return _RUNTIME_READER_WARNING.format(readers=", ".join(names))
+
+
+def _config_has_path(config: Mapping, path: str) -> bool:
+    """True when *path* exists in the config (exact dotted traversal)."""
+    node: Any = config
+    for part in path.split("."):
+        if not isinstance(node, Mapping) or part not in node:
+            return False
+        node = node[part]
+    return True
+
+
+def _touches_credentials(path: str, credentials: Sequence[str]) -> bool:
+    """Credentials take precedence: equal, ancestor or descendant (AC-89).
+
+    A credential key is excluded completely -- its own candidate, a candidate
+    below it and a block hint that would cover one of its subkeys.
+    """
+    return any(
+        path == credential
+        or path.startswith(credential + ".")
+        or credential.startswith(path + ".")
+        for credential in credentials
+    )
+
+
+def _missing_runtime_reader_hints(config: Mapping, candidates: Sequence[Candidate],
+                                 reader_map: Mapping,
+                                 credentials: Sequence[str]) -> list:
+    """Emit an ``info-only`` hint for a runtime key with no producer (AC-81).
+
+    Non-variable registry keys (``repo_containment``, ``orchestrator``, ...) are
+    part of the candidate space even though only ``variables.*`` have a fan-out
+    producer. They become an ``info-only`` hint with the Mark
+    ``runtime-reader``, the elevated approval level and the mandatory reader
+    text. Credential-bearing blocks (``admin-ui`` with ``token``) are excluded.
+    """
+    hints = []
+    for key, readers in reader_map.items():
+        if not _config_has_path(config, key):
+            continue
+        if any(_matches_any(candidate.yaml_path, (key,)) for candidate in candidates):
+            continue
+        if _touches_credentials(key, credentials):
+            continue
+        hints.append(_hint_candidate(
+            "info-only", key,
+            rationale=("Runtime reader key; L0 does not cover the reader "
+                       "behaviour. Review manually."),
+            warnings=(_runtime_reader_warning(readers),),
+            marks=("runtime-reader",),
+            approval_level="confirm-runtime",
+        ))
+    return hints
+
+
+def _with_runtime_reader_mark(candidate: Candidate, reader_map: Mapping,
+                              credentials: Sequence[str]) -> Candidate:
+    """Apply Mark/approval/mandatory text to every runtime-key candidate.
+
+    AC-81 applies to every candidate kind, including ``info-only`` hints.
+    Credentials keep precedence: a credential-touching path is never marked.
+    """
+    keys = tuple(reader_map)
+    if not keys or not _matches_any(candidate.yaml_path, keys):
+        return candidate
+    if _touches_credentials(candidate.yaml_path, credentials):
+        return candidate
+    readers = _runtime_reader_names(candidate.yaml_path, reader_map)
+    if not readers:
+        return candidate
+    warning = _runtime_reader_warning(readers)
+    warnings = tuple(
+        entry for entry in candidate.warnings
+        if entry != _RUNTIME_READER_FALLBACK_WARNING
+    )
+    if warning not in warnings:
+        warnings = warnings + (warning,)
+    return replace(
+        candidate,
+        marks=tuple(sorted(set(candidate.marks) | {"runtime-reader"})),
+        approval_level="confirm-runtime",
+        warnings=warnings,
+        deterministic=False,
     )
 
 
@@ -901,6 +1033,7 @@ def refill_keys(agent_meta_root: Path, config: Mapping) -> set:
 
 def _removable_candidate(config_text: str, path: str, kind: str, *, rationale: str,
                          runtime_reader: bool, credential_lines: Mapping,
+                         runtime_readers: Optional[Sequence[str]] = None,
                          warnings: Tuple[str, ...] = (),
                          reactivation_warning: Optional[str] = None) -> Candidate:
     new_text, removed = _remove_keys(config_text, [path])
@@ -911,7 +1044,11 @@ def _removable_candidate(config_text: str, path: str, kind: str, *, rationale: s
         marks = tuple(sorted(set(marks) | {"inactive-scope", "reactivation-loss-warning"}))
     all_warnings = tuple(warnings)
     if runtime_reader:
-        all_warnings = all_warnings + (_RUNTIME_READER_WARNING,)
+        if runtime_readers is None:
+            runtime_readers = _runtime_reader_names(
+                path, _runtime_reader_map(_FRAMEWORK_ROOT))
+        all_warnings = all_warnings + (
+            _runtime_reader_warning(runtime_readers),)
     if kind == "inactive-scope":
         all_warnings = all_warnings + (
             reactivation_warning or _REACTIVATION_WARNING,)
@@ -934,14 +1071,16 @@ def _removable_candidate(config_text: str, path: str, kind: str, *, rationale: s
 
 def _hint_candidate(kind: str, path: str, *, rationale: str = "",
                     warnings: Tuple[str, ...] = (),
-                    marks: Tuple[Mark, ...] = ()) -> Candidate:
+                    marks: Tuple[Mark, ...] = (),
+                    approval_level: Literal["confirm", "confirm-runtime"] = "confirm"
+                    ) -> Candidate:
     return Candidate(
         id="OPT-{}:{}".format(kind, path),
         kind=kind,
         yaml_path=path,
         scope=_scope_for(path),
         marks=tuple(sorted(set(marks))),
-        approval_level="confirm",
+        approval_level=approval_level,
         warnings=warnings,
         deterministic=False,
         applicable=False,
@@ -1058,7 +1197,8 @@ def _classify_candidates(project_root: Path, agent_meta_root: Path, config: Mapp
     resolved, _ = build_variables(config, agent_meta_root, project_root, active_set=active)
     raw_vars = dict(config.get("variables") or {})
     credentials = credential_paths(config, agent_meta_root)
-    runtime_keys = _runtime_reader_keys(agent_meta_root)
+    runtime_reader_map = _runtime_reader_map(agent_meta_root)
+    runtime_keys = tuple(runtime_reader_map)
     static_refs, static_conditionals = _framework_references(agent_meta_root)
     builder_owned = _builder_owned_names(sorted(raw_vars), config, agent_meta_root,
                                          project_root, active)
@@ -1083,14 +1223,21 @@ def _classify_candidates(project_root: Path, agent_meta_root: Path, config: Mapp
         entry = counts.get(path)
         if entry is None:
             continue
+        if _touches_credentials(path, credentials):
+            # AC-89 precedence: credentials never produce a candidate (not even
+            # a hint) and are never marked as runtime readers.
+            continue
         value_bytes = len(_to_string(raw_vars[name]).encode("utf-8"))
         runtime_reader = _matches_any(path, runtime_keys)
+        runtime_readers = (
+            _runtime_reader_names(path, runtime_reader_map) if runtime_reader else ())
         if entry["conditional"]:
             if name in builder_owned:
                 candidates.append(_removable_candidate(
                     config_text, path, "no-effect",
                     rationale="Builder-owned: the resolved value never uses this entry.",
-                    runtime_reader=runtime_reader, credential_lines=credential_line_map))
+                    runtime_reader=runtime_reader, credential_lines=credential_line_map,
+                    runtime_readers=runtime_readers))
             elif name in static_refs:
                 candidates.append(_hint_candidate(
                     "info-only", path,
@@ -1099,7 +1246,8 @@ def _classify_candidates(project_root: Path, agent_meta_root: Path, config: Mapp
                 candidates.append(_removable_candidate(
                     config_text, path, "no-effect",
                     rationale="Conditional but referenced by no template.",
-                    runtime_reader=runtime_reader, credential_lines=credential_line_map))
+                    runtime_reader=runtime_reader, credential_lines=credential_line_map,
+                    runtime_readers=runtime_readers))
             continue
         if entry["occurrences"]:
             continue  # effective in the current active set -> nothing removable
@@ -1113,7 +1261,8 @@ def _classify_candidates(project_root: Path, agent_meta_root: Path, config: Mapp
             candidates.append(_removable_candidate(
                 config_text, path, "no-effect",
                 rationale="Removal is byte-identical for every active artifact (L0).",
-                runtime_reader=runtime_reader, credential_lines=credential_line_map))
+                runtime_reader=runtime_reader, credential_lines=credential_line_map,
+                runtime_readers=runtime_readers))
         else:
             inactive_roles = _inactive_reference_roles(
                 name, role_references, active_roles, known_roles)
@@ -1125,6 +1274,7 @@ def _classify_candidates(project_root: Path, agent_meta_root: Path, config: Mapp
                            "reference exists for inactive role(s): {}.".format(
                                ", ".join(inactive_roles) or "<unknown>")),
                 runtime_reader=runtime_reader, credential_lines=credential_line_map,
+                runtime_readers=runtime_readers,
                 reactivation_warning=warning))
 
     if include_semantic:
@@ -1133,6 +1283,16 @@ def _classify_candidates(project_root: Path, agent_meta_root: Path, config: Mapp
         # Defense in depth (AC-57/91): even a future producer of a semantic kind
         # must never leak a hint into a run without --include-semantic.
         candidates = _forbid_semantic_kinds(candidates)
+    # AC-81: non-variable runtime keys have no fan-out producer, so they need an
+    # explicit info-only hint. Emitted before the refill guard (so
+    # ``repo_containment`` also receives ``refilled-by-defaults``) and before the
+    # central mark pass (so every runtime-key kind carries Mark + text).
+    candidates.extend(_missing_runtime_reader_hints(
+        config, candidates, runtime_reader_map, sorted(credentials)))
+    candidates = [
+        _with_runtime_reader_mark(candidate, runtime_reader_map, sorted(credentials))
+        for candidate in candidates
+    ]
     # AC-82 (B-2): a key that fill_defaults re-materializes never gets a removal
     # hunk. The guard is applied once, after every producer (incl. semantic)
     # ran; it only neuters existing candidates -- it never emits new ones, so a

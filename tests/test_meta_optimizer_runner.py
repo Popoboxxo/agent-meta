@@ -401,7 +401,10 @@ def test_semantic_kinds_need_the_flag(tmp_path):
     assert without.returncode == 0, without.stderr[-1500:]
     plain = json.loads(without.stdout)
     assert not [c for c in plain["candidates"] if c["kind"] in SEMANTIC_KINDS]
-    assert not [c for c in plain["candidates"] if c["deterministic"] is False]
+    # AC-81: runtime-reader info-only hints are non-deterministic by design;
+    # --include-semantic only gates semantic kinds.
+    assert not [c for c in plain["candidates"]
+                if c["deterministic"] is False and c["kind"] != "info-only"]
 
     with_flag = _run(tmp_path, cfg, "--optimize-config", "--include-semantic", "--json")
     assert with_flag.returncode == 0, with_flag.stderr[-1500:]
