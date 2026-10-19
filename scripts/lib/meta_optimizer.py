@@ -68,7 +68,13 @@ from typing import Any, Callable, Literal, Mapping, Optional, Sequence, Tuple
 import yaml
 
 from lib.active_set import compute_active_set
-from lib.config import build_variables, read_version
+from lib.config import (
+    _CASCADE_MANAGED_PRESET_KEYS,
+    _load_schema_defaults,
+    build_variables,
+    config_field_defaults,
+    read_version,
+)
 from lib.context_report import merge_provider_mappings
 from lib.permissions import restrict_owner_only
 from lib.providers import (
@@ -91,7 +97,7 @@ __all__ = [
     "CandidateKind", "Scope", "Mark", "Candidate", "FanOutEntry",
     "OptimizerProposal", "ProofReport", "ApplyReport", "L0_COMPARISON_FILES",
     "CONTENT_LOSS_THRESHOLD_BYTES", "OPTIMIZER_SUBDIR", "SEMANTIC_KINDS",
-    "RegistryError", "credential_paths", "collect_candidates",
+    "RegistryError", "credential_paths", "refill_keys", "collect_candidates",
     "sentinel_wrapped_names", "fan_out_counts", "prove",
     "comparison_file_digests", "advance_l0", "run_optimize_config",
     "apply_config_patch", "apply_summary",
@@ -138,6 +144,11 @@ _REACTIVATION_WARNING = (
     "If the role/provider that renders this key is activated later, the value is no "
     "longer available; the placeholder then stays unresolved or falls back to the "
     "framework default."
+)
+_REFILL_WARNING = (
+    "Entfernen wäre wirkungslos: der nächste Sync (sync_pipeline.py:152) "
+    "materialisiert den Key wieder und schreibt dabei die gesamte Datei ohne "
+    "Kommentare neu."
 )
 _REDACTION_MARKER = "<redacted credential, {} bytes>"
 _REGISTRY_RELPATH = "config/runtime-config-readers.yaml"
@@ -780,6 +791,34 @@ def _scope_for(path: str) -> str:
     return "structural-other"
 
 
+def refill_keys(agent_meta_root: Path, config: Mapping) -> set:
+    """Return the keys ``fill_defaults`` re-materializes on the next sync (AC-82).
+
+    Derived from the *same* helpers ``fill_defaults`` uses -- never from a copied
+    default table: every ``config_field_defaults`` entry, every schema default
+    path without a dot (the first ``fill_defaults`` loop only touches top-level
+    fields), the ``repo_containment`` block (materialized whenever absent), the
+    derived ``project.short`` and -- only for an explicitly rigorous preset --
+    the nested ``dod.*`` fields. The cascade-managed preset keys are excluded
+    because ``fill_defaults`` skips them on purpose.
+    """
+    agent_meta_root = Path(agent_meta_root)
+    schema_defaults = _load_schema_defaults(agent_meta_root)
+    keys = set(config_field_defaults(agent_meta_root))
+    keys.update(path for path in schema_defaults if "." not in path)
+    keys.difference_update(_CASCADE_MANAGED_PRESET_KEYS)
+    keys.add("repo_containment")
+
+    config = config if isinstance(config, Mapping) else {}
+    project_block = config.get("project")
+    if isinstance(project_block, Mapping) and (
+            project_block.get("name") or project_block.get("prefix")):
+        keys.add("project.short")
+    if config.get("dod-preset") in ("full", "strict"):
+        keys.update(path for path in schema_defaults if path.startswith("dod."))
+    return keys
+
+
 def _removable_candidate(config_text: str, path: str, kind: str, *, rationale: str,
                          runtime_reader: bool, credential_lines: Mapping,
                          warnings: Tuple[str, ...] = ()) -> Candidate:
@@ -811,19 +850,53 @@ def _removable_candidate(config_text: str, path: str, kind: str, *, rationale: s
     )
 
 
-def _hint_candidate(kind: str, path: str, *, rationale: str, warnings: Tuple[str, ...] = ()) -> Candidate:
+def _hint_candidate(kind: str, path: str, *, rationale: str = "",
+                    warnings: Tuple[str, ...] = (),
+                    marks: Tuple[Mark, ...] = ()) -> Candidate:
     return Candidate(
         id="OPT-{}:{}".format(kind, path),
         kind=kind,
         yaml_path=path,
         scope=_scope_for(path),
-        marks=(),
+        marks=tuple(sorted(set(marks))),
         approval_level="confirm",
         warnings=warnings,
         deterministic=False,
         applicable=False,
         proof_level_required="none",
         rationale=rationale,
+    )
+
+
+def _refill_guard(candidate: Candidate, refill: set) -> Candidate:
+    """Neuter a removal candidate whose key ``fill_defaults`` would re-create.
+
+    AC-82 / IC-24 (B-2): removal would be ineffective and the re-fill would
+    rewrite the whole file without comments. The candidate becomes an
+    ``info-only`` hint -- no hunks, not applicable, Mark ``refilled-by-defaults``
+    and the mandatory warning. Exact path match only (no prefix matching).
+    """
+    if candidate.yaml_path not in refill:
+        return candidate
+    warnings = tuple(candidate.warnings)
+    if _REFILL_WARNING not in warnings:
+        warnings = warnings + (_REFILL_WARNING,)
+    return Candidate(
+        id="OPT-info-only:{}".format(candidate.yaml_path),
+        kind="info-only",
+        yaml_path=candidate.yaml_path,
+        scope=candidate.scope,
+        marks=tuple(sorted(set(candidate.marks) | {"refilled-by-defaults"})),
+        approval_level=candidate.approval_level,
+        warnings=warnings,
+        deterministic=False,
+        applicable=False,
+        proof_level_required="none",
+        yaml_bytes_saved=0,
+        injected_bytes_saved_est=0,
+        rationale=candidate.rationale or (
+            "fill_defaults re-materializes this key on the next sync; no removal."),
+        hunks=(),
     )
 
 
@@ -969,6 +1042,12 @@ def _classify_candidates(project_root: Path, agent_meta_root: Path, config: Mapp
         # Defense in depth (AC-57/91): even a future producer of a semantic kind
         # must never leak a hint into a run without --include-semantic.
         candidates = _forbid_semantic_kinds(candidates)
+    # AC-82 (B-2): a key that fill_defaults re-materializes never gets a removal
+    # hunk. The guard is applied once, after every producer (incl. semantic)
+    # ran; it only neuters existing candidates -- it never emits new ones, so a
+    # plain run still has no non-deterministic candidate the spec did not ask for.
+    refill = refill_keys(agent_meta_root, config)
+    candidates = [_refill_guard(candidate, refill) for candidate in candidates]
     candidates.sort(key=lambda candidate: candidate.id)
 
     fan_entries = tuple(
