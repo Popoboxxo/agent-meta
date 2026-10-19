@@ -195,7 +195,9 @@ def test_proof_is_l0_and_comparison_files_listed(optimized):
     report = proof["report"]
     assert report["level_reached"] == "L0"
     assert report["ok"] is True
-    assert report["files_compared"] >= report["byte_equal_files"]
+    # Review N5: a passing L0 means EVERY compared file is byte-equal; the old
+    # `>=` assertion was vacuous (byte_equal_files <= files_compared always).
+    assert report["byte_equal_files"] == report["files_compared"]
     compared = {entry["path"]: entry for entry in proof["comparison_files"]}
     for rel in (".meta-config/auto-commit-allowlist.json",
                 ".meta-config/generated-file-hashes.json",

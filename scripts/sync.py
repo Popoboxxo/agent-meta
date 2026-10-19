@@ -47,7 +47,8 @@ if hasattr(sys.stdout, "reconfigure"):
 
 # --doctor must not touch the installation, not even with bytecode caches
 # (IC-22 write boundary): decide before the first lib import.
-if "--doctor" in sys.argv[1:] or "--optimize-config" in sys.argv[1:]:
+if "--doctor" in sys.argv[1:] or "--optimize-config" in sys.argv[1:] \
+        or "--apply-config-patch" in sys.argv[1:]:
     sys.dont_write_bytecode = True
 
 # Add scripts/ directory to sys.path so lib/ is importable regardless of cwd
@@ -63,6 +64,7 @@ from lib.cli_commands import (
     _SyncContext,
     _build_context,
     _handle_activate_providers,
+    _handle_apply_config_patch,
     _handle_audit_config,
     _handle_backup,
     _handle_context_report,
@@ -130,20 +132,53 @@ def _validate_optimize_flags(parser, args) -> None:
 
     ``--fill-defaults`` materialises defaults into the config, so the L0 proof
     baseline would change; the optimizer aborts with ``meta-optimizer.lossy-flag``
-    (Exit 2, IC-24).
+    (Exit 2, IC-24). The same applies to the applier: the config it was bound to
+    (hash + preview) must not be rewritten by a second mode in the same
+    invocation, and ``--fill-defaults`` would dispatch first.
     """
     if getattr(args, "include_semantic", False) and not getattr(args, "optimize_config", False):
         parser.error("--include-semantic can only be used together with --optimize-config")
-    if getattr(args, "optimize_config", False) and getattr(args, "fill_defaults", False):
+    lossy_modes = [
+        flag for flag, used in (
+            ("--optimize-config", getattr(args, "optimize_config", False)),
+            ("--apply-config-patch", getattr(args, "apply_config_patch", None) is not None),
+        ) if used and getattr(args, "fill_defaults", False)
+    ]
+    if lossy_modes:
         from lib.meta_optimizer import LOSSY_FLAG_CODE
 
         print(
-            f"error: {LOSSY_FLAG_CODE}: --optimize-config cannot be combined with "
+            f"error: {LOSSY_FLAG_CODE}: {lossy_modes[0]} cannot be combined with "
             "--fill-defaults (defaults would be materialised, changing the proof "
             "baseline)",
             file=sys.stderr,
         )
         sys.exit(2)
+
+
+def _validate_apply_flags(parser, args) -> None:
+    """``--apply-config-patch`` needs ``--accept`` and a preview/dry-run (IC-24).
+
+    ``--accept`` is mandatory because the application is an explicit user
+    approval; without ``--preview`` *and* without ``--dry-run`` the invocation
+    would silently write on the strength of a mere agent message, so it is
+    rejected as a usage error (Exit 2).
+    """
+    applying = getattr(args, "apply_config_patch", None) is not None
+    if not applying:
+        stray = [flag for flag, used in (
+            ("--accept", args.accept is not None),
+            ("--accept-runtime", args.accept_runtime is not None),
+            ("--preview", args.preview is not None)) if used]
+        if stray:
+            parser.error(
+                f"{', '.join(stray)} can only be used together with --apply-config-patch")
+        return
+    if not args.accept:
+        parser.error("--apply-config-patch requires at least one --accept <id>")
+    if args.preview is None and not getattr(args, "dry_run", False):
+        parser.error(
+            "--apply-config-patch requires --preview <preview.json> or --dry-run")
 
 
 def _run_artifact_gate(ctx) -> None:
@@ -216,6 +251,32 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                         help="With --optimize-config: also report semantic hints "
                              "(duplicate-value, relocate-*, semantic-merge). Hints are "
                              "never applicable (no hunk, no proof level).")
+    parser.add_argument("--apply-config-patch", metavar="FILE", default=None,
+                        help="Apply a remove-only config patch (IC-24 applier): read "
+                             "proposal.json, recompute the candidates, reconcile the "
+                             "redacted hunks and replace .meta-config/project.yaml "
+                             "atomically -- all-or-nothing. Requires --accept and either "
+                             "--dry-run (write only preview.json) or --preview FILE "
+                             "(bind the application to a previously written preview). "
+                             "Writes the protocol applied.json and the redacted "
+                             "project.yaml.bak below <tmp-sink>/meta-optimizer/<ts>/. "
+                             "Exit 0 all applied, 1 any rejection/proof/stale/version/"
+                             "preview mismatch (nothing written), 2 usage or sink error.")
+    parser.add_argument("--accept", nargs="+", action="extend", default=None, metavar="ID",
+                        help="With --apply-config-patch: the candidate IDs the user "
+                             "approved (mandatory; there is no implicit application). "
+                             "IDs of hints are rejected with 'not-applicable'.")
+    parser.add_argument("--accept-runtime", nargs="+", action="extend", default=None,
+                        metavar="ID",
+                        help="With --apply-config-patch: additionally confirm the "
+                             "candidates whose approval_level is 'confirm-runtime' "
+                             "(runtime readers); without it they are rejected with "
+                             "'needs-runtime-confirmation'.")
+    parser.add_argument("--preview", metavar="FILE", default=None,
+                        help="With --apply-config-patch: the preview.json the user was "
+                             "shown. The application is bound to it (identical ID sets, "
+                             "hash, version and recomputed hunks); a mismatch aborts "
+                             "with meta-optimizer.preview-mismatch (exit 1).")
     parser.add_argument("--doctor", action="store_true",
                         help="Diagnose the installation against the known-issues registry "
                              "(config/known-issues.yaml). Writes nothing into the project or "
@@ -727,6 +788,7 @@ _MODE_HANDLERS = [
     (lambda a: a.cleanup_preview, _handle_cleanup_preview),
     (lambda a: a.context_report, _handle_context_report),
     (lambda a: a.optimize_config, _handle_optimize_config),
+    (lambda a: a.apply_config_patch is not None, _handle_apply_config_patch),
     (lambda a: a.doctor, _handle_doctor),
     (lambda a: a.create_ext, _handle_create_ext),
     (lambda a: a.update_ext, _handle_update_ext),
@@ -754,7 +816,7 @@ _MODE_HANDLERS = [
 
 # Modes that run _build_context with dry_run forced on and stdout on stderr.
 _STDOUT_CLEAN_MODES = ("cleanup_preview", "context_report", "deactivation_status",
-                       "doctor", "optimize_config")
+                       "doctor", "optimize_config", "apply_config_patch")
 
 
 def _dispatch(ctx: _SyncContext) -> None:
@@ -772,6 +834,7 @@ def main() -> None:
     args = parser.parse_args()
     _validate_doctor_flags(parser, args)
     _validate_optimize_flags(parser, args)
+    _validate_apply_flags(parser, args)
     _normalize_check_dry_run(args)
     # Start every run with a fresh gitignore probe cache (#752): a long-lived
     # process must not reuse an ignore decision from a previous run.

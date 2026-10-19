@@ -33,8 +33,20 @@ still use the real config, so L0 stays honest. Semantic kinds
 ``--include-semantic`` (AC-57/91).
 
 Entry points: :func:`collect_candidates`, :func:`fan_out_counts`,
-:func:`prove`, :func:`comparison_file_digests`, :func:`advance_l0` and the CLI
-runner :func:`run_optimize_config`.
+:func:`prove`, :func:`comparison_file_digests`, :func:`advance_l0`, the CLI
+runner :func:`run_optimize_config` and the remove-only applier
+:func:`apply_config_patch`.
+
+The applier (IC-24 "Applier", AC-55/56/75/80/89/90/91/94) is the *only* writer:
+it reads ``project_yaml_sha256``, the candidate IDs, ``agent_meta_version`` and
+``generator_options`` from ``proposal.json``, recomputes the candidates with
+:func:`collect_candidates`, reconciles the redacted hunks (a hunk that inserts a
+line is not remove-only, a hunk that differs from the recomputed one is a
+``hunk-mismatch``) and replaces ``.meta-config/project.yaml`` atomically from a
+scratch file below the sink. All-or-nothing: any rejection, a failed proof, a
+version/TOCTOU/preview mismatch leaves the config untouched. The backup is
+redacted, ``applied.json`` records ``approval_source: "relayed"`` and only key
+*names* (AC-89), and every sink artifact is mode ``0600``.
 """
 from __future__ import annotations
 
@@ -48,14 +60,15 @@ import shutil
 import subprocess
 import sys
 from collections import Counter
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Literal, Mapping, Optional, Sequence, Tuple
+from typing import Any, Callable, Literal, Mapping, Optional, Sequence, Tuple
 
 import yaml
 
-from lib.config import _VARIABLE_FALLBACKS, build_variables
+from lib.active_set import compute_active_set
+from lib.config import build_variables, read_version
 from lib.context_report import merge_provider_mappings
 from lib.permissions import restrict_owner_only
 from lib.providers import (
@@ -76,11 +89,16 @@ from lib.yaml_roundtrip import RoundTripReport, _count_comments, analyze_roundtr
 
 __all__ = [
     "CandidateKind", "Scope", "Mark", "Candidate", "FanOutEntry",
-    "OptimizerProposal", "ProofReport", "L0_COMPARISON_FILES",
+    "OptimizerProposal", "ProofReport", "ApplyReport", "L0_COMPARISON_FILES",
     "CONTENT_LOSS_THRESHOLD_BYTES", "OPTIMIZER_SUBDIR", "SEMANTIC_KINDS",
     "RegistryError", "credential_paths", "collect_candidates",
     "sentinel_wrapped_names", "fan_out_counts", "prove",
     "comparison_file_digests", "advance_l0", "run_optimize_config",
+    "apply_config_patch", "apply_summary",
+    "STALE_PROPOSAL_CODE", "VERSION_MISMATCH_CODE", "NOT_REMOVE_ONLY_CODE",
+    "PREVIEW_MISMATCH_CODE", "CROSS_DEVICE_CODE", "USAGE_CODE",
+    "REJECT_NOT_REPRODUCIBLE", "REJECT_HUNK_MISMATCH", "REJECT_NOT_APPLICABLE",
+    "REJECT_CREDENTIAL_KEY", "REJECT_NEEDS_RUNTIME", "APPROVAL_SOURCE_RELAYED",
 ]
 
 #: Sink subdirectory of the optimizer (IC-34).
@@ -123,6 +141,38 @@ _REACTIVATION_WARNING = (
 )
 _REDACTION_MARKER = "<redacted credential, {} bytes>"
 _REGISTRY_RELPATH = "config/runtime-config-readers.yaml"
+
+#: Applier error codes (IC-24 "Applier"/"Vorschau und Anwendung", Rev. 3.1).
+STALE_PROPOSAL_CODE = "meta-optimizer.stale-proposal"
+VERSION_MISMATCH_CODE = "meta-optimizer.version-mismatch"
+NOT_REMOVE_ONLY_CODE = "meta-optimizer.not-remove-only"
+PREVIEW_MISMATCH_CODE = "meta-optimizer.preview-mismatch"
+CROSS_DEVICE_CODE = "meta-optimizer.cross-device"
+USAGE_CODE = "meta-optimizer.usage"
+#: Per-candidate rejection reasons (spec line 1489).
+REJECT_NOT_REPRODUCIBLE = "not-reproducible"
+REJECT_HUNK_MISMATCH = "hunk-mismatch"
+REJECT_NOT_APPLICABLE = "not-applicable"
+REJECT_CREDENTIAL_KEY = "credential-key"
+REJECT_NEEDS_RUNTIME = "needs-runtime-confirmation"
+#: ``applied.json.approval_source``: this spec only ever writes the *relayed*
+#: user answer; ``permission-prompt`` is reserved (ADR-17, N-1) and must never
+#: appear, so the value is a hard constant rather than a parameter.
+APPROVAL_SOURCE_RELAYED = "relayed"
+#: Sink artifacts of one applier run (AC-75/AC-90).
+PREVIEW_NAME = "preview.json"
+APPLIED_NAME = "applied.json"
+BACKUP_NAME = "project.yaml.bak"
+#: Transient scratch file for the atomic replace, inside the run dir (Rev. 3.3).
+_TRANSIENT_CONFIG_NAME = "project.yaml.new"
+#: The project config the applier rewrites (IC-24).
+_PROJECT_CONFIG_RELPATH = Path(".meta-config") / "project.yaml"
+_APPLIER_TOOL = "apply-config-patch"
+_REDACTION_RE = re.compile(r"<redacted credential, \d+ bytes>")
+
+#: Test seam (AC-90, TOCTOU): called immediately before the atomic replace, after
+#: the config was read back for the hash re-check. Always ``None`` in production.
+_TOCTOU_TEST_HOOK: Optional[Callable[[], None]] = None
 
 CandidateKind = Literal[
     "no-effect",                  # removing is byte-identical (builder-overridden, default, unused)
@@ -214,6 +264,37 @@ class ProofReport:
     ok: bool
     reasons: Tuple[str, ...]
     scope_note: Tuple[str, ...] = SCOPE_NOTE
+
+
+@dataclass(frozen=True)
+class ApplyReport:
+    """Outcome of :func:`apply_config_patch` (IC-24 "Applier", AC-80 (d)).
+
+    ``exit_code`` is the process exit code the CLI returns: 0 when every accepted
+    candidate was applied (or the preview was written), 1 when anything was
+    rejected or a global check failed (then nothing was written), 2 on a usage,
+    sink or render error. ``code`` carries the stable error code of the failure
+    (``meta-optimizer.*``); ``rejected`` holds ``(id, reason)`` pairs and
+    ``applied_ids`` the accepted IDs (for a preview: the ones the preview
+    contains, which have not been written yet).
+    """
+
+    applied_ids: Tuple[str, ...] = ()
+    rejected: Tuple[Tuple[str, str], ...] = ()
+    preview_sha256: str = ""
+    project_yaml_sha256_before: str = ""
+    project_yaml_sha256_after: str = ""
+    backup_redacted_keys: Tuple[str, ...] = ()
+    log_path: Optional[str] = None
+    preview_path: Optional[str] = None
+    run_dir: Optional[str] = None
+    agent_meta_version: str = ""
+    generator_options: Mapping[str, Any] = field(default_factory=dict)
+    approval_source: str = APPROVAL_SOURCE_RELAYED
+    exit_code: int = 0
+    code: str = ""
+    errors: Tuple[str, ...] = ()
+    dry_run: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -786,6 +867,12 @@ def collect_candidates(project_root: Path, agent_meta_root: Path, config: Mappin
     Renders the sentinel config into *work_dir* (default: a fresh
     ``<tmp-sink>/meta-optimizer/<run_id>/work``) and classifies every user
     variable. Credential paths are excluded up front.
+
+    Review N2: when *work_dir* is ``None`` this function allocates the scratch
+    itself and therefore **owns** it -- the render holds an unredacted config
+    copy, so the scratch (and its now-empty run dir) is removed before returning,
+    exactly like :func:`run_optimize_config` does for the dirs it allocates. A
+    caller passing *work_dir* keeps ownership of that dir.
     """
     project_root = Path(project_root)
     agent_meta_root = Path(agent_meta_root)
@@ -795,10 +882,24 @@ def collect_candidates(project_root: Path, agent_meta_root: Path, config: Mappin
         providers = resolve_providers(config, provider_config)
         mappings = merge_provider_mappings(
             provider_config, load_provider_capabilities(agent_meta_root))
-    if work_dir is None:
+    allocated = work_dir is None
+    if allocated:
         work_dir = resolve_work_dir(project_root, config, OPTIMIZER_SUBDIR, _run_id())
     work_dir = Path(work_dir)
+    try:
+        return _classify_candidates(
+            project_root, agent_meta_root, config, config_text, active, work_dir,
+            providers=providers, mappings=mappings, include_semantic=include_semantic)
+    finally:
+        if allocated:
+            _discard_work_dir(work_dir, work_dir.parent.parent)
 
+
+def _classify_candidates(project_root: Path, agent_meta_root: Path, config: Mapping,
+                         config_text: str, active, work_dir: Path, *,
+                         providers: Sequence[str], mappings: Mapping,
+                         include_semantic: bool) -> OptimizerProposal:
+    """Render, measure and classify; the scratch is owned by the caller."""
     resolved, _ = build_variables(config, agent_meta_root, project_root, active_set=active)
     raw_vars = dict(config.get("variables") or {})
     credentials = credential_paths(config, agent_meta_root)
@@ -1011,8 +1112,8 @@ def prove(before_render: Path, after_render: Path, before_yaml: str, after_yaml:
     for path in missing:
         reasons.append("comparison file missing in the render: {}".format(path))
     if set(before) != set(after):
-        missing = sorted(set(before) ^ set(after))
-        reasons.append("file set differs: {}".format(", ".join(missing[:5])))
+        file_set_diff = sorted(set(before) ^ set(after))
+        reasons.append("file set differs: {}".format(", ".join(file_set_diff[:5])))
     if changed:
         reasons.append("changed files ({}): {}".format(len(changed), ", ".join(changed[:5])))
     if roundtrip.order_changed:
@@ -1113,7 +1214,7 @@ def _render_summary(proposal: OptimizerProposal, report: ProofReport) -> str:
     return "\n".join(lines)
 
 
-def _discard_work_dir(work_dir: Path, artifact_dir: Path) -> None:
+def _discard_work_dir(work_dir: Path, artifact_dir: Path) -> bool:
     """Remove a render work dir (and its now-empty run dir) — review F1, option (a).
 
     The render scratch holds an unredacted copy of ``project.yaml``, so AC-89
@@ -1121,17 +1222,34 @@ def _discard_work_dir(work_dir: Path, artifact_dir: Path) -> None:
     if the scratch is deleted before the runner returns. The renders themselves
     still use the real config, so the L0 proof stays honest. The artifact
     directory itself is never removed.
+
+    Review N3: the deletion is no longer silent -- a scratch that survived (e.g. a
+    permission problem) is reported as a warning, because it would otherwise leak
+    a credential copy unnoticed. Returns ``True`` when the scratch is gone.
     """
     work_dir = Path(work_dir)
     artifact_dir = Path(artifact_dir)
     if work_dir == artifact_dir:
-        return
+        return True
     shutil.rmtree(work_dir, ignore_errors=True)
     if work_dir.parent != artifact_dir:  # never remove the artifact directory
         try:
             work_dir.parent.rmdir()
         except OSError:
             pass
+    if work_dir.exists():  # pragma: no cover - filesystem-level failure
+        print("warning: render scratch could not be removed: {}".format(work_dir),
+              file=sys.stderr)
+        return False
+    return True
+
+
+def _discard_empty_dir(path: Path) -> None:
+    """Remove *path* when it is empty; never touches a directory with content."""
+    try:
+        Path(path).rmdir()
+    except OSError:
+        pass
 
 
 def run_optimize_config(*, project_root: Path, agent_meta_root: Path, config_path: Path,
@@ -1226,10 +1344,17 @@ def run_optimize_config(*, project_root: Path, agent_meta_root: Path, config_pat
               file=sys.stderr)
         return 2
 
-    _write_json(run_dir / "proof.json", {
-        "report": _report_dict(report),
-        "comparison_files": [dict(entry) for entry in digests],
-    })
+    # Review N1: this write happens after the scratch was deleted, so it is no
+    # longer covered by the render try/except -- an OSError here must surface as
+    # the documented Exit 2 instead of a traceback.
+    try:
+        _write_json(run_dir / "proof.json", {
+            "report": _report_dict(report),
+            "comparison_files": [dict(entry) for entry in digests],
+        })
+    except OSError as exc:
+        print("error: {}: {}".format(OUT_WRITE_FAILED_CODE, exc), file=sys.stderr)
+        return 2
     if not report.ok:
         print("error: {}: {}".format(PROOF_FAILED_CODE, "; ".join(report.reasons)),
               file=sys.stderr)
@@ -1254,9 +1379,13 @@ def run_optimize_config(*, project_root: Path, agent_meta_root: Path, config_pat
             print("Config optimizer (recomputation): proof {}".format(report.level_reached))
         return 0
 
-    _write_json(run_dir / "proposal.json", _proposal_dict(proposal))
-    (run_dir / "proposal.diff").write_text(proposal.diff, encoding="utf-8")
-    restrict_owner_only(run_dir / "proposal.diff")
+    try:
+        _write_json(run_dir / "proposal.json", _proposal_dict(proposal))
+        (run_dir / "proposal.diff").write_text(proposal.diff, encoding="utf-8")
+        restrict_owner_only(run_dir / "proposal.diff")
+    except OSError as exc:  # review N1: documented Exit 2, never a traceback
+        print("error: {}: {}".format(OUT_WRITE_FAILED_CODE, exc), file=sys.stderr)
+        return 2
 
     payload = {
         "project_yaml_sha256": proposal.project_yaml_sha256,
@@ -1277,3 +1406,604 @@ def run_optimize_config(*, project_root: Path, agent_meta_root: Path, config_pat
     else:
         print(_render_summary(proposal, report))
     return 0
+
+
+# ---------------------------------------------------------------------------
+# Applier (IC-24 "Applier"; AC-55/56/75/80/89/90/91/94)
+# ---------------------------------------------------------------------------
+
+def _is_line_subsequence(before: Sequence[str], after: Sequence[str]) -> bool:
+    """True when *after* is a line subsequence of *before* (remove-only)."""
+    index = 0
+    total = len(before)
+    for line in after:
+        while index < total and before[index] != line:
+            index += 1
+        if index >= total:
+            return False
+        index += 1
+    return True
+
+
+def _hunk_sides(hunk: str) -> Tuple[list, list]:
+    """Return ``(before_side, after_side)`` line lists of one unified hunk.
+
+    Header lines are skipped. Redaction markers are dropped from *both* sides:
+    the marker stands for a credential context line that exists verbatim on both
+    sides, so dropping it keeps the remove-only comparison honest without ever
+    touching the value (AC-89).
+    """
+    before_side: list = []
+    after_side: list = []
+    for line in hunk.splitlines():
+        if line.startswith("@@"):
+            continue
+        if line.startswith("--- ") or line.startswith("+++ "):
+            continue
+        prefix = line[:1]
+        content = line[1:] if prefix in "+- " else line
+        if _REDACTION_RE.search(content):
+            continue
+        if prefix == "-":
+            before_side.append(content)
+        elif prefix == "+":
+            after_side.append(content)
+        else:
+            before_side.append(content)
+            after_side.append(content)
+    return before_side, after_side
+
+
+def _hunk_is_remove_only(hunk: str) -> bool:
+    """True when the hunk only removes lines (its ``+`` side is a subsequence)."""
+    before_side, after_side = _hunk_sides(hunk)
+    return _is_line_subsequence(before_side, after_side)
+
+
+def _redacted_config_text(config_text: str, config: Mapping,
+                          credentials: Sequence[str]) -> Tuple[str, Tuple[str, ...]]:
+    """Return ``(text, key_names)`` with every credential value masked (AC-89).
+
+    The marker is identical to the one used inside diff context, so the backup
+    never holds a plaintext credential -- not even below the (gitignored) sink.
+    Only key *names* are reported back (``applied.json.backup_redacted_keys``).
+    """
+    lines = config_text.splitlines()
+    if not lines:
+        return config_text, ()
+    leaves = dict(_leaf_paths(config))
+    names: set = set()
+    for path, index, indent in _mapping_key_lines([line + "\n" for line in lines]):
+        if path not in credentials:
+            continue
+        key = path.split(".")[-1]
+        value_bytes = len(_to_string(leaves.get(path, "")).encode("utf-8"))
+        lines[index] = "{}{}: {}".format(
+            " " * indent, key, _REDACTION_MARKER.format(value_bytes))
+        names.add(key)
+    if not names:
+        return config_text, ()
+    text = "\n".join(lines)
+    if config_text.endswith("\n"):
+        text += "\n"
+    return text, tuple(sorted(names))
+
+
+def _payload_digest(payload: Mapping) -> str:
+    """sha256 over the canonical JSON form of a sink payload (binding digest)."""
+    blob = json.dumps(payload, sort_keys=True, ensure_ascii=False,
+                      separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(blob).hexdigest()
+
+
+def _binding_digest(payload: Mapping) -> str:
+    """Digest over the *binding-relevant* preview fields (AC-90).
+
+    ``preview_sha256`` (the digest itself) and ``proof`` (a report-only extra)
+    are excluded, so the digest is identical whether or not the preview carries a
+    proof section -- an application can then recompute it from its own body and
+    compare it with ``applied.json.preview_sha256``.
+    """
+    body = {key: value for key, value in payload.items()
+            if key not in ("preview_sha256", "proof")}
+    return _payload_digest(body)
+
+
+def _same_device(path_a: Path, path_b: Path) -> bool:
+    """True when both paths live on the same device (cross-device guard, Rev. 3.3).
+
+    ``os.replace`` cannot move a file across filesystems, so the applier checks
+    before writing anything and aborts with ``meta-optimizer.cross-device``
+    instead of leaving a half-written config. An unknown device is treated as
+    "same" and left to ``os.replace``.
+    """
+    try:
+        return os.stat(os.fspath(path_a)).st_dev == os.stat(os.fspath(path_b)).st_dev
+    except OSError:
+        return True
+
+
+def _applier_run_dir(project_root: Path, config: Mapping, run_id: str) -> Path:
+    """``<sink>/meta-optimizer/<run_id>`` (not created), IC-34/Rev. 3.3."""
+    work = resolve_work_dir(project_root, config, OPTIMIZER_SUBDIR, run_id,
+                            tool=_APPLIER_TOOL)
+    return work.parent
+
+
+def _recompute_candidates(project_root: Path, agent_meta_root: Path, config: Mapping,
+                          config_text: str, generator_options: Mapping) -> OptimizerProposal:
+    """Recompute the candidates with the proposal's own options (N-7)."""
+    active = compute_active_set(dict(config), agent_meta_root, project_root, warn_sink=[])
+    return collect_candidates(
+        project_root, agent_meta_root, config, config_text, active,
+        include_semantic=bool(generator_options.get("include_semantic", False)))
+
+
+def _preview_body(accept_ids: Sequence[str], accept_runtime_ids: Sequence[str],
+                  before_hash: str, version: str, generator_options: Mapping,
+                  entries: Sequence[Mapping], rejected: Sequence[Mapping]) -> dict:
+    """The deterministic preview/apply payload (IC-24 "Vorschau und Anwendung")."""
+    return {
+        "accept_ids": list(accept_ids),
+        "accept_runtime_ids": list(accept_runtime_ids),
+        "project_yaml_sha256": before_hash,
+        "agent_meta_version": version,
+        "generator_options": dict(generator_options),
+        "candidates": [dict(entry) for entry in entries],
+        "rejected": [dict(entry) for entry in rejected],
+    }
+
+
+def _preview_entry(candidate: Candidate) -> dict:
+    return {
+        "id": candidate.id,
+        "yaml_path": candidate.yaml_path,
+        "kind": candidate.kind,
+        "marks": list(candidate.marks),
+        "warnings": list(candidate.warnings),
+        "hunks": list(candidate.hunks),
+    }
+
+
+def apply_summary(report: ApplyReport) -> str:
+    """Human-readable summary of an :class:`ApplyReport` (CLI output)."""
+    if report.dry_run:
+        head = "Config patch preview: {} accepted, {} rejected".format(
+            len(report.applied_ids), len(report.rejected))
+    else:
+        head = "Config patch applied: {} applied, {} rejected".format(
+            len(report.applied_ids), len(report.rejected))
+    lines = [head]
+    if report.code:
+        lines.append("  code: {}".format(report.code))
+    for pid, reason in report.rejected:
+        lines.append("  rejected: {} ({})".format(pid, reason))
+    for error in report.errors:
+        lines.append("  error: {}".format(error))
+    if report.preview_path:
+        lines.append("  preview: {}".format(report.preview_path))
+    if report.log_path:
+        lines.append("  protocol: {}".format(report.log_path))
+    return "\n".join(lines)
+
+
+def _proposal_candidates(proposal: Mapping) -> Tuple[dict, dict]:
+    """Return ``(declared_ids, file_hunks)`` read from ``proposal.json``."""
+    declared: set = set()
+    hunks: dict = {}
+    raw = proposal.get("candidates") or ()
+    if isinstance(raw, (list, tuple)):
+        for entry in raw:
+            if isinstance(entry, Mapping) and entry.get("id"):
+                candidate_id = str(entry["id"])
+                declared.add(candidate_id)
+                hunks[candidate_id] = tuple(str(line) for line in (entry.get("hunks") or ()))
+    return declared, hunks
+
+
+def _check_preview_binding(preview: Mapping, accept_ids: Sequence[str],
+                           accept_runtime_ids: Sequence[str], before_hash: str,
+                           version: str, stored_sha: str) -> Optional[str]:
+    """Return a reason when *preview* does not bind, else ``None`` (AC-90)."""
+    if _binding_digest(preview) != stored_sha:
+        return "preview.json digest does not match its own preview_sha256"
+    if set(str(entry) for entry in (preview.get("accept_ids") or ())) != set(accept_ids):
+        return "accepted IDs differ from the preview"
+    if set(str(entry) for entry in (preview.get("accept_runtime_ids") or ())) != set(
+            accept_runtime_ids):
+        return "accepted runtime IDs differ from the preview"
+    if _to_string(preview.get("project_yaml_sha256")) != before_hash:
+        return "project.yaml hash differs from the preview"
+    if _to_string(preview.get("agent_meta_version")) != version:
+        return "agent-meta version differs from the preview"
+    return None
+
+
+def _check_preview_hunks(preview: Mapping, accepted: Sequence[Candidate]) -> Optional[str]:
+    """Compare the preview's recomputed hunks with the fresh recomputation."""
+    entries = {}
+    for entry in preview.get("candidates") or ():
+        if isinstance(entry, Mapping) and entry.get("id"):
+            entries[str(entry["id"])] = entry
+    for candidate in accepted:
+        entry = entries.get(candidate.id)
+        if entry is None:
+            return "preview.json has no entry for {}".format(candidate.id)
+        if tuple(str(line) for line in (entry.get("hunks") or ())) != candidate.hunks:
+            return "recomputed hunk of {} differs from the preview".format(candidate.id)
+        if str(entry.get("kind", "")) != candidate.kind:
+            return "kind of {} differs from the preview".format(candidate.id)
+        if tuple(entry.get("marks") or ()) != candidate.marks:
+            return "marks of {} differ from the preview".format(candidate.id)
+        if tuple(entry.get("warnings") or ()) != candidate.warnings:
+            return "warnings of {} differ from the preview".format(candidate.id)
+    return None
+
+
+def apply_config_patch(project_root: Path, agent_meta_root: Path, proposal_path: Path,
+                       accept_ids: Sequence[str], *, accept_runtime_ids: Sequence[str] = (),
+                       preview_path: Optional[Path] = None,
+                       dry_run: bool) -> ApplyReport:
+    """Apply a remove-only config patch (IC-24 "Applier", AC-55/56/80/89/90/91).
+
+    ``proposal.json`` is *only* consulted for ``project_yaml_sha256``, the
+    candidate IDs, ``agent_meta_version`` and ``generator_options``: the
+    candidates and their hunks are recomputed with :func:`collect_candidates` and
+    the file hunks merely have to *match* the recomputed (redacted) ones. Anything
+    that does not match -- a non-reproducible ID, a manipulated hunk, a hint, a
+    credential key, a missing ``--accept-runtime`` for a ``confirm-runtime``
+    candidate, a stale/version-mismatching proposal or a diverging preview --
+    is all-or-nothing: the config is never touched. ``dry_run=True`` writes only
+    ``<out>/preview.json`` (AC-90).
+    """
+    project_root = Path(project_root)
+    agent_meta_root = Path(agent_meta_root)
+    accept_ids = tuple(str(entry) for entry in accept_ids)
+    accept_runtime_ids = tuple(str(entry) for entry in accept_runtime_ids)
+    dry_run = bool(dry_run)
+
+    if not accept_ids:
+        return ApplyReport(dry_run=dry_run, exit_code=2, code=USAGE_CODE,
+                           errors=("--accept is mandatory (no implicit application)",))
+    if not dry_run and preview_path is None:
+        return ApplyReport(dry_run=dry_run, exit_code=2, code=USAGE_CODE,
+                           errors=("--preview <preview.json> or --dry-run is mandatory",))
+
+    try:
+        proposal = json.loads(Path(proposal_path).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return ApplyReport(dry_run=dry_run, exit_code=2, code=USAGE_CODE,
+                           errors=("unreadable proposal.json: {}".format(exc),))
+    if not isinstance(proposal, Mapping):
+        return ApplyReport(dry_run=dry_run, exit_code=2, code=USAGE_CODE,
+                           errors=("proposal.json is not a JSON object",))
+
+    declared_ids, file_hunks = _proposal_candidates(proposal)
+    generator_options = dict(proposal.get("generator_options") or {})
+    declared_version = _to_string(proposal.get("agent_meta_version"))
+    declared_hash = _to_string(proposal.get("project_yaml_sha256"))
+
+    running_version = read_version(agent_meta_root)
+    if declared_version != running_version:
+        return ApplyReport(
+            dry_run=dry_run, exit_code=1, code=VERSION_MISMATCH_CODE,
+            agent_meta_version=running_version, generator_options=generator_options,
+            errors=("proposal targets agent-meta {} but {} is running".format(
+                declared_version or "<missing>", running_version),))
+
+    config_path = project_root / _PROJECT_CONFIG_RELPATH
+    try:
+        config_text = config_path.read_text(encoding="utf-8")
+        config = yaml.safe_load(config_text)
+    except (OSError, yaml.YAMLError) as exc:
+        return ApplyReport(dry_run=dry_run, exit_code=2, code=USAGE_CODE,
+                           errors=("cannot read {}: {}".format(_PROJECT_CONFIG_RELPATH, exc),))
+    if not isinstance(config, Mapping):
+        return ApplyReport(dry_run=dry_run, exit_code=2, code=USAGE_CODE,
+                           errors=("{} is not a mapping".format(_PROJECT_CONFIG_RELPATH),))
+    config = dict(config)
+
+    before_hash = hashlib.sha256(config_text.encode("utf-8")).hexdigest()
+    if before_hash != declared_hash:
+        return ApplyReport(dry_run=dry_run, exit_code=1, code=STALE_PROPOSAL_CODE,
+                           project_yaml_sha256_before=before_hash,
+                           project_yaml_sha256_after=before_hash,
+                           agent_meta_version=running_version,
+                           generator_options=generator_options,
+                           errors=("project.yaml changed since the proposal was written",))
+
+    # AC-90: cheap preview binding checks first, so a mismatching preview never
+    # costs a recomputation.
+    preview = None
+    stored_preview_sha = ""
+    if not dry_run:
+        try:
+            preview = json.loads(Path(preview_path).read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            return ApplyReport(dry_run=dry_run, exit_code=1, code=PREVIEW_MISMATCH_CODE,
+                               project_yaml_sha256_before=before_hash,
+                               project_yaml_sha256_after=before_hash,
+                               errors=("unreadable preview.json: {}".format(exc),))
+        if not isinstance(preview, Mapping):
+            return ApplyReport(dry_run=dry_run, exit_code=1, code=PREVIEW_MISMATCH_CODE,
+                               errors=("preview.json is not a JSON object",))
+        preview = dict(preview)
+        stored_preview_sha = _to_string(preview.pop("preview_sha256", ""))
+        reason = _check_preview_binding(preview, accept_ids, accept_runtime_ids,
+                                       before_hash, running_version, stored_preview_sha)
+        if reason:
+            return ApplyReport(dry_run=dry_run, exit_code=1, code=PREVIEW_MISMATCH_CODE,
+                               project_yaml_sha256_before=before_hash,
+                               project_yaml_sha256_after=before_hash,
+                               preview_path=str(preview_path),
+                               agent_meta_version=running_version,
+                               generator_options=generator_options, errors=(reason,))
+
+    try:
+        recomputed = _recompute_candidates(
+            project_root, agent_meta_root, config, config_text, generator_options)
+        credentials = credential_paths(config, agent_meta_root)
+    except RegistryError as exc:
+        return ApplyReport(dry_run=dry_run, exit_code=2, code=exc.code, errors=(str(exc),))
+    except (RuntimeError, OSError, subprocess.SubprocessError, yaml.YAMLError, ValueError) as exc:
+        return ApplyReport(dry_run=dry_run, exit_code=2, code=RENDER_FAILED_CODE,
+                           errors=(str(exc),))
+
+    by_id = {candidate.id: candidate for candidate in recomputed.candidates}
+    accepted: list = []
+    rejected: list = []
+    seen: set = set()
+    for candidate_id in accept_ids:
+        if candidate_id in seen:
+            continue
+        seen.add(candidate_id)
+        candidate = by_id.get(candidate_id)
+        if candidate is None or candidate_id not in declared_ids:
+            rejected.append((candidate_id, REJECT_NOT_REPRODUCIBLE))
+            continue
+        if not candidate.applicable or not candidate.hunks:
+            rejected.append((candidate_id, REJECT_NOT_APPLICABLE))
+            continue
+        if _matches_any(candidate.yaml_path, credentials):
+            rejected.append((candidate_id, REJECT_CREDENTIAL_KEY))
+            continue
+        if (candidate.approval_level == "confirm-runtime"
+                and candidate_id not in accept_runtime_ids):
+            rejected.append((candidate_id, REJECT_NEEDS_RUNTIME))
+            continue
+        if candidate_id not in file_hunks:
+            rejected.append((candidate_id, REJECT_HUNK_MISMATCH))
+            continue
+        if not all(_hunk_is_remove_only(hunk) for hunk in file_hunks[candidate_id]):
+            # AC-80 (b) / threat model (d): a hunk that inserts a line is a
+            # manipulated proposal -> nothing is written at all.
+            return ApplyReport(dry_run=dry_run, exit_code=1, code=NOT_REMOVE_ONLY_CODE,
+                               rejected=tuple(rejected), project_yaml_sha256_before=before_hash,
+                               project_yaml_sha256_after=before_hash,
+                               agent_meta_version=running_version,
+                               generator_options=generator_options,
+                               errors=("proposal hunk of {} inserts a line".format(
+                                   candidate_id),))
+        if tuple(candidate.hunks) != file_hunks[candidate_id]:
+            rejected.append((candidate_id, REJECT_HUNK_MISMATCH))
+            continue
+        accepted.append(candidate)
+
+    if accepted:
+        after_text, _removed = _remove_keys(
+            config_text, [candidate.yaml_path for candidate in accepted])
+        if not _is_line_subsequence(config_text.splitlines(), after_text.splitlines()):
+            return ApplyReport(dry_run=dry_run, exit_code=1, code=NOT_REMOVE_ONLY_CODE,
+                               rejected=tuple(rejected), project_yaml_sha256_before=before_hash,
+                               project_yaml_sha256_after=before_hash,
+                               agent_meta_version=running_version,
+                               generator_options=generator_options,
+                               errors=("the derived config is not a line subsequence",))
+    else:
+        after_text = config_text
+
+    if not dry_run and accepted:
+        reason = _check_preview_hunks(preview, accepted)
+        if reason:
+            return ApplyReport(dry_run=dry_run, exit_code=1, code=PREVIEW_MISMATCH_CODE,
+                               rejected=tuple(rejected), project_yaml_sha256_before=before_hash,
+                               project_yaml_sha256_after=before_hash,
+                               preview_path=str(preview_path),
+                               agent_meta_version=running_version,
+                               generator_options=generator_options, errors=(reason,))
+
+    entries = [_preview_entry(candidate) for candidate in accepted]
+    rejected_payload = [{"id": pid, "reason": reason} for pid, reason in rejected]
+    body = _preview_body(accept_ids, accept_runtime_ids, before_hash, running_version,
+                         recomputed.generator_options, entries, rejected_payload)
+    preview_sha256 = _binding_digest(body)
+
+    if rejected and not dry_run:
+        # All-or-nothing: nothing at all is written -- no run dir, no protocol.
+        return ApplyReport(rejected=tuple(rejected), preview_sha256=preview_sha256,
+                           project_yaml_sha256_before=before_hash,
+                           project_yaml_sha256_after=before_hash,
+                           agent_meta_version=running_version,
+                           generator_options=dict(recomputed.generator_options),
+                           exit_code=1, dry_run=False)
+
+    return _finish_apply(
+        project_root=project_root, agent_meta_root=agent_meta_root, config=config,
+        config_path=config_path, config_text=config_text, after_text=after_text,
+        accepted=accepted, rejected=rejected, body=body, preview_sha256=preview_sha256,
+        before_hash=before_hash, version=running_version, preview_path=preview_path,
+        preview=preview, stored_preview_sha=stored_preview_sha, credentials=credentials,
+        dry_run=dry_run)
+
+
+def _finish_apply(*, project_root: Path, agent_meta_root: Path, config: Mapping,
+                  config_path: Path, config_text: str, after_text: str,
+                  accepted: Sequence[Candidate], rejected: Sequence[Tuple[str, str]],
+                  body: Mapping, preview_sha256: str, before_hash: str, version: str,
+                  preview_path: Optional[Path], preview: Optional[Mapping],
+                  stored_preview_sha: str, credentials: Sequence[str],
+                  dry_run: bool) -> ApplyReport:
+    """Prove, then preview or write -- the write side of :func:`apply_config_patch`."""
+    run_id = _run_id()
+    proof_before: Optional[Path] = None
+    proof_after: Optional[Path] = None
+    try:
+        run_dir = _applier_run_dir(project_root, config, run_id)
+        if accepted:
+            proof_before = resolve_work_dir(project_root, config, OPTIMIZER_SUBDIR,
+                                            run_id + "-before", tool=_APPLIER_TOOL)
+            proof_after = resolve_work_dir(project_root, config, OPTIMIZER_SUBDIR,
+                                           run_id + "-after", tool=_APPLIER_TOOL)
+    except TmpSinkError as exc:
+        return ApplyReport(rejected=tuple(rejected), exit_code=2, code=exc.code,
+                           errors=(exc.message,), dry_run=dry_run,
+                           agent_meta_version=version,
+                           generator_options=dict(body["generator_options"]))
+    except OSError as exc:
+        return ApplyReport(rejected=tuple(rejected), exit_code=2,
+                           code=OUT_WRITE_FAILED_CODE, errors=(str(exc),), dry_run=dry_run,
+                           agent_meta_version=version,
+                           generator_options=dict(body["generator_options"]))
+
+    def make(exit_code: int, *, code: str = "", errors: Sequence[str] = (),
+             applied_ids: Sequence[str] = (), after: Optional[str] = None,
+             preview_out: Optional[str] = None, log_out: Optional[str] = None,
+             backup_keys: Sequence[str] = ()) -> ApplyReport:
+        return ApplyReport(
+            applied_ids=tuple(applied_ids), rejected=tuple(rejected),
+            preview_sha256=preview_sha256,
+            project_yaml_sha256_before=before_hash,
+            project_yaml_sha256_after=after if after is not None else before_hash,
+            backup_redacted_keys=tuple(backup_keys),
+            log_path=log_out,
+            preview_path=preview_out,
+            run_dir=str(run_dir) if run_dir.exists() else None,
+            agent_meta_version=version,
+            generator_options=dict(body["generator_options"]),
+            exit_code=exit_code, code=code, errors=tuple(errors), dry_run=dry_run)
+
+    try:
+        run_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        return make(2, code=OUT_WRITE_FAILED_CODE, errors=(str(exc),))
+
+    if not dry_run and not _same_device(run_dir, config_path.parent):
+        # Rev. 3.3: os.replace cannot cross a filesystem boundary; abort before
+        # anything is written rather than leaving a half-applied config.
+        _discard_empty_dir(run_dir)
+        return make(1, code=CROSS_DEVICE_CODE,
+                    errors=("the tmp-sink is on a different device than .meta-config",))
+
+    proof: Optional[ProofReport] = None
+    try:
+        if accepted:
+            _render_into(agent_meta_root, config_text, proof_before)
+            _render_into(agent_meta_root, after_text, proof_after)
+            proof = prove(proof_before, proof_after, config_text, after_text, "L0")
+    except RegistryError as exc:
+        _discard_empty_dir(run_dir)
+        return make(2, code=exc.code, errors=(str(exc),))
+    except (RuntimeError, OSError, subprocess.SubprocessError, yaml.YAMLError, ValueError) as exc:
+        _discard_empty_dir(run_dir)
+        return make(2, code=RENDER_FAILED_CODE, errors=(str(exc),))
+    finally:
+        for work in (proof_before, proof_after):
+            if work is not None:
+                _discard_work_dir(work, work.parent.parent)
+
+    proof_failed = proof is not None and not proof.ok
+    proof_payload = None
+    if proof is not None:
+        proof_payload = {
+            "level_reached": proof.level_reached,
+            "ok": proof.ok,
+            "files_compared": proof.files_compared,
+            "byte_equal_files": proof.byte_equal_files,
+            "reasons": list(proof.reasons),
+        }
+
+    if dry_run:
+        payload = dict(body)
+        if proof_payload is not None:
+            payload["proof"] = proof_payload
+        payload["preview_sha256"] = preview_sha256
+        try:
+            _write_json(run_dir / PREVIEW_NAME, payload)
+        except OSError as exc:
+            _discard_empty_dir(run_dir)
+            return make(2, code=OUT_WRITE_FAILED_CODE, errors=(str(exc),))
+        exit_code = 1 if (rejected or proof_failed) else 0
+        codes = []
+        if proof_failed:
+            codes.extend(proof.reasons)
+        return make(exit_code, errors=codes, preview_out=str(run_dir / PREVIEW_NAME),
+                    applied_ids=[candidate.id for candidate in accepted])
+
+    if proof_failed:
+        # AC-55/IC-25: a proof that does not hold in the applier's own
+        # recomputation aborts the whole application, nothing is written.
+        _discard_empty_dir(run_dir)
+        return make(1, code=PROOF_FAILED_CODE, errors=tuple(proof.reasons))
+
+    # --- the atomic replace (Rev. 3.3) -------------------------------------
+    backup_text, backup_keys = _redacted_config_text(
+        config_text, config, sorted(credentials))
+    transient = run_dir / _TRANSIENT_CONFIG_NAME
+    try:
+        transient.write_text(after_text, encoding="utf-8")
+        restrict_owner_only(transient)
+    except OSError as exc:
+        _discard_empty_dir(run_dir)
+        return make(2, code=OUT_WRITE_FAILED_CODE, errors=(str(exc),))
+
+    if _TOCTOU_TEST_HOOK is not None:
+        _TOCTOU_TEST_HOOK()
+    try:
+        current = config_path.read_text(encoding="utf-8")
+    except OSError as exc:  # pragma: no cover - the file was readable above
+        transient.unlink(missing_ok=True)
+        _discard_empty_dir(run_dir)
+        return make(2, code=OUT_WRITE_FAILED_CODE, errors=(str(exc),))
+    if hashlib.sha256(current.encode("utf-8")).hexdigest() != before_hash:
+        transient.unlink(missing_ok=True)  # N-12: discard the transient file
+        _discard_empty_dir(run_dir)
+        return make(1, code=STALE_PROPOSAL_CODE,
+                    errors=("project.yaml changed between recomputation and replace",))
+
+    try:
+        _write_text_mode(backup_text, run_dir / BACKUP_NAME)
+        os.replace(os.fspath(transient), os.fspath(config_path))
+    except OSError as exc:
+        transient.unlink(missing_ok=True)
+        return make(2, code=OUT_WRITE_FAILED_CODE, errors=(str(exc),))
+
+    after_hash = hashlib.sha256(after_text.encode("utf-8")).hexdigest()
+    applied = {
+        "accept_ids": list(body["accept_ids"]),
+        "accept_runtime_ids": list(body["accept_runtime_ids"]),
+        "rejected": list(body["rejected"]),
+        "project_yaml_sha256_before": before_hash,
+        "project_yaml_sha256_after": after_hash,
+        "preview_sha256": stored_preview_sha or preview_sha256,
+        "agent_meta_version": version,
+        "generator_options": dict(body["generator_options"]),
+        "timestamp": datetime.now().replace(microsecond=0).isoformat(),
+        "approval_source": APPROVAL_SOURCE_RELAYED,
+        "backup_redacted_keys": list(backup_keys),
+    }
+    log_path = run_dir / APPLIED_NAME
+    try:
+        _write_json(log_path, applied)
+    except OSError as exc:  # pragma: no cover - pragmatic: the patch is applied
+        return make(0, code=OUT_WRITE_FAILED_CODE, errors=(str(exc),),
+                    applied_ids=[candidate.id for candidate in accepted], after=after_hash,
+                    backup_keys=backup_keys)
+
+    return make(0, applied_ids=[candidate.id for candidate in accepted], after=after_hash,
+                log_out=str(log_path), backup_keys=backup_keys)
+
+
+def _write_text_mode(text: str, path: Path) -> None:
+    """Write *text* and restrict it to the owner (sink hardening, AC-89)."""
+    path.write_text(text, encoding="utf-8")
+    restrict_owner_only(path)

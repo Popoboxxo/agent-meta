@@ -65,6 +65,29 @@
   `meta-optimizer.proof-failed`, 2 on `tmp-sink.disabled`, `meta-optimizer.render-failed`,
   `meta-optimizer.out-write-failed`, `optimize-config.out-outside-tmp-sink` or `--fill-defaults`
   (`meta-optimizer.lossy-flag`). The applier (`--apply-config-patch`) follows in package 2d.3.
+- **Remove-only config patch applier (`sync.py --apply-config-patch`, package 2d.3, IC-24/AC-80)**:
+  the only write-capable optimizer mode. It reads **only** `project_yaml_sha256`, the candidate IDs,
+  `agent_meta_version` and `generator_options` from the `proposal.json` and recomputes the candidates
+  itself; the file hunks are reconciled against the recomputed (redacted) ones (a hunk that inserts a
+  line is `meta-optimizer.not-remove-only`, a differing hunk is `rejected: hunk-mismatch`). `--accept`
+  is mandatory (no implicit application), `--accept-runtime` confirms `confirm-runtime` candidates
+  (`rejected: needs-runtime-confirmation` otherwise), hint IDs are `rejected: not-applicable` and
+  unreproducible IDs are `rejected: not-reproducible`. `--dry-run` writes only
+  `<tmp-sink>/meta-optimizer/<ts>/preview.json` (mode `0600`) and never touches the config; an
+  application requires `--preview FILE` and is bound to it (ID sets, hash, version and recomputed
+  hunks, else `meta-optimizer.preview-mismatch`, AC-90). All-or-nothing: rejections, a failed L0 proof
+  (`meta-optimizer.proof-failed`), `meta-optimizer.version-mismatch`, `meta-optimizer.stale-proposal`
+  (also re-checked immediately before `os.replace`, TOCTOU) or `meta-optimizer.cross-device` (sink on a
+  different filesystem) leave the config untouched. On success the config is replaced atomically from a
+  scratch file inside the run dir and the sink keeps `applied.json` (`approval_source: "relayed"`,
+  `accept_ids`, `accept_runtime_ids`, `rejected`, both hashes, `preview_sha256`, `generator_options`,
+  `timestamp`, `backup_redacted_keys` — key *names* only) and a `project.yaml.bak` whose credential
+  values are replaced by the deterministic redaction marker (both `0600`, AC-89). Comments and key
+  order survive (remove-only, `analyze_roundtrip`, AC-56); exit 0 all applied, 1 any rejection/global
+  mismatch (nothing written), 2 usage/`tmp-sink.disabled`/render/write errors/`--fill-defaults` in the
+  same invocation (`meta-optimizer.lossy-flag`). No system temp use
+  (AC-94) and no render scratch survives (the applier's recomputation owns and removes its scratch,
+  review N2).
 
 ### Changed
 - **Routing keywords come from a single source (IC-30)**: the orchestrator/rule routing keywords
