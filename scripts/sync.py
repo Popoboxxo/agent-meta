@@ -47,7 +47,7 @@ if hasattr(sys.stdout, "reconfigure"):
 
 # --doctor must not touch the installation, not even with bytecode caches
 # (IC-22 write boundary): decide before the first lib import.
-if "--doctor" in sys.argv[1:]:
+if "--doctor" in sys.argv[1:] or "--optimize-config" in sys.argv[1:]:
     sys.dont_write_bytecode = True
 
 # Add scripts/ directory to sys.path so lib/ is importable regardless of cwd
@@ -77,6 +77,7 @@ from lib.cli_commands import (
     _handle_fill_defaults,
     _handle_list_backups,
     _handle_only_variables,
+    _handle_optimize_config,
     _handle_prune_backups,
     _handle_restore,
     _handle_sync,
@@ -116,11 +117,33 @@ def _validate_doctor_flags(parser, args) -> None:
     """--strict / --provider / --out belong to --doctor; reject them elsewhere."""
     if getattr(args, "doctor", False):
         return
+    out_allowed = getattr(args, "optimize_config", False)
     stray = [flag for flag, used in (
         ("--strict", args.strict), ("--provider", args.provider is not None),
-        ("--out", args.out is not None)) if used]
+        ("--out", args.out is not None and not out_allowed)) if used]
     if stray:
         parser.error(f"{', '.join(stray)} can only be used together with --doctor")
+
+
+def _validate_optimize_flags(parser, args) -> None:
+    """--include-semantic needs --optimize-config; --fill-defaults is a lossy conflict.
+
+    ``--fill-defaults`` materialises defaults into the config, so the L0 proof
+    baseline would change; the optimizer aborts with ``meta-optimizer.lossy-flag``
+    (Exit 2, IC-24).
+    """
+    if getattr(args, "include_semantic", False) and not getattr(args, "optimize_config", False):
+        parser.error("--include-semantic can only be used together with --optimize-config")
+    if getattr(args, "optimize_config", False) and getattr(args, "fill_defaults", False):
+        from lib.meta_optimizer import LOSSY_FLAG_CODE
+
+        print(
+            f"error: {LOSSY_FLAG_CODE}: --optimize-config cannot be combined with "
+            "--fill-defaults (defaults would be materialised, changing the proof "
+            "baseline)",
+            file=sys.stderr,
+        )
+        sys.exit(2)
 
 
 def _run_artifact_gate(ctx) -> None:
@@ -179,6 +202,20 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                              "a work dir under <tmp-sink>/context-report/ and writes only "
                              "there. Exit 1 on context.over-hard-cap, 2 when the tmp-sink "
                              "is disabled (tmp-sink.disabled).")
+    parser.add_argument("--optimize-config", action="store_true",
+                        help="Read-only config optimizer (IC-24): propose removal "
+                             "candidates for .meta-config/project.yaml and prove (L0) "
+                             "that removing every deterministic candidate keeps all "
+                             "generated artifacts byte-identical. Writes proposal.json, "
+                             "proposal.diff and proof.json below "
+                             "<tmp-sink>/meta-optimizer/<ts>/ and nothing else. Exit 0 "
+                             "(also with candidates), 1 on meta-optimizer.proof-failed, "
+                             "2 on tmp-sink.disabled, meta-optimizer.render-failed or "
+                             "--fill-defaults (meta-optimizer.lossy-flag).")
+    parser.add_argument("--include-semantic", action="store_true",
+                        help="With --optimize-config: also report semantic hints "
+                             "(duplicate-value, relocate-*, semantic-merge). Hints are "
+                             "never applicable (no hunk, no proof level).")
     parser.add_argument("--doctor", action="store_true",
                         help="Diagnose the installation against the known-issues registry "
                              "(config/known-issues.yaml). Writes nothing into the project or "
@@ -196,9 +233,13 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                         help="With --doctor: only check these active providers")
     parser.add_argument("--out", metavar="FILE", default=None,
                         help="With --doctor: also write the JSON report to FILE, which must "
-                             "lie inside <tmp-sink>/doctor/ (e.g. .tmp/doctor/<ts>.json)")
+                             "lie inside <tmp-sink>/doctor/ (e.g. .tmp/doctor/<ts>.json). "
+                             "With --optimize-config: run directory inside "
+                             "<tmp-sink>/meta-optimizer/ (default: a fresh timestamped "
+                             "subdirectory).")
     parser.add_argument("--json", action="store_true",
-                        help="With --context-report or --doctor: emit the report as JSON")
+                        help="With --context-report, --optimize-config or --doctor: emit "
+                             "the report as JSON")
     parser.add_argument("--profile", choices=("full", "compact", "both"), default="full",
                         help="With --context-report: context profile to report "
                              "(compact is reserved for Phase 2)")
@@ -685,6 +726,7 @@ _MODE_HANDLERS = [
     (lambda a: a.only_variables, _handle_only_variables),
     (lambda a: a.cleanup_preview, _handle_cleanup_preview),
     (lambda a: a.context_report, _handle_context_report),
+    (lambda a: a.optimize_config, _handle_optimize_config),
     (lambda a: a.doctor, _handle_doctor),
     (lambda a: a.create_ext, _handle_create_ext),
     (lambda a: a.update_ext, _handle_update_ext),
@@ -712,7 +754,7 @@ _MODE_HANDLERS = [
 
 # Modes that run _build_context with dry_run forced on and stdout on stderr.
 _STDOUT_CLEAN_MODES = ("cleanup_preview", "context_report", "deactivation_status",
-                       "doctor")
+                       "doctor", "optimize_config")
 
 
 def _dispatch(ctx: _SyncContext) -> None:
@@ -729,6 +771,7 @@ def main() -> None:
     parser = _build_arg_parser()
     args = parser.parse_args()
     _validate_doctor_flags(parser, args)
+    _validate_optimize_flags(parser, args)
     _normalize_check_dry_run(args)
     # Start every run with a fresh gitignore probe cache (#752): a long-lived
     # process must not reuse an ignore decision from a previous run.

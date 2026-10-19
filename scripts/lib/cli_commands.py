@@ -1090,6 +1090,42 @@ def _handle_context_report(ctx: _SyncContext) -> None:
     sys.exit(code)
 
 
+def _handle_optimize_config(ctx: _SyncContext) -> None:
+    """Handle ``--optimize-config`` (IC-24): read-only proposal, exit.
+
+    ``main()`` has already forced dry-run and moved stdout to stderr around
+    ``_build_context``. This handler writes only below
+    ``<tmp-sink>/meta-optimizer/<run_id>/`` (``proposal.json``, ``proposal.diff``,
+    ``proof.json``) and never touches the project or the framework root.
+
+    Exit 0 (also with candidates), 1 on ``meta-optimizer.proof-failed``
+    (nothing but ``proof.json`` written), 2 on tmp-sink/render errors
+    (``tmp-sink.disabled``, ``meta-optimizer.render-failed``).
+    """
+    from lib.context_report import merge_provider_mappings
+    from lib.meta_optimizer import run_optimize_config
+    from lib.providers import (
+        load_provider_capabilities,
+        load_providers_config,
+        resolve_providers,
+    )
+
+    ctx.read_only = True
+    ctx.mode = "optimize_config"
+    args = ctx.args
+    provider_config = load_providers_config(ctx.agent_meta_root, ctx.config)
+    providers = resolve_providers(ctx.config, provider_config)
+    mappings = merge_provider_mappings(
+        provider_config, load_provider_capabilities(ctx.agent_meta_root))
+    code = run_optimize_config(
+        project_root=ctx.project_root, agent_meta_root=ctx.agent_meta_root,
+        config_path=ctx.config_path, config=ctx.config, active=ctx.active_set,
+        providers=providers, mappings=mappings, as_json=args.json,
+        include_semantic=getattr(args, "include_semantic", False),
+        out=getattr(args, "out", None))
+    sys.exit(code)
+
+
 _DOCTOR_SUBDIR = "doctor"
 
 

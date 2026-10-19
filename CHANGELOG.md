@@ -42,6 +42,29 @@
   (AC-25) is planned in package 2f, a `compact` sync logs INFO `context-profile.unverified`, and no
   default flips to `compact`. The measured sizes currently miss several AC-26 targets (documented
   deviation, to be resolved by a later spec revision per AC-26).
+- **Config optimizer runner (`sync.py --optimize-config`, package 2d, IC-24/IC-25)**: read-only
+  removal candidates for `.meta-config/project.yaml` plus an L0 losslessness proof. A sentinel render
+  (every text value under `variables:` wrapped in `QZ<NAME>QZ…ZQ<NAME>ZQ`) measures the per-variable
+  fan-out (occurrences, files, injected bytes, per provider; conditional variables are never wrapped
+  and get `occurrences: null`/`conditional: true`), and the proof renders the config verbatim and
+  again without the deterministic candidates and compares both trees — the L0 comparison set includes
+  the render-derived sidecars `.meta-config/auto-commit-allowlist.json`,
+  `.meta-config/generated-file-hashes.json` and `.meta-config/context-hashes.json` (a sidecar missing
+  from the render fails the proof; their hashes are recorded before/after). Conditional variables
+  (`{{#if X}}`/`{{#unless X}}` usage or the render's conditional list) are never sentinel-wrapped and
+  appear in `fan_out` with `occurrences: null`/`files: null`/`conditional: true` and zeroed
+  `per_provider`. Output (`proposal.json`, `proposal.diff`, `proof.json`, mode `0600`) goes exclusively
+  below `<tmp-sink>/meta-optimizer/<ts>/` via `resolve_work_dir`; the sentinel render and both proof
+  renders live in `<run_id>[-before|-after]/work/` and are removed before the command returns, so no
+  unredacted config copy and no credential byte sequence survives under the sink. There is no
+  system-temp use and nothing is written outside the sink. Credential paths (IC-35 `credentials`) are
+  excluded completely (no candidate, no hint, no `FanOutEntry`, redacted diff context; AC-89) and a
+  missing/invalid registry is a hard error (`meta-optimizer.credential-registry-invalid`);
+  `--include-semantic` adds hint-only kinds (`duplicate-value`, `relocate-*`, `semantic-merge`, never
+  applicable, filtered out without the flag); exit 0 (also with candidates), 1 on
+  `meta-optimizer.proof-failed`, 2 on `tmp-sink.disabled`, `meta-optimizer.render-failed`,
+  `meta-optimizer.out-write-failed`, `optimize-config.out-outside-tmp-sink` or `--fill-defaults`
+  (`meta-optimizer.lossy-flag`). The applier (`--apply-config-patch`) follows in package 2d.3.
 
 ### Changed
 - **Routing keywords come from a single source (IC-30)**: the orchestrator/rule routing keywords
