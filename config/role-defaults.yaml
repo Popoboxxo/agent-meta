@@ -283,6 +283,26 @@ roles:
       target_roles:
       - agent-meta-manager
     short_desc: 'Diagnoses the agent-meta installation (reports only to the tmp-sink)'
+  meta-optimizer:
+    model: balanced
+    memory: ''
+    workflow_tier: optional
+    description: 'Read-only config optimizer: reads a `sync.py --optimize-config` proposal
+      and presents token-compact, evidence-backed variants of the project config
+      with mandatory warnings — never edits or applies anything.'
+    routing:
+      addressability: name_only
+      name_only_reason: Config optimization meta role; produces proposals only and is
+        invoked explicitly by name, never by routine task keywords.
+      parallel: false
+      orchestrator_only: true
+    handoff:
+      input_contracts:
+      - task-spec-v1
+      output_contract: config-patch-proposal-v1
+      target_roles:
+      - agent-meta-manager
+    short_desc: 'Proposes compact project-config variants (proposal only)'
   tester:
     model: fast
     memory: ''
