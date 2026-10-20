@@ -317,16 +317,18 @@ _MARKER_RE = re.compile(r"\{\{(#if|#unless) (\w+)\}\}|\{\{(else)\}\}|\{\{/(if|un
 def marker_problems(text: str) -> list[tuple[int, str]]:
     """``(line, problem)`` for unbalanced or mixed block/inline conditional markers.
 
-    A marker alone on its line is a block marker, any other is inline. A block
-    open must be continued/closed by block markers; an inline open must be
-    continued/closed on the same line; the marker kinds must match; nothing may
-    stay open at the end of the file.
+    A line consisting solely of directives is a block line: it carries at least
+    one marker and nothing but whitespace remains once all markers are removed.
+    Every other marker line is inline. A block open must be continued/closed by
+    block markers; an inline open must be continued/closed on the same line; the
+    marker kinds must match; nothing may stay open at the end of the file.
     """
     stack: list[tuple[str, str, int]] = []
     problems: list[tuple[int, str]] = []
     for number, line in enumerate(text.splitlines(), start=1):
         markers = list(_MARKER_RE.finditer(line))
-        form = "block" if len(markers) == 1 and line.strip() == markers[0].group(0) else "inline"
+        remainder = _MARKER_RE.sub("", line)
+        form = "block" if markers and not remainder.strip() else "inline"
         for marker in markers:
             if marker.group(1):
                 stack.append((marker.group(1)[1:], form, number))
@@ -885,6 +887,10 @@ def test_marker_problems_detects_each_bypass():
     assert marker_problems("{{#if A}}\nx {{else}} y\n{{/if}}\n")
     assert marker_problems("x {{#if A}} y\n")
     assert marker_problems("{{#if A}}\nx\n{{else}}\ny\n{{/if}}\nz {{#if B}}w{{else}}{{/if}}\n") == []
+
+
+def test_marker_problems_accepts_nested_block_directives_on_one_line():
+    assert marker_problems("{{#if A}}{{#unless B}}\nx\n{{/unless}}{{else}}\ny\n{{/if}}\n") == []
 
 
 # templates/context/ is rendered by the context engine with handlebars-style
