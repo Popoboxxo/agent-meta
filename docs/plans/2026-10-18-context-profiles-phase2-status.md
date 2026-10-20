@@ -71,6 +71,7 @@ Verifiziert mit `git log --oneline main..HEAD`; alle Commits sind auf dem lokale
 | 2e.5 / Task 31 | `20f2200d` |
 | 2e.6 / Task 32 | `91fb26a4` |
 | Fix: Standalone + compact-Budgets | `58d7689f` |
+| Fix: Marker-Parser (nested Block-Conditionals) | 801b6884 |
 
 ## 3. Task 2.00 Precondition
 
@@ -130,7 +131,7 @@ DAG 2f: `2f.1 → 2f.2 → 2f.3`.
    - Konsequenz: Ziele bleiben **ESTIMATE-Daten**; gemessene Actuals sind als **Regressions-Obergrenzen** gepinnt; der Over-Target-Checker ist aktiv; die Doku benennt die Verfehlung **explizit**.
 2. **Provider-override-only `compact`-Hybrid:** Das Entry-File-Layout ist compact, **eingebettete Rules bleiben jedoch uncompacted** — Ursache: Rule-Kompaktierung hängt am **globalen** `COMPACT_MODE`, während das Entry-File-Gating `CONTEXT_PROFILE_COMPACT` **per Provider** nutzt. Bewertet als **OUT OF SCOPE** (Ripples auf MCP-/External-Tool-Sektionen, `resolve_plugin_compact`, `KNOWLEDGE_ENGINE_HINTS`; ein zu weites Ziehen riskiert `context.dangling-pointer` ERROR). **Empfehlung: eigener Backlog-Eintrag.**
 3. **Minor (latent):** `_extract_rule_section` ist **fence-unaware** — kein aktiver Defekt, nur latentes Risiko.
-4. **Vorbestehend (nicht von 2d/2e):** `tests/test_no_role_routes_in_templates.py::test_repo_conditional_markers_are_well_formed` ist **rot** — nested `{{#if …}}{{#unless …}}` in `agents/1-generic/orchestrator.md:320-322`; der Parser verbietet mehrere Direktiven pro Zeile. Auf `8c334aef` bereits rot (introduced by `1efde04e`/`e5d47d48`), **nicht auf `main`**. Bewusst **nicht** „gefixt“ und **nicht** Test-abgeschwächt.
+4. **BEHOBEN (2026-10-20, `801b6884`):** Der vorbestehende rote Test `tests/test_no_role_routes_in_templates.py::test_repo_conditional_markers_are_well_formed` (nested `{{#if …}}{{#unless …}}` in `agents/1-generic/orchestrator.md:320-322`) war ein Parser-False-Positive: `marker_problems` behandelte reine Direktiven-Zeilen als „inline“. Fix: Zeilen, die ausschließlich aus Direktiven bestehen, gelten als Block-Form; Regressionstest ergänzt (echte Bypässe bleiben rot). `tests/test_no_role_routes_in_templates.py` = **36 passed**.
 5. **Task 31 / AC-90:** Der Pflichtabschnitt vergrößert den compact-Orchestrator um **exakt +1258 B je Provider** → `_IST_COMPACT` wird re-pinnt (Commit `58d7689f`). Die AC-26-Ziele bleiben **unverändert** und weiterhin **unmet/ESTIMATE** (siehe Punkt 1).
 6. **Task 23 (2d.4):** Der Guard neutralisiert bestehende Refill-Kandidaten; es werden bewusst **keine NEUEN** info-only-Kandidaten für alle Refill-Keys emittiert (Runner-Test-Invariante). Als **Design-Entscheidung** dokumentiert.
 7. **Task 30 (2e.4):** Der `test_context_budgets.py`-Re-Pin absorbierte zusätzlich stale Pins aus 2e.2/2e.3/compact-Arbeit (im Code-Kommentar dokumentiert).
@@ -138,7 +139,8 @@ DAG 2f: `2f.1 → 2f.2 → 2f.3`.
 9. **In dieser Session behoben (resolved):**
    - compact §9-Pointer ist auflösbar (`22df124f`);
    - `roster_in_harness`-Gating implementiert + 2c.3 QG-2 verschärft (`1efde04e`);
-   - die 2b.1-`Files`-Block-Abweichung war **stale Plan-Metadaten** — kein Code-Churn.
+   - die 2b.1-`Files`-Block-Abweichung war **stale Plan-Metadaten** — kein Code-Churn;
+   - Marker-Parser-False-Positive behoben (`801b6884`).
 
 ## 7. Umgebung / Ausführung
 
@@ -164,13 +166,13 @@ Wir setzen den freigegebenen Phase-2-Plan für Context Profiles in C:\Repositori
 
 Lies zuerst: docs/plans/2026-10-18-context-profiles-phase2-status.md (Status/Handoff), dann docs/plans/2026-10-17-context-profiles-phase2-plan.md (Task-Sektionen) und docs/specs/2026-10-11-context-profiles-spec.md (Rev. 3.4).
 
-Stand: Branch feat/context-profiles-phase2a (lokal, nicht gepusht). Pakete 2a, 2b, 2c sind FERTIG und committet (siehe Statusdoku §2). Nächstes: Paket 2d (Tasks 20–26), danach Paket 2e (Tasks 27–32). Paket 2f bleibt GATED — nicht starten (eigene Nutzerfreigabe + Kostenschätzung nötig).
+Stand: Branch feat/context-profiles-phase2a ist committet und gepusht. Pakete 2a–2e sind FERTIG und committet (siehe Statusdoku §2). Offen ist nur Paket 2f — GATED, nicht starten (eigene Nutzerfreigabe + Kostenschätzung nötig).
 
 Umgebung: Windows; das `bash`-Tool ist gesperrt → Serena-Shell-Tool nutzen; Tests mit `.venv-1\Scripts\python.exe -m pytest ...`.
 
 Regeln: alle Dev-Arbeit über den orchestrator; ein Commit pro Task mit der exakten Plan-Message; TDD (rot→grün); provider-agnostisch (kein `if provider == "Name"`); Python 3.9; Byte-Stabilität ohne Opt-in; `compact` bleibt opt-in & unverifiziert; kein Push/Branch/PR ohne Auftrag (nur `git`-Agent); keine Worktree-Isolation.
 
-Ziel: Paket 2d (2d.1–2d.7) vollständig implementieren und je Task committen, dann Statusbericht. Wenn 2d grün ist, mit Paket 2e fortfahren. Wo ein Plan-Files-Block/Verhalten von der Realität abweicht: sinnvoll fixen und dokumentieren; AC-26-Zielverfehlung als dokumentierten Spec-Revisions-Punkt belassen.
+Ziel: Pakete 2a–2e sind abgeschlossen (2d.1–2d.7 und 2e.1–2e.6 committet). Offen ist ausschließlich Paket 2f (GATED: Baseline/Eval, eigene Nutzerfreigabe + Kostenschätzung). Wo ein Plan-Files-Block/Verhalten von der Realität abweicht: sinnvoll fixen und dokumentieren; AC-26-Zielverfehlung als dokumentierten Spec-Revisions-Punkt belassen.
 
 Lieferergebnisse: Red/Green-Nachweis je Task, Commits, `sync.py --check`-/consistency-Ausgaben, aktualisierte Plan-Checkboxen, knapper Statusbericht.
 ```
@@ -184,8 +186,10 @@ Lieferergebnisse: Red/Green-Nachweis je Task, Commits, `sync.py --check`-/consis
 | Relevante pytest-Auswahl (nach Fix `58d7689f`) | 572/572 effektiv grün (siehe unten) |
 | `scripts/consistency-check.py` | **PASS** — „No issues found“ |
 | `sync.py --validate` | Exit 0 (2 Warnungen, siehe unten) |
+| Marker-Parser-Fix | tests/test_no_role_routes_in_templates.py → 36 passed (801b6884) |
 
 - **Szenarien:** Die volle Szenarien-Suite lief komplett grün: `Scenarios: 78  Passed: 78  Failed: 0`.
 - **pytest:** Die relevante Auswahl war initial **569 passed / 3 failed**. Alle 3 Fehlschläge gingen auf **Task 31** zurück: stale `standalone/agents/orchestrator.md` + **compact-Budget-Decken um +1258 B/Provider überschritten**. Nach dem Fix `58d7689f` lieferte `tests/test_context_budgets.py tests/test_standalone_export_in_sync.py` **13 passed**; damit sind **572/572** der Auswahl grün.
 - **consistency-check:** `scripts/consistency-check.py` meldet **PASS** / „No issues found“.
 - **sync validate:** `sync.py --validate` endet mit **Exit 0**; es bleiben **2 Warnungen**: `se` gate-dropped und `external/awesome-claude-code` Checkout `3d8bde25`.
+- **Marker-Parser:** `tests/test_no_role_routes_in_templates.py` → **36 passed** nach Fix `801b6884`; der zuvor dokumentierte rote Test ist damit grün.
