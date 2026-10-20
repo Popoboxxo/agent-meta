@@ -2,7 +2,7 @@
 # No unused/dead variables so the only non-deterministic candidates without
 # --include-semantic are the AC-81 runtime-reader info-only hints
 # (e.g. repo_containment), never a semantic kind.
-agent-meta-version: "2.0.0-beta.1"
+agent-meta-version: "2.0.0-beta.2"
 ai-providers:
 - Claude
 dod-preset: rapid-prototyping

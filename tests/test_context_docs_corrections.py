@@ -8,6 +8,8 @@ from pathlib import Path
 import importlib.util
 import re
 
+from tests.changelog_sections import latest_changelog_section
+
 _ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -151,7 +153,7 @@ def test_measure_tokens_help_mentions_strict(capsys):
 def test_changelog_mentions_964_items():
     text = _read("CHANGELOG.md")
     assert re.search(r"(?m)^## \[Unreleased\]", text)
-    unreleased = text.split("\n## [", 2)[1]
-    assert unreleased.startswith("Unreleased")
+    unreleased = latest_changelog_section(text)
+    assert unreleased.startswith("## [Unreleased]")
     assert "--context-report" in unreleased
     assert "#964" in unreleased

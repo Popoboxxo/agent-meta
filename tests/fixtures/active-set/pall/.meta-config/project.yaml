@@ -1,4 +1,4 @@
 # No `roles:` key (all gate-enabled roles); variables.EXTRA_DONTS intentionally unset.
-agent-meta-version: "2.0.0-beta.1"
+agent-meta-version: "2.0.0-beta.2"
 ai-providers:
 - Claude

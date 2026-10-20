@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [2.0.0-beta.2] - 2026-10-20
+
 ### Added
 - **Opt-in context profiles (`context-profile`, UNVERIFIED)**: `context-profile: full|compact` —
   default `full` — plus a per-provider `provider-overrides.<Provider>.context-profile` resolve the

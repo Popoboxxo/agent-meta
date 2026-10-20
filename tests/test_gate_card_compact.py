@@ -15,6 +15,14 @@ extracted verbatim from the source rules — the section names come from
 ``compact`` is opt-in and unverified (IC-36): nothing here claims the profile is
 verified, validated or recommended. QG-5 freezes the opt-in render as
 ``tests/fixtures/compact-golden/agents-managed.md``.
+
+Regenerate the golden (only for a justified rebaseline, documented below): render
+the ``compact`` profile through ``_render`` and write it to the fixture.
+
+Rebaseline log:
+- Release 2.0.0-beta.2 (VERSION bump 2.0.0-beta.1 -> 2.0.0-beta.2): only the
+  ``agent-meta v...`` version string in the compact gate-card header changed.
+  No substantive render change.
 """
 from __future__ import annotations
 

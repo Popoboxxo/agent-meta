@@ -19,6 +19,8 @@ Run: python -m pytest tests/test_context_profile_docs.py -v
 import re
 from pathlib import Path
 
+from tests.changelog_sections import latest_changelog_section
+
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _CLI_REFERENCE = _REPO_ROOT / "docs" / "api" / "cli-reference.md"
 _CHANGELOG = _REPO_ROOT / "CHANGELOG.md"
@@ -50,12 +52,12 @@ def _context_profile_section() -> str:
 
 
 def _unreleased_section() -> str:
+    """The current changelog block: ``[Unreleased]`` plus the next release."""
     text = _CHANGELOG.read_text(encoding="utf-8")
-    start = text.find("## [Unreleased]")
-    assert start != -1, "CHANGELOG.md must keep an [Unreleased] section."
-    rest = text[start:]
-    next_release = re.search(r"(?m)^## \[", rest[1:])
-    return rest if not next_release else rest[: next_release.start() + 1]
+    assert "## [Unreleased]" in text, (
+        "CHANGELOG.md must keep an [Unreleased] section."
+    )
+    return latest_changelog_section(text)
 
 
 def test_cli_reference_documents_opt_in_unverified_with_reason():
