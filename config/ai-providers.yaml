@@ -345,11 +345,11 @@ providers:
       - color
       reject-fields: []
     model-tiers:
-      nano: opencode-go/mimo-v2.5
-      fast: opencode-go/mimo-v2.5
-      balanced: opencode-go/omen-alpha
-      powerful: opencode-go/deepseek-v4-pro
-      max: opencode-go/kimi-k2.7-code
+      nano: opencode-go/deepseek-v4.1-flash
+      fast: opencode-go/deepseek-v4.1-flash
+      balanced: opencode-go/deepseek-v4.1-flash
+      powerful: opencode-go/deepseek-v4.1-flash
+      max: opencode-go/deepseek-v4-pro
     model-aliases:
       flash: opencode-go/deepseek-v4.1-flash
       qwen: opencode-go/qwen3.7-plus
