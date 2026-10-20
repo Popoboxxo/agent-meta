@@ -179,6 +179,38 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   config-patch-proposal-v1`` -> one additional ``input_contracts`` routing row in the orchestrator
   routing data. Changed: the 9 per-provider orchestrator artifacts plus the 9
   ``generated-file-hashes.json`` (18 of 1012 hashes; 0 added/removed). No other render changed.
+- Task 30 (2e.4, IC-27/AC-59/AC-90/AC-91): the ``agent-meta-manager`` template gains the new
+  section ``## 10c. Optimizer-Vorschläge anwenden (Advisory Mode)`` (the three steps
+  Analyse/Vorschau/Anwendung of IC-27 Rev. 3.1) and a minor version bump ``1.24.1 -> 1.25.0``
+  (new optional section, convention: minor). The section is prose plus three bash invocations,
+  so it only changes the rendered ``agent-meta-manager`` artifact of each provider and the
+  managed-file hash of that file. Changed: the 9 per-provider ``agent-meta-manager`` artifacts
+  (``Claude/.claude/agents/agent-meta-manager.md``, ``Codex/.codex/agents/agent-meta-manager.toml``,
+  ``Continue/.continue/agents/agent-meta-manager.md``,
+  ``Copilot/.github/agents/agent-meta-manager.agent.md``,
+  ``Gemini/.gemini/agents/agent-meta-manager.md``,
+  ``KimiCode/.kimi-code/agents/agent-meta-manager.md``,
+  ``Mammouth/.mammouth/agents/agent-meta-manager.md``,
+  ``Opencode/.opencode/agents/agent-meta-manager.md``,
+  ``ZCode/.zcode/agents/agent-meta-manager.md``) plus the 9
+  ``generated-file-hashes.json`` (18 of 1012 hashes; 0 added/removed). No other render changed;
+  ``AC01_EXCEPTIONS`` is NOT extended — the exception list stays limited to the new role
+  artifacts ``meta-doctor``/``meta-optimizer`` (Spec AC-01 iv/v).
+- Task 30 fix round (2e.4, review findings): three *text* corrections inside the new
+  ``## 10c.`` section of the ``agent-meta-manager`` template (the scoped "no manual edit"
+  rule, the release/approval wording, the ``preview.json`` payload sentence). The rendered
+  section keeps its line count (36 lines) and the template version pin stays ``1.25.0``
+  (the section was not yet released), so the *set* of affected paths is unchanged: again
+  exactly the 9 per-provider ``agent-meta-manager`` artifacts plus the 9
+  ``generated-file-hashes.json`` (18 of 1012 hashes; 0 added/removed).
+- Task 30 polish round (2e.4, review findings): one further *text* correction inside the
+  same §10c section -- the "no manual edit" rule now names §13 as well
+  ("§3/§5/§8" -> "§3/§5/§8/§13 (confirmation, schema check, re-sync, SE cascade)"), because
+  §13 (SE cascade) is a documented ``project.yaml`` change path next to §3/§5/§8. The
+  rendered section keeps its line count (36 lines) and the template version pin stays
+  ``1.25.0`` (the section was not yet released), so the *set* of affected paths is
+  unchanged: again exactly the 9 per-provider ``agent-meta-manager`` artifacts plus the 9
+  ``generated-file-hashes.json`` (18 of 1012 hashes; 0 added/removed).
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

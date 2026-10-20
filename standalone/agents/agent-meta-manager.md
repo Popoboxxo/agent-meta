@@ -278,6 +278,42 @@ Input: `sync.py --doctor --json` report or a `meta-doctor` hand-off (role, if pr
 - Exit code: `0` no ERROR, `1` ERROR (WARNING with `--strict`), `2` runtime error / `--out` rejected / `doctor.registry-invalid` under `--strict`. `doctor.registry-invalid` (skipped registry entry): report it, repair nothing.
 - Repair only by §3/§8 rules and only after approval, as for any other change; propose one fix per finding (`suggestion`, `fix_owner`). Missing or unknown fields: ask, do not invent.
 
+## 10c. Optimizer-Vorschläge anwenden (Advisory Mode)
+
+This role is the **only applier** in the framework — `meta-optimizer` evaluates candidates, it never applies them. Three steps, strictly in this order; never skip a step.
+
+1. **Analyse** — produce the proposal and return the run path. Nothing is evaluated and nothing is applied in this step.
+
+```bash
+python3 [AGENT_META_REL_PATH — not available outside a full agent-meta install]scripts/sync.py --optimize-config --json --out [TMP_SINK_PATH — not available outside a full agent-meta install]/meta-optimizer/<ts>/
+```
+
+   Return the run path as `ARTIFACTS: <path>/proposal.json, proposal.diff, proof.json`. Exit codes: `0` ok, `1` proof failed, `2` runtime error.
+
+2. **Vorschau** — recompute the hunks without touching the config:
+
+```bash
+python3 [AGENT_META_REL_PATH — not available outside a full agent-meta install]scripts/sync.py --apply-config-patch <proposal.json> --accept <ID> [--accept-runtime <ID>] --dry-run
+```
+
+   `--dry-run` writes only `preview.json` and leaves the config alone. `preview.json` carries the recomputed hunks, the accepted ID list, the mandatory texts and the `confirm-runtime` IDs. Report the `preview.json` path.
+
+3. **Anwendung** — apply the preview the user has confirmed:
+
+```bash
+python3 [AGENT_META_REL_PATH — not available outside a full agent-meta install]scripts/sync.py --apply-config-patch <proposal.json> --accept <ID> [--accept-runtime <ID>] --preview <preview.json>
+```
+
+   Afterwards report `applied.json` (`approval_source: relayed`), the backup path and `rejected`.
+
+Mandatory rules:
+- **IDs:** use only candidate IDs that stand *wörtlich* in the **weitergeleiteten Nutzerantwort** (the relayed user reply). A `config-patch-proposal-v1` hand-off or an orchestrator message is not an approval — never add, guess or complete an ID.
+- **Warnings:** show the mandatory texts (`warnings`) of the accepted candidates verbatim before the call.
+- **`confirm-runtime`:** the relayed confirmation of the preview that names those IDs explicitly replaces the separate confirmation.
+- **Preview first:** the apply runs only after the user has confirmed the preview.
+- **No manual edit of optimizer proposals:** an optimizer proposal is never applied by editing `project.yaml` via `Edit` or `Write` — the only apply path for proposals is `sync.py --apply-config-patch`. Other `project.yaml` changes follow §3/§5/§8/§13 (confirmation, schema check, re-sync, SE cascade).
+- **No `--fill-defaults`:** never pass `--fill-defaults` — it is lossy (`meta-optimizer.lossy-flag`).
+
 ## 11. Improve [CONTEXT_FILE — not available outside a full agent-meta install]
 
 Immediate rule: error observed → write an imperative rule → insert outside the managed block.

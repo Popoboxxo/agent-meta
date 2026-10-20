@@ -61,24 +61,68 @@ TOLERANCE_MAX_BYTES = 4096
 # Re-pinned for PR E (IC-15 no. 1/9/12, Tasks 1.21/1.23/1.33): AGENTS.md lists only active sharers and
 # no hard-wired banner, use-lazy-rules is not rendered without existing skills (-1.0 KB rules/entry file),
 # Codex/Mammouth no longer write their unread rules dirs (their `rules` pin is dropped). Only decreases.
+# Re-pinned in Task 30 (2e.4, IC-27/AC-90): the `agent-meta-manager` template gains the section
+# `## 10c. Optimizer-Vorschläge anwenden (Advisory Mode)` (the Analyse/Vorschau/Anwendung chain) —
+# ~2.3 KB on every provider roster (the 6 providers with a harness-roster; 2,346 B in the Claude
+# render, measured — the placeholder substitutions make the exact value provider-dependent) and on
+# their always-loaded set; every other artifact is unchanged by this task. The re-pin additionally
+# absorbs the stale pins left by the Phase-2 tasks 2e.2/2e.3 (registration of the new role
+# `meta-optimizer`: roster rows in the orchestrator, the AGENTS.md agent table and the per-provider
+# agent files, ~+7.5 KB roster) and by the compact-profile work: at HEAD the gate was already RED
+# before this task started (e.g. Claude/harness-roster 588,854 B vs. ceiling 585,370 B; compact
+# 534,875 B vs. 532,390 B). The pins below are therefore re-measured from the current state, not
+# extrapolated.
+# The polish round of Task 30 (2e.4) completes the §10c "No manual edit" rule by the §13 reference
+# ("§3/§5/§8" -> "§3/§5/§8/§13 (confirmation, schema check, re-sync, SE cascade)"): +17 B on every
+# provider roster and on the always-loaded set, no other artifact changes.
+#
+# ABSORBED DELTAS OF THIS RE-PIN (measured, not extrapolated — HEAD pin -> measured Ist).
+# The list is COMPLETE for both profiles: every artifact with a non-zero delta is named below.
+# A later re-pin must nevertheless re-measure EVERY artifact — this list documents THIS re-pin, it
+# is not a maintenance promise. That is what keeps a stale pin from being inherited silently.
+# `full` profile:
+#   * harness-roster (the `meta-optimizer` registration + the new §10c section):
+#     Claude 581,274 -> 591,201 (+9,927), Codex 575,241 -> 585,156 (+9,915),
+#     KimiCode 566,366 -> 577,663 (+11,297), Mammouth 568,677 -> 573,719 (+5,042),
+#     Opencode 577,758 -> 587,666 (+9,908), ZCode 565,162 -> 575,003 (+9,841).
+#   * always-loaded (roster + entry-file + rules deltas):
+#     Claude +9,927, Codex +9,932, Continue -50, Copilot +14, KimiCode +11,314, Mammouth +5,059,
+#     Opencode +9,925, ZCode +9,858.
+#   * orchestrator (the `meta-optimizer` routing rows):
+#     Claude 85,147 -> 85,530 (+383), Codex 84,587 -> 85,145 (+558),
+#     Continue 69,871 -> 70,180 (+309), Copilot 69,747 -> 70,056 (+309),
+#     Gemini 85,169 -> 85,552 (+383), KimiCode 70,468 -> 71,943 (+1,475),
+#     Mammouth 70,242 -> 70,481 (+239), Opencode 84,835 -> 85,218 (+383),
+#     ZCode 70,443 -> 70,752 (+309).
+#   * entry-file: Codex/KimiCode/Mammouth/Opencode/ZCode +17 B each (the `meta-optimizer` row in the
+#     agent table), Continue 374 -> 358 (-16), Copilot 9,425 -> 9,457 (+32),
+#     Gemini 31,715 -> 31,841 (+126); Claude unchanged.
+#   * rules: Continue 20,174 -> 20,140 (-34), Copilot 19,954 -> 19,936 (-18); Claude/Gemini unchanged.
+#   * `Gemini/always-loaded` 48,983 -> 31,841 B (-17,142 B) — the largest absorbed delta, a
+#     **pre-existing stale pin** from the Phase-1 / compact-profile work (the Gemini rules are
+#     embedded into the shared AGENTS.md, so no separate rules artifact counts into the
+#     always-loaded set). NOT caused by Task 30; the next re-pin must not inherit it silently.
 _IST_FULL: Dict[str, Dict[str, int]] = {
-    "Claude": {"entry-file": 2511, "rules": 17268, "orchestrator": 85147, "harness-roster": 581274, "always-loaded": 601053},
-    "Codex": {"entry-file": 24143, "orchestrator": 84587, "harness-roster": 575241, "always-loaded": 599384},
+    "Claude": {"entry-file": 2511, "rules": 17268, "orchestrator": 85530, "harness-roster": 591201, "always-loaded": 610980},
+    "Codex": {"entry-file": 24160, "orchestrator": 85145, "harness-roster": 585156, "always-loaded": 609316},
     # Continue: rule files gained `alwaysApply: false` + `description` frontmatter
     # (Task 1.31, IC-15 Nr. 10 / F-14) and `.continue/rules/project-context.md`
     # dropped its unresolved-placeholder lines; the disk-byte metric counts the
     # frontmatter, so `rules`/`always-loaded` grow while the runtime always-on set
     # shrinks (the reader lazy-loads `alwaysApply: false` files).
-    "Continue": {"entry-file": 374, "rules": 20174, "orchestrator": 69871, "always-loaded": 20548},
+    "Continue": {"entry-file": 358, "rules": 20140, "orchestrator": 70180, "always-loaded": 20498},
     # Copilot: `.github/instructions/*.instructions.md` gained the required suffix
     # plus `applyTo`/`description` frontmatter and the agent `name:` fix
     # (Task 1.29, IC-15 Nr. 3 / F-13) — pin refreshed to the measured Ist.
-    "Copilot": {"entry-file": 9425, "rules": 19954, "orchestrator": 69747, "always-loaded": 29379},
-    "Gemini": {"entry-file": 31715, "rules": 17268, "orchestrator": 85169, "always-loaded": 48983},
-    "KimiCode": {"entry-file": 24157, "orchestrator": 70468, "harness-roster": 566366, "always-loaded": 590523},
-    "Mammouth": {"entry-file": 24154, "orchestrator": 70242, "harness-roster": 568677, "always-loaded": 592831},
-    "Opencode": {"entry-file": 24218, "orchestrator": 84835, "harness-roster": 577758, "always-loaded": 601976},
-    "ZCode": {"entry-file": 25056, "orchestrator": 70443, "harness-roster": 565162, "always-loaded": 590218},
+    "Copilot": {"entry-file": 9457, "rules": 19936, "orchestrator": 70056, "always-loaded": 29393},
+    # Gemini: the `rules` artifact is dropped (its rules are embedded in the shared
+    # AGENTS.md), so `always-loaded` equals `entry-file` — the -17,142 B vs. the HEAD
+    # pin is the pre-existing stale pin documented above, not a Task-30 effect.
+    "Gemini": {"entry-file": 31841, "orchestrator": 85552, "always-loaded": 31841},
+    "KimiCode": {"entry-file": 24174, "orchestrator": 71943, "harness-roster": 577663, "always-loaded": 601837},
+    "Mammouth": {"entry-file": 24171, "orchestrator": 70481, "harness-roster": 573719, "always-loaded": 597890},
+    "Opencode": {"entry-file": 24235, "orchestrator": 85218, "harness-roster": 587666, "always-loaded": 611901},
+    "ZCode": {"entry-file": 25073, "orchestrator": 70752, "harness-roster": 575003, "always-loaded": 600076},
 }
 
 
@@ -169,26 +213,58 @@ def test_ac07_missing_ceiling_is_a_violation():
 # render seam ``context_report.render_into_work_dir(..., profile="compact")``
 # plus ``measure_artifacts`` (same basis as ``_IST_FULL``). Data table, not a
 # target: the ceiling is Ist + tolerance and guards against growth.
+# Re-pinned in Task 30 (2e.4) together with ``_IST_FULL``: the `agent-meta-manager`
+# section ``## 10c. Optimizer-Vorschläge anwenden (Advisory Mode)`` adds ~2.3 KB
+# to every provider roster (2,346 B in the Claude render, measured), and the pins
+# left by the Phase-2 tasks 2e.2/2e.3 (registration of ``meta-optimizer``) were
+# stale at HEAD (the gate was already red before this task, e.g. Claude/harness-roster
+# 534,875 B vs. ceiling 532,390 B). Measured values, not extrapolated.
+# The polish round of Task 30 (2e.4) adds the §13 reference to the §10c "No manual
+# edit" rule: +17 B on every provider roster and on the always-loaded set.
+#
+# ABSORBED DELTAS OF THIS RE-PIN (measured, not extrapolated — HEAD pin -> measured Ist).
+# Complete for this profile as well: every artifact with a non-zero delta is named
+# below. A later re-pin must nevertheless re-measure EVERY artifact — this list
+# documents THIS re-pin, it is not a maintenance promise.
+#   * harness-roster (the `meta-optimizer` registration + the new §10c section):
+#     Claude 528,294 -> 537,222 (+8,928), Codex 522,159 -> 531,078 (+8,919),
+#     KimiCode 529,039 -> 537,997 (+8,958), Mammouth 525,127 -> 534,094 (+8,967),
+#     Opencode 524,707 -> 533,661 (+8,954), ZCode 526,417 -> 535,333 (+8,916).
+#   * always-loaded: Claude +8,841, Codex +2,698, Continue -50, Copilot -29,
+#     Gemini -96, KimiCode +2,737, Mammouth +2,746, Opencode +2,732, ZCode +2,675.
+#   * orchestrator: Continue 31,836 -> 31,991 (+155), Copilot 31,710 -> 31,865 (+155),
+#     Gemini 32,584 -> 32,739 (+155) — the `meta-optimizer` routing rows;
+#     Claude 32,450 -> 31,551 (-899), Codex 31,967 -> 31,067 (-900),
+#     KimiCode 33,159 -> 32,277 (-882), Mammouth 31,755 -> 30,856 (-899),
+#     Opencode 32,112 -> 31,213 (-899), ZCode 31,981 -> 31,082 (-899) — pre-existing
+#     compact-profile drift (the compact orchestrator is the slimmed one), not a
+#     Task-30 effect.
+#   * entry-file: Codex/KimiCode/Mammouth/Opencode/ZCode -6,221..-6,241 B each (the
+#     compact entry file no longer embeds the provider agent table), Continue
+#     374 -> 358 (-16), Copilot 9,468 -> 9,457 (-11), Gemini 10,108 -> 10,012 (-96),
+#     Claude 2,530 -> 2,461 (-69).
+#   * rules: Claude 17,286 -> 17,268 (-18), Continue 20,174 -> 20,140 (-34),
+#     Copilot 19,954 -> 19,936 (-18); Gemini writes no rules artifact in `compact`.
 _IST_COMPACT: Dict[str, Dict[str, int]] = {
-    "Claude": {"entry-file": 2530, "rules": 17286, "orchestrator": 32450,
-               "harness-roster": 528294, "always-loaded": 548110},
-    "Codex": {"entry-file": 9634, "orchestrator": 31967,
-              "harness-roster": 522159, "always-loaded": 531793},
-    "Continue": {"entry-file": 374, "rules": 20174, "orchestrator": 31836,
-                 "always-loaded": 20548},
-    "Copilot": {"entry-file": 9468, "rules": 19954, "orchestrator": 31710,
-                "always-loaded": 29422},
+    "Claude": {"entry-file": 2461, "rules": 17268, "orchestrator": 31551,
+               "harness-roster": 537222, "always-loaded": 556951},
+    "Codex": {"entry-file": 3413, "orchestrator": 31067,
+              "harness-roster": 531078, "always-loaded": 534491},
+    "Continue": {"entry-file": 358, "rules": 20140, "orchestrator": 31991,
+                 "always-loaded": 20498},
+    "Copilot": {"entry-file": 9457, "rules": 19936, "orchestrator": 31865,
+                "always-loaded": 29393},
     # Gemini renders its rules embedded into the shared AGENTS.md in `compact`,
     # so no `rules` artifact is written (unlike `full`).
-    "Gemini": {"entry-file": 10108, "orchestrator": 32584, "always-loaded": 10108},
-    "KimiCode": {"entry-file": 9644, "orchestrator": 33159,
-                 "harness-roster": 529039, "always-loaded": 538683},
-    "Mammouth": {"entry-file": 9642, "orchestrator": 31755,
-                 "harness-roster": 525127, "always-loaded": 534769},
-    "Opencode": {"entry-file": 9703, "orchestrator": 32112,
-                 "harness-roster": 524707, "always-loaded": 534410},
-    "ZCode": {"entry-file": 10567, "orchestrator": 31981,
-              "harness-roster": 526417, "always-loaded": 536984},
+    "Gemini": {"entry-file": 10012, "orchestrator": 32739, "always-loaded": 10012},
+    "KimiCode": {"entry-file": 3423, "orchestrator": 32277,
+                 "harness-roster": 537997, "always-loaded": 541420},
+    "Mammouth": {"entry-file": 3421, "orchestrator": 30856,
+                 "harness-roster": 534094, "always-loaded": 537515},
+    "Opencode": {"entry-file": 3481, "orchestrator": 31213,
+                 "harness-roster": 533661, "always-loaded": 537142},
+    "ZCode": {"entry-file": 4326, "orchestrator": 31082,
+              "harness-roster": 535333, "always-loaded": 539659},
 }
 
 COMPACT_BUDGET_CEILINGS: Dict[str, Dict[str, int]] = {
