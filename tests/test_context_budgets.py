@@ -245,25 +245,40 @@ def test_ac07_missing_ceiling_is_a_violation():
 #     Claude 2,530 -> 2,461 (-69).
 #   * rules: Claude 17,286 -> 17,268 (-18), Continue 20,174 -> 20,140 (-34),
 #     Copilot 19,954 -> 19,936 (-18); Gemini writes no rules artifact in `compact`.
+# Re-pinned after Task 31 (2e.5) for the orchestrator ONLY.
+#
+# ABSORBED DELTAS OF THIS RE-PIN (measured, not extrapolated — old Ist -> new Ist).
+# Task 31 (2e.5, IC-27/AC-90): mandatory orchestrator preview gate §3a adds exactly
+# +1258 B to the compact orchestrator on every provider (old Ist -> new Ist:
+# Claude 31551->32809, Codex 31067->32325, Continue 31991->33249,
+# Copilot 31865->33123, Gemini 32739->33997, KimiCode 32277->33535,
+# Mammouth 30856->32114, Opencode 31213->32471, ZCode 31082->32340).
+# No other compact artifact changes: entry-file and rules are unchanged. The
+# orchestrator is part of `harness-roster` (all agent files) and hence of
+# `always-loaded`, so those two aggregates also measure +1258 B for Claude, Codex,
+# KimiCode, Mammouth, Opencode and ZCode just above; their pins stay unchanged on
+# purpose because the ceilings' tolerance absorbs the delta.
+# AC-26 size TARGETS are unchanged and remain ESTIMATE data / unmet (opt-in,
+# unverified). Re-pinned from measured Ist, not extrapolated.
 _IST_COMPACT: Dict[str, Dict[str, int]] = {
-    "Claude": {"entry-file": 2461, "rules": 17268, "orchestrator": 31551,
+    "Claude": {"entry-file": 2461, "rules": 17268, "orchestrator": 32809,
                "harness-roster": 537222, "always-loaded": 556951},
-    "Codex": {"entry-file": 3413, "orchestrator": 31067,
+    "Codex": {"entry-file": 3413, "orchestrator": 32325,
               "harness-roster": 531078, "always-loaded": 534491},
-    "Continue": {"entry-file": 358, "rules": 20140, "orchestrator": 31991,
+    "Continue": {"entry-file": 358, "rules": 20140, "orchestrator": 33249,
                  "always-loaded": 20498},
-    "Copilot": {"entry-file": 9457, "rules": 19936, "orchestrator": 31865,
+    "Copilot": {"entry-file": 9457, "rules": 19936, "orchestrator": 33123,
                 "always-loaded": 29393},
     # Gemini renders its rules embedded into the shared AGENTS.md in `compact`,
     # so no `rules` artifact is written (unlike `full`).
-    "Gemini": {"entry-file": 10012, "orchestrator": 32739, "always-loaded": 10012},
-    "KimiCode": {"entry-file": 3423, "orchestrator": 32277,
+    "Gemini": {"entry-file": 10012, "orchestrator": 33997, "always-loaded": 10012},
+    "KimiCode": {"entry-file": 3423, "orchestrator": 33535,
                  "harness-roster": 537997, "always-loaded": 541420},
-    "Mammouth": {"entry-file": 3421, "orchestrator": 30856,
+    "Mammouth": {"entry-file": 3421, "orchestrator": 32114,
                  "harness-roster": 534094, "always-loaded": 537515},
-    "Opencode": {"entry-file": 3481, "orchestrator": 31213,
+    "Opencode": {"entry-file": 3481, "orchestrator": 32471,
                  "harness-roster": 533661, "always-loaded": 537142},
-    "ZCode": {"entry-file": 4326, "orchestrator": 31082,
+    "ZCode": {"entry-file": 4326, "orchestrator": 32340,
               "harness-roster": 535333, "always-loaded": 539659},
 }
 
