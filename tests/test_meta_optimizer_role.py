@@ -32,6 +32,7 @@ wording and are documented as such.
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 
@@ -894,3 +895,165 @@ def test_orchestrator_version_bumped_for_the_preview_obligation():
     fm = parse_frontmatter_file(_ORCHESTRATOR_TEMPLATE)
     version = tuple(int(part) for part in str(fm["version"]).split("."))
     assert version >= (8, 8, 0), fm["version"]
+
+
+# --- Task 32 / 2e.6 (AC-59, AC-79, AC-91): scenario asserts, CLI docs, conventions practice ---
+
+_SCENARIO_ASSERT = REPO_ROOT / "tests" / "scenarios" / "asserts" / "78-meta-optimizer-role.sh"
+_SCENARIO_REGISTRY = REPO_ROOT / "tests" / "scenarios" / "registry.md"
+_CLI_REFERENCE = REPO_ROOT / "docs" / "api" / "cli-reference.md"
+_CONVENTIONS = REPO_ROOT / "rules" / "2-platform" / "agent-meta-conventions.md"
+_SETUP_GUIDE = REPO_ROOT / "docs" / "guides" / "setup" / "instantiate-project.md"
+_README = REPO_ROOT / "README.md"
+_CHANGELOG = REPO_ROOT / "CHANGELOG.md"
+
+
+def _read(path: Path) -> str:
+    return path.read_text(encoding="utf-8")
+
+
+def _cli_row(flag: str) -> str:
+    """Return the single CLI-reference table row that starts with *flag*."""
+    rows = [
+        line
+        for line in _read(_CLI_REFERENCE).splitlines()
+        if line.startswith("| `" + flag)
+    ]
+    assert len(rows) == 1, (flag, len(rows))
+    return rows[0]
+
+
+def test_scenario_78_assert_is_executable_and_covers_the_ac79_ac91_contract():
+    """AC-59/79/91: the scenario assert pins the full generated-role contract.
+
+    ``run.sh`` only executes an assert script that is executable, so the mode
+    bit is part of the contract. The tokens below are the checks the script
+    must carry; a dropped check silently shrinks the scenario coverage.
+    """
+    assert _SCENARIO_ASSERT.is_file(), _SCENARIO_ASSERT
+    assert os.access(_SCENARIO_ASSERT, os.X_OK), (
+        "tests/scenarios/asserts/78-meta-optimizer-role.sh must stay executable"
+    )
+    text = _read(_SCENARIO_ASSERT)
+    for token in (
+        ".claude",
+        ".opencode",
+        "edit: deny",
+        "model:",
+        "{{ALLEVAR}}",
+        "get_routing_rules",
+        "ARTIFACTS: none",
+        "wörtlich",
+        _NOT_APPLICABLE,
+        "Bash",
+        "Write",
+        "Edit",
+        "Agent",
+    ):
+        assert token in text, token
+    # AC-79: the warnings are taken verbatim -- pinned on a line of its own, so
+    # the rule cannot be satisfied by an unrelated "wörtlich" elsewhere.
+    assert any(
+        "warnings" in line and "wörtlich" in line for line in text.splitlines()
+    ), "the warnings-verbatim rule (AC-79) must be pinned on its own line"
+
+
+def test_scenario_registry_row_documents_the_optimizer_assertions():
+    """The registry row states what scenario 78 actually proves (AC-59/79/91)."""
+    rows = [
+        line
+        for line in _read(_SCENARIO_REGISTRY).splitlines()
+        if line.startswith("|") and "78-meta-optimizer-role" in line
+    ]
+    assert len(rows) == 1, rows
+    row = rows[0]
+    for token in (
+        "meta-optimizer",
+        "Read",
+        "Glob",
+        "Grep",
+        "TodoWrite",
+        "edit: deny",
+        "ARTIFACTS: none",
+        "routing rules",
+        "config-patch-proposal-v1",
+    ):
+        assert token in row, token
+    assert "wörtlich" in row or "verbatim" in row, row
+
+
+def test_cli_reference_documents_both_optimizer_flags_with_exit_codes():
+    """Both optimizer rows document exit 0/1/2 on their own line (AC-59/91).
+
+    The exit codes are part of the CLI contract a caller scripts against; a
+    bare "Exit 0 …, 1 …" spelling does not name ``exit 1``/``exit 2`` and is
+    therefore not accepted.
+    """
+    text = _read(_CLI_REFERENCE)
+    for flag in (
+        "--optimize-config",
+        "--include-semantic",
+        "--apply-config-patch",
+        "--accept",
+        "--accept-runtime",
+        "--preview",
+        "--dry-run",
+    ):
+        assert flag in text, flag
+    for flag in ("--optimize-config", "--apply-config-patch"):
+        row = _cli_row(flag)
+        for level in ("exit 0", "exit 1", "exit 2"):
+            assert re.search(level, row, re.IGNORECASE), (flag, level)
+
+
+def test_conventions_practice_notes_cover_meta_optimizer():
+    """The conventions practice notes record the meta-optimizer evidence (AC-59/79/91)."""
+    text = _read(_CONVENTIONS)
+    marker = "### Praxis-Hinweise"
+    assert marker in text
+    tail = text.split(marker, 1)[1]
+    for token in (
+        "Belegt bei `meta-optimizer`",
+        "routing.rules",
+        "ARTIFACTS: none",
+        "wörtlich",
+        _NOT_APPLICABLE,
+        "config-patch-proposal-v1",
+        "78-meta-optimizer-role",
+        "edit: deny",
+    ):
+        assert token in tail, token
+
+
+def test_setup_guide_and_readme_document_the_optimizer_chain():
+    """The user-facing docs name the analyse/preview/apply chain (AC-59/91)."""
+    setup = _read(_SETUP_GUIDE)
+    for token in (
+        "--optimize-config",
+        "--apply-config-patch",
+        "--dry-run",
+        "--preview",
+        "agent-meta-manager",
+    ):
+        assert token in setup, token
+    readme = _read(_README)
+    for token in ("--optimize-config", "--apply-config-patch", "--preview"):
+        assert token in readme, token
+    assert re.search(r"exit codes", readme, re.IGNORECASE), "README: exit codes missing"
+
+
+def test_changelog_records_the_docs_completion():
+    """The Unreleased section records the 2e.6 documentation completion."""
+    text = _read(_CHANGELOG)
+    start = text.index("## [Unreleased]")
+    next_section = text.find("\n## [", start + len("## [Unreleased]"))
+    section = text[start:next_section if next_section != -1 else len(text)]
+    for token in (
+        "78-meta-optimizer-role",
+        "ARTIFACTS: none",
+        "verbatim",
+        "exit codes",
+        "cli-reference",
+        "--apply-config-patch",
+    ):
+        assert token in section, token

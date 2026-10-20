@@ -1,6 +1,7 @@
 #!/bin/bash
 # Scenario assert for 78-meta-optimizer-role
-# (IC-28/AC-59, Task 2e.2: read-only meta-optimizer proposal role).
+# (IC-28/AC-59, Task 2e.2: read-only meta-optimizer proposal role;
+#  Task 2e.6/AC-79/AC-91: literal ARTIFACTS: none, verbatim warnings, hint label).
 #
 # Contract: cwd = temp project dir (sync output); $1 and env REPO_ROOT carry the
 # agent-meta checkout path. The harness has already run dry-run + real sync +
@@ -12,9 +13,14 @@
 #   4. resolves all placeholders except the escaped doc example `{{ALLEVAR}}`,
 #   5. has NO keyword rule in routing rules (addressability: name_only; it stays
 #      name-dispatchable via target_agents/name_index),
-#   6. carries the config-patch-proposal-v1 output contract markers,
-#   7. grants no execution channel (no Bash tool, explicit "no Bash" wording,
-#      no command lines).
+#   6. carries the config-patch-proposal-v1 output contract markers, with the
+#      literal `ARTIFACTS: none` (the role produces no artifact of its own),
+#   7. takes the mandatory warnings verbatim (`wörtlich`, AC-79) and keeps the
+#      anti-softening rule ("Never skip, soften or reorder a mandatory warning"),
+#   8. labels non-applicable hint candidates with the literal German hint text
+#      `nicht anwendbar — manuelle Nutzeränderung bzw. Framework-Issue` (AC-91),
+#   9. grants no execution channel (no Bash tool, explicit "no Bash" wording,
+#      no command lines, no write/edit tool instruction).
 # Exit 0 = all assertions hold.
 set -u
 
@@ -85,19 +91,38 @@ sys.exit(0 if entry and entry[0].get("addressability") == "name_only" else 1)
 PY
 
 # 6. mandatory config-patch-proposal-v1 output contract markers present.
-for marker in 'STATUS:' 'RESULT:' 'ARTIFACTS:' 'PROPOSALS:' 'PROOF:' 'config-patch-proposal-v1'; do
-    grep -q "$marker" .claude/agents/meta-optimizer.md \
+#    ARTIFACTS is pinned as the literal `ARTIFACTS: none`: the role returns no
+#    artifact of its own (IC-26) -- a free-text artifact list would drift.
+for marker in 'STATUS:' 'RESULT:' 'ARTIFACTS: none' 'PROPOSALS:' 'PROOF:' 'config-patch-proposal-v1'; do
+    grep -qF -- "$marker" .claude/agents/meta-optimizer.md \
         || fail "output contract marker '$marker' missing"
 done
 
-# 7. read-only role: no execution channel. No Bash tool was granted above; the
-#    generated text must say it has no Bash and must not contain command lines.
+# 7./8. AC-79/AC-91 per provider: warnings are taken verbatim (a line carries
+#    both tokens), the anti-softening rule survives, and the literal German hint
+#    label is used for non-applicable candidates.
+for prov in .claude .opencode; do
+    f="$prov/agents/meta-optimizer.md"
+    grep -qE 'warnings.*wörtlich|wörtlich.*warnings' "$f" \
+        || fail "$f lacks the warnings-verbatim rule (warnings + wörtlich on one line, AC-79)"
+    grep -qF 'Never skip, soften or reorder a mandatory warning' "$f" \
+        || fail "$f lacks the anti-softening rule for mandatory warnings (AC-79)"
+    grep -qF 'nicht anwendbar — manuelle Nutzeränderung bzw. Framework-Issue' "$f" \
+        || fail "$f lacks the literal hint label 'nicht anwendbar — manuelle Nutzeränderung bzw. Framework-Issue' (AC-91)"
+done
+
+# 9. read-only role: no execution channel. No Bash tool was granted above; the
+#    generated text must say it has no Bash, must not contain command lines and
+#    must not instruct the use of a write/edit tool.
 for prov in .claude .opencode; do
     f="$prov/agents/meta-optimizer.md"
     grep -q 'no Bash' "$f" || fail "$f does not state that the role has no Bash"
     if grep -qE '^[[:space:]]*(python3?|bash|sh|git|sync\.py)[[:space:]]' "$f"; then
         fail "$f contains an executable command line (read-only role)"
     fi
+    if grep -qiE '\b(use|using) the (write|edit)\b' "$f"; then
+        fail "$f instructs the use of a write/edit tool (read-only role)"
+    fi
 done
 
-echo "ASSERT OK (78-meta-optimizer-role): generated, exact read-only tool set (no Bash/Write/Edit/Agent), edit: deny, no model field, placeholders resolved, name_only routing (no keyword rule), config-patch-proposal-v1 contract present, no execution channel"
+echo "ASSERT OK (78-meta-optimizer-role): generated, exact read-only tool set (no Bash/Write/Edit/Agent), edit: deny, no model field, placeholders resolved, name_only routing (no keyword rule), config-patch-proposal-v1 contract present with literal 'ARTIFACTS: none', warnings verbatim (AC-79, anti-softening rule), literal hint label (AC-91), no execution channel and no write/edit tool instruction"

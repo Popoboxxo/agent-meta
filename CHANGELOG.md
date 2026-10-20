@@ -99,6 +99,14 @@
   default render behavior changes for existing roles.
 
 ### Changed
+- **Optimizer chain documented and scenario 78 completed (package 2e.6, AC-59/AC-79/AC-91)**: scenario
+  `78-meta-optimizer-role` asserts every provider render of `meta-optimizer` (exact read-only tool set
+  `Read`/`Glob`/`Grep`/`TodoWrite`, no `Bash`/`Write`/`Edit`/`Agent`, Opencode `edit: deny`, no `model:` in the
+  source template, resolved placeholders, no keyword rule in `routing.rules`), the literal `ARTIFACTS: none`
+  contract, warnings taken verbatim, the literal hint label and the absence of any execution channel.
+  `docs/api/cli-reference.md` documents both `--optimize-config` and `--apply-config-patch` (incl.
+  `--accept`/`--accept-runtime`/`--preview`/`--dry-run`) with their exit codes, and the new-role practice notes
+  plus the setup guide/README describe the Analyse → Vorschau → Anwendung chain.
 - **Routing keywords come from a single source (IC-30)**: the orchestrator/rule routing keywords
   are read from one registry instead of being duplicated across templates and `role-defaults.yaml`,
   so a keyword rendered for dispatch can no longer drift out of sync with the source of truth.
