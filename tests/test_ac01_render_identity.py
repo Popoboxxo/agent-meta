@@ -232,6 +232,10 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   extended. The default (repo) render drops the section because the repo whitelist has no
   ``meta-optimizer``; that fixture is the slimming/compact golden, rebaselined with the same
   reason in ``tests/test_template_slimming_equivalence.py``.
+- Release 2.0.0-beta.2 (VERSION bump 2.0.0-beta.1 -> 2.0.0-beta.2): only version strings in the
+  rendered entry files, agent headers and the dependent sidecars changed (91 of 1012 hashes;
+  project.yaml, ``generated-file-hashes.json`` and ``context-hashes.json`` follow the version
+  they embed). No substantive render change; ``AC01_EXCEPTIONS`` is NOT extended.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

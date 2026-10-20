@@ -1,6 +1,6 @@
 # 10-role subset (study 10.2, AC-43): deliberately WITHOUT senior-developer,
 # validator, bug-feature-analyzer, concept-specifier, concept-reviewer, ideation.
-agent-meta-version: "2.0.0-beta.1"
+agent-meta-version: "2.0.0-beta.2"
 ai-providers:
 - Claude
 roles:

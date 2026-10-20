@@ -39,6 +39,7 @@ from pathlib import Path
 from scripts.lib.frontmatter import parse_frontmatter_file
 from scripts.lib.roles import load_roles_config
 from scripts.lib.standalone import _CONDITIONAL_FALSE_FLAGS
+from tests.changelog_sections import latest_changelog_section
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = REPO_ROOT / "agents" / "1-generic" / "meta-optimizer.md"
@@ -1045,9 +1046,8 @@ def test_setup_guide_and_readme_document_the_optimizer_chain():
 def test_changelog_records_the_docs_completion():
     """The Unreleased section records the 2e.6 documentation completion."""
     text = _read(_CHANGELOG)
-    start = text.index("## [Unreleased]")
-    next_section = text.find("\n## [", start + len("## [Unreleased]"))
-    section = text[start:next_section if next_section != -1 else len(text)]
+    assert "## [Unreleased]" in text, "CHANGELOG.md must keep an [Unreleased] section."
+    section = latest_changelog_section(text)
     for token in (
         "78-meta-optimizer-role",
         "ARTIFACTS: none",

@@ -51,7 +51,7 @@ HINT_ID = "OPT-dead-variable-content-loss:variables.UNUSED_BIG"
 CONFIG_TEXT = (
     "# Applier fixture (Task 22 / 2d.3): comments, key order and a Markdown\n"
     "# block scalar must survive a remove-only patch except the removed lines.\n"
-    'agent-meta-version: "2.0.0-beta.1"\n'
+    'agent-meta-version: "' + read_version(REPO_ROOT) + '"\n'
     "ai-providers:\n"
     "- Claude\n"
     "dod-preset: rapid-prototyping\n"
