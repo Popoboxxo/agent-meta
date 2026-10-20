@@ -26,6 +26,12 @@ documented reason):
 * Task 31 (2e.5, IC-27/AC-90): orchestrator gains the common-body §3a preview
   gate (template 8.7.0 -> 8.8.0); both goldens carry the new section and the
   version, the compact golden only additionally the version bump.
+* Task 32 (CI fix, AC-49): §3a is gated on ``ROLE_AGENT_META_MANAGER_ACTIVE``
+  and ``ROLE_META_OPTIMIZER_ACTIVE`` (template 8.8.0 -> 8.8.1). The repo
+  whitelist has no ``meta-optimizer``, so both goldens lose the section; this
+  is the only content change next to the version pin. The all-roles AC-01
+  matrix (both roles active) keeps the section, so its hash drift is the
+  version bump only.
 """
 from __future__ import annotations
 

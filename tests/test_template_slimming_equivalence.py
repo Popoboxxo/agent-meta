@@ -111,6 +111,16 @@ Golden rebaseline log (the frozen set is edited only with a documented reason):
   attribution is unaffected. ``_GOLDEN_ROLE_COUNT`` stays 58. AC-01 hashes
   rebaselined separately (see the rebaseline log in
   ``tests/test_ac01_render_identity.py``).
+* Task 32 (CI fix, AC-49): orchestrator §3a (``Optimizer proposals``) is now
+  gated on both ``ROLE_AGENT_META_MANAGER_ACTIVE`` and
+  ``ROLE_META_OPTIMIZER_ACTIVE``. This repository's ``roles:`` whitelist does
+  not include ``meta-optimizer``, so the section disappears from the default
+  render (no dangling mention of an inactive role); template ``8.8.0 -> 8.8.1``.
+  Rebaselined: ``orchestrator.md`` (frontmatter pins + the removed §3a block,
+  leaving one blank-line gap). The frozen meta tokens and the ``model:`` pin
+  stay at their frozen values; no other golden changed. AC-01 hashes
+  rebaselined separately (see the rebaseline log in
+  ``tests/test_ac01_render_identity.py``).
 
 The gate is network-free, writes nothing into the repository (the render target
 is a pytest ``tmp_path``) and renders the corpus once per module (~5s).

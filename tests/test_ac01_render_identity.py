@@ -224,6 +224,14 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   rebaseline: ``tests/fixtures/compact-golden/orchestrator.md`` (owner of the compact
   render, unchanged by this task's scope) is updated because the compact golden also
   carries the template version and the common-body section.
+- Task 32 (CI fix, AC-49): §3a is wrapped in ``ROLE_AGENT_META_MANAGER_ACTIVE`` +
+  ``ROLE_META_OPTIMIZER_ACTIVE`` (template ``8.8.0 -> 8.8.1``). The AC-01 matrix keeps
+  every role active, so the section stays and the render differs only by the version pin.
+  Changed: the 9 per-provider orchestrator artifacts plus the 9 ``generated-file-hashes.json``
+  (18 of 1012 hashes; 0 added/removed). No other render changed; ``AC01_EXCEPTIONS`` is NOT
+  extended. The default (repo) render drops the section because the repo whitelist has no
+  ``meta-optimizer``; that fixture is the slimming/compact golden, rebaselined with the same
+  reason in ``tests/test_template_slimming_equivalence.py``.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

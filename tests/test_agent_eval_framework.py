@@ -87,14 +87,28 @@ def test_claude_wrapper_reports_auth_failure(tmp_path):
     The wrapper has to surface claude's own diagnostic ("Not logged in") plus a
     hint and exit 2 — not die with exit 1 and no diagnosis. The fake `claude`
     earlier in PATH shadows the real CLI, so no LLM call happens.
+
+    Self-sufficient: the wrapper copy, the minimal rendered orchestrator and the
+    fake CLI all live in ``tmp_path``, so the test also passes on a clean
+    checkout without a prior ``sync.py`` run.
     """
-    stub = tmp_path / "claude"
+    repo = tmp_path / "repo"
+    wrapper = repo / "tests" / "routing-llm-eval" / "provider-claude.sh"
+    wrapper.parent.mkdir(parents=True)
+    wrapper.write_text(
+        (EVAL_DIR / "provider-claude.sh").read_text(encoding="utf-8"), encoding="utf-8")
+    agents = repo / ".claude" / "agents"
+    agents.mkdir(parents=True)
+    (agents / "orchestrator.md").write_text(
+        "---\nname: orchestrator\n---\nMinimal orchestrator prompt.\n", encoding="utf-8")
+    stub = tmp_path / "bin" / "claude"
+    stub.parent.mkdir()
     stub.write_text('#!/bin/bash\necho "Not logged in" >&2\nexit 1\n', encoding="utf-8")
     stub.chmod(0o755)
-    env = dict(os.environ, PATH=f"{tmp_path}{os.pathsep}{os.environ['PATH']}")
+    env = dict(os.environ, PATH=f"{stub.parent}{os.pathsep}{os.environ['PATH']}")
     result = subprocess.run(
-        ["bash", str(EVAL_DIR / "provider-claude.sh"), "--agent", "orchestrator", "test prompt"],
-        capture_output=True, text=True, env=env, cwd=str(_REPO_ROOT), timeout=60,
+        ["bash", str(wrapper), "--agent", "orchestrator", "test prompt"],
+        capture_output=True, text=True, env=env, cwd=str(repo), timeout=60,
     )
     assert result.returncode == 2, (
         f"expected exit 2 on auth failure, got {result.returncode}: "

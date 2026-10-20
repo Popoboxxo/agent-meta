@@ -141,17 +141,14 @@ def _rule_files(project_root: Path, caps: Mapping) -> list:
     if not caps.get("has_rules") or not rules_dir:
         return []
     directory = project_root / rules_dir
-    if not directory.is_dir():
-        return []
-    return sorted(p for p in directory.iterdir() if p.is_file() and p.suffix == ".md")
+    return (sorted(p for p in directory.iterdir() if p.is_file() and p.suffix == ".md")
+            if directory.is_dir() else [])
 
 
 def _skill_dirs(caps: Mapping) -> list:
     """Directories where a provider discovers skills: ``skills_dir`` + discovery dirs."""
-    dirs = []
     own = caps.get("skills_dir")
-    if isinstance(own, str) and own:
-        dirs.append(own)
+    dirs = [own] if isinstance(own, str) and own else []
     for extra in caps.get("skills_discovery_dirs") or []:
         if isinstance(extra, str) and extra and extra not in dirs:
             dirs.append(extra)
@@ -167,32 +164,28 @@ def _normalize_heading(line: str) -> str:
     return line.strip().lstrip("#").strip()
 
 
+def _body_lines(text: str) -> list:
+    """Non-empty, stripped body lines of a rule (frontmatter stripped)."""
+    body = _FRONTMATTER_RE.sub("", text, count=1)
+    return [ln.strip() for ln in body.splitlines() if ln.strip()]
+
+
 def _first_heading(text: str) -> str:
     """First markdown heading line of a rule body (frontmatter stripped), else first line."""
-    body = _FRONTMATTER_RE.sub("", text, count=1)
-    first_non_empty = ""
-    for line in body.splitlines():
-        stripped = line.strip()
-        if not stripped:
-            continue
-        if stripped.startswith("#"):
-            return stripped
-        first_non_empty = first_non_empty or stripped
-    return first_non_empty
+    lines = _body_lines(text)
+    return next((ln for ln in lines if ln.startswith("#")), lines[0] if lines else "")
 
 
 def _body_probe(text: str) -> str:
     """Second non-empty body line (frontmatter stripped); ``""`` for one-line rules."""
-    lines = [ln.strip() for ln in _FRONTMATTER_RE.sub("", text, count=1).splitlines() if ln.strip()]
+    lines = _body_lines(text)
     return lines[1] if len(lines) > 1 else ""
 
 
 def _pointer_artifacts(project_root: Path, caps: Mapping) -> list:
     """Generated artifacts that may carry skill pointers: entry file + rule files."""
-    artifacts = []
     context_file = caps.get("context_file")
-    if context_file:
-        artifacts.append(project_root / context_file)
+    artifacts = [project_root / context_file] if context_file else []
     artifacts.extend(_rule_files(project_root, caps))
     return [p for p in artifacts if p.is_file()]
 
@@ -205,9 +198,7 @@ def _lazy_table_skills(text: str) -> list:
         if _TABLE_HEADER_RE.match(line):
             in_table = True
             continue
-        if not in_table:
-            continue
-        if _TABLE_SEPARATOR_RE.match(line):
+        if not in_table or _TABLE_SEPARATOR_RE.match(line):
             continue
         row = _TABLE_ROW_RE.match(line)
         if row:
@@ -273,7 +264,6 @@ def check_over_soft_cap(
             continue
         caps = capabilities.get(provider) or {}
         context_file = str(caps.get("context_file", ""))
-        measured = {"bytes": stat["bytes"], "lines": stat["lines"]}
         for key, unit in (("context_soft_cap_bytes", "bytes"),
                           ("context_soft_cap_chars", "chars"),
                           ("context_soft_cap_lines", "lines")):
@@ -287,7 +277,7 @@ def check_over_soft_cap(
                 text = _read_text(root / context_file)
                 value = len(text) if text is not None else stat["bytes"]
             else:
-                value = measured[unit]
+                value = stat[unit]
             if value > cap:
                 findings.append(_warn(
                     "context.over-soft-cap", context_file,
@@ -433,15 +423,13 @@ def check_unread_channel(
     exempt = _intentional_unread()
     findings = []
 
-    def is_exempt(rel: str) -> bool:
-        return any(fnmatch.fnmatch(rel, pattern) for pattern in exempt)
-
     for provider in active_providers:
         caps = capabilities.get(provider) or {}
         channels = caps.get("rules_read_channels") or []
         rules_dir = caps.get("rules_dir")
         if (caps.get("has_rules") and rules_dir and not any(c in channels for c in _FILE_CHANNELS)
-                and _rule_files(root, caps) and not is_exempt(str(rules_dir))):
+                and _rule_files(root, caps)
+                and not any(fnmatch.fnmatch(str(rules_dir), p) for p in exempt)):
             findings.append(_warn(
                 "context.unread-channel", str(rules_dir),
                 f"{provider}: '{rules_dir}' is generated but not read "
@@ -450,7 +438,8 @@ def check_unread_channel(
         skills_dir = caps.get("skills_dir")
         discovery = caps.get("skills_discovery_dirs") or []
         if (isinstance(skills_dir, str) and skills_dir and skills_dir not in discovery
-                and _non_empty_dir(root / skills_dir) and not is_exempt(skills_dir)):
+                and _non_empty_dir(root / skills_dir)
+                and not any(fnmatch.fnmatch(skills_dir, p) for p in exempt)):
             findings.append(_warn(
                 "context.unread-channel", skills_dir,
                 f"{provider}: '{skills_dir}' is generated but not in skills_discovery_dirs {list(discovery)}",

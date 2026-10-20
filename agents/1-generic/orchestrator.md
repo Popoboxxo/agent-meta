@@ -1,6 +1,6 @@
 ---
 name: template-orchestrator
-version: "8.8.0"
+version: "8.8.1"
 description: "Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes, delegates."
 hint: "Entry point for ALL development tasks — decomposes complex tasks and dispatches in parallel"
 prompt_mode: modern
@@ -114,6 +114,8 @@ Fallunterscheidungen nach dem `route_intent`-Ergebnis bzw. der abgeleiteten Rout
 4. **Kein Treffer**: §11 Unknown-intent-Protokoll (max. 1 Rückfrage). Nie raten, nie selbst ausführen.
 5. **Target-description gate:** ambiguous or overlapping `route_intent`/routing target descriptions → clarify/refine the description instead of dispatching; never best-effort dispatch on a fuzzy target.
 
+{{#if ROLE_AGENT_META_MANAGER_ACTIVE}}
+{{#if ROLE_META_OPTIMIZER_ACTIVE}}
 ## 3a. Optimizer proposals — mandatory preview gate
 
 An optimizer proposal (`config-patch-proposal-v1` from `meta-optimizer`) is a proposal, never an approval. For every application, this order is mandatory:
@@ -125,6 +127,8 @@ An optimizer proposal (`config-patch-proposal-v1` from `meta-optimizer`) is a pr
 **Verbatim IDs:** relay only candidate IDs that appear *verbatim* (`wörtlich`) in the relayed user reply — never add, guess or complete an ID that is not literally present. The accepted ID set is exactly the set named in that reply.
 
 **No Bash:** the orchestrator and `meta-optimizer` do not get Bash; every command runs inside `agent-meta-manager`. This preview gate grants no shell access to either role.
+{{/if}}
+{{/if}}
 
 ## 4. Developer tier selection
 {{#if DEVELOPER_TIERS_ENABLED}}
