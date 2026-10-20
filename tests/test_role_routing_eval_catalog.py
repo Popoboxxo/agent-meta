@@ -253,6 +253,25 @@ def test_ac62_excluded_and_name_only_roles_own_no_overlap_token(roles):
     assert not owners & skipped
 
 
+def test_ac62_promptfoo_providers_use_exec_id_form():
+    """[bug #977] promptfoo needs ``id: exec:<script>`` and no ``command`` field.
+
+    The provider script path is resolved relative to the config file's
+    directory (``ROLES_DIR``), hence the ``../`` prefix in the generated id.
+    """
+    config = yaml.safe_load(PROMPTFOO.read_text(encoding="utf-8"))
+    assert config["providers"], "no providers in generated config"
+    for provider in config["providers"]:
+        assert "command" not in provider, (
+            f"provider {provider!r} must not carry a command array (bug #977)"
+        )
+        assert provider["id"].startswith("exec:"), (
+            f"provider id {provider['id']!r} must be 'exec:<script>' (bug #977)"
+        )
+        script = ROLES_DIR / provider["id"].split(":", 1)[1]
+        assert script.exists(), f"provider script missing: {script}"
+
+
 def test_ac62_generated_header_marks_file_as_generated():
     """[AC-62] generated files carry a DO-NOT-EDIT header."""
     for path in (GENERATED, PROMPTFOO):

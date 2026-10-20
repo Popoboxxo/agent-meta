@@ -81,6 +81,29 @@ def test_claude_wrapper_orchestrator_uses_rendered_agent_file(tmp_path):
     assert not result.stdout.startswith("---")
 
 
+def test_claude_wrapper_reports_auth_failure(tmp_path):
+    """Bug #977: a failing `claude` invocation must not be swallowed by `set -e`.
+
+    The wrapper has to surface claude's own diagnostic ("Not logged in") plus a
+    hint and exit 2 — not die with exit 1 and no diagnosis. The fake `claude`
+    earlier in PATH shadows the real CLI, so no LLM call happens.
+    """
+    stub = tmp_path / "claude"
+    stub.write_text('#!/bin/bash\necho "Not logged in" >&2\nexit 1\n', encoding="utf-8")
+    stub.chmod(0o755)
+    env = dict(os.environ, PATH=f"{tmp_path}{os.pathsep}{os.environ['PATH']}")
+    result = subprocess.run(
+        ["bash", str(EVAL_DIR / "provider-claude.sh"), "--agent", "orchestrator", "test prompt"],
+        capture_output=True, text=True, env=env, cwd=str(_REPO_ROOT), timeout=60,
+    )
+    assert result.returncode == 2, (
+        f"expected exit 2 on auth failure, got {result.returncode}: "
+        f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    )
+    assert "claude invocation failed" in result.stderr, f"stderr={result.stderr!r}"
+    assert "Not logged in" in result.stderr, f"stderr={result.stderr!r}"
+
+
 # --- catalogs --------------------------------------------------------------
 
 
@@ -141,6 +164,28 @@ def test_routing_cases_keep_equals_semantics():
 # --- promptfoo config generation (W3/W4) -----------------------------------
 
 
+def test_generated_promptfoo_providers_use_exec_id_form():
+    """promptfoo identifies `exec` providers via ``id: exec:<script>``.
+
+    A bare ``id: exec`` plus a separate ``command`` array is rejected by
+    ``promptfoo validate`` ("Could not identify provider: exec"). The script
+    path in the id is resolved relative to the config file's directory.
+    """
+    data = yaml.safe_load(
+        (EVAL_DIR / "promptfooconfig.generated.yaml").read_text(encoding="utf-8")
+    )
+    assert data["providers"], "no providers in generated config"
+    for provider in data["providers"]:
+        assert "command" not in provider, (
+            f"provider {provider!r} must not carry a command array (bug #977)"
+        )
+        assert provider["id"].startswith("exec:"), (
+            f"provider id {provider['id']!r} must be 'exec:<script>' (bug #977)"
+        )
+        script = EVAL_DIR / provider["id"].split(":", 1)[1]
+        assert script.exists(), f"provider script missing: {script}"
+
+
 def test_generated_promptfoo_config_is_fresh_and_valid():
     gen = _REPO_ROOT / "scripts" / "gen_promptfoo_config.py"
     check = subprocess.run(
@@ -154,8 +199,10 @@ def test_generated_promptfoo_config_is_fresh_and_valid():
     data = yaml.safe_load(raw)
     assert data["providers"], "no providers in generated config"
     for provider in data["providers"]:
-        command = " ".join(provider["command"])
-        assert "{{prompt}}" not in command, "W4: no inline {{prompt}} allowed"
+        # W4: promptfoo appends the rendered prompt as the last argv element; it
+        # must never be embedded in the provider invocation itself.
+        assert "{{prompt}}" not in provider["id"], "W4: no inline {{prompt}} allowed"
+        assert "{{prompt}}" not in json.dumps(provider), "W4: no inline {{prompt}} allowed"
     assert len(data["tests"]) >= len(_all_cases()) - 1, "config lost cases during merge"
 
 

@@ -10,14 +10,10 @@ defaultTest:
     provider:
       wrapping: false
 providers:
-- id: exec
+- id: exec:../provider-claude.sh
   label: claude-orchestrator
-  command:
-  - ../provider-claude.sh
-- id: exec
+- id: exec:../provider-opencode.sh
   label: opencode-orchestrator
-  command:
-  - ../provider-opencode.sh
 tests:
 - description: rk-developer-01 [developer]
   vars:
@@ -646,6 +642,38 @@ tests:
       properties:
         target:
           const: meta-doctor
+        tier_escalation:
+          const: true
+- description: rn-meta-optimizer-de [meta-optimizer]
+  vars:
+    role: orchestrator
+    prompt: Rufe den Agenten meta-optimizer auf und starte direkt.
+  assert:
+  - type: contains-json
+    value:
+      type: object
+      required:
+      - target
+      - tier_escalation
+      properties:
+        target:
+          const: meta-optimizer
+        tier_escalation:
+          const: true
+- description: rn-meta-optimizer-en [meta-optimizer]
+  vars:
+    role: orchestrator
+    prompt: Run the meta-optimizer agent directly.
+  assert:
+  - type: contains-json
+    value:
+      type: object
+      required:
+      - target
+      - tier_escalation
+      properties:
+        target:
+          const: meta-optimizer
         tier_escalation:
           const: true
 - description: rk-tester-01 [tester]
