@@ -18,7 +18,7 @@
 **Zwei-Spuren-Modell (AC-02/AC-25):**
 
 - **Spur A — jetzt ausliefern (opt-in, unverifiziert):** Profil-Auflösung/Schema/Konditionale, Render-Verdichtung, Budgets/Anker/Report, Optimizer + Rolle — alles opt-in bzw. read-only; Defaults unangetastet; INFO `context-profile.unverified` aktiv. Pakete **2a/2b/2c/2d/2e sind fertig** (Stand 2026-10-20); offen ist nur noch 2f.
-- **Spur B — Paket 2f, GATED (heute nicht startbar):** Baseline-Nachversuch (AC-02), `compact`-Eval (AC-25), Verifikations-Abschluss. Erfordert ausdrückliche Nutzerfreigabe + vorab angezeigte Kostenschätzung.
+- **Spur B — Paket 2f, `SKIPPED-BY-USER` (2026-10-20, siehe §5):** Baseline-Nachversuch (AC-02), `compact`-Eval (AC-25), Verifikations-Abschluss. Geskippt, weil Claude in der Laufumgebung nicht authentifiziert ist (nur 1 Modellklasse, AC-02 verlangt ≥ 2); kein Lauf gestartet.
 
 > Kernaussage für Spur A: `context-profile: compact` ist **Opt-in und unverifiziert** — niemals „verifiziert“, „validiert“ oder „empfohlen“.
 
@@ -112,15 +112,16 @@ DAG 2d: `2d.1 → 2d.2 → 2d.3 → 2d.4 → 2d.5 → 2d.6 → 2d.7` (Ausführun
 
 DAG 2e: `(2d.2, 2d.3) → 2e.1 → (2e.2; 2e.3 → 2e.4 → 2e.5) → 2e.6`.
 
-## 5. Spur B (2f) — GATED
+## 5. Spur B (2f) — SKIPPED-BY-USER (2026-10-20)
 
-**Nicht starten.** Aktueller Status: `SKIPPED-BY-USER`. Start erst nach **separater Nutzerfreigabe** und **vorab angezeigter Kostenschätzung**.
+**Status: `SKIPPED-BY-USER` (2026-10-20).** Kein Lauf gestartet. Grund: Claude ist in der Laufumgebung **nicht authentifiziert** (`claude auth status` → `loggedIn=false`, kein `ANTHROPIC_API_KEY`) — damit ist nur **1 Modellklasse** (Opencode/DeepSeek) verfügbar, **AC-02 verlangt ≥ 2**. Ein Eval wäre von vornherein `not-evidenced`; die Nutzerentscheidung war daher Skip statt Lauf.
 
-- **2f.1** (Task 33): Baseline-Nachversuch (full-Routing-Eval) — Gate: Nutzerfreigabe + Kostenschätzung zuerst.
-- **2f.2** (Task 34): `compact`-Eval gegen die Baseline (AC-25) — Gate: AC-02 belegt.
-- **2f.3** (Task 35): Verifikations-Abschluss (INFO-Absenz, Doku-Claim, AC-26-Claim) — Gate: AC-25 belegt.
+- **Skip-Record:** [`tests/routing-llm-eval/roles/runs/2026-10-20-qg1-phase2.json`](../../tests/routing-llm-eval/roles/runs/2026-10-20-qg1-phase2.json) (597 Cases × 2 Modellklassen × 3 Runs = 3582 Calls; Schätzung 42,029397 USD, `unverified: false`; Grund im Record).
+- **2f.1** (Task 33): Baseline-Nachversuch (full-Routing-Eval) — **geskippt**, Gate nicht erfüllt.
+- **2f.2** (Task 34): `compact`-Eval gegen die Baseline (AC-25) — **geskippt**, Gate: AC-02 nicht belegt.
+- **2f.3** (Task 35): Verifikations-Abschluss (INFO-Absenz, Doku-Claim, AC-26-Claim) — **geskippt**, Gate: AC-25 nicht belegt.
 
-DAG 2f: `2f.1 → 2f.2 → 2f.3`.
+DAG 2f: `2f.1 → 2f.2 → 2f.3` (unverändert, kein Task ausgeführt). Plan-Checkboxen in 2f bleiben **ungetickt**.
 
 ## 6. Offene Abweichungen / Known Issues
 
@@ -141,6 +142,7 @@ DAG 2f: `2f.1 → 2f.2 → 2f.3`.
    - `roster_in_harness`-Gating implementiert + 2c.3 QG-2 verschärft (`1efde04e`);
    - die 2b.1-`Files`-Block-Abweichung war **stale Plan-Metadaten** — kein Code-Churn;
    - Marker-Parser-False-Positive behoben (`801b6884`).
+10. **2f geskippt (Nutzerentscheidung 2026-10-20):** Grund ist die fehlende Claude-Authentifizierung in der Laufumgebung (nur 1 Modellklasse, AC-02 verlangt ≥ 2). Record: `tests/routing-llm-eval/roles/runs/2026-10-20-qg1-phase2.json`. **AC-02 und AC-25 bleiben `not-evidenced`** — es gibt **keinen Verifikationsclaim**; `compact` bleibt **opt-in und unverifiziert**.
 
 ## 7. Umgebung / Ausführung
 
@@ -156,7 +158,7 @@ DAG 2f: `2f.1 → 2f.2 → 2f.3`.
 1. `git status` / `git log --oneline -5` — Branch/Zustand verifizieren.
 2. `python scripts/sync.py --rehydrate` — Kontext rehydrieren.
 3. **Pakete 2a–2e sind abgeschlossen** (Plan-Checkboxen Tasks 1–32 getickt; Commits siehe §2). Es ist **kein Spur-A-Task offen** — Paket 2d/2e sind fertig, nichts nachzuziehen.
-4. **Als Nächstes: nur Paket 2f (GATED)** — 2f.1 → 2f.2 → 2f.3, und **erst** nach ausdrücklicher Nutzerfreigabe + vorab angezeigter Kostenschätzung (§5).
+4. **Paket 2f: geskippt (2026-10-20)** — Nutzerentscheidung, Claude in der Laufumgebung nicht authentifiziert (nur 1 Modellklasse, AC-02 ≥ 2); Skip-Record `tests/routing-llm-eval/roles/runs/2026-10-20-qg1-phase2.json`. Kein Spur-B-Task ausgeführt, Plan-Checkboxen in 2f bleiben ungetickt.
 5. `compact` bleibt **opt-in und unverifiziert**. Kein Push/Branch/PR ohne Auftrag (nur `git`-Agent).
 
 ## 9. Fortsetzungs-Prompt
@@ -193,3 +195,4 @@ Lieferergebnisse: Red/Green-Nachweis je Task, Commits, `sync.py --check`-/consis
 - **consistency-check:** `scripts/consistency-check.py` meldet **PASS** / „No issues found“.
 - **sync validate:** `sync.py --validate` endet mit **Exit 0**; es bleiben **2 Warnungen**: `se` gate-dropped und `external/awesome-claude-code` Checkout `3d8bde25`.
 - **Marker-Parser:** `tests/test_no_role_routes_in_templates.py` → **36 passed** nach Fix `801b6884`; der zuvor dokumentierte rote Test ist damit grün.
+- **Nachtrag (2026-10-20):** Paket **2f** wurde per **Nutzerentscheidung** am 2026-10-20 **geskippt** (Claude nicht authentifiziert → nur 1 Modellklasse, AC-02 verlangt ≥ 2; kein Lauf gestartet). Skip-Record: `tests/routing-llm-eval/roles/runs/2026-10-20-qg1-phase2.json`. **AC-02/AC-25 bleiben `not-evidenced`.**

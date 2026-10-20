@@ -618,6 +618,8 @@ pipeline_stages:
 
 > **Start nur nach Gate:** Diese Tasks werden ohne erfülltes Gate nicht begonnen (keine Vorbereitung von Läufen „auf Vorrat“). Vor jedem Lauf: Kostenschätzung anzeigen (`eval_gate.format_estimate`), ausdrückliche Nutzerfreigabe einholen; Ablehnung ⇒ `SKIPPED-BY-USER`-Record (Muster Task 2.00) und Gate bleibt „nicht belegt“.
 
+> **Status 2026-10-20:** SKIPPED-BY-USER — Claude in der Laufumgebung nicht authentifiziert (nur 1 Modellklasse, AC-02 verlangt ≥ 2). Kein Lauf gestartet; Skip-Record `tests/routing-llm-eval/roles/runs/2026-10-20-qg1-phase2.json`. Steps bleiben ungetickt.
+
 ### Task 33: 2f.1 — Role-Routing-Baseline (`full`) mit ≥ 2 Modellklassen nachversuchen
 **Agent:** test-executor · **Issue:** #977 · **PR:** 2f-I · **AC:** AC-02 (inkl. Reproduktionslauf), AC-62 (Baseline-Teil) · **Gate:** Nutzerfreigabe (Kostenschätzung zuerst)
 **Depends on:** —
