@@ -7,17 +7,17 @@
 | Feld | Wert |
 |---|---|
 | Repo | `C:\Repositories\agent-meta` (Meta-Repo) |
-| Branch | `feat/context-profiles-phase2a` — **lokal, nicht gepusht, kein Upstream, kein PR** |
+| Branch | `feat/context-profiles-phase2a` — **committet; Push via `git`-Agent** (kein Upstream, kein PR) |
 | Basis | `main` = `3f837852` |
 | Working Tree | clean (keine uncommitteten, untracked oder gestagten Änderungen) |
 | Plan | `docs/plans/2026-10-17-context-profiles-phase2-plan.md` (APPROVED) |
 | Spec | `docs/specs/2026-10-11-context-profiles-spec.md` (Rev. 3.4) |
 | Tracking-Issue | #977 |
-| Datum | 2026-10-18 |
+| Datum | 2026-10-20 |
 
 **Zwei-Spuren-Modell (AC-02/AC-25):**
 
-- **Spur A — jetzt ausliefern (opt-in, unverifiziert):** Profil-Auflösung/Schema/Konditionale, Render-Verdichtung, Budgets/Anker/Report, Optimizer + Rolle — alles opt-in bzw. read-only; Defaults unangetastet; INFO `context-profile.unverified` aktiv. Pakete 2a/2b/2c sind **fertig**; 2d/2e sind als Nächstes dran.
+- **Spur A — jetzt ausliefern (opt-in, unverifiziert):** Profil-Auflösung/Schema/Konditionale, Render-Verdichtung, Budgets/Anker/Report, Optimizer + Rolle — alles opt-in bzw. read-only; Defaults unangetastet; INFO `context-profile.unverified` aktiv. Pakete **2a/2b/2c/2d/2e sind fertig** (Stand 2026-10-20); offen ist nur noch 2f.
 - **Spur B — Paket 2f, GATED (heute nicht startbar):** Baseline-Nachversuch (AC-02), `compact`-Eval (AC-25), Verifikations-Abschluss. Erfordert ausdrückliche Nutzerfreigabe + vorab angezeigte Kostenschätzung.
 
 > Kernaussage für Spur A: `context-profile: compact` ist **Opt-in und unverifiziert** — niemals „verifiziert“, „validiert“ oder „empfohlen“.
@@ -53,6 +53,25 @@ Verifiziert mit `git log --oneline main..HEAD`; alle Commits sind auf dem lokale
 
 **Zusatz-Commits (außerplanmäßige Korrekturen auf dem Branch):** `ec8b7eaa` (2a.8-Task im Plan), `0631a6ee` (Log-Zeilen in `sync.log` drainen), `3ebff84f` (`context-profile.invalid`), `91d8514c` (Admin-UI lehnt ungültige Profil-Writes ab).
 
+### Paket 2d/2e (2026-10-20)
+
+| Koordinate / Task | Commit |
+|---|---|
+| 2d.1 / Task 20 | `a074dafc` |
+| 2d.2 / Task 21 | `ea988447` |
+| 2d.3 / Task 22 | `ce06e560` |
+| 2d.4 / Task 23 | `79ce4ecb` |
+| 2d.5 / Task 24 | `c182b57b` |
+| 2d.6 / Task 25 | `1aacab24` |
+| 2d.7 / Task 26 | `79132d9d` |
+| 2e.1 / Task 27 | `8fe1faf1` |
+| 2e.2 / Task 28 | `0cb42218` |
+| 2e.3 / Task 29 | `dd6c32b0` |
+| 2e.4 / Task 30 | `aad97f08` |
+| 2e.5 / Task 31 | `20f2200d` |
+| 2e.6 / Task 32 | `91fb26a4` |
+| Fix: Standalone + compact-Budgets | `58d7689f` |
+
 ## 3. Task 2.00 Precondition
 
 **Zustand:** Ein `SKIPPED-BY-USER`-Record **existiert** unter `tests/routing-llm-eval/roles/runs/2026-10-17-qg1-deepseek.json`. `tests/test_eval_baseline_schema.py` ist **grün (16 passed)**.
@@ -61,9 +80,11 @@ Verifiziert mit `git log --oneline main..HEAD`; alle Commits sind auf dem lokale
 
 **Schlussfolgerung:** Die Vorbedingung gilt als **faktisch erfüllt** (Skip-Record vorhanden, Schema-Test grün; AC-02 bleibt wahrheitsgemäß „nicht belegt“). Die Task-2.00-Steps bleiben bewusst ungetickt, da der Record-Name vom Plan-Soll abweicht — siehe §6/§8. Kein Blocker für Spur A.
 
-## 4. Nächste Spur-A-Tasks
+## 4. Spur-A-Pakete 2d/2e — ERLEDIGT
 
-### Paket 2d — Config-Optimizer-Kern und Applier (Tasks 20–26)
+> **Status 2026-10-20:** Pakete **2d** (Tasks 20–26) und **2e** (Tasks 27–32) sind **ERLEDIGT und committet** (Commits siehe §2, Plan-Checkboxen getickt). **Als Nächstes: nur Paket 2f — GATED** (siehe §5).
+
+### Paket 2d — Config-Optimizer-Kern und Applier (Tasks 20–26) — **ERLEDIGT**
 
 | Koordinate | Task | Ein-Zeiler |
 |---|---|---|
@@ -77,7 +98,7 @@ Verifiziert mit `git log --oneline main..HEAD`; alle Commits sind auf dem lokale
 
 DAG 2d: `2d.1 → 2d.2 → 2d.3 → 2d.4 → 2d.5 → 2d.6 → 2d.7` (Ausführung unabhängig vom Eval möglich; **Merge erst nach 2c**).
 
-### Paket 2e — Rolle `meta-optimizer` und Manager-Integration (Tasks 27–32)
+### Paket 2e — Rolle `meta-optimizer` und Manager-Integration (Tasks 27–32) — **ERLEDIGT**
 
 | Koordinate | Task | Ein-Zeiler |
 |---|---|---|
@@ -109,7 +130,12 @@ DAG 2f: `2f.1 → 2f.2 → 2f.3`.
    - Konsequenz: Ziele bleiben **ESTIMATE-Daten**; gemessene Actuals sind als **Regressions-Obergrenzen** gepinnt; der Over-Target-Checker ist aktiv; die Doku benennt die Verfehlung **explizit**.
 2. **Provider-override-only `compact`-Hybrid:** Das Entry-File-Layout ist compact, **eingebettete Rules bleiben jedoch uncompacted** — Ursache: Rule-Kompaktierung hängt am **globalen** `COMPACT_MODE`, während das Entry-File-Gating `CONTEXT_PROFILE_COMPACT` **per Provider** nutzt. Bewertet als **OUT OF SCOPE** (Ripples auf MCP-/External-Tool-Sektionen, `resolve_plugin_compact`, `KNOWLEDGE_ENGINE_HINTS`; ein zu weites Ziehen riskiert `context.dangling-pointer` ERROR). **Empfehlung: eigener Backlog-Eintrag.**
 3. **Minor (latent):** `_extract_rule_section` ist **fence-unaware** — kein aktiver Defekt, nur latentes Risiko.
-4. **In dieser Session behoben (resolved):**
+4. **Vorbestehend (nicht von 2d/2e):** `tests/test_no_role_routes_in_templates.py::test_repo_conditional_markers_are_well_formed` ist **rot** — nested `{{#if …}}{{#unless …}}` in `agents/1-generic/orchestrator.md:320-322`; der Parser verbietet mehrere Direktiven pro Zeile. Auf `8c334aef` bereits rot (introduced by `1efde04e`/`e5d47d48`), **nicht auf `main`**. Bewusst **nicht** „gefixt“ und **nicht** Test-abgeschwächt.
+5. **Task 31 / AC-90:** Der Pflichtabschnitt vergrößert den compact-Orchestrator um **exakt +1258 B je Provider** → `_IST_COMPACT` wird re-pinnt (Commit `58d7689f`). Die AC-26-Ziele bleiben **unverändert** und weiterhin **unmet/ESTIMATE** (siehe Punkt 1).
+6. **Task 23 (2d.4):** Der Guard neutralisiert bestehende Refill-Kandidaten; es werden bewusst **keine NEUEN** info-only-Kandidaten für alle Refill-Keys emittiert (Runner-Test-Invariante). Als **Design-Entscheidung** dokumentiert.
+7. **Task 30 (2e.4):** Der `test_context_budgets.py`-Re-Pin absorbierte zusätzlich stale Pins aus 2e.2/2e.3/compact-Arbeit (im Code-Kommentar dokumentiert).
+8. **Umgebung:** Der 2d/2e-Lauf erfolgte in einer **Linux-Sandbox** (uv-venv, CPython 3.13.16, pytest 9.1.1) statt Windows `.venv-1\Scripts\python.exe`; `bash` war für Dev-/Test-Rollen verfügbar (abweichend von §7).
+9. **In dieser Session behoben (resolved):**
    - compact §9-Pointer ist auflösbar (`22df124f`);
    - `roster_in_harness`-Gating implementiert + 2c.3 QG-2 verschärft (`1efde04e`);
    - die 2b.1-`Files`-Block-Abweichung war **stale Plan-Metadaten** — kein Code-Churn.
@@ -127,8 +153,9 @@ DAG 2f: `2f.1 → 2f.2 → 2f.3`.
 
 1. `git status` / `git log --oneline -5` — Branch/Zustand verifizieren.
 2. `python scripts/sync.py --rehydrate` — Kontext rehydrieren.
-3. Paket **2d** über den `orchestrator` fortsetzen (2d.1 → … → 2d.7), ein Commit je Task mit der exakten Plan-Message.
-4. `compact` bleibt **opt-in und unverifiziert**. Kein Push/Branch/PR ohne Auftrag (nur `git`-Agent).
+3. **Pakete 2a–2e sind abgeschlossen** (Plan-Checkboxen Tasks 1–32 getickt; Commits siehe §2). Es ist **kein Spur-A-Task offen** — Paket 2d/2e sind fertig, nichts nachzuziehen.
+4. **Als Nächstes: nur Paket 2f (GATED)** — 2f.1 → 2f.2 → 2f.3, und **erst** nach ausdrücklicher Nutzerfreigabe + vorab angezeigter Kostenschätzung (§5).
+5. `compact` bleibt **opt-in und unverifiziert**. Kein Push/Branch/PR ohne Auftrag (nur `git`-Agent).
 
 ## 9. Fortsetzungs-Prompt
 
@@ -147,3 +174,18 @@ Ziel: Paket 2d (2d.1–2d.7) vollständig implementieren und je Task committen, 
 
 Lieferergebnisse: Red/Green-Nachweis je Task, Commits, `sync.py --check`-/consistency-Ausgaben, aktualisierte Plan-Checkboxen, knapper Statusbericht.
 ```
+
+## 10. Abschluss-Verifikation (2026-10-20)
+
+| Prüfung | Ergebnis |
+|---|---|
+| Volle Szenarien-Suite | `Scenarios: 78  Passed: 78  Failed: 0` |
+| Relevante pytest-Auswahl (initial) | 569 passed / 3 failed |
+| Relevante pytest-Auswahl (nach Fix `58d7689f`) | 572/572 effektiv grün (siehe unten) |
+| `scripts/consistency-check.py` | **PASS** — „No issues found“ |
+| `sync.py --validate` | Exit 0 (2 Warnungen, siehe unten) |
+
+- **Szenarien:** Die volle Szenarien-Suite lief komplett grün: `Scenarios: 78  Passed: 78  Failed: 0`.
+- **pytest:** Die relevante Auswahl war initial **569 passed / 3 failed**. Alle 3 Fehlschläge gingen auf **Task 31** zurück: stale `standalone/agents/orchestrator.md` + **compact-Budget-Decken um +1258 B/Provider überschritten**. Nach dem Fix `58d7689f` lieferte `tests/test_context_budgets.py tests/test_standalone_export_in_sync.py` **13 passed**; damit sind **572/572** der Auswahl grün.
+- **consistency-check:** `scripts/consistency-check.py` meldet **PASS** / „No issues found“.
+- **sync validate:** `sync.py --validate` endet mit **Exit 0**; es bleiben **2 Warnungen**: `se` gate-dropped und `external/awesome-claude-code` Checkout `3d8bde25`.

@@ -4,7 +4,7 @@
 >
 > **Freigabevermerk:** Nutzerfreigabe 2026-10-18 (Auftrag ‚Phase 2 komplett umsetzen‘); Entscheidungen zu den offenen Fragen siehe `## Offene Nutzerfragen` unten.
 >
-> **Fortschritt (2026-10-18):** 2a.1–2a.8, 2b.1–2b.6, 2c.1–2c.4 umgesetzt und committet (siehe docs/plans/2026-10-18-context-profiles-phase2-status.md); offen: 2d.1–2d.7, 2e.1–2e.6, 2f.1–2f.3 (2f gated).
+> **Fortschritt (2026-10-20):** 2a.1–2a.8, 2b.1–2b.6, 2c.1–2c.4, 2d.1–2d.7, 2e.1–2e.6 umgesetzt und committet (siehe docs/plans/2026-10-18-context-profiles-phase2-status.md); offen: 2f.1–2f.3 (gated).
 
 **Goal:** Phase 2 der Spec vollständig umsetzen — Profil `compact` (IC-01…IC-12, C1–C7) sowie Config-Optimizer, Applier und Rolle `meta-optimizer` (IC-24…IC-28, IC-35) — ausschließlich als Opt-in ohne Default-Änderung; die nachweisabhängigen Verifikationsschritte (AC-02/AC-25) sind als eigene Gate-Tasks (Paket 2f) ausgewiesen und heute nicht startbar.
 **Architecture:** Neue Auflösungsschicht `context_profile.py` über der bestehenden `COMPACT_MODE`-Ableitung (`config.py:1394-1407`); Profil-Konditionale nur in Resolution/Templates, der Active-Set-Filter (IC-17/IC-18) bleibt orthogonal; Per-Provider-Profile über einen Provider-Injection-Seam analog `_INTENT_ROUTING_TOOL_DEFS`/`shared_runtime_gate_vars`; Optimizer als reines Stdlib-Modul mit Sentinel-Render im tmp-sink, Remove-only-Applier und Laufzeit-Leser-Registry als Daten.
@@ -415,10 +415,10 @@ pipeline_stages:
 - Modify: `scripts/lib/doctor_detectors.py`
 - Modify: `tests/test_doctor_fixtures.py`
 **Interfaces:** Produces Registry `{registry-version, readers[], credentials{name_patterns, keys, value_scan}}` (Seed F-43 inkl. `admin-ui`, `viz`, `lifecycle-triggers`, `variables.TEST_COMMAND`/`TEST_TIMEOUT`/`GIT_MAIN_BRANCH`, `repo_containment`, `orchestrator`), Ratchet-Test, Doctor-Wiring (Laufzeit-Leser zählen als Nutzung); Consumes `secrets.scan_for_secrets(content: str, config: dict | None = None) -> list[str]`, `permissions.restrict_owner_only`, `doctor_detectors.detect_variable_unreferenced`
-- [ ] Step 1: Test schreiben (fail): jeder `evidence`-Pfad existiert und nennt den Key/`project.yaml`; neuer unregistrierter `.sh`-/`scripts/*.py`-Leser ⇒ rot; Positiv-/Negativliste der Muster (`admin-ui.token` trifft, `max-tokens-overrides` nicht); Doctor-Fixture: Variable, die nur über einen registrierten Laufzeit-Leser konsumiert wird ⇒ kein `doctor.variable-unreferenced`-Befund
-- [ ] Step 2: implementieren
-- [ ] Step 3: Test (pass): `python3 -m pytest tests/test_runtime_config_readers.py tests/test_doctor_fixtures.py -q`
-- [ ] Step 4: commit `feat: add runtime config reader registry with credentials`
+- [x] Step 1: Test schreiben (fail): jeder `evidence`-Pfad existiert und nennt den Key/`project.yaml`; neuer unregistrierter `.sh`-/`scripts/*.py`-Leser ⇒ rot; Positiv-/Negativliste der Muster (`admin-ui.token` trifft, `max-tokens-overrides` nicht); Doctor-Fixture: Variable, die nur über einen registrierten Laufzeit-Leser konsumiert wird ⇒ kein `doctor.variable-unreferenced`-Befund
+- [x] Step 2: implementieren
+- [x] Step 3: Test (pass): `python3 -m pytest tests/test_runtime_config_readers.py tests/test_doctor_fixtures.py -q`
+- [x] Step 4: commit `feat: add runtime config reader registry with credentials`
 
 ### Task 21: 2d.2 — Optimizer-Runner mit Kandidaten, Fan-out und L0-Beweis bereitstellen
 **Agent:** senior-developer · **Issue:** #977 · **PR:** 2d · **AC:** AC-54, AC-55 (Beweis-Teil inkl. L0-Vergleichsmenge), AC-57 (Hinweis-Klassifikation, `--include-semantic`), AC-58, AC-75/AC-94/AC-98 (Optimizer-Teil), AC-89 (Runner-Teil), AC-91 (Proposal-Felder) · **Gate:** —
@@ -434,10 +434,10 @@ pipeline_stages:
 - Create: `tests/test_meta_optimizer_fanout.py`
 - Create: `tests/fixtures/meta-optimizer/`
 **Interfaces:** Produces `CandidateKind`, `Candidate(id, kind, yaml_path, scope, marks, approval_level, warnings, deterministic, applicable, proof_level_required, yaml_bytes_saved, injected_bytes_saved_est, rationale, hunks)`, `FanOutEntry(variable, value_bytes, occurrences, files, injected_bytes, per_provider)`, `OptimizerProposal(project_yaml_sha256, agent_meta_version, generator_options, candidates, fan_out, diff)`, `collect_candidates(project_root: Path, agent_meta_root: Path, config: dict, config_text: str, active: ActiveSet) -> OptimizerProposal`, `prove(...) -> ProofReport` (L0 + Bisektion, `scope_note`, Vergleichsmenge inkl. `.meta-config/{auto-commit-allowlist,generated-file-hashes,context-hashes}.json`), `advance_l0(…)`; CLI `sync.py --optimize-config [--json] [--include-semantic] [--out <dir>]` mit `proposal.json`/`proposal.diff`/`proof.json`; Consumes `resolve_work_dir`, `resolve_output_dir`, `eval_gate`-freier Lauf, `yaml_roundtrip.analyze_roundtrip`, Laufzeit-Registry aus 2d.1
-- [ ] Step 1: Test schreiben (fail): selbst-gehostete Config ⇒ `no-effect` für `variables.ORCHESTRATOR_STRICT`, `variables.UNKNOWN_FALLBACK_*`, `variables.SE_BASE_DIR`, `CODE_QUALITY_RULES` als `dead-variable-content-loss`; Fan-out exakt gegen unabhängige Sentinel-Zählung; `tempfile.*`-Monkeypatch wirft; Hash-Snapshot außerhalb des Sinks leer; absichtlich wirksame Variable ⇒ `meta-optimizer.proof-failed` ohne Schreiben; Prüfschritt L0-Vergleichsmenge: `.meta-config/auto-commit-allowlist.json`, `.meta-config/generated-file-hashes.json` und `.meta-config/context-hashes.json` werden vor/nach dem Beweis verglichen (Hash gleich) und in `proof.json` als Vergleichsdateien gelistet; ohne `--include-semantic` erscheinen keine `deterministic: false`-Kandidaten, mit Flag erscheinen sie (`duplicate-value` als `info-only`)
-- [ ] Step 2: implementieren
-- [ ] Step 3: Test (pass): `python3 -m pytest tests/test_meta_optimizer_runner.py tests/test_meta_optimizer_fanout.py -q && python3 scripts/consistency-check.py`
-- [ ] Step 4: commit `feat: add config optimizer runner with fan-out and proof`
+- [x] Step 1: Test schreiben (fail): selbst-gehostete Config ⇒ `no-effect` für `variables.ORCHESTRATOR_STRICT`, `variables.UNKNOWN_FALLBACK_*`, `variables.SE_BASE_DIR`, `CODE_QUALITY_RULES` als `dead-variable-content-loss`; Fan-out exakt gegen unabhängige Sentinel-Zählung; `tempfile.*`-Monkeypatch wirft; Hash-Snapshot außerhalb des Sinks leer; absichtlich wirksame Variable ⇒ `meta-optimizer.proof-failed` ohne Schreiben; Prüfschritt L0-Vergleichsmenge: `.meta-config/auto-commit-allowlist.json`, `.meta-config/generated-file-hashes.json` und `.meta-config/context-hashes.json` werden vor/nach dem Beweis verglichen (Hash gleich) und in `proof.json` als Vergleichsdateien gelistet; ohne `--include-semantic` erscheinen keine `deterministic: false`-Kandidaten, mit Flag erscheinen sie (`duplicate-value` als `info-only`)
+- [x] Step 2: implementieren
+- [x] Step 3: Test (pass): `python3 -m pytest tests/test_meta_optimizer_runner.py tests/test_meta_optimizer_fanout.py -q && python3 scripts/consistency-check.py`
+- [x] Step 4: commit `feat: add config optimizer runner with fan-out and proof`
 
 ### Task 22: 2d.3 — Applier mit Vorschau, Neuberechnung und Remove-only einführen
 **Agent:** senior-developer · **Issue:** #977 · **PR:** 2d · **AC:** AC-55 (Anwendung), AC-56, AC-80, AC-90 (Applier-Teil), AC-91 (Anwendbarkeit: `version-mismatch`, `rejected: not-applicable`), AC-57 (`rejected: not-applicable`), AC-75/AC-94 (Applier-Teil), AC-89 (Redaktion/Mode) · **Gate:** —
@@ -451,10 +451,10 @@ pipeline_stages:
 - Modify: `CHANGELOG.md`
 - Create: `tests/test_meta_optimizer_applier.py`
 **Interfaces:** Produces `apply_config_patch(project_root: Path, agent_meta_root: Path, proposal_path: Path, accept_ids: Sequence[str], *, accept_runtime_ids: Sequence[str] = (), preview_path: Path | None = None, dry_run: bool) -> ApplyReport`, `ApplyReport(applied_ids, rejected, preview_sha256, project_yaml_sha256_before/after, backup_redacted_keys, log_path)`, CLI `sync.py --apply-config-patch <proposal.json> --accept <id>… [--accept-runtime <id>…] [--dry-run] [--preview <preview.json>]`; Consumes `collect_candidates`, `prove`, `yaml_roundtrip.analyze_roundtrip`, `_count_comments`, `restrict_owner_only`
-- [ ] Step 1: Test schreiben (fail): (a) ohne `--accept` Exit 2; (b) manipulierte `proposal.json` ⇒ `hunk-mismatch`/`not-remove-only`, Datei unverändert; (c) nicht reproduzierbare ID ⇒ `not-reproducible`; (d) `preview.json`-Mismatch ⇒ `preview-mismatch`; (e) TOCTOU-Hook ⇒ `stale-proposal`; (f) `applied.json`-Felder inkl. `approval_source == "relayed"`; (g) Kommentare/Reihenfolge via `analyze_roundtrip` erhalten (`expected_comment_loss` aus `_count_comments` der entfernten Zeilen); (h) Fixture mit abweichender `agent_meta_version` ⇒ Exit 1 `version-mismatch`, nichts geschrieben (AC-91); (i) Hinweis-ID in `--accept` ⇒ `rejected: not-applicable`, keine Dateiänderung (AC-57/AC-91); (j) `tempfile.*`-Monkeypatch läuft für `--apply-config-patch` durch (AC-94), Sink-Protokoll und Backup liegen unter `<sink>/meta-optimizer/<ts>/` (AC-75)
-- [ ] Step 2: implementieren
-- [ ] Step 3: Test (pass): `python3 -m pytest tests/test_meta_optimizer_applier.py tests/test_meta_optimizer_runner.py -q`
-- [ ] Step 4: commit `feat: add remove-only config patch applier with preview binding`
+- [x] Step 1: Test schreiben (fail): (a) ohne `--accept` Exit 2; (b) manipulierte `proposal.json` ⇒ `hunk-mismatch`/`not-remove-only`, Datei unverändert; (c) nicht reproduzierbare ID ⇒ `not-reproducible`; (d) `preview.json`-Mismatch ⇒ `preview-mismatch`; (e) TOCTOU-Hook ⇒ `stale-proposal`; (f) `applied.json`-Felder inkl. `approval_source == "relayed"`; (g) Kommentare/Reihenfolge via `analyze_roundtrip` erhalten (`expected_comment_loss` aus `_count_comments` der entfernten Zeilen); (h) Fixture mit abweichender `agent_meta_version` ⇒ Exit 1 `version-mismatch`, nichts geschrieben (AC-91); (i) Hinweis-ID in `--accept` ⇒ `rejected: not-applicable`, keine Dateiänderung (AC-57/AC-91); (j) `tempfile.*`-Monkeypatch läuft für `--apply-config-patch` durch (AC-94), Sink-Protokoll und Backup liegen unter `<sink>/meta-optimizer/<ts>/` (AC-75)
+- [x] Step 2: implementieren
+- [x] Step 3: Test (pass): `python3 -m pytest tests/test_meta_optimizer_applier.py tests/test_meta_optimizer_runner.py -q`
+- [x] Step 4: commit `feat: add remove-only config patch applier with preview binding`
 
 ### Task 23: 2d.4 — `fill_defaults`-Wechselwirkung als `info-only` abbilden
 **Agent:** developer · **Issue:** #977 · **PR:** 2d · **AC:** AC-82 · **Gate:** —
@@ -464,10 +464,10 @@ pipeline_stages:
 - Modify: `scripts/lib/meta_optimizer.py`
 - Create: `tests/test_meta_optimizer_refill.py`
 **Interfaces:** Produces `refill_keys(agent_meta_root: Path, config: dict) -> set[str]`, Mark `refilled-by-defaults`, Pflichttext; Consumes `config.config_field_defaults(agent_meta_root: Path) -> dict`, `config.fill_defaults`
-- [ ] Step 1: Test schreiben (fail): Key aus `refill_keys` ⇒ kein Hunk, `applicable: false`, Mark + Text; Anwenden aller akzeptierbaren Kandidaten, dann regulärer Sync ⇒ `project.yaml` byte-gleich
-- [ ] Step 2: implementieren
-- [ ] Step 3: Test (pass): `python3 -m pytest tests/test_meta_optimizer_refill.py -q`
-- [ ] Step 4: commit `feat: mark refilled defaults as non-removable hints`
+- [x] Step 1: Test schreiben (fail): Key aus `refill_keys` ⇒ kein Hunk, `applicable: false`, Mark + Text; Anwenden aller akzeptierbaren Kandidaten, dann regulärer Sync ⇒ `project.yaml` byte-gleich
+- [x] Step 2: implementieren
+- [x] Step 3: Test (pass): `python3 -m pytest tests/test_meta_optimizer_refill.py -q`
+- [x] Step 4: commit `feat: mark refilled defaults as non-removable hints`
 
 ### Task 24: 2d.5 — `inactive-scope`-Kandidaten mit Reaktivierungs-Warnung ausweisen
 **Agent:** developer · **Issue:** #977 · **PR:** 2d · **AC:** AC-83 · **Gate:** —
@@ -477,10 +477,10 @@ pipeline_stages:
 - Modify: `scripts/lib/meta_optimizer.py`
 - Create: `tests/test_meta_optimizer_inactive_scope.py`
 **Interfaces:** Produces Kandidatenart `inactive-scope`, Pflichttext, Test-Fixture-Kopplung an `tests/fixtures/active-set/p10`; Consumes `ActiveSet`, `resolve_active_roles`, `_VARIABLE_FALLBACKS`
-- [ ] Step 1: Test schreiben (fail): `variables.TEST_COMMANDS` bei inaktivem `tester` ⇒ `inactive-scope` mit Warnung, kein `no-effect`
-- [ ] Step 2: implementieren
-- [ ] Step 3: Test (pass): `python3 -m pytest tests/test_meta_optimizer_inactive_scope.py -q`
-- [ ] Step 4: commit `feat: classify inactive-scope candidates with reactivation warning`
+- [x] Step 1: Test schreiben (fail): `variables.TEST_COMMANDS` bei inaktivem `tester` ⇒ `inactive-scope` mit Warnung, kein `no-effect`
+- [x] Step 2: implementieren
+- [x] Step 3: Test (pass): `python3 -m pytest tests/test_meta_optimizer_inactive_scope.py -q`
+- [x] Step 4: commit `feat: classify inactive-scope candidates with reactivation warning`
 
 ### Task 25: 2d.6 — Laufzeit-Leser als `confirm-runtime` markieren
 **Agent:** developer · **Issue:** #977 · **PR:** 2d · **AC:** AC-81 · **Gate:** —
@@ -490,10 +490,10 @@ pipeline_stages:
 - Modify: `scripts/lib/meta_optimizer.py`
 - Create: `tests/test_meta_optimizer_marks.py`
 **Interfaces:** Produces Mark `runtime-reader`, `approval_level: confirm-runtime`, Ablehnungsgrund `needs-runtime-confirmation`; Consumes `config/runtime-config-readers.yaml`
-- [ ] Step 1: Test schreiben (fail): Kandidat für `repo_containment`, `orchestrator.*` oder `variables.TEST_COMMAND` ⇒ Mark + Text; Anwendung nur mit `--accept-runtime`
-- [ ] Step 2: implementieren
-- [ ] Step 3: Test (pass): `python3 -m pytest tests/test_meta_optimizer_marks.py tests/test_runtime_config_readers.py -q`
-- [ ] Step 4: commit `feat: require runtime confirmation for runtime-reader keys`
+- [x] Step 1: Test schreiben (fail): Kandidat für `repo_containment`, `orchestrator.*` oder `variables.TEST_COMMAND` ⇒ Mark + Text; Anwendung nur mit `--accept-runtime`
+- [x] Step 2: implementieren
+- [x] Step 3: Test (pass): `python3 -m pytest tests/test_meta_optimizer_marks.py tests/test_runtime_config_readers.py -q`
+- [x] Step 4: commit `feat: require runtime confirmation for runtime-reader keys`
 
 ### Task 26: 2d.7 — Credential-Ausschluss und Sink-Härtung end-to-end absichern
 **Agent:** tester · **Issue:** #977 · **PR:** 2d · **AC:** AC-89 · **Gate:** —
@@ -503,10 +503,10 @@ pipeline_stages:
 - Create: `tests/test_meta_optimizer_credentials.py`
 - Create: `tests/fixtures/meta-optimizer/credentials/.meta-config/project.yaml`
 **Interfaces:** Produces E2E-Beweis für Redaktion/Modus/`backup_redacted_keys`; Consumes `sync.py --optimize-config`, `--apply-config-patch --dry-run`, `secrets.scan_for_secrets`
-- [ ] Step 1: Test schreiben (fail): Fixture ohne Redaktion ⇒ rot
-- [ ] Step 2: Fixtures/Implementierungslücken schließen (nur im 2d-Modul)
-- [ ] Step 3: Test (pass): `python3 -m pytest tests/test_meta_optimizer_credentials.py -q`
-- [ ] Step 4: commit `test: prove credential exclusion in optimizer sink artifacts`
+- [x] Step 1: Test schreiben (fail): Fixture ohne Redaktion ⇒ rot
+- [x] Step 2: Fixtures/Implementierungslücken schließen (nur im 2d-Modul)
+- [x] Step 3: Test (pass): `python3 -m pytest tests/test_meta_optimizer_credentials.py -q`
+- [x] Step 4: commit `test: prove credential exclusion in optimizer sink artifacts`
 
 ## Paket 2e — Rolle `meta-optimizer` und Freigabe-Workflow (IC-26, IC-27, IC-28)
 
@@ -519,10 +519,10 @@ pipeline_stages:
 - Modify: `config/role-defaults.yaml`
 - Create: `tests/test_meta_optimizer_role.py`
 **Interfaces:** Produces Rolle `meta-optimizer` (`name: template-meta-optimizer`, `version: "1.0.0"`, `prompt_mode: modern`), `role-defaults`-Eintrag (`model: balanced`, `workflow_tier: optional`, `name_only`, `orchestrator_only: true`, Handoff `input_contracts: [task-spec-v1]`, `output_contract: config-patch-proposal-v1`, `target_roles: [agent-meta-manager]`), Contract-Marker `PROPOSALS`/`PROOF`; Consumes `sync.py --optimize-config`-Proposal-Felder (2d.2), IC-26-Wortlaut
-- [ ] Step 1: Test schreiben (fail): exakte Tool-Menge, kein `model:` in der Quelle, Contract-Marker, keine Schreib-/Ausführungsanweisung, Hinweis-Kennzeichnung
-- [ ] Step 2: implementieren (inkl. Standalone-Konditional-Check)
-- [ ] Step 3: Test (pass): `python3 -m pytest tests/test_meta_optimizer_role.py -q && python3 scripts/consistency-check.py`
-- [ ] Step 4: commit `feat: add read-only meta-optimizer proposal role`
+- [x] Step 1: Test schreiben (fail): exakte Tool-Menge, kein `model:` in der Quelle, Contract-Marker, keine Schreib-/Ausführungsanweisung, Hinweis-Kennzeichnung
+- [x] Step 2: implementieren (inkl. Standalone-Konditional-Check)
+- [x] Step 3: Test (pass): `python3 -m pytest tests/test_meta_optimizer_role.py -q && python3 scripts/consistency-check.py`
+- [x] Step 4: commit `feat: add read-only meta-optimizer proposal role`
 
 ### Task 28: 2e.2 — `meta-optimizer` nach IC-28 registrieren und Goldens rebaselinen
 **Agent:** developer · **Issue:** #977 · **PR:** 2e · **AC:** AC-23 (Ausnahmeliste (i)–(iii)), AC-59 (Registrierung) · **Gate:** —
@@ -544,10 +544,10 @@ pipeline_stages:
 - Create: `tests/scenarios/configs/78-meta-optimizer-role.project.yaml`
 - Create: `tests/scenarios/asserts/78-meta-optimizer-role.sh`
 **Interfaces:** Produces Szenario 78, Schema-Rollen-Enum (regeneriert), Golden-Rebaseline mit Rebaseline-Log, erweitertes `AC01_EXCEPTIONS`-Pattern; Consumes `schema.update_roles_enum`, `sync.py --render-standalone`, `tests/scenarios/run.sh` (`chmod +x`)
-- [ ] Step 1: Test schreiben (fail): Pins, Szenario 78 und AC-01-Harness melden fehlende Registrierung; `meta-optimizer.agent.md`-Pattern-Fixture (Copilot) fehlt
-- [ ] Step 2: implementieren (Sync, Export, Rebaseline mit Begründung, Pattern-Erweiterung)
-- [ ] Step 3: Test (pass): `python3 -m pytest tests/test_role_addressability_coverage.py tests/test_standalone_export_in_sync.py tests/test_ac01_render_identity.py -q && bash tests/scenarios/run.sh 78-meta-optimizer-role`
-- [ ] Step 4: commit `chore: register meta-optimizer role across schema and goldens`
+- [x] Step 1: Test schreiben (fail): Pins, Szenario 78 und AC-01-Harness melden fehlende Registrierung; `meta-optimizer.agent.md`-Pattern-Fixture (Copilot) fehlt
+- [x] Step 2: implementieren (Sync, Export, Rebaseline mit Begründung, Pattern-Erweiterung)
+- [x] Step 3: Test (pass): `python3 -m pytest tests/test_role_addressability_coverage.py tests/test_standalone_export_in_sync.py tests/test_ac01_render_identity.py -q && bash tests/scenarios/run.sh 78-meta-optimizer-role`
+- [x] Step 4: commit `chore: register meta-optimizer role across schema and goldens`
 
 ### Task 29: 2e.3 — Contract `config-patch-proposal-v1` verdrahten
 **Agent:** prompt-engineer · **Issue:** #977 · **PR:** 2e · **AC:** AC-59 (Consumer) · **Gate:** —
@@ -558,10 +558,10 @@ pipeline_stages:
 - Create: `schemas/handoffs/config-patch-proposal.schema.json`
 - Modify: `tests/test_meta_optimizer_role.py`
 **Interfaces:** Produces Consumer-Eintrag + Handoff-Schema; Consumes `consistency/handoff_contracts.check_handoff_contracts(agent_meta_root: Path) -> list[Finding]`
-- [ ] Step 1: Test schreiben (fail): `handoff.output-not-consumed` für `config-patch-proposal-v1`
-- [ ] Step 2: implementieren
-- [ ] Step 3: Test (pass): `python3 scripts/consistency-check.py && python3 -m pytest tests/test_meta_optimizer_role.py -q`
-- [ ] Step 4: commit `feat: wire config-patch-proposal contract into the manager`
+- [x] Step 1: Test schreiben (fail): `handoff.output-not-consumed` für `config-patch-proposal-v1`
+- [x] Step 2: implementieren
+- [x] Step 3: Test (pass): `python3 scripts/consistency-check.py && python3 -m pytest tests/test_meta_optimizer_role.py -q`
+- [x] Step 4: commit `feat: wire config-patch-proposal contract into the manager`
 
 ### Task 30: 2e.4 — `agent-meta-manager`-Workflow um Analyse, Vorschau und Anwendung ergänzen
 **Agent:** prompt-engineer · **Issue:** #977 · **PR:** 2e · **AC:** AC-59, AC-90 (Manager-Schritte), AC-91 (Manager-Teil) · **Gate:** —
@@ -574,10 +574,10 @@ pipeline_stages:
 - Modify: `tests/test_ac01_render_identity.py`
 - Modify: `tests/test_meta_optimizer_role.py`
 **Interfaces:** Produces Abschnitt „Optimizer-Vorschläge anwenden (Advisory Mode)“ mit den drei Schritten und der „nur wörtlich weitergeleitete IDs“-Regel; Consumes `config-patch-proposal-v1`, 2d.3-CLI
-- [ ] Step 1: Test schreiben (fail): Manager ohne die drei Schritte/Schritt-Verben ⇒ rot; `handoff.output-not-consumed` bleibt grün
-- [ ] Step 2: implementieren (Version-Bump `1.24.z → 1.25.0`)
-- [ ] Step 3: Test (pass): `python3 scripts/consistency-check.py && python3 -m pytest tests/test_meta_optimizer_role.py tests/test_ac01_render_identity.py -q`
-- [ ] Step 4: commit `feat: add optimizer apply workflow to agent-meta-manager`
+- [x] Step 1: Test schreiben (fail): Manager ohne die drei Schritte/Schritt-Verben ⇒ rot; `handoff.output-not-consumed` bleibt grün
+- [x] Step 2: implementieren (Version-Bump `1.24.z → 1.25.0`)
+- [x] Step 3: Test (pass): `python3 scripts/consistency-check.py && python3 -m pytest tests/test_meta_optimizer_role.py tests/test_ac01_render_identity.py -q`
+- [x] Step 4: commit `feat: add optimizer apply workflow to agent-meta-manager`
 
 ### Task 31: 2e.5 — Orchestrator zur Vorschau-Pflicht verpflichten
 **Agent:** prompt-engineer · **Issue:** #977 · **PR:** 2e · **AC:** AC-90 (Orchestrator-Teil), AC-23 (IC-27-Template-Teil) · **Gate:** —
@@ -590,10 +590,10 @@ pipeline_stages:
 - Modify: `tests/test_ac01_render_identity.py`
 - Modify: `tests/test_meta_optimizer_role.py`
 **Interfaces:** Produces Pflichtabsatz „Vorschau zeigen (`preview.json`) → Bestätigung einholen → Manager mit `--preview` beauftragen“; Consumes `orchestrator.md:20`-Kanalregel
-- [ ] Step 1: Test schreiben (fail): Orchestrator ohne Vorschau-Pflicht ⇒ rot
-- [ ] Step 2: implementieren (Version-Bump Minor)
-- [ ] Step 3: Test (pass): `python3 -m pytest tests/test_meta_optimizer_role.py tests/test_orchestrator_compact_sections.py tests/test_ac01_render_identity.py -q`
-- [ ] Step 4: commit `feat: require optimizer preview approval in orchestrator`
+- [x] Step 1: Test schreiben (fail): Orchestrator ohne Vorschau-Pflicht ⇒ rot
+- [x] Step 2: implementieren (Version-Bump Minor)
+- [x] Step 3: Test (pass): `python3 -m pytest tests/test_meta_optimizer_role.py tests/test_orchestrator_compact_sections.py tests/test_ac01_render_identity.py -q`
+- [x] Step 4: commit `feat: require optimizer preview approval in orchestrator`
 
 ### Task 32: 2e.6 — Szenario-78-Asserts, CLI-Doku und Konventions-Praxis abschließen
 **Agent:** documenter · **Issue:** #977 · **PR:** 2e · **AC:** AC-59 (Doku/Szenario), AC-79/AC-91 (Asserts) · **Gate:** —
@@ -609,10 +609,10 @@ pipeline_stages:
 - Modify: `CHANGELOG.md`
 - Modify: `tests/test_meta_optimizer_role.py`
 **Interfaces:** Produces vollständige Szenario-78-Asserts + Doku; Consumes 2e.1–2e.5
-- [ ] Step 1: Test schreiben (fail): Asserts fehlen oder bestehen das Szenario nicht
-- [ ] Step 2: implementieren
-- [ ] Step 3: Test (pass): `bash tests/scenarios/run.sh 78-meta-optimizer-role && python3 -m pytest tests/test_meta_optimizer_role.py tests/test_new_role_checklist_doc.py -q`
-- [ ] Step 4: commit `docs: complete meta-optimizer scenario, cli docs and checklist`
+- [x] Step 1: Test schreiben (fail): Asserts fehlen oder bestehen das Szenario nicht
+- [x] Step 2: implementieren
+- [x] Step 3: Test (pass): `bash tests/scenarios/run.sh 78-meta-optimizer-role && python3 -m pytest tests/test_meta_optimizer_role.py tests/test_new_role_checklist_doc.py -q`
+- [x] Step 4: commit `docs: complete meta-optimizer scenario, cli docs and checklist`
 
 ## Paket 2f — Nachweis (Gate-Spur B): Baseline und `compact`-Eval (AC-02, AC-25, AC-86)
 
