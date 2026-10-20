@@ -1,0 +1,3 @@
+ai-providers: [Claude]
+variables:
+  TEST_TIMEOUT: "60"

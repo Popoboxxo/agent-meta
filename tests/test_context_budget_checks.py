@@ -196,7 +196,10 @@ def test_dangling_pointer_clears_once_skills_exist(default_projects, mappings, t
 def test_only_promoted_checks_emit_error(default_projects, mappings):
     assert set(cb.PHASE0_SEVERITY) == set(cb.SPEC_SEVERITY) == set(cb.EMITTED_SEVERITY)
     assert all(level is Severity.WARNING for level in cb.PHASE0_SEVERITY.values())
-    assert cb.PHASE1_PROMOTED == {"context.dangling-pointer", "context.rule-unreachable"}
+    assert cb.PHASE1_PROMOTED == {
+        "context.dangling-pointer", "context.rule-unreachable",
+        "context-profile.marker-in-rule",
+    }
     for check, level in cb.EMITTED_SEVERITY.items():
         expected = cb.SPEC_SEVERITY[check] if check in cb.PHASE1_PROMOTED else Severity.WARNING
         assert level is expected, check
@@ -204,7 +207,9 @@ def test_only_promoted_checks_emit_error(default_projects, mappings):
     for check in ALL_CHECKS:
         for provider, project in default_projects.items():
             for finding in _run(check, project, provider, mappings):
-                assert finding.severity in (Severity.WARNING, Severity.INFO), finding
+                assert finding.severity is cb.EMITTED_SEVERITY[finding.check], finding
+    for provider, project in default_projects.items():
+        assert _run(cb.check_marker_in_rule, project, provider, mappings) == []
 
 
 def test_severity_comes_from_central_table(monkeypatch):
@@ -261,6 +266,19 @@ def test_marker_in_rule_source_and_generated(tmp_path):
     findings = cb.check_marker_in_rule(tmp_path, ["P"], _caps(), None)
     assert [f.file for f in findings] == ["rules/a.md"]
     assert findings[0].check == "context-profile.marker-in-rule"
+    assert findings[0].severity is Severity.ERROR
+    assert cb.COMPACT_MARKER in findings[0].message
+
+
+def test_marker_in_rule_flags_the_roster_gate(tmp_path):
+    """F3: ``ROSTER_IN_HARNESS`` in a rule is flagged like the profile marker."""
+    _write(tmp_path / "rules" / "a.md", "# A\n{{#unless ROSTER_IN_HARNESS}}x\n")
+    _write(tmp_path / "rules" / "b.md", "# B\nclean\n")
+    findings = cb.check_marker_in_rule(tmp_path, ["P"], _caps(), None)
+    assert [f.file for f in findings] == ["rules/a.md"]
+    assert findings[0].check == "context-profile.marker-in-rule"
+    assert findings[0].severity is Severity.ERROR
+    assert "ROSTER_IN_HARNESS" in findings[0].message
 
 
 def test_unread_channel_skills_dir_and_exemption(tmp_path, monkeypatch):
@@ -414,3 +432,43 @@ def test_ac67_matrix_codex_real_sync_has_no_false_positive(default_projects, map
     findings = _run(cb.check_declared_surface_empty, default_projects["Codex"], "Codex", mappings)
     assert findings == []
     assert _run(cb.check_legacy_artifact_present, default_projects["Codex"], "Codex", mappings) == []
+
+
+# ---------------------------------------------------------------------------
+# Task 18 (2c.3): `compact` keeps the Phase-1 severity and reports 0 findings
+# matrix-wide (AC-24 C5/QG-2).
+# ---------------------------------------------------------------------------
+
+_PROVIDER_MATRIX = sorted(yaml.safe_load(
+    (REPO_ROOT / "config" / "ai-providers.yaml").read_text(encoding="utf-8"))["providers"])
+
+
+@pytest.fixture(scope="module")
+def compact_projects(tmp_path_factory):
+    """One freshly synced ``context-profile: compact`` project per registry provider."""
+    from tests.active_set_render import default_config, synced_projects
+
+    configs = {}
+    for provider in _PROVIDER_MATRIX:
+        config = default_config()
+        config["ai-providers"] = [provider]
+        config["context-profile"] = "compact"
+        configs[provider] = config
+    return synced_projects(tmp_path_factory, configs)
+
+
+def test_compact_profile_keeps_phase1_severity_error():
+    """The `compact` opt-in must not lower the Phase-1 severity of either check."""
+    for check in ("context.dangling-pointer", "context.rule-unreachable"):
+        assert cb.EMITTED_SEVERITY[check] is Severity.ERROR, check
+        assert cb._warn(check, "AGENTS.md", "compact probe").severity is Severity.ERROR, check
+
+
+@pytest.mark.parametrize("provider", _PROVIDER_MATRIX)
+def test_compact_matrix_has_no_dangling_pointer_and_no_unreachable_rule(
+        compact_projects, mappings, provider):
+    project = compact_projects[provider]
+    dangling = _run(cb.check_dangling_pointer, project, provider, mappings)
+    assert not dangling, [f"{f.file}: {f.message}" for f in dangling][:5]
+    unreachable = _run(cb.check_rule_unreachable, project, provider, mappings)
+    assert not unreachable, [f.file for f in unreachable][:5]

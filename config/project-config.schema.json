@@ -138,6 +138,7 @@
           "mammouth-expert",
           "meta-doctor",
           "meta-feedback",
+          "meta-optimizer",
           "opencode-expert",
           "openscad-developer",
           "orchestrator",
@@ -815,31 +816,31 @@
                 "full",
                 "slim"
               ],
-                "default": "full"
+              "default": "full"
+            },
+            "frontmatter-keep-fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
               },
-              "frontmatter-keep-fields": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                },
-                "description": "Frontmatter keys that must NOT be stripped for this provider, even when they appear in the global defaults or in frontmatter-strip-fields. Wins over strip. Default: empty."
+              "description": "Frontmatter keys that must NOT be stripped for this provider, even when they appear in the global defaults or in frontmatter-strip-fields. Wins over strip. Default: empty."
+            },
+            "frontmatter-strip-fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
               },
-              "frontmatter-strip-fields": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                },
-                "description": "Frontmatter keys to strip for this provider, in addition to the global defaults (reference_standards). Combined by union with ai-providers.yaml's frontmatter_strip_fields; frontmatter-keep-fields wins. Default: empty."
-              },
-              "surface-version": {
-                "type": "string",
-                "description": "Generation surface for this provider. Must be a key of ai-providers.yaml's mcp-config.surface-formats (Opencode: v1|v2). Default: v1 (unchanged)."
-              },
-              "agent-discovery": {
-                "type": "boolean",
-                "description": "Provider-neutral discovery-surface opt-in. Default: false."
-              }
+              "description": "Frontmatter keys to strip for this provider, in addition to the global defaults (reference_standards). Combined by union with ai-providers.yaml's frontmatter_strip_fields; frontmatter-keep-fields wins. Default: empty."
+            },
+            "surface-version": {
+              "type": "string",
+              "description": "Generation surface for this provider. Must be a key of ai-providers.yaml's mcp-config.surface-formats (Opencode: v1|v2). Default: v1 (unchanged)."
+            },
+            "agent-discovery": {
+              "type": "boolean",
+              "description": "Provider-neutral discovery-surface opt-in. Default: false."
             }
+          }
         },
         "Opencode": {
           "type": "object",
@@ -2503,6 +2504,33 @@
         }
       },
       "additionalProperties": false
+    },
+    "provider-overrides": {
+      "type": "object",
+      "description": "Top-level per-provider overrides (SPEC-CONTEXT-PROFILES-2026-10-11, IC-01). Keys are provider names; currently only 'context-profile' is supported per provider. Providers without an entry (or without 'context-profile' set) inherit the global 'context-profile'. Resolution: explicit sub-setting > provider override > global profile > default.",
+      "additionalProperties": {
+        "type": "object",
+        "description": "Per-provider context-profile override.",
+        "properties": {
+          "context-profile": {
+            "type": "string",
+            "description": "Context-profile override for this provider only. Same enum as the global 'context-profile'. A missing value (or an explicit null) inherits the global value; any other out-of-enum value is a config error (the sync aborts as 'context-profile.invalid', IC-01).",
+            "enum": [
+              "full",
+              "compact"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "context-profile": {
+      "type": "string",
+      "description": "Opt-in context-density profile (SPEC-CONTEXT-PROFILES-2026-10-11, IC-01). 'full' = byte-identical Phase-1 render (safe-side default). 'compact' = instruction-preserving compressed output, opt-in and unverified. The missing key always resolves to 'full'; the default is virtual and never persisted by fill_defaults (safe-side default: compression must be explicitly opted in).",
+      "enum": [
+        "full",
+        "compact"
+      ]
     }
   },
   "required": [

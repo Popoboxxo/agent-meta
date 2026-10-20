@@ -12,14 +12,10 @@ defaultTest:
     provider:
       wrapping: false
 providers:
-- id: exec
+- id: exec:./provider-claude.sh
   label: claude-orchestrator
-  command:
-  - ./provider-claude.sh
-- id: exec
+- id: exec:./provider-opencode.sh
   label: opencode-orchestrator
-  command:
-  - ./provider-opencode.sh
 tests:
 - description: kw-feature-lifecycle-01 [orchestrator]
   vars:

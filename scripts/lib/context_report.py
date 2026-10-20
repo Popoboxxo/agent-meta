@@ -11,6 +11,13 @@ artifacts and writes the report into the sink subdir ``context-report``.
 It never writes into the project proper and never touches the system temp
 directory.
 
+``--profile compact|both`` renders the opt-in ``compact`` profile by injecting
+``context-profile: compact`` into the work-dir *copy* of the config (IC-11) --
+the project config on disk is never modified -- and reports the ``full`` vs
+``compact`` delta. ``compact`` is opt-in and unverified (IC-36); the AC-26 size
+targets are estimates (Spec section 11) and live as data (test pins plus
+capability config keys), never as a constant here.
+
 Limitation: the project is rendered by ``sync.py --init`` on a copy of
 ``project.yaml`` only. Project-local files outside ``.meta-config``
 (``.claude/3-project/*-ext.md``, project-owned rules and hooks, the "Eigene
@@ -31,6 +38,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Mapping, Optional, Sequence
 
+import yaml
+
+from lib.context_profile import resolve_context_profile
 from lib.rules import CLAUDE_RULES_DIR
 from lib.repo_containment import (
     TmpSinkError,
@@ -45,6 +55,14 @@ DEFAULT_AGENT_EXT = ".md"
 ORCHESTRATOR_STEM = "orchestrator"
 GIT_INIT_TIMEOUT_S = 60
 RENDER_FAILED_CODE = "context-report.render-failed"
+PROFILES = ("full", "compact", "both")
+
+# Labelling only -- the AC-26 target *values* are data (test pins and
+# capability keys), never carried here (C7).
+TARGET_ESTIMATE_NOTE = (
+    "AC-26 size targets are ESTIMATES (Spec section 11), not measurements; "
+    "this report does not verify the compact profile"
+)
 
 # (capability key, cap_kind) in precedence order: a hard cap wins over a soft
 # cap, bytes win over chars over lines.
@@ -215,28 +233,110 @@ def render_table(report: Mapping[str, Mapping]) -> str:
     return "\n".join(lines)
 
 
-def _prune_old_work_dirs(output_dir: Path, keep_run_id: str) -> None:
+def profile_delta(full: Mapping[str, Mapping], compact: Mapping[str, Mapping]) -> dict:
+    """Return the ``full`` vs ``compact`` delta ``{provider: {artifact: row}}`` (IC-11).
+
+    Each row is ``{"full": bytes|None, "compact": bytes|None, "delta_bytes": int|None}``.
+    """
+    providers = list(dict.fromkeys(list(full) + list(compact)))
+    delta: dict = {}
+    for provider in providers:
+        full_provider = full.get(provider) or {}
+        compact_provider = compact.get(provider) or {}
+        artifacts = list(dict.fromkeys(list(full_provider) + list(compact_provider)))
+        rows: dict = {}
+        for artifact in artifacts:
+            full_bytes = (full_provider.get(artifact) or {}).get("bytes")
+            compact_bytes = (compact_provider.get(artifact) or {}).get("bytes")
+            if full_bytes is None or compact_bytes is None:
+                delta_bytes = None
+            else:
+                delta_bytes = compact_bytes - full_bytes
+            rows[artifact] = {
+                "full": full_bytes,
+                "compact": compact_bytes,
+                "delta_bytes": delta_bytes,
+            }
+        if rows:
+            delta[provider] = rows
+    return delta
+
+
+def _fmt_bytes(value: Optional[int]) -> str:
+    return "-" if value is None else str(value)
+
+
+def render_delta_table(delta: Mapping[str, Mapping]) -> str:
+    """Render the ``full`` vs ``compact`` delta as an aligned text table."""
+    headers = ("Provider", "Artifact", "Full", "Compact", "Delta")
+    rows = []
+    for provider, artifacts in delta.items():
+        for artifact, row in artifacts.items():
+            rows.append((provider, artifact, _fmt_bytes(row["full"]),
+                         _fmt_bytes(row["compact"]), _fmt_bytes(row["delta_bytes"])))
+    widths = [max([len(h)] + [len(r[i]) for r in rows]) for i, h in enumerate(headers)]
+    lines = [" | ".join(h.ljust(w) for h, w in zip(headers, widths)),
+             "-+-".join("-" * w for w in widths)]
+    lines += [" | ".join(c.ljust(w) for c, w in zip(r, widths)) for r in rows]
+    return "\n".join(lines)
+
+
+def _prune_old_work_dirs(output_dir: Path, keep_run_ids: Sequence[str]) -> None:
     """Drop work dirs of earlier runs so repeated reports do not accumulate."""
     if not output_dir.is_dir():
         return
+    keep = set(keep_run_ids)
     for child in output_dir.iterdir():
         work = child / "work"
-        if child.name != keep_run_id and work.is_dir():
+        if child.name not in keep and work.is_dir():
             shutil.rmtree(work, ignore_errors=True)
 
 
-def render_into_work_dir(agent_meta_root: Path, config_path: Path, work_dir: Path) -> None:
+def _write_render_config(config_path: Path, target_cfg: Path, profile: str) -> dict:
+    """Write the work-dir render config, injecting ``context-profile`` (IC-11).
+
+    ``full`` copies the config verbatim (Phase-1 identity); any other profile
+    sets the top-level ``context-profile`` key in the *work-dir copy* only. The
+    project config on disk is never touched (IC-34). Returns the config mapping
+    that was rendered.
+
+    Limitation: the injected copy is round-tripped through ``yaml.safe_dump``,
+    so comments and anchors of that copy are dropped (the real config keeps them).
+    """
+    raw = config_path.read_bytes()
+    if profile == "full":
+        target_cfg.write_bytes(raw)
+        try:
+            data = yaml.safe_load(raw.decode("utf-8"))
+        except (yaml.YAMLError, UnicodeDecodeError):
+            return {}
+    else:
+        data = yaml.safe_load(raw.decode("utf-8"))
+        if not isinstance(data, Mapping):
+            raise ValueError(
+                "project config must be a mapping, got {}".format(type(data).__name__))
+        data = dict(data)
+        data["context-profile"] = profile
+        target_cfg.write_bytes(
+            yaml.safe_dump(data, sort_keys=False, allow_unicode=True).encode("utf-8"))
+    return dict(data) if isinstance(data, Mapping) else {}
+
+
+def render_into_work_dir(
+    agent_meta_root: Path, config_path: Path, work_dir: Path, *, profile: str = "full"
+) -> dict:
     """Render the project config into *work_dir* via the regular sync codepath.
 
     The sync runs as a subprocess with *work_dir* as cwd and as its temp-dir
     environment, so nothing lands in the real project or in the system temp
-    directory (IC-34).
+    directory (IC-34). *profile* injects ``context-profile`` into the work-dir
+    copy only; returns the rendered config mapping.
     """
     work_dir.mkdir(parents=True, exist_ok=True)
     cfg_dir = work_dir / ".meta-config"
     cfg_dir.mkdir(exist_ok=True)
     target_cfg = cfg_dir / "project.yaml"
-    shutil.copyfile(config_path, target_cfg)
+    rendered_config = _write_render_config(config_path, target_cfg, profile)
     env = work_dir_env(work_dir)
     sync_script = Path(agent_meta_root) / "scripts" / "sync.py"
     subprocess.run(["git", "init", "-q"], cwd=str(work_dir), check=False,
@@ -248,6 +348,15 @@ def render_into_work_dir(agent_meta_root: Path, config_path: Path, work_dir: Pat
     if result.returncode != 0:
         raise RuntimeError("render failed (rc {}): {}".format(
             result.returncode, (result.stdout + result.stderr)[-800:]))
+    return rendered_config
+
+
+def _effective_profiles(rendered_config: Mapping, providers: Sequence[str]) -> dict:
+    """Resolve the effective per-provider profile of a rendered config (IC-01/IC-02)."""
+    return {
+        provider: resolve_context_profile(dict(rendered_config), provider).profile
+        for provider in providers
+    }
 
 
 def run_context_report(
@@ -262,32 +371,67 @@ def run_context_report(
     profile: str = "full",
 ) -> int:
     """Render, measure and report; returns the process exit code (0, 1 over-hard-cap, 2 error)."""
+    if profile not in PROFILES:
+        print("error: context-report.invalid-profile: {!r} (expected one of: {})".format(
+            profile, ", ".join(PROFILES)), file=sys.stderr)
+        return 2
     run_id = "{}-{}".format(datetime.now().strftime("%Y%m%d-%H%M%S"), os.getpid())
+    render_profiles = ["full", "compact"] if profile == "both" else [profile]
     try:
         output_dir = resolve_output_dir(project_root, config, REPORT_SUBDIR)
-        work_dir = resolve_work_dir(project_root, config, REPORT_SUBDIR, run_id)
+        work_dirs = {
+            name: resolve_work_dir(project_root, config, REPORT_SUBDIR,
+                                   run_id + ("" if len(render_profiles) == 1 else "-" + name))
+            for name in render_profiles
+        }
     except TmpSinkError as exc:
         print("error: {}: {}".format(exc.code, exc.message), file=sys.stderr)
         return 2
-    if profile != "full":
-        print("note: profile '{}' is not implemented yet (Phase 2); "
-              "reporting 'full' only".format(profile), file=sys.stderr)
+    measured: dict = {}
+    effective: dict = {}
     try:
-        render_into_work_dir(agent_meta_root, config_path, work_dir)
-    except (RuntimeError, OSError, subprocess.SubprocessError) as exc:
+        for name in render_profiles:
+            rendered_config = render_into_work_dir(
+                agent_meta_root, config_path, work_dirs[name], profile=name)
+            effective[name] = _effective_profiles(rendered_config, providers)
+            measured[name] = measure_artifacts(work_dirs[name], list(providers), mappings)
+    except (RuntimeError, OSError, ValueError, subprocess.SubprocessError, yaml.YAMLError) as exc:
         print("error: {}: {}".format(RENDER_FAILED_CODE, exc), file=sys.stderr)
         return 2
-    _prune_old_work_dirs(output_dir, run_id)
-    report = measure_artifacts(work_dir, list(providers), mappings)
-    if not report:
+    _prune_old_work_dirs(output_dir, [path.parent.name for path in work_dirs.values()])
+    if not any(measured.values()):
         print("warning: context-report: no artifacts measured "
               "(empty report); check providers and path mappings", file=sys.stderr)
-    payload = json.dumps(report, indent=2, ensure_ascii=False)
+    delta = profile_delta(measured["full"], measured["compact"]) if profile == "both" else None
+    if delta is not None:
+        payload_obj = {
+            "profiles": effective,
+            "full": measured["full"],
+            "compact": measured["compact"],
+            "delta": delta,
+            "targets_note": TARGET_ESTIMATE_NOTE,
+        }
+    elif profile == "compact":
+        # Every compact report carries the estimate label (machine-readable),
+        # not only stderr (IC-36/AC-86).
+        payload_obj = dict(measured["compact"])
+        payload_obj["targets_note"] = TARGET_ESTIMATE_NOTE
+    else:
+        payload_obj = measured[profile]
+    payload = json.dumps(payload_obj, indent=2, ensure_ascii=False)
     report_dir = output_dir / run_id
     report_dir.mkdir(parents=True, exist_ok=True)
     (report_dir / "report.json").write_text(payload + "\n", encoding="utf-8")
-    print(payload if as_json else render_table(report))
-    over = find_over_hard_cap(report)
+    if as_json:
+        print(payload)
+    elif delta is not None:
+        print(render_delta_table(delta))
+    else:
+        print(render_table(measured[profile]))
+    if profile != "full":
+        print("note: {}".format(TARGET_ESTIMATE_NOTE), file=sys.stderr)
+    over = [finding for name in render_profiles
+            for finding in find_over_hard_cap(measured[name])]
     for finding in over:
         print(finding, file=sys.stderr)
     return 1 if over else 0

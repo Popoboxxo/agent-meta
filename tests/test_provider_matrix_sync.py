@@ -1,8 +1,9 @@
-"""Provider matrix: one real sync per registered provider, artifact invariants.
+"""Provider matrix: one real sync per provider × profile, artifact invariants.
 
 Every provider in config/ai-providers.yaml is synced into a scratch consumer
-project (single-provider config) and the generated artifacts are checked for
-the invariants that the single-case tests keep missing:
+project (single-provider config) — once per context profile, ``full`` and the
+opt-in ``compact`` (Task 18/2c.3, QG-6) — and the generated artifacts are
+checked for the invariants that the single-case tests keep missing:
 
   * sync exits 0
   * every generated agent file is well-formed (TOML via tomllib, Markdown via
@@ -12,8 +13,12 @@ the invariants that the single-case tests keep missing:
     (personal context file, sync.log, generated env scripts)
   * a second ``--dry-run --check`` run reports no pending changes (idempotence)
 
-Parametrized over the live registry, so a newly onboarded provider is covered
-automatically (provider-agnostic: no provider name appears below).
+Multi-provider combinations (QG-6) are covered on top of that: a pair sharing a
+context file and a pair spanning two context files.
+
+Parametrized over the live registry, so a newly onboarded provider (and a new
+profile) is covered automatically (provider-agnostic: no provider name appears
+below).
 
 Run: python -m pytest tests/test_provider_matrix_sync.py -v
 """
@@ -33,13 +38,32 @@ except ModuleNotFoundError:  # Python < 3.11
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _SYNC = _REPO_ROOT / "scripts" / "sync.py"
-_PROVIDERS = sorted(
-    yaml.safe_load((_REPO_ROOT / "config" / "ai-providers.yaml").read_text(encoding="utf-8"))["providers"]
-)
+_PROVIDER_CONFIG = yaml.safe_load(
+    (_REPO_ROOT / "config" / "ai-providers.yaml").read_text(encoding="utf-8"))["providers"]
+_PROVIDERS = sorted(_PROVIDER_CONFIG)
+_PROFILES = ("full", "compact")
+
 # Files the sync creates that are machine-local and must never be committable.
 _LOCAL_FILE_RE = re.compile(
     r"(\.personal\.md$|(^|/)CLAUDE\.local\.md$|(^|/)sync\.log$|(^|/)env\.(sh|ps1|unset\.sh|unset\.ps1)$|\.sync-backup-)"
 )
+
+
+def _context_file_groups():
+    groups = {}
+    for provider, pc in _PROVIDER_CONFIG.items():
+        groups.setdefault(pc["context_file"], []).append(provider)
+    return {name: sorted(members) for name, members in groups.items()}
+
+
+_CONTEXT_FILE_GROUPS = _context_file_groups()
+_SHARED_MEMBERS = max(_CONTEXT_FILE_GROUPS.values(), key=len)
+_OTHER_MEMBERS = min(_CONTEXT_FILE_GROUPS.values(), key=len)
+# Multi-provider combinations, derived from the registry (no provider literal).
+_MULTI_COMBOS = {
+    "shared-file": _SHARED_MEMBERS[:2],
+    "mixed-files": [_SHARED_MEMBERS[0], _OTHER_MEMBERS[0]],
+}
 
 
 def _run(project: Path, *extra: str) -> subprocess.CompletedProcess:
@@ -55,21 +79,39 @@ def _git(project: Path, *args: str) -> str:
     ).stdout
 
 
-@pytest.fixture(scope="module", params=_PROVIDERS)
-def synced(request, tmp_path_factory):
-    provider = request.param
-    project = tmp_path_factory.mktemp(f"matrix-{provider}")
-    (project / ".meta-config").mkdir()
+def _write_and_init(project: Path, providers, profile=None) -> None:
+    (project / ".meta-config").mkdir(parents=True, exist_ok=True)
     (project / ".meta-config" / "project.yaml").write_text(
         'agent-meta-version: "2.0.0-beta.1"\n'
-        f"ai-providers:\n- {provider}\n"
-        "dod-preset: rapid-prototyping\n"
-        "variables:\n  PROJECT_NAME: matrix\n  PROJECT_PREFIX: mx\n",
+        "ai-providers:\n"
+        + "".join("- %s\n" % provider for provider in providers)
+        + "dod-preset: rapid-prototyping\n"
+        + ("context-profile: %s\n" % profile if profile else "")
+        + "variables:\n  PROJECT_NAME: matrix\n  PROJECT_PREFIX: mx\n",
         encoding="utf-8",
     )
     subprocess.run(["git", "init", "-q"], cwd=project, check=True)
+
+
+@pytest.fixture(scope="module",
+                params=[(provider, profile) for provider in _PROVIDERS for profile in _PROFILES],
+                ids=lambda param: "%s-%s" % (param[0], param[1]))
+def synced(request, tmp_path_factory):
+    provider, profile = request.param
+    project = tmp_path_factory.mktemp("matrix-%s-%s" % (provider, profile))
+    _write_and_init(project, [provider], profile)
     result = _run(project, "--init")
-    return provider, project, result
+    return provider, profile, project, result
+
+
+@pytest.fixture(scope="module", params=sorted(_MULTI_COMBOS))
+def synced_multi(request, tmp_path_factory):
+    combo = request.param
+    providers = _MULTI_COMBOS[combo]
+    project = tmp_path_factory.mktemp("matrix-multi-%s" % combo)
+    _write_and_init(project, providers)
+    result = _run(project, "--init")
+    return combo, providers, project, result
 
 
 def _generated_files(project: Path):
@@ -78,32 +120,36 @@ def _generated_files(project: Path):
             yield f
 
 
-def test_sync_succeeds(synced):
-    provider, _project, result = synced
-    assert result.returncode == 0, f"{provider}: sync failed\n{result.stdout[-2000:]}\n{result.stderr[-2000:]}"
-    assert "Traceback" not in result.stdout + result.stderr
-
-
-def test_agent_files_are_well_formed(synced):
-    provider, project, _ = synced
-    pc = yaml.safe_load((_REPO_ROOT / "config" / "ai-providers.yaml").read_text(encoding="utf-8"))["providers"][provider]
-    agents_dir = project / pc["agents_dir"]
-    assert agents_dir.is_dir(), f"{provider}: agents dir {pc['agents_dir']} missing"
+def _assert_well_formed(agents_dir: Path, label: str) -> None:
+    assert agents_dir.is_dir(), f"{label}: agents dir {agents_dir} missing"
     files = [f for f in agents_dir.iterdir() if f.is_file() and f.suffix in (".md", ".toml")]
-    assert files, f"{provider}: no agent files generated"
+    assert files, f"{label}: no agent files generated"
     for f in files:
         text = f.read_text(encoding="utf-8")
         if f.suffix == ".toml":
             tomllib.loads(text)  # raises -> test fails with the file in the traceback
         elif text.startswith("---"):
             end = text.find("\n---", 3)
-            assert end != -1, f"{provider}: unterminated frontmatter in {f.name}"
+            assert end != -1, f"{label}: unterminated frontmatter in {f.name}"
             yaml.safe_load(text[3:end])
 
 
+def test_sync_succeeds(synced):
+    provider, profile, _project, result = synced
+    assert result.returncode == 0, (
+        f"{provider}/{profile}: sync failed\n{result.stdout[-2000:]}\n{result.stderr[-2000:]}")
+    assert "Traceback" not in result.stdout + result.stderr
+
+
+def test_agent_files_are_well_formed(synced):
+    provider, profile, project, _ = synced
+    pc = _PROVIDER_CONFIG[provider]
+    _assert_well_formed(project / pc["agents_dir"], f"{provider}/{profile}")
+
+
 def test_no_claude_only_paths_in_foreign_agents(synced):
-    provider, project, _ = synced
-    pc = yaml.safe_load((_REPO_ROOT / "config" / "ai-providers.yaml").read_text(encoding="utf-8"))["providers"][provider]
+    provider, profile, project, _ = synced
+    pc = _PROVIDER_CONFIG[provider]
     if ".claude" in pc["agents_dir"]:
         pytest.skip("Claude-family provider owns the .claude/ tree")
     agents_dir = project / pc["agents_dir"]
@@ -111,24 +157,46 @@ def test_no_claude_only_paths_in_foreign_agents(synced):
         f.name for f in agents_dir.iterdir()
         if f.is_file() and ".claude/" in f.read_text(encoding="utf-8")
     ]
-    assert not offenders, f"{provider}: .claude/ references in {offenders[:5]}"
+    assert not offenders, f"{provider}/{profile}: .claude/ references in {offenders[:5]}"
 
 
 def test_machine_local_files_are_gitignored(synced):
-    provider, project, _ = synced
+    provider, profile, project, _ = synced
     untracked = _git(project, "status", "--short", "-uall").splitlines()
     leaked = [
         line[3:] for line in untracked
         if line.startswith("??") and _LOCAL_FILE_RE.search(line[3:])
     ]
-    assert not leaked, f"{provider}: machine-local files not gitignored: {leaked}"
+    assert not leaked, f"{provider}/{profile}: machine-local files not gitignored: {leaked}"
 
 
 def test_second_run_is_idempotent(synced):
-    provider, project, _ = synced
+    provider, profile, project, _ = synced
     result = _run(project, "--dry-run", "--check")
     assert result.returncode == 0, (
-        f"{provider}: --check reports pending changes after a clean sync\n{result.stdout[-2000:]}"
+        f"{provider}/{profile}: --check reports pending changes after a clean sync\n"
+        f"{result.stdout[-2000:]}"
+    )
+
+
+def test_multi_provider_sync_succeeds(synced_multi):
+    combo, providers, _project, result = synced_multi
+    assert result.returncode == 0, (
+        f"{combo} {providers}: sync failed\n{result.stdout[-2000:]}\n{result.stderr[-2000:]}")
+
+
+def test_multi_provider_agent_files_are_well_formed(synced_multi):
+    combo, providers, project, _ = synced_multi
+    for provider in providers:
+        _assert_well_formed(project / _PROVIDER_CONFIG[provider]["agents_dir"], f"{combo}/{provider}")
+
+
+def test_multi_provider_second_run_is_idempotent(synced_multi):
+    combo, providers, project, _ = synced_multi
+    result = _run(project, "--dry-run", "--check")
+    assert result.returncode == 0, (
+        f"{combo} {providers}: --check reports pending changes after a clean sync\n"
+        f"{result.stdout[-2000:]}"
     )
 
 

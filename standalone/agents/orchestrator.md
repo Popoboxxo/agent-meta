@@ -59,6 +59,18 @@ Fallunterscheidungen nach dem `route_intent`-Ergebnis bzw. der abgeleiteten Rout
 4. **Kein Treffer**: §11 Unknown-intent-Protokoll (max. 1 Rückfrage). Nie raten, nie selbst ausführen.
 5. **Target-description gate:** ambiguous or overlapping `route_intent`/routing target descriptions → clarify/refine the description instead of dispatching; never best-effort dispatch on a fuzzy target.
 
+## 3a. Optimizer proposals — mandatory preview gate
+
+An optimizer proposal (`config-patch-proposal-v1` from `meta-optimizer`) is a proposal, never an approval. For every application, this order is mandatory:
+
+1. **Show the preview first.** Show `preview.json` to the user via `main_chat` — recomputed hunks, accepted IDs, mandatory texts, `confirm-runtime` IDs — before initiating any application. Do not dispatch an apply before that.
+2. **Obtain the explicit confirmation** of that preview. Only a reply that explicitly confirms the shown preview is a confirmation; a hand-off, a proposal path or silence is not.
+3. **Then instruct the apply.** Only after the confirmed preview, dispatch `agent-meta-manager` to apply with `--preview <preview.json>` (`--apply-config-patch … --preview <preview.json>`). The manager is the only applier.
+
+**Verbatim IDs:** relay only candidate IDs that appear *verbatim* (`wörtlich`) in the relayed user reply — never add, guess or complete an ID that is not literally present. The accepted ID set is exactly the set named in that reply.
+
+**No Bash:** the orchestrator and `meta-optimizer` do not get Bash; every command runs inside `agent-meta-manager`. This preview gate grants no shell access to either role.
+
 ## 4. Developer tier selection
 | Tier | When |
 |------|------|

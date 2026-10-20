@@ -596,6 +596,45 @@ def _write_dispatch_depth(
         log.action("WRITE", rel, "[agents] max_depth >= required depth")
 
 
+def _managed_notes_as_html_comment(
+    agent_meta_root: Path,
+    config: dict | None,
+    provider: str,
+    provider_config: dict | None,
+) -> bool:
+    """Whether the managed-block maintainer notes may become an HTML comment.
+
+    IC-08 (C6): only a context file whose *sole* reader strips HTML comments
+    before injection (capability ``strips_html_comments``) may hide its
+    maintainer/provenance notes in a ``<!-- … -->`` block; a shared file (more
+    than one reader) never does. Capability-driven via ``merged_caps`` — no
+    provider-name branch. Without the ``compact`` opt-in every render keeps the
+    notes visible, so the output stays byte-identical (AC-23).
+    """
+    from .context_profile import context_profile_variables
+    from .providers import load_provider_capabilities
+    from .rule_channels import merged_caps
+
+    config = config or {}
+    shared_users = _shared_context_users(
+        provider, provider_config, config, tolerate_unknown=True
+    )
+    if len(shared_users) != 1:
+        return False
+    compact = (
+        context_profile_variables(config, provider, shared_users).get(
+            "CONTEXT_PROFILE_COMPACT"
+        )
+        == "true"
+    )
+    if not compact:
+        return False
+    caps = merged_caps(
+        provider, provider_config or {}, load_provider_capabilities(agent_meta_root)
+    )
+    return bool(caps.get("strips_html_comments"))
+
+
 def _update_managed_html_block(
     target_path: Path,
     project_root: Path,
@@ -641,6 +680,16 @@ def _update_managed_html_block(
     _has_dedicated = (pc or {}).get("has_dedicated_context_file", False)
     if _has_dedicated and "AGENT_HINTS_CLAUDE" in variables:
         render_vars = {**variables, "AGENT_HINTS": variables["AGENT_HINTS_CLAUDE"]}
+    render_vars = {
+        **render_vars,
+        "CONTEXT_MANAGED_NOTES_AS_COMMENT": (
+            "true"
+            if _managed_notes_as_html_comment(
+                agent_meta_root, config, provider, provider_config
+            )
+            else "false"
+        ),
+    }
 
     builder = TemplateBuilder(agent_meta_root / "templates" / "context")
     try:
@@ -1583,6 +1632,12 @@ def sync_context_for_provider(
             platform_vars=platform_vars,
         )
 
+    # IC-07 (Task 2b.4): the compact profile's rule REFERENCE sections reach
+    # providers with a skills channel as <skills_dir>/<rule>/SKILL.md.
+    sync_compact_reference_skills(
+        agent_meta_root, project_root, config, variables, log, dry_run,
+        provider, provider_config,
+    )
     _apply_context_filename_settings(project_root, pc, log, dry_run)
 
 
@@ -1819,34 +1874,361 @@ _COMPACT_PLATFORM_RULES = {
             "Details (Guard-Terminologie: Convention vs. Security Boundary, "
             "bekannte technische Grenzen): `rules/1-generic/branch-guard.md`."
         ),
+        "reference_skill": True,
+    },
+    # IC-07 (Task 2b.4): generic rules with a REFERENCE portion next to their
+    # INSTRUCTION core, classified after docs/guides/context-block-inventory.md
+    # (INSTRUCTION stays embedded, the "Bekannte Grenzen"/detail prose is
+    # reference). `reference_skill` marks the rules whose removed sections are
+    # written as `<skills_dir>/<rule>/SKILL.md` for every sharer with a skills
+    # read channel (sync_compact_reference_skills); without that channel the
+    # full text stays embedded (invariant §4.3). `profile_only` keeps these
+    # entries out of the #540 COMPACT_MODE render: they are opt-in
+    # (`context-profile: compact`) only, so every render without that key stays
+    # byte-identical and no pointer promises a skill nobody wrote.
+    "a2a-delegation-gates": {
+        "keep": (
+            "## Enforced Gates (aktiv prüfen — HARD REJECT)",
+            "## Per-Task-Tier: `payload.tier_override` (optional — Issue #346)",
+            "## Subagent Permission Policy (strict)",
+            "## Subagent Permission Policy (warn)",
+        ),
+        "pointer": (
+            "Details (Degradierte Checks, Schema-erzwungenes `payload.t`-Limit, "
+            "Runtime-Enforcement-Tier, Bekannte Grenzen): "
+            "`<skills_dir>/a2a-delegation-gates/SKILL.md`."
+        ),
+        "reference_skill": True,
+        "profile_only": True,
+    },
+    "submodule-protection": {
+        # No H2 section: the whole rule body is the INSTRUCTION core, so there
+        # is no reference portion to move (entry kept for the IC-07
+        # classification and any future reference section).
+        "keep": (),
+        "pointer": (
+            "Details (Submodul-Lifecycle, `.gitmodules`-Schutz): "
+            "`<skills_dir>/submodule-protection/SKILL.md`."
+        ),
+        "reference_skill": True,
+        "profile_only": True,
+    },
+    "security-paved-roads": {
+        "keep": ("## Enforcement",),
+        "pointer": (
+            "Details (Block-Katalog mit Abdeckung und Eigentümer-Rollen): "
+            "`<skills_dir>/security-paved-roads/SKILL.md`."
+        ),
+        "reference_skill": True,
+        "profile_only": True,
     },
 }
 
 
-def compact_embedded_rule(output_stem: str, content: str) -> str:
-    """Collapse OVERVIEW sections of a known platform rule to a pointer (compact mode).
+def _split_compact_rule(output_stem: str, content: str) -> tuple[str, str]:
+    """Split a classified rule into ``(INSTRUCTION core, REFERENCE text)``.
+
+    The classification comes from ``_COMPACT_PLATFORM_RULES``: the preamble
+    (rule title plus its leading directive) and every H2 section named in
+    ``keep`` are the INSTRUCTION core, every other line the REFERENCE portion
+    (IC-07). Both parts together still carry every line of *content* — the
+    split only decides which part is embedded and which one the skills channel
+    has to deliver.
+    """
+    keep_set = set(_COMPACT_PLATFORM_RULES[output_stem]["keep"])
+    core: list[str] = []
+    reference: list[str] = []
+    keep_current = True  # preamble before the first H2 is always instruction/title
+    for line in content.splitlines():
+        if line.startswith("## "):
+            keep_current = line.strip() in keep_set
+        (core if keep_current else reference).append(line)
+    return "\n".join(core).rstrip(), "\n".join(reference).strip()
+
+
+def compact_embedded_rule(output_stem: str, content: str, *,
+                          profile_compact: bool = False,
+                          skills_channel: bool = True) -> str:
+    """Collapse the REFERENCE sections of a known rule to a pointer (compact mode).
 
     The preamble (content before the first ``## `` heading, including the rule's
     ``# `` title) and every H2 section named in the rule's ``keep`` list survive
     verbatim — these are the INSTRUCTION parts that must stay identical in both
     modes (issue #540 non-goal: density only, no semantic change). All other H2
     sections are dropped and replaced by a single pointer line to the full
-    reference. Rules not in the table pass through unchanged, so full mode (which
-    never calls this) and every other embedded rule are unaffected.
+    reference. Rules not in the table — and rules without a removable section —
+    pass through unchanged, so full mode (which never calls this) and every
+    other embedded rule are unaffected.
+
+    ``profile_compact`` marks the ``context-profile: compact`` render of a rule
+    whose ``reference_skill`` sections leave the block: those sections are only
+    removable when at least one read channel delivers them, which the caller
+    reports as ``skills_channel``. Without it the full text stays embedded
+    (invariant §4.3 — never drop content a provider cannot load). Entries
+    flagged ``profile_only`` are not compacted at all without the profile
+    opt-in, so the #540 render keeps its bytes.
     """
     spec = _COMPACT_PLATFORM_RULES.get(output_stem)
     if not spec:
         return content
-    keep_set = set(spec["keep"])
-    kept: list[str] = []
-    keep_current = True  # preamble before the first H2 is always instruction/title
-    for line in content.splitlines():
-        if line.startswith("## "):
-            keep_current = line.strip() in keep_set
-        if keep_current:
-            kept.append(line)
-    body = "\n".join(kept).rstrip()
+    if spec.get("profile_only") and not profile_compact:
+        return content
+    body, reference = _split_compact_rule(output_stem, content)
+    if not reference:
+        return content
+    if profile_compact and spec.get("reference_skill") and not skills_channel:
+        return content
     return f"{body}\n\n{spec['pointer']}"
+
+
+_GATE_CARD_HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
+
+
+def _load_gate_card_sections(agent_meta_root: Path) -> list[str]:
+    """Section specs (``<rule-stem>#<heading>``) the compact gate-card extracts.
+
+    Source of truth (IC-12): ``config/context-anchors.yaml::gate_card_sections``.
+    An absent or empty list is a configuration error, not an empty gate card.
+    """
+    from .io import load_yaml_file
+
+    registry = load_yaml_file(
+        agent_meta_root / "config" / "context-anchors.yaml",
+        on_error="raise", default={},
+    ) or {}
+    sections = registry.get("gate_card_sections")
+    if not isinstance(sections, list) or not sections:
+        raise SyncError(
+            "context.gate-card: 'gate_card_sections' missing or empty in "
+            "config/context-anchors.yaml"
+        )
+    return [str(section) for section in sections]
+
+
+def _extract_rule_section(rule_text: str, heading: str) -> str | None:
+    """Return the ``#<heading>`` section of *rule_text* (heading line included).
+
+    The section runs from the matching heading line to the next markdown heading
+    (any level) or the end of the rule. *heading* matches a heading whose text is
+    equal or starts with ``<heading> `` so a conditioned suffix
+    (``# CRITICAL GATE (runtime-partially enforced)``) is still found. Returns
+    ``None`` when no heading matches.
+    """
+    lines = rule_text.splitlines()
+    start = None
+    for index, line in enumerate(lines):
+        match = _GATE_CARD_HEADING_RE.match(line)
+        if not match:
+            continue
+        text = match.group(2).strip()
+        if text == heading or text.startswith(f"{heading} "):
+            start = index
+            break
+    if start is None:
+        return None
+    end = len(lines)
+    for index in range(start + 1, len(lines)):
+        if _GATE_CARD_HEADING_RE.match(lines[index]):
+            end = index
+            break
+    return "\n".join(lines[start:end]).strip()
+
+
+def build_gate_card(
+    agent_meta_root: Path,
+    config: dict,
+    variables: dict,
+    log: SyncLog,
+) -> str:
+    """Render the compact gate card: rule sections extracted verbatim (IC-06).
+
+    The section names come from ``config/context-anchors.yaml::gate_card_sections``;
+    every section is read from its source rule and substituted like the embedded
+    rules are, so the card is never a hand-maintained copy. A section whose rule
+    or heading is missing aborts the sync with ``SyncError`` instead of shipping
+    a partial gate card.
+    """
+    from .rules import collect_rule_sources
+
+    sources = {
+        Path(output_name).stem: source_path
+        for source_path, output_name in collect_rule_sources(
+            agent_meta_root, config.get("platforms", []), config=config
+        )
+    }
+    sections: list[str] = []
+    for spec in _load_gate_card_sections(agent_meta_root):
+        stem, _sep, heading = spec.partition("#")
+        source_path = sources.get(stem)
+        if source_path is None:
+            raise SyncError(
+                f"context.gate-card: rule '{stem}' for section '{spec}' "
+                "(gate_card_sections) not found"
+            )
+        layer = source_path.parts[-2]
+        rel_source = f"rules/{layer}/{source_path.name}"
+        content = substitute(
+            source_path.read_text(encoding="utf-8"), variables, rel_source, log
+        )
+        content = strip_inactive_conditional_blocks(content, variables)
+        section = _extract_rule_section(content, heading)
+        if section is None:
+            raise SyncError(
+                f"context.gate-card: section '{heading}' missing in {rel_source} "
+                "(gate_card_sections)"
+            )
+        sections.append(section)
+    return "\n\n".join(sections) + "\n"
+
+
+def _enforce_compact_hard_cap(
+    agent_meta_root: Path,
+    config: dict,
+    provider_config: dict | None,
+    project_root: Path | None,
+    pc: dict,
+    target_name: str | None,
+    block: str,
+) -> None:
+    """Abort a compact render whose entry file would reach a reader hard cap.
+
+    Reuses the write-path guard on the rendered managed block so an over-cap
+    ``compact`` entry file never lands on disk (IC-06 ``context.over-hard-cap``,
+    "never silently write"). A no-op when the reader set or target is unknown.
+    """
+    if project_root is None or not provider_config:
+        return
+    name = target_name or pc.get("context_file")
+    if not name:
+        return
+    try:
+        target_path = safe_path(project_root, name)
+    except SyncError:
+        return
+    enforce_context_hard_cap(
+        agent_meta_root, project_root, config, provider_config, target_path, block
+    )
+
+
+def _shared_context_users(
+    provider: str,
+    provider_config: dict | None,
+    config: dict,
+    target_name: str | None = None,
+    tolerate_unknown: bool = False,
+) -> list[str]:
+    """Providers that render into the *same physical* context_file as *provider*.
+
+    IC-15 Nr. 1 (F-05): only the sharers the project ACTIVATES count. A
+    catalog-wide set listed the directories of providers the project never uses
+    and let an inactive sharer veto the lazy channel. The rendering provider
+    itself always belongs to the set. A non-shared context file yields
+    ``[provider]``.
+
+    ``tolerate_unknown`` forwards to :func:`resolve_providers` so callers that
+    pass a synthetic ``provider_config`` (for which the project's ``ai-providers``
+    names are unknown) get the conservative "not shared" answer instead of a
+    raised ``ValueError``; the default keeps the strict historical behavior.
+    """
+    pc = (provider_config or {}).get(provider, {})
+    shared_name = target_name or pc.get("context_file")
+    if not (provider_config and shared_name):
+        return [provider]
+    from .providers import resolve_providers
+
+    active = set(
+        resolve_providers(config, provider_config, tolerate_unknown=tolerate_unknown)
+    )
+    return [
+        p for p, cfg in provider_config.items()
+        if cfg.get("context_file") == shared_name and (p in active or p == provider)
+    ] or [provider]
+
+
+def sync_compact_reference_skills(
+    agent_meta_root: Path,
+    project_root: Path,
+    config: dict,
+    variables: dict,
+    log: SyncLog,
+    dry_run: bool,
+    provider: str,
+    provider_config: dict | None = None,
+) -> None:
+    """Write the REFERENCE sections of compact-profile rules as skills (IC-07).
+
+    A rule with a REFERENCE portion keeps only its INSTRUCTION core embedded
+    (``compact_embedded_rule``); the removed sections stay reachable because
+    they are written as ``<skills_dir>/<rule>/SKILL.md`` — the Phase-1 writer
+    (:func:`lib.skill_channel.write_skill_channel_rule`) is reused, so the
+    artifact has the same format as every other generated skill.
+
+    The stem is deliberately NOT registered in the lazy skills index: that
+    index's ``universe`` is the set of all rule stems, so the Phase-1 writer's
+    stale cleanup (``rules.sync_embedded_rule_files``) would delete the
+    reference skill of an embedded rule in the same sync — it owns only the
+    rules routed to the channel by ``embed: false`` / ``channel: skill``.
+
+    Only reached with the ``compact`` opt-in and only for a context file whose
+    sharers all read rules as skills (``lazy_skill_channel``): without that
+    channel the render keeps the full text embedded (invariant §4.3) and this
+    writer writes nothing. Rules the Phase-1 writer already owns
+    (``lazy_skill_stems``: ``embed: false`` / ``channel: skill``) are skipped so
+    no stem is written twice; a rule without a removable reference section
+    writes nothing.
+    """
+    from .context_profile import context_profile_variables
+    from .rule_channels import lazy_skill_channel, provider_channel_caps
+    from .rules import (
+        collect_rule_sources,
+        lazy_skill_stems,
+        provider_opts_skip,
+        resolve_rules,
+    )
+    from .skill_channel import write_skill_channel_rule
+
+    pc = (provider_config or {}).get(provider, {})
+    skills_dir_rel = pc.get("skills_dir")
+    if not skills_dir_rel:
+        return
+    shared_users = _shared_context_users(provider, provider_config, config)
+    if context_profile_variables(config, provider, shared_users)[
+        "CONTEXT_PROFILE_COMPACT"
+    ] != "true":
+        return
+    sharer_caps = provider_channel_caps(agent_meta_root, provider_config or {}, shared_users)
+    if not all(lazy_skill_channel(caps) for caps in sharer_caps.values()):
+        return
+
+    rule_options = resolve_rules(config, agent_meta_root)
+    already_written = lazy_skill_stems(
+        agent_meta_root, project_root, config, provider, sharer_caps[provider]
+    )
+    skills_target_dir = project_root / skills_dir_rel
+    for source_path, output_name in collect_rule_sources(
+        agent_meta_root, config.get("platforms", []), config=config
+    ):
+        rule_stem = Path(output_name).stem
+        if not _COMPACT_PLATFORM_RULES.get(rule_stem, {}).get("reference_skill"):
+            continue
+        if rule_stem in already_written:
+            continue
+        opts = rule_options.get(rule_stem, {})
+        if all(provider_opts_skip(opts, user) for user in shared_users):
+            continue
+        layer = source_path.parts[-2]
+        rel_source = f"rules/{layer}/{source_path.name}"
+        content = substitute(
+            source_path.read_text(encoding="utf-8"), variables, rel_source, log
+        )
+        content = strip_inactive_conditional_blocks(content, variables)
+        _core, reference = _split_compact_rule(rule_stem, content)
+        if not reference:
+            continue
+        write_skill_channel_rule(
+            rule_stem, reference, opts, skills_target_dir, project_root, log,
+            dry_run, rel_source,
+        )
 
 
 def _build_managed_block(
@@ -1884,20 +2266,10 @@ def _build_managed_block(
     # on which shared provider happens to sync last, and each sync overwrites
     # the other's version forever (issue #638: infinite oscillation, permanent
     # false "out of sync" on --check).
-    # IC-15 Nr. 1 (F-05): only the sharers this project ACTIVATES count. A
-    # catalog-wide set listed the directories of providers the project never
-    # uses and let an inactive sharer veto the lazy channel. The rendering
-    # provider itself always belongs to the set.
-    shared_users = [provider]
+    shared_users = _shared_context_users(
+        provider, provider_config, config, target_name=target_name
+    )
     shared_name = target_name or pc.get("context_file")
-    if provider_config and shared_name:
-        from .providers import resolve_providers
-
-        _active = set(resolve_providers(config, provider_config))
-        shared_users = [
-            p for p, cfg in provider_config.items()
-            if cfg.get("context_file") == shared_name and (p in _active or p == provider)
-        ] or [provider]
 
     # Native rules (pointer instead of embedding) only when EVERY sharer reads
     # its generated rules directory (rules_read_channels, spec §4.3) -- a
@@ -1947,9 +2319,10 @@ def _build_managed_block(
     # by sync_pipeline (IC-04). Only the GATE_* family is neutralised -- the
     # remaining rendered provider-scoped inputs (ORCH_MODE_*, REPO_CONTAINMENT_*)
     # stay per-provider by design (determinism scope AC-25 / R7).
+    from .providers import load_provider_capabilities
+
     if provider_config:
         from .providers import (
-            load_provider_capabilities,
             resolve_providers,
             shared_runtime_gate_vars,
         )
@@ -1969,6 +2342,62 @@ def _build_managed_block(
     if len(shared_users) > 1:
         for p in shared_users:
             local_vars[f"PLATFORM_{p.upper()}"] = True
+
+    # IC-02/AC-30 (2a.6): one context profile per physical context file. A file
+    # shared by several ACTIVE providers renders 'full' as soon as one sharer
+    # resolves to 'full' (ADR-5); a requested 'compact' is downgraded with a
+    # single WARN per file. resolve_shared_file_profile decides over ALL active
+    # sharers, so provider-overrides.<P>=compact only survives while P is the
+    # sole active sharer. The wrapper also covers the single-provider case
+    # (shared_users == [provider]), where its result equals the per-provider
+    # value injected by agent_sync._build_provider_vars.
+    from .context_profile import (
+        context_profile_variables,
+        resolve_context_profile,
+        resolve_shared_file_profile,
+        resolve_shared_emit_roster,
+    )
+
+    local_vars.update(context_profile_variables(config, provider, shared_users))
+    _profile_users = sorted(set(shared_users) | {provider})
+    if len(_profile_users) > 1:
+        _profiles = [resolve_context_profile(config, p) for p in _profile_users]
+        if resolve_shared_file_profile(_profiles) == "full":
+            _compact = sorted(p.provider for p in _profiles if p.profile == "compact")
+            if _compact:
+                # Identical for every rendering sharer -> log.warn dedups it to
+                # exactly one message per physical file.
+                log.warn(
+                    "context-profile.shared-file-downgrade: shared context file "
+                    f"'{shared_name}' renders profile 'full'; 'compact' requested "
+                    "by: " + ", ".join(_compact)
+                )
+
+    # IC-09 / C2-C3 (SPEC-CONTEXT-PROFILES-2026-10-11): the compact agent roster
+    # in this physical file is gated on the sharers' ``roster_in_harness``
+    # capability. The file renders once for every active sharer, so the decision
+    # is resolved over ``shared_users`` with the safe-side rule (emit as soon as
+    # one sharer lacks the harness roster; C2/C3 "entfällt, wenn alle Teiler
+    # roster_in_harness: true haben"). Read from config/provider-capabilities.yaml
+    # — no provider-name branch.
+    #
+    # ``EMIT_AGENT_ROSTER`` is the *emit* predicate in this context file ("true"
+    # keeps the roster list, "false" omits it — the harness owns the roster). It is
+    # deliberately NOT the orchestrator's ``ROSTER_IN_HARNESS`` capability literal:
+    # that one has the inverted meaning ("true" means omit) and is consumed only by
+    # the agent template (orchestrator.md, ``_PROVIDER_ROSTER_VARS``).
+    _roster_caps = load_provider_capabilities(agent_meta_root)
+    _roster_users = shared_users if provider_config else [provider]
+    local_vars["EMIT_AGENT_ROSTER"] = (
+        "true"
+        if resolve_shared_emit_roster(
+            {
+                user: (_roster_caps.get(user) or {}).get("roster_in_harness") is True
+                for user in _roster_users
+            }
+        )
+        else "false"
+    )
 
     from .providers import context_topology
 
@@ -2027,6 +2456,11 @@ def _build_managed_block(
         # Native rule artifacts (.claude/rules/*, skills) stay full — they are
         # lazy-loaded and not part of the always-on context footprint.
         _global_compact = local_vars.get("COMPACT_MODE") == "true"
+        # IC-07 (Task 2b.4): the profile render moves the REFERENCE sections of
+        # the classified rules into the skills channel, so their removability
+        # is bound to that channel (below). Effective, shared-file-downgraded
+        # value (see context_profile_variables above).
+        _profile_compact = local_vars.get("CONTEXT_PROFILE_COMPACT") == "true"
         # shared_users holds only the active sharers (IC-15 Nr. 1), so the
         # plugin compact decision is scoped to providers that can actually
         # render (and thus lose content into) this physical file.
@@ -2100,7 +2534,24 @@ def _build_managed_block(
                 # Deliberately on the global flag, not the provider-aware
                 # `_compact` below -- this is agent-meta's own always-on rule
                 # density, not the plugin lazy-channel-loss bug (#638-adjacent).
-                rule_content = compact_embedded_rule(Path(output_name).stem, rule_content)
+                if _profile_compact and not rules_file_channel:
+                    spec = _COMPACT_PLATFORM_RULES.get(rule_stem, {})
+                    if spec.get("reference_skill") and _split_compact_rule(
+                        rule_stem, rule_content
+                    )[1]:
+                        # IC-07 (Task 2b.4): a REFERENCE portion that no read
+                        # channel can deliver stays embedded in full instead of
+                        # pointing at a skill nobody writes (invariant §4.3).
+                        log.warn(
+                            "context.rule-reference-fallback: rule "
+                            f"'{rule_stem}' keeps its full text embedded — no read "
+                            "skills channel for its REFERENCE sections (spec 4.3)"
+                        )
+                rule_content = compact_embedded_rule(
+                    Path(output_name).stem, rule_content,
+                    profile_compact=_profile_compact,
+                    skills_channel=rules_file_channel,
+                )
             # IC-15 Nr. 12: a lazy-skill table lists only skills that exist for
             # EVERY active sharer; a table without any such skill is not embedded.
             if has_skill_table(rule_content):
@@ -2195,8 +2646,32 @@ def _build_managed_block(
         config, compact=local_vars.get("COMPACT_MODE") == "true"
     )
 
+    if local_vars.get("CONTEXT_PROFILE_COMPACT") == "true":
+        if "MCP_GUARDRAILS_LIST" not in local_vars:
+            from .mcp import (
+                build_mcp_guardrails_list,
+                load_mcp_registry,
+                resolve_active_mcp_servers,
+            )
+
+            _mcp_registry = load_mcp_registry(agent_meta_root, config, project_root)
+            local_vars["MCP_GUARDRAILS_LIST"] = build_mcp_guardrails_list(
+                _mcp_registry,
+                resolve_active_mcp_servers(
+                    config, agent_meta_root, project_root, registry=_mcp_registry
+                ),
+            )
+        local_vars["GATE_CARD"] = build_gate_card(
+            agent_meta_root, config, local_vars, log
+        )
+
     builder = TemplateBuilder(agent_meta_root / "templates" / "context")
     rendered = builder.build("agents-managed", local_vars)
+    if local_vars.get("CONTEXT_PROFILE_COMPACT") == "true":
+        _enforce_compact_hard_cap(
+            agent_meta_root, config, provider_config, project_root, pc,
+            target_name, rendered,
+        )
     return _apply_platform_context_substitution(
         rendered, platform_vars,
         target_name or pc.get("context_file") or "context managed block", log,

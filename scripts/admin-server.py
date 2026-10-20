@@ -239,7 +239,7 @@ PROJECT_WRITABLE_SECTIONS: frozenset[str] = frozenset({
     "tier-preset", "se-focus", "ai-providers", "platforms", "provider-options",
     "provider-isolation", "environments", "model-source-preference",
     "knowledge-engine", "gitignore", "external-skills", "skills-registry",
-    "context_file", "plugins", "repo_containment",
+    "context_file", "context-profile", "plugins", "repo_containment",
     # WP3 (#730): newly exposed project.yaml sections.
     "hooks", "debug-mode", "tier-overrides", "mcp-role-overrides", "backup",
     # Feature: subagent permissions + git repo settings + auto-commit (Admin UI).
@@ -3895,6 +3895,13 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 # REV-R4: the project provider-options surface channel is
                 # validated server-side before any disk write.
                 self._validate_project_provider_options(body.get("provider-options"))
+                # IC-01 (2a review fix): reject out-of-enum context-profile
+                # values before the merge so a bad full-document save 400s
+                # without persisting anything.
+                self._guard_context_profile_write(
+                    "context-profile", body.get("context-profile"))
+                self._guard_context_profile_write(
+                    "provider-overrides", body.get("provider-overrides"))
             result = self.__class__.config_manager.write(
                 "project", self._deep_merge(existing, body))
         else:
@@ -5152,6 +5159,7 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
         if not isinstance(existing, dict):
             existing = {}
         self._guard_model_block_write(section, data, existing)
+        self._guard_context_profile_write(section, data)
         existing[section] = data
         return self._send_json(self.__class__.config_manager.write("project", existing))
 
@@ -5203,6 +5211,42 @@ class AdminRequestHandler(BaseHTTPRequestHandler):
                 "provider. Clear the conflicting "
                 f"'{other}' or '{section}' entry for each listed provider first."
             )
+
+    def _guard_context_profile_write(self, section: str, data: Any) -> None:
+        """Reject context-profile writes that would abort the next sync.
+
+        IC-01: ``context-profile`` (top level) and
+        ``provider-overrides.<P>.context-profile`` accept only ``full`` or
+        ``compact``. An out-of-enum value is a hard config error — the next
+        sync aborts as ``context-profile.invalid`` — so the write itself fails
+        with ``ValueError`` (mapped to HTTP 400 by :meth:`do_POST` /
+        :meth:`do_PUT`) *before* any disk write, giving the Admin UI the same
+        guarantee as direct YAML edits. ``null``/missing counts as unset
+        (inherit, issue #741). Non-dict ``provider-overrides`` payloads are
+        left to the schema-adjacent paths.
+        """
+        if section == "context-profile":
+            pairs = [("context-profile", data)]
+        elif section == "provider-overrides" and isinstance(data, dict):
+            pairs = [
+                (f"provider-overrides.{provider}.context-profile",
+                 entry.get("context-profile"))
+                for provider, entry in sorted(data.items(), key=lambda kv: str(kv[0]))
+                if isinstance(entry, dict)
+            ]
+        else:
+            return
+        _ensure_scripts_on_path(self.__class__.root)
+        from lib.context_profile import VALID_PROFILES  # type: ignore[import]
+
+        invalid = [
+            f"{location}: {value!r}" for location, value in pairs
+            if value is not None and value not in VALID_PROFILES
+        ]
+        if invalid:
+            raise ValueError(
+                "context-profile.invalid: " + ", ".join(invalid)
+                + f" (allowed: {', '.join(VALID_PROFILES)})")
 
     def _validate_permitted_injections_overrides(self, overrides: dict) -> None:
         """Reject a plugin-override write whose ``permitted-injections`` would

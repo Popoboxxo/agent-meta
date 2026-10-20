@@ -1,0 +1,22 @@
+# Fixture: minimal single-provider project for the config-optimizer runner
+# (Task 21 / 2d.2, IC-24). Values are deliberately distinctive tokens so the
+# sentinel fan-out count is unambiguous.
+agent-meta-version: "2.0.0-beta.1"
+ai-providers:
+- Claude
+dod-preset: rapid-prototyping
+repo_containment:
+  tmp-sink:
+    enabled: true
+    path: scratch/out
+variables:
+  PROJECT_NAME: fanoutfixturetoken
+  PROJECT_PREFIX: ff
+  PROJECT_GOAL: fanoutgoaltoken
+  UNKNOWN_FALLBACK_MAIN_CHAT: true
+  UNUSED_SMALL: deadsmall
+  UNUSED_BIG: |
+    Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod
+    tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam,
+    quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo
+    consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse.

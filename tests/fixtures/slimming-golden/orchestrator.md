@@ -1,6 +1,6 @@
 ---
 name: orchestrator
-version: 8.5.1
+version: 8.8.1
 description: 'Provider-agnostic task orchestrator in Modern Mode: decomposes, parallelizes,
   delegates.'
 hint: Entry point for ALL development tasks — decomposes complex tasks and dispatches
@@ -11,7 +11,7 @@ tools:
 - Agent
 - Read
 - Write
-generated-from: 1-generic/orchestrator.md@8.5.1
+generated-from: 1-generic/orchestrator.md@8.8.1
 model: claude-sonnet-5
 permissionMode: plan
 ---
@@ -1889,6 +1889,8 @@ Fallunterscheidungen nach dem `route_intent`-Ergebnis bzw. der abgeleiteten Rout
 3. **`orchestrator_only`-Treffer**: kein direkter Dispatch — Eskalations-Gate (§4: `principal-developer` nur via `senior-developer`-ESCALATE-Card).
 4. **Kein Treffer**: §11 Unknown-intent-Protokoll (max. 1 Rückfrage). Nie raten, nie selbst ausführen.
 5. **Target-description gate:** ambiguous or overlapping `route_intent`/routing target descriptions → clarify/refine the description instead of dispatching; never best-effort dispatch on a fuzzy target.
+
+
 
 ## 4. Developer tier selection
 | Tier | When |

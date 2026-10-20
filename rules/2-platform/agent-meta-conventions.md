@@ -84,6 +84,24 @@ Belegt bei `meta-doctor` (Tasks 0e.1–0e.2):
 - **Budget-Re-Pin:** Neue Rolle plus geänderter Manager/Orchestrator vergrößern Harness-Roster, Orchestrator und `AGENTS.md`; `_IST_FULL` in `tests/test_context_budgets.py` nur re-pinnen, wenn ein Budget-Test rot wird, und die Ursache im Kommentar festhalten.
 - **Schema-Drift:** `sync.py --validate` kann `config/project-config.schema.json` nur umformatieren; reine Formatierungsdrift nicht committen.
 
+Belegt bei `meta-optimizer` (Tasks 2e.1–2e.6):
+
+- **Name-only bleibt ohne Keyword-Route:** Die Rolle steht in `target_agents`/`name_index` (addressability
+  `name_only`), hat aber keine Regel in `routing.rules`; Szenario `78-meta-optimizer-role` prüft genau das
+  über `get_routing_rules`.
+- **Read-only heißt hier wörtlich:** exakt `Read`/`Glob`/`Grep`/`TodoWrite`, kein `Bash`/`Write`/`Edit`/`Agent`,
+  Opencode `edit: deny`, kein `model:` im Quell-Template, alle Platzhalter aufgelöst (Ausnahme: das escapte
+  Doku-Beispiel `{{%ALLEVAR%}}`). Kein Bash-Block im Template.
+- **Contract-Marker sind Assertions, keine Prosa:** `STATUS`, `RESULT`, `ARTIFACTS: none`, `PROPOSALS`, `PROOF`
+  und `config-patch-proposal-v1`; `Candidate.warnings` werden `wörtlich` übernommen, das Hinweis-Label lautet
+  literal `nicht anwendbar — manuelle Nutzeränderung bzw. Framework-Issue`.
+- **Ausführung bleibt beim Consumer:** `meta-optimizer` führt nichts aus; der einzige Anwendungspfad ist
+  `agent-meta-manager` mit `--apply-config-patch … --dry-run` (Vorschau) und `--preview <preview.json>`
+  (Anwendung). `--fill-defaults` kommt im Optimizer-Pfad nicht vor. Beide Flags inkl. Exit-Codes stehen in
+  `docs/api/cli-reference.md`.
+- **Golden-/Baseline-Folgen:** Mit der Rolle bewegen sich `agent-meta-manager`- und `orchestrator`-Golden sowie
+  die AC-01-Baseline; der Provider-Render bleibt provider-agnostisch (keine Provider-Literale).
+
 ## Adding a New Placeholder
 
 1. Add to `scripts/lib/config.py` → `build_variables()` or `_inject_dod()`

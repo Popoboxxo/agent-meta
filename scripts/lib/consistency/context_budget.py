@@ -16,8 +16,8 @@ never through provider names.
 Severity is centralised: ``SPEC_SEVERITY`` holds the level the spec prescribes
 per check, ``PHASE0_SEVERITY`` the Phase-0 level (everything WARNING) and
 ``EMITTED_SEVERITY`` the level actually emitted: Phase 0 plus the checks in
-``PHASE1_PROMOTED`` at their spec level (Task 1.24 and its follow-up:
-``context.dangling-pointer`` and ``context.rule-unreachable`` are ERROR).
+``PHASE1_PROMOTED`` at their spec level: ``context.dangling-pointer`` and
+``context.rule-unreachable`` (Task 1.24) plus ``context-profile.marker-in-rule``.
 ``_warn`` reads ``EMITTED_SEVERITY``; promoting a further check is a
 one-line change in ``PHASE1_PROMOTED``. Sync end stays report-only (ERROR lands
 in the sync.log error list, exit code unchanged); ``--doctor`` exits 1 on an
@@ -69,13 +69,21 @@ PHASE0_SEVERITY = {check: Severity.WARNING for check in SPEC_SEVERITY}
 # ``content_expected`` (surfaces that are empty by design -- skills without
 # lazy rules, MCP without active servers -- are not reported), so there is no
 # false-positive class left that would require a global exemption.
-PHASE1_PROMOTED = frozenset({"context.dangling-pointer", "context.rule-unreachable"})
+PHASE1_PROMOTED = frozenset({
+    "context.dangling-pointer", "context.rule-unreachable",
+    "context-profile.marker-in-rule",
+})
 EMITTED_SEVERITY = {
     check: (SPEC_SEVERITY[check] if check in PHASE1_PROMOTED else level)
     for check, level in PHASE0_SEVERITY.items()
 }
 
 COMPACT_MARKER = "CONTEXT_PROFILE_COMPACT"
+#: Render-side markers that must never appear in a native rule source (IC-03 /
+#: IC-09): the profile AND roster gates belong to agents/context templates
+#: (variables.py force-adds both for the render path), so a stray marker in a
+#: rule would be silently resolved instead of flagged.
+RULE_FORBIDDEN_MARKERS = (COMPACT_MARKER, "ROSTER_IN_HARNESS")
 # Row of a lazy-skill table: "| skill-name | description |" below a "| Skill |" header.
 _TABLE_HEADER_RE = re.compile(r"^\|\s*Skill\s*\|", re.IGNORECASE)
 _TABLE_ROW_RE = re.compile(r"^\|\s*([A-Za-z0-9][A-Za-z0-9_.-]*)\s*\|")
@@ -133,17 +141,14 @@ def _rule_files(project_root: Path, caps: Mapping) -> list:
     if not caps.get("has_rules") or not rules_dir:
         return []
     directory = project_root / rules_dir
-    if not directory.is_dir():
-        return []
-    return sorted(p for p in directory.iterdir() if p.is_file() and p.suffix == ".md")
+    return (sorted(p for p in directory.iterdir() if p.is_file() and p.suffix == ".md")
+            if directory.is_dir() else [])
 
 
 def _skill_dirs(caps: Mapping) -> list:
     """Directories where a provider discovers skills: ``skills_dir`` + discovery dirs."""
-    dirs = []
     own = caps.get("skills_dir")
-    if isinstance(own, str) and own:
-        dirs.append(own)
+    dirs = [own] if isinstance(own, str) and own else []
     for extra in caps.get("skills_discovery_dirs") or []:
         if isinstance(extra, str) and extra and extra not in dirs:
             dirs.append(extra)
@@ -159,32 +164,28 @@ def _normalize_heading(line: str) -> str:
     return line.strip().lstrip("#").strip()
 
 
+def _body_lines(text: str) -> list:
+    """Non-empty, stripped body lines of a rule (frontmatter stripped)."""
+    body = _FRONTMATTER_RE.sub("", text, count=1)
+    return [ln.strip() for ln in body.splitlines() if ln.strip()]
+
+
 def _first_heading(text: str) -> str:
     """First markdown heading line of a rule body (frontmatter stripped), else first line."""
-    body = _FRONTMATTER_RE.sub("", text, count=1)
-    first_non_empty = ""
-    for line in body.splitlines():
-        stripped = line.strip()
-        if not stripped:
-            continue
-        if stripped.startswith("#"):
-            return stripped
-        first_non_empty = first_non_empty or stripped
-    return first_non_empty
+    lines = _body_lines(text)
+    return next((ln for ln in lines if ln.startswith("#")), lines[0] if lines else "")
 
 
 def _body_probe(text: str) -> str:
     """Second non-empty body line (frontmatter stripped); ``""`` for one-line rules."""
-    lines = [ln.strip() for ln in _FRONTMATTER_RE.sub("", text, count=1).splitlines() if ln.strip()]
+    lines = _body_lines(text)
     return lines[1] if len(lines) > 1 else ""
 
 
 def _pointer_artifacts(project_root: Path, caps: Mapping) -> list:
     """Generated artifacts that may carry skill pointers: entry file + rule files."""
-    artifacts = []
     context_file = caps.get("context_file")
-    if context_file:
-        artifacts.append(project_root / context_file)
+    artifacts = [project_root / context_file] if context_file else []
     artifacts.extend(_rule_files(project_root, caps))
     return [p for p in artifacts if p.is_file()]
 
@@ -197,9 +198,7 @@ def _lazy_table_skills(text: str) -> list:
         if _TABLE_HEADER_RE.match(line):
             in_table = True
             continue
-        if not in_table:
-            continue
-        if _TABLE_SEPARATOR_RE.match(line):
+        if not in_table or _TABLE_SEPARATOR_RE.match(line):
             continue
         row = _TABLE_ROW_RE.match(line)
         if row:
@@ -265,7 +264,6 @@ def check_over_soft_cap(
             continue
         caps = capabilities.get(provider) or {}
         context_file = str(caps.get("context_file", ""))
-        measured = {"bytes": stat["bytes"], "lines": stat["lines"]}
         for key, unit in (("context_soft_cap_bytes", "bytes"),
                           ("context_soft_cap_chars", "chars"),
                           ("context_soft_cap_lines", "lines")):
@@ -279,7 +277,7 @@ def check_over_soft_cap(
                 text = _read_text(root / context_file)
                 value = len(text) if text is not None else stat["bytes"]
             else:
-                value = measured[unit]
+                value = stat[unit]
             if value > cap:
                 findings.append(_warn(
                     "context.over-soft-cap", context_file,
@@ -425,15 +423,13 @@ def check_unread_channel(
     exempt = _intentional_unread()
     findings = []
 
-    def is_exempt(rel: str) -> bool:
-        return any(fnmatch.fnmatch(rel, pattern) for pattern in exempt)
-
     for provider in active_providers:
         caps = capabilities.get(provider) or {}
         channels = caps.get("rules_read_channels") or []
         rules_dir = caps.get("rules_dir")
         if (caps.get("has_rules") and rules_dir and not any(c in channels for c in _FILE_CHANNELS)
-                and _rule_files(root, caps) and not is_exempt(str(rules_dir))):
+                and _rule_files(root, caps)
+                and not any(fnmatch.fnmatch(str(rules_dir), p) for p in exempt)):
             findings.append(_warn(
                 "context.unread-channel", str(rules_dir),
                 f"{provider}: '{rules_dir}' is generated but not read "
@@ -442,7 +438,8 @@ def check_unread_channel(
         skills_dir = caps.get("skills_dir")
         discovery = caps.get("skills_discovery_dirs") or []
         if (isinstance(skills_dir, str) and skills_dir and skills_dir not in discovery
-                and _non_empty_dir(root / skills_dir) and not is_exempt(skills_dir)):
+                and _non_empty_dir(root / skills_dir)
+                and not any(fnmatch.fnmatch(skills_dir, p) for p in exempt)):
             findings.append(_warn(
                 "context.unread-channel", skills_dir,
                 f"{provider}: '{skills_dir}' is generated but not in skills_discovery_dirs {list(discovery)}",
@@ -460,11 +457,12 @@ def check_marker_in_rule(
     capabilities: Mapping[str, Mapping],
     active_set,
 ) -> list:
-    """``context-profile.marker-in-rule``: ``CONTEXT_PROFILE_COMPACT`` in a rule file (IC-03; WARN in Phase 0, spec: ERROR).
+    """``context-profile.marker-in-rule``: a render marker in a rule file (IC-03; ERROR since 2a.4).
 
     Scans rule sources (``<project_root>/rules/**/*.md``) and the generated
     rule directories of the active providers. Native rules must stay
-    byte-identical across context profiles, so the marker is not allowed there.
+    byte-identical across context profiles, so neither ``CONTEXT_PROFILE_COMPACT``
+    nor ``ROSTER_IN_HARNESS`` is allowed there (``RULE_FORBIDDEN_MARKERS``).
     """
     root = Path(project_root)
     candidates: dict = {}
@@ -478,10 +476,13 @@ def check_marker_in_rule(
     findings = []
     for path in sorted(candidates):
         text = _read_text(path)
-        if text is not None and COMPACT_MARKER in text:
+        if text is None:
+            continue
+        marker = next((m for m in RULE_FORBIDDEN_MARKERS if m in text), None)
+        if marker is not None:
             findings.append(_warn(
                 "context-profile.marker-in-rule", _rel(path, root),
-                f"rule file contains the profile marker {COMPACT_MARKER} "
+                f"rule file contains the render marker {marker} "
                 "(native rules must be identical in every context profile)",
                 "move profile-conditional content out of rules (IC-03)"))
     return findings

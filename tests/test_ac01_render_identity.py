@@ -155,6 +155,83 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   providers = 45), 9 ``generated-file-hashes.json`` and 1
   ``Copilot/.github/copilot-instructions.md`` — 55 of 1007 hashes; 0 added/removed.
   ``knowledge-migrator`` is not rendered in the matrix. No other artifact changed.
+- Task 11 (2b.2, IC-05, AC-23): the orchestrator template §2a, §9 and the ``<context>``
+  agent table are wrapped in ``{{#if CONTEXT_PROFILE_COMPACT}}…{{else}}…{{/if}}`` (minor
+  bump 8.5.1 -> 8.6.0). The ``{{else}}`` branch is the unchanged text, so without the
+  ``context-profile`` opt-in every render only differs by the version bump in the
+  orchestrator artifact. Changed: the 9 per-provider orchestrator artifacts
+  (``orchestrator.md``/``.toml``/``.agent.md``) plus the 9
+  ``generated-file-hashes.json`` (18 of 1003 hashes; 0 added/removed). No other
+  artifact changed.
+- C2/C3/IC-05 roster gating (SPEC-CONTEXT-PROFILES-2026-10-11): the compact agent roster in
+  both emitters (orchestrator ``<context>`` names line and the shared-file ``agents-list-compact``)
+  is gated on the per-provider ``roster_in_harness`` capability (IC-09). The orchestrator template
+  is bumped 8.6.0 -> 8.7.0; the ``{{else}}`` (full) branch is unchanged, so without the
+  ``context-profile`` opt-in every render only differs by that version bump. Changed: the 9
+  per-provider orchestrator artifacts (``orchestrator.md``/``.toml``/``.agent.md``) plus the 9
+  ``generated-file-hashes.json`` (18 hashes; 0 added/removed). No other artifact changed.
+- Task 28 (2e.2, IC-28/AC-23/AC-59): new role ``meta-optimizer`` registration: per-provider role
+  artifacts, roster/name_index/enum rows in the orchestrator, AGENTS.md/context-file rows,
+  managed-file lists and ``generated-file-hashes.json``. The exception regex is extended to
+  ``.*/meta-optimizer\\.(md|toml|agent\\.md)$`` so the Copilot two-suffix form
+  (``meta-optimizer.agent.md``) is covered. No other render changed.
+- Task 29 (2e.3, IC-27/AC-59): ``agent-meta-manager`` gains ``handoff.input_contracts +=
+  config-patch-proposal-v1`` -> one additional ``input_contracts`` routing row in the orchestrator
+  routing data. Changed: the 9 per-provider orchestrator artifacts plus the 9
+  ``generated-file-hashes.json`` (18 of 1012 hashes; 0 added/removed). No other render changed.
+- Task 30 (2e.4, IC-27/AC-59/AC-90/AC-91): the ``agent-meta-manager`` template gains the new
+  section ``## 10c. Optimizer-Vorschläge anwenden (Advisory Mode)`` (the three steps
+  Analyse/Vorschau/Anwendung of IC-27 Rev. 3.1) and a minor version bump ``1.24.1 -> 1.25.0``
+  (new optional section, convention: minor). The section is prose plus three bash invocations,
+  so it only changes the rendered ``agent-meta-manager`` artifact of each provider and the
+  managed-file hash of that file. Changed: the 9 per-provider ``agent-meta-manager`` artifacts
+  (``Claude/.claude/agents/agent-meta-manager.md``, ``Codex/.codex/agents/agent-meta-manager.toml``,
+  ``Continue/.continue/agents/agent-meta-manager.md``,
+  ``Copilot/.github/agents/agent-meta-manager.agent.md``,
+  ``Gemini/.gemini/agents/agent-meta-manager.md``,
+  ``KimiCode/.kimi-code/agents/agent-meta-manager.md``,
+  ``Mammouth/.mammouth/agents/agent-meta-manager.md``,
+  ``Opencode/.opencode/agents/agent-meta-manager.md``,
+  ``ZCode/.zcode/agents/agent-meta-manager.md``) plus the 9
+  ``generated-file-hashes.json`` (18 of 1012 hashes; 0 added/removed). No other render changed;
+  ``AC01_EXCEPTIONS`` is NOT extended — the exception list stays limited to the new role
+  artifacts ``meta-doctor``/``meta-optimizer`` (Spec AC-01 iv/v).
+- Task 30 fix round (2e.4, review findings): three *text* corrections inside the new
+  ``## 10c.`` section of the ``agent-meta-manager`` template (the scoped "no manual edit"
+  rule, the release/approval wording, the ``preview.json`` payload sentence). The rendered
+  section keeps its line count (36 lines) and the template version pin stays ``1.25.0``
+  (the section was not yet released), so the *set* of affected paths is unchanged: again
+  exactly the 9 per-provider ``agent-meta-manager`` artifacts plus the 9
+  ``generated-file-hashes.json`` (18 of 1012 hashes; 0 added/removed).
+- Task 30 polish round (2e.4, review findings): one further *text* correction inside the
+  same §10c section -- the "no manual edit" rule now names §13 as well
+  ("§3/§5/§8" -> "§3/§5/§8/§13 (confirmation, schema check, re-sync, SE cascade)"), because
+  §13 (SE cascade) is a documented ``project.yaml`` change path next to §3/§5/§8. The
+  rendered section keeps its line count (36 lines) and the template version pin stays
+  ``1.25.0`` (the section was not yet released), so the *set* of affected paths is
+  unchanged: again exactly the 9 per-provider ``agent-meta-manager`` artifacts plus the 9
+  ``generated-file-hashes.json`` (18 of 1012 hashes; 0 added/removed).
+- Task 31 (2e.5, IC-27 Rev. 3.1 step 4 / AC-90 / AC-23): the orchestrator template gains the
+  common-body section ``## 3a. Optimizer proposals — mandatory preview gate`` (show
+  ``preview.json`` to the user via ``main_chat``, obtain the explicit confirmation, only then
+  instruct ``agent-meta-manager`` with ``--preview``; verbatim relayed-ID rule; no Bash for
+  orchestrator/``meta-optimizer``) and a minor version bump ``8.7.0 -> 8.8.0``. The section
+  is outside every ``CONTEXT_PROFILE_COMPACT`` conditional, so both profiles carry it; the
+  default (``full``) render therefore differs only by that section plus the version pin.
+  Changed: the 9 per-provider orchestrator artifacts (``orchestrator.md``/``.toml``/
+  ``.agent.md``) plus the 9 ``generated-file-hashes.json`` (18 of 1012 hashes; 0
+  added/removed). No other render changed; ``AC01_EXCEPTIONS`` is NOT extended. Incidental
+  rebaseline: ``tests/fixtures/compact-golden/orchestrator.md`` (owner of the compact
+  render, unchanged by this task's scope) is updated because the compact golden also
+  carries the template version and the common-body section.
+- Task 32 (CI fix, AC-49): §3a is wrapped in ``ROLE_AGENT_META_MANAGER_ACTIVE`` +
+  ``ROLE_META_OPTIMIZER_ACTIVE`` (template ``8.8.0 -> 8.8.1``). The AC-01 matrix keeps
+  every role active, so the section stays and the render differs only by the version pin.
+  Changed: the 9 per-provider orchestrator artifacts plus the 9 ``generated-file-hashes.json``
+  (18 of 1012 hashes; 0 added/removed). No other render changed; ``AC01_EXCEPTIONS`` is NOT
+  extended. The default (repo) render drops the section because the repo whitelist has no
+  ``meta-optimizer``; that fixture is the slimming/compact golden, rebaselined with the same
+  reason in ``tests/test_template_slimming_equivalence.py``.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
@@ -187,7 +264,7 @@ _PROVIDERS = sorted(
 # Empty entries would hide drift, so every pattern must stay role/entry specific.
 AC01_EXCEPTIONS = frozenset({
     r".*/meta-doctor\.(md|toml|agent\.md)$",
-    r".*/meta-optimizer\.[a-z]+$",
+    r".*/meta-optimizer\.(md|toml|agent\.md)$",
     r".*/standalone/agents/meta-doctor\.md$",
 })
 
@@ -301,6 +378,18 @@ def test_ac01_detects_drift(rendered):
 def test_ac01_exception_list_allows_meta_doctor_artifacts():
     baseline = {"codex/.codex/agents/developer.toml": "a"}
     current = dict(baseline, **{"codex/.codex/agents/meta-doctor.toml": "b"})
+    assert diff_against_manifest(current, baseline) == []
+
+
+def test_ac01_exception_list_allows_meta_optimizer_artifacts():
+    baseline = {"codex/.codex/agents/developer.toml": "a"}
+    current = dict(baseline, **{
+        "Claude/.claude/agents/meta-optimizer.md": "b",
+        "Codex/.codex/agents/meta-optimizer.toml": "c",
+        # Copilot uses the two-suffix form; the old `[a-z]+$` pattern misses
+        # it because of the dot in `.agent.md`.
+        "Copilot/.github/agents/meta-optimizer.agent.md": "d",
+    })
     assert diff_against_manifest(current, baseline) == []
 
 

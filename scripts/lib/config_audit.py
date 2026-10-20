@@ -20,6 +20,7 @@ from pathlib import Path
 from .config_audit_apply import apply_audit  # noqa: F401 -- re-exported, see below
 from .config_audit_providers import find_missing_providers
 from .config_audit_types import AuditIssue, AuditReport  # noqa: F401 -- re-exported for API compat
+from .context_profile import VALID_PROFILES
 from .frontmatter import WRAPPER_TEMPLATES, parse_frontmatter_file
 from .io import load_yaml_file
 from .providers import (
@@ -259,6 +260,11 @@ def audit_config(agent_meta_root: Path, project_config_path: Path) -> AuditRepor
         * ``provider_registry_completeness`` (warning): a provider registered
           in ``config/ai-providers.yaml`` is missing from a known
           provider-keyed Python enumeration in ``scripts/`` (issue #625).
+        * ``context-profile.invalid`` (error): ``context-profile`` (top level
+          or ``provider-overrides.<P>.context-profile``) carries a value
+          outside the ``full``/``compact`` enum (IC-01). The sync path aborts
+          on these for active providers; the audit also covers inactive
+          providers, which the sync never resolves.
 
     Args:
         agent_meta_root: Repository root containing ``agents/`` and ``config/``.
@@ -495,6 +501,37 @@ def audit_config(agent_meta_root: Path, project_config_path: Path) -> AuditRepor
                     detail=PROVIDER_CAPABILITIES_YAML,
                 )
 
+    # --- 9. context-profile.invalid (IC-01) ---------------------------------
+    # Out-of-enum context-profile values (top level or per provider override).
+    # The sync path aborts these as `context-profile.invalid` for *active*
+    # providers only; the audit reports all of them so the error stays visible
+    # via --validate / --audit-config / the admin config-audit API, including
+    # for providers the sync never resolves.
+    def _flag_invalid_profile(role: str, location: str, value: object) -> None:
+        if value is None or value in VALID_PROFILES:
+            return
+        report.add(
+            category="context-profile.invalid",
+            severity="error",
+            role=role,
+            message=(
+                f"{location}: invalid value {value!r} "
+                f"(allowed: {', '.join(VALID_PROFILES)})"
+            ),
+            detail=str(project_config_path),
+        )
+
+    _flag_invalid_profile("", "context-profile", config.get("context-profile"))
+    _overrides = config.get("provider-overrides")
+    if isinstance(_overrides, dict):
+        for _provider, _entry in sorted(_overrides.items()):
+            if isinstance(_entry, dict):
+                _flag_invalid_profile(
+                    _provider,
+                    f"provider-overrides.{_provider}.context-profile",
+                    _entry.get("context-profile"),
+                )
+
     return report
 
 
@@ -513,6 +550,7 @@ def format_report(report: AuditReport) -> str:
     sections: list[tuple[str, str, str]] = [
         ("deprecated_roles", "Deprecated Roles [auto-fixable with --apply]", "[WARN] "),
         ("roles_without_template", "Roles Without Template", "[ERROR]"),
+        ("context-profile.invalid", "Invalid Context Profile (full|compact)", "[ERROR]"),
         ("templates_without_default", "Templates Without Role-Default", "[INFO] "),
         ("role_defaults_without_template", "Role-Default Entries Without Template (framework drift)", "[WARN] "),
         ("orphaned_pipelines", "Orphaned Pipeline References", "[WARN] "),
@@ -544,6 +582,7 @@ def report_to_dict(report: AuditReport) -> dict:
     categories = (
         "deprecated_roles",
         "roles_without_template",
+        "context-profile.invalid",
         "templates_without_default",
         "role_defaults_without_template",
         "orphaned_pipelines",

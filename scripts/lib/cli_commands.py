@@ -1060,6 +1060,12 @@ def _handle_prune_backups(ctx: _SyncContext) -> None:
 def _handle_context_report(ctx: _SyncContext) -> None:
     """Handle ``--context-report`` (IC-11): render into the tmp-sink, measure, exit.
 
+    ``--profile full|compact|both`` selects what is measured: ``full`` keeps the
+    Phase-1 render, ``compact`` renders the opt-in profile (the ``context-profile``
+    key is injected into the work-dir config copy only, never the project config)
+    and ``both`` reports the ``full`` vs ``compact`` delta. ``compact`` is opt-in
+    and unverified (IC-36); the AC-26 size targets are estimates (Spec section 11).
+
     Exit 0 on success, 1 only on ``context.over-hard-cap``, 2 when the tmp-sink
     is disabled or unsafe (``tmp-sink.disabled``) or the render fails
     (``context-report.render-failed``).
@@ -1084,7 +1090,83 @@ def _handle_context_report(ctx: _SyncContext) -> None:
     sys.exit(code)
 
 
+def _handle_optimize_config(ctx: _SyncContext) -> None:
+    """Handle ``--optimize-config`` (IC-24): read-only proposal, exit.
+
+    ``main()`` has already forced dry-run and moved stdout to stderr around
+    ``_build_context``. This handler writes only below
+    ``<tmp-sink>/meta-optimizer/<run_id>/`` (``proposal.json``, ``proposal.diff``,
+    ``proof.json``) and never touches the project or the framework root.
+
+    Exit 0 (also with candidates), 1 on ``meta-optimizer.proof-failed``
+    (nothing but ``proof.json`` written), 2 on tmp-sink/render errors
+    (``tmp-sink.disabled``, ``meta-optimizer.render-failed``).
+    """
+    from lib.context_report import merge_provider_mappings
+    from lib.meta_optimizer import run_optimize_config
+    from lib.providers import (
+        load_provider_capabilities,
+        load_providers_config,
+        resolve_providers,
+    )
+
+    ctx.read_only = True
+    ctx.mode = "optimize_config"
+    args = ctx.args
+    provider_config = load_providers_config(ctx.agent_meta_root, ctx.config)
+    providers = resolve_providers(ctx.config, provider_config)
+    mappings = merge_provider_mappings(
+        provider_config, load_provider_capabilities(ctx.agent_meta_root))
+    code = run_optimize_config(
+        project_root=ctx.project_root, agent_meta_root=ctx.agent_meta_root,
+        config_path=ctx.config_path, config=ctx.config, active=ctx.active_set,
+        providers=providers, mappings=mappings, as_json=args.json,
+        include_semantic=getattr(args, "include_semantic", False),
+        out=getattr(args, "out", None))
+    sys.exit(code)
+
+
 _DOCTOR_SUBDIR = "doctor"
+
+
+def _handle_apply_config_patch(ctx: _SyncContext) -> None:
+    """Handle ``--apply-config-patch`` (IC-24 "Applier", AC-55/80/90/91).
+
+    The only write-capable optimizer mode: it recomputes the candidates, checks
+    the remove-only property and the L0 proof and then replaces
+    ``.meta-config/project.yaml`` atomically (temp file below
+    ``<tmp-sink>/meta-optimizer/<run_id>/``) -- all-or-nothing. The sink keeps the
+    redacted ``project.yaml.bak`` and the protocol ``applied.json`` (0600);
+    ``--dry-run`` writes only ``preview.json`` and never touches the config.
+
+    Exit 0 when every accepted candidate was applied (or the preview was
+    written), 1 when anything was rejected or a global check failed (nothing
+    written), 2 on usage/sink/render errors.
+    """
+    import json
+    from dataclasses import asdict
+
+    from lib.meta_optimizer import apply_config_patch, apply_summary
+
+    args = ctx.args
+    ctx.read_only = True
+    ctx.mode = "apply_config_patch"
+    report = apply_config_patch(
+        ctx.project_root, ctx.agent_meta_root, Path(args.apply_config_patch),
+        args.accept or (),
+        accept_runtime_ids=args.accept_runtime or (),
+        preview_path=Path(args.preview) if args.preview else None,
+        dry_run=bool(args.dry_run))
+    if getattr(args, "json", False):
+        print(json.dumps(asdict(report), indent=2, ensure_ascii=False, default=list))
+    else:
+        print(apply_summary(report))
+    if report.exit_code != 0:
+        detail = "; ".join(report.errors) or ", ".join(
+            "{}: {}".format(pid, reason) for pid, reason in report.rejected)
+        print("error: {}: {}".format(report.code or "meta-optimizer.rejected", detail),
+              file=sys.stderr)
+    sys.exit(report.exit_code)
 
 
 def _resolve_doctor_out(ctx: _SyncContext, out: str):
@@ -1249,6 +1331,19 @@ def _handle_validate(ctx: _SyncContext) -> None:
     for _stale in _stale_overrides:
         log.warning(f"config-audit [P1] stale-override: {_stale.message}")
 
+    # Invalid context-profile values (IC-01): the sync path aborts active
+    # providers as `context-profile.invalid` before this handler runs, so this
+    # surfacing covers the remaining case -- out-of-enum values in
+    # provider-overrides for providers the sync never resolves. Hard error,
+    # like the other consistency checks.
+    _invalid_profiles = _validate_audit_report.by_category("context-profile.invalid")
+    for _invalid_profile in _invalid_profiles:
+        log.warning(
+            f"config-audit [ERROR] context-profile.invalid: "
+            f"{_invalid_profile.message}")
+    if _invalid_profiles:
+        consistency_errors += len(_invalid_profiles)
+
     # Unpaired closing tags (issue #567): a copy-paste artifact like a
     # trailing `</output>` with no `<output>` anywhere in the file ships
     # broken structural markup into every synced project. Treated as a hard
@@ -1408,7 +1503,8 @@ def _handle_sync(ctx: _SyncContext) -> None:
     # or render effect.
     _sync_stage_context_checks(
         ctx.agent_meta_root, ctx.project_root, config, ctx.active_set, ctx.log,
-        info_messages=(ctx.variables or {}).get("_ROUTING_INFO"))
+        info_messages=(ctx.variables or {}).get("_ROUTING_INFO"),
+        profile_info_messages=(ctx.variables or {}).get("_CONTEXT_PROFILE_INFO"))
     # Stage 15: version bookkeeping (#720) -- write the actually-deployed
     # agent-meta version back into project.yaml so it never silently drifts
     # behind a submodule upgrade.

@@ -1615,6 +1615,7 @@ def _log_context_finding(log: SyncLog, finding) -> None:
 def _sync_stage_context_checks(
     agent_meta_root: Path, project_root: Path, config: dict, active_set,
     log: SyncLog, *, info_messages: list[str] | None = None,
+    profile_info_messages: list[str] | None = None,
 ) -> None:
     """Sync-end context/active-set checks (IC-10, IC-19, IC-29; AC-08, AC-43).
 
@@ -1623,10 +1624,14 @@ def _sync_stage_context_checks(
     never change the exit code or any render. Read-only on the project, so it
     is safe in dry-run. Every check is fail-soft -- an exception is logged as
     a WARN and the sync continues. ``info_messages`` are INFO lines collected
-    during variable building (``routing.examples-language-fallback``).
+    during variable building (``routing.examples-language-fallback``);
+    ``profile_info_messages`` are the per-provider ``context-profile:`` summary
+    lines (IC-02/AC-29, ``variables["_CONTEXT_PROFILE_INFO"]``).
     """
     for message in info_messages or ():
         log.note("routing.examples-language-fallback", message)
+    for message in profile_info_messages or ():
+        log.note("context-profile", message)
     try:
         from lib.consistency import active_set_refs, context_budget
         from lib.context_report import measure_artifacts, merge_provider_mappings
@@ -1635,6 +1640,16 @@ def _sync_stage_context_checks(
         providers = resolve_providers(config, provider_config)
         capabilities = merge_provider_mappings(
             provider_config, load_provider_capabilities(agent_meta_root))
+        # IC-36/AC-86: INFO context-profile.unverified per compact provider while
+        # the compact eval has no passing result (rides the _ROUTING_INFO drain).
+        from lib.context_profile import resolve_context_profile
+        from lib.context_profile_gate import context_profile_info_lines
+
+        resolved_profiles = [
+            resolve_context_profile(config, provider) for provider in providers
+        ]
+        for line in context_profile_info_lines(resolved_profiles, agent_meta_root):
+            log.note("context-profile.unverified", line)
         report = None
         try:  # measure once, shared by hard/soft cap checks
             report = measure_artifacts(project_root, providers, capabilities)

@@ -1,0 +1,22 @@
+{
+  "date": "2026-10-20",
+  "estimate": {
+    "calls": 3582,
+    "cases": 597,
+    "cost_usd": 42.029397,
+    "input_tokens": 80476794,
+    "models": [
+      "claude-haiku-4-5",
+      "opencode-go/deepseek-v4.1-flash"
+    ],
+    "output_tokens": 716400,
+    "price_assumption": {
+      "date": "2026-10-20",
+      "source": "config/pricing-overlay.yaml (vendor URLs)"
+    },
+    "runs": 3,
+    "unverified": false
+  },
+  "reason": "Nutzerentscheidung 2026-10-20 — 2f geskippt: Claude nicht authentifiziert (nur 1 Modellklasse, AC-02 verlangt >= 2). Kein Eval gestartet.",
+  "status": "SKIPPED-BY-USER"
+}

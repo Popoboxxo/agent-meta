@@ -87,13 +87,34 @@ if [[ -n "$CONTRACT_FILE" ]]; then
   { printf '\n\n'; cat "$CONTRACT_FILE"; } >> "$SYSTEM_FILE"
 fi
 
+# v5 (issue #977): capture claude's stderr and check the exit status explicitly.
+# Under plain `set -e` a failed invocation (e.g. "Not logged in") aborted the
+# wrapper with exit 1 and no diagnosis; promptfoo then reported an opaque
+# provider error. Failures now exit 2 with claude's own stderr re-emitted.
+STDERR_FILE="$RUN_DIR/claude.stderr"
+set +e
 OUTPUT_TEXT="$(
   cd "$RUN_DIR"
   claude -p \
     --system-prompt-file "$SYSTEM_FILE" \
     --model "${CLAUDE_ROUTING_EVAL_MODEL:-haiku}" \
-    "$PROMPT"
+    "$PROMPT" 2>"$STDERR_FILE"
 )"
+STATUS=$?
+set -e
+
+if [[ $STATUS -ne 0 ]]; then
+  echo "provider-claude: claude invocation failed (exit $STATUS) — check 'claude auth status' / ANTHROPIC_API_KEY" >&2
+  if [[ -s "$STDERR_FILE" ]]; then
+    sed 's/^/provider-claude: /' "$STDERR_FILE" >&2
+  fi
+  exit 2
+fi
+
+# Success: keep claude's stderr (warnings) visible instead of dropping it.
+if [[ -s "$STDERR_FILE" ]]; then
+  cat "$STDERR_FILE" >&2
+fi
 
 printf '%s\n' "$OUTPUT_TEXT"
 

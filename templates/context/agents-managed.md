@@ -5,7 +5,8 @@ version: 2.0.0
 ---
 <!-- agent-meta:managed-begin -->
 {{> header }}
-{{#if HAS_NATIVE_RULES}}
+{{#if CONTEXT_PROFILE_COMPACT}}{{> gate-card }}
+{{else}}{{#if HAS_NATIVE_RULES}}
 {{> rules-pointer }}
 {{else}}
 {{#if HAS_EMBEDDED_RULES}}
@@ -14,8 +15,9 @@ version: 2.0.0
 {{#if HAS_LAZY_RULES}}
 {{> rules-lazy }}
 {{/if}}
-{{/if}}
+{{/if}}{{/if}}
 {{> agents-location }}
-{{> agents-table }}
+{{#if CONTEXT_PROFILE_COMPACT}}{{#if EMIT_AGENT_ROSTER}}{{> agents-list-compact }}
+{{/if}}{{else}}{{> agents-table }}{{/if}}
 {{> knowledge-engine-hints }}
 <!-- agent-meta:managed-end -->

@@ -119,6 +119,23 @@ mindmap
       External Skills
 ```
 
+## Context Profiles (`context-profile`) — opt-in, unverified
+
+`context-profile: full|compact` (default `full`) is a top-level `project.yaml` key that switches the
+context-density profile; a per-provider scope is available via
+`provider-overrides.<Provider>.context-profile`. `compact` ships **opt-in and unverified**: the
+role-routing eval that would evidence AC-25 has not run because its `full` baseline (AC-02) was
+skipped by the user (0f.3, `SKIPPED-BY-USER`), and the planned proof lives in package 2f (a separate
+user approval with a cost estimate comes first). Until then a sync with `context-profile: compact`
+writes the INFO `context-profile.unverified` per compact provider to `sync.log`, and this README
+makes no verification claim beyond "opt-in, unverified". No default changes: a missing key or `full`
+keeps every render byte-identical (AC-35).
+
+The `compact` size targets of AC-26 are **ESTIMATES** (spec section 11), not measurements. The
+measured values are reported by `sync.py --context-report --profile compact|both` and pinned as
+regression ceilings in the test suite. See [`docs/api/cli-reference.md`](docs/api/cli-reference.md)
+for the flags and the resolution precedence.
+
 ## Agent Roster — 74 Generic Agents
 
 ### Core Development (12 agents)
@@ -139,7 +156,7 @@ mindmap
 | **documenter** | fast | 1.7.0 | Maintains CODEBASE_OVERVIEW.md, ARCHITECTURE.md, README.md, conclusions |
 | **git** | fast | 1.4.0 | All git operations: commits, branches, merges, tags, push/pull |
 
-### Workflow & Framework (10 agents)
+### Workflow & Framework (11 agents)
 
 | Agent | Tier | Version | Description |
 |-------|------|---------|-------------|
@@ -151,6 +168,7 @@ mindmap
 | **agent-meta-scout** | balanced | 1.1.3 | Scout AI ecosystem: new skills, roles, rules, patterns |
 | **meta-doctor** | fast | 1.0.0 | Installation diagnosis (`sync.py --doctor`; reports only to the tmp-sink): prioritizes known-issue findings, hands fixes to agent-meta-manager; name-only addressable |
 | **meta-feedback** | fast | 2.1.3 | Improvement proposals for agent-meta as GitHub issues |
+| **meta-optimizer** | balanced | 1.0.0 | Read-only config optimizer: evaluates `sync.py --optimize-config` proposals and presents token-compact, evidence-backed variants — proposal only, name-only addressable |
 | **prompt-engineer** | balanced | 1.3.1 | Expert for prompt engineering, AI security, agent design |
 | **concept-reviewer** | balanced | 1.0.3 | Reviews design docs for completeness, logic, risks, feasibility |
 
@@ -672,6 +690,7 @@ Dynamic model registry updated via `sync.py --update-models`:
 ## CLI & Maintenance Features
 
 - **Config Audit Routine:** Run `python scripts/sync.py --audit-config` to deeply inspect and validate your project and provider configurations for inconsistencies. Add `--apply` to auto-fix issues.
+- **Config Optimizer (advisory, opt-in):** `python scripts/sync.py --optimize-config --json` lists removal candidates for `.meta-config/project.yaml` and proves them byte-identical (L0) into the tmp-sink; `--apply-config-patch <proposal.json> --accept <ID> [--accept-runtime <ID>] --dry-run` writes only `preview.json`, and the apply requires `--preview <preview.json>` after the user confirms that preview. Exit codes: 0 on success (a preview counts as success), 1 on any rejection or a version/stale/preview mismatch with nothing written, 2 on usage errors, a disabled tmp-sink or render/write errors. The `meta-optimizer` role is read-only and only proposes; full flag and exit-code detail lives in the [CLI Reference](docs/api/cli-reference.md).
 - **Environments & Secrets:** Dynamically scaffold `.meta-config/env.ps1` and `.meta-config/env.sh` based on variables defined in `project.yaml`.
 - **Generated-File Drift Detection:** `sync.py` warns (does not block) when a generated file — agent, rule, hook, command, skill, or pipeline-detail — was manually edited since the last sync. `scripts/lib/generated_file_drift.py` compares each active provider's managed files against a content-hash baseline (`.meta-config/generated-file-hashes.json`), recaptured after every writer runs. Enabled by default; disable via `drift-detection.enabled: false` in `project.yaml`. Expected manual edits can be silenced with glob patterns in `.meta-config/drift-allowlist.yaml`.
 - **Setup-Wizard Secret Patterns:** `sync.py --setup` asks (default: yes) whether to add typical secret-pattern `.gitignore` entries (`.env*`, `*.pem`, `*.key`, `credentials*.json`, `secret*.y*ml`) — offered, never silently applied.
@@ -681,7 +700,7 @@ Dynamic model registry updated via `sync.py --update-models`:
 ```
 agents/
   0-external/                # External skill wrappers (dynamically cloned)
-  1-generic/                 # Universal provider-agnostic templates (60 + 13 SE agents)
+  1-generic/                 # Universal provider-agnostic templates (61 + 13 SE agents)
   2-platform/                # Platform-specific overrides (full-replacement or composition)
 config/
   role-defaults.yaml         # Agent defaults, routing, handoff contracts

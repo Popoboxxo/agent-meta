@@ -2,7 +2,111 @@
 
 ## [Unreleased]
 
+### Added
+- **Opt-in context profiles (`context-profile`, UNVERIFIED)**: `context-profile: full|compact` —
+  default `full` — plus a per-provider `provider-overrides.<Provider>.context-profile` resolve the
+  effective profile per provider (precedence: explicit `context_file.mode` > provider override >
+  global key > default; `compact` implies `context_file.mode: compact` only while the mode is
+  unset) and inject `CONTEXT_PROFILE`/`CONTEXT_PROFILE_COMPACT` into the renders. The switch is
+  **opt-in and unverified**: the role-routing eval that would evidence AC-25 has not run (its
+  `full` baseline, AC-02, was skipped by the user — 0f.3, `SKIPPED-BY-USER`; the proof is planned
+  in package 2f). A sync with `compact` therefore logs INFO `context-profile.unverified` per
+  compact provider; a context file shared by several active providers renders `full` and a
+  requested `compact` is downgraded with one WARN `context-profile.shared-file-downgrade` per
+  file (ADR-5). No default flips to `compact`: a missing key or `full` keeps every render
+  byte-identical (AC-35).
+- **`compact` render densification (IC-04…IC-08, package 2b, UNVERIFIED)**: with
+  `context-profile: compact` the renders carry the compact routing lines (IC-04; a keyword with
+  `;` or `|` raises a `SyncError`), compacted orchestrator sections (IC-05), a compact gate card
+  plus name-only agent list in the entry file (IC-06), the REFERENCE sections of the four generic
+  rules (`a2a-delegation-gates`, `branch-guard`, `submodule-protection`, `security-paved-roads`,
+  IC-07) moved to the skills channel as `<skills_dir>/<rule>/SKILL.md` — without that channel the
+  full text stays embedded (invariant §4.3) — and CLAUDE.md notes as HTML comments (IC-08). The
+  classification is recorded in `docs/guides/context-block-inventory.md`. The profile stays
+  **opt-in and unverified**: the deterministic parts (AC-24) are asserted hermetically, the
+  role-routing proof (AC-25) is planned in package 2f, a `compact` sync logs INFO
+  `context-profile.unverified` (AC-86), and no default flips to `compact`.
+- **`compact` anchors, budgets report and provider matrix (package 2c, UNVERIFIED)**: the anchor
+  registry `config/context-anchors.yaml` declares the `all-profiles`/`compact-only` surfaces per
+  provider × profile × artifact kind (IC-12/QG-3), and `sync.py --context-report
+  --profile full|compact|both` renders the opt-in profile into a work directory below the tmp-sink
+  (via `resolve_work_dir`, IC-34) — injecting `context-profile: compact` into the work-dir *copy*
+  of `project.yaml` only, never the project config — and reports the `full` ↔ `compact` delta. Every
+  `compact`/`both` report carries the machine-readable `targets_note`: the AC-26 size targets are
+  ESTIMATES (Spec section 11), not measurements; the measured `compact` sizes are pinned as
+  regression ceilings (`COMPACT_BUDGET_CEILINGS`) while `COMPACT_BUDGET_TARGETS` records the AC-26
+  targets as data (test pins plus the capability config keys `Codex.context_hard_cap_bytes: 32768`
+  and `Copilot.context_soft_cap_chars: 4000`). The provider matrix (QG-6) covers 9 providers ×
+  2 profiles and `sync.py --check` stays green after a `compact` sync (idempotent, QG-2 anchors and
+  pointers intact). The profile stays **opt-in and unverified** (IC-36): the role-routing proof
+  (AC-25) is planned in package 2f, a `compact` sync logs INFO `context-profile.unverified`, and no
+  default flips to `compact`. The measured sizes currently miss several AC-26 targets (documented
+  deviation, to be resolved by a later spec revision per AC-26).
+- **Config optimizer runner (`sync.py --optimize-config`, package 2d, IC-24/IC-25)**: read-only
+  removal candidates for `.meta-config/project.yaml` plus an L0 losslessness proof. A sentinel render
+  (every text value under `variables:` wrapped in `QZ<NAME>QZ…ZQ<NAME>ZQ`) measures the per-variable
+  fan-out (occurrences, files, injected bytes, per provider; conditional variables are never wrapped
+  and get `occurrences: null`/`conditional: true`), and the proof renders the config verbatim and
+  again without the deterministic candidates and compares both trees — the L0 comparison set includes
+  the render-derived sidecars `.meta-config/auto-commit-allowlist.json`,
+  `.meta-config/generated-file-hashes.json` and `.meta-config/context-hashes.json` (a sidecar missing
+  from the render fails the proof; their hashes are recorded before/after). Conditional variables
+  (`{{#if X}}`/`{{#unless X}}` usage or the render's conditional list) are never sentinel-wrapped and
+  appear in `fan_out` with `occurrences: null`/`files: null`/`conditional: true` and zeroed
+  `per_provider`. Output (`proposal.json`, `proposal.diff`, `proof.json`, mode `0600`) goes exclusively
+  below `<tmp-sink>/meta-optimizer/<ts>/` via `resolve_work_dir`; the sentinel render and both proof
+  renders live in `<run_id>[-before|-after]/work/` and are removed before the command returns, so no
+  unredacted config copy and no credential byte sequence survives under the sink. There is no
+  system-temp use and nothing is written outside the sink. Credential paths (IC-35 `credentials`) are
+  excluded completely (no candidate, no hint, no `FanOutEntry`, redacted diff context; AC-89) and a
+  missing/invalid registry is a hard error (`meta-optimizer.credential-registry-invalid`);
+  `--include-semantic` adds hint-only kinds (`duplicate-value`, `relocate-*`, `semantic-merge`, never
+  applicable, filtered out without the flag); exit 0 (also with candidates), 1 on
+  `meta-optimizer.proof-failed`, 2 on `tmp-sink.disabled`, `meta-optimizer.render-failed`,
+  `meta-optimizer.out-write-failed`, `optimize-config.out-outside-tmp-sink` or `--fill-defaults`
+  (`meta-optimizer.lossy-flag`). The applier (`--apply-config-patch`) follows in package 2d.3.
+- **Remove-only config patch applier (`sync.py --apply-config-patch`, package 2d.3, IC-24/AC-80)**:
+  the only write-capable optimizer mode. It reads **only** `project_yaml_sha256`, the candidate IDs,
+  `agent_meta_version` and `generator_options` from the `proposal.json` and recomputes the candidates
+  itself; the file hunks are reconciled against the recomputed (redacted) ones (a hunk that inserts a
+  line is `meta-optimizer.not-remove-only`, a differing hunk is `rejected: hunk-mismatch`). `--accept`
+  is mandatory (no implicit application), `--accept-runtime` confirms `confirm-runtime` candidates
+  (`rejected: needs-runtime-confirmation` otherwise), hint IDs are `rejected: not-applicable` and
+  unreproducible IDs are `rejected: not-reproducible`. `--dry-run` writes only
+  `<tmp-sink>/meta-optimizer/<ts>/preview.json` (mode `0600`) and never touches the config; an
+  application requires `--preview FILE` and is bound to it (ID sets, hash, version and recomputed
+  hunks, else `meta-optimizer.preview-mismatch`, AC-90). All-or-nothing: rejections, a failed L0 proof
+  (`meta-optimizer.proof-failed`), `meta-optimizer.version-mismatch`, `meta-optimizer.stale-proposal`
+  (also re-checked immediately before `os.replace`, TOCTOU) or `meta-optimizer.cross-device` (sink on a
+  different filesystem) leave the config untouched. On success the config is replaced atomically from a
+  scratch file inside the run dir and the sink keeps `applied.json` (`approval_source: "relayed"`,
+  `accept_ids`, `accept_runtime_ids`, `rejected`, both hashes, `preview_sha256`, `generator_options`,
+  `timestamp`, `backup_redacted_keys` — key *names* only) and a `project.yaml.bak` whose credential
+  values are replaced by the deterministic redaction marker (both `0600`, AC-89). Comments and key
+  order survive (remove-only, `analyze_roundtrip`, AC-56); exit 0 all applied, 1 any rejection/global
+  mismatch (nothing written), 2 usage/`tmp-sink.disabled`/render/write errors/`--fill-defaults` in the
+  same invocation (`meta-optimizer.lossy-flag`). No system temp use
+  (AC-94) and no render scratch survives (the applier's recomputation owns and removes its scratch,
+  review N2).
+- **`meta-optimizer` role registered (IC-28/AC-23/AC-59)**: the read-only config-optimizer role
+  introduced in package 2e.1 is now registered across the framework: `meta-optimizer` is in the
+  auto-generated `roles` enum of `config/project-config.schema.json`, in the pinned
+  addressability distribution (94 roles: 88 keyword, 5 name-only, 1 excluded) with its
+  `name_only` reason, in the AC-01 baseline hashes (9 per-provider artifacts plus the
+  orchestrator/`AGENTS.md`/copilot-instructions/managed-list/hash rows), in the standalone export
+  (`standalone/agents/meta-optimizer.md`) and in scenario `78-meta-optimizer-role`. The AC-01
+  exception regex now also covers the Copilot two-suffix form `meta-optimizer.agent.md`. No
+  default render behavior changes for existing roles.
+
 ### Changed
+- **Optimizer chain documented and scenario 78 completed (package 2e.6, AC-59/AC-79/AC-91)**: scenario
+  `78-meta-optimizer-role` asserts every provider render of `meta-optimizer` (exact read-only tool set
+  `Read`/`Glob`/`Grep`/`TodoWrite`, no `Bash`/`Write`/`Edit`/`Agent`, Opencode `edit: deny`, no `model:` in the
+  source template, resolved placeholders, no keyword rule in `routing.rules`), the literal `ARTIFACTS: none`
+  contract, warnings taken verbatim, the literal hint label and the absence of any execution channel.
+  `docs/api/cli-reference.md` documents both `--optimize-config` and `--apply-config-patch` (incl.
+  `--accept`/`--accept-runtime`/`--preview`/`--dry-run`) with their exit codes, and the new-role practice notes
+  plus the setup guide/README describe the Analyse → Vorschau → Anwendung chain.
 - **Routing keywords come from a single source (IC-30)**: the orchestrator/rule routing keywords
   are read from one registry instead of being duplicated across templates and `role-defaults.yaml`,
   so a keyword rendered for dispatch can no longer drift out of sync with the source of truth.

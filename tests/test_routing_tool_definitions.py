@@ -368,6 +368,36 @@ def test_build_for_providers_unknown_provider_fails_soft():
 
 
 # ---------------------------------------------------------------------------
+# compact profile branch (IC-04, Task 2b.1)
+# ---------------------------------------------------------------------------
+
+def test_compact_profile_swaps_the_tool_envelope_for_routing_lines():
+    """``context-profile: compact`` + ``ROUTE_INTENT_CALLABLE=false`` renders the
+    IC-04 line block instead of the json/yaml tool envelope. No ``tool{}``."""
+    config = {"roles": ["developer", "tester"], "context-profile": "compact"}
+    rendered = build_routing_tool_definitions_for_providers(
+        _AGENT_META_ROOT, config, dict(_BASE_VARIABLES), providers=["Claude", "Continue"]
+    )
+    for provider in ("Claude", "Continue"):
+        body = rendered[provider]
+        assert not body.lstrip().startswith("{")
+        assert '"tool"' not in body
+        assert all("|" in line for line in body.splitlines())
+
+
+def test_full_prerender_stays_the_tool_definition():
+    """Without the opt-in the per-provider render is byte-identical to the
+    serialized tool definition (AC-01/AC-35)."""
+    config = {"roles": ["developer", "tester"]}
+    definition = build_routing_tool_definition(_AGENT_META_ROOT, config, dict(_BASE_VARIABLES))
+    rendered = build_routing_tool_definitions_for_providers(
+        _AGENT_META_ROOT, config, dict(_BASE_VARIABLES), providers=["Claude", "Continue"]
+    )
+    assert json.loads(rendered["Claude"]) == definition
+    assert yaml.safe_load(rendered["Continue"]) == definition
+
+
+# ---------------------------------------------------------------------------
 # Placeholder wiring (orchestrator consolidation, roadmap phase 4b)
 # ---------------------------------------------------------------------------
 

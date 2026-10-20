@@ -6275,6 +6275,12 @@ async function viewProjectGeneral() {
     auto_generate: contextFileSrc.auto_generate !== false,
   };
 
+  // context-profile: density-profile switch (SPEC-CONTEXT-PROFILES-2026-10-11, IC-01).
+  // Opt-in and UNVERIFIED until AC-25: a missing or non-'compact' value must keep
+  // the default 'full' so untouched projects render byte-identically (AC-35).
+  // Provider scope stays a project.yaml key (provider-overrides.<Provider>.context-profile).
+  let contextProfile = data["context-profile"] === "compact" ? "compact" : "full";
+
   const TIER_PRESETS = extractPresetKeys(tierPresetsResp, TIER_FALLBACK);
   // Build label map: project-local presets get a ★ prefix so they stand out
   // visually in the dropdown. Global presets render unchanged.
@@ -6475,6 +6481,20 @@ async function viewProjectGeneral() {
     "Declarative only (sync.py still regenerates managed blocks on every run regardless — see issue #540 Fix 5, not yet enforced).",
   ));
   wrap.appendChild(cfPanel);
+
+  // --- Context Profile (SPEC-CONTEXT-PROFILES-2026-10-11, IC-01; opt-in) ---
+  const cpPanel = el("div", { class: "panel", style: "margin-top: var(--space-4);" });
+  cpPanel.appendChild(el("h2", {}, ["Context Profile"]));
+  cpPanel.appendChild(el("p", { class: "muted" }, [
+    "Density profile for the generated context files. 'compact' stays opt-in and is UNVERIFIED as a role-routing change until the package-2f evaluation (AC-25) lands.",
+  ]));
+  cpPanel.appendChild(dropdownField(
+    "Context profile", ["full", "compact"], contextProfile,
+    v => { contextProfile = v; },
+    null,
+    "Opt-in, UNVERIFIED bis AC-25 (context-profile.unverified); Default/'full' unangetastet (AC-35); Provider-Scope nur via provider-overrides.<Provider>.context-profile.",
+  ));
+  wrap.appendChild(cpPanel);
   wrap.appendChild(rulesMatrix);
 
   // Submodule Protection Section
@@ -6585,6 +6605,7 @@ async function viewProjectGeneral() {
           ["tier-preset", top["tier-preset"]],
           ["se-focus", top["se-focus"]],
           ["context_file", contextFile],
+          ["context-profile", contextProfile],
         ], status);
       } catch { /* toast already shown */ }
     } }, ["Save"]),

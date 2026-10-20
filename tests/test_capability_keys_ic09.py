@@ -110,6 +110,39 @@ def test_surface_verified_state(provider):
     assert all(v in _VERIFIED for v in svs.values())
 
 
+def test_roster_in_harness_spec_values():
+    """IC-09 / C2 (spec §4.2/IC-05): ``roster_in_harness`` is the roster gate.
+
+    The authoritative data is ``config/provider-capabilities.yaml``; the render
+    reads it, so the values are pinned here against the spec (true: Claude,
+    Codex, OpenCode, Mammouth, Kimi, ZCode; false: Gemini, Continue, Copilot).
+    """
+    expected = {
+        "Claude": True,
+        "Opencode": True,
+        "Gemini": False,
+        "Continue": False,
+        "Copilot": False,
+        "Mammouth": True,
+        "Codex": True,
+        "ZCode": True,
+        "KimiCode": True,
+    }
+    assert {p: _CAPS[p]["roster_in_harness"] for p in _PROVIDERS} == expected
+
+
+def test_roster_in_harness_consumers_are_key_driven():
+    """The roster gate reads the capability key, never a provider literal.
+
+    (The AST guard ``test_no_provider_literal_usage_in_lib`` proves the absence
+    of provider-name dispatch; this pins that both render paths actually consume
+    the IC-09 key.)
+    """
+    for module in ("config.py", "context.py"):
+        source = (_ROOT / "scripts" / "lib" / module).read_text(encoding="utf-8")
+        assert "roster_in_harness" in source, module
+
+
 def test_spec_example_values():
     assert _CAPS["Codex"]["context_hard_cap_bytes"] == 32768
     assert _CAPS["ZCode"]["context_hard_cap_bytes"] == 100 * 1024

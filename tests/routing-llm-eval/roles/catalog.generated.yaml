@@ -426,6 +426,24 @@ cases:
   expected:
     target: meta-doctor
     tier_escalation: true
+- id: rn-meta-optimizer-de
+  role: meta-optimizer
+  category: name_only
+  lang: de
+  task: Rufe den Agenten meta-optimizer auf und starte direkt.
+  pair_id: rn-meta-optimizer
+  expected:
+    target: meta-optimizer
+    tier_escalation: true
+- id: rn-meta-optimizer-en
+  role: meta-optimizer
+  category: name_only
+  lang: en
+  task: Run the meta-optimizer agent directly.
+  pair_id: rn-meta-optimizer
+  expected:
+    target: meta-optimizer
+    tier_escalation: true
 - id: rk-tester-01
   role: tester
   category: keyword

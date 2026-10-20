@@ -175,3 +175,56 @@ def test_check_exception_does_not_change_exit_code(tmp_path, monkeypatch):
     assert _sync_in_process(project, monkeypatch) == 0
     text = (project / "sync.log").read_text(encoding="utf-8")
     assert "check_dangling_dispatch: check failed: kaputt" in text
+
+
+# --- AC-29 (2a.3 review fix): context-profile summary line in sync.log ------
+
+
+def test_stage_drains_profile_info_messages():
+    # The drain must run before (and independently of) the fail-soft setup, so
+    # the summary lines survive even when a check module fails to import.
+    log = SyncLog()
+    _sync_stage_context_checks(
+        _ROOT, Path("/nonexistent-project"), {}, None, log,
+        profile_info_messages=[
+            "context-profile: Claude profile=full mode=full preset=default "
+            "(sources: context_file_mode=default, profile=default, "
+            "rules_preset=default)"])
+    assert any("context-profile: Claude profile=full" in i for i in log.infos)
+
+
+def test_context_profile_line_single_and_idempotent_across_runs(tmp_path, monkeypatch):
+    # Default (full) config: exactly one summary line per active provider --
+    # no double log at full -- and a second run must not accumulate lines.
+    project = _project(tmp_path)
+    for run in range(2):
+        assert _sync_in_process(project, monkeypatch) == 0, f"run {run} failed"
+        text = (project / "sync.log").read_text(encoding="utf-8")
+        hits = [ln for ln in text.splitlines()
+                if "context-profile: Claude profile=" in ln]
+        assert len(hits) == 1, f"run {run}: {hits}"
+        assert hits[0].startswith("[INFO]")
+        assert "profile=full mode=full preset=default" in hits[0]
+        # Stable provenance core; rules_preset flips to "explicit" only once
+        # config auto-fill has persisted the key (second run), so it is not
+        # asserted here.
+        assert ("sources: context_file_mode=default, profile=default"
+                in hits[0])
+
+
+def test_context_profile_line_reports_explicit_mode_source(tmp_path, monkeypatch):
+    # IC-02/AC-29: an explicitly set context_file.mode is visible as
+    # source=explicit on the summary line in sync.log.
+    project = _project(tmp_path)
+    cfg = project / ".meta-config" / "project.yaml"
+    cfg.write_text(
+        cfg.read_text(encoding="utf-8")
+        + "context-profile: compact\ncontext_file:\n  mode: full\n",
+        encoding="utf-8")
+    assert _sync_in_process(project, monkeypatch) == 0
+    text = (project / "sync.log").read_text(encoding="utf-8")
+    hits = [ln for ln in text.splitlines()
+            if "context-profile: Claude profile=" in ln]
+    assert len(hits) == 1, hits
+    assert "profile=compact mode=full" in hits[0]
+    assert "context_file_mode=explicit" in hits[0]

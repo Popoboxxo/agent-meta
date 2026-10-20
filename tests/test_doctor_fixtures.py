@@ -298,6 +298,22 @@ def test_ac77_variable_unreferenced_reports_key_and_length_but_never_the_value()
     assert finding.severity is Severity.WARNING
 
 
+def test_ac35_variable_consumed_by_a_registered_runtime_reader_is_not_a_finding():
+    """IC-35: a registered runtime reader counts as usage (AC-81 registry part)."""
+    case = FIXTURE_ROOT / "variable-unreferenced" / "negative" / "runtime-reader-consumed"
+    config = yaml.safe_load((case / PROJECT_CONFIG).read_text(encoding="utf-8"))
+    assert config["variables"] == {"TEST_TIMEOUT": "60"}
+    assert _of(_run_case(case, "variable-unreferenced", "negative"), "variable-unreferenced") == []
+
+
+def test_ac35_runtime_reader_registry_is_what_suppresses_the_finding(monkeypatch):
+    """Red-proof for the wiring: without the registry the same variable is reported."""
+    case = FIXTURE_ROOT / "variable-unreferenced" / "negative" / "runtime-reader-consumed"
+    monkeypatch.setattr(doctor_detectors, "_runtime_reader_keys", lambda env: set())
+    (finding,) = _of(_run_case(case, "variable-unreferenced", "negative"), "variable-unreferenced")
+    assert "variables.TEST_TIMEOUT" in finding.message
+
+
 def test_ac77_code_quality_rules_yields_exactly_one_finding_from_its_own_seed():
     case = FIXTURE_ROOT / "dead-variable-code-quality-rules" / "positive"
     report = _run_case(case, "dead-variable-code-quality-rules", "positive")

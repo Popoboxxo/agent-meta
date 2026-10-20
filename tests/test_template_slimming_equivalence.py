@@ -72,6 +72,55 @@ Golden rebaseline log (the frozen set is edited only with a documented reason):
     20 normalization-covered roles (A2A-line / ``</output-guard>`` position /
     Anti-Recursion block) were reported as spurious byte diffs; those goldens
     are unchanged. AC-01 hashes untouched.
+* Task 28 (2e.2, IC-28/AC-59): new role ``meta-optimizer`` registered. **No
+  golden rebaseline required**: the role is not in this repository's
+  ``.meta-config/project.yaml`` ``roles:`` whitelist, so the real-sync render
+  (``AGENT_META_TEST_REPO=… sync.py --validate``) contains no ``meta-optimizer``
+  roster/name_index/routing row and ``orchestrator.md``/``agent-meta-manager.md``
+  stay byte-identical (0 golden files changed). ``_GOLDEN_ROLE_COUNT`` stays 58.
+* Task 30 (2e.4, IC-27/AC-59/AC-90/AC-91): the ``agent-meta-manager`` template
+  gains the new section ``## 10c. Optimizer-Vorschläge anwenden (Advisory Mode)``
+  (the three steps Analyse/Vorschau/Anwendung of IC-27 Rev. 3.1) and a minor
+  version bump ``1.24.1 -> 1.25.0`` (new optional section). One golden file
+  changed: ``agent-meta-manager.md``. The diff is limited to the frontmatter pin
+  (``version:`` and ``generated-from: …@1.25.0``) plus the new section (36
+  rendered lines); the frozen meta tokens (``1.2.0-beta.2`` / ``2026-09-13``)
+  and the ``model:`` pin stay at their frozen values, and the declared
+  normalization region of the role (the ``{{OUTPUT_GUARD_BLOCK}}`` replacement)
+  is untouched, so the B2b attribution still runs for it. ``_GOLDEN_ROLE_COUNT``
+  stays 58. AC-01 hashes rebaselined separately (see the rebaseline log in
+  ``tests/test_ac01_render_identity.py``).
+* Task 30 fix round (2e.4, review findings): the ``agent-meta-manager`` golden
+  is rebaselined again for three *text* corrections inside §10c -- the
+  "no manual edit" rule is scoped to the optimizer proposal path (a blanket
+  "``project.yaml`` is never changed via ``Edit``" contradicted §8b/§13 and the
+  admin-UI shortcut), the release/approval wording is corrected ("is not an
+  approval"), and step 2 now states what ``preview.json`` carries. The section
+  stays 36 rendered lines and the version pin stays ``1.25.0`` (the section was
+  not yet released, so no further bump); the diff against the previous golden
+  is exactly those three text lines. The frozen meta tokens and the ``model:``
+  pin are untouched, so the B2b attribution is unaffected.
+* Task 30 polish round (2e.4, review findings): one further *text* correction
+  inside §10c -- the "no manual edit" rule now names §13 as well
+  ("§3/§5/§8" -> "§3/§5/§8/§13 (confirmation, schema check, re-sync, SE
+  cascade)"), because §13 (SE cascade) is a documented ``project.yaml`` change
+  path next to §3/§5/§8. The golden is rebaselined again; the diff against the
+  previous golden is exactly that one line. The section stays 36 rendered lines
+  and the version pin stays ``1.25.0`` (the section was not yet released); the
+  frozen meta tokens and the ``model:`` pin are untouched, so the B2b
+  attribution is unaffected. ``_GOLDEN_ROLE_COUNT`` stays 58. AC-01 hashes
+  rebaselined separately (see the rebaseline log in
+  ``tests/test_ac01_render_identity.py``).
+* Task 32 (CI fix, AC-49): orchestrator §3a (``Optimizer proposals``) is now
+  gated on both ``ROLE_AGENT_META_MANAGER_ACTIVE`` and
+  ``ROLE_META_OPTIMIZER_ACTIVE``. This repository's ``roles:`` whitelist does
+  not include ``meta-optimizer``, so the section disappears from the default
+  render (no dangling mention of an inactive role); template ``8.8.0 -> 8.8.1``.
+  Rebaselined: ``orchestrator.md`` (frontmatter pins + the removed §3a block,
+  leaving one blank-line gap). The frozen meta tokens and the ``model:`` pin
+  stay at their frozen values; no other golden changed. AC-01 hashes
+  rebaselined separately (see the rebaseline log in
+  ``tests/test_ac01_render_identity.py``).
 
 The gate is network-free, writes nothing into the repository (the render target
 is a pytest ``tmp_path``) and renders the corpus once per module (~5s).

@@ -149,6 +149,12 @@ _CONDITIONAL_FALSE_FLAGS: dict[str, str] = {
     "A2A_PROTOCOL_ENABLED": "false",
     "KNOWLEDGE_ENGINE_ENABLED": "false",
     "SPEC_PLAN_WORKFLOW_ENABLED": "false",
+    # The context-profile axis is opt-in: standalone always renders the `full`
+    # branch, so the compact branch never leaks into the exported persona.
+    "CONTEXT_PROFILE_COMPACT": "false",
+    # The roster gate is opt-in too: standalone has no harness roster, so the
+    # compact agent table keeps its names list (the gate stays closed).
+    "ROSTER_IN_HARNESS": "false",
     # route_intent is a harness-registered callable tool with no standalone
     # counterpart — keep the §3 routing-rules fallback (issue #264).
     "ROUTE_INTENT_CALLABLE": "false",

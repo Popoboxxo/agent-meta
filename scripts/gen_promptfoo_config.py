@@ -6,10 +6,15 @@ tests/routing-llm-eval/ remain the only hand-maintained place. This script
 derives promptfooconfig.generated.yaml from them, so CI-promptfoo and the
 local bash runner consume the same cases without drift.
 
-Finding W4: provider commands deliberately contain NO {{prompt}} placeholder.
-promptfoo appends the rendered prompt as the last argument when the command
-string lacks a placeholder, which keeps multi-line prompts out of shell
-quoting hell.
+Finding W4: provider invocations deliberately contain NO {{prompt}} placeholder.
+promptfoo appends the rendered prompt as the last argument when the provider
+id lacks a placeholder, which keeps multi-line prompts out of shell quoting
+hell.
+
+Issue #977: promptfoo identifies a shell provider by the ``exec:<script>`` id
+form and rejects a bare ``id: exec`` plus separate ``command`` array with
+"Could not identify provider: exec". The script path is resolved relative to
+this config file's directory.
 
 Usage:
     python3 gen_promptfoo_config.py            # write generated file
@@ -37,9 +42,10 @@ CATALOGS = [
     DIR / "catalog.behavior.yaml",
 ]
 
+# Paths are relative to this config file (tests/routing-llm-eval/).
 PROVIDERS = [
-    {"id": "exec", "label": "claude-orchestrator", "command": ["./provider-claude.sh"]},
-    {"id": "exec", "label": "opencode-orchestrator", "command": ["./provider-opencode.sh"]},
+    {"id": "exec:./provider-claude.sh", "label": "claude-orchestrator"},
+    {"id": "exec:./provider-opencode.sh", "label": "opencode-orchestrator"},
 ]
 
 

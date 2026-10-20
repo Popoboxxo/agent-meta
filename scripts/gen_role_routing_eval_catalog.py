@@ -60,9 +60,12 @@ PROMPTFOO_HEADER = (
     "# Source of truth: catalog.generated.yaml + catalog.manual.yaml next to this file.\n"
 )
 
+# Issue #977: promptfoo needs the ``exec:<script>`` id form (no separate
+# ``command`` array). Paths are relative to this config file (roles/), hence
+# the ``../`` prefix.
 PROVIDERS = [
-    {"id": "exec", "label": "claude-orchestrator", "command": ["../provider-claude.sh"]},
-    {"id": "exec", "label": "opencode-orchestrator", "command": ["../provider-opencode.sh"]},
+    {"id": "exec:../provider-claude.sh", "label": "claude-orchestrator"},
+    {"id": "exec:../provider-opencode.sh", "label": "opencode-orchestrator"},
 ]
 
 
