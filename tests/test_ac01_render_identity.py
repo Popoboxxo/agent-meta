@@ -211,6 +211,19 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   ``1.25.0`` (the section was not yet released), so the *set* of affected paths is
   unchanged: again exactly the 9 per-provider ``agent-meta-manager`` artifacts plus the 9
   ``generated-file-hashes.json`` (18 of 1012 hashes; 0 added/removed).
+- Task 31 (2e.5, IC-27 Rev. 3.1 step 4 / AC-90 / AC-23): the orchestrator template gains the
+  common-body section ``## 3a. Optimizer proposals — mandatory preview gate`` (show
+  ``preview.json`` to the user via ``main_chat``, obtain the explicit confirmation, only then
+  instruct ``agent-meta-manager`` with ``--preview``; verbatim relayed-ID rule; no Bash for
+  orchestrator/``meta-optimizer``) and a minor version bump ``8.7.0 -> 8.8.0``. The section
+  is outside every ``CONTEXT_PROFILE_COMPACT`` conditional, so both profiles carry it; the
+  default (``full``) render therefore differs only by that section plus the version pin.
+  Changed: the 9 per-provider orchestrator artifacts (``orchestrator.md``/``.toml``/
+  ``.agent.md``) plus the 9 ``generated-file-hashes.json`` (18 of 1012 hashes; 0
+  added/removed). No other render changed; ``AC01_EXCEPTIONS`` is NOT extended. Incidental
+  rebaseline: ``tests/fixtures/compact-golden/orchestrator.md`` (owner of the compact
+  render, unchanged by this task's scope) is updated because the compact golden also
+  carries the template version and the common-body section.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

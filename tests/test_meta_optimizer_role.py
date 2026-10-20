@@ -1,6 +1,6 @@
-"""Pins for the optimizer chain (Tasks 27 / 2e.1, 29 / 2e.3, 30 / 2e.4).
+"""Pins for the optimizer chain (Tasks 27 / 2e.1, 29 / 2e.3, 30 / 2e.4, 31 / 2e.5).
 
-Three blocks are covered by this module:
+Four blocks are covered by this module:
 
 * **Task 27 / 2e.1 (IC-26, IC-27, AC-79, AC-91)** -- the read-only proposal
   role ``meta-optimizer``: exactly ``Read, Glob, Grep, TodoWrite``, no
@@ -13,8 +13,13 @@ Three blocks are covered by this module:
   consumer declaration in ``agent-meta-manager``.
 * **Task 30 / 2e.4 (IC-27, AC-59, AC-90)** -- the §10c workflow of
   ``agent-meta-manager`` (Analyse -> Vorschau -> Anwendung): the three
-  commands, the mandatory rules, the approval semantics, the preview payload,
+  commands, the mandatory rules, the approval semantics,   the preview payload,
   the apply report and the artifact contract.
+* **Task 31 / 2e.5 (IC-27 Rev. 3.1 step 4, AC-90)** -- the orchestrator's
+  mandatory preview gate: show ``preview.json`` to the user via ``main_chat``,
+  obtain the explicit confirmation, only then instruct ``agent-meta-manager``
+  with ``--preview``; the verbatim relayed-ID rule; and no Bash for the
+  orchestrator or ``meta-optimizer``.
 
 **Pinning principle:** a contract statement is pinned by the *tokens* it must
 contain, not by one exact spelling. A semantically equivalent rephrasing
@@ -782,3 +787,110 @@ def test_manager_version_bumped_to_1_25_0():
     fm = parse_frontmatter_file(_MANAGER_TEMPLATE)
     assert str(fm["version"]) == "1.25.0"
 
+
+
+# --- Task 31 / 2e.5 (IC-27 Rev. 3.1 step 4, AC-90, AC-23): orchestrator preview duty ---
+
+#: The orchestrator has to *show* the preview before it may instruct the apply.
+#: The section is located by its heading (an "Optimizer" heading in the
+#: orchestrator body); the pins below are token-based, so a rephrasing stays
+#: green while a removed obligation turns the gate red.
+_ORCHESTRATOR_TEMPLATE = REPO_ROOT / "agents" / "1-generic" / "orchestrator.md"
+
+_ORCH_PREVIEW_SECTION_RE = re.compile(
+    r"\n## (?P<title>[^\n]*[Oo]ptimizer[^\n]*)\n(?P<body>.*?)(?=\n## |\n</workflow>|\Z)",
+    re.DOTALL,
+)
+
+
+def _orchestrator_text() -> str:
+    return _ORCHESTRATOR_TEMPLATE.read_text(encoding="utf-8")
+
+
+def _orchestrator_preview_section() -> str:
+    """Extract the orchestrator's optimizer-preview subsection.
+
+    Regex-based like :func:`_optimizer_section`, so the assertions do not
+    depend on formatting of the rest of the template.
+    """
+    match = _ORCH_PREVIEW_SECTION_RE.search(_orchestrator_text())
+    assert match, (
+        "orchestrator template has no 'Optimizer ... preview' subsection "
+        "(IC-27 Rev. 3.1 step 4)"
+    )
+    return match.group("body")
+
+
+def test_orchestrator_requires_the_preview_before_any_apply():
+    """IC-27 Rev. 3.1 step 4 / AC-90: show ``preview.json`` before applying.
+
+    The order is the contract: user-facing preview (``main_chat``) ->
+    explicit confirmation -> apply instruction carrying ``--preview``. The
+    three markers must appear in that order, and the apply is bound to
+    ``agent-meta-manager`` as the only applier.
+    """
+    sec = _orchestrator_preview_section()
+    for token in ("preview.json", "main_chat", "agent-meta-manager", "--preview"):
+        assert token in sec, token
+    show = sec.find("main_chat")
+    confirm = sec.lower().find("confirmation")
+    apply_at = sec.find("--preview")
+    assert -1 < show < confirm < apply_at, (
+        "the preview must be shown (main_chat) before the confirmation and "
+        f"before the apply (--preview): show={show} confirm={confirm} apply={apply_at}"
+    )
+    assert re.search(r"\b(?:before|prior\s+to|bevor)\b", sec, re.IGNORECASE), (
+        "the section does not state that the preview comes before the application"
+    )
+
+
+def test_orchestrator_relays_only_verbatim_ids():
+    """IC-27 Rev. 3.1 step 3 / AC-90: only IDs literally present get relayed.
+
+    ``wörtlich`` is a deliberately literal pin next to the English ``verbatim``
+    (the same convention as :func:`test_manager_optimizer_section_requires_ids_
+    from_the_relayed_user_reply`): it marks the verbatim transfer of the user's
+    reply.
+    """
+    sec = _orchestrator_preview_section()
+    assert re.search(r"\b(?:verbatim|wörtlich)\b", sec, re.IGNORECASE), sec
+    assert re.search(
+        r"\b(?:relay|relayed|relaying|weitergeleit\w*)\b", sec, re.IGNORECASE
+    ), sec
+    sentences = [
+        sentence
+        for sentence in _sentences(sec)
+        if re.search(r"\bIDs?\b", sentence)
+        and all(
+            re.search(rf"\b{verb}\w*\b", sentence, re.IGNORECASE)
+            for verb in ("add", "guess", "complete")
+        )
+    ]
+    assert sentences, (
+        "the verbatim rule must forbid adding, guessing or completing an ID "
+        "that is not literally present: " + sec
+    )
+    assert any(_NEGATION_RE.search(sentence) for sentence in sentences), sec
+
+
+def test_orchestrator_and_optimizer_stay_bash_free():
+    """AC-90: the preview gate adds no Bash to orchestrator or ``meta-optimizer``.
+
+    Pinned on both the tool list (frontmatter) and the absence of a ``bash``
+    code block in either template -- a prose rule that carries an executable
+    command block would contradict the capability statement.
+    """
+    fm = parse_frontmatter_file(_ORCHESTRATOR_TEMPLATE)
+    tools = [str(tool) for tool in (fm.get("tools") or [])]
+    assert "Bash" not in tools, tools
+    assert "bash" not in [tool.lower() for tool in tools], tools
+    for template in (_ORCHESTRATOR_TEMPLATE, TEMPLATE):
+        text = template.read_text(encoding="utf-8")
+        assert not re.search(r"```bash", text), f"{template.name} carries a bash block"
+
+
+def test_orchestrator_version_bumped_for_the_preview_obligation():
+    """AC-23: the new mandatory subsection is a minor template bump."""
+    fm = parse_frontmatter_file(_ORCHESTRATOR_TEMPLATE)
+    version = tuple(int(part) for part in str(fm["version"]).split("."))
+    assert version >= (8, 8, 0), fm["version"]

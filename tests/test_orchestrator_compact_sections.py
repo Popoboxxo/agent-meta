@@ -23,6 +23,9 @@ documented reason):
   render legitimately drops ``**Agent table (names only):** <names>`` — the
   compact golden is rebaselined to that gated render. The ``{{else}}`` (full)
   branch is unchanged, so the slimming golden only moves with the version bump.
+* Task 31 (2e.5, IC-27/AC-90): orchestrator gains the common-body §3a preview
+  gate (template 8.7.0 -> 8.8.0); both goldens carry the new section and the
+  version, the compact golden only additionally the version bump.
 """
 from __future__ import annotations
 
