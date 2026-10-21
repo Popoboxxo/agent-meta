@@ -27,7 +27,7 @@ Cheap:
         fast: opencode-go/deepseek-v4.1-flash
         balanced: opencode-go/deepseek-v4.1-flash
         powerful: opencode-go/deepseek-v4.1-flash
-        max: opencode-go/qwen3.7-plus
+        max: opencode-go/deepseek-v4-pro
 Normal:
   description: Das 1:1 Mapping (Status Quo).
   tiers:
@@ -55,11 +55,11 @@ Normal:
         ultra: gemini-3.1-pro-high
     Opencode:
       tiers:
-        nano: opencode-go/mimo-v2.6-flash
+        nano: opencode-go/deepseek-v4.1-flash
         fast: opencode-go/deepseek-v4.1-flash
         balanced: opencode-go/deepseek-v4.1-flash
         powerful: opencode-go/deepseek-v4.1-flash
-        max: opencode-go/kimi-k2.7-code
+        max: opencode-go/deepseek-v4-pro
         ultra: opencode-go/kimi-k3
     Codex:
       tiers:
@@ -108,10 +108,10 @@ Advanced:
     Opencode:
       tiers:
         nano: opencode-go/deepseek-v4.1-flash
-        fast: opencode-go/qwen3.7-plus
-        balanced: opencode-go/kimi-k2.6
-        powerful: opencode-go/kimi-k2.7-code
-        max: opencode-go/kimi-k2.7-code
+        fast: opencode-go/deepseek-v4.1-flash
+        balanced: opencode-go/deepseek-v4.1-flash
+        powerful: opencode-go/deepseek-v4.1-flash
+        max: opencode-go/deepseek-v4-pro
 Expensive:
   description: Sehr starker Shift.
   tiers:
@@ -137,11 +137,11 @@ Expensive:
         max: gemini-3.1-pro-high
     Opencode:
       tiers:
-        nano: opencode-go/qwen3.7-plus
-        fast: opencode-go/kimi-k2.6
-        balanced: opencode-go/kimi-k2.7-code
-        powerful: opencode-go/kimi-k2.7-code
-        max: opencode-go/kimi-k2.7-code
+        nano: opencode-go/deepseek-v4.1-flash
+        fast: opencode-go/deepseek-v4.1-flash
+        balanced: opencode-go/deepseek-v4.1-flash
+        powerful: opencode-go/deepseek-v4.1-flash
+        max: opencode-go/deepseek-v4-pro
 Expensive as Hell:
   description: Fast alle Agenten laufen auf powerful oder max.
   tiers:
@@ -167,8 +167,8 @@ Expensive as Hell:
         max: gemini-3.1-pro-high
     Opencode:
       tiers:
-        nano: opencode-go/kimi-k2.6
-        fast: opencode-go/kimi-k2.7-code
-        balanced: opencode-go/kimi-k2.7-code
-        powerful: opencode-go/kimi-k2.7-code
-        max: opencode-go/kimi-k2.7-code
+        nano: opencode-go/deepseek-v4.1-flash
+        fast: opencode-go/deepseek-v4.1-flash
+        balanced: opencode-go/deepseek-v4.1-flash
+        powerful: opencode-go/deepseek-v4.1-flash
+        max: opencode-go/deepseek-v4-pro

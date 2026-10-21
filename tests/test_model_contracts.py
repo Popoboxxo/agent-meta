@@ -138,7 +138,9 @@ def test_registry_less_provider_still_uses_preset_fallback() -> None:
     assert resolved == _global_normal_preset()["tiers"]["powerful"]
 
 
-def test_preset_provider_specific_tiers_are_explicit_override() -> None:
+def test_preset_provider_specific_tiers_are_explicit_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Orchestrator decision (Task 7): a preset's provider-specific
     ``providers.<P>.tiers`` entry is an explicit per-provider override and is
     NOT shadowed by the registry's ``model-tiers`` table.
@@ -151,6 +153,11 @@ def test_preset_provider_specific_tiers_are_explicit_override() -> None:
     """
     preset = _global_normal_preset()
     preset_tier = preset["providers"]["Opencode"]["tiers"]["powerful"]
+    # Shipped values may coincide (both deepseek-v4.1-flash); force a distinct
+    # registry tier so the override precedence stays observable.
+    monkeypatch.setitem(
+        _PROVIDER_CONFIG["Opencode"]["model-tiers"], "powerful", "opencode-go/sentinel-registry"
+    )
     registry_tier = _PROVIDER_CONFIG["Opencode"]["model-tiers"]["powerful"]
     assert preset_tier != registry_tier, (
         "fixture sanity: the preset provider-specific tier and the registry tier "
