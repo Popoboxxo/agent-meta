@@ -236,6 +236,18 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   rendered entry files, agent headers and the dependent sidecars changed (91 of 1012 hashes;
   project.yaml, ``generated-file-hashes.json`` and ``context-hashes.json`` follow the version
   they embed). No substantive render change; ``AC01_EXCEPTIONS`` is NOT extended.
+- PR #1003 (user decision: model data never flows into AC-01): the hash is now model
+  independent. ``_hash_file`` replaces every column-0 ``model:``/``model =`` frontmatter
+  line with ``model: <MODEL>`` and reduces ``generated-file-hashes.json`` to its managed-path
+  set (its values only hash files compared on their own). Pure ``model-tiers``/
+  ``tier-presets`` changes therefore no longer need a rebaseline
+  (``test_ac01_hash_ignores_model_id`` pins this). Same fix round: the reproducible
+  ``AGENT_META_DATE`` (CHANGELOG release date, #752) is normalized to ``<DATE>`` as well; the
+  previous manifest was written on release day, where it matched ``date.today()`` by chance,
+  so the harness drifted on every later day. One-time rebaseline: the agent artifacts of the
+  8 providers that emit a ``model`` line (Copilot emits none; only its ``prompt-governor``
+  changed, whose body has a static ``model: <model ID if declared>`` example line) plus every
+  ``generated-file-hashes.json`` (522 of 1012 hashes; 0 added/removed); no other hash changed.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
@@ -255,6 +267,8 @@ import yaml
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _SYNC = _REPO_ROOT / "scripts" / "sync.py"
+sys.path.insert(0, str(_REPO_ROOT / "scripts"))
+from lib.config import _resolve_agent_meta_date  # noqa: E402
 _MANIFEST = Path(__file__).resolve().parent / "fixtures" / "ac01-baseline" / "hashes.json"
 _PROVIDERS = sorted(
     yaml.safe_load((_REPO_ROOT / "config" / "ai-providers.yaml").read_text(encoding="utf-8"))["providers"]
@@ -299,8 +313,22 @@ def _make_project(root: Path, provider: str) -> Path:
     return project
 
 
+# Model independence: the resolved model ID is config data (model-tiers,
+# tier-presets), not render logic, so it never enters the hash. Covers the YAML
+# (`model: x`) and TOML (`model = "x"`) frontmatter forms of every provider.
+_MODEL_LINE_RE = re.compile(rb"^model[ \t]*[:=].*$", re.M)
+# generated-file-hashes.json only holds hashes of files that are compared on
+# their own; keep its managed-path set, drop the derived (model-dependent) values.
+_DERIVED_HASHES_NAME = "generated-file-hashes.json"
+
+
 def _hash_file(path: Path, root: Path, dates: Sequence[str]) -> str:
     data = path.read_bytes().replace(b"\r\n", b"\n")
+    data = _MODEL_LINE_RE.sub(b"model: <MODEL>", data)
+    if path.name == _DERIVED_HASHES_NAME:
+        doc = json.loads(data)
+        doc["hashes"] = sorted(doc.get("hashes", {}))
+        data = json.dumps(doc, sort_keys=True).encode()
     # Normalize run-specific values: scratch root path (native, posix, JSON-escaped)
     # and the date stamp(s) captured once per run (before/after the sync).
     root_variants = {str(root), root.as_posix(), str(root).replace("\\", "\\\\")}
@@ -330,7 +358,9 @@ def render_matrix_hashes(fixture_root: Path) -> Dict[str, str]:
                 continue
             projects.append((rel, f))
     # Date captured once before and once after all syncs; both are normalized.
-    dates = {date_before, date.today().isoformat()}
+    # Plus the reproducible AGENT_META_DATE (CHANGELOG release date, #752): it only
+    # coincided with "today" on release day, so the manifest drifted the day after.
+    dates = {date_before, date.today().isoformat(), _resolve_agent_meta_date(_REPO_ROOT)}
     for rel, f in projects:
         hashes[rel] = _hash_file(f, fixture_root, sorted(dates))
     return hashes
@@ -377,6 +407,20 @@ def test_ac01_detects_drift(rendered):
         assert diff_against_manifest(mutated, baseline) == [f"changed: {victim}"]
     finally:
         target.write_bytes(original)
+
+
+def test_ac01_hash_ignores_model_id(tmp_path):
+    def h(name: str, text: str) -> str:
+        f = tmp_path / name
+        f.write_text(text, encoding="utf-8")
+        return _hash_file(f, tmp_path, [])
+
+    assert h("a.md", "---\nmodel: a/x-1\n---\nbody\n") == h("a.md", "---\nmodel: b/y-2\n---\nbody\n")
+    assert h("a.toml", 'model = "x-1"\n') == h("a.toml", 'model = "y-2"\n')
+    assert h("a.md", "---\nmodel: x\n---\nbody\n") != h("a.md", "---\nmodel: x\n---\nother\n")
+    gfh = _DERIVED_HASHES_NAME
+    assert h(gfh, '{"version": 1, "hashes": {"a.md": "11"}}') == h(gfh, '{"version": 1, "hashes": {"a.md": "22"}}')
+    assert h(gfh, '{"version": 1, "hashes": {"a.md": "11"}}') != h(gfh, '{"version": 1, "hashes": {"b.md": "11"}}')
 
 
 def test_ac01_exception_list_allows_meta_doctor_artifacts():
