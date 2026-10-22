@@ -1,8 +1,8 @@
 # Opencode-Einstiegspunkt (#1006) — Implementation Plan
 
-> Status: Entwurf
+> Status: APPROVED (2026-10-22)
 >
-> **Freigabevermerk:** offen. Der Plan ist erst ausführbar, wenn die Spec den Approval-Marker (`Status: APPROVED`) trägt; der Marker wird nur vom Nutzer bzw. `concept-reviewer` gesetzt, nie vom Planer.
+> **Freigabevermerk:** Nutzerfreigabe 2026-10-22 (Auftrag: beide Pläne vollständig abarbeiten). Die zugehörige Spec trägt `Status: APPROVED (2026-10-22)`. Der Plan ist ausführbar; der Approval-Marker wird nur vom Nutzer bzw. `concept-reviewer` gesetzt, nie vom Planer.
 
 **Goal:** Der Opencode-Einstiegspunkt funktioniert auf Surface v1 und v2: die explizit deklarierte `primary-role` wird als `mode: primary` generiert, `default_agent` wird per Managed-Merge (eigener State-Key, Rollback) in eine bestehende `opencode.json` geschrieben, der Edit-/Bash-Deny des Permission-Tier-Gates wird an diesen Einstiegspunkt gekoppelt, und der primäre Orchestrator hebelt das Gate nicht per `edit: allow` aus. Mammouth und jeder Provider ohne explizites `primary-role` bleiben byte-identisch.
 **Architecture:** Neuer Helper `providers.explicit_primary_role` (kein Code-Default) als einzige Quelle für die Mode-Ableitung (`provider_transform`) und den Einstiegspunkt im Merge (`isolation._opencode_entry_point`); `_sync_opencode_runtime_gate` bekommt `active_set`, einen zweiten State-Namespace `default-agent` und die Gate-Kopplung; die Edit-Sperre des Primär-Orchestrators wird im Transform (`deny_edit`/`edit_allow_paths`) aus `config/provider-tools.yaml` gespeist. Create-Pfad (`context.py`) und v1-Settings-Template bleiben unverändert.

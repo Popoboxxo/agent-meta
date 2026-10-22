@@ -1,7 +1,7 @@
 ---
 spec-id: SPEC-OPENCODE-V2-SUPPORT-2026-10-22
 title: Opencode v2-Support Phasen B-D (Config-Keys, Permissions/MCP/Gate-Plugin, Agent-Frontmatter nativ)
-status: Entwurf
+status: APPROVED
 revision: 1.4
 review: docs/reviews/2026-10-22-opencode-v2-support-spec-review.md
 rereview: docs/reviews/2026-10-22-opencode-v2-support-spec-rereview.md
@@ -12,7 +12,7 @@ issues: "#1007 (v2-Support); relevant geschlossen: #747, #765, #794, #387, #383,
 
 # Opencode v2-Support (Phasen B-D) — Spec
 
-> Status: Entwurf
+> Status: APPROVED (2026-10-22) — Nutzerfreigabe 2026-10-22 (Auftrag: beide Pläne vollständig abarbeiten).
 > Trace-Anker: `spec-id: SPEC-OPENCODE-V2-SUPPORT-2026-10-22`
 >
 > Revision 1.4 (2026-10-22): Doku-Korrekturen aus Verifikation (AC-C6-Testname an Spec-A-Umbenennung angepasst, `deny_edit`-Ausdruck an Spec A IC-3 angeglichen, Skip-Wortlaut). Keine inhaltliche Scope-Änderung.
