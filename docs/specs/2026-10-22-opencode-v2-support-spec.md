@@ -2,7 +2,7 @@
 spec-id: SPEC-OPENCODE-V2-SUPPORT-2026-10-22
 title: Opencode v2-Support Phasen B-D (Config-Keys, Permissions/MCP/Gate-Plugin, Agent-Frontmatter nativ)
 status: Entwurf
-revision: 1.3
+revision: 1.4
 review: docs/reviews/2026-10-22-opencode-v2-support-spec-review.md
 rereview: docs/reviews/2026-10-22-opencode-v2-support-spec-rereview.md
 requires-spec: SPEC-OPENCODE-ENTRYPOINT-1006-2026-10-22
@@ -14,6 +14,8 @@ issues: "#1007 (v2-Support); relevant geschlossen: #747, #765, #794, #387, #383,
 
 > Status: Entwurf
 > Trace-Anker: `spec-id: SPEC-OPENCODE-V2-SUPPORT-2026-10-22`
+>
+> Revision 1.4 (2026-10-22): Doku-Korrekturen aus Verifikation (AC-C6-Testname an Spec-A-Umbenennung angepasst, `deny_edit`-Ausdruck an Spec A IC-3 angeglichen, Skip-Wortlaut). Keine inhaltliche Scope-Änderung.
 >
 > Revision 1.3 (2026-10-22): arbeitet Nutzerantworten ein. (1) A-6/OQ-B1 entschieden: der bestehende Schlüssel `provider-options.Opencode.surface-version` wird weiterverwendet, kein neuer Schalter, kein Alias (bewusste Abweichung von Entscheidung 6, vom Nutzer bestätigt) — 3.1, Register Nr. 6, OQ-B1. (2) OQ-B12 bleibt offen, Entscheidungszeitpunkt: nach C0-Verdict (Spike C0). (3) Fake-Fixture-Werte für Secrets durch `EXAMPLE_NOT_A_KEY` ersetzt (AC-B10, AC-T7). (4) 3.4: Signaturen von `_opencode_v2_gate_permissions` / `_sync_opencode_v2_gate_permissions` an den Plan angeglichen. (5) Spike-Pfad auf `docs/spikes/2026-10-22-issue-1007-opencode-v2-plugin-api-spike.md` korrigiert. (6) Referenzen auf den realen Code des Schalters präzisiert (3.1).
 >
@@ -38,7 +40,7 @@ Opencode v2 ist als opt-in-Surface vorhanden (`surface-version: v2`, OQ-8, `conf
 3. Der Runtime-Gate (`scripts/lib/isolation.py::_sync_opencode_runtime_gate` :413, `_opencode_runtime_gate_entries` :368) schreibt nur die v1-Mapform `permission.edit/bash["**"]="deny"`. Auf v2 ist das wirkungslos (v2 kennt `permission`/`bash` nicht).
 4. `scripts/lib/mcp_provider_config.py::_build_connection_entry` (:92) setzt für beide Opencode-Formate `entry["enabled"] = True` (:139-140). v2 kennt `disabled`, `timeout{catalog,execution}` und snake_case-OAuth (Vorgabe/DOKU, UNVERIFIED im Repo: kein Treffer für `oauth`/`timeout`/`disabled` in `mcp_provider_config.py`).
 5. Weitere v2-Config-Keys werden nicht unterstützt: `experimental.subagent_depth`, `experimental.todo`, `providers`, `small_model` (v2: `agents.title.model`), `$schema`-Politik, `provider/model#variant`, `cli.json` (Nachfolger von `tui.json`; weder `tui.json` noch `cli.json` kommen in `scripts/` vor, VERIFIED per Grep).
-6. Bestehende `opencode.json` wird nur beim Erstellen geschrieben (`context._init_provider_settings_json` :1683, `[SKIP] exists` :1698-1701); es gibt keinen Managed-Merge für v2-Keys.
+6. Bestehende `opencode.json` wird nur beim Erstellen geschrieben (`context._init_provider_settings_json` :1683, `log.skip` „already exists — not overwritten“ :1698-1701); es gibt keinen Managed-Merge für v2-Keys.
 7. Im Repo-Root liegen `opencode.json` und `opencode.jsonc` nebeneinander (VERIFIED per Glob; Analyse OC1-4, `docs-part1.md:202`: v2-Doku "Use one form throughout a directory tree"). Kein Code in `scripts/` erzeugt `opencode.jsonc` (VERIFIED per Grep).
 8. `docs/providers/opencode.md:3` trägt "Stand: agent-meta v0.33.x" (VERIFIED) und beschreibt die v2-Surface nicht.
 
@@ -283,7 +285,7 @@ Diese Funktion ist der einzige Akteur für `permissions[]` und für den Surface-
 - Idempotenz: zweiter Lauf erzeugt keinen zweiten identischen Eintrag.
 - **Tier `plugin` mit `MODE=observe` (B-1):** Solange `runtime_gate.py::_baked_plugin_mode` (:123) nur `observe` liefert, blockiert das Plugin nie. Die `permissions[]`-Deny-Tripel bleiben daher in diesem Fall aktiv (Plugin ist additiv, nie Ersatz); das steuert ausschließlich `permission_deny_required` (kein Eingriff in IC-4/IC-7 von Spec A, keine geänderte Aufrufbedingung von `_sync_opencode_runtime_gate`). Bekannte Grenze (OQ-B12): bei Tier `plugin` läuft Spec-A-Schritt 3 (`default_agent`-Merge) nicht, weil dessen Aufrufbedingung Tier `permission` ist; die Kopplung an den Einstiegspunkt prüft `reconcile_opencode_surface_gate` selbst über `_opencode_entry_point`. Auf v1 bleibt Tier `permission` und das Verhalten unverändert.
 
-**Agent-Ebene (B-2, Entscheidung 4):** Die v2-Frontmatter-Funktion (3.7) erhält `deny_edit: bool = False` mit identischer Semantik zu Spec A IC-3: für die Primary-Rolle (`is_primary and opencode_runtime_gate_wanted(...)`) wird der `edit`-Eintrag der Agent-Permissions auf `{action: edit, resource: "*", effect: deny}` gesetzt (nur falls die Rolle `Write`/`Edit` hat; `edit_allow_paths` aus `opencode_primary_edit_allow` ergänzen als `allow`-Einträge, Reihenfolge nach Q3). Sonst würde das `edit: allow` des Orchestrators das globale Deny übersteuern (OQ-B5, #1006-Fehler auf v2).
+**Agent-Ebene (B-2, Entscheidung 4):** Die v2-Frontmatter-Funktion (3.7) erhält `deny_edit: bool = False` mit identischer Semantik zu Spec A IC-3: für die Primary-Rolle (`mode == 'primary' and opencode_runtime_gate_wanted(...)`) wird der `edit`-Eintrag der Agent-Permissions auf `{action: edit, resource: "*", effect: deny}` gesetzt (nur falls die Rolle `Write`/`Edit` hat; `edit_allow_paths` aus `opencode_primary_edit_allow` ergänzen als `allow`-Einträge, Reihenfolge nach Q3). Sonst würde das `edit: allow` des Orchestrators das globale Deny übersteuern (OQ-B5, #1006-Fehler auf v2).
 
 Aufrufer-Hinweis (VERIFIED `sync_pipeline.py:1303-1312`, `cli_commands.py:283-287`): Heute ruft der Aufrufer `_sync_opencode_runtime_gate` nur bei Tier `permission`; diese Bedingung bleibt unverändert. Zusätzlich und unbedingt (je Provider-Iteration, wirksam nur für den Eigentümer) rufen beide Aufrufer `reconcile_opencode_surface_gate` direkt danach, dann `sync_opencode_v2_managed_keys` (M-6). Die Funktion `_sync_opencode_v2_gate_permissions(project_root: Path, provider_config: dict, entries: list[dict], log: SyncLog, dry_run: bool) -> bool` (Schreiber/Rückbauer der Tripel, State `STATE_PERMISSIONS_KEY`; `provider_config` für `opencode_state_path`; Rückgabe True bei Änderung; Signatur mit dem Plan abgeglichen, Rev. 1.3) wird ausschließlich von `reconcile_opencode_surface_gate` aufgerufen; die „Lösung aus Spec A“ für Tier-Wechsel existiert nicht (Spec A schließt sie aus) und wird hier nicht referenziert. Beim Wechsel des Tiers selbst (z. B. `permission` → `plugin`+`enforce`) räumt die Funktion nur v2-Tripel zurück; die v1-Map auf einem v1-Projekt bleibt Spec-A-Nicht-Ziel.
 
@@ -374,7 +376,7 @@ def _transform_frontmatter_for_opencode_v2(
     # deny_edit: Semantik wie Spec A IC-3 (siehe 3.4 "Agent-Ebene"). True ersetzt den
     # edit-Eintrag der Rolle durch {action: edit, resource: "*", effect: deny}, ergaenzt
     # um allow-Eintraege fuer edit_allow_paths (Reihenfolge nach Q3). False = keine Wirkung.
-    # Aufruf: deny_edit = is_primary and opencode_runtime_gate_wanted(...) (Spec A IC-3).
+    # Aufruf: deny_edit = mode == 'primary' and opencode_runtime_gate_wanted(...) (Spec A IC-3).
 ```
 
 Die v2-Funktion unterscheidet sich von der v1-Funktion in genau diesen Punkten: (a) `permissions:` (Liste) statt `permission:` (Map), (b) `steps` (kein `maxSteps`-Alias, kein `temperature`/`max_tokens`/`top_p` Legacy-Felder), (c) `model` mit angehängtem `#variant`, wenn `provider-options.Opencode.model-variants[<role>]` gesetzt ist, (d) `tools` wird nie emittiert, (e) `subagent_depth` wird nie im Frontmatter emittiert. Rest (Provenance-Kommentar, strip-fields, Body-Cleanup) wird durch Aufruf gemeinsamer Hilfsfunktionen wiederverwendet, nicht dupliziert. `system`: Der System-Prompt ist der Markdown-Body (DOKU "system (body)"); es wird **kein** separates `system:`-Frontmatter-Feld emittiert (Default-Annahme OQ-B7; Spike Q5 verifiziert, ob ein explizites Feld nötig ist). Der Aufruf im Zweig :384 lautet datengetrieben: `if mechanism == 'opencode-native-v2': return _transform_frontmatter_for_opencode_v2(...)` — der `opencode-native`-Pfad (Opencode v1 **und** Mammouth) bleibt unverändert.
@@ -483,7 +485,7 @@ AC-Zählung: B1-B22 (22), C1-C17 (17), D1-D10 (10), T1-T7 (7) = 56 ACs (Revision
 - **AC-C3** Given ein v2-Projekt mit `orchestrator.strict` effektiv aktiv und Tier `permission`, When Sync läuft, Then enthält `opencode.json` Top-Level-`permissions` mit den Einträgen `{"action":"edit","resource":"**","effect":"deny"}` und `{"action":"shell","resource":"**","effect":"deny"}` und **kein** `permission.edit/bash["**"]` aus dem Gate. (3.4)
 - **AC-C4** Given strict wird deaktiviert, When Sync läuft, Then sind genau diese beiden Tripel aus `permissions` entfernt; User-Einträge sind unverändert und in unveränderter relativer Reihenfolge. (3.4 Rollback)
 - **AC-C5** Given zweimaliger Sync mit strict aktiv, Then enthält `permissions` jedes Tripel genau einmal. (3.4 Idempotenz)
-- **AC-C6** Given ein v1-Projekt, Then bleibt `_map_claude_tools_to_opencode_permissions` und die geschriebene `permission`-Map byte-identisch (Test `tests/test_transform_contracts.py::test_opencode_native_v1_stays_subagent` bzw. Spec-A-Nachfolger bleibt grün) und `permissions` (Liste) wird nicht geschrieben. (3.4, Entscheidung 8)
+- **AC-C6** Given ein v1-Projekt, Then bleibt `_map_claude_tools_to_opencode_permissions` und die geschriebene `permission`-Map byte-identisch (Test `tests/test_transform_contracts.py::test_opencode_native_v1_primary_role_emits_primary_others_subagent` (Spec-A-Nachfolger, von Plan A Task 3 umbenannt) bleibt grün) und `permissions` (Liste) wird nicht geschrieben. (3.4, Entscheidung 8)
 - **AC-C7** Given ein v2-Projekt mit einem MCP-Server (`active`), When Sync läuft, Then steht der Eintrag unter `mcp.servers.<name>` ohne `enabled`- und ohne `disabled`-Key; ein Server, dessen Registry-Connection `disabled: true` trägt, steht mit `disabled: true` im Eintrag. (3.5)
 - **AC-C8** Given eine Registry-Connection mit `timeout: {catalog: 5000, execution: 60000}`, When v2 synchronisiert, Then trägt der Server-Eintrag `timeout: {catalog: 5000, execution: 60000}`; im v1-Format erscheint `timeout` nicht. (3.5)
 - **AC-C9** Given eine Connection mit `oauth: {client_id: "{env:OC_ID}", client_secret: "{env:OC_SECRET}", scope: "read"}`, When v2 synchronisiert, Then steht `oauth` mit genau diesen snake_case-Schlüsseln im Eintrag; ein Klartext-`client_secret` löst das Secret-Gate aus. (3.5)

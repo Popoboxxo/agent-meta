@@ -8,7 +8,7 @@
 **Architecture:** Neuer Helper `providers.explicit_primary_role` (kein Code-Default) als einzige Quelle für die Mode-Ableitung (`provider_transform`) und den Einstiegspunkt im Merge (`isolation._opencode_entry_point`); `_sync_opencode_runtime_gate` bekommt `active_set`, einen zweiten State-Namespace `default-agent` und die Gate-Kopplung; die Edit-Sperre des Primär-Orchestrators wird im Transform (`deny_edit`/`edit_allow_paths`) aus `config/provider-tools.yaml` gespeist. Create-Pfad (`context.py`) und v1-Settings-Template bleiben unverändert.
 **Tech Stack:** Python 3.9/3.11/3.12 (Stdlib + PyYAML), pytest, Bash-Szenarien (`tests/scenarios/run.sh`), YAML-Config.
 **Spec:** `docs/specs/2026-10-22-opencode-entrypoint-1006-spec.md`
-**Spec-ID:** `spec-id: SPEC-OPENCODE-ENTRYPOINT-1006-2026-10-22` (Rev. 1.3, Entwurf; Reviews `docs/reviews/2026-10-22-opencode-entrypoint-1006-spec-review.md`, `docs/reviews/2026-10-22-opencode-entrypoint-1006-spec-rereview.md`)
+**Spec-ID:** `spec-id: SPEC-OPENCODE-ENTRYPOINT-1006-2026-10-22` (Rev. 1.4, Entwurf; Reviews `docs/reviews/2026-10-22-opencode-entrypoint-1006-spec-review.md`, `docs/reviews/2026-10-22-opencode-entrypoint-1006-spec-rereview.md`)
 **Tracking:** #1006 (Folgearbeit Opencode v2: #1007, eigener Plan B)
 
 ## Entry-/Exit-Kriterien
@@ -17,7 +17,7 @@
 1. Nutzer gibt die Spec frei (`Status: APPROVED` in `docs/specs/2026-10-22-opencode-entrypoint-1006-spec.md`).
 2. OQ-3 (ADR-5) ist entschieden: Option B (scoped allow-list `.tmp/**` + `.meta-viz/**`) — vom Nutzer bestätigt, 2026-10-22. Rückfall auf A (Skalar `deny`) bliebe per `opencode_primary_edit_allow: []` in Task 8 möglich (keine Code-Änderung).
 3. Arbeitsbranch nach `.claude/rules/branch-guard.md`: `fix/1006-opencode-entry-point` (angelegt durch den `git`-Agenten; Tasks laufen nicht auf `main`).
-4. OQ-4 (Rollback bei Tier-Wechsel/Provider-Entfernung) ist entschieden: bewusste Grenze, NICHT Teil dieses Plans — vom Nutzer bestätigt, 2026-10-22; Evidenz in Spec Rev. 1.3 (Nicht-Ziele). Das Folge-Issue wird erst nach dem Merge angelegt (Task 16).
+4. OQ-4 (Rollback bei Tier-Wechsel/Provider-Entfernung) ist entschieden: bewusste Grenze, NICHT Teil dieses Plans — vom Nutzer bestätigt, 2026-10-22; Evidenz in Spec Rev. 1.4 (Nicht-Ziele). Das Folge-Issue wird erst nach dem Merge angelegt (Task 16).
 
 **Exit (alle erfüllt, bevor der PR-Hand-off erfolgt):**
 1. `python3 -m pytest tests -q` grün (keine `failed`/`error`), inklusive neu geschriebener und angepasster Tests (Task 15).
@@ -225,7 +225,7 @@ pipeline_stages:
 - [ ] Step 1: Tests schreiben/anpassen (fail):
   - `tests/test_opencode_runtime_gate.py`: alle Fixtures, die einen Deny erwarten (`test_scalar_permission_family_tolerated`, `test_prior_user_value_recorded_and_restored`, `test_second_strict_sync_is_idempotent_and_byte_identical`, `test_isolation_and_runtime_gate_coexist` (Opencode-Eintrag), `test_dry_run_never_writes`, `test_absent_config_is_created_with_managed_block`) bekommen `"primary-role": "orchestrator"` im Opencode-Eintrag; `test_absent_config_is_created_with_managed_block` erwartet exakt `{"permission": {"edit": {"**": "deny"}, "bash": {"**": "deny"}}, "default_agent": "orchestrator"}`. Neu: `test_strict_without_primary_role_writes_no_deny_and_warns` (AC-10: kein `permission.edit["**"]`/`bash["**"]`, kein `default_agent`, genau eine Warnung mit `primary-role`), `test_strict_with_inactive_primary_role_writes_no_deny` (`active_set` ohne Rolle), `test_managed_deny_rolled_back_when_entry_point_disappears` (erst Sync mit `primary-role` → Deny + `default_agent`; dann ohne → Prior je Familie wiederhergestellt bzw. `**` entfernt, `default_agent` entfernt, Namespaces `runtime-gate-deny` und `default-agent` entfernt, Warnung), `test_strict_with_primary_role_writes_deny_and_default_agent` (AC-10 positiver Fall).
   - `tests/test_runtime_gate_wiring.py`: `_provider_config(...)` und `_run_per_provider(...)` um die genannten Parameter erweitern (`pc["primary-role"] = primary_role` nur wenn nicht `None`; übergebenes `log`/`active_set` an `_sync_stage_per_provider` durchreichen); `test_strict_sync_writes_mapping_deny` und `test_single_provider_strict_writes_deny` zusätzlich `data["default_agent"] == "orchestrator"`; neu: `test_strict_without_primary_role_writes_no_deny_and_warns` (Pipeline-Ebene: `primary_role=None`, `tier="permission"`, strict → kein `permission`-Deny in einer ggf. vorhandenen `opencode.json`, `log.warnings` enthält `primary-role`), `test_gate_writer_receives_active_set` (`record_writer=True`, Sentinel `SimpleNamespace(roles=frozenset({"orchestrator"}))` → `writer_calls[0][1]["active_set"] is sentinel`).
-- [ ] Step 2: Test laufen lassen: `python3 -m pytest tests/test_opencode_runtime_gate.py tests/test_runtime_gate_wiring.py -q` → `5 failed` (3 Kopplungstests in `test_opencode_runtime_gate.py`, 2 neue in `test_runtime_gate_wiring.py`), übrige passed.
+- [ ] Step 2: Test laufen lassen: `python3 -m pytest tests/test_opencode_runtime_gate.py tests/test_runtime_gate_wiring.py -q` → `5 failed` (3 Kopplungstests in `test_opencode_runtime_gate.py`, 2 neue in `test_runtime_gate_wiring.py`; `test_strict_with_primary_role_writes_deny_and_default_agent` ist bereits grün: 3 + 2 = 5 failed), übrige passed.
 - [ ] Step 3: implementieren: in `isolation._sync_opencode_runtime_gate` direkt nach der Berechnung von `entry` und `entries`: `if entries and entry is None: log.warning(<Text oben>); entries = {}`; `gate_effective` für `_merge_default_agent` bleibt `bool(entries)` (nach der Kopplung). In `scripts/lib/sync_pipeline.py` (Aufruf bei `provider_runtime_gate_tier(pc, caps) == "permission"`) und `scripts/lib/cli_commands.py` (gleiche Bedingung im `--test`-Pfad) `active_set=active_set` als Keyword ergänzen (Variable ist in beiden Scopes vorhanden). Danach mit `Grep` `pattern: ^\s+_sync_opencode_runtime_gate\(` über `scripts/` bestätigen (nur Aufrufe; die `def`-Zeile ist nicht eingerückt und zählt nicht): genau 2 Aufrufer, beide mit `active_set=` (erwartet: 2 Aufrufer + 1 def im Modul `isolation.py`).
 - [ ] Step 4: Test (pass): `python3 -m pytest tests/test_opencode_runtime_gate.py tests/test_runtime_gate_wiring.py tests/test_provider_agnostic_dispatch.py tests/test_context_file_modes.py -q` → alle passed (`28` in `test_opencode_runtime_gate.py`, `12` in `test_runtime_gate_wiring.py`).
 - [ ] Step 5: commit `fix: couple opencode runtime gate deny to explicit entry point`
@@ -366,7 +366,7 @@ pipeline_stages:
 **Files:**
 - Modify: `docs/plans/2026-10-22-opencode-entrypoint-1006-plan.md`
 - Modify: `docs/specs/2026-10-22-opencode-entrypoint-1006-spec.md`
-**Interfaces:** Produces Issue-Text (unten, Englisch, GitHub-Issue) und die abgehakten Checkboxen dieses Tasks; Consumes Spec Rev. 1.3 (Nicht-Ziele: verifizierte Evidenz zu OQ-4).
+**Interfaces:** Produces Issue-Text (unten, Englisch, GitHub-Issue) und die abgehakten Checkboxen dieses Tasks; Consumes Spec Rev. 1.4 (Nicht-Ziele: verifizierte Evidenz zu OQ-4).
 **Issue-Text-Entwurf:**
 > **Title:** `fix: roll back opencode runtime-gate deny and default_agent on tier change or provider removal`
 >
@@ -392,7 +392,8 @@ pipeline_stages:
 | AC | Task | Test |
 |---|---|---|
 | AC-01 | 11 | `tests/test_ac01_render_identity.py` (+ Goldens unverändert: `test_template_slimming_equivalence.py`, `test_compact_matrix.py`) |
-| AC-02, AC-03, AC-04 | 2, 3 | `tests/test_explicit_primary_role.py`, `tests/test_transform_contracts.py` |
+| AC-02, AC-04 | 2, 3 | `tests/test_explicit_primary_role.py`, `tests/test_transform_contracts.py` |
+| AC-03 | 2, 3, 11, 15 | `tests/test_explicit_primary_role.py`, `tests/test_transform_contracts.py` |
 | AC-05 | 3, 15 | `tests/test_opencode_v2_surface.py:204`, `tests/test_settings_depth_and_deny.py:85` (unverändert grün) |
 | AC-06, AC-07, AC-08, AC-09, AC-14 | 6 | `tests/test_opencode_runtime_gate.py` (10 neue Tests) |
 | AC-10 | 7 | `tests/test_opencode_runtime_gate.py`, `tests/test_runtime_gate_wiring.py` |
@@ -414,7 +415,7 @@ pipeline_stages:
 **Annahmen / Unsicherheiten**
 1. Permission-Rangfolge (R-1): per Doku belegt, Laufzeit nur per optionaler Probe (Task 1); Task 8 ist darauf gegated. Pfad-Semantik der allow-list (`**`, relativ/absolut) ist ebenfalls nur per Probe belegbar; ohne Beleg degradiert Option B im Worst Case fail-closed zu A (R-2).
 2. OQ-3: entschieden — Plan setzt Option B (scoped allow-list) um (vom Nutzer bestätigt, 2026-10-22); Option A = `opencode_primary_edit_allow: []`.
-3. OQ-4 (Rollback bei Tier-Wechsel/Provider-Entfernung): bewusste Grenze, bestätigt (2026-10-22), Evidenz in Spec Rev. 1.3; nur Task 16 (Folge-Issue nach Merge dokumentiert), keine Code-Änderung in diesem Plan. Restunsicherheit: der Deaktivierungspfad (`scripts/lib/deactivation.py`, `remove_provider_dir`) wurde nur aus der Signatur abgeleitet, nicht per Lauf geprüft.
+3. OQ-4 (Rollback bei Tier-Wechsel/Provider-Entfernung): bewusste Grenze, bestätigt (2026-10-22), Evidenz in Spec Rev. 1.4; nur Task 16 (Folge-Issue nach Merge dokumentiert), keine Code-Änderung in diesem Plan. Restunsicherheit: der Deaktivierungspfad (`scripts/lib/deactivation.py`, `remove_provider_dir`) wurde nur aus der Signatur abgeleitet, nicht per Lauf geprüft.
 4. Warntexte sind Englisch (Code-Konvention); die deutsche Formulierung in AC-07 der Spec wird sinngemäß umgesetzt (Substring-Tests auf Nutzerwert, Rolle, `provider-overrides`).
 5. Tests setzen voraus, dass das AC-01-Matrixprojekt nicht strikt ist (Reviewer-Befund); Task 11 Step 1 enthält ein Stop-Kriterium, falls nicht.
 6. `write_checked` kann bei „nichts zu tun“ ein leeres `{}` anlegen (Bestandsverhalten, unverändert); der Wiring-Test in Task 7 prüft daher tolerant auf Existenz.

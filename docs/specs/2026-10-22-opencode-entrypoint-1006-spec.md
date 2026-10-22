@@ -2,7 +2,7 @@
 spec-id: SPEC-OPENCODE-ENTRYPOINT-1006-2026-10-22
 title: Opencode-Einstiegspunkt (#1006) — mode primary + default_agent auch auf v1, Gate-Kopplung, Managed-Merge
 status: Entwurf
-revision: 1.3
+revision: 1.4
 review: docs/reviews/2026-10-22-opencode-entrypoint-1006-spec-review.md
 rereview: docs/reviews/2026-10-22-opencode-entrypoint-1006-spec-rereview.md
 issue: "#1006"
@@ -12,7 +12,7 @@ amends: OQ-8 (Amendment siehe Abschnitt Entscheidungsregister)
 
 # Opencode-Einstiegspunkt (#1006) — Spec
 
-> Status: Entwurf (Rev. 1.3 — 2026-10-22: Nutzerantworten eingearbeitet: OQ-3 entschieden (Variante B bestätigt), OQ-4 als bewusste Grenze mit verifizierter Evidenz dokumentiert (Folge-Issue). Rev. 1.2 — Rereview `CHANGES_REQUESTED` vom 2026-10-22 eingearbeitet: MAJOR-A, MINOR-A..C; Rev. 1.1: MAJOR-1..3, MINOR-1..6)
+> Status: Entwurf (Rev. 1.4 — 2026-10-22: Doku-Korrekturen aus Verifikation (IC-3 `deny_edit`-Ausdruck, Zeilenreferenzen, Problem-2-Wortlaut, AC-03/AC-15-Präzisierung). Rev. 1.3 — 2026-10-22: Nutzerantworten eingearbeitet: OQ-3 entschieden (Variante B bestätigt), OQ-4 als bewusste Grenze mit verifizierter Evidenz dokumentiert (Folge-Issue). Rev. 1.2 — Rereview `CHANGES_REQUESTED` vom 2026-10-22 eingearbeitet: MAJOR-A, MINOR-A..C; Rev. 1.1: MAJOR-1..3, MINOR-1..6)
 > Trace-Anker: `spec-id: SPEC-OPENCODE-ENTRYPOINT-1006-2026-10-22`
 >
 > Der Approval-Marker (`Status: APPROVED`) wird ausschließlich vom Nutzer bzw. `concept-reviewer`
@@ -34,8 +34,7 @@ Auf der Opencode-Surface v1 (Default) ist der Einstiegspunkt kaputt, sobald die 
 2. **Kein `default_agent`.** `scripts/lib/context.py::apply_settings_surface_shape` (`:1644`) gibt
    `default_agent` nur für `mcp-config.format == "opencode-json-v2"` aus (`:1677-1679`) und für
    jedes andere Format den Inhalt byte-identisch zurück; zudem schreibt
-   `_init_provider_settings_json` (`:1683`) die Datei nur beim ERSTELLEN (`[SKIP] exists`,
-   `:1698-1701`). Das eigene `opencode.json` des Repos enthält kein `default_agent`.
+   `_init_provider_settings_json` (`:1683`) die Datei nur beim ERSTELLEN (`log.skip` mit Grund „already exists — not overwritten“, `context.py:1698-1701`). Das eigene `opencode.json` des Repos enthält kein `default_agent`.
 3. **Das Gate sperrt trotzdem den Main Chat.** `scripts/lib/isolation.py::_sync_opencode_runtime_gate`
    (`:413`) schreibt bei `strict` + Tier `permission` die Globs `permission.edit["**"]="deny"` und
    `permission.bash["**"]="deny"` (`:407-410`, `:454-466`) in `opencode.json`. Opencode startet ohne
@@ -183,7 +182,7 @@ Sperr-Mechanismus Rechte erweitern); `deny_edit` wirkt dann nicht. Bei `perms["e
   zuerst, da letzter Match gewinnt).
 
 `deny_edit=False` (Default) → Output byte-identisch zu heute. Der Rückgabetyp von
-`_map_claude_tools_to_opencode_permissions` (`dict[str, str]`, `:738`) wird für den `edit`-Schlüssel
+`_map_claude_tools_to_opencode_permissions` (`dict[str, str]`, `:706`) wird für den `edit`-Schlüssel
 auf `str | dict[str, str]` erweitert; der Frontmatter-Serializer (`updates["permission"]`, `:845`)
 muss verschachtelte Mappings ausgeben können — Plan-Task: Serializer prüfen, ggf. minimal
 erweitern (AC-11 testet das gerenderte YAML).
@@ -192,8 +191,8 @@ Quelle der Pfade: neuer Schlüssel `opencode_primary_edit_allow: [".tmp/**", ".m
 `config/provider-tools.yaml` (neben `opencode_deny_critical`, `:56`); leere Liste = Skalar `deny`
 (Rückfall auf Option A aus ADR-5, ohne Codeänderung).
 
-Aufruf im Zweig aus IC-2: `deny_edit = is_primary and opencode_runtime_gate_wanted(config, provider,
-agent_meta_root, provider_config)` mit `is_primary` aus IC-2. Der Import von `lib.isolation`
+Aufruf im Zweig aus IC-2: `deny_edit = mode == 'primary' and opencode_runtime_gate_wanted(config, provider,
+agent_meta_root, provider_config)` (`mode` aus IC-2). Der Import von `lib.isolation`
 (IC-4) erfolgt lazy innerhalb der Funktion (einziger Lazy-Import; `isolation.py` importiert
 `provider_transform` nicht, `explicit_primary_role` liegt in `providers.py`, IC-1).
 
@@ -353,8 +352,7 @@ Testdateien sind Vorschläge; der Plan konkretisiert. Alle Tests: `python3 -m py
   `test_opencode_native_v1_stays_subagent` (`:367`) wird zu „v1 primary role emits primary, others
   stay subagent" umgeschrieben.)
 - **AC-03 (Mammouth-Guard):** Given Mammouth-Provider-Config ohne `primary-role`, When die Rolle
-  `orchestrator` transformiert wird, Then `mode` bleibt `subagent` und der Output ist byte-identisch zu
-  vor dem Fix; Given dieselbe Config MIT `primary-role: orchestrator` Then `mode == "primary"`.
+  `orchestrator` transformiert wird, Then `mode == subagent` für Mammouth; Byte-Identität wird indirekt über die AC-01-Hashes (Plan Task 11) verifiziert; Given dieselbe Config MIT `primary-role: orchestrator` Then `mode == "primary"`.
   (IC-1, IC-2, IC-8.)
 - **AC-04 (kein Code-Default):** Given Opencode v2 ohne `primary-role` in der Provider-Config, When
   `orchestrator` transformiert wird, Then `mode == "subagent"` (kein implizites `primary`). (IC-1,
@@ -440,7 +438,7 @@ Testdateien sind Vorschläge; der Plan konkretisiert. Alle Tests: `python3 -m py
      `test_single_provider_strict_writes_deny`): `_provider_config()` bekommt `primary-role:
      orchestrator`, sonst schreibt IC-6 Schritt 2 keinen Deny mehr; Soll: Deny `edit["**"]`/`bash["**"]`
      wie bisher + `default_agent == "orchestrator"`. Neuer Test siehe AC-10.
-  4. `tests/test_opencode_runtime_gate.py:352` (`test_absent_config_is_created_with_managed_block`):
+  4. `tests/test_opencode_runtime_gate.py:333` (`test_absent_config_is_created_with_managed_block`, Assert ≈ `:352`):
      exakter Vergleich `data == {"permission": …}` → erwartet zusätzlich `"default_agent":
      "orchestrator"`; übrige Gate-Fixtures dieser Datei bekommen `primary-role: orchestrator`;
      Ergänzung Namespace `default-agent` (AC-13).
