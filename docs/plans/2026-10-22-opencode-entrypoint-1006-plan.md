@@ -8,16 +8,16 @@
 **Architecture:** Neuer Helper `providers.explicit_primary_role` (kein Code-Default) als einzige Quelle für die Mode-Ableitung (`provider_transform`) und den Einstiegspunkt im Merge (`isolation._opencode_entry_point`); `_sync_opencode_runtime_gate` bekommt `active_set`, einen zweiten State-Namespace `default-agent` und die Gate-Kopplung; die Edit-Sperre des Primär-Orchestrators wird im Transform (`deny_edit`/`edit_allow_paths`) aus `config/provider-tools.yaml` gespeist. Create-Pfad (`context.py`) und v1-Settings-Template bleiben unverändert.
 **Tech Stack:** Python 3.9/3.11/3.12 (Stdlib + PyYAML), pytest, Bash-Szenarien (`tests/scenarios/run.sh`), YAML-Config.
 **Spec:** `docs/specs/2026-10-22-opencode-entrypoint-1006-spec.md`
-**Spec-ID:** `spec-id: SPEC-OPENCODE-ENTRYPOINT-1006-2026-10-22` (Rev. 1.2, Entwurf; Reviews `docs/reviews/2026-10-22-opencode-entrypoint-1006-spec-review.md`, `docs/reviews/2026-10-22-opencode-entrypoint-1006-spec-rereview.md`)
+**Spec-ID:** `spec-id: SPEC-OPENCODE-ENTRYPOINT-1006-2026-10-22` (Rev. 1.3, Entwurf; Reviews `docs/reviews/2026-10-22-opencode-entrypoint-1006-spec-review.md`, `docs/reviews/2026-10-22-opencode-entrypoint-1006-spec-rereview.md`)
 **Tracking:** #1006 (Folgearbeit Opencode v2: #1007, eigener Plan B)
 
 ## Entry-/Exit-Kriterien
 
 **Entry (alle erfüllt, bevor Task 1 startet):**
 1. Nutzer gibt die Spec frei (`Status: APPROVED` in `docs/specs/2026-10-22-opencode-entrypoint-1006-spec.md`).
-2. Nutzer bestätigt OQ-3 (ADR-5): Option B (scoped allow-list `.tmp/**` + `.meta-viz/**`, Default) oder A (Skalar `deny`). Bei A wird in Task 8 `opencode_primary_edit_allow: []` gesetzt (keine Code-Änderung); der Plan bleibt sonst unverändert.
+2. OQ-3 (ADR-5) ist entschieden: Option B (scoped allow-list `.tmp/**` + `.meta-viz/**`) — vom Nutzer bestätigt, 2026-10-22. Rückfall auf A (Skalar `deny`) bliebe per `opencode_primary_edit_allow: []` in Task 8 möglich (keine Code-Änderung).
 3. Arbeitsbranch nach `.claude/rules/branch-guard.md`: `fix/1006-opencode-entry-point` (angelegt durch den `git`-Agenten; Tasks laufen nicht auf `main`).
-4. OQ-4 (Rollback bei Tier-Wechsel/Provider-Entfernung) ist als Folge-Issue entschieden (Default: Folge-Issue, nicht Teil dieses Plans).
+4. OQ-4 (Rollback bei Tier-Wechsel/Provider-Entfernung) ist entschieden: bewusste Grenze, NICHT Teil dieses Plans — vom Nutzer bestätigt, 2026-10-22; Evidenz in Spec Rev. 1.3 (Nicht-Ziele). Das Folge-Issue wird erst nach dem Merge angelegt (Task 16).
 
 **Exit (alle erfüllt, bevor der PR-Hand-off erfolgt):**
 1. `python3 -m pytest tests -q` grün (keine `failed`/`error`), inklusive neu geschriebener und angepasster Tests (Task 15).
@@ -25,7 +25,7 @@
 3. `tests/scenarios/run.sh` meldet für alle Szenarien `PASS` (Task 15).
 4. AC-01-Rebaseline: genau 2 geänderte + 1 hinzugefügter Hash, Goldens `slimming-golden/` und `compact-golden/` unverändert (Task 11).
 5. `CHANGELOG.md` enthält unter `## [Unreleased]` den Abschnitt `### Fixed` (Task 14); kein Version-Bump, kein Major.
-6. Alle Checkboxen dieser Datei gesetzt (Ledger = Plan-Datei, Skill `plan-ledger`).
+6. Alle Checkboxen dieser Datei gesetzt (Ledger = Plan-Datei, Skill `plan-ledger`); Task 16 (Folge-Issue-Anlage) ist die Ausnahme: er startet erst nach dem Merge dieses Plans und blockiert den PR-Hand-off nicht.
 
 ## Global Constraints
 
@@ -43,7 +43,7 @@
 
 ## Ausführungsmodell
 
-- DAG: `1 ∥ 2 ∥ 4 ∥ 13` (= `parallel_group: g1`, ownership-disjunkt) → `2 → 3`; `2 → 5 → 6 → 7`; `(1, 3, 4, 5) → 8`; `3 → 9`; `(3, 6) → 10`; `(3, 6, 7, 8, 9) → 11`; `(7, 8) → 12`; `(3, 6, 7, 8, 9, 10, 11, 12, 13) → 14 → 15`.
+- DAG: `1 ∥ 2 ∥ 4 ∥ 13` (= `parallel_group: g1`, ownership-disjunkt) → `2 → 3`; `2 → 5 → 6 → 7`; `(1, 3, 4, 5) → 8`; `3 → 9`; `(3, 6) → 10`; `(3, 6, 7, 8, 9) → 11`; `(7, 8) → 12`; `(3, 6, 7, 8, 9, 10, 11, 12, 13) → 14 → 15`; `15 → 16` (Task 16 erst nach Merge).
 - Alle übrigen Tasks laufen sequenziell in Nummernreihenfolge (gemeinsame Dateien: `provider_transform.py` 3/8, `isolation.py` 5/6/7, `tests/test_opencode_runtime_gate.py` 5/6/7, `tests/test_runtime_gate_wiring.py` 7, `config/provider-tools.yaml` 8, `config/ai-providers.yaml` 9). Parallel nur Gruppe `g1`; Disjunktheit nach `check_plan_file_overlap` (`scripts/lib/orchestration.py`) im Self-Review nachgewiesen.
 - Plan B (Opencode v2) startet erst nach Merge dieses Plans (`context.py`/`isolation.py` werden dort ebenfalls berührt; Merge seriell, R-6 der Spec).
 - Aufwand: Schätzung über `effort-estimator` (Textreferenz, nicht von diesem Plan berechnet).
@@ -164,7 +164,8 @@ pipeline_stages:
 ## Paket A3 — Merge: State, Einstiegspunkt, default_agent, Gate-Kopplung (IC-4…IC-7)
 
 ### Task 5: State-Namespace `default-agent` und Einstiegspunkt-Helper bereitstellen
-**Agent:** developer · **Issue:** #1006 · **AC:** AC-13 · **Depends on:** 2
+**Agent:** developer · **Issue:** #1006 · **AC:** AC-13
+**Depends on:** 2
 **Files:**
 - Modify: `scripts/lib/isolation.py`
 - Modify: `tests/test_opencode_runtime_gate.py`
@@ -189,7 +190,8 @@ pipeline_stages:
 - [ ] Step 5: commit `feat: add default-agent state namespace and entry point helpers`
 
 ### Task 6: `default_agent` im Managed-Merge schreiben (State, Idempotenz, Rollback, Warnung)
-**Agent:** senior-developer · **Issue:** #1006 · **AC:** AC-06, AC-07, AC-08, AC-09, AC-14 · **Depends on:** 5
+**Agent:** senior-developer · **Issue:** #1006 · **AC:** AC-06, AC-07, AC-08, AC-09, AC-14
+**Depends on:** 5
 **Files:**
 - Modify: `scripts/lib/isolation.py`
 - Modify: `tests/test_opencode_runtime_gate.py`
@@ -211,7 +213,8 @@ pipeline_stages:
 - [ ] Step 5: commit `fix: merge default_agent into existing opencode.json with rollback`
 
 ### Task 7: Gate-Deny an den Einstiegspunkt koppeln, Aufrufer anpassen, bestehende Tests umstellen
-**Agent:** senior-developer · **Issue:** #1006 · **AC:** AC-10, AC-15 (b.3, b.4) · **Depends on:** 6
+**Agent:** senior-developer · **Issue:** #1006 · **AC:** AC-10, AC-15 (b.3, b.4)
+**Depends on:** 6
 **Files:**
 - Modify: `scripts/lib/isolation.py`
 - Modify: `scripts/lib/sync_pipeline.py`
@@ -223,16 +226,17 @@ pipeline_stages:
   - `tests/test_opencode_runtime_gate.py`: alle Fixtures, die einen Deny erwarten (`test_scalar_permission_family_tolerated`, `test_prior_user_value_recorded_and_restored`, `test_second_strict_sync_is_idempotent_and_byte_identical`, `test_isolation_and_runtime_gate_coexist` (Opencode-Eintrag), `test_dry_run_never_writes`, `test_absent_config_is_created_with_managed_block`) bekommen `"primary-role": "orchestrator"` im Opencode-Eintrag; `test_absent_config_is_created_with_managed_block` erwartet exakt `{"permission": {"edit": {"**": "deny"}, "bash": {"**": "deny"}}, "default_agent": "orchestrator"}`. Neu: `test_strict_without_primary_role_writes_no_deny_and_warns` (AC-10: kein `permission.edit["**"]`/`bash["**"]`, kein `default_agent`, genau eine Warnung mit `primary-role`), `test_strict_with_inactive_primary_role_writes_no_deny` (`active_set` ohne Rolle), `test_managed_deny_rolled_back_when_entry_point_disappears` (erst Sync mit `primary-role` → Deny + `default_agent`; dann ohne → Prior je Familie wiederhergestellt bzw. `**` entfernt, `default_agent` entfernt, Namespaces `runtime-gate-deny` und `default-agent` entfernt, Warnung), `test_strict_with_primary_role_writes_deny_and_default_agent` (AC-10 positiver Fall).
   - `tests/test_runtime_gate_wiring.py`: `_provider_config(...)` und `_run_per_provider(...)` um die genannten Parameter erweitern (`pc["primary-role"] = primary_role` nur wenn nicht `None`; übergebenes `log`/`active_set` an `_sync_stage_per_provider` durchreichen); `test_strict_sync_writes_mapping_deny` und `test_single_provider_strict_writes_deny` zusätzlich `data["default_agent"] == "orchestrator"`; neu: `test_strict_without_primary_role_writes_no_deny_and_warns` (Pipeline-Ebene: `primary_role=None`, `tier="permission"`, strict → kein `permission`-Deny in einer ggf. vorhandenen `opencode.json`, `log.warnings` enthält `primary-role`), `test_gate_writer_receives_active_set` (`record_writer=True`, Sentinel `SimpleNamespace(roles=frozenset({"orchestrator"}))` → `writer_calls[0][1]["active_set"] is sentinel`).
 - [ ] Step 2: Test laufen lassen: `python3 -m pytest tests/test_opencode_runtime_gate.py tests/test_runtime_gate_wiring.py -q` → `5 failed` (3 Kopplungstests in `test_opencode_runtime_gate.py`, 2 neue in `test_runtime_gate_wiring.py`), übrige passed.
-- [ ] Step 3: implementieren: in `isolation._sync_opencode_runtime_gate` direkt nach der Berechnung von `entry` und `entries`: `if entries and entry is None: log.warning(<Text oben>); entries = {}`; `gate_effective` für `_merge_default_agent` bleibt `bool(entries)` (nach der Kopplung). In `scripts/lib/sync_pipeline.py` (Aufruf bei `provider_runtime_gate_tier(pc, caps) == "permission"`) und `scripts/lib/cli_commands.py` (gleiche Bedingung im `--test`-Pfad) `active_set=active_set` als Keyword ergänzen (Variable ist in beiden Scopes vorhanden). Danach mit `Grep` `pattern: _sync_opencode_runtime_gate\(` über `scripts/` bestätigen: genau 2 Aufrufer, beide mit `active_set=`.
+- [ ] Step 3: implementieren: in `isolation._sync_opencode_runtime_gate` direkt nach der Berechnung von `entry` und `entries`: `if entries and entry is None: log.warning(<Text oben>); entries = {}`; `gate_effective` für `_merge_default_agent` bleibt `bool(entries)` (nach der Kopplung). In `scripts/lib/sync_pipeline.py` (Aufruf bei `provider_runtime_gate_tier(pc, caps) == "permission"`) und `scripts/lib/cli_commands.py` (gleiche Bedingung im `--test`-Pfad) `active_set=active_set` als Keyword ergänzen (Variable ist in beiden Scopes vorhanden). Danach mit `Grep` `pattern: ^\s+_sync_opencode_runtime_gate\(` über `scripts/` bestätigen (nur Aufrufe; die `def`-Zeile ist nicht eingerückt und zählt nicht): genau 2 Aufrufer, beide mit `active_set=` (erwartet: 2 Aufrufer + 1 def im Modul `isolation.py`).
 - [ ] Step 4: Test (pass): `python3 -m pytest tests/test_opencode_runtime_gate.py tests/test_runtime_gate_wiring.py tests/test_provider_agnostic_dispatch.py tests/test_context_file_modes.py -q` → alle passed (`28` in `test_opencode_runtime_gate.py`, `12` in `test_runtime_gate_wiring.py`).
 - [ ] Step 5: commit `fix: couple opencode runtime gate deny to explicit entry point`
 
 ## Paket A4 — Edit-Sperre des Primär-Orchestrators (IC-3)
 
 ### Task 8: `edit: allow` des primären Orchestrators unter aktivem Gate durch Sperre ersetzen
-**Agent:** developer · **Issue:** #1006 · **AC:** AC-11 · **Depends on:** 1, 3, 4, 5
+**Agent:** developer · **Issue:** #1006 · **AC:** AC-11
+**Depends on:** 1, 3, 4, 5
 **Gate:** Start nur, wenn Task 1 das Verdikt `CONFIRMED_BY_DOC` oder `CONFIRMED_BY_PROBE` trägt; bei `CONTRADICTED` abbrechen und eskalieren (Entscheidung 4 neu bewerten).
-**Unsicherheit (markiert):** Die Rangfolge (Agent-Regeln vor Global) ist per Doku belegt; ohne Probe bleibt ein Restrisiko (R-1). Die Pfad-Semantik der allow-list (`**`, relativ vs. absolut) ist ohne Task-1-Probe unbelegt; Worst Case: `.tmp/**`/`.meta-viz/**` greifen nie und Option B degradiert stillschweigend zu A (fail-closed). Mitigation: `deny_edit` ist ein Parameter und per Config (`opencode_primary_edit_allow`) ausgestaltbar; OQ-3 (Option A vs. B) liegt beim Nutzer — dieser Task implementiert B und kann per `opencode_primary_edit_allow: []` auf A schalten.
+**Unsicherheit (markiert):** Die Rangfolge (Agent-Regeln vor Global) ist per Doku belegt; ohne Probe bleibt ein Restrisiko (R-1). Die Pfad-Semantik der allow-list (`**`, relativ vs. absolut) ist ohne Task-1-Probe unbelegt; Worst Case: `.tmp/**`/`.meta-viz/**` greifen nie und Option B degradiert stillschweigend zu A (fail-closed). Mitigation: `deny_edit` ist ein Parameter und per Config (`opencode_primary_edit_allow`) ausgestaltbar; OQ-3 ist entschieden (B, vom Nutzer bestätigt, 2026-10-22) — dieser Task implementiert B; ein Rückfall auf A wäre per `opencode_primary_edit_allow: []` möglich.
 **Files:**
 - Modify: `scripts/lib/provider_transform.py`
 - Modify: `config/provider-tools.yaml`
@@ -264,7 +268,8 @@ pipeline_stages:
 ## Paket A5 — Config, Szenario, Rebaseline, Self-Sync
 
 ### Task 9: Opencode-`primary-role`-Kommentar und `orchestrator_hint` korrigieren
-**Agent:** developer · **Issue:** #1006 · **AC:** AC-15 (a) · **Depends on:** 3
+**Agent:** developer · **Issue:** #1006 · **AC:** AC-15 (a)
+**Depends on:** 3
 **Hintergrund:** `orchestrator_hint` ist ein unrendered Wert (`ORCHESTRATOR_INVOCATION_HINT` wird in `scripts/lib/context.py` und `scripts/lib/rules.py` nur zugewiesen, in keinem Template verwendet; `tests/test_context_file_modes.py` führt ihn als `_UNRENDERED_PROVIDER_SCOPED`) — die Änderung ist AC-01-neutral.
 **Files:**
 - Modify: `config/ai-providers.yaml`
@@ -277,7 +282,8 @@ pipeline_stages:
 - [ ] Step 5: commit `chore: document opencode primary entry and fix orchestrator hint`
 
 ### Task 10: Szenario 69 für den v1-Einstiegspunkt anpassen
-**Agent:** tester · **Issue:** #1006 · **AC:** AC-15 (b.1) · **Depends on:** 3, 6
+**Agent:** tester · **Issue:** #1006 · **AC:** AC-15 (b.1)
+**Depends on:** 3, 6
 **Files:**
 - Modify: `tests/scenarios/asserts/69-opencode-v2-surface.sh`
 - Modify: `tests/scenarios/registry.md`
@@ -288,7 +294,8 @@ pipeline_stages:
 - [ ] Step 4: commit `test: assert opencode v1 entry point in scenario 69`
 
 ### Task 11: AC-01-Baseline kontrolliert rebaselinen
-**Agent:** tester · **Issue:** #1006 · **AC:** AC-01, AC-15 (b.5) · **Depends on:** 3, 6, 7, 8, 9
+**Agent:** tester · **Issue:** #1006 · **AC:** AC-01, AC-15 (b.5)
+**Depends on:** 3, 6, 7, 8, 9
 **Files:**
 - Modify: `tests/fixtures/ac01-baseline/hashes.json`
 - Modify: `tests/test_ac01_render_identity.py`
@@ -301,14 +308,15 @@ pipeline_stages:
 - [ ] Step 6: commit `test: rebaseline AC-01 hashes for opencode entry point`
 
 ### Task 12: Eigenes `opencode.json` per Self-Sync konvergieren lassen
-**Agent:** developer · **Issue:** #1006 · **AC:** AC-12 · **Depends on:** 7, 8
+**Agent:** developer · **Issue:** #1006 · **AC:** AC-12
+**Depends on:** 7, 8
 **Files:**
 - Modify: `.opencode/agents/orchestrator.md`
 - Modify: `opencode.json`
 - Modify: `.opencode/agent-meta-state.json`
 **Interfaces:** Produces Repo-Stand mit funktionierendem Einstiegspunkt; Consumes Tasks 7, 8 (`.meta-config/project.yaml`: `orchestrator.strict: true`, `mode: strict`, `checkpointing: true`, `ai-providers` enthält `Opencode`).
 - [ ] Step 1: Vorzustand sichern: `git status --short` muss sauber sein (außer eigenen Task-Änderungen); `Read` von `opencode.json` bestätigt: kein `default_agent`, `permission.edit["**"]` und `permission.bash["**"]` = `deny`.
-- [ ] Step 2: `python3 scripts/sync.py` ausführen; danach `git diff -- opencode.json .opencode/` und `git status --short` prüfen. Erwartete Änderungen: (a) `.opencode/agents/orchestrator.md`: `mode: primary`, `permission.edit` = Mapping `'*': deny` / `.tmp/**: allow` / `.meta-viz/**: allow` bei Variante B (Default, OQ-3 / ADR-5; bei Variante A der Skalar `deny`; der Skalar `allow` entfällt in beiden Fällen), `bash: deny` unverändert; (b) `opencode.json`: neuer Key `"default_agent": "orchestrator"`, übrige Keys (`$schema`, `subagent_depth`, `plugin`, `mcp`, `permission.edit/bash["**"]="deny"`) unverändert; (c) `.opencode/agent-meta-state.json`: Namespace `runtime-gate-deny` unverändert, neu `default-agent` = `{"value": "orchestrator", "prior": null}` und der Sentinel `_agent-meta` (R-7: Repo-State war älter als #802). Weitere geänderte Dateien (z. B. Versions-/Datumszeilen in generierten Kontextdateien) sind **nicht** Teil dieses Tasks: im Ergebnis melden, nicht in den Commit aufnehmen.
+- [ ] Step 2: `python3 scripts/sync.py` ausführen; danach `git diff -- opencode.json .opencode/` und `git status --short` prüfen. Erwartete Änderungen: (a) `.opencode/agents/orchestrator.md`: `mode: primary`, `permission.edit` = Mapping `'*': deny` / `.tmp/**: allow` / `.meta-viz/**: allow` bei Variante B (vom Nutzer bestätigt, OQ-3 / ADR-5; bei Variante A der Skalar `deny`; der Skalar `allow` entfällt in beiden Fällen), `bash: deny` unverändert; (b) `opencode.json`: neuer Key `"default_agent": "orchestrator"`, übrige Keys (`$schema`, `subagent_depth`, `plugin`, `mcp`, `permission.edit/bash["**"]="deny"`) unverändert; (c) `.opencode/agent-meta-state.json`: Namespace `runtime-gate-deny` unverändert, neu `default-agent` = `{"value": "orchestrator", "prior": null}` und der Sentinel `_agent-meta` (R-7: Repo-State war älter als #802). Weitere geänderte Dateien (z. B. Versions-/Datumszeilen in generierten Kontextdateien) sind **nicht** Teil dieses Tasks: im Ergebnis melden, nicht in den Commit aufnehmen.
 - [ ] Step 3: Idempotenz: `git diff > .tmp/self-sync-1.diff`, `python3 scripts/sync.py`, `git diff > .tmp/self-sync-2.diff`, `cmp .tmp/self-sync-1.diff .tmp/self-sync-2.diff` → keine Ausgabe (identisch).
 - [ ] Step 4: Validierung: `python3 scripts/sync.py --validate` → Exit 0.
 - [ ] Step 5: commit (nur die drei Dateien) `chore: self-sync opencode entry point artifacts`
@@ -329,7 +337,8 @@ pipeline_stages:
 - [ ] Step 4: commit `docs: add OQ-8 amendment A2 for opencode entry point`
 
 ### Task 14: CHANGELOG „Fixed“ eintragen
-**Agent:** documenter · **Issue:** #1006 · **AC:** AC-16 · **Depends on:** 3, 6, 7, 8, 9, 10, 11, 12, 13
+**Agent:** documenter · **Issue:** #1006 · **AC:** AC-16
+**Depends on:** 3, 6, 7, 8, 9, 10, 11, 12, 13
 **Files:**
 - Modify: `CHANGELOG.md`
 **Interfaces:** Produces Abschnitt `### Fixed` unter `## [Unreleased]` mit dem Eintrag aus dem Abschnitt „CHANGELOG-Eintrag“ der Spec (Englisch, wörtlich, inkl. des Absatzes „Behavior change for all Opencode projects“); kein Version-Bump, kein `### Changed`/Major-Hinweis.
@@ -339,7 +348,8 @@ pipeline_stages:
 - [ ] Step 4: commit `docs: add changelog entry for opencode entry point fix`
 
 ### Task 15: Nachzügler-Suche und Gesamtverifikation
-**Agent:** tester · **Issue:** #1006 · **AC:** AC-05, AC-12, AC-15 · **Depends on:** 14
+**Agent:** tester · **Issue:** #1006 · **AC:** AC-05, AC-12, AC-15
+**Depends on:** 14
 **Files:**
 - Modify: `docs/analysis/2026-10-22-opencode-permission-precedence.md`
 **Interfaces:** Produces Nachzügler-Bericht (angehängt als Abschnitt `## Nachzügler-Suche #1006`), Exit-Nachweis; Consumes alle vorherigen Tasks.
@@ -348,6 +358,32 @@ pipeline_stages:
 - [ ] Step 3: Gesamtlauf: `python3 -m pytest tests -q` → `N passed` ohne `failed`/`error`; `python3 scripts/sync.py --validate` → Exit 0; `tests/scenarios/run.sh` → alle Szenarien `PASS`.
 - [ ] Step 4: Mammouth-Beweis mit konkretem Basisbranch `main` (Branch-Diff, nicht Working-Tree-Diff): `git diff --stat main...HEAD -- tests/fixtures/ac01-baseline/hashes.json` zeigt keine `Mammouth/`-Zeile; Prüfung per `git diff main...HEAD -- tests/fixtures/ac01-baseline/hashes.json | grep -c Mammouth` → `0`.
 - [ ] Step 5: commit (nur falls Nachzügler-Fixes oder Bericht-Änderungen entstanden) `test: record follow-up search and final verification for #1006`
+
+### Task 16: Folge-Issue anlegen (nach Merge von Plan A) — Rollback-Lücke OQ-4
+**Agent:** documenter · **Issue:** #1006 (Folge-Issue, noch nicht angelegt) · **AC:** — (Nicht-Ziel der Spec, OQ-4, vom Nutzer bestätigt 2026-10-22)
+**Depends on:** 15
+**Gate:** Dieser Task startet ERST nach dem Merge von Plan A auf `main`. Er ändert keinen Code und blockiert den PR-Hand-off nicht. Das Issue wird NICHT in diesem Plan/Spec-Lauf angelegt, sondern nur hier dokumentiert; die Anlage erfolgt später über den Orchestrator (Skill `issue-lifecycle`).
+**Files:**
+- Modify: `docs/plans/2026-10-22-opencode-entrypoint-1006-plan.md`
+- Modify: `docs/specs/2026-10-22-opencode-entrypoint-1006-spec.md`
+**Interfaces:** Produces Issue-Text (unten, Englisch, GitHub-Issue) und die abgehakten Checkboxen dieses Tasks; Consumes Spec Rev. 1.3 (Nicht-Ziele: verifizierte Evidenz zu OQ-4).
+**Issue-Text-Entwurf:**
+> **Title:** `fix: roll back opencode runtime-gate deny and default_agent on tier change or provider removal`
+>
+> **Problem:** The managed merge `_sync_opencode_runtime_gate` (`scripts/lib/isolation.py`) is only called when `provider_runtime_gate_tier(pc, caps) == "permission"` (`scripts/lib/sync_pipeline.py:1308`, `scripts/lib/cli_commands.py:283`). Consequently (a) after a tier change away from `permission` (e.g. `advisory`) the rollback branch (`isolation.py:467-479`) never runs: `permission.edit["**"]`/`permission.bash["**"]` = `"deny"` (`isolation.py:408-410`, `:464`) and the state namespaces `runtime-gate-deny` / `default-agent` in `.opencode/agent-meta-state.json` stay stale (`strict` -> non-strict at tier `permission` rolls back correctly); (b) when the provider is removed from `project.yaml`, `_sync_stage_legacy_cleanup` (`sync_pipeline.py:836-886`) only deletes `agents_dir`, `AGENTS.md` and the empty provider root — `opencode.json` is not touched and the state file keeps `.opencode/` alive, so the managed denies and the isolation denies (`isolation.py:310-361`) remain. No counter-mechanism exists (`rule_index.cleanup_stale_managed_files` and `agent_sync._cleanup_stale_agents` only handle files). The deactivation path (`scripts/lib/deactivation.py`, `remove_provider_dir`) was inferred from its signature only and not verified by a run. Known limitation of #1006 (explicitly out of scope there).
+>
+> **Repro (3 steps):**
+> 1. Project with `orchestrator.mode: strict`, provider Opencode at tier `permission`, explicit `primary-role`; run `python3 scripts/sync.py` -> `opencode.json` contains `permission.edit["**"]`/`permission.bash["**"]` = `deny` and `.opencode/agent-meta-state.json` contains `runtime-gate-deny` + `default-agent`.
+> 2. Change the tier of Opencode to `advisory` (capabilities/`runtime_gate`) and sync again -> the denies and both state namespaces remain.
+> 3. Remove `Opencode` from `ai-providers` in `project.yaml` and sync again -> `opencode.json` (denies, `default_agent`) and the state file remain.
+>
+> **Proposal:** (1) Decouple the rollback call from the tier condition: call the rollback path (with `desired=None`, empty entries) whenever a `runtime-gate-deny` / `default-agent` state entry exists, independent of `provider_runtime_gate_tier`; keep the provider-agnostic gate (no hard-wired `.opencode/...` for foreign providers; derive the state path from resolved data). (2) Add a rollback helper that `_sync_stage_legacy_cleanup` calls before the state file is deleted, so a removed provider leaves no managed denies behind. (3) Tests: tier change `permission` -> `advisory` and provider removal both restore `prior` values and remove the namespaces; foreign providers stay untouched.
+>
+> **References:** #1006, `SPEC-OPENCODE-ENTRYPOINT-1006-2026-10-22` (Nicht-Ziele, OQ-4).
+- [ ] Step 1: Bestätigen, dass Plan A gemergt ist (`git log --oneline main --grep "1006"` liefert einen Treffer); sonst Task nicht starten.
+- [ ] Step 2: Vor der Anlage Evidenz erneut gegen `main` prüfen (Zeilenangaben können driften): `Grep` `provider_runtime_gate_tier\(pc, caps\) == "permission"` in `scripts/lib/sync_pipeline.py` und `scripts/lib/cli_commands.py` -> je genau 1 Treffer; `Grep` `def _sync_stage_legacy_cleanup` -> 1 Treffer. Abweichungen im Issue-Text anpassen.
+- [ ] Step 3: Issue mit dem Text oben anlegen (Orchestrator, Skill `issue-lifecycle`; Labels `bug`, `opencode`); Issue-Nummer unter dieses Task-Ergebnis schreiben und in der Spec (Offene Fragen, OQ-4) ergänzen.
+- [ ] Step 4: Kein Code-Commit; nur falls die Spec/der Plan die Issue-Nummer erhält: commit `docs: link follow-up issue for opencode rollback gap`
 
 ## Self-Review
 
@@ -363,21 +399,22 @@ pipeline_stages:
 | AC-11 | 1, 4, 8 | `docs/analysis/2026-10-22-opencode-permission-precedence.md`, `tests/test_agents_frontmatter.py`, `tests/test_opencode_primary_edit_lock.py` |
 | AC-12 | 12 | `sync.py`-Lauf, `cmp` der Diffs, `--validate` |
 | AC-13 | 5 | `tests/test_opencode_runtime_gate.py` |
-| AC-15 (a, b.1-b.5) | 3, 7, 10, 11, 15 | siehe Tasks |
+| AC-15 (a, b.1-b.5) | 3, 7, 9, 10, 11, 15 | siehe Tasks |
 | AC-16 | 14 | `Grep` + `--validate` |
 | OQ-8-Amendment, `orchestrator_hint` | 13, 9 | `tests/test_orchestrator_hint_flag.py` |
+| OQ-4 (Nicht-Ziel / Folge-Issue) | 16 | Dokumentationstask (nach Merge); kein Test |
 
 **Checks**
 - Jeder Task mappt auf genau eine Rolle (`developer`, `senior-developer`, `tester`, `documenter`); jedes Akzeptanzkriterium ist über Testkommando oder Grep/Diff messbar.
-- `Files:`/`Interfaces:` vollständig; Parallelgruppe `g1` = {Task 1: `docs/analysis/…`; Task 2: `providers.py`, `test_explicit_primary_role.py`; Task 4: `test_agents_frontmatter.py`, (bedingt) `frontmatter.py`; Task 13: drei `docs/specs/*`-Dateien} ist dateidisjunkt. Alle übrigen Tasks laufen sequenziell, weil sie `provider_transform.py`, `isolation.py`, `tests/test_opencode_runtime_gate.py`, `tests/test_runtime_gate_wiring.py`, `config/provider-tools.yaml` oder `config/ai-providers.yaml` teilen. Nachweis per `spec_plan._parse_plan_tasks`/`validate_plan`/`check_plan_file_overlap` vor Ausführung.
+- `Files:`/`Interfaces:` vollständig; Parallelgruppe `g1` = {Task 1: `docs/analysis/…`; Task 2: `providers.py`, `test_explicit_primary_role.py`; Task 4: `test_agents_frontmatter.py`, (bedingt) `frontmatter.py`; Task 13: drei `docs/specs/*`-Dateien} ist dateidisjunkt. Alle übrigen Tasks laufen sequenziell, weil sie `provider_transform.py`, `isolation.py`, `tests/test_opencode_runtime_gate.py`, `tests/test_runtime_gate_wiring.py`, `config/provider-tools.yaml` oder `config/ai-providers.yaml` teilen. Nachweis per `scripts/lib/consistency/spec_plan.py::_parse_plan_tasks` sowie `scripts/lib/orchestration.py::validate_plan`/`check_plan_file_overlap` vor Ausführung.
 - Alle genannten Pfade/Symbole wurden gegen den Stand von 2026-10-22 geprüft (u. a. `isolation._read_state`, `_write_state`, `_opencode_runtime_gate_entries`, `_sync_opencode_runtime_gate`; `provider_transform._apply_agent_transform`, `_transform_frontmatter_for_opencode`, `_map_claude_tools_to_opencode_permissions`; `frontmatter._update_frontmatter_dict`; `ActiveSet.roles`; `SyncLog.warning`); neu angelegte Symbole sind in `Interfaces` als Produces ausgewiesen.
 - `pipeline_stages` deckt die einzige `plan-driven`-Stage `implement` ab (Frontmatter-Block oben).
 - Keine Platzhalter; offene Punkte sind als Unsicherheit mit Default benannt (siehe unten).
 
 **Annahmen / Unsicherheiten**
 1. Permission-Rangfolge (R-1): per Doku belegt, Laufzeit nur per optionaler Probe (Task 1); Task 8 ist darauf gegated. Pfad-Semantik der allow-list (`**`, relativ/absolut) ist ebenfalls nur per Probe belegbar; ohne Beleg degradiert Option B im Worst Case fail-closed zu A (R-2).
-2. OQ-3: Plan setzt Option B (scoped allow-list) um; Option A = `opencode_primary_edit_allow: []`.
-3. OQ-4 (Rollback bei Tier-Wechsel/Provider-Entfernung) bleibt Folge-Issue; kein Task.
+2. OQ-3: entschieden — Plan setzt Option B (scoped allow-list) um (vom Nutzer bestätigt, 2026-10-22); Option A = `opencode_primary_edit_allow: []`.
+3. OQ-4 (Rollback bei Tier-Wechsel/Provider-Entfernung): bewusste Grenze, bestätigt (2026-10-22), Evidenz in Spec Rev. 1.3; nur Task 16 (Folge-Issue nach Merge dokumentiert), keine Code-Änderung in diesem Plan. Restunsicherheit: der Deaktivierungspfad (`scripts/lib/deactivation.py`, `remove_provider_dir`) wurde nur aus der Signatur abgeleitet, nicht per Lauf geprüft.
 4. Warntexte sind Englisch (Code-Konvention); die deutsche Formulierung in AC-07 der Spec wird sinngemäß umgesetzt (Substring-Tests auf Nutzerwert, Rolle, `provider-overrides`).
 5. Tests setzen voraus, dass das AC-01-Matrixprojekt nicht strikt ist (Reviewer-Befund); Task 11 Step 1 enthält ein Stop-Kriterium, falls nicht.
 6. `write_checked` kann bei „nichts zu tun“ ein leeres `{}` anlegen (Bestandsverhalten, unverändert); der Wiring-Test in Task 7 prüft daher tolerant auf Existenz.

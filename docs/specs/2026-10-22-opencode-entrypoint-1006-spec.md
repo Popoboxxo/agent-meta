@@ -2,7 +2,7 @@
 spec-id: SPEC-OPENCODE-ENTRYPOINT-1006-2026-10-22
 title: Opencode-Einstiegspunkt (#1006) — mode primary + default_agent auch auf v1, Gate-Kopplung, Managed-Merge
 status: Entwurf
-revision: 1.2
+revision: 1.3
 review: docs/reviews/2026-10-22-opencode-entrypoint-1006-spec-review.md
 rereview: docs/reviews/2026-10-22-opencode-entrypoint-1006-spec-rereview.md
 issue: "#1006"
@@ -12,7 +12,7 @@ amends: OQ-8 (Amendment siehe Abschnitt Entscheidungsregister)
 
 # Opencode-Einstiegspunkt (#1006) — Spec
 
-> Status: Entwurf (Rev. 1.2 — Rereview `CHANGES_REQUESTED` vom 2026-10-22 eingearbeitet: MAJOR-A, MINOR-A..C; Rev. 1.1: MAJOR-1..3, MINOR-1..6)
+> Status: Entwurf (Rev. 1.3 — 2026-10-22: Nutzerantworten eingearbeitet: OQ-3 entschieden (Variante B bestätigt), OQ-4 als bewusste Grenze mit verifizierter Evidenz dokumentiert (Folge-Issue). Rev. 1.2 — Rereview `CHANGES_REQUESTED` vom 2026-10-22 eingearbeitet: MAJOR-A, MINOR-A..C; Rev. 1.1: MAJOR-1..3, MINOR-1..6)
 > Trace-Anker: `spec-id: SPEC-OPENCODE-ENTRYPOINT-1006-2026-10-22`
 >
 > Der Approval-Marker (`Status: APPROVED`) wird ausschließlich vom Nutzer bzw. `concept-reviewer`
@@ -80,8 +80,8 @@ eingefroren.
 3. Die Edit-/Bash-Sperre (Gate) wird an den Einstiegspunkt gekoppelt: der Deny wird nur geschrieben,
    wenn `primary-role` explizit gesetzt ist und diese Rolle generiert wird; sonst nur Warnung.
 4. Der primäre Orchestrator hebelt das Gate nicht aus: solange das Gate aktiv ist, emittiert er statt
-   `edit: allow` eine Sperre (Ausgestaltung: Skalar `deny` vs. scoped allow-list, ADR-5 / OQ-3 —
-   Default-Empfehlung scoped allow-list, Nutzerbestätigung offen).
+   `edit: allow` eine Sperre (Ausgestaltung: scoped allow-list `.tmp/**` + `.meta-viz/**`, ADR-5 —
+   vom Nutzer bestätigt, 2026-10-22; Skalar `deny` bleibt per leerer Pfadliste schaltbar).
 5. Das eigene `opencode.json` des Repos (Self-Sync) konvergiert beim nächsten Sync zu einem
    funktionierenden Einstiegspunkt.
 6. Bugfix, kein Major: CHANGELOG-Eintrag unter „Fixed".
@@ -99,7 +99,27 @@ eingefroren.
   Cleanup, keine `docs/providers/opencode.md`-Überarbeitung — alles Plan B (separate Spec).
 - Kein Create-Pfad-Umbau: `_init_provider_settings_json` und `apply_settings_surface_shape` bleiben
   unverändert (siehe ADR-3, v1-Template-Bytes bleiben frozen).
-- Keine Rollback-Garantie bei Tier-Wechsel/Provider-Entfernung (offen, OQ-4).
+- **Bewusste Grenze (OQ-4, vom Nutzer bestätigt 2026-10-22): keine Rollback-Garantie bei Tier-Wechsel
+  weg von `permission` und bei Provider-Entfernung.** Die Lücke ist NICHT Teil dieses Fixes; sie wird
+  als Folge-Issue geführt (Plan A, letzter Task). Verifizierte Evidenz (Stand Branch
+  `docs/opencode-v2-1006-plans`, 2026-10-22):
+  - (a) *Tier-Wechsel weg von `permission` (z. B. `advisory`):* `_sync_opencode_runtime_gate` wird nur bei
+    `provider_runtime_gate_tier(pc, caps) == "permission"` aufgerufen (`scripts/lib/sync_pipeline.py:1308`,
+    `scripts/lib/cli_commands.py:283`). Der Rollback-Zweig (`scripts/lib/isolation.py:467-479`) läuft dann
+    nie; `permission.edit["**"]`/`permission.bash["**"]` = `"deny"` (`isolation.py:408-410`, `:464`) und
+    der State-Namespace `runtime-gate-deny` (`.opencode/agent-meta-state.json`; `isolation.py:41`, `:441`,
+    `:494-499`) bleiben stale. Der Wechsel `strict` -> nicht-strict bei Tier `permission` rollt dagegen
+    korrekt zurück.
+  - (b) *Provider aus `project.yaml` entfernt:* `_sync_stage_legacy_cleanup`
+    (`sync_pipeline.py:836-886`) löscht nur `agents_dir`, `AGENTS.md` und das leere Provider-Root;
+    `opencode.json` wird nicht angefasst, die State-Datei hält `.opencode/` am Leben -> verwaltete Denies
+    und Isolation-Denies (`isolation.py:310-361`) bleiben stale. Der Deaktivierungspfad
+    (`scripts/lib/deactivation.py`, `remove_provider_dir`) wurde nur aus der Signatur abgeleitet, nicht
+    per Lauf geprüft (Restunsicherheit). Ein Gegenmechanismus existiert nicht
+    (`rule_index.cleanup_stale_managed_files` und `agent_sync._cleanup_stale_agents` behandeln nur Dateien).
+  - Ergebnis: Lücke bestätigt. Konsequenz für Nutzer: nach Tier-Wechsel/Provider-Entfernung `opencode.json`
+    und State-Namespaces manuell bereinigen, bis das Folge-Issue umgesetzt ist (CHANGELOG-Hinweis
+    nicht nötig; bestehendes Verhalten, kein Rückschritt durch #1006).
 - Keine Änderung der Kimi-Allowlist-Logik (`provider_transform.py:525`); deren Default bleibt.
 
 ## Interface Contracts
@@ -387,7 +407,7 @@ Testdateien sind Vorschläge; der Plan konkretisiert. Alle Tests: `python3 -m py
   `bash: deny`, `task`, `read`, `todowrite` unverändert. (IC-3, IC-4.)
 - **AC-12 (Self-Sync):** Given das eigene Repo (`.meta-config/project.yaml`: `orchestrator.strict:
   true`), When `python3 scripts/sync.py` läuft, Then (a) `.opencode/agents/orchestrator.md` hat
-  `mode: primary` und `permission.edit` gemäß AC-11 (Option laut OQ-3; Default B:
+  `mode: primary` und `permission.edit` gemäß AC-11 (Variante B, vom Nutzer bestätigt (OQ-3):
   `{"*": deny, ".tmp/**": allow, ".meta-viz/**": allow}`), (b) `opencode.json` enthält zusätzlich
   `"default_agent": "orchestrator"` bei erhaltenen Keys (`subagent_depth`, `plugin`, `mcp`,
   `permission.edit/bash["**"]="deny"`), (c) `.opencode/agent-meta-state.json` enthält die
@@ -431,7 +451,7 @@ Testdateien sind Vorschläge; der Plan konkretisiert. Alle Tests: `python3 -m py
 
 ## Entscheidungsregister
 
-Verbindliche Nutzerentscheidungen 1–5 (ADR-Kurzform: Kontext → Entscheidung → Konsequenz).
+Verbindliche Nutzerentscheidungen 1–5 sowie die Bestätigungen zu OQ-3/OQ-4 vom 2026-10-22 (ADR-Kurzform: Kontext → Entscheidung → Konsequenz).
 
 | # | Entscheidung | Konsequenz |
 |---|---|---|
@@ -439,7 +459,9 @@ Verbindliche Nutzerentscheidungen 1–5 (ADR-Kurzform: Kontext → Entscheidung 
 | 2 | Shell-/Edit-Sperre an Einstiegspunkt koppeln: Deny nur bei gesetztem `primary-role` und generierter Rolle, sonst nur Warnung. | IC-4/IC-6 Schritt 2; AC-10. Eine Strict-Konfiguration kann das Gate nicht mehr „leer“ schalten, ohne dass ein Einstieg existiert. |
 | 3 | `default_agent` im Managed-Merge (`_sync_opencode_runtime_gate`) mit eigenem State-Key und Rollback; Nutzer-abweichender Wert wird nicht überschrieben, nur gewarnt. | IC-5/IC-6; AC-06…AC-09. |
 | 4 | `edit: allow` im Orchestrator im selben Fix lösen — **Korrektur:** das Template hat kein `edit: allow`, es entsteht im Mapping (`Write → edit`); Ansatzpunkt ist `provider_transform` (IC-3), nicht das Template. Rangfolge per Doku belegt (OQ-1). Ausgestaltung Skalar vs. scoped allow-list: ADR-5. | IC-3/IC-4; AC-11. |
-| 5 | Kein Major; CHANGELOG „Fixed". | AC-16. |
+| 5 | Kein Major; CHANGELOG „Fixed“. | AC-16. |
+| OQ-3 | Edit-Sperre des Primär-Orchestrators: scoped allow-list (Variante B: `.tmp/**` + `.meta-viz/**`) statt Skalar `deny`. **Vom Nutzer bestätigt, 2026-10-22; bleibt Default, OQ-3 geschlossen.** | ADR-5, IC-3, AC-11/AC-12; Rückfall auf A weiterhin per `opencode_primary_edit_allow: []` ohne Codeänderung. |
+| OQ-4 | Rollback-Lücke bei Tier-Wechsel/Provider-Entfernung ist NICHT Teil von Fix A. **Vom Nutzer bestätigt, 2026-10-22.** | Bewusste Grenze unter Nicht-Ziele (verifizierte Evidenz dort); Folge-Issue als letzter Plan-Task (Plan A, Task 16). |
 
 Zusätzliche Spec-Entscheidungen:
 
@@ -478,7 +500,7 @@ Zusätzliche Spec-Entscheidungen:
   Regeln haben Vorrang, letzter Match gewinnt) — Quell-/Repo-Dateien bleiben gesperrt (Entscheidung 2
   erfüllt), Orchestrator-Infrastruktur bleibt funktionsfähig; etwas mehr Surface (Pfadliste,
   verschachteltes YAML im Frontmatter, Pfade müssen zu Checkpoint-Konfiguration passen).
-  *Entscheidung (Default-Empfehlung, Nutzerbestätigung offen → OQ-3):* **B**; die Pfadliste liegt in
+  *Entscheidung (vom Nutzer bestätigt, 2026-10-22; OQ-3 geschlossen):* **B**; die Pfadliste liegt in
   `config/provider-tools.yaml: opencode_primary_edit_allow`, leere Liste = A ohne Codeänderung.
   *Konsequenz:* IC-3/AC-11 beschreiben beide Varianten; Entscheidung 2 (Sperre) bleibt bindend,
   B ist nur Ausgestaltung. Risiko: Pfade driften von `checkpoint_dir`-Konfiguration (R-2).
@@ -525,8 +547,8 @@ dieser Spec).
 |---|---|---|---|
 | OQ-1 | **Permission-Rangfolge in Opencode:** überschreibt ein Agent-Level-`permission.edit: allow` einen globalen `permission.edit: {"**": "deny"}`? **Per Doku belegt:** "Agent permissions are merged with the global config, and agent rules take precedence" (opencode.ai/docs/permissions, Abschnitt Agents; "last matching rule wins"). Damit ist IC-3 notwendig (sonst hebt der primäre Orchestrator das Gate auf); `developer` & Co. dürfen weiterhin editieren. | Beantwortet (siehe links). | Optional (Bestätigung, kein Blocker): Plan-Task, falls Binary vorhanden, Probe in Wegwerf-Verzeichnis unter `.tmp/`: globales edit-deny + Agent mit `edit: allow` bzw. scoped Mapping (ADR-5), Schreibversuch über `opencode run`; Ergebnis dokumentieren. Falls entgegen der Doku Global gewinnt: IC-3 wirkungslos, das Gate sperrt dann auch Subagents → Folge-Issue, Entscheidung 4 neu bewerten. |
 | OQ-2 | Soll der primäre Orchestrator unter aktivem Gate `edit: deny` oder `edit` weggelassen emittieren? | `deny`/scoped Mapping (explizit, unabhängig von der Rangfolge lesbar; Weglassen verlöre die explizite Absicht, Entscheidung 4). | Durch ADR-5 abgedeckt; optionale OQ-1-Probe. |
-| OQ-3 | **Zur Nutzerbestätigung (ADR-5):** Skalar `edit: deny` (A) oder scoped allow-list `.tmp/**` + `.meta-viz/**` (B)? Entscheidung 2 (Sperre) ist bindend; die Wahl betrifft nur die Ausgestaltung. | **B** (Default-Empfehlung): Orchestrator behält Checkpoint-/Artefakt-Schreibpfad (§9), Quell-/Repo-Dateien bleiben gesperrt. A = `opencode_primary_edit_allow: []`, ohne Codeänderung. | Nutzer bei Spec-Freigabe; bis dahin bleibt Status Entwurf. |
-| OQ-4 | **Tier-Wechsel-/Provider-Entfernungs-Rollback-Lücke:** `sync_pipeline.py:1308` und `cli_commands.py:283` rufen den Merge nur bei `provider_runtime_gate_tier(pc, caps) == "permission"`. Wechselt das Tier (oder wird Opencode aus der Provider-Liste entfernt), bleiben verwalteter Deny, `default_agent` und State stehen. | **Offen, nicht in diesem Fix.** Folge-Issue. Vorschlag: Aufruf zusätzlich, wenn der State-Datei-Namespace `runtime-gate-deny`/`default-agent` existiert (Helper `_opencode_managed_state_present(project_root) -> bool`), und `desired=None`/`entries={}` bei Tier ≠ permission. Nicht aufgenommen, weil der Aufruf provider-agnostisch gated werden müsste, ohne `.opencode/…` fest zu verdrahten (Risiko von Fehlrollbacks für fremde Provider). | Entscheidung des Nutzers bei Freigabe: Folge-Issue anlegen (Default) oder in diese Spec ziehen. |
+| OQ-3 | ~~Skalar `edit: deny` (A) oder scoped allow-list (B)?~~ **ENTSCHIEDEN (vom Nutzer bestätigt, 2026-10-22): B** (`.tmp/**` + `.meta-viz/**`); geschlossen. | B: Orchestrator behält Checkpoint-/Artefakt-Schreibpfad (§9), Quell-/Repo-Dateien bleiben gesperrt. A = `opencode_primary_edit_allow: []`, ohne Codeänderung. | Erledigt (Register). |
+| OQ-4 | **Tier-Wechsel-/Provider-Entfernungs-Rollback-Lücke:** `sync_pipeline.py:1308` und `cli_commands.py:283` rufen den Merge nur bei `provider_runtime_gate_tier(pc, caps) == "permission"`. Wechselt das Tier (oder wird Opencode aus der Provider-Liste entfernt), bleiben verwalteter Deny, `default_agent` und State stehen. **ENTSCHIEDEN (vom Nutzer bestätigt, 2026-10-22): bleibt NICHT Teil von Fix A; bewusste Grenze (siehe Nicht-Ziele, verifizierte Evidenz), Folge-Issue.** | Folge-Issue nach Merge von Plan A (Plan A, Task 16). Vorschlag dort: Rollback-Aufruf von der Tier-Bedingung entkoppeln, sobald ein State-Eintrag existiert; Rollback-Helper in `_sync_stage_legacy_cleanup` vor dem State-Löschen. Nicht aufgenommen, weil der Aufruf provider-agnostisch gated werden müsste, ohne `.opencode/…` fest zu verdrahten (Risiko von Fehlrollbacks für fremde Provider). | Geschlossen; nur noch Folge-Issue-Anlage (nach Merge). |
 | OQ-5 | Fehlt `active_set` im Aufrufer (`None`), gilt die Primary-Rolle als generiert. Reicht das für `--test`-Repos und Unit-Tests? | Ja; beide produktiven Aufrufer übergeben `active_set` (IC-7). | Test in AC-10 mit und ohne `active_set`. |
 | OQ-6 | `default_agent` und Gate nur unter Tier `permission`: Reicht das, falls ein zukünftiger Provider denselben Einstiegspunkt ohne Tier braucht? | Ja (YAGNI); der Aufrufer-Guard bleibt. | Beim ersten Bedarf neues Issue. |
 
