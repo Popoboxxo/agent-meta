@@ -1204,6 +1204,45 @@
                 },
                 "headers": {
                   "type": "object"
+                },
+                "timeout": {
+                  "type": "object",
+                  "description": "MCP tool-call timeouts in milliseconds (opencode v2). All keys are optional; each must be a positive integer. `startup` (Amendment B1) is the server startup budget.",
+                  "properties": {
+                    "startup": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "catalog": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "execution": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "oauth": {
+                  "type": "object",
+                  "description": "Managed OAuth credentials for the MCP server (opencode v2, snake_case). Deliberately limited to these three keys: the v2-documented but unsupported keys (callback_port, redirect_uri, auth_server_metadata_url) and `oauth: false` are rejected here so they fail visibly instead of being silently dropped. Secrets belong in `{env:VAR}` placeholders, never plaintext.",
+                  "properties": {
+                    "client_id": {
+                      "type": "string"
+                    },
+                    "client_secret": {
+                      "type": "string"
+                    },
+                    "scope": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "disabled": {
+                  "type": "boolean",
+                  "description": "Deactivate this MCP server for the opencode v2 surface. Absence means active."
                 }
               }
             },
@@ -1305,6 +1344,45 @@
                     },
                     "headers": {
                       "type": "object"
+                    },
+                    "timeout": {
+                      "type": "object",
+                      "description": "MCP tool-call timeouts in milliseconds (opencode v2). All keys are optional; each must be a positive integer. `startup` (Amendment B1) is the server startup budget.",
+                      "properties": {
+                        "startup": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "catalog": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "execution": {
+                          "type": "integer",
+                          "minimum": 1
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "oauth": {
+                      "type": "object",
+                      "description": "Managed OAuth credentials for the MCP server (opencode v2, snake_case). Deliberately limited to these three keys: the v2-documented but unsupported keys (callback_port, redirect_uri, auth_server_metadata_url) and `oauth: false` are rejected here so they fail visibly instead of being silently dropped. Secrets belong in `{env:VAR}` placeholders, never plaintext.",
+                      "properties": {
+                        "client_id": {
+                          "type": "string"
+                        },
+                        "client_secret": {
+                          "type": "string"
+                        },
+                        "scope": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "disabled": {
+                      "type": "boolean",
+                      "description": "Deactivate this MCP server for the opencode v2 surface. Absence means active."
                     }
                   }
                 },
