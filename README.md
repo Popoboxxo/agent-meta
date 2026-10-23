@@ -167,6 +167,14 @@ for the flags and the resolution precedence.
 | **agent-meta-manager** | balanced | 1.19.0 | Manage agent-meta: upgrades, sync, feedback, project-specific agents |
 | **agent-meta-scout** | balanced | 1.1.3 | Scout AI ecosystem: new skills, roles, rules, patterns |
 | **meta-doctor** | fast | 1.0.0 | Installation diagnosis (`sync.py --doctor`; reports only to the tmp-sink): prioritizes known-issue findings, hands fixes to agent-meta-manager; name-only addressable |
+| **memory-architect** | balanced | 1.0.0 | Agent memory architecture: consolidation, retrieval quality, forgetting, write/read separation |
+| **context-engineer** | balanced | 1.0.0 | Context budget: instruction hierarchy, compaction, what enters the window and what does not |
+| **red-team-agent** | balanced | 1.0.0 | Adversarial prompt red-teaming against own systems: injection, jailbreak, tool misuse |
+| **secrets-manager** | balanced | 1.0.0 | Secret lifecycle: creation, storage, rotation, revocation, leak handling — references only |
+| **chaos-engineer** | balanced | 1.0.0 | Failure injection with hypothesis, steady-state and kill switch — never production by default |
+| **reproducible-builds-engineer** | balanced | 1.0.0 | Build determinism and provenance: double-build byte compare, SBOM, non-determinism sources |
+| **ux-researcher** | balanced | 1.0.0 | User research discipline: past behaviour over opinion, sample and bias stated, findings as hypotheses |
+| **privacy-compliance-officer** | balanced | 1.0.0 | GDPR and AI-Act obligations: legal basis, minimisation, retention, transparency, oversight |
 | **meta-feedback** | fast | 2.1.3 | Improvement proposals for agent-meta as GitHub issues |
 | **meta-optimizer** | balanced | 1.0.0 | Read-only config optimizer: evaluates `sync.py --optimize-config` proposals and presents token-compact, evidence-backed variants — proposal only, name-only addressable |
 | **prompt-engineer** | balanced | 1.3.1 | Expert for prompt engineering, AI security, agent design |

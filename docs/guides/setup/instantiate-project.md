@@ -212,6 +212,14 @@ Alle Agenten heißen **generisch** — kein Projekt-Prefix:
 | `.claude/agents/agent-meta-manager.md` | `1-generic/agent-meta-manager.md` |
 | `.claude/agents/agent-meta-scout.md` | `1-generic/agent-meta-scout.md` |
 | `.claude/agents/meta-doctor.md` | `1-generic/meta-doctor.md` (optional, Installationsdiagnose, nur per Name ansprechbar) |
+| `.claude/agents/memory-architect.md` | `1-generic/memory-architect.md` (optional, Agent memory architecture: consolidation, retrieval quality, forgetting, write/read separation) |
+| `.claude/agents/context-engineer.md` | `1-generic/context-engineer.md` (optional, Context budget: instruction hierarchy, compaction, what enters the window and what does not) |
+| `.claude/agents/red-team-agent.md` | `1-generic/red-team-agent.md` (optional, Adversarial prompt red-teaming against own systems: injection, jailbreak, tool misuse) |
+| `.claude/agents/secrets-manager.md` | `1-generic/secrets-manager.md` (optional, Secret lifecycle: creation, storage, rotation, revocation, leak handling — references only) |
+| `.claude/agents/chaos-engineer.md` | `1-generic/chaos-engineer.md` (optional, Failure injection with hypothesis, steady-state and kill switch — never production by default) |
+| `.claude/agents/reproducible-builds-engineer.md` | `1-generic/reproducible-builds-engineer.md` (optional, Build determinism and provenance: double-build byte compare, SBOM, non-determinism sources) |
+| `.claude/agents/ux-researcher.md` | `1-generic/ux-researcher.md` (optional, User research discipline: past behaviour over opinion, sample and bias stated, findings as hypotheses) |
+| `.claude/agents/privacy-compliance-officer.md` | `1-generic/privacy-compliance-officer.md` (optional, GDPR and AI-Act obligations: legal basis, minimisation, retention, transparency, oversight) |
 | `.claude/agents/meta-optimizer.md` | `1-generic/meta-optimizer.md` (optional, read-only Config-Optimizer: bewertet `--optimize-config`-Proposals und liefert Varianten — nur Proposal, nur per Name ansprechbar; Ablauf: `agent-meta-manager` führt `--optimize-config` aus, erzeugt die Vorschau mit `--apply-config-patch … --dry-run` und wendet erst nach bestätigter `preview.json` mit `--preview <preview.json>` an — die Rolle selbst schreibt nie) |
 | `.claude/agents/prompt-engineer.md` | `1-generic/prompt-engineer.md` |
 | `.claude/agents/log-analyzer.md` | `1-generic/log-analyzer.md` (oder `2-platform/homeassistant-log-analyzer.md`) |
