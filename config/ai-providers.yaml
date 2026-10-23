@@ -236,10 +236,13 @@ providers:
     # OQ-8: v2 is opt-in; v1 stays the default byte shape. surface-version: v2
     # selects frontmatter-mechanism: opencode-native-v2 and
     # mcp-config.format: opencode-json-v2 (consumed by Tasks 6/8, never by a
-    # provider-name branch). PRE-3/OQ-4: orchestrator is emitted as mode: primary.
+    # provider-name branch).
     surface-version: "v1"
     agent-discovery: false
     model-format: "{model}"
+    # v1 and v2 emit this role as `mode: primary` and write it as
+    # `default_agent`; without this key `primary` is never emitted
+    # (#1006, OQ-8 amendment A2).
     primary-role: orchestrator
     context_file: AGENTS.md
     context_template: templates/configs/AGENTS.project-template.md
@@ -306,13 +309,15 @@ providers:
     snippets_dir: .opencode/snippets
     pending_tasks_file: .opencode/pending-tasks.md
     extension_dir: .opencode/3-project
-    orchestrator_hint: '- **In Opencode (VS Code):** Nutzt `@orchestrator <Eure Aufgabe>`
-      im Chat.'
+    orchestrator_hint: '- **In Opencode (VS Code):** Der `orchestrator` ist der
+      Default-Agent (mit Tab wechseln); eine @-Erwähnung ist nicht mehr nötig.'
     agent-transform:
       frontmatter-mechanism: opencode-native
       # OQ-8/AC-5: surface-version is data that SELECTS the frontmatter
       # mechanism; the transform writer keeps reading the resolved
-      # `frontmatter-mechanism` value only. v1 stays byte-frozen.
+      # `frontmatter-mechanism` value only. The v1 surface FORMAT is frozen;
+      # the entry point (`mode: primary` + `default_agent`) is excluded from
+      # that freeze (OQ-8 amendment A2, #1006).
       surface-mechanisms:
         v1: opencode-native
         v2: opencode-native-v2

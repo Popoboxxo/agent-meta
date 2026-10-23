@@ -58,6 +58,13 @@ opencode_deny_critical:
   - Write
   - Edit
 
+# Write scope of the primary orchestrator while the Opencode runtime gate is
+# active (#1006): permission.edit becomes {"*": deny, <path>: allow, ...}.
+# An empty list yields the scalar `edit: deny`.
+opencode_primary_edit_allow:
+  - .tmp/**
+  - .meta-viz/**
+
 continue:
   # Continue has no frontmatter tools model. All tools are available by default.
   # The 'tools' field is removed during generation.

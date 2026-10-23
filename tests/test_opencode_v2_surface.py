@@ -216,3 +216,33 @@ def test_unparseable_template_is_returned_unchanged():
     pc = _pc_v2()
     broken = "{ not valid json"
     assert apply_settings_surface_shape(broken, pc) == broken
+
+
+# --- AC-D8: evidence for opencode.json / opencode.jsonc loading --------------
+
+
+def test_ac_d8_evidence_present_with_result_line():
+    """AC-D8: the jsonc-loading evidence exists and states one clear result.
+
+    Guards plan Task 24 (spec §3.9): before ``opencode.jsonc`` may be removed
+    from the repo root, the evidence document must exist and carry exactly one
+    ``ERGEBNIS:`` line, so the removal decision has a single, greppable verdict.
+    """
+    evidence = (
+        _REPO_ROOT / "docs/analysis/evidence/2026-10-22-opencode-jsonc-loading.md"
+    )
+    assert evidence.is_file(), f"missing AC-D8 evidence: {evidence}"
+
+    result_lines = [
+        line
+        for line in evidence.read_text(encoding="utf-8").splitlines()
+        if line.startswith("ERGEBNIS:")
+    ]
+    assert len(result_lines) == 1, (
+        f"expected exactly one 'ERGEBNIS:' line, found {len(result_lines)}: "
+        f"{result_lines}"
+    )
+    assert result_lines[0].strip() in {
+        "ERGEBNIS: JSONC-TRAEGT-NICHTS-BEI",
+        "ERGEBNIS: JSONC-TRAEGT-INHALT-BEI",
+    }

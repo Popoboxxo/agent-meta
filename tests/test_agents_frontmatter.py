@@ -15,6 +15,8 @@ from pathlib import Path
 from scripts.lib.frontmatter import (
     FRONTMATTER_QUIET_STRIP_FIELDS,
     REFERENCE_STANDARDS_FIELD,
+    _parse_frontmatter_yaml,
+    _update_frontmatter_dict,
     build_frontmatter,
     parse_frontmatter_text,
     parse_reference_standards,
@@ -426,3 +428,32 @@ def test_existing_strip_channel_provenance_unchanged_by_new_default(tmp_path):
     assert "generated-from=1-generic/code-reviewer.md@1.2.2" in body
     assert "reference_standards=" not in body
     assert REFERENCE_STANDARDS_FIELD not in out
+
+
+def test_update_frontmatter_dict_preserves_nested_permission_mapping_order():
+    """Serialize a nested `permission` mapping without lossy round-trip (IC-3).
+
+    Characterization pin for #1006/Task 4: the edit lock (IC-3) hands the
+    serializer `permission.edit = {"*": "deny", ".tmp/**": "allow", ...}`.
+    ``_update_frontmatter_dict`` must emit that nested mapping in insertion
+    order (``"*"`` first, last-match-wins), block style (no ``{...}`` flow
+    mapping), and leave the markdown body untouched.
+    """
+    updates = {
+        "permission": {
+            "read": "allow",
+            "edit": {"*": "deny", ".tmp/**": "allow", ".meta-viz/**": "allow"},
+            "bash": "deny",
+        },
+    }
+    out = _update_frontmatter_dict("---\nname: x\n---\nbody\n", updates)
+
+    parsed = _parse_frontmatter_yaml(out)
+    assert parsed["permission"] == updates["permission"]
+    # `"*"` first: the deny must be overridden by the scoped allow entries.
+    assert list(parsed["permission"]["edit"]) == ["*", ".tmp/**", ".meta-viz/**"]
+    assert list(parsed["permission"]) == ["read", "edit", "bash"]
+    # Block style only: a flow mapping would serialize as `edit: {...}`.
+    assert "{" not in out.split("---")[1]
+    # The body after the closing fence is byte-identical to the input body.
+    assert out.split("---", 2)[2] == "\nbody\n"

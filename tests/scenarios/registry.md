@@ -113,7 +113,7 @@ verhalten sich exakt wie bisher.
 | `66-mammouth-tools-map` | Mammouth | strict (default) | `tools:` frontmatter is an object, never a list (AC-6) |
 | `67-copilot-artifact-paths` | Copilot | strict (default) | corrected artifact paths `.github/agents/*.agent.md` (AC-8) |
 | `68-antigravity-discovery-paths` | Gemini | strict (default) | `agent-discovery` gates the `.agents/*` surface + `serverUrl` (AC-9) |
-| `69-opencode-v2-surface` | Opencode | strict (default) | `surface-version: v2` → nested `mcp.servers`, `default_agent`, retained `subagent_depth` (IC-15 Nr. 16) (AC-5/AC-21) |
+| `69-opencode-v2-surface` | Opencode | strict (default) | v2 `surface-version` → nested `mcp.servers`, `default_agent`, retained `subagent_depth` (IC-15 Nr. 16); v1/unset: flat `mcp` + entry point (`default_agent`, `mode: primary`) (#1006) (AC-5/AC-21, AC-15 b.1) |
 | `70-bootstrap-marker-convergence` | Gemini, ZCode | strict (default) | scoped bootstrap sub-markers + legacy discard + user notes (AC-10/AC-16) |
 | `71-check-idempotency-all-providers` | all 9 | strict (default) | all-provider tree byte-identical across syncs + `--check` rc 0 (AC-4/AC-19) |
 | `72-continue-config-validity` | Continue | strict (default) | valid `.continue/config.yaml` (roles enum, no dead agents block, name/version) (AC-7) |
