@@ -425,9 +425,31 @@ def _apply_agent_transform(
         subagent_depth = None
         if spec.get('inject-subagent-depth'):
             subagent_depth = required_depth_int(_caps)
+        # Write-scope lock (#1006, IC-3/ADR-5): the primary entry must not keep
+        # `permission.edit: allow` while the tier-`permission` gate is active —
+        # a primary agent that can write anywhere defeats the Main-Chat gate.
+        # The gate decision has one source of truth (`lib/isolation`), imported
+        # lazily here to avoid a load-time cycle.
+        deny_edit = False
+        edit_allow_paths: tuple[str, ...] = ()
+        if mode == 'primary':
+            from .isolation import opencode_runtime_gate_wanted
+
+            deny_edit = opencode_runtime_gate_wanted(
+                config, provider, agent_meta_root, provider_config,
+            )
+            if deny_edit:
+                allow_cfg = load_provider_tools_config(agent_meta_root).get(
+                    'opencode_primary_edit_allow',
+                )
+                if isinstance(allow_cfg, list):
+                    edit_allow_paths = tuple(
+                        p for p in allow_cfg if isinstance(p, str) and p
+                    )
         return _transform_frontmatter_for_opencode(
             content, name, description, model, steps, generated_from, agent_meta_root, temperature,
             strip_fields=strip_fields, mode=mode, subagent_depth=subagent_depth,
+            deny_edit=deny_edit, edit_allow_paths=edit_allow_paths,
         )
 
     # --- codex-toml document: native TOML agent file, handled wholesale ---
@@ -770,6 +792,8 @@ def _transform_frontmatter_for_opencode(
     quiet_fields: frozenset[str] | None = None,
     mode: str | None = None,
     subagent_depth: int | None = None,
+    deny_edit: bool = False,
+    edit_allow_paths: tuple[str, ...] = (),
 ) -> str:
     """Build opencode-native agent frontmatter.
 
@@ -794,6 +818,16 @@ def _transform_frontmatter_for_opencode(
     quiet_fields: stripped keys that must NOT be named in that provenance
     comment (IC-04, mirrored from `build_frontmatter`). ``None`` applies the
     default quiet set; a non-set value falls back to the loud path.
+
+    deny_edit: closes the primary agent's write scope while the runtime gate is
+    active (#1006, IC-3/ADR-5). Only an existing ``permission.edit == "allow"``
+    is replaced — a role without ``Write``/``Edit`` already carries ``"deny"``
+    from ``opencode_deny_critical`` and stays untouched, so a lock never widens
+    a privilege. The replacement is the scalar ``"deny"`` when
+    ``edit_allow_paths`` is empty (closed by default) and otherwise the mapping
+    ``{"*": "deny", <path>: "allow", …}`` with ``"*"`` first (last match wins
+    in Opencode). Key order of the remaining permissions is preserved and the
+    default ``deny_edit=False`` renders byte-identically to before.
     """
     body = _strip_frontmatter(content)
     body = _strip_claude_specific_lines(body)
@@ -849,6 +883,20 @@ def _transform_frontmatter_for_opencode(
             template_tools, deny_list=deny_list
         )
         if perms:
+            if deny_edit and perms.get("edit") == "allow":
+                # Copy before the in-place replacement: never mutate the
+                # mapping handed to us (shared state / caller expectations).
+                perms = dict(perms)
+                paths = tuple(
+                    p for p in edit_allow_paths if isinstance(p, str) and p
+                )
+                if paths:
+                    scoped: dict[str, str] = {"*": "deny"}
+                    for path in paths:
+                        scoped.setdefault(path, "allow")
+                    perms["edit"] = scoped
+                else:
+                    perms["edit"] = "deny"
             updates["permission"] = perms
 
     # Preserve temperature: template frontmatter takes precedence over role defaults
