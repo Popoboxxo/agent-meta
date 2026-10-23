@@ -138,6 +138,53 @@ def _apply_surface_mechanism_selection(provider_config: dict) -> dict:
     return provider_config
 
 
+def _apply_surface_aux_selection(provider_config: dict) -> dict:
+    """Resolve auxiliary surface values from ``surface-version``.
+
+    SPEC-OPENCODE-V2-SUPPORT-2026-10-22 §3.1 (plan Task 6; AC-B12 resolution,
+    AC-D7 resolution). Two generic per-surface maps are resolved with the same
+    lookup-by-value pattern as :func:`_apply_surface_format_selection`:
+
+    - ``entry["cli-files"][<surface-version>]`` → flat ``entry["cli_file"]``
+      (the committed CLI settings filename for that surface);
+    - ``entry["agent-transform"]["surface-model-patterns"][<surface-version>]``
+      → ``entry["agent-transform"]["model-pattern"]`` (the model-id contract).
+
+    Providers without the map, without the relevant block, or whose
+    ``surface-version`` is not a key of the map keep their statically declared
+    ``cli_file`` / ``model-pattern`` byte-for-byte (fail-safe, never raises —
+    a missing surface key is not an error). The mapping is looked up by value,
+    so no provider-name literal and no ``surface-version`` comparison is
+    involved; the writers dispatch on the resolved ``cli_file`` /
+    ``model-pattern`` values only.
+
+    Returns the same mapping object with per-entry dicts updated in place.
+    """
+    if not isinstance(provider_config, dict):
+        return provider_config
+    for entry in provider_config.values():
+        if not isinstance(entry, dict):
+            continue
+        surface_version = entry.get("surface-version")
+        if not isinstance(surface_version, str) or not surface_version:
+            continue
+        cli_files = entry.get("cli-files")
+        if isinstance(cli_files, dict) and cli_files:
+            selected_cli_file = cli_files.get(surface_version)
+            if isinstance(selected_cli_file, str) and selected_cli_file:
+                entry["cli_file"] = selected_cli_file
+        transform = entry.get("agent-transform")
+        if not isinstance(transform, dict):
+            continue
+        model_patterns = transform.get("surface-model-patterns")
+        if not isinstance(model_patterns, dict) or not model_patterns:
+            continue
+        selected_pattern = model_patterns.get(surface_version)
+        if isinstance(selected_pattern, str) and selected_pattern:
+            transform["model-pattern"] = selected_pattern
+    return provider_config
+
+
 #: Value type per allow-listed override key. Used instead of an inline
 #: ``key == "surface-version"`` branch so the override stays data-driven and
 #: never appears as a surface-version comparison (AC-23 guard).
@@ -249,9 +296,11 @@ def load_providers_config(
 
     The returned registry is normalized once so ``mcp-config.format`` already
     reflects the ``surface-version`` selection (see
-    ``_apply_surface_format_selection``) and ``agent-transform.frontmatter-
+    ``_apply_surface_format_selection``), ``agent-transform.frontmatter-
     mechanism`` reflects the ``surface-version`` selection (see
-    ``_apply_surface_mechanism_selection``); the writers never read
+    ``_apply_surface_mechanism_selection``) and the auxiliary surface values
+    (``cli_file``, ``agent-transform.model-pattern``) reflect it too (see
+    ``_apply_surface_aux_selection``); the writers never read
     ``surface-version``.
 
     When *project_config* is given, the project ``provider-options`` surface
@@ -345,7 +394,8 @@ def load_providers_config(
     if project_config is not None:
         providers = _apply_project_surface_overrides(providers, project_config)
     providers = _apply_surface_format_selection(providers)
-    return _apply_surface_mechanism_selection(providers)
+    providers = _apply_surface_mechanism_selection(providers)
+    return _apply_surface_aux_selection(providers)
 
 
 def load_provider_capabilities(agent_meta_root: Path) -> dict:
