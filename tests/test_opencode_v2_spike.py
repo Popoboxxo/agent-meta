@@ -1,17 +1,34 @@
 """Structure contract for the C0 spike result document (issue #1007, AC-C1).
 
-Plan: ``docs/plans/2026-10-22-opencode-v2-support-plan.md`` Task 1 (C0.1).
-Spec: ``docs/specs/2026-10-22-opencode-v2-support-spec.md`` 3.6 / AC-C1.
+Plan: ``docs/plans/2026-10-22-opencode-v2-support-plan.md`` Task 1 (C0.1) and
+Task 3a (AC-C2 guard test).
+Spec: ``docs/specs/2026-10-22-opencode-v2-support-spec.md`` 3.6 / AC-C1 / AC-C2.
 
-The tests are pure document checks: no network, no runtime probing.
+The tests are document checks: no network, no runtime probing. The one
+exception is ``test_ac_c2_gate_fallback_invariants``, which additionally reads
+the resolved provider registry/capabilities and — only in the NO-GO case —
+exercises the capability-gated plugin writer against ``tmp_path``.
 """
 
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(_REPO_ROOT / "scripts"))
+
+from lib.log import SyncLog
+from lib.providers import (
+    SUPPORTED_PLUGIN_PROTOCOLS,
+    load_provider_capabilities,
+    load_providers_config,
+    provider_runtime_gate_tier,
+)
+from lib.runtime_gate import sync_runtime_gate_plugins
+
+REPO_ROOT = _REPO_ROOT
 
 SPIKE = Path("docs/spikes/2026-10-22-issue-1007-opencode-v2-plugin-api-spike.md")
 SPEC = Path("docs/specs/2026-10-22-opencode-v2-support-spec.md")
@@ -46,6 +63,39 @@ def _read(rel_path: Path) -> str:
 
 def _read_spike() -> str:
     return _read(SPIKE)
+
+
+#: Provider entry whose v2 surface the gate fallback is about. Test-side
+#: literal: the fixture exercises that concrete surface, not a dispatch branch.
+_V2_PROVIDER = "Opencode"
+_V2_PROJECT_CONFIG = {
+    "provider-options": {_V2_PROVIDER: {"surface-version": "v2"}}
+}
+
+#: Registry keys that Task 18 adds only after ``VERDICT-C3: GO`` (Spec 3.1).
+_C3_REGISTRY_KEYS = ("surface-plugin-protocols", "surface-has-plugins")
+
+
+def _c3_verdict() -> str:
+    """Return the single ``VERDICT-C3`` value of the spike document."""
+    values = VERDICT_C3_RE.findall(_read(SPIKE))
+    assert len(values) == 1, (
+        f"expected exactly one 'VERDICT-C3:' line in {SPIKE.as_posix()}, "
+        f"found {len(values)}"
+    )
+    return values[0]
+
+
+def _resolved_v2_provider() -> tuple[dict, dict]:
+    """Resolve the v2 project's provider entry and its declared capabilities."""
+    providers = load_providers_config(REPO_ROOT, _V2_PROJECT_CONFIG)
+    entry = providers.get(_V2_PROVIDER)
+    assert isinstance(entry, dict), f"registry has no {_V2_PROVIDER!r} entry"
+    caps = load_provider_capabilities(REPO_ROOT).get(_V2_PROVIDER)
+    assert isinstance(caps, dict), (
+        f"capabilities registry has no {_V2_PROVIDER!r} entry"
+    )
+    return entry, caps
 
 
 def _q_sections(text: str) -> dict[int, str]:
@@ -137,6 +187,76 @@ def test_measure_budget_respected() -> None:
         assert sources, f"Q{number}: missing 'Quellen: <n>' line"
         assert max(probes) <= 3, f"Q{number}: probe budget exceeded ({probes} > 3)"
         assert max(sources) <= 5, f"Q{number}: source budget exceeded ({sources} > 5)"
+
+
+def test_ac_c2_gate_fallback_invariants(tmp_path: Path) -> None:
+    """AC-C2: the gate fallback invariants hold for both C3 verdicts.
+
+    The verdict is read from the spike document, never hard-coded. In the
+    NO-GO case the permission-tier fallback is verified end-to-end on a v2
+    project fixture; in the GO case (current verdict) only the one-direction
+    invariant "C3 registry keys present => verdict is GO" is asserted. Task 19
+    tightens that to equivalence; the reverse direction is deliberately not
+    asserted here (the keys do not exist before Task 18).
+    """
+    verdict = _c3_verdict()
+    pc, caps = _resolved_v2_provider()
+
+    # Non-vacuity anchor: the fixture really resolves the v2 surface.
+    assert pc.get("surface-version") == "v2"
+    assert pc["mcp-config"]["format"] == "opencode-json-v2"
+    assert pc["agent-transform"]["frontmatter-mechanism"] == "opencode-native-v2"
+
+    # Invariant that holds in BOTH verdict cases (AC-C2): declaring the C3
+    # surface keys without a GO verdict is a contract violation.
+    present_keys = [key for key in _C3_REGISTRY_KEYS if key in pc]
+    if present_keys:
+        assert verdict == "GO", (
+            f"registry declares C3 surface keys {present_keys} but the spike "
+            f"verdict is {verdict!r}; C3 keys require VERDICT-C3: GO"
+        )
+
+    if verdict != "NO-GO":
+        return
+
+    # --- VERDICT-C3: NO-GO — the Permissions-Tier fallback is the contract ---
+    assert not present_keys, (
+        f"NO-GO verdict but the registry declares C3 keys: {present_keys}"
+    )
+    assert provider_runtime_gate_tier(pc, caps) == "permission"
+    assert pc.get("has_plugins") is False, (
+        "NO-GO fallback requires the resolved has_plugins flag to stay false"
+    )
+    assert caps.get("runtime_gate") == "permission", (
+        "config/provider-capabilities.yaml must keep runtime_gate: permission"
+    )
+    assert SUPPORTED_PLUGIN_PROTOCOLS == {"opencode-plugin-js"}, (
+        "NO-GO fallback must not add a v2 plugin protocol to the supported set"
+    )
+
+    # AC-C2 asks for "a sync creates no file under .opencode/plugins/". A full
+    # sync.py run is not needed to prove this: the plugin artifact is written
+    # exclusively by sync_runtime_gate_plugins, gated on the resolved
+    # has_plugins flag (sync_pipeline.py:1303). Exercising that writer against
+    # tmp_path is the cheap, side-effect-free form of the same assertion.
+    log = SyncLog()
+    sync_runtime_gate_plugins(
+        REPO_ROOT,
+        tmp_path,
+        {},
+        log,
+        dry_run=False,
+        provider=_V2_PROVIDER,
+        provider_config={_V2_PROVIDER: pc},
+    )
+    plugin_dir = tmp_path / str(pc.get("plugin_dir") or ".opencode/plugins")
+    written = sorted(p.name for p in plugin_dir.iterdir()) if plugin_dir.is_dir() else []
+    assert written == [], f"NO-GO fallback wrote plugin artifacts: {written}"
+
+    assert "Fallback = Permissions-Tier" in _read(SPIKE), (
+        "NO-GO verdict requires the spike document to state "
+        "'Fallback = Permissions-Tier'"
+    )
 
 
 def test_verdict_consequences_recorded() -> None:
