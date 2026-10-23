@@ -14,14 +14,21 @@ SPEC-PROVIDER-AUDIT-OPENCODE-V2-2026-09-30, §4.1 / AC-5 / AC-21 / AC-23
 Both selections happen once, generically, in ``load_providers_config``; the
 writers consume the resolved value only and never read ``surface-version``.
 
-The v2 settings surface (``opencode.json``) additionally emits the
-``experimental.subagent_depth`` key (sourced from the ``required_depth``
-capability when available, else the template value — IC-15 Nr. 16 as amended by
-SPEC-OPENCODE-V2-SUPPORT-2026-10-22: v2 drops the top-level ``subagent_depth``
-key, the C0 spike showed the v2 parser discards it) and emits ``default_agent``
-from the ``primary-role`` data key. ``apply_settings_surface_shape`` dispatches
-on the resolved ``mcp-config.format`` value only; every non-v2 format is
-returned byte-for-byte so the shipped v1 surface stays frozen.
+The v2 settings surface (``opencode.json``) drops the dead top-level
+``subagent_depth`` key (IC-15 Nr. 16 as amended by
+SPEC-OPENCODE-V2-SUPPORT-2026-10-22: the C0 spike showed the v2 parser discards
+it) and emits ``default_agent`` from the ``primary-role`` data key.
+``apply_settings_surface_shape`` dispatches on the resolved ``mcp-config.format``
+value only; every non-v2 format is returned byte-for-byte so the shipped v1
+surface stays frozen.
+
+Amendment B2 (2026-10-23) — single ownership: ``experimental.subagent_depth``
+is written **only** by ``sync_opencode_v2_managed_keys`` (project option, else
+the capability ``required_depth``). The init transform must not write it, so a
+fresh project takes merge row 1 instead of adopting an untracked value (row 3a),
+a project override wins, and a v2→v1 rollback removes the key. The AC-B1
+*document-level* assertion therefore lives in the end-to-end Task 9 tests below,
+not in the settings-shape unit tests.
 
 Run: python3 -m pytest tests/test_opencode_v2_surface.py -q
 """
@@ -179,27 +186,38 @@ def _pc_v2() -> dict:
     }
 
 
-def test_ac_b1_v2_settings_emit_experimental_subagent_depth_and_default_agent():
-    """AC-B1: v2 carries ``experimental.subagent_depth``, never the top-level key."""
+def test_ac_b1_v2_settings_remove_top_level_subagent_depth_and_emit_default_agent():
+    """AC-B1 (Amendment B2): the settings shape removes the dead key only.
+
+    Single ownership: ``experimental.subagent_depth`` is written by
+    ``sync_opencode_v2_managed_keys``, so the init transform must not create an
+    ``experimental`` block (the document-level assertion lives in the Task 9
+    end-to-end test below).
+    """
     out = apply_settings_surface_shape(_SETTINGS_TEMPLATE, _pc_v2())
     doc = json.loads(out)
-    assert doc["experimental"]["subagent_depth"] == 3, (
-        "the v2 surface must emit the shipped depth under experimental."
-        "subagent_depth (IC-15 Nr. 16 amended)"
-    )
     assert "subagent_depth" not in doc, (
         "the v2 surface must not carry a top-level subagent_depth key (the v2 "
         "parser discards it)"
     )
+    assert "experimental" not in doc, (
+        "single ownership (Amendment B2): the settings shape must not write "
+        "experimental.subagent_depth — the managed-merge writer owns it"
+    )
     assert doc["default_agent"] == "orchestrator"
 
 
-def test_ac_b1_v2_settings_subagent_depth_comes_from_required_depth():
+def test_ac_b1_v2_settings_ignore_capabilities_single_ownership():
+    """Single ownership: a resolved ``required_depth`` cannot make this writer act.
+
+    The capability-sourced value is asserted end-to-end against the managed
+    writer (``test_ac_b1_end_to_end_capability_depth_reaches_document``).
+    """
     doc = json.loads(
         apply_settings_surface_shape(_SETTINGS_TEMPLATE, _pc_v2(), {"required_depth": 2})
     )
-    assert doc["experimental"]["subagent_depth"] == 2
     assert "subagent_depth" not in doc
+    assert "experimental" not in doc
 
 
 def test_v2_settings_default_agent_comes_from_primary_role():
@@ -213,8 +231,8 @@ def test_ac_b1_v2_settings_without_primary_role_emits_no_default_agent():
     pc = _pc_v2()
     pc.pop("primary-role")
     doc = json.loads(apply_settings_surface_shape(_SETTINGS_TEMPLATE, pc))
-    assert doc["experimental"]["subagent_depth"] == 3
     assert "subagent_depth" not in doc
+    assert "experimental" not in doc
     assert "default_agent" not in doc
 
 
@@ -362,10 +380,12 @@ def _run(
     log: SyncLog | None = None,
     dry_run: bool = False,
     provider: str = "Opencode",
+    claimed_files: set[str] | None = None,
 ) -> SyncLog:
     log = log if log is not None else SyncLog()
     opencode_v2_config.sync_opencode_v2_managed_keys(
-        project_root, config, provider, providers, framework, log, dry_run
+        project_root, config, provider, providers, framework, log, dry_run,
+        claimed_files=claimed_files if claimed_files is not None else set(),
     )
     return log
 
@@ -373,6 +393,158 @@ def _run(
 def _warned(log: SyncLog, message: str) -> bool:
     """True when *message* appears in the log (entries carry a ``[WARN]`` prefix)."""
     return any(message in warning for warning in log.warnings)
+
+
+def _v2_settings_shape() -> str:
+    """The document the init transform produces for the v2 settings template."""
+    return apply_settings_surface_shape(
+        _SETTINGS_TEMPLATE,
+        {
+            "primary-role": "orchestrator",
+            "mcp-config": {"format": "opencode-json-v2"},
+        },
+    )
+
+
+def test_ac_b1_end_to_end_single_writer_owns_depth_and_rollback(tmp_path):
+    """AC-B1 + QA-B-01: init shape + managed writer, one owner of the depth.
+
+    A fresh v2 project first runs the settings transform (which only removes the
+    dead top-level key) and then the managed writer with an explicit project
+    depth. The result must take merge row 1 — value written, state recorded,
+    no ``opencode-v2-managed`` warning. Since the init no longer pre-writes the
+    depth, the writer cannot mistake it for an untracked equal user value
+    (row 3a). A v2→v1 rollback then removes the key and empties the namespace.
+    """
+    project = tmp_path / "project"
+    project.mkdir()
+    shaped = _v2_settings_shape()
+    (project / "opencode.json").write_text(shaped, encoding="utf-8")
+    assert "subagent_depth" not in json.loads(shaped)
+
+    log = _run(project, _config(3), {"Opencode": _v2_pc()}, tmp_path / "fw")
+
+    doc = _read_json(project / "opencode.json")
+    assert doc["experimental"]["subagent_depth"] == 3
+    assert "subagent_depth" not in doc, (
+        "the v2 parser discards the top-level key; it must stay removed"
+    )
+    assert doc["default_agent"] == "orchestrator"
+    assert not _warned(log, "opencode-v2-managed"), log.warnings
+    assert _read_state_doc(project)[STATE_KEYS_KEY]["experimental.subagent_depth"] == {
+        "value": 3,
+        "prior": None,
+        "prior_absent": True,
+    }
+
+    _run(project, _config(3), {"Opencode": _v1_pc()}, tmp_path / "fw")
+
+    rolled_back = _read_json(project / "opencode.json")
+    assert "experimental" not in rolled_back, (
+        "row 4 rollback must delete the depth and prune the empty container"
+    )
+    assert "subagent_depth" not in rolled_back
+    assert STATE_KEYS_KEY not in _read_state_doc(project)
+
+
+def test_ac_b1_end_to_end_capability_depth_reaches_document(tmp_path):
+    """AC-B1: without a project option the capability ``required_depth`` wins.
+
+    Relocated from the settings-shape unit test: the value is produced by the
+    single owner (``build_managed_keys``), not by the init transform.
+    """
+    project = tmp_path / "project"
+    project.mkdir()
+    (project / "opencode.json").write_text(_v2_settings_shape(), encoding="utf-8")
+    framework = _write_capabilities(tmp_path / "fw", "Opencode", 2)
+
+    log = _run(project, _config(), {"Opencode": _v2_pc()}, framework)
+
+    doc = _read_json(project / "opencode.json")
+    assert doc["experimental"]["subagent_depth"] == 2
+    assert doc["experimental"]["subagent_depth"] >= 2
+    assert "subagent_depth" not in doc
+    assert not _warned(log, "opencode-v2-managed"), log.warnings
+
+
+def test_ac_b1_review_single_ownership_e2e_adopt_change_rollback(tmp_path):
+    """QA-B-12: row 3a (adopt) → row 2 (value change) → rollback restores prior.
+
+    The document starts with the target value as an *untracked* user value, so
+    the first sync adopts it (no write, no warning, ``prior == value``). A later
+    option change updates the value (row 2, prior kept), and the v1 rollback
+    restores the original prior instead of deleting the key.
+    """
+    project = tmp_path / "project"
+    _write_json(project / "opencode.json", {"experimental": {"subagent_depth": 3}})
+    before = (project / "opencode.json").read_bytes()
+    providers = {"Opencode": _v2_pc()}
+
+    adopted = _run(project, _config(3), providers, tmp_path / "fw")
+
+    assert (project / "opencode.json").read_bytes() == before, (
+        "row 3a adopts silently and must not rewrite the document"
+    )
+    assert not _warned(adopted, "opencode-v2-managed"), adopted.warnings
+    assert _read_state_doc(project)[STATE_KEYS_KEY]["experimental.subagent_depth"] == {
+        "value": 3,
+        "prior": 3,
+        "prior_absent": False,
+    }
+
+    _run(project, _config(4), providers, tmp_path / "fw")
+
+    assert _read_json(project / "opencode.json")["experimental"]["subagent_depth"] == 4
+    assert _read_state_doc(project)[STATE_KEYS_KEY]["experimental.subagent_depth"] == {
+        "value": 4,
+        "prior": 3,
+        "prior_absent": False,
+    }
+
+    _run(project, _config(4), {"Opencode": _v1_pc()}, tmp_path / "fw")
+
+    assert _read_json(project / "opencode.json")["experimental"]["subagent_depth"] == 3
+    assert STATE_KEYS_KEY not in _read_state_doc(project)
+
+
+def test_ac_b11_schema_preserved_through_v2_merge(tmp_path):
+    """RVW-B-02: an existing ``$schema`` survives a v2 merge byte-exactly."""
+    project = tmp_path / "project"
+    schema_url = "https://example.invalid/opencode-schema.json"
+    _write_json(
+        project / "opencode.json",
+        {"$schema": schema_url, "theme": "dark"},
+    )
+
+    _run(project, _config(3), {"Opencode": _v2_pc()}, tmp_path / "fw")
+
+    raw = (project / "opencode.json").read_text(encoding="utf-8")
+    assert f'"$schema": "{schema_url}"' in raw
+    assert _read_json(project / "opencode.json")["$schema"] == schema_url
+
+
+def test_ac_b5_non_dict_ancestor_is_kept_with_warning(tmp_path):
+    """QA-B-03: a non-object ancestor is never clobbered to reach a leaf."""
+    project = tmp_path / "project"
+    user_doc = {"experimental": "legacy-user-value", "theme": "dark"}
+    _write_json(project / "opencode.json", user_doc)
+    before = (project / "opencode.json").read_bytes()
+
+    log = _run(
+        project,
+        _config(**{"experimental-todo": True}),
+        {"Opencode": _v2_pc()},
+        tmp_path / "fw",
+    )
+
+    assert (project / "opencode.json").read_bytes() == before, (
+        "a scalar under the container name is user data and must survive"
+    )
+    assert _read_json(project / "opencode.json")["experimental"] == "legacy-user-value"
+    assert _warned(
+        log, "opencode-v2-managed: experimental.todo user value kept"
+    ), log.warnings
+    assert STATE_KEYS_KEY not in _read_state_doc(project)
 
 
 def test_ac_b4_user_keys_survive_managed_merge(tmp_path):
@@ -621,9 +793,13 @@ def test_ac_b19_user_deleted_key_not_rewritten(tmp_path):
 
     # The user removes the managed key (and the now-empty container) by hand.
     _write_json(project / "opencode.json", {"theme": "dark"})
+    before = (project / "opencode.json").read_bytes()
 
     log = _run(project, _config(3), providers, tmp_path / "fw")
 
+    assert (project / "opencode.json").read_bytes() == before, (
+        "row 3c must not rewrite or reformat the document"
+    )
     doc = _read_json(project / "opencode.json")
     assert "experimental" not in doc
     assert _warned(
@@ -727,7 +903,7 @@ def test_writer_passes_secret_gate_params_to_write_checked(tmp_path, monkeypatch
     assert set(kwargs) >= {"allow_secrets", "verify_gitignored", "config", "dry_run"}
     assert kwargs["allow_secrets"] is False
     assert kwargs["verify_gitignored"] is False
-    assert kwargs["config"] is config
+    assert kwargs["config"] == config
     assert kwargs["dry_run"] is False
     assert calls[1][3]["allow_secrets"] is True
 
@@ -993,6 +1169,45 @@ def test_ac_b20_claude_iteration_triggers_no_rollback(tmp_path, monkeypatch):
         if any(marker in line for marker in forbidden)
     ]
     assert leaked == [], leaked
+
+
+def test_ac_b20_owner_conflict_first_owner_without_work_does_not_block(
+    tmp_path, monkeypatch
+):
+    """QA-B-02: a claimant with nothing to do must not shadow the real owner.
+
+    The claim is taken only after the "no targets and no state" check, so an
+    owner that would be a no-op never blocks the next provider. ``idle-first``
+    therefore has no owner conflict and writes normally. In ``worker-first`` the
+    idle owner runs *after* the writer and sees its state; it must be rejected
+    by the claim (one conflict warning) instead of rolling the managed keys back.
+    Both orders end byte-identical.
+    """
+    providers = {"Idle": _v2_pc(), "Worker": _v2_pc()}
+    config = {"provider-options": {"Worker": {"experimental-subagent-depth": 3}}}
+    tiers = {"Idle": "advisory", "Worker": "advisory"}
+
+    snapshots = {}
+    for label, order, expected_conflicts in (
+        ("idle-first", ["Idle", "Worker"], 0),
+        ("worker-first", ["Worker", "Idle"], 1),
+    ):
+        base = tmp_path / label
+        log = SyncLog()
+        project, _, _ = _run_stage(
+            base, monkeypatch, providers, order, config, tiers, log=log
+        )
+        conflicts = [w for w in log.warnings if "opencode-v2-owner-conflict" in w]
+        assert len(conflicts) == expected_conflicts, log.warnings
+        doc = _read_json(project / "opencode.json")
+        assert doc["experimental"] == {"subagent_depth": 3}
+        assert STATE_KEYS_KEY in _read_state_doc(project)
+        snapshots[label] = (
+            (project / "opencode.json").read_bytes(),
+            (project / _V2_STATE_REL).read_bytes(),
+        )
+
+    assert snapshots["idle-first"] == snapshots["worker-first"]
 
 
 def test_ac_b20_owner_conflict_warns_and_second_provider_is_noop(

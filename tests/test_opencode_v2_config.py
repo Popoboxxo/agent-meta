@@ -53,6 +53,7 @@ from lib.opencode_v2_config import (  # noqa: E402  (path set above)
     project_options,
     v2_active,
 )
+from lib.log import SyncLog  # noqa: E402  (path set above)
 from lib.providers import (  # noqa: E402  (path set above)
     load_provider_capabilities,
     load_providers_config,
@@ -322,7 +323,7 @@ def test_opencode_state_path_derived_from_committed_file(tmp_path):
     )
 
 
-def test_build_managed_keys_v2_full():
+def test_ac_b11_build_managed_keys_v2_full():
     """Full v2 fixture: exact path/value map, no ``$schema``, no title model."""
     config = {
         "provider-options": {
@@ -352,7 +353,7 @@ def test_build_managed_keys_v2_full():
     assert build_managed_keys(config, _V2_PROVIDER, {_V2_PROVIDER: pc}, _REPO_ROOT) == keys
 
 
-def test_build_managed_keys_without_todo_omits_key():
+def test_ac_b3_build_managed_keys_without_todo_omits_key():
     """AC-B3: without the option ``experimental.todo`` is not written at all."""
     config = {
         "provider-options": {
@@ -384,7 +385,40 @@ def test_build_managed_keys_empty_when_not_v2():
     assert build_managed_keys(config, "TotallyFakeProvider", foreign, _REPO_ROOT) == {}
 
 
-def test_secret_plaintext_detected():
+def test_ac_b11_providers_null_entry_is_skipped_with_warning():
+    """QA-B-11: a ``providers.<id>: null`` is skipped, never a removal target."""
+    config = {
+        "provider-options": {
+            _V2_PROVIDER: {"providers": {"x": None, "ok": {"env": ["OC_API_KEY"]}}}
+        }
+    }
+    log = SyncLog()
+
+    keys = build_managed_keys(
+        config, _V2_PROVIDER, _resolved("v2"), _REPO_ROOT, log
+    )
+
+    assert "providers.x" not in keys
+    assert keys["providers.ok"] == {"env": ["OC_API_KEY"]}
+    assert any(
+        "opencode-v2-provider-skipped: providers.x is null" in warning
+        for warning in log.warnings
+    ), log.warnings
+
+
+def test_ac_b10_secret_object_value_under_secret_name_is_finding():
+    """QA-B-06: a secret-named key taints its subtree, object values included."""
+    assert find_plaintext_secrets(
+        {"token": {"value": "PLAINTEXT"}}, "providers"
+    ) == ["providers.token.value"]
+
+    # The valid indirection still wins: only the leaf's own form is checked.
+    assert find_plaintext_secrets(
+        {"token": {"value": "{env:OC_TOKEN}"}}, "providers"
+    ) == []
+
+
+def test_ac_b10_secret_plaintext_detected():
     """AC-B10/AC-T7: plaintext is detected by key NAME, not by the value."""
     providers_obj = {
         "opencode-go": {"headers": {"X-Api-Key": "EXAMPLE_NOT_A_KEY"}}
@@ -403,7 +437,7 @@ def test_secret_plaintext_detected():
     ) == ["providers.x.client_secret"]
 
 
-def test_secret_env_placeholder_ok():
+def test_ac_b10_secret_env_placeholder_ok():
     """``{env:VAR}`` values are valid; malformed placeholders are not."""
     obj = {
         "opencode-go": {
@@ -422,7 +456,7 @@ def test_secret_env_placeholder_ok():
     ) == ["providers.x.api_key"]
 
 
-def test_secret_check_walks_nested_oauth():
+def test_ac_b10_secret_check_walks_nested_oauth():
     """Nested ``oauth`` objects and lists are walked; placeholders are skipped."""
     obj = {
         "x": {

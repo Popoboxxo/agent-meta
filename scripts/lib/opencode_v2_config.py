@@ -37,6 +37,13 @@ Amendment B1 (2026-10-23): the engine is generic over dotted paths. No
 auxiliary title-model path is managed here — the C0 spike could not verify such
 a target, so it was dropped from the spec; callers must not assume one exists.
 
+Amendment B2 (2026-10-23): this module is the **single owner** of
+``experimental.subagent_depth``. The initial settings transform
+(``context.apply_settings_surface_shape``) only removes the dead top-level
+``subagent_depth``; the depth is written exclusively through this engine, so
+rows 1/3a/2/4 apply as specified and a project override or a v2→v1 rollback
+behaves (spec Amendment B2).
+
 Task 8 (B.5) adds the data predicates (``v2_active``,
 ``owns_opencode_surface``), the shared ``opencode_state_path``, the project
 option reader, the managed key set (spec §3.3) and the structural
@@ -432,6 +439,7 @@ def build_managed_keys(
     provider: str,
     provider_config: dict,
     agent_meta_root: Path,
+    log: SyncLog | None = None,
 ) -> dict[str, object]:
     """Return the v2 managed key set as ``{dotted path: value}`` (spec §3.3).
 
@@ -444,6 +452,11 @@ def build_managed_keys(
     - ``providers.<id>`` per project entry, the whole object as a passthrough
       of the documented inner shape (``settings.baseURL``, ``env``, ...). The
       writer never interprets or validates that shape.
+
+    A ``providers.<id>`` entry whose value is ``None`` is skipped with a
+    warning: in ``{path: value}`` a ``None`` target means "no longer managed"
+    (row 4), so passing it through would turn a malformed project value into a
+    removal of an existing managed block (QA-B-11).
 
     ``$schema`` is deliberately absent (v2 has no published schema; AC-B11), and
     Amendment B1 removed ``agents.title.model`` entirely (Q6 UNVERIFIED) — no
@@ -473,6 +486,12 @@ def build_managed_keys(
     provider_entries = options.get("providers")
     if isinstance(provider_entries, dict):
         for provider_id, entry in provider_entries.items():
+            if entry is None:
+                if log is not None:
+                    log.warning(
+                        f"opencode-v2-provider-skipped: providers.{provider_id} is null"
+                    )
+                continue
             managed[f"providers.{provider_id}"] = entry
 
     return managed
@@ -496,8 +515,12 @@ def _walk_plaintext_secrets(obj: object, path: str, secret_context: bool) -> lis
     if isinstance(obj, dict):
         for key, value in obj.items():
             child_path = f"{path}.{key}" if path else str(key)
+            # A secret-named key taints its whole subtree: an object value such
+            # as ``{"token": {"value": "PLAINTEXT"}}`` is still a plaintext
+            # secret, so the context is propagated to the children.
+            child_secret = secret_context or _is_secret_name(key)
             findings.extend(
-                _walk_plaintext_secrets(value, child_path, _is_secret_name(key))
+                _walk_plaintext_secrets(value, child_path, child_secret)
             )
     elif isinstance(obj, list):
         for index, value in enumerate(obj):
@@ -544,17 +567,29 @@ def _get_path(document: dict, path: str) -> object:
     return node
 
 
-def _set_path(document: dict, path: str, value: object) -> None:
-    """Create missing parent objects and set the leaf at dotted *path*."""
+def _set_path(document: dict, path: str, value: object) -> bool:
+    """Create missing parent objects and set the leaf at dotted *path*.
+
+    Returns ``False`` (and leaves the document untouched) when an ancestor
+    exists but is not an object: a scalar/array under a container name is user
+    data, and replacing it to reach a managed leaf would silently destroy it
+    (QA-B-03). The caller then keeps the document and warns instead.
+    """
     parts = path.split(".")
+    # Validate every *existing* ancestor before mutating anything, so a failure
+    # never leaves a half-created branch behind.
+    node: object = document
+    for part in parts[:-1]:
+        if not isinstance(node, dict) or part not in node:
+            break
+        node = node[part]
+        if not isinstance(node, dict):
+            return False
     node = document
     for part in parts[:-1]:
-        child = node.get(part)
-        if not isinstance(child, dict):
-            child = {}
-            node[part] = child
-        node = child
+        node = node.setdefault(part, {})
     node[parts[-1]] = value
+    return True
 
 
 def _prune_empty_parents(document: dict, parts: list[str]) -> None:
@@ -612,7 +647,8 @@ def sync_opencode_v2_managed_keys(
     agent_meta_root: Path,
     log: SyncLog,
     dry_run: bool,
-    claimed_files: set[str] | None = None,
+    *,
+    claimed_files: set[str],
 ) -> None:
     """Merge the v2 managed keys into the EXISTING ``opencode.json`` (spec §3.2).
 
@@ -636,16 +672,18 @@ def sync_opencode_v2_managed_keys(
     for the committed file ``verify_gitignored`` is ``False`` (that flag is only
     set for the local/secrets file, #586).
 
-    ``claimed_files`` is the caller's run-scoped claim registry (N-M2 (3)): the
-    first owner of a managed file acts, every further claimant logs
+    ``claimed_files`` is the caller's run-scoped claim registry (N-M2 (3)) and
+    is a required keyword argument (QA-B-04): the first owner of a managed file
+    with actual work acts, every further claimant logs
     ``opencode-v2-owner-conflict: <file>`` and returns without touching file or
-    state. It is passed in — never module-level — so no state leaks between
-    sync runs and ``[A, B]`` / ``[B, A]`` end in the same file/state (AC-B20).
+    state. The claim is taken only after the "nothing to do" determination
+    (QA-B-02): an owner with neither targets nor state must not shadow the next
+    claimant, otherwise ``[A, B]`` and ``[B, A]`` would diverge. It is passed in
+    — never module-level — so no state leaks between sync runs and both orders
+    end in the same file/state (AC-B20).
     """
     if not owns_opencode_surface(provider_config, provider):
         return
-
-    warn_ignored_v2_options(config, provider, provider_config, log)
 
     pc = _provider_entry(provider_config, provider)
     committed = _mcp_config(pc).get("committed-file")
@@ -654,21 +692,32 @@ def sync_opencode_v2_managed_keys(
         # (no hardcoded filename on any path).
         return
 
-    if claimed_files is not None:
-        if committed in claimed_files:
-            log.warning(f"opencode-v2-owner-conflict: {committed}")
-            return
-        claimed_files.add(committed)
-
     root = Path(project_root)
-    state_path = opencode_state_path(root, pc)
+    # Route the derived state path through ``safe_path`` exactly like the
+    # managed file below (QA-B-05): a ``committed-file`` with ``..`` must not be
+    # able to move the state file outside the project root.
+    state_path = isolation.safe_path(
+        root, opencode_state_path(root, pc).relative_to(root)
+    )
     state = isolation._read_state(state_path, STATE_KEYS_KEY)
-    targets = build_managed_keys(config, provider, pc, agent_meta_root)
+    targets = build_managed_keys(config, provider, pc, agent_meta_root, log)
 
     # No-op without an active v2 surface AND without prior management: a v1
     # project that never had v2 keys must stay byte-identical (AC-B2/B7).
     if not targets and not state:
+        # AC-B13: an "ignored option" warning is not file work and must not be
+        # lost to this early return (a non-v2 surface never produces targets).
+        warn_ignored_v2_options(config, provider, provider_config, log)
         return
+
+    # Claim after the no-work check and before the managed file is read
+    # (QA-B-02): a claimant with nothing to do never blocks the real owner.
+    if committed in claimed_files:
+        log.warning(f"opencode-v2-owner-conflict: {committed}")
+        return
+    claimed_files.add(committed)
+
+    warn_ignored_v2_options(config, provider, provider_config, log)
 
     secret_findings = _plaintext_secret_paths(targets)
     if secret_findings:
@@ -697,13 +746,18 @@ def sync_opencode_v2_managed_keys(
         if result.warning:
             log.warning(result.warning)
         if result.action == "write":
-            _set_path(existing, path, result.value)
+            if not _set_path(existing, path, result.value):
+                # A non-object ancestor is user data: keep it and warn instead
+                # of clobbering it, and do not record state we never wrote.
+                log.warning(_warning(path))
+                continue
             changed = True
         elif result.action == "remove":
             if result.value is ABSENT:
                 _delete_path(existing, path)
-            else:
-                _set_path(existing, path, result.value)
+            elif not _set_path(existing, path, result.value):
+                log.warning(_warning(path))
+                continue
             changed = True
         # ``keep`` / ``noop``: the file is left exactly as it is.
         if result.state is not None:
