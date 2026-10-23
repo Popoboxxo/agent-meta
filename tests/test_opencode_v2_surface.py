@@ -1402,3 +1402,357 @@ def test_ac_b12_model_catalog_check_ignores_variant(tmp_path):
     assert len(errors) == 1, errors
     assert "is not in the configured model-catalog" in errors[0].message
     assert "opencode-go/not-in-catalog#high" in errors[0].message
+
+
+# ===========================================================================
+# Phase C1 / Task 13 (C1.1): ``permissions[]`` gate builder and writer
+# ===========================================================================
+#
+# Amendment B1 (Spike Q3, VERIFIED): ``permissions[]`` is evaluated
+# *last match wins*, agent rules are appended last. The managed deny triples are
+# therefore appended at the END of the list (an early deny would be the weakest
+# position), and the rollback identifies its own triples position-independently
+# by the exact triple — never by list index.
+#
+# The writer is exclusively called by ``reconcile_opencode_surface_gate``
+# (Task 13a); these tests pin its own contract in isolation: END insertion,
+# single occurrence, user order preserved, position-independent rollback, the
+# dedicated ``opencode-v2-permissions`` state namespace, and the Spec-A
+# regression (v2 loses the ``permission`` map, v1 keeps it byte-identically).
+
+_V2_GATE_STATE_KEY = isolation._STATE_V2_PERMISSIONS
+_EDIT_DENY = {"action": "edit", "resource": "**", "effect": "deny"}
+_SHELL_DENY = {"action": "shell", "resource": "**", "effect": "deny"}
+
+
+def _write_caps(root: Path, provider: str, tier: str) -> Path:
+    """Minimal framework root whose capability registry declares ``tier``."""
+    (root / "config").mkdir(parents=True, exist_ok=True)
+    (root / "config" / "provider-capabilities.yaml").write_text(
+        yaml.safe_dump({"capabilities": {provider: {"runtime_gate": tier}}}),
+        encoding="utf-8",
+    )
+    return root
+
+
+def _gate_config(mode: str = "strict") -> dict:
+    """Project config selecting *mode* via the three-tier precedence."""
+    return {"orchestrator": {"mode": mode}}
+
+
+def _run_v2_permissions(
+    project_root: Path,
+    entries: list,
+    log: SyncLog | None = None,
+    provider_config: dict | None = None,
+    dry_run: bool = False,
+) -> bool:
+    return isolation._sync_opencode_v2_gate_permissions(
+        project_root,
+        provider_config if provider_config is not None else _v2_pc(),
+        entries,
+        log if log is not None else SyncLog(),
+        dry_run,
+    )
+
+
+def _run_runtime_gate(
+    project_root: Path,
+    framework: Path,
+    provider_config: dict,
+    config: dict | None = None,
+    log: SyncLog | None = None,
+) -> SyncLog:
+    log = log if log is not None else SyncLog()
+    isolation._sync_opencode_runtime_gate(
+        project_root,
+        config if config is not None else _gate_config(),
+        "Opencode",
+        provider_config,
+        framework,
+        log,
+        dry_run=False,
+    )
+    return log
+
+
+def test_permission_deny_required_truth_table():
+    """A pure decision over resolved data: permission tier, or plugin+observe.
+
+    ``plugin`` + ``enforce`` is False because the baked plugin then blocks on
+    its own (the deny would double up); ``advisory`` never blocks. The tier is
+    the IC-03 resolver's output — no provider literal participates.
+    """
+    permission_caps = {"runtime_gate": "permission"}
+    plugin_pc = {"has_plugins": True, "plugin_protocol": "opencode-plugin-js"}
+
+    assert isolation.permission_deny_required({}, permission_caps, "observe") is True
+    assert isolation.permission_deny_required({}, permission_caps, "enforce") is True
+    assert isolation.permission_deny_required(plugin_pc, {}, "observe") is True
+    assert isolation.permission_deny_required(plugin_pc, {}, "enforce") is False
+    assert (
+        isolation.permission_deny_required({}, {"runtime_gate": "advisory"}, "observe")
+        is False
+    )
+    assert isolation.permission_deny_required({}, {}, "observe") is False
+
+
+def test_ac_c5_idempotent_each_triple_once(tmp_path):
+    """AC-C5: END insertion, one occurrence per triple, second run byte-identical.
+
+    Amendment B1: the managed triples follow every existing entry; a repeat run
+    neither duplicates them nor reorders the user's entries.
+    """
+    project = tmp_path / "project"
+    user_permissions = [
+        {"action": "edit", "resource": "src/**", "effect": "allow"},
+        {"action": "shell", "resource": "npm run *", "effect": "allow"},
+    ]
+    _write_json(
+        project / "opencode.json",
+        {"theme": "dark", "permissions": list(user_permissions)},
+    )
+    log = SyncLog()
+
+    assert _run_v2_permissions(project, [_EDIT_DENY, _SHELL_DENY], log) is True
+
+    doc = _read_json(project / "opencode.json")
+    permissions = doc["permissions"]
+    assert doc["theme"] == "dark"
+    assert permissions[:2] == user_permissions, "user entries keep their order"
+    assert permissions[2:] == [_EDIT_DENY, _SHELL_DENY], (
+        "managed triples must be appended at the END (last match wins)"
+    )
+    assert len(permissions) == 4, "each triple exactly once"
+    assert _read_state_doc(project)[_V2_GATE_STATE_KEY] == {
+        "triples": [["edit", "**", "deny"], ["shell", "**", "deny"]]
+    }
+
+    file_bytes = (project / "opencode.json").read_bytes()
+    state_bytes = (project / _V2_STATE_REL).read_bytes()
+    assert _run_v2_permissions(project, [_EDIT_DENY, _SHELL_DENY], SyncLog()) is False, (
+        "a second identical run is a no-op"
+    )
+    assert (project / "opencode.json").read_bytes() == file_bytes
+    assert (project / _V2_STATE_REL).read_bytes() == state_bytes
+
+
+def test_ac_c4_writer_rollback_removes_only_state_triples_keeps_user_order(tmp_path):
+    """AC-C4: rollback works after the triples moved — identified by triple."""
+    project = tmp_path / "project"
+    edit_allow = {"action": "edit", "resource": "src/**", "effect": "allow"}
+    shell_allow = {"action": "shell", "resource": "git *", "effect": "allow"}
+    _write_json(project / "opencode.json", {"permissions": [edit_allow, shell_allow]})
+
+    _run_v2_permissions(project, [_EDIT_DENY, _SHELL_DENY])
+    written = _read_json(project / "opencode.json")["permissions"]
+    assert written[2:] == [_EDIT_DENY, _SHELL_DENY]
+
+    # The user moves the managed triples to the front. A rollback that used
+    # list indices would now remove the wrong entries.
+    _write_json(
+        project / "opencode.json",
+        {"permissions": [written[3], written[1], written[2], written[0]]},
+    )
+
+    assert _run_v2_permissions(project, []) is True
+
+    remaining = _read_json(project / "opencode.json")["permissions"]
+    assert remaining == [shell_allow, edit_allow], (
+        "only the state triples were removed; user relative order survived"
+    )
+    assert _V2_GATE_STATE_KEY not in _read_state_doc(project)
+
+
+def test_user_identical_triple_not_claimed_and_survives_rollback(tmp_path):
+    """A user entry identical to a managed triple is never claimed or removed."""
+    project = tmp_path / "project"
+    user_shell = dict(_SHELL_DENY)
+    _write_json(project / "opencode.json", {"permissions": [user_shell]})
+
+    _run_v2_permissions(project, [_EDIT_DENY, _SHELL_DENY])
+
+    permissions = _read_json(project / "opencode.json")["permissions"]
+    assert permissions[0] == user_shell
+    assert permissions[1:] == [_EDIT_DENY], "no duplicate shell triple is written"
+    assert _read_state_doc(project)[_V2_GATE_STATE_KEY] == {
+        "triples": [["edit", "**", "deny"]]
+    }, "the user's identical triple must not enter our state"
+
+    assert _run_v2_permissions(project, []) is True
+
+    assert _read_json(project / "opencode.json")["permissions"] == [user_shell], (
+        "the user's own triple survives the rollback"
+    )
+    assert _V2_GATE_STATE_KEY not in _read_state_doc(project)
+
+
+def test_ac_b16_permissions_namespace_isolated(tmp_path):
+    """AC-B16: only ``opencode-v2-permissions`` is written; siblings stay put."""
+    project = tmp_path / "project"
+    _write_json(project / "opencode.json", {"permissions": []})
+    siblings = {
+        "isolation-deny": ["**/.claude/**"],
+        "runtime-gate-deny": {"**": {"edit": None, "bash": None}},
+        STATE_KEYS_KEY: {
+            "experimental.subagent_depth": {
+                "value": 3,
+                "prior": None,
+                "prior_absent": True,
+            }
+        },
+        "opencode-v2-cli": {"plugins": {"value": ["acme.js"], "prior": None}},
+        "opencode-v2-mcp": {"mcp.servers.acme": {"value": {"type": "local"}}},
+    }
+    _write_json(project / _V2_STATE_REL, siblings)
+
+    _run_v2_permissions(project, [_EDIT_DENY, _SHELL_DENY])
+
+    after = _read_state_doc(project)
+    for key, value in siblings.items():
+        assert after[key] == value, f"namespace {key!r} was clobbered"
+    assert after[_V2_GATE_STATE_KEY] == {
+        "triples": [["edit", "**", "deny"], ["shell", "**", "deny"]]
+    }
+    assert isinstance(
+        isolation._read_state(project / _V2_STATE_REL, _V2_GATE_STATE_KEY), dict
+    ), "AC-B16: the namespace reads back as a dict"
+
+    file_bytes = (project / "opencode.json").read_bytes()
+    state_bytes = (project / _V2_STATE_REL).read_bytes()
+    _run_v2_permissions(project, [_EDIT_DENY, _SHELL_DENY])
+    assert (project / "opencode.json").read_bytes() == file_bytes
+    assert (project / _V2_STATE_REL).read_bytes() == state_bytes
+    assert _read_state_doc(project)["isolation-deny"] == siblings["isolation-deny"]
+
+
+def test_v2_gate_permissions_empty_without_entry_point(tmp_path):
+    """AC-C15 (builder part): no explicit+generated primary role ⇒ no entries."""
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    capabilities = load_provider_capabilities(framework)
+    without_primary = _v2_pc()
+    without_primary.pop("primary-role")
+
+    def build(provider_config: dict, config: dict, mode: str = "observe") -> list:
+        return isolation._opencode_v2_gate_permissions(
+            config, "Opencode", framework, provider_config, capabilities, mode
+        )
+
+    assert build({"Opencode": without_primary}, _gate_config()) == []
+
+    with_primary = {"Opencode": _v2_pc()}
+    assert build(with_primary, _gate_config()) == [_EDIT_DENY, _SHELL_DENY]
+
+    # Negative controls: each single gate condition is load-bearing.
+    assert build(with_primary, _gate_config("advisory")) == [], "strict is required"
+    assert build(with_primary, _gate_config("strict"), mode="enforce") == [
+        _EDIT_DENY,
+        _SHELL_DENY,
+    ], "the permission tier ignores the plugin mode"
+    advisory_framework = _write_caps(tmp_path / "fw-advisory", "Opencode", "advisory")
+    assert (
+        isolation._opencode_v2_gate_permissions(
+            _gate_config(), "Opencode", advisory_framework, with_primary,
+            load_provider_capabilities(advisory_framework), "observe",
+        )
+        == []
+    ), "an advisory tier never emits deny triples"
+    assert build({"Opencode": _v1_pc()}, _gate_config()) == [], (
+        "v2_active is required — v1 keeps the Spec-A permission map"
+    )
+    plugin_pc = dict(_v2_pc(), has_plugins=True, plugin_protocol="opencode-plugin-js")
+    assert build({"Opencode": plugin_pc}, _gate_config(), mode="observe") == [
+        _EDIT_DENY,
+        _SHELL_DENY,
+    ], "plugin + observe keeps the deny"
+    assert build({"Opencode": plugin_pc}, _gate_config(), mode="enforce") == [], (
+        "plugin + enforce relies on the plugin, not on the deny"
+    )
+
+
+def test_v2_runtime_gate_skips_permission_map_step(tmp_path):
+    """AC-C3 (Spec-A step 4 skipped): v2 gets ``default_agent`` only."""
+    project = tmp_path / "project"
+    project.mkdir()
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+
+    log = _run_runtime_gate(project, framework, {"Opencode": _v2_pc()})
+
+    doc = _read_json(project / "opencode.json")
+    assert doc["default_agent"] == "orchestrator"
+    assert "permission" not in doc, (
+        "on v2 the Spec-A permission map must not be written (N-M1 owner)"
+    )
+    assert "permissions" not in doc, (
+        "this path never writes the v2 triples — reconcile owns them"
+    )
+    assert log.warnings == [], log.warnings
+
+    state = _read_state_doc(project)
+    assert isolation._STATE_RUNTIME_GATE_KEY not in state, (
+        "no runtime-gate-deny state may be created for a v2 surface"
+    )
+    assert state[isolation._STATE_DEFAULT_AGENT_KEY] == {
+        "value": "orchestrator",
+        "prior": None,
+    }
+
+
+def test_ac_c6_v1_permission_map_unchanged_and_no_permissions_list(tmp_path):
+    """AC-C6 (regression): v1 keeps the byte-identical ``permission`` map."""
+    project = tmp_path / "project"
+    project.mkdir()
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+
+    _run_runtime_gate(project, framework, {"Opencode": _v1_pc()})
+
+    doc = _read_json(project / "opencode.json")
+    assert doc == {
+        "permission": {"edit": {"**": "deny"}, "bash": {"**": "deny"}},
+        "default_agent": "orchestrator",
+    }
+    assert "permissions" not in doc, "v1 never gets the v2 list form"
+
+    state = _read_state_doc(project)
+    assert state[isolation._STATE_RUNTIME_GATE_KEY] == {
+        "**": {"edit": None, "bash": None}
+    }
+    assert state[isolation._STATE_DEFAULT_AGENT_KEY] == {
+        "value": "orchestrator",
+        "prior": None,
+    }
+    assert _V2_GATE_STATE_KEY not in state
+
+
+def test_ac_c16a_default_agent_merge_runs_on_v2(tmp_path):
+    """AC-C16a (regression): the entry-point merge is unchanged on v2.
+
+    A user value wins with a warning and is never tracked; an absent key is
+    written and tracked in the ``default-agent`` namespace.
+    """
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+
+    user_value = tmp_path / "user-value"
+    _write_json(
+        user_value / "opencode.json",
+        {"default_agent": "developer", "permissions": []},
+    )
+    log = _run_runtime_gate(user_value, framework, {"Opencode": _v2_pc()})
+
+    assert _read_json(user_value / "opencode.json")["default_agent"] == "developer"
+    assert any(
+        "default_agent is 'developer' but the entry point role is 'orchestrator'"
+        in warning
+        for warning in log.warnings
+    ), log.warnings
+    assert isolation._STATE_DEFAULT_AGENT_KEY not in _read_state_doc(user_value)
+
+    fresh = tmp_path / "fresh"
+    fresh.mkdir()
+    _run_runtime_gate(fresh, framework, {"Opencode": _v2_pc()})
+
+    assert _read_json(fresh / "opencode.json")["default_agent"] == "orchestrator"
+    assert _read_state_doc(fresh)[isolation._STATE_DEFAULT_AGENT_KEY] == {
+        "value": "orchestrator",
+        "prior": None,
+    }
