@@ -53,7 +53,7 @@ from lib.consistency.model_contracts import check_model_contracts
 from lib.context import apply_settings_surface_shape
 from lib.log import SyncLog
 from lib.opencode_v2_config import STATE_KEYS_KEY
-from lib.providers import load_providers_config
+from lib.providers import load_provider_capabilities, load_providers_config
 
 _SURFACE_MECHANISMS = {"v1": "opencode-native", "v2": "opencode-native-v2"}
 
@@ -463,6 +463,11 @@ def test_ac_b1_end_to_end_capability_depth_reaches_document(tmp_path):
     doc = _read_json(project / "opencode.json")
     assert doc["experimental"]["subagent_depth"] == 2
     assert doc["experimental"]["subagent_depth"] >= 2
+    # QA-B2-04: bind the produced document to the *shipped* registry value
+    # instead of the fixture number, read at test time (never hardcoded).
+    assert doc["experimental"]["subagent_depth"] == (
+        load_provider_capabilities(_REPO_ROOT)["Opencode"]["required_depth"]
+    )
     assert "subagent_depth" not in doc
     assert not _warned(log, "opencode-v2-managed"), log.warnings
 

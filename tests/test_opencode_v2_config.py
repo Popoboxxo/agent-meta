@@ -385,8 +385,13 @@ def test_build_managed_keys_empty_when_not_v2():
     assert build_managed_keys(config, "TotallyFakeProvider", foreign, _REPO_ROOT) == {}
 
 
-def test_ac_b11_providers_null_entry_is_skipped_with_warning():
-    """QA-B-11: a ``providers.<id>: null`` is skipped, never a removal target."""
+def test_ac_b11_providers_null_entry_not_written_ends_management():
+    """QA-B-11: a ``providers.<id>: null`` is not written; management ends.
+
+    For a path in the state file this is row 4 (remove, or restore the recorded
+    prior), for a fresh one simply "nothing written" — the warning must say so,
+    not promise a preserved block.
+    """
     config = {
         "provider-options": {
             _V2_PROVIDER: {"providers": {"x": None, "ok": {"env": ["OC_API_KEY"]}}}
@@ -402,6 +407,7 @@ def test_ac_b11_providers_null_entry_is_skipped_with_warning():
     assert keys["providers.ok"] == {"env": ["OC_API_KEY"]}
     assert any(
         "opencode-v2-provider-skipped: providers.x is null" in warning
+        and "management ends (row 4: remove, or restore recorded prior)" in warning
         for warning in log.warnings
     ), log.warnings
 

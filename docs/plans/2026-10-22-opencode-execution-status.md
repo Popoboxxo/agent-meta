@@ -53,7 +53,7 @@
 
 ## Phase-B-Review-Fixrunde (2026-10-23)
 
-**Quelle:** Review zu `feat/1007-b-keys` (Verdict `CHANGES_REQUESTED`). Kein Commit in dieser Runde (bewusst offen für den Review-Nachlauf).
+**Quelle:** Review zu `feat/1007-b-keys` (Verdict `CHANGES_REQUESTED`). Commits dieser Runde: `1b7e5959`, `511d6111`, `bdff8459` — Status `done`.
 
 | Finding | Schwere | Änderung | Beleg |
 |---|---|---|---|
@@ -65,7 +65,7 @@
 | QA-B-06 | MINOR | Secret-Kontext wird auf Kinder eines secret-benannten Keys vererbt (`{"token": {"value": "PLAINTEXT"}}` ist ein Finding). | `scripts/lib/opencode_v2_config.py`, `::test_ac_b10_secret_object_value_under_secret_name_is_finding` |
 | QA-B-07 | MINOR | AC-B19-Test prüft zusätzlich Byte-Gleichheit des Dokuments. | `tests/test_opencode_v2_surface.py::test_ac_b19_user_deleted_key_not_rewritten` |
 | QA-B-10 | MINOR | Kommentar in `model_contracts._catalog_id`: `#variant`-Stripping ist eine universelle Modell-ID-Regel, keine v2-Sonderregel (kein Verhaltenswechsel). | `scripts/lib/consistency/model_contracts.py` |
-| QA-B-11 | MINOR | `providers.<id>: null` wird in `build_managed_keys` übersprungen und gewarnt, statt als Removal-Ziel (`None`) zu wirken. | `scripts/lib/opencode_v2_config.py`, `::test_ac_b11_providers_null_entry_is_skipped_with_warning` |
+| QA-B-11 | MINOR | `providers.<id>: null` wird in `build_managed_keys` nicht geschrieben und gewarnt; für einen Pfad im State endet die Verwaltung (Zeile 4: entfernen bzw. Prior wiederherstellen), für einen frischen wird nichts geschrieben. | `scripts/lib/opencode_v2_config.py`, `::test_ac_b11_providers_null_entry_not_written_ends_management` |
 | QA-B-12 | MINOR | End-to-End Adopt (3a) → Optionsänderung (2) → Rollback stellt den ursprünglichen Prior wieder her. | `::test_ac_b1_review_single_ownership_e2e_adopt_change_rollback` |
 | QA-B-13 | MINOR | Identitäts- durch Gleichheitsassertion für `kwargs["config"]` ersetzt. | `tests/test_opencode_v2_surface.py` |
 | RVW-B-01 | MINOR | AC-IDs in Testnamen ergänzt: `test_ac_b11_build_managed_keys_v2_full`, `test_ac_b3_build_managed_keys_without_todo_omits_key`, `test_ac_b10_secret_*`. | `tests/test_opencode_v2_config.py` |

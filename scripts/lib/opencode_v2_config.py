@@ -453,10 +453,16 @@ def build_managed_keys(
       of the documented inner shape (``settings.baseURL``, ``env``, ...). The
       writer never interprets or validates that shape.
 
-    A ``providers.<id>`` entry whose value is ``None`` is skipped with a
-    warning: in ``{path: value}`` a ``None`` target means "no longer managed"
-    (row 4), so passing it through would turn a malformed project value into a
-    removal of an existing managed block (QA-B-11).
+    A ``providers.<id>`` entry whose value is ``None`` is *not written* and is
+    warned about (QA-B-11). That is **not** a "keep the existing block" promise:
+    ``null`` means **management of this path ends**. The key set carries no
+    target for it, so the path reaches the engine as ``target is None`` — row 4 —
+    as soon as it is in the state file. Row 4 then removes the managed block, or
+    restores the recorded prior (an adopted prior can equal the value, so the
+    block survives unchanged in that case). For a fresh, unmanaged path nothing
+    is written and nothing is removed. Passing the ``None`` through directly
+    would have the same effect without the warning, turning a malformed project
+    value silently into a removal.
 
     ``$schema`` is deliberately absent (v2 has no published schema; AC-B11), and
     Amendment B1 removed ``agents.title.model`` entirely (Q6 UNVERIFIED) — no
@@ -489,7 +495,9 @@ def build_managed_keys(
             if entry is None:
                 if log is not None:
                     log.warning(
-                        f"opencode-v2-provider-skipped: providers.{provider_id} is null"
+                        f"opencode-v2-provider-skipped: providers.{provider_id} is"
+                        " null — not written; management ends (row 4: remove, or"
+                        " restore recorded prior)"
                     )
                 continue
             managed[f"providers.{provider_id}"] = entry
@@ -535,12 +543,15 @@ def _walk_plaintext_secrets(obj: object, path: str, secret_context: bool) -> lis
 def find_plaintext_secrets(obj: object, path: str) -> list[str]:
     """Return the paths of plaintext credentials under *path* (spec §3.3).
 
-    A value is a finding iff its **key name** contains ``key``, ``secret`` or
-    ``token`` (case-insensitive) and the value is not a valid ``{env:VAR}``
-    placeholder. Nested objects and lists are walked (``oauth`` structures
-    included); list elements are addressed as ``path[index]``. Decisions are
-    name-based on purpose — the concrete value is never matched against a
-    secret pattern (AC-B10: the test must not bind to the value).
+    A value is a finding when its **own key name or the name of any ancestor
+    key** contains ``key``, ``secret`` or ``token`` (case-insensitive) and the
+    value is not a valid ``{env:VAR}`` placeholder. A secret-named key taints
+    its whole subtree: ``{"token": {"value": "PLAINTEXT"}}`` reports
+    ``token.value``, not only a string directly under ``token``. Nested objects
+    and lists are walked (``oauth`` structures included); list elements are
+    addressed as ``path[index]``. Decisions are name-based on purpose — the
+    concrete value is never matched against a secret pattern (AC-B10: the test
+    must not bind to the value).
     """
     return _walk_plaintext_secrets(obj, path, secret_context=False)
 
