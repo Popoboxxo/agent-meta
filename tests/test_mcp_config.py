@@ -689,7 +689,9 @@ def test_build_connection_entry_opencode_json_v2_matches_v1_shape():
 def test_write_provider_config_opencode_json_v2_nests_mcp_servers(tmp_path):
     path = tmp_path / "opencode.json"
     log = SyncLog()
-    entries = {"srv": {"type": "remote", "enabled": True, "url": "{env:URL}"}}
+    # v2-shaped entry: no legacy 'enabled' (AC-C7) — the v2 validator reports it
+    # as a finding since AC-C10, and the real builder never emits it.
+    entries = {"srv": {"type": "remote", "url": "{env:URL}"}}
 
     _write_provider_config(path, entries, "opencode-json-v2", log, dry_run=False, allow_secrets=True)
 
