@@ -60,6 +60,7 @@ from lib.mcp_provider_config import (
     _build_connection_entry,
     _build_mcp_entries,
     _write_provider_config,
+    generate_provider_configs,
 )
 from lib.opencode_v2_config import STATE_KEYS_KEY
 from lib.providers import load_provider_capabilities, load_providers_config
@@ -2457,3 +2458,306 @@ def test_other_formats_ignore_new_connection_keys():
     ):
         entry = _build_connection_entry(conn, None, fmt)
         assert not ({"disabled", "timeout", "oauth"} & set(entry)), fmt
+
+
+# ===========================================================================
+# Phase C2 / Task 16 (C2.3): MCP-managed paths + provider-bound rollback
+# ===========================================================================
+#
+# One managed path per server: ``mcp.servers.<name>`` with the whole server
+# object as the managed value (spec §3.5, M-3). Unlike the old wholesale
+# replacement, user servers live next to managed ones. The rollback is
+# reachable from the early-return paths of ``generate_provider_configs`` (no
+# registry, no active servers), so a v2→v1 switch removes the recorded paths
+# even when no agent-meta server is active (AC-C17). It never runs for a
+# non-owner provider and never touches another writer's state namespace
+# (AC-B20/AC-B16).
+
+
+def _write_mcp_catalog(agent_meta_root: Path, servers: dict) -> None:
+    """Write a minimal ``config/plugin-catalog.yaml`` with MCP servers."""
+    plugins = {name: {**sdef, "kind": "mcp-server"} for name, sdef in servers.items()}
+    (agent_meta_root / "config").mkdir(parents=True, exist_ok=True)
+    (agent_meta_root / "config" / "plugin-catalog.yaml").write_text(
+        yaml.safe_dump({"version": "1.0.0", "plugins": plugins}), encoding="utf-8"
+    )
+
+
+def _managed_server(url: str = "https://example.invalid/mcp") -> dict:
+    return {"description": "managed", "connection": {"type": "sse", "url": url}}
+
+
+def _sync_mcp(
+    project_root: Path,
+    config: dict,
+    provider_config: dict,
+    framework: Path,
+    log: SyncLog | None = None,
+    dry_run: bool = False,
+    provider: str = "Opencode",
+) -> SyncLog:
+    """Drive the real ``generate_provider_configs`` entry point for one provider."""
+    log = log if log is not None else SyncLog()
+    generate_provider_configs(
+        framework,
+        project_root,
+        config,
+        provider_config,
+        log,
+        dry_run=dry_run,
+        provider=provider,
+    )
+    return log
+
+
+def test_ac_b4_user_mcp_server_survives_v2_sync(tmp_path):
+    """AC-B4 (MCP part): a user server stays next to the managed one.
+
+    The managed path is ``mcp.servers.<name>`` per server (never a wholesale
+    ``mcp`` replacement), so ``my-own`` is untouched. Flat v1-style keys next
+    to ``servers`` are dropped: the v2 document allows only ``servers`` under
+    ``mcp`` (``artifact_validate._validate_opencode_v2``).
+    """
+    framework = tmp_path / "fw"
+    project = tmp_path / "project"
+    _write_mcp_catalog(framework, {"managed": _managed_server()})
+    user_server = {"type": "local", "command": ["my-own"]}
+    _write_json(
+        project / "opencode.json",
+        {
+            "plugin": ["acme.js"],
+            "mcp": {
+                "servers": {"my-own": user_server},
+                "legacy-flat": {"type": "local", "command": ["old"]},
+            },
+        },
+    )
+
+    _sync_mcp(
+        project,
+        {"mcp-servers": ["managed"], "platforms": []},
+        {"Opencode": _v2_pc()},
+        framework,
+    )
+
+    doc = _read_json(project / "opencode.json")
+    assert doc["plugin"] == ["acme.js"]
+    assert doc["mcp"]["servers"]["my-own"] == user_server
+    assert doc["mcp"]["servers"]["managed"] == {
+        "type": "remote",
+        "url": "https://example.invalid/mcp",
+    }
+    assert "legacy-flat" not in doc["mcp"], (
+        "the v2 document allows only 'servers' under 'mcp'"
+    )
+    state = _read_state_doc(project)[opencode_v2_config.STATE_MCP_KEY]
+    assert set(state) == {"mcp.servers.managed"}
+    assert state["mcp.servers.managed"]["prior_absent"] is True
+
+
+def test_ac_b7_v2_to_v1_with_active_servers_removes_managed_server_paths(tmp_path):
+    """AC-B7: a v2→v1 switch with active servers removes the managed v2 paths.
+
+    The rollback runs before the (byte-frozen) v1 writer, so no nested
+    ``mcp.servers`` block survives; the v1 writer emits the flat ``mcp`` map
+    and the namespace is dropped.
+    """
+    framework = tmp_path / "fw"
+    project = tmp_path / "project"
+    _write_mcp_catalog(framework, {"managed": _managed_server()})
+    _write_json(project / "opencode.json", {"theme": "dark"})
+    config = {"mcp-servers": ["managed"], "platforms": []}
+
+    _sync_mcp(project, config, {"Opencode": _v2_pc()}, framework)
+    assert "servers" in _read_json(project / "opencode.json")["mcp"]
+    assert opencode_v2_config.STATE_MCP_KEY in _read_state_doc(project)
+
+    _sync_mcp(project, config, {"Opencode": _v1_pc()}, framework)
+
+    doc = _read_json(project / "opencode.json")
+    assert "servers" not in doc["mcp"], "managed v2 paths must be gone"
+    assert doc["mcp"]["managed"]["enabled"] is True, "v1 writer stays flat"
+    assert doc["theme"] == "dark"
+    assert opencode_v2_config.STATE_MCP_KEY not in _read_state_doc(project)
+
+
+def test_ac_c17_v2_to_v1_without_active_servers_removes_managed_paths_keeps_user_entry(
+    tmp_path,
+):
+    """AC-C17: rollback runs on the early return without active servers.
+
+    Previously ``generate_provider_configs`` returned before any cleanup, so a
+    v2→v1 switch left an orphaned ``mcp.servers``. Now the recorded managed
+    paths are removed, the unrecorded user entry stays and no flat v1 map is
+    emitted (there is nothing to write).
+    """
+    framework = tmp_path / "fw"
+    project = tmp_path / "project"
+    _write_mcp_catalog(framework, {"managed": _managed_server()})
+    user_server = {"type": "local", "command": ["my-own"]}
+    _write_json(
+        project / "opencode.json",
+        {"theme": "dark", "mcp": {"servers": {"my-own": user_server}}},
+    )
+    _sync_mcp(
+        project,
+        {"mcp-servers": ["managed"], "platforms": []},
+        {"Opencode": _v2_pc()},
+        framework,
+    )
+
+    log = _sync_mcp(
+        project,
+        {"mcp-servers": [], "platforms": []},
+        {"Opencode": _v1_pc()},
+        framework,
+    )
+
+    doc = _read_json(project / "opencode.json")
+    assert doc["mcp"] == {"servers": {"my-own": user_server}}, (
+        "only the managed path is removed; the user server stays"
+    )
+    assert doc["theme"] == "dark"
+    assert "managed" not in doc["mcp"], "no flat v1 map on the early return"
+    assert opencode_v2_config.STATE_MCP_KEY not in _read_state_doc(project)
+    assert not _warned(log, "opencode-v2-managed"), log.warnings
+
+
+def test_ac_c17_namespace_removed_after_rollback(tmp_path):
+    """AC-C17: the ``opencode-v2-mcp`` namespace is dropped, siblings survive."""
+    framework = tmp_path / "fw"
+    project = tmp_path / "project"
+    _write_mcp_catalog(framework, {"managed": _managed_server()})
+    _sync_mcp(
+        project,
+        {"mcp-servers": ["managed"], "platforms": []},
+        {"Opencode": _v2_pc()},
+        framework,
+    )
+    state_path = project / _V2_STATE_REL
+    seeded = _read_json(state_path)
+    seeded["isolation-deny"] = ["**/.claude/**"]
+    _write_json(state_path, seeded)
+    assert opencode_v2_config.STATE_MCP_KEY in seeded
+
+    _sync_mcp(
+        project,
+        {"mcp-servers": [], "platforms": []},
+        {"Opencode": _v1_pc()},
+        framework,
+    )
+
+    after = _read_json(state_path)
+    assert opencode_v2_config.STATE_MCP_KEY not in after
+    assert after["isolation-deny"] == ["**/.claude/**"]
+    assert isolation._read_state(state_path, opencode_v2_config.STATE_MCP_KEY) == {}
+
+
+def test_ac_b16_mcp_namespace_isolated_from_keys_namespace(tmp_path):
+    """AC-B16: the MCP writer owns ``opencode-v2-mcp`` and nothing else."""
+    framework = tmp_path / "fw"
+    project = tmp_path / "project"
+    _write_mcp_catalog(framework, {"managed": _managed_server()})
+    _write_json(project / "opencode.json", {"theme": "dark"})
+    keys_state = {
+        "experimental.todo": {
+            "value": True,
+            "prior": None,
+            "prior_absent": True,
+        }
+    }
+    _write_json(project / _V2_STATE_REL, {STATE_KEYS_KEY: keys_state})
+
+    config = {"mcp-servers": ["managed"], "platforms": []}
+    _sync_mcp(project, config, {"Opencode": _v2_pc()}, framework)
+
+    after = _read_json(project / _V2_STATE_REL)
+    assert after[STATE_KEYS_KEY] == keys_state, "a foreign namespace is never touched"
+    assert set(after[opencode_v2_config.STATE_MCP_KEY]) == {"mcp.servers.managed"}
+
+    file_bytes = (project / "opencode.json").read_bytes()
+    state_bytes = (project / _V2_STATE_REL).read_bytes()
+    _sync_mcp(project, config, {"Opencode": _v2_pc()}, framework)
+    assert (project / "opencode.json").read_bytes() == file_bytes
+    assert (project / _V2_STATE_REL).read_bytes() == state_bytes
+
+
+def test_ac_b20_mcp_rollback_not_run_for_non_owner_provider(tmp_path, monkeypatch):
+    """AC-B20: a non-owner iteration leaves file and state byte-identical.
+
+    The read spy makes the test non-vacuous: the ownership guard must run
+    before any state access, even though the rollback is reached through the
+    normal provider loop.
+    """
+    framework = tmp_path / "fw"
+    project = tmp_path / "project"
+    _write_mcp_catalog(framework, {"managed": _managed_server()})
+    _sync_mcp(
+        project,
+        {"mcp-servers": ["managed"], "platforms": []},
+        {"Opencode": _v2_pc()},
+        framework,
+    )
+    file_before = (project / "opencode.json").read_bytes()
+    state_before = (project / _V2_STATE_REL).read_bytes()
+
+    def _forbidden(*args, **kwargs):
+        raise AssertionError("state must not be read for a non-owner provider")
+
+    monkeypatch.setattr(isolation, "_read_state", _forbidden)
+
+    log = SyncLog()
+    _sync_mcp(
+        project,
+        {"mcp-servers": ["managed"], "platforms": []},
+        {"Claude": _non_owner_pc()},
+        framework,
+        log=log,
+        provider="Claude",
+    )
+
+    assert (project / "opencode.json").read_bytes() == file_before
+    assert (project / _V2_STATE_REL).read_bytes() == state_before
+    assert (project / ".mcp.json").exists(), "the non-owner writes its own surface"
+    leaked = [
+        line
+        for line in log.actions + log.warnings + log.skipped + log.infos + log.errors
+        if "opencode-v2-" in line
+    ]
+    assert leaked == [], leaked
+
+
+def test_mcp_writer_passes_secret_gate_params_to_write_checked(tmp_path, monkeypatch):
+    """The v2 MCP writer delegates the secret gate to ``io.write_checked``.
+
+    Same parameter shape as ``mcp_provider_config._write_json_config``: an
+    override of ``allow-committed-secrets`` is honoured, the committed file is
+    never treated as a gitignored local file, and the caller's ``config`` is
+    forwarded. ``dry_run`` is passed through unchanged.
+    """
+    project = tmp_path / "project"
+    project.mkdir()
+    config = {"allow-committed-secrets": True}
+    calls: list = []
+
+    def _capture(*args, **kwargs):
+        calls.append((args, kwargs))
+        return True
+
+    monkeypatch.setattr(opencode_v2_config.io, "write_checked", _capture)
+
+    entries = {"example": {"type": "remote", "url": "https://example.invalid"}}
+    opencode_v2_config.sync_opencode_mcp_managed(
+        project, {"Opencode": _v2_pc()}, "Opencode", entries, SyncLog(), False,
+        config=config,
+    )
+
+    assert len(calls) == 1, calls
+    args, kwargs = calls[0]
+    assert args[3] == "opencode.json"
+    payload = json.loads(args[1])
+    assert payload["mcp"]["servers"]["example"] == entries["example"]
+    assert kwargs["allow_secrets"] is True
+    assert kwargs["verify_gitignored"] is False
+    assert kwargs["config"] is config
+    assert kwargs["dry_run"] is False

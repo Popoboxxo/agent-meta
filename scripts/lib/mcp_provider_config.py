@@ -685,29 +685,58 @@ def generate_provider_configs(
     Raises SyncError if actual secrets are found in committed content and
     allow_committed_secrets is False.
     """
+    # The provider's resolved data is read BEFORE the early returns: the v2
+    # rollback must also run when there is no registry, no active server or no
+    # usable config — otherwise a v2→v1 switch leaves an orphaned
+    # ``mcp.servers`` behind (spec §3.5 M-3, AC-C17). For non-owners the
+    # rollback is a no-op *before* any state read (N-M2, AC-B20).
+    pc = provider_config.get(provider, {})
+    if not isinstance(pc, dict):
+        pc = {}
+    mcp_cfg = pc.get("mcp-config", {})
+    if not isinstance(mcp_cfg, dict):
+        mcp_cfg = {}
+
+    fmt = mcp_cfg.get("format")
+    committed_file = mcp_cfg.get("committed-file")
+    secrets_file = mcp_cfg.get("secrets-file")
+
+    # Lazy import: keeps the top-level module graph free of the
+    # mcp_provider_config -> opencode_v2_config edge (see ``_v2_oauth`` and the
+    # module docstring).
+    from . import opencode_v2_config
+
+    def _rollback_opencode_mcp() -> None:
+        opencode_v2_config.rollback_opencode_mcp(
+            project_root, provider_config, provider, log, dry_run
+        )
+
     # Registry resolution comes from lib.registry_query (Issue #478) — the
     # plugins-free resolution layer — so this module never depends on mcp.py;
     # that direction would recreate the mcp/mcp_provider_config/rules import
     # cycle mcp_registry.py was extracted to break (#613).
     registry = load_mcp_registry(agent_meta_root, config, project_root)
     if not registry:
+        _rollback_opencode_mcp()
         return
 
     active_servers = resolve_active_mcp_servers(config, agent_meta_root, project_root, registry=registry)
     if not active_servers:
+        # Zero active servers is still a cleanup state: the rollback runs
+        # independently of the server count (AC-C17).
+        _rollback_opencode_mcp()
         return
 
-    pc = provider_config.get(provider, {})
-    mcp_cfg = pc.get("mcp-config", {})
     if not mcp_cfg:
+        _rollback_opencode_mcp()
         return
-
-    fmt = mcp_cfg.get("format")
-    committed_file = mcp_cfg.get("committed-file")
-    secrets_file = mcp_cfg.get("secrets-file")
 
     if not fmt or not committed_file:
+        _rollback_opencode_mcp()
         return
+
+    if fmt != "opencode-json-v2":
+        _rollback_opencode_mcp()
 
     _warn_stale_mcp_servers_key(project_root, pc, committed_file, secrets_file, log, dry_run, config)
 
@@ -740,15 +769,31 @@ def generate_provider_configs(
         local_path is not None and local_entries and local_path == committed_path
     )
     if not same_file_secrets_write:
-        _write_provider_config(
-            path=committed_path,
-            mcp_entries=committed_entries,
-            fmt=fmt,
-            log=log,
-            dry_run=dry_run,
-            allow_secrets=allow_committed_secrets,
-            config=config,
-        )
+        if fmt == "opencode-json-v2":
+            # v2 manages one path per server (``mcp.servers.<name>``) instead
+            # of replacing ``mcp`` wholesale, so user servers survive and a
+            # deactivated server is rolled back per path (spec §3.5, M-3).
+            # The local secrets file below keeps the replacement semantics of
+            # ``_update_opencode_v2_json_config`` (R-14).
+            opencode_v2_config.sync_opencode_mcp_managed(
+                project_root,
+                provider_config,
+                provider,
+                committed_entries,
+                log,
+                dry_run,
+                config=config,
+            )
+        else:
+            _write_provider_config(
+                path=committed_path,
+                mcp_entries=committed_entries,
+                fmt=fmt,
+                log=log,
+                dry_run=dry_run,
+                allow_secrets=allow_committed_secrets,
+                config=config,
+            )
 
     # --- Local/secrets provider config (only when secrets.local.yaml exists) ---
     if secrets_file and local_entries:

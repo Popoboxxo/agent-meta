@@ -50,6 +50,24 @@ option reader, the managed key set (spec §3.3) and the structural
 ``find_plaintext_secrets`` check (spec §3.3/AC-B10). Activation and ownership
 are decided on resolved values only — no provider name, no ``surface-version``
 comparison.
+
+Task 16 (C2.3) adds the MCP half of the surface (spec §3.5, M-3):
+``sync_opencode_mcp_managed`` manages one path per server
+(``mcp.servers.<name>``, the whole server object as the value) with the same
+decision table and the ``opencode-v2-mcp`` state namespace, and
+``rollback_opencode_mcp`` removes exactly the recorded paths. Both start with
+``owns_opencode_surface`` and derive the committed file and the state file from
+the provider's resolved data.
+
+Known limitation (deliberate, not a gap to "fix" by inventing a second claim
+registry): the MCP writer does **not** participate in the run-scoped
+``claimed_files`` set introduced by Task 10 — its plan signature has no such
+parameter. If two provider entries ever claimed the same managed file, the two
+writers would not arbitrate ownership between them. The current registry has
+exactly one provider whose ``mcp-config.surface-formats`` contains
+``opencode-json-v2``, so a second claimant is a misconfiguration that no
+shipped provider produces. Should a real second owner appear, extend the one
+existing claim registry instead of adding another.
 """
 from __future__ import annotations
 
@@ -797,3 +815,259 @@ def sync_opencode_v2_managed_keys(
 
     if new_state != state:
         isolation._write_state(state_path, new_state, dry_run, STATE_KEYS_KEY)
+
+
+# ---------------------------------------------------------------------------
+# MCP managed paths (spec §3.5, M-3; Task 16 / C2.3)
+#
+# One managed path per server — ``mcp.servers.<name>`` — with the whole server
+# object as the managed value, so the decision table above applies unchanged
+# and user servers live next to the managed ones. Both entry points start with
+# the ownership guard (N-M2) and derive the committed file and the state file
+# from the provider's resolved data; neither hardcodes ``opencode.json``.
+# ---------------------------------------------------------------------------
+
+_MCP_SERVERS_PREFIX = "mcp.servers."
+
+
+def _mcp_state_path(root: Path, pc: dict) -> Path:
+    """The owner's state file, routed through ``safe_path`` (task-9 pattern)."""
+    return isolation.safe_path(
+        root, opencode_state_path(root, pc).relative_to(root)
+    )
+
+
+def _mcp_targets(entries: dict | None) -> dict[str, object]:
+    """Map ``{server_name: entry}`` to ``{"mcp.servers.<name>": entry}``."""
+    if not isinstance(entries, dict):
+        return {}
+    return {
+        f"{_MCP_SERVERS_PREFIX}{name}": entry
+        for name, entry in entries.items()
+    }
+
+
+def _drop_flat_mcp_keys(document: dict) -> bool:
+    """Drop v1-style flat keys beside ``servers`` under ``mcp``.
+
+    The v2 document only allows ``servers`` under ``mcp``
+    (``artifact_validate._validate_opencode_v2``); a flat v1 server map must
+    not survive a v1→v2 switch. Only the v2 writer calls this — the v1 writer
+    (byte-frozen, R-15) never does.
+    """
+    mcp_value = document.get("mcp")
+    if not isinstance(mcp_value, dict):
+        return False
+    dropped = False
+    for key in [key for key in mcp_value if key != "servers"]:
+        del mcp_value[key]
+        dropped = True
+    return dropped
+
+
+def sync_opencode_mcp_managed(
+    project_root: Path,
+    provider_config: dict,
+    provider: str,
+    entries: dict,
+    log: SyncLog,
+    dry_run: bool,
+    config: dict | None = None,
+) -> None:
+    """Merge the v2 MCP servers into the owner's committed file (spec §3.5).
+
+    ``entries`` is the already-rendered ``{server_name: connection}`` map from
+    ``mcp_provider_config``. Every server is one managed path
+    (``mcp.servers.<name>``) decided by :func:`merge_managed_path`: a user
+    server that was never managed is never deleted (rows 3/3a), our own value
+    is updated (row 2), and a server that is no longer active is removed or its
+    prior restored (rows 4/4a). Flat v1-style keys beside ``servers`` are
+    dropped on a v2 write, because the v2 document allows only ``servers``
+    under ``mcp``.
+
+    The ownership guard is the first statement: non-owners never read state,
+    write a file or log (AC-B20, N-M2). The secret gate is delegated to
+    ``io.write_checked`` with the same parameters as
+    ``mcp_provider_config._write_json_config`` — ``allow_secrets`` from
+    ``allow-committed-secrets``, ``verify_gitignored=False`` (a committed
+    file), the caller's ``config`` and ``dry_run``.
+
+    Known limitation: this writer has no ``claimed_files`` parameter, so it
+    does not participate in the Task-10 run-scoped claim registry (see the
+    module docstring). With the current single-owner registry that is not
+    observable.
+    """
+    if not owns_opencode_surface(provider_config, provider):
+        return
+
+    pc = _provider_entry(provider_config, provider)
+    committed = _mcp_config(pc).get("committed-file")
+    if not _non_empty_string(committed):
+        return  # unreachable behind the ownership guard; keeps types local
+
+    root = Path(project_root)
+    state_path = _mcp_state_path(root, pc)
+    state = isolation._read_state(state_path, STATE_MCP_KEY)
+    targets = _mcp_targets(entries)
+
+    # No-op without active servers AND without prior management: a v1 project
+    # that never had v2 managed servers must stay byte-identical (AC-B7).
+    if not targets and not state:
+        return
+
+    file_path = isolation.safe_path(root, committed)
+    existing = isolation._read_json_safe(file_path, log)
+    if existing is None:
+        if file_path.exists():
+            return  # parse error — warning already emitted, never overwrite it
+        existing = {}
+    elif not isinstance(existing, dict):
+        return  # a non-object document is not ours to rewrite
+
+    # A v2 write may not leave a flat v1 map next to ``servers``. Only done
+    # when there is something to manage, so a file with foreign flat keys is
+    # not rewritten by a pure no-op.
+    changed = _drop_flat_mcp_keys(existing) if targets else False
+
+    new_state: dict[str, dict] = {}
+    for path in sorted(set(state) | set(targets)):
+        result = merge_managed_path(
+            path,
+            targets.get(path),
+            _get_path(existing, path),
+            state.get(path),
+        )
+        if result.warning:
+            log.warning(result.warning)
+        if result.action == "write":
+            if not _set_path(existing, path, result.value):
+                # A non-object ancestor is user data: keep it and warn instead
+                # of clobbering it, and do not record state we never wrote.
+                log.warning(_warning(path))
+                continue
+            changed = True
+        elif result.action == "remove":
+            if result.value is ABSENT:
+                _delete_path(existing, path)
+            elif not _set_path(existing, path, result.value):
+                log.warning(_warning(path))
+                continue
+            changed = True
+        # ``keep`` / ``noop``: the file is left exactly as it is.
+        if result.state is not None:
+            new_state[path] = result.state
+
+    if changed:
+        content = json.dumps(existing, indent=2, ensure_ascii=False) + "\n"
+        if not dry_run:
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+        written = io.write_checked(
+            file_path,
+            content,
+            log,
+            committed,
+            allow_secrets=(config or {}).get("allow-committed-secrets", False),
+            verify_gitignored=False,
+            config=config,
+            dry_run=dry_run,
+        )
+        if written:
+            log.action("WRITE", committed, "opencode-v2 mcp servers")
+        else:
+            log.skip(committed, "opencode-v2 mcp servers unchanged")
+    else:
+        log.skip(committed, "opencode-v2 mcp servers unchanged")
+
+    if new_state != state:
+        isolation._write_state(state_path, new_state, dry_run, STATE_MCP_KEY)
+
+
+def rollback_opencode_mcp(
+    project_root: Path,
+    provider_config: dict,
+    provider: str,
+    log: SyncLog,
+    dry_run: bool,
+) -> None:
+    """Remove the managed ``mcp.servers.<name>`` paths of the owner (§3.5 (4)).
+
+    Reachable from every early-return path of ``generate_provider_configs``
+    (no registry, no active servers, no usable config) and from the non-v2 normal
+    path, so a v2→v1 switch cleans up even without a single active server
+    (AC-C17). The ownership guard is the first statement and precedes any
+    state read: a non-owner iteration leaves file and state byte-identical
+    (AC-B20). File and state path come from the owner's resolved data only.
+
+    Uses the same decision table with ``target is None``: only a path whose
+    current value still equals the recorded ``value`` is removed/restored (row
+    4); a user-modified value survives with a warning (row 4a) and management
+    ends. ``mcp.servers`` (and ``mcp``) disappear only when they become empty —
+    the generic parent pruning in :func:`_delete_path`. Namespace cleanup is
+    written through ``isolation._write_state``; an empty namespace is removed.
+    """
+    if not owns_opencode_surface(provider_config, provider):
+        return
+
+    pc = _provider_entry(provider_config, provider)
+    committed = _mcp_config(pc).get("committed-file")
+    if not _non_empty_string(committed):
+        return
+
+    root = Path(project_root)
+    state_path = _mcp_state_path(root, pc)
+    state = isolation._read_state(state_path, STATE_MCP_KEY)
+    if not state:
+        return
+
+    file_path = isolation.safe_path(root, committed)
+    existing = isolation._read_json_safe(file_path, log)
+    if existing is None:
+        if file_path.exists():
+            return  # parse error — never rewrite, only drop the stale state
+        # The managed file is gone: nothing to restore, management just ends.
+        isolation._write_state(state_path, {}, dry_run, STATE_MCP_KEY)
+        return
+    if not isinstance(existing, dict):
+        return
+
+    new_state: dict[str, dict] = {}
+    changed = False
+    for path in sorted(state):
+        result = merge_managed_path(
+            path,
+            None,
+            _get_path(existing, path),
+            state.get(path),
+        )
+        if result.warning:
+            log.warning(result.warning)
+        if result.action == "remove":
+            if result.value is ABSENT:
+                _delete_path(existing, path)
+            elif not _set_path(existing, path, result.value):
+                log.warning(_warning(path))
+                continue
+            changed = True
+        # ``keep`` / ``noop``: the file is left exactly as it is.
+        if result.state is not None:
+            new_state[path] = result.state
+
+    if changed:
+        content = json.dumps(existing, indent=2, ensure_ascii=False) + "\n"
+        if not dry_run:
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+        written = io.write_checked(
+            file_path,
+            content,
+            log,
+            committed,
+            verify_gitignored=False,
+            dry_run=dry_run,
+        )
+        if written:
+            log.action("WRITE", committed, "opencode-v2 mcp rollback")
+        else:
+            log.skip(committed, "opencode-v2 mcp rollback unchanged")
+
+    if new_state != state:
+        isolation._write_state(state_path, new_state, dry_run, STATE_MCP_KEY)
