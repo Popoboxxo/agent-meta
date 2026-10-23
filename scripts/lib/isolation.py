@@ -53,6 +53,11 @@ _RUNTIME_GATE_GLOB = "**"
 _RUNTIME_GATE_DECISION = "deny"
 _RUNTIME_GATE_FAMILIES = ("edit", "bash")
 
+# Entry-point key inside opencode.json (#1006/IC-6): written by the managed
+# merge only for an explicit AND generated primary role, tracked in the
+# ``default-agent`` state namespace so a rollback can remove/restore it.
+_DEFAULT_AGENT_JSON_KEY = "default_agent"
+
 _GEMINI_POLICIES_DIR = ".gemini/policies"
 _GEMINI_ISOLATION_FILE = ".gemini/policies/provider-isolation.toml"
 _CONTINUE_ISOLATION_FILE = ".continue/rules/provider-isolation.md"
@@ -452,6 +457,81 @@ def _opencode_entry_point(
     return role
 
 
+def _merge_default_agent(
+    existing: dict,
+    desired: str | None,
+    st: dict,
+    gate_effective: bool,
+    provider: str,
+    log: SyncLog,
+) -> dict:
+    """Merge the managed ``default_agent`` into *existing*; return new state.
+
+    Mutates ``existing["default_agent"]`` in place and returns the value of the
+    ``default-agent`` state namespace (``{}`` removes it). ``desired`` is the
+    explicit AND generated primary role (``_opencode_entry_point``) or
+    ``None``. The user's value always wins: a differing user value is never
+    overwritten, only warned about — with the gate consequence appended when
+    ``gate_effective`` (IC-6, AC-06…AC-09).
+
+    A state record without a non-empty ``str`` ``value`` counts as "no state".
+    ``provider`` is part of the IC-6 writer contract; the warning text stays
+    provider-agnostic (a provider name would only ever be interpolated).
+    """
+    state_value = st.get("value") if isinstance(st, dict) else None
+    if not (isinstance(state_value, str) and state_value):
+        st = {}
+        state_value = None
+
+    current = existing.get(_DEFAULT_AGENT_JSON_KEY)
+
+    def _warn() -> None:
+        message = (
+            f"default_agent is '{current}' but the entry point role is "
+            f"'{desired}'; leaving the user value untouched"
+        )
+        if gate_effective:
+            message += (
+                f" — the runtime gate is active, so '{current}' is locked: set "
+                f"default_agent to '{desired}' or disable strict for this "
+                "provider via orchestrator.provider-overrides"
+            )
+        log.warning(message)
+
+    if desired is not None and not st:
+        if current is None:
+            existing[_DEFAULT_AGENT_JSON_KEY] = desired
+            return {"value": desired, "prior": None}
+        if current == desired:
+            # The user already set exactly our entry point: remember it so a
+            # later rollback leaves the value alone (AC-08).
+            return {"value": desired, "prior": desired}
+        _warn()
+        return {}
+
+    if desired is not None:
+        if current != state_value:
+            # Changed or deleted by the user after the managed write: leave it.
+            _warn()
+            return st
+        if desired != state_value:
+            existing[_DEFAULT_AGENT_JSON_KEY] = desired
+            return {**st, "value": desired}
+        return st
+
+    if not st:
+        return {}
+
+    # Rollback: restore only a still-managed value, then drop the namespace.
+    if current == state_value:
+        prior = st.get("prior")
+        if isinstance(prior, str) and prior:
+            existing[_DEFAULT_AGENT_JSON_KEY] = prior
+        else:
+            existing.pop(_DEFAULT_AGENT_JSON_KEY, None)
+    return {}
+
+
 def _sync_opencode_runtime_gate(
     project_root: Path,
     config: dict,
@@ -460,8 +540,10 @@ def _sync_opencode_runtime_gate(
     agent_meta_root: Path,
     log: SyncLog,
     dry_run: bool,
+    active_set=None,
 ) -> None:
-    """Merge the Main-Chat runtime-gate deny into the EXISTING opencode.json.
+    """Merge the Main-Chat runtime-gate deny and ``default_agent`` into the
+    EXISTING opencode.json.
 
     Uses the same managed merge path as provider isolation
     (``_read_json_safe`` / ``write_checked``) — never
@@ -471,6 +553,14 @@ def _sync_opencode_runtime_gate(
     that key is recorded in the ``runtime-gate-deny`` state namespace, so a
     later non-strict sync removes only the managed deny and restores the prior
     value exactly (IC-09, AC-10/AC-11).
+
+    In addition (#1006/IC-6) the explicit + generated primary role
+    (``_opencode_entry_point``) is written as ``default_agent``; its prior
+    value lives in the separate ``default-agent`` namespace and is
+    removed/restored on rollback. A differing user value is never overwritten,
+    only warned about. Both writers share the state file with read-modify-write
+    per namespace. ``active_set=None`` treats the entry point as generated.
+    A parse error in ``opencode.json`` returns before any write (AC-14).
     """
     settings_path = safe_path(project_root, "opencode.json")
     state_path = safe_path(project_root, _OPENCODE_STATE_FILE)
@@ -486,6 +576,16 @@ def _sync_opencode_runtime_gate(
         gate_state = {}
 
     entries = _opencode_runtime_gate_entries(config, provider, agent_meta_root, provider_config)
+
+    # Entry point (#1006/IC-6): an explicit AND generated primary role. The
+    # gate-deny coupling itself lands in Task 7; here the deny stays driven by
+    # ``entries`` alone and ``gate_effective`` only shapes the warning.
+    entry = _opencode_entry_point(provider, provider_config, active_set)
+    da_state = _read_state(state_path, _STATE_DEFAULT_AGENT_KEY)
+    before_default_agent = existing.get(_DEFAULT_AGENT_JSON_KEY)
+    new_da_state = _merge_default_agent(
+        existing, entry, da_state, bool(entries), provider, log
+    )
 
     permission = existing.get("permission")
     if not isinstance(permission, dict):
@@ -528,8 +628,12 @@ def _sync_opencode_runtime_gate(
 
     if not dry_run:
         settings_path.parent.mkdir(parents=True, exist_ok=True)
+    default_agent_changed = existing.get(_DEFAULT_AGENT_JSON_KEY) != before_default_agent
+    action = "runtime-gate deny: permission.edit/bash '**'"
+    if default_agent_changed:
+        action += ", default_agent"
     if write_checked(settings_path, settings_content, log, rel_settings, dry_run=dry_run):
-        log.action("WRITE", rel_settings, "runtime-gate deny: permission.edit/bash '**'")
+        log.action("WRITE", rel_settings, action)
     else:
         log.skip(rel_settings, "runtime-gate unchanged")
     if state_changed:
@@ -539,6 +643,8 @@ def _sync_opencode_runtime_gate(
             dry_run,
             _STATE_RUNTIME_GATE_KEY,
         )
+    if new_da_state != da_state:
+        _write_state(state_path, new_da_state, dry_run, _STATE_DEFAULT_AGENT_KEY)
 
 
 # ---------------------------------------------------------------------------

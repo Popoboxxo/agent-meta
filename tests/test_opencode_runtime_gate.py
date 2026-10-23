@@ -14,10 +14,11 @@ Covers the Phase-0 permission-path tightening (SPEC-OPENCODE-RUNTIME-GATE-
   ``opencode.json`` and the same state file (``isolation-deny`` +
   ``runtime-gate-deny``) without clobbering each other.
 
-Issue #1006 (IC-4/IC-5) extends this: the ``default-agent`` state namespace is
-a third, dict-valued sibling (AC-13), ``opencode_runtime_gate_wanted`` mirrors
-the entry computation and ``_opencode_entry_point`` resolves the explicit +
-generated primary role.
+Issue #1006 (IC-4/IC-5/IC-6) extends this: the ``default-agent`` state namespace
+is a third, dict-valued sibling (AC-13), ``opencode_runtime_gate_wanted`` mirrors
+the entry computation, ``_opencode_entry_point`` resolves the explicit +
+generated primary role and ``_merge_default_agent`` writes/rolls back
+``default_agent`` in the managed merge (AC-06…AC-09, AC-14).
 
 Run: python -m pytest tests/test_opencode_runtime_gate.py -v
 """
@@ -457,3 +458,271 @@ def test_runtime_gate_wanted_mirrors_entries(tmp_path):
     assert isolation.opencode_runtime_gate_wanted(
         {"orchestrator": {"mode": "advisory"}}, "Opencode", framework, provider_config
     ) is False
+
+
+# ---------------------------------------------------------------------------
+# #1006 Task 6 (IC-6): ``default_agent`` in the managed merge
+# ---------------------------------------------------------------------------
+
+def _pc(primary: bool = True) -> dict:
+    """Provider entry with (or without) the explicit ``primary-role`` key."""
+    entry: dict = {"has_hooks": False}
+    if primary:
+        entry["primary-role"] = "orchestrator"
+    return {"Opencode": entry}
+
+
+def _sync(project_root, framework, config, pc, log, active_set=None,
+          dry_run: bool = False) -> None:
+    isolation._sync_opencode_runtime_gate(
+        project_root, config, "Opencode", pc, framework, log,
+        dry_run=dry_run, active_set=active_set,
+    )
+
+
+def _make_project(tmp_path) -> Path:
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    return project_root
+
+
+def test_default_agent_written_with_state_and_idempotent(tmp_path):
+    """AC-06: a missing ``default_agent`` is written once, with state."""
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    config = {"orchestrator": {"mode": "strict"}}
+    (project_root / "opencode.json").write_text(
+        json.dumps({"theme": "x"}) + "\n", encoding="utf-8"
+    )
+
+    _sync(project_root, framework, config, _pc(), SyncLog())
+
+    data = _read_json(project_root / "opencode.json")
+    assert data["default_agent"] == "orchestrator"
+    assert data["theme"] == "x"
+    assert _read_state(project_root)[_DEFAULT_AGENT_KEY] == {
+        "value": "orchestrator",
+        "prior": None,
+    }
+
+    first_json = (project_root / "opencode.json").read_bytes()
+    first_state = (project_root / _STATE_FILE).read_bytes()
+
+    _sync(project_root, framework, config, _pc(), SyncLog())
+
+    assert (project_root / "opencode.json").read_bytes() == first_json
+    assert (project_root / _STATE_FILE).read_bytes() == first_state
+
+
+def test_differing_user_default_agent_not_overwritten_warns(tmp_path):
+    """AC-07: a user value wins, exactly one warning (with consequence under
+    an effective gate); the gate deny is still written."""
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    (project_root / "opencode.json").write_text(
+        json.dumps({"default_agent": "build"}) + "\n", encoding="utf-8"
+    )
+    log = SyncLog()
+
+    _sync(project_root, framework, {"orchestrator": {"mode": "strict"}}, _pc(), log)
+
+    data = _read_json(project_root / "opencode.json")
+    assert data["default_agent"] == "build"
+    assert data["permission"]["edit"]["**"] == "deny"
+    assert _DEFAULT_AGENT_KEY not in _read_state(project_root)
+    assert len(log.warnings) == 1, log.warnings
+    for token in ("build", "orchestrator", "provider-overrides"):
+        assert token in log.warnings[0], log.warnings
+
+    # Without strict the gate is not effective: no consequence hint.
+    quiet_root = tmp_path / "project2"
+    quiet_root.mkdir()
+    (quiet_root / "opencode.json").write_text(
+        json.dumps({"default_agent": "build"}) + "\n", encoding="utf-8"
+    )
+    quiet_log = SyncLog()
+
+    _sync(quiet_root, framework, {}, _pc(), quiet_log)
+
+    assert _read_json(quiet_root / "opencode.json")["default_agent"] == "build"
+    assert not (quiet_root / _STATE_FILE).exists()
+    assert len(quiet_log.warnings) == 1, quiet_log.warnings
+    assert "build" in quiet_log.warnings[0]
+    assert "orchestrator" in quiet_log.warnings[0]
+    assert "provider-overrides" not in quiet_log.warnings[0]
+
+
+def test_same_user_default_agent_records_prior_and_survives_rollback(tmp_path):
+    """AC-08: user value == entry point -> no file change, ``prior`` recorded."""
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    (project_root / "opencode.json").write_text(
+        json.dumps({"default_agent": "orchestrator"}, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    before = (project_root / "opencode.json").read_bytes()
+
+    _sync(project_root, framework, {}, _pc(), SyncLog())
+
+    assert (project_root / "opencode.json").read_bytes() == before
+    assert _read_state(project_root)[_DEFAULT_AGENT_KEY] == {
+        "value": "orchestrator",
+        "prior": "orchestrator",
+    }
+
+    _sync(project_root, framework, {}, _pc(primary=False), SyncLog())
+
+    assert _read_json(project_root / "opencode.json")["default_agent"] == "orchestrator"
+    assert _DEFAULT_AGENT_KEY not in _read_state(project_root)
+
+
+def test_default_agent_rollback_removes_key_when_prior_none(tmp_path):
+    """AC-09: prior ``None`` -> key removed; user keys and sibling namespaces
+    stay untouched."""
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    config = {"orchestrator": {"mode": "strict"}}
+    (project_root / "opencode.json").write_text(
+        json.dumps({"theme": "x"}) + "\n", encoding="utf-8"
+    )
+    state_path = project_root / _STATE_FILE
+    state_path.parent.mkdir(parents=True)
+    isolation._write_state(state_path, ["**/.claude/**"], dry_run=False)
+
+    _sync(project_root, framework, config, _pc(), SyncLog())
+
+    data = _read_json(project_root / "opencode.json")
+    assert data["default_agent"] == "orchestrator"
+    state = _read_state(project_root)
+    assert state[_DEFAULT_AGENT_KEY] == {"value": "orchestrator", "prior": None}
+    assert state[_RUNTIME_GATE_KEY] == {"**": {"edit": None, "bash": None}}
+
+    _sync(project_root, framework, config, _pc(primary=False), SyncLog())
+
+    data = _read_json(project_root / "opencode.json")
+    assert "default_agent" not in data
+    assert data["theme"] == "x"
+    state = _read_state(project_root)
+    assert _DEFAULT_AGENT_KEY not in state
+    assert state[_ISOLATION_KEY] == ["**/.claude/**"]
+    assert state[_RUNTIME_GATE_KEY] == {"**": {"edit": None, "bash": None}}
+
+
+def test_default_agent_rollback_keeps_user_changed_value(tmp_path):
+    """AC-09: a user change after the managed write survives the rollback."""
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    config = {"orchestrator": {"mode": "strict"}}
+
+    _sync(project_root, framework, config, _pc(), SyncLog())
+    data = _read_json(project_root / "opencode.json")
+    assert data["default_agent"] == "orchestrator"
+    data["default_agent"] = "build"
+    (project_root / "opencode.json").write_text(
+        json.dumps(data, indent=2) + "\n", encoding="utf-8"
+    )
+
+    _sync(project_root, framework, config, _pc(primary=False), SyncLog())
+
+    assert _read_json(project_root / "opencode.json")["default_agent"] == "build"
+    assert _DEFAULT_AGENT_KEY not in _read_state(project_root)
+
+
+def test_default_agent_follows_changed_primary_role(tmp_path):
+    """IC-6: a changed explicit role is followed while the state is ours."""
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    config = {"orchestrator": {"mode": "strict"}}
+
+    _sync(project_root, framework, config, _pc(), SyncLog())
+    assert _read_state(project_root)[_DEFAULT_AGENT_KEY] == {
+        "value": "orchestrator",
+        "prior": None,
+    }
+
+    changed = {"Opencode": {"has_hooks": False, "primary-role": "developer"}}
+    _sync(project_root, framework, config, changed, SyncLog())
+
+    assert _read_json(project_root / "opencode.json")["default_agent"] == "developer"
+    assert _read_state(project_root)[_DEFAULT_AGENT_KEY] == {
+        "value": "developer",
+        "prior": None,
+    }
+
+
+def test_user_deleted_default_agent_is_not_rewritten_warns(tmp_path):
+    """IC-6: a deleted managed key is NOT re-created; warn and keep state."""
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    config = {"orchestrator": {"mode": "strict"}}
+
+    _sync(project_root, framework, config, _pc(), SyncLog())
+    data = _read_json(project_root / "opencode.json")
+    assert data["default_agent"] == "orchestrator"
+    data.pop("default_agent")
+    (project_root / "opencode.json").write_text(
+        json.dumps(data, indent=2) + "\n", encoding="utf-8"
+    )
+    log = SyncLog()
+
+    _sync(project_root, framework, config, _pc(), log)
+
+    assert "default_agent" not in _read_json(project_root / "opencode.json")
+    assert _read_state(project_root)[_DEFAULT_AGENT_KEY] == {
+        "value": "orchestrator",
+        "prior": None,
+    }
+    assert len(log.warnings) == 1, log.warnings
+    assert "orchestrator" in log.warnings[0]
+
+
+def test_inactive_primary_role_gets_no_default_agent(tmp_path):
+    """IC-4/IC-6: a non-generated primary role writes neither key nor state."""
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    active_set = SimpleNamespace(roles=frozenset({"developer"}))
+
+    _sync(
+        project_root,
+        framework,
+        {"orchestrator": {"mode": "strict"}},
+        _pc(),
+        SyncLog(),
+        active_set=active_set,
+    )
+
+    assert "default_agent" not in _read_json(project_root / "opencode.json")
+    assert _DEFAULT_AGENT_KEY not in _read_state(project_root)
+
+
+def test_unparseable_opencode_json_is_left_untouched(tmp_path):
+    """AC-14: an unparseable file is never rewritten; no state is created."""
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    settings = project_root / "opencode.json"
+    settings.write_text("{not json", encoding="utf-8")
+    log = SyncLog()
+
+    _sync(project_root, framework, {"orchestrator": {"mode": "strict"}}, _pc(), log)
+
+    assert settings.read_text(encoding="utf-8") == "{not json"
+    assert not (project_root / _STATE_FILE).exists()
+    assert log.warnings
+
+
+def test_dry_run_with_primary_role_never_writes(tmp_path):
+    """AC-14: ``dry_run`` writes neither ``opencode.json`` nor the state file."""
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+
+    _sync(
+        project_root,
+        framework,
+        {"orchestrator": {"mode": "strict"}},
+        _pc(),
+        SyncLog(),
+        dry_run=True,
+    )
+
+    assert not (project_root / "opencode.json").exists()
+    assert not (project_root / _STATE_FILE).exists()
