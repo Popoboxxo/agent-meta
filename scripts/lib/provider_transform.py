@@ -430,6 +430,10 @@ def _apply_agent_transform(
         # a primary agent that can write anywhere defeats the Main-Chat gate.
         # The gate decision has one source of truth (`lib/isolation`), imported
         # lazily here to avoid a load-time cycle.
+        # Known boundary: the lock keys off the DERIVED `mode` above. A project
+        # override template that declares `mode: primary` for a role the
+        # registry does not name as `primary-role` inherits the template value
+        # further down (`mode or template_fm["mode"]`) but is NOT locked here.
         deny_edit = False
         edit_allow_paths: tuple[str, ...] = ()
         if mode == 'primary':

@@ -11,7 +11,8 @@
   gate is active (writes limited to `.tmp/**` and `.meta-viz/**`). A user-set, different
   `default_agent` is never overwritten (warning only; under strict the gate still applies, so set
   `default_agent` to `orchestrator`). Providers without an explicit `primary-role` (Mammouth) stay
-  byte-identical.
+  byte-identical. For non-strict projects the generated orchestrator carries `bash: deny` (from
+  `opencode_deny_critical`), so the main chat must delegate shell work.
   **Behavior change for all Opencode projects (strict or not):** the default agent is now
   `orchestrator` instead of `build`, and `@orchestrator` no longer invokes it (it is a primary agent;
   switch via Tab/default).

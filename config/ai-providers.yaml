@@ -315,7 +315,9 @@ providers:
       frontmatter-mechanism: opencode-native
       # OQ-8/AC-5: surface-version is data that SELECTS the frontmatter
       # mechanism; the transform writer keeps reading the resolved
-      # `frontmatter-mechanism` value only. v1 stays byte-frozen.
+      # `frontmatter-mechanism` value only. The v1 surface FORMAT is frozen;
+      # the entry point (`mode: primary` + `default_agent`) is excluded from
+      # that freeze (OQ-8 amendment A2, #1006).
       surface-mechanisms:
         v1: opencode-native
         v2: opencode-native-v2

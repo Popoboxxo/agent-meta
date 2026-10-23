@@ -242,6 +242,7 @@ Wegwerfverzeichnis `.tmp/opencode-probe/` (inkl. `.tmp/opencode-probe-home/`) bl
 ## Ergebnis
 
 Verdict: CONFIRMED_BY_DOC
+Verdikt: CONFIRMED_BY_DOC
 
 **Begründung:** Frage 1 (Agent-Regeln vor globaler Config, letzter Match gewinnt) ist durch die
 Herstellerdoku belegt (`DOKU`, Zitate (a) und (b)) und wird durch zwei lokale, deterministische Belege

@@ -687,6 +687,83 @@ def test_user_deleted_default_agent_is_not_rewritten_warns(tmp_path):
     }
     assert len(log.warnings) == 1, log.warnings
     assert "orchestrator" in log.warnings[0]
+    # A deleted key has no value to quote: never render the literal 'None'.
+    assert "'None'" not in log.warnings[0], log.warnings
+    assert "None" not in log.warnings[0], log.warnings
+    assert "missing" in log.warnings[0], log.warnings
+    assert "removed" in log.warnings[0], log.warnings
+
+
+def test_three_sync_restores_different_prior_value(tmp_path):
+    """IC-6: a prior user value survives two managed rewrites.
+
+    ``orchestrator`` (user, same as the first entry point) → primary role
+    changes to ``developer`` (managed write) → primary role removed ⇒ the
+    original ``orchestrator`` is restored, not the intermediate managed value.
+    """
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    config = {}
+    (project_root / "opencode.json").write_text(
+        json.dumps({"default_agent": "orchestrator"}, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    # Sync 1: the user already set our entry point -> prior recorded.
+    _sync(project_root, framework, config, _pc(), SyncLog())
+    assert _read_json(project_root / "opencode.json")["default_agent"] == "orchestrator"
+    assert _read_state(project_root)[_DEFAULT_AGENT_KEY] == {
+        "value": "orchestrator",
+        "prior": "orchestrator",
+    }
+
+    # Sync 2: the explicit primary role changes -> managed rewrite.
+    developer = {"Opencode": {"has_hooks": False, "primary-role": "developer"}}
+    _sync(project_root, framework, config, developer, SyncLog())
+    assert _read_json(project_root / "opencode.json")["default_agent"] == "developer"
+    assert _read_state(project_root)[_DEFAULT_AGENT_KEY] == {
+        "value": "developer",
+        "prior": "orchestrator",
+    }
+
+    # Sync 3: the primary role is gone -> the ORIGINAL user value comes back.
+    _sync(project_root, framework, config, _pc(primary=False), SyncLog())
+    assert _read_json(project_root / "opencode.json")["default_agent"] == "orchestrator"
+    assert _DEFAULT_AGENT_KEY not in _read_state(project_root)
+
+
+def test_sync_action_names_only_what_changed(tmp_path):
+    """RVW-A2-2: the action text must not claim a deny that was never written."""
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+
+    # Non-strict: no deny at all — only the entry point changes.
+    non_strict_root = _make_project(tmp_path)
+    non_strict_log = SyncLog()
+    _sync(non_strict_root, framework, {}, _pc(), non_strict_log)
+    writes = [a for a in non_strict_log.actions if "WRITE" in a]
+    assert len(writes) == 1, non_strict_log.actions
+    assert "default_agent" in writes[0]
+    assert "runtime-gate deny" not in writes[0], writes[0]
+
+    # Strict: the deny is written and named, plus the entry point.
+    strict_root = tmp_path / "project-strict"
+    strict_root.mkdir()
+    strict_log = SyncLog()
+    _sync(
+        strict_root, framework, {"orchestrator": {"mode": "strict"}}, _pc(), strict_log
+    )
+    writes = [a for a in strict_log.actions if "WRITE" in a]
+    assert len(writes) == 1, strict_log.actions
+    for token in ("runtime-gate deny", "default_agent"):
+        assert token in writes[0], writes[0]
+
+    # Strict -> non-strict: the text reports the removal, not a write.
+    rollback_log = SyncLog()
+    _sync(strict_root, framework, {}, _pc(), rollback_log)
+    writes = [a for a in rollback_log.actions if "WRITE" in a]
+    assert len(writes) == 1, rollback_log.actions
+    assert "runtime-gate deny removed" in writes[0], writes[0]
+    assert "default_agent" not in writes[0], writes[0]
 
 
 def test_inactive_primary_role_gets_no_default_agent(tmp_path):

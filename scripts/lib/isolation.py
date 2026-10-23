@@ -444,6 +444,10 @@ def _opencode_entry_point(
 ) -> str | None:
     """Primary role of *provider* if explicit AND generated, else ``None``.
 
+    ``provider_config`` must be the resolved provider registry
+    (``{provider: {...}}``), never a single provider entry — the lookup is
+    keyed by ``provider`` (``providers.explicit_primary_role``).
+
     Explicit: ``providers.explicit_primary_role`` (IC-1 — no code default, so
     a provider without ``primary-role`` never emits an entry point). Generated:
     ``active_set is None`` (no active-set information ⇒ fail-open) or the role
@@ -462,7 +466,6 @@ def _merge_default_agent(
     desired: str | None,
     st: dict,
     gate_effective: bool,
-    provider: str,
     log: SyncLog,
 ) -> dict:
     """Merge the managed ``default_agent`` into *existing*; return new state.
@@ -475,8 +478,9 @@ def _merge_default_agent(
     ``gate_effective`` (IC-6, AC-06…AC-09).
 
     A state record without a non-empty ``str`` ``value`` counts as "no state".
-    ``provider`` is part of the IC-6 writer contract; the warning text stays
-    provider-agnostic (a provider name would only ever be interpolated).
+    The warning text stays provider-agnostic and names the entry point role;
+    a value the user deleted (``None``) gets its own sentence instead of the
+    literal ``'None'``.
     """
     state_value = st.get("value") if isinstance(st, dict) else None
     if not (isinstance(state_value, str) and state_value):
@@ -486,16 +490,29 @@ def _merge_default_agent(
     current = existing.get(_DEFAULT_AGENT_JSON_KEY)
 
     def _warn() -> None:
-        message = (
-            f"default_agent is '{current}' but the entry point role is "
-            f"'{desired}'; leaving the user value untouched"
-        )
-        if gate_effective:
-            message += (
-                f" — the runtime gate is active, so '{current}' is locked: set "
-                f"default_agent to '{desired}' or disable strict for this "
-                "provider via orchestrator.provider-overrides"
+        if current is None:
+            message = (
+                "default_agent is missing (removed after the managed write) "
+                f"but the entry point role is '{desired}'; leaving it untouched"
             )
+        else:
+            message = (
+                f"default_agent is '{current}' but the entry point role is "
+                f"'{desired}'; leaving the user value untouched"
+            )
+        if gate_effective:
+            if current is None:
+                message += (
+                    " — the runtime gate is active, so no agent is "
+                    f"pre-selected: set default_agent to '{desired}' or disable "
+                    "strict for this provider via orchestrator.provider-overrides"
+                )
+            else:
+                message += (
+                    f" — the runtime gate is active, so '{current}' is locked: "
+                    f"set default_agent to '{desired}' or disable strict for "
+                    "this provider via orchestrator.provider-overrides"
+                )
         log.warning(message)
 
     if desired is not None and not st:
@@ -566,6 +583,11 @@ def _sync_opencode_runtime_gate(
     is wanted but no explicit + generated primary role exists, no deny is
     written (it would lock every agent), a warning explains why, and a managed
     deny from an earlier sync is rolled back by the regular rollback branch.
+
+    ``provider_config`` is the resolved provider registry (``{provider: …}``),
+    never a single provider entry: both the gate-tier lookup
+    (``_opencode_runtime_gate_entries``) and the entry-point lookup
+    (``_opencode_entry_point``) index it by ``provider``.
     """
     settings_path = safe_path(project_root, "opencode.json")
     state_path = safe_path(project_root, _OPENCODE_STATE_FILE)
@@ -603,13 +625,15 @@ def _sync_opencode_runtime_gate(
     da_state = _read_state(state_path, _STATE_DEFAULT_AGENT_KEY)
     before_default_agent = existing.get(_DEFAULT_AGENT_JSON_KEY)
     new_da_state = _merge_default_agent(
-        existing, entry, da_state, bool(entries), provider, log
+        existing, entry, da_state, bool(entries), log
     )
 
     permission = existing.get("permission")
     if not isinstance(permission, dict):
         permission = {}
     permission_changed = False
+    deny_written = False
+    deny_removed = False
     state_changed = False
 
     for family in _RUNTIME_GATE_FAMILIES:
@@ -625,6 +649,7 @@ def _sync_opencode_runtime_gate(
                 mapping[_RUNTIME_GATE_GLOB] = _RUNTIME_GATE_DECISION
                 permission[family] = mapping
                 permission_changed = True
+                deny_written = True
         else:
             # Non-strict rollback: only remove OUR deny, then restore the prior.
             if family in gate_state:
@@ -636,6 +661,7 @@ def _sync_opencode_runtime_gate(
                         mapping[_RUNTIME_GATE_GLOB] = prior
                     permission[family] = mapping
                     permission_changed = True
+                    deny_removed = True
                 gate_state.pop(family, None)
                 state_changed = True
 
@@ -648,11 +674,17 @@ def _sync_opencode_runtime_gate(
     if not dry_run:
         settings_path.parent.mkdir(parents=True, exist_ok=True)
     default_agent_changed = existing.get(_DEFAULT_AGENT_JSON_KEY) != before_default_agent
-    action = "runtime-gate deny: permission.edit/bash '**'"
+    # Compose only the parts that actually changed: a non-strict sync writes no
+    # deny, so "runtime-gate deny: …" would be misleading there.
+    action_parts = []
+    if deny_written:
+        action_parts.append("runtime-gate deny: permission.edit/bash '**'")
+    elif deny_removed:
+        action_parts.append("runtime-gate deny removed: permission.edit/bash '**'")
     if default_agent_changed:
-        action += ", default_agent"
+        action_parts.append("default_agent")
     if write_checked(settings_path, settings_content, log, rel_settings, dry_run=dry_run):
-        log.action("WRITE", rel_settings, action)
+        log.action("WRITE", rel_settings, ", ".join(action_parts) or "runtime-gate")
     else:
         log.skip(rel_settings, "runtime-gate unchanged")
     if state_changed:

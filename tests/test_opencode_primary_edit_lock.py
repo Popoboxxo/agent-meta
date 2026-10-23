@@ -177,9 +177,30 @@ def test_role_without_write_tool_keeps_edit_deny_under_lock() -> None:
     )
 
 
-def test_default_call_is_byte_identical() -> None:
-    """`deny_edit=False` (the default path) renders exactly as before."""
-    args = (
+# Frozen pre-change fixture (RVW-A2-4): the `deny_edit=False` default path must
+# keep rendering exactly this — captured from the code before the lock
+# parameter existed. A change here means the unlock path is no longer
+# byte-identical to the old behaviour.
+_GOLDEN_UNLOCKED = (
+    "---\n"
+    "name: orchestrator\n"
+    "version: 0.101.0\n"
+    "description: desc\n"
+    "mode: subagent\n"
+    "generated-from: 1-generic/orchestrator.md@0.101.0\n"
+    "permission:\n"
+    "  read: allow\n"
+    "  bash: allow\n"
+    "  grep: allow\n"
+    "  edit: allow\n"
+    "---\n"
+    "Koordiniert alle Entwicklungsaufgaben.\n"
+)
+
+
+def _default_render(**kwargs) -> str:
+    """Render through the pre-lock call shape (positional args only + kwargs)."""
+    return _transform_frontmatter_for_opencode(
         _agent_content(),
         "orchestrator",
         "desc",
@@ -187,9 +208,12 @@ def test_default_call_is_byte_identical() -> None:
         "",
         "1-generic/orchestrator.md@0.101.0",
         REPO_ROOT,
+        **kwargs,
     )
 
-    default = _transform_frontmatter_for_opencode(*args)
-    explicit_off = _transform_frontmatter_for_opencode(*args, deny_edit=False)
 
-    assert explicit_off == default
+def test_default_call_is_byte_identical() -> None:
+    """`deny_edit=False` (the default path) matches the pre-change golden."""
+    assert _default_render(deny_edit=False) == _GOLDEN_UNLOCKED
+    # The parameter default must take the same path as the explicit `False`.
+    assert _default_render() == _GOLDEN_UNLOCKED
