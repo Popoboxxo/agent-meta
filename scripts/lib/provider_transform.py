@@ -30,7 +30,7 @@ from .frontmatter import (
     load_provider_tools_config,
 )
 from .log import SyncLog
-from .providers import resolve_frontmatter_strip_fields
+from .providers import explicit_primary_role, resolve_frontmatter_strip_fields
 
 def _validate_tools_against_whitelist(
     tools: list, provider: str, agent_meta_root: Path, log: SyncLog, role: str,
@@ -340,11 +340,13 @@ def _apply_agent_transform(
       body-sanitize-hr: bool          — replace body `^---$` lines with `___`
       frontmatter-mechanism: opencode-native
                                        — build opencode-native frontmatter instead
-                                         of the inject/strip steps above
+                                         of the inject/strip steps above; the
+                                         explicit `primary-role` is emitted as
+                                         `mode: primary` (no `mode` otherwise)
       frontmatter-mechanism: opencode-native-v2
-                                       — as opencode-native, plus the
-                                         `primary-role` entry emitted as
-                                         `mode: primary` (others `mode: subagent`)
+                                       — as opencode-native, except every role
+                                         without the `primary-role` value is
+                                         pinned to `mode: subagent`
       frontmatter-mechanism: codex-toml
                                        — build a Codex-native TOML agent document
                                          (name/description/model/extra-fields +
@@ -353,7 +355,8 @@ def _apply_agent_transform(
 
     Provider-level keys honoured here: `model-literal` (emit the literal
     verbatim, e.g. Antigravity `inherit`) and `primary-role` (the single
-    `mode: primary` entry for the opencode-native-v2 mechanism).
+    `mode: primary` entry, on v1 and v2 alike; absent -> never primary, so a
+    provider without the key, e.g. the Mammouth fork, stays byte-identical).
     """
     from .roles import (
         resolve_max_tokens,
@@ -405,10 +408,14 @@ def _apply_agent_transform(
                 _raw_tools, provider, agent_meta_root, log, role,
             )
             content = _update_frontmatter_dict(content, {'tools': _valid_tools})
+        # Entry point (#1006, OQ-8 amendment A2): only an EXPLICIT `primary-role`
+        # yields `mode: primary`, on v1 and v2 alike; there is no code default.
         mode = None
-        if mechanism == 'opencode-native-v2':
-            primary_role = (provider_config.get(provider) or {}).get('primary-role', 'orchestrator')
-            mode = 'primary' if role == primary_role else 'subagent'
+        primary_role = explicit_primary_role(provider_config, provider)
+        if primary_role is not None and role == primary_role:
+            mode = 'primary'
+        elif mechanism == 'opencode-native-v2':
+            mode = 'subagent'
         # Data-driven dispatch depth (spec key `inject-subagent-depth`): emit the
         # capability `required_depth` as the frontmatter `subagent_depth` so a
         # spawned orchestrator keeps its dispatch tools (study 3.4: no depth
