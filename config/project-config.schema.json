@@ -868,6 +868,37 @@
             "agent-discovery": {
               "type": "boolean",
               "description": "Provider-neutral discovery-surface opt-in. Default: false."
+            },
+            "experimental-subagent-depth": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "v2: experimental.subagent_depth. Default: capabilities required_depth (Quelle wie bisher subagent_depth)."
+            },
+            "experimental-todo": {
+              "type": "boolean",
+              "description": "v2: experimental.todo. Default: nicht gesetzt (Key wird nicht geschrieben)."
+            },
+            "providers": {
+              "type": "object",
+              "propertyNames": {
+                "pattern": "^[A-Za-z0-9_-]+$"
+              },
+              "additionalProperties": {
+                "type": "object"
+              },
+              "description": "v2: Passthrough in den Top-Level-Key providers; Schluessel = Provider-ID."
+            },
+            "model-variants": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._-]+$"
+              },
+              "description": "v2: Rolle -> Variante; wird als '#variant' an die Modell-ID gehaengt."
+            },
+            "cli": {
+              "type": "object",
+              "description": "v2: Inhalt von cli.json (Passthrough). Fehlt der Key, wird keine cli.json geschrieben."
             }
           }
         },
