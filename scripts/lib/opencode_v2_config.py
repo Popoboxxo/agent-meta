@@ -1,13 +1,13 @@
-"""Managed-merge decision engine for the opencode v2 config surface.
+"""Managed-merge engine for the opencode v2 config surface.
 
-Pure decision functions only: this module decides *what* a managed path should
-become, which provider owns the surface and which secrets are plaintext. It
-never writes a file and never logs. The I/O layer (reading ``opencode.json`` +
-the state file, applying the result, writing) lives in
-``sync_opencode_v2_managed_keys`` (Task 9) — keeping the decision table testable
-row by row without temp dirs. (``build_managed_keys`` reads the stat-cached
-provider capability registry for its default dispatch depth; that is a config
-lookup, not a write.)
+The decision layer is pure: ``merge_managed_path`` decides *what* a managed path
+should become without touching a file or a log, which keeps the decision table
+testable row by row in ``tests/test_opencode_v2_config.py``.
+``sync_opencode_v2_managed_keys`` (spec §3.2, Task 9) is the I/O layer around
+it: it reads ``opencode.json`` + the state file, renders the decisions and
+writes through the shared ``isolation`` helpers and ``io.write_checked`` (no
+new I/O variant). Ownership (``owns_opencode_surface``) is decided before any
+state is read, so non-owner providers are strict no-ops (N-M2, AC-B20).
 
 The table itself is ``SPEC-OPENCODE-V2-SUPPORT-2026-10-22`` §3.2: for one
 managed dotted ``path`` ``P`` with target value ``T`` (``target is None`` =
@@ -46,12 +46,14 @@ comparison.
 """
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from . import isolation, providers
+from . import io, isolation, providers
 from .dispatch_depth import required_depth_int
+from .log import SyncLog
 
 # Resolved v2 values (spec §3.1). Activation is a pure function of these two
 # resolved values — never of the raw ``surface-version`` selector or a provider
@@ -481,3 +483,200 @@ def find_plaintext_secrets(obj: object, path: str) -> list[str]:
     secret pattern (AC-B10: the test must not bind to the value).
     """
     return _walk_plaintext_secrets(obj, path, secret_context=False)
+
+
+# ---------------------------------------------------------------------------
+# Dotted-path helpers for the file layer
+#
+# Managed paths are dotted JSON paths (``experimental.todo``,
+# ``providers.<id>``). The helpers below work on a freshly parsed document and
+# never serialize the ``ABSENT`` sentinel. Container pruning after a removal is
+# generic: every ancestor that became an empty object is dropped, so
+# ``experimental`` disappears on a full v2→v1 rollback and a hypothetical
+# ``agents.title``/``agents`` chain would be pruned the same way (Amendment B1:
+# no title path is managed, so that branch is simply never exercised).
+# ---------------------------------------------------------------------------
+
+def _get_path(document: dict, path: str) -> object:
+    """Return the value at dotted *path*, or the ``ABSENT`` sentinel."""
+    node: object = document
+    for part in path.split("."):
+        if not isinstance(node, dict) or part not in node:
+            return ABSENT
+        node = node[part]
+    return node
+
+
+def _set_path(document: dict, path: str, value: object) -> None:
+    """Create missing parent objects and set the leaf at dotted *path*."""
+    parts = path.split(".")
+    node = document
+    for part in parts[:-1]:
+        child = node.get(part)
+        if not isinstance(child, dict):
+            child = {}
+            node[part] = child
+        node = child
+    node[parts[-1]] = value
+
+
+def _prune_empty_parents(document: dict, parts: list[str]) -> None:
+    """Drop ancestors of *parts* that became empty objects after a removal.
+
+    Walks upwards from the immediate parent: as soon as an ancestor still has
+    content (or is not an object) the chain is left alone. This is deliberately
+    path-generic — no container name is special-cased.
+    """
+    for depth in range(len(parts) - 1, 0, -1):
+        ancestor = _get_path(document, ".".join(parts[:depth]))
+        if not isinstance(ancestor, dict) or ancestor:
+            return
+        if depth == 1:
+            document.pop(parts[0], None)
+        else:
+            parent = _get_path(document, ".".join(parts[: depth - 1]))
+            if isinstance(parent, dict):
+                parent.pop(parts[depth - 1], None)
+
+
+def _delete_path(document: dict, path: str) -> None:
+    """Delete the key at dotted *path* and prune now-empty parent containers."""
+    parts = path.split(".")
+    node = document
+    for part in parts[:-1]:
+        child = node.get(part)
+        if not isinstance(child, dict):
+            return
+        node = child
+    node.pop(parts[-1], None)
+    _prune_empty_parents(document, parts)
+
+
+def _plaintext_secret_paths(targets: dict[str, object]) -> list[str]:
+    """Structural check of the ``providers`` subtree that is about to be written.
+
+    Runs on the managed values themselves (not on a value pattern) and therefore
+    also in dry-run, where ``write_checked`` skips its own scan (spec §3.3 m-7).
+    The path prefix is passed through verbatim, so a finding reads
+    ``providers.x.headers.X-Api-Key``.
+    """
+    findings: list[str] = []
+    for path in sorted(targets):
+        if path == "providers" or path.startswith("providers."):
+            findings.extend(find_plaintext_secrets(targets[path], path))
+    return findings
+
+
+def sync_opencode_v2_managed_keys(
+    project_root: Path,
+    config: dict,
+    provider: str,
+    provider_config: dict,
+    agent_meta_root: Path,
+    log: SyncLog,
+    dry_run: bool,
+) -> None:
+    """Merge the v2 managed keys into the EXISTING ``opencode.json`` (spec §3.2).
+
+    The ownership guard is the first statement: a provider that does not own the
+    managed surface (no selectable v2 JSON surface / no ``committed-file``) never
+    reads state, writes a file or logs — regardless of any state entries left by
+    an earlier sync (AC-B20, N-M2). Only the owner derives the target file and
+    the state path from its own resolved data (``committed-file`` and
+    ``opencode_state_path``); nothing is hardcoded.
+
+    Every managed path is decided by :func:`merge_managed_path` over the
+    union of the state entries and the current targets, which is exactly the
+    rollback path: on v1 the target set is empty, so rows 4/4a restore the prior
+    value or delete the key and prune empty parents. ``keep``/``noop`` leave the
+    file untouched (a user value is never overwritten, a no-op never rewrites or
+    reformats the file), and the state namespace is rewritten only when it
+    actually changed. A parse error or a structural secret finding returns
+    without writing anything (data-loss protection, rule 6; AC-B10/AC-T7).
+    The regex-based secret gate is delegated to ``io.write_checked`` with the
+    same parameters as ``mcp_provider_config._write_json_config`` (spec §3.3);
+    for the committed file ``verify_gitignored`` is ``False`` (that flag is only
+    set for the local/secrets file, #586).
+    """
+    if not owns_opencode_surface(provider_config, provider):
+        return
+
+    pc = _provider_entry(provider_config, provider)
+    committed = _mcp_config(pc).get("committed-file")
+    if not _non_empty_string(committed):
+        # Unreachable behind the ownership guard; keeps the type contract local
+        # (no hardcoded filename on any path).
+        return
+
+    root = Path(project_root)
+    state_path = opencode_state_path(root, pc)
+    state = isolation._read_state(state_path, STATE_KEYS_KEY)
+    targets = build_managed_keys(config, provider, pc, agent_meta_root)
+
+    # No-op without an active v2 surface AND without prior management: a v1
+    # project that never had v2 keys must stay byte-identical (AC-B2/B7).
+    if not targets and not state:
+        return
+
+    secret_findings = _plaintext_secret_paths(targets)
+    if secret_findings:
+        for finding in secret_findings:
+            log.error(committed, f"opencode-v2-secret-plaintext: {finding}")
+        return
+
+    file_path = isolation.safe_path(root, committed)
+    existing = isolation._read_json_safe(file_path, log)
+    if existing is None:
+        if file_path.exists():
+            return  # parse error — warning already emitted, never overwrite it
+        existing = {}
+    elif not isinstance(existing, dict):
+        return  # a non-object document is not ours to rewrite (data-loss guard)
+
+    new_state: dict[str, dict] = {}
+    changed = False
+    for path in sorted(set(state) | set(targets)):
+        result = merge_managed_path(
+            path,
+            targets.get(path),
+            _get_path(existing, path),
+            state.get(path),
+        )
+        if result.warning:
+            log.warning(result.warning)
+        if result.action == "write":
+            _set_path(existing, path, result.value)
+            changed = True
+        elif result.action == "remove":
+            if result.value is ABSENT:
+                _delete_path(existing, path)
+            else:
+                _set_path(existing, path, result.value)
+            changed = True
+        # ``keep`` / ``noop``: the file is left exactly as it is.
+        if result.state is not None:
+            new_state[path] = result.state
+
+    if changed:
+        content = json.dumps(existing, indent=2, ensure_ascii=False) + "\n"
+        if not dry_run:
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+        written = io.write_checked(
+            file_path,
+            content,
+            log,
+            committed,
+            allow_secrets=(config or {}).get("allow-committed-secrets", False),
+            verify_gitignored=False,
+            config=config,
+            dry_run=dry_run,
+        )
+        if written:
+            log.action("WRITE", committed, "opencode-v2 managed keys")
+        else:
+            log.skip(committed, "opencode-v2 managed keys unchanged")
+    else:
+        log.skip(committed, "opencode-v2 managed keys unchanged")
+
+    if new_state != state:
+        isolation._write_state(state_path, new_state, dry_run, STATE_KEYS_KEY)

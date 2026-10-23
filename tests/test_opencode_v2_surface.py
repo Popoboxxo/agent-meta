@@ -36,7 +36,10 @@ import yaml
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 
+from lib import isolation, opencode_v2_config
 from lib.context import apply_settings_surface_shape
+from lib.log import SyncLog
+from lib.opencode_v2_config import STATE_KEYS_KEY
 from lib.providers import load_providers_config
 
 _SURFACE_MECHANISMS = {"v1": "opencode-native", "v2": "opencode-native-v2"}
@@ -246,3 +249,500 @@ def test_ac_d8_evidence_present_with_result_line():
         "ERGEBNIS: JSONC-TRAEGT-NICHTS-BEI",
         "ERGEBNIS: JSONC-TRAEGT-INHALT-BEI",
     }
+
+
+# ===========================================================================
+# Phase B / Task 9 (B.6): ``sync_opencode_v2_managed_keys`` (file I/O)
+# ===========================================================================
+#
+# The decision table itself (spec §3.2 rows 1…4a) is pinned in
+# ``tests/test_opencode_v2_config.py``. These tests pin the I/O layer around it:
+# ownership-first provider binding (N-M2), the provider-derived file/state paths,
+# the state encoding, empty-container pruning on rollback, the two-stage secret
+# gate and dry-run/data-loss protection (AC-B4/5/6/7/8/14/15/16/17/19/20, AC-T7).
+
+_V2_STATE_REL = Path(".opencode") / "agent-meta-state.json"
+
+
+def _mcp_block(active_surface: str = "v2") -> dict:
+    """Resolved ``mcp-config`` of a registry entry that offers both surfaces.
+
+    Ownership is independent of the active surface: ``surface-formats`` and
+    ``committed-file`` are declared on the entry either way (spec §3.2, N-M2).
+    """
+    return {
+        "format": "opencode-json-v2" if active_surface == "v2" else "opencode-json",
+        "committed-file": "opencode.json",
+        "surface-formats": {"v1": "opencode-json", "v2": "opencode-json-v2"},
+    }
+
+
+def _v2_pc() -> dict:
+    return {
+        "primary-role": "orchestrator",
+        "mcp-config": _mcp_block("v2"),
+        "agent-transform": {"frontmatter-mechanism": "opencode-native-v2"},
+    }
+
+
+def _v1_pc() -> dict:
+    return {
+        "primary-role": "orchestrator",
+        "mcp-config": _mcp_block("v1"),
+        "agent-transform": {"frontmatter-mechanism": "opencode-native"},
+    }
+
+
+def _config(depth: int | None = None, **options) -> dict:
+    """Project config with the Opencode v2 options; no depth ⇒ capability default."""
+    block = dict(options)
+    if depth is not None:
+        block["experimental-subagent-depth"] = depth
+    return {"provider-options": {"Opencode": block}}
+
+
+def _write_json(path: Path, data: object) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return path
+
+
+def _read_json(path: Path) -> dict:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _read_state_doc(project_root: Path) -> dict:
+    path = project_root / _V2_STATE_REL
+    return _read_json(path) if path.exists() else {}
+
+
+def _write_capabilities(root: Path, provider: str, required_depth: int) -> Path:
+    """Framework root whose capability registry declares ``required_depth``."""
+    (root / "config").mkdir(parents=True, exist_ok=True)
+    (root / "config" / "provider-capabilities.yaml").write_text(
+        yaml.safe_dump({"capabilities": {provider: {"required_depth": required_depth}}}),
+        encoding="utf-8",
+    )
+    return root
+
+
+def _run(
+    project_root: Path,
+    config: dict,
+    providers: dict,
+    framework: Path,
+    log: SyncLog | None = None,
+    dry_run: bool = False,
+    provider: str = "Opencode",
+) -> SyncLog:
+    log = log if log is not None else SyncLog()
+    opencode_v2_config.sync_opencode_v2_managed_keys(
+        project_root, config, provider, providers, framework, log, dry_run
+    )
+    return log
+
+
+def _warned(log: SyncLog, message: str) -> bool:
+    """True when *message* appears in the log (entries carry a ``[WARN]`` prefix)."""
+    return any(message in warning for warning in log.warnings)
+
+
+def test_ac_b4_user_keys_survive_managed_merge(tmp_path):
+    """AC-B4: user keys (plugin/instructions/model/mcp) survive the merge.
+
+    Only the explicitly managed paths may change; unknown top-level keys and
+    nested user structures stay exactly as they were (spec §3.2 rule 5).
+    """
+    project = tmp_path / "project"
+    user_doc = {
+        "plugin": ["acme.js"],
+        "instructions": ["AGENTS.md"],
+        "model": "opencode-go/deepseek-v4-pro",
+        "subagent_depth": 9,
+        "mcp": {"servers": {"my-own": {"type": "local", "command": ["x"]}}},
+    }
+    _write_json(project / "opencode.json", user_doc)
+    provider_value = {
+        "name": "opencode-go",
+        "env": ["OC_API_KEY"],
+        "settings": {"baseURL": "https://example.invalid/v1"},
+    }
+
+    _run(
+        project,
+        _config(3, providers={"opencode-go": provider_value}),
+        {"Opencode": _v2_pc()},
+        tmp_path / "fw",
+    )
+
+    doc = _read_json(project / "opencode.json")
+    for key in ("plugin", "instructions", "model", "subagent_depth", "mcp"):
+        assert doc[key] == user_doc[key], f"user key {key!r} was modified"
+    assert doc["experimental"]["subagent_depth"] == 3
+    assert doc["providers"]["opencode-go"] == provider_value
+
+
+def test_ac_b5_user_value_kept_with_warning(tmp_path):
+    """AC-B5 (row 3): an unmanaged user value wins and produces the warning."""
+    project = tmp_path / "project"
+    _write_json(project / "opencode.json", {"experimental": {"subagent_depth": 7}})
+
+    log = _run(project, _config(3), {"Opencode": _v2_pc()}, tmp_path / "fw")
+
+    doc = _read_json(project / "opencode.json")
+    assert doc["experimental"]["subagent_depth"] == 7
+    assert _warned(
+        log, "opencode-v2-managed: experimental.subagent_depth user value kept"
+    )
+    assert STATE_KEYS_KEY not in _read_state_doc(project)
+
+
+def test_ac_b6_capability_change_updates_value(tmp_path):
+    """AC-B6 (row 2): our own value is updated when the capability changes."""
+    project = tmp_path / "project"
+    framework = _write_capabilities(tmp_path / "fw", "Opencode", 3)
+    providers = {"Opencode": _v2_pc()}
+
+    _run(project, _config(), providers, framework)
+    doc = _read_json(project / "opencode.json")
+    assert doc["experimental"]["subagent_depth"] == 3
+    state = _read_state_doc(project)[STATE_KEYS_KEY]
+    assert state["experimental.subagent_depth"] == {
+        "value": 3,
+        "prior": None,
+        "prior_absent": True,
+    }
+
+    _write_capabilities(framework, "Opencode", 4)
+    _run(project, _config(), providers, framework)
+
+    doc = _read_json(project / "opencode.json")
+    assert doc["experimental"]["subagent_depth"] == 4
+    state = _read_state_doc(project)[STATE_KEYS_KEY]
+    assert state["experimental.subagent_depth"] == {
+        "value": 4,
+        "prior": None,
+        "prior_absent": True,
+    }
+
+
+def test_ac_b7_v2_to_v1_removes_managed_keys_and_empty_containers(tmp_path):
+    """AC-B7 (rows 4/4a): rollback removes managed keys, prunes empty parents.
+
+    A user value that was changed by hand survives with its warning (row 4a);
+    an unrelated user ``agents.title`` object is never special-cased.
+    """
+    clean = tmp_path / "clean"
+    provider_value = {"name": "opencode-go", "env": ["OC_API_KEY"]}
+    user_doc = {"theme": "dark", "agents": {"title": {"name": "user-title"}}}
+    _write_json(clean / "opencode.json", user_doc)
+
+    v2_config = _config(
+        3, **{"experimental-todo": True, "providers": {"opencode-go": provider_value}}
+    )
+    _run(clean, v2_config, {"Opencode": _v2_pc()}, tmp_path / "fw")
+    written = _read_json(clean / "opencode.json")
+    assert written["experimental"] == {"subagent_depth": 3, "todo": True}
+    assert written["providers"]["opencode-go"] == provider_value
+
+    _run(clean, _config(3), {"Opencode": _v1_pc()}, tmp_path / "fw")
+
+    doc = _read_json(clean / "opencode.json")
+    assert "experimental" not in doc
+    assert "providers" not in doc
+    assert doc["theme"] == user_doc["theme"]
+    assert doc["agents"] == user_doc["agents"]
+    assert STATE_KEYS_KEY not in _read_state_doc(clean)
+
+    changed = tmp_path / "changed"
+    _run(changed, _config(3), {"Opencode": _v2_pc()}, tmp_path / "fw")
+    user_edited = _read_json(changed / "opencode.json")
+    user_edited["experimental"]["subagent_depth"] = 9
+    _write_json(changed / "opencode.json", user_edited)
+
+    log = _run(changed, _config(3), {"Opencode": _v1_pc()}, tmp_path / "fw")
+
+    kept = _read_json(changed / "opencode.json")
+    assert kept["experimental"]["subagent_depth"] == 9, "row 4a must not restore/overwrite"
+    assert _warned(
+        log, "opencode-v2-managed: experimental.subagent_depth user value kept"
+    )
+    assert STATE_KEYS_KEY not in _read_state_doc(changed)
+
+
+def test_ac_b8_second_run_is_byte_identical(tmp_path):
+    """AC-B8: a second sync without changes leaves file and state byte-identical."""
+    project = tmp_path / "project"
+    config = _config(3, **{"experimental-todo": True})
+    providers = {"Opencode": _v2_pc()}
+
+    _run(project, config, providers, tmp_path / "fw")
+    file_bytes = (project / "opencode.json").read_bytes()
+    state_bytes = (project / _V2_STATE_REL).read_bytes()
+
+    _run(project, config, providers, tmp_path / "fw")
+
+    assert (project / "opencode.json").read_bytes() == file_bytes
+    assert (project / _V2_STATE_REL).read_bytes() == state_bytes
+
+
+def test_ac_b14_dry_run_writes_nothing(tmp_path):
+    """AC-B14 (rule 7): dry-run writes neither the file nor the state, but logs."""
+    project = tmp_path / "project"
+    project.mkdir()
+
+    log = _run(
+        project,
+        _config(3, **{"experimental-todo": True}),
+        {"Opencode": _v2_pc()},
+        tmp_path / "fw",
+        dry_run=True,
+    )
+
+    assert not (project / "opencode.json").exists()
+    assert not (project / _V2_STATE_REL).exists()
+    assert any("opencode.json" in action for action in log.actions), log.actions
+
+
+def test_ac_b15_broken_json_writes_nothing_and_warns(tmp_path):
+    """AC-B15 (rule 6): an unparseable file is never overwritten, only warned."""
+    project = tmp_path / "project"
+    broken = project / "opencode.json"
+    broken.parent.mkdir(parents=True)
+    broken.write_text("{ not valid json", encoding="utf-8")
+    before = broken.read_bytes()
+
+    log = _run(project, _config(3), {"Opencode": _v2_pc()}, tmp_path / "fw")
+
+    assert broken.read_bytes() == before
+    assert not (project / _V2_STATE_REL).exists()
+    assert any("could not parse JSON" in warning for warning in log.warnings), log.warnings
+
+
+def test_ac_b16_namespace_isolation_no_clobber(tmp_path):
+    """AC-B16: the writer touches only ``opencode-v2-keys``; siblings stay put."""
+    project = tmp_path / "project"
+    _write_json(
+        project / "opencode.json",
+        {"experimental": {"subagent_depth": 3}},
+    )
+    sibling_isolation = ["**/.claude/**"]
+    sibling_gate = {"**": {"edit": None, "bash": None}}
+    _write_json(
+        project / _V2_STATE_REL,
+        {
+            "isolation-deny": sibling_isolation,
+            "runtime-gate-deny": sibling_gate,
+            STATE_KEYS_KEY: {
+                "experimental.subagent_depth": {
+                    "value": 3,
+                    "prior": None,
+                    "prior_absent": True,
+                }
+            },
+        },
+    )
+    before = _read_json(project / _V2_STATE_REL)
+
+    _run(project, _config(3), {"Opencode": _v2_pc()}, tmp_path / "fw")
+
+    after = _read_json(project / _V2_STATE_REL)
+    assert after["isolation-deny"] == sibling_isolation
+    assert after["runtime-gate-deny"] == sibling_gate
+    assert after[STATE_KEYS_KEY] == before[STATE_KEYS_KEY]
+    assert set(after[STATE_KEYS_KEY]) == {"experimental.subagent_depth"}
+    assert isinstance(isolation._read_state(project / _V2_STATE_REL, STATE_KEYS_KEY), dict)
+
+    file_bytes = (project / "opencode.json").read_bytes()
+    state_bytes = (project / _V2_STATE_REL).read_bytes()
+    _run(project, _config(3), {"Opencode": _v2_pc()}, tmp_path / "fw")
+    assert (project / "opencode.json").read_bytes() == file_bytes
+    assert (project / _V2_STATE_REL).read_bytes() == state_bytes
+    assert _read_json(project / _V2_STATE_REL)["isolation-deny"] == sibling_isolation
+
+
+def test_ac_b17_equal_user_value_no_warning_and_survives_rollback(tmp_path):
+    """AC-B17 (rows 3a/4): an equal user value is adopted silently and kept."""
+    project = tmp_path / "project"
+    _write_json(project / "opencode.json", {"experimental": {"todo": True}})
+    before = (project / "opencode.json").read_bytes()
+    providers = {"Opencode": _v2_pc()}
+
+    log = _run(project, _config(**{"experimental-todo": True}), providers, tmp_path / "fw")
+
+    assert (project / "opencode.json").read_bytes() == before
+    assert log.warnings == [], log.warnings
+    assert _read_state_doc(project)[STATE_KEYS_KEY]["experimental.todo"] == {
+        "value": True,
+        "prior": True,
+        "prior_absent": False,
+    }
+
+    _run(project, _config(**{"experimental-todo": True}), {"Opencode": _v1_pc()}, tmp_path / "fw")
+
+    assert _read_json(project / "opencode.json")["experimental"]["todo"] is True
+    assert STATE_KEYS_KEY not in _read_state_doc(project)
+
+
+def test_ac_b19_user_deleted_key_not_rewritten(tmp_path):
+    """AC-B19 (row 3c): a user-deleted managed key stays deleted, with warning."""
+    project = tmp_path / "project"
+    providers = {"Opencode": _v2_pc()}
+    _run(project, _config(3), providers, tmp_path / "fw")
+    assert _read_json(project / "opencode.json")["experimental"]["subagent_depth"] == 3
+
+    # The user removes the managed key (and the now-empty container) by hand.
+    _write_json(project / "opencode.json", {"theme": "dark"})
+
+    log = _run(project, _config(3), providers, tmp_path / "fw")
+
+    doc = _read_json(project / "opencode.json")
+    assert "experimental" not in doc
+    assert _warned(
+        log, "opencode-v2-managed: experimental.subagent_depth user value kept"
+    )
+    assert _read_state_doc(project)[STATE_KEYS_KEY]["experimental.subagent_depth"] == {
+        "value": 3,
+        "prior": None,
+        "prior_absent": True,
+    }
+
+
+def test_ac_t7_plaintext_apikey_blocks_write_and_reports_in_dry_run(tmp_path):
+    """AC-T7: a plaintext credential under ``providers`` blocks, even in dry-run.
+
+    Detection is by KEY NAME (``X-Api-Key`` contains ``key``), never by the
+    concrete value; ``{env:VAR}`` values stay valid (spec §3.3).
+    """
+    plaintext = _config(
+        3,
+        providers={
+            "x": {
+                "settings": {"baseURL": "https://example.invalid/v1"},
+                "headers": {"X-Api-Key": "EXAMPLE_NOT_A_KEY"},
+            }
+        },
+    )
+    finding = "opencode-v2-secret-plaintext: providers.x.headers.X-Api-Key"
+
+    dry_project = tmp_path / "dry"
+    dry_project.mkdir()
+    dry_log = _run(
+        dry_project,
+        plaintext,
+        {"Opencode": _v2_pc()},
+        tmp_path / "fw",
+        dry_run=True,
+    )
+    assert not (dry_project / "opencode.json").exists()
+    assert any(finding in error for error in dry_log.errors), dry_log.errors
+
+    real_project = tmp_path / "real"
+    real_project.mkdir()
+    real_log = _run(real_project, plaintext, {"Opencode": _v2_pc()}, tmp_path / "fw")
+    assert not (real_project / "opencode.json").exists()
+    assert any(finding in error for error in real_log.errors), real_log.errors
+
+    # Positive control: baseURL + {env:VAR} indirection is valid and is written.
+    ok_project = tmp_path / "ok"
+    ok_project.mkdir()
+    valid_provider = {
+        "settings": {"baseURL": "https://example.invalid/v1"},
+        "env": ["OC_API_KEY"],
+    }
+    _run(
+        ok_project,
+        _config(3, providers={"x": valid_provider}),
+        {"Opencode": _v2_pc()},
+        tmp_path / "fw",
+    )
+    doc = _read_json(ok_project / "opencode.json")
+    assert doc["providers"]["x"]["env"] == ["OC_API_KEY"]
+
+
+def test_writer_passes_secret_gate_params_to_write_checked(tmp_path, monkeypatch):
+    """The writer delegates the secret gate to ``io.write_checked`` (not a copy).
+
+    The call must carry ``allow_secrets``, ``verify_gitignored``, ``config`` and
+    ``dry_run`` — a variant that only calls ``find_plaintext_secrets`` is
+    explicitly not sufficient (spec §3.3, plan global constraint).
+    """
+    calls = []
+
+    def fake_write_checked(path, content, log, rel_label, **kwargs):
+        calls.append((path, content, rel_label, kwargs))
+        return True
+
+    monkeypatch.setattr(opencode_v2_config.io, "write_checked", fake_write_checked)
+    providers = {"Opencode": _v2_pc()}
+    config = _config(3, **{"experimental-todo": True})
+
+    plain_project = tmp_path / "plain"
+    plain_project.mkdir()
+    _run(plain_project, config, providers, tmp_path / "fw", dry_run=False)
+
+    allowed_project = tmp_path / "allowed"
+    allowed_project.mkdir()
+    _run(
+        allowed_project,
+        {**config, "allow-committed-secrets": True},
+        providers,
+        tmp_path / "fw",
+        dry_run=False,
+    )
+
+    assert len(calls) == 2, calls
+    _, content, rel_label, kwargs = calls[0]
+    assert rel_label == "opencode.json"
+    assert content.endswith("\n")
+    assert json.loads(content)["experimental"]["todo"] is True
+    assert set(kwargs) >= {"allow_secrets", "verify_gitignored", "config", "dry_run"}
+    assert kwargs["allow_secrets"] is False
+    assert kwargs["verify_gitignored"] is False
+    assert kwargs["config"] is config
+    assert kwargs["dry_run"] is False
+    assert calls[1][3]["allow_secrets"] is True
+
+
+def test_ac_b20_non_owner_provider_is_noop_even_with_state(tmp_path, monkeypatch):
+    """AC-B20 (N-M2): a non-owner is a no-op *before* the state is read.
+
+    The read spy makes the test non-vacuous: moving the ownership guard behind
+    the state read makes this test fail instead of silently passing.
+    """
+    project = tmp_path / "project"
+    file_path = project / "opencode.json"
+    _write_json(file_path, {"theme": "dark", "experimental": {"subagent_depth": 3}})
+    _write_json(
+        project / _V2_STATE_REL,
+        {
+            "isolation-deny": ["**/.claude/**"],
+            STATE_KEYS_KEY: {
+                "experimental.subagent_depth": {
+                    "value": 3,
+                    "prior": None,
+                    "prior_absent": True,
+                }
+            },
+        },
+    )
+    file_before = file_path.read_bytes()
+    state_before = (project / _V2_STATE_REL).read_bytes()
+    non_owner = {
+        "Claude": {
+            "mcp-config": {"format": "claude-settings", "committed-file": ".mcp.json"}
+        }
+    }
+
+    def _forbidden(*args, **kwargs):
+        raise AssertionError("state must not be read for a non-owner provider")
+
+    monkeypatch.setattr(isolation, "_read_state", _forbidden)
+
+    log = SyncLog()
+    _run(project, _config(3), non_owner, tmp_path / "fw", log=log, provider="Claude")
+
+    assert file_path.read_bytes() == file_before
+    assert (project / _V2_STATE_REL).read_bytes() == state_before
+    assert log.actions == [] and log.warnings == [] and log.errors == []
+    assert log.skipped == [] and log.infos == []
