@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Fixed
+- **Opencode entry point (#1006)**: the orchestrator is now generated as `mode: primary` and
+  `default_agent` is written to an existing `opencode.json` (managed merge with own state key and
+  rollback) on surface v1 as well, so the strict permission-tier gate no longer locks the main chat
+  out of every agent. The edit/bash deny is only written when an explicit `primary-role` is
+  generated (otherwise a warning); the primary orchestrator no longer emits `edit: allow` while the
+  gate is active (writes limited to `.tmp/**` and `.meta-viz/**`). A user-set, different
+  `default_agent` is never overwritten (warning only; under strict the gate still applies, so set
+  `default_agent` to `orchestrator`). Providers without an explicit `primary-role` (Mammouth) stay
+  byte-identical.
+  **Behavior change for all Opencode projects (strict or not):** the default agent is now
+  `orchestrator` instead of `build`, and `@orchestrator` no longer invokes it (it is a primary agent;
+  switch via Tab/default).
+
 ## [2.0.0-beta.2] - 2026-10-20
 
 ### Added
