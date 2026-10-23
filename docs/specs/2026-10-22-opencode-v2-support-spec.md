@@ -2,8 +2,8 @@
 spec-id: SPEC-OPENCODE-V2-SUPPORT-2026-10-22
 title: Opencode v2-Support Phasen B-D (Config-Keys, Permissions/MCP/Gate-Plugin, Agent-Frontmatter nativ)
 status: APPROVED
-revision: 1.5
-amendment: B1 (2026-10-23, C0-Exit-Gate: VERDICT-C3 GO / VERDICT-FIELDS AMEND)
+revision: 1.6
+amendment: B1 (2026-10-23, C0-Exit-Gate: VERDICT-C3 GO / VERDICT-FIELDS AMEND); B2 (2026-10-23, Einzeleigentum experimental.subagent_depth)
 review: docs/reviews/2026-10-22-opencode-v2-support-spec-review.md
 rereview: docs/reviews/2026-10-22-opencode-v2-support-spec-rereview.md
 requires-spec: SPEC-OPENCODE-ENTRYPOINT-1006-2026-10-22
@@ -15,6 +15,8 @@ issues: "#1007 (v2-Support); relevant geschlossen: #747, #765, #794, #387, #383,
 
 > Status: APPROVED (2026-10-22) — Nutzerfreigabe 2026-10-22 (Auftrag: beide Pläne vollständig abarbeiten). Amendment B1 (2026-10-23) ist Folge des freigegebenen C0-Exit-Gates und ändert diesen Approval-Status nicht.
 > Trace-Anker: `spec-id: SPEC-OPENCODE-V2-SUPPORT-2026-10-22`
+>
+> Revision 1.6 (2026-10-23): **Amendment B2** — Einzeleigentum von `experimental.subagent_depth`: nur der Managed-Merge-Writer (`sync_opencode_v2_managed_keys`/`build_managed_keys`) schreibt den Pfad, der Init-Transform `apply_settings_surface_shape` entfernt nur noch den toten Top-Level-Key. Behebt den Zeile-3a-Adoptionsdefekt (frisches Projekt), den ignorierten Projekt-Override und den verbliebenen Key nach v2→v1-Rollback. AC-B1 bleibt inhaltlich unverändert; seine Dokumentassertion wandert vom Settings-Shape-Unittest in einen End-to-End-Test. Details: „Amendment B2 (2026-10-23)“.
 >
 > Revision 1.5 (2026-10-23): **Amendment B1** aus dem C0-Spike (`VERDICT-C3: GO`, `VERDICT-FIELDS: AMEND`) eingearbeitet — Details in „Amendment B1 (2026-10-23)". Kurzfassung: (1) `agents.title.model` ist UNVERIFIED → Key und AC-B9 entfallen; (2) `providers`-Innenform korrigiert (`settings.baseURL`, `env` statt `options.{baseURL,apiKey}`); (3) `cli.json` nur mit dokumentiertem Key `plugins`; (4) Managed-Deny-Tripel ans **Listenende** von `permissions[]` (last match wins); (5) `plugins` (Plural) statt `plugin`, `timeout.startup` ergänzt; (6) Q5 vollständig VERIFIED/DOKU → keine Änderung. Kein neues Approval, keine neue REQ.
 >
@@ -213,7 +215,7 @@ Idempotenz: `T != None`, `P in S`, `C == S[P].value == T` → keine Aktion.
 
 **`$schema`-Politik (v2, Default-Annahme OQ-B4):** v2 hat kein publiziertes Schema (N8; das v1-Schema `https://opencode.ai/config.json` markiert v2-Keys als ungültig). Daher: auf v2 wird `$schema` weder hinzugefügt noch ein vorhandenes entfernt; `build_managed_keys` enthält `$schema` nicht. Auf v1 bleibt das Verhalten unverändert (kein Schema im Template, vorhandenes bleibt). Der Pfad `$schema` steht trotzdem als reservierter Name in der Managed-Key-Liste, damit ein späterer v2-Schema-URL-Wert per Daten (`schema-url` im Registry-Eintrag) nachgezogen werden kann, ohne die Merge-Mechanik zu ändern.
 
-**Initiale Settings-Datei (neu erzeugt):** `context.apply_settings_surface_shape` (:1644) wird so angepasst, dass bei `mcp-config.format == "opencode-json-v2"` das Top-Level-`subagent_depth` **entfernt** und durch `experimental.subagent_depth` ersetzt wird (Wert: `required_depth_int(capabilities)`, sonst der Template-Wert); `default_agent` bleibt wie in Spec A definiert (dieses Dokument ändert dessen Quelle nicht). Alle anderen Formate geben `content` byte-identisch zurück (v1-Template-Test `tests/test_opencode_v2_surface.py:204` `test_v1_settings_template_is_byte_identical` bleibt grün). Die Doc-Aussage "IC-15 Nr. 16" ist zu aktualisieren: das v2-Dokument trägt kein Top-Level-`subagent_depth` mehr.
+**Initiale Settings-Datei (neu erzeugt):** `context.apply_settings_surface_shape` (:1644) entfernt bei `mcp-config.format == "opencode-json-v2"` ausschließlich das Top-Level-`subagent_depth` (der v2-Parser verwirft es). **Einzeleigentum (Amendment B2, 2026-10-23):** `experimental.subagent_depth` schreibt diese Funktion **nicht** — der Pfad gehört allein `sync_opencode_v2_managed_keys`/`build_managed_keys` (Projekt-Option, sonst `required_depth_int(capabilities)`), damit die Merge-Tabelle (Zeilen 1/3a/2/4) und der Rollback greifen. `default_agent` bleibt wie in Spec A definiert (dieses Dokument ändert dessen Quelle nicht). Alle anderen Formate geben `content` byte-identisch zurück (v1-Template-Test `tests/test_opencode_v2_surface.py::test_v1_settings_template_is_byte_identical` bleibt grün). Die Doc-Aussage "IC-15 Nr. 16" ist zu aktualisieren: das v2-Dokument trägt kein Top-Level-`subagent_depth` mehr; die Tiefe steht unter `experimental.subagent_depth` (End-to-End belegt).
 
 **Modell-ID-Format `provider/model` (v2):** Alle v2-Modell-IDs haben die Form `<providerID>/<modelID>[#<variant>]`. Registry-Tiers sind bereits `opencode-go/...` (VERIFIED `config/ai-providers.yaml:347-358`). Neu: `artifact_validate.validate_frontmatter` erhält für aufgelöste v2-Opencode-Artefakte eine Prüfung `model` gegen `^[^/#\s]+/[^#\s]+(#[A-Za-z0-9._-]+)?$`; Verstoß → Finding `artifact-contract: model '<x>' is not provider/model[#variant]`. Aktivierung datengetrieben über neuen `agent-transform.model-pattern` (str, regex; Opencode setzt ihn nur in `surface-model-patterns: {v2: <regex>}`; Auflösung in `_apply_surface_aux_selection`). Bestehende `model-catalog`-Prüfung (`consistency/model_contracts.py`) vergleicht gegen die ID **ohne** `#variant`.
 
@@ -478,7 +480,7 @@ Format Given/When/Then, jeweils mit zugeordnetem Vertrag (in Klammern). "v2-Proj
 
 AC-Zählung: B1-B22 (22, davon **AC-B9 entfällt (Amendment B1)** → 21 gültig), C1-C17 (17), D1-D10 (10), T1-T7 (7) = **55 gültige ACs** (Revision 1.5; Rev. 1.2 hatte 56, Rev. 1.1 53, Rev. 1.0 44).
 
-- **AC-B1** Given ein v2-Projekt ohne bestehende `opencode.json`, When `sync.py` läuft, Then enthält die erzeugte `opencode.json` `experimental.subagent_depth` (Wert = `required_depth` der Opencode-Capability, aktuell 3) und **kein** Top-Level-`subagent_depth`. (3.2 Initiale Settings-Datei)
+- **AC-B1** Given ein v2-Projekt ohne bestehende `opencode.json`, When `sync.py` läuft, Then enthält die erzeugte `opencode.json` `experimental.subagent_depth` (Wert = `required_depth` der Opencode-Capability, aktuell 2) und **kein** Top-Level-`subagent_depth`. (3.2 Initiale Settings-Datei; **Amendment B2:** der Wert wird vom Managed-Merge-Writer erzeugt, nicht vom Init-Shape — die Dokumentassertion ist ein End-to-End-Test aus Init-Shape + `sync_opencode_v2_managed_keys`, AC-Inhalt unverändert)
 - **AC-B2** Given ein v1-Projekt (oder Schlüssel nicht gesetzt), When `sync.py` läuft, Then ist `opencode.json` byte-identisch zur Ausgabe vor dieser Änderung zuzüglich der Änderungen aus Spec A, und `tests/test_opencode_v2_surface.py::test_v1_settings_template_is_byte_identical` bleibt grün. (3.2)
 - **AC-B3** Given `VERDICT-FIELDS: CONFIRMED` (andernfalls ist Phase B nicht gestartet, Amendment B1 zuerst) und ein v2-Projekt mit `provider-options.Opencode.experimental-todo: true`, When Sync läuft, Then steht `experimental.todo == true` in `opencode.json`; ohne den Key wird `experimental.todo` nicht geschrieben. (3.1, 3.3)
 - **AC-B4** Given eine vorhandene `opencode.json` mit User-Keys (`plugin`, `instructions`, `model`) und einem User-`mcp.servers.my-own`-Eintrag neben einem von agent-meta verwalteten Server, When ein v2-Sync (inkl. MCP-Writer) läuft, Then sind alle diese User-Keys unverändert (JSON-Werte gleich, `mcp.servers.my-own` bleibt erhalten) und die Managed-Keys ergänzt. (3.2 Tabelle Zeile 1, Regel 5; 3.5 Managed-Pfade)
@@ -687,6 +689,34 @@ VERDICT-FIELDS: AMEND
 | B1-D3 | `cli.json` ist nur mit `plugins` belegt | Passthrough ohne Allow-List, aber keine Verifikationsbehauptung für `theme`/`autoupdate` | AC-D7/Task 23/Task 28 nutzen `plugins`; Doku und Changelog bleiben bei belegten Keys |
 | B1-D4 | Q3 VERIFIED: last match wins, Agent-Regeln zuletzt | Managed-Deny ans Listenende, Rollback über Tripel statt Index | §3.4, AC-C3/C4/C5, Tasks 13/13a/22 umgestellt |
 | B1-D5 | Q5 vollständig VERIFIED/DOKU, aber `timeout` hat ein drittes Feld `startup` | Keine Änderung an `oauth`/`disabled`/D1; nur `startup` additiv zulassen | §3.5/AC-C8/Task 14 erlauben `startup`; C2 und D1 bleiben unblockiert |
+
+## Amendment B2 (2026-10-23)
+
+**Quelle:** Phase-B-Review zu `feat/1007-b-keys` (Verdict `CHANGES_REQUESTED`, Finding QA-B-01).
+
+**Status:** Diese Spec bleibt `Status: APPROVED (2026-10-22)`, Revision 1.6. Amendment B2 präzisiert die Zuständigkeit für einen bereits spezifizierten Pfad; es ist **keine neue Freigabe**, keine neue REQ und keine Verhaltensänderung des Enddokuments (AC-B1 bleibt inhaltlich unverändert).
+
+### Regel: Einzeleigentum von `experimental.subagent_depth`
+
+`experimental.subagent_depth` hat **genau einen** Writer: `sync_opencode_v2_managed_keys` über `build_managed_keys` (§3.2). Der Wert ist die Projekt-Option `provider-options.<provider>.experimental-subagent-depth`, sonst `required_depth_int(capabilities)`; ohne beide Quellen wird der Key nicht verwaltet.
+
+`context.apply_settings_surface_shape` (initiale Settings-Datei, §3.2) **entfernt** auf `opencode-json-v2` weiterhin das Top-Level-`subagent_depth` (eine migrierte v1-Datei verliert den toten Key), schreibt aber **nicht** `experimental.subagent_depth`. `default_agent` bleibt unverändert; alle Nicht-v2-Formate bleiben byte-identisch.
+
+### Begründung (behobener Defekt)
+
+Zwei Writer besaßen denselben Pfad. Auf einem **frischen v2-Projekt** schrieb der Init-Transform die Capability-Tiefe zuerst. Der Managed-Merge sah danach einen vorhandenen, aber **unverfolgten** Wert:
+
+- Ist der Init-Wert **gleich** dem Zielwert, greift **Zeile 3a**: der Wert wird als „User-Wert“ adoptiert (`prior = Wert`, `prior_absent: false`). Der v2→v1-Rollback „restauriert“ diesen Prior und lässt den Key stehen (Verstoß gegen **AC-B7**).
+- Ist der Init-Wert **ungleich** dem Zielwert (Projekt-Override), greift **Zeile 3**: der Init-Wert bleibt als User-Wert stehen, mit einer **permanenten** Warnung `opencode-v2-managed: experimental.subagent_depth user value kept`; der Override wird ignoriert. Beim Rollback fehlt ein State-Eintrag, Zeile 4 greift nicht — der Key bleibt ebenfalls stehen.
+
+Mit einem einzigen Writer gilt für ein frisches Projekt **Zeile 1** (schreiben, `prior_absent: true`), ein Override ist **Zeile 2**, und der Rollback entfernt den Key über **Zeile 4** samt Pruning des leeren `experimental`-Containers.
+
+### Folgen
+
+- **AC-B1:** unverändert (Dokument enthält `experimental.subagent_depth` mit dem Capability-Wert und kein Top-Level-`subagent_depth`). Die Assertion wandert von den Settings-Shape-Unittests in einen End-to-End-Test (Init-Shape + Managed-Merge); sie ist damit an den tatsächlich erzeugten Dokumentzustand gebunden statt an eine Funktion.
+- **AC-B2/B7:** die v1-Byte-Freeze-Tests bleiben unverändert; der Rollback ist jetzt auch für ein frisches v2-Projekt belegt.
+- **§3.2:** die Zeilen 1/3a/2/4 sind für `experimental.subagent_depth` erst durch dieses Amendment tatsächlich erreichbar; `build_managed_keys` bleibt die einzige Quelle der Zielwerte.
+- **Kein Provider-Name, kein `surface-version`-Dispatch:** beide Funktionen entscheiden weiterhin nur über aufgelöste Werte (`mcp-config.format`, Optionen, Capabilities).
 
 ## Trace-Anker
 

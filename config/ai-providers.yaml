@@ -305,6 +305,12 @@ providers:
       surface-formats:
         v1: opencode-json
         v2: opencode-json-v2
+    # SPEC-OPENCODE-V2-SUPPORT-2026-10-22 §3.1 (Task 6): per-surface CLI
+    # settings filename. `surface-version` SELECTS it and the loader exposes
+    # the flat resolved key `cli_file`; no v1 entry means v1 writes no such
+    # file (v1 stays byte-frozen).
+    cli-files:
+      v2: cli.json
     skills_dir: .opencode/skills
     snippets_dir: .opencode/snippets
     pending_tasks_file: .opencode/pending-tasks.md
@@ -321,6 +327,13 @@ providers:
       surface-mechanisms:
         v1: opencode-native
         v2: opencode-native-v2
+      # SPEC-OPENCODE-V2-SUPPORT-2026-10-22 §3.1 (Task 6): v2 model ids are
+      # `provider/model[#variant]`. `surface-version` SELECTS the pattern;
+      # `artifact_validate` reads the resolved `model-pattern` only.
+      surface-model-patterns:
+        v2: '^[^/#\s]+/[^#\s]+(#[A-Za-z0-9._-]+)?$'
+      # Allow-list source for the v2 native frontmatter fields (Spec §3.2, D1).
+      surface-v2-fields: [system, permissions, steps, variant]
       tools-format: keep
       tool-name-map: {}
       # §4.3: allow-list turns Opencode v2's silent frontmatter drop into a

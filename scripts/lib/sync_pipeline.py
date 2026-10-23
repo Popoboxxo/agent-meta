@@ -89,6 +89,7 @@ from lib.knowledge import sync_knowledge_engine
 from lib.log import SyncLog
 from lib.subagent_permissions import resolve_subagent_permission_provider_vars
 from lib.mcp import generate_mcp_artifacts, sync_secrets_template
+from lib.opencode_v2_config import sync_opencode_v2_managed_keys
 from lib.pipelines import (
     PIPELINES_EFFECTIVE_KEY,
     apply_overrides,
@@ -1129,6 +1130,10 @@ def _sync_stage_per_provider(
     mcp_registry = load_mcp_registry(agent_meta_root, config, project_root)
     external_tools_registry = load_external_tools_registry(agent_meta_root, config, project_root)
     skill_channel_universe: set[str] | None = None
+    # N-M2 (3) / AC-B20: run-scoped ownership registry — exactly one owner may
+    # act on a managed opencode file per sync run. Created here (never at module
+    # level) so no claim leaks into the next run.
+    opencode_claimed_files: set[str] = set()
 
     for provider in providers:
         pc = provider_config[provider]
@@ -1311,6 +1316,15 @@ def _sync_stage_per_provider(
                 agent_meta_root, log, args.dry_run,
                 active_set=active_set,
             )
+        # B.7 / AC-B13/B18/B20: tier-INDEPENDENT v2 managed-key merge/rollback.
+        # Deliberately outside the ``== "permission"`` block above (Spec-A
+        # freeze): the writer is a no-op for non-owners and without v2/state,
+        # and the run-scoped registry makes it order-independent.
+        sync_opencode_v2_managed_keys(
+            project_root, config, provider, provider_config,
+            agent_meta_root, log, args.dry_run,
+            claimed_files=opencode_claimed_files,
+        )
         if pc.get("has_commands", False):
             sync_commands_for_provider(agent_meta_root, project_root, config, log,
                                        args.dry_run, provider,

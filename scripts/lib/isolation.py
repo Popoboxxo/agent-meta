@@ -44,6 +44,26 @@ _STATE_RUNTIME_GATE_KEY = "runtime-gate-deny"
 # "prior": <str | None>}`` where ``value`` is the ``default_agent`` the merge
 # wrote and ``prior`` the user's previous value (``None`` = key was absent).
 _STATE_DEFAULT_AGENT_KEY = "default-agent"
+# Managed-merge namespaces for the opencode v2 surface (#1007/AC-B16), all
+# dict-valued. Declared here because ``isolation`` owns the state file: every
+# writer/reader (``opencode_v2_config``) imports these constants instead of
+# repeating the literals, which keeps one source of truth per namespace.
+_STATE_V2_KEYS = "opencode-v2-keys"
+_STATE_V2_PERMISSIONS = "opencode-v2-permissions"
+_STATE_V2_CLI = "opencode-v2-cli"
+_STATE_V2_MCP = "opencode-v2-mcp"
+
+# The dict-valued namespaces: ``_read_state`` returns ``{}`` (never ``[]``) for
+# these, so an absent/mis-typed record degrades to an empty mapping the callers
+# can use directly. Every other namespace is list-valued.
+_STATE_DICT_KEYS = frozenset((
+    _STATE_RUNTIME_GATE_KEY,
+    _STATE_DEFAULT_AGENT_KEY,
+    _STATE_V2_KEYS,
+    _STATE_V2_PERMISSIONS,
+    _STATE_V2_CLI,
+    _STATE_V2_MCP,
+))
 
 # A2 root-deny (IC-09): the managed glob and decision written INSIDE each
 # permission family mapping. The glob is disjoint from every ``_dir_to_glob``
@@ -191,10 +211,11 @@ def _read_state(state_path: Path, key: str = _STATE_ISOLATION_KEY):
 
     Returns the namespace's empty value when the file or the namespace is
     missing/unparseable: a dict for the dict-valued namespaces
-    (``runtime-gate-deny``, ``default-agent``), a list otherwise.
+    (``_STATE_DICT_KEYS``: ``runtime-gate-deny``, ``default-agent`` and the four
+    ``opencode-v2-*`` namespaces), a list otherwise.
     """
     value = _load_state_data(state_path).get(key)
-    if key in (_STATE_RUNTIME_GATE_KEY, _STATE_DEFAULT_AGENT_KEY):
+    if key in _STATE_DICT_KEYS:
         return value if isinstance(value, dict) else {}
     return value if isinstance(value, list) else []
 

@@ -45,8 +45,10 @@ from .io import strip_jsonc_comments
 CHECK = "artifact-contract"
 
 #: Mechanisms whose artifacts are serialized as TOML, not Markdown frontmatter.
-#: (The former v1-only ``subagent_depth`` guard was removed: the v2 surface
-#: retains the orchestrator depth — IC-15 Nr. 16.)
+#: (The former v1-only ``subagent_depth`` guard was removed: the v2 settings
+#: document carries the orchestrator depth as ``experimental.subagent_depth`` —
+#: IC-15 Nr. 16 is REVERSED by SPEC-OPENCODE-V2-SUPPORT-2026-10-22; a top-level
+#: ``subagent_depth`` key is not emitted on the v2 surface.)
 TOML_MECHANISMS = frozenset({"codex-toml"})
 
 #: Frontmatter keys every generated agent artifact MUST carry.
@@ -68,6 +70,10 @@ class ArtifactContract:
     allowed_fields: set[str] | None
     reject_fields: set[str]
     required_fields: frozenset[str] = REQUIRED_FIELDS
+    #: Resolved ``agent-transform.model-pattern`` (SPEC-OPENCODE-V2-SUPPORT
+    #: §3.1, plan Task 6). ``None`` disables the model-id check, which keeps
+    #: every surface without a declared pattern (all v1 entries) byte-frozen.
+    model_pattern: str | None = None
 
 
 def _artifact_transform(provider_config: dict | None) -> dict:
@@ -93,6 +99,12 @@ def resolve_artifact_contract(provider_config: dict | None) -> ArtifactContract:
     The ``allowed-fields`` allow-list is enforced on the v2 surface only (spec
     §2.1/§5); this is the one place that rule is applied, so the sync-time
     warning and the consistency check cannot drift apart.
+
+    ``model-pattern`` is read from the already resolved ``agent-transform``
+    (the loader selects it from ``surface-model-patterns`` by surface-version,
+    plan Task 6). Absent, empty or non-string values mean "no model check" --
+    the fail-safe default that keeps surfaces without a declared pattern (the
+    whole v1 tree) exactly as before.
     """
     transform = _artifact_transform(provider_config)
     mechanism = str(transform.get("frontmatter-mechanism", "provider-md"))
@@ -102,11 +114,27 @@ def resolve_artifact_contract(provider_config: dict | None) -> ArtifactContract:
         if isinstance(allowed, list) and allowed and artifact_v2_surface(provider_config)
         else None
     )
+    pattern = transform.get("model-pattern")
     return ArtifactContract(
         mechanism=mechanism,
         allowed_fields=allowed_fields,
         reject_fields=set(transform.get("reject-fields") or []),
+        model_pattern=pattern if isinstance(pattern, str) and pattern else None,
     )
+
+
+def _model_id_matches(model: str, pattern: str) -> bool:
+    """Whether *model* fully matches the resolved *pattern*.
+
+    A malformed pattern is treated as "no constraint" (fail-open): the pattern
+    is config data and a sync must not crash on it. Runtime behavior is
+    unaffected because the emitted value is still whatever the resolver
+    produced.
+    """
+    try:
+        return re.fullmatch(pattern, model) is not None
+    except re.error:  # pragma: no cover - config-error path
+        return True
 
 
 def _finding(path: str, message: str, suggestion: str = "") -> Finding:
@@ -135,6 +163,7 @@ def validate_frontmatter(
     required_fields: set[str],
     reject_fields: set[str],
     path: str,
+    model_pattern: str | None = None,
 ) -> list[Finding]:
     """Validate a Markdown document's YAML frontmatter against field contracts.
 
@@ -143,6 +172,10 @@ def validate_frontmatter(
       ``None`` disables the allow-list (the conservative, no-false-positive
       default; spec §2.1).
     * ``reject_fields`` — every listed key MUST be absent.
+    * ``model_pattern`` — when not ``None``, an emitted string ``model`` MUST
+      fully match it (the resolved ``provider/model[#variant]`` contract, spec
+      §3.1). ``None`` disables the check, so surfaces without a declared
+      pattern behave exactly as before.
 
     A missing block or malformed YAML yields exactly one ERROR Finding and no
     field-level findings (avoids double-reporting an unparseable document).
@@ -190,6 +223,21 @@ def validate_frontmatter(
             )
         )
 
+    if model_pattern is not None:
+        model = parsed.get("model")
+        if (
+            isinstance(model, str)
+            and model
+            and not _model_id_matches(model, model_pattern)
+        ):
+            findings.append(
+                _finding(
+                    path,
+                    f"model '{model}' is not provider/model[#variant]",
+                    "Emit the model as 'provider/model' or 'provider/model#variant'.",
+                )
+            )
+
     return findings
 
 
@@ -209,6 +257,7 @@ def validate_artifact(text: str, contract: ArtifactContract, path: str) -> list[
         required_fields=set(contract.required_fields),
         reject_fields=contract.reject_fields,
         path=path,
+        model_pattern=contract.model_pattern,
     )
 
 
@@ -241,8 +290,9 @@ def validate_json_document(text: str, fmt: str, path: str) -> list[Finding]:
 
     * ``opencode-json-v2`` — a document that declares MCP content MUST carry the
       nested ``mcp.servers`` object and MUST NOT carry a flat top-level ``mcp``
-      server map. (``subagent_depth`` is no longer a v1-only key: the v2 surface
-      retains the orchestrator depth — IC-15 Nr. 16.)
+      server map. (IC-15 Nr. 16 is reversed by
+      SPEC-OPENCODE-V2-SUPPORT-2026-10-22: the v2 document carries the depth as
+      ``experimental.subagent_depth`` and no top-level ``subagent_depth``.)
     * ``opencode-json`` — a document that declares MCP content MUST carry the
       flat top-level ``mcp`` object (frozen v1 byte shape, AC-21).
 

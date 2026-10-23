@@ -926,3 +926,116 @@ def test_managed_deny_rolled_back_when_entry_point_disappears(tmp_path):
     assert _DEFAULT_AGENT_KEY not in state
     assert len(log.warnings) == 1, log.warnings
     assert "primary-role" in log.warnings[0], log.warnings
+
+
+# ---------------------------------------------------------------------------
+# AC-B16 (part 1): the four opencode-v2 state namespaces are dict-valued
+# ---------------------------------------------------------------------------
+
+# Contract literals, deliberately spelled out here (not imported from
+# ``isolation``) so the RED phase fails on the *behaviour* rather than on a
+# missing attribute. The trailing assertions pin the constants to them.
+_V2_NAMESPACES = (
+    "opencode-v2-keys",
+    "opencode-v2-permissions",
+    "opencode-v2-cli",
+    "opencode-v2-mcp",
+)
+
+
+def test_ac_b16_read_state_returns_dict_for_v2_namespaces(tmp_path):
+    """AC-B16: each v2 namespace reads as ``{}`` when the state file is absent,
+    when the namespace key is missing and when a non-dict value is stored —
+    never as ``[]`` (a list default would make the managed-merge engine treat
+    the namespace as an empty list and clobber it on write)."""
+    state_path = tmp_path / _STATE_FILE
+
+    # 1. missing file
+    for namespace in _V2_NAMESPACES:
+        assert isolation._read_state(state_path, namespace) == {}
+
+    # 2. existing file, namespace key absent
+    state_path.parent.mkdir(parents=True)
+    state_path.write_text(
+        json.dumps({_ISOLATION_KEY: ["**/.claude/**"]}) + "\n", encoding="utf-8"
+    )
+    for namespace in _V2_NAMESPACES:
+        assert isolation._read_state(state_path, namespace) == {}
+
+    # 3. existing file, namespace holds a non-dict value
+    state_path.write_text(
+        json.dumps({namespace: [] for namespace in _V2_NAMESPACES}) + "\n",
+        encoding="utf-8",
+    )
+    for namespace in _V2_NAMESPACES:
+        assert isolation._read_state(state_path, namespace) == {}
+
+    # Single source of truth for Task 7 (``opencode_v2_config`` imports these).
+    assert isolation._STATE_V2_KEYS == "opencode-v2-keys"
+    assert isolation._STATE_V2_PERMISSIONS == "opencode-v2-permissions"
+    assert isolation._STATE_V2_CLI == "opencode-v2-cli"
+    assert isolation._STATE_V2_MCP == "opencode-v2-mcp"
+
+
+def test_ac_b16_v2_namespaces_do_not_clobber_siblings(tmp_path):
+    """AC-B16: writing the ``opencode-v2-keys`` namespace preserves the
+    pre-existing ``isolation-deny`` and ``runtime-gate-deny`` namespaces."""
+    state_path = tmp_path / _STATE_FILE
+    state_path.parent.mkdir(parents=True)
+
+    isolation._write_state(state_path, ["**/.claude/**"], dry_run=False)
+    isolation._write_state(
+        state_path,
+        {"**": {"edit": None, "bash": None}},
+        dry_run=False,
+        key=_RUNTIME_GATE_KEY,
+    )
+
+    v2_state = {
+        "experimental.todo": {
+            "value": True, "prior": None, "prior_absent": True,
+        }
+    }
+    isolation._write_state(state_path, v2_state, dry_run=False, key="opencode-v2-keys")
+
+    data = _read_json(state_path)
+    assert data[_ISOLATION_KEY] == ["**/.claude/**"]
+    assert data[_RUNTIME_GATE_KEY] == {"**": {"edit": None, "bash": None}}
+    assert data["opencode-v2-keys"] == v2_state
+
+    # Dropping the v2 namespace again leaves both siblings untouched.
+    isolation._write_state(state_path, {}, dry_run=False, key="opencode-v2-keys")
+    data = _read_json(state_path)
+    assert data[_ISOLATION_KEY] == ["**/.claude/**"]
+    assert data[_RUNTIME_GATE_KEY] == {"**": {"edit": None, "bash": None}}
+    assert "opencode-v2-keys" not in data
+
+
+def test_isolation_namespace_still_returns_list(tmp_path):
+    """Regression guard: list-shaped namespaces keep returning ``[]`` and the
+    two Spec-A dict namespaces keep returning ``{}`` — the v2 extension must not
+    change any existing default."""
+    state_path = tmp_path / _STATE_FILE
+
+    # Absent file: isolation-deny is a list, the Spec-A namespaces are dicts.
+    assert isolation._read_state(state_path) == []
+    assert isolation._read_state(state_path, _ISOLATION_KEY) == []
+    assert isolation._read_state(state_path, _RUNTIME_GATE_KEY) == {}
+    assert isolation._read_state(state_path, _DEFAULT_AGENT_KEY) == {}
+
+    state_path.parent.mkdir(parents=True)
+    isolation._write_state(state_path, ["**/opencode.json"], dry_run=False)
+    isolation._write_state(
+        state_path,
+        {"value": "orchestrator", "prior": None},
+        dry_run=False,
+        key=_DEFAULT_AGENT_KEY,
+    )
+
+    assert isolation._read_state(state_path) == ["**/opencode.json"]
+    assert isolation._read_state(state_path, _ISOLATION_KEY) == ["**/opencode.json"]
+    assert isolation._read_state(state_path, _DEFAULT_AGENT_KEY) == {
+        "value": "orchestrator", "prior": None,
+    }
+    # Missing runtime-gate namespace still degrades to a dict, not a list.
+    assert isolation._read_state(state_path, _RUNTIME_GATE_KEY) == {}
