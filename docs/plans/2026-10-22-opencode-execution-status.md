@@ -48,8 +48,31 @@
 | 8 | `senior-developer` | `13ccf688` | rot `ImportError` → `22 passed` | `done` | `owns_opencode_surface` ist False für Claude-artige und Mammouth-artige Einträge; kein `agents.title.model`, kein `$schema`. |
 | 9 | `senior-developer` | `7b9ccecb` | rot `13 failed` → `84 passed` | `done` | Der Writer schreibt nur neu, wenn eine Entscheidung das Dokument verändert hat (JSONC-Kommentare überleben); Nicht-Objekt-JSON gilt als Parse-Fehler. |
 | 10 | `senior-developer` | `ccbfe520` | rot `6 failed, 1 passed` → `47 passed` | `done` | Rot umfasste die 5 Plan-Tests plus 1 zusätzlichen Ownership-Konflikt-Guard. Laufbezogener Parameter `claimed_files` ergänzt; `warn_ignored_v2_options` wird aus dem Writer heraus aufgerufen; die Aufrufbedingung `== "permission"` ist nachweislich unverändert (reine Einfügungen). |
-| 11 | `senior-developer` | `db35f684` | rot `5 failed` (`KeyError: 'experimental'`) → `73 passed` | `done` | Szenario 69 PASS. Das Assert liegt in `69-opencode-v2-surface.sh:199` (nicht `:173` wie im Plan). Spec-Prosa-Drift: AC-B1 nennt Tiefe 3, die Repo-Capability `required_depth` ist 2. |
+| 11 | `senior-developer` | `db35f684` | rot `5 failed` (`KeyError: 'experimental'`) → `73 passed` | `done` | Szenario 69 PASS. Das Assert liegt in `69-opencode-v2-surface.sh:203` (nicht `:173` wie im Plan; Review RVW-B-04). Spec-Prosa-Drift: AC-B1 nennt Tiefe 3, die Repo-Capability `required_depth` ist 2. |
 | 12 | `developer` | `d5853d1e` | rot `3 failed` → `92 passed` | `done` | `consistency-check.py` PASS. Das Task-6-Muster akzeptiert `a/b/c` im Modellsegment; eine ungültige Regex in `model-pattern` schlägt bewusst offen fehl (keine Prüfung). |
+
+## Phase-B-Review-Fixrunde (2026-10-23)
+
+**Quelle:** Review zu `feat/1007-b-keys` (Verdict `CHANGES_REQUESTED`). Kein Commit in dieser Runde (bewusst offen für den Review-Nachlauf).
+
+| Finding | Schwere | Änderung | Beleg |
+|---|---|---|---|
+| QA-B-01 | BLOCKER | Einzeleigentum `experimental.subagent_depth`: `context.apply_settings_surface_shape` entfernt nur noch den Top-Level-Key und schreibt die Tiefe nicht mehr; `build_managed_keys` ist der einzige Writer. End-to-End-Test (Init-Shape + Writer, Option 3) plus v2→v1-Rollback; AC-B1-Dokumentassertion aus den Settings-Shape-Unittests dorthin verschoben. | `scripts/lib/context.py`, `tests/test_opencode_v2_surface.py::test_ac_b1_end_to_end_*`, Spec Amendment B2 (Rev. 1.6) |
+| QA-B-02 | MAJOR | Claim (`claimed_files.add`) hinter die „nichts zu tun"-Prüfung und vor den Datei-Read; `warn_ignored_v2_options` nach dem Claim. Der AC-B13-Warnpfad im No-op-Zweig bleibt erhalten (Warnung ist keine Dateiarbeit). Zwei-Owner-Test mit „erster Owner hat keine Arbeit". | `scripts/lib/opencode_v2_config.py`, `::test_ac_b20_owner_conflict_first_owner_without_work_does_not_block` |
+| QA-B-03 | MAJOR | `_set_path` ersetzt keinen Nicht-dict-Vorfahren mehr: `False` + Warnung, kein Schreiben, kein State. Regressionstest `{"experimental": "legacy-user-value"}`. | `scripts/lib/opencode_v2_config.py`, `::test_ac_b5_non_dict_ancestor_is_kept_with_warning` |
+| QA-B-04 | MAJOR | `claimed_files` ist jetzt Pflicht-Keyword (`*`); beide Produktionsaufrufe unverändert als Keyword, Testhelfer `_run` angepasst. | `scripts/lib/opencode_v2_config.py`, `tests/test_opencode_v2_surface.py::_run` |
+| QA-B-05 | MINOR | Abgeleiteter State-Pfad läuft durch `isolation.safe_path` wie der Managed-File-Pfad. | `scripts/lib/opencode_v2_config.py` |
+| QA-B-06 | MINOR | Secret-Kontext wird auf Kinder eines secret-benannten Keys vererbt (`{"token": {"value": "PLAINTEXT"}}` ist ein Finding). | `scripts/lib/opencode_v2_config.py`, `::test_ac_b10_secret_object_value_under_secret_name_is_finding` |
+| QA-B-07 | MINOR | AC-B19-Test prüft zusätzlich Byte-Gleichheit des Dokuments. | `tests/test_opencode_v2_surface.py::test_ac_b19_user_deleted_key_not_rewritten` |
+| QA-B-10 | MINOR | Kommentar in `model_contracts._catalog_id`: `#variant`-Stripping ist eine universelle Modell-ID-Regel, keine v2-Sonderregel (kein Verhaltenswechsel). | `scripts/lib/consistency/model_contracts.py` |
+| QA-B-11 | MINOR | `providers.<id>: null` wird in `build_managed_keys` übersprungen und gewarnt, statt als Removal-Ziel (`None`) zu wirken. | `scripts/lib/opencode_v2_config.py`, `::test_ac_b11_providers_null_entry_is_skipped_with_warning` |
+| QA-B-12 | MINOR | End-to-End Adopt (3a) → Optionsänderung (2) → Rollback stellt den ursprünglichen Prior wieder her. | `::test_ac_b1_review_single_ownership_e2e_adopt_change_rollback` |
+| QA-B-13 | MINOR | Identitäts- durch Gleichheitsassertion für `kwargs["config"]` ersetzt. | `tests/test_opencode_v2_surface.py` |
+| RVW-B-01 | MINOR | AC-IDs in Testnamen ergänzt: `test_ac_b11_build_managed_keys_v2_full`, `test_ac_b3_build_managed_keys_without_todo_omits_key`, `test_ac_b10_secret_*`. | `tests/test_opencode_v2_config.py` |
+| RVW-B-02 | MINOR | Test: vorhandenes `$schema` überlebt einen v2-Merge byte-exakt. | `::test_ac_b11_schema_preserved_through_v2_merge` |
+| RVW-B-04 | MINOR | Ledger-Zeilenreferenz des Szenario-69-Asserts korrigiert (`:199` → `:203`). | dieses Dokument, Zeile Task 11 |
+
+**Bewusste Abweichung:** Der frühere Test „Template-Tiefe wird ohne Capabilities nach `experimental.subagent_depth` übernommen" entfällt als eigene Assertion, weil die bindende Entscheidung die Template-Tiefe als Quelle streicht (nur Projekt-Option oder Capability). Die Capability-Quelle bleibt als End-to-End-Test erhalten.
 
 **Phase-B-Exit-Kriterien (2026-10-23):** `python3 -m pytest tests/test_opencode_v2_surface.py tests/test_opencode_v2_config.py tests/test_opencode_v2_schema.py tests/test_opencode_v2_aux_selection.py tests/test_opencode_runtime_gate.py -q` → `106 passed`; `python3 scripts/sync.py --validate` rc 0; `python3 scripts/sync.py --check` rc 0 (kein Drift, 0 Aktionen / 449 übersprungen, 35 Warnungen aus Altstand/Umgebung); `python3 scripts/consistency-check.py` → `[PASS] All checks passed.` rc 0.
 
