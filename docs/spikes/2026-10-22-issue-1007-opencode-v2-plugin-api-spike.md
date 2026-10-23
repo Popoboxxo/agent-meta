@@ -24,7 +24,7 @@ Der alte Audit-Sandkasten `/var/tmp/opencode-audit/opencode-v2/` existiert nicht
 - **DOKU** — offizielle v2-Dokumentation, hier nicht selbst gemessen; bzw. bereits vorhandene Evidenz, unverändert übernommen.
 - **UNVERIFIED** — mit dem vorhandenen Aufwand nicht belegbar (oder durch Laufzeit-Hinweis in Frage gestellt).
 
-`Proben:` zählt die für die jeweilige Frage **ausgewerteten** v2-Läufe (`opencode run`, `opencode debug config`, `opencode debug agents`, `opencode models`). Hilfeaufrufe, fehlgeschlagene Bring-up-Versuche und der npm-Install sind im folgenden Protokoll vollständig gelistet, werden aber nicht als Frage-Probe gezählt. Budget je Frage: ≤ 3 Proben, ≤ 5 Quellen — überall eingehalten.
+`Proben:` zählt die für die jeweilige Frage **ausgewerteten** v2-Läufe. Als Frage-Probe zählen ausschließlich fragegerichtete Aufrufe von `opencode run`, `opencode debug config`, `opencode debug agents` und `opencode models`. Je getesteter Bedingung zählt eine `opencode run`-Invocation (z. B. Q1: Auto-Discovery-Lauf vs. expliziter `plugins`-Eintrag). Von den Inspektionskommandos zählt **je Frage und je Kommando höchstens eine Probe**, auch wenn dasselbe Kommando mehrfach aufgerufen wurde: `opencode debug agents` dreimal in Q6 (gekürzt, `agents.json`, `agents2.json`) ergibt also eine Probe, `opencode models` (Filter- und Volllauf) eine weitere — Q6 bleibt bei 2. Hilfeaufrufe, fehlgeschlagene Bring-up-Versuche (z. B. Lauf 13 mit Default-Permission: `Permission denied: shell`, nur als Nebenbefund gewertet) und der npm-Install sind im folgenden Protokoll vollständig gelistet, werden aber nicht als Frage-Probe gezählt. Budget je Frage: ≤ 3 Proben, ≤ 5 Quellen — überall eingehalten.
 
 Keine der abgerufenen Web-/Doku-Seiten enthielt anweisungsartige Einschübe („ignore previous instructions“, Tool-Aufrufe, Secrets-Abfragen). Es gab daher nichts als Prompt-Injection zu markieren; sämtliche Fremdinhalte wurden ausschließlich als Daten gelesen. Die Datei `~/.config/opencode/plugins/rtk.ts` (fremder Nutzer-Plugin-Code) wurde nur als Beispiel gelesen, nicht ausgeführt und nicht verändert.
 
@@ -115,9 +115,8 @@ Nötige Anpassung für `opencode-plugin-v2-js` (neues Template, wie Spec §3.6 v
 1. `export default { id: "agent-meta-runtime-gate", async setup(ctx) { … } }` (Objekt, nicht Funktion — der 2.x-Loader validiert `typeof === "object"`; ein Callable mit angeflanschten Feldern fällt durch, siehe `rtk.ts`-Kommentar).
 2. Registrierung über `await ctx.tool.hook("execute.before", …)` (Observe-Pfad) und — erst nach P6-Freigabe — `await ctx.permission.hook("evaluate", …)` für `effect="deny"`.
 3. Die sync-zeit-gebackenen Konstanten (`MODE`, `STRICT`, `AGENT_ALLOWLIST`) können unverändert substituiert werden; `MODE=observe` bleibt korrekt (kein Enforce).
-Bewertung: VERIFIED (statische Prüfung von Template, Loader-Vertrag und Docs; kein Lauf mit dem Template selbst).
-
 4. `scripts/lib/runtime_gate.py:93-95` (`PLUGIN_TEMPLATE_BY_PROTOCOL`) braucht einen neuen Protokoll-Key → neues Template; die v1-Zuordnung bleibt unangetastet.
+Bewertung: DOKU (statische Prüfung von Template, Loader-Vertrag und Docs; `Proben: 0` — kein Lauf mit dem Template selbst).
 
 Quelle: `templates/plugins/runtime-gate.opencode-plugin.js.tmpl` (Zeilen 11-26, gelesen 2026-10-23); `scripts/lib/runtime_gate.py:93-95` (`PLUGIN_TEMPLATE_BY_PROTOCOL = {"opencode-plugin-js": …}`); `https://opencode.ai/v2/docs/build/plugins` („Support V1“, „Tools“, „Permissions“; Abruf 2026-10-23); `~/.config/opencode/plugins/rtk.ts` (2.x-Objektform, nur gelesen).
 Proben: 0
@@ -171,7 +170,7 @@ Quellen: 5
 
 | Key/Feld | Marker | betroffene Phase |
 |---|---|---|
-| `timeout` (`catalog`/`execution`) | DOKU | C2 |
+| `timeout` (`startup`/`catalog`/`execution`) | DOKU | C2 |
 | `oauth` (`client_id`/`client_secret`/`scope`, snake_case) | DOKU | C2 |
 | `disabled` | DOKU | C2 |
 | `system` (Body statt Frontmatter-Feld) | VERIFIED | D1 |
@@ -188,7 +187,7 @@ Quellen: 5
 2. **`providers`-Innenform (Phase B):** `settings.baseURL` + `env` statt `options.{baseURL,apiKey}`; AC-B10 und §3.3 sind anzupassen.
 3. **`cli.json`-Inhalt (Phase D2):** dokumentiert nur `plugins`; AC-D7 (`theme`, `autoupdate`) ist unbelegt und vor D2 zu korrigieren.
 4. **`permissions[]`-Einfügeposition (3.4/C1):** last-match + Agent-Regeln zuletzt (VERIFIED, Lauf 18) → Managed-Denies gehören ans Listenende, nicht an den Anfang; sonst sind sie durch jede spätere Regel (auch Agent-`allow`) überstimmbar.
-5. **Plugin-Config-Key (C3):** v2 nutzt `plugins` (Plural); für Dateien unter `.opencode/plugins/` ist kein Eintrag nötig. §3.6 spricht von `plugin` — reine Doku-Korrektur, kein Blocker.
+5. **Plugin-Config-Key (C3): erledigt.** v2 nutzt `plugins` (Plural); für Dateien unter `.opencode/plugins/` ist kein Eintrag nötig. Nach Amendment B1 sagt die Spec `plugins` (Plural) und Auto-Discovery (§3.6); der frühere Widerspruch zu `plugin` in §3.6 bleibt nur als historische Notiz stehen — kein offener Befund mehr, kein Blocker.
 
 ## Verdikt-Begründung
 
