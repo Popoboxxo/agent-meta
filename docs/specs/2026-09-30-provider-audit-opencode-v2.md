@@ -23,7 +23,7 @@
 | OQ-5 | Copilot agent extension is **`.agent.md`** (GitHub-cloud canonical) under **`.github/agents/`**. | The Copilot writer emits `*.agent.md`; stale-cleanup is scoped to `.github/agents/` (AC-8, AC-22). |
 | OQ-6 | Antigravity `model` is **`inherit`** instead of concrete tier IDs. | `ai-providers.yaml` sets the Antigravity model to `inherit`; no tier ID is emitted for Antigravity (AC-9). |
 | OQ-7 | Mammouth context uses **`AGENTS.md`**; **`MAMMOUTH.md` and its routing entry are retired**. | Mammouth `context_file` points at `AGENTS.md`; the `MAMMOUTH.md` artifact and the associated routing entry are removed. |
-| OQ-8 | Opencode v1→v2: **v2 stays opt-in in this release**; the default flip happens only with the next major (SemVer). | `surface-version` defaults to `v1`; v2 is per-project opt-in; the v2 surface is a **minor** and a future default flip is reserved for a major (§11, ADR-2). |
+| OQ-8 | Opencode v1→v2: **v2 stays opt-in in this release**; the default flip happens only with the next major (SemVer). | `surface-version` defaults to `v1`; v2 is per-project opt-in; the v2 surface is a **minor** and a future default flip is reserved for a major (§11, ADR-2). The v1 freeze covers the surface format only; the entry point (`mode: primary` + `default_agent`) is excluded, see Amendment A2. |
 | OQ-9 | Continue `roles`-enum defect in `templates/configs/CONTINUE.config-template.yaml:28` is **fixed in-scope**. | The template at `:28` is corrected so the `roles` enum no longer emits the invalid `agent` value; the fix ships with this change instead of a separate CO-2 follow-up. |
 | Scope §9 | The **27 drift files** in the repo are **regenerated in-scope** (AC-3b applies). | The change ends with a real repo-root sync that regenerates and commits the 27 files; AC-3b (`sync.py --check` rc 0 at the repo root) is binding, not moved to a follow-up PR. |
 
@@ -413,6 +413,14 @@ Each entry: **Recommendation**, **Rationale**, **Alternative**, and the **RESOLV
 - **Rationale:** Existing projects run v1.18.31 (F3); a hard flip is breaking without migration (design DECISION-2, §6.1). This refines design §6.1 (which lists the v2 surface as major) by tying the major bump to the **default flip**, not to the opt-in surface.
 - **Alternative:** Flip default in a future major release.
 - **DECISION (2026-10-01):** v2 remains opt-in in this release; the default flip happens only with the next major (SemVer).
+
+> **Amendment A2 (2026-10-22, Issue #1006):** Der v1-Freeze aus OQ-8 gilt für das Surface-**Format**
+> (Frontmatter-Schlüsselmenge, MCP-Form, Settings-Template-Bytes), nicht für den **Einstiegspunkt**.
+> `mode: primary` für die in `config/ai-providers.yaml` explizit deklarierte `primary-role` sowie
+> `default_agent` in `opencode.json` werden auch auf Surface v1 ausgegeben (Bugfix: ohne Einstiegspunkt
+> sperrt das Permission-Tier-Gate den Main Chat). Provider ohne explizites `primary-role` (z.B.
+> Mammouth) bleiben unverändert. v2 bleibt opt-in; der Default-Flip bleibt dem nächsten Major
+> vorbehalten. Referenz: `SPEC-OPENCODE-ENTRYPOINT-1006-2026-10-22`.
 
 ---
 
