@@ -278,3 +278,125 @@ spezifischeren `allow`-Einträgen überstimmt, alle übrigen Pfade bleiben gespe
   Session-Regeln beobachtet.
 - **Windows (`UNVERIFIED`):** Die Pfad-Normalisierung (`\` → `/`) ist im Binary vorhanden; die Probe
   lief ausschließlich auf Linux. Für agent-meta-relevante Ziele (POSIX-Pipelines) unkritisch.
+
+---
+
+## Nachzügler-Suche #1006
+
+Plan-A-Task 15 (`docs/plans/2026-10-22-opencode-entrypoint-1006-plan.md`), Branch
+`fix/1006-opencode-entry-point`, Stand `e5d5d038`. Zweck: prüfen, ob nach den Tasks 3 und 6–12 noch
+Stellen in `tests/` oder `scripts/` existieren, die das **alte** Verhalten festschreiben, und den
+Gesamtlauf belegen.
+
+### Step 1 — Ist-Zustand der Basis
+
+| Kommando | rc |
+|---|---|
+| `python3 scripts/sync.py --validate` | 0 |
+| `python3 scripts/sync.py --check` | 0 |
+
+Beide Läufe melden `0 action(s)`; die Warnungen (u. a. `active-set.dangling-mention`,
+`gitignore-shadowing`, externe Repo-Pins) sind Bestandsbefunde und nicht #1006-spezifisch.
+
+### Step 2 — Nachzügler-Grep (`tests/` + `scripts/`, Trefferzahl = Zeilen)
+
+| Muster | Treffer | Bewertung |
+|---|---|---|
+| `default_agent` | 89 | erwartet |
+| `mode: subagent` | 9 | erwartet |
+| `primary-role` | 65 | erwartet (inkl. Ausnahme (c)) |
+| `edit: allow` | 2 | erwartet |
+| `"edit"]` | 28 | erwartet |
+| `runtime-gate-deny` | 8 | erwartet |
+| `_sync_opencode_runtime_gate` | 15 | erwartet |
+| `mode == "subagent"` | 0 | — |
+
+Einordnung der Treffer:
+
+- **Implementierung (`scripts/lib/`)** — `providers.explicit_primary_role()`, `context.apply_settings_surface_shape()`
+  (`default_agent`), `provider_transform._apply_agent_transform()` (Entry-Point-Promotion, gescopter
+  `edit`-Lock, `edit: deny`-Fallback), `isolation._sync_opencode_runtime_gate()` /
+  `_merge_default_agent()` (State-Namespaces `runtime-gate-deny`, `default-agent`),
+  `sync_pipeline.py`/`cli_commands.py` (Wiring). Erwartet: das ist der neue Mechanismus selbst.
+- **Neue/angepasste Tests (Tasks 2, 3, 6–12)** — `test_explicit_primary_role.py`,
+  `test_transform_contracts.py` (v1/v2-Promotion, Mammouth bleibt ohne `primary-role`),
+  `test_opencode_runtime_gate.py`, `test_runtime_gate_wiring.py`,
+  `test_opencode_primary_edit_lock.py` (gescopter `edit`-Lock, `edit: deny`-Fallback, kein Lock ohne
+  `strict`/für Subagenten), `test_agents_frontmatter.py`, `test_artifact_contracts.py`,
+  `test_settings_depth_and_deny.py`, `test_surface_version_consistency.py::…default_agent…`,
+  `test_orchestrator_hint_flag.py`, `tests/scenarios/asserts/69-opencode-v2-surface.sh`
+  (`mode: primary` + `default_agent` für v1 und v2). Erwartet.
+- **Falsch-Positive (kein #1006-Bezug)** — `test_context_topology_admin.py::test_core_file_default_agents_md`
+  (AGENTS.md), `test_routing_tool_definitions.py` (Variable `default_agents` = Rule-Set),
+  `tests/scenarios/asserts/72-continue-config-validity.sh` (`roles: ["chat", "edit"]`, Continue-Config).
+  Erwartet.
+
+Die drei im Plan benannten Ausnahmen wurden einzeln verifiziert:
+
+- **(a)** `tests/routing-llm-eval/provider-opencode.sh:81` —
+  `sed 's/^mode: subagent$/mode: primary/'` ist für den Fall, dass die Rolle bereits primär generiert
+  wird, ein No-Op (der `sed`-Kommentar beschreibt weiterhin den Fall einer Subagenten-Rolle). Kein
+  Fix nötig; der Workaround bleibt harmlos.
+- **(b)** `tests/test_opencode_v2_surface.py::test_v2_settings_without_primary_role_emits_no_default_agent`
+  — Create-Pfad (`apply_settings_surface_shape`), unverändert korrekt.
+- **(c)** `scripts/lib/provider_transform.py:554` — `.get('primary-role', 'orchestrator')` im
+  Kimi-/`subagents-allowlist`-Zweig (Dispatcher-Allowlist, nicht Entry-Point). Nicht-Ziel.
+
+**Ergebnis:** keine ungeprüften Treffer, kein Nachzügler-Fix erforderlich.
+
+### Step 3 — Unverändert-grün-Liste (AC-15 a)
+
+`pytest tests/test_surface_version_selection.py tests/test_provider_config_contracts.py
+tests/test_settings_depth_and_deny.py tests/test_opencode_v2_surface.py tests/test_agents_frontmatter.py
+tests/test_artifact_contracts.py tests/test_surface_version_consistency.py -q`
+→ **162 passed** (7 Dateien, 0 failed/skipped).
+
+### Step 4 — Gesamtlauf
+
+`python3 -m pytest tests` (6264 gesammelte Tests, 361 Dateien) überschreitet das Ausführungslimit
+einer einzelnen Invocation: der serielle Lauf wurde nach ~22 min bei 11 % abgebrochen (kein
+serielles Gesamtergebnis vorhanden, es wird hier keines behauptet). Ersatzweise wurde jede der 361
+Dateien als eigener pytest-Prozess ausgeführt (10 parallel), danach jede nicht-grüne Datei seriell
+nachgeprüft:
+
+- 6232 passed, 24 skipped, 0 failed
+- `tests/test_cli_smoke_multi_provider.py`: 19 **errors** im Parallel-Lauf (Artefakt der
+  Parallelisierung, nicht reproduzierbar), seriell nachgeprüft → **19 passed**
+- 11 `tests/browser/*`-Dateien: rc 5 wegen `1 skipped` (Module-Level-Skip, Playwright-Browser nicht
+  installiert) — erwartet, kein Testfehler
+
+Effektiv: **6251 passed, 24 skipped, 0 failed**. Die 24 Skips enthalten die 11 Module-Level-Skips der
+Browser-Dateien. Summe der Dateiläufe 6275 Items = 6264 gesammelte Tests + 11 Module-Level-Skip-Items.
+
+### Step 5 — Szenarien
+
+`bash tests/scenarios/run.sh` (78 Szenarien, in 8 Batches über den akzeptierten ID-Filter, je
+`Scenarios/Passed/Failed`-Summary): **78 passed, 0 failed**. Einzelnachweis je Batch:
+9+10+10+10+9+10+10+10 = 78.
+
+### Step 6 — Mammouth-Beweis (Branch-Diff gegen `main`)
+
+```
+$ git diff --stat main...HEAD -- tests/fixtures/ac01-baseline/hashes.json
+ tests/fixtures/ac01-baseline/hashes.json | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+$ git diff main...HEAD -- tests/fixtures/ac01-baseline/hashes.json | grep -c Mammouth
+0
+```
+
+Die geänderten Zeilen betreffen ausschließlich `Opencode/…`:
+`Opencode/.opencode/agent-meta-state.json` (neu), `Opencode/.opencode/agents/orchestrator.md`
+(Rebaseline) und `Opencode/opencode.json` (Entry-Point/State). Keine `Mammouth/`-Zeile.
+
+### Step 7 — Provider-agnostisch + AC-01
+
+- `pytest tests/test_provider_agnostic_dispatch.py -q` → **71 passed**
+- `pytest tests/test_ac01_render_identity.py -q` → **5 passed** (149 s)
+- Kombinierte Invocation überschritt das Tool-Timeout (120 s), daher getrennt ausgeführt; Summe **76 passed**.
+
+### Ergebnis
+
+Alle in Task 15 geforderten Nachweise sind erbracht: `--validate`/`--check` rc 0, keine ungeprüften
+Nachzügler-Treffer, Unverändert-grün-Liste 162 passed, Gesamtlauf ohne Failures (6251 passed / 24
+skipped), 78/78 Szenarien PASS, Mammouth unberührt, Provider-agnostisch + AC-01 grün.
