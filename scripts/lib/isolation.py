@@ -561,6 +561,11 @@ def _sync_opencode_runtime_gate(
     only warned about. Both writers share the state file with read-modify-write
     per namespace. ``active_set=None`` treats the entry point as generated.
     A parse error in ``opencode.json`` returns before any write (AC-14).
+
+    The deny is coupled to the entry point (#1006/IC-6 step 2): when the gate
+    is wanted but no explicit + generated primary role exists, no deny is
+    written (it would lock every agent), a warning explains why, and a managed
+    deny from an earlier sync is rolled back by the regular rollback branch.
     """
     settings_path = safe_path(project_root, "opencode.json")
     state_path = safe_path(project_root, _OPENCODE_STATE_FILE)
@@ -577,10 +582,24 @@ def _sync_opencode_runtime_gate(
 
     entries = _opencode_runtime_gate_entries(config, provider, agent_meta_root, provider_config)
 
-    # Entry point (#1006/IC-6): an explicit AND generated primary role. The
-    # gate-deny coupling itself lands in Task 7; here the deny stays driven by
-    # ``entries`` alone and ``gate_effective`` only shapes the warning.
+    # Entry point (#1006/IC-6): an explicit AND generated primary role.
     entry = _opencode_entry_point(provider, provider_config, active_set)
+
+    # Gate-deny coupled to the entry point (#1006/IC-6 step 2): without an
+    # explicit and generated primary role the deny would lock EVERY agent —
+    # there would be no agent left able to edit or run a shell. In that case
+    # write no deny at all; a managed deny from an earlier sync is taken back
+    # by the rollback branch below (``entries`` empty), and the user is told
+    # how to restore the entry point.
+    if entries and entry is None:
+        log.warning(
+            "runtime gate (permission.edit/bash deny) NOT written for "
+            f"provider '{provider}': no explicit and generated primary-role — "
+            "the gate would lock every agent; declare primary-role in "
+            "config/ai-providers.yaml and keep that role in the active set"
+        )
+        entries = {}
+
     da_state = _read_state(state_path, _STATE_DEFAULT_AGENT_KEY)
     before_default_agent = existing.get(_DEFAULT_AGENT_JSON_KEY)
     new_da_state = _merge_default_agent(

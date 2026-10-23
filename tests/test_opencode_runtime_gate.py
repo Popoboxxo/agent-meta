@@ -20,6 +20,10 @@ the entry computation, ``_opencode_entry_point`` resolves the explicit +
 generated primary role and ``_merge_default_agent`` writes/rolls back
 ``default_agent`` in the managed merge (AC-06…AC-09, AC-14).
 
+Task 7 couples the deny to that entry point (AC-10): without an explicit AND
+generated primary role no deny is written, exactly one warning names
+``primary-role``, and a deny managed by an earlier sync is rolled back.
+
 Run: python -m pytest tests/test_opencode_runtime_gate.py -v
 """
 from __future__ import annotations
@@ -59,7 +63,10 @@ def _read_json(path: Path) -> dict:
 
 
 def _read_state(project_root: Path) -> dict:
-    return _read_json(project_root / _STATE_FILE)
+    """Namespaced state file; an absent file has no namespaces (like
+    ``isolation._read_state``, which yields the empty value per key)."""
+    path = project_root / _STATE_FILE
+    return _read_json(path) if path.exists() else {}
 
 
 def test_read_write_state_preserves_sibling_namespaces(tmp_path):
@@ -171,7 +178,7 @@ def test_scalar_permission_family_tolerated(tmp_path):
         project_root,
         {"orchestrator": {"mode": "strict"}},
         "Opencode",
-        {"Opencode": {"has_hooks": False}},
+        {"Opencode": {"has_hooks": False, "primary-role": "orchestrator"}},
         framework,
         log,
         dry_run=False,
@@ -197,7 +204,7 @@ def test_prior_user_value_recorded_and_restored(tmp_path):
         json.dumps(original, indent=2) + "\n", encoding="utf-8"
     )
     framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
-    provider_config = {"Opencode": {"has_hooks": False}}
+    provider_config = {"Opencode": {"has_hooks": False, "primary-role": "orchestrator"}}
     log = SyncLog()
 
     isolation._sync_opencode_runtime_gate(
@@ -248,7 +255,7 @@ def test_second_strict_sync_is_idempotent_and_byte_identical(tmp_path):
         encoding="utf-8",
     )
     framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
-    provider_config = {"Opencode": {"has_hooks": False}}
+    provider_config = {"Opencode": {"has_hooks": False, "primary-role": "orchestrator"}}
     config = {"orchestrator": {"mode": "strict"}}
     log = SyncLog()
 
@@ -281,6 +288,7 @@ def test_isolation_and_runtime_gate_coexist(tmp_path):
         },
         "Opencode": {
             "has_hooks": False,
+            "primary-role": "orchestrator",
             "isolation-dirs": ["opencode.json"],
             "isolation-mechanism": "opencode-permissions",
         },
@@ -328,7 +336,7 @@ def test_dry_run_never_writes(tmp_path):
         project_root,
         {"orchestrator": {"mode": "strict"}},
         "Opencode",
-        {"Opencode": {"has_hooks": False}},
+        {"Opencode": {"has_hooks": False, "primary-role": "orchestrator"}},
         framework,
         log,
         dry_run=True,
@@ -350,14 +358,17 @@ def test_absent_config_is_created_with_managed_block(tmp_path):
         project_root,
         {"orchestrator": {"mode": "strict"}},
         "Opencode",
-        {"Opencode": {"has_hooks": False}},
+        {"Opencode": {"has_hooks": False, "primary-role": "orchestrator"}},
         framework,
         log,
         dry_run=False,
     )
 
     data = _read_json(project_root / "opencode.json")
-    assert data == {"permission": {"edit": {"**": "deny"}, "bash": {"**": "deny"}}}
+    assert data == {
+        "permission": {"edit": {"**": "deny"}, "bash": {"**": "deny"}},
+        "default_agent": "orchestrator",
+    }
 
 
 def test_default_agent_namespace_reads_as_dict(tmp_path):
@@ -605,7 +616,9 @@ def test_default_agent_rollback_removes_key_when_prior_none(tmp_path):
     state = _read_state(project_root)
     assert _DEFAULT_AGENT_KEY not in state
     assert state[_ISOLATION_KEY] == ["**/.claude/**"]
-    assert state[_RUNTIME_GATE_KEY] == {"**": {"edit": None, "bash": None}}
+    # #1006 Task 7: the deny is coupled to the entry point, so dropping the
+    # primary role takes the managed deny back as well.
+    assert _RUNTIME_GATE_KEY not in state
 
 
 def test_default_agent_rollback_keeps_user_changed_value(tmp_path):
@@ -726,3 +739,113 @@ def test_dry_run_with_primary_role_never_writes(tmp_path):
 
     assert not (project_root / "opencode.json").exists()
     assert not (project_root / _STATE_FILE).exists()
+
+
+# ---------------------------------------------------------------------------
+# #1006 Task 7 (IC-6 step 2): gate-deny coupled to the entry point
+# ---------------------------------------------------------------------------
+
+def test_strict_with_primary_role_writes_deny_and_default_agent(tmp_path):
+    """AC-10: an explicit AND generated primary role keeps deny + entry point."""
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+
+    _sync(
+        project_root,
+        framework,
+        {"orchestrator": {"mode": "strict"}},
+        _pc(),
+        SyncLog(),
+    )
+
+    data = _read_json(project_root / "opencode.json")
+    assert data["permission"]["edit"]["**"] == "deny"
+    assert data["permission"]["bash"]["**"] == "deny"
+    assert data["default_agent"] == "orchestrator"
+    state = _read_state(project_root)
+    assert state[_RUNTIME_GATE_KEY] == {"**": {"edit": None, "bash": None}}
+    assert state[_DEFAULT_AGENT_KEY] == {"value": "orchestrator", "prior": None}
+
+
+def test_strict_without_primary_role_writes_no_deny_and_warns(tmp_path):
+    """AC-10: strict without an entry point writes NO deny (it would lock every
+    agent) and warns about the missing ``primary-role`` — exactly once."""
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    log = SyncLog()
+
+    _sync(
+        project_root,
+        framework,
+        {"orchestrator": {"mode": "strict"}},
+        _pc(primary=False),
+        log,
+    )
+
+    data = _read_json(project_root / "opencode.json")
+    assert "permission" not in data
+    assert "default_agent" not in data
+    state = _read_state(project_root)
+    assert _RUNTIME_GATE_KEY not in state
+    assert _DEFAULT_AGENT_KEY not in state
+    assert len(log.warnings) == 1, log.warnings
+    assert "primary-role" in log.warnings[0], log.warnings
+    assert "NOT written" in log.warnings[0], log.warnings
+    assert "Opencode" in log.warnings[0], log.warnings
+
+
+def test_strict_with_inactive_primary_role_writes_no_deny(tmp_path):
+    """AC-10: a declared but not-generated primary role writes no deny either."""
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    active_set = SimpleNamespace(roles=frozenset({"developer"}))
+    log = SyncLog()
+
+    _sync(
+        project_root,
+        framework,
+        {"orchestrator": {"mode": "strict"}},
+        _pc(),
+        log,
+        active_set=active_set,
+    )
+
+    data = _read_json(project_root / "opencode.json")
+    assert "permission" not in data
+    assert "default_agent" not in data
+    assert _RUNTIME_GATE_KEY not in _read_state(project_root)
+    assert len(log.warnings) == 1, log.warnings
+    assert "primary-role" in log.warnings[0], log.warnings
+
+
+def test_managed_deny_rolled_back_when_entry_point_disappears(tmp_path):
+    """AC-10: losing the entry point takes the managed deny back — the prior
+    user value is restored (``edit``), an absent one is removed (``bash``), and
+    the ``default_agent`` plus both state namespaces are dropped."""
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    config = {"orchestrator": {"mode": "strict"}}
+    (project_root / "opencode.json").write_text(
+        json.dumps({"permission": {"edit": {"**": "allow"}}}) + "\n",
+        encoding="utf-8",
+    )
+
+    _sync(project_root, framework, config, _pc(), SyncLog())
+
+    data = _read_json(project_root / "opencode.json")
+    assert data["permission"]["edit"]["**"] == "deny"
+    assert data["permission"]["bash"]["**"] == "deny"
+    assert data["default_agent"] == "orchestrator"
+
+    log = SyncLog()
+    _sync(project_root, framework, config, _pc(primary=False), log)
+
+    data = _read_json(project_root / "opencode.json")
+    assert data["permission"]["edit"]["**"] == "allow"
+    assert "**" not in data["permission"]["bash"]
+    assert "default_agent" not in data
+    state = _read_state(project_root)
+    assert _RUNTIME_GATE_KEY not in state
+    assert _DEFAULT_AGENT_KEY not in state
+    assert len(log.warnings) == 1, log.warnings
+    assert "primary-role" in log.warnings[0], log.warnings
