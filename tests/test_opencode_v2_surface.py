@@ -14,13 +14,14 @@ SPEC-PROVIDER-AUDIT-OPENCODE-V2-2026-09-30, §4.1 / AC-5 / AC-21 / AC-23
 Both selections happen once, generically, in ``load_providers_config``; the
 writers consume the resolved value only and never read ``surface-version``.
 
-The v2 settings surface (``opencode.json``) additionally retains the
-``subagent_depth`` key (sourced from the ``required_depth`` capability when
-available — IC-15 Nr. 16: the v2 surface must not drop the orchestrator depth)
-and emits ``default_agent`` from the ``primary-role`` data key.
-``apply_settings_surface_shape`` dispatches on the resolved
-``mcp-config.format`` value only; every non-v2 format is returned
-byte-for-byte so the shipped v1 surface stays frozen.
+The v2 settings surface (``opencode.json``) additionally emits the
+``experimental.subagent_depth`` key (sourced from the ``required_depth``
+capability when available, else the template value — IC-15 Nr. 16 as amended by
+SPEC-OPENCODE-V2-SUPPORT-2026-10-22: v2 drops the top-level ``subagent_depth``
+key, the C0 spike showed the v2 parser discards it) and emits ``default_agent``
+from the ``primary-role`` data key. ``apply_settings_surface_shape`` dispatches
+on the resolved ``mcp-config.format`` value only; every non-v2 format is
+returned byte-for-byte so the shipped v1 surface stays frozen.
 
 Run: python3 -m pytest tests/test_opencode_v2_surface.py -q
 """
@@ -175,20 +176,27 @@ def _pc_v2() -> dict:
     }
 
 
-def test_v2_settings_keep_subagent_depth_and_emit_default_agent():
+def test_ac_b1_v2_settings_emit_experimental_subagent_depth_and_default_agent():
+    """AC-B1: v2 carries ``experimental.subagent_depth``, never the top-level key."""
     out = apply_settings_surface_shape(_SETTINGS_TEMPLATE, _pc_v2())
     doc = json.loads(out)
-    assert doc["subagent_depth"] == 3, (
-        "the v2 surface must retain the shipped subagent_depth (IC-15 Nr. 16)"
+    assert doc["experimental"]["subagent_depth"] == 3, (
+        "the v2 surface must emit the shipped depth under experimental."
+        "subagent_depth (IC-15 Nr. 16 amended)"
+    )
+    assert "subagent_depth" not in doc, (
+        "the v2 surface must not carry a top-level subagent_depth key (the v2 "
+        "parser discards it)"
     )
     assert doc["default_agent"] == "orchestrator"
 
 
-def test_v2_settings_subagent_depth_comes_from_required_depth():
+def test_ac_b1_v2_settings_subagent_depth_comes_from_required_depth():
     doc = json.loads(
         apply_settings_surface_shape(_SETTINGS_TEMPLATE, _pc_v2(), {"required_depth": 2})
     )
-    assert doc["subagent_depth"] == 2
+    assert doc["experimental"]["subagent_depth"] == 2
+    assert "subagent_depth" not in doc
 
 
 def test_v2_settings_default_agent_comes_from_primary_role():
@@ -198,11 +206,12 @@ def test_v2_settings_default_agent_comes_from_primary_role():
     assert doc["default_agent"] == "developer"
 
 
-def test_v2_settings_without_primary_role_emits_no_default_agent():
+def test_ac_b1_v2_settings_without_primary_role_emits_no_default_agent():
     pc = _pc_v2()
     pc.pop("primary-role")
     doc = json.loads(apply_settings_surface_shape(_SETTINGS_TEMPLATE, pc))
-    assert doc["subagent_depth"] == 3
+    assert doc["experimental"]["subagent_depth"] == 3
+    assert "subagent_depth" not in doc
     assert "default_agent" not in doc
 
 
@@ -210,6 +219,20 @@ def test_v1_settings_template_is_byte_identical():
     """The shipped v1 surface must stay frozen, comments included."""
     pc = {"surface-version": "v1", "mcp-config": {"format": "opencode-json"}}
     assert apply_settings_surface_shape(_SETTINGS_TEMPLATE, pc) == _SETTINGS_TEMPLATE
+
+
+def test_ac_b2_v1_settings_unchanged():
+    """AC-B2: the v2 key migration must not leak into the v1 surface.
+
+    The authoritative v1 freeze is ``test_v1_settings_template_is_byte_identical``;
+    this test additionally passes capability data to prove that even a resolved
+    ``required_depth`` cannot reshape v1 (no ``experimental`` block, top-level
+    ``subagent_depth`` untouched).
+    """
+    pc = {"surface-version": "v1", "mcp-config": {"format": "opencode-json"}}
+    out = apply_settings_surface_shape(_SETTINGS_TEMPLATE, pc, {"required_depth": 2})
+    assert out == _SETTINGS_TEMPLATE
+    assert '"experimental"' not in out
 
 
 def test_non_v2_format_is_byte_identical():

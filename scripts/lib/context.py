@@ -1649,12 +1649,13 @@ def apply_settings_surface_shape(
     Provider-neutral dispatch on the resolved ``mcp-config.format`` value ONLY
     (never on a provider name or ``surface-version``; the loader resolves the
     format, the writer consumes it). For the ``opencode-json-v2`` surface the
-    top-level ``subagent_depth`` key is RETAINED — sourced from the
-    ``required_depth`` capability when available (IC-15 Nr. 16: the v2 surface
-    must not drop the orchestrator depth; the shipped template value is kept
-    otherwise) — and ``default_agent`` is emitted from the ``primary-role``
-    data key (OQ-4/AC-5). Every other format returns ``content`` byte-for-byte,
-    so the shipped v1 surface stays frozen.
+    top-level ``subagent_depth`` key is REMOVED and re-emitted as
+    ``experimental.subagent_depth`` — sourced from the ``required_depth``
+    capability when available, else the template value (IC-15 Nr. 16 as amended
+    by SPEC-OPENCODE-V2-SUPPORT-2026-10-22: the v2 parser discards a top-level
+    ``subagent_depth``) — and ``default_agent`` is emitted from the
+    ``primary-role`` data key (OQ-4/AC-5). Every other format returns
+    ``content`` byte-for-byte, so the shipped v1 surface stays frozen.
 
     The settings template is JSONC (``//`` comments); the transform parses it
     leniently and re-emits clean JSON. A template that cannot be parsed is
@@ -1672,8 +1673,25 @@ def apply_settings_surface_shape(
     if not isinstance(document, dict):
         return content
     depth = required_depth_int(capabilities)
+    if depth is None:
+        template_depth = document.pop("subagent_depth", None)
+        depth = (
+            template_depth
+            if isinstance(template_depth, int)
+            and not isinstance(template_depth, bool)
+            else None
+        )
+    else:
+        document.pop("subagent_depth", None)
     if depth is not None:
-        document["subagent_depth"] = depth
+        experimental = document.get("experimental")
+        if experimental is None:
+            experimental = {}
+        if not isinstance(experimental, dict):
+            # Malformed user data: do not clobber it (fail-soft).
+            return content
+        experimental["subagent_depth"] = depth
+        document["experimental"] = experimental
     primary_role = pc.get("primary-role")
     if isinstance(primary_role, str) and primary_role:
         document["default_agent"] = primary_role

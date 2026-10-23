@@ -45,8 +45,10 @@ from .io import strip_jsonc_comments
 CHECK = "artifact-contract"
 
 #: Mechanisms whose artifacts are serialized as TOML, not Markdown frontmatter.
-#: (The former v1-only ``subagent_depth`` guard was removed: the v2 surface
-#: retains the orchestrator depth — IC-15 Nr. 16.)
+#: (The former v1-only ``subagent_depth`` guard was removed: the v2 settings
+#: document carries the orchestrator depth as ``experimental.subagent_depth`` —
+#: IC-15 Nr. 16 is REVERSED by SPEC-OPENCODE-V2-SUPPORT-2026-10-22; a top-level
+#: ``subagent_depth`` key is not emitted on the v2 surface.)
 TOML_MECHANISMS = frozenset({"codex-toml"})
 
 #: Frontmatter keys every generated agent artifact MUST carry.
@@ -241,8 +243,9 @@ def validate_json_document(text: str, fmt: str, path: str) -> list[Finding]:
 
     * ``opencode-json-v2`` — a document that declares MCP content MUST carry the
       nested ``mcp.servers`` object and MUST NOT carry a flat top-level ``mcp``
-      server map. (``subagent_depth`` is no longer a v1-only key: the v2 surface
-      retains the orchestrator depth — IC-15 Nr. 16.)
+      server map. (IC-15 Nr. 16 is reversed by
+      SPEC-OPENCODE-V2-SUPPORT-2026-10-22: the v2 document carries the depth as
+      ``experimental.subagent_depth`` and no top-level ``subagent_depth``.)
     * ``opencode-json`` — a document that declares MCP content MUST carry the
       flat top-level ``mcp`` object (frozen v1 byte shape, AC-21).
 

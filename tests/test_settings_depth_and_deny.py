@@ -1,13 +1,15 @@
-"""IC-15 Nr. 16 (AC-10 / F-17): the OpenCode v2 settings surface keeps the
-subagent depth, and provider isolation never denies a provider the shared
-``AGENTS.md`` core it actively reads.
+"""IC-15 Nr. 16 as amended (AC-B1/AC-B2): the OpenCode v2 settings surface
+carries the subagent depth under ``experimental.subagent_depth`` (not the
+top-level v2-dropped key), and provider isolation never denies a provider the
+shared ``AGENTS.md`` core it actively reads.
 
 Two coupled regressions from the context-budget study (§3.3):
 
 * The v2 settings transform (``apply_settings_surface_shape``) dropped the
   v1 ``subagent_depth`` key, so an orchestrator chain fell back to depth 1.
-  The depth is retained on v2 and sourced from the ``required_depth``
-  capability (never a provider literal).
+  The depth is emitted as ``experimental.subagent_depth`` on v2 and sourced
+  from the ``required_depth`` capability (never a provider literal); the v2
+  parser discards a top-level ``subagent_depth`` (C0 spike side finding).
 * In a multi-provider project the shared core ``AGENTS.md`` is listed as an
   isolation-dir by some providers, so an ``AGENTS.md``-reading provider
   (``agents_md_visible_to_subagents: true``) received a ``**/AGENTS.md``
@@ -61,20 +63,26 @@ _V1_PC = {"surface-version": "v1", "mcp-config": {"format": "opencode-json"}}
 # ---------------------------------------------------------------------------
 
 
-def test_v2_settings_keep_subagent_depth_from_required_depth():
+def test_ac_b1_v2_settings_subagent_depth_under_experimental():
     caps = load_provider_capabilities(_REPO_ROOT)["Opencode"]
     doc = json.loads(apply_settings_surface_shape(_V2_TEMPLATE, _V2_PC, caps))
-    assert doc.get("subagent_depth") == caps["required_depth"], (
-        "the v2 surface must keep the orchestrator depth, sourced from required_depth"
+    assert doc["experimental"]["subagent_depth"] == caps["required_depth"], (
+        "the v2 surface must emit the orchestrator depth as "
+        "experimental.subagent_depth, sourced from required_depth"
     )
-    assert doc["subagent_depth"] >= 2
+    assert doc["experimental"]["subagent_depth"] >= 2
+    assert "subagent_depth" not in doc, (
+        "the v2 surface must not keep the top-level subagent_depth key"
+    )
 
 
-def test_v2_settings_keep_template_depth_without_capabilities():
+def test_ac_b1_v2_settings_keep_template_depth_without_capabilities():
     doc = json.loads(apply_settings_surface_shape(_V2_TEMPLATE, _V2_PC))
-    assert doc.get("subagent_depth") == 3, (
-        "without capability data the shipped template depth must be retained, not dropped"
+    assert doc["experimental"]["subagent_depth"] == 3, (
+        "without capability data the shipped template depth must be carried "
+        "over to experimental.subagent_depth, not dropped"
     )
+    assert "subagent_depth" not in doc
 
 
 def test_v2_settings_still_emit_default_agent_from_primary_role():
