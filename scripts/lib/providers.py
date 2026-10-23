@@ -50,6 +50,20 @@ def resolve_agent_meta_root(project_root: Path) -> Path:
     return project_root
 
 
+def explicit_primary_role(provider_config: dict, provider: str) -> str | None:
+    """Declared ``primary-role`` of *provider* or ``None``.
+
+    Returns the value only when ``provider_config[provider]['primary-role']`` is
+    a non-empty ``str``. NO code default (unlike the Kimi allow-list default at
+    the ``subagents-allowlist`` step) — a provider that never declares the key
+    is never promoted to a primary agent implicitly (#1006, IC-1). Never raises:
+    missing provider / non-dict entry / non-str / empty value -> ``None``.
+    """
+    entry = provider_config.get(provider) if isinstance(provider_config, dict) else None
+    value = entry.get("primary-role") if isinstance(entry, dict) else None
+    return value if isinstance(value, str) and value else None
+
+
 def _apply_surface_format_selection(provider_config: dict) -> dict:
     """Resolve ``mcp-config.format`` from ``surface-version`` + ``mcp-config.surface-formats``.
 
