@@ -248,6 +248,11 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   8 providers that emit a ``model`` line (Copilot emits none; only its ``prompt-governor``
   changed, whose body has a static ``model: <model ID if declared>`` example line) plus every
   ``generated-file-hashes.json`` (522 of 1012 hashes; 0 added/removed); no other hash changed.
+- Task 11 (#1006, OQ-8 amendment A2): Opencode entry point on v1 — orchestrator ``mode: primary``,
+  ``default_agent`` written by the managed merge, new ``agent-meta-state.json`` (``default-agent``
+  namespace). Changed: ``Opencode/.opencode/agents/orchestrator.md``, ``Opencode/opencode.json``;
+  added: ``Opencode/.opencode/agent-meta-state.json`` (2 changed, 1 added). ``AC01_EXCEPTIONS`` is
+  NOT extended; Mammouth and all other providers unchanged.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
