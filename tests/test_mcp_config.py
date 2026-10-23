@@ -665,6 +665,11 @@ def test_write_provider_config_antigravity_writes_mcp_servers(tmp_path):
 
 
 def test_build_connection_entry_opencode_json_v2_matches_v1_shape():
+    """v2 keeps the v1 transport shape but drops the frozen v1 ``enabled`` flag.
+
+    AC-C7 (spec 3.5): an active v2 server carries neither ``enabled`` nor
+    ``disabled``; only ``opencode-json`` (v1) still emits ``enabled: true``.
+    """
     conn = {
         "type": "stdio",
         "command": "npx",
@@ -673,7 +678,9 @@ def test_build_connection_entry_opencode_json_v2_matches_v1_shape():
     }
     v1 = _build_connection_entry(conn, None, "opencode-json")
     v2 = _build_connection_entry(conn, None, "opencode-json-v2")
-    assert v2 == v1
+    assert v1["enabled"] is True
+    assert "enabled" not in v2
+    assert {key: value for key, value in v1.items() if key != "enabled"} == v2
     assert v2["type"] == "local"
     assert v2["command"] == ["npx", "-y", "srv"]
     assert v2["environment"] == {"API_KEY": "{env:API_KEY}"}

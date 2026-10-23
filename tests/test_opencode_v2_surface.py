@@ -42,6 +42,7 @@ import re
 import sys
 from pathlib import Path
 
+import pytest
 import yaml
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -53,7 +54,13 @@ from lib.artifact_validate import resolve_artifact_contract, validate_frontmatte
 from lib.consistency.artifact_contracts import check_artifact_contracts
 from lib.consistency.model_contracts import check_model_contracts
 from lib.context import apply_settings_surface_shape
+from lib.io import SyncError
 from lib.log import SyncLog
+from lib.mcp_provider_config import (
+    _build_connection_entry,
+    _build_mcp_entries,
+    _write_provider_config,
+)
 from lib.opencode_v2_config import STATE_KEYS_KEY
 from lib.providers import load_provider_capabilities, load_providers_config
 
@@ -2230,3 +2237,223 @@ def test_ic4_functions_and_call_condition_unchanged():
         assert text.count(_RUNTIME_GATE_CALL_CONDITION) == 1, (
             f"{filename}: call condition must stay exactly once"
         )
+
+
+# ===========================================================================
+# Phase C2 / Task 15 (C2.2): the v2 MCP connection entry
+# ===========================================================================
+#
+# ``_build_connection_entry`` dispatches on the resolved ``mcp-config.format``
+# value only — never on a provider name and never on ``surface-version`` (H-1 /
+# AC-14, AC-23). On the v2 format the entry drops the frozen v1
+# ``enabled: true`` and may carry the documented ``disabled`` / ``timeout`` /
+# ``oauth`` keys (spec §3.5, AC-C7/C8/C9); the v1 ``opencode-json`` path and
+# every other format stay byte-identical (AC-C11).
+#
+# Fixture note (Amendment B1 / Spike Q2): these MCP assertions make no
+# permission decision, so no ``ask``/``--auto`` fixture is involved; the
+# permission fixtures elsewhere in this file carry explicit ``allow``/``deny``.
+
+_V2_STDIO_CONN = {
+    "type": "stdio",
+    "command": "npx",
+    "args": ["-y", "srv"],
+    "env": {"API_KEY": "{{API_KEY}}"},
+}
+
+
+def test_ac_c7_v2_entry_has_no_enabled_and_no_disabled_by_default():
+    """AC-C7: active v2 servers carry neither ``enabled`` nor ``disabled``."""
+    v2 = _build_connection_entry(_V2_STDIO_CONN, None, "opencode-json-v2")
+    assert "enabled" not in v2
+    assert "disabled" not in v2
+    assert v2["type"] == "local"
+    assert v2["command"] == ["npx", "-y", "srv"]
+    # the frozen v1 entry keeps the active flag
+    v1 = _build_connection_entry(_V2_STDIO_CONN, None, "opencode-json")
+    assert v1["enabled"] is True
+
+
+def test_ac_c7_disabled_true_only_with_registry_flag():
+    """AC-C7: ``disabled: true`` is emitted only for the literal registry flag."""
+    enabled_conn = {"type": "sse", "url": "{{URL}}"}
+    registry = {
+        "on": {"connection": enabled_conn},
+        "off": {"connection": dict(enabled_conn, disabled=True)},
+    }
+    entries = _build_mcp_entries(["on", "off"], registry, None, "opencode-json-v2")
+    assert "disabled" not in entries["on"]
+    assert entries["off"]["disabled"] is True
+
+    # No other value is a registry "flag" — the key stays absent.
+    for value in (False, "true", 1, None):
+        entry = _build_connection_entry(
+            dict(enabled_conn, disabled=value), None, "opencode-json-v2"
+        )
+        assert "disabled" not in entry, value
+
+    # v1 does not know the key (byte freeze).
+    v1 = _build_connection_entry(dict(enabled_conn, disabled=True), None, "opencode-json")
+    assert "disabled" not in v1
+
+
+def test_ac_c8_timeout_passthrough_v2_and_absent_v1():
+    """AC-C8: v2 passes the millisecond timeouts through, v1 never sees them."""
+    conn = {"type": "sse", "url": "{{URL}}", "timeout": {"catalog": 5000, "execution": 60000}}
+    v2 = _build_connection_entry(conn, None, "opencode-json-v2")
+    assert v2["timeout"] == {"catalog": 5000, "execution": 60000}
+
+    # Amendment B1: the optional ``startup`` budget is carried along.
+    with_startup = dict(
+        conn, timeout={"startup": 30000, "catalog": 5000, "execution": 60000}
+    )
+    assert _build_connection_entry(
+        with_startup, None, "opencode-json-v2"
+    )["timeout"] == {"catalog": 5000, "execution": 60000, "startup": 30000}
+
+    assert "timeout" not in _build_connection_entry(conn, None, "opencode-json")
+
+    # Invalid shapes are not emitted at all (the catalog check reports them).
+    invalid = (
+        {},
+        {"catalog": "5000", "execution": 60000},
+        {"catalog": 0, "execution": 60000},
+        {"catalog": True, "execution": 60000},
+        {"catalog": 5000.5, "execution": 60000},
+        {"catalog": 5000, "execution": 60000, "bogus": 1},
+        {"catalog": 5000, "execution": 60000, "startup": "30000"},
+        "5000",
+        None,
+    )
+    for shape in invalid:
+        entry = _build_connection_entry(
+            dict(conn, timeout=shape), None, "opencode-json-v2"
+        )
+        assert "timeout" not in entry, shape
+
+
+def test_ac_c9_oauth_snake_case_and_plaintext_secret_rejected():
+    """AC-C9: snake_case oauth pass-through, plaintext ``client_secret`` aborts."""
+    conn = {
+        "type": "sse",
+        "url": "{{URL}}",
+        "oauth": {
+            "client_id": "{{OC_ID}}",
+            "client_secret": "{{OC_SECRET}}",
+            "scope": "read",
+        },
+    }
+    v2 = _build_connection_entry(conn, None, "opencode-json-v2")
+    assert v2["oauth"] == {
+        "client_id": "{env:OC_ID}",
+        "client_secret": "{env:OC_SECRET}",
+        "scope": "read",
+    }
+
+    # camelCase is not a supported input shape: no oauth key at all
+    # (artifact/schema validation reports the catalog entry, Task 17).
+    camel = dict(conn, oauth={"clientId": "{{OC_ID}}"})
+    assert "oauth" not in _build_connection_entry(camel, None, "opencode-json-v2")
+    # v1 does not know oauth (byte freeze).
+    assert "oauth" not in _build_connection_entry(conn, None, "opencode-json")
+
+    # A plaintext secret stops through the same error path as the existing
+    # committed-config secret gate (``io.write_checked`` -> SyncError).
+    plain = dict(
+        conn, oauth={"client_id": "{{OC_ID}}", "client_secret": "PLAINTEXT-OC-SECRET"}
+    )
+    with pytest.raises(SyncError) as excinfo:
+        _build_connection_entry(plain, None, "opencode-json-v2")
+    assert "oauth.client_secret" in str(excinfo.value)
+
+    # The local/secrets render is allowed (the allow_secrets=True path).
+    local = _build_connection_entry(
+        conn,
+        {"OC_ID": "client-id-value", "OC_SECRET": "resolved-secret-value"},
+        "opencode-json-v2",
+    )
+    assert local["oauth"]["client_secret"] == "resolved-secret-value"
+
+
+# Checked-in AC-C11 reference: the committed v1 Opencode MCP entry shape. It is
+# spelled out here on purpose — the test must not be derived from the builder
+# it guards.
+_AC_C11_V1_REFERENCE = {
+    "filesystem": {
+        "type": "local",
+        "enabled": True,
+        "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "/tmp/ws"],
+        "environment": {"NODE_ENV": "{env:NODE_ENV}"},
+    },
+    "search": {
+        "type": "remote",
+        "enabled": True,
+        "url": "{env:SEARCH_URL}",
+        "headers": {"Authorization": "Bearer {env:SEARCH_TOKEN}"},
+    },
+}
+
+_AC_C11_V1_REGISTRY = {
+    "filesystem": {
+        "connection": {
+            "type": "stdio",
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp/ws"],
+            "env": {"NODE_ENV": "{{NODE_ENV}}"},
+        }
+    },
+    "search": {
+        "connection": {
+            "type": "sse",
+            "url": "{{SEARCH_URL}}",
+            "headers": {"Authorization": "Bearer {{SEARCH_TOKEN}}"},
+        }
+    },
+}
+
+
+def test_ac_c11_v1_entry_byte_identical_to_reference(tmp_path):
+    """AC-C11: the v1 Opencode MCP output is byte-identical to the reference."""
+    entries = _build_mcp_entries(
+        list(_AC_C11_V1_REFERENCE), _AC_C11_V1_REGISTRY, None, "opencode-json"
+    )
+    assert entries == _AC_C11_V1_REFERENCE
+
+    path = tmp_path / "opencode.json"
+    _write_provider_config(
+        path=path,
+        mcp_entries=entries,
+        fmt="opencode-json",
+        log=SyncLog(),
+        dry_run=False,
+        allow_secrets=True,
+    )
+    expected = (
+        json.dumps({"mcp": _AC_C11_V1_REFERENCE}, indent=2, ensure_ascii=False) + "\n"
+    )
+    assert path.read_text(encoding="utf-8") == expected
+
+
+def test_other_formats_ignore_new_connection_keys():
+    """Only ``opencode-json-v2`` knows ``disabled``/``timeout``/``oauth``."""
+    conn = {
+        "type": "sse",
+        "url": "{{URL}}",
+        "disabled": True,
+        "timeout": {"catalog": 5000, "execution": 60000},
+        "oauth": {"client_id": "{{OC_ID}}"},
+    }
+    for fmt in (
+        "opencode-json",
+        "claude-settings",
+        "gemini-settings",
+        "vscode-settings",
+        "antigravity-mcp-json",
+        "continue-yaml",
+        "kimi-json",
+        "zcode-json",
+        "codex-toml-mcp",
+        None,
+    ):
+        entry = _build_connection_entry(conn, None, fmt)
+        assert not ({"disabled", "timeout", "oauth"} & set(entry)), fmt
