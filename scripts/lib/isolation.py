@@ -1092,6 +1092,183 @@ def _sync_opencode_v2_gate_permissions(
     return file_changed or state_changed
 
 
+def _rollback_opencode_v1_gate_map(
+    project_root: Path,
+    provider_config: dict,
+    log: SyncLog,
+    dry_run: bool,
+) -> None:
+    """Take back the Spec-A ``permission`` map after a v1 → v2 surface switch.
+
+    Mirrors the else-branch of Spec A step 4 (``_sync_opencode_runtime_gate``)
+    without touching that frozen function: the ``**`` deny is removed only while
+    it still carries the managed decision, the recorded ``prior`` value is
+    restored, the family entry is dropped, empty containers are pruned and the
+    ``runtime-gate-deny`` namespace is emptied. A value the user changed is left
+    alone — only the state entry goes (we no longer own it). No state ⇒ no-op,
+    so the call can run on every v2 surface.
+
+    The state lives in the parent of the owner's committed file, never in a
+    hardcoded path (N-M2/§3.2).
+    """
+    from . import opencode_v2_config  # lazy: breaks the isolation <-> v2 cycle
+
+    root = Path(project_root)
+    committed = _v2_committed_file(provider_config)
+    if committed is None:
+        return
+    try:
+        state_rel = opencode_v2_config.opencode_state_path(
+            root, provider_config
+        ).relative_to(root)
+    except ValueError:
+        return
+    state_path = safe_path(root, state_rel)
+
+    state = _read_state(state_path, _STATE_RUNTIME_GATE_KEY)
+    gate_state = state.get(_RUNTIME_GATE_GLOB)
+    if not isinstance(gate_state, dict) or not gate_state:
+        return
+    before = dict(gate_state)
+
+    file_path = safe_path(root, committed)
+    existing = _read_json_safe(file_path, log)
+    if existing is None:
+        if file_path.exists():
+            return  # parse error — warning already emitted, skip the write
+        existing = {}
+    elif not isinstance(existing, dict):
+        return  # not ours to rewrite
+
+    permission = existing.get("permission")
+    permission = permission if isinstance(permission, dict) else {}
+
+    file_changed = False
+    for family in _RUNTIME_GATE_FAMILIES:
+        if family not in gate_state:
+            continue
+        mapping = _permission_mapping(permission.get(family))
+        if mapping.get(_RUNTIME_GATE_GLOB) == _RUNTIME_GATE_DECISION:
+            prior = gate_state.get(family)
+            if prior is None:
+                mapping.pop(_RUNTIME_GATE_GLOB, None)
+            else:
+                mapping[_RUNTIME_GATE_GLOB] = prior
+            if mapping:
+                permission[family] = mapping
+            else:
+                permission.pop(family, None)
+            file_changed = True
+        # Whether or not the value was still ours, the record is stale now.
+        gate_state.pop(family, None)
+
+    if file_changed:
+        if permission:
+            existing["permission"] = permission
+        else:
+            existing.pop("permission", None)
+        content = json.dumps(existing, indent=2, ensure_ascii=False) + "\n"
+        if not dry_run:
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+        if write_checked(file_path, content, log, committed, dry_run=dry_run):
+            log.action("WRITE", committed, "runtime-gate deny removed: permission map")
+        else:
+            log.skip(committed, "runtime-gate deny unchanged")
+
+    if gate_state != before:
+        _write_state(
+            state_path,
+            {_RUNTIME_GATE_GLOB: gate_state} if gate_state else {},
+            dry_run,
+            _STATE_RUNTIME_GATE_KEY,
+        )
+
+
+def reconcile_opencode_surface_gate(
+    project_root: Path,
+    config: dict,
+    provider: str,
+    provider_config: dict,
+    agent_meta_root: Path,
+    log: SyncLog,
+    dry_run: bool,
+) -> None:
+    """Reconcile the gate form with the active opencode surface (spec §3.4).
+
+    The single actor for the v2 ``permissions[]`` triples and for the surface
+    switch rollback. Tier-independent (it also runs when the Spec-A writer does
+    not) but provider-bound: a non-owner returns before any state or file read
+    (N-M2), so a Claude/Gemini iteration can never undo the opencode state.
+
+    Binding rollback matrix, in order:
+
+    1. v1 → v2: first take back the Spec-A ``permission`` map recorded in the
+       ``runtime-gate-deny`` namespace, then write the ``permissions[]`` triples.
+    2. v2 → v1: remove the triples recorded in ``opencode-v2-permissions`` (only
+       the unchanged ones) and empty the namespace — regardless of tier; the v1
+       map is then written by Spec A on the ``permission`` tier.
+    3. v2, tier ``permission``, strict off: entries ``[]`` → remove the triples.
+    4. v2, tier ``plugin`` + ``observe``, strict on: ``permission_deny_required``
+       true → the triples stay/get written (the plugin never weakens the gate).
+    5. v2, tier ``plugin`` + ``enforce`` or tier ``advisory``: entries ``[]`` →
+       remove the triples, even when the Spec-A writer never ran.
+    6. v2, no entry point: entries ``[]`` → remove the triples; when the tier is
+       not ``permission`` (Spec A step 2 does not run) this function emits the
+       ``primary-role`` warning itself, otherwise Spec A's warning stays the only
+       one.
+    7. v2, nothing in state, strict off: no-op.
+
+    ``plugin_mode`` comes from ``runtime_gate._baked_plugin_mode`` and
+    ``capabilities`` from ``providers.load_provider_capabilities``. Both imports
+    stay function-local: ``isolation`` ↔ ``opencode_v2_config`` would be an
+    import cycle, and the plugin mode is a sync-time constant.
+    """
+    from . import opencode_v2_config  # lazy: breaks the isolation <-> v2 cycle
+
+    if not opencode_v2_config.owns_opencode_surface(provider_config, provider):
+        return
+
+    from . import runtime_gate  # lazy: keeps the module import surface small
+
+    plugin_mode = runtime_gate._baked_plugin_mode()
+    try:
+        capabilities = providers.load_provider_capabilities(agent_meta_root)
+    except Exception:  # noqa: BLE001 - unreadable registry degrades to advisory
+        capabilities = {}
+
+    is_v2_surface = opencode_v2_config.v2_active(provider_config, provider)
+
+    # Row 1: the old v1 mapping must go before the v2 list is written.
+    if is_v2_surface:
+        _rollback_opencode_v1_gate_map(project_root, provider_config, log, dry_run)
+
+    entries = _opencode_v2_gate_permissions(
+        config, provider, agent_meta_root, provider_config, capabilities, plugin_mode
+    )
+
+    # Row 6 (AC-C15): on the ``permission`` tier Spec A's coupling warning is
+    # the single one; on every other tier Spec A never runs, so the consequence
+    # of a missing entry point would otherwise go untold.
+    if is_v2_surface and not entries:
+        if _opencode_entry_point(provider, provider_config, None) is None:
+            pc = _v2_provider_entry(provider_config, provider)
+            tier = providers.provider_runtime_gate_tier(
+                pc, _capabilities_for(capabilities, provider)
+            )
+            if tier != "permission":
+                log.warning(
+                    "opencode-v2 gate (permissions deny) NOT written for "
+                    f"provider '{provider}': no explicit and generated "
+                    "primary-role — the gate would lock every agent; declare "
+                    "primary-role in config/ai-providers.yaml and keep that "
+                    "role in the active set"
+                )
+
+    _sync_opencode_v2_gate_permissions(
+        project_root, provider_config, entries, log, dry_run
+    )
+
+
 # ---------------------------------------------------------------------------
 # Gemini: TOML policy file .gemini/policies/provider-isolation.toml
 # ---------------------------------------------------------------------------

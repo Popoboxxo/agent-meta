@@ -36,7 +36,9 @@ Run: python3 -m pytest tests/test_opencode_v2_surface.py -q
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -46,7 +48,7 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 
 import lib.sync_pipeline as sync_pipeline
-from lib import isolation, opencode_v2_config
+from lib import isolation, opencode_v2_config, runtime_gate
 from lib.artifact_validate import resolve_artifact_contract, validate_frontmatter
 from lib.consistency.artifact_contracts import check_artifact_contracts
 from lib.consistency.model_contracts import check_model_contracts
@@ -1756,3 +1758,475 @@ def test_ac_c16a_default_agent_merge_runs_on_v2(tmp_path):
         "value": "orchestrator",
         "prior": None,
     }
+
+
+# ===========================================================================
+# Phase C1 / Task 13a (C1.2): ``reconcile_opencode_surface_gate``
+# ===========================================================================
+#
+# The binding 7-row rollback matrix of spec §3.4. The reconciler is the ONLY
+# actor for the v2 ``permissions[]`` triples and for the surface-switch
+# rollback. It is tier-independent but provider-bound: a non-owner returns
+# before any read (N-M2), so a Claude/Gemini iteration can never undo the
+# opencode state.
+#
+# Fixtures carry explicit ``allow``/``deny`` entries (Amendment B1 note): the
+# default ``ask`` plus ``--auto`` is not a confirmation and would make an
+# automated gate probe meaningless (Spike Q2, RVW-C0-06).
+
+
+def _reconcile(
+    project_root: Path,
+    config: dict,
+    provider_config: dict,
+    framework: Path,
+    provider: str = "Opencode",
+    log: SyncLog | None = None,
+    dry_run: bool = False,
+) -> None:
+    isolation.reconcile_opencode_surface_gate(
+        project_root,
+        config,
+        provider,
+        provider_config,
+        framework,
+        log if log is not None else SyncLog(),
+        dry_run,
+    )
+
+
+_USER_PERMISSIONS = [
+    {"action": "edit", "resource": "src/**", "effect": "allow"},
+    {"action": "shell", "resource": "git *", "effect": "allow"},
+]
+
+
+def _seed_v1_strict(project: Path) -> None:
+    """A v1-strict project with the Spec-A map deny plus ``runtime-gate-deny``.
+
+    ``edit`` has a user entry next to the managed glob; the recorded prior is
+    ``"allow"`` for edit and ``None`` (key absent) for bash.
+    """
+    _write_json(
+        project / "opencode.json",
+        {
+            "theme": "dark",
+            "permissions": list(_USER_PERMISSIONS),
+            "permission": {
+                "edit": {"**": "deny", "docs/**": "allow"},
+                "bash": {"**": "deny", "git *": "allow"},
+            },
+        },
+    )
+    _write_json(
+        project / _V2_STATE_REL,
+        {
+            isolation._STATE_DEFAULT_AGENT_KEY: {
+                "value": "orchestrator",
+                "prior": None,
+            },
+            isolation._STATE_RUNTIME_GATE_KEY: {
+                "**": {"edit": "allow", "bash": None}
+            },
+        },
+    )
+
+
+def _seed_v2_triples(project: Path, user: bool = True) -> None:
+    """A v2 project whose managed triples are written and recorded in state."""
+    permissions = list(_USER_PERMISSIONS) if user else []
+    _write_json(project / "opencode.json", {"theme": "dark", "permissions": permissions})
+    _run_v2_permissions(project, [_EDIT_DENY, _SHELL_DENY])
+
+
+def _plugin_pc() -> dict:
+    """A v2 owner resolved to the ``plugin`` tier from its machine flags."""
+    return dict(_v2_pc(), has_plugins=True, plugin_protocol="opencode-plugin-js")
+
+
+# --- AC-C3 / AC-C4 (wiring) ------------------------------------------------
+
+
+def test_ac_c3_v2_strict_tier_permission_writes_triples_and_no_permission_map(
+    tmp_path, monkeypatch
+):
+    """AC-C3: wired sync writes the triples at the END and no v1 map.
+
+    The call site is the real ``_sync_stage_per_provider`` seam (only the
+    unrelated writers are stubbed), so this pins the Task-13a wiring as well as
+    the matrix row "v2, Tier permission, strict on".
+    """
+    project = tmp_path / "project"
+    project.mkdir()
+    _write_json(project / "opencode.json", {"permissions": list(_USER_PERMISSIONS)})
+
+    project, _, gate_calls = _run_stage(
+        tmp_path, monkeypatch, {"Opencode": _v2_pc()}, ["Opencode"],
+        _gate_config(), {"Opencode": "permission"},
+    )
+
+    assert gate_calls, "the permission tier must dispatch the Spec-A writer"
+    doc = _read_json(project / "opencode.json")
+    assert doc["permissions"][:2] == _USER_PERMISSIONS, "user entries keep their order"
+    assert doc["permissions"][2:] == [_EDIT_DENY, _SHELL_DENY], (
+        "managed triples must be appended at the END (last match wins)"
+    )
+    assert "permission" not in doc, "v2 must not carry the v1 permission map"
+    assert _read_state_doc(project)[_V2_GATE_STATE_KEY] == {
+        "triples": [["edit", "**", "deny"], ["shell", "**", "deny"]]
+    }
+
+
+def test_ac_c4_strict_off_removes_managed_triples_keeps_user_order(tmp_path):
+    """AC-C4: strict off removes exactly the recorded triples, user order intact."""
+    project = tmp_path / "project"
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    _seed_v2_triples(project)
+
+    log = SyncLog()
+    _reconcile(
+        project, _gate_config("advisory"), {"Opencode": _v2_pc()}, framework, log=log
+    )
+
+    assert _read_json(project / "opencode.json")["permissions"] == _USER_PERMISSIONS
+    assert _V2_GATE_STATE_KEY not in _read_state_doc(project)
+    assert any("opencode-v2 gate permissions" in action for action in log.actions), (
+        log.actions
+    )
+
+
+# --- AC-C15 (entry point) --------------------------------------------------
+
+
+def test_ac_c15_no_primary_role_writes_no_triple_and_warns(tmp_path):
+    """AC-C15: no entry point ⇒ no triple; exactly one warning names the cause.
+
+    On the ``permission`` tier Spec A's coupling warning is the only one (the
+    reconcile function stays silent). On every other tier Spec A does not run,
+    so ``reconcile_opencode_surface_gate`` emits the warning itself.
+    """
+    pc_without_role = _v2_pc()
+    pc_without_role.pop("primary-role")
+
+    # Tier permission: Spec A warns, reconcile stays silent.
+    project = tmp_path / "permission-tier"
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    log = SyncLog()
+    _run_runtime_gate(
+        project, framework, {"Opencode": pc_without_role}, log=log
+    )
+    _reconcile(
+        project, _gate_config(), {"Opencode": pc_without_role}, framework, log=log
+    )
+    assert "permissions" not in _read_json(project / "opencode.json")
+    warnings = [w for w in log.warnings if "primary-role" in w]
+    assert len(warnings) == 1, log.warnings
+    assert "lock every agent" in warnings[0], warnings[0]
+    assert _V2_GATE_STATE_KEY not in _read_state_doc(project)
+
+    # Tier advisory: Spec A never runs, reconcile owns the warning.
+    project = tmp_path / "advisory-tier"
+    framework = _write_caps(tmp_path / "fw-advisory", "Opencode", "advisory")
+    log = SyncLog()
+    _reconcile(
+        project, _gate_config(), {"Opencode": pc_without_role}, framework, log=log
+    )
+    assert not (project / "opencode.json").exists()
+    warnings = [w for w in log.warnings if "primary-role" in w]
+    assert len(warnings) == 1, log.warnings
+    assert "lock every agent" in warnings[0], warnings[0]
+
+
+# --- AC-B21 / AC-B22 (surface switches) ------------------------------------
+
+
+def test_ac_b21_v1_strict_to_v2_removes_permission_map_and_empties_runtime_gate_deny(
+    tmp_path,
+):
+    """AC-B21 (matrix row 1): v1 map out first, then the v2 triples in."""
+    project = tmp_path / "project"
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    _seed_v1_strict(project)
+
+    _reconcile(project, _gate_config(), {"Opencode": _v2_pc()}, framework)
+
+    doc = _read_json(project / "opencode.json")
+    assert doc["permission"]["edit"] == {"**": "allow", "docs/**": "allow"}, (
+        "the recorded prior is restored, the user entry is untouched"
+    )
+    assert doc["permission"]["bash"] == {"git *": "allow"}, (
+        "an absent prior removes the managed glob and prunes the empty family"
+    )
+    assert doc["permissions"][:2] == _USER_PERMISSIONS, "user order preserved"
+    assert doc["permissions"][2:] == [_EDIT_DENY, _SHELL_DENY]
+    state = _read_state_doc(project)
+    assert isolation._STATE_RUNTIME_GATE_KEY not in state, (
+        "the Spec-A namespace is emptied once the v1 map was taken back"
+    )
+    assert state[isolation._STATE_DEFAULT_AGENT_KEY] == {
+        "value": "orchestrator",
+        "prior": None,
+    }, "sibling namespaces are untouched"
+
+
+def test_ac_b22_v2_to_v1_empties_permissions_namespace_and_list(tmp_path):
+    """AC-B22 (matrix row 2): v2→v1 always rolls back, then Spec A writes v1."""
+    # Tier permission: rollback + the Spec-A map afterwards.
+    project = tmp_path / "project"
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    _seed_v2_triples(project)
+
+    _reconcile(project, _gate_config(), {"Opencode": _v1_pc()}, framework)
+
+    doc = _read_json(project / "opencode.json")
+    assert doc["permissions"] == _USER_PERMISSIONS, "user order preserved"
+    assert _V2_GATE_STATE_KEY not in _read_state_doc(project)
+
+    _run_runtime_gate(project, framework, {"Opencode": _v1_pc()})
+    doc = _read_json(project / "opencode.json")
+    assert doc["permission"] == {
+        "edit": {"**": "deny"},
+        "bash": {"**": "deny"},
+    }, "Spec A writes the v1 map after the rollback"
+    assert _read_state_doc(project)[isolation._STATE_RUNTIME_GATE_KEY] == {
+        "**": {"edit": None, "bash": None}
+    }
+
+    # Tier advisory: the rollback still runs (no v1 map, Spec A never ran).
+    project = tmp_path / "advisory"
+    framework = _write_caps(tmp_path / "fw-advisory", "Opencode", "advisory")
+    _seed_v2_triples(project)
+
+    _reconcile(project, _gate_config(), {"Opencode": _v1_pc()}, framework)
+
+    doc = _read_json(project / "opencode.json")
+    assert doc["permissions"] == _USER_PERMISSIONS
+    assert "permission" not in doc
+    assert _V2_GATE_STATE_KEY not in _read_state_doc(project)
+
+
+# --- AC-C14 (tier plugin) --------------------------------------------------
+
+
+def test_ac_c14_observe_keeps_triples_enforce_removes(tmp_path, monkeypatch):
+    """AC-C14: ``observe`` keeps the deny, ``enforce`` drops it without Spec A."""
+    project = tmp_path / "project"
+    framework = _write_caps(tmp_path / "fw", "Opencode", "advisory")
+    plugin_config = {"Opencode": _plugin_pc()}
+
+    monkeypatch.setattr(runtime_gate, "_baked_plugin_mode", lambda: "observe")
+    _reconcile(project, _gate_config(), plugin_config, framework)
+    doc = _read_json(project / "opencode.json")
+    assert doc["permissions"] == [_EDIT_DENY, _SHELL_DENY], (
+        "plugin in observe mode never weakens the gate"
+    )
+    assert _read_state_doc(project)[_V2_GATE_STATE_KEY]["triples"] == [
+        ["edit", "**", "deny"],
+        ["shell", "**", "deny"],
+    ]
+
+    monkeypatch.setattr(runtime_gate, "_baked_plugin_mode", lambda: "enforce")
+    _reconcile(project, _gate_config(), plugin_config, framework)
+
+    assert "permissions" not in _read_json(project / "opencode.json"), (
+        "enforce removes the triples although _sync_opencode_runtime_gate never ran"
+    )
+    assert _V2_GATE_STATE_KEY not in _read_state_doc(project)
+
+
+# --- AC-B20 / AC-B8 (provider binding, idempotency) ------------------------
+
+
+def test_ac_b20_reconcile_noop_for_non_owner_provider(tmp_path, monkeypatch):
+    """AC-B20 (N-M2): a non-owner returns before any read; nothing changes."""
+    project = tmp_path / "project"
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    _seed_v2_triples(project)
+    file_before = (project / "opencode.json").read_bytes()
+    state_before = (project / _V2_STATE_REL).read_bytes()
+
+    def _forbidden(*args, **kwargs):
+        raise AssertionError("state must not be read for a non-owner provider")
+
+    monkeypatch.setattr(isolation, "_read_state", _forbidden)
+
+    log = SyncLog()
+    _reconcile(
+        project, _gate_config(), {"Claude": _non_owner_pc()}, framework,
+        provider="Claude", log=log,
+    )
+
+    assert (project / "opencode.json").read_bytes() == file_before
+    assert (project / _V2_STATE_REL).read_bytes() == state_before
+    assert log.actions == [] and log.warnings == [] and log.errors == []
+
+
+def test_ac_b8_reconcile_noop_when_nothing_in_state_and_idempotent(tmp_path):
+    """AC-B8 (matrix row 7): strict off + empty state is a byte-identical no-op."""
+    project = tmp_path / "project"
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    _write_json(project / "opencode.json", {"permissions": list(_USER_PERMISSIONS)})
+    file_before = (project / "opencode.json").read_bytes()
+    state_path = project / _V2_STATE_REL
+
+    log = SyncLog()
+    _reconcile(
+        project, _gate_config("advisory"), {"Opencode": _v2_pc()}, framework, log=log
+    )
+
+    assert (project / "opencode.json").read_bytes() == file_before
+    assert not state_path.exists(), "a no-op must not create the state file"
+    assert log.actions == [] and log.warnings == []
+
+    # Gate effectively active: triples appear, a second run is byte-identical.
+    _reconcile(project, _gate_config(), {"Opencode": _v2_pc()}, framework)
+    first_file = (project / "opencode.json").read_bytes()
+    first_state = state_path.read_bytes()
+    assert _read_json(project / "opencode.json")["permissions"][2:] == [
+        _EDIT_DENY,
+        _SHELL_DENY,
+    ]
+
+    _reconcile(project, _gate_config(), {"Opencode": _v2_pc()}, framework)
+    assert (project / "opencode.json").read_bytes() == first_file
+    assert state_path.read_bytes() == first_state
+
+
+# --- the binding 7-row matrix ---------------------------------------------
+
+
+def _matrix_v1_to_v2(project: Path, framework: Path) -> None:
+    project.mkdir(parents=True)
+    _seed_v1_strict(project)
+    _reconcile(project, _gate_config(), {"Opencode": _v2_pc()}, framework)
+    doc = _read_json(project / "opencode.json")
+    assert doc["permission"]["edit"]["**"] == "allow"
+    assert doc["permission"]["bash"] == {"git *": "allow"}
+    assert isolation._STATE_RUNTIME_GATE_KEY not in _read_state_doc(project)
+    assert doc["permissions"][:2] == _USER_PERMISSIONS
+    assert doc["permissions"][2:] == [_EDIT_DENY, _SHELL_DENY]
+
+
+def _matrix_v2_to_v1(project: Path, framework: Path) -> None:
+    _seed_v2_triples(project)
+    _reconcile(project, _gate_config(), {"Opencode": _v1_pc()}, framework)
+    assert _read_json(project / "opencode.json")["permissions"] == _USER_PERMISSIONS
+    assert _V2_GATE_STATE_KEY not in _read_state_doc(project)
+
+
+def _matrix_permission_strict_off(project: Path, framework: Path) -> None:
+    _seed_v2_triples(project)
+    _reconcile(project, _gate_config("advisory"), {"Opencode": _v2_pc()}, framework)
+    assert _read_json(project / "opencode.json")["permissions"] == _USER_PERMISSIONS
+    assert _V2_GATE_STATE_KEY not in _read_state_doc(project)
+
+
+def _matrix_plugin_observe(project: Path, framework: Path) -> None:
+    _reconcile(project, _gate_config(), {"Opencode": _plugin_pc()}, framework)
+    doc = _read_json(project / "opencode.json")
+    assert doc["permissions"] == [_EDIT_DENY, _SHELL_DENY]
+    assert _V2_GATE_STATE_KEY in _read_state_doc(project)
+
+
+def _matrix_tier_downgrade(project: Path, framework: Path, monkeypatch) -> None:
+    # Tier plugin + enforce: the plugin blocks on its own, the deny goes.
+    _seed_v2_triples(project)
+    monkeypatch.setattr(runtime_gate, "_baked_plugin_mode", lambda: "enforce")
+    _reconcile(project, _gate_config(), {"Opencode": _plugin_pc()}, framework)
+    assert _read_json(project / "opencode.json")["permissions"] == _USER_PERMISSIONS
+    assert _V2_GATE_STATE_KEY not in _read_state_doc(project)
+
+    # Tier advisory: same removal, Spec A never runs.
+    alternative = project / "advisory"
+    _seed_v2_triples(alternative)
+    _reconcile(alternative, _gate_config(), {"Opencode": _v2_pc()}, framework)
+    assert _read_json(alternative / "opencode.json")["permissions"] == _USER_PERMISSIONS
+    assert _V2_GATE_STATE_KEY not in _read_state_doc(alternative)
+
+
+def _matrix_no_entry_point(project: Path, framework: Path) -> None:
+    pc_without_role = _v2_pc()
+    pc_without_role.pop("primary-role")
+    _seed_v2_triples(project)
+    log = SyncLog()
+    _reconcile(
+        project, _gate_config(), {"Opencode": pc_without_role}, framework, log=log
+    )
+    assert _read_json(project / "opencode.json")["permissions"] == _USER_PERMISSIONS
+    assert _V2_GATE_STATE_KEY not in _read_state_doc(project)
+    assert any("primary-role" in warning for warning in log.warnings), log.warnings
+
+
+def _matrix_nothing_in_state(project: Path, framework: Path) -> None:
+    project.mkdir(parents=True)
+    _write_json(project / "opencode.json", {"permissions": list(_USER_PERMISSIONS)})
+    file_before = (project / "opencode.json").read_bytes()
+    _reconcile(project, _gate_config("advisory"), {"Opencode": _v2_pc()}, framework)
+    assert (project / "opencode.json").read_bytes() == file_before
+    assert not (project / _V2_STATE_REL).exists()
+
+
+def test_reconcile_matrix_seven_rows(tmp_path, monkeypatch):
+    """Spec §3.4: each of the seven binding rows produces its stated action."""
+    permission_fw = _write_caps(tmp_path / "fw-permission", "Opencode", "permission")
+    advisory_fw = _write_caps(tmp_path / "fw-advisory", "Opencode", "advisory")
+
+    rows = [
+        ("1-v1-to-v2", permission_fw, False, _matrix_v1_to_v2),
+        ("2-v2-to-v1", advisory_fw, False, _matrix_v2_to_v1),
+        ("3-v2-permission-strict-off", permission_fw, False, _matrix_permission_strict_off),
+        ("4-v2-plugin-observe", advisory_fw, False, _matrix_plugin_observe),
+        ("5-v2-plugin-enforce-or-advisory", advisory_fw, True, _matrix_tier_downgrade),
+        ("6-v2-no-entry-point", advisory_fw, False, _matrix_no_entry_point),
+        ("7-v2-nothing-in-state-strict-off", permission_fw, False, _matrix_nothing_in_state),
+    ]
+
+    for label, framework, needs_monkeypatch, check in rows:
+        project = tmp_path / label
+        if needs_monkeypatch:
+            check(project, framework, monkeypatch)
+        else:
+            check(project, framework)
+
+
+# --- IC-4 freeze -----------------------------------------------------------
+
+# SHA-256 of the normalised source of the two Spec-A functions, captured at the
+# start of Task 13a (commit f07ab459). Spec-A invariant: ``permissions[]`` is
+# reconciled elsewhere; these two functions and the tier call condition keep
+# their exact shape (spec §3.4, IC-4 / m-6, AC-C14).
+_IC4_SOURCE_HASHES = {
+    "_opencode_runtime_gate_entries": (
+        "b4a6c1420a851f096fe095ddaf5e0f0702be2eab883231f56bc828e513dd9001"
+    ),
+    "opencode_runtime_gate_wanted": (
+        "294986792a899dedaa05a03786cb657c82081dafc1968aeb065de80aeba1deea"
+    ),
+}
+_RUNTIME_GATE_CALL_CONDITION = 'provider_runtime_gate_tier(pc, caps) == "permission"'
+
+
+def _normalised_function_source(source: str, name: str) -> str:
+    start = source.index(f"\ndef {name}(") + 1
+    rest = source[start + 1:]
+    match = re.search(r"^(?:def |# ---)", rest, re.M)
+    end = start + 1 + match.start() if match else len(source)
+    block = source[start:end].strip("\n")
+    return "\n".join(line.rstrip() for line in block.split("\n")) + "\n"
+
+
+def test_ic4_functions_and_call_condition_unchanged():
+    """IC-4 freeze: both functions and both call conditions are byte-identical."""
+    source = Path(isolation.__file__).read_text(encoding="utf-8")
+    for name, expected in _IC4_SOURCE_HASHES.items():
+        actual = hashlib.sha256(
+            _normalised_function_source(source, name).encode("utf-8")
+        ).hexdigest()
+        assert actual == expected, f"Spec-A function {name} changed: {actual}"
+
+    lib_dir = Path(__file__).resolve().parent.parent / "scripts" / "lib"
+    for filename in ("sync_pipeline.py", "cli_commands.py"):
+        text = (lib_dir / filename).read_text(encoding="utf-8")
+        assert text.count(_RUNTIME_GATE_CALL_CONDITION) == 1, (
+            f"{filename}: call condition must stay exactly once"
+        )
