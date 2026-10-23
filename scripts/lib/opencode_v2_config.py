@@ -65,6 +65,19 @@ V2_MCP_FORMAT = "opencode-json-v2"
 # environment variable and is never a plaintext secret.
 _ENV_PLACEHOLDER_RE = re.compile(r"^\{env:[A-Za-z_][A-Za-z0-9_]*\}$")
 
+# Project options that only exist on a v2 surface (spec §3.1/AC-B13). On a
+# non-v2 surface they are ignored, not silently dropped: the writer warns per
+# configured key. Keep this the single source — ``small-model`` was removed by
+# Amendment B1 and must not reappear here. A tuple keeps the warning order
+# deterministic.
+_V2_ONLY_OPTION_KEYS = (
+    "experimental-subagent-depth",
+    "experimental-todo",
+    "providers",
+    "model-variants",
+    "cli",
+)
+
 # A plaintext finding is decided by the KEY NAME, never by the value pattern
 # (AC-B10/AC-T7): only keys that name a credential are inspected.
 _SECRET_NAME_MARKERS = ("key", "secret", "token")
@@ -385,6 +398,30 @@ def project_options(config: dict, provider: str) -> dict:
     return value if isinstance(value, dict) else {}
 
 
+def warn_ignored_v2_options(
+    config: dict,
+    provider: str,
+    provider_config: dict,
+    log: SyncLog,
+) -> None:
+    """Warn about project options that only a v2 surface understands (AC-B13).
+
+    A non-v2 surface ignores every key of :data:`_V2_ONLY_OPTION_KEYS`; the
+    warning makes that visible instead of dropping the configuration silently
+    (spec §3.1 error paths). On v2 nothing is ignored and nothing is logged.
+    The keys are read from ``provider-options.<provider>`` only — no provider
+    name literal and no ``surface-version`` comparison.
+    """
+    if v2_active(provider_config, provider):
+        return
+    options = project_options(config, provider)
+    for key in _V2_ONLY_OPTION_KEYS:
+        if key in options:
+            log.warning(
+                f"opencode-v2-option-ignored: {key} requires surface-version v2"
+            )
+
+
 def _positive_int(value: object) -> bool:
     """JSON-schema ``integer, minimum 1`` — ``True``/``False`` are not ints."""
     return isinstance(value, int) and not isinstance(value, bool) and value >= 1
@@ -575,6 +612,7 @@ def sync_opencode_v2_managed_keys(
     agent_meta_root: Path,
     log: SyncLog,
     dry_run: bool,
+    claimed_files: set[str] | None = None,
 ) -> None:
     """Merge the v2 managed keys into the EXISTING ``opencode.json`` (spec §3.2).
 
@@ -597,9 +635,17 @@ def sync_opencode_v2_managed_keys(
     same parameters as ``mcp_provider_config._write_json_config`` (spec §3.3);
     for the committed file ``verify_gitignored`` is ``False`` (that flag is only
     set for the local/secrets file, #586).
+
+    ``claimed_files`` is the caller's run-scoped claim registry (N-M2 (3)): the
+    first owner of a managed file acts, every further claimant logs
+    ``opencode-v2-owner-conflict: <file>`` and returns without touching file or
+    state. It is passed in — never module-level — so no state leaks between
+    sync runs and ``[A, B]`` / ``[B, A]`` end in the same file/state (AC-B20).
     """
     if not owns_opencode_surface(provider_config, provider):
         return
+
+    warn_ignored_v2_options(config, provider, provider_config, log)
 
     pc = _provider_entry(provider_config, provider)
     committed = _mcp_config(pc).get("committed-file")
@@ -607,6 +653,12 @@ def sync_opencode_v2_managed_keys(
         # Unreachable behind the ownership guard; keeps the type contract local
         # (no hardcoded filename on any path).
         return
+
+    if claimed_files is not None:
+        if committed in claimed_files:
+            log.warning(f"opencode-v2-owner-conflict: {committed}")
+            return
+        claimed_files.add(committed)
 
     root = Path(project_root)
     state_path = opencode_state_path(root, pc)

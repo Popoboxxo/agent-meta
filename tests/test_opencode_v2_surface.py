@@ -27,6 +27,7 @@ Run: python3 -m pytest tests/test_opencode_v2_surface.py -q
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -36,6 +37,7 @@ import yaml
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 
+import lib.sync_pipeline as sync_pipeline
 from lib import isolation, opencode_v2_config
 from lib.context import apply_settings_surface_shape
 from lib.log import SyncLog
@@ -746,3 +748,270 @@ def test_ac_b20_non_owner_provider_is_noop_even_with_state(tmp_path, monkeypatch
     assert (project / _V2_STATE_REL).read_bytes() == state_before
     assert log.actions == [] and log.warnings == [] and log.errors == []
     assert log.skipped == [] and log.infos == []
+
+
+# ===========================================================================
+# Phase B / Task 10 (B.7): tier-independent wiring + N-M2 owner conflict
+# ===========================================================================
+#
+# The writer itself is pinned by the Task 9 tests above. These tests pin the
+# *sync seam*: the writer runs in EVERY provider iteration, outside the
+# ``provider_runtime_gate_tier(...) == "permission"`` call condition (Spec-A
+# freeze), warns about v2-only project options on a non-v2 surface (AC-B13) and
+# lets exactly one owner per managed file act per run (N-M2 / AC-B20).
+
+
+def _non_owner_pc() -> dict:
+    """A provider entry without a selectable v2 surface (Claude-shaped data)."""
+    return {
+        "mcp-config": {"format": "claude-settings", "committed-file": ".mcp.json"}
+    }
+
+
+def _stage_framework(tmp_path: Path, tiers: dict) -> Path:
+    """Minimal framework root whose capability registry declares the tiers."""
+    root = tmp_path / "framework"
+    (root / "config").mkdir(parents=True, exist_ok=True)
+    (root / "config" / "provider-capabilities.yaml").write_text(
+        yaml.safe_dump(
+            {"capabilities": {provider: {"runtime_gate": tier}
+                              for provider, tier in tiers.items()}}
+        ),
+        encoding="utf-8",
+    )
+    return root
+
+
+def _run_stage(
+    tmp_path: Path,
+    monkeypatch,
+    provider_config: dict,
+    providers: list,
+    config: dict,
+    tiers: dict,
+    log: SyncLog | None = None,
+    gate_calls: list | None = None,
+) -> tuple[Path, SyncLog, list]:
+    """Drive ``_sync_stage_per_provider`` with every unrelated writer stubbed.
+
+    Returns ``(project_root, log, gate_calls)``; ``gate_calls`` records the
+    Spec-A runtime-gate writer, so a test can prove a tier did not dispatch it
+    while the v2 managed-key writer still ran (AC-B18).
+    """
+    root = _stage_framework(tmp_path, tiers)
+    project_root = tmp_path / "project"
+    project_root.mkdir(parents=True, exist_ok=True)
+    log = log if log is not None else SyncLog()
+    calls = gate_calls if gate_calls is not None else []
+
+    monkeypatch.setattr(sync_pipeline, "sync_agents_for_provider", lambda *a, **k: None)
+    monkeypatch.setattr(sync_pipeline, "sync_prompts_for_continue", lambda *a, **k: None)
+    monkeypatch.setattr(sync_pipeline, "sync_rules", lambda *a, **k: None)
+    monkeypatch.setattr(sync_pipeline, "sync_speech_mode", lambda *a, **k: None)
+    monkeypatch.setattr(sync_pipeline, "sync_embedded_rule_files", lambda *a, **k: None)
+    monkeypatch.setattr(sync_pipeline, "generate_mcp_artifacts", lambda *a, **k: [])
+    monkeypatch.setattr(
+        sync_pipeline, "generate_external_tool_artifacts", lambda *a, **k: []
+    )
+    monkeypatch.setattr(
+        sync_pipeline, "sync_snippets_for_provider", lambda *a, **k: None
+    )
+    monkeypatch.setattr(
+        sync_pipeline, "sync_external_skills_for_provider", lambda *a, **k: None
+    )
+    monkeypatch.setattr(
+        sync_pipeline, "sweep_orphan_skill_channel_rules", lambda *a, **k: None
+    )
+    monkeypatch.setattr(
+        sync_pipeline, "_sync_opencode_runtime_gate",
+        lambda *a, **k: calls.append((a, k)),
+    )
+
+    import lib.external_tools as external_tools_module
+    import lib.mcp as mcp_module
+
+    monkeypatch.setattr(mcp_module, "load_mcp_registry", lambda *a, **k: {})
+    monkeypatch.setattr(
+        external_tools_module, "load_external_tools_registry", lambda *a, **k: {}
+    )
+
+    sync_pipeline._sync_stage_per_provider(
+        root, project_root, config, provider_config, list(providers), {},
+        None, False, False, [], argparse.Namespace(dry_run=False), log, None,
+    )
+    return project_root, log, calls
+
+
+def test_ac_b13_option_ignored_on_non_v2_with_warning_and_no_write(
+    tmp_path, monkeypatch
+):
+    """AC-B13: a v2-only project option on a non-v2 surface warns, writes nothing."""
+    config = _config(3, **{"experimental-todo": True})
+
+    project, log, _ = _run_stage(
+        tmp_path, monkeypatch, {"Opencode": _v1_pc()}, ["Opencode"],
+        config, {"Opencode": "advisory"},
+    )
+
+    assert not (project / "opencode.json").exists()
+    assert not (project / _V2_STATE_REL).exists()
+    assert _warned(
+        log,
+        "opencode-v2-option-ignored: experimental-todo requires surface-version v2",
+    ), log.warnings
+    assert _warned(
+        log,
+        "opencode-v2-option-ignored: experimental-subagent-depth"
+        " requires surface-version v2",
+    ), log.warnings
+
+
+def test_ac_b18_managed_key_written_under_advisory_tier(tmp_path, monkeypatch):
+    """AC-B18: the managed-key writer is not gated by the permission tier."""
+    config = _config(3, **{"experimental-todo": True})
+
+    project, _, gate_calls = _run_stage(
+        tmp_path, monkeypatch, {"Opencode": _v2_pc()}, ["Opencode"],
+        config, {"Opencode": "advisory"},
+    )
+
+    assert gate_calls == [], "advisory must not dispatch the Spec-A gate writer"
+    doc = _read_json(project / "opencode.json")
+    assert doc["experimental"] == {"subagent_depth": 3, "todo": True}
+    assert STATE_KEYS_KEY in _read_state_doc(project)
+
+
+def test_ac_b18_v1_rollback_runs_regardless_of_tier(tmp_path, monkeypatch):
+    """AC-B18: a v1 surface rolls back prior v2 keys even on a non-permission tier."""
+    project = tmp_path / "project"
+    _write_json(
+        project / "opencode.json",
+        {"theme": "dark", "experimental": {"subagent_depth": 3}},
+    )
+    _write_json(
+        project / _V2_STATE_REL,
+        {
+            STATE_KEYS_KEY: {
+                "experimental.subagent_depth": {
+                    "value": 3,
+                    "prior": None,
+                    "prior_absent": True,
+                }
+            }
+        },
+    )
+
+    project, _, gate_calls = _run_stage(
+        tmp_path, monkeypatch, {"Opencode": _v1_pc()}, ["Opencode"],
+        _config(), {"Opencode": "advisory"},
+    )
+
+    assert gate_calls == []
+    doc = _read_json(project / "opencode.json")
+    assert "experimental" not in doc
+    assert doc["theme"] == "dark"
+    assert STATE_KEYS_KEY not in _read_state_doc(project)
+
+
+def test_ac_b20_opencode_v2_plus_claude_two_syncs_byte_identical(
+    tmp_path, monkeypatch
+):
+    """AC-B20: file and state are byte-identical across two syncs AND both orders."""
+    config = _config(3, **{"experimental-todo": True})
+    providers = {"Opencode": _v2_pc(), "Claude": _non_owner_pc()}
+    tiers = {"Opencode": "advisory", "Claude": "advisory"}
+    snapshots: dict[str, tuple[bytes, bytes]] = {}
+
+    for label, order in (
+        ("opencode-first", ["Opencode", "Claude"]),
+        ("claude-first", ["Claude", "Opencode"]),
+    ):
+        base = tmp_path / label
+        project, _, _ = _run_stage(
+            base, monkeypatch, providers, order, config, tiers
+        )
+        first_file = (project / "opencode.json").read_bytes()
+        first_state = (project / _V2_STATE_REL).read_bytes()
+        _run_stage(base, monkeypatch, providers, order, config, tiers)
+        assert (project / "opencode.json").read_bytes() == first_file
+        assert (project / _V2_STATE_REL).read_bytes() == first_state
+        snapshots[label] = (first_file, first_state)
+
+    assert snapshots["opencode-first"] == snapshots["claude-first"]
+
+
+def test_ac_b20_claude_iteration_triggers_no_rollback(tmp_path, monkeypatch):
+    """AC-B20: a non-owner iteration never rolls back or logs the v2 writers."""
+    config = _config(3, **{"experimental-todo": True})
+    base = tmp_path / "seeded"
+    project, _, _ = _run_stage(
+        base, monkeypatch, {"Opencode": _v2_pc()}, ["Opencode"],
+        config, {"Opencode": "advisory"},
+    )
+    file_before = (project / "opencode.json").read_bytes()
+    state_before = (project / _V2_STATE_REL).read_bytes()
+
+    log = SyncLog()
+    _run_stage(
+        base, monkeypatch, {"Claude": _non_owner_pc()}, ["Claude"],
+        config, {"Claude": "advisory"}, log=log,
+    )
+
+    assert (project / "opencode.json").read_bytes() == file_before
+    assert (project / _V2_STATE_REL).read_bytes() == state_before
+    forbidden = ("opencode-v2-managed", "opencode-v2-owner-conflict",
+                 "opencode-v2-option-ignored")
+    leaked = [
+        line
+        for line in log.actions + log.warnings + log.skipped + log.infos + log.errors
+        if any(marker in line for marker in forbidden)
+    ]
+    assert leaked == [], leaked
+
+
+def test_ac_b20_owner_conflict_warns_and_second_provider_is_noop(
+    tmp_path, monkeypatch
+):
+    """N-M2 (3): only the first owner acts per managed file; the rest warn."""
+    providers = {"First": _v2_pc(), "Second": _v2_pc()}
+    config = {
+        "provider-options": {
+            "First": {"experimental-subagent-depth": 3},
+            "Second": {"experimental-subagent-depth": 3},
+        }
+    }
+    tiers = {"First": "advisory", "Second": "advisory"}
+    reads: list = []
+    real_read = isolation._read_json_safe
+
+    def _counting_read(*args, **kwargs):
+        reads.append(args[0])
+        return real_read(*args, **kwargs)
+
+    monkeypatch.setattr(isolation, "_read_json_safe", _counting_read)
+
+    snapshots = {}
+    for label, order in (
+        ("first-first", ["First", "Second"]),
+        ("second-first", ["Second", "First"]),
+    ):
+        reads.clear()
+        base = tmp_path / label
+        log = SyncLog()
+        project, _, _ = _run_stage(
+            base, monkeypatch, providers, order, config, tiers, log=log
+        )
+        assert len(reads) == 1, (
+            "the second owner must be rejected before any file read"
+        )
+        warnings = [w for w in log.warnings if "opencode-v2-owner-conflict" in w]
+        assert len(warnings) == 1, log.warnings
+        assert "opencode-v2-owner-conflict: opencode.json" in warnings[0]
+        doc = _read_json(project / "opencode.json")
+        assert doc["experimental"] == {"subagent_depth": 3}
+        snapshots[label] = (
+            (project / "opencode.json").read_bytes(),
+            (project / _V2_STATE_REL).read_bytes(),
+        )
+
+    assert snapshots["first-first"] == snapshots["second-first"]

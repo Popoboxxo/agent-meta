@@ -57,6 +57,7 @@ from lib.harnesses import ensure_write_isolation, resolve_active_harness
 from lib.hooks import create_hook
 from lib.io import SyncError
 from lib.log import SyncLog
+from lib.opencode_v2_config import sync_opencode_v2_managed_keys
 from lib.pipelines import (
     PIPELINES_EFFECTIVE_KEY,
     apply_overrides,
@@ -230,6 +231,9 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
 
     validation_errors = 0
     errors_before = len(log.errors)
+    # N-M2 (3) / AC-B20: run-scoped ownership registry mirroring the production
+    # per-provider stage — exactly one owner acts per managed opencode file.
+    test_repo_claimed_files: set[str] = set()
     for provider in providers:
         pc = provider_config[provider]
         caps = capabilities.get(provider, {}) if isinstance(capabilities, dict) else {}
@@ -286,6 +290,13 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
                 agent_meta_root, log, dry_run,
                 active_set=active_set,
             )
+        # B.7 / AC-B13/B18/B20: same tier-independent call as the production
+        # per-provider stage (mirrored so a --test-generated repo matches).
+        sync_opencode_v2_managed_keys(
+            test_repo_path, config, provider, provider_config,
+            agent_meta_root, log, dry_run,
+            claimed_files=test_repo_claimed_files,
+        )
         if pc.get("has_commands", False):
             sync_commands_for_provider(agent_meta_root, test_repo_path, config, log,
                                        dry_run, provider, provider_config=provider_config,
