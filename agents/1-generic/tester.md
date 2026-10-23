@@ -50,7 +50,7 @@ describe / class / suite: ModuleName
 ## 5. Test patterns
 
 - **Real assertions:** the test MUST actually validate the function
-- **Realistic test data:** no "test" strings, use realistic values
+- **Realistic test data:** no "test" strings, use realistic *shapes* (lengths, formats, edge values) — generated synthetically, never copied from production (see constraints)
 - **Test isolation:** each test independent, clean up shared state
 - **No `any`** in test code
 - **No flaky tests**
