@@ -36,9 +36,14 @@ _OPENCODE_STATE_FILE = ".opencode/agent-meta-state.json"
 # Namespaced managed state (IC-09): the shared Opencode state file carries one
 # record per writer, updated with read-modify-write so no writer clobbers the
 # other. ``isolation-deny`` is the pre-existing namespace (list[str]);
-# ``runtime-gate-deny`` is the A2 namespace (dict[str, dict]).
+# ``runtime-gate-deny`` is the A2 namespace (dict[str, dict]) and
+# ``default-agent`` the entry-point namespace (dict).
 _STATE_ISOLATION_KEY = "isolation-deny"
 _STATE_RUNTIME_GATE_KEY = "runtime-gate-deny"
+# Entry-point namespace (#1006/IC-5): value ``{"value": <role>,
+# "prior": <str | None>}`` where ``value`` is the ``default_agent`` the merge
+# wrote and ``prior`` the user's previous value (``None`` = key was absent).
+_STATE_DEFAULT_AGENT_KEY = "default-agent"
 
 # A2 root-deny (IC-09): the managed glob and decision written INSIDE each
 # permission family mapping. The glob is disjoint from every ``_dir_to_glob``
@@ -180,10 +185,11 @@ def _read_state(state_path: Path, key: str = _STATE_ISOLATION_KEY):
     """Read ONE namespaced managed record from the shared state file.
 
     Returns the namespace's empty value when the file or the namespace is
-    missing/unparseable: a dict for ``runtime-gate-deny``, a list otherwise.
+    missing/unparseable: a dict for the dict-valued namespaces
+    (``runtime-gate-deny``, ``default-agent``), a list otherwise.
     """
     value = _load_state_data(state_path).get(key)
-    if key == _STATE_RUNTIME_GATE_KEY:
+    if key in (_STATE_RUNTIME_GATE_KEY, _STATE_DEFAULT_AGENT_KEY):
         return value if isinstance(value, dict) else {}
     return value if isinstance(value, list) else []
 
@@ -408,6 +414,42 @@ def _opencode_runtime_gate_entries(
         family: {_RUNTIME_GATE_GLOB: _RUNTIME_GATE_DECISION}
         for family in _RUNTIME_GATE_FAMILIES
     }
+
+
+def opencode_runtime_gate_wanted(
+    config: dict,
+    provider: str,
+    agent_meta_root: Path,
+    provider_config: dict,
+) -> bool:
+    """True iff the tier-``permission`` gate is requested (IC-4).
+
+    Exactly ``bool(_opencode_runtime_gate_entries(...))`` — one decision
+    source, so the edit-lock (IC-3) and the gate writer never disagree.
+    """
+    return bool(
+        _opencode_runtime_gate_entries(config, provider, agent_meta_root, provider_config)
+    )
+
+
+def _opencode_entry_point(
+    provider: str,
+    provider_config: dict,
+    active_set,
+) -> str | None:
+    """Primary role of *provider* if explicit AND generated, else ``None``.
+
+    Explicit: ``providers.explicit_primary_role`` (IC-1 — no code default, so
+    a provider without ``primary-role`` never emits an entry point). Generated:
+    ``active_set is None`` (no active-set information ⇒ fail-open) or the role
+    is a member of ``active_set.roles``.
+    """
+    role = providers.explicit_primary_role(provider_config, provider)
+    if role is None:
+        return None
+    if active_set is not None and role not in active_set.roles:
+        return None
+    return role
 
 
 def _sync_opencode_runtime_gate(

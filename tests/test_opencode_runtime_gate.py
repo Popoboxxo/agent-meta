@@ -14,6 +14,11 @@ Covers the Phase-0 permission-path tightening (SPEC-OPENCODE-RUNTIME-GATE-
   ``opencode.json`` and the same state file (``isolation-deny`` +
   ``runtime-gate-deny``) without clobbering each other.
 
+Issue #1006 (IC-4/IC-5) extends this: the ``default-agent`` state namespace is
+a third, dict-valued sibling (AC-13), ``opencode_runtime_gate_wanted`` mirrors
+the entry computation and ``_opencode_entry_point`` resolves the explicit +
+generated primary role.
+
 Run: python -m pytest tests/test_opencode_runtime_gate.py -v
 """
 from __future__ import annotations
@@ -21,6 +26,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import yaml
 
@@ -32,6 +38,7 @@ from lib.log import SyncLog
 
 _ISOLATION_KEY = isolation._STATE_ISOLATION_KEY
 _RUNTIME_GATE_KEY = isolation._STATE_RUNTIME_GATE_KEY
+_DEFAULT_AGENT_KEY = isolation._STATE_DEFAULT_AGENT_KEY
 _STATE_FILE = Path(".opencode") / "agent-meta-state.json"
 
 
@@ -350,3 +357,103 @@ def test_absent_config_is_created_with_managed_block(tmp_path):
 
     data = _read_json(project_root / "opencode.json")
     assert data == {"permission": {"edit": {"**": "deny"}, "bash": {"**": "deny"}}}
+
+
+def test_default_agent_namespace_reads_as_dict(tmp_path):
+    """IC-5: the ``default-agent`` namespace is dict-valued, ``{}`` when
+    missing/invalid — never a list."""
+    state_path = tmp_path / _STATE_FILE
+    assert isolation._read_state(state_path, _DEFAULT_AGENT_KEY) == {}
+
+    state_path.parent.mkdir(parents=True)
+    isolation._write_state(
+        state_path,
+        {"value": "orchestrator", "prior": None},
+        dry_run=False,
+        key=_DEFAULT_AGENT_KEY,
+    )
+
+    assert _read_json(state_path)[_DEFAULT_AGENT_KEY] == {
+        "value": "orchestrator",
+        "prior": None,
+    }
+    assert isolation._read_state(state_path, _DEFAULT_AGENT_KEY) == {
+        "value": "orchestrator",
+        "prior": None,
+    }
+
+
+def test_default_agent_namespace_coexists_with_siblings(tmp_path):
+    """AC-13: all three namespaces coexist; removing one leaves the others."""
+    state_path = tmp_path / _STATE_FILE
+    state_path.parent.mkdir(parents=True)
+
+    isolation._write_state(state_path, ["**/.claude/**"], dry_run=False)
+    isolation._write_state(
+        state_path,
+        {"**": {"edit": None, "bash": None}},
+        dry_run=False,
+        key=_RUNTIME_GATE_KEY,
+    )
+    isolation._write_state(
+        state_path,
+        {"value": "orchestrator", "prior": None},
+        dry_run=False,
+        key=_DEFAULT_AGENT_KEY,
+    )
+
+    data = _read_json(state_path)
+    assert data[_ISOLATION_KEY] == ["**/.claude/**"]
+    assert data[_RUNTIME_GATE_KEY] == {"**": {"edit": None, "bash": None}}
+    assert data[_DEFAULT_AGENT_KEY] == {"value": "orchestrator", "prior": None}
+    assert "_agent-meta" in data
+
+    # Removing only the default-agent namespace keeps both siblings intact.
+    isolation._write_state(state_path, {}, dry_run=False, key=_DEFAULT_AGENT_KEY)
+
+    data = _read_json(state_path)
+    assert _DEFAULT_AGENT_KEY not in data
+    assert data[_ISOLATION_KEY] == ["**/.claude/**"]
+    assert data[_RUNTIME_GATE_KEY] == {"**": {"edit": None, "bash": None}}
+    assert "_agent-meta" in data
+
+
+def test_entry_point_requires_explicit_primary_role():
+    """IC-4: no code default — only an explicit registry key yields a role."""
+    assert isolation._opencode_entry_point("Opencode", {"Opencode": {}}, None) is None
+    assert (
+        isolation._opencode_entry_point(
+            "Opencode", {"Opencode": {"primary-role": "orchestrator"}}, None
+        )
+        == "orchestrator"
+    )
+
+
+def test_entry_point_respects_active_set():
+    """IC-4: an explicit role counts only when it is also generated."""
+    provider_config = {"Opencode": {"primary-role": "orchestrator"}}
+    inactive = SimpleNamespace(roles=frozenset({"developer"}))
+    active = SimpleNamespace(roles=frozenset({"developer", "orchestrator"}))
+
+    assert isolation._opencode_entry_point("Opencode", provider_config, inactive) is None
+    assert (
+        isolation._opencode_entry_point("Opencode", provider_config, active)
+        == "orchestrator"
+    )
+    assert (
+        isolation._opencode_entry_point("Opencode", provider_config, None)
+        == "orchestrator"
+    )
+
+
+def test_runtime_gate_wanted_mirrors_entries(tmp_path):
+    """IC-4: the boolean is exactly ``bool(_opencode_runtime_gate_entries(...))``."""
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    provider_config = {"Opencode": {"has_hooks": False}}
+
+    assert isolation.opencode_runtime_gate_wanted(
+        {"orchestrator": {"mode": "strict"}}, "Opencode", framework, provider_config
+    ) is True
+    assert isolation.opencode_runtime_gate_wanted(
+        {"orchestrator": {"mode": "advisory"}}, "Opencode", framework, provider_config
+    ) is False
