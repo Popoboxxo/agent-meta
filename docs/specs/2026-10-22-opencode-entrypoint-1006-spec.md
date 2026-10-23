@@ -1,7 +1,7 @@
 ---
 spec-id: SPEC-OPENCODE-ENTRYPOINT-1006-2026-10-22
 title: Opencode-Einstiegspunkt (#1006) — mode primary + default_agent auch auf v1, Gate-Kopplung, Managed-Merge
-status: Entwurf
+status: APPROVED
 revision: 1.4
 review: docs/reviews/2026-10-22-opencode-entrypoint-1006-spec-review.md
 rereview: docs/reviews/2026-10-22-opencode-entrypoint-1006-spec-rereview.md
@@ -12,7 +12,9 @@ amends: OQ-8 (Amendment siehe Abschnitt Entscheidungsregister)
 
 # Opencode-Einstiegspunkt (#1006) — Spec
 
-> Status: Entwurf (Rev. 1.4 — 2026-10-22: Doku-Korrekturen aus Verifikation (IC-3 `deny_edit`-Ausdruck, Zeilenreferenzen, Problem-2-Wortlaut, AC-03/AC-15-Präzisierung). Rev. 1.3 — 2026-10-22: Nutzerantworten eingearbeitet: OQ-3 entschieden (Variante B bestätigt), OQ-4 als bewusste Grenze mit verifizierter Evidenz dokumentiert (Folge-Issue). Rev. 1.2 — Rereview `CHANGES_REQUESTED` vom 2026-10-22 eingearbeitet: MAJOR-A, MINOR-A..C; Rev. 1.1: MAJOR-1..3, MINOR-1..6)
+> Status: APPROVED (2026-10-22) — Nutzerfreigabe 2026-10-22 (Auftrag: beide Pläne vollständig abarbeiten).
+>
+> Rev. 1.4 — 2026-10-22: Doku-Korrekturen aus Verifikation (IC-3 `deny_edit`-Ausdruck, Zeilenreferenzen, Problem-2-Wortlaut, AC-03/AC-15-Präzisierung). Rev. 1.3 — 2026-10-22: Nutzerantworten eingearbeitet: OQ-3 entschieden (Variante B bestätigt), OQ-4 als bewusste Grenze mit verifizierter Evidenz dokumentiert (Folge-Issue). Rev. 1.2 — Rereview `CHANGES_REQUESTED` vom 2026-10-22 eingearbeitet: MAJOR-A, MINOR-A..C; Rev. 1.1: MAJOR-1..3, MINOR-1..6)
 > Trace-Anker: `spec-id: SPEC-OPENCODE-ENTRYPOINT-1006-2026-10-22`
 >
 > Der Approval-Marker (`Status: APPROVED`) wird ausschließlich vom Nutzer bzw. `concept-reviewer`

@@ -19,6 +19,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import yaml
 
@@ -44,12 +45,15 @@ def _framework_root(tmp_path: Path, provider: str, tier: str) -> Path:
     return root
 
 
-def _provider_config(has_plugins: bool = False) -> dict:
+def _provider_config(
+    has_plugins: bool = False, primary_role: str | None = "orchestrator"
+) -> dict:
     """Provider entry with only rules enabled (all other sync paths skipped).
 
     ``has_plugins`` adds the IC-08/IC-14 runtime-gate plugin capability keys so
     the dispatch can be exercised with a fixture, independent of any real
-    provider (Opencode still ships ``has_plugins: false``).
+    provider (Opencode still ships ``has_plugins: false``). ``primary_role``
+    declares the explicit entry point (``None`` omits the key entirely).
     """
     pc = {
         "has_rules": True,
@@ -65,6 +69,8 @@ def _provider_config(has_plugins: bool = False) -> dict:
             "plugin_ext": ".js",
             "plugin_protocol": "opencode-plugin-js",
         })
+    if primary_role is not None:
+        pc["primary-role"] = primary_role
     return {PROVIDER: pc}
 
 
@@ -78,6 +84,9 @@ def _run_per_provider(
     has_plugins: bool = False,
     agent_meta_root: Path | None = None,
     plugin_calls: list | None = None,
+    active_set=None,
+    log: SyncLog | None = None,
+    primary_role: str | None = "orchestrator",
 ):
     """Drive ``_sync_stage_per_provider`` with every unrelated writer stubbed.
 
@@ -86,13 +95,15 @@ def _run_per_provider(
     plugin generator must find its template); the default fake root only
     resolves the tier capability. When ``plugin_calls`` is given, the plugin
     writer is replaced by a recorder so the dispatch itself can be asserted.
+    ``active_set`` and ``log`` are passed through to the stage (IC-7 / AC-10);
+    ``primary_role`` shapes the explicit entry point (``None`` = no key).
 
     Returns ``(captured_rule_vars, writer_calls, project_root)``.
     """
     root = agent_meta_root or _framework_root(tmp_path, PROVIDER, tier)
     project_root = tmp_path / "project"
     project_root.mkdir(parents=True, exist_ok=True)
-    provider_config = _provider_config(has_plugins=has_plugins)
+    provider_config = _provider_config(has_plugins=has_plugins, primary_role=primary_role)
     captured: dict = {}
     writer_calls: list = []
 
@@ -131,8 +142,9 @@ def _run_per_provider(
 
     sync_pipeline._sync_stage_per_provider(
         root, project_root, config, provider_config, [PROVIDER], {},
-        None, False, False, [], argparse.Namespace(dry_run=False), SyncLog(),
-        None,  # active_set: consumers (prompts/skills) are stubbed above
+        None, False, False, [], argparse.Namespace(dry_run=False),
+        log if log is not None else SyncLog(),
+        active_set,
     )
     return captured, writer_calls, project_root
 
@@ -188,6 +200,7 @@ def test_strict_sync_writes_mapping_deny(tmp_path, monkeypatch):
     data = json.loads((project_root / "opencode.json").read_text(encoding="utf-8"))
     assert data["permission"]["edit"] == {"**": "deny"}
     assert data["permission"]["bash"] == {"**": "deny"}
+    assert data["default_agent"] == "orchestrator"
 
     state = json.loads((project_root / _STATE_FILE).read_text(encoding="utf-8"))
     assert state["runtime-gate-deny"] == {"**": {"edit": None, "bash": None}}
@@ -206,6 +219,37 @@ def test_single_provider_strict_writes_deny(tmp_path, monkeypatch):
     data = json.loads((project_root / "opencode.json").read_text(encoding="utf-8"))
     assert data["permission"]["edit"]["**"] == "deny"
     assert data["permission"]["bash"]["**"] == "deny"
+    assert data["default_agent"] == "orchestrator"
+
+
+def test_strict_without_primary_role_writes_no_deny_and_warns(tmp_path, monkeypatch):
+    """AC-10: the pipeline seam honours the coupling — without an explicit
+    ``primary-role`` no deny lands in ``opencode.json`` and the log warns."""
+    log = SyncLog()
+    _, _, project_root = _run_per_provider(
+        tmp_path, monkeypatch, "permission", {"orchestrator": {"mode": "strict"}},
+        primary_role=None, log=log,
+    )
+
+    settings = project_root / "opencode.json"
+    data = json.loads(settings.read_text(encoding="utf-8")) if settings.exists() else {}
+    assert "permission" not in data
+    assert "default_agent" not in data
+    assert any("primary-role" in warning for warning in log.warnings), log.warnings
+
+
+def test_gate_writer_receives_active_set(tmp_path, monkeypatch):
+    """IC-7: the per-provider stage forwards its ``active_set`` to the writer."""
+    sentinel = SimpleNamespace(roles=frozenset({"orchestrator"}))
+
+    _, writer_calls, _ = _run_per_provider(
+        tmp_path, monkeypatch, "permission", {"orchestrator": {"mode": "strict"}},
+        record_writer=True, active_set=sentinel,
+    )
+
+    assert len(writer_calls) == 1
+    _args, kwargs = writer_calls[0]
+    assert kwargs["active_set"] is sentinel
 
 
 def test_advisory_sync_writes_no_deny_and_no_plugin(tmp_path, monkeypatch):

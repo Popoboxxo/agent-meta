@@ -1309,6 +1309,7 @@ def _sync_stage_per_provider(
             _sync_opencode_runtime_gate(
                 project_root, config, provider, provider_config,
                 agent_meta_root, log, args.dry_run,
+                active_set=active_set,
             )
         if pc.get("has_commands", False):
             sync_commands_for_provider(agent_meta_root, project_root, config, log,

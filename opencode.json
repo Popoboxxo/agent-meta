@@ -43,5 +43,6 @@
     "bash": {
       "**": "deny"
     }
-  }
+  },
+  "default_agent": "orchestrator"
 }

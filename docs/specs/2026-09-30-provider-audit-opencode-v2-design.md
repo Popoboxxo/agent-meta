@@ -586,5 +586,5 @@ Each scenario gets an `asserts/<id>.sh` (registry convention) and a `registry.md
 | OQ-5 | Copilot agent extension: `.md` (VS Code tolerant) or `.agent.md` (GitHub cloud)? | Both contracts observed; path fix is orthogonal (F9). |
 | OQ-6 | Should Antigravity `model` use `inherit` instead of concrete tier IDs? | Doc accepts `inherit|flash|pro`; current IDs are non-contract (F6 G-3). |
 | OQ-7 | Mammouth context file: rename to `AGENTS.md`, or emit `CONTEXT.md`? | Binary reads all three; context-file topology is shared (F8 MM-4). |
-| OQ-8 | Does the v1→v2 surface flip default in a future release, or stay opt-in indefinitely? | Product decision; affects SemVer track (§6.1). |
+| OQ-8 | Does the v1→v2 surface flip default in a future release, or stay opt-in indefinitely? | Product decision; affects SemVer track (§6.1). Siehe Amendment A2 (#1006) in docs/specs/2026-09-30-provider-audit-opencode-v2.md: Surface-Format bleibt frozen, Einstiegspunkt nicht. |
 | OQ-9 | Fix the Continue template `roles` enum (CO-2) now, or track it as a separate follow-up? | `templates/configs/CONTINUE.config-template.yaml:28` uses `roles: [chat, edit, agent]`, where `agent` is outside the runtime `roles` enum (F7/N11). It is a generator defect but orthogonal to the generated-config fix; named follow-up **CO-2** (§1.3). |

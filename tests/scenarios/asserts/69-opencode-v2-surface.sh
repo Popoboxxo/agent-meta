@@ -17,10 +17,10 @@
 #   1. SHIPPED DEFAULT (v1 frozen): <REPO_ROOT>/config/ai-providers.yaml declares
 #      `surface-version: "v1"` + the `surface-formats` map v1->opencode-json,
 #      v2->opencode-json-v2.
-#   1b. V1 BYTE-IDENTITY: a scratch project generated with NO project-channel key
-#      (and one with an explicit v1) keeps the flat v1 `mcp` shape and its output
-#      is byte-identical to the pre-change baseline (no `default_agent`, flat
-#      `mcp` server map, v1-only `subagent_depth` retained).
+#   1b. V1 FLAT SURFACE + ENTRY POINT: a scratch project generated with NO
+#      project-channel key (and one with an explicit v1) keeps the flat `mcp`
+#      shape frozen; entry point (`mode: primary` + `default_agent`) emitted on
+#      v1 as well (#1006), and both outputs stay byte-identical.
 #   2. V2 PROJECT CHANNEL: the PRIMARY project (synced by the harness from the
 #      fixture above) must emit the v2 shape/mechanism — nested `mcp.servers`, no
 #      flat top-level server map, the retained `subagent_depth` (>= 2, IC-15
@@ -130,7 +130,8 @@ _write_project "$PROJ_V1" "s69v1" "v1" || fail "explicit-v1 sync failed — see 
 cmp -s "$PROJ_V1/opencode.json" "$PROJ_UNSET/opencode.json" \
     || fail "explicit surface-version: v1 is not byte-identical to unset v1 output"
 
-# The v1 baseline keeps the frozen flat `mcp` shape and no v2 keys.
+# The v1 baseline keeps the frozen flat `mcp` shape; the entry point is shared
+# with v2 (#1006, OQ-8 amendment A2).
 python3 - "$PROJ_UNSET/opencode.json" <<'PY' || fail "v1 opencode.json is not the frozen flat shape"
 import json
 import sys
@@ -138,7 +139,32 @@ doc = json.load(open(sys.argv[1], encoding="utf-8"))
 mcp = doc.get("mcp")
 assert isinstance(mcp, dict), "v1 opencode.json requires the flat top-level 'mcp' object"
 assert "servers" not in mcp, "v1 flat 'mcp' must not carry a nested 'servers' key"
-assert "default_agent" not in doc, "v1 must not carry the v2-only key 'default_agent'"
+assert doc.get("default_agent") == "orchestrator", "v1 must carry default_agent from the explicit primary-role (#1006)"
+PY
+
+# v1 emits the same entry-point frontmatter: `mode: primary` for the explicit
+# primary-role, `mode: subagent` for every other generated role (#1006).
+python3 - "$PROJ_UNSET/.opencode/agents/orchestrator.md" \
+          "$PROJ_UNSET/.opencode/agents/developer.md" <<'PY' \
+    || fail "v1 frontmatter entry point not applied"
+import sys
+def fm(path):
+    text = open(path, encoding="utf-8").read()
+    block = text.split("---", 2)[1]
+    out = {}
+    for line in block.splitlines():
+        if ":" in line:
+            k, v = line.split(":", 1)
+            out[k.strip()] = v.strip()
+    return out
+primary = fm(sys.argv[1])
+sub = fm(sys.argv[2])
+assert primary.get("mode") == "primary", (
+    f"v1 orchestrator (primary-role) must be mode: primary, got {primary.get('mode')!r}"
+)
+assert sub.get("mode") == "subagent", (
+    f"v1 non-primary role must be mode: subagent, got {sub.get('mode')!r}"
+)
 PY
 
 # --- 2. PRIMARY v2 project (project channel, harness-synced). ----------------

@@ -1,8 +1,8 @@
 # Opencode v2-Support (Phasen C0, B, C1/C2, C3, D) — Implementation Plan
 
-> Status: Entwurf
+> Status: APPROVED (2026-10-22)
 >
-> **Freigabe-Gate:** Dieser Plan ist erst ausführbar, wenn die Entry-Kriterien E1–E4 (siehe „Phasen und Entry-Kriterien“) erfüllt sind. Insbesondere ist die zugrunde liegende Spec (Rev. 1.4) noch `Status: Entwurf`. Die Abweichung A-6 (Wiederverwendung des bestehenden Schalters `provider-options.Opencode.surface-version` statt eines neuen Schlüssels, Spec OQ-B1) ist vom Nutzer bestätigt (2026-10-22); es gibt keinen neuen Schalter und keinen Alias.
+> **Freigabe-Gate:** Nutzerfreigabe 2026-10-22 (Auftrag: beide Pläne vollständig abarbeiten). Die zugrunde liegende Spec (Rev. 1.4) trägt `Status: APPROVED (2026-10-22)`. Die Entry-Kriterien E1–E4 gelten weiterhin operativ (E1 = Plan A gemergt) und werden vor der betroffenen Phase belegt. Die Abweichung A-6 (Wiederverwendung des bestehenden Schalters `provider-options.Opencode.surface-version` statt eines neuen Schlüssels, Spec OQ-B1) ist vom Nutzer bestätigt (2026-10-22); es gibt keinen neuen Schalter und keinen Alias.
 >
 > **Revision 2026-10-22 (Rev. 1.4-Abgleich: Doku-Korrekturen — nicht existierende Test-Dateinamen durch konkrete ersetzt, `check_mcp_connection_keys` als neu anzulegen markiert, Task-5-Rot-Erwartung korrigiert; Rev. 1.3-Abgleich):** Nutzerantworten eingearbeitet (A-6 bestätigt, OQ-B12 bleibt offen bis nach C0-Verdict), Fake-Secret-Werte durch `EXAMPLE_NOT_A_KEY` ersetzt, Signaturen aus Spec 3.4 und Spike-Pfad mit der Spec abgeglichen (U-4, U-6). Task-Nummern und Traceability unverändert (kein Task entfällt: der Plan enthielt nie einen Task für den Schalter).
 
