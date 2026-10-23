@@ -12,10 +12,17 @@ I/O layer and renders the returned ``MergeResult``.
 Amendment B1 (2026-10-23): no path for a title/small model is managed by this
 engine; the table is generic over dotted paths.
 
+Task 8 (B.5) additionally pins the data predicates (``v2_active`` only when
+both resolved values match, never raising on missing blocks), the provider/file
+ownership criterion (``owns_opencode_surface``, N-M2/AC-B20), the derived state
+path, the exact v2 managed key set without ``$schema``/``agents.title.model``
+(AC-B3/B10/B11) and the name-based plaintext-secret check (AC-B10/AC-T7).
+
 Run: python3 -m pytest tests/test_opencode_v2_config.py -q
 """
 from __future__ import annotations
 
+import copy
 import json
 import sys
 from pathlib import Path
@@ -23,7 +30,9 @@ from pathlib import Path
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 
+from lib.dispatch_depth import required_depth_int  # noqa: E402  (path set above)
 from lib.isolation import (  # noqa: E402  (path set above)
+    _OPENCODE_STATE_FILE,
     _STATE_V2_CLI,
     _STATE_V2_KEYS,
     _STATE_V2_MCP,
@@ -36,7 +45,17 @@ from lib.opencode_v2_config import (  # noqa: E402  (path set above)
     STATE_MCP_KEY,
     STATE_PERMISSIONS_KEY,
     MergeResult,
+    build_managed_keys,
+    find_plaintext_secrets,
     merge_managed_path,
+    opencode_state_path,
+    owns_opencode_surface,
+    project_options,
+    v2_active,
+)
+from lib.providers import (  # noqa: E402  (path set above)
+    load_provider_capabilities,
+    load_providers_config,
 )
 
 _PATH = "experimental.subagent_depth"
@@ -195,3 +214,225 @@ def test_state_encoding_distinguishes_null_prior_from_absent():
     assert absent_prior.action == "remove"
     assert absent_prior.value is ABSENT
     assert absent_prior.value is not None
+
+
+# ---------------------------------------------------------------------------
+# Task 8 (B.5): activation, provider/file ownership, managed key set, secrets
+# ---------------------------------------------------------------------------
+
+_V2_PROVIDER = "Opencode"
+_V2_PROJECT_CONFIG = {"provider-options": {_V2_PROVIDER: {"surface-version": "v2"}}}
+_PROVIDERS_OBJECT = {
+    "opencode-go": {
+        "name": "opencode-go",
+        "env": ["OC_API_KEY"],
+        "settings": {"baseURL": "https://example.invalid/v1"},
+    }
+}
+
+
+def _resolved(surface: str = "v1") -> dict:
+    """Resolved registry entry for the v1 or v2 surface (real registry data)."""
+    project_config = _V2_PROJECT_CONFIG if surface == "v2" else None
+    return load_providers_config(_REPO_ROOT, project_config)[_V2_PROVIDER]
+
+
+def test_v2_active_true_only_with_both_resolved_values():
+    """v2 is active only when mechanism AND format are the resolved v2 values."""
+    v2 = _resolved("v2")
+    assert v2["agent-transform"]["frontmatter-mechanism"] == "opencode-native-v2"
+    assert v2["mcp-config"]["format"] == "opencode-json-v2"
+
+    # A single resolved entry and the whole registry are both accepted.
+    assert v2_active(v2, _V2_PROVIDER) is True
+    assert v2_active({_V2_PROVIDER: v2}, _V2_PROVIDER) is True
+
+    # Only the pair activates — neither value alone is enough.
+    wrong_mechanism = copy.deepcopy(v2)
+    wrong_mechanism["agent-transform"]["frontmatter-mechanism"] = "opencode-native"
+    assert v2_active(wrong_mechanism, _V2_PROVIDER) is False
+
+    wrong_format = copy.deepcopy(v2)
+    wrong_format["mcp-config"]["format"] = "opencode-json"
+    assert v2_active(wrong_format, _V2_PROVIDER) is False
+
+
+def test_v2_active_false_for_v1_and_missing_blocks():
+    """v1 and malformed/missing blocks are inactive and never raise."""
+    v1 = _resolved("v1")
+    assert v2_active(v1, _V2_PROVIDER) is False
+    assert v2_active({_V2_PROVIDER: v1}, _V2_PROVIDER) is False
+
+    assert v2_active({}, _V2_PROVIDER) is False
+    assert v2_active(None, _V2_PROVIDER) is False
+    assert v2_active({"mcp-config": {"format": "opencode-json-v2"}}, _V2_PROVIDER) is False
+    assert (
+        v2_active(
+            {"agent-transform": {"frontmatter-mechanism": "opencode-native-v2"}},
+            _V2_PROVIDER,
+        )
+        is False
+    )
+    assert v2_active({"mcp-config": None, "agent-transform": None}, _V2_PROVIDER) is False
+
+
+def test_owns_surface_true_for_registry_entry_with_v2_surface_formats_and_committed_file():
+    """The real registry entry owns the surface for both resolved surfaces."""
+    for surface in ("v1", "v2"):
+        pc = _resolved(surface)
+        assert owns_opencode_surface(pc, _V2_PROVIDER) is True
+        assert owns_opencode_surface({_V2_PROVIDER: pc}, _V2_PROVIDER) is True
+
+
+def test_owns_surface_false_for_other_formats():
+    """A foreign provider (any name) with another MCP format is not an owner."""
+    fake = {
+        "mcp-config": {
+            "committed-file": "fake.json",
+            "format": "claude-settings",
+            "surface-formats": {"v1": "claude-settings", "v2": "claude-settings"},
+        }
+    }
+    assert owns_opencode_surface(fake, "TotallyFakeProvider") is False
+    assert owns_opencode_surface({"TotallyFakeProvider": fake}, "TotallyFakeProvider") is False
+
+
+def test_owns_surface_false_without_surface_formats():
+    """Mammouth-like entry: opencode-json format but no selectable v2 surface."""
+    mammouth_like = {
+        "mcp-config": {"committed-file": "mammouth.json", "format": "opencode-json"}
+    }
+    assert owns_opencode_surface(mammouth_like, "Mammouth") is False
+    real_mammouth = load_providers_config(_REPO_ROOT)["Mammouth"]
+    assert owns_opencode_surface(real_mammouth, "Mammouth") is False
+
+
+def test_opencode_state_path_derived_from_committed_file(tmp_path):
+    """The state path is ``<dir of committed-file>/.opencode/agent-meta-state.json``."""
+    pc = _resolved("v2")
+    expected = tmp_path / _OPENCODE_STATE_FILE
+    assert opencode_state_path(tmp_path, pc) == expected
+    # Registry form resolves the surface owner instead of guessing a file.
+    assert opencode_state_path(tmp_path, {_V2_PROVIDER: pc}) == expected
+
+    nested = {"mcp-config": {"committed-file": "config/opencode.json"}}
+    assert (
+        opencode_state_path(tmp_path, nested)
+        == tmp_path / "config" / ".opencode" / "agent-meta-state.json"
+    )
+
+
+def test_build_managed_keys_v2_full():
+    """Full v2 fixture: exact path/value map, no ``$schema``, no title model."""
+    config = {
+        "provider-options": {
+            _V2_PROVIDER: {
+                "experimental-todo": True,
+                "providers": copy.deepcopy(_PROVIDERS_OBJECT),
+            }
+        }
+    }
+    pc = _resolved("v2")
+    assert project_options(config, _V2_PROVIDER) == config["provider-options"][_V2_PROVIDER]
+
+    keys = build_managed_keys(config, _V2_PROVIDER, pc, _REPO_ROOT)
+
+    depth = required_depth_int(
+        load_provider_capabilities(_REPO_ROOT).get(_V2_PROVIDER)
+    )
+    assert keys == {
+        "experimental.subagent_depth": depth,
+        "experimental.todo": True,
+        "providers.opencode-go": _PROVIDERS_OBJECT["opencode-go"],
+    }
+    assert "$schema" not in keys
+    assert "agents.title.model" not in keys
+    assert not any(key.startswith("providers.opencode-go.options") for key in keys)
+    # Whole registry is accepted as well.
+    assert build_managed_keys(config, _V2_PROVIDER, {_V2_PROVIDER: pc}, _REPO_ROOT) == keys
+
+
+def test_build_managed_keys_without_todo_omits_key():
+    """AC-B3: without the option ``experimental.todo`` is not written at all."""
+    config = {
+        "provider-options": {
+            _V2_PROVIDER: {"providers": copy.deepcopy(_PROVIDERS_OBJECT)}
+        }
+    }
+    keys = build_managed_keys(config, _V2_PROVIDER, _resolved("v2"), _REPO_ROOT)
+    assert "experimental.todo" not in keys
+
+    # An explicit project depth wins over the capability default.
+    explicit = {"provider-options": {_V2_PROVIDER: {"experimental-subagent-depth": 5}}}
+    keys = build_managed_keys(explicit, _V2_PROVIDER, _resolved("v2"), _REPO_ROOT)
+    assert keys == {"experimental.subagent_depth": 5}
+
+
+def test_build_managed_keys_empty_when_not_v2():
+    """Non-v2 surfaces and non-owner providers manage no keys at all."""
+    config = {
+        "provider-options": {
+            _V2_PROVIDER: {
+                "experimental-todo": True,
+                "providers": copy.deepcopy(_PROVIDERS_OBJECT),
+            }
+        }
+    }
+    assert build_managed_keys(config, _V2_PROVIDER, _resolved("v1"), _REPO_ROOT) == {}
+
+    foreign = {"mcp-config": {"committed-file": "fake.json", "format": "claude-settings"}}
+    assert build_managed_keys(config, "TotallyFakeProvider", foreign, _REPO_ROOT) == {}
+
+
+def test_secret_plaintext_detected():
+    """AC-B10/AC-T7: plaintext is detected by key NAME, not by the value."""
+    providers_obj = {
+        "opencode-go": {"headers": {"X-Api-Key": "EXAMPLE_NOT_A_KEY"}}
+    }
+    assert find_plaintext_secrets(providers_obj, "providers") == [
+        "providers.opencode-go.headers.X-Api-Key"
+    ]
+
+    # The value is irrelevant: a different value under a secret-named key is
+    # still a finding (the detection is name-based).
+    assert find_plaintext_secrets({"x": {"token": "anything"}}, "providers") == [
+        "providers.x.token"
+    ]
+    assert find_plaintext_secrets(
+        {"x": {"client_secret": "whatever"}}, "providers"
+    ) == ["providers.x.client_secret"]
+
+
+def test_secret_env_placeholder_ok():
+    """``{env:VAR}`` values are valid; malformed placeholders are not."""
+    obj = {
+        "opencode-go": {
+            "env": ["OC_API_KEY"],
+            "settings": {"baseURL": "https://example.invalid/v1"},
+            "headers": {"X-Api-Key": "{env:OC_API_KEY}"},
+        }
+    }
+    assert find_plaintext_secrets(obj, "providers") == []
+
+    assert find_plaintext_secrets(
+        {"x": {"api_key": "{env:1BAD}"}}, "providers"
+    ) == ["providers.x.api_key"]
+    assert find_plaintext_secrets(
+        {"x": {"api_key": "{env:}"}}, "providers"
+    ) == ["providers.x.api_key"]
+
+
+def test_secret_check_walks_nested_oauth():
+    """Nested ``oauth`` objects and lists are walked; placeholders are skipped."""
+    obj = {
+        "x": {
+            "oauth": {
+                "client_id": "public-id",
+                "client_secret": "{env:OC_CLIENT_SECRET}",
+                "tokens": [{"access_token": "PLAINTEXT"}],
+            }
+        }
+    }
+    assert find_plaintext_secrets(obj, "providers") == [
+        "providers.x.oauth.tokens[0].access_token"
+    ]

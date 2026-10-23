@@ -1,10 +1,13 @@
 """Managed-merge decision engine for the opencode v2 config surface.
 
-Pure functions only: this module decides *what* a managed path should become,
-it never touches the filesystem, never logs and never resolves providers. The
-I/O layer (reading ``opencode.json`` + the state file, applying the result,
-writing) lives in ``sync_opencode_v2_managed_keys`` (Task 9) — keeping the
-decision table testable row by row without temp dirs.
+Pure decision functions only: this module decides *what* a managed path should
+become, which provider owns the surface and which secrets are plaintext. It
+never writes a file and never logs. The I/O layer (reading ``opencode.json`` +
+the state file, applying the result, writing) lives in
+``sync_opencode_v2_managed_keys`` (Task 9) — keeping the decision table testable
+row by row without temp dirs. (``build_managed_keys`` reads the stat-cached
+provider capability registry for its default dispatch depth; that is a config
+lookup, not a write.)
 
 The table itself is ``SPEC-OPENCODE-V2-SUPPORT-2026-10-22`` §3.2: for one
 managed dotted ``path`` ``P`` with target value ``T`` (``target is None`` =
@@ -33,12 +36,36 @@ stay distinguishable because ``null`` is a valid value.
 Amendment B1 (2026-10-23): the engine is generic over dotted paths. No
 auxiliary title-model path is managed here — the C0 spike could not verify such
 a target, so it was dropped from the spec; callers must not assume one exists.
+
+Task 8 (B.5) adds the data predicates (``v2_active``,
+``owns_opencode_surface``), the shared ``opencode_state_path``, the project
+option reader, the managed key set (spec §3.3) and the structural
+``find_plaintext_secrets`` check (spec §3.3/AC-B10). Activation and ownership
+are decided on resolved values only — no provider name, no ``surface-version``
+comparison.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
+from pathlib import Path
 
-from . import isolation
+from . import isolation, providers
+from .dispatch_depth import required_depth_int
+
+# Resolved v2 values (spec §3.1). Activation is a pure function of these two
+# resolved values — never of the raw ``surface-version`` selector or a provider
+# name. Providers declare them through the registry maps (Task 6).
+V2_FRONTMATTER_MECHANISM = "opencode-native-v2"
+V2_MCP_FORMAT = "opencode-json-v2"
+
+# Valid secret indirection (spec §3.3): a value of this exact shape refers to an
+# environment variable and is never a plaintext secret.
+_ENV_PLACEHOLDER_RE = re.compile(r"^\{env:[A-Za-z_][A-Za-z0-9_]*\}$")
+
+# A plaintext finding is decided by the KEY NAME, never by the value pattern
+# (AC-B10/AC-T7): only keys that name a credential are inspected.
+_SECRET_NAME_MARKERS = ("key", "secret", "token")
 
 # State namespaces (spec §3.2) — re-exported from ``isolation``, which owns the
 # state file, so the literals have exactly one source of truth. Each writer
@@ -223,3 +250,234 @@ def merge_managed_path(
         state=_state_entry(target, state["prior"], state["prior_absent"]),
         warning=None,
     )
+
+
+# ---------------------------------------------------------------------------
+# Activation and provider/file ownership (spec §3.2, N-M2)
+# ---------------------------------------------------------------------------
+
+def _provider_entry(provider_config: dict, provider: str) -> dict:
+    """Return the entry for *provider* from a registry **or** a single entry.
+
+    Mirrors ``isolation._opencode_runtime_gate_entries``: callers pass either
+    the full resolved registry (``{provider: {...}}``) or the already-resolved
+    per-provider entry. Anything unusable degrades to ``{}`` instead of raising.
+    """
+    if not isinstance(provider_config, dict):
+        return {}
+    entry = provider_config.get(provider)
+    if isinstance(entry, dict):
+        return entry
+    return provider_config
+
+
+def _mcp_config(provider_config: dict) -> dict:
+    """The ``mcp-config`` block of a single provider entry, else ``{}``."""
+    if not isinstance(provider_config, dict):
+        return {}
+    mcp_config = provider_config.get("mcp-config")
+    return mcp_config if isinstance(mcp_config, dict) else {}
+
+
+def _non_empty_string(value: object) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def v2_active(provider_config: dict, provider: str) -> bool:
+    """True iff the **resolved** entry carries both v2 values (spec §3.1).
+
+    Purely data-driven: ``frontmatter-mechanism == "opencode-native-v2"`` AND
+    ``mcp-config.format == "opencode-json-v2"``. The raw ``surface-version``
+    selector and the provider name are never inspected.
+    """
+    pc = _provider_entry(provider_config, provider)
+    agent_transform = pc.get("agent-transform")
+    mcp_config = pc.get("mcp-config")
+    return (
+        isinstance(agent_transform, dict)
+        and agent_transform.get("frontmatter-mechanism") == V2_FRONTMATTER_MECHANISM
+        and isinstance(mcp_config, dict)
+        and mcp_config.get("format") == V2_MCP_FORMAT
+    )
+
+
+def owns_opencode_surface(provider_config: dict, provider: str) -> bool:
+    """True iff this provider owns the managed opencode file (spec §3.2, N-M2).
+
+    Ownership requires a *selectable* v2 JSON surface in the registry entry
+    (``mcp-config.surface-formats`` is a non-empty dict containing
+    ``"opencode-json-v2"``) **and** a non-empty ``mcp-config.committed-file``.
+    Non-owners (Claude, Gemini, Mammouth, ...) never write or roll back here,
+    regardless of any existing state entries. Pure data check — no provider
+    literal, no ``surface-version`` comparison.
+    """
+    mcp_config = _mcp_config(_provider_entry(provider_config, provider))
+    surface_formats = mcp_config.get("surface-formats")
+    if not isinstance(surface_formats, dict) or not surface_formats:
+        return False
+    if V2_MCP_FORMAT not in surface_formats.values():
+        return False
+    return _non_empty_string(mcp_config.get("committed-file"))
+
+
+def _owned_committed_file(provider_config: dict) -> str | None:
+    """The owner's ``committed-file``, accepting a single entry or a registry.
+
+    A single entry answers directly. For a registry, the surface owner is
+    located deterministically via the same marker ``owns_opencode_surface``
+    uses (``surface-formats`` containing the v2 format) — never by provider
+    name and never by a hardcoded filename.
+    """
+    mcp_config = _mcp_config(provider_config)
+    committed = mcp_config.get("committed-file")
+    if _non_empty_string(committed):
+        return committed
+    if isinstance(provider_config, dict):
+        for entry in provider_config.values():
+            if not isinstance(entry, dict):
+                continue
+            entry_mcp = _mcp_config(entry)
+            surface_formats = entry_mcp.get("surface-formats")
+            if (
+                isinstance(surface_formats, dict)
+                and V2_MCP_FORMAT in surface_formats.values()
+            ):
+                candidate = entry_mcp.get("committed-file")
+                if _non_empty_string(candidate):
+                    return candidate
+    return None
+
+
+def opencode_state_path(project_root: Path, provider_config: dict) -> Path:
+    """The state file of the owner: ``<committed-file dir>/.opencode/...``.
+
+    Single source for every writer and rollback of this spec (spec §3.2/§3.5/
+    §3.8). Derived from the provider's resolved ``mcp-config.committed-file``,
+    so ``opencode.json`` yields exactly ``isolation._OPENCODE_STATE_FILE``
+    without hardcoding the filename here. No file I/O.
+    """
+    base = Path(project_root)
+    committed = _owned_committed_file(provider_config)
+    if committed is not None:
+        base = base / Path(committed).parent
+    return base / isolation._OPENCODE_STATE_FILE
+
+
+# ---------------------------------------------------------------------------
+# Project options and the managed key set (spec §3.1/§3.3)
+# ---------------------------------------------------------------------------
+
+def project_options(config: dict, provider: str) -> dict:
+    """The ``provider-options.<provider>`` block, or ``{}``.
+
+    The provider is a parameter so no provider name literal is needed; unset,
+    non-dict or malformed values degrade to ``{}`` (schema validation owns the
+    hard errors).
+    """
+    if not isinstance(config, dict):
+        return {}
+    options = config.get("provider-options")
+    if not isinstance(options, dict):
+        return {}
+    value = options.get(provider)
+    return value if isinstance(value, dict) else {}
+
+
+def _positive_int(value: object) -> bool:
+    """JSON-schema ``integer, minimum 1`` — ``True``/``False`` are not ints."""
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 1
+
+
+def build_managed_keys(
+    config: dict,
+    provider: str,
+    provider_config: dict,
+    agent_meta_root: Path,
+) -> dict[str, object]:
+    """Return the v2 managed key set as ``{dotted path: value}`` (spec §3.3).
+
+    Empty when the surface is not v2-active. Otherwise:
+
+    - ``experimental.subagent_depth`` from the project option, else the
+      provider capability's ``required_depth`` — omitted when neither exists;
+    - ``experimental.todo`` only when the project explicitly sets it (``False``
+      is a set value and is written as such);
+    - ``providers.<id>`` per project entry, the whole object as a passthrough
+      of the documented inner shape (``settings.baseURL``, ``env``, ...). The
+      writer never interprets or validates that shape.
+
+    ``$schema`` is deliberately absent (v2 has no published schema; AC-B11), and
+    Amendment B1 removed ``agents.title.model`` entirely (Q6 UNVERIFIED) — no
+    title/small-model path is produced here.
+    """
+    if not v2_active(provider_config, provider):
+        return {}
+
+    options = project_options(config, provider)
+    managed: dict[str, object] = {}
+
+    depth = options.get("experimental-subagent-depth")
+    if not _positive_int(depth):
+        try:
+            capabilities = providers.load_provider_capabilities(agent_meta_root)
+        except Exception:  # noqa: BLE001 - unreadable registry -> omit depth
+            capabilities = {}
+        caps = capabilities.get(provider) if isinstance(capabilities, dict) else None
+        depth = required_depth_int(caps)
+    if depth is not None:
+        managed["experimental.subagent_depth"] = depth
+
+    todo = options.get("experimental-todo")
+    if isinstance(todo, bool):
+        managed["experimental.todo"] = todo
+
+    provider_entries = options.get("providers")
+    if isinstance(provider_entries, dict):
+        for provider_id, entry in provider_entries.items():
+            managed[f"providers.{provider_id}"] = entry
+
+    return managed
+
+
+# ---------------------------------------------------------------------------
+# Structural secret check (spec §3.3, AC-B10/AC-T7)
+# ---------------------------------------------------------------------------
+
+def _is_secret_name(key: object) -> bool:
+    lowered = str(key).lower()
+    return any(marker in lowered for marker in _SECRET_NAME_MARKERS)
+
+
+def _is_env_placeholder(value: object) -> bool:
+    return isinstance(value, str) and _ENV_PLACEHOLDER_RE.match(value) is not None
+
+
+def _walk_plaintext_secrets(obj: object, path: str, secret_context: bool) -> list[str]:
+    findings: list[str] = []
+    if isinstance(obj, dict):
+        for key, value in obj.items():
+            child_path = f"{path}.{key}" if path else str(key)
+            findings.extend(
+                _walk_plaintext_secrets(value, child_path, _is_secret_name(key))
+            )
+    elif isinstance(obj, list):
+        for index, value in enumerate(obj):
+            findings.extend(
+                _walk_plaintext_secrets(value, f"{path}[{index}]", secret_context)
+            )
+    elif secret_context and not _is_env_placeholder(obj):
+        findings.append(path)
+    return findings
+
+
+def find_plaintext_secrets(obj: object, path: str) -> list[str]:
+    """Return the paths of plaintext credentials under *path* (spec §3.3).
+
+    A value is a finding iff its **key name** contains ``key``, ``secret`` or
+    ``token`` (case-insensitive) and the value is not a valid ``{env:VAR}``
+    placeholder. Nested objects and lists are walked (``oauth`` structures
+    included); list elements are addressed as ``path[index]``. Decisions are
+    name-based on purpose — the concrete value is never matched against a
+    secret pattern (AC-B10: the test must not bind to the value).
+    """
+    return _walk_plaintext_secrets(obj, path, secret_context=False)
