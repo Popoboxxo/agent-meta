@@ -122,10 +122,10 @@ pipeline_stages:
 - Modify: `docs/specs/2026-10-22-opencode-v2-support-spec.md`
 - Modify: `docs/plans/2026-10-22-opencode-v2-support-plan.md`
 **Interfaces:** Produces Spec-Abschnitt `Amendment B1` (nur wenn `VERDICT-FIELDS: AMEND` oder `VERDICT-C3: NO-GO`: betroffene Keys/Felder streichen bzw. umbenennen, zugehörige ACs und Mapping-Zeilen als entfallen markieren, Plan-Tasks mit Status „entfallen“ kennzeichnen; die Folgen aus Q6 (Phase B), Q5 (Phase C2/D1) und C3 getrennt ausweisen); Prüfung, dass die Spec den korrigierten Spike-Pfad `docs/spikes/2026-10-22-issue-1007-opencode-v2-plugin-api-spike.md` trägt (Spec 3.6 und AC-C1/AC-C2; Korrektur bereits in Spec Rev. 1.3 erfolgt, hier nur Grep-Nachweis); Plan-Re-Planning-Vermerk; Consumes Spike-Doc aus Task 2
-- [ ] Step 1: Test schreiben (rot, falls zutreffend): `python3 -m pytest tests/test_opencode_v2_spike.py -q` → `FAILED …::test_verdict_consequences_recorded`, solange `AMEND`/`NO-GO` ohne `Amendment B1` in der Spec steht (bei `CONFIRMED` + `GO` ist der Test bereits grün)
-- [ ] Step 2: Spec anpassen (Amendment B1 mit Datum und Verdict-Zeilen; Spike-Pfad per Grep gegen den Plan-Pfad prüfen, Korrektur nur falls noch abweichend); Plan: Tasks der entfallenen Keys/Phase (z. B. Task 18–19 bei NO-GO) in der Phasentabelle als „entfallen“ markieren und Checkboxen mit Begründung abhaken
-- [ ] Step 3: Test grün: `python3 -m pytest tests/test_opencode_v2_spike.py -q` → Exit 0, `7 passed`
-- [ ] Step 4: commit `docs: record opencode v2 spike verdict and spec amendment B1`
+- [x] Step 1: Test schreiben (rot, falls zutreffend): `python3 -m pytest tests/test_opencode_v2_spike.py -q` → `FAILED …::test_verdict_consequences_recorded`, solange `AMEND`/`NO-GO` ohne `Amendment B1` in der Spec steht (bei `CONFIRMED` + `GO` ist der Test bereits grün)
+- [x] Step 2: Spec anpassen (Amendment B1 mit Datum und Verdict-Zeilen; Spike-Pfad per Grep gegen den Plan-Pfad prüfen, Korrektur nur falls noch abweichend); Plan: Tasks der entfallenen Keys/Phase (z. B. Task 18–19 bei NO-GO) in der Phasentabelle als „entfallen“ markieren und Checkboxen mit Begründung abhaken
+- [x] Step 3: Test grün: `python3 -m pytest tests/test_opencode_v2_spike.py -q` → Exit 0, `7 passed`
+- [x] Step 4: commit `docs: record opencode v2 spike verdict and spec amendment B1`
 
 ### Task 3a: C0.4 — Absicherungstest AC-C2 `test_ac_c2_gate_fallback_invariants` (läuft bei GO und NO-GO)
 **Agent:** tester · **Issue:** #1007 · **AC:** AC-C2
@@ -133,10 +133,10 @@ pipeline_stages:
 **Files:**
 - Modify: `tests/test_opencode_v2_spike.py`
 **Interfaces:** Produces `tests/test_opencode_v2_spike.py::test_ac_c2_gate_fallback_invariants` (Spec AC-C2; Absicherungstest im C0-Task, läuft bei jedem Testlauf unabhängig vom Verdikt und liest `VERDICT-C3` aus dem Spike-Dokument). **Bei `VERDICT-C3: NO-GO`** prüft er auf einem v2-Projekt (Fixture mit `surface-version: v2` über `providers.load_providers_config`): `provider_runtime_gate_tier(pc, caps) == "permission"`, aufgelöstes `has_plugins` ist `false`, `config/provider-capabilities.yaml` führt `runtime_gate: permission` unverändert, die Registry enthält weder `surface-plugin-protocols` noch `surface-has-plugins`, `SUPPORTED_PLUGIN_PROTOCOLS == {"opencode-plugin-js"}`, ein Sync in `tmp_path` erzeugt keine Datei unter `.opencode/plugins/`, und das Spike-Dokument enthält den Satz „Fallback = Permissions-Tier“. **Bei `VERDICT-C3: GO`** prüft er die Invariante „`surface-plugin-protocols`/`surface-has-plugins` sind in der Registry genau dann vorhanden, wenn das Verdikt GO ist“; weil die C3-Schlüssel erst in Task 18 entstehen, prüft der Test im C0-PR nur die Richtung „Schlüssel vorhanden ⇒ GO“, Task 19 verschärft auf Äquivalenz. Kein Test hängt an Phase C3; Consumes Task 3 (Verdikt, Spike-Pfad)
-- [ ] Step 1: Test schreiben (Absicherungstest: der Fallback-Zustand ist der heutige Bestand, der erste Lauf ist daher grün)
-- [ ] Step 2: Lauf: `python3 -m pytest tests/test_opencode_v2_spike.py -q` → Exit 0, `8 passed` (Gesamtdatei, inklusive AC-C1-Tests aus Task 1); `-k ac_c2` → `1 passed`
-- [ ] Step 3: Negativprobe (nicht committen): in der Test-Kopie `has_plugins: true` bzw. `surface-plugin-protocols` im Registry-Eintrag setzen → `1 failed`; Nachweis, dass der Test nicht vakuös ist
-- [ ] Step 4: commit `test: guard opencode v2 permission-tier fallback (AC-C2)`
+- [x] Step 1: Test schreiben (Absicherungstest: der Fallback-Zustand ist der heutige Bestand, der erste Lauf ist daher grün)
+- [x] Step 2: Lauf: `python3 -m pytest tests/test_opencode_v2_spike.py -q` → Exit 0, `8 passed` (Gesamtdatei, inklusive AC-C1-Tests aus Task 1); `-k ac_c2` → `1 passed`
+- [x] Step 3: Negativprobe (nicht committen): in der Test-Kopie `has_plugins: true` bzw. `surface-plugin-protocols` im Registry-Eintrag setzen → `1 failed`; Nachweis, dass der Test nicht vakuös ist
+- [x] Step 4: commit `test: guard opencode v2 permission-tier fallback (AC-C2)`
 
 ## Phase B — Config-Keys und Managed-Merge
 
@@ -437,10 +437,10 @@ pipeline_stages:
 - Create: `docs/analysis/evidence/2026-10-22-opencode-jsonc-loading.md`
 - Modify: `tests/test_opencode_v2_surface.py`
 **Interfaces:** Produces Evidenzdokument mit Befehl + Ausgabe (v1 und, falls installierbar, v2: Ladereihenfolge, Merge, Konflikt bei gleichzeitigem `opencode.json`/`opencode.jsonc`), Ergebniszeile `ERGEBNIS: JSONC-TRAEGT-NICHTS-BEI` oder `ERGEBNIS: JSONC-TRAEGT-INHALT-BEI` sowie Marker VERIFIED/DOKU/UNVERIFIED pro Aussage, und den Test `test_ac_d8_evidence_present_with_result_line` in `tests/test_opencode_v2_surface.py` (prüft Datei + genau eine `ERGEBNIS:`-Zeile); Consumes `docs/analysis/evidence/2026-09-30-runtime-opencode-v1.md` Zeilen 98–111 (bestehende v1-Evidenz) und den Inhalt der Repo-`opencode.jsonc`
-- [ ] Step 1: Repo-`opencode.jsonc` lesen; bestehende v1-Evidenz sichten; Test `test_ac_d8_evidence_present_with_result_line` schreiben und rot beobachten: `python3 -m pytest tests/test_opencode_v2_surface.py -q -k ac_d8_evidence` → Exit 1, `1 failed`
-- [ ] Step 2: Probe (höchstens 3 Läufe) mit beiden Dateien in einem Temp-Verzeichnis unter `.tmp/` ausführen (`opencode debug config`); ist `opencode` nicht installierbar, Aussage als DOKU/UNVERIFIED markieren und im Ergebnis vermerken; Dokument schreiben
-- [ ] Step 3: grün: `python3 -m pytest tests/test_opencode_v2_surface.py -q -k ac_d8_evidence` → Exit 0, `1 passed`
-- [ ] Step 4: commit `docs: add evidence for opencode json and jsonc loading`
+- [x] Step 1: Repo-`opencode.jsonc` lesen; bestehende v1-Evidenz sichten; Test `test_ac_d8_evidence_present_with_result_line` schreiben und rot beobachten: `python3 -m pytest tests/test_opencode_v2_surface.py -q -k ac_d8_evidence` → Exit 1, `1 failed`
+- [x] Step 2: Probe (höchstens 3 Läufe) mit beiden Dateien in einem Temp-Verzeichnis unter `.tmp/` ausführen (`opencode debug config`); ist `opencode` nicht installierbar, Aussage als DOKU/UNVERIFIED markieren und im Ergebnis vermerken; Dokument schreiben
+- [x] Step 3: grün: `python3 -m pytest tests/test_opencode_v2_surface.py -q -k ac_d8_evidence` → Exit 0, `1 passed`
+- [x] Step 4: commit `docs: add evidence for opencode json and jsonc loading`
 
 ### Task 25: D3.2 — Dauer-WARNING `opencode-config-duplicate`
 **Agent:** developer · **Issue:** #1007 · **AC:** AC-D9
@@ -601,7 +601,7 @@ pipeline_stages:
 - **A-5** Der aufgelöste Opencode-Eintrag behält `mcp-config.surface-formats` und `mcp-config.committed-file` nach `load_providers_config` (Voraussetzung für `owns_opencode_surface`); Task 6 sichert das per Test ab.
 
 **Unsicherheiten (explizit):**
-- **U-1 (Spike-abhängig, hoch) — erledigt am 2026-10-23 (Amendment B1):** Existenz und Namen der Phase-B-Keys und der MCP-Felder sind durch den Spike belegt: `experimental.subagent_depth`/`experimental.todo`/`providers`/`cli.json` DOKU, `agents.title.model` UNVERIFIED → entfällt (AC-B9, `small-model`), `providers`-Innenform `settings.baseURL`/`env`. Q5 ist vollständig VERIFIED/DOKU → keine Sperre für C2/D1. Tasks 4, 8, 9, 11, 14, 15, 23 sind freigegeben und oben angepasst.
+- **U-1 (Spike-abhängig, hoch) — erledigt am 2026-10-23 (Amendment B1):** Existenz und Namen der Phase-B-Keys und der MCP-Felder sind durch den Spike belegt: `experimental.subagent_depth`/`experimental.todo`/`providers`/`cli.json` DOKU, `agents.title.model` UNVERIFIED → entfällt (AC-B9, `small-model`), `providers`-Innenform `settings.baseURL`/`env`. Q5 ist vollständig VERIFIED/DOKU → keine Sperre für C2/D1. Tasks 4, 8, 13, 13a, 14, 18, 21, 22, 23, 27, 28 tragen einen expliziten Amendment-B1-Vermerk (11 Tasks); Tasks 9 und 11 erwähnen die Folge nur inline, Task 15 braucht keine Änderung (`timeout.startup` ist in Task 14 abgehandelt).
 - **U-2 (Spike-abhängig) — erledigt am 2026-10-23 (Amendment B1):** Q3 VERIFIED: „last matching rule wins", Agent-Regeln zuletzt. Der frühere Satz „Task 13 fügt am Listenanfang ein" ist überholt; Task 13/13a fügen am **Listenende** ein, Task 22 ordnet `*`-Deny vor die Pfad-Allows.
 - **U-3 (Spec-Inkonsistenz):** AC-C16 (b) gehört laut Spec zu Phase C, benötigt aber die v2-Frontmatter-Funktion aus Phase D (Spec 3.7). Der Plan verifiziert Teil (a) in Task 13 und Teil (b) in Task 22 (Phase D).
 - **U-4 (Dateiname, erledigt in Spec Rev. 1.3):** Die Konvention verlangt `…-issue-<n>-…-spike.md` (Regex `_SPIKE_RE` in `scripts/lib/consistency/spec_plan.py` fordert nur das Suffix `-spike.md`). Plan und Spec Rev. 1.3 verwenden einheitlich `docs/spikes/2026-10-22-issue-1007-opencode-v2-plugin-api-spike.md`; Task 3 prüft nur noch, dass die Spec den korrigierten Pfad trägt (Grep, keine Änderung nötig).
