@@ -1,0 +1,43 @@
+agent-meta-version: "2.0.0-beta.2"
+ai-providers:
+- Claude
+- Opencode
+dod-preset: standard
+platforms: []
+orchestrator:
+  mode: main-chat
+roles:
+- orchestrator
+- agent-meta-manager
+- developer
+- ux-researcher
+repo_containment:
+  tmp-sink:
+    enabled: true
+    path: scratch/out
+project:
+  name: scenario-ux-researcher
+  prefix: s85
+  short: scenario-ux-researcher
+variables:
+  PROJECT_NAME: scenario-ux-researcher
+  PROJECT_DESCRIPTION: Verify the ux-researcher role generation.
+  PROJECT_GOAL: Confirm the new review role is generated, read-only and name-only addressable.
+  PROJECT_LANGUAGES: Python
+  COMMUNICATION_LANGUAGE: Deutsch
+  USER_INPUT_LANGUAGE: Deutsch
+  DOCS_LANGUAGE: Englisch
+  INTERNAL_DOCS_LANGUAGE: Deutsch
+  CODE_LANGUAGE: Englisch
+  CODE_CONVENTIONS: '- Python PEP8'
+  GIT_PLATFORM: GitHub
+  GIT_REMOTE_URL: https://github.com/example/scenario-ux-researcher
+  GIT_MAIN_BRANCH: main
+rules-preset: default
+speech-mode: full
+tier-preset: Normal
+se-focus: false
+max-parallel-agents: 2
+conventions-preset: default
+debug-mode: false
+allow-committed-secrets: false
