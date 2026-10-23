@@ -14,7 +14,9 @@ the provider's declared ``model-format`` template and optional
   ``kimi-code/kimi-code/*``) are both ERROR findings.
 * ``model-catalog`` — when declared (non-empty), every emitted ID must be in
   the catalog; an ID outside it is fail-loud. An absent catalog disables the
-  containment check (conservative; spec §2.1 / DECISION-5).
+  containment check (conservative; spec §2.1 / DECISION-5). The containment
+  key drops a ``#variant`` suffix (``provider/model#variant`` is the same
+  catalog entry with a selection suffix, spec §3.1).
 
 Provider-agnostic by construction: the check iterates the registry and the
 catalog; no provider-name literal appears in the code.
@@ -160,7 +162,7 @@ def _check_model(
                 )
             )
 
-    if catalog_set is not None and model not in catalog_set:
+    if catalog_set is not None and _catalog_id(model) not in catalog_set:
         findings.append(
             _finding(
                 path,
@@ -171,3 +173,13 @@ def _check_model(
         )
 
     return findings
+
+
+def _catalog_id(model: str) -> str:
+    """The catalog key for *model*: the id without the ``#variant`` suffix.
+
+    SPEC-OPENCODE-V2-SUPPORT §3.1 models a variant as
+    ``provider/model#variant`` — it is the same catalog entry with a selection
+    suffix, so comparing the decorated string would be a false mismatch.
+    """
+    return model.split("#", 1)[0]

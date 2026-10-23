@@ -40,6 +40,9 @@ sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 
 import lib.sync_pipeline as sync_pipeline
 from lib import isolation, opencode_v2_config
+from lib.artifact_validate import resolve_artifact_contract, validate_frontmatter
+from lib.consistency.artifact_contracts import check_artifact_contracts
+from lib.consistency.model_contracts import check_model_contracts
 from lib.context import apply_settings_surface_shape
 from lib.log import SyncLog
 from lib.opencode_v2_config import STATE_KEYS_KEY
@@ -1038,3 +1041,144 @@ def test_ac_b20_owner_conflict_warns_and_second_provider_is_noop(
         )
 
     assert snapshots["first-first"] == snapshots["second-first"]
+
+
+# ===========================================================================
+# Phase B / Task 12 (B.9): model-id format `provider/model[#variant]`
+# ===========================================================================
+#
+# The check is driven purely by the *resolved* `agent-transform.model-pattern`
+# (Task 6: `surface-model-patterns[<surface-version>]` -> `model-pattern`). No
+# provider name and no surface-version comparison appears here or in the code
+# under test; an artifact contract without a resolved `model-pattern` performs
+# no model check at all (the v1 surface stays untouched).
+
+_V2_MODEL_PATTERN = r"^[^/#\s]+/[^#\s]+(#[A-Za-z0-9._-]+)?$"
+
+
+def _model_contract_pc(surface: str) -> dict:
+    """An Opencode-shaped entry whose v2 surface declares the model pattern."""
+    pc = _opencode_like(surface)
+    pc["agents_dir"] = ".probe/agents"
+    pc["agent_ext"] = ".md"
+    pc["agent-transform"]["surface-model-patterns"] = {"v2": _V2_MODEL_PATTERN}
+    return pc
+
+
+def _agent_with_model(model: str) -> str:
+    return (
+        "---\n"
+        "name: probe\n"
+        "description: model-id format probe\n"
+        f"model: {model}\n"
+        "---\n"
+        "Body content.\n"
+    )
+
+
+def _validate_model(root: Path, surface: str, model: str) -> tuple[dict, list]:
+    """Resolve the surface's contract from a fixture registry and validate *model*."""
+    _write_config(root, {"Opencode": _model_contract_pc(surface)})
+    pc = load_providers_config(root)["Opencode"]
+    contract = resolve_artifact_contract(pc)
+    findings = validate_frontmatter(
+        _agent_with_model(model),
+        allowed_fields=contract.allowed_fields,
+        required_fields=set(contract.required_fields),
+        reject_fields=contract.reject_fields,
+        path=".probe/agents/probe.md",
+        model_pattern=contract.model_pattern,
+    )
+    return pc, findings
+
+
+def test_ac_b12_model_without_provider_prefix_is_finding(tmp_path):
+    """AC-B12: a bare model id is an ``artifact-contract`` finding on v2.
+
+    The pattern comes from the resolved contract (Task 6 data), so the check
+    needs no provider-name branch. The end-to-end consistency path is asserted
+    as well: it turns the finding into a non-zero exit code.
+    """
+    pc, findings = _validate_model(tmp_path / "fw", "v2", "deepseek-v4")
+
+    assert pc["agent-transform"]["model-pattern"] == _V2_MODEL_PATTERN
+    errors = [f for f in findings if f.severity.value == "ERROR"]
+    assert len(errors) == 1, findings
+    assert errors[0].check == "artifact-contract"
+    assert errors[0].message == "model 'deepseek-v4' is not provider/model[#variant]"
+    assert errors[0].file == ".probe/agents/probe.md"
+
+    # End-to-end: the same fixture through the shared consistency checker.
+    project = tmp_path / "project"
+    _write_config(project, {"Opencode": _model_contract_pc("v2")})
+    agent = project / ".probe" / "agents" / "probe.md"
+    agent.parent.mkdir(parents=True)
+    agent.write_text(_agent_with_model("deepseek-v4"), encoding="utf-8")
+    e2e = check_artifact_contracts(project)
+    assert [f.message for f in e2e if f.check == "artifact-contract"] == [
+        "model 'deepseek-v4' is not provider/model[#variant]"
+    ], e2e
+
+    # v1 regression: without a resolved `model-pattern` nothing is checked.
+    v1_pc, v1_findings = _validate_model(tmp_path / "v1-fw", "v1", "deepseek-v4")
+    assert "model-pattern" not in v1_pc["agent-transform"]
+    assert resolve_artifact_contract(v1_pc).model_pattern is None
+    assert v1_findings == [], v1_findings
+
+
+def test_ac_b12_valid_ids_accepted(tmp_path):
+    """AC-B12: ``provider/model`` and ``provider/model#variant`` both pass."""
+    for model in ("opencode-go/deepseek-v4-pro#high", "opencode-go/deepseek-v4-pro"):
+        slug = model.split("/", 1)[1].replace("#", "-")
+        pc, findings = _validate_model(tmp_path / slug, "v2", model)
+        assert pc["agent-transform"]["model-pattern"] == _V2_MODEL_PATTERN
+        assert findings == [], (model, findings)
+
+    # Negative controls: the pattern is not vacuous. (The pattern's model
+    # segment is `[^#\s]+`, so extra slashes are permitted by design; only the
+    # missing provider prefix and a dangling `#` are violations.)
+    for model in ("deepseek-v4", "opencode-go/deepseek-v4-pro#", "/deepseek-v4"):
+        _, findings = _validate_model(
+            tmp_path / ("bad-" + model.replace("/", "_").replace("#", "-")), "v2", model
+        )
+        assert len(findings) == 1, (model, findings)
+
+
+def test_ac_b12_model_catalog_check_ignores_variant(tmp_path):
+    """AC-B12: the catalog compares the id WITHOUT ``#variant`` (no false mismatch)."""
+    root = tmp_path / "fw"
+    (root / "config").mkdir(parents=True)
+    (root / "config" / "ai-providers.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "providers": {
+                    "Probe": {
+                        "agents_dir": ".probe/agents",
+                        "agent_ext": ".md",
+                        "model-format": "{model}",
+                        "model-catalog": ["opencode-go/deepseek-v4-pro"],
+                        "agent-transform": {"frontmatter-mechanism": "provider-md"},
+                    }
+                }
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    agents = root / ".probe" / "agents"
+    agents.mkdir(parents=True)
+    (agents / "variant.md").write_text(
+        _agent_with_model("opencode-go/deepseek-v4-pro#high"), encoding="utf-8"
+    )
+
+    # A declared variant is the same catalog model: no finding.
+    assert check_model_contracts(root) == []
+
+    # Control: an id outside the catalog is still fail-loud, variant included.
+    (agents / "unknown.md").write_text(
+        _agent_with_model("opencode-go/not-in-catalog#high"), encoding="utf-8"
+    )
+    errors = [f for f in check_model_contracts(root) if f.check == "model-contract"]
+    assert len(errors) == 1, errors
+    assert "is not in the configured model-catalog" in errors[0].message
+    assert "opencode-go/not-in-catalog#high" in errors[0].message
