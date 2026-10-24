@@ -55,6 +55,8 @@ sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import test_ac01_render_identity as render_harness  # noqa: E402
 
+from tests.changelog_sections import release_section  # noqa: E402
+
 import lib.sync_pipeline as sync_pipeline
 from lib import isolation, opencode_v2_config, provider_transform, runtime_gate
 from lib.artifact_validate import resolve_artifact_contract, validate_frontmatter
@@ -4985,7 +4987,7 @@ def test_v2_to_v1_switch_rolls_back_all_namespaces(tmp_path):
 _AC_D5_PROVIDERS = ("Opencode", "Claude", "Gemini", "Mammouth")
 
 _AC_D5_BASE_CONFIG = {
-    "agent-meta-version": "2.0.0-beta.2",
+    "agent-meta-version": "2.0.0-beta.3",
     "ai-providers": list(_AC_D5_PROVIDERS),
     "dod-preset": "rapid-prototyping",
     "platforms": [],
@@ -5159,11 +5161,14 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # AC-T4 (plan-wide constraint): the golden fixtures are the baseline after the
 # Plan-A merge and must not be touched by any task of the v2 plan. The expected
 # values are the frozen digests of the three fixture trees (relpath + NUL +
-# bytes + NUL, files sorted by relpath) — literals, never recomputed.
+# bytes + NUL, files sorted by relpath) — literals, never recomputed. The
+# 2.0.0-beta.3 release bump rebaselined `ac01-baseline` and `compact-golden`
+# (version strings only: the `agent-meta vX` stamp and the templates carrying
+# it), so their digests were re-pinned to the rebaselined trees.
 _FIXTURE_TREES = {
-    "ac01-baseline": "09bdcb53dd33621430978851dc7ca85a1710eabad6724f440043f951cb6dfd5f",
+    "ac01-baseline": "a0c14c24b44ad2939a578928f4168cb655a28ec77ac509531802c32b6a7d182f",
     "slimming-golden": "66c7a598dc6bf7729bee5a46dfc22889bda4f3d65816c4c1f6c4938a8242b505",
-    "compact-golden": "d56b299c7512ff6678e3f401d823084fcdf3e9b813af1397192b7b99d64f77ba",
+    "compact-golden": "3d8acdcbce82305680c7b0bb936940488142d81bc455779177715761532c4878",
 }
 
 
@@ -5333,32 +5338,39 @@ def test_new_v2_code_has_no_provider_branch():
 # --- AC-T5: CHANGELOG entry for the opencode v2 surface (Task 32 / R.1) -----
 
 
-def _changelog_unreleased_section() -> str:
-    """Return the body of the ``## [Unreleased]`` section of ``CHANGELOG.md``.
+#: The release that shipped the opencode v2 surface. Pinned on purpose: after
+#: the promotion the entry no longer sits in the moving ``[Unreleased]`` window,
+#: so a pinned release block keeps the guardrail exact across later releases.
+_V2_CHANGELOG_RELEASE = "2.0.0-beta.3"
 
-    The section ends at the next level-2 heading, so a later release block can
-    never satisfy an assertion about the unreleased entry.
+
+def _changelog_release_section() -> str:
+    """Return the body of the ``## [2.0.0-beta.3]`` section of ``CHANGELOG.md``.
+
+    The section ends at the next level-2 heading, so another release block can
+    never satisfy an assertion about the v2 entry.
     """
     changelog = _REPO_ROOT / "CHANGELOG.md"
     assert changelog.is_file(), f"missing CHANGELOG.md: {changelog}"
     text = changelog.read_text(encoding="utf-8")
-    marker = "## [Unreleased]"
-    assert marker in text, f"CHANGELOG.md carries no {marker!r} section"
-    body = text.split(marker, 1)[1]
-    return body.split("\n## ", 1)[0]
+    section = release_section(text, _V2_CHANGELOG_RELEASE)
+    assert section, (
+        f"CHANGELOG.md carries no {_V2_CHANGELOG_RELEASE!r} release section"
+    )
+    return section
 
 
 def test_changelog_mentions_opencode_v2_support():
-    """AC-T5 (Task 32): the Unreleased section records the v2 surface.
+    """AC-T5 (Task 32): the v2 release section records the v2 surface.
 
     The entry is the user-facing summary of the whole v2 package, so it must
     name the feature (``opencode v2``) and the newly managed file
     (``cli.json``) — both were absent before this task.
     """
-    unreleased = _changelog_unreleased_section().lower()
-    assert "opencode v2" in unreleased, (
-        "the [Unreleased] section must document the opencode v2 surface"
+    section = _changelog_release_section().lower()
+    assert "opencode v2" in section, (
+        "the 2.0.0-beta.3 section must document the opencode v2 surface"
     )
-    assert "cli.json" in unreleased, (
-        "the [Unreleased] section must document the managed cli.json"
+    assert "cli.json" in section, (
+        "the 2.0.0-beta.3 section must document the managed cli.json"
     )
