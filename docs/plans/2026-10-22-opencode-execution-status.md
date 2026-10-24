@@ -2,7 +2,7 @@
 
 **Zweck:** Ausführungs-Ledger zum Plan `docs/plans/2026-10-22-opencode-v2-support-plan.md` (Phasen C0, B, C1/C2, C3, D) und damit zum Tracking-Issue #1007. Das Dokument hält je Phase und je Task den erreichten Stand, die Beleg-Commits, die Testlage und die substanziellen Befunde fest; es ersetzt weder Plan noch Spec.
 
-**Geltungsbereich:** Branch `feat/1007-b-keys` (Basis `main` = `526a5dab`; Phase C0 über PR #1011 gemergt, C0-Ledger-Commit `52a72a0f`, Evidenz-Nachbesserung `2978753c`). Phase-B-Arbeit von `bd49dc5b` bis `d5853d1e`. Phase C1/C2 auf Branch `feat/1007-c1-c2-gate` (Basis `d0b81f91`), Commits `f07ab459` bis `ad4380e1`. Phase C3 auf Branch `feat/1007-c3-plugin` (Basis `9f274040`), Commits `c8270845` und `c673991f`. Phase D auf Branch `feat/1007-d-surface` (Basis `dfb77de4`), Commits `fa42ec7b` bis `04d41eb8` (13 Commits, inklusive Folgelauf zu Task 23). Der Release (Task 33) wurde auf Branch `chore/1007-release-2.0.0-beta.3` mit Commit `74f4493d` abgeschlossen (`VERSION` `2.0.0-beta.3`, Nutzerfreigabe 2026-10-23). Stand: 2026-10-24.
+**Geltungsbereich:** Branch `feat/1007-b-keys` (Basis `main` = `526a5dab`; Phase C0 über PR #1011 gemergt, C0-Ledger-Commit `52a72a0f`, Evidenz-Nachbesserung `2978753c`). Phase-B-Arbeit von `bd49dc5b` bis `d5853d1e`. Phase C1/C2 auf Branch `feat/1007-c1-c2-gate` (Basis `d0b81f91`), Commits `f07ab459` bis `ad4380e1`. Phase C3 auf Branch `feat/1007-c3-plugin` (Basis `9f274040`), Commits `c8270845` und `c673991f`. Phase D auf Branch `feat/1007-d-surface` (Basis `dfb77de4`), Commits `fa42ec7b` bis `04d41eb8` (13 Commits, inklusive Folgelauf zu Task 23). Der Release (Task 33) wurde auf Branch `chore/1007-release-2.0.0-beta.3` mit Commit `74f4493d` abgeschlossen und über PR #1019 als `31a4c6ba` auf `main` gemergt (`VERSION` `2.0.0-beta.3`, Nutzerfreigabe 2026-10-23). Stand: 2026-10-24.
 
 **Datenquelle:** Commits dieses Branches, die im Plan gesetzten Checkboxen (C0: Tasks 1, 2, 3, 3a, 24; B: Tasks 4–12; C1/C2: Tasks 13, 13a, 14–17; C3: Tasks 18, 19; D: Tasks 20–23 inklusive Folgelauf, 25–32; Task 33 erledigt als Release-Bump) sowie die dort protokollierten Testläufe und die Phasen-Exit-Kriterien.
 
@@ -20,10 +20,10 @@
 | Phase | Tasks | Status |
 |---|---|---|
 | C0 | 1, 2, 3, 3a, 24 | `done (gemergt, PR #1011)` |
-| B | 4–12 | `done (Review/PR offen)` |
-| C1/C2 | 13, 13a, 14–17 | `done (Review/PR offen)` |
-| C3 | 18–19 | `done (Review/PR offen)` |
-| D | 20–33 (ohne 24) | `done` |
+| B | 4–12 | `done (gemergt, PR #1012)` |
+| C1/C2 | 13, 13a, 14–17 | `done (gemergt, PR #1016)` |
+| C3 | 18–19 | `done (gemergt, PR #1017)` |
+| D | 20–33 (ohne 24) | `done (gemergt, PR #1018)` |
 
 **Entry-Kriterien:** E1 done · E2 done · E3 done · E4 done.
 
@@ -216,7 +216,7 @@ bash tests/scenarios/run.sh 69-opencode-v2-surface
 
 ### Aus Phase D
 
-- **Task 33 (Release-Bump) erledigt:** `VERSION` steht auf `2.0.0-beta.3` (Nutzerfreigabe 2026-10-23), der Unreleased-Inhalt ist in den Abschnitt `## [2.0.0-beta.3] - 2026-10-23` verschoben; Release-Commit `74f4493d` auf Branch `chore/1007-release-2.0.0-beta.3`. Push, PR und Merge liegen bei der `git`-Rolle und stehen noch aus.
+- **Task 33 (Release-Bump) erledigt:** `VERSION` steht auf `2.0.0-beta.3` (Nutzerfreigabe 2026-10-23), der Unreleased-Inhalt ist in den Abschnitt `## [2.0.0-beta.3] - 2026-10-23` verschoben; Release-Commit `74f4493d` auf Branch `chore/1007-release-2.0.0-beta.3`. Push und PR #1019 sind erfolgt; der Squash-Merge landete auf `main` als `31a4c6ba`. Release `2.0.0-beta.3` steht auf `main`; die Tag-Setzung `v2.0.0-beta.3` (annotiert, auf `main`) folgt im Anschluss durch die `git`-Rolle.
 - **Bekannte Grenze — v2-Plugin-Artefakt beim Rückwechsel:** Ein Wechsel v2→v1 baut die verwalteten Config-Namespaces und die `cli.json` zurück, lässt aber `.opencode/plugins/agent-meta-runtime-gate.js` stehen. Das liegt außerhalb des Geltungsbereichs von AC-B7/AC-B22 (Befund aus Task 29, `54a5eeaf`) und ist als Follow-up offen.
 - **Bekannte Grenze — `claimed_files`:** MCP- und `cli.json`-Writer treten dem laufbezogenen `claimed_files`-Set nicht bei (siehe „Bekannte Grenze für C3/D“). Die aktuelle Registry hat genau einen v2-Eigentümer, daher ist das heute folgenlos; bei einem zweiten Eigentümer derselben Datei muss die Kollisionsbehandlung vorher nachgezogen werden.
 - **Amendment B4 (`default_agent`):** Auf Tier `plugin` wird `default_agent` nicht abgestimmt (Details unter QA-D-02 oben). Die Agent-Ebene (`deny_edit`, umgesetzt in Task 22) zusammen mit den Config-Tripeln ist dort die tragende Schutzschicht.
@@ -224,5 +224,5 @@ bash tests/scenarios/run.sh 69-opencode-v2-surface
 
 ## Nächste Schritte
 
-1. Phase D ist über PR #1018 gemergt.
-2. Task 33 ist erledigt (Commit `74f4493d`); offen sind nur Push, PR und Merge durch die `git`-Rolle.
+1. Alle Phasen (C0, B, C1/C2, C3, D) sind auf `main` gemergt — PRs #1011, #1012, #1016, #1017, #1018.
+2. Task 33 (Release-Bump) ist über PR #1019 als `31a4c6ba` gemergt; `VERSION` = `2.0.0-beta.3`. Die Tag-Setzung `v2.0.0-beta.3` (annotiert, auf `main`) folgt im Anschluss durch die `git`-Rolle.
