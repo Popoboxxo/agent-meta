@@ -5147,3 +5147,37 @@ def test_new_v2_code_has_no_provider_branch():
         "AC-T6: scripts/lib/opencode_v2_config.py must dispatch on resolved "
         "config values only:\n" + "\n".join(sorted(offenders))
     )
+
+
+# --- AC-T5: CHANGELOG entry for the opencode v2 surface (Task 32 / R.1) -----
+
+
+def _changelog_unreleased_section() -> str:
+    """Return the body of the ``## [Unreleased]`` section of ``CHANGELOG.md``.
+
+    The section ends at the next level-2 heading, so a later release block can
+    never satisfy an assertion about the unreleased entry.
+    """
+    changelog = _REPO_ROOT / "CHANGELOG.md"
+    assert changelog.is_file(), f"missing CHANGELOG.md: {changelog}"
+    text = changelog.read_text(encoding="utf-8")
+    marker = "## [Unreleased]"
+    assert marker in text, f"CHANGELOG.md carries no {marker!r} section"
+    body = text.split(marker, 1)[1]
+    return body.split("\n## ", 1)[0]
+
+
+def test_changelog_mentions_opencode_v2_support():
+    """AC-T5 (Task 32): the Unreleased section records the v2 surface.
+
+    The entry is the user-facing summary of the whole v2 package, so it must
+    name the feature (``opencode v2``) and the newly managed file
+    (``cli.json``) — both were absent before this task.
+    """
+    unreleased = _changelog_unreleased_section().lower()
+    assert "opencode v2" in unreleased, (
+        "the [Unreleased] section must document the opencode v2 surface"
+    )
+    assert "cli.json" in unreleased, (
+        "the [Unreleased] section must document the managed cli.json"
+    )
