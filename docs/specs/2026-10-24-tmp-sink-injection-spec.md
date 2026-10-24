@@ -2,8 +2,36 @@
 
 > Status: Entwurf
 >
-> **Revision 3 (2026-10-24):** Re-Review Iteration 2
-> (`docs/reviews/2026-10-24-tmp-sink-injection-spec-review.md`, Abschnitt „Re-Review (Iteration 2)")
+> **Revision 3 — Nutzerentscheidungen (2026-10-24):** Revision 3 besteht aus zwei Teilen — diesem
+> Block und dem darunter folgenden Re-Review-Iteration-2-Block (inhaltlich unverändert gültig).
+> Festgelegt sind vier Fragen:
+>
+> - **Q3 — Toolchain-Caches per Opt-in erlaubt.** Config-Key
+>   `repo_containment.tmp-sink.system-temp-exception.toolchain-caches` (Default `false`, YAML plural
+>   kebab-case; das Python-Feld bleibt `SystemTempException.toolchain_cache`). Nur bei `true` **und**
+>   `enabled: true` pinnt der Builder `PIP_CACHE_DIR=<abs>/cache/pip` und
+>   `npm_config_cache=<abs>/cache/npm` in den Env-Pin-Block; `tmp_env` bleibt cache-neutral.
+>   Begründung: Default aus bricht keine Toolchain, und ein In-Repo-Cache wächst in Backup/CI/Submodul,
+>   wird von `cleanup: on-sync` gelöscht und zeigt nach einem Repo-Umzug bis zum Re-Sync auf einen toten
+>   Pfad — deshalb Opt-in, nicht Default (ADR-13, AC-38).
+> - **Q6 — Allowlist-Schema ist strikt.** `.meta-config/temp-literal-allowlist.yaml` verlangt `path`,
+>   `pattern` und `reason`, optional `owner`; `expires` ist **kein** Schema-Teil. Ein Eintrag ohne
+>   `reason` oder mit einem nicht unterstützten Feld unterdrückt die Meldung nicht.
+>   Begründung: `expires` bräuchte einen Ablauf-Job, den es nicht gibt; eine Pseudo-Ablaufsemantik wäre
+>   eine stille Ausnahme (ADR-14, AC-39).
+> - **Q10 — Der Antigravity-Adapter mappt `args.FilePath` → `tool_input.file_path`.** Begründung:
+>   `ARG_KEY_MAP` (`antigravity-json-adapter.sh:111`) enthält nur `CommandLine`/`Cwd`; `FilePath` fällt
+>   unverändert durch, der Hook sucht `tool_input.file_path` (`repo-containment-impl.sh:391-397`) und
+>   blockt damit jeden Antigravity-Write fail-closed (ADR-15, AC-40).
+> - **Q11 — §5.5 nennt `PYTEST_BASETEMP`/den Config-Key statt eines `/tmp`-Literals.** Die Pflichtregel
+>   („Basetemp NIE im Arbeitsbaum") bleibt wörtlich erhalten; nur die Literal-Verbreitung im Regeltext
+>   verschwindet. Begründung: der Regeltext darf nicht selbst die Form tragen, die er verbietet
+>   (ADR-16, AC-41).
+>
+> Status bleibt Entwurf, kein Approval.
+>
+> **Revision 3 — Re-Review Iteration 2 (2026-10-24):** Befunde aus
+> `docs/reviews/2026-10-24-tmp-sink-injection-spec-review.md` (Abschnitt „Re-Review (Iteration 2)")
 > eingearbeitet: RVW2-01 ist **entschieden** — der Env-Pin-Block setzt `TMPDIR`/`TEMP`/`TMP`
 > **absolut** (wie `TmpPaths.env`), weil diese Variablen prozess-global sind und von Kindprozessen
 > gegen **deren** `cwd` interpretiert werden; Template-Beispiele bleiben relativ
@@ -24,7 +52,10 @@
 > PreToolUse-Hook `repo-containment`, Backup-Staging, Opencode-Permission-Scope, Test-/Golden-Infrastruktur).
 > **Umfang:** Eine Quelle der Wahrheit für den Scratch-Pfad, vollständige Injektion an allen
 > Schreib-/Temp-Punkten, Default „im Repo", fail-closed statt Adeln des Arbeitsverzeichnisses,
-> entliteralisiertes `pytest --basetemp` (plattformneutral, konfiguriert).
+> entliteralisiertes `pytest --basetemp` (plattformneutral, konfiguriert). Revision 3 ergänzt vier
+> Nutzerentscheidungen: Toolchain-Cache-Opt-in (Q3), striktes Allowlist-Schema ohne `expires` (Q6),
+> Adapter-Mapping `args.FilePath` → `tool_input.file_path` (Q10) und einen literal-freien
+> §5.5-Regeltext, der auf `PYTEST_BASETEMP`/den Config-Key verweist (Q11).
 > **Nicht in diesem Dokument:** Implementierung, Code-Änderungen, Commits, `sync.py`-Läufe, Plan.
 > **Belege:** Zeilenangaben beziehen sich auf Branch `docs/tmp-sink-injection-spec`, Stand 2026-10-24.
 > Maßgeblich sind die Symbole, nicht die Zeilennummern.
@@ -68,7 +99,7 @@ fest verdrahtete.
    inhaltlich richtig; das Problem ist die **Literal-Verbreitung**, nicht ein Regelwiderspruch. Die
    Begründung ist belegt (Plattenvorfall 2026-09-19/20: 16 GB, 432.138 Einträge; 13 zusätzliche
    Testfehlschläge 2026-09-20).
-4. **Vage Temp-Anweisungen ohne Pflicht-Ort.** 12 SE-/Test-Rollen sagen „write … to a temporary file" /
+4. **Vage Temp-Anweisungen ohne Pflicht-Ort.** 13 Rollen (12 SE-Rollen + `test-executor`) sagen „write … to a temporary file" /
    „temp → rename" / „scratch/output path", ohne den Sink zu nennen (Details in
    [Ist-Zustand](#ist-zustand-verifiziert-2026-10-24) Punkt E). Der Agent muss raten — und rät
    typischerweise auf den System-Temp.
@@ -150,11 +181,16 @@ Konkret:
   Variante „`system-temp-exception` per Default aus" ist **nicht** Teil dieser Spec: sie würde den
   Default-Basetemp unter `<sink>/pytest` legen und damit §5.5 inhaltlich umkehren. Q1 ist auf „Default
   an" entschieden; eine Umkehr bräuchte eine eigene Nutzerentscheidung und einen eigenen Änderungsantrag.
+  Die in Q11 (ADR-16) entschiedene Ersetzung des `/tmp`-Literals im Regeltext durch den Verweis auf
+  `PYTEST_BASETEMP` bzw. den Config-Key `system-temp-exception` ist ausdrücklich **keine** inhaltliche
+  Umkehr: die Pflichtregel „Der pytest-Basetemp darf NIE im Arbeitsbaum liegen" bleibt wörtlich erhalten.
 - **Kein Test-only-Bypass im Produktionscode.** Fail-closed-Hook-Tests erzwingen ihre Isolation im Test
   (Fixture außerhalb des Repo-Baums, siehe AC-03/AC-05/AC-07/AC-28/AC-29), nicht über ein neues
   Root-Override-Feld im Hook.
 - **Keine Änderung an `orchestrator-guard` / `branch-guard`.** Die Hooks koexistieren unverändert.
-- **Keine Abschaffung des System-Temp für Toolchain-Caches** (pip/npm/docker) ohne eigenen Beschluss —
+- **Keine Umleitung der Toolchain-Caches per Default.** pip/npm bleiben im Nutzer-Cache außerhalb des
+  Repos; ein In-Repo-Cache ist nur als ausdrückliches, sichtbares Opt-in zulässig
+  (`system-temp-exception.toolchain-caches: true`, Q3/ADR-13). `docker` wird weiterhin nicht umgeleitet —
   siehe [Toolchain-Ausnahme](#toolchain-ausnahme).
 - **Keine Implementierung in diesem Dokument.** Keine Code-Änderungen, keine Commits, kein Sync-Lauf.
 - **Keine Migration bestehender `.tmp`-Inhalte.** Kein Umzug, kein Löschen, keine Cleanup-Semantik-
@@ -194,6 +230,7 @@ Konkret:
 | Begründung 2: 13 zusätzliche Fehlschläge durch Repo-Wurzel-Erkennung | ebd. `:431-439` |
 | Literal im kanonischen Aufruf (Punkt 5) | ebd. `:428-429` |
 | Literal in ausgelieferten Werten | `.meta-config/project.yaml:194` (`TEST_COMMANDS`), `:249` (`CODE_QUALITY_RULES`) |
+| Soll (Rev. 3): Regeltext nennt `PYTEST_BASETEMP` bzw. den Config-Key `system-temp-exception`, kein `/tmp`-Literal in der Vorschrift | Entscheidung Q11 (IC-21, AC-41, ADR-16); die Doku-Änderung selbst ist ein Plan-Schritt, nicht Teil dieser Spec |
 | Folge | Die Dateien, die den Agenten instruieren, tragen das Literal — die Regel selbst bleibt gültig |
 
 ### C — 18 `/tmp`-Literale in 7 Templates
@@ -262,6 +299,7 @@ Kein Schutzziel, mehrere Orte möglich — der Agent entscheidet selbst und land
 | `cwd` ist leer (Antigravity) | `hooks/1-generic/antigravity-json-adapter.sh:122-127` setzt `out['cwd'] = ''`; der Hook behandelt `''` wie „fehlt" (`:152`) | derselbe `$PWD`-Rückfall |
 | kein `.meta-config/`-Ancestor | `:160-180` | `resolve_repo_root` schlägt fehl ⇒ `REPO_ROOT="$WORKDIR"`; Arbeitsverzeichnis wird zum Root „geadelt" |
 | relativer Zielpfad | `:347` | Basis ist `WORKDIR` (= `cwd`). Das ist **korrekt**, solange `WORKDIR` der echte `cwd` ist: Prüf-Ort und Schreib-Ort sind dann identisch (RVW-12, Annahme A1 in R11). |
+| Write/Edit-Ziel aus Antigravity trägt `args.FilePath` (PascalCase) | `hooks/1-generic/antigravity-json-adapter.sh:111` `ARG_KEY_MAP = {'CommandLine': 'command', 'Cwd': 'cwd'}` ⇒ `FilePath` fällt unverändert als `tool_input.FilePath` durch; der Hook liest `tool_input.file_path` (`repo-containment-impl.sh:391-397`) | Exit 2 fail-closed **ohne Pfadprüfung** — jeder Antigravity-Write wird pauschal blockiert (Q10 entschieden, ADR-15) |
 | alles andere | `:99-103` (fehlendes `hook_common.sh`), `:105-110` (kein Python), `:113-126` (leerer/kaputter Payload), `:391-397` (fehlendes `file_path`) | Exit 2, fail-closed |
 | Exit-Codes | — | `0` = allow, `2` = block |
 
@@ -374,6 +412,10 @@ in den Sink wäre **schädlich**: wenn der Sink deaktiviert oder nicht beschreib
 Block-Meldung nicht an der Ablage scheitern — der Guard würde sich selbst aussperren. Deshalb
 **dokumentierte Ausnahme** (Inventar 12, ADR-11), nicht Injektionspunkt.
 
+Der Adapter bleibt darüber hinaus unverändert; **eine** Ergänzung ist entschieden: `ARG_KEY_MAP` bekommt
+den Eintrag `'FilePath': 'file_path'` (Q10, ADR-15, AC-40), damit ein Write geprüft statt pauschal
+blockiert wird. Die `mktemp`-Ausnahme aus dem vorigen Absatz bleibt davon unberührt.
+
 ### N — Weitere Treffer, bewusst außerhalb des Scopes
 
 | Ort | Beleg | Einordnung |
@@ -399,7 +441,7 @@ class SystemTempException:
     enabled: bool          # repo_containment.tmp-sink.system-temp-exception.enabled
     reason: str            # Pflichttext, wenn enabled (Dokumentationspflicht)
     pytest_basetemp: bool  # Ausnahme gilt fuer pytest --basetemp
-    toolchain_cache: bool  # Ausnahme gilt fuer pip/npm/docker-Caches
+    toolchain_cache: bool  # YAML-Key `toolchain-caches` (Default false); gilt fuer pip/npm, nie fuer docker
 
 @dataclass(frozen=True)
 class TmpPaths:
@@ -516,7 +558,7 @@ Projekt-Config, also auch keinen Maschinenpfad im Release-Artefakt.
 | 2 | `{{TEST_COMMANDS}}` / `CODE_QUALITY_RULES` | `/tmp/$USER/pytest-agent-meta` literal (`.meta-config/project.yaml:194,249`) | Token `{{PYTEST_BASETEMP}}` in beiden Werten; Builder ersetzt es durch `TmpPaths.pytest_basetemp`, shell-gequotet | `scripts/lib/config.py::_build_orch_variables` (nach `:1542`) | Sync | Token bleibt unersetzt ⇒ `_fail` (Exit 1), Code `tmp-sink.pytest-token` |
 | 3 | Subprozess-Env `TMPDIR`/`TEMP`/`TMP` | `work_dir_env` nur an 2 Stellen (`context_report.py:340`, `meta_optimizer.py:1508`); alle anderen Starts erben System-Temp — **12 Aufrufe** in `scripts/*.py` (Abschnitt N) | jeder Framework-Subprozessstart in `scripts/**` (auch `scripts/*.py`), der Temp-Dateien erzeugen kann, erhält `TmpPaths.env` oder steht in einer begründeten Allowlist; Agenten-Bash erhält einen Prompt-Block mit `export TMPDIR=<absoluter Sink>`, `TEMP` und `TMP` — **absolute** Werte aus `TmpPaths.absolute`, kein relativer Env-Wert (RVW2-01, ADR-12) | `scripts/lib/tmp_paths.py::tmp_env` (neu, delegiert an `work_dir_env`), Builder-Variable `TMP_SINK_ENV_PIN_BLOCK` via `tmp_sink_env_pin_block` | Sync (Block) / Laufzeit (Env) | Sink aus ⇒ `TmpSinkError` beim Aufruf von `tmp_env` **und** von `tmp_sink_env_pin_block` (kein Env-Pin auf einen deaktivierten Sink; der Builder setzt die Variable dann nicht); fehlender Pin ⇒ Consistency-WARNING `temp-literal.subprocess-env` |
 | 4 | Backup/Staging | `scripts/lib/backup.py:340` `TemporaryDirectory()` ohne `dir=` | `TemporaryDirectory(dir=<absolute>/backup-staging)`; bei deaktiviertem Sink expliziter, geloggter Fallback auf System-Temp | `scripts/lib/backup.py::create_backup` via `resolve_output_dir` (`repo_containment.py:641-652`) | Laufzeit (CLI/Agent) | Sink aktiv + nicht auflösbar ⇒ Abbruch mit `TmpSinkError`; Sink aus ⇒ WARNING `backup.staging-system-temp` + System-Temp |
-| 5 | Hooks (Pfadauflösung + Meldungen) | `repo-containment-impl.sh:151-180` adelt `$PWD` (auch bei leerem `cwd`); `:347` Basis `WORKDIR`; Meldungen `:370-388` relativ | **Anker-Regel:** `cwd` fehlt/leer ⇒ kein `$PWD`; Anker = Verzeichnis des Ziels, wenn das Ziel absolut ist, sonst Exit 2 `repo-containment.no-root`. Kein Ancestor mit `.meta-config/` ⇒ Exit 2. Relative Ziele gegen `cwd` (Prüf-Ort = Schreib-Ort). Meldungen mit absolutem Sink | Hook-Implementierung selbst (kein Sync-Placeholder) | Laufzeit pro Tool-Call | Exit 2 mit stabiler Fehlerklasse ([Fail-closed-Design](#fail-closed-design-hook)) |
+| 5 | Hooks (Pfadauflösung + Meldungen) | `repo-containment-impl.sh:151-180` adelt `$PWD` (auch bei leerem `cwd`); `:347` Basis `WORKDIR`; Meldungen `:370-388` relativ | **Anker-Regel:** `cwd` fehlt/leer ⇒ kein `$PWD`; Anker = Verzeichnis des Ziels, wenn das Ziel absolut ist, sonst Exit 2 `repo-containment.no-root`. Kein Ancestor mit `.meta-config/` ⇒ Exit 2. Relative Ziele gegen `cwd` (Prüf-Ort = Schreib-Ort). Meldungen mit absolutem Sink. Der Antigravity-Adapter mappt `args.FilePath` → `tool_input.file_path` (Q10, ADR-15) | Hook-Implementierung selbst (kein Sync-Placeholder) | Laufzeit pro Tool-Call | Exit 2 mit stabiler Fehlerklasse ([Fail-closed-Design](#fail-closed-design-hook)) |
 | 6 | Opencode-Permissions / edit-Scope | `config/provider-tools.yaml:64-66` Literal `.tmp/**`; generiert nach `.opencode/agents/orchestrator.md:13-16` | Scope wird zur Sync-Zeit aus `TmpPaths.relative` abgeleitet (`<relative>/**` + `.meta-viz/**`); Sink aus ⇒ nur `.meta-viz/**` | `scripts/lib/provider_transform.py:477-484` (Einlesen) + `:985-998` (Scope-Bau) | Sync | Fehlende Ableitung ⇒ Consistency-WARNING `repo-containment.no-hook-support` bleibt; Scope-Bau fällt auf `edit: deny` zurück (`:998`) |
 | 7 | Tests / Goldens / Guards / Check-Scope | Goldens frieren `/tmp` ein (I); Report-Guard erzwingt `.tmp`-Literal (`test_template_report_paths.py:68-71`); kein generelles Verbot (`:42-48`) | Goldens rebased; neuer Check `temp-literal.*` (WARNING) über `agents/**`, `standalone/**`, `rules/1-generic/**`, `config/**`, `tests/fixtures/slimming-golden/**`, `tests/conftest.py`; Allowlist `.meta-config/temp-literal-allowlist.yaml` | `scripts/lib/consistency/temp_literals.py` (neu), registriert im `_strict_findings`-Block (`scripts/lib/cli_commands.py:1411-1426`) | Sync-Validierung `--validate` | Verstoß ohne Allowlist-Eintrag ⇒ WARNING (nicht Exit), damit Bestandsprojekte nicht hart brechen; `--strict`-Pfad bleibt unverändert |
 | 8 | Sink-Provisionierung / `ensure_tmp_sink_gitignore` | `sync_pipeline.py:238-269`; `ensure_tmp_sink` + `ensure_tmp_sink_gitignore`; `_resolve_sink_dir` liefert `None` bei deaktiviertem Sink | unverändert, aber gespeist aus `resolve_tmp_paths` (eine Auflösung) | `scripts/lib/sync_pipeline.py::_sync_tmp_sink` | Sync | Sink aus ⇒ `log.skip` (bestehend, `:238-240`); Pfad ungültig ⇒ Exit 1 (Validator) |
@@ -525,6 +567,7 @@ Projekt-Config, also auch keinen Maschinenpfad im Release-Artefakt.
 | 11 | `standalone/agents/**` + Standalone-Fallback für `{{TMP_SINK_PATH}}` | 18 `/tmp`, 4 `.tmp/`-Sink-Literale, 12 Platzhalter-Notizen (Abschnitt K); `_standalone_variables` (`standalone.py:254-282`) setzt `TMP_SINK_PATH` nicht | `_standalone_variables` setzt `TMP_SINK_PATH = ".tmp"` (Framework-Default, da Standalone keine Projekt-Config hat) und `TMP_SINK_ENV_PIN_BLOCK = ""` (kein Maschinenpfad, IC-15); Literale verschwinden über die Template-Korrektur; `sync.py --render-standalone --check` ist grün | `scripts/lib/standalone.py::_standalone_variables` + `render_standalone_agent` | `sync.py --render-standalone` | Drift ⇒ Exit 1 (bestehend, `cli_commands.py:496-508`); Literal ⇒ WARNING `temp-literal.system-temp` (Punkt 7 deckt `standalone/**` ab) |
 | 12 | Antigravity-Adapter: `mktemp`-stderr-Datei | `hooks/1-generic/antigravity-json-adapter.sh:167` `_ERR_FILE=$(mktemp)`, `trap … EXIT` (`:168`) | **bewusste Ausnahme:** bleibt im System-Temp; eine Umleitung in den Sink würde die Block-Meldung von der Schreibfähigkeit des Sinks abhängig machen (Selbstausschluss) | keine Injektion | Laufzeit pro Hook-Lauf | Datei verschwindet per `trap`; Fehler beim Anlegen darf den Adapter nicht blocken (heutiges Verhalten bleibt) |
 | 13 | `.tmp`-Literal in Regeln | `rules/1-generic/plan-ledger.md:67` („Schreiben nur im Projektroot und in `.tmp/`") | Regeltext nennt den Platzhalter bzw. „im konfigurierten Scratch-Sink" | Template-Renderer | Sync | Check 7 meldet verbleibende Literale |
+| 14 | §5.5-Regeltext | `docs/concepts/repo-containment-prison-mode.md:404-439`: Pflichtregel inhaltlich korrekt, aber `/tmp/<user>` als Beispiel (`:410-411`) und im kanonischen Aufruf (`:428-429`) noch literal | Regeltext verweist auf `PYTEST_BASETEMP` bzw. den Config-Key `system-temp-exception`; die Pflichtregel („Basetemp NIE im Arbeitsbaum") bleibt **wörtlich** erhalten; kein `--basetemp=/tmp`-Literal in der Vorschrift | kein Renderer — redaktionelle Änderung am Konzeptdokument (Doku-Task im Plan, Q11/ADR-16) | Doku-Schritt im Plan (nicht Teil dieser Spec) | Kein Laufzeit-Fehlerpfad; AC-41 prüft den Regeltext |
 | — | `config/routing/reviewers.yaml:28` | `.tmp/…` im `notes:`-Text; **kein** Renderer, **kein** Produktions-Konsument (nur `tests/test_review_fleet.py:13`) | **ausgenommen** (Test-Fixture/Framework-Doku); der Satz nennt nur noch „den konfigurierten Scratch-Sink"; keine Platzhalter-Erwartung | keine | — | Kein Fehlerpfad; ein späterer Renderer wäre die Voraussetzung für Injektion (ADR-10) |
 | — | `rules/2-platform/_wf-sharkord-docker-binaries.md:26-31` | `/tmp` in einem Container-Build-Step; Datei ist `_`-präfixiert und wird nicht als Regel gerendert (`rules.py:229-231`) | **ausgenommen:** Schreibziel im Container-Layer, nicht im Host-Repo | keine | — | — |
 | — | `scripts/hermes_export.py:26-29` | `/tmp/...` in der CLI-Usage-Docstring | **ausgenommen:** Operator-Beispiel, keine Agenten-Anweisung | keine | — | — |
@@ -598,7 +641,7 @@ repo_containment:
       enabled: true                 # entschieden (Q1): Default an, kein Literal
       reason: "pytest basetemp must stay outside the repo (ancestor-collision, 13 failures 2026-09-20)"
       pytest-basetemp: true
-      toolchain-cache: false        # Opt-in, siehe Toolchain-Ausnahme
+      toolchain-caches: false       # Opt-in (Q3): true => pip/npm-Cache in den Env-Pin-Block
 ```
 
 **Begründung der Empfehlung:**
@@ -730,6 +773,7 @@ wird erkannt". Wer eine persistente Senke will, braucht einen eigenen Beschluss 
 | nicht beschreibbarer Pfad | nicht geprüft (bewusst) | kein Block — der Hook prüft nur die Lage, nicht die Schreibbarkeit | — | Betriebsfehler des Tools, nicht des Guards (Convention boundary) |
 | `system-temp-exception` nicht Mapping | **Exit 1** | Defaults (sicher) | — | `invalid 'repo_containment.tmp-sink.system-temp-exception': expected a mapping, got str.` |
 | `system-temp-exception.enabled: false` + `pytest-basetemp: true` | **Exit 1** | — | — | `invalid 'repo_containment.tmp-sink.system-temp-exception': 'pytest-basetemp: true' requires 'enabled: true'.` |
+| `system-temp-exception.enabled: false` + `toolchain-caches: true` | **Exit 1** | — | — | `invalid 'repo_containment.tmp-sink.system-temp-exception': 'toolchain-caches: true' requires 'enabled: true'.` (Q3) |
 | `system-temp-exception.enabled: true` ohne `reason` | **Exit 1** | — | — | `invalid 'repo_containment.tmp-sink.system-temp-exception.reason': required when the exception is enabled (document why writes leave the repo).` |
 | `gettempdir()` liegt im Projekt | **Exit 1** | — | — | `tmp-sink.system-temp-exception: platform temp root <dir> is inside the project root — the exception cannot take effect.` |
 | `{{PYTEST_BASETEMP}}` bleibt unersetzt | **Exit 1** | — | — | `tmp-sink.pytest-token: '{{PYTEST_BASETEMP}}' was not resolved in TEST_COMMANDS/CODE_QUALITY_RULES.` |
@@ -801,21 +845,30 @@ wird erkannt". Wer eine persistente Senke will, braucht einen eigenen Beschluss 
 wird von der Toolchain verwaltet und ist kein Schreibziel einer Rollen-Anweisung. Die Regel adressiert
 Agenten-Schreibzugriffe, nicht Tool-Interna.
 
-**Enge, dokumentierte Ausnahme (Opt-in):**
+**Enge, dokumentierte Ausnahme (Opt-in, Q3/ADR-13):**
 
 ```yaml
 repo_containment:
   tmp-sink:
     system-temp-exception:
-      toolchain-cache: false   # true => pip/npm-Cache wird in den Sink gepinnt
+      toolchain-caches: false   # Default: false. true => pip/npm-Cache wird in den Sink gepinnt
 ```
 
-- Nur wenn `true` **und** `system-temp-exception.enabled: true`, setzt der Builder
+- **Default ist bewusst `false`**, damit Toolchains nicht brechen: `pip`/`npm` nutzen weiter den warmen
+  Nutzer-Cache, ohne dass ein Projekt etwas konfigurieren muss. Das Opt-in ist damit **bewusst und
+  sichtbar** — es gibt keinen stillen Wechsel.
+- Nur wenn `toolchain-caches: true` **und** `system-temp-exception.enabled: true`, setzt der Builder
   `PIP_CACHE_DIR=<absolute>/cache/pip` und `npm_config_cache=<absolute>/cache/npm` in
   `TMP_SINK_ENV_PIN_BLOCK` (dieselbe absolute Basis wie die dortigen `TMPDIR`/`TEMP`/`TMP`, ADR-12).
+  `TmpPaths.env`/`tmp_env` bleiben **cache-neutral**: sie setzen ausschließlich `TMPDIR`/`TEMP`/`TMP`.
+- `toolchain-caches: true` bei `enabled: false` ist wirkungslos und deshalb ein Config-Fehler ⇒ `_fail`
+  mit Exit 1 (analog zur bestehenden `pytest-basetemp`-Regel).
 - `docker` wird **nicht** umgeleitet (Daemon-Konfiguration außerhalb des Repos; nicht Agenten-schreibbar).
 - Ein Opt-in erzeugt eine WARNING `temp-literal.toolchain-cache-in-repo` in `--validate`, damit die
-  Entscheidung sichtbar bleibt.
+  Entscheidung sichtbar bleibt. **Begründung der WARNING:** Ein In-Repo-Cache wächst in Backup, CI-Cache
+  und Submodul-Mount hinein; `cleanup: on-sync` würde ihn löschen (stiller Performance-Verlust); und nach
+  einem Repo-Umzug zeigt der Pin bis zum Re-Sync auf einen toten Pfad. Der Fehlercode ist ein Code, kein
+  Config-Key — er bleibt unverändert, obwohl der Config-Key plural `toolchain-caches` heißt.
 
 ---
 
@@ -823,9 +876,9 @@ repo_containment:
 
 ### 1. Was wird gebaut?
 
-Ein Resolver, der den Scratch-Pfad einmalig auflöst, plus Injektion dieses Pfads an dreizehn Inventar-
-Punkten — zehn aktive Injektionen (Templates, Test-Kommandos, Subprozess-Env, Backup, Hook,
-Provider-Scope, Guards, Provisionierung, Standalone-Export, Regeln), zwei Konsumenten
+Ein Resolver, der den Scratch-Pfad einmalig auflöst, plus Injektion dieses Pfads an vierzehn Inventar-
+Punkten — elf aktive Injektionen (Templates, Test-Kommandos, Subprozess-Env, Backup, Hook,
+Provider-Scope, Guards, Provisionierung, Standalone-Export, Regeln, §5.5-Regeltext), zwei Konsumenten
 (Managed-`.gitignore`, Doctor-Check) und eine dokumentierte Ausnahme (Adapter-`mktemp`) — sowie ein
 fail-closed Hook-Verdict. Vier weitere Treffer sind begründet ausgenommen (Abschnitt N).
 
@@ -884,18 +937,18 @@ nur zusätzlicher Konsument.
 | Datei:Symbol | Signatur | Fehlerpfade | Status |
 |---|---|---|---|
 | `scripts/lib/tmp_paths.py::resolve_tmp_paths` | `(project_root: Path, config: dict \| None) -> TmpPaths` | **wirft nicht bei deaktiviertem Sink** (`enabled=False`); wirft `TmpSinkError`: `tmp-sink.invalid-path`, `tmp-sink.system-temp-exception`; nie `sys.exit` | neu |
-| `scripts/lib/tmp_paths.py::SystemTempException` | `@dataclass(frozen=True)` Felder `enabled: bool`, `reason: str`, `pytest_basetemp: bool`, `toolchain_cache: bool` | keine (reine Datenklasse; Validierung im Resolver: `tmp-sink.system-temp-exception`) | neu |
+| `scripts/lib/tmp_paths.py::SystemTempException` | `@dataclass(frozen=True)` Felder `enabled: bool`, `reason: str`, `pytest_basetemp: bool`, `toolchain_cache: bool`; das Feld `toolchain_cache` liest den YAML-Key `toolchain-caches` (Default `false`, Q3) | keine (reine Datenklasse; Validierung im Resolver: `tmp-sink.system-temp-exception`, inklusive `toolchain-caches: true` bei `enabled: false` ⇒ `_fail`/Exit 1) | neu |
 | `scripts/lib/tmp_paths.py::TmpPaths` | `@dataclass(frozen=True)` Felder `relative: str`, `absolute: Path \| None`, `enabled: bool`, `system_temp_exception: SystemTempException`, `pytest_basetemp: str`, `env: dict[str, str]`; `env` enthält **ausschließlich absolute** Werte (`str(paths.absolute)`) | keine (reine Datenklasse); Invariante: `enabled is False` ⇔ `absolute is None` und `env == {}` | neu |
 | `scripts/lib/tmp_paths.py::tmp_env` | `(paths: TmpPaths, base: dict \| None = None) -> dict[str, str]`; delegiert an `work_dir_env`, Werte immer absolut | `TmpSinkError` mit `tmp-sink.disabled`, wenn `paths.enabled is False` | neu |
-| `scripts/lib/tmp_paths.py::tmp_sink_env_pin_block` | `(paths: TmpPaths) -> str`; POSIX-sh-Block, der `TMPDIR`, `TEMP` und `TMP` auf **denselben absoluten** Wert setzt (`str(paths.absolute)`, kein `relative`), mit Existenzprüfung **vor** dem Export | `TmpSinkError` mit `tmp-sink.disabled`, wenn `paths.enabled is False` (der Builder setzt die Variable dann nicht) | neu |
+| `scripts/lib/tmp_paths.py::tmp_sink_env_pin_block` | `(paths: TmpPaths) -> str`; POSIX-sh-Block, der `TMPDIR`, `TEMP` und `TMP` auf **denselben absoluten** Wert setzt (`str(paths.absolute)`, kein `relative`), mit Existenzprüfung **vor** dem Export; **nur bei `toolchain_cache: true`** zusätzlich `PIP_CACHE_DIR=<abs>/cache/pip` und `npm_config_cache=<abs>/cache/npm` (Q3, ADR-13) | `TmpSinkError` mit `tmp-sink.disabled`, wenn `paths.enabled is False` (der Builder setzt die Variable dann nicht) | neu |
 | `scripts/lib/tmp_paths.py::resolve_pytest_basetemp` | `(project_root: Path, paths: TmpPaths) -> str` | `tmp-sink.system-temp-exception` (Temp-Root im Projekt, Ausnahme ohne `enabled`, Wert mit `"`) | neu |
 | `scripts/lib/repo_containment.py::resolve_output_dir` | `(project_root: Path, config: dict \| None, subdir: str, *, tool: str = "") -> Path` | bestehend: `tmp-sink.disabled`, `tmp-sink.invalid-path`, `tmp-sink.invalid-segment`, `out-outside-tmp-sink` | unverändert (neuer Konsument: `backup.py`) |
 | `scripts/lib/repo_containment.py::resolve_work_dir` | `(project_root, config, subdir, run_id, *, tool="") -> Path` | wie oben | unverändert |
 | `scripts/lib/repo_containment.py::resolve_out_path` | `(project_root: Path, config: dict \| None, out: str, *, tool: str = "") -> Path`; validiert ein explizites `--out` per `realpath` gegen den Sink | bestehend: `tmp-sink.disabled`, `<tool>.out-outside-tmp-sink` | unverändert (Konsument in AC-24, bestehend `:671-701`) |
 | `scripts/lib/repo_containment.py::work_dir_env` | `(work_dir: Path, base: dict \| None = None) -> dict` | keine (reine Env-Konstruktion; schreibt nicht) | unverändert (Aufruf nur noch über `tmp_env`) |
 | `scripts/lib/repo_containment.py::resolve_effective_repo_containment` | `(config: dict \| None, provider: str \| None = None) -> ResolvedRepoContainment` | keine (nicht-exitierend) | unverändert; `tmp_paths.py` baut darauf auf |
-| `scripts/lib/config.py::_build_orch_variables` | `(variables, config, …) -> None`; setzt neu `TMP_SINK_ABS_PATH`, `PYTEST_BASETEMP`, `TMP_SINK_ENV_PIN_BLOCK` (aus `tmp_sink_env_pin_block`, **absolute** Werte, ADR-12) und ersetzt `{{PYTEST_BASETEMP}}` in `TEST_COMMANDS`/`CODE_QUALITY_RULES`; bei `enabled=False` entfallen `TMP_SINK_ABS_PATH` und `TMP_SINK_ENV_PIN_BLOCK` | `_fail`: `tmp-sink.pytest-token` (unersetztes Token) | erweitert (`:1539-1542` bestehend) |
-| `scripts/lib/config.py::_validate_repo_containment` | `(config: dict, config_path: Path) -> None` | `_fail` (Exit 1) für `system-temp-exception`-Struktur, Widerspruch `pytest-basetemp`/`enabled`, fehlenden `reason`, `gettempdir()` im Projekt | erweitert (`:483-587`) |
+| `scripts/lib/config.py::_build_orch_variables` | `(variables, config, …) -> None`; setzt neu `TMP_SINK_ABS_PATH`, `PYTEST_BASETEMP`, `TMP_SINK_ENV_PIN_BLOCK` (aus `tmp_sink_env_pin_block`, **absolute** Werte, ADR-12; Cache-Keys nur bei `toolchain-caches: true`) und ersetzt `{{PYTEST_BASETEMP}}` in `TEST_COMMANDS`/`CODE_QUALITY_RULES`; bei `enabled=False` entfallen `TMP_SINK_ABS_PATH` und `TMP_SINK_ENV_PIN_BLOCK` | `_fail`: `tmp-sink.pytest-token` (unersetztes Token) | erweitert (`:1539-1542` bestehend) |
+| `scripts/lib/config.py::_validate_repo_containment` | `(config: dict, config_path: Path) -> None` | `_fail` (Exit 1) für `system-temp-exception`-Struktur, Widerspruch `pytest-basetemp`/`enabled`, Widerspruch `toolchain-caches`/`enabled` (Q3), fehlenden `reason`, `gettempdir()` im Projekt | erweitert (`:483-587`) |
 | `scripts/lib/consistency/placeholders.py::_BUILTIN_VARS` | `set[str]`; neu `TMP_SINK_ABS_PATH`, `PYTEST_BASETEMP`, `TMP_SINK_ENV_PIN_BLOCK` | keine eigenen Fehlerpfade (Registrierung; Drift meldet der bestehende Placeholder-Check) | erweitert (`:136` bestehend) |
 | `scripts/lib/consistency/temp_literals.py::check_temp_literals` | `(agent_meta_root: Path, project_root: Path, config: dict \| None) -> list[Finding]`; Scope `agents/**`, `standalone/**`, `rules/1-generic/**`, `config/**`, `tests/fixtures/slimming-golden/**`, `tests/conftest.py` | Findings `temp-literal.system-temp`, `temp-literal.sink-relative`, `temp-literal.subprocess-env`, `temp-literal.toolchain-cache-in-repo`, `temp-literal.provider-advisory` (alle WARNING) | neu |
 | `scripts/lib/cli_commands.py` (`_strict_findings`-Block) | Aufruf `_strict_findings += check_temp_literals(...)` vor `print_report` (`:1411-1426`) | keine eigenen Fehlerpfade; Exit-Code kommt aus `print_report` | erweitert |
@@ -907,8 +960,8 @@ nur zusätzlicher Konsument.
 | `scripts/lib/backup.py::create_backup` | Staging via `TemporaryDirectory(dir=<abs>/backup-staging)`; Fallback nur bei `tmp-sink.disabled` | `backup.tmp-sink.invalid-path`; WARNING `backup.staging-system-temp` | erweitert (`:338-341`) |
 | `scripts/lib/provider_transform.py::_transform_frontmatter_for_opencode` | zusätzlicher Parameter `edit_allow_paths` **aus `TmpPaths`** statt aus der statischen Liste | `deny_edit` + leere Pfade ⇒ `edit: deny` (bestehend `:998`) | erweitert (`:477-484`, `:985-998`) |
 | `scripts/lib/sync_pipeline.py::_sync_tmp_sink` | nutzt `resolve_tmp_paths` statt eigener Auflösung; unverändertes Provisionierungsverhalten | keine neuen Fehlerpfade; bei deaktiviertem Sink `log.skip` (bestehend) | erweitert (`:238-269`) |
-| `hooks/1-generic/antigravity-json-adapter.sh` | unverändert; `_ERR_FILE` bleibt `mktemp` im System-Temp (`:167-168`) | keine Änderung am Deny/Allow-Vertrag | unverändert (dokumentierte Ausnahme, ADR-11) |
-| `.meta-config/temp-literal-allowlist.yaml` | Liste `{path, pattern, reason}` (Pflicht) plus optional `owner`; kein `expires` (Q6) | unbekannter Verstoß ⇒ WARNING | neu |
+| `hooks/1-generic/antigravity-json-adapter.sh` | `ARG_KEY_MAP` wird um `'FilePath': 'file_path'` erweitert (Q10, ADR-15), damit `args.FilePath` als `tool_input.file_path` beim Hook ankommt; `_ERR_FILE` bleibt `mktemp` im System-Temp (`:167-168`) | keine Änderung am Deny/Allow-Vertrag; ohne den Eintrag blockt der Hook jeden Write fail-closed (`repo-containment-impl.sh:391-397`) | erweitert (Mapping) / unverändert (`mktemp`-Ausnahme, ADR-11) |
+| `.meta-config/temp-literal-allowlist.yaml` | Liste mit **Pflichtfeldern** `path`, `pattern`, `reason` und optional `owner`; `expires` ist **kein** Schema-Teil (Q6, ADR-14) | vollständiger Eintrag ⇒ Verstoß unterdrückt; fehlendes `reason` oder nicht unterstütztes Feld (z. B. `expires`) ⇒ Verstoß bleibt WARNING **und** der ungültige Eintrag wird als WARNING derselben Check-Familie gemeldet; unbekannter Verstoß ohne Eintrag ⇒ WARNING | neu |
 | `.meta-config/temp-env-allowlist.yaml` | Liste `{path, symbol, reason}` für Subprozesse ohne Env-Pin (Inventar 3) | unbegründeter Aufruf ⇒ WARNING `temp-literal.subprocess-env` | neu |
 | `tests/conftest.py::_EXTERNAL_BASETEMP_HINT` | statischer Text ohne `/tmp`-Literal; Hinweis verweist auf `PYTEST_BASETEMP` | keine (statischer Hinweistext) | erweitert (`:28`) |
 
@@ -928,7 +981,8 @@ nur zusätzlicher Konsument.
             │    ├─ TMP_SINK_ABS_PATH      (absolut)     → nur Python-Konsumenten (Backup, Meldungen)
             │    ├─ PYTEST_BASETEMP        (absolut/plattformneutral)
             │    │    └─ Token-Ersetzung in TEST_COMMANDS / CODE_QUALITY_RULES
-            │    └─ TMP_SINK_ENV_PIN_BLOCK (export TMPDIR=<absolut>, ADR-12) → Agenten-Prompt
+            │    └─ TMP_SINK_ENV_PIN_BLOCK (export TMPDIR=<absolut>, ADR-12
+            │         + PIP_CACHE_DIR/npm_config_cache nur bei toolchain-caches: true) → Agenten-Prompt
             ├─ provider_transform: edit_allow_paths = [<relative>/** , .meta-viz/**]
             ├─ hooks: Wrapper/Impl deployen (Provider gebacken, Sink NICHT gebacken)
             ├─ gitignore: _tmp_sink_gitignore_entry(<relative>) → Managed-Block
@@ -967,6 +1021,12 @@ Antigravity-Sonderfall: Der Adapter liefert `cwd=''`, wenn weder `cwd`, `workspa
 `args.Cwd` gefüllt sind (`antigravity-json-adapter.sh:122-127`); der Anker kommt dann aus dem Ziel.
 Ein Write mit absolutem Pfad innerhalb des Workspace bleibt erlaubt; `/tmp/x` bleibt blockiert.
 
+Der Adapter normalisiert die AGY-Argumentnamen vor dem Hook: `args.CommandLine` → `command`,
+`args.Cwd` → `cwd` und — **neu entschieden (Q10/ADR-15)** — `args.FilePath` → `file_path`
+(`ARG_KEY_MAP`, `antigravity-json-adapter.sh:111`). Ohne den dritten Eintrag fällt `FilePath`
+unverändert durch, der Hook findet kein `tool_input.file_path` (`repo-containment-impl.sh:391-397`) und
+blockt den Write fail-closed ohne Pfadprüfung.
+
 ### Test-Lauf
 
 ```
@@ -989,7 +1049,8 @@ physisch außerhalb des Repo-Baums liegen, sonst findet die Ancestor-Suche das e
 **AC-01 — Kein System-Temp-Literal in Agenten-Templates.**
 Gegeben: `agents/**`. Wenn: mit dem exakten Muster `(^|[^A-Za-z0-9_.-])(/tmp/|%TEMP%|[A-Za-z]:\\\\Temp\\\\)`
 (case-sensitive, Pfadkontext, keine Treffer in „Template"/„temporary") gesucht wird. Dann: keine Treffer
-außer den in `.meta-config/temp-literal-allowlist.yaml` deklarierten `{path, pattern}`-Paaren.
+außer den in `.meta-config/temp-literal-allowlist.yaml` deklarierten, vollständigen Einträgen
+(`path`, `pattern`, `reason`; optional `owner` — Schema nach Q6/IC-11).
 Test: `tests/test_temp_literals.py::test_no_system_temp_literal_in_agents`.
 
 **AC-02 — Kein Sink-Literal in Report-Ziel-Anweisungen der vier Templates.**
@@ -1080,7 +1141,8 @@ Test: `tests/test_repo_containment_validate.py::test_unresolved_pytest_token_fai
 Gegeben: die Matrix aus [Konfigurierbarkeit](#konfigurierbarkeit--fehlerverhalten) — vier Fälle: kein
 Mapping, `pytest-basetemp: true` bei `enabled: false`, fehlender `reason`, `gettempdir()` im Projekt.
 Wenn: `sync.py --validate` läuft. Dann: Exit 1 mit dem dokumentierten Fehlertext — **ein eigener
-Testparameter je Fall**, kein Sammelassert.
+Testparameter je Fall**, kein Sammelassert. Der fünfte Matrixfall (`toolchain-caches: true` bei
+`enabled: false`, Q3) ist bewusst **nicht** Teil dieser AC, sondern hat seinen eigenen Test in AC-38.
 Test: `tests/test_repo_containment_schema.py::test_system_temp_exception_matrix`
 (parametrisiert, 4 Fälle) und
 `tests/test_repo_containment_validate.py::test_system_temp_exception_rejects_invalid_config`.
@@ -1115,11 +1177,14 @@ Test: `tests/test_repo_containment_consistency.py::test_no_hook_support_warning_
 
 **AC-21 — Temp-Literal-Check ist wirksam und nicht blockierend.**
 Gegeben: ein Template mit `/tmp/x`. Wenn: `--validate` läuft. Dann: WARNING `temp-literal.system-temp` mit
-Datei und Zeile; Exit 0. Mit Eintrag in der Allowlist: keine Meldung.
+Datei und Zeile; Exit 0. Mit einem **vollständigen** Allowlist-Eintrag (`path`, `pattern`, `reason`):
+keine Meldung. Ein Eintrag ohne `reason` oder mit einem nicht unterstützten Feld (z. B. `expires`)
+unterdrückt die Meldung **nicht** — der Verstoß bleibt WARNING, und der ungültige Eintrag wird
+zusätzlich als WARNING derselben Check-Familie gemeldet (Q6, ADR-14; Schema-Details IC-11, Tests AC-39).
 Test: `tests/test_consistency_temp_literals.py::test_warning_and_allowlist`.
 
 **AC-22 — Vage Temp-Anweisungen sind ersetzt.**
-Gegeben: die 12 SE-/Test-Rollen aus Ist-Zustand E. Wenn: gerendert. Dann: nennt jede Anweisung den
+Gegeben: die 13 Rollen aus Ist-Zustand E (12 SE-Rollen + `test-executor`). Wenn: gerendert. Dann: nennt jede Anweisung den
 konfigurierten Sink (`{{TMP_SINK_PATH}}`) als Schreibort für das Zwischenartefakt, oder begründet explizit
 einen anderen Ort.
 Test: `tests/test_template_report_paths.py::test_atomic_write_names_tmp_sink`.
@@ -1158,8 +1223,8 @@ Test: `tests/test_standalone_render.py::test_tmp_sink_path_uses_framework_defaul
 
 **AC-28 — Leerer `cwd`: der Anker kommt aus dem Zielverzeichnis (Hook-Unit-Test).**
 Vorbedingung: Fixture mit `.meta-config/`; Payload-Feld `cwd` vorhanden, aber `""`. Der Test prüft die
-Ankerwahl auf Hook-Ebene; die Adapter-Zuordnung `args.FilePath` → `tool_input.file_path` ist **nicht** Teil
-dieses AC (offen, Q10/R14).
+Ankerwahl auf Hook-Ebene; die Adapter-Zuordnung `args.FilePath` → `tool_input.file_path` ist mit Q10
+entschieden (ADR-15) und wird in AC-40 geprüft, nicht hier.
 Gegeben: `cwd=""`, `tool_name=Write`, `tool_input.file_path=<fixture>/notes.md` (absolut, innerhalb des
 Roots). Wenn: Hook läuft. Dann: Exit 0, und der Anker ist das Verzeichnis des Ziels, nicht `$PWD`.
 Test: `tests/test_repo_containment_hook.py::test_empty_cwd_anchors_on_absolute_target`.
@@ -1218,6 +1283,44 @@ oberhalb. Wenn: Hook läuft. Dann: Exit 0, und als Root gilt der fremde Baum —
 offengelegte Vertrauensannahme fest, statt sie ungetestet zu lassen.
 Test: `tests/test_repo_containment_hook.py::test_empty_cwd_uses_project_of_absolute_target`.
 
+**AC-38 — Toolchain-Caches sind ein Opt-in und niemals Default (Q3).**
+Gegeben: Default-Config (`system-temp-exception.enabled: true`, `toolchain-caches` nicht gesetzt). Wenn:
+`build_variables` läuft. Dann: `TMP_SINK_ENV_PIN_BLOCK` enthält weder `PIP_CACHE_DIR` noch
+`npm_config_cache`; `TmpPaths.env` bleibt cache-neutral (`TMPDIR`/`TEMP`/`TMP`). Bei
+`toolchain-caches: true` **und** `enabled: true` enthalten beide Keys absolute Pfade unter
+`<absolute>/cache/…` (`<absolute>/cache/pip`, `<absolute>/cache/npm`) — dieselbe absolute Basis wie
+`TMPDIR`. Bei `toolchain-caches: true` und `enabled: false` beendet `sync.py --validate` den Lauf mit
+Exit 1 und dem dokumentierten Fehlertext. `docker` wird in keinem Fall umgeleitet.
+Test: `tests/test_tmp_sink_output_dirs.py::test_toolchain_cache_opt_in_is_off_by_default`,
+`tests/test_tmp_sink_output_dirs.py::test_toolchain_cache_opt_in_pins_cache_dirs`,
+`tests/test_repo_containment_validate.py::test_toolchain_cache_requires_enabled_exception`.
+
+**AC-39 — Allowlist-Schema ist strikt: `reason` ist Pflicht, `expires` existiert nicht (Q6).**
+Gegeben: `.meta-config/temp-literal-allowlist.yaml`. Wenn: `--validate` läuft. Dann: ein Eintrag mit
+`path`, `pattern` und `reason` unterdrückt die WARNING für den passenden Verstoß; ein Eintrag ohne
+`reason` unterdrückt sie **nicht** (der Verstoß bleibt WARNING, der ungültige Eintrag wird zusätzlich als
+WARNING derselben Check-Familie gemeldet); ein Eintrag mit dem Feld `expires` wird ebenso behandelt —
+`expires` ist **kein** Schema-Teil. `owner` bleibt optional und ändert das Ergebnis nicht.
+Test: `tests/test_consistency_temp_literals.py::test_allowlist_requires_reason`,
+`tests/test_consistency_temp_literals.py::test_allowlist_rejects_expires_field`.
+
+**AC-40 — Der Antigravity-Adapter mappt `args.FilePath` → `tool_input.file_path` (Q10).**
+Gegeben: AGY-Payload `{"toolCall": {"name": "write_to_file", "args": {"FilePath": "/ws/a.md"}},
+"workspacePaths": ["/ws"]}`. Wenn: der Adapter läuft. Dann: das an den Ziel-Hook gereichte JSON enthält
+`tool_name == "Write"` **und** `tool_input.file_path == "/ws/a.md"` — der Hook prüft den Write, statt ihn
+am fehlenden `file_path` fail-closed zu blockieren. Der Regressionsfall wird im bestehenden Adapter-Test
+ergänzt; ein separater PascalCase-Contract-Test ist **nicht** gefordert.
+Test: `tests/test_antigravity_hooks_registration.py::test_adapter_normalizes_edit_tool_names`
+(ergänzte Assertion `received["tool_input"]["file_path"] == "/ws/a.md"`).
+
+**AC-41 — §5.5 verweist auf `PYTEST_BASETEMP`/den Config-Key statt auf ein `/tmp`-Literal (Q11).**
+Gegeben: `docs/concepts/repo-containment-prison-mode.md`, Abschnitt 5.5. Wenn: der Abschnitt geprüft
+wird. Dann: er nennt `PYTEST_BASETEMP` bzw. den Config-Key `system-temp-exception` als Quelle des
+Basetemp-Werts und enthält kein `--basetemp=/tmp`-Literal; die Pflichtregel „Der pytest-Basetemp darf
+NIE im Arbeitsbaum liegen" bleibt wörtlich enthalten. Die Änderung ist ein Doku-Schritt des Plans, nicht
+Teil dieser Spec.
+Test: `tests/test_docs_tmp_sink_injection.py::test_prison_mode_section_uses_basetemp_variable`.
+
 
 ---
 
@@ -1228,7 +1331,7 @@ Test: `tests/test_repo_containment_hook.py::test_empty_cwd_uses_project_of_absol
 | R1 | Hook-Fail-closed blockiert legitime Arbeit in Verzeichnissen ohne `.meta-config/` | mittel | hoch (Arbeitsstopp) | präzise Meldung mit Reparatur + Opt-out; Doku-Absatz; Rollout mit `sync.py --validate`-Hinweis |
 | R2 | Golden-/Guard-Rebase wird vergessen | hoch (wenn nicht im selben Plan-Schritt) | mittel (Suite rot, Guard verliert Vertrauen) | AC-19/AC-02/AC-03 als ein Plan-Schritt; Tests zuerst |
 | R3 | Env-Pin (`TMPDIR`) bricht Fremd-Tools | mittel | mittel | nur absolute Werte (ADR-12) und ein existierendes, absolut auflösbares Verzeichnis; Existenzprüfung vor dem Export (AC-36); `TmpSinkError` statt leerem Wert |
-| R4 | `system-temp-exception` wird zum Schlupfloch (alles nach System-Temp) | niedrig | hoch | Key-Granularität (`pytest-basetemp`, `toolchain-cache`), `reason`-Pflicht, WARNING bei Inanspruchnahme |
+| R4 | `system-temp-exception` wird zum Schlupfloch (alles nach System-Temp) | niedrig | hoch | Key-Granularität (`pytest-basetemp`, `toolchain-caches`, Default `false`), `reason`-Pflicht, WARNING bei Inanspruchnahme |
 | R5 | Symlink/TOCTOU im Sink bleibt ausnutzbar | mittel | mittel | realpath + `_ensure_inside_sink` (`repo_containment.py:617-638`); Restrisiko dokumentiert |
 | R6 | Opencode-Scope-Ableitung ist advisory und wird als Garantie missverstanden | hoch | mittel | WARNING + Doku; `external_directory` ausdrücklich UNVERIFIED |
 | R7 | Repo-Wachstum durch neue In-Repo-Artefakte (Backup-Staging, Bash-Logs) | mittel | niedrig | `.gitignore`-Block (`ensure_tmp_sink_gitignore`), `cleanup: manual` unverändert |
@@ -1238,7 +1341,7 @@ Test: `tests/test_repo_containment_hook.py::test_empty_cwd_uses_project_of_absol
 | R11 | Provider löst relative Tool-Pfade anders auf als `cwd` (Annahme A1) | niedrig | mittel (Fehlblockade oder Fehlfreigabe bei relativen Zielen) | AC-06/AC-33 prüfen den realen Zielpfad; `cwd` ist bei allen aktiven Providern das Payload-Feld (`antigravity-json-adapter.sh:111`, Hook `:151-158`); Abweichung würde durch AC-33 sichtbar, nicht still akzeptiert |
 | R12 | Neue Fail-closed-Hook-ACs sind selbst basetemp-abhängig (Ancestor-Kollision) | hoch, wenn Fixture aus `tmp_path` gebaut wird | hoch (Test grün/rot je nach Aufruf, Guard verliert Beweiskraft) | Vorbedingung in AC-03/04/05/07: Fixture per `mkdtemp` im System-Temp plus Assertion „kein `.meta-config/` im Ancestor-Pfad"; gilt unabhängig von Option A/C (RVW-07) |
 | R13 | `standalone/**` wird nach der Template-Korrektur nicht regeneriert | mittel | mittel (ausgelieferte Personas behalten Literale und Platzhalter-Notizen) | `--render-standalone --check` als Gate (AC-26); der Temp-Literal-Check deckt `standalone/**` ab |
-| R14 | Antigravity-Writes tragen `args.FilePath` (PascalCase) statt `tool_input.file_path` | mittel | hoch (Write würde am `file_path`-Check `:391-397` fail-closed scheitern) | offene Frage Q10; bis zur Verifikation bleibt das Verhalten fail-closed (kein Fail-open-Risiko), aber funktional blockierend — im Plan als Prüfschritt vor dem `cwd`-Rollout |
+| R14 | Antigravity-Writes tragen `args.FilePath` (PascalCase) statt `tool_input.file_path` | war hoch (jeder Write fail-closed blockiert) | **entschieden und mitigiert (Q10/ADR-15):** `ARG_KEY_MAP` mappt `FilePath` → `file_path`, der Hook prüft den Write statt ihn pauschal zu blocken | der Regressionsfall in `test_adapter_normalizes_edit_tool_names` (AC-40) hält das Mapping fest; Restrisiko: weitere, heute unbekannte PascalCase-Argumente bleiben unmapped und damit fail-closed |
 
 
 ---
@@ -1246,8 +1349,10 @@ Test: `tests/test_repo_containment_hook.py::test_empty_cwd_uses_project_of_absol
 ## ADRs (Entscheidungsregister)
 
 Format: MADR-minimal (Kontext / Entscheidung / Konsequenzen). Alle Entscheidungen sind Vorschläge dieser
-Spec und werden mit ihr freigegeben oder verworfen; die in Revision 2 entschiedenen Fragen
-(Q1, Q2, Q4, Q5, Q7, Q8, Q9) sind in [Offene Fragen](#offene-fragen) als entschieden markiert.
+Spec und werden mit ihr freigegeben oder verworfen. Zuordnung der entschiedenen Fragen: Revision 2
+entschied Q1, Q2, Q4, Q5, Q7, Q8 und Q9; Revision 3 entschied durch Nutzerentscheidung Q3 (ADR-13),
+Q6 (ADR-14), Q10 (ADR-15) und Q11 (ADR-16). Alle sind in
+[Offene Fragen](#offene-fragen) als entschieden markiert.
 
 
 ### ADR-01 — Ein Resolver, keine zweite Auflösung
@@ -1381,6 +1486,65 @@ Spec und werden mit ihr freigegeben oder verworfen; die in Revision 2 entschiede
   den Reparaturweg, statt still auf einen toten Pfad zu zeigen (AC-36). (−) Der Standalone-Export setzt die
   Variable leer, weil er keine Projekt-Config hat (IC-15).
 
+### ADR-13 — Toolchain-Caches nur per Opt-in, Default aus (Q3)
+
+- **Kontext:** `system-temp-exception` war bisher nur für `pytest --basetemp` gedacht; pip/npm schreiben
+  weiter in den Nutzer-Cache (`~/.cache/pip`, `~/.npm/_cacache`). Ein In-Repo-Cache wäre bequemer für
+  Offline-Läufe, wächst aber im Arbeitsbaum und wird von Backups/CI erfasst.
+- **Entscheidung:** Der Config-Key
+  `repo_containment.tmp-sink.system-temp-exception.toolchain-caches` (plural, kebab-case; Default `false`)
+  erlaubt ein Opt-in. Nur bei `true` **und** `enabled: true` pinnt der Builder
+  `PIP_CACHE_DIR=<abs>/cache/pip` und `npm_config_cache=<abs>/cache/npm` in `TMP_SINK_ENV_PIN_BLOCK`
+  (dieselbe absolute Basis wie `TMPDIR`/`TEMP`/`TMP`, ADR-12). `tmp_env` bleibt cache-neutral.
+  `toolchain-caches: true` bei `enabled: false` ⇒ `_fail` Exit 1. `docker` wird nie umgeleitet. Das
+  Python-Feld heißt weiterhin `SystemTempException.toolchain_cache`.
+- **Konsequenzen:** (+) keine gebrochenen Toolchains durch einen Default-Wechsel; die Entscheidung ist
+  sichtbar (explizites Opt-in plus WARNING `temp-literal.toolchain-cache-in-repo`). (−) Wer den Cache im
+  Repo will, muss ihn auch entsorgen: er wächst in Backup/CI/Submodul, `cleanup: on-sync` löscht ihn, und
+  nach einem Repo-Umzug zeigt der Pin bis zum Re-Sync auf einen toten Pfad. (−) `toolchain-caches` bei
+  `enabled: false` ist ein zusätzlicher Config-Fehlerfall in der Fehlermatrix.
+
+### ADR-14 — Allowlist-Schema mit `reason`-Pflicht, ohne `expires` (Q6)
+
+- **Kontext:** Revision 2 ließ die Allowlist-Frage offen und führte `owner` bereits als optionales Feld;
+  ein `expires`-Feld stand im Raum, ohne dass ein Ablaufmechanismus existiert.
+- **Entscheidung:** `.meta-config/temp-literal-allowlist.yaml` verlangt `path`, `pattern` und `reason`;
+  `owner` ist optional; `expires` ist **kein** Schema-Teil. Ein Eintrag ohne `reason` oder mit einem nicht
+  unterstützten Feld (z. B. `expires`) unterdrückt die Meldung nicht — der Verstoß bleibt WARNING, und der
+  ungültige Eintrag wird als WARNING derselben Check-Familie gemeldet.
+- **Konsequenzen:** (+) jede Ausnahme trägt ihre Begründung im Artefakt; (+) keine Pseudo-Ablaufsemantik,
+  die niemand durchsetzt. (−) Projekte mit `expires` in einer Altliste bekommen zwei WARNINGs statt einer
+  Unterdrückung — bewusst laut, nicht still.
+
+### ADR-15 — Der Antigravity-Adapter mappt `FilePath` → `file_path` (Q10)
+
+- **Kontext:** `ARG_KEY_MAP` (`antigravity-json-adapter.sh:111`) enthält nur `CommandLine` und `Cwd`.
+  `args.FilePath` fällt unverändert als `tool_input.FilePath` durch; der Hook liest ausschließlich
+  `tool_input.file_path` (`repo-containment-impl.sh:391-397`) und blockt deshalb jeden Antigravity-Write
+  fail-closed, ohne den Pfad je zu prüfen.
+- **Entscheidung:** Der Adapter-Vertrag wird um `'FilePath': 'file_path'` erweitert. Der `mktemp`-Pfad des
+  Adapters bleibt unverändert (ADR-11). Der Regressionsfall wird im bestehenden Test
+  `tests/test_antigravity_hooks_registration.py::test_adapter_normalizes_edit_tool_names` ergänzt
+  (`received["tool_input"]["file_path"] == "/ws/a.md"`); ein separater PascalCase-Contract-Test ist nicht
+  gefordert.
+- **Konsequenzen:** (+) Antigravity-Writes werden geprüft statt pauschal blockiert; (+) das Mapping bleibt
+  eine Tabellenzeile, keine Provider-Verzweigung. (−) Ein weiteres AGY-Argument mit anderem Namen bleibt
+  unmapped und damit fail-closed — dokumentiert als Restrisiko in R14.
+
+### ADR-16 — §5.5 verweist auf den Config-Key statt auf ein `/tmp`-Literal (Q11)
+
+- **Kontext:** §5.5 (`docs/concepts/repo-containment-prison-mode.md:404-439`) verlangt inhaltlich korrekt,
+  dass der Basetemp nie im Arbeitsbaum liegt, nennt aber `--basetemp=/tmp/<user>` als Beispiel
+  (`:410-411`) und im kanonischen Aufruf (`:428-429`). Der Regeltext trägt damit selbst die Form, die er
+  verbietet.
+- **Entscheidung:** Der Regeltext verweist künftig auf `PYTEST_BASETEMP` bzw. den Config-Key
+  `system-temp-exception`; ein `/tmp`-Literal bleibt in der Vorschrift nicht stehen. Die Pflichtregel
+  („Der pytest-Basetemp darf NIE im Arbeitsbaum liegen") bleibt wörtlich erhalten. Das ist eine reine
+  Doku-Änderung; der Task gehört in den Plan, nicht in diese Spec (Inventar 14).
+- **Konsequenzen:** (+) die Regel ist literal-frei und damit konsistent mit AC-01/AC-13; (+) keine
+  inhaltliche Umkehr (Nicht-Ziele). (−) `docs/concepts/**` hat keinen Renderer, die Änderung ist deshalb
+  redaktionell und wird nur durch AC-41 (Doku-Test) abgesichert.
+
 
 ---
 
@@ -1398,9 +1562,10 @@ Spec und werden mit ihr freigegeben oder verworfen; die in Revision 2 entschiede
 - **IC-04** — `pytest_basetemp` ist absolut und literal-frei: entweder `<absolute>/pytest` oder
   `<tempfile.gettempdir()>/<user>/pytest-agent-meta`; in `TEST_COMMANDS` shell-gequotet, kein `"` im Wert.
 - **IC-05** — Builder-Vertrag: `TMP_SINK_PATH` (relativ, immer gesetzt), `TMP_SINK_ABS_PATH` (absolut),
-  `PYTEST_BASETEMP`, `TMP_SINK_ENV_PIN_BLOCK` (absolut, aus `tmp_sink_env_pin_block`); Token
-  `{{PYTEST_BASETEMP}}` wird in `TEST_COMMANDS` und `CODE_QUALITY_RULES` ersetzt, unersetzt ⇒ Exit 1; bei
-  `enabled=False` entfallen `TMP_SINK_ABS_PATH` und `TMP_SINK_ENV_PIN_BLOCK`.
+  `PYTEST_BASETEMP`, `TMP_SINK_ENV_PIN_BLOCK` (absolut, aus `tmp_sink_env_pin_block`); der Block enthält
+  `PIP_CACHE_DIR` und `npm_config_cache` **nur** bei `toolchain-caches: true` (Q3) — `tmp_env` bleibt
+  cache-neutral; Token `{{PYTEST_BASETEMP}}` wird in `TEST_COMMANDS` und `CODE_QUALITY_RULES` ersetzt,
+  unersetzt ⇒ Exit 1; bei `enabled=False` entfallen `TMP_SINK_ABS_PATH` und `TMP_SINK_ENV_PIN_BLOCK`.
 - **IC-06** — `tmp_env(paths)` setzt `TMPDIR`/`TEMP`/`TMP` auf `paths.absolute`; bei `enabled=False`
   `TmpSinkError` mit `tmp-sink.disabled`.
 - **IC-07** — Hook-Verdict: Anker = `cwd` (nicht leer) oder Zielverzeichnis bei absolutem Ziel; relative
@@ -1413,9 +1578,14 @@ Spec und werden mit ihr freigegeben oder verworfen; die in Revision 2 entschiede
   `.meta-viz/**`); leere Ableitung ⇒ `edit: deny`.
 - **IC-11** — Consistency-Check `check_temp_literals` meldet WARNINGs mit Allowlist
   `.meta-config/temp-literal-allowlist.yaml`; Scope inklusive `standalone/**`; registriert im
-  `_strict_findings`-Block (`cli_commands.py:1411-1426`).
+  `_strict_findings`-Block (`cli_commands.py:1411-1426`). Allowlist-Schema (Q6): Pflichtfelder `path`,
+  `pattern`, `reason`, optional `owner`; `expires` ist kein Schema-Teil. Ein Eintrag ohne `reason` oder mit
+  einem nicht unterstützten Feld unterdrückt den Verstoß nicht, sondern erzeugt zusätzlich eine WARNING
+  derselben Check-Familie.
 - **IC-12** — Config-Schema/Validator: `system-temp-exception.{enabled,reason,pytest-basetemp,
-  toolchain-cache}` mit den Fehlerfällen aus [Konfigurierbarkeit](#konfigurierbarkeit--fehlerverhalten).
+  toolchain-caches}` (YAML-Key plural/kebab-case, Python-Feld `toolchain_cache`; `toolchain-caches`
+  Default `false`, `true` bei `enabled: false` ⇒ `_fail` Exit 1) mit den Fehlerfällen aus
+  [Konfigurierbarkeit](#konfigurierbarkeit--fehlerverhalten).
 - **IC-13** — `TMP_SINK_ABS_PATH` darf in `agents/**` und `standalone/**` nicht gerendert werden
   (Template-Lint). Davon getrennt und ausdrücklich erlaubt ist der `TMP_SINK_ENV_PIN_BLOCK` mit absoluten
   Env-Werten (ADR-12).
@@ -1428,17 +1598,24 @@ Spec und werden mit ihr freigegeben oder verworfen; die in Revision 2 entschiede
 - **IC-16** — Managed-`.gitignore`-Eintrag und Doctor-Finding werden aus `TmpPaths` gespeist; kein
   weiterer `resolve_effective_repo_containment`-Aufruf und kein dritter Parser in
   `gitignore.py::_tmp_sink_gitignore_entry` / `doctor_detectors.py::_sink_hits`.
-- **IC-17** — Der Antigravity-Adapter bleibt unverändert; sein `mktemp`-stderr-Pfad ist die dokumentierte
-  Ausnahme (ADR-11) und wird per `trap` entfernt.
+- **IC-17** — Der Antigravity-Adapter mappt `args.FilePath` → `tool_input.file_path` (`ARG_KEY_MAP`
+  erweitert um `'FilePath': 'file_path'`, Q10/ADR-15); sein `mktemp`-stderr-Pfad bleibt unverändert die
+  dokumentierte Ausnahme (ADR-11) und wird per `trap` entfernt.
 - **IC-18** — Subprozess-Env-Pin gilt für `scripts/**` (inkl. `scripts/*.py`); Ausnahmen stehen mit
   Begründung in `.meta-config/temp-env-allowlist.yaml`.
 - **IC-19** — `TMP_SINK_ENV_PIN_BLOCK` (erzeugt von `tmp_sink_env_pin_block(paths)`) setzt `TMPDIR`,
   `TEMP` und `TMP` ausschließlich auf absolute Werte (`str(paths.absolute)`, identisch zu `TmpPaths.env`),
-  prüft die Existenz vor dem Export und ist die einzige Ausnahme zu ADR-02/IC-13 (ADR-12); bei
+  prüft die Existenz vor dem Export und ist die einzige Ausnahme zu ADR-02/IC-13 (ADR-12); zusätzlich
+  setzt derselbe Block `PIP_CACHE_DIR=<abs>/cache/pip` und `npm_config_cache=<abs>/cache/npm`, **wenn**
+  `toolchain_cache` aktiv ist (Q3/ADR-13) — ohne Opt-in enthält der Block keinen Cache-Key; bei
   `enabled=False` wirft die Funktion `tmp-sink.disabled` und der Builder setzt die Variable nicht.
 - **IC-20** — `resolve_out_path(project_root, config, out, *, tool="") -> Path` validiert ein explizites
   `--out` per `realpath` gegen den Sink; Fehler `tmp-sink.disabled` und `<tool>.out-outside-tmp-sink`;
   Verhalten unverändert.
+- **IC-21** — §5.5 (`docs/concepts/repo-containment-prison-mode.md:404-439`) verweist auf
+  `PYTEST_BASETEMP` bzw. den Config-Key `system-temp-exception` und enthält kein `--basetemp=/tmp`-Literal
+  in der Vorschrift; die Pflichtregel „Der pytest-Basetemp darf NIE im Arbeitsbaum liegen" bleibt wörtlich
+  erhalten (Q11/ADR-16, AC-41). Umsetzung als Doku-Task im Plan, nicht in dieser Spec.
 
 
 ---
@@ -1484,14 +1661,19 @@ Spec und werden mit ihr freigegeben oder verworfen; die in Revision 2 entschiede
 | AC-35 | IC-05, IC-19 | 3 |
 | AC-36 | IC-19 | 3 |
 | AC-37 | IC-07, IC-08 | 5 |
+| AC-38 | IC-05, IC-12, IC-19 | 3 |
+| AC-39 | IC-11 | 7 |
+| AC-40 | IC-17 | 5 |
+| AC-41 | IC-21 | 14 |
 
 
 ---
 
 ## Offene Fragen
 
-**Legende:** „entschieden (Rev. 2)" = in dieser Revision festgelegt, damit kein AC von einer offenen
-Frage abhängt (RVW-05). Kein AC hängt an Q3, Q6, Q10 oder Q11.
+**Legende:** „Entschieden (Rev. 2)" = in Revision 2 festgelegt; „Entschieden (Rev. 3)" = in Revision 3
+durch Nutzerentscheidung festgelegt. Es bleibt **keine offene Frage**: alle elf Fragen sind entschieden.
+Die ACs hängen bewusst an den Entscheidungen — Q3 → AC-38, Q6 → AC-39, Q10 → AC-40, Q11 → AC-41.
 
 - **Q1** — Soll die System-Temp-Ausnahme (`system-temp-exception.enabled`, `pytest-basetemp: true`) im
   Framework-Default **an** oder **aus** sein? — **Entschieden (Rev. 2): an.** Begründung: „aus" würde den
@@ -1501,8 +1683,15 @@ Frage abhängt (RVW-05). Kein AC hängt an Q3, Q6, Q10 oder Q11.
   (Rev. 2): ja.** Absolute Konsumenten (Backup, Meldungen, Diagnose) bekommen damit eine stabile Quelle;
   in Templates bleibt sie verboten (IC-13, AC-16).
 - **Q3** — Dürfen Toolchain-Caches (pip/npm) per Opt-in in den Sink gepinnt werden, oder bleibt das
-  dauerhaft ausgeschlossen? — **Offen.** Kein AC hängt daran; Default bleibt `false`
-  ([Toolchain-Ausnahme](#toolchain-ausnahme)).
+  dauerhaft ausgeschlossen? — **Entschieden (Rev. 3): Opt-in erlaubt, Default aus.** Config-Key
+  `repo_containment.tmp-sink.system-temp-exception.toolchain-caches` (Default `false`); nur bei `true`
+  **und** `enabled: true` pinnt der Builder `PIP_CACHE_DIR=<abs>/cache/pip` und
+  `npm_config_cache=<abs>/cache/npm` in den Env-Pin-Block, `tmp_env` bleibt cache-neutral, `docker` wird
+  nie umgeleitet (AC-38, IC-05/IC-12/IC-19, ADR-13,
+  [Toolchain-Ausnahme](#toolchain-ausnahme)). Begründung: Default aus bricht keine Toolchain; der
+  In-Repo-Cache wächst in Backup/CI/Submodul, `cleanup: on-sync` würde ihn löschen, und nach einem
+  Repo-Umzug zeigt der Pin bis zum Re-Sync auf einen toten Pfad — deshalb ausdrückliches, sichtbares
+  Opt-in statt Default.
 - **Q4** — Soll `repo_containment.enabled: false` weiterhin Vorrang haben, wenn **kein** Projekt-Root
   auflösbar ist? — **Entschieden (Rev. 2): nein, Root-Auflösung geht vor.** Ohne Root ist die Config nicht
   lesbar; ein Opt-out eines fremden Projekts darf keinen Write außerhalb freischalten (AC-08 bleibt
@@ -1511,10 +1700,13 @@ Frage abhängt (RVW-05). Kein AC hängt an Q3, Q6, Q10 oder Q11.
   (Rev. 2): nein.** Ersetzt durch die Anker-Regel (ADR-08): `cwd` fehlt/leer + absolutes Ziel ⇒ Anker aus
   dem Ziel; relatives Ziel ohne `cwd` ⇒ Exit 2 `repo-containment.no-root` (AC-28/AC-29).
 - **Q6** — Wo soll die Allowlist für Temp-Literale liegen und wie streng soll sie sein (nur
-  Pfad+Pattern, oder zusätzlich `owner`/`expires`)? — **Offen.** AC-21 ist so formuliert, dass es unter
-  beiden Varianten gilt (Pfad+Pattern ist die Mindestanforderung). Das Schema in
-  [Interface Contracts](#interface-contracts) führt `owner` deshalb nur als **optionales** Feld und
-  `expires` gar nicht — die Schema-Formulierung ist damit nicht strenger als die offene Frage (RVW2-07).
+  Pfad+Pattern, oder zusätzlich `owner`/`expires`)? — **Entschieden (Rev. 3):**
+  `.meta-config/temp-literal-allowlist.yaml` mit den Pflichtfeldern `path`, `pattern`, `reason` und dem
+  optionalen `owner`; `expires` ist **kein** Schema-Teil. Ein Eintrag ohne `reason` oder mit einem nicht
+  unterstützten Feld (z. B. `expires`) unterdrückt die Meldung nicht — der Verstoß bleibt WARNING, und der
+  ungültige Eintrag wird als WARNING derselben Check-Familie gemeldet (AC-21, AC-39, IC-11, ADR-14).
+  Begründung: `expires` bräuchte einen Ablauf-Job, den es nicht gibt; eine Pseudo-Ablaufsemantik wäre eine
+  stille Ausnahme, `owner` dagegen nur ein Nachverfolgungs-Hinweis.
 - **Q7** — Soll ein Backup bei deaktiviertem Sink auf System-Temp ausweichen oder hart abbrechen? —
   **Entschieden (Rev. 2): ausweichen, mit WARNING.** Ein Backup darf nie an der Sink-Konfiguration
   scheitern (AC-10).
@@ -1528,11 +1720,18 @@ Frage abhängt (RVW-05). Kein AC hängt an Q3, Q6, Q10 oder Q11.
   `tests/test_antigravity_hooks_registration.py:331`); der Adapter mappt nur `CommandLine`/`Cwd`
   (`antigravity-json-adapter.sh:111`), die `file_path`-Suche des Hooks (`:391-397`) findet dann nichts.
   Wird `FilePath` → `file_path` künftig gemappt (Adapter-Vertrag), oder bleibt der Write-Pfad für
-  Antigravity fail-closed blockiert? — **Offen**, kein AC hängt daran; das aktuelle Verhalten ist
-  fail-closed (R14).
+  Antigravity fail-closed blockiert? — **Entschieden (Rev. 3): Der Adapter mappt `args.FilePath` →
+  `tool_input.file_path`.** `ARG_KEY_MAP` wird um `'FilePath': 'file_path'` erweitert, damit Writes
+  geprüft statt pauschal blockiert werden. Der Regressionsfall wird im bestehenden Test
+  `tests/test_antigravity_hooks_registration.py::test_adapter_normalizes_edit_tool_names` ergänzt
+  (`received["tool_input"]["file_path"] == "/ws/a.md"`); ein separater PascalCase-Contract-Test ist
+  **kein** Pflichtumfang (AC-40, IC-17, ADR-15, R14 entschieden/mitigiert).
 - **Q11** — Soll §5.5 (`docs/concepts/repo-containment-prison-mode.md:404-439`) selbst auf
   `PYTEST_BASETEMP`/den Config-Key verweisen, oder bleibt der Regeltext als Beispiel-Formulierung
-  unverändert? — **Offen**, reine Doku-Frage; kein AC hängt daran.
+  unverändert? — **Entschieden (Rev. 3): §5.5 verweist auf `PYTEST_BASETEMP` bzw. den Config-Key
+  `system-temp-exception`, kein `/tmp`-Literal mehr in der Vorschrift.** Die inhaltliche Pflichtregel
+  („Der pytest-Basetemp darf NIE im Arbeitsbaum liegen") bleibt **wörtlich** erhalten; das ist ein
+  Doku-Soll, dessen Task im Plan liegt (AC-41, IC-21, ADR-16, Inventar 14).
 
 
 ---
