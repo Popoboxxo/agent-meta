@@ -36,6 +36,7 @@ Run: python3 -m pytest tests/test_opencode_v2_surface.py -q
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 import json
 import re
@@ -5022,4 +5023,127 @@ def test_ac_t4_fixtures_unchanged():
     assert mismatched == [], (
         "golden fixtures changed (AC-T4 requires them frozen):\n"
         + "\n".join(mismatched)
+    )
+
+
+# --- AC coverage + provider agnosticism meta-tests (Task 31, AC-T3/AC-T6) ----
+
+#: Spec AC-T3: every AC owned by this file must have at least one named test.
+_AC_T3_SURFACE_IDS = (
+    "b1", "b2", "b4", "b5", "b7", "b12", "b16", "b17", "b18", "b19",
+    "b20", "b21", "b22", "c3", "c4", "c7", "c14", "c15", "c16a", "c16b",
+    "c17", "d1", "d3", "d4", "d7",
+)
+
+_AC_T3_REQUIRED_PATTERN = re.compile(
+    r"^def test_ac_(b1|b2|b4|b5|b7|b12|b16|b17|b18|b19|b20|b21|b22|"
+    r"c3|c4|c7|c14|c15|c16a|c16b|c17|d1|d3|d4|d7)_",
+    re.MULTILINE,
+)
+
+_OPENCODE_V2_CONFIG_PATH = _REPO_ROOT / "scripts" / "lib" / "opencode_v2_config.py"
+
+
+def test_ac_t3_required_acs_have_tests():
+    """AC-T3: every required AC has at least one test named after it.
+
+    The sweep reads the source text of this file (regex on
+    ``def test_ac_<id>_``), so deleting or renaming a test is caught even when
+    the suite stays green for another reason. AC-D9 is owned by
+    ``tests/test_artifact_contracts.py`` and AC-C1/AC-C2 by
+    ``tests/test_opencode_v2_spike.py`` (spec AC-T3) — those files are checked
+    explicitly rather than folded into this file's list.
+    """
+    source = Path(__file__).read_text(encoding="utf-8")
+    found = set(_AC_T3_REQUIRED_PATTERN.findall(source))
+    missing = [ac for ac in _AC_T3_SURFACE_IDS if ac not in found]
+    assert missing == [], (
+        "AC-T3: no test named 'def test_ac_<id>_...' in "
+        f"tests/test_opencode_v2_surface.py for: {missing}"
+    )
+
+    contracts = (_REPO_ROOT / "tests" / "test_artifact_contracts.py").read_text(
+        encoding="utf-8"
+    )
+    assert re.search(r"^def test_ac_d9_", contracts, re.MULTILINE), (
+        "AC-T3/AC-D9: no 'def test_ac_d9_...' test in "
+        "tests/test_artifact_contracts.py"
+    )
+
+    spike = (_REPO_ROOT / "tests" / "test_opencode_v2_spike.py").read_text(
+        encoding="utf-8"
+    )
+    for ac_id in ("c1", "c2"):
+        assert re.search(rf"^def test_ac_{ac_id}_", spike, re.MULTILINE), (
+            f"AC-T3/AC-{ac_id.upper()}: no 'def test_ac_{ac_id}_...' test in "
+            "tests/test_opencode_v2_spike.py"
+        )
+
+
+def _docstring_constants(tree: ast.AST) -> set[int]:
+    """``id()`` of ``Constant`` nodes that are module/class/function docstrings."""
+    found: set[int] = set()
+    for parent in ast.walk(tree):
+        if not isinstance(
+            parent, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
+        ):
+            continue
+        body = parent.body
+        if (
+            body
+            and isinstance(body[0], ast.Expr)
+            and isinstance(body[0].value, ast.Constant)
+            and isinstance(body[0].value.value, str)
+        ):
+            found.add(id(body[0].value))
+    return found
+
+
+def test_new_v2_code_has_no_provider_branch():
+    """AC-T6: the v2 writer branches on resolved values, never on a provider
+    name, and never reads the raw ``surface-version`` selector.
+
+    Static AST scan of ``scripts/lib/opencode_v2_config.py``:
+
+    * a registered provider-name literal as an operand of any comparison
+      (``==``/``!=``/``in``/``not in``/ordering) is a provider branch;
+    * a live ``"surface-version"`` constant (subscript, ``.get`` call,
+      comparison, assignment) is a raw-selector read.
+
+    Docstrings are ignored: they document the rule without executing it, and
+    comments never reach the AST.
+    """
+    tree = ast.parse(_OPENCODE_V2_CONFIG_PATH.read_text(encoding="utf-8"))
+    providers = yaml.safe_load(
+        (_REPO_ROOT / "config" / "ai-providers.yaml").read_text(encoding="utf-8")
+    )
+    names = set((providers.get("providers") or {}).keys())
+    assert names, "config/ai-providers.yaml declares no registered providers"
+
+    docstrings = _docstring_constants(tree)
+    offenders: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Compare):
+            for operand in (node.left, *node.comparators):
+                for sub in ast.walk(operand):
+                    if (
+                        isinstance(sub, ast.Constant)
+                        and isinstance(sub.value, str)
+                        and sub.value in names
+                    ):
+                        offenders.append(
+                            f"opencode_v2_config.py:{sub.lineno}: compares "
+                            f"provider name {sub.value!r}"
+                        )
+        if (
+            isinstance(node, ast.Constant)
+            and node.value == "surface-version"
+            and id(node) not in docstrings
+        ):
+            offenders.append(
+                f"opencode_v2_config.py:{node.lineno}: reads 'surface-version'"
+            )
+    assert offenders == [], (
+        "AC-T6: scripts/lib/opencode_v2_config.py must dispatch on resolved "
+        "config values only:\n" + "\n".join(sorted(offenders))
     )
