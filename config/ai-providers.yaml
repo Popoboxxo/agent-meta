@@ -375,6 +375,11 @@ providers:
       - subagent
       - hidden
       - color
+      # Task 22 (§4.3): `system` is a legitimate emitted key of the v1 surface
+      # (the v2 surface strips it — the Markdown body IS the system prompt,
+      # Spike Q5). The allow-list is the superset of both surfaces, so a v1
+      # artifact carrying `system` is not a sync-time finding.
+      - system
       reject-fields: []
     model-tiers:
       nano: opencode-go/deepseek-v4.1-flash

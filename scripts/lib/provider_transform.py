@@ -430,10 +430,21 @@ def _apply_agent_transform(
         if spec.get('inject-subagent-depth'):
             subagent_depth = required_depth_int(_caps)
         # Write-scope lock (#1006, IC-3/ADR-5): the primary entry must not keep
-        # `permission.edit: allow` while the tier-`permission` gate is active —
-        # a primary agent that can write anywhere defeats the Main-Chat gate.
+        # a write-anywhere permission while the runtime gate is active — a
+        # primary agent that can write anywhere defeats the Main-Chat gate.
         # The gate decision has one source of truth (`lib/isolation`), imported
         # lazily here to avoid a load-time cycle.
+        # SPEC-OPENCODE-V2-SUPPORT Amendment B3 (AC-C14 applies to the agent
+        # level too): the AGENT level must use the SAME predicate as the v2
+        # config triples — `permission_deny_required`, i.e. tier `permission`
+        # OR tier `plugin` while the baked plugin only observes. The frozen
+        # `opencode_runtime_gate_wanted` (tier `permission` only) stays
+        # untouched for the Spec-A writer; it would leave `edit: allow` in
+        # place on tier `plugin` + `observe`, and that agent-level allow is
+        # appended last, overruling the global deny (last match wins).
+        # `capabilities` and `plugin_mode` are resolved HERE (Amendment
+        # B3-Folge): the transform itself never loads them. Without an
+        # effective strict gate no deny is emitted (AC-C16 b).
         # Known boundary: the lock keys off the DERIVED `mode` above. A project
         # override template that declares `mode: primary` for a role the
         # registry does not name as `primary-role` inherits the template value
@@ -441,10 +452,27 @@ def _apply_agent_transform(
         deny_edit = False
         edit_allow_paths: tuple[str, ...] = ()
         if mode == 'primary':
-            from .isolation import opencode_runtime_gate_wanted
+            from . import isolation
+            from . import providers as providers_lib
+            from . import runtime_gate
+            from .consistency.orchestrator_strict import _resolve_effective_strict
 
-            deny_edit = opencode_runtime_gate_wanted(
-                config, provider, agent_meta_root, provider_config,
+            capabilities = provider_capabilities
+            if capabilities is None:
+                try:
+                    capabilities = providers_lib.load_provider_capabilities(
+                        agent_meta_root,
+                    )
+                except Exception:  # noqa: BLE001 - unreadable registry degrades
+                    capabilities = {}
+            orch = config.get('orchestrator', {}) if isinstance(config, dict) else {}
+            deny_edit = _resolve_effective_strict(orch, provider) and (
+                isolation.permission_deny_required(
+                    # One resolved provider entry (registry or single entry).
+                    isolation._v2_provider_entry(provider_config, provider),
+                    isolation._capabilities_for(capabilities, provider),
+                    runtime_gate._baked_plugin_mode(),
+                )
             )
             if deny_edit:
                 allow_cfg = load_provider_tools_config(agent_meta_root).get(
@@ -1091,6 +1119,36 @@ def _resolve_v2_model_variant(
         return variant
     return None
 
+def _v2_permissions_with_edit_deny(
+    permissions: list[dict[str, str]],
+    edit_allow_paths: tuple[str, ...],
+) -> list[dict[str, str]]:
+    """Close the primary `edit` action, keeping the configured path allows.
+
+    Spec A IC-3 on the v2 list surface: the `edit: allow` entry becomes
+    ``{action: edit, resource: "*", effect: deny}`` followed by one ``allow``
+    entry per ``edit_allow_paths`` path. The ``*`` deny MUST come FIRST: last
+    matching rule wins (Amendment B1 / Spike Q3 VERIFIED), so only this order
+    lets the specific allows win. A role without ``Write``/``Edit`` already
+    carries ``edit: deny`` and is returned unchanged — a lock never widens a
+    privilege. All other action entries keep their order and effect.
+    """
+    paths: list[str] = []
+    for path in edit_allow_paths:
+        if isinstance(path, str) and path and path not in paths:
+            paths.append(path)
+    scoped: list[dict[str, str]] = []
+    for entry in permissions:
+        if entry.get("action") != "edit" or entry.get("effect") != "allow":
+            scoped.append(entry)
+            continue
+        scoped.append({"action": "edit", "resource": "*", "effect": "deny"})
+        scoped.extend(
+            {"action": "edit", "resource": path, "effect": "allow"} for path in paths
+        )
+    return scoped
+
+
 def _transform_frontmatter_for_opencode_v2(
     content: str,
     name: str,
@@ -1128,9 +1186,9 @@ def _transform_frontmatter_for_opencode_v2(
     instead of duplicating the v1 logic. `agent_meta_root` is accepted for
     signature parity with the v1 builder: the closed-world permission list needs
     no tool config (unmapped actions are denied, so no deny list is read).
-    `deny_edit`/`edit_allow_paths` are part of the frozen signature; the gate
-    semantics are implemented by the D1.3 follow-up, so `deny_edit=True`
-    currently renders like `False`.
+    `deny_edit=True` closes the primary role's `edit` scope (Spec A IC-3, §3.4
+    "Agent-Ebene"): the `edit` allow becomes a `*` deny followed by the
+    `edit_allow_paths` allows, so the gate survives on the agent level too.
     """
     body = _strip_frontmatter(content)
     body = _strip_claude_specific_lines(body)
@@ -1166,9 +1224,12 @@ def _transform_frontmatter_for_opencode_v2(
         updates["steps"] = template_fm["maxSteps"]
 
     template_tools = template_fm.get("tools")
-    updates["permissions"] = map_tools_to_opencode_v2_permissions(
+    permissions = map_tools_to_opencode_v2_permissions(
         template_tools if isinstance(template_tools, list) else [],
     )
+    if deny_edit:
+        permissions = _v2_permissions_with_edit_deny(permissions, edit_allow_paths)
+    updates["permissions"] = permissions
 
     removes = list(_V2_OPENCODE_REMOVE_FIELDS)
     if strip_fields:

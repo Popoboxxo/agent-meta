@@ -3918,3 +3918,181 @@ def test_ac_d4_v1_artifacts_byte_identical_to_pre_change_output(tmp_path):
     v1_fm = _frontmatter_of(v1_artifact)
     assert "permission" in v1_fm
     assert "permissions" not in v1_fm
+
+
+# ===========================================================================
+# Phase D1 / Task 22 (D1.3): agent-level edit deny, Mammouth isolation, `system`
+# ===========================================================================
+#
+# Spec §3.4 ("Agent-Ebene"), §3.7, AC-C16(b), AC-D6, AC-C14 (Amendment B3):
+#
+# * `deny_edit=True` turns the primary role's closed-world `edit: allow` entry
+#   into `{action: edit, resource: "*", effect: deny}` followed by one `allow`
+#   entry per path in `opencode_primary_edit_allow` — the `*` deny comes FIRST
+#   because last match wins (Amendment B1, Spike Q3 VERIFIED);
+# * the frontmatter call site resolves `deny_edit` with
+#   `isolation.permission_deny_required(provider_config, capabilities,
+#   plugin_mode)` — NOT with the frozen `opencode_runtime_gate_wanted` (tier
+#   `permission` only), so tier `plugin` + `observe` is covered too (Amendment
+#   B3, AC-C14 on the agent level);
+# * a provider without `surface-mechanisms` (the Mammouth fork) stays on the
+#   `opencode-native` v1 path and is only reported through the REV-R5 warning;
+# * `system` is part of the Opencode `agent-transform.allowed-fields` registry.
+
+_V2_ORCHESTRATOR_TOOLS = ("Read", "Grep", "Glob", "Bash", "Edit", "Write", "Agent")
+
+
+def _registry_for_surface(surface: str) -> dict:
+    """The real registry resolved for *surface* via the project option channel."""
+    return load_providers_config(
+        _REPO_ROOT, {"provider-options": {"Opencode": {"surface-version": surface}}},
+    )
+
+
+def _render_orchestrator(
+    tmp_path: Path,
+    project_config: dict,
+    *,
+    registry: dict | None = None,
+    tools: tuple[str, ...] = _V2_ORCHESTRATOR_TOOLS,
+) -> dict:
+    """Render the primary orchestrator artifact and return its frontmatter."""
+    if registry is None:
+        registry = _registry_for_surface("v2")
+    rendered = provider_transform.transform_agent_content_for_provider(
+        _v2_template(tools), "Opencode", "orchestrator", "orchestrator", "desc",
+        "1-generic/orchestrator.md@2.0.0", project_config, _REPO_ROOT,
+        tmp_path, tmp_path / "orchestrator.md", registry, SyncLog(),
+    )
+    return _frontmatter_of(rendered)
+
+
+def _edit_entries(permissions: list[dict]) -> list[tuple[int, dict]]:
+    return [
+        (index, entry)
+        for index, entry in enumerate(permissions)
+        if entry.get("action") == "edit"
+    ]
+
+
+def _assert_scoped_edit_deny(permissions: list[dict]) -> None:
+    """AC-C16(b) + Amendment B1: `*` deny first, then the configured allows."""
+    edit = _edit_entries(permissions)
+    assert edit, permissions
+    deny_index, deny_entry = edit[0]
+    assert deny_entry == {"action": "edit", "resource": "*", "effect": "deny"}, edit
+
+    allows = [(index, entry) for index, entry in edit if entry["effect"] == "allow"]
+    assert [entry["resource"] for _, entry in allows] == [".tmp/**", ".meta-viz/**"]
+    assert all(entry["resource"] != "*" for _, entry in allows)
+    assert all(index > deny_index for index, _ in allows), (
+        "the root deny must precede the path allows — last match wins in Opencode"
+    )
+
+
+def test_ac_c16b_orchestrator_artifact_has_edit_deny_when_gate_active(tmp_path):
+    """AC-C16(b), tier `permission` + strict: the primary edit scope is closed."""
+    project_config = {"orchestrator": {"mode": "strict"}}
+    fm = _render_orchestrator(tmp_path, project_config)
+
+    assert fm["mode"] == "primary"
+    _assert_scoped_edit_deny(fm["permissions"])
+    # The gate never reaches into the other actions.
+    assert {
+        entry["action"]: entry["effect"]
+        for entry in fm["permissions"] if entry["action"] != "edit"
+    } == {"shell": "allow", "subagent": "allow"}
+
+
+def test_ac_c16b_no_edit_deny_without_gate(tmp_path):
+    """AC-C16(b): without an active gate the template-derived allow survives."""
+    fm = _render_orchestrator(tmp_path, {})
+
+    assert fm["mode"] == "primary"
+    assert isinstance(fm["permissions"], list), "v2 surface expected"
+    assert _edit_entries(fm["permissions"]) == [
+        (0, {"action": "edit", "resource": "*", "effect": "allow"}),
+    ]
+
+
+def test_ac_c14_orchestrator_artifact_has_edit_deny_at_plugin_observe(tmp_path):
+    """AC-C14 (Amendment B3): tier `plugin` + `observe` still denies at the agent level.
+
+    The config triples use `permission_deny_required`, and the agent level MUST
+    use the same predicate: with the frozen `opencode_runtime_gate_wanted`
+    (tier `permission` only) this artifact would keep `edit: allow` and, being
+    appended last, overrule the global deny.
+    """
+    registry = _registry_for_surface("v2")
+    pc = registry["Opencode"]
+    caps = load_provider_capabilities(_REPO_ROOT)
+    assert provider_runtime_gate_tier(pc, caps.get("Opencode")) == "plugin"
+    assert runtime_gate._baked_plugin_mode() == "observe"
+    assert isolation.permission_deny_required(
+        pc, caps.get("Opencode"), runtime_gate._baked_plugin_mode(),
+    ) is True
+
+    fm = _render_orchestrator(
+        tmp_path, {"orchestrator": {"mode": "strict"}}, registry=registry,
+    )
+
+    _assert_scoped_edit_deny(fm["permissions"])
+    assert fm["mode"] == "primary"
+
+
+def test_ac_d6_mammouth_with_surface_v2_keeps_opencode_native_output(tmp_path):
+    """AC-D6: a fork without `surface-mechanisms` keeps the v1 surface (REV-R5).
+
+    Mammouth declares an explicit non-default `surface-version` without a
+    `mcp-config.surface-formats` map, so the selection is a no-op and the
+    resolution reports the REV-R5 warning. The agent artifact therefore keeps
+    the `permission:` map — never a v2 `permissions:` list.
+    """
+    from lib import providers as providers_lib
+
+    entry = json.loads(json.dumps(load_providers_config(_REPO_ROOT)["Mammouth"]))
+    entry["surface-version"] = "v2"
+    assert "surface-mechanisms" not in (entry.get("agent-transform") or {})
+    _write_config(tmp_path, {"Mammouth": entry})
+    registry = load_providers_config(tmp_path)
+
+    assert registry["Mammouth"]["agent-transform"]["frontmatter-mechanism"] == (
+        "opencode-native"
+    )
+    warnings = providers_lib._surface_version_warnings(registry)
+    assert len(warnings) == 1, warnings
+    assert "Mammouth" in warnings[0]
+    assert "surface-formats" in warnings[0]
+
+    rendered = provider_transform.transform_agent_content_for_provider(
+        _v2_template(_V2_ORCHESTRATOR_TOOLS), "Mammouth", "orchestrator",
+        "orchestrator", "desc", "1-generic/orchestrator.md@2.0.0", {}, _REPO_ROOT,
+        tmp_path, tmp_path / "orchestrator.md", registry, SyncLog(),
+    )
+    fm = _frontmatter_of(rendered)
+
+    assert isinstance(fm.get("permission"), dict), fm
+    assert fm["permission"]["edit"] == "allow"
+    assert "permissions" not in fm
+
+
+def test_system_in_allowed_fields():
+    """Task 22: `system` belongs to the Opencode allow-list superset (§4.3)."""
+    allowed = load_providers_config(_REPO_ROOT)["Opencode"]["agent-transform"][
+        "allowed-fields"
+    ]
+    assert "system" in allowed
+
+    # Contract proof: on the v2 surface the allow-list is enforced, and a
+    # v1 artifact carrying `system` is no finding.
+    contract = resolve_artifact_contract(_registry_for_surface("v2")["Opencode"])
+    assert contract.allowed_fields is not None
+    assert "system" in contract.allowed_fields
+    findings = validate_frontmatter(
+        "---\nname: agent\ndescription: d\nsystem: prompt\n---\nbody\n",
+        allowed_fields=contract.allowed_fields,
+        required_fields=set(),
+        reject_fields=contract.reject_fields,
+        path="agent.md",
+    )
+    assert findings == []
