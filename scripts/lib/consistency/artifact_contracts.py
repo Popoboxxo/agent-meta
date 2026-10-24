@@ -59,6 +59,12 @@ CHECK_SETTINGS_FILE_DUPLICATE = "opencode-config-duplicate"
 #: silent override of generated values is exactly what this guard prevents.
 _SHADOWING_SETTINGS_EXT = ".jsonc"
 
+#: Extension the evidence covers as the shadowed source. Only a ``.json``
+#: settings file is probed for a ``.jsonc`` twin (QA-E-01): ``Path.with_suffix``
+#: on a YAML settings file would invent a ``config.jsonc`` sibling check the
+#: evidence never showed.
+_SHADOWING_SOURCE_EXT = ".json"
+
 #: Framework catalog that hosts the MCP registry (no JSON schema exists for it,
 #: which is why this check duplicates the declared types in code).
 _MCP_CATALOG_FILE = "config/plugin-catalog.yaml"
@@ -164,6 +170,13 @@ def _settings_file_duplicate_findings(
         if not isinstance(settings_file, str) or not settings_file.strip():
             continue
         settings_path = agent_meta_root / settings_file
+        # The shadowing evidence covers ``.json`` only: the runtime probes the
+        # sibling ``.jsonc`` of a JSON settings file. A YAML/TOML settings file
+        # (e.g. ``.continue/config.yaml``) has no ``config.jsonc`` twin that
+        # could override it, so probing one would report a phantom duplicate
+        # (QA-E-01).
+        if settings_path.suffix != _SHADOWING_SOURCE_EXT:
+            continue
         if not settings_path.is_file():
             continue
         jsonc_path = settings_path.with_suffix(_SHADOWING_SETTINGS_EXT)
@@ -193,7 +206,10 @@ def check_settings_file_duplicates(
     overrides the managed settings file. For every **active** provider — the
     ``ai-providers`` selection of *project_config* when present, the whole
     registry otherwise — the resolved ``settings_file`` is checked for a file
-    with the same stem and the ``.jsonc`` extension in the same directory.
+    with the same stem and the ``.jsonc`` extension in the same directory. Only
+    a ``.json`` settings file is eligible: the evidence covers JSON shadowing,
+    so a YAML/TOML settings file is never probed for an invented ``.jsonc``
+    twin (QA-E-01).
 
     Yields a ``Severity.WARNING`` (never an error: consumers decide via
     ``consistency-check.py --strict``) with the stable message

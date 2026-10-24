@@ -46,7 +46,7 @@
   instead of the v1 `permission` map; the primary role receives an `edit: deny` (with the
   configured `opencode_primary_edit_allow` path allows, here `.tmp/**` and `.meta-viz/**`) while
   the gate is active. v1 artifacts stay byte-identical.
-- **Scenario 79** (`tests/scenarios/79-opencode-v2-full-surface.sh`): asserts the full v2 surface
+- **Scenario 79** (`tests/scenarios/asserts/79-opencode-v2-full-surface.sh`): asserts the full v2 surface
   end to end, together with the v1 ↔ v2 lab diff and the v2 → v1 switch rollback in
   `tests/test_opencode_v2_surface.py`; scenario 69 keeps guarding the v2 config keys.
 - **C0 spike result**: `VERDICT-C3: GO` (the v2 plugin mechanism is real, probed on v2.1.3) and

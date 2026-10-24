@@ -1231,15 +1231,31 @@ def sync_opencode_cli_file(
     ``allow-committed-secrets``, ``verify_gitignored=False`` for a committed
     file, the caller's ``config`` and ``dry_run``). A parse error or a
     non-object document is never overwritten.
+
+    An unresolvable path is a logged warning, never a traceback (QA-E-03,
+    mirroring :func:`isolation._sync_opencode_v2_gate_permissions`): an absolute
+    ``mcp-config.committed-file`` makes the state path fall outside the project
+    root (``relative_to`` raises ``ValueError``), and a ``cli-files`` value that
+    escapes the root is rejected by ``isolation.safe_path``. Both cases leave
+    file and state untouched.
+
+    Two silent no-ops are now visible (QA-E-02): a non-object managed document
+    is warned about instead of being passed over, and a ``cli`` key whose value
+    is ``null`` is not written but warned about — same contract as
+    ``providers.<id>: null`` in :func:`build_managed_keys`.
     """
     if not owns_opencode_surface(provider_config, provider):
         return
 
     pc = _provider_entry(provider_config, provider)
     root = Path(project_root)
-    state_path = isolation.safe_path(
-        root, opencode_state_path(root, pc).relative_to(root)
-    )
+    try:
+        state_path = isolation.safe_path(
+            root, opencode_state_path(root, pc).relative_to(root)
+        )
+    except (ValueError, io.SyncError) as exc:
+        log.warning(f"opencode-v2-cli: unresolved state path — {exc}")
+        return
     state = isolation._read_state(state_path, STATE_CLI_KEY)
 
     rel = _cli_file_rel(pc)
@@ -1259,11 +1275,16 @@ def sync_opencode_cli_file(
     # JSON object keys are strings by definition; stringify here so a YAML
     # integer key cannot break the deterministic sort below. A rollback never
     # writes: the ``cli`` option is v2-only, so it is ignored on that surface.
-    targets: dict[str, object] = (
-        {str(key): value for key, value in cli.items()}
-        if isinstance(cli, dict) and not rollback_only
-        else {}
-    )
+    # A ``null`` value is not a target: it ends management of the key (row 4),
+    # exactly like ``providers.<id>: null`` — a fresh key writes nothing, so the
+    # warning is the only trace it leaves behind (QA-E-02).
+    targets: dict[str, object] = {}
+    if isinstance(cli, dict) and not rollback_only:
+        for key, value in cli.items():
+            if value is None:
+                log.warning(f"opencode-v2-cli: {key} is null — not written")
+                continue
+            targets[str(key)] = value
 
     # No option AND no prior management: nothing to write, nothing to delete
     # (the rollback exception only exists when state is present).
@@ -1271,14 +1292,22 @@ def sync_opencode_cli_file(
         return
 
     rel_label = rel.as_posix()
-    file_path = isolation.safe_path(root, rel)
+    try:
+        file_path = isolation.safe_path(root, rel)
+    except (ValueError, io.SyncError) as exc:
+        log.warning(f"opencode-v2-cli: unresolved managed file {rel_label} — {exc}")
+        return
     existing = isolation._read_json_safe(file_path, log)
     if existing is None:
         if file_path.exists():
             return  # parse error — warning already emitted, never overwrite it
         existing = {}
     elif not isinstance(existing, dict):
-        return  # a non-object document is not ours to rewrite (data-loss guard)
+        # a non-object document is not ours to rewrite (data-loss guard); say so
+        log.warning(
+            f"opencode-v2-cli: {rel_label} is not a JSON object — not written"
+        )
+        return
 
     new_state: dict[str, dict] = {}
     changed = False

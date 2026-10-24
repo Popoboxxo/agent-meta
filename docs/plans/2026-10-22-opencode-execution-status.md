@@ -179,6 +179,23 @@ bash tests/scenarios/run.sh 69-opencode-v2-surface
 | 32 | `developer` | `04d41eb8` | rot `1 failed` → `1 passed` | `done` | CHANGELOG in `Added`/`Changed` mit Trennung DOKU/VERIFIED. Alle 79 Szenarien PASS (in Batches gefahren); `--validate`, `--check` und `consistency-check` rc 0. **Der vollständige `pytest tests`-Lauf beendete lokal nicht (1188 passed, 0 failed bei ca. 17 %); den Vollsuite-Beleg liefert CI.** |
 | 33 | `release` | — | — | `offen — Release-Bump erfordert ausdrückliche Nutzerfreigabe (HITL)` | Kein Bump, kein Tag, kein Push in Phase D. |
 
+## Phase-D-Review-Fixrunde (2026-10-24)
+
+**Quelle:** Review zu `feat/1007-d-surface` (Arbeitsstand `d7e8d187`), Verdict `CHANGES_REQUESTED` ohne Blocker — zwei echte Defekte (QA-E-01, QA-E-03), der Rest Abdeckungs- und Doku-Präzisierung. Der Fixrunden-Commit folgt direkt auf `d7e8d187`.
+
+| Finding | Schwere | Änderung | Beleg |
+|---|---|---|---|
+| QA-E-01 | MAJOR (Bug) | `opencode-config-duplicate` prüft nur noch `.json`-Settings-Dateien auf einen `.jsonc`-Zwilling. Für `.yaml` (z. B. `.continue/config.yaml`) wurde `config.jsonc` erfunden und ein Phantom-Finding erzeugt, das `--strict` scheitern ließ. | `scripts/lib/consistency/artifact_contracts.py`, `tests/test_artifact_contracts.py::test_ac_d9_yaml_settings_file_is_never_probed_for_a_jsonc_twin` |
+| QA-E-03 | MAJOR (Defekt) | Beide Pfadableitungen in `sync_opencode_cli_file` sind gewrappt: ein absolutes `mcp-config.committed-file` (`relative_to` → `ValueError`) und ein aus dem Root ausbrechendes `cli-files`-Value (`safe_path` → `ValueError`) warnen jetzt und kehren zurück, statt einen Traceback zu werfen. | `scripts/lib/opencode_v2_config.py`, `::test_cli_writer_absolute_committed_file_warns_instead_of_raising`, `::test_cli_writer_escaping_cli_files_value_warns_instead_of_raising` |
+| QA-E-02 | MINOR | Zwei stille No-ops sind sichtbar: ein Nicht-Objekt-Dokument und ein `cli`-Key mit `null` werden gewarnt (`opencode-v2-cli: <key> is null — not written`), analog zu `providers.<id>: null`. | `scripts/lib/opencode_v2_config.py`, `::test_cli_writer_warns_on_null_value`, `::test_cli_writer_warns_on_non_object_document` |
+| QA-E-04 | MINOR | Provider-Doku qualifiziert die closed-world-Aussage: eine Basiszeile je Aktion; der Gate-Lock der `primary-role` erweitert `edit` bei aktivem Gate um `*`-Deny plus Pfad-Allows. | `docs/providers/opencode.md` |
+| QA-E-05 | MINOR | Der Gate-Lock-Test behauptet nicht mehr Tier `permission`: er belegt explizit Tier `plugin` + baked `observe` (der v2-Registry-Fall) und präzisiert den Docstring. | `tests/test_opencode_v2_surface.py::test_ac_c16b_orchestrator_artifact_has_edit_deny_when_gate_active` |
+| QA-E-06 | MINOR | `test_ac_t3_required_acs_have_tests` ist im Docstring als Namens-/Traceability-Guard ausgewiesen, nicht als Verhaltensabdeckung. | `tests/test_opencode_v2_surface.py` |
+| QA-E-07 | MINOR | Szenario 79 prüft zusätzlich die Reihenfolge (`edit`-`*`-Deny vor den Pfad-Allows) und `edit: deny` einer read-only Rolle; die Fixture generiert dafür `explorer`. Folge für den Lab-Diff (Task 29): die Zeile „6 differierende Dateien“ ist damit überholt — der Test erwartet jetzt 7 Dateien und 4 Manifest-Einträge. | `tests/scenarios/asserts/79-opencode-v2-full-surface.sh`, `tests/scenarios/configs/79-opencode-v2-full-surface.project.yaml` |
+| RVW-E-02 | MINOR | CHANGELOG-Pfad auf `tests/scenarios/asserts/79-opencode-v2-full-surface.sh` korrigiert. | `CHANGELOG.md` |
+| RVW-E-03 | MINOR | AC-C16(a2) deckt jetzt auch den abweichenden User-Wert auf Tier `plugin` ab: kein Merge, keine Warnung, Byte-Gleichheit. | `tests/test_opencode_v2_surface.py::test_ac_c16a_divergent_user_value_stays_silent_at_tier_plugin` |
+| RVW-E-05 | MINOR | Plan Task 32 Step 3 annotiert, dass der lokale Vollsuite-Lauf nicht beendete (`1188 passed/0 failed bei ~17 %`); der Vollsuite-Beleg bleibt CI. | `docs/plans/2026-10-22-opencode-v2-support-plan.md` |
+
 ## Offene Punkte
 
 - **C3-Gate-Plugin ist observe-only (bekannte Grenze):** Das generierte v2-Plugin annotiert vorgeschlagene Tool-Aufrufe und blockiert nie. Blockieren wäre in v2 erst über `ctx.permission.hook("evaluate")` möglich; dieser Deny-Pfad ist bewusst nicht enthalten und bleibt P6-gated (`MODE=enforce` ist nicht implementiert). Das tatsächliche Gate bleibt damit der Permission-Deny aus C1: `permission_deny_required` hält die verwalteten Edit-/Shell-Tripel bei Tier `plugin`+`observe` additiv erhalten.

@@ -546,6 +546,29 @@ def test_ac_d9_no_finding_without_jsonc(tmp_path: Path) -> None:
     assert _duplicate_findings(findings) == []
 
 
+def test_ac_d9_yaml_settings_file_is_never_probed_for_a_jsonc_twin(
+    tmp_path: Path,
+) -> None:
+    # QA-E-01: the evidence covers a `.jsonc` shadowing a `.json` only. A YAML
+    # settings file must not trigger `config.jsonc` — that suffix swap would
+    # report a phantom "config.yaml and config.jsonc both present" finding and
+    # fail `--strict` on a clean tree.
+    _write_provider_registry(
+        tmp_path, {"SyntheticYaml": {"settings_file": ".continue/config.yaml"}}
+    )
+    (tmp_path / ".continue").mkdir()
+    (tmp_path / ".continue" / "config.yaml").write_text("{}", encoding="utf-8")
+    (tmp_path / ".continue" / "config.jsonc").write_text("{}", encoding="utf-8")
+
+    findings = _duplicate_findings(
+        artifact_contracts.check_artifact_contracts(
+            tmp_path, {"ai-providers": ["SyntheticYaml"]}
+        )
+    )
+
+    assert findings == [], [f.message for f in findings]
+
+
 def test_ac_d9_check_is_provider_agnostic(tmp_path: Path) -> None:
     # AC-D9: a synthetic provider with a different settings_file (and a second
     # one without a twin) produces the same finding — the check reads the

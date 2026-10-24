@@ -215,10 +215,13 @@ permissions:
 ...
 ```
 
-Die v2-Liste ist **closed-world**: für jede der Aktionen `edit`, `shell`, `subagent` steht genau
-ein Eintrag — `allow` bei gemapptem Tool, sonst `deny`. Eine read-only Rolle erbt dadurch keine
-Schreibrechte. Der globale Gate-Tripel in `opencode.json` nutzt `resource: "**"` und wird ans
-Listenende angehängt; die Agent-Ebene nutzt `resource: "*"`.
+Die v2-Liste ist **closed-world**: in der Basisliste steht für jede der Aktionen `edit`, `shell`,
+`subagent` genau ein Eintrag — `allow` bei gemapptem Tool, sonst `deny`. Eine read-only Rolle erbt
+dadurch keine Schreibrechte. Der Gate-Lock der `primary-role` erweitert diese Basisliste **bei aktivem Gate**: der
+`edit`-Eintrag wird zu einem `*`-**Deny**, gefolgt von je einem `allow` pro konfiguriertem Pfad
+(`opencode_primary_edit_allow`, z. B. `.tmp/**`); `shell` und `subagent` bleiben bei genau einem
+Eintrag. Der globale Gate-Tripel in `opencode.json` nutzt `resource: "**"` und wird ans Listenende
+angehängt; die Agent-Ebene nutzt `resource: "*"`.
 
 `mode: subagent` ist Standard für alle agent-meta Agenten — sie werden explizit delegiert,
 nicht als Haupt-Agent gestartet. Die `primary-role` (orchestrator) erhält `mode: primary` und

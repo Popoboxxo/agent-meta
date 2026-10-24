@@ -20,6 +20,9 @@
 #      (last match wins, Amendment B1 / Spike Q3).
 #   3. AGENT ARTIFACT: the configured role `developer` has a `permissions:` LIST
 #      and a `model:` with the configured `#high` variant.
+#   3b. GATE LOCK: in the primary artifact the `edit` `*` deny comes BEFORE the
+#      configured path allows (last match wins), and a read-only role keeps
+#      `edit: deny`.
 #   4. CLI.JSON: exists and carries exactly the documented `plugins` key.
 #   5. PLUGIN ARTIFACT: the v2 runtime-gate plugin is deployed.
 #   6. `sync.py --check` returns rc 0 on the consistent tree.
@@ -136,6 +139,56 @@ assert "subagent_depth" not in fm, "v2 agent frontmatter must not carry 'subagen
 model = fm.get("model")
 assert isinstance(model, str) and model.endswith("#high"), (
     f"configured role 'developer' must carry the '#high' model variant (got {model!r})"
+)
+PY
+
+# 3b. Gate lock on the agent level (AC-C16 b, Amendment B1): the primary's
+#     `edit` `*` deny must precede the configured path allows (last match wins),
+#     and a read-only role must keep `edit: deny`.
+ORCH=".opencode/agents/orchestrator.md"
+READONLY_ROLE=".opencode/agents/explorer.md"
+[ -f "$ORCH" ] || fail "primary artifact missing: $ORCH"
+[ -f "$READONLY_ROLE" ] || fail "read-only role artifact missing: $READONLY_ROLE"
+python3 - "$ORCH" "$READONLY_ROLE" <<'PY' || fail "gate-lock ordering / read-only edit deny violated"
+import sys
+import yaml
+
+
+def frontmatter(path):
+    with open(path, encoding="utf-8") as fh:
+        text = fh.read()
+    assert text.startswith("---"), f"{path}: YAML frontmatter expected"
+    return yaml.safe_load(text.split("---", 2)[1]) or {}
+
+
+orchestrator = frontmatter(sys.argv[1]).get("permissions")
+assert isinstance(orchestrator, list), (
+    f"primary artifact requires a permissions list (got {orchestrator!r})"
+)
+edits = [
+    (index, entry)
+    for index, entry in enumerate(orchestrator)
+    if isinstance(entry, dict) and entry.get("action") == "edit"
+]
+denies = [(index, entry) for index, entry in edits if entry.get("effect") == "deny"]
+assert len(denies) == 1, f"primary needs exactly one `edit` deny (got {denies!r})"
+deny_index, deny_entry = denies[0]
+assert deny_entry == {"action": "edit", "resource": "*", "effect": "deny"}, deny_entry
+allows = [(index, entry) for index, entry in edits if entry.get("effect") == "allow"]
+assert allows, "the gate lock must keep the configured path allows"
+assert [entry["resource"] for _, entry in allows] == [".tmp/**", ".meta-viz/**"], allows
+assert all(index > deny_index for index, _ in allows), (
+    "the `edit` `*` deny must precede the path allows (last match wins): "
+    f"deny at {deny_index}, allows at {[index for index, _ in allows]}"
+)
+
+read_only = [
+    entry
+    for entry in frontmatter(sys.argv[2]).get("permissions") or []
+    if isinstance(entry, dict) and entry.get("action") == "edit"
+]
+assert read_only == [{"action": "edit", "resource": "*", "effect": "deny"}], (
+    f"a read-only role must keep `edit: deny` (got {read_only!r})"
 )
 PY
 

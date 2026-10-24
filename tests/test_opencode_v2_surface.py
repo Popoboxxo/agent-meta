@@ -3580,6 +3580,53 @@ def test_ac_c16a_no_default_agent_reconciliation_at_tier_plugin(
     assert isolation._STATE_DEFAULT_AGENT_KEY in _read_state_doc(control_project)
 
 
+def test_ac_c16a_divergent_user_value_stays_silent_at_tier_plugin(
+    tmp_path, monkeypatch
+):
+    """AC-C16(a2) (RVW-E-03): a *divergent* user value produces no merge warning.
+
+    The deleted-value case is pinned by the test above; this is its sibling on
+    tier ``plugin``. Because no ``default_agent`` merge runs there, the
+    user-value warning of the permission-tier merge (AC-C16 a1: "default_agent is
+    'developer' but the entry point role is 'orchestrator'") cannot appear — and
+    the divergent value must survive byte-identically.
+    """
+    pc = _resolved_surface_pc("v2")
+    caps = _opencode_caps()
+    assert provider_runtime_gate_tier(pc, caps) == "plugin"
+    monkeypatch.setattr(runtime_gate, "_baked_plugin_mode", lambda: "observe")
+
+    base = tmp_path / "plugin"
+    project = base / "project"
+    project.mkdir(parents=True)
+    (project / "opencode.json").write_text(_v2_settings_shape(), encoding="utf-8")
+
+    # A first run lets the v2 managed-key writer normalise the document, so the
+    # byte comparison below isolates the `default_agent` handling.
+    _run_stage(
+        base, monkeypatch, {"Opencode": pc}, ["Opencode"],
+        _gate_config(), {"Opencode": "plugin"},
+    )
+    doc = _read_json(project / "opencode.json")
+    doc["default_agent"] = "developer"
+    _write_json(project / "opencode.json", doc)
+    before = (project / "opencode.json").read_bytes()
+
+    log = SyncLog()
+    _run_stage(
+        base, monkeypatch, {"Opencode": pc}, ["Opencode"],
+        _gate_config(), {"Opencode": "plugin"}, log=log,
+    )
+
+    assert (project / "opencode.json").read_bytes() == before, (
+        "tier plugin must not rewrite a divergent user default_agent"
+    )
+    markers = ("default_agent", "opencode-v2-managed", "primary-role")
+    leaked = [w for w in log.warnings if any(m in w for m in markers)]
+    assert leaked == [], leaked
+    assert isolation._STATE_DEFAULT_AGENT_KEY not in _read_state_doc(project)
+
+
 def test_v1_tier_permission_unchanged_with_c3_registry(tmp_path):
     """AC-C14 / v1: the same registry data keeps v1 on tier ``permission``.
 
@@ -4036,9 +4083,23 @@ def _assert_scoped_edit_deny(permissions: list[dict]) -> None:
 
 
 def test_ac_c16b_orchestrator_artifact_has_edit_deny_when_gate_active(tmp_path):
-    """AC-C16(b), tier `permission` + strict: the primary edit scope is closed."""
+    """AC-C16(b) + AC-C14: with an active gate the primary edit scope is closed.
+
+    The rendered registry resolves tier ``plugin`` (not ``permission``) and the
+    baked plugin runs in ``observe``, so ``permission_deny_required`` is what
+    keeps the deny in place here — the shared predicate, exactly as Amendment B3
+    requires at the agent level. ``strict`` is the project-side switch that makes
+    the gate active at all.
+    """
+    registry = _registry_for_surface("v2")
+    caps = load_provider_capabilities(_REPO_ROOT)
+    assert provider_runtime_gate_tier(registry["Opencode"], caps.get("Opencode")) == (
+        "plugin"
+    ), "precondition: the v2 registry resolves tier plugin, not permission"
+    assert runtime_gate._baked_plugin_mode() == "observe"
+
     project_config = {"orchestrator": {"mode": "strict"}}
-    fm = _render_orchestrator(tmp_path, project_config)
+    fm = _render_orchestrator(tmp_path, project_config, registry=registry)
 
     assert fm["mode"] == "primary"
     _assert_scoped_edit_deny(fm["permissions"])
@@ -4489,6 +4550,118 @@ def test_cli_rollback_cannot_resolve_leaves_file_and_state(tmp_path):
         ), name
 
 
+def test_cli_writer_absolute_committed_file_warns_instead_of_raising(tmp_path):
+    """QA-E-03: an absolute ``committed-file`` must not raise from the writer.
+
+    ``opencode_state_path`` derives the state file from the committed file's
+    directory. An absolute value puts it outside the project root, so
+    ``relative_to(root)`` used to raise ``ValueError``. The writer now logs the
+    unresolved path and leaves file and state untouched.
+    """
+    project = tmp_path / "project"
+    project.mkdir()
+    pc = _v2_pc()
+    pc["mcp-config"]["committed-file"] = str(tmp_path / "outside" / "opencode.json")
+
+    log = _run_cli(
+        project, _config(cli={"plugins": ["opencode-acme-cli"]}), {"Opencode": pc},
+    )
+
+    assert _warned(log, "opencode-v2-cli: unresolved state path"), log.warnings
+    assert not (project / _CLI_FILE).exists()
+    assert not (tmp_path / "outside").exists(), "the guard writes nothing either"
+    assert not (project / _V2_STATE_REL).exists()
+
+
+def test_cli_writer_escaping_cli_files_value_warns_instead_of_raising(tmp_path):
+    """QA-E-03: a traversing ``cli-files`` value must not raise from the writer.
+
+    On a rollback the managed file is resolved from the surviving ``cli-files``
+    map. A value that escapes the project root used to hit
+    ``isolation.safe_path``'s ``ValueError: Path traversal detected``. The
+    writer now warns and leaves file and state untouched.
+    """
+    project = tmp_path / "project"
+    _write_json(project / _CLI_FILE, {"plugins": ["opencode-acme-cli"]})
+    _write_json(
+        project / _V2_STATE_REL,
+        {
+            opencode_v2_config.STATE_CLI_KEY: {
+                "plugins": {
+                    "value": ["opencode-acme-cli"],
+                    "prior": None,
+                    "prior_absent": True,
+                }
+            }
+        },
+    )
+    file_bytes = (project / _CLI_FILE).read_bytes()
+    state_bytes = (project / _V2_STATE_REL).read_bytes()
+    pc = _v1_pc()
+    pc["cli-files"] = {"v2": "../../../../evil.json"}
+
+    log = _run_cli(project, _config(), {"Opencode": pc})
+
+    assert _warned(log, "opencode-v2-cli: unresolved managed file"), log.warnings
+    assert "Path traversal detected" in " ".join(log.warnings), log.warnings
+    assert (project / _CLI_FILE).read_bytes() == file_bytes
+    assert (project / _V2_STATE_REL).read_bytes() == state_bytes
+    assert not (tmp_path.parent / "evil.json").exists()
+
+
+def test_cli_writer_warns_on_null_value(tmp_path):
+    """QA-E-02: ``cli.<key>: null`` is not written and is warned about.
+
+    Mirrors ``providers.<id>: null`` in :func:`build_managed_keys`: a fresh key
+    leaves no file behind, and a previously managed key ends management (row 4)
+    instead of writing a JSON ``null``.
+    """
+    project = tmp_path / "project"
+    project.mkdir()
+    providers = {"Opencode": _v2_pc()}
+
+    log = _run_cli(project, _config(cli={"plugins": None}), providers)
+
+    assert _warned(log, "opencode-v2-cli: plugins is null — not written"), log.warnings
+    assert not (project / _CLI_FILE).exists()
+    assert opencode_v2_config.STATE_CLI_KEY not in _read_state_doc(project)
+
+    # A managed value followed by `null` ends management without writing null.
+    _run_cli(project, _config(cli={"plugins": ["opencode-acme-cli"]}), providers)
+    assert _read_json(project / _CLI_FILE) == {"plugins": ["opencode-acme-cli"]}
+
+    log = _run_cli(project, _config(cli={"plugins": None}), providers)
+
+    assert _warned(log, "opencode-v2-cli: plugins is null — not written"), log.warnings
+    assert not (project / _CLI_FILE).exists(), (
+        "row 4 removes the managed key and prunes the empty container"
+    )
+    assert opencode_v2_config.STATE_CLI_KEY not in _read_state_doc(project)
+
+
+def test_cli_writer_warns_on_non_object_document(tmp_path):
+    """QA-E-02: a non-object ``cli.json`` is a logged no-op, not a silent one.
+
+    The data-loss guard still wins (the document is never rewritten), but the
+    skip is now visible in the log.
+    """
+    project = tmp_path / "project"
+    project.mkdir()
+    document = project / _CLI_FILE
+    document.write_text("[]\n", encoding="utf-8")
+    before = document.read_bytes()
+
+    log = _run_cli(
+        project, _config(cli={"plugins": ["opencode-acme-cli"]}), {"Opencode": _v2_pc()},
+    )
+
+    assert _warned(
+        log, f"opencode-v2-cli: {_CLI_FILE} is not a JSON object — not written"
+    ), log.warnings
+    assert document.read_bytes() == before
+    assert opencode_v2_config.STATE_CLI_KEY not in _read_state_doc(project)
+
+
 # ===========================================================================
 # Phase D / Task 27 (D4): provider doc reflects the delivered v2 surface
 # ===========================================================================
@@ -4550,6 +4723,9 @@ _LAB_DIFF_CHANGED = (
     ".meta-config/generated-file-hashes.json",
     ".opencode/agent-meta-state.json",
     ".opencode/agents/developer.md",
+    # The read-only role lets scenario 79 assert `edit: deny` on a subagent; its
+    # frontmatter differs between v1 (`permission` map) and v2 (`permissions[]`).
+    ".opencode/agents/explorer.md",
     ".opencode/agents/orchestrator.md",
     "AGENTS.md",
     "opencode.json",
@@ -4709,6 +4885,7 @@ def test_lab_diff_v1_v2(tmp_path):
         if hashes_v1.get(key) != hashes_v2.get(key)
     } == {
         ".opencode/agents/developer.md",
+        ".opencode/agents/explorer.md",
         ".opencode/agents/orchestrator.md",
         ".opencode/plugins/agent-meta-runtime-gate.js",
     }, "the managed hash manifest must follow the surface, not drift on its own"
@@ -5045,12 +5222,16 @@ _OPENCODE_V2_CONFIG_PATH = _REPO_ROOT / "scripts" / "lib" / "opencode_v2_config.
 
 
 def test_ac_t3_required_acs_have_tests():
-    """AC-T3: every required AC has at least one test named after it.
+    """AC-T3 name/traceability guard — NOT behavioural coverage of the ACs.
 
-    The sweep reads the source text of this file (regex on
-    ``def test_ac_<id>_``), so deleting or renaming a test is caught even when
-    the suite stays green for another reason. AC-D9 is owned by
-    ``tests/test_artifact_contracts.py`` and AC-C1/AC-C2 by
+    This test only proves that a test *named* ``def test_ac_<id>_*`` still
+    exists for every required AC. It reads the source text (regex on
+    ``def test_ac_<id>_``), so deleting or renaming such a test is caught even
+    when the suite stays green for another reason. It says nothing about what
+    those tests assert — the behavioural evidence lives in the named tests
+    themselves (QA-E-06).
+
+    AC-D9 is owned by ``tests/test_artifact_contracts.py`` and AC-C1/AC-C2 by
     ``tests/test_opencode_v2_spike.py`` (spec AC-T3) — those files are checked
     explicitly rather than folded into this file's list.
     """
