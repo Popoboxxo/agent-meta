@@ -103,8 +103,31 @@ python3 -m pytest tests/test_provider_agnostic_dispatch.py tests/test_import_acy
 
 **Verdikt zum Kriterium „`tests/test_mcp_config.py` unverändert grün“: NICHT erfüllt — bewusst abgewichen.** Die Datei wurde in Task 15 und Task 17 zweimal gezielt korrigiert, weil sie Vorspike-Annahmen festschrieb, die AC-C7 bzw. AC-C10 widersprechen. Der v1-Byte-Freeze selbst wird weiterhin geprüft: `test_ac_c11_v1_entry_byte_identical_to_reference` und die verschärfte Assertion in `test_build_connection_entry_opencode_json_v2_matches_v1_shape` (`v1["enabled"] is True` plus Gleichheit aller übrigen Schlüssel) sind grün. Das Kriterium gilt damit als abgewichen, nicht als verfehlt im Sinne einer Regression.
 
+## C1/C2-Review-Fixrunde (2026-10-23)
+
+**Quelle:** Review zu `feat/1007-c1-c2-gate` (Verdict `CHANGES_REQUESTED`). Branch-Arbeitsstand `9b4d28d6`.
+
+| Finding | Schwere | Änderung | Beleg |
+|---|---|---|---|
+| QA-C-01 | BLOCKER | `active_set` ist jetzt Pflicht-Keyword von `reconcile_opencode_surface_gate` **und** `_opencode_v2_gate_permissions` und wird von beiden Produktionsaufrufern (`sync_pipeline._sync_stage_per_provider`, `cli_commands`-Test-Repo-Pfad) sowie in der Zeile-6-Warnung mit demselben Wert wie Spec A benutzt. Kein Fail-open-`None` mehr. | `scripts/lib/isolation.py`, `scripts/lib/sync_pipeline.py`, `scripts/lib/cli_commands.py`, `::test_ac_c15_non_generated_primary_role_gets_no_triples_on_*`, Spec Amendment B3 (Rev. 1.7) |
+| QA-C-02 | MAJOR (Vertrag) | Agent-Ebene (`deny_edit`, Task 22) MUSS `permission_deny_required` verwenden (auch `plugin`+`observe`), nicht `opencode_runtime_gate_wanted`; AC-C14 gilt auch für die Agent-Ebene. Nur Vertrag/Plan, Implementierung bleibt Task 22. | Spec Amendment B3, AC-C14, Plan Task 22 („Amendment-B3-Folge") |
+| QA-C-04 | MINOR | `_drop_flat_mcp_keys` loggt eine Warnung je verworfenem flachen v1-Key (`opencode-v2 mcp: dropped flat v1 key 'mcp.<name>'`); der Managed-Container `servers` wird nie gemeldet. | `scripts/lib/opencode_v2_config.py`, `::test_qa_c04_flat_v1_keys_dropped_with_one_warning_per_key` |
+| RVW-C-01 | MINOR | Freeze-Test prüft die Aufrufbedingung **in place** (Bedingung + direkt eingerückter `_sync_opencode_runtime_gate(`-Aufruf) und dass beide Aufrufer `active_set=active_set` übergeben. | `::test_ic4_functions_and_call_condition_unchanged` |
+| RVW-C-02 | MINOR | Matrix-Zeile „1b-v1-to-v2-advisory": v1-Map wird entfernt, `runtime-gate-deny` geleert, keine Tripel/kein State. | `::test_reconcile_matrix_seven_rows` / `_matrix_v1_to_v2_advisory` |
+| RVW-C-03 | MINOR | End-to-End `disabled: true` durch `generate_provider_configs`: `mcp.servers.<name>.disabled is True`, kein `enabled`. | `::test_ac_c7_disabled_true_reaches_document_end_to_end` |
+| RVW-C-04 | MINOR | AC-C10 klargestellt: ein Timeout-Teil-Subset ist gültig, Finding nur bei nicht-ganzzahligen Werten. | Spec AC-C10 |
+| RVW-C-05 | MINOR | §3.4 dokumentiert den neuen `active_set`-Parameter und warum Fail-open an der Einstiegspunkt-Prüfung unzulässig ist. | Spec §3.4 |
+| RVW-C-06 | MINOR | AC-C16(a)-Rollback-Hälfte: Verschwindet `primary-role`, wird `default_agent` entfernt und der `default-agent`-State geleert. | `::test_ac_c16a_default_agent_removed_when_primary_role_disappears` |
+| RVW-C-07 | MINOR | Plan-Task-15-Step-3 verweist für „`tests/test_mcp_config.py` unverändert" auf die bewusste Ledger-Abweichung. | Plan Task 15 |
+
 ## Offene Punkte
 
+- **QA-C-02 (MAJOR, Vertrag):** Die Agent-Ebene (`deny_edit`, Task 22) muss `permission_deny_required` verwenden (auch Tier `plugin`+`observe`); der Frontmatter-Aufrufort braucht dafür `capabilities` + `plugin_mode`. Bindend im Plan (Task 22) und in Spec Amendment B3 hinterlegt — **nicht** in dieser Runde implementiert.
+- **QA-C-03 (MINOR, bekannt):** Ein bereits vorhandenes, identisches, aber unverfolgtes Tripel unterdrückt die End-Einfügung (schwächste Position) und wird nie geclaimt. Nach State-Verlust kann ein v2→v1-Wechsel `permissions[]` (inkl. unserer Tripel) auf einem v1-Dokument hinterlassen, das ein Zod-`.strict`-Parser ablehnen könnte. Entscheidung „Dedupe vs. End-Einfügung" und eine Warnung bei vorhandenen Tripeln ohne State stehen aus.
+- **QA-C-05 (MINOR, bekannt):** `finding.file` ist immer `config/plugin-catalog.yaml`, auch für Verstöße aus `.meta-config`-Override oder Inline-Katalog. Die Meldung nennt damit nicht die tatsächliche Quelle.
+- **QA-C-06 (MINOR, bekannt):** `_v2_committed_file`/`_v2_provider_entry` duplizieren den Owner-/Committed-File-Scan aus `opencode_v2_config`; `_V2_ACTION_RENAME` ist derzeit toter Code (weder verdrahtet noch entfernt).
+- **QA-C-07 (MINOR, bekannt):** `scripts/lib/isolation.py` ist mit 1407 Zeilen (+614 in C1) ein God-Modul, oberhalb der im Repo zitierten ≤600-Richtlinie. Follow-up: Extraktion des v2-Gate-Blocks (dokumentierte Spec-Abweichung).
+- **QA-C-08 (MINOR, bekannt):** Die v2-Gate-Writer nutzen `allow_secrets=False`, während der Schwester-Writer derselben Datei `config["allow-committed-secrets"]` durchreicht. Ein Klartext-Secret eines Users bricht damit auch einen reinen Rollback ab; entweder gleiche Secret-Gate-Parameter durchreichen oder die strengere Wahl dokumentieren.
 - **OQ-B12** ist mit `VERDICT-C3: GO` an seinem Entscheidungszeitpunkt angelangt. Der dokumentierte Default „Eigenprüfung genügt (kein Eingriff in Spec A)“ gilt weiter, eine ausdrückliche Entscheidung steht jedoch noch aus.
 - Die unabhängigen Stränge B, C1/C2 und D sind durch OQ-B12 nicht blockiert.
 - **Plandefekt Task 15:** Der Plan ging davon aus, dass `tests/test_mcp_config.py` unverändert bleibt. Der Test `test_build_connection_entry_opencode_json_v2_matches_v1_shape` kodierte jedoch „v2 == v1 inkl. `enabled: true`“, was AC-C7 widerspricht; die Assertion musste invertiert werden (v1 `enabled is True`, v2 ohne `enabled`, übrige Schlüssel gleich).
