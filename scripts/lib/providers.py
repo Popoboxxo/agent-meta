@@ -147,8 +147,17 @@ def _apply_surface_aux_selection(provider_config: dict) -> dict:
 
     - ``entry["cli-files"][<surface-version>]`` → flat ``entry["cli_file"]``
       (the committed CLI settings filename for that surface);
+    - ``entry["surface-plugin-protocols"][<surface-version>]`` → flat
+      ``entry["plugin_protocol"]`` (the verified plugin runtime protocol);
+    - ``entry["surface-has-plugins"][<surface-version>]`` → flat
+      ``entry["has_plugins"]`` (the capability flag of that surface);
     - ``entry["agent-transform"]["surface-model-patterns"][<surface-version>]``
       → ``entry["agent-transform"]["model-pattern"]`` (the model-id contract).
+
+    The plugin maps are the C3 activation channel: the static ``has_plugins``
+    stays ``false`` so a surface without an entry (``v1``) never resolves to
+    tier ``plugin`` (spec §3.1 B-1 / B-D7). Both values are type-checked; a
+    malformed map value leaves the statically declared key untouched.
 
     Providers without the map, without the relevant block, or whose
     ``surface-version`` is not a key of the map keep their statically declared
@@ -173,6 +182,18 @@ def _apply_surface_aux_selection(provider_config: dict) -> dict:
             selected_cli_file = cli_files.get(surface_version)
             if isinstance(selected_cli_file, str) and selected_cli_file:
                 entry["cli_file"] = selected_cli_file
+        plugin_protocols = entry.get("surface-plugin-protocols")
+        if isinstance(plugin_protocols, dict) and plugin_protocols:
+            selected_protocol = plugin_protocols.get(surface_version)
+            if isinstance(selected_protocol, str) and selected_protocol:
+                entry["plugin_protocol"] = selected_protocol
+        has_plugins_by_surface = entry.get("surface-has-plugins")
+        if (
+            isinstance(has_plugins_by_surface, dict)
+            and has_plugins_by_surface
+            and isinstance(has_plugins_by_surface.get(surface_version), bool)
+        ):
+            entry["has_plugins"] = has_plugins_by_surface[surface_version]
         transform = entry.get("agent-transform")
         if not isinstance(transform, dict):
             continue
@@ -669,10 +690,11 @@ def context_topology(config: Optional[dict], provider: Optional[str] = None) -> 
 SUPPORTED_HOOK_PROTOCOLS = {"claude-code-json", "antigravity-hooks-json"}
 
 # Plugin analogue of SUPPORTED_HOOK_PROTOCOLS: only a `plugin_protocol` listed
-# here counts as a verified native plugin runtime. Phase 0 ships the machine
-# flag surface; no provider declares `has_plugins`/`plugin_protocol` yet, so
-# the plugin tier stays unreachable until the P6 verification (Phase 1).
-SUPPORTED_PLUGIN_PROTOCOLS = {"opencode-plugin-js"}
+# here counts as a verified native plugin runtime. `opencode-plugin-v2-js` is
+# added by SPEC-OPENCODE-V2-SUPPORT-2026-10-22 §3.6 (phase C3) after the C0
+# spike recorded `VERDICT-C3: GO` with reproducible Q1–Q3 probes; the v1
+# protocol stays supported so both surfaces keep their verified runtime.
+SUPPORTED_PLUGIN_PROTOCOLS = {"opencode-plugin-js", "opencode-plugin-v2-js"}
 
 
 def provider_hooks_supported(pc: dict) -> bool:

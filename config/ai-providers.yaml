@@ -286,6 +286,17 @@ providers:
     plugin_dir: .opencode/plugins
     plugin_ext: .js
     plugin_protocol: opencode-plugin-js
+    # Phase C3 (SPEC-OPENCODE-V2-SUPPORT-2026-10-22 §3.1/§3.6): the v2 surface
+    # activates the native plugin runtime through DATA only. The static
+    # `has_plugins: false` above stays, so a v1 project keeps tier `permission`
+    # and never gets an artifact (B-D7/AC-C13). Activation is justified by the
+    # reproducible Q3 probe in
+    # docs/spikes/2026-10-22-issue-1007-opencode-v2-plugin-api-spike.md
+    # (`VERDICT-C3: GO`; Lauf 17 shows the hook firing in a subagent session).
+    surface-plugin-protocols:
+      v2: opencode-plugin-v2-js
+    surface-has-plugins:
+      v2: true
     runtime_gate-mechanism: opencode-plugin
     bash_tool_name: bash
     provider_root_dirs:

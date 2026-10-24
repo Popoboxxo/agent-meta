@@ -63,7 +63,11 @@ from lib.mcp_provider_config import (
     generate_provider_configs,
 )
 from lib.opencode_v2_config import STATE_KEYS_KEY
-from lib.providers import load_provider_capabilities, load_providers_config
+from lib.providers import (
+    load_provider_capabilities,
+    load_providers_config,
+    provider_runtime_gate_tier,
+)
 
 _SURFACE_MECHANISMS = {"v1": "opencode-native", "v2": "opencode-native-v2"}
 
@@ -3052,3 +3056,165 @@ def test_mcp_writer_passes_secret_gate_params_to_write_checked(tmp_path, monkeyp
     assert kwargs["verify_gitignored"] is False
     assert kwargs["config"] is config
     assert kwargs["dry_run"] is False
+
+
+# ===========================================================================
+# Phase C3 / Task 18 (C3.1): v2 gate plugin, protocol and data activation
+# ===========================================================================
+#
+# ``VERDICT-C3: GO`` (spike 2026-10-23, ``docs/spikes/2026-10-22-issue-1007-
+# opencode-v2-plugin-api-spike.md``) unlocks the native v2 plugin runtime. The
+# activation is DATA only: ``surface-plugin-protocols.v2`` and
+# ``surface-has-plugins.v2`` on the registry entry are resolved by
+# ``providers._apply_surface_aux_selection`` into the flat ``plugin_protocol`` /
+# ``has_plugins`` keys. The static ``has_plugins: false`` stays, so a v1 project
+# never reaches tier ``plugin`` and never gets an artifact (B-D7 / AC-C13).
+#
+# The plugin stays additive: ``MODE=observe`` means the permission deny of spec
+# §3.4 remains the gate (``isolation.permission_deny_required``), and the v2
+# template never registers a blocking ``ctx.permission.hook("evaluate")``
+
+
+def _resolved_surface_pc(surface: str | None = "v2") -> dict:
+    """Resolve the real registry entry for *surface* (``None`` = committed v1)."""
+    project_config = (
+        None
+        if surface is None
+        else {"provider-options": {"Opencode": {"surface-version": surface}}}
+    )
+    return load_providers_config(_REPO_ROOT, project_config)["Opencode"]
+
+
+def _opencode_caps() -> dict:
+    """The declared capability record of the real Opencode registry entry."""
+    return load_provider_capabilities(_REPO_ROOT)["Opencode"]
+
+
+def _sync_gate_plugin(project_root: Path, pc: dict) -> SyncLog:
+    """Run the capability-gated plugin writer for one resolved provider entry."""
+    log = SyncLog()
+    runtime_gate.sync_runtime_gate_plugins(
+        _REPO_ROOT,
+        project_root,
+        {},
+        log,
+        dry_run=False,
+        provider="Opencode",
+        provider_config={"Opencode": pc},
+    )
+    return log
+
+
+def test_ac_c12_v2_project_gets_plugin_file_and_tier_plugin(tmp_path):
+    """AC-C12: the v2 surface resolves to tier ``plugin`` and writes the artifact.
+
+    The entry is the SHIPPED registry (no fixture copy): the C3 keys must exist
+    there, the resolved protocol must be ``opencode-plugin-v2-js`` and the
+    generated file must carry the v2 object export from spike Q4.
+    """
+    pc = _resolved_surface_pc("v2")
+    caps = _opencode_caps()
+
+    assert pc["has_plugins"] is True
+    assert pc["plugin_protocol"] == "opencode-plugin-v2-js"
+    assert provider_runtime_gate_tier(pc, caps) == "plugin"
+    assert runtime_gate.PLUGIN_TEMPLATE_BY_PROTOCOL["opencode-plugin-v2-js"] == (
+        "templates/plugins/runtime-gate.opencode-v2-plugin.js.tmpl"
+    )
+
+    log = _sync_gate_plugin(tmp_path, pc)
+
+    target = tmp_path / ".opencode/plugins/agent-meta-runtime-gate.js"
+    assert target.is_file(), log.warnings
+    content = target.read_text(encoding="utf-8")
+
+    # Same sync-time substitution as the v1 artifact: no placeholder survives.
+    assert "{{" not in content
+    assert 'MODE = "observe"' in content
+    assert 'MODE = "enforce"' not in content
+
+    # Spike Q4: default export OBJECT with id + setup(ctx), hook registration
+    # through ctx.tool.hook("execute.before").
+    assert "export default {" in content
+    assert 'id: "agent-meta-runtime-gate"' in content
+    assert "async setup(ctx)" in content
+    assert 'ctx.tool.hook("execute.before"' in content
+    assert "tool.execute.before" not in content, (
+        "the v1 hook name is ignored by the v2 loader (spike Q4)"
+    )
+
+    # Observe only: the blocking permission hook must not be registered
+    # (`await ctx.permission.hook(…)` is the only registration form).
+    assert "await ctx.permission.hook(" not in content
+
+
+def test_ac_c12_v1_project_keeps_tier_permission_and_no_plugin_file(tmp_path):
+    """AC-C12 (v1 half): the static ``has_plugins: false`` keeps v1 frozen.
+
+    Same registry data, default surface ``v1`` → tier ``permission``, the
+    static ``opencode-plugin-js`` protocol stays, and the plugin writer creates
+    no artifact (and not even the plugin directory).
+    """
+    pc = _resolved_surface_pc(None)
+    caps = _opencode_caps()
+
+    assert pc["surface-version"] == "v1"
+    assert pc["has_plugins"] is False
+    assert pc["plugin_protocol"] == "opencode-plugin-js", (
+        "v1 has no surface-plugin-protocols entry, so the static value stays"
+    )
+    assert provider_runtime_gate_tier(pc, caps) == "permission"
+    assert caps["runtime_gate"] == "permission"
+
+    _sync_gate_plugin(tmp_path, pc)
+
+    assert not (tmp_path / ".opencode/plugins").exists(), (
+        "a v1 project must not receive any plugin artifact"
+    )
+
+
+def test_ac_c13_has_plugins_false_resolved_means_no_plugin_file(tmp_path):
+    """AC-C13: activation hinges on the RESOLVED ``has_plugins``, not the map.
+
+    A fixture registry offers the v2 protocol but resolves ``has_plugins`` to
+    ``false``: no artifact, tier stays ``permission``. The positive control
+    (same fixture, map value ``true``) proves the assertion is not vacuous.
+    """
+    base = {
+        "surface-version": "v2",
+        "primary-role": "orchestrator",
+        "has_plugins": False,
+        "plugin_dir": ".opencode/plugins",
+        "plugin_ext": ".js",
+        "plugin_protocol": "opencode-plugin-js",
+        "surface-plugin-protocols": {"v2": "opencode-plugin-v2-js"},
+        "mcp-config": _mcp_block("v2"),
+        "agent-transform": {"frontmatter-mechanism": "opencode-native-v2"},
+    }
+    caps = {"runtime_gate": "permission"}
+
+    off_root = tmp_path / "fw-off"
+    _write_config(off_root, {"Opencode": dict(base, **{"surface-has-plugins": {"v2": False}})})
+    off_pc = load_providers_config(off_root)["Opencode"]
+    assert off_pc["plugin_protocol"] == "opencode-plugin-v2-js", (
+        "the protocol resolves even though the capability is off"
+    )
+    assert off_pc["has_plugins"] is False
+    assert provider_runtime_gate_tier(off_pc, caps) == "permission"
+
+    project_off = tmp_path / "project-off"
+    log = _sync_gate_plugin(project_off, off_pc)
+    assert not (project_off / ".opencode/plugins").exists(), log.warnings
+
+    # Positive control: the same fixture with the capability on writes the file.
+    on_root = tmp_path / "fw-on"
+    _write_config(on_root, {"Opencode": dict(base, **{"surface-has-plugins": {"v2": True}})})
+    on_pc = load_providers_config(on_root)["Opencode"]
+    assert on_pc["has_plugins"] is True
+    assert provider_runtime_gate_tier(on_pc, caps) == "plugin"
+
+    project_on = tmp_path / "project-on"
+    _sync_gate_plugin(project_on, on_pc)
+    assert (
+        project_on / ".opencode/plugins/agent-meta-runtime-gate.js"
+    ).is_file(), "positive control must write the artifact"
