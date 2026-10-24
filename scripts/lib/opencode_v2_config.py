@@ -59,6 +59,13 @@ decision table and the ``opencode-v2-mcp`` state namespace, and
 ``owns_opencode_surface`` and derive the committed file and the state file from
 the provider's resolved data.
 
+Task 23 (D2) adds the dedicated CLI settings file (spec §3.8):
+``sync_opencode_cli_file`` manages the top-level keys of
+``provider-options.<provider>.cli`` in the resolved ``cli_file``, with the same
+decision table and its own ``opencode-v2-cli`` namespace. Amendment B1:
+``plugins`` is the only documented top-level key; the writer stays a generic
+passthrough and never touches ``tui.json``.
+
 Known limitation (deliberate, not a gap to "fix" by inventing a second claim
 registry): the MCP writer does **not** participate in the run-scoped
 ``claimed_files`` set introduced by Task 10 — its plan signature has no such
@@ -1081,3 +1088,170 @@ def rollback_opencode_mcp(
 
     if new_state != state:
         isolation._write_state(state_path, new_state, dry_run, STATE_MCP_KEY)
+
+
+# ---------------------------------------------------------------------------
+# ``cli.json`` managed file (spec §3.8; Task 23 / D2)
+#
+# The CLI settings file is a dedicated managed file (not part of
+# ``opencode.json``): every top-level key of the project's ``cli`` object is one
+# managed path in its own ``opencode-v2-cli`` state namespace, decided by the
+# same table above. The writer starts with the ownership guard (N-M2), derives
+# the file name from the owner's resolved ``cli_file`` (relative to the
+# committed file's directory — never a hardcoded literal) and the state path
+# from ``opencode_state_path``.
+#
+# Amendment B1 (2026-10-23): ``plugins`` is the only documented top-level key;
+# ``theme``/``autoupdate`` are not. The writer therefore stays a generic
+# passthrough of whatever top-level keys the user provides — no allow-list and
+# no special case. ``tui.json`` is never created, modified or deleted.
+# ---------------------------------------------------------------------------
+
+
+def _cli_file_rel(pc: dict) -> Path | None:
+    """The CLI settings file, relative to the committed file's directory.
+
+    ``None`` when the resolved entry has no ``cli_file`` (the v1 surface has no
+    ``cli-files`` entry) or no ``committed-file``: both mean "this provider has
+    no managed CLI file", and the writer must not invent one.
+    """
+    cli_name = pc.get("cli_file")
+    committed = _mcp_config(pc).get("committed-file")
+    if not _non_empty_string(cli_name) or not _non_empty_string(committed):
+        return None
+    return Path(committed).parent / cli_name
+
+
+def sync_opencode_cli_file(
+    project_root: Path,
+    config: dict,
+    provider: str,
+    provider_config: dict,
+    log: SyncLog,
+    dry_run: bool,
+) -> None:
+    """Merge the project's ``cli`` object into the managed ``cli_file`` (§3.8).
+
+    The ownership guard is the first statement: a non-owner never reads state,
+    writes a file or logs (AC-B20, N-M2). The file name comes from the resolved
+    ``cli_file`` relative to the directory of ``mcp-config.committed-file``; the
+    state file comes from ``opencode_state_path`` — nothing is hardcoded.
+
+    Every top-level key of ``provider-options.<provider>.cli`` is one managed
+    path (Amendment B1: generic passthrough, no allow-list), so the decision
+    table applies unchanged: a user key is adopted or kept (rows 3/3a), our own
+    value is updated (row 2), and a key that is no longer configured is removed
+    or its prior restored (rows 4/4a). The second run is byte-identical.
+
+    Missing ``cli_file`` (v1) writes and deletes nothing at all (spec §3.8: the
+    file name is the only way to find the file, and a v1 surface has none —
+    so its state is left in place too). A missing/non-object ``cli`` option
+    writes nothing — with one exception: if the ``opencode-v2-cli`` state
+    namespace is
+    non-empty, the recorded managed keys are rolled back (the project option was
+    removed but agent-meta must still clean up what it wrote). A rollback that
+    leaves the document empty removes the file again (the empty container is
+    pruned; a user key anywhere in the document keeps it alive untouched).
+
+    The secret gate is delegated to ``io.write_checked`` with the same
+    parameters as the Task-9 writer (``allow_secrets`` from
+    ``allow-committed-secrets``, ``verify_gitignored=False`` for a committed
+    file, the caller's ``config`` and ``dry_run``). A parse error or a
+    non-object document is never overwritten.
+    """
+    if not owns_opencode_surface(provider_config, provider):
+        return
+
+    pc = _provider_entry(provider_config, provider)
+    rel = _cli_file_rel(pc)
+    if rel is None:
+        # No resolved CLI file (v1) — a v1 switch intentionally writes and
+        # deletes nothing here (spec §3.8).
+        return
+
+    root = Path(project_root)
+    state_path = isolation.safe_path(
+        root, opencode_state_path(root, pc).relative_to(root)
+    )
+    state = isolation._read_state(state_path, STATE_CLI_KEY)
+
+    cli = project_options(config, provider).get("cli")
+    # JSON object keys are strings by definition; stringify here so a YAML
+    # integer key cannot break the deterministic sort below.
+    targets: dict[str, object] = (
+        {str(key): value for key, value in cli.items()}
+        if isinstance(cli, dict)
+        else {}
+    )
+
+    # No option AND no prior management: nothing to write, nothing to delete
+    # (the rollback exception only exists when state is present).
+    if not targets and not state:
+        return
+
+    rel_label = rel.as_posix()
+    file_path = isolation.safe_path(root, rel)
+    existing = isolation._read_json_safe(file_path, log)
+    if existing is None:
+        if file_path.exists():
+            return  # parse error — warning already emitted, never overwrite it
+        existing = {}
+    elif not isinstance(existing, dict):
+        return  # a non-object document is not ours to rewrite (data-loss guard)
+
+    new_state: dict[str, dict] = {}
+    changed = False
+    for key in sorted(set(state) | set(targets)):
+        # Top-level keys are literal: a dot inside a user key must not turn
+        # into a nested path here (the generic dotted helpers are for
+        # ``opencode.json``'s nested managed paths).
+        result = merge_managed_path(
+            key,
+            targets.get(key),
+            existing.get(key, ABSENT),
+            state.get(key),
+        )
+        if result.warning:
+            log.warning(result.warning)
+        if result.action == "write":
+            existing[key] = result.value
+            changed = True
+        elif result.action == "remove":
+            if result.value is ABSENT:
+                existing.pop(key, None)
+            else:
+                existing[key] = result.value
+            changed = True
+        # ``keep`` / ``noop``: the document is left exactly as it is.
+        if result.state is not None:
+            new_state[key] = result.state
+
+    if changed and not existing:
+        # A rollback that leaves no content prunes the empty container — the
+        # managed file itself — instead of keeping an empty ``{}`` behind.
+        if not dry_run and file_path.exists():
+            file_path.unlink()
+        log.action("DELETE", rel_label, "opencode-v2 cli")
+    elif changed:
+        content = json.dumps(existing, indent=2, ensure_ascii=False) + "\n"
+        if not dry_run:
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+        written = io.write_checked(
+            file_path,
+            content,
+            log,
+            rel_label,
+            allow_secrets=(config or {}).get("allow-committed-secrets", False),
+            verify_gitignored=False,
+            config=config,
+            dry_run=dry_run,
+        )
+        if written:
+            log.action("WRITE", rel_label, "opencode-v2 cli")
+        else:
+            log.skip(rel_label, "opencode-v2 cli unchanged")
+    else:
+        log.skip(rel_label, "opencode-v2 cli unchanged")
+
+    if new_state != state:
+        isolation._write_state(state_path, new_state, dry_run, STATE_CLI_KEY)

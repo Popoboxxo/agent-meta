@@ -342,6 +342,9 @@ def _v2_pc() -> dict:
         "primary-role": "orchestrator",
         "mcp-config": _mcp_block("v2"),
         "agent-transform": {"frontmatter-mechanism": "opencode-native-v2"},
+        # Resolved by ``providers._apply_surface_aux_selection`` (Task 6); the
+        # v1 entry carries no such key, which is exactly AC-D7's "no file" case.
+        "cli_file": "cli.json",
     }
 
 
@@ -4096,3 +4099,252 @@ def test_system_in_allowed_fields():
         path="agent.md",
     )
     assert findings == []
+
+
+# ===========================================================================
+# Phase D2 / Task 23 (D2): ``cli.json`` as a managed file
+# ===========================================================================
+#
+# Spec §3.8 / Amendment B1 / AC-D7, AC-B16 (cli part), AC-B20 (cli part):
+#
+# * ``plugins`` is the ONLY documented top-level key of ``cli.json``; the writer
+#   stays a generic passthrough of the user-provided top-level keys (no
+#   allow-list) and the tests make no claim about ``theme``/``autoupdate``;
+# * the file name is the resolved ``cli_file`` (Task 6), relative to the
+#   directory of ``mcp-config.committed-file`` — never a hardcoded literal;
+# * the writer owns the ``opencode-v2-cli`` state namespace only, starts with
+#   ``owns_opencode_surface`` (non-owners are no-ops before any state read) and
+#   writes through ``io.write_checked`` with the Task-9 secret-gate parameters;
+# * ``tui.json`` is never created, modified or deleted.
+
+_CLI_FILE = "cli.json"
+
+
+def _run_cli(
+    project_root: Path,
+    config: dict,
+    providers: dict,
+    provider: str = "Opencode",
+    log: SyncLog | None = None,
+    dry_run: bool = False,
+) -> SyncLog:
+    log = log if log is not None else SyncLog()
+    opencode_v2_config.sync_opencode_cli_file(
+        project_root, config, provider, providers, log, dry_run,
+    )
+    return log
+
+
+def test_ac_d7_cli_json_written_with_exact_keys(tmp_path):
+    """AC-D7 (Amendment B1): the documented ``plugins`` key is passed through.
+
+    The written document carries exactly the user's top-level keys (generic
+    passthrough, no invented allow-list). Removing the project option rolls the
+    managed key back and empties the ``opencode-v2-cli`` namespace — even though
+    the option no longer exists in the project config.
+    """
+    project = tmp_path / "project"
+    project.mkdir()
+    plugins = ["opencode-acme-cli"]
+    providers = {"Opencode": _v2_pc()}
+
+    _run_cli(project, _config(cli={"plugins": plugins}), providers)
+
+    doc = _read_json(project / _CLI_FILE)
+    assert doc == {"plugins": plugins}, doc
+    assert _read_state_doc(project)[opencode_v2_config.STATE_CLI_KEY] == {
+        "plugins": {"value": plugins, "prior": None, "prior_absent": True}
+    }
+
+    # Rollback: the option is gone, the managed key must go with it.
+    log = _run_cli(project, _config(), providers)
+
+    assert not (project / _CLI_FILE).exists(), (
+        "a rollback that leaves no content must not keep an empty cli.json"
+    )
+    assert opencode_v2_config.STATE_CLI_KEY not in _read_state_doc(project)
+    assert not _warned(log, "opencode-v2-managed"), log.warnings
+
+
+def test_ac_d7_no_cli_json_without_option_or_on_v1(tmp_path, monkeypatch):
+    """AC-D7: no option or a v1 surface never creates ``cli.json``.
+
+    Drives the real stage seam (so it is a green regression test before the
+    writer exists): without a ``cli`` option there is nothing to write, and on
+    v1 the resolved ``cli_file`` is absent, so the option is ignored.
+    """
+    no_option, _, _ = _run_stage(
+        tmp_path / "no-option", monkeypatch, {"Opencode": _v2_pc()}, ["Opencode"],
+        _config(3), {"Opencode": "advisory"},
+    )
+    assert not (no_option / _CLI_FILE).exists()
+    assert opencode_v2_config.STATE_CLI_KEY not in _read_state_doc(no_option)
+
+    on_v1, _, _ = _run_stage(
+        tmp_path / "v1", monkeypatch, {"Opencode": _v1_pc()}, ["Opencode"],
+        _config(cli={"plugins": ["opencode-acme-cli"]}), {"Opencode": "advisory"},
+    )
+    assert not (on_v1 / _CLI_FILE).exists(), (
+        "v1 has no resolved cli_file, so the writer must stay a no-op"
+    )
+    assert opencode_v2_config.STATE_CLI_KEY not in _read_state_doc(on_v1)
+
+
+def test_ac_d7_tui_json_never_touched(tmp_path):
+    """AC-D7: ``tui.json`` is never created, modified or deleted by the writer."""
+    project = tmp_path / "project"
+    tui = project / "tui.json"
+    tui.parent.mkdir(parents=True)
+    tui.write_bytes(b'{"theme": "user-owned"}\n')
+    before = tui.read_bytes()
+    providers = {"Opencode": _v2_pc()}
+
+    first = _run_cli(
+        project, _config(cli={"plugins": ["opencode-acme-cli"]}), providers,
+    )
+    assert (project / _CLI_FILE).is_file()
+    assert tui.read_bytes() == before
+
+    second = _run_cli(project, _config(), providers)  # rollback
+    assert tui.read_bytes() == before
+
+    touched = [
+        line
+        for line in first.actions + first.skipped + first.warnings
+        + second.actions + second.skipped + second.warnings
+        if "tui.json" in line
+    ]
+    assert touched == [], touched
+
+
+def test_ac_b16_cli_namespace_isolated(tmp_path):
+    """AC-B16 (cli part): only ``opencode-v2-cli`` is written; siblings survive.
+
+    A second run is byte-identical for both the managed file and the state
+    file, and the namespace stays a ``dict`` for ``isolation._read_state``.
+    """
+    project = tmp_path / "project"
+    sibling_isolation = ["**/.claude/**"]
+    sibling_keys = {
+        "experimental.subagent_depth": {
+            "value": 3,
+            "prior": None,
+            "prior_absent": True,
+        }
+    }
+    sibling_mcp = {
+        "mcp.servers.example": {
+            "value": {"type": "local"},
+            "prior": None,
+            "prior_absent": True,
+        }
+    }
+    _write_json(
+        project / _V2_STATE_REL,
+        {
+            "isolation-deny": sibling_isolation,
+            STATE_KEYS_KEY: sibling_keys,
+            opencode_v2_config.STATE_MCP_KEY: sibling_mcp,
+        },
+    )
+    before = _read_json(project / _V2_STATE_REL)
+    providers = {"Opencode": _v2_pc()}
+    config = _config(cli={"plugins": ["opencode-acme-cli"]})
+
+    _run_cli(project, config, providers)
+
+    after = _read_json(project / _V2_STATE_REL)
+    assert after["isolation-deny"] == before["isolation-deny"]
+    assert after[STATE_KEYS_KEY] == before[STATE_KEYS_KEY]
+    assert after[opencode_v2_config.STATE_MCP_KEY] == before[opencode_v2_config.STATE_MCP_KEY]
+    assert set(after[opencode_v2_config.STATE_CLI_KEY]) == {"plugins"}
+    assert isinstance(
+        isolation._read_state(project / _V2_STATE_REL, opencode_v2_config.STATE_CLI_KEY),
+        dict,
+    )
+
+    file_bytes = (project / _CLI_FILE).read_bytes()
+    state_bytes = (project / _V2_STATE_REL).read_bytes()
+    _run_cli(project, config, providers)
+
+    assert (project / _CLI_FILE).read_bytes() == file_bytes
+    assert (project / _V2_STATE_REL).read_bytes() == state_bytes
+
+
+def test_ac_b20_cli_writer_noop_for_non_owner_provider(tmp_path, monkeypatch):
+    """AC-B20 (cli part): a non-owner is a no-op *before* the state is read."""
+    project = tmp_path / "project"
+    _write_json(project / "opencode.json", {"theme": "dark"})
+    _write_json(
+        project / _V2_STATE_REL,
+        {
+            opencode_v2_config.STATE_CLI_KEY: {
+                "plugins": {
+                    "value": ["opencode-acme-cli"],
+                    "prior": None,
+                    "prior_absent": True,
+                }
+            }
+        },
+    )
+    file_before = (project / "opencode.json").read_bytes()
+    state_before = (project / _V2_STATE_REL).read_bytes()
+
+    def _forbidden(*args, **kwargs):
+        raise AssertionError("state must not be read for a non-owner provider")
+
+    monkeypatch.setattr(isolation, "_read_state", _forbidden)
+
+    log = SyncLog()
+    _run_cli(
+        project,
+        _config(cli={"plugins": ["opencode-acme-cli"]}),
+        {"Claude": _non_owner_pc()},
+        provider="Claude",
+        log=log,
+    )
+
+    assert not (project / _CLI_FILE).exists()
+    assert (project / "opencode.json").read_bytes() == file_before
+    assert (project / _V2_STATE_REL).read_bytes() == state_before
+    assert log.actions == [] and log.warnings == [] and log.errors == []
+    assert log.skipped == [] and log.infos == []
+
+
+def test_cli_writer_passes_secret_gate_params_to_write_checked(tmp_path, monkeypatch):
+    """The CLI writer delegates the secret gate to ``io.write_checked``.
+
+    Same parameters as the Task-9 writer: ``allow_secrets`` from
+    ``allow-committed-secrets``, ``verify_gitignored=False`` (committed file),
+    the caller's ``config`` and ``dry_run``.
+    """
+    calls = []
+
+    def fake_write_checked(path, content, log, rel_label, **kwargs):
+        calls.append((path, content, rel_label, kwargs))
+        return True
+
+    monkeypatch.setattr(opencode_v2_config.io, "write_checked", fake_write_checked)
+    providers = {"Opencode": _v2_pc()}
+    config = _config(cli={"plugins": ["opencode-acme-cli"]})
+
+    plain_project = tmp_path / "plain"
+    plain_project.mkdir()
+    _run_cli(plain_project, config, providers)
+
+    allowed_project = tmp_path / "allowed"
+    allowed_project.mkdir()
+    _run_cli(allowed_project, {**config, "allow-committed-secrets": True}, providers)
+
+    assert len(calls) == 2, calls
+    path, content, rel_label, kwargs = calls[0]
+    assert path == plain_project / _CLI_FILE
+    assert rel_label == _CLI_FILE
+    assert content.endswith("\n")
+    assert json.loads(content) == {"plugins": ["opencode-acme-cli"]}
+    assert set(kwargs) >= {"allow_secrets", "verify_gitignored", "config", "dry_run"}
+    assert kwargs["allow_secrets"] is False
+    assert kwargs["verify_gitignored"] is False
+    assert kwargs["config"] == config
+    assert kwargs["dry_run"] is False
+    assert calls[1][3]["allow_secrets"] is True
