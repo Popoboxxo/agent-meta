@@ -57,7 +57,10 @@ from lib.harnesses import ensure_write_isolation, resolve_active_harness
 from lib.hooks import create_hook
 from lib.io import SyncError
 from lib.log import SyncLog
-from lib.opencode_v2_config import sync_opencode_v2_managed_keys
+from lib.opencode_v2_config import (
+    sync_opencode_cli_file,
+    sync_opencode_v2_managed_keys,
+)
 from lib.pipelines import (
     PIPELINES_EFFECTIVE_KEY,
     apply_overrides,
@@ -307,6 +310,12 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
             test_repo_path, config, provider, provider_config,
             agent_meta_root, log, dry_run,
             claimed_files=test_repo_claimed_files,
+        )
+        # D2 / AC-D7: same dedicated ``cli_file`` writer as the production
+        # per-provider stage (mirrored so a --test-generated repo matches).
+        sync_opencode_cli_file(
+            test_repo_path, config, provider, provider_config,
+            log, dry_run,
         )
         if pc.get("has_commands", False):
             sync_commands_for_provider(agent_meta_root, test_repo_path, config, log,

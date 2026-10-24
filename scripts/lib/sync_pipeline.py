@@ -93,7 +93,10 @@ from lib.knowledge import sync_knowledge_engine
 from lib.log import SyncLog
 from lib.subagent_permissions import resolve_subagent_permission_provider_vars
 from lib.mcp import generate_mcp_artifacts, sync_secrets_template
-from lib.opencode_v2_config import sync_opencode_v2_managed_keys
+from lib.opencode_v2_config import (
+    sync_opencode_cli_file,
+    sync_opencode_v2_managed_keys,
+)
 from lib.pipelines import (
     PIPELINES_EFFECTIVE_KEY,
     apply_overrides,
@@ -1338,6 +1341,14 @@ def _sync_stage_per_provider(
             project_root, config, provider, provider_config,
             agent_meta_root, log, args.dry_run,
             claimed_files=opencode_claimed_files,
+        )
+        # D2 / AC-D7: the dedicated ``cli_file`` of the same surface, directly
+        # after the managed-key merge and outside the ``== "permission"`` block.
+        # A no-op for non-owners, without ``cli_file`` (v1) or without a
+        # configured ``cli`` object (except a recorded rollback).
+        sync_opencode_cli_file(
+            project_root, config, provider, provider_config,
+            log, args.dry_run,
         )
         if pc.get("has_commands", False):
             sync_commands_for_provider(agent_meta_root, project_root, config, log,

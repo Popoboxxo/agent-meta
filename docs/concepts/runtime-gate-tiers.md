@@ -1,6 +1,6 @@
 # Konzept — Runtime-Gate-Tiers des CRITICAL GATE
 
-- **Status:** Accepted (Phase 0 implementiert und abgenommen; **Phase 1 / Plugin-Tier-Flip DECLINED (won't-do)**; Artefakte dormant als inaktives Inventar)
+- **Status:** Accepted (Phase 0 implementiert und abgenommen; **Phase 1 / Plugin-Tier für die Opencode-v2-Surface geliefert (C3, Modus `observe`)**; `MODE=enforce` bleibt durch P6 gesperrt; v1 bleibt `permission`)
 - **Spec:** [`../specs/2026-09-13-opencode-runtime-gate-design.md`](../specs/2026-09-13-opencode-runtime-gate-design.md)
   (`spec-id: SPEC-OPENCODE-RUNTIME-GATE-2026-09-13`, Status APPROVED)
 - **Plan:** [`../plans/2026-09-13-opencode-runtime-gate.md`](../plans/2026-09-13-opencode-runtime-gate.md)
@@ -34,20 +34,25 @@ Kanonische Vokabel: `scripts/lib/runtime_gate.py::RUNTIME_GATE_TIERS =
 | Tier | Runtime-Zusage | Stand |
 |---|---|---|
 | `hook` | Verifizierter PreToolUse-Hook-Vertrag: das Runtime blockiert den Tool-Call (`GATE_ENFORCED`). | Phase 0 aktiv, wo `hooks: true` + verifiziertes `hook_protocol` deklariert ist. |
-| `plugin` | Native Plugin-Tier; das Artefakt war ausschließlich auf den Modus `observe` (nur Logging) ausgelegt. | **Phase 1 — DECLINED (won't-do).** Der P6-Real-Repo-Test ist in dieser Umgebung nicht durchführbar; ein unverifizierter „enforce"-Flip wird ausdrücklich **nicht** ausgeliefert. Kein Provider deklariert `runtime_gate: plugin`. |
+| `plugin` | Native Plugin-Tier; das Artefakt ist ausschließlich auf den Modus `observe` (nur Logging) ausgelegt. | **Seit C3 geliefert für Opencode v2:** aufgelöst über die Daten `surface-has-plugins.v2: true` und `surface-plugin-protocols.v2: opencode-plugin-v2-js`; v1 behält das statische `has_plugins: false` und bleibt `permission`. `MODE=enforce` bleibt gesperrt, bis P6 bestanden ist. |
 | `permission` | Native Permission-Schicht blockiert Main-Chat-Writes (A2-Root-Deny). **PARTIAL**: keine Delegations-Provenienz. | Phase 0 (aktueller Status des permission-fähigen Providers), **best-effort — nicht garantiert**. |
 | `advisory` | Rein prompt-basiert, ohne Runtime-Gate. | Fail-safe-Default für unbekannte/fehlende Konfiguration. |
 
 - `advisory` schreibt **nie** einen Permission-Eintrag und deployt **nie** ein Plugin.
-- `plugin` ist ohne `has_plugins`/verifiziertes `plugin_protocol` unerreichbar; da der
-  Tier-Flip DECLINED ist, bleibt `has_plugins: false` und `MODE=enforce` **dauerhaft**
-  gesperrt (siehe §7).
+- `plugin` ist nur über aufgelöste Daten erreichbar: truthy `has_plugins` **und** ein
+  `plugin_protocol` aus `SUPPORTED_PLUGIN_PROTOCOLS`. Das statische `has_plugins: false` bleibt,
+  damit v1 nie `plugin` wird; Opencode v2 löst über `surface-has-plugins.v2` und
+  `surface-plugin-protocols.v2` nach `plugin` auf. `MODE=enforce` bleibt bis zum bestandenen
+  P6-Test gesperrt (siehe §7).
 
-**Fixierte, ehrliche Garantie.** Auf OpenCode gilt die Zusage `permission` —
+**Fixierte, ehrliche Garantie.** Auf OpenCode v1 gilt die Zusage `permission` —
 **best-effort, nicht garantiert** (PARTIAL: keine Delegations-Provenienz, Child-Session-
-Propagation unverifiziert). Auf Providern ohne Hook gilt `advisory` (rein prompt-basiert).
-Nirgends wird eine vollständig erzwungene Zusage behauptet; der einzige verifizierte
-Runtime-Gate bleibt der `hook`-Tier.
+Propagation unverifiziert). Auf OpenCode v2 löst die Oberfläche nach `plugin` auf, das Artefakt
+läuft aber ausschließlich im Modus `observe` (nur Logging); die Durchsetzung trägt dort
+weiterhin der `permissions[]`-Deny (`permission_deny_required`: Tier `plugin` **und** Modus
+`observe`). Auf Providern ohne Hook gilt `advisory` (rein prompt-basiert). Nirgends wird eine
+vollständig erzwungene Zusage behauptet; der einzige verifizierte Runtime-Gate bleibt der
+`hook`-Tier.
 
 ## 3. Resolver-Präzedenz & Fail-safe
 
@@ -87,6 +92,10 @@ innerhalb der bestehenden Permission-Familien:
   **unverifiziert**. Die Tier `permission` darf deshalb **niemals als vollständig
   erzwungen** beschrieben werden — sie ist und bleibt PARTIAL.
 
+Auf v2 schreibt dieselbe Gate-Ebene stattdessen `permissions[]`-Tripel
+(`{action, resource: "**", effect: "deny"}`, ans Listenende); die PARTIAL-Grenze (keine
+Delegations-Provenienz) gilt dort unverändert.
+
 Offene Phase-0-Risiken (dokumentiert, nicht versteckt):
 
 - **AN-6 / OQ-3:** Ob Agent-Frontmatter-Permissions den Root-Deny für
@@ -104,9 +113,9 @@ Offene Phase-0-Risiken (dokumentiert, nicht versteckt):
 `RUNTIME_GATE_PLUGIN_MODE`. Es wird an beiden Renderer-Seams in die
 `provider_variables` injiziert (Context und Rules).
 
-- `GATE_ENFORCED` = `true` für `hook` (Phase 0). Die `plugin`-Verzweigung bleibt im
-  Code vorhanden, ist aber mit dem DECLINED-Beschluss unerreichbar (kein Provider
-  deklariert `runtime_gate: plugin`).
+- `GATE_ENFORCED` = `true` für `hook` **und** `plugin` (so liefert es das Bundle). Auf Opencode
+  v2 läuft das Plugin dennoch ausschließlich `observe`; die tragende Schicht ist der
+  `permissions[]`-Deny.
 - `GATE_PARTIAL` = `true` nur für `permission`.
 - `GATE_ADVISORY` = `true` nur für `advisory`.
 
@@ -114,7 +123,9 @@ Offene Phase-0-Risiken (dokumentiert, nicht versteckt):
 genau einen der drei zueinander exklusiven Blöcke. Die `GATE_ENFORCED`-Variante
 reproduziert den bisherigen Strict-Wortlaut **verbatim** (`# CRITICAL GATE` +
 `… ALLES -> \`orchestrator\`. Keine Ausnahmen.`), sodass die Ausgabe
-Hook-fähiger Provider byte-identisch bleibt (F-05). Die Provenienz trägt der
+Hook-fähiger Provider byte-identisch bleibt (F-05). Opencode v2 rendert wegen des
+aufgelösten Tiers `plugin` ebenfalls diesen Block; durchgesetzt wird die Zusage dort vom
+`permissions[]`-Deny, nicht vom `observe`-Plugin. Die Provenienz trägt der
 Tier-Hinweis in `rules/1-generic/a2a-delegation-gates.md` (mit `{{ENFORCEMENT_TIER}}`
 und Verweis auf „Bekannte Grenzen").
 
@@ -132,27 +143,34 @@ leitet die Severity aus derselben Tier ab (Check-ID unverändert
 
 `orchestrator.require-runtime-gate` ist ein Boolean-Sibling-Key (Default `false`,
 D-C2). `runtime-gate.plugin-mode` (`enum: [observe, enforce]`, Default `observe`) ist
-der Phase-1-Schema-Key (IC-16) und beeinflusst das Phase-0-Rendering nicht; da der
-Tier-Flip DECLINED ist, bleibt `enforce` unerreichbar und der Key rein deklarativ.
+der Phase-1-Schema-Key (IC-16) und beeinflusst die Erzeugung des Artefakts nicht:
+`runtime_gate._baked_plugin_mode()` liefert immer `observe`. P6 gated damit
+ausschließlich `MODE=enforce`; für das Artefakt bleibt der Key deklarativ.
 
-## 7. Phase-1-Vorbehalt (P6) — DECLINED (won't-do)
+## 7. Phase-1-Grenze (P6) — `MODE=enforce` bleibt gesperrt
 
-Die native OpenCode-Plugin-Tier ist **abgelehnt (won't-do)**, nicht nur zurückgestellt:
+Die native OpenCode-Plugin-Tier ist für die v2-Surface **geliefert**, aber ausschließlich im
+Modus `observe`:
 
 - Der P6-Real-Repo-Test ist in dieser Umgebung nicht durchführbar. Ein unverifizierter
   „enforce"-Flip würde einen „erzwungen"-Anspruch ohne Nachweis ausliefern; das wird
-  ausdrücklich **nicht** getan.
-- `runtime_gate: plugin`, `has_plugins: true`, `MODE=enforce` und der Tier-Flip sind
-  **dauerhaft** gesperrt. Kein Provider deklariert `runtime_gate: plugin`; der Resolver
-  liefert auf OpenCode weiterhin `permission`.
-- Die Artefakte bleiben als **inaktives Inventar** erhalten und dokumentiert: das
-  Plugin-Template `templates/plugins/runtime-gate.opencode-plugin.js.tmpl` (nur für
-  `observe` ausgelegt), die Konfiguration `has_plugins: false` und ihre Tests. Sie sind
-  dormant und tragen keine Zusage.
-- Es wird nie „vollständig erzwungen" behauptet; die fixierte Zusage ist auf OpenCode
-  `permission` (best-effort, nicht garantiert) und auf hook-losen Providern `advisory`.
+  ausdrücklich **nicht** getan. P6 gated daher ausschließlich `MODE=enforce`.
+- Das Plugin-Artefakt wird immer mit `MODE=observe` erzeugt
+  (`runtime_gate._baked_plugin_mode()`); `permission_deny_required` hält deshalb die
+  `permissions[]`-Tripel aktiv. Das Plugin ist additiv, nie Ersatz.
+- `runtime_gate: plugin` bleibt in `config/provider-capabilities.yaml` uneingesetzt; die
+  Tier `plugin` entsteht allein aus den aufgelösten Daten `surface-has-plugins.v2: true` und
+  `surface-plugin-protocols.v2: opencode-plugin-v2-js`. Das statische `has_plugins: false`
+  bleibt, damit v1 `permission` behält.
+- Die v1-Artefakte (`templates/plugins/runtime-gate.opencode-plugin.js.tmpl`,
+  `has_plugins: false`) bleiben unverändert; das v2-Template
+  `templates/plugins/runtime-gate.opencode-v2-plugin.js.tmpl` ist observe-only und trägt
+  keine enforce-Zusage.
+- Es wird nie „vollständig erzwungen" behauptet; die fixierte Zusage ist auf OpenCode v1
+  `permission` (best-effort, nicht garantiert), auf OpenCode v2 `plugin`+`observe` mit
+  Permission-Deny und auf hook-losen Providern `advisory`.
 
-**P6-Befunde (read-only Verifikation, belegen den Beschluss):**
+**P6-Befunde (read-only Verifikation, belegen die observe-Grenze):**
 
 - `tool.execute.before` kann nur per `throw` verweigern (kein anderer Blockier-Kanal).
 - Das Hook-`input` trägt **keine Agent-Identität** (`{tool, sessionID, callID}`); die
@@ -175,7 +193,8 @@ Glob `"**"` auf und stellt ihn bei einer `strict` → non-`strict`-Transition ex
 wieder her. Wiederholte Strict-Syncs sind idempotent (byte-identisch). Der
 A2-Dispatch keyt auf `provider_runtime_gate_tier(...) == "permission"` und läuft
 auch für Single-Provider-Projekte (nicht am ≥2-Provider-Guard der Isolation
-gekoppelt).
+gekoppelt). Auf v2 läuft zusätzlich der tierunabhängige
+`reconcile_opencode_surface_gate` (siehe §4).
 
 ## 9. Referenzen
 
@@ -183,5 +202,8 @@ gekoppelt).
 - `scripts/lib/providers.py::provider_runtime_gate_tier` / `::runtime_gate_vars` — Resolver + Bundle.
 - `config/provider-capabilities.yaml:capabilities.<provider>.runtime_gate` — deklarierte Tier.
 - `scripts/lib/isolation.py::_sync_opencode_runtime_gate` — A2-Root-Deny/Merge.
+- `scripts/lib/isolation.py::permission_deny_required` / `::reconcile_opencode_surface_gate` — v2-Gate-Ebene.
+- `config/ai-providers.yaml:Opencode.surface-has-plugins` / `:surface-plugin-protocols` — Daten, die die Tier `plugin` für v2 auflösen.
+- `templates/plugins/runtime-gate.opencode-v2-plugin.js.tmpl` — v2-Artefakt (observe-only).
 - `scripts/lib/consistency/orchestrator_strict.py` — tier-abgeleitete Severity.
 - `rules/1-generic/use-orchestrator.md`, `rules/1-generic/a2a-delegation-gates.md` — gestufte Zusage.

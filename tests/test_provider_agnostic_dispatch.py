@@ -403,6 +403,7 @@ def test_lib_sweep_covers_task_modules():
         "artifact_validate.py",
         "bootstrap.py",
         "mcp_provider_config.py",
+        "opencode_v2_config.py",
         "pipelines.py",
         "context.py",
         "consistency/artifact_contracts.py",

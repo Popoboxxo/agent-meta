@@ -36,10 +36,13 @@ Run: python3 -m pytest tests/test_opencode_v2_surface.py -q
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 import json
 import re
+import subprocess
 import sys
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -47,9 +50,13 @@ import yaml
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO_ROOT / "scripts"))
+# The AC-01 harness owns the "render one project with scripts/sync.py" helper;
+# the lab diff below reuses it instead of adding a second renderer.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import test_ac01_render_identity as render_harness  # noqa: E402
 
 import lib.sync_pipeline as sync_pipeline
-from lib import isolation, opencode_v2_config, runtime_gate
+from lib import isolation, opencode_v2_config, provider_transform, runtime_gate
 from lib.artifact_validate import resolve_artifact_contract, validate_frontmatter
 from lib.consistency.artifact_contracts import check_artifact_contracts
 from lib.consistency.model_contracts import check_model_contracts
@@ -311,6 +318,28 @@ def test_ac_d8_evidence_present_with_result_line():
     }
 
 
+def test_ac_d8_repo_root_has_no_opencode_jsonc():
+    """AC-D8 (Task 26): the repo root keeps only the managed ``opencode.json``.
+
+    The evidence for Task 24 resolved ``ERGEBNIS: JSONC-TRAEGT-NICHTS-BEI``:
+    ``opencode.jsonc`` carried nothing but comments and a ``$schema`` value
+    already present in ``opencode.json``, while a content-bearing JSONC would
+    *override* the managed JSON (v1 and v2 probe). So the duplicate is removed
+    instead of migrated — and it must not come back, because recreating it
+    would re-open the shadowing risk for this repo itself.
+
+    The evidence file is asserted too: the removal decision stays traceable.
+    """
+    evidence = (
+        _REPO_ROOT / "docs/analysis/evidence/2026-10-22-opencode-jsonc-loading.md"
+    )
+    assert evidence.is_file(), f"missing AC-D8 evidence: {evidence}"
+    assert not (_REPO_ROOT / "opencode.jsonc").exists(), (
+        "the repo root must not carry a duplicate opencode.jsonc next to the "
+        "managed opencode.json (AC-D8, evidence 2026-10-22-opencode-jsonc-loading)"
+    )
+
+
 # ===========================================================================
 # Phase B / Task 9 (B.6): ``sync_opencode_v2_managed_keys`` (file I/O)
 # ===========================================================================
@@ -342,6 +371,9 @@ def _v2_pc() -> dict:
         "primary-role": "orchestrator",
         "mcp-config": _mcp_block("v2"),
         "agent-transform": {"frontmatter-mechanism": "opencode-native-v2"},
+        # Resolved by ``providers._apply_surface_aux_selection`` (Task 6); the
+        # v1 entry carries no such key, which is exactly AC-D7's "no file" case.
+        "cli_file": "cli.json",
     }
 
 
@@ -351,6 +383,19 @@ def _v1_pc() -> dict:
         "mcp-config": _mcp_block("v1"),
         "agent-transform": {"frontmatter-mechanism": "opencode-native"},
     }
+
+
+def _v1_pc_with_cli_files() -> dict:
+    """A v1 entry as the loader leaves it: no ``cli_file``, surface map survives.
+
+    ``providers._apply_surface_aux_selection`` only *adds* the flat
+    ``cli_file`` for the active surface; the registry-level ``cli-files`` map
+    stays on the entry (spec §3.1), so a v2→v1 rollback can still name the file
+    a previous v2 surface wrote.
+    """
+    pc = _v1_pc()
+    pc["cli-files"] = {"v2": _CLI_FILE}
+    return pc
 
 
 def _config(depth: int | None = None, **options) -> dict:
@@ -3535,6 +3580,53 @@ def test_ac_c16a_no_default_agent_reconciliation_at_tier_plugin(
     assert isolation._STATE_DEFAULT_AGENT_KEY in _read_state_doc(control_project)
 
 
+def test_ac_c16a_divergent_user_value_stays_silent_at_tier_plugin(
+    tmp_path, monkeypatch
+):
+    """AC-C16(a2) (RVW-E-03): a *divergent* user value produces no merge warning.
+
+    The deleted-value case is pinned by the test above; this is its sibling on
+    tier ``plugin``. Because no ``default_agent`` merge runs there, the
+    user-value warning of the permission-tier merge (AC-C16 a1: "default_agent is
+    'developer' but the entry point role is 'orchestrator'") cannot appear — and
+    the divergent value must survive byte-identically.
+    """
+    pc = _resolved_surface_pc("v2")
+    caps = _opencode_caps()
+    assert provider_runtime_gate_tier(pc, caps) == "plugin"
+    monkeypatch.setattr(runtime_gate, "_baked_plugin_mode", lambda: "observe")
+
+    base = tmp_path / "plugin"
+    project = base / "project"
+    project.mkdir(parents=True)
+    (project / "opencode.json").write_text(_v2_settings_shape(), encoding="utf-8")
+
+    # A first run lets the v2 managed-key writer normalise the document, so the
+    # byte comparison below isolates the `default_agent` handling.
+    _run_stage(
+        base, monkeypatch, {"Opencode": pc}, ["Opencode"],
+        _gate_config(), {"Opencode": "plugin"},
+    )
+    doc = _read_json(project / "opencode.json")
+    doc["default_agent"] = "developer"
+    _write_json(project / "opencode.json", doc)
+    before = (project / "opencode.json").read_bytes()
+
+    log = SyncLog()
+    _run_stage(
+        base, monkeypatch, {"Opencode": pc}, ["Opencode"],
+        _gate_config(), {"Opencode": "plugin"}, log=log,
+    )
+
+    assert (project / "opencode.json").read_bytes() == before, (
+        "tier plugin must not rewrite a divergent user default_agent"
+    )
+    markers = ("default_agent", "opencode-v2-managed", "primary-role")
+    leaked = [w for w in log.warnings if any(m in w for m in markers)]
+    assert leaked == [], leaked
+    assert isolation._STATE_DEFAULT_AGENT_KEY not in _read_state_doc(project)
+
+
 def test_v1_tier_permission_unchanged_with_c3_registry(tmp_path):
     """AC-C14 / v1: the same registry data keeps v1 on tier ``permission``.
 
@@ -3576,3 +3668,1697 @@ def test_v1_tier_permission_unchanged_with_c3_registry(tmp_path):
     }, log.warnings
     assert doc["default_agent"] == "orchestrator"
     assert "permissions" not in doc
+
+
+# --- AC-D1 / AC-C6: closed-world v2 permission builder ----------------------
+
+
+def test_ac_d1_builder_allows_mapped_actions():
+    """AC-D1 (3.7): mapped Claude tools yield one ``allow`` entry per action.
+
+    ``Write``/``Edit`` -> ``edit``, ``Bash`` -> ``shell``, ``Agent`` ->
+    ``subagent``. The result is an ordered list with exactly one entry per
+    action in the fixed order ``edit``, ``shell``, ``subagent``.
+    """
+    assert provider_transform.map_tools_to_opencode_v2_permissions(
+        ["Bash", "Read", "Write", "Edit", "Agent"],
+    ) == [
+        {"action": "edit", "resource": "*", "effect": "allow"},
+        {"action": "shell", "resource": "*", "effect": "allow"},
+        {"action": "subagent", "resource": "*", "effect": "allow"},
+    ]
+
+    # Partial mapping: only the mapped actions are allowed, the order stays.
+    assert provider_transform.map_tools_to_opencode_v2_permissions(
+        ["Bash", "Read"],
+    ) == [
+        {"action": "edit", "resource": "*", "effect": "deny"},
+        {"action": "shell", "resource": "*", "effect": "allow"},
+        {"action": "subagent", "resource": "*", "effect": "deny"},
+    ]
+    assert provider_transform.map_tools_to_opencode_v2_permissions(
+        ["Write", "Edit", "Agent"],
+    ) == [
+        {"action": "edit", "resource": "*", "effect": "allow"},
+        {"action": "shell", "resource": "*", "effect": "deny"},
+        {"action": "subagent", "resource": "*", "effect": "allow"},
+    ]
+    # A single ``Write`` is enough for the ``edit`` action.
+    assert provider_transform.map_tools_to_opencode_v2_permissions(["Write"])[0] == {
+        "action": "edit", "resource": "*", "effect": "allow",
+    }
+
+
+def test_ac_d1_builder_closed_world_denies_unmapped_actions():
+    """AC-D1 (M-5): a read-only role gets all three actions ``deny``.
+
+    Closed-world: unmapped actions are denied, never omitted, so a role
+    without ``Write``/``Edit`` cannot silently gain ``edit`` rights.
+    """
+    assert provider_transform.map_tools_to_opencode_v2_permissions(["Read"]) == [
+        {"action": "edit", "resource": "*", "effect": "deny"},
+        {"action": "shell", "resource": "*", "effect": "deny"},
+        {"action": "subagent", "resource": "*", "effect": "deny"},
+    ]
+    # Every entry carries the same closed-world shape.
+    for entry in provider_transform.map_tools_to_opencode_v2_permissions([]):
+        assert entry["resource"] == "*"
+        assert entry["effect"] == "deny"
+    # Unknown / unmapped tools never widen the surface.
+    unmapped = ["Glob", "Grep", "TodoWrite"]
+    assert provider_transform.map_tools_to_opencode_v2_permissions(unmapped) == [
+        {"action": "edit", "resource": "*", "effect": "deny"},
+        {"action": "shell", "resource": "*", "effect": "deny"},
+        {"action": "subagent", "resource": "*", "effect": "deny"},
+    ]
+
+
+def test_ac_d1_builder_ignores_deny_list():
+    """AC-D1 (3.7): ``deny_list``/``opencode_deny_critical`` has no effect.
+
+    The v1 deny list exists to close the *map* surface; the v2 builder is
+    closed-world by construction, so the same roles stay identical whether the
+    list is omitted, empty or populated.
+    """
+    tools = ["Bash", "Write", "Edit", "Agent"]
+    without = provider_transform.map_tools_to_opencode_v2_permissions(tools)
+    assert provider_transform.map_tools_to_opencode_v2_permissions(
+        tools, deny_list=None,
+    ) == without
+    assert provider_transform.map_tools_to_opencode_v2_permissions(
+        tools, deny_list=[],
+    ) == without
+    assert provider_transform.map_tools_to_opencode_v2_permissions(
+        tools, deny_list=["Bash", "Write", "Edit"],
+    ) == without
+    assert without == [
+        {"action": "edit", "resource": "*", "effect": "allow"},
+        {"action": "shell", "resource": "*", "effect": "allow"},
+        {"action": "subagent", "resource": "*", "effect": "allow"},
+    ]
+    # read-only role stays closed-world regardless of the deny list.
+    read_only = provider_transform.map_tools_to_opencode_v2_permissions(["Read"])
+    assert provider_transform.map_tools_to_opencode_v2_permissions(
+        ["Read"], deny_list=["Bash", "Write", "Edit"],
+    ) == read_only
+
+
+def test_ac_c6_v1_mapper_unchanged():
+    """AC-C6 / decision 8: the v1 permission map stays frozen.
+
+    The v1 mapper keeps its own vocabulary (``bash``/``read``/``edit``/...)
+    and its allow-then-deny semantics; the v2 builder must not touch it.
+    """
+    full_reference = {
+        "bash": "allow",
+        "read": "allow",
+        "edit": "allow",
+        "glob": "allow",
+        "grep": "allow",
+        "webfetch": "allow",
+        "websearch": "allow",
+        "task": "allow",
+        "todowrite": "allow",
+    }
+    assert provider_transform._map_claude_tools_to_opencode_permissions(
+        ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "WebFetch",
+         "WebSearch", "Agent", "TodoWrite"],
+    ) == full_reference
+    # An explicitly allowed tool wins over the deny list (unchanged v1 rule).
+    assert provider_transform._map_claude_tools_to_opencode_permissions(
+        ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "WebFetch",
+         "WebSearch", "Agent", "TodoWrite"],
+        deny_list=["Bash", "Write", "Edit"],
+    ) == full_reference
+    # Deny only applies to tools the template did not allow.
+    assert provider_transform._map_claude_tools_to_opencode_permissions(
+        ["Read"], deny_list=["Bash", "Write", "Edit"],
+    ) == {"read": "allow", "bash": "deny", "edit": "deny"}
+
+
+# ===========================================================================
+# Phase D1 / Task 21 (D1.2): native v2 agent frontmatter
+# ===========================================================================
+#
+# Spec §3.7 / AC-D1-D4: the ``opencode-native-v2`` mechanism gets its own
+# frontmatter builder instead of sharing the v1 one. A v2 artifact carries
+# ``permissions:`` (closed-world list of ``{action, resource, effect}``),
+# ``steps`` (never the ``maxSteps`` alias and never the v1 sampling fields),
+# ``model`` with an optional ``#variant``, never ``tools``, never
+# ``subagent_depth`` and never a separate ``system:`` field — the Markdown body
+# IS the system prompt (Spike Q5, VERIFIED). The v1 builder and the Mammouth
+# path (``opencode-native`` without a surface mechanism) stay byte-identical.
+
+_V2_TEMPLATE = (
+    "---\n"
+    "name: template-developer\n"
+    'version: "2.0.0"\n'
+    "description: old description\n"
+    "{tools}"
+    "{extra}"
+    "---\n"
+    "\n"
+    "Body content.\n"
+)
+
+_V2_FULL_TOOLS = ("Read", "Write", "Bash", "Agent")
+
+
+def _v2_template(tools=_V2_FULL_TOOLS, extra=""):
+    tools_block = ""
+    if tools:
+        tools_block = "tools:\n" + "".join(f"  - {tool}\n" for tool in tools)
+    return _V2_TEMPLATE.format(tools=tools_block, extra=extra)
+
+
+def _frontmatter_of(content: str) -> dict:
+    return yaml.safe_load(content.split("---", 2)[1]) or {}
+
+
+def _render_opencode_v2(content: str, *, model: str = "", steps: str = "",
+                        variant: str | None = None) -> str:
+    return provider_transform._transform_frontmatter_for_opencode_v2(
+        content, "developer", "new description", model, steps,
+        "1-generic/developer.md@2.0.0", _REPO_ROOT, variant=variant,
+    )
+
+
+def test_ac_d1_v2_artifact_has_permissions_list_and_no_legacy_keys():
+    """AC-D1 (3.7 a/d/e): ``permissions[]`` replaces the v1 legacy surface.
+
+    No ``permission:`` map, no ``tools:``, no ``maxSteps``, no
+    ``subagent_depth``, no sampling fields and no separate ``system:`` field;
+    ``permissions`` is a list of ``{action, resource, effect}`` with one entry
+    per action in the fixed order.
+    """
+    content = _v2_template(
+        extra=(
+            "permission:\n"
+            "  edit: allow\n"
+            "subagent_depth: 3\n"
+            "maxSteps: 40\n"
+            "temperature: 0.2\n"
+            "max_tokens: 1000\n"
+            "top_p: 0.9\n"
+            "system: legacy prompt\n"
+        ),
+    )
+    fm = _frontmatter_of(_render_opencode_v2(content))
+
+    assert fm["permissions"] == [
+        {"action": "edit", "resource": "*", "effect": "allow"},
+        {"action": "shell", "resource": "*", "effect": "allow"},
+        {"action": "subagent", "resource": "*", "effect": "allow"},
+    ]
+    for legacy in (
+        "permission", "tools", "maxSteps", "subagent_depth", "system",
+        "temperature", "max_tokens", "top_p",
+    ):
+        assert legacy not in fm, f"{legacy} must not appear in a v2 artifact"
+    # The body stays the system prompt: it is never moved into the frontmatter.
+    assert fm["name"] == "developer"
+    assert fm["description"] == "new description"
+
+
+def test_ac_d1_role_without_write_has_edit_deny():
+    """AC-D1 (M-5): a role without ``Write``/``Edit`` gets ``edit: deny``.
+
+    Closed-world: the action is still present, it is just denied — regardless
+    of ``opencode_deny_critical``.
+    """
+    role_with_shell = _frontmatter_of(
+        _render_opencode_v2(_v2_template(["Read", "Grep", "Glob", "Bash", "Agent"])),
+    )
+    assert {
+        entry["action"]: entry["effect"] for entry in role_with_shell["permissions"]
+    } == {"edit": "deny", "shell": "allow", "subagent": "allow"}
+
+    read_only = _frontmatter_of(
+        _render_opencode_v2(_v2_template(["Read", "Grep", "TodoWrite"])),
+    )
+    assert read_only["permissions"] == [
+        {"action": "edit", "resource": "*", "effect": "deny"},
+        {"action": "shell", "resource": "*", "effect": "deny"},
+        {"action": "subagent", "resource": "*", "effect": "deny"},
+    ]
+
+
+def test_ac_d2_steps_emitted_without_maxsteps():
+    """AC-D2 (3.7 b): ``steps`` is emitted, ``maxSteps`` never is."""
+    for extra in ("steps: 40\n", "maxSteps: 40\n"):
+        fm = _frontmatter_of(_render_opencode_v2(_v2_template(extra=extra)))
+        assert fm["steps"] == 40, extra
+        assert "maxSteps" not in fm, extra
+
+    # Template frontmatter wins over the resolved role default, exactly like v1.
+    fm = _frontmatter_of(
+        _render_opencode_v2(_v2_template(extra="steps: 40\n"), steps="25"),
+    )
+    assert fm["steps"] == 40
+
+
+def test_ac_d3_variant_appended_to_model_only_for_configured_role(tmp_path):
+    """AC-D3 (3.7 c): ``#variant`` only for the configured role.
+
+    The variant comes from ``provider-options.<provider>.model-variants[<role>]``
+    and is appended to the resolved model ID — roles without an entry keep the
+    plain ID, and an absent model stays absent.
+    """
+    model = "opencode-go/deepseek-v4-pro"
+    assert _frontmatter_of(
+        _render_opencode_v2(_v2_template(), model=model, variant="high"),
+    )["model"] == f"{model}#high"
+    assert _frontmatter_of(
+        _render_opencode_v2(_v2_template(), model=model),
+    )["model"] == model
+    assert "model" not in _frontmatter_of(
+        _render_opencode_v2(_v2_template(), variant="high"),
+    )
+
+    # Branch wiring: the mechanism branch resolves the variant per role.
+    registry = load_providers_config(_REPO_ROOT)
+    opencode = json.loads(json.dumps(registry["Opencode"]))
+    opencode["agent-transform"]["frontmatter-mechanism"] = "opencode-native-v2"
+    provider_config = dict(registry)
+    provider_config["Opencode"] = opencode
+    config = {
+        "model-overrides": {"Opencode": {
+            "developer": model,
+            "code-reviewer": "opencode-go/deepseek-v4-flash",
+        }},
+        "provider-options": {"Opencode": {
+            "model-variants": {"developer": "high"},
+        }},
+    }
+
+    def _render_role(role: str) -> dict:
+        return _frontmatter_of(
+            provider_transform.transform_agent_content_for_provider(
+                _v2_template(), "Opencode", role, role, "new description",
+                f"1-generic/{role}.md@2.0.0", config, _REPO_ROOT, tmp_path,
+                tmp_path / f"{role}.md", provider_config, SyncLog(),
+            ),
+        )
+
+    assert _render_role("developer")["model"] == f"{model}#high"
+    assert _render_role("code-reviewer")["model"] == "opencode-go/deepseek-v4-flash"
+
+
+def test_ac_d4_v1_artifacts_byte_identical_to_pre_change_output(tmp_path):
+    """AC-D4 / decision 10: the v1 builder output is byte-frozen.
+
+    Reference captured from ``_transform_frontmatter_for_opencode`` before the
+    v2 builder existed; the mechanism branch keeps routing v1 projects to that
+    exact function (``permission:`` map, no ``permissions:`` list).
+    """
+    content = _v2_template(
+        extra="steps: 40\ntemperature: 0.2\nmax_tokens: 1000\ntop_p: 0.9\n",
+    )
+    expected = (
+        "---\n"
+        "name: developer\n"
+        "version: 2.0.0\n"
+        "description: new description\n"
+        "steps: 40\n"
+        "temperature: 0.2\n"
+        "max_tokens: 1000\n"
+        "mode: subagent\n"
+        "generated-from: 1-generic/developer.md@2.0.0\n"
+        "model: opencode-go/deepseek-v4-flash\n"
+        "permission:\n"
+        "  read: allow\n"
+        "  edit: allow\n"
+        "  bash: allow\n"
+        "  task: allow\n"
+        "---\n"
+        "Body content.\n"
+    )
+    assert provider_transform._transform_frontmatter_for_opencode(
+        content, "developer", "new description",
+        model="opencode-go/deepseek-v4-flash", steps="",
+        generated_from="1-generic/developer.md@2.0.0",
+        agent_meta_root=_REPO_ROOT,
+    ) == expected
+
+    # Real v1 registry: the opencode-native mechanism still dispatches to the
+    # unchanged builder — `permission:` map, never a `permissions:` list.
+    v1_artifact = provider_transform.transform_agent_content_for_provider(
+        _v2_template(), "Opencode", "developer", "developer", "new description",
+        "1-generic/developer.md@2.0.0", {}, _REPO_ROOT, tmp_path,
+        tmp_path / "developer.md", load_providers_config(_REPO_ROOT), SyncLog(),
+    )
+    v1_fm = _frontmatter_of(v1_artifact)
+    assert "permission" in v1_fm
+    assert "permissions" not in v1_fm
+
+
+# ===========================================================================
+# Phase D1 / Task 22 (D1.3): agent-level edit deny, Mammouth isolation, `system`
+# ===========================================================================
+#
+# Spec §3.4 ("Agent-Ebene"), §3.7, AC-C16(b), AC-D6, AC-C14 (Amendment B3):
+#
+# * `deny_edit=True` turns the primary role's closed-world `edit: allow` entry
+#   into `{action: edit, resource: "*", effect: deny}` followed by one `allow`
+#   entry per path in `opencode_primary_edit_allow` — the `*` deny comes FIRST
+#   because last match wins (Amendment B1, Spike Q3 VERIFIED);
+# * the frontmatter call site resolves `deny_edit` with
+#   `isolation.permission_deny_required(provider_config, capabilities,
+#   plugin_mode)` — NOT with the frozen `opencode_runtime_gate_wanted` (tier
+#   `permission` only), so tier `plugin` + `observe` is covered too (Amendment
+#   B3, AC-C14 on the agent level);
+# * a provider without `surface-mechanisms` (the Mammouth fork) stays on the
+#   `opencode-native` v1 path and is only reported through the REV-R5 warning;
+# * `system` is part of the Opencode `agent-transform.allowed-fields` registry.
+
+_V2_ORCHESTRATOR_TOOLS = ("Read", "Grep", "Glob", "Bash", "Edit", "Write", "Agent")
+
+
+def _registry_for_surface(surface: str) -> dict:
+    """The real registry resolved for *surface* via the project option channel."""
+    return load_providers_config(
+        _REPO_ROOT, {"provider-options": {"Opencode": {"surface-version": surface}}},
+    )
+
+
+def _render_orchestrator(
+    tmp_path: Path,
+    project_config: dict,
+    *,
+    registry: dict | None = None,
+    tools: tuple[str, ...] = _V2_ORCHESTRATOR_TOOLS,
+) -> dict:
+    """Render the primary orchestrator artifact and return its frontmatter."""
+    if registry is None:
+        registry = _registry_for_surface("v2")
+    rendered = provider_transform.transform_agent_content_for_provider(
+        _v2_template(tools), "Opencode", "orchestrator", "orchestrator", "desc",
+        "1-generic/orchestrator.md@2.0.0", project_config, _REPO_ROOT,
+        tmp_path, tmp_path / "orchestrator.md", registry, SyncLog(),
+    )
+    return _frontmatter_of(rendered)
+
+
+def _edit_entries(permissions: list[dict]) -> list[tuple[int, dict]]:
+    return [
+        (index, entry)
+        for index, entry in enumerate(permissions)
+        if entry.get("action") == "edit"
+    ]
+
+
+def _assert_scoped_edit_deny(permissions: list[dict]) -> None:
+    """AC-C16(b) + Amendment B1: `*` deny first, then the configured allows."""
+    edit = _edit_entries(permissions)
+    assert edit, permissions
+    deny_index, deny_entry = edit[0]
+    assert deny_entry == {"action": "edit", "resource": "*", "effect": "deny"}, edit
+
+    allows = [(index, entry) for index, entry in edit if entry["effect"] == "allow"]
+    assert [entry["resource"] for _, entry in allows] == [".tmp/**", ".meta-viz/**"]
+    assert all(entry["resource"] != "*" for _, entry in allows)
+    assert all(index > deny_index for index, _ in allows), (
+        "the root deny must precede the path allows — last match wins in Opencode"
+    )
+
+
+def test_ac_c16b_orchestrator_artifact_has_edit_deny_when_gate_active(tmp_path):
+    """AC-C16(b) + AC-C14: with an active gate the primary edit scope is closed.
+
+    The rendered registry resolves tier ``plugin`` (not ``permission``) and the
+    baked plugin runs in ``observe``, so ``permission_deny_required`` is what
+    keeps the deny in place here — the shared predicate, exactly as Amendment B3
+    requires at the agent level. ``strict`` is the project-side switch that makes
+    the gate active at all.
+    """
+    registry = _registry_for_surface("v2")
+    caps = load_provider_capabilities(_REPO_ROOT)
+    assert provider_runtime_gate_tier(registry["Opencode"], caps.get("Opencode")) == (
+        "plugin"
+    ), "precondition: the v2 registry resolves tier plugin, not permission"
+    assert runtime_gate._baked_plugin_mode() == "observe"
+
+    project_config = {"orchestrator": {"mode": "strict"}}
+    fm = _render_orchestrator(tmp_path, project_config, registry=registry)
+
+    assert fm["mode"] == "primary"
+    _assert_scoped_edit_deny(fm["permissions"])
+    # The gate never reaches into the other actions.
+    assert {
+        entry["action"]: entry["effect"]
+        for entry in fm["permissions"] if entry["action"] != "edit"
+    } == {"shell": "allow", "subagent": "allow"}
+
+
+def test_ac_c16b_no_edit_deny_without_gate(tmp_path):
+    """AC-C16(b): without an active gate the template-derived allow survives."""
+    fm = _render_orchestrator(tmp_path, {})
+
+    assert fm["mode"] == "primary"
+    assert isinstance(fm["permissions"], list), "v2 surface expected"
+    assert _edit_entries(fm["permissions"]) == [
+        (0, {"action": "edit", "resource": "*", "effect": "allow"}),
+    ]
+
+
+def test_ac_c14_orchestrator_artifact_has_edit_deny_at_plugin_observe(tmp_path):
+    """AC-C14 (Amendment B3): tier `plugin` + `observe` still denies at the agent level.
+
+    The config triples use `permission_deny_required`, and the agent level MUST
+    use the same predicate: with the frozen `opencode_runtime_gate_wanted`
+    (tier `permission` only) this artifact would keep `edit: allow` and, being
+    appended last, overrule the global deny.
+    """
+    registry = _registry_for_surface("v2")
+    pc = registry["Opencode"]
+    caps = load_provider_capabilities(_REPO_ROOT)
+    assert provider_runtime_gate_tier(pc, caps.get("Opencode")) == "plugin"
+    assert runtime_gate._baked_plugin_mode() == "observe"
+    assert isolation.permission_deny_required(
+        pc, caps.get("Opencode"), runtime_gate._baked_plugin_mode(),
+    ) is True
+
+    fm = _render_orchestrator(
+        tmp_path, {"orchestrator": {"mode": "strict"}}, registry=registry,
+    )
+
+    _assert_scoped_edit_deny(fm["permissions"])
+    assert fm["mode"] == "primary"
+
+
+def test_ac_d6_mammouth_with_surface_v2_keeps_opencode_native_output(tmp_path):
+    """AC-D6: a fork without `surface-mechanisms` keeps the v1 surface (REV-R5).
+
+    Mammouth declares an explicit non-default `surface-version` without a
+    `mcp-config.surface-formats` map, so the selection is a no-op and the
+    resolution reports the REV-R5 warning. The agent artifact therefore keeps
+    the `permission:` map — never a v2 `permissions:` list.
+    """
+    from lib import providers as providers_lib
+
+    entry = json.loads(json.dumps(load_providers_config(_REPO_ROOT)["Mammouth"]))
+    entry["surface-version"] = "v2"
+    assert "surface-mechanisms" not in (entry.get("agent-transform") or {})
+    _write_config(tmp_path, {"Mammouth": entry})
+    registry = load_providers_config(tmp_path)
+
+    assert registry["Mammouth"]["agent-transform"]["frontmatter-mechanism"] == (
+        "opencode-native"
+    )
+    warnings = providers_lib._surface_version_warnings(registry)
+    assert len(warnings) == 1, warnings
+    assert "Mammouth" in warnings[0]
+    assert "surface-formats" in warnings[0]
+
+    rendered = provider_transform.transform_agent_content_for_provider(
+        _v2_template(_V2_ORCHESTRATOR_TOOLS), "Mammouth", "orchestrator",
+        "orchestrator", "desc", "1-generic/orchestrator.md@2.0.0", {}, _REPO_ROOT,
+        tmp_path, tmp_path / "orchestrator.md", registry, SyncLog(),
+    )
+    fm = _frontmatter_of(rendered)
+
+    assert isinstance(fm.get("permission"), dict), fm
+    assert fm["permission"]["edit"] == "allow"
+    assert "permissions" not in fm
+
+
+def test_system_in_allowed_fields():
+    """Task 22: `system` belongs to the Opencode allow-list superset (§4.3)."""
+    allowed = load_providers_config(_REPO_ROOT)["Opencode"]["agent-transform"][
+        "allowed-fields"
+    ]
+    assert "system" in allowed
+
+    # Contract proof: on the v2 surface the allow-list is enforced, and a
+    # v1 artifact carrying `system` is no finding.
+    contract = resolve_artifact_contract(_registry_for_surface("v2")["Opencode"])
+    assert contract.allowed_fields is not None
+    assert "system" in contract.allowed_fields
+    findings = validate_frontmatter(
+        "---\nname: agent\ndescription: d\nsystem: prompt\n---\nbody\n",
+        allowed_fields=contract.allowed_fields,
+        required_fields=set(),
+        reject_fields=contract.reject_fields,
+        path="agent.md",
+    )
+    assert findings == []
+
+
+# ===========================================================================
+# Phase D2 / Task 23 (D2): ``cli.json`` as a managed file
+# ===========================================================================
+#
+# Spec §3.8 / Amendment B1 / AC-D7, AC-B16 (cli part), AC-B20 (cli part):
+#
+# * ``plugins`` is the ONLY documented top-level key of ``cli.json``; the writer
+#   stays a generic passthrough of the user-provided top-level keys (no
+#   allow-list) and the tests make no claim about ``theme``/``autoupdate``;
+# * the file name is the resolved ``cli_file`` (Task 6), relative to the
+#   directory of ``mcp-config.committed-file`` — never a hardcoded literal;
+# * the writer owns the ``opencode-v2-cli`` state namespace only, starts with
+#   ``owns_opencode_surface`` (non-owners are no-ops before any state read) and
+#   writes through ``io.write_checked`` with the Task-9 secret-gate parameters;
+# * ``tui.json`` is never created, modified or deleted.
+
+_CLI_FILE = "cli.json"
+
+
+def _run_cli(
+    project_root: Path,
+    config: dict,
+    providers: dict,
+    provider: str = "Opencode",
+    log: SyncLog | None = None,
+    dry_run: bool = False,
+) -> SyncLog:
+    log = log if log is not None else SyncLog()
+    opencode_v2_config.sync_opencode_cli_file(
+        project_root, config, provider, providers, log, dry_run,
+    )
+    return log
+
+
+def test_ac_d7_cli_json_written_with_exact_keys(tmp_path):
+    """AC-D7 (Amendment B1): the documented ``plugins`` key is passed through.
+
+    The written document carries exactly the user's top-level keys (generic
+    passthrough, no invented allow-list). Removing the project option rolls the
+    managed key back and empties the ``opencode-v2-cli`` namespace — even though
+    the option no longer exists in the project config.
+    """
+    project = tmp_path / "project"
+    project.mkdir()
+    plugins = ["opencode-acme-cli"]
+    providers = {"Opencode": _v2_pc()}
+
+    _run_cli(project, _config(cli={"plugins": plugins}), providers)
+
+    doc = _read_json(project / _CLI_FILE)
+    assert doc == {"plugins": plugins}, doc
+    assert _read_state_doc(project)[opencode_v2_config.STATE_CLI_KEY] == {
+        "plugins": {"value": plugins, "prior": None, "prior_absent": True}
+    }
+
+    # Rollback: the option is gone, the managed key must go with it.
+    log = _run_cli(project, _config(), providers)
+
+    assert not (project / _CLI_FILE).exists(), (
+        "a rollback that leaves no content must not keep an empty cli.json"
+    )
+    assert opencode_v2_config.STATE_CLI_KEY not in _read_state_doc(project)
+    assert not _warned(log, "opencode-v2-managed"), log.warnings
+
+
+def test_ac_d7_no_cli_json_without_option_or_on_v1(tmp_path, monkeypatch):
+    """AC-D7: no option or a v1 surface never creates ``cli.json``.
+
+    Drives the real stage seam (so it is a green regression test before the
+    writer exists): without a ``cli`` option there is nothing to write, and on
+    v1 the resolved ``cli_file`` is absent, so the option is ignored.
+    """
+    no_option, _, _ = _run_stage(
+        tmp_path / "no-option", monkeypatch, {"Opencode": _v2_pc()}, ["Opencode"],
+        _config(3), {"Opencode": "advisory"},
+    )
+    assert not (no_option / _CLI_FILE).exists()
+    assert opencode_v2_config.STATE_CLI_KEY not in _read_state_doc(no_option)
+
+    on_v1, _, _ = _run_stage(
+        tmp_path / "v1", monkeypatch, {"Opencode": _v1_pc()}, ["Opencode"],
+        _config(cli={"plugins": ["opencode-acme-cli"]}), {"Opencode": "advisory"},
+    )
+    assert not (on_v1 / _CLI_FILE).exists(), (
+        "v1 has no resolved cli_file, so the writer must stay a no-op"
+    )
+    assert opencode_v2_config.STATE_CLI_KEY not in _read_state_doc(on_v1)
+
+
+def test_ac_d7_tui_json_never_touched(tmp_path):
+    """AC-D7: ``tui.json`` is never created, modified or deleted by the writer."""
+    project = tmp_path / "project"
+    tui = project / "tui.json"
+    tui.parent.mkdir(parents=True)
+    tui.write_bytes(b'{"theme": "user-owned"}\n')
+    before = tui.read_bytes()
+    providers = {"Opencode": _v2_pc()}
+
+    first = _run_cli(
+        project, _config(cli={"plugins": ["opencode-acme-cli"]}), providers,
+    )
+    assert (project / _CLI_FILE).is_file()
+    assert tui.read_bytes() == before
+
+    second = _run_cli(project, _config(), providers)  # rollback
+    assert tui.read_bytes() == before
+
+    touched = [
+        line
+        for line in first.actions + first.skipped + first.warnings
+        + second.actions + second.skipped + second.warnings
+        if "tui.json" in line
+    ]
+    assert touched == [], touched
+
+
+def test_ac_b16_cli_namespace_isolated(tmp_path):
+    """AC-B16 (cli part): only ``opencode-v2-cli`` is written; siblings survive.
+
+    A second run is byte-identical for both the managed file and the state
+    file, and the namespace stays a ``dict`` for ``isolation._read_state``.
+    """
+    project = tmp_path / "project"
+    sibling_isolation = ["**/.claude/**"]
+    sibling_keys = {
+        "experimental.subagent_depth": {
+            "value": 3,
+            "prior": None,
+            "prior_absent": True,
+        }
+    }
+    sibling_mcp = {
+        "mcp.servers.example": {
+            "value": {"type": "local"},
+            "prior": None,
+            "prior_absent": True,
+        }
+    }
+    _write_json(
+        project / _V2_STATE_REL,
+        {
+            "isolation-deny": sibling_isolation,
+            STATE_KEYS_KEY: sibling_keys,
+            opencode_v2_config.STATE_MCP_KEY: sibling_mcp,
+        },
+    )
+    before = _read_json(project / _V2_STATE_REL)
+    providers = {"Opencode": _v2_pc()}
+    config = _config(cli={"plugins": ["opencode-acme-cli"]})
+
+    _run_cli(project, config, providers)
+
+    after = _read_json(project / _V2_STATE_REL)
+    assert after["isolation-deny"] == before["isolation-deny"]
+    assert after[STATE_KEYS_KEY] == before[STATE_KEYS_KEY]
+    assert after[opencode_v2_config.STATE_MCP_KEY] == before[opencode_v2_config.STATE_MCP_KEY]
+    assert set(after[opencode_v2_config.STATE_CLI_KEY]) == {"plugins"}
+    assert isinstance(
+        isolation._read_state(project / _V2_STATE_REL, opencode_v2_config.STATE_CLI_KEY),
+        dict,
+    )
+
+    file_bytes = (project / _CLI_FILE).read_bytes()
+    state_bytes = (project / _V2_STATE_REL).read_bytes()
+    _run_cli(project, config, providers)
+
+    assert (project / _CLI_FILE).read_bytes() == file_bytes
+    assert (project / _V2_STATE_REL).read_bytes() == state_bytes
+
+
+def test_ac_b20_cli_writer_noop_for_non_owner_provider(tmp_path, monkeypatch):
+    """AC-B20 (cli part): a non-owner is a no-op *before* the state is read."""
+    project = tmp_path / "project"
+    _write_json(project / "opencode.json", {"theme": "dark"})
+    _write_json(
+        project / _V2_STATE_REL,
+        {
+            opencode_v2_config.STATE_CLI_KEY: {
+                "plugins": {
+                    "value": ["opencode-acme-cli"],
+                    "prior": None,
+                    "prior_absent": True,
+                }
+            }
+        },
+    )
+    file_before = (project / "opencode.json").read_bytes()
+    state_before = (project / _V2_STATE_REL).read_bytes()
+
+    def _forbidden(*args, **kwargs):
+        raise AssertionError("state must not be read for a non-owner provider")
+
+    monkeypatch.setattr(isolation, "_read_state", _forbidden)
+
+    log = SyncLog()
+    _run_cli(
+        project,
+        _config(cli={"plugins": ["opencode-acme-cli"]}),
+        {"Claude": _non_owner_pc()},
+        provider="Claude",
+        log=log,
+    )
+
+    assert not (project / _CLI_FILE).exists()
+    assert (project / "opencode.json").read_bytes() == file_before
+    assert (project / _V2_STATE_REL).read_bytes() == state_before
+    assert log.actions == [] and log.warnings == [] and log.errors == []
+    assert log.skipped == [] and log.infos == []
+
+
+def test_cli_writer_passes_secret_gate_params_to_write_checked(tmp_path, monkeypatch):
+    """The CLI writer delegates the secret gate to ``io.write_checked``.
+
+    Same parameters as the Task-9 writer: ``allow_secrets`` from
+    ``allow-committed-secrets``, ``verify_gitignored=False`` (committed file),
+    the caller's ``config`` and ``dry_run``.
+    """
+    calls = []
+
+    def fake_write_checked(path, content, log, rel_label, **kwargs):
+        calls.append((path, content, rel_label, kwargs))
+        return True
+
+    monkeypatch.setattr(opencode_v2_config.io, "write_checked", fake_write_checked)
+    providers = {"Opencode": _v2_pc()}
+    config = _config(cli={"plugins": ["opencode-acme-cli"]})
+
+    plain_project = tmp_path / "plain"
+    plain_project.mkdir()
+    _run_cli(plain_project, config, providers)
+
+    allowed_project = tmp_path / "allowed"
+    allowed_project.mkdir()
+    _run_cli(allowed_project, {**config, "allow-committed-secrets": True}, providers)
+
+    assert len(calls) == 2, calls
+    path, content, rel_label, kwargs = calls[0]
+    assert path == plain_project / _CLI_FILE
+    assert rel_label == _CLI_FILE
+    assert content.endswith("\n")
+    assert json.loads(content) == {"plugins": ["opencode-acme-cli"]}
+    assert set(kwargs) >= {"allow_secrets", "verify_gitignored", "config", "dry_run"}
+    assert kwargs["allow_secrets"] is False
+    assert kwargs["verify_gitignored"] is False
+    assert kwargs["config"] == config
+    assert kwargs["dry_run"] is False
+    assert calls[1][3]["allow_secrets"] is True
+
+
+def test_ac_b22_cli_json_rolled_back_on_v1_surface(tmp_path):
+    """AC-B22/AC-B7: a v2→v1 switch must roll back the managed CLI file too.
+
+    ``cli_file`` resolves only on v2 (spec §3.1), so the v1 re-sync has to find
+    the file through the registry-level ``cli-files`` map that survives the
+    surface selection. Without that fallback ``cli.json`` and the
+    ``opencode-v2-cli`` state namespace survive the switch, contradicting
+    AC-B7/AC-B22 ("die State-Namespaces ... sind leer/entfernt").
+    """
+    project = tmp_path / "project"
+    plugins = ["opencode-acme-cli"]
+    v2 = {"Opencode": _v2_pc()}
+    v1 = {"Opencode": _v1_pc_with_cli_files()}
+
+    _run_cli(project, _config(cli={"plugins": plugins}), v2)
+    assert _read_json(project / _CLI_FILE) == {"plugins": plugins}
+    assert opencode_v2_config.STATE_CLI_KEY in _read_state_doc(project)
+
+    assert "cli_file" not in v1["Opencode"], "a v1 surface resolves no cli_file"
+    log = _run_cli(project, _config(), v1)
+
+    assert not (project / _CLI_FILE).exists(), (
+        "a rollback that leaves no content must delete the managed file"
+    )
+    assert opencode_v2_config.STATE_CLI_KEY not in _read_state_doc(project), (
+        "AC-B22: the opencode-v2-cli namespace must be gone after the switch"
+    )
+    assert not _warned(log, "cannot resolve managed file for rollback"), log.warnings
+
+
+def test_ac_b7_cli_rollback_keeps_user_keys(tmp_path):
+    """AC-B7 (rows 4/4a): only the managed keys go, a user key keeps the file."""
+    project = tmp_path / "project"
+    plugins = ["opencode-acme-cli"]
+    _write_json(project / _CLI_FILE, {"theme": "user-owned"})
+
+    _run_cli(project, _config(cli={"plugins": plugins}), {"Opencode": _v2_pc()})
+    assert _read_json(project / _CLI_FILE) == {
+        "theme": "user-owned",
+        "plugins": plugins,
+    }, "a user key is never overwritten or dropped"
+
+    _run_cli(project, _config(), {"Opencode": _v1_pc_with_cli_files()})
+
+    assert _read_json(project / _CLI_FILE) == {"theme": "user-owned"}
+    assert opencode_v2_config.STATE_CLI_KEY not in _read_state_doc(project)
+
+
+def test_cli_rollback_resolves_existing_candidate_among_several(tmp_path):
+    """Several ``cli-files`` values: only an existing file identifies the owner."""
+    project = tmp_path / "project"
+    plugins = ["opencode-acme-cli"]
+    _run_cli(project, _config(cli={"plugins": plugins}), {"Opencode": _v2_pc()})
+
+    pc = _v1_pc_with_cli_files()
+    pc["cli-files"] = {"v1": "cli-legacy.json", "v2": _CLI_FILE}
+    log = _run_cli(project, _config(), {"Opencode": pc})
+
+    assert not (project / _CLI_FILE).exists()
+    assert not (project / "cli-legacy.json").exists(), (
+        "a non-existing candidate is never guessed"
+    )
+    assert opencode_v2_config.STATE_CLI_KEY not in _read_state_doc(project)
+    assert not _warned(log, "ambiguous managed file for rollback"), log.warnings
+
+
+def test_cli_rollback_cannot_resolve_leaves_file_and_state(tmp_path):
+    """Documented limitation: with no unambiguous file the writer never guesses.
+
+    Two cases — the entry carries no ``cli-files`` map at all, and several map
+    values point at files that all exist. Both leave the managed file and the
+    ``opencode-v2-cli`` namespace untouched and log the canonical warning.
+    """
+    plugins = ["opencode-acme-cli"]
+    cases = {
+        "no-map": None,
+        "ambiguous": {"v1": "cli-a.json", "v2": _CLI_FILE},
+    }
+    for name, cli_files in cases.items():
+        project = tmp_path / name
+        _run_cli(project, _config(cli={"plugins": plugins}), {"Opencode": _v2_pc()})
+        # A second existing file makes the "ambiguous" case genuinely ambiguous.
+        _write_json(project / "cli-a.json", {"stale": True})
+        file_bytes = (project / _CLI_FILE).read_bytes()
+
+        pc = _v1_pc()
+        if cli_files is not None:
+            pc["cli-files"] = dict(cli_files)
+        log = _run_cli(project, _config(), {"Opencode": pc})
+
+        assert (project / _CLI_FILE).read_bytes() == file_bytes, name
+        assert opencode_v2_config.STATE_CLI_KEY in _read_state_doc(project), name
+        assert _warned(
+            log, "opencode-v2-cli: cannot resolve managed file for rollback"
+        ), name
+
+
+def test_cli_writer_absolute_committed_file_warns_instead_of_raising(tmp_path):
+    """QA-E-03: an absolute ``committed-file`` must not raise from the writer.
+
+    ``opencode_state_path`` derives the state file from the committed file's
+    directory. An absolute value puts it outside the project root, so
+    ``relative_to(root)`` used to raise ``ValueError``. The writer now logs the
+    unresolved path and leaves file and state untouched.
+    """
+    project = tmp_path / "project"
+    project.mkdir()
+    pc = _v2_pc()
+    pc["mcp-config"]["committed-file"] = str(tmp_path / "outside" / "opencode.json")
+
+    log = _run_cli(
+        project, _config(cli={"plugins": ["opencode-acme-cli"]}), {"Opencode": pc},
+    )
+
+    assert _warned(log, "opencode-v2-cli: unresolved state path"), log.warnings
+    assert not (project / _CLI_FILE).exists()
+    assert not (tmp_path / "outside").exists(), "the guard writes nothing either"
+    assert not (project / _V2_STATE_REL).exists()
+
+
+def test_cli_writer_escaping_cli_files_value_warns_instead_of_raising(tmp_path):
+    """QA-E-03: a traversing ``cli-files`` value must not raise from the writer.
+
+    On a rollback the managed file is resolved from the surviving ``cli-files``
+    map. A value that escapes the project root used to hit
+    ``isolation.safe_path``'s ``ValueError: Path traversal detected``. The
+    writer now warns and leaves file and state untouched.
+    """
+    project = tmp_path / "project"
+    _write_json(project / _CLI_FILE, {"plugins": ["opencode-acme-cli"]})
+    _write_json(
+        project / _V2_STATE_REL,
+        {
+            opencode_v2_config.STATE_CLI_KEY: {
+                "plugins": {
+                    "value": ["opencode-acme-cli"],
+                    "prior": None,
+                    "prior_absent": True,
+                }
+            }
+        },
+    )
+    file_bytes = (project / _CLI_FILE).read_bytes()
+    state_bytes = (project / _V2_STATE_REL).read_bytes()
+    pc = _v1_pc()
+    pc["cli-files"] = {"v2": "../../../../evil.json"}
+
+    log = _run_cli(project, _config(), {"Opencode": pc})
+
+    assert _warned(log, "opencode-v2-cli: unresolved managed file"), log.warnings
+    assert "Path traversal detected" in " ".join(log.warnings), log.warnings
+    assert (project / _CLI_FILE).read_bytes() == file_bytes
+    assert (project / _V2_STATE_REL).read_bytes() == state_bytes
+    assert not (tmp_path.parent / "evil.json").exists()
+
+
+def test_cli_writer_warns_on_null_value(tmp_path):
+    """QA-E-02: ``cli.<key>: null`` is not written and is warned about.
+
+    Mirrors ``providers.<id>: null`` in :func:`build_managed_keys`: a fresh key
+    leaves no file behind, and a previously managed key ends management (row 4)
+    instead of writing a JSON ``null``.
+    """
+    project = tmp_path / "project"
+    project.mkdir()
+    providers = {"Opencode": _v2_pc()}
+
+    log = _run_cli(project, _config(cli={"plugins": None}), providers)
+
+    assert _warned(log, "opencode-v2-cli: plugins is null — not written"), log.warnings
+    assert not (project / _CLI_FILE).exists()
+    assert opencode_v2_config.STATE_CLI_KEY not in _read_state_doc(project)
+
+    # A managed value followed by `null` ends management without writing null.
+    _run_cli(project, _config(cli={"plugins": ["opencode-acme-cli"]}), providers)
+    assert _read_json(project / _CLI_FILE) == {"plugins": ["opencode-acme-cli"]}
+
+    log = _run_cli(project, _config(cli={"plugins": None}), providers)
+
+    assert _warned(log, "opencode-v2-cli: plugins is null — not written"), log.warnings
+    assert not (project / _CLI_FILE).exists(), (
+        "row 4 removes the managed key and prunes the empty container"
+    )
+    assert opencode_v2_config.STATE_CLI_KEY not in _read_state_doc(project)
+
+
+def test_cli_writer_warns_on_non_object_document(tmp_path):
+    """QA-E-02: a non-object ``cli.json`` is a logged no-op, not a silent one.
+
+    The data-loss guard still wins (the document is never rewritten), but the
+    skip is now visible in the log.
+    """
+    project = tmp_path / "project"
+    project.mkdir()
+    document = project / _CLI_FILE
+    document.write_text("[]\n", encoding="utf-8")
+    before = document.read_bytes()
+
+    log = _run_cli(
+        project, _config(cli={"plugins": ["opencode-acme-cli"]}), {"Opencode": _v2_pc()},
+    )
+
+    assert _warned(
+        log, f"opencode-v2-cli: {_CLI_FILE} is not a JSON object — not written"
+    ), log.warnings
+    assert document.read_bytes() == before
+    assert opencode_v2_config.STATE_CLI_KEY not in _read_state_doc(project)
+
+
+# ===========================================================================
+# Phase D / Task 27 (D4): provider doc reflects the delivered v2 surface
+# ===========================================================================
+#
+# SPEC-OPENCODE-V2-SUPPORT-2026-10-22 §3.10 / AC-D10. The provider doc is an
+# external artifact, so the assertions stay narrow: the ``Stand`` header must
+# follow ``VERSION`` (the old ``v0.33.x`` line is stale), the four sections of
+# the delivered surface must exist, and the context-file rule must be stated as
+# AGENTS.md-only (no dedicated rules directory).
+
+_PROVIDER_DOC = _REPO_ROOT / "docs/providers/opencode.md"
+
+
+def test_provider_doc_current():
+    """AC-D10: no stale version, all four delivered-surface sections present."""
+    text = _PROVIDER_DOC.read_text(encoding="utf-8")
+    assert "v0.33" not in text, (
+        "the 'Stand' line must follow VERSION, not the stale v0.33.x value"
+    )
+    for heading in (
+        "## Surface v1 vs. v2",
+        "## Aktivierung",
+        "## Managed Keys und User-Keys",
+        "## Dateien",
+    ):
+        assert heading in text, f"missing documented section: {heading}"
+
+
+def test_provider_doc_states_agents_md_only():
+    """§3.10: AGENTS.md is the single managed context file for Opencode."""
+    text = _PROVIDER_DOC.read_text(encoding="utf-8")
+    assert "AGENTS.md-only" in text
+    assert ".opencode/rules/" not in text, (
+        "Opencode has no dedicated rules directory; the doc must not reference one"
+    )
+
+
+# ===========================================================================
+# Phase D / Task 29 (T.2): lab diff v1 <-> v2 and the full switch rollback
+# ===========================================================================
+#
+# AC-T2 / AC-B7 (integration) / AC-B21 / AC-B22 (integration). The renderer is
+# the AC-01 harness (``test_ac01_render_identity._run_sync``): scenario 79 is
+# synced twice — once with the four v2 project options removed (v1) and once as
+# shipped (v2) — and the two trees are compared file by file. Every input other
+# than the surface selector is identical by construction, so the file set that
+# differs is the surface delta and nothing else.
+
+_SCENARIO_79_CONFIG = (
+    _REPO_ROOT / "tests/scenarios/configs/79-opencode-v2-full-surface.project.yaml"
+)
+# The complete v2 opt-in of scenario 79 (Amdmt B1: no `small-model`).
+_SCENARIO_79_V2_OPTIONS = ("surface-version", "experimental-todo", "model-variants", "cli")
+
+# AC-T2: the exhaustive difference between the two renders. `AGENTS.md` is a
+# shared artifact; its only difference here is Opencode's runtime-gate tier
+# contribution (`permission` vs `plugin`), asserted separately below.
+_LAB_DIFF_CHANGED = (
+    ".meta-config/generated-file-hashes.json",
+    ".opencode/agent-meta-state.json",
+    ".opencode/agents/developer.md",
+    # The read-only role lets scenario 79 assert `edit: deny` on a subagent; its
+    # frontmatter differs between v1 (`permission` map) and v2 (`permissions[]`).
+    ".opencode/agents/explorer.md",
+    ".opencode/agents/orchestrator.md",
+    "AGENTS.md",
+    "opencode.json",
+)
+_LAB_DIFF_ONLY_ON_V2 = (
+    ".opencode/plugins/.agent-meta-managed",
+    ".opencode/plugins/agent-meta-runtime-gate.js",
+    "cli.json",
+)
+# Input fixture, not render output: the two runs must differ here on purpose.
+_NON_RENDER_INPUTS = (".meta-config/project.yaml",)
+_GATE_TRIPLES = [
+    {"action": "edit", "resource": "**", "effect": "deny"},
+    {"action": "shell", "resource": "**", "effect": "deny"},
+]
+_V2_NAMESPACES = (
+    isolation._STATE_V2_KEYS,
+    isolation._STATE_V2_PERMISSIONS,
+    isolation._STATE_V2_CLI,
+    isolation._STATE_V2_MCP,
+)
+
+
+def _scenario_79_project(*, surface: str) -> dict:
+    """Scenario-79 config; for ``v1`` the v2 project channel is removed."""
+    config = yaml.safe_load(_SCENARIO_79_CONFIG.read_text(encoding="utf-8"))
+    options = (config.get("provider-options") or {}).get("Opencode") or {}
+    if surface == "v1":
+        for key in _SCENARIO_79_V2_OPTIONS:
+            options.pop(key, None)
+        if not options:
+            config.pop("provider-options", None)
+    else:
+        assert options.get("surface-version") == "v2", (
+            f"scenario 79 must opt into v2 through the project channel (got {options!r})"
+        )
+    return config
+
+
+def _sync_scenario_79(project: Path, config: dict, *, init: bool) -> None:
+    """Render ``config`` into ``project`` through the AC-01 sync runner."""
+    (project / ".meta-config").mkdir(parents=True, exist_ok=True)
+    (project / ".meta-config" / "project.yaml").write_text(
+        yaml.safe_dump(config, sort_keys=False, allow_unicode=True), encoding="utf-8"
+    )
+    if init:
+        subprocess.run(["git", "init", "-q"], cwd=project, check=True)
+    result = render_harness._run_sync(project, *(["--init"] if init else []))
+    assert result.returncode == 0, (
+        f"sync failed ({'--init' if init else 'plain'}):\n"
+        f"{result.stdout[-2000:]}\n{result.stderr[-2000:]}"
+    )
+
+
+def _rendered_files(project: Path) -> dict:
+    """Relative path -> compared bytes of one rendered tree.
+
+    Only run-specific values are normalized (the scratch root and the date
+    stamps, exactly as the AC-01 harness does); model lines are NOT normalized,
+    because the model variant is one of the asserted surface differences.
+    """
+    root = project.resolve()
+    dates = sorted({date.today().isoformat(), render_harness._resolve_agent_meta_date(_REPO_ROOT)})
+    files = {}
+    for path in sorted(root.rglob("*")):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(root).as_posix()
+        if render_harness._SKIP_RE.search(rel) or rel in _NON_RENDER_INPUTS:
+            continue
+        data = path.read_bytes().replace(b"\r\n", b"\n")
+        for needle in sorted({str(root), root.as_posix()}, key=len, reverse=True):
+            data = data.replace(needle.encode(), b"<ROOT>")
+        for stamp in dates:
+            data = data.replace(stamp.encode(), b"<DATE>")
+        files[rel] = data
+    return files
+
+
+def _frontmatter(data: bytes) -> dict:
+    text = data.decode("utf-8")
+    assert text.startswith("---"), "agent artifacts start with YAML frontmatter"
+    return yaml.safe_load(text.split("---", 2)[1]) or {}
+
+
+def test_lab_diff_v1_v2(tmp_path):
+    """AC-T2: the same project on v1 and v2 differs in exactly the v2 surface.
+
+    The diff report names every changed / added / removed path, so a regression
+    is diagnosable from the failure alone.
+    """
+    v1_root = tmp_path / "v1"
+    v2_root = tmp_path / "v2"
+    _sync_scenario_79(v1_root, _scenario_79_project(surface="v1"), init=True)
+    _sync_scenario_79(v2_root, _scenario_79_project(surface="v2"), init=True)
+
+    v1 = _rendered_files(v1_root)
+    v2 = _rendered_files(v2_root)
+
+    changed = tuple(sorted(p for p in set(v1) & set(v2) if v1[p] != v2[p]))
+    only_v1 = tuple(sorted(set(v1) - set(v2)))
+    only_v2 = tuple(sorted(set(v2) - set(v1)))
+    report = (
+        f"\nchanged={list(changed)}\nonly-in-v1={list(only_v1)}\n"
+        f"only-in-v2={list(only_v2)}\n"
+        f"compared {len(v1)} v1 files against {len(v2)} v2 files"
+    )
+    assert changed == _LAB_DIFF_CHANGED, f"unexpected changed files:{report}"
+    assert only_v1 == (), f"v2 must not remove generated files:{report}"
+    assert only_v2 == _LAB_DIFF_ONLY_ON_V2, f"unexpected new files:{report}"
+
+    # --- opencode.json: mcp form, experimental.*, permissions vs permission
+    doc_v1 = json.loads(v1["opencode.json"])
+    doc_v2 = json.loads(v2["opencode.json"])
+    assert set(doc_v1) == {"subagent_depth", "mcp", "default_agent", "permission"}, doc_v1
+    assert doc_v1["mcp"]["playwright"]["enabled"] is True, (
+        "v1 keeps the flat mcp entry with the legacy 'enabled' flag"
+    )
+    assert set(doc_v2) == {"default_agent", "mcp", "permissions", "experimental"}, doc_v2
+    assert set(doc_v2["mcp"]) == {"servers"}, doc_v2["mcp"]
+    assert "enabled" not in doc_v2["mcp"]["servers"]["playwright"]
+    assert doc_v2["experimental"] == {"subagent_depth": 2, "todo": True}
+    assert doc_v1["permission"] == {"edit": {"**": "deny"}, "bash": {"**": "deny"}}
+    assert doc_v2["permissions"] == _GATE_TRIPLES
+
+    # --- .opencode/agents/*.md: permissions format and model variant
+    for role in ("developer", "orchestrator"):
+        rel = f".opencode/agents/{role}.md"
+        fm_v1 = _frontmatter(v1[rel])
+        fm_v2 = _frontmatter(v2[rel])
+        assert isinstance(fm_v1["permission"], dict), (role, fm_v1)
+        assert "permissions" not in fm_v1, (role, fm_v1)
+        assert isinstance(fm_v2["permissions"], list), (role, fm_v2)
+        assert "permission" not in fm_v2, (role, fm_v2)
+        for entry in fm_v2["permissions"]:
+            assert set(entry) == {"action", "resource", "effect"}, (role, entry)
+        assert "#" not in fm_v1["model"], (role, fm_v1["model"])
+    developer_v2 = _frontmatter(v2[".opencode/agents/developer.md"])
+    orchestrator_v2 = _frontmatter(v2[".opencode/agents/orchestrator.md"])
+    assert developer_v2["model"].endswith("#high"), (
+        f"the configured model variant must reach the artifact "
+        f"(got {developer_v2['model']!r})"
+    )
+    assert "#" not in orchestrator_v2["model"], (
+        "a role without a configured variant keeps the plain model id"
+    )
+
+    # --- cli.json and the plugin artifact exist only on v2
+    assert json.loads(v2["cli.json"]) == {"plugins": ["opencode-acme-cli"]}
+    assert b"export default {" in v2[".opencode/plugins/agent-meta-runtime-gate.js"]
+
+    # --- the derived hash manifest differs only where the surface differs
+    hashes_v1 = json.loads(v1[".meta-config/generated-file-hashes.json"])["hashes"]
+    hashes_v2 = json.loads(v2[".meta-config/generated-file-hashes.json"])["hashes"]
+    assert {
+        key for key in set(hashes_v1) | set(hashes_v2)
+        if hashes_v1.get(key) != hashes_v2.get(key)
+    } == {
+        ".opencode/agents/developer.md",
+        ".opencode/agents/explorer.md",
+        ".opencode/agents/orchestrator.md",
+        ".opencode/plugins/agent-meta-runtime-gate.js",
+    }, "the managed hash manifest must follow the surface, not drift on its own"
+
+    # --- AGENTS.md differs only in Opencode's runtime-gate tier contribution
+    agents_v1 = v1["AGENTS.md"].decode("utf-8")
+    agents_v2 = v2["AGENTS.md"].decode("utf-8")
+    tier_marker = "## Runtime-Enforcement-Tier:"
+    assert agents_v1.split(tier_marker)[0] == agents_v2.split(tier_marker)[0], (
+        "no AGENTS.md section before the runtime-gate tier may differ"
+    )
+    assert agents_v1.split("## Git Delegation")[1] == agents_v2.split("## Git Delegation")[1], (
+        "no AGENTS.md section after the gate block may differ"
+    )
+    assert f"{tier_marker} `permission`" in agents_v1
+    assert f"{tier_marker} `plugin`" in agents_v2
+    assert "# CRITICAL GATE (runtime-partially enforced)" in agents_v1
+    assert "# CRITICAL GATE\nMAIN CHAT darf nicht selbst editieren." in agents_v2
+
+
+def test_v2_to_v1_switch_rolls_back_all_namespaces(tmp_path):
+    """AC-B7/AC-B21/AC-B22: v2 -> v1 empties all four namespaces, and back.
+
+    One project is synced on v2, switched to v1 and switched back. The rollback
+    must clear ``opencode-v2-keys``/-permissions/-cli/-mcp, leave no managed
+    ``experimental`` / ``permissions`` / ``mcp.servers`` content behind, keep
+    user keys, and delete ``cli.json`` once it is empty. The reverse direction
+    must take the v1 ``permission``-map denies out and empty ``runtime-gate-deny``.
+    """
+    project = tmp_path / "project"
+    _sync_scenario_79(project, _scenario_79_project(surface="v2"), init=True)
+
+    # --- v2 surface fully written ----------------------------------------
+    doc = _read_json(project / "opencode.json")
+    assert "experimental" in doc and "permissions" in doc, doc
+    assert _read_json(project / "cli.json") == {"plugins": ["opencode-acme-cli"]}
+    state = _read_state_doc(project)
+    assert {ns for ns in _V2_NAMESPACES if ns in state} == set(_V2_NAMESPACES), state
+
+    # User keys next to the managed ones (AC-B7: "geänderte User-Werte bleiben").
+    doc["theme"] = "acme-dark"
+    doc["plugin"] = ["user-plugin.js"]
+    _write_json(project / "opencode.json", doc)
+
+    # --- v2 -> v1 --------------------------------------------------------
+    _sync_scenario_79(project, _scenario_79_project(surface="v1"), init=False)
+
+    doc = _read_json(project / "opencode.json")
+    assert "experimental" not in doc, doc
+    assert "permissions" not in doc, doc
+    assert "servers" not in doc["mcp"], "the nested v2 container must be pruned"
+    assert doc["mcp"]["playwright"]["enabled"] is True, "the v1 flat form is back"
+    assert doc["theme"] == "acme-dark", "a user key survives the rollback"
+    assert doc["plugin"] == ["user-plugin.js"], "a user key survives the rollback"
+    assert doc["permission"] == {"edit": {"**": "deny"}, "bash": {"**": "deny"}}, (
+        "Spec A writes the v1 map after the v2 triples are gone"
+    )
+    assert not (project / "cli.json").exists(), (
+        "the managed CLI file is removed once the rollback leaves it empty"
+    )
+    state = _read_state_doc(project)
+    assert [ns for ns in state if ns.startswith("opencode-v2-")] == [], state
+    assert state[isolation._STATE_RUNTIME_GATE_KEY] == {
+        "**": {"edit": None, "bash": None}
+    }, "Spec A owns the v1 deny state again"
+
+    # --- v1 -> v2 (reverse direction, AC-B21) ----------------------------
+    _sync_scenario_79(project, _scenario_79_project(surface="v2"), init=False)
+
+    doc = _read_json(project / "opencode.json")
+    assert "permission" not in doc, (
+        f"the v1 deny map must be taken back (prior restored): {doc}"
+    )
+    assert doc["permissions"] == _GATE_TRIPLES, doc
+    assert doc["experimental"] == {"subagent_depth": 2, "todo": True}
+    assert doc["theme"] == "acme-dark" and doc["plugin"] == ["user-plugin.js"]
+    state = _read_state_doc(project)
+    assert isolation._STATE_RUNTIME_GATE_KEY not in state, state
+    assert {ns for ns in _V2_NAMESPACES if ns in state} == set(_V2_NAMESPACES), state
+
+
+# ===========================================================================
+# Phase D / Task 30 (T.3): no cross-provider effect, golden fixtures frozen
+# ===========================================================================
+#
+# AC-D5 / AC-D6 / AC-T4 (Spec §3.7, decision 10, global constraint "keine
+# Querwirkung"). The same four-provider project is rendered twice — once with
+# Opencode on v1, once on v2 — and every byte that is NOT Opencode-owned must
+# match. The provider-spanning files are listed explicitly and checked one by
+# one: `AGENTS.md` is shared by Gemini/Mammouth/Opencode, and its runtime-gate
+# tier is folded to the weakest provider, so Opencode's v1→v2 tier change must
+# NOT leak into it; `.meta-config/generated-file-hashes.json` is a derived
+# manifest over all providers, so only its Opencode entries may move.
+
+# Provider order matters: the AC-B8 re-review flagged an order-dependent
+# rollback, so Opencode is listed first and the comparison stays order-sensitive.
+_AC_D5_PROVIDERS = ("Opencode", "Claude", "Gemini", "Mammouth")
+
+_AC_D5_BASE_CONFIG = {
+    "agent-meta-version": "2.0.0-beta.2",
+    "ai-providers": list(_AC_D5_PROVIDERS),
+    "dod-preset": "rapid-prototyping",
+    "platforms": [],
+    "roles": ["orchestrator", "developer"],
+    "orchestrator": {"mode": "strict"},
+    "project": {
+        "name": "ac-d5-cross-provider",
+        "prefix": "ad5",
+        "short": "ac-d5",
+    },
+    "variables": {
+        "PROJECT_NAME": "ac-d5-cross-provider",
+        "PROJECT_DESCRIPTION": "Cross-provider isolation proof for the v2 surface.",
+        "PROJECT_GOAL": "Prove that Opencode v2 never touches other providers.",
+        "GIT_PLATFORM": "GitHub",
+        "GIT_REMOTE_URL": "https://github.com/example/ac-d5-cross-provider",
+        "GIT_MAIN_BRANCH": "main",
+    },
+    "rules-preset": "default",
+    "speech-mode": "full",
+    "tier-preset": "Normal",
+    "se-focus": False,
+    "max-parallel-agents": 2,
+    "conventions-preset": "default",
+    "debug-mode": False,
+    "allow-committed-secrets": False,
+}
+
+# Provider-owned trees of Claude, Gemini and Mammouth (AC-D5): never changed.
+_AC_D5_FOREIGN_PREFIXES = (".claude/", ".gemini/", ".mammouth/")
+# Non-prefixed artifacts of the same three providers.
+_AC_D5_FOREIGN_FILES = ("CLAUDE.md", "AGENTS.personal.md", "mammouth.json")
+# Provider-spanning files, explicitly listed (AC-D5).
+_AC_D5_SPANNING_FILES = ("AGENTS.md", ".meta-config/generated-file-hashes.json")
+# The complete delta of the two renders: the Opencode surface plus the derived
+# hash manifest (validated separately below).
+_AC_D5_CHANGED = (
+    ".meta-config/generated-file-hashes.json",
+    ".opencode/agent-meta-state.json",
+    ".opencode/agents/developer.md",
+    ".opencode/agents/orchestrator.md",
+    # The v2 settings document itself.
+    "opencode.json",
+)
+_AC_D5_ONLY_ON_V2 = (
+    ".opencode/plugins/.agent-meta-managed",
+    ".opencode/plugins/agent-meta-runtime-gate.js",
+)
+
+
+def _ac_d5_config(surface: str) -> dict:
+    """The four-provider config; ``v1`` drops the Opencode surface option."""
+    config = json.loads(json.dumps(_AC_D5_BASE_CONFIG))
+    if surface == "v2":
+        config["provider-options"] = {"Opencode": {"surface-version": "v2"}}
+    return config
+
+
+def _sync_four_providers(project: Path, surface: str) -> None:
+    (project / ".meta-config").mkdir(parents=True, exist_ok=True)
+    (project / ".meta-config" / "project.yaml").write_text(
+        yaml.safe_dump(_ac_d5_config(surface), sort_keys=False, allow_unicode=True),
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "init", "-q"], cwd=project, check=True)
+    result = render_harness._run_sync(project, "--init")
+    assert result.returncode == 0, (
+        f"{surface} sync failed:\n{result.stdout[-2000:]}\n{result.stderr[-2000:]}"
+    )
+
+
+def _assert_provider_tree_identical(
+    v1: dict, v2: dict, prefix: str,
+) -> None:
+    """Every file below *prefix* is present and byte-identical in both renders."""
+    paths_v1 = {rel for rel in v1 if rel.startswith(prefix)}
+    paths_v2 = {rel for rel in v2 if rel.startswith(prefix)}
+    assert paths_v1, f"guard: {prefix} must produce artifacts"
+    assert paths_v1 == paths_v2, (
+        f"{prefix} file set changed: only-v1={sorted(paths_v1 - paths_v2)} "
+        f"only-v2={sorted(paths_v2 - paths_v1)}"
+    )
+    differing = sorted(rel for rel in paths_v1 if v1[rel] != v2[rel])
+    assert differing == [], f"{prefix} artifacts changed under Opencode v2: {differing}"
+
+
+def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
+    """AC-D5: Opencode v2 leaves Claude, Gemini and Mammouth byte-identical.
+
+    Reference = the same project with Opencode on v1. Every provider-owned
+    artifact must match byte for byte. The provider-spanning files are listed
+    explicitly and validated individually:
+
+    * ``AGENTS.md`` — identical, because the shared runtime-gate tier folds to
+      the weakest provider; Opencode's own tier change must not leak into it
+      (the single-provider delta is covered by ``test_lab_diff_v1_v2``);
+    * ``.meta-config/generated-file-hashes.json`` — only its Opencode entries
+      may differ (developer, orchestrator, runtime-gate plugin).
+    """
+    v1_root = tmp_path / "opencode-v1"
+    v2_root = tmp_path / "opencode-v2"
+    _sync_four_providers(v1_root, "v1")
+    _sync_four_providers(v2_root, "v2")
+
+    v1 = _rendered_files(v1_root)
+    v2 = _rendered_files(v2_root)
+
+    only_v1 = tuple(sorted(set(v1) - set(v2)))
+    only_v2 = tuple(sorted(set(v2) - set(v1)))
+    changed = tuple(sorted(rel for rel in set(v1) & set(v2) if v1[rel] != v2[rel]))
+    report = (
+        f"\nchanged={list(changed)}\nonly-in-v1={list(only_v1)}\n"
+        f"only-in-v2={list(only_v2)}\n"
+        f"compared {len(v1)} v1 files against {len(v2)} v2 files"
+    )
+
+    # --- the complete, closed delta --------------------------------------
+    assert only_v1 == (), f"v2 must not remove a file:{report}"
+    assert only_v2 == _AC_D5_ONLY_ON_V2, f"unexpected new files:{report}"
+    assert changed == tuple(sorted(_AC_D5_CHANGED)), (
+        f"the cross-provider delta is not the Opencode surface:{report}"
+    )
+
+    # --- Claude / Gemini / Mammouth: byte-identical ----------------------
+    for prefix in _AC_D5_FOREIGN_PREFIXES:
+        _assert_provider_tree_identical(v1, v2, prefix)
+    for rel in _AC_D5_FOREIGN_FILES:
+        assert rel in v1 and rel in v2, f"missing foreign artifact {rel}{report}"
+        assert v1[rel] == v2[rel], f"foreign artifact changed under v2: {rel}"
+
+    # --- the explicitly listed provider-spanning files -------------------
+    # Only the derived manifest may move; `AGENTS.md` must stay identical.
+    spanning_changed = tuple(
+        rel for rel in _AC_D5_SPANNING_FILES if v1[rel] != v2[rel]
+    )
+    assert spanning_changed == (".meta-config/generated-file-hashes.json",), (
+        f"unexpected provider-spanning delta {spanning_changed}: "
+        f"allowed files are {_AC_D5_SPANNING_FILES}{report}"
+    )
+
+    # --- provider-spanning file 1: AGENTS.md -----------------------------
+    # Shared by Opencode/Gemini/Mammouth. The tier is the weakest of the
+    # involved providers, so both renders stay `advisory` and the file must be
+    # byte-identical; an Opencode-only tier change would be a leak.
+    agents_v1 = v1["AGENTS.md"].decode("utf-8")
+    agents_v2 = v2["AGENTS.md"].decode("utf-8")
+    assert agents_v1 == agents_v2, (
+        "AGENTS.md is provider-spanning: only Opencode parts may change, but "
+        "the shared runtime-gate tier is advisory on both surfaces"
+    )
+    assert "## Runtime-Enforcement-Tier: `advisory`" in agents_v1
+    assert "## Runtime-Enforcement-Tier: `advisory`" in agents_v2
+
+    # --- provider-spanning file 2: derived hash manifest -----------------
+    hashes_v1 = json.loads(v1[".meta-config/generated-file-hashes.json"])["hashes"]
+    hashes_v2 = json.loads(v2[".meta-config/generated-file-hashes.json"])["hashes"]
+    manifest_delta = {
+        key for key in set(hashes_v1) | set(hashes_v2)
+        if hashes_v1.get(key) != hashes_v2.get(key)
+    }
+    assert manifest_delta == {
+        ".opencode/agents/developer.md",
+        ".opencode/agents/orchestrator.md",
+        ".opencode/plugins/agent-meta-runtime-gate.js",
+    }, (
+        "the generated hash manifest may only follow the Opencode surface, "
+        f"got {sorted(manifest_delta)}"
+    )
+
+
+# AC-T4 (plan-wide constraint): the golden fixtures are the baseline after the
+# Plan-A merge and must not be touched by any task of the v2 plan. The expected
+# values are the frozen digests of the three fixture trees (relpath + NUL +
+# bytes + NUL, files sorted by relpath) — literals, never recomputed.
+_FIXTURE_TREES = {
+    "ac01-baseline": "09bdcb53dd33621430978851dc7ca85a1710eabad6724f440043f951cb6dfd5f",
+    "slimming-golden": "66c7a598dc6bf7729bee5a46dfc22889bda4f3d65816c4c1f6c4938a8242b505",
+    "compact-golden": "d56b299c7512ff6678e3f401d823084fcdf3e9b813af1397192b7b99d64f77ba",
+}
+
+
+def _fixture_tree_sha256(root: Path) -> str:
+    """Deterministic digest over a fixture directory (paths and contents)."""
+    digest = hashlib.sha256()
+    files = sorted(
+        (path for path in root.rglob("*") if path.is_file()),
+        key=lambda path: path.relative_to(root).as_posix(),
+    )
+    for path in files:
+        digest.update(path.relative_to(root).as_posix().encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def test_ac_t4_fixtures_unchanged():
+    """AC-T4: the three golden fixture trees still match their frozen digests.
+
+    A changed fixture invalidates every golden comparison downstream, so this
+    is the guard for the whole plan — the expected digests are embedded
+    literals and the check runs in-process (no subprocess).
+    """
+    fixtures_root = _REPO_ROOT / "tests" / "fixtures"
+    mismatched = []
+    for name, expected in _FIXTURE_TREES.items():
+        root = fixtures_root / name
+        assert root.is_dir(), f"missing golden fixture directory: {root}"
+        actual = _fixture_tree_sha256(root)
+        if actual != expected:
+            mismatched.append(f"{name}: expected {expected}, got {actual}")
+    assert mismatched == [], (
+        "golden fixtures changed (AC-T4 requires them frozen):\n"
+        + "\n".join(mismatched)
+    )
+
+
+# --- AC coverage + provider agnosticism meta-tests (Task 31, AC-T3/AC-T6) ----
+
+#: Spec AC-T3: every AC owned by this file must have at least one named test.
+_AC_T3_SURFACE_IDS = (
+    "b1", "b2", "b4", "b5", "b7", "b12", "b16", "b17", "b18", "b19",
+    "b20", "b21", "b22", "c3", "c4", "c7", "c14", "c15", "c16a", "c16b",
+    "c17", "d1", "d3", "d4", "d7",
+)
+
+_AC_T3_REQUIRED_PATTERN = re.compile(
+    r"^def test_ac_(b1|b2|b4|b5|b7|b12|b16|b17|b18|b19|b20|b21|b22|"
+    r"c3|c4|c7|c14|c15|c16a|c16b|c17|d1|d3|d4|d7)_",
+    re.MULTILINE,
+)
+
+_OPENCODE_V2_CONFIG_PATH = _REPO_ROOT / "scripts" / "lib" / "opencode_v2_config.py"
+
+
+def test_ac_t3_required_acs_have_tests():
+    """AC-T3 name/traceability guard — NOT behavioural coverage of the ACs.
+
+    This test only proves that a test *named* ``def test_ac_<id>_*`` still
+    exists for every required AC. It reads the source text (regex on
+    ``def test_ac_<id>_``), so deleting or renaming such a test is caught even
+    when the suite stays green for another reason. It says nothing about what
+    those tests assert — the behavioural evidence lives in the named tests
+    themselves (QA-E-06).
+
+    AC-D9 is owned by ``tests/test_artifact_contracts.py`` and AC-C1/AC-C2 by
+    ``tests/test_opencode_v2_spike.py`` (spec AC-T3) — those files are checked
+    explicitly rather than folded into this file's list.
+    """
+    source = Path(__file__).read_text(encoding="utf-8")
+    found = set(_AC_T3_REQUIRED_PATTERN.findall(source))
+    missing = [ac for ac in _AC_T3_SURFACE_IDS if ac not in found]
+    assert missing == [], (
+        "AC-T3: no test named 'def test_ac_<id>_...' in "
+        f"tests/test_opencode_v2_surface.py for: {missing}"
+    )
+
+    contracts = (_REPO_ROOT / "tests" / "test_artifact_contracts.py").read_text(
+        encoding="utf-8"
+    )
+    assert re.search(r"^def test_ac_d9_", contracts, re.MULTILINE), (
+        "AC-T3/AC-D9: no 'def test_ac_d9_...' test in "
+        "tests/test_artifact_contracts.py"
+    )
+
+    spike = (_REPO_ROOT / "tests" / "test_opencode_v2_spike.py").read_text(
+        encoding="utf-8"
+    )
+    for ac_id in ("c1", "c2"):
+        assert re.search(rf"^def test_ac_{ac_id}_", spike, re.MULTILINE), (
+            f"AC-T3/AC-{ac_id.upper()}: no 'def test_ac_{ac_id}_...' test in "
+            "tests/test_opencode_v2_spike.py"
+        )
+
+
+def _docstring_constants(tree: ast.AST) -> set[int]:
+    """``id()`` of ``Constant`` nodes that are module/class/function docstrings."""
+    found: set[int] = set()
+    for parent in ast.walk(tree):
+        if not isinstance(
+            parent, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
+        ):
+            continue
+        body = parent.body
+        if (
+            body
+            and isinstance(body[0], ast.Expr)
+            and isinstance(body[0].value, ast.Constant)
+            and isinstance(body[0].value.value, str)
+        ):
+            found.add(id(body[0].value))
+    return found
+
+
+def test_new_v2_code_has_no_provider_branch():
+    """AC-T6: the v2 writer branches on resolved values, never on a provider
+    name, and never reads the raw ``surface-version`` selector.
+
+    Static AST scan of ``scripts/lib/opencode_v2_config.py``:
+
+    * a registered provider-name literal as an operand of any comparison
+      (``==``/``!=``/``in``/``not in``/ordering) is a provider branch;
+    * a live ``"surface-version"`` constant (subscript, ``.get`` call,
+      comparison, assignment) is a raw-selector read.
+
+    Docstrings are ignored: they document the rule without executing it, and
+    comments never reach the AST.
+    """
+    tree = ast.parse(_OPENCODE_V2_CONFIG_PATH.read_text(encoding="utf-8"))
+    providers = yaml.safe_load(
+        (_REPO_ROOT / "config" / "ai-providers.yaml").read_text(encoding="utf-8")
+    )
+    names = set((providers.get("providers") or {}).keys())
+    assert names, "config/ai-providers.yaml declares no registered providers"
+
+    docstrings = _docstring_constants(tree)
+    offenders: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Compare):
+            for operand in (node.left, *node.comparators):
+                for sub in ast.walk(operand):
+                    if (
+                        isinstance(sub, ast.Constant)
+                        and isinstance(sub.value, str)
+                        and sub.value in names
+                    ):
+                        offenders.append(
+                            f"opencode_v2_config.py:{sub.lineno}: compares "
+                            f"provider name {sub.value!r}"
+                        )
+        if (
+            isinstance(node, ast.Constant)
+            and node.value == "surface-version"
+            and id(node) not in docstrings
+        ):
+            offenders.append(
+                f"opencode_v2_config.py:{node.lineno}: reads 'surface-version'"
+            )
+    assert offenders == [], (
+        "AC-T6: scripts/lib/opencode_v2_config.py must dispatch on resolved "
+        "config values only:\n" + "\n".join(sorted(offenders))
+    )
+
+
+# --- AC-T5: CHANGELOG entry for the opencode v2 surface (Task 32 / R.1) -----
+
+
+def _changelog_unreleased_section() -> str:
+    """Return the body of the ``## [Unreleased]`` section of ``CHANGELOG.md``.
+
+    The section ends at the next level-2 heading, so a later release block can
+    never satisfy an assertion about the unreleased entry.
+    """
+    changelog = _REPO_ROOT / "CHANGELOG.md"
+    assert changelog.is_file(), f"missing CHANGELOG.md: {changelog}"
+    text = changelog.read_text(encoding="utf-8")
+    marker = "## [Unreleased]"
+    assert marker in text, f"CHANGELOG.md carries no {marker!r} section"
+    body = text.split(marker, 1)[1]
+    return body.split("\n## ", 1)[0]
+
+
+def test_changelog_mentions_opencode_v2_support():
+    """AC-T5 (Task 32): the Unreleased section records the v2 surface.
+
+    The entry is the user-facing summary of the whole v2 package, so it must
+    name the feature (``opencode v2``) and the newly managed file
+    (``cli.json``) — both were absent before this task.
+    """
+    unreleased = _changelog_unreleased_section().lower()
+    assert "opencode v2" in unreleased, (
+        "the [Unreleased] section must document the opencode v2 surface"
+    )
+    assert "cli.json" in unreleased, (
+        "the [Unreleased] section must document the managed cli.json"
+    )

@@ -489,3 +489,112 @@ def test_check_mcp_connection_keys_validates_merged_project_override(
     assert len(errors) == 1, [f.message for f in errors]
     assert errors[0].message == "mcp-connection-key: shared.oauth invalid"
     assert "clientId" in errors[0].suggestion
+
+
+# --------------------------------------------------------------------------- #
+# settings-file duplicate guard (plan Task 25, AC-D9)
+# --------------------------------------------------------------------------- #
+
+#: AC-D9-mandated finding label. A constant, not a provider dispatch: the check
+#: iterates the registry and composes the message from the actual file names.
+_CHECK_SETTINGS_DUPLICATE = "opencode-config-duplicate"
+
+
+def _write_provider_registry(root: Path, providers: dict) -> None:
+    """Write a minimal framework-shaped provider registry (JSON is valid YAML)."""
+    config_dir = root / "config"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    (config_dir / "ai-providers.yaml").write_text(
+        json.dumps({"providers": providers}, indent=2),
+        encoding="utf-8",
+    )
+
+
+def _duplicate_findings(findings: list[Finding]) -> list[Finding]:
+    return [f for f in findings if f.check == _CHECK_SETTINGS_DUPLICATE]
+
+
+def test_ac_d9_duplicate_jsonc_is_warning(tmp_path: Path) -> None:
+    # AC-D9: a content-bearing .jsonc is merged over the managed .json (last
+    # write wins, evidence doc §3), so the duplicate is a permanent WARNING.
+    _write_provider_registry(tmp_path, {"Opencode": {"settings_file": "opencode.json"}})
+    (tmp_path / "opencode.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "opencode.jsonc").write_text("{}", encoding="utf-8")
+
+    findings = artifact_contracts.check_settings_file_duplicates(
+        tmp_path, {"ai-providers": ["Opencode"]}
+    )
+
+    assert len(findings) == 1, [f.message for f in findings]
+    assert findings[0].severity == Severity.WARNING
+    assert findings[0].check == "opencode-config-duplicate"
+    assert findings[0].message == (
+        "opencode-config-duplicate: opencode.json and opencode.jsonc "
+        "both present; keep one"
+    )
+
+
+def test_ac_d9_no_finding_without_jsonc(tmp_path: Path) -> None:
+    # AC-D9: without a .jsonc twin there is nothing shadowing the settings file.
+    _write_provider_registry(tmp_path, {"Opencode": {"settings_file": "opencode.json"}})
+    (tmp_path / "opencode.json").write_text("{}", encoding="utf-8")
+
+    findings = artifact_contracts.check_artifact_contracts(
+        tmp_path, {"ai-providers": ["Opencode"]}
+    )
+
+    assert _duplicate_findings(findings) == []
+
+
+def test_ac_d9_yaml_settings_file_is_never_probed_for_a_jsonc_twin(
+    tmp_path: Path,
+) -> None:
+    # QA-E-01: the evidence covers a `.jsonc` shadowing a `.json` only. A YAML
+    # settings file must not trigger `config.jsonc` — that suffix swap would
+    # report a phantom "config.yaml and config.jsonc both present" finding and
+    # fail `--strict` on a clean tree.
+    _write_provider_registry(
+        tmp_path, {"SyntheticYaml": {"settings_file": ".continue/config.yaml"}}
+    )
+    (tmp_path / ".continue").mkdir()
+    (tmp_path / ".continue" / "config.yaml").write_text("{}", encoding="utf-8")
+    (tmp_path / ".continue" / "config.jsonc").write_text("{}", encoding="utf-8")
+
+    findings = _duplicate_findings(
+        artifact_contracts.check_artifact_contracts(
+            tmp_path, {"ai-providers": ["SyntheticYaml"]}
+        )
+    )
+
+    assert findings == [], [f.message for f in findings]
+
+
+def test_ac_d9_check_is_provider_agnostic(tmp_path: Path) -> None:
+    # AC-D9: a synthetic provider with a different settings_file (and a second
+    # one without a twin) produces the same finding — the check reads the
+    # registry's settings_file and never a provider name.
+    _write_provider_registry(
+        tmp_path,
+        {
+            "SyntheticAlpha": {"settings_file": "foo.json"},
+            "SyntheticBeta": {"settings_file": "nested/bar.json"},
+        },
+    )
+    (tmp_path / "foo.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "foo.jsonc").write_text("{}", encoding="utf-8")
+    (tmp_path / "nested").mkdir()
+    (tmp_path / "nested" / "bar.json").write_text("{}", encoding="utf-8")
+
+    findings = _duplicate_findings(
+        artifact_contracts.check_artifact_contracts(
+            tmp_path, {"ai-providers": ["SyntheticAlpha", "SyntheticBeta"]}
+        )
+    )
+
+    assert len(findings) == 1, [f.message for f in findings]
+    assert findings[0].severity == Severity.WARNING
+    assert findings[0].check == "opencode-config-duplicate"
+    assert findings[0].message == (
+        "opencode-config-duplicate: foo.json and foo.jsonc both present; keep one"
+    )
+    assert "Opencode" not in findings[0].message

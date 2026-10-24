@@ -2,9 +2,9 @@
 
 **Zweck:** Ausführungs-Ledger zum Plan `docs/plans/2026-10-22-opencode-v2-support-plan.md` (Phasen C0, B, C1/C2, C3, D) und damit zum Tracking-Issue #1007. Das Dokument hält je Phase und je Task den erreichten Stand, die Beleg-Commits, die Testlage und die substanziellen Befunde fest; es ersetzt weder Plan noch Spec.
 
-**Geltungsbereich:** Branch `feat/1007-b-keys` (Basis `main` = `526a5dab`; Phase C0 über PR #1011 gemergt, C0-Ledger-Commit `52a72a0f`, Evidenz-Nachbesserung `2978753c`). Phase-B-Arbeit von `bd49dc5b` bis `d5853d1e`. Phase C1/C2 auf Branch `feat/1007-c1-c2-gate` (Basis `d0b81f91`), Commits `f07ab459` bis `ad4380e1`. Phase C3 auf Branch `feat/1007-c3-plugin` (Basis `9f274040`), Commits `c8270845` und `c673991f`. Stand: 2026-10-24.
+**Geltungsbereich:** Branch `feat/1007-b-keys` (Basis `main` = `526a5dab`; Phase C0 über PR #1011 gemergt, C0-Ledger-Commit `52a72a0f`, Evidenz-Nachbesserung `2978753c`). Phase-B-Arbeit von `bd49dc5b` bis `d5853d1e`. Phase C1/C2 auf Branch `feat/1007-c1-c2-gate` (Basis `d0b81f91`), Commits `f07ab459` bis `ad4380e1`. Phase C3 auf Branch `feat/1007-c3-plugin` (Basis `9f274040`), Commits `c8270845` und `c673991f`. Phase D auf Branch `feat/1007-d-surface` (Basis `dfb77de4`), Commits `fa42ec7b` bis `04d41eb8` (13 Commits, inklusive Folgelauf zu Task 23). Stand: 2026-10-24.
 
-**Datenquelle:** Commits dieses Branches, die im Plan gesetzten Checkboxen (C0: Tasks 1, 2, 3, 3a, 24; B: Tasks 4–12; C1/C2: Tasks 13, 13a, 14–17; C3: Tasks 18, 19) sowie die dort protokollierten Testläufe und die Phasen-Exit-Kriterien.
+**Datenquelle:** Commits dieses Branches, die im Plan gesetzten Checkboxen (C0: Tasks 1, 2, 3, 3a, 24; B: Tasks 4–12; C1/C2: Tasks 13, 13a, 14–17; C3: Tasks 18, 19; D: Tasks 20–23 inklusive Folgelauf, 25–32; Task 33 bewusst offen) sowie die dort protokollierten Testläufe und die Phasen-Exit-Kriterien.
 
 **Legende der Spaltenwerte**
 
@@ -23,7 +23,7 @@
 | B | 4–12 | `done (Review/PR offen)` |
 | C1/C2 | 13, 13a, 14–17 | `done (Review/PR offen)` |
 | C3 | 18–19 | `done (Review/PR offen)` |
-| D | 20–33 (ohne 24) | `offen` |
+| D | 20–33 (ohne 24) | `done (Review/PR offen; Task 33 offen)` |
 
 **Entry-Kriterien:** E1 done · E2 done · E3 done · E4 done.
 
@@ -158,6 +158,44 @@ bash tests/scenarios/run.sh 69-opencode-v2-surface
 | QA-D-03 | MINOR | Der Registry-Kommentar bei `has_plugins` ist jetzt wahr für v1 (statischer Default ⇒ Tier `permission`, kein Artefakt) und verweist für v2 auf den C3-Datenblock; P6 gatet nur noch `MODE=enforce` (der Observe-Pfad ist ausgeliefert, der blockierende Pfad nicht implementiert). | `config/ai-providers.yaml` (Kommentar bei `has_plugins: false`) |
 | QA-D-04 | MINOR | Die AC-C2-Äquivalenz ist global: der Check läuft über **alle** Einträge aus `load_providers_config(_REPO_ROOT)`, die einen der beiden C3-Keys deklarieren (jeder solche Eintrag muss den Both-or-None-Satz tragen; unter `GO` muss mindestens einer existieren), statt nur über den `Opencode`-v2-Eintrag. | `tests/test_opencode_v2_spike.py::test_ac_c2_gate_fallback_invariants` |
 
+## D
+
+**Branch:** `feat/1007-d-surface` (Basis `dfb77de4`; Arbeitsstand `04d41eb8`). Die Plan-Blöcke der Tasks 20, 21, 22, 23, 25, 26, 27, 28, 29, 30, 31 und 32 sind abgehakt; Task 33 bleibt offen (HITL). Task 24 war bereits mit PR C0 gemergt.
+
+| Task | Agent | Commit | Tests | Status | Abweichungen/Befunde |
+|---|---|---|---|---|---|
+| 20 | `senior-developer` | `fa42ec7b` | rot `3 failed, 1 passed` → `5 passed` | `done` | Der Builder ist closed-world: je Aktion (`edit`, `shell`, `subagent`, in dieser Reihenfolge) **genau ein** Eintrag. `_map_claude_tools_to_opencode_permissions` bleibt unverändert. |
+| 21 | `senior-developer` | `920882b1` | rot `4 failed, 1 passed` → `5 passed` | `done` | Artefakt trägt `permissions:` als Liste, `steps` ohne `maxSteps`, `model` mit `#variant`; kein `tools`, kein `subagent_depth`, kein `system:`. v1-Referenzprobe byte-identisch. Die Provenienz-Logik wurde in einen gemeinsamen Helfer extrahiert (v1-Rumpf unverändert). |
+| 22 | `senior-developer` | `90459853` | rot **`3 failed, 2 passed`** (Plan erwartete `4 failed, 1 passed`) → `173 passed` | `done` | `deny_edit = strict AND permission_deny_required(pc, caps, plugin_mode)` wird am Frontmatter-Aufrufort aufgelöst (Amendment B3); der `*`-Deny steht **vor** den Pfad-Allows; schreibgeschützte Rollen werden nie erweitert; `system` in `allowed-fields` aufgenommen. **Befund zum Rot-Zähler:** `test_ac_c16b_no_edit_deny_without_gate` und der Mammouth-Fall waren bereits grün, weil der v2-Builder `deny_edit` noch ignorierte und Mammouth schon auf `opencode-native` lief. |
+| 23 | `senior-developer` | `7033a04` | rot `5 failed, 1 passed` → `123 passed` | `done` | Verwaltete `cli.json` mit generischem Passthrough (dokumentierter Key nur `plugins`); `tui.json` nachweislich unberührt (Hash); Rückbau, wenn die Option entfällt. |
+| 23-fix | `senior-developer` | `d4b17147` | neuer Test `test_ac_b22_cli_json_rolled_back_on_v1_surface`; `127 passed` | `done` | Auf einer v1-Oberfläche löste `cli_file` nicht auf, deshalb überlebte der Namespace. Behoben: der Rückbau löst die Datei aus der überlebenden `cli-files`-Map auf und warnt, wenn es mehrdeutig bleibt (kein Raten). |
+| 25 | `developer` | `aae4664f` | rot `2 failed, 1 passed` → `41 passed` | `done` | Provider-agnostisch über `settings_file` jedes aktiven Providers; die Warnung erscheint für das Repo, `--strict` rc 1, nicht-strikt rc 0. |
+| 26 | `developer` | `e9911b1b` | rot `1 failed` → `2 passed` | `done` | Die Datei enthielt nur Kommentare und ein identisches `$schema` ⇒ keine Inhaltsüberführung (Evidenz `JSONC-TRAEGT-NICHTS-BEI`). Die Warnung `opencode-config-duplicate` verschwindet; die Nicht-Vakuität ist gegen das HEAD-Paar belegt. |
+| 27 | `technical-writer` | `2e40c5e7` | echter Rot-Lauf durch Wiederherstellen der alten Doku (`2 failed`) → `2 passed` | `done` | Vier Abschnitte, `AGENTS.md-only`, Verweis auf `.opencode/rules/` entfernt. Zusätzlich `docs/concepts/runtime-gate-tiers.md` korrigiert (Aussagen aus der Zeit vor C3). |
+| 28 | `tester` | `979a7800` | Szenario PASS; Negativprobe mit `surface-version: v1` Exit 1 | `done` | Registry-Zeilenzahl 1; Assert-Skript im Modus 100755. |
+| 29 | `tester` | `54a5eeaf` | `2 passed` | `done` | Prüft genau 6 differierende Dateien und 3 v2-only-Artefakte, alles Übrige byte-identisch; beide Negativproben feuern. **Offener Punkt:** das v2-Plugin-Artefakt überlebt einen Rückwechsel v2→v1 (außerhalb des Geltungsbereichs von AC-B7/B22) — als bekannte Grenze für ein Follow-up notiert. |
+| 30 | `tester` | `9736a8ec` | `2 passed`; 135 Golden-Tests grün | `done` | Drei eingebettete Fixture-Digests (`ac01-baseline`, `slimming-golden`, `compact-golden`). |
+| 31 | `tester` | `00624008` | `203 passed` | `done` | `opencode_v2_config.py` in den lib-Sweep aufgenommen; AC-T3-Abdeckungstest; AST-Guard gegen Provider-Zweige; die Negativprobe (Provider-Literal) feuert. |
+| 32 | `developer` | `04d41eb8` | rot `1 failed` → `1 passed` | `done` | CHANGELOG in `Added`/`Changed` mit Trennung DOKU/VERIFIED. Alle 79 Szenarien PASS (in Batches gefahren); `--validate`, `--check` und `consistency-check` rc 0. **Der vollständige `pytest tests`-Lauf beendete lokal nicht (1188 passed, 0 failed bei ca. 17 %); den Vollsuite-Beleg liefert CI.** |
+| 33 | `release` | — | — | `offen — Release-Bump erfordert ausdrückliche Nutzerfreigabe (HITL)` | Kein Bump, kein Tag, kein Push in Phase D. |
+
+## Phase-D-Review-Fixrunde (2026-10-24)
+
+**Quelle:** Review zu `feat/1007-d-surface` (Arbeitsstand `d7e8d187`), Verdict `CHANGES_REQUESTED` ohne Blocker — zwei echte Defekte (QA-E-01, QA-E-03), der Rest Abdeckungs- und Doku-Präzisierung. Der Fixrunden-Commit folgt direkt auf `d7e8d187`.
+
+| Finding | Schwere | Änderung | Beleg |
+|---|---|---|---|
+| QA-E-01 | MAJOR (Bug) | `opencode-config-duplicate` prüft nur noch `.json`-Settings-Dateien auf einen `.jsonc`-Zwilling. Für `.yaml` (z. B. `.continue/config.yaml`) wurde `config.jsonc` erfunden und ein Phantom-Finding erzeugt, das `--strict` scheitern ließ. | `scripts/lib/consistency/artifact_contracts.py`, `tests/test_artifact_contracts.py::test_ac_d9_yaml_settings_file_is_never_probed_for_a_jsonc_twin` |
+| QA-E-03 | MAJOR (Defekt) | Beide Pfadableitungen in `sync_opencode_cli_file` sind gewrappt: ein absolutes `mcp-config.committed-file` (`relative_to` → `ValueError`) und ein aus dem Root ausbrechendes `cli-files`-Value (`safe_path` → `ValueError`) warnen jetzt und kehren zurück, statt einen Traceback zu werfen. | `scripts/lib/opencode_v2_config.py`, `::test_cli_writer_absolute_committed_file_warns_instead_of_raising`, `::test_cli_writer_escaping_cli_files_value_warns_instead_of_raising` |
+| QA-E-02 | MINOR | Zwei stille No-ops sind sichtbar: ein Nicht-Objekt-Dokument und ein `cli`-Key mit `null` werden gewarnt (`opencode-v2-cli: <key> is null — not written`), analog zu `providers.<id>: null`. | `scripts/lib/opencode_v2_config.py`, `::test_cli_writer_warns_on_null_value`, `::test_cli_writer_warns_on_non_object_document` |
+| QA-E-04 | MINOR | Provider-Doku qualifiziert die closed-world-Aussage: eine Basiszeile je Aktion; der Gate-Lock der `primary-role` erweitert `edit` bei aktivem Gate um `*`-Deny plus Pfad-Allows. | `docs/providers/opencode.md` |
+| QA-E-05 | MINOR | Der Gate-Lock-Test behauptet nicht mehr Tier `permission`: er belegt explizit Tier `plugin` + baked `observe` (der v2-Registry-Fall) und präzisiert den Docstring. | `tests/test_opencode_v2_surface.py::test_ac_c16b_orchestrator_artifact_has_edit_deny_when_gate_active` |
+| QA-E-06 | MINOR | `test_ac_t3_required_acs_have_tests` ist im Docstring als Namens-/Traceability-Guard ausgewiesen, nicht als Verhaltensabdeckung. | `tests/test_opencode_v2_surface.py` |
+| QA-E-07 | MINOR | Szenario 79 prüft zusätzlich die Reihenfolge (`edit`-`*`-Deny vor den Pfad-Allows) und `edit: deny` einer read-only Rolle; die Fixture generiert dafür `explorer`. Folge für den Lab-Diff (Task 29): die Zeile „6 differierende Dateien“ ist damit überholt — der Test erwartet jetzt 7 Dateien und 4 Manifest-Einträge. | `tests/scenarios/asserts/79-opencode-v2-full-surface.sh`, `tests/scenarios/configs/79-opencode-v2-full-surface.project.yaml` |
+| RVW-E-02 | MINOR | CHANGELOG-Pfad auf `tests/scenarios/asserts/79-opencode-v2-full-surface.sh` korrigiert. | `CHANGELOG.md` |
+| RVW-E-03 | MINOR | AC-C16(a2) deckt jetzt auch den abweichenden User-Wert auf Tier `plugin` ab: kein Merge, keine Warnung, Byte-Gleichheit. | `tests/test_opencode_v2_surface.py::test_ac_c16a_divergent_user_value_stays_silent_at_tier_plugin` |
+| RVW-E-05 | MINOR | Plan Task 32 Step 3 annotiert, dass der lokale Vollsuite-Lauf nicht beendete (`1188 passed/0 failed bei ~17 %`); der Vollsuite-Beleg bleibt CI. | `docs/plans/2026-10-22-opencode-v2-support-plan.md` |
+
 ## Offene Punkte
 
 - **C3-Gate-Plugin ist observe-only (bekannte Grenze):** Das generierte v2-Plugin annotiert vorgeschlagene Tool-Aufrufe und blockiert nie. Blockieren wäre in v2 erst über `ctx.permission.hook("evaluate")` möglich; dieser Deny-Pfad ist bewusst nicht enthalten und bleibt P6-gated (`MODE=enforce` ist nicht implementiert). Das tatsächliche Gate bleibt damit der Permission-Deny aus C1: `permission_deny_required` hält die verwalteten Edit-/Shell-Tripel bei Tier `plugin`+`observe` additiv erhalten.
@@ -170,13 +208,21 @@ bash tests/scenarios/run.sh 69-opencode-v2-surface
 - **QA-C-08 (MINOR, bekannt):** Die v2-Gate-Writer nutzen `allow_secrets=False`, während der Schwester-Writer derselben Datei `config["allow-committed-secrets"]` durchreicht. Ein Klartext-Secret eines Users bricht damit auch einen reinen Rollback ab; entweder gleiche Secret-Gate-Parameter durchreichen oder die strengere Wahl dokumentieren.
 - **OQ-B12** ist mit `VERDICT-C3: GO` an seinem Entscheidungszeitpunkt angelangt. Der dokumentierte Default „Eigenprüfung genügt (kein Eingriff in Spec A)“ gilt weiter, eine ausdrückliche Entscheidung steht jedoch noch aus.
 - **QA-D-02 (MAJOR, akzeptierte Grenze, AC-Geltungsbereich):** Auf Tier `plugin` (C3-v2) läuft `_sync_opencode_runtime_gate` — und damit der `default_agent`-Managed-Merge — nicht; `settings-init` schreibt `default_agent` einmalig und `reconcile_opencode_surface_gate` prüft nur den Einstiegspunkt. Ein gelöschter `default_agent` wird dort nicht wieder ergänzt, ein abweichender User-Wert bleibt ohne Merge-WARNUNG, ein verschwundener `primary-role` nimmt den Wert nicht zurück. AC-C16(a) ist entsprechend in (a1) Tier `permission` / (a2) Tier `plugin` geschnitten (Spec Rev. 1.8 / Amendment B4). Schutz auf Tier `plugin`: Agent-Ebene (`deny_edit`) plus Config-Tripel. Eine Angleichung bräuchte einen Eingriff in Spec A oder einen zweiten `default_agent`-Writer — bewusst nicht Teil dieses Auftrags (eigener Spec-Auftrag möglich).
-- **Bekannte Doku-Lücke (nicht Teil von QA-D-03):** `docs/concepts/runtime-gate-tiers.md` beschreibt in §2/§7 noch den Stand vor C3 („kein Provider deklariert `runtime_gate: plugin`“, „`has_plugins: false` … **dauerhaft** gesperrt“). Für die v2-Oberfläche ist das inzwischen falsch; die Datei braucht eine eigene, redaktionelle Nachführung.
+- **Bekannte Doku-Lücke (nicht Teil von QA-D-03):** `docs/concepts/runtime-gate-tiers.md` beschreibt in §2/§7 noch den Stand vor C3 („kein Provider deklariert `runtime_gate: plugin`“, „`has_plugins: false` … **dauerhaft** gesperrt“). Für die v2-Oberfläche ist das inzwischen falsch; die Datei braucht eine eigene, redaktionelle Nachführung. **Erledigt in Task 27 (`2e40c5e7`):** die Aussagen sind korrigiert.
 - Die unabhängigen Stränge B, C1/C2 und D sind durch OQ-B12 nicht blockiert.
 - **Plandefekt Task 15:** Der Plan ging davon aus, dass `tests/test_mcp_config.py` unverändert bleibt. Der Test `test_build_connection_entry_opencode_json_v2_matches_v1_shape` kodierte jedoch „v2 == v1 inkl. `enabled: true`“, was AC-C7 widerspricht; die Assertion musste invertiert werden (v1 `enabled is True`, v2 ohne `enabled`, übrige Schlüssel gleich).
 - **Plandefekt Task 17:** Eine zweite Fixture in `tests/test_mcp_config.py` führte ein synthetisches v2-Dokument mit `enabled: true`; nach AC-C10 ist das ungültig. Der Schlüssel wurde entfernt, die Assertions blieben unverändert.
 - **Bekannte Grenze für C3/D:** Der MCP-Writer partizipiert nicht am laufbezogenen `claimed_files`-Set (im Modul-Docstring dokumentiert; die aktuelle Registry hat genau einen v2-Eigentümer). Bei einem zweiten v2-Eigentümer auf derselben Datei muss die Kollisionsbehandlung vor Task 23/D nachgezogen werden; ebenso überspringen Schreibvorgänge auf dieselbe Datei den committeten Managed-Write.
 
+### Aus Phase D
+
+- **Task 33 (Release-Bump) offen:** Der Minor-Bump und das Verschieben des Unreleased-Abschnitts in einen Versionsabschnitt erfordern eine ausdrückliche Nutzerfreigabe (HITL). Der Task ist im Plan bewusst nicht abgehakt; Push und Tag bleiben Aufgabe der `git`-Rolle.
+- **Bekannte Grenze — v2-Plugin-Artefakt beim Rückwechsel:** Ein Wechsel v2→v1 baut die verwalteten Config-Namespaces und die `cli.json` zurück, lässt aber `.opencode/plugins/agent-meta-runtime-gate.js` stehen. Das liegt außerhalb des Geltungsbereichs von AC-B7/AC-B22 (Befund aus Task 29, `54a5eeaf`) und ist als Follow-up offen.
+- **Bekannte Grenze — `claimed_files`:** MCP- und `cli.json`-Writer treten dem laufbezogenen `claimed_files`-Set nicht bei (siehe „Bekannte Grenze für C3/D“). Die aktuelle Registry hat genau einen v2-Eigentümer, daher ist das heute folgenlos; bei einem zweiten Eigentümer derselben Datei muss die Kollisionsbehandlung vorher nachgezogen werden.
+- **Amendment B4 (`default_agent`):** Auf Tier `plugin` wird `default_agent` nicht abgestimmt (Details unter QA-D-02 oben). Die Agent-Ebene (`deny_edit`, umgesetzt in Task 22) zusammen mit den Config-Tripeln ist dort die tragende Schutzschicht.
+- **Doku-Vorbehalt für MCP-Felder:** Die Doku zu MCP-Feldern trennt DOKU- und VERIFIED-Aussagen (CHANGELOG in Task 32 ebenso). Die Vorbehalte sind beim Weiterbau der Doku zu erhalten; für Felder, die nur als DOKU belegt sind, darf keine Verifikationsbehauptung entstehen.
+
 ## Nächste Schritte
 
-1. Review und PR für Phase C3 (Tasks 18, 19) auf `feat/1007-c3-plugin`.
-2. Danach Phase D (Tasks 20–33 ohne 24): Frontmatter, `cli.json`, Duplikat, Doku, Tests, Release.
+1. Review und PR für Phase D (Tasks 20–32 ohne 24) auf `feat/1007-d-surface` (Arbeitsstand `04d41eb8`).
+2. Nach dem Merge: Task 33 ausschließlich mit ausdrücklicher Nutzerfreigabe (Release-Bump; Push und Tag danach durch die `git`-Rolle).
