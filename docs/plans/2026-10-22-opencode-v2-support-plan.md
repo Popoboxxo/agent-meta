@@ -384,10 +384,10 @@ pipeline_stages:
 - Modify: `scripts/lib/provider_transform.py`
 - Modify: `tests/test_opencode_v2_surface.py`
 **Interfaces:** Produces `provider_transform.map_tools_to_opencode_v2_permissions(tools: list, deny_list: list[str] | None = None) -> list[dict[str, str]]`: Claude-Tool → Aktion (`Bash`→`shell`, `Write`/`Edit`→`edit`, `Agent`→`subagent`), **genau ein** Eintrag je Aktion in der Reihenfolge `edit`, `shell`, `subagent` mit `{"action", "resource": "*", "effect": "allow"|"deny"}` (allow bei Mapping, sonst deny; unabhängig von `deny_list`/`opencode_deny_critical`); `_map_claude_tools_to_opencode_permissions` (`provider_transform.py:703`) bleibt unverändert; Consumes nichts Neues
-- [ ] Step 1: Test schreiben (4 Tests): `test_ac_d1_builder_allows_mapped_actions`; `test_ac_d1_builder_closed_world_denies_unmapped_actions` (Tools `["Read"]` → alle drei `deny`, AC-D1 Rolle ohne `Write`/`Edit`); `test_ac_d1_builder_ignores_deny_list`; `test_ac_c6_v1_mapper_unchanged` (Ausgabe von `_map_claude_tools_to_opencode_permissions` für ein festes Tool-Set gegen eingebettete Referenz)
-- [ ] Step 2: rot: `python3 -m pytest tests/test_opencode_v2_surface.py -q -k "builder or v1_mapper"` → Exit 1, `3 failed, 1 passed`
-- [ ] Step 3: implementieren; Test grün: `python3 -m pytest tests/test_opencode_v2_surface.py tests/test_transform_contracts.py -q` → Exit 0
-- [ ] Step 4: commit `feat: add closed-world opencode v2 permission builder`
+- [x] Step 1: Test schreiben (4 Tests): `test_ac_d1_builder_allows_mapped_actions`; `test_ac_d1_builder_closed_world_denies_unmapped_actions` (Tools `["Read"]` → alle drei `deny`, AC-D1 Rolle ohne `Write`/`Edit`); `test_ac_d1_builder_ignores_deny_list`; `test_ac_c6_v1_mapper_unchanged` (Ausgabe von `_map_claude_tools_to_opencode_permissions` für ein festes Tool-Set gegen eingebettete Referenz)
+- [x] Step 2: rot: `python3 -m pytest tests/test_opencode_v2_surface.py -q -k "builder or v1_mapper"` → Exit 1, `3 failed, 1 passed`
+- [x] Step 3: implementieren; Test grün: `python3 -m pytest tests/test_opencode_v2_surface.py tests/test_transform_contracts.py -q` → Exit 0
+- [x] Step 4: commit `feat: add closed-world opencode v2 permission builder`
 
 ### Task 21: D1.2 — v2-Frontmatter-Funktion und Mechanismus-Verzweigung
 **Agent:** senior-developer · **Issue:** #1007 · **AC:** AC-D1, AC-D2, AC-D3, AC-D4
@@ -397,10 +397,10 @@ pipeline_stages:
 - Modify: `tests/test_opencode_v2_surface.py`
 **Interfaces:** Produces `provider_transform._transform_frontmatter_for_opencode_v2(content: str, name: str, description: str, model: str, steps: str, generated_from: str, agent_meta_root: Path, temperature: str = "", strip_fields: list[str] | None = None, quiet_fields: frozenset[str] | None = None, mode: str | None = None, variant: str | None = None, deny_edit: bool = False, edit_allow_paths: tuple[str, ...] = ()) -> str` (Unterschiede zur v1-Funktion laut Spec 3.7: `permissions:` als Liste statt `permission:`-Map, `steps` ohne `maxSteps`-Alias und ohne `temperature`/`max_tokens`/`top_p`, `model` mit `#variant`, nie `tools`, nie `subagent_depth`, kein separates `system:`-Feld; gemeinsame Hilfsfunktionen wiederverwenden); Verzweigung im Zweig `mechanism in ('opencode-native', 'opencode-native-v2')` (`provider_transform.py:384`, Mechanismus-Unterscheidung bisher bei :409): `if mechanism == 'opencode-native-v2': return _transform_frontmatter_for_opencode_v2(...)` — der `opencode-native`-Pfad (Opencode v1 und Mammouth) bleibt unverändert; `variant` aus `provider-options.<provider>.model-variants[<role>]`; Consumes Task 20, Task 6 (Modell-Pattern)
 **Amendment-B1-Folge:** Q5 bestätigt `system` (Body) und `variant` (`#variant`) als **VERIFIED** → Task 21 bleibt inhaltlich unverändert (kein `system:`-Feld, `#variant` wie beschrieben). Die Agent-interne Permissions-Reihenfolge (`*`-Deny vor Pfad-Allows) betrifft Task 22, nicht die Frontmatter-Mechanik.
-- [ ] Step 1: Test schreiben (5 Tests): `test_ac_d1_v2_artifact_has_permissions_list_and_no_legacy_keys` (kein `permission:`, `tools:`, `maxSteps`, `subagent_depth`); `test_ac_d1_role_without_write_has_edit_deny`; `test_ac_d2_steps_emitted_without_maxsteps`; `test_ac_d3_variant_appended_to_model_only_for_configured_role`; `test_ac_d4_v1_artifacts_byte_identical_to_pre_change_output` (festes Template, Referenz aus `_transform_frontmatter_for_opencode` direkt)
-- [ ] Step 2: rot: `python3 -m pytest tests/test_opencode_v2_surface.py -q -k "ac_d1_v2 or ac_d1_role or ac_d2 or ac_d3 or ac_d4"` → Exit 1, `4 failed, 1 passed`
-- [ ] Step 3: implementieren; Test grün: `python3 -m pytest tests/test_opencode_v2_surface.py tests/test_transform_contracts.py tests/test_opencode_agents.py -q` → Exit 0
-- [ ] Step 4: commit `feat: generate native opencode v2 agent frontmatter`
+- [x] Step 1: Test schreiben (5 Tests): `test_ac_d1_v2_artifact_has_permissions_list_and_no_legacy_keys` (kein `permission:`, `tools:`, `maxSteps`, `subagent_depth`); `test_ac_d1_role_without_write_has_edit_deny`; `test_ac_d2_steps_emitted_without_maxsteps`; `test_ac_d3_variant_appended_to_model_only_for_configured_role`; `test_ac_d4_v1_artifacts_byte_identical_to_pre_change_output` (festes Template, Referenz aus `_transform_frontmatter_for_opencode` direkt)
+- [x] Step 2: rot: `python3 -m pytest tests/test_opencode_v2_surface.py -q -k "ac_d1_v2 or ac_d1_role or ac_d2 or ac_d3 or ac_d4"` → Exit 1, `4 failed, 1 passed`
+- [x] Step 3: implementieren; Test grün: `python3 -m pytest tests/test_opencode_v2_surface.py tests/test_transform_contracts.py tests/test_opencode_agents.py -q` → Exit 0
+- [x] Step 4: commit `feat: generate native opencode v2 agent frontmatter`
 
 ### Task 22: D1.3 — `deny_edit`, erlaubte Schreibpfade, `system` in der Allow-Liste, Mammouth-Isolation
 **Agent:** senior-developer · **Issue:** #1007 · **AC:** AC-C16 (b), AC-D6
@@ -413,10 +413,10 @@ pipeline_stages:
 **Amendment-B3-Folge (2026-10-23, bindend):** `deny_edit` wird mit `permission_deny_required(provider_config, capabilities, plugin_mode)` berechnet — also auch bei Tier `plugin` + Modus `observe` — und **nicht** mit dem eingefrorenen `opencode_runtime_gate_wanted` (Spec A IC-4, nur Tier `permission`). Der Frontmatter-Aufrufort **MUSS** dazu zusätzlich `capabilities` (Eintrag aus `config/provider-capabilities.yaml`) und `plugin_mode` (`runtime_gate._baked_plugin_mode`) auflösen — beide Werte entstehen am Aufrufort und werden nicht in der Transformation nachgeladen. Falsifizierbar wird das nur auf einer `plugin`-Fixture: `test_ac_c14_orchestrator_artifact_has_edit_deny_at_plugin_observe` (Step 1) schlägt fehl, solange `deny_edit` noch das rein permission-basierte Prädikat nutzt, weil auf einer `permission`-Tier-Fixture beide Prädikate identisch sind. Grund: Bei `plugin`+`observe` steht das Agent-`edit: allow` der Primary-Rolle zuletzt und überstimmt das globale Config-`deny` (last match wins) — die Agent-Ebene muss dasselbe Prädikat wie die Config-Tripel verwenden (Spec Amendment B3, AC-C14/C16b). `opencode_runtime_gate_wanted`/`_opencode_runtime_gate_entries` bleiben unverändert.
 **Amendment-B4-Folge (2026-10-23, bindend für den Vertrag — keine Codeänderung in dieser Task):** Auf der C3-v2-Oberfläche ist der aufgelöste Tier `plugin`; `_sync_opencode_runtime_gate` läuft dort nicht (Aufrufbedingung `== "permission"` bleibt eingefroren), also entfällt auch dessen `default_agent`-Managed-Merge. Bei `plugin`+`observe` ist damit die **Agent-Ebene die tragende Schutzschicht** (`deny_edit` dieser Task) — zusammen mit den Config-Tripeln aus Task 13a; `default_agent` wird auf diesem Tier **nicht** abgestimmt: `settings-init` schreibt ihn einmalig, ein vom User gelöschter Wert wird nicht wieder ergänzt, ein abweichender Wert erzeugt keine Merge-WARNUNG (akzeptierte Grenze, OQ-B12; Spec Amendment B4 / AC-C16(a2)). `test_ac_c16a_no_default_agent_reconciliation_at_tier_plugin` pinnt diese Grenze, ohne sie zu ändern.
 **Amendment-B1-Folge:** Spike Q3 VERIFIED (last match wins) → der `*`-`deny` steht **vor** den pfadspezifischen `allow`-Einträgen aus `edit_allow_paths`, damit die spezifischeren Allows gewinnen. `test_ac_c16b_orchestrator_artifact_has_edit_deny_when_gate_active` prüft die Reihenfolge (deny vor allows).
-- [ ] Step 1: Test schreiben (5 Tests): `test_ac_c16b_orchestrator_artifact_has_edit_deny_when_gate_active` (inkl. Positionsprüfung deny vor allows); `test_ac_c16b_no_edit_deny_without_gate`; `test_ac_c14_orchestrator_artifact_has_edit_deny_at_plugin_observe` (Fixture mit Tier `plugin` und `runtime_gate._baked_plugin_mode` → `observe`: Orchestrator-Artefakt trägt `{action: edit, resource: "*", effect: deny}`; schlägt fehl, solange `deny_edit` das eingefrorene `opencode_runtime_gate_wanted` nutzt, weil auf einer `permission`-Tier-Fixture beide Prädikate identisch sind); `test_ac_d6_mammouth_with_surface_v2_keeps_opencode_native_output` (Mammouth-Eintrag ohne `surface-mechanisms`, Ausgabe enthält `permission:`-Map, keine `permissions:`-Liste, WARNING REV-R5 aus `providers._surface_version_warnings`); `test_system_in_allowed_fields`
-- [ ] Step 2: rot: `python3 -m pytest tests/test_opencode_v2_surface.py -q -k "ac_c16b or ac_c14_orchestrator_artifact or ac_d6 or system_in_allowed"` → Exit 1, `4 failed, 1 passed`
-- [ ] Step 3: implementieren; Test grün: `python3 -m pytest tests/test_opencode_v2_surface.py tests/test_transform_contracts.py tests/test_artifact_contracts.py -q` → Exit 0
-- [ ] Step 4: commit `feat: deny edit on opencode v2 primary agent when gate active`
+- [x] Step 1: Test schreiben (5 Tests): `test_ac_c16b_orchestrator_artifact_has_edit_deny_when_gate_active` (inkl. Positionsprüfung deny vor allows); `test_ac_c16b_no_edit_deny_without_gate`; `test_ac_c14_orchestrator_artifact_has_edit_deny_at_plugin_observe` (Fixture mit Tier `plugin` und `runtime_gate._baked_plugin_mode` → `observe`: Orchestrator-Artefakt trägt `{action: edit, resource: "*", effect: deny}`; schlägt fehl, solange `deny_edit` das eingefrorene `opencode_runtime_gate_wanted` nutzt, weil auf einer `permission`-Tier-Fixture beide Prädikate identisch sind); `test_ac_d6_mammouth_with_surface_v2_keeps_opencode_native_output` (Mammouth-Eintrag ohne `surface-mechanisms`, Ausgabe enthält `permission:`-Map, keine `permissions:`-Liste, WARNING REV-R5 aus `providers._surface_version_warnings`); `test_system_in_allowed_fields`
+- [x] Step 2: rot: `python3 -m pytest tests/test_opencode_v2_surface.py -q -k "ac_c16b or ac_c14_orchestrator_artifact or ac_d6 or system_in_allowed"` → Exit 1, `4 failed, 1 passed`
+- [x] Step 3: implementieren; Test grün: `python3 -m pytest tests/test_opencode_v2_surface.py tests/test_transform_contracts.py tests/test_artifact_contracts.py -q` → Exit 0
+- [x] Step 4: commit `feat: deny edit on opencode v2 primary agent when gate active`
 
 ### Task 23: D2 — `cli.json` als Managed-Datei
 **Agent:** senior-developer · **Issue:** #1007 · **AC:** AC-D7, AC-B16, AC-B20 (cli-Teil)
@@ -428,10 +428,10 @@ pipeline_stages:
 - Modify: `tests/test_opencode_v2_surface.py`
 **Interfaces:** Produces `opencode_v2_config.sync_opencode_cli_file(project_root: Path, config: dict, provider: str, provider_config: dict, log: SyncLog, dry_run: bool) -> None` (Spec 3.8; gibt zuerst zurück, wenn `not owns_opencode_surface(provider_config, provider)`; Datei = `provider_config["cli_file"]` (aufgelöst, Task 6), relativ zum Verzeichnis von `committed-file`; State `opencode_state_path`; fehlt `cli_file` oder `provider-options.<provider>.cli`: nichts schreiben, nichts löschen — Ausnahme Rückbau bei vorhandenem State `opencode-v2-cli`; jeder Top-Level-Schlüssel des `cli`-Objekts ist ein Managed-Pfad nach den Regeln der Tabelle aus Task 7; Schreiben über `io.write_checked` mit den Secret-Gate-Parametern; `tui.json` wird nie erzeugt, verändert oder gelöscht); Aufruf direkt nach `sync_opencode_v2_managed_keys` in `sync_pipeline._sync_stage_per_provider` und im `cli_commands`-Test-Repo-Pfad; Consumes Task 6/7/8/10
 **Amendment-B1-Folge:** In `cli.json` ist nur der Top-Level-Key `plugins` dokumentiert; `theme`/`autoupdate` sind es nicht. Der Writer bleibt generischer Passthrough (keine Allow-List), aber Test-Fixtures und Doku verwenden `plugins` und behaupten keine Verifikation für `theme`/`autoupdate`.
-- [ ] Step 1: Test schreiben (6 Tests): `test_ac_d7_cli_json_written_with_exact_keys` (`cli: {plugins: ["opencode-acme-cli"]}`); `test_ac_d7_no_cli_json_without_option_or_on_v1`; `test_ac_d7_tui_json_never_touched` (vorhandene `tui.json` bleibt byte-identisch); `test_ac_b16_cli_namespace_isolated`; `test_ac_b20_cli_writer_noop_for_non_owner_provider`; `test_cli_writer_passes_secret_gate_params_to_write_checked`
-- [ ] Step 2: rot: `python3 -m pytest tests/test_opencode_v2_surface.py -q -k "ac_d7 or cli_namespace or cli_writer"` → Exit 1, `5 failed, 1 passed` (der Test „keine `cli.json` ohne Option/auf v1“ ist als Regressionstest bereits grün)
-- [ ] Step 3: implementieren; Test grün: `python3 -m pytest tests/test_opencode_v2_surface.py tests/test_runtime_gate_wiring.py -q` → Exit 0
-- [ ] Step 4: commit `feat: manage opencode v2 cli.json from provider options`
+- [x] Step 1: Test schreiben (6 Tests): `test_ac_d7_cli_json_written_with_exact_keys` (`cli: {plugins: ["opencode-acme-cli"]}`); `test_ac_d7_no_cli_json_without_option_or_on_v1`; `test_ac_d7_tui_json_never_touched` (vorhandene `tui.json` bleibt byte-identisch); `test_ac_b16_cli_namespace_isolated`; `test_ac_b20_cli_writer_noop_for_non_owner_provider`; `test_cli_writer_passes_secret_gate_params_to_write_checked`
+- [x] Step 2: rot: `python3 -m pytest tests/test_opencode_v2_surface.py -q -k "ac_d7 or cli_namespace or cli_writer"` → Exit 1, `5 failed, 1 passed` (der Test „keine `cli.json` ohne Option/auf v1“ ist als Regressionstest bereits grün)
+- [x] Step 3: implementieren; Test grün: `python3 -m pytest tests/test_opencode_v2_surface.py tests/test_runtime_gate_wiring.py -q` → Exit 0
+- [x] Step 4: commit `feat: manage opencode v2 cli.json from provider options`
 
 ### Task 24: D3.1 — Evidenz zum Ladeverhalten von `opencode.json` + `opencode.jsonc` (mit PR C0 gemergt)
 **Agent:** provider-expert · **Issue:** #1007 · **AC:** AC-D8 (Evidenzteil) · **parallel_group:** c0-g1
@@ -452,10 +452,10 @@ pipeline_stages:
 - Modify: `scripts/lib/consistency/artifact_contracts.py`
 - Modify: `tests/test_artifact_contracts.py`
 **Interfaces:** Produces in `check_artifact_contracts` (`artifact_contracts.py:64`) bzw. einer neuen Funktion `check_settings_file_duplicates(agent_meta_root: Path, project_config: dict | None = None) -> list[Finding]` (von `check_artifact_contracts` aufgerufen): für jeden **aktiven** Provider mit `settings_file` (Registry-Schlüssel) wird ein `Severity.WARNING`-Finding `opencode-config-duplicate: opencode.json and opencode.jsonc both present; keep one` erzeugt, wenn eine Datei mit gleichem Stamm und Endung `.jsonc` im selben Verzeichnis existiert (Meldungstext aus Stamm/Endung zusammengesetzt, kein Providername); `consistency-check.py` bleibt rc 0 ohne `--strict`, rc 1 mit `--strict`; Consumes `providers.load_providers_config`, `consistency.report.Finding`/`Severity`
-- [ ] Step 1: Test schreiben (3 Tests): `test_ac_d9_duplicate_jsonc_is_warning`; `test_ac_d9_no_finding_without_jsonc`; `test_ac_d9_check_is_provider_agnostic` (anderer Provider mit `settings_file: foo.json` + `foo.jsonc` löst dasselbe Finding aus)
-- [ ] Step 2: rot: `python3 -m pytest tests/test_artifact_contracts.py -q -k ac_d9` → Exit 1, `2 failed, 1 passed`
-- [ ] Step 3: implementieren; Test grün: `python3 -m pytest tests/test_artifact_contracts.py -q` → Exit 0; `python3 scripts/consistency-check.py` → Warnung für das Repo-Root-Duplikat erscheint, rc 0
-- [ ] Step 4: commit `feat: warn when settings file has a jsonc twin`
+- [x] Step 1: Test schreiben (3 Tests): `test_ac_d9_duplicate_jsonc_is_warning`; `test_ac_d9_no_finding_without_jsonc`; `test_ac_d9_check_is_provider_agnostic` (anderer Provider mit `settings_file: foo.json` + `foo.jsonc` löst dasselbe Finding aus)
+- [x] Step 2: rot: `python3 -m pytest tests/test_artifact_contracts.py -q -k ac_d9` → Exit 1, `2 failed, 1 passed`
+- [x] Step 3: implementieren; Test grün: `python3 -m pytest tests/test_artifact_contracts.py -q` → Exit 0; `python3 scripts/consistency-check.py` → Warnung für das Repo-Root-Duplikat erscheint, rc 0
+- [x] Step 4: commit `feat: warn when settings file has a jsonc twin`
 
 ### Task 26: D3.3 — `opencode.jsonc` im Repo-Root entfernen
 **Agent:** developer · **Issue:** #1007 · **AC:** AC-D8
@@ -463,10 +463,10 @@ pipeline_stages:
 **Files:**
 - Modify: `opencode.json`
 **Interfaces:** Produces Repo ohne `opencode.jsonc` (Löschung als `git rm opencode.jsonc` durch den Orchestrator bzw. die `git`-Rolle, da die Dateitools kein Löschen kennen; Rolle meldet die Löschung in ihrem Report); bei `ERGEBNIS: JSONC-TRAEGT-INHALT-BEI` wird der Inhalt vorher nach `opencode.json` überführt; Consumes Evidenz aus Task 24 (Evidenz-Commit liegt vor dem Lösch-Commit), Task 25
-- [ ] Step 1: Test schreiben (1 Test in `tests/test_opencode_v2_surface.py`): `test_ac_d8_repo_root_has_no_opencode_jsonc` (prüft `not (_REPO_ROOT / "opencode.jsonc").exists()` und Evidenz-Datei vorhanden)
-- [ ] Step 2: rot: `python3 -m pytest tests/test_opencode_v2_surface.py -q -k ac_d8_repo_root` → Exit 1, `1 failed`
-- [ ] Step 3: Inhalt ggf. überführen, Datei entfernen; Test grün: `python3 -m pytest tests/test_opencode_v2_surface.py -q -k ac_d8` → `2 passed`; `python3 scripts/sync.py --check` → rc 0 (zeigt `opencode.json` weiter in Sync; falls `--check` wegen der Datei Drift meldet, `python3 scripts/sync.py` ausführen und das Ergebnis im PR begründen)
-- [ ] Step 4: commit `chore: remove duplicate opencode.jsonc from repo root`
+- [x] Step 1: Test schreiben (1 Test in `tests/test_opencode_v2_surface.py`): `test_ac_d8_repo_root_has_no_opencode_jsonc` (prüft `not (_REPO_ROOT / "opencode.jsonc").exists()` und Evidenz-Datei vorhanden)
+- [x] Step 2: rot: `python3 -m pytest tests/test_opencode_v2_surface.py -q -k ac_d8_repo_root` → Exit 1, `1 failed`
+- [x] Step 3: Inhalt ggf. überführen, Datei entfernen; Test grün: `python3 -m pytest tests/test_opencode_v2_surface.py -q -k ac_d8` → `2 passed`; `python3 scripts/sync.py --check` → rc 0 (zeigt `opencode.json` weiter in Sync; falls `--check` wegen der Datei Drift meldet, `python3 scripts/sync.py` ausführen und das Ergebnis im PR begründen)
+- [x] Step 4: commit `chore: remove duplicate opencode.jsonc from repo root`
 
 ### Task 27: D4 — Doku: `docs/providers/opencode.md` und AGENTS.md-only
 **Agent:** technical-writer · **Issue:** #1007 · **AC:** AC-D10
@@ -476,10 +476,10 @@ pipeline_stages:
 - Modify: `tests/test_opencode_v2_surface.py`
 **Interfaces:** Produces aktualisierte Doku: Kopfzeile „Stand“ mit der aktuellen Version aus `VERSION` (statt „v0.33.x“, Zeile 3), neue Abschnitte `## Surface v1 vs. v2` (Key-Tabelle aus Spec 3.2–3.8), `## Aktivierung` (`provider-options.Opencode.surface-version`), `## Managed Keys und User-Keys`, `## Dateien` (`opencode.json` einzig, kein `.jsonc`, `cli.json`, kein `tui.json`), Hinweise zu Kommentarverlust beim Rückschreiben einer JSONC-`opencode.json` (R-4), zur Ersetzungs-Semantik der lokalen `.opencode/mcp.local.json` (R-14) und zum v1-MCP-Writer (R-15); Regel „AGENTS.md-only“: `AGENTS.md` ist die einzige von agent-meta verwaltete Kontextdatei für Opencode, keine `CLAUDE.md`-/`OPENCODE.md`-Erzeugung, Verweis auf `.opencode/rules/` (Zeile ~83) entfernen; Consumes Tasks 9, 13, 13a, 15, 21, 23 (dokumentierter Ist-Stand), Spike-Ergebnis
 **Amendment-B1-Folge:** Doku-Korrekturen aus dem Spike: Plugin-Config-Key ist `plugins` (**Plural**), und Dateien unter `.opencode/plugins/` werden ohne Config-Eintrag auto-discovered; `cli.json` nur mit dem dokumentierten Key `plugins` beschreiben (`theme`/`autoupdate` nicht als verifiziert nennen); `providers` in der Innenform `settings.baseURL`/`env` dokumentieren; `agents.title.model`/`small-model` kommen in der Key-Tabelle nicht vor.
-- [ ] Step 1: Test schreiben (2 Tests): `test_provider_doc_current` (kein `v0.33`, die vier Abschnittsüberschriften vorhanden, AC-D10) und `test_provider_doc_states_agents_md_only` (enthält `AGENTS.md-only` und enthält nicht `.opencode/rules/`)
-- [ ] Step 2: rot: `python3 -m pytest tests/test_opencode_v2_surface.py -q -k provider_doc` → Exit 1, `2 failed`
-- [ ] Step 3: Doku schreiben; Test grün: `python3 -m pytest tests/test_opencode_v2_surface.py -q -k provider_doc` → `2 passed`
-- [ ] Step 4: commit `docs: document opencode v2 surface and agents-md-only context`
+- [x] Step 1: Test schreiben (2 Tests): `test_provider_doc_current` (kein `v0.33`, die vier Abschnittsüberschriften vorhanden, AC-D10) und `test_provider_doc_states_agents_md_only` (enthält `AGENTS.md-only` und enthält nicht `.opencode/rules/`)
+- [x] Step 2: rot: `python3 -m pytest tests/test_opencode_v2_surface.py -q -k provider_doc` → Exit 1, `2 failed`
+- [x] Step 3: Doku schreiben; Test grün: `python3 -m pytest tests/test_opencode_v2_surface.py -q -k provider_doc` → `2 passed`
+- [x] Step 4: commit `docs: document opencode v2 surface and agents-md-only context`
 
 ### Task 28: T.1 — Szenario 79 `79-opencode-v2-full-surface` (Absicherungstest mit Negativprobe)
 **Agent:** tester · **Issue:** #1007 · **AC:** AC-T1
@@ -490,10 +490,10 @@ pipeline_stages:
 - Modify: `tests/scenarios/registry.md`
 **Interfaces:** Produces Szenario-Config nach dem Muster von `tests/scenarios/configs/69-opencode-v2-surface.project.yaml` (`ai-providers: [Opencode]`, `provider-options.Opencode: {surface-version: v2, experimental-todo: true, model-variants: {developer: high}, cli: {plugins: ["opencode-acme-cli"]}}`, strict-Orchestrator via `orchestrator: {mode: strict}`, Plugin `playwright` aktiv, `project.prefix: s79`), Assert-Skript (ausführbar, `chmod +x`) prüft: `experimental.subagent_depth`/`experimental.todo`, `permissions[]`-Tripel (C) am Listenende, `mcp.servers` ohne `enabled`, Agent-Frontmatter mit `permissions:`-Liste und `model: …#high`, `cli.json` mit dem Key `plugins`, `sync.py --check` rc 0; der v2→v1-Rückwechsel ist **nicht** Teil des Shell-Szenarios, sondern wird als Python-Test `test_v2_to_v1_switch_rolls_back_all_namespaces` in Task 29 geprüft (U-8: ein zweiter Sync im Szenario-Runner ist nicht belegt); Registry-Zeile `| \`79-opencode-v2-full-surface\` | Opencode | strict | … |` in `tests/scenarios/registry.md` direkt nach der Zeile von Szenario 78 (Zeilenaufbau der Nachbarzeilen kopieren); Consumes alle vorigen Tasks, `tests/scenarios/run.sh` (Aufrufform vorher lesen). Der Task ist ein **Absicherungstest** der vorigen Tasks: er ist beim ersten Lauf grün; sein Nachweis der Nicht-Vakuität ist die Negativprobe in Step 2
 **Amendment-B1-Folge:** `small-model` und die Assertion auf `agents.title.model` entfallen (AC-B9); `cli` nutzt den dokumentierten Key `plugins` statt `theme`; `permissions[]`-Tripel werden am Listenende erwartet.
-- [ ] Step 1: Config + vollständiges Assert-Skript schreiben und Registry-Zeile ergänzen; `tests/scenarios/run.sh` zuvor lesen (Aufrufform)
-- [ ] Step 2: Negativprobe (nicht committen): das Assert-Skript gegen eine Kopie der Config mit `surface-version: v1` (unter `.tmp/`) laufen lassen → Exit ≠ 0; belegt, dass die Assertions keine v1-Ausgabe akzeptieren. Schlägt eine Prüfung gegen die echte v2-Config fehl, ist das ein Befund für den zuständigen Task (Rückmeldung an den Orchestrator, kein Szenario-Hack)
-- [ ] Step 3: grün: `bash tests/scenarios/run.sh 79-opencode-v2-full-surface` → Exit 0; `grep -c '^| `79-opencode-v2-full-surface`' tests/scenarios/registry.md` → `1`
-- [ ] Step 4: commit `test: add scenario 79 for the opencode v2 full surface`
+- [x] Step 1: Config + vollständiges Assert-Skript schreiben und Registry-Zeile ergänzen; `tests/scenarios/run.sh` zuvor lesen (Aufrufform)
+- [x] Step 2: Negativprobe (nicht committen): das Assert-Skript gegen eine Kopie der Config mit `surface-version: v1` (unter `.tmp/`) laufen lassen → Exit ≠ 0; belegt, dass die Assertions keine v1-Ausgabe akzeptieren. Schlägt eine Prüfung gegen die echte v2-Config fehl, ist das ein Befund für den zuständigen Task (Rückmeldung an den Orchestrator, kein Szenario-Hack)
+- [x] Step 3: grün: `bash tests/scenarios/run.sh 79-opencode-v2-full-surface` → Exit 0; `grep -c '^| `79-opencode-v2-full-surface`' tests/scenarios/registry.md` → `1`
+- [x] Step 4: commit `test: add scenario 79 for the opencode v2 full surface`
 
 ### Task 29: T.2 — Lab-Diff v1 ↔ v2 und Rückwechsel v2 ↔ v1
 **Agent:** tester · **Issue:** #1007 · **AC:** AC-T2, AC-B7 (Integration), AC-B21/AC-B22 (Integration)
@@ -501,10 +501,10 @@ pipeline_stages:
 **Files:**
 - Modify: `tests/test_opencode_v2_surface.py`
 **Interfaces:** Produces `test_lab_diff_v1_v2`: generiert dasselbe Projekt (Fixture aus Szenario 79, ohne v2-Optionen für v1) mit `surface-version: v1` und `v2` in zwei Verzeichnissen unter `tmp_path` und prüft, dass **genau** diese Dateien/Schlüssel differieren: `opencode.json` (`mcp`-Form, `experimental.*`, `permissions` statt `permission`), `.opencode/agents/*.md` (Permissions-Format, Modell-Variante), optional `cli.json`/Plugin-Datei; alle übrigen Dateien (inkl. aller Nicht-Opencode-Provider) sind byte-identisch; Vergleichsbasis v1 = Stand nach Plan A; und `test_v2_to_v1_switch_rolls_back_all_namespaces` (Projekt auf v2 synchronisieren, Konfig auf v1 stellen, erneut synchronisieren: alle vier Namespaces `opencode-v2-*` leer bzw. entfernt, keine `experimental`-/`permissions`-/`mcp.servers`-Managed-Reste in `opencode.json`, User-Keys erhalten; sowie der Gegenweg v1-strict → v2 entfernt die `permission`-Map-Denys und leert `runtime-gate-deny`); Consumes Harness-Hilfsfunktion zum Rendern eines Projekts (Muster aus `tests/test_ac01_render_identity.py` vorher lesen und wiederverwenden)
-- [ ] Step 1: Tests schreiben (`test_lab_diff_v1_v2`, `test_v2_to_v1_switch_rolls_back_all_namespaces`)
-- [ ] Step 2: Lauf: `python3 -m pytest tests/test_opencode_v2_surface.py -q -k "lab_diff or switch_rolls_back"` → Exit 0, `2 passed` (reine Absicherung der vorigen Tasks, beim ersten Lauf grün; schlägt ein Test an, liefert die Differenzliste den Befund)
-- [ ] Step 3: Negativprobe: temporär eine Zeile in `opencode.json` v2 ergänzt bzw. einen Namespace-Rückbau auskommentiert → `1 failed` je Test (nicht committen) — Nachweis, dass die Tests nicht vakuös sind
-- [ ] Step 4: commit `test: add v1 versus v2 lab diff and switch rollback for opencode`
+- [x] Step 1: Tests schreiben (`test_lab_diff_v1_v2`, `test_v2_to_v1_switch_rolls_back_all_namespaces`)
+- [x] Step 2: Lauf: `python3 -m pytest tests/test_opencode_v2_surface.py -q -k "lab_diff or switch_rolls_back"` → Exit 0, `2 passed` (reine Absicherung der vorigen Tasks, beim ersten Lauf grün; schlägt ein Test an, liefert die Differenzliste den Befund)
+- [x] Step 3: Negativprobe: temporär eine Zeile in `opencode.json` v2 ergänzt bzw. einen Namespace-Rückbau auskommentiert → `1 failed` je Test (nicht committen) — Nachweis, dass die Tests nicht vakuös sind
+- [x] Step 4: commit `test: add v1 versus v2 lab diff and switch rollback for opencode`
 
 ### Task 30: T.3 — Querwirkungs-Beweis: andere Provider und Goldens unverändert
 **Agent:** tester · **Issue:** #1007 · **AC:** AC-D5, AC-D6, AC-T4
@@ -512,10 +512,10 @@ pipeline_stages:
 **Files:**
 - Modify: `tests/test_opencode_v2_surface.py`
 **Interfaces:** Produces `test_ac_d5_other_providers_byte_identical_when_opencode_is_v2` (Projekt mit Opencode (v2) + Claude + Gemini + Mammouth vs. Referenzlauf mit Opencode v1: alle Artefakte von Claude, Gemini und Mammouth byte-identisch; providerübergreifende Dateien wie `AGENTS.md` dürfen nur Opencode-Anteile ändern und werden im Test explizit aufgelistet) und `test_ac_t4_fixtures_unchanged` (prüft SHA-256 der drei Fixture-Verzeichnisse `tests/fixtures/ac01-baseline`, `tests/fixtures/slimming-golden`, `tests/fixtures/compact-golden` gegen eine im Test eingebettete Liste — Werte beim ersten Lauf nach Plan-A-Merge aus den Dateien ermitteln und eintragen, kein Subprozess); zusätzlich Pflichtlauf der Golden-Tests; Consumes Task 29-Harness
-- [ ] Step 1: Test schreiben (2 Tests)
-- [ ] Step 2: Lauf: `python3 -m pytest tests/test_opencode_v2_surface.py -q -k "ac_d5 or ac_t4"` → Exit 0, `2 passed`
-- [ ] Step 3: Golden-Lauf: `python3 -m pytest tests/test_ac01_render_identity.py tests/test_template_slimming_equivalence.py tests/test_compact_matrix.py -q` → Exit 0; jede nötige Fixture-Änderung = Task fehlgeschlagen (Global Constraints)
-- [ ] Step 4: commit `test: prove opencode v2 has no cross-provider effect`
+- [x] Step 1: Test schreiben (2 Tests)
+- [x] Step 2: Lauf: `python3 -m pytest tests/test_opencode_v2_surface.py -q -k "ac_d5 or ac_t4"` → Exit 0, `2 passed`
+- [x] Step 3: Golden-Lauf: `python3 -m pytest tests/test_ac01_render_identity.py tests/test_template_slimming_equivalence.py tests/test_compact_matrix.py -q` → Exit 0; jede nötige Fixture-Änderung = Task fehlgeschlagen (Global Constraints)
+- [x] Step 4: commit `test: prove opencode v2 has no cross-provider effect`
 
 ### Task 31: T.4 — Provider-Agnostik- und Abdeckungs-Meta-Test
 **Agent:** tester · **Issue:** #1007 · **AC:** AC-T3, AC-T6
@@ -524,10 +524,10 @@ pipeline_stages:
 - Modify: `tests/test_provider_agnostic_dispatch.py`
 - Modify: `tests/test_opencode_v2_surface.py`
 **Interfaces:** Produces in `test_lib_sweep_covers_task_modules` (`test_provider_agnostic_dispatch.py:398`) den zusätzlichen Eintrag `"opencode_v2_config.py"` in `expected`; in `tests/test_opencode_v2_surface.py` `test_ac_t3_required_acs_have_tests` (parst den Dateitext per Regex nach `def test_ac_(b1|b2|b4|b5|b7|b12|b16|b17|b18|b19|b20|b21|b22|c3|c4|c7|c14|c15|c16a|c16b|c17|d1|d3|d4|d7)_` — mindestens ein Treffer je Eintrag; AC-D9 liegt in `tests/test_artifact_contracts.py` und wird dort per zweitem Dateipfad geprüft; AC-C1/AC-C2 werden in `tests/test_opencode_v2_spike.py` geprüft (Spec AC-T3): Treffer auf `def test_ac_c1_` und `def test_ac_c2_` dort) sowie ein statischer Test `test_new_v2_code_has_no_provider_branch` (AST-Scan von `opencode_v2_config.py` auf Vergleiche gegen Provider-Namenskonstanten und auf Zugriffe `"surface-version"`)
-- [ ] Step 1: Test schreiben (3 Änderungen wie oben)
-- [ ] Step 2: Lauf: `python3 -m pytest tests/test_provider_agnostic_dispatch.py tests/test_opencode_v2_surface.py tests/test_opencode_v2_spike.py -q` → Exit 0; fehlende AC-Testnamen aus der Fehlermeldung nachziehen (Namen der Tests in Task 9–23 an das Schema `test_ac_<id>_…` angleichen — kleine Umbenennungen sind erlaubt)
-- [ ] Step 3: Negativprobe wie in Task 29 (temporärer Providervergleich in `opencode_v2_config.py` → `test_no_provider_name_dispatch_branches_in_lib` rot, danach zurücknehmen)
-- [ ] Step 4: commit `test: guard opencode v2 coverage and provider agnosticism`
+- [x] Step 1: Test schreiben (3 Änderungen wie oben)
+- [x] Step 2: Lauf: `python3 -m pytest tests/test_provider_agnostic_dispatch.py tests/test_opencode_v2_surface.py tests/test_opencode_v2_spike.py -q` → Exit 0; fehlende AC-Testnamen aus der Fehlermeldung nachziehen (Namen der Tests in Task 9–23 an das Schema `test_ac_<id>_…` angleichen — kleine Umbenennungen sind erlaubt)
+- [x] Step 3: Negativprobe wie in Task 29 (temporärer Providervergleich in `opencode_v2_config.py` → `test_no_provider_name_dispatch_branches_in_lib` rot, danach zurücknehmen)
+- [x] Step 4: commit `test: guard opencode v2 coverage and provider agnosticism`
 
 ### Task 32: R.1 — CHANGELOG und Gesamt-Validierung
 **Agent:** developer · **Issue:** #1007 · **AC:** AC-T5
@@ -535,10 +535,10 @@ pipeline_stages:
 **Files:**
 - Modify: `CHANGELOG.md`
 **Interfaces:** Produces Eintrag unter `## [Unreleased]` (`CHANGELOG.md:3`) in `### Added` (v2-Optionen `experimental-subagent-depth`, `experimental-todo`, `providers`, `model-variants`, `cli` — Amendment B1: **kein** `small-model`; Managed-Merge für `opencode.json`; native `permissions[]`-Gate am Listenende; MCP-v2-Felder inkl. `timeout.startup`; `cli.json` (nur dokumentierte Keys wie `plugins`); v2-natives Agent-Frontmatter; Szenario 79; Spike-Ergebnis) und `### Changed` (v2-Settings tragen `experimental.subagent_depth` statt Top-Level-`subagent_depth` — IC-15 Nr. 16 amended; surface-übergreifender Rückbau der Gate-Permissions; `opencode.jsonc` entfernt; Warnung `opencode-config-duplicate`); keine Verifikationsbehauptung für Features, die der Spike nur als DOKU/UNVERIFIED belegt (insbesondere **kein** `theme`/`autoupdate` in `cli.json`, kein `agents.title.model`); Consumes alle Tasks
-- [ ] Step 1: Test schreiben: `test_changelog_mentions_opencode_v2_support` in `tests/test_opencode_v2_surface.py` prüft, dass der Unreleased-Abschnitt die Wörter `opencode v2` und `cli.json` enthält
-- [ ] Step 2: rot: `python3 -m pytest tests/test_opencode_v2_surface.py -q -k changelog` → Exit 1, `1 failed`
-- [ ] Step 3: CHANGELOG schreiben; grün: `python3 -m pytest tests/test_opencode_v2_surface.py -q -k changelog` → `1 passed`; Gesamtlauf: `python3 -m pytest tests -q -x` → Exit 0; `python3 scripts/sync.py --validate` → rc 0; `python3 scripts/sync.py --check` → rc 0; `python3 scripts/consistency-check.py` → rc 0
-- [ ] Step 4: commit `docs: changelog for opencode v2 support`
+- [x] Step 1: Test schreiben: `test_changelog_mentions_opencode_v2_support` in `tests/test_opencode_v2_surface.py` prüft, dass der Unreleased-Abschnitt die Wörter `opencode v2` und `cli.json` enthält
+- [x] Step 2: rot: `python3 -m pytest tests/test_opencode_v2_surface.py -q -k changelog` → Exit 1, `1 failed`
+- [x] Step 3: CHANGELOG schreiben; grün: `python3 -m pytest tests/test_opencode_v2_surface.py -q -k changelog` → `1 passed`; Gesamtlauf: `python3 -m pytest tests -q -x` → Exit 0; `python3 scripts/sync.py --validate` → rc 0; `python3 scripts/sync.py --check` → rc 0; `python3 scripts/consistency-check.py` → rc 0
+- [x] Step 4: commit `docs: changelog for opencode v2 support`
 
 ### Task 33: R.2 — Minor-Version-Bump (nach Nutzerfreigabe)
 **Agent:** release · **Issue:** #1007 · **AC:** — (Release-Prozess, Spec Nicht-Ziele)
@@ -546,6 +546,7 @@ pipeline_stages:
 **Files:**
 - Modify: `VERSION`
 **Interfaces:** Produces Minor-Bump von `VERSION` gemäß `.claude/skills/conventions/SKILL.md` (aktuell `2.0.0-beta.2`; die nächste Versionsnummer bestimmt die `release`-Rolle nach dem Pre-Release-Schema); Verschieben des Unreleased-Inhalts in einen Versionsabschnitt nur im Release-Task der `release`-Rolle; Consumes Task 32; der Task startet nur nach ausdrücklicher Nutzerfreigabe (Release ist nicht Teil der Merge-Kette, Push/Tag nur `git`-Rolle)
+> **Status 2026-10-23:** nicht gestartet — Release-Bump erfordert ausdrückliche Nutzerfreigabe (HITL).
 - [ ] Step 1: Test schreiben: bestehende Versions-Konsistenztests (`tests/test_version_bookkeeping.py`, `tests/test_surface_version_consistency.py`, `tests/test_surface_version_selection.py`, `tests/test_agent_meta_version_schema.py`) als Rot-/Grün-Nachweis verwenden; vor dem Bump `python3 -m pytest tests -q -k version` → Exit 0
 - [ ] Step 2: Bump durchführen
 - [ ] Step 3: `python3 -m pytest tests -q -k version` → Exit 0; `python3 scripts/sync.py --check` → rc 0
