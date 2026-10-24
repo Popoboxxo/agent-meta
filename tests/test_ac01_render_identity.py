@@ -254,6 +254,15 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   added: ``Opencode/.opencode/agent-meta-state.json`` (2 changed, 1 added). ``AC01_EXCEPTIONS`` is
   NOT extended; Mammouth and all other providers unchanged.
 
+- Literature round 2, eight new review roles (PR #1015, IC-28): `memory-architect`, `context-engineer`,
+  `red-team-agent`, `secrets-manager`, `chaos-engineer`, `reproducible-builds-engineer`,
+  `ux-researcher`, `privacy-compliance-officer` add eight agent artifacts per provider, eight roster
+  rows, eight agent-table rows in the entry files (+864 B, Copilot +1,430 B) and eight orchestrator/
+  name-index rows, plus the managed-file lists and `generated-file-hashes.json`. The manifest grows
+  1012 -> 1085 hashes (the new per-provider agent artifacts and managed-file lists); 106 existing hashes
+  changed. No existing role body changed.
+
+
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """
 
