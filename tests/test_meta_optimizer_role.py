@@ -39,10 +39,11 @@ from pathlib import Path
 from scripts.lib.frontmatter import parse_frontmatter_file
 from scripts.lib.roles import load_roles_config
 from scripts.lib.standalone import _CONDITIONAL_FALSE_FLAGS
-from tests.changelog_sections import latest_changelog_section
+from tests.changelog_sections import release_section
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = REPO_ROOT / "agents" / "1-generic" / "meta-optimizer.md"
+_RELEASE = "2.0.0-beta.2"
 
 _H4_DESCRIPTION = (
     "Read-only config optimizer: reads a `sync.py --optimize-config` proposal and "
@@ -1044,10 +1045,10 @@ def test_setup_guide_and_readme_document_the_optimizer_chain():
 
 
 def test_changelog_records_the_docs_completion():
-    """The Unreleased section records the 2e.6 documentation completion."""
+    """The pinned 2.0.0-beta.2 release section records the 2e.6 docs completion."""
     text = _read(_CHANGELOG)
     assert "## [Unreleased]" in text, "CHANGELOG.md must keep an [Unreleased] section."
-    section = latest_changelog_section(text)
+    section = release_section(text, _RELEASE)
     for token in (
         "78-meta-optimizer-role",
         "ARTIFACTS: none",

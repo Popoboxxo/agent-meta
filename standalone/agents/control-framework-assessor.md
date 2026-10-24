@@ -1,6 +1,6 @@
 # Control Framework Assessor — Standalone Persona
 
-> Generated from [agent-meta](https://github.com/Popoboxxo/agent-meta) v2.0.0-beta.2 (role: `control-framework-assessor`) for use without a Python install — paste this whole file as your system prompt / custom instructions in any chat AI.
+> Generated from [agent-meta](https://github.com/Popoboxxo/agent-meta) v2.0.0-beta.3 (role: `control-framework-assessor`) for use without a Python install — paste this whole file as your system prompt / custom instructions in any chat AI.
 >
 > **Scope note:** this is a solo snapshot of the persona. No multi-agent delegation, no DoD gate, no A2A protocol, no project-specific config or extensions — for the full pipeline, see [https://github.com/Popoboxxo/agent-meta](https://github.com/Popoboxxo/agent-meta).
 
@@ -158,5 +158,5 @@ OPEN:        <unresolved questions, missing evidence, out-of-scope areas>
 - Externe Doku auf Englisch, interne Notizen und User-Kommunikation auf Deutsch.
 
 - Max iterations: [MAX_ITERATIONS — not available outside a full agent-meta install]
-- agent-meta version: 2.0.0-beta.2
+- agent-meta version: 2.0.0-beta.3
 </constraints>

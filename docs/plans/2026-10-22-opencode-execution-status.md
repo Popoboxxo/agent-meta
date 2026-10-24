@@ -2,9 +2,9 @@
 
 **Zweck:** Ausführungs-Ledger zum Plan `docs/plans/2026-10-22-opencode-v2-support-plan.md` (Phasen C0, B, C1/C2, C3, D) und damit zum Tracking-Issue #1007. Das Dokument hält je Phase und je Task den erreichten Stand, die Beleg-Commits, die Testlage und die substanziellen Befunde fest; es ersetzt weder Plan noch Spec.
 
-**Geltungsbereich:** Branch `feat/1007-b-keys` (Basis `main` = `526a5dab`; Phase C0 über PR #1011 gemergt, C0-Ledger-Commit `52a72a0f`, Evidenz-Nachbesserung `2978753c`). Phase-B-Arbeit von `bd49dc5b` bis `d5853d1e`. Phase C1/C2 auf Branch `feat/1007-c1-c2-gate` (Basis `d0b81f91`), Commits `f07ab459` bis `ad4380e1`. Phase C3 auf Branch `feat/1007-c3-plugin` (Basis `9f274040`), Commits `c8270845` und `c673991f`. Phase D auf Branch `feat/1007-d-surface` (Basis `dfb77de4`), Commits `fa42ec7b` bis `04d41eb8` (13 Commits, inklusive Folgelauf zu Task 23). Stand: 2026-10-24.
+**Geltungsbereich:** Branch `feat/1007-b-keys` (Basis `main` = `526a5dab`; Phase C0 über PR #1011 gemergt, C0-Ledger-Commit `52a72a0f`, Evidenz-Nachbesserung `2978753c`). Phase-B-Arbeit von `bd49dc5b` bis `d5853d1e`. Phase C1/C2 auf Branch `feat/1007-c1-c2-gate` (Basis `d0b81f91`), Commits `f07ab459` bis `ad4380e1`. Phase C3 auf Branch `feat/1007-c3-plugin` (Basis `9f274040`), Commits `c8270845` und `c673991f`. Phase D auf Branch `feat/1007-d-surface` (Basis `dfb77de4`), Commits `fa42ec7b` bis `04d41eb8` (13 Commits, inklusive Folgelauf zu Task 23). Der Release (Task 33) wurde auf Branch `chore/1007-release-2.0.0-beta.3` mit Commit `74f4493d` abgeschlossen (`VERSION` `2.0.0-beta.3`, Nutzerfreigabe 2026-10-23). Stand: 2026-10-24.
 
-**Datenquelle:** Commits dieses Branches, die im Plan gesetzten Checkboxen (C0: Tasks 1, 2, 3, 3a, 24; B: Tasks 4–12; C1/C2: Tasks 13, 13a, 14–17; C3: Tasks 18, 19; D: Tasks 20–23 inklusive Folgelauf, 25–32; Task 33 bewusst offen) sowie die dort protokollierten Testläufe und die Phasen-Exit-Kriterien.
+**Datenquelle:** Commits dieses Branches, die im Plan gesetzten Checkboxen (C0: Tasks 1, 2, 3, 3a, 24; B: Tasks 4–12; C1/C2: Tasks 13, 13a, 14–17; C3: Tasks 18, 19; D: Tasks 20–23 inklusive Folgelauf, 25–32; Task 33 erledigt als Release-Bump) sowie die dort protokollierten Testläufe und die Phasen-Exit-Kriterien.
 
 **Legende der Spaltenwerte**
 
@@ -23,7 +23,7 @@
 | B | 4–12 | `done (Review/PR offen)` |
 | C1/C2 | 13, 13a, 14–17 | `done (Review/PR offen)` |
 | C3 | 18–19 | `done (Review/PR offen)` |
-| D | 20–33 (ohne 24) | `done (Review/PR offen; Task 33 offen)` |
+| D | 20–33 (ohne 24) | `done` |
 
 **Entry-Kriterien:** E1 done · E2 done · E3 done · E4 done.
 
@@ -160,7 +160,7 @@ bash tests/scenarios/run.sh 69-opencode-v2-surface
 
 ## D
 
-**Branch:** `feat/1007-d-surface` (Basis `dfb77de4`; Arbeitsstand `04d41eb8`). Die Plan-Blöcke der Tasks 20, 21, 22, 23, 25, 26, 27, 28, 29, 30, 31 und 32 sind abgehakt; Task 33 bleibt offen (HITL). Task 24 war bereits mit PR C0 gemergt.
+**Branch:** `feat/1007-d-surface` (Basis `dfb77de4`; Arbeitsstand `04d41eb8`). Die Plan-Blöcke der Tasks 20, 21, 22, 23, 25, 26, 27, 28, 29, 30, 31 und 32 sind abgehakt; Task 33 ist mit `74f4493d` erledigt (Release-Bump, Branch `chore/1007-release-2.0.0-beta.3`). Task 24 war bereits mit PR C0 gemergt.
 
 | Task | Agent | Commit | Tests | Status | Abweichungen/Befunde |
 |---|---|---|---|---|---|
@@ -177,7 +177,7 @@ bash tests/scenarios/run.sh 69-opencode-v2-surface
 | 30 | `tester` | `9736a8ec` | `2 passed`; 135 Golden-Tests grün | `done` | Drei eingebettete Fixture-Digests (`ac01-baseline`, `slimming-golden`, `compact-golden`). |
 | 31 | `tester` | `00624008` | `203 passed` | `done` | `opencode_v2_config.py` in den lib-Sweep aufgenommen; AC-T3-Abdeckungstest; AST-Guard gegen Provider-Zweige; die Negativprobe (Provider-Literal) feuert. |
 | 32 | `developer` | `04d41eb8` | rot `1 failed` → `1 passed` | `done` | CHANGELOG in `Added`/`Changed` mit Trennung DOKU/VERIFIED. Alle 79 Szenarien PASS (in Batches gefahren); `--validate`, `--check` und `consistency-check` rc 0. **Der vollständige `pytest tests`-Lauf beendete lokal nicht (1188 passed, 0 failed bei ca. 17 %); den Vollsuite-Beleg liefert CI.** |
-| 33 | `release` | — | — | `offen — Release-Bump erfordert ausdrückliche Nutzerfreigabe (HITL)` | Kein Bump, kein Tag, kein Push in Phase D. |
+| 33 | `release` | `74f4493d` | `95 passed, 11 skipped` (`-k version`), `scripts/sync.py --check` rc 0; gezielt `130 passed` (`test_opencode_v2_surface.py`), `9 passed` (`test_meta_optimizer_credentials.py`), `68 passed` (die drei Changelog-Guard-Module), Szenarien 76/77/78 `3/3 PASS`, `test_ac01_render_identity.py` `5 passed` | `done` | `VERSION` `2.0.0-beta.3` (Freigabe 2026-10-23); der Unreleased-Inhalt liegt in `## [2.0.0-beta.3] - 2026-10-23`, `[Unreleased]` bleibt als leere Überschrift. **Test-Buchhaltung, die der Bump erzwang:** die Changelog-Guards sind über den bestehenden `release_section`-Helfer gepinnt — `2.0.0-beta.2` für den in beta.2 ausgelieferten Inhalt (`test_context_profile_docs.py`, `test_context_docs_corrections.py`, `test_meta_optimizer_role.py`), `2.0.0-beta.3` für den neu freigegebenen opencode-v2-Inhalt (`test_opencode_v2_surface.py`); 12 Fixture-/Szenario-Stempel `agent-meta-version` auf `2.0.0-beta.3` gehoben (Meta-Optimizer, Active-Set, MCP-Active, Szenarien 76/77/78); die beiden eingebetteten Fixture-Tree-Digests `ac01-baseline` und `compact-golden` neu gepinnt (`slimming-golden` unverändert) und ein beta.3-Rebaseline-Bullet in das Docstring-Log von `tests/test_ac01_render_identity.py` aufgenommen (82 von 1013 Hashes, 0 hinzugefügt/entfernt). Zwei Review-Runden, Endverdikt APPROVE, keine Assertion abgeschwächt. Die Vollsuite wurde lokal nicht gefahren (beendet in dieser Umgebung nicht, siehe Task 32); der Vollsuite-Beleg ist CI. Kein Push, kein PR in dieser Runde — beides `git`-Rolle. |
 
 ## Phase-D-Review-Fixrunde (2026-10-24)
 
@@ -216,7 +216,7 @@ bash tests/scenarios/run.sh 69-opencode-v2-surface
 
 ### Aus Phase D
 
-- **Task 33 (Release-Bump) offen:** Der Minor-Bump und das Verschieben des Unreleased-Abschnitts in einen Versionsabschnitt erfordern eine ausdrückliche Nutzerfreigabe (HITL). Der Task ist im Plan bewusst nicht abgehakt; Push und Tag bleiben Aufgabe der `git`-Rolle.
+- **Task 33 (Release-Bump) erledigt:** `VERSION` steht auf `2.0.0-beta.3` (Nutzerfreigabe 2026-10-23), der Unreleased-Inhalt ist in den Abschnitt `## [2.0.0-beta.3] - 2026-10-23` verschoben; Release-Commit `74f4493d` auf Branch `chore/1007-release-2.0.0-beta.3`. Push, PR und Merge liegen bei der `git`-Rolle und stehen noch aus.
 - **Bekannte Grenze — v2-Plugin-Artefakt beim Rückwechsel:** Ein Wechsel v2→v1 baut die verwalteten Config-Namespaces und die `cli.json` zurück, lässt aber `.opencode/plugins/agent-meta-runtime-gate.js` stehen. Das liegt außerhalb des Geltungsbereichs von AC-B7/AC-B22 (Befund aus Task 29, `54a5eeaf`) und ist als Follow-up offen.
 - **Bekannte Grenze — `claimed_files`:** MCP- und `cli.json`-Writer treten dem laufbezogenen `claimed_files`-Set nicht bei (siehe „Bekannte Grenze für C3/D“). Die aktuelle Registry hat genau einen v2-Eigentümer, daher ist das heute folgenlos; bei einem zweiten Eigentümer derselben Datei muss die Kollisionsbehandlung vorher nachgezogen werden.
 - **Amendment B4 (`default_agent`):** Auf Tier `plugin` wird `default_agent` nicht abgestimmt (Details unter QA-D-02 oben). Die Agent-Ebene (`deny_edit`, umgesetzt in Task 22) zusammen mit den Config-Tripeln ist dort die tragende Schutzschicht.
@@ -224,5 +224,5 @@ bash tests/scenarios/run.sh 69-opencode-v2-surface
 
 ## Nächste Schritte
 
-1. Review und PR für Phase D (Tasks 20–32 ohne 24) auf `feat/1007-d-surface` (Arbeitsstand `04d41eb8`).
-2. Nach dem Merge: Task 33 ausschließlich mit ausdrücklicher Nutzerfreigabe (Release-Bump; Push und Tag danach durch die `git`-Rolle).
+1. Phase D ist über PR #1018 gemergt.
+2. Task 33 ist erledigt (Commit `74f4493d`); offen sind nur Push, PR und Merge durch die `git`-Rolle.
