@@ -27,6 +27,10 @@
 #      (>= 2, IC-15 Nr. 16 amended) with no top-level `subagent_depth`, a
 #      `default_agent` key, and v2 frontmatter (`orchestrator` mode:
 #      primary, others subagent).
+#   2d. C3 PLUGIN ARTIFACT: the same v2 project resolves `has_plugins` true (data
+#      from `surface-has-plugins.v2`), so the stage dispatch deploys
+#      `.opencode/plugins/agent-meta-runtime-gate.js` with the v2 object export
+#      (spike Q4). The v1 baseline must not receive it.
 #   3. V2 `--check` rc 0 on the consistent v2 tree; a v1 tree under the v2 project
 #      yields a non-zero `--check` (no silent divergence).
 # Exit 0 = all assertions hold.
@@ -219,6 +223,18 @@ assert "default_agent" in doc, (
 )
 assert doc["default_agent"], "'default_agent' must be non-empty"
 PY
+
+# 2d. C3 plugin artifact: the resolved `has_plugins` (surface-has-plugins.v2)
+#     makes the stage dispatch deploy the observe artifact. Asserting the file
+#     here pins the dispatch end-to-end, not just the writer in isolation.
+PLUGIN=".opencode/plugins/agent-meta-runtime-gate.js"
+[ -f "$PLUGIN" ] || fail "v2 must deploy the runtime-gate plugin artifact: $PLUGIN"
+grep -qF "export default {" "$PLUGIN" \
+    || fail "the v2 plugin artifact must use the object default export (spike Q4)"
+grep -qF 'MODE = "observe"' "$PLUGIN" \
+    || fail "the v2 plugin artifact must bake MODE = \"observe\" (AC-19 / OQ-B12)"
+[ ! -e "$PROJ_UNSET/.opencode/plugins/agent-meta-runtime-gate.js" ] \
+    || fail "the v1 baseline must not receive any plugin artifact (B-D7 / AC-C13)"
 
 python3 - .opencode/agents/orchestrator.md .opencode/agents/developer.md <<'PY' || fail "v2 frontmatter mechanism not applied"
 import sys

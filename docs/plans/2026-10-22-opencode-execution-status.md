@@ -2,9 +2,9 @@
 
 **Zweck:** Ausführungs-Ledger zum Plan `docs/plans/2026-10-22-opencode-v2-support-plan.md` (Phasen C0, B, C1/C2, C3, D) und damit zum Tracking-Issue #1007. Das Dokument hält je Phase und je Task den erreichten Stand, die Beleg-Commits, die Testlage und die substanziellen Befunde fest; es ersetzt weder Plan noch Spec.
 
-**Geltungsbereich:** Branch `feat/1007-b-keys` (Basis `main` = `526a5dab`; Phase C0 über PR #1011 gemergt, C0-Ledger-Commit `52a72a0f`, Evidenz-Nachbesserung `2978753c`). Phase-B-Arbeit von `bd49dc5b` bis `d5853d1e`. Phase C1/C2 auf Branch `feat/1007-c1-c2-gate` (Basis `d0b81f91`), Commits `f07ab459` bis `ad4380e1`. Stand: 2026-10-23.
+**Geltungsbereich:** Branch `feat/1007-b-keys` (Basis `main` = `526a5dab`; Phase C0 über PR #1011 gemergt, C0-Ledger-Commit `52a72a0f`, Evidenz-Nachbesserung `2978753c`). Phase-B-Arbeit von `bd49dc5b` bis `d5853d1e`. Phase C1/C2 auf Branch `feat/1007-c1-c2-gate` (Basis `d0b81f91`), Commits `f07ab459` bis `ad4380e1`. Phase C3 auf Branch `feat/1007-c3-plugin` (Basis `9f274040`), Commits `c8270845` und `c673991f`. Stand: 2026-10-24.
 
-**Datenquelle:** Commits dieses Branches, die im Plan gesetzten Checkboxen (C0: Tasks 1, 2, 3, 3a, 24; B: Tasks 4–12; C1/C2: Tasks 13, 13a, 14–17) sowie die dort protokollierten Testläufe und die C1/C2-Exit-Kriterien.
+**Datenquelle:** Commits dieses Branches, die im Plan gesetzten Checkboxen (C0: Tasks 1, 2, 3, 3a, 24; B: Tasks 4–12; C1/C2: Tasks 13, 13a, 14–17; C3: Tasks 18, 19) sowie die dort protokollierten Testläufe und die Phasen-Exit-Kriterien.
 
 **Legende der Spaltenwerte**
 
@@ -22,7 +22,7 @@
 | C0 | 1, 2, 3, 3a, 24 | `done (gemergt, PR #1011)` |
 | B | 4–12 | `done (Review/PR offen)` |
 | C1/C2 | 13, 13a, 14–17 | `done (Review/PR offen)` |
-| C3 | 18–19 | `offen` |
+| C3 | 18–19 | `done (Review/PR offen)` |
 | D | 20–33 (ohne 24) | `offen` |
 
 **Entry-Kriterien:** E1 done · E2 done · E3 done · E4 done.
@@ -120,8 +120,48 @@ python3 -m pytest tests/test_provider_agnostic_dispatch.py tests/test_import_acy
 | RVW-C-06 | MINOR | AC-C16(a)-Rollback-Hälfte: Verschwindet `primary-role`, wird `default_agent` entfernt und der `default-agent`-State geleert. | `::test_ac_c16a_default_agent_removed_when_primary_role_disappears` |
 | RVW-C-07 | MINOR | Plan-Task-15-Step-3 verweist für „`tests/test_mcp_config.py` unverändert" auf die bewusste Ledger-Abweichung. | Plan Task 15 |
 
+## C3
+
+**Branch:** `feat/1007-c3-plugin` (Basis `9f274040`; Arbeitsstand `c673991f`). Beide Task-Blöcke sind im Plan abgehakt; `VERDICT-C3: GO` lag bereits vor (Spike 2026-10-23).
+
+| Task | Agent | Commit | Tests | Status | Abweichungen/Befunde |
+|---|---|---|---|---|---|
+| 18 | `senior-developer` | `c8270845` | rot `2 failed, 1 passed` → `177 passed`; Aux/Surface `30 passed`; `python3 scripts/sync.py --validate` rc 0, `--check` rc 0; `node --check` rc 0 | `done` | Neues Template `templates/plugins/runtime-gate.opencode-v2-plugin.js.tmpl` ist ein ESM-Default-Export als **Objekt** mit `id` und `setup(ctx)` und registriert `ctx.tool.hook("execute.before")` — reiner Observe-Pfad, **kein** Permission-Deny-Hook. Die Registry erhält `surface-plugin-protocols: {v2: opencode-plugin-v2-js}` und `surface-has-plugins: {v2: true}`; das statische `has_plugins: false` bleibt unverändert. Aufgelöst ergibt v2 Tier `plugin` plus Plugin-Datei, v1 Tier `permission` ohne Datei. **Befund:** Der Plan-Step für `test_ac_c13` erwartete einen Test; ein zusätzlicher Positiv-Kontrollzweig hält die Negativ-Assertion nicht vakuös. |
+| 19 | `tester` | `c673991f` | erster Lauf grün (`165 passed`, Task-19-Step-2-Kommando) | `done` | Reine Absicherungstests, kein Produktivcode. Zwei Negativproben feuern wie erwartet und wurden danach zurückgenommen: (1) `permission_deny_required` ohne den `plugin`+`observe`-Zweig → `test_ac_c14_real_v2_registry_plugin_observe_keeps_deny_triples` `1 failed`; (2) Entfernen der beiden C3-Registry-Schlüssel → `test_ac_c2_gate_fallback_invariants` `1 failed`. Der GO-Zweig des Spike-Tests prüft jetzt die **Äquivalenz** „C3-Schlüssel vorhanden ⇔ GO“: ein Teil-Schlüsselsatz schlägt unter beiden Verdikten fehl. |
+
+**C3-Exit-Kriterien (2026-10-24, Arbeitsstand `c673991f`):**
+
+```
+python3 -m pytest tests/test_opencode_v2_surface.py tests/test_opencode_v2_spike.py tests/test_runtime_gate_plugins.py tests/test_runtime_gate_rendering.py tests/test_provider_agnostic_dispatch.py -q
+python3 scripts/sync.py --validate
+python3 scripts/sync.py --check
+python3 scripts/consistency-check.py
+bash tests/scenarios/run.sh 69-opencode-v2-surface
+```
+
+**Ergebnisse:**
+
+1. `188 passed in 14.81s` → rc 0.
+2. rc 0, `0 action(s)  |  382 skipped  |  2 warning(s)` (die zwei Warnungen stammen aus der Umgebung: gedroppte `se`-Gruppe und ein fehlgeschlagener Checkout in `agent-meta-test/external/awesome-claude-code`).
+3. rc 0, `0 action(s)  |  449 skipped  |  35 warning(s)`, `Provider context files are up to date.`
+4. rc 0, `[PASS]  All checks passed.`
+5. `PASS  69-opencode-v2-surface` → `Scenarios: 1  Passed: 1  Failed: 0`, rc 0.
+
+## C3-Review-Fixrunde (2026-10-24)
+
+**Quelle:** Zwei Reviews zu `feat/1007-c3-plugin` (Verdict `CHANGES_REQUESTED`), Arbeitsstand `523bf1f9`. Alle vier Findings sind geschlossen; QA-D-02 ist eine **Vertragspräzisierung** (Spec Amendment B4), keine Verhaltensänderung.
+
+| Finding | Schwere | Änderung | Beleg |
+|---|---|---|---|
+| QA-D-01 | MINOR (Abdeckung) | Der Stage-Helper `_run_stage` spioniert neben `_sync_opencode_runtime_gate` jetzt auch `sync_pipeline.sync_runtime_gate_plugins` (`plugin_calls`-Out-Parameter). Zwei neue Tests fahren den echten Dispatch `if pc.get("has_plugins")` mit der **ausgelieferten** Registry: v2 ⇒ Writer genau einmal (mit aufgelöstem Provider-Registry-Dict), v1 ⇒ nie. Szenario 69 prüft zusätzlich, dass der v2-Lauf `.opencode/plugins/agent-meta-runtime-gate.js` erzeugt, die Datei `export default {` und `MODE = "observe"` trägt und der v1-Baseline-Lauf **kein** Plugin-Artefakt erhält. | `tests/test_opencode_v2_surface.py::test_qa_d01_stage_dispatches_plugin_writer_for_real_v2_registry`, `::test_qa_d01_stage_does_not_dispatch_plugin_writer_for_v1`, `tests/scenarios/asserts/69-opencode-v2-surface.sh` (Abschnitt 2d) |
+| QA-D-02 | MAJOR (Vertrag) | **Akzeptierte, dokumentierte Grenze.** Verhalten unverändert (OQ-B12: „Eigenprüfung genügt (kein Eingriff in Spec A)“). AC-C16(a) ist jetzt in (a1) Tier `permission` (Managed-Merge mit State `default-agent`, User-Wert-WARNUNG, Rollback) und (a2) Tier `plugin` (C3-v2: `settings-init` schreibt `default_agent` einmalig, `reconcile_opencode_surface_gate` prüft nur den Einstiegspunkt; **keine** weitere Abstimmung: gelöschter Wert wird nicht ergänzt, abweichender Wert ohne Warnung belassen, verschwundene `primary-role` nimmt den Wert nicht zurück) geschnitten. Auf Tier `plugin`+`observe` schützen Agent-Ebene (`deny_edit`, Task 22) und die Config-Tripel. | Spec Revision 1.8 / Amendment B4, §3.4-Cross-Referenz, AC-C16, Plan Task 22 („Amendment-B4-Folge"), `::test_ac_c16a_no_default_agent_reconciliation_at_tier_plugin` |
+| QA-D-03 | MINOR | Der Registry-Kommentar bei `has_plugins` ist jetzt wahr für v1 (statischer Default ⇒ Tier `permission`, kein Artefakt) und verweist für v2 auf den C3-Datenblock; P6 gatet nur noch `MODE=enforce` (der Observe-Pfad ist ausgeliefert, der blockierende Pfad nicht implementiert). | `config/ai-providers.yaml` (Kommentar bei `has_plugins: false`) |
+| QA-D-04 | MINOR | Die AC-C2-Äquivalenz ist global: der Check läuft über **alle** Einträge aus `load_providers_config(_REPO_ROOT)`, die einen der beiden C3-Keys deklarieren (jeder solche Eintrag muss den Both-or-None-Satz tragen; unter `GO` muss mindestens einer existieren), statt nur über den `Opencode`-v2-Eintrag. | `tests/test_opencode_v2_spike.py::test_ac_c2_gate_fallback_invariants` |
+
 ## Offene Punkte
 
+- **C3-Gate-Plugin ist observe-only (bekannte Grenze):** Das generierte v2-Plugin annotiert vorgeschlagene Tool-Aufrufe und blockiert nie. Blockieren wäre in v2 erst über `ctx.permission.hook("evaluate")` möglich; dieser Deny-Pfad ist bewusst nicht enthalten und bleibt P6-gated (`MODE=enforce` ist nicht implementiert). Das tatsächliche Gate bleibt damit der Permission-Deny aus C1: `permission_deny_required` hält die verwalteten Edit-/Shell-Tripel bei Tier `plugin`+`observe` additiv erhalten.
+- **Amendment B3 (Task 22):** Die Agent-Ebene (`deny_edit`) ist bei Tier `plugin`+`observe` ebenfalls an `permission_deny_required` gebunden (AC-C14 gilt auch dort); verantwortlich ist Task 22, in C3 ist dazu nichts implementiert. Details siehe QA-C-02.
 - **QA-C-02 (MAJOR, Vertrag):** Die Agent-Ebene (`deny_edit`, Task 22) muss `permission_deny_required` verwenden (auch Tier `plugin`+`observe`); der Frontmatter-Aufrufort braucht dafür `capabilities` + `plugin_mode`. Bindend im Plan (Task 22) und in Spec Amendment B3 hinterlegt — **nicht** in dieser Runde implementiert.
 - **QA-C-03 (MINOR, bekannt):** Ein bereits vorhandenes, identisches, aber unverfolgtes Tripel unterdrückt die End-Einfügung (schwächste Position) und wird nie geclaimt. Nach State-Verlust kann ein v2→v1-Wechsel `permissions[]` (inkl. unserer Tripel) auf einem v1-Dokument hinterlassen, das ein Zod-`.strict`-Parser ablehnen könnte. Entscheidung „Dedupe vs. End-Einfügung" und eine Warnung bei vorhandenen Tripeln ohne State stehen aus.
 - **QA-C-05 (MINOR, bekannt):** `finding.file` ist immer `config/plugin-catalog.yaml`, auch für Verstöße aus `.meta-config`-Override oder Inline-Katalog. Die Meldung nennt damit nicht die tatsächliche Quelle.
@@ -129,6 +169,8 @@ python3 -m pytest tests/test_provider_agnostic_dispatch.py tests/test_import_acy
 - **QA-C-07 (MINOR, bekannt):** `scripts/lib/isolation.py` ist mit 1407 Zeilen (+614 in C1) ein God-Modul, oberhalb der im Repo zitierten ≤600-Richtlinie. Follow-up: Extraktion des v2-Gate-Blocks (dokumentierte Spec-Abweichung).
 - **QA-C-08 (MINOR, bekannt):** Die v2-Gate-Writer nutzen `allow_secrets=False`, während der Schwester-Writer derselben Datei `config["allow-committed-secrets"]` durchreicht. Ein Klartext-Secret eines Users bricht damit auch einen reinen Rollback ab; entweder gleiche Secret-Gate-Parameter durchreichen oder die strengere Wahl dokumentieren.
 - **OQ-B12** ist mit `VERDICT-C3: GO` an seinem Entscheidungszeitpunkt angelangt. Der dokumentierte Default „Eigenprüfung genügt (kein Eingriff in Spec A)“ gilt weiter, eine ausdrückliche Entscheidung steht jedoch noch aus.
+- **QA-D-02 (MAJOR, akzeptierte Grenze, AC-Geltungsbereich):** Auf Tier `plugin` (C3-v2) läuft `_sync_opencode_runtime_gate` — und damit der `default_agent`-Managed-Merge — nicht; `settings-init` schreibt `default_agent` einmalig und `reconcile_opencode_surface_gate` prüft nur den Einstiegspunkt. Ein gelöschter `default_agent` wird dort nicht wieder ergänzt, ein abweichender User-Wert bleibt ohne Merge-WARNUNG, ein verschwundener `primary-role` nimmt den Wert nicht zurück. AC-C16(a) ist entsprechend in (a1) Tier `permission` / (a2) Tier `plugin` geschnitten (Spec Rev. 1.8 / Amendment B4). Schutz auf Tier `plugin`: Agent-Ebene (`deny_edit`) plus Config-Tripel. Eine Angleichung bräuchte einen Eingriff in Spec A oder einen zweiten `default_agent`-Writer — bewusst nicht Teil dieses Auftrags (eigener Spec-Auftrag möglich).
+- **Bekannte Doku-Lücke (nicht Teil von QA-D-03):** `docs/concepts/runtime-gate-tiers.md` beschreibt in §2/§7 noch den Stand vor C3 („kein Provider deklariert `runtime_gate: plugin`“, „`has_plugins: false` … **dauerhaft** gesperrt“). Für die v2-Oberfläche ist das inzwischen falsch; die Datei braucht eine eigene, redaktionelle Nachführung.
 - Die unabhängigen Stränge B, C1/C2 und D sind durch OQ-B12 nicht blockiert.
 - **Plandefekt Task 15:** Der Plan ging davon aus, dass `tests/test_mcp_config.py` unverändert bleibt. Der Test `test_build_connection_entry_opencode_json_v2_matches_v1_shape` kodierte jedoch „v2 == v1 inkl. `enabled: true`“, was AC-C7 widerspricht; die Assertion musste invertiert werden (v1 `enabled is True`, v2 ohne `enabled`, übrige Schlüssel gleich).
 - **Plandefekt Task 17:** Eine zweite Fixture in `tests/test_mcp_config.py` führte ein synthetisches v2-Dokument mit `enabled: true`; nach AC-C10 ist das ungültig. Der Schlüssel wurde entfernt, die Assertions blieben unverändert.
@@ -136,5 +178,5 @@ python3 -m pytest tests/test_provider_agnostic_dispatch.py tests/test_import_acy
 
 ## Nächste Schritte
 
-1. Review und PR für Phase C1/C2 (Tasks 13, 13a, 14–17).
-2. Danach Phase C3 (Tasks 18–19); `VERDICT-C3: GO` liegt vor.
+1. Review und PR für Phase C3 (Tasks 18, 19) auf `feat/1007-c3-plugin`.
+2. Danach Phase D (Tasks 20–33 ohne 24): Frontmatter, `cli.json`, Duplikat, Doku, Tests, Release.

@@ -2,8 +2,8 @@
 spec-id: SPEC-OPENCODE-V2-SUPPORT-2026-10-22
 title: Opencode v2-Support Phasen B-D (Config-Keys, Permissions/MCP/Gate-Plugin, Agent-Frontmatter nativ)
 status: APPROVED
-revision: 1.7
-amendment: B1 (2026-10-23, C0-Exit-Gate: VERDICT-C3 GO / VERDICT-FIELDS AMEND); B2 (2026-10-23, Einzeleigentum experimental.subagent_depth); B3 (2026-10-23, Agent-Ebene nutzt permission_deny_required + active_set am Einstiegspunkt)
+revision: 1.8
+amendment: B1 (2026-10-23, C0-Exit-Gate: VERDICT-C3 GO / VERDICT-FIELDS AMEND); B2 (2026-10-23, Einzeleigentum experimental.subagent_depth); B3 (2026-10-23, Agent-Ebene nutzt permission_deny_required + active_set am Einstiegspunkt); B4 (2026-10-23, AC-C16(a) auf Tier permission begrenzt — kein default_agent-Abgleich bei Tier plugin)
 review: docs/reviews/2026-10-22-opencode-v2-support-spec-review.md
 rereview: docs/reviews/2026-10-22-opencode-v2-support-spec-rereview.md
 requires-spec: SPEC-OPENCODE-ENTRYPOINT-1006-2026-10-22
@@ -15,6 +15,8 @@ issues: "#1007 (v2-Support); relevant geschlossen: #747, #765, #794, #387, #383,
 
 > Status: APPROVED (2026-10-22) — Nutzerfreigabe 2026-10-22 (Auftrag: beide Pläne vollständig abarbeiten). Amendment B1 (2026-10-23) ist Folge des freigegebenen C0-Exit-Gates und ändert diesen Approval-Status nicht.
 > Trace-Anker: `spec-id: SPEC-OPENCODE-V2-SUPPORT-2026-10-22`
+>
+> Revision 1.8 (2026-10-23): **Amendment B4** — Vertragspräzisierung aus dem C3-Review (QA-D-02). AC-C16(a) wird auf den Geltungsbereich zugeschnitten, den die ausgelieferte Registry tatsächlich hat: Der `default_agent`-Managed-Merge (State `default-agent`, User-Wert-Warnung, Rollback) läuft auf Tier `permission` (v1 und v2 vor C3). Auf Tier `plugin` (v2 ab C3) schreibt `settings-init` den Wert einmalig, `reconcile_opencode_surface_gate` **prüft** nur den Einstiegspunkt, und es findet keine weitere Abstimmung statt. Das Verhalten bleibt unverändert (OQ-B12: „Eigenprüfung genügt (kein Eingriff in Spec A)“); nur die AC-Formulierung war nie auf diesen Bereich zugeschnitten. Details: „Amendment B4 (2026-10-23)“.
 >
 > Revision 1.7 (2026-10-23): **Amendment B3** — zwei Nachschärfungen aus dem C1/C2-Review (QA-C-01/QA-C-02). (1) Der Einstiegspunkt-Prüfer `_opencode_entry_point` wird von allen Gate-Akteuren mit demselben, echten `active_set` aufgerufen (kein Fail-open-`None`), sonst schriebe der v2-Reconciler Tripel für eine nur deklarierte, nicht generierte Primary-Rolle, während Spec A sein Deny verweigert. (2) Die **Agent-Ebene** (`deny_edit`, Task 22) muss dasselbe Prädikat wie die Config-Tripel verwenden: `permission_deny_required` (Tier `permission` **oder** `plugin`+`observe`), nicht das eingefrorene `opencode_runtime_gate_wanted`. Details: „Amendment B3 (2026-10-23)“.
 >
@@ -282,6 +284,8 @@ def _opencode_v2_gate_permissions(config: dict, provider: str, agent_meta_root: 
 
 **Normativ (B-2): der v2-Zweig ersetzt ausschließlich Spec-A-Schritt 4 (`permission`-Merge) aus `_sync_opencode_runtime_gate` (IC-6).** Spec-A-Schritte 1 (`_opencode_entry_point`), 2 (Gate-Kopplung inkl. WARNING bei `wanted and entry is None`), 3 (`default_agent`-Managed-Merge mit State `default-agent`, Entscheidung 3) und 5 laufen auf v2 unverändert und mit denselben Parametern (inkl. `active_set`), und zwar unter der unveränderten Aufrufbedingung `provider_runtime_gate_tier(pc, caps) == "permission"` (sync_pipeline.py:1308, cli_commands.py:283; Spec A IC-7). In `_sync_opencode_runtime_gate` entfällt auf v2 (`v2_active`) Schritt 4 vollständig (weder `permission`-Map schreiben noch zurückbauen); das übernimmt ausschließlich die tierunabhängige Funktion `reconcile_opencode_surface_gate` (unten).
 
+**Amendment B4 (2026-10-23) — Folge für Schritt 3:** Weil die Aufrufbedingung unverändert bleibt und der aufgelöste v2-Tier ab C3 `plugin` ist, läuft der `default_agent`-Managed-Merge (Schritt 3) auf Tier `plugin` **nicht**. Dort schreibt `settings-init` den Wert einmalig und `reconcile_opencode_surface_gate` prüft nur den Einstiegspunkt; auf Tier `permission` (v1, v2 vor C3) bleibt Schritt 3 samt State `default-agent` und Rollback unverändert. Verbindliche AC-Fassung: AC-C16(a1)/(a2).
+
 **Tierunabhängiger Surface-Abgleich (N-M1):** neue Funktion in `scripts/lib/isolation.py`
 
 ```python
@@ -536,7 +540,7 @@ AC-Zählung: B1-B22 (22, davon **AC-B9 entfällt (Amendment B1)** → 21 gültig
 - **AC-C13** Given `VERDICT-C3: GO`, aber aufgelöstes `has_plugins: false`, Then wird keine Plugin-Datei generiert und der Tier bleibt `permission`. (3.6)
 - **AC-C14** Given ein v2-Projekt mit strict aktiv, Tier `plugin` und Plugin-Modus `observe`, When Sync läuft, Then bleiben die Deny-Tripel `{edit,**,deny}` und `{shell,**,deny}` in `permissions[]` erhalten (Plugin schwächt das Gate nicht). Given dasselbe Projekt mit Tier `plugin` + Modus `enforce` (oder Tier `advisory`) und bereits geschriebenen Tripeln, When Sync läuft, Then werden die Tripel durch `reconcile_opencode_surface_gate` entfernt, obwohl `_sync_opencode_runtime_gate` (Aufrufbedingung Tier `permission`) nicht läuft; `_opencode_runtime_gate_entries`/`opencode_runtime_gate_wanted` sind unverändert (Spec A IC-4; Test: Quelltext-Vergleich der Funktionen gegen den Stand nach Spec A). (3.4 Tier `plugin`, Rückbau-Matrix, B-1, m-6) **Amendment B3: AC-C14 gilt auch für die Agent-Ebene** — `deny_edit` (Task 22) muss dasselbe Prädikat `permission_deny_required` verwenden, damit bei Tier `plugin`+`observe` das zuletzt angehängte Agent-`edit: allow` das globale Deny nicht überstimmt.
 - **AC-C15** Given ein v2-Projekt mit strict aktiv, aber ohne explizite/generierte `primary-role`, When Sync läuft, Then wird kein Deny-Tripel in `permissions[]` geschrieben (ein bereits verwaltetes wird zurückgenommen) und eine WARNING nennt `primary-role` und die Konsequenz (Spec A IC-6 Schritt 2, Entscheidung 2). (3.4 normativ, B-2)
-- **AC-C16** Given ein v2-Projekt mit explizitem `primary-role` `orchestrator` und strict aktiv, When Sync läuft, Then (a) steht `default_agent: orchestrator` in `opencode.json` (Managed-Merge mit State `default-agent`, Verhalten wie Spec A AC-06…09: User-Wert bleibt mit WARNING, Rollback bei Wegfall), und (b) enthält das v2-Artefakt `.opencode/agents/orchestrator.md` in `permissions:` den Eintrag `{action: edit, resource: "*", effect: deny}` (`deny_edit`); ohne Gate fehlt dieser Deny. (3.4 Agent-Ebene, 3.7, B-2)
+- **AC-C16** Given ein v2-Projekt mit explizitem `primary-role` `orchestrator` und strict aktiv, When Sync läuft, Then (a) steht `default_agent: orchestrator` in `opencode.json` — **(a1) auf Tier `permission`** (v1 und v2 vor C3) über den Managed-Merge mit State `default-agent`, Verhalten wie Spec A AC-06…09 (User-Wert bleibt mit WARNING, Rollback bei Wegfall); **(a2) auf Tier `plugin`** (v2 ab C3, `surface-has-plugins.v2`) schreibt ausschließlich `settings-init` den Wert einmalig, `reconcile_opencode_surface_gate` **prüft** nur den Einstiegspunkt und es findet **keine** weitere Abstimmung statt — ein vom User gelöschtes `default_agent` wird auf Tier `plugin` nicht wieder ergänzt, ein abweichender User-Wert erzeugt keine Merge-WARNUNG, und ohne `primary-role` wird der von `settings-init` geschriebene Wert nicht zurückgenommen (akzeptierte Grenze, OQ-B12; Begründung und Grenzen: Amendment B4); und (b) enthält das v2-Artefakt `.opencode/agents/orchestrator.md` in `permissions:` den Eintrag `{action: edit, resource: "*", effect: deny}` (`deny_edit`); ohne Gate fehlt dieser Deny. (3.4 Agent-Ebene, 3.7, B-2, Amendment B4)
 - **AC-C17** Given ein v2-Projekt mit User-Eintrag `mcp.servers.my-own` und ohne aktive agent-meta-MCP-Server, das von v2 auf v1 zurückgestellt wird, When Sync läuft, Then sind alle von agent-meta geschriebenen `mcp.servers.<name>`-Pfade entfernt (kein verwaistes `mcp.servers` des Managed-Teils), der User-Eintrag bleibt erhalten und der Namespace `opencode-v2-mcp` ist entfernt. (3.5 Managed-Pfade, M-3)
 
 **Phase D**
@@ -768,6 +772,37 @@ Die beiden Gate-Ebenen dürfen nicht mit unterschiedlichen Prädikaten arbeiten.
 - **§3.4 (RVW-C-05):** neuer `active_set`-Parameter an beiden v2-Gate-Funktionen dokumentiert; Begründung gegen Fail-open siehe Regel 1.
 - **Offene MINOR-Findings aus demselben Review (QA-C-03/05/06/07/08)** bleiben als bekannte Grenzen im Ausführungsstatus geführt; sie sind nicht Teil dieses Amendments.
 
+## Amendment B4 (2026-10-23)
+
+**Quelle:** C3-Review zu `feat/1007-c3-plugin` (Finding QA-D-02, MAJOR — Vertragsinkonsistenz).
+
+**Status:** Diese Spec bleibt `Status: APPROVED (2026-10-22)`, Revision 1.8. Amendment B4 ist **keine** Verhaltensänderung und **keine** Scope-Erweiterung: Es schneidet AC-C16(a) auf den Bereich zu, auf dem der dort beschriebene Managed-Merge nach der C3-Aktivierung tatsächlich läuft. Das Verhalten folgt dem in OQ-B12 festgehaltenen Default („Eigenprüfung genügt (kein Eingriff in Spec A)“) und lässt die eingefrorene Aufrufbedingung von Spec A (`== "permission"`, IC-7) unberührt.
+
+### Regel — `default_agent` wird auf Tier `plugin` nicht abgestimmt
+
+Mit `surface-has-plugins.v2: true` (C3) löst die v2-Oberfläche auf Tier `plugin` auf. Damit läuft `_sync_opencode_runtime_gate` — und mit ihm Schritt 3, der `default_agent`-Managed-Merge — auf einem C3-v2-Projekt **nicht**; er bleibt an `provider_runtime_gate_tier(pc, caps) == "permission"` gebunden (Spec A IC-7, unverändert).
+
+Verbindlich ist daher:
+
+- **Tier `permission`** (v1, v2 vor C3): unverändert. Schritt 3 schreibt `default_agent` aus dem expliziten und generierten Einstiegspunkt, führt den State `default-agent`, belässt einen abweichenden User-Wert mit WARNING und baut bei Wegfall von `primary-role` zurück (AC-C16(a1), Spec A AC-06…09).
+- **Tier `plugin`** (C3-v2): `settings-init` (`context.apply_settings_surface_shape`) schreibt `default_agent` **einmalig** aus `primary-role`; `reconcile_opencode_surface_gate` **prüft** den Einstiegspunkt (und warnt bei fehlendem `primary-role`), schreibt den Key aber nicht und führt keinen `default-agent`-State. Konsequenzen:
+  - ein vom User **gelöschter** `default_agent` wird nicht wieder ergänzt,
+  - ein **abweichender** User-Wert erzeugt keine Merge-WARNUNG (er bleibt unverändert stehen),
+  - ein **verschwundener** `primary-role` nimmt den einmalig geschriebenen Wert nicht zurück.
+- Der Schutz auf Tier `plugin` liegt damit auf der **Agent-Ebene** (`deny_edit` der Primary-Rolle, Task 22 / Amendment B3, `permission_deny_required`) und auf den Config-Tripeln (`permissions[]`), nicht auf `default_agent`.
+
+### Akzeptierte Grenze
+
+Die drei oben genannten Konsequenzen sind **akzeptiert** (OQ-B12: „Eigenprüfung genügt (kein Eingriff in Spec A)“). Eine Angleichung würde entweder einen Eingriff in Spec A (Aufrufbedingung bzw. Schritt 3 aus der Tier-Bedingung lösen) oder einen zweiten Writer für `default_agent` verlangen; beides ist hier bewusst nicht Teil des Auftrags und bleibt als eigener Spec-Auftrag möglich.
+
+### Folgen
+
+- **AC-C16(a)** ist in (a1)/(a2) geschnitten; (b) bleibt unverändert.
+- **§3.4** verweist auf dieses Amendment (Folge für Schritt 3).
+- **Plan Task 22** trägt die Konsequenz-Notiz: Bei `plugin`+`observe` ist die Agent-Ebene die tragende Schicht; `default_agent` wird dort nicht abgestimmt.
+- **Test:** `tests/test_opencode_v2_surface.py::test_ac_c16a_no_default_agent_reconciliation_at_tier_plugin` pinnt beide Hälften (Tier `plugin`: kein erneutes Schreiben, kein State, keine Warnung; Kontrolle auf Tier `permission`: der Merge läuft und ergänzt den gelöschten Wert).
+- Kein Provider-Name, kein `surface-version`-Dispatch: die Grenze folgt ausschließlich aus dem aufgelösten Tier.
+
 ## Trace-Anker
 
 ```
@@ -778,4 +813,4 @@ builds-on:     SPEC-PROVIDER-AUDIT-OPENCODE-V2-2026-09-30
                SPEC-OPENCODE-RUNTIME-GATE-2026-09-13
 ```
 
-Der abgeleitete Plan (`docs/plans/2026-10-22-opencode-v2-support-plan.md`) referenziert `spec-id: SPEC-OPENCODE-V2-SUPPORT-2026-10-22` als `**Spec-ID:**` und `SPEC-OPENCODE-ENTRYPOINT-1006-2026-10-22` als Abhängigkeit. Dieses Dokument trägt `Status: APPROVED (2026-10-22)`; die Amendments B1 (Rev. 1.5), B2 (Rev. 1.6) und B3 (Rev. 1.7, 2026-10-23) sind Folgen des freigegebenen C0-Exit-Gates bzw. der Reviews und ändern den Approval-Status nicht.
+Der abgeleitete Plan (`docs/plans/2026-10-22-opencode-v2-support-plan.md`) referenziert `spec-id: SPEC-OPENCODE-V2-SUPPORT-2026-10-22` als `**Spec-ID:**` und `SPEC-OPENCODE-ENTRYPOINT-1006-2026-10-22` als Abhängigkeit. Dieses Dokument trägt `Status: APPROVED (2026-10-22)`; die Amendments B1 (Rev. 1.5), B2 (Rev. 1.6), B3 (Rev. 1.7) und B4 (Rev. 1.8, 2026-10-23) sind Folgen des freigegebenen C0-Exit-Gates bzw. der Reviews und ändern den Approval-Status nicht.
