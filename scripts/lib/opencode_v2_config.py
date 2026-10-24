@@ -64,7 +64,9 @@ Task 23 (D2) adds the dedicated CLI settings file (spec §3.8):
 ``provider-options.<provider>.cli`` in the resolved ``cli_file``, with the same
 decision table and its own ``opencode-v2-cli`` namespace. Amendment B1:
 ``plugins`` is the only documented top-level key; the writer stays a generic
-passthrough and never touches ``tui.json``.
+passthrough and never touches ``tui.json``. A v2→v1 switch rolls the namespace
+back: the surface resolves no ``cli_file``, so the file is then located through
+the entry's surviving ``cli-files`` map (never a hardcoded filename).
 
 Known limitation (deliberate, not a gap to "fix" by inventing a second claim
 registry): the MCP writer does **not** participate in the run-scoped
@@ -1099,7 +1101,8 @@ def rollback_opencode_mcp(
 # same table above. The writer starts with the ownership guard (N-M2), derives
 # the file name from the owner's resolved ``cli_file`` (relative to the
 # committed file's directory — never a hardcoded literal) and the state path
-# from ``opencode_state_path``.
+# from ``opencode_state_path``. On a rollback (no resolved ``cli_file``) the
+# file comes from the entry's ``cli-files`` map values instead.
 #
 # Amendment B1 (2026-10-23): ``plugins`` is the only documented top-level key;
 # ``theme``/``autoupdate`` are not. The writer therefore stays a generic
@@ -1109,17 +1112,80 @@ def rollback_opencode_mcp(
 
 
 def _cli_file_rel(pc: dict) -> Path | None:
-    """The CLI settings file, relative to the committed file's directory.
+    """The CLI settings file of the **active** surface, from ``cli_file``.
 
     ``None`` when the resolved entry has no ``cli_file`` (the v1 surface has no
     ``cli-files`` entry) or no ``committed-file``: both mean "this provider has
-    no managed CLI file", and the writer must not invent one.
+    no managed CLI file on the active surface". A rollback of a *previous*
+    surface uses :func:`_resolve_cli_rollback_rel` instead — the writer must
+    never invent a file name.
     """
     cli_name = pc.get("cli_file")
     committed = _mcp_config(pc).get("committed-file")
     if not _non_empty_string(cli_name) or not _non_empty_string(committed):
         return None
     return Path(committed).parent / cli_name
+
+
+def _cli_rollback_candidates(pc: dict) -> list[Path]:
+    """Every managed CLI file path the entry's ``cli-files`` map can name.
+
+    The loader resolves one map value into the flat ``cli_file`` for the
+    *active* surface but leaves the registry-level map on the entry (spec
+    §3.1), so a rollback after a surface switch can still name the file a
+    *previous* surface wrote. Relative to the committed file's directory, like
+    :func:`_cli_file_rel` — no filename is hardcoded here. Duplicate values
+    collapse to one candidate; order follows the map, so the result is
+    deterministic.
+    """
+    cli_files = pc.get("cli-files")
+    committed = _mcp_config(pc).get("committed-file")
+    if not isinstance(cli_files, dict) or not _non_empty_string(committed):
+        return []
+    base = Path(committed).parent
+    candidates: list[Path] = []
+    for value in cli_files.values():
+        if not _non_empty_string(value):
+            continue
+        candidate = base / value
+        if candidate not in candidates:
+            candidates.append(candidate)
+    return candidates
+
+
+def _resolve_cli_rollback_rel(
+    root: Path, pc: dict, log: SyncLog
+) -> Path | None:
+    """Resolve the managed CLI file for a rollback without a ``cli_file``.
+
+    A v1 surface resolves no ``cli_file`` (spec §3.1), so the file has to come
+    from the surviving ``cli-files`` map instead:
+
+    1. exactly one distinct map value -> that path;
+    2. several values -> the single candidate whose file currently exists (a
+       missing file is no evidence either way);
+    3. otherwise -> ``None``. The caller then logs the documented limitation
+       and leaves file and state untouched — a wrong guess could rewrite a
+       user file, so this never guesses.
+    """
+    candidates = _cli_rollback_candidates(pc)
+    if len(candidates) == 1:
+        return candidates[0]
+    existing = [
+        candidate
+        for candidate in candidates
+        if isolation.safe_path(root, candidate).exists()
+    ]
+    if len(existing) == 1:
+        return existing[0]
+    if len(candidates) > 1:
+        # Ambiguous: several map values, but zero or several of them exist.
+        log.warning(
+            "opencode-v2-cli: ambiguous managed file for rollback"
+            f" ({len(existing)} of {len(candidates)} candidates exist:"
+            f" {', '.join(candidate.as_posix() for candidate in candidates)})"
+        )
+    return None
 
 
 def sync_opencode_cli_file(
@@ -1143,15 +1209,22 @@ def sync_opencode_cli_file(
     value is updated (row 2), and a key that is no longer configured is removed
     or its prior restored (rows 4/4a). The second run is byte-identical.
 
-    Missing ``cli_file`` (v1) writes and deletes nothing at all (spec §3.8: the
-    file name is the only way to find the file, and a v1 surface has none —
-    so its state is left in place too). A missing/non-object ``cli`` option
-    writes nothing — with one exception: if the ``opencode-v2-cli`` state
-    namespace is
-    non-empty, the recorded managed keys are rolled back (the project option was
-    removed but agent-meta must still clean up what it wrote). A rollback that
-    leaves the document empty removes the file again (the empty container is
-    pruned; a user key anywhere in the document keeps it alive untouched).
+    Missing ``cli_file`` (v1) writes nothing: the file name is the only way to
+    find the file and a v1 surface has none. It does **not** leave prior
+    management behind, though: when the ``opencode-v2-cli`` state namespace is
+    non-empty the recorded managed keys are rolled back (AC-B7/AC-B22 require
+    all ``opencode-v2-*`` namespaces to be empty after a v2→v1 switch). The
+    file is then resolved data-driven through the entry's ``cli-files`` map —
+    its values survive the surface selection — in
+    :func:`_resolve_cli_rollback_rel`. When no unambiguous candidate exists the
+    writer logs ``opencode-v2-cli: cannot resolve managed file for rollback``
+    and leaves file and state untouched (documented limitation, never a guess).
+    A missing/non-object ``cli`` option on the active surface writes nothing —
+    with one exception: if the namespace is non-empty, the recorded managed keys
+    are rolled back (the project option was removed but agent-meta must still
+    clean up what it wrote). A rollback that leaves the document empty removes
+    the file again (the empty container is pruned; a user key anywhere in the
+    document keeps it alive untouched).
 
     The secret gate is delegated to ``io.write_checked`` with the same
     parameters as the Task-9 writer (``allow_secrets`` from
@@ -1163,24 +1236,32 @@ def sync_opencode_cli_file(
         return
 
     pc = _provider_entry(provider_config, provider)
-    rel = _cli_file_rel(pc)
-    if rel is None:
-        # No resolved CLI file (v1) — a v1 switch intentionally writes and
-        # deletes nothing here (spec §3.8).
-        return
-
     root = Path(project_root)
     state_path = isolation.safe_path(
         root, opencode_state_path(root, pc).relative_to(root)
     )
     state = isolation._read_state(state_path, STATE_CLI_KEY)
 
+    rel = _cli_file_rel(pc)
+    # No resolved file means the active surface does not manage a CLI file
+    # (v1). That is not "nothing ever happened": a previous v2 surface may have
+    # left managed keys behind, and AC-B7/AC-B22 require the rollback.
+    rollback_only = rel is None
+    if rollback_only:
+        if not state:
+            return  # no resolved file and nothing recorded: write nothing
+        rel = _resolve_cli_rollback_rel(root, pc, log)
+        if rel is None:
+            log.warning("opencode-v2-cli: cannot resolve managed file for rollback")
+            return
+
     cli = project_options(config, provider).get("cli")
     # JSON object keys are strings by definition; stringify here so a YAML
-    # integer key cannot break the deterministic sort below.
+    # integer key cannot break the deterministic sort below. A rollback never
+    # writes: the ``cli`` option is v2-only, so it is ignored on that surface.
     targets: dict[str, object] = (
         {str(key): value for key, value in cli.items()}
-        if isinstance(cli, dict)
+        if isinstance(cli, dict) and not rollback_only
         else {}
     )
 

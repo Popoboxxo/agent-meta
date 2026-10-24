@@ -356,6 +356,19 @@ def _v1_pc() -> dict:
     }
 
 
+def _v1_pc_with_cli_files() -> dict:
+    """A v1 entry as the loader leaves it: no ``cli_file``, surface map survives.
+
+    ``providers._apply_surface_aux_selection`` only *adds* the flat
+    ``cli_file`` for the active surface; the registry-level ``cli-files`` map
+    stays on the entry (spec §3.1), so a v2→v1 rollback can still name the file
+    a previous v2 surface wrote.
+    """
+    pc = _v1_pc()
+    pc["cli-files"] = {"v2": _CLI_FILE}
+    return pc
+
+
 def _config(depth: int | None = None, **options) -> dict:
     """Project config with the Opencode v2 options; no depth ⇒ capability default."""
     block = dict(options)
@@ -4348,3 +4361,100 @@ def test_cli_writer_passes_secret_gate_params_to_write_checked(tmp_path, monkeyp
     assert kwargs["config"] == config
     assert kwargs["dry_run"] is False
     assert calls[1][3]["allow_secrets"] is True
+
+
+def test_ac_b22_cli_json_rolled_back_on_v1_surface(tmp_path):
+    """AC-B22/AC-B7: a v2→v1 switch must roll back the managed CLI file too.
+
+    ``cli_file`` resolves only on v2 (spec §3.1), so the v1 re-sync has to find
+    the file through the registry-level ``cli-files`` map that survives the
+    surface selection. Without that fallback ``cli.json`` and the
+    ``opencode-v2-cli`` state namespace survive the switch, contradicting
+    AC-B7/AC-B22 ("die State-Namespaces ... sind leer/entfernt").
+    """
+    project = tmp_path / "project"
+    plugins = ["opencode-acme-cli"]
+    v2 = {"Opencode": _v2_pc()}
+    v1 = {"Opencode": _v1_pc_with_cli_files()}
+
+    _run_cli(project, _config(cli={"plugins": plugins}), v2)
+    assert _read_json(project / _CLI_FILE) == {"plugins": plugins}
+    assert opencode_v2_config.STATE_CLI_KEY in _read_state_doc(project)
+
+    assert "cli_file" not in v1["Opencode"], "a v1 surface resolves no cli_file"
+    log = _run_cli(project, _config(), v1)
+
+    assert not (project / _CLI_FILE).exists(), (
+        "a rollback that leaves no content must delete the managed file"
+    )
+    assert opencode_v2_config.STATE_CLI_KEY not in _read_state_doc(project), (
+        "AC-B22: the opencode-v2-cli namespace must be gone after the switch"
+    )
+    assert not _warned(log, "cannot resolve managed file for rollback"), log.warnings
+
+
+def test_ac_b7_cli_rollback_keeps_user_keys(tmp_path):
+    """AC-B7 (rows 4/4a): only the managed keys go, a user key keeps the file."""
+    project = tmp_path / "project"
+    plugins = ["opencode-acme-cli"]
+    _write_json(project / _CLI_FILE, {"theme": "user-owned"})
+
+    _run_cli(project, _config(cli={"plugins": plugins}), {"Opencode": _v2_pc()})
+    assert _read_json(project / _CLI_FILE) == {
+        "theme": "user-owned",
+        "plugins": plugins,
+    }, "a user key is never overwritten or dropped"
+
+    _run_cli(project, _config(), {"Opencode": _v1_pc_with_cli_files()})
+
+    assert _read_json(project / _CLI_FILE) == {"theme": "user-owned"}
+    assert opencode_v2_config.STATE_CLI_KEY not in _read_state_doc(project)
+
+
+def test_cli_rollback_resolves_existing_candidate_among_several(tmp_path):
+    """Several ``cli-files`` values: only an existing file identifies the owner."""
+    project = tmp_path / "project"
+    plugins = ["opencode-acme-cli"]
+    _run_cli(project, _config(cli={"plugins": plugins}), {"Opencode": _v2_pc()})
+
+    pc = _v1_pc_with_cli_files()
+    pc["cli-files"] = {"v1": "cli-legacy.json", "v2": _CLI_FILE}
+    log = _run_cli(project, _config(), {"Opencode": pc})
+
+    assert not (project / _CLI_FILE).exists()
+    assert not (project / "cli-legacy.json").exists(), (
+        "a non-existing candidate is never guessed"
+    )
+    assert opencode_v2_config.STATE_CLI_KEY not in _read_state_doc(project)
+    assert not _warned(log, "ambiguous managed file for rollback"), log.warnings
+
+
+def test_cli_rollback_cannot_resolve_leaves_file_and_state(tmp_path):
+    """Documented limitation: with no unambiguous file the writer never guesses.
+
+    Two cases — the entry carries no ``cli-files`` map at all, and several map
+    values point at files that all exist. Both leave the managed file and the
+    ``opencode-v2-cli`` namespace untouched and log the canonical warning.
+    """
+    plugins = ["opencode-acme-cli"]
+    cases = {
+        "no-map": None,
+        "ambiguous": {"v1": "cli-a.json", "v2": _CLI_FILE},
+    }
+    for name, cli_files in cases.items():
+        project = tmp_path / name
+        _run_cli(project, _config(cli={"plugins": plugins}), {"Opencode": _v2_pc()})
+        # A second existing file makes the "ambiguous" case genuinely ambiguous.
+        _write_json(project / "cli-a.json", {"stale": True})
+        file_bytes = (project / _CLI_FILE).read_bytes()
+
+        pc = _v1_pc()
+        if cli_files is not None:
+            pc["cli-files"] = dict(cli_files)
+        log = _run_cli(project, _config(), {"Opencode": pc})
+
+        assert (project / _CLI_FILE).read_bytes() == file_bytes, name
+        assert opencode_v2_config.STATE_CLI_KEY in _read_state_doc(project), name
+        assert _warned(
+            log, "opencode-v2-cli: cannot resolve managed file for rollback"
+        ), name
