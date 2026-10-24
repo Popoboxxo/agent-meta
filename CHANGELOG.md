@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+- **Eight literature-anchored review roles (IC-28)**: `memory-architect`, `context-engineer`,
+  `red-team-agent`, `secrets-manager`, `chaos-engineer`, `reproducible-builds-engineer`,
+  `ux-researcher`, `privacy-compliance-officer`. All read-only (no `Write`/`Edit`/`Agent`), all
+  name-only addressable (no keyword rule, `orchestrator_only: true`), each with its own
+  output-contract id and handoff targets. Registered across schema enum, addressability pins,
+  standalone export, eight scenarios and the README role table.
+
 ### Fixed
 - **Opencode entry point (#1006)**: the orchestrator is now generated as `mode: primary` and
   `default_agent` is written to an existing `opencode.json` (managed merge with own state key and
