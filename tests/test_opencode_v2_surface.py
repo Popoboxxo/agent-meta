@@ -1012,18 +1012,23 @@ def _run_stage(
     tiers: dict,
     log: SyncLog | None = None,
     gate_calls: list | None = None,
+    plugin_calls: list | None = None,
 ) -> tuple[Path, SyncLog, list]:
     """Drive ``_sync_stage_per_provider`` with every unrelated writer stubbed.
 
     Returns ``(project_root, log, gate_calls)``; ``gate_calls`` records the
     Spec-A runtime-gate writer, so a test can prove a tier did not dispatch it
-    while the v2 managed-key writer still ran (AC-B18).
+    while the v2 managed-key writer still ran (AC-B18). ``plugin_calls`` is an
+    optional out-parameter that records the capability-gated plugin writer, so
+    a test can pin the ``has_plugins`` dispatch of the same seam (QA-D-01)
+    instead of calling the writer directly.
     """
     root = _stage_framework(tmp_path, tiers)
     project_root = tmp_path / "project"
     project_root.mkdir(parents=True, exist_ok=True)
     log = log if log is not None else SyncLog()
     calls = gate_calls if gate_calls is not None else []
+    plugin_dispatches = plugin_calls if plugin_calls is not None else []
 
     monkeypatch.setattr(sync_pipeline, "sync_agents_for_provider", lambda *a, **k: None)
     monkeypatch.setattr(sync_pipeline, "sync_prompts_for_continue", lambda *a, **k: None)
@@ -1046,6 +1051,10 @@ def _run_stage(
     monkeypatch.setattr(
         sync_pipeline, "_sync_opencode_runtime_gate",
         lambda *a, **k: calls.append((a, k)),
+    )
+    monkeypatch.setattr(
+        sync_pipeline, "sync_runtime_gate_plugins",
+        lambda *a, **k: plugin_dispatches.append((a, k)),
     )
 
     import lib.external_tools as external_tools_module
@@ -3220,6 +3229,69 @@ def test_ac_c13_has_plugins_false_resolved_means_no_plugin_file(tmp_path):
     ).is_file(), "positive control must write the artifact"
 
 
+# --- QA-D-01: the ``has_plugins`` dispatch of the real stage seam ------------
+#
+# All C3 tests above call ``sync_runtime_gate_plugins`` directly or through
+# ``_sync_gate_plugin``; none of them drove the production dispatch. A broken
+# ``if pc.get("has_plugins")`` in ``_sync_stage_per_provider`` would therefore
+# have left every test green. These two tests pin the dispatch itself against
+# the SHIPPED registry entry (v2 dispatches, v1 never does).
+
+
+def test_qa_d01_stage_dispatches_plugin_writer_for_real_v2_registry(
+    tmp_path, monkeypatch
+):
+    """QA-D-01: the shipped v2 entry dispatches the plugin writer at the seam."""
+    pc = _resolved_surface_pc("v2")
+    plugin_calls: list = []
+    log = SyncLog()
+
+    _, _, gate_calls = _run_stage(
+        tmp_path, monkeypatch, {"Opencode": pc}, ["Opencode"],
+        _gate_config(), {"Opencode": "plugin"}, log=log,
+        plugin_calls=plugin_calls,
+    )
+
+    assert gate_calls == [], (
+        "tier plugin must not dispatch the Spec-A writer (it is gated on "
+        "tier permission)"
+    )
+    assert len(plugin_calls) == 1, log.warnings + log.actions
+    args, _kwargs = plugin_calls[0]
+    assert args[5] == "Opencode", "the writer must receive the provider name"
+    assert args[6] == {"Opencode": pc}, (
+        "the writer must receive the resolved provider registry (not a single "
+        "provider entry)"
+    )
+
+
+def test_qa_d01_stage_does_not_dispatch_plugin_writer_for_v1(
+    tmp_path, monkeypatch
+):
+    """QA-D-01 (v1 half): the shipped v1 entry never dispatches the writer.
+
+    Same seam, same test body — only the resolved surface differs. The v1
+    entry keeps the static ``has_plugins: false``, so the writer must not be
+    called at all (``test_plugin_dispatch_noop_without_capability`` proves the
+    same for a synthetic fixture).
+    """
+    pc = _resolved_surface_pc(None)
+    assert pc["has_plugins"] is False, (
+        "non-vacuity: the v1 entry really resolves the capability off"
+    )
+    plugin_calls: list = []
+    log = SyncLog()
+
+    _run_stage(
+        tmp_path, monkeypatch, {"Opencode": pc}, ["Opencode"],
+        _gate_config(), {"Opencode": "permission"}, log=log,
+        plugin_calls=plugin_calls,
+    )
+
+    assert plugin_calls == [], "a v1 surface must never dispatch the plugin writer"
+    assert not (tmp_path / "project" / ".opencode" / "plugins").exists()
+
+
 # ===========================================================================
 # Phase C3 / Task 19 (C3.2): assurance tests for tier ``plugin``
 # ===========================================================================
@@ -3363,6 +3435,104 @@ def test_oqb12_tier_plugin_writes_no_default_agent_but_checks_entry_point(
         "no entry point => no triple, so the document is never created"
     )
     assert _V2_GATE_STATE_KEY not in _read_state_doc(project_no_entry)
+
+
+def test_ac_c16a_no_default_agent_reconciliation_at_tier_plugin(
+    tmp_path, monkeypatch
+):
+    """AC-C16(a) as scoped by Amendment B4 (QA-D-02): no reconciliation at ``plugin``.
+
+    Amendment B4 narrows AC-C16(a): the ``default_agent`` managed merge (with
+    its ``default-agent`` state and its user-value warning) runs on tier
+    ``permission`` only, because Spec A's call condition is frozen at
+    ``== "permission"`` (OQ-B12: "Eigenprüfung genügt"). On the C3 v2 surface
+    (tier ``plugin``) ``settings-init`` writes ``default_agent`` once and
+    ``reconcile_opencode_surface_gate`` only CHECKS the entry point — nothing
+    reconciles afterwards. A user-deleted ``default_agent`` therefore stays
+    deleted (accepted limitation).
+
+    The permission-tier half is the non-vacuity control: the same seeded
+    document *does* get ``default_agent`` re-added there, because the real
+    managed merge runs.
+    """
+    pc = _resolved_surface_pc("v2")
+    caps = _opencode_caps()
+    assert provider_runtime_gate_tier(pc, caps) == "plugin"
+
+    monkeypatch.setattr(runtime_gate, "_baked_plugin_mode", lambda: "observe")
+
+    # (a) settings-init writes `default_agent` once — and only once.
+    base = tmp_path / "plugin"
+    project = base / "project"
+    project.mkdir(parents=True)
+    (project / "opencode.json").write_text(_v2_settings_shape(), encoding="utf-8")
+    seeded = _read_json(project / "opencode.json")
+    assert seeded["default_agent"] == "orchestrator", (
+        "settings-init must write default_agent from primary-role"
+    )
+    assert not (project / _V2_STATE_REL).exists(), (
+        "settings-init records no managed state"
+    )
+
+    # (b) A full stage run at tier plugin neither removes nor re-records it.
+    log = SyncLog()
+    _, _, gate_calls = _run_stage(
+        base, monkeypatch, {"Opencode": pc}, ["Opencode"],
+        _gate_config(), {"Opencode": "plugin"}, log=log,
+    )
+    assert gate_calls == [], (
+        "tier plugin must not dispatch the Spec-A writer — it owns the "
+        "default_agent merge (Amendment B4)"
+    )
+    doc = _read_json(project / "opencode.json")
+    assert doc["default_agent"] == "orchestrator", (
+        "reconcile must leave the settings-init value untouched"
+    )
+    assert isolation._STATE_DEFAULT_AGENT_KEY not in _read_state_doc(project), (
+        "tier plugin writes no default-agent state, so no rollback/reconcile "
+        "exists for it"
+    )
+    assert not _warned(log, "default_agent"), log.warnings
+
+    # (c) The accepted limitation: a user-deleted value is not re-added, and
+    #     no user-value warning appears (no merge runs at all).
+    del doc["default_agent"]
+    _write_json(project / "opencode.json", doc)
+    before = (project / "opencode.json").read_bytes()
+    stage_log = SyncLog()
+    _run_stage(
+        base, monkeypatch, {"Opencode": pc}, ["Opencode"],
+        _gate_config(), {"Opencode": "plugin"}, log=stage_log,
+    )
+
+    assert (project / "opencode.json").read_bytes() == before, (
+        "no writer may touch (or re-add) default_agent at tier plugin"
+    )
+    markers = ("default_agent", "opencode-v2-managed", "primary-role")
+    leaked = [w for w in stage_log.warnings if any(m in w for m in markers)]
+    assert leaked == [], leaked
+
+    # (d) Non-vacuity control: at tier permission the managed merge runs and
+    #     re-adds the deleted value (the behaviour AC-C16(a) originally meant).
+    control_base = tmp_path / "permission"
+    control_project = control_base / "project"
+    control_project.mkdir(parents=True)
+    control_doc = json.loads(_v2_settings_shape())
+    del control_doc["default_agent"]
+    _write_json(control_project / "opencode.json", control_doc)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    control_pc = _v2_pc()  # same v2 surface, without the plugin capability
+    assert provider_runtime_gate_tier(control_pc, {"runtime_gate": "permission"}) == (
+        "permission"
+    ), "control precondition: without has_plugins the tier stays permission"
+
+    _run_runtime_gate(control_project, framework, {"Opencode": control_pc})
+
+    control_after = _read_json(control_project / "opencode.json")
+    assert control_after["default_agent"] == "orchestrator", (
+        "on tier permission the managed merge must re-add the deleted value"
+    )
+    assert isolation._STATE_DEFAULT_AGENT_KEY in _read_state_doc(control_project)
 
 
 def test_v1_tier_permission_unchanged_with_c3_registry(tmp_path):

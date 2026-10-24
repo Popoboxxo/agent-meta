@@ -198,7 +198,9 @@ def test_ac_c2_gate_fallback_invariants(tmp_path: Path) -> None:
     AC-C2 is asserted: the C3 registry keys are present **exactly when** the
     verdict is GO. C0 shipped only the implication "keys present => GO"; Task
     19 sharpens it to "present <=> GO", so a registry that loses the keys while
-    the verdict stays GO fails just like keys without a GO verdict.
+    the verdict stays GO fails just like keys without a GO verdict. The
+    equivalence is GLOBAL: it is evaluated for every registry entry that
+    declares one of the two keys (QA-D-04), not only for the v2 fixture below.
     """
     verdict = _c3_verdict()
     pc, caps = _resolved_v2_provider()
@@ -211,8 +213,29 @@ def test_ac_c2_gate_fallback_invariants(tmp_path: Path) -> None:
     # AC-C2 equivalence (Task 19): C3 keys present <=> verdict is GO. The keys
     # are both-or-none registry data, so a partial set is a contract violation
     # under either verdict — the expected presence is compared as a list.
-    present_keys = [key for key in _C3_REGISTRY_KEYS if key in pc]
+    # QA-D-04: ``VERDICT-C3`` is GLOBAL, so the equivalence is checked for EVERY
+    # registry entry that declares one of the two keys, not just this fixture's
+    # provider. A second entry that carries only half the pair (or that keeps
+    # the keys under a NO-GO verdict) must fail as loudly as this one.
     expected_keys = list(_C3_REGISTRY_KEYS) if verdict == "GO" else []
+    present_keys = [key for key in _C3_REGISTRY_KEYS if key in pc]
+    declaring = {
+        name: [key for key in _C3_REGISTRY_KEYS if key in entry]
+        for name, entry in load_providers_config(REPO_ROOT).items()
+        if isinstance(entry, dict) and any(key in entry for key in _C3_REGISTRY_KEYS)
+    }
+    if verdict == "GO":
+        assert declaring, (
+            "AC-C2 equivalence violated: VERDICT-C3 is 'GO', so at least one "
+            "registry entry must declare the C3 surface keys "
+            f"{expected_keys!r}, found none"
+        )
+    for name, entry_keys in declaring.items():
+        assert entry_keys == expected_keys, (
+            f"AC-C2 equivalence violated for provider {name!r}: VERDICT-C3 is "
+            f"{verdict!r}, so the registry must declare the C3 surface keys "
+            f"{expected_keys!r}, found {entry_keys!r}"
+        )
     assert present_keys == expected_keys, (
         f"AC-C2 equivalence violated: VERDICT-C3 is {verdict!r}, so the registry "
         f"must declare the C3 surface keys {expected_keys!r}, "

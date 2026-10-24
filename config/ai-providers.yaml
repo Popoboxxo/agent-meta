@@ -276,12 +276,15 @@ providers:
     - AGENTS.md
     isolation-mechanism: opencode-permissions
     # Runtime-gate plugin capability (SPEC-OPENCODE-RUNTIME-GATE-2026-09-13,
-    # IC-02). has_plugins stays false until the P6 real-repo verification
-    # (Task 9) records that tool.execute.before fires in subagent sessions and
-    # that the Main Chat is distinguishable — until then the resolved tier
-    # stays `permission` and no plugin artifact is generated. plugin_dir/
-    # plugin_ext/plugin_protocol document the capability the generator uses
-    # once the flag is unlocked.
+    # IC-02). This static default describes the v1 surface: with
+    # `has_plugins: false` v1 resolves to tier `permission` and never receives a
+    # plugin artifact. The v2 surface activates the plugin runtime through DATA
+    # in the Phase C3 block below (`surface-has-plugins` /
+    # `surface-plugin-protocols`), so a v2 project resolves to tier `plugin` and
+    # gets the observe artifact. The P6 real-repo verification (Task 9) now
+    # gates `MODE=enforce` only — the generated artifact stays observe-only and
+    # the blocking path is not implemented. plugin_dir/plugin_ext/
+    # plugin_protocol document the capability the generator uses.
     has_plugins: false
     plugin_dir: .opencode/plugins
     plugin_ext: .js
