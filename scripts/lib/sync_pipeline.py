@@ -1328,6 +1328,7 @@ def _sync_stage_per_provider(
         reconcile_opencode_surface_gate(
             project_root, config, provider, provider_config,
             agent_meta_root, log, args.dry_run,
+            active_set=active_set,
         )
         # B.7 / AC-B13/B18/B20: tier-INDEPENDENT v2 managed-key merge/rollback.
         # Deliberately outside the ``== "permission"`` block above (Spec-A

@@ -299,6 +299,7 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
         reconcile_opencode_surface_gate(
             test_repo_path, config, provider, provider_config,
             agent_meta_root, log, dry_run,
+            active_set=active_set,
         )
         # B.7 / AC-B13/B18/B20: same tier-independent call as the production
         # per-provider stage (mirrored so a --test-generated repo matches).

@@ -847,13 +847,18 @@ def _mcp_targets(entries: dict | None) -> dict[str, object]:
     }
 
 
-def _drop_flat_mcp_keys(document: dict) -> bool:
+def _drop_flat_mcp_keys(document: dict, log: SyncLog | None = None) -> bool:
     """Drop v1-style flat keys beside ``servers`` under ``mcp``.
 
     The v2 document only allows ``servers`` under ``mcp``
     (``artifact_validate._validate_opencode_v2``); a flat v1 server map must
     not survive a v1→v2 switch. Only the v2 writer calls this — the v1 writer
     (byte-frozen, R-15) never does.
+
+    Dropping is silent no longer (QA-C-04): a hand-written user server below
+    ``mcp.<name>`` would otherwise disappear without a trace. Every dropped key
+    logs one warning that names the exact path. ``log=None`` is only for direct
+    unit calls; the production writer always passes its log.
     """
     mcp_value = document.get("mcp")
     if not isinstance(mcp_value, dict):
@@ -861,6 +866,10 @@ def _drop_flat_mcp_keys(document: dict) -> bool:
     dropped = False
     for key in [key for key in mcp_value if key != "servers"]:
         del mcp_value[key]
+        if log is not None:
+            log.warning(
+                f"opencode-v2 mcp: dropped flat v1 key 'mcp.{key}'"
+            )
         dropped = True
     return dropped
 
@@ -883,7 +892,8 @@ def sync_opencode_mcp_managed(
     is updated (row 2), and a server that is no longer active is removed or its
     prior restored (rows 4/4a). Flat v1-style keys beside ``servers`` are
     dropped on a v2 write, because the v2 document allows only ``servers``
-    under ``mcp``.
+    under ``mcp``; each dropped key logs one warning so a hand-written server
+    never disappears silently (QA-C-04).
 
     The ownership guard is the first statement: non-owners never read state,
     write a file or log (AC-B20, N-M2). The secret gate is delegated to
@@ -927,7 +937,7 @@ def sync_opencode_mcp_managed(
     # A v2 write may not leave a flat v1 map next to ``servers``. Only done
     # when there is something to manage, so a file with foreign flat keys is
     # not rewritten by a pure no-op.
-    changed = _drop_flat_mcp_keys(existing) if targets else False
+    changed = _drop_flat_mcp_keys(existing, log) if targets else False
 
     new_state: dict[str, dict] = {}
     for path in sorted(set(state) | set(targets)):

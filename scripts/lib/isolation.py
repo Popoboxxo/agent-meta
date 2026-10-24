@@ -857,6 +857,8 @@ def _opencode_v2_gate_permissions(
     provider_config: dict,
     capabilities: dict,
     plugin_mode: str,
+    *,
+    active_set,
 ) -> list[dict]:
     """The effective v2 deny triples for *provider*; empty when inactive.
 
@@ -866,6 +868,13 @@ def _opencode_v2_gate_permissions(
     the same three-tier precedence as IC-4) and an explicit AND generated entry
     point exists (Spec A ``_opencode_entry_point``) — without it the deny would
     lock every agent (Spec A IC-6 step 2).
+
+    ``active_set`` is a required keyword and must be the *same* value the Spec-A
+    writer receives (``_sync_opencode_runtime_gate(..., active_set=...)``): the
+    entry-point predicate is "explicit AND generated", so a role that is only
+    declared but not part of the active set never yields triples (QA-C-01). It
+    is deliberately not defaulted to ``None`` — that fail-open made this builder
+    contradict Spec A and write v2 denies for a role that was never generated.
 
     The calculation is independent of ``_opencode_runtime_gate_entries`` (Spec-A
     freeze): it produces the LIST form, never the v1 mapping, and never calls
@@ -890,7 +899,7 @@ def _opencode_v2_gate_permissions(
     if not _resolve_effective_strict(orch, provider):
         return []
 
-    if _opencode_entry_point(provider, provider_config, None) is None:
+    if _opencode_entry_point(provider, provider_config, active_set) is None:
         return []
 
     return [
@@ -1192,6 +1201,8 @@ def reconcile_opencode_surface_gate(
     agent_meta_root: Path,
     log: SyncLog,
     dry_run: bool,
+    *,
+    active_set,
 ) -> None:
     """Reconcile the gate form with the active opencode surface (spec §3.4).
 
@@ -1199,6 +1210,14 @@ def reconcile_opencode_surface_gate(
     switch rollback. Tier-independent (it also runs when the Spec-A writer does
     not) but provider-bound: a non-owner returns before any state or file read
     (N-M2), so a Claude/Gemini iteration can never undo the opencode state.
+
+    ``active_set`` is a required keyword (QA-C-01): both production call sites
+    pass the same per-sync active set as the Spec-A writer
+    (``_sync_opencode_runtime_gate``), so the "explicit AND generated primary
+    role" predicate (``_opencode_entry_point``) is evaluated identically in both
+    writers. A fail-open default (``None``) is not acceptable here — it made
+    this function write deny triples for a declared-but-not-generated role while
+    Spec A refused its deny and warned "the gate would lock every agent".
 
     Binding rollback matrix, in order:
 
@@ -1243,14 +1262,16 @@ def reconcile_opencode_surface_gate(
         _rollback_opencode_v1_gate_map(project_root, provider_config, log, dry_run)
 
     entries = _opencode_v2_gate_permissions(
-        config, provider, agent_meta_root, provider_config, capabilities, plugin_mode
+        config, provider, agent_meta_root, provider_config, capabilities, plugin_mode,
+        active_set=active_set,
     )
 
     # Row 6 (AC-C15): on the ``permission`` tier Spec A's coupling warning is
     # the single one; on every other tier Spec A never runs, so the consequence
-    # of a missing entry point would otherwise go untold.
+    # of a missing entry point would otherwise go untold. The predicate uses the
+    # same active set as the builder and the Spec-A writer (QA-C-01).
     if is_v2_surface and not entries:
-        if _opencode_entry_point(provider, provider_config, None) is None:
+        if _opencode_entry_point(provider, provider_config, active_set) is None:
             pc = _v2_provider_entry(provider_config, provider)
             tier = providers.provider_runtime_gate_tier(
                 pc, _capabilities_for(capabilities, provider)
