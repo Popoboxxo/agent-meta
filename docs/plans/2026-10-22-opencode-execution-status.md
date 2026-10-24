@@ -2,9 +2,9 @@
 
 **Zweck:** Ausführungs-Ledger zum Plan `docs/plans/2026-10-22-opencode-v2-support-plan.md` (Phasen C0, B, C1/C2, C3, D) und damit zum Tracking-Issue #1007. Das Dokument hält je Phase und je Task den erreichten Stand, die Beleg-Commits, die Testlage und die substanziellen Befunde fest; es ersetzt weder Plan noch Spec.
 
-**Geltungsbereich:** Branch `feat/1007-b-keys` (Basis `main` = `526a5dab`; Phase C0 über PR #1011 gemergt, C0-Ledger-Commit `52a72a0f`, Evidenz-Nachbesserung `2978753c`). Phase-B-Arbeit von `bd49dc5b` bis `d5853d1e`. Phase C1/C2 auf Branch `feat/1007-c1-c2-gate` (Basis `d0b81f91`), Commits `f07ab459` bis `ad4380e1`. Stand: 2026-10-23.
+**Geltungsbereich:** Branch `feat/1007-b-keys` (Basis `main` = `526a5dab`; Phase C0 über PR #1011 gemergt, C0-Ledger-Commit `52a72a0f`, Evidenz-Nachbesserung `2978753c`). Phase-B-Arbeit von `bd49dc5b` bis `d5853d1e`. Phase C1/C2 auf Branch `feat/1007-c1-c2-gate` (Basis `d0b81f91`), Commits `f07ab459` bis `ad4380e1`. Phase C3 auf Branch `feat/1007-c3-plugin` (Basis `9f274040`), Commits `c8270845` und `c673991f`. Stand: 2026-10-24.
 
-**Datenquelle:** Commits dieses Branches, die im Plan gesetzten Checkboxen (C0: Tasks 1, 2, 3, 3a, 24; B: Tasks 4–12; C1/C2: Tasks 13, 13a, 14–17) sowie die dort protokollierten Testläufe und die C1/C2-Exit-Kriterien.
+**Datenquelle:** Commits dieses Branches, die im Plan gesetzten Checkboxen (C0: Tasks 1, 2, 3, 3a, 24; B: Tasks 4–12; C1/C2: Tasks 13, 13a, 14–17; C3: Tasks 18, 19) sowie die dort protokollierten Testläufe und die Phasen-Exit-Kriterien.
 
 **Legende der Spaltenwerte**
 
@@ -22,7 +22,7 @@
 | C0 | 1, 2, 3, 3a, 24 | `done (gemergt, PR #1011)` |
 | B | 4–12 | `done (Review/PR offen)` |
 | C1/C2 | 13, 13a, 14–17 | `done (Review/PR offen)` |
-| C3 | 18–19 | `offen` |
+| C3 | 18–19 | `done (Review/PR offen)` |
 | D | 20–33 (ohne 24) | `offen` |
 
 **Entry-Kriterien:** E1 done · E2 done · E3 done · E4 done.
@@ -120,8 +120,37 @@ python3 -m pytest tests/test_provider_agnostic_dispatch.py tests/test_import_acy
 | RVW-C-06 | MINOR | AC-C16(a)-Rollback-Hälfte: Verschwindet `primary-role`, wird `default_agent` entfernt und der `default-agent`-State geleert. | `::test_ac_c16a_default_agent_removed_when_primary_role_disappears` |
 | RVW-C-07 | MINOR | Plan-Task-15-Step-3 verweist für „`tests/test_mcp_config.py` unverändert" auf die bewusste Ledger-Abweichung. | Plan Task 15 |
 
+## C3
+
+**Branch:** `feat/1007-c3-plugin` (Basis `9f274040`; Arbeitsstand `c673991f`). Beide Task-Blöcke sind im Plan abgehakt; `VERDICT-C3: GO` lag bereits vor (Spike 2026-10-23).
+
+| Task | Agent | Commit | Tests | Status | Abweichungen/Befunde |
+|---|---|---|---|---|---|
+| 18 | `senior-developer` | `c8270845` | rot `2 failed, 1 passed` → `177 passed`; Aux/Surface `30 passed`; `python3 scripts/sync.py --validate` rc 0, `--check` rc 0; `node --check` rc 0 | `done` | Neues Template `templates/plugins/runtime-gate.opencode-v2-plugin.js.tmpl` ist ein ESM-Default-Export als **Objekt** mit `id` und `setup(ctx)` und registriert `ctx.tool.hook("execute.before")` — reiner Observe-Pfad, **kein** Permission-Deny-Hook. Die Registry erhält `surface-plugin-protocols: {v2: opencode-plugin-v2-js}` und `surface-has-plugins: {v2: true}`; das statische `has_plugins: false` bleibt unverändert. Aufgelöst ergibt v2 Tier `plugin` plus Plugin-Datei, v1 Tier `permission` ohne Datei. **Befund:** Der Plan-Step für `test_ac_c13` erwartete einen Test; ein zusätzlicher Positiv-Kontrollzweig hält die Negativ-Assertion nicht vakuös. |
+| 19 | `tester` | `c673991f` | erster Lauf grün (`165 passed`, Task-19-Step-2-Kommando) | `done` | Reine Absicherungstests, kein Produktivcode. Zwei Negativproben feuern wie erwartet und wurden danach zurückgenommen: (1) `permission_deny_required` ohne den `plugin`+`observe`-Zweig → `test_ac_c14_real_v2_registry_plugin_observe_keeps_deny_triples` `1 failed`; (2) Entfernen der beiden C3-Registry-Schlüssel → `test_ac_c2_gate_fallback_invariants` `1 failed`. Der GO-Zweig des Spike-Tests prüft jetzt die **Äquivalenz** „C3-Schlüssel vorhanden ⇔ GO“: ein Teil-Schlüsselsatz schlägt unter beiden Verdikten fehl. |
+
+**C3-Exit-Kriterien (2026-10-24, Arbeitsstand `c673991f`):**
+
+```
+python3 -m pytest tests/test_opencode_v2_surface.py tests/test_opencode_v2_spike.py tests/test_runtime_gate_plugins.py tests/test_runtime_gate_rendering.py tests/test_provider_agnostic_dispatch.py -q
+python3 scripts/sync.py --validate
+python3 scripts/sync.py --check
+python3 scripts/consistency-check.py
+bash tests/scenarios/run.sh 69-opencode-v2-surface
+```
+
+**Ergebnisse:**
+
+1. `188 passed in 14.81s` → rc 0.
+2. rc 0, `0 action(s)  |  382 skipped  |  2 warning(s)` (die zwei Warnungen stammen aus der Umgebung: gedroppte `se`-Gruppe und ein fehlgeschlagener Checkout in `agent-meta-test/external/awesome-claude-code`).
+3. rc 0, `0 action(s)  |  449 skipped  |  35 warning(s)`, `Provider context files are up to date.`
+4. rc 0, `[PASS]  All checks passed.`
+5. `PASS  69-opencode-v2-surface` → `Scenarios: 1  Passed: 1  Failed: 0`, rc 0.
+
 ## Offene Punkte
 
+- **C3-Gate-Plugin ist observe-only (bekannte Grenze):** Das generierte v2-Plugin annotiert vorgeschlagene Tool-Aufrufe und blockiert nie. Blockieren wäre in v2 erst über `ctx.permission.hook("evaluate")` möglich; dieser Deny-Pfad ist bewusst nicht enthalten und bleibt P6-gated (`MODE=enforce` ist nicht implementiert). Das tatsächliche Gate bleibt damit der Permission-Deny aus C1: `permission_deny_required` hält die verwalteten Edit-/Shell-Tripel bei Tier `plugin`+`observe` additiv erhalten.
+- **Amendment B3 (Task 22):** Die Agent-Ebene (`deny_edit`) ist bei Tier `plugin`+`observe` ebenfalls an `permission_deny_required` gebunden (AC-C14 gilt auch dort); verantwortlich ist Task 22, in C3 ist dazu nichts implementiert. Details siehe QA-C-02.
 - **QA-C-02 (MAJOR, Vertrag):** Die Agent-Ebene (`deny_edit`, Task 22) muss `permission_deny_required` verwenden (auch Tier `plugin`+`observe`); der Frontmatter-Aufrufort braucht dafür `capabilities` + `plugin_mode`. Bindend im Plan (Task 22) und in Spec Amendment B3 hinterlegt — **nicht** in dieser Runde implementiert.
 - **QA-C-03 (MINOR, bekannt):** Ein bereits vorhandenes, identisches, aber unverfolgtes Tripel unterdrückt die End-Einfügung (schwächste Position) und wird nie geclaimt. Nach State-Verlust kann ein v2→v1-Wechsel `permissions[]` (inkl. unserer Tripel) auf einem v1-Dokument hinterlassen, das ein Zod-`.strict`-Parser ablehnen könnte. Entscheidung „Dedupe vs. End-Einfügung" und eine Warnung bei vorhandenen Tripeln ohne State stehen aus.
 - **QA-C-05 (MINOR, bekannt):** `finding.file` ist immer `config/plugin-catalog.yaml`, auch für Verstöße aus `.meta-config`-Override oder Inline-Katalog. Die Meldung nennt damit nicht die tatsächliche Quelle.
@@ -136,5 +165,5 @@ python3 -m pytest tests/test_provider_agnostic_dispatch.py tests/test_import_acy
 
 ## Nächste Schritte
 
-1. Review und PR für Phase C1/C2 (Tasks 13, 13a, 14–17).
-2. Danach Phase C3 (Tasks 18–19); `VERDICT-C3: GO` liegt vor.
+1. Review und PR für Phase C3 (Tasks 18, 19) auf `feat/1007-c3-plugin`.
+2. Danach Phase D (Tasks 20–33 ohne 24): Frontmatter, `cli.json`, Duplikat, Doku, Tests, Release.

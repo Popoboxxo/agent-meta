@@ -358,10 +358,10 @@ pipeline_stages:
 - Modify: `config/ai-providers.yaml`
 - Modify: `tests/test_opencode_v2_surface.py`
 **Interfaces:** Produces `runtime_gate.PLUGIN_TEMPLATE_BY_PROTOCOL["opencode-plugin-v2-js"] = "templates/plugins/runtime-gate.opencode-v2-plugin.js.tmpl"` (`runtime_gate.py:93`), `providers.SUPPORTED_PLUGIN_PROTOCOLS = {"opencode-plugin-js", "opencode-plugin-v2-js"}` (`providers.py:611`), Registry-Schlüssel `surface-plugin-protocols: {v2: opencode-plugin-v2-js}` und `surface-has-plugins: {v2: true}` im Opencode-Eintrag (statisches `has_plugins: false` bleibt, kein v1-Eintrag), Auflösung in `providers._apply_surface_aux_selection` zu `plugin_protocol` und `has_plugins`; Template nach Spike-Q4 (Anpassung des v1-Templates `templates/plugins/runtime-gate.opencode-plugin.js.tmpl` oder Neuschreibung; Modus `observe`); Plugin-Pfad `.opencode/plugins/agent-meta-runtime-gate.js` (`runtime_gate_plugin_relpath`, `PLUGIN_STEM`); Aktivierung `surface-has-plugins.v2: true` nur, wenn das Spike-Doc eine reproduzierbare Probe (`opencode run`-Ausgabe) für Q3 enthält; Consumes Task 13a, Spike-Q1–Q4. Der Fallback (NO-GO) ist nicht Teil dieses Tasks (Task 3a, läuft in beiden Fällen)
-- [ ] Step 1: Test schreiben (3 Tests): `test_ac_c12_v2_project_gets_plugin_file_and_tier_plugin`; `test_ac_c12_v1_project_keeps_tier_permission_and_no_plugin_file`; `test_ac_c13_has_plugins_false_resolved_means_no_plugin_file`
-- [ ] Step 2: rot: `python3 -m pytest tests/test_opencode_v2_surface.py -q -k "ac_c12 or ac_c13"` → Exit 1, `2 failed, 1 passed` (der v1-Test ist als Regressionstest bereits grün)
-- [ ] Step 3: implementieren; Test grün: `python3 -m pytest tests/test_opencode_v2_surface.py tests/test_runtime_gate_plugins.py tests/test_runtime_gate_rendering.py tests/test_provider_agnostic_dispatch.py -q` → Exit 0
-- [ ] Step 4: commit `feat: generate opencode v2 runtime gate plugin when verified`
+- [x] Step 1: Test schreiben (3 Tests): `test_ac_c12_v2_project_gets_plugin_file_and_tier_plugin`; `test_ac_c12_v1_project_keeps_tier_permission_and_no_plugin_file`; `test_ac_c13_has_plugins_false_resolved_means_no_plugin_file`
+- [x] Step 2: rot: `python3 -m pytest tests/test_opencode_v2_surface.py -q -k "ac_c12 or ac_c13"` → Exit 1, `2 failed, 1 passed` (der v1-Test ist als Regressionstest bereits grün)
+- [x] Step 3: implementieren; Test grün: `python3 -m pytest tests/test_opencode_v2_surface.py tests/test_runtime_gate_plugins.py tests/test_runtime_gate_rendering.py tests/test_provider_agnostic_dispatch.py -q` → Exit 0
+- [x] Step 4: commit `feat: generate opencode v2 runtime gate plugin when verified`
 
 ### Task 19: C3.2 — Absicherung Tier `plugin`: Deny bleibt bei `observe`, Spike-Invariante verschärfen
 **Agent:** tester · **Issue:** #1007 · **AC:** AC-C14, AC-C2 (Äquivalenz bei GO)
@@ -370,10 +370,10 @@ pipeline_stages:
 - Modify: `tests/test_opencode_v2_surface.py`
 - Modify: `tests/test_opencode_v2_spike.py`
 **Interfaces:** Produces als **Absicherungstests** (kein Produktivcode; Logik liegt in `permission_deny_required` (Task 13) und `reconcile_opencode_surface_gate` (Task 13a)): `test_ac_c14_real_v2_registry_plugin_observe_keeps_deny_triples` (reale Registry mit den C3-Schlüsseln aus Task 18: Tier `plugin`, Modus `observe` → Tripel bleiben; Modus `enforce` per Monkeypatch von `runtime_gate._baked_plugin_mode` → Tripel werden entfernt), `test_oqb12_tier_plugin_writes_no_default_agent_but_checks_entry_point` (bei Tier `plugin` läuft Spec-A-Schritt 3 nicht; `reconcile_opencode_surface_gate` prüft den Einstiegspunkt über `_opencode_entry_point`, schreibt nach `observe` aber kein `default_agent`; fehlender Einstiegspunkt → WARNING und kein Tripel), `test_v1_tier_permission_unchanged_with_c3_registry` (v1 mit denselben Registry-Daten bleibt Tier `permission`); in `tests/test_opencode_v2_spike.py` verschärft Task 19 den GO-Zweig von `test_ac_c2_gate_fallback_invariants` von „Schlüssel vorhanden ⇒ GO“ auf Äquivalenz; Consumes Task 18, Task 13/13a. Dieselbe Fixture-Regel wie in Task 13a/18 gilt auch hier: explizite `permissions` `allow`/`deny`, nie Default `ask` plus `--auto` (keine Bestätigung, Spike Q2 Nebenbefund).
-- [ ] Step 1: Tests schreiben (Absicherungstests: beim ersten Lauf grün, falls Task 13/13a/18 korrekt sind)
-- [ ] Step 2: Lauf: `python3 -m pytest tests/test_opencode_v2_surface.py tests/test_opencode_v2_spike.py tests/test_runtime_gate_wiring.py tests/test_runtime_gate_config.py tests/test_opencode_runtime_gate.py -q` → Exit 0
-- [ ] Step 3: Negativprobe (nicht committen): `permission_deny_required` temporär ohne `observe`-Zweig → `test_ac_c14_real_v2_registry_plugin_observe_keeps_deny_triples` `1 failed`; C3-Schlüssel aus der Registry-Kopie entfernen → der verschärfte Spike-Test `1 failed`
-- [ ] Step 4: commit `test: guard opencode v2 gate deny under plugin observe mode`
+- [x] Step 1: Tests schreiben (Absicherungstests: beim ersten Lauf grün, falls Task 13/13a/18 korrekt sind)
+- [x] Step 2: Lauf: `python3 -m pytest tests/test_opencode_v2_surface.py tests/test_opencode_v2_spike.py tests/test_runtime_gate_wiring.py tests/test_runtime_gate_config.py tests/test_opencode_runtime_gate.py -q` → Exit 0
+- [x] Step 3: Negativprobe (nicht committen): `permission_deny_required` temporär ohne `observe`-Zweig → `test_ac_c14_real_v2_registry_plugin_observe_keeps_deny_triples` `1 failed`; C3-Schlüssel aus der Registry-Kopie entfernen → der verschärfte Spike-Test `1 failed`
+- [x] Step 4: commit `test: guard opencode v2 gate deny under plugin observe mode`
 
 ## Phase D — Frontmatter, `cli.json`, Duplikat, Doku, Tests, Release
 
