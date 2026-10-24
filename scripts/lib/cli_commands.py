@@ -206,7 +206,10 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
     from lib.dod import resolve_release_gates
     from lib.hook_plugins import sync_hook_lib, sync_release_gates
     from lib.hooks import sync_hooks
-    from lib.isolation import _sync_opencode_runtime_gate
+    from lib.isolation import (
+        _sync_opencode_runtime_gate,
+        reconcile_opencode_surface_gate,
+    )
     from lib.providers import (
         load_provider_capabilities,
         load_providers_config,
@@ -290,6 +293,14 @@ def validate_test_repo(test_repo_path: Path, agent_meta_root: Path, config: dict
                 agent_meta_root, log, dry_run,
                 active_set=active_set,
             )
+        # C1.2 / AC-C3/C4/C14/C15/B7/B21/B22: same tier-independent surface
+        # reconcile as the production per-provider stage (mirrored so a
+        # --test-generated repo matches), before the managed-key merge.
+        reconcile_opencode_surface_gate(
+            test_repo_path, config, provider, provider_config,
+            agent_meta_root, log, dry_run,
+            active_set=active_set,
+        )
         # B.7 / AC-B13/B18/B20: same tier-independent call as the production
         # per-provider stage (mirrored so a --test-generated repo matches).
         sync_opencode_v2_managed_keys(

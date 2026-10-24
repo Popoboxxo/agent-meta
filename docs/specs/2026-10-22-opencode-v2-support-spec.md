@@ -2,8 +2,8 @@
 spec-id: SPEC-OPENCODE-V2-SUPPORT-2026-10-22
 title: Opencode v2-Support Phasen B-D (Config-Keys, Permissions/MCP/Gate-Plugin, Agent-Frontmatter nativ)
 status: APPROVED
-revision: 1.6
-amendment: B1 (2026-10-23, C0-Exit-Gate: VERDICT-C3 GO / VERDICT-FIELDS AMEND); B2 (2026-10-23, Einzeleigentum experimental.subagent_depth)
+revision: 1.7
+amendment: B1 (2026-10-23, C0-Exit-Gate: VERDICT-C3 GO / VERDICT-FIELDS AMEND); B2 (2026-10-23, Einzeleigentum experimental.subagent_depth); B3 (2026-10-23, Agent-Ebene nutzt permission_deny_required + active_set am Einstiegspunkt)
 review: docs/reviews/2026-10-22-opencode-v2-support-spec-review.md
 rereview: docs/reviews/2026-10-22-opencode-v2-support-spec-rereview.md
 requires-spec: SPEC-OPENCODE-ENTRYPOINT-1006-2026-10-22
@@ -15,6 +15,8 @@ issues: "#1007 (v2-Support); relevant geschlossen: #747, #765, #794, #387, #383,
 
 > Status: APPROVED (2026-10-22) — Nutzerfreigabe 2026-10-22 (Auftrag: beide Pläne vollständig abarbeiten). Amendment B1 (2026-10-23) ist Folge des freigegebenen C0-Exit-Gates und ändert diesen Approval-Status nicht.
 > Trace-Anker: `spec-id: SPEC-OPENCODE-V2-SUPPORT-2026-10-22`
+>
+> Revision 1.7 (2026-10-23): **Amendment B3** — zwei Nachschärfungen aus dem C1/C2-Review (QA-C-01/QA-C-02). (1) Der Einstiegspunkt-Prüfer `_opencode_entry_point` wird von allen Gate-Akteuren mit demselben, echten `active_set` aufgerufen (kein Fail-open-`None`), sonst schriebe der v2-Reconciler Tripel für eine nur deklarierte, nicht generierte Primary-Rolle, während Spec A sein Deny verweigert. (2) Die **Agent-Ebene** (`deny_edit`, Task 22) muss dasselbe Prädikat wie die Config-Tripel verwenden: `permission_deny_required` (Tier `permission` **oder** `plugin`+`observe`), nicht das eingefrorene `opencode_runtime_gate_wanted`. Details: „Amendment B3 (2026-10-23)“.
 >
 > Revision 1.6 (2026-10-23): **Amendment B2** — Einzeleigentum von `experimental.subagent_depth`: nur der Managed-Merge-Writer (`sync_opencode_v2_managed_keys`/`build_managed_keys`) schreibt den Pfad, der Init-Transform `apply_settings_surface_shape` entfernt nur noch den toten Top-Level-Key. Behebt den Zeile-3a-Adoptionsdefekt (frisches Projekt), den ignorierten Projekt-Override und den verbliebenen Key nach v2→v1-Rollback. AC-B1 bleibt inhaltlich unverändert; seine Dokumentassertion wandert vom Settings-Shape-Unittest in einen End-to-End-Test. Details: „Amendment B2 (2026-10-23)“.
 >
@@ -257,9 +259,15 @@ def permission_deny_required(provider_config: dict, capabilities: dict, plugin_m
 
 def _opencode_v2_gate_permissions(config: dict, provider: str, agent_meta_root: Path,
                                   provider_config: dict, capabilities: dict,
-                                  plugin_mode: str) -> list[dict]: ...
+                                  plugin_mode: str, *, active_set) -> list[dict]: ...
     # `capabilities`/`plugin_mode` werden fuer permission_deny_required benoetigt
     # (Plan Task 13; Signatur mit dem Plan abgeglichen, Rev. 1.3).
+    # `active_set` (Rev. 1.7 / Amendment B3, RVW-C-05): PFLICHT-Keyword, derselbe
+    # Wert wie beim Spec-A-Writer. Der Einstiegspunkt ist "explizit UND generiert";
+    # ein Fail-open-Default (None = "jede deklarierte Rolle zaehlt") ist hier NICHT
+    # zulaessig, weil sonst derselbe Sync Tripel fuer eine nicht generierte Rolle
+    # schreibt, waehrend Spec A sein Deny mit "wuerde jeden Agenten sperren"
+    # verweigert (QA-C-01).
     # Effective-Entries fuer v2: nicht leer gdw. v2_active UND permission_deny_required(...)
     # UND orchestrator.strict effektiv aktiv (isolation._resolve_effective_strict, wie IC-4)
     # UND vorhandener Einstiegspunkt (Spec A _opencode_entry_point, IC-6 Schritt 2,
@@ -279,8 +287,13 @@ def _opencode_v2_gate_permissions(config: dict, provider: str, agent_meta_root: 
 ```python
 def reconcile_opencode_surface_gate(project_root: Path, config: dict, provider: str,
                                     provider_config: dict, agent_meta_root: Path,
-                                    log: SyncLog, dry_run: bool) -> None: ...
+                                    log: SyncLog, dry_run: bool, *,
+                                    active_set) -> None: ...
     # Erste Zeile: if not owns_opencode_surface(provider_config, provider): return  (N-M2).
+    # `active_set` (Rev. 1.7 / Amendment B3, RVW-C-05): PFLICHT-Keyword, von beiden
+    # Aufrufern mit demselben Wert wie `_sync_opencode_runtime_gate` uebergeben. Der
+    # Einstiegspunkt-Pruefer darf hier nicht fail-open laufen; er speist sowohl den
+    # Tripel-Builder als auch die Warnung in Zeile 6.
     # Aufruf: in JEDER Provider-Iteration, IMMER nach dem (bedingten) Aufruf von
     # _sync_opencode_runtime_gate, ausserhalb von dessen Tier-Bedingung
     # (sync_pipeline.py nach :1312, cli_commands.py nach :287).
@@ -304,7 +317,7 @@ Diese Funktion ist der einzige Akteur für `permissions[]` und für den Surface-
 - Idempotenz: zweiter Lauf erzeugt keinen zweiten identischen Eintrag.
 - **Tier `plugin` mit `MODE=observe` (B-1):** Solange `runtime_gate.py::_baked_plugin_mode` (:123) nur `observe` liefert, blockiert das Plugin nie. Die `permissions[]`-Deny-Tripel bleiben daher in diesem Fall aktiv (Plugin ist additiv, nie Ersatz); das steuert ausschließlich `permission_deny_required` (kein Eingriff in IC-4/IC-7 von Spec A, keine geänderte Aufrufbedingung von `_sync_opencode_runtime_gate`). Bekannte Grenze (OQ-B12): bei Tier `plugin` läuft Spec-A-Schritt 3 (`default_agent`-Merge) nicht, weil dessen Aufrufbedingung Tier `permission` ist; die Kopplung an den Einstiegspunkt prüft `reconcile_opencode_surface_gate` selbst über `_opencode_entry_point`. Auf v1 bleibt Tier `permission` und das Verhalten unverändert.
 
-**Agent-Ebene (B-2, Entscheidung 4):** Die v2-Frontmatter-Funktion (3.7) erhält `deny_edit: bool = False` mit identischer Semantik zu Spec A IC-3: für die Primary-Rolle (`mode == 'primary' and opencode_runtime_gate_wanted(...)`) wird der `edit`-Eintrag der Agent-Permissions auf `{action: edit, resource: "*", effect: deny}` gesetzt (nur falls die Rolle `Write`/`Edit` hat; `edit_allow_paths` aus `opencode_primary_edit_allow` ergänzen als `allow`-Einträge). **Reihenfolge (Amendment B1, 2026-10-23):** Der `*`-`deny` steht **vor** den pfadspezifischen `allow`-Einträgen aus `edit_allow_paths`, damit beim belegten „last match wins" die spezifischeren Allows die `*`-Regel überstimmen; damit bleiben die erlaubten Schreibpfade nutzbar. Diese Reihenfolge ist **abgeleitet aus Q3 (last match wins), für die Agent-interne Reihenfolge nicht separat gemessen**. Sie ist unabhängig von der globalen Einfügeposition (dort ans Listenende, s. o.). Sonst würde das `edit: allow` des Orchestrators das globale Deny übersteuern (OQ-B5, #1006-Fehler auf v2).
+**Agent-Ebene (B-2, Entscheidung 4; Prädikat nach Amendment B3):** Die v2-Frontmatter-Funktion (3.7) erhält `deny_edit: bool = False` mit identischer Semantik zu Spec A IC-3: für die Primary-Rolle (`mode == 'primary' and deny_edit`) wird der `edit`-Eintrag der Agent-Permissions auf `{action: edit, resource: "*", effect: deny}` gesetzt (nur falls die Rolle `Write`/`Edit` hat; `edit_allow_paths` aus `opencode_primary_edit_allow` ergänzen als `allow`-Einträge). **Prädikat (Amendment B3, 2026-10-23):** `deny_edit` MUSS mit `permission_deny_required(provider_config, capabilities, plugin_mode)` berechnet werden — also auch bei Tier `plugin` + `observe` —, nicht mit dem eingefrorenen `opencode_runtime_gate_wanted` (Spec A IC-4, nur Tier `permission`). Nur so deckt sich die Agent-Ebene mit den Config-Tripeln aus §3.4; sonst bliebe bei `plugin`+`observe` das globale `deny` wirkungslos, weil das zuletzt angehängte Agent-`edit: allow` es überstimmt (QA-C-02). `opencode_runtime_gate_wanted` bleibt unverändert (Spec-A-Freeze) und wird auf der Agent-Ebene nicht mehr verwendet. **Reihenfolge (Amendment B1, 2026-10-23):** Der `*`-`deny` steht **vor** den pfadspezifischen `allow`-Einträgen aus `edit_allow_paths`, damit beim belegten „last match wins" die spezifischeren Allows die `*`-Regel überstimmen; damit bleiben die erlaubten Schreibpfade nutzbar. Diese Reihenfolge ist **abgeleitet aus Q3 (last match wins), für die Agent-interne Reihenfolge nicht separat gemessen**. Sie ist unabhängig von der globalen Einfügeposition (dort ans Listenende, s. o.). Sonst würde das `edit: allow` des Orchestrators das globale Deny übersteuern (OQ-B5, #1006-Fehler auf v2).
 
 Aufrufer-Hinweis (VERIFIED `sync_pipeline.py:1303-1312`, `cli_commands.py:283-287`): Heute ruft der Aufrufer `_sync_opencode_runtime_gate` nur bei Tier `permission`; diese Bedingung bleibt unverändert. Zusätzlich und unbedingt (je Provider-Iteration, wirksam nur für den Eigentümer) rufen beide Aufrufer `reconcile_opencode_surface_gate` direkt danach, dann `sync_opencode_v2_managed_keys` (M-6). Die Funktion `_sync_opencode_v2_gate_permissions(project_root: Path, provider_config: dict, entries: list[dict], log: SyncLog, dry_run: bool) -> bool` (Schreiber/Rückbauer der Tripel, State `STATE_PERMISSIONS_KEY`; `provider_config` für `opencode_state_path`; Rückgabe True bei Änderung; Signatur mit dem Plan abgeglichen, Rev. 1.3) wird ausschließlich von `reconcile_opencode_surface_gate` aufgerufen; die „Lösung aus Spec A“ für Tier-Wechsel existiert nicht (Spec A schließt sie aus) und wird hier nicht referenziert. Beim Wechsel des Tiers selbst (z. B. `permission` → `plugin`+`enforce`) räumt die Funktion nur v2-Tripel zurück; die v1-Map auf einem v1-Projekt bleibt Spec-A-Nicht-Ziel.
 
@@ -399,7 +412,10 @@ def _transform_frontmatter_for_opencode_v2(
     # edit-Eintrag der Rolle durch {action: edit, resource: "*", effect: deny}, ergaenzt
     # um allow-Eintraege fuer edit_allow_paths; Amendment B1: der "*"-deny steht VOR den
     # pfadspezifischen allows (last match wins, 3.4). False = keine Wirkung.
-    # Aufruf: deny_edit = mode == 'primary' and opencode_runtime_gate_wanted(...) (Spec A IC-3).
+    # Aufruf: deny_edit = permission_deny_required(provider_config, capabilities, plugin_mode)
+    # (Amendment B3, 2026-10-23; NICHT das eingefrorene opencode_runtime_gate_wanted).
+    # `mode == 'primary'` wirkt in der Funktion selbst; `capabilities` und `plugin_mode`
+    # werden am Frontmatter-Aufrufort aufgeloest (3.4 "Agent-Ebene").
 ```
 
 Die v2-Funktion unterscheidet sich von der v1-Funktion in genau diesen Punkten: (a) `permissions:` (Liste) statt `permission:` (Map), (b) `steps` (kein `maxSteps`-Alias, kein `temperature`/`max_tokens`/`top_p` Legacy-Felder), (c) `model` mit angehängtem `#variant`, wenn `provider-options.Opencode.model-variants[<role>]` gesetzt ist, (d) `tools` wird nie emittiert, (e) `subagent_depth` wird nie im Frontmatter emittiert. Rest (Provenance-Kommentar, strip-fields, Body-Cleanup) wird durch Aufruf gemeinsamer Hilfsfunktionen wiederverwendet, nicht dupliziert. `system`: Der System-Prompt ist der Markdown-Body; es wird **kein** separates `system:`-Frontmatter-Feld emittiert. **Amendment B1 (2026-10-23):** Spike Q5 bestätigt das **VERIFIED** (`debug agents` zeigt `system` = exakt den Body); OQ-B7/B-D4 sind damit bestätigt, hier ändert sich nichts. Ebenso **VERIFIED**: `variant` wird aus `model: provider/model#variant` geparst (`{"providerID": ..., "variant": "high"}`) — die Punkt-(c)-Regel bleibt unverändert. Der Aufruf im Zweig :384 lautet datengetrieben: `if mechanism == 'opencode-native-v2': return _transform_frontmatter_for_opencode_v2(...)` — der `opencode-native`-Pfad (Opencode v1 **und** Mammouth) bleibt unverändert.
@@ -514,11 +530,11 @@ AC-Zählung: B1-B22 (22, davon **AC-B9 entfällt (Amendment B1)** → 21 gültig
 - **AC-C7** Given ein v2-Projekt mit einem MCP-Server (`active`), When Sync läuft, Then steht der Eintrag unter `mcp.servers.<name>` ohne `enabled`- und ohne `disabled`-Key; ein Server, dessen Registry-Connection `disabled: true` trägt, steht mit `disabled: true` im Eintrag. (3.5)
 - **AC-C8 (Amendment B1)** Given eine Registry-Connection mit `timeout: {catalog: 5000, execution: 60000}`, When v2 synchronisiert, Then trägt der Server-Eintrag `timeout: {catalog: 5000, execution: 60000}`; ein zusätzlich gesetztes `startup` (Millisekunden, Spike Q5 DOKU) wird ebenfalls übernommen, und im v1-Format erscheint `timeout` nicht. (3.5)
 - **AC-C9** Given eine Connection mit `oauth: {client_id: "{env:OC_ID}", client_secret: "{env:OC_SECRET}", scope: "read"}`, When v2 synchronisiert, Then steht `oauth` mit genau diesen snake_case-Schlüsseln im Eintrag; ein Klartext-`client_secret` löst das Secret-Gate aus. (3.5)
-- **AC-C10** Given ein v2-Dokument mit Server-Eintrag, der `enabled` oder camelCase-OAuth-Schlüssel trägt, When `--check`/`--validate` läuft, Then entsteht ein `artifact-contract`-Finding. (3.5 `_validate_opencode_v2`)
+- **AC-C10** Given ein v2-Dokument mit Server-Eintrag, der `enabled` oder camelCase-OAuth-Schlüssel trägt, When `--check`/`--validate` läuft, Then entsteht ein `artifact-contract`-Finding. (3.5 `_validate_opencode_v2`) **Klarstellung (Amendment B3, RVW-C-04):** Ein **Teil-Subset** der optionalen Timeout-Keys ist gültig (jeder der Keys `startup`/`catalog`/`execution` darf einzeln fehlen); Finding-Auslöser sind ausschließlich **nicht-ganzzahlige** Werte (bzw. `bool`/`0` und unbekannte Keys), nicht ein unvollständiges Key-Set.
 - **AC-C11** Given der MCP-Schreibpfad für v1 (`opencode-json`), Then bleibt die Ausgabe byte-identisch (`entry["enabled"] = True` unverändert), geprüft über `tests/test_mcp_config.py` (bestehende Tests) plus einen neuen expliziten Byte-Vergleichstest in `tests/test_opencode_v2_surface.py`, der die v1-Opencode-MCP-Ausgabe gegen eine eingecheckte Referenz vergleicht. (3.5, Entscheidung 8)
 - **AC-C12** Given `VERDICT-C3: GO`, `SUPPORTED_PLUGIN_PROTOCOLS` um `opencode-plugin-v2-js` erweitert und aktivierte Daten (`surface-plugin-protocols.v2`, `surface-has-plugins.v2: true`), When ein v2-Projekt synchronisiert, Then liegt `.opencode/plugins/agent-meta-runtime-gate.js` (Name gemäß `runtime_gate_plugin_relpath`, `PLUGIN_STEM`) vor und `provider_runtime_gate_tier` liefert `plugin`. Given ein v1-Projekt mit denselben Registry-Daten, Then bleibt der Tier `permission` und es entsteht keine Plugin-Datei. (3.6 C3)
 - **AC-C13** Given `VERDICT-C3: GO`, aber aufgelöstes `has_plugins: false`, Then wird keine Plugin-Datei generiert und der Tier bleibt `permission`. (3.6)
-- **AC-C14** Given ein v2-Projekt mit strict aktiv, Tier `plugin` und Plugin-Modus `observe`, When Sync läuft, Then bleiben die Deny-Tripel `{edit,**,deny}` und `{shell,**,deny}` in `permissions[]` erhalten (Plugin schwächt das Gate nicht). Given dasselbe Projekt mit Tier `plugin` + Modus `enforce` (oder Tier `advisory`) und bereits geschriebenen Tripeln, When Sync läuft, Then werden die Tripel durch `reconcile_opencode_surface_gate` entfernt, obwohl `_sync_opencode_runtime_gate` (Aufrufbedingung Tier `permission`) nicht läuft; `_opencode_runtime_gate_entries`/`opencode_runtime_gate_wanted` sind unverändert (Spec A IC-4; Test: Quelltext-Vergleich der Funktionen gegen den Stand nach Spec A). (3.4 Tier `plugin`, Rückbau-Matrix, B-1, m-6)
+- **AC-C14** Given ein v2-Projekt mit strict aktiv, Tier `plugin` und Plugin-Modus `observe`, When Sync läuft, Then bleiben die Deny-Tripel `{edit,**,deny}` und `{shell,**,deny}` in `permissions[]` erhalten (Plugin schwächt das Gate nicht). Given dasselbe Projekt mit Tier `plugin` + Modus `enforce` (oder Tier `advisory`) und bereits geschriebenen Tripeln, When Sync läuft, Then werden die Tripel durch `reconcile_opencode_surface_gate` entfernt, obwohl `_sync_opencode_runtime_gate` (Aufrufbedingung Tier `permission`) nicht läuft; `_opencode_runtime_gate_entries`/`opencode_runtime_gate_wanted` sind unverändert (Spec A IC-4; Test: Quelltext-Vergleich der Funktionen gegen den Stand nach Spec A). (3.4 Tier `plugin`, Rückbau-Matrix, B-1, m-6) **Amendment B3: AC-C14 gilt auch für die Agent-Ebene** — `deny_edit` (Task 22) muss dasselbe Prädikat `permission_deny_required` verwenden, damit bei Tier `plugin`+`observe` das zuletzt angehängte Agent-`edit: allow` das globale Deny nicht überstimmt.
 - **AC-C15** Given ein v2-Projekt mit strict aktiv, aber ohne explizite/generierte `primary-role`, When Sync läuft, Then wird kein Deny-Tripel in `permissions[]` geschrieben (ein bereits verwaltetes wird zurückgenommen) und eine WARNING nennt `primary-role` und die Konsequenz (Spec A IC-6 Schritt 2, Entscheidung 2). (3.4 normativ, B-2)
 - **AC-C16** Given ein v2-Projekt mit explizitem `primary-role` `orchestrator` und strict aktiv, When Sync läuft, Then (a) steht `default_agent: orchestrator` in `opencode.json` (Managed-Merge mit State `default-agent`, Verhalten wie Spec A AC-06…09: User-Wert bleibt mit WARNING, Rollback bei Wegfall), und (b) enthält das v2-Artefakt `.opencode/agents/orchestrator.md` in `permissions:` den Eintrag `{action: edit, resource: "*", effect: deny}` (`deny_edit`); ohne Gate fehlt dieser Deny. (3.4 Agent-Ebene, 3.7, B-2)
 - **AC-C17** Given ein v2-Projekt mit User-Eintrag `mcp.servers.my-own` und ohne aktive agent-meta-MCP-Server, das von v2 auf v1 zurückgestellt wird, When Sync läuft, Then sind alle von agent-meta geschriebenen `mcp.servers.<name>`-Pfade entfernt (kein verwaistes `mcp.servers` des Managed-Teils), der User-Eintrag bleibt erhalten und der Namespace `opencode-v2-mcp` ist entfernt. (3.5 Managed-Pfade, M-3)
@@ -718,6 +734,40 @@ Mit einem einzigen Writer gilt für ein frisches Projekt **Zeile 1** (schreiben,
 - **§3.2:** die Zeilen 1/3a/2/4 sind für `experimental.subagent_depth` erst durch dieses Amendment tatsächlich erreichbar; `build_managed_keys` bleibt die einzige Quelle der Zielwerte.
 - **Kein Provider-Name, kein `surface-version`-Dispatch:** beide Funktionen entscheiden weiterhin nur über aufgelöste Werte (`mcp-config.format`, Optionen, Capabilities).
 
+## Amendment B3 (2026-10-23)
+
+**Quelle:** C1/C2-Review zu `feat/1007-c1-c2-gate` (Verdict `CHANGES_REQUESTED`, Findings QA-C-01 BLOCKER und QA-C-02 MAJOR).
+
+**Status:** Diese Spec bleibt `Status: APPROVED (2026-10-22)`, Revision 1.7. Amendment B3 schärft zwei bereits spezifizierte Prädikate; es ist **keine neue Freigabe**, keine neue REQ und keine Scope-Erweiterung.
+
+### Regel 1 — Einstiegspunkt-Prüfung mit echtem `active_set` (QA-C-01, umgesetzt in C1/C2)
+
+Der Einstiegspunkt ist **explizit UND generiert** (`_opencode_entry_point`; Spec A IC-6). Alle Gate-Akteure müssen ihn mit demselben, echten `active_set` des laufenden Syncs aufrufen:
+
+- `_sync_opencode_runtime_gate(..., active_set=...)` (Spec A, unverändert),
+- `reconcile_opencode_surface_gate(..., *, active_set)` (Pflicht-Keyword, Rev. 1.7),
+- `_opencode_v2_gate_permissions(..., *, active_set)` (Pflicht-Keyword, Rev. 1.7).
+
+Ein Fail-open-Default `active_set=None` („jede deklarierte Rolle zählt") ist für diese Prüfung **nicht zulässig**: Er ließ denselben Sync v2-Deny-Tripel für eine nur deklarierte, nicht generierte Primary-Rolle schreiben, während Spec A sein Deny mit „the gate would lock every agent" verweigerte — und auf Tier `plugin`+`observe`, wo Spec A gar nicht läuft, geschah das sogar still. Beide Produktionsaufrufer (`sync_pipeline._sync_stage_per_provider`, `cli_commands`-Test-Repo-Pfad) übergeben daher das real berechnete `active_set`; die Zeile-6-Warnung nutzt denselben Wert.
+
+**Folge:** Auf Tier `permission` warnt genau einmal Spec A (Reconciler schweigt), auf jedem anderen Tier warnt der Reconciler selbst; in beiden Fällen entstehen **keine** Tripel und **kein** State (Tests: `test_ac_c15_non_generated_primary_role_gets_no_triples_on_permission_tier`, `..._on_plugin_observe`).
+
+### Regel 2 — Agent-Ebene nutzt `permission_deny_required` (QA-C-02, bindend für Task 22/C3)
+
+Die beiden Gate-Ebenen dürfen nicht mit unterschiedlichen Prädikaten arbeiten. Die Config-Tripel verwenden `permission_deny_required` (Tier `permission` **oder** `plugin`+`observe`). Die **Agent-Ebene** (`deny_edit` in `_transform_frontmatter_for_opencode_v2`, §3.4 „Agent-Ebene", Task 22) MUSS dasselbe Prädikat verwenden und darf **nicht** beim eingefrorenen `opencode_runtime_gate_wanted` (nur Tier `permission`) bleiben.
+
+**Begründung:** Bei Tier `plugin`+`observe` wird das Agent-`edit: allow` der Primary-Rolle **zuletzt** angehängt (Amendment B1: last match wins) und überstimmt damit das globale Config-`deny`. Der Gate wäre auf dieser Stufe wirkungslos, obwohl die Tripel korrekt geschrieben sind.
+
+**AC-Bezug:** AC-C16 (b) prüft den Agent-Eintrag; **AC-C14 gilt auch für die Agent-Ebene** (Klarstellung in AC-C14). `opencode_runtime_gate_wanted` und `_opencode_runtime_gate_entries` bleiben unverändert (Spec A IC-4 / m-6).
+
+**Folge für den Plan:** Task 22 erhält die bindende Notiz „Amendment-B3-Folge" (Prädikat, benötigte `capabilities`/`plugin_mode` am Frontmatter-Aufrufort).
+
+### Weitere Klarstellungen
+
+- **AC-C10 (RVW-C-04):** Ein Teil-Subset der optionalen Timeout-Keys ist gültig; Finding-Auslöser sind ausschließlich nicht-ganzzahlige Werte (bzw. `bool`/`0`/unbekannte Keys), nicht ein unvollständiges Key-Set.
+- **§3.4 (RVW-C-05):** neuer `active_set`-Parameter an beiden v2-Gate-Funktionen dokumentiert; Begründung gegen Fail-open siehe Regel 1.
+- **Offene MINOR-Findings aus demselben Review (QA-C-03/05/06/07/08)** bleiben als bekannte Grenzen im Ausführungsstatus geführt; sie sind nicht Teil dieses Amendments.
+
 ## Trace-Anker
 
 ```
@@ -728,4 +778,4 @@ builds-on:     SPEC-PROVIDER-AUDIT-OPENCODE-V2-2026-09-30
                SPEC-OPENCODE-RUNTIME-GATE-2026-09-13
 ```
 
-Der abgeleitete Plan (`docs/plans/2026-10-22-opencode-v2-support-plan.md`) referenziert `spec-id: SPEC-OPENCODE-V2-SUPPORT-2026-10-22` als `**Spec-ID:**` und `SPEC-OPENCODE-ENTRYPOINT-1006-2026-10-22` als Abhängigkeit. Dieses Dokument trägt `Status: APPROVED (2026-10-22)`; Amendment B1 (Rev. 1.5, 2026-10-23) ist Folge des freigegebenen C0-Exit-Gates und ändert den Approval-Status nicht.
+Der abgeleitete Plan (`docs/plans/2026-10-22-opencode-v2-support-plan.md`) referenziert `spec-id: SPEC-OPENCODE-V2-SUPPORT-2026-10-22` als `**Spec-ID:**` und `SPEC-OPENCODE-ENTRYPOINT-1006-2026-10-22` als Abhängigkeit. Dieses Dokument trägt `Status: APPROVED (2026-10-22)`; die Amendments B1 (Rev. 1.5), B2 (Rev. 1.6) und B3 (Rev. 1.7, 2026-10-23) sind Folgen des freigegebenen C0-Exit-Gates bzw. der Reviews und ändern den Approval-Status nicht.

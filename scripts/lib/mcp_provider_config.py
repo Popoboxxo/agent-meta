@@ -25,6 +25,7 @@ import re
 from pathlib import Path
 
 from .io import (
+    SyncError,
     _load_yaml_or_json,
     read_json_lenient,
     safe_path,
@@ -89,6 +90,69 @@ def _subst_for_format(fmt: str | None):
     return _subst
 
 
+# Documented opencode v2 connection keys (spec §3.5, Amendment B1). The writer
+# accepts only these shapes; anything else is reported by the catalog/schema
+# validation layer instead of being half-written or silently renamed.
+_V2_TIMEOUT_KEYS = ("catalog", "execution", "startup")
+_V2_OAUTH_KEYS = ("client_id", "client_secret", "scope")
+
+
+def _is_positive_int(value: object) -> bool:
+    """True for a positive JSON integer — ``true`` is not a timeout value."""
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
+def _v2_timeout(conn: dict) -> dict | None:
+    """Validated opencode v2 ``timeout`` object (milliseconds), else ``None``.
+
+    All three keys are optional (schema: ``additionalProperties: false``, each a
+    positive integer); an empty object, an unknown key or a non-integer value
+    yields ``None`` so the entry never carries a partially valid object. The
+    catalog check reports the offending source value (Task 17).
+    """
+    timeout = conn.get("timeout")
+    if not isinstance(timeout, dict) or not timeout:
+        return None
+    if not set(timeout) <= set(_V2_TIMEOUT_KEYS):
+        return None
+    if not all(_is_positive_int(value) for value in timeout.values()):
+        return None
+    return {key: timeout[key] for key in _V2_TIMEOUT_KEYS if key in timeout}
+
+
+def _v2_oauth(conn: dict, secrets: dict | None) -> dict | None:
+    """Rendered opencode v2 ``oauth`` object (snake_case), else ``None``.
+
+    Deliberately limited to the three supported keys — the v2-documented
+    ``callback_port``/``redirect_uri``/``auth_server_metadata_url`` and
+    ``oauth: false`` are not inputs here (the schema/catalog check reports
+    them). ``oauth.client_secret`` is secret-named, so the structural check
+    runs on the **committed** render only: that render substitutes ``{{VAR}}``
+    to ``{env:VAR}`` and must never contain a literal. The local/secrets render
+    legitimately carries the resolved value and follows the existing
+    ``allow_secrets=True`` path instead.
+    """
+    oauth = conn.get("oauth")
+    if not isinstance(oauth, dict) or not oauth:
+        return None
+    if not set(oauth) <= set(_V2_OAUTH_KEYS):
+        return None
+    rendered = {key: _subst_opencode(str(value), secrets) for key, value in oauth.items()}
+    if secrets is None:
+        # Lazy import: keeps the module graph free of a top-level
+        # mcp_provider_config -> opencode_v2_config edge (see module docstring).
+        from .opencode_v2_config import find_plaintext_secrets
+
+        findings = find_plaintext_secrets(rendered, "oauth")
+        if findings:
+            raise SyncError(
+                "Secret detected in committed MCP config: " + ", ".join(findings)
+                + "\n  Use {env:VAR} placeholders (e.g. {{OC_SECRET}}) in the "
+                "registry connection, or allow-committed-secrets: true (not recommended)."
+            )
+    return {key: rendered[key] for key in _V2_OAUTH_KEYS if key in rendered}
+
+
 def _build_connection_entry(conn: dict, secrets: dict | None, fmt: str | None = None) -> dict:
     """Convert a registry connection block to a provider-config dict.
 
@@ -96,6 +160,8 @@ def _build_connection_entry(conn: dict, secrets: dict | None, fmt: str | None = 
     provider name — AC-14/AC-23):
       - ``opencode-json`` / ``opencode-json-v2``: command as array,
         "environment" key, ``{env:VAR}`` interpolation; remote type ``remote``.
+        Only v1 emits ``enabled: true``; v2 emits ``disabled``/``timeout``/
+        ``oauth`` instead (spec §3.5, AC-C7/C8/C9).
       - ``vscode-settings``: remote type ``http`` (VS Code deprecates ``sse``),
         ``${env:VAR}`` interpolation.
       - ``antigravity-mcp-json``: remote URL uses the documented ``serverUrl``
@@ -113,6 +179,7 @@ def _build_connection_entry(conn: dict, secrets: dict | None, fmt: str | None = 
     orig_type = conn_type
 
     is_opencode = fmt in ("opencode-json", "opencode-json-v2")
+    is_opencode_v2 = fmt == "opencode-json-v2"
     is_vscode = fmt == "vscode-settings"
     is_antigravity = fmt == "antigravity-mcp-json"
     is_continue = fmt == "continue-yaml"
@@ -136,7 +203,7 @@ def _build_connection_entry(conn: dict, secrets: dict | None, fmt: str | None = 
             entry["transport"] = "sse"
     else:
         entry["type"] = conn_type
-        if is_opencode:
+        if fmt == "opencode-json":
             entry["enabled"] = True
 
     if orig_type == "sse":
@@ -164,6 +231,18 @@ def _build_connection_entry(conn: dict, secrets: dict | None, fmt: str | None = 
             entry["args"] = args
             if env:
                 entry["env"] = {k: subst(str(v), secrets) for k, v in env.items()}
+
+    if is_opencode_v2:
+        # v2 has no ``enabled`` flag: an active server simply omits ``disabled``
+        # (spec §3.5, AC-C7). The remaining keys exist only on this format.
+        if conn.get("disabled") is True:
+            entry["disabled"] = True
+        timeout = _v2_timeout(conn)
+        if timeout is not None:
+            entry["timeout"] = timeout
+        oauth = _v2_oauth(conn, secrets)
+        if oauth is not None:
+            entry["oauth"] = oauth
 
     return entry
 
@@ -606,29 +685,58 @@ def generate_provider_configs(
     Raises SyncError if actual secrets are found in committed content and
     allow_committed_secrets is False.
     """
+    # The provider's resolved data is read BEFORE the early returns: the v2
+    # rollback must also run when there is no registry, no active server or no
+    # usable config — otherwise a v2→v1 switch leaves an orphaned
+    # ``mcp.servers`` behind (spec §3.5 M-3, AC-C17). For non-owners the
+    # rollback is a no-op *before* any state read (N-M2, AC-B20).
+    pc = provider_config.get(provider, {})
+    if not isinstance(pc, dict):
+        pc = {}
+    mcp_cfg = pc.get("mcp-config", {})
+    if not isinstance(mcp_cfg, dict):
+        mcp_cfg = {}
+
+    fmt = mcp_cfg.get("format")
+    committed_file = mcp_cfg.get("committed-file")
+    secrets_file = mcp_cfg.get("secrets-file")
+
+    # Lazy import: keeps the top-level module graph free of the
+    # mcp_provider_config -> opencode_v2_config edge (see ``_v2_oauth`` and the
+    # module docstring).
+    from . import opencode_v2_config
+
+    def _rollback_opencode_mcp() -> None:
+        opencode_v2_config.rollback_opencode_mcp(
+            project_root, provider_config, provider, log, dry_run
+        )
+
     # Registry resolution comes from lib.registry_query (Issue #478) — the
     # plugins-free resolution layer — so this module never depends on mcp.py;
     # that direction would recreate the mcp/mcp_provider_config/rules import
     # cycle mcp_registry.py was extracted to break (#613).
     registry = load_mcp_registry(agent_meta_root, config, project_root)
     if not registry:
+        _rollback_opencode_mcp()
         return
 
     active_servers = resolve_active_mcp_servers(config, agent_meta_root, project_root, registry=registry)
     if not active_servers:
+        # Zero active servers is still a cleanup state: the rollback runs
+        # independently of the server count (AC-C17).
+        _rollback_opencode_mcp()
         return
 
-    pc = provider_config.get(provider, {})
-    mcp_cfg = pc.get("mcp-config", {})
     if not mcp_cfg:
+        _rollback_opencode_mcp()
         return
-
-    fmt = mcp_cfg.get("format")
-    committed_file = mcp_cfg.get("committed-file")
-    secrets_file = mcp_cfg.get("secrets-file")
 
     if not fmt or not committed_file:
+        _rollback_opencode_mcp()
         return
+
+    if fmt != "opencode-json-v2":
+        _rollback_opencode_mcp()
 
     _warn_stale_mcp_servers_key(project_root, pc, committed_file, secrets_file, log, dry_run, config)
 
@@ -661,15 +769,31 @@ def generate_provider_configs(
         local_path is not None and local_entries and local_path == committed_path
     )
     if not same_file_secrets_write:
-        _write_provider_config(
-            path=committed_path,
-            mcp_entries=committed_entries,
-            fmt=fmt,
-            log=log,
-            dry_run=dry_run,
-            allow_secrets=allow_committed_secrets,
-            config=config,
-        )
+        if fmt == "opencode-json-v2":
+            # v2 manages one path per server (``mcp.servers.<name>``) instead
+            # of replacing ``mcp`` wholesale, so user servers survive and a
+            # deactivated server is rolled back per path (spec §3.5, M-3).
+            # The local secrets file below keeps the replacement semantics of
+            # ``_update_opencode_v2_json_config`` (R-14).
+            opencode_v2_config.sync_opencode_mcp_managed(
+                project_root,
+                provider_config,
+                provider,
+                committed_entries,
+                log,
+                dry_run,
+                config=config,
+            )
+        else:
+            _write_provider_config(
+                path=committed_path,
+                mcp_entries=committed_entries,
+                fmt=fmt,
+                log=log,
+                dry_run=dry_run,
+                allow_secrets=allow_committed_secrets,
+                config=config,
+            )
 
     # --- Local/secrets provider config (only when secrets.local.yaml exists) ---
     if secrets_file and local_entries:

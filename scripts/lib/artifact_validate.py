@@ -54,6 +54,21 @@ TOML_MECHANISMS = frozenset({"codex-toml"})
 #: Frontmatter keys every generated agent artifact MUST carry.
 REQUIRED_FIELDS = frozenset({"name", "description"})
 
+#: Connection keys opencode v2 supports on an MCP server entry (spec §3.5,
+#: Amendment B1). The document check and the merged-catalog check share these
+#: rules, so a registry connection and the emitted entry cannot drift apart.
+V2_CONNECTION_KEYS = ("timeout", "oauth", "disabled")
+
+#: ``timeout`` sub-keys (milliseconds). All optional; ``startup`` was added by
+#: Amendment B1.
+V2_TIMEOUT_KEYS = ("startup", "catalog", "execution")
+
+#: ``oauth`` sub-keys — snake_case only. The v2-documented but unsupported
+#: ``callback_port``/``redirect_uri``/``auth_server_metadata_url`` and
+#: ``oauth: false`` are reported, never silently dropped
+#: (``additionalProperties: false`` semantics, spec §3.5).
+V2_OAUTH_KEYS = ("client_id", "client_secret", "scope")
+
 
 @dataclass(frozen=True)
 class ArtifactContract:
@@ -293,6 +308,9 @@ def validate_json_document(text: str, fmt: str, path: str) -> list[Finding]:
       server map. (IC-15 Nr. 16 is reversed by
       SPEC-OPENCODE-V2-SUPPORT-2026-10-22: the v2 document carries the depth as
       ``experimental.subagent_depth`` and no top-level ``subagent_depth``.)
+      Each ``mcp.servers.<name>`` entry MUST NOT carry the legacy v1 ``enabled``
+      flag and MUST use the documented v2 ``timeout``/``oauth``/``disabled``
+      shapes (AC-C10, :func:`v2_connection_key_violations`).
     * ``opencode-json`` — a document that declares MCP content MUST carry the
       flat top-level ``mcp`` object (frozen v1 byte shape, AC-21).
 
@@ -320,6 +338,94 @@ def validate_json_document(text: str, fmt: str, path: str) -> list[Finding]:
     if fmt == "opencode-json":
         return _validate_opencode_v1(doc, path)
     return []
+
+
+def _quoted(keys: list[str]) -> str:
+    return ", ".join(f"'{key}'" for key in keys)
+
+
+def _is_positive_int(value: object) -> bool:
+    """True for a positive integer — booleans are not millisecond budgets."""
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
+def _timeout_detail(timeout: object) -> str:
+    """Why *timeout* is not a valid v2 timeout object (``""`` when it is)."""
+    if not isinstance(timeout, dict) or not timeout:
+        return (
+            "must be an object with integer 'catalog'/'execution' "
+            "(optional 'startup')"
+        )
+    unknown = sorted(set(timeout) - set(V2_TIMEOUT_KEYS))
+    if unknown:
+        return (
+            f"carries unsupported key(s) {_quoted(unknown)} "
+            f"(allowed: {', '.join(V2_TIMEOUT_KEYS)})"
+        )
+    invalid = sorted(k for k, v in timeout.items() if not _is_positive_int(v))
+    if invalid:
+        noun = "value" if len(invalid) == 1 else "values"
+        return f"has invalid {noun} for {_quoted(invalid)} (must be a positive integer)"
+    return ""
+
+
+def _oauth_detail(oauth: object) -> str:
+    """Why *oauth* is not a valid v2 oauth object (``""`` when it is)."""
+    if not isinstance(oauth, dict) or not oauth:
+        return (
+            "must be an object with the snake_case keys "
+            f"{_quoted(list(V2_OAUTH_KEYS))} ('oauth: false' is not supported)"
+        )
+    unknown = sorted(set(oauth) - set(V2_OAUTH_KEYS))
+    if unknown:
+        return (
+            f"carries unsupported key(s) {_quoted(unknown)} "
+            f"(allowed: {', '.join(V2_OAUTH_KEYS)}; camelCase and the "
+            "v2-documented callback/redirect keys are not supported)"
+        )
+    invalid = sorted(k for k, v in oauth.items() if not isinstance(v, str))
+    if invalid:
+        noun = "value" if len(invalid) == 1 else "values"
+        return f"has non-string {noun} for {_quoted(invalid)}"
+    return ""
+
+
+def _disabled_detail(disabled: object) -> str:
+    """Why *disabled* is not a valid v2 flag (``""`` when it is)."""
+    if isinstance(disabled, bool):
+        return ""
+    return "must be a boolean"
+
+
+def v2_connection_key_violations(connection: object) -> list[tuple[str, str]]:
+    """``(key, detail)`` pairs for every invalid opencode v2 connection key.
+
+    Single source of truth for the two validation layers that must agree:
+
+    * the committed-document check (:func:`_validate_opencode_v2`), and
+    * the merged-catalog check
+      (``consistency.artifact_contracts.check_mcp_connection_keys``).
+
+    Absent keys are valid — they are simply not emitted. A present key must
+    match the documented shape exactly, so documented-but-unsupported values
+    (camelCase, ``callback_port``, ``oauth: false``) surface as a finding
+    instead of being silently dropped or half-written.
+    """
+    if not isinstance(connection, dict):
+        return []
+    detectors = {
+        "timeout": _timeout_detail,
+        "oauth": _oauth_detail,
+        "disabled": _disabled_detail,
+    }
+    violations: list[tuple[str, str]] = []
+    for key in V2_CONNECTION_KEYS:
+        if key not in connection:
+            continue
+        detail = detectors[key](connection[key])
+        if detail:
+            violations.append((key, detail))
+    return violations
 
 
 def _validate_opencode_v2(doc: dict, path: str) -> list[Finding]:
@@ -358,6 +464,43 @@ def _validate_opencode_v2(doc: dict, path: str) -> list[Finding]:
                     )
                 )
 
+            if isinstance(mcp["servers"], dict):
+                findings += _validate_v2_servers(mcp["servers"], path)
+
+    return findings
+
+
+def _validate_v2_servers(servers: dict, path: str) -> list[Finding]:
+    """Validate the connection keys of every v2 ``mcp.servers.<name>`` entry.
+
+    AC-C10: the frozen v1 shape carried ``enabled``; the v2 serializer writes
+    neither ``enabled`` nor (for active servers) ``disabled``. The connection
+    keys are checked with the same rules the merged-catalog check uses
+    (:func:`v2_connection_key_violations`), so a writer-emitted document is
+    clean and a hand-edited one fails loudly.
+    """
+    findings: list[Finding] = []
+    for name in sorted(servers):
+        entry = servers[name]
+        if not isinstance(entry, dict):
+            continue
+        if "enabled" in entry:
+            findings.append(
+                _finding(
+                    path,
+                    f"v2 server uses legacy 'enabled' ('{name}')",
+                    "Drop 'enabled'; an active v2 server carries no flag "
+                    "(use 'disabled: true' to deactivate it).",
+                )
+            )
+        for key, detail in v2_connection_key_violations(entry):
+            findings.append(
+                _finding(
+                    path,
+                    f"v2 server '{name}' {key} is invalid: {detail}",
+                    "Emit the documented v2 shape.",
+                )
+            )
     return findings
 
 

@@ -2,9 +2,9 @@
 
 **Zweck:** Ausführungs-Ledger zum Plan `docs/plans/2026-10-22-opencode-v2-support-plan.md` (Phasen C0, B, C1/C2, C3, D) und damit zum Tracking-Issue #1007. Das Dokument hält je Phase und je Task den erreichten Stand, die Beleg-Commits, die Testlage und die substanziellen Befunde fest; es ersetzt weder Plan noch Spec.
 
-**Geltungsbereich:** Branch `feat/1007-b-keys` (Basis `main` = `526a5dab`; Phase C0 über PR #1011 gemergt, C0-Ledger-Commit `52a72a0f`, Evidenz-Nachbesserung `2978753c`). Phase-B-Arbeit von `bd49dc5b` bis `d5853d1e`. Stand: 2026-10-23.
+**Geltungsbereich:** Branch `feat/1007-b-keys` (Basis `main` = `526a5dab`; Phase C0 über PR #1011 gemergt, C0-Ledger-Commit `52a72a0f`, Evidenz-Nachbesserung `2978753c`). Phase-B-Arbeit von `bd49dc5b` bis `d5853d1e`. Phase C1/C2 auf Branch `feat/1007-c1-c2-gate` (Basis `d0b81f91`), Commits `f07ab459` bis `ad4380e1`. Stand: 2026-10-23.
 
-**Datenquelle:** Commits dieses Branches, die im Plan gesetzten Checkboxen (C0: Tasks 1, 2, 3, 3a, 24; B: Tasks 4–12) sowie die dort protokollierten Testläufe.
+**Datenquelle:** Commits dieses Branches, die im Plan gesetzten Checkboxen (C0: Tasks 1, 2, 3, 3a, 24; B: Tasks 4–12; C1/C2: Tasks 13, 13a, 14–17) sowie die dort protokollierten Testläufe und die C1/C2-Exit-Kriterien.
 
 **Legende der Spaltenwerte**
 
@@ -21,7 +21,7 @@
 |---|---|---|
 | C0 | 1, 2, 3, 3a, 24 | `done (gemergt, PR #1011)` |
 | B | 4–12 | `done (Review/PR offen)` |
-| C1/C2 | 13, 13a, 14–17 | `offen` |
+| C1/C2 | 13, 13a, 14–17 | `done (Review/PR offen)` |
 | C3 | 18–19 | `offen` |
 | D | 20–33 (ohne 24) | `offen` |
 
@@ -76,12 +76,65 @@
 
 **Phase-B-Exit-Kriterien (2026-10-23):** `python3 -m pytest tests/test_opencode_v2_surface.py tests/test_opencode_v2_config.py tests/test_opencode_v2_schema.py tests/test_opencode_v2_aux_selection.py tests/test_opencode_runtime_gate.py -q` → `106 passed`; `python3 scripts/sync.py --validate` rc 0; `python3 scripts/sync.py --check` rc 0 (kein Drift, 0 Aktionen / 449 übersprungen, 35 Warnungen aus Altstand/Umgebung); `python3 scripts/consistency-check.py` → `[PASS] All checks passed.` rc 0.
 
+## C1/C2
+
+**Branch:** `feat/1007-c1-c2-gate` (Basis `d0b81f91`; Arbeitsstand `ad4380e1`). Alle sechs Task-Blöcke sind im Plan abgehakt.
+
+| Task | Agent | Commit | Tests | Status | Abweichungen/Befunde |
+|---|---|---|---|---|---|
+| 13 | `senior-developer` | `f07ab459` | rot `7 failed, 2 passed` → `99 passed` | `done` | `permission_deny_required` als eigene Wahrheitstabelle (Tier `permission` → True; `plugin`+`observe` → True; `plugin`+`enforce` → False; `advisory` → False). Die verwalteten Tripel werden am **Ende** von `permissions[]` angehängt (Amendment B1, Spike Q3: last match wins) und der Rollback arbeitet positionsunabhängig über das exakte Tripel. v2 erhält die v1-`permission`-Map nicht mehr. **Abweichung:** Die Writer-Signatur hat kein `config`, deshalb übergibt sie `allow_secrets=False, config=None` (Spec-A-Parität); eine leere `permissions`-Liste wird bereinigt. |
+| 13a | `senior-developer` | `3bdfac09` | rot `9 failed, 1 passed` → `109 passed` | `done` | Rückbau-Matrix mit allen 7 Zeilen umgesetzt. IC-4-Quelltext-Hashes im Test eingebettet (`_opencode_runtime_gate_entries` `b4a6c142…`, `opencode_runtime_gate_wanted` `294986792…`); die Bedingung `provider_runtime_gate_tier(pc, caps) == "permission"` tritt je Sync-Datei genau einmal auf. Die Verdrahtung sitzt zwischen Gate-Block und Managed-Keys-Writer. **Abweichung:** Die 7 Matrix-Zeilen laufen in einer einzigen Testfunktion (um den exakten RED-Zähler des Plans zu erhalten), nicht als `parametrize`. |
+| 14 | `developer` | `a9e3353a` | rot `3 failed, 1 passed` (Plan prognostizierte einen Fehlschlag) → `9 passed` | `done` | Beide MCP-`connection`-Objekte des Schemas sind offen (kein `additionalProperties`), daher waren alle drei Ablehnungsfälle vor dem Eingriff rot; der Akzeptanztest prüft deshalb zusätzlich, dass die Schlüssel auf **beiden** Objekten deklariert sind. `timeout` erlaubt `startup`; `oauth` ist bewusst auf drei Schlüssel begrenzt (dokumentierte, aber nicht unterstützte Schlüssel schlagen sichtbar fehl). |
+| 15 | `senior-developer` | `b7c6177a` | rot `4 failed, 2 passed` → `115 passed` | `done` | Der v2-Eintrag trägt kein `enabled`; `disabled`/`timeout`/`oauth` werden nur bei Gültigkeit emittiert; ein Klartext-OAuth-Secret bricht über `SyncError` ab. **Abweichung (Plandefekt):** `tests/test_mcp_config.py` musste geändert werden — `test_build_connection_entry_opencode_json_v2_matches_v1_shape` kodierte die Vorspike-Annahme „v2 == v1 inkl. `enabled: true`“, die AC-C7 widerspricht; die Assertion wurde invertiert (v1 `enabled is True`, v2 ohne `enabled`, übrige Schlüssel gleich) und der v1-Freeze verschärft. Der Plan behauptete, die Datei bleibe unverändert. |
+| 16 | `senior-developer` | `ba8282d5` | rot `7 failed` → `155 passed` | `done` | `mcp.servers.<name>` je Pfad, Namespace `opencode-v2-mcp`; der Rückbau greift auch auf den frühen Return-Pfaden und ist unabhängig von der Zahl aktiver Server. **Bekannte Grenzen:** Der MCP-Writer nimmt nicht am laufbezogenen `claimed_files`-Set teil (im Modul-Docstring dokumentiert; die aktuelle Registry hat genau einen v2-Eigentümer); Schreibvorgänge auf dieselbe Datei überspringen den committeten Managed-Write. |
+| 17 | `developer` | `ad4380e1` | rot `6 failed, 1 passed` → `115 passed` | `done` | `_validate_opencode_v2`-Findings plus neues `check_mcp_connection_keys` auf dem zusammengeführten Katalog (`Severity.ERROR`, `mcp-connection-key: <server>.<key> invalid`); ein Projekt-Override heilt eine Framework-Verletzung (nachgewiesen). **Abweichungen:** Zweite Fixture-Korrektur in `tests/test_mcp_config.py` (ein synthetisches v2-Dokument trug `enabled: true` — ungültig nach AC-C10; der Schlüssel wurde entfernt, die Assertions blieben unverändert); `timeout` wird je vorhandenem Schlüssel geprüft (kein Pflicht-Paar Katalog+Execution); `disabled` wird zusätzlich auf Dokumentebene typgeprüft. |
+
+**C1/C2-Exit-Kriterien (2026-10-23, Arbeitsstand `ad4380e1`):**
+
+```
+python3 -m pytest tests/test_opencode_v2_surface.py tests/test_opencode_runtime_gate.py tests/test_runtime_gate_wiring.py tests/test_artifact_contracts.py tests/test_mcp_config.py tests/test_opencode_v2_schema.py -q
+python3 scripts/sync.py --validate
+python3 scripts/sync.py --check
+python3 scripts/consistency-check.py
+python3 -m pytest tests/test_provider_agnostic_dispatch.py tests/test_import_acyclicity.py tests/test_python_compat_consistency.py -q
+```
+
+**Ergebnisse:** (1) `214 passed, 15 warnings` rc 0; (2) rc 0, `[PASS] All checks passed.`; (3) rc 0, `0 action(s) | 449 skipped | 35 warning(s)`, Provider-Kontextdateien aktuell; (4) rc 0, `[PASS] All checks passed.`; (5) `84 passed` rc 0.
+
+**Verdikt zum Kriterium „`tests/test_mcp_config.py` unverändert grün“: NICHT erfüllt — bewusst abgewichen.** Die Datei wurde in Task 15 und Task 17 zweimal gezielt korrigiert, weil sie Vorspike-Annahmen festschrieb, die AC-C7 bzw. AC-C10 widersprechen. Der v1-Byte-Freeze selbst wird weiterhin geprüft: `test_ac_c11_v1_entry_byte_identical_to_reference` und die verschärfte Assertion in `test_build_connection_entry_opencode_json_v2_matches_v1_shape` (`v1["enabled"] is True` plus Gleichheit aller übrigen Schlüssel) sind grün. Das Kriterium gilt damit als abgewichen, nicht als verfehlt im Sinne einer Regression.
+
+## C1/C2-Review-Fixrunde (2026-10-23)
+
+**Quelle:** Review zu `feat/1007-c1-c2-gate` (Verdict `CHANGES_REQUESTED`). Branch-Arbeitsstand `9b4d28d6`.
+
+| Finding | Schwere | Änderung | Beleg |
+|---|---|---|---|
+| QA-C-01 | BLOCKER | `active_set` ist jetzt Pflicht-Keyword von `reconcile_opencode_surface_gate` **und** `_opencode_v2_gate_permissions` und wird von beiden Produktionsaufrufern (`sync_pipeline._sync_stage_per_provider`, `cli_commands`-Test-Repo-Pfad) sowie in der Zeile-6-Warnung mit demselben Wert wie Spec A benutzt. Kein Fail-open-`None` mehr. | `scripts/lib/isolation.py`, `scripts/lib/sync_pipeline.py`, `scripts/lib/cli_commands.py`, `::test_ac_c15_non_generated_primary_role_gets_no_triples_on_*`, Spec Amendment B3 (Rev. 1.7) |
+| QA-C-02 | MAJOR (Vertrag) | Agent-Ebene (`deny_edit`, Task 22) MUSS `permission_deny_required` verwenden (auch `plugin`+`observe`), nicht `opencode_runtime_gate_wanted`; AC-C14 gilt auch für die Agent-Ebene. Nur Vertrag/Plan, Implementierung bleibt Task 22. | Spec Amendment B3, AC-C14, Plan Task 22 („Amendment-B3-Folge") |
+| QA-C-04 | MINOR | `_drop_flat_mcp_keys` loggt eine Warnung je verworfenem flachen v1-Key (`opencode-v2 mcp: dropped flat v1 key 'mcp.<name>'`); der Managed-Container `servers` wird nie gemeldet. | `scripts/lib/opencode_v2_config.py`, `::test_qa_c04_flat_v1_keys_dropped_with_one_warning_per_key` |
+| RVW-C-01 | MINOR | Freeze-Test prüft die Aufrufbedingung **in place** (Bedingung + direkt eingerückter `_sync_opencode_runtime_gate(`-Aufruf) und dass beide Aufrufer `active_set=active_set` übergeben. | `::test_ic4_functions_and_call_condition_unchanged` |
+| RVW-C-02 | MINOR | Matrix-Zeile „1b-v1-to-v2-advisory": v1-Map wird entfernt, `runtime-gate-deny` geleert, keine Tripel/kein State. | `::test_reconcile_matrix_seven_rows` / `_matrix_v1_to_v2_advisory` |
+| RVW-C-03 | MINOR | End-to-End `disabled: true` durch `generate_provider_configs`: `mcp.servers.<name>.disabled is True`, kein `enabled`. | `::test_ac_c7_disabled_true_reaches_document_end_to_end` |
+| RVW-C-04 | MINOR | AC-C10 klargestellt: ein Timeout-Teil-Subset ist gültig, Finding nur bei nicht-ganzzahligen Werten. | Spec AC-C10 |
+| RVW-C-05 | MINOR | §3.4 dokumentiert den neuen `active_set`-Parameter und warum Fail-open an der Einstiegspunkt-Prüfung unzulässig ist. | Spec §3.4 |
+| RVW-C-06 | MINOR | AC-C16(a)-Rollback-Hälfte: Verschwindet `primary-role`, wird `default_agent` entfernt und der `default-agent`-State geleert. | `::test_ac_c16a_default_agent_removed_when_primary_role_disappears` |
+| RVW-C-07 | MINOR | Plan-Task-15-Step-3 verweist für „`tests/test_mcp_config.py` unverändert" auf die bewusste Ledger-Abweichung. | Plan Task 15 |
+
 ## Offene Punkte
 
+- **QA-C-02 (MAJOR, Vertrag):** Die Agent-Ebene (`deny_edit`, Task 22) muss `permission_deny_required` verwenden (auch Tier `plugin`+`observe`); der Frontmatter-Aufrufort braucht dafür `capabilities` + `plugin_mode`. Bindend im Plan (Task 22) und in Spec Amendment B3 hinterlegt — **nicht** in dieser Runde implementiert.
+- **QA-C-03 (MINOR, bekannt):** Ein bereits vorhandenes, identisches, aber unverfolgtes Tripel unterdrückt die End-Einfügung (schwächste Position) und wird nie geclaimt. Nach State-Verlust kann ein v2→v1-Wechsel `permissions[]` (inkl. unserer Tripel) auf einem v1-Dokument hinterlassen, das ein Zod-`.strict`-Parser ablehnen könnte. Entscheidung „Dedupe vs. End-Einfügung" und eine Warnung bei vorhandenen Tripeln ohne State stehen aus.
+- **QA-C-05 (MINOR, bekannt):** `finding.file` ist immer `config/plugin-catalog.yaml`, auch für Verstöße aus `.meta-config`-Override oder Inline-Katalog. Die Meldung nennt damit nicht die tatsächliche Quelle.
+- **QA-C-06 (MINOR, bekannt):** `_v2_committed_file`/`_v2_provider_entry` duplizieren den Owner-/Committed-File-Scan aus `opencode_v2_config`; `_V2_ACTION_RENAME` ist derzeit toter Code (weder verdrahtet noch entfernt).
+- **QA-C-07 (MINOR, bekannt):** `scripts/lib/isolation.py` ist mit 1407 Zeilen (+614 in C1) ein God-Modul, oberhalb der im Repo zitierten ≤600-Richtlinie. Follow-up: Extraktion des v2-Gate-Blocks (dokumentierte Spec-Abweichung).
+- **QA-C-08 (MINOR, bekannt):** Die v2-Gate-Writer nutzen `allow_secrets=False`, während der Schwester-Writer derselben Datei `config["allow-committed-secrets"]` durchreicht. Ein Klartext-Secret eines Users bricht damit auch einen reinen Rollback ab; entweder gleiche Secret-Gate-Parameter durchreichen oder die strengere Wahl dokumentieren.
 - **OQ-B12** ist mit `VERDICT-C3: GO` an seinem Entscheidungszeitpunkt angelangt. Der dokumentierte Default „Eigenprüfung genügt (kein Eingriff in Spec A)“ gilt weiter, eine ausdrückliche Entscheidung steht jedoch noch aus.
 - Die unabhängigen Stränge B, C1/C2 und D sind durch OQ-B12 nicht blockiert.
+- **Plandefekt Task 15:** Der Plan ging davon aus, dass `tests/test_mcp_config.py` unverändert bleibt. Der Test `test_build_connection_entry_opencode_json_v2_matches_v1_shape` kodierte jedoch „v2 == v1 inkl. `enabled: true`“, was AC-C7 widerspricht; die Assertion musste invertiert werden (v1 `enabled is True`, v2 ohne `enabled`, übrige Schlüssel gleich).
+- **Plandefekt Task 17:** Eine zweite Fixture in `tests/test_mcp_config.py` führte ein synthetisches v2-Dokument mit `enabled: true`; nach AC-C10 ist das ungültig. Der Schlüssel wurde entfernt, die Assertions blieben unverändert.
+- **Bekannte Grenze für C3/D:** Der MCP-Writer partizipiert nicht am laufbezogenen `claimed_files`-Set (im Modul-Docstring dokumentiert; die aktuelle Registry hat genau einen v2-Eigentümer). Bei einem zweiten v2-Eigentümer auf derselben Datei muss die Kollisionsbehandlung vor Task 23/D nachgezogen werden; ebenso überspringen Schreibvorgänge auf dieselbe Datei den committeten Managed-Write.
 
 ## Nächste Schritte
 
-1. Review und PR für Phase B (Tasks 4–12).
-2. Danach Phase C1/C2 (Tasks 13, 13a, 14–17), PR nach grüner CI.
+1. Review und PR für Phase C1/C2 (Tasks 13, 13a, 14–17).
+2. Danach Phase C3 (Tasks 18–19); `VERDICT-C3: GO` liegt vor.

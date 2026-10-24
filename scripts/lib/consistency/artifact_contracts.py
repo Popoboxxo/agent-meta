@@ -32,11 +32,21 @@ from typing import Iterator
 
 from ..artifact_validate import (
     resolve_artifact_contract,
+    v2_connection_key_violations,
     validate_artifact,
     validate_mcp_document,
 )
 from ..providers import load_providers_config
+from ..registry_query import load_mcp_registry
 from .report import Finding, Severity
+
+#: Check label of the merged-catalog connection-key check (spec §3.5 (b)). The
+#: message carries the same prefix, so a CI grep sees one stable string.
+CHECK_MCP_CONNECTION_KEY = "mcp-connection-key"
+
+#: Framework catalog that hosts the MCP registry (no JSON schema exists for it,
+#: which is why this check duplicates the declared types in code).
+_MCP_CATALOG_FILE = "config/plugin-catalog.yaml"
 
 
 def _iter_artifacts(directory: Path, ext: str) -> Iterator[Path]:
@@ -59,6 +69,51 @@ def _rel(path: Path, root: Path) -> str:
         return str(path.relative_to(root)).replace("\\", "/")
     except ValueError:
         return str(path)
+
+
+def check_mcp_connection_keys(
+    agent_meta_root: Path, project_config: dict | None = None
+) -> list[Finding]:
+    """Validate the opencode v2 connection keys of the merged MCP catalog.
+
+    Spec §3.5 (b): the framework catalog (``config/plugin-catalog.yaml``) has no
+    JSON schema, so the types of the optional v2 keys are checked here instead
+    of at the document level. The **merged** catalog is validated — framework,
+    then ``.meta-config/plugin-catalog.yaml``, then the inline
+    ``plugin-catalog`` block of the project config, each deep-merged over the
+    previous one (``registry_query.load_mcp_registry``), so a project override
+    is checked exactly as generation would read it.
+
+    Only MCP-server entries are considered (the catalog also hosts cli-tools).
+    Absent keys are valid; a violation is a ``Severity.ERROR`` with the stable
+    message ``mcp-connection-key: <server>.<key> invalid`` and the concrete
+    sub-key detail in the suggestion. No provider name is read anywhere: the
+    keys are provider-agnostic catalog data and the v2-only consumption happens
+    in the v2 format branch of the writer.
+    """
+    findings: list[Finding] = []
+    registry = load_mcp_registry(
+        agent_meta_root, project_config, project_root=agent_meta_root
+    )
+    if not isinstance(registry, dict):
+        return findings
+    catalog_file = _rel(agent_meta_root / _MCP_CATALOG_FILE, agent_meta_root)
+
+    for name in sorted(registry):
+        server = registry[name]
+        if not isinstance(server, dict):
+            continue
+        for key, detail in v2_connection_key_violations(server.get("connection")):
+            findings.append(
+                Finding(
+                    Severity.ERROR,
+                    CHECK_MCP_CONNECTION_KEY,
+                    catalog_file,
+                    f"{CHECK_MCP_CONNECTION_KEY}: {name}.{key} invalid",
+                    f"connection.{key} {detail}.",
+                )
+            )
+    return findings
 
 
 def check_artifact_contracts(
@@ -87,6 +142,10 @@ def check_artifact_contracts(
     truth).
     """
     findings: list[Finding] = []
+    # Catalog-level check (spec §3.5 (b)): independent of the provider registry,
+    # so it runs even when no provider config is resolvable.
+    findings += check_mcp_connection_keys(agent_meta_root, project_config)
+
     providers = load_providers_config(agent_meta_root, project_config)
     if not isinstance(providers, dict):
         return findings

@@ -84,7 +84,11 @@ from lib.gitignore import (
 from lib.hook_plugins import sync_hook_lib, sync_release_gates
 from lib.hooks import sync_hooks
 from lib.io import SyncError, _write_yaml, safe_path, write_atomic
-from lib.isolation import _sync_opencode_runtime_gate, sync_provider_isolation
+from lib.isolation import (
+    _sync_opencode_runtime_gate,
+    reconcile_opencode_surface_gate,
+    sync_provider_isolation,
+)
 from lib.knowledge import sync_knowledge_engine
 from lib.log import SyncLog
 from lib.subagent_permissions import resolve_subagent_permission_provider_vars
@@ -1316,6 +1320,16 @@ def _sync_stage_per_provider(
                 agent_meta_root, log, args.dry_run,
                 active_set=active_set,
             )
+        # C1.2 / AC-C3/C4/C14/C15/B7/B21/B22: tier-INDEPENDENT surface
+        # reconcile. The single actor for the v2 ``permissions[]`` triples and
+        # the surface-switch rollback. Deliberately outside the ``== "permission"``
+        # block above (Spec-A freeze) and BEFORE the managed-key merge (spec
+        # §3.4 data flow); a no-op for non-owners.
+        reconcile_opencode_surface_gate(
+            project_root, config, provider, provider_config,
+            agent_meta_root, log, args.dry_run,
+            active_set=active_set,
+        )
         # B.7 / AC-B13/B18/B20: tier-INDEPENDENT v2 managed-key merge/rollback.
         # Deliberately outside the ``== "permission"`` block above (Spec-A
         # freeze): the writer is a no-op for non-owners and without v2/state,
