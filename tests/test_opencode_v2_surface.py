@@ -311,6 +311,28 @@ def test_ac_d8_evidence_present_with_result_line():
     }
 
 
+def test_ac_d8_repo_root_has_no_opencode_jsonc():
+    """AC-D8 (Task 26): the repo root keeps only the managed ``opencode.json``.
+
+    The evidence for Task 24 resolved ``ERGEBNIS: JSONC-TRAEGT-NICHTS-BEI``:
+    ``opencode.jsonc`` carried nothing but comments and a ``$schema`` value
+    already present in ``opencode.json``, while a content-bearing JSONC would
+    *override* the managed JSON (v1 and v2 probe). So the duplicate is removed
+    instead of migrated — and it must not come back, because recreating it
+    would re-open the shadowing risk for this repo itself.
+
+    The evidence file is asserted too: the removal decision stays traceable.
+    """
+    evidence = (
+        _REPO_ROOT / "docs/analysis/evidence/2026-10-22-opencode-jsonc-loading.md"
+    )
+    assert evidence.is_file(), f"missing AC-D8 evidence: {evidence}"
+    assert not (_REPO_ROOT / "opencode.jsonc").exists(), (
+        "the repo root must not carry a duplicate opencode.jsonc next to the "
+        "managed opencode.json (AC-D8, evidence 2026-10-22-opencode-jsonc-loading)"
+    )
+
+
 # ===========================================================================
 # Phase B / Task 9 (B.6): ``sync_opencode_v2_managed_keys`` (file I/O)
 # ===========================================================================
