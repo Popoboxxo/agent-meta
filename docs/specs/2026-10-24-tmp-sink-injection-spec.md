@@ -1,6 +1,6 @@
 # Tmp-Sink-Injektion — Spec
 
-> Status: Entwurf
+> Status: APPROVED (2026-10-24)
 >
 > **Revision 3 — Nutzerentscheidungen (2026-10-24):** Revision 3 besteht aus zwei Teilen — diesem
 > Block und dem darunter folgenden Re-Review-Iteration-2-Block (inhaltlich unverändert gültig).
@@ -28,7 +28,7 @@
 >   verschwindet. Begründung: der Regeltext darf nicht selbst die Form tragen, die er verbietet
 >   (ADR-16, AC-41).
 >
-> Status bleibt Entwurf, kein Approval.
+> Status: APPROVED (2026-10-24) — Nutzerfreigabe erteilt.
 >
 > **Revision 3 — Re-Review Iteration 2 (2026-10-24):** Befunde aus
 > `docs/reviews/2026-10-24-tmp-sink-injection-spec-review.md` (Abschnitt „Re-Review (Iteration 2)")

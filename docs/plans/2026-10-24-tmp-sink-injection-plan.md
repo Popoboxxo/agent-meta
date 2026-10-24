@@ -1,5 +1,5 @@
 # Tmp-Sink-Injektion Implementation Plan
-> Status: Entwurf
+> Status: APPROVED (2026-10-24)
 >
 > **Revision 3 (2026-10-24):** Nutzerentscheidungen Q3 (Toolchain-Cache-Opt-in), Q6 (Allowlist-Schema), Q10 (Antigravity `args.FilePath` → `file_path`), Q11 (§5.5 verweist auf `PYTEST_BASETEMP`) eingearbeitet. Neue Tasks 19–22; bestehende Task-IDs 1–18 unverändert (nur `Depends on`-Ergänzungen bei Task 15/18); `pipeline_stages` unverändert.
 
@@ -22,7 +22,7 @@
 - **Antigravity-Adapter-Vertrag (Q10/ADR-15).** `ARG_KEY_MAP` mappt `FilePath` → `file_path`, damit `args.FilePath` als `tool_input.file_path` beim Hook ankommt. Ein separater PascalCase-Contract-Test ist **nicht** Pflicht; der Regressionsfall liegt im bestehenden Adapter-Test (Task 20, AC-40).
 - **§5.5-Doku verweist auf `PYTEST_BASETEMP` (Q11/ADR-16).** Der Abschnitt nennt `PYTEST_BASETEMP`/`system-temp-exception` als Quelle und enthält kein `/tmp`-Literal in der Vorschrift; die Pflichtregel „Der pytest-Basetemp darf NIE im Arbeitsbaum liegen" bleibt wörtlich erhalten (Task 21, AC-41).
 - **Verifizierte Belege:** alle Pfade, Symbole und Zeilennummern sind gegen Branch `docs/tmp-sink-injection-spec` (Stand 2026-10-24) geprüft; maßgeblich sind die Symbole, die Zeilen sind Belege. Abweichungen von der Vorgabe sind im Abschnitt „Verifizierte Korrekturen" begründet.
-- **Kein Approval.** Plan und Spec bleiben Entwurf; kein Schritt setzt einen Approval-Marker.
+- **Approval.** Spec und Plan sind am 2026-10-24 durch den Nutzer freigegeben (`Status: APPROVED (2026-10-24)`).
 
 ## File Structure
 
@@ -930,8 +930,8 @@ PG-B errors: ["deadlock: task 'task-11' depends on unknown task_id 'task-1' (not
 
 ## Gate-Status
 
-- **Spec:** Entwurf (Revision 3, `spec-id: SPEC-tmp-sink-injection`); **dieser Plan:** Entwurf. Kein Approval-Marker gesetzt, weder hier noch in der Spec.
-- **Erwartete Validator-Ausgabe:** `python3 scripts/sync.py --validate-spec-plan` meldet **genau einen** ERROR — `spec_plan_approval_marker` für `docs/plans/2026-10-24-tmp-sink-injection-plan.md`, erzeugt von `_check_approval_markers` (`scripts/lib/consistency/spec_plan.py:479-507`), weil die referenzierte Spec nicht freigegeben ist. Das ist das Gate, das korrekt greift, kein Defekt. Alle übrigen Prüfungen (Pflichtabschnitte, Platzhalter, Traceability, Ledger-Format, Plan-Graph) müssen ohne Befund bleiben.
+- **Spec:** APPROVED (2026-10-24), Revision 3, `spec-id: SPEC-tmp-sink-injection`; **dieser Plan:** APPROVED (2026-10-24).
+- **Erwartete Validator-Ausgabe:** `python3 scripts/sync.py --validate-spec-plan` meldet **0 Findings, Exit 0** — die Spec ist `APPROVED (2026-10-24)`, damit greift `_check_approval_markers` (`scripts/lib/consistency/spec_plan.py:479-507`) nicht mehr. Das Gate-Verhalten vor der Freigabe (**genau ein** ERROR `spec_plan_approval_marker` für `docs/plans/2026-10-24-tmp-sink-injection-plan.md`) belegt der synthetische Fixture-Test aus Task 18. Alle übrigen Prüfungen (Pflichtabschnitte, Platzhalter, Traceability, Ledger-Format, Plan-Graph) müssen ohne Befund bleiben.
 - **Plan-Graph:** `validate_plan` läuft für Plandokumente als `kind="sequential"`; geprüft werden Duplikate, Dangling-Dependencies und Zyklen (keine Datei-Overlap-Prüfung, weil Ownership-Konflikte nur in `parallel_group`-Fanouts gelten).
-- **Blockierend für die Implementierung:** nur noch die fehlende Nutzerfreigabe (`Status: APPROVED`). Alle Nutzerfragen der Spec sind entschieden: Q1/Q2/Q4/Q5/Q7/Q8/Q9 in Revision 2; Q3 (Toolchain-Cache-Opt-in, Task 19/AC-38), Q6 (Allowlist-Schema, Task 22/AC-39), Q10 (Antigravity `FilePath` → `file_path`, Task 20/AC-40) und Q11 (§5.5-Verweis auf `PYTEST_BASETEMP`, Task 21/AC-41) in Revision 3. Keine offene Frage mehr.
-- **Nicht Teil dieses Plans:** Implementierung, Commits, `sync.py`-Läufe, jede Form von Approval (kein Marker wird gesetzt), Worktree-Isolation, Migration bestehender `.tmp`-Inhalte.
+- **Freigabe:** erteilt am 2026-10-24. Alle Nutzerfragen der Spec sind entschieden: Q1/Q2/Q4/Q5/Q7/Q8/Q9 in Revision 2; Q3 (Toolchain-Cache-Opt-in, Task 19/AC-38), Q6 (Allowlist-Schema, Task 22/AC-39), Q10 (Antigravity `FilePath` → `file_path`, Task 20/AC-40) und Q11 (§5.5-Verweis auf `PYTEST_BASETEMP`, Task 21/AC-41) in Revision 3. Keine offene Frage mehr.
+- **Nicht Teil dieses Plans:** Worktree-Isolation und Migration bestehender `.tmp`-Inhalte.
