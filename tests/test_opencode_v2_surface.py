@@ -39,7 +39,9 @@ import argparse
 import hashlib
 import json
 import re
+import subprocess
 import sys
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -47,6 +49,10 @@ import yaml
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO_ROOT / "scripts"))
+# The AC-01 harness owns the "render one project with scripts/sync.py" helper;
+# the lab diff below reuses it instead of adding a second renderer.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import test_ac01_render_identity as render_harness  # noqa: E402
 
 import lib.sync_pipeline as sync_pipeline
 from lib import isolation, opencode_v2_config, provider_transform, runtime_gate
@@ -4517,3 +4523,267 @@ def test_provider_doc_states_agents_md_only():
     assert ".opencode/rules/" not in text, (
         "Opencode has no dedicated rules directory; the doc must not reference one"
     )
+
+
+# ===========================================================================
+# Phase D / Task 29 (T.2): lab diff v1 <-> v2 and the full switch rollback
+# ===========================================================================
+#
+# AC-T2 / AC-B7 (integration) / AC-B21 / AC-B22 (integration). The renderer is
+# the AC-01 harness (``test_ac01_render_identity._run_sync``): scenario 79 is
+# synced twice — once with the four v2 project options removed (v1) and once as
+# shipped (v2) — and the two trees are compared file by file. Every input other
+# than the surface selector is identical by construction, so the file set that
+# differs is the surface delta and nothing else.
+
+_SCENARIO_79_CONFIG = (
+    _REPO_ROOT / "tests/scenarios/configs/79-opencode-v2-full-surface.project.yaml"
+)
+# The complete v2 opt-in of scenario 79 (Amdmt B1: no `small-model`).
+_SCENARIO_79_V2_OPTIONS = ("surface-version", "experimental-todo", "model-variants", "cli")
+
+# AC-T2: the exhaustive difference between the two renders. `AGENTS.md` is a
+# shared artifact; its only difference here is Opencode's runtime-gate tier
+# contribution (`permission` vs `plugin`), asserted separately below.
+_LAB_DIFF_CHANGED = (
+    ".meta-config/generated-file-hashes.json",
+    ".opencode/agent-meta-state.json",
+    ".opencode/agents/developer.md",
+    ".opencode/agents/orchestrator.md",
+    "AGENTS.md",
+    "opencode.json",
+)
+_LAB_DIFF_ONLY_ON_V2 = (
+    ".opencode/plugins/.agent-meta-managed",
+    ".opencode/plugins/agent-meta-runtime-gate.js",
+    "cli.json",
+)
+# Input fixture, not render output: the two runs must differ here on purpose.
+_NON_RENDER_INPUTS = (".meta-config/project.yaml",)
+_GATE_TRIPLES = [
+    {"action": "edit", "resource": "**", "effect": "deny"},
+    {"action": "shell", "resource": "**", "effect": "deny"},
+]
+_V2_NAMESPACES = (
+    isolation._STATE_V2_KEYS,
+    isolation._STATE_V2_PERMISSIONS,
+    isolation._STATE_V2_CLI,
+    isolation._STATE_V2_MCP,
+)
+
+
+def _scenario_79_project(*, surface: str) -> dict:
+    """Scenario-79 config; for ``v1`` the v2 project channel is removed."""
+    config = yaml.safe_load(_SCENARIO_79_CONFIG.read_text(encoding="utf-8"))
+    options = (config.get("provider-options") or {}).get("Opencode") or {}
+    if surface == "v1":
+        for key in _SCENARIO_79_V2_OPTIONS:
+            options.pop(key, None)
+        if not options:
+            config.pop("provider-options", None)
+    else:
+        assert options.get("surface-version") == "v2", (
+            f"scenario 79 must opt into v2 through the project channel (got {options!r})"
+        )
+    return config
+
+
+def _sync_scenario_79(project: Path, config: dict, *, init: bool) -> None:
+    """Render ``config`` into ``project`` through the AC-01 sync runner."""
+    (project / ".meta-config").mkdir(parents=True, exist_ok=True)
+    (project / ".meta-config" / "project.yaml").write_text(
+        yaml.safe_dump(config, sort_keys=False, allow_unicode=True), encoding="utf-8"
+    )
+    if init:
+        subprocess.run(["git", "init", "-q"], cwd=project, check=True)
+    result = render_harness._run_sync(project, *(["--init"] if init else []))
+    assert result.returncode == 0, (
+        f"sync failed ({'--init' if init else 'plain'}):\n"
+        f"{result.stdout[-2000:]}\n{result.stderr[-2000:]}"
+    )
+
+
+def _rendered_files(project: Path) -> dict:
+    """Relative path -> compared bytes of one rendered tree.
+
+    Only run-specific values are normalized (the scratch root and the date
+    stamps, exactly as the AC-01 harness does); model lines are NOT normalized,
+    because the model variant is one of the asserted surface differences.
+    """
+    root = project.resolve()
+    dates = sorted({date.today().isoformat(), render_harness._resolve_agent_meta_date(_REPO_ROOT)})
+    files = {}
+    for path in sorted(root.rglob("*")):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(root).as_posix()
+        if render_harness._SKIP_RE.search(rel) or rel in _NON_RENDER_INPUTS:
+            continue
+        data = path.read_bytes().replace(b"\r\n", b"\n")
+        for needle in sorted({str(root), root.as_posix()}, key=len, reverse=True):
+            data = data.replace(needle.encode(), b"<ROOT>")
+        for stamp in dates:
+            data = data.replace(stamp.encode(), b"<DATE>")
+        files[rel] = data
+    return files
+
+
+def _frontmatter(data: bytes) -> dict:
+    text = data.decode("utf-8")
+    assert text.startswith("---"), "agent artifacts start with YAML frontmatter"
+    return yaml.safe_load(text.split("---", 2)[1]) or {}
+
+
+def test_lab_diff_v1_v2(tmp_path):
+    """AC-T2: the same project on v1 and v2 differs in exactly the v2 surface.
+
+    The diff report names every changed / added / removed path, so a regression
+    is diagnosable from the failure alone.
+    """
+    v1_root = tmp_path / "v1"
+    v2_root = tmp_path / "v2"
+    _sync_scenario_79(v1_root, _scenario_79_project(surface="v1"), init=True)
+    _sync_scenario_79(v2_root, _scenario_79_project(surface="v2"), init=True)
+
+    v1 = _rendered_files(v1_root)
+    v2 = _rendered_files(v2_root)
+
+    changed = tuple(sorted(p for p in set(v1) & set(v2) if v1[p] != v2[p]))
+    only_v1 = tuple(sorted(set(v1) - set(v2)))
+    only_v2 = tuple(sorted(set(v2) - set(v1)))
+    report = (
+        f"\nchanged={list(changed)}\nonly-in-v1={list(only_v1)}\n"
+        f"only-in-v2={list(only_v2)}\n"
+        f"compared {len(v1)} v1 files against {len(v2)} v2 files"
+    )
+    assert changed == _LAB_DIFF_CHANGED, f"unexpected changed files:{report}"
+    assert only_v1 == (), f"v2 must not remove generated files:{report}"
+    assert only_v2 == _LAB_DIFF_ONLY_ON_V2, f"unexpected new files:{report}"
+
+    # --- opencode.json: mcp form, experimental.*, permissions vs permission
+    doc_v1 = json.loads(v1["opencode.json"])
+    doc_v2 = json.loads(v2["opencode.json"])
+    assert set(doc_v1) == {"subagent_depth", "mcp", "default_agent", "permission"}, doc_v1
+    assert doc_v1["mcp"]["playwright"]["enabled"] is True, (
+        "v1 keeps the flat mcp entry with the legacy 'enabled' flag"
+    )
+    assert set(doc_v2) == {"default_agent", "mcp", "permissions", "experimental"}, doc_v2
+    assert set(doc_v2["mcp"]) == {"servers"}, doc_v2["mcp"]
+    assert "enabled" not in doc_v2["mcp"]["servers"]["playwright"]
+    assert doc_v2["experimental"] == {"subagent_depth": 2, "todo": True}
+    assert doc_v1["permission"] == {"edit": {"**": "deny"}, "bash": {"**": "deny"}}
+    assert doc_v2["permissions"] == _GATE_TRIPLES
+
+    # --- .opencode/agents/*.md: permissions format and model variant
+    for role in ("developer", "orchestrator"):
+        rel = f".opencode/agents/{role}.md"
+        fm_v1 = _frontmatter(v1[rel])
+        fm_v2 = _frontmatter(v2[rel])
+        assert isinstance(fm_v1["permission"], dict), (role, fm_v1)
+        assert "permissions" not in fm_v1, (role, fm_v1)
+        assert isinstance(fm_v2["permissions"], list), (role, fm_v2)
+        assert "permission" not in fm_v2, (role, fm_v2)
+        for entry in fm_v2["permissions"]:
+            assert set(entry) == {"action", "resource", "effect"}, (role, entry)
+        assert "#" not in fm_v1["model"], (role, fm_v1["model"])
+    developer_v2 = _frontmatter(v2[".opencode/agents/developer.md"])
+    orchestrator_v2 = _frontmatter(v2[".opencode/agents/orchestrator.md"])
+    assert developer_v2["model"].endswith("#high"), (
+        f"the configured model variant must reach the artifact "
+        f"(got {developer_v2['model']!r})"
+    )
+    assert "#" not in orchestrator_v2["model"], (
+        "a role without a configured variant keeps the plain model id"
+    )
+
+    # --- cli.json and the plugin artifact exist only on v2
+    assert json.loads(v2["cli.json"]) == {"plugins": ["opencode-acme-cli"]}
+    assert b"export default {" in v2[".opencode/plugins/agent-meta-runtime-gate.js"]
+
+    # --- the derived hash manifest differs only where the surface differs
+    hashes_v1 = json.loads(v1[".meta-config/generated-file-hashes.json"])["hashes"]
+    hashes_v2 = json.loads(v2[".meta-config/generated-file-hashes.json"])["hashes"]
+    assert {
+        key for key in set(hashes_v1) | set(hashes_v2)
+        if hashes_v1.get(key) != hashes_v2.get(key)
+    } == {
+        ".opencode/agents/developer.md",
+        ".opencode/agents/orchestrator.md",
+        ".opencode/plugins/agent-meta-runtime-gate.js",
+    }, "the managed hash manifest must follow the surface, not drift on its own"
+
+    # --- AGENTS.md differs only in Opencode's runtime-gate tier contribution
+    agents_v1 = v1["AGENTS.md"].decode("utf-8")
+    agents_v2 = v2["AGENTS.md"].decode("utf-8")
+    tier_marker = "## Runtime-Enforcement-Tier:"
+    assert agents_v1.split(tier_marker)[0] == agents_v2.split(tier_marker)[0], (
+        "no AGENTS.md section before the runtime-gate tier may differ"
+    )
+    assert agents_v1.split("## Git Delegation")[1] == agents_v2.split("## Git Delegation")[1], (
+        "no AGENTS.md section after the gate block may differ"
+    )
+    assert f"{tier_marker} `permission`" in agents_v1
+    assert f"{tier_marker} `plugin`" in agents_v2
+    assert "# CRITICAL GATE (runtime-partially enforced)" in agents_v1
+    assert "# CRITICAL GATE\nMAIN CHAT darf nicht selbst editieren." in agents_v2
+
+
+def test_v2_to_v1_switch_rolls_back_all_namespaces(tmp_path):
+    """AC-B7/AC-B21/AC-B22: v2 -> v1 empties all four namespaces, and back.
+
+    One project is synced on v2, switched to v1 and switched back. The rollback
+    must clear ``opencode-v2-keys``/-permissions/-cli/-mcp, leave no managed
+    ``experimental`` / ``permissions`` / ``mcp.servers`` content behind, keep
+    user keys, and delete ``cli.json`` once it is empty. The reverse direction
+    must take the v1 ``permission``-map denies out and empty ``runtime-gate-deny``.
+    """
+    project = tmp_path / "project"
+    _sync_scenario_79(project, _scenario_79_project(surface="v2"), init=True)
+
+    # --- v2 surface fully written ----------------------------------------
+    doc = _read_json(project / "opencode.json")
+    assert "experimental" in doc and "permissions" in doc, doc
+    assert _read_json(project / "cli.json") == {"plugins": ["opencode-acme-cli"]}
+    state = _read_state_doc(project)
+    assert {ns for ns in _V2_NAMESPACES if ns in state} == set(_V2_NAMESPACES), state
+
+    # User keys next to the managed ones (AC-B7: "geänderte User-Werte bleiben").
+    doc["theme"] = "acme-dark"
+    doc["plugin"] = ["user-plugin.js"]
+    _write_json(project / "opencode.json", doc)
+
+    # --- v2 -> v1 --------------------------------------------------------
+    _sync_scenario_79(project, _scenario_79_project(surface="v1"), init=False)
+
+    doc = _read_json(project / "opencode.json")
+    assert "experimental" not in doc, doc
+    assert "permissions" not in doc, doc
+    assert "servers" not in doc["mcp"], "the nested v2 container must be pruned"
+    assert doc["mcp"]["playwright"]["enabled"] is True, "the v1 flat form is back"
+    assert doc["theme"] == "acme-dark", "a user key survives the rollback"
+    assert doc["plugin"] == ["user-plugin.js"], "a user key survives the rollback"
+    assert doc["permission"] == {"edit": {"**": "deny"}, "bash": {"**": "deny"}}, (
+        "Spec A writes the v1 map after the v2 triples are gone"
+    )
+    assert not (project / "cli.json").exists(), (
+        "the managed CLI file is removed once the rollback leaves it empty"
+    )
+    state = _read_state_doc(project)
+    assert [ns for ns in state if ns.startswith("opencode-v2-")] == [], state
+    assert state[isolation._STATE_RUNTIME_GATE_KEY] == {
+        "**": {"edit": None, "bash": None}
+    }, "Spec A owns the v1 deny state again"
+
+    # --- v1 -> v2 (reverse direction, AC-B21) ----------------------------
+    _sync_scenario_79(project, _scenario_79_project(surface="v2"), init=False)
+
+    doc = _read_json(project / "opencode.json")
+    assert "permission" not in doc, (
+        f"the v1 deny map must be taken back (prior restored): {doc}"
+    )
+    assert doc["permissions"] == _GATE_TRIPLES, doc
+    assert doc["experimental"] == {"subagent_depth": 2, "todo": True}
+    assert doc["theme"] == "acme-dark" and doc["plugin"] == ["user-plugin.js"]
+    state = _read_state_doc(project)
+    assert isolation._STATE_RUNTIME_GATE_KEY not in state, state
+    assert {ns for ns in _V2_NAMESPACES if ns in state} == set(_V2_NAMESPACES), state
