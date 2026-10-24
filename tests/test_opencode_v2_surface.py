@@ -3702,3 +3702,219 @@ def test_ac_c6_v1_mapper_unchanged():
     assert provider_transform._map_claude_tools_to_opencode_permissions(
         ["Read"], deny_list=["Bash", "Write", "Edit"],
     ) == {"read": "allow", "bash": "deny", "edit": "deny"}
+
+
+# ===========================================================================
+# Phase D1 / Task 21 (D1.2): native v2 agent frontmatter
+# ===========================================================================
+#
+# Spec §3.7 / AC-D1-D4: the ``opencode-native-v2`` mechanism gets its own
+# frontmatter builder instead of sharing the v1 one. A v2 artifact carries
+# ``permissions:`` (closed-world list of ``{action, resource, effect}``),
+# ``steps`` (never the ``maxSteps`` alias and never the v1 sampling fields),
+# ``model`` with an optional ``#variant``, never ``tools``, never
+# ``subagent_depth`` and never a separate ``system:`` field — the Markdown body
+# IS the system prompt (Spike Q5, VERIFIED). The v1 builder and the Mammouth
+# path (``opencode-native`` without a surface mechanism) stay byte-identical.
+
+_V2_TEMPLATE = (
+    "---\n"
+    "name: template-developer\n"
+    'version: "2.0.0"\n'
+    "description: old description\n"
+    "{tools}"
+    "{extra}"
+    "---\n"
+    "\n"
+    "Body content.\n"
+)
+
+_V2_FULL_TOOLS = ("Read", "Write", "Bash", "Agent")
+
+
+def _v2_template(tools=_V2_FULL_TOOLS, extra=""):
+    tools_block = ""
+    if tools:
+        tools_block = "tools:\n" + "".join(f"  - {tool}\n" for tool in tools)
+    return _V2_TEMPLATE.format(tools=tools_block, extra=extra)
+
+
+def _frontmatter_of(content: str) -> dict:
+    return yaml.safe_load(content.split("---", 2)[1]) or {}
+
+
+def _render_opencode_v2(content: str, *, model: str = "", steps: str = "",
+                        variant: str | None = None) -> str:
+    return provider_transform._transform_frontmatter_for_opencode_v2(
+        content, "developer", "new description", model, steps,
+        "1-generic/developer.md@2.0.0", _REPO_ROOT, variant=variant,
+    )
+
+
+def test_ac_d1_v2_artifact_has_permissions_list_and_no_legacy_keys():
+    """AC-D1 (3.7 a/d/e): ``permissions[]`` replaces the v1 legacy surface.
+
+    No ``permission:`` map, no ``tools:``, no ``maxSteps``, no
+    ``subagent_depth``, no sampling fields and no separate ``system:`` field;
+    ``permissions`` is a list of ``{action, resource, effect}`` with one entry
+    per action in the fixed order.
+    """
+    content = _v2_template(
+        extra=(
+            "permission:\n"
+            "  edit: allow\n"
+            "subagent_depth: 3\n"
+            "maxSteps: 40\n"
+            "temperature: 0.2\n"
+            "max_tokens: 1000\n"
+            "top_p: 0.9\n"
+            "system: legacy prompt\n"
+        ),
+    )
+    fm = _frontmatter_of(_render_opencode_v2(content))
+
+    assert fm["permissions"] == [
+        {"action": "edit", "resource": "*", "effect": "allow"},
+        {"action": "shell", "resource": "*", "effect": "allow"},
+        {"action": "subagent", "resource": "*", "effect": "allow"},
+    ]
+    for legacy in (
+        "permission", "tools", "maxSteps", "subagent_depth", "system",
+        "temperature", "max_tokens", "top_p",
+    ):
+        assert legacy not in fm, f"{legacy} must not appear in a v2 artifact"
+    # The body stays the system prompt: it is never moved into the frontmatter.
+    assert fm["name"] == "developer"
+    assert fm["description"] == "new description"
+
+
+def test_ac_d1_role_without_write_has_edit_deny():
+    """AC-D1 (M-5): a role without ``Write``/``Edit`` gets ``edit: deny``.
+
+    Closed-world: the action is still present, it is just denied — regardless
+    of ``opencode_deny_critical``.
+    """
+    role_with_shell = _frontmatter_of(
+        _render_opencode_v2(_v2_template(["Read", "Grep", "Glob", "Bash", "Agent"])),
+    )
+    assert {
+        entry["action"]: entry["effect"] for entry in role_with_shell["permissions"]
+    } == {"edit": "deny", "shell": "allow", "subagent": "allow"}
+
+    read_only = _frontmatter_of(
+        _render_opencode_v2(_v2_template(["Read", "Grep", "TodoWrite"])),
+    )
+    assert read_only["permissions"] == [
+        {"action": "edit", "resource": "*", "effect": "deny"},
+        {"action": "shell", "resource": "*", "effect": "deny"},
+        {"action": "subagent", "resource": "*", "effect": "deny"},
+    ]
+
+
+def test_ac_d2_steps_emitted_without_maxsteps():
+    """AC-D2 (3.7 b): ``steps`` is emitted, ``maxSteps`` never is."""
+    for extra in ("steps: 40\n", "maxSteps: 40\n"):
+        fm = _frontmatter_of(_render_opencode_v2(_v2_template(extra=extra)))
+        assert fm["steps"] == 40, extra
+        assert "maxSteps" not in fm, extra
+
+    # Template frontmatter wins over the resolved role default, exactly like v1.
+    fm = _frontmatter_of(
+        _render_opencode_v2(_v2_template(extra="steps: 40\n"), steps="25"),
+    )
+    assert fm["steps"] == 40
+
+
+def test_ac_d3_variant_appended_to_model_only_for_configured_role(tmp_path):
+    """AC-D3 (3.7 c): ``#variant`` only for the configured role.
+
+    The variant comes from ``provider-options.<provider>.model-variants[<role>]``
+    and is appended to the resolved model ID — roles without an entry keep the
+    plain ID, and an absent model stays absent.
+    """
+    model = "opencode-go/deepseek-v4-pro"
+    assert _frontmatter_of(
+        _render_opencode_v2(_v2_template(), model=model, variant="high"),
+    )["model"] == f"{model}#high"
+    assert _frontmatter_of(
+        _render_opencode_v2(_v2_template(), model=model),
+    )["model"] == model
+    assert "model" not in _frontmatter_of(
+        _render_opencode_v2(_v2_template(), variant="high"),
+    )
+
+    # Branch wiring: the mechanism branch resolves the variant per role.
+    registry = load_providers_config(_REPO_ROOT)
+    opencode = json.loads(json.dumps(registry["Opencode"]))
+    opencode["agent-transform"]["frontmatter-mechanism"] = "opencode-native-v2"
+    provider_config = dict(registry)
+    provider_config["Opencode"] = opencode
+    config = {
+        "model-overrides": {"Opencode": {
+            "developer": model,
+            "code-reviewer": "opencode-go/deepseek-v4-flash",
+        }},
+        "provider-options": {"Opencode": {
+            "model-variants": {"developer": "high"},
+        }},
+    }
+
+    def _render_role(role: str) -> dict:
+        return _frontmatter_of(
+            provider_transform.transform_agent_content_for_provider(
+                _v2_template(), "Opencode", role, role, "new description",
+                f"1-generic/{role}.md@2.0.0", config, _REPO_ROOT, tmp_path,
+                tmp_path / f"{role}.md", provider_config, SyncLog(),
+            ),
+        )
+
+    assert _render_role("developer")["model"] == f"{model}#high"
+    assert _render_role("code-reviewer")["model"] == "opencode-go/deepseek-v4-flash"
+
+
+def test_ac_d4_v1_artifacts_byte_identical_to_pre_change_output(tmp_path):
+    """AC-D4 / decision 10: the v1 builder output is byte-frozen.
+
+    Reference captured from ``_transform_frontmatter_for_opencode`` before the
+    v2 builder existed; the mechanism branch keeps routing v1 projects to that
+    exact function (``permission:`` map, no ``permissions:`` list).
+    """
+    content = _v2_template(
+        extra="steps: 40\ntemperature: 0.2\nmax_tokens: 1000\ntop_p: 0.9\n",
+    )
+    expected = (
+        "---\n"
+        "name: developer\n"
+        "version: 2.0.0\n"
+        "description: new description\n"
+        "steps: 40\n"
+        "temperature: 0.2\n"
+        "max_tokens: 1000\n"
+        "mode: subagent\n"
+        "generated-from: 1-generic/developer.md@2.0.0\n"
+        "model: opencode-go/deepseek-v4-flash\n"
+        "permission:\n"
+        "  read: allow\n"
+        "  edit: allow\n"
+        "  bash: allow\n"
+        "  task: allow\n"
+        "---\n"
+        "Body content.\n"
+    )
+    assert provider_transform._transform_frontmatter_for_opencode(
+        content, "developer", "new description",
+        model="opencode-go/deepseek-v4-flash", steps="",
+        generated_from="1-generic/developer.md@2.0.0",
+        agent_meta_root=_REPO_ROOT,
+    ) == expected
+
+    # Real v1 registry: the opencode-native mechanism still dispatches to the
+    # unchanged builder — `permission:` map, never a `permissions:` list.
+    v1_artifact = provider_transform.transform_agent_content_for_provider(
+        _v2_template(), "Opencode", "developer", "developer", "new description",
+        "1-generic/developer.md@2.0.0", {}, _REPO_ROOT, tmp_path,
+        tmp_path / "developer.md", load_providers_config(_REPO_ROOT), SyncLog(),
+    )
+    v1_fm = _frontmatter_of(v1_artifact)
+    assert "permission" in v1_fm
+    assert "permissions" not in v1_fm
