@@ -4787,3 +4787,239 @@ def test_v2_to_v1_switch_rolls_back_all_namespaces(tmp_path):
     state = _read_state_doc(project)
     assert isolation._STATE_RUNTIME_GATE_KEY not in state, state
     assert {ns for ns in _V2_NAMESPACES if ns in state} == set(_V2_NAMESPACES), state
+
+
+# ===========================================================================
+# Phase D / Task 30 (T.3): no cross-provider effect, golden fixtures frozen
+# ===========================================================================
+#
+# AC-D5 / AC-D6 / AC-T4 (Spec §3.7, decision 10, global constraint "keine
+# Querwirkung"). The same four-provider project is rendered twice — once with
+# Opencode on v1, once on v2 — and every byte that is NOT Opencode-owned must
+# match. The provider-spanning files are listed explicitly and checked one by
+# one: `AGENTS.md` is shared by Gemini/Mammouth/Opencode, and its runtime-gate
+# tier is folded to the weakest provider, so Opencode's v1→v2 tier change must
+# NOT leak into it; `.meta-config/generated-file-hashes.json` is a derived
+# manifest over all providers, so only its Opencode entries may move.
+
+# Provider order matters: the AC-B8 re-review flagged an order-dependent
+# rollback, so Opencode is listed first and the comparison stays order-sensitive.
+_AC_D5_PROVIDERS = ("Opencode", "Claude", "Gemini", "Mammouth")
+
+_AC_D5_BASE_CONFIG = {
+    "agent-meta-version": "2.0.0-beta.2",
+    "ai-providers": list(_AC_D5_PROVIDERS),
+    "dod-preset": "rapid-prototyping",
+    "platforms": [],
+    "roles": ["orchestrator", "developer"],
+    "orchestrator": {"mode": "strict"},
+    "project": {
+        "name": "ac-d5-cross-provider",
+        "prefix": "ad5",
+        "short": "ac-d5",
+    },
+    "variables": {
+        "PROJECT_NAME": "ac-d5-cross-provider",
+        "PROJECT_DESCRIPTION": "Cross-provider isolation proof for the v2 surface.",
+        "PROJECT_GOAL": "Prove that Opencode v2 never touches other providers.",
+        "GIT_PLATFORM": "GitHub",
+        "GIT_REMOTE_URL": "https://github.com/example/ac-d5-cross-provider",
+        "GIT_MAIN_BRANCH": "main",
+    },
+    "rules-preset": "default",
+    "speech-mode": "full",
+    "tier-preset": "Normal",
+    "se-focus": False,
+    "max-parallel-agents": 2,
+    "conventions-preset": "default",
+    "debug-mode": False,
+    "allow-committed-secrets": False,
+}
+
+# Provider-owned trees of Claude, Gemini and Mammouth (AC-D5): never changed.
+_AC_D5_FOREIGN_PREFIXES = (".claude/", ".gemini/", ".mammouth/")
+# Non-prefixed artifacts of the same three providers.
+_AC_D5_FOREIGN_FILES = ("CLAUDE.md", "AGENTS.personal.md", "mammouth.json")
+# Provider-spanning files, explicitly listed (AC-D5).
+_AC_D5_SPANNING_FILES = ("AGENTS.md", ".meta-config/generated-file-hashes.json")
+# The complete delta of the two renders: the Opencode surface plus the derived
+# hash manifest (validated separately below).
+_AC_D5_CHANGED = (
+    ".meta-config/generated-file-hashes.json",
+    ".opencode/agent-meta-state.json",
+    ".opencode/agents/developer.md",
+    ".opencode/agents/orchestrator.md",
+    # The v2 settings document itself.
+    "opencode.json",
+)
+_AC_D5_ONLY_ON_V2 = (
+    ".opencode/plugins/.agent-meta-managed",
+    ".opencode/plugins/agent-meta-runtime-gate.js",
+)
+
+
+def _ac_d5_config(surface: str) -> dict:
+    """The four-provider config; ``v1`` drops the Opencode surface option."""
+    config = json.loads(json.dumps(_AC_D5_BASE_CONFIG))
+    if surface == "v2":
+        config["provider-options"] = {"Opencode": {"surface-version": "v2"}}
+    return config
+
+
+def _sync_four_providers(project: Path, surface: str) -> None:
+    (project / ".meta-config").mkdir(parents=True, exist_ok=True)
+    (project / ".meta-config" / "project.yaml").write_text(
+        yaml.safe_dump(_ac_d5_config(surface), sort_keys=False, allow_unicode=True),
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "init", "-q"], cwd=project, check=True)
+    result = render_harness._run_sync(project, "--init")
+    assert result.returncode == 0, (
+        f"{surface} sync failed:\n{result.stdout[-2000:]}\n{result.stderr[-2000:]}"
+    )
+
+
+def _assert_provider_tree_identical(
+    v1: dict, v2: dict, prefix: str,
+) -> None:
+    """Every file below *prefix* is present and byte-identical in both renders."""
+    paths_v1 = {rel for rel in v1 if rel.startswith(prefix)}
+    paths_v2 = {rel for rel in v2 if rel.startswith(prefix)}
+    assert paths_v1, f"guard: {prefix} must produce artifacts"
+    assert paths_v1 == paths_v2, (
+        f"{prefix} file set changed: only-v1={sorted(paths_v1 - paths_v2)} "
+        f"only-v2={sorted(paths_v2 - paths_v1)}"
+    )
+    differing = sorted(rel for rel in paths_v1 if v1[rel] != v2[rel])
+    assert differing == [], f"{prefix} artifacts changed under Opencode v2: {differing}"
+
+
+def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
+    """AC-D5: Opencode v2 leaves Claude, Gemini and Mammouth byte-identical.
+
+    Reference = the same project with Opencode on v1. Every provider-owned
+    artifact must match byte for byte. The provider-spanning files are listed
+    explicitly and validated individually:
+
+    * ``AGENTS.md`` — identical, because the shared runtime-gate tier folds to
+      the weakest provider; Opencode's own tier change must not leak into it
+      (the single-provider delta is covered by ``test_lab_diff_v1_v2``);
+    * ``.meta-config/generated-file-hashes.json`` — only its Opencode entries
+      may differ (developer, orchestrator, runtime-gate plugin).
+    """
+    v1_root = tmp_path / "opencode-v1"
+    v2_root = tmp_path / "opencode-v2"
+    _sync_four_providers(v1_root, "v1")
+    _sync_four_providers(v2_root, "v2")
+
+    v1 = _rendered_files(v1_root)
+    v2 = _rendered_files(v2_root)
+
+    only_v1 = tuple(sorted(set(v1) - set(v2)))
+    only_v2 = tuple(sorted(set(v2) - set(v1)))
+    changed = tuple(sorted(rel for rel in set(v1) & set(v2) if v1[rel] != v2[rel]))
+    report = (
+        f"\nchanged={list(changed)}\nonly-in-v1={list(only_v1)}\n"
+        f"only-in-v2={list(only_v2)}\n"
+        f"compared {len(v1)} v1 files against {len(v2)} v2 files"
+    )
+
+    # --- the complete, closed delta --------------------------------------
+    assert only_v1 == (), f"v2 must not remove a file:{report}"
+    assert only_v2 == _AC_D5_ONLY_ON_V2, f"unexpected new files:{report}"
+    assert changed == tuple(sorted(_AC_D5_CHANGED)), (
+        f"the cross-provider delta is not the Opencode surface:{report}"
+    )
+
+    # --- Claude / Gemini / Mammouth: byte-identical ----------------------
+    for prefix in _AC_D5_FOREIGN_PREFIXES:
+        _assert_provider_tree_identical(v1, v2, prefix)
+    for rel in _AC_D5_FOREIGN_FILES:
+        assert rel in v1 and rel in v2, f"missing foreign artifact {rel}{report}"
+        assert v1[rel] == v2[rel], f"foreign artifact changed under v2: {rel}"
+
+    # --- the explicitly listed provider-spanning files -------------------
+    # Only the derived manifest may move; `AGENTS.md` must stay identical.
+    spanning_changed = tuple(
+        rel for rel in _AC_D5_SPANNING_FILES if v1[rel] != v2[rel]
+    )
+    assert spanning_changed == (".meta-config/generated-file-hashes.json",), (
+        f"unexpected provider-spanning delta {spanning_changed}: "
+        f"allowed files are {_AC_D5_SPANNING_FILES}{report}"
+    )
+
+    # --- provider-spanning file 1: AGENTS.md -----------------------------
+    # Shared by Opencode/Gemini/Mammouth. The tier is the weakest of the
+    # involved providers, so both renders stay `advisory` and the file must be
+    # byte-identical; an Opencode-only tier change would be a leak.
+    agents_v1 = v1["AGENTS.md"].decode("utf-8")
+    agents_v2 = v2["AGENTS.md"].decode("utf-8")
+    assert agents_v1 == agents_v2, (
+        "AGENTS.md is provider-spanning: only Opencode parts may change, but "
+        "the shared runtime-gate tier is advisory on both surfaces"
+    )
+    assert "## Runtime-Enforcement-Tier: `advisory`" in agents_v1
+    assert "## Runtime-Enforcement-Tier: `advisory`" in agents_v2
+
+    # --- provider-spanning file 2: derived hash manifest -----------------
+    hashes_v1 = json.loads(v1[".meta-config/generated-file-hashes.json"])["hashes"]
+    hashes_v2 = json.loads(v2[".meta-config/generated-file-hashes.json"])["hashes"]
+    manifest_delta = {
+        key for key in set(hashes_v1) | set(hashes_v2)
+        if hashes_v1.get(key) != hashes_v2.get(key)
+    }
+    assert manifest_delta == {
+        ".opencode/agents/developer.md",
+        ".opencode/agents/orchestrator.md",
+        ".opencode/plugins/agent-meta-runtime-gate.js",
+    }, (
+        "the generated hash manifest may only follow the Opencode surface, "
+        f"got {sorted(manifest_delta)}"
+    )
+
+
+# AC-T4 (plan-wide constraint): the golden fixtures are the baseline after the
+# Plan-A merge and must not be touched by any task of the v2 plan. The expected
+# values are the frozen digests of the three fixture trees (relpath + NUL +
+# bytes + NUL, files sorted by relpath) — literals, never recomputed.
+_FIXTURE_TREES = {
+    "ac01-baseline": "09bdcb53dd33621430978851dc7ca85a1710eabad6724f440043f951cb6dfd5f",
+    "slimming-golden": "66c7a598dc6bf7729bee5a46dfc22889bda4f3d65816c4c1f6c4938a8242b505",
+    "compact-golden": "d56b299c7512ff6678e3f401d823084fcdf3e9b813af1397192b7b99d64f77ba",
+}
+
+
+def _fixture_tree_sha256(root: Path) -> str:
+    """Deterministic digest over a fixture directory (paths and contents)."""
+    digest = hashlib.sha256()
+    files = sorted(
+        (path for path in root.rglob("*") if path.is_file()),
+        key=lambda path: path.relative_to(root).as_posix(),
+    )
+    for path in files:
+        digest.update(path.relative_to(root).as_posix().encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def test_ac_t4_fixtures_unchanged():
+    """AC-T4: the three golden fixture trees still match their frozen digests.
+
+    A changed fixture invalidates every golden comparison downstream, so this
+    is the guard for the whole plan — the expected digests are embedded
+    literals and the check runs in-process (no subprocess).
+    """
+    fixtures_root = _REPO_ROOT / "tests" / "fixtures"
+    mismatched = []
+    for name, expected in _FIXTURE_TREES.items():
+        root = fixtures_root / name
+        assert root.is_dir(), f"missing golden fixture directory: {root}"
+        actual = _fixture_tree_sha256(root)
+        if actual != expected:
+            mismatched.append(f"{name}: expected {expected}, got {actual}")
+    assert mismatched == [], (
+        "golden fixtures changed (AC-T4 requires them frozen):\n"
+        + "\n".join(mismatched)
+    )
