@@ -783,6 +783,58 @@ def _map_claude_tools_to_opencode_permissions(
 
     return perms
 
+# v2 permission actions, in the order the emitted ``permissions[]`` list keeps
+# (SPEC-OPENCODE-V2-SUPPORT-2026-10-22, 3.7 / AC-D1).
+_V2_PERMISSION_ACTIONS = ("edit", "shell", "subagent")
+
+# Claude tool -> v2 action. Tools without a v2 counterpart (Read, Glob, Grep,
+# WebFetch, WebSearch, TodoWrite) carry no permission action in v2 and are
+# dropped; the closed-world builder below still emits a ``deny`` for their
+# action bucket.
+_V2_CLAUDE_TOOL_ACTIONS = {
+    "Write": "edit",
+    "Edit": "edit",
+    "Bash": "shell",
+    "Agent": "subagent",
+}
+
+def map_tools_to_opencode_v2_permissions(
+    tools: list,
+    deny_list: list[str] | None = None,
+) -> list[dict[str, str]]:
+    """Map Claude Code tool names to a closed-world opencode v2 permission list.
+
+    v2 replaces the v1 ``permission:`` map with an ordered ``permissions[]``
+    list of ``{action, resource, effect}`` entries. Mapping:
+
+      Write / Edit -> edit
+      Bash         -> shell
+      Agent        -> subagent
+
+    Every other Claude tool has no v2 permission counterpart and is dropped.
+    The result is CLOSED-WORLD: exactly one entry per action in the fixed order
+    ``edit``, ``shell``, ``subagent`` — ``allow`` when the template tools map
+    to that action, ``deny`` otherwise. A read-only role therefore gets
+    ``edit: deny`` instead of silently inheriting write rights.
+
+    ``deny_list`` (``opencode_deny_critical``) is accepted for signature parity
+    with the v1 mapper and deliberately has no effect: the v2 surface is closed
+    by construction, so there is nothing left for a deny list to close.
+    """
+    allowed = {
+        _V2_CLAUDE_TOOL_ACTIONS[tool]
+        for tool in tools
+        if isinstance(tool, str) and tool in _V2_CLAUDE_TOOL_ACTIONS
+    }
+    return [
+        {
+            "action": action,
+            "resource": "*",
+            "effect": "allow" if action in allowed else "deny",
+        }
+        for action in _V2_PERMISSION_ACTIONS
+    ]
+
 def _transform_frontmatter_for_opencode(
     content: str,
     name: str,

@@ -49,7 +49,7 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 
 import lib.sync_pipeline as sync_pipeline
-from lib import isolation, opencode_v2_config, runtime_gate
+from lib import isolation, opencode_v2_config, provider_transform, runtime_gate
 from lib.artifact_validate import resolve_artifact_contract, validate_frontmatter
 from lib.consistency.artifact_contracts import check_artifact_contracts
 from lib.consistency.model_contracts import check_model_contracts
@@ -3576,3 +3576,129 @@ def test_v1_tier_permission_unchanged_with_c3_registry(tmp_path):
     }, log.warnings
     assert doc["default_agent"] == "orchestrator"
     assert "permissions" not in doc
+
+
+# --- AC-D1 / AC-C6: closed-world v2 permission builder ----------------------
+
+
+def test_ac_d1_builder_allows_mapped_actions():
+    """AC-D1 (3.7): mapped Claude tools yield one ``allow`` entry per action.
+
+    ``Write``/``Edit`` -> ``edit``, ``Bash`` -> ``shell``, ``Agent`` ->
+    ``subagent``. The result is an ordered list with exactly one entry per
+    action in the fixed order ``edit``, ``shell``, ``subagent``.
+    """
+    assert provider_transform.map_tools_to_opencode_v2_permissions(
+        ["Bash", "Read", "Write", "Edit", "Agent"],
+    ) == [
+        {"action": "edit", "resource": "*", "effect": "allow"},
+        {"action": "shell", "resource": "*", "effect": "allow"},
+        {"action": "subagent", "resource": "*", "effect": "allow"},
+    ]
+
+    # Partial mapping: only the mapped actions are allowed, the order stays.
+    assert provider_transform.map_tools_to_opencode_v2_permissions(
+        ["Bash", "Read"],
+    ) == [
+        {"action": "edit", "resource": "*", "effect": "deny"},
+        {"action": "shell", "resource": "*", "effect": "allow"},
+        {"action": "subagent", "resource": "*", "effect": "deny"},
+    ]
+    assert provider_transform.map_tools_to_opencode_v2_permissions(
+        ["Write", "Edit", "Agent"],
+    ) == [
+        {"action": "edit", "resource": "*", "effect": "allow"},
+        {"action": "shell", "resource": "*", "effect": "deny"},
+        {"action": "subagent", "resource": "*", "effect": "allow"},
+    ]
+    # A single ``Write`` is enough for the ``edit`` action.
+    assert provider_transform.map_tools_to_opencode_v2_permissions(["Write"])[0] == {
+        "action": "edit", "resource": "*", "effect": "allow",
+    }
+
+
+def test_ac_d1_builder_closed_world_denies_unmapped_actions():
+    """AC-D1 (M-5): a read-only role gets all three actions ``deny``.
+
+    Closed-world: unmapped actions are denied, never omitted, so a role
+    without ``Write``/``Edit`` cannot silently gain ``edit`` rights.
+    """
+    assert provider_transform.map_tools_to_opencode_v2_permissions(["Read"]) == [
+        {"action": "edit", "resource": "*", "effect": "deny"},
+        {"action": "shell", "resource": "*", "effect": "deny"},
+        {"action": "subagent", "resource": "*", "effect": "deny"},
+    ]
+    # Every entry carries the same closed-world shape.
+    for entry in provider_transform.map_tools_to_opencode_v2_permissions([]):
+        assert entry["resource"] == "*"
+        assert entry["effect"] == "deny"
+    # Unknown / unmapped tools never widen the surface.
+    unmapped = ["Glob", "Grep", "TodoWrite"]
+    assert provider_transform.map_tools_to_opencode_v2_permissions(unmapped) == [
+        {"action": "edit", "resource": "*", "effect": "deny"},
+        {"action": "shell", "resource": "*", "effect": "deny"},
+        {"action": "subagent", "resource": "*", "effect": "deny"},
+    ]
+
+
+def test_ac_d1_builder_ignores_deny_list():
+    """AC-D1 (3.7): ``deny_list``/``opencode_deny_critical`` has no effect.
+
+    The v1 deny list exists to close the *map* surface; the v2 builder is
+    closed-world by construction, so the same roles stay identical whether the
+    list is omitted, empty or populated.
+    """
+    tools = ["Bash", "Write", "Edit", "Agent"]
+    without = provider_transform.map_tools_to_opencode_v2_permissions(tools)
+    assert provider_transform.map_tools_to_opencode_v2_permissions(
+        tools, deny_list=None,
+    ) == without
+    assert provider_transform.map_tools_to_opencode_v2_permissions(
+        tools, deny_list=[],
+    ) == without
+    assert provider_transform.map_tools_to_opencode_v2_permissions(
+        tools, deny_list=["Bash", "Write", "Edit"],
+    ) == without
+    assert without == [
+        {"action": "edit", "resource": "*", "effect": "allow"},
+        {"action": "shell", "resource": "*", "effect": "allow"},
+        {"action": "subagent", "resource": "*", "effect": "allow"},
+    ]
+    # read-only role stays closed-world regardless of the deny list.
+    read_only = provider_transform.map_tools_to_opencode_v2_permissions(["Read"])
+    assert provider_transform.map_tools_to_opencode_v2_permissions(
+        ["Read"], deny_list=["Bash", "Write", "Edit"],
+    ) == read_only
+
+
+def test_ac_c6_v1_mapper_unchanged():
+    """AC-C6 / decision 8: the v1 permission map stays frozen.
+
+    The v1 mapper keeps its own vocabulary (``bash``/``read``/``edit``/...)
+    and its allow-then-deny semantics; the v2 builder must not touch it.
+    """
+    full_reference = {
+        "bash": "allow",
+        "read": "allow",
+        "edit": "allow",
+        "glob": "allow",
+        "grep": "allow",
+        "webfetch": "allow",
+        "websearch": "allow",
+        "task": "allow",
+        "todowrite": "allow",
+    }
+    assert provider_transform._map_claude_tools_to_opencode_permissions(
+        ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "WebFetch",
+         "WebSearch", "Agent", "TodoWrite"],
+    ) == full_reference
+    # An explicitly allowed tool wins over the deny list (unchanged v1 rule).
+    assert provider_transform._map_claude_tools_to_opencode_permissions(
+        ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "WebFetch",
+         "WebSearch", "Agent", "TodoWrite"],
+        deny_list=["Bash", "Write", "Edit"],
+    ) == full_reference
+    # Deny only applies to tools the template did not allow.
+    assert provider_transform._map_claude_tools_to_opencode_permissions(
+        ["Read"], deny_list=["Bash", "Write", "Edit"],
+    ) == {"read": "allow", "bash": "deny", "edit": "deny"}
