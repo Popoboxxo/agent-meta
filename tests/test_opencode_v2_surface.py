@@ -3218,3 +3218,191 @@ def test_ac_c13_has_plugins_false_resolved_means_no_plugin_file(tmp_path):
     assert (
         project_on / ".opencode/plugins/agent-meta-runtime-gate.js"
     ).is_file(), "positive control must write the artifact"
+
+
+# ===========================================================================
+# Phase C3 / Task 19 (C3.2): assurance tests for tier ``plugin``
+# ===========================================================================
+#
+# No production code here: the behaviour under test already lives in
+# ``isolation.permission_deny_required`` (Task 13) and
+# ``isolation.reconcile_opencode_surface_gate`` (Task 13a). These tests pin it
+# against the SHIPPED registry (Task 18: ``surface-plugin-protocols.v2`` /
+# ``surface-has-plugins.v2``), so an edit to the registry data or a lost
+# observe branch fails loudly (AC-C14, OQ-B12).
+#
+# Fixtures use the real registry entry and real capabilities — no synthetic
+# ``has_plugins``/``plugin_protocol`` stub — because the point of C3 is that
+# the DATA resolves to tier ``plugin``. Explicit ``allow``/``deny`` project
+# entries keep the probe deterministic (Spike Q2: default ``ask`` plus
+# ``--auto`` is not a confirmation).
+
+
+def test_ac_c14_real_v2_registry_plugin_observe_keeps_deny_triples(
+    tmp_path, monkeypatch
+):
+    """AC-C14: on the shipped v2 registry ``observe`` keeps the deny triples.
+
+    Tier ``plugin`` comes from the machine flags, not from a fixture:
+    ``provider_runtime_gate_tier`` must return ``"plugin"`` for the resolved v2
+    entry. ``permission_deny_required`` is then the single decision that keeps
+    the deny additive in ``observe`` mode and drops it in ``enforce`` mode —
+    the latter without ``_sync_opencode_runtime_gate`` ever running (it is
+    gated on tier ``permission``).
+    """
+    pc = _resolved_surface_pc("v2")
+    caps = _opencode_caps()
+
+    # Non-vacuity: the real registry really is in the C3 plugin state.
+    assert pc["has_plugins"] is True, "the shipped v2 entry lost surface-has-plugins.v2"
+    assert pc["plugin_protocol"] == "opencode-plugin-v2-js"
+    assert provider_runtime_gate_tier(pc, caps) == "plugin"
+
+    # The predicate itself, over real resolved data.
+    assert isolation.permission_deny_required(pc, caps, "observe") is True, (
+        "a plugin in observe mode never blocks, so the deny must stay"
+    )
+    assert isolation.permission_deny_required(pc, caps, "enforce") is False, (
+        "an enforcing plugin blocks on its own; the redundant deny is dropped"
+    )
+
+    project = tmp_path / "project"
+    monkeypatch.setattr(runtime_gate, "_baked_plugin_mode", lambda: "observe")
+    log = SyncLog()
+    _reconcile(project, _gate_config(), {"Opencode": pc}, _REPO_ROOT, log=log)
+
+    doc = _read_json(project / "opencode.json")
+    assert doc["permissions"] == [_EDIT_DENY, _SHELL_DENY], (
+        "tier plugin + observe must keep both deny triples (AC-C14)"
+    )
+    assert _read_state_doc(project)[_V2_GATE_STATE_KEY]["triples"] == [
+        ["edit", "**", "deny"],
+        ["shell", "**", "deny"],
+    ]
+
+    monkeypatch.setattr(runtime_gate, "_baked_plugin_mode", lambda: "enforce")
+    _reconcile(project, _gate_config(), {"Opencode": pc}, _REPO_ROOT)
+
+    assert "permissions" not in _read_json(project / "opencode.json"), (
+        "enforce removes the triples although the Spec-A writer never ran"
+    )
+    assert _V2_GATE_STATE_KEY not in _read_state_doc(project)
+    assert not any(
+        "runtime gate (permission.edit/bash deny)" in warning
+        for warning in log.warnings
+    ), log.warnings
+
+
+def test_oqb12_tier_plugin_writes_no_default_agent_but_checks_entry_point(
+    tmp_path, monkeypatch
+):
+    """OQ-B12: tier ``plugin`` skips Spec-A step 3; reconcile checks it itself.
+
+    Spec A's ``default_agent`` merge is called under the unchanged tier
+    ``permission`` condition (Spec-A freeze, IC-7), so on tier ``plugin`` the
+    stage dispatch never reaches it. ``reconcile_opencode_surface_gate``
+    therefore evaluates the entry point on its own (``_opencode_entry_point``)
+    and writes no ``default_agent``; a missing entry point yields exactly one
+    WARNING and no triple.
+    """
+    pc = _resolved_surface_pc("v2")
+    caps = _opencode_caps()
+    assert provider_runtime_gate_tier(pc, caps) == "plugin"
+
+    monkeypatch.setattr(runtime_gate, "_baked_plugin_mode", lambda: "observe")
+
+    # (a) The real stage seam at tier ``plugin``: Spec-A is not dispatched.
+    project, _, gate_calls = _run_stage(
+        tmp_path / "plugin-tier", monkeypatch, {"Opencode": pc}, ["Opencode"],
+        _gate_config(), {"Opencode": "plugin"},
+    )
+    assert gate_calls == [], (
+        "tier plugin must not dispatch the Spec-A writer (its step 3 owns "
+        "default_agent) — the reconcile function is the only actor"
+    )
+    doc = _read_json(project / "opencode.json")
+    assert "default_agent" not in doc, (
+        "reconcile must not write default_agent at tier plugin (OQ-B12 default)"
+    )
+    assert doc["permissions"] == [_EDIT_DENY, _SHELL_DENY], (
+        "the reconcile function must still keep the deny triples"
+    )
+
+    # (b) No entry point: reconcile checks it and warns exactly once itself.
+    entry_point_calls = []
+    real_entry_point = isolation._opencode_entry_point
+
+    def _spy(provider, provider_config, active_set):
+        role = real_entry_point(provider, provider_config, active_set)
+        entry_point_calls.append(role)
+        return role
+
+    monkeypatch.setattr(isolation, "_opencode_entry_point", _spy)
+
+    pc_without_role = _resolved_surface_pc("v2")
+    pc_without_role.pop("primary-role")
+    assert provider_runtime_gate_tier(pc_without_role, caps) == "plugin", (
+        "the tier is flag-derived and must not depend on the entry point"
+    )
+
+    project_no_entry = tmp_path / "no-entry"
+    log = SyncLog()
+    _reconcile(
+        project_no_entry, _gate_config(), {"Opencode": pc_without_role}, _REPO_ROOT,
+        log=log,
+    )
+
+    assert entry_point_calls, (
+        "reconcile must evaluate the entry point itself via _opencode_entry_point"
+    )
+    assert set(entry_point_calls) == {None}, entry_point_calls
+    warnings = [w for w in log.warnings if "primary-role" in w]
+    assert len(warnings) == 1, log.warnings
+    assert "lock every agent" in warnings[0], warnings[0]
+    assert not (project_no_entry / "opencode.json").exists(), (
+        "no entry point => no triple, so the document is never created"
+    )
+    assert _V2_GATE_STATE_KEY not in _read_state_doc(project_no_entry)
+
+
+def test_v1_tier_permission_unchanged_with_c3_registry(tmp_path):
+    """AC-C14 / v1: the same registry data keeps v1 on tier ``permission``.
+
+    ``surface-plugin-protocols``/``surface-has-plugins`` are surface-keyed;
+    the v1 resolution must keep the static ``has_plugins: false`` and the
+    static protocol, so v1 stays on the unchanged Spec-A path
+    (``permission`` map plus ``default_agent``) and the mode never matters.
+    """
+    v1 = _resolved_surface_pc(None)
+    v2 = _resolved_surface_pc("v2")
+    caps = _opencode_caps()
+
+    # The C3 data is shared registry data, not a v2-only entry.
+    assert v1["surface-plugin-protocols"] == {"v2": "opencode-plugin-v2-js"}
+    assert v1["surface-has-plugins"] == {"v2": True}
+    assert provider_runtime_gate_tier(v2, caps) == "plugin", (
+        "positive control: the same entry is plugin-tier on the v2 surface"
+    )
+
+    assert v1["has_plugins"] is False, "the static v1 flag stays false"
+    assert v1["plugin_protocol"] == "opencode-plugin-js", (
+        "no surface-plugin-protocols entry for v1, so the static value stays"
+    )
+    assert provider_runtime_gate_tier(v1, caps) == "permission"
+    for mode in ("observe", "enforce"):
+        assert isolation.permission_deny_required(v1, caps, mode) is True, (
+            f"tier permission never depends on the plugin mode (mode={mode})"
+        )
+
+    # Behavioural check: v1 still goes through the Spec-A writer (permission
+    # map + default_agent), never through the triples.
+    project = tmp_path / "project"
+    log = SyncLog()
+    _run_runtime_gate(project, _REPO_ROOT, {"Opencode": v1}, log=log)
+    doc = _read_json(project / "opencode.json")
+    assert doc["permission"] == {
+        "edit": {"**": "deny"},
+        "bash": {"**": "deny"},
+    }, log.warnings
+    assert doc["default_agent"] == "orchestrator"
+    assert "permissions" not in doc

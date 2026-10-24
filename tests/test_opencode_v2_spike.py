@@ -194,10 +194,11 @@ def test_ac_c2_gate_fallback_invariants(tmp_path: Path) -> None:
 
     The verdict is read from the spike document, never hard-coded. In the
     NO-GO case the permission-tier fallback is verified end-to-end on a v2
-    project fixture; in the GO case (current verdict) only the one-direction
-    invariant "C3 registry keys present => verdict is GO" is asserted. Task 19
-    tightens that to equivalence; the reverse direction is deliberately not
-    asserted here (the keys do not exist before Task 18).
+    project fixture. In the GO case (current verdict) the full equivalence of
+    AC-C2 is asserted: the C3 registry keys are present **exactly when** the
+    verdict is GO. C0 shipped only the implication "keys present => GO"; Task
+    19 sharpens it to "present <=> GO", so a registry that loses the keys while
+    the verdict stays GO fails just like keys without a GO verdict.
     """
     verdict = _c3_verdict()
     pc, caps = _resolved_v2_provider()
@@ -207,14 +208,16 @@ def test_ac_c2_gate_fallback_invariants(tmp_path: Path) -> None:
     assert pc["mcp-config"]["format"] == "opencode-json-v2"
     assert pc["agent-transform"]["frontmatter-mechanism"] == "opencode-native-v2"
 
-    # Invariant that holds in BOTH verdict cases (AC-C2): declaring the C3
-    # surface keys without a GO verdict is a contract violation.
+    # AC-C2 equivalence (Task 19): C3 keys present <=> verdict is GO. The keys
+    # are both-or-none registry data, so a partial set is a contract violation
+    # under either verdict — the expected presence is compared as a list.
     present_keys = [key for key in _C3_REGISTRY_KEYS if key in pc]
-    if present_keys:
-        assert verdict == "GO", (
-            f"registry declares C3 surface keys {present_keys} but the spike "
-            f"verdict is {verdict!r}; C3 keys require VERDICT-C3: GO"
-        )
+    expected_keys = list(_C3_REGISTRY_KEYS) if verdict == "GO" else []
+    assert present_keys == expected_keys, (
+        f"AC-C2 equivalence violated: VERDICT-C3 is {verdict!r}, so the registry "
+        f"must declare the C3 surface keys {expected_keys!r}, "
+        f"found {present_keys!r}"
+    )
 
     if verdict != "NO-GO":
         return
