@@ -2442,6 +2442,26 @@ def test_ic4_functions_and_call_condition_unchanged():
         reconcile_block = _call_block(text, reconcile_matches[0])
         assert "active_set=active_set" in reconcile_block, reconcile_block
 
+        # RVW-C-02: the reconciler must be called at the *same* indentation as
+        # the guarded Spec-A ``if`` block, i.e. OUTSIDE it (indent 8). Any extra
+        # wrapper such as ``if provider_runtime_gate_tier(...) == "permission":``
+        # around the reconciler would silently drop the tier ``plugin``/``advisory``
+        # rollback and must fail here — the mutation is only observable through
+        # the indentation, not through the call text or the condition count.
+        guard_indent = matches[0].group("indent")
+        reconcile_indent = reconcile_matches[0].group("indent")
+        assert len(guard_indent) == 8, (
+            f"{filename}: the runtime-gate block must stay at indent 8 inside "
+            f"the per-provider iteration, got indent {len(guard_indent)}"
+        )
+        assert reconcile_indent == guard_indent, (
+            f"{filename}: reconcile_opencode_surface_gate must be called at the "
+            f"same indentation as the guarded _sync_opencode_runtime_gate block "
+            f"(outside the if, indent {len(guard_indent)}), got indent "
+            f"{len(reconcile_indent)} — the tier-independent reconciler must not "
+            f"be nested in a runtime-gate-tier condition"
+        )
+
 
 # ===========================================================================
 # Phase C2 / Task 15 (C2.2): the v2 MCP connection entry

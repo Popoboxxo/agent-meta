@@ -412,7 +412,10 @@ def _transform_frontmatter_for_opencode_v2(
     # edit-Eintrag der Rolle durch {action: edit, resource: "*", effect: deny}, ergaenzt
     # um allow-Eintraege fuer edit_allow_paths; Amendment B1: der "*"-deny steht VOR den
     # pfadspezifischen allows (last match wins, 3.4). False = keine Wirkung.
-    # Aufruf: deny_edit = mode == 'primary' and opencode_runtime_gate_wanted(...) (Spec A IC-3).
+    # Aufruf: deny_edit = permission_deny_required(provider_config, capabilities, plugin_mode)
+    # (Amendment B3, 2026-10-23; NICHT das eingefrorene opencode_runtime_gate_wanted).
+    # `mode == 'primary'` wirkt in der Funktion selbst; `capabilities` und `plugin_mode`
+    # werden am Frontmatter-Aufrufort aufgeloest (3.4 "Agent-Ebene").
 ```
 
 Die v2-Funktion unterscheidet sich von der v1-Funktion in genau diesen Punkten: (a) `permissions:` (Liste) statt `permission:` (Map), (b) `steps` (kein `maxSteps`-Alias, kein `temperature`/`max_tokens`/`top_p` Legacy-Felder), (c) `model` mit angehängtem `#variant`, wenn `provider-options.Opencode.model-variants[<role>]` gesetzt ist, (d) `tools` wird nie emittiert, (e) `subagent_depth` wird nie im Frontmatter emittiert. Rest (Provenance-Kommentar, strip-fields, Body-Cleanup) wird durch Aufruf gemeinsamer Hilfsfunktionen wiederverwendet, nicht dupliziert. `system`: Der System-Prompt ist der Markdown-Body; es wird **kein** separates `system:`-Frontmatter-Feld emittiert. **Amendment B1 (2026-10-23):** Spike Q5 bestätigt das **VERIFIED** (`debug agents` zeigt `system` = exakt den Body); OQ-B7/B-D4 sind damit bestätigt, hier ändert sich nichts. Ebenso **VERIFIED**: `variant` wird aus `model: provider/model#variant` geparst (`{"providerID": ..., "variant": "high"}`) — die Punkt-(c)-Regel bleibt unverändert. Der Aufruf im Zweig :384 lautet datengetrieben: `if mechanism == 'opencode-native-v2': return _transform_frontmatter_for_opencode_v2(...)` — der `opencode-native`-Pfad (Opencode v1 **und** Mammouth) bleibt unverändert.
