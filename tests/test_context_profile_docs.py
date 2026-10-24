@@ -19,12 +19,13 @@ Run: python -m pytest tests/test_context_profile_docs.py -v
 import re
 from pathlib import Path
 
-from tests.changelog_sections import latest_changelog_section
+from tests.changelog_sections import release_section
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _CLI_REFERENCE = _REPO_ROOT / "docs" / "api" / "cli-reference.md"
 _CHANGELOG = _REPO_ROOT / "CHANGELOG.md"
 _README = _REPO_ROOT / "README.md"
+_RELEASE = "2.0.0-beta.2"
 
 
 def _normalized(text: str) -> str:
@@ -51,13 +52,17 @@ def _context_profile_section() -> str:
     return rest[: next_heading.start()] if next_heading else rest
 
 
-def _unreleased_section() -> str:
-    """The current changelog block: ``[Unreleased]`` plus the next release."""
+def _release_section() -> str:
+    """The changelog block of the release that shipped the context profile."""
     text = _CHANGELOG.read_text(encoding="utf-8")
     assert "## [Unreleased]" in text, (
         "CHANGELOG.md must keep an [Unreleased] section."
     )
-    return latest_changelog_section(text)
+    section = release_section(text, _RELEASE)
+    assert section, (
+        f"CHANGELOG.md must carry a ## [{_RELEASE}] release section."
+    )
+    return section
 
 
 def test_cli_reference_documents_opt_in_unverified_with_reason():
@@ -130,9 +135,9 @@ def test_cli_reference_never_claims_verification():
 
 
 def test_changelog_unreleased_documents_the_opt_in_profile():
-    lowered = _normalized(_unreleased_section())
+    lowered = _normalized(_release_section())
     assert "context-profile" in lowered, (
-        "CHANGELOG.md [Unreleased] must document the opt-in context profile "
+        f"CHANGELOG.md [{_RELEASE}] must document the opt-in context profile "
         "(2a.7)."
     )
     assert "unverified" in lowered, (
@@ -221,9 +226,9 @@ def test_inventory_keeps_compact_opt_in_and_unverified():
 
 
 def test_changelog_documents_the_compact_render_package():
-    lowered = _normalized(_unreleased_section())
+    lowered = _normalized(_release_section())
     assert "package 2b" in lowered, (
-        "CHANGELOG.md [Unreleased] must record package 2b (the compact render "
+        f"CHANGELOG.md [{_RELEASE}] must record package 2b (the compact render "
         "densification)."
     )
     assert "compact" in lowered and "skills" in lowered, (
@@ -253,11 +258,11 @@ def _readme_profile_section() -> str:
 
 
 def _changelog_bullet(marker: str) -> str:
-    """The [Unreleased] bullet (plus its continuation lines) containing *marker*."""
-    lines = _unreleased_section().splitlines()
+    """The pinned release bullet (plus its continuation lines) containing *marker*."""
+    lines = _release_section().splitlines()
     index = next((i for i, line in enumerate(lines) if marker in line), None)
     assert index is not None, (
-        f"CHANGELOG.md [Unreleased] must carry a bullet naming '{marker}' (2c.4)."
+        f"CHANGELOG.md [{_RELEASE}] must carry a bullet naming '{marker}' (2c.4)."
     )
     block = [lines[index]]
     for line in lines[index + 1:]:
@@ -345,9 +350,9 @@ def test_readme_never_claims_verification():
 
 
 def test_changelog_documents_the_compact_anchors_report_package():
-    lowered = _normalized(_unreleased_section())
+    lowered = _normalized(_release_section())
     assert "package 2c" in lowered, (
-        "CHANGELOG.md [Unreleased] must record package 2c (anchor registry, "
+        f"CHANGELOG.md [{_RELEASE}] must record package 2c (anchor registry, "
         "budgets/report, provider matrix)."
     )
     assert "anchor" in lowered and "provider matrix" in lowered, (

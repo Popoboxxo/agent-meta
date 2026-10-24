@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [2.0.0-beta.3] - 2026-10-23
+
 ### Added
 - **Opencode v2 surface (opt-in, #1007, `VERDICT-C3: GO`)**: five new
   `provider-options.Opencode` keys that only take effect with `surface-version: v2` —
