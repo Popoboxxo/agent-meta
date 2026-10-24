@@ -4480,3 +4480,40 @@ def test_cli_rollback_cannot_resolve_leaves_file_and_state(tmp_path):
         assert _warned(
             log, "opencode-v2-cli: cannot resolve managed file for rollback"
         ), name
+
+
+# ===========================================================================
+# Phase D / Task 27 (D4): provider doc reflects the delivered v2 surface
+# ===========================================================================
+#
+# SPEC-OPENCODE-V2-SUPPORT-2026-10-22 §3.10 / AC-D10. The provider doc is an
+# external artifact, so the assertions stay narrow: the ``Stand`` header must
+# follow ``VERSION`` (the old ``v0.33.x`` line is stale), the four sections of
+# the delivered surface must exist, and the context-file rule must be stated as
+# AGENTS.md-only (no dedicated rules directory).
+
+_PROVIDER_DOC = _REPO_ROOT / "docs/providers/opencode.md"
+
+
+def test_provider_doc_current():
+    """AC-D10: no stale version, all four delivered-surface sections present."""
+    text = _PROVIDER_DOC.read_text(encoding="utf-8")
+    assert "v0.33" not in text, (
+        "the 'Stand' line must follow VERSION, not the stale v0.33.x value"
+    )
+    for heading in (
+        "## Surface v1 vs. v2",
+        "## Aktivierung",
+        "## Managed Keys und User-Keys",
+        "## Dateien",
+    ):
+        assert heading in text, f"missing documented section: {heading}"
+
+
+def test_provider_doc_states_agents_md_only():
+    """§3.10: AGENTS.md is the single managed context file for Opencode."""
+    text = _PROVIDER_DOC.read_text(encoding="utf-8")
+    assert "AGENTS.md-only" in text
+    assert ".opencode/rules/" not in text, (
+        "Opencode has no dedicated rules directory; the doc must not reference one"
+    )
