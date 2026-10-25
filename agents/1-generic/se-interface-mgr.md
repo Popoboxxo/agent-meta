@@ -1,6 +1,6 @@
 ---
 name: se-interface-mgr
-version: 1.11.1
+version: 1.11.2
 description: Manages generic signal flow and deterministic synchronization across
   systems. Persists interface registry to filesystem.
 hint: Manages generic signal flow, deterministic sync across systems
@@ -165,8 +165,8 @@ schema_version: "1.0.0"
 ```
 
 **Atomic write procedure:**
-1. Write full output (frontmatter + JSON + human-readable table) to a temporary file
-2. Rename temp file to target path
+1. Write full output (frontmatter + JSON + human-readable table) to `{{TMP_SINK_PATH}}/se-interface-mgr-<topic>.json`
+2. Rename the file from the sink to the target path (atomic write)
 3. Update `.se-state.yaml` with `last_completed_step` pointing to this file
 
 <output_contract>

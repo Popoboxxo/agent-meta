@@ -19,7 +19,7 @@ Spalte `Commit` bleibt `— (pending)`, bis der jeweilige Commit tatsächlich ex
 | 3 | Suite-Kommando literal-frei rendern | done | — (pending) | Steps 1–3 grün; Step 4 (Commit) offen, weil der Subagent keinen Commit-Auftrag hatte |
 | 4 | Achtzehn System-Temp-Literale in sieben Templates ersetzen | done | — (pending) | Steps 1–3 grün; 18 Literale → `{{TMP_SINK_PATH}}`; Version-Bumps + 8 `based-on`-Pins kaskadiert; Step 4 (Commit) offen |
 | 5 | Vier Sink-Literale in Auditor-Templates | done | — (pending) | Steps 1–3 grün; Step 4 (Commit) offen, kein Commit-Auftrag. Golden `app-lifecycle-governor` erwartungsgemäß rot (nur Versionszeilen), Rebaseline Task 16 |
-| 6 | Vage Temp-Anweisungen präzisieren | pending | — (pending) | — |
+| 6 | Vage Temp-Anweisungen präzisieren | done | — (pending) | Steps 1–3 grün; 13 Rollen + `plan-ledger.md` nennen `{{TMP_SINK_PATH}}`; 13 Patch-Bumps, kein `2-platform`-Cascade (keine `based-on`-Kinder); Step 4 (Commit) offen, kein Commit-Auftrag |
 | 7 | Standalone-Export regenerieren | pending | — (pending) | — |
 | 8 | Hook-Anker und fail-closed Root-Auflösung | pending | — (pending) | — |
 | 9 | Hook-Testmatrix und bewusste Inversion | pending | — (pending) | — |
@@ -501,3 +501,125 @@ Zu rebaselinen: 7 Golden-Rollen (`developer`, `code-reviewer`, `tester`, `valida
 `OG-PASS-CODE-REVIEWER`-Normalisierung (Bash-Beispiel auf `{{TMP_SINK_PATH}}` umstellen),
 danach `tests/fixtures/ac01-baseline/hashes.json` neu erzeugen. Ohne Task 16 bleibt die
 Suite bei den zwei eingefrorenen Modulen rot.
+
+## Evidence — Task 6
+
+### Rot (vor der Template-Änderung)
+
+`python3 -m pytest tests/test_template_report_paths.py -q` → Exit 1, `13 failed, 13 passed in 0.25s`:
+
+```
+.............FFFFFFFFFFFFF                                               [100%]
+=================================== FAILURES ===================================
+________________ test_atomic_write_names_tmp_sink[se-architect] ________________
+
+    @pytest.mark.parametrize("role", ATOMIC_WRITE_ROLES)
+    def test_atomic_write_names_tmp_sink(role):
+        """AC-22: the atomic-write/scratch instruction names the configured sink."""
+        text = _read(role)
+>       assert "{{TMP_SINK_PATH}}" in text
+E       assert '{{TMP_SINK_PATH}}' in '---\nname: se-architect\nversion: 2.2.1\n...'
+tests/test_template_report_paths.py:100: AssertionError
+...
+FAILED tests/test_template_report_paths.py::test_atomic_write_names_tmp_sink[se-architect]
+FAILED tests/test_template_report_paths.py::test_atomic_write_names_tmp_sink[se-component-requirements]
+FAILED tests/test_template_report_paths.py::test_atomic_write_names_tmp_sink[se-critic]
+FAILED tests/test_template_report_paths.py::test_atomic_write_names_tmp_sink[se-developer]
+FAILED tests/test_template_report_paths.py::test_atomic_write_names_tmp_sink[se-integration-and-test-manager]
+FAILED tests/test_template_report_paths.py::test_atomic_write_names_tmp_sink[se-interface-mgr]
+FAILED tests/test_template_report_paths.py::test_atomic_write_names_tmp_sink[se-junior-developer]
+FAILED tests/test_template_report_paths.py::test_atomic_write_names_tmp_sink[se-requirements]
+FAILED tests/test_template_report_paths.py::test_atomic_write_names_tmp_sink[se-senior-developer]
+FAILED tests/test_template_report_paths.py::test_atomic_write_names_tmp_sink[se-termination]
+FAILED tests/test_template_report_paths.py::test_atomic_write_names_tmp_sink[se-validator]
+FAILED tests/test_template_report_paths.py::test_atomic_write_names_tmp_sink[se-verifier]
+FAILED tests/test_template_report_paths.py::test_atomic_write_names_tmp_sink[test-executor]
+13 failed, 13 passed in 0.25s
+```
+
+Alle 13 Rollen rot, deckungsgleich mit der Planvorgabe (12 SE-Rollen + `test-executor`).
+
+### Grün (nach der Implementierung)
+
+| # | Kommando | Ergebnis |
+|---|---|---|
+| 1 | `python3 -m pytest tests/test_template_report_paths.py -q` | `26 passed in 0.18s`, Exit 0 |
+| 2 | `python3 -m pytest tests/test_temp_literals.py -q` | `4 passed in 0.21s`, Exit 0 |
+| 3 | `python3 scripts/sync.py --validate` | Exit 0; `4 action(s) \| 378 skipped \| 2 warning(s)` im ersten Lauf (die WRITE-Actions sind die Regeneration von `test-executor`-Output, generierte Verzeichnisse sind gitignored); Wiederholungslauf `0 action(s) \| 382 skipped \| 2 warning(s)`. Beide Warnungen vorbestehend (`active-set.gate-dropped 'se-component-requirements'`, Submodul-Checkout `external/awesome-claude-code`); `grep -c "\[ERROR\]"` = **0**, kein `frontmatter.*`-ERROR |
+| 4 | `grep -rn "to a temporary file\|temp → rename\|\.tmp/" agents/1-generic/ rules/1-generic/plan-ledger.md` | keine Treffer, Exit 1 (0 legitime Rest-Treffer) |
+| 5 | `ast.parse(tests/test_template_report_paths.py, feature_version=(3, 9))` | `py3.9 syntax ok` |
+| 6 | Regression `python3 -m pytest tests/test_review_fleet.py tests/test_template_report_paths.py -q` | `35 passed in 0.31s`, Exit 0 |
+| 7 | Zusatz `tests/test_agents_frontmatter.py tests/test_conventions_platform_cascade.py tests/test_template_integrity_checks.py tests/test_review_fleet.py tests/test_template_report_paths.py tests/test_temp_literals.py` | `93 passed`, Exit 0 |
+| 8 | Zusatz `tests/test_se_persistence.py tests/test_se_role_boundary.py tests/test_se_validate.py tests/test_active_set.py` | `124 passed`, Exit 0 (separat; `test_active_set_dangling.py` `40 passed` in 214 s, vorbestehend langsam) |
+| 9 | `python3 scripts/consistency-check.py --changed` | Exit 0, `[PASS] All checks passed` — der `frontmatter.version-bump`-Guard ist nur im `--changed`-Modus aktiv (`cli_commands.py:179` ruft `changed_only=False`); damit sind alle 13 Patch-Bumps explizit nachgewiesen |
+
+### Abgedeckte ACs (Task 6)
+
+- **AC-22** — `test_atomic_write_names_tmp_sink`, parametrisiert über 13 Rollen
+  (`ATOMIC_WRITE_ROLES` = 12 SE-Rollen + `test-executor`): jede Rolle enthält
+  `{{TMP_SINK_PATH}}`; zusätzlich für jeden „Atomic write"-Absatz (blank-line-separierter
+  Block) die Negative-Assertion `re.search(r"to a temporary file|temp → rename", block)
+  is None`. Die Assertion ist auf den Atomic-Write-Block gescoped (kein Blanket-Ban im
+  restlichen Template) — `test-executor` hat keinen solchen Block und wird nur auf die
+  Sink-Nennung geprüft.
+
+### Geänderte Stellen
+
+| Template | Form nachher |
+|---|---|
+| `se-developer.md` | `1. Write implementation summary (…) to `{{TMP_SINK_PATH}}/se-developer-<topic>.md`` / `2. Rename the file from the sink to the target path (atomic write)` |
+| `se-junior-developer.md` | analog `se-junior-developer-<topic>.md` |
+| `se-integration-and-test-manager.md` | `1. Write full output (frontmatter + JSON integration plan) to `{{TMP_SINK_PATH}}/se-integration-and-test-manager-<topic>.json`` / Schritt 2 wie oben |
+| `se-interface-mgr.md` | analog `…-<topic>.json` (Liste „JSON + human-readable table" unverändert) |
+| `se-termination.md` | analog `…-<topic>.json` („JSON + decision summary") |
+| `se-validator.md` | analog `…-<topic>.json` |
+| `se-verifier.md` | analog `…-<topic>.json` |
+| `se-architect.md` | `**Atomic write:** write to `{{TMP_SINK_PATH}}/se-architect-<topic>.md` → rename → `.se-state.yaml` aktualisieren.` |
+| `se-component-requirements.md` | dito, `.md`; `.se-state.yaml`-Zellsatz + Issue-#334-Satz unverändert |
+| `se-critic.md` | `write to `…-<topic>.md` → rename → Protokoll → Endreport → REQ-Frontmatter-Sync (…) → `.se-state.yaml`` |
+| `se-requirements.md` | dito, `.md`; Issue-#334-Satz unverändert |
+| `se-senior-developer.md` | dito, `.md` |
+| `test-executor.md:30` | „… ephemeral run artifacts the suite itself produces (logs, reports) under `{{TMP_SINK_PATH}}/runs/`." |
+| `test-executor.md:87` | „`docker wait`, log capture (`{{TMP_SINK_PATH}}/runs/` only)" |
+| `rules/1-generic/plan-ledger.md:67` | „… Schreiben nur im Projektroot und im konfigurierten Scratch-Sink (`{{TMP_SINK_PATH}}/`)." |
+
+### Migrations-Verifikation (stabile Keys)
+
+Stabile Keys: 13 Rollen-Stems + 1 Regel-Datei. Vorher 13 vage Anweisungen
+(`to a temporary file` ×7, `temp → rename` ×5) + 1 `.tmp/`-Literal; nachher 13
+`{{TMP_SINK_PATH}}`-Nennungen + 1 `{{TMP_SINK_PATH}}/`-Nennung:
+**14 geprüft, 0 fehlend, 0 doppelt**; Artefakt-Erweiterungen (`.md` ×7, `.json` ×5) und
+die `.se-state.yaml`-Folgesätze je Rolle unverändert. `2-platform`-Cascade: **0** —
+`grep -rn "based-on:" agents/2-platform/` enthält keine der 13 Rollen, und
+`grep -rln "se-…\|test-executor" agents/2-platform/` liefert keine Treffer
+(keine `extends:`/`patches:`-Kinder).
+
+### Slimming-Golden (erwartet rot, Rebaseline in Task 16)
+
+`tests/test_template_slimming_equivalence.py` bleibt unangetastet:
+`2 failed, 7 passed` — identisch zur Task-4/5-Baseline (kein neuer roter Rollen-Satz).
+Rote Rollen: `app-lifecycle-governor`, `code-reviewer`, `developer`, `devops-engineer`,
+`docker`, `documenter`, `e2e-tester`, `test-executor`, `tester`, `validator` — alle
+vorbestehend aus Task 3/4/5; **keine** `se-*`-Rolle ist im Golden-Set. Der
+`test-executor`-Diff bleibt auf Version/`generated-from` plus die vorbestehende
+Task-3-Kommando-Differenz beschränkt (Renderer löst `{{TMP_SINK_PATH}}` zu `.tmp` auf,
+der Sink-Satz selbst ist golden-invariant).
+
+### Abweichungen von der Aufgabenbeschreibung
+
+1. **Wortlaut der Rollen:** Die Plan-Vorgabe „Write the full output to …, then rename to the target path
+   (atomic write)" ist als `e.g.` gekennzeichnet und daher nicht bindend. Um die Doppelung mit
+   dem bereits vorhandenen Schritt 2 („Rename temp file to target path") zu vermeiden, nennen die
+   sieben Nummern-Listen-Rollen den Sink in Schritt 1 und Schritt 2 lautet jetzt „Rename the file
+   from the sink to the target path (atomic write)". Die fünf `**Atomic write:** temp → rename …`-
+   Einzeiler behalten ihre Bullet-Form (Plan Step 2: „keep the existing bullet shape") und bekommen
+   `write to `{{TMP_SINK_PATH}}/…` → rename → …` vorangestellt. Die `.se-state.yaml`-Kette und alle
+   Zusatzsätze bleiben wörtlich erhalten.
+2. **`test-executor` hat keinen Atomic-Write-Absatz** — der Test prüft dort nur die
+   Sink-Nennung (beide Stellen `:30`, `:87`), die Negativ-Assertion greift nur, wenn ein
+   Atomic-Write-Block existiert.
+3. **Kein `2-platform`-Cascade** (im Gegensatz zu Task 4): keine Plattform-Override pinnt
+   eine der 13 Rollen, daher nur die 13 Patch-Bumps der `1-generic`-Templates.
+   `rules/1-generic/plan-ledger.md` hat kein Frontmatter → kein Versionsbump.
+4. **Step 4 (Commit) nicht ausgeführt** — kein Commit-Auftrag für diesen Subagenten
+   (Branch-Guard/Commit-Authority bleiben beim Orchestrator).

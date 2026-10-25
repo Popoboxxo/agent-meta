@@ -64,7 +64,7 @@ Normativ nur bei aktiviertem Spec/Plan-Workflow.
   Workflow **nicht** genutzt.
 - Der Ersatz ist kein Worktree, sondern die Kombination aus **expliziter Ownership +
   Barrieren + Checkpoint-Ledger**.
-- Repo-Containment bleibt unangetastet: Schreiben nur im Projektroot und in `.tmp/`.
+- Repo-Containment bleibt unangetastet: Schreiben nur im Projektroot und im konfigurierten Scratch-Sink (`{{TMP_SINK_PATH}}/`).
 
 ## Archiv-Trigger
 

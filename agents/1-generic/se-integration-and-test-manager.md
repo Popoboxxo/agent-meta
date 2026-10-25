@@ -1,6 +1,6 @@
 ---
 name: se-integration-and-test-manager
-version: 2.2.2
+version: 2.2.3
 description: 'V&V-Orchestrator: Koordiniert Integrationsstrategie, Test-Ebenen und
   Traceability-Feedback über L1-Ln. Persists test plan and V&V report. Federt Implementierungs-Befunde
   bottom-up in die Kaskade zurück (Issue #339 B6).'
@@ -275,8 +275,8 @@ schema_version: "1.0.0"
 ```
 
 **Atomic write procedure:**
-1. Write full output (frontmatter + JSON integration plan) to a temporary file
-2. Rename temp file to target path
+1. Write full output (frontmatter + JSON integration plan) to `{{TMP_SINK_PATH}}/se-integration-and-test-manager-<topic>.json`
+2. Rename the file from the sink to the target path (atomic write)
 3. Update `.se-state.yaml` with `last_completed_step` pointing to this file
 
 <output_contract>

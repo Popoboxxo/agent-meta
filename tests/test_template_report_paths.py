@@ -26,6 +26,21 @@ WRITABLE_AUDITORS = [
     "prompt-governor",
     "security-auditor",
 ]
+SE_ROLES = [
+    "se-architect",
+    "se-component-requirements",
+    "se-critic",
+    "se-developer",
+    "se-integration-and-test-manager",
+    "se-interface-mgr",
+    "se-junior-developer",
+    "se-requirements",
+    "se-senior-developer",
+    "se-termination",
+    "se-validator",
+    "se-verifier",
+]
+ATOMIC_WRITE_ROLES = SE_ROLES + ["test-executor"]
 
 
 def _read(role):
@@ -71,3 +86,25 @@ def test_writable_auditor_reports_into_configured_sink(role):
     text = _read(role)
     assert "{{TMP_SINK_PATH}}/" in text
     assert not re.search(r"`\.tmp/[a-z0-9-]+-<topic>\.md`", text)
+
+
+def _atomic_write_blocks(text):
+    """Return the atomic-write paragraphs (blank-line separated blocks)."""
+    return [block for block in re.split(r"\n[ \t]*\n", text) if "Atomic write" in block]
+
+
+@pytest.mark.parametrize("role", ATOMIC_WRITE_ROLES)
+def test_atomic_write_names_tmp_sink(role):
+    """AC-22: the atomic-write/scratch instruction names the configured sink."""
+    text = _read(role)
+    assert "{{TMP_SINK_PATH}}" in text
+    blocks = _atomic_write_blocks(text)
+    for block in blocks:
+        assert "{{TMP_SINK_PATH}}" in block, (
+            f"{role}: atomic-write instruction does not name the configured sink"
+        )
+        vague = re.search(r"to a temporary file|temp \u2192 rename", block)
+        assert not vague, (
+            f"{role}: atomic-write instruction stays vague: "
+            f"{block.strip().splitlines()[0]}"
+        )

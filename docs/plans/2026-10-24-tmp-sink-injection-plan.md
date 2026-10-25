@@ -335,9 +335,9 @@ Die frühere Gruppe PG-C `{13,17}` ist aufgelöst; Task 13 und Task 17 laufen se
 
 **Rot zuerst:** `test_atomic_write_names_tmp_sink` schlägt fehl, weil die 13 Rollen (12 SE-Rollen + `test-executor`) heute „to a temporary file" bzw. „temp → rename" ohne Ort sagen (`se-validator.md:192-193` u. a.) und `plan-ledger.md:67` `.tmp/` literal nennt.
 
-- [ ] Step 1: Test schreiben (rot), parametrisiert über die 13 Rollen: `assert "{{TMP_SINK_PATH}}" in text`; zusätzlich Negativ-Assertion `assert not re.search(r"to a temporary file|temp \u2192 rename", text)` für die betroffenen Absätze.
-- [ ] Step 2: Wortlaut vereinheitlichen, z. B. „Write the full output to `{{TMP_SINK_PATH}}/<role>-<topic>.json`, then rename to the target path (atomic write)"; `test-executor.md:30,87` auf „under `{{TMP_SINK_PATH}}/runs/`"; `plan-ledger.md:67` auf „im konfigurierten Scratch-Sink (`{{TMP_SINK_PATH}}/`)".
-- [ ] Step 3: `python3 -m pytest tests/test_template_report_paths.py -q` grün.
+- [x] Step 1: Test schreiben (rot), parametrisiert über die 13 Rollen: `assert "{{TMP_SINK_PATH}}" in text`; zusätzlich Negativ-Assertion `assert not re.search(r"to a temporary file|temp \u2192 rename", text)` für die betroffenen Absätze.
+- [x] Step 2: Wortlaut vereinheitlichen, z. B. „Write the full output to `{{TMP_SINK_PATH}}/<role>-<topic>.json`, then rename to the target path (atomic write)"; `test-executor.md:30,87` auf „under `{{TMP_SINK_PATH}}/runs/`"; `plan-ledger.md:67` auf „im konfigurierten Scratch-Sink (`{{TMP_SINK_PATH}}/`)".
+- [x] Step 3: `python3 -m pytest tests/test_template_report_paths.py -q` grün.
 - [ ] Step 4: Commit `refactor: name the configured sink in scratch instructions`.
 
 ### Task 7: Standalone-Export regenerieren
