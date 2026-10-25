@@ -22,7 +22,7 @@ Spalte `Commit` bleibt `— (pending)`, bis der jeweilige Commit tatsächlich ex
 | 6 | Vage Temp-Anweisungen präzisieren | done | — (pending) | Steps 1–3 grün; 13 Rollen + `plan-ledger.md` nennen `{{TMP_SINK_PATH}}`; 13 Patch-Bumps, kein `2-platform`-Cascade (keine `based-on`-Kinder); Step 4 (Commit) offen, kein Commit-Auftrag |
 | 7 | Standalone-Export regenerieren | done | — (pending) | Steps 1–3 grün; `TMP_SINK_PATH=".tmp"` + `TMP_SINK_ENV_PIN_BLOCK=""`; 23 Standalone-Dateien regeneriert (0 Drift); AC-26/AC-27; Step 4 (Commit) offen, kein Commit-Auftrag |
 | 8 | Hook-Anker und fail-closed Root-Auflösung | done | — (pending) | Steps 1–3 grün; Anker-Regel (`cwd`/Zielverzeichnis, kein `$PWD`), `repo-containment.no-root` statt Root-Promotion, absolute Sink-Meldung, Hook-Sink == `TmpPaths.absolute`; Impl-Version 1.1.0→1.2.0; Step 4 (Commit) offen, kein Commit-Auftrag |
-| 9 | Hook-Testmatrix und bewusste Inversion | pending | — (pending) | — |
+| 9 | Hook-Testmatrix und bewusste Inversion | done | — (pending) | Steps 1–3 grün; AC-03/04/06/07/08/18/28/29/30/33/37 abgedeckt, alte Fail-open-Erwartung bewusst invertiert; kein Produktionscode geändert; Step 4 (Commit) offen, kein Commit-Auftrag |
 | 10 | Env-Pin für Framework-Subprozesse ausweiten | pending | — (pending) | — |
 | 11 | Subprozess-Klassifikation und Backup-Staging | pending | — (pending) | — |
 | 12 | Gitignore- und Doctor-Zweitparser entfernen | pending | — (pending) | — |
@@ -33,7 +33,7 @@ Spalte `Commit` bleibt `— (pending)`, bis der jeweilige Commit tatsächlich ex
 | 17 | Doku und Beispiel-Config | pending | — (pending) | — |
 | 18 | Abschluss-Validierung und Ledger | pending | — (pending) | Läuft zuletzt (Abschluss-Gate) |
 | 19 | Toolchain-Cache-Opt-in (Q3) | pending | — (pending) | — |
-| 20 | Antigravity `args.FilePath` → `file_path` (Q10) | pending | — (pending) | — |
+| 20 | Antigravity `args.FilePath` → `file_path` (Q10) | done | — (pending) | Steps 1–3 grün; `ARG_KEY_MAP` um `'FilePath': 'file_path'` erweitert, Assertion in `test_adapter_normalizes_edit_tool_names`; 60 passed, `--validate` 0 neue Findings; Step 4 (Commit) offen, kein Commit-Auftrag |
 | 21 | §5.5 verweist auf `PYTEST_BASETEMP` (Q11) | pending | — (pending) | — |
 | 22 | Allowlist-Schema-Härtung (Q6) | pending | — (pending) | — |
 
@@ -952,3 +952,248 @@ Zusätzliche Handproben (nicht Teil der drei geforderten Transkripte):
   (Symlink-`cwd`), AC-18 (`test_block_message_uses_absolute_sink`), AC-28/29/37,
   AC-30 (Adapter-Tempdatei) sind noch nicht als Tests vorhanden; das Verhalten ist
   implementiert und oben manuell belegt.
+
+## Evidence — Task 9
+
+### Rot (vor der finalen Teständerung)
+
+Die Inversion ist eine Test-Änderung, keine Verhaltensänderung: das Verhalten wurde in
+Task 8 implementiert. Der ehrliche Rot-Beleg ist deshalb der Lauf der **neuen** Tests gegen
+den **alten** Hook. Dafür wurde `git archive c2da2aff^` nach
+`/tmp/opencode/am-red-task9` entpackt (Hook-Impl `version: 1.1.0`, also ohne Anker-Regel),
+die beiden neuen Testdateien hineinkopiert und der Lauf dort ausgeführt:
+
+```
+$ cd /tmp/opencode/am-red-task9
+$ python3 -m pytest tests/test_repo_containment_hook.py -q \
+    -k "missing_config_fails_closed or relative_target_without_cwd_fails_closed"
+
+=================================== FAILURES ===================================
+_______________________ test_missing_config_fails_closed _______________________
+
+external_fixture = PosixPath('/tmp/am-hook-ext-wkbt6ojj')
+...
+        result = _run_hook(_write_payload(external_fixture / "notes.md", external_fixture))
+>       assert result.returncode == 2, result.stderr
+E       AssertionError:
+E       assert 0 == 2
+E        +  where 0 = CompletedProcess(args=['/usr/bin/bash', '/tmp/opencode/am-red-task9/hooks/1-generic/repo-containment.sh'], returncode=0, stdout='', stderr='').returncode
+
+tests/test_repo_containment_hook.py:298: AssertionError
+________________ test_relative_target_without_cwd_fails_closed _________________
+
+external_fixture = PosixPath('/tmp/am-hook-ext-6utezqzt')
+...
+        from_outside = _run_hook(payload, process_cwd=external_fixture)
+>       assert from_outside.returncode == 2, from_outside.stderr
+E       AssertionError:
+E       assert 0 == 2
+E        +  where 0 = CompletedProcess(args=['/usr/bin/bash', '/tmp/opencode/am-red-task9/hooks/1-generic/repo-containment.sh'], returncode=0, stdout='', stderr='').returncode
+
+tests/test_repo_containment_hook.py:316: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_repo_containment_hook.py::test_missing_config_fails_closed
+FAILED tests/test_repo_containment_hook.py::test_relative_target_without_cwd_fails_closed
+2 failed, 39 deselected in 1.01s
+```
+
+Beide Tests belegen den alten Fail-open: `cwd`/`$PWD` wurde zum Root geadelt, das Ziel lag
+„innerhalb" dieses Pseudo-Roots ⇒ Exit 0.
+
+**AC-30** hatte vor Task 9 keine Abdeckung (der Adapter räumt bereits auf, der Test ist eine
+Charakterisierung). Rot-Beleg daher zweistufig:
+
+```
+$ git show HEAD:tests/test_antigravity_hooks_registration.py | grep -n "mktemp\|cleaned_up\|TMPDIR"
+grep-exit=1        # 0 Treffer: keine Aufräum-Assertion vorhanden
+```
+
+Mutationsprobe (Kopie des Adapters in `/tmp`, **ohne** die `trap 'rm -f ...' EXIT`-Zeile;
+Produktionsdatei unberührt):
+
+```
+$ ... | TMPDIR=.../scratch TMP=.../scratch bash /tmp/opencode/am-red-ac30/mutated.sh target.sh
+{"decision": "deny", "reason": "blocked: strict mode"}
+leftover-after-mutation:
+tmp.W7qXjMYWli
+
+$ ... | TMPDIR=.../scratch TMP=.../scratch bash /tmp/opencode/am-red-ac30/antigravity-json-adapter.sh target.sh
+{"decision": "deny", "reason": "blocked: strict mode"}
+leftover-real-adapter:
+0
+```
+
+Ohne Trap bleibt die `mktemp`-Datei liegen (die Assertion `sorted(scratch.iterdir()) == []`
+schlägt dann fehl); mit Trap ist das Verzeichnis leer — die neue Assertion ist also
+tragend, nicht tautologisch.
+
+### Grün (nach der Teständerung)
+
+| # | Kommando | Ergebnis |
+|---|---|---|
+| 1 | `python3 -m pytest tests/test_repo_containment_hook.py tests/test_antigravity_hooks_registration.py -q` | `60 passed in 23.31s`, Exit 0 |
+| 2 | `python3 -m pytest tests/test_tmp_sink_path_parity.py tests/test_tmp_sink_path_hardening.py -q` | `220 passed in 4.97s`, Exit 0 |
+| 3 | `python3 scripts/sync.py --validate` | Exit 0, `0 action(s), 382 skipped, 2 warning(s)` (beide WARNINGS vorbestehend: `active-set.gate-dropped`, Submodul-Checkout `external/awesome-claude-code`) |
+| 4 | `python3 -m pytest tests/test_repo_containment_hook.py -q --collect-only` | 40 Tests, davon 11 neu/umbenannt (siehe Mapping) |
+
+### Abgedeckte ACs (Task 9)
+
+| AC | Test | Aussage |
+|---|---|---|
+| AC-03 | `test_missing_config_fails_closed` | Fixture ohne `.meta-config/`, Ziel **innerhalb** ⇒ Exit 2 `repo-containment.no-root` (bewusst invertiert) |
+| AC-04 | `test_relative_target_without_cwd_fails_closed` | kein `cwd`, `file_path="notes.md"` ⇒ Exit 2, „relative target without \`cwd\`"; zusätzlich Prozess-CWD = Repo-Root ⇒ weiterhin 2 (kein `$PWD`-Ersatz) |
+| AC-06 | `test_relative_target_resolves_against_cwd` | `cwd=<root>/.tmp/sub`, `notes.md` ⇒ 0; `../../../../etc/passwd` ⇒ 2 |
+| AC-07 | `test_symlinked_cwd_uses_realpath` | Symlink-`cwd` nach außen ⇒ 2 + `resolved: payload \`cwd\` <link> -> <realpath>`; Symlink in ein Projekt ⇒ 0 |
+| AC-08 | `test_disabled_mode_allows_even_an_outside_write` (bleibt), `test_opt_out_does_not_unlock_a_foreign_cwd` | Opt-out wirkt projektlokal; ohne auflösbaren Root ⇒ 2 |
+| AC-18 | `test_block_message_uses_absolute_sink` | absolute `repo root:`/`allowed:`-Pfade, kein `.tmp` als nackter Pfad, `anchor:`/`repair:`/`opt-out:` vorhanden |
+| AC-28 | `test_empty_cwd_anchors_on_absolute_target` | `cwd=""`, absolutes Ziel im Root ⇒ 0 |
+| AC-29 | `test_empty_cwd_does_not_allow_system_temp` | `cwd=""`, Ziel im System-Temp ⇒ 2 + `no-root` |
+| AC-30 | `test_adapter_temp_file_is_cleaned_up` | Scratch-Verzeichnis leer, `git status --porcelain` unverändert, Deny-JSON unverändert |
+| AC-33 | `test_relative_target_is_judged_at_its_real_location` | `cwd=<root>/a/b`, `../../x` ⇒ 0, `../../../../etc/passwd` ⇒ 2 (aus Task 8, nur auf Spec-Namen umbenannt) |
+| AC-37 | `test_empty_cwd_uses_project_of_absolute_target` | `cwd=""`, fremdes Projekt mit `.meta-config/` ⇒ 0 (dokumentierte ADR-08-Annahme), Nachbar ohne Root ⇒ 2 |
+
+### Abweichungen von der Aufgabenbeschreibung (Spec ist normativ)
+
+1. **Testnamen folgen der Spec, nicht dem Task-Text.** Der Task-Auftrag nannte
+   `test_relative_target_is_checked_against_cwd`, `test_symlinked_cwd_is_resolved`,
+   `test_empty_cwd_anchors_on_absolute_target_inside_root`,
+   `test_empty_cwd_blocks_system_temp_target`,
+   `test_empty_cwd_foreign_project_target_is_allowed`; die Spec (AC-06/07/28/29/37)
+   benennt `test_relative_target_resolves_against_cwd`, `test_symlinked_cwd_uses_realpath`,
+   `test_empty_cwd_anchors_on_absolute_target`, `test_empty_cwd_does_not_allow_system_temp`,
+   `test_empty_cwd_uses_project_of_absolute_target`. Umgesetzt sind die **Spec-Namen**
+   (Traceability in den ACs), weil die Spec normativ ist.
+2. **AC-33-Test umbenannt** von `test_relative_target_with_depth_is_checked_at_real_location`
+   (Task-8-Arbeitstitel) auf den Spec-Namen
+   `test_relative_target_is_judged_at_its_real_location`. Assertions unverändert.
+3. **AC-30 ist eine Charakterisierung, keine Rot-Grün-Änderung:** der Adapter räumt seit
+   jeher per EXIT-Trap auf (`antigravity-json-adapter.sh:167-168`); Task 9 ergänzt nur die
+   fehlende Abdeckung. Der Rot-Beleg erfolgt über die fehlende Coverage plus Mutationsprobe
+   (siehe oben), ohne Produktionscode anzufassen.
+4. **Helfer konsolidiert statt dupliziert:** `_write_payload(path, cwd=None, tool=...)`
+   bildet alle drei Payload-Formen ab (`cwd` fehlt / `cwd=""` / `cwd=<pfad>`),
+   `_run_hook(..., process_cwd=...)` macht das Prozess-CWD explizit (Default `_REPO_ROOT`).
+   Kein zweiter Payload-Builder für die Sonderfälle.
+5. **Zusatz-Assertions** (über den Task-Text hinaus, aus der Spec ableitbar):
+   Negativ-Kontrolle in AC-06, Positiv-Kontrolle in AC-07 (Symlink in ein Projekt ⇒ 0),
+   Prozess-CWD-Kreuzprobe in AC-04, Nachbar-Fall in AC-37.
+6. **Kein Produktionscode geändert** — es gab keinen Test, der einen Defekt aus Task 8
+   nachweist. `git status` enthält nur die beiden Testdateien.
+7. **Step 4 (Commit) nicht ausgeführt** — kein Commit-Auftrag für diesen Subagenten.
+
+### Risiken / Interpretationen
+
+- **AC-37** hält eine bewusste Vertrauensannahme fest (fremdes Projekt mit `.meta-config/`
+  wird bei leerem `cwd` Root). Der Test ist eine Dokumentation der Grenze, keine
+  Sicherheitszusage; eine Änderung der Annahme macht ihn absichtlich rot.
+- **AC-30 (b)** nutzt `git status --porcelain` als Proxy für „keine neue Datei im
+  Repo-Baum". Das ist robust gegen den sonst schon schmutzigen Arbeitsbaum (Vergleich
+  vor/nach), aber nicht parallel-suite-fest: bei gleichzeitig schreibenden Läufen im selben
+  Repo könnte die Differenz fremd verursacht sein.
+- **AC-28** ist nur dann diskriminierend, wenn `tmp_path` außerhalb des Repos liegt (der
+  `conftest`-Basetemp-Guard warnt bei In-Repo-Basetemp nur). Mit In-Repo-Basetemp wäre der
+  alte `$PWD`-Fallback nicht mehr vom Ziel-Anker unterscheidbar; die Docstring nennt die
+  Annahme.
+- **AC-04** setzt voraus, dass der Repo-Root `.meta-config/` trägt (Self-Hosting-Repo). In
+  einem Checkout ohne `.meta-config/` wäre die Kreuzprobe „Prozess-CWD = Repo-Root" nicht
+  mehr aussagekräftig (der Test bliebe grün, weil beide Fälle blocken).
+
+## Evidence — Task 20
+
+### Rot (Assertion ergänzt, Adapter noch unverändert)
+
+`python3 -m pytest tests/test_antigravity_hooks_registration.py::test_adapter_normalizes_edit_tool_names -q`
+→ Exit 1:
+
+```
+F                                                                        [100%]
+=================================== FAILURES ===================================
+___________________ test_adapter_normalizes_edit_tool_names ____________________
+
+tmp_path = PosixPath('/tmp/pytest-of-hermes/pytest-89/test_adapter_normalizes_edit_t0')
+
+    def test_adapter_normalizes_edit_tool_names(tmp_path):
+        out_file = tmp_path / "received.json"
+        fixture = _adapter_fixture(tmp_path, '#!/bin/bash\ncat > "$ADAPTER_TEST_OUT"\nexit 0\n')
+        payload = json.dumps({
+            "hookEventName": "PreToolUse",
+            "toolCall": {"name": "write_to_file", "args": {"FilePath": "/ws/a.md"}},
+            "workspacePaths": ["/ws"],
+        })
+        _run_adapter(fixture, payload, env_out=out_file)
+
+        received = json.loads(out_file.read_text(encoding="utf-8"))
+        assert received["tool_name"] == "Write"
+>       assert received["tool_input"]["file_path"] == "/ws/a.md"  # FilePath -> file_path
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'file_path'
+
+tests/test_antigravity_hooks_registration.py:354: KeyError
+=========================== short test summary info ============================
+FAILED tests/test_antigravity_hooks_registration.py::test_adapter_normalizes_edit_tool_names
+1 failed in 0.35s
+```
+
+Ursache: der Adapter reicht unbekannte `args`-Keys unverändert durch
+(`tool_input[ARG_KEY_MAP.get(k, k)] = v`), `FilePath` landete also als
+`tool_input.FilePath` — der Hook-Lookup (`repo-containment-impl.sh`) liest aber
+`file_path` und sah damit keinen Pfad (fail-open für Edit/Write-Prüfungen).
+
+### Grün (nach der Implementierung)
+
+| # | Kommando | Ergebnis |
+|---|---|---|
+| 1 | `python3 -m pytest tests/test_antigravity_hooks_registration.py::test_adapter_normalizes_edit_tool_names -q` | `1 passed in 0.28s`, Exit 0 |
+| 2 | `python3 -m pytest tests/test_antigravity_hooks_registration.py tests/test_repo_containment_hook.py -q` | `60 passed in 16.63s`, Exit 0 |
+| 3 | `python3 scripts/sync.py --validate` (Lauf 1) | Exit 0, `1 action(s) | 381 skipped | 2 warning(s)` — die eine COPY-Aktion betraf die mitvalidierte Nebenkopplung `test-repo` (`/home/hermes/repos/agent-meta-test`), **nicht** dieses Repo |
+| 4 | `python3 scripts/sync.py --validate` (Lauf 2+3) | Exit 0, `0 action(s) | 382 skipped | 2 warning(s)`; beide WARNINGS vorbestehend (`active-set.gate-dropped`, Submodul-Checkout `external/awesome-claude-code`) ⇒ 0 neue Findings |
+| 5 | `git status --porcelain` | nur die erwarteten Pfade: Adapter, die zwei Hook-Testmodule, Plan + Status (kein unerwarteter Write) |
+
+Der Drift zwischen Quelle und getrackter Deployed-Kopie (siehe Abweichung 3) schlägt in
+keiner der beiden `--validate`-Läufe als Finding auf.
+
+### Abgedeckte ACs (Task 20)
+
+| AC | Test | Aussage |
+|---|---|---|
+| AC-40 | `test_adapter_normalizes_edit_tool_names` | `toolCall.args.FilePath` kommt als `tool_input.file_path` beim Ziel-Hook an; die bestehende Tool-Namens-Normalisierung (`write_to_file` → `Write`) bleibt unverändert |
+
+### Abweichungen von der Aufgabenbeschreibung (Spec ist normativ)
+
+1. **Kein separater PascalCase-Contract-Test** — AC-40 fordert ihn ausdrücklich nicht; die
+   Assertion sitzt im bestehenden Test (wie im Plan-Interface festgelegt).
+2. **Nur eine Produktionszeile** (`'FilePath': 'file_path'` in `ARG_KEY_MAP`): `TOOL_MAP`,
+   Deny/Allow-Vertrag, `mktemp`-Pfad und EXIT-Trap sind unberührt, kein Provider-Name im
+   Code. Der Adapter bleibt datengetrieben (`ARG_KEY_MAP`).
+3. **Adapter-Version bleibt `1.1.0`, Deployed-Kopie bleibt alt (Scope-Entscheidung).** Plan-Step 2
+   verlangt genau eine Zeile und keinen Versions-Bump; der Drift-Check
+   (`hooks.stale-deployed-version`) vergleicht ausschließlich `# version:` und meldet daher
+   **nichts**. Folge: die getrackte Kopie `.agents/hooks/antigravity-json-adapter.sh` (gelistet
+   in `.meta-config/generated-file-hashes.json`) trägt weiterhin den alten `ARG_KEY_MAP`, und
+   dieser Repo-interne Sync meldet sie als „unchanged" — der Drift ist über `--validate`
+   **nicht** sichtbar. **Offen für den Orchestrator:** Adapter-Version auf `1.2.0` bumpen,
+   `python3 scripts/sync.py` einmal laufen lassen und `.agents/hooks/antigravity-json-adapter.sh`
+   (+ Hash-Baseline) mitcommitten; erst der Bump macht die Drift für Downstream-Projekte als
+   Warnung sichtbar. Der Datei-Scope dieses Auftrags (nur Adapter + Test + zwei Ledger) wurde
+   deshalb eingehalten.
+4. **Step 4 (Commit) nicht ausgeführt** — kein Commit-Auftrag für diesen Subagenten; die
+   Plan-Checkbox bleibt deshalb offen (gleiche Konvention wie Tasks 1–9, deren Step 4 trotz
+   existierender Commits offen ist). Der Status-Eintrag führt `— (pending)`.
+5. **`--validate`-Lauf 1 hat die Nebenkopplung `test-repo` mitgeschrieben:** die COPY-Aktion
+   zielte auf `/home/hermes/repos/agent-meta-test/.agents/hooks/antigravity-json-adapter.sh`
+   (in `.meta-config/project.yaml` als `test-repo` deklariert). Das ist vorbestehendes
+   `--validate`-Verhalten (kein `dry_run` für die Sekundärprojekte), nicht durch diesen Task
+   eingeführt; das Repo-eigene `.agents/` blieb unberührt.
+
+### Risiken / Interpretationen
+
+- **Stille Drift der Deployed-Kopie:** `.agents/hooks/antigravity-json-adapter.sh` ist
+  getrackt und bleibt nach diesem Task auf dem alten Mapping; für dieses Self-Hosting-Repo
+  greift der Fix erst nach einem `sync.py`-Lauf. Kein Test und kein `--validate`-Finding
+  erzwingt das, weil die Versionsprüfung inhaltsblind ist.
+- **Keine AC-40-Abdeckung für den Downstream-Deploy-Pfad:** getestet ist der
+  Adapter-Aufruf mit dem AGY-Payload, nicht die ausgerollte Kopie. Ein Projekt mit alter
+  Kopie bleibt bis zum nächsten Sync ungeschützt; das ist bewusst außerhalb dieses Tasks.
+- Nicht ausgeführt: die volle Testsuite (nur die im Plan-Step 3 genannten Module plus
+  `sync.py --validate`).
+

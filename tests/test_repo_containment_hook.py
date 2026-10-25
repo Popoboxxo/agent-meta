@@ -72,23 +72,38 @@ def _project(tmp_path: Path, block: str | None = None) -> Path:
     return root
 
 
-def _run_hook(payload: dict | str) -> subprocess.CompletedProcess:
+def _run_hook(
+    payload: dict | str, process_cwd: Path | str | None = None
+) -> subprocess.CompletedProcess:
+    """Run the hook as a subprocess.
+
+    ``process_cwd`` is the guard process' own working directory (the thing the
+    hook must never adopt as a repo root). It defaults to the agent-meta repo
+    root, which *does* carry ``.meta-config/`` — so any test that still passes
+    with that default proves the verdict came from the payload, never ``$PWD``.
+    """
     raw = payload if isinstance(payload, str) else json.dumps(payload)
     return subprocess.run(
         [_BASH, str(_HOOK_PATH)],
         input=raw,
         capture_output=True,
         text=True,
-        cwd=str(_REPO_ROOT),
+        cwd=str(process_cwd if process_cwd is not None else _REPO_ROOT),
     )
 
 
-def _write_payload(path: Path, cwd: Path, tool: str = "Write") -> dict:
-    return {
-        "tool_name": tool,
-        "tool_input": {"file_path": str(path)},
-        "cwd": str(cwd),
-    }
+def _write_payload(
+    path: Path | str, cwd: Path | str | None = None, tool: str = "Write"
+) -> dict:
+    """Build a PreToolUse payload for a Write/Edit target.
+
+    ``cwd=None`` omits the ``cwd`` key entirely (the AC-04 payload shape);
+    ``cwd=""`` sends the key with an empty value (the AC-28/29/37 shape).
+    """
+    payload: dict = {"tool_name": tool, "tool_input": {"file_path": str(path)}}
+    if cwd is not None:
+        payload["cwd"] = str(cwd)
+    return payload
 
 
 def _bash_payload(command: str, cwd: Path) -> dict:
@@ -184,6 +199,23 @@ def test_disabled_mode_allows_even_an_outside_write(tmp_path):
     assert result.returncode == 0, result.stderr
 
 
+def test_opt_out_does_not_unlock_a_foreign_cwd(tmp_path, external_fixture):
+    """AC-08: `enabled: false` stays project-local (root resolution comes first).
+
+    The same foreign project with the opt-out allows a write *inside itself*
+    (exit 0) but cannot unlock a write from a `cwd` that resolves to no project
+    at all (exit 2, ``repo-containment.no-root``).
+    """
+    foreign = _project(tmp_path, "repo_containment:\n  enabled: false\n")
+
+    inside = _run_hook(_write_payload(foreign / "note.md", foreign))
+    assert inside.returncode == 0, inside.stderr
+
+    outside = _run_hook(_write_payload(external_fixture / "x.py", external_fixture))
+    assert outside.returncode == 2, outside.stderr
+    assert "repo-containment.no-root" in outside.stderr
+
+
 # --- Bash: best-effort write detection ---------------------------------
 
 
@@ -240,19 +272,55 @@ def test_broken_json_payload_fails_closed():
     assert result.returncode == 2
 
 
-def test_missing_config_defaults_to_containment_on(tmp_path):
-    """No `.meta-config/` anywhere: the hook still blocks (F4).
+def test_missing_config_fails_closed(external_fixture):
+    """AC-03: without any `.meta-config/` ancestor the hook fails closed.
 
-    Note (Task 8): the exit 2 no longer comes from "containment ON with the
-    working directory promoted to a root" — root resolution now fails closed
-    with ``repo-containment.no-root``. Task 9 deliberately inverts and renames
-    this test to ``test_missing_config_fails_closed`` (spec §"Bewusste
-    Test-Änderung"); the assertion is unchanged on purpose.
+    The fixture has no ``.meta-config/`` ancestor (asserted by
+    ``_external_fixture``) and the target lies *inside* the fixture, so the
+    verdict can only come from the missing project root — not from a target
+    outside some promoted directory.
+
+    Deliberate inversion (Task 9, spec §"Bewusste Test-Änderung"): the old
+    ``test_missing_config_defaults_to_containment_on`` asserted exit 2 for a
+    target *outside* a promoted fixture root, i.e. the fail-open case
+    (``cwd=/tmp``, target ``/tmp/x``) was never covered — it returned 0.
+
+        # bewusst invertiert (Fail-open-Fall cwd=/tmp, Ziel /tmp/x)
+        # root = tmp_path / "bare"
+        # result = _run_hook(_write_payload(root.parent / "outside.py", root))
+        # assert result.returncode == 2      # passed only via the escaped target
+
+    The reversed test below keeps the old expectation (exit 2) but names the
+    code and points the target inside the fixture, which fails on the
+    pre-Task-8 hook (exit 0).
     """
-    root = tmp_path / "bare"
-    root.mkdir()
-    result = _run_hook(_write_payload(root.parent / "outside.py", root))
-    assert result.returncode == 2
+    result = _run_hook(_write_payload(external_fixture / "notes.md", external_fixture))
+    assert result.returncode == 2, result.stderr
+    assert "repo-containment.no-root" in result.stderr
+    anchor = os.path.realpath(external_fixture)
+    assert f"no project root found above {anchor}" in result.stderr
+
+
+def test_relative_target_without_cwd_fails_closed(external_fixture):
+    """AC-04: a relative target and no `cwd` cannot be anchored -> exit 2.
+
+    ``$PWD`` must not stand in for the payload field: the same payload is run
+    once with the (project carrying) agent-meta repo as process cwd and once
+    from the isolated external fixture. Both stay blocked, so the guard never
+    resolves a relative target against its own working directory.
+    """
+    payload = _write_payload("notes.md")  # no `cwd` key at all
+    assert "cwd" not in payload
+
+    from_outside = _run_hook(payload, process_cwd=external_fixture)
+    assert from_outside.returncode == 2, from_outside.stderr
+    assert "repo-containment.no-root" in from_outside.stderr
+    assert "relative target without `cwd`" in from_outside.stderr
+    assert "target:    notes.md" in from_outside.stderr
+
+    from_project_pwd = _run_hook(payload)  # process cwd = _REPO_ROOT
+    assert from_project_pwd.returncode == 2, from_project_pwd.stderr
+    assert "relative target without `cwd`" in from_project_pwd.stderr
 
 
 # --- Fail-closed anchor rule (Task 8) ----------------------------------
@@ -274,7 +342,7 @@ def test_cwd_outside_project_cannot_be_adopted(external_fixture):
     assert f"anchor:    {anchor}" in result.stderr
 
 
-def test_relative_target_with_depth_is_checked_at_real_location(tmp_path):
+def test_relative_target_is_judged_at_its_real_location(tmp_path):
     """AC-33: a relative target is resolved against `cwd`, not the repo root."""
     root = _project(tmp_path)
     deep = root / "a" / "b"
@@ -286,6 +354,104 @@ def test_relative_target_with_depth_is_checked_at_real_location(tmp_path):
     outside = _run_hook(_write_payload(Path("../../../../etc/passwd"), deep))
     assert outside.returncode == 2, outside.stderr
     assert "outside the repository root" in outside.stderr
+
+
+def test_relative_target_resolves_against_cwd(tmp_path):
+    """AC-06: relative targets are judged where the tool would write them.
+
+    ``cwd=<root>/.tmp/sub`` plus ``file_path="notes.md"`` is evaluated as
+    ``<root>/.tmp/sub/notes.md`` (inside the enabled sink) -> exit 0. From the
+    same `cwd` a relative target climbing out of the project is blocked, which
+    only holds when the base really is the workdir and not the repo root.
+    """
+    root = _project(tmp_path)
+    workdir = root / ".tmp" / "sub"
+    workdir.mkdir(parents=True)
+
+    inside = _run_hook(_write_payload("notes.md", workdir))
+    assert inside.returncode == 0, inside.stderr
+
+    climbing = _run_hook(_write_payload("../../../../etc/passwd", workdir))
+    assert climbing.returncode == 2, climbing.stderr
+    assert "outside the repository root" in climbing.stderr
+
+
+@pytest.mark.skipif(os.name == "nt", reason="symlink semantics differ on Windows")
+def test_symlinked_cwd_uses_realpath(external_fixture):
+    """AC-07: a symlinked `cwd` is realpath-resolved before the root search.
+
+    A link pointing outside every project must exit 2 with the *resolved* path
+    named in stderr (the link must never become an anchor on its own). The
+    control case — a link into a project — must allow, which only works when
+    the realpath is searched rather than the link's own ancestors.
+    """
+    real_outside = external_fixture / "real-outside"
+    real_outside.mkdir()
+    link_outside = external_fixture / "link-outside"
+    os.symlink(real_outside, link_outside)
+    resolved_outside = os.path.realpath(real_outside)
+
+    blocked = _run_hook(_write_payload(real_outside / "x.py", link_outside))
+    assert blocked.returncode == 2, blocked.stderr
+    assert "repo-containment.no-root" in blocked.stderr
+    assert f"no project root found above {resolved_outside}" in blocked.stderr
+    assert (
+        f"resolved:  payload `cwd` {link_outside} -> {resolved_outside}"
+        in blocked.stderr
+    )
+
+    project = external_fixture / "project"
+    project.mkdir()
+    _write_config(project, "repo_containment:\n  enabled: true\n")
+    link_inside = external_fixture / "link-inside"
+    os.symlink(project, link_inside)
+
+    allowed = _run_hook(_write_payload(project / "notes.md", link_inside))
+    assert allowed.returncode == 0, allowed.stderr
+
+
+def test_empty_cwd_anchors_on_absolute_target(tmp_path):
+    """AC-28: `cwd=""` anchors on the target's directory, never on `$PWD`.
+
+    The fixture lives outside the agent-meta repo, so an implementation falling
+    back to the guard process' working directory (the repo root) would call the
+    target "outside" and exit 2. Exit 0 is only reachable through the
+    target-derived anchor.
+    """
+    root = _project(tmp_path)
+    result = _run_hook(_write_payload(root / "notes.md", ""))
+    assert result.returncode == 0, result.stderr
+
+
+def test_empty_cwd_does_not_allow_system_temp(external_fixture):
+    """AC-29: `cwd=""` plus a system-temp target still fails closed."""
+    result = _run_hook(_write_payload(external_fixture / "x.py", ""))
+    assert result.returncode == 2, result.stderr
+    assert "repo-containment.no-root" in result.stderr
+    anchor = os.path.realpath(external_fixture)
+    assert f"no project root found above {anchor}" in result.stderr
+    assert "the target's own directory when `cwd` is missing" in result.stderr
+
+
+def test_empty_cwd_uses_project_of_absolute_target(external_fixture):
+    """AC-37: documented assumption (ADR-08) — the target's own project wins.
+
+    With ``cwd=""`` an absolute target inside a *foreign* tree that carries
+    ``.meta-config/`` becomes the root and the write is allowed. This pins the
+    residual trust assumption (a foreign project is trusted exactly like a
+    `cwd`) so it cannot change unnoticed; it is deliberately not a security
+    claim. A sibling without ``.meta-config/`` stays blocked.
+    """
+    foreign = external_fixture / "foreign"
+    foreign.mkdir()
+    _write_config(foreign, "repo_containment:\n  enabled: true\n")
+
+    allowed = _run_hook(_write_payload(foreign / "notes.md", ""))
+    assert allowed.returncode == 0, allowed.stderr
+
+    blocked = _run_hook(_write_payload(external_fixture / "other.py", ""))
+    assert blocked.returncode == 2, blocked.stderr
+    assert "repo-containment.no-root" in blocked.stderr
 
 
 def test_hook_sink_matches_tmp_paths(tmp_path):
@@ -324,6 +490,32 @@ def _outside_block_stderr(root: Path) -> str:
     result = _run_hook(_write_payload(root.parent / "outside.py", root))
     assert result.returncode == 2, result.stderr
     return result.stderr
+
+
+def test_block_message_uses_absolute_sink(tmp_path):
+    """AC-18: a blocked write names the absolute root and the absolute sink.
+
+    No ``<root>/<relative-sink>`` concatenation artifact and no bare ``.tmp``:
+    both paths are realpaths, as computed by ``resolve_tmp_paths().absolute``.
+    """
+    root = _project(tmp_path)
+    stderr = _outside_block_stderr(root)
+
+    real_root = os.path.realpath(root)
+    real_sink = os.path.realpath(root / ".tmp")
+    assert real_sink == f"{real_root}/.tmp"
+
+    assert f"  repo root: {real_root}" in stderr
+    assert f"allowed:   paths under {real_root} and under {real_sink}" in stderr
+    # The relative sink never appears as a standalone allowed location.
+    assert " under .tmp" not in stderr
+    # Fixed message skeleton (spec §Fehlermeldungen).
+    assert f"  anchor:    {real_root}" in stderr
+    assert "  repair:    write inside " in stderr
+    assert (
+        f"  opt-out:   repo_containment.enabled: false in {real_root}/.meta-config/project.yaml"
+        in stderr
+    )
 
 
 def test_valid_custom_sink_path_is_reflected_in_stderr(tmp_path):

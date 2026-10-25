@@ -393,9 +393,9 @@ Der `standalone/agents/`-Eintrag ist Verzeichnis-Ownership: `--render-standalone
 
 **Rot zuerst:** `test_relative_target_without_cwd_fails_closed` (AC-04) und `test_empty_cwd_anchors_on_absolute_target` (AC-28) schlagen fehl, weil `cwd=""` heute wie „fehlt" behandelt wird und `$PWD` als Basis nimmt.
 
-- [ ] Step 1: Tests schreiben/umbauen (rot): AC-03 (`test_missing_config_fails_closed`, Fixture ohne `.meta-config/`, Ziel **innerhalb** der Fixture ⇒ Exit 2 mit Code — die bewusste Inversion der alten Erwartung), AC-04 (relatives Ziel ohne `cwd` ⇒ Exit 2, stderr nennt „relative target without `cwd`"), AC-06 (`cwd=<fixture>/.tmp/sub`, `notes.md` ⇒ Exit 0), AC-07 (Symlink-`cwd` ⇒ Exit 2, stderr nennt realpath), AC-08 (bestehender Outside-Write-Test bleibt), AC-18 (`test_block_message_uses_absolute_sink`), AC-28 (`cwd=""`, absolutes Ziel im Root ⇒ Exit 0), AC-29 (`cwd=""`, Ziel im System-Temp ⇒ Exit 2), AC-33 (aus Task 8 gehalten), AC-37 (`cwd=""`, fremdes Projekt mit `.meta-config/` ⇒ Exit 0, dokumentierte Annahme), AC-30 (`test_adapter_temp_file_is_cleaned_up`: keine neue Datei im Repo-Baum, `mktemp`-Datei nach Prozessende weg, Deny-Vertrag unverändert).
-- [ ] Step 2: Testdatei konsolidieren: gemeinsamer `_write_payload()`-/`_external_fixture()`-Helfer, Docstrings mit AC-ID; alte Erwartung als Kommentar „bewusst invertiert (Fail-open-Fall cwd=/tmp, Ziel /tmp/x)" dokumentieren.
-- [ ] Step 3: `python3 -m pytest tests/test_repo_containment_hook.py tests/test_antigravity_hooks_registration.py -q` grün.
+- [x] Step 1: Tests schreiben/umbauen (rot): AC-03 (`test_missing_config_fails_closed`, Fixture ohne `.meta-config/`, Ziel **innerhalb** der Fixture ⇒ Exit 2 mit Code — die bewusste Inversion der alten Erwartung), AC-04 (relatives Ziel ohne `cwd` ⇒ Exit 2, stderr nennt „relative target without `cwd`"), AC-06 (`cwd=<fixture>/.tmp/sub`, `notes.md` ⇒ Exit 0), AC-07 (Symlink-`cwd` ⇒ Exit 2, stderr nennt realpath), AC-08 (bestehender Outside-Write-Test bleibt), AC-18 (`test_block_message_uses_absolute_sink`), AC-28 (`cwd=""`, absolutes Ziel im Root ⇒ Exit 0), AC-29 (`cwd=""`, Ziel im System-Temp ⇒ Exit 2), AC-33 (aus Task 8 gehalten), AC-37 (`cwd=""`, fremdes Projekt mit `.meta-config/` ⇒ Exit 0, dokumentierte Annahme), AC-30 (`test_adapter_temp_file_is_cleaned_up`: keine neue Datei im Repo-Baum, `mktemp`-Datei nach Prozessende weg, Deny-Vertrag unverändert).
+- [x] Step 2: Testdatei konsolidieren: gemeinsamer `_write_payload()`-/`_external_fixture()`-Helfer, Docstrings mit AC-ID; alte Erwartung als Kommentar „bewusst invertiert (Fail-open-Fall cwd=/tmp, Ziel /tmp/x)" dokumentieren.
+- [x] Step 3: `python3 -m pytest tests/test_repo_containment_hook.py tests/test_antigravity_hooks_registration.py -q` grün.
 - [ ] Step 4: Commit `test: cover hook anchor rule and invert fail-open test`.
 
 ## Phase P3 — Env-Pin, Backup, Zweitparser
@@ -606,9 +606,9 @@ vollständig vor dem Abschluss-Gate Task 18.
 
 **Rot zuerst:** nach Ergänzung der Assertion schlägt `tests/test_antigravity_hooks_registration.py::test_adapter_normalizes_edit_tool_names` fehl, weil `tool_input` heute `FilePath` statt `file_path` trägt.
 
-- [ ] Step 1: Assertion `received["tool_input"]["file_path"] == "/ws/a.md"` im bestehenden Test ergänzen (rot).
-- [ ] Step 2: `ARG_KEY_MAP` um die eine Zeile `'FilePath': 'file_path'` erweitern; kein Provider-Name im Code, Deny/Allow-Vertrag und `mktemp`-Ausnahme (`:167-168`) unverändert.
-- [ ] Step 3: `python3 -m pytest tests/test_antigravity_hooks_registration.py tests/test_repo_containment_hook.py -q` grün.
+- [x] Step 1: Assertion `received["tool_input"]["file_path"] == "/ws/a.md"` im bestehenden Test ergänzen (rot).
+- [x] Step 2: `ARG_KEY_MAP` um die eine Zeile `'FilePath': 'file_path'` erweitern; kein Provider-Name im Code, Deny/Allow-Vertrag und `mktemp`-Ausnahme (`:167-168`) unverändert.
+- [x] Step 3: `python3 -m pytest tests/test_antigravity_hooks_registration.py tests/test_repo_containment_hook.py -q` grün.
 - [ ] Step 4: Commit `fix: map antigravity FilePath to file_path in adapter`.
 
 ### Task 21: §5.5 verweist auf `PYTEST_BASETEMP` (Q11)
