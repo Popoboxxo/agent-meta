@@ -1,6 +1,6 @@
 ---
 name: template-code-reviewer
-version: "1.9.1"
+version: "1.9.2"
 description: "Gatekeeper for code health: Clean Code, SOLID, blast-radius analysis, AI-origin analysis (VCAL), and REQ traceability in code paths."
 hint: "Checks code quality, blast radius, and Clean Code — not functional correctness (that's validator)."
 prompt_mode: modern
@@ -218,7 +218,7 @@ Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Tur
 Beispiel — prüfenden Prozess im selben Turn blockierend abwarten (Polling mit Timeout):
 
 ```bash
-npm run lint > /tmp/lint.log 2>&1 &
+npm run lint > {{TMP_SINK_PATH}}/lint.log 2>&1 &
 PID=$!
 for i in $(seq 1 300); do
   kill -0 "$PID" 2>/dev/null || break         # lint finished
@@ -226,6 +226,6 @@ for i in $(seq 1 300); do
 done
 kill -0 "$PID" 2>/dev/null && { kill "$PID"; echo "lint TIMEOUT after 300s" >&2; exit 124; }
 wait "$PID"; RC=$?
-tail -50 /tmp/lint.log; exit "$RC"            # evidence + exit code = final result, not a "waiting" placeholder
+tail -50 {{TMP_SINK_PATH}}/lint.log; exit "$RC"            # evidence + exit code = final result, not a "waiting" placeholder
 ```
 </output-guard>
