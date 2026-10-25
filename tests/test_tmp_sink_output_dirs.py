@@ -6,6 +6,7 @@ Run: python -m pytest tests/test_tmp_sink_output_dirs.py -q
 from __future__ import annotations
 
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -18,7 +19,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from lib import repo_containment as rc  # noqa: E402
-from lib.config import build_variables  # noqa: E402
+from lib.config import build_variables, load_config  # noqa: E402
 from lib.tmp_paths import (  # noqa: E402
     SystemTempException,
     TmpPaths,
@@ -433,3 +434,63 @@ def test_disabled_sink_without_pytest_exception_has_no_basetemp(tmp_path):
             ),
         )
     assert exc.value.code == "tmp-sink.system-temp-exception"
+
+
+# ---------------------------------------------------------------------------
+# Suite commands rendered literal-free (Task 3: AC-13, AC-34)
+# ---------------------------------------------------------------------------
+
+def _repo_variables() -> dict:
+    """Render the variables of this repository's real project config."""
+    config = load_config(REPO_ROOT / ".meta-config" / "project.yaml")
+    variables, _warnings = build_variables(config, REPO_ROOT, REPO_ROOT)
+    return variables
+
+
+def _basetemp_args(rendered: str) -> list[str]:
+    """Every ``--basetemp=...`` argv element of a rendered shell command."""
+    return [arg for arg in shlex.split(rendered) if arg.startswith("--basetemp=")]
+
+
+def test_test_commands_have_no_system_temp_literal():
+    """AC-13: the repo's suite commands carry no system-temp literal.
+
+    The resolved basetemp is the single sanctioned temp path, so it is masked
+    before the literal check — on POSIX the platform temp root *is* ``/tmp``.
+    """
+    variables = _repo_variables()
+    basetemp = variables["PYTEST_BASETEMP"]
+    assert os.path.isabs(basetemp)
+
+    for key in ("TEST_COMMANDS", "CODE_QUALITY_RULES"):
+        rendered = variables[key]
+        command_text = rendered.replace(basetemp, "<PYTEST_BASETEMP>")
+
+        assert "/tmp" not in command_text, key
+        assert "%TEMP%" not in command_text, key
+        assert "C:\\Temp" not in command_text, key
+        assert "$USER" not in command_text, key
+
+        # Shell-quoted and exactly one argument (AC-13/AC-34).
+        assert '--basetemp="' in rendered, key
+        args = _basetemp_args(rendered)
+        assert len(args) == 1, (key, args)
+        assert args[0] == f"--basetemp={basetemp}", key
+
+
+def test_basetemp_with_spaces_is_single_argument(tmp_path, monkeypatch):
+    """AC-34: a system temp root containing a space stays one argument."""
+    spaced_root = tmp_path.parent / "system temp root"
+    monkeypatch.setattr(tempfile, "gettempdir", lambda: str(spaced_root))
+
+    variables = _repo_variables()
+    basetemp = variables["PYTEST_BASETEMP"]
+    assert " " in basetemp
+    assert basetemp.startswith(str(spaced_root))
+
+    for key in ("TEST_COMMANDS", "CODE_QUALITY_RULES"):
+        rendered = variables[key]
+        assert '--basetemp="' in rendered, key
+        args = _basetemp_args(rendered)
+        assert len(args) == 1, (key, args)
+        assert args[0] == f"--basetemp={basetemp}", key

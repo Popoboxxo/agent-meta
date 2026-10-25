@@ -16,7 +16,7 @@ Spalte `Commit` bleibt `— (pending)`, bis der jeweilige Commit tatsächlich ex
 |---|---|---|---|---|
 | 1 | Zentraler Tmp-Paths-Resolver | done | — (pending) | Steps 1–3 grün; Step 4 (Commit) offen, weil der Subagent keinen Commit-Auftrag hatte |
 | 2 | Builder-Variablen und Ausnahme-Validierung | done | — (pending) | Steps 1–3 grün; Step 4 (Commit) offen (kein Commit-Auftrag) |
-| 3 | Suite-Kommando literal-frei rendern | pending | — (pending) | — |
+| 3 | Suite-Kommando literal-frei rendern | done | — (pending) | Steps 1–3 grün; Step 4 (Commit) offen, weil der Subagent keinen Commit-Auftrag hatte |
 | 4 | Achtzehn System-Temp-Literale in sieben Templates ersetzen | pending | — (pending) | — |
 | 5 | Vier Sink-Literale in Auditor-Templates | pending | — (pending) | — |
 | 6 | Vage Temp-Anweisungen präzisieren | pending | — (pending) | — |
@@ -163,3 +163,109 @@ E       AttributeError: 'module' object at lib.config has no attribute '_replace
 4. **Task-1-Tests angepasst:** `test_env_pin_block_is_absolute` und
    `test_env_pin_block_refuses_missing_directory` provisionieren jetzt explizit über
    `tmp_env(paths)`, weil der Resolver seit Task 2 schreibfrei ist (Dry-Run-Sicherheit).
+
+## Evidence — Task 3
+
+### Rot (vor der Config-Änderung, `project.yaml` auf HEAD-Stand gestasht)
+
+`python3 -m pytest tests/test_tmp_sink_output_dirs.py -q -k "test_test_commands_have_no_system_temp_literal or test_basetemp_with_spaces"`
+→ Exit 1, `2 failed, 39 deselected in 3.78s`:
+
+```
+>           assert "/tmp" not in command_text, key
+E           AssertionError: TEST_COMMANDS
+E           assert '/tmp' not in 'python scri...t-agent-meta'
+E             
+E             '/tmp' is contained here:
+E               basetemp=/tmp/$USER/pytest-agent-meta
+E             ?          ++++
+
+tests/test_tmp_sink_output_dirs.py:469: AssertionError
+
+>           assert '--basetemp="' in rendered, key
+E           AssertionError: TEST_COMMANDS
+E           assert '--basetemp="' in 'python scripts/sync.py --dry-run && python scripts/sync.py --validate && python3 -m pytest tests/ --basetemp=/tmp/$USER/pytest-agent-meta'
+
+tests/test_tmp_sink_output_dirs.py:493: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_tmp_sink_output_dirs.py::test_test_commands_have_no_system_temp_literal
+FAILED tests/test_tmp_sink_output_dirs.py::test_basetemp_with_spaces_is_single_argument
+```
+
+### Grün (nach der Implementierung)
+
+| # | Kommando | Ergebnis |
+|---|---|---|
+| 1 | `python3 -m pytest tests/test_tmp_sink_output_dirs.py -q` | `41 passed in 5.65s`, Exit 0 |
+| 2 | `python3 scripts/sync.py --dry-run` | Exit 0; `12 action(s) \| 437 skipped \| 35 warning(s)`; `grep -c '/tmp'` im Log = **0** |
+| 3 | `python3 scripts/sync.py --validate` | Exit 0; `12 action(s) \| 370 skipped \| 2 warning(s)` — die 12 Writes (4 Test-Rollen × 3 Provider) sind **vorbestehend** (identisch mit gestashten Task-3-Änderungen), beide Warnungen ebenfalls |
+| 4 | `python3 scripts/sync.py --validate-spec-plan` | Exit 0; `validate-spec-plan: no spec/plan-workflow findings` (Lauf vor dem Ledger-Update dieser Datei; siehe Hinweis unten) |
+| 5 | Regression `python3 -m pytest tests/test_tmp_paths_builder.py tests/test_repo_containment_validate.py tests/test_repo_containment_schema.py -q` | `78 passed`, Exit 0 |
+| 6 | Zusatz: `tests/test_config_audit.py` + 5 Template-Config-Testmodule | `33 passed` bzw. `94 passed`, Exit 0 |
+
+Die 35 Dry-Run-Warnungen sind **vorbestehend**: mit gestashten Task-3-Änderungen
+meldet `--dry-run` auf HEAD `0 action(s) | 449 skipped | 35 warning(s)`. Die 12
+`WRITE`-Actions im Dry-Run sind dagegen die erwartete Folge der Config-Änderung: die
+vier Test-Rollen (`documenter`, `e2e-tester`, `test-executor`, `tester`) × drei
+Provider betten `{{TEST_COMMANDS}}` ein und werden beim nächsten echten Sync
+regeneriert (generierte Verzeichnisse sind in agent-meta gitignored).
+`--validate` meldet die 12 Actions unabhängig von den Task-3-Änderungen (auch auf
+HEAD) — ein vorbestehender Zähler-Unterschied der beiden Modi, kein Finding
+(Exit 0, 2 vorbestehende Warnungen).
+
+Gerenderte Werte (Kommando 5 aus der Aufgabenbeschreibung):
+
+```
+PYTEST_BASETEMP = /tmp/hermes/pytest-agent-meta
+--- TEST_COMMANDS ---
+python scripts/sync.py --dry-run && python scripts/sync.py --validate && python3 -m pytest tests/ --basetemp="/tmp/hermes/pytest-agent-meta"
+--- CODE_QUALITY_RULES ---
+- sync.py muss nach jeder Änderung mit --dry-run fehlerfrei laufen
+- Alle neuen Platzhalter müssen in agent-meta.config.example.yaml dokumentiert sein
+- Änderungs-Workflow: Einfacher Wert -> project.yaml, Projektwissen -> 3-project-ext, Neue Rolle -> 1-generic, Neuer Skill -> sync.py --add-skill
+- pytest-Basetemp NIE im Arbeitsbaum — Aufruf: --basetemp="/tmp/hermes/pytest-agent-meta" (Quelle: repo_containment.tmp-sink.system-temp-exception); Repo-Kopien in Tests müssen .tmp/ ausschließen und Symlinks unverfolgt kopieren (siehe docs/concepts/repo-containment-prison-mode.md §5.5)
+```
+
+Quelltext-Check: `grep -n '/tmp\|\$USER\|%TEMP%' .meta-config/project.yaml
+templates/configs/agent-meta.config.example.yaml` → keine Treffer.
+
+### Abgedeckte ACs (Task 3)
+
+- **AC-13** — `test_test_commands_have_no_system_temp_literal` (beide Werte ohne
+  `/tmp`, `%TEMP%`, `C:\Temp`, `$USER`; `--basetemp="…"` shell-gequotet; genau ein
+  `--basetemp=`-Argument nach `shlex.split`)
+- **AC-34** — `test_basetemp_with_spaces_is_single_argument` (`gettempdir()` mit
+  Leerzeichen ⇒ genau ein Argument, Wert identisch zu `PYTEST_BASETEMP`)
+
+### Abweichungen von der Aufgabenbeschreibung (Spec ist normativ)
+
+1. **Token-Form:** Die Aufgabe nannte `--basetemp="{{PYTEST_BASETEMP}}"`. Der in Task 2
+   implementierte und getestete Helper `_replace_pytest_basetemp_token` entfernt bei
+   dieser bereits gequoteten Form die Anführungszeichen (Ergebnis:
+   `--basetemp=/tmp/a b/...`), was AC-34 mit Leerzeichen bricht. Eingesetzt ist deshalb
+   `--basetemp={{PYTEST_BASETEMP}}`, das vertragsgemäß zu
+   `--basetemp="<absolut>"` rendert (Spec AC-13/AC-34: shell-gequotet, leerzeichensicher).
+2. **Literal-Assertion maskiert den aufgelösten Basetemp:** AC-13 verbietet Literale im
+   konfigurierten Kommando, erlaubt aber ausdrücklich „einen plattformneutralen
+   Temp-Root-Pfad". Auf POSIX ist `tempfile.gettempdir()` = `/tmp`, ein roher
+   Substring-Check würde also den erlaubten aufgelösten Wert verbieten. Der Test
+   ersetzt `PYTEST_BASETEMP` vor der Literal-Prüfung durch `<PYTEST_BASETEMP>`.
+3. **Testname:** Die Spec (`AC-34`) nennt
+   `test_basetemp_with_spaces_is_single_argument`; die Aufgabe nannte
+   `test_basetemp_with_space_keeps_single_argument`. Umgesetzt ist der Spec-Name.
+4. **Bullet-Formulierung:** `--basetemp={{PYTEST_BASETEMP}}` steht als eigenständiges
+   Argument (nicht in Klammern), damit `shlex.split` ein sauberes
+   `--basetemp=`-Argv-Element liefert (sonst klebt `(` am Token).
+5. **Step 4 (Commit) nicht ausgeführt** — kein Commit-Auftrag für diesen Subagenten.
+
+**Hinweis zu `--validate-spec-plan`:** Der Exit-0-Lauf erfolgte vor dem Ledger-Update
+dieser Datei (bzw. mit auf HEAD gestashtem Status-Dokument). Sobald
+`docs/plans/2026-10-24-tmp-sink-injection-status.md` uncommitted ist, matcht sie das
+Datumsmuster `^\d{4}-\d{2}-\d{2}-.+\.md$` und wird als Plan-Artefakt gescannt:
+7 WARNINGs (`spec_plan_required_sections` ×6, `spec_plan_traceability` ×1 wegen des
+`` `(APPROVED, Rev. 3)` ``-Suffix in der `**Spec:**`-Zeile), **0 ERRORs**, Exit 1.
+Das ist ein Artefakt des fehlenden Commits (Step 4) und verschwindet mit dem
+Task-Commit; die Code-/Config-Änderung selbst ist clean (Exit 0 im gestashten Lauf).
+Identity-Check der Migration: 2 stabile Config-Keys (`TEST_COMMANDS`,
+`CODE_QUALITY_RULES`) vorher/nachher vorhanden — 0 fehlend, 0 doppelt; 0
+`/tmp`/`$USER`/`%TEMP%`-Treffer in beiden Config-Dateien.
