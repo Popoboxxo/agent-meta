@@ -2,6 +2,50 @@ name: Orchestration Tests
 
 # Validiert Orchestrator-/Runtime-Verhalten und Template-Konsistenz.
 # Konzept: docs/concepts/orchestrator-first-architecture.md (L3 — CI/CD Orchestration Tests)
+#
+# Speed rationale:
+#   - suite size 6569 tests / 361 modules used to run as 3 full-suite legs
+#     (3.9 / 3.11 / 3.12). Those three legs dominated CI wall clock.
+#   - now: 2 fully-tested endpoints (floor 3.9, ceiling 3.12) x 3 shards
+#     = 6 jobs x ~1/3 suite. 3.11 has its own cheap targeted job (compat-311):
+#     3.11 lies strictly between 3.9 and 3.12, so a full-suite 3.11 leg only
+#     bought a small compatibility delta.
+#   - Python 3.9 is the compatibility floor: every test module must stay
+#     3.9-parseable (python.py39-union-syntax / fstring-backslash gates).
+#   - shards use `-n 2 --dist loadfile` (runner size is treated as 2-core):
+#     `loadfile` keeps one test module per worker, so a module's subprocesses
+#     never interleave across workers mid-file.
+#     Note: `loadfile` only guarantees this WITHIN one shard. The shard split
+#     itself is count-based (`--splits`), so items of the same module can still
+#     land in different shards -- repo-copy fixtures are therefore duplicated
+#     per shard. No correctness impact, only extra fixture work.
+#   - the `subprocess-serial` job runs the sync.py-driving modules with
+#     `-n 0` (one at a time). Every one of them launches `sync.py` repeatedly
+#     and `sync.py --validate` runs the full repo-wide consistency suite;
+#     parallel workers would multiply concurrent sync.py processes and
+#     overload the runner. Workstation/shared-host runs must never use
+#     `-n auto` for the same reason (cap at `-n 8 --dist loadfile`).
+
+# Single source of truth for the subprocess-heavy module set: the shard job
+# derives its `--ignore=<file>` args from this list, the serial job passes it
+# as positional arguments. Never duplicate the list in a second place.
+env:
+  SUBPROCESS_HEAVY: >-
+    tests/test_provider_matrix_sync.py
+    tests/test_cli_smoke_multi_provider.py
+    tests/test_scan_staged.py
+    tests/test_compact_matrix.py
+    tests/test_provider_reactivation_artifacts.py
+    tests/test_sync_validation_gate.py
+    tests/test_sharkord_service_name_migration.py
+    tests/test_knowledge_engine.py
+    tests/test_doctor_cli.py
+    tests/test_context_profile_schema.py
+    tests/test_platform_defaults_resolved_file.py
+    tests/test_continue_prompts_active_set.py
+    tests/test_cleanup_preview_cli.py
+    tests/test_auto_commit_allowlist_pipeline.py
+    tests/test_unread_channels_removed.py
 
 on:
   push:
@@ -24,14 +68,20 @@ on:
       - 'CHANGELOG.md'
       - '.github/workflows/orchestration-test.yml'
 
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}"
+  # Event-scoped groups; only superseded PR runs are cancelled.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.9', '3.11', '3.12']
+        python-version: ['3.9', '3.12']
+        shard: [1, 2, 3]
 
     steps:
       - name: Checkout
@@ -41,12 +91,120 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: tests/requirements.txt
 
       - name: Install test dependencies
         run: pip install -r tests/requirements.txt
 
-      - name: Run orchestration & runtime tests
-        run: python -m pytest tests/ -q -n auto
+      # Shard split is count-based (pytest-split default) on purpose: no
+      # `.test_durations` baseline is committed, so `--splitting-algorithm`
+      # would have nothing to learn from on a cold runner. Commit a durations
+      # file first, then switch to `least_duration` only after it is fresh.
+      #
+      # The subprocess-heavy modules are excluded here (they run in
+      # `subprocess-serial` with -n 0). Building the --ignore args from the
+      # workflow-level SUBPROCESS_HEAVY keeps one authoritative list.
+      - name: Build --ignore args for subprocess-heavy modules
+        id: heavy
+        shell: bash
+        run: |
+          args=""
+          for f in $SUBPROCESS_HEAVY; do
+            args="$args --ignore=$f"
+          done
+          args="${args# }"
+          echo "args=$args" >> "$GITHUB_OUTPUT"
 
+      - name: Run orchestration & runtime tests (shard ${{ matrix.shard }}/3)
+        run: >-
+          python -m pytest tests/ -q -n 2 --dist loadfile
+          ${{ steps.heavy.outputs.args }}
+          --splits 3 --group ${{ matrix.shard }}
+          --durations=10 -ra
+
+      # Repo-wide and expensive, and shard-independent, so run it once per
+      # Python version (2x) instead of in all 6 shard jobs.
       - name: Validate agent templates
+        if: matrix.shard == 1
         run: python scripts/sync.py --validate
+
+  # The modules excluded from the shards all drive `sync.py` through
+  # subprocesses; several of them run the repo-wide `sync.py --validate`
+  # (full consistency suite) and two copy the whole repo tree first. Running
+  # them under `-n 0` keeps exactly one pytest process alive, so their sync.py
+  # children cannot stack up on the assumed 2-core runner. Both endpoints
+  # (3.9/3.12) run here, so excluding them from the shards does not shrink the
+  # "two fully-tested endpoints" invariant.
+  subprocess-serial:
+    runs-on: ubuntu-latest
+    # 451 of 6569 tests, but strictly serial: no worker overlap, and several
+    # of them drive the repo-wide `sync.py --validate`. The timeout is only a
+    # backstop -- the per-subprocess timeouts in tests/timeouts.py are the
+    # real guard -- so it keeps generous headroom over the shard job.
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9', '3.12']
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: tests/requirements.txt
+
+      - name: Install test dependencies
+        run: pip install -r tests/requirements.txt
+
+      - name: Run subprocess-heavy modules serial (Python ${{ matrix.python-version }})
+        run: >-
+          python -m pytest $SUBPROCESS_HEAVY -q -n 0
+          --durations=10 -ra
+
+  # Python 3.11 sits strictly between the fully-tested floor (3.9) and
+  # ceiling (3.12). Its only genuine version-specific boundary is TOML
+  # parsing: `tomli` is installed below 3.11, stdlib `tomllib` from 3.11 on
+  # (see tests/requirements.txt). This job pins that boundary plus the
+  # version-agnostic code-hygiene gates.
+  #
+  # `-n 0` on purpose: two of the nine files below (test_provider_matrix_sync,
+  # test_sync_validation_gate) launch sync.py repeatedly, including the
+  # repo-wide `--validate` suite. Serial keeps their subprocesses from
+  # competing for the assumed 2 cores. This job is new; its 30 min ceiling matches
+  # the shard job because serial execution loses worker overlap.
+  compat-311:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: tests/requirements.txt
+
+      - name: Install test dependencies
+        run: pip install -r tests/requirements.txt
+
+      - name: TOML boundary + code hygiene (3.11)
+        run: >-
+          python -m pytest -q -n 0
+          tests/test_toml_writer.py
+          tests/test_provider_toml_transform.py
+          tests/test_provider_matrix_sync.py
+          tests/test_mcp_config.py
+          tests/test_read_only_sandbox.py
+          tests/test_reference_standards_strip.py
+          tests/test_sync_validation_gate.py
+          tests/test_python_compat_consistency.py
+          tests/test_import_acyclicity.py

@@ -13,9 +13,22 @@
 #   is printed and kept in <tmp>/.scenario-logs/assert.log. Scenarios
 #   without an assert file behave exactly as before.
 #
-# Usage:
+# Usage (three modes):
 #   tests/scenarios/run.sh                # run all scenarios
 #   tests/scenarios/run.sh 01 12 17       # run only the given scenario id prefixes
+#   tests/scenarios/run.sh --list         # print the selected names, run nothing
+#
+#   SCENARIO_SHARD=2 SCENARIO_TOTAL=4 tests/scenarios/run.sh
+#                                         # run only shard 2 of 4 (CI matrix)
+#
+# Selection order is fixed: (1) the positional prefix filters narrow the
+# catalog (prefix match on the scenario name), then (2) a shard selection is
+# applied to the *remaining*, locale-independently sorted list --
+# 0-based index % SCENARIO_TOTAL == SCENARIO_SHARD - 1. Both SCENARIO_SHARD
+# and SCENARIO_TOTAL must be set together as positive integers with
+# 1 <= SCENARIO_SHARD <= SCENARIO_TOTAL. `--list` applies the same selection
+# and prints one scenario name per line, which makes shard coverage provable
+# without running sync.
 #
 # See tests/scenarios/registry.md for what each scenario covers and why.
 set -u
@@ -24,11 +37,74 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 CONFIGS_DIR="$SCRIPT_DIR/configs"
 
-FILTERS=("$@")
+usage() {
+    cat >&2 <<'EOF'
+Usage: tests/scenarios/run.sh [--list] [<scenario-id-prefix> ...]
 
-pass=0
-fail=0
-failed_names=()
+  (no args)        run every scenario
+  <prefix> ...     run only scenarios whose name starts with a prefix
+  --list           print the selected scenario names (one per line), run nothing
+
+Environment:
+  SCENARIO_SHARD=<i>  which shard to run (1-based)
+  SCENARIO_TOTAL=<n>  number of shards; both must be set together
+EOF
+}
+
+LIST_ONLY=0
+FILTERS=()
+for arg in "$@"; do
+    case "$arg" in
+        --list)
+            LIST_ONLY=1
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        -*)
+            echo "error: unknown option '$arg'" >&2
+            usage
+            exit 2
+            ;;
+        *)
+            FILTERS+=("$arg")
+            ;;
+    esac
+done
+
+# --- shard validation -------------------------------------------------------
+SHARD="${SCENARIO_SHARD:-}"
+TOTAL="${SCENARIO_TOTAL:-}"
+shard_active=0
+
+if [ -n "$SHARD" ] || [ -n "$TOTAL" ]; then
+    if [ -z "$SHARD" ] || [ -z "$TOTAL" ]; then
+        echo "error: SCENARIO_SHARD and SCENARIO_TOTAL must be set together" >&2
+        exit 2
+    fi
+    case "$SHARD" in
+        ''|*[!0-9]*)
+            echo "error: SCENARIO_SHARD must be a positive integer (got '$SHARD')" >&2
+            exit 2
+            ;;
+    esac
+    case "$TOTAL" in
+        ''|*[!0-9]*)
+            echo "error: SCENARIO_TOTAL must be a positive integer (got '$TOTAL')" >&2
+            exit 2
+            ;;
+    esac
+    if [ "$SHARD" -lt 1 ] || [ "$TOTAL" -lt 1 ]; then
+        echo "error: SCENARIO_SHARD and SCENARIO_TOTAL must be positive integers" >&2
+        exit 2
+    fi
+    if [ "$SHARD" -gt "$TOTAL" ]; then
+        echo "error: SCENARIO_SHARD ($SHARD) must be <= SCENARIO_TOTAL ($TOTAL)" >&2
+        exit 2
+    fi
+    shard_active=1
+fi
 
 matches_filter() {
     local id="$1"
@@ -43,13 +119,46 @@ matches_filter() {
     return 1
 }
 
-for cfg in "$CONFIGS_DIR"/*.project.yaml; do
-    name="$(basename "$cfg" .project.yaml)"
-    matches_filter "$name" || continue
+# Sorted, locale-independent scenario name list. `LC_ALL=C sort` keeps the
+# order identical on every runner; no `mapfile` (absent in macOS bash 3.2).
+SCENARIO_NAMES=()
+while IFS= read -r name; do
+    SCENARIO_NAMES+=("$name")
+done < <(
+    for cfg in "$CONFIGS_DIR"/*.project.yaml; do
+        [ -e "$cfg" ] || continue
+        basename "$cfg" .project.yaml
+    done | LC_ALL=C sort
+)
 
+# Prefix filter first, then shard selection over the filtered, sorted list.
+SELECTED=()
+index=0
+for name in ${SCENARIO_NAMES[@]+"${SCENARIO_NAMES[@]}"}; do
+    matches_filter "$name" || continue
+    if [ "$shard_active" -eq 1 ] && [ $((index % TOTAL)) -ne $((SHARD - 1)) ]; then
+        index=$((index + 1))
+        continue
+    fi
+    SELECTED+=("$name")
+    index=$((index + 1))
+done
+
+if [ "$LIST_ONLY" -eq 1 ]; then
+    for name in ${SELECTED[@]+"${SELECTED[@]}"}; do
+        printf '%s\n' "$name"
+    done
+    exit 0
+fi
+
+pass=0
+fail=0
+failed_names=()
+
+for name in ${SELECTED[@]+"${SELECTED[@]}"}; do
     tmp_dir="$(mktemp -d)"
     mkdir -p "$tmp_dir/.meta-config"
-    cp "$cfg" "$tmp_dir/.meta-config/project.yaml"
+    cp "$CONFIGS_DIR/$name.project.yaml" "$tmp_dir/.meta-config/project.yaml"
 
     log_dir="$tmp_dir/.scenario-logs"
     mkdir -p "$log_dir"
@@ -102,7 +211,11 @@ for cfg in "$CONFIGS_DIR"/*.project.yaml; do
 done
 
 echo "----"
-echo "Scenarios: $((pass + fail))  Passed: $pass  Failed: $fail"
+if [ "$shard_active" -eq 1 ]; then
+    echo "Scenarios (shard $SHARD/$TOTAL): $((pass + fail))  Passed: $pass  Failed: $fail"
+else
+    echo "Scenarios: $((pass + fail))  Passed: $pass  Failed: $fail"
+fi
 
 if [ "$fail" -gt 0 ]; then
     echo "Failed: ${failed_names[*]}"
