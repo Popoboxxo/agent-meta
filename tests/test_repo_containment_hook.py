@@ -24,6 +24,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -31,6 +32,10 @@ import pytest
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _HOOK_PATH = _REPO_ROOT / "hooks" / "1-generic" / "repo-containment.sh"
 _IMPL_PATH = _REPO_ROOT / "hooks" / "1-generic" / "repo-containment-impl.sh"
+
+sys.path.insert(0, str(_REPO_ROOT / "scripts"))
+
+from lib.tmp_paths import resolve_tmp_paths  # noqa: E402
 
 _BASH = shutil.which("bash") or "bash"
 
@@ -92,6 +97,31 @@ def _bash_payload(command: str, cwd: Path) -> dict:
         "tool_input": {"command": command},
         "cwd": str(cwd),
     }
+
+
+def _external_fixture() -> Path:
+    """Create a directory outside every project root (AC-03/AC-05/AC-07).
+
+    ``tmp_path`` is unsuitable here: its location depends on the configured
+    pytest basetemp, which may itself sit inside a project root. The spec
+    therefore requires ``tempfile.mkdtemp(dir=tempfile.gettempdir())`` plus an
+    assertion that no ancestor carries ``.meta-config/``.
+    """
+    fixture = Path(tempfile.mkdtemp(dir=tempfile.gettempdir(), prefix="am-hook-ext-"))
+    for ancestor in (fixture, *fixture.parents):
+        assert not (ancestor / ".meta-config").is_dir(), (
+            f"external fixture {fixture} is not isolated: {ancestor} has .meta-config/"
+        )
+    return fixture
+
+
+@pytest.fixture()
+def external_fixture():
+    fixture = _external_fixture()
+    try:
+        yield fixture
+    finally:
+        shutil.rmtree(fixture, ignore_errors=True)
 
 
 # --- Write/Edit: path containment --------------------------------------
@@ -211,11 +241,75 @@ def test_broken_json_payload_fails_closed():
 
 
 def test_missing_config_defaults_to_containment_on(tmp_path):
-    """No `.meta-config/` anywhere: the hook resolves to ENABLED (F4)."""
+    """No `.meta-config/` anywhere: the hook still blocks (F4).
+
+    Note (Task 8): the exit 2 no longer comes from "containment ON with the
+    working directory promoted to a root" — root resolution now fails closed
+    with ``repo-containment.no-root``. Task 9 deliberately inverts and renames
+    this test to ``test_missing_config_fails_closed`` (spec §"Bewusste
+    Test-Änderung"); the assertion is unchanged on purpose.
+    """
     root = tmp_path / "bare"
     root.mkdir()
     result = _run_hook(_write_payload(root.parent / "outside.py", root))
     assert result.returncode == 2
+
+
+# --- Fail-closed anchor rule (Task 8) ----------------------------------
+
+
+def test_cwd_outside_project_cannot_be_adopted(external_fixture):
+    """AC-05: a `cwd` outside any project must never be promoted to a root.
+
+    The regression the hook carried until Task 8: with ``cwd=/tmp`` and target
+    ``/tmp/x.py`` it adopted ``$PWD``/``cwd`` as the repo root and allowed the
+    write (exit 0) because the target was "inside" that fake root.
+    """
+    target = external_fixture / "x.py"
+    result = _run_hook(_write_payload(target, external_fixture))
+    assert result.returncode == 2, result.stderr
+    assert "repo-containment.no-root" in result.stderr
+    anchor = os.path.realpath(external_fixture)
+    assert f"no project root found above {anchor}" in result.stderr
+    assert f"anchor:    {anchor}" in result.stderr
+
+
+def test_relative_target_with_depth_is_checked_at_real_location(tmp_path):
+    """AC-33: a relative target is resolved against `cwd`, not the repo root."""
+    root = _project(tmp_path)
+    deep = root / "a" / "b"
+    deep.mkdir(parents=True)
+
+    inside = _run_hook(_write_payload(Path("../../x"), deep))
+    assert inside.returncode == 0, inside.stderr
+
+    outside = _run_hook(_write_payload(Path("../../../../etc/passwd"), deep))
+    assert outside.returncode == 2, outside.stderr
+    assert "outside the repository root" in outside.stderr
+
+
+def test_hook_sink_matches_tmp_paths(tmp_path):
+    """Shared contract: the hook's effective sink equals TmpPaths.absolute."""
+    import yaml
+
+    root = _project(
+        tmp_path,
+        'repo_containment:\n'
+        '  enabled: true\n'
+        '  tmp-sink:\n'
+        '    enabled: true\n'
+        '    path: "scratch/x"\n',
+    )
+    config = yaml.safe_load(
+        (root / ".meta-config" / "project.yaml").read_text(encoding="utf-8")
+    )
+    paths = resolve_tmp_paths(root, config)
+    assert paths.absolute is not None
+
+    stderr = _outside_block_stderr(root)
+    allowed = next(line for line in stderr.splitlines() if "allowed:" in line)
+    assert allowed.strip().endswith(f"and under {paths.absolute}")
+    assert str(paths.absolute) == os.path.realpath(root / "scratch" / "x")
 
 
 # --- Safe-side: invalid tmp-sink paths fall back to ".tmp" -------------

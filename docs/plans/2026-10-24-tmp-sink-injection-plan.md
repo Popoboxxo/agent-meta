@@ -376,9 +376,9 @@ Der `standalone/agents/`-Eintrag ist Verzeichnis-Ownership: `--render-standalone
 
 **Rot zuerst:** `test_cwd_outside_project_cannot_be_adopted` (`cwd=/tmp`, Ziel `/tmp/x.py`, kein `.meta-config/` oberhalb) schlägt fehl: der Hook adelt `$PWD` (`:151-154`, `:175-180`) und liefert Exit 0 statt 2.
 
-- [ ] Step 1: Tests schreiben (rot): AC-05 (Exit 2, `repo-containment.no-root`), AC-33 (relatives `../../x` bei `cwd=<fixture>/a/b` ⇒ Exit 0; `../../../../etc/passwd` ⇒ Exit 2), Paritätstest `test_hook_sink_matches_tmp_paths` (Hook-stderr-Sink == `str(resolve_tmp_paths(...).absolute)`), Fixture-Helfer `_external_fixture()` mit `tempfile.mkdtemp(dir=tempfile.gettempdir())` und Assertion „kein `.meta-config/` im Ancestor-Pfad".
-- [ ] Step 2: `repo-containment-impl.sh` umbauen: `WORKDIR` nur aus nicht-leerem `cwd`, sonst Anker aus absolutem Ziel, sonst Block; `resolve_repo_root` ohne Fallback; Meldungstexte nach Spec-Vertrag mit `target`, `anchor`, `repair`, `opt-out`; Sink in der Block-Meldung absolut (`allowed: paths under <abs root> and under <abs sink>`). `repo-containment.sh` nur anfassen, wenn dort eine Versions-/Hash-Bindung an die Impl steht.
-- [ ] Step 3: `python3 -m pytest tests/test_repo_containment_hook.py -q` grün (die bewusste Inversion folgt in Task 9).
+- [x] Step 1: Tests schreiben (rot): AC-05 (Exit 2, `repo-containment.no-root`), AC-33 (relatives `../../x` bei `cwd=<fixture>/a/b` ⇒ Exit 0; `../../../../etc/passwd` ⇒ Exit 2), Paritätstest `test_hook_sink_matches_tmp_paths` (Hook-stderr-Sink == `str(resolve_tmp_paths(...).absolute)`), Fixture-Helfer `_external_fixture()` mit `tempfile.mkdtemp(dir=tempfile.gettempdir())` und Assertion „kein `.meta-config/` im Ancestor-Pfad".
+- [x] Step 2: `repo-containment-impl.sh` umbauen: `WORKDIR` nur aus nicht-leerem `cwd`, sonst Anker aus absolutem Ziel, sonst Block; `resolve_repo_root` ohne Fallback; Meldungstexte nach Spec-Vertrag mit `target`, `anchor`, `repair`, `opt-out`; Sink in der Block-Meldung absolut (`allowed: paths under <abs root> and under <abs sink>`). `repo-containment.sh` nur anfassen, wenn dort eine Versions-/Hash-Bindung an die Impl steht.
+- [x] Step 3: `python3 -m pytest tests/test_repo_containment_hook.py -q` grün (die bewusste Inversion folgt in Task 9).
 - [ ] Step 4: Commit `fix: fail closed in repo containment hook without project root`.
 
 ### Task 9: Hook-Testmatrix und bewusste Inversion

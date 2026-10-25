@@ -21,7 +21,7 @@ Spalte `Commit` bleibt `— (pending)`, bis der jeweilige Commit tatsächlich ex
 | 5 | Vier Sink-Literale in Auditor-Templates | done | — (pending) | Steps 1–3 grün; Step 4 (Commit) offen, kein Commit-Auftrag. Golden `app-lifecycle-governor` erwartungsgemäß rot (nur Versionszeilen), Rebaseline Task 16 |
 | 6 | Vage Temp-Anweisungen präzisieren | done | — (pending) | Steps 1–3 grün; 13 Rollen + `plan-ledger.md` nennen `{{TMP_SINK_PATH}}`; 13 Patch-Bumps, kein `2-platform`-Cascade (keine `based-on`-Kinder); Step 4 (Commit) offen, kein Commit-Auftrag |
 | 7 | Standalone-Export regenerieren | done | — (pending) | Steps 1–3 grün; `TMP_SINK_PATH=".tmp"` + `TMP_SINK_ENV_PIN_BLOCK=""`; 23 Standalone-Dateien regeneriert (0 Drift); AC-26/AC-27; Step 4 (Commit) offen, kein Commit-Auftrag |
-| 8 | Hook-Anker und fail-closed Root-Auflösung | pending | — (pending) | — |
+| 8 | Hook-Anker und fail-closed Root-Auflösung | done | — (pending) | Steps 1–3 grün; Anker-Regel (`cwd`/Zielverzeichnis, kein `$PWD`), `repo-containment.no-root` statt Root-Promotion, absolute Sink-Meldung, Hook-Sink == `TmpPaths.absolute`; Impl-Version 1.1.0→1.2.0; Step 4 (Commit) offen, kein Commit-Auftrag |
 | 9 | Hook-Testmatrix und bewusste Inversion | pending | — (pending) | — |
 | 10 | Env-Pin für Framework-Subprozesse ausweiten | pending | — (pending) | — |
 | 11 | Subprozess-Klassifikation und Backup-Staging | pending | — (pending) | — |
@@ -786,3 +786,169 @@ verschwunden (`--render-standalone --check`: 91 Dateien, 90 Rollen unverändert)
    Task 3/4/5 (eingefrorenes Hash-Manifest), Rebaseline ist Task 16. Task 7 ändert nur
    `standalone/**`, nicht die gerenderten `.claude/**`-Dateien.
 5. **Step 4 (Commit) nicht ausgeführt** — kein Commit-Auftrag für diesen Subagenten.
+
+## Evidence — Task 8
+
+### Rot (vor der Implementierung)
+
+`python3 -m pytest tests/test_repo_containment_hook.py -q` → Exit 1, `1 failed, 32 passed`:
+
+```
+_______________ test_cwd_outside_project_cannot_be_adopted ___________________
+
+external_fixture = PosixPath('/tmp/am-hook-ext-pohrevg9')
+
+    def test_cwd_outside_project_cannot_be_adopted(external_fixture):
+        """AC-05: a `cwd` outside any project must never be promoted to a root.
+
+        The regression the hook carried until Task 8: with ``cwd=/tmp`` and target
+        ``/tmp/x.py`` it adopted ``$PWD``/``cwd`` as the repo root and allowed the
+        write (exit 0) because the target was "inside" that fake root.
+        """
+        target = external_fixture / "x.py"
+        result = _run_hook(_write_payload(target, external_fixture))
+>       assert result.returncode == 2, result.stderr
+E       AssertionError:
+E       assert 0 == 2
+E        +  where 0 = CompletedProcess(args=['/usr/bin/bash', '/home/hermes/repos/agent-meta/hooks/1-generic/repo-containment.sh'], returncode=0, stdout='', stderr='').returncode
+
+tests/test_repo_containment_hook.py:270: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_repo_containment_hook.py::test_cwd_outside_project_cannot_be_adopted
+1 failed, 32 passed in 10.80s
+```
+
+Der Hook lieferte Exit 0 (Fail-open): `resolve_repo_root` fand keinen `.meta-config/`-Ancestor
+und adelte `cwd`/`$PWD` selbst zum Root. AC-33 und der Paritätstest sind Regressionswächter und
+waren schon vor der Änderung grün.
+
+### Grün (nach der Implementierung)
+
+| # | Kommando | Ergebnis |
+|---|---|---|
+| 1 | `python3 -m pytest tests/test_repo_containment_hook.py -q` | `33 passed in 14.42s`, Exit 0 |
+| 2 | `python3 -m pytest tests/test_antigravity_hooks_registration.py tests/test_tmp_sink_path_parity.py tests/test_tmp_sink_path_hardening.py -q` | `238 passed in 6.69s`, Exit 0 |
+| 3 | `python3 -m pytest tests/test_repo_containment_hook.py tests/test_repo_containment_consistency.py tests/test_tmp_sink_path_parity.py tests/test_tmp_sink_path_hardening.py tests/test_antigravity_hooks_registration.py -q` | `284 passed in 24.55s`, Exit 0 |
+| 4 | `python3 -m pytest tests/test_runtime_config_readers.py tests/test_hook_registration_invariant.py tests/test_doctor_runner.py -q` | `105 passed`, Exit 0 (nach Reparatur der Evidence-Zeile, siehe Abweichung 4) |
+| 5 | `python3 scripts/sync.py --validate` | Exit 0; 0 × `hooks.stale-deployed-version`, 2 vorbestehende WARNINGS (`active-set.gate-dropped`, Submodul-Checkout `external/awesome-claude-code`) |
+| 6 | `bash -n hooks/1-generic/repo-containment-impl.sh` | Exit 0 |
+| 7 | `bash -n hooks/1-generic/repo-containment.sh` | Exit 0 (Wrapper unverändert — keine Versions-/Hash-Bindung an die Impl) |
+
+### Manuelle Nachweise (Impl direkt, ohne Wrapper)
+
+```
+$ printf '{"tool_name":"Write","tool_input":{"file_path":"/tmp/x.py"},"cwd":"/tmp"}' | bash hooks/1-generic/repo-containment-impl.sh
+REPO_CONTAINMENT: no project root found above /tmp (code repo-containment.no-root).
+  A project root is a directory that contains `.meta-config/`.
+  This guard never promotes the working directory to a project root.
+  target:    /tmp/x.py
+  anchor:    /tmp            (payload `cwd`, or the target's own directory when `cwd` is missing)
+  allowed:   only inside a project root (plus its configured tmp-sink)
+  repair:    run `python scripts/sync.py` in the project, or open the session
+             inside the project directory
+  opt-out:   repo_containment.enabled: false in <project>/.meta-config/project.yaml
+exit=2
+
+$ printf '{"tool_name":"Write","tool_input":{"file_path":"/tmp/am-manual-aSWBjd/x.py"}}' | bash hooks/1-generic/repo-containment-impl.sh
+REPO_CONTAINMENT: no project root found above /tmp/am-manual-aSWBjd (code repo-containment.no-root).
+  A project root is a directory that contains `.meta-config/`.
+  This guard never promotes the working directory to a project root.
+  target:    /tmp/am-manual-aSWBjd/x.py
+  anchor:    /tmp/am-manual-aSWBjd            (payload `cwd`, or the target's own directory when `cwd` is missing)
+  allowed:   only inside a project root (plus its configured tmp-sink)
+  repair:    run `python scripts/sync.py` in the project, or open the session
+             inside the project directory
+  opt-out:   repo_containment.enabled: false in <project>/.meta-config/project.yaml
+exit=2
+
+$ printf '{"tool_name":"Write","tool_input":{"file_path":"notes.md"}}' | bash hooks/1-generic/repo-containment-impl.sh
+REPO_CONTAINMENT: no project root found for a relative target without `cwd`
+(code repo-containment.no-root).
+  A relative path cannot be anchored: the payload carried no `cwd` (or an empty one)
+  and the target is not absolute. Failing closed.
+  target:    notes.md
+  repair:    re-run `python scripts/sync.py` for this provider (hook payload contract, issue #630);
+             send an absolute `file_path`, or include `cwd` in the payload
+exit=2
+```
+
+Zusätzliche Handproben (nicht Teil der drei geforderten Transkripte):
+
+| Fall | Ergebnis |
+|---|---|
+| fremdes Projekt mit `enabled: false`, `cwd` = sein Unterbaum, Ziel in ihm | Exit 0 (Opt-out bleibt projektlokal) |
+| dasselbe Opt-out, aber `cwd=/tmp`, Ziel `/tmp/y.py` | Exit 2 `repo-containment.no-root` (Root-Auflösung vor Opt-out) |
+| leerer `cwd`, absolutes Ziel in einem fremden Projekt | Exit 0 (Anker aus Zielverzeichnis, AC-37-Verhalten) |
+| leerer `cwd`, absolutes Ziel im echten Projektroot | Exit 0 (AC-28-Verhalten) |
+| `Bash` ohne `cwd` (`ls -la`) | Exit 2 `repo-containment.no-root` (dokumentierte Auslegung, siehe Abweichung 2) |
+
+### Abgedeckte ACs (Task 8)
+
+- **AC-05** — `test_cwd_outside_project_cannot_be_adopted`: Fixture aus
+  `tempfile.mkdtemp(dir=tempfile.gettempdir())` mit Ancestor-Assertion („kein
+  `.meta-config/` oberhalb"), `cwd=<fixture>`, Ziel `<fixture>/x.py` ⇒ Exit 2,
+  `repo-containment.no-root`, `no project root found above <anchor>` und `anchor:`-Zeile.
+- **AC-33** — `test_relative_target_with_depth_is_checked_at_real_location`:
+  `cwd=<root>/a/b`, `../../x` ⇒ Exit 0; `../../../../etc/passwd` ⇒ Exit 2.
+- **Parität (Shared Contract)** — `test_hook_sink_matches_tmp_paths`: die `allowed:`-Zeile
+  endet auf `and under <TmpPaths.absolute>`; `absolute == realpath(root/scratch/x)`.
+- **AC-18/AC-28/AC-29/AC-37 (Verhalten implementiert, Tests folgen in Task 9)** — absolute
+  Root-/Sink-Pfade in der Block-Meldung, Anker aus dem Zielverzeichnis bei leerem `cwd`,
+  System-Temp-Ziel bleibt blockiert, fremdes-Projekt-Ziel wird erlaubt.
+
+### Verhaltensänderungen (Fail-closed-Vertrag)
+
+1. **Kein `$PWD` mehr.** `WORKDIR` stammt ausschließlich aus einem absoluten Payload-`cwd`
+   oder aus `realpath(dirname(ziel))` bei absolutem Write/Edit-Ziel; sonst Exit 2.
+2. **Keine Root-Promotion.** Findet `resolve_repo_root` keinen `.meta-config/`-Ancestor,
+   wird der Anker nicht zum Root; Exit 2, Code `repo-containment.no-root`.
+3. **Reihenfolge:** Anker + Root-Auflösung laufen **vor** dem `enabled: false`-Kurzschluss
+   und vor dem Config-Read; ein fremdes Opt-out kann keinen Write freischalten.
+4. **Meldungen:** absolute Root-/Sink-Pfade (`allowed: paths under <root> and under <sink>`),
+   `anchor:`-/`repair:`-/`opt-out:`-Zeilen; die Substrings `outside the repository root`,
+   `DISABLED tmp-sink` und `under <root>/<sink>` bleiben erhalten.
+5. **Symlink-`cwd`:** `realpath` vor der Ancestor-Suche; weicht das Ergebnis ab, nennt die
+   Meldung zusätzlich `resolved: payload \`cwd\` <raw> -> <real> (resolved)`.
+
+### Abweichungen von der Aufgabenbeschreibung (Spec ist normativ)
+
+1. **Impl-Versionsbump 1.1.0 → 1.2.0** samt Anpassung von
+   `tests/test_tmp_sink_path_parity.py::test_hook_version_bumped_and_old_version_is_drift`
+   (Regex + Drift-Replace). Der Header der Impl verlangt den Bump bei jeder Logikänderung;
+   der Paritätstest pinnte die alte Version. `repo-containment.sh` bleibt unverändert
+   (Wrapper ohne Hash-Bindung, nur `# version: 1.0.0`, kein Bump nötig).
+2. **Bash ohne `cwd` ⇒ fail closed.** Die Spec-Ankerregel ist pfadförmig („Ziel absolut ⇒
+   `dirname(ziel)`"); für Bash gibt es kein einzelnes Ziel. Auslegung: Bash ohne `cwd`
+   liefert Exit 2 mit demselben Code und einer eigenen Meldung („a Bash command is not a
+   path"), statt einen Anker aus dem Kommando zu raten. **Risiko:** ein Provider, der Bash
+   ohne `cwd` sendet (z. B. Antigravity-Adapter bei leerem `workspacePaths`/`args.Cwd`),
+   blockt damit auch reine Lese-Kommandos. Beide dokumentierten Adapter füllen `cwd` im
+   Regelfall; Task 9/20 beobachten das Adapterverhalten.
+3. **Relativer `cwd` wird nicht als Anker verwendet** (statt ihn per `realpath` implizit
+   gegen den Prozess-CWD aufzulösen). Das wäre sonst eine verdeckte `$PWD`-Übernahme.
+   Ein absolutes Write/Edit-Ziel ankert weiterhin; sonst greift die Meldung
+   „relative target without `cwd`" plus `note:`-Zeile. Provider senden absolute
+   `cwd`-Werte (Annahme A1).
+4. **Kollaterale Pflege (generierte bzw. referenzielle Artefakte):**
+   `.agents/hooks/repo-containment-impl.sh` (einzige getrackte deployte Kopie; `.claude/`
+   und `.gemini/` sind gitignored) und `.meta-config/generated-file-hashes.json` wurden
+   durch `python3 scripts/sync.py` regeneriert, sonst meldet `--validate`
+   `hooks.stale-deployed-version`. Der Hash-Baseline-Diff umfasst zusätzlich die
+   generierten Dateien der Tasks 1–7 (sie waren vor diesem Lauf nicht neu gehasht); das
+   ist Buchhaltung des Sync-Tools, keine manuelle Bearbeitung generierter Dateien.
+   `config/runtime-config-readers.yaml` zeigt jetzt auf `repo-containment-impl.sh:313`
+   (`CONFIG_FILE=`), weil die alte Evidence-Zeile `:267` durch den Umbau auf
+   `no_anchor_block()` zeigte (Test `test_runtime_config_readers.py`).
+5. **Docstring-Anpassung `test_missing_config_defaults_to_containment_on`:** Assertion und
+   Name bleiben unverändert (Exit 2 gilt weiterhin), der Docstring hält fest, dass der
+   Exit 2 seit Task 8 aus `repo-containment.no-root` folgt und Task 9 den Test bewusst
+   invertiert/umbenennt.
+6. **Step 4 (Commit) nicht ausgeführt** — kein Commit-Auftrag für diesen Subagenten.
+
+### Offene Punkte für Task 9
+
+- `test_missing_config_fails_closed` (AC-03) ersetzt die alte Fail-open-Erwartung.
+- AC-04 (relatives Ziel ohne `cwd`), AC-06 (`cwd=<sink>/sub`, `notes.md`), AC-07
+  (Symlink-`cwd`), AC-18 (`test_block_message_uses_absolute_sink`), AC-28/29/37,
+  AC-30 (Adapter-Tempdatei) sind noch nicht als Tests vorhanden; das Verhalten ist
+  implementiert und oben manuell belegt.

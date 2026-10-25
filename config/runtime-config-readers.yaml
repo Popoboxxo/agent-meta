@@ -16,7 +16,7 @@ registry-version: 1
 readers:
   - key: repo_containment
     reader: hooks/1-generic/repo-containment-impl.sh
-    evidence: ".claude/hooks/repo-containment-impl.sh:267"
+    evidence: ".claude/hooks/repo-containment-impl.sh:313"
     effect: "Schreib-Containment der Agenten"
   - key: orchestrator
     reader: hooks/1-generic/orchestrator-guard-impl.sh
