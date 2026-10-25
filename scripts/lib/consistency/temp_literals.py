@@ -40,6 +40,13 @@ Codes (IC-11):
     ``tests/test_tmp_sink_env_coverage.py``; this finding makes the same gap
     visible in ``--validate``.
 
+``temp-literal.allowlist-entry``
+    An entry in ``.meta-config/temp-literal-allowlist.yaml`` cannot be applied:
+    a mandatory field (``path``, ``pattern``, ``reason``) is missing or empty,
+    the ``pattern`` does not compile, or the entry carries a field outside the
+    schema — ``expires`` included (Q6/ADR-14, AC-39). It suppresses nothing and
+    the violation keeps its own WARNING; always a WARNING, never a hard exit.
+
 ``temp-literal.toolchain-cache-in-repo``
     ``system-temp-exception.toolchain-caches`` is opted in, so pip/npm caches
     live inside the sink. Task 19 owns the opt-in itself; this module only
@@ -55,10 +62,9 @@ Codes (IC-11):
 
 Allowlist (ADR-14/Q6): ``.meta-config/temp-literal-allowlist.yaml`` carries
 entries ``{path, pattern, reason}`` (optional ``owner``). A *complete* entry
-suppresses only its own file (repo-relative glob in ``path``) and the matching
-line (regex in ``pattern``). Task 22 hardens the schema (mandatory ``reason``,
-``expires`` rejected); :func:`_load_allowlist_entries` already returns the raw
-entries unchanged so that hardening only adds validation here.
+suppresses only its own file (glob in ``path``) and its matching line (regex).
+Strict schema (Task 22): no ``expires``; an unappliable entry is reported as its
+own ``temp-literal.allowlist-entry`` WARNING while the violation stays visible.
 """
 
 from __future__ import annotations
@@ -126,12 +132,10 @@ _PIN_TOKENS = ("tmp_env", "tmp_sink_env")
 # ---------------------------------------------------------------------------
 
 def _load_allowlist_entries(root: Path) -> list:
-    """Return the raw ``entries`` list of the literal allowlist.
+    """Raw ``entries`` list; an allowlist problem never crashes the check.
 
-    Missing file, malformed YAML or a non-list payload yields an empty list —
-    the check must never crash on an allowlist problem. Schema enforcement
-    (mandatory ``reason``, rejected ``expires``) is Task 22 and deliberately
-    not implemented here.
+    Missing file, malformed YAML or a non-list payload yields an empty list.
+    Schema enforcement lives in :func:`_entry_problems`.
     """
     payload = load_yaml_file(root / _ALLOWLIST_RELPATH, on_error="default", default={})
     if not isinstance(payload, dict):
@@ -140,19 +144,58 @@ def _load_allowlist_entries(root: Path) -> list:
     return entries if isinstance(entries, list) else []
 
 
-def _entry_is_complete(entry: object) -> bool:
-    """Whether an entry carries the mandatory fields and a usable pattern."""
+def _entry_problems(entry: object) -> List[str]:
+    """Every reason an entry cannot be applied (empty ⇒ complete, Q6/ADR-14).
+
+    ``path``/``pattern``/``reason`` are mandatory non-empty strings,
+    ``pattern`` must compile, ``owner`` is optional, every other field
+    (``expires`` included) invalidates the entry.
+    """
     if not isinstance(entry, dict):
-        return False
+        return ["entry is not a mapping"]
+    problems: List[str] = []
+    unknown = sorted(str(field) for field in set(entry) - _ALLOWED_ENTRY_FIELDS)
+    if unknown:
+        hint = " ('expires' is not part of the schema)" if "expires" in unknown else ""
+        problems.append("unsupported field(s): " + ", ".join(unknown) + hint)
     for field in _REQUIRED_ENTRY_FIELDS:
         value = entry.get(field)
         if not isinstance(value, str) or not value.strip():
-            return False
-    try:
-        re.compile(entry["pattern"])
-    except re.error:
-        return False
-    return True
+            problems.append(f"missing non-empty '{field}'")
+    pattern = entry.get("pattern")
+    if isinstance(pattern, str) and pattern.strip():
+        try:
+            re.compile(pattern)
+        except re.error as exc:
+            problems.append(f"invalid 'pattern' regex: {exc}")
+    return problems
+
+
+def _entry_is_complete(entry: object) -> bool:
+    """Whether an entry satisfies the strict Q6/ADR-14 schema."""
+    return not _entry_problems(entry)
+
+
+def _allowlist_entry_findings(entries: list) -> List[Finding]:
+    """One WARNING per unappliable entry, independent of any violation (AC-39)."""
+    findings: List[Finding] = []
+    for index, entry in enumerate(entries, start=1):
+        problems = _entry_problems(entry)
+        if not problems:
+            continue
+        path = entry.get("path") if isinstance(entry, dict) else None
+        findings.append(Finding(
+            Severity.WARNING,
+            "temp-literal.allowlist-entry",
+            _ALLOWLIST_RELPATH.as_posix(),
+            f"allowlist entry #{index}"
+            + (f" ({path})" if isinstance(path, str) and path.strip() else "")
+            + " suppresses nothing: " + "; ".join(problems),
+            "Declare path, pattern and reason (owner optional); 'expires' is not "
+            "part of the schema (Q6/ADR-14), so the violation keeps its own "
+            "temp-literal.system-temp warning until the entry is fixed.",
+        ))
+    return findings
 
 
 def _entry_suppresses(entry: object, relpath: str, line: str) -> bool:
@@ -529,12 +572,12 @@ def check_temp_literals(
 
     Never raises: this is a read-only consistency check (ADR-06).
     """
-    findings: List[Finding] = []
     roots = _iter_scan_roots(Path(agent_meta_root), Path(project_root))
     allowlist_root = roots[0]
     if not (allowlist_root / _ALLOWLIST_RELPATH).is_file() and len(roots) > 1:
         allowlist_root = roots[1]
     entries = _load_allowlist_entries(allowlist_root)
+    findings: List[Finding] = _allowlist_entry_findings(entries)
 
     seen: set = set()
     for root in roots:

@@ -641,10 +641,10 @@ vollständig vor dem Abschluss-Gate Task 18.
 
 **Rot zuerst:** `tests/test_consistency_temp_literals.py::test_allowlist_requires_reason` und `::test_allowlist_rejects_expires_field` schlagen fehl, weil heute ein Eintrag ohne `reason` unterdrückt und `expires` ignoriert wird.
 
-- [ ] Step 1: Tests schreiben (rot): AC-39 in drei Fällen — vollständiger Eintrag unterdrückt, fehlendes `reason` unterdrückt nicht und erzeugt zusätzlich eine WARNING für den ungültigen Eintrag, `expires` wird wie ein nicht unterstütztes Feld behandelt; `owner` bleibt optional und ändert das Ergebnis nicht.
-- [ ] Step 2: Schema-Prüfung implementieren (Feld-Whitelist, `reason`-Pflicht), `.meta-config/temp-literal-allowlist.yaml` mit begründetem Kopfkommentar und unverändert leerer `entries`-Liste; kein Hard-Exit, die WARNING bleibt.
-- [ ] Step 3: `python3 -m pytest tests/test_consistency_temp_literals.py -q` grün.
-- [ ] Step 4: Commit `feat: enforce temp-literal allowlist schema`.
+- [x] Step 1: Tests schreiben (rot): AC-39 in drei Fällen — vollständiger Eintrag unterdrückt, fehlendes `reason` unterdrückt nicht und erzeugt zusätzlich eine WARNING für den ungültigen Eintrag, `expires` wird wie ein nicht unterstütztes Feld behandelt; `owner` bleibt optional und ändert das Ergebnis nicht.
+- [x] Step 2: Schema-Prüfung implementieren (Feld-Whitelist, `reason`-Pflicht), `.meta-config/temp-literal-allowlist.yaml` mit begründetem Kopfkommentar und unverändert leerer `entries`-Liste; kein Hard-Exit, die WARNING bleibt.
+- [x] Step 3: `python3 -m pytest tests/test_consistency_temp_literals.py -q` grün.
+- [ ] Step 4: Commit `feat: enforce temp-literal allowlist schema` — offen: der Auftrag für Task 22 lautet ausdrücklich „Do NOT commit/push“; Commit-Authority bleibt beim `git`-Agenten.
 
 ### Task 18: Abschluss-Validierung und Ledger
 

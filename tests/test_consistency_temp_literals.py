@@ -16,6 +16,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
 import yaml
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -79,6 +80,10 @@ def _literal_findings(findings: list) -> list:
     return [f for f in findings if f.check == "temp-literal.system-temp"]
 
 
+def _invalid_entry_findings(findings: list) -> list:
+    return [f for f in findings if f.check == "temp-literal.allowlist-entry"]
+
+
 # ---------------------------------------------------------------------------
 # AC-21 — warning with file + line, suppressed only by a complete entry
 # ---------------------------------------------------------------------------
@@ -108,6 +113,119 @@ def test_warning_and_allowlist(tmp_path: Path) -> None:
         "a complete allowlist entry (path, pattern, reason) must suppress the "
         f"hit, got: {_literal_findings(suppressed)}"
     )
+
+
+# ---------------------------------------------------------------------------
+# AC-39 / Q6 / ADR-14 — strict allowlist schema
+# ---------------------------------------------------------------------------
+
+def test_allowlist_requires_reason(tmp_path: Path) -> None:
+    """AC-39: an entry without ``reason`` suppresses nothing and is itself
+    reported as a WARNING of the same check family."""
+    root = _framework_root(tmp_path)
+    incomplete = {
+        "path": _COMPLETE_ENTRY["path"],
+        "pattern": _COMPLETE_ENTRY["pattern"],
+    }
+    _write_allowlist(root, [incomplete])
+
+    findings = check_temp_literals(root, root, {})
+
+    literal = _literal_findings(findings)
+    assert len(literal) == 1, (
+        "an entry without 'reason' must not suppress the violation, got: "
+        f"{literal}"
+    )
+
+    invalid = _invalid_entry_findings(findings)
+    assert len(invalid) == 1, (
+        "the invalid entry must be reported as an additional WARNING, got: "
+        f"{invalid}"
+    )
+    finding = invalid[0]
+    assert finding.severity is Severity.WARNING
+    assert finding.file == ".meta-config/temp-literal-allowlist.yaml"
+    assert "reason" in finding.message
+    assert print_report(findings, root, changed_only=False) == 0, (
+        "an invalid allowlist entry must never turn the run red (ADR-06)"
+    )
+
+
+def test_allowlist_rejects_expires_field(tmp_path: Path) -> None:
+    """AC-39: ``expires`` is not part of the schema — it is treated like any
+    other unsupported field (no suppression, extra WARNING)."""
+    root = _framework_root(tmp_path)
+    entry = dict(_COMPLETE_ENTRY, expires="2026-12-31")
+    _write_allowlist(root, [entry])
+
+    findings = check_temp_literals(root, root, {})
+
+    literal = _literal_findings(findings)
+    assert len(literal) == 1, (
+        "an entry carrying 'expires' must not suppress the violation, got: "
+        f"{literal}"
+    )
+
+    invalid = _invalid_entry_findings(findings)
+    assert len(invalid) == 1, f"expected one invalid-entry warning, got: {invalid}"
+    assert invalid[0].severity is Severity.WARNING
+    assert "expires" in invalid[0].message
+    assert print_report(findings, root, changed_only=False) == 0
+
+
+def test_allowlist_owner_is_optional_and_changes_nothing(tmp_path: Path) -> None:
+    """AC-39: ``owner`` stays optional — a complete entry with ``owner``
+    suppresses exactly like the same entry without it."""
+    root = _framework_root(tmp_path)
+    _write_allowlist(root, [dict(_COMPLETE_ENTRY, owner="developer")])
+
+    findings = check_temp_literals(root, root, {})
+
+    assert _literal_findings(findings) == [], (
+        "a complete entry (path, pattern, reason) plus optional owner must "
+        f"suppress the hit, got: {_literal_findings(findings)}"
+    )
+    assert _invalid_entry_findings(findings) == [], (
+        "'owner' is a schema field and must not be reported as invalid, got: "
+        f"{_invalid_entry_findings(findings)}"
+    )
+
+
+@pytest.mark.parametrize("field", ["expires-at", "review_by", "ticket", "pattern2"])
+def test_allowlist_rejects_unknown_fields(tmp_path: Path, field: str) -> None:
+    """AC-39: every field outside the whitelist invalidates the entry — it
+    suppresses nothing and is reported, exactly like ``expires``."""
+    root = _framework_root(tmp_path)
+    _write_allowlist(root, [dict(_COMPLETE_ENTRY, **{field: "x"})])
+
+    findings = check_temp_literals(root, root, {})
+
+    assert len(_literal_findings(findings)) == 1, (
+        f"unknown field {field!r} must not suppress the violation"
+    )
+    invalid = _invalid_entry_findings(findings)
+    assert len(invalid) == 1, (
+        f"unknown field {field!r} must produce exactly one invalid-entry "
+        f"warning, got: {invalid}"
+    )
+    assert field in invalid[0].message
+
+
+def test_allowlist_entry_index_reported_for_multiple_entries(tmp_path: Path) -> None:
+    """The invalid-entry WARNING names the offending entry by 1-based index."""
+    root = _framework_root(tmp_path)
+    _write_allowlist(root, [
+        _COMPLETE_ENTRY,
+        {"path": _COMPLETE_ENTRY["path"], "pattern": _COMPLETE_ENTRY["pattern"]},
+    ])
+
+    findings = check_temp_literals(root, root, {})
+
+    assert _literal_findings(findings) == [], "entry #1 is complete: no hit"
+    invalid = _invalid_entry_findings(findings)
+    assert len(invalid) == 1, f"only entry #2 is invalid, got: {invalid}"
+    assert "#2" in invalid[0].message
+    assert "#1" not in invalid[0].message
 
 
 # ---------------------------------------------------------------------------

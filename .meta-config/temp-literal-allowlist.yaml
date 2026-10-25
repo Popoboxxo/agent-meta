@@ -13,7 +13,8 @@
 #
 # A matching path+pattern pair suppresses the warning only when the entry is
 # complete. Incomplete entries, unknown fields (e.g. ``expires``) or a bad
-# regex suppress nothing and are reported as their own warning.
+# regex suppress nothing and are reported as their own warning of the same
+# family (code ``temp-literal.allowlist-entry``, Q6/ADR-14/AC-39).
 #
 # Do not add entries for write targets — use the {{TMP_SINK_PATH}} placeholder.
 entries: []

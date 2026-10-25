@@ -35,7 +35,7 @@ Spalte `Commit` bleibt `— (pending)`, bis der jeweilige Commit tatsächlich ex
 | 19 | Toolchain-Cache-Opt-in (Q3) | pending | — (pending) | — |
 | 20 | Antigravity `args.FilePath` → `file_path` (Q10) | done | — (pending) | Steps 1–3 grün; `ARG_KEY_MAP` um `'FilePath': 'file_path'` erweitert, Assertion in `test_adapter_normalizes_edit_tool_names`; 60 passed, `--validate` 0 neue Findings; Step 4 (Commit) offen, kein Commit-Auftrag |
 | 21 | §5.5 verweist auf `PYTEST_BASETEMP` (Q11) | pending | — (pending) | — |
-| 22 | Allowlist-Schema-Härtung (Q6) | pending | — (pending) | — |
+| 22 | Allowlist-Schema-Härtung (Q6) | done | — (pending) | Steps 1–3 grün; AC-39: Feld-Whitelist (`path`/`pattern`/`reason` Pflicht, `owner` optional, `expires` und jedes andere Feld abgelehnt) + `temp-literal.allowlist-entry`-WARNING je ungültigem Eintrag; Allowlist bleibt `entries: []`; 13 + 21 Tests grün, `--validate` Exit 0 mit unveränderten 22 `temp-literal.system-temp`-WARNINGS; Step 4 (Commit) offen, kein Commit-Auftrag |
 
 ## Evidence — Task 1
 
@@ -2007,3 +2007,122 @@ Regressionswächter für Task 21 stehen.
   AC-41 bleibt bis dahin offen.
 - `templates/configs/project.yaml.example` enthält einen vorbestehenden doppelten
   `external-skills`-Kommentarblock (unabhängig von Task 17, nicht angefasst).
+
+## Evidence — Task 22
+
+### Rot (vor der Implementierung, verbatim)
+
+Zuerst die drei AC-39-Kernfälle in einem Lauf (`test_warning_and_allowlist` ist der bereits
+grüne Vollständig-Eintrag-Fall, die beiden anderen sind die im Plan genannten Rot-Tests):
+
+`python3 -m pytest tests/test_consistency_temp_literals.py::test_warning_and_allowlist tests/test_consistency_temp_literals.py::test_allowlist_requires_reason tests/test_consistency_temp_literals.py::test_allowlist_rejects_expires_field -q` → Exit 1:
+
+```
+        invalid = _invalid_entry_findings(findings)
+>       assert len(invalid) == 1, (
+            "the invalid entry must be reported as an additional WARNING, got: "
+            f"{invalid}"
+        )
+E       AssertionError: the invalid entry must be reported as an additional WARNING, got: []
+E       assert 0 == 1
+E        +  where 0 = len([])
+
+tests/test_consistency_temp_literals.py:141: AssertionError
+_____________________ test_allowlist_rejects_expires_field _____________________
+
+        literal = _literal_findings(findings)
+>       assert len(literal) == 1, (
+            "an entry carrying 'expires' must not suppress the violation, got: "
+            f"{literal}"
+        )
+E       AssertionError: an entry carrying 'expires' must not suppress the violation, got: []
+E       assert 0 == 1
+E        +  where 0 = len([])
+
+tests/test_consistency_temp_literals.py:164: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_consistency_temp_literals.py::test_allowlist_requires_reason
+FAILED tests/test_consistency_temp_literals.py::test_allowlist_rejects_expires_field
+2 failed, 1 passed in 0.31s
+```
+
+Der volle Lauf der Testdatei war `7 failed, 6 passed in 0.41s`; die übrigen fünf Roten sind
+`test_allowlist_rejects_unknown_fields[expires-at|review_by|ticket|pattern2]` (unbekannte Felder
+unterdrückten heute, weil die Feld-Whitelist ungenutzt war) und
+`test_allowlist_entry_index_reported_for_multiple_entries` (keine `allowlist-entry`-WARNING).
+
+**Abweichung vom Plan-Rot-Text:** Ein Eintrag *ohne* `reason` unterdrückte bereits seit Task 14
+nicht (`_entry_is_complete` prüfte die Pflichtfelder), es fehlte nur die zusätzliche WARNING für
+den ungültigen Eintrag. `expires` verhielt sich wie im Plan beschrieben: der Eintrag unterdrückte
+und wurde nicht gemeldet.
+
+### Grün (Befehl → Anzahl → Exit)
+
+| # | Befehl | Ergebnis | Exit |
+|---|---|---|---|
+| 1 | `python3 -m pytest tests/test_consistency_temp_literals.py -q` | `13 passed` | 0 |
+| 2 | `python3 -m pytest tests/test_temp_literals.py tests/test_consistency_checks.py -q` | `21 passed` | 0 |
+| 3 | `python3 scripts/sync.py --validate` | 0 ERROR; 22 WARNING `temp-literal.system-temp` (unverändert, Task-16-Goldens); 0 `temp-literal.allowlist-entry`; 1 vorbestehende `repo-containment.no-hook-support`-WARNING | 0 |
+| 4 | `python3 scripts/consistency-check.py` | `22 warning(s) found` — alle `temp-literal.system-temp` | 0 |
+
+### Schema (Q6 / ADR-14 / AC-39)
+
+| Feld | Status | Prüfung |
+|---|---|---|
+| `path` | **Pflicht** | nicht-leerer String, repo-relativer Glob (`fnmatch`) |
+| `pattern` | **Pflicht** | nicht-leerer String **und** `re.compile` erfolgreich |
+| `reason` | **Pflicht** | nicht-leerer String |
+| `owner` | optional | beliebiger Wert, ändert das Ergebnis nicht (weder Unterdrückung noch Meldung) |
+| `expires` | **nicht unterstützt** | wie jedes andere Feld außerhalb der Whitelist: unterdrückt nichts und wird gemeldet |
+| sonstige Felder | **nicht unterstützt** | dito (`expires-at`, `review_by`, `ticket`, `pattern2` getestet) |
+| Eintrag kein Mapping | ungültig | `entry is not a mapping` |
+
+Ein **vollständiger** Eintrag unterdrückt weiterhin nur seinen eigenen Pfad und die passende
+Zeile. Ein ungültiger Eintrag unterdrückt nie; jede ungültige Position erzeugt **genau eine**
+zusätzliche WARNING der Familie `temp-literal.*` (Code `temp-literal.allowlist-entry`,
+`file = .meta-config/temp-literal-allowlist.yaml`, 1-basierter Index in der Meldung). Kein
+Hard-Exit, kein `sys.exit` — `print_report(...) == 0` bleibt (ADR-06).
+
+Beispielmeldungen (verbatim aus einem Probe-Lauf):
+
+```
+allowlist entry #2 (agents/1-generic/demo.md) suppresses nothing: unsupported field(s): expires ('expires' is not part of the schema); missing non-empty 'reason'
+allowlist entry #3 (agents/1-generic/demo.md) suppresses nothing: invalid 'pattern' regex: missing ), unterminated subpattern at position 0
+allowlist entry #4 suppresses nothing: entry is not a mapping
+```
+
+Suggestion-Text aller drei: `Declare path, pattern and reason (owner optional); 'expires' is not
+part of the schema (Q6/ADR-14), so the violation keeps its own temp-literal.system-temp warning
+until the entry is fixed.`
+
+### Dateien
+
+- `scripts/lib/consistency/temp_literals.py` — `_entry_problems` (Feld-Whitelist + `reason`-Pflicht
+  + Regex-Kompilierung), `_entry_is_complete` darauf umgestellt, `_allowlist_entry_findings` und
+  Registrierung in `check_temp_literals`; Modul bleibt mit **600 Zeilen** innerhalb der Grenze.
+- `.meta-config/temp-literal-allowlist.yaml` — Kopfkommentar nennt Code und AC-39; `entries: []`
+  unverändert leer, keine realen Einträge.
+- `tests/test_consistency_temp_literals.py` — fünf neue Tests (reason, expires, owner, unbekannte
+  Felder parametrisiert, Index-Meldung); `13 passed`.
+
+### Abweichungen / Interpretationen
+
+1. **Eigener Code `temp-literal.allowlist-entry`.** Die Spec fordert „WARNING derselben
+   Check-Familie", nennt aber keinen Code; gewählt wurde ein `temp-literal.*`-Code mit
+   `file = .meta-config/temp-literal-allowlist.yaml`.
+2. **Meldung unabhängig vom Verstoß.** Jeder unanwendbare Eintrag wird gemeldet, auch wenn der
+   passende Verstoß durch einen anderen vollständigen Eintrag unterdrückt ist — eine kaputte
+   Allowlist ist für sich ein Defekt (ADR-14: „bewusst laut, nicht still").
+3. **Zusätzlich abgedeckt:** nicht-Mapping-Einträge und nicht kompilierende `pattern`-Regexe werden
+   ebenfalls als ungültiger Eintrag gemeldet (vorher nur „unterdrückt nicht").
+4. **Rot-Beleg weicht im `reason`-Fall vom Plan-Wortlaut ab** (siehe oben): Unterdrückung war schon
+   Task-14-korrekt, rot war die fehlende Zusatz-WARNING.
+
+### Risiken
+
+- Ungültige Einträge werden bei **jedem** Lauf gemeldet, auch mehrfach pro Root-Lauf (der
+  Framework-Root liefert die Allowlist, es gibt keinen Doppel-Scan; bei abweichendem
+  Projekt-Root ohne eigene Allowlist wird die Framework-Datei verwendet). Kein Risiko im
+  Ist-Zustand, da `entries` leer ist.
+- Projekte mit Altlisten, die `expires` nutzen, erhalten künftig zwei WARNINGs statt einer stillen
+  Unterdrückung — das ist die beabsichtigte ADR-14-Konsequenz.
