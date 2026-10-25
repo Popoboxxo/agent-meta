@@ -253,15 +253,31 @@ def _adapter_fixture(tmp_path: Path, target_body: str) -> Path:
 
 
 def _run_adapter(fixture_dir: Path, payload: str, target: str = "target.sh",
-                 env_out: Path | None = None) -> subprocess.CompletedProcess:
+                 env_out: Path | None = None,
+                 tmp_dir: Path | None = None) -> subprocess.CompletedProcess:
     env = dict(os.environ)
     if env_out is not None:
         env["ADAPTER_TEST_OUT"] = str(env_out)
+    if tmp_dir is not None:
+        # `mktemp` honours TMPDIR (GNU) and TMPDIR/TMP (BSD/macOS); pin both so
+        # the adapter's scratch file provably lands in the test-owned directory.
+        env["TMPDIR"] = str(tmp_dir)
+        env["TMP"] = str(tmp_dir)
     return subprocess.run(  # noqa: S603
         ["bash", "antigravity-json-adapter.sh", target],
         input=payload, capture_output=True, text=True, cwd=fixture_dir, env=env,
         timeout=60,
     )
+
+
+def _repo_status() -> str:
+    """`git status --porcelain` of this repository (must not change)."""
+    result = subprocess.run(  # noqa: S603
+        ["git", "-C", str(_REPO_ROOT), "status", "--porcelain"],
+        capture_output=True, text=True, timeout=60,
+    )
+    assert result.returncode == 0, result.stderr
+    return result.stdout
 
 
 def test_adapter_maps_agy_deny_to_decision_json(tmp_path):
@@ -335,6 +351,7 @@ def test_adapter_normalizes_edit_tool_names(tmp_path):
 
     received = json.loads(out_file.read_text(encoding="utf-8"))
     assert received["tool_name"] == "Write"
+    assert received["tool_input"]["file_path"] == "/ws/a.md"  # FilePath -> file_path
 
 
 def test_adapter_posttooluse_exit2_emits_no_decision(tmp_path):
@@ -391,3 +408,40 @@ def test_adapter_missing_argument_fails_open_with_warning(tmp_path):
     assert result.returncode == 0
     assert result.stdout == ""
     assert "no target hook script argument" in result.stderr
+
+
+def test_adapter_temp_file_is_cleaned_up(tmp_path):
+    """AC-30: the adapter's mktemp scratch file is local and removed.
+
+    The adapter captures the target hook's stderr in a ``mktemp`` file
+    (``antigravity-json-adapter.sh:167-168``) and removes it via an EXIT trap.
+    AC-30 pins all three consequences: (a) the file no longer exists once the
+    process ended, (b) the repository working tree gained no file, and
+    (c) the deny JSON contract on stdout is unchanged.
+    """
+    scratch = tmp_path / "adapter-tmp"
+    scratch.mkdir()
+    fixture = _adapter_fixture(
+        tmp_path, '#!/bin/bash\necho "blocked: strict mode" >&2\nexit 2\n'
+    )
+    payload = json.dumps({
+        "hookEventName": "PreToolUse",
+        "toolCall": {"name": "run_command", "args": {"CommandLine": "git push"}},
+        "workspacePaths": ["/ws"],
+    })
+
+    before = _repo_status()
+    result = _run_adapter(fixture, payload, tmp_dir=scratch)
+    after = _repo_status()
+
+    # (c) deny contract unchanged.
+    assert result.returncode == 0
+    decision = json.loads(result.stdout)
+    assert decision["decision"] == "deny"
+    assert "blocked: strict mode" in decision["reason"]
+
+    # (a) the mktemp file is gone: the pinned scratch dir is empty again.
+    assert sorted(scratch.iterdir()) == []
+
+    # (b) no new file in the repository working tree.
+    assert after == before, "adapter run changed the repo working tree"

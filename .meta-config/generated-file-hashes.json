@@ -222,7 +222,7 @@
     ".gemini/agents/tester.md": "3fb84f120814cf3a",
     ".gemini/agents/ui-ux-designer.md": "2eed606e570af03e",
     ".gemini/agents/validator.md": "f91eb9f5ddb23008",
-    ".agents/hooks/antigravity-json-adapter.sh": "74d4641aa085d26d",
+    ".agents/hooks/antigravity-json-adapter.sh": "2f26145f29a933e8",
     ".agents/hooks/auto-github-release.sh": "f5f5945e0ba50285",
     ".agents/hooks/orchestrator-guard-impl.sh": "3b382143f713ff5f",
     ".agents/hooks/orchestrator-guard.sh": "ffdbda662d556fc9",
