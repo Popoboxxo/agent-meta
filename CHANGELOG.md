@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Added
+- **Tmp-sink injection (`SPEC-tmp-sink-injection`, spec Rev. 3)**: system temp literals in
+  shipped framework text are replaced by the configured sink (`{{TMP_SINK_PATH}}` /
+  `{{TMP_SINK_ABS_PATH}}`), and the pytest basetemp as well as the child-process environment are
+  derived from `repo_containment.tmp-sink.system-temp-exception`. The suite command renders the
+  basetemp as `{{PYTEST_BASETEMP}}` instead of a machine path. A new `temp-literal.*`
+  consistency family (WARNING) reports remaining literals in the scanned framework text, and the
+  `tmp-sink` config keys (`system-temp-exception`, `toolchain-caches` opt-in) are documented in
+  the example config.
+
 ## [2.0.0-beta.3] - 2026-10-23
 
 ### Added

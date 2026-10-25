@@ -170,6 +170,15 @@ repo_containment:
     path: ".tmp"
     gitignore: true
     cleanup: "manual"          # "on-sync" leert .tmp bei jedem Sync (destruktiv!)
+    # System-Temp-Ausnahme — bewusste, begründungspflichtige Opt-in-Ausnahme.
+    # Sie erlaubt genau einen Zweck außerhalb des Repos: den pytest-Basetemp.
+    # Der Sync rendert daraus {{PYTEST_BASETEMP}} für TEST_COMMANDS; ein
+    # Pfad-Literal gehört weder hier noch in die Vorschrift (ADR-16, AC-41).
+    system-temp-exception:
+      enabled: true
+      reason: "pytest basetemp must stay outside the repo (ancestor collision, 13 failures 2026-09-20)"
+      pytest-basetemp: true
+      toolchain-caches: false  # Opt-in: true pinnt pip/npm-Caches in den Sink (nie docker)
   # provider-overrides:
   #   Continue: { enabled: false }
 

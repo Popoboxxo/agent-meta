@@ -30,7 +30,7 @@ Spalte `Commit` bleibt `— (pending)`, bis der jeweilige Commit tatsächlich ex
 | 14 | Consistency-Check für Temp-Literale | done | — (pending) | Steps 1–3 grün; AC-21/IC-11; neues Modul `scripts/lib/consistency/temp_literals.py` ist Single Source des AC-01-Musters; Registrierung in `consistency-check.py` und im `_strict_findings`-Block (WARNING, Exit unverändert); Task-11-Schuld getilgt (2 Admin-Server-Starts mit `env=_admin_tmp_env`, beide `deferred:`-Einträge entfernt); 22 `temp-literal.system-temp`-WARNINGS sind ausschließlich Task-16-Goldens (echte Reste, kein False Positive); Step 4 (Commit) offen, kein Commit-Auftrag |
 | 15 | Aggregations-Guard über alle Schreibpfade | pending | — (pending) | — |
 | 16 | Goldens rebaselinen | pending | — (pending) | — |
-| 17 | Doku und Beispiel-Config | pending | — (pending) | — |
+| 17 | Doku und Beispiel-Config | done | — (pending) | Steps 1–3 grün; §5.5-Unterabschnitt „Konfiguration" nennt `system-temp-exception`/`PYTEST_BASETEMP`, Beispiel-Config und CHANGELOG ergänzt; §5.5-Regeltext (Literal) bleibt für Task 21 unangetastet; `--validate` Exit 0, 22 unveränderte `temp-literal.system-temp`-WARNINGS; Step 4 (Commit) offen, kein Commit-Auftrag |
 | 18 | Abschluss-Validierung und Ledger | pending | — (pending) | Läuft zuletzt (Abschluss-Gate) |
 | 19 | Toolchain-Cache-Opt-in (Q3) | pending | — (pending) | — |
 | 20 | Antigravity `args.FilePath` → `file_path` (Q10) | done | — (pending) | Steps 1–3 grün; `ARG_KEY_MAP` um `'FilePath': 'file_path'` erweitert, Assertion in `test_adapter_normalizes_edit_tool_names`; 60 passed, `--validate` 0 neue Findings; Step 4 (Commit) offen, kein Commit-Auftrag |
@@ -1926,3 +1926,84 @@ TMPDIR=/home/hermes/repos/agent-meta/.tmp TEMP=… TMP=…  (alle absolut, PATH/
 - `_admin_tmp_env` liest `<agent_meta_root>/.meta-config/project.yaml` — konsistent mit
   `scripts/admin-server.py::_tmp_sink_env`; in einem Submodul ohne eigene Config bleibt es beim
   geerbten Env (dokumentierter Fallback, kein stiller Pin auf einen falschen Pfad).
+
+## Evidence — Task 17
+
+### Rot (vor der Implementierung)
+
+`/usr/bin/python3 -m pytest tests/test_docs_tmp_sink_injection.py -q` → `3 failed, 1 passed`:
+
+```
+F.FF                                                                     [100%]
+=================================== FAILURES ===================================
+__________________ test_prison_mode_documents_temp_exception ___________________
+>       assert "system-temp-exception" in section
+E       AssertionError: assert 'system-temp-exception' in ' Repo-Kopien und pytest-Basetemp (Pflichtregel)…'
+tests/test_docs_tmp_sink_injection.py:52: AssertionError
+______________ test_project_yaml_example_documents_temp_exception ______________
+>       assert "system-temp-exception:" in text
+E       AssertionError: assert 'system-temp-exception:' in '# .meta-config/project.yaml — Projekt-Konfiguration für agent-meta…'
+tests/test_docs_tmp_sink_injection.py:66: AssertionError
+_______________ test_changelog_documents_tmp_sink_injection ___________________
+>       assert "tmp-sink" in unreleased
+E       AssertionError: assert 'tmp-sink' in '\n\n'
+tests/test_docs_tmp_sink_injection.py:82: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_docs_tmp_sink_injection.py::test_prison_mode_documents_temp_exception
+FAILED tests/test_docs_tmp_sink_injection.py::test_project_yaml_example_documents_temp_exception
+FAILED tests/test_docs_tmp_sink_injection.py::test_changelog_documents_tmp_sink_injection
+3 failed, 1 passed in 0.19s
+```
+
+Der vierte Test (`test_prison_mode_keeps_mandatory_basetemp_rule`) war bereits grün — der
+Pflichtsatz „Der pytest-Basetemp darf NIE im Arbeitsbaum liegen" steht im Bestand und bleibt als
+Regressionswächter für Task 21 stehen.
+
+### Grün (nach der Implementierung)
+
+| # | Kommando | Ergebnis |
+|---|---|---|
+| 1 | `/usr/bin/python3 -m pytest tests/test_docs_tmp_sink_injection.py -q` | `4 passed in 0.18s`, Exit 0 |
+| 2 | `/usr/bin/python3 -m pytest tests/test_consistency_temp_literals.py tests/test_template_report_paths.py -q` | `31 passed in 0.45s`, Exit 0 |
+| 3 | `/usr/bin/python3 -m pytest tests/test_readme_template.py -q` (Zusatz: liest `project.yaml.example`) | `11 passed in 0.14s`, Exit 0 |
+| 4 | `/usr/bin/python3 scripts/sync.py --validate` | Exit 0, **22** `temp-literal.*`-WARNINGS — unverändert (21 `tests/fixtures/slimming-golden/**` + 1 `tests/conftest.py:28`), keine neue Wurzel betroffen |
+
+### Doku-Soll (AC-41 vorbereitet, ohne Task 21 zu übernehmen)
+
+- `CHANGELOG.md` → `## [Unreleased]` / `### Added`: ein Eintrag „Tmp-sink injection
+  (`SPEC-tmp-sink-injection`, spec Rev. 3)" nennt `tmp-sink`, `{{PYTEST_BASETEMP}}`,
+  `system-temp-exception`, `toolchain-caches` und die `temp-literal.*`-Familie.
+- `templates/configs/project.yaml.example` → unter `repo_containment.tmp-sink`: aktiver Block
+  `system-temp-exception` mit `enabled`, `reason`, `pytest-basetemp`, `toolchain-caches: false`
+  (explizit) plus Kommentar, dass die Ausnahme begründungspflichtig ist und der Sync daraus
+  `{{PYTEST_BASETEMP}}` rendert (Vorbild: `agent-meta.config.example.yaml:168`, Task 3).
+- `docs/concepts/repo-containment-prison-mode.md` → §5.5 erhält den Unterabschnitt
+  „Konfiguration": Key-Tabelle (`enabled`, `reason`, `pytest-basetemp`, `toolchain-caches`),
+  die Fehlerfälle (`enabled: false` + `pytest-basetemp: true` bzw. `toolchain-caches: true` ⇒
+  Exit 1 `tmp-sink.system-temp-exception`, ebenso System-Temp-Root innerhalb des Projekts) und
+  das fail-closed Hook-Verhalten mit den absoluten Meldungszeilen `anchor:`, `repair:`,
+  `opt-out:` (`repo-containment.no-root`, Exit 2). **Der Regeltext selbst bleibt wörtlich
+  unverändert** — inklusive der bestehenden `--basetemp=/tmp/…`-Literale; der Wechsel auf
+  `PYTEST_BASETEMP` ist Task 21.
+
+### Abweichungen / Interpretationen
+
+1. **`reason` ist optional-mit-Default, nicht hart pflichtig.** Der Resolver
+   (`tmp_paths.py:112-114`) fällt bei fehlendem/leerem `reason` auf
+   `DEFAULT_SYSTEM_TEMP_EXCEPTION_REASON` zurück. Die Doku sagt deshalb „Begründungstext; fehlt
+   er, gilt der Framework-Default" statt „Pflichttext". Der Test fordert nur einen nicht-leeren
+   `reason` in der Beispiel-Config.
+2. **Ein zusätzlicher Test-Helfer, kein Produktionscode.** `_section_5_5` schneidet §5.5 bis
+   `### 5.6`/`## 6.` — Task 21 kann dieselbe Datei erweitern, ohne den Helfer zu ändern.
+3. **Test-Assertion über den Auftrag hinaus:** der CHANGELOG-Eintrag muss auch
+   `SPEC-tmp-sink-injection` nennen (Plan-Step 2 fordert den Verweis).
+4. **Nur die vier Task-17-Dateien + zwei Ledger-Dateien geändert**; keine Änderung an
+   Produktionscode, Templates außer `project.yaml.example`, oder PRs #1013/#1015.
+
+### Risiken
+
+- §5.5 enthält weiterhin die beiden `--basetemp=/tmp/…`-Literale (Bestand). Sie liegen außerhalb
+  des `temp-literal.*`-Scan-Scopes (`docs/**` wird nicht gescannt) und sind Task 21 zugeordnet;
+  AC-41 bleibt bis dahin offen.
+- `templates/configs/project.yaml.example` enthält einen vorbestehenden doppelten
+  `external-skills`-Kommentarblock (unabhängig von Task 17, nicht angefasst).

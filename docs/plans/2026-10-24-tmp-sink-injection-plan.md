@@ -562,10 +562,10 @@ Pfad korrigiert gegen die Vorgabe: der Repo-Containment-Beispielblock liegt in `
 
 **Rot zuerst:** `test_prison_mode_documents_temp_exception` schlägt fehl, weil §5.5 (`:404-439`) den Config-Key und den Token nicht nennt.
 
-- [ ] Step 1: Test schreiben (rot): §5.5 enthält `system-temp-exception` und `PYTEST_BASETEMP`; `templates/configs/project.yaml.example` enthält `system-temp-exception:` mit `reason`; `CHANGELOG.md` enthält einen Eintrag mit `tmp-sink` und `PYTEST_BASETEMP`.
-- [ ] Step 2: Doku und Beispiel ergänzen; CHANGELOG-Eintrag unter „Unreleased" mit Verweis auf `SPEC-tmp-sink-injection`.
-- [ ] Step 3: `python3 -m pytest tests/test_docs_tmp_sink_injection.py -q` grün.
-- [ ] Step 4: Commit `docs: document tmp-sink injection and env pin`.
+- [x] Step 1: Test schreiben (rot): §5.5 enthält `system-temp-exception` und `PYTEST_BASETEMP`; `templates/configs/project.yaml.example` enthält `system-temp-exception:` mit `reason`; `CHANGELOG.md` enthält einen Eintrag mit `tmp-sink` und `PYTEST_BASETEMP`.
+- [x] Step 2: Doku und Beispiel ergänzen; CHANGELOG-Eintrag unter „Unreleased" mit Verweis auf `SPEC-tmp-sink-injection`.
+- [x] Step 3: `python3 -m pytest tests/test_docs_tmp_sink_injection.py -q` grün.
+- [ ] Step 4: Commit `docs: document tmp-sink injection and env pin`. — Offen: der Auftrag untersagt Commit/Push für diesen Subagenten-Lauf; Nachweis in `…-status.md` „Evidence — Task 17".
 
 **Phase P6 (Rev. 3) — Tasks 19–22, sequenziell.** Die vier Tasks setzen die Nutzerentscheidungen
 Q3/Q6/Q10/Q11 um; sie liegen in P5, weil sie Guards, Goldens/Doku und den Adapter berühren, laufen aber
