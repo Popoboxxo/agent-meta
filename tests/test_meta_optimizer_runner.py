@@ -512,11 +512,16 @@ def test_proof_failed_on_effective_variable(tmp_path):
 # --- AC-94: no system temp --------------------------------------------------
 
 def test_optimizer_never_uses_systemtemp(tmp_path, monkeypatch):
-    """AC-94: the whole runner path survives a tempfile.* monkeypatch that raises."""
+    """AC-94: the runner path survives a monkeypatched tempfile *creation* API."""
     def boom(*_a, **_k):
         raise AssertionError("system temp must not be used")
 
-    for name in ("mkdtemp", "mkstemp", "gettempdir", "NamedTemporaryFile", "TemporaryDirectory"):
+    # Creation APIs only: ``tempfile.gettempdir()`` is a pure read that the
+    # central resolver queries for the "sink not in system temp" check
+    # (``tmp_sink_location_error``, spec §IC-01) and for the sanctioned
+    # pytest-basetemp precedence (IC-04/ADR-01) -- it never creates an entry.
+    # Same deviation as ``tests/test_context_report.py`` (Task 10).
+    for name in ("mkdtemp", "mkstemp", "NamedTemporaryFile", "TemporaryDirectory"):
         monkeypatch.setattr(tempfile, name, boom)
     cfg = _init_project(tmp_path, _fixture("claude-minimal.yaml"))
     config = yaml.safe_load(cfg.read_text(encoding="utf-8"))
