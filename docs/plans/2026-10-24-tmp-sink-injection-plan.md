@@ -456,10 +456,10 @@ Der `standalone/agents/`-Eintrag ist Verzeichnis-Ownership: `--render-standalone
 
 **Rot zuerst:** `test_tmp_sink_entry_uses_resolved_path` schlägt fehl, weil `_tmp_sink_gitignore_entry` noch `resolve_effective_repo_containment` selbst aufruft (`gitignore.py:317-339`); `test_tmp_sink_check_uses_resolver_reason` schlägt fehl, weil `_sink_hits` (`:403-411`) die Config erneut parst.
 
-- [ ] Step 1: Tests schreiben (rot): AC-31 (`scratch/out` ⇒ Eintrag `scratch/out/`; `enabled: false` ⇒ kein Eintrag), AC-32 (`path: ../out` ⇒ Finding `CHECK_TMP_SINK` mit `reason == "must not contain '..' segments"`), plus AST-Assertion: in `gitignore.py` und `doctor_detectors.py` kommt kein `resolve_effective_repo_containment` und kein `get_path(...tmp-sink.path...)` mehr vor.
-- [ ] Step 2: Beide Stellen auf `TmpPaths` umstellen, Doctor-Meldung (`Finding`, Schwere `ERROR`) beibehalten.
-- [ ] Step 3: `python3 -m pytest tests/test_tmp_sink_default_on.py tests/test_doctor_runner.py -q` grün.
-- [ ] Step 4: Commit `refactor: derive gitignore and doctor sink from resolver`.
+- [x] Step 1: Tests schreiben (rot): AC-31 (`scratch/out` ⇒ Eintrag `scratch/out/`; `enabled: false` ⇒ kein Eintrag), AC-32 (`path: ../out` ⇒ Finding `CHECK_TMP_SINK` mit `reason == "must not contain '..' segments"`), plus AST-Assertion: in `gitignore.py` und `doctor_detectors.py` kommt kein `resolve_effective_repo_containment` und kein `get_path(...tmp-sink.path...)` mehr vor.
+- [x] Step 2: Beide Stellen auf `TmpPaths` umstellen, Doctor-Meldung (`Finding`, Schwere `ERROR`) beibehalten.
+- [x] Step 3: `python3 -m pytest tests/test_tmp_sink_default_on.py tests/test_doctor_runner.py -q` grün.
+- [ ] Step 4: Commit `refactor: derive gitignore and doctor sink from resolver` — offen: kein Commit-Auftrag für diesen Subagenten (Konvention wie Tasks 1–11; Status führt `— (pending)`).
 
 ## Phase P4 — Provider-Agnostik und Consistency
 

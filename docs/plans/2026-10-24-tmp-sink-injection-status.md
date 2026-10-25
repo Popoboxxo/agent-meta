@@ -25,7 +25,7 @@ Spalte `Commit` bleibt `— (pending)`, bis der jeweilige Commit tatsächlich ex
 | 9 | Hook-Testmatrix und bewusste Inversion | done | — (pending) | Steps 1–3 grün; AC-03/04/06/07/08/18/28/29/30/33/37 abgedeckt, alte Fail-open-Erwartung bewusst invertiert; kein Produktionscode geändert; Step 4 (Commit) offen, kein Commit-Auftrag |
 | 10 | Env-Pin für Framework-Subprozesse ausweiten | done | — (pending) | Steps 1–3 grün; beide Render-Seams rufen `tmp_env(paths)`, `work_dir_env` nur noch in `tmp_paths.py` (AST-Guard); 4 Plan-Dateien + 4 mechanische Test-Anpassungen (Signatur/Guard); 6 vorbestehende `gettempdir`-Rotmarks (nicht Task 10); Step 4 (Commit) offen, kein Commit-Auftrag |
 | 11 | Subprozess-Klassifikation und Backup-Staging | done | — (pending) | Steps 1–3 grün; AC-09/10/11; Backup-Staging via `resolve_output_dir("backup-staging")`, Fallback nur bei `tmp-sink.disabled`; 10 der 12 bekannten Aufrufe gepinnt, 2 `taskkill` allowlisted; Guard scannt `scripts/**` (42 Ausreißer → 21 Allowlist-Einträge, u. a. `deferred` für Task-14-Datei); Step 4 (Commit) offen, kein Commit-Auftrag |
-| 12 | Gitignore- und Doctor-Zweitparser entfernen | pending | — (pending) | — |
+| 12 | Gitignore- und Doctor-Zweitparser entfernen | done | — (pending) | Steps 1–3 grün; AC-31/AC-32; `_tmp_sink_gitignore_entry(paths)` aus `TmpPaths.relative`, `_sink_hits` nutzt `resolve_tmp_paths` und übernimmt den Resolver-`reason`; AST-Guard gegen Zweitparser; Step 4 (Commit) offen, kein Commit-Auftrag |
 | 13 | Opencode-Schreibscope aus dem Sink ableiten | pending | — (pending) | — |
 | 14 | Consistency-Check für Temp-Literale | pending | — (pending) | — |
 | 15 | Aggregations-Guard über alle Schreibpfade | pending | — (pending) | — |
@@ -1569,4 +1569,134 @@ keiner der beiden `--validate`-Läufe als Finding auf.
   Kopie bleibt bis zum nächsten Sync ungeschützt; das ist bewusst außerhalb dieses Tasks.
 - Nicht ausgeführt: die volle Testsuite (nur die im Plan-Step 3 genannten Module plus
   `sync.py --validate`).
+
+## Evidence — Task 12
+
+### Rot (vor der Implementierung)
+
+Erster Lauf nach dem Schreiben der Tests (der eine zusätzliche Fehlschlag war ein falscher
+Import im neuen Test selbst, vor der Implementierung korrigiert):
+
+`python3 -m pytest tests/test_tmp_sink_default_on.py tests/test_doctor_runner.py -q`
+→ `4 failed, 79 passed in 20.85s`, Exit 1. Die beiden geforderten Anker (nach Korrektur des
+Test-Imports, weiterhin ohne Produktionsänderung):
+
+`python3 -m pytest tests/test_doctor_runner.py::test_tmp_sink_check_uses_resolver_reason tests/test_tmp_sink_default_on.py::test_tmp_sink_entry_uses_resolved_path -q`
+→ `2 failed in 1.23s`, Exit 1:
+
+```
+___________________ test_tmp_sink_check_uses_resolver_reason ___________________
+...
+>       monkeypatch.setattr(doctor_detectors, "resolve_tmp_paths", fake_resolver)
+E       AttributeError: <module 'lib.doctor_detectors' from '/home/hermes/repos/agent-meta/scripts/lib/doctor_detectors.py'> has no attribute 'resolve_tmp_paths'
+
+tests/test_doctor_runner.py:711: AttributeError
+____________________ test_tmp_sink_entry_uses_resolved_path ____________________
+
+tmp_path = PosixPath('/tmp/pytest-of-hermes/pytest-137/test_tmp_sink_entry_uses_resol0')
+
+    def test_tmp_sink_entry_uses_resolved_path(tmp_path):
+        """AC-31/IC-16: the entry comes from TmpPaths.relative, not a second parse."""
+        cfg = {"enabled": True, "tmp-sink": {"enabled": True, "path": "scratch/out"}}
+>       assert _tmp_sink_gitignore_entry(_paths(tmp_path, cfg)) == "scratch/out/"
+E       AssertionError: assert '.tmp/' == 'scratch/out/'
+E
+E         - scratch/out/
+E         + .tmp/
+
+tests/test_tmp_sink_default_on.py:47: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_doctor_runner.py::test_tmp_sink_check_uses_resolver_reason
+FAILED tests/test_tmp_sink_default_on.py::test_tmp_sink_entry_uses_resolved_path
+2 failed in 1.23s
+```
+
+AST-Guard gegen den Ist-Zustand auf `HEAD` (gleiche Prüflogik wie der Test, gegen
+`git show HEAD:...` ausgeführt):
+
+```
+HEAD scripts/lib/gitignore.py: resolve_effective_repo_containment=True, get_path(tmp-sink.path)=[]
+HEAD scripts/lib/doctor_detectors.py: resolve_effective_repo_containment=False, get_path(tmp-sink.path)=['repo_containment.tmp-sink.path']
+```
+
+### Grün (nach der Implementierung)
+
+| # | Kommando | Ergebnis |
+|---|---|---|
+| 1 | `python3 -m pytest tests/test_tmp_sink_default_on.py tests/test_doctor_runner.py -q` | `83 passed in 20.61s`, Exit 0 |
+| 2 | `python3 -m pytest tests/test_tmp_sink_default_on.py tests/test_doctor_runner.py tests/test_repo_containment_tmp_sink.py tests/test_gitignore_provider_dirs.py tests/test_gitignore_keep.py tests/test_gitignore_context_file_protection.py -q` | `147 passed in 23.40s`, Exit 0 (6 Module) |
+| 3 | `python3 -m pytest tests/test_doctor_cli.py tests/test_doctor_fixtures.py tests/test_doctor_runner.py -q` | `205 passed in 128.56s`, Exit 0 (3 Module, Doctor-Nachbarschaft) |
+| 4 | `python3 -m pytest tests/test_repo_containment_tmp_sink.py tests/test_repo_containment_consistency.py tests/test_gitignore_provider_dirs.py tests/test_gitignore_keep.py tests/test_gitignore_context_file_protection.py tests/test_tmp_sink_default_on.py -q` | `85 passed in 12.38s`, Exit 0 (6 Module, Gitignore-/Sink-Nachbarschaft) |
+| 5 | `python3 -m pytest tests/test_tmp_sink_env_coverage.py tests/test_repo_containment_consistency.py -q` | `18 passed in 5.20s`, Exit 0 |
+| 6 | `python3 -m pytest tests/test_runtime_config_readers.py -q` | `1 failed, 20 passed in 0.48s`, Exit 1 — **vorbestehend und taskfremd**, siehe Abweichung 6; mit `--deselect …::test_a_registry_evidence_lines_exist_and_mention_the_key`: `20 passed in 0.44s`, Exit 0 |
+| 7 | `python3 scripts/sync.py --validate` | Exit 0; `0 action(s)  |  382 skipped  |  2 warning(s)` — beide vorbestehend (`active-set.gate-dropped`, Submodul-Checkout `external/awesome-claude-code`) |
+| 8 | `python3 -c "ast.parse(..., feature_version=(3, 9))"` über die vier geänderten Dateien | `py3.9 syntax ok` für alle vier |
+| 9 | End-to-End: `python3 scripts/sync.py --config /tmp/t12_scratch/.meta-config/project.yaml --dry-run --check` | Exit 1 (erwarteter `--check`-Drift im Scratch-Projekt); Managed-Block-Zeile enthält `scratch/out/` und `DRY-RUN: would write self-ignoring scratch/out/.gitignore` — der Sync-Pfad nutzt den konfigurierten Sink, nicht `.tmp/` |
+
+### Abgedeckte ACs (Task 12)
+
+- **AC-31** — `tests/test_tmp_sink_default_on.py::test_tmp_sink_entry_uses_resolved_path`:
+  `TmpPaths` für `scratch/out` ⇒ Eintrag `scratch/out/`; `enabled: false` ⇒
+  `_tmp_sink_gitignore_entry(...) is None` und kein Eintrag im Managed-Block.
+- **AC-32** — `tests/test_doctor_runner.py::test_tmp_sink_check_uses_resolver_reason`:
+  `tmp-sink.path: ../out` ⇒ Finding `doctor.tmp-sink-location` mit
+  `Severity.ERROR` und der Meldung
+  `repo_containment.tmp-sink.path violates the sink rules: must not contain '..' segments`
+  (Reason identisch zum Validator, ohne eigene Parser-Kopie). Ein gestubbter Resolver
+  beweist zusätzlich, dass `_sink_hits` den Resolver und nicht die Config nutzt.
+- **Zusatz IC-16** — `test_sink_consumers_do_not_reparse_the_config` (AST):
+  `resolve_effective_repo_containment` kommt in `gitignore.py`/`doctor_detectors.py` nicht
+  mehr vor; `get_path(...tmp-sink.path...)` in `doctor_detectors.py` ebenfalls nicht.
+
+### Implementierung
+
+| Stelle | Vorher | Nachher |
+|---|---|---|
+| `gitignore.py::_tmp_sink_gitignore_entry` | `(repo_containment_cfg)` + eigener `resolve_effective_repo_containment`-Aufruf | `(paths: TmpPaths)`, Eintrag aus `paths.relative`, `enabled=False` ⇒ `None`; kein Config-Parsing |
+| `gitignore.py::compute_base_gitignore_entries` | 4. Argument = `repo_containment`-Block | unverändert rückwärtskompatibel, zusätzlich `tmp_paths=`/`project_root=`; Legacy-Fallback ruft den Zentral-Resolver |
+| `gitignore.py::_tmp_sink_gitignore_enabled` | — | neuer, reiner Boolean-Leser für `tmp-sink.gitignore` (Default AN), weil `TmpPaths` laut IC-01/IC-02 kein Gitignore-Flag trägt |
+| `doctor_detectors.py::_sink_hits` | `get_path(...tmp-sink.path...)` + eigene `tmp_sink_path_error`/`tmp_sink_location_error`-Kaskade | `resolve_tmp_paths(env.project_root, env.config)`; `tmp-sink.invalid-path` ⇒ `Hit(CHECK_TMP_SINK, Severity.ERROR, reason=<Resolver-Reason>)`; andere Resolver-Codes feuern den Check nicht |
+| `tests/test_doctor_runner.py::test_sink_check_uses_central_repo_containment_functions` | pinnte die entfernten `tmp_sink_*`-Re-Exports | ersetzt durch `test_sink_check_uses_the_central_resolver` (Identität `doctor_detectors.resolve_tmp_paths is lib.tmp_paths.resolve_tmp_paths`) |
+
+### Abweichungen von der Aufgabenbeschreibung
+
+1. **`compute_base_gitignore_entries` behält seine `repo_containment_cfg`-Signatur.** Die
+   Aufrufer außerhalb der vier Task-Dateien (`sync_pipeline.py`, sechs Testmodule) übergeben
+   weiterhin den Config-Block; eine Signaturänderung hätte Dateien außerhalb des
+   Task-Scopes erzwungen. Stattdessen nimmt die Funktion optional `tmp_paths` (und
+   `project_root` für den Fallback) entgegen; die Produktion nutzt den zentralen Resolver,
+   weiterhin ohne eigene Pfadinterpretation in `_tmp_sink_gitignore_entry`.
+2. **Legacy-Fallback nutzt `Path.cwd()` als Projektwurzel.** Nur wenn kein `tmp_paths`
+   übergeben wird (heutige `sync_pipeline`-Aufrufstelle, Bestands-Tests). Der einzige
+   konsumierte Wert ist `TmpPaths.relative`; End-to-End-Lauf 9 belegt den korrekten Eintrag
+   auch bei abweichendem `cwd`. Eine spätere Umstellung von `sync_pipeline.py` auf
+   `tmp_paths=resolve_tmp_paths(project_root, config)` ist der saubere Folgeweg.
+3. **`_sink_hits` extrahiert den nackten Reason aus der Resolver-Meldung.** Der Resolver
+   formatiert lexikalische Fehler als `"'…path' is invalid (<reason>); using '.tmp'."` und
+   Lagefehler als `"repo_containment.tmp-sink.path '<rel>': <reason>"`. AC-32 verlangt den
+   Reason ohne Pfadkontext; der Check parst dabei **keine Config**, sondern nur den bereits
+   erzeugten Resolver-Text (`(<reason>); using` bzw. `rpartition(": ")`).
+4. **`_tmp_sink_gitignore_enabled` liest genau einen Boolean** (`tmp-sink.gitignore`), weil
+   `TmpPaths` dieses Feld per Spec nicht enthält. Der Pfad wird ausschließlich über
+   `TmpPaths.relative` bezogen (AST-Guard belegt es).
+5. **Step 4 (Commit) nicht ausgeführt** — kein Commit-Auftrag für diesen Subagenten; die
+   Plan-Checkbox bleibt offen, der Status führt `— (pending)` (Konvention wie Tasks 1–11).
+6. **Vorbestehender roter Regressionstest, nicht durch Task 12 verursacht:**
+   `test_runtime_config_readers.py::test_a_registry_evidence_lines_exist_and_mention_the_key`
+   scheitert an `admin-ui`-Evidence `scripts/admin-server.py:515` (Zeile ist leer).
+   `git diff --quiet HEAD -- scripts/admin-server.py config/runtime-config-readers.yaml`
+   bestätigt: beide Dateien sind gegenüber `HEAD` unverändert; die Zeile war schon auf `HEAD`
+   leer (Task 11 hat `admin-server.py` verschoben). Eigentümer: Task 11 bzw. ein
+   Config-Evidence-Fix außerhalb dieses Scopes.
+
+### Risiken / Interpretationen
+
+- Der Legacy-Fallback in `compute_base_gitignore_entries` ist nur korrekt, solange er
+  ausschließlich `TmpPaths.relative` konsumiert. Eine künftige Nutzung von `absolute`/`env`
+  an dieser Stelle würde die echte Projektwurzel benötigen (siehe Abweichung 2).
+- Der Doctor prüft weiterhin nur `tmp-sink.invalid-path`; `tmp-sink.system-temp-exception`
+  bleibt Sache des Validators. Das entspricht dem bisherigen Check-Zuschnitt, ist aber
+  bewusst als Scope-Entscheidung dokumentiert.
+- Der vorbestehende `test_runtime_config_readers`-Fehlschlag bleibt offen und kann das
+  Task-15/18-Gate rot halten, bis die Evidence-Zeile aktualisiert ist.
 
