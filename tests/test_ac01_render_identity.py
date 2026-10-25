@@ -260,6 +260,18 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   namespace). Changed: ``Opencode/.opencode/agents/orchestrator.md``, ``Opencode/opencode.json``;
   added: ``Opencode/.opencode/agent-meta-state.json`` (2 changed, 1 added). ``AC01_EXCEPTIONS`` is
   NOT extended; Mammouth and all other providers unchanged.
+- Task 16 (SPEC-tmp-sink-injection, AC-19): rebaseline after the tmp-sink injection. The rendered
+  agent text of 11 roles changed: ``ai-security-guardian``, ``app-lifecycle-governor``,
+  ``code-reviewer``, ``developer``, ``devops-engineer``, ``docker``, ``e2e-tester``,
+  ``prompt-governor``, ``security-auditor``, ``test-executor`` and ``tester`` (all 9 providers,
+  99 artifacts = 11 x 9) — every diff is one of: the auditor report path / log destination moving
+  from a system-temp literal to ``.tmp`` (``{{TMP_SINK_PATH}}``), the ``--basetemp="…"`` shape of
+  ``TEST_COMMANDS`` replacing ``--basetemp=/tmp/$USER/...``, the ``.tmp/runs/`` scratch prose, or
+  the template version pin that Task 4/6 bumped. ``validator`` is gated off in the matrix config,
+  so its template change produces no matrix artifact. Plus the three hook scripts whose runtime
+  changed with the sink (``Claude/.claude/hooks/repo-containment-impl.sh`` and the two Gemini
+  ``.agents/hooks/*.sh``). 102 of 1013 hashes; 0 added/removed; ``generated-file-hashes.json`` is
+  unchanged because no managed path appeared or vanished. ``AC01_EXCEPTIONS`` is NOT extended.
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

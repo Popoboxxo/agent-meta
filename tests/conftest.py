@@ -25,7 +25,12 @@ from pytest import PytestWarning
 
 _AGENT_META_ROOT = Path(__file__).resolve().parents[1]
 
-_EXTERNAL_BASETEMP_HINT = "--basetemp=/tmp/$USER/pytest-agent-meta"
+#: The hint names the framework token, never a system-temp literal: the value
+#: behind ``PYTEST_BASETEMP`` is what sync.py resolves from
+#: ``repo_containment.tmp-sink.system-temp-exception`` (SPEC-tmp-sink-injection,
+#: AC-19). A concrete system-temp path here would be exactly the literal the
+#: temp-literal guard bans in shipped text.
+_EXTERNAL_BASETEMP_HINT = '--basetemp="{{PYTEST_BASETEMP}}"'
 
 
 def _is_within(path, root):

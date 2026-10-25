@@ -29,7 +29,7 @@ Spalte `Commit` bleibt `— (pending)`, bis der jeweilige Commit tatsächlich ex
 | 13 | Opencode-Schreibscope aus dem Sink ableiten | done | — (pending) | Steps 1–3 grün; `edit_allow_paths` = `TmpPaths.relative`-Glob + statische `.meta-viz/**`-Liste; statische Liste auf `.meta-viz/**` reduziert; AC-17/AC-20; Step 4 (Commit) offen, kein Commit-Auftrag |
 | 14 | Consistency-Check für Temp-Literale | done | — (pending) | Steps 1–3 grün; AC-21/IC-11; neues Modul `scripts/lib/consistency/temp_literals.py` ist Single Source des AC-01-Musters; Registrierung in `consistency-check.py` und im `_strict_findings`-Block (WARNING, Exit unverändert); Task-11-Schuld getilgt (2 Admin-Server-Starts mit `env=_admin_tmp_env`, beide `deferred:`-Einträge entfernt); 22 `temp-literal.system-temp`-WARNINGS sind ausschließlich Task-16-Goldens (echte Reste, kein False Positive); Step 4 (Commit) offen, kein Commit-Auftrag |
 | 15 | Aggregations-Guard über alle Schreibpfade | done | — (pending) | Steps 1–3 grün; fünf Guards in `tests/test_tmp_sink_injection.py` (AC-01/AC-26, Hook fail-closed, Backup-Staging, Subprozess-Env, Single-Source) + `test_temp_literals.py` importiert das AC-01-Muster statt es zu duplizieren; Rot-Beleg: zwei Definitionsdateien; 12 passed, Regression 66 passed, `--validate` Exit 0 mit unveränderten 22 `temp-literal.system-temp`; Step 4 (Commit) offen, kein Commit-Auftrag |
-| 16 | Goldens rebaselinen | pending | — (pending) | — |
+| 16 | Goldens rebaselinen | done | — (pending) | Steps 1–4 grün; Rot-Lauf vor jeder Änderung protokolliert (10 Goldens + AC-01-Manifest); Golden-Diff zeilenweise klassifiziert, 0 unerwartete Zeilen; 10 Goldens gepatcht (nicht neu gerendert), `conftest.py:28` + Hinweis-Assertions literal-frei; AC-01-Manifest über den dokumentierten Generator neu erzeugt (102/1013, 0 added/removed); `--validate` 0 `temp-literal.*`; Standalone-Drift Exit 0; Step 5 (Commit) offen, kein Commit-Auftrag |
 | 17 | Doku und Beispiel-Config | done | — (pending) | Steps 1–3 grün; §5.5-Unterabschnitt „Konfiguration" nennt `system-temp-exception`/`PYTEST_BASETEMP`, Beispiel-Config und CHANGELOG ergänzt; §5.5-Regeltext (Literal) bleibt für Task 21 unangetastet; `--validate` Exit 0, 22 unveränderte `temp-literal.system-temp`-WARNINGS; Step 4 (Commit) offen, kein Commit-Auftrag |
 | 18 | Abschluss-Validierung und Ledger | pending | — (pending) | Läuft zuletzt (Abschluss-Gate) |
 | 19 | Toolchain-Cache-Opt-in (Q3) | done | — (pending) | Steps 1–3 grün; AC-38: `tmp_sink_env_pin_block` pinnt `PIP_CACHE_DIR`/`npm_config_cache` nur bei `enabled: true` **und** `toolchain-caches: true` unter `<sink>/cache/…`; Validator weist den Widerspruch mit Exit 1 ab; `TmpPaths.env`/`tmp_env` bleiben cache-neutral; `--validate` Exit 0, 22 `temp-literal.*` unverändert (0 `toolchain-cache-in-repo`); Step 4 (Commit) offen, kein Commit-Auftrag |
@@ -2498,3 +2498,162 @@ Template-/Hook-/Backup-/Subprozess-Hälften sind Vorbedingung dieses Tasks (Task
 - Die bekannten vorbestehenden Rotmarks (`tests/test_meta_optimizer_runner.py`/`_applier.py`
   rund um `gettempdir`-Patching) wurden nicht berührt; Task 15 fügt keine `gettempdir`-Nutzung
   in Produktionscode hinzu.
+
+## Evidence — Task 16
+
+### Step 1 — Rot-Lauf (unverändert, vor jeder Anpassung)
+
+Kommando (exakt der Auftrag):
+
+```
+python3 -m pytest tests/test_template_slimming_equivalence.py tests/test_basetemp_guard.py \
+  tests/test_knowledge_engine.py tests/test_ac01_render_identity.py -q
+```
+
+Ergebnis: **`4 failed, 66 passed in 222.23s`** (Exit 1). `tests/test_basetemp_guard.py` und
+`tests/test_knowledge_engine.py` waren entgegen der Plan-Erwartung bereits grün (dort wird kein
+`/tmp`-Hinweistext assertiert); die 22 `--validate`-Warnungen waren damit kein Test-Rot, sondern
+nur Golden-/Conftest-Rot. Je Fehlschlag (erwartet = eingefrorener Golden-Wert, tatsächlich =
+gerenderter Wert):
+
+| Test | Rolle (Template) | Assertion | erwartet (Golden) | tatsächlich (Render) |
+|---|---|---|---|---|
+| `test_golden_equivalence_and_normalization_marking` | `app-lifecycle-governor` (`1-generic`) | byte-gleich nach Ports | `version: 1.4.0`, `generated-from: …@1.4.0` | `version: 1.4.1`, `…@1.4.1` |
+| dito | `code-reviewer` (`1-generic`) | byte-gleich | `version: 1.9.1`; `npm run lint > /tmp/lint.log 2>&1 &`; `tail -50 /tmp/lint.log` | `1.9.2`; `> .tmp/lint.log`; `tail -50 .tmp/lint.log` |
+| dito | `developer` (`2-platform`) | byte-gleich | `version: 2.0.1`, `based-on: …@4.8.0`; `npm run e2e > /tmp/e2e.log 2>&1 &`; `tail -50 /tmp/e2e.log` | `2.0.2`, `@4.8.1`; `> .tmp/e2e.log`; `tail -50 .tmp/e2e.log` |
+| dito | `devops-engineer` (`1-generic`) | byte-gleich | `1.7.0`; `docker logs "$NAME" > /tmp/"$NAME".log`; `tail -20 /tmp/"$NAME".log` | `1.7.1`; `> .tmp/…`; `tail -20 .tmp/…` |
+| dito | `docker` (`1-generic`) | byte-gleich | `1.9.0`; dieselben zwei `/tmp`-Zeilen | `1.9.1`; dieselben zwei `.tmp`-Zeilen |
+| dito | `documenter` (`1-generic`) | byte-gleich | `--basetemp=/tmp/$USER/pytest-agent-meta` | `--basetemp="/tmp/hermes/pytest-agent-meta"` |
+| dito | `e2e-tester` (`1-generic`) | byte-gleich | `1.6.0`; `--basetemp=/tmp/$USER/…`; zwei `/tmp`-Log-Zeilen | `1.6.1`; `--basetemp="/tmp/hermes/…"`; zwei `.tmp`-Zeilen |
+| dito | `test-executor` (`1-generic`) | byte-gleich | `1.2.1`; zweimal `--basetemp=/tmp/$USER/…`; `under a scratch/output path.`; `log capture (scratch/output paths only)` | `1.2.2`; zweimal `--basetemp="/tmp/hermes/…"`; `under `.tmp/runs/`.`; `log capture (`.tmp/runs/` only)` |
+| dito | `tester` (`1-generic`) | byte-gleich | `2.7.0`; `--basetemp=/tmp/$USER/…`; `docker logs … /tmp/…`; `tee /tmp/run-…`; zwei Guard-`/tmp`-Zeilen | `2.7.1`; `--basetemp="/tmp/hermes/…"`; `docker logs … .tmp/…`; `tee .tmp/run-…`; zwei Guard-`.tmp`-Zeilen |
+| dito | `validator` (`1-generic`) | byte-gleich | `4.7.1`; `docker logs … /tmp/…`; `tee /tmp/run-…` | `4.7.2`; `docker logs … .tmp/…`; `tee .tmp/run-…` |
+| `test_no_declared_normalization_is_dead` | `OG-PASS-CODE-REVIEWER` | Varianten-Region muss in einem Template vorkommen | Region mit `/tmp/lint.log` (Varianten-`inline`) | Template trägt seit Task 4 `{{TMP_SINK_PATH}}/lint.log`, gerendert `.tmp/lint.log` → kein Treffer |
+| `test_ac01_render_identical_to_manifest` | AC-01-Matrix | Hash-Gleichheit gegen `hashes.json` | 1013 Baseline-Hashes | 102 abweichende Hashes (11 Rollen × 9 Provider + 3 Hook-Skripte) |
+| `test_ac01_detects_drift` | AC-01-Matrix | `diff == [victim]` | genau 1 Drift-Eintrag | `left contains 102 more items` (Kaskade des veralteten Manifests) |
+
+Der Rot-Lauf wurde vollständig in `.tmp/task16-red.log` festgehalten; kein Test/Golden wurde vor
+diesem Lauf angefasst.
+
+### Step 2 — Bewusste Diff-Prüfung (Golden → Render)
+
+Erzeugt über denselben realen Sync-Pfad wie die Gate-Fixture (`.tmp/diag_golden_diff.py`,
+volle Diffs in `.tmp/task16-golden-diff.txt`). Jede geänderte Zeile wurde klassifiziert:
+
+| Fixture | geänderte Zeilen | Kategorie | Bewertung |
+|---|---|---|---|
+| `app-lifecycle-governor.md` | `version`, `generated-from` | E4 Pin | erwartet |
+| `code-reviewer.md` | `version`, `generated-from`; `npm run lint`-Ziel; `tail -50`-Ziel | E4 + E1 | erwartet |
+| `developer.md` | `version`, `based-on`, `generated-from`; `npm run e2e`-Ziel; `tail -50`-Ziel | E4 + E1 | erwartet |
+| `devops-engineer.md` | `version`, `generated-from`; `docker logs`-Ziel; `tail -20`-Ziel | E4 + E1 | erwartet |
+| `docker.md` | `version`, `generated-from`; `docker logs`-Ziel; `tail -20`-Ziel | E4 + E1 | erwartet |
+| `documenter.md` | `--basetemp=`-Form | E2 | erwartet |
+| `e2e-tester.md` | `version`, `generated-from`; `--basetemp=`; `docker logs`; `tail -20` | E4 + E2 + E1 | erwartet |
+| `test-executor.md` | `version`, `generated-from`; 2× `--basetemp=`; 2× Scratch-Pfad-Prosa | E4 + E2 + E3 | erwartet (E3 begründet, s. D5) |
+| `tester.md` | `version`, `generated-from`; `--basetemp=`; Workflow-`docker logs`; Workflow-`tee`; Guard-`docker logs`; Guard-`tail` | E4 + E2 + E1 | erwartet |
+| `validator.md` | `version`, `generated-from`; Workflow-`docker logs`; Workflow-`tee` | E4 + E1 | erwartet |
+
+Kategorien: **E1** `docker logs`/`tail`/`tee`/`npm run …` → Sink (`/tmp` → `.tmp`), **E2**
+`--basetemp=`-Form (`/tmp/$USER/…` → `--basetemp="…"`), **E3** Scratch-Pfad-Prosa →
+`{{TMP_SINK_PATH}}/runs/`, **E4** Frontmatter-Pins der von Task 4/5/6 gebumpten Templates.
+**Unerwartete Zeilen: 0.** Die Golden-Diffs enthalten außerdem keine Modellzeilen (die
+`_GOLDEN_MODEL_MAP`-Pins bleiben eingefroren) und keine bereits deklarierten B2a/B2b-Regionen
+(deshalb Patch statt Re-Render, s. D3).
+
+### Step 3/4 — Rebaseline und Grün-Läufe
+
+| Kommando | Ergebnis | Exit |
+|---|---|---|
+| `pytest tests/test_template_slimming_equivalence.py tests/test_basetemp_guard.py tests/test_knowledge_engine.py tests/test_ac01_render_identity.py -q` | `71 passed in 223s` | 0 |
+| `pytest tests/test_temp_literals.py tests/test_consistency_temp_literals.py tests/test_tmp_sink_injection.py tests/test_standalone_render.py -q` | `26 passed in 18s` | 0 |
+| `pytest tests/test_opencode_v2_surface.py::test_ac_t4_fixtures_unchanged tests/test_escalate_card_contract.py tests/test_provider_reactivation_artifacts.py -q` | `10 passed in 39s` | 0 |
+| `python3 scripts/sync.py --validate` | `[PASS] All checks passed`; **0** `temp-literal.*`-Warnungen (vorher 22 `temp-literal.system-temp`) | 0 |
+| `python3 scripts/sync.py --render-standalone --check` | `OK standalone/ is up to date (91 file(s))` | 0 |
+
+AC-01-Manifest: `python tests/test_ac01_render_identity.py --write` → `wrote 1013 hashes`;
+geändert 102 von 1013 (0 added / 0 removed). Verteilung: 11 Rollen × 9 Provider = 99
+Agenten-Artefakte (`ai-security-guardian`, `app-lifecycle-governor`, `code-reviewer`,
+`developer`, `devops-engineer`, `docker`, `e2e-tester`, `prompt-governor`, `security-auditor`,
+`test-executor`, `tester`) + 3 Hook-Skripte (`Claude/.claude/hooks/repo-containment-impl.sh`,
+`Gemini/.agents/hooks/repo-containment-impl.sh`, `Gemini/.agents/hooks/antigravity-json-adapter.sh`).
+`generated-file-hashes.json` unverändert, weil kein Managed-Pfad hinzukam/verschwand; `validator`
+ist in der Matrix-Config gegatet und erzeugt dort kein Artefakt.
+
+### Abweichungen / Interpretationen
+
+1. **D1 — Rot-Umfang größer als die Plan-Files-Liste.** Der Rot-Lauf zeigt **10** driftende
+   Goldens, nicht 4: zusätzlich `app-lifecycle-governor` (nur Versions-Pin), `code-reviewer`,
+   `developer`, `devops-engineer`, `docker`, `validator`. Ursache sind die von Task 4/5/6
+   gebumpten Template-Versionen (Golden friert Per-Rollen-Versionen bewusst ein) und die
+   Sink-Literale in den Output-Guard-/Workflow-Regionen. Die vier in der Task-Liste genannten
+   Fixtures sind eine Teilmenge; ohne die sechs weiteren bleibt das Gate rot. Alle zehn wurden
+   nach derselben Diff-Klassifikation rebaselined.
+2. **D2 — Golden-Rebaseline als Patch, nicht als Re-Render.** Ein Re-Render hätte auch bereits
+   deklarierte Normalisierungen eingebrannt (z. B. die `PI-BLANK`-Leerzeile in
+   `test-executor`, die `OG-*`-Regionen) und damit B2b-Beweiskraft still zurückgenommen. Der
+   Patch (`.tmp/patch_goldens.py`) ersetzt ausschließlich die klassifizierten Restzeilen; die
+   Round-Trip-Prüfung (Port-Kette == Render) lief vor jedem Schreiben.
+3. **D3 — `--basetemp` wird als `{{PYTEST_BASETEMP}}` eingefroren, nicht als Maschinenpfad.**
+   Der gerenderte Wert ist `<tempdir>/<user>/pytest-agent-meta` und damit rechner-/CI-abhängig;
+   ein eingefrorenes `"/tmp/hermes/…"` würde das Gate auf einem anderen User sofort brechen. Die
+   Gate-Fixture portiert das Token vor dem Vergleich (`_port_golden_pytest_basetemp`), analog zu
+   `_port_golden_meta_tokens`; die `--basetemp="…"`-Form selbst bleibt byte-exakt geprüft. Die
+   `{{…}}`-Form ist bewusst gewählt: der Shipped-Text-Scanner behandelt `{{…}}` als absoluten
+   Token (`_ABSOLUTE_VALUE_PREFIXES`), sodass die Fixture weder `temp-literal.system-temp` noch
+   `temp-literal.sink-relative` auslöst (mit `<…>` entstand eine falsche sink-relative Warnung).
+4. **D4 — Dead-Normalization-Check rendert Template-Regionen.** `OG-PASS-CODE-REVIEWER` lebt nur
+   noch als passthrough-Variante; die Rohdatei trägt aber `{{TMP_SINK_PATH}}`, der Golden die
+   aufgelöste `.tmp`-Form. Der Inverse-Check vergleicht deshalb die *gerenderte* Region
+   (`_render_template`) statt der Rohdatei — statische Prosa rendert unverändert, der Check wird
+   nicht lockerer (`test_no_declared_normalization_is_dead` grün).
+5. **D5 — Sechste Diff-Kategorie (`.tmp/runs/`)**: `test-executor` ersetzt „scratch/output path"
+   durch `{{TMP_SINK_PATH}}/runs/`. Das ist keine der fünf genannten Zeilenkategorien, aber die
+   bewusste Task-4-Änderung `766731ad` („name the configured sink in scratch instructions") und
+   literal-frei; als erwartet klassifiziert, weil Template-Diff und Commit dieselbe Aussage
+   belegen. Kein Blocker-Befund.
+6. **D6 — AC-01-Manifest und Fixture-Digests mitgeführt** (laut Auftrag/Plan
+   „Goldens- und AC-01-Rebaseline"): `tests/fixtures/ac01-baseline/hashes.json` über den
+   dokumentierten Generator, danach `tests/test_opencode_v2_surface.py`-Digests für
+   `ac01-baseline` und `slimming-golden` neu gepinnt (`compact-golden` unverändert).
+   Rebaseline-Begründung steht in den Docstrings von `test_ac01_render_identity.py` und
+   `test_template_slimming_equivalence.py`.
+7. **D7 — `tests/test_basetemp_guard.py`/`tests/test_knowledge_engine.py` waren nicht rot.**
+   Es gibt dort keine Hinweis-Assertion auf `/tmp`. Der Hinweis (`_EXTERNAL_BASETEMP_HINT`) wurde
+   dennoch auf `--basetemp="{{PYTEST_BASETEMP}}"` umgestellt; `test_basetemp_guard.py` bekam eine
+   neue Guard-Assertion (Hinweis nennt `PYTEST_BASETEMP`, enthält kein `/tmp`/`%TEMP%`/
+   `C:\Temp`/`$USER`), die Meldung in `test_knowledge_engine.py:81` nennt jetzt
+   `--basetemp="<PYTEST_BASETEMP>"` statt `/tmp/<user>`.
+8. **D8 — `tests/test_provider_reactivation_artifacts.py:16,65`** (laut Plan „nicht im
+   Check-Scope, wird beim Rebase mitgeführt"): beide Meldungstexte nennen jetzt
+   `--basetemp="<PYTEST_BASETEMP>"`; keine Assertion geändert.
+9. **Kein Commit** (Step 5 offen) — der Auftrag sagt ausdrücklich „Do NOT commit/push"; kein
+   Worktree, keine PR-Berührung (#1013/#1015 unangetastet), kein Voll-Suite-Lauf.
+
+### FILES_CHANGED
+
+- `tests/fixtures/slimming-golden/{app-lifecycle-governor,code-reviewer,developer,devops-engineer,docker,documenter,e2e-tester,test-executor,tester,validator}.md`
+- `tests/fixtures/ac01-baseline/hashes.json` (Generator-Lauf, 102/1013 geändert)
+- `tests/test_template_slimming_equivalence.py` (Basetemp-Port, `OG-TAIL-*`/`OG-PASS-CODE-REVIEWER`
+  auf `.tmp`, Dead-Check rendert, Rebaseline-Log)
+- `tests/test_ac01_render_identity.py` (Rebaseline-Log)
+- `tests/test_opencode_v2_surface.py` (2 Fixture-Digests)
+- `tests/conftest.py` (`_EXTERNAL_BASETEMP_HINT` literal-frei)
+- `tests/test_basetemp_guard.py` (neue Hinweis-Guard-Assertion)
+- `tests/test_knowledge_engine.py` (Meldungstext literal-frei)
+- `tests/test_provider_reactivation_artifacts.py` (2 Meldungstexte literal-frei)
+- `docs/plans/2026-10-24-tmp-sink-injection-plan.md`, dieser Ledger
+
+### Offene Risiken
+
+- **Token-Form in Fixtures:** `{{PYTEST_BASETEMP}}` sieht wie ein unaufgelöster Platzhalter aus.
+  Ein künftiger Rebaseline-Lauf muss ihn über `_port_golden_pytest_basetemp` behandeln und darf
+  ihn nicht durch einen konkreten Pfad ersetzen (sonst Maschinenbindung/Scanner-Warnung).
+- **AC-01-Rebaseline ist klassifiziert, nicht inhaltlich neu bewertet:** 102 geänderte Hashes
+  wurden über Pfad→Template-Zuordnung + Branch-Diff den Task-4/5/6/8/9/20-Änderungen
+  zugeordnet; ein unbemerkter Render-Nebeneffekt außerhalb dieser Rollen wäre nur über einen
+  erneuten manuellen Matrix-Diff sichtbar.
+- **Golden-Pins bleiben eingefroren:** jede weitere Template-Versionserhöhung macht ein
+  Rebaseline nötig (bekannte Betriebslast, unverändert).
+- **`OG-TAIL-*`/`OG-PASS-CODE-REVIEWER` sind nach dem Rebaseline für ihre Regionen Identität**;
+  die B2b-Beweiskraft für die *alte* `/tmp`-Form liegt jetzt im Rebaseline-Log, nicht mehr im
+  Regionenvergleich.

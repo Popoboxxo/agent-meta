@@ -540,11 +540,11 @@ Modulname korrigiert gegen die Vorgabe: die Spec nennt `scripts/lib/consistency/
 
 **Rot zuerst:** Step 1 ist ein echter fehlschlagender Lauf der bestehenden Tests: `python3 -m pytest tests/test_template_slimming_equivalence.py tests/test_basetemp_guard.py tests/test_knowledge_engine.py -q` schlägt nach Task 3/4/6/7 fehl. Konkret: `test_template_slimming_equivalence.py` vergleicht die Goldens byte-genau gegen den gerenderten Text und findet in `tests/fixtures/slimming-golden/tester.md:51` (`--basetemp=/tmp/$USER/pytest-agent-meta`) den neuen Wert `--basetemp="<absolut>/pytest"`; ebenso für `OG-TAIL-DEV`, `OG-TAIL-DOCKER` und `OG-PASS-CODE-REVIEWER` in `test-executor.md:33,41`, `e2e-tester.md:73`, `documenter.md:68`. `tests/test_basetemp_guard.py` schlägt fehl, weil der erwartete Hinweistext das Literal `/tmp` enthält, `tests/test_knowledge_engine.py:81` aus demselben Grund.
 
-- [ ] Step 1: Rot-Lauf ausführen und Fehlschläge protokollieren (je Fehlschlag: Testname, Assertion, erwarteter Golden-Wert, tatsächlich gerenderter Wert). Kein Test wird vor diesem Lauf angepasst.
-- [ ] Step 2: Golden-Diff bewusst prüfen: nur die erwarteten Zeilen (`docker logs`, `tee`, `tail`, `npm run …`, `--basetemp=`) dürfen sich ändern; jede andere Abweichung ist ein Befund und blockiert den Schritt.
-- [ ] Step 3: `tests/fixtures/slimming-golden/{tester,test-executor,e2e-tester,documenter}.md` auf den gerenderten `TEST_COMMANDS`-Wert aktualisieren; `tests/conftest.py:28` auf einen Verweis ohne Literal umstellen; `tests/test_basetemp_guard.py` und `tests/test_knowledge_engine.py` auf denselben Verweis.
-- [ ] Step 4: `python3 -m pytest tests/test_template_slimming_equivalence.py tests/test_basetemp_guard.py tests/test_knowledge_engine.py -q` grün.
-- [ ] Step 5: Commit `test: rebaseline slimming goldens without temp literals`.
+- [x] Step 1: Rot-Lauf ausführen und Fehlschläge protokollieren (je Fehlschlag: Testname, Assertion, erwarteter Golden-Wert, tatsächlich gerenderter Wert). Kein Test wird vor diesem Lauf angepasst.
+- [x] Step 2: Golden-Diff bewusst prüfen: nur die erwarteten Zeilen (`docker logs`, `tee`, `tail`, `npm run …`, `--basetemp=`) dürfen sich ändern; jede andere Abweichung ist ein Befund und blockiert den Schritt.
+- [x] Step 3: `tests/fixtures/slimming-golden/{tester,test-executor,e2e-tester,documenter}.md` auf den gerenderten `TEST_COMMANDS`-Wert aktualisieren; `tests/conftest.py:28` auf einen Verweis ohne Literal umstellen; `tests/test_basetemp_guard.py` und `tests/test_knowledge_engine.py` auf denselben Verweis.
+- [x] Step 4: `python3 -m pytest tests/test_template_slimming_equivalence.py tests/test_basetemp_guard.py tests/test_knowledge_engine.py -q` grün.
+- [ ] Step 5: Commit `test: rebaseline slimming goldens without temp literals`. — Offen: der Auftrag untersagt Commit/Push für diesen Subagenten-Lauf; Nachweis in `…-status.md` „Evidence — Task 16".
 
 ### Task 17: Doku und Beispiel-Config
 

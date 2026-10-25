@@ -5164,10 +5164,13 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # bytes + NUL, files sorted by relpath) — literals, never recomputed. The
 # 2.0.0-beta.3 release bump rebaselined `ac01-baseline` and `compact-golden`
 # (version strings only: the `agent-meta vX` stamp and the templates carrying
-# it), so their digests were re-pinned to the rebaselined trees.
+# it), so their digests were re-pinned to the rebaselined trees. Task 16
+# (SPEC-tmp-sink-injection, AC-19) rebaselined `ac01-baseline` and
+# `slimming-golden` (sink literals + basetemp shape, documented in the two
+# harnesses' rebaseline logs); `compact-golden` is untouched.
 _FIXTURE_TREES = {
-    "ac01-baseline": "a0c14c24b44ad2939a578928f4168cb655a28ec77ac509531802c32b6a7d182f",
-    "slimming-golden": "66c7a598dc6bf7729bee5a46dfc22889bda4f3d65816c4c1f6c4938a8242b505",
+    "ac01-baseline": "69994f06ea7ea40a318b8c1a0cc08eef3dc94b718561447d060e090ad9846172",
+    "slimming-golden": "ed9668a76b84a0d09e6509fce43ca4aa60f79d7af8969e4d7c7e978ea7c32567",
     "compact-golden": "3d8acdcbce82305680c7b0bb936940488142d81bc455779177715761532c4878",
 }
 
