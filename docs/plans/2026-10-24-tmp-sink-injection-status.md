@@ -28,7 +28,7 @@ Spalte `Commit` bleibt `— (pending)`, bis der jeweilige Commit tatsächlich ex
 | 12 | Gitignore- und Doctor-Zweitparser entfernen | done | — (pending) | Steps 1–3 grün; AC-31/AC-32; `_tmp_sink_gitignore_entry(paths)` aus `TmpPaths.relative`, `_sink_hits` nutzt `resolve_tmp_paths` und übernimmt den Resolver-`reason`; AST-Guard gegen Zweitparser; Step 4 (Commit) offen, kein Commit-Auftrag |
 | 13 | Opencode-Schreibscope aus dem Sink ableiten | done | — (pending) | Steps 1–3 grün; `edit_allow_paths` = `TmpPaths.relative`-Glob + statische `.meta-viz/**`-Liste; statische Liste auf `.meta-viz/**` reduziert; AC-17/AC-20; Step 4 (Commit) offen, kein Commit-Auftrag |
 | 14 | Consistency-Check für Temp-Literale | done | — (pending) | Steps 1–3 grün; AC-21/IC-11; neues Modul `scripts/lib/consistency/temp_literals.py` ist Single Source des AC-01-Musters; Registrierung in `consistency-check.py` und im `_strict_findings`-Block (WARNING, Exit unverändert); Task-11-Schuld getilgt (2 Admin-Server-Starts mit `env=_admin_tmp_env`, beide `deferred:`-Einträge entfernt); 22 `temp-literal.system-temp`-WARNINGS sind ausschließlich Task-16-Goldens (echte Reste, kein False Positive); Step 4 (Commit) offen, kein Commit-Auftrag |
-| 15 | Aggregations-Guard über alle Schreibpfade | pending | — (pending) | — |
+| 15 | Aggregations-Guard über alle Schreibpfade | done | — (pending) | Steps 1–3 grün; fünf Guards in `tests/test_tmp_sink_injection.py` (AC-01/AC-26, Hook fail-closed, Backup-Staging, Subprozess-Env, Single-Source) + `test_temp_literals.py` importiert das AC-01-Muster statt es zu duplizieren; Rot-Beleg: zwei Definitionsdateien; 12 passed, Regression 66 passed, `--validate` Exit 0 mit unveränderten 22 `temp-literal.system-temp`; Step 4 (Commit) offen, kein Commit-Auftrag |
 | 16 | Goldens rebaselinen | pending | — (pending) | — |
 | 17 | Doku und Beispiel-Config | done | — (pending) | Steps 1–3 grün; §5.5-Unterabschnitt „Konfiguration" nennt `system-temp-exception`/`PYTEST_BASETEMP`, Beispiel-Config und CHANGELOG ergänzt; §5.5-Regeltext (Literal) bleibt für Task 21 unangetastet; `--validate` Exit 0, 22 unveränderte `temp-literal.system-temp`-WARNINGS; Step 4 (Commit) offen, kein Commit-Auftrag |
 | 18 | Abschluss-Validierung und Ledger | pending | — (pending) | Läuft zuletzt (Abschluss-Gate) |
@@ -2395,3 +2395,106 @@ byte-identisch.
   (`--validate` Exit 0).
 - Der Negativfall `--basetemp=.tmp/pyt` bleibt absichtlich stehen (Sink-Pfad, kein
   System-Temp-Literal) — nicht in den `/tmp`-Guard aufnehmen.
+
+## Evidence — Task 15
+
+### Rot (vor Step 2, verbatim)
+
+`/usr/bin/python3 -m pytest tests/test_tmp_sink_injection.py::test_temp_literal_pattern_has_single_source_of_truth -q`
+→ Exit 1. Der Ist-Wert enthält beide Definitionsdateien — genau der im Plan benannte Rot-Beleg:
+
+```
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_____________ test_temp_literal_pattern_has_single_source_of_truth _____________
+
+    def test_temp_literal_pattern_has_single_source_of_truth():
+        """AC-01: exactly one compiled definition, in the consistency module."""
+        definitions = _ac01_pattern_definitions()
+>       assert definitions == ["scripts/lib/consistency/temp_literals.py"], (
+            "the AC-01 pattern must be defined exactly once in "
+            "scripts/lib/consistency/temp_literals.py; consumers import it. "
+            f"Observed definitions: {definitions}"
+        )
+E       AssertionError: the AC-01 pattern must be defined exactly once in scripts/lib/consistency/temp_literals.py; consumers import it. Observed definitions: ['scripts/lib/consistency/temp_literals.py', 'tests/test_temp_literals.py']
+E       assert ['scripts/lib..._literals.py'] == ['scripts/lib..._literals.py']
+E
+E         Left contains one more item: 'tests/test_temp_literals.py'
+E         Use -v to get more diff
+
+tests/test_tmp_sink_injection.py:483: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_tmp_sink_injection.py::test_temp_literal_pattern_has_single_source_of_truth
+1 failed in 7.16s
+```
+
+Vor Step 2 waren die übrigen fünf Guards bereits grün (`1 failed, 5 passed`) — die
+Template-/Hook-/Backup-/Subprozess-Hälften sind Vorbedingung dieses Tasks (Tasks 4, 7, 8, 9,
+10, 11, 14, 22); der Rot-Beleg kommt ausschließlich aus der fehlenden gemeinsamen Musterquelle.
+
+### Grün (Befehl → Anzahl → Exit)
+
+| # | Befehl | Ergebnis | Exit |
+|---|---|---|---|
+| 1 | `/usr/bin/python3 -m pytest tests/test_tmp_sink_injection.py tests/test_temp_literals.py -q` | `12 passed` | 0 |
+| 2 | `/usr/bin/python3 -m pytest tests/test_tmp_sink_env_coverage.py tests/test_consistency_temp_literals.py tests/test_repo_containment_hook.py tests/test_backup_round_trip_804.py -q` | `66 passed` | 0 |
+| 3 | `/usr/bin/python3 scripts/sync.py --validate` | `0 action(s) \| 382 skipped \| 2 warning(s)` (beide vorbestehend); **22** `temp-literal.system-temp`-WARNINGS, unverändert | 0 |
+
+### Die fünf Guards
+
+| # | Test | Assertion | Warum nicht tautologisch |
+|---|---|---|---|
+| a | `test_agents_carry_no_unsuppressed_temp_literal` | `check_temp_literals` liefert kein `temp-literal.system-temp` unter `agents/` und keinen `temp-literal.allowlist-entry`-Befund | Scannt die echten Template-Dateien; ein neues Literal oder ein unvollständiger Allowlist-Eintrag macht den Lauf rot. |
+| a′ | `test_standalone_export_carries_no_unsuppressed_temp_literal` | dasselbe für `standalone/` (AC-26) | Der Export wird als zweite Oberfläche geprüft; Template-Fix ohne Regeneration bleibt rot. |
+| b | `test_hook_blocks_cwd_outside_project` | Subprozess mit `cwd` in `tempfile.mkdtemp(dir=gettempdir())`, Ziel im selben fremden Verzeichnis ⇒ Exit 2 und `repo-containment.no-root`; Ancestor-Assertion verbietet `.meta-config/` | Prozess-`cwd` ist absichtlich das echte Repo (mit `.meta-config/`): ein Exit 0 würde beweisen, dass `$PWD` adoptiert wurde. Die Fixture liegt außerhalb des Repo-Baums, also gibt es keinen stillen Anker. |
+| c | `test_backup_module_has_no_system_temp_remainder` | AST: genau ein `TemporaryDirectory()` ohne `dir=` — in `_backup_staging`, innerhalb des `except`-Handlers mit `tmp-sink.disabled`; kein `gettempdir`; mindestens ein `dir=str(staging_parent)`; `staging_parent = resolve_output_dir(..., "backup-staging")` | Ein zweiter blanker Aufruf, ein verschobener Fallback, ein entferntes `dir=` oder `gettempdir()` als Basis werden erkannt; der eine erlaubte Aufruf ist AC-10 (System-Temp **nur** bei deaktiviertem Sink), nicht ein Test-Bypass. |
+| d | `test_every_subprocess_start_pins_tmp_env` | AST über `scripts/**`: jeder `subprocess.run/Popen/call/check_call/check_output` ist über `tmp_env`/`tmp_sink_env` gepinnt (direkt oder via Scope-Assignment) oder hat einen vollständigen `{path, symbol, reason}`-Eintrag | Eigener Scanner (nicht der Produktions-Check); ein neuer ungepinnter Start ist sofort rot, ein Teil-Eintrag oder Zusatzfeld unterdrückt nichts. |
+| e | `test_temp_literal_pattern_has_single_source_of_truth` | AST-`re.compile`-Suche mit allen drei AC-01-Markern; `definitions == ["scripts/lib/consistency/temp_literals.py"]`; Ist-Wert in der Meldung; zusätzlich Verhaltensproben des importierten Objekts | Jede zweite kompilierte Kopie (auch in Tests) wird gefunden; die Verhaltensproben verhindern, dass ein leeres/falsches Muster als „single source" durchgeht. |
+
+### AC-01/AC-26-Anordnung
+
+- **AC-01** bleibt doppelt verankert: `tests/test_temp_literals.py::test_no_system_temp_literal_in_agents`
+  (direkter Scan, unverändert) und Guard (a) als Aggregation über den Produktions-Check.
+- **AC-26** liegt in `tests/test_temp_literals.py::test_no_system_temp_literal_in_standalone`
+  (unverändert) und Guard (a′) im Aggregationslauf.
+- Das Muster wird nur noch in `scripts/lib/consistency/temp_literals.py` kompiliert;
+  `tests/test_temp_literals.py` importiert es und prüft Text (`_AC01_PATTERN_TEXT`) plus
+  Semantik (positive/negative Proben). Der Textvergleich ist ein Assertion-Wert, keine
+  zweite kompilierte Definition.
+
+### Abweichungen / Interpretationen
+
+1. **Guard (c) lässt genau den AC-10-Fallback zu.** Die Task-Formulierung „kein
+   `TemporaryDirectory()` ohne `dir=`" kollidiert mit AC-10, das für `tmp-sink.enabled: false`
+   ausdrücklich System-Temp-Staging **mit** WARNING verlangt (bestehender Test
+   `test_staging_falls_back_to_system_temp_with_warning` asserted `dir is None`). Der Guard
+   akzeptiert daher exakt einen `dir=`-losen Aufruf und bindet ihn strukturell an
+   `_backup_staging` + `except`-Handler + `tmp-sink.disabled`; jeder weitere ist rot.
+2. **Guard (d) prüft den Pin, nicht nur die Anwesenheit von `env=`.** Ein `env=os.environ.copy()`
+   würde die Task-Formulierung wörtlich erfüllen, AC-11 aber nicht; der Guard verlangt deshalb
+   `tmp_env`/`tmp_sink_env` (direkt oder aufgelöst) oder einen vollständigen Allowlist-Eintrag.
+3. **Single-Source-Scan ignoriert Sink/VCS/Caches/Mounts** (`.git`, `.tmp`, `__pycache__`,
+   `.venv`, `node_modules`, `external`, `.agent-meta`). `.tmp` ist der sanktionierte
+   Scratch-Bereich und kann Arbeitskopien enthalten; ein Treffer dort wäre kein Framework-Duplikat.
+4. **`tests/test_temp_literals.py` behält `_AC01_PATTERN_TEXT`** als erwarteten Soll-Text
+   (Task-Anforderung „Gleichheit zur AC-01-Musterdefinition"). Der Detektor schlägt nur auf
+   `re.compile` an, sodass der Assertion-Wert keine zweite Quelle ist.
+5. **Kein Commit** (Step 4 offen) — der Auftrag sagt ausdrücklich „Do NOT commit/push".
+
+### Dateien
+
+- `tests/test_tmp_sink_injection.py` (neu) — fünf Guards.
+- `tests/test_temp_literals.py` — Import des Musters aus `lib.consistency.temp_literals`,
+  `_AC01_PATTERN_TEXT` + `test_pattern_is_the_ac01_definition`, bestehende Tests unverändert.
+- Dieser Ledger und die Task-15-Checkboxen im Plan (Auftrag, nicht Code-Scope).
+
+### Risiken
+
+- Guard (a) nutzt den Produktions-Check als Messinstrument; ein Fehler in
+  `check_temp_literals` würde beide Seiten gleichzeitig treffen. Der direkte Scan in
+  `tests/test_temp_literals.py` bleibt als unabhängige zweite Verankerung bestehen.
+- Die Ancestor-Assertion in Guard (b) schlägt laut fehl, wenn `gettempdir()` selbst unter einem
+  Projekt-Root liegt (gewollt: kein stiller Fehlpass).
+- Die bekannten vorbestehenden Rotmarks (`tests/test_meta_optimizer_runner.py`/`_applier.py`
+  rund um `gettempdir`-Patching) wurden nicht berührt; Task 15 fügt keine `gettempdir`-Nutzung
+  in Produktionscode hinzu.

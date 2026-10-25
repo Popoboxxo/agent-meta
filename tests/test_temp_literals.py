@@ -9,11 +9,15 @@ text. An entry without ``reason`` (or with an unsupported field such as
 hardens; the consistency check owns the WARNING side, this guard stays
 assertion-based.
 
+The pattern is imported from ``lib.consistency.temp_literals`` (Task 15): this
+module must never declare a second compiled definition.
+
 Run: python3 -m pytest tests/test_temp_literals.py -q
 """
 
 import fnmatch
 import re
+import sys
 from pathlib import Path
 
 import yaml
@@ -22,10 +26,19 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 _AGENTS_ROOT = _REPO_ROOT / "agents"
 _ALLOWLIST_PATH = _REPO_ROOT / ".meta-config" / "temp-literal-allowlist.yaml"
 
+_SCRIPTS_ROOT = _REPO_ROOT / "scripts"
+if str(_SCRIPTS_ROOT) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_ROOT))
+
+# Single source of truth (Task 15 / IC-11): the consistency module owns the
+# pattern, every consumer imports it. The expected text below is an assertion
+# value, not a second definition.
+from lib.consistency.temp_literals import SYSTEM_TEMP_LITERAL_RE  # noqa: E402
+
 # Exact AC-01 pattern (case-sensitive, path context). Template/temporary do not
 # match because ``/tmp/`` requires the trailing slash and the boundary class
 # excludes word characters, dots, underscores and hyphens.
-SYSTEM_TEMP_LITERAL_RE = re.compile(r"(^|[^A-Za-z0-9_.-])(/tmp/|%TEMP%|[A-Za-z]:\\\\Temp\\\\)")
+_AC01_PATTERN_TEXT = r"(^|[^A-Za-z0-9_.-])(/tmp/|%TEMP%|[A-Za-z]:\\\\Temp\\\\)"
 
 # Q6 / IC-11 / AC-39: path, pattern and reason are mandatory, owner optional,
 # ``expires`` is not part of the schema.
@@ -109,9 +122,8 @@ def test_no_system_temp_literal_in_standalone():
     """AC-26: the rendered standalone export carries no system temp literal.
 
     Same AC-01 pattern and the same allowlist as the ``agents/**`` guard on
-    purpose — one source of truth (Task 15 consolidates the scanner into
-    ``scripts/lib/consistency/temp_literals.py``; until then this module owns
-    the pattern).
+    purpose — one source of truth in
+    ``scripts/lib/consistency/temp_literals.py`` (Task 15).
     """
     hits = _collect_hits_under(_REPO_ROOT / "standalone")
     assert not hits, (
@@ -135,6 +147,15 @@ def test_pattern_ignores_words_like_template_and_temporary():
         assert not SYSTEM_TEMP_LITERAL_RE.search(word), word
     for literal in ("/tmp/x.log", "> /tmp/a", "%TEMP%\\x", "C:\\\\Temp\\\\x"):
         assert SYSTEM_TEMP_LITERAL_RE.search(literal), literal
+
+
+def test_pattern_is_the_ac01_definition():
+    """Task 15/AC-01: the imported pattern carries the normative text."""
+    assert SYSTEM_TEMP_LITERAL_RE.pattern == _AC01_PATTERN_TEXT
+    for literal in ("/tmp/x.log", "> /tmp/a", "%TEMP%\\x", "C:\\\\Temp\\\\x"):
+        assert SYSTEM_TEMP_LITERAL_RE.search(literal), literal
+    for word in ("Template", "temporary", "attempt", "my/tmp/x", "tmp/"):
+        assert not SYSTEM_TEMP_LITERAL_RE.search(word), word
 
 
 def test_incomplete_allowlist_entry_does_not_suppress():
