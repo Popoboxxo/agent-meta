@@ -32,7 +32,6 @@ from .variables import (
     strip_inactive_conditional_blocks,
     substitute,
 )
-from .dispatch_depth import required_depth_int
 from .context_templates.builder import TemplateBuilder
 
 SNIPPETS_DIR = "snippets"
@@ -1649,16 +1648,28 @@ def apply_settings_surface_shape(
     Provider-neutral dispatch on the resolved ``mcp-config.format`` value ONLY
     (never on a provider name or ``surface-version``; the loader resolves the
     format, the writer consumes it). For the ``opencode-json-v2`` surface the
-    top-level ``subagent_depth`` key is RETAINED — sourced from the
-    ``required_depth`` capability when available (IC-15 Nr. 16: the v2 surface
-    must not drop the orchestrator depth; the shipped template value is kept
-    otherwise) — and ``default_agent`` is emitted from the ``primary-role``
-    data key (OQ-4/AC-5). Every other format returns ``content`` byte-for-byte,
-    so the shipped v1 surface stays frozen.
+    dead top-level ``subagent_depth`` key is REMOVED (IC-15 Nr. 16 as amended by
+    SPEC-OPENCODE-V2-SUPPORT-2026-10-22: the v2 parser discards a top-level
+    ``subagent_depth``) and ``default_agent`` is emitted from the
+    ``primary-role`` data key (OQ-4/AC-5). Every other format returns
+    ``content`` byte-for-byte, so the shipped v1 surface stays frozen.
+
+    **Single ownership (spec Amendment B2):** this initial-template transform
+    does NOT write ``experimental.subagent_depth``. That path is owned solely by
+    ``opencode_v2_config.sync_opencode_v2_managed_keys`` (``build_managed_keys``:
+    project option, else the capability ``required_depth``), so the managed-merge
+    decision table — not the init writer — owns the state entry, a project
+    override wins, and a v2→v1 rollback removes the key again. Writing it here
+    first made a fresh project's value look untracked: a differing override was
+    kept as a "user value" with a permanent warning (row 3), and an equal value
+    was adopted with ``prior = value`` (row 3a) — so rollback left the key
+    behind either way.
 
     The settings template is JSONC (``//`` comments); the transform parses it
     leniently and re-emits clean JSON. A template that cannot be parsed is
     returned unchanged (fail-soft — the settings init still writes it).
+    ``capabilities`` is accepted for signature compatibility and deliberately
+    unused: the depth is resolved by the managed-merge writer, not here.
     """
     mcp_config = pc.get("mcp-config") or {}
     if mcp_config.get("format") != "opencode-json-v2":
@@ -1671,9 +1682,9 @@ def apply_settings_surface_shape(
         return content
     if not isinstance(document, dict):
         return content
-    depth = required_depth_int(capabilities)
-    if depth is not None:
-        document["subagent_depth"] = depth
+    # Only the dead v1 key is removed; the depth itself belongs to the
+    # managed-merge writer (Amendment B2, single ownership).
+    document.pop("subagent_depth", None)
     primary_role = pc.get("primary-role")
     if isinstance(primary_role, str) and primary_role:
         document["default_agent"] = primary_role

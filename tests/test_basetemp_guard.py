@@ -67,6 +67,26 @@ def test_guard_stays_silent_for_external_basetemp():
     assert recorded == []
 
 
+def test_external_basetemp_hint_names_the_token_without_a_temp_literal():
+    """AC-19: the hint must not reintroduce the system-temp literal it bans.
+
+    ``PYTEST_BASETEMP`` is the value sync.py resolves from
+    ``repo_containment.tmp-sink.system-temp-exception``, so the warning stays
+    actionable without shipping a ``/tmp/<user>`` string (which the shipped-text
+    scan would flag again).
+    """
+    hint = guard._EXTERNAL_BASETEMP_HINT
+    assert "PYTEST_BASETEMP" in hint
+    for literal in ("/tmp", "%TEMP%", "C:\\Temp", "$USER"):
+        assert literal not in hint
+
+    in_repo = guard._AGENT_META_ROOT / ".tmp" / "pytest-probe"
+    recorded = []
+    guard.pytest_configure(_fake_config(basetemp=str(in_repo), recorded=recorded))
+    assert len(recorded) == 1
+    assert "PYTEST_BASETEMP" in str(recorded[0])
+
+
 def test_guard_falls_back_to_tmpdir_env(monkeypatch):
     monkeypatch.setenv("TMPDIR", str(guard._AGENT_META_ROOT / ".tmp" / "tmproot"))
     recorded = []

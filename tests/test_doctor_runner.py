@@ -685,10 +685,38 @@ def test_tmp_sink_location_under_system_temp(tmp_path, monkeypatch):
     assert hit.severity is Severity.ERROR and hit.message.endswith("resolves into the system temp directory")
 
 
-def test_sink_check_uses_central_repo_containment_functions():
-    from lib import repo_containment
-    assert doctor_detectors.tmp_sink_path_error is repo_containment.tmp_sink_path_error
-    assert doctor_detectors.tmp_sink_location_error is repo_containment.tmp_sink_location_error
+def test_tmp_sink_check_uses_resolver_reason(tmp_path, monkeypatch):
+    """AC-32/IC-16: CHECK_TMP_SINK adopts the central resolver's reason verbatim."""
+    from lib.repo_containment import TmpSinkError
+
+    ids = real("tmp-sink-outside-repo-or-system-temp")
+    cfg = {"repo_containment": {"tmp-sink": {"path": "../out"}}}
+    (hit,) = run(tmp_path, monkeypatch, ids, config=cfg).findings
+    assert hit.ref_check == "doctor.tmp-sink-location" and hit.severity is Severity.ERROR
+    assert hit.message == (
+        "repo_containment.tmp-sink.path violates the sink rules: "
+        "must not contain '..' segments"
+    )
+
+    # Stubbing the resolver proves _sink_hits does not parse the config itself.
+    calls = []
+
+    def fake_resolver(project_root, config):
+        calls.append((project_root, config))
+        raise TmpSinkError(
+            "tmp-sink.invalid-path",
+            "repo_containment.tmp-sink.path '../out': stubbed resolver reason",
+        )
+
+    monkeypatch.setattr(doctor_detectors, "resolve_tmp_paths", fake_resolver)
+    (stubbed,) = run(tmp_path, monkeypatch, ids, config=cfg).findings
+    assert calls, "CHECK_TMP_SINK must obtain its resolution from the resolver"
+    assert stubbed.message.endswith(": stubbed resolver reason")
+
+
+def test_sink_check_uses_the_central_resolver():
+    from lib import tmp_paths
+    assert doctor_detectors.resolve_tmp_paths is tmp_paths.resolve_tmp_paths
 
 
 @pytest.mark.parametrize("installed", [False, True])

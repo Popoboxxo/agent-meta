@@ -78,7 +78,8 @@ def _assert_copy_dest_is_safe(src, dest):
             f"refusing to copy {src} into {dest}: the destination is inside the "
             f"copied source tree but not under an ignored path, so copytree "
             f"would recurse without bound. Put pytest's basetemp outside the "
-            f"repo (e.g. --basetemp=/tmp/<user>) or under one of "
+            f"repo (e.g. --basetemp=\"<PYTEST_BASETEMP>\", the value sync.py "
+            f"resolves) or under one of "
             f"{sorted(_COPY_IGNORED_TOP_LEVEL)}."
         )
 

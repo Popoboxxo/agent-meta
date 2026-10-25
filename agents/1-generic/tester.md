@@ -68,10 +68,10 @@ When verifying behavior via ad-hoc container runs (e.g. `docker run`), diagnosti
   ```
   NAME=verify-$RANDOM
   docker run --name "$NAME" <image> <cmd>          # record exit code ($?)
-  docker logs "$NAME" > /tmp/"$NAME".log 2>&1      # capture BEFORE removal
+  docker logs "$NAME" > {{TMP_SINK_PATH}}/"$NAME".log 2>&1      # capture BEFORE removal
   docker rm "$NAME"                                # cleanup only after capture
   ```
-- **Alternative (tee):** when a persistent named container is not appropriate: `docker run --rm <image> <cmd> 2>&1 | tee /tmp/run-$RANDOM.log` — the pipe keeps output even on non-zero exit.
+- **Alternative (tee):** when a persistent named container is not appropriate: `docker run --rm <image> <cmd> 2>&1 | tee {{TMP_SINK_PATH}}/run-$RANDOM.log` — the pipe keeps output even on non-zero exit.
 - On failure, report the captured log path — the next agent needs those diagnostics.
 </workflow>
 
@@ -141,9 +141,9 @@ Beispiel — Container synchron abwarten (`docker wait`):
 NAME=verify-$RANDOM
 docker run --name "$NAME" -d alpine sh -c "sleep 5; exit 7"   # replace with your real test container
 RC=$(docker wait "$NAME")                     # BLOCKS until container exits — no completion notification will ever arrive
-docker logs "$NAME" > /tmp/"$NAME".log 2>&1   # capture diagnostics BEFORE removal
+docker logs "$NAME" > {{TMP_SINK_PATH}}/"$NAME".log 2>&1   # capture diagnostics BEFORE removal
 docker rm "$NAME"
-echo "container exit code: $RC" && tail -20 /tmp/"$NAME".log
+echo "container exit code: $RC" && tail -20 {{TMP_SINK_PATH}}/"$NAME".log
 ```
 
 {{#if AUTO_COMMIT_ENABLED}}

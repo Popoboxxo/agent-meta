@@ -1,0 +1,91 @@
+# Temp-Env-Allowlist (Spec: SPEC-tmp-sink-injection, AC-11/IC-18)
+#
+# Purpose: name every subprocess call site under ``scripts/**`` that does NOT
+# pass an environment derived from ``lib.tmp_paths.tmp_env``. The guard
+# ``tests/test_tmp_sink_env_coverage.py::test_subprocess_calls_pin_temp_env``
+# fails for an unlisted call site, so a new subprocess start can never inherit
+# the system temp directory silently.
+#
+# Schema per entry (strict — exactly these three fields, no ``expires``):
+#   path:    repo-relative path of the Python file, e.g. "scripts/lib/io.py"
+#   symbol:  enclosing function (or class) name of the call site
+#   reason:  mandatory justification that MUST open with a sanctioned
+#            category, followed by ":" and a concrete explanation:
+#              git-plumbing:     git plumbing command; git owns its temp files
+#              pure-read:        read-only probe (--version, diff, view, status)
+#              process-control:  taskkill/kill; creates no files at all
+#              external-cli:     external CLI (gh, plugin) manages its own temp
+#              deferred:         outside this task's file ownership; the
+#                                explanation names the owning task
+#
+# A partial entry (missing ``reason``, unknown field, unclassified reason)
+# suppresses nothing. Entries must match a current call site — a stale entry
+# fails ``test_allowlist_entries_match_a_current_call_site``.
+#
+# Every other call site passes ``env=`` derived from ``tmp_env(paths)`` with the
+# inherited environment merged in (never a bare replacement of PATH/HOME).
+entries:
+  # -- process control: no files are created -------------------------------
+  - path: "scripts/admin-server.py"
+    symbol: "_stop"
+    reason: "process-control: taskkill terminates a PID; no files or temp dirs are created"
+  - path: "scripts/admin-server.py"
+    symbol: "_admin_stop"
+    reason: "process-control: taskkill terminates a PID; no files or temp dirs are created"
+
+  # -- git plumbing: git owns its own temp/index handling -------------------
+  - path: "scripts/lib/cli_commands.py"
+    symbol: "handle_scan_staged"
+    reason: "git-plumbing: 'git diff --cached' reads the index; no framework temp files"
+  - path: "scripts/lib/config.py"
+    symbol: "read_git_version"
+    reason: "git-plumbing: 'git describe --tags' is a read-only version probe"
+  - path: "scripts/lib/consistency/frontmatter.py"
+    symbol: "_get_head_version"
+    reason: "git-plumbing: 'git show HEAD:<path>' is a read-only blob read"
+  - path: "scripts/lib/io.py"
+    symbol: "run_git_check_ignore"
+    reason: "git-plumbing: 'git check-ignore' is a read-only ignore probe"
+  - path: "scripts/lib/skill_admin.py"
+    symbol: "add_skill"
+    reason: "git-plumbing: 'git clone' populates the target tree; git owns its temp files"
+  - path: "scripts/lib/skills.py"
+    symbol: "_is_ahead_of_pin"
+    reason: "git-plumbing: merge-base/rev-parse ancestry probe; no framework temp files"
+  - path: "scripts/lib/skills.py"
+    symbol: "get_skill_commit"
+    reason: "git-plumbing: 'git rev-parse --short HEAD' is a read-only probe"
+  - path: "scripts/lib/skills.py"
+    symbol: "ensure_skill_repo"
+    reason: "git-plumbing: submodule add/update/clone/checkout; git owns its temp files"
+  - path: "scripts/lib/skills.py"
+    symbol: "deinit_skill_repo"
+    reason: "git-plumbing: submodule deinit/rm manipulates the index; no framework temp files"
+  - path: "scripts/lib/spec_plan_validate.py"
+    symbol: "_changed_files"
+    reason: "git-plumbing: rev-parse/diff/ls-files read-only changed-file probe"
+
+  # -- pure reads: no writes, no temp files --------------------------------
+  - path: "scripts/lib/auto_github_release.py"
+    symbol: "_release_exists"
+    reason: "pure-read: 'gh release view' only queries the remote release"
+  - path: "scripts/lib/doctor_detectors.py"
+    symbol: "detect_command"
+    reason: "pure-read: 'sync.py --dry-run' detection probe; dry-run writes nothing"
+  - path: "scripts/lib/plugin_test.py"
+    symbol: "_run_version"
+    reason: "pure-read: '<binary> --version' only prints the version"
+  - path: "scripts/lib/se_export/github_issues_adapter.py"
+    symbol: "_verify_gh_available"
+    reason: "pure-read: 'gh auth status' only reports the authenticated account"
+
+  # -- external CLIs: the tool, not the framework, owns its temp files ------
+  - path: "scripts/lib/auto_github_release.py"
+    symbol: "main"
+    reason: "external-cli: 'gh release create' runs in the gh CLI; no framework temp files"
+  - path: "scripts/lib/plugin_test.py"
+    symbol: "_mcp_initialize_handshake"
+    reason: "external-cli: MCP plugin handshake with an explicit merged child env; plugin owns temp"
+  - path: "scripts/lib/se_export/github_issues_adapter.py"
+    symbol: "_run_gh"
+    reason: "external-cli: generic gh command runner; the gh CLI owns its temp files"

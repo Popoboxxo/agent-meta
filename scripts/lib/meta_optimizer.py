@@ -88,8 +88,8 @@ from lib.repo_containment import (
     resolve_out_path,
     resolve_output_dir,
     resolve_work_dir,
-    work_dir_env,
 )
+from lib.tmp_paths import TmpPaths, resolve_tmp_paths, tmp_env
 from lib.secrets import scan_for_secrets
 from lib.variables import strip_inactive_conditional_blocks
 from lib.yaml_roundtrip import RoundTripReport, _count_comments, analyze_roundtrip
@@ -1155,12 +1155,17 @@ def collect_candidates(project_root: Path, agent_meta_root: Path, config: Mappin
                        config_text: str, active, *, work_dir: Optional[Path] = None,
                        providers: Optional[Sequence[str]] = None,
                        mappings: Optional[Mapping] = None,
-                       include_semantic: bool = False) -> OptimizerProposal:
+                       include_semantic: bool = False,
+                       paths: Optional[TmpPaths] = None) -> OptimizerProposal:
     """Collect removal candidates and the fan-out report (IC-24).
 
     Renders the sentinel config into *work_dir* (default: a fresh
     ``<tmp-sink>/meta-optimizer/<run_id>/work``) and classifies every user
     variable. Credential paths are excluded up front.
+
+    *paths* is the already resolved tmp-sink of the caller; when omitted it is
+    resolved once here (ADR-01: the central resolver stays the only source) and
+    only its ``env`` is used, for the render subprocess pin (IC-34/IC-18).
 
     Review N2: when *work_dir* is ``None`` this function allocates the scratch
     itself and therefore **owns** it -- the render holds an unredacted config
@@ -1176,6 +1181,8 @@ def collect_candidates(project_root: Path, agent_meta_root: Path, config: Mappin
         providers = resolve_providers(config, provider_config)
         mappings = merge_provider_mappings(
             provider_config, load_provider_capabilities(agent_meta_root))
+    if paths is None:
+        paths = resolve_tmp_paths(project_root, config)
     allocated = work_dir is None
     if allocated:
         work_dir = resolve_work_dir(project_root, config, OPTIMIZER_SUBDIR, _run_id())
@@ -1183,7 +1190,8 @@ def collect_candidates(project_root: Path, agent_meta_root: Path, config: Mappin
     try:
         return _classify_candidates(
             project_root, agent_meta_root, config, config_text, active, work_dir,
-            providers=providers, mappings=mappings, include_semantic=include_semantic)
+            providers=providers, mappings=mappings, include_semantic=include_semantic,
+            paths=paths)
     finally:
         if allocated:
             _discard_work_dir(work_dir, work_dir.parent.parent)
@@ -1192,7 +1200,7 @@ def collect_candidates(project_root: Path, agent_meta_root: Path, config: Mappin
 def _classify_candidates(project_root: Path, agent_meta_root: Path, config: Mapping,
                          config_text: str, active, work_dir: Path, *,
                          providers: Sequence[str], mappings: Mapping,
-                         include_semantic: bool) -> OptimizerProposal:
+                         include_semantic: bool, paths: TmpPaths) -> OptimizerProposal:
     """Render, measure and classify; the scratch is owned by the caller."""
     resolved, _ = build_variables(config, agent_meta_root, project_root, active_set=active)
     raw_vars = dict(config.get("variables") or {})
@@ -1210,7 +1218,7 @@ def _classify_candidates(project_root: Path, agent_meta_root: Path, config: Mapp
     wrap_names = sentinel_wrapped_names(
         config, agent_meta_root, project_root, active, resolved=resolved,
         static_conditionals=static_conditionals)
-    _render_into(agent_meta_root, _wrapped_config_text(config, wrap_names), work_dir)
+    _render_into(agent_meta_root, _wrapped_config_text(config, wrap_names), work_dir, paths)
     scan = fan_out_counts(
         work_dir, config, agent_meta_root, project_root, active,
         providers=providers, mappings=mappings, resolved=resolved,
@@ -1498,14 +1506,21 @@ def _run_id() -> str:
     return "{}-{}".format(datetime.now().strftime("%Y%m%d-%H%M%S"), os.getpid())
 
 
-def _render_into(agent_meta_root: Path, config_text: str, work_dir: Path) -> None:
-    """Render *config_text* into *work_dir* via the regular sync codepath."""
+def _render_into(agent_meta_root: Path, config_text: str, work_dir: Path,
+                 paths: TmpPaths) -> None:
+    """Render *config_text* into *work_dir* via the regular sync codepath.
+
+    *paths* is the caller's resolved tmp-sink; its absolute env pin
+    (:func:`lib.tmp_paths.tmp_env`, IC-34/IC-18) goes to the ``git init`` and
+    sync subprocesses, so the framework's own temp writes never reach the system
+    temp directory. This module therefore never sets a temp variable itself.
+    """
     work_dir.mkdir(parents=True, exist_ok=True)
     config_dir = work_dir / ".meta-config"
     config_dir.mkdir(exist_ok=True)
     config_path = config_dir / "project.yaml"
     config_path.write_text(config_text, encoding="utf-8")
-    env = work_dir_env(work_dir)
+    env = tmp_env(paths)
     sync_script = Path(agent_meta_root) / "scripts" / "sync.py"
     subprocess.run(["git", "init", "-q"], cwd=str(work_dir), check=False,
                    capture_output=True, env=env, timeout=60)
@@ -1614,6 +1629,7 @@ def run_optimize_config(*, project_root: Path, agent_meta_root: Path, config_pat
                                         run_id + "-before")
         proof_after = resolve_work_dir(project_root, dict(config), OPTIMIZER_SUBDIR,
                                        run_id + "-after")
+        paths = resolve_tmp_paths(project_root, dict(config))
     except TmpSinkError as exc:
         print("error: {}: {}".format(exc.code, exc.message), file=sys.stderr)
         return 2
@@ -1643,7 +1659,7 @@ def run_optimize_config(*, project_root: Path, agent_meta_root: Path, config_pat
             proposal = collect_candidates(
                 project_root, agent_meta_root, config, config_text, active,
                 work_dir=work_dir, providers=providers, mappings=mappings,
-                include_semantic=include_semantic)
+                include_semantic=include_semantic, paths=paths)
             removable = [candidate for candidate in proposal.candidates
                          if candidate.deterministic]
         else:
@@ -1652,8 +1668,8 @@ def run_optimize_config(*, project_root: Path, agent_meta_root: Path, config_pat
         keys = [candidate.yaml_path for candidate in removable
                 if candidate.yaml_path.startswith("variables.")]
         after_text, _ = _remove_keys(config_text, keys)
-        _render_into(agent_meta_root, config_text, proof_before)
-        _render_into(agent_meta_root, after_text, proof_after)
+        _render_into(agent_meta_root, config_text, proof_before, paths)
+        _render_into(agent_meta_root, after_text, proof_after, paths)
 
         report = prove(proof_before, proof_after, config_text, after_text, "L0")
         digests = comparison_file_digests(proof_before, proof_after)
@@ -2179,6 +2195,7 @@ def _finish_apply(*, project_root: Path, agent_meta_root: Path, config: Mapping,
     proof_after: Optional[Path] = None
     try:
         run_dir = _applier_run_dir(project_root, config, run_id)
+        paths = resolve_tmp_paths(project_root, dict(config))
         if accepted:
             proof_before = resolve_work_dir(project_root, config, OPTIMIZER_SUBDIR,
                                             run_id + "-before", tool=_APPLIER_TOOL)
@@ -2227,8 +2244,8 @@ def _finish_apply(*, project_root: Path, agent_meta_root: Path, config: Mapping,
     proof: Optional[ProofReport] = None
     try:
         if accepted:
-            _render_into(agent_meta_root, config_text, proof_before)
-            _render_into(agent_meta_root, after_text, proof_after)
+            _render_into(agent_meta_root, config_text, proof_before, paths)
+            _render_into(agent_meta_root, after_text, proof_after, paths)
             proof = prove(proof_before, proof_after, config_text, after_text, "L0")
     except RegistryError as exc:
         _discard_empty_dir(run_dir)

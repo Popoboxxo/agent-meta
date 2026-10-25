@@ -1,6 +1,6 @@
 ---
 name: se-validator
-version: 1.7.2
+version: 1.7.4
 description: 'L1 System-Validierung: End-to-End User Journeys gegen Stakeholder-Bedürfnisse
   abgleichen. ''Did we build the right system?'' Persists validation report.'
 hint: Validiert das System auf L1-Ebene durch User-Journey-Simulation — ignoriert
@@ -189,8 +189,8 @@ schema_version: "1.0.0"
 ```
 
 **Atomic write procedure:**
-1. Write full output (frontmatter + JSON) to a temporary file
-2. Rename temp file to target path
+1. Write full output (frontmatter + JSON) to `{{TMP_SINK_PATH}}/se-validator-<topic>.json`
+2. Rename `se-validator-<topic>.json` from the sink to the target path (atomic write)
 3. Update `.se-state.yaml` with `last_completed_step` pointing to this file
 
 <output_contract>

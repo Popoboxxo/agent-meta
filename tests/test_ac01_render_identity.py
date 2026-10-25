@@ -236,6 +236,13 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   rendered entry files, agent headers and the dependent sidecars changed (91 of 1012 hashes;
   project.yaml, ``generated-file-hashes.json`` and ``context-hashes.json`` follow the version
   they embed). No substantive render change; ``AC01_EXCEPTIONS`` is NOT extended.
+- Release 2.0.0-beta.3 (VERSION bump 2.0.0-beta.2 -> 2.0.0-beta.3): only version strings in the
+  rendered entry files, agent headers and the dependent sidecars changed (82 of 1013 hashes;
+  0 added/removed; project.yaml, ``generated-file-hashes.json`` and ``context-hashes.json``
+  follow the version they embed). No substantive render change; ``AC01_EXCEPTIONS`` is NOT
+  extended. The two embedded fixture-tree digests in ``tests/test_opencode_v2_surface.py``
+  were re-pinned to the rebaselined trees (``ac01-baseline``, ``compact-golden``);
+  ``slimming-golden`` stayed unchanged.
 - PR #1003 (user decision: model data never flows into AC-01): the hash is now model
   independent. ``_hash_file`` replaces every column-0 ``model:``/``model =`` frontmatter
   line with ``model: <MODEL>`` and reduces ``generated-file-hashes.json`` to its managed-path
@@ -248,6 +255,23 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   8 providers that emit a ``model`` line (Copilot emits none; only its ``prompt-governor``
   changed, whose body has a static ``model: <model ID if declared>`` example line) plus every
   ``generated-file-hashes.json`` (522 of 1012 hashes; 0 added/removed); no other hash changed.
+- Task 11 (#1006, OQ-8 amendment A2): Opencode entry point on v1 — orchestrator ``mode: primary``,
+  ``default_agent`` written by the managed merge, new ``agent-meta-state.json`` (``default-agent``
+  namespace). Changed: ``Opencode/.opencode/agents/orchestrator.md``, ``Opencode/opencode.json``;
+  added: ``Opencode/.opencode/agent-meta-state.json`` (2 changed, 1 added). ``AC01_EXCEPTIONS`` is
+  NOT extended; Mammouth and all other providers unchanged.
+- Task 16 (SPEC-tmp-sink-injection, AC-19): rebaseline after the tmp-sink injection. The rendered
+  agent text of 11 roles changed: ``ai-security-guardian``, ``app-lifecycle-governor``,
+  ``code-reviewer``, ``developer``, ``devops-engineer``, ``docker``, ``e2e-tester``,
+  ``prompt-governor``, ``security-auditor``, ``test-executor`` and ``tester`` (all 9 providers,
+  99 artifacts = 11 x 9) — every diff is one of: the auditor report path / log destination moving
+  from a system-temp literal to ``.tmp`` (``{{TMP_SINK_PATH}}``), the ``--basetemp="…"`` shape of
+  ``TEST_COMMANDS`` replacing ``--basetemp=/tmp/$USER/...``, the ``.tmp/runs/`` scratch prose, or
+  the template version pin that Task 4/6 bumped. ``validator`` is gated off in the matrix config,
+  so its template change produces no matrix artifact. Plus the three hook scripts whose runtime
+  changed with the sink (``Claude/.claude/hooks/repo-containment-impl.sh`` and the two Gemini
+  ``.agents/hooks/*.sh``). 102 of 1013 hashes; 0 added/removed; ``generated-file-hashes.json`` is
+  unchanged because no managed path appeared or vanished. ``AC01_EXCEPTIONS`` is NOT extended.
 
 - Literature round 2, evidence gates (PR #1013): eight role templates (`git`, `security-auditor`,
   `database-reviewer`, `tester`, `accessibility-specialist`, `se-senior-developer`,

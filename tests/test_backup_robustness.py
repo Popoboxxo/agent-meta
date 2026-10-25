@@ -1,8 +1,10 @@
 """Regression tests for Wave 8 backup robustness (#582, #583, #586p5)."""
 
 import json
+import os
 import re
 import sys
+import tempfile
 import zipfile
 from pathlib import Path
 from unittest import mock
@@ -20,6 +22,7 @@ from lib.backup import (  # noqa: E402
     restore_backup,
 )
 from lib.log import SyncLog  # noqa: E402
+from lib.repo_containment import TmpSinkError  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -159,3 +162,65 @@ def test_admin_server_backup_handlers_use_real_synclog_not_a_stub():
     assert "class _Log" not in source
     assert source.count("from lib.log import SyncLog") == 3
     assert source.count("log = SyncLog()") == 3
+
+
+# ---------------------------------------------------------------------------
+# AC-09 / AC-10 / invalid sink -- backup staging and the tmp-sink
+# ---------------------------------------------------------------------------
+
+def _sink_config(*, enabled: bool = True, path: str = ".tmp") -> dict:
+    return {
+        "backup": {"dir": ".backup/agent-meta"},
+        "repo_containment": {"tmp-sink": {"enabled": enabled, "path": path}},
+    }
+
+
+def _seed(root: Path) -> None:
+    (root / ".meta-config").mkdir(parents=True, exist_ok=True)
+    (root / ".meta-config" / "project.yaml").write_text("roles: []\n", encoding="utf-8")
+
+
+def _capture_staging(monkeypatch) -> dict:
+    captured: dict = {}
+    real_factory = tempfile.TemporaryDirectory
+
+    def recording_factory(*args, **kwargs):
+        captured["dir"] = kwargs.get("dir")
+        return real_factory(*args, **kwargs)
+
+    monkeypatch.setattr("lib.backup.tempfile.TemporaryDirectory", recording_factory)
+    return captured
+
+
+def test_staging_falls_back_to_system_temp_with_warning(tmp_path, monkeypatch):
+    """AC-10: ``enabled: false`` => system temp, WARNING, backup still succeeds."""
+    _seed(tmp_path)
+    log = SyncLog()
+    captured = _capture_staging(monkeypatch)
+
+    created = create_backup(
+        tmp_path, [], {}, _sink_config(enabled=False), log,
+        source_version="0.0.0-test",
+    )
+
+    assert created["success"] is True
+    assert (tmp_path / created["archive"]).is_file()
+    assert captured.get("dir") is None, "disabled sink must not pass dir="
+    assert any("backup.staging-system-temp" in warning for warning in log.warnings), log.warnings
+
+
+def test_invalid_sink_aborts_backup_with_stable_code(tmp_path):
+    """Sink enabled but not resolvable => abort, never a silent system-temp fallback."""
+    _seed(tmp_path)
+    log = SyncLog()
+
+    with pytest.raises(TmpSinkError) as exc:
+        create_backup(
+            tmp_path, [], {}, _sink_config(path="../escape"), log,
+            source_version="0.0.0-test",
+        )
+
+    assert exc.value.code == "backup.tmp-sink.invalid-path"
+    assert not any("backup.staging-system-temp" in warning for warning in log.warnings)
+    # No archive was written.
+    assert not list((tmp_path / ".backup" / "agent-meta").glob("*.zip"))

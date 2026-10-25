@@ -1,6 +1,6 @@
 ---
 name: se-critic
-version: 2.2.1
+version: 2.2.2
 reference_standards:
 - "IEEE 1028-2008"
 description: "Audits requirements and architecture against generic laws. Enforces role boundaries. Persists review protocols with RVW-IDs and propagates suspect marks (Issues #339 B5/B6, #334)."
@@ -117,7 +117,7 @@ Schema: `schemas/se-critic.schema.json`
 **Keine Review-Intermediate im Zellen-Ordner (Issue #334):** `*.critic.iter-N.md`, `*.critic.final.md` und `*.iter-N.md` werden NICHT neben den Final-Artefakten persistiert — der Iterations-Zustand lebt im A2A-Loop und in den Review-Protokollen. Stale-Intermediate älterer Läufe im Zellen-Ordner entfernen.
 
 **Frontmatter:** `step: critic`, `agent: se-critic`, `review_target`, `review_id`, `iteration`, `status`, `timestamp`, `schema_version: 1.0.0`
-**Atomic write:** temp → rename Protokoll → Endreport → REQ-Frontmatter-Sync (`review_state`, `last_reviewed`, `reviewer`, `review_iteration`, ggf. `suspect_children`) → `.se-state.yaml` aktualisieren.
+**Atomic write:** write to `{{TMP_SINK_PATH}}/se-critic-<topic>.md` → rename → Protokoll → Endreport → REQ-Frontmatter-Sync (`review_state`, `last_reviewed`, `reviewer`, `review_iteration`, ggf. `suspect_children`) → `.se-state.yaml` aktualisieren.
 
 <output_contract>
 ```

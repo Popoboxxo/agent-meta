@@ -23,7 +23,7 @@
 | OQ-5 | Copilot agent extension is **`.agent.md`** (GitHub-cloud canonical) under **`.github/agents/`**. | The Copilot writer emits `*.agent.md`; stale-cleanup is scoped to `.github/agents/` (AC-8, AC-22). |
 | OQ-6 | Antigravity `model` is **`inherit`** instead of concrete tier IDs. | `ai-providers.yaml` sets the Antigravity model to `inherit`; no tier ID is emitted for Antigravity (AC-9). |
 | OQ-7 | Mammouth context uses **`AGENTS.md`**; **`MAMMOUTH.md` and its routing entry are retired**. | Mammouth `context_file` points at `AGENTS.md`; the `MAMMOUTH.md` artifact and the associated routing entry are removed. |
-| OQ-8 | Opencode v1→v2: **v2 stays opt-in in this release**; the default flip happens only with the next major (SemVer). | `surface-version` defaults to `v1`; v2 is per-project opt-in; the v2 surface is a **minor** and a future default flip is reserved for a major (§11, ADR-2). |
+| OQ-8 | Opencode v1→v2: **v2 stays opt-in in this release**; the default flip happens only with the next major (SemVer). | `surface-version` defaults to `v1`; v2 is per-project opt-in; the v2 surface is a **minor** and a future default flip is reserved for a major (§11, ADR-2). The v1 freeze covers the surface format only; the entry point (`mode: primary` + `default_agent`) is excluded, see Amendment A2. |
 | OQ-9 | Continue `roles`-enum defect in `templates/configs/CONTINUE.config-template.yaml:28` is **fixed in-scope**. | The template at `:28` is corrected so the `roles` enum no longer emits the invalid `agent` value; the fix ships with this change instead of a separate CO-2 follow-up. |
 | Scope §9 | The **27 drift files** in the repo are **regenerated in-scope** (AC-3b applies). | The change ends with a real repo-root sync that regenerates and commits the 27 files; AC-3b (`sync.py --check` rc 0 at the repo root) is binding, not moved to a follow-up PR. |
 
@@ -414,6 +414,14 @@ Each entry: **Recommendation**, **Rationale**, **Alternative**, and the **RESOLV
 - **Alternative:** Flip default in a future major release.
 - **DECISION (2026-10-01):** v2 remains opt-in in this release; the default flip happens only with the next major (SemVer).
 
+> **Amendment A2 (2026-10-22, Issue #1006):** Der v1-Freeze aus OQ-8 gilt für das Surface-**Format**
+> (Frontmatter-Schlüsselmenge, MCP-Form, Settings-Template-Bytes), nicht für den **Einstiegspunkt**.
+> `mode: primary` für die in `config/ai-providers.yaml` explizit deklarierte `primary-role` sowie
+> `default_agent` in `opencode.json` werden auch auf Surface v1 ausgegeben (Bugfix: ohne Einstiegspunkt
+> sperrt das Permission-Tier-Gate den Main Chat). Provider ohne explizites `primary-role` (z.B.
+> Mammouth) bleiben unverändert. v2 bleibt opt-in; der Default-Flip bleibt dem nächsten Major
+> vorbehalten. Referenz: `SPEC-OPENCODE-ENTRYPOINT-1006-2026-10-22`.
+
 ---
 
 ## 5. Silent-drop handling: warn vs. fail, exit codes
@@ -696,3 +704,34 @@ No `DECISION-NEEDED` marker remains; none of the options was deleted (§4 retain
 ## Trace anchor
 
 `spec-id: SPEC-PROVIDER-AUDIT-OPENCODE-V2-2026-09-30`
+
+---
+
+## Amendment 2026-10-22 — IC-15 Nr. 16 reversed (opencode v2 surface)
+
+> Docs-only amendment propagated by `SPEC-OPENCODE-V2-SUPPORT-2026-10-22`
+> (Rev. 1.5, Amendment B1). `Status: APPROVED (2026-10-01)` is unchanged; no AC
+> is renumbered and no historical statement is deleted.
+
+- **IC-15 Nr. 16 is REVERSED.** The v2 settings document carries the orchestrator
+  dispatch depth as `experimental.subagent_depth`. A top-level `subagent_depth`
+  key is removed and is no longer emitted on the `opencode-json-v2` surface.
+  Reason: the C0 spike
+  (`docs/spikes/2026-10-22-issue-1007-opencode-v2-plugin-api-spike.md`) showed
+  the v2 parser discards the v1 top-level `subagent_depth`, so retaining it
+  would silently lose the depth.
+- **Code:** `scripts/lib/context.py::apply_settings_surface_shape` removes the
+  top-level key and writes `experimental.subagent_depth` (value
+  `required_depth_int(capabilities)`, else the template value) when the resolved
+  `mcp-config.format` is `opencode-json-v2`; every other format stays
+  byte-identical. The IC-15 Nr. 16 comment in
+  `scripts/lib/artifact_validate.py` is updated accordingly (validator behaviour
+  is unchanged by this amendment).
+- **Superseded statement:** §5's "contains no v1-only keys (e.g.
+  `subagent_depth`, flat `mcp`)" is narrowed for the top-level depth key by the
+  rule above; the flat-`mcp` prohibition is unaffected.
+- **Docs/tests:** scenario `69-opencode-v2-surface` asserts
+  `experimental.subagent_depth >= 2` plus the absence of the top-level key;
+  `tests/scenarios/registry.md` uses the amended wording.
+- **Trace:** `SPEC-OPENCODE-V2-SUPPORT-2026-10-22` §3.2 ("Amendment zu IC-15
+  Nr. 16"), AC-B1, AC-B2 and AC-T1.

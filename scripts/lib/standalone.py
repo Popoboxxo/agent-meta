@@ -267,6 +267,19 @@ def _standalone_variables(agent_meta_root: Path) -> dict:
     variables.update(_standalone_active_set_flags(agent_meta_root))
     variables["AGENT_META_VERSION"] = read_version(agent_meta_root)
     variables["AGENT_META_DATE"] = _resolve_agent_meta_date(agent_meta_root)
+    # Tmp-sink defaults (IC-15, AC-27): a standalone persona has no project
+    # config to resolve ``repo_containment.tmp-sink.path`` from, so it names the
+    # framework default ``.tmp`` — the same relative, validated form a fresh
+    # install uses — instead of leaving a raw placeholder that the safety net
+    # below would turn into a "[... not available outside a full agent-meta
+    # install]" note. ``TMP_SINK_ENV_PIN_BLOCK`` stays empty because an env pin
+    # carries an absolute machine path, which must never ship in a persona
+    # (IC-13/IC-15). ``TMP_SINK_ABS_PATH``/``PYTEST_BASETEMP`` are deliberately
+    # absent for the same reason: no 1-generic template references them — only
+    # project-configured DEV_COMMANDS/TEST_COMMANDS do, and standalone replaces
+    # those with neutral "ask the user" fallbacks.
+    variables["TMP_SINK_PATH"] = ".tmp"
+    variables["TMP_SINK_ENV_PIN_BLOCK"] = ""
     # Convention blocks: render the 'default' preset so a standalone release/git
     # persona keeps its versioning table / issue-naming block instead of degrading
     # to a "not available" safety-net note. active_roles=None => all roles active.

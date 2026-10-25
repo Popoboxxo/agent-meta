@@ -1,6 +1,6 @@
 ---
 name: se-junior-developer
-version: 1.8.0
+version: 1.8.2
 description: Implements trivial SE leaf nodes (COTS wrappers, single-interface components). Escalates on interface complexity or scope growth. Persists implementation output.
 hint: |
   Use for trivial SE leaf nodes: single component, 0-1 interfaces, no cross-cutting concerns. Escalates if interface complexity grows.
@@ -182,8 +182,8 @@ schema_version: "1.0.0"
 ```
 
 **Atomic write procedure:**
-1. Write implementation summary (frontmatter + artifacts list + test coverage) to a temporary file
-2. Rename temp file to target path
+1. Write implementation summary (frontmatter + artifacts list + test coverage) to `{{TMP_SINK_PATH}}/se-junior-developer-<topic>.md`
+2. Rename `se-junior-developer-<topic>.md` from the sink to the target path (atomic write)
 3. Update `.se-state.yaml` with `last_completed_step` pointing to this file
 
 {{ANTI_RECURSION_BLOCK}}

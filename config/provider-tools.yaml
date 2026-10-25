@@ -58,6 +58,15 @@ opencode_deny_critical:
   - Write
   - Edit
 
+# Write scope of the primary orchestrator while the Opencode runtime gate is
+# active (#1006): permission.edit becomes {"*": "deny", "<path>": "allow", ...}.
+# The tmp-sink glob is DERIVED at sync time from `TmpPaths.relative`
+# (`repo_containment.tmp-sink.path`); this list only carries the static
+# context-free fallback entries. An empty list yields the scalar `edit: deny`
+# (documented opt-out, ADR-5 option A).
+opencode_primary_edit_allow:
+  - .meta-viz/**
+
 continue:
   # Continue has no frontmatter tools model. All tools are available by default.
   # The 'tools' field is removed during generation.

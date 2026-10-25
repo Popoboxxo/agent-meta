@@ -1,6 +1,6 @@
 ---
 name: template-ai-security-guardian
-version: "1.4.0"
+version: "1.4.1"
 description: "AI-specific security risk detection: hallucinated dependencies (slopsquatting), fabricated IAM actions, insecure AI defaults (debug mode, permissive CORS, default credentials), brittle conditional security checks, phantom API endpoints, leaked training-data patterns — read-only, complements security-auditor (OWASP) and dependency-auditor (supply chain)."
 hint: "AI security review: hallucinated deps, fabricated IAM, insecure defaults, brittle logic, phantom endpoints — static detection of AI-generated risk patterns, read-only"
 reference_standards:
@@ -108,7 +108,7 @@ FINDINGS: <structured list per finding format>
 ARTIFACTS: <report file path, or "none">
 ```
 
-Long reports → write to `.tmp/ai-security-guardian-<topic>.md`, return path only.
+Long reports → write to `{{TMP_SINK_PATH}}/ai-security-guardian-<topic>.md`, return path only.
 {{CLOSING_SUMMARY_BLOCK}}
 
 </output_contract>

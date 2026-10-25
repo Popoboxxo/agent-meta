@@ -1,7 +1,7 @@
 ---
 name: devops-engineer
-version: "1.0.0"
-based-on: "1-generic/devops-engineer.md@1.7.0"
+version: "1.0.1"
+based-on: "1-generic/devops-engineer.md@1.7.1"
 description: "HACS Integration DevOps — CI von Tag 1 mit hacs/action + hassfest, Release-Dreiklang (Commit+Tag+Release)."
 hint: "Baut CI/CD für HACS-Integrationen (hacs/action, hassfest, Release-Pipeline)"
 prompt_mode: modern

@@ -1,7 +1,7 @@
 ---
 name: code-reviewer
-version: "2.0.0"
-based-on: "1-generic/code-reviewer.md@1.9.1"
+version: "2.0.1"
+based-on: "1-generic/code-reviewer.md@1.9.2"
 description: "HACS Integration Code-Reviewer — prüft manifest/hacs.json-Hygiene, Entity-Identität, Flow-Validierung, Datenschutz und Release-Konsistenz zusätzlich zu generischen Clean-Code-Regeln."
 hint: "Reviewt HACS-Integration-Code auf HA-spezifische Gates (kein Funktionstest — das ist validator)"
 prompt_mode: modern

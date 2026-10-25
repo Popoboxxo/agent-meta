@@ -45,12 +45,29 @@ from .io import strip_jsonc_comments
 CHECK = "artifact-contract"
 
 #: Mechanisms whose artifacts are serialized as TOML, not Markdown frontmatter.
-#: (The former v1-only ``subagent_depth`` guard was removed: the v2 surface
-#: retains the orchestrator depth — IC-15 Nr. 16.)
+#: (The former v1-only ``subagent_depth`` guard was removed: the v2 settings
+#: document carries the orchestrator depth as ``experimental.subagent_depth`` —
+#: IC-15 Nr. 16 is REVERSED by SPEC-OPENCODE-V2-SUPPORT-2026-10-22; a top-level
+#: ``subagent_depth`` key is not emitted on the v2 surface.)
 TOML_MECHANISMS = frozenset({"codex-toml"})
 
 #: Frontmatter keys every generated agent artifact MUST carry.
 REQUIRED_FIELDS = frozenset({"name", "description"})
+
+#: Connection keys opencode v2 supports on an MCP server entry (spec §3.5,
+#: Amendment B1). The document check and the merged-catalog check share these
+#: rules, so a registry connection and the emitted entry cannot drift apart.
+V2_CONNECTION_KEYS = ("timeout", "oauth", "disabled")
+
+#: ``timeout`` sub-keys (milliseconds). All optional; ``startup`` was added by
+#: Amendment B1.
+V2_TIMEOUT_KEYS = ("startup", "catalog", "execution")
+
+#: ``oauth`` sub-keys — snake_case only. The v2-documented but unsupported
+#: ``callback_port``/``redirect_uri``/``auth_server_metadata_url`` and
+#: ``oauth: false`` are reported, never silently dropped
+#: (``additionalProperties: false`` semantics, spec §3.5).
+V2_OAUTH_KEYS = ("client_id", "client_secret", "scope")
 
 
 @dataclass(frozen=True)
@@ -68,6 +85,10 @@ class ArtifactContract:
     allowed_fields: set[str] | None
     reject_fields: set[str]
     required_fields: frozenset[str] = REQUIRED_FIELDS
+    #: Resolved ``agent-transform.model-pattern`` (SPEC-OPENCODE-V2-SUPPORT
+    #: §3.1, plan Task 6). ``None`` disables the model-id check, which keeps
+    #: every surface without a declared pattern (all v1 entries) byte-frozen.
+    model_pattern: str | None = None
 
 
 def _artifact_transform(provider_config: dict | None) -> dict:
@@ -93,6 +114,12 @@ def resolve_artifact_contract(provider_config: dict | None) -> ArtifactContract:
     The ``allowed-fields`` allow-list is enforced on the v2 surface only (spec
     §2.1/§5); this is the one place that rule is applied, so the sync-time
     warning and the consistency check cannot drift apart.
+
+    ``model-pattern`` is read from the already resolved ``agent-transform``
+    (the loader selects it from ``surface-model-patterns`` by surface-version,
+    plan Task 6). Absent, empty or non-string values mean "no model check" --
+    the fail-safe default that keeps surfaces without a declared pattern (the
+    whole v1 tree) exactly as before.
     """
     transform = _artifact_transform(provider_config)
     mechanism = str(transform.get("frontmatter-mechanism", "provider-md"))
@@ -102,11 +129,27 @@ def resolve_artifact_contract(provider_config: dict | None) -> ArtifactContract:
         if isinstance(allowed, list) and allowed and artifact_v2_surface(provider_config)
         else None
     )
+    pattern = transform.get("model-pattern")
     return ArtifactContract(
         mechanism=mechanism,
         allowed_fields=allowed_fields,
         reject_fields=set(transform.get("reject-fields") or []),
+        model_pattern=pattern if isinstance(pattern, str) and pattern else None,
     )
+
+
+def _model_id_matches(model: str, pattern: str) -> bool:
+    """Whether *model* fully matches the resolved *pattern*.
+
+    A malformed pattern is treated as "no constraint" (fail-open): the pattern
+    is config data and a sync must not crash on it. Runtime behavior is
+    unaffected because the emitted value is still whatever the resolver
+    produced.
+    """
+    try:
+        return re.fullmatch(pattern, model) is not None
+    except re.error:  # pragma: no cover - config-error path
+        return True
 
 
 def _finding(path: str, message: str, suggestion: str = "") -> Finding:
@@ -135,6 +178,7 @@ def validate_frontmatter(
     required_fields: set[str],
     reject_fields: set[str],
     path: str,
+    model_pattern: str | None = None,
 ) -> list[Finding]:
     """Validate a Markdown document's YAML frontmatter against field contracts.
 
@@ -143,6 +187,10 @@ def validate_frontmatter(
       ``None`` disables the allow-list (the conservative, no-false-positive
       default; spec §2.1).
     * ``reject_fields`` — every listed key MUST be absent.
+    * ``model_pattern`` — when not ``None``, an emitted string ``model`` MUST
+      fully match it (the resolved ``provider/model[#variant]`` contract, spec
+      §3.1). ``None`` disables the check, so surfaces without a declared
+      pattern behave exactly as before.
 
     A missing block or malformed YAML yields exactly one ERROR Finding and no
     field-level findings (avoids double-reporting an unparseable document).
@@ -190,6 +238,21 @@ def validate_frontmatter(
             )
         )
 
+    if model_pattern is not None:
+        model = parsed.get("model")
+        if (
+            isinstance(model, str)
+            and model
+            and not _model_id_matches(model, model_pattern)
+        ):
+            findings.append(
+                _finding(
+                    path,
+                    f"model '{model}' is not provider/model[#variant]",
+                    "Emit the model as 'provider/model' or 'provider/model#variant'.",
+                )
+            )
+
     return findings
 
 
@@ -209,6 +272,7 @@ def validate_artifact(text: str, contract: ArtifactContract, path: str) -> list[
         required_fields=set(contract.required_fields),
         reject_fields=contract.reject_fields,
         path=path,
+        model_pattern=contract.model_pattern,
     )
 
 
@@ -241,8 +305,12 @@ def validate_json_document(text: str, fmt: str, path: str) -> list[Finding]:
 
     * ``opencode-json-v2`` — a document that declares MCP content MUST carry the
       nested ``mcp.servers`` object and MUST NOT carry a flat top-level ``mcp``
-      server map. (``subagent_depth`` is no longer a v1-only key: the v2 surface
-      retains the orchestrator depth — IC-15 Nr. 16.)
+      server map. (IC-15 Nr. 16 is reversed by
+      SPEC-OPENCODE-V2-SUPPORT-2026-10-22: the v2 document carries the depth as
+      ``experimental.subagent_depth`` and no top-level ``subagent_depth``.)
+      Each ``mcp.servers.<name>`` entry MUST NOT carry the legacy v1 ``enabled``
+      flag and MUST use the documented v2 ``timeout``/``oauth``/``disabled``
+      shapes (AC-C10, :func:`v2_connection_key_violations`).
     * ``opencode-json`` — a document that declares MCP content MUST carry the
       flat top-level ``mcp`` object (frozen v1 byte shape, AC-21).
 
@@ -270,6 +338,94 @@ def validate_json_document(text: str, fmt: str, path: str) -> list[Finding]:
     if fmt == "opencode-json":
         return _validate_opencode_v1(doc, path)
     return []
+
+
+def _quoted(keys: list[str]) -> str:
+    return ", ".join(f"'{key}'" for key in keys)
+
+
+def _is_positive_int(value: object) -> bool:
+    """True for a positive integer — booleans are not millisecond budgets."""
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
+def _timeout_detail(timeout: object) -> str:
+    """Why *timeout* is not a valid v2 timeout object (``""`` when it is)."""
+    if not isinstance(timeout, dict) or not timeout:
+        return (
+            "must be an object with integer 'catalog'/'execution' "
+            "(optional 'startup')"
+        )
+    unknown = sorted(set(timeout) - set(V2_TIMEOUT_KEYS))
+    if unknown:
+        return (
+            f"carries unsupported key(s) {_quoted(unknown)} "
+            f"(allowed: {', '.join(V2_TIMEOUT_KEYS)})"
+        )
+    invalid = sorted(k for k, v in timeout.items() if not _is_positive_int(v))
+    if invalid:
+        noun = "value" if len(invalid) == 1 else "values"
+        return f"has invalid {noun} for {_quoted(invalid)} (must be a positive integer)"
+    return ""
+
+
+def _oauth_detail(oauth: object) -> str:
+    """Why *oauth* is not a valid v2 oauth object (``""`` when it is)."""
+    if not isinstance(oauth, dict) or not oauth:
+        return (
+            "must be an object with the snake_case keys "
+            f"{_quoted(list(V2_OAUTH_KEYS))} ('oauth: false' is not supported)"
+        )
+    unknown = sorted(set(oauth) - set(V2_OAUTH_KEYS))
+    if unknown:
+        return (
+            f"carries unsupported key(s) {_quoted(unknown)} "
+            f"(allowed: {', '.join(V2_OAUTH_KEYS)}; camelCase and the "
+            "v2-documented callback/redirect keys are not supported)"
+        )
+    invalid = sorted(k for k, v in oauth.items() if not isinstance(v, str))
+    if invalid:
+        noun = "value" if len(invalid) == 1 else "values"
+        return f"has non-string {noun} for {_quoted(invalid)}"
+    return ""
+
+
+def _disabled_detail(disabled: object) -> str:
+    """Why *disabled* is not a valid v2 flag (``""`` when it is)."""
+    if isinstance(disabled, bool):
+        return ""
+    return "must be a boolean"
+
+
+def v2_connection_key_violations(connection: object) -> list[tuple[str, str]]:
+    """``(key, detail)`` pairs for every invalid opencode v2 connection key.
+
+    Single source of truth for the two validation layers that must agree:
+
+    * the committed-document check (:func:`_validate_opencode_v2`), and
+    * the merged-catalog check
+      (``consistency.artifact_contracts.check_mcp_connection_keys``).
+
+    Absent keys are valid — they are simply not emitted. A present key must
+    match the documented shape exactly, so documented-but-unsupported values
+    (camelCase, ``callback_port``, ``oauth: false``) surface as a finding
+    instead of being silently dropped or half-written.
+    """
+    if not isinstance(connection, dict):
+        return []
+    detectors = {
+        "timeout": _timeout_detail,
+        "oauth": _oauth_detail,
+        "disabled": _disabled_detail,
+    }
+    violations: list[tuple[str, str]] = []
+    for key in V2_CONNECTION_KEYS:
+        if key not in connection:
+            continue
+        detail = detectors[key](connection[key])
+        if detail:
+            violations.append((key, detail))
+    return violations
 
 
 def _validate_opencode_v2(doc: dict, path: str) -> list[Finding]:
@@ -308,6 +464,43 @@ def _validate_opencode_v2(doc: dict, path: str) -> list[Finding]:
                     )
                 )
 
+            if isinstance(mcp["servers"], dict):
+                findings += _validate_v2_servers(mcp["servers"], path)
+
+    return findings
+
+
+def _validate_v2_servers(servers: dict, path: str) -> list[Finding]:
+    """Validate the connection keys of every v2 ``mcp.servers.<name>`` entry.
+
+    AC-C10: the frozen v1 shape carried ``enabled``; the v2 serializer writes
+    neither ``enabled`` nor (for active servers) ``disabled``. The connection
+    keys are checked with the same rules the merged-catalog check uses
+    (:func:`v2_connection_key_violations`), so a writer-emitted document is
+    clean and a hand-edited one fails loudly.
+    """
+    findings: list[Finding] = []
+    for name in sorted(servers):
+        entry = servers[name]
+        if not isinstance(entry, dict):
+            continue
+        if "enabled" in entry:
+            findings.append(
+                _finding(
+                    path,
+                    f"v2 server uses legacy 'enabled' ('{name}')",
+                    "Drop 'enabled'; an active v2 server carries no flag "
+                    "(use 'disabled: true' to deactivate it).",
+                )
+            )
+        for key, detail in v2_connection_key_violations(entry):
+            findings.append(
+                _finding(
+                    path,
+                    f"v2 server '{name}' {key} is invalid: {detail}",
+                    "Emit the documented v2 shape.",
+                )
+            )
     return findings
 
 

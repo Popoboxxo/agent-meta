@@ -154,3 +154,65 @@ def test_schema_defaults_match_spec():
 
 def test_block_is_closed_at_top_level():
     assert _rc_schema().get("additionalProperties") is False
+
+
+# --- system-temp-exception --------------------------------------------
+
+
+def _exception_schema() -> dict:
+    return _rc_schema()["properties"]["tmp-sink"]["properties"][
+        "system-temp-exception"
+    ]
+
+
+def test_system_temp_exception_block_is_valid():
+    jsonschema.validate(
+        _base_config(
+            {
+                "tmp-sink": {
+                    "system-temp-exception": {
+                        "enabled": True,
+                        "reason": "pytest basetemp must stay outside the repo",
+                        "pytest-basetemp": True,
+                        "toolchain-caches": False,
+                    }
+                }
+            }
+        ),
+        _schema(),
+    )
+
+
+def test_system_temp_exception_defaults_match_spec():
+    props = _exception_schema()["properties"]
+    assert props["enabled"]["default"] is True
+    assert props["pytest-basetemp"]["default"] is True
+    assert props["toolchain-caches"]["default"] is False
+    assert _exception_schema().get("additionalProperties") is False
+
+
+def test_system_temp_exception_must_be_an_object():
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(
+            _base_config({"tmp-sink": {"system-temp-exception": "on"}}),
+            _schema(),
+        )
+
+
+@pytest.mark.parametrize("key", ["enabled", "pytest-basetemp", "toolchain-caches"])
+def test_system_temp_exception_booleans_only(key):
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(
+            _base_config({"tmp-sink": {"system-temp-exception": {key: "yes"}}}),
+            _schema(),
+        )
+
+
+def test_system_temp_exception_additional_properties_rejected():
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(
+            _base_config(
+                {"tmp-sink": {"system-temp-exception": {"bogus": True}}}
+            ),
+            _schema(),
+        )

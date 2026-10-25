@@ -39,7 +39,7 @@ Four verified gaps remain:
 - No new provider, no provider-name branch anywhere; only data-driven lookups (parent ADR-1).
 - No change to the parent spec's AC-1…AC-22, no renumbering, no code implementation in this amendment.
 - No change to the `surface-formats`/`surface-mechanisms` maps themselves.
-- No forced migration of consumers; no default flip to v2 (reserved for a future major; parent §11/OQ-8).
+- No forced migration of consumers; no default flip to v2 (reserved for a future major; parent §11/OQ-8). Siehe Amendment A2 (#1006) in docs/specs/2026-09-30-provider-audit-opencode-v2.md: Surface-Format bleibt frozen, Einstiegspunkt nicht.
 - No new Admin endpoint; only the existing ai-providers endpoints are extended.
 
 ---
@@ -64,7 +64,7 @@ Render `surface-version` as a `<select>` whose options are the keys of the provi
 
 ### D5 — v1 default, byte-frozen; v2 opt-in
 
-No behavior change when `provider-options` does not set the key. v1 output stays byte-identical to the pre-change baseline. v2 remains opt-in and ships as a **minor** (parent A1.2/OQ-8).
+No behavior change when `provider-options` does not set the key. v1 output stays byte-identical to the pre-change baseline. v2 remains opt-in and ships as a **minor** (parent A1.2/OQ-8). Siehe Amendment A2 (#1006) in docs/specs/2026-09-30-provider-audit-opencode-v2.md: Surface-Format bleibt frozen, Einstiegspunkt nicht.
 
 ---
 

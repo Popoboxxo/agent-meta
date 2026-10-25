@@ -1,7 +1,7 @@
 ---
 name: developer
-version: 2.0.1
-based-on: 1-generic/developer.md@4.8.0
+version: 2.0.2
+based-on: 1-generic/developer.md@4.8.1
 description: 'Developer-Agent für das agent-meta Meta-Repository. Erweitert den generischen
   Developer um Framework-Wissen: Schichten-Architektur, Platzhalter-Lifecycle, Python-Modulstruktur,
   Rollen-Anlegen-Prozess und Sync-Interface.'
@@ -16,7 +16,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 2-platform/agent-meta-developer.md@2.0.1
+generated-from: 2-platform/agent-meta-developer.md@2.0.2
 model: claude-sonnet-5
 ---
 
@@ -247,7 +247,7 @@ Wenn du einen Hintergrundprozess startest, MUSST du innerhalb deines eigenen Tur
 Beispiel — Hintergrundprozess im selben Turn blockierend abwarten (Polling mit Timeout):
 
 ```bash
-npm run e2e > /tmp/e2e.log 2>&1 &
+npm run e2e > .tmp/e2e.log 2>&1 &
 PID=$!
 TIMEOUT=600
 for i in $(seq 1 "$TIMEOUT"); do
@@ -256,6 +256,6 @@ for i in $(seq 1 "$TIMEOUT"); do
 done
 kill -0 "$PID" 2>/dev/null && { kill "$PID"; echo "TIMEOUT after ${TIMEOUT}s" >&2; exit 124; }
 wait "$PID"; RC=$?
-tail -50 /tmp/e2e.log; exit "$RC"             # evidence + exit code = final result, not a "waiting" placeholder
+tail -50 .tmp/e2e.log; exit "$RC"             # evidence + exit code = final result, not a "waiting" placeholder
 ```
 

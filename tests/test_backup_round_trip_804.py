@@ -15,8 +15,10 @@ provider *key* (``"Claude"``) although the archive stores the provider's root
 reported ``True`` when it was set unconditionally.
 """
 
+import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -39,6 +41,30 @@ def _seed_project(root: Path) -> dict:
 
 def _config() -> dict:
     return {"backup": {"dir": ".backup/agent-meta"}}
+
+
+def _config_with_sink(*, enabled: bool = True, path: str = ".tmp") -> dict:
+    """Backup config plus an explicit tmp-sink (AC-09/AC-10)."""
+    return {
+        "backup": {"dir": ".backup/agent-meta"},
+        "repo_containment": {"tmp-sink": {"enabled": enabled, "path": path}},
+    }
+
+
+def _capture_staging(monkeypatch) -> dict:
+    """Record the ``TemporaryDirectory(...)`` kwargs used for backup staging."""
+    captured: dict = {}
+    real_factory = tempfile.TemporaryDirectory
+
+    def recording_factory(*args, **kwargs):
+        captured["args"] = args
+        captured["dir"] = kwargs.get("dir")
+        if kwargs.get("dir") is not None:
+            captured["existed_before"] = Path(kwargs["dir"]).is_dir()
+        return real_factory(*args, **kwargs)
+
+    monkeypatch.setattr("lib.backup.tempfile.TemporaryDirectory", recording_factory)
+    return captured
 
 
 def test_round_trip_restore_by_name_restores_content(tmp_path):
@@ -159,3 +185,34 @@ def test_round_trip_restores_local_secrets_file(tmp_path):
 
     assert result["success"] is True
     assert secrets.read_text(encoding="utf-8") == "MCP_EXAMPLE_VALUE: not-a-real-secret\n"
+
+
+# ---------------------------------------------------------------------------
+# AC-09 -- backup staging lives inside the tmp-sink
+# ---------------------------------------------------------------------------
+
+def test_staging_dir_is_inside_tmp_sink(tmp_path, monkeypatch):
+    """AC-09: staging is ``<repo>/.tmp/backup-staging``, never the system temp."""
+    root = tmp_path
+    provider_config = _seed_project(root)
+    log = SyncLog()
+    captured = _capture_staging(monkeypatch)
+
+    created = create_backup(
+        root, ["Claude"], provider_config, _config_with_sink(), log,
+        source_version="0.0.0-test",
+    )
+
+    assert created["success"] is True
+    assert (root / created["archive"]).is_file()
+
+    staging_base = captured.get("dir")
+    assert staging_base is not None, "staging must pass dir= to TemporaryDirectory"
+    expected = Path(os.path.realpath(root / ".tmp" / "backup-staging"))
+    assert Path(staging_base) == expected
+    assert captured.get("existed_before") is True
+    # AC-09: the system temp dir is not used as the staging base.
+    assert Path(os.path.realpath(staging_base)) != Path(os.path.realpath(tempfile.gettempdir()))
+    assert not any(
+        "backup.staging-system-temp" in warning for warning in log.warnings
+    ), log.warnings

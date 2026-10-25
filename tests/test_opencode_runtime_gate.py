@@ -14,6 +14,16 @@ Covers the Phase-0 permission-path tightening (SPEC-OPENCODE-RUNTIME-GATE-
   ``opencode.json`` and the same state file (``isolation-deny`` +
   ``runtime-gate-deny``) without clobbering each other.
 
+Issue #1006 (IC-4/IC-5/IC-6) extends this: the ``default-agent`` state namespace
+is a third, dict-valued sibling (AC-13), ``opencode_runtime_gate_wanted`` mirrors
+the entry computation, ``_opencode_entry_point`` resolves the explicit +
+generated primary role and ``_merge_default_agent`` writes/rolls back
+``default_agent`` in the managed merge (AC-06…AC-09, AC-14).
+
+Task 7 couples the deny to that entry point (AC-10): without an explicit AND
+generated primary role no deny is written, exactly one warning names
+``primary-role``, and a deny managed by an earlier sync is rolled back.
+
 Run: python -m pytest tests/test_opencode_runtime_gate.py -v
 """
 from __future__ import annotations
@@ -21,6 +31,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import yaml
 
@@ -32,6 +43,7 @@ from lib.log import SyncLog
 
 _ISOLATION_KEY = isolation._STATE_ISOLATION_KEY
 _RUNTIME_GATE_KEY = isolation._STATE_RUNTIME_GATE_KEY
+_DEFAULT_AGENT_KEY = isolation._STATE_DEFAULT_AGENT_KEY
 _STATE_FILE = Path(".opencode") / "agent-meta-state.json"
 
 
@@ -51,7 +63,10 @@ def _read_json(path: Path) -> dict:
 
 
 def _read_state(project_root: Path) -> dict:
-    return _read_json(project_root / _STATE_FILE)
+    """Namespaced state file; an absent file has no namespaces (like
+    ``isolation._read_state``, which yields the empty value per key)."""
+    path = project_root / _STATE_FILE
+    return _read_json(path) if path.exists() else {}
 
 
 def test_read_write_state_preserves_sibling_namespaces(tmp_path):
@@ -163,7 +178,7 @@ def test_scalar_permission_family_tolerated(tmp_path):
         project_root,
         {"orchestrator": {"mode": "strict"}},
         "Opencode",
-        {"Opencode": {"has_hooks": False}},
+        {"Opencode": {"has_hooks": False, "primary-role": "orchestrator"}},
         framework,
         log,
         dry_run=False,
@@ -189,7 +204,7 @@ def test_prior_user_value_recorded_and_restored(tmp_path):
         json.dumps(original, indent=2) + "\n", encoding="utf-8"
     )
     framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
-    provider_config = {"Opencode": {"has_hooks": False}}
+    provider_config = {"Opencode": {"has_hooks": False, "primary-role": "orchestrator"}}
     log = SyncLog()
 
     isolation._sync_opencode_runtime_gate(
@@ -240,7 +255,7 @@ def test_second_strict_sync_is_idempotent_and_byte_identical(tmp_path):
         encoding="utf-8",
     )
     framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
-    provider_config = {"Opencode": {"has_hooks": False}}
+    provider_config = {"Opencode": {"has_hooks": False, "primary-role": "orchestrator"}}
     config = {"orchestrator": {"mode": "strict"}}
     log = SyncLog()
 
@@ -273,6 +288,7 @@ def test_isolation_and_runtime_gate_coexist(tmp_path):
         },
         "Opencode": {
             "has_hooks": False,
+            "primary-role": "orchestrator",
             "isolation-dirs": ["opencode.json"],
             "isolation-mechanism": "opencode-permissions",
         },
@@ -320,7 +336,7 @@ def test_dry_run_never_writes(tmp_path):
         project_root,
         {"orchestrator": {"mode": "strict"}},
         "Opencode",
-        {"Opencode": {"has_hooks": False}},
+        {"Opencode": {"has_hooks": False, "primary-role": "orchestrator"}},
         framework,
         log,
         dry_run=True,
@@ -342,11 +358,684 @@ def test_absent_config_is_created_with_managed_block(tmp_path):
         project_root,
         {"orchestrator": {"mode": "strict"}},
         "Opencode",
-        {"Opencode": {"has_hooks": False}},
+        {"Opencode": {"has_hooks": False, "primary-role": "orchestrator"}},
         framework,
         log,
         dry_run=False,
     )
 
     data = _read_json(project_root / "opencode.json")
-    assert data == {"permission": {"edit": {"**": "deny"}, "bash": {"**": "deny"}}}
+    assert data == {
+        "permission": {"edit": {"**": "deny"}, "bash": {"**": "deny"}},
+        "default_agent": "orchestrator",
+    }
+
+
+def test_default_agent_namespace_reads_as_dict(tmp_path):
+    """IC-5: the ``default-agent`` namespace is dict-valued, ``{}`` when
+    missing/invalid — never a list."""
+    state_path = tmp_path / _STATE_FILE
+    assert isolation._read_state(state_path, _DEFAULT_AGENT_KEY) == {}
+
+    state_path.parent.mkdir(parents=True)
+    isolation._write_state(
+        state_path,
+        {"value": "orchestrator", "prior": None},
+        dry_run=False,
+        key=_DEFAULT_AGENT_KEY,
+    )
+
+    assert _read_json(state_path)[_DEFAULT_AGENT_KEY] == {
+        "value": "orchestrator",
+        "prior": None,
+    }
+    assert isolation._read_state(state_path, _DEFAULT_AGENT_KEY) == {
+        "value": "orchestrator",
+        "prior": None,
+    }
+
+
+def test_default_agent_namespace_coexists_with_siblings(tmp_path):
+    """AC-13: all three namespaces coexist; removing one leaves the others."""
+    state_path = tmp_path / _STATE_FILE
+    state_path.parent.mkdir(parents=True)
+
+    isolation._write_state(state_path, ["**/.claude/**"], dry_run=False)
+    isolation._write_state(
+        state_path,
+        {"**": {"edit": None, "bash": None}},
+        dry_run=False,
+        key=_RUNTIME_GATE_KEY,
+    )
+    isolation._write_state(
+        state_path,
+        {"value": "orchestrator", "prior": None},
+        dry_run=False,
+        key=_DEFAULT_AGENT_KEY,
+    )
+
+    data = _read_json(state_path)
+    assert data[_ISOLATION_KEY] == ["**/.claude/**"]
+    assert data[_RUNTIME_GATE_KEY] == {"**": {"edit": None, "bash": None}}
+    assert data[_DEFAULT_AGENT_KEY] == {"value": "orchestrator", "prior": None}
+    assert "_agent-meta" in data
+
+    # Removing only the default-agent namespace keeps both siblings intact.
+    isolation._write_state(state_path, {}, dry_run=False, key=_DEFAULT_AGENT_KEY)
+
+    data = _read_json(state_path)
+    assert _DEFAULT_AGENT_KEY not in data
+    assert data[_ISOLATION_KEY] == ["**/.claude/**"]
+    assert data[_RUNTIME_GATE_KEY] == {"**": {"edit": None, "bash": None}}
+    assert "_agent-meta" in data
+
+
+def test_entry_point_requires_explicit_primary_role():
+    """IC-4: no code default — only an explicit registry key yields a role."""
+    assert isolation._opencode_entry_point("Opencode", {"Opencode": {}}, None) is None
+    assert (
+        isolation._opencode_entry_point(
+            "Opencode", {"Opencode": {"primary-role": "orchestrator"}}, None
+        )
+        == "orchestrator"
+    )
+
+
+def test_entry_point_respects_active_set():
+    """IC-4: an explicit role counts only when it is also generated."""
+    provider_config = {"Opencode": {"primary-role": "orchestrator"}}
+    inactive = SimpleNamespace(roles=frozenset({"developer"}))
+    active = SimpleNamespace(roles=frozenset({"developer", "orchestrator"}))
+
+    assert isolation._opencode_entry_point("Opencode", provider_config, inactive) is None
+    assert (
+        isolation._opencode_entry_point("Opencode", provider_config, active)
+        == "orchestrator"
+    )
+    assert (
+        isolation._opencode_entry_point("Opencode", provider_config, None)
+        == "orchestrator"
+    )
+
+
+def test_runtime_gate_wanted_mirrors_entries(tmp_path):
+    """IC-4: the boolean is exactly ``bool(_opencode_runtime_gate_entries(...))``."""
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    provider_config = {"Opencode": {"has_hooks": False}}
+
+    assert isolation.opencode_runtime_gate_wanted(
+        {"orchestrator": {"mode": "strict"}}, "Opencode", framework, provider_config
+    ) is True
+    assert isolation.opencode_runtime_gate_wanted(
+        {"orchestrator": {"mode": "advisory"}}, "Opencode", framework, provider_config
+    ) is False
+
+
+# ---------------------------------------------------------------------------
+# #1006 Task 6 (IC-6): ``default_agent`` in the managed merge
+# ---------------------------------------------------------------------------
+
+def _pc(primary: bool = True) -> dict:
+    """Provider entry with (or without) the explicit ``primary-role`` key."""
+    entry: dict = {"has_hooks": False}
+    if primary:
+        entry["primary-role"] = "orchestrator"
+    return {"Opencode": entry}
+
+
+def _sync(project_root, framework, config, pc, log, active_set=None,
+          dry_run: bool = False) -> None:
+    isolation._sync_opencode_runtime_gate(
+        project_root, config, "Opencode", pc, framework, log,
+        dry_run=dry_run, active_set=active_set,
+    )
+
+
+def _make_project(tmp_path) -> Path:
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    return project_root
+
+
+def test_default_agent_written_with_state_and_idempotent(tmp_path):
+    """AC-06: a missing ``default_agent`` is written once, with state."""
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    config = {"orchestrator": {"mode": "strict"}}
+    (project_root / "opencode.json").write_text(
+        json.dumps({"theme": "x"}) + "\n", encoding="utf-8"
+    )
+
+    _sync(project_root, framework, config, _pc(), SyncLog())
+
+    data = _read_json(project_root / "opencode.json")
+    assert data["default_agent"] == "orchestrator"
+    assert data["theme"] == "x"
+    assert _read_state(project_root)[_DEFAULT_AGENT_KEY] == {
+        "value": "orchestrator",
+        "prior": None,
+    }
+
+    first_json = (project_root / "opencode.json").read_bytes()
+    first_state = (project_root / _STATE_FILE).read_bytes()
+
+    _sync(project_root, framework, config, _pc(), SyncLog())
+
+    assert (project_root / "opencode.json").read_bytes() == first_json
+    assert (project_root / _STATE_FILE).read_bytes() == first_state
+
+
+def test_differing_user_default_agent_not_overwritten_warns(tmp_path):
+    """AC-07: a user value wins, exactly one warning (with consequence under
+    an effective gate); the gate deny is still written."""
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    (project_root / "opencode.json").write_text(
+        json.dumps({"default_agent": "build"}) + "\n", encoding="utf-8"
+    )
+    log = SyncLog()
+
+    _sync(project_root, framework, {"orchestrator": {"mode": "strict"}}, _pc(), log)
+
+    data = _read_json(project_root / "opencode.json")
+    assert data["default_agent"] == "build"
+    assert data["permission"]["edit"]["**"] == "deny"
+    assert _DEFAULT_AGENT_KEY not in _read_state(project_root)
+    assert len(log.warnings) == 1, log.warnings
+    for token in ("build", "orchestrator", "provider-overrides"):
+        assert token in log.warnings[0], log.warnings
+
+    # Without strict the gate is not effective: no consequence hint.
+    quiet_root = tmp_path / "project2"
+    quiet_root.mkdir()
+    (quiet_root / "opencode.json").write_text(
+        json.dumps({"default_agent": "build"}) + "\n", encoding="utf-8"
+    )
+    quiet_log = SyncLog()
+
+    _sync(quiet_root, framework, {}, _pc(), quiet_log)
+
+    assert _read_json(quiet_root / "opencode.json")["default_agent"] == "build"
+    assert not (quiet_root / _STATE_FILE).exists()
+    assert len(quiet_log.warnings) == 1, quiet_log.warnings
+    assert "build" in quiet_log.warnings[0]
+    assert "orchestrator" in quiet_log.warnings[0]
+    assert "provider-overrides" not in quiet_log.warnings[0]
+
+
+def test_same_user_default_agent_records_prior_and_survives_rollback(tmp_path):
+    """AC-08: user value == entry point -> no file change, ``prior`` recorded."""
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    (project_root / "opencode.json").write_text(
+        json.dumps({"default_agent": "orchestrator"}, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    before = (project_root / "opencode.json").read_bytes()
+
+    _sync(project_root, framework, {}, _pc(), SyncLog())
+
+    assert (project_root / "opencode.json").read_bytes() == before
+    assert _read_state(project_root)[_DEFAULT_AGENT_KEY] == {
+        "value": "orchestrator",
+        "prior": "orchestrator",
+    }
+
+    _sync(project_root, framework, {}, _pc(primary=False), SyncLog())
+
+    assert _read_json(project_root / "opencode.json")["default_agent"] == "orchestrator"
+    assert _DEFAULT_AGENT_KEY not in _read_state(project_root)
+
+
+def test_default_agent_rollback_removes_key_when_prior_none(tmp_path):
+    """AC-09: prior ``None`` -> key removed; user keys and sibling namespaces
+    stay untouched."""
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    config = {"orchestrator": {"mode": "strict"}}
+    (project_root / "opencode.json").write_text(
+        json.dumps({"theme": "x"}) + "\n", encoding="utf-8"
+    )
+    state_path = project_root / _STATE_FILE
+    state_path.parent.mkdir(parents=True)
+    isolation._write_state(state_path, ["**/.claude/**"], dry_run=False)
+
+    _sync(project_root, framework, config, _pc(), SyncLog())
+
+    data = _read_json(project_root / "opencode.json")
+    assert data["default_agent"] == "orchestrator"
+    state = _read_state(project_root)
+    assert state[_DEFAULT_AGENT_KEY] == {"value": "orchestrator", "prior": None}
+    assert state[_RUNTIME_GATE_KEY] == {"**": {"edit": None, "bash": None}}
+
+    _sync(project_root, framework, config, _pc(primary=False), SyncLog())
+
+    data = _read_json(project_root / "opencode.json")
+    assert "default_agent" not in data
+    assert data["theme"] == "x"
+    state = _read_state(project_root)
+    assert _DEFAULT_AGENT_KEY not in state
+    assert state[_ISOLATION_KEY] == ["**/.claude/**"]
+    # #1006 Task 7: the deny is coupled to the entry point, so dropping the
+    # primary role takes the managed deny back as well.
+    assert _RUNTIME_GATE_KEY not in state
+
+
+def test_default_agent_rollback_keeps_user_changed_value(tmp_path):
+    """AC-09: a user change after the managed write survives the rollback."""
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    config = {"orchestrator": {"mode": "strict"}}
+
+    _sync(project_root, framework, config, _pc(), SyncLog())
+    data = _read_json(project_root / "opencode.json")
+    assert data["default_agent"] == "orchestrator"
+    data["default_agent"] = "build"
+    (project_root / "opencode.json").write_text(
+        json.dumps(data, indent=2) + "\n", encoding="utf-8"
+    )
+
+    _sync(project_root, framework, config, _pc(primary=False), SyncLog())
+
+    assert _read_json(project_root / "opencode.json")["default_agent"] == "build"
+    assert _DEFAULT_AGENT_KEY not in _read_state(project_root)
+
+
+def test_default_agent_follows_changed_primary_role(tmp_path):
+    """IC-6: a changed explicit role is followed while the state is ours."""
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    config = {"orchestrator": {"mode": "strict"}}
+
+    _sync(project_root, framework, config, _pc(), SyncLog())
+    assert _read_state(project_root)[_DEFAULT_AGENT_KEY] == {
+        "value": "orchestrator",
+        "prior": None,
+    }
+
+    changed = {"Opencode": {"has_hooks": False, "primary-role": "developer"}}
+    _sync(project_root, framework, config, changed, SyncLog())
+
+    assert _read_json(project_root / "opencode.json")["default_agent"] == "developer"
+    assert _read_state(project_root)[_DEFAULT_AGENT_KEY] == {
+        "value": "developer",
+        "prior": None,
+    }
+
+
+def test_user_deleted_default_agent_is_not_rewritten_warns(tmp_path):
+    """IC-6: a deleted managed key is NOT re-created; warn and keep state."""
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    config = {"orchestrator": {"mode": "strict"}}
+
+    _sync(project_root, framework, config, _pc(), SyncLog())
+    data = _read_json(project_root / "opencode.json")
+    assert data["default_agent"] == "orchestrator"
+    data.pop("default_agent")
+    (project_root / "opencode.json").write_text(
+        json.dumps(data, indent=2) + "\n", encoding="utf-8"
+    )
+    log = SyncLog()
+
+    _sync(project_root, framework, config, _pc(), log)
+
+    assert "default_agent" not in _read_json(project_root / "opencode.json")
+    assert _read_state(project_root)[_DEFAULT_AGENT_KEY] == {
+        "value": "orchestrator",
+        "prior": None,
+    }
+    assert len(log.warnings) == 1, log.warnings
+    assert "orchestrator" in log.warnings[0]
+    # A deleted key has no value to quote: never render the literal 'None'.
+    assert "'None'" not in log.warnings[0], log.warnings
+    assert "None" not in log.warnings[0], log.warnings
+    assert "missing" in log.warnings[0], log.warnings
+    assert "removed" in log.warnings[0], log.warnings
+
+
+def test_three_sync_restores_different_prior_value(tmp_path):
+    """IC-6: a prior user value survives two managed rewrites.
+
+    ``orchestrator`` (user, same as the first entry point) → primary role
+    changes to ``developer`` (managed write) → primary role removed ⇒ the
+    original ``orchestrator`` is restored, not the intermediate managed value.
+    """
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    config = {}
+    (project_root / "opencode.json").write_text(
+        json.dumps({"default_agent": "orchestrator"}, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    # Sync 1: the user already set our entry point -> prior recorded.
+    _sync(project_root, framework, config, _pc(), SyncLog())
+    assert _read_json(project_root / "opencode.json")["default_agent"] == "orchestrator"
+    assert _read_state(project_root)[_DEFAULT_AGENT_KEY] == {
+        "value": "orchestrator",
+        "prior": "orchestrator",
+    }
+
+    # Sync 2: the explicit primary role changes -> managed rewrite.
+    developer = {"Opencode": {"has_hooks": False, "primary-role": "developer"}}
+    _sync(project_root, framework, config, developer, SyncLog())
+    assert _read_json(project_root / "opencode.json")["default_agent"] == "developer"
+    assert _read_state(project_root)[_DEFAULT_AGENT_KEY] == {
+        "value": "developer",
+        "prior": "orchestrator",
+    }
+
+    # Sync 3: the primary role is gone -> the ORIGINAL user value comes back.
+    _sync(project_root, framework, config, _pc(primary=False), SyncLog())
+    assert _read_json(project_root / "opencode.json")["default_agent"] == "orchestrator"
+    assert _DEFAULT_AGENT_KEY not in _read_state(project_root)
+
+
+def test_sync_action_names_only_what_changed(tmp_path):
+    """RVW-A2-2: the action text must not claim a deny that was never written."""
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+
+    # Non-strict: no deny at all — only the entry point changes.
+    non_strict_root = _make_project(tmp_path)
+    non_strict_log = SyncLog()
+    _sync(non_strict_root, framework, {}, _pc(), non_strict_log)
+    writes = [a for a in non_strict_log.actions if "WRITE" in a]
+    assert len(writes) == 1, non_strict_log.actions
+    assert "default_agent" in writes[0]
+    assert "runtime-gate deny" not in writes[0], writes[0]
+
+    # Strict: the deny is written and named, plus the entry point.
+    strict_root = tmp_path / "project-strict"
+    strict_root.mkdir()
+    strict_log = SyncLog()
+    _sync(
+        strict_root, framework, {"orchestrator": {"mode": "strict"}}, _pc(), strict_log
+    )
+    writes = [a for a in strict_log.actions if "WRITE" in a]
+    assert len(writes) == 1, strict_log.actions
+    for token in ("runtime-gate deny", "default_agent"):
+        assert token in writes[0], writes[0]
+
+    # Strict -> non-strict: the text reports the removal, not a write.
+    rollback_log = SyncLog()
+    _sync(strict_root, framework, {}, _pc(), rollback_log)
+    writes = [a for a in rollback_log.actions if "WRITE" in a]
+    assert len(writes) == 1, rollback_log.actions
+    assert "runtime-gate deny removed" in writes[0], writes[0]
+    assert "default_agent" not in writes[0], writes[0]
+
+
+def test_inactive_primary_role_gets_no_default_agent(tmp_path):
+    """IC-4/IC-6: a non-generated primary role writes neither key nor state."""
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    active_set = SimpleNamespace(roles=frozenset({"developer"}))
+
+    _sync(
+        project_root,
+        framework,
+        {"orchestrator": {"mode": "strict"}},
+        _pc(),
+        SyncLog(),
+        active_set=active_set,
+    )
+
+    assert "default_agent" not in _read_json(project_root / "opencode.json")
+    assert _DEFAULT_AGENT_KEY not in _read_state(project_root)
+
+
+def test_unparseable_opencode_json_is_left_untouched(tmp_path):
+    """AC-14: an unparseable file is never rewritten; no state is created."""
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    settings = project_root / "opencode.json"
+    settings.write_text("{not json", encoding="utf-8")
+    log = SyncLog()
+
+    _sync(project_root, framework, {"orchestrator": {"mode": "strict"}}, _pc(), log)
+
+    assert settings.read_text(encoding="utf-8") == "{not json"
+    assert not (project_root / _STATE_FILE).exists()
+    assert log.warnings
+
+
+def test_dry_run_with_primary_role_never_writes(tmp_path):
+    """AC-14: ``dry_run`` writes neither ``opencode.json`` nor the state file."""
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+
+    _sync(
+        project_root,
+        framework,
+        {"orchestrator": {"mode": "strict"}},
+        _pc(),
+        SyncLog(),
+        dry_run=True,
+    )
+
+    assert not (project_root / "opencode.json").exists()
+    assert not (project_root / _STATE_FILE).exists()
+
+
+# ---------------------------------------------------------------------------
+# #1006 Task 7 (IC-6 step 2): gate-deny coupled to the entry point
+# ---------------------------------------------------------------------------
+
+def test_strict_with_primary_role_writes_deny_and_default_agent(tmp_path):
+    """AC-10: an explicit AND generated primary role keeps deny + entry point."""
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+
+    _sync(
+        project_root,
+        framework,
+        {"orchestrator": {"mode": "strict"}},
+        _pc(),
+        SyncLog(),
+    )
+
+    data = _read_json(project_root / "opencode.json")
+    assert data["permission"]["edit"]["**"] == "deny"
+    assert data["permission"]["bash"]["**"] == "deny"
+    assert data["default_agent"] == "orchestrator"
+    state = _read_state(project_root)
+    assert state[_RUNTIME_GATE_KEY] == {"**": {"edit": None, "bash": None}}
+    assert state[_DEFAULT_AGENT_KEY] == {"value": "orchestrator", "prior": None}
+
+
+def test_strict_without_primary_role_writes_no_deny_and_warns(tmp_path):
+    """AC-10: strict without an entry point writes NO deny (it would lock every
+    agent) and warns about the missing ``primary-role`` — exactly once."""
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    log = SyncLog()
+
+    _sync(
+        project_root,
+        framework,
+        {"orchestrator": {"mode": "strict"}},
+        _pc(primary=False),
+        log,
+    )
+
+    data = _read_json(project_root / "opencode.json")
+    assert "permission" not in data
+    assert "default_agent" not in data
+    state = _read_state(project_root)
+    assert _RUNTIME_GATE_KEY not in state
+    assert _DEFAULT_AGENT_KEY not in state
+    assert len(log.warnings) == 1, log.warnings
+    assert "primary-role" in log.warnings[0], log.warnings
+    assert "NOT written" in log.warnings[0], log.warnings
+    assert "Opencode" in log.warnings[0], log.warnings
+
+
+def test_strict_with_inactive_primary_role_writes_no_deny(tmp_path):
+    """AC-10: a declared but not-generated primary role writes no deny either."""
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    active_set = SimpleNamespace(roles=frozenset({"developer"}))
+    log = SyncLog()
+
+    _sync(
+        project_root,
+        framework,
+        {"orchestrator": {"mode": "strict"}},
+        _pc(),
+        log,
+        active_set=active_set,
+    )
+
+    data = _read_json(project_root / "opencode.json")
+    assert "permission" not in data
+    assert "default_agent" not in data
+    assert _RUNTIME_GATE_KEY not in _read_state(project_root)
+    assert len(log.warnings) == 1, log.warnings
+    assert "primary-role" in log.warnings[0], log.warnings
+
+
+def test_managed_deny_rolled_back_when_entry_point_disappears(tmp_path):
+    """AC-10: losing the entry point takes the managed deny back — the prior
+    user value is restored (``edit``), an absent one is removed (``bash``), and
+    the ``default_agent`` plus both state namespaces are dropped."""
+    project_root = _make_project(tmp_path)
+    framework = _write_caps(tmp_path / "fw", "Opencode", "permission")
+    config = {"orchestrator": {"mode": "strict"}}
+    (project_root / "opencode.json").write_text(
+        json.dumps({"permission": {"edit": {"**": "allow"}}}) + "\n",
+        encoding="utf-8",
+    )
+
+    _sync(project_root, framework, config, _pc(), SyncLog())
+
+    data = _read_json(project_root / "opencode.json")
+    assert data["permission"]["edit"]["**"] == "deny"
+    assert data["permission"]["bash"]["**"] == "deny"
+    assert data["default_agent"] == "orchestrator"
+
+    log = SyncLog()
+    _sync(project_root, framework, config, _pc(primary=False), log)
+
+    data = _read_json(project_root / "opencode.json")
+    assert data["permission"]["edit"]["**"] == "allow"
+    assert "**" not in data["permission"]["bash"]
+    assert "default_agent" not in data
+    state = _read_state(project_root)
+    assert _RUNTIME_GATE_KEY not in state
+    assert _DEFAULT_AGENT_KEY not in state
+    assert len(log.warnings) == 1, log.warnings
+    assert "primary-role" in log.warnings[0], log.warnings
+
+
+# ---------------------------------------------------------------------------
+# AC-B16 (part 1): the four opencode-v2 state namespaces are dict-valued
+# ---------------------------------------------------------------------------
+
+# Contract literals, deliberately spelled out here (not imported from
+# ``isolation``) so the RED phase fails on the *behaviour* rather than on a
+# missing attribute. The trailing assertions pin the constants to them.
+_V2_NAMESPACES = (
+    "opencode-v2-keys",
+    "opencode-v2-permissions",
+    "opencode-v2-cli",
+    "opencode-v2-mcp",
+)
+
+
+def test_ac_b16_read_state_returns_dict_for_v2_namespaces(tmp_path):
+    """AC-B16: each v2 namespace reads as ``{}`` when the state file is absent,
+    when the namespace key is missing and when a non-dict value is stored —
+    never as ``[]`` (a list default would make the managed-merge engine treat
+    the namespace as an empty list and clobber it on write)."""
+    state_path = tmp_path / _STATE_FILE
+
+    # 1. missing file
+    for namespace in _V2_NAMESPACES:
+        assert isolation._read_state(state_path, namespace) == {}
+
+    # 2. existing file, namespace key absent
+    state_path.parent.mkdir(parents=True)
+    state_path.write_text(
+        json.dumps({_ISOLATION_KEY: ["**/.claude/**"]}) + "\n", encoding="utf-8"
+    )
+    for namespace in _V2_NAMESPACES:
+        assert isolation._read_state(state_path, namespace) == {}
+
+    # 3. existing file, namespace holds a non-dict value
+    state_path.write_text(
+        json.dumps({namespace: [] for namespace in _V2_NAMESPACES}) + "\n",
+        encoding="utf-8",
+    )
+    for namespace in _V2_NAMESPACES:
+        assert isolation._read_state(state_path, namespace) == {}
+
+    # Single source of truth for Task 7 (``opencode_v2_config`` imports these).
+    assert isolation._STATE_V2_KEYS == "opencode-v2-keys"
+    assert isolation._STATE_V2_PERMISSIONS == "opencode-v2-permissions"
+    assert isolation._STATE_V2_CLI == "opencode-v2-cli"
+    assert isolation._STATE_V2_MCP == "opencode-v2-mcp"
+
+
+def test_ac_b16_v2_namespaces_do_not_clobber_siblings(tmp_path):
+    """AC-B16: writing the ``opencode-v2-keys`` namespace preserves the
+    pre-existing ``isolation-deny`` and ``runtime-gate-deny`` namespaces."""
+    state_path = tmp_path / _STATE_FILE
+    state_path.parent.mkdir(parents=True)
+
+    isolation._write_state(state_path, ["**/.claude/**"], dry_run=False)
+    isolation._write_state(
+        state_path,
+        {"**": {"edit": None, "bash": None}},
+        dry_run=False,
+        key=_RUNTIME_GATE_KEY,
+    )
+
+    v2_state = {
+        "experimental.todo": {
+            "value": True, "prior": None, "prior_absent": True,
+        }
+    }
+    isolation._write_state(state_path, v2_state, dry_run=False, key="opencode-v2-keys")
+
+    data = _read_json(state_path)
+    assert data[_ISOLATION_KEY] == ["**/.claude/**"]
+    assert data[_RUNTIME_GATE_KEY] == {"**": {"edit": None, "bash": None}}
+    assert data["opencode-v2-keys"] == v2_state
+
+    # Dropping the v2 namespace again leaves both siblings untouched.
+    isolation._write_state(state_path, {}, dry_run=False, key="opencode-v2-keys")
+    data = _read_json(state_path)
+    assert data[_ISOLATION_KEY] == ["**/.claude/**"]
+    assert data[_RUNTIME_GATE_KEY] == {"**": {"edit": None, "bash": None}}
+    assert "opencode-v2-keys" not in data
+
+
+def test_isolation_namespace_still_returns_list(tmp_path):
+    """Regression guard: list-shaped namespaces keep returning ``[]`` and the
+    two Spec-A dict namespaces keep returning ``{}`` — the v2 extension must not
+    change any existing default."""
+    state_path = tmp_path / _STATE_FILE
+
+    # Absent file: isolation-deny is a list, the Spec-A namespaces are dicts.
+    assert isolation._read_state(state_path) == []
+    assert isolation._read_state(state_path, _ISOLATION_KEY) == []
+    assert isolation._read_state(state_path, _RUNTIME_GATE_KEY) == {}
+    assert isolation._read_state(state_path, _DEFAULT_AGENT_KEY) == {}
+
+    state_path.parent.mkdir(parents=True)
+    isolation._write_state(state_path, ["**/opencode.json"], dry_run=False)
+    isolation._write_state(
+        state_path,
+        {"value": "orchestrator", "prior": None},
+        dry_run=False,
+        key=_DEFAULT_AGENT_KEY,
+    )
+
+    assert isolation._read_state(state_path) == ["**/opencode.json"]
+    assert isolation._read_state(state_path, _ISOLATION_KEY) == ["**/opencode.json"]
+    assert isolation._read_state(state_path, _DEFAULT_AGENT_KEY) == {
+        "value": "orchestrator", "prior": None,
+    }
+    # Missing runtime-gate namespace still degrades to a dict, not a list.
+    assert isolation._read_state(state_path, _RUNTIME_GATE_KEY) == {}

@@ -220,7 +220,7 @@ PROGRAM_FINDINGS: <count>
 
 CISO phase counters: findings per deep-dive checklist; report `0` when the phase ran clean or its domain is out of scope.
 
-Long reports → write to `.tmp/security-auditor-<topic>.md`, return path only.
+Long reports → write to `{{TMP_SINK_PATH}}/security-auditor-<topic>.md`, return path only.
 MERGE_SCORE: start 100; CRITICAL −40, HIGH −20, MEDIUM −10, LOW −5; floor 0.
 {{CLOSING_SUMMARY_BLOCK}}
 

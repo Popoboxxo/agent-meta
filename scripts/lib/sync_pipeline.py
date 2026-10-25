@@ -84,11 +84,19 @@ from lib.gitignore import (
 from lib.hook_plugins import sync_hook_lib, sync_release_gates
 from lib.hooks import sync_hooks
 from lib.io import SyncError, _write_yaml, safe_path, write_atomic
-from lib.isolation import _sync_opencode_runtime_gate, sync_provider_isolation
+from lib.isolation import (
+    _sync_opencode_runtime_gate,
+    reconcile_opencode_surface_gate,
+    sync_provider_isolation,
+)
 from lib.knowledge import sync_knowledge_engine
 from lib.log import SyncLog
 from lib.subagent_permissions import resolve_subagent_permission_provider_vars
 from lib.mcp import generate_mcp_artifacts, sync_secrets_template
+from lib.opencode_v2_config import (
+    sync_opencode_cli_file,
+    sync_opencode_v2_managed_keys,
+)
 from lib.pipelines import (
     PIPELINES_EFFECTIVE_KEY,
     apply_overrides,
@@ -112,6 +120,7 @@ from lib.repo_containment import (
     ensure_tmp_sink_gitignore,
     resolve_effective_repo_containment,
 )
+from lib.tmp_paths import resolve_tmp_paths
 from lib.rules import (
     collect_rule_sources,
     resolve_rules,
@@ -223,15 +232,18 @@ def _sync_stage_tmp_sink(
     provider-overridable), so resolution runs once with ``provider=None``.
     """
     dry_run = bool(getattr(args, "dry_run", False))
+    root = _tmp_sink_project_root(config_path, project_root)
+    # ADR-01: the central resolver owns the tmp-sink path decision. It is
+    # read-only, so dry-run still creates nothing; provisioning and cleanup
+    # keep using the repo_containment helpers, which need the effective flags.
+    paths = resolve_tmp_paths(root, config)
     effective = resolve_effective_repo_containment(config)
     for finding in effective.findings:
         log.warn(f"repo-containment: {finding.message}")
 
-    if not effective.tmp_sink_enabled:
+    if not paths.enabled:
         log.skip("repo-containment", "tmp-sink disabled — no scratch sink provisioned")
         return
-
-    root = _tmp_sink_project_root(config_path, project_root)
 
     cleanup = cleanup_tmp_sink(root, effective, dry_run=dry_run)
     if cleanup is not None:
@@ -1129,6 +1141,10 @@ def _sync_stage_per_provider(
     mcp_registry = load_mcp_registry(agent_meta_root, config, project_root)
     external_tools_registry = load_external_tools_registry(agent_meta_root, config, project_root)
     skill_channel_universe: set[str] | None = None
+    # N-M2 (3) / AC-B20: run-scoped ownership registry — exactly one owner may
+    # act on a managed opencode file per sync run. Created here (never at module
+    # level) so no claim leaks into the next run.
+    opencode_claimed_files: set[str] = set()
 
     for provider in providers:
         pc = provider_config[provider]
@@ -1309,7 +1325,35 @@ def _sync_stage_per_provider(
             _sync_opencode_runtime_gate(
                 project_root, config, provider, provider_config,
                 agent_meta_root, log, args.dry_run,
+                active_set=active_set,
             )
+        # C1.2 / AC-C3/C4/C14/C15/B7/B21/B22: tier-INDEPENDENT surface
+        # reconcile. The single actor for the v2 ``permissions[]`` triples and
+        # the surface-switch rollback. Deliberately outside the ``== "permission"``
+        # block above (Spec-A freeze) and BEFORE the managed-key merge (spec
+        # §3.4 data flow); a no-op for non-owners.
+        reconcile_opencode_surface_gate(
+            project_root, config, provider, provider_config,
+            agent_meta_root, log, args.dry_run,
+            active_set=active_set,
+        )
+        # B.7 / AC-B13/B18/B20: tier-INDEPENDENT v2 managed-key merge/rollback.
+        # Deliberately outside the ``== "permission"`` block above (Spec-A
+        # freeze): the writer is a no-op for non-owners and without v2/state,
+        # and the run-scoped registry makes it order-independent.
+        sync_opencode_v2_managed_keys(
+            project_root, config, provider, provider_config,
+            agent_meta_root, log, args.dry_run,
+            claimed_files=opencode_claimed_files,
+        )
+        # D2 / AC-D7: the dedicated ``cli_file`` of the same surface, directly
+        # after the managed-key merge and outside the ``== "permission"`` block.
+        # A no-op for non-owners, without ``cli_file`` (v1) or without a
+        # configured ``cli`` object (except a recorded rollback).
+        sync_opencode_cli_file(
+            project_root, config, provider, provider_config,
+            log, args.dry_run,
+        )
         if pc.get("has_commands", False):
             sync_commands_for_provider(agent_meta_root, project_root, config, log,
                                        args.dry_run, provider,

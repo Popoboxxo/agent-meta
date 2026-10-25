@@ -10,8 +10,10 @@ declared config **values** — there is no ``if provider == "…"`` branch:
   (Antigravity G-2); an unknown source name passes through unchanged.
 * ``allowed-fields`` / ``reject-fields`` feed the Task-1 validators, so a
   transform output that violates the contract yields ``Finding``s (AC-13).
-* ``frontmatter-mechanism: opencode-native-v2`` emits the ``primary-role``
-  entry as ``mode: primary`` (from the ``primary-role`` data key, OQ-4).
+* ``frontmatter-mechanism: opencode-native`` (v1) and ``opencode-native-v2``
+  (v2) emit the explicit ``primary-role`` entry as ``mode: primary``; without
+  an explicit ``primary-role`` no provider is ever promoted (no code default,
+  OQ-4/#1006 IC-2).
 * ``model-literal: inherit`` emits the literal verbatim with no injected tier
   ID (OQ-6).
 * the ``model-inherit-fallback`` (``provider_transform.py:290-296``) resolves a
@@ -364,10 +366,41 @@ def test_opencode_native_v2_primary_role_comes_from_data_key() -> None:
     assert _frontmatter(out)["mode"] == "subagent"
 
 
-def test_opencode_native_v1_stays_subagent() -> None:
-    """The v1 ``opencode-native`` mechanism is unchanged (no primary entry)."""
+def test_opencode_native_v1_primary_role_emits_primary_others_subagent() -> None:
+    """#1006/IC-2: on v1 the explicit ``primary-role`` is ``mode: primary``."""
     out, _ = _transform("Opencode", role="orchestrator")
+    assert _frontmatter(out)["mode"] == "primary"
+
+    out, _ = _transform("Opencode", role="developer")
     assert _frontmatter(out)["mode"] == "subagent"
+
+
+def test_opencode_native_v2_without_primary_role_emits_no_primary() -> None:
+    """#1006/IC-2: no explicit ``primary-role`` means no ``mode: primary`` — the
+    code default ``'orchestrator'`` is gone (v2 falls back to ``subagent``)."""
+    config = _opencode_v2_config()
+    config["Opencode"].pop("primary-role")
+    out, _ = _transform("Opencode", role="orchestrator", provider_config=config)
+    assert _frontmatter(out)["mode"] == "subagent"
+
+
+def test_mammouth_without_primary_role_stays_subagent() -> None:
+    """#1006/AC-03: a provider that never declares ``primary-role`` stays
+    byte-identical — the guard is the absent data key, not a provider name."""
+    assert "primary-role" not in _PROVIDER_CONFIG["Mammouth"], (
+        "fixture sanity: Mammouth must not declare a primary-role"
+    )
+    out, _ = _transform("Mammouth", role="orchestrator")
+    assert _frontmatter(out)["mode"] == "subagent"
+
+
+def test_mammouth_with_explicit_primary_role_emits_primary() -> None:
+    """#1006/IC-2: declaring ``primary-role`` promotes that role on any provider
+    using an opencode-native mechanism — purely data-driven."""
+    config = copy.deepcopy(_PROVIDER_CONFIG)
+    config["Mammouth"]["primary-role"] = "orchestrator"
+    out, _ = _transform("Mammouth", role="orchestrator", provider_config=config)
+    assert _frontmatter(out)["mode"] == "primary"
 
 
 # ---------------------------------------------------------------------------

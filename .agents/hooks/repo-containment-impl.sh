@@ -1,5 +1,5 @@
 #!/bin/bash
-# version: 1.1.0
+# version: 1.2.0
 # Real repo-containment ("prison mode") logic. NOT a standalone hook —
 # invoked by repo-containment.sh (thin self-health wrapper, issue #630), which
 # pipes the PreToolUse JSON payload to this script's stdin after syntax-
@@ -63,6 +63,17 @@
 # Fail-mode (issue #630): the wrapper owns the missing-/broken-impl handling.
 # This impl itself fails CLOSED on a missing helper lib, a missing python
 # interpreter (issue #595 posture) and on an empty/malformed payload.
+#
+# Anchor rule (fail-closed root resolution, spec §Fail-closed-Design):
+# the repo root is searched from an explicit ANCHOR — the payload `cwd` when
+# present and non-empty, or the directory of an absolute Write/Edit target when
+# `cwd` is missing/empty. `$PWD` is NEVER adopted: the guard process' working
+# directory says nothing about the project a tool call belongs to. If no
+# ancestor of the anchor carries `.meta-config/`, this hook exits 2 with the
+# single code `repo-containment.no-root` instead of promoting the anchor to a
+# root (that promotion was the fail-open this rule closes). A Bash call has no
+# path-shaped target to anchor on (a command may write zero, one or many
+# targets), so Bash without `cwd` fails closed with the same code.
 #
 # Safe-side (F4): a missing, unreadable or unparseable config resolves to
 # ENABLED, and a present-but-non-boolean `enabled` also resolves to ENABLED —
@@ -143,20 +154,73 @@ case "$AGENT_META_PROVIDER" in
   *) PROVIDER="$AGENT_META_PROVIDER" ;;
 esac
 
-# --- Workdir + repo root ----------------------------------------------
-# The payload `cwd` is the directory the tool call runs in. Repo root is the
-# nearest ancestor directory that contains a `.meta-config/` directory — NOT
-# the git toplevel (a project may live inside a larger git repo; containment
-# must follow the agent-meta project root).
-WORKDIR=$(hook_json_get "$INPUT" "cwd")
-if [ -z "$WORKDIR" ]; then
-  WORKDIR="$PWD"
+# --- Realpath helper ---------------------------------------------------
+# stdlib-only (python is already required above), works for a path that does
+# not exist yet, and normalizes symlinks on every platform. Prints "" when the
+# interpreter fails, so callers can treat an unnormalizable anchor as missing.
+resolve_realpath() {
+  "$_PY" -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$1" 2>/dev/null
+}
+
+# --- Target extraction -------------------------------------------------
+# Extracted before the anchor: with a missing/empty `cwd`, an absolute
+# Write/Edit target is what the anchor is derived from.
+FILE_PATH=$(hook_json_get "$INPUT" "tool_input.file_path")
+BASH_CMD=$(hook_json_get "$INPUT" "tool_input.command")
+
+if [ "$TOOL_NAME" = "Write" ] || [ "$TOOL_NAME" = "Edit" ]; then
+  if [ -z "$FILE_PATH" ]; then
+    echo "REPO_CONTAINMENT: no tool_input.file_path in the payload for $TOOL_NAME." >&2
+    echo "Failing closed — the write target cannot be evaluated." >&2
+    exit 2
+  fi
 fi
-case "$WORKDIR" in
-  /*) ;;
-  *) WORKDIR="$PWD/$WORKDIR" ;;
+
+# A commandless Bash call cannot write anything and needs no anchor.
+if [ "$TOOL_NAME" = "Bash" ] && [ -z "$BASH_CMD" ]; then
+  exit 0
+fi
+
+# --- Anchor ------------------------------------------------------------
+# Anchor precedence (spec §Fail-closed-Design "Vertrag" point 1):
+#   1. payload `cwd` present, non-empty and absolute -> realpath(cwd)
+#   2. else target absolute (Write/Edit)             -> realpath(dirname(target))
+#   3. else                                          -> no anchor, fail closed
+# `$PWD` is never a fallback, not even implicitly: a RELATIVE `cwd` is ignored
+# as an anchor (resolving it would silently adopt the guard's own working
+# directory). Providers send an absolute `cwd`; a relative one is treated like
+# a missing one, so an absolute Write/Edit target can still anchor the search.
+CWD_RAW=$(hook_json_get "$INPUT" "cwd")
+WORKDIR=""
+ANCHOR_SOURCE="none"
+case "$CWD_RAW" in
+  /*)
+    WORKDIR="$(resolve_realpath "$CWD_RAW")"
+    ANCHOR_SOURCE="cwd"
+    ;;
 esac
 
+if [ -z "$WORKDIR" ]; then
+  case "$TOOL_NAME" in
+    Write|Edit)
+      case "$FILE_PATH" in
+        /*)
+          WORKDIR="$(resolve_realpath "$(dirname "$FILE_PATH")")"
+          ANCHOR_SOURCE="target"
+          ;;
+      esac
+      ;;
+    # Bash deliberately has no target-derived anchor: a command is not a path,
+    # and picking one of its (possibly many, possibly computed) write targets as
+    # the anchor would trust more parse evidence than this best-effort detector
+    # claims. No `cwd` therefore means no anchor -> fail closed below.
+  esac
+fi
+
+# --- Repo root (no promotion, no $PWD) --------------------------------
+# The nearest ancestor of the ANCHOR that contains a `.meta-config/`
+# directory — NOT the git toplevel (a project may live inside a larger git
+# repo; containment must follow the agent-meta project root).
 resolve_repo_root() {
   local dir="$1" parent
   while [ -n "$dir" ]; do
@@ -172,11 +236,92 @@ resolve_repo_root() {
   return 1
 }
 
+# Print a human-readable, absolute form of a target for a block message.
+# Falls back to the raw value when it cannot be normalized (python failure).
+display_target() {
+  local raw="${1:-}" resolved=""
+  case "$raw" in
+    '') printf '%s' "(none)"; return 0 ;;
+    /*) resolved="$(resolve_realpath "$raw")" ;;
+    *)
+      if [ -n "$WORKDIR" ]; then
+        resolved="$(resolve_realpath "$WORKDIR/$raw")"
+      fi
+      ;;
+  esac
+  printf '%s' "${resolved:-$raw}"
+}
+
+# Message for "anchor exists, but no project root above it" (spec §Fehlermeldungen).
+no_root_block() {
+  local target="$1"
+  echo "REPO_CONTAINMENT: no project root found above $WORKDIR (code repo-containment.no-root)." >&2
+  echo "  A project root is a directory that contains \`.meta-config/\`." >&2
+  echo "  This guard never promotes the working directory to a project root." >&2
+  echo "  target:    $target" >&2
+  echo "  anchor:    $WORKDIR            (payload \`cwd\`, or the target's own directory when \`cwd\` is missing)" >&2
+  if [ -n "$CWD_RAW" ] && [ "$CWD_RAW" != "$WORKDIR" ]; then
+    echo "  resolved:  payload \`cwd\` $CWD_RAW -> $WORKDIR (resolved)" >&2
+  fi
+  echo "  allowed:   only inside a project root (plus its configured tmp-sink)" >&2
+  echo "  repair:    run \`python scripts/sync.py\` in the project, or open the session" >&2
+  echo "             inside the project directory" >&2
+  echo "  opt-out:   repo_containment.enabled: false in <project>/.meta-config/project.yaml" >&2
+}
+
+# Message for "no anchor at all": a relative Write/Edit target without `cwd`
+# (spec §Fehlermeldungen, second skeleton). Same code, distinct reason.
+no_anchor_block() {
+  local target="$1"
+  echo "REPO_CONTAINMENT: no project root found for a relative target without \`cwd\`" >&2
+  echo "(code repo-containment.no-root)." >&2
+  echo "  A relative path cannot be anchored: the payload carried no \`cwd\` (or an empty one)" >&2
+  echo "  and the target is not absolute. Failing closed." >&2
+  echo "  target:    $target" >&2
+  if [ -n "$CWD_RAW" ]; then
+    echo "  note:      payload \`cwd\` '$CWD_RAW' is not absolute and cannot anchor a root search." >&2
+  fi
+  echo "  repair:    re-run \`python scripts/sync.py\` for this provider (hook payload contract, issue #630);" >&2
+  echo "             send an absolute \`file_path\`, or include \`cwd\` in the payload" >&2
+}
+
+# Message for Bash without an anchor. There is no spec skeleton for this case
+# (the anchor rule is path-shaped); documented reading: fail closed with the
+# same single code rather than guess an anchor from a command string.
+bash_no_anchor_block() {
+  local command="$1"
+  echo "REPO_CONTAINMENT: no project root found for a Bash command without \`cwd\`" >&2
+  echo "(code repo-containment.no-root)." >&2
+  echo "  A Bash command is not a path: unlike Write/Edit it has no single target" >&2
+  echo "  directory to anchor a project-root search on. Failing closed." >&2
+  echo "  command:   $command" >&2
+  if [ -n "$CWD_RAW" ]; then
+    echo "  note:      payload \`cwd\` '$CWD_RAW' is not absolute and cannot anchor a root search." >&2
+  fi
+  echo "  repair:    re-run \`python scripts/sync.py\` for this provider (hook payload contract, issue #630);" >&2
+  echo "             include \`cwd\` in the payload" >&2
+}
+
+if [ -z "$WORKDIR" ]; then
+  if [ "$TOOL_NAME" = "Bash" ]; then
+    bash_no_anchor_block "$(printf '%s' "$BASH_CMD" | head -c 200)"
+  else
+    no_anchor_block "$FILE_PATH"
+  fi
+  exit 2
+fi
+
 REPO_ROOT="$(resolve_repo_root "$WORKDIR")" || REPO_ROOT=""
 if [ -z "$REPO_ROOT" ]; then
-  # No .meta-config/ anywhere above the workdir: treat the workdir itself as
-  # the root and let the safe-side config defaults apply (containment ON).
-  REPO_ROOT="$WORKDIR"
+  # No `.meta-config/` above the anchor: do NOT invent a root from the anchor
+  # (the old fail-open) and do NOT read any config — a foreign project's
+  # `enabled: false` must never unlock a write outside it.
+  if [ "$TOOL_NAME" = "Bash" ]; then
+    no_root_block "$(printf '%s' "$BASH_CMD" | head -c 200)"
+  else
+    no_root_block "$(display_target "$FILE_PATH")"
+  fi
+  exit 2
 fi
 CONFIG_FILE="$REPO_ROOT/.meta-config/project.yaml"
 
@@ -313,6 +458,12 @@ while IFS='=' read -r _key _value; do
   esac
 done < <(printf '%s\n' "$CONFIG_OUT")
 
+# Absolute sink for messages and for the allow-list text (AC-18): the hook's
+# effective sink is the realpath of <root>/<sink>, matching
+# scripts/lib/tmp_paths.py::resolve_tmp_paths(...).absolute (shared contract,
+# tests/test_repo_containment_hook.py::test_hook_sink_matches_tmp_paths).
+SINK_ABS="$(resolve_realpath "$REPO_ROOT/$SINK_PATH")"
+
 # enabled: false -> no enforcement at all (spec §4.1).
 if [ "$ENABLED" != "1" ]; then
   exit 0
@@ -367,34 +518,45 @@ print("BLOCK")
 PYEOF
 }
 
+# How the anchor was obtained, for block messages (the no-root message keeps
+# the spec's fixed parenthetical instead).
+anchor_label() {
+  case "$ANCHOR_SOURCE" in
+    target) printf '%s' "the target's own directory; payload carried no \`cwd\`" ;;
+    *) printf '%s' "payload \`cwd\`" ;;
+  esac
+}
+
 block_write() {
-  local target="$1" reason="${2:-outside}"
+  local target="$1" reason="${2:-outside}" absolute
+  absolute="$(display_target "$target")"
   if [ "$reason" = "sink-disabled" ]; then
     echo "REPO_CONTAINMENT: write target is inside the configured but DISABLED tmp-sink (prison mode)." >&2
-    echo "  target:    $target" >&2
-    echo "  reason:    the tmp-sink ($REPO_ROOT/$SINK_PATH) is writable only when" >&2
+    echo "  target:    $absolute" >&2
+    echo "  reason:    the tmp-sink ($SINK_ABS) is writable only when" >&2
     echo "             repo_containment.tmp-sink.enabled: true." >&2
+    echo "  anchor:    $WORKDIR            ($(anchor_label))" >&2
+    echo "  repair:    set repo_containment.tmp-sink.enabled: true in" >&2
+    echo "             $REPO_ROOT/.meta-config/project.yaml, or write outside the tmp-sink." >&2
   else
     echo "REPO_CONTAINMENT: write target is outside the repository root (prison mode)." >&2
-    echo "  target:    $target" >&2
+    echo "  target:    $absolute" >&2
     echo "  repo root: $REPO_ROOT" >&2
     if [ "$SINK_ENABLED" = "1" ]; then
-      echo "  allowed:   paths under $REPO_ROOT and under $REPO_ROOT/$SINK_PATH" >&2
+      echo "  allowed:   paths under $REPO_ROOT and under $SINK_ABS" >&2
     else
-      echo "  allowed:   paths under $REPO_ROOT (the tmp-sink subtree is disabled)" >&2
+      echo "  allowed:   paths under $REPO_ROOT (the tmp-sink subtree $SINK_ABS is disabled)" >&2
     fi
+    echo "  anchor:    $WORKDIR            ($(anchor_label))" >&2
+    echo "  repair:    write inside $REPO_ROOT (or its tmp-sink), or re-run" >&2
+    echo "             \`python scripts/sync.py\` in the project" >&2
   fi
-  echo "  Opt-out: set repo_containment.enabled: false in .meta-config/project.yaml." >&2
+  echo "  opt-out:   repo_containment.enabled: false in $REPO_ROOT/.meta-config/project.yaml" >&2
 }
 
 # --- Write/Edit: check the explicit target path ------------------------
+# FILE_PATH was extracted above (the anchor may depend on it).
 if [ "$TOOL_NAME" = "Write" ] || [ "$TOOL_NAME" = "Edit" ]; then
-  FILE_PATH=$(hook_json_get "$INPUT" "tool_input.file_path")
-  if [ -z "$FILE_PATH" ]; then
-    echo "REPO_CONTAINMENT: no tool_input.file_path in the payload for $TOOL_NAME." >&2
-    echo "Failing closed — the write target cannot be evaluated." >&2
-    exit 2
-  fi
   case "$(containment_verdict "$FILE_PATH")" in
     ALLOW) exit 0 ;;
     BLOCK_SINK)
@@ -418,11 +580,8 @@ fi
 # documented best-effort status (the config-doubt safe-side rule above is
 # unaffected).
 if [ "$TOOL_NAME" = "Bash" ]; then
-  BASH_CMD=$(hook_json_get "$INPUT" "tool_input.command")
-  if [ -z "$BASH_CMD" ]; then
-    exit 0
-  fi
-
+  # BASH_CMD was extracted above (an empty one already exited 0 before the
+  # anchor step).
   WRITE_TARGETS=$(printf '%s' "$BASH_CMD" | "$_PY" -c '
 import os
 import re
