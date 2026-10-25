@@ -144,10 +144,11 @@ def resolve_tmp_paths(project_root: Path, config: Optional[dict]) -> TmpPaths:
     ``tmp-sink.invalid-path`` (lexical/path/location checks, also while
     disabled) and ``tmp-sink.system-temp-exception``.
 
-    The enabled sink directory is provisioned through
-    :func:`lib.repo_containment.ensure_tmp_sink` (idempotent, never deletes) so
-    that AC-12's requirement — every pinned env value *exists* as a directory —
-    holds for callers without an extra provisioning step.
+    Resolution is **pure**: it never creates the sink directory, so a
+    ``sync.py --dry-run`` (which builds variables and runs this resolver) stays
+    free of filesystem mutations. Provisioning lives in the consuming APIs
+    that actually need an existing directory — :func:`tmp_env` (AC-12) — while
+    :func:`tmp_sink_env_pin_block` renders the existence check instead (AC-36).
     """
     root = Path(project_root)
     effective = rc.resolve_effective_repo_containment(config)
@@ -183,13 +184,6 @@ def resolve_tmp_paths(project_root: Path, config: Optional[dict]) -> TmpPaths:
                 "tmp-sink.invalid-path",
                 f"repo_containment.tmp-sink.path {relative!r}: "
                 "not resolvable (link escape or invalid segment)",
-            )
-        provisioned = rc.ensure_tmp_sink(root, effective)
-        if provisioned is None or Path(provisioned) != absolute:
-            raise rc.TmpSinkError(
-                "tmp-sink.invalid-path",
-                f"repo_containment.tmp-sink.path {relative!r}: "
-                "not resolvable while provisioning",
             )
         env = rc.work_dir_env(absolute)
 
@@ -302,6 +296,10 @@ def tmp_env(paths: TmpPaths, base: Optional[dict] = None) -> dict[str, str]:
     ``tmp-sink.disabled`` for a disabled sink.
     """
     absolute = _require_enabled(paths, "tmp_env")
+    # AC-12: the pinned values must *exist* as directories. Provisioning happens
+    # here (not in resolve_tmp_paths) so resolution stays read-only and dry-run
+    # never mutates the filesystem. Idempotent; never deletes (ADR-02).
+    absolute.mkdir(parents=True, exist_ok=True)
     env = rc.work_dir_env(absolute, base)
     for key in TMP_ENV_KEYS:
         env[key] = str(absolute)

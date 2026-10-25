@@ -7,6 +7,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -480,6 +481,33 @@ def _validate_providers(config: dict, config_path: Path) -> None:
         _reject(raw, "ai-providers")
 
 
+#: Token replaced in ``TEST_COMMANDS``/``CODE_QUALITY_RULES`` (IC-05/AC-13).
+PYTEST_BASETEMP_TOKEN = "{{PYTEST_BASETEMP}}"
+
+
+def _replace_pytest_basetemp_token(value: str, basetemp: str) -> str:
+    """Replace ``{{PYTEST_BASETEMP}}`` with the shell-quoted basetemp (AC-13/AC-34).
+
+    The value is embedded as ``--basetemp="<path>"`` so a temp root containing
+    spaces survives ``shlex.split`` as exactly one argument. An already-quoted
+    token (``"{{PYTEST_BASETEMP}}"``) is rewritten without doubling the quotes.
+    ``basetemp`` is validated upstream (no ``"``/line breaks) by
+    :func:`lib.tmp_paths.resolve_pytest_basetemp`.
+    """
+    if f'"{PYTEST_BASETEMP_TOKEN}"' in value:
+        value = value.replace(f'"{PYTEST_BASETEMP_TOKEN}"', basetemp)
+    return value.replace(PYTEST_BASETEMP_TOKEN, f'"{basetemp}"')
+
+
+def _path_is_inside(root: Path, candidate: str) -> bool:
+    """True when ``candidate`` resolves to ``root`` or below (realpath-based)."""
+    try:
+        base = os.path.realpath(os.fspath(root))
+        return os.path.commonpath([base, os.path.realpath(candidate)]) == base
+    except ValueError:  # different drives
+        return False
+
+
 def _validate_repo_containment(config: dict, config_path: Path) -> None:
     """Hard-validate the optional 'repo_containment' block (spec §4.3).
 
@@ -572,6 +600,51 @@ def _validate_repo_containment(config: dict, config_path: Path) -> None:
             "invalid 'repo_containment.tmp-sink.cleanup': expected one of "
             f"{', '.join(TMP_SINK_CLEANUP_MODES)}, got {cleanup!r}."
         )
+
+    # system-temp-exception matrix (AC-15, IC-12). Validated here — the single
+    # hard exit — so the resolver can stay non-exiting library code. An absent
+    # block inherits the framework defaults (enabled + pytest-basetemp) and is
+    # always valid; ``toolchain-caches`` semantic checks are Task 19's scope.
+    exception = sink.get("system-temp-exception")
+    if exception is not None:
+        if not isinstance(exception, dict):
+            _fail(
+                "invalid 'repo_containment.tmp-sink.system-temp-exception': "
+                f"expected a mapping, got {type(exception).__name__}."
+            )
+        for key in ("enabled", "pytest-basetemp"):
+            if key in exception and not isinstance(exception[key], bool):
+                _fail(
+                    "invalid 'repo_containment.tmp-sink.system-temp-exception."
+                    f"{key}': expected true/false (bool), got "
+                    f"{exception[key]!r} ({type(exception[key]).__name__})."
+                )
+        exc_enabled = exception.get("enabled", True)
+        exc_pytest_basetemp = exception.get("pytest-basetemp", True)
+        if exc_pytest_basetemp and not exc_enabled:
+            _fail(
+                "invalid 'repo_containment.tmp-sink.system-temp-exception': "
+                "'pytest-basetemp: true' requires 'enabled: true'."
+            )
+        reason = exception.get("reason")
+        if exc_enabled and (not isinstance(reason, str) or not reason.strip()):
+            _fail(
+                "invalid 'repo_containment.tmp-sink.system-temp-exception."
+                "reason': required when the exception is enabled "
+                "(document why writes leave the repo)."
+            )
+        sink_enabled = sink.get("enabled", True)
+        uses_system_temp = exc_pytest_basetemp and (
+            exc_enabled or not sink_enabled
+        )
+        if uses_system_temp:
+            temp_root = tempfile.gettempdir()
+            if _path_is_inside(config_path.parent.parent, temp_root):
+                _fail(
+                    "tmp-sink.system-temp-exception: platform temp root "
+                    f"{temp_root!r} is inside the project root — the "
+                    "exception cannot take effect."
+                )
 
     path = sink.get("path")
     if path is not None:
@@ -1499,7 +1572,7 @@ def _build_provider_variables(
 
 def _build_orch_variables(
     variables: dict, unmapped: list[str], config: dict, agent_meta_root: Path,
-    active_set: ActiveSet | None = None,
+    active_set: ActiveSet | None = None, project_root: Path | None = None,
 ) -> None:
     """Populate orchestrator/A2A/native-extensions/analysis flag variables.
 
@@ -1517,6 +1590,9 @@ def _build_orch_variables(
             template and the analysis module).
         active_set: the per-sync ActiveSet (computed when omitted); filters
             ANTI_RECURSION_BLOCK and DIRECT_DISPATCH_SECTION (IC-18 no. 6/7).
+        project_root: the consuming project's root (where ``.meta-config/``
+            lives); needed to resolve the tmp-sink paths. Falls back to
+            ``agent_meta_root`` for self-hosting/test callers.
     """
     active_set = _resolve_active_set(active_set, config, agent_meta_root)
     orch_config = config.get("orchestrator", {})
@@ -1540,6 +1616,40 @@ def _build_orch_variables(
     # TMP_SINK_PATH (IC-34): configured tmp-sink path for role templates; same
     # resolution as REPO_CONTAINMENT_TMP_PATH. Provided only, not yet rendered.
     variables["TMP_SINK_PATH"] = variables["REPO_CONTAINMENT_TMP_PATH"]
+    # IC-05/ADR-01: every other tmp-sink form comes from the single resolver.
+    # TMP_SINK_ABS_PATH/TMP_SINK_ENV_PIN_BLOCK are omitted for a disabled sink
+    # (AC-25); PYTEST_BASETEMP is always available and shell-quoted into the
+    # configured suite commands (AC-13/AC-34). A leftover token is a hard
+    # failure (AC-14) — the sync CLI maps SyncError to rc 1.
+    from .repo_containment import TmpSinkError
+    from .tmp_paths import resolve_tmp_paths, tmp_sink_env_pin_block
+
+    _tmp_root = (
+        Path(project_root) if project_root is not None else Path(agent_meta_root)
+    )
+    try:
+        _tmp_paths = resolve_tmp_paths(_tmp_root, config)
+    except TmpSinkError as exc:
+        raise SyncError(str(exc)) from exc
+    if _tmp_paths.enabled and _tmp_paths.absolute is not None:
+        variables["TMP_SINK_ABS_PATH"] = str(_tmp_paths.absolute)
+        variables["TMP_SINK_ENV_PIN_BLOCK"] = tmp_sink_env_pin_block(_tmp_paths)
+    variables["PYTEST_BASETEMP"] = _tmp_paths.pytest_basetemp
+    for _token_key in ("TEST_COMMANDS", "CODE_QUALITY_RULES"):
+        _token_value = variables.get(_token_key)
+        if isinstance(_token_value, str):
+            variables[_token_key] = _replace_pytest_basetemp_token(
+                _token_value, _tmp_paths.pytest_basetemp
+            )
+    if any(
+        isinstance(variables.get(_token_key), str)
+        and PYTEST_BASETEMP_TOKEN in variables[_token_key]
+        for _token_key in ("TEST_COMMANDS", "CODE_QUALITY_RULES")
+    ):
+        raise SyncError(
+            "tmp-sink.pytest-token: '{{PYTEST_BASETEMP}}' was not resolved in "
+            "TEST_COMMANDS/CODE_QUALITY_RULES."
+        )
     # A2A_PROTOCOL_ENABLED: structured agent-to-agent handoff envelope.
     # Active when orchestrator.handoff.protocol is set (default "a2a-v1").
     # Disable via handoff.protocol: none/false to drop the ~90-line A2A section.
@@ -2203,7 +2313,10 @@ def build_variables(
     variables.update(active_set_variables(active_set))
     _build_provider_variables(
         variables, config, agent_meta_root, warn_sink=unmapped, active_set=active_set)
-    _build_orch_variables(variables, unmapped, config, agent_meta_root, active_set=active_set)
+    _build_orch_variables(
+        variables, unmapped, config, agent_meta_root,
+        active_set=active_set, project_root=project_root,
+    )
     _build_subagent_permission_variables(variables, config)
     _build_platform_variables(variables, unmapped, config, agent_meta_root, active_set)
     dod_resolved = _build_dod_variables(variables, config, agent_meta_root)

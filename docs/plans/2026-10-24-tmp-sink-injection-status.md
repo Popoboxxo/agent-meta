@@ -15,7 +15,7 @@ Spalte `Commit` bleibt `— (pending)`, bis der jeweilige Commit tatsächlich ex
 | Task | Title | Status | Commit | Notes |
 |---|---|---|---|---|
 | 1 | Zentraler Tmp-Paths-Resolver | done | — (pending) | Steps 1–3 grün; Step 4 (Commit) offen, weil der Subagent keinen Commit-Auftrag hatte |
-| 2 | Builder-Variablen und Ausnahme-Validierung | pending | — (pending) | — |
+| 2 | Builder-Variablen und Ausnahme-Validierung | done | — (pending) | Steps 1–3 grün; Step 4 (Commit) offen (kein Commit-Auftrag) |
 | 3 | Suite-Kommando literal-frei rendern | pending | — (pending) | — |
 | 4 | Achtzehn System-Temp-Literale in sieben Templates ersetzen | pending | — (pending) | — |
 | 5 | Vier Sink-Literale in Auditor-Templates | pending | — (pending) | — |
@@ -96,7 +96,70 @@ ERROR tests/test_tmp_sink_output_dirs.py
    Implementiert: `tmp-sink.system-temp-exception`.
 4. **Step 4 (Commit) nicht ausgeführt** — kein Commit-Auftrag für diesen Subagenten
    (siehe Spalte `Commit`).
-5. **Provisionierung im Resolver:** AC-12 verlangt, dass die drei Env-Werte als
-   Verzeichnis existieren. Der Resolver ruft dafür `ensure_tmp_sink` auf (idempotent,
-   löscht nie, keine eigene `mkdir`-Logik). Das ist ein dokumentierter
-   Dateisystem-Nebeneffekt von `resolve_tmp_paths` bei aktivem Sink.
+5. **Provisionierung im Resolver (in Task 2 korrigiert):** AC-12 verlangt, dass die drei
+   Env-Werte als Verzeichnis existieren. Task 1 provisionierte dafür im
+   `resolve_tmp_paths`; Task 2 hat das entfernt, weil ein `sync.py --dry-run` sonst
+   `.tmp` anlegt. Provisionierung lebt jetzt in `tmp_env` (AC-12), der Env-Pin-Block
+   prüft die Existenz zur Laufzeit (AC-36) — der Resolver bleibt schreibfrei.
+
+## Evidence — Task 2
+
+### Rot (vor der Implementierung)
+
+`python3 -m pytest tests/test_tmp_paths_builder.py tests/test_repo_containment_validate.py tests/test_repo_containment_schema.py -q`
+→ `16 failed, 62 passed`; die beiden geforderten Anker:
+
+```
+tests/test_tmp_paths_builder.py::test_builder_sets_absolute_and_relative_sink
+>       absolute = variables["TMP_SINK_ABS_PATH"]
+E       KeyError: 'TMP_SINK_ABS_PATH'
+
+tests/test_tmp_paths_builder.py::test_unresolved_pytest_token_fails_sync
+>       monkeypatch.setattr("lib.config._replace_pytest_basetemp_token", ...)
+E       AttributeError: 'module' object at lib.config has no attribute '_replace_pytest_basetemp_token'
+```
+
+### Grün (nach der Implementierung)
+
+| # | Kommando | Ergebnis |
+|---|---|---|
+| 1 | `python3 -m pytest tests/test_tmp_paths_builder.py tests/test_repo_containment_validate.py tests/test_repo_containment_schema.py -q` | `78 passed`, Exit 0 |
+| 2 | `python3 -m pytest tests/test_tmp_sink_output_dirs.py tests/test_tmp_sink_path_parity.py tests/test_tmp_sink_path_hardening.py tests/test_tmp_sink_default_on.py tests/test_tmp_sink_migration_error.py -q` | `274 passed`, Exit 0 |
+| 3 | `python3 scripts/sync.py --validate` | Exit 0, `0 action(s) \| 382 skipped \| 2 warning(s)` (beide vorbestehend) |
+| 4 | `python3 scripts/sync.py --dry-run` | Exit 0 |
+| 5 | `python3 scripts/sync.py --config <scratch>/.meta-config/project.yaml --dry-run` (Sink aktiv) | Exit 0, `DRY-RUN: would provision tmp-sink .tmp/`, **kein** `.tmp` angelegt |
+| 6 | `ast.parse(..., feature_version=(3, 9))` für `config.py`, `consistency/placeholders.py`, `sync_pipeline.py`, `tmp_paths.py` | alle `ok` |
+| 7 | Alle 48 Testmodule, die `build_variables` referenzieren (u. a. `test_ac01_render_identity`, `test_compact_matrix`, `test_build_variables_*`, `test_template_slimming_equivalence`) | grün (batchweise; langsame Matrix-Tests unverändert langsam) |
+
+### Abgedeckte ACs (Task 2)
+
+- **AC-13** — `test_builder_resolves_pytest_token_in_both_values`
+- **AC-14** — `test_unresolved_pytest_token_fails_sync` (Builder wirft `SyncError`
+  `tmp-sink.pytest-token`; der Sync-CLI mappt das auf Exit 1)
+- **AC-15** — `test_system_temp_exception_matrix` (4 Fälle, parametrisiert, inkl.
+  `gettempdir()` im Projekt), `test_repo_containment_validate.py::test_system_temp_exception_*`,
+  `test_repo_containment_schema.py::test_system_temp_exception_*`
+- **AC-16** — `test_builder_sets_absolute_and_relative_sink`
+- **AC-25** — `test_disabled_sink_omits_absolute_variables`,
+  `test_disabled_sink_sync_dry_run_is_successful`
+- **AC-35** — `test_env_pin_block_is_absolute`
+
+### Abweichungen von der Aufgabenbeschreibung (Spec ist normativ)
+
+1. **`_fail` vs. `SyncError`:** `_build_orch_variables` liegt in einer Bibliothek ohne
+   `config_path` und wird u. a. von `meta_optimizer` aufgerufen. Statt `sys.exit` wirft
+   der Builder bei Rest-Token `SyncError` mit dem wörtlichen Spec-Text
+   (`tmp-sink.pytest-token: '{{PYTEST_BASETEMP}}' was not resolved in
+   TEST_COMMANDS/CODE_QUALITY_RULES.`); der Sync-CLI fängt `SyncError` bereits ab und
+   beendet mit Exit 1. Kein `sys.exit` in der Bibliothek.
+2. **`_sync_stage_tmp_sink` statt `_sync_tmp_sink`:** der reale Funktionsname (Plan
+   nennt den veralteten Namen); `resolve_effective_repo_containment` bleibt zusätzlich
+   nötig, weil `cleanup_tmp_sink`/`ensure_tmp_sink_gitignore` das Effective-Objekt
+   verlangen — `resolve_tmp_paths` liefert nur `TmpPaths`.
+3. **Schema-Datei ergänzt:** `config/project-config.schema.json` steht nicht in der
+   Files-Liste, ist aber zwingend (`tmp-sink.additionalProperties: false` würde den
+   neuen Key sonst ablehnen). `system-temp-exception` ist als geschlossenes Objekt
+   unter `tmp-sink` ergänzt.
+4. **Task-1-Tests angepasst:** `test_env_pin_block_is_absolute` und
+   `test_env_pin_block_refuses_missing_directory` provisionieren jetzt explizit über
+   `tmp_env(paths)`, weil der Resolver seit Task 2 schreibfrei ist (Dry-Run-Sicherheit).

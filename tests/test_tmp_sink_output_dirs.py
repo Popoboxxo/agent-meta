@@ -311,6 +311,9 @@ def test_relative_and_absolute_sink_variables(tmp_path):
 def test_env_pin_block_is_absolute(tmp_path):
     """AC-35: the block pins all three vars to the absolute sink."""
     paths = resolve_tmp_paths(tmp_path, _cfg())
+    # Resolution/provisioning are separate since Task 2: tmp_env creates the
+    # sink (AC-12), the resolver itself stays write-free for dry-run safety.
+    tmp_env(paths)
     block = tmp_sink_env_pin_block(paths)
 
     assert f"TMPDIR={paths.relative}" not in block
@@ -333,6 +336,7 @@ def test_env_pin_block_is_absolute(tmp_path):
 def test_env_pin_block_refuses_missing_directory(tmp_path):
     """AC-36: a dead sink path is not exported; the repair hint is printed."""
     paths = resolve_tmp_paths(tmp_path, _cfg())
+    tmp_env(paths)  # provision (AC-12), then simulate the moved repo below
     block = tmp_sink_env_pin_block(paths)
     shutil.rmtree(paths.absolute)
     assert not paths.absolute.exists()
