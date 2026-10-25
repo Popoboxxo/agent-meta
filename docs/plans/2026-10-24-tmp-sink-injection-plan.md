@@ -498,10 +498,10 @@ Modulname korrigiert gegen die Vorgabe: die Spec nennt `scripts/lib/consistency/
 
 **Rot zuerst:** `test_warning_and_allowlist` scheitert mit `ImportError`, weil `lib.consistency.temp_literals` fehlt.
 
-- [ ] Step 1: Tests schreiben (rot): AC-21 (Template mit `/tmp/x` ⇒ WARNING `temp-literal.system-temp` mit Datei und Zeile, Exit 0; Allowlist-Eintrag `{path, pattern, reason}` ⇒ keine Meldung), Scope-Test (jede der sechs Wurzeln wird geprüft), Fixture-Vollständigkeits-Check (der Fixture-Eintrag enthält `path`, `pattern` und `reason`). Schema-Erzwingung (fehlendes `reason`, `expires`) ist Task 22 (AC-39).
-- [ ] Step 2: Modul implementieren, in `scripts/consistency-check.py` und im `_strict_findings`-Block registrieren (WARNING, kein Exit).
-- [ ] Step 3: `python3 -m pytest tests/test_consistency_temp_literals.py -q` grün; `python3 scripts/sync.py --validate` zeigt keine neuen ERROR.
-- [ ] Step 4: Commit `feat: warn on system temp literals in shipped text`.
+- [x] Step 1: Tests schreiben (rot): AC-21 (Template mit `/tmp/x` ⇒ WARNING `temp-literal.system-temp` mit Datei und Zeile, Exit 0; Allowlist-Eintrag `{path, pattern, reason}` ⇒ keine Meldung), Scope-Test (jede der sechs Wurzeln wird geprüft), Fixture-Vollständigkeits-Check (der Fixture-Eintrag enthält `path`, `pattern` und `reason`). Schema-Erzwingung (fehlendes `reason`, `expires`) ist Task 22 (AC-39).
+- [x] Step 2: Modul implementieren, in `scripts/consistency-check.py` und im `_strict_findings`-Block registrieren (WARNING, kein Exit).
+- [x] Step 3: `python3 -m pytest tests/test_consistency_temp_literals.py -q` grün; `python3 scripts/sync.py --validate` zeigt keine neuen ERROR.
+- [ ] Step 4: Commit `feat: warn on system temp literals in shipped text` — offen: der Auftrag für Task 14 lautet ausdrücklich „do not commit/push"; Commit-Authority bleibt beim `git`-Agenten.
 
 ## Phase P5 — Guards, Goldens, Doku
 

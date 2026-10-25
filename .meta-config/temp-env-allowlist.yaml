@@ -89,11 +89,3 @@ entries:
   - path: "scripts/lib/se_export/github_issues_adapter.py"
     symbol: "_run_gh"
     reason: "external-cli: generic gh command runner; the gh CLI owns its temp files"
-
-  # -- deferred: owned by a later task (must be pinned there) --------------
-  - path: "scripts/lib/cli_commands.py"
-    symbol: "_build_context"
-    reason: "deferred: launches admin-server; cli_commands.py is owned by Task 14, pin in a follow-up"
-  - path: "scripts/lib/cli_commands.py"
-    symbol: "_run_common_tail"
-    reason: "deferred: launches admin-server; cli_commands.py is owned by Task 14, pin in a follow-up"

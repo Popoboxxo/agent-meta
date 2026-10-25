@@ -27,7 +27,7 @@ Spalte `Commit` bleibt `— (pending)`, bis der jeweilige Commit tatsächlich ex
 | 11 | Subprozess-Klassifikation und Backup-Staging | done | — (pending) | Steps 1–3 grün; AC-09/10/11; Backup-Staging via `resolve_output_dir("backup-staging")`, Fallback nur bei `tmp-sink.disabled`; 10 der 12 bekannten Aufrufe gepinnt, 2 `taskkill` allowlisted; Guard scannt `scripts/**` (42 Ausreißer → 21 Allowlist-Einträge, u. a. `deferred` für Task-14-Datei); Step 4 (Commit) offen, kein Commit-Auftrag |
 | 12 | Gitignore- und Doctor-Zweitparser entfernen | done | — (pending) | Steps 1–3 grün; AC-31/AC-32; `_tmp_sink_gitignore_entry(paths)` aus `TmpPaths.relative`, `_sink_hits` nutzt `resolve_tmp_paths` und übernimmt den Resolver-`reason`; AST-Guard gegen Zweitparser; Step 4 (Commit) offen, kein Commit-Auftrag |
 | 13 | Opencode-Schreibscope aus dem Sink ableiten | done | — (pending) | Steps 1–3 grün; `edit_allow_paths` = `TmpPaths.relative`-Glob + statische `.meta-viz/**`-Liste; statische Liste auf `.meta-viz/**` reduziert; AC-17/AC-20; Step 4 (Commit) offen, kein Commit-Auftrag |
-| 14 | Consistency-Check für Temp-Literale | pending | — (pending) | — |
+| 14 | Consistency-Check für Temp-Literale | done | — (pending) | Steps 1–3 grün; AC-21/IC-11; neues Modul `scripts/lib/consistency/temp_literals.py` ist Single Source des AC-01-Musters; Registrierung in `consistency-check.py` und im `_strict_findings`-Block (WARNING, Exit unverändert); Task-11-Schuld getilgt (2 Admin-Server-Starts mit `env=_admin_tmp_env`, beide `deferred:`-Einträge entfernt); 22 `temp-literal.system-temp`-WARNINGS sind ausschließlich Task-16-Goldens (echte Reste, kein False Positive); Step 4 (Commit) offen, kein Commit-Auftrag |
 | 15 | Aggregations-Guard über alle Schreibpfade | pending | — (pending) | — |
 | 16 | Goldens rebaselinen | pending | — (pending) | — |
 | 17 | Doku und Beispiel-Config | pending | — (pending) | — |
@@ -1788,3 +1788,141 @@ Keine Provider-Namens-Verzweigung: die Ableitung hängt an `TmpPaths`-Daten und 
   Task 13; er gehört zum Consistency-Check (Task 14/15).
 - Die `.meta-viz/**`-Zeile bleibt statisch; eine künftige Konfigurierbarkeit dieses Pfads
   müsste ebenfalls über den Resolver laufen.
+
+## Evidence — Task 14
+
+### Rot (vor der Implementierung, verbatim)
+
+`python3 -m pytest tests/test_consistency_temp_literals.py -q` → Exit 1:
+
+```
+==================================== ERRORS ====================================
+___________ ERROR collecting tests/test_consistency_temp_literals.py ___________
+ImportError while importing test module '/home/hermes/repos/agent-meta/tests/test_consistency_temp_literals.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/usr/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+tests/test_consistency_temp_literals.py:27: in <module>
+    from lib.consistency.temp_literals import (
+E   ModuleNotFoundError: No module named 'lib.consistency.temp_literals'
+=========================== short test summary info ============================
+ERROR tests/test_consistency_temp_literals.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 0.34s
+```
+
+`ModuleNotFoundError` ist die von `ImportError` abgeleitete Form des im Plan genannten
+Rot-Belegs; alle fünf Tests des Moduls waren vor der Implementierung nicht sammelbar.
+
+### Grün (Befehl → Anzahl → Exit)
+
+| # | Befehl | Ergebnis | Exit |
+|---|---|---|---|
+| 1 | `python3 -m pytest tests/test_consistency_temp_literals.py -q` | `5 passed` | 0 |
+| 2 | `python3 -m pytest tests/test_temp_literals.py tests/test_tmp_sink_env_coverage.py tests/test_consistency_checks.py tests/test_consistency_reference_standards.py -q` | `65 passed` | 0 |
+| 3 | `python3 -m pytest tests/test_repo_containment_consistency.py tests/test_orchestrator_strict_visibility.py tests/test_rule_variables.py -q` (Nachbarschaft des geänderten `cli_commands.py`) | `32 passed` | 0 |
+| 4 | `python3 scripts/sync.py --validate` | 0 ERROR; 22 WARNING `temp-literal.system-temp` (Task-16-Goldens, siehe unten); 2 vorbestehende Sync-Warnungen (`active-set.gate-dropped`, Submodul-Checkout `external/awesome-claude-code`) | 0 |
+| 5 | `python3 scripts/consistency-check.py` | `22 warning(s) found` — alle `temp-literal.system-temp`, 0 ERROR | 0 |
+
+### AC-21 — WARNING mit Datei und Zeile, Allowlist unterdrückt
+
+`check_temp_literals(root, root, {})` auf einem synthetischen Template mit
+`docker logs c > /tmp/probe.log` liefert genau ein Finding:
+
+```
+severity = WARNING, check = temp-literal.system-temp,
+file = agents/1-generic/demo.md,
+message = "system temp literal in shipped text on line 3: Run: docker logs c > /tmp/probe.log 2>&1"
+```
+
+`print_report(...) == 0` (kein Exit). Ein vollständiger Allowlist-Eintrag
+`{path: "agents/1-generic/demo.md", pattern: "/tmp/probe\\.log", reason: "…"}` entfernt das
+Finding vollständig. `test_warning_and_allowlist` deckt beide Hälften ab.
+
+### Scope (IC-11) — sechs Wurzeln, je ein eigener Nachweis
+
+`test_every_scope_root_is_scanned` legt je eine Probe-Datei unter genau einer Wurzel an und
+prüft **jede Wurzel einzeln** (nicht nur den Gesamtlauf):
+
+| Wurzel | Scan |
+|---|---|
+| `agents/**` | rekursiv, Text-Endungen (`_SCOPE_DIRS`) |
+| `standalone/**` | rekursiv, Text-Endungen |
+| `rules/1-generic/**` | rekursiv, Text-Endungen |
+| `config/**` | rekursiv, Text-Endungen |
+| `tests/fixtures/slimming-golden/**` | rekursiv, Text-Endungen |
+| `tests/conftest.py` | Einzeldatei (`_SCOPE_FILES`) |
+
+Negativ-Kontrolle im selben Test: identische Literale unter `scripts/out-of-scope.py` und
+`README.md` erzeugen **kein** Finding. `Finding.file` ist immer repo-relativ (`path` der
+Allowlist), die Zeile steht in der Meldung.
+
+### Allowlist-Semantik
+
+`.meta-config/temp-literal-allowlist.yaml` wird über `lib.io.load_yaml_file(on_error="default")`
+geladen (fehlende/kaputte Datei ⇒ leere Liste, kein Crash). Ein Eintrag unterdrückt nur, wenn
+`path` (repo-relativer Glob, `fnmatch`) **und** `pattern` (Regex auf die Zeile) passen und
+`reason` nicht leer ist. Unbekannte Felder (z. B. `expires`) werden in Task 14 noch ignoriert —
+die Feld-Whitelist (`_ALLOWED_ENTRY_FIELDS`) liegt bereit, die Ablehnung samt eigener WARNING
+ist Task 22 (AC-39).
+
+### Codes
+
+| Code | Auslöser | Heute im Repo |
+|---|---|---|
+| `temp-literal.system-temp` | AC-01-Muster in einer der sechs Wurzeln | 22 (nur Task-16-Goldens + `tests/conftest.py`) |
+| `temp-literal.sink-relative` | `TMPDIR`/`TEMP`/`TMP`/`--basetemp` auf einen **relativen** Wert gepinnt (ADR-12) | 0 |
+| `temp-literal.subprocess-env` | `subprocess.*` unter `scripts/**` ohne `tmp_env`-Ableitung und ohne vollständigen `temp-env-allowlist`-Eintrag | 0 |
+| `temp-literal.toolchain-cache-in-repo` | `system-temp-exception.toolchain-caches: true` (Resolver-Wert) | 0 (Default `false`) |
+| `temp-literal.provider-advisory` | primäre Rolle mit skalarem `edit: allow` auf einem Provider ohne verifizierten Hook-Protokoll | 0 (der Orchestrator trägt seit Task 13 einen Pfad-Scope) |
+
+### Task-11-Schuld getilgt
+
+`_admin_tmp_env(root)` in `scripts/lib/cli_commands.py` liefert `tmp_env(paths)` (TMPDIR/TEMP/TMP
+absolut, PATH/HOME geerbt) für die beiden Admin-Server-Starts in `_build_context` und
+`_run_common_tail`; bei deaktiviertem/nicht auflösbarem Sink `None` (Parent-Env, Rollback-Hebel
+bleibt funktionsfähig). Beide `deferred:`-Einträge aus `.meta-config/temp-env-allowlist.yaml`
+wurden entfernt. Verifikation: `tests/test_tmp_sink_env_coverage.py` grün (inkl.
+`test_allowlist_entries_match_a_current_call_site` — keine verwaisten Einträge) und direkter
+Aufruf:
+
+```
+TMPDIR=/home/hermes/repos/agent-meta/.tmp TEMP=… TMP=…  (alle absolut, PATH/HOME geerbt)
+```
+
+### Abweichungen vom Auftrag
+
+1. **Doppelbericht vermieden (`include_temp_literals`).** `sync.py --validate` ruft sowohl
+   `run_checks` als auch den `_strict_findings`-Block auf. Damit die Familie nicht zweimal
+   gedruckt wird, hat `run_checks` den Schalter `include_temp_literals` (Default `True` für den
+   Standalone-CLI); `_run_consistency_checks` setzt ihn auf `False`, der `_strict_findings`-Block
+   ist der einzige Melder in `--validate`. Beide vom Auftrag genannten Registrierungen existieren.
+2. **`temp-literal.sink-relative` präzisiert.** Die Spec nennt nur den Code, keinen Auslöser.
+   Ausgelegt als ADR-12-Verstoß: ein relativer `TMPDIR`/`TEMP`/`TMP`/`--basetemp`-Wert
+   (Prosa wie `--basetemp to use` zählt nicht, siehe `_looks_like_path`).
+3. **`temp-literal.provider-advisory` auf die primäre Oberfläche begrenzt.** Nur die primäre
+   Rolle ist von der globalen Deny-Regel betroffen, die ein skalares `edit: allow` aushebeln
+   würde (Task-13-Kontext); Subagenten waren nie durch diese Regel gegated. Ein pauschal
+   gemeldeter Subagenten-Scope hätte 42 Rollen gleichzeitig als advisory gemeldet, ohne
+   Zusatzinformation. Der Fall feuert nachweislich, sobald eine primäre Rolle ohne Pfad-Scope
+   gerendert wird (manueller Probe gegen `.opencode/agents/orch.md`).
+4. **22 `temp-literal.*`-WARNINGS statt 0 (Task-16-Reste).** Alle 22 liegen in
+   `tests/fixtures/slimming-golden/**` (21) und `tests/conftest.py` (1) — genau die Dateien, die
+   Task 16 rebaselined; die Goldens frieren noch `--basetemp=/tmp/$USER/…` und `/tmp/…`-Logs ein.
+   Das sind echte Reste, keine False Positives; eine Allowlist-Ausnahme wäre falsch, weil Task 16
+   die Quelldateien ohnehin ersetzt. Nach Task 16 muss die Zahl auf 0 fallen (Gate für Task 18).
+5. **Zusätzlich geändert (Auftrag, nicht Code-Scope):** `.meta-config/temp-env-allowlist.yaml`
+   (Schuld-Abbau) und die zwei Ledger-Dokumente. Die vier Task-14-Dateien sind exakt die
+   vorgegebenen.
+
+### Risiken / Interpretationen
+
+- `tests/test_temp_literals.py` deklariert das AC-01-Muster bis Task 15 weiterhin selbst; der
+  Einzelquellen-Guard (`test_temp_literal_pattern_has_single_source_of_truth`) ist daher
+  erwartungsgemäß noch rot. Task 14 hat keine zweite Kopie hinzugefügt.
+- Bis Task 16 bleibt `sync.py --validate` warnungsreich (22), aber Exit 0. Der Sync-Gate-Schritt
+  in Task 14 verlangt ausdrücklich nur „keine neuen ERROR".
+- `_admin_tmp_env` liest `<agent_meta_root>/.meta-config/project.yaml` — konsistent mit
+  `scripts/admin-server.py::_tmp_sink_env`; in einem Submodul ohne eigene Config bleibt es beim
+  geerbten Env (dokumentierter Fallback, kein stiller Pin auf einen falschen Pfad).

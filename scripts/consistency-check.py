@@ -65,6 +65,7 @@ from lib.consistency.reference_standards import check_reference_standards
 from lib.consistency.repo_containment import check_repo_containment_templates
 from lib.consistency.report import Finding, Severity, print_json_report, print_report
 from lib.consistency.subagent_permissions import check_subagent_permission_templates
+from lib.consistency.temp_literals import check_temp_literals
 from lib.io import load_yaml_file
 
 # ── git helpers ───────────────────────────────────────────────────────────────
@@ -170,7 +171,16 @@ def run_checks(
     root: Path,
     changed_only: bool = False,
     specific_file: Path | None = None,
+    include_temp_literals: bool = True,
 ) -> list[Finding]:
+    """Run every framework consistency check and return the findings.
+
+    ``include_temp_literals=False`` lets ``sync.py --validate`` skip the
+    ``temp-literal.*`` family here because it reports that family from its own
+    ``_strict_findings`` block (single report, no duplicate warnings). The
+    standalone ``consistency-check.py`` CLI keeps the default and therefore
+    always includes it.
+    """
     findings: list[Finding] = []
 
     changed_files: set[str] | None = None
@@ -231,6 +241,11 @@ def run_checks(
         findings += check_fstring_backslash_hazard(root)
         findings += check_repo_containment_templates(_AGENT_META_ROOT)
         findings += check_based_on_stale(root)  # ERROR since IC-15 Nr. 24 (#885 F-09)
+
+        # Temp-literal check (SPEC-tmp-sink-injection AC-21/IC-11, WARNING only):
+        # shipped text must not point at the machine temp directory.
+        if include_temp_literals:
+            findings += check_temp_literals(root, root, project_config)
 
         # Phase 5: Documentation & UI Consistency
         findings.extend(check_sync_cli_docs(_AGENT_META_ROOT))
