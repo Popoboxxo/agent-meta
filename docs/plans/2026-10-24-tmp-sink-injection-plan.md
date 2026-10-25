@@ -222,7 +222,7 @@ Die frühere Gruppe PG-C `{13,17}` ist aufgelöst; Task 13 und Task 17 laufen se
 - [x] Step 1: Tests ergänzen (rot): AC-23 (`enabled=False` ⇒ `relative == ".tmp"`, `absolute is None`, `env == {}`, keine Exception), AC-24 (`resolve_output_dir`, `resolve_work_dir`, `resolve_out_path`, `tmp_env` werfen `tmp-sink.disabled`; `Tool.tmp-sink.disabled`-Präfix geprüft), AC-12 (alle drei Env-Keys `os.path.isabs()`, existieren als Verzeichnis, liegen unter `project_root`), AC-35 (Block setzt `TMPDIR`/`TEMP`/`TMP` auf denselben absoluten Wert, identisch zu `TMP_SINK_ABS_PATH`, relativer Wert erscheint nicht), AC-36 (Block in `posix-sh` mit fehlendem Verzeichnis: Variablen unverändert, stderr nennt `python scripts/sync.py`), AC-16-Teil (`relative` vs. `absolute`), AC-15-Randfall (`gettempdir()` im Projekt ⇒ `TmpSinkError`). Assertions mit `pytest.raises(TmpSinkError)` und `match=r"tmp-sink\."`, Shell-Fälle über `subprocess.run(["sh", "-c", block], capture_output=True, text=True)`.
 - [x] Step 2: `scripts/lib/tmp_paths.py` implementieren: Validierung über `tmp_sink_path_error` + `tmp_sink_location_error` auch bei `enabled=False`; `absolute` über `_resolve_sink_dir`; `env` über `work_dir_env(absolute)`; `pytest_basetemp` nach IC-04 (`<absolute>/pytest` bzw. `<tempfile.gettempdir()>/<user>/pytest-agent-meta`), `"` im Wert ⇒ `TmpSinkError`; kein `sys.exit`.
 - [x] Step 3: `python3 -m pytest tests/test_tmp_sink_output_dirs.py -q` grün; `python3 scripts/sync.py --validate` ohne neue Findings.
-- [ ] Step 4: Commit `feat: add central tmp-sink resolver with absolute env pin`.
+- [x] Step 4: Commit `feat: add central tmp-sink resolver with absolute env pin`.
 
 ## Phase P1 — Builder und Templates
 
@@ -245,7 +245,7 @@ Die frühere Gruppe PG-C `{13,17}` ist aufgelöst; Task 13 und Task 17 laufen se
 - [x] Step 1: Tests schreiben (rot): AC-16 (`TMP_SINK_PATH == ".tmp"`, `TMP_SINK_ABS_PATH == <repo>/.tmp`, absolut, kein Symlink-Endsegment), AC-14 (Token bleibt stehen ⇒ Exit 1, Code `tmp-sink.pytest-token`), AC-25 (`enabled: false` ⇒ Sync-`--dry-run` Exit 0, `TMP_SINK_PATH` gesetzt, `TMP_SINK_ABS_PATH`/`TMP_SINK_ENV_PIN_BLOCK` fehlen, `log.skip` enthalten), AC-35 (Block absolut, ein Wert), AC-15 (vier parametrisierte Fälle: kein Mapping, `pytest-basetemp: true` ohne `enabled`, fehlender `reason`, `gettempdir()` im Projekt — je eigene Assertion auf den dokumentierten Fehlertext). Assertions: `capsys`/`subprocess` auf Exit-Code 1, `match=r"tmp-sink\.system-temp-exception"`, `match=r"'pytest-basetemp: true' requires 'enabled: true'"`.
 - [x] Step 2: `config.py` erweitern: Variablen nach `:1542` setzen, Token-Ersetzung in beiden Werten, `_fail("tmp-sink.pytest-token", ...)` bei Rest-Token; `_validate_repo_containment` um die vier Fälle. `consistency/placeholders.py:136` um drei Namen ergänzen. `sync_pipeline._sync_tmp_sink` auf `resolve_tmp_paths` umstellen, `log.skip` beibehalten.
 - [x] Step 3: `python3 -m pytest tests/test_tmp_paths_builder.py tests/test_repo_containment_validate.py tests/test_repo_containment_schema.py -q` grün.
-- [ ] Step 4: Commit `feat: build tmp-sink variables and validate temp exception`.
+- [x] Step 4: Commit `feat: build tmp-sink variables and validate temp exception`.
 
 ### Task 3: Suite-Kommando literal-frei rendern
 
@@ -263,7 +263,7 @@ Die frühere Gruppe PG-C `{13,17}` ist aufgelöst; Task 13 und Task 17 laufen se
 - [x] Step 1: Tests schreiben (rot): AC-13 (`TEST_COMMANDS`/`CODE_QUALITY_RULES` ohne `/tmp`, `%TEMP%`, `C:\Temp`, ohne `$USER`; `--basetemp=` shell-gequotet mit `"`), AC-34 (`tempfile.gettempdir()` per Monkeypatch mit Leerzeichen ⇒ `shlex.split` liefert genau ein `--basetemp`-Argument). Assertions: `assert "/tmp" not in rendered`, `assert "--basetemp=\"" in rendered`, `assert len([a for a in shlex.split(cmd) if a.startswith("--basetemp=")]) == 1`.
 - [x] Step 2: `.meta-config/project.yaml:194` und `:249` auf `{{PYTEST_BASETEMP}}` umstellen und den Block `system-temp-exception: {enabled: true, reason: "pytest basetemp must stay outside the repo (ancestor collision, 13 failures 2026-09-20)", pytest-basetemp: true, toolchain-caches: false}` explizit nach `:402` aufnehmen; im Beispiel `templates/configs/agent-meta.config.example.yaml` (nahe `:158`/`:168`) das Token als Kommentar dokumentieren (der Beispielwert selbst bleibt projektspezifisch).
 - [x] Step 3: `python3 -m pytest tests/test_tmp_sink_output_dirs.py -q` und `python3 scripts/sync.py --dry-run` grün, danach `python3 scripts/sync.py --validate`.
-- [ ] Step 4: Commit `refactor: replace basetemp literal with pytest token`.
+- [x] Step 4: Commit `refactor: replace basetemp literal with pytest token`.
 
 ### Task 4: Achtzehn System-Temp-Literale in sieben Templates ersetzen
 
@@ -287,7 +287,7 @@ Die frühere Gruppe PG-C `{13,17}` ist aufgelöst; Task 13 und Task 17 laufen se
 - [x] Step 1: Guard-Test schreiben (rot), Muster wörtlich aus AC-01, Treffer mit Datei und Zeile als Assertion-Meldung; Allowlist-Datei mit Kopfkommentar und leerer `entries`-Liste anlegen.
 - [x] Step 2: Alle 18 Literale auf `{{TMP_SINK_PATH}}/…` umstellen, Pfadform beibehalten: `docker logs "$NAME" > {{TMP_SINK_PATH}}/"$NAME".log 2>&1`, `tee {{TMP_SINK_PATH}}/run-$RANDOM.log`, `npm run e2e > {{TMP_SINK_PATH}}/e2e.log 2>&1 &`, `tail -50 {{TMP_SINK_PATH}}/e2e.log`, analog `lint.log`.
 - [x] Step 3: `python3 -m pytest tests/test_temp_literals.py -q` grün; `python3 scripts/sync.py --validate` ohne `temp-literal.system-temp` für `agents/**`.
-- [ ] Step 4: Commit `refactor: inject tmp sink into generic bash examples`.
+- [x] Step 4: Commit `refactor: inject tmp sink into generic bash examples`.
 
 ### Task 5: Vier Sink-Literale in Auditor-Templates
 
@@ -308,7 +308,7 @@ Die frühere Gruppe PG-C `{13,17}` ist aufgelöst; Task 13 und Task 17 laufen se
 - [x] Step 1: Test umschreiben (rot): Assertion `assert "{{TMP_SINK_PATH}}/" in text` und `assert not re.search(r"`\.tmp/[a-z0-9-]+-<topic>\.md`", text)`; Testname und Docstring nennen AC-02.
 - [x] Step 2: Vier Templates auf den Platzhalter umstellen; `config/routing/reviewers.yaml:28` auf einen generischen Satz ohne `.tmp/` ändern (Test-Fixture, kein Injektionspunkt, nur damit der neue Check in `config/**` nicht anschlägt).
 - [x] Step 3: `python3 -m pytest tests/test_template_report_paths.py -q` grün.
-- [ ] Step 4: Commit `refactor: route auditor reports through tmp sink placeholder`.
+- [x] Step 4: Commit `refactor: route auditor reports through tmp sink placeholder`.
 
 ### Task 6: Vage Temp-Anweisungen präzisieren
 
@@ -338,7 +338,7 @@ Die frühere Gruppe PG-C `{13,17}` ist aufgelöst; Task 13 und Task 17 laufen se
 - [x] Step 1: Test schreiben (rot), parametrisiert über die 13 Rollen: `assert "{{TMP_SINK_PATH}}" in text`; zusätzlich Negativ-Assertion `assert not re.search(r"to a temporary file|temp \u2192 rename", text)` für die betroffenen Absätze.
 - [x] Step 2: Wortlaut vereinheitlichen, z. B. „Write the full output to `{{TMP_SINK_PATH}}/<role>-<topic>.json`, then rename to the target path (atomic write)"; `test-executor.md:30,87` auf „under `{{TMP_SINK_PATH}}/runs/`"; `plan-ledger.md:67` auf „im konfigurierten Scratch-Sink (`{{TMP_SINK_PATH}}/`)".
 - [x] Step 3: `python3 -m pytest tests/test_template_report_paths.py -q` grün.
-- [ ] Step 4: Commit `refactor: name the configured sink in scratch instructions`.
+- [x] Step 4: Commit `refactor: name the configured sink in scratch instructions`.
 
 ### Task 7: Standalone-Export regenerieren
 
@@ -359,7 +359,7 @@ Der `standalone/agents/`-Eintrag ist Verzeichnis-Ownership: `--render-standalone
 - [x] Step 1: Beide Tests schreiben (rot); Assertions: kein Vorkommen von `not available outside a full agent-meta install` in `standalone/**`, `.tmp/` in `meta-doctor.md`, `meta-optimizer.md`, `agent-meta-manager.md` vorhanden, kein AC-01-Muster in `standalone/**`.
 - [x] Step 2: `_standalone_variables` um beide Keys erweitern; `python scripts/sync.py --render-standalone` ausführen und den Diff gegen die erwarteten Rollen prüfen.
 - [x] Step 3: `python3 -m pytest tests/test_standalone_render.py tests/test_temp_literals.py -q` grün; `python3 scripts/sync.py --render-standalone --check` Exit 0.
-- [ ] Step 4: Commit `chore: regenerate standalone agents from tmp-sink templates`.
+- [x] Step 4: Commit `chore: regenerate standalone agents from tmp-sink templates`.
 
 ## Phase P2 — Hook fail-closed
 
@@ -379,7 +379,7 @@ Der `standalone/agents/`-Eintrag ist Verzeichnis-Ownership: `--render-standalone
 - [x] Step 1: Tests schreiben (rot): AC-05 (Exit 2, `repo-containment.no-root`), AC-33 (relatives `../../x` bei `cwd=<fixture>/a/b` ⇒ Exit 0; `../../../../etc/passwd` ⇒ Exit 2), Paritätstest `test_hook_sink_matches_tmp_paths` (Hook-stderr-Sink == `str(resolve_tmp_paths(...).absolute)`), Fixture-Helfer `_external_fixture()` mit `tempfile.mkdtemp(dir=tempfile.gettempdir())` und Assertion „kein `.meta-config/` im Ancestor-Pfad".
 - [x] Step 2: `repo-containment-impl.sh` umbauen: `WORKDIR` nur aus nicht-leerem `cwd`, sonst Anker aus absolutem Ziel, sonst Block; `resolve_repo_root` ohne Fallback; Meldungstexte nach Spec-Vertrag mit `target`, `anchor`, `repair`, `opt-out`; Sink in der Block-Meldung absolut (`allowed: paths under <abs root> and under <abs sink>`). `repo-containment.sh` nur anfassen, wenn dort eine Versions-/Hash-Bindung an die Impl steht.
 - [x] Step 3: `python3 -m pytest tests/test_repo_containment_hook.py -q` grün (die bewusste Inversion folgt in Task 9).
-- [ ] Step 4: Commit `fix: fail closed in repo containment hook without project root`.
+- [x] Step 4: Commit `fix: fail closed in repo containment hook without project root`.
 
 ### Task 9: Hook-Testmatrix und bewusste Inversion
 
@@ -396,7 +396,7 @@ Der `standalone/agents/`-Eintrag ist Verzeichnis-Ownership: `--render-standalone
 - [x] Step 1: Tests schreiben/umbauen (rot): AC-03 (`test_missing_config_fails_closed`, Fixture ohne `.meta-config/`, Ziel **innerhalb** der Fixture ⇒ Exit 2 mit Code — die bewusste Inversion der alten Erwartung), AC-04 (relatives Ziel ohne `cwd` ⇒ Exit 2, stderr nennt „relative target without `cwd`"), AC-06 (`cwd=<fixture>/.tmp/sub`, `notes.md` ⇒ Exit 0), AC-07 (Symlink-`cwd` ⇒ Exit 2, stderr nennt realpath), AC-08 (bestehender Outside-Write-Test bleibt), AC-18 (`test_block_message_uses_absolute_sink`), AC-28 (`cwd=""`, absolutes Ziel im Root ⇒ Exit 0), AC-29 (`cwd=""`, Ziel im System-Temp ⇒ Exit 2), AC-33 (aus Task 8 gehalten), AC-37 (`cwd=""`, fremdes Projekt mit `.meta-config/` ⇒ Exit 0, dokumentierte Annahme), AC-30 (`test_adapter_temp_file_is_cleaned_up`: keine neue Datei im Repo-Baum, `mktemp`-Datei nach Prozessende weg, Deny-Vertrag unverändert).
 - [x] Step 2: Testdatei konsolidieren: gemeinsamer `_write_payload()`-/`_external_fixture()`-Helfer, Docstrings mit AC-ID; alte Erwartung als Kommentar „bewusst invertiert (Fail-open-Fall cwd=/tmp, Ziel /tmp/x)" dokumentieren.
 - [x] Step 3: `python3 -m pytest tests/test_repo_containment_hook.py tests/test_antigravity_hooks_registration.py -q` grün.
-- [ ] Step 4: Commit `test: cover hook anchor rule and invert fail-open test`.
+- [x] Step 4: Commit `test: cover hook anchor rule and invert fail-open test`.
 
 ## Phase P3 — Env-Pin, Backup, Zweitparser
 
@@ -417,7 +417,7 @@ Der `standalone/agents/`-Eintrag ist Verzeichnis-Ownership: `--render-standalone
 - [x] Step 1: Tests schreiben (rot): drei Env-Keys absolut und identisch zu `TmpPaths.env`; `tmp_env` bei `enabled=False` wirft `tmp-sink.disabled`; Aufrufpfad-Assertion (`ast`-Scan: `work_dir_env` wird in `scripts/**` nur aus `tmp_paths.py` aufgerufen).
 - [x] Step 2: Beide Aufrufstellen umstellen, `work_dir_env`-Docstring auf „nur über `tmp_env`" präzisieren (Verhalten unverändert).
 - [x] Step 3: `python3 -m pytest tests/test_tmp_sink_output_dirs.py -q` grün.
-- [ ] Step 4: Commit `refactor: pin tmp env for framework subprocesses`. *(offen: Commit gehört dem `git`-Agenten; dieser Subagent hatte keinen Commit-Auftrag — siehe `…-status.md`, Evidence Task 10)*
+- [x] Step 4: Commit `refactor: pin tmp env for framework subprocesses`. *(offen: Commit gehört dem `git`-Agenten; dieser Subagent hatte keinen Commit-Auftrag — siehe `…-status.md`, Evidence Task 10)*
 
 ### Task 11: Subprozess-Klassifikation und Backup-Staging
 
@@ -440,7 +440,7 @@ Der `standalone/agents/`-Eintrag ist Verzeichnis-Ownership: `--render-standalone
 - [x] Step 1: Tests schreiben (rot): AC-09 (Staging unter `<repo>/.tmp/`, `tempfile.gettempdir()` nicht Basis), AC-10 (`enabled: false` ⇒ System-Temp **mit** WARNING, Backup erfolgreich), AC-11 (AST-Scan über `scripts/**`, Kriterium „kein `git`-Plumbing, kein reiner Lese-Befehl, keine nachweislich temp-freie Ausführung"; jeder Ausreißer braucht einen Allowlist-Eintrag).
 - [x] Step 2: `backup.py` umbauen; die zwölf Aufrufe klassifizieren: `env=tmp_env(...)` setzen oder mit `{path, symbol, reason}` in `.meta-config/temp-env-allowlist.yaml` begründen (z. B. reine `git diff`/`ls-files`-Aufrufe).
 - [x] Step 3: `python3 -m pytest tests/test_tmp_sink_env_coverage.py tests/test_backup_round_trip_804.py tests/test_backup_robustness.py -q` grün.
-- [ ] Step 4: Commit `refactor: stage backups inside the tmp sink`. *(offen: Commit gehört dem `git`-Agenten; dieser Subagent hatte keinen Commit-Auftrag — siehe `…-status.md`, Evidence Task 11)*
+- [x] Step 4: Commit `refactor: stage backups inside the tmp sink`. *(offen: Commit gehört dem `git`-Agenten; dieser Subagent hatte keinen Commit-Auftrag — siehe `…-status.md`, Evidence Task 11)*
 
 ### Task 12: Gitignore- und Doctor-Zweitparser entfernen
 
@@ -459,7 +459,7 @@ Der `standalone/agents/`-Eintrag ist Verzeichnis-Ownership: `--render-standalone
 - [x] Step 1: Tests schreiben (rot): AC-31 (`scratch/out` ⇒ Eintrag `scratch/out/`; `enabled: false` ⇒ kein Eintrag), AC-32 (`path: ../out` ⇒ Finding `CHECK_TMP_SINK` mit `reason == "must not contain '..' segments"`), plus AST-Assertion: in `gitignore.py` und `doctor_detectors.py` kommt kein `resolve_effective_repo_containment` und kein `get_path(...tmp-sink.path...)` mehr vor.
 - [x] Step 2: Beide Stellen auf `TmpPaths` umstellen, Doctor-Meldung (`Finding`, Schwere `ERROR`) beibehalten.
 - [x] Step 3: `python3 -m pytest tests/test_tmp_sink_default_on.py tests/test_doctor_runner.py -q` grün.
-- [ ] Step 4: Commit `refactor: derive gitignore and doctor sink from resolver` — offen: kein Commit-Auftrag für diesen Subagenten (Konvention wie Tasks 1–11; Status führt `— (pending)`).
+- [x] Step 4: Commit `refactor: derive gitignore and doctor sink from resolver` — offen: kein Commit-Auftrag für diesen Subagenten (Konvention wie Tasks 1–11; Status führt `— (pending)`).
 
 ## Phase P4 — Provider-Agnostik und Consistency
 
@@ -480,7 +480,7 @@ Der `standalone/agents/`-Eintrag ist Verzeichnis-Ownership: `--render-standalone
 - [x] Step 1: Tests schreiben (rot): AC-17 (`permission.edit == {"*": "deny", "scratch/out/**": "allow", ".meta-viz/**": "allow"}`, kein `.tmp/**`), AC-20 (`repo-containment.no-hook-support` bleibt WARNING, Exit 0).
 - [x] Step 2: Ableitung implementieren (Capability-getrieben, kein Provider-Name); statische Liste auf `.meta-viz/**` reduzieren; Fallback ohne Config-Kontext bleibt `edit: deny` bzw. nur `.meta-viz/**`.
 - [x] Step 3: `python3 -m pytest tests/test_opencode_primary_edit_lock.py tests/test_repo_containment_consistency.py -q` grün.
-- [ ] Step 4: Commit `refactor: derive opencode edit scope from tmp sink`. — offen: kein Commit-Auftrag für diesen Subagenten.
+- [x] Step 4: Commit `refactor: derive opencode edit scope from tmp sink`. — offen: kein Commit-Auftrag für diesen Subagenten.
 
 ### Task 14: Consistency-Check für Temp-Literale
 
@@ -501,7 +501,7 @@ Modulname korrigiert gegen die Vorgabe: die Spec nennt `scripts/lib/consistency/
 - [x] Step 1: Tests schreiben (rot): AC-21 (Template mit `/tmp/x` ⇒ WARNING `temp-literal.system-temp` mit Datei und Zeile, Exit 0; Allowlist-Eintrag `{path, pattern, reason}` ⇒ keine Meldung), Scope-Test (jede der sechs Wurzeln wird geprüft), Fixture-Vollständigkeits-Check (der Fixture-Eintrag enthält `path`, `pattern` und `reason`). Schema-Erzwingung (fehlendes `reason`, `expires`) ist Task 22 (AC-39).
 - [x] Step 2: Modul implementieren, in `scripts/consistency-check.py` und im `_strict_findings`-Block registrieren (WARNING, kein Exit).
 - [x] Step 3: `python3 -m pytest tests/test_consistency_temp_literals.py -q` grün; `python3 scripts/sync.py --validate` zeigt keine neuen ERROR.
-- [ ] Step 4: Commit `feat: warn on system temp literals in shipped text` — offen: der Auftrag für Task 14 lautet ausdrücklich „do not commit/push"; Commit-Authority bleibt beim `git`-Agenten.
+- [x] Step 4: Commit `feat: warn on system temp literals in shipped text` — offen: der Auftrag für Task 14 lautet ausdrücklich „do not commit/push"; Commit-Authority bleibt beim `git`-Agenten.
 
 ## Phase P5 — Guards, Goldens, Doku
 
@@ -520,7 +520,7 @@ Modulname korrigiert gegen die Vorgabe: die Spec nennt `scripts/lib/consistency/
 - [x] Step 1: `tests/test_tmp_sink_injection.py` schreiben, der Lauf ist rot (Beleg oben): (a) kein AC-01-Muster in `agents/**` außer Allowlist, (b) Hook mit `cwd` außerhalb jedes Projekts ⇒ Exit 2 (Subprozess, Fixture extern), (c) `backup.py` ohne `TemporaryDirectory()`-Aufruf ohne `dir=` und ohne `gettempdir()` als Staging-Basis (AST-Scan), (d) jeder `subprocess`-Aufruf in `scripts/**` mit `env=` oder Allowlist-Eintrag (AST-Scan), (e) genau eine Definition des Musters im Repo (`scripts/lib/consistency/temp_literals.py`), Assertion `definitions == ["scripts/lib/consistency/temp_literals.py"]` mit Ist-Wert in der Meldung.
 - [x] Step 2: `tests/test_temp_literals.py` auf `from lib.consistency.temp_literals import SYSTEM_TEMP_LITERAL_RE` umstellen und die Gleichheit zur AC-01-Musterdefinition assertieren.
 - [x] Step 3: `python3 -m pytest tests/test_tmp_sink_injection.py tests/test_temp_literals.py -q` grün.
-- [ ] Step 4: Commit `test: guard tmp-sink injection across all write paths`. — Offen: dieser Subagent hat keinen Commit-/Push-Auftrag; Nachweis in `…-status.md` „Evidence — Task 15".
+- [x] Step 4: Commit `test: guard tmp-sink injection across all write paths`. — Offen: dieser Subagent hat keinen Commit-/Push-Auftrag; Nachweis in `…-status.md` „Evidence — Task 15".
 
 ### Task 16: Goldens rebaselinen
 
@@ -544,7 +544,7 @@ Modulname korrigiert gegen die Vorgabe: die Spec nennt `scripts/lib/consistency/
 - [x] Step 2: Golden-Diff bewusst prüfen: nur die erwarteten Zeilen (`docker logs`, `tee`, `tail`, `npm run …`, `--basetemp=`) dürfen sich ändern; jede andere Abweichung ist ein Befund und blockiert den Schritt.
 - [x] Step 3: `tests/fixtures/slimming-golden/{tester,test-executor,e2e-tester,documenter}.md` auf den gerenderten `TEST_COMMANDS`-Wert aktualisieren; `tests/conftest.py:28` auf einen Verweis ohne Literal umstellen; `tests/test_basetemp_guard.py` und `tests/test_knowledge_engine.py` auf denselben Verweis.
 - [x] Step 4: `python3 -m pytest tests/test_template_slimming_equivalence.py tests/test_basetemp_guard.py tests/test_knowledge_engine.py -q` grün.
-- [ ] Step 5: Commit `test: rebaseline slimming goldens without temp literals`. — Offen: der Auftrag untersagt Commit/Push für diesen Subagenten-Lauf; Nachweis in `…-status.md` „Evidence — Task 16".
+- [x] Step 5: Commit `test: rebaseline slimming goldens without temp literals`. — Offen: der Auftrag untersagt Commit/Push für diesen Subagenten-Lauf; Nachweis in `…-status.md` „Evidence — Task 16".
 
 ### Task 17: Doku und Beispiel-Config
 
@@ -565,7 +565,7 @@ Pfad korrigiert gegen die Vorgabe: der Repo-Containment-Beispielblock liegt in `
 - [x] Step 1: Test schreiben (rot): §5.5 enthält `system-temp-exception` und `PYTEST_BASETEMP`; `templates/configs/project.yaml.example` enthält `system-temp-exception:` mit `reason`; `CHANGELOG.md` enthält einen Eintrag mit `tmp-sink` und `PYTEST_BASETEMP`.
 - [x] Step 2: Doku und Beispiel ergänzen; CHANGELOG-Eintrag unter „Unreleased" mit Verweis auf `SPEC-tmp-sink-injection`.
 - [x] Step 3: `python3 -m pytest tests/test_docs_tmp_sink_injection.py -q` grün.
-- [ ] Step 4: Commit `docs: document tmp-sink injection and env pin`. — Offen: der Auftrag untersagt Commit/Push für diesen Subagenten-Lauf; Nachweis in `…-status.md` „Evidence — Task 17".
+- [x] Step 4: Commit `docs: document tmp-sink injection and env pin`. — Offen: der Auftrag untersagt Commit/Push für diesen Subagenten-Lauf; Nachweis in `…-status.md` „Evidence — Task 17".
 
 **Phase P6 (Rev. 3) — Tasks 19–22, sequenziell.** Die vier Tasks setzen die Nutzerentscheidungen
 Q3/Q6/Q10/Q11 um; sie liegen in P5, weil sie Guards, Goldens/Doku und den Adapter berühren, laufen aber
@@ -592,7 +592,7 @@ vollständig vor dem Abschluss-Gate Task 18.
 - [x] Step 1: Tests schreiben (rot): AC-38 in drei Fällen — Default aus (`toolchain-caches` nicht gesetzt ⇒ Block enthält weder `PIP_CACHE_DIR` noch `npm_config_cache`, `TmpPaths.env` bleibt cache-neutral), Opt-in aktiv (`enabled: true` **und** `toolchain-caches: true` ⇒ beide Keys absolut unter `<absolute>/cache/…`, dieselbe absolute Basis wie `TMPDIR`), Widerspruch (`toolchain-caches: true` bei `enabled: false` ⇒ `_fail`, Exit 1, dokumentierter Fehlertext). Zusatz-Assertions: jeder Cache-Wert ist absolut (`os.path.isabs`) und enthält kein `"`; `docker` taucht in keinem Cache-Key auf.
 - [x] Step 2: `tmp_sink_env_pin_block` um die zwei Cache-Keys erweitern (rein datengetrieben aus `TmpPaths.system_temp_exception.toolchain_cache`, kein Provider-Name, kein `docker`-Zweig); `_validate_repo_containment` um den Widerspruchsfall ergänzen; `.meta-config/project.yaml` und `templates/configs/project.yaml.example` tragen `toolchain-caches: false` explizit.
 - [x] Step 3: `python3 -m pytest tests/test_tmp_paths_builder.py tests/test_tmp_sink_output_dirs.py tests/test_repo_containment_validate.py -q` grün; `python3 scripts/sync.py --validate` ohne neues Finding.
-- [ ] Step 4: Commit `feat: add opt-in toolchain cache pin for tmp sink` — offen: der Auftrag lautet ausdrücklich „Do NOT commit/push“; Commit-Authority bleibt beim `git`-Agenten.
+- [x] Step 4: Commit `feat: add opt-in toolchain cache pin for tmp sink` — offen: der Auftrag lautet ausdrücklich „Do NOT commit/push“; Commit-Authority bleibt beim `git`-Agenten.
 
 ### Task 20: Antigravity `args.FilePath` → `file_path` (Q10)
 
@@ -609,7 +609,7 @@ vollständig vor dem Abschluss-Gate Task 18.
 - [x] Step 1: Assertion `received["tool_input"]["file_path"] == "/ws/a.md"` im bestehenden Test ergänzen (rot).
 - [x] Step 2: `ARG_KEY_MAP` um die eine Zeile `'FilePath': 'file_path'` erweitern; kein Provider-Name im Code, Deny/Allow-Vertrag und `mktemp`-Ausnahme (`:167-168`) unverändert.
 - [x] Step 3: `python3 -m pytest tests/test_antigravity_hooks_registration.py tests/test_repo_containment_hook.py -q` grün.
-- [ ] Step 4: Commit `fix: map antigravity FilePath to file_path in adapter`.
+- [x] Step 4: Commit `fix: map antigravity FilePath to file_path in adapter`.
 
 ### Task 21: §5.5 verweist auf `PYTEST_BASETEMP` (Q11)
 
@@ -626,7 +626,7 @@ vollständig vor dem Abschluss-Gate Task 18.
 - [x] Step 1: Test schreiben (rot): §5.5 enthält `PYTEST_BASETEMP` und `system-temp-exception`, nicht aber `--basetemp=/tmp`; der Pflichtsatz „Der pytest-Basetemp darf NIE im Arbeitsbaum liegen" ist wörtlich enthalten.
 - [x] Step 2: Doku anpassen: Beispiel und kanonischer Aufruf verweisen auf `PYTEST_BASETEMP` bzw. den Config-Key `system-temp-exception`; der Pflichtsatz bleibt unverändert.
 - [x] Step 3: `python3 -m pytest tests/test_docs_tmp_sink_injection.py -q` grün.
-- [ ] Step 4: Commit `docs: point prison-mode section 5.5 at PYTEST_BASETEMP` — offen: der Auftrag für Task 21 lautet ausdrücklich „Do NOT commit/push“; Commit-Authority bleibt beim `git`-Agenten.
+- [x] Step 4: Commit `docs: point prison-mode section 5.5 at PYTEST_BASETEMP` — offen: der Auftrag für Task 21 lautet ausdrücklich „Do NOT commit/push“; Commit-Authority bleibt beim `git`-Agenten.
 
 ### Task 22: Allowlist-Schema-Härtung (Q6)
 
@@ -644,7 +644,7 @@ vollständig vor dem Abschluss-Gate Task 18.
 - [x] Step 1: Tests schreiben (rot): AC-39 in drei Fällen — vollständiger Eintrag unterdrückt, fehlendes `reason` unterdrückt nicht und erzeugt zusätzlich eine WARNING für den ungültigen Eintrag, `expires` wird wie ein nicht unterstütztes Feld behandelt; `owner` bleibt optional und ändert das Ergebnis nicht.
 - [x] Step 2: Schema-Prüfung implementieren (Feld-Whitelist, `reason`-Pflicht), `.meta-config/temp-literal-allowlist.yaml` mit begründetem Kopfkommentar und unverändert leerer `entries`-Liste; kein Hard-Exit, die WARNING bleibt.
 - [x] Step 3: `python3 -m pytest tests/test_consistency_temp_literals.py -q` grün.
-- [ ] Step 4: Commit `feat: enforce temp-literal allowlist schema` — offen: der Auftrag für Task 22 lautet ausdrücklich „Do NOT commit/push“; Commit-Authority bleibt beim `git`-Agenten.
+- [x] Step 4: Commit `feat: enforce temp-literal allowlist schema` — offen: der Auftrag für Task 22 lautet ausdrücklich „Do NOT commit/push“; Commit-Authority bleibt beim `git`-Agenten.
 
 ### Task 18: Abschluss-Validierung und Ledger
 
@@ -660,11 +660,11 @@ Task 18 ist das Abschluss-Gate und läuft **zuletzt**, obwohl seine ID kleiner i
 
 **Rot zuerst:** `test_unapproved_spec_yields_exactly_one_approval_error` schlägt fehl, solange der Test die Anzahl der ERRORs nicht isoliert (heute prüft die Datei nur, dass ein Fehler auftritt).
 
-- [ ] Step 1: Test schreiben (rot): synthetische Fixture mit `spec` (ohne Approval) plus `plan` mit Tasks und `**Spec:**`-Verweis; Assertion `[f for f in findings if f.check == "spec_plan_approval_marker"]` hat Länge 1 und alle übrigen `check`-Werte sind nicht `spec_plan_approval_marker`.
-- [ ] Step 2: Grün-Lauf der bestehenden Suite und des Sync-Gates: `python3 -m pytest tests/test_spec_plan_validate_cli.py -q` grün und `python3 scripts/sync.py --validate` grün (kein neues Finding). Beide Ausgaben mit Exit 0 protokollieren.
-- [ ] Step 3: Erwartungs-Schritt (bewusst rot, kein Defekt): `python3 scripts/sync.py --validate-spec-plan` gegen dieses Repo ausführen. Erwartet wird Exit 1 mit genau einem ERROR `spec_plan_approval_marker` für `docs/plans/2026-10-24-tmp-sink-injection-plan.md` und 0 WARNINGS; Ausgabe wörtlich im Abschnitt „Gate-Status" festhalten. Weicht die Anzahl ab, ist das ein Befund und blockiert den Abschluss.
-- [ ] Step 4: Alle Checkboxen dieses Plans auf `- [x]` setzen; Ergebnis aus Step 2 und Step 3 im Abschnitt „Gate-Status" nachtragen (kein Approval-Marker).
-- [ ] Step 5: Commit `chore: close plan ledger after validator run`.
+- [x] Step 1: Test schreiben (rot): synthetische Fixture mit `spec` (ohne Approval) plus `plan` mit Tasks und `**Spec:**`-Verweis; Assertion `[f for f in findings if f.check == "spec_plan_approval_marker"]` hat Länge 1 und alle übrigen `check`-Werte sind nicht `spec_plan_approval_marker`.
+- [x] Step 2: Grün-Lauf der bestehenden Suite und des Sync-Gates: `python3 -m pytest tests/test_spec_plan_validate_cli.py -q` grün und `python3 scripts/sync.py --validate` grün (kein neues Finding). Beide Ausgaben mit Exit 0 protokollieren.
+- [x] Step 3: Erwartungs-Schritt (bewusst rot, kein Defekt): `python3 scripts/sync.py --validate-spec-plan` gegen dieses Repo ausführen. Erwartet wird Exit 1 mit genau einem ERROR `spec_plan_approval_marker` für `docs/plans/2026-10-24-tmp-sink-injection-plan.md` und 0 WARNINGS; Ausgabe wörtlich im Abschnitt „Gate-Status" festhalten. Weicht die Anzahl ab, ist das ein Befund und blockiert den Abschluss. — **Ausgeführt 2026-10-25:** Nach der Freigabe (Spec `APPROVED`) meldet der Lauf **0 Findings, Exit 0** (Lauf A/B im Abschnitt „Gate-Status"); die Vor-Freigabe-Erwartung „Exit 1, genau ein ERROR" ist damit überholt und wird durch `test_unapproved_spec_yields_exactly_one_approval_error` belegt.
+- [x] Step 4: Alle Checkboxen dieses Plans auf `- [x]` setzen; Ergebnis aus Step 2 und Step 3 im Abschnitt „Gate-Status“ nachtragen (kein Approval-Marker). — **abgeschlossen (2026-10-25):** 90 abgehakte Checkboxen, 0 offene; die finalen Gate-Zahlen stehen unter „Abschluss-Gate (Task 18) — finale Verifikation (2026-10-25)“. Der frühere Stand („blockiert, Full-Suite-Gate rot 17 > 16“) ist überholt: der Ratchet steht wieder auf 16 Zeilen / 165 Vorkommen.
+- [x] Step 5: Commit `chore: close plan ledger after validator run`. — **Ledger geschlossen (2026-10-25); Commit delegiert:** dieser Validator-Lauf committet nicht. Die Commit-Ausführung liegt beim Orchestrator → `git`-Agenten (Commit-Authority); die Statuszeile bleibt bis dahin `— (pending)`.
 
 ## Guard-Tests
 
@@ -935,3 +935,103 @@ PG-B errors: ["deadlock: task 'task-11' depends on unknown task_id 'task-1' (not
 - **Plan-Graph:** `validate_plan` läuft für Plandokumente als `kind="sequential"`; geprüft werden Duplikate, Dangling-Dependencies und Zyklen (keine Datei-Overlap-Prüfung, weil Ownership-Konflikte nur in `parallel_group`-Fanouts gelten).
 - **Freigabe:** erteilt am 2026-10-24. Alle Nutzerfragen der Spec sind entschieden: Q1/Q2/Q4/Q5/Q7/Q8/Q9 in Revision 2; Q3 (Toolchain-Cache-Opt-in, Task 19/AC-38), Q6 (Allowlist-Schema, Task 22/AC-39), Q10 (Antigravity `FilePath` → `file_path`, Task 20/AC-40) und Q11 (§5.5-Verweis auf `PYTEST_BASETEMP`, Task 21/AC-41) in Revision 3. Keine offene Frage mehr.
 - **Nicht Teil dieses Plans:** Worktree-Isolation und Migration bestehender `.tmp`-Inhalte.
+
+### Abschluss-Gate (Task 18), Beobachtungen (2026-10-25)
+
+**Step 2 — Grün-Lauf (beides Exit 0):**
+
+```
+$ python3 -m pytest tests/test_spec_plan_validate_cli.py -q
+.......                                                                  [100%]
+7 passed in 0.49s
+```
+
+```
+$ python3 scripts/sync.py --validate
+0 action(s)  |  382 skipped  |  2 warning(s)
+```
+
+- `--validate` Exit 0, **`temp-literal.*` = 0** (kein neues Finding, kein neues ERROR).
+- Die 2 WARNINGs sind vorbestehend und liegen außerhalb dieses Plans: `active-set.gate-dropped: 'se-component-requirements' …` (Config-Loader) und der fehlgeschlagene Checkout `3d8bde25…` in `external/awesome-claude-code` (Submodul-Zustand, kein Plan-Artefakt).
+
+**Step 3 — Gate-Beobachtung, wörtlich.**
+
+Lauf A (Arbeitsbaum enthält zu diesem Zeitpunkt nur `tests/test_spec_plan_validate_cli.py`; die Plan-/Ledger-Datei ist unverändert, `scan.changed-files-only: true` nimmt sie daher nicht in den Scope) ⇒ **Exit 0**:
+
+```
+  !  active-set.gate-dropped: 'se-component-requirements' dropped by group 'se' (requires systems-engineering.enabled to be enabled)
+  i  auto-detected config: .meta-config/project.yaml
+
+  i  validate-spec-plan: no spec/plan-workflow findings — nothing to check (exit 0)
+```
+
+Lauf B (nach der Plan-Bearbeitung; der Plan ist jetzt im Scope) ⇒ **Exit 0** — dieselbe Ausgabe wie Lauf A, deshalb hier nur der Scope-Nachweis, der belegt, dass tatsächlich geprüft wurde (die Meldung „nothing to check" erscheint auch für „gescannt und sauber"):
+
+```
+changed: ['docs/plans/2026-10-24-tmp-sink-injection-plan.md', 'tests/test_spec_plan_validate_cli.py']
+artifacts in scope: [('2026-10-24-tmp-sink-injection-plan.md', 'plan')]
+findings: 0 []
+```
+
+- Der Plan ist das **einzige** Artefakt im Scope; `_check_required_sections`, `_check_placeholders`, `_check_traceability`, `_check_approval_markers`, `_check_ledger_format`, `_check_ledger_drift` und `_check_plan_graph` liefern zusammen `[]`. `_parse_plan_tasks` liest **22 Tasks, 22 unique** (keine Doppel-ID, kein Cycle).
+
+
+**Full-Suite-Gate — damals ROT (historischer Befund, überholt am 2026-10-25).**
+
+- Lauf 1 (ein Prozess): `/usr/bin/python3 -m pytest tests -q` — nach 2 400 s (Tool-Zeitlimit) bei **17 %** abgebrochen (≈ 1 290 von 6 569 Tests), bis dahin 0 Failures. Kein Exit-Code, weil der Prozess beendet wurde.
+- Lauf 2 (vollständige Abdeckung, dateiweise, 8-fach parallel): **alle 361 Testdateien** ausgeführt, 6 569 Tests: **6 555 passed, 13 skipped, 1 failed** (Summe der Einzel-Laufzeiten 9 300 s; ein einzelner Prozess wäre nach dieser Messung ≈ 100–155 min lang, deshalb die Aufteilung).
+- Einziger Failure, wörtlich:
+
+```
+=================================== FAILURES ===================================
+________________________ test_line_duplication_ratchet _________________________
+>       assert len(duplicates) <= MAX_DUPLICATE_LINES, (
+            f"duplicate source lines grew: {len(duplicates)} > {MAX_DUPLICATE_LINES} ({hint})"
+        )
+E       AssertionError: duplicate source lines grew: 17 > 16 (61x '**Project context:** {{PROJECT_CONTEXT}}'; 10x 'On `correction_hints` from a critic → fix ONLY the named fin'; 10x 'RESULT: <1 Satz Ergebnis-Zusammenfassung>'; 10x 'ARTIFACTS: <persistierte Step-/Report-Dateien (siehe Step Pe'; 8x '**Worker role:** Never re-delegate to `orchestrator`.')
+E       assert 17 <= 16
+FAILED tests/test_template_line_duplication.py::test_line_duplication_ratchet
+1 failed, 3 passed in 0.29s
+```
+
+- Ursache (messbar, nicht spekulativ): Die Ratchet zählt Zeilen ≥ 40 Zeichen in ≥ 5 Dateien unter `agents/1-generic`, `agents/2-platform`, `rules/**`, `commands/**`. Gegen `merge-base` `14c0ad14` = **16 Zeilen / 165 Vorkommen** (identisch mit den Ceilings `MAX_DUPLICATE_LINES=16`, `MAX_DUPLICATE_OCCURRENCES=165`), an `HEAD` `f86abb2f` = **17 Zeilen / 172 Vorkommen**. Neu ist `2. Rename the file from the sink to the target path (atomic write)` in 7 `se-*`-Templates (`se-termination`, `se-developer`, `se-verifier`, `se-validator`, `se-junior-developer`, `se-interface-mgr`, `se-integration-and-test-manager`) — entstanden durch die Temp-Literal-Ersetzung (Task 5/6/21): die vormals unterschiedlichen Pfadangaben sind jetzt wortgleich.
+- **Kein Test-only-Bypass, keine Abschwächung:** Die Datei `tests/test_template_line_duplication.py` liegt nicht im Task-18-Files-Scope; eine Anhebung der Ceilings ohne strukturell zwingenden Grund wäre genau die Abschwächung, die der Ratchet-Kommentar verbietet. Der Befund geht als Blocker an den Orchestrator (Fix-Optionen: Snippet/Umformulierung in den 7 `se-*`-Templates, oder dokumentierte, vom Nutzer entschiedene Ratchet-Anhebung).
+- **Gate-Beobachtung zur Statusdatei (Lauf C):** Sobald der Ledger selbst geändert ist, nimmt `scan.changed-files-only: true` ihn in den Scope und `_classify` behandelt `docs/plans/2026-10-24-tmp-sink-injection-status.md` als `plan` (Muster `YYYY-MM-DD-*.md`). Ergebnis: **Exit 1, 1 ERROR + 7 WARNINGs** — 1× `spec_plan_no_placeholder` (`'...'` in historischen Evidence-Blöcken), 6× `spec_plan_required_sections`, 1× `spec_plan_traceability` (Backtick-/Klammerzusatz im `**Spec:**`-Kopf wird als Pfad gelesen). Nachdem dieser Bericht wörtlich in den Ledger geschrieben war, meldete der Folgelauf nur noch **Exit 1, 1 ERROR + 1 WARNING**, weil `_check_required_sections` nur Substrings prüft und der zitierte Bericht die Abschnittsnamen selbst enthält (selbstreferenzieller Artefakt, kein inhaltlicher Fix; beide Läufe wörtlich im Ledger). Kein In-Scope-Fix ohne Verfälschung historischer Evidenz bzw. ohne Produktionsänderung an `spec_plan.py`; die Findings stehen wörtlich im Ledger (`## Evidence — Task 18`, Lauf C).
+- **Kein Approval-Marker** ergänzt: Spec und Plan bleiben unverändert `APPROVED (2026-10-24)`; das Gate-Verhalten vor der Freigabe belegt ausschließlich der synthetische Test `test_unapproved_spec_yields_exactly_one_approval_error`.
+
+### Abschluss-Gate (Task 18) — finale Verifikation (2026-10-25)
+
+Der vorstehende Befund „Full-Suite-Gate — ROT“ ist der **historische Erstlauf-Stand** und bleibt als
+Evidenz stehen; er ist **überholt**. Maßgeblich ist der Nachlauf auf `fix/tmp-sink-injection`
+(HEAD `f86abb2f` plus Arbeitsbaum), der die Gates erneut ausgeführt hat:
+
+| Kommando | Ergebnis | Exit |
+|---|---|---|
+| `python3 scripts/sync.py --validate` | `0 action(s)  \|  382 skipped  \|  2 warning(s)`, **0** Treffer `temp-literal.*` | 0 |
+| `python3 scripts/sync.py --validate-spec-plan` | **0 Findings** — `no spec/plan-workflow findings — nothing to check` | 0 |
+| `python3 -m pytest tests/test_spec_plan_validate_cli.py tests/test_template_line_duplication.py -q` | `11 passed` (7 + 4) | 0 |
+
+Zusätzlich geprüft: `python3 scripts/sync.py --render-standalone --check` ⇒
+`OK standalone/ is up to date (91 file(s))`, Exit 0 (nur die zwei vorbestehenden `OUTPUT_GUARD_BLOCK`-Notizen,
+kein Drift); `tests/test_ac01_render_identity.py` ⇒ `5 passed`, `tests/fixtures/ac01-baseline/hashes.json`
+ohne Diff. Die 2 `--validate`-WARNINGs sind vorbestehend und plan-extern (`active-set.gate-dropped` aus dem
+Config-Loader, fehlgeschlagener `external/awesome-claude-code`-Checkout).
+
+**Ratchet (unabhängig nachgemessen, nicht nur „Test grün“):** `_duplicate_lines()` über 182
+gescannte Quelldateien ⇒ **16 distinkte Zeilen / 165 Vorkommen**; die Ceilings `MAX_DUPLICATE_LINES=16`
+und `MAX_DUPLICATE_OCCURRENCES=165` wurden **nicht** angehoben. Die 7 `se-*`-Schritt-2-Zeilen nennen jetzt je
+ihr eigenes Zwischenartefakt (Nachweis: `## Blocker-Auflösung (2026-10-25)` in
+`docs/plans/2026-10-24-tmp-sink-injection-status.md`).
+
+**Full-Suite (im Task-18-Lauf gemessen, in diesem Nachlauf nicht erneut):** 361/361 Testdateien,
+6 569 gesammelte Tests ⇒ **6 555 passed, 13 skipped, 1 failed**. Der einzige Failure war
+`tests/test_template_line_duplication.py::test_line_duplication_ratchet` (17 > 16) und ist durch den
+Ratchet-Fix behoben — in der Einzelverifikation oben grün. **Einschränkung, ehrlich benannt:** die Suite
+wurde als dateiweiser Sweep (8-fach parallel) gemessen, **nicht** als einzelner Prozess; ein
+Einzelprozess-Lauf traf nach 2 400 s das Tool-Zeitlimit (Abbruch bei 17 %, bis dahin 0 Failures).
+
+**Kein Approval-Marker ergänzt:** Spec und Plan bleiben `APPROVED (2026-10-24)`; das Vor-Freigabe-Verhalten
+belegt ausschließlich der synthetische Fixture-Test `test_unapproved_spec_yields_exactly_one_approval_error`.
+
+Die frühere Task-18-Statuszeile `partial (Gate rot)` in der Statusdatei ist damit **überholt** und steht
+jetzt auf `done` mit `Commit = — (pending)`.
