@@ -664,7 +664,7 @@ Task 18 ist das Abschluss-Gate und läuft **zuletzt**, obwohl seine ID kleiner i
 - [x] Step 2: Grün-Lauf der bestehenden Suite und des Sync-Gates: `python3 -m pytest tests/test_spec_plan_validate_cli.py -q` grün und `python3 scripts/sync.py --validate` grün (kein neues Finding). Beide Ausgaben mit Exit 0 protokollieren.
 - [x] Step 3: Erwartungs-Schritt (bewusst rot, kein Defekt): `python3 scripts/sync.py --validate-spec-plan` gegen dieses Repo ausführen. Erwartet wird Exit 1 mit genau einem ERROR `spec_plan_approval_marker` für `docs/plans/2026-10-24-tmp-sink-injection-plan.md` und 0 WARNINGS; Ausgabe wörtlich im Abschnitt „Gate-Status" festhalten. Weicht die Anzahl ab, ist das ein Befund und blockiert den Abschluss. — **Ausgeführt 2026-10-25:** Nach der Freigabe (Spec `APPROVED`) meldet der Lauf **0 Findings, Exit 0** (Lauf A/B im Abschnitt „Gate-Status"); die Vor-Freigabe-Erwartung „Exit 1, genau ein ERROR" ist damit überholt und wird durch `test_unapproved_spec_yields_exactly_one_approval_error` belegt.
 - [x] Step 4: Alle Checkboxen dieses Plans auf `- [x]` setzen; Ergebnis aus Step 2 und Step 3 im Abschnitt „Gate-Status“ nachtragen (kein Approval-Marker). — **abgeschlossen (2026-10-25):** 90 abgehakte Checkboxen, 0 offene; die finalen Gate-Zahlen stehen unter „Abschluss-Gate (Task 18) — finale Verifikation (2026-10-25)“. Der frühere Stand („blockiert, Full-Suite-Gate rot 17 > 16“) ist überholt: der Ratchet steht wieder auf 16 Zeilen / 165 Vorkommen.
-- [x] Step 5: Commit `chore: close plan ledger after validator run`. — **Ledger geschlossen (2026-10-25); Commit delegiert:** dieser Validator-Lauf committet nicht. Die Commit-Ausführung liegt beim Orchestrator → `git`-Agenten (Commit-Authority); die Statuszeile bleibt bis dahin `— (pending)`.
+- [x] Step 5: Commit `chore: close plan ledger after validator run`. — **Ledger geschlossen (2026-10-25); Commit delegiert:** dieser Validator-Lauf committet nicht. Die Commit-Ausführung lag beim Orchestrator → `git`-Agenten (Commit-Authority); der Ledger-Abschluss wurde als `01ec57b0` auf `fix/tmp-sink-injection` committet und der Branch als `f9e3f3e5` über PR #1023 nach `main` gemergt. Der frühere Satz „die Statuszeile bleibt bis dahin `— (pending)`“ ist damit überholt; die Statuszeile führt `01ec57b0`.
 
 ## Guard-Tests
 
@@ -1035,3 +1035,25 @@ belegt ausschließlich der synthetische Fixture-Test `test_unapproved_spec_yield
 
 Die frühere Task-18-Statuszeile `partial (Gate rot)` in der Statusdatei ist damit **überholt** und steht
 jetzt auf `done` mit `Commit = — (pending)`.
+
+### Merge (2026-10-25)
+
+Plan und Ledger sind abgeschlossen und gemergt. Der Ledger-Abschluss-Commit auf dem Feature-Branch war
+`01ec57b0`; der Branch `fix/tmp-sink-injection` wurde über **PR #1023**
+(https://github.com/Popoboxxo/agent-meta/pull/1023) als Squash-Merge in `main` @ `14c0ad14` integriert.
+Der Merge-Commit auf `main` ist `f9e3f3e5c0f61c94a1425da137e2920f423fe191`
+(`feat: enforce tmp-sink injection across all write paths (#1023)`), `mergedAt` `2026-10-25T16:14:35Z`;
+`main`-HEAD nach dem Merge ist `f9e3f3e5`. Die CI auf dem PR war 5/5 grün (`validate` 53s, `scenarios`
+35m56s, `test (3.9)` 28m1s, `test (3.11)` 35m56s, `test (3.12)` 35m48s), `mergeable: CLEAN`. Der
+vorstehende Satz „`Commit = — (pending)`“ ist damit überholt.
+
+Post-Merge-Gates auf `main` @ `f9e3f3e5`, alle Exit 0:
+
+- **validate:** `python3 scripts/sync.py --validate` → `0 action(s) | 382 skipped | 2 warning(s)`, 0 `[ERROR]`, 0 `temp-literal.*`; beide WARNINGS vorbestehend (`active-set.gate-dropped`, `external/awesome-claude-code`-Checkout), dazu der vorbestehende Hinweis `repo-containment.no-hook-support` im Config-Validation-Block.
+- **--check:** `python3 scripts/sync.py --check` → `0 action(s) | 449 skipped | 35 warning(s)`, „Provider context files are up to date.“
+- **consistency-check:** `python3 scripts/consistency-check.py` → `[PASS] All checks passed`, 0 Fehler.
+- **validate-spec-plan:** `python3 scripts/sync.py --validate-spec-plan` → 0 Findings.
+- **provider-agnostic:** `tests/test_provider_agnostic_dispatch.py` und `tests/test_repo_containment_consistency.py` → `85 passed`; Code-Grep nach `if provider == "Name"` in den geänderten Modulen → 0 Treffer (die zwei Treffer sind Prosa in Docstrings/Kommentaren).
+- **AC-01:** `tests/test_ac01_render_identity.py`, `tests/test_temp_literals.py`, `tests/test_tmp_sink_injection.py` und `tests/test_template_line_duplication.py` → `21 passed`; Ratchet 16 distinkte Zeilen / 165 Vorkommen, Ceilings unverändert.
+- **Full-Suite:** 6 556 passed, 13 skipped, 0 failed, 0 errors (6 569 gesammelt). Einschränkung: gemessen als sequenzieller 6-Chunk-Sweep (≈1h59m), weil ein Einzelprozess-Lauf projiziert ≈140+ Minuten gebraucht hätte; den Einzelprozess-Beleg liefert die CI auf Python 3.9, 3.11 und 3.12.
+- **scenarios:** `bash tests/scenarios/run.sh` → `Scenarios: 79  Passed: 79  Failed: 0`, 46m54s; HEAD und Arbeitsbaum danach unverändert.

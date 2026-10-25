@@ -32,7 +32,7 @@ Spalte `Commit` bleibt `— (pending)`, bis der jeweilige Commit tatsächlich ex
 | 15 | Aggregations-Guard über alle Schreibpfade | done | `dc42d4a2` | Steps 1–3 grün; fünf Guards in `tests/test_tmp_sink_injection.py` (AC-01/AC-26, Hook fail-closed, Backup-Staging, Subprozess-Env, Single-Source) + `test_temp_literals.py` importiert das AC-01-Muster statt es zu duplizieren; Rot-Beleg: zwei Definitionsdateien; 12 passed, Regression 66 passed, `--validate` Exit 0 mit unveränderten 22 `temp-literal.system-temp`; Step 4 (Commit) offen, kein Commit-Auftrag |
 | 16 | Goldens rebaselinen | done | `1b567270` | Steps 1–4 grün; Rot-Lauf vor jeder Änderung protokolliert (10 Goldens + AC-01-Manifest); Golden-Diff zeilenweise klassifiziert, 0 unerwartete Zeilen; 10 Goldens gepatcht (nicht neu gerendert), `conftest.py:28` + Hinweis-Assertions literal-frei; AC-01-Manifest über den dokumentierten Generator neu erzeugt (102/1013, 0 added/removed); `--validate` 0 `temp-literal.*`; Standalone-Drift Exit 0; Step 5 (Commit) offen, kein Commit-Auftrag |
 | 17 | Doku und Beispiel-Config | done | `0adae5ea` | Steps 1–3 grün; §5.5-Unterabschnitt „Konfiguration" nennt `system-temp-exception`/`PYTEST_BASETEMP`, Beispiel-Config und CHANGELOG ergänzt; §5.5-Regeltext (Literal) bleibt für Task 21 unangetastet; `--validate` Exit 0, 22 unveränderte `temp-literal.system-temp`-WARNINGS; Step 4 (Commit) offen, kein Commit-Auftrag |
-| 18 | Abschluss-Validierung und Ledger | done | — (pending) | Steps 1–5 abgeschlossen (Gate-Test `test_unapproved_spec_yields_exactly_one_approval_error`; `--validate` Exit 0 mit 0 `temp-literal.*`; `--validate-spec-plan` 0 Findings/Exit 0; Ratchet 16 Zeilen/165 Vorkommen; `--render-standalone --check` Exit 0). Beide Gate-Blocker am 2026-10-25 behoben; Ledger geschlossen (90 abgehakt, 0 offen). Der frühere Stand `partial (Gate rot)` ist **überholt**. Commit bleibt `— (pending)`: Commit-Authority beim Orchestrator → `git`-Agenten. Details: `## Evidence — Task 18` und `## Blocker-Auflösung (2026-10-25)` |
+| 18 | Abschluss-Validierung und Ledger | done | `01ec57b0` | Steps 1–5 abgeschlossen (Gate-Test `test_unapproved_spec_yields_exactly_one_approval_error`; `--validate` Exit 0 mit 0 `temp-literal.*`; `--validate-spec-plan` 0 Findings/Exit 0; Ratchet 16 Zeilen/165 Vorkommen; `--render-standalone --check` Exit 0). Beide Gate-Blocker am 2026-10-25 behoben; Ledger geschlossen (90 abgehakt, 0 offen). Der frühere Stand `partial (Gate rot)` ist **überholt**. Der Ledger-Abschluss wurde als `01ec57b0` auf `fix/tmp-sink-injection` committet und über PR #1023 als `f9e3f3e5` nach `main` gemergt; der frühere Hinweis auf einen noch offenen Commit ist damit überholt. Details: `## Evidence — Task 18`, `## Blocker-Auflösung (2026-10-25)` und `## Merge-Nachweis (2026-10-25)` |
 | 19 | Toolchain-Cache-Opt-in (Q3) | done | `e25f7da4` | Steps 1–3 grün; AC-38: `tmp_sink_env_pin_block` pinnt `PIP_CACHE_DIR`/`npm_config_cache` nur bei `enabled: true` **und** `toolchain-caches: true` unter `<sink>/cache/…`; Validator weist den Widerspruch mit Exit 1 ab; `TmpPaths.env`/`tmp_env` bleiben cache-neutral; `--validate` Exit 0, 22 `temp-literal.*` unverändert (0 `toolchain-cache-in-repo`); Step 4 (Commit) offen, kein Commit-Auftrag |
 | 20 | Antigravity `args.FilePath` → `file_path` (Q10) | done | `9213b66c` | Steps 1–3 grün; `ARG_KEY_MAP` um `'FilePath': 'file_path'` erweitert, Assertion in `test_adapter_normalizes_edit_tool_names`; 60 passed, `--validate` 0 neue Findings; Step 4 (Commit) offen, kein Commit-Auftrag |
 | 21 | §5.5 verweist auf `PYTEST_BASETEMP` (Q11) | done | `d1e37608` | Steps 1–3 grün; AC-41: §5.5-Beispiel und kanonischer Aufruf nutzen `{{PYTEST_BASETEMP}}`/`repo_containment.tmp-sink.system-temp-exception`, kein `--basetemp=/tmp`-Literal mehr, Pflichtsatz byte-identisch; 5 + 21 Tests grün, `--validate` Exit 0 mit unveränderten 22 `temp-literal.system-temp`-WARNINGS; Step 4 (Commit) offen, kein Commit-Auftrag |
@@ -2849,6 +2849,7 @@ wieder und `--validate-spec-plan` meldet 0 Findings (wie Lauf A/B).
 **Status (maßgeblich, 2026-10-25): Ledger geschlossen.** Alle 22 Tasks stehen auf `done`, der Plan hat
 **90 abgehakte Checkboxen und 0 offene**; Task 18 Steps 1–5 sind abgeschlossen. Der Commit bleibt `— (pending)`, weil die
 Commit-Authority beim Orchestrator → `git`-Agenten liegt (dieser Lauf committet nicht).
+→ **überholt (2026-10-25):** Der Ledger-Abschluss ist als `01ec57b0` auf `fix/tmp-sink-injection` committet und über PR #1023 als `f9e3f3e5` nach `main` gemergt; der vorstehende Satz beschreibt den Stand dieses Laufs.
 
 > **Historie (überholt):** „Der Ledger ist **nicht** abgeschlossen (Full-Suite-Gate rot).“ — dieser Satz
 > beschreibt den Stand des Task-18-Erstlaufs und bleibt als Evidenz stehen. Beide damaligen Gate-Blocker
@@ -2883,7 +2884,7 @@ Notes der Task-Zeilen beschreiben weiterhin den Subagenten-Stand („Step 4 offe
 | 15 | `dc42d4a2` | test: guard tmp-sink injection across all write paths |
 | 16 | `1b567270` | test: rebaseline slimming goldens without temp literals |
 | 17 | `0adae5ea` | docs: document tmp-sink injection and env pin |
-| 18 | — (pending) | dieser Task: keine Commit-Ausführung (Orchestrator → `git`-Agent) |
+| 18 | `01ec57b0` | Ledger-Abschluss auf `fix/tmp-sink-injection` (Subject nicht separat belegt; geplanter Text aus Task 18 Step 5: `chore: close plan ledger after validator run`) |
 | 19 | `e25f7da4` | feat: add opt-in toolchain cache pin for tmp sink |
 | 20 | `9213b66c` | fix: map antigravity FilePath to file_path in adapter |
 | 21 | `d1e37608` | docs: point prison-mode section 5.5 at PYTEST_BASETEMP |
@@ -2981,9 +2982,62 @@ Ratchet unabhängig nachgemessen: **16 distinkte Zeilen / 165 Vorkommen** (Ceili
 
 **Ledger-Stand:** Task-18-Zeile `done`, `Commit = — (pending)` (Commit-Authority beim Orchestrator →
 `git`-Agenten); Plan-Checkboxen **90 abgehakt / 0 offen**. Die frühere Zeile `partial (Gate rot)` ist damit
-**überholt**.
+**überholt**. → **überholt (2026-10-25):** Task-18-Commit ist `01ec57b0`, gemergt als `f9e3f3e5` über PR #1023 (siehe `## Merge-Nachweis (2026-10-25)`).
 
 **Full-Suite (gemessen im Task-18-Lauf):** 6 555 passed, 13 skipped, 1 failed (= der inzwischen behobene
 Ratchet). **Einschränkung:** dateiweiser Sweep (8-fach parallel), **kein** Einzelprozess-Lauf; dieser traf nach
 2 400 s das Tool-Zeitlimit (17 %, 0 Failures). In diesem Abschluss-Lauf wurde die Full-Suite nicht erneut
 ausgeführt.
+
+## Merge-Nachweis (2026-10-25)
+
+Dieser Abschnitt schließt den Ledger gegen den Remote-Stand ab: Er belegt den Merge des Feature-Branches und
+die vollständige Post-Merge-Verifikation auf `main`. Alle Angaben stammen aus den Läufen vom 2026-10-25; sie
+treten neben die frühere Evidenz und ersetzen sie nicht.
+
+| Feld | Wert |
+|---|---|
+| Feature-Branch | `fix/tmp-sink-injection` |
+| Pre-Merge-Head (Feature-Branch) | `01ec57b0` (Ledger-Abschluss) |
+| Pull Request | **#1023** — https://github.com/Popoboxxo/agent-meta/pull/1023 |
+| Base | `main` @ `14c0ad14` |
+| Merge-Verfahren | Squash-Merge |
+| `mergedAt` | `2026-10-25T16:14:35Z` |
+| Merge-Commit auf `main` | `f9e3f3e5c0f61c94a1425da137e2920f423fe191` |
+| Merge-Subject | `feat: enforce tmp-sink injection across all write paths (#1023)` |
+
+### CI auf dem PR (#1023)
+
+| Check | Ergebnis |
+|---|---|
+| `validate` | grün, 53s |
+| `scenarios` | grün, 35m56s |
+| `test (3.9)` | grün, 28m1s |
+| `test (3.11)` | grün, 35m56s |
+| `test (3.12)` | grün, 35m48s |
+| `mergeable` | `CLEAN` |
+
+Damit 5/5 Checks grün und `mergeable: CLEAN`.
+
+### Post-Merge-Verifikation auf `main` @ `f9e3f3e5`
+
+| # | Kommando | Ergebnis | Exit |
+|---|---|---|---|
+| 1 | `python3 scripts/sync.py --validate` | `0 action(s) \| 382 skipped \| 2 warning(s)`, 0 `[ERROR]`, 0 `temp-literal.*`; beide WARNINGS sind vorbestehend (`active-set.gate-dropped`, `external/awesome-claude-code`-Checkout), zusätzlich erscheint der vorbestehende Hinweis `repo-containment.no-hook-support` im Config-Validation-Block | 0 |
+| 2 | `python3 scripts/sync.py --check` | `0 action(s) \| 449 skipped \| 35 warning(s)`, „Provider context files are up to date.“ | 0 |
+| 3 | `python3 scripts/consistency-check.py` | `[PASS] All checks passed`, 0 Fehler | 0 |
+| 4 | `python3 scripts/sync.py --validate-spec-plan` | 0 Findings | 0 |
+| 5 | `python3 -m pytest tests/test_provider_agnostic_dispatch.py tests/test_repo_containment_consistency.py -q` | `85 passed`; Code-Grep nach `if provider == "Name"` in den geänderten Modulen: 0 Treffer (die zwei Treffer sind Prosa in Docstrings/Kommentaren) | 0 |
+| 6 | `python3 -m pytest tests/test_ac01_render_identity.py tests/test_temp_literals.py tests/test_tmp_sink_injection.py tests/test_template_line_duplication.py -q` | `21 passed`; Ratchet 16 distinkte Zeilen / 165 Vorkommen, Ceilings unverändert | 0 |
+| 7 | `python3 scripts/sync.py --dry-run` | `0 action(s)`, idempotent gegenüber `--check` | 0 |
+| 8 | Full-Suite | **6 556 passed, 13 skipped, 0 failed, 0 errors** (6 569 gesammelt) | 0 |
+| 9 | `bash tests/scenarios/run.sh` | `Scenarios: 79  Passed: 79  Failed: 0`, 46m54s; HEAD und Arbeitsbaum danach unverändert | 0 |
+
+**Einschränkung Full-Suite, ehrlich benannt:** Die Suite wurde als sequenzieller Sweep in 6 Chunks gemessen
+(Gesamtdauer ≈1h59m), weil ein Einzelprozess-Lauf nach Projektion ≈140+ Minuten gebraucht hätte. Die 6 556
+`passed` sind also die Summe der Chunk-Läufe, kein einzelner Prozesslauf; den Einzelprozess-Beleg liefert die
+CI auf Python 3.9, 3.11 und 3.12 (alle drei grün, siehe CI-Tabelle oben).
+
+**Gate-Bilanz:** Alle neun Post-Merge-Prüfungen enden mit Exit 0; die zwei `--validate`-WARNINGS und die 35
+`--check`-WARNINGS sind vorbestehend und plan-extern. Der Merge ist damit nachträglich vollständig belegt.
+
