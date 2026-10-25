@@ -147,6 +147,21 @@ Golden rebaseline log (the frozen set is edited only with a documented reason):
   tokens (``1.2.0-beta.2`` / ``2026-09-13``) and the ``model:`` pins stay at
   their frozen values. AC-01 hashes rebaselined separately (see the rebaseline
   log in ``tests/test_ac01_render_identity.py``).
+* Merge of ``origin/main`` (tmp-sink injection) into the evidence-gates branch
+  (2026-10-25): the branch template already carried ``{{TMP_SINK_PATH}}``, but
+  the frozen ``tester`` golden still held the pre-tmp-sink system-temp literals,
+  so the merge conflicted in the frontmatter and the ``--basetemp`` line.
+  The fixture was **re-derived from the real sync render**
+  (``AGENT_META_TEST_REPO=… sync.py --validate`` plus the two documented inverse
+  ports: the ``{{PYTEST_BASETEMP}}`` token and the stripped
+  ``{{AUTO_COMMIT_BLOCK}}`` tail), not text-merged. It therefore carries the
+  branch wording (``realistic *shapes*``, production-data constraints), main's
+  ``.tmp`` literals and the ``version: 2.8.0`` /
+  ``generated-from: 1-generic/tester.md@2.8.0`` pins; the ``model:`` pin stays at
+  its frozen ``claude-haiku-4-5-20251001`` (ported by ``_GOLDEN_MODEL_MAP``).
+  In the same step the ``accessibility-specialist`` golden is rebaselined for the
+  missing blank line before ``**Gate:**`` (template ``0.6.0 -> 0.6.1``: one blank
+  line plus the two frontmatter pins). No other golden changed.
 
 The gate is network-free, writes nothing into the repository (the render target
 is a pytest ``tmp_path``) and renders the corpus once per module (~5s).

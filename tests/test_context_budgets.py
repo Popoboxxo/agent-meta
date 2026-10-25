@@ -40,6 +40,7 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from lib import context_report as cr  # noqa: E402
 from lib.providers import load_provider_capabilities, load_providers_config  # noqa: E402
+from lib.tmp_paths import resolve_tmp_paths  # noqa: E402
 from tests.test_ac01_render_identity import _make_project  # noqa: E402
 
 TOLERANCE_MIN_BYTES = 256
@@ -125,16 +126,29 @@ TOLERANCE_MAX_BYTES = 4096
 #   * ZCode/always-loaded: 600076 -> 607304 (+7228)
 #   * ZCode/harness-roster: 575003 -> 582231 (+7228)
 #   * ZCode/orchestrator: 70752 -> 72010 (+1258)
+# RE-PIN (merge of origin/main, tmp-sink injection; 2026-10-25): the merge changed the
+# rendered text of the git/tester/security-auditor/database-reviewer/incident-responder/
+# performance-optimizer/se-senior-developer role files, so every aggregate that contains
+# those files shrank by 16-17 B (the replacement of the system-temp paths is shorter than
+# the old literals). Measured, not extrapolated. Complete list of non-zero deltas:
+#   * harness-roster: Claude 598429 -> 598413 (-16), Codex 592384 -> 592368 (-16),
+#     KimiCode 584891 -> 584875 (-16), Mammouth 580947 -> 580931 (-16),
+#     Opencode 594910 -> 594893 (-17), ZCode 582231 -> 582215 (-16).
+#   * always-loaded: Claude 618208 -> 618192 (-16), Codex 616544 -> 616528 (-16),
+#     KimiCode 609065 -> 609049 (-16), Mammouth 605118 -> 605102 (-16),
+#     Opencode 619145 -> 619128 (-17), ZCode 607304 -> 607288 (-16).
+#   * orchestrator: Opencode 86476 -> 86475 (-1). Every other artifact is unchanged
+#     (entry-file, rules, Continue/Copilot/Gemini and all their artifacts).
 _IST_FULL: Dict[str, Dict[str, int]] = {
-    "Claude": {"always-loaded": 618208, "entry-file": 2511, "harness-roster": 598429, "orchestrator": 86788, "rules": 17268},
-    "Codex": {"always-loaded": 616544, "entry-file": 24160, "harness-roster": 592384, "orchestrator": 86403},
+    "Claude": {"always-loaded": 618192, "entry-file": 2511, "harness-roster": 598413, "orchestrator": 86788, "rules": 17268},
+    "Codex": {"always-loaded": 616528, "entry-file": 24160, "harness-roster": 592368, "orchestrator": 86403},
     "Continue": {"always-loaded": 20498, "entry-file": 358, "orchestrator": 71438, "rules": 20140},
     "Copilot": {"always-loaded": 29393, "entry-file": 9457, "orchestrator": 71314, "rules": 19936},
     "Gemini": {"always-loaded": 31841, "entry-file": 31841, "orchestrator": 86810},
-    "KimiCode": {"always-loaded": 609065, "entry-file": 24174, "harness-roster": 584891, "orchestrator": 73201},
-    "Mammouth": {"always-loaded": 605118, "entry-file": 24171, "harness-roster": 580947, "orchestrator": 71739},
-    "Opencode": {"always-loaded": 619145, "entry-file": 24235, "harness-roster": 594910, "orchestrator": 86476},
-    "ZCode": {"always-loaded": 607304, "entry-file": 25073, "harness-roster": 582231, "orchestrator": 72010},
+    "KimiCode": {"always-loaded": 609049, "entry-file": 24174, "harness-roster": 584875, "orchestrator": 73201},
+    "Mammouth": {"always-loaded": 605102, "entry-file": 24171, "harness-roster": 580931, "orchestrator": 71739},
+    "Opencode": {"always-loaded": 619128, "entry-file": 24235, "harness-roster": 594893, "orchestrator": 86475},
+    "ZCode": {"always-loaded": 607288, "entry-file": 25073, "harness-roster": 582215, "orchestrator": 72010},
 }
 
 
@@ -286,16 +300,25 @@ def test_ac07_missing_ceiling_is_a_violation():
 #   * Opencode/harness-roster: 533661 -> 540905 (+7244)
 #   * ZCode/always-loaded: 539659 -> 546887 (+7228)
 #   * ZCode/harness-roster: 535333 -> 542561 (+7228)
+# RE-PIN (merge of origin/main, tmp-sink injection; 2026-10-25) — measured, not
+# extrapolated. Same cause as the `full` re-pin above; non-zero deltas only:
+#   * harness-roster: Claude 544450 -> 544434 (-16), Codex 538306 -> 538290 (-16),
+#     KimiCode 545225 -> 545209 (-16), Mammouth 541322 -> 541306 (-16),
+#     Opencode 540905 -> 540888 (-17), ZCode 542561 -> 542545 (-16).
+#   * always-loaded: Claude 564179 -> 564163 (-16), Codex 541719 -> 541703 (-16),
+#     KimiCode 548648 -> 548632 (-16), Mammouth 544743 -> 544727 (-16),
+#     Opencode 544386 -> 544369 (-17), ZCode 546887 -> 546871 (-16).
+#   * orchestrator: Opencode 32471 -> 32470 (-1). Every other artifact unchanged.
 _IST_COMPACT: Dict[str, Dict[str, int]] = {
-    "Claude": {"always-loaded": 564179, "entry-file": 2461, "harness-roster": 544450, "orchestrator": 32809, "rules": 17268},
-    "Codex": {"always-loaded": 541719, "entry-file": 3413, "harness-roster": 538306, "orchestrator": 32325},
+    "Claude": {"always-loaded": 564163, "entry-file": 2461, "harness-roster": 544434, "orchestrator": 32809, "rules": 17268},
+    "Codex": {"always-loaded": 541703, "entry-file": 3413, "harness-roster": 538290, "orchestrator": 32325},
     "Continue": {"always-loaded": 20498, "entry-file": 358, "orchestrator": 33249, "rules": 20140},
     "Copilot": {"always-loaded": 29393, "entry-file": 9457, "orchestrator": 33123, "rules": 19936},
     "Gemini": {"always-loaded": 10012, "entry-file": 10012, "orchestrator": 33997},
-    "KimiCode": {"always-loaded": 548648, "entry-file": 3423, "harness-roster": 545225, "orchestrator": 33535},
-    "Mammouth": {"always-loaded": 544743, "entry-file": 3421, "harness-roster": 541322, "orchestrator": 32114},
-    "Opencode": {"always-loaded": 544386, "entry-file": 3481, "harness-roster": 540905, "orchestrator": 32471},
-    "ZCode": {"always-loaded": 546887, "entry-file": 4326, "harness-roster": 542561, "orchestrator": 32340},
+    "KimiCode": {"always-loaded": 548632, "entry-file": 3423, "harness-roster": 545209, "orchestrator": 33535},
+    "Mammouth": {"always-loaded": 544727, "entry-file": 3421, "harness-roster": 541306, "orchestrator": 32114},
+    "Opencode": {"always-loaded": 544369, "entry-file": 3481, "harness-roster": 540888, "orchestrator": 32470},
+    "ZCode": {"always-loaded": 546871, "entry-file": 4326, "harness-roster": 542545, "orchestrator": 32340},
 }
 
 COMPACT_BUDGET_CEILINGS: Dict[str, Dict[str, int]] = {
@@ -306,7 +329,9 @@ COMPACT_BUDGET_CEILINGS: Dict[str, Dict[str, int]] = {
 # The AGENTS.md providers share one context file; measured in a single project
 # with all of them active (`compact`).
 _AGENTS_MD_PROVIDERS = ("Codex", "Gemini", "KimiCode", "Mammouth", "Opencode", "ZCode")
-_IST_COMPACT_MULTI_AGENTS_MD = 11374
+# Multi-provider AGENTS.md Ist-value; re-measured 2026-10-25 after the origin/main
+# merge: 11374 -> 11257 (-117 B, the tmp-sink text is shorter).
+_IST_COMPACT_MULTI_AGENTS_MD = 11257
 
 # AC-26 size targets for `compact`, as DATA (never a library constant; C7).
 # ESTIMATES (Spec section 11): goals, not measurements. `compact` ships
@@ -382,7 +407,8 @@ def measured_compact(tmp_path_factory):
     for provider in _PROVIDERS:
         config = _matrix_config(root, provider, [provider])
         work = root / (provider + "-work")
-        cr.render_into_work_dir(REPO_ROOT, config, work, profile="compact")
+        paths = resolve_tmp_paths(root / provider, {})
+        cr.render_into_work_dir(REPO_ROOT, config, work, profile="compact", paths=paths)
         works[provider] = work
         report.update(cr.measure_artifacts(work, [provider], mappings))
     return report, mappings, works
@@ -394,7 +420,8 @@ def measured_compact_multi(tmp_path_factory):
     mappings = _matrix_mappings()
     config = _matrix_config(root, "multi", _AGENTS_MD_PROVIDERS)
     work = root / "work"
-    cr.render_into_work_dir(REPO_ROOT, config, work, profile="compact")
+    paths = resolve_tmp_paths(root / "multi", {})
+    cr.render_into_work_dir(REPO_ROOT, config, work, profile="compact", paths=paths)
     return cr.measure_artifacts(work, _AGENTS_MD_PROVIDERS, mappings)
 
 

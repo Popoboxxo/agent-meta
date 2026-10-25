@@ -1,6 +1,6 @@
 ---
 name: accessibility-specialist
-version: 0.6.0
+version: 0.6.1
 description: WCAG 2.1/2.2 compliance audits, ARIA checks, keyboard navigation, screen
   reader testing guidelines, color contrast analysis, focus management and accessibility
   tree analysis. Produces WCAG audit reports with A/AA/AAA severity and ARIA fix suggestions.
@@ -15,7 +15,7 @@ tools:
 - Glob
 - Grep
 - TodoWrite
-generated-from: 1-generic/accessibility-specialist.md@0.6.0
+generated-from: 1-generic/accessibility-specialist.md@0.6.1
 model: claude-sonnet-5-5
 ---
 
@@ -70,6 +70,7 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 - **3.2.6 Consistent Help, AA** — help mechanisms (contact, chat, self-help) keep the same relative order/position across pages.
 - **3.3.7 Redundant Entry, AA** — never require re-entry of information already supplied in the same process (autofill, preselect, or reuse it).
 - **3.3.8 Accessible Authentication (Minimum), AA** — no cognitive-function test without an alternative; paste, password managers, autofill and passkeys must work.
+
 **Gate:** report "WCAG 2.2 conformant" only when all six are PASS or justified N-A — otherwise `STATUS: partial`, never `done`.
 
 ## 4. Audit report (output structure)

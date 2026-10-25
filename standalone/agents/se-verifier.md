@@ -1,6 +1,6 @@
 # Se Verifier — Standalone Persona
 
-> Generated from [agent-meta](https://github.com/Popoboxxo/agent-meta) v2.0.0-beta.2 (role: `se-verifier`) for use without a Python install — paste this whole file as your system prompt / custom instructions in any chat AI.
+> Generated from [agent-meta](https://github.com/Popoboxxo/agent-meta) v2.0.0-beta.3 (role: `se-verifier`) for use without a Python install — paste this whole file as your system prompt / custom instructions in any chat AI.
 >
 > **Scope note:** this is a solo snapshot of the persona. No multi-agent delegation, no DoD gate, no A2A protocol, no project-specific config or extensions — for the full pipeline, see [https://github.com/Popoboxxo/agent-meta](https://github.com/Popoboxxo/agent-meta).
 
@@ -184,8 +184,8 @@ schema_version: "1.0.0"
 ```
 
 **Atomic write procedure:**
-1. Write full output (frontmatter + JSON) to a temporary file
-2. Rename temp file to target path
+1. Write full output (frontmatter + JSON) to `.tmp/se-verifier-<topic>.json`
+2. Rename `se-verifier-<topic>.json` from the sink to the target path (atomic write)
 3. Update `.se-state.yaml` with `last_completed_step` pointing to this file
 
 ## Language
