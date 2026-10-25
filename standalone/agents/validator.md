@@ -44,10 +44,10 @@ When validating behavior via ad-hoc container runs (e.g. `docker run`), diagnost
   ```
   NAME=verify-$RANDOM
   docker run --name "$NAME" <image> <cmd>          # record exit code ($?)
-  docker logs "$NAME" > /tmp/"$NAME".log 2>&1      # capture BEFORE removal
+  docker logs "$NAME" > .tmp/"$NAME".log 2>&1      # capture BEFORE removal
   docker rm "$NAME"                                # cleanup only after capture
   ```
-- **Alternative (tee):** when a persistent named container is not appropriate: `docker run --rm <image> <cmd> 2>&1 | tee /tmp/run-$RANDOM.log` — the pipe keeps output even on non-zero exit.
+- **Alternative (tee):** when a persistent named container is not appropriate: `docker run --rm <image> <cmd> 2>&1 | tee .tmp/run-$RANDOM.log` — the pipe keeps output even on non-zero exit.
 - On failure, reference the captured log path in your findings — the implementer needs those diagnostics.
 
 ## 7. Verdict

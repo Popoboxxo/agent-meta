@@ -20,7 +20,7 @@ Spalte `Commit` bleibt `— (pending)`, bis der jeweilige Commit tatsächlich ex
 | 4 | Achtzehn System-Temp-Literale in sieben Templates ersetzen | done | — (pending) | Steps 1–3 grün; 18 Literale → `{{TMP_SINK_PATH}}`; Version-Bumps + 8 `based-on`-Pins kaskadiert; Step 4 (Commit) offen |
 | 5 | Vier Sink-Literale in Auditor-Templates | done | — (pending) | Steps 1–3 grün; Step 4 (Commit) offen, kein Commit-Auftrag. Golden `app-lifecycle-governor` erwartungsgemäß rot (nur Versionszeilen), Rebaseline Task 16 |
 | 6 | Vage Temp-Anweisungen präzisieren | done | — (pending) | Steps 1–3 grün; 13 Rollen + `plan-ledger.md` nennen `{{TMP_SINK_PATH}}`; 13 Patch-Bumps, kein `2-platform`-Cascade (keine `based-on`-Kinder); Step 4 (Commit) offen, kein Commit-Auftrag |
-| 7 | Standalone-Export regenerieren | pending | — (pending) | — |
+| 7 | Standalone-Export regenerieren | done | — (pending) | Steps 1–3 grün; `TMP_SINK_PATH=".tmp"` + `TMP_SINK_ENV_PIN_BLOCK=""`; 23 Standalone-Dateien regeneriert (0 Drift); AC-26/AC-27; Step 4 (Commit) offen, kein Commit-Auftrag |
 | 8 | Hook-Anker und fail-closed Root-Auflösung | pending | — (pending) | — |
 | 9 | Hook-Testmatrix und bewusste Inversion | pending | — (pending) | — |
 | 10 | Env-Pin für Framework-Subprozesse ausweiten | pending | — (pending) | — |
@@ -623,3 +623,166 @@ der Sink-Satz selbst ist golden-invariant).
    `rules/1-generic/plan-ledger.md` hat kein Frontmatter → kein Versionsbump.
 4. **Step 4 (Commit) nicht ausgeführt** — kein Commit-Auftrag für diesen Subagenten
    (Branch-Guard/Commit-Authority bleiben beim Orchestrator).
+
+## Evidence — Task 7
+
+### Rot (vor der Implementierung/Regeneration)
+
+`python3 -m pytest tests/test_standalone_render.py tests/test_temp_literals.py -q`
+→ Exit 1, `2 failed, 4 passed in 0.43s`:
+
+```
+______________________ test_tmp_sink_path_uses_framework_default ______________
+
+>       assert not offenders, (
+            "TMP_SINK_PATH rendered as a placeholder note in standalone/** (AC-27, IC-15). "
+            "Set TMP_SINK_PATH = '.tmp' in standalone.py::_standalone_variables:\n"
+            + "\n".join(offenders)
+        )
+E       AssertionError: TMP_SINK_PATH rendered as a placeholder note in standalone/** (AC-27, IC-15). Set TMP_SINK_PATH = '.tmp' in standalone.py::_standalone_variables:
+E         standalone/agents/agent-meta-manager.md:288: python3 [AGENT_META_REL_PATH — not available outside a full agent-meta install]scripts/sync.py --optimize-config --json --out [TMP_SINK_PATH — not available outside a full agent-meta install]/meta-optimizer/<ts>/
+E         standalone/agents/meta-doctor.md:23: - Report targets are exclusively `[TMP_SINK_PATH — not available outside a full agent-meta install]/doctor/` (`--doctor --out`) and
+E         standalone/agents/meta-doctor.md:24: `[TMP_SINK_PATH — not available outside a full agent-meta install]/context-report/` (`--context-report --json`). The runner writes those files, not you:
+E         standalone/agents/meta-doctor.md:43: python3 [AGENT_META_REL_PATH — not available outside a full agent-meta install]scripts/sync.py --doctor --json --out [TMP_SINK_PATH — not available outside a full agent-meta install]/doctor/<YYYYMMDD-HHMMSS>.json
+E         standalone/agents/meta-doctor.md:55: `[TMP_SINK_PATH — not available outside a full agent-meta install]/doctor/`; any other target is rejected by the runner (`doctor.out-outside-tmp-sink`, exit 2).
+E         standalone/agents/meta-doctor.md:65: 1. **Doctor run:** `--doctor --json --out [TMP_SINK_PATH — not available outside a full agent-meta install]/doctor/<ts>.json` (timestamp `YYYYMMDD-HHMMSS`).
+E         standalone/agents/meta-doctor.md:106: ARTIFACTS: <paths, e.g. [TMP_SINK_PATH — not available outside a full agent-meta install]/doctor/<ts>.json, or none>
+E         standalone/agents/meta-doctor.md:128: - Never repair, never edit files, never write outside `[TMP_SINK_PATH — not available outside a full agent-meta install]/doctor/` and
+E         standalone/agents/meta-doctor.md:129: `[TMP_SINK_PATH — not available outside a full agent-meta install]/context-report/`; no `Write`/`Edit`.
+E         standalone/agents/meta-optimizer.md:32: The executing step belongs to `agent-meta-manager` (IC-27): it runs `sync.py --optimize-config --json --out [TMP_SINK_PATH — not available outside a full agent-meta install]/meta-optimizer/<ts>/` and returns the artifact paths. This role has no Bash and executes nothing.
+E         standalone/agents/meta-optimizer.md:64: text — `ARTIFACTS: none`. The executing step is `agent-meta-manager`'s: it runs `sync.py --optimize-config --json --out [TMP_SINK_PATH — not available outside a full agent-meta install]/meta-optimizer/<ts>/`, later the mandatory preview (`sync.py --apply-config-patch ... --dry-run`) and the apply (`--preview`, after the user confirms the preview). This role executes nothing and writes nothing.
+E         standalone/agents/meta-optimizer.md:80: ARTIFACTS: none (input read: [TMP_SINK_PATH — not available outside a full agent-meta install]/meta-optimizer/<ts>/proposal.json)
+E       assert not ['standalone/agents/agent-meta-manager.md:288: python3 [AGENT_META_REL_PATH — not available outside a full agent-meta ...MP_SINK_PATH — not available outside a full agent-meta install]/doctor/<ts>.json` (timestamp `YYYYMMDD-HHMMSS`).', ...]
+
+tests/test_standalone_render.py:51: AssertionError
+
+___________________ test_no_system_temp_literal_in_standalone ___________________
+
+>       assert not hits, (
+            "system temp literal(s) found in standalone/** (AC-26). Regenerate after "
+            "fixing the source template (`python3 scripts/sync.py --render-standalone`):\n"
+            + "\n".join(hits)
+        )
+E       AssertionError: system temp literal(s) found in standalone/** (AC-26). Regenerate after fixing the source template (`python3 scripts/sync.py --render-standalone`):
+E         standalone/agents/code-reviewer.md:206: npm run lint > /tmp/lint.log 2>&1 &
+E         standalone/agents/code-reviewer.md:214: tail -50 /tmp/lint.log; exit "$RC"            # evidence + exit code = final result, not a "waiting" placeholder
+E         standalone/agents/developer.md:30: docker logs "$NAME" > /tmp/"$NAME".log 2>&1      # capture BEFORE removal
+E         standalone/agents/developer.md:33: - **Alternative (tee):** when a persistent named container is not appropriate: `docker run --rm <image> <cmd> 2>&1 | tee /tmp/run-$RANDOM.log` — the pipe keeps output even on non-zero exit.
+E         standalone/agents/developer.md:130: npm run e2e > /tmp/e2e.log 2>&1 &
+E         standalone/agents/developer.md:139: tail -50 /tmp/e2e.log; exit "$RC"             # evidence + exit code = final result, not a "waiting" placeholder
+E         standalone/agents/devops-engineer.md:185: docker logs "$NAME" > /tmp/"$NAME".log 2>&1   # capture diagnostics BEFORE removal
+E         standalone/agents/devops-engineer.md:187: echo "container exit code: $RC" && tail -20 /tmp/"$NAME".log
+E         standalone/agents/docker.md:115: docker logs "$NAME" > /tmp/"$NAME".log 2>&1   # capture diagnostics BEFORE removal
+E         standalone/agents/docker.md:117: echo "container exit code: $RC" && tail -20 /tmp/"$NAME".log
+E         standalone/agents/e2e-tester.md:126: docker logs "$NAME" > /tmp/"$NAME".log 2>&1   # capture diagnostics BEFORE removal
+E         standalone/agents/e2e-tester.md:128: echo "container exit code: $RC" && tail -20 /tmp/"$NAME".log
+E         standalone/agents/tester.md:55: docker logs "$NAME" > /tmp/"$NAME".log 2>&1      # capture BEFORE removal
+E         standalone/agents/tester.md:58: - **Alternative (tee):** when a persistent named container is not appropriate: `docker run --rm <image> <cmd> 2>&1 | tee /tmp/run-$RANDOM.log` — the pipe keeps output even on non-zero exit.
+E         standalone/agents/tester.md:125: docker logs "$NAME" > /tmp/"$NAME".log 2>&1   # capture diagnostics BEFORE removal
+E         standalone/agents/tester.md:127: echo "container exit code: $RC" && tail -20 /tmp/"$NAME".log
+E         standalone/agents/validator.md:47: docker logs "$NAME" > /tmp/"$NAME".log 2>&1      # capture BEFORE removal
+E         standalone/agents/validator.md:50: - **Alternative (tee):** when a persistent named container is not appropriate: `docker run --rm <image> <cmd> 2>&1 | tee /tmp/run-$RANDOM.log` — the pipe keeps output even on non-zero exit.
+E       assert not ['standalone/agents/code-reviewer.md:206: npm run lint > /tmp/lint.log 2>&1 &', ...]
+
+tests/test_temp_literals.py:117: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_standalone_render.py::test_tmp_sink_path_uses_framework_default
+FAILED tests/test_temp_literals.py::test_no_system_temp_literal_in_standalone
+2 failed, 4 passed in 0.43s
+```
+
+Deckungsgleich mit der Planvorgabe: 12 `TMP_SINK_PATH`-Notizen in drei Dateien,
+18 AC-01-Treffer in sieben Dateien.
+
+### Grün (nach der Implementierung)
+
+| # | Kommando | Ergebnis |
+|---|---|---|
+| 1 | `python3 -m pytest tests/test_standalone_render.py tests/test_temp_literals.py -q` | `6 passed in 0.42s`, Exit 0 |
+| 2 | `python3 scripts/sync.py --render-standalone --check` | Exit 0; `OK  standalone/ is up to date (91 file(s))` (die `!  Variable … not in config`-Zeilen sind vorbestehende Standalone-Safety-Nets anderer Platzhalter, keine Drift) |
+| 3 | `python3 scripts/sync.py --render-standalone` | `23 written \| 0 removed \| 68 unchanged \| 90 role(s)`; Wiederholung im `--check`-Modus: `0 written` |
+| 4 | `python3 scripts/sync.py --validate` | Exit 0; `0 action(s) \| 382 skipped \| 2 warning(s)` (beide vorbestehend: `active-set.gate-dropped`, Submodul-Checkout `external/awesome-claude-code`) |
+| 5 | `grep -rn "not available outside a full agent-meta install" standalone/agents/{meta-doctor,meta-optimizer,agent-meta-manager}.md` | Treffer nur für **andere** Platzhalter (`AGENT_META_REL_PATH`, `EXTENSION_DIR`, `SKILLS_DIR`, `CONTEXT_FILE`, `PROMPT_INJECTION_DEFENSE_BLOCK`, `OUTPUT_GUARD_BLOCK`) — vorbestehen, nicht Task-7-Scope (siehe Abweichung 1) |
+| 6 | `grep -rn "\[TMP_SINK_PATH — not available outside a full agent-meta install\]" standalone/` | keine Treffer, Exit 1 |
+| 7 | `grep -rn "{{TMP_SINK_PATH}}\|{{TMP_SINK_ENV_PIN_BLOCK}}\|{{PYTEST_BASETEMP}}" standalone/` | keine Treffer, Exit 1 |
+| 8 | `grep -Prn "/home/\|/Users/\|/tmp/" standalone/` | 0 Treffer (kein Maschinenpfad im Export) |
+| 9 | Regression `python3 -m pytest tests/test_standalone_render.py tests/test_temp_literals.py tests/test_standalone_export_in_sync.py -q` | `7 passed in 3.85s`, Exit 0 |
+| 10 | Regression `python3 -m pytest tests/test_meta_doctor_role.py tests/test_meta_optimizer_role.py -q` | `61 passed in 1.78s`, Exit 0 |
+| 11 | `python3 -m pytest tests/test_ac01_render_identity.py -q` | `2 failed, 3 passed` — **vorbestehend** aus Task 4/5 (Hash-Manifest `tests/fixtures/ac01-baseline/hashes.json`), Rebaseline ist Task 16; Task 7 rendert nur `standalone/**`, nicht `.claude/**` |
+
+### Standalone-Diff (23 Dateien, je 1:1-Zeilenersetzung)
+
+| Datei | Δ | Begründung |
+|---|---|---|
+| `meta-doctor.md` | 8 | 8 `[TMP_SINK_PATH — …]`-Notizen → `.tmp/doctor/`, `.tmp/context-report/` (AC-27) |
+| `meta-optimizer.md` | 3 | 3 Notizen → `.tmp/meta-optimizer/<ts>/` bzw. `…/proposal.json` (AC-27) |
+| `agent-meta-manager.md` | 1 | 1 Notiz → `.tmp/meta-optimizer/<ts>/` (AC-27) |
+| `developer.md` | 4 | 4 `/tmp/`-Beispiele → `.tmp/` (Task 4) |
+| `code-reviewer.md` | 2 | 2 `/tmp/`-Beispiele → `.tmp/` (Task 4) |
+| `tester.md` | 4 | 4 `/tmp/`-Beispiele → `.tmp/` (Task 4) |
+| `validator.md` | 2 | 2 `/tmp/`-Beispiele → `.tmp/` (Task 4) |
+| `docker.md` | 2 | 2 `/tmp/`-Beispiele → `.tmp/` (Task 4) |
+| `devops-engineer.md` | 2 | 2 `/tmp/`-Beispiele → `.tmp/` (Task 4) |
+| `e2e-tester.md` | 2 | 2 `/tmp/`-Beispiele → `.tmp/` (Task 4) |
+| `se-architect.md` | 1 | `temp → rename` → `write to .tmp/se-architect-<topic>.md → rename` (Task 6) |
+| `se-component-requirements.md` | 1 | analog (Task 6) |
+| `se-critic.md` | 1 | analog (Task 6) |
+| `se-developer.md` | 2 | Nummernliste Schritt 1/2 auf `.tmp/se-developer-<topic>.md` (Task 6) |
+| `se-integration-and-test-manager.md` | 2 | analog `.json` (Task 6) |
+| `se-interface-mgr.md` | 2 | analog `.json` (Task 6) |
+| `se-junior-developer.md` | 2 | analog `.md` (Task 6) |
+| `se-requirements.md` | 1 | analog (Task 6) |
+| `se-senior-developer.md` | 1 | analog (Task 6) |
+| `se-termination.md` | 2 | analog `.json` (Task 6) |
+| `se-validator.md` | 2 | analog `.json` (Task 6) |
+| `se-verifier.md` | 2 | analog `.json` (Task 6) |
+| `test-executor.md` | 2 | `.tmp/runs/` statt „scratch/output path" (Task 6) |
+
+**Nicht** geändert (erwartet): `ai-security-guardian.md`, `app-lifecycle-governor.md`,
+`prompt-governor.md`, `security-auditor.md` — Task 5 ersetzte dort `.tmp/<role>-…` durch
+`{{TMP_SINK_PATH}}/…`, das Standalone zu `.tmp/<role>-…` rendert: **byte-identisch** zum
+vorherigen Export, also 0 Diff. `standalone/README.md` unverändert (keine Rollen-/Versionsänderung).
+
+### Abgedeckte ACs (Task 7)
+
+- **AC-27 / IC-15** — `test_tmp_sink_path_uses_framework_default`: keine
+  `[TMP_SINK_PATH — not available outside a full agent-meta install]`-Notiz in
+  `standalone/**`; die drei Rollen nennen `.tmp/doctor/`, `.tmp/context-report/` bzw.
+  `.tmp/meta-optimizer/<ts>/`; kein rohes `{{TMP_SINK_PATH}}`.
+- **AC-26** — `test_no_system_temp_literal_in_standalone`: exakt das AC-01-Muster aus
+  `tests/test_temp_literals.py` (keine zweite Musterquelle; der Scanner ist als
+  `_collect_hits_under(root)` geteilt, Task 15 konsolidiert ihn nach
+  `scripts/lib/consistency/temp_literals.py`) ⇒ 0 Treffer in `standalone/**`; Drift-Gate
+  `--render-standalone --check` Exit 0.
+
+### Migrations-Verifikation (stabile Keys)
+
+Stabile Keys: 12 `TMP_SINK_PATH`-Render-Stellen (8 `meta-doctor`, 3 `meta-optimizer`,
+1 `agent-meta-manager`) und 18 `/tmp/`-Sites (7 Rollen). Vorher 12 Notizen → nachher
+12 `.tmp`-Ziele: **12 geprüft, 0 fehlend, 0 doppelt**. Vorher 18 `/tmp/`-Sites →
+nachher 18 `.tmp/`-Sites: **18 geprüft, 0 fehlend, 0 doppelt**. Keine Rollendatei
+verschwunden (`--render-standalone --check`: 91 Dateien, 90 Rollen unverändert).
+
+### Abweichungen von der Aufgabenbeschreibung
+
+1. **Verifikations-Grep 5 ist gescoped, nicht global.** Der wörtliche Grep über die drei
+   Dateien liefert weiter Treffer — aber ausschließlich für **andere** Platzhalter
+   (`AGENT_META_REL_PATH`, `EXTENSION_DIR`, `SKILLS_DIR`, `CONTEXT_FILE`,
+   `PROMPT_INJECTION_DEFENSE_BLOCK`, `OUTPUT_GUARD_BLOCK`), die schon vor Task 7 dort
+   standen. AC-27/IC-15 verbieten nur die `TMP_SINK_PATH`-Notiz; deren Grep ist 0.
+   Ein globales Entfernen aller Notizen wäre ein eigener, nicht beauftragter Task.
+2. **`TMP_SINK_ABS_PATH`/`PYTEST_BASETEMP` bewusst nicht gesetzt.** Geprüft:
+   `agents/`, `rules/`, `snippets/` enthalten **0** Referenzen auf
+   `{{TMP_SINK_ABS_PATH}}`, `{{PYTEST_BASETEMP}}` oder `{{TMP_SINK_ENV_PIN_BLOCK}}`;
+   die absoluten Werte gelangen nur über projekt-konfigurierte
+   `DEV_COMMANDS`/`TEST_COMMANDS` in Templates, und Standalone ersetzt diese durch
+   neutrale „ask the user"-Fallbacks. Beide Variablen würden einen Maschinenpfad in den
+   Export schreiben (IC-13) — sie bleiben deshalb abwesend. `TMP_SINK_ENV_PIN_BLOCK=""`
+   ist wie im Plan gesetzt (leer, kein Pfad).
+3. **`.tmp/` bleibt in `standalone/**` sichtbar** (4 Auditor- + 3 Meta-Rollen). Das ist
+   der von AC-27 verlangte Framework-Default-Sink, nicht das in Templates verbotene
+   `.tmp/<role>-`-Literal; der Guard prüft deshalb nur das AC-01-Muster (System-Temp).
+4. **`tests/test_ac01_render_identity.py` bleibt rot** (`2 failed`) — vorbestehend aus
+   Task 3/4/5 (eingefrorenes Hash-Manifest), Rebaseline ist Task 16. Task 7 ändert nur
+   `standalone/**`, nicht die gerenderten `.claude/**`-Dateien.
+5. **Step 4 (Commit) nicht ausgeführt** — kein Commit-Auftrag für diesen Subagenten.

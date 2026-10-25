@@ -74,11 +74,11 @@ def entry_suppresses(entry, relpath, line):
     return re.search(entry["pattern"], line) is not None
 
 
-def collect_hits():
-    """Return ``relpath:line: text`` for every unsuppressed literal hit."""
+def _collect_hits_under(root):
+    """Shared scanner: ``relpath:line: text`` for unsuppressed hits under root."""
     entries = load_allowlist_entries()
     hits = []
-    for path in sorted(_AGENTS_ROOT.rglob("*.md")):
+    for path in sorted(Path(root).rglob("*.md")):
         relpath = path.relative_to(_REPO_ROOT).as_posix()
         text = path.read_text(encoding="utf-8")
         for lineno, line in enumerate(text.splitlines(), start=1):
@@ -90,6 +90,11 @@ def collect_hits():
     return hits
 
 
+def collect_hits():
+    """Return ``relpath:line: text`` for every unsuppressed literal hit."""
+    return _collect_hits_under(_AGENTS_ROOT)
+
+
 def test_no_system_temp_literal_in_agents():
     """AC-01: ``agents/**/*.md`` carries no system temp literal."""
     hits = collect_hits()
@@ -97,6 +102,22 @@ def test_no_system_temp_literal_in_agents():
         "system temp literal(s) found in agents/** (AC-01, ADR-06). Write to "
         "{{TMP_SINK_PATH}} instead, or declare a complete entry (path, pattern, "
         "reason) in .meta-config/temp-literal-allowlist.yaml:\n" + "\n".join(hits)
+    )
+
+
+def test_no_system_temp_literal_in_standalone():
+    """AC-26: the rendered standalone export carries no system temp literal.
+
+    Same AC-01 pattern and the same allowlist as the ``agents/**`` guard on
+    purpose — one source of truth (Task 15 consolidates the scanner into
+    ``scripts/lib/consistency/temp_literals.py``; until then this module owns
+    the pattern).
+    """
+    hits = _collect_hits_under(_REPO_ROOT / "standalone")
+    assert not hits, (
+        "system temp literal(s) found in standalone/** (AC-26). Regenerate after "
+        "fixing the source template (`python3 scripts/sync.py --render-standalone`):\n"
+        + "\n".join(hits)
     )
 
 

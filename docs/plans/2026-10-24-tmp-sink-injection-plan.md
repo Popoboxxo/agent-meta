@@ -356,9 +356,9 @@ Der `standalone/agents/`-Eintrag ist Verzeichnis-Ownership: `--render-standalone
 
 **Rot zuerst:** `test_tmp_sink_path_uses_framework_default` schlägt fehl, weil `standalone/agents/meta-doctor.md` die Notiz `[TMP_SINK_PATH — not available outside a full agent-meta install]` trägt (12 Vorkommen in drei Dateien); `test_no_system_temp_literal_in_standalone` listet 18 `/tmp`- und 4 `.tmp/`-Treffer.
 
-- [ ] Step 1: Beide Tests schreiben (rot); Assertions: kein Vorkommen von `not available outside a full agent-meta install` in `standalone/**`, `.tmp/` in `meta-doctor.md`, `meta-optimizer.md`, `agent-meta-manager.md` vorhanden, kein AC-01-Muster in `standalone/**`.
-- [ ] Step 2: `_standalone_variables` um beide Keys erweitern; `python scripts/sync.py --render-standalone` ausführen und den Diff gegen die erwarteten Rollen prüfen.
-- [ ] Step 3: `python3 -m pytest tests/test_standalone_render.py tests/test_temp_literals.py -q` grün; `python3 scripts/sync.py --render-standalone --check` Exit 0.
+- [x] Step 1: Beide Tests schreiben (rot); Assertions: kein Vorkommen von `not available outside a full agent-meta install` in `standalone/**`, `.tmp/` in `meta-doctor.md`, `meta-optimizer.md`, `agent-meta-manager.md` vorhanden, kein AC-01-Muster in `standalone/**`.
+- [x] Step 2: `_standalone_variables` um beide Keys erweitern; `python scripts/sync.py --render-standalone` ausführen und den Diff gegen die erwarteten Rollen prüfen.
+- [x] Step 3: `python3 -m pytest tests/test_standalone_render.py tests/test_temp_literals.py -q` grün; `python3 scripts/sync.py --render-standalone --check` Exit 0.
 - [ ] Step 4: Commit `chore: regenerate standalone agents from tmp-sink templates`.
 
 ## Phase P2 — Hook fail-closed
