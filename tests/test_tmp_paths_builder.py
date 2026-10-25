@@ -148,6 +148,43 @@ def test_env_pin_block_is_absolute(tmp_path):
     assert f"TMPDIR='{variables['TMP_SINK_PATH']}'" not in block
 
 
+# --- AC-38: toolchain-cache opt-in (Q3/ADR-13) -------------------------
+
+_TOOLCHAIN_OPT_IN = {
+    "tmp-sink": {
+        "system-temp-exception": {
+            "enabled": True,
+            "reason": "unit-test reason",
+            "pytest-basetemp": True,
+            "toolchain-caches": True,
+        }
+    }
+}
+
+
+def test_env_pin_block_is_cache_neutral_by_default(tmp_path):
+    """AC-38: the framework default (``toolchain-caches: false``) adds no key."""
+    block = _build(tmp_path)["TMP_SINK_ENV_PIN_BLOCK"]
+
+    assert "PIP_CACHE_DIR" not in block
+    assert "npm_config_cache" not in block
+
+
+def test_env_pin_block_pins_toolchain_caches_on_opt_in(tmp_path):
+    """AC-38: the opt-in renders both cache exports below the absolute sink."""
+    variables = _build(tmp_path, _TOOLCHAIN_OPT_IN)
+    block = variables["TMP_SINK_ENV_PIN_BLOCK"]
+    absolute = variables["TMP_SINK_ABS_PATH"]
+
+    for key, subdir in (("PIP_CACHE_DIR", "pip"), ("npm_config_cache", "npm")):
+        expected = os.path.join(absolute, "cache", subdir)
+        assert f"export {key}={shlex.quote(expected)}" in block
+        assert os.path.isabs(expected)
+        assert '"' not in expected
+    # ADR-13: docker is never redirected.
+    assert "docker" not in block.lower()
+
+
 # --- AC-25: a disabled sink keeps TMP_SINK_PATH only --------------------
 
 

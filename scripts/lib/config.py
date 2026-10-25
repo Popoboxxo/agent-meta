@@ -601,10 +601,10 @@ def _validate_repo_containment(config: dict, config_path: Path) -> None:
             f"{', '.join(TMP_SINK_CLEANUP_MODES)}, got {cleanup!r}."
         )
 
-    # system-temp-exception matrix (AC-15, IC-12). Validated here — the single
-    # hard exit — so the resolver can stay non-exiting library code. An absent
-    # block inherits the framework defaults (enabled + pytest-basetemp) and is
-    # always valid; ``toolchain-caches`` semantic checks are Task 19's scope.
+    # system-temp-exception matrix (AC-15/AC-38, IC-12). Validated here — the
+    # single hard exit — so the resolver can stay non-exiting library code. An
+    # absent block inherits the framework defaults (enabled + pytest-basetemp)
+    # and is always valid.
     exception = sink.get("system-temp-exception")
     if exception is not None:
         if not isinstance(exception, dict):
@@ -612,7 +612,7 @@ def _validate_repo_containment(config: dict, config_path: Path) -> None:
                 "invalid 'repo_containment.tmp-sink.system-temp-exception': "
                 f"expected a mapping, got {type(exception).__name__}."
             )
-        for key in ("enabled", "pytest-basetemp"):
+        for key in ("enabled", "pytest-basetemp", "toolchain-caches"):
             if key in exception and not isinstance(exception[key], bool):
                 _fail(
                     "invalid 'repo_containment.tmp-sink.system-temp-exception."
@@ -625,6 +625,12 @@ def _validate_repo_containment(config: dict, config_path: Path) -> None:
             _fail(
                 "invalid 'repo_containment.tmp-sink.system-temp-exception': "
                 "'pytest-basetemp: true' requires 'enabled: true'."
+            )
+        exc_toolchain_caches = exception.get("toolchain-caches", False)
+        if exc_toolchain_caches and not exc_enabled:
+            _fail(
+                "invalid 'repo_containment.tmp-sink.system-temp-exception': "
+                "'toolchain-caches: true' requires 'enabled: true'."
             )
         reason = exception.get("reason")
         if exc_enabled and (not isinstance(reason, str) or not reason.strip()):

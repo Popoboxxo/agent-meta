@@ -32,7 +32,7 @@ Spalte `Commit` bleibt `— (pending)`, bis der jeweilige Commit tatsächlich ex
 | 16 | Goldens rebaselinen | pending | — (pending) | — |
 | 17 | Doku und Beispiel-Config | done | — (pending) | Steps 1–3 grün; §5.5-Unterabschnitt „Konfiguration" nennt `system-temp-exception`/`PYTEST_BASETEMP`, Beispiel-Config und CHANGELOG ergänzt; §5.5-Regeltext (Literal) bleibt für Task 21 unangetastet; `--validate` Exit 0, 22 unveränderte `temp-literal.system-temp`-WARNINGS; Step 4 (Commit) offen, kein Commit-Auftrag |
 | 18 | Abschluss-Validierung und Ledger | pending | — (pending) | Läuft zuletzt (Abschluss-Gate) |
-| 19 | Toolchain-Cache-Opt-in (Q3) | pending | — (pending) | — |
+| 19 | Toolchain-Cache-Opt-in (Q3) | done | — (pending) | Steps 1–3 grün; AC-38: `tmp_sink_env_pin_block` pinnt `PIP_CACHE_DIR`/`npm_config_cache` nur bei `enabled: true` **und** `toolchain-caches: true` unter `<sink>/cache/…`; Validator weist den Widerspruch mit Exit 1 ab; `TmpPaths.env`/`tmp_env` bleiben cache-neutral; `--validate` Exit 0, 22 `temp-literal.*` unverändert (0 `toolchain-cache-in-repo`); Step 4 (Commit) offen, kein Commit-Auftrag |
 | 20 | Antigravity `args.FilePath` → `file_path` (Q10) | done | — (pending) | Steps 1–3 grün; `ARG_KEY_MAP` um `'FilePath': 'file_path'` erweitert, Assertion in `test_adapter_normalizes_edit_tool_names`; 60 passed, `--validate` 0 neue Findings; Step 4 (Commit) offen, kein Commit-Auftrag |
 | 21 | §5.5 verweist auf `PYTEST_BASETEMP` (Q11) | pending | — (pending) | — |
 | 22 | Allowlist-Schema-Härtung (Q6) | done | — (pending) | Steps 1–3 grün; AC-39: Feld-Whitelist (`path`/`pattern`/`reason` Pflicht, `owner` optional, `expires` und jedes andere Feld abgelehnt) + `temp-literal.allowlist-entry`-WARNING je ungültigem Eintrag; Allowlist bleibt `entries: []`; 13 + 21 Tests grün, `--validate` Exit 0 mit unveränderten 22 `temp-literal.system-temp`-WARNINGS; Step 4 (Commit) offen, kein Commit-Auftrag |
@@ -2126,3 +2126,139 @@ until the entry is fixed.`
   Ist-Zustand, da `entries` leer ist.
 - Projekte mit Altlisten, die `expires` nutzen, erhalten künftig zwei WARNINGs statt einer stillen
   Unterdrückung — das ist die beabsichtigte ADR-14-Konsequenz.
+
+## Evidence — Task 19
+
+### Rot (vor der Implementierung)
+
+`python3 -m pytest tests/test_tmp_paths_builder.py tests/test_tmp_sink_output_dirs.py tests/test_repo_containment_validate.py -q` → Exit 1:
+
+```
+.......F...............................................F................ [ 67%]
+...............................F..                                       [100%]
+=================================== FAILURES ===================================
+______________ test_env_pin_block_pins_toolchain_caches_on_opt_in ______________
+
+    for key, subdir in (("PIP_CACHE_DIR", "pip"), ("npm_config_cache", "npm")):
+        expected = os.path.join(absolute, "cache", subdir)
+>       assert f"export {key}={shlex.quote(expected)}" in block
+E       assert 'export PIP_CACHE_DIR=/tmp/pytest-of-hermes/pytest-185/test_env_pin_block_pins_toolch0/.tmp/cache/pip' in "# tmp-sink env pin (absolute values, ADR-12)\nif [ -d /tmp/pytest-of-hermes/pytest-185/test_env_pin_block_pins_toolch0/.tmp ]; then\n  export TMPDIR=/tmp/pytest-of-hermes/pytest-185/test_env_pin_block_pins_toolch0/.tmp\n  export TEMP=/tmp/pytest-of-hermes/pytest-185/test_env_pin_block_pins_toolch0/.tmp\n  export TMP=/tmp/pytest-of-hermes/pytest-185/test_env_pin_block_pins_toolch0/.tmp\nelse\n  printf '%s\\n' 'tmp-sink: /tmp/pytest-of-hermes/pytest-185/test_env_pin_block_pins_toolch0/.tmp does not exist; TMPDIR/TEMP/TMP left unchanged (repair: python scripts/sync.py)' >&2\nfi\n"
+
+tests/test_tmp_paths_builder.py:181: AssertionError
+_________________ test_toolchain_cache_opt_in_pins_cache_dirs __________________
+
+    keys = ("TMPDIR", "TEMP", "TMP", "PIP_CACHE_DIR", "npm_config_cache")
+    values = _block_env(block, keys)
+    base = str(paths.absolute)
+
+    assert values["TMPDIR"] == base
+>   assert values["PIP_CACHE_DIR"] == os.path.join(base, "cache", "pip")
+E   AssertionError: assert '' == '/tmp/pytest-...tmp/cache/pip'
+E     - /tmp/pytest-of-hermes/pytest-185/test_toolchain_cache_opt_in_pi0/.tmp/cache/pip
+
+tests/test_tmp_sink_output_dirs.py:480: AssertionError
+______________ test_toolchain_cache_requires_enabled_exception ________________
+
+>   with pytest.raises(SystemExit) as exc:
+E   Failed: DID NOT RAISE SystemExit
+
+tests/test_repo_containment_validate.py:308: Failed
+=========================== short test summary info ============================
+FAILED tests/test_tmp_paths_builder.py::test_env_pin_block_pins_toolchain_caches_on_opt_in
+FAILED tests/test_tmp_sink_output_dirs.py::test_toolchain_cache_opt_in_pins_cache_dirs
+FAILED tests/test_repo_containment_validate.py::test_toolchain_cache_requires_enabled_exception
+3 failed, 103 passed in 27.70s
+```
+
+Der erste Rot-Lauf zeigte `5 failed`; zwei davon waren Test-seitige Fehlannahmen über
+`TmpPaths.env` (es erbt `os.environ` über `work_dir_env`, ist also kein 3-Key-Dict). Sie wurden
+vor der Implementierung auf „kein Cache-Key hinzugefügt" umgestellt (`monkeypatch.delenv` +
+`tmp_env(base={})`), sodass exakt die drei AC-38-Fälle rot blieben. Der
+`toolchain-cache-in-repo`-WARNING-Test war bereits durch Task 14 grün (Bestätigung, kein Rot-Treiber).
+
+### Grün (Befehl → Anzahl → Exit)
+
+| # | Befehl | Ergebnis | Exit |
+|---|---|---|---|
+| 1 | `python3 -m pytest tests/test_tmp_paths_builder.py tests/test_tmp_sink_output_dirs.py tests/test_repo_containment_validate.py -q` | `106 passed` | 0 |
+| 2 | `python3 -m pytest tests/test_consistency_temp_literals.py tests/test_tmp_sink_env_coverage.py tests/test_backup_*.py -q` | `36 passed` | 0 |
+| 3 | `python3 scripts/sync.py --validate` | 0 ERROR; 22 WARNING `temp-literal.system-temp` (unverändert, Task-16-Goldens); 0 `temp-literal.toolchain-cache-in-repo` | 0 |
+| 4 | `python3 scripts/sync.py --dry-run` | `0 action(s) \| 449 skipped \| 35 warning(s)` (vorbestehend) | 0 |
+| 5 | `python3 -m pytest tests/test_consistency_temp_literals.py tests/test_tmp_paths_builder.py tests/test_tmp_sink_output_dirs.py tests/test_repo_containment_validate.py -q` | `119 passed` (Nachlauf nach Docstring-Kürzung) | 0 |
+
+### Matrix (AC-38, beobachtete Block-/Env-Ausgabe)
+
+Basis jeweils `<absolute> = /tmp/task19-matrix-…/.tmp` (reale Probe).
+
+| Fall | Block-Exports | `TmpPaths.env` | `tmp_env(base={})` |
+|---|---|---|---|
+| Default, Key fehlt | `TMPDIR`, `TEMP`, `TMP` | kein `PIP_CACHE_DIR`/`npm_config_cache` | nur `TEMP`, `TMP`, `TMPDIR` |
+| Default, `toolchain-caches: false` | `TMPDIR`, `TEMP`, `TMP` | kein `PIP_CACHE_DIR`/`npm_config_cache` | nur `TEMP`, `TMP`, `TMPDIR` |
+| Opt-in `enabled: true` + `toolchain-caches: true` | `TMPDIR`, `TEMP`, `TMP`, `PIP_CACHE_DIR=<abs>/cache/pip`, `npm_config_cache=<abs>/cache/npm` | unverändert cache-neutral | unverändert nur `TEMP`, `TMP`, `TMPDIR` |
+
+Aktiver Block (verbatim):
+
+```
+if [ -d /tmp/task19-matrix-0s_3a8vr/.tmp ]; then
+  export TMPDIR=/tmp/task19-matrix-0s_3a8vr/.tmp
+  export TEMP=/tmp/task19-matrix-0s_3a8vr/.tmp
+  export TMP=/tmp/task19-matrix-0s_3a8vr/.tmp
+  export PIP_CACHE_DIR=/tmp/task19-matrix-0s_3a8vr/.tmp/cache/pip
+  export npm_config_cache=/tmp/task19-matrix-0s_3a8vr/.tmp/cache/npm
+else
+  printf '%s\n' 'tmp-sink: /tmp/task19-matrix-0s_3a8vr/.tmp does not exist; TMPDIR/TEMP/TMP left unchanged (repair: python scripts/sync.py)' >&2
+fi
+```
+
+Widerspruch (`toolchain-caches: true` bei `enabled: false`) → Exit 1, stderr verbatim:
+
+```
+ERROR: /tmp/task19-contradiction-…/.meta-config/project.yaml: invalid 'repo_containment.tmp-sink.system-temp-exception': 'toolchain-caches: true' requires 'enabled: true'.
+EXIT=1
+```
+
+Zusatz-Assertions im Opt-in-Test: beide Cache-Werte `os.path.isabs`, ohne `"`, unter derselben
+absoluten Basis wie `TMPDIR` (`commonpath`), und `docker` kommt im gesamten Block nicht vor
+(Treffer auch in der WARNING-Meldung `temp-literal.toolchain-cache-in-repo` ist ausgenommen — dort
+steht kein `docker`).
+
+### Dateien
+
+- `scripts/lib/tmp_paths.py` — `TOOLCHAIN_CACHE_ENV_KEYS` (Datenpaare `(env-key, subdir)`) und die
+  bedingten Exports in `tmp_sink_env_pin_block` hinter `exception.enabled and
+  exception.toolchain_cache`; kein Provider-Name, kein `docker`-Zweig.
+- `scripts/lib/config.py` — `toolchain-caches` in die Bool-Typprüfung der Ausnahme-Matrix
+  aufgenommen und der Widerspruch über `_fail` (Exit 1) ergänzt; staler „Task 19"-Kommentar ersetzt.
+- `scripts/lib/consistency/temp_literals.py` — Docstring des bestehenden
+  `temp-literal.toolchain-cache-in-repo`-Pfads an die echte Opt-in-Semantik angepasst; keine zweite
+  Implementierung. Datei bleibt bei exakt **600 Zeilen**.
+- `.meta-config/project.yaml:407` / `templates/configs/project.yaml.example:181` — bereits
+  vorhandenes `toolchain-caches: false` verifiziert (je **1** Vorkommen), nicht dupliziert, unverändert.
+- `tests/test_tmp_sink_output_dirs.py` — Default-aus (parametrisiert `None`/`False`), Opt-in-Pin,
+  Cache-Neutralität von `TmpPaths.env`/`tmp_env`, WARNING-Check, `_block_env`-Helfer.
+- `tests/test_tmp_paths_builder.py` — Default cache-neutral, Opt-in rendert beide Exports über
+  `TMP_SINK_ENV_PIN_BLOCK`.
+- `tests/test_repo_containment_validate.py` — `test_toolchain_cache_requires_enabled_exception`
+  (Exit 1 + dokumentierter Fehlertext).
+
+### Abweichungen / Interpretationen
+
+1. **WARNING-Pfad war bereits vorhanden.** Task 14 lieferte `_toolchain_cache_findings`; Task 19
+   gleicht nur den Docstring ab und verifiziert das Verhalten per Test (grün vor der Implementierung).
+2. **`TmpPaths.env` erbt `os.environ`.** Die „cache-neutral"-Assertion prüft deshalb, dass kein
+   Cache-Key *hinzugefügt/überschrieben* wird (`monkeypatch.delenv`), und nutzt für die exakte
+   Key-Menge `tmp_env(paths, base={})`. Keine Produktionsänderung an `tmp_env`.
+3. **Validierungstiefe.** Zusätzlich zum geforderten Widerspruch prüft der Validator
+   `toolchain-caches` auf `bool` (dieselbe Schleife wie `enabled`/`pytest-basetemp`).
+4. **Config-Dateien unverändert**, weil der Key bereits exakt einmal vorhanden war (Auftrag:
+   „verify, don't duplicate").
+5. **Kein Commit** (Step 4 offen) — Auftrag sagt ausdrücklich „Do NOT commit/push".
+
+### Risiken
+
+- `cleanup: on-sync` löscht den Sink inklusive `cache/` — der Opt-in ist deshalb nur mit WARNING,
+  nicht mit Schutz hinterlegt (Spec: bewusster Trade-off, ADR-13).
+- Der Block legt `cache/pip`/`cache/npm` nicht an; das übernimmt die jeweilige Toolchain beim ersten
+  Lauf. Ein reiner `--dry-run` erzeugt daher keine Cache-Verzeichnisse (gewollt, keine Mutation).
+- `docker` bleibt unangetastet (Daemon-Konfiguration außerhalb des Repos); ein Nutzer, der auch
+  Docker-Caches im Repo erwartet, bekommt dafür keinen Pin — dokumentierte Grenze der Ausnahme.

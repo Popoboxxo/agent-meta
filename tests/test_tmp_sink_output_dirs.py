@@ -23,6 +23,8 @@ from lib import context_report as cr  # noqa: E402
 from lib import meta_optimizer as mo  # noqa: E402
 from lib import repo_containment as rc  # noqa: E402
 from lib.config import build_variables, load_config  # noqa: E402
+from lib.consistency.report import Severity  # noqa: E402
+from lib.consistency.temp_literals import check_temp_literals  # noqa: E402
 from lib.tmp_paths import (  # noqa: E402
     SystemTempException,
     TmpPaths,
@@ -422,6 +424,88 @@ def test_toolchain_cache_requires_enabled_exception(tmp_path):
             _exception_cfg(enabled=False, pytest_basetemp=False, toolchain_caches=True),
         )
     assert exc.value.code == "tmp-sink.system-temp-exception"
+
+
+def _block_env(block: str, keys: tuple[str, ...]) -> dict[str, str]:
+    """Evaluate the pin block and read back exactly *keys*."""
+    probe = block + "".join(
+        f"\nprintf '%s\\n' \"${{{key}-}}\"\n" for key in keys
+    )
+    result = subprocess.run(
+        ["sh", "-c", probe],
+        capture_output=True,
+        text=True,
+        env={"PATH": "/usr/bin:/bin"},
+    )
+    assert result.returncode == 0, result.stderr
+    values = result.stdout.splitlines()
+    assert len(values) == len(keys), result.stdout
+    return dict(zip(keys, values))
+
+
+@pytest.mark.parametrize("toolchain_caches", [None, False])
+def test_toolchain_cache_default_stays_off(tmp_path, monkeypatch, toolchain_caches):
+    """AC-38: without the opt-in both the block and the env stay cache-neutral."""
+    monkeypatch.delenv("PIP_CACHE_DIR", raising=False)
+    monkeypatch.delenv("npm_config_cache", raising=False)
+    paths = resolve_tmp_paths(
+        tmp_path, _exception_cfg(toolchain_caches=toolchain_caches)
+    )
+    assert paths.system_temp_exception.toolchain_cache is False
+    tmp_env(paths)
+    block = tmp_sink_env_pin_block(paths)
+
+    assert "PIP_CACHE_DIR" not in block
+    assert "npm_config_cache" not in block
+    # ADR-13: the cache keys belong to the block only — never to ``TmpPaths.env``.
+    assert "PIP_CACHE_DIR" not in paths.env
+    assert "npm_config_cache" not in paths.env
+    assert set(tmp_env(paths, base={})) == {"TMPDIR", "TEMP", "TMP"}
+
+
+def test_toolchain_cache_opt_in_pins_cache_dirs(tmp_path, monkeypatch):
+    """AC-38: enabled + toolchain-caches pins pip/npm below the absolute sink."""
+    monkeypatch.delenv("PIP_CACHE_DIR", raising=False)
+    monkeypatch.delenv("npm_config_cache", raising=False)
+    paths = resolve_tmp_paths(tmp_path, _exception_cfg(toolchain_caches=True))
+    assert paths.system_temp_exception.toolchain_cache is True
+    tmp_env(paths)
+    block = tmp_sink_env_pin_block(paths)
+
+    keys = ("TMPDIR", "TEMP", "TMP", "PIP_CACHE_DIR", "npm_config_cache")
+    values = _block_env(block, keys)
+    base = str(paths.absolute)
+
+    assert values["TMPDIR"] == base
+    assert values["PIP_CACHE_DIR"] == os.path.join(base, "cache", "pip")
+    assert values["npm_config_cache"] == os.path.join(base, "cache", "npm")
+    for key in ("PIP_CACHE_DIR", "npm_config_cache"):
+        assert os.path.isabs(values[key])
+        assert '"' not in values[key]
+        assert os.path.commonpath([base, values[key]]) == base
+        assert values[key].startswith(base + os.sep)
+    # ADR-13: docker's daemon config is never redirected.
+    assert "docker" not in block.lower()
+    # ADR-13: ``TmpPaths.env``/``tmp_env`` stay cache-neutral even on opt-in.
+    assert "PIP_CACHE_DIR" not in paths.env
+    assert "npm_config_cache" not in paths.env
+    assert set(tmp_env(paths, base={})) == {"TMPDIR", "TEMP", "TMP"}
+
+
+def test_toolchain_cache_opt_in_is_reported_as_warning(tmp_path):
+    """AC-38: an active opt-in stays visible as a ``temp-literal.*`` WARNING."""
+    code = "temp-literal.toolchain-cache-in-repo"
+    shipped = load_config(REPO_ROOT / ".meta-config" / "project.yaml")
+    assert [f for f in check_temp_literals(REPO_ROOT, REPO_ROOT, shipped)
+            if f.check == code] == []
+
+    findings = [f for f in check_temp_literals(
+        REPO_ROOT, REPO_ROOT, _exception_cfg(toolchain_caches=True)
+    ) if f.check == code]
+
+    assert len(findings) == 1
+    assert findings[0].severity is Severity.WARNING
+    assert findings[0].file == ".meta-config/project.yaml"
 
 
 def test_disabled_sink_without_pytest_exception_has_no_basetemp(tmp_path):

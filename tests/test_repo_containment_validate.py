@@ -298,6 +298,27 @@ def test_system_temp_exception_requires_enabled_for_pytest(tmp_path, capsys):
     assert "'pytest-basetemp: true' requires 'enabled: true'." in capsys.readouterr().err
 
 
+def test_toolchain_cache_requires_enabled_exception(tmp_path, capsys):
+    """AC-38: ``toolchain-caches: true`` without the exception is a config error.
+
+    The opt-in only has an effect while the system-temp exception is enabled;
+    without it the key is dead configuration, so the validator fails loudly
+    (same ``_fail``/Exit-1 path as the ``pytest-basetemp`` contradiction).
+    """
+    with pytest.raises(SystemExit) as exc:
+        _validate(
+            _exception(
+                enabled=False,
+                **{"pytest-basetemp": False, "toolchain-caches": True},
+            ),
+            tmp_path,
+        )
+    assert exc.value.code == 1
+    err = capsys.readouterr().err
+    assert "invalid 'repo_containment.tmp-sink.system-temp-exception'" in err
+    assert "'toolchain-caches: true' requires 'enabled: true'." in err
+
+
 def test_system_temp_exception_requires_reason(tmp_path, capsys):
     with pytest.raises(SystemExit) as exc:
         _validate(_exception(enabled=True), tmp_path)

@@ -35,6 +35,13 @@ from . import repo_containment as rc
 #: Environment keys pinned to the absolute sink (IC-06/ADR-12).
 TMP_ENV_KEYS = ("TMPDIR", "TEMP", "TMP")
 
+#: Toolchain caches pinned below ``<sink>/cache`` when opted in (Q3/ADR-13).
+#: Data-driven (env key, subdirectory) pairs: no provider names, no docker.
+TOOLCHAIN_CACHE_ENV_KEYS = (
+    ("PIP_CACHE_DIR", "pip"),
+    ("npm_config_cache", "npm"),
+)
+
 #: Framework default reason for the system-temp exception (Q1: enabled, ADR-03).
 #: Projects without the key inherit this text; it keeps the justification in
 #: the config instead of losing it from the rulebook.
@@ -315,6 +322,12 @@ def tmp_sink_env_pin_block(paths: TmpPaths) -> str:
     variables stay untouched and a repair hint naming
     ``python scripts/sync.py`` goes to stderr (AC-36). Values are quoted with
     :func:`shlex.quote`, so spaces and quotes cannot break the block.
+
+    The toolchain-cache opt-in (Q3/ADR-13) adds ``PIP_CACHE_DIR`` and
+    ``npm_config_cache`` below ``<absolute>/cache`` — only when the exception
+    is enabled *and* ``toolchain-caches`` is on. ``TmpPaths.env`` never carries
+    these keys; they belong to this block alone. ``docker`` is never redirected
+    (its daemon configuration lives outside the repo).
     """
     absolute = _require_enabled(paths, "tmp_sink_env_pin_block")
     value = str(absolute)
@@ -329,8 +342,15 @@ def tmp_sink_env_pin_block(paths: TmpPaths) -> str:
         f"  export TMPDIR={quoted}",
         f"  export TEMP={quoted}",
         f"  export TMP={quoted}",
+    ]
+    exception = paths.system_temp_exception
+    if exception.enabled and exception.toolchain_cache:
+        for key, subdir in TOOLCHAIN_CACHE_ENV_KEYS:
+            cache_value = os.path.join(value, "cache", subdir)
+            lines.append(f"  export {key}={shlex.quote(cache_value)}")
+    lines.extend([
         "else",
         f"  printf '%s\\n' {shlex.quote(message)} >&2",
         "fi",
-    ]
+    ])
     return "\n".join(lines) + "\n"

@@ -48,9 +48,9 @@ Codes (IC-11):
     the violation keeps its own WARNING; always a WARNING, never a hard exit.
 
 ``temp-literal.toolchain-cache-in-repo``
-    ``system-temp-exception.toolchain-caches`` is opted in, so pip/npm caches
-    live inside the sink. Task 19 owns the opt-in itself; this module only
-    reports it (the default stays ``false``, ADR-13).
+    ``system-temp-exception.toolchain-caches`` is opted in while the exception
+    is enabled, so pip/npm caches live inside the sink (Q3/ADR-13, AC-38).
+    Default remains ``false``; the contradictory combination is a hard error.
 
 ``temp-literal.provider-advisory``
     A *primary* agent is generated for a provider without a verified hook
