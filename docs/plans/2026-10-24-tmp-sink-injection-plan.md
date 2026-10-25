@@ -477,10 +477,10 @@ Der `standalone/agents/`-Eintrag ist Verzeichnis-Ownership: `--render-standalone
 
 **Rot zuerst:** `test_edit_allow_derived_from_tmp_sink` schlägt fehl: bei `path: scratch/out` erzeugt der Transform noch `.tmp/**` aus der statischen Liste (`config/provider-tools.yaml:64-66`).
 
-- [ ] Step 1: Tests schreiben (rot): AC-17 (`permission.edit == {"*": "deny", "scratch/out/**": "allow", ".meta-viz/**": "allow"}`, kein `.tmp/**`), AC-20 (`repo-containment.no-hook-support` bleibt WARNING, Exit 0).
-- [ ] Step 2: Ableitung implementieren (Capability-getrieben, kein Provider-Name); statische Liste auf `.meta-viz/**` reduzieren; Fallback ohne Config-Kontext bleibt `edit: deny` bzw. nur `.meta-viz/**`.
-- [ ] Step 3: `python3 -m pytest tests/test_opencode_primary_edit_lock.py tests/test_repo_containment_consistency.py -q` grün.
-- [ ] Step 4: Commit `refactor: derive opencode edit scope from tmp sink`.
+- [x] Step 1: Tests schreiben (rot): AC-17 (`permission.edit == {"*": "deny", "scratch/out/**": "allow", ".meta-viz/**": "allow"}`, kein `.tmp/**`), AC-20 (`repo-containment.no-hook-support` bleibt WARNING, Exit 0).
+- [x] Step 2: Ableitung implementieren (Capability-getrieben, kein Provider-Name); statische Liste auf `.meta-viz/**` reduzieren; Fallback ohne Config-Kontext bleibt `edit: deny` bzw. nur `.meta-viz/**`.
+- [x] Step 3: `python3 -m pytest tests/test_opencode_primary_edit_lock.py tests/test_repo_containment_consistency.py -q` grün.
+- [ ] Step 4: Commit `refactor: derive opencode edit scope from tmp sink`. — offen: kein Commit-Auftrag für diesen Subagenten.
 
 ### Task 14: Consistency-Check für Temp-Literale
 

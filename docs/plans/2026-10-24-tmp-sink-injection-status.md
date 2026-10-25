@@ -26,7 +26,7 @@ Spalte `Commit` bleibt `— (pending)`, bis der jeweilige Commit tatsächlich ex
 | 10 | Env-Pin für Framework-Subprozesse ausweiten | done | — (pending) | Steps 1–3 grün; beide Render-Seams rufen `tmp_env(paths)`, `work_dir_env` nur noch in `tmp_paths.py` (AST-Guard); 4 Plan-Dateien + 4 mechanische Test-Anpassungen (Signatur/Guard); 6 vorbestehende `gettempdir`-Rotmarks (nicht Task 10); Step 4 (Commit) offen, kein Commit-Auftrag |
 | 11 | Subprozess-Klassifikation und Backup-Staging | done | — (pending) | Steps 1–3 grün; AC-09/10/11; Backup-Staging via `resolve_output_dir("backup-staging")`, Fallback nur bei `tmp-sink.disabled`; 10 der 12 bekannten Aufrufe gepinnt, 2 `taskkill` allowlisted; Guard scannt `scripts/**` (42 Ausreißer → 21 Allowlist-Einträge, u. a. `deferred` für Task-14-Datei); Step 4 (Commit) offen, kein Commit-Auftrag |
 | 12 | Gitignore- und Doctor-Zweitparser entfernen | done | — (pending) | Steps 1–3 grün; AC-31/AC-32; `_tmp_sink_gitignore_entry(paths)` aus `TmpPaths.relative`, `_sink_hits` nutzt `resolve_tmp_paths` und übernimmt den Resolver-`reason`; AST-Guard gegen Zweitparser; Step 4 (Commit) offen, kein Commit-Auftrag |
-| 13 | Opencode-Schreibscope aus dem Sink ableiten | pending | — (pending) | — |
+| 13 | Opencode-Schreibscope aus dem Sink ableiten | done | — (pending) | Steps 1–3 grün; `edit_allow_paths` = `TmpPaths.relative`-Glob + statische `.meta-viz/**`-Liste; statische Liste auf `.meta-viz/**` reduziert; AC-17/AC-20; Step 4 (Commit) offen, kein Commit-Auftrag |
 | 14 | Consistency-Check für Temp-Literale | pending | — (pending) | — |
 | 15 | Aggregations-Guard über alle Schreibpfade | pending | — (pending) | — |
 | 16 | Goldens rebaselinen | pending | — (pending) | — |
@@ -1700,3 +1700,91 @@ HEAD scripts/lib/doctor_detectors.py: resolve_effective_repo_containment=False, 
 - Der vorbestehende `test_runtime_config_readers`-Fehlschlag bleibt offen und kann das
   Task-15/18-Gate rot halten, bis die Evidence-Zeile aktualisiert ist.
 
+
+## Evidence — Task 13
+
+### Rot (vor der Implementierung, verbatim)
+
+`python3 -m pytest tests/test_opencode_primary_edit_lock.py tests/test_repo_containment_consistency.py -q`
+→ Exit 1:
+
+```
+FAILED tests/test_opencode_primary_edit_lock.py::test_edit_allow_derived_from_tmp_sink
+FAILED tests/test_opencode_primary_edit_lock.py::test_edit_allow_sink_disabled_keeps_static_scope_only
+FAILED tests/test_opencode_primary_edit_lock.py::test_provider_tools_static_scope_has_no_sink_literal
+3 failed, 22 passed in 1.43s
+```
+
+AC-17-Kern (Auszug aus dem Einzellauf):
+
+```
+>       assert permission["edit"] == _SINK_SCOPED
+E       AssertionError: assert {'*': 'deny',.../**': 'allow'} == {'*': 'deny',.../**': 'allow'}
+E         Left contains 1 more item:
+E         {'.tmp/**': 'allow'}
+E         Right contains 1 more item:
+E         {'scratch/out/**': 'allow'}
+tests/test_opencode_primary_edit_lock.py:129: AssertionError
+```
+
+Der Transform las die statische Liste `.tmp/**` und ignorierte den konfigurierten Sink
+`scratch/out`; die statische `.tmp/**`-Zeile war zusätzlich separat rot.
+
+### Grün (nach der Implementierung)
+
+| # | Kommando | Ergebnis |
+|---|---|---|
+| 1 | `/usr/bin/python3 -m pytest tests/test_opencode_primary_edit_lock.py tests/test_repo_containment_consistency.py -q` | `25 passed in 1.46s`, Exit 0 |
+| 2 | `/usr/bin/python3 -m pytest tests/test_opencode_agents.py tests/test_opencode_runtime_gate.py tests/test_opencode_v2_aux_selection.py tests/test_opencode_v2_config.py tests/test_opencode_v2_schema.py tests/test_opencode_v2_spike.py -q` | `87 passed, 15 warnings in 8.01s`, Exit 0 |
+| 3 | `/usr/bin/python3 -m pytest tests/test_opencode_v2_surface.py -q` | `130 passed in 59.03s`, Exit 0 |
+| 4 | `/usr/bin/python3 -m pytest tests/test_provider_toml_transform.py tests/test_provider_agnostic_dispatch.py tests/test_transform_contracts.py tests/test_agents_frontmatter.py tests/test_dispatch_permissions_frontmatter.py tests/test_model_inherit.py tests/test_read_only_sandbox.py tests/test_reference_standards_strip.py tests/test_subagent_allowlist_frontmatter.py tests/test_active_set_single_source.py -q` | `228 passed in 15.86s`, Exit 0 |
+| 5 | `/usr/bin/python3 scripts/sync.py --validate` | `0 action(s)  |  382 skipped  |  2 warning(s)`, Exit 0 (beide WARNINGS vorbestehend: `active-set.gate-dropped`, Submodul-Checkout `external/awesome-claude-code`) |
+| 6 | `/usr/bin/python3 scripts/sync.py --dry-run` | `0 action(s)  |  449 skipped  |  35 warning(s)`, Exit 0 |
+| 7 | `python3 -c "ast.parse(..., feature_version=(3, 9))"` auf `provider_transform.py` | `py3.9 syntax ok` |
+
+Hinweis: `tests/test_provider_transform*.py` existiert nicht; die Regressionszeilen 2–4
+sind die tatsächlich vorhandenen transform-/opencode-konsumierenden Module.
+
+### Abgedeckte ACs (Task 13)
+
+- **AC-17** — `test_edit_allow_derived_from_tmp_sink`: bei `path: scratch/out` ist
+  `permission.edit == {"*": "deny", "scratch/out/**": "allow", ".meta-viz/**": "allow"}`,
+  `.tmp/**` fehlt, `*` steht zuerst.
+- **IC-10-Randfälle** — `test_edit_allow_sink_disabled_keeps_static_scope_only`
+  (Sink aus ⇒ nur `.meta-viz/**`) und `test_provider_tools_static_scope_has_no_sink_literal`
+  (statische Liste enthält kein Sink-Literal mehr).
+- **AC-20** — `test_no_hook_support_warning_still_emitted`: `repo-containment.no-hook-support`
+  bleibt `Severity.WARNING`, kein ERROR, `print_json_report(...) == 0`.
+
+### Ableitung (Implementierung)
+
+| Stelle | Vorher | Nachher |
+|---|---|---|
+| `provider_transform.py::_tmp_sink_edit_allow_paths` (neu) | — | `resolve_tmp_paths(project_root, config)` ⇒ `(f"{TmpPaths.relative}/**",)`; `enabled=False` ⇒ `()`; `TmpSinkError` ⇒ WARNING + `()` (fail-closed, kein Sync-Abbruch) |
+| `provider_transform.py::_apply_agent_transform` (Opencode-Zweig) | `edit_allow_paths = tuple(static)` | `tuple(dict.fromkeys(derived + static))` — Sink zuerst, dann statische Fallback-Einträge; explizit leere Liste bleibt der dokumentierte Opt-out (ADR-5 A) ⇒ Skalar `deny` |
+| `config/provider-tools.yaml::opencode_primary_edit_allow` | `[".tmp/**", ".meta-viz/**"]` | `[".meta-viz/**"]` + Kommentar: Sink wird zur Sync-Zeit aus `TmpPaths.relative` abgeleitet |
+
+Keine Provider-Namens-Verzweigung: die Ableitung hängt an `TmpPaths`-Daten und am
+`deny_edit`-Prädikat (`has_hooks`/Tier), nicht an `provider == "Opencode"`.
+
+### Abweichungen von der Aufgabenbeschreibung
+
+1. **Regression-Glob `tests/test_provider_transform*.py` existiert nicht.** Stattdessen wurden
+   die tatsächlichen Konsumenten aufgeführt (Zeilen 2–4 der Grün-Tabelle); keine
+   Ersatzdatei angelegt.
+2. **Explizit leere `opencode_primary_edit_allow`-Liste schaltet die Ableitung ab.** Ohne
+   diese Auslegung hätte der Sink automatisch `.tmp/**` ergänzt und den in Spec A/ADR-5
+   dokumentierten Opt-out („leere Liste ⇒ `edit: deny`") still entwertet. Der bestehende
+   Test `test_empty_allow_list_falls_back_to_scalar_deny` bleibt damit unverändert grün.
+3. **Zusätzlich geändert (Auftrag, nicht Code-Scope):** Plan-Checkboxen Task 13 und dieser
+   Ledger. Die vier Code-Dateien sind exakt die vorgegebenen.
+
+### Risiken / Interpretationen
+
+- `.opencode/agents/orchestrator.md` wurde nicht neu generiert. Mit dem Framework-Default
+  (`.tmp`) ist das gerenderte Ergebnis byte-identisch zu vorher; ein Projekt mit eigenem
+  Sink erhält den neuen Scope erst beim nächsten echten Sync.
+- Der `temp-literal.provider-advisory`-WARNING (Spec, Provider-Agnostik) ist nicht Teil von
+  Task 13; er gehört zum Consistency-Check (Task 14/15).
+- Die `.meta-viz/**`-Zeile bleibt statisch; eine künftige Konfigurierbarkeit dieses Pfads
+  müsste ebenfalls über den Resolver laufen.

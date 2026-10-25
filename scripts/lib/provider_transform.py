@@ -35,6 +35,8 @@ from .providers import (
     resolve_frontmatter_strip_fields,
     resolve_provider_options,
 )
+from .repo_containment import TmpSinkError
+from .tmp_paths import resolve_tmp_paths
 
 def _validate_tools_against_whitelist(
     tools: list, provider: str, agent_meta_root: Path, log: SyncLog, role: str,
@@ -265,6 +267,40 @@ def _reassemble_body(content: str, body: str) -> str:
         return content[:fm_end + 4] + '\n' + body.lstrip('\n')
     return body.lstrip('\n')
 
+def _tmp_sink_edit_allow_paths(
+    config: dict,
+    project_root: Path | None,
+    log: SyncLog,
+) -> tuple[str, ...]:
+    """Derive the primary edit-scope glob from the tmp-sink resolver (IC-10).
+
+    The edit scope of a hook-less provider follows the configured sink instead
+    of a shipped literal: ``TmpPaths.relative`` is the single source of truth
+    (ADR-01), so a project with ``path: scratch/out`` gets
+    ``scratch/out/**`` and never a stale ``.tmp/**``.
+
+    A disabled sink contributes nothing; neither does an unresolvable sink
+    configuration (the render must not crash mid-sync — fail-closed means the
+    caller keeps only the static fallback or the scalar ``deny``).
+    """
+    if project_root is None or not isinstance(config, dict):
+        return ()
+    try:
+        paths = resolve_tmp_paths(project_root, config)
+    except TmpSinkError as exc:
+        log.warning(
+            f"opencode edit scope: tmp-sink not derivable ({exc}) - "
+            "falling back to the static allow-list",
+        )
+        return ()
+    if not paths.enabled:
+        return ()
+    relative = paths.relative.strip().strip("/")
+    if not relative:
+        return ()
+    return (f"{relative}/**",)
+
+
 def _apply_agent_transform(
     content: str,
     spec: dict,
@@ -479,9 +515,18 @@ def _apply_agent_transform(
                     'opencode_primary_edit_allow',
                 )
                 if isinstance(allow_cfg, list):
-                    edit_allow_paths = tuple(
+                    static_paths = tuple(
                         p for p in allow_cfg if isinstance(p, str) and p
                     )
+                    # IC-10: the sink glob comes from the single resolver, the
+                    # static list is only the context-free fallback. An
+                    # explicitly empty list stays the documented opt-out
+                    # (ADR-5 option A -> scalar `edit: deny`).
+                    if static_paths:
+                        edit_allow_paths = tuple(dict.fromkeys(
+                            _tmp_sink_edit_allow_paths(config, project_root, log)
+                            + static_paths
+                        ))
         # Data-driven branch (SPEC 3.7): only the resolved v2 mechanism gets the
         # native v2 builder. `opencode-native` (v1 and providers without a
         # surface mechanism, e.g. the Mammouth fork) keeps the frozen v1 path.
