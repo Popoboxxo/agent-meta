@@ -1,6 +1,6 @@
 ---
 name: se-developer
-version: 1.8.1
+version: 1.8.2
 description: Implements standard SE leaf nodes with multiple interfaces. Follows SE interface discipline and contract-first approach. Persists implementation output.
 hint: |
   Standard SE leaf node implementation. Handles multiple interfaces (2-4). Escalates cross-cutting or boundary-level leafs.
@@ -200,7 +200,7 @@ schema_version: "1.0.0"
 
 **Atomic write procedure:**
 1. Write implementation summary (frontmatter + artifacts list + test coverage) to `{{TMP_SINK_PATH}}/se-developer-<topic>.md`
-2. Rename the file from the sink to the target path (atomic write)
+2. Rename `se-developer-<topic>.md` from the sink to the target path (atomic write)
 3. Update `.se-state.yaml` with `last_completed_step` pointing to this file
 
 {{ANTI_RECURSION_BLOCK}}

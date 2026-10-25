@@ -1,6 +1,6 @@
 ---
 name: se-termination
-version: 1.12.2
+version: 1.12.3
 description: Deterministic per-system leaf/continue decision with dynamic depth control.
   Sets scope for downstream pipeline routing.
 hint: Dynamic depth termination with SE_MIN_DEPTH/SE_MAX_DEPTH control
@@ -167,7 +167,7 @@ schema_version: "1.0.0"
 
 **Atomic write procedure:**
 1. Write full output (frontmatter + JSON + decision summary) to `{{TMP_SINK_PATH}}/se-termination-<topic>.json`
-2. Rename the file from the sink to the target path (atomic write)
+2. Rename `se-termination-<topic>.json` from the sink to the target path (atomic write)
 3. Update `.se-state.yaml` with `last_completed_step` pointing to this file
 
 <output_contract>

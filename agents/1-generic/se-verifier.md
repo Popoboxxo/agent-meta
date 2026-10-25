@@ -1,6 +1,6 @@
 ---
 name: se-verifier
-version: 1.8.1
+version: 1.8.2
 description: Multi-Level Verification L1-Ln. Validates that fully integrated systems/sub-systems
   exactly fulfill architectural specifications and interfaces. Persists verification report.
 hint: Use this agent to verify integrated systems against their specifications on
@@ -204,7 +204,7 @@ schema_version: "1.0.0"
 
 **Atomic write procedure:**
 1. Write full output (frontmatter + JSON) to `{{TMP_SINK_PATH}}/se-verifier-<topic>.json`
-2. Rename the file from the sink to the target path (atomic write)
+2. Rename `se-verifier-<topic>.json` from the sink to the target path (atomic write)
 3. Update `.se-state.yaml` with `last_completed_step` pointing to this file
 
 ## Language

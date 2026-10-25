@@ -156,7 +156,7 @@ schema_version: "1.0.0"
 
 **Atomic write procedure:**
 1. Write full output (frontmatter + JSON + human-readable table) to `.tmp/se-interface-mgr-<topic>.json`
-2. Rename the file from the sink to the target path (atomic write)
+2. Rename `se-interface-mgr-<topic>.json` from the sink to the target path (atomic write)
 3. Update `.se-state.yaml` with `last_completed_step` pointing to this file
 
 <output_contract>
