@@ -623,10 +623,10 @@ vollständig vor dem Abschluss-Gate Task 18.
 
 **Rot zuerst:** `tests/test_docs_tmp_sink_injection.py::test_prison_mode_section_uses_basetemp_variable` schlägt fehl, weil §5.5 (`:404-439`) heute `--basetemp=/tmp/<user>` literal als Beispiel und im kanonischen Aufruf nennt (`:410-411`, `:428-429`) und `PYTEST_BASETEMP` nicht erwähnt.
 
-- [ ] Step 1: Test schreiben (rot): §5.5 enthält `PYTEST_BASETEMP` und `system-temp-exception`, nicht aber `--basetemp=/tmp`; der Pflichtsatz „Der pytest-Basetemp darf NIE im Arbeitsbaum liegen" ist wörtlich enthalten.
-- [ ] Step 2: Doku anpassen: Beispiel und kanonischer Aufruf verweisen auf `PYTEST_BASETEMP` bzw. den Config-Key `system-temp-exception`; der Pflichtsatz bleibt unverändert.
-- [ ] Step 3: `python3 -m pytest tests/test_docs_tmp_sink_injection.py -q` grün.
-- [ ] Step 4: Commit `docs: point prison-mode section 5.5 at PYTEST_BASETEMP`.
+- [x] Step 1: Test schreiben (rot): §5.5 enthält `PYTEST_BASETEMP` und `system-temp-exception`, nicht aber `--basetemp=/tmp`; der Pflichtsatz „Der pytest-Basetemp darf NIE im Arbeitsbaum liegen" ist wörtlich enthalten.
+- [x] Step 2: Doku anpassen: Beispiel und kanonischer Aufruf verweisen auf `PYTEST_BASETEMP` bzw. den Config-Key `system-temp-exception`; der Pflichtsatz bleibt unverändert.
+- [x] Step 3: `python3 -m pytest tests/test_docs_tmp_sink_injection.py -q` grün.
+- [ ] Step 4: Commit `docs: point prison-mode section 5.5 at PYTEST_BASETEMP` — offen: der Auftrag für Task 21 lautet ausdrücklich „Do NOT commit/push“; Commit-Authority bleibt beim `git`-Agenten.
 
 ### Task 22: Allowlist-Schema-Härtung (Q6)
 

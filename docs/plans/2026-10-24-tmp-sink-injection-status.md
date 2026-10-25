@@ -34,7 +34,7 @@ Spalte `Commit` bleibt `— (pending)`, bis der jeweilige Commit tatsächlich ex
 | 18 | Abschluss-Validierung und Ledger | pending | — (pending) | Läuft zuletzt (Abschluss-Gate) |
 | 19 | Toolchain-Cache-Opt-in (Q3) | done | — (pending) | Steps 1–3 grün; AC-38: `tmp_sink_env_pin_block` pinnt `PIP_CACHE_DIR`/`npm_config_cache` nur bei `enabled: true` **und** `toolchain-caches: true` unter `<sink>/cache/…`; Validator weist den Widerspruch mit Exit 1 ab; `TmpPaths.env`/`tmp_env` bleiben cache-neutral; `--validate` Exit 0, 22 `temp-literal.*` unverändert (0 `toolchain-cache-in-repo`); Step 4 (Commit) offen, kein Commit-Auftrag |
 | 20 | Antigravity `args.FilePath` → `file_path` (Q10) | done | — (pending) | Steps 1–3 grün; `ARG_KEY_MAP` um `'FilePath': 'file_path'` erweitert, Assertion in `test_adapter_normalizes_edit_tool_names`; 60 passed, `--validate` 0 neue Findings; Step 4 (Commit) offen, kein Commit-Auftrag |
-| 21 | §5.5 verweist auf `PYTEST_BASETEMP` (Q11) | pending | — (pending) | — |
+| 21 | §5.5 verweist auf `PYTEST_BASETEMP` (Q11) | done | — (pending) | Steps 1–3 grün; AC-41: §5.5-Beispiel und kanonischer Aufruf nutzen `{{PYTEST_BASETEMP}}`/`repo_containment.tmp-sink.system-temp-exception`, kein `--basetemp=/tmp`-Literal mehr, Pflichtsatz byte-identisch; 5 + 21 Tests grün, `--validate` Exit 0 mit unveränderten 22 `temp-literal.system-temp`-WARNINGS; Step 4 (Commit) offen, kein Commit-Auftrag |
 | 22 | Allowlist-Schema-Härtung (Q6) | done | — (pending) | Steps 1–3 grün; AC-39: Feld-Whitelist (`path`/`pattern`/`reason` Pflicht, `owner` optional, `expires` und jedes andere Feld abgelehnt) + `temp-literal.allowlist-entry`-WARNING je ungültigem Eintrag; Allowlist bleibt `entries: []`; 13 + 21 Tests grün, `--validate` Exit 0 mit unveränderten 22 `temp-literal.system-temp`-WARNINGS; Step 4 (Commit) offen, kein Commit-Auftrag |
 
 ## Evidence — Task 1
@@ -2262,3 +2262,136 @@ steht kein `docker`).
   Lauf. Ein reiner `--dry-run` erzeugt daher keine Cache-Verzeichnisse (gewollt, keine Mutation).
 - `docker` bleibt unangetastet (Daemon-Konfiguration außerhalb des Repos); ein Nutzer, der auch
   Docker-Caches im Repo erwartet, bekommt dafür keinen Pin — dokumentierte Grenze der Ausnahme.
+
+## Evidence — Task 21
+
+### Rot (vor der Implementierung, verbatim)
+
+`/usr/bin/python3 -m pytest tests/test_docs_tmp_sink_injection.py -q` → `1 failed, 4 passed`,
+Exit 1:
+
+```
+..F..                                                                    [100%]
+=================================== FAILURES ===================================
+_______________ test_prison_mode_section_uses_basetemp_variable ________________
+
+    def test_prison_mode_section_uses_basetemp_variable():
+        """AC-41: the rule text points at the token, not at a machine temp literal."""
+        section = _section_5_5(_read(PRISON_MODE_DOC))
+    
+        assert "PYTEST_BASETEMP" in section
+        assert "system-temp-exception" in section
+        assert MANDATORY_RULE in section
+>       assert "--basetemp=/tmp" not in section
+E       AssertionError: assert '--basetemp=/tmp' not in ' Repo-Kopie....\n\n---\n\n'
+E         
+E         '--basetemp=/tmp' is contained here:
+E           z. B.
+E              `--basetemp=/tmp/<user>` (oder `TMPDIR` entsprechend). Liegt er im Repo — etwa
+E         ?     +++++++++++++++
+E              `--basetemp=.tmp/pyt` — legt pytest dort `<basetemp>/pytest-of-<user>/` plus den
+E              `pytest-current`-Symlink an....
+E         
+E         ...Full output truncated (62 lines hidden), use '-vv' to show
+
+tests/test_docs_tmp_sink_injection.py:70: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_docs_tmp_sink_injection.py::test_prison_mode_section_uses_basetemp_variable
+1 failed, 4 passed in 0.20s
+```
+
+Rot-Treiber war das `--basetemp=/tmp`-Literal; die Token-/Key-Assertions waren nach Task 17
+bereits erfüllt (§5.5-Unterabschnitt „Konfiguration"). Der Test prüft alle vier AC-41-Facetten
+und bleibt als Regressionswächter stehen.
+
+### Grün (Befehl → Anzahl → Exit)
+
+| # | Befehl | Ergebnis | Exit |
+|---|---|---|---|
+| 1 | `/usr/bin/python3 -m pytest tests/test_docs_tmp_sink_injection.py -q` | `5 passed in 0.17s` | 0 |
+| 2 | `/usr/bin/python3 -m pytest tests/test_consistency_temp_literals.py tests/test_basetemp_guard.py -q` | `21 passed in 1.03s` | 0 |
+| 3 | `/usr/bin/python3 scripts/sync.py --validate` | 0 ERROR; 22 WARNING `temp-literal.system-temp` (unverändert, Task-16-Goldens) | 0 |
+
+`tests/conftest.py` ist **nicht** als Modul collectable (`no tests ran`, Exit 5); deshalb wurden
+die beiden anderen Regressionsdateien separat ausgeführt. `conftest.py` wird bei jedem
+pytest-Lauf ohnehin importiert — der geforderte Regressionseffekt ist damit abgedeckt.
+
+Zählprobe auf der `--validate`-Ausgabe: `temp-literal.system-temp` = **22**, andere
+`temp-literal.*`-Codes = **0**. Die Doku liegt außerhalb des IC-11-Scan-Scopes (`docs/**`), die
+Zahl bleibt daher unverändert.
+
+### Doku (vorher → nachher, §5.5)
+
+Punkt 1 (Beispiel), vorher:
+
+```
+1. **Der pytest-Basetemp darf NIE im Arbeitsbaum liegen.** Er gehört außerhalb, z. B.
+   `--basetemp=/tmp/<user>` (oder `TMPDIR` entsprechend). Liegt er im Repo — etwa
+   `--basetemp=.tmp/pyt` — legt pytest dort `<basetemp>/pytest-of-<user>/` plus den
+   `pytest-current`-Symlink an.
+```
+
+nachher:
+
+```
+1. **Der pytest-Basetemp darf NIE im Arbeitsbaum liegen.** Er gehört außerhalb; den Wert
+   liefert `{{PYTEST_BASETEMP}}` aus
+   `repo_containment.tmp-sink.system-temp-exception` in `.meta-config/project.yaml` (oder
+   `TMPDIR` entsprechend). Liegt er im Repo — etwa `--basetemp=.tmp/pyt` — legt pytest dort
+   `<basetemp>/pytest-of-<user>/` plus den `pytest-current`-Symlink an.
+```
+
+Punkt 5 (kanonischer Aufruf), vorher → nachher:
+
+```
+-   --basetemp=/tmp/$USER/pytest-agent-meta`.
++   --basetemp={{PYTEST_BASETEMP}}`.
+```
+
+Der Unterabschnitt „Konfiguration" (Task 17) bleibt unverändert und ist jetzt mit dem Regeltext
+konsistent: er nennt weiterhin `repo_containment.tmp-sink.system-temp-exception` als Quelle und
+den Token `PYTEST_BASETEMP`. `--basetemp=.tmp/pyt` bleibt als **negatives** Beispiel erhalten
+(In-Repo-Basetemp), enthält aber kein System-Temp-Literal.
+
+### Pflichtsatz byte-identisch (AC-41)
+
+Programmatischer Vergleich des markierten Satzes in `HEAD` vs. Arbeitsbaum (§5.5-Ausschnitt):
+
+```
+old line: 1. **Der pytest-Basetemp darf NIE im Arbeitsbaum liegen.** Er gehört außerhalb, z. B.
+new line: 1. **Der pytest-Basetemp darf NIE im Arbeitsbaum liegen.** Er gehört außerhalb; den Wert
+old sentence utf-8 bytes: 2a2a446572207079746573742d4261736574656d702064617266204e494520696d20417262656974736261756d206c696567656e2e2a2a
+new sentence utf-8 bytes: 2a2a446572207079746573742d4261736574656d702064617266204e494520696d20417262656974736261756d206c696567656e2e2a2a
+byte-identical: True
+```
+
+Nur der Satz nach dem schließenden `**` wurde umformuliert; der Regelsatz selbst ist
+byte-identisch.
+
+### Dateien
+
+- `docs/concepts/repo-containment-prison-mode.md` — §5.5 Punkt 1 (Beispiel) und Punkt 5
+  (kanonischer Aufruf) auf `{{PYTEST_BASETEMP}}`/`system-temp-exception` umgestellt; **kein**
+  `/tmp`-Literal mehr im Abschnitt (0 Treffer, vorher 2); Regeltext und „Konfiguration"
+  unverändert.
+- `tests/test_docs_tmp_sink_injection.py` — `test_prison_mode_section_uses_basetemp_variable`
+  (Token, Config-Key, Pflichtsatz, Abwesenheit von `--basetemp=/tmp`).
+
+### Abweichungen / Interpretationen
+
+1. **Rot-Treiber ist das Literal, nicht der fehlende Token.** Der Plan-Text („`PYTEST_BASETEMP`
+   nicht erwähnt") war nach Task 17 überholt: der Unterabschnitt „Konfiguration" nennt Token und
+   Key bereits. Die Token-/Key-Assertions bleiben als Regressionsschutz im neuen Test.
+2. **Kanonischer Aufruf mit `{{PYTEST_BASETEMP}}`** statt nacktem Tokennamen — exakt die Form aus
+   `.meta-config/project.yaml:249`; die Konfigurationsprosa nennt weiterhin den Token
+   `PYTEST_BASETEMP`, sodass ein Leser beides zuordnen kann.
+3. **Kein Commit** (Step 4 offen) — Auftrag sagt ausdrücklich „Do NOT commit/push".
+
+### Risiken
+
+- `{{PYTEST_BASETEMP}}` steht jetzt in einer **Doku**-Datei, die nicht durch `sync.py` gerendert
+  wird. Das ist gewollt („In der Vorschrift steht der Token, kein Maschinenpfad"); ein
+  dokumentweiter Platzhalter-Validator würde den Token als bekannte Builtin-Variable akzeptieren
+  (`--validate` Exit 0).
+- Der Negativfall `--basetemp=.tmp/pyt` bleibt absichtlich stehen (Sink-Pfad, kein
+  System-Temp-Literal) — nicht in den `/tmp`-Guard aufnehmen.

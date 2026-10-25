@@ -407,10 +407,11 @@ managed-Block-Logik geführt.
 folgt eine Pflichtregel für jede Test-Infrastruktur, die das Repo kopiert (z. B. die
 Self-Hosting-Tests in `tests/`):
 
-1. **Der pytest-Basetemp darf NIE im Arbeitsbaum liegen.** Er gehört außerhalb, z. B.
-   `--basetemp=/tmp/<user>` (oder `TMPDIR` entsprechend). Liegt er im Repo — etwa
-   `--basetemp=.tmp/pyt` — legt pytest dort `<basetemp>/pytest-of-<user>/` plus den
-   `pytest-current`-Symlink an.
+1. **Der pytest-Basetemp darf NIE im Arbeitsbaum liegen.** Er gehört außerhalb; den Wert
+   liefert `{{PYTEST_BASETEMP}}` aus
+   `repo_containment.tmp-sink.system-temp-exception` in `.meta-config/project.yaml` (oder
+   `TMPDIR` entsprechend). Liegt er im Repo — etwa `--basetemp=.tmp/pyt` — legt pytest dort
+   `<basetemp>/pytest-of-<user>/` plus den `pytest-current`-Symlink an.
 2. **Jede Repo-Kopie muss `.tmp` ausschließen** — zusätzlich zu den übrigen lokalen Bäumen
    (`.venv/`, `graphify-out/`, `.opencode/`, `.pytest_cache/`, `node_modules/`). Wird `.tmp`
    mitkopiert und liegt das Kopierziel selbst im Basetemp, kopiert der Klon seinen eigenen
@@ -426,7 +427,7 @@ Self-Hosting-Tests in `tests/`):
    Repo-Wurzel liegt. Der In-Repo-Lauf bleibt damit erlaubt — er ist ein legitimer
    Diagnose-Lauf für die Plattenplatz-Sicherheit. Der kanonische Aufruf steht in
    `.meta-config/project.yaml` (`TEST_COMMANDS`): `python3 -m pytest tests/
-   --basetemp=/tmp/$USER/pytest-agent-meta`.
+   --basetemp={{PYTEST_BASETEMP}}`.
 
 Punkt 1 hat **zwei** Gründe, nicht nur den Plattenplatz: liegt der Basetemp im Arbeitsbaum,
 dann liegt auch `tmp_path` im Arbeitsbaum. Tests, die die Repo-Wurzel-Erkennung prüfen (sie

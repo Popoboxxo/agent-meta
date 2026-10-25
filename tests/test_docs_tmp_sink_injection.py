@@ -60,6 +60,16 @@ def test_prison_mode_keeps_mandatory_basetemp_rule():
     assert MANDATORY_RULE in section
 
 
+def test_prison_mode_section_uses_basetemp_variable():
+    """AC-41: the rule text points at the token, not at a machine temp literal."""
+    section = _section_5_5(_read(PRISON_MODE_DOC))
+
+    assert "PYTEST_BASETEMP" in section
+    assert "system-temp-exception" in section
+    assert MANDATORY_RULE in section
+    assert "--basetemp=/tmp" not in section
+
+
 def test_project_yaml_example_documents_temp_exception():
     """The example config carries the opt-in exception with a documented reason."""
     text = _read(PROJECT_YAML_EXAMPLE)
