@@ -18,6 +18,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+from tests.timeouts import SCRIPT_TIMEOUT
+
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 EVAL_DIR = _REPO_ROOT / "tests" / "routing-llm-eval"
 _BASH = "bash"
@@ -30,7 +32,7 @@ def _run_provider(script: str, *args: str) -> subprocess.CompletedProcess:
         capture_output=True,
         text=True,
         cwd=str(_REPO_ROOT),
-        timeout=60,
+        timeout=SCRIPT_TIMEOUT,
     )
 
 
@@ -72,7 +74,7 @@ def test_claude_wrapper_orchestrator_uses_rendered_agent_file(tmp_path):
     env = dict(os.environ, PATH=f"{tmp_path}{os.pathsep}{os.environ['PATH']}")
     result = subprocess.run(
         ["bash", str(EVAL_DIR / "provider-claude.sh"), "--agent", "orchestrator", "p"],
-        capture_output=True, text=True, env=env, timeout=60,
+        capture_output=True, text=True, env=env, timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 0, result.stderr
     text = rendered.read_text(encoding="utf-8")
@@ -108,7 +110,7 @@ def test_claude_wrapper_reports_auth_failure(tmp_path):
     env = dict(os.environ, PATH=f"{stub.parent}{os.pathsep}{os.environ['PATH']}")
     result = subprocess.run(
         ["bash", str(wrapper), "--agent", "orchestrator", "test prompt"],
-        capture_output=True, text=True, env=env, cwd=str(repo), timeout=60,
+        capture_output=True, text=True, env=env, cwd=str(repo), timeout=SCRIPT_TIMEOUT,
     )
     assert result.returncode == 2, (
         f"expected exit 2 on auth failure, got {result.returncode}: "

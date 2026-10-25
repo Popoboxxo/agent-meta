@@ -17,6 +17,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from tests.timeouts import SYNC_TIMEOUT, SYNC_VALIDATE_TIMEOUT
+
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 
 _PROJECT_YAML = """
@@ -37,13 +39,14 @@ def test_generated_docker_agent_has_no_leftover_platform_namespace_placeholder(t
 
     sync_result = subprocess.run(
         [sys.executable, str(_REPO_ROOT / "scripts" / "sync.py")],
-        cwd=str(tmp_path), capture_output=True, text=True, timeout=60,
+        cwd=str(tmp_path), capture_output=True, text=True, timeout=SYNC_TIMEOUT,
     )
     assert sync_result.returncode == 0, sync_result.stdout + sync_result.stderr
 
     validate_result = subprocess.run(
         [sys.executable, str(_REPO_ROOT / "scripts" / "sync.py"), "--validate"],
-        cwd=str(tmp_path), capture_output=True, text=True, timeout=60,
+        cwd=str(tmp_path), capture_output=True, text=True,
+        timeout=SYNC_VALIDATE_TIMEOUT,
     )
     assert validate_result.returncode == 0, validate_result.stdout + validate_result.stderr
 

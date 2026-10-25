@@ -14,6 +14,8 @@ from scripts.lib.knowledge import (
     generate_schema,
 )
 
+from tests.timeouts import SYNC_VALIDATE_TIMEOUT
+
 _AGENT_META_ROOT = Path(__file__).resolve().parent.parent
 
 # --- repo-copy helpers ------------------------------------------------------
@@ -301,9 +303,12 @@ def test_knowledge_indexer_has_routing_keywords():
 def test_knowledge_roles_pass_schema_validation():
     import sys
     import subprocess
+    # Hang guard only: --validate runs the repo-wide consistency suite
+    # (see tests/timeouts.py for why 60 s was not enough on CI).
     result = subprocess.run(  # noqa: PLW1510
         [sys.executable, str(_AGENT_META_ROOT / "scripts" / "sync.py"), "--dry-run", "--validate"],
         cwd=_AGENT_META_ROOT, capture_output=True, text=True,
+        timeout=SYNC_VALIDATE_TIMEOUT,
     )
     assert result.returncode == 0, result.stdout + result.stderr
 
