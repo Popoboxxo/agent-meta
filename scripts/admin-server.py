@@ -301,6 +301,33 @@ def _ensure_scripts_on_path(root: Path) -> None:
             sys.path.insert(0, str_candidate)
 
 
+def _tmp_sink_env(root: Path, base: dict | None = None) -> dict | None:
+    """Return a child-process environment pinned to the project tmp-sink.
+
+    The pin comes from :func:`lib.tmp_paths.tmp_env` (TMPDIR/TEMP/TMP absolute
+    and inherited ``PATH``/``HOME`` merged in, IC-18/ADR-12). ``None`` means
+    "inherit the parent environment" and is returned for a *disabled* sink
+    (a supported state) or when no project config is available — an admin
+    start/stop must never fail because the sink is off. Configuration errors
+    are already surfaced by ``sync.py --validate``; at runtime the server
+    keeps operating with the inherited env instead of blocking its UI.
+    """
+    config_path = Path(root) / ".meta-config" / "project.yaml"
+    if not config_path.exists():
+        return None
+    try:
+        _ensure_scripts_on_path(Path(root))
+        from lib.config import load_config
+        from lib.tmp_paths import resolve_tmp_paths, tmp_env
+
+        paths = resolve_tmp_paths(Path(root), load_config(config_path))
+        if not paths.enabled:
+            return None
+        return tmp_env(paths, base)
+    except Exception:  # noqa: BLE001 - admin lifecycle must not depend on the sink
+        return None
+
+
 def _is_bare_backup_name(name: Any) -> bool:
     """Return True if ``name`` is a bare ``*.zip`` file name (no path parts).
 
@@ -613,6 +640,7 @@ class VizManager:
                     startupinfo=si,
                     creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
                     cwd=str(self.root),
+                    env=_tmp_sink_env(self.root),
                 )
             else:
                 proc = subprocess.Popen(
@@ -621,6 +649,7 @@ class VizManager:
                     stderr=subprocess.STDOUT,
                     start_new_session=True,
                     cwd=str(self.root),
+                    env=_tmp_sink_env(self.root),
                 )
 
         pid_file.write_text(str(proc.pid), encoding="utf-8")
@@ -1248,6 +1277,7 @@ class SyncExecutor:
                 encoding="utf-8",
                 errors="replace",
                 timeout=300,
+                env=_tmp_sink_env(self.root),
             )
             output = (proc.stdout or "") + ("\n" + proc.stderr if proc.stderr else "")
             result = {
@@ -1627,6 +1657,7 @@ class AuditService:
                 cwd=str(self._ctx.root),
                 capture_output=True,
                 text=True,
+                env=_tmp_sink_env(self._ctx.root),
             )
             # consistency-check.py --json prints pure JSON to stdout regardless
             # of exit code.
@@ -5800,11 +5831,13 @@ def _admin_start_detached(args: argparse.Namespace) -> None:
                 cmd, stdout=log_fh, stderr=subprocess.STDOUT,
                 startupinfo=si, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
                 cwd=str(root),
+                env=_tmp_sink_env(root),
             )
         else:
             proc = subprocess.Popen(
                 cmd, stdout=log_fh, stderr=subprocess.STDOUT,
                 start_new_session=True, cwd=str(root),
+                env=_tmp_sink_env(root),
             )
 
     pid_file.write_text(str(proc.pid), encoding="utf-8")

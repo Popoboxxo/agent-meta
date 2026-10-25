@@ -437,10 +437,10 @@ Der `standalone/agents/`-Eintrag ist Verzeichnis-Ownership: `--render-standalone
 
 **Rot zuerst:** `test_staging_dir_is_inside_tmp_sink` schlägt fehl, weil `backup.py:340` `TemporaryDirectory()` ohne `dir=` im System-Temp anlegt; `test_subprocess_calls_pin_temp_env` listet die 12 ungeschützten Aufrufe in `scripts/*.py` (`admin-server.py:609,618,644,1243,1625,5799,5805,5830`, `consistency-check.py:79,83,98`, `run_role_routing_eval.py:727`).
 
-- [ ] Step 1: Tests schreiben (rot): AC-09 (Staging unter `<repo>/.tmp/`, `tempfile.gettempdir()` nicht Basis), AC-10 (`enabled: false` ⇒ System-Temp **mit** WARNING, Backup erfolgreich), AC-11 (AST-Scan über `scripts/**`, Kriterium „kein `git`-Plumbing, kein reiner Lese-Befehl, keine nachweislich temp-freie Ausführung"; jeder Ausreißer braucht einen Allowlist-Eintrag).
-- [ ] Step 2: `backup.py` umbauen; die zwölf Aufrufe klassifizieren: `env=tmp_env(...)` setzen oder mit `{path, symbol, reason}` in `.meta-config/temp-env-allowlist.yaml` begründen (z. B. reine `git diff`/`ls-files`-Aufrufe).
-- [ ] Step 3: `python3 -m pytest tests/test_tmp_sink_env_coverage.py tests/test_backup_round_trip_804.py tests/test_backup_robustness.py -q` grün.
-- [ ] Step 4: Commit `refactor: stage backups inside the tmp sink`.
+- [x] Step 1: Tests schreiben (rot): AC-09 (Staging unter `<repo>/.tmp/`, `tempfile.gettempdir()` nicht Basis), AC-10 (`enabled: false` ⇒ System-Temp **mit** WARNING, Backup erfolgreich), AC-11 (AST-Scan über `scripts/**`, Kriterium „kein `git`-Plumbing, kein reiner Lese-Befehl, keine nachweislich temp-freie Ausführung"; jeder Ausreißer braucht einen Allowlist-Eintrag).
+- [x] Step 2: `backup.py` umbauen; die zwölf Aufrufe klassifizieren: `env=tmp_env(...)` setzen oder mit `{path, symbol, reason}` in `.meta-config/temp-env-allowlist.yaml` begründen (z. B. reine `git diff`/`ls-files`-Aufrufe).
+- [x] Step 3: `python3 -m pytest tests/test_tmp_sink_env_coverage.py tests/test_backup_round_trip_804.py tests/test_backup_robustness.py -q` grün.
+- [ ] Step 4: Commit `refactor: stage backups inside the tmp sink`. *(offen: Commit gehört dem `git`-Agenten; dieser Subagent hatte keinen Commit-Auftrag — siehe `…-status.md`, Evidence Task 11)*
 
 ### Task 12: Gitignore- und Doctor-Zweitparser entfernen
 

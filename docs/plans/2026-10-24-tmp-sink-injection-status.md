@@ -24,7 +24,7 @@ Spalte `Commit` bleibt `— (pending)`, bis der jeweilige Commit tatsächlich ex
 | 8 | Hook-Anker und fail-closed Root-Auflösung | done | — (pending) | Steps 1–3 grün; Anker-Regel (`cwd`/Zielverzeichnis, kein `$PWD`), `repo-containment.no-root` statt Root-Promotion, absolute Sink-Meldung, Hook-Sink == `TmpPaths.absolute`; Impl-Version 1.1.0→1.2.0; Step 4 (Commit) offen, kein Commit-Auftrag |
 | 9 | Hook-Testmatrix und bewusste Inversion | done | — (pending) | Steps 1–3 grün; AC-03/04/06/07/08/18/28/29/30/33/37 abgedeckt, alte Fail-open-Erwartung bewusst invertiert; kein Produktionscode geändert; Step 4 (Commit) offen, kein Commit-Auftrag |
 | 10 | Env-Pin für Framework-Subprozesse ausweiten | done | — (pending) | Steps 1–3 grün; beide Render-Seams rufen `tmp_env(paths)`, `work_dir_env` nur noch in `tmp_paths.py` (AST-Guard); 4 Plan-Dateien + 4 mechanische Test-Anpassungen (Signatur/Guard); 6 vorbestehende `gettempdir`-Rotmarks (nicht Task 10); Step 4 (Commit) offen, kein Commit-Auftrag |
-| 11 | Subprozess-Klassifikation und Backup-Staging | pending | — (pending) | — |
+| 11 | Subprozess-Klassifikation und Backup-Staging | done | — (pending) | Steps 1–3 grün; AC-09/10/11; Backup-Staging via `resolve_output_dir("backup-staging")`, Fallback nur bei `tmp-sink.disabled`; 10 der 12 bekannten Aufrufe gepinnt, 2 `taskkill` allowlisted; Guard scannt `scripts/**` (42 Ausreißer → 21 Allowlist-Einträge, u. a. `deferred` für Task-14-Datei); Step 4 (Commit) offen, kein Commit-Auftrag |
 | 12 | Gitignore- und Doctor-Zweitparser entfernen | pending | — (pending) | — |
 | 13 | Opencode-Schreibscope aus dem Sink ableiten | pending | — (pending) | — |
 | 14 | Consistency-Check für Temp-Literale | pending | — (pending) | — |
@@ -1309,6 +1309,167 @@ waren deshalb die `proposed`-Fixtures der Applier-Suite bereits rot.
   `TmpPaths`-Konstruktion am Render-Seam. Kosten sind ein paar `realpath`-Aufrufe pro Report.
 - **`tests/test_ac01_render_identity.py`/Slimming-Goldens** bleiben unberührt (nicht im Scope,
   Rebaseline ist Task 16); Task 10 ändert keine gerenderten Artefakte.
+
+## Evidence — Task 11
+
+### Rot (vor der Implementierung)
+
+`python3 -m pytest tests/test_tmp_sink_env_coverage.py::test_subprocess_calls_pin_temp_env -q`
+→ Exit 1 (`scripts/**`: 42 ungepinnte Aufrufe, darunter die 12 namentlich bekannten):
+
+```
+E       AssertionError: subprocess calls without a tmp-sink env pin (AC-11/IC-18). Pass env=tmp_env(paths) (merging the inherited env) or add a complete entry {path, symbol, reason} to .meta-config/temp-env-allowlist.yaml:
+E         scripts/admin-server.py:_run (line 1243)
+E         scripts/admin-server.py:run_consistency_check (line 1625)
+E         scripts/admin-server.py:_admin_start_detached (line 5799)
+E         scripts/admin-server.py:_admin_start_detached (line 5805)
+E         scripts/admin-server.py:_start (line 609)
+E         scripts/admin-server.py:_start (line 618)
+E         scripts/admin-server.py:_stop (line 644)
+E         scripts/admin-server.py:_admin_stop (line 5830)
+E         scripts/consistency-check.py:get_changed_files (line 83)
+E         scripts/consistency-check.py:get_changed_files (line 79)
+E         scripts/consistency-check.py:get_new_files_vs_main (line 98)
+E         scripts/lib/auto_github_release.py:_release_exists (line 186)
+E         scripts/lib/auto_github_release.py:main (line 271)
+E         scripts/lib/cli_commands.py:handle_scan_staged (line 449)
+E         scripts/lib/cli_commands.py:_build_context (line 528)
+E         scripts/lib/cli_commands.py:_run_common_tail (line 1635)
+E         scripts/lib/config.py:read_git_version (line 1206)
+E         scripts/lib/consistency/frontmatter.py:_get_head_version (line 274)
+E         scripts/lib/doctor_detectors.py:detect_command (line 366)
+E         scripts/lib/io.py:run_git_check_ignore (line 538)
+E         scripts/lib/plugin_test.py:_run_version (line 67)
+E         scripts/lib/plugin_test.py:_mcp_initialize_handshake (line 92)
+E         scripts/lib/se_export/github_issues_adapter.py:_run_gh (line 265)
+E         scripts/lib/se_export/github_issues_adapter.py:_verify_gh_available (line 200)
+E         scripts/lib/skill_admin.py:add_skill (line 51)
+E         scripts/lib/skills.py:_is_ahead_of_pin (line 206)
+E         scripts/lib/skills.py:_is_ahead_of_pin (line 212)
+E         scripts/lib/skills.py:get_skill_commit (line 150)
+E         scripts/lib/skills.py:ensure_skill_repo (line 320)
+E         scripts/lib/skills.py:ensure_skill_repo (line 251)
+E         scripts/lib/skills.py:ensure_skill_repo (line 302)
+E         scripts/lib/skills.py:deinit_skill_repo (line 342)
+E         scripts/lib/skills.py:deinit_skill_repo (line 351)
+E         scripts/lib/skills.py:ensure_skill_repo (line 261)
+E         scripts/lib/skills.py:ensure_skill_repo (line 267)
+E         scripts/lib/skills.py:ensure_skill_repo (line 269)
+E         scripts/lib/skills.py:ensure_skill_repo (line 271)
+E         scripts/lib/skills.py:ensure_skill_repo (line 277)
+E         scripts/lib/spec_plan_validate.py:_changed_files (line 44)
+E         scripts/lib/spec_plan_validate.py:_changed_files (line 57)
+E         scripts/run_role_routing_eval.py:call_provider (line 727)
+```
+
+`python3 -m pytest tests/test_backup_round_trip_804.py::test_staging_dir_is_inside_tmp_sink tests/test_backup_robustness.py::test_staging_falls_back_to_system_temp_with_warning tests/test_backup_robustness.py::test_invalid_sink_aborts_backup_with_stable_code -q`
+→ Exit 1:
+
+```
+>       assert staging_base is not None, "staging must pass dir= to TemporaryDirectory"
+E       AssertionError: staging must pass dir= to TemporaryDirectory
+E       assert None is not None
+tests/test_backup_round_trip_804.py:210: AssertionError
+...
+>       assert any("backup.staging-system-temp" in warning for warning in log.warnings), log.warnings
+E       AssertionError: []
+tests/test_backup_robustness.py:209: AssertionError
+...
+>       with pytest.raises(TmpSinkError) as exc:
+E       Failed: DID NOT RAISE TmpSinkError
+tests/test_backup_robustness.py:217: Failed
+```
+
+### Grün (nach der Implementierung)
+
+| # | Kommando | Ergebnis |
+|---|---|---|
+| 1 | `python3 -m pytest tests/test_tmp_sink_env_coverage.py tests/test_backup_round_trip_804.py tests/test_backup_robustness.py -q` | `23 passed in 7.44s`, Exit 0 |
+| 2 | `python3 -m pytest tests/test_tmp_sink_output_dirs.py tests/test_backup_*.py -q` | `63 passed in 9.31s`, Exit 0 (Module: `test_tmp_sink_output_dirs.py`, `test_backup_round_trip_804.py`, `test_backup_robustness.py`) |
+| 3 | `python3 -m pytest tests/test_admin_server.py tests/test_admin_backup_name_validation.py tests/test_admin_plugin_test_endpoint.py tests/test_consistency_checks.py tests/test_role_routing_eval_catalog.py tests/test_skill_admin.py -q` | `195 passed, 11 subtests passed in 25.82s`, Exit 0 (Nachbarregression der geänderten Module) |
+| 4 | `python3 scripts/sync.py --validate` | Exit 0; `0 action(s) \| 382 skipped \| 2 warning(s)` — beide vorbestehend (`active-set.gate-dropped`, Submodul-Checkout `external/awesome-claude-code`) |
+| 5 | `python3 scripts/sync.py --dry-run` | Exit 0; `0 action(s) \| 449 skipped \| 35 warning(s)` (vorbestehende `active-set.unresolved-placeholder`-Warnungen) |
+| 6 | `python3 -m py_compile scripts/admin-server.py scripts/consistency-check.py scripts/run_role_routing_eval.py scripts/lib/backup.py` | Exit 0 |
+
+### Abgedeckte ACs (Task 11)
+
+- **AC-09** — `tests/test_backup_round_trip_804.py::test_staging_dir_is_inside_tmp_sink`:
+  `TemporaryDirectory` erhält `dir=<realpath>/.../.tmp/backup-staging`, das Verzeichnis
+  existiert vor dem Kontext, und `tempfile.gettempdir()` ist nicht die Staging-Basis; das
+  Backup ist erfolgreich und das Archiv liegt im Repo.
+- **AC-10** — `tests/test_backup_robustness.py::test_staging_falls_back_to_system_temp_with_warning`:
+  `repo_containment.tmp-sink.enabled: false` ⇒ `dir=` fehlt (System-Temp), WARNING
+  `backup.staging-system-temp` ist im `SyncLog`, das Backup ist erfolgreich.
+- **AC-11** — `tests/test_tmp_sink_env_coverage.py::test_subprocess_calls_pin_temp_env`:
+  AST-Scan über `scripts/**`; jeder `subprocess.run`/`Popen`/`call`/`check_call`/`check_output`
+  ist entweder über `tmp_env`/`tmp_sink_env` gepinnt oder hat einen vollständigen
+  Allowlist-Eintrag `{path, symbol, reason}`. Zusätzlich: strikte Schema-Prüfung,
+  Teil-Einträge unterdrücken nichts, veraltete Einträge schlagen fehl.
+
+### Implementierung
+
+| Stelle | Vorher | Nachher |
+|---|---|---|
+| `scripts/lib/backup.py::create_backup` | `tempfile.TemporaryDirectory()` (System-Temp) | `_backup_staging(...)`: `resolve_output_dir(project_root, config, "backup-staging")` + `mkdir`, dann `TemporaryDirectory(dir=<abs>)`; Fallback **nur** bei `tmp-sink.disabled` (WARNING), sonst `TmpSinkError("backup.tmp-sink.invalid-path")` |
+| `scripts/admin-server.py` | 8 Starts ohne Env-Pin | Helper `_tmp_sink_env(root)` (tmp-Pin, `None` bei deaktiviertem Sink); 6 Starts gepinnt (`_start` ×2, `_run`, `run_consistency_check`, `_admin_start_detached` ×2), 2 `taskkill`-Stellen allowlisted |
+| `scripts/consistency-check.py` | 3 `git`-Aufrufe ohne Env | Helper `_tmp_sink_env(root)`; alle drei `git diff`/`ls-files`-Aufrufe gepinnt (deaktivierter Sink ⇒ `env=None`, Check bleibt lauffähig) |
+| `scripts/run_role_routing_eval.py::call_provider` | `env = os.environ.copy()` | `env = _tmp_sink_env(os.environ.copy())` — merged den Sink-Pin, behält PATH/HOME |
+| `.meta-config/temp-env-allowlist.yaml` | — | neu, 21 Einträge mit Kategorie-Präfix im `reason`; keine `expires` |
+
+### Klassifikation der 12 namentlich bekannten Aufrufe
+
+| Aufruf | Entscheidung |
+|---|---|
+| `admin-server.py:609,618` (`_start`) | `env=_tmp_sink_env(self.root)` |
+| `admin-server.py:1243` (`_run`) | `env=_tmp_sink_env(self.root)` |
+| `admin-server.py:1625` (`run_consistency_check`) | `env=_tmp_sink_env(self._ctx.root)` |
+| `admin-server.py:5799,5805` (`_admin_start_detached`) | `env=_tmp_sink_env(root)` |
+| `admin-server.py:644` (`_stop`, taskkill) | Allowlist `process-control: taskkill …` |
+| `admin-server.py:5830` (`_admin_stop`, taskkill) | Allowlist `process-control: taskkill …` |
+| `consistency-check.py:79,83` (`get_changed_files`) | `env=_tmp_sink_env(root)` |
+| `consistency-check.py:98` (`get_new_files_vs_main`) | `env=_tmp_sink_env(root)` |
+| `run_role_routing_eval.py:727` (`call_provider`) | `env=_tmp_sink_env(os.environ.copy())` |
+
+### Abweichungen von der Aufgabenbeschreibung (Spec ist normativ)
+
+1. **Der Guard meldet 42 statt 12 Ausreißer.** Die Aufgabenbeschreibung nennt nur die 12
+   Aufrufe in `scripts/*.py`; der AST-Scan über `scripts/**` (AC-11/IC-18) findet zusätzlich
+   30 ungepinnte Aufrufe in `scripts/lib/**`. Diese Dateien sind **nicht** Teil des
+   Task-11-Dateisatzes und teilweise Task 12/14 zugeordnet (`doctor_detectors.py`,
+   `cli_commands.py`), daher wurden sie **klassifiziert statt umgebaut**: 21 Allowlist-Einträge
+   (`git-plumbing`, `pure-read`, `process-control`, `external-cli`, `deferred`). Kein
+   Library-Aufruf wurde ohne Begründung stummgeschaltet.
+2. **Zwei der 12 werden allowlisted statt gepinnt.** Die beiden `taskkill`-Stellen
+   (`_stop`, `_admin_stop`) sind reine Prozesssteuerung ohne Datei-/Temp-Erzeugung; ein
+   `tmp_env`-Aufruf würde das Stoppen des Servers bei deaktiviertem/kaputtem Sink blockieren.
+3. **`consistency-check.py` pinnt statt zu allowlisten.** Die drei `git`-Aufrufe sind zwar
+   reine Lese-Befehle (Allowlist wäre zulässig), aber der Plan nennt die Datei explizit als
+   „Env-Pin an drei Stellen"; der Pin ist über `_tmp_sink_env` sink-aus-sicher (Fallback
+   `None`) und hält den Rollback-Hebel `enabled: false` funktionsfähig.
+4. **`deferred`-Kategorie im Allowlist-Schema (2 Einträge).** `cli_commands.py` startet den
+   Admin-Server (`_build_context`, `_run_common_tail`), ist aber Task 14 zugeordnet und durfte
+   hier nicht geändert werden. Die Einträge nennen die Owning-Task; der Guard akzeptiert
+   `deferred:` nur mit Task-Nennung. **Offen:** in Task 14 (oder einem Folge-Task) auf
+   `env=_tmp_sink_env(...)` umstellen, dann Einträge entfernen.
+5. **`doctor_detectors.py:detect_command` und `plugin_test.py` bleiben allowlisted**, weil
+   Task 12 die Datei besitzt bzw. der MCP-Handshake bereits ein explizites gemergtes
+   `child_env` übergibt und das Plugin seine Temp-Dateien selbst verwaltet.
+6. **Kein Commit, kein Push** — Step 4 bleibt offen (Commit-Authority beim `git`-Agenten).
+
+### Offene Punkte / Risiken
+
+- **AC-94-Rotmarks unverändert:** `test_optimizer_never_uses_systemtemp` bleibt rot
+  (`resolve_tmp_paths` → `tmp_sink_location_error` → `gettempdir`, vorbestehend seit Task 1/2).
+  Die volle Paarung `test_meta_optimizer_{runner,applier}.py` wurde wegen der 742-s-Laufzeit
+  aus Task 10 nicht erneut gefahren; die geänderten Module (backup/admin/consistency/eval)
+  sind disjunkt. Keine Verschlechterung festgestellt.
+- **`deferred`-Einträge sind eine bewusste Schuld:** die beiden Admin-Server-Starts aus
+  `cli_commands.py` erben weiterhin das Parent-Env. Bis Task 14 gepinnt ist, hängt der
+  Temp-Pfad dieser Server von der aufrufenden Shell ab (der Agenten-Shell-Pin aus
+  `TMP_SINK_ENV_PIN_BLOCK` deckt den Normalfall ab).
+- **Allowlist-Pflege:** neue Subprozesse lassen den Guard fehlschlagen (gewollt); ein
+  verschobener/umbenannter Aufruf macht seinen Eintrag „stale" und ebenfalls rot
+  (`test_allowlist_entries_match_a_current_call_site`).
 
 ## Evidence — Task 20
 
