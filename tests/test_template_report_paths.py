@@ -2,8 +2,8 @@
 
 Read-only reviewers cannot write files, so they must follow the #514
 truncation-guard contract (compact summary + chunking, persistence by a
-write-capable role). Write-capable auditors persist long reports inside
-the repo-containment area (`.tmp/`) without a provider-specific path.
+write-capable role). Write-capable auditors persist long reports into the
+configured tmp sink (`{{TMP_SINK_PATH}}/`) without a provider-specific path.
 """
 
 import re
@@ -66,6 +66,8 @@ def test_read_only_reviewer_has_no_write_tools(role):
 
 
 @pytest.mark.parametrize("role", WRITABLE_AUDITORS)
-def test_writable_auditor_reports_into_repo_tmp(role):
+def test_writable_auditor_reports_into_configured_sink(role):
+    """AC-02: writable auditors write long reports into the configured tmp sink."""
     text = _read(role)
-    assert re.search(r"`\.tmp/[a-z0-9-]+-<topic>\.md`", text)
+    assert "{{TMP_SINK_PATH}}/" in text
+    assert not re.search(r"`\.tmp/[a-z0-9-]+-<topic>\.md`", text)

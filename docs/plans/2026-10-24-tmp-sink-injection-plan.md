@@ -284,9 +284,9 @@ Die frühere Gruppe PG-C `{13,17}` ist aufgelöst; Task 13 und Task 17 laufen se
 
 **Rot zuerst:** `tests/test_temp_literals.py::test_no_system_temp_literal_in_agents` listet 18 Treffer in sieben Dateien (`developer.md:47,50,154,163`; `code-reviewer.md:221,229`; `tester.md:71,74,141,143`; `validator.md:76,79`; `docker.md:128,130`; `devops-engineer.md:202,204`; `e2e-tester.md:154,156`) und schlägt fehl.
 
-- [ ] Step 1: Guard-Test schreiben (rot), Muster wörtlich aus AC-01, Treffer mit Datei und Zeile als Assertion-Meldung; Allowlist-Datei mit Kopfkommentar und leerer `entries`-Liste anlegen.
-- [ ] Step 2: Alle 18 Literale auf `{{TMP_SINK_PATH}}/…` umstellen, Pfadform beibehalten: `docker logs "$NAME" > {{TMP_SINK_PATH}}/"$NAME".log 2>&1`, `tee {{TMP_SINK_PATH}}/run-$RANDOM.log`, `npm run e2e > {{TMP_SINK_PATH}}/e2e.log 2>&1 &`, `tail -50 {{TMP_SINK_PATH}}/e2e.log`, analog `lint.log`.
-- [ ] Step 3: `python3 -m pytest tests/test_temp_literals.py -q` grün; `python3 scripts/sync.py --validate` ohne `temp-literal.system-temp` für `agents/**`.
+- [x] Step 1: Guard-Test schreiben (rot), Muster wörtlich aus AC-01, Treffer mit Datei und Zeile als Assertion-Meldung; Allowlist-Datei mit Kopfkommentar und leerer `entries`-Liste anlegen.
+- [x] Step 2: Alle 18 Literale auf `{{TMP_SINK_PATH}}/…` umstellen, Pfadform beibehalten: `docker logs "$NAME" > {{TMP_SINK_PATH}}/"$NAME".log 2>&1`, `tee {{TMP_SINK_PATH}}/run-$RANDOM.log`, `npm run e2e > {{TMP_SINK_PATH}}/e2e.log 2>&1 &`, `tail -50 {{TMP_SINK_PATH}}/e2e.log`, analog `lint.log`.
+- [x] Step 3: `python3 -m pytest tests/test_temp_literals.py -q` grün; `python3 scripts/sync.py --validate` ohne `temp-literal.system-temp` für `agents/**`.
 - [ ] Step 4: Commit `refactor: inject tmp sink into generic bash examples`.
 
 ### Task 5: Vier Sink-Literale in Auditor-Templates
@@ -305,9 +305,9 @@ Die frühere Gruppe PG-C `{13,17}` ist aufgelöst; Task 13 und Task 17 laufen se
 
 **Rot zuerst:** der neue Test `test_writable_auditor_reports_into_configured_sink` schlägt fehl, weil die vier Templates `\.tmp/` fest schreiben (`ai-security-guardian.md:111`, `app-lifecycle-governor.md:100`, `prompt-governor.md:120`, `security-auditor.md:217`).
 
-- [ ] Step 1: Test umschreiben (rot): Assertion `assert "{{TMP_SINK_PATH}}/" in text` und `assert not re.search(r"`\.tmp/[a-z0-9-]+-<topic>\.md`", text)`; Testname und Docstring nennen AC-02.
-- [ ] Step 2: Vier Templates auf den Platzhalter umstellen; `config/routing/reviewers.yaml:28` auf einen generischen Satz ohne `.tmp/` ändern (Test-Fixture, kein Injektionspunkt, nur damit der neue Check in `config/**` nicht anschlägt).
-- [ ] Step 3: `python3 -m pytest tests/test_template_report_paths.py -q` grün.
+- [x] Step 1: Test umschreiben (rot): Assertion `assert "{{TMP_SINK_PATH}}/" in text` und `assert not re.search(r"`\.tmp/[a-z0-9-]+-<topic>\.md`", text)`; Testname und Docstring nennen AC-02.
+- [x] Step 2: Vier Templates auf den Platzhalter umstellen; `config/routing/reviewers.yaml:28` auf einen generischen Satz ohne `.tmp/` ändern (Test-Fixture, kein Injektionspunkt, nur damit der neue Check in `config/**` nicht anschlägt).
+- [x] Step 3: `python3 -m pytest tests/test_template_report_paths.py -q` grün.
 - [ ] Step 4: Commit `refactor: route auditor reports through tmp sink placeholder`.
 
 ### Task 6: Vage Temp-Anweisungen präzisieren
