@@ -1,6 +1,6 @@
 ---
 name: se-requirements
-version: 2.2.2
+version: 2.2.3
 reference_standards:
 - "ISO/IEC/IEEE 29148:2018"
 - "ISO/IEC/IEEE 15288:2023"
@@ -183,7 +183,7 @@ Bei `rejected`: mit `correction_hints` iterieren. Bei `blocked`: an `se-orchestr
 ## Step Persistence
 **Output file:** `{SE_BASE_DIR}/{parent_path}/L{level}/{FolderName}/L{level}_{FolderName}_Requirements.md`
 **Frontmatter:** `step: requirements`, `agent: se-requirements`, `iteration`, `status: done`, `timestamp`, `schema_version: 1.0.0` — plus die Pflichtfelder des REQ-Frontmatter-Standards (siehe oben; `document_frontmatter`-Felder direkt in den YAML-Block übernehmen).
-**Atomic write:** temp → rename → `.se-state.yaml` `last_completed_step` aktualisieren. Keine `.iter-N`/`.final`-Kopien neben dem Final-Artefakt (Issue #334); veraltete Intermediate älterer Läufe entfernen.
+**Atomic write:** write to `{{TMP_SINK_PATH}}/se-requirements-<topic>.md` → rename → `.se-state.yaml` `last_completed_step` aktualisieren. Keine `.iter-N`/`.final`-Kopien neben dem Final-Artefakt (Issue #334); veraltete Intermediate älterer Läufe entfernen.
 
 <output_contract>
 ```

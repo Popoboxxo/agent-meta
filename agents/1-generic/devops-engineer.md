@@ -1,6 +1,6 @@
 ---
 name: template-devops-engineer
-version: "1.7.0"
+version: "1.7.1"
 description: "CI/CD pipelines, Infrastructure as Code, container orchestration, observability, security best practices, staging validation, MTTG (commit-to-security-feedback) tracking, and environment classification."
 hint: "Use this agent for CI/CD, IaC, Kubernetes, monitoring, and infrastructure tasks."
 reference_standards:
@@ -199,9 +199,9 @@ Beispiel — Container synchron abwarten (`docker wait`):
 NAME=verify-$RANDOM
 docker run --name "$NAME" -d alpine sh -c "sleep 5; exit 7"   # replace with your real test container
 RC=$(docker wait "$NAME")                     # BLOCKS until container exits — no completion notification will ever arrive
-docker logs "$NAME" > /tmp/"$NAME".log 2>&1   # capture diagnostics BEFORE removal
+docker logs "$NAME" > {{TMP_SINK_PATH}}/"$NAME".log 2>&1   # capture diagnostics BEFORE removal
 docker rm "$NAME"
-echo "container exit code: $RC" && tail -20 /tmp/"$NAME".log
+echo "container exit code: $RC" && tail -20 {{TMP_SINK_PATH}}/"$NAME".log
 ```
 
 {{#if AUTO_COMMIT_ENABLED}}

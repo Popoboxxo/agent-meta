@@ -1,7 +1,7 @@
 ---
 name: developer
-version: "1.3.0"
-based-on: "1-generic/developer.md@4.8.0"
+version: "1.3.1"
+based-on: "1-generic/developer.md@4.8.1"
 description: "HACS Integration Developer — Python-basierte Home Assistant Custom Components (custom_components/<domain>), HACS-Meta, manifest, Config/Options-Flow, Coordinator, Store, Services."
 hint: "Feature-Implementierung und Bugfixes für HACS-Integrationen (Python, custom_components, manifest.json, Config-Flow)"
 prompt_mode: modern

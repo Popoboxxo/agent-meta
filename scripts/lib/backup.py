@@ -34,6 +34,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from .log import SyncLog
+from .repo_containment import TmpSinkError, resolve_output_dir
+from .tmp_paths import resolve_tmp_paths
 
 DEFAULT_BACKUP_DIR = ".backup/agent-meta"
 DEFAULT_MAX_BACKUPS = 10
@@ -252,6 +254,46 @@ def list_backups(
     return result
 
 
+def _backup_staging(
+    project_root: Path,
+    config: dict,
+    log: SyncLog,
+) -> tempfile.TemporaryDirectory:
+    """Return the staging context for a backup archive (AC-09/AC-10).
+
+    With an enabled tmp-sink the staging directory lives under
+    ``<absolute>/backup-staging`` (resolved through
+    :func:`lib.repo_containment.resolve_output_dir`, never the system temp).
+    A *disabled* sink is the only sanctioned fallback: the staging area then
+    moves to the system temp directory and a ``backup.staging-system-temp``
+    WARNING makes that explicit (a backup never blocks on a disabled sink).
+
+    Every other resolver error aborts the backup with
+    ``backup.tmp-sink.invalid-path`` instead of silently using the system
+    temp; the caller maps the raised :class:`TmpSinkError` to a non-zero exit.
+    """
+    try:
+        # Resolve first so an invalid *path* aborts even while the sink is
+        # disabled (IC-03), before resolve_output_dir would report
+        # ``tmp-sink.disabled``.
+        resolve_tmp_paths(project_root, config)
+        staging_parent = resolve_output_dir(project_root, config, "backup-staging")
+    except TmpSinkError as exc:
+        if exc.code == "tmp-sink.disabled":
+            log.warning(
+                "backup.staging-system-temp: tmp-sink is disabled; staging "
+                "the backup in the system temp directory"
+            )
+            return tempfile.TemporaryDirectory()
+        raise TmpSinkError(
+            "backup.tmp-sink.invalid-path",
+            f"cannot stage the backup inside the tmp-sink: {exc.message}",
+        ) from exc
+
+    staging_parent.mkdir(parents=True, exist_ok=True)
+    return tempfile.TemporaryDirectory(dir=str(staging_parent))
+
+
 def create_backup(
     project_root: Path,
     providers: list[str] | None,
@@ -337,7 +379,7 @@ def create_backup(
 
     backup_dir.mkdir(parents=True, exist_ok=True)
 
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with _backup_staging(project_root, config, log) as tmpdir:
         tmp = Path(tmpdir)
 
         # Write manifest

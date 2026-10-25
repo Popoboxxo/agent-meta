@@ -264,7 +264,7 @@ Bei `rejected`: mit `correction_hints` iterieren. Bei `blocked` (auch: <2 REQ-L3
 
 **Output file:** `[SE_BASE_DIR — not available outside a full agent-meta install]/{parent_path}/Components/{FolderName}/L3_{FolderName}_Requirements.md`
 **Frontmatter:** `step: component-requirements`, `agent: se-component-requirements`, `iteration`, `status: done`, `timestamp`, `schema_version: 1.0.0` — plus die Pflichtfelder des REQ-Frontmatter-Standards (siehe oben; `document_frontmatter`-Felder direkt in den YAML-Block übernehmen).
-**Atomic write:** temp → rename → `.se-state.yaml` (cell-local in der Component-Zelle, Taxonomie) `last_completed_step` aktualisieren. Keine `.iter-N`/`.final`-Kopien neben dem Final-Artefakt (Issue #334); veraltete Intermediate älterer Läufe entfernen.
+**Atomic write:** write to `.tmp/se-component-requirements-<topic>.md` → rename → `.se-state.yaml` (cell-local in der Component-Zelle, Taxonomie) `last_completed_step` aktualisieren. Keine `.iter-N`/`.final`-Kopien neben dem Final-Artefakt (Issue #334); veraltete Intermediate älterer Läufe entfernen.
 
 <output_contract>
 ```

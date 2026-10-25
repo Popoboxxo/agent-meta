@@ -40,6 +40,7 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from lib import context_report as cr  # noqa: E402
 from lib.providers import load_provider_capabilities, load_providers_config  # noqa: E402
+from lib.tmp_paths import resolve_tmp_paths  # noqa: E402
 from tests.test_ac01_render_identity import _make_project  # noqa: E402
 
 TOLERANCE_MIN_BYTES = 256
@@ -366,7 +367,8 @@ def measured_compact(tmp_path_factory):
     for provider in _PROVIDERS:
         config = _matrix_config(root, provider, [provider])
         work = root / (provider + "-work")
-        cr.render_into_work_dir(REPO_ROOT, config, work, profile="compact")
+        paths = resolve_tmp_paths(root / provider, {})
+        cr.render_into_work_dir(REPO_ROOT, config, work, profile="compact", paths=paths)
         works[provider] = work
         report.update(cr.measure_artifacts(work, [provider], mappings))
     return report, mappings, works
@@ -378,7 +380,8 @@ def measured_compact_multi(tmp_path_factory):
     mappings = _matrix_mappings()
     config = _matrix_config(root, "multi", _AGENTS_MD_PROVIDERS)
     work = root / "work"
-    cr.render_into_work_dir(REPO_ROOT, config, work, profile="compact")
+    paths = resolve_tmp_paths(root / "multi", {})
+    cr.render_into_work_dir(REPO_ROOT, config, work, profile="compact", paths=paths)
     return cr.measure_artifacts(work, _AGENTS_MD_PROVIDERS, mappings)
 
 

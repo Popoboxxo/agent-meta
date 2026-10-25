@@ -407,10 +407,11 @@ managed-Block-Logik geführt.
 folgt eine Pflichtregel für jede Test-Infrastruktur, die das Repo kopiert (z. B. die
 Self-Hosting-Tests in `tests/`):
 
-1. **Der pytest-Basetemp darf NIE im Arbeitsbaum liegen.** Er gehört außerhalb, z. B.
-   `--basetemp=/tmp/<user>` (oder `TMPDIR` entsprechend). Liegt er im Repo — etwa
-   `--basetemp=.tmp/pyt` — legt pytest dort `<basetemp>/pytest-of-<user>/` plus den
-   `pytest-current`-Symlink an.
+1. **Der pytest-Basetemp darf NIE im Arbeitsbaum liegen.** Er gehört außerhalb; den Wert
+   liefert `{{PYTEST_BASETEMP}}` aus
+   `repo_containment.tmp-sink.system-temp-exception` in `.meta-config/project.yaml` (oder
+   `TMPDIR` entsprechend). Liegt er im Repo — etwa `--basetemp=.tmp/pyt` — legt pytest dort
+   `<basetemp>/pytest-of-<user>/` plus den `pytest-current`-Symlink an.
 2. **Jede Repo-Kopie muss `.tmp` ausschließen** — zusätzlich zu den übrigen lokalen Bäumen
    (`.venv/`, `graphify-out/`, `.opencode/`, `.pytest_cache/`, `node_modules/`). Wird `.tmp`
    mitkopiert und liegt das Kopierziel selbst im Basetemp, kopiert der Klon seinen eigenen
@@ -426,7 +427,7 @@ Self-Hosting-Tests in `tests/`):
    Repo-Wurzel liegt. Der In-Repo-Lauf bleibt damit erlaubt — er ist ein legitimer
    Diagnose-Lauf für die Plattenplatz-Sicherheit. Der kanonische Aufruf steht in
    `.meta-config/project.yaml` (`TEST_COMMANDS`): `python3 -m pytest tests/
-   --basetemp=/tmp/$USER/pytest-agent-meta`.
+   --basetemp={{PYTEST_BASETEMP}}`.
 
 Punkt 1 hat **zwei** Gründe, nicht nur den Plattenplatz: liegt der Basetemp im Arbeitsbaum,
 dann liegt auch `tmp_path` im Arbeitsbaum. Tests, die die Repo-Wurzel-Erkennung prüfen (sie
@@ -443,6 +444,33 @@ Die Regel ist eine **Convention boundary** im Sinne der zentralen Definition in
 sie schützt gegen akzidentellen Missbrauch (vergessenes `--basetemp`, naive Automatisierung),
 nicht gegen einen gezielten Bypass. Punkt 4 ist zusätzlich als Defense-in-depth gedacht — er
 verhindert, dass ein fehlkonfigurierter Basetemp still die Platte füllt, statt laut abzubrechen.
+
+#### Konfiguration
+
+Der Basetemp-Wert ist konfigurierbar und literal-frei. Er kommt aus
+`repo_containment.tmp-sink.system-temp-exception` in `.meta-config/project.yaml`; der Sync
+rendert daraus den Token `PYTEST_BASETEMP` (absoluter Pfad im System-Temp) für
+`TEST_COMMANDS`. In der Vorschrift steht der Token, kein Maschinenpfad.
+
+| Key | Bedeutung |
+|---|---|
+| `enabled` | Ausnahme aktiv (Framework-Default `true`); sonst gilt der Basetemp unter dem Sink (`<sink>/pytest`). |
+| `reason` | Begründungstext der Ausnahme; fehlt er, gilt der Framework-Default. Der Text hält die Begründung im Regelwerk sichtbar. |
+| `pytest-basetemp` | Der Basetemp darf im System-Temp liegen — der einzige erlaubte Zweck. |
+| `toolchain-caches` | Opt-in (Default `false`): pip/npm-Caches werden in den Sink gepinnt; `docker` bleibt ausgenommen. |
+
+Wirkungslose Kombinationen sind Konfigurationsfehler, kein stilles „aus": `enabled: false`
+zusammen mit `pytest-basetemp: true` oder `toolchain-caches: true` bricht den Sync mit Exit 1
+ab (`tmp-sink.system-temp-exception`). Dasselbe gilt, wenn der System-Temp-Root selbst
+innerhalb des Projekts liegt — dann wäre die Ausnahme wertlos.
+
+Der Containment-Hook ist **fail-closed**: Lässt sich oberhalb des Ankers kein Projekt-Root
+(`.meta-config/`) auflösen, blockt er mit Exit 2 und `repo-containment.no-root`, statt das
+Arbeitsverzeichnis zum Root zu adeln. Die Block-Meldung nennt Ziel und Sink **absolut**
+(`allowed: paths under <root> and under <sink>`) sowie die Zeilen `anchor:` (Herkunft des
+Ankers: Payload-`cwd` oder das Verzeichnis des Ziels), `repair:` (Sync erneut ausführen bzw.
+absoluten `file_path` oder `cwd` im Payload mitgeben) und `opt-out:`
+(`repo_containment.enabled: false` in der Projekt-Config).
 
 ---
 

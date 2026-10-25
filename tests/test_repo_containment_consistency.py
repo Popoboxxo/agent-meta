@@ -26,7 +26,7 @@ from lib.consistency.repo_containment import (
     check_repo_containment_support,
     check_repo_containment_templates,
 )
-from lib.consistency.report import Severity
+from lib.consistency.report import Severity, print_json_report
 from lib.providers import load_providers_config
 
 
@@ -48,6 +48,26 @@ def test_warns_for_hookless_provider_with_containment_on():
         and "Opencode" in f.message
         for f in findings
     )
+
+
+def test_no_hook_support_warning_still_emitted(capsys):
+    """AC-20: a hook-less provider stays advisory — WARNING and exit 0.
+
+    Deriving the Opencode edit scope from the sink does not upgrade this
+    finding: Opencode is still enforced only through the permission layer, so
+    the check must stay visible without failing the validation run.
+    """
+    findings = check_repo_containment_support(
+        _REPO_ROOT, {"ai-providers": ["Opencode"]}, _provider_config()
+    )
+    no_hook = [
+        f for f in findings if f.check == "repo-containment.no-hook-support"
+    ]
+
+    assert no_hook, "the hook-less provider must stay visible"
+    assert all(f.severity == Severity.WARNING for f in no_hook)
+    assert not any(f.severity == Severity.ERROR for f in findings)
+    assert print_json_report(findings) == 0, "WARNING must not fail the run"
 
 
 def test_default_on_warns_even_without_explicit_block():

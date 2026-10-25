@@ -741,6 +741,10 @@ def work_dir_env(work_dir: Path, base: Optional[dict] = None) -> dict:
 
     Subprocesses started with it create temporary files below the tmp-sink
     work directory instead of the system temp directory (IC-34).
+
+    **Reached only through** :func:`lib.tmp_paths.tmp_env` (IC-18): that wrapper
+    owns the ``tmp-sink.disabled`` decision and the provisioning, so this helper
+    stays a pure env construction with no config knowledge.
     """
     env = dict(os.environ if base is None else base)
     for key in ("TMPDIR", "TEMP", "TMP"):

@@ -108,7 +108,7 @@ Bei `rejected`: mit `correction_hints` iterieren. Bei `blocked`: eskalieren.
 **Output file (Final-Artefakt, kanonischer Name ohne Suffix):**
 `{SE_BASE_DIR}/{parent_path}/L{level}/{FolderName}/L{level}_{FolderName}_Architecture.md`
 **Frontmatter:** `step: architecture`, `agent: se-architect`, `iteration`, `status: done`, `timestamp`, `schema_version: 1.0.0` — plus Taxonomie-Pflichtfelder (`type: ARCH`, `scope`, `status`, `date`, `author_agent: se-architect`).
-**Atomic write:** temp → rename → `.se-state.yaml` aktualisieren.
+**Atomic write:** write to `.tmp/se-architect-<topic>.md` → rename → `.se-state.yaml` aktualisieren.
 **Iterations-Zustand:** läuft über den A2A-Loop mit `se-critic` (Envelopes + Review-Protokolle) — **niemals** als `*.iter-N.md`/`*.final.md`-Dateien im Zellen-Ordner (Issue #334). Stale-Intermediate älterer Läufe nach dem Final-Pass entfernen. Optionales Iterations-Audit-Trail: als Report nach `{SE_BASE_DIR}/reports/{FolderName}/` (siehe `se-cascade-artifact-taxonomy.md`), nicht neben dem Final-Artefakt.
 
 <output_contract>

@@ -145,7 +145,10 @@ def test_context_report_never_uses_tempfile(tmp_path, monkeypatch):
     def boom(*_a, **_k):
         raise AssertionError("system temp must not be used")
 
-    for name in ("mkdtemp", "mkstemp", "gettempdir", "NamedTemporaryFile", "TemporaryDirectory"):
+    # Creation APIs only: ``tempfile.gettempdir()`` is a pure read and is
+    # queried by the central tmp-path resolver for the sanctioned pytest
+    # basetemp precedence (IC-04/ADR-01) -- it never creates a temp entry.
+    for name in ("mkdtemp", "mkstemp", "NamedTemporaryFile", "TemporaryDirectory"):
         monkeypatch.setattr(tempfile, name, boom)
     cfg = _project(tmp_path)
     mappings = {"Claude": {"context_file": "CLAUDE.md"}}

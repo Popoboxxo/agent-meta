@@ -27,10 +27,10 @@ When verifying behavior via ad-hoc container runs (e.g. `docker run`), diagnosti
   ```
   NAME=verify-$RANDOM
   docker run --name "$NAME" <image> <cmd>          # record exit code ($?)
-  docker logs "$NAME" > /tmp/"$NAME".log 2>&1      # capture BEFORE removal
+  docker logs "$NAME" > .tmp/"$NAME".log 2>&1      # capture BEFORE removal
   docker rm "$NAME"                                # cleanup only after capture
   ```
-- **Alternative (tee):** when a persistent named container is not appropriate: `docker run --rm <image> <cmd> 2>&1 | tee /tmp/run-$RANDOM.log` — the pipe keeps output even on non-zero exit.
+- **Alternative (tee):** when a persistent named container is not appropriate: `docker run --rm <image> <cmd> 2>&1 | tee .tmp/run-$RANDOM.log` — the pipe keeps output even on non-zero exit.
 - On failure, report the captured log path — the next agent needs those diagnostics.
 
 8. **Migration verification (mandatory when the task moves, renames, or re-derives existing entities/IDs):** silent identity loss during a migration (e.g. a stable `unique_id` regenerated or dropped instead of carried over) can be invisible in a diff and irreversible once committed — it doesn't just risk history/state, it can permanently break references other systems hold to that ID. Before reporting done:
@@ -127,7 +127,7 @@ Delegation:
 Beispiel — Hintergrundprozess im selben Turn blockierend abwarten (Polling mit Timeout):
 
 ```bash
-npm run e2e > /tmp/e2e.log 2>&1 &
+npm run e2e > .tmp/e2e.log 2>&1 &
 PID=$!
 TIMEOUT=600
 for i in $(seq 1 "$TIMEOUT"); do
@@ -136,5 +136,5 @@ for i in $(seq 1 "$TIMEOUT"); do
 done
 kill -0 "$PID" 2>/dev/null && { kill "$PID"; echo "TIMEOUT after ${TIMEOUT}s" >&2; exit 124; }
 wait "$PID"; RC=$?
-tail -50 /tmp/e2e.log; exit "$RC"             # evidence + exit code = final result, not a "waiting" placeholder
+tail -50 .tmp/e2e.log; exit "$RC"             # evidence + exit code = final result, not a "waiting" placeholder
 ```

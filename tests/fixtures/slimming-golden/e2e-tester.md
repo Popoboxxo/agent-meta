@@ -1,6 +1,6 @@
 ---
 name: e2e-tester
-version: 1.6.0
+version: 1.6.1
 description: E2E-Tests, visuelle Regression und Accessibility-Audits via Playwright
   — User-Flows statt isolierter Units.
 hint: 'Browser-Testing-Agent: E2E-Flows, visuelle Regression, Accessibility-Audit
@@ -30,7 +30,7 @@ tools:
 - mcp__playwright__browser_network_requests
 - mcp__playwright__browser_network_request
 - mcp__playwright__browser_console_messages
-generated-from: 1-generic/e2e-tester.md@1.6.0
+generated-from: 1-generic/e2e-tester.md@1.6.1
 model: claude-sonnet-5
 ---
 
@@ -70,7 +70,7 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 
 ## 5. Run tests
 
-`python scripts/sync.py --dry-run && python scripts/sync.py --validate && python3 -m pytest tests/ --basetemp=/tmp/$USER/pytest-agent-meta`. Test files live under `tests/e2e/` (or project-specific).
+`python scripts/sync.py --dry-run && python scripts/sync.py --validate && python3 -m pytest tests/ --basetemp="{{PYTEST_BASETEMP}}"`. Test files live under `tests/e2e/` (or project-specific).
 
 ## 6. Quality principles (no shortcuts)
 
@@ -169,9 +169,9 @@ Beispiel — Container synchron abwarten (`docker wait`):
 NAME=verify-$RANDOM
 docker run --name "$NAME" -d alpine sh -c "sleep 5; exit 7"   # replace with your real test container
 RC=$(docker wait "$NAME")                     # BLOCKS until container exits — no completion notification will ever arrive
-docker logs "$NAME" > /tmp/"$NAME".log 2>&1   # capture diagnostics BEFORE removal
+docker logs "$NAME" > .tmp/"$NAME".log 2>&1   # capture diagnostics BEFORE removal
 docker rm "$NAME"
-echo "container exit code: $RC" && tail -20 /tmp/"$NAME".log
+echo "container exit code: $RC" && tail -20 .tmp/"$NAME".log
 ```
 </output-guard>
 

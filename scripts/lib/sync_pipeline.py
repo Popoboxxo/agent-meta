@@ -120,6 +120,7 @@ from lib.repo_containment import (
     ensure_tmp_sink_gitignore,
     resolve_effective_repo_containment,
 )
+from lib.tmp_paths import resolve_tmp_paths
 from lib.rules import (
     collect_rule_sources,
     resolve_rules,
@@ -231,15 +232,18 @@ def _sync_stage_tmp_sink(
     provider-overridable), so resolution runs once with ``provider=None``.
     """
     dry_run = bool(getattr(args, "dry_run", False))
+    root = _tmp_sink_project_root(config_path, project_root)
+    # ADR-01: the central resolver owns the tmp-sink path decision. It is
+    # read-only, so dry-run still creates nothing; provisioning and cleanup
+    # keep using the repo_containment helpers, which need the effective flags.
+    paths = resolve_tmp_paths(root, config)
     effective = resolve_effective_repo_containment(config)
     for finding in effective.findings:
         log.warn(f"repo-containment: {finding.message}")
 
-    if not effective.tmp_sink_enabled:
+    if not paths.enabled:
         log.skip("repo-containment", "tmp-sink disabled — no scratch sink provisioned")
         return
-
-    root = _tmp_sink_project_root(config_path, project_root)
 
     cleanup = cleanup_tmp_sink(root, effective, dry_run=dry_run)
     if cleanup is not None:

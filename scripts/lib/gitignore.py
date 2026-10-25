@@ -28,10 +28,7 @@ from pathlib import Path
 
 from .io import run_git_check_ignore
 from .providers import resolve_providers
-from .repo_containment import (
-    default_repo_containment_block,
-    resolve_effective_repo_containment,
-)
+from .tmp_paths import TmpPaths, resolve_tmp_paths
 
 # Category fallback for Claude's gitignore_entries when the provider config
 # carries none (mirrors the historical inline default in sync.py).
@@ -189,6 +186,9 @@ def compute_base_gitignore_entries(
     provider_config: dict,
     gitignore_cfg: dict,
     repo_containment_cfg: dict | None = None,
+    *,
+    tmp_paths: TmpPaths | None = None,
+    project_root: Path | None = None,
 ) -> list[str]:
     """Compute the base entries of the agent-meta managed .gitignore block.
 
@@ -207,8 +207,14 @@ def compute_base_gitignore_entries(
 
     ``repo_containment_cfg`` is the optional ``repo_containment`` config block.
     When its tmp-sink is enabled and ``tmp-sink.gitignore`` is true, the sink
-    path (default ``.tmp/``) is appended additively (spec §5.3). A missing
-    block adds nothing, preserving the historical entry set.
+    entry is appended additively (spec §5.3, default ``.tmp/``).
+
+    The sink **path** is never interpreted here: callers that already resolved
+    it pass ``tmp_paths`` (IC-16/ADR-01). The legacy keyword-less call sites
+    (unit tests, historical callers) fall back to the central
+    :func:`~lib.tmp_paths.resolve_tmp_paths`; ``project_root`` only feeds that
+    fallback and defaults to the current working directory, which is
+    sufficient because this function consumes ``TmpPaths.relative`` alone.
 
     Note: sync.py applies the result only when Claude is an active provider
     (the exact-managed-block path is Claude-gated) — the same guard is kept
@@ -314,29 +320,47 @@ def compute_base_gitignore_entries(
     if custom_entries:
         entries.extend(custom_entries)
 
-    sink_entry = _tmp_sink_gitignore_entry(repo_containment_cfg)
-    if sink_entry and sink_entry not in entries:
-        entries.append(sink_entry)
+    if _tmp_sink_gitignore_enabled(repo_containment_cfg):
+        if tmp_paths is None:
+            tmp_paths = resolve_tmp_paths(
+                Path(project_root) if project_root is not None else Path.cwd(),
+                {"repo_containment": repo_containment_cfg}
+                if isinstance(repo_containment_cfg, dict)
+                else None,
+            )
+        sink_entry = _tmp_sink_gitignore_entry(tmp_paths)
+        if sink_entry and sink_entry not in entries:
+            entries.append(sink_entry)
 
     return entries
 
 
-def _tmp_sink_gitignore_entry(repo_containment_cfg: dict | None) -> str | None:
-    """Return the tmp-sink managed-block entry, or None when not applicable.
+def _tmp_sink_gitignore_enabled(repo_containment_cfg: dict | None) -> bool:
+    """Read the ``tmp-sink.gitignore`` toggle (default ON, IC-15 Nr. 26).
 
-    Additive on top of the Claude-gated managed block. Default ON (IC-15
-    Nr. 26): a missing/non-mapping ``repo_containment`` block falls back to
-    ``default_repo_containment_block()`` (sink ``.tmp/``). An explicit mapping
-    yields an entry only with an enabled sink and ``tmp-sink.gitignore: true``.
+    ``TmpPaths`` intentionally carries no gitignore flag (IC-01/IC-02 field
+    list), so the on/off switch stays with the gitignore consumer. This reads
+    only the boolean, never the path: the path itself comes from ``TmpPaths``
+    via the central resolver (ADR-01/IC-16).
     """
     if not isinstance(repo_containment_cfg, dict):
-        repo_containment_cfg = default_repo_containment_block()
-    effective = resolve_effective_repo_containment(
-        {"repo_containment": repo_containment_cfg}, None
-    )
-    if not (effective.tmp_sink_enabled and effective.tmp_sink_gitignore):
+        return True
+    sink = repo_containment_cfg.get("tmp-sink")
+    if not isinstance(sink, dict):
+        return True
+    value = sink.get("gitignore", True)
+    return value if isinstance(value, bool) else True
+
+
+def _tmp_sink_gitignore_entry(paths: TmpPaths) -> str | None:
+    """Return the tmp-sink managed-block entry, or None when not applicable.
+
+    Additive on top of the dedicated-context managed block, derived from the
+    resolver's ``paths.relative`` (IC-16). A disabled sink yields no entry.
+    """
+    if not paths.enabled:
         return None
-    return _ensure_trailing_slash(effective.tmp_sink_path)
+    return _ensure_trailing_slash(paths.relative)
 
 
 def _collect_skill_gitignore_entries(config: dict, ext_config: dict, provider_config: dict) -> list[str]:

@@ -187,8 +187,8 @@ schema_version: "1.0.0"
 ```
 
 **Atomic write procedure:**
-1. Write implementation summary (frontmatter + artifacts list + test coverage) to a temporary file
-2. Rename temp file to target path
+1. Write implementation summary (frontmatter + artifacts list + test coverage) to `.tmp/se-developer-<topic>.md`
+2. Rename `se-developer-<topic>.md` from the sink to the target path (atomic write)
 3. Update `.se-state.yaml` with `last_completed_step` pointing to this file
 
 **Exception:** The escalation card (`status: escalate`) is NOT a delegation — it is the regular result the orchestrator routes onward.

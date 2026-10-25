@@ -285,7 +285,7 @@ This role is the **only applier** in the framework — `meta-optimizer` evaluate
 1. **Analyse** — produce the proposal and return the run path. Nothing is evaluated and nothing is applied in this step.
 
 ```bash
-python3 [AGENT_META_REL_PATH — not available outside a full agent-meta install]scripts/sync.py --optimize-config --json --out [TMP_SINK_PATH — not available outside a full agent-meta install]/meta-optimizer/<ts>/
+python3 [AGENT_META_REL_PATH — not available outside a full agent-meta install]scripts/sync.py --optimize-config --json --out .tmp/meta-optimizer/<ts>/
 ```
 
    Return the run path as `ARTIFACTS: <path>/proposal.json, proposal.diff, proof.json`. Exit codes: `0` ok, `1` proof failed, `2` runtime error.

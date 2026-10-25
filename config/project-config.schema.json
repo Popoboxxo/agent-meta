@@ -2590,6 +2590,33 @@
               ],
               "default": "manual",
               "description": "manual = never delete contents automatically (safe default). on-sync = prune the directory on each sync run (opt-in, destructive)."
+            },
+            "system-temp-exception": {
+              "type": "object",
+              "description": "Named, documented exception for the only writes allowed to leave the repo: pytest's --basetemp (and, opt-in, pip/npm toolchain caches). Missing block = framework defaults (enabled true, pytest-basetemp true).",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Enable the system-temp exception. When false, no write may leave the repo and 'pytest-basetemp: true' is a config error."
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Why writes may leave the repo. Required by the sync-time validator whenever the exception is enabled (default)."
+                },
+                "pytest-basetemp": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Allow pytest --basetemp to use the platform temp root. Requires enabled: true; the rendered value is injected via {{PYTEST_BASETEMP}}."
+                },
+                "toolchain-caches": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Opt-in pip/npm cache redirection (PIP_CACHE_DIR, npm_config_cache). Default false; true requires enabled: true (validated in a later task)."
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false

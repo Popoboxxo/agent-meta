@@ -47,6 +47,10 @@ STRICT = {"orchestrator": {"mode": "strict"}}
 
 _SCOPED = {"*": "deny", ".tmp/**": "allow", ".meta-viz/**": "allow"}
 
+# AC-17: the sink glob is derived from `repo_containment.tmp-sink.path`
+# (`TmpPaths.relative`), the static list only contributes `.meta-viz/**`.
+_SINK_SCOPED = {"*": "deny", "scratch/out/**": "allow", ".meta-viz/**": "allow"}
+
 
 def _agent_content(tools: tuple[str, ...] = ("Read", "Bash", "Grep", "Write")) -> str:
     """Template-shaped content with a writable tool set by default."""
@@ -111,6 +115,44 @@ def test_primary_orchestrator_edit_is_scoped_under_active_gate() -> None:
     assert list(permission["edit"]) == ["*", ".tmp/**", ".meta-viz/**"], (
         "the root deny must come first — last match wins in Opencode"
     )
+
+
+def test_edit_allow_derived_from_tmp_sink() -> None:
+    """AC-17: with `path: scratch/out` the scope follows the sink, not `.tmp`."""
+    project_config = {
+        "orchestrator": {"mode": "strict"},
+        "repo_containment": {"tmp-sink": {"path": "scratch/out"}},
+    }
+
+    permission = _permission(_render(project_config=project_config))
+
+    assert permission["edit"] == _SINK_SCOPED
+    assert ".tmp/**" not in permission["edit"], (
+        "the static `.tmp/**` literal must not survive a configured sink"
+    )
+    assert list(permission["edit"]) == ["*", "scratch/out/**", ".meta-viz/**"], (
+        "the root deny comes first (last match wins); the sink precedes the "
+        "static `.meta-viz/**` fallback"
+    )
+
+
+def test_edit_allow_sink_disabled_keeps_static_scope_only() -> None:
+    """IC-10: a disabled sink contributes nothing; the static scope remains."""
+    project_config = {
+        "orchestrator": {"mode": "strict"},
+        "repo_containment": {"tmp-sink": {"enabled": False}},
+    }
+
+    permission = _permission(_render(project_config=project_config))
+
+    assert permission["edit"] == {"*": "deny", ".meta-viz/**": "allow"}
+
+
+def test_provider_tools_static_scope_has_no_sink_literal() -> None:
+    """The static fallback list carries no sink literal any more (Step 2)."""
+    config = load_provider_tools_config(REPO_ROOT)
+
+    assert config["opencode_primary_edit_allow"] == [".meta-viz/**"]
 
 
 def test_empty_allow_list_falls_back_to_scalar_deny(monkeypatch: pytest.MonkeyPatch) -> None:

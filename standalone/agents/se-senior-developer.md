@@ -122,7 +122,7 @@ ARTIFACTS: <Step-Persistence-Dateien, sonst leer>
 ## Step Persistence
 **Output file:** `{SE_BASE_DIR}/{parent_path}/L{level}/{FolderName}/implementation/L{level}_{FolderName}_Impl.md`
 **Frontmatter:** `step: implementation`, `agent: se-senior-developer`, `status`, `timestamp`, `schema_version: 1.0.0`
-**Atomic write:** temp → rename → `.se-state.yaml` `last_completed_step` aktualisieren.
+**Atomic write:** write to `.tmp/se-senior-developer-<topic>.md` → rename → `.se-state.yaml` `last_completed_step` aktualisieren.
 
 `status: escalate` ist kein Delegation, sondern reguläres Ergebnis.
 Erlaubte Eskalationen: Interface-Change → `se-interface-mgr`/`se-architect` | Boundary → `se-architect` | Unklare/contradictory specs | Critic loop exhausted → `blocked`

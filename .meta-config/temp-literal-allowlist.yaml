@@ -1,0 +1,20 @@
+# Temp-Literal-Allowlist (Spec: SPEC-tmp-sink-injection, ADR-06/AC-21/AC-39)
+#
+# Purpose: declare the only system-temp literals (``/tmp/``, ``%TEMP%``,
+# ``C:\\Temp\\``) that are allowed to remain under the check scope. Every other
+# occurrence is reported by the temp-literal consistency check as a WARNING
+# (``temp-literal.system-temp``) — never a hard exit (ADR-06).
+#
+# Schema per entry (Q6 / IC-11 / AC-39):
+#   path:    repo-relative glob of the file to exempt, e.g. "agents/1-generic/x.md"
+#   pattern: regex matched against the offending line (suppresses that line only)
+#   reason:  mandatory, non-empty justification ("expires" is NOT a schema field)
+#   owner:   optional role/team name; does not change the result
+#
+# A matching path+pattern pair suppresses the warning only when the entry is
+# complete. Incomplete entries, unknown fields (e.g. ``expires``) or a bad
+# regex suppress nothing and are reported as their own warning of the same
+# family (code ``temp-literal.allowlist-entry``, Q6/ADR-14/AC-39).
+#
+# Do not add entries for write targets — use the {{TMP_SINK_PATH}} placeholder.
+entries: []
