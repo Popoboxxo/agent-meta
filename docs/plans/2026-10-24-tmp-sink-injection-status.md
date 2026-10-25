@@ -23,7 +23,7 @@ Spalte `Commit` bleibt `— (pending)`, bis der jeweilige Commit tatsächlich ex
 | 7 | Standalone-Export regenerieren | done | — (pending) | Steps 1–3 grün; `TMP_SINK_PATH=".tmp"` + `TMP_SINK_ENV_PIN_BLOCK=""`; 23 Standalone-Dateien regeneriert (0 Drift); AC-26/AC-27; Step 4 (Commit) offen, kein Commit-Auftrag |
 | 8 | Hook-Anker und fail-closed Root-Auflösung | done | — (pending) | Steps 1–3 grün; Anker-Regel (`cwd`/Zielverzeichnis, kein `$PWD`), `repo-containment.no-root` statt Root-Promotion, absolute Sink-Meldung, Hook-Sink == `TmpPaths.absolute`; Impl-Version 1.1.0→1.2.0; Step 4 (Commit) offen, kein Commit-Auftrag |
 | 9 | Hook-Testmatrix und bewusste Inversion | done | — (pending) | Steps 1–3 grün; AC-03/04/06/07/08/18/28/29/30/33/37 abgedeckt, alte Fail-open-Erwartung bewusst invertiert; kein Produktionscode geändert; Step 4 (Commit) offen, kein Commit-Auftrag |
-| 10 | Env-Pin für Framework-Subprozesse ausweiten | pending | — (pending) | — |
+| 10 | Env-Pin für Framework-Subprozesse ausweiten | done | — (pending) | Steps 1–3 grün; beide Render-Seams rufen `tmp_env(paths)`, `work_dir_env` nur noch in `tmp_paths.py` (AST-Guard); 4 Plan-Dateien + 4 mechanische Test-Anpassungen (Signatur/Guard); 6 vorbestehende `gettempdir`-Rotmarks (nicht Task 10); Step 4 (Commit) offen, kein Commit-Auftrag |
 | 11 | Subprozess-Klassifikation und Backup-Staging | pending | — (pending) | — |
 | 12 | Gitignore- und Doctor-Zweitparser entfernen | pending | — (pending) | — |
 | 13 | Opencode-Schreibscope aus dem Sink ableiten | pending | — (pending) | — |
@@ -1097,6 +1097,218 @@ tragend, nicht tautologisch.
 - **AC-04** setzt voraus, dass der Repo-Root `.meta-config/` trägt (Self-Hosting-Repo). In
   einem Checkout ohne `.meta-config/` wäre die Kreuzprobe „Prozess-CWD = Repo-Root" nicht
   mehr aussagekräftig (der Test bliebe grün, weil beide Fälle blocken).
+
+## Evidence — Task 10
+
+### Rot (vor der Implementierung)
+
+`python3 -m pytest tests/test_tmp_sink_output_dirs.py -q -k "context_report_passes_absolute_tmp_env or meta_optimizer_render_pins_sink_env or work_dir_env_is_only or framework_render_modules"`
+→ Exit 1:
+
+```
+FFFF                                                                     [100%]
+=================================== FAILURES ===================================
+_________________ test_context_report_passes_absolute_tmp_env __________________
+
+tmp_path = PosixPath('/tmp/pytest-of-hermes/pytest-104/test_context_report_passes_abs0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x78802c674180>
+
+    def test_context_report_passes_absolute_tmp_env(tmp_path, monkeypatch):
+        """IC-34: the render subprocesses receive the absolute ``TmpPaths.env`` pin.
+
+        Red before Task 10: ``render_into_work_dir`` built its env with
+        ``work_dir_env(work_dir)`` and knew no ``paths`` argument.
+        """
+        project_root = tmp_path / "project"
+        config_path = project_root / ".meta-config" / "project.yaml"
+        config_path.parent.mkdir(parents=True)
+        config_path.write_text("variables:\n  PROJECT_NAME: demo\n", encoding="utf-8")
+        paths = resolve_tmp_paths(project_root, {})
+        work_dir = project_root / ".tmp" / "context-report" / "run-1" / "work"
+
+        captured = _capture_subprocess_env(monkeypatch, cr)
+>       cr.render_into_work_dir(REPO_ROOT, config_path, work_dir, paths=paths)
+E       TypeError: render_into_work_dir() got an unexpected keyword argument 'paths'
+
+tests/test_tmp_sink_output_dirs.py:540: TypeError
+___________________ test_meta_optimizer_render_pins_sink_env ___________________
+
+tmp_path = PosixPath('/tmp/pytest-of-hermes/pytest-104/test_meta_optimizer_render_pin0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x78802c6742b0>
+
+    def test_meta_optimizer_render_pins_sink_env(tmp_path, monkeypatch):
+        """IC-34: the optimizer render helper pins the absolute sink env.
+
+        Red before Task 10: ``_render_into`` called ``work_dir_env(work_dir)``.
+        """
+        project_root = tmp_path / "project"
+        project_root.mkdir()
+        paths = resolve_tmp_paths(project_root, {})
+        work_dir = paths.absolute / "meta-optimizer" / "run-1" / "work"
+
+        captured = _capture_subprocess_env(monkeypatch, mo)
+>       mo._render_into(REPO_ROOT, "variables:\n  A: b\n", work_dir, paths)
+E       TypeError: _render_into() takes 3 positional arguments but 4 were given
+
+tests/test_tmp_sink_output_dirs.py:559: TypeError
+_______________ test_work_dir_env_is_only_called_from_tmp_paths ________________
+
+    def test_work_dir_env_is_only_called_from_tmp_paths():
+        """IC-18: ``work_dir_env`` is reachable only through ``tmp_env``."""
+        call_sites = _work_dir_env_call_sites()
+        only = Path("scripts/lib/tmp_paths.py")
+
+>       assert set(call_sites) == {only}, {
+            str(path): lines for path, lines in call_sites.items()
+        }
+E       AssertionError: {'scripts/lib/context_report.py': [340], 'scripts/lib/meta_optimizer.py': [1508], 'scripts/lib/tmp_paths.py': [303, 188]}
+E       assert {PosixPath('s...mp_paths.py')} == {PosixPath('s...mp_paths.py')}
+E
+E         Extra items in the left set:
+E         PosixPath('scripts/lib/meta_optimizer.py')
+E         PosixPath('scripts/lib/context_report.py')
+E         Use -v to get more diff
+
+tests/test_tmp_sink_output_dirs.py:594: AssertionError
+__________________ test_framework_render_modules_call_tmp_env __________________
+
+    def test_framework_render_modules_call_tmp_env():
+        """The two Task-10 call sites go through ``tmp_env``, not ``work_dir_env``."""
+        for relative in ("scripts/lib/context_report.py", "scripts/lib/meta_optimizer.py"):
+            tree = ast.parse((REPO_ROOT / relative).read_text(encoding="utf-8"))
+            called = {
+                node.func.id
+                for node in ast.walk(tree)
+                if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+            }
+>           assert "tmp_env" in called, relative
+E           AssertionError: scripts/lib/context_report.py
+E           assert 'tmp_env' in {'Path', 'RuntimeError', 'ValueError', '_cap_for', '_effective_profiles', '_entry', ...}
+
+tests/test_tmp_sink_output_dirs.py:609: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_tmp_sink_output_dirs.py::test_context_report_passes_absolute_tmp_env
+FAILED tests/test_tmp_sink_output_dirs.py::test_meta_optimizer_render_pins_sink_env
+FAILED tests/test_tmp_sink_output_dirs.py::test_work_dir_env_is_only_called_from_tmp_paths
+FAILED tests/test_tmp_sink_output_dirs.py::test_framework_render_modules_call_tmp_env
+4 failed, 41 deselected in 1.46s
+```
+
+Beide Env-Pin-Tests scheitern an der fehlenden `paths`-Schnittstelle (`TypeError`, also noch vor jeder
+Assertion); der `ast`-Guard nennt exakt die beiden Plan-Aufrufstellen (`context_report.py:340`,
+`meta_optimizer.py:1508`) als Fremd-Aufrufer von `work_dir_env`.
+
+### Grün (nach der Implementierung)
+
+| # | Kommando | Ergebnis |
+|---|---|---|
+| 1 | `python3 -m pytest tests/test_tmp_sink_output_dirs.py -q` | `45 passed in 6.71s`, Exit 0 |
+| 2 | `python3 -m pytest tests/test_tmp_paths_builder.py tests/test_context_report.py -q` | `31 passed in 202.15s`, Exit 0 |
+| 3 | `python3 -m pytest tests/test_context_budgets.py -q` | `12 passed in 407.12s`, Exit 0 |
+| 4 | `python3 -m pytest tests/test_meta_optimizer_marks.py tests/test_meta_optimizer_fanout.py -q` | `12 passed in 224.98s`, Exit 0 |
+| 5 | `python3 -m pytest tests/test_meta_optimizer_credentials.py tests/test_meta_optimizer_role.py tests/test_meta_optimizer_refill.py tests/test_meta_optimizer_inactive_scope.py -q` | `57 passed in 476.07s`, Exit 0 |
+| 6 | `python3 -m pytest tests/test_meta_optimizer_runner.py tests/test_meta_optimizer_applier.py -q` | `1 failed, 40 passed, 5 errors in 742.16s` — **alle 6 vorbestehend** (siehe Abweichung 3) |
+| 7 | `python3 -m pytest tests/test_doctor_runner.py -q` | `74 passed in 12.15s`, Exit 0 |
+| 8 | `python3 scripts/sync.py --validate` | Exit 0; `0 action(s) \| 382 skipped \| 2 warning(s)`, `grep -c "[ERROR]"` = **0** (beide WARNINGS vorbestehend: `active-set.gate-dropped`, Submodul-Checkout `external/awesome-claude-code`) |
+| 9 | `ast.parse(..., feature_version=(3, 9))` über alle 8 geänderten Dateien | `py3.9 ok` (8/8) |
+| 10 | `grep -rn "work_dir_env" scripts/` | nur noch Definition `repo_containment.py:739` + zwei Aufrufe `tmp_paths.py:188,303` (+ Docstring-Nennung) |
+
+### Abgedeckte ACs (Task 10)
+
+- **AC-12** — `test_context_report_passes_absolute_tmp_env` und
+  `test_meta_optimizer_render_pins_sink_env`: für **jeden** gestarteten Subprozess
+  (`git init` und Sync-Render) sind `TMPDIR`/`TEMP`/`TMP` absolut, existieren als
+  Verzeichnis und sind wertgleich mit `TmpPaths.env` — also der absolute Sink-Root, nicht
+  das Work-Dir (`assert env["TMPDIR"] != str(work_dir)`).
+- **IC-18** — `test_work_dir_env_is_only_called_from_tmp_paths` (`ast`-Scan über
+  `scripts/**`: die Call-Site-Menge ist exakt `scripts/lib/tmp_paths.py`) plus
+  `test_framework_render_modules_call_tmp_env` (beide Module rufen `tmp_env`).
+- **`tmp-sink.disabled`** für `tmp_env` war bereits in Task 1 abgedeckt
+  (`test_writers_still_raise_when_sink_disabled`) — bewusst **nicht** dupliziert.
+
+### Implementierung
+
+| Stelle | Vorher | Nachher |
+|---|---|---|
+| `context_report.py:340` (`render_into_work_dir`) | `env = work_dir_env(work_dir)` | `env = tmp_env(paths)`; `paths: TmpPaths` ist keyword-only Pflichtparameter des Render-Seams |
+| `context_report.py::run_context_report` | — | `paths = resolve_tmp_paths(project_root, config)` einmal im bestehenden `TmpSinkError`-try (Exit 2), danach durchgereicht |
+| `meta_optimizer.py:1508` (`_render_into`) | `env = work_dir_env(work_dir)` | `env = tmp_env(paths)`; `paths` ist vierter Pflichtparameter |
+| `meta_optimizer.py::collect_candidates` | — | optionaler `paths`-Parameter; ohne ihn genau **eine** Auflösung über `resolve_tmp_paths` (ADR-01), weitergereicht an `_classify_candidates` → `_render_into` |
+| `meta_optimizer.py::run_optimize_config` | — | `paths = resolve_tmp_paths(...)` im bestehenden `TmpSinkError`-try (Exit 2), an `collect_candidates` und beide `_render_into`-Aufrufe |
+| `meta_optimizer.py::_finish_apply` | — | dito (nach `_applier_run_dir`, damit die Fehlerpräzedenz unverändert bleibt) |
+| `repo_containment.py::work_dir_env` | Docstring ohne Aufrufpfad | Docstring: „**Reached only through** `lib.tmp_paths.tmp_env`" (IC-18), Logik 0 Zeilen geändert |
+
+Kein zweiter Resolver, kein neuer Config-Read, keine Provider-Verzweigung: `TmpPaths` kommt
+aus dem einen Resolver; die beiden Module lesen `repo_containment.tmp-sink` nirgends selbst.
+
+### Verhaltensänderung (Spec ist normativ)
+
+Der Env-Pin zeigt jetzt auf den **Sink-Root** (`TmpPaths.env`) statt auf das jeweilige
+Work-Dir. Beides ist absolut und liegt im Sink, aber nur der Sink-Root ist wertgleich mit
+`TmpPaths.env` (Spec-Zeile „jeder Framework-Subprozessstart … erhält `TmpPaths.env`",
+IC-18/ADR-12). Nebeneffekt, der einen vorbestehenden Fehler behebt: mit `TMPDIR=<work>`
+sah der gerenderte Sync-Subprozess den „System-Temp" **innerhalb** seines eigenen
+Projekt-Roots und starb an `tmp-sink.system-temp-exception`
+(`…/work is inside the project root`). Mit dem Sink-Root-Pin rendert er normal — auf HEAD
+waren deshalb die `proposed`-Fixtures der Applier-Suite bereits rot.
+
+### Abweichungen von der Aufgabenbeschreibung (Spec ist normativ)
+
+1. **Vier zusätzliche Testdateien (mechanische Signatur-Anpassung).** Der Plan listet nur
+   `tests/test_tmp_sink_output_dirs.py`. `render_into_work_dir` und `_render_into` erhalten
+   aber `paths` als Pflichtparameter, damit der Pin wirklich `TmpPaths.env` ist (Spec-Zeile
+   IC-18 / Sink-Root-Pin). Angepasst wurden deshalb: `tests/test_context_budgets.py`
+   (2 Aufrufe: `paths=resolve_tmp_paths(<projekt>, {})`), `tests/test_meta_optimizer_runner.py`
+   (1 `fake_render`-Monkeypatch: `_paths=None`) und `tests/test_meta_optimizer_applier.py`
+   (2 `fake_render`-Monkeypatches, gleiches Muster). Die 3 Monkeypatches ersetzen `_render_into`
+   komplett, also musste nur ihre Signatur tolerant werden — keine Assertion geändert.
+   Alternative wäre ein synthetisches `TmpPaths` gewesen (ad-hoc-Konstruktion statt Resolver);
+   das hätte ADR-01 verletzt und einen zweiten Env-Pin-Pfad erzeugt.
+2. **`tests/test_context_report.py::test_context_report_never_uses_tempfile` entschärft
+   (1 Zeile).** Der Test verbot pauschal auch `tempfile.gettempdir()`. Der zentrale Resolver
+   (ADR-01, seit Task 1/2) *muss* `gettempdir()` lesen, um die sanktionierte
+   pytest-Basetemp-Präzedenz zu bestimmen (`resolve_pytest_basetemp`/`tmp_sink_location_error`);
+   `run_context_report` ruft ihn jetzt einmal auf. `gettempdir()` ist ein reiner Read ohne
+   Temp-Erzeugung — gepatcht werden deshalb nur noch die **Erzeugungs**-APIs
+   (`mkdtemp`, `mkstemp`, `NamedTemporaryFile`, `TemporaryDirectory`). Die Aussage „kein
+   System-Temp-Write" bleibt vollständig geprüft; ein Kommentar im Test nennt den Grund.
+3. **Die 6 Rotmarks in `test_meta_optimizer_{runner,applier}.py` sind vorbestehend, nicht
+   Task 10.** Es sind genau die Tests, die `tempfile.gettempdir` auf `raise` patchen:
+   `test_optimizer_never_uses_systemtemp` plus die fünf Fälle der modulweiten `applied`-Fixture.
+   Nachweis: dieselben Tests wurden mit `git stash` auf HEAD (`f071dbb7`) gefahren —
+   `test_optimizer_never_uses_systemtemp` ist dort identisch rot
+   (`AssertionError: system temp must not be used`), und die Applier-Fixtures scheitern dort
+   bereits eine Stufe früher (Render-Env-Fehler, siehe oben). Ursache ist unverändert
+   `config.py::build_variables` → `resolve_tmp_paths` → `gettempdir` (Task 1/2, in diesem Task
+   nicht angefasst). **Nicht repariert** — siehe offene Punkte.
+4. **`_finish_apply` löst `paths` auch ohne `accepted` auf** (dry-run-Vorschau). Das ist
+   gefahrlos (der Resolver ist rein), hält die Fehlerpräzedenz (`_applier_run_dir` zuerst) und
+   vermeidet eine zweite Verzweigung; der Sink-Fehler wird weiterhin als Exit 2 gemappt.
+5. **Keine `.meta-config`-Änderung, kein Versionsbump, kein `sync.py`-Regenerat nötig** —
+   `--validate` meldet `0 action(s)`; die geänderten Module sind nicht generierte Artefakte.
+6. **Step 4 (Commit) nicht ausgeführt** — kein Commit-Auftrag für diesen Subagenten
+   (Commit-Authority liegt beim `git`-Agenten). Die Plan-Checkbox bleibt offen, die Statuszeile
+   führt `— (pending)`.
+
+### Offene Punkte / Risiken
+
+- **AC-94-Testprämisse vs. ADR-01:** die zwei `gettempdir`-Patch-Tests sind seit Task 1/2 rot.
+  Task 10 macht sie nicht schlechter, aber auch nicht grün. Zu entscheiden (Task 11/18?):
+  `gettempdir` aus dem Patch-Set nehmen (wie in Abweichung 2 begründet) oder den Resolver so
+  aufteilen, dass die Basetemp-Präzedenz ohne `gettempdir` auskommt. Solange das offen ist,
+  bleibt `tests/test_meta_optimizer*.py` bei 6 Rotmarks.
+- **`apply_config_patch` fängt `TmpSinkError` aus `_recompute_candidates` nicht** (die
+  Except-Liste führt `RegistryError`/`ValueError`/`OSError`, nicht `TmpSinkError`). Das ist
+  vorbestehend (`collect_candidates` → `resolve_work_dir` warf dort schon so) und durch Task 10
+  nur *früher* im selben Aufruf möglich; ein deaktivierter Sink im Apply-Pfad kann also weiter
+  einen Traceback statt Exit 2 erzeugen. Nicht in diesem Task repariert (eigene Entscheidung
+  nötig, inkl. Test).
+- **`run_context_report` löst einmal zusätzlich auf** (`resolve_tmp_paths` neben
+  `resolve_output_dir`/`resolve_work_dir`, die intern je selbst auflösen). Bewusst in Kauf
+  genommen: der Resolver ist rein und die Alternative wäre ein zweiter Pfad oder eine
+  `TmpPaths`-Konstruktion am Render-Seam. Kosten sind ein paar `realpath`-Aufrufe pro Report.
+- **`tests/test_ac01_render_identity.py`/Slimming-Goldens** bleiben unberührt (nicht im Scope,
+  Rebaseline ist Task 16); Task 10 ändert keine gerenderten Artefakte.
 
 ## Evidence — Task 20
 

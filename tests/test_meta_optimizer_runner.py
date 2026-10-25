@@ -290,7 +290,7 @@ def test_render_work_dirs_use_resolve_work_dir_and_are_removed(tmp_path, monkeyp
     active = compute_active_set(config, REPO_ROOT, tmp_path, warn_sink=[])
     calls = []
 
-    def fake_render(_agent_meta_root, _config_text, work_dir):
+    def fake_render(_agent_meta_root, _config_text, work_dir, _paths=None):
         work_dir = Path(work_dir)
         calls.append(work_dir)
         work_dir.mkdir(parents=True, exist_ok=True)

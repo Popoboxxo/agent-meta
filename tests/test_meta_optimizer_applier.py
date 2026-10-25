@@ -564,7 +564,7 @@ def test_collect_candidates_removes_its_own_scratch(tmp_path, monkeypatch):
     active = compute_active_set(config, REPO_ROOT, tmp_path, warn_sink=[])
     calls = []
 
-    def fake_render(_agent_meta_root, _config_text, work_dir):
+    def fake_render(_agent_meta_root, _config_text, work_dir, _paths=None):
         work_dir = Path(work_dir)
         calls.append(work_dir)
         work_dir.mkdir(parents=True, exist_ok=True)
@@ -590,7 +590,7 @@ def test_artifact_write_failure_is_out_write_failed(tmp_path, monkeypatch):
     config = yaml.safe_load(cfg.read_text(encoding="utf-8"))
     active = compute_active_set(config, REPO_ROOT, tmp_path, warn_sink=[])
 
-    def fake_render(_agent_meta_root, _config_text, work_dir):
+    def fake_render(_agent_meta_root, _config_text, work_dir, _paths=None):
         work_dir = Path(work_dir)
         work_dir.mkdir(parents=True, exist_ok=True)
         (work_dir / "CLAUDE.md").write_text("x\n", encoding="utf-8")

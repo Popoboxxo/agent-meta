@@ -5,6 +5,7 @@ Run: python -m pytest tests/test_tmp_sink_output_dirs.py -q
 
 from __future__ import annotations
 
+import ast
 import os
 import shlex
 import shutil
@@ -18,6 +19,8 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
+from lib import context_report as cr  # noqa: E402
+from lib import meta_optimizer as mo  # noqa: E402
 from lib import repo_containment as rc  # noqa: E402
 from lib.config import build_variables, load_config  # noqa: E402
 from lib.tmp_paths import (  # noqa: E402
@@ -494,3 +497,113 @@ def test_basetemp_with_spaces_is_single_argument(tmp_path, monkeypatch):
         args = _basetemp_args(rendered)
         assert len(args) == 1, (key, args)
         assert args[0] == f"--basetemp={basetemp}", key
+
+
+# ---------------------------------------------------------------------------
+# Framework subprocess env pin (Task 10: IC-18/IC-34, AC-11 groundwork)
+# ---------------------------------------------------------------------------
+
+def _capture_subprocess_env(monkeypatch, module) -> list[dict]:
+    """Capture the ``env`` of every ``subprocess.run`` call in *module*."""
+    captured: list[dict] = []
+
+    def fake_run(argv, **kwargs):
+        captured.append(dict(kwargs.get("env") or {}))
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+    return captured
+
+
+def _assert_pin_matches_tmp_paths(env: dict, paths: TmpPaths) -> None:
+    """All three keys are absolute and identical to ``TmpPaths.env`` (AC-12)."""
+    for key in ("TMPDIR", "TEMP", "TMP"):
+        assert env[key] == paths.env[key]
+        assert os.path.isabs(env[key])
+        assert Path(env[key]).is_dir()
+
+
+def test_context_report_passes_absolute_tmp_env(tmp_path, monkeypatch):
+    """IC-34: the render subprocesses receive the absolute ``TmpPaths.env`` pin.
+
+    Red before Task 10: ``render_into_work_dir`` built its env with
+    ``work_dir_env(work_dir)`` and knew no ``paths`` argument.
+    """
+    project_root = tmp_path / "project"
+    config_path = project_root / ".meta-config" / "project.yaml"
+    config_path.parent.mkdir(parents=True)
+    config_path.write_text("variables:\n  PROJECT_NAME: demo\n", encoding="utf-8")
+    paths = resolve_tmp_paths(project_root, {})
+    work_dir = project_root / ".tmp" / "context-report" / "run-1" / "work"
+
+    captured = _capture_subprocess_env(monkeypatch, cr)
+    cr.render_into_work_dir(REPO_ROOT, config_path, work_dir, paths=paths)
+
+    assert captured, "no subprocess was started"
+    for env in captured:
+        _assert_pin_matches_tmp_paths(env, paths)
+        assert env["TMPDIR"] != str(work_dir)
+
+
+def test_meta_optimizer_render_pins_sink_env(tmp_path, monkeypatch):
+    """IC-34: the optimizer render helper pins the absolute sink env.
+
+    Red before Task 10: ``_render_into`` called ``work_dir_env(work_dir)``.
+    """
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    paths = resolve_tmp_paths(project_root, {})
+    work_dir = paths.absolute / "meta-optimizer" / "run-1" / "work"
+
+    captured = _capture_subprocess_env(monkeypatch, mo)
+    mo._render_into(REPO_ROOT, "variables:\n  A: b\n", work_dir, paths)
+
+    assert captured, "no subprocess was started"
+    for env in captured:
+        _assert_pin_matches_tmp_paths(env, paths)
+        assert env["TMPDIR"] != str(work_dir)
+
+
+def _work_dir_env_call_sites() -> dict[Path, list[int]]:
+    """Every ``scripts/**`` file that *calls* ``work_dir_env`` and the lines."""
+    call_sites: dict[Path, list[int]] = {}
+    for source in sorted((REPO_ROOT / "scripts").rglob("*.py")):
+        tree = ast.parse(source.read_text(encoding="utf-8"))
+        lines = [
+            node.lineno
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and (
+                (isinstance(node.func, ast.Name) and node.func.id == "work_dir_env")
+                or (
+                    isinstance(node.func, ast.Attribute)
+                    and node.func.attr == "work_dir_env"
+                )
+            )
+        ]
+        if lines:
+            call_sites[source.relative_to(REPO_ROOT)] = lines
+    return call_sites
+
+
+def test_work_dir_env_is_only_called_from_tmp_paths():
+    """IC-18: ``work_dir_env`` is reachable only through ``tmp_env``."""
+    call_sites = _work_dir_env_call_sites()
+    only = Path("scripts/lib/tmp_paths.py")
+
+    assert set(call_sites) == {only}, {
+        str(path): lines for path, lines in call_sites.items()
+    }
+    assert call_sites[only], "tmp_env must delegate to work_dir_env"
+
+
+def test_framework_render_modules_call_tmp_env():
+    """The two Task-10 call sites go through ``tmp_env``, not ``work_dir_env``."""
+    for relative in ("scripts/lib/context_report.py", "scripts/lib/meta_optimizer.py"):
+        tree = ast.parse((REPO_ROOT / relative).read_text(encoding="utf-8"))
+        called = {
+            node.func.id
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+        }
+        assert "tmp_env" in called, relative

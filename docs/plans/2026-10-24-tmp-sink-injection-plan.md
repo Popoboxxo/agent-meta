@@ -414,10 +414,10 @@ Der `standalone/agents/`-Eintrag ist Verzeichnis-Ownership: `--render-standalone
 
 **Rot zuerst:** `test_context_report_passes_absolute_tmp_env` schlägt fehl, weil der Subprozess heute nur `work_dir_env(work_dir)` erhält und der Aufruf `tmp_env` nicht kennt.
 
-- [ ] Step 1: Tests schreiben (rot): drei Env-Keys absolut und identisch zu `TmpPaths.env`; `tmp_env` bei `enabled=False` wirft `tmp-sink.disabled`; Aufrufpfad-Assertion (`ast`-Scan: `work_dir_env` wird in `scripts/**` nur aus `tmp_paths.py` aufgerufen).
-- [ ] Step 2: Beide Aufrufstellen umstellen, `work_dir_env`-Docstring auf „nur über `tmp_env`" präzisieren (Verhalten unverändert).
-- [ ] Step 3: `python3 -m pytest tests/test_tmp_sink_output_dirs.py -q` grün.
-- [ ] Step 4: Commit `refactor: pin tmp env for framework subprocesses`.
+- [x] Step 1: Tests schreiben (rot): drei Env-Keys absolut und identisch zu `TmpPaths.env`; `tmp_env` bei `enabled=False` wirft `tmp-sink.disabled`; Aufrufpfad-Assertion (`ast`-Scan: `work_dir_env` wird in `scripts/**` nur aus `tmp_paths.py` aufgerufen).
+- [x] Step 2: Beide Aufrufstellen umstellen, `work_dir_env`-Docstring auf „nur über `tmp_env`" präzisieren (Verhalten unverändert).
+- [x] Step 3: `python3 -m pytest tests/test_tmp_sink_output_dirs.py -q` grün.
+- [ ] Step 4: Commit `refactor: pin tmp env for framework subprocesses`. *(offen: Commit gehört dem `git`-Agenten; dieser Subagent hatte keinen Commit-Auftrag — siehe `…-status.md`, Evidence Task 10)*
 
 ### Task 11: Subprozess-Klassifikation und Backup-Staging
 
