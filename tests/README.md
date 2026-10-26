@@ -30,18 +30,53 @@ Durchsatz. CI nutzt bewusst `-n 2` (Runner-Größe wird als 2-Kern angenommen).
 ## Subprozess-lastige Module: `-n 0`
 
 Module, die `sync.py` wiederholt per Subprozess treiben, laufen **nie** in den
-parallelen Shards, sondern seriell (`-n 0`). Die einzige maßgebliche Liste ist
-`env: SUBPROCESS_HEAVY` in `.github/workflows/orchestration-test.yml`; die
-Shards bauen daraus ihre `--ignore=<file>`-Argumente, der Job
-`subprocess-serial` übergibt dieselbe Liste als Positionsargumente. Aktuell
-sind es 15 Module mit 451 Tests.
+parallelen Shards, sondern seriell (`-n 0`). Die einzige maßgebliche Quelle sind
+die drei `env:`-Gruppen `SUBPROCESS_SHARD_1`, `SUBPROCESS_SHARD_2` und
+`SUBPROCESS_SHARD_3` in `.github/workflows/orchestration-test.yml`. Der Job
+`subprocess-shard` übergibt genau eine Gruppe als Positionsargumente, die
+`test`-Shards bauen aus der Vereinigung ihre `--ignore=<file>`-Argumente.
+Aktuell sind es 15 Module mit 451 Tests in drei disjunkten Gruppen
+(78 / 183 / 190 Tests).
+
+Die Gruppen sind modul-disjunkt, und der `test`-Job prüft das bei jedem Lauf:
+Vereinigung exakt 15 Dateien, keine Datei in zwei Gruppen, jede Datei existiert
+— sonst bricht der Job laut ab. Dadurch bleibt die Modul-Isolation erhalten:
+kein Modul liegt in zwei Jobs, seine Subprozesse können sich also nicht
+stapeln.
 
 Aufnahmekriterium: das Modul startet `sync.py` mehr als einmal pro Modul-Lauf
 (Fixture-Sync plus Test-Syncs) oder es ruft den repo-weiten `--validate`-Pfad.
 Beispiele: `tests/test_provider_matrix_sync.py` (mehrfacher `sync.py`-Lauf) und
 `tests/test_sync_validation_gate.py` (`--validate`). Der Eintrag gehört in
-dieselbe Änderung wie das Modul, damit Shards und Serial-Job nicht
+dieselbe Änderung wie das Modul, damit Count-Shards und `subprocess-shard` nicht
 auseinanderlaufen.
+
+## Shard-Balance
+
+Die `test`-Shards sind **kein** reiner Count-Split. 17 Dateien sind
+setup-dominiert: ihre Repo-Copy-/Render-Fixtures sind modul-scoped, pytest
+rechnet ihr Setup also dem ersten Test zu, der sie instanziiert. Die gemessenen
+40–260 s gelten pro Fixture-Instanziierung (pro Modul), nicht pro Test; die
+Platzierungsgewichte sind pro Datei. Ein reiner Count-Split verteilt diese
+Dateien unregelmäßig, und genau das hat die Shard-Laufzeiten auseinandergezogen
+(gemessen 1007/501/102 s auf 3.9 und 1000/887/89 s auf 3.12, kritischer Pfad
+vorher der serielle Subprozess-Job mit 1864 s).
+
+Deshalb:
+
+- `HEAVY_FIXTURE_SHARD_1`, `HEAVY_FIXTURE_SHARD_2` und `HEAVY_FIXTURE_SHARD_3`
+  (env im Workflow) platzieren diese 17 Dateien explizit und disjunkt. Jeder
+  `test`-Shard fährt zuerst seinen Heavy-Slice, danach den Rest.
+- Der Rest — alle übrigen Dateien — wird weiterhin per Testanzahl aufgeteilt
+  (`--splits 3`); die 32 explizit platzierten Dateien (15 Subprozess + 17
+  Heavy-Fixture) werden dort per `--ignore` ausgeschlossen.
+- Es ist **keine** `.test_durations`-Datei eingecheckt. `--splitting-algorithm
+  least_duration` hätte auf einem kalten Runner also keine Lerndaten; die
+  Platzierung beruht auf dem gemessenen Setup-Bracket, nicht auf erfundenen
+  Dauern.
+- Follow-up (optional): ein `workflow_dispatch`-Job mit `--store-durations` und
+  danach die Umstellung auf `--splitting-algorithm least_duration`, sobald die
+  Datei frisch ist.
 
 ## Keine volle Suite lokal
 
@@ -85,11 +120,19 @@ prüfbar. Inhaltliche Abdeckung je Szenario: `tests/scenarios/registry.md`.
 
 | Workflow / Job | Was läuft | Parallelität |
 |----------------|-----------|--------------|
-| `orchestration-test.yml` → `test` | Suite ohne `SUBPROCESS_HEAVY`, aufgeteilt in 3 Shards, Python 3.9 und 3.12 | `-n 2 --dist loadfile`, `--splits 3` |
-| `orchestration-test.yml` → `subprocess-serial` | `SUBPROCESS_HEAVY` auf Python 3.9 und 3.12 | `-n 0` |
+| `orchestration-test.yml` → `test` | Erst der Heavy-Fixture-Slice des Shards (5 / 4 / 8 explizit platzierte, setup-dominierte Dateien, 121 / 101 / 224 Tests), dann der Rest der Suite ohne die 32 explizit platzierten Dateien, per Count-Split; Python 3.9 und 3.12 | `-n 2 --dist loadfile`, Rest zusätzlich `--splits 3` |
+| `orchestration-test.yml` → `subprocess-shard` | `SUBPROCESS_SHARD_1..3` (5 / 4 / 6 Module, 78 / 183 / 190 Tests) auf Python 3.9 und 3.12, Timeout 30 min | `-n 0` |
 | `orchestration-test.yml` → `compat-311` | TOML-Boundary + Code-Hygiene-Dateien sowie zwei subprozess-lastige Sync-Module (`test_provider_matrix_sync.py`, `test_sync_validation_gate.py`) auf Python 3.11 | `-n 0` |
 | `validate.yml` → `scenarios` | `tests/scenarios/run.sh` in 4 Shards | kein pytest |
 | `validate.yml` → `validate` | Sync-Output erzeugen, Drift-Gate, `--validate`, Frontmatter-Lint | kein pytest |
 
-Damit sind die Endpunkte 3.9 und 3.12 vollständig abgedeckt (Shards **und**
-Serial-Job), 3.11 nur mit den version-spezifischen Gates.
+Damit sind die Endpunkte 3.9 und 3.12 vollständig abgedeckt (Count-Shards,
+Heavy-Slices **und** Subprozess-Gruppen), 3.11 nur mit den version-spezifischen
+Gates.
+
+`sync.py --validate` läuft bewusst in **beiden** Workflows: hier im
+`test`-Job auf 3.9 und 3.12 (gemessen 12–38 s pro Aufruf, deckt das
+Cross-Version-Delta ab), in `validate.yml` auf 3.11 zusammen mit Drift-Gate und
+Frontmatter-Lint (gemessen 55 s für den kompletten Job). Keine der beiden
+Kopien wird entfernt — die Zusatzkosten sind vernachlässigbar, der
+Cross-Version-Nutzen ist real.
