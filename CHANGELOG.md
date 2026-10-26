@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- Preserve `AGENTS.md` user notes in `## Eigene Notizen` across footer rebuilds (#1027)
+
 ## [2.0.0-beta.4] - 2026-10-26
 
 ### Added
