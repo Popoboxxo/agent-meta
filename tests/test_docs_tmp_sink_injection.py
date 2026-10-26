@@ -12,10 +12,15 @@ from pathlib import Path
 
 import yaml
 
+from tests.changelog_sections import release_section
+
 ROOT = Path(__file__).resolve().parent.parent
 PRISON_MODE_DOC = ROOT / "docs" / "concepts" / "repo-containment-prison-mode.md"
 PROJECT_YAML_EXAMPLE = ROOT / "templates" / "configs" / "project.yaml.example"
 CHANGELOG = ROOT / "CHANGELOG.md"
+
+#: The release that shipped the tmp-sink injection (SPEC-tmp-sink-injection).
+_RELEASE = "2.0.0-beta.4"
 
 MANDATORY_RULE = "Der pytest-Basetemp darf NIE im Arbeitsbaum liegen"
 
@@ -32,16 +37,6 @@ def _section_5_5(text):
         re.MULTILINE | re.DOTALL,
     )
     assert match, "section '### 5.5' is missing from the prison-mode document"
-    return match.group("body")
-
-
-def _unreleased_changelog(text):
-    match = re.search(
-        r"^## \[Unreleased\](?P<body>.*?)(?=^## \[|\Z)",
-        text,
-        re.MULTILINE | re.DOTALL,
-    )
-    assert match, "CHANGELOG.md has no '## [Unreleased]' section"
     return match.group("body")
 
 
@@ -86,9 +81,14 @@ def test_project_yaml_example_documents_temp_exception():
 
 
 def test_changelog_documents_tmp_sink_injection():
-    """The Unreleased entry names the injected sink and the env/token pin."""
-    unreleased = _unreleased_changelog(_read(CHANGELOG))
+    """The release section of the shipped feature names the injected sink and the env/token pin."""
+    text = _read(CHANGELOG)
+    assert "## [Unreleased]" in text, "CHANGELOG.md must keep an [Unreleased] section."
+    section = release_section(text, _RELEASE)
+    assert section.startswith(f"## [{_RELEASE}]"), (
+        f"CHANGELOG.md must carry a ## [{_RELEASE}] release section."
+    )
 
-    assert "tmp-sink" in unreleased
-    assert "PYTEST_BASETEMP" in unreleased
-    assert "SPEC-tmp-sink-injection" in unreleased
+    assert "tmp-sink" in section
+    assert "PYTEST_BASETEMP" in section
+    assert "SPEC-tmp-sink-injection" in section
