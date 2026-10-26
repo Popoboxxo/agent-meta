@@ -3,49 +3,105 @@ name: Orchestration Tests
 # Validiert Orchestrator-/Runtime-Verhalten und Template-Konsistenz.
 # Konzept: docs/concepts/orchestrator-first-architecture.md (L3 — CI/CD Orchestration Tests)
 #
-# Speed rationale:
-#   - suite size 6569 tests / 361 modules used to run as 3 full-suite legs
-#     (3.9 / 3.11 / 3.12). Those three legs dominated CI wall clock.
-#   - now: 2 fully-tested endpoints (floor 3.9, ceiling 3.12) x 3 shards
-#     = 6 jobs x ~1/3 suite. 3.11 has its own cheap targeted job (compat-311):
-#     3.11 lies strictly between 3.9 and 3.12, so a full-suite 3.11 leg only
-#     bought a small compatibility delta.
-#   - Python 3.9 is the compatibility floor: every test module must stay
-#     3.9-parseable (python.py39-union-syntax / fstring-backslash gates).
-#   - shards use `-n 2 --dist loadfile` (runner size is treated as 2-core):
-#     `loadfile` keeps one test module per worker, so a module's subprocesses
-#     never interleave across workers mid-file.
-#     Note: `loadfile` only guarantees this WITHIN one shard. The shard split
-#     itself is count-based (`--splits`), so items of the same module can still
-#     land in different shards -- repo-copy fixtures are therefore duplicated
-#     per shard. No correctness impact, only extra fixture work.
-#   - the `subprocess-serial` job runs the sync.py-driving modules with
-#     `-n 0` (one at a time). Every one of them launches `sync.py` repeatedly
-#     and `sync.py --validate` runs the full repo-wide consistency suite;
-#     parallel workers would multiply concurrent sync.py processes and
-#     overload the runner. Workstation/shared-host runs must never use
-#     `-n auto` for the same reason (cap at `-n 8 --dist loadfile`).
+# Measured baseline (run 40245389770, base main c858d18d):
+#   - suite size: 6575 tests / 362 modules.
+#   - the old `subprocess-serial` job was the critical path: 1864 s on 3.9 and
+#     824 s on 3.12 for one 451-test list run under `-n 0`.
+#   - the old three `test` shards measured 1007/501/102 s (3.9) and
+#     1000/887/89 s (3.12). The imbalance is NOT test-count driven: 17 files
+#     are setup-dominated by repo-copy fixtures. Those fixtures are
+#     module-scoped, so pytest attributes their setup to the first test that
+#     instantiates them; the measured 40-260 s is per fixture instantiation
+#     (per module), not per test. Placement weights are per file.
+#
+# Structure now:
+#   - `test` job: two fully tested endpoints (compatibility floor 3.9, ceiling
+#     3.12) x 3 shards. Each shard first runs its explicit
+#     `HEAVY_FIXTURE_SHARD_<n>` slice (the 17 measured setup-dominated files,
+#     disjoint per shard), then the count-based remainder (`--splits 3`) with
+#     all 32 explicitly placed files (15 subprocess + 17 heavy-fixture)
+#     ignored.
+#   - `subprocess-shard` job: the 15 sync.py-driving modules split into three
+#     disjoint groups (78 / 183 / 190 tests), still `-n 0`, now 3 parallel
+#     groups per endpoint instead of one serial 451-test list. The groups are
+#     module-disjoint, so no module is spread across jobs and their
+#     subprocesses cannot stack up inside one job.
+#   - `compat-311`: cheap targeted TOML-boundary + code-hygiene job.
+#
+# Why the heavy-fixture placement is explicit instead of duration-based:
+#   no `.test_durations` baseline is committed, so `--splitting-algorithm
+#   least_duration` would have nothing to learn from on a cold runner. The 17
+#   files are placed by their measured setup bracket; everything else is still
+#   split by test count (`--splits`, pytest-split default). Follow-up (not part
+#   of this change): an optional `workflow_dispatch` job with
+#   `--store-durations`, then switch to `--splitting-algorithm least_duration`
+#   once the file is fresh.
+#
+# `-n auto` is banned everywhere: each worker copy spawns its own `sync.py`
+# children and `sync.py --validate` runs the full repo-wide consistency suite,
+# so `-n auto` multiplies concurrent sync.py runs with the host core count.
+# CI uses `-n 2 --dist loadfile` (runner treated as 2 cores); `loadfile` keeps
+# one test module per worker, so a module's subprocesses never interleave
+# across workers mid-file. Workstation/shared-host runs cap at
+# `-n 8 --dist loadfile`. Note: `loadfile` only guarantees this WITHIN one
+# shard/job. The 32 explicitly placed files (15 subprocess + 17 heavy-fixture)
+# are module-atomic: each runs in exactly one job. The count-based remainder
+# can still spread one module across the three `test` shards (pytest-split
+# splits items, not files), which duplicates its repo-copy fixtures per shard
+# -- extra fixture work, no correctness impact.
+#
+# `sync.py --validate` deliberately runs in BOTH workflows:
+#   - here in the `test` job ("Validate agent templates") on 3.9 and 3.12,
+#     measured 12-38 s per call, covering the cross-version delta;
+#   - in `validate.yml`'s `validate` job on 3.11 (55 s measured for the whole
+#     job) together with the drift gate and the frontmatter lint.
+# Neither copy is removed: the added cost is negligible and the cross-version
+# coverage is real.
 
-# Single source of truth for the subprocess-heavy module set: the shard job
-# derives its `--ignore=<file>` args from this list, the serial job passes it
-# as positional arguments. Never duplicate the list in a second place.
+# Single source of truth for the explicit slice placement below. The `test`
+# job validates the partition and derives its `--ignore` args from these six
+# lists; `subprocess-shard` passes exactly one group as positional arguments.
+# Never duplicate any of these lists in a second place.
 env:
-  SUBPROCESS_HEAVY: >-
-    tests/test_provider_matrix_sync.py
+  SUBPROCESS_SHARD_1: >-
     tests/test_cli_smoke_multi_provider.py
-    tests/test_scan_staged.py
-    tests/test_compact_matrix.py
-    tests/test_provider_reactivation_artifacts.py
-    tests/test_sync_validation_gate.py
-    tests/test_sharkord_service_name_migration.py
-    tests/test_knowledge_engine.py
     tests/test_doctor_cli.py
-    tests/test_context_profile_schema.py
-    tests/test_platform_defaults_resolved_file.py
-    tests/test_continue_prompts_active_set.py
+    tests/test_scan_staged.py
     tests/test_cleanup_preview_cli.py
-    tests/test_auto_commit_allowlist_pipeline.py
+    tests/test_platform_defaults_resolved_file.py
+  SUBPROCESS_SHARD_2: >-
+    tests/test_provider_matrix_sync.py
+    tests/test_sync_validation_gate.py
     tests/test_unread_channels_removed.py
+    tests/test_continue_prompts_active_set.py
+  SUBPROCESS_SHARD_3: >-
+    tests/test_compact_matrix.py
+    tests/test_knowledge_engine.py
+    tests/test_context_profile_schema.py
+    tests/test_provider_reactivation_artifacts.py
+    tests/test_sharkord_service_name_migration.py
+    tests/test_auto_commit_allowlist_pipeline.py
+
+  HEAVY_FIXTURE_SHARD_1: >-
+    tests/test_context_header_noise.py
+    tests/test_context_anchors.py
+    tests/test_ac01_render_identity.py
+    tests/test_dispatch_depth_and_hard_cap.py
+    tests/test_context_budget_checks.py
+  HEAVY_FIXTURE_SHARD_2: >-
+    tests/test_context_budgets.py
+    tests/test_active_set_dangling.py
+    tests/test_lazy_skills_channel.py
+    tests/test_meta_optimizer_credentials.py
+  HEAVY_FIXTURE_SHARD_3: >-
+    tests/test_meta_optimizer_refill.py
+    tests/test_meta_optimizer_runner.py
+    tests/test_meta_optimizer_inactive_scope.py
+    tests/test_meta_optimizer_applier.py
+    tests/test_meta_optimizer_marks.py
+    tests/test_meta_optimizer_fanout.py
+    tests/test_migration_paths.py
+    tests/test_opencode_v2_surface.py
 
 on:
   push:
@@ -97,56 +153,142 @@ jobs:
       - name: Install test dependencies
         run: pip install -r tests/requirements.txt
 
-      # Shard split is count-based (pytest-split default) on purpose: no
-      # `.test_durations` baseline is committed, so `--splitting-algorithm`
-      # would have nothing to learn from on a cold runner. Commit a durations
-      # file first, then switch to `least_duration` only after it is fresh.
-      #
-      # The subprocess-heavy modules are excluded here (they run in
-      # `subprocess-serial` with -n 0). Building the --ignore args from the
-      # workflow-level SUBPROCESS_HEAVY keeps one authoritative list.
-      - name: Build --ignore args for subprocess-heavy modules
-        id: heavy
+      # One step that BOTH validates the explicit six-list partition and emits
+      # the pytest args (a heredoc writing to $GITHUB_OUTPUT, no `eval`).
+      # It fails the job loudly on a duplicate path, on a wrong union size
+      # (15 subprocess / 17 heavy-fixture files) or on a missing file, so the
+      # two suites can never silently drift apart.
+      - name: Validate slice partition and build pytest args
+        id: partition
         shell: bash
+        env:
+          SHARD: ${{ matrix.shard }}
         run: |
-          args=""
-          for f in $SUBPROCESS_HEAVY; do
-            args="$args --ignore=$f"
-          done
-          args="${args# }"
-          echo "args=$args" >> "$GITHUB_OUTPUT"
+          python - <<'PY'
+          import os
+          import pathlib
+          import sys
 
-      - name: Run orchestration & runtime tests (shard ${{ matrix.shard }}/3)
+          shard = os.environ["SHARD"]
+
+          subprocess_groups = [
+              ("SUBPROCESS_SHARD_1", os.environ["SUBPROCESS_SHARD_1"].split()),
+              ("SUBPROCESS_SHARD_2", os.environ["SUBPROCESS_SHARD_2"].split()),
+              ("SUBPROCESS_SHARD_3", os.environ["SUBPROCESS_SHARD_3"].split()),
+          ]
+          heavy_groups = [
+              ("HEAVY_FIXTURE_SHARD_1", os.environ["HEAVY_FIXTURE_SHARD_1"].split()),
+              ("HEAVY_FIXTURE_SHARD_2", os.environ["HEAVY_FIXTURE_SHARD_2"].split()),
+              ("HEAVY_FIXTURE_SHARD_3", os.environ["HEAVY_FIXTURE_SHARD_3"].split()),
+          ]
+
+          errors = []
+
+          # a) collect all paths from the six env lists, b) reject duplicates.
+          seen = {}
+          for name, paths in subprocess_groups + heavy_groups:
+              for path in paths:
+                  seen.setdefault(path, []).append(name)
+          for path, groups in sorted(seen.items()):
+              if len(groups) > 1:
+                  errors.append(f"duplicate path {path} in {' + '.join(groups)}")
+          all_paths = list(seen)
+
+          # c) the two unions must have the expected, fixed sizes.
+          subprocess_union = {p for _n, paths in subprocess_groups for p in paths}
+          heavy_union = {p for _n, paths in heavy_groups for p in paths}
+          if len(subprocess_union) != 15:
+              errors.append(
+                  f"subprocess union is {len(subprocess_union)} entries, expected 15"
+              )
+          if len(heavy_union) != 17:
+              errors.append(
+                  f"heavy-fixture union is {len(heavy_union)} entries, expected 17"
+              )
+
+          # d) every listed path must be an existing file.
+          for path in all_paths:
+              if not pathlib.Path(path).is_file():
+                  errors.append(f"listed path does not exist: {path}")
+
+          heavy_lookup = dict(heavy_groups)
+          heavy_key = f"HEAVY_FIXTURE_SHARD_{shard}"
+          if heavy_key not in heavy_lookup:
+              errors.append(f"unknown shard {shard!r} (expected 1, 2 or 3)")
+
+          if errors:
+              for error in errors:
+                  print(f"ERROR: {error}", file=sys.stderr)
+              sys.exit(1)
+
+          # e) one --ignore per explicitly placed path (subprocess + heavy).
+          ignore = " ".join(f"--ignore={path}" for path in all_paths)
+          # f) this shard's heavy-fixture slice.
+          heavy = " ".join(heavy_lookup[heavy_key])
+
+          print(
+              f"validated partition: {len(subprocess_union)} subprocess / "
+              f"{len(heavy_union)} heavy-fixture / {len(all_paths)} placed paths"
+          )
+          print(f"heavy slice for shard {shard}: {heavy}")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
+              handle.write(f"ignore={ignore}\n")
+              handle.write(f"heavy={heavy}\n")
+          PY
+
+      # The 17 measured setup-dominated files run as one explicit slice per
+      # shard. Their cost is fixture setup (repo copies), not assertion time, so
+      # more workers barely help; the point is that a count split no longer
+      # scatters them across shards. The repo-copy/render fixtures are
+      # module-scoped, so pytest attributes their setup to the first test that
+      # instantiates them: the measured 40-260 s is per fixture instantiation
+      # (per module), not per test. Placement weights are per file.
+      - name: Run heavy-fixture slice (shard ${{ matrix.shard }}/3)
+        run: >-
+          python -m pytest ${{ steps.partition.outputs.heavy }}
+          -q -n 2 --dist loadfile --durations=10 -ra
+
+      # Everything not explicitly placed is still split by test count
+      # (pytest-split default): no `.test_durations` baseline is committed.
+      - name: Run count-based remainder (shard ${{ matrix.shard }}/3)
         run: >-
           python -m pytest tests/ -q -n 2 --dist loadfile
-          ${{ steps.heavy.outputs.args }}
+          ${{ steps.partition.outputs.ignore }}
           --splits 3 --group ${{ matrix.shard }}
           --durations=10 -ra
 
       # Repo-wide and expensive, and shard-independent, so run it once per
       # Python version (2x) instead of in all 6 shard jobs.
+      # Measured 12-38 s per call -- negligible next to a shard's runtime, and
+      # this is the only place the validate suite sees 3.9/3.12
+      # (`validate.yml` runs it on 3.11 only). Keeping both copies is a
+      # deliberate decision, not an oversight.
       - name: Validate agent templates
         if: matrix.shard == 1
         run: python scripts/sync.py --validate
 
-  # The modules excluded from the shards all drive `sync.py` through
-  # subprocesses; several of them run the repo-wide `sync.py --validate`
-  # (full consistency suite) and two copy the whole repo tree first. Running
-  # them under `-n 0` keeps exactly one pytest process alive, so their sync.py
-  # children cannot stack up on the assumed 2-core runner. Both endpoints
-  # (3.9/3.12) run here, so excluding them from the shards does not shrink the
-  # "two fully-tested endpoints" invariant.
-  subprocess-serial:
+  # These 15 modules drive `sync.py` through subprocesses; several run the
+  # repo-wide `sync.py --validate` (full consistency suite) and some copy the
+  # whole repo tree. `-n 0` keeps exactly one pytest process alive per job, so
+  # their sync.py children cannot stack up on the assumed 2-core runner.
+  #
+  # The old single serial job was the CI critical path (1864 s on 3.9). The
+  # three groups are module-disjoint -- the `test` job asserts the union is
+  # exactly the same 15 files -- so splitting them across runners adds no
+  # worker overlap and keeps the "two fully-tested endpoints" invariant.
+  subprocess-shard:
     runs-on: ubuntu-latest
-    # 451 of 6569 tests, but strictly serial: no worker overlap, and several
-    # of them drive the repo-wide `sync.py --validate`. The timeout is only a
-    # backstop -- the per-subprocess timeouts in tests/timeouts.py are the
-    # real guard -- so it keeps generous headroom over the shard job.
-    timeout-minutes: 45
+    # 451 tests in total, but strictly serial per job. The timeout is only a
+    # backstop -- the per-subprocess timeouts in tests/timeouts.py are the real
+    # guard -- and three-way module-disjoint splitting keeps every group
+    # comfortably below it (the serial whole measured 1864 s on 3.9).
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         python-version: ['3.9', '3.12']
+        shard: [1, 2, 3]
 
     steps:
       - name: Checkout
@@ -162,10 +304,27 @@ jobs:
       - name: Install test dependencies
         run: pip install -r tests/requirements.txt
 
-      - name: Run subprocess-heavy modules serial (Python ${{ matrix.python-version }})
-        run: >-
-          python -m pytest $SUBPROCESS_HEAVY -q -n 0
-          --durations=10 -ra
+      - name: Run subprocess-heavy modules (group ${{ matrix.shard }}/3)
+        shell: bash
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          case "$SHARD" in
+            1) modules="$SUBPROCESS_SHARD_1" ;;
+            2) modules="$SUBPROCESS_SHARD_2" ;;
+            3) modules="$SUBPROCESS_SHARD_3" ;;
+            *) echo "ERROR: unknown shard '$SHARD'" >&2; exit 1 ;;
+          esac
+          # An empty group would make pytest collect the whole repo (measured
+          # 6364 collected / 23 collection errors) and burn the 30-min timeout
+          # instead of failing fast.
+          [ -n "$modules" ] || { echo "ERROR: empty module list for shard '$SHARD'" >&2; exit 1; }
+          # Print the module list up front so a 15-min job is not blind.
+          echo "Subprocess group $SHARD/3 on Python ${{ matrix.python-version }}:"
+          for module in $modules; do
+            echo "  $module"
+          done
+          python -m pytest $modules -n 0 -v --tb=short -ra --durations=10
 
   # Python 3.11 sits strictly between the fully-tested floor (3.9) and
   # ceiling (3.12). Its only genuine version-specific boundary is TOML
