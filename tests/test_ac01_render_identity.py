@@ -322,6 +322,17 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   `tests/test_opencode_v2_surface.py` were re-verified against the regenerated `ac01-baseline` and
   `slimming-golden` trees; `compact-golden` is unchanged.
 
+- Issue #1027 (AGENTS.md footer notes, 2026-10-26): the fix preserves ``## Eigene Notizen`` in the
+  AGENTS.md footer and removes it from the static drift signature, so the
+  ``context-hashes.json`` values of the six AGENTS.md providers (Codex, Gemini, KimiCode,
+  Mammouth, Opencode, ZCode) move; in addition the extended ``update-meta`` recovery
+  documentation changes the 7 provider-specific command renders (Claude ``.claude/commands``,
+  Continue ``.continue/prompts``, Copilot ``.github/prompts``, Gemini ``.gemini/commands``,
+  Mammouth ``.mammouth/commands``, Opencode ``.opencode/commands``, ZCode ``.zcode/commands``).
+  Changed: 13 of 1085 hashes (7 command artifacts + 6 ``context-hashes.json``); 0 added/removed
+  paths. No agent or rule template touched and no golden (``slimming-golden``/``compact-golden``)
+  touched; ``AC01_EXCEPTIONS`` is NOT extended (no blanket pattern, no widened regex).
+
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

@@ -5193,8 +5193,11 @@ def test_ac_d5_other_providers_byte_identical_when_opencode_is_v2(tmp_path):
 # strings only, so `ac01-baseline` (its `hashes.json`) and `compact-golden`
 # (the `agent-meta vX` stamp) were re-pinned to the rebaselined trees;
 # `slimming-golden` stayed unchanged. Log: `tests/test_ac01_render_identity.py`.
+# Issue #1027 (AGENTS.md footer notes): `ac01-baseline` re-pinned — 13 hashes
+# (7 `update-meta` command renders + 6 `context-hashes.json`). Log:
+# `tests/test_ac01_render_identity.py`.
 _FIXTURE_TREES = {
-    "ac01-baseline": "ac6288e60cb3e92c3ffb15e32ece5a094805ecebf5ebda1c4b959f8445849de4",
+    "ac01-baseline": "8e7a7a7df1e5300bf137adf5cdc0b3fca24877a9d085fde2517baa2f6c098aae",
     "slimming-golden": "5642151dcaab8c864b4680d0fea61b3958305a524bb77dc433c57cbf50b24296",
     "compact-golden": "9d854180164778fc63d71df35288539d0cfcd9ad7ea0ed803bf79a57bdd0d886",
 }
