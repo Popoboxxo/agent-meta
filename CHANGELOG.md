@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [2.0.0-beta.4] - 2026-10-26
+
 ### Added
 - **Eight literature-anchored review roles (IC-28)**: `memory-architect`, `context-engineer`,
   `red-team-agent`, `secrets-manager`, `chaos-engineer`, `reproducible-builds-engineer`,
@@ -9,6 +11,16 @@
   name-only addressable (no keyword rule, `orchestrator_only: true`), each with its own
   output-contract id and handoff targets. Registered across schema enum, addressability pins,
   standalone export, eight scenarios and the README role table.
+- **Literature-anchored evidence gates for eight roles (#1013)**: `git` gains a staged-content gate
+  (secrets/credentials/cloud keys, `.gitignore` coverage, abort on a hit, an already-pushed
+  credential is treated as compromised), `security-auditor` composes LOW/MEDIUM findings into
+  `CHAIN-n` attack chains, `database-reviewer` gains rule DB-08 (NULL/three-valued logic),
+  `tester` forbids production data, PII and secrets in test fixtures, `accessibility-specialist`
+  makes the WCAG 2.2 delta auditable, `se-senior-developer` gains security rules for
+  security-critical SE leaves, `performance-optimizer` requires a benchmark protocol before
+  optimizing, and `incident-responder` preserves volatile evidence before stabilizing. Each touched
+  template got a minor version bump; `config/review-rules/database.yaml` gained DB-08 and the
+  `hacs-tester` override pin was bumped.
 - **Tmp-sink injection (`SPEC-tmp-sink-injection`, spec Rev. 3)**: system temp literals in
   shipped framework text are replaced by the configured sink (`{{TMP_SINK_PATH}}` /
   `{{TMP_SINK_ABS_PATH}}`), and the pytest basetemp as well as the child-process environment are

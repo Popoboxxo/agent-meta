@@ -243,6 +243,13 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   extended. The two embedded fixture-tree digests in ``tests/test_opencode_v2_surface.py``
   were re-pinned to the rebaselined trees (``ac01-baseline``, ``compact-golden``);
   ``slimming-golden`` stayed unchanged.
+- Release 2.0.0-beta.4 (VERSION bump 2.0.0-beta.3 -> 2.0.0-beta.4): only version strings in the
+  rendered entry files, agent headers and the dependent sidecars changed (82 of 1085 hashes;
+  0 added/removed; project.yaml, ``generated-file-hashes.json`` and ``context-hashes.json``
+  follow the version they embed). No substantive render change; ``AC01_EXCEPTIONS`` is NOT
+  extended. The two embedded fixture-tree digests in ``tests/test_opencode_v2_surface.py``
+  were re-pinned to the rebaselined trees (``ac01-baseline``, ``compact-golden``);
+  ``slimming-golden`` stayed unchanged.
 - PR #1003 (user decision: model data never flows into AC-01): the hash is now model
   independent. ``_hash_file`` replaces every column-0 ``model:``/``model =`` frontmatter
   line with ``model: <MODEL>`` and reduces ``generated-file-hashes.json`` to its managed-path
