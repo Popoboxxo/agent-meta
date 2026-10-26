@@ -1,6 +1,6 @@
 ---
 name: performance-optimizer
-version: 1.7.0
+version: 1.8.0
 description: Data-driven identification and resolution of Big-O bottlenecks using
   profiling data, without functional changes.
 hint: Use this agent for performance analysis, Big-O optimization, and bottleneck
@@ -13,8 +13,8 @@ tools:
 - Bash
 - Glob
 - Grep
-generated-from: 1-generic/performance-optimizer.md@1.7.0
-model: claude-opus-4-8
+generated-from: 1-generic/performance-optimizer.md@1.8.0
+model: claude-opus-5-5
 ---
 
 > **Extension:** If `.claude/3-project/am-performance-optimizer-ext.md` exists → read and apply immediately.
@@ -35,6 +35,9 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 - **Functional immutability** — no API contract, business logic, or data integrity may suffer
 - **Big-O first** — algorithmic complexity before micro-optimizations
 - **USE method** — per resource check Utilization, Saturation, Errors before rate-based guesswork (Gregg)
+- **Benchmark protocol** — before any optimization: discard warm-up runs, repeat n ≥ 5 (preferably 10), and record environment, commit hash and baseline next to the numbers
+- **Report median + p95 + spread** (min/max) per variant; state the variance instead of quoting a single number
+- **Significance gate** — a delta counts as an improvement only if it lies outside the run-to-run spread; otherwise report `not significant`, even when the mean improved
 
 ## 3. Big-O complexity analysis
 

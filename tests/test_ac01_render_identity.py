@@ -297,6 +297,24 @@ Rebaseline log (manifest is plain JSON, so reasons are kept here):
   dispatch rows; C/D were part of D's rebaseline; B (routing eval catalog) and F (standalone README export)
   are not part of the matrix render. No hash was absorbed silently and no exception was added.
 
+- Literature round 2, evidence gates (PR #1013): eight role templates (`git`, `security-auditor`,
+  `database-reviewer`, `tester`, `accessibility-specialist`, `se-senior-developer`,
+  `performance-optimizer`, `incident-responder`) each gained one literature-anchored rule. Rebaselined:
+  the agent artifact of those roles across all providers plus the affected
+  `.meta-config/generated-file-hashes.json` (roster/always-loaded +7,228 B, orchestrator +1,258 B).
+  No routing, enum or name-index change — the roles were already registered.
+
+- Merge of main (bb92039f, #1013 evidence gates) into the literature-round-2 branch (PR #1015 +
+  follow-up series A-F; 2026-10-26): the two independently rebaselined baselines were combined by
+  re-rendering the merged tree. Drift before `--write` was exactly the 63 per-provider hashes of the
+  seven matrix-active #1013 roles (`git`, `security-auditor`, `database-reviewer`, `tester`,
+  `accessibility-specialist`, `performance-optimizer`, `incident-responder`; `se-senior-developer` is
+  gated off in the matrix), i.e. 7 x 9 = 63 of 1085 hashes; 0 added/removed. #1015's eight new roles
+  and the A-F follow-ups were already in the branch baseline, so the merged manifest is the union of
+  both sources with no silently absorbed hash and no exception added. The fixture-tree digests in
+  `tests/test_opencode_v2_surface.py` were re-verified against the regenerated `ac01-baseline` and
+  `slimming-golden` trees; `compact-golden` is unchanged.
+
 
 Run: python -m pytest tests/test_ac01_render_identity.py -q
 """

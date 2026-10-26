@@ -48,3 +48,9 @@ rules:
     title: Expand-and-contract migrations (expand → migrate → contract; no breaking single-release schema change)
     severity_hint: high
     standard_ref:
+  - id: DB-08
+    title: "NULL semantics (three-valued logic): no `NOT IN` against a nullable subquery/column (use `NOT EXISTS`); no `= NULL`/`!= NULL`; NULL behaviour in WHERE, JOIN, UNIQUE constraints and aggregates verified"
+    severity_hint: critical
+    blocking: true
+    claim_type: verifiable
+    standard_ref:

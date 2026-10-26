@@ -1,6 +1,6 @@
 ---
 name: template-database-reviewer
-version: "1.4.0"
+version: "1.5.0"
 description: "Domain code review for data layers: migration safety, N+1 queries, injection vectors, indexing, transactions, schema evolution — two-pass evidence-based review with rules index."
 hint: "Database review: migrations, N+1, injection, indexing, transactions — evidence-based findings with MERGE_SCORE"
 prompt_mode: modern
@@ -35,6 +35,7 @@ No index file → built-in defaults:
 | DB-05 | Transaction boundaries: multi-write operations atomic, isolation level sane |
 | DB-06 | Schema evolution discipline: no destructive drops/rename without explicit plan note |
 | DB-07 | Expand-and-contract migrations: expand → migrate → contract, no breaking single-release schema change (#773) |
+| DB-08 | NULL semantics (three-valued logic): no `NOT IN` against a nullable subquery/column (use `NOT EXISTS`); no `= NULL`/`!= NULL`; NULL behaviour in WHERE, JOIN, UNIQUE constraints and aggregates verified |
 </rules-index>
 
 <workflow>
@@ -50,6 +51,15 @@ No index file → built-in defaults:
 `id · severity · file:line · rule_id · standard_ref(CWE if applicable) · confidence · evidence(snippet) · fix`
 
 Severity enum: `CRITICAL | HIGH | MEDIUM | LOW`. Injection findings always carry `standard_ref: CWE-89`.
+
+## NULL semantics check (DB-08)
+
+`NOT IN` against a subquery or column that may contain NULL returns an empty result set instead of an error — no exception, no log, only wrong data.
+
+- Rewrite to `NOT EXISTS`, or filter the subquery with `IS NOT NULL`; never trust a `NOT IN` whose inner side is nullable.
+- No `= NULL` / `!= NULL` (always unknown) — use `IS NULL`/`IS NOT NULL`, `COALESCE`, `NULLS FIRST|LAST` where ordering or defaults are meant.
+- New nullable columns: state the NULL behaviour in WHERE, JOIN (`LEFT JOIN` + `NOT IN` is the classic silent miss), UNIQUE constraints (multiple NULLs allowed) and aggregates (`COUNT(col)` skips NULL, `SUM`/`AVG` return NULL).
+- Severity: silently empty/wrong result on a hot path → CRITICAL; `= NULL` comparison → HIGH; unresolved NULL semantics on a new column → MEDIUM.
 </workflow>
 
 <output_contract>

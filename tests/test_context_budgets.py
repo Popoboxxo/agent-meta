@@ -165,16 +165,69 @@ TOLERANCE_MAX_BYTES = 4096
 #     694297 -> 691800, KimiCode 687531 -> 685034, Mammouth 682788 -> 680291,
 #     Opencode 697208 -> 694711, ZCode 685404 -> 682907 (-2,480 each: entry + roster);
 #     Gemini 33667 -> 32490 (-1,177, entry only); Continue/Copilot unchanged.
+# RE-PIN (literature evidence gates, review round 2): one evidence-gate rule per role in eight role templates (+7,228 B roster, +1,258 B orchestrator)
+# Absorbed deltas of this re-pin (measured, not extrapolated):
+#   * Claude/always-loaded: 610980 -> 618208 (+7228)
+#   * Claude/harness-roster: 591201 -> 598429 (+7228)
+#   * Claude/orchestrator: 85530 -> 86788 (+1258)
+#   * Codex/always-loaded: 609316 -> 616544 (+7228)
+#   * Codex/harness-roster: 585156 -> 592384 (+7228)
+#   * Codex/orchestrator: 85145 -> 86403 (+1258)
+#   * Continue/orchestrator: 70180 -> 71438 (+1258)
+#   * Copilot/orchestrator: 70056 -> 71314 (+1258)
+#   * Gemini/orchestrator: 85552 -> 86810 (+1258)
+#   * KimiCode/always-loaded: 601837 -> 609065 (+7228)
+#   * KimiCode/harness-roster: 577663 -> 584891 (+7228)
+#   * KimiCode/orchestrator: 71943 -> 73201 (+1258)
+#   * Mammouth/always-loaded: 597890 -> 605118 (+7228)
+#   * Mammouth/harness-roster: 573719 -> 580947 (+7228)
+#   * Mammouth/orchestrator: 70481 -> 71739 (+1258)
+#   * Opencode/always-loaded: 611901 -> 619145 (+7244)
+#   * Opencode/harness-roster: 587666 -> 594910 (+7244)
+#   * Opencode/orchestrator: 85218 -> 86476 (+1258)
+#   * ZCode/always-loaded: 600076 -> 607304 (+7228)
+#   * ZCode/harness-roster: 575003 -> 582231 (+7228)
+#   * ZCode/orchestrator: 70752 -> 72010 (+1258)
+# RE-PIN (merge of origin/main, tmp-sink injection; 2026-10-25): the merge changed the
+# rendered text of the git/tester/security-auditor/database-reviewer/incident-responder/
+# performance-optimizer/se-senior-developer role files, so every aggregate that contains
+# those files shrank by 16-17 B (the replacement of the system-temp paths is shorter than
+# the old literals). Measured, not extrapolated. Complete list of non-zero deltas:
+#   * harness-roster: Claude 598429 -> 598413 (-16), Codex 592384 -> 592368 (-16),
+#     KimiCode 584891 -> 584875 (-16), Mammouth 580947 -> 580931 (-16),
+#     Opencode 594910 -> 594893 (-17), ZCode 582231 -> 582215 (-16).
+#   * always-loaded: Claude 618208 -> 618192 (-16), Codex 616544 -> 616528 (-16),
+#     KimiCode 609065 -> 609049 (-16), Mammouth 605118 -> 605102 (-16),
+#     Opencode 619145 -> 619128 (-17), ZCode 607304 -> 607288 (-16).
+#   * orchestrator: Opencode 86476 -> 86475 (-1). Every other artifact is unchanged
+#     (entry-file, rules, Continue/Copilot/Gemini and all their artifacts).
+# MERGE RE-PIN (main bb92039f / #1013 into feat/lit-r2-new-roles / #1015, 2026-10-26):
+# measured on the merged tree with `measure_artifacts`, not merged arithmetically. The two
+# parents had rebaselined independently; against the main (#1013 + tmp-sink) pin the merged
+# tree absorbs #1015's eight review roles and follow-up series A-F:
+#   * roster/always-loaded: Claude +82,497 (598,413 -> 680,910), Codex +81,556
+#     (592,368 -> 673,924), KimiCode +82,269 (584,875 -> 667,144), Mammouth +81,473
+#     (580,931 -> 662,404), Opencode +81,867 (594,893 -> 676,760), ZCode +81,903
+#     (582,215 -> 664,118).
+#   * orchestrator: +3,453 Claude/Codex/Gemini/Opencode, +3,121 KimiCode, +2,955
+#     Continue/Copilot/Mammouth/ZCode — the #1015 routing rows net of the 12 name-only
+#     table rows removed by fix A.
+#   * entry-file: -313 on the six AGENTS.md providers (+864 from #1015's rows, -1,177
+#     from fix A), Copilot +1,430; Continue/Gemini and every `rules` artifact unchanged.
+# Against the branch (#1015 + A-F) pin the same tree adds exactly #1013's evidence gates:
+# +5,971 B roster/always-loaded on the six roster providers (seven of the eight enriched
+# roles are active in the matrix; `se-senior-developer` is gated off), orchestrator,
+# entry-file and rules unchanged.
 _IST_FULL: Dict[str, Dict[str, int]] = {
-    "Claude": {"always-loaded": 694718, "entry-file": 2511, "harness-roster": 674939, "orchestrator": 90241, "rules": 17268},
-    "Codex": {"always-loaded": 691800, "entry-file": 23847, "harness-roster": 667953, "orchestrator": 89856},
+    "Claude": {"always-loaded": 700689, "entry-file": 2511, "harness-roster": 680910, "orchestrator": 90241, "rules": 17268},
+    "Codex": {"always-loaded": 697771, "entry-file": 23847, "harness-roster": 673924, "orchestrator": 89856},
     "Continue": {"always-loaded": 20498, "entry-file": 358, "orchestrator": 74393, "rules": 20140},
     "Copilot": {"always-loaded": 30823, "entry-file": 10887, "orchestrator": 74269, "rules": 19936},
     "Gemini": {"always-loaded": 32490, "entry-file": 32490, "orchestrator": 90263},
-    "KimiCode": {"always-loaded": 685034, "entry-file": 23861, "harness-roster": 661173, "orchestrator": 76322},
-    "Mammouth": {"always-loaded": 680291, "entry-file": 23858, "harness-roster": 656433, "orchestrator": 74694},
-    "Opencode": {"always-loaded": 694711, "entry-file": 23922, "harness-roster": 670789, "orchestrator": 89928},
-    "ZCode": {"always-loaded": 682907, "entry-file": 24760, "harness-roster": 658147, "orchestrator": 74965},
+    "KimiCode": {"always-loaded": 691005, "entry-file": 23861, "harness-roster": 667144, "orchestrator": 76322},
+    "Mammouth": {"always-loaded": 686262, "entry-file": 23858, "harness-roster": 662404, "orchestrator": 74694},
+    "Opencode": {"always-loaded": 700682, "entry-file": 23922, "harness-roster": 676760, "orchestrator": 89928},
+    "ZCode": {"always-loaded": 688878, "entry-file": 24760, "harness-roster": 664118, "orchestrator": 74965},
 }
 
 
@@ -350,16 +403,48 @@ def test_ac07_missing_ceiling_is_a_violation():
 #     Codex 615200 -> 615057, KimiCode 623340 -> 623197, Mammouth 618639 -> 618496,
 #     Opencode 618177 -> 618034, ZCode 621213 -> 621070).
 #   * entry-file, rules and orchestrator: unchanged on every provider (0 B).
+# RE-PIN (literature evidence gates, review round 2): one evidence-gate rule per role in eight role templates (+7,228 B roster, +1,258 B orchestrator)
+# Absorbed deltas of this re-pin (measured, not extrapolated):
+#   * Claude/always-loaded: 556951 -> 564179 (+7228)
+#   * Claude/harness-roster: 537222 -> 544450 (+7228)
+#   * Codex/always-loaded: 534491 -> 541719 (+7228)
+#   * Codex/harness-roster: 531078 -> 538306 (+7228)
+#   * KimiCode/always-loaded: 541420 -> 548648 (+7228)
+#   * KimiCode/harness-roster: 537997 -> 545225 (+7228)
+#   * Mammouth/always-loaded: 537515 -> 544743 (+7228)
+#   * Mammouth/harness-roster: 534094 -> 541322 (+7228)
+#   * Opencode/always-loaded: 537142 -> 544386 (+7244)
+#   * Opencode/harness-roster: 533661 -> 540905 (+7244)
+#   * ZCode/always-loaded: 539659 -> 546887 (+7228)
+#   * ZCode/harness-roster: 535333 -> 542561 (+7228)
+# RE-PIN (merge of origin/main, tmp-sink injection; 2026-10-25) — measured, not
+# extrapolated. Same cause as the `full` re-pin above; non-zero deltas only:
+#   * harness-roster: Claude 544450 -> 544434 (-16), Codex 538306 -> 538290 (-16),
+#     KimiCode 545225 -> 545209 (-16), Mammouth 541322 -> 541306 (-16),
+#     Opencode 540905 -> 540888 (-17), ZCode 542561 -> 542545 (-16).
+#   * always-loaded: Claude 564179 -> 564163 (-16), Codex 541719 -> 541703 (-16),
+#     KimiCode 548648 -> 548632 (-16), Mammouth 544743 -> 544727 (-16),
+#     Opencode 544386 -> 544369 (-17), ZCode 546887 -> 546871 (-16).
+#   * orchestrator: Opencode 32471 -> 32470 (-1). Every other artifact unchanged.
+# MERGE RE-PIN (main bb92039f / #1013 into the literature-round-2 branch / #1015,
+# 2026-10-26): measured on the merged tree, not merged arithmetically. Against the main
+# pin the merged compact tree absorbs #1015's roles and A-F: roster/always-loaded
+# Claude +80,266 (544,434 -> 624,700), Codex +79,325, KimiCode +80,536,
+# Mammouth +79,740, Opencode +79,636, ZCode +80,170; orchestrator +1,222 (most
+# providers; +1,372 Continue/Copilot/Gemini, +1,388 KimiCode); Copilot entry-file
+# +1,430, Gemini entry-file +936; all other artifacts unchanged.
+# Against the branch pin the merged tree adds exactly #1013's evidence gates: +5,971 B
+# roster/always-loaded on the six roster providers, nothing else changes.
 _IST_COMPACT: Dict[str, Dict[str, int]] = {
-    "Claude": {"always-loaded": 638458, "entry-file": 2461, "harness-roster": 618729, "orchestrator": 34031, "rules": 17268},
-    "Codex": {"always-loaded": 615057, "entry-file": 3413, "harness-roster": 611644, "orchestrator": 33547},
+    "Claude": {"always-loaded": 644429, "entry-file": 2461, "harness-roster": 624700, "orchestrator": 34031, "rules": 17268},
+    "Codex": {"always-loaded": 621028, "entry-file": 3413, "harness-roster": 617615, "orchestrator": 33547},
     "Continue": {"always-loaded": 20498, "entry-file": 358, "orchestrator": 34621, "rules": 20140},
     "Copilot": {"always-loaded": 30823, "entry-file": 10887, "orchestrator": 34495, "rules": 19936},
     "Gemini": {"always-loaded": 10948, "entry-file": 10948, "orchestrator": 35369},
-    "KimiCode": {"always-loaded": 623197, "entry-file": 3423, "harness-roster": 619774, "orchestrator": 34923},
-    "Mammouth": {"always-loaded": 618496, "entry-file": 3421, "harness-roster": 615075, "orchestrator": 33336},
-    "Opencode": {"always-loaded": 618034, "entry-file": 3481, "harness-roster": 614553, "orchestrator": 33692},
-    "ZCode": {"always-loaded": 621070, "entry-file": 4326, "harness-roster": 616744, "orchestrator": 33562},
+    "KimiCode": {"always-loaded": 629168, "entry-file": 3423, "harness-roster": 625745, "orchestrator": 34923},
+    "Mammouth": {"always-loaded": 624467, "entry-file": 3421, "harness-roster": 621046, "orchestrator": 33336},
+    "Opencode": {"always-loaded": 624005, "entry-file": 3481, "harness-roster": 620524, "orchestrator": 33692},
+    "ZCode": {"always-loaded": 627041, "entry-file": 4326, "harness-roster": 622715, "orchestrator": 33562},
 }
 
 COMPACT_BUDGET_CEILINGS: Dict[str, Dict[str, int]] = {
@@ -370,11 +455,9 @@ COMPACT_BUDGET_CEILINGS: Dict[str, Dict[str, int]] = {
 # The AGENTS.md providers share one context file; measured in a single project
 # with all of them active (`compact`).
 _AGENTS_MD_PROVIDERS = ("Codex", "Gemini", "KimiCode", "Mammouth", "Opencode", "ZCode")
-# RE-PIN (literature round 2 follow-up): the eight review roles are ``name_only``, so the
-# rendered-table filter (fix A) keeps them out of the shared multi-provider AGENTS.md -- and
-# the compact entry file never carried the agent table in the first place. The measured file
-# stays at 12,193 B (unchanged by A-F); the earlier "+819 B" note described an intermediate
-# state in which those rows still rendered there.
+# MERGE RE-PIN (2026-10-26): measured 12,193 B on the merged tree; the branch value
+# already carried #1015 + fix A, and #1013's evidence gates are role-body text that
+# does not enter this shared entry file. Main's 11,257 B predates the #1015 roles.
 _IST_COMPACT_MULTI_AGENTS_MD = 12193
 
 # AC-26 size targets for `compact`, as DATA (never a library constant; C7).

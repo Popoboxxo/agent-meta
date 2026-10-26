@@ -40,6 +40,9 @@ A2A envelope present → parse `payload.{t,ctx,con,refs,pri,dep}`. Otherwise: pl
 6. HANDOFF    Hotfix → developer. Post-mortem / RCA → documenter.
 ```
 
+### 2.1 PRESERVE — capture evidence before stabilizing
+Before any state-destroying action (restart, rollback, scale-down, container removal, log rotation), capture volatile evidence in order of decreasing volatility: process and kernel state → network tables and open connections → memory (dump when intrusion is suspected) → local logs → the central log copy. Keep changes minimal and explainable; document every capture with path, timestamp and host, and reference the capture IDs in the RCA timeline. Restart or roll back only after the capture is complete — or with an explicitly documented exception (acute customer harm); reconstructing a timeline after a restart is evidence destruction, not stabilization.
+
 ## 3. RCA methodology
 
 - **5-Whys:** ask "why" five times from the symptom until the systemic cause is reached
