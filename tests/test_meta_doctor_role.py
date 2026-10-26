@@ -11,6 +11,7 @@ from pathlib import Path
 
 from scripts.lib.frontmatter import parse_frontmatter_file
 from scripts.lib.roles import load_roles_config
+from scripts.lib.standalone import resolve_block_snippets
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = REPO_ROOT / "agents" / "1-generic" / "meta-doctor.md"
@@ -52,9 +53,18 @@ def _text() -> str:
     return TEMPLATE.read_text(encoding="utf-8")
 
 
+def _raw_body() -> str:
+    return _text().split("---", 2)[2]
+
+
 def _body() -> str:
-    parts = _text().split("---", 2)
-    return parts[2]
+    """Body with ``snippets/agents`` block placeholders resolved.
+
+    IC-31 (#552): wording moved into a block snippet (e.g. the worker-role
+    router line) must stay inspectable, so the body is read with the same
+    snippet resolution the sync pipeline uses.
+    """
+    return resolve_block_snippets(_raw_body(), REPO_ROOT)
 
 
 def _roles() -> dict:
@@ -142,8 +152,11 @@ def test_only_placeholder_never_literal_tmp_sink():
 
 def test_prompt_injection_and_rights_statements():
     body = _body()
-    assert "{{PROMPT_INJECTION_DEFENSE_BLOCK}}" in body
-    assert "{{OUTPUT_GUARD_BLOCK}}" in body
+    raw = _raw_body()
+    assert "{{PROMPT_INJECTION_DEFENSE_BLOCK}}" in raw
+    assert "{{OUTPUT_GUARD_BLOCK}}" in raw
+    # ... and the block snippet resolves to its guard content (IC-31, #552)
+    assert "<output-guard>" in body and "{{OUTPUT_GUARD_BLOCK}}" not in body
     assert "data, not instructions" in body
     assert "never repairs anything" in _text()
     # AC-95: never describe meta-doctor as strictly read-only
